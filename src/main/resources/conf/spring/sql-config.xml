@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans 
+	xmlns="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:tx="http://www.springframework.org/schema/tx" 
+	xmlns:jee="http://www.springframework.org/schema/jee" 
+	xmlns:aop="http://www.springframework.org/schema/aop" 
+	xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="
+   	http://www.springframework.org/schema/beans 
+   	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+   	http://www.springframework.org/schema/tx 
+   	http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+   	http://www.springframework.org/schema/jee 
+   	http://www.springframework.org/schema/jee/spring-jee-3.0.xsd
+   	http://www.springframework.org/schema/aop 
+   	http://www.springframework.org/schema/aop/spring-aop-3.0.xsd">
+
+	<!-- ################### Datasource Configuration START #################### -->
+	<bean id="db1" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${db1.spring.driver}" />
+		<property name="url" value="${db1.spring.url}" />
+		<property name="username" value="${db1.spring.username}" />
+		<property name="password" value="${db1.spring.password}" />
+	</bean>
+	<bean id="dataSource1" class="org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy">
+	    <property name="targetDataSource">
+	        <ref local="db1" />
+	    </property>
+	</bean>
+	
+	<bean id="db2" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${db2.spring.driver}" />
+		<property name="url" value="${db2.spring.url}" />
+		<property name="username" value="${db2.spring.username}" />
+		<property name="password" value="${db2.spring.password}" />
+	</bean>
+	<bean id="dataSource2" class="org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy">
+	    <property name="targetDataSource">
+	        <ref local="db2" />
+	    </property>
+	</bean>
+	<!-- ################### Datasource Configuration END ###################### -->
+	
+	<!-- ################### SqlMap Configuration START ###################### -->
+	<bean id="sqlSessionFactory1" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="dataSource" ref="dataSource1" /> 
+		<property name="mapperLocations" value="classpath:**/*Dao.xml" /> 
+	</bean>
+	<bean id="sqlSession1" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory1"/>
+	</bean>
+
+	<bean id="sqlSessionFactory2" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="dataSource" ref="dataSource2" /> 
+		<property name="mapperLocations" value="classpath:**/*Dao.xml" /> 
+	</bean>
+	<bean id="sqlSession2" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory2"/>
+	</bean>
+	<!-- ################### SqlMap Configuration END ###################### -->
+
+	<!-- ################### Transaction Configuration START ################### -->
+	<bean id="txManager1" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource1" />
+	</bean>
+	<tx:advice id="txAdvice1" transaction-manager="txManager1">
+		<tx:attributes>
+			<tx:method name="get*" read-only="true" />
+			<tx:method name="list*" read-only="true" />
+			<tx:method name="insert*" propagation="REQUIRED" rollback-for="Exception" />
+			<tx:method name="update*" propagation="REQUIRED" rollback-for="Exception" />
+			<tx:method name="delete*" propagation="REQUIRED" rollback-for="Exception" />
+		</tx:attributes>
+	</tx:advice>
+	
+	<bean id="txManager2" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource2" />
+	</bean>
+	<tx:advice id="txAdvice2" transaction-manager="txManager2">
+		<tx:attributes>
+			<tx:method name="get*" read-only="true" />
+			<tx:method name="list*" read-only="true" />
+			<tx:method name="insert*" propagation="REQUIRED" rollback-for="Exception" />
+			<tx:method name="update*" propagation="REQUIRED" rollback-for="Exception" />
+			<tx:method name="delete*" propagation="REQUIRED" rollback-for="Exception" />
+		</tx:attributes>
+	</tx:advice>	
+	
+	<aop:config proxy-target-class="true">
+		<aop:pointcut id="txAdvisePointCut" expression="execution(public * net.dstone.*..*Service.*(..))" />
+		<aop:advisor id="transactionAdvisor1" pointcut-ref="txAdvisePointCut" advice-ref="txAdvice1" />
+		<aop:advisor id="transactionAdvisor2" pointcut-ref="txAdvisePointCut" advice-ref="txAdvice2" />
+	</aop:config>
+	<!-- ################### Transaction Configuration END ##################### -->
+
+</beans>
+

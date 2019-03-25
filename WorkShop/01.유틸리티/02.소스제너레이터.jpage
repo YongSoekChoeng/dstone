@@ -1,0 +1,493 @@
+
+	/**********************************<< 자주사용하는 SETTING 시작 >>***********************************/
+	/* <트랜젝션종류 	- 0:다건조회, 1:단건조회, 2:입력, 3:수정, 4:삭제  >-----------------------------------*/
+	int			CRUD 							= 0;
+	/* <페이징여부   	- CRUD가 0일 경우에만 유효. 나머지는 무시.>--------------------------------------------*/
+	boolean 	PAGE_YN 						= true;	
+	/* <테이블명	 	- CRUD가 2:입력, 3:수정, 4:삭제 일 경우에만  유효. 나머지는 무시.>--------------------------*/
+	String 		TABLE_NAME 						= "SAMPLE_DEPT";
+
+	/* <클래스영문명>----------------------------------------------------------------------------*/
+	String 		CLASS_NAME 						= "Dept";
+	/* <클래스한글명 >----------------------------------------------------------------------------*/
+	String 		CLASS_COMMENT 					= "그룹";
+
+	/* <기능(메소드)영문명 - 접두어(list/get/insert/update/delete)를 제외한 영문명. CRUD에 따라 접두어 자동생성.>-*/
+	String 		FUNC_NAME 						= "SampleDept";
+	/* <기능(메소드)한글명. 기능(메소드)에 대한 한글명. >---------------------------------------------------*/
+	String 		FUNC_COMMENT 					= "샘플그룹정보";
+	
+	/* <소스생성종류.  	- 0:소스덤프, 1:소스생성, 2:테스트소스덤프>---------------------------------------*/
+	int 		GEN_KIND						= 1;
+	/* <소스생성레벨 - 1번째:VO, 2번째:SQL, 3번째:DAO, 4번째:SVC, 5번째:CTRL. Y/N에 따라 해당레벨의 소스생성.>---*/
+	String 		GEN_LEVEL 						= "YYYYY";
+	/***********************************<< 자주사용하는 SETTING 끝 >>************************************/
+	
+	
+	/***********************************<< 가끔바꾸는 SETTING 시작 >>************************************/
+	/* ==============================================================================================
+	<ROOT 패키지>
+	=============================================================================================== */	
+	String 		ROOT_PACKAGE_NAME 				= "net.dstone.sample";
+	/* ==============================================================================================
+	<모듈명>
+	=============================================================================================== */	
+	String 		MODULE_NAME 					= "dept";
+	/* ==============================================================================================
+	<DBID>프레임웍에 설정된 DB 아이디(사용자홈/SYSTEMINFO.properties 에 등록된 타겟 DBID)
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.DBID 			= "DBID_2";
+	/* ==============================================================================================
+	<SqlSessionTemplate>DBID와 맵핑되는 /WebContent/WEB-INF/classes/conf/spring/sql-config.xml에 등록된 SqlSessionTemplate의 ID
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.SQL_CLIENT_ID = "sqlSession2";
+	/* ==============================================================================================
+	클라이언트종류. - 1:JSP, 2:JSON, 3:RestFULL웹서비스(JSON통신방식), 4:RestFULL웹서비스(XML통신방식) 
+	=============================================================================================== */
+	int	 		CLIENT_KIND						= 1;
+	/* ==============================================================================================
+	파일을 생성할지 여부. true:소스 생성. false:소스 덤프(소스생성하지 않음.)
+	=============================================================================================== */
+	boolean 	FILE_GEN_YN 					= false;	
+	/* ==============================================================================================
+	테스트소스 생성여부. (true:테스트 소스 덤프. false:일반 소스 생성.)
+	=============================================================================================== */
+	boolean		IS_TEST_SRC_GEN					= true;
+	
+	/* ==============================================================================================
+	<모듈패키지>
+	=============================================================================================== */	
+	String 		PACKAGE_NAME 		= ROOT_PACKAGE_NAME + "." + MODULE_NAME.toLowerCase();
+	/* ==============================================================================================
+	<CUD담당 DAO의 패키지명>CUD(입력/수정/삭제)용 공통VO,공통SQL,공통DAO 이 위치할 패키지명. 전체테이블에 대한 CUD는 공통VO,공통SQL,공통DAO에 구현해놓고 개별 비즈니스는 공통DAO를 상속하여 해당기능을 이용한다.
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.COMM_CUD_PACKAGE_NAME	= PACKAGE_NAME + ".cud";
+	/* ==============================================================================================
+	<CUD(입력/수정/삭제)용 DAO명(공통DAO명)>
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.COMM_CUD_DAO_NAME 	= MODULE_NAME.substring(0, 1).toUpperCase() + MODULE_NAME.substring(1).toLowerCase() + "CudDao";
+	/************************************<< 가끔바꾸는 SETTING 끝 >>************************************/
+	
+	// 0:소스덤프
+	if(GEN_KIND == 0){
+		FILE_GEN_YN 		= false;
+		IS_TEST_SRC_GEN		= false;	
+	// 1:소스생성
+	}else if(GEN_KIND == 1){
+		FILE_GEN_YN 		= true;
+		IS_TEST_SRC_GEN		= false;
+	// 2:테스트소스 덤프		
+	}else if(GEN_KIND == 2){
+		FILE_GEN_YN 		= false;
+		IS_TEST_SRC_GEN		= true;
+	}
+	String 		METHOD_NAME 		= "";
+	String 		METHOD_COMMENT 		= "";
+	/* METHOD_NAME은 conf/spring/sql-config.xml 의 txAdvice에 기록된 tx:method명에 맞게 작성되어야 함. 	     */
+	FUNC_NAME						= FUNC_NAME.substring(0, 1).toUpperCase() + FUNC_NAME.substring(1);
+	if(CRUD == 0){
+		METHOD_NAME 				= "list"+FUNC_NAME;
+		METHOD_COMMENT				= FUNC_COMMENT + " 리스트조회";
+	}else if(CRUD == 1){
+		METHOD_NAME 				= "get"+FUNC_NAME;
+		METHOD_COMMENT 				= FUNC_COMMENT + " 상세조회";
+	}else if(CRUD == 2){
+		METHOD_NAME 				= "insert"+FUNC_NAME;
+		METHOD_COMMENT 				= FUNC_COMMENT + " 입력";
+	}else if(CRUD == 3){
+		METHOD_NAME 				= "update"+FUNC_NAME;
+		METHOD_COMMENT 				= FUNC_COMMENT + " 수정";
+	}else if(CRUD == 4){
+		METHOD_NAME 				= "delete"+FUNC_NAME;
+		METHOD_COMMENT 				= FUNC_COMMENT + " 삭제";
+	}
+
+	/* ==============================================================================================
+	<CTRL 프리픽스>
+	CTRL의 @RequestMapping(value="")에 들어갈 값. 
+	클라이언트종류가 1:JSP, 2:JSON 일 경우에만 적용.
+	=============================================================================================== */	
+	String 	CTRL_PREFIX 	= "/" + CLASS_NAME.toLowerCase();
+	/* ==============================================================================================
+	<CTRL URI>
+	메소드의 @RequestMapping(value = "")에 들어갈 값. 결국 CTRL_PREFIX+CTRL_URI 해당 메소드를 호출하게 된다.
+	클라이언트종류가 1:JSP, 2:JSON 일 경우에만 적용.
+	=============================================================================================== */	
+	String 	CTRL_URI 		= "/" + METHOD_NAME + ".do";
+	/* ==============================================================================================
+	<CTRL 리턴JSP>
+	ModelAndView.setViewName( JSP_ROOT_PATH + CTRL_PREFIX + "/" + CTRL_RETURN_JSP )에 들어갈 값. 결국 CTRL_PREFIX/CTRL_RETURN_JSP 로 포워드 된다.
+	클라이언트종류가 1:JSP 일 경우에만 적용
+	=============================================================================================== */	
+	String 	CTRL_RETURN_JSP	= METHOD_NAME;
+	
+	String 	DATA_SOURCE_ID = net.dstone.common.tools.BizGenerator.SQL_CLIENT_ID;
+	// 일반 소스 생성
+	if(!IS_TEST_SRC_GEN){
+
+		String strWsVoPackageName 	= "";
+		String strWsVoName 			= "";
+		String strVoPackageName 	= "";
+		String strVoName 			= "";
+		String cudVoPackageName 	= "";
+		String cudVoName 			= "";
+		String strDaoPackageName 	= "";
+		String strDaoName 			= "";
+		String strMethodName 		= "";
+		String strMethodComment 	= "";
+		boolean listYn 				= false;
+		String strSvcPackageName 	= "";
+		String strSvcName 			= "";
+		String strCtrlPackageName	= "";
+		String strCtrlName			= "";
+		String strMethodKind 		= "";
+		String strMediaType 			= "";
+		
+		System.out.println("============================ START ============================");
+		try{
+			// 트랜젝션종류 - 0:다건조회, 1:단건조회
+			if(CRUD == 0 || CRUD == 1){
+				/* 1. VO 생성 */
+				strVoPackageName 	= PACKAGE_NAME + ".vo";
+				strVoName 			= FUNC_NAME + "Vo";
+				if(GEN_LEVEL.substring(0, 1).equals("Y")){
+					net.dstone.common.tools.BizGenerator.genVoBySql(
+						strVoPackageName
+						, strVoName
+						, (CRUD == 0 ? PAGE_YN : false)
+						, FILE_GEN_YN
+					);
+				}
+				/* 2. SQL 생성 */
+				strDaoPackageName = PACKAGE_NAME;
+				strDaoName = CLASS_NAME + "Dao";
+				strMethodName = METHOD_NAME;
+				strMethodComment = METHOD_COMMENT;
+				if(GEN_LEVEL.substring(1, 2).equals("Y")){
+					net.dstone.common.tools.BizGenerator.genSqlBySql( 
+						strDaoPackageName
+						, strDaoName
+						, strMethodName
+						, strMethodComment
+						, strVoPackageName
+						, strVoName
+						, (CRUD == 0 ? PAGE_YN : false)
+						, FILE_GEN_YN
+					);
+				}
+				/* 3. DAO 생성 */
+				listYn = (CRUD == 0 ? true : false);
+				if(GEN_LEVEL.substring(2, 3).equals("Y")){
+					net.dstone.common.tools.BizGenerator.genDaoBySql( 
+						strDaoPackageName
+						, strDaoName
+						, strMethodName
+						, strMethodComment
+						, strVoPackageName
+						, strVoName
+						, listYn
+						, (CRUD == 0 ? PAGE_YN : false)
+						, FILE_GEN_YN
+					);
+				}
+
+				/* 4. Service 생성 */
+				strSvcPackageName = PACKAGE_NAME;
+				strSvcName = CLASS_NAME + "Service";
+				if(GEN_LEVEL.substring(3, 4).equals("Y")){
+					net.dstone.common.tools.BizGenerator.genSvc( 
+						strSvcPackageName
+						, strSvcName 
+						, strDaoPackageName
+						, strDaoName
+						, strMethodName
+						, strMethodComment
+						, strVoPackageName
+						, strVoName
+						, CRUD
+						, null
+						, PAGE_YN
+						, FILE_GEN_YN
+					);
+				}
+				/* 5. Client 생성 */
+				strCtrlPackageName = PACKAGE_NAME;
+				strCtrlName = CLASS_NAME + "Controller";
+				if(GEN_LEVEL.substring(4, 5).equals("Y")){
+					// 1:JSP
+					if(CLIENT_KIND == 1){
+						net.dstone.common.tools.BizGenerator.genCtrlForJsp(
+							strCtrlPackageName
+							, strCtrlName
+							, strSvcPackageName
+							, strSvcName
+							, strMethodName
+							, strMethodComment
+							, strVoPackageName
+							, strVoName
+							, CRUD
+							, TABLE_NAME
+							, CTRL_PREFIX
+							, CTRL_URI
+							, CTRL_RETURN_JSP
+							, PAGE_YN
+							, FILE_GEN_YN
+						);
+					// 2:JSON
+					}else if(CLIENT_KIND == 2){
+						net.dstone.common.tools.BizGenerator.genCtrlForJson( 
+							strCtrlPackageName
+							, strCtrlName
+							, strSvcPackageName
+							, strSvcName
+							, strMethodName
+							, strMethodComment
+							, strVoPackageName
+							, strVoName
+							, CRUD
+							, TABLE_NAME
+							, CTRL_PREFIX
+							, CTRL_URI
+							, PAGE_YN
+							, FILE_GEN_YN
+						);
+					// 3:RestFULL웹서비스(JSON통신방식), 4:RestFULL웹서비스(XML통신방식)	
+					}else if(CLIENT_KIND == 3||CLIENT_KIND == 4){
+						strCtrlPackageName 	= PACKAGE_NAME + ".ws";
+						strCtrlName 		= CLASS_NAME + "Webservice";
+						strWsVoPackageName 	= strCtrlPackageName;
+						strWsVoName 		= CLASS_NAME + "WebserviceVo";
+							
+						// 0:다건조회, 1:단건조회, 2:입력, 3:수정, 4:삭제
+						if(CRUD == 0 || CRUD == 1){
+							strMethodKind = "PUT";
+						}else if(CRUD == 2){
+							strMethodKind = "POST";
+						}else if(CRUD == 3){
+							strMethodKind = "PUT";
+						}else if(CRUD == 4){
+							strMethodKind = "PUT";
+						}
+						strMediaType = "";
+						if(CLIENT_KIND == 3){
+							strMediaType = "JSON";
+						}else if(CLIENT_KIND == 4){
+							strMediaType = "XML";
+						}
+						net.dstone.common.tools.BizGenerator.genWsForRestFul( 
+							strCtrlPackageName
+							, strCtrlName
+							, strSvcPackageName
+							, strSvcName
+							, "/"+CLASS_NAME
+							, strMethodKind
+							, strMethodName
+							, strMethodComment
+							, strWsVoPackageName
+							, strWsVoName
+							, strVoPackageName
+							, strVoName
+							, CRUD
+							, null
+							, strMediaType
+							, PAGE_YN
+							, FILE_GEN_YN
+						);
+					}
+				}
+			// 트랜젝션종류 - 2:입력, 3:수정, 4:삭제
+			} else {
+				if(net.dstone.common.utils.StringUtil.isEmpty(TABLE_NAME)){
+					throw new Exception("테이블명이 없습니다.");
+				}
+				/* 4. Service 생성 */
+				strSvcPackageName 	= PACKAGE_NAME;
+				strSvcName 			= CLASS_NAME + "Service";
+				strDaoPackageName 	= PACKAGE_NAME;
+				strDaoName 			= CLASS_NAME + "Dao";
+				strMethodName 		= METHOD_NAME;
+				strMethodComment 	= METHOD_COMMENT;
+				strVoPackageName 	= PACKAGE_NAME + ".vo";
+				strVoName 			= FUNC_NAME + "Vo";
+				if(GEN_LEVEL.substring(3, 4).equals("Y")){
+					net.dstone.common.tools.BizGenerator.genSvc( 
+						strSvcPackageName
+						, strSvcName 
+						, strDaoPackageName
+						, strDaoName
+						, strMethodName
+						, strMethodComment
+						, strVoPackageName
+						, strVoName
+						, CRUD
+						, TABLE_NAME
+						, false
+						, FILE_GEN_YN
+					);
+				}
+				/* 5. Client 생성 */
+				strCtrlPackageName = PACKAGE_NAME;
+				strCtrlName = CLASS_NAME + "Controller";
+				if(GEN_LEVEL.substring(4, 5).equals("Y")){
+					// 1:JSP
+					if(CLIENT_KIND == 1){
+						net.dstone.common.tools.BizGenerator.genCtrlForJsp(
+							strCtrlPackageName
+							, strCtrlName
+							, strSvcPackageName
+							, strSvcName
+							, strMethodName
+							, strMethodComment
+							, strVoPackageName
+							, strVoName
+							, CRUD
+							, TABLE_NAME
+							, CTRL_PREFIX
+							, CTRL_URI
+							, CTRL_RETURN_JSP
+							, PAGE_YN
+							, FILE_GEN_YN
+						);
+					// 2:JSON	
+					}else if(CLIENT_KIND == 2){
+						net.dstone.common.tools.BizGenerator.genCtrlForJson( 
+							strCtrlPackageName
+							, strCtrlName
+							, strSvcPackageName
+							, strSvcName
+							, strMethodName
+							, strMethodComment
+							, strVoPackageName
+							, strVoName
+							, CRUD
+							, TABLE_NAME
+							, CTRL_PREFIX
+							, CTRL_URI
+							, PAGE_YN
+							, FILE_GEN_YN
+						);
+					//3:RestFULL웹서비스(JSON통신방식), 4:RestFULL웹서비스(XML통신방식)	
+					}else if(CLIENT_KIND == 3||CLIENT_KIND == 4){
+						strCtrlPackageName 	= PACKAGE_NAME + ".ws";
+						strCtrlName 		= CLASS_NAME + "Webservice";
+						strWsVoPackageName 	= strCtrlPackageName;
+						strWsVoName 		= CLASS_NAME + "WebserviceVo";
+						
+						strVoPackageName 	= net.dstone.common.tools.BizGenerator.COMM_CUD_PACKAGE_NAME + ".vo";
+						strVoName 			= net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, " ").trim() + "CudVo";
+						
+						// 0:다건조회, 1:단건조회, 2:입력, 3:수정, 4:삭제
+						if(CRUD == 0 || CRUD == 1){
+							strMethodKind = "PUT";
+						}else if(CRUD == 2){
+							strMethodKind = "POST";
+						}else if(CRUD == 3){
+							strMethodKind = "PUT";
+						}else if(CRUD == 4){
+							strMethodKind = "PUT";
+						}
+						strMediaType = "";
+						if(CLIENT_KIND == 3){
+							strMediaType = "JSON";
+						}else if(CLIENT_KIND == 4){
+							strMediaType = "XML";
+						}
+						
+						net.dstone.common.tools.BizGenerator.genWsForRestFul( 
+							strCtrlPackageName
+							, strCtrlName
+							, strSvcPackageName
+							, strSvcName
+							, "/"+CLASS_NAME
+							, strMethodKind
+							, strMethodName
+							, strMethodComment
+							, strWsVoPackageName
+							, strWsVoName
+							, strVoPackageName
+							, strVoName
+							, CRUD
+							, TABLE_NAME
+							, strMediaType
+							, PAGE_YN
+							, FILE_GEN_YN
+						);
+					}
+					
+				}
+			}
+			
+		}catch(Exception e){
+			System.out.println(e);
+		}
+		System.out.println("============================ END ============================");
+		
+	// 테스트 소스 생성	
+	}else{
+		
+		String strWSPath 		= "";
+		String strMethodKind 	= "";
+		String strMethodName 	= "";
+		String strWsVoPackageName = "";
+		String strWsVoName 		= "";
+		String strVoPackageName = "";
+		String strVoName 		= "";
+		String strMediaType 	= "";
+
+		System.out.println("\r\n\r\n============================ TEST SRC START ============================");
+		
+		try{
+
+			// 트랜젝션종류 - 2:입력, 3:수정, 4:삭제
+			if(CRUD == 2 || CRUD == 3 || CRUD == 4){
+				if(net.dstone.common.utils.StringUtil.isEmpty(TABLE_NAME)){
+					throw new Exception("테이블명이 없습니다.");
+				}
+			}
+			strWSPath 			= "/"+CLASS_NAME;
+			// 트랜젝션종류 - 0:다건조회, 1:단건조회, 2:입력, 3:수정, 4:삭제
+			if(CRUD == 0 || CRUD == 1){
+				strMethodKind = "PUT";
+			}else if(CRUD == 2){
+				strMethodKind = "POST";
+			}else if(CRUD == 3){
+				strMethodKind = "PUT";
+			}else if(CRUD == 4){
+				strMethodKind = "PUT";
+			}
+			strMethodName 		= METHOD_NAME;
+
+			strWsVoPackageName 	= PACKAGE_NAME + ".ws";
+			strWsVoName 		= CLASS_NAME + "WebserviceVo";
+
+			strVoPackageName 	= PACKAGE_NAME + ".vo";
+			strVoName 			= FUNC_NAME + "Vo";
+
+			// 클라이언트종류. - 1:JSP
+			if(CLIENT_KIND == 1){
+				System.out.println("<<< "+ net.dstone.common.tools.BizGenerator.JSP_ROOT_PATH + CTRL_PREFIX + "/" + CTRL_RETURN_JSP +".jsp >>>");
+				net.dstone.common.tools.BizGenerator.genTestSrcForJsp(CRUD, TABLE_NAME, CTRL_PREFIX, CTRL_URI, strVoPackageName, strVoName, PAGE_YN);
+			// 클라이언트종류. - 2:JSON
+			}else if(CLIENT_KIND == 2){
+				System.out.println("<<< "+ net.dstone.common.tools.BizGenerator.JSP_ROOT_PATH + CTRL_PREFIX + "/" + CTRL_RETURN_JSP +".jsp >>>");
+				net.dstone.common.tools.BizGenerator.genTestSrcForJson(CRUD, TABLE_NAME, CTRL_PREFIX, CTRL_URI, strVoPackageName, strVoName, PAGE_YN);
+			// 클라이언트종류. - 3:RestFULL웹서비스(JSON통신방식)
+			}else if(CLIENT_KIND == 3){
+				strMediaType = "JSON";
+				net.dstone.common.tools.BizGenerator.genTestSrcForWsJquery(strWSPath, strMethodKind, strMethodName, strWsVoPackageName, strWsVoName, CRUD , strMediaType);
+				net.dstone.common.tools.BizGenerator.genTestSrcForWsJava(strWSPath, strMethodKind, strMethodName, strWsVoPackageName, strWsVoName, CRUD , strMediaType);
+			// 클라이언트종류. - 4:RestFULL웹서비스(XML통신방식)
+			}else if(CLIENT_KIND == 4){
+				strMediaType = "XML";
+				net.dstone.common.tools.BizGenerator.genTestSrcForWsJquery(strWSPath, strMethodKind, strMethodName, strWsVoPackageName, strWsVoName, CRUD , strMediaType);
+				net.dstone.common.tools.BizGenerator.genTestSrcForWsJava(strWSPath, strMethodKind, strMethodName, strWsVoPackageName, strWsVoName, CRUD , strMediaType);
+			}
+
+		}catch(Exception e){
+			System.out.println(e);
+		}
+		
+		System.out.println("============================ TEST SRC END ============================");
+	
+	}
+

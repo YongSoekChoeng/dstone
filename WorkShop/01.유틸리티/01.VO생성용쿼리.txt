@@ -1,0 +1,5 @@
+        SELECT                                                            
+            *
+        FROM                                                                          
+            SAMPLE_DEPT                                                                     
+        WHERE 1=1 

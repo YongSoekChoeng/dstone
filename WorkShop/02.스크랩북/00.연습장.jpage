@@ -1,0 +1,5 @@
+boolean isMember = false;String PACKAGE_NAME = "net.dstone.sample.biz.bbs";String daoName = "BbsDao";String SQL_CLIENT_ID = "sqlMapClientTemplate2";
+try {	System.out.println( "start !!!" );		isMember = net.dstone.common.utils.BeanUtil.isBeanMemberName(PACKAGE_NAME + "." + daoName, SQL_CLIENT_ID);		System.out.println(isMember);		System.out.println( "end !!!" );
+} catch (Exception e) {
+	e.printStackTrace();
+}

@@ -1,0 +1,74 @@
+
+	/*********************************** SETTING 시작 ***********************************/
+
+	/* ==============================================================================================
+	<ROOT 패키지>
+	=============================================================================================== */	
+	String 		ROOT_PACKAGE_NAME 				= "net.dstone.sample";
+	/* ==============================================================================================
+	<모듈명>
+	=============================================================================================== */	
+	String 		MODULE_NAME 					= "member";
+	/* ==============================================================================================
+	<DBID>프레임웍에 설정된 DB 아이디(사용자홈/SYSTEMINFO.properties 에 등록된 타겟 DBID)
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.DBID 			= "DBID_1";
+	/* ==============================================================================================
+	<SqlSessionTemplate>DBID와 맵핑되는 /WebContent/WEB-INF/classes/conf/spring/sql-config.xml에 등록된 SqlSessionTemplate 의 ID
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.SQL_CLIENT_ID = "sqlSession1";
+	
+	/* ==============================================================================================
+	일괄로 소스를 생성할 테이블ID, 테이블명
+	=============================================================================================== */	
+	java.util.Properties tables = new java.util.Properties();
+	tables.setProperty("SAMPLE_MEMBER", "샘플맴버");	
+	tables.setProperty("SAMPLE_GROUP", "샘플그룹");
+	//tables.setProperty("SAMPLE_DEPT", "샘플부서");	
+
+	/* ==============================================================================================
+	<모듈패키지>
+	=============================================================================================== */	
+	String 		PACKAGE_NAME 		= ROOT_PACKAGE_NAME + "." + MODULE_NAME.toLowerCase();
+	/* ==============================================================================================
+	<CUD담당 DAO의 패키지명>
+	CUD(입력/수정/삭제)용 공통VO,공통SQL,공통DAO 이 위치할 패키지명. 전체테이블에 대한 CUD는 공통VO,공통SQL,공통DAO에 구현해놓고 개별 비즈니스는 공통DAO를 상속하여 해당기능을 이용한다.
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.COMM_CUD_PACKAGE_NAME	= PACKAGE_NAME + ".cud";
+	/* ==============================================================================================
+	<CUD(입력/수정/삭제)용 DAO명(공통DAO명)>
+	=============================================================================================== */	
+	net.dstone.common.tools.BizGenerator.COMM_CUD_DAO_NAME 	= MODULE_NAME.substring(0, 1).toUpperCase() + MODULE_NAME.substring(1).toLowerCase() + "CudDao";
+
+	/*********************************** SETTING 끝 ***********************************/
+
+
+	System.out.println("============================ START ============================");
+	String tableName = "";
+	String entityName = "";
+	try{
+		// 기존파일 삭제
+		net.dstone.common.utils.FileUtil.deleteDir(net.dstone.common.tools.BizGenerator.SRC_ROOT +"/"+ net.dstone.common.utils.StringUtil.replace(net.dstone.common.tools.BizGenerator.COMM_CUD_PACKAGE_NAME, ".", "/"));
+		
+		java.util.Enumeration en = tables.keys();
+		while(en.hasMoreElements()){
+			try {
+				tableName = (String)en.nextElement();
+				entityName = tables.getProperty(tableName);
+				// 1. VO 제너레이팅
+				net.dstone.common.tools.BizGenerator.genVoForCud(tableName, entityName, true);
+				// 2. SQL 제너레이팅
+				net.dstone.common.tools.BizGenerator.genSqlForCud(tableName, entityName, true, true);
+				// 3. DAO 제너레이팅
+				net.dstone.common.tools.BizGenerator.genDaoForCud(tableName, entityName, true, true);
+			} catch (Exception e) {
+				System.out.println("CUD일괄제너레이터 - 테이블["+tableName+"]작업중 예외발생.");
+				e.printStackTrace();
+			}
+		}
+	
+	}catch(Throwable e){
+		e.printStackTrace();
+	}
+	System.out.println("============================ END ============================");
+
