@@ -19,7 +19,7 @@
 	멤버
 	<table border=1>
 		<tr>
-			<td>1. listSampleMember</td><td><a href="/member/listSampleMember.do" >GO</a></td>
+			<td>1. listSampleMember</td><td><a href="/sample/view/member/listSampleMember.jsp" >GO</a></td>
 		</tr>
 		<tr>
 			<td>2. getSampleMember</td><td><a href="/sample/view/member/getSampleMember.jsp" >GO</a></td>
@@ -38,7 +38,7 @@
 	그룹
 	<table border=1>
 		<tr>
-			<td>1. listSampleGroup</td><td><a href="/group/listSampleGroup.do" >GO</a></td>
+			<td>1. listSampleGroup</td><td><a href="/sample/view/group/listSampleGroup.jsp" >GO</a></td>
 		</tr>
 		<tr>
 			<td>2. getSampleGroup</td><td><a href="/sample/view/group/getSampleGroup.jsp" >GO</a></td>
@@ -57,7 +57,7 @@
 	부서
 	<table border=1>
 		<tr>
-			<td>1. listSampleDept</td><td><a href="/dept/listSampleDept.do" >GO</a></td>
+			<td>1. listSampleDept</td><td><a href="/sample/view/dept/listSampleDept.jsp" >GO</a></td>
 		</tr>
 		<tr>
 			<td>2. getSampleDept</td><td><a href="/sample/view/dept/getSampleDept.jsp" >GO</a></td>

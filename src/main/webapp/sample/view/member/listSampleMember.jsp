@@ -4,14 +4,15 @@
 String                                                         RETURN_CD;                                       
 java.util.HashMap                                              returnObj;                                       
 java.util.List<net.dstone.sample.member.vo.SampleMemberVo>                  returnVoList;                       
-net.dstone.sample.member.vo.SampleMemberVo                                  sampleMemberVo;                
+net.dstone.sample.member.vo.SampleMemberVo                                  sampleMemberVo;             
+net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.RequestUtil(request, response);
 net.dstone.common.utils.PageUtil                                      pageUtil;                                        
 /******************************************* 변수 선언 끝 *********************************************/           
                                                                                                                 
 /******************************************* 변수 정의 시작 *******************************************/           
-RETURN_CD           = (String)request.getAttribute("RETURN_CD");                                             
-returnObj           = (java.util.HashMap)request.getAttribute("returnObj");                                   
-sampleMemberVo            = null;                                                                          
+RETURN_CD           = (String)requestUtil.getAttribute("RETURN_CD");                                             
+returnObj           = (java.util.HashMap)requestUtil.getAttribute("returnObj");                                   
+sampleMemberVo      = null;                                                                          
 returnVoList        = null;                                                                          
 pageUtil            = null;                                                                          
 if(returnObj != null){                                                                                          
@@ -34,7 +35,7 @@ if(returnObj != null){
 <body>                                                                                                          
                                                                                                                 
 <!--폼 시작-->                                                                                                   
-<form name="MAIN_FORM" method="post" action="//member/listSampleMember.do">                            
+<form name="MAIN_FORM" method="post" action="<%=requestUtil.getStrContextPath() %>/member/listSampleMember.do">                            
 	<input type=hidden name="PAGE_NUM" value="<%= (pageUtil != null ? pageUtil.intPageNum : 1) %>">           
 	<input type='button' name='' value='LIST' onclick='javascript:goForIt();' >                                 
 	<table border=1>                                                                                              
@@ -57,7 +58,6 @@ if(returnObj != null){
 			<td colspan=16 &nbsp; ><%= (pageUtil != null ? pageUtil.htmlPostPage(request, "MAIN_FORM", "PAGE_NUM" ) : "" ) %></td> 
 		</tr>	                                                                                                  
 	</table>                                                                                                      
-                                                                                                                 
 </form>                                                                                                          
 <!--폼 끝-->                                                                                                      
                                                                                                                  
