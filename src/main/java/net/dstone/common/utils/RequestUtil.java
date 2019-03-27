@@ -1,12 +1,8 @@
 package net.dstone.common.utils;
 
-import org.apache.commons.beanutils.BeanUtils;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.log4j.PropertyConfigurator;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.slf4j.Logger;
 
 public class RequestUtil {
 

@@ -1,10 +1,5 @@
 package net.dstone.common.utils;
 
-import java.util.Enumeration;
-
-import javax.servlet.http.HttpServletRequest;
-
-import org.apache.commons.beanutils.BeanUtils;
 import org.slf4j.Logger;
 
 public class CompileUtil {

@@ -8,11 +8,6 @@ package net.dstone.common.utils;
 
 import java.sql.ResultSet;
 import java.sql.Types;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Properties;
-import java.util.StringTokenizer;
 import java.util.Vector;
 
 /**

@@ -1,7 +1,10 @@
 package net.dstone.common.utils;
 
-import java.io.*;
-import javax.servlet.http.*;
+import java.io.PrintWriter;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 public class WebUtil {
 

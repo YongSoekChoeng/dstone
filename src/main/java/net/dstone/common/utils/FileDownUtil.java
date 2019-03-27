@@ -1,7 +1,10 @@
 package net.dstone.common.utils;
 
-import java.io.*;
-import javax.servlet.http.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * @author db2admin ORIGINAL_FILE_NAME, SAVED_FILE_NAME 을 파라메터로 호출한다.

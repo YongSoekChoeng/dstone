@@ -1,6 +1,6 @@
 package net.dstone.common.queue;
 
-import java.util.*;
+import java.util.Vector;
 
 public class QueueHandler {
 	

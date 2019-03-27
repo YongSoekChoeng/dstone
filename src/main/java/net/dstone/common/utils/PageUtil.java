@@ -1,10 +1,5 @@
 package net.dstone.common.utils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 public class PageUtil {
 
 	public static int DEFAULT_PAGE_SIZE = 10;

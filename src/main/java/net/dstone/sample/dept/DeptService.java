@@ -1,16 +1,14 @@
 package net.dstone.sample.dept; 
  
-import java.util.Map; 
-import java.util.HashMap; 
-import java.util.List; 
- 
-import org.springframework.beans.factory.annotation.Autowired; 
-import org.springframework.stereotype.Service; 
-import org.springframework.transaction.annotation.Transactional; 
- 
-import org.slf4j.Logger; 
-import org.slf4j.LoggerFactory; 
- 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import net.dstone.common.biz.BaseService; 
  
 @Service 

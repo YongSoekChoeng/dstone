@@ -1,11 +1,8 @@
 package net.dstone.common.utils;
 
 import java.io.StringWriter;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -14,14 +11,10 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.beanutils.BeanUtils;
-import org.springframework.web.bind.ServletRequestUtils;
+import org.slf4j.Logger;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import org.springframework.web.servlet.FrameworkServlet;
-import org.apache.commons.lang.StringUtils;
-import org.codehaus.jackson.map.MapperConfig;
-import org.codehaus.jackson.map.PropertyNamingStrategy;
-import org.slf4j.Logger;
 
 public class BeanUtil {
 

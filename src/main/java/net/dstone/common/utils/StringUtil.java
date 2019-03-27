@@ -1,9 +1,7 @@
 package net.dstone.common.utils;
 
-import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.regex.Pattern;
 
 public class StringUtil {
 
