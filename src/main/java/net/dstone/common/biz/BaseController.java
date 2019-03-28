@@ -2,6 +2,8 @@ package net.dstone.common.biz;
 
 import org.apache.commons.beanutils.BeanUtils;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.ModelAndView;
 
 
 
@@ -236,7 +238,11 @@ public abstract class BaseController extends net.dstone.common.spring.mvc.BaseOb
 	 * @param exception
 	 */
 	protected void handleException(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response, Object exception){
-		
+		if( exception != null ) {
+			if( exception instanceof java.lang.Exception ) {
+				((Exception)exception).printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -247,6 +253,34 @@ public abstract class BaseController extends net.dstone.common.spring.mvc.BaseOb
 	 */
 	protected void loginCheck(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response){
 		
+	}
+	
+	/**
+	 * 기본링크 메소드
+	 * @param request
+	 * @param response
+	 * @param exception
+	 */
+    @RequestMapping(value = "/defaultLink.do") 
+	protected ModelAndView defaultLink(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response, ModelAndView mav){
+
+   		/************************ 변수 선언 시작 ************************/
+   		net.dstone.common.utils.RequestUtil 					requestUtil;
+   		/************************ 변수 선언 끝 **************************/
+   		try {
+   			/************************ 변수 정의 시작 ************************/
+   			requestUtil 			= new net.dstone.common.utils.RequestUtil(request, response);
+   			/************************ 변수 정의 끝 ************************/
+   			
+   			/************************ 컨트롤러 로직 시작 ************************/
+   			mav.setViewName(requestUtil.getParameter("defaultLink", ""));
+   			/************************ 컨트롤러 로직 끝 ************************/
+   		
+   		} catch (Exception e) {
+   			e.printStackTrace();
+   			handleException(request, response, e);
+   		}
+   		return mav;
 	}
 	
 }

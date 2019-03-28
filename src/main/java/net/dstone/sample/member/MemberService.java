@@ -9,7 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import net.dstone.common.biz.BaseService; 
+import net.dstone.common.biz.BaseService;
+import net.dstone.common.utils.StringUtil; 
  
 @Service 
 public class MemberService extends BaseService { 
@@ -21,10 +22,16 @@ public class MemberService extends BaseService {
     @Autowired 
     private net.dstone.sample.member.cud.MemberCudDao memberCudDao; 
     /********* 공통 입력/수정/삭제 DAO 정의부분 끝 *********/
+    
     /********* DAO 정의부분 시작 *********/
     @Autowired 
     private net.dstone.sample.member.MemberDao memberDao; 
     /********* DAO 정의부분 끝 *********/
+
+    /********* 샘플그룹 SVC 정의 시작 *********/
+    @Autowired 
+    private net.dstone.sample.member.GroupService groupService;
+    /********* 샘플그룹 SVC 정의 끝 *********/
     
     /** 
      * 샘플멤버정보 리스트조회 
@@ -133,6 +140,23 @@ public class MemberService extends BaseService {
             paramVo.setUSER_ID( paramVo.getUSER_ID()); 
             //DAO 호출부분 구현 
             memberCudDao.insertSampleMember(paramVo);  
+            
+            if( !StringUtil.isEmpty(paramVo.getGROUP_ID()) ) {
+            	net.dstone.sample.member.vo.SampleGroupVo sampleGroupVo = new net.dstone.sample.member.vo.SampleGroupVo();
+            	sampleGroupVo.setGROUP_ID(paramVo.getGROUP_ID());
+            	sampleGroupVo = groupService.getSampleGroup(sampleGroupVo);
+            	if( sampleGroupVo == null || StringUtil.isEmpty(sampleGroupVo.getGROUP_ID())  ) {
+            		net.dstone.sample.member.cud.vo.SampleGroupCudVo sampleGroupCudVo = new net.dstone.sample.member.cud.vo.SampleGroupCudVo();
+            		sampleGroupCudVo.setGROUP_ID(paramVo.getGROUP_ID());
+            		sampleGroupCudVo.setNAME("임시샘플그룹");
+            		sampleGroupCudVo.setINPUT_DT(paramVo.getINPUT_DT());
+            		groupService.insertSampleGroup(sampleGroupCudVo);
+if("ER".equals(paramVo.getGROUP_ID())) {
+	throw new Exception("임의로 예외발생.");
+}
+            	}
+            }
+            
             isSuccess = true; 
             /************************ 비즈니스로직 끝 **************************/  
         } catch (Exception e) { 

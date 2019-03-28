@@ -25,15 +25,11 @@
 	<!-- ################### AspectJ Configuration START ####################### -->
 	<aop:aspectj-autoproxy />
 	<aop:config proxy-target-class="true"></aop:config>
-	<bean id="executionLoggingAspect" class="net.dstone.common.spring.aop.ExecutionLoggingAspect">
-		<property name="loggerName" value="${log4j.logger.executionLogger}"></property>
-	</bean>
-	
 	<!-- ################### AspectJ Configuration END ######################### -->
 
 	<!-- ################### JSP Configuration START ########################### -->
 	<bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
-		<property name="prefix" value="/" />
+		<property name="prefix" value="/WEB-INF/views/" />
 		<property name="suffix" value=".jsp" />
 	</bean>
 	<!-- ################### JSP Configuration END ############################# -->
