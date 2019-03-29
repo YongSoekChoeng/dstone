@@ -125,8 +125,11 @@ public class GroupService extends BaseService {
             /************************ 변수 정의 시작 ************************/  
             newKeyVo = new net.dstone.sample.member.cud.vo.SampleGroupCudVo();
             /************************ 변수 정의 끝 **************************/  
-             
+            
             /************************ 비즈니스로직 시작 ************************/  
+            if("ER".equals(paramVo.getGROUP_ID())) {
+            	throw new Exception("임의로 예외발생.");
+            }
             //NEW KEY 생성 부분 구현 
             //paramVo.setGROUP_ID( memberCudDao.selectSampleGroupNewKey(newKeyVo).getGROUP_ID() ); 
             paramVo.setGROUP_ID( paramVo.getGROUP_ID() ); 

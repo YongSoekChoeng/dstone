@@ -46,7 +46,7 @@
         FROM                                                                          
             SAMPLE_DEPT                                                                     
         WHERE 1=1 
-
+			AND DEPT_ID = #{DEPT_ID}
     </select>                                                                       
  
 </mapper>                                                                             

@@ -32,6 +32,11 @@ public class MemberService extends BaseService {
     @Autowired 
     private net.dstone.sample.member.GroupService groupService;
     /********* 샘플그룹 SVC 정의 끝 *********/
+
+    /********* 샘플부서 SVC 정의 시작 *********/
+    @Autowired 
+    private net.dstone.sample.dept.DeptService deptService; 
+    /********* 샘플부서 SVC 정의 끝 *********/
     
     /** 
      * 샘플멤버정보 리스트조회 
@@ -151,9 +156,19 @@ public class MemberService extends BaseService {
             		sampleGroupCudVo.setNAME("임시샘플그룹");
             		sampleGroupCudVo.setINPUT_DT(paramVo.getINPUT_DT());
             		groupService.insertSampleGroup(sampleGroupCudVo);
-if("ER".equals(paramVo.getGROUP_ID())) {
-	throw new Exception("임의로 예외발생.");
-}
+            	}
+            }
+            
+            if( !StringUtil.isEmpty(paramVo.getDEPT_ID()) ) {
+            	net.dstone.sample.dept.vo.SampleDeptVo sampleDeptVo = new net.dstone.sample.dept.vo.SampleDeptVo();
+            	sampleDeptVo.setDEPT_ID(paramVo.getDEPT_ID());
+            	sampleDeptVo = deptService.getSampleDept(sampleDeptVo);
+            	if( sampleDeptVo == null || StringUtil.isEmpty(sampleDeptVo.getDEPT_ID())  ) {
+                	net.dstone.sample.dept.cud.vo.SampleDeptCudVo  sampleDeptCudVo = new net.dstone.sample.dept.cud.vo.SampleDeptCudVo();
+                	sampleDeptCudVo.setDEPT_ID(paramVo.getDEPT_ID());
+                	sampleDeptCudVo.setDEPT_NAME("임시샘플부서");
+                	sampleDeptCudVo.setINPUT_DT(paramVo.getINPUT_DT());
+            		deptService.insertSampleDept(sampleDeptCudVo);
             	}
             }
             

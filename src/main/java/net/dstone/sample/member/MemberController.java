@@ -184,7 +184,7 @@ public class MemberController extends net.dstone.common.biz.BaseController {
    			mav.setViewName("/sample/view/member/insertSampleMember");
    			/************************ 컨트롤러 로직 끝 ************************/
    		
-   		} catch (Exception e) {
+   		} catch (Exception e) {	
    			handleException(request, response, e);
    			request.setAttribute("RETURN_CD"	, net.dstone.common.biz.BaseController.RETURN_FAIL );
    			request.setAttribute("RETURN_MSG"	, e.toString() );

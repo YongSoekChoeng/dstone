@@ -27,7 +27,7 @@ public class DeptService extends BaseService {
     /********* DAO 정의부분 끝 *********/
     
     /** 
-     * 샘플그룹정보 리스트조회 
+     * 샘플부서정보 리스트조회 
      * @param paramVo 
      * @return 
      * @throws Exception 
@@ -73,14 +73,14 @@ public class DeptService extends BaseService {
             /************************ 비즈니스로직 끝 **************************/ 
         } catch (Exception e) { 
             logger.error(this.getClass().getName() + ".listSampleDept 수행중 예외발생. 상세사항:" + e.toString()); 
-            throw new Exception( "샘플그룹정보 리스트조회 수행중 예외발생" );
+            throw new Exception( "샘플부서정보 리스트조회 수행중 예외발생" );
         } 
         return returnMap; 
     } 
 
 
     /** 
-     * 샘플그룹정보 상세조회 
+     * 샘플부서정보 상세조회 
      * @param paramVo 
      * @return 
      * @throws Exception 
@@ -103,14 +103,14 @@ public class DeptService extends BaseService {
             /************************ 비즈니스로직 끝 **************************/ 
         } catch (Exception e) { 
             logger.error(this.getClass().getName() + ".getSampleDept 수행중 예외발생. 상세사항:" + e.toString()); 
-            throw new Exception( "샘플그룹정보 상세조회 수행중 예외발생" );
+            throw new Exception( "샘플부서정보 상세조회 수행중 예외발생" );
         } 
         return returnObj; 
     } 
 
 
     /**  
-     * 샘플그룹정보 입력 
+     * 샘플부서정보 입력 
      * @param paramVo  
      * @return boolean 
      * @throws Exception  
@@ -126,7 +126,10 @@ public class DeptService extends BaseService {
             newKeyVo = new net.dstone.sample.dept.cud.vo.SampleDeptCudVo();
             /************************ 변수 정의 끝 **************************/  
              
-            /************************ 비즈니스로직 시작 ************************/  
+            /************************ 비즈니스로직 시작 ************************/              
+            if("ER".equals(paramVo.getDEPT_ID())) {
+            	throw new Exception("임의로 예외발생.");
+            }
             //NEW KEY 생성 부분 구현 
             //paramVo.setDEPT_ID( deptCudDao.selectSampleDeptNewKey(newKeyVo).getDEPT_ID() ); 
             paramVo.setDEPT_ID( paramVo.getDEPT_ID() ); 
@@ -136,14 +139,14 @@ public class DeptService extends BaseService {
             /************************ 비즈니스로직 끝 **************************/  
         } catch (Exception e) { 
             logger.error(this.getClass().getName() + ".insertSampleDept("+paramVo+") 수행중 예외발생. 상세사항:" + e.toString());  
-            throw new Exception( "샘플그룹정보 입력 수행중 예외발생" ); 
+            throw new Exception( "샘플부서정보 입력 수행중 예외발생" ); 
         }  
         return isSuccess;  
     } 
 
 
     /**  
-     * 샘플그룹정보 수정 
+     * 샘플부서정보 수정 
      * @param paramVo  
      * @return boolean 
      * @throws Exception  
@@ -165,14 +168,14 @@ public class DeptService extends BaseService {
             /************************ 비즈니스로직 끝 **************************/  
         } catch (Exception e) { 
             logger.error(this.getClass().getName() + ".updateSampleDept("+paramVo+") 수행중 예외발생. 상세사항:" + e.toString());  
-            throw new Exception( "샘플그룹정보 수정 수행중 예외발생" ); 
+            throw new Exception( "샘플부서정보 수정 수행중 예외발생" ); 
         }  
         return isSuccess;  
     } 
 
 
     /**  
-     * 샘플그룹정보 삭제 
+     * 샘플부서정보 삭제 
      * @param paramVo  
      * @return boolean 
      * @throws Exception  
@@ -194,7 +197,7 @@ public class DeptService extends BaseService {
             /************************ 비즈니스로직 끝 **************************/  
         } catch (Exception e) { 
             logger.error(this.getClass().getName() + ".deleteSampleDept("+paramVo+") 수행중 예외발생. 상세사항:" + e.toString());  
-            throw new Exception( "샘플그룹정보 삭제 수행중 예외발생" ); 
+            throw new Exception( "샘플부서정보 삭제 수행중 예외발생" ); 
         }  
         return isSuccess;  
     } 
