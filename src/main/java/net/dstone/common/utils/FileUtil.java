@@ -1,90 +1,210 @@
 package net.dstone.common.utils;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
+
+import org.slf4j.Logger;
 
 public class FileUtil {
 
+	private static Logger logger = org.slf4j.LoggerFactory.getLogger(FileUtil.class);
+	
 	public static int SEARCH_MODE_AND = 1;
 	public static int SEARCH_MODE_OR = 2;
 
+	public static int SEARCH_CASE_SENSITIVE = 1;
+	public static int SEARCH_CASE_IGNORE = 2;
+
 	public static String readFile(String filePath) {
-		String result = "";
+		return readFile(filePath, null);
+	}
+	public static byte[] readFileByteArray(String filePath) {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		java.io.FileInputStream fi = null;
-		java.io.InputStreamReader ir = null;
-		java.io.BufferedReader buf = null;
 		try {
 			fi = new java.io.FileInputStream(filePath);
-			ir = new java.io.InputStreamReader(fi);
-			buf = new java.io.BufferedReader(ir);
-			String temp = null;
-			while ((temp = buf.readLine()) != null) {
-				result += temp + "\r\n";
+			int len = 0;
+			byte[] buff = new byte[1024];
+			while ((len = fi.read(buff)) != -1 ) {
+				baos.write(buff, 0, len);
 			}
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			e.printStackTrace();
 			return null;
 		} finally {
-			if (buf != null)
-				try {
-					buf.close();
-				} catch (Exception e) {
-				}
-			if (ir != null)
-				try {
-					ir.close();
-				} catch (Exception e) {
-				}
-			if (fi != null)
+			if (fi != null){
 				try {
 					fi.close();
 				} catch (Exception e) {
 				}
+			}
+			if (baos != null) {
+				try {
+					baos.close();
+				} catch (IOException e) {
+				}
+			}
+		}
+		return baos.toByteArray();
+	}
+	public static String readFile(String filePath, String charSet) {
+		
+		String result = "";
+		java.io.FileInputStream fi = null;
+		java.io.InputStreamReader ir = null;
+		java.io.BufferedReader buf = null;
+		int lineNum = 0;
+		try {
+			fi = new java.io.FileInputStream(filePath);
+			if(StringUtil.isEmpty(charSet)){
+				ir = new java.io.InputStreamReader(fi);
+			}else{
+				ir = new java.io.InputStreamReader(fi, charSet);
+			}
+			buf = new java.io.BufferedReader(ir);
+			String temp = null;
+			while ((temp = buf.readLine()) != null) {
+				result += temp + "\r\n";
+				lineNum++;
+			}
+			// 1라인일 경우 쓸데없이 붙은 개행문자를 지워준다.
+			if(lineNum == 1){
+				result = result.substring(0, result.length()-2);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		} finally {
+			if (buf != null){
+				try {
+					buf.close();
+				} catch (Exception e) {
+				}
+			}
+			if (ir != null){
+				try {
+					ir.close();
+				} catch (Exception e) {
+				}
+			}
+			if (fi != null){
+				try {
+					fi.close();
+				} catch (Exception e) {
+				}
+			}
 		}
 		return result;
 	}
-	public static String readFile(String filePath, String charSet) {
-		String result = "";
+	
+	public static String[] readFileByLines(String filePath) {
+		return readFileByLines(filePath, null);
+	}
+	
+	public static String[] readFileByLines(String filePath, String charSet) {
+		
+		String[] lines = null;
+		String line = null;
+		ArrayList<String> lineArray = new ArrayList<String>();
+		
 		java.io.FileInputStream fi = null;
 		java.io.InputStreamReader ir = null;
 		java.io.BufferedReader buf = null;
 		try {
 			fi = new java.io.FileInputStream(filePath);
-			ir = new java.io.InputStreamReader(fi, charSet);
-			buf = new java.io.BufferedReader(ir);
-			String temp = null;
-			while ((temp = buf.readLine()) != null) {
-				result += temp + "\r\n";
+			if(StringUtil.isEmpty(charSet)){
+				ir = new java.io.InputStreamReader(fi);
+			}else{
+				ir = new java.io.InputStreamReader(fi, charSet);
 			}
+			buf = new java.io.BufferedReader(ir);
+			while ((line = buf.readLine()) != null) {
+				lineArray.add(line);
+			}
+			lines = new String[lineArray.size()];
+			lineArray.toArray(lines);
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			e.printStackTrace();
 			return null;
 		} finally {
-			if (buf != null)
+			if (buf != null){
 				try {
 					buf.close();
 				} catch (Exception e) {
 				}
-			if (ir != null)
+			}
+			if (ir != null){
 				try {
 					ir.close();
 				} catch (Exception e) {
 				}
-			if (fi != null)
+			}
+			if (fi != null){
 				try {
 					fi.close();
 				} catch (Exception e) {
 				}
+			}
+			lineArray.clear();
+			lineArray = null;
+		}
+		return lines;
+	}
+	
+	public static String readFileLikeTail(String filePath, int lines) {
+		String result = "";
+		StringBuffer buff = new StringBuffer();
+
+		File file = null;
+		long fileLen = 0;
+		RandomAccessFile raf = null;
+		int readLines = 0;
+		
+		try {
+			if( isFileExist(filePath) ){
+				file = new File(filePath); 
+				raf = new RandomAccessFile(file, "r");
+				
+				fileLen = file.length()-1;
+				raf.seek(fileLen);
+				for(long pointer = fileLen; pointer >=0; pointer--){
+					raf.seek(pointer);
+					char c;
+					c = (char)raf.read();
+					if( c == '\n' ){
+						readLines++;
+						if(readLines == lines){
+							break;
+						}
+					}
+					buff.append(c);
+				}
+				buff.reverse();
+				result = buff.toString();
+				result = new String(result.getBytes("8859_1")); 
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		} finally {
+			if (raf != null){
+				try {
+					raf.close();
+				} catch (Exception e) {
+				}
+			}
 		}
 		return result;
 	}
 
 	public static void deleteFile(String filePath) {
-		String result = "";
 
 		try {
 			java.io.File f = new java.io.File(filePath);
@@ -92,18 +212,15 @@ public class FileUtil {
 				f.delete();
 			}
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 		}
 	}
 	public static void deleteDir(String filePath) {
+		
 		filePath = StringUtil.replace(filePath, "\\", "/");
-		String result = "";
 		String[] fList = null;
 		String f = null;
 		try {
-
-System.out.println("StringUtil.isFileExist("+ filePath + ") ==============>>>>" + isFileExist(filePath));
-System.out.println("StringUtil.isDirectory"+ filePath + ") ==============>>>>" + isDirectory(filePath));	
 			if ( isFileExist(filePath) ) {
 				if ( isDirectory(filePath) ) {
 					fList = readFileListAll(filePath);
@@ -111,10 +228,8 @@ System.out.println("StringUtil.isDirectory"+ filePath + ") ==============>>>>" +
 						for(int i=0; i<fList.length; i++){
 							f = fList[i];
 							if ( isDirectory(f) ) {
-System.out.println("deleteDir ==============>>>>"+ f);								
 								deleteDir(f);
 							}else{
-System.out.println("deleteDir ==============>>>>"+ f);									
 								deleteFile(f);
 							}
 						}
@@ -123,11 +238,12 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				}
 			}
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 		}
 	}
 
 	public static boolean isFileExist(String filePath) {
+		
 		boolean bExist = false;
 
 		try {
@@ -135,13 +251,42 @@ System.out.println("deleteDir ==============>>>>"+ f);
 			java.io.File f = new java.io.File(filePath);
 			bExist = f.exists();
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 			return false;
 		}
 		return bExist;
 	}
+	
+	
+	public static boolean isFileModified(String srcFile, String tgtFile) {
+		boolean isModified = false;
+		File tf = null;
+		File sf = null;
+		try {
+			tf = new File(tgtFile);
+			sf = new File(srcFile);
+			
+			if( !sf.exists() ||  !tf.exists()  ){
+				isModified = true;
+			}else{
+				if( sf.exists() && tf.exists() ){
+					if( sf.isFile() && tf.isFile() ){
+						if( tf.lastModified() > sf.lastModified() ){
+							isModified = true;
+						}
+					}
+				}
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return isModified;
+	}
 	public static boolean isDirectory(String filePath) {
+		
 		boolean bDirectory = false;
+		
 		try {
 			filePath = StringUtil.replace(filePath, "\\", "/");
 			java.io.File f = new java.io.File(filePath);
@@ -149,13 +294,14 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				bDirectory = f.isDirectory();
 			}
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 			return false;
 		}
 		return bDirectory;
 	}
 
 	public static String[] readFileList(String filePath) {
+		
 		String[] result = null;
 
 		try {
@@ -166,14 +312,43 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				}
 			}
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 			return null;
 		}
 		return result;
 	}
+	
+	public static String[] readDirList(String filePath) {
+		File[] dirs = null;
+		ArrayList<String> list = new ArrayList<String>();
+		String[] result = null;
+
+		try {
+			java.io.File f = new java.io.File(filePath);
+			if (f.exists()) {
+				if (f.isDirectory()) {
+					dirs = f.listFiles();
+					if( dirs != null ){
+						for( int i=0; i<dirs.length; i++ ){
+							if (dirs[i].isDirectory()) {
+								list.add(dirs[i].getName());
+							}
+						}
+					}
+				}
+			}
+			result = (String[])list.toArray(new String[list.size()]);
+		} catch (Exception e) {
+			logger.info(e.toString());
+			return null;
+		}
+		return result;
+	}
+	
 
 
 	public static void writeFile(String strPath, String strFileName, String strContents) {
+		
 		File f = null;
 		FileOutputStream fout = null;
 		BufferedWriter writer = null;
@@ -185,7 +360,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 			writer.write(strContents);
 			writer.flush();
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 		} finally {
 			if (fout != null)
 				try {
@@ -201,6 +376,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 	}
 	
 	public static void writeFile(String strPath, String strFileName, String strContents, String charSet) {
+		
 		File f = null;
 		FileOutputStream fout = null;
 		BufferedWriter writer = null;
@@ -212,7 +388,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 			writer.write(strContents);
 			writer.flush();
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 		} finally {
 			if (fout != null)
 				try {
@@ -226,9 +402,31 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				}
 		}
 	}
+	
+	public static void writeFileByteArray(String strPath, String strFileName, byte[] input) {
+		
+		File f = null;
+		FileOutputStream fout = null;
+		try {
+			makeDir(strPath);
+			f = new File(strPath + System.getProperty("file.separator") + strFileName);
+			fout = new FileOutputStream(f);
+			fout.write(input);
+		} catch (Exception e) {
+			logger.info(e.toString());
+		} finally {
+			if (fout != null){
+				try {
+					fout.close();
+				} catch (Exception e) {
+				}
+			}
+		}
+	}
 
 
 	public static void copyFile(String source, String target) {
+		
 		source = StringUtil.replace(source, "\\", "/");
 		target = StringUtil.replace(target, "\\", "/");
 		File sourceFile = new File(source);
@@ -252,7 +450,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 			}
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.info(e.toString());
 		} finally {
 			try {
 				outputStream.close();
@@ -264,10 +462,36 @@ System.out.println("deleteDir ==============>>>>"+ f);
 			}
 		}
 	}
+	
+
+	public static void moveFile(String source, String target) {
+		source = StringUtil.replace(source, "\\", "/");
+		target = StringUtil.replace(target, "\\", "/");
+
+		java.nio.file.Path sFile;
+		java.nio.file.Path tFile;
+
+		try {
+			String targetPath = target.substring(0, target.lastIndexOf("/"));
+			String sourcePath = target.substring(0, target.lastIndexOf("/"));
+			
+			makeDir(targetPath);
+			makeDir(sourcePath);
+
+			sFile = java.nio.file.Paths.get(source);
+			tFile = java.nio.file.Paths.get(target);
+
+			java.nio.file.Files.move(sFile, tFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+		} catch (Exception e) {
+			logger.info(e.toString());
+		} 
+	}
 
 
 	public static String[] readFileListAll(String filePath) {
-		java.util.Vector listVec = new java.util.Vector();
+
+		java.util.Vector<String> listVec = new java.util.Vector<String>();
 		String[] result = new String[listVec.size()];
 		String subFilePath = "";
 		java.io.File tempFile = null;
@@ -300,7 +524,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				}
 			}
 		} catch (Exception e) {
-			System.out.println("FileUtils.readFileListAll(" + filePath + ") "+ e.toString());
+			logger.info(e.toString());
 			return null;
 		}
 		return result;
@@ -316,12 +540,13 @@ System.out.println("deleteDir ==============>>>>"+ f);
 		fileFullPath = StringUtil.replace(fileFullPath, "\\", "/");
 		if (fileFullPath != null) {
 			if (fileFullPath.indexOf("/") != -1) {
-				fileName = fileFullPath
-						.substring(fileFullPath.lastIndexOf("/") + 1);
-				if (!extInclude) {
-					if (fileName.indexOf(".") != -1) {
-						fileName = fileName.substring(0, fileName.lastIndexOf("."));
-					}
+				fileName = fileFullPath.substring(fileFullPath.lastIndexOf("/") + 1);
+			}else{
+				fileName = fileFullPath;
+			}
+			if (!extInclude) {
+				if (fileName.indexOf(".") != -1) {
+					fileName = fileName.substring(0, fileName.lastIndexOf("."));
 				}
 			}
 		}
@@ -345,8 +570,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 		String fileExt = "";
 		if (fileFullPath != null && !"".equals(fileFullPath)) {
 			if (fileFullPath.indexOf(".") != -1) {
-				fileExt = fileFullPath
-						.substring(fileFullPath.lastIndexOf(".") + 1);
+				fileExt = fileFullPath.substring(fileFullPath.lastIndexOf(".") + 1);
 			}
 		}
 		return fileExt;
@@ -354,13 +578,11 @@ System.out.println("deleteDir ==============>>>>"+ f);
 	
 
 	public static boolean makeDir(String s) {
+		
 		boolean flag = false;
 		s = StringUtil.replace(s, "/", System.getProperty("file.separator"));
-		java.util.StringTokenizer stringtokenizer = new java.util.StringTokenizer(
-				s, System.getProperty("file.separator"));
-		String s1 = "";
+		java.util.StringTokenizer stringtokenizer = new java.util.StringTokenizer(s, System.getProperty("file.separator"));
 		String s3 = "";
-		Object obj = null;
 		try {
 			while (stringtokenizer.hasMoreTokens()) {
 				String s2 = stringtokenizer.nextToken();
@@ -371,22 +593,21 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				}
 			}
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			logger.info(e.toString());
 		}
 		return flag;
 	}
 	
-	public static String[] searchFileList(String filePath, int searchMode, String[] keyword, String[] extFilter, boolean searchSaperatedOnly) {
-		
+	public static String[] searchFileList(String filePath, int searchMode, int searchCase, String[] keyword, String[] extFilter, boolean searchSaperatedOnly) {
+
 		String[] result = new String[0];
-		java.util.Enumeration keyEnum = null;
-		java.util.Vector listVec = new java.util.Vector();
+		java.util.Vector<String> listVec = new java.util.Vector<String>();
 		String[] fileList = null;
 		String file = null;
 		String fileConts = null;
 		
 		String key = null;
-		String[] div = {" ", "\t", "\n", "\r", "(", ")", "{", "}", "[", "]", ".", ",", ";"};
+		String[] div = {" ", "\t", "\n", "\r", "(", ")", "{", "}", "[", "]", ".", ",", ";", "\"", "'", "/"};
 		int keyCount = 0;
 		int keyMatchCount = 0;
 		
@@ -439,9 +660,16 @@ System.out.println("deleteDir ==============>>>>"+ f);
 					}
 					fileConts = readFile(file);
 					//fileConts = StringUtil.replace(fileConts, "\r", "");
+					if( searchCase == SEARCH_CASE_IGNORE){
+						fileConts = fileConts.toUpperCase();
+					}
+					
 					keyMatchCount = 0;
 					for(int k=0; k<keyword.length; k++){
 						key = keyword[k];
+						if( searchCase == SEARCH_CASE_IGNORE ){
+							key = key.toUpperCase();
+						}
 						isMatchKey = false;
 						if(searchSaperatedOnly){
 							for(int l=0; l<div.length; l++){
@@ -449,9 +677,6 @@ System.out.println("deleteDir ==============>>>>"+ f);
 									if(fileConts.indexOf(div[l] + key + div[o]) != -1){
 										isMatchKey = true;
 										keyMatchCount++;
-//if(file.indexOf("BaseController") != -1){
-//		System.out.println("====================>>>keyCount:" +keyCount + ", keyMatchCount:" +keyMatchCount+ ", key["+div[l] + key + div[o]+"], file["+file+"], indexOf["+fileConts.indexOf(div[l] + key + div[o])+"]" );
-//}
 									}
 									if(isMatchKey){break;}
 								}
@@ -477,7 +702,7 @@ System.out.println("deleteDir ==============>>>>"+ f);
 				}
 			}
 		} catch (Exception e) {
-			System.out.println("FileUtils.searchFileList 수행중 예외발생. 상세사항: "+ e.toString());
+			logger.info(e.toString());
 			return null;
 		}
 		result = new String[listVec.size()];
@@ -486,9 +711,5 @@ System.out.println("deleteDir ==============>>>>"+ f);
 		listVec = null;
 		return result;
 	}
-
-
-	
-	
 	
 }

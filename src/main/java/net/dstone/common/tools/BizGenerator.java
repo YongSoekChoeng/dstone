@@ -77,11 +77,12 @@ public class BizGenerator {
 				keySql.append("ORDER BY COLS.TABLE_NAME, COLS.POSITION ").append("\n");
 
 				db.setQuery(keySql.toString());
-				ds = new net.dstone.common.utils.DataSet(db.select());
-				primarykeys = new String[ds.getRowCnt()];
-				if (ds.getRowCnt() > 0) {
-					for (int i = 0; i < ds.getRowCnt(); i++) {
-						primarykeys[i] = ds.getDatum(i, "COLUMN_NAME");
+				ds = new net.dstone.common.utils.DataSet();
+				ds.buildFromResultSet(db.select(), "PK_LIST");
+				primarykeys = new String[ds.getDataSetRowCount("PK_LIST")];
+				if (primarykeys.length > 0) {
+					for (int i = 0; i < primarykeys.length; i++) {
+						primarykeys[i] = ds.getDataSet("PK_LIST", i).getDatum("COLUMN_NAME");
 					}
 				}
 			} else if ("MSSQL".equals(db.currentDbKind)) {
@@ -97,11 +98,11 @@ public class BizGenerator {
 				keySql.append("ORDER BY KU.TABLE_NAME, KU.ORDINAL_POSITION ").append("\n");
 
 				db.setQuery(keySql.toString());
-				ds = new net.dstone.common.utils.DataSet(db.select());
-				primarykeys = new String[ds.getRowCnt()];
-				if (ds.getRowCnt() > 0) {
-					for (int i = 0; i < ds.getRowCnt(); i++) {
-						primarykeys[i] = ds.getDatum(i, "COLUMN_NAME");
+				ds.buildFromResultSet(db.select(), "PK_LIST");
+				primarykeys = new String[ds.getDataSetRowCount("PK_LIST")];
+				if (primarykeys.length > 0) {
+					for (int i = 0; i < primarykeys.length; i++) {
+						primarykeys[i] = ds.getDataSet("PK_LIST", i).getDatum("COLUMN_NAME");
 					}
 				}
 			} else if ("MYSQL".equals(db.currentDbKind)) {
@@ -125,11 +126,11 @@ public class BizGenerator {
 				keySql.append("ORDER BY ORDINAL_POSITION ").append("\n");
 
 				db.setQuery(keySql.toString());
-				ds = new net.dstone.common.utils.DataSet(db.select());
-				primarykeys = new String[ds.getRowCnt()];
-				if (ds.getRowCnt() > 0) {
-					for (int i = 0; i < ds.getRowCnt(); i++) {
-						primarykeys[i] = ds.getDatum(i, "COLUMN_NAME");
+				ds.buildFromResultSet(db.select(), "PK_LIST");
+				primarykeys = new String[ds.getDataSetRowCount("PK_LIST")];
+				if (ds.getDataSetRowCount("PK_LIST") > 0) {
+					for (int i = 0; i < ds.getDataSetRowCount("PK_LIST"); i++) {
+						primarykeys[i] = ds.getDataSet("PK_LIST", i).getDatum("COLUMN_NAME");
 					}
 				}
 			}
@@ -438,22 +439,22 @@ public class BizGenerator {
 					// 1. 컬럼기본정보 조회
 					ds = net.dstone.common.tools.BizGenerator.Util.getCols(TABLE_NAME);
 					if(ds != null){
-						if (ds.getRowCnt() > 0) {
+						if (ds.getDataSetRowCount("COL_LIST") > 0) {
 							tab = new DbInfo().newTabInfo();
 							tab.TABLE_NAME = TABLE_NAME;
 							tab.TABLE_COMMENT = "";
-							for (int i = 0; i < ds.getRowCnt(); i++) {
+							for (int i = 0; i < ds.getDataSetRowCount("COL_LIST"); i++) {
 								col = new DbInfo().newColInfo();
-								col.COLUMN_NAME = ds.getDatum(i, "COLUMN_NAME");
-								col.COLUMN_COMMENT = ds.getDatum(i, "COLUMN_COMMENT");
-								col.DATA_TYPE = ds.getDatum(i, "DATA_TYPE");
-								if(StringUtil.isEmpty(ds.getDatum(i, "DATA_LENGTH"))){
+								col.COLUMN_NAME = ds.getDataSet("COL_LIST", i).getDatum("COLUMN_NAME");
+								col.COLUMN_COMMENT = ds.getDataSet("COL_LIST", i).getDatum("COLUMN_COMMENT");
+								col.DATA_TYPE = ds.getDataSet("COL_LIST", i).getDatum("DATA_TYPE");
+								if(StringUtil.isEmpty(ds.getDataSet("COL_LIST", i).getDatum("DATA_LENGTH"))){
 									col.DATA_LENGTH = 0;
 								}else{
-									col.DATA_LENGTH = ds.getIntDatum(i, "DATA_LENGTH");
+									col.DATA_LENGTH = Integer.parseInt(ds.getDataSet("COL_LIST", i).getDatum("DATA_LENGTH", "0"));
 								}
-								col.COLUMN_NAME = ds.getDatum(i, "COLUMN_NAME");
-								tab.cols.put(ds.getDatum(i, "COLUMN_NAME"), col);
+								col.COLUMN_NAME = ds.getDataSet("COL_LIST", i).getDatum("COLUMN_NAME");
+								tab.cols.put(ds.getDataSet("COL_LIST", i).getDatum("COLUMN_NAME"), col);
 							}
 						}
 					}	
@@ -461,9 +462,9 @@ public class BizGenerator {
 					// 2. 키값 조회
 					ds = net.dstone.common.tools.BizGenerator.Util.getKeys(TABLE_NAME);
 					if(ds != null){
-						if (ds.getRowCnt() > 0) {
-							for (int i = 0; i < ds.getRowCnt(); i++) {
-								col = tab.getCol(ds.getDatum(i, "COLUMN_NAME"));
+						if (ds.getDataSetRowCount("KEY_LIST") > 0) {
+							for (int i = 0; i < ds.getDataSetRowCount("KEY_LIST"); i++) {
+								col = tab.getCol(ds.getDataSet("KEY_LIST", i).getDatum("COLUMN_NAME"));
 								col.IS_KEY = true;
 							}
 						}
@@ -578,7 +579,7 @@ public class BizGenerator {
 			} else {
 				if (strVoName == null || "".equals(strVoName)) {
 					if (TABLE_NAME != null && !"".equals(TABLE_NAME)) {
-						strVoName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, " ").trim() + "CudVo";
+						strVoName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, " ").trim() + "CudVo";
 					}
 				}
 				if (strVoPackageName == null || "".equals(strVoPackageName)) {
@@ -704,7 +705,8 @@ public class BizGenerator {
 					db.getConnection();
 
 					db.setQuery(sql);
-					ds = new net.dstone.common.utils.DataSet(db.select());
+					ds = new net.dstone.common.utils.DataSet();
+					ds.buildFromResultSet(db.select(), "SELECT_RESULT");
 					cols = db.columnNames;
 
 					vo.append("\n");
@@ -886,9 +888,9 @@ public class BizGenerator {
 				e.printStackTrace();
 			}
 
-			tableName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, " ").trim();
-			voName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, " ").trim() + "CudVo";
-			sVoName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, "").trim() + "CudVo";
+			tableName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, " ").trim();
+			voName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, " ").trim() + "CudVo";
+			sVoName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, "").trim() + "CudVo";
 			fileName = tableName + "CudDao.xml";
 			nameSpace = StringUtil.replace((PACKAGE_NAME + "." + strDaoName).toUpperCase(), ".", "_");
 
@@ -1329,9 +1331,9 @@ public class BizGenerator {
 			String daoName = "";
 			String daoFileName = "";
 
-			voName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, " ").trim() + "CudVo";
-			sVoName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, "").trim() + "CudVo";
-			tableName = net.dstone.common.utils.StringUtil.getHungarian(TABLE_NAME, " ").trim();
+			voName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, " ").trim() + "CudVo";
+			sVoName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, "").trim() + "CudVo";
+			tableName = net.dstone.common.utils.StringUtil.getHungarianName(TABLE_NAME, " ").trim();
 
 			daoName = strDaoName;
 			nameSpace = StringUtil.replace((PACKAGE_NAME + "." + strDaoName).toUpperCase(), ".", "_");
@@ -1605,8 +1607,8 @@ public class BizGenerator {
 			if (CRUD == 2 || CRUD == 3 || CRUD == 4) {
 				if (!StringUtil.isEmpty(strTableName)) {
 					tableVoPackageName = COMM_CUD_PACKAGE_NAME + ".vo";
-					tableVoName = net.dstone.common.utils.StringUtil.getHungarian(strTableName, " ").trim() + "CudVo";
-					tableName = net.dstone.common.utils.StringUtil.getHungarian(strTableName, " ").trim();
+					tableVoName = net.dstone.common.utils.StringUtil.getHungarianName(strTableName, " ").trim() + "CudVo";
+					tableName = net.dstone.common.utils.StringUtil.getHungarianName(strTableName, " ").trim();
 				}
 				// KEY값 구해오는 부분.
 
@@ -2017,7 +2019,7 @@ public class BizGenerator {
 			if (CRUD == 2 || CRUD == 3 || CRUD == 4) {
 				if (!StringUtil.isEmpty(strTableName)) {
 					strVoPackageName = COMM_CUD_PACKAGE_NAME + ".vo";
-					strVoName = net.dstone.common.utils.StringUtil.getHungarian(strTableName, " ").trim() + "CudVo";
+					strVoName = net.dstone.common.utils.StringUtil.getHungarianName(strTableName, " ").trim() + "CudVo";
 				}
 			}
 
@@ -2294,7 +2296,7 @@ public class BizGenerator {
 			if (CRUD == 2 || CRUD == 3 || CRUD == 4) {
 				if (!StringUtil.isEmpty(strTableName)) {
 					strVoPackageName = COMM_CUD_PACKAGE_NAME + ".vo";
-					strVoName = net.dstone.common.utils.StringUtil.getHungarian(strTableName, " ").trim() + "CudVo";
+					strVoName = net.dstone.common.utils.StringUtil.getHungarianName(strTableName, " ").trim() + "CudVo";
 				}
 			}
 
@@ -3001,7 +3003,8 @@ public class BizGenerator {
 				db.getConnection();
 
 				db.setQuery(sql);
-				ds = new net.dstone.common.utils.DataSet(db.select());
+				ds = new net.dstone.common.utils.DataSet();
+				ds.buildFromResultSet(db.select(), "SELECT_RESULT");
 				cols = db.columnNames;
 				colsTypes = db.columnTypes;
 				for (int i = 0; i < cols.length; i++) {
@@ -3471,7 +3474,8 @@ public class BizGenerator {
 				db.getConnection();
 
 				db.setQuery(sql);
-				ds = new net.dstone.common.utils.DataSet(db.select());
+				ds = new net.dstone.common.utils.DataSet();
+				ds.buildFromResultSet(db.select(), "SELECT_RESULT");
 				cols = db.columnNames;
 				colsTypes = db.columnTypes;
 				for (int i = 0; i < cols.length; i++) {
@@ -4620,7 +4624,8 @@ public class BizGenerator {
 				}
 
 				db.setQuery(sql.toString());
-				ds = new net.dstone.common.utils.DataSet(db.select());
+				ds = new net.dstone.common.utils.DataSet();
+				ds.buildFromResultSet(db.select(), "COL_LIST");
 				
 				sql = new StringBuffer();
 				if ("ORACLE".equals(db.currentDbKind)) {
@@ -4636,10 +4641,10 @@ public class BizGenerator {
 				colNames = db.columnNames;
 				colTypes = db.columnTypes;
 				
-				for(int i=0; i<ds.getRowCnt(); i++){
+				for(int i=0; i<ds.getDataSetRowCount("COL_LIST"); i++){
 					for(int k=0; k<colNames.length; k++){
-						if(ds.getDatum(i, "COLUMN_NAME").equals(colNames[k])){
-							ds.getRow(i).setDatum("DATA_TYPE", colTypes[k].trim());
+						if(ds.getDataSet("COL_LIST", i).getDatum("COLUMN_NAME").equals(colNames[k])){
+							ds.getDataSet("COL_LIST", i).setDatum("DATA_TYPE", colTypes[k].trim());
 							break;
 						}
 					}
@@ -4700,7 +4705,8 @@ public class BizGenerator {
 
 				}
 				db.setQuery(keySql.toString());
-				ds = new net.dstone.common.utils.DataSet(db.select());
+				ds = new net.dstone.common.utils.DataSet();
+				ds.buildFromResultSet(db.select(), "KEY_LIST");
 
 			} catch (Exception e) {
 				e.printStackTrace();

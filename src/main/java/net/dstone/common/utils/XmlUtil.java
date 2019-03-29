@@ -1,5 +1,7 @@
 package net.dstone.common.utils;
 
+import java.io.StringReader;
+
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
@@ -9,39 +11,28 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
+import org.slf4j.Logger;
 import org.w3c.dom.Document;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
-/**
- * XML 핸들링 유틸리티
- * 사용예)
-	String xmlPath = "D:/Temp/sql-config.xml";
-	net.dstone.common.utils.XmlUtil xmlUtil;
-	try {
-		System.out.println( "start !!!" );
-		
-		xmlUtil = net.dstone.common.utils.XmlUtil.getInstance(xmlPath);
-		xmlUtil.getDataSet().checkData();
-		xmlUtil.getNodeById("dataSource").getAttributes().getNamedItem("destroy-method").setTextContent("close2");
-		xmlUtil.save();
-		
-		System.out.println( "end !!!" );
-	} catch (Exception e) {
-		e.printStackTrace();
-	}
- */
 public class XmlUtil {
+
+	@SuppressWarnings("unused")
+	private static Logger logger = org.slf4j.LoggerFactory.getLogger(XmlUtil.class);
+
+	public static int XML_SOURCE_KIND_PATH 	= 1;
+	public static int XML_SOURCE_KIND_STRING = 2;
+	
 	public static XmlUtil xml = null;
 
-	public static XmlUtil getInstance(String xmlPath) {
+	public static XmlUtil getInstance(int xmlSourceKind, String xmlSource) {
 		if (xml == null) {
 			xml = new XmlUtil();
 		}
 		try {
-			xml.init(xmlPath);
+			xml.init(xmlSourceKind, xmlSource);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -53,82 +44,55 @@ public class XmlUtil {
 	XPath xPath;
 	Document document;
 	InputSource xmlSource;
-	DataSet dataSet = null;
-
+	
 	private XmlUtil() {
 
 	}
 
-	private void init(String xmlPath) throws Exception {
+	private void init(int xmlSourceKind, String xmlSource) throws Exception {
 		this.xpathFactory = XPathFactory.newInstance();
 		this.xPath = xpathFactory.newXPath();
-		this.xmlPath = xmlPath;
-		this.xmlSource = new InputSource(this.xmlPath);
-		this.document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(this.xmlSource); 
-		this.dataSet = new DataSet();
-		parseIntoDataSet(this.document, this.dataSet);
+		java.io.FileInputStream fin = null;
+		
+		try {
+			if( xmlSourceKind ==  XML_SOURCE_KIND_PATH){
+				this.xmlPath = xmlSource;
+				fin =  new java.io.FileInputStream(this.xmlPath);
+				this.xmlSource = new InputSource(fin);
+				this.document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(this.xmlSource); 
+			}else{
+				this.xmlPath = null;
+				this.xmlSource = new InputSource(new StringReader(xmlSource));
+				this.document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(this.xmlSource); 
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			if( fin != null ){try{ fin.close(); }catch(Exception e){}}
+		}
+
 	}
 	
-	private DataSet parseIntoDataSet(Node node, DataSet pDataSet){
-		if(node != null){
-			if(isValid(node)){
-				pDataSet.setDatum("노드명", node.getNodeName());
-				if(node.hasAttributes()){
-					NamedNodeMap attArray = node.getAttributes();
-					String strKey = null;
-					String strVal = null;
-					if(attArray != null){
-						for(int i=0; i<attArray.getLength();i++){
-							strKey = attArray.item(i).getNodeName();
-							strVal = attArray.item(i).getNodeValue();
-							pDataSet.setDatum(strKey, strVal);
-						}
-					}
-				}
-				if(node.hasChildNodes()){
-					NodeList nodeList = node.getChildNodes();
-					if(nodeList != null){
-						for(int i=0; i<nodeList.getLength();i++){
-							Node childNode = nodeList.item(i);
-							DataSet childDataSet = new DataSet();
-							if(isValid(childNode)){
-								pDataSet.addRow(childDataSet);
-								parseIntoDataSet(childNode, childDataSet);
-							}
+	public boolean hasChildElement(Node node){
+		boolean hasChild = false;
+		if( node != null ){
+			if( node.getNodeType() == Node.ELEMENT_NODE ){
+				NodeList nodeList = node.getChildNodes();
+				if( nodeList != null ){
+					Node child = null;
+					for(int i=0; i<nodeList.getLength(); i++){
+						child = nodeList.item(i);
+						if( child.getNodeType() == Node.ELEMENT_NODE ){
+							hasChild = true;
+							break;
 						}
 					}
 				}
 			}
 		}
-		return pDataSet;
-	}
-	
-	private boolean isValid(Node node){
-		boolean valid = false;
-		if( 
-			node.getNodeType() == Node.DOCUMENT_NODE 
-			|| node.getNodeType() == Node.ELEMENT_NODE
-			|| node.getNodeType() == Node.ATTRIBUTE_NODE
-		){
-			valid = true;
-		}
-		return valid;
+		return hasChild;
 	}
 
-	public DataSet getDataSet(){
-		return this.dataSet;
-	}
-
-	public DataSet getDataSet(String nodeNm){
-		DataSet returnDataSet = null;
-		Node node = getNode(nodeNm);
-		if(node != null){
-			returnDataSet = new DataSet();
-			parseIntoDataSet(node, returnDataSet);
-		}
-		return returnDataSet;
-	}
-	
 	public Node getRoot() {
 		Node node = null;
 		String expression = "/" ;
@@ -142,7 +106,21 @@ public class XmlUtil {
 	
 	public Node getNode(String nodeNm) {
 		Node node = null;
-		String expression = "//*/" + nodeNm;
+		String expression = "/" + nodeNm;
+		try {
+			node = (Node) this.xPath.evaluate(expression, document, XPathConstants.NODE);
+			if(node == null){
+				expression = "//*/" + nodeNm;
+				node = (Node) this.xPath.evaluate(expression, document, XPathConstants.NODE);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return node;
+	}
+
+	public Node getNodeByExp(String expression) {
+		Node node = null;
 		try {
 			node = (Node) this.xPath.evaluate(expression, document, XPathConstants.NODE);
 		} catch (Exception e) {
@@ -160,6 +138,25 @@ public class XmlUtil {
 			e.printStackTrace();
 		}
 		return node;
+	}
+	public NodeList getNodeList(String nodeNm) {
+		NodeList nodeList = null;
+		String expression = "//*/" + nodeNm;
+		try {
+			nodeList = (NodeList) this.xPath.evaluate(expression, document, XPathConstants.NODESET);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return nodeList;
+	}
+	public NodeList getNodeListByExp(String expression) {
+		NodeList nodeList = null;
+		try {
+			nodeList = (NodeList) this.xPath.evaluate(expression, document, XPathConstants.NODESET);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return nodeList;
 	}
 	
 	public boolean hasNode(String nodeNm) {
@@ -195,26 +192,46 @@ public class XmlUtil {
 	}
 
 
-	public NodeList getNodeList(String nodeNm) {
-		NodeList nodeList = null;
-		String expression = "//*/" + nodeNm;
-		try {
-			nodeList = (NodeList) this.xPath.evaluate(expression, document, XPathConstants.NODESET);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return nodeList;
-	}
+
+	
+
 	
 	public void save() {
 		try {
-			TransformerFactory transFactory = TransformerFactory.newInstance();
-			Transformer transformer = transFactory.newTransformer();
-			DOMSource source = new DOMSource(this.getRoot());
-			StreamResult result = new StreamResult(new java.io.File(xmlPath));
-			transformer.transform(source, result);
+			if( this.xmlPath != null ){
+				TransformerFactory transFactory = TransformerFactory.newInstance();
+				Transformer transformer = transFactory.newTransformer();
+				DOMSource source = new DOMSource(this.getRoot());
+				StreamResult result = new StreamResult(new java.io.File(this.xmlPath));
+				transformer.transform(source, result);
+			}
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
+
+	public Document getDocument() {
+		return document;
+	}
+
+	public void setDocument(Document document) {
+		this.document = document;
+	}
+
+	/**
+	 * @return the xPath
+	 */
+	public XPath getxPath() {
+		return xPath;
+	}
+
+	/**
+	 * @param xPath the xPath to set
+	 */
+	public void setxPath(XPath xPath) {
+		this.xPath = xPath;
+	}
+	
 }
+

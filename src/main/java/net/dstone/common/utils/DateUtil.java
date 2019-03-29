@@ -10,7 +10,7 @@ public class DateUtil {
 	public static final String DATE_FORMAT_YMD = "yyyyMMdd";
 	public static final String[] WEEK_DAY = { "일", "월", "화", "수", "목", "금", "토" };
 
-	/**
+	/** 
 	 * 오늘 날짜를 지정된 형식으로 반환.
 	 * 
 	 * @param format

@@ -6,7 +6,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlRootElement( name="SampleDeptCudVo" ) 
 public class SampleDeptCudVo extends net.dstone.common.biz.BaseVo implements java.io.Serializable { 
 	private String DEPT_ID; 
-	private String DEPT_NAME; 
+	private String DEPT_NAME;
 	private String INPUT_DT; 
 	/** 
 	 * 
