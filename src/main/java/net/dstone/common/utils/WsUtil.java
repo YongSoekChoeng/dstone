@@ -39,7 +39,7 @@ import org.apache.commons.httpclient.methods.TraceMethod;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
-import org.apache.http.conn.ssl.SSLContexts;
+import org.apache.http.ssl.SSLContexts;
 import org.slf4j.Logger;
 
 public class WsUtil {
