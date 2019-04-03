@@ -5,10 +5,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
 @Service
-public class BaseService extends net.dstone.common.spring.mvc.BaseObject {
-
-	protected void debug(Object o) {
-		super.debug(o);
-	}
+public class BaseService extends net.dstone.common.core.BaseObject {
 	
 }

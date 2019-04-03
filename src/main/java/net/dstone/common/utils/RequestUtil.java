@@ -2,12 +2,12 @@ package net.dstone.common.utils;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.slf4j.Logger;
 
 public class RequestUtil {
 
 	/** 로그출력 */
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(RequestUtil.class);
+	private static LogUtil logger = new LogUtil(RequestUtil.class);
+	
 	private boolean boolRequestParseYn = true;
 	private boolean boolRequestDetailParseYn = false;
 
@@ -63,7 +63,7 @@ public class RequestUtil {
 				this.fileup = new net.dstone.common.utils.FileUpUtil(request, response);
 				this.uploadList = (java.util.ArrayList<java.util.Properties>) this.fileup.getUploadInfo().get("UPLOAD_LIST");
 			} catch (Exception e) {
-				e.printStackTrace();
+				logger.info(e);
 				throw e;
 			}
 		} else {
@@ -142,7 +142,7 @@ public class RequestUtil {
 		}
 
 		buff.append(strT).append("/").append(MAST_BAR_2).append(" " + requestUtil.getClass().getName() + ".parseRequest ").append(MAST_BAR_2).append("/\r\n");
-		System.out.println(buff.toString());
+		logger.info(buff.toString());
 	}
 	
 	private boolean populateJson(){
@@ -187,7 +187,7 @@ public class RequestUtil {
 					}
 				}
 			}catch(Exception e){
-				e.printStackTrace();
+				logger.info(e);
 			}
 		}
 		jsonMapPopulatedYn = true;

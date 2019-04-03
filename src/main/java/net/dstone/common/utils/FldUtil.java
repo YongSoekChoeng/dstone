@@ -2,13 +2,12 @@ package net.dstone.common.utils;
 
 import java.util.Iterator;
 
-import org.slf4j.Logger;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 
 public class FldUtil {
 
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(FldUtil.class);
+	private static LogUtil logger = new LogUtil(FldUtil.class);
 
 	/***************************** 제어용상수/변수 시작 ************************/
 	public static final String N 									= "\n";

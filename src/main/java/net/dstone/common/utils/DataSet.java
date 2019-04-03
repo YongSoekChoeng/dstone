@@ -14,11 +14,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import net.dstone.common.utils.BeanUtil.JsonPropertyNamingStrategy;
-import net.dstone.common.utils.FldUtil.Member;
-import net.dstone.common.utils.FldUtil.Struct;
-
-import org.slf4j.Logger;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -28,6 +23,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import net.dstone.common.utils.BeanUtil.JsonPropertyNamingStrategy;
+import net.dstone.common.utils.FldUtil.Member;
+import net.dstone.common.utils.FldUtil.Struct;
+
 /**
  * BNC(방카)온라인용 자료구조 클래스.
  * FLD, XML, JSON, VO 여러가지 형태의 데이터로 컨버젼 가능하고 자체적인 데이터저장 기능을 구현했음.
@@ -35,7 +34,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 @SuppressWarnings("serial")
 public class DataSet implements java.io.Serializable {
 
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(DataSet.class);
+	private static LogUtil logger = new LogUtil(DataSet.class);
 	
 	/**
 	 * 데이터의 가장 말단(Leaf) 구현체

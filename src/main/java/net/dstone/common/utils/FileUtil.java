@@ -10,11 +10,9 @@ import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
-import org.slf4j.Logger;
-
 public class FileUtil {
 
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(FileUtil.class);
+	private static LogUtil logger = new LogUtil(FileUtil.class);
 	
 	public static int SEARCH_MODE_AND = 1;
 	public static int SEARCH_MODE_OR = 2;

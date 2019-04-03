@@ -35,7 +35,7 @@
 		    )   P 
 		WHERE 2>1 
 		    /* 페이징의 기준이 되는 KEY값을 반드시 넣어주시기 바랍니다. */  
-		ORDER BY DEPT_ID LIMIT #{INT_FROM}, #{INT_TO} 
+		ORDER BY @KEY값@ LIMIT #{INT_FROM}, #{INT_TO} 
 
     </select>                                                                       
  
@@ -46,7 +46,7 @@
         FROM                                                                          
             SAMPLE_DEPT                                                                     
         WHERE 1=1 
-			AND DEPT_ID = #{DEPT_ID}
+
     </select>                                                                       
  
 </mapper>                                                                             

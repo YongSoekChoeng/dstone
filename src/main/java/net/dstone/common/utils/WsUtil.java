@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -40,14 +38,13 @@ import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.apache.http.ssl.SSLContexts;
-import org.slf4j.Logger;
 
 public class WsUtil {
 	
 	public static int HTTP_OK = 200;
 	public static int HTTP_NOT_FOUND = 400;
 
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(WsUtil.class);
+	private static LogUtil logger = new LogUtil(WsUtil.class);
 	
 	public static final TrustManager[] TRUST_ALL_CERTS = new TrustManager[]{
 		new X509TrustManager(){

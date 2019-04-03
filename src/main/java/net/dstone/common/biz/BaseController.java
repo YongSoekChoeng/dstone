@@ -6,17 +6,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
 @Controller
-public abstract class BaseController extends net.dstone.common.spring.mvc.BaseObject {
+public abstract class BaseController extends net.dstone.common.core.BaseObject {
 
 	public static String RETURN_SUCCESS = "0";
 	public static String RETURN_FAIL 	= "1"; 
 	
 	private static boolean IS_JSON_CHARSET_CONVERT = false; 
 	
-	protected void debug(Object o) {
-		super.debug(o);
-	}
-
 	protected String nullCheck(Object o) {
 		return net.dstone.common.utils.StringUtil.nullCheck(o, "");
 	}

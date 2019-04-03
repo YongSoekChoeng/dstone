@@ -1,6 +1,7 @@
 package net.dstone.common.tools;
 
 import net.dstone.common.utils.FileUtil;
+import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 import net.dstone.common.utils.SystemUtil;
 
@@ -1656,16 +1657,14 @@ public class BizGenerator {
 				svcH.append("import org.springframework.stereotype.Service; ").append("\n");
 				svcH.append("import org.springframework.transaction.annotation.Transactional; ").append("\n");
 				svcH.append(" ").append("\n");
-				svcH.append("import org.slf4j.Logger; ").append("\n");
-				svcH.append("import org.slf4j.LoggerFactory; ").append("\n");
-				svcH.append(" ").append("\n");
 				svcH.append("import net.dstone.common.biz.BaseService; ").append("\n");
+				svcH.append("import net.dstone.common.utils.LogUtil; ").append("\n");
 				svcH.append(" ").append("\n");
 				//svcH.append("@Transactional(propagation=Propagation.REQUIRED, noRollbackFor=Exception.class)").append("\n");
 				svcH.append("@Service ").append("\n");
 				svcH.append("public class " + strSvcName + " extends BaseService { ").append("\n");
 				svcH.append("     ").append("\n");
-				svcH.append("    private Logger logger = LoggerFactory.getLogger(getClass()); ").append("\n");
+				svcH.append("    LogUtil logger = getLogger(); ").append("\n");
 				svcH.append("     ").append("\n");
 
 				if (!FileUtil.isFileExist(svcFileName)) {
@@ -2044,7 +2043,6 @@ public class BizGenerator {
 			ctrlH.append("import org.springframework.web.bind.annotation.RequestMapping;").append("\n");
 			ctrlH.append("").append("\n");
 			ctrlH.append("import net.dstone.common.utils.DateUtil;").append("\n");
-			ctrlH.append("import net.dstone.common.utils.PropUtil;").append("\n");
 			ctrlH.append("import net.dstone.common.utils.StringUtil;").append("\n");
 			ctrlH.append("import net.dstone.common.utils.BeanUtil;").append("\n");
 
@@ -2321,7 +2319,6 @@ public class BizGenerator {
 			ctrlH.append("import org.springframework.web.bind.annotation.RequestMapping;").append("\n");
 			ctrlH.append("").append("\n");
 			ctrlH.append("import net.dstone.common.utils.DateUtil;").append("\n");
-			ctrlH.append("import net.dstone.common.utils.PropUtil;").append("\n");
 			ctrlH.append("import net.dstone.common.utils.StringUtil;").append("\n");
 			ctrlH.append("import net.dstone.common.utils.BeanUtil;").append("\n");
 
@@ -2593,10 +2590,10 @@ public class BizGenerator {
 				svcH.append("import javax.ws.rs.core.*; ").append("\r\n");
 				svcH.append("import javax.ws.rs.*; ").append("\r\n");
 				svcH.append(" ").append("\r\n");
-				svcH.append("import org.slf4j.Logger; ").append("\r\n");
-				svcH.append("import org.slf4j.LoggerFactory; ").append("\r\n");
 				svcH.append("import org.springframework.beans.factory.annotation.Autowired; ").append("\r\n");
 				svcH.append("import org.springframework.stereotype.Component; ").append("\r\n");
+				svcH.append(" ").append("\r\n");
+				svcH.append("import net.dstone.common.utils.LogUtil; ").append("\n");
 				svcH.append(" ").append("\r\n");
 				svcH.append("@Component ").append("\r\n");
 				svcH.append("@Path(\"" + strWSPath + "\") ").append("\r\n");
@@ -2623,7 +2620,7 @@ public class BizGenerator {
 				svcH.append("     * http://www.ywebb.com/http4e/install/ 로 HTTP4e플러그인 설치 후 개발. ").append("\r\n");
 				svcH.append("    **************************************************************************************************************/ ").append("\r\n");
 				svcH.append("      ").append("\r\n");
-				svcH.append("    private Logger logger = LoggerFactory.getLogger(getClass());  ").append("\r\n");
+				svcH.append("    LogUtil logger = getLogger();  ").append("\r\n");
 				svcH.append("     ").append("\r\n");
 
 				if (!FileUtil.isFileExist(wsFileName)) {

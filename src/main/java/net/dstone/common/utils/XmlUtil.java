@@ -11,7 +11,6 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
-import org.slf4j.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -20,7 +19,7 @@ import org.xml.sax.InputSource;
 public class XmlUtil {
 
 	@SuppressWarnings("unused")
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(XmlUtil.class);
+	private static LogUtil logger = new LogUtil(XmlUtil.class);
 
 	public static int XML_SOURCE_KIND_PATH 	= 1;
 	public static int XML_SOURCE_KIND_STRING = 2;

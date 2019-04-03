@@ -1,26 +1,19 @@
-package net.dstone.common.spring.aop;
+package net.dstone.common.aop;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import net.dstone.common.utils.LogUtil;
 
 @Aspect
 @Component
-public class ExecutionLoggingAspect {
-	
-	private Logger logger = LoggerFactory.getLogger(getClass());
+public class ExecutionLoggingAspect extends net.dstone.common.core.BaseObject{
 
-	public void setLoggerName(String loggerName) {
-		if (StringUtils.isNotEmpty(loggerName)) {
-			this.logger = LoggerFactory.getLogger(loggerName);
-		}
-	}
+	LogUtil logger = getLogger();
 
 	/**
 	 * Controller AOP
@@ -32,7 +25,7 @@ public class ExecutionLoggingAspect {
 	@Around("execution(* net.dstone.*..*Controller.*(..))")
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		System.out.println("\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "]======================================||");
-		logger.info("+->[CONTROLLER] {}", buildSimpleExecutionInfo(joinPoint));
+		logger.info("+->[CONTROLLER] {"+buildSimpleExecutionInfo(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
 
@@ -45,7 +38,8 @@ public class ExecutionLoggingAspect {
 	 */
 	@Around("execution(* net.dstone.*..*Service.*(..))")
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		logger.info("+--->[SERVICE ] {}", buildSimpleExecutionInfo(joinPoint));
+		logger.info("+--->[SERVICE ] {"+buildSimpleExecutionInfo(joinPoint)+"}");
+		
 		return joinPoint.proceed();
 	}
 
@@ -58,7 +52,7 @@ public class ExecutionLoggingAspect {
 	 */
 	@Around("execution(* net.dstone.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		logger.info("+----->[DAO   ] {}", buildSimpleExecutionInfo(joinPoint));
+		logger.info("+----->[DAO   ] {"+buildSimpleExecutionInfo(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
 
@@ -69,12 +63,9 @@ public class ExecutionLoggingAspect {
 	 * @return
 	 */
 	private String buildSimpleExecutionInfo(ProceedingJoinPoint joinPoint) {
-
 		StringBuffer buffer = new StringBuffer();
-
 		String className = joinPoint.getTarget().getClass().getSimpleName();
 		String methodName = joinPoint.getSignature().getName();
-
 		StringBuffer paramListInfo = new StringBuffer();
 		int args = joinPoint.getArgs().length;
 		for (int i = 0; i < args; i++) {
@@ -91,9 +82,7 @@ public class ExecutionLoggingAspect {
 				paramListInfo.append(", ");
 			}
 		}
-
 		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
-
 		return buffer.toString();
 	}
 

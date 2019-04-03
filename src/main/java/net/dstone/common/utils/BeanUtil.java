@@ -16,7 +16,6 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang.ClassUtils;
-import org.slf4j.Logger;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
@@ -27,7 +26,8 @@ import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
 import com.fasterxml.jackson.databind.introspect.AnnotatedParameter;
 
 public class BeanUtil {
-	private static Logger logger = org.slf4j.LoggerFactory.getLogger(BeanUtil.class);
+	
+	private static LogUtil logger = new LogUtil(BeanUtil.class);
 	
 	public static int NAME_POLICY_NOTHING 		= 0;
 	public static int NAME_POLICY_HUNGARIAN 	= 1;

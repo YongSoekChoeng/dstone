@@ -10,13 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.dstone.common.biz.BaseService;
+import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil; 
  
 @Service 
 public class MemberService extends BaseService { 
-     
-    private Logger logger = LoggerFactory.getLogger(getClass()); 
-     
+
+	LogUtil logger = getLogger();
 
     /********* 공통 입력/수정/삭제 DAO 정의부분 시작 *********/
     @Autowired 
@@ -29,7 +29,7 @@ public class MemberService extends BaseService {
     /********* DAO 정의부분 끝 *********/
 
     /********* 샘플그룹 SVC 정의 시작 *********/
-    @Autowired 
+    @Autowired
     private net.dstone.sample.member.GroupService groupService;
     /********* 샘플그룹 SVC 정의 끝 *********/
 
