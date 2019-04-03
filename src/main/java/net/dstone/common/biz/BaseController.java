@@ -11,8 +11,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	public static String RETURN_SUCCESS = "0";
 	public static String RETURN_FAIL 	= "1"; 
 	
-	private static boolean IS_JSON_CHARSET_CONVERT = false; 
-	
 	protected String nullCheck(Object o) {
 		return net.dstone.common.utils.StringUtil.nullCheck(o, "");
 	}
@@ -23,7 +21,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	 * @param bean
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
 	protected Object bindSingleValue(net.dstone.common.utils.RequestUtil request, Object bean) {
 		Class<?> clz = null;
 		java.lang.reflect.Field[] fields = null;
@@ -59,7 +56,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	 * @param bean
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
 	protected Object bindSingleJsonObj(net.dstone.common.utils.RequestUtil request, Object bean) {
 		Class<?> clz = null;
 		java.lang.reflect.Field[] fields = null;
@@ -95,7 +91,7 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	 * @param beanName
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	protected Object bindMultiValues(net.dstone.common.utils.RequestUtil request, String beanName) {
 		Object[] beanArray = null;
 		Class<?> clz = null;
@@ -103,7 +99,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 		java.lang.reflect.Field[] fields = null;
 		java.lang.reflect.Field field = null;
 		java.util.Properties fieldProp = new java.util.Properties();
-		java.util.HashMap<String, Object> map = null;
 		int maxArrayNum = 0;
 		String paramName = "";
 		String paramValue = "";
@@ -127,7 +122,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 					}
 				}
 				for(int i=0; i<maxArrayNum; i++ ){
-					map = new java.util.HashMap<String, Object>();
 					bean = clz.newInstance();
 					for(int k=0; k<fields.length; k++ ){
 						field = fields[k];
@@ -162,7 +156,7 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	 * @param beanName
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	protected Object bindMultiJsonObjs(net.dstone.common.utils.RequestUtil request, String beanName) {
 		Object[] beanArray = null;
 		Class<?> clz = null;
@@ -170,7 +164,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 		java.lang.reflect.Field[] fields = null;
 		java.lang.reflect.Field field = null;
 		java.util.Properties fieldProp = new java.util.Properties();
-		java.util.HashMap<String, Object> map = null;
 		int maxArrayNum = 0;
 		String paramName = "";
 		String paramValue = "";
@@ -194,7 +187,6 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 					}
 				}
 				for(int i=0; i<maxArrayNum; i++ ){
-					map = new java.util.HashMap<String, Object>();
 					bean = clz.newInstance();
 					for(int k=0; k<fields.length; k++ ){
 						field = fields[k];
