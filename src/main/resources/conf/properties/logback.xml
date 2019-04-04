@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOGS_ABSOLUTE_PATH" value="D:/WorkShop/AppHome/FRAMEWORK/LOGS" />
+ 
+    <appender name="stdoutAppender" class="ch.qos.logback.core.ConsoleAppender">
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>%d{HH:mm} %-5level %logger{36} - %msg%n</Pattern>
+        </layout>
+    </appender>
+    <appender name="executionAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_ABSOLUTE_PATH}/execution/execution.log</file>
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss}:%-3relative][%thread] %-5level %logger{35} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_ABSOLUTE_PATH}/execution/execution.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <!-- or whenever the file size reaches 100MB -->
+                <maxFileSize>10MB</maxFileSize>
+                <!-- kb, mb, gb -->
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- You can specify loggers down here ! -->
+    <logger name="org.springframework" level="INFO">
+        <appender-ref ref="executionAppender" />
+    </logger>
+    <logger name="com.zaxxer.hikari.pool.PoolBase" level="ERROR">
+        <appender-ref ref="executionAppender" />
+    </logger>
+    <logger name="com.zaxxer.hikari.pool.HikariPool" level="ERROR">
+        <appender-ref ref="executionAppender" />
+    </logger>
+    <logger name="com.zaxxer.hikari.HikariDataSource" level="ERROR">
+        <appender-ref ref="executionAppender" />
+    </logger>
+    <logger name="java.sql" level="INFO">
+        <appender-ref ref="executionAppender" />
+    </logger>    
+    <!--  
+    <logger name="org.springframework" level="INFO">
+        <appender-ref ref="executionAppender" />
+    </logger>
+    <logger name="java.sql" level="DEBUG">
+        <appender-ref ref="executionAppender" />
+    </logger>
+    -->
+    
+    <root level="INFO">
+        <appender-ref ref="stdoutAppender" />
+        <appender-ref ref="executionAppender" />
+    </root>
+</configuration>

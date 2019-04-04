@@ -17,11 +17,26 @@
    	http://www.springframework.org/schema/aop/spring-aop-3.0.xsd">
 
 	<!-- ################### Datasource Configuration START #################### -->
-	<bean id="db1" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
-		<property name="driverClassName" value="${db1.spring.driver}" />
-		<property name="url" value="${db1.spring.url}" />
-		<property name="username" value="${db1.spring.username}" />
-		<property name="password" value="${db1.spring.password}" />
+	<bean id="db1" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
+        <constructor-arg>
+            <bean class="com.zaxxer.hikari.HikariConfig">
+                <constructor-arg>
+                    <props>
+                        <prop key="jdbcUrl">${db1.spring.url}</prop>
+                        <prop key="username">${db1.spring.username}</prop>
+                        <prop key="password">${db1.spring.password}</prop>
+                    </props>
+                </constructor-arg>
+                <property name="autoCommit" value="false" />
+                <property name="driverClassName" value="${db1.spring.driver}"/>
+                <property name="minimumIdle" value="5" />
+                <property name="maximumPoolSize" value="10" />
+                <!--  
+                <property name="connectionTestQuery" value="select 1" />
+                -->
+                <property name="connectionTimeout"  value="300000" />
+            </bean>
+        </constructor-arg>
 	</bean>
 	<bean id="dataSource1" class="org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy">
 	    <property name="targetDataSource">
@@ -29,11 +44,26 @@
 	    </property>
 	</bean>
 	
-	<bean id="db2" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
-		<property name="driverClassName" value="${db2.spring.driver}" />
-		<property name="url" value="${db2.spring.url}" />
-		<property name="username" value="${db2.spring.username}" />
-		<property name="password" value="${db2.spring.password}" />
+	<bean id="db2" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
+        <constructor-arg>
+            <bean class="com.zaxxer.hikari.HikariConfig">
+                <constructor-arg>
+                    <props>
+                        <prop key="jdbcUrl">${db2.spring.url}</prop>
+                        <prop key="username">${db2.spring.username}</prop>
+                        <prop key="password">${db2.spring.password}</prop>
+                    </props>
+                </constructor-arg>
+                <property name="autoCommit" value="false" />
+                <property name="driverClassName" value="${db2.spring.driver}"/>
+                <property name="minimumIdle" value="5" />
+                <property name="maximumPoolSize" value="10" />
+                <!--  
+                <property name="connectionTestQuery" value="select 1" />
+                -->
+                <property name="connectionTimeout"  value="300000" />
+            </bean>
+        </constructor-arg>
 	</bean>
 	<bean id="dataSource2" class="org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy">
 	    <property name="targetDataSource">

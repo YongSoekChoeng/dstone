@@ -23,6 +23,12 @@
         <outputDirectory>${project.basedir}/target/classes</outputDirectory>     
         <resources>
             <resource>
+                <directory>src/main/java</directory>
+				<includes>
+					<include>**/*.xml</include>
+				</includes>
+            </resource>
+            <resource>
                 <directory>src/main/resources</directory>
 				<excludes>
 					<exclude>**/*.java</exclude>
@@ -193,63 +199,10 @@
 
 		<!-- Logging -->
 		<dependency>
-		    <groupId>org.apache.logging.log4j</groupId>
-		    <artifactId>log4j-api</artifactId>
-		    <version>2.5</version>
+		    <groupId>ch.qos.logback</groupId>
+		    <artifactId>logback-classic</artifactId>
+		    <version>1.2.3</version>
 		</dependency>
-		<dependency>
-		    <groupId>org.apache.logging.log4j</groupId>
-		    <artifactId>log4j-core</artifactId>
-		    <version>2.5</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>${org.slf4j-version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>jcl-over-slf4j</artifactId>
-			<version>${org.slf4j-version}</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-log4j12</artifactId>
-			<version>${org.slf4j-version}</version>
-			<scope>runtime</scope>
-		</dependency>
-      	<dependency>
-        	<groupId>log4sql</groupId>
-        	<artifactId>log4sql</artifactId>
-        	<version>7.8</version>
-        	<scope>system</scope>
-          	<systemPath>${project.basedir}/src/main/webapp/WEB-INF/lib/log4sql.jar</systemPath>
-      	</dependency>
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.15</version>
-			<exclusions>
-				<exclusion>
-					<groupId>javax.mail</groupId>
-					<artifactId>mail</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>javax.jms</groupId>
-					<artifactId>jms</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>com.sun.jdmk</groupId>
-					<artifactId>jmxtools</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>com.sun.jmx</groupId>
-					<artifactId>jmxri</artifactId>
-				</exclusion>
-			</exclusions>
-			<scope>compile</scope>
-		</dependency>	
 		
 		<!-- Apache and Third Parties -->
 		<dependency>
@@ -265,14 +218,14 @@
 
 		<!-- DATABASE -->
 		<dependency>
-			<groupId>commons-dbcp</groupId>
-			<artifactId>commons-dbcp</artifactId><!-- Connection Pool -->
-			<version>1.4</version>
-		</dependency>
+			<groupId>com.zaxxer</groupId>
+			<artifactId>HikariCP</artifactId>
+			<version>3.2.0</version>
+		</dependency>	
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId><!-- MySql JDBC -->
-			<version>5.1.37</version>
+			<version>8.0.15</version>
 		</dependency>
 
 		<!-- JSON -->

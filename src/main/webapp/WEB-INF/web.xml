@@ -41,16 +41,6 @@
 	</filter-mapping>
 	<!-- ### Encoding Filter Configration End ### -->
 
-	<!-- ### Log4j Configration Start ### -->
-	<context-param>
-		<param-name>log4jConfigLocation</param-name>
-		<param-value>/WEB-INF/classes/conf/properties/log4j.properties</param-value>
-	</context-param>
-	<listener>
-		<listener-class>org.springframework.web.util.Log4jConfigListener</listener-class>
-	</listener>
-	<!-- ### Log4j Configration End ### -->
-
 	<!-- ### Servlet Configration Start ### -->
 	<!-- Spring -->
 	<context-param>
