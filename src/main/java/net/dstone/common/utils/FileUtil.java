@@ -527,6 +527,46 @@ public class FileUtil {
 		}
 		return result;
 	}
+	
+	public static String[] readDirListAll(String filePath) {
+
+		java.util.Vector<String> listVec = new java.util.Vector<String>();
+		String[] result = new String[listVec.size()];
+		String subFilePath = "";
+		java.io.File tempFile = null;
+		try {
+			java.io.File f = new java.io.File(filePath);
+			if (f.exists()) {
+				if (f.isDirectory()) {
+					String[] subResult = null;
+					result = f.list();
+					if (result != null) {
+						for (int i = 0; i < result.length; i++) {
+							subFilePath = filePath + "/" + result[i];
+							tempFile = new java.io.File(subFilePath);
+							if (tempFile.isDirectory()) {
+								listVec.add(subFilePath);
+								subResult = readDirListAll(subFilePath);
+								if (subResult != null) {
+									for (int k = 0; k < subResult.length; k++) {
+										listVec.add(subResult[k]);
+									}
+								}
+							}
+						}
+						result = new String[listVec.size()];
+						listVec.copyInto(result);
+						listVec.clear();
+						listVec = null;
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.info(e.toString());
+			return null;
+		}
+		return result;
+	}
 
 
 	public static String getFileName(String fileFullPath) {
