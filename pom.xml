@@ -279,6 +279,13 @@
 			<artifactId>jpopulator</artifactId><!-- JPOPULATOR(테스트데이터제너레이터) -->
 			<version>1.2.0</version>
 		</dependency>
-
+		
+		<!-- Docker -->
+		<dependency>
+			<groupId>com.spotify</groupId>
+			<artifactId>docker-client</artifactId>
+			<version>8.15.1</version>
+		</dependency>
+		
 	</dependencies>
 </project>
