@@ -5,8 +5,6 @@ String                                                         RETURN_CD;
 net.dstone.sample.dept.vo.SampleDeptVo                                      returnObj;                                       
 /******************************************* 변수 선언 끝 *********************************************/    
        
-// 테스트코멘트
-// ㅁㅁㅁ
 /******************************************* 변수 정의 시작 *******************************************/           
 RETURN_CD           = (String)request.getAttribute("RETURN_CD");                                             
 returnObj           = (net.dstone.sample.dept.vo.SampleDeptVo)request.getAttribute("returnObj");                                   
