@@ -4,7 +4,7 @@
 String                                               RETURN_CD;                                       
 Boolean                                              returnObj;                                                 
 /******************************************* 변수 선언 끝 *********************************************/           
-// 작업자1 수정4 
+
 /******************************************* 변수 정의 시작 *******************************************/           
 RETURN_CD           = (String)request.getAttribute("RETURN_CD");                                             
 returnObj           = (Boolean)request.getAttribute("returnObj");                                   
