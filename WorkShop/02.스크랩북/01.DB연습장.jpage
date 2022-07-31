@@ -1,10 +1,10 @@
-
-String DBID = "DBID_2";
+
+String DBID = "DBID_0";
 net.dstone.common.utils.DbUtil db = null;
 net.dstone.common.utils.DataSet ds = null;
 
 StringBuffer sql = new StringBuffer();
-String TABLE_NAME = "BBS_INFO";
+String TABLE_NAME = "HELP";
 
 try {
 
@@ -23,7 +23,7 @@ try {
 	sql.append("FROM  ").append("\n");
 	sql.append("	INFORMATION_SCHEMA.COLUMNS  ").append("\n");
 	sql.append("WHERE 1=1 ").append("\n");
-	sql.append("	AND TABLE_SCHEMA='"+DB_SID+"'  ").append("\n");
+	//sql.append("	AND TABLE_SCHEMA='"+DB_SID+"'  ").append("\n");
 	sql.append("    AND TABLE_NAME='" + TABLE_NAME + "' ").append("\n");
 	sql.append("ORDER BY ORDINAL_POSITION ").append("\n");
 	
@@ -31,10 +31,10 @@ try {
 	db.getConnection();
 	db.setQuery(sql.toString());
 	
-	//db.select();
+	db.select();
 	
-	ds = new net.dstone.common.utils.DataSet(db.select());
-	ds.checkData();
+	//ds = new net.dstone.common.utils.DataSet(db.select());
+	//ds.checkData();
 	
 }catch(Exception e){
 	System.out.println(db.getQuery());

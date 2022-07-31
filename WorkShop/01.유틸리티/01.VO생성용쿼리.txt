@@ -1,5 +1,7 @@
         SELECT                                                            
             *
-        FROM                                                                          
-            SAMPLE_DEPT                                                                     
+        FROM        	                                                                                 
+            --SAMPLE_GROUP /* 샘플그룹 */                                                    
+            --SAMPLE_MEMBER /* 샘플맴버 */                           
+            SAMPLE_DEPT	/* 샘플부서 */
         WHERE 1=1 

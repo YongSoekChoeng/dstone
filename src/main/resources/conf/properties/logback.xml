@@ -27,6 +27,7 @@
     <logger name="org.springframework" level="INFO">
         <appender-ref ref="executionAppender" />
     </logger>
+    <!--  
     <logger name="com.zaxxer.hikari.pool.PoolBase" level="ERROR">
         <appender-ref ref="executionAppender" />
     </logger>
@@ -39,6 +40,7 @@
     <logger name="java.sql" level="INFO">
         <appender-ref ref="executionAppender" />
     </logger>    
+    -->
     <!--  
     <logger name="org.springframework" level="INFO">
         <appender-ref ref="executionAppender" />
@@ -52,4 +54,5 @@
         <appender-ref ref="stdoutAppender" />
         <appender-ref ref="executionAppender" />
     </root>
+    
 </configuration>
