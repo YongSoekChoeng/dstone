@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="NET_DSTONE_SAMPLE_MEMBER_GROUPDAO">                                                       
+                                                                                      
+    <!-- SampleGroupVo VO -->                                                                
+                                                                                   
+    <!--  샘플그룹정보 리스트조회(카운트) -->                                                      
+    <select id="listSampleGroupCount" parameterType="net.dstone.sample.member.vo.SampleGroupVo" resultType="Integer">         
+        SELECT COUNT(*) CNT FROM ( 
+        SELECT                                                            
+            *
+        FROM        	                                                                                 
+            SAMPLE_GROUP /* 샘플그룹 */                                                    
+            --SAMPLE_MEMBER /* 샘플맴버 */                           
+            --SAMPLE_DEPT	/* 샘플부서 */
+        WHERE 1=1 
+        ) P
+    </select>                                                                       
+                                                                                   
+    <!--  샘플그룹정보 리스트조회 -->                                                      
+    <select id="listSampleGroup" parameterType="net.dstone.sample.member.vo.SampleGroupVo" resultType="net.dstone.sample.member.vo.SampleGroupVo">         
+		SELECT  
+			RNUM 
+			,P.* 
+		FROM  
+		    (  
+		    SELECT  
+		        ROWNUM RNUM, P1.*  
+		    FROM  
+		        (  
+                /**********************************************************************************************************************************/ 
+
+        SELECT                                                            
+            *
+        FROM        	                                                                                 
+            SAMPLE_GROUP /* 샘플그룹 */                                                    
+            --SAMPLE_MEMBER /* 샘플맴버 */                           
+            --SAMPLE_DEPT	/* 샘플부서 */
+        WHERE 1=1 
+
+                /**********************************************************************************************************************************/ 
+		        ) P1 
+		    )   P 
+		WHERE 2>1 
+		    AND RNUM <![CDATA[>=]]> #{INT_FROM} 
+		    AND RNUM <![CDATA[<=]]> #{INT_TO} 
+		    AND ROWNUM <![CDATA[<=]]> #{PAGE_SIZE} 
+    </select>                                                                       
+ 
+    <!--  샘플그룹정보 상세조회 -->                                                      
+    <select id="getSampleGroup" parameterType="net.dstone.sample.member.vo.SampleGroupVo" resultType="net.dstone.sample.member.vo.SampleGroupVo">         
+        SELECT                                                            
+            *
+        FROM        	                                                                                 
+            SAMPLE_GROUP /* 샘플그룹 */                                                    
+            --SAMPLE_MEMBER /* 샘플맴버 */                           
+            --SAMPLE_DEPT	/* 샘플부서 */
+        WHERE 1=1 
+
+    </select>                                                                       
+ 
+</mapper>                                                                             
+

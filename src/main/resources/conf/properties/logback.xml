@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="LOGS_ABSOLUTE_PATH" value="D:/WorkShop/AppHome/FRAMEWORK/LOGS" />
+    <property name="LOGS_ABSOLUTE_PATH" value="D:/AppHome/LOGS/dstone" />
  
     <appender name="stdoutAppender" class="ch.qos.logback.core.ConsoleAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
@@ -29,27 +29,39 @@
     </logger>
     <!--  
     <logger name="com.zaxxer.hikari.pool.PoolBase" level="ERROR">
-        <appender-ref ref="executionAppender" />
+        <appender-ref ref="stdoutAppender" />
     </logger>
     <logger name="com.zaxxer.hikari.pool.HikariPool" level="ERROR">
-        <appender-ref ref="executionAppender" />
+        <appender-ref ref="stdoutAppender" />
     </logger>
     <logger name="com.zaxxer.hikari.HikariDataSource" level="ERROR">
-        <appender-ref ref="executionAppender" />
+        <appender-ref ref="stdoutAppender" />
     </logger>
     <logger name="java.sql" level="INFO">
-        <appender-ref ref="executionAppender" />
-    </logger>    
-    -->
-    <!--  
+        <appender-ref ref="stdoutAppender" />
+    </logger>   
     <logger name="org.springframework" level="INFO">
-        <appender-ref ref="executionAppender" />
+        <appender-ref ref="stdoutAppender" />
     </logger>
     <logger name="java.sql" level="DEBUG">
-        <appender-ref ref="executionAppender" />
+        <appender-ref ref="stdoutAppender" />
     </logger>
     -->
-    
+	    
+	<!--Log4jdbc logger-->
+	<logger name="jdbc" level="OFF"/>
+	<logger name="jdbc.connection" level="OFF"/>
+	<logger name="jdbc.sqlonly" level="INFO">
+		<appender-ref ref="executionAppender"/>
+	</logger>
+	<logger name="jdbc.sqltiming" level="OFF" additivity="false">
+		<appender-ref ref="executionAppender"/>
+	</logger>
+	<logger name="jdbc.audit" level="OFF"/>
+	<logger name="jdbc.resultset" level="OFF"/>
+	<logger name="jdbc.resultsettable" level="OFF"/>    
+	    
+	<!--Root-->
     <root level="INFO">
         <appender-ref ref="stdoutAppender" />
         <appender-ref ref="executionAppender" />
