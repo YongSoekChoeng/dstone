@@ -32,7 +32,7 @@ public class QueueHandler {
 	}
 
 	private void debug(Object o){
-		System.out.println(o);
+		net.dstone.common.utils.LogUtil.sysout(o);
 	}
 	protected void init(){
 		// 큐 초기화
@@ -66,7 +66,7 @@ public class QueueHandler {
 	}
 	
 	public void dumpQueue(){
-		System.out.println(queue);
+		net.dstone.common.utils.LogUtil.sysout(queue);
 	}
 	
 	@SuppressWarnings({ "serial", "rawtypes" })

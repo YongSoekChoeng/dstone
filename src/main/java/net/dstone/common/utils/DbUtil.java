@@ -627,7 +627,7 @@ public class DbUtil {
 				} catch (Throwable e) {}
 				strDbInfo.append("/*******************************************************************/").append("\r\n");
 			} catch (Exception e) {
-				System.out.println("getDataBaseInfo 수행중예외발생. 상세사항:" + e.toString());
+				net.dstone.common.utils.LogUtil.sysout("getDataBaseInfo 수행중예외발생. 상세사항:" + e.toString());
 			}
 		}
 	}

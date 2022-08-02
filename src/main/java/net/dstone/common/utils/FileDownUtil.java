@@ -58,7 +58,7 @@ public class FileDownUtil extends javax.servlet.http.HttpServlet {
 
 			ORI_FILE_NAME = new String(ORI_FILE_NAME.getBytes(), "UTF-8");
 			
-			System.out.println( "ORI_FILE_NAME["+ORI_FILE_NAME+"] SAVE_FILE_NAME["+SAVE_FILE_NAME+"] FILEUP_WEB_DIR["+FILEUP_WEB_DIR+"]" );
+			net.dstone.common.utils.LogUtil.sysout( "ORI_FILE_NAME["+ORI_FILE_NAME+"] SAVE_FILE_NAME["+SAVE_FILE_NAME+"] FILEUP_WEB_DIR["+FILEUP_WEB_DIR+"]" );
 
 			path = FILEUP_WEB_DIR;
 			

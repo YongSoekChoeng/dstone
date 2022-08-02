@@ -346,7 +346,7 @@ public class GuidUtil {
 		try {
 			GuidUtil g = new GuidUtil();
 		} catch (Exception e) {
-			System.out.println("Guid::main threw " + e.getClass() + " with message: " + e.getMessage());
+			net.dstone.common.utils.LogUtil.sysout("Guid::main threw " + e.getClass() + " with message: " + e.getMessage());
 		}
 	}
 }

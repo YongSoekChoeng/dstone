@@ -24,7 +24,7 @@ public class ExecutionLoggingAspect extends net.dstone.common.core.BaseObject{
 	 */
 	@Around("execution(* net.dstone.*..*Controller.*(..))")
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		System.out.println("\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "]======================================||");
+		net.dstone.common.utils.LogUtil.sysout("\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "]======================================||");
 		logger.info("+->[CONTROLLER] {"+buildSimpleExecutionInfo(joinPoint)+"}");
 		return joinPoint.proceed();
 	}

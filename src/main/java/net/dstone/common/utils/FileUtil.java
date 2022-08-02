@@ -359,6 +359,7 @@ public class FileUtil {
 			writer.flush();
 		} catch (Exception e) {
 			logger.info(e.toString());
+			e.printStackTrace();
 		} finally {
 			if (fout != null)
 				try {

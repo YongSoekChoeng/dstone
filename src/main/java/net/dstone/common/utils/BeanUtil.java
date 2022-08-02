@@ -683,7 +683,7 @@ public class BeanUtil {
 					LOCAL_NAME	= words[5].trim();
 					PARENT_NAME	= words[6].trim();
 					
-					//System.out.println( "NAME["+NAME+"] LEVEL["+words[0]+"] PARENT_NAME["+PARENT_NAME+"] VIRTUAL_GP["+VIRTUAL_GP+"]" );					
+					//net.dstone.common.utils.LogUtil.sysout( "NAME["+NAME+"] LEVEL["+words[0]+"] PARENT_NAME["+PARENT_NAME+"] VIRTUAL_GP["+VIRTUAL_GP+"]" );					
 					
 					line = TAB;
 					if(orderBy == 1){

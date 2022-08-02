@@ -11,7 +11,7 @@ public class DataGenerator {
 	public static Populator populator = new PopulatorImpl();
 	
 	private static void debug(Object msg){
-		System.out.println(msg);
+		net.dstone.common.utils.LogUtil.sysout(msg);
 	}
 	
 	public static Object genRandomData(String className){

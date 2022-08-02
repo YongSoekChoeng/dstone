@@ -88,7 +88,10 @@ public class LogUtil {
 		if( this.logger.isErrorEnabled() ){
 			this.logger.error(getLogString(o));
 		}
-		
+	}
+
+	public static void sysout(Object o) {
+		System.out.println(o);
 	}
 	
 }

@@ -35,7 +35,7 @@ public class SystemUtil {
 				pro.load(fin);
 				SystemUtil.SYSINFO_ENCODING_CONVERT = pro.getProperty("SYSINFO_ENCODING_CONVERT", "").trim().toUpperCase().equals("TRUE") ? true : false;
 			} catch (Exception e) {
-				System.out.println("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.initialize() 수행중 예외발생. 상세사항:" + e.toString());
+				net.dstone.common.utils.LogUtil.sysout("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.initialize() 수행중 예외발생. 상세사항:" + e.toString());
 			} finally {
 				if(fin != null){
 					try {
@@ -61,7 +61,7 @@ public class SystemUtil {
 				answer = DbUtil.fromDbToKor(answer);
 			}
 		} catch (Exception e) {
-			System.out.println("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.getBoolProperty('" + keyName + "') 수행중 예외발생. 상세사항:" + e.toString());
+			net.dstone.common.utils.LogUtil.sysout("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.getBoolProperty('" + keyName + "') 수행중 예외발생. 상세사항:" + e.toString());
 		} finally {
 			if (answer.trim().toUpperCase().equals("TRUE")) {
 				return true;
@@ -81,7 +81,7 @@ public class SystemUtil {
 			}
 			iAnswer = Integer.parseInt(answer);
 		} catch (Exception e) {
-			System.out.println("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.getIntProperty('" + keyName + "') 수행중 예외발생. 상세사항:" + e.toString());
+			net.dstone.common.utils.LogUtil.sysout("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.getIntProperty('" + keyName + "') 수행중 예외발생. 상세사항:" + e.toString());
 		} finally {}
 		return iAnswer;
 	}
@@ -94,7 +94,7 @@ public class SystemUtil {
 				answer = DbUtil.fromDbToKor(answer);
 			}
 		} catch (Exception e) {
-			System.out.println("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.getProperty('" + keyName + "') 수행중 예외발생. 상세사항:" + e.toString());
+			net.dstone.common.utils.LogUtil.sysout("<MESSAGE>[" + DateUtil.getToDate("yyyy'년 'MM'월 'dd'일 'HH'시'mm'분 'ss'초'") + "] " + "SystemUtil.getProperty('" + keyName + "') 수행중 예외발생. 상세사항:" + e.toString());
 		} finally {}
 		return answer;
 	}
@@ -119,7 +119,7 @@ public class SystemUtil {
 		while (enum2.hasMoreElements()) {
 			name = (String) enum2.nextElement();
 			value = prop.getProperty(name);
-			System.out.println("[ " + name + " ]:" + value);
+			net.dstone.common.utils.LogUtil.sysout("[ " + name + " ]:" + value);
 		}
 	}
 
@@ -132,10 +132,10 @@ public class SystemUtil {
 		long freeMem = rt.freeMemory();
 		java.text.NumberFormat nf = java.text.NumberFormat.getInstance();
 
-		System.out.println("/********************* Memory Check 시작 **********************/");
-		System.out.println("Total amount of memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMem)), 20, " ") + " byte]");
-		System.out.println("Amount of free memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMem)), 20, " ") + " byte]");
-		System.out.println("/********************* Memory Check 끝 ************************/");
+		net.dstone.common.utils.LogUtil.sysout("/********************* Memory Check 시작 **********************/");
+		net.dstone.common.utils.LogUtil.sysout("Total amount of memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMem)), 20, " ") + " byte]");
+		net.dstone.common.utils.LogUtil.sysout("Amount of free memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMem)), 20, " ") + " byte]");
+		net.dstone.common.utils.LogUtil.sysout("/********************* Memory Check 끝 ************************/");
 
 	}
 

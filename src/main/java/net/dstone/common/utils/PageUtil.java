@@ -77,7 +77,7 @@ public class PageUtil {
 	String IMG_NEXT = "/img/blat5.gif";
 
 	private void debug(Object o) {
-		System.out.println(o);
+		net.dstone.common.utils.LogUtil.sysout(o);
 	}
 
 	/**

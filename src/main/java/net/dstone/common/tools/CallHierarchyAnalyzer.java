@@ -14,7 +14,7 @@ public class CallHierarchyAnalyzer {
 	}
 	
 	private void debug(Object msg){
-		System.out.println(msg);
+		net.dstone.common.utils.LogUtil.sysout(msg);
 	}
 	
 	public static CallHierarchyAnalyzer getInstance(String rootPath){

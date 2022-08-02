@@ -1,19 +1,24 @@
-package net.dstone.common.queue;
+package net.dstone.common.task;
 
 import java.util.Properties;
+import java.util.concurrent.Callable;
 
-public abstract class QueueItem {
-
+public abstract class TaskItem implements Callable<TaskItem>{
+	
 	protected void debug(Object o){
 		net.dstone.common.utils.LogUtil.sysout(o);
 	}
 	
+	public abstract TaskItem doTheTask();
+	
+	@Override
+	public TaskItem call() throws Exception {
+		return (TaskItem)this.doTheTask();
+	}
+	
 	private String strId = "";
 	private Properties prop = new Properties();
-	
-	public QueueItem(){
-		strId = String.valueOf(System.currentTimeMillis());
-	}
+
 	/**
 	 * @return
 	 * 2007. 12. 23.
@@ -91,7 +96,10 @@ public abstract class QueueItem {
 	public Properties getProp(){
 		return this.prop;
 	}
-	
-	public abstract void doTheJob();
 
+	@Override
+	public String toString() {
+		return "TaskItem [strId=" + strId + ", prop=" + prop + "]";
+	}
+	
 }

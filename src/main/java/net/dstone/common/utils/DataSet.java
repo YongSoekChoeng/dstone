@@ -331,7 +331,7 @@ public class DataSet implements java.io.Serializable {
 		if(DATA_TRIM_YN){
 			val = val.trim();
 		}
-//System.out.println( "getValFromFld :: key["+key+"] val["+val+"] length["+size+"] realSize["+val.getBytes().length+"]" );		
+//net.dstone.common.utils.LogUtil.sysout( "getValFromFld :: key["+key+"] val["+val+"] length["+size+"] realSize["+val.getBytes().length+"]" );		
 		return val;
 	}
 
@@ -350,7 +350,7 @@ public class DataSet implements java.io.Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		//System.out.println( "setValToFld :: key["+key+"] length["+length+"] realSize["+strByteArray.length+"] val["+new String(strByteArray)+"]" );		
+		//net.dstone.common.utils.LogUtil.sysout( "setValToFld :: key["+key+"] length["+length+"] realSize["+strByteArray.length+"] val["+new String(strByteArray)+"]" );		
 		return strByteArray;
 	}
 	
@@ -373,7 +373,7 @@ public class DataSet implements java.io.Serializable {
 		buffer.append(this.toString("")).append(N);
 		buffer.append("").append("||******************************* ").append(" DataSet" + (struct !=null ? "["+struct.getStructId()+"]" : "" ) + " End ").append(" *******************************||").append(N);
 		//debug(buffer.toString());
-		System.out.println(buffer.toString());
+		net.dstone.common.utils.LogUtil.sysout(buffer.toString());
 	}
 	
 	private ObjectMapper getJsonMapper(){

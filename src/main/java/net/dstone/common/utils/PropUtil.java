@@ -27,7 +27,7 @@ public class PropUtil {
 		Properties props = new Properties();
 		File propsFile = null;
 		String propsName = "";
-		System.out.println( "||============================================ SYSTEM.KIND[" + StringUtil.nullCheck(System.getProperty("SYSTEM.KIND"), "local") + "] ============================================||" );
+		net.dstone.common.utils.LogUtil.sysout( "||============================================ SYSTEM.KIND[" + StringUtil.nullCheck(System.getProperty("SYSTEM.KIND"), "local") + "] ============================================||" );
 
 		if (propFiles != null) {
 			
