@@ -166,7 +166,7 @@ public class QueueHandler {
 					
 					net.dstone.common.task.TaskHandler.TaskConfig conf = net.dstone.common.task.TaskHandler.getInstance().getTaskConfig();
 					conf.setTaskMode(net.dstone.common.task.TaskHandler.FIXED);
-					conf.setThreadNumWenFixed(THREAD_NUM_PER_ONE_FETCH);
+					conf.setThreadNumWhenFixed(THREAD_NUM_PER_ONE_FETCH);
 					conf.setWaitTimeAfterShutdown(1);
 					
 					workList = net.dstone.common.task.TaskHandler.getInstance().doTheTasks(conf, workList);

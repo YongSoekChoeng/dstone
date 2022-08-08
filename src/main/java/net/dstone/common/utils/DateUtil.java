@@ -2,6 +2,8 @@ package net.dstone.common.utils;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
 
 public class DateUtil {
@@ -9,6 +11,7 @@ public class DateUtil {
 	public static final String DATE_FORMAT_YMDHMS = "yyyyMMddHHmmss";
 	public static final String DATE_FORMAT_YMD = "yyyyMMdd";
 	public static final String[] WEEK_DAY = { "일", "월", "화", "수", "목", "금", "토" };
+	public static HashMap<String, Calendar> STOPWATCH_MAP = new HashMap<String, Calendar>();
 
 	/** 
 	 * 오늘 날짜를 지정된 형식으로 반환.
@@ -582,4 +585,50 @@ public class DateUtil {
 		return startEnd;
 	}
 
+	public static void stopWatchStart(String stopWatchId) {
+		Calendar before = Calendar.getInstance();
+		SimpleDateFormat hhmmssSSS = new SimpleDateFormat("HH:mm:ss.SSS");
+		STOPWATCH_MAP.put(stopWatchId, before);
+		LogUtil.sysout( "||====================================== ["+stopWatchId+"]START [시작시간 "+hhmmssSSS.format(before.getTime())+"] ======================================||" );
+		
+	}
+	public static void stopWatchEnd(String stopWatchId) {
+		StringBuffer buff = new StringBuffer();
+		if(!STOPWATCH_MAP.containsKey(stopWatchId)){
+			LogUtil.sysout("["+stopWatchId+"]는 존재하지않은 정보입니다.");
+		}
+		try {
+			Calendar before = STOPWATCH_MAP.get(stopWatchId);
+			Calendar after = Calendar.getInstance();
+			
+			SimpleDateFormat hhmmssSSS = new SimpleDateFormat("HH:mm:ss.SSS");
+
+			int hh = after.get(Calendar.HOUR_OF_DAY) - before.get(Calendar.HOUR_OF_DAY);
+			int mm = after.get(Calendar.MINUTE) - before.get(Calendar.MINUTE);
+			int ss = after.get(Calendar.SECOND) - before.get(Calendar.SECOND);
+			int SSS = after.get(Calendar.MILLISECOND) - before.get(Calendar.MILLISECOND);
+			if(SSS < 0){
+				ss--;
+				SSS = after.get(Calendar.MILLISECOND)+(1*1000) - before.get(Calendar.MILLISECOND);
+			}
+			if(ss < 0){
+				mm--;
+				ss = after.get(Calendar.SECOND)+(1*60) - before.get(Calendar.SECOND);
+			}
+			if(mm < 0){
+				hh--;
+				mm = after.get(Calendar.MINUTE)+(1*60) - before.get(Calendar.MINUTE);
+			}
+			if(hh < 0){
+				hh = 0;
+			}
+			
+			String elapsedTime = StringUtil.filler(String.valueOf(hh), 2, "0")+"시간  "+StringUtil.filler(String.valueOf(mm), 2, "0")+"분 "+StringUtil.filler(String.valueOf(ss), 2, "0")+"."+StringUtil.filler(String.valueOf(SSS), 3, "0")+"초";
+
+			LogUtil.sysout( "||====================================== ["+stopWatchId+"]END   [종료시간 "+hhmmssSSS.format(after.getTime())+" 소요시간 "+elapsedTime+"] ======================================||" );
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 }

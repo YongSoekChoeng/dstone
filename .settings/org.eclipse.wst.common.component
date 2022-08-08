@@ -6,6 +6,6 @@
         <wb-resource deploy-path="/WEB-INF/classes" source-path="/src/main/resources"/>
         <wb-resource deploy-path="/" source-path="/src/main/webapp"/>
         <property name="java-output-path" value="/프레임웍/WebContent/WEB-INF/classes"/>
-        <property name="context-root" value="dstone"/>
+        <property name="context-root" value="/"/>
     </wb-module>
 </project-modules>

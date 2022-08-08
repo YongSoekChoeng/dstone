@@ -6,9 +6,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.LineIterator;
 
 public class FileUtil {
 
@@ -749,6 +761,141 @@ public class FileUtil {
 		listVec.clear();
 		listVec = null;
 		return result;
+	}
+	
+	public static void sortFile(String inputFileFullPath, String outputFileFullPath) {
+		try {
+			sortFile(inputFileFullPath, outputFileFullPath, com.google.code.externalsorting.ExternalSort.defaultcomparator);
+		} catch (Exception e) {
+			logger.error(e.toString());
+		}
+	}
+	public static void sortFile(String inputFileFullPath, String outputFileFullPath, Comparator<String> cmp) {
+		try {
+			com.google.code.externalsorting.ExternalSort.sort(new File(inputFileFullPath), new File(outputFileFullPath), cmp);
+		} catch (Exception e) {
+			logger.error(e.toString());
+		}
+	}
+	
+	public static void mergeFiles(String inputDir, String outputFileFullPath) {
+		mergeFiles(inputDir, outputFileFullPath, new Comparator<String>() {
+            @Override
+            public int compare(String r1, String r2) {
+                    return 0;
+            }			
+		});
+	}
+	
+	public static void mergeFiles(String inputDir, String outputFileFullPath, Comparator<String> cmp) {
+		List<File> files = new ArrayList<File>();
+		try {
+			String[] fileList = readFileListAll(inputDir) ;
+			if(fileList != null){
+				for(String file : fileList){
+					files.add(new File(file));
+				}
+			}
+			com.google.code.externalsorting.ExternalSort.mergeSortedFiles(files, new File(outputFileFullPath), cmp);
+		} catch (Exception e) {
+			logger.error(e.toString());
+		}
+	}	
+	
+	
+	
+	
+	
+
+	/**
+	 * Given a source file, the charset encoding of the containing text, and the
+	 * maximum split size allowed this method will split the source file into
+	 * several individual files in byte sizes less than or equal to the
+	 * splitMaxByteSize parameter while preserving integrity of individual
+	 * lines.
+	 * 
+	 * Note that since line integrity is guaranteed the individual split files
+	 * can be of different sizes since file splits always begin with a full line
+	 * and end with a full line (i.e. no lines will be split across separate
+	 * files).
+	 * 
+	 * @param sourceTextFile
+	 *            The source file which contains textual data
+	 * @param encoding
+	 *            The charset encoding of the textual data in the source file
+	 * @param splitMaxByteSize
+	 *            The maximum size in bytes of the individual split files
+	 * @return The set of split files created from the source file
+	 * @throws Exception
+	 */
+	public static List<String> splitTextFile(String inputFileFullPath, String outputDir, int fileSizeByMB) throws Exception {
+		int defaultCharBufferSize = 8192;
+		String fileName = getFileName(inputFileFullPath);
+		String fileExt = getFileExt(inputFileFullPath);
+		File sourceTextFile = new File(inputFileFullPath);
+		Charset encoding = Charset.defaultCharset();
+		long sourceTotalByteSize = sourceTextFile.length();
+		List<String> splitFiles = new ArrayList<String>();
+		long splitMaxByteSize = fileSizeByMB * 1000 * 1000;
+		
+		if (sourceTotalByteSize <= splitMaxByteSize) {
+			splitFiles.add(sourceTextFile.getAbsolutePath());
+			return splitFiles;
+		}
+		// Calculate total number of split files
+		int numSplitFiles = ((int) (sourceTotalByteSize / splitMaxByteSize)) + (splitMaxByteSize % sourceTotalByteSize > 0 ? 1 : 0);
+
+		/**
+		 * Maps the split file number to a byte index in the source file that
+		 * represents the last byte stored in the split file.
+		 */
+		Map<Integer, Long> splitNumLastLineTotalBytes = new HashMap<Integer, Long>();
+
+		Long totalByteSize = 0L;
+
+		LineIterator it = null;
+		FileInputStream sourceInputStream = new FileInputStream(sourceTextFile);
+		int lastLineBreakByteSize = 0;
+		try {
+			net.dstone.common.utils.resources.LineBufferedReader advancedBufferReader = new net.dstone.common.utils.resources.LineBufferedReader(new InputStreamReader(sourceInputStream, encoding), defaultCharBufferSize);
+			it = IOUtils.lineIterator(advancedBufferReader);
+			while (it.hasNext()) {
+				char[] lastLineTerminators = advancedBufferReader.getLastLineTerminatorChars();
+				lastLineBreakByteSize = new String(lastLineTerminators).getBytes(encoding).length;
+				totalByteSize += it.nextLine().getBytes(encoding).length + lastLineBreakByteSize;
+				int splitFileNum = (int) (totalByteSize / splitMaxByteSize) + 1;
+				splitNumLastLineTotalBytes.put(splitFileNum, totalByteSize);
+			}
+		} finally {
+			LineIterator.closeQuietly(it);
+		}
+
+		FileChannel sourceFileChannel = null;
+		try (RandomAccessFile sourceTextFileRAM = new RandomAccessFile(sourceTextFile, "r")) {
+			sourceFileChannel = sourceTextFileRAM.getChannel();
+			int position = 0;
+			Long lastTotalBytesOfLastLineForSplitFile = 0L;
+			for (int i = 1; i <= numSplitFiles; i++) {
+				Long totalBytesOfLastLineForSplitFile = splitNumLastLineTotalBytes.get(i);
+				Long byteSize = totalBytesOfLastLineForSplitFile - lastTotalBytesOfLastLineForSplitFile;
+				MappedByteBuffer mappedByteBuffer = sourceFileChannel.map(MapMode.READ_ONLY, position, byteSize);
+				position = totalBytesOfLastLineForSplitFile.intValue();
+				lastTotalBytesOfLastLineForSplitFile = totalBytesOfLastLineForSplitFile;
+
+				File splitFile = new File(outputDir + "/" + fileName + "_" + i + "." + fileExt);
+				if (splitFile.exists()){
+					splitFile.delete();
+				}
+
+				try (RandomAccessFile splitFileRAM = new RandomAccessFile(splitFile, "rw")) {
+					FileChannel splitFileChannel = splitFileRAM.getChannel();
+					splitFileChannel.write(mappedByteBuffer);
+					splitFiles.add(splitFile.getAbsolutePath());
+					
+				}
+			}
+		}
+		return splitFiles;
 	}
 	
 }

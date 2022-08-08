@@ -27,23 +27,23 @@ public class TaskHandler {
 		}
 		/**
 		 * @param taskMode : TaskHandler.CACHED, TaskHandler.FIXED, TaskHandler.SINGLE 중 하나.
-		 * @param threadNumWenFixed : taskMode 가 TaskHandler.FIXED 일 때 생성할 쓰레드 갯수.
+		 * @param threadNumWhenFixed : taskMode 가 TaskHandler.FIXED 일 때 생성할 쓰레드 갯수.
 		 */
 		public TaskConfig(int taskMode, int threadNumWenFixed){
 			this.taskMode = taskMode;
 			if(threadNumWenFixed > 0){
-				this.threadNumWenFixed = threadNumWenFixed;
+				this.threadNumWhenFixed = threadNumWenFixed;
 			}			
 		}
 		/**
 		 * @param taskMode : TaskHandler.CACHED, TaskHandler.FIXED, TaskHandler.SINGLE 중 하나.
-		 * @param threadNumWenFixed : taskMode 가 TaskHandler.FIXED 일 때 생성할 쓰레드 갯수.
+		 * @param threadNumWhenFixed : taskMode 가 TaskHandler.FIXED 일 때 생성할 쓰레드 갯수.
 		 * @param waitTimeAfterShutdown : shutdown 명령 이후 쓰레드가 실제로 종료했는지 확인하기 위한 대기시간. 이 시간이 지나면 강제종료.
 		 */
 		public TaskConfig(int taskMode, int threadNumWenFixed, int waitTimeAfterShutdown){
 			this.taskMode = taskMode;
 			if(threadNumWenFixed > 0){
-				this.threadNumWenFixed = threadNumWenFixed;
+				this.threadNumWhenFixed = threadNumWenFixed;
 			}			
 			if(waitTimeAfterShutdown > 0){
 				this.waitTimeAfterShutdown = waitTimeAfterShutdown;
@@ -53,7 +53,7 @@ public class TaskHandler {
 		/*******************************************************************
 		(적당한 스레드 수) = (CPU 개수) * (CPU 활용도 0~1) * ( 1 + 작업시간 대비 대기 시간의 비율)
 		*******************************************************************/
-		protected int threadNumWenFixed = Runtime.getRuntime().availableProcessors() * (1) * (1);
+		protected int threadNumWhenFixed = Runtime.getRuntime().availableProcessors() * (1) * (1);
 		protected int waitTimeAfterShutdown = 0;
 		
 		public int getTaskMode() {
@@ -62,11 +62,11 @@ public class TaskHandler {
 		public void setTaskMode(int taskMode) {
 			this.taskMode = taskMode;
 		}
-		public int getThreadNumWenFixed() {
-			return threadNumWenFixed;
+		public int getThreadNumWhenFixed() {
+			return threadNumWhenFixed;
 		}
-		public void setThreadNumWenFixed(int threadNumWenFixed) {
-			this.threadNumWenFixed = threadNumWenFixed;
+		public void setThreadNumWhenFixed(int threadNumWenFixed) {
+			this.threadNumWhenFixed = threadNumWenFixed;
 		}
 		public int getWaitTimeAfterShutdown() {
 			return waitTimeAfterShutdown;
@@ -112,7 +112,7 @@ public class TaskHandler {
 		if(conf.taskMode == TaskHandler.CACHED){
 			executorService = Executors.newCachedThreadPool();
 		}else if(conf.taskMode == TaskHandler.FIXED){
-			executorService = Executors.newFixedThreadPool(conf.threadNumWenFixed);
+			executorService = Executors.newFixedThreadPool(conf.threadNumWhenFixed);
 		}else{
 			executorService = Executors.newSingleThreadExecutor();
 		}
@@ -144,7 +144,7 @@ public class TaskHandler {
 		if(conf.taskMode == TaskHandler.CACHED){
 			executorService = Executors.newCachedThreadPool();
 		}else if(conf.taskMode == TaskHandler.FIXED){
-			executorService = Executors.newFixedThreadPool(conf.threadNumWenFixed);
+			executorService = Executors.newFixedThreadPool(conf.threadNumWhenFixed);
 		}else{
 			executorService = Executors.newSingleThreadExecutor();
 		}
