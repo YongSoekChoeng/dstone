@@ -31,18 +31,29 @@ import org.apache.commons.httpclient.methods.HeadMethod;
 import org.apache.commons.httpclient.methods.OptionsMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.methods.RequestEntity;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.commons.httpclient.methods.TraceMethod;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.HttpContext;
 import org.apache.http.ssl.SSLContexts;
 
 public class WsUtil {
 	
 	public static int HTTP_OK = 200;
 	public static int HTTP_NOT_FOUND = 400;
+
+	public static String CONT_TYPE_HTML = "text/html";
+	public static String CONT_TYPE_XML = "text/xml";
+	public static String CONT_TYPE_FORM = "application/x-www-form-urlencoded";
+	public static String CONT_TYPE_JSON = "application/json";
 
 	private static LogUtil logger = new LogUtil(WsUtil.class);
 	
@@ -69,6 +80,7 @@ public class WsUtil {
 	public String execute(Bean tBean) {
 		return execute(tBean, null);
 	}
+
 	public String execute(Bean tBean, String charset) {
 
 		this.bean = tBean;
@@ -79,52 +91,39 @@ public class WsUtil {
 			}
 			
 			if ("GET".equals(bean.method)) {
-				httpMethod = new GetMethod(bean.url);
-				addHeaders(httpMethod);
+				this.httpMethod = new GetMethod(bean.url);
+				addHeaders();
 			} else if ("POST".equals(bean.method)) {
-				httpMethod = new PostMethod(bean.url);
-				addHeaders(httpMethod);
-				addParams((PostMethod) httpMethod, charset);
-				addTextBody(charset);
-				addJsonBody(charset);
-				RequestEntity re = new StringRequestEntity(bean.body, bean.contentType, charset);
-				((PostMethod) httpMethod).setRequestEntity(re);
+				this.httpMethod = new PostMethod(bean.url);
+				addHeaders();
+				addBody(charset);
 			} else if ("HEAD".equals(bean.method)) {
-				httpMethod = new HeadMethod(bean.url);
-				addHeaders(httpMethod);
+				this.httpMethod = new HeadMethod(bean.url);
+				addHeaders();
 			} else if ("PUT".equals(bean.method)) {
-				httpMethod = new PutMethod(bean.url);
-				addHeaders(httpMethod);
-				addTextBody(charset);
-				addJsonBody(charset);
-				RequestEntity re = new StringRequestEntity(bean.body, bean.contentType, charset);
-				((PutMethod) httpMethod).setRequestEntity(re);
+				this.httpMethod = new PutMethod(bean.url);
+				addHeaders();
+				addBody(charset);
 			} else if ("DELETE".equals(bean.method)) {
-				httpMethod = new DeleteMethod(bean.url);
-				addHeaders(httpMethod);
-
+				this.httpMethod = new DeleteMethod(bean.url);
+				addHeaders();
 			} else if ("TRACE".equals(bean.method)) {
-				httpMethod = new TraceMethod(bean.url);
-				addHeaders(httpMethod);
-
+				this.httpMethod = new TraceMethod(bean.url);
+				addHeaders();
 			} else if ("OPTIONS".equals(bean.method)) {
-				httpMethod = new OptionsMethod(bean.url);
-				addHeaders(httpMethod);
-
+				this.httpMethod = new OptionsMethod(bean.url);
+				addHeaders();
 			} else {
 				throw new RuntimeException("Method '" + bean.method + "' not implemented.");
 			}
-			
-			doExecute(httpMethod, this.response);
+			doExecute(this.httpMethod, this.response);
 
 		} catch (java.io.IOException e) {
 			abort();
 			e.printStackTrace();
-
 		} catch (IllegalArgumentException e) {
 			abort();
 			e.printStackTrace();
-
 		} catch (Exception e) {
 			abort();
 			e.printStackTrace();
@@ -133,9 +132,49 @@ public class WsUtil {
 	}
 	
 	/**
+	 * Populating HttpMethod with headers
+	 */
+	private void addHeaders() {
+		for (String key : bean.headers.keySet()) {
+			Collection<String> values = (Collection<String>) bean.headers.get(key);
+			StringBuilder sb = new StringBuilder();
+			int cnt = 0;
+			for (String val : values) {
+				if (cnt != 0) {
+					sb.append(",");
+				}
+				sb.append(val);
+				cnt++;
+			}
+			this.httpMethod.addRequestHeader(key, sb.toString());
+		}
+	}		
+	
+	/**
+	 * Populating Body
+	 */
+	private void addBody(String charset)throws Exception {
+		if(this.bean != null){
+			// JSON 전송일 경우
+			if( WsUtil.CONT_TYPE_JSON.equals(this.bean.contentType) ){
+				this.addJsonBody(charset);
+			// FORM 전송일 경우
+			}else if( WsUtil.CONT_TYPE_FORM.equals(this.bean.contentType) ){
+				this.addParams(charset);
+			// XML 전송일 경우
+			}else if( WsUtil.CONT_TYPE_XML.equals(this.bean.contentType) ){
+				this.addXmlBody(charset);
+			// 나머지 전송일 경우
+			}else{
+				this.addTextBody(charset);
+			}
+		}
+	}	
+	
+	/**
 	 * Populating PostMethod with parameters
 	 */
-	private void addParams(PostMethod postMethod, String charset) {
+	private void addParams(String charset) {
 		for (String key : bean.parameters.keySet()) {
 			Collection<String> values = (Collection<String>) bean.parameters.get(key);
 			StringBuilder sb = new StringBuilder();
@@ -149,43 +188,9 @@ public class WsUtil {
 				}else{
 					sb.append(StringUtil.encodingConv(val, charset));
 				}
-				
 				cnt++;
 			}
-			postMethod.setParameter(key, sb.toString());
-			//postMethod.addParameter(key, sb.toString());
-		}
-	}
-
-	/**
-	 * Populating HttpMethod with headers
-	 */
-	private void addHeaders(HttpMethod httpMethod) {
-		for (String key : bean.headers.keySet()) {
-			Collection<String> values = (Collection<String>) bean.headers.get(key);
-			StringBuilder sb = new StringBuilder();
-			int cnt = 0;
-			for (String val : values) {
-				if (cnt != 0) {
-					sb.append(",");
-				}
-				sb.append(val);
-				cnt++;
-			}
-			httpMethod.addRequestHeader(key, sb.toString());
-		}
-	}
-	
-	/**
-	 * Populating Body
-	 */
-	private void addTextBody(String charset) {
-		if( bean.bodyBuff.length() > 0 ){	
-			if(StringUtil.isEmpty(charset)){
-				bean.body = bean.body + bean.bodyBuff.toString();
-			}else{
-				bean.body = bean.body + StringUtil.encodingConv(bean.bodyBuff.toString(), charset);
-			}
+			((PostMethod)this.httpMethod).addParameter(key, sb.toString());
 		}
 	}
 
@@ -201,6 +206,30 @@ public class WsUtil {
 			}
 		}
 	}
+	/**
+	 * Populating Body
+	 */
+	private void addTextBody(String charset) {
+		if( bean.bodyBuff.length() > 0 ){	
+			if(StringUtil.isEmpty(charset)){
+				bean.body = bean.body + bean.bodyBuff.toString();
+			}else{
+				bean.body = bean.body + StringUtil.encodingConv(bean.bodyBuff.toString(), charset);
+			}
+		}
+	}
+	/**
+	 * Populating Body
+	 */
+	private void addXmlBody(String charset) {
+		if( bean.bodyBuff.length() > 0 ){	
+			if(StringUtil.isEmpty(charset)){
+				bean.body = bean.body + bean.bodyBuff.toString();
+			}else{
+				bean.body = bean.body + StringUtil.encodingConv(bean.bodyBuff.toString(), charset);
+			}
+		}
+	}	
 	
 
 	/**
@@ -210,14 +239,16 @@ public class WsUtil {
 		if( this.bean.url.toLowerCase().startsWith("https") ){
 			Protocol.registerProtocol("https", new Protocol("https", new TrustAllSsLSocketFactory(), 433));
 		}
-		HttpClient client = new HttpClient();
-		long sTime = System.currentTimeMillis();
-		long eTime = 0;
-		boolean debugInOutYn					= true;
-		StringBuffer debugStr = new StringBuffer();
+		
+		HttpClient client 		= null;
+		long sTime 				= System.currentTimeMillis();
+		long eTime 				= 0;
+		boolean debugInOutYn	= true;
+		StringBuffer debugStr 	= new StringBuffer();
 		try {
-			responseReader.outputStr = new StringBuffer();
 
+			client 					= new HttpClient();
+			responseReader.outputStr = new StringBuffer();
 			client.executeMethod(httpMethod);	
 			responseReader.read(httpMethod);
 			
@@ -241,7 +272,7 @@ public class WsUtil {
 		} finally {
 			if (httpMethod != null){
 				httpMethod.releaseConnection();
-			}
+			}		
 		}
 	}
 	
@@ -266,7 +297,7 @@ public class WsUtil {
 		public String method = "GET";
 		public String url = "";
 		public String body = "";
-		public String contentType = null;
+		public String contentType = "text/html";
 		
 		private Map<String, Collection<String>> headers = new HashMap<String, Collection<String>>();
 		private Map<String, Collection<String>> parameters = new HashMap<String, Collection<String>>();
@@ -274,6 +305,9 @@ public class WsUtil {
 		private Map<String, Map<String, Object>> bodyJsonMap = new LinkedHashMap<String, Map<String, Object>>();
 
 		public void addHeader(String key, String value) {
+			if( StringUtil.isEmpty(this.contentType)){
+				this.contentType = WsUtil.CONT_TYPE_HTML;
+			}
 			List<String> valuesList = (List<String>) headers.get(key);
 			if (valuesList == null) {
 				valuesList = new ArrayList<String>();
@@ -283,6 +317,7 @@ public class WsUtil {
 		}
 
 		public void addParam(String key, String value) {
+			this.contentType = WsUtil.CONT_TYPE_FORM;
 			Collection<String> valuesList = (Collection<String>) parameters.get(key);
 			if (valuesList == null) {
 				valuesList = new ArrayList<String>();
@@ -293,8 +328,8 @@ public class WsUtil {
 
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		public void addJsonBody(String key, Object bean) {
+			this.contentType = WsUtil.CONT_TYPE_JSON;
 			if( bean != null ){
-				this.contentType = "application/json";
 				Map<String, Object> valuesList = null;
 				Map<String, Object> tempValuesList = null;
 				if( bodyJsonMap.containsKey(key) ){
@@ -319,7 +354,12 @@ public class WsUtil {
 		}
 
 		public void addTextBody(String text) {
+			this.contentType = WsUtil.CONT_TYPE_HTML;
 			bodyBuff.append(text);
+		}
+		public void addXmlBody(String xml) {
+			this.contentType = WsUtil.CONT_TYPE_XML;
+			bodyBuff.append(xml);
 		}
 
 		public String toString() {
@@ -418,6 +458,10 @@ public class WsUtil {
 		public Socket createSocket(String host, int port) throws IOException, UnknownHostException {
 			return getSocketFactory().createSocket(host, port);
 		}
+		
+	}
+
+	private static void getHttpClient(){
 		
 	}
 }

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+ 
+    <Appenders>
+    
+        <Console name="console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss} %5p [%c] %m%n"/>
+        </Console>
+
+        <RollingFile name ="rollingFile">
+            <FileName>D:/AppHome/LOGS/dstone/execution/execution.log</FileName>
+            <FilePattern>D:/AppHome/LOGS/dstone/execution/%d{yyyy-MM-dd}/execution.zip</FilePattern>
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} %5p [%c] %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval = "1" modulate = "true"/>
+            </Policies>
+        </RollingFile>
+        
+    </Appenders>
+
+    <Loggers>
+    	<!-- You can specify loggers down here ! -->
+    	
+		<!--Spring logger-->
+	    <Logger name="org.springframework" level="INFO" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		    
+		<!--Jdbc logger-->
+		<Logger name="jdbc" level="OFF" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.connection" level="OFF" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.sqlonly" level="INFO" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>
+		<Logger name="jdbc.sqltiming" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>
+		<Logger name="jdbc.audit" level="OFF" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.resultset" level="OFF" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.resultsettable" level="OFF" additivity="true">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+	    <Logger name="com.zaxxer.hikari" level="OFF" additivity="true">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>
+	    
+	    <!--  
+	    <Logger name="java.sql" level="INFO" additivity="true">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>   
+	    <Logger name="org.springframework" level="INFO" additivity="true">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>
+	    <Logger name="java.sql" level="DEBUG" additivity="true">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>
+	    -->
+        
+        <Root level="INFO" additivity="true">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+        </Root>
+    </Loggers>
+    
+</Configuration>

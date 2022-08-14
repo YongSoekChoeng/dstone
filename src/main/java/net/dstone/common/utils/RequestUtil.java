@@ -9,7 +9,7 @@ public class RequestUtil {
 	private static LogUtil logger = new LogUtil(RequestUtil.class);
 	
 	private boolean boolRequestParseYn = true;
-	private boolean boolRequestDetailParseYn = false;
+	private boolean boolRequestDetailParseYn = true;
 
 	private static final String MAST_BAR_1 = "*****************************************";
 	private static final String MAST_BAR_2 = "========================================";

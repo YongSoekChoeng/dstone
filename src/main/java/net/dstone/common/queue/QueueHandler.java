@@ -14,11 +14,11 @@ public class QueueHandler {
 	/**
 	 * 큐에 아이템이 있을 경우 Fetch해올 큐아이템 갯수. -1 이면 큐의 모든 아이템을 Fetch해온다.
 	 */
-	public static int FETCH_SIZE_BY_ONE = 100;    
+	public static int FETCH_SIZE_BY_ONE = 500; 
 	/**
 	 * Fetch해온  큐아이템을 처리 할 쓰레드 갯수.
 	 */
-	public static int THREAD_NUM_PER_ONE_FETCH = 10;    
+	public static int THREAD_NUM_PER_ONE_FETCH = 30;    
 	/****************************  설정 끝   ****************************/
 	
 	protected static QueueHandler queueHandler = null;
@@ -75,7 +75,7 @@ public class QueueHandler {
 		net.dstone.common.utils.LogUtil.sysout(queue);
 	}
 	
-	@SuppressWarnings({ "serial", "rawtypes" })
+	@SuppressWarnings({ "serial" })
 	class Queue extends ArrayList<QueueItem>{
 		
 		public boolean isEmpty(){
@@ -118,7 +118,6 @@ public class QueueHandler {
 			}
 		}
 		
-		@SuppressWarnings("unchecked")
 		private Queue fetchFromQueue(){
 			Queue queueToBeWorked = new Queue();
 			try {

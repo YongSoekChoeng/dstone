@@ -1,6 +1,5 @@
 package net.dstone.common.utils;
 
-import java.awt.List;
 import java.util.ArrayList;
 
 import net.dstone.common.task.TaskItem;
@@ -73,7 +72,7 @@ public class WStressUtil {
 		conf.setTaskMode(net.dstone.common.task.TaskHandler.FIXED);
 		conf.setThreadNumWhenFixed(config.getConcurrentUserNum());
 		conf.setWaitTimeAfterShutdown(1);
-				
+						
 		try {
 			ArrayList<TaskItem> taskList = new ArrayList<TaskItem>();
 			for(int i=0; i<conf.getThreadNumWhenFixed(); i++){
@@ -84,19 +83,23 @@ public class WStressUtil {
 							
 							net.dstone.common.utils.WsUtil ws = new net.dstone.common.utils.WsUtil();
 							try {
+								
 								for(int k=0; k<config.getFireNumByUser(); k++){
-									Thread.sleep(config.getThinkTimeByMillSec());
 									
+									if( config.getThinkTimeByMillSec() > 0 ){
+										Thread.sleep(config.getThinkTimeByMillSec());
+									}
 									net.dstone.common.utils.WsUtil.Bean wsBean = new net.dstone.common.utils.WsUtil.Bean();
-									wsBean.url = url;
-									wsBean.method = "POST";
 									String[] paramKeys = ds.getChildrenKeys();
 									if(paramKeys != null){
 										for(String key : paramKeys){
-											wsBean.addParam(key, ds.getChild(key).toString());
+											wsBean.addParam(key, ds.getDatum(key));
 										}
 									}
+									wsBean.url = url;
+									wsBean.method = "POST";			
 									ws.execute(wsBean);
+									
 								}
 
 							} catch (Exception e) {
@@ -107,8 +110,6 @@ public class WStressUtil {
 					}						
 				);
 			}
-			
-			
 			net.dstone.common.task.TaskHandler.getInstance().doTheTasks(conf, taskList);
 			
 		} catch (Exception e) {

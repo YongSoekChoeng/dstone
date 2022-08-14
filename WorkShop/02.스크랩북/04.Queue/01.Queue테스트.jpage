@@ -1,5 +1,5 @@
 net.dstone.common.utils.DateUtil.stopWatchStart("01.Queue테스트");
-try {		String filePath = "D:/Temp/samplequeue";		java.util.ArrayList<net.dstone.common.queue.QueueItem> workList = new java.util.ArrayList<net.dstone.common.queue.QueueItem>();	for(int i =0; i<100; i++){		net.dstone.sample.queue.SampleQueueItem item = new net.dstone.sample.queue.SampleQueueItem();		item.setId("TEST-"+ i);		item.setProperty("filePath", filePath);		item.setProperty("deleteFileYn", "N");		net.dstone.common.queue.QueueHandler.getInstance().addQueue(item);	}	System.out.println(workList);		System.out.println( "||====================================== END !!! ======================================||" );	
+try {		String filePath = "D:/Temp/samplequeue";		java.util.ArrayList<net.dstone.common.queue.QueueItem> workList = new java.util.ArrayList<net.dstone.common.queue.QueueItem>();	for(int i =0; i<10; i++){		net.dstone.sample.queue.SampleQueueItem item = new net.dstone.sample.queue.SampleQueueItem();		item.setId("TEST-"+ i);		item.setProperty("filePath", filePath);		item.setProperty("deleteFileYn", "N");		net.dstone.common.queue.QueueHandler.getInstance().addQueue(item);	}	System.out.println(workList);	
 } catch (Exception e) {
 	e.printStackTrace();
 } finally{	net.dstone.common.utils.DateUtil.stopWatchEnd("01.Queue테스트");}
