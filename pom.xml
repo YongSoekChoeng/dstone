@@ -252,7 +252,7 @@
 		<!-- DATABASE -->
 		<dependency>
 			<groupId>com.zaxxer</groupId>
-			<artifactId>HikariCP</artifactId>
+			<artifactId>HikariCP</artifactId><!-- Connection Pool -->
 			<version>3.4.0</version>
 		</dependency>	
 		<dependency>

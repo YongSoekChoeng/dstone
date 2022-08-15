@@ -9,6 +9,7 @@ public class InitServlet extends javax.servlet.http.HttpServlet {
 		super.init(config);
 		try {
 			/*** 1. net.dstone.common.utils.PropUtil Start ***/
+			LogUtil.sysout("/*** 1. net.dstone.common.utils.PropUtil Start ***/");
 			String rootDirectory = config.getServletContext().getRealPath("/WEB-INF/classes/conf/properties");
 			net.dstone.common.utils.PropUtil.initialize(rootDirectory);
 
