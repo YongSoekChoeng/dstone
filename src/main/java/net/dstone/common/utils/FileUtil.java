@@ -779,12 +779,7 @@ public class FileUtil {
 	}
 	
 	public static void mergeFiles(String inputDir, String outputFileFullPath) {
-		mergeFiles(inputDir, outputFileFullPath, new Comparator<String>() {
-            @Override
-            public int compare(String r1, String r2) {
-                    return 0;
-            }			
-		});
+		mergeFiles(inputDir, outputFileFullPath, com.google.code.externalsorting.ExternalSort.defaultcomparator);
 	}
 	
 	public static void mergeFiles(String inputDir, String outputFileFullPath, Comparator<String> cmp) {

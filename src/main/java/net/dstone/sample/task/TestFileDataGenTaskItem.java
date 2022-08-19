@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import net.dstone.common.task.TaskItem;
 import net.dstone.common.utils.StringUtil;
 
-public class GenTestDataTask extends TaskItem {
+public class TestFileDataGenTaskItem extends TaskItem {
 
 	static ArrayList<String> dateList = new ArrayList<String>();
 	static ArrayList<String> timeList = new ArrayList<String>();
