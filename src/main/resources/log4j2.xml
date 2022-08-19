@@ -23,22 +23,27 @@
     <Loggers>
     	<!-- You can specify loggers down here ! -->
     	
+        <Root level="INFO" additivity="false">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+        </Root>        
+    	
 		<!--Spring logger-->
-	    <Logger name="org.springframework" level="INFO" additivity="true">   
+	    <Logger name="org.springframework" level="INFO" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
 		    
-		<!--Jdbc logger-->
-		<Logger name="jdbc" level="OFF" additivity="true">   
+		<!--Log4jdbc logger-->
+		<Logger name="jdbc" level="OFF" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.connection" level="OFF" additivity="true">   
+		<Logger name="jdbc.connection" level="OFF" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.sqlonly" level="INFO" additivity="true">   
+		<Logger name="jdbc.sqlonly" level="OFF" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
@@ -46,42 +51,37 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
-		<Logger name="jdbc.audit" level="OFF" additivity="true">   
+		<Logger name="jdbc.audit" level="OFF" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.resultset" level="OFF" additivity="true">   
+		<Logger name="jdbc.resultset" level="OFF" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.resultsettable" level="OFF" additivity="true">   
+		<Logger name="jdbc.resultsettable" level="OFF" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-	    <Logger name="com.zaxxer.hikari" level="OFF" additivity="true">
+	    <Logger name="com.zaxxer.hikari" level="OFF" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>
 	    
 	    <!--  
-	    <Logger name="java.sql" level="INFO" additivity="true">
+	    <Logger name="java.sql" level="INFO" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>   
-	    <Logger name="org.springframework" level="INFO" additivity="true">
+	    <Logger name="org.springframework" level="INFO" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>
-	    <Logger name="java.sql" level="DEBUG" additivity="true">
+	    <Logger name="java.sql" level="DEBUG" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>
 	    -->
-        
-        <Root level="INFO" additivity="true">
-            <AppenderRef ref="console"/>
-            <AppenderRef ref="rollingFile"/>
-        </Root>
     </Loggers>
     
 </Configuration>
