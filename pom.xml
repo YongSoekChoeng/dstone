@@ -207,11 +207,13 @@
 			<artifactId>HikariCP</artifactId><!-- Connection Pool -->
 			<version>3.4.0</version>
 		</dependency>	
-		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId><!-- MySql JDBC -->
-			<version>8.0.15</version>
-		</dependency>
+        <dependency>
+            <groupId>oracle.jdbc</groupId>
+            <artifactId>ojdbc</artifactId>
+            <version>12.1.0.2.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/ojdbc8.jar</systemPath>
+        </dependency>
 
 		<!-- JSON -->
 		<dependency>
