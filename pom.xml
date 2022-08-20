@@ -37,6 +37,13 @@
 	
 	<dependencies>
 	
+        <!-- @Inject -->
+        <dependency>
+            <groupId>javax.inject</groupId>
+            <artifactId>javax.inject</artifactId>
+		    <version>${javax.inject}</version>
+        </dependency>
+              
 		<!-- Servlet -->
 		<dependency>
 		    <groupId>javax.servlet</groupId>
