@@ -47,7 +47,7 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
-		<Logger name="jdbc.sqltiming" level="OFF" additivity="false">   
+		<Logger name="jdbc.sqltiming" level="INFO" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
@@ -59,7 +59,7 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.resultsettable" level="OFF" additivity="false">   
+		<Logger name="jdbc.resultsettable" level="INFO" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
