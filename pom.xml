@@ -214,6 +214,36 @@
             <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/ojdbc8.jar</systemPath>
         </dependency>
 
+		<!-- FILE -->
+        <dependency>
+            <groupId>org.apache</groupId>
+            <artifactId>common-cvs</artifactId>
+            <version>1.9.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/commons-csv-1.9.0.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code</groupId>
+            <artifactId>external-merge-sort</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/external-merge-sort-1.0.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-core</artifactId>
+            <version>1.3</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/hamcrest-core-1.3.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.github</groupId>
+            <artifactId>jamm</artifactId>
+            <version>0.3.1</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/jamm-0.3.1.jar</systemPath>
+        </dependency>
+		
 		<!-- JSON -->
 		<dependency>
 			<groupId>org.jsoup</groupId>
