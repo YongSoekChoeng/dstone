@@ -90,7 +90,7 @@ public class DataSet implements java.io.Serializable {
 				this.val.add(val);
 			}
 		}
-		protected void addVal(String val){
+		public void addVal(String val){
 			if(this.val == null){
 				this.val = new ArrayList<String>();
 			}

@@ -67,7 +67,11 @@ public class WStressUtil {
 	}
 
 	public void fireStress(String url, DataSet ds){
-
+		this.fireStress(url, "POST", net.dstone.common.utils.WsUtil.CONT_TYPE_FORM, ds);
+	}
+	
+	public void fireStress(String url, String method, String contentType, DataSet ds){
+		
 		net.dstone.common.task.TaskHandler.TaskConfig conf = net.dstone.common.task.TaskHandler.getInstance().getTaskConfig();
 		conf.setTaskMode(net.dstone.common.task.TaskHandler.FIXED);
 		conf.setThreadNumWhenFixed(config.getConcurrentUserNum());
@@ -97,7 +101,8 @@ public class WStressUtil {
 										}
 									}
 									wsBean.url = url;
-									wsBean.method = "POST";			
+									wsBean.method = method;			
+									wsBean.setContentType(contentType);
 									ws.execute(wsBean);
 									
 								}
@@ -115,5 +120,5 @@ public class WStressUtil {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
+	}	
 }
