@@ -14,7 +14,7 @@
 		<junit.version>4.12</junit.version>
 		
 		<!-- Spring  -->
-		<org.springframework.version>4.3.14.RELEASE</org.springframework.version>
+		<org.springframework.version>5.2.21.RELEASE</org.springframework.version>
 		<org.aspectj.version>1.8.9</org.aspectj.version>
 		
 		<!-- Web -->
