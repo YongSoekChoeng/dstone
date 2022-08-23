@@ -9,13 +9,13 @@
 	
 	<properties>	
 		<!-- Java -->
-		<java-version>1.8</java-version>
+		<java.version>1.8</java.version>
 		<javax.inject>1</javax.inject>
-		<junit-version>4.12</junit-version>
+		<junit.version>4.12</junit.version>
 		
 		<!-- Spring  -->
-		<org.springframework-version>4.3.14.RELEASE</org.springframework-version>
-		<org.aspectj-version>1.8.9</org.aspectj-version>
+		<org.springframework.version>4.3.14.RELEASE</org.springframework.version>
+		<org.aspectj.version>1.8.9</org.aspectj.version>
 		
 		<!-- Web -->
 		<jsp.version>2.2.1</jsp.version>
@@ -23,15 +23,15 @@
 		<servlet.version>3.0.1</servlet.version>
 		
 		<!-- Logging -->
-		<log4j-version>2.17.2</log4j-version>
-		<org.slf4j-version>1.7.30</org.slf4j-version>
-		<log4jdbc-version>1.16</log4jdbc-version>
+		<log4j.version>2.17.2</log4j.version>
+		<org.slf4j.version>1.7.30</org.slf4j.version>
+		<log4jdbc.version>1.16</log4jdbc.version>
 		
 		<!-- Maven -->
-		<maven-eclipse-plugin-version>2.10</maven-eclipse-plugin-version>
-		<maven-compiler-plugin-version>3.7.0</maven-compiler-plugin-version>
-		<exec-maven-plugin-version>1.6.0</exec-maven-plugin-version>
-		<maven-war-plugin-version>3.0.0</maven-war-plugin-version>
+		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
+		<maven-compiler-plugin.version>3.7.0</maven-compiler-plugin.version>
+		<exec-maven-plugin.version>1.6.0</exec-maven-plugin.version>
+		<maven-war-plugin.version>3.0.0</maven-war-plugin.version>
 	</properties>
 	
 	<dependencies>
@@ -71,7 +71,7 @@
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-context</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 			<exclusions>
 				<exclusion>
 					<groupId>commons-logging</groupId>
@@ -82,59 +82,59 @@
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-aop</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-beans</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-web</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-webmvc</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-orm</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-context-support</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		<dependency> 
 			<groupId>org.springframework</groupId> 
 			<artifactId>spring-jdbc</artifactId> 
-			<version>${org.springframework-version}</version> 
+			<version>${org.springframework.version}</version> 
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-test</artifactId>
-			<version>${org.springframework-version}</version>
+			<version>${org.springframework.version}</version>
 		</dependency>
 		
 		<!-- AspectJ -->
 		<dependency>
 		    <groupId>org.aspectj</groupId>
 		    <artifactId>aspectjrt</artifactId>
-		    <version>${org.aspectj-version}</version>
+		    <version>${org.aspectj.version}</version>
 		</dependency>    
 		<dependency>
 		    <groupId>org.aspectj</groupId>
 		    <artifactId>aspectjweaver</artifactId>
-		    <version>${org.aspectj-version}</version>
+		    <version>${org.aspectj.version}</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.aspectj</groupId>
 		    <artifactId>aspectjtools</artifactId>
-		    <version>${org.aspectj-version}</version>
+		    <version>${org.aspectj.version}</version>
 		</dependency>
 		
 		<!-- CG Proxy -->
@@ -165,27 +165,27 @@
 		<dependency>
 		    <groupId>org.apache.logging.log4j</groupId>
 		    <artifactId>log4j-core</artifactId>
-		    <version>${log4j-version}</version>
+		    <version>${log4j.version}</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.apache.logging.log4j</groupId>
 		    <artifactId>log4j-api</artifactId>
-		    <version>${log4j-version}</version>
+		    <version>${log4j.version}</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.apache.logging.log4j</groupId>
 		    <artifactId>log4j-slf4j-impl</artifactId>
-		    <version>${log4j-version}</version>
+		    <version>${log4j.version}</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.slf4j</groupId>
 		    <artifactId>slf4j-api</artifactId>
-		    <version>${org.slf4j-version}</version>
+		    <version>${org.slf4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.bgee.log4jdbc-log4j2</groupId>
 			<artifactId>log4jdbc-log4j2-jdbc4</artifactId>
-		    <version>${log4jdbc-version}</version>
+		    <version>${log4jdbc.version}</version>
 		</dependency>
 		
 		<!-- Apache and Third Parties -->
@@ -342,7 +342,7 @@
 		<plugins>
             <plugin>
                 <artifactId>maven-eclipse-plugin</artifactId>
-                <version>${maven-eclipse-plugin-version}</version>
+                <version>${maven-eclipse-plugin.version}</version>
                 <configuration>
                     <additionalProjectnatures>
                         <projectnature>org.springframework.ide.eclipse.core.springnature</projectnature>
@@ -357,10 +357,10 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>${maven-compiler-plugin-version}</version>
+				<version>${maven-compiler-plugin.version}</version>
 				<configuration>
-                    <source>${java-version}</source>
-                    <target>${java-version}</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                     <showWarnings>true</showWarnings>
                     <showDeprecation>true</showDeprecation>
 					<encoding>UTF-8</encoding>
@@ -369,12 +369,12 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>${exec-maven-plugin-version}</version>
+                <version>${exec-maven-plugin.version}</version>
             </plugin>			
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-war-plugin</artifactId>
-				<version>${maven-war-plugin-version}</version>
+				<version>${maven-war-plugin.version}</version>
 			</plugin>
 		</plugins>
 	</build>
