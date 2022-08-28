@@ -130,6 +130,13 @@ public class DeptService extends BaseService {
             paramVo.setDEPT_ID( deptCudDao.selectSampleDeptNewKey(newKeyVo).getDEPT_ID() ); 
             //DAO 호출부분 구현 
             deptCudDao.insertSampleDept(paramVo);  
+            
+            //NEW KEY 생성 부분 구현 
+            paramVo.setDEPT_ID( deptCudDao.selectMySampleDeptNewKey(newKeyVo).getDEPT_ID() ); 
+            //DAO 호출부분 구현 
+            deptCudDao.insertMySampleDept(paramVo);  
+
+if(true)throw new Exception("고의적인 예외2!!!");       
             isSuccess = true; 
             /************************ 비즈니스로직 끝 **************************/  
         } catch (Exception e) { 

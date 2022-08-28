@@ -13,7 +13,7 @@
         FROM                                                                          
             SAMPLE_DEPT                                                                       
         WHERE 1=1                                                                     
-    </select>                                                                       
+    </select>                                                   
                                                                                    
     <!--  샘플부서[SAMPLE_DEPT] 입력 -->                                                             
     <insert id="insertSampleDept" parameterType="net.dstone.sample.dept.cud.vo.SampleDeptCudVo" >                             
@@ -51,6 +51,55 @@
         WHERE 1=1                                                                         
             AND DEPT_ID = #{DEPT_ID}
     </delete>                                                                       
+                        
+                                                                          
+    <!-- 샘플부서[SAMPLE_DEPT] VO -->                                                                
                                                                                    
+    <!--  샘플부서[SAMPLE_DEPT] NEW키값 조회 -->                                                        
+    <select id="selectMySampleDeptNewKey" parameterType="net.dstone.sample.dept.cud.vo.SampleDeptCudVo" resultType="net.dstone.sample.dept.cud.vo.SampleDeptCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(DEPT_ID)), 0, MAX(DEPT_ID) )+1), 30, '0') DEPT_ID 
+        FROM                                                                          
+            SAMPLE_DEPT                                                                       
+        WHERE 1=1                                                                     
+    </select>                                                                       
+                                                                                   
+    <!--  샘플부서[SAMPLE_DEPT] 입력 -->                                                             
+    <insert id="insertMySampleDept" parameterType="net.dstone.sample.dept.cud.vo.SampleDeptCudVo" >                             
+        INSERT INTO SAMPLE_DEPT (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="DEPT_ID != null and !DEPT_ID.equals('')" >DEPT_ID,</if>
+                <if test="DEPT_NAME != null and !DEPT_NAME.equals('')" >DEPT_NAME,</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >INPUT_DT,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="DEPT_ID != null and !DEPT_ID.equals('')" >#{DEPT_ID},</if>
+                <if test="DEPT_NAME != null and !DEPT_NAME.equals('')" >#{DEPT_NAME},</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >STR_TO_DATE( #{INPUT_DT}, '%Y%m%d%H%i%s' ),</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  샘플부서[SAMPLE_DEPT] 수정 -->                                                             
+    <update id="updateMySampleDept" parameterType="net.dstone.sample.dept.cud.vo.SampleDeptCudVo" >                             
+        UPDATE SAMPLE_DEPT                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="DEPT_ID != null and !DEPT_ID.equals('')" >DEPT_ID = #{DEPT_ID},</if>
+                <if test="DEPT_NAME != null and !DEPT_NAME.equals('')" >DEPT_NAME = #{DEPT_NAME},</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >INPUT_DT = STR_TO_DATE( #{INPUT_DT}, '%Y%m%d%H%i%s' ),</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND DEPT_ID = #{DEPT_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  샘플부서[SAMPLE_DEPT] 삭제 -->                                                             
+    <delete id="deleteMySampleDept" parameterType="net.dstone.sample.dept.cud.vo.SampleDeptCudVo" >                             
+        DELETE FROM SAMPLE_DEPT                                                              
+        WHERE 1=1                                                                         
+            AND DEPT_ID = #{DEPT_ID}
+    </delete>                                                                       
+                                                                               
 </mapper>                                                                             
 
