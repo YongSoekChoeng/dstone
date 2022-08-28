@@ -10,7 +10,7 @@ import net.dstone.common.utils.DataSet;
 
 @Controller
 @RequestMapping(value = "/rabbitmq/*")
-public class RabbitMqController extends net.dstone.common.biz.BaseController { 
+public class PublishController extends net.dstone.common.biz.BaseController { 
 
     /********* SVC 정의부분 시작 *********/
     @Autowired 
