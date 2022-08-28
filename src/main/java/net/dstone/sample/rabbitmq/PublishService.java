@@ -12,27 +12,24 @@ import net.dstone.common.core.BaseObject;
 @Configuration
 public class PublishService extends BaseObject {
 	
-	@Value("${rabbitmq.server.address}")
-	private String address;
+	@Value("${spring.rabbitmq.host}")
+	private String host;
 
-	@Value("${rabbitmq.server.port}")
+	@Value("${spring.rabbitmq.port}")
 	private Integer port;
 
-	@Value("${rabbitmq.server.username}")
+	@Value("${spring.rabbitmq.username}")
 	private String username;
 
-	@Value("${rabbitmq.server.password}")
+	@Value("${spring.rabbitmq.password}")
 	private String password;
 
-	@Value("${rabbitmq.server.virtualhost}")
-	private String virtualhost;
-	
 	public void sendRabbitMq(String exchang, String queueName, String routingKey, String msg) {
 		// RabbitMQ 연결
 		CachingConnectionFactory cf = null;
 		try {
 			
-			cf = new CachingConnectionFactory(address, port);
+			cf = new CachingConnectionFactory(host, port);
 			cf.setUsername(username);
 			cf.setPassword(password);
 

@@ -18,26 +18,23 @@ import net.dstone.common.biz.BaseService;
 @Service
 @Configuration
 public class ReceiveService extends BaseService{
-	
-	@Value("${rabbitmq.server.address}")
-	private String address;
 
-	@Value("${rabbitmq.server.port}")
+	@Value("${spring.rabbitmq.host}")
+	private String host;
+
+	@Value("${spring.rabbitmq.port}")
 	private Integer port;
 
-	@Value("${rabbitmq.server.username}")
+	@Value("${spring.rabbitmq.username}")
 	private String username;
 
-	@Value("${rabbitmq.server.password}")
+	@Value("${spring.rabbitmq.password}")
 	private String password;
 
-	@Value("${rabbitmq.server.virtualhost}")
-	private String virtualhost;	
-	
 	@PostConstruct
 	private void init() {
 		// RabbitMQ 연결
-		CachingConnectionFactory cf = new CachingConnectionFactory(address, port);
+		CachingConnectionFactory cf = new CachingConnectionFactory(host, port);
 		cf.setUsername(username);
 		cf.setPassword(password);
 
