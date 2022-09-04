@@ -128,13 +128,22 @@ public class SystemUtil {
 	*/
 	public static void showMemoryInfo() {
 		Runtime rt = Runtime.getRuntime();
+		
 		long totalMem = rt.totalMemory();
 		long freeMem = rt.freeMemory();
+		long usedMem = totalMem-freeMem;
+		
+		long totalMemMB = new Double(totalMem/(1024*1024)).longValue();
+		long freeMemMB = new Double(freeMem/(1024*1024)).longValue();
+		long usedMemMB = totalMemMB - freeMemMB;
+				
 		java.text.NumberFormat nf = java.text.NumberFormat.getInstance();
 
 		net.dstone.common.utils.LogUtil.sysout("/********************* Memory Check 시작 **********************/");
-		net.dstone.common.utils.LogUtil.sysout("Total amount of memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMem)), 20, " ") + " byte]");
-		net.dstone.common.utils.LogUtil.sysout("Amount of free memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMem)), 20, " ") + " byte]");
+		
+		net.dstone.common.utils.LogUtil.sysout("Total amount of memory  [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMem)), 20, " ") + " byte] [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMemMB)), 20, " ") + " Mb]");
+		net.dstone.common.utils.LogUtil.sysout("Used amount of memory   [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(usedMem)), 20, " ") + " byte] [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(usedMemMB)), 20, " ") + " Mb]");
+		net.dstone.common.utils.LogUtil.sysout("Amount of free memory   [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMem)), 20, " ") + " byte] [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMemMB)), 20, " ") + " Mb]");
 		net.dstone.common.utils.LogUtil.sysout("/********************* Memory Check 끝 ************************/");
 
 	}
@@ -145,12 +154,20 @@ public class SystemUtil {
 	public static String getMemoryInfo(String div) {
 		StringBuffer buff = new StringBuffer();
 		Runtime rt = Runtime.getRuntime();
+		
 		long totalMem = rt.totalMemory();
 		long freeMem = rt.freeMemory();
+		long usedMem = totalMem-freeMem;
+		
+		long totalMemMB = new Double(totalMem/(1024*1024)).longValue();
+		long freeMemMB = new Double(freeMem/(1024*1024)).longValue();
+		long usedMemMB = totalMemMB - freeMemMB;
+				
 		java.text.NumberFormat nf = java.text.NumberFormat.getInstance();
-
-		buff.append("Total amount of memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMem)), 20, " ") + " byte]").append(div);
-		buff.append("Amount of free memory 	 [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMem)), 20, " ") + " byte]").append(div);
+		
+		buff.append("Total amount of memory  [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMem)), 20, " ") + " byte] [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(totalMemMB)), 20, " ") + " Mb]").append(div);
+		buff.append("Used amount of memory   [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(usedMem)), 20, " ") + " byte] [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(usedMemMB)), 20, " ") + " Mb]").append(div);
+		buff.append("Amount of free memory   [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMem)), 20, " ") + " byte] [ " + net.dstone.common.utils.StringUtil.filler(String.valueOf(nf.format(freeMemMB)), 20, " ") + " Mb]").append(div);
 
 		return buff.toString();
 

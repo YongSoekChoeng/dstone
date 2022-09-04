@@ -1,7 +1,7 @@
-
-String DBID = "DBID_1";
+
+String DBID = "DBID_0";
 net.dstone.common.utils.DbUtil db = null;
-net.dstone.common.utils.DataSet ds = null;
+net.dstone.common.utils.DataSet ds = new net.dstone.common.utils.DataSet();
 
 StringBuffer sql = new StringBuffer();
 String TABLE_NAME = "HELP";
@@ -18,11 +18,9 @@ try {
 	db = new net.dstone.common.utils.DbUtil(DBID);
 	db.getConnection();
 	db.setQuery(sql.toString());
+		ds.buildFromResultSet(db.select(), "");	
 	
-	db.select();
-	
-	//ds = new net.dstone.common.utils.DataSet(db.select());
-	//ds.checkData();
+	ds.checkData();
 	
 }catch(Exception e){
 	System.out.println(db.getQuery());
