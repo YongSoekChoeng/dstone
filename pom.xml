@@ -20,7 +20,7 @@
 		<!-- Web -->
 		<jsp.version>2.2.1</jsp.version>
 		<jstl.version>1.2.1</jstl.version>
-		<servlet.version>3.0.1</servlet.version>
+		<servlet.version>3.1.0</servlet.version>
 		
 		<!-- Logging -->
 		<log4j.version>2.17.2</log4j.version>

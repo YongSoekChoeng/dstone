@@ -2,6 +2,8 @@ package net.dstone.common.queue;
 
 import java.util.ArrayList;
 
+import net.dstone.common.queue.QueueHandler.Queue;
+import net.dstone.common.queue.QueueHandler.QueueThread;
 import net.dstone.common.task.TaskItem;
 
 public class QueueHandler {
@@ -14,17 +16,18 @@ public class QueueHandler {
 	/**
 	 * 큐에 아이템이 있을 경우 Fetch해올 큐아이템 갯수. -1 이면 큐의 모든 아이템을 Fetch해온다.
 	 */
-	public static int FETCH_SIZE_BY_ONE = 500; 
+	public static int FETCH_SIZE_BY_ONE = 1000; 
 	/**
 	 * Fetch해온  큐아이템을 처리 할 쓰레드 갯수.
 	 */
-	public static int THREAD_NUM_PER_ONE_FETCH = 30;    
+	public static int THREAD_NUM_PER_ONE_FETCH = 100;  
 	/****************************  설정 끝   ****************************/
 	
 	protected static QueueHandler queueHandler = null;
 	
 	protected Queue queue = null;
 	protected QueueThread queueThread = null;
+	private static int workingQueueCount = 0;
 	
 	public static QueueHandler getInstance(){
 		if(queueHandler == null){
@@ -68,6 +71,7 @@ public class QueueHandler {
 		if(this.queue != null){
 			intSize = this.queue.size();
 		}
+		intSize = intSize + workingQueueCount;
 		return intSize;
 	}
 	
@@ -125,6 +129,7 @@ public class QueueHandler {
 					if(FETCH_SIZE_BY_ONE == -1){
 						queueToBeWorked = (Queue)queue.clone();
 						queue.clear();
+						workingQueueCount = queueToBeWorked.size();
 					}else{
 						int index = 1;
 						for(int i=0; i<queue.size(); i++){
@@ -135,6 +140,7 @@ public class QueueHandler {
 							queue.remove(i);
 							i--;
 							index++;
+							workingQueueCount++;
 						}
 					}
 				}
@@ -156,8 +162,15 @@ public class QueueHandler {
 							@Override
 							public TaskItem doTheTask() {
 								debug("<<<<<<<<<<<<<<<<<<<< ["+queueItem.getId()+"] doTheJob 시작 >>>>>>>>>>>>>>>>>>>>>>>");
-								queueItem.doTheJob();
+								try {
+									queueItem.doTheJob();
+								} catch (Exception e) {
+									throw e;
+								} finally {
+									workingQueueCount--;
+								}
 								debug("<<<<<<<<<<<<<<<<<<<< ["+queueItem.getId()+"] doTheJob 종료 >>>>>>>>>>>>>>>>>>>>>>>");
+								
 								return this;
 							}
 						});
