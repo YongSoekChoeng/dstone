@@ -94,12 +94,7 @@ public class WStressUtil {
 										Thread.sleep(config.getThinkTimeByMillSec());
 									}
 									net.dstone.common.utils.WsUtil.Bean wsBean = new net.dstone.common.utils.WsUtil.Bean();
-									String[] paramKeys = ds.getChildrenKeys();
-									if(paramKeys != null){
-										for(String key : paramKeys){
-											wsBean.addParam(key, ds.getDatum(key));
-										}
-									}
+									wsBean.setParameters(ds);
 									wsBean.url = url;
 									wsBean.method = method;			
 									wsBean.setContentType(contentType);
