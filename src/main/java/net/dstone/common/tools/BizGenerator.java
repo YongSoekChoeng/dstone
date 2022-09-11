@@ -16,7 +16,7 @@ public class BizGenerator {
 	 ***************************************************************************************************/
 
 	// 프레임웍에 설정된 DB 아이디(사용자홈/SYSTEMINFO.properties 에 등록된 타겟 DBID)
-	public static String DBID = "DBID_1";
+	public static String DBID = "DBID_0";
 	// SqlSessionTemplate 로 등록된 ID
 	public static String SQL_CLIENT_ID = "sqlMapClientTemplate1";
 	// 프로젝트 루트
