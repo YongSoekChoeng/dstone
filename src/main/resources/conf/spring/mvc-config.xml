@@ -34,18 +34,5 @@
 	</bean>
 	<!-- ################### JSP Configuration END ############################# -->
 
-	<!-- ################### JSON Configuration START ########################## -->
-	<bean id="jsonResolver" class="org.springframework.web.servlet.view.BeanNameViewResolver">
-		<property name="order">
-			<value>1</value>
-		</property>
-	</bean>
-	<bean name="jsonView" class="net.sf.json.spring.web.servlet.view.JsonView">
-		<property name="contentType">
-			<value>text/html</value>
-		</property>
-	</bean>
-	<!-- ################### JSON Configuration END ############################ -->
-
 </beans>
 

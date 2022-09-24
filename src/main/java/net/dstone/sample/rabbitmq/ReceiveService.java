@@ -18,6 +18,8 @@ import net.dstone.common.biz.BaseService;
 @Service
 @Configuration
 public class ReceiveService extends BaseService{
+	
+	private boolean isStartWhenInit = false;
 
 	@Value("${spring.rabbitmq.host}")
 	private String host;
@@ -33,31 +35,33 @@ public class ReceiveService extends BaseService{
 
 	@PostConstruct
 	private void init() {
-		// RabbitMQ 연결
-		CachingConnectionFactory cf = new CachingConnectionFactory(host, port);
-		cf.setUsername(username);
-		cf.setPassword(password);
+		if(isStartWhenInit) {
+			// RabbitMQ 연결
+			CachingConnectionFactory cf = new CachingConnectionFactory(host, port);
+			cf.setUsername(username);
+			cf.setPassword(password);
 
-		// 큐 생성
-		RabbitAdmin admin = new RabbitAdmin(cf);
-		Queue queue = new Queue("TestQ");
-		admin.declareQueue(queue);
+			// 큐 생성
+			RabbitAdmin admin = new RabbitAdmin(cf);
+			Queue queue = new Queue("TestQ");
+			admin.declareQueue(queue);
 
-		// Exchange에 바인딩
-		DirectExchange exchange = new DirectExchange("amq.direct");
-		admin.declareBinding(BindingBuilder.bind(queue).to(exchange).with("foo.bar"));
+			// Exchange에 바인딩
+			DirectExchange exchange = new DirectExchange("amq.direct");
+			admin.declareBinding(BindingBuilder.bind(queue).to(exchange).with("foo.bar"));
 
-		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer(cf);
-		Object listener = new Object() {
-			// 메시지 처리
-			public void handleMessage(Object foo) {
-				getLogger().sysout("ReceiveService.handleMessage()==========================>>> foo["+foo+"]");
-			}
-		};
-		// 메시지 리스닝
-		MessageListenerAdapter adapter = new MessageListenerAdapter(listener);
-		container.setMessageListener(adapter);
-		container.setQueueNames("TestQ");
-		container.start();
+			SimpleMessageListenerContainer container = new SimpleMessageListenerContainer(cf);
+			Object listener = new Object() {
+				// 메시지 처리
+				public void handleMessage(Object foo) {
+					getLogger().sysout("ReceiveService.handleMessage()==========================>>> foo["+foo+"]");
+				}
+			};
+			// 메시지 리스닝
+			MessageListenerAdapter adapter = new MessageListenerAdapter(listener);
+			container.setMessageListener(adapter);
+			container.setQueueNames("TestQ");
+			container.start();
+		}
 	}
 }

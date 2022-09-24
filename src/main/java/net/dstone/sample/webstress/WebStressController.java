@@ -28,12 +28,14 @@ public class WebStressController extends net.dstone.common.biz.BaseController {
 			String id = "TEST-" + net.dstone.common.utils.DateUtil.getToDate("HHmmss-") + new net.dstone.common.utils.GuidUtil().getNewGuid();
 			String fileName = id + ".log";
 			String fileConts = net.dstone.common.utils.DateUtil.getToDate("yyyyMMdd-HH:mm:ss") + "에 파일내용.";
-			net.dstone.common.utils.FileUtil.writeFile(filePath, fileName, fileConts);
+			String fileDelYn = requestUtil.getParameter("fileDelYn", "Y");
 
 			net.dstone.sample.webstress.WebStressQueueItem item = new net.dstone.sample.webstress.WebStressQueueItem();
 			item.setId(id);
 			item.setProperty("filePath", filePath);
 			item.setProperty("fileName", fileName);
+			item.setProperty("fileConts", fileConts);
+			item.setProperty("fileDelYn", fileDelYn);
 			item.doTheJob();
 
 			//Thread.sleep(5*1000);
@@ -69,11 +71,15 @@ public class WebStressController extends net.dstone.common.biz.BaseController {
 			String fileName = id + ".log";
 			String fileConts = net.dstone.common.utils.DateUtil.getToDate("yyyyMMdd-HH:mm:ss") + "에 파일내용.";
 			net.dstone.common.utils.FileUtil.writeFile(filePath, fileName, fileConts);
+			String fileDelYn = requestUtil.getParameter("fileDelYn", "Y");
 
 			net.dstone.sample.webstress.WebStressQueueItem item = new net.dstone.sample.webstress.WebStressQueueItem();
 			item.setId(id);
 			item.setProperty("filePath", filePath);
 			item.setProperty("fileName", fileName);
+			item.setProperty("fileConts", fileConts);
+			item.setProperty("fileDelYn", fileDelYn);
+			
 			net.dstone.common.queue.QueueHandler.getInstance().addQueue(item);
 			
 			//Thread.sleep(5*1000);

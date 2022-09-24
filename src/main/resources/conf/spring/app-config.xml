@@ -14,7 +14,7 @@
 
 	<!-- ################### Application Configuration START ################### -->
 	<context:component-scan base-package="net.dstone.*" />
-	<context:property-placeholder location="/WEB-INF/classes/conf/properties/*.properties" />
+	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/*.properties" />
 	<!-- ################### Application Configuration END ##################### -->
 
 </beans>
