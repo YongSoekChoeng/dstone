@@ -124,16 +124,10 @@ public class WsUtil {
 			
 			// Bean.Body 값 세팅
 			if(StringUtil.isEmpty(this.bean.body)){
-				String bodyStr = "";
 				if( WsUtil.CONT_TYPE_XML.equals(this.bean.getContentType()) ){
-					bodyStr = this.bean.parameters.toXml();
+					this.bean.body = this.bean.parameters.toXml();
 				}else if( WsUtil.CONT_TYPE_JSON.equals(this.bean.getContentType()) ){
-					bodyStr = this.bean.parameters.toJson();
-				}
-				if(StringUtil.isEmpty(charset)){
-					this.bean.body = bodyStr;
-				}else{
-					this.bean.body = StringUtil.encodingConv(bodyStr, charset);
+					this.bean.body = this.bean.parameters.toJson();
 				}
 			}
 			
@@ -149,10 +143,18 @@ public class WsUtil {
 				if( WsUtil.CONT_TYPE_XML.equals(this.bean.getContentType()) ||  WsUtil.CONT_TYPE_JSON.equals(this.bean.getContentType()) ){
 					if ("POST".equals(bean.method)) {
 						httpRequest = new HttpPost(this.bean.url);
-						((HttpPost)httpRequest).setEntity(new StringEntity(this.bean.body));
+						if(StringUtil.isEmpty(charset)){
+							((HttpPost)httpRequest).setEntity(new StringEntity(this.bean.body));
+						}else {
+							((HttpPost)httpRequest).setEntity(new StringEntity(this.bean.body, this.charset));
+						}
 					}else {
 						httpRequest = new HttpPut(this.bean.url);
-						((HttpPut)httpRequest).setEntity(new StringEntity(this.bean.body));
+						if(StringUtil.isEmpty(charset)){
+							((HttpPut)httpRequest).setEntity(new StringEntity(this.bean.body));
+						}else {
+							((HttpPut)httpRequest).setEntity(new StringEntity(this.bean.body, this.charset));
+						}
 					}					
 				// 나머지 HTML FORM 타입일 경우	
 				}else {
@@ -164,12 +166,19 @@ public class WsUtil {
 					}
 					if ("POST".equals(bean.method)) {
 						httpRequest = new HttpPost(this.bean.url);
-						((HttpPost)httpRequest).setEntity(new UrlEncodedFormEntity(paramList, this.charset));
+						if(StringUtil.isEmpty(charset)){
+							((HttpPost)httpRequest).setEntity(new UrlEncodedFormEntity(paramList));
+						}else {
+							((HttpPost)httpRequest).setEntity(new UrlEncodedFormEntity(paramList, this.charset));
+						}
 					}else {
 						httpRequest = new HttpPut(this.bean.url);
-						((HttpPut)httpRequest).setEntity(new UrlEncodedFormEntity(paramList, this.charset));
+						if(StringUtil.isEmpty(charset)){
+							((HttpPut)httpRequest).setEntity(new UrlEncodedFormEntity(paramList));
+						}else {
+							((HttpPut)httpRequest).setEntity(new UrlEncodedFormEntity(paramList, this.charset));
+						}
 					}					
-					
 				}				
 			}else{ 
 				throw new Exception("지원하지 않는 메소드["+bean.method+"] 입니다.");
