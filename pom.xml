@@ -297,19 +297,13 @@
 		    <version>3.6.5</version>
 		</dependency>		
 		
-		<!-- Build and Validate -->
-		<dependency>
-			<groupId>org.apache.maven.plugins</groupId>
-			<artifactId>maven-compiler-plugin</artifactId>
-			<version>3.1</version>
-			<type>maven-plugin</type>
+		<!-- Encrypt -->
+		<dependency> 
+			<groupId>com.github.ulisesbocchio</groupId> 
+			<artifactId>jasypt-spring-boot-starter</artifactId> 
+			<version>2.0.0</version> 
 		</dependency>
-		<dependency>
-			<groupId>org.hibernate</groupId>
-			<artifactId>hibernate-validator-annotation-processor</artifactId>
-			<version>4.1.0.Final</version>
-		</dependency>
-		
+        
 		<!-- FILE -->
         <dependency>
             <groupId>org.apache</groupId>
@@ -339,6 +333,19 @@
             <scope>system</scope>
             <systemPath>${basedir}/src/main/webapp/WEB-INF/lib/jamm-0.3.1.jar</systemPath>
         </dependency>
+		
+		<!-- Build and Validate -->
+		<dependency>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-compiler-plugin</artifactId>
+			<version>3.1</version>
+			<type>maven-plugin</type>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-validator-annotation-processor</artifactId>
+			<version>4.1.0.Final</version>
+		</dependency>
 		
 	</dependencies>
 	
