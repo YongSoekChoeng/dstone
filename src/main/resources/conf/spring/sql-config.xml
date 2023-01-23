@@ -44,6 +44,7 @@
 	    </property>
 	</bean>
 	
+	<!--  
 	<bean id="db2" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
         <constructor-arg>
             <bean class="com.zaxxer.hikari.HikariConfig">
@@ -58,9 +59,7 @@
                 <property name="driverClassName" value="${db2.spring.driver}"/>
                 <property name="minimumIdle" value="5" />
                 <property name="maximumPoolSize" value="10" />
-                <!--  
                 <property name="connectionTestQuery" value="select 1" />
-                -->
                 <property name="connectionTimeout"  value="300000" />
             </bean>
         </constructor-arg>
@@ -70,6 +69,7 @@
 	        <ref local="db2" />
 	    </property>
 	</bean>
+	-->
 	<!-- ################### Datasource Configuration END ###################### -->
 	
 	<!-- ################### SqlMap Configuration START ###################### -->
@@ -81,6 +81,7 @@
 		<constructor-arg index="0" ref="sqlSessionFactory1"/>
 	</bean>
 
+	<!--  
 	<bean id="sqlSessionFactory2" class="org.mybatis.spring.SqlSessionFactoryBean"> 
 		<property name="dataSource" ref="dataSource2" /> 
 		<property name="mapperLocations" value="classpath:**/*Dao.xml" /> 
@@ -88,6 +89,7 @@
 	<bean id="sqlSession2" class="org.mybatis.spring.SqlSessionTemplate">
 		<constructor-arg index="0" ref="sqlSessionFactory2"/>
 	</bean>
+	-->
 	<!-- ################### SqlMap Configuration END ###################### -->
 
 	<!-- ################### Transaction Configuration START ################### -->
@@ -103,7 +105,7 @@
 			<tx:method name="delete*" propagation="REQUIRED" rollback-for="Exception" />
 		</tx:attributes>
 	</tx:advice>
-	
+	<!--  
 	<bean id="txManager2" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
 		<property name="dataSource" ref="dataSource2" />
 	</bean>
@@ -115,12 +117,15 @@
 			<tx:method name="update*" propagation="REQUIRED" rollback-for="Exception" />
 			<tx:method name="delete*" propagation="REQUIRED" rollback-for="Exception" />
 		</tx:attributes>
-	</tx:advice>	
+	</tx:advice>
+	-->	
 	
 	<aop:config proxy-target-class="true">
 		<aop:pointcut id="txAdvisePointCut" expression="execution(public * net.dstone.*..*Service.*(..))" />
 		<aop:advisor id="transactionAdvisor1" pointcut-ref="txAdvisePointCut" advice-ref="txAdvice1" />
+		<!--  
 		<aop:advisor id="transactionAdvisor2" pointcut-ref="txAdvisePointCut" advice-ref="txAdvice2" />
+		-->
 	</aop:config>
 	<!-- ################### Transaction Configuration END ##################### -->
 

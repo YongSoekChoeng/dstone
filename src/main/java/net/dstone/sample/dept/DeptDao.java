@@ -15,10 +15,7 @@ public class DeptDao extends net.dstone.common.biz.BaseDao {
     @Qualifier("sqlSession1") 
     private SqlSessionTemplate sqlSession1; 
 
-    @Autowired 
-    @Qualifier("sqlSession2") 
-    private SqlSessionTemplate sqlSession2; 
-     
+    
     /* 
      * 샘플부서정보 리스트조회(카운트) 
      */ 
