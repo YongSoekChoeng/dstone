@@ -8,7 +8,7 @@
 	/* ==============================================================================================
 	<모듈명>
 	=============================================================================================== */	
-	String 		MODULE_NAME 					= "member";
+	String 		MODULE_NAME 					= "dept";
 	/* ==============================================================================================
 	<DBID>프레임웍에 설정된 DB 아이디(사용자홈/SYSTEMINFO.properties 에 등록된 타겟 DBID)
 	=============================================================================================== */	
@@ -22,9 +22,9 @@
 	일괄로 소스를 생성할 테이블ID, 테이블명
 	=============================================================================================== */	
 	java.util.Properties tables = new java.util.Properties();
-	tables.setProperty("SAMPLE_MEMBER", "샘플맴버");	
-	tables.setProperty("SAMPLE_GROUP", "샘플그룹");
-	//tables.setProperty("SAMPLE_DEPT", "샘플부서");	
+	//tables.setProperty("SAMPLE_MEMBER", "샘플맴버");	
+	//tables.setProperty("SAMPLE_GROUP", "샘플그룹");
+	tables.setProperty("SAMPLE_DEPT", "샘플부서");	
 
 	/* ==============================================================================================
 	<모듈패키지>
@@ -40,6 +40,10 @@
 	=============================================================================================== */	
 	net.dstone.common.tools.BizGenerator.COMM_CUD_DAO_NAME 	= MODULE_NAME.substring(0, 1).toUpperCase() + MODULE_NAME.substring(1).toLowerCase() + "CudDao";
 
+	/* ==============================================================================================
+	<파일생성여부>
+	=============================================================================================== */	
+	boolean fileGenYn = false;
 	/*********************************** SETTING 끝 ***********************************/
 
 
@@ -56,11 +60,11 @@
 				tableName = (String)en.nextElement();
 				entityName = tables.getProperty(tableName);
 				// 1. VO 제너레이팅
-				net.dstone.common.tools.BizGenerator.genVoForCud(tableName, entityName, true);
+				net.dstone.common.tools.BizGenerator.genVoForCud(tableName, entityName, fileGenYn);
 				// 2. SQL 제너레이팅
-				net.dstone.common.tools.BizGenerator.genSqlForCud(tableName, entityName, true, true);
+				net.dstone.common.tools.BizGenerator.genSqlForCud(tableName, entityName, true, fileGenYn);
 				// 3. DAO 제너레이팅
-				net.dstone.common.tools.BizGenerator.genDaoForCud(tableName, entityName, true, true);
+				net.dstone.common.tools.BizGenerator.genDaoForCud(tableName, entityName, true, fileGenYn);
 			} catch (Exception e) {
 				System.out.println("CUD일괄제너레이터 - 테이블["+tableName+"]작업중 예외발생.");
 				e.printStackTrace();
