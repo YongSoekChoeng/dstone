@@ -15,7 +15,7 @@
 	<!-- ################### Application Configuration START ################### -->
 	<context:component-scan base-package="net.dstone.*" />
 	<!-- Application 프로퍼티 -->
-	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/app_${spring.profiles.active}.properties" />
+	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/app${spring.profiles.active}.properties" />
 	<!-- JDBC 프로퍼티 -->
 	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/jdbc.properties" />
 	<!-- RABBIT-MQ 프로퍼티 -->
