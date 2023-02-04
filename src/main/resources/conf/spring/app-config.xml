@@ -4,22 +4,28 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
 	xmlns:context="http://www.springframework.org/schema/context" 
 	xmlns:task="http://www.springframework.org/schema/task"
+	xmlns:util="http://www.springframework.org/schema/util"
 	xsi:schemaLocation="
   	http://www.springframework.org/schema/beans 
   	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
   	http://www.springframework.org/schema/context 
   	http://www.springframework.org/schema/context/spring-context-3.0.xsd
   	http://www.springframework.org/schema/task 
-  	http://www.springframework.org/schema/task/spring-task.xsd">
+  	http://www.springframework.org/schema/task/spring-task.xsd
+  	http://www.springframework.org/schema/util
+  	http://www.springframework.org/schema/util/spring-util.xsd">
 
 	<!-- ################### Application Configuration START ################### -->
 	<context:component-scan base-package="net.dstone.*" />
-	<!-- Application 프로퍼티 -->
-	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/app${spring.profiles.active}.properties" />
-	<!-- JDBC 프로퍼티 -->
-	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/jdbc.properties" />
-	<!-- RABBIT-MQ 프로퍼티 -->
-	<context:property-placeholder ignore-resource-not-found="true" location="/WEB-INF/classes/conf/properties/rabbitmq.properties" />
+	<!--  
+	<context:property-placeholder ignore-resource-not-found="true" location="classpath:conf/properties/*.properties" />
+	-->
+	<util:properties id="props" location="
+			classpath:conf/properties/server#{systemProperties['server.kind'] != null ? systemProperties['server.kind'] : 'Local' }.properties
+			, classpath:conf/properties/jdbc.properties
+			, classpath:conf/properties/rabbitmq.properties
+	"/>
+	<context:property-placeholder  properties-ref="props" />
 	<!-- ################### Application Configuration END ##################### -->
 
 </beans>

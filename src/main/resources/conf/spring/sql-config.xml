@@ -21,7 +21,7 @@
         <constructor-arg>
             <bean class="com.zaxxer.hikari.HikariConfig">
                 <constructor-arg>
-                    <props>
+                    <props> 
                         <prop key="jdbcUrl">${db1.spring.url}</prop>
                         <prop key="username">${db1.spring.username}</prop>
                         <prop key="password">${db1.spring.password}</prop>

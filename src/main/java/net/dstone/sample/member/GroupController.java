@@ -8,6 +8,7 @@ import java.util.List;
 import javax.servlet.http.HttpSession;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.ModelAndView;
@@ -19,7 +20,6 @@ import net.dstone.common.utils.BeanUtil;
 @Controller
 @RequestMapping(value = "/group/*")
 public class GroupController extends net.dstone.common.biz.BaseController { 
-    
 
     /********* SVC 정의부분 시작 *********/
     @Autowired 
@@ -38,7 +38,7 @@ public class GroupController extends net.dstone.common.biz.BaseController {
    		/************************ 세션체크 시작 ************************/
    		loginCheck(request, response);
    		/************************ 세션체크 끝 **************************/
-   		
+
    		/************************ 변수 선언 시작 ************************/
    		net.dstone.common.utils.RequestUtil 					requestUtil;
    		Map 											returnObj;
