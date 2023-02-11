@@ -3,7 +3,6 @@ package net.dstone.common.utils;
 import java.util.ArrayList;
 
 import net.dstone.common.task.TaskItem;
-import net.dstone.common.utils.WStressUtil.WStressUtilConfig;
 
 public class WStressUtil extends net.dstone.common.core.BaseObject {
 
@@ -83,7 +82,7 @@ public class WStressUtil extends net.dstone.common.core.BaseObject {
 			msg.append("\n");
 			msg.append("||============================== 스트레스테스트 설정값 시작 ==============================||").append("\n");
 			msg.append("TaskMode["+net.dstone.common.task.TaskHandler.FIXED+"] ThreadNumWhenFixed["+config.getConcurrentUserNum()+"]").append("\n");
-			msg.append("ConcurrentUserNum["+config.getConcurrentUserNum()+"] FireNumByUser["+config.getFireNumByUser()+"] ThinkTimeByMillSec["+config.getThinkTimeByMillSec()+"]");
+			msg.append("ConcurrentUserNum["+config.getConcurrentUserNum()+"] FireNumByUser["+config.getFireNumByUser()+"] ThinkTimeByMillSec["+config.getThinkTimeByMillSec()+"]").append("\n");
 			msg.append("||============================== 스트레스테스트 설정값 끝 ==============================||");
 			msg.append("\n");
 			this.getLogger().info(msg.toString());
