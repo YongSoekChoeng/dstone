@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration>
  
-    <Appenders>
+     <Properties>
+        <Property name="level.default">INFO</Property>
+        <Property name="level.dstone">INFO</Property>
+    </Properties>
     
+    <Appenders>
         <Console name="console" target="SYSTEM_OUT">
             <PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss} %5p [%c] %m%n"/>
         </Console>
@@ -16,20 +20,20 @@
             <Policies>
                 <TimeBasedTriggeringPolicy interval = "1" modulate = "true"/>
             </Policies>
+            <DefaultRolloverStrategy max="10" fileIndex="min"/>
         </RollingFile>
-        
     </Appenders>
 
     <Loggers>
     	<!-- You can specify loggers down here ! -->
     	
-        <Root level="INFO" additivity="false">
+        <Root level="${level.default}" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
         </Root>        
     	
 		<!--Spring logger-->
-	    <Logger name="org.springframework" level="INFO" additivity="false">   
+	    <Logger name="org.springframework" level="${level.default}" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
@@ -47,7 +51,7 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
-		<Logger name="jdbc.sqltiming" level="INFO" additivity="false">   
+		<Logger name="jdbc.sqltiming" level="${level.default}" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
@@ -59,7 +63,7 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.resultsettable" level="INFO" additivity="false">   
+		<Logger name="jdbc.resultsettable" level="${level.default}" additivity="false">   
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
@@ -68,20 +72,11 @@
             <AppenderRef ref="rollingFile"/>
 	    </Logger>
 	    
-	    <!--  
-	    <Logger name="java.sql" level="INFO" additivity="false">
-            <AppenderRef ref="console"/>
-            <AppenderRef ref="rollingFile"/>
-	    </Logger>   
-	    <Logger name="org.springframework" level="INFO" additivity="false">
+	    <Logger name="net.dstone" level="${level.dstone}" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>
-	    <Logger name="java.sql" level="DEBUG" additivity="false">
-            <AppenderRef ref="console"/>
-            <AppenderRef ref="rollingFile"/>
-	    </Logger>
-	    -->
+	    
     </Loggers>
     
 </Configuration>
