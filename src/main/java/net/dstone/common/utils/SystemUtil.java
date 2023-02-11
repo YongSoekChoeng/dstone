@@ -190,5 +190,11 @@ public class SystemUtil {
 		}
 		return buff.toString();
 	}
-	
+
+	/**
+	* <code>getSystemProperty</code> 시스템프로퍼티값을 확인하는 메소드
+	*/
+	public static String getSystemProperty(String name) {
+		return System.getProperty(name, "");
+	}
 }
