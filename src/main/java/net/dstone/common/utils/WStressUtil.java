@@ -3,8 +3,9 @@ package net.dstone.common.utils;
 import java.util.ArrayList;
 
 import net.dstone.common.task.TaskItem;
+import net.dstone.common.utils.WStressUtil.WStressUtilConfig;
 
-public class WStressUtil {
+public class WStressUtil extends net.dstone.common.core.BaseObject {
 
 	private static WStressUtil wStressUtil = null;
 	WStressUtilConfig config = new WStressUtilConfig();
@@ -78,6 +79,15 @@ public class WStressUtil {
 		conf.setWaitTimeAfterShutdown(1);
 						
 		try {
+			StringBuffer msg = new StringBuffer();
+			msg.append("\n");
+			msg.append("||============================== 스트레스테스트 설정값 시작 ==============================||").append("\n");
+			msg.append("TaskMode["+net.dstone.common.task.TaskHandler.FIXED+"] ThreadNumWhenFixed["+config.getConcurrentUserNum()+"]").append("\n");
+			msg.append("ConcurrentUserNum["+config.getConcurrentUserNum()+"] FireNumByUser["+config.getFireNumByUser()+"] ThinkTimeByMillSec["+config.getThinkTimeByMillSec()+"]");
+			msg.append("||============================== 스트레스테스트 설정값 끝 ==============================||");
+			msg.append("\n");
+			this.getLogger().info(msg.toString());
+			
 			ArrayList<TaskItem> taskList = new ArrayList<TaskItem>();
 			for(int i=0; i<conf.getThreadNumWhenFixed(); i++){
 				taskList.add(
