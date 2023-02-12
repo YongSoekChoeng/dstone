@@ -1,9 +1,9 @@
 package net.dstone.common.queue;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.List;
 
-import net.dstone.common.queue.QueueHandler.Queue;
-import net.dstone.common.queue.QueueHandler.QueueThread;
 import net.dstone.common.task.TaskItem;
 
 public class QueueHandler {
@@ -12,15 +12,15 @@ public class QueueHandler {
 	/**
 	 * 큐를 감시할 시간간격.
 	 */
-	public static int QUEUE_CHECK_INTERVAL = 1*1000; 
+	public static int QUEUE_CHECK_INTERVAL = 500; 
 	/**
 	 * 큐에 아이템이 있을 경우 Fetch해올 큐아이템 갯수. -1 이면 큐의 모든 아이템을 Fetch해온다.
 	 */
-	public static int FETCH_SIZE_BY_ONE = 1000; 
+	public static int FETCH_SIZE_BY_ONE = -1; 
 	/**
 	 * Fetch해온  큐아이템을 처리 할 쓰레드 갯수.
 	 */
-	public static int THREAD_NUM_PER_ONE_FETCH = 100;  
+	public static int THREAD_NUM_PER_ONE_FETCH = 100;
 	/****************************  설정 끝   ****************************/
 	
 	protected static QueueHandler queueHandler = null;
@@ -82,6 +82,7 @@ public class QueueHandler {
 	@SuppressWarnings({ "serial" })
 	class Queue extends ArrayList<QueueItem>{
 		
+		@Override
 		public boolean isEmpty(){
 			boolean isEmpty = true;
 			if(this.size() > 0){
@@ -89,7 +90,8 @@ public class QueueHandler {
 			}
 			return isEmpty;
 		}
-		
+
+		@Override
 		public String toString(){
 			StringBuffer buff = new StringBuffer();
 			Object[] oblArray = super.toArray();
@@ -126,7 +128,7 @@ public class QueueHandler {
 			Queue queueToBeWorked = new Queue();
 			try {
 				synchronized(queue) {
-					if(FETCH_SIZE_BY_ONE == -1){
+					if(FETCH_SIZE_BY_ONE == -1 || FETCH_SIZE_BY_ONE >= queue.size() ){
 						queueToBeWorked = (Queue)queue.clone();
 						queue.clear();
 						workingQueueCount = queueToBeWorked.size();
@@ -154,8 +156,14 @@ public class QueueHandler {
 			isWorking = true;
 			try {
 				if (queueToBeWorked != null) {
+					
+					net.dstone.common.task.TaskHandler.TaskConfig conf = net.dstone.common.task.TaskHandler.getInstance().getTaskConfig();
+					conf.setTaskMode(net.dstone.common.task.TaskHandler.FIXED);
+					conf.setThreadNumWhenFixed(THREAD_NUM_PER_ONE_FETCH);
+					conf.setWaitTimeAfterShutdown(1);
+					
 					java.util.ArrayList<net.dstone.common.task.TaskItem> workList = new java.util.ArrayList<net.dstone.common.task.TaskItem>();
-
+					
 					for(int i=0; i<queueToBeWorked.size(); i++) {
 						QueueItem queueItem = queueToBeWorked.get(i);
 						workList.add(new net.dstone.common.task.TaskItem(){
@@ -175,14 +183,8 @@ public class QueueHandler {
 							}
 						});
 					}
-					
-					net.dstone.common.task.TaskHandler.TaskConfig conf = net.dstone.common.task.TaskHandler.getInstance().getTaskConfig();
-					conf.setTaskMode(net.dstone.common.task.TaskHandler.FIXED);
-					conf.setThreadNumWhenFixed(THREAD_NUM_PER_ONE_FETCH);
-					conf.setWaitTimeAfterShutdown(1);
-					
 					workList = net.dstone.common.task.TaskHandler.getInstance().doTheTasks(conf, workList);
-					
+
 				}
 			} catch (Exception e) {
 				debug(e);

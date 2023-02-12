@@ -2,12 +2,13 @@ package net.dstone.common.utils;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 
 public class DateUtil {
 
+	private static LogUtil logger = new LogUtil(DateUtil.class);
+	
 	public static final String DATE_FORMAT_YMDHMS = "yyyyMMddHHmmss";
 	public static final String DATE_FORMAT_YMD = "yyyyMMdd";
 	public static final String[] WEEK_DAY = { "일", "월", "화", "수", "목", "금", "토" };
@@ -589,8 +590,7 @@ public class DateUtil {
 		Calendar before = Calendar.getInstance();
 		SimpleDateFormat hhmmssSSS = new SimpleDateFormat("HH:mm:ss.SSS");
 		STOPWATCH_MAP.put(stopWatchId, before);
-		LogUtil.sysout( "||====================================== ["+stopWatchId+"]START [시작시간 "+hhmmssSSS.format(before.getTime())+"] ======================================||" );
-		
+		logger.sysout( "||====================================== ["+stopWatchId+"]START [시작시간 "+hhmmssSSS.format(before.getTime())+"] ======================================||" );
 	}
 	public static void stopWatchEnd(String stopWatchId) {
 		StringBuffer buff = new StringBuffer();
@@ -624,8 +624,7 @@ public class DateUtil {
 			}
 			
 			String elapsedTime = StringUtil.filler(String.valueOf(hh), 2, "0")+"시간  "+StringUtil.filler(String.valueOf(mm), 2, "0")+"분 "+StringUtil.filler(String.valueOf(ss), 2, "0")+"."+StringUtil.filler(String.valueOf(SSS), 3, "0")+"초";
-
-			LogUtil.sysout( "||====================================== ["+stopWatchId+"]END   [종료시간 "+hhmmssSSS.format(after.getTime())+" 소요시간 "+elapsedTime+"] ======================================||" );
+			logger.sysout( "||====================================== ["+stopWatchId+"]END   [종료시간 "+hhmmssSSS.format(after.getTime())+" 소요시간 "+elapsedTime+"] ======================================||" );
 			
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -109,24 +109,31 @@ public class TaskHandler {
 	public TaskItem doTheTask(TaskConfig conf, TaskItem item) throws Exception{
 		ExecutorService executorService = null;
 		Future<TaskItem> future = null;
-		if(conf.taskMode == TaskHandler.CACHED){
-			executorService = Executors.newCachedThreadPool();
-		}else if(conf.taskMode == TaskHandler.FIXED){
-			executorService = Executors.newFixedThreadPool(conf.threadNumWhenFixed);
-		}else{
-			executorService = Executors.newSingleThreadExecutor();
-		}
 		
+		net.dstone.common.utils.DateUtil.stopWatchStart("TaskHandler.doTheTask");
 		try {
-			future = executorService.submit(item);
+			
+			if(conf.taskMode == TaskHandler.CACHED){
+				executorService = Executors.newCachedThreadPool();
+				future = executorService.submit(item);
+			}else if(conf.taskMode == TaskHandler.FIXED){
+				executorService = Executors.newFixedThreadPool(conf.threadNumWhenFixed);
+				future = executorService.submit(item);
+			}else{
+				executorService = Executors.newSingleThreadExecutor();
+				future = executorService.submit(item);
+			}
+			
 			if(future != null){
 				item = future.get();
 			}
+			
 		} catch (Exception e) {
 			debug( this.getClass().getName() + ".doTheTask() 작없중 예외발생. ID[" + item.getId() + "] 상세내용:" + e.toString());
 			throw e;
 		} finally {
 			close(executorService, conf);
+			net.dstone.common.utils.DateUtil.stopWatchEnd("TaskHandler.doTheTask");
 		}
 		return item;
 	}
@@ -140,7 +147,9 @@ public class TaskHandler {
 	public ArrayList<TaskItem> doTheTasks(TaskConfig conf, ArrayList<TaskItem> itemList) throws Exception{
 		ExecutorService executorService = null;
 		ArrayList<TaskItem> returnVal = new ArrayList<TaskItem>();
-		List<Future<TaskItem>> futureList = null;
+		List<Future<TaskItem>> futureList = new ArrayList<Future<TaskItem>>();
+
+		net.dstone.common.utils.DateUtil.stopWatchStart("TaskHandler.doTheTasks");
 		if(conf.taskMode == TaskHandler.CACHED){
 			executorService = Executors.newCachedThreadPool();
 		}else if(conf.taskMode == TaskHandler.FIXED){
@@ -148,12 +157,20 @@ public class TaskHandler {
 		}else{
 			executorService = Executors.newSingleThreadExecutor();
 		}
-		
+
 		try {
+			
 			futureList = executorService.invokeAll(itemList);
+			
 			if(futureList != null){
-				for(Future<TaskItem> future : futureList){
-					returnVal.add(future.get());
+				Future<TaskItem> future = null;
+				for(int i=0; i<futureList.size(); i++ ){
+					future = futureList.get(i);
+				    try {
+				    	returnVal.add(future.get());
+				    } catch (Exception e) {
+				    	returnVal.add(null);
+				    }
 				}
 			}
 		} catch (Exception e) {
@@ -161,7 +178,9 @@ public class TaskHandler {
 			throw e;
 		} finally {
 			close(executorService, conf);
+			net.dstone.common.utils.DateUtil.stopWatchEnd("TaskHandler.doTheTasks");
 		}
+
 		return returnVal;
 	}
 	
