@@ -1,8 +1,7 @@
 package net.dstone.common.queue;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import net.dstone.common.task.TaskItem;
 
@@ -52,15 +51,13 @@ public class QueueHandler {
 		queueThread.start();
 	}
 	
-	@SuppressWarnings("unchecked")
 	public void addQueue(QueueItem queueItem) {
 		try {
-			synchronized(queue) {
-				debug("||======================================= Adding QueueItem Start... =======================================||");
-				debug(queueItem);
-				debug("||======================================= Adding QueueItem End... =======================================||");
-				queue.add(queueItem);
-			}
+			
+			debug("||======================================= Adding QueueItem Start... =======================================||");
+			queue.offer(queueItem);
+			debug("||======================================= Adding QueueItem End... =======================================||");
+			
 		} catch (Exception e) {
 			debug(e);
 		}
@@ -80,7 +77,7 @@ public class QueueHandler {
 	}
 	
 	@SuppressWarnings({ "serial" })
-	class Queue extends ArrayList<QueueItem>{
+	class Queue extends LinkedBlockingQueue<QueueItem>{
 		
 		@Override
 		public boolean isEmpty(){
@@ -114,8 +111,7 @@ public class QueueHandler {
 						Thread.sleep(QUEUE_CHECK_INTERVAL);
 					}else{
 						if( !this.isWorking ){
-							Queue queueToBeWorked = fetchFromQueue();
-							doTheJob(queueToBeWorked);
+							doTheJob(fetchFromQueue());
 						}
 					}
 				} catch(InterruptedException e) {
@@ -124,35 +120,23 @@ public class QueueHandler {
 			}
 		}
 		
-		private Queue fetchFromQueue(){
-			Queue queueToBeWorked = new Queue();
+		private ArrayList<QueueItem> fetchFromQueue(){
+			ArrayList<QueueItem> queueToBeWorked = null;
 			try {
-				synchronized(queue) {
-					if(FETCH_SIZE_BY_ONE == -1 || FETCH_SIZE_BY_ONE >= queue.size() ){
-						queueToBeWorked = (Queue)queue.clone();
-						queue.clear();
-						workingQueueCount = queueToBeWorked.size();
-					}else{
-						int index = 1;
-						for(int i=0; i<queue.size(); i++){
-							if( index > FETCH_SIZE_BY_ONE ){
-								break;	
-							}
-							queueToBeWorked.add(queue.get(i));
-							queue.remove(i);
-							i--;
-							index++;
-							workingQueueCount++;
-						}
-					}
+				if(FETCH_SIZE_BY_ONE == -1 || FETCH_SIZE_BY_ONE >= queue.size() ){
+					queueToBeWorked = new ArrayList<QueueItem>(queue.size());
+				}else{
+					queueToBeWorked = new ArrayList<QueueItem>(FETCH_SIZE_BY_ONE);
 				}
+				queue.drainTo(queueToBeWorked);
+				workingQueueCount = queueToBeWorked.size();
 			} catch (Exception e) {
 				debug(e);
 			}
 			return queueToBeWorked;
 		}
 		
-		private void doTheJob(Queue queueToBeWorked) {
+		private void doTheJob(ArrayList<QueueItem> queueToBeWorked) {
 			isWorking = true;
 			try {
 				if (queueToBeWorked != null) {
@@ -163,7 +147,6 @@ public class QueueHandler {
 					conf.setWaitTimeAfterShutdown(1);
 					
 					java.util.ArrayList<net.dstone.common.task.TaskItem> workList = new java.util.ArrayList<net.dstone.common.task.TaskItem>();
-					
 					for(int i=0; i<queueToBeWorked.size(); i++) {
 						QueueItem queueItem = queueToBeWorked.get(i);
 						workList.add(new net.dstone.common.task.TaskItem(){
@@ -190,9 +173,6 @@ public class QueueHandler {
 				debug(e);
 			} finally {
 				isWorking = false;
-				if (queueToBeWorked != null) {
-					queueToBeWorked.clear();
-				}
 			}
 		}
 		
