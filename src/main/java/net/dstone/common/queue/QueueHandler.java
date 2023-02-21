@@ -125,10 +125,12 @@ public class QueueHandler {
 			try {
 				if(FETCH_SIZE_BY_ONE == -1 || FETCH_SIZE_BY_ONE >= queue.size() ){
 					queueToBeWorked = new ArrayList<QueueItem>(queue.size());
+					queue.drainTo(queueToBeWorked);
 				}else{
 					queueToBeWorked = new ArrayList<QueueItem>(FETCH_SIZE_BY_ONE);
+					queue.drainTo(queueToBeWorked, FETCH_SIZE_BY_ONE);
 				}
-				queue.drainTo(queueToBeWorked);
+				
 				workingQueueCount = queueToBeWorked.size();
 			} catch (Exception e) {
 				debug(e);
