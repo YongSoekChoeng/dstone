@@ -1,7 +1,9 @@
 package net.dstone.common.task;
 
-import java.util.Properties;
+import java.util.HashMap;
 import java.util.concurrent.Callable;
+
+import net.dstone.common.utils.StringUtil;
 
 public abstract class TaskItem implements Callable<TaskItem>{
 	
@@ -17,7 +19,7 @@ public abstract class TaskItem implements Callable<TaskItem>{
 	}
 	
 	private String strId = "";
-	private Properties prop = new Properties();
+	private HashMap<String, Object> prop = new HashMap<String, Object>();
 
 	/**
 	 * @return
@@ -64,7 +66,7 @@ public abstract class TaskItem implements Callable<TaskItem>{
 	 * Comment :
 	 */
 	public void setProperty(String strKey, String strVal){
-		this.prop.setProperty(strKey, strVal);
+		this.prop.put(strKey, strVal);
 	}
 	
 	/**
@@ -74,7 +76,7 @@ public abstract class TaskItem implements Callable<TaskItem>{
 	 * Comment :
 	 */
 	public String getProperty(String strKey){
-		return this.prop.getProperty(strKey);
+		return this.prop.get(strKey).toString();
 	}
 	
 	/**
@@ -85,7 +87,7 @@ public abstract class TaskItem implements Callable<TaskItem>{
 	 * Comment :
 	 */
 	public String getProperty(String strKey, String strDefaultVal){
-		return this.prop.getProperty(strKey, strDefaultVal);
+		return StringUtil.nullCheck(this.prop.get(strKey), strDefaultVal);
 	}
 	
 	/**
@@ -93,7 +95,7 @@ public abstract class TaskItem implements Callable<TaskItem>{
 	 * 2007. 12. 23.
 	 * Comment :
 	 */
-	public Properties getProp(){
+	public HashMap getProp(){
 		return this.prop;
 	}
 
