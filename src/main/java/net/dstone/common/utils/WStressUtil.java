@@ -82,25 +82,19 @@ public class WStressUtil extends net.dstone.common.core.BaseObject {
 	}
 	
 	public void fireStress(String url, String method, String contentType, DataSet ds){
-		
-		net.dstone.common.task.TaskHandler.TaskConfig conf = net.dstone.common.task.TaskHandler.getInstance().getTaskConfig();
-		conf.setTaskMode(net.dstone.common.task.TaskHandler.FIXED);
-		conf.setThreadNumWhenFixed(config.getConcurrentUserNum());
-		conf.setWaitTimeAfterShutdown(1);
-						
+			
 		try {
 			StringBuffer msg = new StringBuffer();
 			msg.append("\n");
 			msg.append("||============================== 스트레스테스트 설정값 시작 ==============================||").append("\n");
-			msg.append("TaskMode["+net.dstone.common.task.TaskHandler.FIXED+"] MaxNumLimit["+config.getMaxNumLimit()+"] ThinkTimeByMillSec["+config.getThinkTimeByMillSec()+"]").append("\n");
 			msg.append("ConcurrentUserNum["+config.getConcurrentUserNum()+"] FireNumByUser["+config.getFireNumByUser()+"]").append("\n");
 			msg.append("||============================== 스트레스테스트 설정값 끝 ==============================||");
 			msg.append("\n");
 			
-			this.getLogger().sysout(msg.toString());
+			LogUtil.sysout(msg.toString());
 			
 			ArrayList<TaskItem> taskList = new ArrayList<TaskItem>();
-			for( int i=0; i<conf.getThreadNumWhenFixed(); i++){
+			for( int i=0; i<config.getConcurrentUserNum(); i++){
 				TaskItem taskItem = new TaskItem() {
 					@Override
 					public TaskItem doTheTask() {
@@ -136,7 +130,7 @@ public class WStressUtil extends net.dstone.common.core.BaseObject {
 				}
 				taskList.add(taskItem);
 			}
-			net.dstone.common.task.TaskHandler.getInstance().doTheTasks(conf, taskList);
+			net.dstone.common.task.TaskHandler.getInstance().addFixedExecutorService("WStressUtil", config.getConcurrentUserNum()).doTheTasks("WStressUtil", taskList);
 			
 		} catch (Exception e) {
 			e.printStackTrace();
