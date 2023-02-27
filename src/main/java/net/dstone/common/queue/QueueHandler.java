@@ -21,30 +21,30 @@ public class QueueHandler extends BaseObject {
 	/****************************  큐관련 설정 끝   ****************************/
 
 	/**************************** 쓰레드풀관련 설정 시작 ****************************/
-	public static String EXECUTOR_TYPE_CACHED 	= "CACHED";	// CachedThreadPool 로 작업
-	public static String EXECUTOR_TYPE_FIXED 	= "FIXED";	// FixedThreadPool 로 작업
-	public static String EXECUTOR_TYPE_CUSTOM 	= "CUSTOM";	// FixedThreadPool 로 작업
-	public static String EXECUTOR_TYPE_SINGLE 	= "SINGLE";	// CustomThreadPool 로 작업
+	public static String EXECUTOR_TYPE_CACHED 	= "CACHED";					// CachedThreadPool 로 작업
+	public static String EXECUTOR_TYPE_FIXED 	= "FIXED";					// FixedThreadPool 로 작업
+	public static String EXECUTOR_TYPE_CUSTOM 	= "CUSTOM";					// FixedThreadPool 로 작업
+	public static String EXECUTOR_TYPE_SINGLE 	= "SINGLE";					// CustomThreadPool 로 작업
 	
 	public static String EXECUTOR_TYPE 			= EXECUTOR_TYPE_CACHED;		// 선택된 쓰레드풀 타입
 
 	// TaskHandler-Custom 쓰레드풀 타입일때 사용할 설정
 	public static String EXECUTOR_SERVICE_ID 	= "QHANDLER_THREAD_POOL";	// 쓰레드풀아이디.
-	public static int CORE_POOL_SIZE 			= 10; 	// 기본풀사이즈
-	public static int MAXIMUM_POOL_SIZE 		= 200;	// 최대퓰사이즈
-	public static int QUEUE_CAPACITY 			= 50;	// 큐용량-corePoolSize보다 쓰레드요청이 많아졌을 경우 이 수치만큼 큐잉한다. 이 수치가 넘어가게 되면 maximumPoolSize까지 쓰레드가 생성됨. corePoolSize+queueCapacity+maximumPoolSize 를 넘어가는 요청이 발생 시 RejectedExecutionException이 발생.
-	public static int KEEP_ALIVE_TIME 			= 1000;	// corePoolSize를 초과하여 생성된 쓰레드에 대해서 미사용시 제거대기시간(초단위).-corePoolSize보다 쓰레드요청이 많아졌을 경우 queueCapacity까지 큐잉되다가 큐잉초과시 maximumPoolSize까지 쓰레드가 생성되는데 keepAliveTime시간만큼 유지했다가 다시 corePoolSize로 돌아가는동안 유지되는 시간을 의미.
+	public static int CORE_POOL_SIZE 			= 10; 						// 기본풀사이즈
+	public static int MAXIMUM_POOL_SIZE 		= 200;						// 최대퓰사이즈
+	public static int QUEUE_CAPACITY 			= 50;						// 큐용량-corePoolSize보다 쓰레드요청이 많아졌을 경우 이 수치만큼 큐잉한다. 이 수치가 넘어가게 되면 maximumPoolSize까지 쓰레드가 생성됨. corePoolSize+queueCapacity+maximumPoolSize 를 넘어가는 요청이 발생 시 RejectedExecutionException이 발생.
+	public static int KEEP_ALIVE_TIME 			= 1000;						// corePoolSize를 초과하여 생성된 쓰레드에 대해서 미사용시 제거대기시간(초단위).-corePoolSize보다 쓰레드요청이 많아졌을 경우 queueCapacity까지 큐잉되다가 큐잉초과시 maximumPoolSize까지 쓰레드가 생성되는데 keepAliveTime시간만큼 유지했다가 다시 corePoolSize로 돌아가는동안 유지되는 시간을 의미.
 	
 	// TaskHandler-Fixed 쓰레드풀 타입일때 사용할 설정
-	public static int POOL_SIZE_WHEN_FIXED 		= 30;	// Fixed 풀사이즈.
+	public static int POOL_SIZE_WHEN_FIXED 		= 30;						// Fixed 풀사이즈.
 	/****************************  쓰레드풀관련 설정 끝   ****************************/
 	
-	protected static QueueHandler queueHandler = null;
+	protected static QueueHandler queueHandler 	= null;
+	protected Queue queue 						= null;
+	protected QueueThread queueThread 			= null;
+	private static int workingQueueCount 		= 0;
 	
-	protected Queue queue = null;
-	protected QueueThread queueThread = null;
-	private static int workingQueueCount = 0;
-	private TaskHandler taskHandler = null;
+	private TaskHandler taskHandler 			= null;
 	
 	public static QueueHandler getInstance(){
 		if(queueHandler == null){
