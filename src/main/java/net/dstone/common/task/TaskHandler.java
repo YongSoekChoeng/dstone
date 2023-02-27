@@ -164,6 +164,7 @@ public class TaskHandler extends BaseObject{
 			throw e;
 		} finally {
 			net.dstone.common.utils.DateUtil.stopWatchEnd("TaskHandler["+executorServiceId+"].doTheTask");
+			//this.close(executorService);
 		}
 		return item;
 	}
@@ -199,6 +200,7 @@ public class TaskHandler extends BaseObject{
 			throw e;
 		} finally {
 			net.dstone.common.utils.DateUtil.stopWatchEnd("TaskHandler["+executorServiceId+"].doTheTasks("+itemList.size()+")");
+			//this.close(executorService);
 		}
 
 		return returnVal;
