@@ -373,6 +373,7 @@ public class QueueHandler extends BaseObject {
 			private void doTheJob(ArrayList<QueueItem> queueToBeWorked) {
 				isWorking = true;
 				try {
+					net.dstone.common.utils.DateUtil.stopWatchStart("QueueHandler["+queueServiceId+"].doTheJob("+queueToBeWorked.size()+")");
 					if (queueToBeWorked != null) {
 						java.util.ArrayList<net.dstone.common.task.TaskItem> workList = new java.util.ArrayList<net.dstone.common.task.TaskItem>();
 						for(int i=0; i<queueToBeWorked.size(); i++) {
@@ -400,6 +401,7 @@ public class QueueHandler extends BaseObject {
 				} catch (Exception e) {
 					debug(e);
 				} finally {
+					net.dstone.common.utils.DateUtil.stopWatchEnd("QueueHandler["+queueServiceId+"].doTheJob("+queueToBeWorked.size()+")");
 					isWorking = false;
 				}
 			}
