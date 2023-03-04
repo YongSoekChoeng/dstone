@@ -130,9 +130,6 @@ public class TaskHandler extends BaseObject{
 		init();
 	}
 
-	private void debug(Object o){
-		getLogger().info(o);
-	}
 	protected void init(){
 		EXECUTOR_SERVICE_MAP = new HashMap<String, ExecutorService>();
 	}
@@ -147,20 +144,15 @@ public class TaskHandler extends BaseObject{
 	public TaskItem doTheTask(String executorServiceId, TaskItem item) throws Exception{
 		ExecutorService executorService = null;
 		Future<TaskItem> future = null;
-		
 		try {
 			net.dstone.common.utils.DateUtil.stopWatchStart("TaskHandler["+executorServiceId+"].doTheTask");
-			
 			executorService = this.getExecutorService(executorServiceId);
-			
 			future = executorService.submit(item);
-			
 			if(future != null){
 				item = future.get();
 			}
-			
 		} catch (Exception e) {
-			debug( this.getClass().getName() + ".doTheTask() 작없중 예외발생. ID[" + item.getId() + "] 상세내용:" + e.toString());
+			getLogger().info( this.getClass().getName() + ".doTheTask() 작없중 예외발생. ID[" + item.getId() + "] 상세내용:" + e.toString());
 			throw e;
 		} finally {
 			net.dstone.common.utils.DateUtil.stopWatchEnd("TaskHandler["+executorServiceId+"].doTheTask");
@@ -179,9 +171,10 @@ public class TaskHandler extends BaseObject{
 		ExecutorService executorService = null;
 		ArrayList<TaskItem> returnVal = new ArrayList<TaskItem>();
 		List<Future<TaskItem>> futureList = new ArrayList<Future<TaskItem>>();
-
+		String msg = "TaskHandler["+executorServiceId+"].doTheTasks(TaskItem갯수:"+itemList.size()+"). Active Thread Count["+Thread.activeCount()+"]";
+		
 		try {
-			net.dstone.common.utils.DateUtil.stopWatchStart("TaskHandler["+executorServiceId+"].doTheTasks("+itemList.size()+")");
+			net.dstone.common.utils.DateUtil.stopWatchStart(msg);
 			executorService = getExecutorService(executorServiceId);
 			futureList = executorService.invokeAll(itemList);
 			if(futureList != null){
@@ -196,13 +189,12 @@ public class TaskHandler extends BaseObject{
 				}
 			}
 		} catch (Exception e) {
-			debug( this.getClass().getName() + ".doTheTasks() 작없중 예외발생. 상세내용:" + e.toString());
+			getLogger().info( this.getClass().getName() + ".doTheTasks() 작없중 예외발생. 상세내용:" + e.toString());
 			throw e;
 		} finally {
-			net.dstone.common.utils.DateUtil.stopWatchEnd("TaskHandler["+executorServiceId+"].doTheTasks("+itemList.size()+")");
+			net.dstone.common.utils.DateUtil.stopWatchEnd(msg);
 			//this.close(executorService);
 		}
-
 		return returnVal;
 	}
 	
@@ -212,14 +204,14 @@ public class TaskHandler extends BaseObject{
 				executorService.shutdown();
 	            int waitTimeAfterShutdown = 30;
 		        if (executorService.awaitTermination(waitTimeAfterShutdown, TimeUnit.SECONDS)) {
-		        	debug(LocalTime.now() + " 모든 Task가 종료.");
+		        	getLogger().debug(LocalTime.now() + " 모든 Task가 종료.");
 		        } else {
-		        	debug(LocalTime.now() + " "+waitTimeAfterShutdown+"초 대기하였으나 일부 Task가 종료되지 않아서 강제종료 처리.");
+		        	getLogger().debug(LocalTime.now() + " "+waitTimeAfterShutdown+"초 대기하였으나 일부 Task가 종료되지 않아서 강제종료 처리.");
 
 		        }
 			}
 		} catch (Exception e) {
-			debug( this.getClass().getName() + ".close() 작없중 예외발생. 상세내용:" + e.toString());
+			getLogger().debug( this.getClass().getName() + ".close() 작없중 예외발생. 상세내용:" + e.toString());
 		}
 
 	}

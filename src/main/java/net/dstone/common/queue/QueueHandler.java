@@ -47,7 +47,7 @@ public class QueueHandler extends BaseObject {
 	public QueueService addQueueService(String queueServiceId, Config conf) throws Exception{
 		QueueService queueService = null;
 		if(!QUEUE_SERVICE_MAP.containsKey(queueServiceId)) {
-			queueService = new QueueService(conf);
+			queueService = new QueueService(queueServiceId, conf);
 			queueService.setQueueServiceId(queueServiceId);
 	        QUEUE_SERVICE_MAP.put(queueServiceId, queueService);
 		}else {
@@ -194,16 +194,13 @@ public class QueueHandler extends BaseObject {
 		@SuppressWarnings("unused")
 		private QueueService (){}
 		
-		protected QueueService(Config conf)throws Exception{
-			this.conf = conf;
+		protected QueueService(String queueServiceId, Config taskConf)throws Exception{
+			this.queueServiceId = queueServiceId;
+			this.conf = taskConf;
 			validateConfig(this.conf);
 			init();
 		}
 
-		private void debug(Object o){
-			getLogger().info(o);
-		}
-		
 		private void validateConfig(Config conf) throws Exception{
 			
 			if(conf == null) {
@@ -249,14 +246,15 @@ public class QueueHandler extends BaseObject {
 				queueThread.start();
 				// Task 쓰레드풀 등록
 				taskHandler = net.dstone.common.task.TaskHandler.getInstance();
+				String executorServiceId = makeExecutorServiceId();
 				if(conf.getExecutorType().equals(EXECUTOR_TYPE_CACHED)) {
-					taskHandler.addCachedExecutorService(conf.getExecutorServiceId());
+					taskHandler.addCachedExecutorService(executorServiceId);
 				}else if(conf.getExecutorType().equals(EXECUTOR_TYPE_FIXED)) {
-					taskHandler.addFixedExecutorService(conf.getExecutorServiceId(),  conf.getPoolSizeWhenFixed());
+					taskHandler.addFixedExecutorService(executorServiceId,  conf.getPoolSizeWhenFixed());
 				}else if(conf.getExecutorType().equals(EXECUTOR_TYPE_CUSTOM)) {
-					taskHandler.addCustomExecutorService(conf.getExecutorServiceId(), conf.getCorePoolSize(), conf.getMaximumPoolSize(), conf.getQueueCapacity(), conf.getKeepAliveTime());
+					taskHandler.addCustomExecutorService(executorServiceId, conf.getCorePoolSize(), conf.getMaximumPoolSize(), conf.getQueueCapacity(), conf.getKeepAliveTime());
 				}else if(conf.getExecutorType().equals(EXECUTOR_TYPE_SINGLE)) {
-					taskHandler.addSingleExecutorService(conf.getExecutorServiceId());
+					taskHandler.addSingleExecutorService(executorServiceId);
 				}
 				
 			} catch (Exception e) {
@@ -272,13 +270,18 @@ public class QueueHandler extends BaseObject {
 		public void setQueueServiceId(String queueServiceId) {
 			this.queueServiceId = queueServiceId;
 		}
+		
+		private String makeExecutorServiceId() {
+			String executorServiceId = this.queueServiceId + "-" + conf.getExecutorServiceId();
+			return executorServiceId;
+		}
 
 		public void addQueue(QueueItem queueItem) {
 			try {
-				debug("||======================================= Adding QueueItem ["+queueItem.getId()+"] =======================================||");
+				getLogger().debug("||===================== Adding QueueItem ["+queueItem.getId()+"] =====================||");
 				queue.offer(queueItem);
 			} catch (Exception e) {
-				debug(e);
+				e.printStackTrace();
 			}
 		}
 		
@@ -347,7 +350,7 @@ public class QueueHandler extends BaseObject {
 							}
 						}
 					} catch(InterruptedException e) {
-						debug(e);
+						e.printStackTrace();
 					}
 				}
 			}
@@ -365,7 +368,9 @@ public class QueueHandler extends BaseObject {
 					
 					workingQueueCount = queueToBeWorked.size();
 				} catch (Exception e) {
-					debug(e);
+					e.printStackTrace();
+				} finally {
+					getLogger().info("Queue로부터 Fetch된 아이템갯수["+workingQueueCount+"] 현재 Queue에 남아있는 아이템갯수["+queue.size()+"]");
 				}
 				return queueToBeWorked;
 			}
@@ -373,7 +378,7 @@ public class QueueHandler extends BaseObject {
 			private void doTheJob(ArrayList<QueueItem> queueToBeWorked) {
 				isWorking = true;
 				try {
-					net.dstone.common.utils.DateUtil.stopWatchStart("QueueHandler["+queueServiceId+"].doTheJob("+queueToBeWorked.size()+")");
+					net.dstone.common.utils.DateUtil.stopWatchStart("QueueHandler["+queueServiceId+"].doTheJob(QueueItem갯수:"+queueToBeWorked.size()+")");
 					if (queueToBeWorked != null) {
 						java.util.ArrayList<net.dstone.common.task.TaskItem> workList = new java.util.ArrayList<net.dstone.common.task.TaskItem>();
 						for(int i=0; i<queueToBeWorked.size(); i++) {
@@ -396,12 +401,12 @@ public class QueueHandler extends BaseObject {
 							}
 							workList.add(taskItem);
 						}
-						workList = taskHandler.doTheTasks(getQueueServiceId() +"-"+ conf.getExecutorServiceId(), workList);
+						workList = taskHandler.doTheTasks(makeExecutorServiceId(), workList);
 					}
 				} catch (Exception e) {
-					debug(e);
+					e.printStackTrace();
 				} finally {
-					net.dstone.common.utils.DateUtil.stopWatchEnd("QueueHandler["+queueServiceId+"].doTheJob("+queueToBeWorked.size()+")");
+					net.dstone.common.utils.DateUtil.stopWatchEnd("QueueHandler["+queueServiceId+"].doTheJob(QueueItem갯수:"+queueToBeWorked.size()+")");
 					isWorking = false;
 				}
 			}
