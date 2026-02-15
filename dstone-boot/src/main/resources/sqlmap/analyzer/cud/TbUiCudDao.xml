@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 화면[TB_UI] VO -->                                                                
+                                                                                   
+    <!--  화면[TB_UI] 상세 조회 -->                                                        
+    <select id="selectTbUi" parameterType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo">       
+        SELECT                                                                        
+            SYS_ID, UI_ID, UI_NM, FILE_NAME, WORKER_ID
+        FROM                                                                          
+            TB_UI                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID}
+            AND UI_ID = #{UI_ID}
+    </select>                                                                       
+                                                                                   
+    <!--  화면[TB_UI] NEW키값 조회 -->                                                        
+    <select id="selectTbUiNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(UI_ID)), 0, MAX(UI_ID) )+1), 100, '0') UI_ID 
+        FROM                                                                          
+            TB_UI                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID} 
+    </select>                                                                       
+                                                                                   
+    <!--  화면[TB_UI] 입력 -->                                                             
+    <insert id="insertTbUi" parameterType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo" >                             
+        INSERT INTO TB_UI (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="UI_ID != null and !UI_ID.equals('')" >UI_ID,</if>
+                <if test="UI_NM != null and !UI_NM.equals('')" >UI_NM,</if>
+                <if test="FILE_NAME != null and !FILE_NAME.equals('')" >FILE_NAME,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="UI_ID != null and !UI_ID.equals('')" >#{UI_ID},</if>
+                <if test="UI_NM != null and !UI_NM.equals('')" >#{UI_NM},</if>
+                <if test="FILE_NAME != null and !FILE_NAME.equals('')" >#{FILE_NAME},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  화면[TB_UI] 수정 -->                                                             
+    <update id="updateTbUi" parameterType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo" >                             
+        UPDATE TB_UI                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="UI_ID != null and !UI_ID.equals('')" >UI_ID = #{UI_ID},</if>
+                <if test="UI_NM != null and !UI_NM.equals('')" >UI_NM = #{UI_NM},</if>
+                <if test="FILE_NAME != null and !FILE_NAME.equals('')" >FILE_NAME = #{FILE_NAME},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND SYS_ID = #{SYS_ID}
+            AND UI_ID = #{UI_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  화면[TB_UI] 삭제 -->                                                             
+    <delete id="deleteTbUi" parameterType="net.dstone.boot.analyzer.cud.vo.TbUiCudVo" >                             
+        DELETE FROM TB_UI                                                              
+        WHERE 1=1                                                                         
+            AND SYS_ID = #{SYS_ID}
+            AND UI_ID = #{UI_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

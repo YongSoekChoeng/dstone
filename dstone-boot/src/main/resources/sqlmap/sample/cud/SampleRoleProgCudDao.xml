@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.sample.cud.SampleCudDao">                                                       
+                                                                                      
+    <!-- 샘플ROLE별프로그램[SAMPLE_ROLE_PROG] VO -->                                                                
+                                                                                   
+    <!--  샘플ROLE별프로그램[SAMPLE_ROLE_PROG] NEW키값 조회 -->                                                        
+    <select id="selectSampleRoleProgNewKey" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleProgCudVo" resultType="net.dstone.boot.sample.cud.vo.SampleRoleProgCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(PROG_ID)), 0, MAX(PROG_ID) )+1), 30, '0') PROG_ID 
+        FROM                                                                          
+            SAMPLE_ROLE_PROG                                                                       
+        WHERE 1=1                                                                     
+            AND ROLE_ID = #{ROLE_ID} 
+    </select>                                                                       
+                                                                                   
+    <!--  샘플ROLE별프로그램[SAMPLE_ROLE_PROG] 입력 -->                                                             
+    <insert id="insertSampleRoleProg" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleProgCudVo" >                             
+        INSERT INTO SAMPLE_ROLE_PROG (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="ROLE_ID != null and !ROLE_ID.equals('')" >ROLE_ID,</if>
+                <if test="PROG_ID != null and !PROG_ID.equals('')" >PROG_ID,</if>
+                <if test="PROG_NAME != null and !PROG_NAME.equals('')" >PROG_NAME,</if>
+                <if test="PROG_URL != null and !PROG_URL.equals('')" >PROG_URL,</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >INPUT_DT,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="ROLE_ID != null and !ROLE_ID.equals('')" >#{ROLE_ID},</if>
+                <if test="PROG_ID != null and !PROG_ID.equals('')" >#{PROG_ID},</if>
+                <if test="PROG_NAME != null and !PROG_NAME.equals('')" >#{PROG_NAME},</if>
+                <if test="PROG_URL != null and !PROG_URL.equals('')" >#{PROG_URL},</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >STR_TO_DATE( #{INPUT_DT}, '%Y%m%d%H%i%s' ),</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  샘플ROLE별프로그램[SAMPLE_ROLE_PROG] 수정 -->                                                             
+    <update id="updateSampleRoleProg" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleProgCudVo" >                             
+        UPDATE SAMPLE_ROLE_PROG                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="ROLE_ID != null and !ROLE_ID.equals('')" >ROLE_ID = #{ROLE_ID},</if>
+                <if test="PROG_ID != null and !PROG_ID.equals('')" >PROG_ID = #{PROG_ID},</if>
+                <if test="PROG_NAME != null and !PROG_NAME.equals('')" >PROG_NAME = #{PROG_NAME},</if>
+                <if test="PROG_URL != null and !PROG_URL.equals('')" >PROG_URL = #{PROG_URL},</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >INPUT_DT = STR_TO_DATE( #{INPUT_DT}, '%Y%m%d%H%i%s' ),</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND ROLE_ID = #{ROLE_ID}
+            AND PROG_ID = #{PROG_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  샘플ROLE별프로그램[SAMPLE_ROLE_PROG] 삭제 -->                                                             
+    <delete id="deleteSampleRoleProg" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleProgCudVo" >                             
+        DELETE FROM SAMPLE_ROLE_PROG                                                              
+        WHERE 1=1                                                                         
+            AND ROLE_ID = #{ROLE_ID}
+            AND PROG_ID = #{PROG_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

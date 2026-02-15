@@ -1,0 +1,75 @@
+
+spring: 
+    main: 
+        allow-bean-definition-overriding: true
+    ##########################################################################################
+    # <자동설정기능>
+    # 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작하는 기능들이 있음. 
+    # 따라서 설정의도가 OFF라고 할 때 설정의도대로 하려면 부가적으로 아래의 설정을 해주어야 함.
+    ##########################################################################################
+    autoconfigure: 
+        # 제외할 설정.
+        exclude: 
+            # 스프링시큐리티사용 시 주석처리. 비사용 시 주석제거.(스프링시큐리티는 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작함)
+            #- org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+            # Redis사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.data.redis.~ 가 존재할 경우 Spring Boot는 무조건 Redis 연결을 시도)
+            #- org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+            #- org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+            # RabbitMq사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.rabbitmq.~ 가 존재할 경우 Spring Boot는 무조건 RabbitMq 연결을 시도)
+            #- org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration					
+    data:  
+        # Redis 설정
+        redis: 
+            enabled: true # Redis사용 여부(true/false)
+            client-type: lettuce
+            lettuce: 
+                pool:
+                    max-active: 5
+                    max-idle: 5
+                    min-idle: 2			
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT}
+            timeout: 10000
+    devtools: 
+        restart: 
+            enabled: true
+    # RabbitMq 설정		
+    rabbitmq: 
+        enabled: true # RabbitMq사용 여부(true/false)
+        host: ${RABBITMQ_HOST}
+        port: ${RABBITMQ_PORT}
+        virtual-host: /dstone-mq
+        username: ENC(IIOITvsB1izl1mH7iw/A3eM5QUQ0z7HHj7sJqS9rrWI=)
+        password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
+        bindings: 
+            binding-notifications: 
+                queue-id: app.notifications.queue
+                queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
+                exchange-id: app.fanout.exchange # (fanout)라우팅 키와 상관없이 바인딩된 모든 큐로 메시지를 전달
+                #exchange-durable: false
+                routing-key: 
+            binding-orders: 
+                queue-id: app.orders.queue
+                queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
+                exchange-id: app.direct.exchange # (direct)라우팅 키가 정확히 일치하는 큐로 메시지를 전달
+                #exchange-durable: false
+                routing-key: orders.process
+    websocket: 
+        enabled: true
+mail: 
+    host: 127.0.0.1
+    port: 3344
+    user: jysn007
+    password: db2admin
+
+sftp: 
+    host: 127.0.0.1
+    port: 22
+    username: jysn007
+    password: db2admin!@
+    private-key-path: ${APP_HOME}/dstone-boot/ssl/id_rsa
+
+app: 
+    common: 
+        biz: 
+            simple-encrypt-key: jysn007db2admin!

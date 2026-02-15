@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	
+	<parent>
+		<groupId>net.dstone</groupId>
+		<artifactId>dstone</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+	<artifactId>dstone-boot</artifactId> 
+	<packaging>war</packaging>
+	
+	<properties>
+		<!-- Java -->
+		<java.version>21</java.version>
+		<!-- Web -->
+		<jsp.version>3.0.0</jsp.version>
+		<jstl.version>3.0.1</jstl.version>
+		<servlet.version>6.0.0</servlet.version>
+		<!-- Maven-Plugin -->
+		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
+		<!-- Log4j -->
+		<log4j.version>2.24.3</log4j.version>
+		<!-- Dl4j(AI) -->
+		<dl4j.version>1.0.0-M1.1</dl4j.version>
+	</properties>
+	
+	<repositories>
+        <repository>
+            <id>central</id>
+            <name>Central Repository</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <layout>default</layout>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    
+	<dependencies>
+	
+		<!-- dstone-common -->
+		<dependency>
+		    <groupId>net.dstone</groupId>
+		    <artifactId>dstone-common</artifactId>
+		</dependency>	
+		
+		<!-- Lombok -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		
+		<!-- AspectJ -->
+		<dependency>
+		    <groupId>org.aspectj</groupId>
+		    <artifactId>aspectjrt</artifactId>
+		</dependency>    
+		<dependency>
+		    <groupId>org.aspectj</groupId>
+		    <artifactId>aspectjweaver</artifactId>
+		</dependency>
+		<dependency>
+		    <groupId>org.aspectj</groupId>
+		    <artifactId>aspectjtools</artifactId>
+		</dependency>
+		
+		<!-- Swagger -->
+		<dependency>
+			<groupId>io.springfox</groupId>
+			<artifactId>springfox-swagger2</artifactId>
+			<version>2.9.2</version>
+		</dependency>
+		<dependency>
+			<groupId>io.springfox</groupId>
+			<artifactId>springfox-swagger-ui</artifactId>
+			<version>2.9.2</version>
+		</dependency>
+		
+		<!-- Java Parser -->
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-core</artifactId>
+			<version>3.26.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-symbol-solver-core</artifactId>
+			<version>3.26.0</version>
+		</dependency>
+		<dependency>
+		    <groupId>io.github.classgraph</groupId>
+		    <artifactId>classgraph</artifactId>
+		    <version>4.8.165</version>
+		</dependency>	
+		<dependency>
+		    <groupId>org.reflections</groupId>
+		    <artifactId>reflections</artifactId>
+		    <version>0.9.10</version>
+		</dependency>
+
+		<!-- Html Parser -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.11.3</version>
+		</dependency>
+
+		<!-- Test -->
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.github.benas</groupId>
+			<artifactId>jpopulator</artifactId><!-- JPOPULATOR(테스트데이터제너레이터) -->
+			<version>1.2.0</version>
+		</dependency>
+		
+		<!-- Rule Engine / Easy Rules -->
+		<dependency>
+		    <groupId>org.jeasy</groupId>
+		    <artifactId>easy-rules-core</artifactId>
+		    <version>4.1.0</version>
+		</dependency>
+		
+		<!-- Netty -->
+		<dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-codec-http</artifactId>
+		    <version>4.1.117.Final</version>
+		</dependency>
+
+		<!-- Servlet -->
+		<dependency>
+		    <groupId>jakarta.servlet</groupId>
+		    <artifactId>jakarta.servlet-api</artifactId>
+		    <version>${servlet.version}</version>
+		    <scope>provided</scope>
+		</dependency>
+		<!-- VIEW -->
+		<!-- thymeleaf 와 jasper,jstl 둘중 하나만 선택해야 함. -->
+		<!--  
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+		-->
+		<dependency>
+		    <groupId>jakarta.servlet.jsp</groupId>
+		    <artifactId>jakarta.servlet.jsp-api</artifactId>
+		    <version>${jsp.version}</version>
+		    <scope>provided</scope>
+		</dependency>
+		<dependency>
+		    <groupId>jakarta.servlet.jsp.jstl</groupId>
+		    <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+		    <version>${jstl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-jasper</artifactId>
+		</dependency>
+        <dependency>
+		    <groupId>taglibs</groupId>
+		    <artifactId>standard</artifactId>
+		    <version>1.1.2</version>
+        </dependency>
+		
+		<!-- OCR API -->
+		<dependency>
+		    <groupId>net.sourceforge.tess4j</groupId>
+		    <artifactId>tess4j</artifactId>
+		    <version>5.4.0</version>
+		</dependency>
+		
+		<!-- Google API -->
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>1.25.0</version>
+		</dependency>
+		<dependency>
+		    <groupId>com.google.apis</groupId>
+		    <artifactId>google-api-services-drive</artifactId>
+		    <version>v3-rev197-1.25.0</version>
+		</dependency>		
+		<dependency>
+			<groupId>com.google.oauth-client</groupId>
+			<artifactId>google-oauth-client</artifactId>
+			<version>1.34.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.apis</groupId>
+			<artifactId>google-api-services-sheets</artifactId>
+			<version>v4-rev612-1.25.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.oauth-client</groupId>
+			<artifactId>google-oauth-client-java6</artifactId>
+			<version>1.21.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.oauth-client</groupId>
+			<artifactId>google-oauth-client-jetty</artifactId>
+			<version>1.33.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client-jackson2</artifactId>
+			<version>1.20.0</version>
+		</dependency>	
+		<dependency>
+			<groupId>com.google.auth</groupId>
+			<artifactId>google-auth-library-oauth2-http</artifactId>
+			<version>1.18.0</version>
+		</dependency>		
+	    
+	    <!-- AI -->
+		<dependency>
+		    <groupId>nz.ac.waikato.cms.weka</groupId>
+		    <artifactId>weka-stable</artifactId>
+		    <version>3.8.6</version>
+		</dependency>		
+	    
+	</dependencies>
+
+    <build>
+		<finalName>${artifactId}</finalName>
+        <resources>
+            <resource>
+                <directory>conf</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>*.properties</include>
+				</includes>
+            </resource>
+            <resource>
+                <directory>src/main/java</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>**/*.xml</include>
+				</includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<excludes>
+					<exclude>**/*.java</exclude>
+					<!-- Resources Replacement(Ones in conf directory should be used instead.) Start  -->
+					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  시작 -->
+					<!--
+					<exclude>application.xml</exclude>
+					<exclude>log4j2.xml</exclude>
+					-->
+					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  끝 -->
+					<!-- Resources Replacement(Ones in conf directory should be used instead.) End  -->
+				</excludes>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+		<plugins>
+		
+			<!-- 이클립스에서 메이븐 사용하기 위한 플러그인 -->
+            <plugin>
+                <artifactId>maven-eclipse-plugin</artifactId>
+                <version>${maven-eclipse-plugin.version}</version>
+                <configuration>
+                    <additionalProjectnatures>
+                        <projectnature>org.springframework.ide.eclipse.core.springnature</projectnature>
+                    </additionalProjectnatures>
+                    <additionalBuildcommands>
+                        <buildcommand>org.springframework.ide.eclipse.core.springbuilder</buildcommand>
+                    </additionalBuildcommands>
+                    <downloadSources>true</downloadSources>
+                    <downloadJavadocs>true</downloadJavadocs>
+                </configuration>
+            </plugin>
+		
+			<!-- 컴파일을 위한 플러그인 -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<release>${java.version}</release>
+					<showWarnings>true</showWarnings>
+					<showDeprecation>true</showDeprecation>
+					<encoding>UTF-8</encoding>
+					<parameters>true</parameters>
+				</configuration>
+			</plugin>
+			 
+			<!-- WAR 패키징을 위한 플러그인 -->		
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-war-plugin</artifactId>
+			</plugin>
+ 	
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<includeSystemScope>false</includeSystemScope>
+					<mainClass>net.dstone.boot.DstoneBootApplication</mainClass>
+					<!-- JDK17 이후 보안강화로 발생하는 Nested jar 문제에 대한 처리. 서명이 필요한 Library에 대해서 jar를 Unpacking 하여 class로 취급 하도록 처리하는 기능.(Nested jar 문제 해소)  -->
+					<requiresUnpack>
+			            <dependency>
+			                <groupId>org.bouncycastle</groupId>
+			                <artifactId>bcprov-jdk18on</artifactId>
+			            </dependency>
+			        </requiresUnpack>
+				</configuration>
+			</plugin>
+
+		</plugins>
+		
+    </build>
+
+
+</project>

@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+		
+	<parent>
+		<groupId>net.dstone</groupId>
+		<artifactId>dstone</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+	<artifactId>dstone-common</artifactId>
+		
+	<properties>
+		<!-- Java -->
+		<java.version>21</java.version>
+		<!-- Web -->
+		<jsp.version>3.0.0</jsp.version>
+		<jstl.version>3.0.1</jstl.version>
+		<servlet.version>6.0.0</servlet.version>
+		<!-- Maven-Plugin -->
+		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
+		<!-- Log4j -->
+		<log4j.version>2.24.3</log4j.version>
+		<!-- Dl4j(AI) -->
+		<dl4j.version>1.0.0-M1.1</dl4j.version>
+	</properties>
+	
+	<dependencies>
+	
+		<!-- SpringBoot/Spring -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+		    <groupId>org.springframework.boot</groupId>
+		    <artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-log4j2</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+		</dependency>
+		
+		<!-- Hot deply -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<optional>true</optional>
+		</dependency>
+		
+		<!-- 리액티브 웹 스택 사용.(RestTemplate 대신 WebClient 사용하기 위해 설정) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+		
+		<!--  스프링 부트 애플리케이션에서 RabbitMQ를 아주 쉽고 간편하게 사용할 수 있도록 도와주는 라이브러리 -->
+		<dependency>
+		    <groupId>org.springframework.boot</groupId>
+		    <artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<dependency> 
+			<groupId>org.springframework</groupId> 
+			<artifactId>spring-jdbc</artifactId> 
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+		<dependency>
+		    <groupId>org.springframework</groupId>
+		    <artifactId>spring-messaging</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.session</groupId>
+			<artifactId>spring-session-data-redis</artifactId>
+		</dependency>
+		
+		<!-- DATABASE(JDBC) -->
+		<dependency>
+			<groupId>com.zaxxer</groupId>
+			<artifactId>HikariCP</artifactId>
+		</dependency>		
+		<dependency>
+		    <groupId>com.mysql</groupId>
+		    <artifactId>mysql-connector-j</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.hsqldb</groupId>
+			<artifactId>hsqldb</artifactId>
+		</dependency>		
+		<dependency>
+		    <groupId>org.postgresql</groupId>
+		    <artifactId>postgresql</artifactId>
+		    <version>42.7.7</version>
+		</dependency>
+		<dependency>
+		    <groupId>com.oracle.database.jdbc</groupId>
+		    <artifactId>ojdbc8</artifactId>
+		    <version>21.1.0.0</version>
+		</dependency>
+		
+		<!-- DBCP(DataBaseConnectionPool) -->
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-dbcp2</artifactId>
+		</dependency>	
+		
+		<!-- MyBatis -->
+		<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis-spring</artifactId>
+			<version>3.0.5</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis</artifactId>
+			<version>3.5.19</version>
+		</dependency>
+			
+		<!-- Apache-Commons -->
+		<dependency>
+			<groupId>commons-beanutils</groupId>
+			<artifactId>commons-beanutils</artifactId>
+			<version>1.11.0</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-lang3</artifactId>
+		    <version>3.18.0</version>
+		</dependency>
+			
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-core</artifactId>
+		    <version>${log4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-api</artifactId>
+		    <version>${log4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bgee.log4jdbc-log4j2</groupId>
+			<artifactId>log4jdbc-log4j2-jdbc4.1</artifactId>
+		    <version>1.16</version>
+		</dependency>
+		
+		<!-- Encrypt -->
+		<dependency> 
+			<groupId>com.github.ulisesbocchio</groupId> 
+			<artifactId>jasypt-spring-boot-starter</artifactId> 
+			<version>3.0.4</version> 
+		</dependency>
+		<dependency>
+		    <groupId>org.bouncycastle</groupId>
+		    <artifactId>bcprov-jdk18on</artifactId>
+		    <version>1.81</version>
+		</dependency>
+		
+		<!-- File Upload -->
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>2.15.1</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-fileupload2-jakarta-servlet6</artifactId>
+		    <version>2.0.0-M2</version> 
+	    </dependency>
+		
+		<!-- PDF API -->
+		<dependency>
+		    <groupId>org.apache.pdfbox</groupId>
+		    <artifactId>pdfbox</artifactId>
+		    <version>2.0.27</version>
+		</dependency>
+		
+		<!-- SFTP -->
+		<dependency>
+		    <groupId>com.jcraft</groupId>
+		    <artifactId>jsch</artifactId>   
+		    <version>0.1.55</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-vfs2</artifactId>
+		    <version>2.9.0</version>
+		</dependency>
+		
+		<!-- JWT(Json Web Token) -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.11.5</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.11.5</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.11.5</version>
+			<scope>runtime</scope>
+		</dependency>	
+		
+		<!-- Mail -->
+		<dependency>
+		    <groupId>jakarta.mail</groupId>
+		    <artifactId>jakarta.mail-api</artifactId>
+		    <version>2.1.4</version>
+		</dependency>
+		
+		<!-- JSON -->
+		<dependency>
+			<groupId>com.googlecode.json-simple</groupId>
+			<artifactId>json-simple</artifactId>
+			<version>1.1.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.codehaus.jackson</groupId>
+			<artifactId>jackson-jaxrs</artifactId>
+			<version>1.9.13</version>
+		</dependency>
+		<dependency>
+		    <groupId>com.fasterxml.jackson.core</groupId>
+		    <artifactId>jackson-core</artifactId>
+		</dependency>
+	    <dependency>
+	        <groupId>com.fasterxml.jackson.core</groupId>
+	        <artifactId>jackson-databind</artifactId>
+	    </dependency>
+		
+		<!-- HTTP Connection -->
+		<dependency>
+		    <groupId>org.apache.httpcomponents</groupId>
+		    <artifactId>httpclient</artifactId>
+		    <version>4.5.14</version> <!-- Use the latest version -->
+		</dependency>
+		<dependency>
+		    <groupId>org.apache.httpcomponents.client5</groupId>
+		    <artifactId>httpclient5</artifactId>
+		</dependency>
+
+		<!-- Query Parser -->
+		<dependency>
+		    <groupId>com.github.jsqlparser</groupId>
+		    <artifactId>jsqlparser</artifactId>
+		    <version>4.7</version>
+		</dependency>
+
+		<!-- Encoding 자동체크 -->
+		<dependency>
+			<groupId>com.googlecode.juniversalchardet</groupId>
+			<artifactId>juniversalchardet</artifactId>
+			<version>1.0.3</version>
+		</dependency>
+		
+		<!-- WebSocket Client -->
+		<dependency>
+		    <groupId>com.squareup.okhttp3</groupId>
+		    <artifactId>okhttp</artifactId>
+		    <version>4.9.3</version>
+		</dependency>
+		
+		
+	</dependencies>
+
+    <build>
+		<finalName>${artifactId}</finalName>
+        <resources>
+            <resource>
+                <directory>conf</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>*.properties</include>
+				</includes>
+            </resource>
+            <resource>
+                <directory>src/main/java</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>**/*.xml</include>
+				</includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<excludes>
+					<exclude>**/*.java</exclude>
+					<!-- Resources Replacement(Ones in conf directory should be used instead.) Start  -->
+					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  시작 -->
+					<!--
+					<exclude>application.xml</exclude>
+					<exclude>log4j2.xml</exclude>
+					-->
+					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  끝 -->
+					<!-- Resources Replacement(Ones in conf directory should be used instead.) End  -->
+				</excludes>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+		<plugins>
+		
+			<!-- 이클립스에서 메이븐 사용하기 위한 플러그인 -->
+            <plugin>
+                <artifactId>maven-eclipse-plugin</artifactId>
+                <version>${maven-eclipse-plugin.version}</version>
+                <configuration>
+                    <additionalProjectnatures>
+                        <projectnature>org.springframework.ide.eclipse.core.springnature</projectnature>
+                    </additionalProjectnatures>
+                    <additionalBuildcommands>
+                        <buildcommand>org.springframework.ide.eclipse.core.springbuilder</buildcommand>
+                    </additionalBuildcommands>
+                    <downloadSources>true</downloadSources>
+                    <downloadJavadocs>true</downloadJavadocs>
+                </configuration>
+            </plugin>
+		
+			<!-- 컴파일을 위한 플러그인 -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<release>${java.version}</release>
+					<showWarnings>true</showWarnings>
+					<showDeprecation>true</showDeprecation>
+					<encoding>UTF-8</encoding>
+					<parameters>true</parameters>
+				</configuration>
+			</plugin>
+			 
+		</plugins>
+		
+    </build>
+
+
+</project>

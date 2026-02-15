@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.dstone.boot.common.security.CustomUserDao">
+
+	<select id="selectUser" parameterType="map" resultType="map">
+		SELECT 
+			GROUP_ID, USER_ID, USER_PW, MEMBER_NAME, AGE
+			, DUTY, REGION, ADDRESS, ADDRESS_DTL, JUMINNO, GENDER
+			, TEL, HP, EMAIL, INPUT_DT, UPDATE_DT
+		FROM 
+			SAMPLE_MEMBER
+		WHERE 1=1
+			AND USER_ID = #{USER_ID}
+	</select>
+
+	<update id="updateUserLoginTime" parameterType="map" >
+		UPDATE SAMPLE_MEMBER
+		SET 
+			UPDATE_DT = NOW()
+		WHERE 1=1
+			AND USER_ID = #{USER_ID}
+	</update>
+
+	<select id="selectListAuthority" parameterType="map" resultType="String">
+		SELECT 
+			C.ROLE_ID
+		FROM 
+			SAMPLE_MEMBER A
+			, SAMPLE_GROUP B
+			, SAMPLE_GROUP_ROLE C
+		WHERE 1=1
+			AND A.GROUP_ID = B.GROUP_ID
+			AND B.GROUP_ID = C.GROUP_ID
+			AND A.USER_ID = #{USER_ID}
+		GROUP BY
+			C.ROLE_ID 	
+	</select>
+
+	<select id="selectListUrlAndRole" parameterType="map" resultType="map">
+		SELECT 
+			ROLE_ID, PROG_ID, PROG_NAME, PROG_URL
+		FROM 
+			SAMPLE_ROLE_PROG
+		WHERE 1=1
+		ORDER BY
+			PROG_URL, ROLE_ID
+	</select>
+
+	<select id="selectListUrlByRole" parameterType="map" resultType="map">
+		SELECT 
+			PROG_URL
+			, ROLE_ID
+		FROM 
+			SAMPLE_ROLE_PROG
+		WHERE 1=1
+			AND ROLE_ID = #{ROLE_ID}
+	</select>
+
+</mapper>

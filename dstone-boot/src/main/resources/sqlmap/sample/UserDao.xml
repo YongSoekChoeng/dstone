@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.dstone.boot.sample.UserDao">                                                       
+                                                                                      
+    <!-- UserVo VO -->                                                                
+                                                                                   
+    <!--  샘플사용자정보 리스트조회(카운트) -->                                                      
+    <select id="listUserCount" parameterType="net.dstone.boot.sample.vo.UserVo" resultType="Integer">         
+        SELECT COUNT(*) CNT FROM ( 
+        SELECT                                                            
+            *
+        FROM                                  
+            SAMPLE_MEMBER
+        WHERE 1=1 
+        ) P
+    </select>                                                                       
+                                                                                   
+    <!--  샘플사용자정보 리스트조회 -->                                                      
+    <select id="listUser" parameterType="net.dstone.boot.sample.vo.UserVo" resultType="net.dstone.boot.sample.vo.UserVo">         
+		SELECT  
+			P.* 
+		FROM  
+		    (  
+	        SELECT                                                            
+				GROUP_ID
+				,USER_ID
+				,USER_PW
+				,MEMBER_NAME
+				,AGE
+				,DUTY
+				,REGION
+				,ADDRESS
+				,ADDRESS_DTL
+				,JUMINNO
+				,GENDER
+				,TEL
+				,HP
+				,EMAIL
+				,INPUT_DT
+				,UPDATE_DT
+	        FROM                                             
+	            SAMPLE_MEMBER
+	        WHERE 1=1 
+		    )   P 
+		WHERE 2>1 
+		ORDER BY USER_ID LIMIT #{INT_FROM}, #{INT_TO} 
+
+    </select>                                                                       
+ 
+</mapper>                                                                             
+

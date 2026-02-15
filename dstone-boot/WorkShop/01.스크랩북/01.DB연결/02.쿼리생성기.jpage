@@ -1,0 +1,7 @@
+String DBID = "DBID_3";String TABLE_NAME = "TB_CT_CTR_M";String queryKind = "BASIC"; /* BASIC/MYBATIS */String tableAlias = "A";net.dstone.common.utils.DateUtil.stopWatchStart("02.테이블쿼리생성기");
+try {	String sql = "";		/*	 	sql = net.dstone.common.utils.SqlUtil.getCrudSql(DBID, TABLE_NAME, queryKind, tableAlias);
+	net.dstone.common.utils.LogUtil.sysout(sql);	sql = net.dstone.common.utils.SqlUtil.getSelectSql(DBID, TABLE_NAME, queryKind, tableAlias);	net.dstone.common.utils.LogUtil.sysout(sql);		*/	sql = net.dstone.common.utils.SqlUtil.getCrudSql(DBID, TABLE_NAME, queryKind, tableAlias);	net.dstone.common.utils.LogUtil.sysout(sql);	
+}catch(Exception e){
+	e.printStackTrace();
+}finally{	net.dstone.common.utils.DateUtil.stopWatchEnd("02.테이블쿼리생성기");
+}

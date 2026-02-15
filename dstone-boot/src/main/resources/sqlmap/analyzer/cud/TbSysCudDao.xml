@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 시스템[TB_SYS] VO -->                                                                
+                                                                                   
+    <!--  시스템[TB_SYS] 상세 조회 -->                                                        
+    <select id="selectTbSys" parameterType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo">       
+        SELECT                                                                        
+            SYS_ID, SYS_NM, CONF_FILE_PATH, APP_ROOT_PATH, APP_SRC_PATH, 
+            APP_WEB_PATH, APP_SQL_PATH, WRITE_PATH, SAVE_FILE_NAME, DBID, IS_TABLE_LIST_FROM_DB, 
+            TABLE_NAME_LIKE_STR, TABLE_LIST_FILE_NAME, IS_SAVE_TO_DB, APP_JDK_HOME, APP_CLASSPATH, 
+            WORKER_THREAD_KIND, WORKER_THREAD_NUM, WORKER_ID
+        FROM                                                                          
+            TB_SYS                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID}
+    </select>                                                                       
+                                                                                   
+    <!--  시스템[TB_SYS] NEW키값 조회 -->                                                        
+    <select id="selectTbSysNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(SYS_ID)), 0, MAX(SYS_ID) )+1), 20, '0') SYS_ID 
+        FROM                                                                          
+            TB_SYS                                                                       
+        WHERE 1=1                                                                     
+    </select>                                                                       
+                                                                                   
+    <!--  시스템[TB_SYS] 입력 -->                                                             
+    <insert id="insertTbSys" parameterType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo" >                             
+        INSERT INTO TB_SYS (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="SYS_NM != null and !SYS_NM.equals('')" >SYS_NM,</if>
+                <if test="CONF_FILE_PATH != null and !CONF_FILE_PATH.equals('')" >CONF_FILE_PATH,</if>
+                <if test="APP_ROOT_PATH != null and !APP_ROOT_PATH.equals('')" >APP_ROOT_PATH,</if>
+                <if test="APP_SRC_PATH != null and !APP_SRC_PATH.equals('')" >APP_SRC_PATH,</if>
+                <if test="APP_WEB_PATH != null and !APP_WEB_PATH.equals('')" >APP_WEB_PATH,</if>
+                <if test="APP_SQL_PATH != null and !APP_SQL_PATH.equals('')" >APP_SQL_PATH,</if>
+                <if test="WRITE_PATH != null and !WRITE_PATH.equals('')" >WRITE_PATH,</if>
+                <if test="SAVE_FILE_NAME != null and !SAVE_FILE_NAME.equals('')" >SAVE_FILE_NAME,</if>
+                <if test="DBID != null and !DBID.equals('')" >DBID,</if>
+                <if test="IS_TABLE_LIST_FROM_DB != null and !IS_TABLE_LIST_FROM_DB.equals('')" >IS_TABLE_LIST_FROM_DB,</if>
+                <if test="TABLE_NAME_LIKE_STR != null and !TABLE_NAME_LIKE_STR.equals('')" >TABLE_NAME_LIKE_STR,</if>
+                <if test="TABLE_LIST_FILE_NAME != null and !TABLE_LIST_FILE_NAME.equals('')" >TABLE_LIST_FILE_NAME,</if>
+                <if test="IS_SAVE_TO_DB != null and !IS_SAVE_TO_DB.equals('')" >IS_SAVE_TO_DB,</if>
+                <if test="APP_JDK_HOME != null and !APP_JDK_HOME.equals('')" >APP_JDK_HOME,</if>
+                <if test="APP_CLASSPATH != null and !APP_CLASSPATH.equals('')" >APP_CLASSPATH,</if>
+                <if test="WORKER_THREAD_KIND != null and !WORKER_THREAD_KIND.equals('')" >WORKER_THREAD_KIND,</if>
+                <if test="WORKER_THREAD_NUM != null and !WORKER_THREAD_NUM.equals('')" >WORKER_THREAD_NUM,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="SYS_NM != null and !SYS_NM.equals('')" >#{SYS_NM},</if>
+                <if test="CONF_FILE_PATH != null and !CONF_FILE_PATH.equals('')" >#{CONF_FILE_PATH},</if>
+                <if test="APP_ROOT_PATH != null and !APP_ROOT_PATH.equals('')" >#{APP_ROOT_PATH},</if>
+                <if test="APP_SRC_PATH != null and !APP_SRC_PATH.equals('')" >#{APP_SRC_PATH},</if>
+                <if test="APP_WEB_PATH != null and !APP_WEB_PATH.equals('')" >#{APP_WEB_PATH},</if>
+                <if test="APP_SQL_PATH != null and !APP_SQL_PATH.equals('')" >#{APP_SQL_PATH},</if>
+                <if test="WRITE_PATH != null and !WRITE_PATH.equals('')" >#{WRITE_PATH},</if>
+                <if test="SAVE_FILE_NAME != null and !SAVE_FILE_NAME.equals('')" >#{SAVE_FILE_NAME},</if>
+                <if test="DBID != null and !DBID.equals('')" >#{DBID},</if>
+                <if test="IS_TABLE_LIST_FROM_DB != null and !IS_TABLE_LIST_FROM_DB.equals('')" >#{IS_TABLE_LIST_FROM_DB},</if>
+                <if test="TABLE_NAME_LIKE_STR != null and !TABLE_NAME_LIKE_STR.equals('')" >#{TABLE_NAME_LIKE_STR},</if>
+                <if test="TABLE_LIST_FILE_NAME != null and !TABLE_LIST_FILE_NAME.equals('')" >#{TABLE_LIST_FILE_NAME},</if>
+                <if test="IS_SAVE_TO_DB != null and !IS_SAVE_TO_DB.equals('')" >#{IS_SAVE_TO_DB},</if>
+                <if test="APP_JDK_HOME != null and !APP_JDK_HOME.equals('')" >#{APP_JDK_HOME},</if>
+                <if test="APP_CLASSPATH != null and !APP_CLASSPATH.equals('')" >#{APP_CLASSPATH},</if>
+                <if test="WORKER_THREAD_KIND != null and !WORKER_THREAD_KIND.equals('')" >#{WORKER_THREAD_KIND},</if>
+                <if test="WORKER_THREAD_NUM != null and !WORKER_THREAD_NUM.equals('')" >#{WORKER_THREAD_NUM},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  시스템[TB_SYS] 수정 -->                                                             
+    <update id="updateTbSys" parameterType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo" >                             
+        UPDATE TB_SYS                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="SYS_NM != null and !SYS_NM.equals('')" >SYS_NM = #{SYS_NM},</if>
+                <if test="CONF_FILE_PATH != null and !CONF_FILE_PATH.equals('')" >CONF_FILE_PATH = #{CONF_FILE_PATH},</if>
+                <if test="APP_ROOT_PATH != null and !APP_ROOT_PATH.equals('')" >APP_ROOT_PATH = #{APP_ROOT_PATH},</if>
+                <if test="APP_SRC_PATH != null and !APP_SRC_PATH.equals('')" >APP_SRC_PATH = #{APP_SRC_PATH},</if>
+                <if test="APP_WEB_PATH != null and !APP_WEB_PATH.equals('')" >APP_WEB_PATH = #{APP_WEB_PATH},</if>
+                <if test="APP_SQL_PATH != null and !APP_SQL_PATH.equals('')" >APP_SQL_PATH = #{APP_SQL_PATH},</if>
+                <if test="WRITE_PATH != null and !WRITE_PATH.equals('')" >WRITE_PATH = #{WRITE_PATH},</if>
+                <if test="SAVE_FILE_NAME != null and !SAVE_FILE_NAME.equals('')" >SAVE_FILE_NAME = #{SAVE_FILE_NAME},</if>
+                <if test="DBID != null and !DBID.equals('')" >DBID = #{DBID},</if>
+                <if test="IS_TABLE_LIST_FROM_DB != null and !IS_TABLE_LIST_FROM_DB.equals('')" >IS_TABLE_LIST_FROM_DB = #{IS_TABLE_LIST_FROM_DB},</if>
+                <if test="TABLE_NAME_LIKE_STR != null and !TABLE_NAME_LIKE_STR.equals('')" >TABLE_NAME_LIKE_STR = #{TABLE_NAME_LIKE_STR},</if>
+                <if test="TABLE_LIST_FILE_NAME != null and !TABLE_LIST_FILE_NAME.equals('')" >TABLE_LIST_FILE_NAME = #{TABLE_LIST_FILE_NAME},</if>
+                <if test="IS_SAVE_TO_DB != null and !IS_SAVE_TO_DB.equals('')" >IS_SAVE_TO_DB = #{IS_SAVE_TO_DB},</if>
+                <if test="APP_JDK_HOME != null and !APP_JDK_HOME.equals('')" >APP_JDK_HOME = #{APP_JDK_HOME},</if>
+                <if test="APP_CLASSPATH != null and !APP_CLASSPATH.equals('')" >APP_CLASSPATH = #{APP_CLASSPATH},</if>
+                <if test="WORKER_THREAD_KIND != null and !WORKER_THREAD_KIND.equals('')" >WORKER_THREAD_KIND = #{WORKER_THREAD_KIND},</if>
+                <if test="WORKER_THREAD_NUM != null and !WORKER_THREAD_NUM.equals('')" >WORKER_THREAD_NUM = #{WORKER_THREAD_NUM},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND SYS_ID = #{SYS_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  시스템[TB_SYS] 삭제 -->                                                             
+    <delete id="deleteTbSys" parameterType="net.dstone.boot.analyzer.cud.vo.TbSysCudVo" >                             
+        DELETE FROM TB_SYS                                                              
+        WHERE 1=1                                                                         
+            AND SYS_ID = #{SYS_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

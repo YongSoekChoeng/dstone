@@ -1,0 +1,27 @@
+
+net.dstone.common.utils.DateUtil.stopWatchStart("01.파일검색연습장");
+
+String filePath = "";
+filePath = "C:/he-ide/eGovFrameDev-4.2.0-64bit/workspace/.metadata/.plugins/org.eclipse.wst.server.core/tmp2/wtpwebapps/QBX";
+
+int searchMode = net.dstone.common.utils.FileUtil.SEARCH_MODE_AND;int searchCase = net.dstone.common.utils.FileUtil.SEARCH_CASE_SENSITIVE;
+String[] keyword = {"pForm.gfn_searchAddress"};
+String[] extFilter = {"js"};
+boolean searchSaperatedOnly = true;
+
+String[] fileList = null;
+String file = "";
+
+try {
+	fileList = net.dstone.common.utils.FileUtil.searchFileList(filePath, searchMode, searchCase, keyword, extFilter, searchSaperatedOnly);
+	if(fileList != null){
+		for(int i=0; i<fileList.length; i++){
+			file = fileList[i];
+			System.out.println(file);
+		}
+	}
+}catch(Exception e){
+	e.printStackTrace();
+}finally{
+	net.dstone.common.utils.DateUtil.stopWatchEnd("01.파일검색연습장");
+}

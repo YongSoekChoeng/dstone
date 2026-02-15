@@ -1,0 +1,209 @@
+server: 
+    port: 7081    
+    tomcat: 
+        accept-count: 100
+        max-connections: 10000
+        max-threads: 200
+        min-spare-threads: 10
+        max-swallow-size: 2MB
+        connection-timeout: 15s
+    error: 
+        whitelabel: 
+            enabled: true
+    servlet: 
+        context-path: /
+        jsp: 
+            init-parameters: 
+                development: true
+        encoding: 
+            force-response: true
+            charset: UTF-8
+        session: 
+            cookie: 
+                name: JSESSIONID
+    ssl: 
+        enabled: false
+        protocol: TLS
+        enabled-protocols: 
+            - TLSv1
+            - TLSv1.1
+            - TLSv1.2
+        key-store: ${APP_HOME}/dstone-boot/ssl/dstone-keystore.p12
+        key-store-type: PKCS12
+        key-store-password: ENC(vZbjr2NF87hEmiRHka9fUVIay5zvZeNtIRlNGHxvid8=)
+        key-store-alias: dstone-ssl
+
+spring: 
+    main: 
+        allow-bean-definition-overriding: true
+    ##########################################################################################
+    # <자동설정기능>
+    # 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작하는 기능들이 있음. 
+    # 따라서 설정의도가 OFF라고 할 때 설정의도대로 하려면 부가적으로 아래의 설정을 해주어야 함.
+    ##########################################################################################
+    autoconfigure: 
+        # 제외할 설정.
+        exclude: 
+            # 스프링시큐리티사용 시 주석처리. 비사용 시 주석제거.(스프링시큐리티는 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작함)
+            #- org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+            # Redis사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.data.redis.~ 가 존재할 경우 Spring Boot는 무조건 Redis 연결을 시도)
+            #- org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+            #- org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+            # RabbitMq사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.rabbitmq.~ 가 존재할 경우 Spring Boot는 무조건 RabbitMq 연결을 시도)
+            #- org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+    security: 
+        enabled: true # 스프링시큐리티사용 여부(true/false)
+    session:  # Redis 를 Spring Session 으로 사용할 경우 store-type 를 redis 로 세팅.
+        store-type: redis # 세션 저장소(none/redis)
+        redis: 
+            namespace: dstone:session # 세션을 저장하는 데 사용되는 키의 네임스페이스					
+    data:  
+        # Redis 설정
+        redis: 
+            enabled: true # Redis사용 여부(true/false)
+            client-type: lettuce
+            lettuce: 
+                pool:
+                    max-active: 5
+                    max-idle: 5
+                    min-idle: 2			
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT}
+            timeout: 10000			
+    datasource: 
+        common: 
+            hikari: 
+                driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+                username: ENC(ydLjxrknr8dD59e6E+HvxdxRaGiFa9jOCpJJDtb0uak=)
+                password: ENC(ydLjxrknr8dD59e6E+HvxdxRaGiFa9jOCpJJDtb0uak=)
+                maximum-pool-size: 30
+                connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
+                max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
+                idle-timeout: 600000       # Idle 상태 커넥션의 최대 유지시간. 기본값 10분.
+                #initialization-fail-timeout: 0 
+                use-jndi-lookup: N
+                jndi-lookup-name: java:comp/env/sampleDB
+            networks: 
+                - backend                
+        sample:
+            hikari: 
+                driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+                username: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)
+                password: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)
+                maximum-pool-size: 30
+                connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
+                max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
+                idle-timeout: 600000       # Idle 상태 커넥션의 최대 유지시간. 기본값 10분.
+                #initialization-fail-timeout: 0 
+                use-jndi-lookup: N
+                jndi-lookup-name: java:comp/env/sampleDB
+            networks: 
+                - backend
+        analyzer:
+            hikari: 
+                driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/analyzeDB?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+                username: ENC(/V7LzByd6FKQ2uPexJOOaY8E6gCVnRc9TcoPT/pu1y8=)
+                password: ENC(/V7LzByd6FKQ2uPexJOOaY8E6gCVnRc9TcoPT/pu1y8=)
+                maximum-pool-size: 30
+                connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
+                max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
+                idle-timeout: 600000       # Idle 상태 커넥션의 최대 유지시간. 기본값 10분.
+                #initialization-fail-timeout: 0 
+                use-jndi-lookup: N
+                jndi-lookup-name: java:comp/env/analyze
+            networks: 
+                - backend
+    devtools: 
+        restart: 
+            enabled: true
+    # RabbitMq 설정		
+    rabbitmq: 
+        enabled: true # RabbitMq사용 여부(true/false)
+        host: ${RABBITMQ_HOST}
+        port: ${RABBITMQ_PORT}
+        virtual-host: /dstone-mq
+        username: ENC(IIOITvsB1izl1mH7iw/A3eM5QUQ0z7HHj7sJqS9rrWI=)
+        password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
+        bindings: 
+            binding-notifications: 
+                queue-id: app.notifications.queue
+                queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
+                exchange-id: app.fanout.exchange # (fanout)라우팅 키와 상관없이 바인딩된 모든 큐로 메시지를 전달
+                #exchange-durable: false
+                routing-key: 
+            binding-orders: 
+                queue-id: app.orders.queue
+                queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
+                exchange-id: app.direct.exchange # (direct)라우팅 키가 정확히 일치하는 큐로 메시지를 전달
+                #exchange-durable: false
+                routing-key: orders.process
+    # 스웨거 생성기능(http://xxxxx:xxxx/swagger-ui.html 로 접근)
+    swagger: 
+        enabled: false
+    websocket: 
+        enabled: true
+        
+resources: 
+    fileUp: 
+        path: ${FILE_UPLOAD_ROOT}
+
+mail: 
+    host: 127.0.0.1
+    port: 3344
+    user: jysn007
+    password: db2admin
+
+sftp: 
+    host: 127.0.0.1
+    port: 22
+    username: jysn007
+    password: db2admin!@
+    private-key-path: ${APP_HOME}/dstone-boot/ssl/id_rsa
+
+app: 
+    common: 
+        biz: 
+            simple-encrypt-key: jysn007db2admin!
+
+interface: 
+    naver: 
+      # 발급받은 클라이언트ID
+      client-id: WCdNwqKh3uohtkernz7O
+      # 발급받은 클라이언트패스워드
+      client-secret: Q3D0dt9YNU
+      # 1. 로그인 URL
+      login-url: https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=@client_id@&redirect_uri=@redirect_uri@&state=@state@&scope=@scope@
+      # 2. 로그인 후 콜백 URL
+      login-redirect-uri: /naver/loginCallback.do
+      # 3. 사용자토큰 조회 URL
+      access-token-url: https://nid.naver.com/oauth2.0/token?grant_type=authorization_code&client_id=@client_id@&client_secret=@client_secret@&redirect_uri=@redirect_uri@&code=@code@&state=@state@
+      # 4. 사용자정보 조회 URL
+      userinfo-url: https://openapi.naver.com/v1/nid/me
+      # 5. 로그아웃 URL
+      logout-url: https://nid.naver.com/oauth2.0/token?grant_type=delete&client_id=@client_id@&client_secret=@client_secret@&access_token=@access_token@&service_provider=@service_provider@
+      # 6. 로그아웃 후 콜백 URL
+      logout-redirect-uri: /naver/logoutCallback.do
+    kakao: 
+      # 발급받은 클라이언트ID
+      client-id: 6f89f3f82713133646791acf04bb78c7
+      # 1. 로그인 URL
+      login-url: https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=@client_id@&redirect_uri=@redirect_uri@
+      # 2. 로그인 후 콜백 URL
+      login-redirect-uri: /kakao/loginCallback.do
+      # 3. 사용자토큰 조회 URL
+      access-token-url: https://kauth.kakao.com/oauth/token?grant_type=authorization_code&client_id=@client_id@&redirect_uri=@redirect_uri@&code=@code@
+      # 4. 사용자정보 조회 URL
+      userinfo-url: https://kapi.kakao.com/v2/user/me
+      # 5. 로그아웃 URL
+      logout-url: https://kauth.kakao.com/oauth/logout?response_type=code&client_id=@client_id@&logout_redirect_uri=@logout_redirect_uri@
+      # 6. 로그아웃 후 콜백 URL
+      logout-redirect-uri: /kakao/logoutCallback.do
+    google: 
+      # OAuth 클라이언트ID 인증정보파일경로
+      credentials-filepath: ${APP_HOME}/dstone-boot/src/main/resources/keys/google/client_secret_318736365485-2mvsrt8dme7lmbup6epcqee3adq8mhbg.apps.googleusercontent.com.json
+      # Maps Platform 키
+      maps-platform-key: AIzaSyDu-nIXG2yLg-Y2HgiRWKuupadjMXjnRT8
+      

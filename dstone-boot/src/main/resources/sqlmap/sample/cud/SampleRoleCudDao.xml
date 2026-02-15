@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.sample.cud.SampleCudDao">                                                       
+                                                                                      
+    <!-- 샘플ROLE[SAMPLE_ROLE] VO -->                                                                
+                                                                                   
+    <!--  샘플ROLE[SAMPLE_ROLE] NEW키값 조회 -->                                                        
+    <select id="selectSampleRoleNewKey" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleCudVo" resultType="net.dstone.boot.sample.cud.vo.SampleRoleCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(ROLE_ID)), 0, MAX(ROLE_ID) )+1), 30, '0') ROLE_ID 
+        FROM                                                                          
+            SAMPLE_ROLE                                                                       
+        WHERE 1=1                                                                     
+    </select>                                                                       
+                                                                                   
+    <!--  샘플ROLE[SAMPLE_ROLE] 입력 -->                                                             
+    <insert id="insertSampleRole" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleCudVo" >                             
+        INSERT INTO SAMPLE_ROLE (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="ROLE_ID != null and !ROLE_ID.equals('')" >ROLE_ID,</if>
+                <if test="ROLE_NAME != null and !ROLE_NAME.equals('')" >ROLE_NAME,</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >INPUT_DT,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="ROLE_ID != null and !ROLE_ID.equals('')" >#{ROLE_ID},</if>
+                <if test="ROLE_NAME != null and !ROLE_NAME.equals('')" >#{ROLE_NAME},</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >STR_TO_DATE( #{INPUT_DT}, '%Y%m%d%H%i%s' ),</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  샘플ROLE[SAMPLE_ROLE] 수정 -->                                                             
+    <update id="updateSampleRole" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleCudVo" >                             
+        UPDATE SAMPLE_ROLE                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="ROLE_ID != null and !ROLE_ID.equals('')" >ROLE_ID = #{ROLE_ID},</if>
+                <if test="ROLE_NAME != null and !ROLE_NAME.equals('')" >ROLE_NAME = #{ROLE_NAME},</if>
+                <if test="INPUT_DT != null and !INPUT_DT.equals('')" >INPUT_DT = STR_TO_DATE( #{INPUT_DT}, '%Y%m%d%H%i%s' ),</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND ROLE_ID = #{ROLE_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  샘플ROLE[SAMPLE_ROLE] 삭제 -->                                                             
+    <delete id="deleteSampleRole" parameterType="net.dstone.boot.sample.cud.vo.SampleRoleCudVo" >                             
+        DELETE FROM SAMPLE_ROLE                                                              
+        WHERE 1=1                                                                         
+            AND ROLE_ID = #{ROLE_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

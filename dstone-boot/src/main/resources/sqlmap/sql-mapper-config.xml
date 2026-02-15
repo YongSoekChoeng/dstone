@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+
+	<!--Mybatis 설정 -->
+	<settings>
+		<!--  파라미터에 Null 값이 있을 경우 에러가 발생하는 건데 대한 처리 -->
+		<setting name="jdbcTypeForNull" value="VARCHAR"></setting>
+	</settings>
+	
+	<!-- Type Aliases 설정-->
+    <typeAliases>
+
+    </typeAliases>
+    
+</configuration>

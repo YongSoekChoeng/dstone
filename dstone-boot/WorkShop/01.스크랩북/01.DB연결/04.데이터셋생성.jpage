@@ -1,0 +1,19 @@
+
+String DBID = "DBID_0";
+net.dstone.common.utils.DbUtil db = null;
+net.dstone.common.utils.DataSet ds = new net.dstone.common.utils.DataSet();
+String dsName = "gds_demoUserInfo";
+net.dstone.common.utils.DateUtil.stopWatchStart("연습장");
+try {
+	db = new net.dstone.common.utils.DbUtil(DBID);
+	db.getConnection();
+	String sqlStr = net.dstone.common.utils.FileUtil.readFile("C:\\WorkShop\\C\\Temp\\연습장.rb");	db.setQuery(sqlStr);		ds.buildFromResultSet(db.select(), "");		//ds.checkData();
+		StringBuffer buff = new StringBuffer();	String[] cols = db.getColumnNames();		buff.append("      <Dataset id=\""+dsName+"\" >").append("\n");	buff.append("        <ColumnInfo>").append("\n");	for(String col : cols){		buff.append("          <Column id=\"" + col + "\" type=\"STRING\" size=\"256\"/>").append("\n");	}	buff.append("        </ColumnInfo>").append("\n");	buff.append("        <Rows>").append("\n");	buff.append("          <Row>").append("\n");	for(String col : cols){		buff.append("            <Col id=\"" + col + "\" ></Col>").append("\n");	}	buff.append("          </Row>").append("\n");	buff.append("        </Rows>").append("\n");	buff.append("      </Dataset>").append("\n");	net.dstone.common.utils.LogUtil.sysout(buff);	
+}catch(Exception e){
+	System.out.println(db.getQuery());
+	e.printStackTrace();
+}finally{
+	if(db != null){
+		db.release();
+	}	net.dstone.common.utils.DateUtil.stopWatchEnd("연습장");
+}

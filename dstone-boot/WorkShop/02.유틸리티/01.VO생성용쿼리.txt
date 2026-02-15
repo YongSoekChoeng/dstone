@@ -1,0 +1,43 @@
+
+			SELECT 
+				A.SEQ /* 시퀀스 */
+				, A.SYS_ID /* 시스템ID */
+				, A.UI_ID /* 화면ID */
+				, A.UI_NM /* 화면명 */
+				, A.BASIC_URL /* 기준URL */
+				, A.FUNCTION_ID_1 /* 기능ID_1 */
+				, A.FUNCTION_NAME_1 /* 기능명_1 */
+				, A.CLASS_KIND_1 /* 클래스종류1(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_2 /* 기능ID_2 */
+				, A.FUNCTION_NAME_2 /* 기능명_2 */
+				, A.CLASS_KIND_2 /* 클래스종류2(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_3 /* 기능ID_3 */
+				, A.FUNCTION_NAME_3 /* 기능명_3 */
+				, A.CLASS_KIND_3 /* 클래스종류3(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_4 /* 기능ID_4 */
+				, A.FUNCTION_NAME_4 /* 기능명_4 */
+				, A.CLASS_KIND_4 /* 클래스종류4(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_5 /* 기능ID_5 */
+				, A.FUNCTION_NAME_5 /* 기능명_5 */
+				, A.CLASS_KIND_5 /* 클래스종류5(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_6 /* 기능ID_6 */
+				, A.FUNCTION_NAME_6 /* 기능명_6 */
+				, A.CLASS_KIND_6 /* 클래스종류6(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_7 /* 기능ID_7 */
+				, A.FUNCTION_NAME_7 /* 기능명_7 */
+				, A.CLASS_KIND_7 /* 클래스종류7(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_8 /* 기능ID_8 */
+				, A.FUNCTION_NAME_8 /* 기능명_8 */
+				, A.CLASS_KIND_8 /* 클래스종류8(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_9 /* 기능ID_9 */
+				, A.FUNCTION_NAME_9 /* 기능명_9 */
+				, A.CLASS_KIND_9 /* 클래스종류9(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.FUNCTION_ID_10 /* 기능ID_10 */
+				, A.FUNCTION_NAME_10 /* 기능명_10 */
+				, A.CLASS_KIND_10 /* 클래스종류10(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+				, A.CALL_TBL /* 호출테이블 */
+				, A.WORKER_ID /* 입력자ID */
+			FROM
+				TB_METRIX A
+			WHERE 1=1
+			

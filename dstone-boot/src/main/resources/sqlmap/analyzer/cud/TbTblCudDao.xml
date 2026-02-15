@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 테이블[TB_TBL] VO -->                                                                
+                                                                                   
+    <!--  테이블[TB_TBL] 상세 조회 -->                                                        
+    <select id="selectTbTbl" parameterType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo">       
+        SELECT                                                                        
+            SYS_ID, TBL_ID, TBL_OWNER, TBL_NM, WORKER_ID
+        FROM                                                                          
+            TB_TBL                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID}
+            AND TBL_ID = #{TBL_ID}
+    </select>                                                                       
+                                                                                   
+    <!--  테이블[TB_TBL] NEW키값 조회 -->                                                        
+    <select id="selectTbTblNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(TBL_ID)), 0, MAX(TBL_ID) )+1), 100, '0') TBL_ID 
+        FROM                                                                          
+            TB_TBL                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID} 
+    </select>                                                                       
+                                                                                   
+    <!--  테이블[TB_TBL] 입력 -->                                                             
+    <insert id="insertTbTbl" parameterType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo" >                             
+        INSERT INTO TB_TBL (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="TBL_ID != null and !TBL_ID.equals('')" >TBL_ID,</if>
+                <if test="TBL_OWNER != null and !TBL_OWNER.equals('')" >TBL_OWNER,</if>
+                <if test="TBL_NM != null and !TBL_NM.equals('')" >TBL_NM,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="TBL_ID != null and !TBL_ID.equals('')" >#{TBL_ID},</if>
+                <if test="TBL_OWNER != null and !TBL_OWNER.equals('')" >#{TBL_OWNER},</if>
+                <if test="TBL_NM != null and !TBL_NM.equals('')" >#{TBL_NM},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  테이블[TB_TBL] 수정 -->                                                             
+    <update id="updateTbTbl" parameterType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo" >                             
+        UPDATE TB_TBL                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="TBL_ID != null and !TBL_ID.equals('')" >TBL_ID = #{TBL_ID},</if>
+                <if test="TBL_OWNER != null and !TBL_OWNER.equals('')" >TBL_OWNER = #{TBL_OWNER},</if>
+                <if test="TBL_NM != null and !TBL_NM.equals('')" >TBL_NM = #{TBL_NM},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND SYS_ID = #{SYS_ID}
+            AND TBL_ID = #{TBL_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  테이블[TB_TBL] 삭제 -->                                                             
+    <delete id="deleteTbTbl" parameterType="net.dstone.boot.analyzer.cud.vo.TbTblCudVo" >                             
+        DELETE FROM TB_TBL                                                              
+        WHERE 1=1                                                                         
+            AND SYS_ID = #{SYS_ID}
+            AND TBL_ID = #{TBL_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

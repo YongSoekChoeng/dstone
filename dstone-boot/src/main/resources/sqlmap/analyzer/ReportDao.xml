@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.ReportDao">                                                       
+                                                                                      
+    <!-- OverAllVo VO -->                                                                
+                                                                                   
+    <!--  종합결과 리스트조회(카운트) -->                                                      
+    <select id="listOverAllCount" parameterType="net.dstone.boot.analyzer.vo.OverAllVo" resultType="Integer">         
+        SELECT COUNT(*) CNT FROM ( 
+			SELECT 
+				1
+			FROM
+				TB_METRIX A
+			WHERE 1=1
+				AND SYS_ID = #{SYS_ID}
+				<if test="SEQ != null and !SEQ.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND SEQ LIKE CONCAT( '%',  #{SEQ} , '%' )
+						</when>
+						<otherwise>
+							AND SEQ = #{SEQ}
+						</otherwise>
+					</choose>	
+				</if>
+				<if test="UI_ID != null and !UI_ID.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND UI_ID LIKE CONCAT( '%',  #{UI_ID} , '%' )
+						</when>
+						<otherwise>
+							AND UI_ID = #{UI_ID}
+						</otherwise>
+					</choose>					
+				</if>
+				<if test="UI_NM != null and !UI_NM.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND UI_NM LIKE CONCAT( '%',  #{UI_NM} , '%' )
+						</when>
+						<otherwise>
+							AND UI_NM = #{UI_NM}
+						</otherwise>
+					</choose>	
+				</if>
+				<if test="BASIC_URL != null and !BASIC_URL.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND BASIC_URL LIKE CONCAT( '%',  #{BASIC_URL} , '%' )
+						</when>
+						<otherwise>
+							AND BASIC_URL = #{BASIC_URL}
+						</otherwise>
+					</choose>	
+				</if>
+				<if test="FUNCTION_ID != null and !FUNCTION_ID.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND (
+								FUNCTION_ID_1  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_2  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_3  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_4  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_5  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_6  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_7  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_8  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_9  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								OR FUNCTION_ID_10  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+								)
+						</when>
+						<otherwise>
+							AND (
+								FUNCTION_ID_1  = #{FUNCTION_ID}
+								OR FUNCTION_ID_2  = #{FUNCTION_ID}
+								OR FUNCTION_ID_3  = #{FUNCTION_ID}
+								OR FUNCTION_ID_4  = #{FUNCTION_ID}
+								OR FUNCTION_ID_5  = #{FUNCTION_ID}
+								OR FUNCTION_ID_6  = #{FUNCTION_ID}
+								OR FUNCTION_ID_7  = #{FUNCTION_ID}
+								OR FUNCTION_ID_8  = #{FUNCTION_ID}
+								OR FUNCTION_ID_9  = #{FUNCTION_ID}
+								OR FUNCTION_ID_10  = #{FUNCTION_ID}
+								)
+						</otherwise>
+					</choose>
+				</if>
+				<if test="FUNCTION_NAME != null and !FUNCTION_NAME.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND (
+								FUNCTION_NAME_1  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_2  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_3  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_4  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_5  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_6  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_7  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_8  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_9  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								OR FUNCTION_NAME_10  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+								)
+						</when>
+						<otherwise>
+							AND (
+								FUNCTION_NAME_1  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_2  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_3  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_4  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_5  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_6  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_7  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_8  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_9  = #{FUNCTION_NAME}
+								OR FUNCTION_NAME_10  = #{FUNCTION_NAME}
+								)
+						</otherwise>
+					</choose>
+				</if>
+				<if test="CALL_TBL != null and !CALL_TBL.equals('')" >
+					<choose>
+						<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+							AND CALL_TBL LIKE CONCAT( '%',  #{CALL_TBL} , '%' )
+						</when>
+						<otherwise>
+							AND (
+								CALL_TBL LIKE CONCAT( '%',  ' ', #{CALL_TBL}, '(' , '%' )
+								OR CALL_TBL LIKE CONCAT( '%',  ',', #{CALL_TBL}, '(' , '%' )
+								OR CALL_TBL LIKE CONCAT( #{CALL_TBL}, '(' , '%' )
+								
+								OR CALL_TBL LIKE CONCAT( '%',  ' ', #{CALL_TBL}, '-' , '%' )
+								OR CALL_TBL LIKE CONCAT( '%',  ',', #{CALL_TBL}, '-' , '%' )
+								OR CALL_TBL LIKE CONCAT( #{CALL_TBL}, '-' , '%' )
+								
+								OR CALL_TBL = #{CALL_TBL}
+								)
+						</otherwise>
+					</choose>	
+				</if>
+        ) P
+    </select>                                                                       
+                                                                                   
+    <!--  종합결과 리스트조회 -->                                                      
+    <select id="listOverAll" parameterType="net.dstone.boot.analyzer.vo.OverAllVo" resultType="net.dstone.boot.analyzer.vo.OverAllVo">         
+		SELECT 
+			(@RNUM := @RNUM+1) AS RNUM
+			, A.SEQ ID /* 아이디 */
+			, A.SEQ /* 시퀀스 */
+			, A.SYS_ID /* 시스템ID */
+			, A.UI_ID /* 화면ID */
+			, A.UI_NM /* 화면명 */
+			, A.BASIC_URL /* 기준URL */
+			, A.FUNCTION_ID_1 /* 기능ID_1 */
+			, A.FUNCTION_NAME_1 /* 기능명_1 */
+			, A.CLASS_KIND_1 /* 클래스종류1(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_2 /* 기능ID_2 */
+			, A.FUNCTION_NAME_2 /* 기능명_2 */
+			, A.CLASS_KIND_2 /* 클래스종류2(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_3 /* 기능ID_3 */
+			, A.FUNCTION_NAME_3 /* 기능명_3 */
+			, A.CLASS_KIND_3 /* 클래스종류3(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_4 /* 기능ID_4 */
+			, A.FUNCTION_NAME_4 /* 기능명_4 */
+			, A.CLASS_KIND_4 /* 클래스종류4(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_5 /* 기능ID_5 */
+			, A.FUNCTION_NAME_5 /* 기능명_5 */
+			, A.CLASS_KIND_5 /* 클래스종류5(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_6 /* 기능ID_6 */
+			, A.FUNCTION_NAME_6 /* 기능명_6 */
+			, A.CLASS_KIND_6 /* 클래스종류6(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_7 /* 기능ID_7 */
+			, A.FUNCTION_NAME_7 /* 기능명_7 */
+			, A.CLASS_KIND_7 /* 클래스종류7(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_8 /* 기능ID_8 */
+			, A.FUNCTION_NAME_8 /* 기능명_8 */
+			, A.CLASS_KIND_8 /* 클래스종류8(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_9 /* 기능ID_9 */
+			, A.FUNCTION_NAME_9 /* 기능명_9 */
+			, A.CLASS_KIND_9 /* 클래스종류9(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_10 /* 기능ID_10 */
+			, A.FUNCTION_NAME_10 /* 기능명_10 */
+			, A.CLASS_KIND_10 /* 클래스종류10(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.CALL_TBL /* 호출테이블 */
+			, A.WORKER_ID /* 입력자ID */
+		FROM
+			TB_METRIX A
+			,( SELECT @RNUM := 0) AS B
+		WHERE 1=1
+			AND SYS_ID = #{SYS_ID}
+			<if test="SEQ != null and !SEQ.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND SEQ LIKE CONCAT( '%',  #{SEQ} , '%' )
+					</when>
+					<otherwise>
+						AND SEQ = #{SEQ}
+					</otherwise>
+				</choose>	
+			</if>
+			<if test="UI_ID != null and !UI_ID.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND UI_ID LIKE CONCAT( '%',  #{UI_ID} , '%' )
+					</when>
+					<otherwise>
+						AND UI_ID = #{UI_ID}
+					</otherwise>
+				</choose>					
+			</if>
+			<if test="UI_NM != null and !UI_NM.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND UI_NM LIKE CONCAT( '%',  #{UI_NM} , '%' )
+					</when>
+					<otherwise>
+						AND UI_NM = #{UI_NM}
+					</otherwise>
+				</choose>	
+			</if>
+			<if test="BASIC_URL != null and !BASIC_URL.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND BASIC_URL LIKE CONCAT( '%',  #{BASIC_URL} , '%' )
+					</when>
+					<otherwise>
+						AND BASIC_URL = #{BASIC_URL}
+					</otherwise>
+				</choose>	
+			</if>
+			<if test="FUNCTION_ID != null and !FUNCTION_ID.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND (
+							FUNCTION_ID_1  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_2  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_3  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_4  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_5  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_6  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_7  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_8  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_9  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							OR FUNCTION_ID_10  LIKE CONCAT( '%',  #{FUNCTION_ID} , '%' )
+							)
+					</when>
+					<otherwise>
+						AND (
+							FUNCTION_ID_1  = #{FUNCTION_ID}
+							OR FUNCTION_ID_2  = #{FUNCTION_ID}
+							OR FUNCTION_ID_3  = #{FUNCTION_ID}
+							OR FUNCTION_ID_4  = #{FUNCTION_ID}
+							OR FUNCTION_ID_5  = #{FUNCTION_ID}
+							OR FUNCTION_ID_6  = #{FUNCTION_ID}
+							OR FUNCTION_ID_7  = #{FUNCTION_ID}
+							OR FUNCTION_ID_8  = #{FUNCTION_ID}
+							OR FUNCTION_ID_9  = #{FUNCTION_ID}
+							OR FUNCTION_ID_10  = #{FUNCTION_ID}
+							)
+					</otherwise>
+				</choose>
+			</if>
+			<if test="FUNCTION_NAME != null and !FUNCTION_NAME.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND (
+							FUNCTION_NAME_1  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_2  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_3  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_4  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_5  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_6  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_7  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_8  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_9  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							OR FUNCTION_NAME_10  LIKE CONCAT( '%',  #{FUNCTION_NAME} , '%' )
+							)
+					</when>
+					<otherwise>
+						AND (
+							FUNCTION_NAME_1  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_2  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_3  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_4  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_5  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_6  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_7  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_8  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_9  = #{FUNCTION_NAME}
+							OR FUNCTION_NAME_10  = #{FUNCTION_NAME}
+							)
+					</otherwise>
+				</choose>
+			</if>
+			<if test="CALL_TBL != null and !CALL_TBL.equals('')" >
+				<choose>
+					<when test = "LIKE_EQUAL != null and LIKE_EQUAL.equals('LIKE')">
+						AND CALL_TBL LIKE CONCAT( '%',  #{CALL_TBL} , '%' )
+					</when>
+					<otherwise>
+						AND (
+							CALL_TBL LIKE CONCAT( '%',  ' ', #{CALL_TBL}, '(' , '%' )
+							OR CALL_TBL LIKE CONCAT( '%',  ',', #{CALL_TBL}, '(' , '%' )
+							OR CALL_TBL LIKE CONCAT( #{CALL_TBL}, '(' , '%' )
+							
+							OR CALL_TBL LIKE CONCAT( '%',  ' ', #{CALL_TBL}, '-' , '%' )
+							OR CALL_TBL LIKE CONCAT( '%',  ',', #{CALL_TBL}, '-' , '%' )
+							OR CALL_TBL LIKE CONCAT( #{CALL_TBL}, '-' , '%' )
+							
+							OR CALL_TBL = #{CALL_TBL}
+							)
+					</otherwise>
+				</choose>			
+			</if>
+
+		<if test="LIMIT != null and !LIMIT.equals('')" >LIMIT #{LIMIT}</if>
+    </select>                                                                       
+                                                                   
+    <!--  종합결과 상세사항조회 -->                                                      
+    <select id="selectOverAll" parameterType="net.dstone.boot.analyzer.vo.OverAllVo" resultType="net.dstone.boot.analyzer.vo.OverAllVo">         
+		SELECT 
+			A.SEQ ID /* 아이디 */
+			, A.SEQ /* 시퀀스 */
+			, A.SYS_ID /* 시스템ID */
+			, A.UI_ID /* 화면ID */
+			, A.UI_NM /* 화면명 */
+			, A.BASIC_URL /* 기준URL */
+			, A.FUNCTION_ID_1 /* 기능ID_1 */
+			, A.FUNCTION_NAME_1 /* 기능명_1 */
+			, A.CLASS_KIND_1 /* 클래스종류1(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_2 /* 기능ID_2 */
+			, A.FUNCTION_NAME_2 /* 기능명_2 */
+			, A.CLASS_KIND_2 /* 클래스종류2(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_3 /* 기능ID_3 */
+			, A.FUNCTION_NAME_3 /* 기능명_3 */
+			, A.CLASS_KIND_3 /* 클래스종류3(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_4 /* 기능ID_4 */
+			, A.FUNCTION_NAME_4 /* 기능명_4 */
+			, A.CLASS_KIND_4 /* 클래스종류4(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_5 /* 기능ID_5 */
+			, A.FUNCTION_NAME_5 /* 기능명_5 */
+			, A.CLASS_KIND_5 /* 클래스종류5(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_6 /* 기능ID_6 */
+			, A.FUNCTION_NAME_6 /* 기능명_6 */
+			, A.CLASS_KIND_6 /* 클래스종류6(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_7 /* 기능ID_7 */
+			, A.FUNCTION_NAME_7 /* 기능명_7 */
+			, A.CLASS_KIND_7 /* 클래스종류7(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_8 /* 기능ID_8 */
+			, A.FUNCTION_NAME_8 /* 기능명_8 */
+			, A.CLASS_KIND_8 /* 클래스종류8(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_9 /* 기능ID_9 */
+			, A.FUNCTION_NAME_9 /* 기능명_9 */
+			, A.CLASS_KIND_9 /* 클래스종류9(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.FUNCTION_ID_10 /* 기능ID_10 */
+			, A.FUNCTION_NAME_10 /* 기능명_10 */
+			, A.CLASS_KIND_10 /* 클래스종류10(CT:컨트롤러/SV:서비스/DA:DAO/OT:나머지) */
+			, A.CALL_TBL /* 호출테이블 */
+			, A.WORKER_ID /* 입력자ID */
+		FROM
+			TB_METRIX A
+		WHERE 1=1
+			AND SYS_ID = #{SYS_ID}
+			AND SEQ = #{SEQ}
+    </select>                                                                       
+ 
+</mapper>                                                                             
+

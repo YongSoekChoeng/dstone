@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.ConfigurationDao">                                                       
+                                                                                      
+    <!-- SysVo VO -->                                                                
+                                                                                   
+    <!--  시스템정보 리스트조회(카운트) -->                                                      
+    <select id="listSysCount" parameterType="net.dstone.boot.analyzer.vo.SysVo" resultType="Integer">         
+        SELECT COUNT(*) CNT FROM ( 
+        SELECT                                                            
+            A.SYS_ID /* 시스템ID */
+            , A.SYS_NM /* 시스템명 */
+            , A.CONF_FILE_PATH /* 설정파일경로 */
+            , A.APP_ROOT_PATH /* 어플리케이션루트 */
+            , A.APP_SRC_PATH /* 어플리케이션서버소스루트 */
+            , A.APP_WEB_PATH /* 어플리케이션웹소스루트 */
+            , A.APP_SQL_PATH /* 어플리케이션쿼리소스루트 */
+            , A.WRITE_PATH /* 분석결과생성경로 */
+            , A.SAVE_FILE_NAME /* 분석결과저장파일명 */
+            , A.DBID /* DBID */
+            , A.IS_TABLE_LIST_FROM_DB /* 테이블목록을DB로부터읽어올지여부 */
+            , A.TABLE_NAME_LIKE_STR /* 테이블명을DB로부터읽어올때적용할프리픽스 */
+            , A.TABLE_LIST_FILE_NAME /* 테이블목록정보파일명 */
+            , A.IS_SAVE_TO_DB /* 작업결과를DB에저장할지여부 */
+            , A.APP_JDK_HOME /* 분석대상어플리케이션JDK홈 */
+            , A.APP_CLASSPATH /* 분석대상어플리케이션클래스패스 */
+            , A.WORKER_THREAD_KIND /* 분석작업을진행할쓰레드핸들러종류 */
+            , A.WORKER_THREAD_NUM /* 분석작업을진행할쓰레드갯수 */
+            , A.WORKER_ID /* 입력자ID */
+        FROM                                               
+            TB_SYS A
+        WHERE 1=1 
+			<if test="SYS_ID != null and !SYS_ID.equals('')" >AND A.SYS_ID LIKE '%' #{SYS_ID}</if>
+            <if test="SYS_NM != null and !SYS_NM.equals('')" >AND A.SYS_NM LIKE '%' #{SYS_NM}</if>
+            <if test="CONF_FILE_PATH != null and !CONF_FILE_PATH.equals('')" >AND A.CONF_FILE_PATH LIKE '%' #{CONF_FILE_PATH}</if>
+            <if test="APP_ROOT_PATH != null and !APP_ROOT_PATH.equals('')" >AND A.APP_ROOT_PATH LIKE '%' #{APP_ROOT_PATH}</if>
+            <if test="APP_SRC_PATH != null and !APP_SRC_PATH.equals('')" >AND A.APP_SRC_PATH LIKE '%' #{APP_SRC_PATH}</if>
+            <if test="APP_WEB_PATH != null and !APP_WEB_PATH.equals('')" >AND A.APP_WEB_PATH LIKE '%' #{APP_WEB_PATH}</if>
+            <if test="APP_SQL_PATH != null and !APP_SQL_PATH.equals('')" >AND A.APP_SQL_PATH LIKE '%' #{APP_SQL_PATH}</if>
+            <if test="WRITE_PATH != null and !WRITE_PATH.equals('')" >AND A.WRITE_PATH LIKE '%' #{WRITE_PATH}</if>
+            <if test="SAVE_FILE_NAME != null and !SAVE_FILE_NAME.equals('')" >AND A.SAVE_FILE_NAME LIKE '%' #{SAVE_FILE_NAME}</if>
+            <if test="DBID != null and !DBID.equals('')" >AND A.DBID LIKE '%' #{DBID}</if>
+            <if test="IS_TABLE_LIST_FROM_DB != null and !IS_TABLE_LIST_FROM_DB.equals('')" >AND A.IS_TABLE_LIST_FROM_DB LIKE '%' #{IS_TABLE_LIST_FROM_DB}</if>
+            <if test="TABLE_NAME_LIKE_STR != null and !TABLE_NAME_LIKE_STR.equals('')" >AND A.TABLE_NAME_LIKE_STR LIKE '%' #{TABLE_NAME_LIKE_STR}</if>
+            <if test="TABLE_LIST_FILE_NAME != null and !TABLE_LIST_FILE_NAME.equals('')" >AND A.TABLE_LIST_FILE_NAME LIKE '%' #{TABLE_LIST_FILE_NAME}</if>
+            <if test="IS_SAVE_TO_DB != null and !IS_SAVE_TO_DB.equals('')" >AND A.IS_SAVE_TO_DB LIKE '%' #{IS_SAVE_TO_DB}</if>
+            <if test="APP_JDK_HOME != null and !APP_JDK_HOME.equals('')" >AND A.APP_JDK_HOME LIKE '%' #{APP_JDK_HOME}</if>
+            <if test="APP_CLASSPATH != null and !APP_CLASSPATH.equals('')" >AND A.APP_CLASSPATH LIKE '%' #{APP_CLASSPATH}</if>
+            <if test="WORKER_THREAD_KIND != null and !WORKER_THREAD_KIND.equals('')" >AND A.WORKER_THREAD_KIND LIKE '%' #{WORKER_THREAD_KIND}</if>
+            <if test="WORKER_THREAD_NUM != null and !WORKER_THREAD_NUM.equals('')" >AND A.WORKER_THREAD_NUM LIKE '%' #{WORKER_THREAD_NUM}</if>	        
+        ) P
+    </select>                                                                       
+                                                                                   
+    <!--  시스템정보 리스트조회 -->                                                      
+    <select id="listSys" parameterType="net.dstone.boot.analyzer.vo.SysVo" resultType="net.dstone.boot.analyzer.vo.SysVo">         
+		SELECT  
+			P.* 
+		FROM  
+		    (  
+            /**********************************************************************************************************************************/ 
+
+	        SELECT                                                            
+	            A.SYS_ID /* 시스템ID */
+	            , A.SYS_NM /* 시스템명 */
+	            , A.CONF_FILE_PATH /* 설정파일경로 */
+	            , A.APP_ROOT_PATH /* 어플리케이션루트 */
+	            , A.APP_SRC_PATH /* 어플리케이션서버소스루트 */
+	            , A.APP_WEB_PATH /* 어플리케이션웹소스루트 */
+            	, A.APP_SQL_PATH /* 어플리케이션쿼리소스루트 */
+	            , A.WRITE_PATH /* 분석결과생성경로 */
+	            , A.SAVE_FILE_NAME /* 분석결과저장파일명 */
+	            , A.DBID /* DBID */
+	            , A.IS_TABLE_LIST_FROM_DB /* 테이블목록을DB로부터읽어올지여부 */
+	            , A.TABLE_NAME_LIKE_STR /* 테이블명을DB로부터읽어올때적용할프리픽스 */
+	            , A.TABLE_LIST_FILE_NAME /* 테이블목록정보파일명 */
+	            , A.IS_SAVE_TO_DB /* 작업결과를DB에저장할지여부 */
+	            , A.APP_JDK_HOME /* 분석대상어플리케이션JDK홈 */
+	            , A.APP_CLASSPATH /* 분석대상어플리케이션클래스패스 */
+	            , A.WORKER_THREAD_KIND /* 분석작업을진행할쓰레드핸들러종류 */
+	            , A.WORKER_THREAD_NUM /* 분석작업을진행할쓰레드갯수 */
+	            , A.WORKER_ID /* 입력자ID */
+	        FROM                                               
+	            TB_SYS A
+	        WHERE 1=1 
+				<if test="SYS_ID != null and !SYS_ID.equals('')" >AND A.SYS_ID LIKE '%' #{SYS_ID}</if>
+	            <if test="SYS_NM != null and !SYS_NM.equals('')" >AND A.SYS_NM LIKE '%' #{SYS_NM}</if>
+	            <if test="CONF_FILE_PATH != null and !CONF_FILE_PATH.equals('')" >AND A.CONF_FILE_PATH LIKE '%' #{CONF_FILE_PATH}</if>
+	            <if test="APP_ROOT_PATH != null and !APP_ROOT_PATH.equals('')" >AND A.APP_ROOT_PATH LIKE '%' #{APP_ROOT_PATH}</if>
+	            <if test="APP_SRC_PATH != null and !APP_SRC_PATH.equals('')" >AND A.APP_SRC_PATH LIKE '%' #{APP_SRC_PATH}</if>
+	            <if test="APP_WEB_PATH != null and !APP_WEB_PATH.equals('')" >AND A.APP_WEB_PATH LIKE '%' #{APP_WEB_PATH}</if>
+            	<if test="APP_SQL_PATH != null and !APP_SQL_PATH.equals('')" >AND A.APP_SQL_PATH LIKE '%' #{APP_SQL_PATH}</if>
+	            <if test="WRITE_PATH != null and !WRITE_PATH.equals('')" >AND A.WRITE_PATH LIKE '%' #{WRITE_PATH}</if>
+	            <if test="SAVE_FILE_NAME != null and !SAVE_FILE_NAME.equals('')" >AND A.SAVE_FILE_NAME LIKE '%' #{SAVE_FILE_NAME}</if>
+	            <if test="DBID != null and !DBID.equals('')" >AND A.DBID LIKE '%' #{DBID}</if>
+	            <if test="IS_TABLE_LIST_FROM_DB != null and !IS_TABLE_LIST_FROM_DB.equals('')" >AND A.IS_TABLE_LIST_FROM_DB LIKE '%' #{IS_TABLE_LIST_FROM_DB}</if>
+	            <if test="TABLE_NAME_LIKE_STR != null and !TABLE_NAME_LIKE_STR.equals('')" >AND A.TABLE_NAME_LIKE_STR LIKE '%' #{TABLE_NAME_LIKE_STR}</if>
+	            <if test="TABLE_LIST_FILE_NAME != null and !TABLE_LIST_FILE_NAME.equals('')" >AND A.TABLE_LIST_FILE_NAME LIKE '%' #{TABLE_LIST_FILE_NAME}</if>
+	            <if test="IS_SAVE_TO_DB != null and !IS_SAVE_TO_DB.equals('')" >AND A.IS_SAVE_TO_DB LIKE '%' #{IS_SAVE_TO_DB}</if>
+	            <if test="APP_JDK_HOME != null and !APP_JDK_HOME.equals('')" >AND A.APP_JDK_HOME LIKE '%' #{APP_JDK_HOME}</if>
+	            <if test="APP_CLASSPATH != null and !APP_CLASSPATH.equals('')" >AND A.APP_CLASSPATH LIKE '%' #{APP_CLASSPATH}</if>
+	            <if test="WORKER_THREAD_KIND != null and !WORKER_THREAD_KIND.equals('')" >AND A.WORKER_THREAD_KIND LIKE '%' #{WORKER_THREAD_KIND}</if>
+	            <if test="WORKER_THREAD_NUM != null and !WORKER_THREAD_NUM.equals('')" >AND A.WORKER_THREAD_NUM LIKE '%' #{WORKER_THREAD_NUM}</if>	
+            /**********************************************************************************************************************************/ 
+		    )   P 
+		WHERE 2>1 
+		    /* 페이징의 기준이 되는 KEY값을 반드시 넣어주시기 바랍니다. */  
+		ORDER BY SYS_ID LIMIT #{INT_FROM}, #{INT_TO} 
+
+    </select>                                                                       
+ 
+    <!--  시스템정보 상세조회 -->                                                      
+    <select id="getSys" parameterType="net.dstone.boot.analyzer.vo.SysVo" resultType="net.dstone.boot.analyzer.vo.SysVo">         
+        SELECT                                                            
+            A.SYS_ID /* 시스템ID */
+            , A.SYS_NM /* 시스템명 */
+            , A.CONF_FILE_PATH /* 설정파일경로 */
+            , A.APP_ROOT_PATH /* 어플리케이션루트 */
+            , A.APP_SRC_PATH /* 어플리케이션서버소스루트 */
+            , A.APP_WEB_PATH /* 어플리케이션웹소스루트 */
+            , A.APP_SQL_PATH /* 어플리케이션쿼리소스루트 */
+            , A.WRITE_PATH /* 분석결과생성경로 */
+            , A.SAVE_FILE_NAME /* 분석결과저장파일명 */
+            , A.DBID /* DBID */
+            , A.IS_TABLE_LIST_FROM_DB /* 테이블목록을DB로부터읽어올지여부 */
+            , A.TABLE_NAME_LIKE_STR /* 테이블명을DB로부터읽어올때적용할프리픽스 */
+            , A.TABLE_LIST_FILE_NAME /* 테이블목록정보파일명 */
+            , A.IS_SAVE_TO_DB /* 작업결과를DB에저장할지여부 */
+            , A.APP_JDK_HOME /* 분석대상어플리케이션JDK홈 */
+            , A.APP_CLASSPATH /* 분석대상어플리케이션클래스패스 */
+            , A.WORKER_THREAD_KIND /* 분석작업을진행할쓰레드핸들러종류 */
+            , A.WORKER_THREAD_NUM /* 분석작업을진행할쓰레드갯수 */
+            , A.WORKER_ID /* 입력자ID */
+        FROM                                               
+            TB_SYS A
+        WHERE 1=1 
+			AND A.SYS_ID = #{SYS_ID}
+    </select>                                                                       
+ 
+</mapper>                                                                             
+

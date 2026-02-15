@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><Configuration>
+ 
+	<!-- 시스템 아이디. -->
+    <SYS_ID>framework</SYS_ID>
+    
+	<!-- 시스템 명. -->
+    <SYS_NM>프레임웍샘플</SYS_NM>
+    
+	<!-- 어플리케이션루트 -->
+    <APP_ROOT_PATH>D:/AppHome/framework/dstone/dstone-boot/src/main</APP_ROOT_PATH>
+    
+	<!-- 어플리케이션서버소스경로(분석대상 어플리케이션 java소스 루트 경로. 어플리케이션루트이하의 경로만 기술.) -->
+    <APP_SRC_PATH>/java</APP_SRC_PATH>
+    
+	<!-- 어플리케이션웹소스경로(분석대상 어플리케이션 웹 루트 루트 경로. 어플리케이션루트이하의 경로만 기술.) -->
+    <APP_WEB_PATH>/webapp</APP_WEB_PATH>
+    
+	<!-- 어플리케이션쿼리소스루트(분석대상 어플리케이션 쿼리 루트 경로. 전체 경로 기술.) -->
+    <APP_SQL_PATH>D:/AppHome/framework/dstone/dstone-boot/src/main/resources/sqlmap</APP_SQL_PATH>
+    
+	<!-- 중간산출물 저장디렉토리 -->
+    <WRITE_PATH>D:/Temp/anlaysis-framework</WRITE_PATH>
+    
+	<!-- 저장파일명(디렉토리 -WRITE_PATH) -->
+    <SAVE_FILE_NAME>AppMetrix.ouput</SAVE_FILE_NAME>
+        
+	<!-- 작업결과를 DB에 저장할지 여부. true-작업결과를 DB에 저장. false-작업결과를 DB에 저장하지 않음. -->
+    <IS_SAVE_TO_DB>true</IS_SAVE_TO_DB>
+    
+	<!-- DB를 특정하는 아이디. DBID_1(오라클), DBID_2(MYSQL) -->
+    <DBID>DBID_2</DBID>
+    
+	<!-- 테이블목록을 DB로부터 읽어올지 여부. true-테이블명을 DB로부터 읽어옴. false-테이블명을 전체테이블목록파일(TABLE_LIST_FILE_NAME)에서 읽어오거나 쿼리 로부터 읽어옴.-->
+    <IS_TABLE_LIST_FROM_DB>false</IS_TABLE_LIST_FROM_DB>
+    
+	<!-- 테이블명을 DB로부터 읽어올때 적용할 프리픽스(IS_TABLE_LIST_FROM_DB 가 true일 경우에만 유효)-->
+    <TABLE_NAME_LIKE_STR/>
+       
+	<!-- 테이블목록정보파일명(디렉토리 -WRITE_PATH) -->
+    <TABLE_LIST_FILE_NAME>TableList.txt</TABLE_LIST_FILE_NAME>
+    
+	<!-- 분석대상어플리케이션 JDK홈 -->
+    <APP_JDK_HOME>C:/DEV/JDK/1.8</APP_JDK_HOME>
+    
+	<!-- 분석작업을 진행 할 쓰레드핸들러 종류(1:싱글 쓰레드풀, 2:Fixed 쓰레드풀, 3:Cached 쓰레드풀) -->
+    <WORKER_THREAD_KIND>2</WORKER_THREAD_KIND>
+    
+	<!-- 분석작업을 진행 할 쓰레드 갯수(WORKER_THREAD_KIND가 Fixed 쓰레드풀 일 경우에만 유효) -->
+    <WORKER_THREAD_NUM>6</WORKER_THREAD_NUM>
+    
+	<!-- 분석패키지루트 목록(콤마 구분자) -->
+    <INCLUDE_PACKAGE_ROOT>net.dstone.boot.sample.analyze</INCLUDE_PACKAGE_ROOT>
+    
+	<!-- 분석제외패키지패턴 목록(콤마 구분자) -->
+    <EXCLUDE_PACKAGE_PATTERN>.vo.,.vo,VO,Vo,.model.</EXCLUDE_PACKAGE_PATTERN>
+    
+	<!-- 분석대상어플리케이션 클래스패스 -->
+    <APP_CLASSPATH>D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-web/2.7.0/spring-boot-starter-web-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter/2.7.0/spring-boot-starter-2.7.0.jar;
+D:/REPO/MAVEN/org/yaml/snakeyaml/1.30/snakeyaml-1.30.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-json/2.7.0/spring-boot-starter-json-2.7.0.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.13.3/jackson-datatype-jdk8-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.13.3/jackson-datatype-jsr310-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/module/jackson-module-parameter-names/2.13.3/jackson-module-parameter-names-2.13.3.jar;
+D:/REPO/MAVEN/org/springframework/spring-web/5.3.20/spring-web-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/spring-webmvc/5.3.20/spring-webmvc-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/spring-expression/5.3.20/spring-expression-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-validation/2.7.0/spring-boot-starter-validation-2.7.0.jar;
+D:/REPO/MAVEN/org/apache/tomcat/embed/tomcat-embed-el/9.0.63/tomcat-embed-el-9.0.63.jar;
+D:/REPO/MAVEN/org/hibernate/validator/hibernate-validator/6.2.3.Final/hibernate-validator-6.2.3.Final.jar;
+D:/REPO/MAVEN/jakarta/validation/jakarta.validation-api/2.0.2/jakarta.validation-api-2.0.2.jar;
+D:/REPO/MAVEN/org/jboss/logging/jboss-logging/3.4.3.Final/jboss-logging-3.4.3.Final.jar;
+D:/REPO/MAVEN/com/fasterxml/classmate/1.5.1/classmate-1.5.1.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-tomcat/2.7.0/spring-boot-starter-tomcat-2.7.0.jar;
+D:/REPO/MAVEN/jakarta/annotation/jakarta.annotation-api/1.3.5/jakarta.annotation-api-1.3.5.jar;
+D:/REPO/MAVEN/org/apache/tomcat/embed/tomcat-embed-core/9.0.63/tomcat-embed-core-9.0.63.jar;
+D:/REPO/MAVEN/org/apache/tomcat/embed/tomcat-embed-websocket/9.0.63/tomcat-embed-websocket-9.0.63.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-security/2.7.0/spring-boot-starter-security-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/spring-aop/5.3.20/spring-aop-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/security/spring-security-config/5.7.1/spring-security-config-5.7.1.jar;
+D:/REPO/MAVEN/org/springframework/security/spring-security-core/5.7.1/spring-security-core-5.7.1.jar;
+D:/REPO/MAVEN/org/springframework/security/spring-security-crypto/5.7.1/spring-security-crypto-5.7.1.jar;
+D:/REPO/MAVEN/org/springframework/security/spring-security-web/5.7.1/spring-security-web-5.7.1.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-configuration-processor/2.7.0/spring-boot-configuration-processor-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-log4j2/2.7.0/spring-boot-starter-log4j2-2.7.0.jar;
+D:/REPO/MAVEN/org/apache/logging/log4j/log4j-slf4j-impl/2.17.2/log4j-slf4j-impl-2.17.2.jar;
+D:/REPO/MAVEN/org/apache/logging/log4j/log4j-jul/2.17.2/log4j-jul-2.17.2.jar;
+D:/REPO/MAVEN/org/slf4j/jul-to-slf4j/1.7.36/jul-to-slf4j-1.7.36.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-starter-cache/2.7.0/spring-boot-starter-cache-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/spring-context-support/5.3.20/spring-context-support-5.3.20.jar;
+D:/REPO/MAVEN/jakarta/xml/bind/jakarta.xml.bind-api/2.3.3/jakarta.xml.bind-api-2.3.3.jar;
+D:/REPO/MAVEN/jakarta/activation/jakarta.activation-api/1.2.2/jakarta.activation-api-1.2.2.jar;
+D:/REPO/MAVEN/org/springframework/spring-core/5.3.20/spring-core-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/spring-jcl/5.3.20/spring-jcl-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-devtools/2.7.0/spring-boot-devtools-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot/2.7.0/spring-boot-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/boot/spring-boot-autoconfigure/2.7.0/spring-boot-autoconfigure-2.7.0.jar;
+D:/REPO/MAVEN/org/springframework/spring-jdbc/5.3.20/spring-jdbc-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/spring-beans/5.3.20/spring-beans-5.3.20.jar;
+D:/REPO/MAVEN/org/springframework/spring-tx/5.3.20/spring-tx-5.3.20.jar;
+D:/REPO/MAVEN/com/zaxxer/HikariCP/4.0.3/HikariCP-4.0.3.jar;
+D:/REPO/MAVEN/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar;
+D:/REPO/MAVEN/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar;
+D:/REPO/MAVEN/org/hsqldb/hsqldb/2.5.2/hsqldb-2.5.2.jar;
+D:/AppHome/framework/dstone/dstone-boot/src/main/webapp/WEB-INF/lib/ojdbc8-12.2.0.1.jar;
+D:/REPO/MAVEN/org/apache/commons/commons-dbcp2/2.9.0/commons-dbcp2-2.9.0.jar;
+D:/REPO/MAVEN/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar;
+D:/REPO/MAVEN/org/mybatis/mybatis-spring/1.3.0/mybatis-spring-1.3.0.jar;
+D:/REPO/MAVEN/org/mybatis/mybatis/3.4.1/mybatis-3.4.1.jar;
+D:/REPO/MAVEN/javax/servlet/javax.servlet-api/4.0.1/javax.servlet-api-4.0.1.jar;
+D:/REPO/MAVEN/javax/servlet/jsp/javax.servlet.jsp-api/2.2.1/javax.servlet.jsp-api-2.2.1.jar;
+D:/REPO/MAVEN/javax/servlet/jsp/jstl/javax.servlet.jsp.jstl-api/1.2.1/javax.servlet.jsp.jstl-api-1.2.1.jar;
+D:/REPO/MAVEN/org/apache/tomcat/embed/tomcat-embed-jasper/9.0.63/tomcat-embed-jasper-9.0.63.jar;
+D:/REPO/MAVEN/org/eclipse/jdt/ecj/3.18.0/ecj-3.18.0.jar;
+D:/REPO/MAVEN/taglibs/standard/1.1.2/standard-1.1.2.jar;
+D:/REPO/MAVEN/org/aspectj/aspectjrt/1.9.7/aspectjrt-1.9.7.jar;
+D:/REPO/MAVEN/org/aspectj/aspectjweaver/1.9.7/aspectjweaver-1.9.7.jar;
+D:/REPO/MAVEN/org/aspectj/aspectjtools/1.9.7/aspectjtools-1.9.7.jar;
+D:/REPO/MAVEN/com/googlecode/json-simple/json-simple/1.1/json-simple-1.1.jar;
+D:/REPO/MAVEN/org/codehaus/jackson/jackson-jaxrs/1.9.13/jackson-jaxrs-1.9.13.jar;
+D:/REPO/MAVEN/org/codehaus/jackson/jackson-core-asl/1.9.13/jackson-core-asl-1.9.13.jar;
+D:/REPO/MAVEN/org/codehaus/jackson/jackson-mapper-asl/1.9.13/jackson-mapper-asl-1.9.13.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/core/jackson-core/2.13.3/jackson-core-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/core/jackson-databind/2.13.3/jackson-databind-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/core/jackson-annotations/2.13.3/jackson-annotations-2.13.3.jar;
+D:/REPO/MAVEN/commons-beanutils/commons-beanutils/1.9.3/commons-beanutils-1.9.3.jar;
+D:/REPO/MAVEN/commons-logging/commons-logging/1.2/commons-logging-1.2.jar;
+D:/REPO/MAVEN/commons-collections/commons-collections/3.2.2/commons-collections-3.2.2.jar;
+D:/REPO/MAVEN/commons-lang/commons-lang/2.6/commons-lang-2.6.jar;
+D:/REPO/MAVEN/servlets/com/cos/05Nov2002/cos-05Nov2002.jar;
+D:/REPO/MAVEN/org/projectlombok/lombok/1.18.24/lombok-1.18.24.jar;
+D:/REPO/MAVEN/commons-httpclient/commons-httpclient/3.1/commons-httpclient-3.1.jar;
+D:/REPO/MAVEN/commons-codec/commons-codec/1.15/commons-codec-1.15.jar;
+D:/REPO/MAVEN/org/apache/httpcomponents/httpcore/4.4.15/httpcore-4.4.15.jar;
+D:/REPO/MAVEN/org/apache/logging/log4j/log4j-core/2.16.0/log4j-core-2.16.0.jar;
+D:/REPO/MAVEN/org/apache/logging/log4j/log4j-api/2.16.0/log4j-api-2.16.0.jar;
+D:/REPO/MAVEN/org/bgee/log4jdbc-log4j2/log4jdbc-log4j2-jdbc4.1/1.16/log4jdbc-log4j2-jdbc4.1-1.16.jar;
+D:/REPO/MAVEN/com/github/ulisesbocchio/jasypt-spring-boot-starter/3.0.4/jasypt-spring-boot-starter-3.0.4.jar;
+D:/REPO/MAVEN/com/github/ulisesbocchio/jasypt-spring-boot/3.0.4/jasypt-spring-boot-3.0.4.jar;
+D:/REPO/MAVEN/org/jasypt/jasypt/1.9.3/jasypt-1.9.3.jar;
+D:/AppHome/framework/dstone/dstone-boot/src/main/webapp/WEB-INF/lib/bcprov-ext-jdk18on-175.jar;
+D:/REPO/MAVEN/com/spotify/docker-client/8.15.1/docker-client-8.15.1.jar;
+D:/REPO/MAVEN/com/google/guava/guava/20.0/guava-20.0.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/jaxrs/jackson-jaxrs-json-provider/2.13.3/jackson-jaxrs-json-provider-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/jaxrs/jackson-jaxrs-base/2.13.3/jackson-jaxrs-base-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/module/jackson-module-jaxb-annotations/2.13.3/jackson-module-jaxb-annotations-2.13.3.jar;
+D:/REPO/MAVEN/com/fasterxml/jackson/datatype/jackson-datatype-guava/2.13.3/jackson-datatype-guava-2.13.3.jar;
+D:/REPO/MAVEN/org/glassfish/jersey/core/jersey-client/2.35/jersey-client-2.35.jar;
+D:/REPO/MAVEN/jakarta/ws/rs/jakarta.ws.rs-api/2.1.6/jakarta.ws.rs-api-2.1.6.jar;
+D:/REPO/MAVEN/org/glassfish/jersey/core/jersey-common/2.35/jersey-common-2.35.jar;
+D:/REPO/MAVEN/org/glassfish/hk2/osgi-resource-locator/1.0.3/osgi-resource-locator-1.0.3.jar;
+D:/REPO/MAVEN/org/glassfish/hk2/external/jakarta.inject/2.6.1/jakarta.inject-2.6.1.jar;
+D:/REPO/MAVEN/org/glassfish/jersey/connectors/jersey-apache-connector/2.35/jersey-apache-connector-2.35.jar;
+D:/REPO/MAVEN/org/glassfish/jersey/media/jersey-media-json-jackson/2.35/jersey-media-json-jackson-2.35.jar;
+D:/REPO/MAVEN/org/glassfish/jersey/ext/jersey-entity-filtering/2.35/jersey-entity-filtering-2.35.jar;
+D:/REPO/MAVEN/javax/activation/activation/1.1/activation-1.1.jar;
+D:/REPO/MAVEN/org/apache/commons/commons-compress/1.18/commons-compress-1.18.jar;
+D:/REPO/MAVEN/commons-io/commons-io/2.5/commons-io-2.5.jar;
+D:/REPO/MAVEN/org/apache/httpcomponents/httpclient/4.5.13/httpclient-4.5.13.jar;
+D:/REPO/MAVEN/com/github/jnr/jnr-unixsocket/0.18/jnr-unixsocket-0.18.jar;
+D:/REPO/MAVEN/com/github/jnr/jnr-ffi/2.1.4/jnr-ffi-2.1.4.jar;
+D:/REPO/MAVEN/com/github/jnr/jffi/1.2.15/jffi-1.2.15.jar;
+D:/REPO/MAVEN/com/github/jnr/jffi/1.2.15/jffi-1.2.15-native.jar;
+D:/REPO/MAVEN/org/ow2/asm/asm/5.0.3/asm-5.0.3.jar;
+D:/REPO/MAVEN/org/ow2/asm/asm-commons/5.0.3/asm-commons-5.0.3.jar;
+D:/REPO/MAVEN/org/ow2/asm/asm-analysis/5.0.3/asm-analysis-5.0.3.jar;
+D:/REPO/MAVEN/org/ow2/asm/asm-tree/5.0.3/asm-tree-5.0.3.jar;
+D:/REPO/MAVEN/org/ow2/asm/asm-util/5.0.3/asm-util-5.0.3.jar;
+D:/REPO/MAVEN/com/github/jnr/jnr-x86asm/1.0.2/jnr-x86asm-1.0.2.jar;
+D:/REPO/MAVEN/com/github/jnr/jnr-constants/0.9.8/jnr-constants-0.9.8.jar;
+D:/REPO/MAVEN/com/github/jnr/jnr-enxio/0.16/jnr-enxio-0.16.jar;
+D:/REPO/MAVEN/com/github/jnr/jnr-posix/3.0.35/jnr-posix-3.0.35.jar;
+D:/REPO/MAVEN/org/bouncycastle/bcpkix-jdk15on/1.60/bcpkix-jdk15on-1.60.jar;
+D:/REPO/MAVEN/org/bouncycastle/bcprov-jdk15on/1.60/bcprov-jdk15on-1.60.jar;
+D:/REPO/MAVEN/io/github/benas/jpopulator/1.2.0/jpopulator-1.2.0.jar;
+D:/REPO/MAVEN/org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.jar;
+D:/REPO/MAVEN/org/apache/commons/commons-math3/3.3/commons-math3-3.3.jar;
+D:/REPO/MAVEN/javax/validation/validation-api/2.0.1.Final/validation-api-2.0.1.Final.jar;
+D:/REPO/MAVEN/joda-time/joda-time/2.6/joda-time-2.6.jar;
+D:/REPO/MAVEN/org/springframework/spring-context/5.3.20/spring-context-5.3.20.jar;
+D:/REPO/MAVEN/org/jsoup/jsoup/1.11.3/jsoup-1.11.3.jar;
+D:/REPO/MAVEN/com/github/jsqlparser/jsqlparser/4.7/jsqlparser-4.7.jar;
+D:/REPO/MAVEN/com/github/javaparser/javaparser-core/3.25.7/javaparser-core-3.25.7.jar;
+D:/REPO/MAVEN/com/github/javaparser/javaparser-symbol-solver-core/3.25.7/javaparser-symbol-solver-core-3.25.7.jar;
+D:/REPO/MAVEN/org/javassist/javassist/3.29.2-GA/javassist-3.29.2-GA.jar;
+D:/REPO/MAVEN/io/github/classgraph/classgraph/4.8.165/classgraph-4.8.165.jar;</APP_CLASSPATH>
+    
+</Configuration>

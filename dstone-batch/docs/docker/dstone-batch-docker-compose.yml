@@ -1,0 +1,130 @@
+########################################################################################
+# <컨테이너목록>
+# * 아래의 모든 컨테이너들을 일괄로 생성한다.
+# 1. dstone-mysql(데이터베이스)
+# 2. dstone-batch(배치프레임웍 Application)
+# 3. dstone-batch-server(배치프레임웍 Application 관리서버)
+# 
+# <사전작업>
+# 1. 작업디렉토리 결정 후 템플릿 복사.
+#   /workshop
+#     └─ /dstone-mysql                             # <Database (MySQL)>
+#        ├─ init-db/                               #   DB 초기화 스크립트
+#        ├─ 01.dstone-mysql-docker.yml             #   개별 Docker Compose 빌드파일
+#        └─ 02.dstone-mysql-docker-reg.sh          #   Docker Hub 등록 Shell
+#     └─ /dstone-batch                             # <Batch Application>
+#        ├─ conf/                                  #   설정 파일
+#        ├─ target/                                #   실행 파일
+#        ├─ 01.dstone-batch-docker.yml             #   개별 Docker Compose 빌드파일
+#        └─ 02.dstone-batch-docker-reg.sh          #   Docker Hub 등록 Shell
+#     └─ /dstone-batch-server                      # <Batch Admin Application>
+#        ├─ conf/                                  #   설정 파일
+#        ├─ target/                                #   실행 파일
+#        ├─ 01.dstone-batch-server-docker.yml      #   개별 Docker Compose 빌드파일
+#        └─ 02.dstone-batch-server-docker-reg.sh   #   Docker Hub 등록 Shell
+#     └─ /workshop/dstone-batch-docker-compose.yml # 메인 Docker Compose 빌드파일
+# 
+# <작업명령>
+# 1. Docker Compose 실행
+#   - docker compose -p dstone -f /workshop/dstone-batch-docker-compose.yml up -d
+# 2. 로그 확인
+#   - docker compose -p dstone -f /workshop/dstone-batch-docker-compose.yml logs -f
+# 3. 중지 및 삭제
+#   - docker compose -p dstone -f /workshop/dstone-batch-docker-compose.yml down -v
+########################################################################################
+services:
+
+  # MySQL 데이터베이스 서버(dstone-batch만 설치할 경우 설치. dstone-boot가 설치되어 있으면 mysql이 이미 설치되러 있음)
+  dstone-mysql:  
+    # ---------- 최초작업일 때 ---------------------- #
+    # image: mysql:8.0
+    # --------------------------------------------- #    
+    # ---------- Docker Hub 에서 가져올 때 ---------- #
+    image: jysn007/dstone-mysql:latest
+    # --------------------------------------------- #    
+    container_name: dstone-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: db2admin!@
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_0900_ai_ci
+    ports:
+      - "3306:3306"  
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./dstone-mysql/init-db:/docker-entrypoint-initdb.d
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    networks:
+      - dstone-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 배치프레임웍 Application 관리서버
+  dstone-batch-server:    
+    # ---------- 최초작업일 때 ---------------------- #
+    # image: eclipse-temurin:21-jdk
+    # --------------------------------------------- #    
+    # ---------- Docker Hub 에서 가져올 때 ---------- #
+    image: jysn007/dstone-batch-server:latest
+    # --------------------------------------------- #    
+    container_name: dstone-batch-server
+    env_file:
+      - /workshop/dstone-batch-server/conf/env-dev.properties
+    ports:
+      - "9393:9393"
+    volumes:
+      # dstone-batch-server(배치관리프로그램)용 설정
+      - /workshop/dstone-batch-server/target:/workshop/dstone-batch-server/target
+      - /workshop/dstone-batch-server/conf:/workshop/dstone-batch-server/conf
+      # dstone-batch(배치프로그램)용 설정
+      - /workshop/dstone-batch/target:/workshop/dstone-batch/target
+      - /workshop/dstone-batch/conf:/workshop/dstone-batch/conf
+    networks:
+      - dstone-network
+    depends_on:
+      - dstone-mysql
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "Starting Dataflow Server..."
+        java -Dspring.profiles.active=dev -jar /workshop/dstone-batch-server/target/spring-cloud-dataflow-server-2.11.5.jar --spring.config.location=/workshop/dstone-batch-server/conf/dataflow-server.yml
+    restart: unless-stopped
+    
+  # 배치프레임웍 Application
+  dstone-batch:    
+    # ---------- 최초작업일 때 ---------------------- #
+    # image: eclipse-temurin:21-jdk
+    # --------------------------------------------- #    
+    # ---------- Docker Hub 에서 가져올 때 ---------- #
+    image: jysn007/dstone-batch:latest
+    # --------------------------------------------- #    
+    container_name: dstone-batch
+    ports:
+      - "6081:6081"
+    volumes:
+      - /workshop/dstone-batch/target/dstone-batch-0.0.1-SNAPSHOT.jar:/workshop/dstone-batch/target/dstone-batch-0.0.1-SNAPSHOT.jar
+      - /workshop/dstone-batch/conf:/workshop/dstone-batch/conf
+    networks:
+      - dstone-network
+    depends_on:
+      - dstone-mysql
+      - dstone-batch-server
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "Starting Spring Boot Application..."
+        java -Dspring.profiles.active=dev -jar /workshop/dstone-batch/target/dstone-batch-0.0.1-SNAPSHOT.jar net.dstone.batch.common.DstoneBatchApplication
+    restart: unless-stopped
+
+networks:
+  dstone-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

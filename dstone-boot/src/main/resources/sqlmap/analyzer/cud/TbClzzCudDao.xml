@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 클래스[TB_CLZZ] VO -->                                                                
+                                                                                   
+    <!--  클래스[TB_CLZZ] 상세 조회 -->                                                        
+    <select id="selectTbClzz" parameterType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo">       
+        SELECT                                                                        
+            SYS_ID, CLZZ_ID, PKG_ID, CLZZ_NM, CLZZ_KIND, 
+            RESOURCE_ID, CLZZ_INTF, INTF_ID_LIST, PARENT_CLZZ_ID, INTF_IMPL_CLZZ_ID_LIST, 
+            MEMBER_ALIAS_LIST, FILE_NAME, WORKER_ID
+        FROM                                                                          
+            TB_CLZZ                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID}
+            AND CLZZ_ID = #{CLZZ_ID}
+    </select>                                                                       
+                                                                                   
+    <!--  클래스[TB_CLZZ] NEW키값 조회 -->                                                        
+    <select id="selectTbClzzNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(CLZZ_ID)), 0, MAX(CLZZ_ID) )+1), 300, '0') CLZZ_ID 
+        FROM                                                                          
+            TB_CLZZ                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID} 
+    </select>                                                                       
+                                                                                   
+    <!--  클래스[TB_CLZZ] 입력 -->                                                             
+    <insert id="insertTbClzz" parameterType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo" >                             
+        INSERT INTO TB_CLZZ (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="CLZZ_ID != null and !CLZZ_ID.equals('')" >CLZZ_ID,</if>
+                <if test="PKG_ID != null and !PKG_ID.equals('')" >PKG_ID,</if>
+                <if test="CLZZ_NM != null and !CLZZ_NM.equals('')" >CLZZ_NM,</if>
+                <if test="CLZZ_KIND != null and !CLZZ_KIND.equals('')" >CLZZ_KIND,</if>
+                <if test="RESOURCE_ID != null and !RESOURCE_ID.equals('')" >RESOURCE_ID,</if>
+                <if test="CLZZ_INTF != null and !CLZZ_INTF.equals('')" >CLZZ_INTF,</if>
+                <if test="INTF_ID_LIST != null and !INTF_ID_LIST.equals('')" >INTF_ID_LIST,</if>
+                <if test="PARENT_CLZZ_ID != null and !PARENT_CLZZ_ID.equals('')" >PARENT_CLZZ_ID,</if>
+                <if test="INTF_IMPL_CLZZ_ID_LIST != null and !INTF_IMPL_CLZZ_ID_LIST.equals('')" >INTF_IMPL_CLZZ_ID_LIST,</if>
+                <if test="MEMBER_ALIAS_LIST != null and !MEMBER_ALIAS_LIST.equals('')" >MEMBER_ALIAS_LIST,</if>
+                <if test="FILE_NAME != null and !FILE_NAME.equals('')" >FILE_NAME,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="CLZZ_ID != null and !CLZZ_ID.equals('')" >#{CLZZ_ID},</if>
+                <if test="PKG_ID != null and !PKG_ID.equals('')" >#{PKG_ID},</if>
+                <if test="CLZZ_NM != null and !CLZZ_NM.equals('')" >#{CLZZ_NM},</if>
+                <if test="CLZZ_KIND != null and !CLZZ_KIND.equals('')" >#{CLZZ_KIND},</if>
+                <if test="RESOURCE_ID != null and !RESOURCE_ID.equals('')" >#{RESOURCE_ID},</if>
+                <if test="CLZZ_INTF != null and !CLZZ_INTF.equals('')" >#{CLZZ_INTF},</if>
+                <if test="INTF_ID_LIST != null and !INTF_ID_LIST.equals('')" >#{INTF_ID_LIST},</if>
+                <if test="PARENT_CLZZ_ID != null and !PARENT_CLZZ_ID.equals('')" >#{PARENT_CLZZ_ID},</if>
+                <if test="INTF_IMPL_CLZZ_ID_LIST != null and !INTF_IMPL_CLZZ_ID_LIST.equals('')" >#{INTF_IMPL_CLZZ_ID_LIST},</if>
+                <if test="MEMBER_ALIAS_LIST != null and !MEMBER_ALIAS_LIST.equals('')" >#{MEMBER_ALIAS_LIST},</if>
+                <if test="FILE_NAME != null and !FILE_NAME.equals('')" >#{FILE_NAME},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  클래스[TB_CLZZ] 수정 -->                                                             
+    <update id="updateTbClzz" parameterType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo" >                             
+        UPDATE TB_CLZZ                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="CLZZ_ID != null and !CLZZ_ID.equals('')" >CLZZ_ID = #{CLZZ_ID},</if>
+                <if test="PKG_ID != null and !PKG_ID.equals('')" >PKG_ID = #{PKG_ID},</if>
+                <if test="CLZZ_NM != null and !CLZZ_NM.equals('')" >CLZZ_NM = #{CLZZ_NM},</if>
+                <if test="CLZZ_KIND != null and !CLZZ_KIND.equals('')" >CLZZ_KIND = #{CLZZ_KIND},</if>
+                <if test="RESOURCE_ID != null and !RESOURCE_ID.equals('')" >RESOURCE_ID = #{RESOURCE_ID},</if>
+                <if test="CLZZ_INTF != null and !CLZZ_INTF.equals('')" >CLZZ_INTF = #{CLZZ_INTF},</if>
+                <if test="INTF_ID_LIST != null and !INTF_ID_LIST.equals('')" >INTF_ID_LIST = #{INTF_ID_LIST},</if>
+                <if test="PARENT_CLZZ_ID != null and !PARENT_CLZZ_ID.equals('')" >PARENT_CLZZ_ID = #{PARENT_CLZZ_ID},</if>
+                <if test="INTF_IMPL_CLZZ_ID_LIST != null and !INTF_IMPL_CLZZ_ID_LIST.equals('')" >INTF_IMPL_CLZZ_ID_LIST = #{INTF_IMPL_CLZZ_ID_LIST},</if>
+                <if test="MEMBER_ALIAS_LIST != null and !MEMBER_ALIAS_LIST.equals('')" >MEMBER_ALIAS_LIST = #{MEMBER_ALIAS_LIST},</if>
+                <if test="FILE_NAME != null and !FILE_NAME.equals('')" >FILE_NAME = #{FILE_NAME},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND SYS_ID = #{SYS_ID}
+            AND CLZZ_ID = #{CLZZ_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  클래스[TB_CLZZ] 삭제 -->                                                             
+    <delete id="deleteTbClzz" parameterType="net.dstone.boot.analyzer.cud.vo.TbClzzCudVo" >                             
+        DELETE FROM TB_CLZZ                                                              
+        WHERE 1=1                                                                         
+            AND SYS_ID = #{SYS_ID}
+            AND CLZZ_ID = #{CLZZ_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

@@ -1,0 +1,377 @@
+{
+	"info": {
+		"_postman_id": "6e197f57-6964-4a60-8f03-ad3de596e612",
+		"name": "배치샘플",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "6821306"
+	},
+	"item": [
+		{
+			"name": "common",
+			"item": [
+				{
+					"name": "regJobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/regtasks",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"regtasks"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "jobStatus",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/status/69",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"status",
+								"69"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "job001",
+			"item": [
+				{
+					"name": "sampleJob",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/sampleJob",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"sampleJob"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},		
+		{
+			"name": "job002",
+			"item": [
+				{
+					"name": "tableDataGenType01Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/tableDataGenType01Job?dataCnt=10000",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"tableDataGenType01Job"
+							],
+							"query": [
+								{
+									"key": "dataCnt",
+									"value": "10000"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "tableDataGenType02Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/tableDataGenType02Job?dataCnt=10000",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"tableDataGenType02Job"
+							],
+							"query": [
+								{
+									"key": "dataCnt",
+									"value": "10000"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "job003",
+			"item": [
+				{
+					"name": "tableUpdateType01Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/tableUpdateType01Job",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"tableUpdateType01Job"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "tableUpdateType02Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/tableUpdateType02Job",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"tableUpdateType02Job"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "tableUpdateType03Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/tableUpdateType03Job",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"tableUpdateType03Job"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "job004",
+			"item": [
+				{
+					"name": "fileDataGenJob",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/fileDataGenJob",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"fileDataGenJob"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "job005",
+			"item": [
+				{
+					"name": "fileCopyType01Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/fileCopyType01Job",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"fileCopyType01Job"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "fileCopyType02Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/fileCopyType02Job?outputFileDir=C:/Temp/SAMPLE_DATA/split",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"fileCopyType02Job"
+							],
+							"query": [
+								{
+									"key": "outputFileDir",
+									"value": "C:/Temp/SAMPLE_DATA/split"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "job006",
+			"item": [
+				{
+					"name": "fileToTableJob",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"status\": \"OK\",\r\n    \"meta\": {\r\n        \"totalCount\": 1,\r\n        \"page\": 1,\r\n        \"count\": 1\r\n    },\r\n    \"addresses\": [\r\n        {\r\n            \"roadAddress\": \"충청북도 음성군 음성읍 가섭길 578\",\r\n            \"jibunAddress\": \"충청북도 음성군 음성읍 용산리 산11-4\",\r\n            \"englishAddress\": \"578, Gaseop-gil, Eumseong-eup, Eumseong-gun, Chungcheongbuk-do, Republic of Korea\",\r\n            \"addressElements\": [\r\n                {\r\n                    \"types\": [\r\n                        \"SIDO\"\r\n                    ],\r\n                    \"longName\": \"충청북도\",\r\n                    \"shortName\": \"충청북도\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"SIGUGUN\"\r\n                    ],\r\n                    \"longName\": \"음성군\",\r\n                    \"shortName\": \"음성군\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"DONGMYUN\"\r\n                    ],\r\n                    \"longName\": \"음성읍\",\r\n                    \"shortName\": \"음성읍\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"RI\"\r\n                    ],\r\n                    \"longName\": \"용산리\",\r\n                    \"shortName\": \"용산리\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"ROAD_NAME\"\r\n                    ],\r\n                    \"longName\": \"가섭길\",\r\n                    \"shortName\": \"가섭길\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"BUILDING_NUMBER\"\r\n                    ],\r\n                    \"longName\": \"578\",\r\n                    \"shortName\": \"578\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"BUILDING_NAME\"\r\n                    ],\r\n                    \"longName\": \"\",\r\n                    \"shortName\": \"\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"LAND_NUMBER\"\r\n                    ],\r\n                    \"longName\": \"산11-4\",\r\n                    \"shortName\": \"산11-4\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"POSTAL_CODE\"\r\n                    ],\r\n                    \"longName\": \"27688\",\r\n                    \"shortName\": \"27688\",\r\n                    \"code\": \"\"\r\n                }\r\n            ],\r\n            \"x\": \"127.7054521\",\r\n            \"y\": \"36.9673716\",\r\n            \"distance\": 0.0\r\n        }\r\n    ],\r\n    \"errorMessage\": \"\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/fileToTableJob",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"fileToTableJob"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "tableToFileJob",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"status\": \"OK\",\r\n    \"meta\": {\r\n        \"totalCount\": 1,\r\n        \"page\": 1,\r\n        \"count\": 1\r\n    },\r\n    \"addresses\": [\r\n        {\r\n            \"roadAddress\": \"충청북도 음성군 음성읍 가섭길 578\",\r\n            \"jibunAddress\": \"충청북도 음성군 음성읍 용산리 산11-4\",\r\n            \"englishAddress\": \"578, Gaseop-gil, Eumseong-eup, Eumseong-gun, Chungcheongbuk-do, Republic of Korea\",\r\n            \"addressElements\": [\r\n                {\r\n                    \"types\": [\r\n                        \"SIDO\"\r\n                    ],\r\n                    \"longName\": \"충청북도\",\r\n                    \"shortName\": \"충청북도\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"SIGUGUN\"\r\n                    ],\r\n                    \"longName\": \"음성군\",\r\n                    \"shortName\": \"음성군\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"DONGMYUN\"\r\n                    ],\r\n                    \"longName\": \"음성읍\",\r\n                    \"shortName\": \"음성읍\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"RI\"\r\n                    ],\r\n                    \"longName\": \"용산리\",\r\n                    \"shortName\": \"용산리\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"ROAD_NAME\"\r\n                    ],\r\n                    \"longName\": \"가섭길\",\r\n                    \"shortName\": \"가섭길\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"BUILDING_NUMBER\"\r\n                    ],\r\n                    \"longName\": \"578\",\r\n                    \"shortName\": \"578\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"BUILDING_NAME\"\r\n                    ],\r\n                    \"longName\": \"\",\r\n                    \"shortName\": \"\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"LAND_NUMBER\"\r\n                    ],\r\n                    \"longName\": \"산11-4\",\r\n                    \"shortName\": \"산11-4\",\r\n                    \"code\": \"\"\r\n                },\r\n                {\r\n                    \"types\": [\r\n                        \"POSTAL_CODE\"\r\n                    ],\r\n                    \"longName\": \"27688\",\r\n                    \"shortName\": \"27688\",\r\n                    \"code\": \"\"\r\n                }\r\n            ],\r\n            \"x\": \"127.7054521\",\r\n            \"y\": \"36.9673716\",\r\n            \"distance\": 0.0\r\n        }\r\n    ],\r\n    \"errorMessage\": \"\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:6081/batch/restapi/tableToFileJob?outputFileFullPath=C:/Temp/SAMPLE_DATA/table/SAMPLE_TEST33.sam",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "6081",
+							"path": [
+								"batch",
+								"restapi",
+								"tableToFileJob"
+							],
+							"query": [
+								{
+									"key": "outputFileFullPath",
+									"value": "C:/Temp/SAMPLE_DATA/table/SAMPLE_TEST33.sam"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

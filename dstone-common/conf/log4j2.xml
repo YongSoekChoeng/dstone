@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+ 
+     <Properties>
+        <Property name="logging.root-path">${sys:APP_HOME}/LOGS</Property>
+        <Property name="level.default">INFO</Property>
+        <Property name="level.dstone">INFO</Property>
+    </Properties>
+    
+    <Appenders>
+        <Console name="console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss} %5p [%c] %m%n"/>
+        </Console>
+        <RollingFile name ="rollingFile" filePermissions="rwxrwxr--">
+            <FileName>${logging.root-path}/dstone-boot/execution/execution.log</FileName>
+            <FilePattern>${logging.root-path}/dstone-boot/execution/backup/%d{yyyy-MM-dd}-execution.zip</FilePattern>
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} %5p [%c] %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval = "1" modulate = "true"/>
+            </Policies>
+			<DefaultRolloverStrategy max="7" fileIndex="max" >
+			  	<Delete basePath = "${logging.root-path}/dstone-boot/execution/backup" maxDepth = "1">
+			  		<!-- 3일이 경과한 로그파일은 자동 삭제 -->
+			  		<IfLastModified age = "3d"/>
+			  	</Delete>
+		  	</DefaultRolloverStrategy>
+        </RollingFile>
+        
+    </Appenders>
+
+    <Loggers>
+    	<!-- You can specify loggers down here ! -->
+        <Root level="${level.default}" additivity="false">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+        </Root>        
+    	
+		<!--Spring logger-->
+	    <Logger name="org.springframework" level="${level.default}" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+    	
+		<!--Log4jdbc logger-->
+		<Logger name="log4jdbc.log4j2" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		
+		<!--Jdbc logger-->
+		<Logger name="jdbc" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.connection" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.sqlonly" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>
+		<Logger name="jdbc.sqltiming" level="INFO" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>
+		<Logger name="jdbc.audit" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.resultset" level="OFF" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+		<Logger name="jdbc.resultsettable" level="INFO" additivity="false">   
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
+	    <Logger name="com.zaxxer.hikari" level="OFF" additivity="false">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>
+	    
+	    <Logger name="net.dstone" level="${level.dstone}" additivity="false">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>
+	    
+    </Loggers>
+    
+</Configuration>

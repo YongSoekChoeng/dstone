@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 종합메트릭스[TB_METRIX] VO -->                                                                
+                                                                                   
+    <!--  종합메트릭스[TB_METRIX] 상세 조회 -->                                                        
+    <select id="selectTbMetrix" parameterType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo">       
+        SELECT                                                                        
+            SYS_ID, UI_ID, UI_NM, BASIC_URL, FUNCTION_ID_1, 
+            FUNCTION_NAME_1, CLASS_KIND_1, FUNCTION_ID_2, FUNCTION_NAME_2, CLASS_KIND_2, 
+            FUNCTION_ID_3, FUNCTION_NAME_3, CLASS_KIND_3, FUNCTION_ID_4, FUNCTION_NAME_4, 
+            CLASS_KIND_4, FUNCTION_ID_5, FUNCTION_NAME_5, CLASS_KIND_5, FUNCTION_ID_6, 
+            FUNCTION_NAME_6, CLASS_KIND_6, FUNCTION_ID_7, FUNCTION_NAME_7, CLASS_KIND_7, 
+            FUNCTION_ID_8, FUNCTION_NAME_8, CLASS_KIND_8, FUNCTION_ID_9, FUNCTION_NAME_9, 
+            CLASS_KIND_9, FUNCTION_ID_10, FUNCTION_NAME_10, CLASS_KIND_10, CALL_TBL, 
+            WORKER_ID
+        FROM                                                                          
+            TB_METRIX                                                                       
+        WHERE 1=1                                                                     
+    </select>                                                                       
+                                                                                   
+    <!--  종합메트릭스[TB_METRIX] NEW키값 조회 -->                                                        
+    <select id="selectTbMetrixNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo">       
+        SELECT                                                                        
+        FROM                                                                          
+            TB_METRIX                                                                       
+        WHERE 1=1                                                                     
+    </select>                                                                       
+                                                                                   
+    <!--  종합메트릭스[TB_METRIX] 입력 -->                                                             
+    <insert id="insertTbMetrix" parameterType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo" >                             
+        INSERT INTO TB_METRIX (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="UI_ID != null and !UI_ID.equals('')" >UI_ID,</if>
+                <if test="UI_NM != null and !UI_NM.equals('')" >UI_NM,</if>
+                <if test="BASIC_URL != null and !BASIC_URL.equals('')" >BASIC_URL,</if>
+                <if test="FUNCTION_ID_1 != null and !FUNCTION_ID_1.equals('')" >FUNCTION_ID_1,</if>
+                <if test="FUNCTION_NAME_1 != null and !FUNCTION_NAME_1.equals('')" >FUNCTION_NAME_1,</if>
+                <if test="CLASS_KIND_1 != null and !CLASS_KIND_1.equals('')" >CLASS_KIND_1,</if>
+                <if test="FUNCTION_ID_2 != null and !FUNCTION_ID_2.equals('')" >FUNCTION_ID_2,</if>
+                <if test="FUNCTION_NAME_2 != null and !FUNCTION_NAME_2.equals('')" >FUNCTION_NAME_2,</if>
+                <if test="CLASS_KIND_2 != null and !CLASS_KIND_2.equals('')" >CLASS_KIND_2,</if>
+                <if test="FUNCTION_ID_3 != null and !FUNCTION_ID_3.equals('')" >FUNCTION_ID_3,</if>
+                <if test="FUNCTION_NAME_3 != null and !FUNCTION_NAME_3.equals('')" >FUNCTION_NAME_3,</if>
+                <if test="CLASS_KIND_3 != null and !CLASS_KIND_3.equals('')" >CLASS_KIND_3,</if>
+                <if test="FUNCTION_ID_4 != null and !FUNCTION_ID_4.equals('')" >FUNCTION_ID_4,</if>
+                <if test="FUNCTION_NAME_4 != null and !FUNCTION_NAME_4.equals('')" >FUNCTION_NAME_4,</if>
+                <if test="CLASS_KIND_4 != null and !CLASS_KIND_4.equals('')" >CLASS_KIND_4,</if>
+                <if test="FUNCTION_ID_5 != null and !FUNCTION_ID_5.equals('')" >FUNCTION_ID_5,</if>
+                <if test="FUNCTION_NAME_5 != null and !FUNCTION_NAME_5.equals('')" >FUNCTION_NAME_5,</if>
+                <if test="CLASS_KIND_5 != null and !CLASS_KIND_5.equals('')" >CLASS_KIND_5,</if>
+                <if test="FUNCTION_ID_6 != null and !FUNCTION_ID_6.equals('')" >FUNCTION_ID_6,</if>
+                <if test="FUNCTION_NAME_6 != null and !FUNCTION_NAME_6.equals('')" >FUNCTION_NAME_6,</if>
+                <if test="CLASS_KIND_6 != null and !CLASS_KIND_6.equals('')" >CLASS_KIND_6,</if>
+                <if test="FUNCTION_ID_7 != null and !FUNCTION_ID_7.equals('')" >FUNCTION_ID_7,</if>
+                <if test="FUNCTION_NAME_7 != null and !FUNCTION_NAME_7.equals('')" >FUNCTION_NAME_7,</if>
+                <if test="CLASS_KIND_7 != null and !CLASS_KIND_7.equals('')" >CLASS_KIND_7,</if>
+                <if test="FUNCTION_ID_8 != null and !FUNCTION_ID_8.equals('')" >FUNCTION_ID_8,</if>
+                <if test="FUNCTION_NAME_8 != null and !FUNCTION_NAME_8.equals('')" >FUNCTION_NAME_8,</if>
+                <if test="CLASS_KIND_8 != null and !CLASS_KIND_8.equals('')" >CLASS_KIND_8,</if>
+                <if test="FUNCTION_ID_9 != null and !FUNCTION_ID_9.equals('')" >FUNCTION_ID_9,</if>
+                <if test="FUNCTION_NAME_9 != null and !FUNCTION_NAME_9.equals('')" >FUNCTION_NAME_9,</if>
+                <if test="CLASS_KIND_9 != null and !CLASS_KIND_9.equals('')" >CLASS_KIND_9,</if>
+                <if test="FUNCTION_ID_10 != null and !FUNCTION_ID_10.equals('')" >FUNCTION_ID_10,</if>
+                <if test="FUNCTION_NAME_10 != null and !FUNCTION_NAME_10.equals('')" >FUNCTION_NAME_10,</if>
+                <if test="CLASS_KIND_10 != null and !CLASS_KIND_10.equals('')" >CLASS_KIND_10,</if>
+                <if test="CALL_TBL != null and !CALL_TBL.equals('')" >CALL_TBL,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="UI_ID != null and !UI_ID.equals('')" >#{UI_ID},</if>
+                <if test="UI_NM != null and !UI_NM.equals('')" >#{UI_NM},</if>
+                <if test="BASIC_URL != null and !BASIC_URL.equals('')" >#{BASIC_URL},</if>
+                <if test="FUNCTION_ID_1 != null and !FUNCTION_ID_1.equals('')" >#{FUNCTION_ID_1},</if>
+                <if test="FUNCTION_NAME_1 != null and !FUNCTION_NAME_1.equals('')" >#{FUNCTION_NAME_1},</if>
+                <if test="CLASS_KIND_1 != null and !CLASS_KIND_1.equals('')" >#{CLASS_KIND_1},</if>
+                <if test="FUNCTION_ID_2 != null and !FUNCTION_ID_2.equals('')" >#{FUNCTION_ID_2},</if>
+                <if test="FUNCTION_NAME_2 != null and !FUNCTION_NAME_2.equals('')" >#{FUNCTION_NAME_2},</if>
+                <if test="CLASS_KIND_2 != null and !CLASS_KIND_2.equals('')" >#{CLASS_KIND_2},</if>
+                <if test="FUNCTION_ID_3 != null and !FUNCTION_ID_3.equals('')" >#{FUNCTION_ID_3},</if>
+                <if test="FUNCTION_NAME_3 != null and !FUNCTION_NAME_3.equals('')" >#{FUNCTION_NAME_3},</if>
+                <if test="CLASS_KIND_3 != null and !CLASS_KIND_3.equals('')" >#{CLASS_KIND_3},</if>
+                <if test="FUNCTION_ID_4 != null and !FUNCTION_ID_4.equals('')" >#{FUNCTION_ID_4},</if>
+                <if test="FUNCTION_NAME_4 != null and !FUNCTION_NAME_4.equals('')" >#{FUNCTION_NAME_4},</if>
+                <if test="CLASS_KIND_4 != null and !CLASS_KIND_4.equals('')" >#{CLASS_KIND_4},</if>
+                <if test="FUNCTION_ID_5 != null and !FUNCTION_ID_5.equals('')" >#{FUNCTION_ID_5},</if>
+                <if test="FUNCTION_NAME_5 != null and !FUNCTION_NAME_5.equals('')" >#{FUNCTION_NAME_5},</if>
+                <if test="CLASS_KIND_5 != null and !CLASS_KIND_5.equals('')" >#{CLASS_KIND_5},</if>
+                <if test="FUNCTION_ID_6 != null and !FUNCTION_ID_6.equals('')" >#{FUNCTION_ID_6},</if>
+                <if test="FUNCTION_NAME_6 != null and !FUNCTION_NAME_6.equals('')" >#{FUNCTION_NAME_6},</if>
+                <if test="CLASS_KIND_6 != null and !CLASS_KIND_6.equals('')" >#{CLASS_KIND_6},</if>
+                <if test="FUNCTION_ID_7 != null and !FUNCTION_ID_7.equals('')" >#{FUNCTION_ID_7},</if>
+                <if test="FUNCTION_NAME_7 != null and !FUNCTION_NAME_7.equals('')" >#{FUNCTION_NAME_7},</if>
+                <if test="CLASS_KIND_7 != null and !CLASS_KIND_7.equals('')" >#{CLASS_KIND_7},</if>
+                <if test="FUNCTION_ID_8 != null and !FUNCTION_ID_8.equals('')" >#{FUNCTION_ID_8},</if>
+                <if test="FUNCTION_NAME_8 != null and !FUNCTION_NAME_8.equals('')" >#{FUNCTION_NAME_8},</if>
+                <if test="CLASS_KIND_8 != null and !CLASS_KIND_8.equals('')" >#{CLASS_KIND_8},</if>
+                <if test="FUNCTION_ID_9 != null and !FUNCTION_ID_9.equals('')" >#{FUNCTION_ID_9},</if>
+                <if test="FUNCTION_NAME_9 != null and !FUNCTION_NAME_9.equals('')" >#{FUNCTION_NAME_9},</if>
+                <if test="CLASS_KIND_9 != null and !CLASS_KIND_9.equals('')" >#{CLASS_KIND_9},</if>
+                <if test="FUNCTION_ID_10 != null and !FUNCTION_ID_10.equals('')" >#{FUNCTION_ID_10},</if>
+                <if test="FUNCTION_NAME_10 != null and !FUNCTION_NAME_10.equals('')" >#{FUNCTION_NAME_10},</if>
+                <if test="CLASS_KIND_10 != null and !CLASS_KIND_10.equals('')" >#{CLASS_KIND_10},</if>
+                <if test="CALL_TBL != null and !CALL_TBL.equals('')" >#{CALL_TBL},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  종합메트릭스[TB_METRIX] 수정 -->                                                             
+    <update id="updateTbMetrix" parameterType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo" >                             
+        UPDATE TB_METRIX                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="UI_ID != null and !UI_ID.equals('')" >UI_ID = #{UI_ID},</if>
+                <if test="UI_NM != null and !UI_NM.equals('')" >UI_NM = #{UI_NM},</if>
+                <if test="BASIC_URL != null and !BASIC_URL.equals('')" >BASIC_URL = #{BASIC_URL},</if>
+                <if test="FUNCTION_ID_1 != null and !FUNCTION_ID_1.equals('')" >FUNCTION_ID_1 = #{FUNCTION_ID_1},</if>
+                <if test="FUNCTION_NAME_1 != null and !FUNCTION_NAME_1.equals('')" >FUNCTION_NAME_1 = #{FUNCTION_NAME_1},</if>
+                <if test="CLASS_KIND_1 != null and !CLASS_KIND_1.equals('')" >CLASS_KIND_1 = #{CLASS_KIND_1},</if>
+                <if test="FUNCTION_ID_2 != null and !FUNCTION_ID_2.equals('')" >FUNCTION_ID_2 = #{FUNCTION_ID_2},</if>
+                <if test="FUNCTION_NAME_2 != null and !FUNCTION_NAME_2.equals('')" >FUNCTION_NAME_2 = #{FUNCTION_NAME_2},</if>
+                <if test="CLASS_KIND_2 != null and !CLASS_KIND_2.equals('')" >CLASS_KIND_2 = #{CLASS_KIND_2},</if>
+                <if test="FUNCTION_ID_3 != null and !FUNCTION_ID_3.equals('')" >FUNCTION_ID_3 = #{FUNCTION_ID_3},</if>
+                <if test="FUNCTION_NAME_3 != null and !FUNCTION_NAME_3.equals('')" >FUNCTION_NAME_3 = #{FUNCTION_NAME_3},</if>
+                <if test="CLASS_KIND_3 != null and !CLASS_KIND_3.equals('')" >CLASS_KIND_3 = #{CLASS_KIND_3},</if>
+                <if test="FUNCTION_ID_4 != null and !FUNCTION_ID_4.equals('')" >FUNCTION_ID_4 = #{FUNCTION_ID_4},</if>
+                <if test="FUNCTION_NAME_4 != null and !FUNCTION_NAME_4.equals('')" >FUNCTION_NAME_4 = #{FUNCTION_NAME_4},</if>
+                <if test="CLASS_KIND_4 != null and !CLASS_KIND_4.equals('')" >CLASS_KIND_4 = #{CLASS_KIND_4},</if>
+                <if test="FUNCTION_ID_5 != null and !FUNCTION_ID_5.equals('')" >FUNCTION_ID_5 = #{FUNCTION_ID_5},</if>
+                <if test="FUNCTION_NAME_5 != null and !FUNCTION_NAME_5.equals('')" >FUNCTION_NAME_5 = #{FUNCTION_NAME_5},</if>
+                <if test="CLASS_KIND_5 != null and !CLASS_KIND_5.equals('')" >CLASS_KIND_5 = #{CLASS_KIND_5},</if>
+                <if test="FUNCTION_ID_6 != null and !FUNCTION_ID_6.equals('')" >FUNCTION_ID_6 = #{FUNCTION_ID_6},</if>
+                <if test="FUNCTION_NAME_6 != null and !FUNCTION_NAME_6.equals('')" >FUNCTION_NAME_6 = #{FUNCTION_NAME_6},</if>
+                <if test="CLASS_KIND_6 != null and !CLASS_KIND_6.equals('')" >CLASS_KIND_6 = #{CLASS_KIND_6},</if>
+                <if test="FUNCTION_ID_7 != null and !FUNCTION_ID_7.equals('')" >FUNCTION_ID_7 = #{FUNCTION_ID_7},</if>
+                <if test="FUNCTION_NAME_7 != null and !FUNCTION_NAME_7.equals('')" >FUNCTION_NAME_7 = #{FUNCTION_NAME_7},</if>
+                <if test="CLASS_KIND_7 != null and !CLASS_KIND_7.equals('')" >CLASS_KIND_7 = #{CLASS_KIND_7},</if>
+                <if test="FUNCTION_ID_8 != null and !FUNCTION_ID_8.equals('')" >FUNCTION_ID_8 = #{FUNCTION_ID_8},</if>
+                <if test="FUNCTION_NAME_8 != null and !FUNCTION_NAME_8.equals('')" >FUNCTION_NAME_8 = #{FUNCTION_NAME_8},</if>
+                <if test="CLASS_KIND_8 != null and !CLASS_KIND_8.equals('')" >CLASS_KIND_8 = #{CLASS_KIND_8},</if>
+                <if test="FUNCTION_ID_9 != null and !FUNCTION_ID_9.equals('')" >FUNCTION_ID_9 = #{FUNCTION_ID_9},</if>
+                <if test="FUNCTION_NAME_9 != null and !FUNCTION_NAME_9.equals('')" >FUNCTION_NAME_9 = #{FUNCTION_NAME_9},</if>
+                <if test="CLASS_KIND_9 != null and !CLASS_KIND_9.equals('')" >CLASS_KIND_9 = #{CLASS_KIND_9},</if>
+                <if test="FUNCTION_ID_10 != null and !FUNCTION_ID_10.equals('')" >FUNCTION_ID_10 = #{FUNCTION_ID_10},</if>
+                <if test="FUNCTION_NAME_10 != null and !FUNCTION_NAME_10.equals('')" >FUNCTION_NAME_10 = #{FUNCTION_NAME_10},</if>
+                <if test="CLASS_KIND_10 != null and !CLASS_KIND_10.equals('')" >CLASS_KIND_10 = #{CLASS_KIND_10},</if>
+                <if test="CALL_TBL != null and !CALL_TBL.equals('')" >CALL_TBL = #{CALL_TBL},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+    </update>                                                                       
+                                                                                   
+    <!--  종합메트릭스[TB_METRIX] 삭제 -->                                                             
+    <delete id="deleteTbMetrix" parameterType="net.dstone.boot.analyzer.cud.vo.TbMetrixCudVo" >                             
+        DELETE FROM TB_METRIX                                                              
+        WHERE 1=1                                                                         
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

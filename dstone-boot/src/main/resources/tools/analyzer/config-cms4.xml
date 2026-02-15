@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><Configuration>
+ 
+	<!-- 시스템 아이디. -->
+    <SYS_ID>cms4</SYS_ID>
+    
+	<!-- 시스템 명. -->
+    <SYS_NM>cms4</SYS_NM>
+    
+	<!-- 어플리케이션루트 -->
+    <APP_ROOT_PATH>D:/AppHome/cms4_prd</APP_ROOT_PATH>
+    
+	<!-- 어플리케이션서버소스경로(분석대상 어플리케이션 java소스 루트 경로. 어플리케이션루트이하의 경로만 기술.) -->
+    <APP_SRC_PATH>/WEB-INF/classes</APP_SRC_PATH>
+    
+	<!-- 어플리케이션웹소스경로(분석대상 어플리케이션 웹 루트 루트 경로. 어플리케이션루트이하의 경로만 기술.) -->
+    <APP_WEB_PATH>WEB-INF/views</APP_WEB_PATH>
+    
+	<!-- 어플리케이션쿼리소스루트(분석대상 어플리케이션 쿼리 루트 경로. 전체 경로 기술.) -->
+    <APP_SQL_PATH>D:/AppHome/cms4_prd/WEB-INF/classes/sqlmap</APP_SQL_PATH>
+    
+	<!-- 중간산출물 저장디렉토리 -->
+    <WRITE_PATH>D:/Temp/anlaysis-cms4</WRITE_PATH>
+    
+	<!-- 저장파일명(디렉토리 -WRITE_PATH) -->
+    <SAVE_FILE_NAME>AppMetrix.ouput</SAVE_FILE_NAME>
+        
+	<!-- 작업결과를 DB에 저장할지 여부. true-작업결과를 DB에 저장. false-작업결과를 DB에 저장하지 않음. -->
+    <IS_SAVE_TO_DB>true</IS_SAVE_TO_DB>
+    
+	<!-- DB를 특정하는 아이디. DBID_1(오라클), DBID_2(MYSQL) -->
+    <DBID>DBID_2</DBID>
+    
+	<!-- 테이블목록을 DB로부터 읽어올지 여부. true-테이블명을 DB로부터 읽어옴. false-테이블명을 전체테이블목록파일(TABLE_LIST_FILE_NAME)에서 읽어오거나 쿼리 로부터 읽어옴.-->
+    <IS_TABLE_LIST_FROM_DB>false</IS_TABLE_LIST_FROM_DB>
+    
+	<!-- 테이블명을 DB로부터 읽어올때 적용할 프리픽스(IS_TABLE_LIST_FROM_DB 가 true일 경우에만 유효)-->
+    <TABLE_NAME_LIKE_STR/>
+       
+	<!-- 테이블목록정보파일명(디렉토리 -WRITE_PATH) -->
+    <TABLE_LIST_FILE_NAME>TableList.txt</TABLE_LIST_FILE_NAME>
+    
+	<!-- 분석대상어플리케이션 JDK홈 -->
+    <APP_JDK_HOME>C:/DEV/JDK/1.8</APP_JDK_HOME>
+    
+	<!-- 분석작업을 진행 할 쓰레드핸들러 종류(1:싱글 쓰레드풀, 2:Fixed 쓰레드풀, 3:Cached 쓰레드풀) -->
+    <WORKER_THREAD_KIND>2</WORKER_THREAD_KIND>
+    
+	<!-- 분석작업을 진행 할 쓰레드 갯수(WORKER_THREAD_KIND가 Fixed 쓰레드풀 일 경우에만 유효) -->
+    <WORKER_THREAD_NUM>6</WORKER_THREAD_NUM>
+    
+	<!-- 분석패키지루트 목록(콤마 구분자) -->
+    <INCLUDE_PACKAGE_ROOT>kr.co.gnx</INCLUDE_PACKAGE_ROOT>
+    
+	<!-- 분석제외패키지패턴 목록(콤마 구분자) -->
+    <EXCLUDE_PACKAGE_PATTERN>.vo.,.vo,VO,Vo,.model.,kr.co.gnx.base.Base,kr.co.gnx.comm.util.</EXCLUDE_PACKAGE_PATTERN>
+    
+	<!-- 분석대상어플리케이션 클래스패스 -->
+    <APP_CLASSPATH>D:/AppHome/cms4_prd/WEB-INF/lib/activation-1.1.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/aopalliance-1.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/aspectjrt-1.8.13.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/aspectjweaver-1.9.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/bcmail-jdk14-1.38.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/bcmail-jdk14-138.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/bcprov-jdk14-1.38.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/bcprov-jdk14-138.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/bctsp-jdk14-1.38.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/byte-buddy-1.8.12.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/castor-1.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/classmate-1.4.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-beanutils-1.8.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-codec-1.9.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-collections-3.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-collections4-4.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-compress-1.18.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-dbcp-1.4.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-dbcp2-2.0.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-digester-2.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-fileupload-1.3.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-io-2.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-lang-2.6.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-logging-1.1.3.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-math3-3.6.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-pool-1.5.4.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/commons-pool2-2.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/curvesapi-1.05.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/ezmorph-1.0.4.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/fontbox-2.0.17.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/guava-20.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/httpclient-4.3.3.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/httpcore-4.3.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/itext-2.1.7.js2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/itextpdf-5.5.13.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jackson-annotations-2.9.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jackson-core-2.9.5.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jackson-core-asl-1.9.13.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jackson-databind-2.9.5.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jackson-mapper-asl-1.9.13.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jasperreports-5.5.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jasypt-1.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jasypt-spring31-1.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jcommon-1.0.15.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jdtcore-3.1.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jfreechart-1.0.12.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jjwt-0.9.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/json-lib-2.2.2-jdk15.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/json-lib-ext-spring-1.0.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/jstl-1.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/logback-classic-1.2.9.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/logback-core-1.2.9.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/logback-ext-spring-0.1.5.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/mail-1.4.7.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/mapstruct-1.2.0.Final.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/mariadb-java-client-2.2.5.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/xmpcore-5.1.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/metadata-extractor-2.9.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/mybatis-3.4.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/mybatis-spring-1.3.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/mysql-connector-java-5.0.8.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/ojdbc6-11.2.0.3.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/ojdbc8-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/ons-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/oraclepki-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/osdt_cert-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/osdt_core-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/pdfbox-2.0.17.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/pdfbox-debugger-2.0.17.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/pdfbox-tools-2.0.17.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/poi-4.0.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/poi-ooxml-4.0.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/poi-ooxml-schemas-4.0.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/servlet-api-2.4.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/shedlock-core-4.4.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/shedlock-provider-jdbc-internal-4.4.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/shedlock-provider-jdbc-template-4.4.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/shedlock-spring-4.4.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/simplefan-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/sitemesh-3.0.1.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/slf4j-api-1.7.32.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-aop-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-beans-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-context-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-core-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-expression-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-jdbc-4.3.5.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-plugin-core-1.2.0.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-plugin-metadata-1.2.0.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-acl-4.2.2.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-config-4.2.2.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-core-4.2.2.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-oauth-2.3.3.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-oauth2-2.0.14.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-taglibs-4.2.2.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-security-web-4.2.2.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-tx-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-web-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/spring-webmvc-4.3.7.RELEASE.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-core-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-schema-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-spi-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-spring-web-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-swagger-common-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-swagger-ui-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/springfox-swagger2-2.9.2.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/swagger-annotations-1.5.20.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/swagger-models-1.5.20.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/typeface-nanum-barun-gothic-1.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/UbiServer.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/ucp-19.3.0.0.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/xml-apis-1.3.02.jar;
+D:/AppHome/cms4_prd/WEB-INF/lib/xmlbeans-3.0.2.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/annotations-api.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/catalina-ant.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/catalina-ha.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/catalina-storeconfig.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/catalina-tribes.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/catalina.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/ecj-4.6.3.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/el-api.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/jasper-el.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/jasper.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/jaspic-api.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/jsp-api.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/servlet-api.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-api.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-coyote.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-dbcp.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-de.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-es.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-fr.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-ja.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-ko.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-ru.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-i18n-zh-CN.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-jdbc.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-jni.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-util-scan.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-util.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/tomcat-websocket.jar;
+C:/DEV/WAS/Tomcat/8.5/lib/websocket-api.jar</APP_CLASSPATH>
+    
+</Configuration>

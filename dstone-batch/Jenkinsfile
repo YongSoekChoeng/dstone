@@ -1,0 +1,108 @@
+pipeline {
+    agent any
+    
+    environment {
+        APP_NAME = 'dstone-batch'
+        WORKSPACE_DIR = '/workshop/dstone/dstone-batch'
+        DOCKER_COMPOSE_FILE = "${WORKSPACE_DIR}/01.dstone-batch-docker.yml"
+        DOCKER_PROJECT = 'dstone'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo '====== Git Checkout ======'
+                checkout scm
+                script {
+                    echo "Current branch: ${env.GIT_BRANCH}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo '====== Maven Build ======'
+                sh '''
+                    mvn clean package -DskipTests
+                    echo "Build completed: target/dstone-batch-0.0.1-SNAPSHOT.jar"
+                '''
+            }
+        }
+        
+        stage('Prepare Deployment Directory') {
+            steps {
+                echo '====== Prepare Deployment Files ======'
+                sh '''
+                    # 작업 디렉토리 생성
+                    mkdir -p ${WORKSPACE_DIR}/target
+                    mkdir -p ${WORKSPACE_DIR}/conf
+                    
+                    # WAR 파일 복사
+                    cp target/dstone-batch-0.0.1-SNAPSHOT.jar ${WORKSPACE_DIR}/target/
+                    
+                    # 설정 파일 복사
+                    cp -r conf/* ${WORKSPACE_DIR}/conf/
+                    
+                    # Docker Compose 파일 복사
+                    cp docs/docker/dstone-batch/01.dstone-batch-docker.yml ${WORKSPACE_DIR}/
+                    
+                    # 권한 설정
+                    chmod 644 ${WORKSPACE_DIR}/target/dstone-batch-0.0.1-SNAPSHOT.jar
+                '''
+            }
+        }
+        
+        stage('Stop Existing Container') {
+            steps {
+                echo '====== Stop Existing Container ======'
+                sh '''
+                    cd ${WORKSPACE_DIR}
+                    docker-compose -p ${DOCKER_PROJECT} -f ${DOCKER_COMPOSE_FILE} down || true
+                '''
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                echo '====== Deploy Application ======'
+                sh '''
+                    cd ${WORKSPACE_DIR}
+                    docker-compose -p ${DOCKER_PROJECT} -f ${DOCKER_COMPOSE_FILE} up -d
+                '''
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                echo '====== Health Check ======'
+                sh '''
+                    echo "Waiting for application to start..."
+                    sleep 15
+                    
+                    # 컨테이너 상태 확인
+                    docker ps | grep dstone-batch || (echo "Container not running" && exit 1)
+                    
+                    # 로그 확인
+                    docker logs dstone-batch --tail 50
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo '====== Deployment Successful ======'
+        }
+        failure {
+            echo '====== Deployment Failed ======'
+            sh '''
+                # 실패 시 로그 출력
+                docker logs dstone-batch --tail 100 || true
+            '''
+        }
+        always {
+            echo '====== Cleanup ======'
+            deleteDir()
+        }
+    }
+}

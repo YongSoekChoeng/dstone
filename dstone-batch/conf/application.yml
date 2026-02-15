@@ -1,0 +1,100 @@
+server:
+    port: 6081
+spring:
+    main:
+        allow-bean-definition-overriding: true
+    ##########################################################################################
+    # <자동설정기능>
+    # 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작하는 기능들이 있음. 
+    # 따라서 설정의도가 OFF라고 할 때 설정의도대로 하려면 부가적으로 아래의 설정을 해주어야 함.
+    ##########################################################################################
+    autoconfigure: 
+        # 제외할 설정.
+        exclude: 
+            # 스프링시큐리티사용 시 주석처리. 비사용 시 주석제거.(스프링시큐리티는 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작함)
+            - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+            # Redis사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.data.redis.~ 가 존재할 경우 Spring Boot는 무조건 Redis 연결을 시도)
+            #- org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+            #- org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+            # RabbitMq사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.rabbitmq.~ 가 존재할 경우 Spring Boot는 무조건 RabbitMq 연결을 시도)
+            #- org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+    security: 
+        enabled: false # 스프링시큐리티사용 여부(true/false)
+    application:
+        name: dstone-batch
+        ################################################################################
+        # <auto-register-jobs>
+        # true 일 경우 AutoRegJob어노테이션의 모든 Job들을 Job Registry에 자동등록. 스프링부트로 기동해서 RestApi로 서비스할 경우에만 사용.
+        # fasle일 경우 AutoRegJob어노테이션의 개별 Job을 호출 시점에 Job Registry에 등록. 개별 Job을 SimpleBatchRunner/ScdfTaskRunner 로 호출하여 사용할 경우 사용. 
+        ################################################################################
+        auto-register-jobs: false
+    datasource:
+        common: 
+            hikari: 
+                driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy        # 데이터베이스 드라이버 클래스 이름
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/dataflow  # 데이터베이스 연결 URL
+                username: ENC(VElaOj1pF3IdRCrKXHIQFVRCQv4hE6Oniig5ohsQ1wY=)     # 데이터베이스 사용자 이름
+                password: ENC(VElaOj1pF3IdRCrKXHIQFVRCQv4hE6Oniig5ohsQ1wY=)     # 데이터베이스 사용자 비밀번호
+                minimum-idle: 2                                                 # 최소 Idle 커넥션 수
+                maximum-pool-size: 50                                           # 커넥션 풀의 최대 크기
+                connection-timeout: 30000                                       # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
+                max-lifetime: 1700000                                           # 커넥션의 최대 생존시간(ms). (DB timeout 보다 짧게 설정 필요). 기본값 30분.
+                idle-timeout: 600000                                            # Idle 상태 커넥션의 최대 유지시간. 기본값 10분.
+                keepalive-time: 0                                               # idle 상태의 커넥션을 살려두기 위해 수행하는 keep-alive ping 수행 간격(ms). 기본값 0ms(기능 꺼짐).
+                data-source-properties:                                         
+                    cache-prep-stmts: "true"                                    # PreparedStatement 캐시 사용 여부
+                    prep-stmt-cache-size: "250"                                 # PreparedStatement 캐시 크기
+                    prep-stmt-cache-sql-limit: "2048"                           # PreparedStatement 캐시 SQL 제한 크기
+                    use-server-prep-stmts: "true"                               # 서버 측 PreparedStatement 사용 여부
+                    use-local-session-state: "true"                             # 로컬 세션 상태 사용 여부
+                    rewrite-batched-statements: "true"                          # 배치된 SQL 문장 재작성 여부
+                    cache-result-set-metadata: "true"                           # ResultSet 메타데이터 캐시 사용 여부
+                    cache-server-configuration: "true"                          # 서버 구성 정보 캐시 사용 여부
+                    elide-set-auto-commits: "true"                              # setAutoCommits 생략 여부
+                    maintain-time-stats: "false"                                # 시간 통계 정보 유지 여부
+            networks: 
+                - backend				       
+        sample:
+            hikari: 
+                driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy        # 데이터베이스 드라이버 클래스 이름
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB  # 데이터베이스 연결 URL
+                username: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)     # 데이터베이스 사용자 이름
+                password: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)     # 데이터베이스 사용자 비밀번호
+                minimum-idle: 2                                                 # 최소 Idle 커넥션 수
+                maximum-pool-size: 100                                          # 커넥션 풀의 최대 크기
+                connection-timeout: 600000                                      # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
+                max-lifetime: 1700000                                           # 커넥션의 최대 생존시간(ms). (DB timeout 보다 짧게 설정 필요). 기본값 30분.
+                idle-timeout: 600000                                            # Idle 상태 커넥션의 최대 유지시간. 기본값 10분.
+                keepalive-time: 300000                                          # idle 상태의 커넥션을 살려두기 위해 수행하는 keep-alive ping 수행 간격(ms). 기본값 0ms(기능 꺼짐).
+                data-source-properties:                                         
+                    cache-prep-stmts: "true"                                    # PreparedStatement 캐시 사용 여부
+                    prep-stmt-cache-size: "250"                                 # PreparedStatement 캐시 크기
+                    prep-stmt-cache-sql-limit: "2048"                           # PreparedStatement 캐시 SQL 제한 크기
+                    use-server-prep-stmts: "true"                               # 서버 측 PreparedStatement 사용 여부
+                    use-local-session-state: "true"                             # 로컬 세션 상태 사용 여부
+                    rewrite-batched-statements: "true"                          # 배치된 SQL 문장 재작성 여부
+                    cache-result-set-metadata: "true"                           # ResultSet 메타데이터 캐시 사용 여부
+                    cache-server-configuration: "true"                          # 서버 구성 정보 캐시 사용 여부
+                    elide-set-auto-commits: "true"                              # setAutoCommits 생략 여부
+                    maintain-time-stats: "false"                                # 시간 통계 정보 유지 여부
+            networks: 
+                - backend		
+    devtools: 
+        restart: 
+            enabled: false
+    batch:
+        # NEVER/ALWAYS 
+        initialize-schema: NEVER
+        jdbc:
+            initialize-schema: NEVER # NEVER/ALWAYS 
+            table-prefix: BATCH_
+        job:
+            enabled: false  # Job 자동 실행 활성화 (false로 설정 시 수동 실행만 가능. Data Flow 사용시 반드시 false로 세팅)
+    cloud: 
+        task: 
+            initialize-enabled: false
+        dataflow:
+            job-auto-register: true
+            client:
+                server-uri: http://${ADMIN_HOST}:${ADMIN_PORT}
+                enable-dsl: true

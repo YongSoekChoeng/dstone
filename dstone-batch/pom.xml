@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	
+	<parent>
+		<groupId>net.dstone</groupId>
+		<artifactId>dstone</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+	<artifactId>dstone-batch</artifactId> 
+
+	<properties>
+		<java.version>21</java.version>
+		<log4j.version>2.24.3</log4j.version>
+		<spring-cloud-starter-task.version>3.1.1</spring-cloud-starter-task.version>
+		<spring-cloud.version>2023.0.0</spring-cloud.version>
+		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
+	</properties>
+
+	<repositories>
+        <repository>
+            <id>central</id>
+            <name>Central Repository</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <layout>default</layout>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    
+	<dependencies>
+	
+		<!-- dstone-common -->
+		<dependency>
+		    <groupId>net.dstone</groupId>
+		    <artifactId>dstone-common</artifactId>
+		</dependency>	
+				
+		<!-- Spring Boot Batch -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-batch</artifactId>
+			<exclusions>
+		        <exclusion>
+	                <groupId>org.springframework.boot</groupId>
+	                <artifactId>spring-boot-starter-logging</artifactId>
+		        </exclusion>
+		    </exclusions>
+		</dependency>
+		
+		<!-- Spring Cloud Task -->
+	    <dependency>
+	        <groupId>org.springframework.cloud</groupId>
+	        <artifactId>spring-cloud-starter-task</artifactId>
+		    <version>${spring-cloud-starter-task.version}</version>
+	    </dependency>
+
+		<!-- AspectJ -->
+		<dependency>
+		    <groupId>org.aspectj</groupId>
+		    <artifactId>aspectjrt</artifactId>
+		</dependency>    
+		<dependency>
+		    <groupId>org.aspectj</groupId>
+		    <artifactId>aspectjweaver</artifactId>
+		</dependency>
+		<dependency>
+		    <groupId>org.aspectj</groupId>
+		    <artifactId>aspectjtools</artifactId>
+		</dependency>
+		
+	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+    <build>
+		<finalName>${artifactId}-${version}</finalName>
+        <resources>
+            <resource>
+                <directory>conf</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>*.properties</include>
+				</includes>
+                <!--
+				<excludes>
+					<exclude>application.xml</exclude>
+					<exclude>log4j2.xml</exclude>
+				</excludes>					
+				-->
+            </resource>
+            <resource>
+                <directory>src/main/java</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>**/*.xml</include>
+				</includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <targetPath>${project.basedir}/target/classes</targetPath>
+				<excludes>
+					<exclude>**/*.java</exclude>
+					<!-- Resources Replacement(Ones in conf directory should be used instead.) Start  -->
+					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  시작 -->
+					<!--
+					<exclude>application.xml</exclude>
+					<exclude>log4j2.xml</exclude>
+					<exclude>env.properties</exclude>
+					-->
+					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  끝 -->
+					<!-- Resources Replacement(Ones in conf directory should be used instead.) End  -->
+				</excludes>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+		<plugins>
+		
+			<!-- 컴파일을 위한 플러그인 -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
+					<showWarnings>true</showWarnings>
+					<showDeprecation>true</showDeprecation>
+					<encoding>UTF-8</encoding>
+					<parameters>true</parameters>
+				</configuration>
+			</plugin>
+			 
+			<!-- WAR 패키징을 위한 플러그인 -->		
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-war-plugin</artifactId>
+			</plugin>
+ 	
+			<!-- JAR (스프링부트형식-BOOT-INF포함구조-으로) 패키징을 위한 플러그인 -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<includeSystemScope>true</includeSystemScope>
+					<mainClass>net.dstone.batch.common.DstoneBatchApplication</mainClass>
+				</configuration>
+			</plugin>
+
+		</plugins>
+		
+    </build>
+
+</project>

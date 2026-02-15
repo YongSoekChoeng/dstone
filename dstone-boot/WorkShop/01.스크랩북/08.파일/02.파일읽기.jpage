@@ -1,0 +1,18 @@
+
+net.dstone.common.utils.DateUtil.stopWatchStart("02.파일읽기");
+
+String filePath = "";
+filePath = "D:/Temp/rabbitmq2.json";
+StringBuffer buff = new StringBuffer();
+try {
+	String[] lines = net.dstone.common.utils.FileUtil.readFileByLines(filePath);
+	for(String line : lines){
+		line = net.dstone.common.utils.StringUtil.replace(line, "\"", "\\\"");
+		buff.append("buff.append(\""+line+"\").append(\"\\n\");").append("\n");
+	}
+	System.out.println(buff);
+}catch(Exception e){
+	e.printStackTrace();
+}finally{
+	net.dstone.common.utils.DateUtil.stopWatchEnd("02.파일읽기");
+}

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 테이블맵핑[TB_FUNC_TBL_MAPPING] VO -->                                                                
+                                                                                   
+    <!--  테이블맵핑[TB_FUNC_TBL_MAPPING] 상세 조회 -->                                                        
+    <select id="selectTbFuncTblMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo">       
+        SELECT                                                                        
+            SYS_ID, FUNC_ID, TBL_ID, JOB_KIND, WORKER_ID
+        FROM                                                                          
+            TB_FUNC_TBL_MAPPING                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID}
+            AND FUNC_ID = #{FUNC_ID}
+            AND TBL_ID = #{TBL_ID}
+            AND JOB_KIND = #{JOB_KIND}
+    </select>                                                                       
+                                                                                   
+    <!--  테이블맵핑[TB_FUNC_TBL_MAPPING] NEW키값 조회 -->                                                        
+    <select id="selectTbFuncTblMappingNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(JOB_KIND)), 0, MAX(JOB_KIND) )+1), 10, '0') JOB_KIND 
+        FROM                                                                          
+            TB_FUNC_TBL_MAPPING                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID} 
+            AND FUNC_ID = #{FUNC_ID} 
+            AND TBL_ID = #{TBL_ID} 
+    </select>                                                                       
+                                                                                   
+    <!--  테이블맵핑[TB_FUNC_TBL_MAPPING] 입력 -->                                                             
+    <insert id="insertTbFuncTblMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo" >                             
+        INSERT INTO TB_FUNC_TBL_MAPPING (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="FUNC_ID != null and !FUNC_ID.equals('')" >FUNC_ID,</if>
+                <if test="TBL_ID != null and !TBL_ID.equals('')" >TBL_ID,</if>
+                <if test="JOB_KIND != null and !JOB_KIND.equals('')" >JOB_KIND,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="FUNC_ID != null and !FUNC_ID.equals('')" >#{FUNC_ID},</if>
+                <if test="TBL_ID != null and !TBL_ID.equals('')" >#{TBL_ID},</if>
+                <if test="JOB_KIND != null and !JOB_KIND.equals('')" >#{JOB_KIND},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  테이블맵핑[TB_FUNC_TBL_MAPPING] 수정 -->                                                             
+    <update id="updateTbFuncTblMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo" >                             
+        UPDATE TB_FUNC_TBL_MAPPING                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="FUNC_ID != null and !FUNC_ID.equals('')" >FUNC_ID = #{FUNC_ID},</if>
+                <if test="TBL_ID != null and !TBL_ID.equals('')" >TBL_ID = #{TBL_ID},</if>
+                <if test="JOB_KIND != null and !JOB_KIND.equals('')" >JOB_KIND = #{JOB_KIND},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND SYS_ID = #{SYS_ID}
+            AND FUNC_ID = #{FUNC_ID}
+            AND TBL_ID = #{TBL_ID}
+            AND JOB_KIND = #{JOB_KIND}
+    </update>                                                                       
+                                                                                   
+    <!--  테이블맵핑[TB_FUNC_TBL_MAPPING] 삭제 -->                                                             
+    <delete id="deleteTbFuncTblMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncTblMappingCudVo" >                             
+        DELETE FROM TB_FUNC_TBL_MAPPING                                                              
+        WHERE 1=1                                                                         
+            AND SYS_ID = #{SYS_ID}
+            AND FUNC_ID = #{FUNC_ID}
+            AND TBL_ID = #{TBL_ID}
+            AND JOB_KIND = #{JOB_KIND}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

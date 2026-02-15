@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                                                                                      
+<mapper namespace="net.dstone.boot.analyzer.cud.AnalyzerCudDao">                                                       
+                                                                                      
+    <!-- 기능간맵핑[TB_FUNC_FUNC_MAPPING] VO -->                                                                
+                                                                                   
+    <!--  기능간맵핑[TB_FUNC_FUNC_MAPPING] 상세 조회 -->                                                        
+    <select id="selectTbFuncFuncMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo">       
+        SELECT                                                                        
+            SYS_ID, FUNC_ID, CALL_FUNC_ID, WORKER_ID
+        FROM                                                                          
+            TB_FUNC_FUNC_MAPPING                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID}
+            AND FUNC_ID = #{FUNC_ID}
+            AND CALL_FUNC_ID = #{CALL_FUNC_ID}
+    </select>                                                                       
+                                                                                   
+    <!--  기능간맵핑[TB_FUNC_FUNC_MAPPING] NEW키값 조회 -->                                                        
+    <select id="selectTbFuncFuncMappingNewKey" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo" resultType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo">       
+        SELECT                                                                        
+            LPAD(( IF( ISNULL(MAX(CALL_FUNC_ID)), 0, MAX(CALL_FUNC_ID) )+1), 300, '0') CALL_FUNC_ID 
+        FROM                                                                          
+            TB_FUNC_FUNC_MAPPING                                                                       
+        WHERE 1=1                                                                     
+            AND SYS_ID = #{SYS_ID} 
+            AND FUNC_ID = #{FUNC_ID} 
+    </select>                                                                       
+                                                                                   
+    <!--  기능간맵핑[TB_FUNC_FUNC_MAPPING] 입력 -->                                                             
+    <insert id="insertTbFuncFuncMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo" >                             
+        INSERT INTO TB_FUNC_FUNC_MAPPING (                                                            
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID,</if>
+                <if test="FUNC_ID != null and !FUNC_ID.equals('')" >FUNC_ID,</if>
+                <if test="CALL_FUNC_ID != null and !CALL_FUNC_ID.equals('')" >CALL_FUNC_ID,</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID,</if>
+                </trim>
+        ) VALUES (                                                                    
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >#{SYS_ID},</if>
+                <if test="FUNC_ID != null and !FUNC_ID.equals('')" >#{FUNC_ID},</if>
+                <if test="CALL_FUNC_ID != null and !CALL_FUNC_ID.equals('')" >#{CALL_FUNC_ID},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >#{WORKER_ID},</if>
+                </trim>
+        )                                                                             
+    </insert>                                                                       
+                                                                                   
+    <!--  기능간맵핑[TB_FUNC_FUNC_MAPPING] 수정 -->                                                             
+    <update id="updateTbFuncFuncMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo" >                             
+        UPDATE TB_FUNC_FUNC_MAPPING                                                                   
+        SET                                                                           
+                <trim prefix="" suffixOverrides=",">
+                <if test="SYS_ID != null and !SYS_ID.equals('')" >SYS_ID = #{SYS_ID},</if>
+                <if test="FUNC_ID != null and !FUNC_ID.equals('')" >FUNC_ID = #{FUNC_ID},</if>
+                <if test="CALL_FUNC_ID != null and !CALL_FUNC_ID.equals('')" >CALL_FUNC_ID = #{CALL_FUNC_ID},</if>
+                <if test="WORKER_ID != null and !WORKER_ID.equals('')" >WORKER_ID = #{WORKER_ID},</if>
+                </trim>
+        WHERE 1=1                                                                        
+            AND SYS_ID = #{SYS_ID}
+            AND FUNC_ID = #{FUNC_ID}
+            AND CALL_FUNC_ID = #{CALL_FUNC_ID}
+    </update>                                                                       
+                                                                                   
+    <!--  기능간맵핑[TB_FUNC_FUNC_MAPPING] 삭제 -->                                                             
+    <delete id="deleteTbFuncFuncMapping" parameterType="net.dstone.boot.analyzer.cud.vo.TbFuncFuncMappingCudVo" >                             
+        DELETE FROM TB_FUNC_FUNC_MAPPING                                                              
+        WHERE 1=1                                                                         
+            AND SYS_ID = #{SYS_ID}
+            AND FUNC_ID = #{FUNC_ID}
+            AND CALL_FUNC_ID = #{CALL_FUNC_ID}
+    </delete>                                                                       
+                                                                                   
+</mapper>                                                                             
+

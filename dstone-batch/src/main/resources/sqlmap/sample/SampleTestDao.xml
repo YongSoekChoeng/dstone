@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>                                            
+                                                                                      
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                 
+<mapper namespace="net.dstone.batch.sample.SampleTestDao">                                                       
+
+	<select id="selectListSampleTestAll" resultType="map">
+		SELECT TEST_ID, TEST_NAME, FLAG_YN, INPUT_DT
+		FROM SAMPLE_TEST
+		WHERE 1=1
+			AND FLAG_YN = 'N'
+		ORDER BY TEST_ID
+	</select>
+	
+    <!-- 
+        MyBatisPagingItemReader용 페이징 쿼리
+        _page: 페이지 번호 (0부터 시작)
+        _pagesize: 페이지 크기
+        _skiprows: 건너뛸 행 수 (_page * _pagesize)
+    -->
+	<select id="selectListSampleTestPaging" resultType="map">
+		SELECT P.* FROM (
+			SELECT TEST_ID, TEST_NAME, FLAG_YN, INPUT_DT
+			FROM SAMPLE_TEST
+			WHERE 1=1
+			ORDER BY TEST_ID
+		)   P
+		WHERE 2>1 
+		ORDER BY TEST_ID 
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+	
+    <!-- 
+        MyBatisPartition 용 쿼리
+    -->
+	<select id="selectListSampleTestBetween" resultType="map">
+		SELECT 
+			TEST_ID, TEST_NAME, FLAG_YN, INPUT_DT
+		FROM 
+			SAMPLE_TEST
+		WHERE 1=1
+			AND TEST_ID BETWEEN #{MIN_ID} AND #{MAX_ID}
+	</select>
+	
+	<insert id="insertSampleTest" parameterType="map" >
+		INSERT INTO SAMPLE_TEST (TEST_ID, TEST_NAME, FLAG_YN, INPUT_DT)
+		VALUES (#{TEST_ID}, #{TEST_NAME}, 'N', #{INPUT_DT})
+	</insert>
+	
+	<update id="updateSampleTest" parameterType="map" >
+		UPDATE SAMPLE_TEST
+		SET 
+			TEST_NAME = #{TEST_NAME}
+			, FLAG_YN = #{FLAG_YN}
+		WHERE TEST_ID = #{TEST_ID}
+	</update>
+                
+	<delete id="deleteSampleTest" parameterType="map" >
+		DELETE FROM SAMPLE_TEST
+		WHERE TEST_ID = #{TEST_ID}
+	</delete>
+                 
+	<delete id="deleteSampleTestAll" >
+		DELETE FROM SAMPLE_TEST;
+	</delete>
+                                                                                          
+</mapper>                                                                             
+
