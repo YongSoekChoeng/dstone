@@ -33,7 +33,9 @@ public class TableDeleteTasklet extends BaseTasklet{
     	
 		// SAMPLE_TEST 테이블 삭제
 		String deleteQueryId = "net.dstone.batch.sample.SampleTestDao.deleteSampleTestAll";
-		this.sqlSessionSample.delete(deleteQueryId);
+		int deleteCnt = this.sqlSessionSample.delete(deleteQueryId);
+		
+		this.info("deleteCnt============>>>["+deleteCnt+"]");
 
         return RepeatStatus.FINISHED;
     }

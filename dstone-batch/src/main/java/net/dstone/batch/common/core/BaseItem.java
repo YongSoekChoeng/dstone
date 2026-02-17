@@ -28,13 +28,15 @@ public abstract class BaseItem extends BaseBatchObject implements StepExecutionL
     	// JobParameter 를 StepExecution Parameter 로 카피.
     	if( this.stepExecution != null && this.stepExecution.getJobParameters() != null ) {
     		Map<String, JobParameter<?>> jobParamMap = this.stepExecution.getJobParameters().getParameters();
-    		Iterator<String > jobParamMapKey = jobParamMap.keySet().iterator();
-    		while(jobParamMapKey.hasNext()) {
-    			String key = jobParamMapKey.next();
-    			JobParameter val = jobParamMap.get(key);
-    			if( val != null && StringUtil.isEmpty(this.getStepParam(key)) ) {
-    				this.setStepParam(key, val.getValue());
-    			}
+    		if( jobParamMap != null ) {
+        		Iterator<String > jobParamMapKey = jobParamMap.keySet().iterator();
+        		while(jobParamMapKey.hasNext()) {
+        			String key = jobParamMapKey.next();
+        			JobParameter val = jobParamMap.get(key);
+        			if( val != null && StringUtil.isEmpty(this.getStepParam(key)) ) {
+        				this.setStepParam(key, val.getValue());
+        			}
+        		}
     		}
     	}
     	// 상속 클래스들에서 진행할 개별적 작업 호출.
