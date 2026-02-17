@@ -90,11 +90,3 @@ spring:
             table-prefix: BATCH_
         job:
             enabled: false  # Job 자동 실행 활성화 (false로 설정 시 수동 실행만 가능. Data Flow 사용시 반드시 false로 세팅)
-    cloud: 
-        task: 
-            initialize-enabled: false
-        dataflow:
-            job-auto-register: true
-            client:
-                server-uri: http://${ADMIN_HOST}:${ADMIN_PORT}
-                enable-dsl: true
