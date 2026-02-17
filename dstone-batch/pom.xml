@@ -14,8 +14,6 @@
 	<properties>
 		<java.version>21</java.version>
 		<log4j.version>2.24.3</log4j.version>
-		<spring-cloud-starter-task.version>3.1.1</spring-cloud-starter-task.version>
-		<spring-cloud.version>2023.0.0</spring-cloud.version>
 		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
 	</properties>
 
@@ -54,13 +52,6 @@
 		    </exclusions>
 		</dependency>
 		
-		<!-- Spring Cloud Task -->
-	    <dependency>
-	        <groupId>org.springframework.cloud</groupId>
-	        <artifactId>spring-cloud-starter-task</artifactId>
-		    <version>${spring-cloud-starter-task.version}</version>
-	    </dependency>
-
 		<!-- AspectJ -->
 		<dependency>
 		    <groupId>org.aspectj</groupId>
@@ -76,18 +67,6 @@
 		</dependency>
 		
 	</dependencies>
-
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>${spring-cloud.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 
     <build>
 		<finalName>${artifactId}-${version}</finalName>

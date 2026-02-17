@@ -9,7 +9,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @Import({ 
 	ConfigAspect.class,
 	ConfigAutoReg.class,
-	ConfigCloudTask.class,
 	ConfigDatasource.class,
 	ConfigEnc.class,
 	ConfigInterceptor.class,

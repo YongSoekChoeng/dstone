@@ -27,15 +27,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.ApplicationPidFileWriter;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
-import org.springframework.cloud.task.configuration.EnableTask;
 import org.springframework.context.annotation.ComponentScan;
 
-import net.dstone.batch.common.runner.ScdfTaskRunner;
 import net.dstone.common.utils.ConvertUtil;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
-@EnableTask
 @EnableBatchProcessing
 @SpringBootApplication(exclude = {
 	org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
