@@ -17,8 +17,8 @@
 	        </Filters>
         </Console>
         <RollingFile name ="rollingFile" filePermissions="rwxrwxr--">
-            <FileName>${logging.root-path}/dstone-batch/execution/execution.log</FileName>
-            <FilePattern>${logging.root-path}/dstone-batch/execution/backup/%d{yyyy-MM-dd}-execution.zip</FilePattern>
+            <FileName>${logging.root-path}/${sys:APP_NAME}/execution/execution.log</FileName>
+            <FilePattern>${logging.root-path}/${sys:APP_NAME}/execution/backup/%d{yyyy-MM-dd}-execution.zip</FilePattern>
             <PatternLayout>
                 <Pattern>%d{yyyy-MM-dd HH:mm:ss} %5p [%c] %m%n</Pattern>
             </PatternLayout>
@@ -30,7 +30,7 @@
                 <TimeBasedTriggeringPolicy interval = "1" modulate = "true"/>
             </Policies>
 			<DefaultRolloverStrategy max="7" fileIndex="max" >
-			  	<Delete basePath = "${logging.root-path}/dstone-batch/execution/backup" maxDepth = "1">
+			  	<Delete basePath = "${logging.root-path}/${sys:APP_NAME}/execution/backup" maxDepth = "1">
 			  		<!-- 3일이 경과한 로그파일은 자동 삭제 -->
 			  		<IfLastModified age = "3d"/>
 			  	</Delete>
