@@ -10,6 +10,7 @@ import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -35,6 +36,10 @@ public abstract class AbstractRunner extends BaseBatchObject {
 	@Autowired
 	@Qualifier("jobLauncher")
 	protected JobLauncher jobLauncher;
+
+	@Autowired
+	@Qualifier("jobOperator")
+	protected JobOperator JobOperator;
 
 	@Autowired
 	protected JobRegistry jobRegistry;
@@ -138,8 +143,8 @@ public abstract class AbstractRunner extends BaseBatchObject {
 	 * @param jobParameters
 	 * @return
 	 */
-	protected static JobExecution jobLaunch(ConfigurableApplicationContext context, String transactionId, Job job, JobParameters jobParameters ) {
-		LogUtil.sysout( AbstractRunner.class.getName() + ".jobLaunch("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
+	protected static JobExecution startJob(ConfigurableApplicationContext context, String transactionId, Job job, JobParameters jobParameters ) {
+		LogUtil.sysout( AbstractRunner.class.getName() + ".startJob("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
 		JobExecution execution = null;
 		try {
 			JobLauncher jobLauncher = (JobLauncher)context.getBean("jobLauncher");
@@ -159,11 +164,32 @@ public abstract class AbstractRunner extends BaseBatchObject {
 	 * @param jobParameters
 	 * @return
 	 */
-	protected static JobExecution jobAsyncLaunch(ConfigurableApplicationContext context,String transactionId, Job job, JobParameters jobParameters ) {
-		LogUtil.sysout( AbstractRunner.class.getName() + ".jobAsyncLaunch("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
+	protected static JobExecution startAsyncJob(ConfigurableApplicationContext context,String transactionId, Job job, JobParameters jobParameters ) {
+		LogUtil.sysout( AbstractRunner.class.getName() + ".startAsyncJob("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
 		JobExecution execution = null;
 		try {
 			JobLauncher jobLauncher = (JobLauncher)context.getBean("asyncJobLauncher");
+			logBatchCall(transactionId, job, jobParameters);
+			execution = jobLauncher.run(job, jobParameters);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return execution;
+	}
+	
+	/**
+	 * Job을 중지 시키는 메소드.
+	 * @param context
+	 * @param transactionId
+	 * @param job
+	 * @param jobParameters
+	 * @return
+	 */
+	protected static JobExecution stopJob(ConfigurableApplicationContext context, String transactionId, Job job, JobParameters jobParameters ) {
+		LogUtil.sysout( AbstractRunner.class.getName() + ".stopJob("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
+		JobExecution execution = null;
+		try {
+			JobLauncher jobLauncher = (JobLauncher)context.getBean("jobLauncher");
 			logBatchCall(transactionId, job, jobParameters);
 			execution = jobLauncher.run(job, jobParameters);
 		} catch (Exception e) {

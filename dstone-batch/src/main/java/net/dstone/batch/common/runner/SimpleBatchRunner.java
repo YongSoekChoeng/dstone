@@ -66,7 +66,7 @@ public class SimpleBatchRunner extends AbstractRunner {
     		// 7. Job 조회
     		job = getJob(context, jobName, jobParameters);
     		// 8. Job 실행
-    		execution = jobLaunch(context, transactionId, job, jobParameters);
+    		execution = startJob(context, transactionId, job, jobParameters);
 		} catch (Throwable e) {
 			exitCode = -1;
 			e.printStackTrace();

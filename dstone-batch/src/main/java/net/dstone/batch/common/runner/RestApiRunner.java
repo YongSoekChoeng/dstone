@@ -38,6 +38,21 @@ public class RestApiRunner extends AbstractRunner {
 	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
 
 	/**
+	 * healthCheck을 수행하는 메소드.
+	 * @param params
+	 * @param request
+	 * @return
+	 * @throws Exception
+	 */
+	@RequestMapping("/healthCheck")
+    public ResponseEntity<?> healthCheck(@RequestParam Map<String, Object> params, HttpServletRequest request) throws Exception {
+        return ResponseEntity.ok(Map.of(
+             "status", BatchStatus.STARTED
+        ));
+    }
+	
+	
+	/**
 	 * AutoRegJob 어노테이션들이 붙은 Job들을 SCDF에 등록하는 메소드.
 	 * @param params
 	 * @param request
@@ -84,7 +99,7 @@ public class RestApiRunner extends AbstractRunner {
     		// 5. Job 조회
     		job = getJob(context, jobName, jobParameters);
     		// 6. Job 실행
-    		execution = jobAsyncLaunch(context, transactionId, job, jobParameters);
+    		execution = startAsyncJob(context, transactionId, job, jobParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
 	        return ResponseEntity.ok(Map.of(

@@ -81,7 +81,7 @@ public class ScdfTaskRunner extends AbstractRunner implements ApplicationRunner 
     		// 6. Job 조회
     		job = getJob(context, jobName, jobParameters);
     		// 7. Job 실행
-    		execution = jobLaunch(context, transactionId, job, jobParameters);
+    		execution = startJob(context, transactionId, job, jobParameters);
     		LogUtil.sysout( "JobName["+jobName+"] 작업결과:" + execution.getExitStatus() );
 		} catch (Exception e) {
 			e.printStackTrace();
