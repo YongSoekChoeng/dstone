@@ -21,6 +21,7 @@ import org.springframework.web.client.RestTemplate;
 
 import net.dstone.batch.common.DstoneBatchApplication;
 import net.dstone.batch.common.annotation.AutoRegJob;
+import net.dstone.batch.common.biz.BaseService;
 import net.dstone.batch.common.core.BaseJobConfig;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.ConvertUtil;
@@ -42,8 +43,8 @@ public class ScdfTaskRunner extends AbstractRunner implements ApplicationRunner 
 	@Override
 	public void run(ApplicationArguments args) throws Exception {
 		String jobName = configProperty.getProperty("spring.batch.job.names");
-		LogUtil.sysout( this.getClass().getName() + "run(jobName["+jobName+"]) has been called !!!" );
         if( !StringUtil.isEmpty(jobName) ) {
+        	LogUtil.sysout( this.getClass().getName() + ".run(jobName["+jobName+"]) has been called !!!" );
         	ArrayList<String> listArgs = new ArrayList<String>();
     		listArgs.add( "spring.batch.job.names=" + jobName);
         	String[] strArgs = null;
@@ -65,8 +66,8 @@ public class ScdfTaskRunner extends AbstractRunner implements ApplicationRunner 
 	 */
 	private void launch(String[] jobParams) {
         String jobName = "";
-        JobExecution execution = null;
         Job job = null;
+        Map<String, Object> returnMap = new HashMap<String, Object>();
         // 1. 트렌젝션ID 생성.
 		String transactionId = newTransactionId();
 		try {
@@ -77,12 +78,14 @@ public class ScdfTaskRunner extends AbstractRunner implements ApplicationRunner 
     		// 4. 파라메터레지스트리 등록
     		jobConfigRegister(transactionId, jobParameters);
     		// 5. jobRegistry에 저장
-    		jobRegister(context, transactionId, jobName, jobParameters);
-    		// 6. Job 조회
-    		job = getJob(context, jobName, jobParameters);
-    		// 7. Job 실행
-    		execution = startJob(context, transactionId, job, jobParameters);
-    		LogUtil.sysout( "JobName["+jobName+"] 작업결과:" + execution.getExitStatus() );
+    		this.baseService.registerJob(jobName);
+    		// 7. Job 조회
+    		returnMap = this.baseService.getJob(jobName);
+    		if( "Y".equals(returnMap.containsKey(BaseService.SUCCESS_YN)) ) {
+    			job = (Job)returnMap.get(BaseService.JOB);
+    		}
+    		// 8. Job 실행
+    		this.baseService.startJobExecution(transactionId, job, jobParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {

@@ -27,7 +27,7 @@ spring:
         # true 일 경우 AutoRegJob어노테이션의 모든 Job들을 Job Registry에 자동등록. 스프링부트로 기동해서 RestApi로 서비스할 경우에만 사용.
         # fasle일 경우 AutoRegJob어노테이션의 개별 Job을 호출 시점에 Job Registry에 등록. 개별 Job을 SimpleBatchRunner/ScdfTaskRunner 로 호출하여 사용할 경우 사용. 
         ################################################################################
-        auto-register-jobs: false
+        auto-register-jobs: true
     datasource:
         common: 
             hikari: 
@@ -81,7 +81,7 @@ spring:
                 - backend		
     devtools: 
         restart: 
-            enabled: false
+            enabled: true
     batch:
         # NEVER/ALWAYS 
         initialize-schema: NEVER

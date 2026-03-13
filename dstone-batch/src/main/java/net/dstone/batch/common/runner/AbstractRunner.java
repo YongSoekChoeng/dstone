@@ -3,55 +3,24 @@ package net.dstone.batch.common.runner;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
-import org.springframework.batch.core.configuration.JobRegistry;
-import org.springframework.batch.core.explore.JobExplorer;
-import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
 
-import net.dstone.batch.common.config.ConfigAutoReg;
+import net.dstone.batch.common.biz.BaseService;
 import net.dstone.batch.common.consts.ConstMaps;
 import net.dstone.batch.common.core.BaseBatchObject;
 import net.dstone.common.utils.GuidUtil;
-import net.dstone.common.utils.LogUtil;
-import net.dstone.common.utils.StringUtil;
 
 @Configuration
 public abstract class AbstractRunner extends BaseBatchObject {
 	
-	@Autowired
-	ConfigurableApplicationContext context;
-	
-	@Autowired
-	@Qualifier("asyncJobLauncher")
-	protected JobLauncher asyncJobLauncher;
-
-	@Autowired
-	@Qualifier("jobLauncher")
-	protected JobLauncher jobLauncher;
-
-	@Autowired
-	@Qualifier("jobOperator")
-	protected JobOperator JobOperator;
-
-	@Autowired
-	protected JobRegistry jobRegistry;
-
-	@Autowired
-	protected JobExplorer jobExplorer;
-
-	@Autowired
-	protected ConfigAutoReg configAutoReg;
-
 	private static GuidUtil guidUtil = new GuidUtil();
-	
+
+	@Autowired 
+	BaseService baseService; // 서비스 bean
+
 	/**
 	 * @return
 	 */
@@ -90,115 +59,6 @@ public abstract class AbstractRunner extends BaseBatchObject {
 	
 
 	/**
-	 * TransactionId 로 Job 구성을 jobRegistry에 저장.
-	 * @param context
-	 * @param jobName
-	 * @param jobParams
-	 * @param forceRegister
-	 * @throws Exception
-	 */
-	protected static void jobRegister(ConfigurableApplicationContext context, String transactionId, String jobName, JobParameters jobParameters) throws Exception {
-		try {
-			// 1. jobName 체크
-			if( StringUtil.isEmpty(jobName) ) {
-				throw new Exception("JobName["+jobName+"] is not supposed to be empty!");
-			}
-    		ConfigAutoReg configAutoReg = (ConfigAutoReg)context.getBean("configAutoReg");
-			// 2. jobRegistry 등록.
-            configAutoReg.registerJob(transactionId, jobName);
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new Exception("JobName["+jobName+"] 등록 실패.");
-		}
-	}
-	
-	/**
-	 * jobRegistry에 저장 된 Job 반환.
-	 * @param context
-	 * @param jobName
-	 * @param jobParams
-	 * @throws Exception
-	 */
-	protected static Job getJob(ConfigurableApplicationContext context, String jobName, JobParameters jobParameters) throws Exception {
-		Job job = null;
-		try {
-			// 1. jobName 체크
-			if( StringUtil.isEmpty(jobName) ) {
-				throw new Exception("JobName["+jobName+"] is not supposed to be empty!");
-			}
-    		JobRegistry jobRegistry = (JobRegistry)context.getBean("jobRegistry");
-            job = jobRegistry.getJob(jobName);
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new Exception("JobName["+jobName+"] 조회 실패.");
-		}
-		return job;
-	}
-	
-	/**
-	 * Job을 실행 시키는 메소드.
-	 * @param context
-	 * @param transactionId
-	 * @param job
-	 * @param jobParameters
-	 * @return
-	 */
-	protected static JobExecution startJob(ConfigurableApplicationContext context, String transactionId, Job job, JobParameters jobParameters ) {
-		LogUtil.sysout( AbstractRunner.class.getName() + ".startJob("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
-		JobExecution execution = null;
-		try {
-			JobLauncher jobLauncher = (JobLauncher)context.getBean("jobLauncher");
-			logBatchCall(transactionId, job, jobParameters);
-			execution = jobLauncher.run(job, jobParameters);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return execution;
-	}
-
-	/**
-	 * Job을 Async 방식으로 실행 시키는 메소드.
-	 * @param context
-	 * @param transactionId
-	 * @param job
-	 * @param jobParameters
-	 * @return
-	 */
-	protected static JobExecution startAsyncJob(ConfigurableApplicationContext context,String transactionId, Job job, JobParameters jobParameters ) {
-		LogUtil.sysout( AbstractRunner.class.getName() + ".startAsyncJob("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
-		JobExecution execution = null;
-		try {
-			JobLauncher jobLauncher = (JobLauncher)context.getBean("asyncJobLauncher");
-			logBatchCall(transactionId, job, jobParameters);
-			execution = jobLauncher.run(job, jobParameters);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return execution;
-	}
-	
-	/**
-	 * Job을 중지 시키는 메소드.
-	 * @param context
-	 * @param transactionId
-	 * @param job
-	 * @param jobParameters
-	 * @return
-	 */
-	protected static JobExecution stopJob(ConfigurableApplicationContext context, String transactionId, Job job, JobParameters jobParameters ) {
-		LogUtil.sysout( AbstractRunner.class.getName() + ".stopJob("+context+", "+transactionId+", "+job+", "+jobParameters+") has been called !!!");
-		JobExecution execution = null;
-		try {
-			JobLauncher jobLauncher = (JobLauncher)context.getBean("jobLauncher");
-			logBatchCall(transactionId, job, jobParameters);
-			execution = jobLauncher.run(job, jobParameters);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return execution;
-	}
-
-	/**
 	 * TransactionId 로 Job 구성을 파라메터레지스트리에 등록.
 	 * @param transactionId
 	 */
@@ -213,23 +73,4 @@ public abstract class AbstractRunner extends BaseBatchObject {
 	protected static void jobConfigUnRegister(String transactionId) {
 		ConstMaps.JobParamRegistry.unregisterByThread(transactionId);
 	}
-
-	/**
-	 * @param transactionId
-	 * @param job
-	 * @param jobParameters
-	 */
-	protected static void logBatchCall(String transactionId, Job job, JobParameters jobParameters) {
-    	StringBuffer buff = new StringBuffer();
-    	try {
-    		buff.append("\n");
-    		buff.append("||======================================= Job Launching =======================================||").append("\n");
-    		buff.append("TransactionId : ").append(transactionId).append("\n");
-    		buff.append("JobName : ").append(job.getName()).append("\n");
-    		buff.append("Job Parameter : ").append(jobParameters).append("\n");
-    		buff.append("||=============================================================================================||").append("\n");
-		}finally {
-			LogUtil.sysout( buff );
-		}
-    }
 }

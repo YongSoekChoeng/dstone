@@ -5,13 +5,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import net.dstone.batch.common.DstoneBatchApplication;
+import net.dstone.batch.common.biz.BaseService;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
@@ -45,8 +45,9 @@ public class SimpleBatchRunner extends AbstractRunner {
     	exitCode = 0;
         String jobName = "";
         String[] jobParams = new String[0];
-        JobExecution execution = null;
         Job job = null;
+        BaseService baseService;
+        Map<String, Object> returnMap = new HashMap<String, Object>();
 
         // 1. 트렌젝션ID 생성.
 		String transactionId = newTransactionId();
@@ -55,6 +56,7 @@ public class SimpleBatchRunner extends AbstractRunner {
     		if(context == null) {
                 context = new SpringApplicationBuilder(DstoneBatchApplication.class).web(WebApplicationType.NONE).run(jobParams);
     		}
+    		baseService = context.getBean(BaseService.class);
     		// 3. Job Name 추출
     		jobName = parseJobName(args);
     		// 4. Job Parameter 추출
@@ -62,11 +64,19 @@ public class SimpleBatchRunner extends AbstractRunner {
     		// 5. 파라메터레지스트리 등록
     		jobConfigRegister(transactionId, jobParameters);
     		// 6. jobRegistry에 저장
-    		jobRegister(context, transactionId, jobName, jobParameters);
+    		baseService.registerJob(jobName);
     		// 7. Job 조회
-    		job = getJob(context, jobName, jobParameters);
+    		returnMap = baseService.getJob(jobName);
+    		if( "Y".equals(returnMap.get(BaseService.SUCCESS_YN)) ) {
+    			job = (Job)returnMap.get(BaseService.JOB);
+    		}else {
+    			throw new Exception( "jobName["+jobName+"]수행중 예외발생. 세부사항:" + returnMap.containsKey(BaseService.RETURN_MSG) );
+    		}
     		// 8. Job 실행
-    		execution = startJob(context, transactionId, job, jobParameters);
+    		returnMap = baseService.startJobExecution(transactionId, job, jobParameters);
+    		if( !"Y".equals(returnMap.get(BaseService.SUCCESS_YN)) ) {
+    			throw new Exception( "jobName["+jobName+"]수행중 예외발생. 세부사항:" + returnMap.containsKey(BaseService.RETURN_MSG) );
+    		}
 		} catch (Throwable e) {
 			exitCode = -1;
 			e.printStackTrace();
