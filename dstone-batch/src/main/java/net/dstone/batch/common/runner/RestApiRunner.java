@@ -2,11 +2,13 @@ package net.dstone.batch.common.runner;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,26 +61,6 @@ public class RestApiRunner extends AbstractRunner{
 	
 	
 	/**
-	 * AutoRegJob 어노테이션들이 붙은 Job들을 SCDF에 등록하는 메소드.
-	 * @param params
-	 * @param request
-	 * @return
-	 * @throws Exception
-	 */
-	@RequestMapping("/registerJobsByScdf")
-    public ResponseEntity<?> registerJobsByScdf(@RequestParam Map<String, Object> params, HttpServletRequest request){
-		
-		/*** SCDF에 Job 의 Task를 등록 시작 ***/
-		net.dstone.batch.common.DstoneBatchApplication.setSysProperties();
-		ScdfTaskRunner.registerAllJobToDataflow(context);
-		/*** SCDF에 Job 의 Task를 등록 끝 ***/
-		
-        return ResponseEntity.ok(Map.of(
-             "status", BatchStatus.STARTED
-        ));
-    }
-	
-	/**
 	 * AutoRegJob 어노테이션들이 붙은 Job들 등록하는 메소드.
 	 * @param params
 	 * @param request
@@ -111,7 +93,7 @@ public class RestApiRunner extends AbstractRunner{
     }
 	
 	/** 
-	 * jobName 에 해당하는 JOB을 jobRegistry에 등록하는 메소드.
+	 * jobName 에 해당하는 Job을 jobRegistry에 등록하는 메소드.
 	 * @param jobName
 	 * @param params
 	 * @param request
@@ -145,28 +127,30 @@ public class RestApiRunner extends AbstractRunner{
     }
 	
 	/** 
-	 * jobName 에 해당하는 JOB을 jobRegistry에서 삭제하는 메소드.
+	 * jobRegistry에 등록된 Job Name 목록을 반환하는 메소드.
 	 * @param jobName
 	 * @param params
 	 * @param request
 	 * @return
 	 * @throws Exception
 	 */
-	@RequestMapping("/unregisterJob/{jobName}")
-    public ResponseEntity<?> unregisterJob(@PathVariable String jobName, HttpServletRequest request){
+	@SuppressWarnings("unchecked")
+	@RequestMapping("/getJobs")
+    public ResponseEntity<?> getJobs(HttpServletRequest request){
 
         ResponseEntity<?> response = null;
         Map<String, Object> returnMap = new HashMap<String, Object>();
 		
 		try {
     		// jobRegistry에 저장
-			returnMap = baseService.unregisterJob(jobName);
+			returnMap = baseService.getJobList();
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
 			if(returnMap.containsKey(BaseService.SUCCESS_YN) && returnMap.get(BaseService.SUCCESS_YN).equals("Y") ) {
 	    		response = ResponseEntity.ok(Map.of(
-	    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN)
+	    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN),
+	    	            "jobList", (List<String>)returnMap.get(BaseService.JOB_LIST)
 	    	            ));
 			}else {
 				response = ResponseEntity.ok(Map.of(
@@ -177,6 +161,8 @@ public class RestApiRunner extends AbstractRunner{
 		}
         return response;
     }
+	
+
 	
 	/** 
 	 * jobName 에 해당하는 JOB을 (jobRegistry에 등록되지 않았을 경우 등록하고)실행하는 메소드.
@@ -296,23 +282,31 @@ public class RestApiRunner extends AbstractRunner{
 
         ResponseEntity<?> response = null;
         Map<String, Object> returnMap = new HashMap<String, Object>();
+        JobInstance instance = null;
         JobExecution execution = null;
-        
+        String jobName = "";
         try {
         	returnMap = baseService.getJobExecution(jobExecutionId);
         	execution = (JobExecution)returnMap.get(BaseService.JOB_EXCUTION);
+        	if( execution != null ) {
+            	instance = execution.getJobInstance();
+            	jobName = instance.getJobName();
+        	}
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
 			if(returnMap.containsKey(BaseService.SUCCESS_YN) && returnMap.get(BaseService.SUCCESS_YN).equals("Y") ) {
 	            if( execution.isRunning() ) {
 	            	response = ResponseEntity.ok(Map.of(
+	                        "jobName", jobName,
 	                        "status", execution.getStatus().toString(),
 	                        "startTime", execution.getStartTime(),
 		    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN)
 	                ));
 	            }else {
 	            	response = ResponseEntity.ok(Map.of(
+	                        "jobName", jobName,
 	                        "status", execution.getStatus().toString(),
 	                        "exitStatus", execution.getExitStatus().toString(),
 	                        "startTime", execution.getStartTime(),
@@ -401,6 +395,40 @@ public class RestApiRunner extends AbstractRunner{
 			}
 		}
 		return response; 
+    }
+	
+	/** 
+	 * jobName 에 해당하는 JOB을 jobRegistry에서 삭제하는 메소드.
+	 * @param jobName
+	 * @param params
+	 * @param request
+	 * @return
+	 * @throws Exception
+	 */
+	@RequestMapping("/unregisterJob/{jobName}")
+    public ResponseEntity<?> unregisterJob(@PathVariable String jobName, HttpServletRequest request){
+
+        ResponseEntity<?> response = null;
+        Map<String, Object> returnMap = new HashMap<String, Object>();
+		
+		try {
+    		// jobRegistry에 저장
+			returnMap = baseService.unregisterJob(jobName);
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			if(returnMap.containsKey(BaseService.SUCCESS_YN) && returnMap.get(BaseService.SUCCESS_YN).equals("Y") ) {
+	    		response = ResponseEntity.ok(Map.of(
+	    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN)
+	    	            ));
+			}else {
+				response = ResponseEntity.ok(Map.of(
+	    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN),
+	    	            "message", (String)returnMap.get(BaseService.RETURN_MSG)
+	    	            ));
+			}
+		}
+        return response;
     }
 
     /**

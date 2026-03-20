@@ -1,6 +1,7 @@
 package net.dstone.batch.common.biz;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -86,6 +87,7 @@ public class BaseService extends BaseBatchObject {
 	public static String SUCCESS_YN 			= "SUCCESS_YN";
 	public static String RETURN_MSG 			= "RETURN_MSG";
 	public static String JOB 					= "JOB";
+	public static String JOB_LIST 				= "JOB_LIST";
 	public static String JOB_INSTANCE 			= "JOB_INSTANCE";
 	public static String JOB_INSTANCE_ID 		= "JOB_INSTANCE_ID";
 	public static String JOB_EXCUTION 			= "JOB_EXCUTION";
@@ -276,7 +278,6 @@ public class BaseService extends BaseBatchObject {
 	/**
 	 * JobRegistry(인메모리 레지스트리)에 저장 된 Job 반환.
 	 * @param jobName
-	 * @param jobParams
 	 * @throws Exception
 	 */
 	public Map<String, Object> getJob(String jobName){
@@ -303,6 +304,38 @@ public class BaseService extends BaseBatchObject {
 	        }
             job = jobRegistry.getJob(jobName);
     		returnMap.put(BaseService.JOB, job);
+    		returnMap.put(BaseService.SUCCESS_YN, "Y");
+		} catch (Exception e) {
+			e.printStackTrace();
+			returnMap.put(BaseService.SUCCESS_YN, "N");
+			returnMap.put(BaseService.RETURN_MSG, msg);
+		}
+		return returnMap;
+	}
+
+	/**
+	 * JobRegistry(인메모리 레지스트리)에 저장 된 Job 목록 반환.
+	 * @throws Exception
+	 */
+	public Map<String, Object> getJobList(){
+		LogUtil.sysout( this.getClass().getName() + ".getJobNames() has been called !!!");
+
+		Map<String, Object> returnMap = new HashMap<String, Object>();
+		returnMap.put(BaseService.SUCCESS_YN, "");
+		returnMap.put(BaseService.RETURN_MSG, "");
+		returnMap.put(BaseService.JOB_LIST, null);
+		
+		List<String> jobList = new ArrayList<String>();
+		String msg = "";
+		
+		try {
+			Collection<String> jobCollection = jobRegistry.getJobNames();
+			if( jobCollection != null ) {
+				for(String jobName : jobCollection) {
+					jobList.add(jobName);
+				}
+			}
+    		returnMap.put(BaseService.JOB_LIST, jobList);
     		returnMap.put(BaseService.SUCCESS_YN, "Y");
 		} catch (Exception e) {
 			e.printStackTrace();
