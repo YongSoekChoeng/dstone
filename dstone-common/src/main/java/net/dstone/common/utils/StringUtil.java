@@ -19,7 +19,6 @@ import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.mozilla.universalchardet.UniversalDetector;
-import org.springframework.util.Base64Utils;
 
 public class StringUtil {
 
@@ -1711,7 +1710,7 @@ public class StringUtil {
     	String output = "";
     	try {
     		if( !isEmpty(input) ) {
-    			output = new String(Base64Utils.encode(input.getBytes()));
+    			output = new String(Base64Util.encode(input.getBytes()));
     		}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -1728,7 +1727,7 @@ public class StringUtil {
     	String output = "";
     	try {
     		if( !isEmpty(input) ) {
-    			output = new String(Base64Utils.decode(input.getBytes()));
+    			output = new String(Base64Util.decode( new String(input.getBytes())));
     		}
 		} catch (Exception e) {
 			e.printStackTrace();
