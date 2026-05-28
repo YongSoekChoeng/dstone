@@ -541,7 +541,7 @@ public class FileUtil {
 		return readFileListAll(filePath, null);
 	}
 	
-	public static String[] readFileListAll(String filePath, String filterStr) {
+	private static String[] readFileListAll(String filePath, String filterStr) {
 
 		java.util.Vector<String> listVec = new java.util.Vector<String>();
 		String[] result = new String[listVec.size()];
