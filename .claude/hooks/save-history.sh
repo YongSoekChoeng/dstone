@@ -122,7 +122,7 @@ echo "[History] 저장 완료: ${FILEPATH}" >&2
 # Git 자동 커밋 & 푸시 (백그라운드, 실패해도 훅은 성공으로 처리)
 (
   cd "$(dirname "$(dirname "$(dirname "$0")")")" || exit 0
-  git add "99.History/${DATE_DIR}/${FILENAME}" 2>/dev/null || exit 0
+  git add "History/${DATE_DIR}/${FILENAME}" 2>/dev/null || exit 0
   git diff --cached --quiet && exit 0
   git commit -m "history: ${DATE_DIR} ${HHMM} - ${TOPIC}" \
     --no-gpg-sign 2>/dev/null || exit 0
