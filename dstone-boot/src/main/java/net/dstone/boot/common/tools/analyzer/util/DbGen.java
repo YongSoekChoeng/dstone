@@ -398,7 +398,23 @@ public class DbGen {
 		public static StringBuffer DELETE_TB_METRIX = new StringBuffer();
 		
 		public static StringBuffer SELECT_TB_FUNC_ALL = new StringBuffer();
-		
+
+		/* ===== DB 직접 저장 전환 후 추가된 SQL ===== */
+		public static StringBuffer INSERT_TB_UI_WITH_FILE     = new StringBuffer();
+		public static StringBuffer INSERT_TB_FUNC_WITH_BODY   = new StringBuffer();
+		public static StringBuffer INSERT_TB_QUERY            = new StringBuffer();
+		public static StringBuffer DELETE_TB_QUERY            = new StringBuffer();
+		public static StringBuffer UPDATE_TB_CLZZ_IMPL        = new StringBuffer();
+		public static StringBuffer UPDATE_TB_CLZZ_ALIAS       = new StringBuffer();
+		public static StringBuffer UPDATE_TB_QUERY_CALLTBL    = new StringBuffer();
+		public static StringBuffer SELECT_ALL_CLZZ            = new StringBuffer();
+		public static StringBuffer SELECT_ALL_MTD_WITH_CALLS  = new StringBuffer();
+		public static StringBuffer SELECT_CTL_MTD_WITH_URL    = new StringBuffer();
+		public static StringBuffer SELECT_ALL_UI              = new StringBuffer();
+		public static StringBuffer SELECT_ALL_UI_LINKS        = new StringBuffer();
+		public static StringBuffer SELECT_ALL_QUERY_WITH_TBL  = new StringBuffer();
+		public static StringBuffer SELECT_ALL_FUNC_ID         = new StringBuffer();
+
 		static {
 
 			/* <시스템-TB_SYS> */
@@ -629,6 +645,69 @@ public class DbGen {
 
 			/* <종합메트릭스-TB_METRIX> */
 			DELETE_TB_METRIX.append("DELETE FROM TB_METRIX WHERE SYS_ID = ? AND WORKER_ID = 'SYSTEM' ").append("\n");
+
+			/* ===== DB 직접 저장 전환 후 추가된 SQL 초기화 ===== */
+
+			/* <화면(FILE_NAME 포함)-TB_UI> */
+			INSERT_TB_UI_WITH_FILE.append("INSERT INTO TB_UI ( SYS_ID, UI_ID, UI_NM, FILE_NAME, WORKER_ID ) VALUES ( ?, ?, ?, ?, 'SYSTEM' ) ").append("\n");
+
+			/* <기능메서드(MTD_BODY 포함)-TB_FUNC> */
+			INSERT_TB_FUNC_WITH_BODY.append("INSERT INTO TB_FUNC ( ").append("\n");
+			INSERT_TB_FUNC_WITH_BODY.append("	SYS_ID, FUNC_ID, CLZZ_ID, MTD_ID, MTD_NM, MTD_URL, MTD_BODY, FILE_NAME, WORKER_ID ").append("\n");
+			INSERT_TB_FUNC_WITH_BODY.append(") VALUES ( ").append("\n");
+			INSERT_TB_FUNC_WITH_BODY.append("	?, ?, ?, ?, ?, ?, ?, ?, 'SYSTEM' ").append("\n");
+			INSERT_TB_FUNC_WITH_BODY.append(") ").append("\n");
+
+			/* <쿼리-TB_QUERY> */
+			INSERT_TB_QUERY.append("INSERT INTO TB_QUERY ( ").append("\n");
+			INSERT_TB_QUERY.append("	SYS_ID, SQL_KEY, SQL_NAMESPACE, SQL_ID, SQL_KIND, SQL_BODY, WORKER_ID ").append("\n");
+			INSERT_TB_QUERY.append(") VALUES ( ?, ?, ?, ?, ?, ?, 'SYSTEM' ) ").append("\n");
+
+			DELETE_TB_QUERY.append("DELETE FROM TB_QUERY WHERE SYS_ID = ? AND WORKER_ID = 'SYSTEM' ").append("\n");
+
+			/* <TB_CLZZ UPDATE - 인터페이스구현하위클래스목록> */
+			UPDATE_TB_CLZZ_IMPL.append("UPDATE TB_CLZZ SET INTF_IMPL_CLZZ_ID_LIST = ? WHERE SYS_ID = ? AND CLZZ_ID = ? ").append("\n");
+
+			/* <TB_CLZZ UPDATE - 호출알리아스> */
+			UPDATE_TB_CLZZ_ALIAS.append("UPDATE TB_CLZZ SET MEMBER_ALIAS_LIST = ? WHERE SYS_ID = ? AND CLZZ_ID = ? ").append("\n");
+
+			/* <TB_QUERY UPDATE - 호출테이블목록> */
+			UPDATE_TB_QUERY_CALLTBL.append("UPDATE TB_QUERY SET CALL_TBL_LIST = ? WHERE SYS_ID = ? AND SQL_KEY = ? ").append("\n");
+
+			/* <TB_CLZZ SELECT ALL> */
+			SELECT_ALL_CLZZ.append("SELECT CLZZ_ID, PKG_ID, CLZZ_NM, CLZZ_KIND, RESOURCE_ID, CLZZ_INTF, ").append("\n");
+			SELECT_ALL_CLZZ.append("       INTF_ID_LIST, PARENT_CLZZ_ID, INTF_IMPL_CLZZ_ID_LIST, MEMBER_ALIAS_LIST, FILE_NAME ").append("\n");
+			SELECT_ALL_CLZZ.append("FROM TB_CLZZ WHERE SYS_ID = ? ").append("\n");
+
+			/* <TB_FUNC SELECT ALL + CALL LISTS (METRIX 캐시용, MTD_BODY 제외)> */
+			SELECT_ALL_MTD_WITH_CALLS.append("SELECT f.FUNC_ID, f.CLZZ_ID, f.MTD_ID, f.MTD_NM, f.MTD_URL, ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("  GROUP_CONCAT(DISTINCT fm.CALL_FUNC_ID ORDER BY fm.CALL_FUNC_ID SEPARATOR ',') AS CALL_MTD_LIST, ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("  GROUP_CONCAT(CONCAT(tm.TBL_ID,'!',IFNULL(tm.JOB_KIND,'')) ORDER BY tm.TBL_ID SEPARATOR '|') AS CALL_TBL_LIST ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("FROM TB_FUNC f ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("LEFT JOIN TB_FUNC_FUNC_MAPPING fm ON f.SYS_ID=fm.SYS_ID AND f.FUNC_ID=fm.FUNC_ID ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("LEFT JOIN TB_FUNC_TBL_MAPPING tm ON f.SYS_ID=tm.SYS_ID AND f.FUNC_ID=tm.FUNC_ID ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("WHERE f.SYS_ID=? ").append("\n");
+			SELECT_ALL_MTD_WITH_CALLS.append("GROUP BY f.FUNC_ID, f.CLZZ_ID, f.MTD_ID, f.MTD_NM, f.MTD_URL ").append("\n");
+
+			/* <CT 클래스 메서드 + URL (METRIX 기본구조용)> */
+			SELECT_CTL_MTD_WITH_URL.append("SELECT f.FUNC_ID, f.CLZZ_ID, f.MTD_NM, f.MTD_URL ").append("\n");
+			SELECT_CTL_MTD_WITH_URL.append("FROM TB_FUNC f ").append("\n");
+			SELECT_CTL_MTD_WITH_URL.append("JOIN TB_CLZZ c ON f.SYS_ID=c.SYS_ID AND f.CLZZ_ID=c.CLZZ_ID ").append("\n");
+			SELECT_CTL_MTD_WITH_URL.append("WHERE f.SYS_ID=? AND c.CLZZ_KIND='CT' ").append("\n");
+			SELECT_CTL_MTD_WITH_URL.append("  AND f.MTD_URL IS NOT NULL AND f.MTD_URL <> '' ").append("\n");
+
+			/* <TB_UI SELECT ALL> */
+			SELECT_ALL_UI.append("SELECT UI_ID, UI_NM, FILE_NAME FROM TB_UI WHERE SYS_ID=? ").append("\n");
+
+			/* <TB_UI_FUNC_MAPPING SELECT ALL> */
+			SELECT_ALL_UI_LINKS.append("SELECT UI_ID, MTD_URL FROM TB_UI_FUNC_MAPPING WHERE SYS_ID=? ").append("\n");
+
+			/* <TB_QUERY SELECT ALL (C-3 캐시용, SQL_BODY 제외)> */
+			SELECT_ALL_QUERY_WITH_TBL.append("SELECT SQL_KEY, SQL_NAMESPACE, SQL_ID, SQL_KIND, CALL_TBL_LIST ").append("\n");
+			SELECT_ALL_QUERY_WITH_TBL.append("FROM TB_QUERY WHERE SYS_ID=? ").append("\n");
+
+			/* <TB_FUNC FUNC_ID 목록 (C-2, C-3 청크 처리용)> */
+			SELECT_ALL_FUNC_ID.append("SELECT FUNC_ID FROM TB_FUNC WHERE SYS_ID=? ORDER BY FUNC_ID ").append("\n");
 
 		}
 	}
@@ -1211,8 +1290,25 @@ public class DbGen {
 		deleteTB_FUNC_FUNC_MAPPING(DBID, sysId);
 		deleteTB_TBL(DBID, sysId);
 		deleteTB_FUNC(DBID, sysId);
+		deleteTB_QUERY(DBID, sysId);
 		deleteTB_CLZZ(DBID, sysId);
 		deleteTB_METRIX(DBID, sysId);
+	}
+
+	private static void deleteTB_QUERY(String DBID, String sysId) throws Exception {
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.DELETE_TB_QUERY.toString());
+			db.pstmt.setString(1, sysId);
+			db.delete();
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw e;
+		} finally {
+			if (db != null) db.release();
+		}
 	}
 	
 	private static void deleteTB_CLZZ(String DBID, String sysId) throws Exception {
@@ -1359,6 +1455,563 @@ public class DbGen {
 		}
 	}
 	
+	/* =========================================================
+	 * DB 직접 저장 전환 후 추가된 메서드
+	 * ========================================================= */
+
+	/** A-1: TB_CLZZ 배치 INSERT */
+	public static void insertBatchTB_CLZZ(String DBID, String sysId, java.util.List<net.dstone.boot.common.tools.analyzer.vo.ClzzVo> list) throws Exception {
+		if (list == null || list.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_CLZZ.toString());
+			for (int i = 0; i < list.size(); i++) {
+				net.dstone.boot.common.tools.analyzer.vo.ClzzVo v = list.get(i);
+				if (StringUtil.isEmpty(v.getClassId())) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, v.getClassId());
+				p = setParam(db.pstmt, p, v.getPackageId());
+				p = setParam(db.pstmt, p, v.getClassName());
+				p = setParam(db.pstmt, p, v.getClassKind() != null ? v.getClassKind().getClzzKindCd() : null);
+				p = setParam(db.pstmt, p, v.getResourceId());
+				p = setParam(db.pstmt, p, v.getClassOrInterface());
+				p = setParam(db.pstmt, p, joinList(v.getInterfaceIdList(), ","));
+				p = setParam(db.pstmt, p, v.getParentClassId());
+				p = setParam(db.pstmt, p, joinList(v.getImplClassIdList(), ","));
+				p = setParam(db.pstmt, p, serializeAlias(v.getCallClassAlias()));
+				p = setParam(db.pstmt, p, v.getFileName());
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** A-2: TB_CLZZ 인터페이스구현하위클래스목록 UPDATE */
+	public static void updateTB_CLZZ_IMPL(String DBID, String sysId, String clzzId, java.util.List<String> implList) throws Exception {
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.UPDATE_TB_CLZZ_IMPL.toString());
+			setParam(db.pstmt, 0, joinList(implList, ","));
+			db.pstmt.setString(2, sysId);
+			db.pstmt.setString(3, clzzId);
+			db.pstmt.executeUpdate();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** A-3: TB_CLZZ 호출알리아스 UPDATE */
+	public static void updateTB_CLZZ_ALIAS(String DBID, String sysId, String clzzId, java.util.List<java.util.Map<String, String>> aliasList) throws Exception {
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.UPDATE_TB_CLZZ_ALIAS.toString());
+			setParam(db.pstmt, 0, serializeAlias(aliasList));
+			db.pstmt.setString(2, sysId);
+			db.pstmt.setString(3, clzzId);
+			db.pstmt.executeUpdate();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** B-1: TB_QUERY 배치 INSERT */
+	public static void insertBatchTB_QUERY(String DBID, String sysId, java.util.List<net.dstone.boot.common.tools.analyzer.vo.QueryVo> list) throws Exception {
+		if (list == null || list.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_QUERY.toString());
+			for (int i = 0; i < list.size(); i++) {
+				net.dstone.boot.common.tools.analyzer.vo.QueryVo v = list.get(i);
+				if (StringUtil.isEmpty(v.getKey())) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, v.getKey());
+				p = setParam(db.pstmt, p, v.getNamespace());
+				p = setParam(db.pstmt, p, v.getQueryId());
+				p = setParam(db.pstmt, p, v.getQueryKind());
+				p = setParam(db.pstmt, p, v.getQueryBody());
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** B-2: TB_QUERY 호출테이블목록 UPDATE */
+	public static void updateTB_QUERY_CALLTBL(String DBID, String sysId, String sqlKey, java.util.List<String> tblList) throws Exception {
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.UPDATE_TB_QUERY_CALLTBL.toString());
+			setParam(db.pstmt, 0, joinList(tblList, ","));
+			db.pstmt.setString(2, sysId);
+			db.pstmt.setString(3, sqlKey);
+			db.pstmt.executeUpdate();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** C-1: TB_FUNC 배치 INSERT (MTD_BODY 포함) */
+	public static void insertBatchTB_FUNC(String DBID, String sysId, java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> list) throws Exception {
+		if (list == null || list.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 200;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_FUNC_WITH_BODY.toString());
+			for (int i = 0; i < list.size(); i++) {
+				net.dstone.boot.common.tools.analyzer.vo.MtdVo v = list.get(i);
+				if (StringUtil.isEmpty(v.getFunctionId())) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, v.getFunctionId());
+				p = setParam(db.pstmt, p, v.getClassId());
+				p = setParam(db.pstmt, p, v.getMethodId());
+				p = setParam(db.pstmt, p, v.getMethodName());
+				p = setParam(db.pstmt, p, v.getMethodUrl());
+				p = setParam(db.pstmt, p, v.getMethodBody());
+				p = setParam(db.pstmt, p, v.getFileName());
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** C-2: TB_FUNC_FUNC_MAPPING 배치 INSERT. entries = List of [funcId, callFuncId] */
+	public static void insertBatchTB_FUNC_FUNC_MAPPING(String DBID, String sysId, java.util.List<String[]> entries) throws Exception {
+		if (entries == null || entries.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_FUNC_FUNC_MAPPING.toString());
+			for (int i = 0; i < entries.size(); i++) {
+				String[] e = entries.get(i);
+				if (StringUtil.isEmpty(e[0]) || StringUtil.isEmpty(e[1])) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, e[0]);
+				p = setParam(db.pstmt, p, e[1]);
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** C-3: TB_FUNC_TBL_MAPPING 배치 INSERT. entries = List of [funcId, tblId, jobKind] */
+	public static void insertBatchTB_FUNC_TBL_MAPPING(String DBID, String sysId, java.util.List<String[]> entries) throws Exception {
+		if (entries == null || entries.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_FUNC_TBL_MAPPING.toString());
+			for (int i = 0; i < entries.size(); i++) {
+				String[] e = entries.get(i);
+				if (StringUtil.isEmpty(e[0]) || StringUtil.isEmpty(e[1])) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, e[0]);
+				p = setParam(db.pstmt, p, e[1]);
+				p = setParam(db.pstmt, p, e.length > 2 ? e[2] : null);
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** D-1: TB_UI 배치 INSERT (FILE_NAME 포함) */
+	public static void insertBatchTB_UI(String DBID, String sysId, java.util.List<net.dstone.boot.common.tools.analyzer.vo.UiVo> list) throws Exception {
+		if (list == null || list.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_UI_WITH_FILE.toString());
+			for (int i = 0; i < list.size(); i++) {
+				net.dstone.boot.common.tools.analyzer.vo.UiVo v = list.get(i);
+				if (StringUtil.isEmpty(v.getUiId())) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, v.getUiId());
+				p = setParam(db.pstmt, p, v.getUiName());
+				p = setParam(db.pstmt, p, v.getFileName());
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** D-2: TB_UI_FUNC_MAPPING 배치 INSERT. entries = List of [uiId, linkUrl] */
+	public static void insertBatchTB_UI_FUNC_MAPPING(String DBID, String sysId, java.util.List<String[]> entries) throws Exception {
+		if (entries == null || entries.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_UI_FUNC_MAPPING.toString());
+			for (int i = 0; i < entries.size(); i++) {
+				String[] e = entries.get(i);
+				if (StringUtil.isEmpty(e[0]) || StringUtil.isEmpty(e[1])) continue;
+				int p = 0;
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, e[0]);
+				p = setParam(db.pstmt, p, e[1]);
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/** F: TB_METRIX 배치 INSERT */
+	public static void insertBatchTB_METRIX(String DBID, String sysId, java.util.List<DataSet> metrixList) throws Exception {
+		if (metrixList == null || metrixList.isEmpty()) return;
+		net.dstone.common.utils.DbUtil db = null;
+		int chunkSize = 500;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.INSERT_TB_METRIX.toString());
+			for (int i = 0; i < metrixList.size(); i++) {
+				DataSet row = metrixList.get(i);
+				int p = 0;
+				p = setParam(db.pstmt, p, String.valueOf(i + 1));
+				p = setParam(db.pstmt, p, sysId);
+				p = setParam(db.pstmt, p, row.getDatum("UI_ID"));
+				p = setParam(db.pstmt, p, row.getDatum("UI_NM"));
+				p = setParam(db.pstmt, p, row.getDatum("BASIC_URL"));
+				for (int k = 1; k <= FUNC_DEPTH_CNT; k++) {
+					p = setParam(db.pstmt, p, row.getDatum("FUNCTION_ID_" + k, ""));
+					p = setParam(db.pstmt, p, row.getDatum("FUNCTION_NAME_" + k, ""));
+					p = setParam(db.pstmt, p, row.getDatum("CLASS_KIND_" + k, ""));
+				}
+				p = setParam(db.pstmt, p, row.getDatum("CALL_TBL"));
+				db.pstmt.addBatch();
+				if (i > 0 && i % chunkSize == 0) db.pstmt.executeBatch();
+			}
+			db.pstmt.executeBatch();
+		} finally {
+			if (db != null) db.release();
+		}
+	}
+
+	/* ---- SELECT 메서드 ---- */
+
+	/** A-2, A-3, C-2 캐시용: 전체 ClzzVo 목록 */
+	public static java.util.List<net.dstone.boot.common.tools.analyzer.vo.ClzzVo> selectAllClzzVo(String DBID, String sysId) throws Exception {
+		java.util.List<net.dstone.boot.common.tools.analyzer.vo.ClzzVo> result = new java.util.ArrayList<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_ALL_CLZZ.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.ClzzVo v = new net.dstone.boot.common.tools.analyzer.vo.ClzzVo();
+				v.setClassId(rs.getString("CLZZ_ID"));
+				v.setPackageId(rs.getString("PKG_ID"));
+				v.setClassName(rs.getString("CLZZ_NM"));
+				String kind = rs.getString("CLZZ_KIND");
+				if (!StringUtil.isEmpty(kind)) v.setClassKind(net.dstone.boot.common.tools.analyzer.consts.ClzzKind.getClzzKindCd(kind));
+				v.setResourceId(rs.getString("RESOURCE_ID"));
+				v.setClassOrInterface(rs.getString("CLZZ_INTF"));
+				v.setInterfaceIdList(splitToList(rs.getString("INTF_ID_LIST"), ","));
+				v.setParentClassId(rs.getString("PARENT_CLZZ_ID"));
+				v.setImplClassIdList(splitToList(rs.getString("INTF_IMPL_CLZZ_ID_LIST"), ","));
+				v.setCallClassAlias(deserializeAlias(rs.getString("MEMBER_ALIAS_LIST")));
+				v.setFileName(rs.getString("FILE_NAME"));
+				result.add(v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** METRIX 캐시용: 전체 MtdVo + call lists (MTD_BODY 제외) */
+	public static java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> selectAllMtdVoWithCalls(String DBID, String sysId) throws Exception {
+		java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> result = new java.util.ArrayList<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_ALL_MTD_WITH_CALLS.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.MtdVo v = new net.dstone.boot.common.tools.analyzer.vo.MtdVo();
+				v.setFunctionId(rs.getString("FUNC_ID"));
+				v.setClassId(rs.getString("CLZZ_ID"));
+				v.setMethodId(rs.getString("MTD_ID"));
+				v.setMethodName(rs.getString("MTD_NM"));
+				v.setMethodUrl(rs.getString("MTD_URL"));
+				v.setCallMtdVoList(splitToList(rs.getString("CALL_MTD_LIST"), ","));
+				v.setCallTblVoList(splitToList(rs.getString("CALL_TBL_LIST"), "\\|"));
+				result.add(v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** METRIX 기본구조용: CT 클래스 메서드 + URL */
+	public static java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> selectCtMtdWithUrl(String DBID, String sysId) throws Exception {
+		java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> result = new java.util.ArrayList<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_CTL_MTD_WITH_URL.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.MtdVo v = new net.dstone.boot.common.tools.analyzer.vo.MtdVo();
+				v.setFunctionId(rs.getString("FUNC_ID"));
+				v.setClassId(rs.getString("CLZZ_ID"));
+				v.setMethodName(rs.getString("MTD_NM"));
+				v.setMethodUrl(rs.getString("MTD_URL"));
+				result.add(v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** D-2 이후 METRIX용: 전체 UI 목록 */
+	public static java.util.List<net.dstone.boot.common.tools.analyzer.vo.UiVo> selectAllUiVo(String DBID, String sysId) throws Exception {
+		java.util.List<net.dstone.boot.common.tools.analyzer.vo.UiVo> result = new java.util.ArrayList<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_ALL_UI.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.UiVo v = new net.dstone.boot.common.tools.analyzer.vo.UiVo();
+				v.setUiId(rs.getString("UI_ID"));
+				v.setUiName(rs.getString("UI_NM"));
+				v.setFileName(rs.getString("FILE_NAME"));
+				result.add(v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** METRIX용: UI 링크 맵 (uiId → List<link>) */
+	public static java.util.Map<String, java.util.List<String>> selectAllUiLinks(String DBID, String sysId) throws Exception {
+		java.util.Map<String, java.util.List<String>> result = new java.util.LinkedHashMap<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_ALL_UI_LINKS.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				String uiId = rs.getString("UI_ID");
+				String link = rs.getString("MTD_URL");
+				result.computeIfAbsent(uiId, k -> new java.util.ArrayList<>()).add(link);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** C-3 캐시용: 전체 QueryVo 맵 (sqlKey → QueryVo, SQL_BODY 제외) */
+	public static java.util.Map<String, net.dstone.boot.common.tools.analyzer.vo.QueryVo> selectAllQueryVoMap(String DBID, String sysId) throws Exception {
+		java.util.Map<String, net.dstone.boot.common.tools.analyzer.vo.QueryVo> result = new java.util.LinkedHashMap<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_ALL_QUERY_WITH_TBL.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.QueryVo v = new net.dstone.boot.common.tools.analyzer.vo.QueryVo();
+				v.setKey(rs.getString("SQL_KEY"));
+				v.setNamespace(rs.getString("SQL_NAMESPACE"));
+				v.setQueryId(rs.getString("SQL_ID"));
+				v.setQueryKind(rs.getString("SQL_KIND"));
+				v.setCallTblList(splitToList(rs.getString("CALL_TBL_LIST"), ","));
+				result.put(v.getKey(), v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** C-2, C-3 청크 처리용: 전체 FUNC_ID 목록 */
+	public static java.util.List<String> selectAllFuncId(String DBID, String sysId) throws Exception {
+		java.util.List<String> result = new java.util.ArrayList<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(QUERY.SELECT_ALL_FUNC_ID.toString());
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) result.add(rs.getString("FUNC_ID"));
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** C-2, C-3 청크 처리용: FUNC_ID 목록으로 MtdVo + MTD_BODY SELECT */
+	public static java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> selectMtdVoWithBodyByIds(String DBID, String sysId, java.util.List<String> funcIds) throws Exception {
+		java.util.List<net.dstone.boot.common.tools.analyzer.vo.MtdVo> result = new java.util.ArrayList<>();
+		if (funcIds == null || funcIds.isEmpty()) return result;
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			StringBuilder placeholders = new StringBuilder();
+			for (int i = 0; i < funcIds.size(); i++) {
+				if (i > 0) placeholders.append(",");
+				placeholders.append("?");
+			}
+			String sql = "SELECT FUNC_ID, CLZZ_ID, MTD_BODY FROM TB_FUNC WHERE SYS_ID=? AND FUNC_ID IN (" + placeholders + ")";
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(sql);
+			db.pstmt.setString(1, sysId);
+			for (int i = 0; i < funcIds.size(); i++) {
+				db.pstmt.setString(i + 2, funcIds.get(i));
+			}
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.MtdVo v = new net.dstone.boot.common.tools.analyzer.vo.MtdVo();
+				v.setFunctionId(rs.getString("FUNC_ID"));
+				v.setClassId(rs.getString("CLZZ_ID"));
+				v.setMethodBody(rs.getString("MTD_BODY"));
+				result.add(v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/** B-2 처리용: 전체 QueryVo SELECT (SQL_BODY 포함) */
+	public static java.util.List<net.dstone.boot.common.tools.analyzer.vo.QueryVo> selectAllQueryVoWithBody(String DBID, String sysId) throws Exception {
+		java.util.List<net.dstone.boot.common.tools.analyzer.vo.QueryVo> result = new java.util.ArrayList<>();
+		net.dstone.common.utils.DbUtil db = null;
+		try {
+			String sql = "SELECT SQL_KEY, SQL_NAMESPACE, SQL_ID, SQL_KIND, SQL_BODY FROM TB_QUERY WHERE SYS_ID=?";
+			db = new net.dstone.common.utils.DbUtil(DBID);
+			db.getConnection();
+			db.setQuery(sql);
+			db.pstmt.setString(1, sysId);
+			java.sql.ResultSet rs = db.select();
+			while (rs.next()) {
+				net.dstone.boot.common.tools.analyzer.vo.QueryVo v = new net.dstone.boot.common.tools.analyzer.vo.QueryVo();
+				v.setKey(rs.getString("SQL_KEY"));
+				v.setNamespace(rs.getString("SQL_NAMESPACE"));
+				v.setQueryId(rs.getString("SQL_ID"));
+				v.setQueryKind(rs.getString("SQL_KIND"));
+				v.setQueryBody(rs.getString("SQL_BODY"));
+				result.add(v);
+			}
+		} finally {
+			if (db != null) db.release();
+		}
+		return result;
+	}
+
+	/* ---- 직렬화/역직렬화 유틸 ---- */
+
+	private static String joinList(java.util.List<String> list, String sep) {
+		if (list == null || list.isEmpty()) return null;
+		StringBuilder sb = new StringBuilder();
+		for (String s : list) {
+			if (sb.length() > 0) sb.append(sep);
+			sb.append(s);
+		}
+		return sb.toString();
+	}
+
+	private static java.util.List<String> splitToList(String str, String sep) {
+		java.util.List<String> list = new java.util.ArrayList<>();
+		if (StringUtil.isEmpty(str)) return list;
+		for (String s : str.split(sep)) {
+			String trimmed = s.trim();
+			if (!trimmed.isEmpty()) list.add(trimmed);
+		}
+		return list;
+	}
+
+	/** MEMBER_ALIAS_LIST 직렬화: "fullClass-alias,fullClass-alias,..." */
+	private static String serializeAlias(java.util.List<java.util.Map<String, String>> aliasList) {
+		if (aliasList == null || aliasList.isEmpty()) return null;
+		StringBuilder sb = new StringBuilder();
+		for (java.util.Map<String, String> m : aliasList) {
+			if (sb.length() > 0) sb.append(",");
+			sb.append(m.get("FULL_CLASS")).append("-").append(m.get("ALIAS"));
+		}
+		return sb.toString();
+	}
+
+	/** MEMBER_ALIAS_LIST 역직렬화 */
+	public static java.util.List<java.util.Map<String, String>> deserializeAlias(String str) {
+		java.util.List<java.util.Map<String, String>> list = new java.util.ArrayList<>();
+		if (StringUtil.isEmpty(str)) return list;
+		for (String entry : str.split(",")) {
+			int dashIdx = entry.lastIndexOf("-");
+			if (dashIdx > 0) {
+				java.util.Map<String, String> m = new java.util.HashMap<>();
+				m.put("FULL_CLASS", entry.substring(0, dashIdx));
+				m.put("ALIAS", entry.substring(dashIdx + 1));
+				list.add(m);
+			}
+		}
+		return list;
+	}
+
 	public static net.dstone.common.utils.DataSet selectTB_FUNC_ALL(String DBID, String FUNC_ID, String CLZZ_KIND, String FUNC_RECURSIVE_YN, String TBL_RECURSIVE_YN) throws Exception {
 		net.dstone.common.utils.DataSet ds = new net.dstone.common.utils.DataSet();
 		net.dstone.common.utils.DbUtil db = null;

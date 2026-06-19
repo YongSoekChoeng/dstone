@@ -293,7 +293,7 @@ public class TossParseMtd extends TextParseMtd implements ParseMtd {
 		}
 	}
 	
-	private String getGetterMethodNameByNameSpace(String nameSpace) throws Exception {
+	public String getGetterMethodNameByNameSpace(String nameSpace) throws Exception {
 		String getterMethodName = "";
 		if( nameSpace.endsWith("_") ) {
 			getterMethodName = nameSpace;
