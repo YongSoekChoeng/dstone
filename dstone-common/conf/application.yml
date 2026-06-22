@@ -30,6 +30,10 @@ spring:
             host: ${REDIS_HOST}
             port: ${REDIS_PORT}
             timeout: 10000
+    # Kafka 설정
+    kafka: 
+        enabled: true # Kafka사용 여부(true/false)
+        bootstrap-servers: localhost:9092
     devtools: 
         restart: 
             enabled: true

@@ -112,6 +112,12 @@
 			<artifactId>spring-session-data-redis</artifactId>
 		</dependency>
 		
+		<!--  스프링 부트 애플리케이션에서 Kafka 사용할 수 있도록 도와주는 라이브러리 -->
+		<dependency>
+		    <groupId>org.springframework.kafka</groupId>
+		    <artifactId>spring-kafka</artifactId>
+		</dependency>
+		
 		<!-- DATABASE(JDBC) -->
 		<dependency>
 			<groupId>com.zaxxer</groupId>

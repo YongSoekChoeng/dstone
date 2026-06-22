@@ -12,6 +12,7 @@ import net.dstone.common.core.BaseObject;
 	ConfigAspect.class,
 	ConfigDatasource.class,
 	ConfigEnc.class,
+	ConfigKafka.class,
 	ConfigListener.class,
 	ConfigMapper.class,
 	ConfigMq.class,

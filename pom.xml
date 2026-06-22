@@ -11,8 +11,6 @@
         <module>dstone-common</module>
         <module>dstone-boot</module>
         <module>dstone-batch</module>
-        <module>dstone-batchadmin</module>
-        <module>hi-framework</module>
     </modules>
     
 	<properties>
