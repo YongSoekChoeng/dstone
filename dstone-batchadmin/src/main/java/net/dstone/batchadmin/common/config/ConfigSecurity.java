@@ -145,7 +145,6 @@ public class ConfigSecurity extends BaseObject {
 				, new AntPathRequestMatcher("/images/**")
 				, new AntPathRequestMatcher("/js/**")
 				/*** 동적자원중 권한체크가 필요없는 자원들 ***/
-				, new AntPathRequestMatcher("/views/" + LOGIN_PAGE)
 				, new AntPathRequestMatcher(LOGIN_GO_ACTION)
 				, new AntPathRequestMatcher(LOGIN_PROCESS_ACTION)
 				, new AntPathRequestMatcher(LOGIN_PROCESS_SUCCESS_ACTION)

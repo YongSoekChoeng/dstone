@@ -30,6 +30,15 @@ public class MainController extends net.dstone.batchadmin.common.biz.BaseControl
 	private BatchJobService batchJobService;
 
 	/**
+	 * 메인화면(대시보드) 페이지.
+	 */
+	@RequestMapping(value = "/main.do")
+	public ModelAndView main(HttpServletRequest request, HttpServletResponse response, ModelAndView mav) throws Exception {
+		mav.setViewName("main");
+		return mav;
+	}
+
+	/**
 	 * 메인화면의 요약정보(등록된 배치서버수/배치Job수)를 조회한다. main.jsp에서 화면로딩 후 AJAX로 호출.
 	 */
 	@RequestMapping(value = "/summary.do")
