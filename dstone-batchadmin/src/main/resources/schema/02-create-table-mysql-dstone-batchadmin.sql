@@ -2,7 +2,7 @@
 /**********************************************
 dstone-batchadmin 데이터베이스[MySQL] 테이블
 **********************************************/
-USE dstone_batchadmin;
+USE batchadmin;
 
 -- 관리자 로그인 계정
 CREATE TABLE IF NOT EXISTS TB_ADMIN_USER (

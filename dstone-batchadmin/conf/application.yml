@@ -41,7 +41,7 @@ spring:
         common:
             hikari:
                 driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/dstone_batchadmin?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/batchadmin?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
                 username: ENC(fMOxXIAkCpi10Cx3yXDQVYIcvj6uTeIVboUyUwxxORM=)
                 password: ENC(V+3YAEAPNEoW+7DanoSJXmOx5+j0K8vqLVX7oZR98As=)
                 minimum-idle: 2
