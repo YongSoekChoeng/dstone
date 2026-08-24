@@ -22,7 +22,8 @@ import net.dstone.common.core.BaseObject;
 	ConfigSwagger.class,
 	ConfigTransaction.class,
 	ConfigWebMvc.class,
-	ConfigWebSocket.class
+	ConfigWebSocket.class,
+	net.dstone.common.websocket.controller.WebSocketController.class
 })
 public class Config extends BaseObject{
 	
