@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.batchadmin.job.BatchJobExecDao">
+
+    <!--
+        관리대상 배치서버의 Spring Batch 메타데이터(BATCH_JOB_INSTANCE/BATCH_JOB_EXECUTION 등) 조회.
+        RoutingDataSource를 사용하므로 MyBatis databaseId 자동판별을 쓰지 않고, 파라메터로 넘어오는
+        DBMS_TYPE('MYSQL'/'POSTGRES') 값으로 <choose> 분기한다. (페이징 구문/날짜파싱 함수가 벤더별로 다름)
+    -->
+
+    <sql id="searchCondition">
+        WHERE 1=1
+            <if test="SEARCH_JOB_INSTANCE_ID != null and !SEARCH_JOB_INSTANCE_ID.equals('')">AND I.JOB_INSTANCE_ID = #{SEARCH_JOB_INSTANCE_ID}</if>
+            <if test="SEARCH_JOB_NAME != null and !SEARCH_JOB_NAME.equals('')">AND I.JOB_NAME LIKE CONCAT('%', #{SEARCH_JOB_NAME}, '%')</if>
+            <if test="SEARCH_START_DT_FROM != null and !SEARCH_START_DT_FROM.equals('')">
+                <choose>
+                    <when test="DBMS_TYPE != null and DBMS_TYPE.equals('POSTGRES')">
+                        AND E.START_TIME &gt;= TO_TIMESTAMP(#{SEARCH_START_DT_FROM}, 'YYYYMMDDHH24MISS')
+                    </when>
+                    <otherwise>
+                        AND E.START_TIME &gt;= STR_TO_DATE(#{SEARCH_START_DT_FROM}, '%Y%m%d%H%i%s')
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="SEARCH_START_DT_TO != null and !SEARCH_START_DT_TO.equals('')">
+                <choose>
+                    <when test="DBMS_TYPE != null and DBMS_TYPE.equals('POSTGRES')">
+                        AND E.START_TIME &lt;= TO_TIMESTAMP(#{SEARCH_START_DT_TO}, 'YYYYMMDDHH24MISS')
+                    </when>
+                    <otherwise>
+                        AND E.START_TIME &lt;= STR_TO_DATE(#{SEARCH_START_DT_TO}, '%Y%m%d%H%i%s')
+                    </otherwise>
+                </choose>
+            </if>
+    </sql>
+
+    <!-- 배치JOB 목록조회(카운트). 행 grain = JobExecution 1건 = 1행 -->
+    <select id="listJobExecutionCount" parameterType="net.dstone.batchadmin.job.vo.BatchJobExecVo" resultType="int">
+        SELECT COUNT(*)
+        FROM
+            BATCH_JOB_EXECUTION E
+            INNER JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+        <include refid="searchCondition" />
+    </select>
+
+    <!-- 배치JOB 목록조회 -->
+    <select id="listJobExecution" parameterType="net.dstone.batchadmin.job.vo.BatchJobExecVo" resultType="net.dstone.batchadmin.job.vo.BatchJobExecVo">
+        SELECT
+            E.JOB_EXECUTION_ID     /* JOB실행ID */
+            , I.JOB_INSTANCE_ID    /* JOB아이디(인스턴스ID) */
+            , I.JOB_NAME           /* JOB명 */
+            , E.STATUS             /* 상태 */
+            , E.CREATE_TIME        /* 생성일시 */
+            , E.START_TIME         /* 최종수행일시(시작시각) */
+            , E.END_TIME           /* 종료일시 */
+            , E.EXIT_CODE          /* 종료코드 */
+            , E.EXIT_MESSAGE       /* 결과메세지 */
+            , E.LAST_UPDATED       /* 최종수정일시 */
+        FROM
+            BATCH_JOB_EXECUTION E
+            INNER JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+        <include refid="searchCondition" />
+        ORDER BY E.START_TIME DESC, E.JOB_EXECUTION_ID DESC
+        <choose>
+            <when test="DBMS_TYPE != null and DBMS_TYPE.equals('POSTGRES')">
+                LIMIT #{INT_TO} OFFSET #{INT_FROM}
+            </when>
+            <otherwise>
+                LIMIT #{INT_FROM}, #{INT_TO}
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- JobExecution 단건조회 -->
+    <select id="selectJobExecution" parameterType="long" resultType="net.dstone.batchadmin.job.vo.BatchJobExecVo">
+        SELECT
+            E.JOB_EXECUTION_ID
+            , I.JOB_INSTANCE_ID
+            , I.JOB_NAME
+            , E.STATUS
+            , E.CREATE_TIME
+            , E.START_TIME
+            , E.END_TIME
+            , E.EXIT_CODE
+            , E.EXIT_MESSAGE
+            , E.LAST_UPDATED
+        FROM
+            BATCH_JOB_EXECUTION E
+            INNER JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+        WHERE 1=1
+            AND E.JOB_EXECUTION_ID = #{jobExecutionId}
+    </select>
+
+    <!-- JobInstance에 속한 전체 JobExecution 이력조회(수행이력) -->
+    <select id="listJobExecutionByInstance" parameterType="long" resultType="net.dstone.batchadmin.job.vo.BatchJobExecVo">
+        SELECT
+            E.JOB_EXECUTION_ID
+            , I.JOB_INSTANCE_ID
+            , I.JOB_NAME
+            , E.STATUS
+            , E.CREATE_TIME
+            , E.START_TIME
+            , E.END_TIME
+            , E.EXIT_CODE
+            , E.EXIT_MESSAGE
+            , E.LAST_UPDATED
+        FROM
+            BATCH_JOB_EXECUTION E
+            INNER JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+        WHERE 1=1
+            AND I.JOB_INSTANCE_ID = #{jobInstanceId}
+        ORDER BY E.JOB_EXECUTION_ID DESC
+    </select>
+
+    <!-- JobExecution의 StepExecution 목록조회 -->
+    <select id="listStepExecution" parameterType="long" resultType="net.dstone.batchadmin.job.vo.BatchStepExecVo">
+        SELECT
+            S.STEP_EXECUTION_ID
+            , S.STEP_NAME
+            , S.JOB_EXECUTION_ID
+            , S.STATUS
+            , S.START_TIME
+            , S.END_TIME
+            , S.COMMIT_COUNT
+            , S.READ_COUNT
+            , S.WRITE_COUNT
+            , S.FILTER_COUNT
+            , S.READ_SKIP_COUNT
+            , S.WRITE_SKIP_COUNT
+            , S.PROCESS_SKIP_COUNT
+            , S.ROLLBACK_COUNT
+            , S.EXIT_CODE
+            , S.EXIT_MESSAGE
+        FROM
+            BATCH_STEP_EXECUTION S
+        WHERE 1=1
+            AND S.JOB_EXECUTION_ID = #{jobExecutionId}
+        ORDER BY S.STEP_EXECUTION_ID
+    </select>
+
+    <!-- JobExecution의 실행파라메터 목록조회 -->
+    <select id="listExecutionParams" parameterType="long" resultType="hashmap">
+        SELECT
+            P.PARAMETER_NAME
+            , P.PARAMETER_TYPE
+            , P.PARAMETER_VALUE
+            , P.IDENTIFYING
+        FROM
+            BATCH_JOB_EXECUTION_PARAMS P
+        WHERE 1=1
+            AND P.JOB_EXECUTION_ID = #{jobExecutionId}
+        ORDER BY P.PARAMETER_NAME
+    </select>
+
+</mapper>

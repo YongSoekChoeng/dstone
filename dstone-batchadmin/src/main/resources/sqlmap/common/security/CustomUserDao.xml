@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.batchadmin.common.security.CustomUserDao">
+
+    <!-- 관리자 로그인 조회 -->
+    <select id="selectUser" parameterType="map" resultType="hashmap">
+        SELECT
+            A.USER_ID       /* 사용자ID */
+            , A.USER_PW     /* 비밀번호(BCrypt해시) */
+            , A.USER_NM     /* 사용자명 */
+            , A.USE_YN      /* 사용여부 */
+        FROM
+            TB_ADMIN_USER A
+        WHERE 1=1
+            AND A.USER_ID = #{USER_ID}
+    </select>
+
+    <!-- 관리자 로그인 시간 갱신 -->
+    <update id="updateUserLoginTime" parameterType="map">
+        UPDATE TB_ADMIN_USER
+        SET
+            LAST_LOGIN_DT = NOW()
+        WHERE
+            USER_ID = #{USER_ID}
+    </update>
+
+</mapper>

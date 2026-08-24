@@ -8,8 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **dstone-common**: Shared library (JAR) — utilities, security, data access, messaging
 - **dstone-boot**: Web application framework (WAR) — includes a Java source code static analyzer feature
 - **dstone-batch**: Spring Batch processing framework (JAR) — standardized job development
+- **dstone-batchadmin**: Web application (WAR) — manages `dstone-batch` jobs (list/detail/register screens, start/stop/restart, CRON auto-scheduling) across one or more `dstone-batch` server instances
 
-Both `dstone-boot` and `dstone-batch` depend on `dstone-common`.
+`dstone-boot`, `dstone-batch`, and `dstone-batchadmin` all depend on `dstone-common`.
 
 ## Build Commands
 
@@ -22,6 +23,9 @@ cd dstone-boot && mvn clean package
 
 # Build batch (JAR)
 cd dstone-batch && mvn clean package
+
+# Build batch admin web app (WAR)
+cd dstone-batchadmin && mvn clean package
 
 # Build all from root
 mvn clean install
@@ -38,9 +42,12 @@ java -jar target/dstone-boot.war
 
 # dstone-batch — run a specific job
 java -jar -Dspring.batch.job.names=sampleJob target/dstone-batch-1.0.0-SNAPSHOT.jar
+
+# dstone-batchadmin (port 7082)
+java -jar target/dstone-batchadmin.war
 ```
 
-Docker deployment scripts are in `dstone-boot/docs/docker/` and `dstone-batch/docs/docker/`.
+Docker deployment scripts are in `dstone-boot/docs/docker/` and `dstone-batch/docs/docker/` (not yet added for `dstone-batchadmin`).
 
 ## Architecture
 
@@ -125,6 +132,22 @@ public class MyJobConfig extends BaseJobConfig {
 
 Spring Batch metadata tables must be created manually from `src/main/resources/schema/*.sql` (`initialize-schema: NEVER`).
 
+### dstone-batchadmin: Batch Job Management
+
+Manages `dstone-batch` jobs via two mechanisms, both configured per registered batch server (`TB_BATCH_SERVER`):
+- **Direct DB read** for list/detail/history — queries the target server's Spring Batch metadata tables (`BATCH_JOB_INSTANCE`/`BATCH_JOB_EXECUTION`/`BATCH_STEP_EXECUTION`) through a `RoutingDataSource` (`common/datasource/RoutingDataSource.java`) that resolves the correct `HikariDataSource` per server at runtime (built/cached by `BatchServerDataSourceRegistry`).
+- **REST calls** for control actions (start/stop/restart/abandon/delete) — `common/rest/BatchRestClient.java` calls the target server's `dstone-batch` `RestApiRunner` endpoints (`/batch/startJob/{jobName}`, `/batch/stopJob/{id}`, etc.).
+
+Two datasources:
+- `common` → `dstone_batchadmin` schema (static, own login users/`TB_ADMIN_USER`, server registry/`TB_BATCH_SERVER`, job metadata/`TB_BATCH_JOB`)
+- `batch` → the `RoutingDataSource` described above (dynamic, one target per registered server)
+
+Since `RoutingDataSource` prevents MyBatis's `databaseIdProvider` from resolving per-query, MySQL/PostgreSQL differences (mainly paging syntax) are handled with an explicit `DBMS_TYPE` query parameter and `<choose>` branches in `sqlmap/job/BatchJobExecDao.xml`, rather than the `databaseId` mapper attribute.
+
+Registered Job metadata (`TB_BATCH_JOB.JOB_NM`) must match the `@AutoRegJob(name=...)` value on the target `dstone-batch` server exactly — `dstone-batchadmin` cannot create new Job logic, only manage metadata and trigger the existing REST API. `common/scheduler/JobScheduleManager.java` uses Spring's built-in `ThreadPoolTaskScheduler` + `CronTrigger` (no Quartz) to auto-start jobs whose `SCHEDULE_USE_YN='Y'`.
+
+Security is simplified vs. `dstone-boot`: login is required (`TB_ADMIN_USER`, `BCryptPasswordEncoder`) but there is no per-URL role/permission check — it's a single-role internal admin tool.
+
 ## Required Infrastructure
 
 | Infrastructure | Purpose | Modules |
@@ -157,3 +180,4 @@ Jenkins pipelines are defined in:
 |---|---|---|
 | dstone-boot | 7081 | WAR |
 | dstone-batch | 6081 | JAR |
+| dstone-batchadmin | 7082 | WAR |

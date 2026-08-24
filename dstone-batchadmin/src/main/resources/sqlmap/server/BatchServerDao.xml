@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.batchadmin.server.BatchServerDao">
+
+    <!-- 배치서버 목록조회 -->
+    <select id="listServer" parameterType="net.dstone.batchadmin.server.vo.BatchServerVo" resultType="net.dstone.batchadmin.server.vo.BatchServerVo">
+        SELECT
+            A.SERVER_ID         /* 서버ID */
+            , A.SERVER_NM       /* 서버명 */
+            , A.REST_BASE_URL   /* REST API BASE URL */
+            , A.DB_HOST         /* 배치메타DB호스트 */
+            , A.DB_PORT         /* 배치메타DB포트 */
+            , A.DB_NAME         /* 배치메타DB명 */
+            , A.DB_USER         /* 배치메타DB사용자 */
+            , A.DBMS_TYPE       /* DBMS종류(MYSQL/POSTGRES) */
+            , A.USE_YN          /* 사용여부 */
+            , A.DESCRIPTION     /* 설명 */
+            , A.REG_DT          /* 등록일시 */
+            , A.UPDATE_DT       /* 수정일시 */
+        FROM
+            TB_BATCH_SERVER A
+        WHERE 1=1
+            <if test="SERVER_NM != null and !SERVER_NM.equals('')">AND A.SERVER_NM LIKE CONCAT('%', #{SERVER_NM}, '%')</if>
+            <if test="USE_YN != null and !USE_YN.equals('')">AND A.USE_YN = #{USE_YN}</if>
+        ORDER BY A.SERVER_ID
+    </select>
+
+    <!-- 사용중인 배치서버 목록조회(DB_PASSWORD 포함). BatchServerDataSourceRegistry 전용(화면에는 절대 노출하지 않음) -->
+    <select id="listActiveServerWithPassword" resultType="net.dstone.batchadmin.server.vo.BatchServerVo">
+        SELECT
+            A.SERVER_ID
+            , A.SERVER_NM
+            , A.REST_BASE_URL
+            , A.DB_HOST
+            , A.DB_PORT
+            , A.DB_NAME
+            , A.DB_USER
+            , A.DB_PASSWORD
+            , A.DBMS_TYPE
+            , A.USE_YN
+        FROM
+            TB_BATCH_SERVER A
+        WHERE 1=1
+            AND A.USE_YN = 'Y'
+        ORDER BY A.SERVER_ID
+    </select>
+
+    <!-- 배치서버 단건조회 -->
+    <select id="selectServer" parameterType="long" resultType="net.dstone.batchadmin.server.vo.BatchServerVo">
+        SELECT
+            A.SERVER_ID
+            , A.SERVER_NM
+            , A.REST_BASE_URL
+            , A.DB_HOST
+            , A.DB_PORT
+            , A.DB_NAME
+            , A.DB_USER
+            , A.DB_PASSWORD
+            , A.DBMS_TYPE
+            , A.USE_YN
+            , A.DESCRIPTION
+            , A.REG_DT
+            , A.UPDATE_DT
+        FROM
+            TB_BATCH_SERVER A
+        WHERE 1=1
+            AND A.SERVER_ID = #{serverId}
+    </select>
+
+    <!-- 배치서버 등록 -->
+    <insert id="insertServer" parameterType="net.dstone.batchadmin.server.vo.BatchServerVo" useGeneratedKeys="true" keyProperty="SERVER_ID" keyColumn="SERVER_ID">
+        INSERT INTO TB_BATCH_SERVER (
+            SERVER_NM, REST_BASE_URL, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DBMS_TYPE, USE_YN, DESCRIPTION
+        ) VALUES (
+            #{SERVER_NM}, #{REST_BASE_URL}, #{DB_HOST}, #{DB_PORT}, #{DB_NAME}, #{DB_USER}, #{DB_PASSWORD}, #{DBMS_TYPE}, #{USE_YN}, #{DESCRIPTION}
+        )
+    </insert>
+
+    <!-- 배치서버 수정 (DB_PASSWORD가 null이면 기존값 유지) -->
+    <update id="updateServer" parameterType="net.dstone.batchadmin.server.vo.BatchServerVo">
+        UPDATE TB_BATCH_SERVER
+        SET
+            SERVER_NM = #{SERVER_NM}
+            , REST_BASE_URL = #{REST_BASE_URL}
+            , DB_HOST = #{DB_HOST}
+            , DB_PORT = #{DB_PORT}
+            , DB_NAME = #{DB_NAME}
+            , DB_USER = #{DB_USER}
+            <if test="DB_PASSWORD != null and !DB_PASSWORD.equals('')">, DB_PASSWORD = #{DB_PASSWORD}</if>
+            , DBMS_TYPE = #{DBMS_TYPE}
+            , USE_YN = #{USE_YN}
+            , DESCRIPTION = #{DESCRIPTION}
+            , UPDATE_DT = NOW()
+        WHERE
+            SERVER_ID = #{SERVER_ID}
+    </update>
+
+    <!-- 배치서버 삭제 -->
+    <delete id="deleteServer" parameterType="long">
+        DELETE FROM TB_BATCH_SERVER WHERE SERVER_ID = #{serverId}
+    </delete>
+
+</mapper>

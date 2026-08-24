@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.batchadmin.job.BatchJobDao">
+
+    <!-- 배치Job 메타데이터 목록조회 -->
+    <select id="listJob" parameterType="net.dstone.batchadmin.job.vo.BatchJobVo" resultType="net.dstone.batchadmin.job.vo.BatchJobVo">
+        SELECT
+            A.JOB_ID                /* JOB일련번호 */
+            , A.JOB_NM              /* JOB명(dstone-batch @AutoRegJob명과 일치) */
+            , A.SERVER_ID           /* 대상 배치서버ID */
+            , B.SERVER_NM           /* 대상 배치서버명 */
+            , A.DESCRIPTION         /* 설명 */
+            , A.CRON_EXPRESSION     /* CRON표현식 */
+            , A.SCHEDULE_USE_YN     /* 자동스케줄 사용여부 */
+            , A.OWNER_NM            /* 담당자 */
+            , A.USE_YN              /* 사용여부 */
+            , A.REG_DT              /* 등록일시 */
+            , A.UPDATE_DT           /* 수정일시 */
+        FROM
+            TB_BATCH_JOB A
+            INNER JOIN TB_BATCH_SERVER B ON A.SERVER_ID = B.SERVER_ID
+        WHERE 1=1
+            <if test="SERVER_ID != null">AND A.SERVER_ID = #{SERVER_ID}</if>
+            <if test="JOB_NM != null and !JOB_NM.equals('')">AND A.JOB_NM LIKE CONCAT('%', #{JOB_NM}, '%')</if>
+            <if test="USE_YN != null and !USE_YN.equals('')">AND A.USE_YN = #{USE_YN}</if>
+        ORDER BY A.JOB_ID DESC
+    </select>
+
+    <!-- 자동스케줄 대상 Job 목록조회 -->
+    <select id="listScheduledJob" resultType="net.dstone.batchadmin.job.vo.BatchJobVo">
+        SELECT
+            A.JOB_ID
+            , A.JOB_NM
+            , A.SERVER_ID
+            , A.CRON_EXPRESSION
+            , A.SCHEDULE_USE_YN
+            , A.USE_YN
+        FROM
+            TB_BATCH_JOB A
+        WHERE 1=1
+            AND A.USE_YN = 'Y'
+            AND A.SCHEDULE_USE_YN = 'Y'
+            AND A.CRON_EXPRESSION IS NOT NULL
+    </select>
+
+    <!-- 배치Job 메타데이터 단건조회 -->
+    <select id="selectJob" parameterType="long" resultType="net.dstone.batchadmin.job.vo.BatchJobVo">
+        SELECT
+            A.JOB_ID
+            , A.JOB_NM
+            , A.SERVER_ID
+            , A.DESCRIPTION
+            , A.CRON_EXPRESSION
+            , A.SCHEDULE_USE_YN
+            , A.OWNER_NM
+            , A.USE_YN
+            , A.REG_DT
+            , A.UPDATE_DT
+        FROM
+            TB_BATCH_JOB A
+        WHERE 1=1
+            AND A.JOB_ID = #{jobId}
+    </select>
+
+    <!-- 배치Job 메타데이터 등록 -->
+    <insert id="insertJob" parameterType="net.dstone.batchadmin.job.vo.BatchJobVo" useGeneratedKeys="true" keyProperty="JOB_ID" keyColumn="JOB_ID">
+        INSERT INTO TB_BATCH_JOB (
+            JOB_NM, SERVER_ID, DESCRIPTION, CRON_EXPRESSION, SCHEDULE_USE_YN, OWNER_NM, USE_YN
+        ) VALUES (
+            #{JOB_NM}, #{SERVER_ID}, #{DESCRIPTION}, #{CRON_EXPRESSION}, #{SCHEDULE_USE_YN}, #{OWNER_NM}, #{USE_YN}
+        )
+    </insert>
+
+    <!-- 배치Job 메타데이터 수정 -->
+    <update id="updateJob" parameterType="net.dstone.batchadmin.job.vo.BatchJobVo">
+        UPDATE TB_BATCH_JOB
+        SET
+            JOB_NM = #{JOB_NM}
+            , SERVER_ID = #{SERVER_ID}
+            , DESCRIPTION = #{DESCRIPTION}
+            , CRON_EXPRESSION = #{CRON_EXPRESSION}
+            , SCHEDULE_USE_YN = #{SCHEDULE_USE_YN}
+            , OWNER_NM = #{OWNER_NM}
+            , USE_YN = #{USE_YN}
+            , UPDATE_DT = NOW()
+        WHERE
+            JOB_ID = #{JOB_ID}
+    </update>
+
+    <!-- 배치Job 메타데이터 삭제 -->
+    <delete id="deleteJob" parameterType="long">
+        DELETE FROM TB_BATCH_JOB WHERE JOB_ID = #{jobId}
+    </delete>
+
+</mapper>

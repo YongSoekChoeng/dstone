@@ -1,0 +1,61 @@
+server:
+    port: 7082
+    tomcat:
+        accept-count: 100
+        max-connections: 10000
+        max-threads: 200
+        min-spare-threads: 10
+        max-swallow-size: 2MB
+        connection-timeout: 15s
+    error:
+        whitelabel:
+            enabled: true
+    servlet:
+        context-path: /
+        jsp:
+            init-parameters:
+                development: true
+        encoding:
+            force-response: true
+            charset: UTF-8
+        session:
+            cookie:
+                name: JSESSIONID
+
+spring:
+    main:
+        allow-bean-definition-overriding: true
+    ##########################################################################################
+    # <자동설정기능>
+    # 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작하는 기능들이 있음.
+    # 따라서 설정의도가 OFF라고 할 때 설정의도대로 하려면 부가적으로 아래의 설정을 해주어야 함.
+    ##########################################################################################
+    autoconfigure:
+        exclude:
+            # 스프링시큐리티사용 시 주석처리. 비사용 시 주석제거.
+            #- org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+    security:
+        enabled: true # 스프링시큐리티사용 여부(true/false)
+    datasource:
+        # batchadmin 자체 스키마(로그인사용자/배치서버레지스트리/Job메타데이터). MySQL/PostgreSQL 전환 시 driver-class-name/jdbc-url만 교체하면 됨.
+        common:
+            hikari:
+                driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+                jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/dstone_batchadmin?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+                username: ENC(fMOxXIAkCpi10Cx3yXDQVYIcvj6uTeIVboUyUwxxORM=)
+                password: ENC(V+3YAEAPNEoW+7DanoSJXmOx5+j0K8vqLVX7oZR98As=)
+                minimum-idle: 2
+                maximum-pool-size: 20
+                connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
+                max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
+                idle-timeout: 600000       # Idle 상태 커넥션의 최대 유지시간. 기본값 10분.
+    devtools:
+        restart:
+            enabled: true
+
+# batchadmin 자체 스키마(common 데이터소스)의 DBMS 종류. MYSQL/POSTGRES. 매퍼 XML의 <if test="DBMS_TYPE=='...'"> 분기에 사용.
+app:
+    batchadmin:
+        dbms-type: MYSQL
+        scheduler:
+            pool-size: 5
