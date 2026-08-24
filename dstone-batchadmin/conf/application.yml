@@ -1,5 +1,5 @@
 server:
-    port: 7082
+    port: 5081
     tomcat:
         accept-count: 100
         max-connections: 10000

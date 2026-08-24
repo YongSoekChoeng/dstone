@@ -35,8 +35,6 @@ public class CustomAuthenticationProvider extends BaseObject implements Authenti
 	@Resource(name = "customUserService")
 	private CustomUserService customUserService;
 
-	private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
 	@Override
 	public boolean supports(Class<?> authentication) {
 		return authentication.equals(UsernamePasswordAuthenticationToken.class);
@@ -54,14 +52,20 @@ public class CustomAuthenticationProvider extends BaseObject implements Authenti
 		try {
 			// 1. 인증 로그인 처리
 			Map<String, Object> result = customUserService.loginProcess(param);
+			
+			String passwdFromUI = net.dstone.common.utils.EncUtil.encrypt(user_pw);
+			String passwdFromDB = (String) result.get("USER_PW");
+			
+			this.info("passwdFromUI["+passwdFromUI+"]" + " 11 passwdFromDB["+passwdFromDB+"]");
+			
 			if (result == null || result.isEmpty()) {
 				throw new SecException(ErrCd.USER_NOT_REG);
 			} else if (!"Y".equals(result.get("USE_YN"))) {
 				throw new SecException(ErrCd.USER_NOT_REG);
-			} else if (!result.containsKey("USER_PW") || !passwordEncoder.matches(user_pw, (String) result.get("USER_PW"))) {
+			} else if (!result.containsKey("USER_PW") || !passwdFromUI.equals(passwdFromDB) ) {
 				throw new SecException(ErrCd.WRONG_PASSWD);
 			}
-
+			
 			// 2. 인가 ROLE(고정 - ROLE_ADMIN)
 			List<GrantedAuthority> roles = new ArrayList<GrantedAuthority>();
 			roles.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
