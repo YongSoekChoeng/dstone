@@ -31,7 +31,8 @@ import net.dstone.common.utils.StringUtil;
  * 02. 신규데이터 입력 - Step
  * 
  * < JobParameter >
- * 1. chunkSize : 청크 사이즈.
+ * 1. dataCnt : 생성데이터 갯수. 필수.
+ * 2. chunkSize : 청크 사이즈.
  * 
  * </pre>
  */
