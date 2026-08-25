@@ -93,4 +93,31 @@
         DELETE FROM TB_BATCH_JOB WHERE JOB_ID = #{jobId}
     </delete>
 
+    <!-- 배치Job 실행파라메터 목록조회 -->
+    <select id="listJobParam" parameterType="long" resultType="net.dstone.batchadmin.job.vo.BatchJobParamVo">
+        SELECT
+            A.JOB_ID
+            , A.PARAM_NAME      /* 파라메터명 */
+            , A.PARAM_VALUE     /* 파라메터값 */
+        FROM
+            TB_BATCH_JOB_PARAM A
+        WHERE 1=1
+            AND A.JOB_ID = #{jobId}
+        ORDER BY A.SORT_ORDER, A.PARAM_NAME
+    </select>
+
+    <!-- 배치Job 실행파라메터 전체삭제(등록/수정시 전체교체 방식으로 재저장) -->
+    <delete id="deleteJobParam" parameterType="long">
+        DELETE FROM TB_BATCH_JOB_PARAM WHERE JOB_ID = #{jobId}
+    </delete>
+
+    <!-- 배치Job 실행파라메터 일괄등록 -->
+    <insert id="insertJobParam" parameterType="java.util.List">
+        INSERT INTO TB_BATCH_JOB_PARAM (JOB_ID, PARAM_NAME, PARAM_VALUE, SORT_ORDER)
+        VALUES
+        <foreach collection="list" item="item" index="idx" separator=",">
+            (#{item.JOB_ID}, #{item.PARAM_NAME}, #{item.PARAM_VALUE}, #{idx})
+        </foreach>
+    </insert>
+
 </mapper>

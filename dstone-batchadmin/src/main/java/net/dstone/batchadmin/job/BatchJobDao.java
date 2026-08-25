@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Repository;
 
+import net.dstone.batchadmin.job.vo.BatchJobParamVo;
 import net.dstone.batchadmin.job.vo.BatchJobVo;
 
 /**
@@ -35,5 +36,21 @@ public class BatchJobDao extends net.dstone.batchadmin.common.biz.BaseDao {
 	public int deleteJob(Long jobId) throws Exception {
 		return sqlSessionCommon.delete("net.dstone.batchadmin.job.BatchJobDao.deleteJob", jobId);
 	}
+
+	/*** 배치Job 실행파라메터(TB_BATCH_JOB_PARAM) 시작 ***/
+
+	public List<BatchJobParamVo> listJobParam(Long jobId) throws Exception {
+		return sqlSessionCommon.selectList("net.dstone.batchadmin.job.BatchJobDao.listJobParam", jobId);
+	}
+
+	public int deleteJobParam(Long jobId) throws Exception {
+		return sqlSessionCommon.delete("net.dstone.batchadmin.job.BatchJobDao.deleteJobParam", jobId);
+	}
+
+	public int insertJobParam(List<BatchJobParamVo> paramList) throws Exception {
+		return sqlSessionCommon.insert("net.dstone.batchadmin.job.BatchJobDao.insertJobParam", paramList);
+	}
+
+	/*** 배치Job 실행파라메터 끝 ***/
 
 }

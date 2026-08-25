@@ -62,7 +62,7 @@
 							delLink.click(function(){ deleteJob($(this).data("id")); });
 							var startLink = $("<span class='btn-link'>즉시시작</span>");
 							startLink.data("row", row);
-							startLink.click(function(){ var r=$(this).data("row"); startJobNow(r.SERVER_ID, r.JOB_NM); });
+							startLink.click(function(){ var r=$(this).data("row"); startJobNow(r.JOB_ID, r.JOB_NM); });
 							tdAction.append(editLink).append(delLink).append(startLink);
 							tr.append(tdAction);
 							tbody.append(tr);
@@ -81,19 +81,62 @@
 				$("#OWNER_NM").val(row.OWNER_NM);
 				$("#USE_YN").val(row.USE_YN);
 				$("#FORM_TITLE").text("배치JOB 수정");
+				loadJobParams(row.JOB_ID);
 			}
 
 			function resetForm(){
 				document.JOB_FORM.reset();
 				$("#JOB_ID").val("");
 				$("#FORM_TITLE").text("배치JOB 신규등록");
+				$("#PARAM_TBODY").empty();
+				addParamRow("", "");
 			}
+
+			/*** 실행파라메터 행 관리 시작 ***/
+			function addParamRow(name, value){
+				var tr = $("<tr></tr>");
+				tr.append($("<td></td>").append(
+					$("<input type='text' name='PARAM_NAME'>").val(name || "")
+				));
+				tr.append($("<td></td>").append(
+					$("<input type='text' name='PARAM_VALUE'>").val(value || "")
+				));
+				var tdAction = $("<td></td>");
+				var delLink = $("<span class='btn-link'>삭제</span>");
+				delLink.click(function(){ $(this).closest("tr").remove(); });
+				tdAction.append(delLink);
+				tr.append(tdAction);
+				$("#PARAM_TBODY").append(tr);
+			}
+
+			function loadJobParams(jobId){
+				$("#PARAM_TBODY").empty();
+				$.ajax({
+					type:"POST",
+					url:"<%=request.getContextPath()%>/job/listJobParam.do",
+					data:{JOB_ID: jobId},
+					dataType:"json",
+					success:function(data, status, request){
+						var list = data.returnObj || [];
+						if(list.length == 0){
+							addParamRow("", "");
+						}else{
+							for(var i=0; i<list.length; i++){
+								addParamRow(list[i].PARAM_NAME, list[i].PARAM_VALUE);
+							}
+						}
+					},
+					error:function(){ addParamRow("", ""); }
+				});
+			}
+			/*** 실행파라메터 행 관리 끝 ***/
 
 			function saveJob(){
 				$.ajax({
 					type:"POST",
 					url:"<%=request.getContextPath()%>/job/saveJob.do",
 					data:$(document.JOB_FORM).serializeObject(),
+					traditional:true, /* PARAM_NAME/PARAM_VALUE 배열을 PARAM_NAME=a&PARAM_NAME=b 형태(브라켓 없이)로 직렬화 */
 					dataType:"json",
 					success:function(data, status, request){
 						var successYn = request.getResponseHeader('successYn');
@@ -119,12 +162,12 @@
 				});
 			}
 
-			function startJobNow(serverId, jobNm){
-				if(!confirm(jobNm+" 을(를) 즉시 시작하시겠습니까?")) return;
+			function startJobNow(jobId, jobNm){
+				if(!confirm(jobNm+" 을(를) 등록된 파라메터로 즉시 시작하시겠습니까?")) return;
 				$.ajax({
 					type:"POST",
 					url:"<%=request.getContextPath()%>/job/startJob.do",
-					data:{SERVER_ID: serverId, JOB_NAME: jobNm},
+					data:{JOB_ID: jobId},
 					dataType:"json",
 					success:function(data){ alert("결과: " + JSON.stringify(data.returnObj)); },
 					error:function(){ alert("호출 실패"); }
@@ -194,6 +237,14 @@
 										</select>
 									</div>
 								</div>
+								<h4>실행파라메터 <span class="btn-link" onclick="javascript:addParamRow('','');">+ 행추가</span></h4>
+								<table class="grid">
+									<thead>
+										<tr><th style="width:35%">파라메터명</th><th style="width:45%">값</th><th>관리</th></tr>
+									</thead>
+									<tbody id="PARAM_TBODY"></tbody>
+								</table>
+
 								<button type="button" class="button primary" onclick="javascript:saveJob();">저장</button>
 								<button type="button" class="button" onclick="javascript:resetForm();">신규작성</button>
 							</form>

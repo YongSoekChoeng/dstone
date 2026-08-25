@@ -11,6 +11,7 @@ import org.springframework.web.servlet.ModelAndView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.batchadmin.job.vo.BatchJobExecVo;
+import net.dstone.batchadmin.job.vo.BatchJobParamVo;
 import net.dstone.batchadmin.job.vo.BatchJobVo;
 import net.dstone.common.utils.RequestUtil;
 import net.dstone.common.utils.StringUtil;
@@ -121,7 +122,21 @@ public class BatchJobController extends net.dstone.batchadmin.common.biz.BaseCon
 		mav = new ModelAndView("jsonView");
 		RequestUtil requestUtil = new RequestUtil(request, response);
 		BatchJobVo paramVo = (BatchJobVo) bindSingleValue(requestUtil, new BatchJobVo());
-		batchJobService.saveJob(paramVo);
+		BatchJobParamVo[] paramArr = (BatchJobParamVo[]) bindMultiValues(requestUtil, "net.dstone.batchadmin.job.vo.BatchJobParamVo");
+		batchJobService.saveJob(paramVo, paramArr);
+		mav.addObject("successYn", "Y");
+		return mav;
+	}
+
+	/**
+	 * Job 등록/수정 폼에서 특정 Job의 저장된 실행파라메터 목록을 불러올 때 사용.
+	 */
+	@RequestMapping(value = "/listJobParam.do")
+	public ModelAndView listJobParam(HttpServletRequest request, HttpServletResponse response, ModelAndView mav) throws Exception {
+		mav = new ModelAndView("jsonView");
+		RequestUtil requestUtil = new RequestUtil(request, response);
+		Long jobId = Long.valueOf(requestUtil.getParameter("JOB_ID"));
+		mav.addObject("returnObj", batchJobService.listJobParam(jobId));
 		mav.addObject("successYn", "Y");
 		return mav;
 	}
@@ -157,9 +172,8 @@ public class BatchJobController extends net.dstone.batchadmin.common.biz.BaseCon
 	public ModelAndView startJob(HttpServletRequest request, HttpServletResponse response, ModelAndView mav) throws Exception {
 		mav = new ModelAndView("jsonView");
 		RequestUtil requestUtil = new RequestUtil(request, response);
-		Long serverId = Long.valueOf(requestUtil.getParameter("SERVER_ID"));
-		String jobNm = requestUtil.getParameter("JOB_NAME");
-		mav.addObject("returnObj", batchJobService.startJob(serverId, jobNm));
+		Long jobId = Long.valueOf(requestUtil.getParameter("JOB_ID"));
+		mav.addObject("returnObj", batchJobService.startJob(jobId));
 		mav.addObject("successYn", "Y");
 		return mav;
 	}

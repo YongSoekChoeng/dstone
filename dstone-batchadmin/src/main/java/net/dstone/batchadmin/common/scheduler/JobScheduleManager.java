@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import net.dstone.batchadmin.common.rest.BatchRestClient;
 import net.dstone.batchadmin.job.BatchJobDao;
+import net.dstone.batchadmin.job.vo.BatchJobParamVo;
 import net.dstone.batchadmin.job.vo.BatchJobVo;
 import net.dstone.batchadmin.server.BatchServerDao;
 import net.dstone.batchadmin.server.vo.BatchServerVo;
@@ -94,8 +95,15 @@ public class JobScheduleManager extends BaseObject {
 				this.error(this.getClass().getName() + ".fireJob() jobId[" + jobId + "] 의 대상서버가 유효하지 않습니다.");
 				return;
 			}
-			this.info(this.getClass().getName() + ".fireJob() jobNm[" + jobNm + "] server[" + server.getSERVER_NM() + "] 스케줄기동 시작.");
-			Map<String, Object> result = batchRestClient.startJob(server.getREST_BASE_URL(), jobNm, null);
+			List<BatchJobParamVo> paramList = batchJobDao.listJobParam(jobId);
+			Map<String, Object> params = new HashMap<String, Object>();
+			if (paramList != null) {
+				for (BatchJobParamVo param : paramList) {
+					params.put(param.getPARAM_NAME(), param.getPARAM_VALUE());
+				}
+			}
+			this.info(this.getClass().getName() + ".fireJob() jobNm[" + jobNm + "] server[" + server.getSERVER_NM() + "] params[" + params + "] 스케줄기동 시작.");
+			Map<String, Object> result = batchRestClient.startJob(server.getREST_BASE_URL(), jobNm, params);
 			this.info(this.getClass().getName() + ".fireJob() jobNm[" + jobNm + "] 스케줄기동 결과:" + result);
 		} catch (Exception e) {
 			this.error(this.getClass().getName() + ".fireJob(jobId[" + jobId + "]) 수행중 예외발생. 상세사항:" + e.toString());

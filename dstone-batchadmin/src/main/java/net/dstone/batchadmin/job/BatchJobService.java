@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import net.dstone.batchadmin.common.rest.BatchRestClient;
 import net.dstone.batchadmin.common.scheduler.JobScheduleManager;
 import net.dstone.batchadmin.job.vo.BatchJobExecVo;
+import net.dstone.batchadmin.job.vo.BatchJobParamVo;
 import net.dstone.batchadmin.job.vo.BatchJobVo;
 import net.dstone.batchadmin.job.vo.BatchStepExecVo;
 import net.dstone.batchadmin.server.BatchServerDao;
@@ -55,13 +56,18 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 		}
 	}
 
-	public void saveJob(BatchJobVo vo) throws BizException {
+	/**
+	 * @param vo Job 메타데이터
+	 * @param paramArr 실행파라메터 목록(PARAM_NAME이 비어있는 행은 무시). null이면 파라메터 변경 없이 Job 메타데이터만 저장.
+	 */
+	public void saveJob(BatchJobVo vo, BatchJobParamVo[] paramArr) throws BizException {
 		try {
 			if (vo.getJOB_ID() == null) {
 				batchJobDao.insertJob(vo); // useGeneratedKeys로 vo.JOB_ID가 채워짐
 			} else {
 				batchJobDao.updateJob(vo);
 			}
+			saveJobParam(vo.getJOB_ID(), paramArr);
 			jobScheduleManager.scheduleJob(vo);
 		} catch (Exception e) {
 			this.error(this.getClass().getName() + ".saveJob 수행중 예외발생. 상세사항:" + e.toString());
@@ -69,9 +75,39 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 		}
 	}
 
+	/**
+	 * Job의 실행파라메터를 전체교체(삭제 후 재등록) 방식으로 저장한다.
+	 */
+	private void saveJobParam(Long jobId, BatchJobParamVo[] paramArr) throws Exception {
+		batchJobDao.deleteJobParam(jobId);
+		if (paramArr == null || paramArr.length == 0) {
+			return;
+		}
+		List<BatchJobParamVo> insertList = new java.util.ArrayList<BatchJobParamVo>();
+		for (BatchJobParamVo param : paramArr) {
+			if (param == null || net.dstone.common.utils.StringUtil.isEmpty(param.getPARAM_NAME())) {
+				continue;
+			}
+			param.setJOB_ID(jobId);
+			insertList.add(param);
+		}
+		if (!insertList.isEmpty()) {
+			batchJobDao.insertJobParam(insertList);
+		}
+	}
+
+	public List<BatchJobParamVo> listJobParam(Long jobId) throws BizException {
+		try {
+			return batchJobDao.listJobParam(jobId);
+		} catch (Exception e) {
+			this.error(this.getClass().getName() + ".listJobParam 수행중 예외발생. 상세사항:" + e.toString());
+			throw new BizException(ErrCd.SYS_ERR, e.toString());
+		}
+	}
+
 	public void deleteJob(Long jobId) throws BizException {
 		try {
-			batchJobDao.deleteJob(jobId);
+			batchJobDao.deleteJob(jobId); // TB_BATCH_JOB_PARAM은 FK ON DELETE CASCADE로 함께 삭제됨
 			jobScheduleManager.unscheduleJob(jobId);
 		} catch (Exception e) {
 			this.error(this.getClass().getName() + ".deleteJob 수행중 예외발생. 상세사항:" + e.toString());
@@ -183,10 +219,25 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 
 	/*** Job 제어(REST 호출, dstone-batch RestApiRunner 대상) 시작 ***/
 
-	public Map<String, Object> startJob(Long serverId, String jobNm) throws BizException {
+	/**
+	 * 등록된 배치Job을 시작한다. 대상서버/JOB명과, Job 등록시 저장된 실행파라메터(TB_BATCH_JOB_PARAM)를
+	 * 함께 조회하여 dstone-batch startJob 호출에 그대로 전달한다.
+	 */
+	public Map<String, Object> startJob(Long jobId) throws BizException {
 		try {
-			BatchServerVo server = getServerOrThrow(serverId);
-			return batchRestClient.startJob(server.getREST_BASE_URL(), jobNm, null);
+			BatchJobVo job = batchJobDao.selectJob(jobId);
+			if (job == null) {
+				throw new Exception("등록되지 않은 배치Job입니다. JOB_ID[" + jobId + "]");
+			}
+			BatchServerVo server = getServerOrThrow(job.getSERVER_ID());
+			List<BatchJobParamVo> paramList = batchJobDao.listJobParam(jobId);
+			Map<String, Object> params = new HashMap<String, Object>();
+			if (paramList != null) {
+				for (BatchJobParamVo param : paramList) {
+					params.put(param.getPARAM_NAME(), param.getPARAM_VALUE());
+				}
+			}
+			return batchRestClient.startJob(server.getREST_BASE_URL(), job.getJOB_NM(), params);
 		} catch (Exception e) {
 			this.error(this.getClass().getName() + ".startJob 수행중 예외발생. 상세사항:" + e.toString());
 			throw new BizException(ErrCd.SYS_ERR, e.toString());

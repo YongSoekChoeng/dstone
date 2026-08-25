@@ -1,5 +1,6 @@
 package net.dstone.batchadmin.common.rest;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,6 +41,21 @@ public class BatchRestClient extends BaseObject {
 		}
 	}
 
+	private Map<String, Object> exchange(URI uri, HttpMethod method) {
+		try {
+			ResponseEntity<Map<String, Object>> response = getRestTemplate().exchange(uri, method, HttpEntity.EMPTY,
+					new ParameterizedTypeReference<Map<String, Object>>() {
+					});
+			return response.getBody();
+		} catch (Exception e) {
+			this.error(this.getClass().getName() + ".exchange(" + uri + ") 호출중 예외발생. 상세사항:" + e.toString());
+			Map<String, Object> errorMap = new HashMap<String, Object>();
+			errorMap.put("success", "N");
+			errorMap.put("message", e.toString());
+			return errorMap;
+		}
+	}
+
 	public Map<String, Object> healthCheck(String restBaseUrl) {
 		return exchange(restBaseUrl + "/healthCheck", HttpMethod.GET);
 	}
@@ -56,6 +72,9 @@ public class BatchRestClient extends BaseObject {
 		return exchange(restBaseUrl + "/unregisterJob/" + jobName, HttpMethod.POST);
 	}
 
+	/**
+	 * @param params Job 등록시 저장된 실행파라메터(TB_BATCH_JOB_PARAM). 값은 쿼리파라메터로 percent-encoding되어 전달된다.
+	 */
 	public Map<String, Object> startJob(String restBaseUrl, String jobName, Map<String, Object> params) {
 		UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(restBaseUrl + "/startJob/" + jobName);
 		if (params != null) {
@@ -63,7 +82,8 @@ public class BatchRestClient extends BaseObject {
 				builder.queryParam(entry.getKey(), entry.getValue());
 			}
 		}
-		return exchange(builder.toUriString(), HttpMethod.POST);
+		URI uri = builder.build().encode().toUri();
+		return exchange(uri, HttpMethod.POST);
 	}
 
 	public Map<String, Object> stopJob(String restBaseUrl, Long jobExecutionId) {
