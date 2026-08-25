@@ -8,7 +8,7 @@ import jakarta.xml.bind.annotation.XmlRootElement;
  * 관리대상 dstone-batch 서버 레지스트리(TB_BATCH_SERVER) VO.
  * <pre>
  * REST_BASE_URL : dstone-batch RestApiRunner의 base url (예: http://localhost:6081/batch)
- * DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD : 해당 서버가 사용하는 Spring Batch 메타데이터DB 접속정보(DB_PASSWORD는 ENC(...) 암호화 저장)
+ * DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD : 해당 서버가 사용하는 Spring Batch 메타데이터DB 접속정보
  * DBMS_TYPE : MYSQL/POSTGRES - 매퍼 XML의 벤더별 쿼리분기(<if test="DBMS_TYPE=='...'">)에 사용
  * </pre>
  */

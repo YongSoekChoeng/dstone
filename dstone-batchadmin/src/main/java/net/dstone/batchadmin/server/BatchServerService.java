@@ -53,7 +53,10 @@ public class BatchServerService extends net.dstone.batchadmin.common.biz.BaseSer
 			if (StringUtil.isEmpty(vo.getDB_PASSWORD())) {
 				throw new Exception("배치서버 등록시 DB_PASSWORD는 필수입니다.");
 			}
-			vo.setDB_PASSWORD("ENC(" + stringEncryptor.encrypt(vo.getDB_PASSWORD()) + ")");
+
+			String password = net.dstone.common.utils.EncUtil.encrypt(vo.getDB_PASSWORD());
+			vo.setDB_PASSWORD(password);
+			
 			batchServerDao.insertServer(vo);
 			dataSourceRegistry.refresh();
 		} catch (Exception e) {
@@ -68,10 +71,12 @@ public class BatchServerService extends net.dstone.batchadmin.common.biz.BaseSer
 	public void updateServer(BatchServerVo vo) throws BizException {
 		try {
 			if (!StringUtil.isEmpty(vo.getDB_PASSWORD())) {
-				vo.setDB_PASSWORD("ENC(" + stringEncryptor.encrypt(vo.getDB_PASSWORD()) + ")");
+				String password = net.dstone.common.utils.EncUtil.encrypt(vo.getDB_PASSWORD());
+				vo.setDB_PASSWORD(password);
 			} else {
 				vo.setDB_PASSWORD(null);
 			}
+			
 			batchServerDao.updateServer(vo);
 			dataSourceRegistry.refresh();
 		} catch (Exception e) {

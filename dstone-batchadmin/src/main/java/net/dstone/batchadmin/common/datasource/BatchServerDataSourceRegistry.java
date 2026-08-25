@@ -76,8 +76,9 @@ public class BatchServerDataSourceRegistry extends BaseObject {
 		String dbmsType = server.getDBMS_TYPE() == null ? "MYSQL" : server.getDBMS_TYPE().trim().toUpperCase();
 		HikariConfig config = new HikariConfig();
 		String password = server.getDB_PASSWORD();
-		if (password != null && password.startsWith("ENC(") && password.endsWith(")")) {
-			password = stringEncryptor.decrypt(password.substring(4, password.length() - 1));
+
+		if ( !"".equals(password)) {
+			password = net.dstone.common.utils.EncUtil.decrypt(password);
 		}
 		if ("POSTGRES".equals(dbmsType)) {
 			config.setDriverClassName("org.postgresql.Driver");

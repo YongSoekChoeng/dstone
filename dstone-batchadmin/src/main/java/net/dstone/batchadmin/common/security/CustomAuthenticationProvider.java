@@ -53,11 +53,12 @@ public class CustomAuthenticationProvider extends BaseObject implements Authenti
 			// 1. 인증 로그인 처리
 			Map<String, Object> result = customUserService.loginProcess(param);
 			
-			String passwdFromUI = net.dstone.common.utils.EncUtil.encrypt(user_pw);
+			String passwdFromUI = user_pw;
 			String passwdFromDB = (String) result.get("USER_PW");
-			
-			this.info("passwdFromUI["+passwdFromUI+"]" + " 11 passwdFromDB["+passwdFromDB+"]");
-			
+			if ( !"".equals(passwdFromDB)) {
+				passwdFromDB = net.dstone.common.utils.EncUtil.decrypt(passwdFromDB);
+			}
+			 
 			if (result == null || result.isEmpty()) {
 				throw new SecException(ErrCd.USER_NOT_REG);
 			} else if (!"Y".equals(result.get("USE_YN"))) {

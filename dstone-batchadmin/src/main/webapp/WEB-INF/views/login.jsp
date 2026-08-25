@@ -23,7 +23,7 @@
 							<form name="SUBMIT_FORM" method="post" action="<%=net.dstone.batchadmin.common.config.ConfigSecurity.LOGIN_PROCESS_ACTION%>">
 								<div class="field">
 									<label>아이디</label>
-									<input type="text" name="<%=net.dstone.batchadmin.common.config.ConfigSecurity.USERNAME_PARAMETER%>" autofocus>
+									<input type="text" name="<%=net.dstone.batchadmin.common.config.ConfigSecurity.USERNAME_PARAMETER%>" autofocus value="batchadmin" >
 								</div>
 								<div class="field">
 									<label>비밀번호</label>
