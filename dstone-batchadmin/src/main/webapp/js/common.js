@@ -1,7 +1,7 @@
 
     $.fn.serializeObject = function() { 
         var o = {}; 
-        $(this).find('input[type="hidden"], input[type="text"], input[type="password"], input[type="checkbox"]:checked, input[type="radio"]:checked, select, textarea').each(function() { 
+        $(this).find('input[type="hidden"], input[type="text"], input[type="password"], input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="time"], input[type="number"], input[type="email"], input[type="tel"], input[type="url"], input[type="search"], input[type="checkbox"]:checked, input[type="radio"]:checked, select, textarea').each(function() {
             if ($(this).attr('type') == 'hidden') { //if checkbox is checked do not take the hidden field 
                 var $parent = $(this).parent(); 
                 var $chb = $parent.find('input[type="checkbox"][name="' + this.name.replace(/\[/g, '\[').replace(/\]/g, '\]') + '\"]'); 

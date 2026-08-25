@@ -50,13 +50,14 @@ public class BatchServerService extends net.dstone.batchadmin.common.biz.BaseSer
 
 	public void insertServer(BatchServerVo vo) throws BizException {
 		try {
+			trimServerFields(vo);
 			if (StringUtil.isEmpty(vo.getDB_PASSWORD())) {
 				throw new Exception("배치서버 등록시 DB_PASSWORD는 필수입니다.");
 			}
 
 			String password = net.dstone.common.utils.EncUtil.encrypt(vo.getDB_PASSWORD());
 			vo.setDB_PASSWORD(password);
-			
+
 			batchServerDao.insertServer(vo);
 			dataSourceRegistry.refresh();
 		} catch (Exception e) {
@@ -70,6 +71,7 @@ public class BatchServerService extends net.dstone.batchadmin.common.biz.BaseSer
 	 */
 	public void updateServer(BatchServerVo vo) throws BizException {
 		try {
+			trimServerFields(vo);
 			if (!StringUtil.isEmpty(vo.getDB_PASSWORD())) {
 				String password = net.dstone.common.utils.EncUtil.encrypt(vo.getDB_PASSWORD());
 				vo.setDB_PASSWORD(password);
@@ -83,6 +85,21 @@ public class BatchServerService extends net.dstone.batchadmin.common.biz.BaseSer
 			this.error(this.getClass().getName() + ".updateServer 수행중 예외발생. 상세사항:" + e.toString());
 			throw new BizException(ErrCd.SYS_ERR, e.toString());
 		}
+	}
+
+	/**
+	 * 공백이 섞여 접속정보가 조용히 깨지는 것을 방지(REST_BASE_URL/DB_HOST 등에 앞뒤 공백이 유입되면
+	 * REST호출/DB연결이 이유없이 실패하는 것처럼 보임). DB_PASSWORD는 값 그대로 유지한다.
+	 */
+	private void trimServerFields(BatchServerVo vo) {
+		vo.setSERVER_NM(StringUtil.trim(vo.getSERVER_NM()));
+		vo.setREST_BASE_URL(StringUtil.trim(vo.getREST_BASE_URL()));
+		vo.setDB_HOST(StringUtil.trim(vo.getDB_HOST()));
+		vo.setDB_PORT(StringUtil.trim(vo.getDB_PORT()));
+		vo.setDB_NAME(StringUtil.trim(vo.getDB_NAME()));
+		vo.setDB_USER(StringUtil.trim(vo.getDB_USER()));
+		vo.setDBMS_TYPE(StringUtil.trim(vo.getDBMS_TYPE()));
+		vo.setDESCRIPTION(StringUtil.trim(vo.getDESCRIPTION()));
 	}
 
 	public void deleteServer(Long serverId) throws BizException {

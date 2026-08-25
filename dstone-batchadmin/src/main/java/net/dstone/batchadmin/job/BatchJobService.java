@@ -62,6 +62,11 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 	 */
 	public void saveJob(BatchJobVo vo, BatchJobParamVo[] paramArr) throws BizException {
 		try {
+			// JOB_NM은 dstone-batch측 @AutoRegJob(name=...) 값과 정확히 일치해야 하므로 공백 유입을 방지하기 위해 trim
+			vo.setJOB_NM(net.dstone.common.utils.StringUtil.trim(vo.getJOB_NM()));
+			vo.setCRON_EXPRESSION(net.dstone.common.utils.StringUtil.trim(vo.getCRON_EXPRESSION()));
+			vo.setDESCRIPTION(net.dstone.common.utils.StringUtil.trim(vo.getDESCRIPTION()));
+			vo.setOWNER_NM(net.dstone.common.utils.StringUtil.trim(vo.getOWNER_NM()));
 			if (vo.getJOB_ID() == null) {
 				batchJobDao.insertJob(vo); // useGeneratedKeys로 vo.JOB_ID가 채워짐
 			} else {
@@ -85,10 +90,16 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 		}
 		List<BatchJobParamVo> insertList = new java.util.ArrayList<BatchJobParamVo>();
 		for (BatchJobParamVo param : paramArr) {
-			if (param == null || net.dstone.common.utils.StringUtil.isEmpty(param.getPARAM_NAME())) {
+			if (param == null) {
+				continue;
+			}
+			String paramName = net.dstone.common.utils.StringUtil.trim(param.getPARAM_NAME());
+			if (net.dstone.common.utils.StringUtil.isEmpty(paramName)) {
 				continue;
 			}
 			param.setJOB_ID(jobId);
+			param.setPARAM_NAME(paramName);
+			param.setPARAM_VALUE(net.dstone.common.utils.StringUtil.trim(param.getPARAM_VALUE()));
 			insertList.add(param);
 		}
 		if (!insertList.isEmpty()) {
@@ -130,6 +141,11 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 				throw new Exception("등록되지 않은 배치서버입니다. SERVER_ID[" + paramVo.getSERVER_ID() + "]");
 			}
 			paramVo.setDBMS_TYPE(server.getDBMS_TYPE());
+			// 조회조건에 유입된 앞뒤 공백 제거(공백이 섞이면 LIKE/등호 비교가 매치되지 않아 조회가 안되는 것처럼 보임)
+			paramVo.setSEARCH_JOB_NAME(net.dstone.common.utils.StringUtil.trim(paramVo.getSEARCH_JOB_NAME()));
+			paramVo.setSEARCH_JOB_INSTANCE_ID(net.dstone.common.utils.StringUtil.trim(paramVo.getSEARCH_JOB_INSTANCE_ID()));
+			paramVo.setSEARCH_START_DT_FROM(net.dstone.common.utils.StringUtil.trim(paramVo.getSEARCH_START_DT_FROM()));
+			paramVo.setSEARCH_START_DT_TO(net.dstone.common.utils.StringUtil.trim(paramVo.getSEARCH_START_DT_TO()));
 			// 실행일자(yyyyMMdd) 검색조건을 하루의 시작/끝 시각(yyyyMMddHHmmss)으로 확장
 			if (!net.dstone.common.utils.StringUtil.isEmpty(paramVo.getSEARCH_START_DT_FROM())) {
 				paramVo.setSEARCH_START_DT_FROM(paramVo.getSEARCH_START_DT_FROM() + "000000");
