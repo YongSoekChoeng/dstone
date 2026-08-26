@@ -107,8 +107,7 @@ public class TableDataGenType02JobConfig extends BaseJobConfig {
     			int dataCnt = Integer.parseInt(this.getJobParam("dataCnt").toString()) ;
     			for(int i=0; i<dataCnt; i++) {
                     Map<String, Object> row = new HashMap<>();
-                    row.put("TEST_ID", StringUtil.filler(String.valueOf(i), 8, "0") );
-                    //row.put("TEST_NAME", "이름-" + i);
+                    row.put("TEST_NAME", "이름-" + i);
                     row.put("FLAG_YN", "N");
                     row.put("INPUT_DT", DateUtil.getToDate("yyyyMMddHHmmss"));
                     queue.add(row);
