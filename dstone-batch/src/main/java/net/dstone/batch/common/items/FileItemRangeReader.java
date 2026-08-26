@@ -142,11 +142,13 @@ public class FileItemRangeReader extends AbstractItemReader<Map<String, Object>>
         } catch (Exception e) {
             throw new ItemStreamException("파일 오픈 실패: " + inputFileFullPath, e);
         }
+        // 재시작 시 이전 실행에서 이미 커밋완료된(fromLine 기준 상대) 라인수를 복원(이후 read() 호출 시 자동으로 건너뜀).
+        super.open(stepExecution);
     }
 
     @Override
-    public synchronized Map<String, Object> read() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
-    	//callLog(this, "read");
+    protected synchronized Map<String, Object> doRead() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
+    	//callLog(this, "doRead");
         if (reader == null) {
             throw new IllegalStateException("Reader is not opened.");
         }

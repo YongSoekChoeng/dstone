@@ -116,8 +116,8 @@ public class TableDataGenType02JobConfig extends BaseJobConfig {
     		}
     		
 			@Override
-			public Map<String, Object> read() {
-				//callLog(this, "read");
+			protected Map<String, Object> doRead() {
+				//callLog(this, "doRead");
 				Map<String, Object> row = null;
 				if(queue == null) {
 					fillQueue();
@@ -127,7 +127,7 @@ public class TableDataGenType02JobConfig extends BaseJobConfig {
 			}
 		};
     }
-	/* --------------------------------- Reader 설정 끝 -------------------------------- */ 
+	/* --------------------------------- Reader 설정 끝 -------------------------------- */
 
 	/* --------------------------------- Processor 설정 시작 ---------------------------- */ 
     /**

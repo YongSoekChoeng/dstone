@@ -33,13 +33,13 @@ public class SampleItemReader<T> extends AbstractItemReader<T> implements ItemRe
     }
 
     @Override
-    public T read() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
-    	log(this.getClass().getName() + ".read() has been called !!!");
+    protected T doRead() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
+    	log(this.getClass().getName() + ".doRead() has been called !!!");
     	T item = null;
     	synchronized(lockObj) {
     		item = dataQueue.poll();
         	String threadId = String.valueOf(Thread.currentThread().threadId());
-        	log( "threadId["+threadId+"] " + "net.dstone.batch.sample.jobs.job001.SampleItemReader.read() has been called !!! ::: item["+item+"]" + "this.dataQueue.size() ===>>> " + this.dataQueue.size());
+        	log( "threadId["+threadId+"] " + "net.dstone.batch.sample.jobs.job001.SampleItemReader.doRead() has been called !!! ::: item["+item+"]" + "this.dataQueue.size() ===>>> " + this.dataQueue.size());
     	}
         return item;
     }

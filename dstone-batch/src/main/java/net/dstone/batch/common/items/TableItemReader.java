@@ -112,11 +112,13 @@ public class TableItemReader extends AbstractItemReader<Map<String, Object>> imp
         	close();
             throw new ItemStreamException("Cursor 열기 실패: " + queryId, e);
         }
+        // 재시작 시 이전 실행에서 이미 커밋완료된 건수를 복원(이후 read() 호출 시 자동으로 건너뜀).
+        super.open(executionContext);
     }
 
     @Override
-    public synchronized Map<String, Object> read() {
-    	//callLog(this, "read");
+    protected synchronized Map<String, Object> doRead() {
+    	//callLog(this, "doRead");
         if (this.cursor == null) {
         	return null;
         }

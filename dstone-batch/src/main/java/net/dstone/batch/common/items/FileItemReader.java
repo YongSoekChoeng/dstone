@@ -124,16 +124,18 @@ public class FileItemReader extends AbstractItemReader<Map<String, Object>> impl
         	}
         	// Default OUTPUT 파일명 Step Parameter 로 저장.
         	this.setStepParam( Constants.Partition.OUTPUT_FILE_PATH, this.getDefaultOutputFileFullPath(inputFile));
-        	
+
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(inputFile), Charset.forName(charset)));
         } catch (Exception e) {
             throw new ItemStreamException("파일 오픈 실패: " + inputFile, e);
         }
+        // 재시작 시 이전 실행에서 이미 커밋완료된 라인수를 복원(이후 read() 호출 시 자동으로 건너뜀).
+        super.open(executionContext);
     }
 
     @Override
-    public Map<String, Object> read() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
-    	//callLog(this, "read");
+    protected Map<String, Object> doRead() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
+    	//callLog(this, "doRead");
         if (reader == null) {
             throw new IllegalStateException("Reader is not opened.");
         }
