@@ -17,6 +17,8 @@ public class BatchJobParamVo {
 	private String PARAM_NAME;
 	@JsonProperty("PARAM_VALUE")
 	private String PARAM_VALUE;
+	@JsonProperty("PARAM_DESC")
+	private String PARAM_DESC;
 
 	public Long getJOB_ID() {
 		return JOB_ID;
@@ -36,9 +38,15 @@ public class BatchJobParamVo {
 	public void setPARAM_VALUE(String PARAM_VALUE) {
 		this.PARAM_VALUE = PARAM_VALUE;
 	}
+	public String getPARAM_DESC() {
+		return PARAM_DESC;
+	}
+	public void setPARAM_DESC(String PARAM_DESC) {
+		this.PARAM_DESC = PARAM_DESC;
+	}
 
 	@Override
 	public String toString() {
-		return "BatchJobParamVo [JOB_ID=" + JOB_ID + ", PARAM_NAME=" + PARAM_NAME + ", PARAM_VALUE=" + PARAM_VALUE + "]";
+		return "BatchJobParamVo [JOB_ID=" + JOB_ID + ", PARAM_NAME=" + PARAM_NAME + ", PARAM_VALUE=" + PARAM_VALUE + ", PARAM_DESC=" + PARAM_DESC + "]";
 	}
 }

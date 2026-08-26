@@ -100,6 +100,7 @@ public class BatchJobService extends net.dstone.batchadmin.common.biz.BaseServic
 			param.setJOB_ID(jobId);
 			param.setPARAM_NAME(paramName);
 			param.setPARAM_VALUE(net.dstone.common.utils.StringUtil.trim(param.getPARAM_VALUE()));
+			param.setPARAM_DESC(net.dstone.common.utils.StringUtil.trim(param.getPARAM_DESC()));
 			insertList.add(param);
 		}
 		if (!insertList.isEmpty()) {

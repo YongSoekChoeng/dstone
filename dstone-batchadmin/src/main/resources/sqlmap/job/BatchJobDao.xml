@@ -99,6 +99,7 @@
             A.JOB_ID
             , A.PARAM_NAME      /* 파라메터명 */
             , A.PARAM_VALUE     /* 파라메터값 */
+            , A.PARAM_DESC      /* 파라메터 설명 */
         FROM
             TB_BATCH_JOB_PARAM A
         WHERE 1=1
@@ -113,10 +114,10 @@
 
     <!-- 배치Job 실행파라메터 일괄등록 -->
     <insert id="insertJobParam" parameterType="java.util.List">
-        INSERT INTO TB_BATCH_JOB_PARAM (JOB_ID, PARAM_NAME, PARAM_VALUE, SORT_ORDER)
+        INSERT INTO TB_BATCH_JOB_PARAM (JOB_ID, PARAM_NAME, PARAM_VALUE, PARAM_DESC, SORT_ORDER)
         VALUES
         <foreach collection="list" item="item" index="idx" separator=",">
-            (#{item.JOB_ID}, #{item.PARAM_NAME}, #{item.PARAM_VALUE}, #{idx})
+            (#{item.JOB_ID}, #{item.PARAM_NAME}, #{item.PARAM_VALUE}, #{item.PARAM_DESC}, #{idx})
         </foreach>
     </insert>
 

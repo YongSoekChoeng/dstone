@@ -11,7 +11,9 @@
 			.form-box .row { display:flex; gap:12px; margin-bottom:10px; flex-wrap: wrap; }
 			.form-box .row .field { flex:1; min-width: 200px; }
 			.form-box .row .field label { display:block; font-size:0.85em; margin-bottom:3px; }
-			.form-box .row .field input, .form-box .row .field select { width:100%; box-sizing:border-box; }
+			.form-box .row .field input, .form-box .row .field select, .form-box .row .field textarea { width:100%; box-sizing:border-box; font-family:inherit; }
+			.form-box .row .field.wide { flex-basis:100%; }
+			.form-box .row .field textarea { resize:vertical; }
 			.btn-link { cursor:pointer; color:#2a6fdb; text-decoration: underline; margin-right:6px; }
 			.hint { font-size:0.85em; color:#666; }
 		</style>
@@ -89,17 +91,20 @@
 				$("#JOB_ID").val("");
 				$("#FORM_TITLE").text("배치JOB 신규등록");
 				$("#PARAM_TBODY").empty();
-				addParamRow("", "");
+				addParamRow("", "", "");
 			}
 
 			/*** 실행파라메터 행 관리 시작 ***/
-			function addParamRow(name, value){
+			function addParamRow(name, value, desc){
 				var tr = $("<tr></tr>");
 				tr.append($("<td></td>").append(
 					$("<input type='text' name='PARAM_NAME'>").val(name || "")
 				));
 				tr.append($("<td></td>").append(
 					$("<input type='text' name='PARAM_VALUE'>").val(value || "")
+				));
+				tr.append($("<td></td>").append(
+					$("<input type='text' name='PARAM_DESC'>").val(desc || "")
 				));
 				var tdAction = $("<td></td>");
 				var delLink = $("<span class='btn-link'>삭제</span>");
@@ -119,14 +124,14 @@
 					success:function(data, status, request){
 						var list = data.returnObj || [];
 						if(list.length == 0){
-							addParamRow("", "");
+							addParamRow("", "", "");
 						}else{
 							for(var i=0; i<list.length; i++){
-								addParamRow(list[i].PARAM_NAME, list[i].PARAM_VALUE);
+								addParamRow(list[i].PARAM_NAME, list[i].PARAM_VALUE, list[i].PARAM_DESC);
 							}
 						}
 					},
-					error:function(){ addParamRow("", ""); }
+					error:function(){ addParamRow("", "", ""); }
 				});
 			}
 			/*** 실행파라메터 행 관리 끝 ***/
@@ -220,7 +225,9 @@
 									<div class="field"><label>담당자</label><input type="text" id="OWNER_NM" name="OWNER_NM"></div>
 								</div>
 								<div class="row">
-									<div class="field"><label>설명</label><input type="text" id="DESCRIPTION" name="DESCRIPTION"></div>
+									<div class="field wide"><label>설명</label><textarea id="DESCRIPTION" name="DESCRIPTION" rows="5"></textarea></div>
+								</div>
+								<div class="row">
 									<div class="field"><label>CRON 표현식 (예: 0 0 1 * * *)</label><input type="text" id="CRON_EXPRESSION" name="CRON_EXPRESSION"></div>
 									<div class="field">
 										<label>자동스케줄 사용여부</label>
@@ -237,10 +244,10 @@
 										</select>
 									</div>
 								</div>
-								<h4>실행파라메터 <span class="btn-link" onclick="javascript:addParamRow('','');">+ 행추가</span></h4>
+								<h4>실행파라메터 <span class="btn-link" onclick="javascript:addParamRow('','','');">+ 행추가</span></h4>
 								<table class="grid">
 									<thead>
-										<tr><th style="width:35%">파라메터명</th><th style="width:45%">값</th><th>관리</th></tr>
+										<tr><th style="width:20%">파라메터명</th><th style="width:25%">값</th><th style="width:40%">설명</th><th>관리</th></tr>
 									</thead>
 									<tbody id="PARAM_TBODY"></tbody>
 								</table>
