@@ -26,7 +26,7 @@ import net.dstone.common.utils.StringUtil;
  * <pre>
  * 
  * CREATE TABLE SAMPLE_TEST (
- *   TEST_ID VARCHAR(30) NOT NULL, 
+ *   TEST_ID BIGINT NOT NULL AUTO_INCREMENT,
  *   TEST_NAME VARCHAR(200), 
  *   FLAG_YN VARCHAR(1), 
  *   INPUT_DT DATE NOT NULL,  
@@ -61,7 +61,7 @@ public class FileToTableJobConfig extends BaseJobConfig {
     boolean append 				= false;		// 기존파일이 존재 할 경우 기존데이터에 추가할지 여부
     LinkedHashMap<String,Integer> colInfoMap = new LinkedHashMap<String,Integer>(); 
     {
-	    colInfoMap.put("TEST_ID", 30);
+	    colInfoMap.put("TEST_ID", 64);
 	    colInfoMap.put("TEST_NAME", 200);
 	    colInfoMap.put("FLAG_YN", 1);
 	    colInfoMap.put("INPUT_DT", 14);

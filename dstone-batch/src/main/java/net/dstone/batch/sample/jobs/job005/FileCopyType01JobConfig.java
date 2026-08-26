@@ -51,7 +51,7 @@ public class FileCopyType01JobConfig extends BaseJobConfig {
     boolean append 				= false;		// 기존파일이 존재 할 경우 기존데이터에 추가할지 여부
     LinkedHashMap<String,Integer> colInfoMap = new LinkedHashMap<String,Integer>(); 
     {
-	    colInfoMap.put("TEST_ID", 30);
+	    colInfoMap.put("TEST_ID", 64);
 	    colInfoMap.put("TEST_NAME", 200);
 	    colInfoMap.put("FLAG_YN", 1);
 	    colInfoMap.put("INPUT_DT", 14);

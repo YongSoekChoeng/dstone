@@ -29,7 +29,7 @@ import net.dstone.common.utils.StringUtil;
  * 아래의 LAYOUT 구조와 동일한 파일 데이터를 생성하는 Job.
  * 
  * CREATE TABLE SAMPLE_TEST (
- *   TEST_ID VARCHAR(30) NOT NULL, 
+ *   TEST_ID BIGINT NOT NULL AUTO_INCREMENT,
  *   TEST_NAME VARCHAR(200), 
  *   FLAG_YN VARCHAR(1), 
  *   INPUT_DT DATE NOT NULL,  
@@ -65,7 +65,7 @@ public class FileDataGenJobConfig extends BaseJobConfig {
     boolean append 				= false;		// 기존파일이 존재 할 경우 기존데이터에 추가할지 여부
     LinkedHashMap<String,Integer> colInfoMap = new LinkedHashMap<String,Integer>(); 
     {
-	    colInfoMap.put("TEST_ID", 30);
+	    colInfoMap.put("TEST_ID", 64);
 	    colInfoMap.put("TEST_NAME", 200);
 	    colInfoMap.put("FLAG_YN", 1);
 	    colInfoMap.put("INPUT_DT", 14);
@@ -143,7 +143,7 @@ public class FileDataGenJobConfig extends BaseJobConfig {
     		    queue = new ConcurrentLinkedQueue<Map<String, Object>>();
     			for(int i=0; i<dataCnt; i++) {
                     Map<String, Object> row = new HashMap<>();
-                    row.put("TEST_ID", StringUtil.filler(String.valueOf(i), 8, "0") );
+                    row.put("TEST_ID", String.valueOf(i));
                     row.put("TEST_NAME", "이름-" + row.get("TEST_ID"));
                     row.put("FLAG_YN", "N");
                     row.put("INPUT_DT", DateUtil.getToDate("yyyyMMddHHmmss"));
