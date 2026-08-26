@@ -43,8 +43,8 @@
 	</select>
 	
 	<insert id="insertSampleTest" parameterType="map" >
-		INSERT INTO SAMPLE_TEST (TEST_ID, TEST_NAME, FLAG_YN, INPUT_DT)
-		VALUES (#{TEST_ID}, #{TEST_NAME}, 'N', #{INPUT_DT})
+		INSERT INTO SAMPLE_TEST ( TEST_NAME, FLAG_YN, INPUT_DT)
+		VALUES ( #{TEST_NAME}, 'N', #{INPUT_DT})
 	</insert>
 	
 	<update id="updateSampleTest" parameterType="map" >

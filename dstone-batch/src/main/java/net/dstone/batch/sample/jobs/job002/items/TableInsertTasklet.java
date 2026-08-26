@@ -83,7 +83,6 @@ public class TableInsertTasklet extends BaseTasklet{
                     int batchSize = 1000;
                     for (int i = startIdx; i < endIdx; i++) {
                         Map<String, String> row = new HashMap<>();
-                        row.put("TEST_ID", StringUtil.filler(String.valueOf(i), 8, "0") );
                         row.put("TEST_NAME", "이름-" + i);
                         row.put("FLAG_YN", "N");
                         row.put("INPUT_DT", DateUtil.getToDate("yyyyMMddHHmmss"));
