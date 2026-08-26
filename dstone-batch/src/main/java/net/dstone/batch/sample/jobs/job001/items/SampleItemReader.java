@@ -3,7 +3,6 @@ package net.dstone.batch.sample.jobs.job001.items;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.NonTransientResourceException;
 import org.springframework.batch.item.ParseException;
 import org.springframework.batch.item.UnexpectedInputException;
@@ -11,7 +10,7 @@ import org.springframework.batch.item.UnexpectedInputException;
 import net.dstone.batch.common.items.AbstractItemReader;
 
 // 제네릭 T는 읽어올 데이터의 타입을 나타냅니다.
-public class SampleItemReader<T> extends AbstractItemReader<T> implements ItemReader<T> {
+public class SampleItemReader<T> extends AbstractItemReader<T> {
 
     private Queue<T> dataQueue = null;
     

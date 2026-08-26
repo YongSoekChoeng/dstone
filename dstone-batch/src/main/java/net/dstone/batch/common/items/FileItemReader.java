@@ -14,7 +14,6 @@ import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.ItemStreamException;
-import org.springframework.batch.item.ItemStreamReader;
 import org.springframework.batch.item.NonTransientResourceException;
 import org.springframework.batch.item.UnexpectedInputException;
 import org.springframework.stereotype.Component;
@@ -64,7 +63,7 @@ import net.dstone.common.utils.StringUtil;
  */
 @Component
 @StepScope
-public class FileItemReader extends AbstractItemReader<Map<String, Object>> implements ItemStreamReader<Map<String, Object>>{
+public class FileItemReader extends AbstractItemReader<Map<String, Object>> {
 
     /**************************************** 멤버 선언 시작 ****************************************
 	inputFileFullPath : 읽어올 대상파일 전체경로. 생성자로 주입.

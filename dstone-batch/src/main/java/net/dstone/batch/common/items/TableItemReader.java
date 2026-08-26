@@ -10,7 +10,6 @@ import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.ItemStreamException;
-import org.springframework.batch.item.ItemStreamReader;
 import org.springframework.stereotype.Component;
 
 /**
@@ -55,7 +54,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @StepScope
-public class TableItemReader extends AbstractItemReader<Map<String, Object>> implements ItemStreamReader<Map<String, Object>> {
+public class TableItemReader extends AbstractItemReader<Map<String, Object>> {
 
     private final SqlSessionFactory sqlSessionFactory;
     private final String queryId;
