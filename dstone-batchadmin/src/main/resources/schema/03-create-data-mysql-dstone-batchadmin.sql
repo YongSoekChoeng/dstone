@@ -1,0 +1,58 @@
+
+/**********************************************
+dstone-batchadmin 데이터베이스[MySQL] 초기데이터
+02-create-table-mysql-dstone-batchadmin.sql 실행 후, 초기 데이터생성용으로 사용.
+(운영중인 batchadmin 스키마의 데이터를 그대로 내보낸 것으로, PK/UNIQUE 충돌 시 해당 행은 건너뜀 - INSERT IGNORE)
+**********************************************/
+USE batchadmin;
+
+-- 관리자 로그인 계정
+INSERT IGNORE INTO `TB_ADMIN_USER` (`USER_ID`, `USER_PW`, `USER_NM`, `USE_YN`, `LAST_LOGIN_DT`, `REG_DT`) VALUES ('batchadmin','81fB6VF53xHQE6ildR8DXBbKrofdWC/0R5zKuF8Ww/U=','관리자','Y','2026-08-26 10:53:16','2026-08-24 18:05:27');
+
+-- 관리대상 dstone-batch 서버 레지스트리
+INSERT IGNORE INTO `TB_BATCH_SERVER` (`SERVER_ID`, `SERVER_NM`, `REST_BASE_URL`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DBMS_TYPE`, `USE_YN`, `DESCRIPTION`, `REG_DT`, `UPDATE_DT`) VALUES (1,'로컬','http://localhost:6081/batch','localhost','3306','dataflow','dataflow','4GDT2M1kgPvdykYItAalNFeCjlrxCA3zWjXMKw6OVIk=','MYSQL','Y',NULL,'2026-08-25 09:30:33',NULL);
+
+-- 배치Job 메타데이터/스케줄 정의
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (1,'sampleJob',1,'배치작업 샘플','0 0 1 * * *','N','정용석','Y','2026-08-25 10:02:34',NULL);
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (2,'tableDataGenType01Job',1,'테이블 SAMPLE_TEST 에 테스트데이터를 입력하는 Job.\n삭제 Tasklet + 입력 Tasklet 2단계 구성\n다중쓰레드로 동작.','0 0 1 * * *','N','정용석','Y','2026-08-25 10:20:26','2026-08-26 11:17:19');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (3,'tableDataGenType02Job',1,'테이블 SAMPLE_TEST 에 테스트데이터를 입력하는 Job.\n삭제 Tasklet + 입력  Step[Reader/Processor/Writer]으로 구성.\n다중쓰레드로 동작.','0 0 1 * * *','N','정용석','Y','2026-08-25 10:21:00','2026-08-26 11:17:44');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (4,'tableUpdateType01Job',1,'테이블 SAMPLE_TEST 데이터 수정(FLAG_YN \'N\'→\'Y\')하는 Job.\nStep[Reader/Processor/Writer]으로 구성\n단일쓰레드로 동작','0 0 1 * * *','N','정용석','Y','2026-08-25 10:23:36','2026-08-26 11:18:05');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (5,'tableUpdateType02Job',1,'테이블 SAMPLE_TEST 의 데이터를 수정(FLAG_YN \'N\'→\'Y\')하는 Job. \nStep[Reader/Processor/Writer]으로 구성\n다중쓰레드로 동작.\nPartitioning 사용.','0 0 1 * * *','N','정용석','Y','2026-08-25 10:24:18','2026-08-26 11:20:23');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (6,'tableUpdateType03Job',1,'테이블 SAMPLE_TEST 의 데이터를 수정(FLAG_YN \'N\'→\'Y\')하는 Job. \nStep[Reader/Processor/Writer]으로 구성\n단일쓰레드로 동작.\nPaging 사용(MyBatisPagingItemReader).','0 0 1 * * *','N','정용석','Y','2026-08-25 10:25:08','2026-08-26 11:22:09');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (7,'fileDataGenJob',1,'테스트용 파일정보를 생성하는 Job.\n단일쓰레드로 동작.','0 0 1 * * *','N','정용석','Y','2026-08-26 11:25:17',NULL);
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (8,'fileCopyType01Job',1,'파일을 복사하는 Job.\n1:1 복사.\n단일쓰레드로 동작.','0 0 1 * * *','N','정용석','Y','2026-08-26 11:30:27',NULL);
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (9,'fileCopyType02Job',1,'파일을 복사하는 Job.\n1:N 복사.\n다중쓰레드로 동작.\nPartitioning 사용(Line Range Partitioning).','0 0 1 * * *','N','정용석','Y','2026-08-26 11:32:30','2026-08-26 11:33:27');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (10,'fileToTableJob',1,'파일데이터를 테이블 SAMPLE_TEST 로 입력하는 Job.\n다중쓰레드로 동작.','0 0 1 * * *','N','정용석','Y','2026-08-26 11:35:23','2026-08-26 11:37:24');
+INSERT IGNORE INTO `TB_BATCH_JOB` (`JOB_ID`, `JOB_NM`, `SERVER_ID`, `DESCRIPTION`, `CRON_EXPRESSION`, `SCHEDULE_USE_YN`, `OWNER_NM`, `USE_YN`, `REG_DT`, `UPDATE_DT`) VALUES (11,'tableToFileJob',1,'테이블 SAMPLE_TEST 의 데이터를 파일로 저장하는 Job.\n다중쓰레드로 동작.','0 0 1 * * *','N','정용석','Y','2026-08-26 11:37:05',NULL);
+
+-- 배치Job 실행파라메터
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (2,'dataCnt','200000',0,'생성데이터 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (2,'gridSize','2',1,'병렬처리할 쓰레드 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (3,'chunkSize','100',0,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (3,'dataCnt','20000',1,'생성데이터 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (4,'chunkSize','500',0,'');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (5,'chunkSize','100',1,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (5,'gridSize','5',0,'쓰레드(파티션) 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (6,'chunkSize','100',0,'청크 사이즈(페이징 크기로도 사용)');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (7,'append','false',4,'기존파일 존재 시 이어서 생성할지 여부');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (7,'charset','UTF-8',3,'파일 인코딩');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (7,'chunkSize','1000',1,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (7,'dataCnt','10000',0,'생성할 데이터 건수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (7,'outputFileFullPath','C:/Temp/SAMPLE_DATA/SAMPLE01.sam',2,'생성될 Full파일 경로');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (8,'append','false',4,'기존파일 존재 시 이어서 생성할지 여부');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (8,'charset','UTF-8',3,'파일 인코딩');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (8,'chunkSize','1000',0,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (8,'inputFileFullPath','C:/Temp/SAMPLE_DATA/SAMPLE01.sam',1,'대상파일 Full경로');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (8,'outputFileFullPath','C:/Temp/SAMPLE_DATA/SAMPLE01-copy.sam',2,'복사생성될 Full파일 경로');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (9,'append','false',5,'존파일 존재 시 이어서 생성할지 여부');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (9,'charset','UTF-8',4,'파일 인코딩');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (9,'chunkSize','1000',1,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (9,'gridSize','3',0,'쓰레드(파티션) 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (9,'inputFileFullPath','C:/Temp/SAMPLE_DATA/SAMPLE01.sam',2,'대상파일 Full경로');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (9,'outputFileDir','C:/Temp/SAMPLE_DATA/split',3,'복사파일 생성 디렉토리');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (10,'chunkSize','5000',1,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (10,'gridSize','4',0,'쓰레드(파티션) 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (10,'inputFileFullPath','C:/Temp/SAMPLE_DATA/SAMPLE01.sam',2,'대상파일 Full경로');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (11,'chunkSize','5000',1,'청크 사이즈');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (11,'gridSize','4',0,'쓰레드(파티션) 갯수');
+INSERT IGNORE INTO `TB_BATCH_JOB_PARAM` (`JOB_ID`, `PARAM_NAME`, `PARAM_VALUE`, `SORT_ORDER`, `PARAM_DESC`) VALUES (11,'outputFileFullPath','C:/Temp/SAMPLE_DATA/table/SAMPLE_TEST.sam',2,'결과 파일 Full경로');
