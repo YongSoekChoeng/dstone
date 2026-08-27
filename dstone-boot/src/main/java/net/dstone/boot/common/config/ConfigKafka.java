@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
@@ -18,13 +20,25 @@ import net.dstone.common.utils.KafkaUtil;
 import net.dstone.common.utils.StringUtil;
 
 @Configuration
-@ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true")
 public class ConfigKafka extends BaseObject {
 
 	@Autowired
 	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
 
+	// @KafkaListener 는 containerFactory 를 명시하지 않으면 이 빈("kafkaListenerContainerFactory")을 사용함.
+	// spring.kafka.enabled=false 이면 컨테이너는 등록만 되고 기동(브로커 연결)은 하지 않음.
     @Bean
+    public ConcurrentKafkaListenerContainerFactory<Object,Object> kafkaListenerContainerFactory(
+    		ConsumerFactory<Object,Object> consumerFactory) {
+
+    	ConcurrentKafkaListenerContainerFactory<Object,Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+    	factory.setConsumerFactory(consumerFactory);
+    	factory.setAutoStartup(Boolean.parseBoolean(configProperty.getProperty("spring.kafka.enabled")));
+    	return factory;
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "spring.kafka.enabled", havingValue = "true")
     public KafkaTemplate<String,Object> kafkaTemplate() {
     	
     	Map<String,Object> initValMap = new HashMap<String,Object>();

@@ -12,10 +12,14 @@ import net.dstone.boot.common.biz.BaseService;
 @Service
 public class KafkaService  extends BaseService { 
 
-	@Autowired
+	@Autowired(required = false)
 	private KafkaTemplate<String, Object> kafkaTemplate;
-	
+
 	public void publish(String topic, String key, Map<String,Object> param) {
+		if (kafkaTemplate == null) {
+			this.warn(".publish(" + param + ") - spring.kafka.enabled=false, 발행하지 않음");
+			return;
+		}
 		this.info(".publish(" + param + ")");
 		// key = aggregateId → 같은 주문의 이벤트는 항상 같은 파티션으로 (순서 보장)
         kafkaTemplate.send(topic, key, param);
