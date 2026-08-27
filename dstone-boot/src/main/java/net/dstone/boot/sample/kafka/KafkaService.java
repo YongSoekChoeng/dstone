@@ -12,8 +12,8 @@ import net.dstone.boot.common.biz.BaseService;
 @Service
 public class KafkaService  extends BaseService { 
 
-	@Autowired 
-	private KafkaTemplate<String, Map<String,Object>> kafkaTemplate;
+	@Autowired
+	private KafkaTemplate<String, Object> kafkaTemplate;
 	
 	public void publish(String topic, String key, Map<String,Object> param) {
 		// key = aggregateId → 같은 주문의 이벤트는 항상 같은 파티션으로 (순서 보장)
