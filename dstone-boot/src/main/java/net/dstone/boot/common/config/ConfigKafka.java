@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
@@ -35,7 +36,7 @@ public class ConfigKafka extends BaseObject {
 			initValMap.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 		}
 		if( !initValMap.containsKey(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG) || StringUtil.isEmpty(initValMap.get(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG))  ) {
-			initValMap.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+			initValMap.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 		}
 
         return KafkaUtil.getInstance(initValMap).getKafkaTemplate();

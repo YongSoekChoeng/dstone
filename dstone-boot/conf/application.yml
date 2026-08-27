@@ -82,12 +82,14 @@ spring:
                 enable.idempotence: true
         consumer:
             group-id: order-service-group
-            key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-            value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+            key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+            value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
             auto-offset-reset: earliest
             properties:
                 isolation.level: read_committed
                 spring.json.trusted.packages: "net.dstone.*"
+                spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+                spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
     datasource: 
         common: 
             hikari: 
