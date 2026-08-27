@@ -19,6 +19,7 @@
 
 				<li><a href="<%=request.getContextPath()%>/views/sample/google/maps/main">구글맵</a></li>
 				<li><a href="<%=request.getContextPath()%>/views/websocket/test">웹소켓테스트</a></li>
+				<li><a href="<%=request.getContextPath()%>/views/kafka/test">KAFKA테스트</a></li>
 				<li><a href="<%=request.getContextPath()%>/kakao/loginPage.do">카카오로그인</a></li>
 				<li><a href="<%=request.getContextPath()%>/naver/loginPage.do">네이버로그인</a></li>
 				
