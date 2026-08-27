@@ -81,7 +81,8 @@ spring:
             properties:
                 enable.idempotence: true
         consumer:
-            group-id: order-service-group
+            # Default group-id 설정. @KafkaListener 에 groupId 설정이 없을 때 적용될 기본 groupId.
+            group-id: dstone-kafka-consumer-group
             key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
             value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
             auto-offset-reset: earliest
