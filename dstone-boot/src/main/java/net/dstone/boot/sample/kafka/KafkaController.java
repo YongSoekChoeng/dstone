@@ -1,6 +1,7 @@
 package net.dstone.boot.sample.kafka;
 
-import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -10,7 +11,6 @@ import org.springframework.web.servlet.ModelAndView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.boot.common.biz.BaseController;
-import net.dstone.common.utils.DataSet;
 import net.dstone.common.utils.RequestUtil;
 
 @Controller
@@ -25,13 +25,13 @@ public class KafkaController extends BaseController {
 		RequestUtil requestUtil = new RequestUtil(request, response);
 		if(isAjax(request)) { mav = new ModelAndView("jsonView"); }
 		
-		DataSet param = new DataSet();
-		Enumeration<String> paramNames = requestUtil.getParameterNames();
-		while( paramNames.hasMoreElements() ) {
-			String paramKey = paramNames.nextElement();
-			param.addDatum(paramKey, requestUtil.getParameter(paramKey));
-		}
-		kafkaService.publish("order-events", "1", param.toMap());
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("orderId", requestUtil.getParameter("orderId"));
+		param.put("orderName", requestUtil.getParameter("orderName"));
+		param.put("orderItem", requestUtil.getParameter("orderItem"));
+		param.put("orderCount", requestUtil.getParameter("orderCount"));
+		
+		kafkaService.publish("order-events", "1", param);
 		
 		return mav;
 	}

@@ -16,6 +16,7 @@ public class KafkaService  extends BaseService {
 	private KafkaTemplate<String, Object> kafkaTemplate;
 	
 	public void publish(String topic, String key, Map<String,Object> param) {
+		this.info(".publish(" + param + ")");
 		// key = aggregateId → 같은 주문의 이벤트는 항상 같은 파티션으로 (순서 보장)
         kafkaTemplate.send(topic, key, param);
 	}
@@ -23,6 +24,6 @@ public class KafkaService  extends BaseService {
     @KafkaListener(topics = "order-events", groupId = "inventory-service-group")
     public void consume(Map<String,Object> param) {
         // 처리 로직
-    	this.info("param===>>" + param);
+    	this.info(".consume(" + param + ")");
     }
 }
