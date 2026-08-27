@@ -1,5 +1,15 @@
 package net.dstone.boot.test;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+
 import net.dstone.common.utils.DateUtil;
 import net.dstone.common.utils.StringUtil;
 
@@ -7,14 +17,15 @@ public class TestBean {
 
 	public static void main(String[] args) {
 		
-		TestBean.테스트();
+		TestBean.KAFKA테스트();
 		
+		//TestBean.테스트();
 		//TestBean.암복호화();
 		//TestBean.파일분리();
 		//TestBean.DB테스트();
 		//TestBean.레빗엠큐테스트();
 		//TestBean.레디스테스트();
-		
+		//TestBean.KAFKA테스트();
 	}
 	
 
@@ -225,6 +236,50 @@ public class TestBean {
 			e.printStackTrace();
 		} finally{
 			net.dstone.common.utils.DateUtil.stopWatchEnd("01.레디스테스트");
+		}
+
+	}
+
+
+	public static void KAFKA테스트() {
+		
+		/*****************************************************/
+		KafkaTemplate<String, Object> kafkaTemplate = null;
+		Map<String,Object> event = new HashMap<String,Object>();
+		event.put("orderId", "1");
+		event.put("orderName", "테스트주문");
+		event.put("orderItem", "연필");
+		event.put("orderCount", "1000");
+		/*****************************************************/
+		
+		net.dstone.common.utils.DateUtil.stopWatchStart("01.KAFKA테스트");
+		
+		try {
+
+
+	        // 1. 카프카 프로듀서 설정 정보 (Pure Java Map)
+	        Map<String, Object> configProps = new HashMap<>();
+	        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+	        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+	        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, org.springframework.kafka.support.serializer.JsonSerializer.class);
+	        // 옵션 세팅 (선택)
+	        configProps.put(ProducerConfig.ACKS_CONFIG, "all");
+
+	        // 2. KafkaTemplate 직접 인스턴스화
+	        kafkaTemplate = net.dstone.common.utils.KafkaUtil.getInstance(configProps).getKafkaTemplate();
+			
+	        // 3. KAFKA 전송
+	        org.springframework.kafka.support.SendResult<String, Object> result = kafkaTemplate.send("order-events", event.get("orderId").toString(), event).get(5, TimeUnit.SECONDS);
+		    System.out.println("전송 완료: " + result.getRecordMetadata());
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally{
+			if (kafkaTemplate != null) {
+				kafkaTemplate.flush();
+				kafkaTemplate.destroy(); // 내부 producerFactory까지 종료
+			}
+			net.dstone.common.utils.DateUtil.stopWatchEnd("01.KAFKA테스트");
 		}
 
 	}

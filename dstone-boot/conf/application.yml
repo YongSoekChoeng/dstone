@@ -74,6 +74,20 @@ spring:
     kafka: 
         enabled: true # Kafka사용 여부(true/false)
         bootstrap-servers: localhost:9092
+        producer:
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+            acks: all
+            properties:
+                enable.idempotence: true
+        consumer:
+            group-id: order-service-group
+            key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+            value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+            auto-offset-reset: earliest
+            properties:
+                isolation.level: read_committed
+                spring.json.trusted.packages: "net.dstone.*"
     datasource: 
         common: 
             hikari: 
