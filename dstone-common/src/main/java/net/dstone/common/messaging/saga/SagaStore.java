@@ -1,5 +1,6 @@
 package net.dstone.common.messaging.saga;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,7 +17,13 @@ public interface SagaStore {
 
 	void updateStatus(Object sagaId, String status, String currentStep);
 
-	/** stepHistory 키: SAGA_ID, STEP_NAME, RESULT, ERROR_MSG */
+	/** stepHistory 키: SAGA_ID, STEP_NAME, RESULT, ERROR_MSG, PAYLOAD(해당 스텝을 성공시킨 command의 JSON) */
 	void insertStepHistory(Map<String, Object> stepHistory);
+
+	/**
+	 * 보상(compensate) 대상 조회: 해당 사가에서 RESULT='SUCCESS'로 끝난 스텝들을 최신순(역순)으로 반환.
+	 * 각 행 키: STEP_NAME, PAYLOAD
+	 */
+	List<Map<String, Object>> findSuccessStepHistory(Object sagaId);
 
 }

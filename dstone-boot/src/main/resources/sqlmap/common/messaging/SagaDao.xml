@@ -30,9 +30,22 @@
 
 	<insert id="insertStepHistory" parameterType="map">
 		INSERT INTO TB_SAGA_STEP_HISTORY
-			(SAGA_ID, STEP_NAME, RESULT, ERROR_MSG)
+			(SAGA_ID, STEP_NAME, RESULT, ERROR_MSG, PAYLOAD)
 		VALUES
-			(#{SAGA_ID}, #{STEP_NAME}, #{RESULT}, #{ERROR_MSG})
+			(#{SAGA_ID}, #{STEP_NAME}, #{RESULT}, #{ERROR_MSG}, #{PAYLOAD})
 	</insert>
+
+	<!-- 보상 캐스케이딩용: 이 사가에서 성공(SUCCESS)한 스텝들을 최신순(ID DESC)으로 조회 -->
+	<select id="findSuccessStepHistory" parameterType="map" resultType="map">
+		SELECT
+			STEP_NAME, PAYLOAD
+		FROM
+			TB_SAGA_STEP_HISTORY
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+			AND RESULT = 'SUCCESS'
+		ORDER BY
+			ID DESC
+	</select>
 
 </mapper>

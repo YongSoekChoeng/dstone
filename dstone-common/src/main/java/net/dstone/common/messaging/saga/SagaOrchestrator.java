@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.messaging.outbox.OutboxAppender;
+import net.dstone.common.utils.ConvertUtil;
 
 /**
  * 오케스트레이션 방식 사가 엔진.
@@ -18,6 +21,7 @@ public class SagaOrchestrator extends BaseObject {
 	private final SagaStore sagaStore;
 	private final OutboxAppender outboxAppender;
 	private final List<SagaStepHandler> stepHandlers;
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	public SagaOrchestrator(SagaStore sagaStore, OutboxAppender outboxAppender, List<SagaStepHandler> stepHandlers) {
 		this.sagaStore = sagaStore;
@@ -51,28 +55,50 @@ public class SagaOrchestrator extends BaseObject {
 		runStep(sagaId, nextStep, command);
 	}
 
+	/**
+	 * 사가 정의를 아는 호출자(리스너 등)가 마지막 스텝의 reply까지 받은 뒤 호출해서 사가를 종결시킨다.
+	 * 엔진 자체는 스텝 순서를 모르므로 "이게 마지막 스텝이다"는 판단은 호출자 책임이다.
+	 */
+	public void complete(String sagaId, String lastStep) {
+		sagaStore.updateStatus(sagaId, SagaStatus.COMPLETED.name(), lastStep);
+	}
+
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
 		SagaStepHandler handler = findHandler(stepName);
 		try {
 			Map<String, Object> result = handler.handle(command);
-			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "SUCCESS", null));
+			if (result == null) {
+				result = new HashMap<String, Object>();
+			}
+			// 보상 캐스케이딩과 리스너의 다음 스텝 트리거 모두 sagaId를 필요로 하므로, 핸들러 구현과 무관하게 항상 심어준다.
+			result.put("SAGA_ID", sagaId);
+			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "SUCCESS", null, command));
 			sagaStore.updateStatus(sagaId, SagaStatus.STEP_DONE.name(), stepName);
 			// 다음 스텝 트리거용 이벤트. 토픽명은 관례상 "{stepName}-reply"를 기본으로 한다.
 			outboxAppender.append(stepName + "-reply", sagaId, result);
 		} catch (Exception e) {
 			this.error("saga[" + sagaId + "] step[" + stepName + "] 실패: " + e.getMessage());
-			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "FAILED", e.getMessage()));
-			compensate(sagaId, stepName, command);
+			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "FAILED", e.getMessage(), command));
+			compensate(sagaId, stepName);
 		}
 	}
 
-	private void compensate(String sagaId, String failedStep, Map<String, Object> command) {
+	/**
+	 * 실패한 스텝 이전에 이미 성공한 스텝들을 역순(최신 성공 스텝부터)으로 되돌린다.
+	 * 실패한 스텝 자신은 성공한 적이 없으므로 보상 대상이 아니다.
+	 */
+	private void compensate(String sagaId, String failedStep) {
 		sagaStore.updateStatus(sagaId, SagaStatus.COMPENSATING.name(), failedStep);
-		try {
-			SagaStepHandler handler = findHandler(failedStep);
-			handler.compensate(command);
-		} catch (Exception e) {
-			this.error("saga[" + sagaId + "] compensate[" + failedStep + "] 중 오류: " + e.getMessage());
+		List<Map<String, Object>> succeededSteps = sagaStore.findSuccessStepHistory(sagaId);
+		for (Map<String, Object> row : succeededSteps) {
+			String stepName = (String) row.get("STEP_NAME");
+			try {
+				SagaStepHandler handler = findHandler(stepName);
+				Map<String, Object> payload = parsePayload((String) row.get("PAYLOAD"));
+				handler.compensate(payload);
+			} catch (Exception e) {
+				this.error("saga[" + sagaId + "] compensate[" + stepName + "] 중 오류: " + e.getMessage());
+			}
 		}
 		sagaStore.updateStatus(sagaId, SagaStatus.FAILED.name(), failedStep);
 	}
@@ -86,12 +112,24 @@ public class SagaOrchestrator extends BaseObject {
 		throw new IllegalStateException("등록된 SagaStepHandler가 없습니다: " + stepName);
 	}
 
-	private Map<String, Object> historyRow(String sagaId, String stepName, String result, String errorMessage) {
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> parsePayload(String payloadJson) {
+		try {
+			return objectMapper.readValue(payloadJson, Map.class);
+		} catch (Exception e) {
+			this.error("보상용 payload 파싱 실패: " + e.getMessage());
+			return new HashMap<String, Object>();
+		}
+	}
+
+	private Map<String, Object> historyRow(String sagaId, String stepName, String result, String errorMessage,
+			Map<String, Object> command) {
 		Map<String, Object> row = new HashMap<String, Object>();
 		row.put("SAGA_ID", sagaId);
 		row.put("STEP_NAME", stepName);
 		row.put("RESULT", result);
 		row.put("ERROR_MSG", errorMessage);
+		row.put("PAYLOAD", ConvertUtil.convertToJson(command));
 		return row;
 	}
 

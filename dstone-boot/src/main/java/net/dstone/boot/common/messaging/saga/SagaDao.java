@@ -1,6 +1,7 @@
 package net.dstone.boot.common.messaging.saga;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Repository;
@@ -36,6 +37,14 @@ public class SagaDao extends net.dstone.boot.common.biz.BaseDao implements SagaS
 	@Override
 	public void insertStepHistory(Map<String, Object> stepHistory) {
 		sqlSessionCommon.insert(NS + "insertStepHistory", stepHistory);
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public List<Map<String, Object>> findSuccessStepHistory(Object sagaId) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("SAGA_ID", sagaId);
+		return sqlSessionCommon.selectList(NS + "findSuccessStepHistory", param);
 	}
 
 }
