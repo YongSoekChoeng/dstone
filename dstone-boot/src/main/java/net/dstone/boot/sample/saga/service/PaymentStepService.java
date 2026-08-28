@@ -19,6 +19,13 @@ public class PaymentStepService extends BaseService implements SagaStepHandler {
 		return "payment";
 	}
 
+	/**
+	 * <pre>
+	 * command: OrderSagaReplyListener.onInventoryReserved()가 "inventoryReserve-reply" Kafka 메시지의
+	 * value를 역직렬화해 proceed()로 넘긴 것 — 즉 이 파라메터의 실제 원천은 Kafka 메시지 본문이다.
+	 * 반환값: 여기서 리턴한 command에 SAGA_ID가 다시 얹혀 토픽 "payment-reply"의 메시지 value로 발행된다.
+	 * </pre>
+	 */
 	@Override
 	public Map<String, Object> handle(Map<String, Object> command) throws Exception {
 		int amount = ((Number) command.get("AMOUNT")).intValue();
