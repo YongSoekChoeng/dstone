@@ -1,18 +1,18 @@
-package net.dstone.boot.sample.saga;
+package net.dstone.boot.sample.saga.service;
 
 import java.util.Map;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
-import net.dstone.common.core.BaseObject;
+import net.dstone.boot.common.biz.BaseService;
 import net.dstone.common.messaging.saga.SagaStepHandler;
 
 /**
  * 주문 사가 1번째 스텝: 재고 차감.
  * 데모용 실패 조건: QTY >= 100 (재고부족)
  */
-@Component
-public class InventoryReserveStepHandler extends BaseObject implements SagaStepHandler {
+@Service
+public class InventoryReserveStepService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {

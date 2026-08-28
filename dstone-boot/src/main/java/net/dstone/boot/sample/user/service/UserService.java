@@ -1,4 +1,4 @@
-package net.dstone.boot.sample; 
+package net.dstone.boot.sample.user.service; 
  
 import java.util.HashMap;
 import java.util.List;
@@ -24,7 +24,7 @@ public class UserService extends BaseService {
     /********* 공통 입력/수정/삭제 DAO 정의부분 끝 *********/
     /********* DAO 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.sample.UserDao userDao; 
+    private net.dstone.boot.sample.user.dao.UserDao userDao; 
     /********* DAO 정의부분 끝 *********/
     /** 
      * 샘플사용자정보 리스트조회 

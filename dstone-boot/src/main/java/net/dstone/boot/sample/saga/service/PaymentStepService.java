@@ -1,18 +1,18 @@
-package net.dstone.boot.sample.saga;
+package net.dstone.boot.sample.saga.service;
 
 import java.util.Map;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
-import net.dstone.common.core.BaseObject;
+import net.dstone.boot.common.biz.BaseService;
 import net.dstone.common.messaging.saga.SagaStepHandler;
 
 /**
  * 주문 사가 2번째 스텝: 결제.
  * 데모용 실패 조건: AMOUNT >= 1000000 (한도초과) -> 실패 시 이전에 성공한 재고차감이 자동 보상(롤백)된다.
  */
-@Component
-public class PaymentStepHandler extends BaseObject implements SagaStepHandler {
+@Service
+public class PaymentStepService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {

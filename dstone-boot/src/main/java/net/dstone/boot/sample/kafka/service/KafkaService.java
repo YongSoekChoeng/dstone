@@ -1,4 +1,4 @@
-package net.dstone.boot.sample.kafka;
+package net.dstone.boot.sample.kafka.service;
 
 import java.util.Map;
 

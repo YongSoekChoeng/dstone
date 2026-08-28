@@ -1,4 +1,4 @@
-package net.dstone.boot.sample; 
+package net.dstone.boot.sample.user.controller; 
  
 import java.util.Map;
 
@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
+import net.dstone.boot.sample.user.service.UserService;
 import net.dstone.common.utils.RequestUtil;
 @Controller
 @RequestMapping(value = "/sample/user/*")
@@ -15,7 +16,7 @@ public class UserController extends net.dstone.boot.common.biz.BaseController {
 
     /********* SVC 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.sample.UserService userService; 
+    private net.dstone.boot.sample.user.service.UserService userService; 
     /********* SVC 정의부분 끝 *********/
     
     /** 

@@ -1,17 +1,17 @@
-package net.dstone.boot.sample.saga;
+package net.dstone.boot.sample.saga.service;
 
 import java.util.Map;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
-import net.dstone.common.core.BaseObject;
+import net.dstone.boot.common.biz.BaseService;
 import net.dstone.common.messaging.saga.SagaStepHandler;
 
 /**
  * 주문 사가 마지막 스텝: 주문 확정.
  */
-@Component
-public class OrderConfirmStepHandler extends BaseObject implements SagaStepHandler {
+@Service
+public class OrderConfirmStepService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {

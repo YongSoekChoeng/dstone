@@ -1,4 +1,4 @@
-package net.dstone.boot.sample; 
+package net.dstone.boot.sample.admin.service; 
  
 import java.util.Map; 
 import java.util.HashMap; 
@@ -116,7 +116,7 @@ public class AdminService extends BaseService {
 
     /********* DAO 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.sample.AdminDao adminDao; 
+    private net.dstone.boot.sample.admin.dao.AdminDao adminDao; 
     /********* DAO 정의부분 끝 *********/
     /** 
      * 샘플사용자정보 리스트조회 

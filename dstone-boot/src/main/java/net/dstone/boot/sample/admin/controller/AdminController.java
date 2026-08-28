@@ -1,4 +1,4 @@
-package net.dstone.boot.sample; 
+package net.dstone.boot.sample.admin.controller; 
  
 import java.util.Map;
 
@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
+import net.dstone.boot.sample.admin.service.AdminService;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.RequestUtil;
 @Controller
@@ -15,7 +16,7 @@ public class AdminController extends net.dstone.boot.common.biz.BaseController {
     
     /********* SVC 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.sample.AdminService adminService; 
+    private net.dstone.boot.sample.admin.service.AdminService adminService; 
     /********* SVC 정의부분 끝 *********/
 
 	@Autowired 

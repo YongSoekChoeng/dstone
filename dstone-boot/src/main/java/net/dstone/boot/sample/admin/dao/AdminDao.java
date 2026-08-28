@@ -1,4 +1,4 @@
-package net.dstone.boot.sample; 
+package net.dstone.boot.sample.admin.dao; 
  
 import java.util.List;
 

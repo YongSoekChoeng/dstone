@@ -1,4 +1,4 @@
-package net.dstone.boot.sample.kafka;
+package net.dstone.boot.sample.kafka.controller;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,6 +11,7 @@ import org.springframework.web.servlet.ModelAndView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.boot.common.biz.BaseController;
+import net.dstone.boot.sample.kafka.service.KafkaService;
 import net.dstone.common.utils.RequestUtil;
 
 @Controller

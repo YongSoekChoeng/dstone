@@ -1,4 +1,4 @@
-package net.dstone.boot.sample.saga;
+package net.dstone.boot.sample.saga.controller;
 
 import java.util.HashMap;
 import java.util.Map;

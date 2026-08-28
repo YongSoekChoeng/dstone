@@ -17,7 +17,7 @@ public class MarketController extends net.dstone.boot.common.biz.BaseController 
 
     /********* SVC 정의부분 시작 *********/
     @Autowired
-    private net.dstone.boot.sample.UserService userService; 
+    private net.dstone.boot.sample.user.service.UserService userService; 
     /********* SVC 정의부분 끝 *********/
     
     /** 
