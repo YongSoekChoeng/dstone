@@ -29,11 +29,28 @@ spring:
                     min-idle: 2			
             host: ${REDIS_HOST}
             port: ${REDIS_PORT}
-            timeout: 10000
+            timeout: 10000	
     # Kafka 설정
     kafka: 
         enabled: true # Kafka사용 여부(true/false)
         bootstrap-servers: localhost:9092
+        producer:
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+            acks: all
+            properties:
+                enable.idempotence: true
+        consumer:
+            # Default group-id 설정. @KafkaListener 에 groupId 설정이 없을 때 적용될 기본 groupId.
+            group-id: dstone-kafka-consumer-group
+            key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+            value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+            auto-offset-reset: earliest
+            properties:
+                isolation.level: read_committed
+                spring.json.trusted.packages: "net.dstone.*"
+                spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+                spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
     devtools: 
         restart: 
             enabled: true
