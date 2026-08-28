@@ -19,21 +19,28 @@ public class OrderSagaReplyListener extends BaseObject {
 	@Autowired
 	private SagaOrchestrator sagaOrchestrator;
 
-	@KafkaListener(topics = "inventoryReserve-reply", groupId = "order-saga-group")
+	/*
+	 * 컨슈머 그룹id는 "같은 토픽을 나눠 처리하는 동일 로직의 인스턴스들"이라는 전제로 동작한다.
+	 * 아래 세 리스너는 서로 다른 토픽을 서로 다른 목적으로 처리하므로, groupId를 하나로 공유하면
+	 * (구독이 다른 멤버들이 한 그룹에 섞여) 멤버가 조인할 때마다 그룹 전체가 리밸런스되고,
+	 * 이게 반복되면서 브로커/네트워크에 부하를 줘 다른 컨슈머 그룹(inventory-service-group 등)도
+	 * 안정적으로 partitions assigned 상태에 못 들어가는 문제가 있었다. 리스너별로 groupId를 분리한다.
+	 */
+	@KafkaListener(topics = "inventoryReserve-reply", groupId = "order-saga-inventory-reserve-reply-group")
 	public void onInventoryReserved(Map<String, Object> payload) {
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] inventoryReserve-reply 수신 -> payment 진행");
 		sagaOrchestrator.proceed(sagaId, "payment", payload);
 	}
 
-	@KafkaListener(topics = "payment-reply", groupId = "order-saga-group")
+	@KafkaListener(topics = "payment-reply", groupId = "order-saga-payment-reply-group")
 	public void onPaid(Map<String, Object> payload) {
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] payment-reply 수신 -> orderConfirm 진행");
 		sagaOrchestrator.proceed(sagaId, "orderConfirm", payload);
 	}
 
-	@KafkaListener(topics = "orderConfirm-reply", groupId = "order-saga-group")
+	@KafkaListener(topics = "orderConfirm-reply", groupId = "order-saga-order-confirm-reply-group")
 	public void onOrderConfirmed(Map<String, Object> payload) {
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] orderConfirm-reply 수신 -> 사가 COMPLETED 처리");
