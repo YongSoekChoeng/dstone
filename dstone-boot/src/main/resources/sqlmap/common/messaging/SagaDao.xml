@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.boot.common.messaging.saga.SagaDao">
+
+	<insert id="insert" parameterType="map">
+		INSERT INTO TB_SAGA_INSTANCE
+			(SAGA_ID, SAGA_TYPE, STATUS, CURRENT_STEP)
+		VALUES
+			(#{SAGA_ID}, #{SAGA_TYPE}, #{STATUS}, #{CURRENT_STEP})
+	</insert>
+
+	<select id="findById" parameterType="map" resultType="map">
+		SELECT
+			SAGA_ID, SAGA_TYPE, STATUS, CURRENT_STEP, CREATED_DT, UPDATED_DT
+		FROM
+			TB_SAGA_INSTANCE
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+	</select>
+
+	<update id="updateStatus" parameterType="map">
+		UPDATE TB_SAGA_INSTANCE
+		SET
+			STATUS = #{STATUS}
+			, CURRENT_STEP = #{CURRENT_STEP}
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+	</update>
+
+	<insert id="insertStepHistory" parameterType="map">
+		INSERT INTO TB_SAGA_STEP_HISTORY
+			(SAGA_ID, STEP_NAME, RESULT, ERROR_MSG)
+		VALUES
+			(#{SAGA_ID}, #{STEP_NAME}, #{RESULT}, #{ERROR_MSG})
+	</insert>
+
+</mapper>

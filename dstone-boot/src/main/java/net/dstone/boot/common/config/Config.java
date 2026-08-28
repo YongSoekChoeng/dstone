@@ -3,10 +3,12 @@ package net.dstone.boot.common.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import net.dstone.common.core.BaseObject;
 
 @EnableAsync
+@EnableScheduling
 @Configuration
 @Import({ 
 	ConfigAspect.class,

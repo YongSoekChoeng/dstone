@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  이 파일은 스캔 대상이 아닌 참고 템플릿입니다.
+  실제로는 이 내용을 각 모듈의 src/main/resources/sqlmap/common/messaging/SagaDao.xml 로 복사하고
+  namespace를 그 모듈의 SagaDao 구현체 FQCN으로 맞춰서 사용하세요.
+  (dstone-boot 적용본은 dstone-boot/src/main/resources/sqlmap/common/messaging/SagaDao.xml 참고)
+-->
+<mapper namespace="{module.package}.common.messaging.saga.SagaDao">
+
+	<insert id="insert" parameterType="map">
+		INSERT INTO TB_SAGA_INSTANCE
+			(SAGA_ID, SAGA_TYPE, STATUS, CURRENT_STEP)
+		VALUES
+			(#{SAGA_ID}, #{SAGA_TYPE}, #{STATUS}, #{CURRENT_STEP})
+	</insert>
+
+	<select id="findById" parameterType="map" resultType="map">
+		SELECT
+			SAGA_ID, SAGA_TYPE, STATUS, CURRENT_STEP, CREATED_DT, UPDATED_DT
+		FROM
+			TB_SAGA_INSTANCE
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+	</select>
+
+	<update id="updateStatus" parameterType="map">
+		UPDATE TB_SAGA_INSTANCE
+		SET
+			STATUS = #{STATUS}
+			, CURRENT_STEP = #{CURRENT_STEP}
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+	</update>
+
+	<insert id="insertStepHistory" parameterType="map">
+		INSERT INTO TB_SAGA_STEP_HISTORY
+			(SAGA_ID, STEP_NAME, RESULT, ERROR_MSG)
+		VALUES
+			(#{SAGA_ID}, #{STEP_NAME}, #{RESULT}, #{ERROR_MSG})
+	</insert>
+
+</mapper>

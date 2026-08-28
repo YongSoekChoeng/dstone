@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.boot.common.messaging.outbox.OutboxDao">
+
+	<insert id="insert" parameterType="map" useGeneratedKeys="true" keyProperty="ID" keyColumn="ID">
+		INSERT INTO TB_OUTBOX_MESSAGE
+			(TOPIC, MSG_KEY, PAYLOAD, STATUS, RETRY_CNT)
+		VALUES
+			(#{TOPIC}, #{MSG_KEY}, #{PAYLOAD}, #{STATUS}, 0)
+	</insert>
+
+	<select id="findPending" parameterType="map" resultType="map">
+		SELECT
+			ID, TOPIC, MSG_KEY, PAYLOAD, STATUS, RETRY_CNT
+		FROM
+			TB_OUTBOX_MESSAGE
+		WHERE 1=1
+			AND STATUS = 'PENDING'
+		ORDER BY
+			ID ASC
+		LIMIT #{LIMIT}
+	</select>
+
+	<update id="markSent" parameterType="map">
+		UPDATE TB_OUTBOX_MESSAGE
+		SET
+			STATUS = 'SENT'
+			, SENT_DT = NOW()
+		WHERE 1=1
+			AND ID = #{ID}
+	</update>
+
+	<!-- 재시도 5회 초과 시 FAILED로 전이(운영자 확인 필요). 한도는 필요에 맞게 조정 -->
+	<update id="markFailed" parameterType="map">
+		UPDATE TB_OUTBOX_MESSAGE
+		SET
+			RETRY_CNT = RETRY_CNT + 1
+			, ERROR_MSG = #{ERROR_MSG}
+			, STATUS = CASE WHEN RETRY_CNT + 1 >= 5 THEN 'FAILED' ELSE 'PENDING' END
+		WHERE 1=1
+			AND ID = #{ID}
+	</update>
+
+</mapper>
