@@ -21,12 +21,12 @@ import net.dstone.common.utils.StringUtil;
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 @EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
-
+	
 	/**************************************** 1. Logging 관련 AOP ****************************************/
 	@Around("execution(* net.dstone.*..*Controller.*(..))")
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
-		this.info("+->[CONTROLLER] {"+buildSimpleExecutionInfo(joinPoint, "")+"}");
+		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
 		
 		/*****************************************************************************************************
 		컨트롤러 호출 시 응답헤더에 기본값 세팅
@@ -52,61 +52,14 @@ public class ConfigAspect extends BaseObject {
 
 	@Around("execution(* net.dstone.*..*Service*.*(..))")
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+--->[SERVICE ] {"+buildSimpleExecutionInfo(joinPoint, "")+"}");
+		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
 
 	@Around("execution(* net.dstone.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[DAO   ] {"+buildSimpleExecutionInfo(joinPoint, "")+"}");
+		this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
-	}
-
-	private String buildSimpleExecutionInfo(ProceedingJoinPoint joinPoint, String tabSpace) {
-		StringBuffer buffer = new StringBuffer();
-		String className = joinPoint.getTarget().getClass().getSimpleName();
-		String methodName = joinPoint.getSignature().getName();
-		StringBuffer paramListInfo = new StringBuffer();
-		int args = joinPoint.getArgs().length;
-		int setNum = 0;
-		for (int i = 0; i < args; i++) {
-			Object param = joinPoint.getArgs()[i];
-			if (param instanceof HttpServletRequest) {
-				continue;
-			}else if (param instanceof HttpServletResponse) {
-				continue;
-			}else if (param instanceof String) {
-				paramListInfo.append("String" + "[" + param + "]");
-			}else{
-				String result = "";
-				try {
-					result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
-				}catch(Exception e) {
-					result = ConvertUtil.convertToJson(param);
-					result = StringUtil.replace(result, "\n", "");
-				}
-				paramListInfo.append(result);
-			}
-			if (setNum > 0) {
-				paramListInfo.append(", ");
-			}
-			setNum++;
-		}
-		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
-		return splitToLines(buffer.toString(),  tabSpace);
-	}
-	
-	private String splitToLines(String msg, String tabSpace) {
-		StringBuffer buffer = new StringBuffer();
-		String[] lines = StringUtil.toStrArray(msg, "\n");
-		for(int i=0; i < lines.length; i++) {
-			String line = lines[i];
-			buffer.append(tabSpace).append(line);
-			if(i < lines.length-1) {
-				buffer.append("\n");
-			}
-		}
-		return buffer.toString();
 	}
 
 }

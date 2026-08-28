@@ -20,11 +20,13 @@ public class OrderSagaReplyListener extends BaseObject {
 	private SagaOrchestrator sagaOrchestrator;
 
 	/*
-	 * 컨슈머 그룹id는 "같은 토픽을 나눠 처리하는 동일 로직의 인스턴스들"이라는 전제로 동작한다.
-	 * 아래 세 리스너는 서로 다른 토픽을 서로 다른 목적으로 처리하므로, groupId를 하나로 공유하면
-	 * (구독이 다른 멤버들이 한 그룹에 섞여) 멤버가 조인할 때마다 그룹 전체가 리밸런스되고,
-	 * 이게 반복되면서 브로커/네트워크에 부하를 줘 다른 컨슈머 그룹(inventory-service-group 등)도
-	 * 안정적으로 partitions assigned 상태에 못 들어가는 문제가 있었다. 리스너별로 groupId를 분리한다.
+	 * <@KafkaListener 파라메터>
+	 * - id : 컨슈머의 고유 식별자(ID)를 지정. 생략할 경우 기본적으로 컨슈머 컨테이너가 임의의 ID를 생성.
+	 * - groupId : 이 컨슈머가 속할 Kafka 컨슈머 그룹ID. application.yml에 정의된 spring.kafka.consumer.group-id보다 이 파라메터에 설정한 값이 우선.
+	 * - topics : 구독할 하나 이상의 토픽 이름을 지정. SpEL 사용가능. 예)topics = {"orders", "payments"} 또는 topics = "#{'${my.app.topics}'.split(',')}"
+	 * - topicPattern : 정규표현식(Regex)을 사용하여 매칭되는 여러 토픽을 동적으로 구독. 예)topicPattern = "order.*"
+	 * - topicPartitions :  특정 토픽의 특정 파티션만 명시적으로 지정하여 구독.
+	 * 컨슈머 그룹ID는 "같은 토픽을 나눠 처리하는 동일 로직의 인스턴스들"이라는 전제로 동작한다.
 	 */
 	@KafkaListener(topics = "inventoryReserve-reply", groupId = "order-saga-inventory-reserve-reply-group")
 	public void onInventoryReserved(Map<String, Object> payload) {

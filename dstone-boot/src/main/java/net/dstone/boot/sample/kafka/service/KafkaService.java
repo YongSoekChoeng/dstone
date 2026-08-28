@@ -20,7 +20,6 @@ public class KafkaService  extends BaseService {
 			this.warn(".publish(" + param + ") - spring.kafka.enabled=false, 발행하지 않음");
 			return;
 		}
-		this.info(".publish(" + param + ")");
 		// key = aggregateId → 같은 주문의 이벤트는 항상 같은 파티션으로 (순서 보장)
         kafkaTemplate.send(topic, key, param);
 	}
@@ -28,6 +27,6 @@ public class KafkaService  extends BaseService {
     @KafkaListener(topics = "order-events", groupId = "inventory-service-group")
     public void consume(Map<String,Object> param) {
         // 처리 로직
-    	this.info(".consume(" + param + ")");
+    	this.info("topics[order-events] 수신완료!!!");
     }
 }

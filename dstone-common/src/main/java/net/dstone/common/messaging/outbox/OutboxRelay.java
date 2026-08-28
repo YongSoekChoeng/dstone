@@ -30,6 +30,7 @@ public class OutboxRelay extends BaseObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public int dispatchPending(int limit) {
+		this.info(signatureLog());
 		List<Map<String, Object>> rows = outboxStore.findPending(limit);
 		for (Map<String, Object> row : rows) {
 			Object id = row.get("ID");

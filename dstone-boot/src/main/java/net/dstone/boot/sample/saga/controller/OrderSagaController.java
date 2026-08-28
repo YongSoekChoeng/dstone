@@ -16,7 +16,7 @@ import net.dstone.common.utils.RequestUtil;
 
 /**
  * 사가(Saga)+아웃박스 패턴 샘플: 주문 처리(재고차감 -> 결제 -> 주문확정).
- * 스텝 구현은 InventoryReserveStepHandler/PaymentStepHandler/OrderConfirmStepHandler, 스텝 간 진행은
+ * 스텝 구현은 InventoryReserveStepService/PaymentStepService/OrderConfirmStepService, 스텝 간 진행은
  * OrderSagaReplyListener가 아웃박스 릴레이로 발행되는 "{step}-reply" 이벤트를 받아 트리거한다.
  */
 @Controller

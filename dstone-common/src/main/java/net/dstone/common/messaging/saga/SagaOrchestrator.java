@@ -34,8 +34,10 @@ public class SagaOrchestrator extends BaseObject {
 	 * @return 생성된 sagaId
 	 */
 	public String start(String sagaType, String firstStep, Map<String, Object> payload) {
+		
+		this.info(signatureLog());
+		
 		String sagaId = UUID.randomUUID().toString();
-
 		Map<String, Object> saga = new HashMap<String, Object>();
 		saga.put("SAGA_ID", sagaId);
 		saga.put("SAGA_TYPE", sagaType);
@@ -64,6 +66,7 @@ public class SagaOrchestrator extends BaseObject {
 	}
 
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
+		this.info(signatureLog());
 		SagaStepHandler handler = findHandler(stepName);
 		try {
 			Map<String, Object> result = handler.handle(command);
@@ -79,7 +82,7 @@ public class SagaOrchestrator extends BaseObject {
 		} catch (Exception e) {
 			this.error("saga[" + sagaId + "] step[" + stepName + "] 실패: " + e.getMessage());
 			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "FAILED", e.getMessage(), command));
-			compensate(sagaId, stepName);
+			this.compensate(sagaId, stepName);
 		}
 	}
 
@@ -88,6 +91,7 @@ public class SagaOrchestrator extends BaseObject {
 	 * 실패한 스텝 자신은 성공한 적이 없으므로 보상 대상이 아니다.
 	 */
 	private void compensate(String sagaId, String failedStep) {
+		this.info(signatureLog());
 		sagaStore.updateStatus(sagaId, SagaStatus.COMPENSATING.name(), failedStep);
 		List<Map<String, Object>> succeededSteps = sagaStore.findSuccessStepHistory(sagaId);
 		for (Map<String, Object> row : succeededSteps) {
@@ -104,6 +108,7 @@ public class SagaOrchestrator extends BaseObject {
 	}
 
 	private SagaStepHandler findHandler(String stepName) {
+		this.info(signatureLog());
 		for (SagaStepHandler handler : stepHandlers) {
 			if (stepName.equals(handler.getStepName())) {
 				return handler;
@@ -114,6 +119,7 @@ public class SagaOrchestrator extends BaseObject {
 
 	@SuppressWarnings("unchecked")
 	private Map<String, Object> parsePayload(String payloadJson) {
+		this.info(signatureLog());
 		try {
 			return objectMapper.readValue(payloadJson, Map.class);
 		} catch (Exception e) {
@@ -122,8 +128,8 @@ public class SagaOrchestrator extends BaseObject {
 		}
 	}
 
-	private Map<String, Object> historyRow(String sagaId, String stepName, String result, String errorMessage,
-			Map<String, Object> command) {
+	private Map<String, Object> historyRow(String sagaId, String stepName, String result, String errorMessage, Map<String, Object> command) {
+		this.info(signatureLog());
 		Map<String, Object> row = new HashMap<String, Object>();
 		row.put("SAGA_ID", sagaId);
 		row.put("STEP_NAME", stepName);

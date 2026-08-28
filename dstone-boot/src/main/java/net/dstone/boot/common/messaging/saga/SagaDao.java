@@ -15,11 +15,13 @@ public class SagaDao extends net.dstone.boot.common.biz.BaseDao implements SagaS
 
 	@Override
 	public void insert(Map<String, Object> sagaInstance) {
+		this.info(signatureLog());
 		sqlSessionCommon.insert(NS + "insert", sagaInstance);
 	}
 
 	@Override
 	public Map<String, Object> findById(Object sagaId) {
+		this.info(signatureLog());
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("SAGA_ID", sagaId);
 		return sqlSessionCommon.selectOne(NS + "findById", param);
@@ -27,6 +29,7 @@ public class SagaDao extends net.dstone.boot.common.biz.BaseDao implements SagaS
 
 	@Override
 	public void updateStatus(Object sagaId, String status, String currentStep) {
+		this.info(signatureLog());
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("SAGA_ID", sagaId);
 		param.put("STATUS", status);
@@ -36,12 +39,14 @@ public class SagaDao extends net.dstone.boot.common.biz.BaseDao implements SagaS
 
 	@Override
 	public void insertStepHistory(Map<String, Object> stepHistory) {
+		this.info(signatureLog());
 		sqlSessionCommon.insert(NS + "insertStepHistory", stepHistory);
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
 	public List<Map<String, Object>> findSuccessStepHistory(Object sagaId) {
+		this.info(signatureLog());
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("SAGA_ID", sagaId);
 		return sqlSessionCommon.selectList(NS + "findSuccessStepHistory", param);
