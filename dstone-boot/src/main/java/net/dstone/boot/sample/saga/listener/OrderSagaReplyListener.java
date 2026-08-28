@@ -30,6 +30,7 @@ public class OrderSagaReplyListener extends BaseObject {
 	 */
 	@KafkaListener(topics = "inventoryReserve-reply", groupId = "order-saga-inventory-reserve-reply-group")
 	public void onInventoryReserved(Map<String, Object> payload) {
+		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] inventoryReserve-reply 수신 -> payment 진행");
 		sagaOrchestrator.proceed(sagaId, "payment", payload);
@@ -37,6 +38,7 @@ public class OrderSagaReplyListener extends BaseObject {
 
 	@KafkaListener(topics = "payment-reply", groupId = "order-saga-payment-reply-group")
 	public void onPaid(Map<String, Object> payload) {
+		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] payment-reply 수신 -> orderConfirm 진행");
 		sagaOrchestrator.proceed(sagaId, "orderConfirm", payload);
@@ -44,6 +46,7 @@ public class OrderSagaReplyListener extends BaseObject {
 
 	@KafkaListener(topics = "orderConfirm-reply", groupId = "order-saga-order-confirm-reply-group")
 	public void onOrderConfirmed(Map<String, Object> payload) {
+		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] orderConfirm-reply 수신 -> 사가 COMPLETED 처리");
 		sagaOrchestrator.complete(sagaId, "orderConfirm");

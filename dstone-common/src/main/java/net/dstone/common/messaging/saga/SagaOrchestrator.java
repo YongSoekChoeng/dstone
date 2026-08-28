@@ -31,6 +31,9 @@ public class SagaOrchestrator extends BaseObject {
 
 	/**
 	 * 사가를 시작하고 첫 스텝을 실행한다.
+	 * @param sagaType
+	 * @param firstStep
+	 * @param payload
 	 * @return 생성된 sagaId
 	 */
 	public String start(String sagaType, String firstStep, Map<String, Object> payload) {
@@ -43,9 +46,12 @@ public class SagaOrchestrator extends BaseObject {
 		saga.put("SAGA_TYPE", sagaType);
 		saga.put("STATUS", SagaStatus.STARTED.name());
 		saga.put("CURRENT_STEP", firstStep);
+		
+		// 사가 정보 DB저장
 		sagaStore.insert(saga);
-
+		// 첫스템 시작
 		runStep(sagaId, firstStep, payload);
+		
 		return sagaId;
 	}
 
@@ -65,6 +71,12 @@ public class SagaOrchestrator extends BaseObject {
 		sagaStore.updateStatus(sagaId, SagaStatus.COMPLETED.name(), lastStep);
 	}
 
+	/**
+	 * 사가의 첫 스텝을 실행한다.
+	 * @param sagaId
+	 * @param stepName
+	 * @param command
+	 */
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
 		this.info(signatureLog());
 		SagaStepHandler handler = findHandler(stepName);
