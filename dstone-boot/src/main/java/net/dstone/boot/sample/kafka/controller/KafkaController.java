@@ -15,7 +15,7 @@ import net.dstone.boot.sample.kafka.service.KafkaService;
 import net.dstone.common.utils.RequestUtil;
 
 @Controller
-@RequestMapping(value = "/kafka")
+@RequestMapping(value = "/sample/kafka")
 public class KafkaController extends BaseController {
 
 	@Autowired 

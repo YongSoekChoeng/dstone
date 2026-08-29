@@ -15,7 +15,7 @@
 			function doTestAjax(){ 
 				$.ajax({ 
 					type:"POST", 
-					url:"/sample/kafka/send.do", 
+					url:"/sample/saga/order/start.do", 
 					data:encodeURIComponent(JSON.stringify($(document.AJAX_FORM).serializeObject())), 
 					dataType:"json", 
 					success:function(data, status, request){
@@ -60,15 +60,13 @@
 					<section>
 						<!-- =============================================== Content 영역 Start =============================================== -->
 						  
-						*** KAFKA 테스트<span id="successYn"></span><br>
+						*** SAGA 테스트<span id="successYn"></span><br>
 						<form name="AJAX_FORM" method="post" action="">
-						주문ID:<input type="text" name="orderId" value="" >
+						주문아이템:<input type="text" name="itemId" value="APPLE" >
 						<br>
-						주문명:<input type="text" name="orderName" value="테스트주문" >
+						주문회차:<input type="text" name="qty" value="1" >
 						<br>
-						주문아이템:<input type="text" name="orderItem" value="연필" >
-						<br>
-						주문수량:<input type="text" name="orderCount" value="1000" >
+						주문수량:<input type="text" name="amount" value="1000" >
 						<br>
 						<table border=1>
 							<tr>

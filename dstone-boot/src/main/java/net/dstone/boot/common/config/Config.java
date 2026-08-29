@@ -11,6 +11,7 @@ import net.dstone.common.core.BaseObject;
 @EnableScheduling
 @Configuration
 @Import({ 
+	net.dstone.common.config.ConfigAspect.class,
 	ConfigAspect.class,
 	ConfigDatasource.class,
 	ConfigEnc.class,

@@ -18,7 +18,7 @@ public class ConfigAspect extends BaseObject {
 	
 	public static final ThreadLocal<ProceedingJoinPoint> CURRENT_JOIN_POINT = new ThreadLocal<>();
 
-	@Around("execution(* net.dstone..*.*(..))")
+	@Around("execution(* net.dstone.common.*..*.*(..))")
 	public Object doAllProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 	    try {
 	    	CURRENT_JOIN_POINT.set(joinPoint);

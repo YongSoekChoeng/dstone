@@ -16,27 +16,27 @@ import net.dstone.common.utils.ConvertUtil;
  * 오케스트레이션 방식 사가(Orchestration Saga) 엔진.
  *
  * [전체 흐름 요약]
- * 1) 이 클래스(오케스트레이터)가 사가의 "지휘자" 역할을 한다. 각 스텝은 SagaStepHandler 구현체가
- *    로컬(동일 JVM, 동일 DB 트랜잭션)에서 동기 실행한다 — 원격 서비스 호출이 아니라 인프로세스 호출이다.
- * 2) 한 스텝이 끝나면 그 결과를 "다음 스텝을 트리거하는 이벤트"로 만들어 발행해야 하는데, 이때
- *    Kafka로 직접 보내지 않고 반드시 OutboxAppender.append()를 거친다.
- *    이유: sagaStore.insertStepHistory()/updateStatus() 같은 DB 쓰기와 이벤트 발행을
- *    "하나의 로컬 트랜잭션"으로 묶어야 하기 때문(Transactional Outbox 패턴).
- *    → DB 커밋은 성공했는데 Kafka 발행에는 실패(또는 그 반대)하는 이중 쓰기(dual write) 문제를 제거한다.
- * 3) 실제 Kafka 전송은 별도 스레드(OutboxRelay, dstone-boot에서는 OutboxRelayScheduler가 주기 호출)가
- *    TB_OUTBOX_MESSAGE의 PENDING 레코드를 폴링해서 비동기적으로 수행한다.
- * 4) 다음 스텝으로의 "진행(proceed)"은 이 엔진이 스스로 하지 않는다. Kafka Consumer(각 모듈의
- *    @KafkaListener, 예: OrderSagaReplyListener)가 "{step}-reply" 토픽을 구독하고 있다가 메시지를
- *    수신하면 그 payload를 들고 proceed()를 호출해준다. 즉 스텝 간 연결은 Kafka 메시지가 매개한다.
- * 5) 스텝 실행 중 예외가 발생하면 compensate()가 자동 호출되어, 이미 성공했던 이전 스텝들을
- *    역순으로 되돌린다(SEC(Saga Execution Coordinator) 패턴의 보상 트랜잭션).
+ *    1) 이 클래스(오케스트레이터)가 사가의 "지휘자" 역할을 한다. 각 스텝은 SagaStepHandler 구현체가
+ *       로컬(동일 JVM, 동일 DB 트랜잭션)에서 동기 실행한다 — 원격 서비스 호출이 아니라 인프로세스 호출이다.
+ *    2) 한 스텝이 끝나면 그 결과를 "다음 스텝을 트리거하는 이벤트"로 만들어 발행해야 하는데, 이때
+ *       Kafka로 직접 보내지 않고 반드시 OutboxAppender.append()를 거친다.
+ *       이유: sagaStore.insertStepHistory()/updateStatus() 같은 DB 쓰기와 이벤트 발행을
+ *       "하나의 로컬 트랜잭션"으로 묶어야 하기 때문(Transactional Outbox 패턴).
+ *       → DB 커밋은 성공했는데 Kafka 발행에는 실패(또는 그 반대)하는 이중 쓰기(dual write) 문제를 제거한다.
+ *    3) 실제 Kafka 전송은 별도 스레드(OutboxRelay, dstone-boot에서는 OutboxRelayScheduler가 주기 호출)가
+ *       TB_OUTBOX_MESSAGE의 PENDING 레코드를 폴링해서 비동기적으로 수행한다.
+ *    4) 다음 스텝으로의 "진행(proceed)"은 이 엔진이 스스로 하지 않는다. 
+ *       Kafka Consumer(각 모듈의 @KafkaListener, 예: OrderSagaReplyListener)가 "{step}-reply" 토픽을 구독하고 있다가 메시지를
+ *       수신하면 그 payload를 들고 proceed()를 호출해준다. 즉 스텝 간 연결은 Kafka 메시지가 매개한다.
+ *    5) 스텝 실행 중 예외가 발생하면 compensate()가 자동 호출되어, 이미 성공했던 이전 스텝들을
+ *       역순으로 되돌린다(SEC(Saga Execution Coordinator) 패턴의 보상 트랜잭션).
  *
  * [스텝/토픽 네이밍 규칙]
- * 스텝 이름이 "inventoryReserve"라면, 결과 이벤트는 관례상 토픽 "inventoryReserve-reply"로 발행된다.
- * 이 토픽을 구독하는 리스너가 다음 스텝 이름(예: "payment")을 알고 있다가 proceed()를 호출하는 식으로,
- * "사가 정의(스텝 순서)"는 오케스트레이터가 아니라 리스너/컨트롤러 쪽 호출자가 갖는다.
- * (엔진 자체는 SagaStepHandler 목록에서 이름만으로 찾아 실행할 뿐, 순서를 알지 못한다 — 그래야
- *  이 엔진 코드가 사가 종류(주문/배송/정산 등)에 무관하게 재사용 가능하다.)
+ *    스텝 이름이 "inventoryReserve"라면, 결과 이벤트는 관례상 토픽 "inventoryReserve-reply"로 발행된다.
+ *    이 토픽을 구독하는 리스너가 다음 스텝 이름(예: "payment")을 알고 있다가 proceed()를 호출하는 식으로,
+ *    "사가 정의(스텝 순서)"는 오케스트레이터가 아니라 리스너/컨트롤러 쪽 호출자가 갖는다.
+ *    (엔진 자체는 SagaStepHandler 목록에서 이름만으로 찾아 실행할 뿐, 순서를 알지 못한다 — 그래야
+ *    이 엔진 코드가 사가 종류(주문/배송/정산 등)에 무관하게 재사용 가능하다.)
  * </pre>
  */
 public class SagaOrchestrator extends BaseObject {

@@ -18,9 +18,8 @@ import net.dstone.common.messaging.saga.SagaStepHandler;
 
 /**
  * dstone-common의 사가+아웃박스 엔진(OutboxAppenderImpl/OutboxRelay/SagaOrchestrator)을
- * dstone-boot의 실제 DataSource(OutboxDao/SagaDao, sqlSessionCommon 기반)와 KafkaTemplate으로 배선한다.
- * net.dstone.boot 하위이므로 DstoneBootApplication의 @ComponentScan(basePackages="net.dstone.boot")에
- * 자동으로 포함되어 별도 @Import가 필요 없다.
+ * dstone-boot의 실제 DataSource(OutboxDao/SagaDao, sqlSessionCommon 기반)와 KafkaTemplate으로 연결한다.
+ * net.dstone.boot 하위이므로 DstoneBootApplication의 @ComponentScan(basePackages="net.dstone.boot")에 자동으로 포함되어 별도 @Import가 필요 없다.
  */
 @Component
 public class ConfigMessaging extends BaseObject {

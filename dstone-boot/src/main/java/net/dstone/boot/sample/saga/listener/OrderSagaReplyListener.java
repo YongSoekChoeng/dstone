@@ -28,6 +28,7 @@ public class OrderSagaReplyListener extends BaseObject {
 	 * - topicPartitions :  특정 토픽의 특정 파티션만 명시적으로 지정하여 구독.
 	 * 컨슈머 그룹ID는 "같은 토픽을 나눠 처리하는 동일 로직의 인스턴스들"이라는 전제로 동작한다.
 	 */
+	
 	/**
 	 * <pre>
 	 * inventoryReserve 스텝의 결과 이벤트를 수신해 payment 스텝을 트리거한다.
