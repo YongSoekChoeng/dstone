@@ -25,7 +25,7 @@ import net.dstone.common.utils.ConvertUtil;
  *       → DB 커밋은 성공했는데 Kafka 발행에는 실패(또는 그 반대)하는 이중 쓰기(dual write) 문제를 제거한다.
  *       주의: 이 클래스 자신은 트랜잭션을 시작하지 않는다(순수 POJO). 이 원자성은 이 클래스를 호출하는
  *       쪽이 트랜잭션 경계를 열어줘야만 성립한다 — dstone-boot는 ConfigTransaction의 AOP 어드바이저가
- *       "*ServiceImpl" 클래스의 insert*/update* 메소드에만 트랜잭션을 걸므로, 반드시 그 규칙을 만족하는
+ *       *ServiceImpl 클래스의 insert/update 메소드에만 트랜잭션을 걸므로, 반드시 그 규칙을 만족하는
  *       래퍼(dstone-boot의 SagaTransactionServiceImpl)를 통해 start()/proceed()/complete()를
  *       호출해야 한다. SagaOrchestrator를 직접 호출하면 runStep() 내부의 여러 DB 쓰기가 트랜잭션 없이
  *       각각 개별 auto-commit되어 원자성이 깨질 수 있다.
