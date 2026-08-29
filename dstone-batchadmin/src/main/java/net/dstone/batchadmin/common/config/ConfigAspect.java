@@ -1,10 +1,14 @@
 package net.dstone.batchadmin.common.config;
 
+import java.lang.reflect.Method;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
@@ -21,12 +25,20 @@ import net.dstone.common.utils.StringUtil;
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 @EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
-
+	
+	private final static String NO_LOG_ASPECT = "@annotation(net.dstone.common.annotation.NoAspectLog)";
+	
 	/**************************************** 1. Logging 관련 AOP ****************************************/
-	@Around("execution(* net.dstone.*..*Controller.*(..))")
+	/**
+	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.batchadmin.*..*Controller.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
-		this.info("+->[CONTROLLER] {"+buildSimpleExecutionInfo(joinPoint, "")+"}");
+		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
 		
 		/*****************************************************************************************************
 		컨트롤러 호출 시 응답헤더에 기본값 세팅
@@ -50,63 +62,40 @@ public class ConfigAspect extends BaseObject {
 		return retObj;
 	}
 
-	@Around("execution(* net.dstone.*..*Service*.*(..))")
+	/**
+	 * 서비스 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.batchadmin.*..*Service*.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+--->[SERVICE ] {"+buildSimpleExecutionInfo(joinPoint, "")+"}");
+		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
 
-	@Around("execution(* net.dstone.*..*Dao.*(..))")
+	/**
+	 * DAO 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.batchadmin.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[DAO   ] {"+buildSimpleExecutionInfo(joinPoint, "")+"}");
-		return joinPoint.proceed();
-	}
-
-	private String buildSimpleExecutionInfo(ProceedingJoinPoint joinPoint, String tabSpace) {
-		StringBuffer buffer = new StringBuffer();
-		String className = joinPoint.getTarget().getClass().getSimpleName();
-		String methodName = joinPoint.getSignature().getName();
-		StringBuffer paramListInfo = new StringBuffer();
-		int args = joinPoint.getArgs().length;
-		int setNum = 0;
-		for (int i = 0; i < args; i++) {
-			Object param = joinPoint.getArgs()[i];
-			if (param instanceof HttpServletRequest) {
-				continue;
-			}else if (param instanceof HttpServletResponse) {
-				continue;
-			}else if (param instanceof String) {
-				paramListInfo.append("String" + "[" + param + "]");
-			}else{
-				String result = "";
-				try {
-					result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
-				}catch(Exception e) {
-					result = ConvertUtil.convertToJson(param);
-					result = StringUtil.replace(result, "\n", "");
-				}
-				paramListInfo.append(result);
+		Method method = ((MethodSignature)joinPoint.getSignature()).getMethod();
+		boolean noLog = method.getAnnotation(net.dstone.common.annotation.NoAspectLog.class) != null;
+		try {
+			if( noLog ) {
+				ThreadContext.put("SUPPRESS_SQL_LOG", "Y");
+			}else {
+				this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
 			}
-			if (setNum > 0) {
-				paramListInfo.append(", ");
-			}
-			setNum++;
-		}
-		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
-		return splitToLines(buffer.toString(),  tabSpace);
-	}
-	
-	private String splitToLines(String msg, String tabSpace) {
-		StringBuffer buffer = new StringBuffer();
-		String[] lines = StringUtil.toStrArray(msg, "\n");
-		for(int i=0; i < lines.length; i++) {
-			String line = lines[i];
-			buffer.append(tabSpace).append(line);
-			if(i < lines.length-1) {
-				buffer.append("\n");
+			return joinPoint.proceed();
+		} finally {
+			if( noLog ) {
+				ThreadContext.remove("SUPPRESS_SQL_LOG");
 			}
 		}
-		return buffer.toString();
 	}
 
 }

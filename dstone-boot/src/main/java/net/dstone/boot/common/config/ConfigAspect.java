@@ -24,7 +24,13 @@ public class ConfigAspect extends BaseObject {
 	private final static String NO_LOG_ASPECT = "@annotation(net.dstone.common.annotation.NoAspectLog)";
 	
 	/**************************************** 1. Logging 관련 AOP ****************************************/
-	@Around("execution(* net.dstone.*..*Controller.*(..))" + " && !" + NO_LOG_ASPECT)
+	/**
+	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.boot.*..*Controller.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
 		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
@@ -51,13 +57,25 @@ public class ConfigAspect extends BaseObject {
 		return retObj;
 	}
 
-	@Around("execution(* net.dstone.*..*Service*.*(..))" + " && !" + NO_LOG_ASPECT)
+	/**
+	 * 서비스 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.boot.*..*Service*.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
 
-	@Around("execution(* net.dstone.*..*Dao.*(..))")
+	/**
+	 * DAO 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.boot.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		Method method = ((MethodSignature)joinPoint.getSignature()).getMethod();
 		boolean noLog = method.getAnnotation(net.dstone.common.annotation.NoAspectLog.class) != null;

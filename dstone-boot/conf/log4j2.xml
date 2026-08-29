@@ -50,15 +50,24 @@
 		</Logger>  	
 		
 		<!--Jdbc logger-->
-		<Logger name="jdbc" level="OFF" additivity="false">   
+		<Logger name="jdbc" level="OFF" additivity="false">    
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.connection" level="OFF" additivity="false">   
+		<Logger name="jdbc.connection" level="OFF" additivity="false">    
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.sqlonly" level="OFF" additivity="false">   
+		<Logger name="jdbc.sqlonly" level="OFF" additivity="false">    
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
@@ -69,19 +78,31 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 		</Logger>
-		<Logger name="jdbc.audit" level="OFF" additivity="false">   
+		<Logger name="jdbc.audit" level="OFF" additivity="false">    
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
 		<Logger name="jdbc.resultset" level="OFF" additivity="false">   
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		 
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.resultsettable" level="INFO" additivity="false">   
+		<Logger name="jdbc.resultsettable" level="INFO" additivity="false">  
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		  
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-	    <Logger name="com.zaxxer.hikari" level="OFF" additivity="false">
+	    <Logger name="com.zaxxer.hikari" level="OFF" additivity="false"> 
+            <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
+            	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
+            </ThreadContextMapFilter>		
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>

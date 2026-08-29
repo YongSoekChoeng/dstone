@@ -57,9 +57,7 @@ public class BaseObject {
 	protected String signatureLog() {
 		String logStr = "";
 		ProceedingJoinPoint joinPoint = net.dstone.common.config.ConfigAspect.CURRENT_JOIN_POINT.get();
-		if( joinPoint != null ) {
-			logStr = this.buildSimpleExecutionInfo(joinPoint, "");
-		}
+		logStr = this.signatureLog(joinPoint);
 		return logStr;
 	}
 
@@ -70,33 +68,38 @@ public class BaseObject {
 	
 	private String buildSimpleExecutionInfo(ProceedingJoinPoint joinPoint, String tabSpace) {
 		StringBuffer buffer = new StringBuffer();
-		String className = joinPoint.getTarget().getClass().getSimpleName();
-		String methodName = joinPoint.getSignature().getName();
+		String className = "";
+		String methodName = "";
 		StringBuffer paramListInfo = new StringBuffer();
-		int args = joinPoint.getArgs().length;
-		int setNum = 0;
-		for (int i = 0; i < args; i++) {
-			Object param = joinPoint.getArgs()[i];
-			if (param instanceof HttpServletRequest) {
-				continue;
-			}else if (param instanceof HttpServletResponse) {
-				continue;
-			}else if (param instanceof String) {
-				paramListInfo.append("String" + "[" + param + "]");
-			}else{
-				String result = "";
-				try {
-					result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
-				}catch(Exception e) {
-					result = ConvertUtil.convertToJson(param);
-					result = StringUtil.replace(result, "\n", "");
+		
+		if( joinPoint != null ) {
+			className = joinPoint.getTarget().getClass().getSimpleName();
+			methodName = joinPoint.getSignature().getName();
+			int args = joinPoint.getArgs().length;
+			int setNum = 0;
+			for (int i = 0; i < args; i++) {
+				Object param = joinPoint.getArgs()[i];
+				if (param instanceof HttpServletRequest) {
+					continue;
+				}else if (param instanceof HttpServletResponse) {
+					continue;
+				}else if (param instanceof String) {
+					paramListInfo.append("String" + "[" + param + "]");
+				}else{
+					String result = "";
+					try {
+						result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
+					}catch(Exception e) {
+						result = ConvertUtil.convertToJson(param);
+						result = StringUtil.replace(result, "\n", "");
+					}
+					paramListInfo.append(result);
 				}
-				paramListInfo.append(result);
+				if (setNum > 0) {
+					paramListInfo.append(", ");
+				}
+				setNum++;
 			}
-			if (setNum > 0) {
-				paramListInfo.append(", ");
-			}
-			setNum++;
 		}
 		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
 		return splitToLines(buffer.toString(),  tabSpace);

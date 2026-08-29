@@ -160,7 +160,9 @@ public class SagaOrchestrator extends BaseObject {
 	 *                 저장되어 나중에 compensate()가 보상 호출 시 그대로 복원해서 재사용하는 값이다.
 	 */
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
+		
 		this.info(signatureLog());
+		
 		// 멱등성 체크: Kafka at-least-once 재전달 등으로 같은 "{이전스텝}-reply" 이벤트가 중복 수신되어
 		// proceed()가 같은 (sagaId, stepName)에 대해 두 번 호출될 수 있다. 이미 SUCCESS 처리된 스텝이면
 		// 핸들러(부수효과 있음)를 다시 실행하지 않고 그냥 무시한다 — 최초 처리 시점에 이미 이 스텝의
@@ -244,6 +246,7 @@ public class SagaOrchestrator extends BaseObject {
 
 	private SagaStepHandler findHandler(String stepName) {
 		this.info(signatureLog());
+		
 		for (SagaStepHandler handler : stepHandlers) {
 			if (stepName.equals(handler.getStepName())) {
 				return handler;

@@ -18,14 +18,22 @@ public class ConfigAspect extends BaseObject {
 	
 	public static final ThreadLocal<ProceedingJoinPoint> CURRENT_JOIN_POINT = new ThreadLocal<>();
 
+	/**
+	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
 	@Around("execution(* net.dstone.common.*..*.*(..))")
 	public Object doAllProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
+		Object returnObj;
 	    try {
 	    	CURRENT_JOIN_POINT.set(joinPoint);
-	        return joinPoint.proceed();
+	    	returnObj = joinPoint.proceed();
 	    } finally {
 	    	CURRENT_JOIN_POINT.remove();
 	    }
+	    return returnObj;
 	}
 
 }
