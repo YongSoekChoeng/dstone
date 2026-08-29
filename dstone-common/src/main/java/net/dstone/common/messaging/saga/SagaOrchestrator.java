@@ -46,6 +46,12 @@ public class SagaOrchestrator extends BaseObject {
 	private final List<SagaStepHandler> stepHandlers;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
+	/**
+	 * 사가(Orchestration Saga) 엔진으로 Spring 컴퍼넌트에서 생성시킬 때 아래의 파라메터를 넘겨야 함.
+	 * @param sagaStore - 사가 인스턴스 및 이력등을 저장 할 수 있도록 SagaStore 를 구현한 DAO컴퍼넌트.
+	 * @param outboxAppender - 
+	 * @param stepHandlers
+	 */
 	public SagaOrchestrator(SagaStore sagaStore, OutboxAppender outboxAppender, List<SagaStepHandler> stepHandlers) {
 		this.sagaStore = sagaStore;
 		this.outboxAppender = outboxAppender;
@@ -127,8 +133,12 @@ public class SagaOrchestrator extends BaseObject {
 	/**
 	 * <pre>
 	 * 한 스텝을 실행하고, 그 결과를 다음 스텝 트리거용 이벤트로 아웃박스에 적재한다.
-	 * 처리 순서: ①핸들러 동기 실행 → ②SAGA_ID 결과에 주입 → ③스텝 이력 DB 저장 → ④사가 상태 갱신
-	 *          → ⑤outboxAppender.append()로 TB_OUTBOX_MESSAGE에 PENDING 행 삽입.
+	 * 처리 순서: 
+	 *   ①핸들러 동기 실행 
+	 *   → ②SAGA_ID 결과에 주입 
+	 *   → ③스텝 이력 DB 저장 
+	 *   → ④사가 상태 갱신
+	 *   → ⑤outboxAppender.append()로 TB_OUTBOX_MESSAGE에 PENDING 행 삽입.
 	 * ②~⑤는 (배포 환경의 트랜잭션 경계 설정에 따라) 하나의 로컬 트랜잭션으로 묶여야
 	 * 아웃박스 패턴의 원자성 보장이 성립한다 — DB 반영과 "발행 예약"이 함께 커밋되거나 함께 롤백되어야 한다.
 	 * 실제 Kafka 전송(브로커로의 네트워크 I/O)은 여기서 일어나지 않고, 이후 OutboxRelay가 비동기로 수행한다.

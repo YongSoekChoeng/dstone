@@ -5,7 +5,7 @@ import java.util.Map;
 /**
  * 사가의 한 스텝을 실제로 처리하는 핸들러 계약.
  * 각 모듈이 자기 도메인 로직으로 구현하여 @Component로 등록하면,
- * SagaOrchestrator가 Spring이 모아준 List&lt;SagaStepHandler&gt;에서 getStepName()으로 찾아서 실행한다.
+ * SagaOrchestrator가 Spring이 모아준 List<SagaStepHandler>에서 getStepName()으로 찾아서 실행한다.
  */
 public interface SagaStepHandler {
 
