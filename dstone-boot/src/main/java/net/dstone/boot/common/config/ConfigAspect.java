@@ -1,9 +1,12 @@
 package net.dstone.boot.common.config;
 
+import java.lang.reflect.Method;
+
 import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
@@ -56,15 +59,19 @@ public class ConfigAspect extends BaseObject {
 
 	@Around("execution(* net.dstone.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
+		Method method = ((MethodSignature)joinPoint.getSignature()).getMethod();
+		boolean noLog = method.getAnnotation(net.dstone.common.annotation.NoAspectLog.class) != null;
 		try {
-			if( joinPoint.getClass().getAnnotationsByType(net.dstone.common.annotation.NoAspectLog.class) != null) {
+			if( noLog ) {
 				ThreadContext.put("SUPPRESS_SQL_LOG", "Y");
 			}else {
 				this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
 			}
 			return joinPoint.proceed();
 		} finally {
-			ThreadContext.remove("SUPPRESS_SQL_LOG");
+			if( noLog ) {
+				ThreadContext.remove("SUPPRESS_SQL_LOG");
+			}
 		}
 	}
 
