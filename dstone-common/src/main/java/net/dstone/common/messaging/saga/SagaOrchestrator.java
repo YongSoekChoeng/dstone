@@ -23,6 +23,12 @@ import net.dstone.common.utils.ConvertUtil;
  *       이유: sagaStore.insertStepHistory()/updateStatus() 같은 DB 쓰기와 이벤트 발행을
  *       "하나의 로컬 트랜잭션"으로 묶어야 하기 때문(Transactional Outbox 패턴).
  *       → DB 커밋은 성공했는데 Kafka 발행에는 실패(또는 그 반대)하는 이중 쓰기(dual write) 문제를 제거한다.
+ *       주의: 이 클래스 자신은 트랜잭션을 시작하지 않는다(순수 POJO). 이 원자성은 이 클래스를 호출하는
+ *       쪽이 트랜잭션 경계를 열어줘야만 성립한다 — dstone-boot는 ConfigTransaction의 AOP 어드바이저가
+ *       "*ServiceImpl" 클래스의 insert*/update* 메소드에만 트랜잭션을 걸므로, 반드시 그 규칙을 만족하는
+ *       래퍼(dstone-boot의 SagaTransactionServiceImpl)를 통해 start()/proceed()/complete()를
+ *       호출해야 한다. SagaOrchestrator를 직접 호출하면 runStep() 내부의 여러 DB 쓰기가 트랜잭션 없이
+ *       각각 개별 auto-commit되어 원자성이 깨질 수 있다.
  *    3) 실제 Kafka 전송은 별도 스레드(OutboxRelay, dstone-boot에서는 OutboxRelayScheduler가 주기 호출)가
  *       TB_OUTBOX_MESSAGE의 PENDING 레코드를 폴링해서 비동기적으로 수행한다.
  *    4) 다음 스텝으로의 "진행(proceed)"은 이 엔진이 스스로 하지 않는다. 
