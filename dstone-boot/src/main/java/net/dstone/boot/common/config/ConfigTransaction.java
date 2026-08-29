@@ -28,7 +28,9 @@ public class ConfigTransaction extends BaseObject{
 	Datasource/Transaction 설정
 	********************************************************************************/
 	private int TX_METHOD_TIMEOUT = 30;
-	private static String AOP_POINTCUT_EXPRESSION = "execution(public * net.dstone.*..*ServiceImpl.*(..))";
+	// "*ServiceImpl"뿐 아니라 인터페이스 없는 "*Service" 클래스도 트랜잭션 대상이 되도록 "*Service*"(포함 매칭)로 지정.
+	// proxyTargetClass=true(ConfigAspect)라 인터페이스 유무와 무관하게 CGLIB로 구체 클래스가 프록시되므로 매칭에 문제없음.
+	private static String AOP_POINTCUT_EXPRESSION = "execution(public * net.dstone.*..*Service*.*(..))";
 	
 
 	/********************************************************************************
