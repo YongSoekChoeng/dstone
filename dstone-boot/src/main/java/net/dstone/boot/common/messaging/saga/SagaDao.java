@@ -52,4 +52,25 @@ public class SagaDao extends net.dstone.boot.common.biz.BaseDao implements SagaS
 		return sqlSessionCommon.selectList(NS + "findSuccessStepHistory", param);
 	}
 
+	@Override
+	public boolean existsSuccessStep(Object sagaId, String stepName) {
+		this.info(signatureLog());
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("SAGA_ID", sagaId);
+		param.put("STEP_NAME", stepName);
+		Integer count = sqlSessionCommon.selectOne(NS + "countSuccessStep", param);
+		return count != null && count > 0;
+	}
+
+	@Override
+	public void markCompensated(Object sagaId, String stepName, String errorMessage) {
+		this.info(signatureLog());
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("SAGA_ID", sagaId);
+		param.put("STEP_NAME", stepName);
+		param.put("RESULT", errorMessage == null ? "SUCCESS" : "FAILED");
+		param.put("ERROR_MSG", errorMessage);
+		sqlSessionCommon.update(NS + "markCompensated", param);
+	}
+
 }

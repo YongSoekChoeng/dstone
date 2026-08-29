@@ -20,10 +20,12 @@ public class OutboxDao extends net.dstone.boot.common.biz.BaseDao implements Out
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public List<Map<String, Object>> findPending(int limit) {
+	public List<Map<String, Object>> claimPending(int limit, String dispatchToken) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("LIMIT", limit);
-		return sqlSessionCommon.selectList(NS + "findPending", param);
+		param.put("DISPATCH_TOKEN", dispatchToken);
+		sqlSessionCommon.update(NS + "claim", param);
+		return sqlSessionCommon.selectList(NS + "findByDispatchToken", param);
 	}
 
 	@Override
@@ -39,6 +41,13 @@ public class OutboxDao extends net.dstone.boot.common.biz.BaseDao implements Out
 		param.put("ID", id);
 		param.put("ERROR_MSG", errorMessage);
 		sqlSessionCommon.update(NS + "markFailed", param);
+	}
+
+	@Override
+	public int requeueStale(int staleSeconds) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("STALE_SECONDS", staleSeconds);
+		return sqlSessionCommon.update(NS + "requeueStale", param);
 	}
 
 }

@@ -48,4 +48,30 @@
 			ID DESC
 	</select>
 
+	<!-- 멱등성 체크용: 해당 스텝이 이미 SUCCESS로 기록됐는지 -->
+	<select id="countSuccessStep" parameterType="map" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			TB_SAGA_STEP_HISTORY
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+			AND STEP_NAME = #{STEP_NAME}
+			AND RESULT = 'SUCCESS'
+	</select>
+
+	<!-- 보상(compensate) 처리 결과를 해당 스텝의 이력 행에 기록. 새 행을 추가하지 않고 UPDATE하는 이유는
+	     UX_SAGA_STEP(SAGA_ID, STEP_NAME) 유니크 제약과 충돌하지 않기 위함(같은 스텝 이력 행에 보상 결과를 덧붙임). -->
+	<update id="markCompensated" parameterType="map">
+		UPDATE TB_SAGA_STEP_HISTORY
+		SET
+			COMPENSATE_RESULT = #{RESULT}
+			, COMPENSATE_ERROR_MSG = #{ERROR_MSG}
+			, COMPENSATED_DT = NOW()
+		WHERE 1=1
+			AND SAGA_ID = #{SAGA_ID}
+			AND STEP_NAME = #{STEP_NAME}
+			AND RESULT = 'SUCCESS'
+	</update>
+
 </mapper>

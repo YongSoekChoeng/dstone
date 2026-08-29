@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.DuplicateKeyException;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.common.core.BaseObject;
@@ -159,6 +161,14 @@ public class SagaOrchestrator extends BaseObject {
 	 */
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
 		this.info(signatureLog());
+		// 멱등성 체크: Kafka at-least-once 재전달 등으로 같은 "{이전스텝}-reply" 이벤트가 중복 수신되어
+		// proceed()가 같은 (sagaId, stepName)에 대해 두 번 호출될 수 있다. 이미 SUCCESS 처리된 스텝이면
+		// 핸들러(부수효과 있음)를 다시 실행하지 않고 그냥 무시한다 — 최초 처리 시점에 이미 이 스텝의
+		// outbox 이벤트는 (트랜잭션 래퍼 덕에) durable하게 적재되어 있으므로 재발행할 필요도 없다.
+		if (sagaStore.existsSuccessStep(sagaId, stepName)) {
+			this.warn("saga[" + sagaId + "] step[" + stepName + "] 이미 SUCCESS 처리된 스텝의 중복 수신 — 재실행 없이 무시");
+			return;
+		}
 		SagaStepHandler handler = findHandler(stepName);
 		try {
 			Map<String, Object> result = handler.handle(command);
@@ -167,14 +177,29 @@ public class SagaOrchestrator extends BaseObject {
 			}
 			// 보상 캐스케이딩과 리스너의 다음 스텝 트리거 모두 sagaId를 필요로 하므로, 핸들러 구현과 무관하게 항상 심어준다.
 			result.put("SAGA_ID", sagaId);
-			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "SUCCESS", null, command));
+			try {
+				sagaStore.insertStepHistory(historyRow(sagaId, stepName, "SUCCESS", null, command));
+			} catch (DuplicateKeyException dke) {
+				// 위 existsSuccessStep 체크와 이 INSERT 사이의 좁은 경합 구간에서 동시 중복 호출이 있었던 경우.
+				// TB_SAGA_STEP_HISTORY의 UX_SAGA_STEP(SAGA_ID, STEP_NAME) 유니크 제약이 최종 안전망 역할을 하며,
+				// 이미 다른 실행이 이 스텝을 기록했으므로 이번 시도는 그냥 폐기한다(재실행 방지의 마지막 방어선).
+				this.warn("saga[" + sagaId + "] step[" + stepName + "] 동시 중복 처리 감지(unique 제약) — 이번 시도 폐기");
+				return;
+			}
 			sagaStore.updateStatus(sagaId, SagaStatus.STEP_DONE.name(), stepName);
 			// 다음 스텝 트리거용 이벤트. 토픽명은 관례상 "{stepName}-reply"를 기본으로 한다.
 			// topic="{stepName}-reply"(Kafka 토픽), key=sagaId(Kafka 파티션 키), payload=result(Kafka 메시지 value, JSON 직렬화)
 			outboxAppender.append(stepName + "-reply", sagaId, result);
 		} catch (Exception e) {
 			this.error("saga[" + sagaId + "] step[" + stepName + "] 실패: " + e.getMessage());
-			sagaStore.insertStepHistory(historyRow(sagaId, stepName, "FAILED", e.getMessage(), command));
+			try {
+				sagaStore.insertStepHistory(historyRow(sagaId, stepName, "FAILED", e.getMessage(), command));
+			} catch (DuplicateKeyException dke) {
+				// 이미 다른 실행이 이 스텝의 결과(SUCCESS 또는 FAILED)를 먼저 기록한 경우 — 그 쪽이 필요하면
+				// 이미 compensate()까지 진행했을 것이므로 여기서 중복으로 보상까지 갈 필요가 없다.
+				this.warn("saga[" + sagaId + "] step[" + stepName + "] 실패 기록 중 동시 중복 처리 감지 — 이번 시도 폐기");
+				return;
+			}
 			this.compensate(sagaId, stepName);
 		}
 	}
@@ -201,8 +226,17 @@ public class SagaOrchestrator extends BaseObject {
 				SagaStepHandler handler = findHandler(stepName);
 				Map<String, Object> payload = parsePayload((String) row.get("PAYLOAD"));
 				handler.compensate(payload);
+				// 보상 성공을 TB_SAGA_STEP_HISTORY.COMPENSATE_RESULT에 기록해 운영자가 DB 조회만으로
+				// "이 사가에서 어떤 스텝까지 정상 보상됐는지"를 확인할 수 있게 한다(과거엔 로그에만 남았음).
+				sagaStore.markCompensated(sagaId, stepName, null);
 			} catch (Exception e) {
 				this.error("saga[" + sagaId + "] compensate[" + stepName + "] 중 오류: " + e.getMessage());
+				try {
+					// 보상 실패도 마찬가지로 DB에 기록 — 로그를 뒤지지 않아도 "부분 보상 실패" 상태를 조회로 알 수 있게 한다.
+					sagaStore.markCompensated(sagaId, stepName, e.getMessage());
+				} catch (Exception e2) {
+					this.error("saga[" + sagaId + "] compensate[" + stepName + "] 실패 이력 기록 중 추가 오류: " + e2.getMessage());
+				}
 			}
 		}
 		sagaStore.updateStatus(sagaId, SagaStatus.FAILED.name(), failedStep);

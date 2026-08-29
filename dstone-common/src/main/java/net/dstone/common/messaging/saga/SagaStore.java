@@ -64,4 +64,27 @@ public interface SagaStore {
 	 */
 	List<Map<String, Object>> findSuccessStepHistory(Object sagaId);
 
+	/**
+	 * <pre>
+	 * 해당 사가의 해당 스텝이 이미 RESULT='SUCCESS'로 기록되어 있는지 확인한다(멱등성 체크용).
+	 * Kafka at-least-once 재전달 등으로 같은 "{step}-reply" 이벤트가 중복 수신되어 SagaOrchestrator.proceed()가
+	 * 같은 (sagaId, stepName)에 대해 두 번 호출되는 경우, 이미 성공 처리된 스텝을 재실행하지 않기 위해 쓰인다.
+	 * </pre>
+	 * @param sagaId
+	 * @param stepName
+	 * @return
+	 */
+	boolean existsSuccessStep(Object sagaId, String stepName);
+
+	/**
+	 * <pre>
+	 * 보상(compensate) 처리 결과를 해당 스텝의 이력 행에 기록한다(TB_SAGA_STEP_HISTORY.COMPENSATE_RESULT 등).
+	 * </pre>
+	 * @param sagaId 사가 식별자
+	 * @param stepName 보상 대상 스텝 이름
+	 * @param errorMessage null이면 보상 성공(COMPENSATE_RESULT='SUCCESS'), non-null이면 보상 실패
+	 *                     (COMPENSATE_RESULT='FAILED', COMPENSATE_ERROR_MSG에 저장)
+	 */
+	void markCompensated(Object sagaId, String stepName, String errorMessage);
+
 }

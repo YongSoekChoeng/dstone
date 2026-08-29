@@ -2,6 +2,7 @@ package net.dstone.common.messaging.outbox;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.kafka.core.KafkaTemplate;
 
@@ -42,14 +43,17 @@ public class OutboxRelay extends BaseObject {
 	 *                   역직렬화한 뒤 send()에 넘긴다. KafkaTemplate 쪽 ProducerFactory에 설정된
 	 *                   JsonSerializer가 이 Map을 다시 JSON으로 직렬화해 실제 메시지 value(본문)로 만든다.
 	 * </pre>
-	 * @param limit 한 번에 조회/발행할 최대 건수(findPending의 LIMIT). dstone-boot의 OutboxRelayScheduler는
+	 * @param limit 한 번에 조회/발행할 최대 건수(claimPending의 LIMIT). dstone-boot의 OutboxRelayScheduler는
 	 *              기본 100건씩, 1초(messaging.outbox.relay-interval-ms) 간격으로 이 메소드를 호출한다.
 	 * @return 발행을 시도한 건수(성공/실패 모두 포함). 스케줄러는 이 값으로 로그만 남기고 별도 처리는 안 한다.
 	 */
 	@SuppressWarnings("unchecked")
 	public int dispatchPending(int limit) {
 		this.info(signatureLog());
-		List<Map<String, Object>> rows = outboxStore.findPending(limit);
+		// 이번 호출을 식별하는 토큰 — claimPending()이 PENDING->SENDING 전환과 동시에 마킹해두고, 그 토큰으로
+		// 다시 조회해 "내가 방금 클레임한 행"만 정확히 가져온다(다중 인스턴스 동시 폴링 시 중복 클레임 방지).
+		String dispatchToken = UUID.randomUUID().toString();
+		List<Map<String, Object>> rows = outboxStore.claimPending(limit, dispatchToken);
 		for (Map<String, Object> row : rows) {
 			Object id = row.get("ID");
 			String topic = (String) row.get("TOPIC");
@@ -69,6 +73,25 @@ public class OutboxRelay extends BaseObject {
 			}
 		}
 		return rows.size();
+	}
+
+	/**
+	 * <pre>
+	 * SENDING 상태로 staleSeconds 이상 방치된 행(claimPending()으로 선점됐지만 markSent()/markFailed()
+	 * 반영 전에 프로세스가 죽는 등으로 완료되지 못한 행)을 다시 PENDING으로 되돌려 다음 dispatchPending()
+	 * 폴링에서 재시도되게 한다. dstone-boot의 OutboxRelayScheduler가 dispatchPending()보다 훨씬 긴
+	 * 주기로 별도 호출한다.
+	 * </pre>
+	 * @param staleSeconds SENDING 상태를 "방치됨"으로 간주할 임계 시간(초)
+	 * @return 되돌린 건수
+	 */
+	public int requeueStale(int staleSeconds) {
+		this.info(signatureLog());
+		int count = outboxStore.requeueStale(staleSeconds);
+		if (count > 0) {
+			this.warn("outbox message " + count + "건을 SENDING(방치) -> PENDING으로 복구");
+		}
+		return count;
 	}
 
 }
