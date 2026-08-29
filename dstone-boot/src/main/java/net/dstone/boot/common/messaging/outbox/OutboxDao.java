@@ -31,6 +31,7 @@ public class OutboxDao extends net.dstone.boot.common.biz.BaseDao implements Out
 	}
 
 	@Override
+	@NoAspectLog
 	public void markSent(Object id) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("ID", id);
@@ -38,6 +39,7 @@ public class OutboxDao extends net.dstone.boot.common.biz.BaseDao implements Out
 	}
 
 	@Override
+	@NoAspectLog
 	public void markFailed(Object id, String errorMessage) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("ID", id);
@@ -46,6 +48,7 @@ public class OutboxDao extends net.dstone.boot.common.biz.BaseDao implements Out
 	}
 
 	@Override
+	@NoAspectLog
 	public int requeueStale(int staleSeconds) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("STALE_SECONDS", staleSeconds);

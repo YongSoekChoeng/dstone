@@ -4,6 +4,7 @@
 <mapper namespace="net.dstone.boot.common.messaging.saga.SagaDao">
 
 	<insert id="insert" parameterType="map">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.insert */
 		INSERT INTO TB_SAGA_INSTANCE
 			(SAGA_ID, SAGA_TYPE, STATUS, CURRENT_STEP)
 		VALUES
@@ -11,6 +12,7 @@
 	</insert>
 
 	<select id="findById" parameterType="map" resultType="map">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.findById */
 		SELECT
 			SAGA_ID, SAGA_TYPE, STATUS, CURRENT_STEP, CREATED_DT, UPDATED_DT
 		FROM
@@ -20,6 +22,7 @@
 	</select>
 
 	<update id="updateStatus" parameterType="map">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.updateStatus */
 		UPDATE TB_SAGA_INSTANCE
 		SET
 			STATUS = #{STATUS}
@@ -29,6 +32,7 @@
 	</update>
 
 	<insert id="insertStepHistory" parameterType="map">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.insertStepHistory */
 		INSERT INTO TB_SAGA_STEP_HISTORY
 			(SAGA_ID, STEP_NAME, RESULT, ERROR_MSG, PAYLOAD)
 		VALUES
@@ -37,6 +41,7 @@
 
 	<!-- 보상 캐스케이딩용: 이 사가에서 성공(SUCCESS)한 스텝들을 최신순(ID DESC)으로 조회 -->
 	<select id="findSuccessStepHistory" parameterType="map" resultType="map">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.findSuccessStepHistory */
 		SELECT
 			STEP_NAME, PAYLOAD
 		FROM
@@ -50,6 +55,7 @@
 
 	<!-- 멱등성 체크용: 해당 스텝이 이미 SUCCESS로 기록됐는지 -->
 	<select id="countSuccessStep" parameterType="map" resultType="int">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.countSuccessStep */
 		SELECT
 			COUNT(*)
 		FROM
@@ -63,6 +69,7 @@
 	<!-- 보상(compensate) 처리 결과를 해당 스텝의 이력 행에 기록. 새 행을 추가하지 않고 UPDATE하는 이유는
 	     UX_SAGA_STEP(SAGA_ID, STEP_NAME) 유니크 제약과 충돌하지 않기 위함(같은 스텝 이력 행에 보상 결과를 덧붙임). -->
 	<update id="markCompensated" parameterType="map">
+		/* net.dstone.boot.common.messaging.saga.SagaDao.markCompensated */
 		UPDATE TB_SAGA_STEP_HISTORY
 		SET
 			COMPENSATE_RESULT = #{RESULT}

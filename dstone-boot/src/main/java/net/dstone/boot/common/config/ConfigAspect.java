@@ -1,7 +1,6 @@
 package net.dstone.boot.common.config;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -10,11 +9,8 @@ import org.springframework.stereotype.Component;
 
 import com.ulisesbocchio.jasyptspringboot.annotation.EnableEncryptableProperties;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.common.core.BaseObject;
-import net.dstone.common.utils.ConvertUtil;
-import net.dstone.common.utils.StringUtil;
 
 @Aspect
 @Component
@@ -58,10 +54,18 @@ public class ConfigAspect extends BaseObject {
 		return joinPoint.proceed();
 	}
 
-	@Around("execution(* net.dstone.*..*Dao.*(..))" + " && !" + NO_LOG_ASPECT)
+	@Around("execution(* net.dstone.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
-		return joinPoint.proceed();
+		try {
+			if( joinPoint.getClass().getAnnotationsByType(net.dstone.common.annotation.NoAspectLog.class) != null) {
+				ThreadContext.put("SUPPRESS_SQL_LOG", "Y");
+			}else {
+				this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
+			}
+			return joinPoint.proceed();
+		} finally {
+			ThreadContext.remove("SUPPRESS_SQL_LOG");
+		}
 	}
 
 }
