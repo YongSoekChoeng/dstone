@@ -22,8 +22,10 @@ import net.dstone.common.utils.StringUtil;
 @EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
 	
+	private final static String NO_LOG_ASPECT = "@annotation(net.dstone.common.annotation.NoAspectLog)";
+	
 	/**************************************** 1. Logging 관련 AOP ****************************************/
-	@Around("execution(* net.dstone.*..*Controller.*(..))")
+	@Around("execution(* net.dstone.*..*Controller.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
 		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
@@ -50,13 +52,13 @@ public class ConfigAspect extends BaseObject {
 		return retObj;
 	}
 
-	@Around("execution(* net.dstone.*..*Service*.*(..))")
+	@Around("execution(* net.dstone.*..*Service*.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
 
-	@Around("execution(* net.dstone.*..*Dao.*(..))")
+	@Around("execution(* net.dstone.*..*Dao.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();

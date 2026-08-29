@@ -8,6 +8,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.core.BaseObject;
 
 /**
@@ -47,9 +48,10 @@ public class OutboxRelay extends BaseObject {
 	 *              기본 100건씩, 1초(messaging.outbox.relay-interval-ms) 간격으로 이 메소드를 호출한다.
 	 * @return 발행을 시도한 건수(성공/실패 모두 포함). 스케줄러는 이 값으로 로그만 남기고 별도 처리는 안 한다.
 	 */
+	@NoAspectLog
 	@SuppressWarnings("unchecked")
 	public int dispatchPending(int limit) {
-		this.info(signatureLog());
+		//this.info(signatureLog());
 		// 이번 호출을 식별하는 토큰 — claimPending()이 PENDING->SENDING 전환과 동시에 마킹해두고, 그 토큰으로
 		// 다시 조회해 "내가 방금 클레임한 행"만 정확히 가져온다(다중 인스턴스 동시 폴링 시 중복 클레임 방지).
 		String dispatchToken = UUID.randomUUID().toString();

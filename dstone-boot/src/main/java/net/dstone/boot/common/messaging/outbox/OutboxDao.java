@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Repository;
 
+import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.messaging.outbox.OutboxStore;
 
 @Repository
@@ -20,6 +21,7 @@ public class OutboxDao extends net.dstone.boot.common.biz.BaseDao implements Out
 
 	@Override
 	@SuppressWarnings("unchecked")
+	@NoAspectLog
 	public List<Map<String, Object>> claimPending(int limit, String dispatchToken) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("LIMIT", limit);
