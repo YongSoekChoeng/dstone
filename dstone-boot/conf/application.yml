@@ -72,7 +72,7 @@ spring:
             timeout: 10000			
     # Kafka 설정
     kafka: 
-        true: true # Kafka사용 여부(true/false)
+        enabled: true # Kafka사용 여부(true/false)
         bootstrap-servers: localhost:9092
         producer:
             key-serializer: org.apache.kafka.common.serialization.StringSerializer
