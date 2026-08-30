@@ -50,7 +50,7 @@ public class OrderSagaReplyListener extends BaseObject {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] inventoryReserve-reply 수신 -> payment 진행");
-		sagaTransactionService.updateSagaStep(sagaId, "payment", payload);
+		sagaTransactionService.updateSagaStep(sagaId, "step02-payment", payload);
 	}
 
 	/**
@@ -66,7 +66,7 @@ public class OrderSagaReplyListener extends BaseObject {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] payment-reply 수신 -> orderConfirm 진행");
-		sagaTransactionService.updateSagaStep(sagaId, "orderConfirm", payload);
+		sagaTransactionService.updateSagaStep(sagaId, "step03-orderConfirm", payload);
 	}
 
 	/**
@@ -82,7 +82,7 @@ public class OrderSagaReplyListener extends BaseObject {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
 		this.info("saga[" + sagaId + "] orderConfirm-reply 수신 -> 사가 COMPLETED 처리");
-		sagaTransactionService.updateSagaComplete(sagaId, "orderConfirm");
+		sagaTransactionService.updateSagaComplete(sagaId, "orderCompleted");
 	}
 
 }
