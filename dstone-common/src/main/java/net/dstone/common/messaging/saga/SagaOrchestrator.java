@@ -86,7 +86,6 @@ public class SagaOrchestrator extends BaseObject {
 	 * @return 생성된 sagaId(UUID 문자열). TB_SAGA_INSTANCE의 PK이자, 이후 모든 관련 Kafka 메시지의 key.
 	 */
 	public String start(String sagaType, String firstStep, Map<String, Object> payload) {
-		
 		this.info(signatureLog());
 		
 		String sagaId = UUID.randomUUID().toString();
@@ -120,6 +119,7 @@ public class SagaOrchestrator extends BaseObject {
 	 *                그대로 넘기므로, Kafka ConsumerRecord.value()가 사실상 이 파라메터의 원천이다.
 	 */
 	public void proceed(String sagaId, String nextStep, Map<String, Object> command) {
+		this.info(signatureLog());
 		runStep(sagaId, nextStep, command);
 	}
 
@@ -135,6 +135,7 @@ public class SagaOrchestrator extends BaseObject {
 	 *                 Kafka로는 나가지 않는다.
 	 */
 	public void complete(String sagaId, String lastStep) {
+		this.info(signatureLog());
 		sagaStore.updateStatus(sagaId, SagaStatus.COMPLETED.name(), lastStep);
 	}
 
@@ -160,9 +161,7 @@ public class SagaOrchestrator extends BaseObject {
 	 *                 저장되어 나중에 compensate()가 보상 호출 시 그대로 복원해서 재사용하는 값이다.
 	 */
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
-		
 		this.info(signatureLog());
-		
 		// 멱등성 체크: Kafka at-least-once 재전달 등으로 같은 "{이전스텝}-reply" 이벤트가 중복 수신되어
 		// proceed()가 같은 (sagaId, stepName)에 대해 두 번 호출될 수 있다. 이미 SUCCESS 처리된 스텝이면
 		// 핸들러(부수효과 있음)를 다시 실행하지 않고 그냥 무시한다 — 최초 처리 시점에 이미 이 스텝의
@@ -246,7 +245,6 @@ public class SagaOrchestrator extends BaseObject {
 
 	private SagaStepHandler findHandler(String stepName) {
 		this.info(signatureLog());
-		
 		for (SagaStepHandler handler : stepHandlers) {
 			if (stepName.equals(handler.getStepName())) {
 				return handler;

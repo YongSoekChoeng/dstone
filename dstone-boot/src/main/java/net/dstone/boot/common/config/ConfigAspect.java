@@ -21,16 +21,16 @@ import net.dstone.common.core.BaseObject;
 @EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
 	
-	private final static String NO_LOG_ASPECT = "@annotation(net.dstone.common.annotation.NoAspectLog)";
-	
-	/**************************************** 1. Logging 관련 AOP ****************************************/
+
+	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
+	private final static String NO_LOG_REGEX = "@annotation(net.dstone.common.annotation.NoAspectLog)";
 	/**
 	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
 	 * @param joinPoint
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.boot.*..*Controller.*(..))" + " && !" + NO_LOG_ASPECT)
+	@Around("execution(* net.dstone.boot.*..*Controller.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
 		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
@@ -56,19 +56,17 @@ public class ConfigAspect extends BaseObject {
 		this.sysout("||===================================== [" + joinPoint.getTarget().getClass().getName() + "] END ======================================||\n");
 		return retObj;
 	}
-
 	/**
 	 * 서비스 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
 	 * @param joinPoint
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.boot.*..*Service*.*(..))" + " && !" + NO_LOG_ASPECT)
+	@Around("execution(* net.dstone.boot.*..*Service*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
-
 	/**
 	 * DAO 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
 	 * @param joinPoint
@@ -92,5 +90,6 @@ public class ConfigAspect extends BaseObject {
 			}
 		}
 	}
+	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
 
 }

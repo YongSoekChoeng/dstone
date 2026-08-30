@@ -1,7 +1,13 @@
 package net.dstone.common.core;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.log;
+
+import java.lang.StackWalker.StackFrame;
+import java.util.Optional;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.logging.log4j.core.tools.Generate.CustomLogger;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.springframework.stereotype.Component;
 
@@ -55,15 +61,27 @@ public class BaseObject {
 	}
 
 	protected String signatureLog() {
-		String logStr = "";
+		StringBuffer buffer = new StringBuffer();
 		ProceedingJoinPoint joinPoint = net.dstone.common.config.ConfigAspect.CURRENT_JOIN_POINT.get();
-		logStr = this.signatureLog(joinPoint);
-		return logStr;
+		if(joinPoint!=null) {
+			buffer.append("[CALL]" + this.signatureLog(joinPoint));
+		} else {
+			String className = "";
+			String methodName = "";
+			StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+			Optional<StackFrame> callingFrame = walker.walk(frames -> frames.skip(1).findFirst());
+			if (callingFrame.isPresent()) {
+				StackFrame frame = callingFrame.get();
+				className = frame.getClassName();
+				methodName = frame.getMethodName();
+				buffer.append("[PRIVATE-CALL]" + className + "." + methodName + "()");
+			}
+		}
+		return buffer.toString();
 	}
 
 	protected String signatureLog(ProceedingJoinPoint joinPoint) {
-		String logStr = this.buildSimpleExecutionInfo(joinPoint, "");
-		return logStr;
+		return this.buildSimpleExecutionInfo(joinPoint, "");
 	}
 	
 	private String buildSimpleExecutionInfo(ProceedingJoinPoint joinPoint, String tabSpace) {
@@ -72,34 +90,32 @@ public class BaseObject {
 		String methodName = "";
 		StringBuffer paramListInfo = new StringBuffer();
 		
-		if( joinPoint != null ) {
-			className = joinPoint.getTarget().getClass().getSimpleName();
-			methodName = joinPoint.getSignature().getName();
-			int args = joinPoint.getArgs().length;
-			int setNum = 0;
-			for (int i = 0; i < args; i++) {
-				Object param = joinPoint.getArgs()[i];
-				if (param instanceof HttpServletRequest) {
-					continue;
-				}else if (param instanceof HttpServletResponse) {
-					continue;
-				}else if (param instanceof String) {
-					paramListInfo.append("String" + "[" + param + "]");
-				}else{
-					String result = "";
-					try {
-						result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
-					}catch(Exception e) {
-						result = ConvertUtil.convertToJson(param);
-						result = StringUtil.replace(result, "\n", "");
-					}
-					paramListInfo.append(result);
+		className = joinPoint.getTarget().getClass().getSimpleName();
+		methodName = joinPoint.getSignature().getName();
+		int args = joinPoint.getArgs().length;
+		int setNum = 0;
+		for (int i = 0; i < args; i++) {
+			Object param = joinPoint.getArgs()[i];
+			if (param instanceof HttpServletRequest) {
+				continue;
+			}else if (param instanceof HttpServletResponse) {
+				continue;
+			}else if (param instanceof String) {
+				paramListInfo.append("String" + "[" + param + "]");
+			}else{
+				String result = "";
+				try {
+					result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
+				}catch(Exception e) {
+					result = ConvertUtil.convertToJson(param);
+					result = StringUtil.replace(result, "\n", "");
 				}
-				if (setNum > 0) {
-					paramListInfo.append(", ");
-				}
-				setNum++;
+				paramListInfo.append(result);
 			}
+			if (setNum > 0) {
+				paramListInfo.append(", ");
+			}
+			setNum++;
 		}
 		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
 		return splitToLines(buffer.toString(),  tabSpace);

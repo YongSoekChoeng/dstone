@@ -26,9 +26,8 @@ import net.dstone.common.utils.StringUtil;
 @EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
 	
+	/****************************************** 1. 로깅 관련 AOP 설정 시작 ******************************************/
 	private final static String NO_LOG_ASPECT = "@annotation(net.dstone.common.annotation.NoAspectLog)";
-	
-	/**************************************** 1. Logging 관련 AOP ****************************************/
 	/**
 	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
 	 * @param joinPoint
@@ -97,5 +96,6 @@ public class ConfigAspect extends BaseObject {
 			}
 		}
 	}
-
+	/****************************************** 1. 로깅 관련 AOP 설정 종료 ******************************************/
+	
 }

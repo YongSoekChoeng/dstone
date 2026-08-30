@@ -47,19 +47,16 @@ public class SagaTransactionServiceImpl extends BaseService implements SagaTrans
 
 	@Override
 	public String insertSaga(String sagaType, String firstStep, Map<String, Object> payload) {
-		this.info(signatureLog());
 		return sagaOrchestrator.start(sagaType, firstStep, payload);
 	}
 
 	@Override
 	public void updateSagaStep(String sagaId, String nextStep, Map<String, Object> command) {
-		this.info(signatureLog());
 		sagaOrchestrator.proceed(sagaId, nextStep, command);
 	}
 
 	@Override
 	public void updateSagaComplete(String sagaId, String lastStep) {
-		this.info(signatureLog());
 		sagaOrchestrator.complete(sagaId, lastStep);
 	}
 
