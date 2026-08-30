@@ -62,11 +62,13 @@
 						  
 						*** SAGA 테스트<span id="successYn"></span><br>
 						<form name="AJAX_FORM" method="post" action="">
-						주문아이템:<input type="text" name="itemId" value="APPLE" >
+						주문아이템<input type="text" name="itemId" value="APPLE" >
 						<br>
-						주문회차:<input type="text" name="qty" value="1" >
+						요청수량(100이상 일 경우 재고부족 에러발생.)
+						<input type="text" name="qty" value="1" >
 						<br>
-						주문수량:<input type="text" name="amount" value="1000" >
+						주문금액(1000000이상 일 경우 한도초과 금액 에러발생.)
+						<input type="text" name="amount" value="1000" >
 						<br>
 						<table border=1>
 							<tr>

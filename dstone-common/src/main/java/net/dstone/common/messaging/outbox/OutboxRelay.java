@@ -35,12 +35,11 @@ public class OutboxRelay extends BaseObject {
 	/**
 	 * <pre>
 	 * TB_OUTBOX_MESSAGE에서 PENDING 상태 레코드를 조회해 Kafka로 발행을 시도하고,
-	 * 건별로 성공/실패를 즉시 DB에 반영한다(전체를 하나의 트랜잭션으로 묶지 않음 — 건별 독립 처리).
-	 *
+	 * 건별로 성공/실패를 즉시 DB에 반영한다(전체를 하나의 트랜잭션으로 묶지 않음 — 건별 독립 처리).	 *
 	 * [row 각 컬럼 → Kafka ProducerRecord 매핑]
 	 *  - row.TOPIC    → kafkaTemplate.send()의 topic 인자 (전송 대상 토픽)
 	 *  - row.MSG_KEY  → kafkaTemplate.send()의 key 인자 (파티션 결정용, StringSerializer로 직렬화)
-	 *  - row.PAYLOAD  → DB에는 JSON 문자열로 저장돼 있던 것을 objectMapper로 Map&lt;String,Object&gt;로
+	 *  - row.PAYLOAD  → DB에는 JSON 문자열로 저장돼 있던 것을 objectMapper로 Map<String,Object>로
 	 *                   역직렬화한 뒤 send()에 넘긴다. KafkaTemplate 쪽 ProducerFactory에 설정된
 	 *                   JsonSerializer가 이 Map을 다시 JSON으로 직렬화해 실제 메시지 value(본문)로 만든다.
 	 * </pre>
@@ -87,6 +86,7 @@ public class OutboxRelay extends BaseObject {
 	 * @param staleSeconds SENDING 상태를 "방치됨"으로 간주할 임계 시간(초)
 	 * @return 되돌린 건수
 	 */
+	@NoAspectLog
 	public int requeueStale(int staleSeconds) {
 		this.info(signatureLog());
 		int count = outboxStore.requeueStale(staleSeconds);

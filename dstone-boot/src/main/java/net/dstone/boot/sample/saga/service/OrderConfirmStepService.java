@@ -15,7 +15,7 @@ public class OrderConfirmStepService extends BaseService implements SagaStepHand
 
 	@Override
 	public String getStepName() {
-		return "orderConfirm";
+		return "step03-orderConfirm";
 	}
 
 	/**

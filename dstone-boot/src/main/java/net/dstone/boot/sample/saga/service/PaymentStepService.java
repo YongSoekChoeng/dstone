@@ -16,7 +16,7 @@ public class PaymentStepService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {
-		return "payment";
+		return "step02-payment";
 	}
 
 	/**

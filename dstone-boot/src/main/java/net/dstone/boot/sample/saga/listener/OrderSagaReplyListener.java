@@ -45,7 +45,7 @@ public class OrderSagaReplyListener extends BaseObject {
 	 * </pre>
 	 * @param payload Kafka 메시지 value(JSON→Map 역직렬화 결과). "SAGA_ID" 키로 사가 식별자를 꺼내 쓴다.
 	 */
-	@KafkaListener(topics = "inventoryReserve-reply", groupId = "order-saga-inventory-reserve-reply-group")
+	@KafkaListener(topics = "step01-inventoryReserve-reply", groupId = "step01-inventoryReserve-reply-consumer-group")
 	public void onInventoryReserved(Map<String, Object> payload) {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
@@ -61,7 +61,7 @@ public class OrderSagaReplyListener extends BaseObject {
 	 * </pre>
 	 * @param payload Kafka 메시지 value(JSON→Map). "SAGA_ID"로 사가 식별.
 	 */
-	@KafkaListener(topics = "payment-reply", groupId = "order-saga-payment-reply-group")
+	@KafkaListener(topics = "step02-payment-reply", groupId = "step02-payment-reply-consumer-group")
 	public void onPaid(Map<String, Object> payload) {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
@@ -77,7 +77,7 @@ public class OrderSagaReplyListener extends BaseObject {
 	 * </pre>
 	 * @param payload Kafka 메시지 value(JSON→Map). "SAGA_ID"만 사용하고 나머지 필드는 참조하지 않는다.
 	 */
-	@KafkaListener(topics = "orderConfirm-reply", groupId = "order-saga-order-confirm-reply-group")
+	@KafkaListener(topics = "step03-orderConfirm-reply", groupId = "step03-orderConfirm-reply-consumer-group")
 	public void onOrderConfirmed(Map<String, Object> payload) {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");

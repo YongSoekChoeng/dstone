@@ -56,7 +56,7 @@ public class OrderSagaController extends BaseController {
 		command.put("QTY", Integer.parseInt(requestUtil.getParameter("qty", "1")));
 		command.put("AMOUNT", Integer.parseInt(requestUtil.getParameter("amount", "10000")));
 
-		String sagaId = sagaTransactionService.insertSaga("ORDER", "inventoryReserve", command);
+		String sagaId = sagaTransactionService.insertSaga("ORDER", "step01-inventoryReserve", command);
 
 		Map<String, Object> returnObj = new HashMap<String, Object>();
 		returnObj.put("sagaId", sagaId);

@@ -24,7 +24,7 @@ public class KafkaService  extends BaseService {
         kafkaTemplate.send(topic, key, param);
 	}
 	
-    @KafkaListener(topics = "order-events", groupId = "order-events-group")
+    @KafkaListener(topics = "order-events", groupId = "order-events-consumer-group")
     public void consume(Map<String,Object> param) {
         // 처리 로직
     	this.info("topics[order-events] 수신완료!!!");

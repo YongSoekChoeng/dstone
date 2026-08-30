@@ -24,7 +24,7 @@ public class OutboxRelayScheduler extends BaseObject {
 	@Autowired
 	private ConfigProperty configProperty;
 
-	@Scheduled(fixedDelayString = "${messaging.outbox.relay-interval-ms:1000}")
+	@Scheduled(fixedDelayString = "${spring.kafka.messaging.outbox.relay-interval-ms:1000}")
 	public void relay() {
 		try {
 			int count = outboxRelay.dispatchPending(100);
@@ -37,14 +37,14 @@ public class OutboxRelayScheduler extends BaseObject {
 	}
 
 	/**
-	 * claimPending()으로 SENDING 전환됐지만 markSent()/markFailed()까지 못 가고 방치된(=릴레이가 그 사이 죽은)
-	 * 행을 주기적으로 PENDING으로 복구한다. relay()보다 훨씬 긴 주기로 충분하다(정상 흐름에서 SENDING은
-	 * 아주 짧게만 머문다 — kafkaTemplate.send().get() 왕복 정도).
+	 * claimPending()으로 SENDING 전환됐지만 markSent()/markFailed()까지 못 가고 
+	 * 방치된(=릴레이가 그 사이 죽은) 행을 주기적으로 PENDING으로 복구한다. 
+	 * relay()보다 훨씬 긴 주기로 충분하다(정상 흐름에서 SENDING은 아주 짧게만 머문다 — kafkaTemplate.send().get() 왕복 정도).
 	 */
-	@Scheduled(fixedDelayString = "${messaging.outbox.requeue-stale-interval-ms:60000}")
+	@Scheduled(fixedDelayString = "${spring.kafka.messaging.outbox.requeue-stale-interval-ms:60000}")
 	public void requeueStale() {
 		try {
-			String staleSecondsProp = configProperty.getProperty("messaging.outbox.stale-seconds");
+			String staleSecondsProp = configProperty.getProperty("spring.kafka.messaging.outbox.stale-seconds");
 			int staleSeconds = StringUtil.isEmpty(staleSecondsProp) ? 120 : Integer.parseInt(staleSecondsProp);
 			outboxRelay.requeueStale(staleSeconds);
 		} catch (Exception e) {
