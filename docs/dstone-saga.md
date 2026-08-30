@@ -8,6 +8,11 @@
 
 ## 전체 개요 시퀀스 다이어그램
 
+![전체 개요](images/saga-00-overview.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -81,6 +86,8 @@ sequenceDiagram
     end
 ```
 
+</details>
+
 ---
 
 ## 0단계. 사전 조건 — 애플리케이션 기동 시 컴포넌트 초기화
@@ -94,6 +101,11 @@ sequenceDiagram
 | `OutboxRelayScheduler` | `@Scheduled`로 1초마다 `dispatchPending()` 호출 대기 중 |
 
 이 중 하나라도 안 떠 있으면(예: `spring.kafka.enabled`가 false였던 지난번 오타 버그) 뒤에 나오는 단계들이 통째로 멈춥니다.
+
+![0단계: 앱 기동 시 컴포넌트 초기화](images/saga-01-startup-init.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -123,6 +135,8 @@ sequenceDiagram
     Spring->>Sched: @Scheduled 스케줄러 등록
     Note right of Sched: relay() 1초 주기, requeueStale() 60초 주기 시작
 ```
+
+</details>
 
 ---
 
@@ -163,6 +177,11 @@ sequenceDiagram
 
 `start()` 호출이 `insertSaga()` 리턴까지 다 끝나면, AOP 어드바이저가 트랜잭션을 커밋합니다. 이 순간 **①~④ 4개의 DB 변경이 전부 한 번에 확정**됩니다(원자성 보장 — Transactional Outbox 패턴의 핵심). HTTP 응답이 `sagaId`를 담아 반환됩니다. → 여기서 사용자 요청은 끝.
 
+![1~2단계: 사가 시작(HTTP 요청)](images/saga-02-saga-start.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -176,7 +195,7 @@ sequenceDiagram
     participant ODao as OutboxDao
     participant DB as MySQL(sampleDB)
 
-    Client->>Ctrl: GET/POST /sample/saga/order/start.do?qty=&amount=
+    Client->>Ctrl: POST /sample/saga/order/start.do (qty, amount 파라미터)
     Ctrl->>Ctrl: command = {ORDER_ID,ITEM_ID,QTY,AMOUNT,IS_ORDER_COMPLETED=N}
     Ctrl->>TxSvc: insertSaga("ORDER","step01-inventoryReserve",command)
     Note over TxSvc: ConfigTransaction AOP: *ServiceImpl.insert* 매치 → BEGIN TX
@@ -185,7 +204,7 @@ sequenceDiagram
     activate Orch
     Orch->>Orch: sagaId = UUID.randomUUID()
     Orch->>SDao: insert({SAGA_ID,SAGA_TYPE,STATUS=STARTED,CURRENT_STEP})
-    SDao->>DB: INSERT TB_SAGA_INSTANCE ①
+    SDao->>DB: INSERT TB_SAGA_INSTANCE (1)
     Orch->>Orch: runStep(sagaId,"step01-inventoryReserve",command)
     Orch->>SDao: existsSuccessStep(sagaId,step) → false
     SDao->>DB: SELECT COUNT(*)
@@ -194,13 +213,13 @@ sequenceDiagram
         Step1-->>Orch: return command
         Orch->>Orch: result.put("SAGA_ID", sagaId)
         Orch->>SDao: insertStepHistory(SUCCESS, payload)
-        SDao->>DB: INSERT TB_SAGA_STEP_HISTORY ②
+        SDao->>DB: INSERT TB_SAGA_STEP_HISTORY (2)
         Orch->>SDao: updateStatus(STEP_DONE, step01-inventoryReserve)
-        SDao->>DB: UPDATE TB_SAGA_INSTANCE ③
+        SDao->>DB: UPDATE TB_SAGA_INSTANCE (3)
         Orch->>OApp: append("step01-inventoryReserve-reply", sagaId, result)
         OApp->>OApp: JSON 직렬화
         OApp->>ODao: insert({TOPIC,MSG_KEY,PAYLOAD,STATUS=PENDING})
-        ODao->>DB: INSERT TB_OUTBOX_MESSAGE ④
+        ODao->>DB: INSERT TB_OUTBOX_MESSAGE (4)
     else QTY >= 100 (실패)
         Step1-->>Orch: throw IllegalStateException
         Note over Orch: 아래 "실패 시 보상 플로우" 다이어그램 참고
@@ -208,9 +227,11 @@ sequenceDiagram
     Orch-->>TxSvc: return sagaId
     deactivate Orch
     deactivate TxSvc
-    Note over DB: COMMIT ①~④ 원자적 확정
+    Note over DB: COMMIT (1)~(4) 원자적 확정
     Ctrl-->>Client: 200 OK { sagaId, command }
 ```
+
+</details>
 
 ---
 
@@ -227,6 +248,11 @@ sequenceDiagram
    - 실패하면 `markFailed(id, ...)` → `RETRY_CNT+1`, 5회 넘으면 `FAILED`, 아니면 다시 `PENDING`(다음 폴링에서 재시도)
 
 이 시점에 브로커의 `step01-inventoryReserve-reply` 토픽 파티션(key=sagaId로 결정된 파티션)에 메시지가 실제로 append 됩니다.
+
+![3단계: Outbox 릴레이(Kafka 발행)](images/saga-03-outbox-relay.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -264,6 +290,8 @@ sequenceDiagram
     Note over Sched,DB: requeueStale()은 별도 60초 주기 — SENDING인 채 방치된 행을 PENDING으로 복구
 ```
 
+</details>
+
 ---
 
 ## 4단계. Kafka 컨슈머가 메시지 수신 → 다음 스텝 트리거 (스레드: Kafka 리스너 컨테이너 스레드)
@@ -283,6 +311,11 @@ sequenceDiagram
 - 트랜잭션 커밋
 
 메시지 오프셋 커밋: 리스너 메소드가 예외 없이 정상 리턴하면 Spring Kafka가 기본(BATCH ack mode)으로 이 poll 배치의 오프셋을 커밋합니다.
+
+![4단계: Kafka 컨슈머 → 다음 스텝 트리거](images/saga-04-consume-proceed.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -328,6 +361,8 @@ sequenceDiagram
     Note over Listener,Broker: 정상 리턴 → 오프셋 커밋(BATCH ack mode)
 ```
 
+</details>
+
 ---
 
 ## 5~6단계. 위 3~4단계 반복 (payment-reply 발행 → orderConfirm 트리거)
@@ -345,6 +380,11 @@ sequenceDiagram
 - `SagaOrchestrator.complete()` → **[DB WRITE]** `TB_SAGA_INSTANCE.STATUS=COMPLETED` (이 메소드는 이벤트를 더 이상 발행하지 않음 — 사가 종료)
 
 → 여기서 사가 완료. `TB_SAGA_STEP_HISTORY`에는 3건(step01/02/03, 전부 SUCCESS)이 남아 있습니다.
+
+![7단계: 사가 종결](images/saga-05-saga-complete.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -371,6 +411,8 @@ sequenceDiagram
         Note over Listener: 현재 로직상 도달 불가(방어코드) — 아무 것도 안 하고 조용히 종료
     end
 ```
+
+</details>
 
 ---
 
@@ -403,6 +445,11 @@ sequenceDiagram
 - 마지막에 `TB_SAGA_INSTANCE.STATUS=FAILED`
 
 이 보상 흐름은 **Kafka/Outbox를 전혀 거치지 않고, 실패가 발생한 그 트랜잭션/그 스레드 안에서 동기적으로** 즉시 실행됩니다.
+
+![실패 시 보상(compensate) 플로우](images/saga-06-compensate.svg)
+
+<details>
+<summary>mermaid 소스 보기 (수정 시 이미지 재생성 필요)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -440,3 +487,5 @@ sequenceDiagram
     SDao->>DB: UPDATE TB_SAGA_INSTANCE SET STATUS=FAILED
     Note over Orch,DB: Kafka/Outbox 미사용 — 전부 동기·로컬 처리
 ```
+
+</details>
