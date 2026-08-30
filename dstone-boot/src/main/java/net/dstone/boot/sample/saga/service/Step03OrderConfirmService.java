@@ -30,7 +30,7 @@ public class Step03OrderConfirmService extends BaseService implements SagaStepHa
 	@Override
 	public Map<String, Object> handle(Map<String, Object> command) throws Exception {
 		if ( "GOLD".equals(StringUtil.ifEmpty(command.get("ITEM_ID"), "")) ) {
-			throw new IllegalStateException("결제 실패: ORDER_ID=" + command.get("ORDER_ID") + ", 미취급 아이템=" + command.get("ITEM_ID"));
+			throw new IllegalStateException("취급아이템체크 실패: ORDER_ID=" + command.get("ORDER_ID") + ", 미취급 아이템=" + command.get("ITEM_ID"));
 		}
 		command.put("IS_ORDER_COMPLETED", "Y");
 		this.info("주문 확정: ORDER_ID=" + command.get("ORDER_ID"));
