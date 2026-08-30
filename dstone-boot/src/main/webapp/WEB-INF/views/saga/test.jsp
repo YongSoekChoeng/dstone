@@ -62,13 +62,13 @@
 						  
 						*** SAGA 테스트<span id="successYn"></span><br>
 						<form name="AJAX_FORM" method="post" action="">
-						요청수량(100이상 일 경우 재고부족 에러발생. - Step01 에러발생)
+						요청수량( [100]이상 일 경우 Step01에서 재고부족 에러발생. )
 						<input type="text" name="qty" value="1" >
 						<br>
-						주문금액(1000000이상 일 경우 한도초과 금액 에러발생. - Step02 에러발생)
+						주문금액( [1000000]이상 일 경우 Step02에서 한도초과 금액 에러발생. )
 						<input type="text" name="amount" value="1000" >
 						<br>
-						주문아이템(GOLD 일 경우 미취급아이템 에러발생. - Step03 에러발생)
+						주문아이템( [GOLD]일 경우 Step03에서 미취급아이템 에러발생. )
 						<input type="text" name="itemId" value="APPLE" >
 						<br>
 						<table border=1>
