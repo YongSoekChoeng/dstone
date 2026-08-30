@@ -88,7 +88,7 @@ public class OutboxRelay extends BaseObject {
 	 */
 	@NoAspectLog
 	public int requeueStale(int staleSeconds) {
-		this.info(signatureLog());
+		//this.info(signatureLog());
 		int count = outboxStore.requeueStale(staleSeconds);
 		if (count > 0) {
 			this.warn("outbox message " + count + "건을 SENDING(방치) -> PENDING으로 복구");
