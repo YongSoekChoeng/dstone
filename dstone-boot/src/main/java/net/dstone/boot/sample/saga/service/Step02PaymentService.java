@@ -12,7 +12,7 @@ import net.dstone.common.messaging.saga.SagaStepHandler;
  * 데모용 실패 조건: AMOUNT >= 1000000 (한도초과) -> 실패 시 이전에 성공한 재고차감이 자동 보상(롤백)된다.
  */
 @Service
-public class PaymentStepService extends BaseService implements SagaStepHandler {
+public class Step02PaymentService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {

@@ -12,7 +12,7 @@ import net.dstone.common.messaging.saga.SagaStepHandler;
  * 데모용 실패 조건: QTY >= 100 (재고부족)
  */
 @Service
-public class InventoryReserveStepService extends BaseService implements SagaStepHandler {
+public class Step01InventoryReserveService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {

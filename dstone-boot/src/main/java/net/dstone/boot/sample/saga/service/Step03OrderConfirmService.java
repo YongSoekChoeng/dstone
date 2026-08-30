@@ -6,12 +6,13 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.boot.common.biz.BaseService;
 import net.dstone.common.messaging.saga.SagaStepHandler;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * 주문 사가 마지막 스텝: 주문 확정.
  */
 @Service
-public class OrderConfirmStepService extends BaseService implements SagaStepHandler {
+public class Step03OrderConfirmService extends BaseService implements SagaStepHandler {
 
 	@Override
 	public String getStepName() {
@@ -28,6 +29,10 @@ public class OrderConfirmStepService extends BaseService implements SagaStepHand
 	 */
 	@Override
 	public Map<String, Object> handle(Map<String, Object> command) throws Exception {
+		if ( "GOLD".equals(StringUtil.ifEmpty(command.get("ITEM_ID"), "")) ) {
+			throw new IllegalStateException("결제 실패: ORDER_ID=" + command.get("ORDER_ID") + ", 미취급 아이템=" + command.get("ITEM_ID"));
+		}
+		command.put("IS_ORDER_COMPLETED", "Y");
 		this.info("주문 확정: ORDER_ID=" + command.get("ORDER_ID"));
 		return command;
 	}

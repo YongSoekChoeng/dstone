@@ -81,8 +81,13 @@ public class OrderSagaReplyListener extends BaseObject {
 	public void onOrderConfirmed(Map<String, Object> payload) {
 		this.signatureLog();
 		String sagaId = (String) payload.get("SAGA_ID");
-		this.info("saga[" + sagaId + "] orderConfirm-reply 수신 -> 사가 COMPLETED 처리");
-		sagaTransactionService.updateSagaComplete(sagaId, "orderCompleted");
+		String isOrderCompleted = (String) payload.get("IS_ORDER_COMPLETED");
+
+		if("Y".equals(isOrderCompleted)) {
+			this.info("saga[" + sagaId + "] orderConfirm-reply 수신 -> 사가 COMPLETED 처리");
+			sagaTransactionService.updateSagaComplete(sagaId, "orderCompleted");
+		}
+
 	}
 
 }

@@ -55,6 +55,7 @@ public class OrderSagaController extends BaseController {
 		command.put("ITEM_ID", requestUtil.getParameter("itemId", "APPLE"));
 		command.put("QTY", Integer.parseInt(requestUtil.getParameter("qty", "1")));
 		command.put("AMOUNT", Integer.parseInt(requestUtil.getParameter("amount", "10000")));
+		command.put("IS_ORDER_COMPLETED", "N");
 
 		String sagaId = sagaTransactionService.insertSaga("ORDER", "step01-inventoryReserve", command);
 
