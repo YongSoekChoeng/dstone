@@ -1,5 +1,51 @@
 # SAGA 테스트 시 dstone-common + dstone-boot 전체 흐름 (순서대로)
 
+
+## SAGA 패턴 주된 기능 정리
+
+```
+
+1. Publish(발행) - SagaOrchestrator
+	net.dstone.boot.sample.saga.controller.OrderSagaController.start(HttpServletRequest, HttpServletResponse, ModelAndView)
+		* 트랜젝션 시작
+		net.dstone.boot.common.messaging.saga.SagaTransactionServiceImpl.insertSaga(String, String, Map<String, Object>)
+			net.dstone.common.messaging.saga.SagaOrchestrator.start(String, String, Map<String, Object>)
+				net.dstone.common.messaging.saga.SagaStore.insert(Map<String, Object>)
+				* 엔진에서 스텝 시작
+				net.dstone.common.messaging.saga.SagaOrchestrator.runStep(String, String, Map<String, Object>)
+					* 멱동성 체크
+					net.dstone.common.messaging.saga.SagaStore.existsSuccessStep(Object, String)
+					* SagaStepHandler 를 구현한 서비스들 중에 stepName이 동일한 Handler(서비스) 검색.
+					net.dstone.common.messaging.saga.SagaOrchestrator.findHandler(String stepName)
+					* Handler(서비스) 처리.
+					net.dstone.common.messaging.saga.SagaStepHandler.handle(Map<String, Object>)
+					* 이력 저장
+					net.dstone.common.messaging.saga.SagaStore.insertStepHistory(Map<String, Object>)
+					net.dstone.common.messaging.saga.SagaOrchestrator.historyRow(String, String, String, String, Map<String, Object>)
+					* 상태 저장
+					net.dstone.common.messaging.saga.SagaStore.updateStatus(Object, String, String)
+					* 응답 대기건으로 DB 저장
+					net.dstone.common.messaging.outbox.OutboxAppender.append(String, String, Map<String, Object>)
+				
+2. 대기건 DB 에서 조회 해서 Kafka로 전송 - OutboxRelay
+	net.dstone.common.messaging.outbox.OutboxRelay.dispatchPending(int)
+		* 대상건 조회
+		net.dstone.common.messaging.outbox.OutboxStore.claimPending(int, String)
+		* Kafka 전송
+		org.springframework.kafka.core.KafkaTemplate.send(String, String, Object)
+		* 상태 저장
+		net.dstone.common.messaging.outbox.OutboxStore.markSent(Object)
+
+3. Consume(소비) - Kafka 수신 Listener
+	net.dstone.boot.sample.saga.listener.OrderSagaReplyListener
+		* 트랜젝션 시작
+		net.dstone.boot.common.messaging.saga.SagaTransactionService.updateSagaStep(String, String, Map<String, Object>)
+			net.dstone.common.messaging.saga.SagaOrchestrator.proceed(String, String, Map<String, Object>)
+				* 엔진에서 스텝 시작
+				net.dstone.common.messaging.saga.SagaOrchestrator.runStep(String, String, Map<String, Object>)
+
+```
+
 전제: `POST /sample/saga/order/start.do?qty=1&amount=10000` 처럼 정상 케이스로 호출했다고 가정합니다. (실패/보상 케이스는 맨 아래 별도 설명)
 
 각 단계 설명 아래에 그 단계의 컴포넌트 간 호출을 시퀀스 다이어그램으로 붙여뒀습니다. 맨 위 "전체 개요"는 요약본이고, 아래로 내려가며 단계별 상세 다이어그램이 나옵니다.
