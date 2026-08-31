@@ -21,12 +21,21 @@ public class OrderSagaReplyListener extends BaseObject {
 
 	/*
 	 * <@KafkaListener 파라메터>
-	 * - id : 컨슈머의 고유 식별자(ID)를 지정. 생략할 경우 기본적으로 컨슈머 컨테이너가 임의의 ID를 생성.
-	 * - groupId : 이 컨슈머가 속할 Kafka 컨슈머 그룹ID. application.yml에 정의된 spring.kafka.consumer.group-id보다 이 파라메터에 설정한 값이 우선.
-	 * - topics : 구독할 하나 이상의 토픽 이름을 지정. SpEL 사용가능. 예)topics = {"orders", "payments"} 또는 topics = "#{'${my.app.topics}'.split(',')}"
-	 * - topicPattern : 정규표현식(Regex)을 사용하여 매칭되는 여러 토픽을 동적으로 구독. 예)topicPattern = "order.*"
-	 * - topicPartitions :  특정 토픽의 특정 파티션만 명시적으로 지정하여 구독.
-	 * 컨슈머 그룹ID는 "같은 토픽을 나눠 처리하는 동일 로직의 인스턴스들"이라는 전제로 동작한다.
+	 * - id
+	 *       컨슈머의 고유 식별자(ID)를 지정. 
+	 *       생략가능. 생략할 경우 기본적으로 컨슈머 컨테이너가 임의의 ID를 생성.
+	 * - groupId
+	 *       (이 컨슈머가 속할) 컨슈머 그룹ID. 
+	 *       application.yml에 정의된 spring.kafka.consumer.group-id보다 이 파라메터에 설정한 값이 우선.
+	 *       동일한 목적을 가진 컨슈머들의 논리적인 집합. 컨슈머 그룹ID는 "같은 토픽을 나눠 처리하는 동일 로직의 인스턴스들"이라는 전제로 동작.
+	 *       하나의 토픽의 데이터는 컨슈머 그룹 내의 딱 하나의 컨슈머 인스턴스만 수신하여 중복 처리를 방지.
+	 *       동일한 토픽의 데이터를 다른 서비스(예: 통계 서비스와 알림 서비스)에서도 똑같이 받아 가야 한다면, 각 서비스마다 groupId를 다르게 설정하면 됨. groupId가 다르면 메시지는 각각의 그룹으로 독립적으로 복제되어 전송.
+	 * - topics
+	 *       구독할 하나 이상의 토픽 이름을 지정. SpEL 사용가능. 예)topics = {"orders", "payments"} 또는 topics = "#{'${my.app.topics}'.split(',')}"
+	 * - topicPattern
+	 *       정규표현식(Regex)을 사용하여 매칭되는 여러 토픽을 동적으로 구독. 예)topicPattern = "order.*"
+	 * - topicPartitions 
+	 *       특정 토픽의 특정 파티션만 명시적으로 지정하여 구독.
 	 */
 	
 	/**
