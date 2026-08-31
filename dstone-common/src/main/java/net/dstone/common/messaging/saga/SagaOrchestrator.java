@@ -76,9 +76,9 @@ public class SagaOrchestrator extends BaseObject {
 	 * 동시에 result 맵 안에도 "SAGA_ID" 필드로 심어지므로(runStep 참고) Kafka 메시지 "value"(JSON body)에도
 	 * 포함되어, 소비자(리스너) 측에서 payload.get("SAGA_ID")로 꺼내 쓸 수 있다.
 	 * </pre>
-	 * @param sagaType  사가의 업무적 종류를 나타내는 분류값(예: "ORDER"). Kafka로는 전송되지 않고
-	 *                  TB_SAGA_INSTANCE.SAGA_TYPE 컬럼에만 저장되는 순수 내부 메타데이터다.
-	 * @param firstStep 최초로 실행할 스텝 이름. SagaStepHandler.getStepName()과 매칭되는 식별자이며,
+	 * @param sagaType  업무종류를 나타내는 분류값(예: "ORDER"). 
+	 *                  Kafka로는 전송되지 않고 TB_SAGA_INSTANCE.SAGA_TYPE 컬럼에만 저장되는 순수 내부 메타데이터.
+	 * @param firstStep 업무종류 내에서 최초로 실행할 스텝 이름. SagaStepHandler.getStepName()과 매칭되는 식별자이며,
 	 *                  동시에 결과 이벤트가 발행될 Kafka 토픽명의 접두어("{firstStep}-reply")를 결정한다.
 	 * @param payload   첫 스텝 핸들러(SagaStepHandler.handle)에 그대로 전달될 입력 커맨드(Map).
 	 *                  이 시점에는 아직 Kafka로 나가지 않는 순수 로컬 호출 인자이며, 첫 스텝이 끝난 뒤
@@ -97,7 +97,8 @@ public class SagaOrchestrator extends BaseObject {
 		
 		// 사가 정보 DB저장
 		sagaStore.insert(saga);
-		// 첫스템 시작
+		
+		// 스텝 시작
 		runStep(sagaId, firstStep, payload);
 		
 		return sagaId;
@@ -105,34 +106,37 @@ public class SagaOrchestrator extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 이전 스텝의 응답을 받아 다음 스텝을 진행시키고 싶을 때 호출한다.
-	 * 호출 시점: 이 메소드는 Kafka Consumer 콜백(@KafkaListener 메소드) 안에서 호출되는 것이 정상 사용 패턴이다.
-	 * 즉 "이전 스텝의 응답(Kafka reply)"이란 실제로는 OutboxRelay가 이전 스텝 처리 후 발행한
-	 * "{이전스텝}-reply" 토픽 메시지를 리스너가 poll/역직렬화하여 받은 것을 말한다(예: OrderSagaReplyListener).
+	 * 이전 스텝의 응답을 받아 다음 스텝을 진행시키고 싶을 때 호출한다. 
+	 * 한번만 호출되는 시작/종료 와는 다르게 여러번 호출 될 수 있으며 호출되는 순서대로 누적된다. (start -> proceed -> proceed -> ....  -> complete)
+	 * 
+	 * 호출 시점: 이 메소드는 Kafka Consumer 콜백(@KafkaListener 메소드) 안에서 호출되는 것이 정상 사용 패턴이다.(이전스텝의 응답에서 주로 호출)
+	 * 즉 "{이전스텝}-reply" 토픽 메시지를 리스너가 poll/역직렬화하여 받고 이 리스너에서 다음 스텝으로 넘기는 역할을 한다.
 	 * (다음 스텝 이름 결정은 사가 정의를 아는 모듈 쪽 호출자가 넘겨준다 — 엔진은 스텝 순서 자체를 모른다)
 	 * </pre>
 	 * @param sagaId  진행 중인 사가의 식별자. Kafka 메시지 value(JSON)에 "SAGA_ID" 필드로 담겨 온 값을
 	 *                리스너가 꺼내 그대로 전달하는 것이 일반적이다(예: payload.get("SAGA_ID")).
-	 * @param nextStep 다음에 실행할 스텝 이름. Kafka 토픽명 자체에는 없고(리스너가 구독한 토픽은 "이전 스텝"의
-	 *                 reply 토픽이다), 사가 정의(순서)를 아는 리스너 코드가 하드코딩/설정으로 결정해서 넘긴다.
-	 * @param command 다음 스텝 핸들러에 전달할 입력값. 대부분 "직전 Kafka 메시지의 value(역직렬화된 Map)"를
-	 *                그대로 넘기므로, Kafka ConsumerRecord.value()가 사실상 이 파라메터의 원천이다.
+	 * @param nextStep 다음에 실행할 스텝 이름. Kafka 토픽명 자체에는 없고(리스너가 구독한 토픽은 {이전스텝}-reply 토픽이다), 
+	 *                사가 정의(순서)를 아는 리스너 코드가 하드코딩/설정으로 결정해서 넘긴다.
+	 * @param command 다음 스텝 핸들러에 전달할 입력값. 대부분 직전 Kafka 메시지의 value(역직렬화된 Map)를 그대로 넘기므로, 
+	 *                Kafka ConsumerRecord.value()가 사실상 이 파라메터의 원천이다.
 	 */
 	public void proceed(String sagaId, String nextStep, Map<String, Object> command) {
 		this.info(signatureLog());
+
+		// 스텝 시작
 		runStep(sagaId, nextStep, command);
 	}
 
 	/**
 	 * <pre>
-	 * 사가 정의를 아는 호출자(리스너 등)가 마지막 스텝의 reply까지 받은 뒤 호출해서 사가를 종결시킨다.
+	 * 사가의 마지막 스텝을 실행한다. (리스너가 마지막 스텝의 reply까지 받은 뒤 호출해서 사가를 종결시킨다)
+	 * 
 	 * 엔진 자체는 스텝 순서를 모르므로 "이게 마지막 스텝이다"는 판단은 호출자 책임이다.
 	 * 이 메소드는 상태만 갱신할 뿐 이벤트를 발행하지 않는다 — 사가가 끝났다는 사실을 Kafka로 알리고
 	 * 싶다면 호출자가 별도로 outboxAppender.append()를 불러야 한다(현재 샘플은 그렇게 하지 않는다).
 	 * </pre>
-	 * @param sagaId  종결할 사가의 식별자(TB_SAGA_INSTANCE.SAGA_ID). 마지막 reply 이벤트의 SAGA_ID 필드에서 추출.
-	 * @param lastStep 종결 시점의 마지막 스텝 이름. TB_SAGA_INSTANCE.CURRENT_STEP 갱신용으로만 쓰이고
-	 *                 Kafka로는 나가지 않는다.
+	 * @param sagaId   종결할 사가의 식별자(TB_SAGA_INSTANCE.SAGA_ID). 마지막 reply 이벤트의 SAGA_ID 필드에서 추출.
+	 * @param lastStep 종결 시점의 마지막 스텝 이름. TB_SAGA_INSTANCE.CURRENT_STEP 갱신용으로만 쓰이고 Kafka로는 나가지 않는다.
 	 */
 	public void complete(String sagaId, String lastStep) {
 		this.info(signatureLog());
@@ -148,8 +152,8 @@ public class SagaOrchestrator extends BaseObject {
 	 *   → ③스텝 이력 DB 저장 
 	 *   → ④사가 상태 갱신
 	 *   → ⑤outboxAppender.append()로 TB_OUTBOX_MESSAGE에 PENDING 행 삽입.
-	 * ②~⑤는 (배포 환경의 트랜잭션 경계 설정에 따라) 하나의 로컬 트랜잭션으로 묶여야
-	 * 아웃박스 패턴의 원자성 보장이 성립한다 — DB 반영과 "발행 예약"이 함께 커밋되거나 함께 롤백되어야 한다.
+	 *   
+	 * ②~⑤는 (배포 환경의 트랜잭션 경계 설정에 따라) 하나의 로컬 트랜잭션으로 묶여야 아웃박스 패턴의 원자성 보장이 성립한다.(DB 반영과 "발행 예약"이 함께 커밋되거나 함께 롤백)
 	 * 실제 Kafka 전송(브로커로의 네트워크 I/O)은 여기서 일어나지 않고, 이후 OutboxRelay가 비동기로 수행한다.
 	 * </pre>
 	 * @param sagaId   사가 식별자. 결과 Map에 "SAGA_ID"로 주입되어 Kafka 메시지 value에 포함되며,
@@ -162,10 +166,8 @@ public class SagaOrchestrator extends BaseObject {
 	 */
 	private void runStep(String sagaId, String stepName, Map<String, Object> command) {
 		this.info(signatureLog());
-		// 멱등성 체크: Kafka at-least-once 재전달 등으로 같은 "{이전스텝}-reply" 이벤트가 중복 수신되어
-		// proceed()가 같은 (sagaId, stepName)에 대해 두 번 호출될 수 있다. 이미 SUCCESS 처리된 스텝이면
-		// 핸들러(부수효과 있음)를 다시 실행하지 않고 그냥 무시한다 — 최초 처리 시점에 이미 이 스텝의
-		// outbox 이벤트는 (트랜잭션 래퍼 덕에) durable하게 적재되어 있으므로 재발행할 필요도 없다.
+		// 멱등성 체크: Kafka at-least-once 재전달 등으로 같은 "{이전스텝}-reply" 이벤트가 중복 수신되어 proceed()가 같은 (sagaId, stepName)에 대해 두 번 호출될 수 있다. 
+		// 이미 SUCCESS 처리된 스텝이면 다시 실행하지 않고 그냥 무시한다.
 		if (sagaStore.existsSuccessStep(sagaId, stepName)) {
 			this.warn("saga[" + sagaId + "] step[" + stepName + "] 이미 SUCCESS 처리된 스텝의 중복 수신 — 재실행 없이 무시");
 			return;
@@ -228,7 +230,7 @@ public class SagaOrchestrator extends BaseObject {
 				Map<String, Object> payload = parsePayload((String) row.get("PAYLOAD"));
 				handler.compensate(payload);
 				// 보상 성공을 TB_SAGA_STEP_HISTORY.COMPENSATE_RESULT에 기록해 운영자가 DB 조회만으로
-				// "이 사가에서 어떤 스텝까지 정상 보상됐는지"를 확인할 수 있게 한다(과거엔 로그에만 남았음).
+				// "이 사가에서 어떤 스텝까지 정상 보상됐는지"를 확인할 수 있게 한다.
 				sagaStore.markCompensated(sagaId, stepName, null);
 			} catch (Exception e) {
 				this.error("saga[" + sagaId + "] compensate[" + stepName + "] 중 오류: " + e.getMessage());

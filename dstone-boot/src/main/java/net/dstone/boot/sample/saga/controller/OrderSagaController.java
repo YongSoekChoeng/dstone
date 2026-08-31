@@ -37,10 +37,10 @@ public class OrderSagaController extends BaseController {
 	 * (이 경우 이미 성공한 재고차감이 자동으로 보상(롤백)된다).
 	 *
 	 * command 맵은 sagaTransactionService.insertSaga()(내부적으로 SagaOrchestrator.start())를 통해
-	 * 첫 스텝(inventoryReserve) 핸들러에 로컬로 전달될 뿐,
-	 * 이 시점에는 Kafka로 나가지 않는다. inventoryReserve 스텝이 성공한 "이후"에야 이 값(handler가 반환한
-	 * 결과, 보통 command 자신)이 SAGA_ID와 합쳐져 "inventoryReserve-reply" 토픽의 메시지 value로 발행된다.
-	 * 즉 여기서 만든 ORDER_ID/ITEM_ID/QTY/AMOUNT 필드가 그대로 Kafka 메시지 본문 필드가 되는 셈이다.
+	 * 첫 스텝(step01-inventoryReserve) 핸들러에 로컬로 전달될 뿐, 이 시점에는 Kafka로 나가지 않는다.
+	 * step01-inventoryReserve 스텝이 성공한 "이후"에야 이 값(handler가 반환한 결과, 보통 command 자신)이 SAGA_ID와 합쳐져 
+	 * step01-inventoryReserve-reply 토픽의 메시지 value로 발행된다.
+	 * 즉 여기서 만든 ORDER_ID/ITEM_ID/QTY/AMOUNT/IS_ORDER_COMPLETED 필드가 그대로 Kafka 메시지 본문 필드가 되는 셈이다.
 	 * </pre>
 	 */
 	@RequestMapping("/start.do")
