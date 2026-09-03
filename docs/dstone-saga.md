@@ -1,7 +1,7 @@
 # SAGA 테스트 시 dstone-common + dstone-boot 전체 흐름 (순서대로)
 
 
-## SAGA 패턴 주된 기능 정리
+## 1. SAGA 패턴 주된 기능 정리
 
 ```
 
@@ -52,7 +52,7 @@
 
 ---
 
-## 전체 개요 시퀀스 다이어그램
+## 2. 전체 개요 시퀀스 다이어그램
 
 ![전체 개요](images/saga-00-overview.svg)
 
@@ -136,7 +136,7 @@ sequenceDiagram
 
 ---
 
-## 0단계. 사전 조건 — 애플리케이션 기동 시 컴포넌트 초기화
+## 3. 0단계. 사전 조건 — 애플리케이션 기동 시 컴포넌트 초기화
 
 | 구성요소 | 역할 |
 |---|---|
@@ -186,7 +186,7 @@ sequenceDiagram
 
 ---
 
-## 1~2단계. HTTP 요청 → 사가 시작 (스레드: 톰캣 요청 스레드)
+## 4. 1~2단계. HTTP 요청 → 사가 시작 (스레드: 톰캣 요청 스레드)
 
 `OrderSagaController.start()` (`OrderSagaController.java:47`)
 
@@ -195,13 +195,13 @@ sequenceDiagram
 
 여기서 `SagaTransactionServiceImpl`은 클래스명이 `*ServiceImpl`이고 메소드명이 `insert*`라서, `ConfigTransaction`의 AOP 어드바이저(`txAdvisorCommon`)가 **이 시점부터 트랜잭션을 엽니다**(MySQL 커넥션 획득, autocommit off). 이 트랜잭션 하나가 아래 전체를 감쌉니다.
 
-### `SagaOrchestrator.start()` (dstone-common, 같은 스레드/같은 트랜잭션) — `SagaOrchestrator.java:88`
+### 4.1 `SagaOrchestrator.start()` (dstone-common, 같은 스레드/같은 트랜잭션) — `SagaOrchestrator.java:88`
 
 1. `sagaId = UUID.randomUUID()` 생성
 2. `sagaStore.insert(...)` → **[DB WRITE①]** `TB_SAGA_INSTANCE`에 1행 삽입: `STATUS=STARTED, CURRENT_STEP=step01-inventoryReserve`
 3. `runStep(sagaId, "step01-inventoryReserve", command)` 호출
 
-### `runStep()` 내부 — `SagaOrchestrator.java:167`
+### 4.2 `runStep()` 내부 — `SagaOrchestrator.java:167`
 
 1. `existsSuccessStep(sagaId, "step01-inventoryReserve")` → 첫 실행이므로 false, 통과
 2. `findHandler("step01-inventoryReserve")` → Spring이 모아준 `List<SagaStepHandler>` 중 `Step01InventoryReserveService` 를 찾음
@@ -213,13 +213,13 @@ sequenceDiagram
 6. `sagaStore.updateStatus(sagaId, STEP_DONE, "step01-inventoryReserve")` → **[DB WRITE③]** `TB_SAGA_INSTANCE.STATUS=STEP_DONE`
 7. `outboxAppender.append("step01-inventoryReserve-reply", sagaId, result)` 호출
 
-### `OutboxAppenderImpl.append()` (dstone-common)
+### 4.3 `OutboxAppenderImpl.append()` (dstone-common)
 
 - result를 JSON 문자열로 직렬화
 - **[DB WRITE④]** `TB_OUTBOX_MESSAGE`에 1행 삽입: `TOPIC=step01-inventoryReserve-reply, MSG_KEY=sagaId, PAYLOAD=(JSON), STATUS=PENDING`
 - **주의: 이 시점까지 Kafka로는 아무것도 전송되지 않았습니다.** DB에 "나중에 보낼 예약"만 해둔 것.
 
-### 트랜잭션 커밋
+### 4.4 트랜잭션 커밋
 
 `start()` 호출이 `insertSaga()` 리턴까지 다 끝나면, AOP 어드바이저가 트랜잭션을 커밋합니다. 이 순간 **①~④ 4개의 DB 변경이 전부 한 번에 확정**됩니다(원자성 보장 — Transactional Outbox 패턴의 핵심). HTTP 응답이 `sagaId`를 담아 반환됩니다. → 여기서 사용자 요청은 끝.
 
@@ -281,7 +281,7 @@ sequenceDiagram
 
 ---
 
-## 3단계. Outbox 릴레이 — 실제 Kafka 발행 (스레드: 스프링 스케줄러 스레드, 최대 1초 뒤)
+## 5. 3단계. Outbox 릴레이 — 실제 Kafka 발행 (스레드: 스프링 스케줄러 스레드, 최대 1초 뒤)
 
 `OutboxRelayScheduler.relay()` (`OutboxRelayScheduler.java:27`) → `OutboxRelay.dispatchPending(100)` (`OutboxRelay.java:52`)
 
@@ -340,7 +340,7 @@ sequenceDiagram
 
 ---
 
-## 4단계. Kafka 컨슈머가 메시지 수신 → 다음 스텝 트리거 (스레드: Kafka 리스너 컨테이너 스레드)
+## 6. 4단계. Kafka 컨슈머가 메시지 수신 → 다음 스텝 트리거 (스레드: Kafka 리스너 컨테이너 스레드)
 
 `OrderSagaReplyListener.onInventoryReserved()` (`OrderSagaReplyListener.java:54`)
 - groupId `step01-inventoryReserve-reply-consumer-group`이 해당 토픽 파티션을 poll 하고 있다가 메시지 수신
@@ -411,14 +411,14 @@ sequenceDiagram
 
 ---
 
-## 5~6단계. 위 3~4단계 반복 (payment-reply 발행 → orderConfirm 트리거)
+## 7. 5~6단계. 위 3~4단계 반복 (payment-reply 발행 → orderConfirm 트리거)
 
 - `OutboxRelayScheduler`가 다음 폴링(≤1초 후) 때 `step02-payment-reply`를 Kafka로 발행 → **3단계 다이어그램과 동일 패턴** (topic만 `step02-payment-reply`로 바뀜)
 - `OrderSagaReplyListener.onPaid()` (groupId `step02-payment-reply-consumer-group`)가 수신 → `updateSagaStep(sagaId, "step03-orderConfirm", payload)` → `Step03OrderConfirmService.handle()` 실행 (`ITEM_ID=="GOLD"`면 실패) → 성공 시 `command.put("IS_ORDER_COMPLETED","Y")` → history/status/outbox 저장 → `step03-orderConfirm-reply` PENDING 등록 → 커밋 — **4단계 다이어그램과 동일 패턴** (handler만 `Step03OrderConfirmService`로 바뀜)
 
 ---
 
-## 7단계. 마지막 릴레이 + 마지막 리스너 → 사가 종결
+## 8. 7단계. 마지막 릴레이 + 마지막 리스너 → 사가 종결
 
 - `OutboxRelayScheduler`가 `step03-orderConfirm-reply`를 Kafka로 발행
 - `OrderSagaReplyListener.onOrderConfirmed()` (groupId `step03-orderConfirm-reply-consumer-group`)가 수신
@@ -462,7 +462,7 @@ sequenceDiagram
 
 ---
 
-## 정리: DB/Kafka 왕복 횟수
+## 9. 정리: DB/Kafka 왕복 횟수
 
 정상 3스텝 사가 1건 완료까지:
 - HTTP 요청 1번 (동기)
@@ -474,7 +474,7 @@ sequenceDiagram
 
 ---
 
-## 실패 시 보상(compensate) 플로우 (예: QTY=100으로 호출)
+## 10. 실패 시 보상(compensate) 플로우 (예: QTY=100으로 호출)
 
 1. 1~2단계 동일하게 진행하다가 `Step01InventoryReserveService.handle()`이 `IllegalStateException` 던짐
 2. `runStep()`의 `catch(Exception e)` 진입 (`SagaOrchestrator.java:196`)

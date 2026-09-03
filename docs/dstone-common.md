@@ -1,6 +1,6 @@
 # dstone-common
 
-## 개요
+## 1. 개요
 
 `dstone-common`은 dstone 멀티모듈 프로젝트의 핵심 공통 라이브러리입니다. `dstone-boot`와 `dstone-batch` 두 모듈이 공통으로 사용하는 유틸리티, 설정, 기반 클래스를 제공합니다.
 
@@ -10,7 +10,7 @@
 
 ---
 
-## 기술 스택
+## 2. 기술 스택
 
 | 영역 | 기술 |
 |---|---|
@@ -30,7 +30,7 @@
 
 ---
 
-## 패키지 구조
+## 3. 패키지 구조
 
 ```
 src/main/java/net/dstone/common/
@@ -49,7 +49,7 @@ src/main/java/net/dstone/common/
 
 ---
 
-## 주요 유틸리티 (`net.dstone.common.utils`)
+## 4. 주요 유틸리티 (`net.dstone.common.utils`)
 
 | 클래스 | 설명 |
 |---|---|
@@ -62,7 +62,7 @@ src/main/java/net/dstone/common/
 
 ---
 
-## 공통 설정 패턴
+## 5. 공통 설정 패턴
 
 모든 모듈의 `conf/application.yml`에서 공통으로 참조하는 설정 구조:
 
@@ -92,7 +92,7 @@ spring.datasource.<name>.hikari:
 
 ---
 
-## 환경 변수
+## 6. 환경 변수
 
 | 변수명 | 설명 |
 |---|---|
@@ -110,7 +110,7 @@ spring.datasource.<name>.hikari:
 
 ---
 
-## 보안 아키텍처
+## 7. 보안 아키텍처
 
 - **Jasypt**: `application.yml` 내 민감 정보(DB 비밀번호 등)를 `ENC(...)` 형식으로 암호화 저장. 복호화 키는 `env.properties`의 `jasypt.encryptor.password`에 설정
 - **BouncyCastle**: JDK 17+ 환경에서의 중첩 JAR 보안 문제 해결 및 암호화 알고리즘 확장
@@ -118,7 +118,7 @@ spring.datasource.<name>.hikari:
 
 ---
 
-## 애플리케이션 기동 순서
+## 8. 애플리케이션 기동 순서
 
 공통 모듈이 정의한 기동 순서를 모든 모듈이 따릅니다:
 
@@ -129,7 +129,7 @@ spring.datasource.<name>.hikari:
 
 ---
 
-## 빌드
+## 9. 빌드
 
 ```bash
 # 공통 라이브러리 빌드 (다른 모듈 빌드 전 선행 필요)

@@ -1,9 +1,9 @@
 # Docker
 
-## 개요
+## 1. 개요
 컨테이너 런타임. `dstone-boot` 이미지 빌드/로컬 사설 레지스트리 운영 및 [kind](kubernetes.md) 기반 로컬 쿠버네티스 클러스터 구동에 사용한다.
 
-## 설치 정보
+## 2. 설치 정보
 - 버전: Docker CE 29.7.2, Docker Compose plugin v5.5.0
 - 설치 방식: Docker 공식 apt 저장소 (`download.docker.com`)
 - 저장소 등록 파일: `/etc/apt/sources.list.d/docker.sources`
@@ -16,7 +16,7 @@ Architectures: amd64
 Signed-By: /etc/apt/keyrings/docker.asc
 ```
 
-## 설치 방법 (실제 수행된 절차)
+## 3. 설치 방법 (실제 수행된 절차)
 ```bash
 sudo apt install -y ca-certificates curl
 sudo install -m 0755 -d /etc/apt/keyrings
@@ -41,7 +41,7 @@ docker --version
 docker compose version
 ```
 
-## 서비스 시작/중지
+## 4. 서비스 시작/중지
 WSL 환경 특성상 `dockerd`를 systemd로 자동 기동하지 않고, 전용 스크립트로 백그라운드에서 직접 기동한다.
 
 ```bash
@@ -51,10 +51,10 @@ WSL 환경 특성상 `dockerd`를 systemd로 자동 기동하지 않고, 전용 
 ```
 최상위 래퍼: `/usr/local/bin/start-docker.sh` / `stop-docker.sh`.
 
-## 권한
+## 5. 권한
 현재 사용자(`jysn007`)는 `docker` 그룹에 속해 있어 `sudo` 없이 `docker` 명령을 사용할 수 있다. 그룹 변경 후에는 재로그인(WSL 재시작)이 필요하다.
 
-## dstone 프로젝트에서의 역할
+## 6. dstone 프로젝트에서의 역할
 - `dstone-boot` 이미지 빌드/실행 환경(`dstone-boot/Dockerfile`) — 로컬 사설 레지스트리(`localhost:5000`)를 거쳐 kind에 배포한다. 상세는 [cloud-architecture.md](../cloud-architecture.md) 참고.
 - `dstone-batchadmin`은 아직 Docker 배포 스크립트가 추가되지 않은 상태 (CLAUDE.md 참고).
 - [kind](kubernetes.md) 클러스터의 컨테이너 런타임으로도 사용된다.

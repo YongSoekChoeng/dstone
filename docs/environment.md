@@ -7,13 +7,13 @@ dstone 프로젝트를 개발하기 위해 WSL(Ubuntu) 환경에 수동으로 �
 - 대상 환경: WSL2 Ubuntu 26.04 LTS (Resolute Raccoon)
 - 갱신 방식: 새 소프트웨어를 설치하거나 주요 설정을 변경할 때마다 이 문서와 `docs/software/*.md`를 함께 갱신한다.
 
-## 운영 원칙 (중요)
+## 1. 운영 원칙 (중요)
 
 WSL은 기본적으로 systemd 서비스를 부팅 시 자동 기동하지 않도록 운용 중이다. 그래서 DB/메시징/CI 등 대부분의 서비스는
 `/usr/local/bin/start-*.sh`, `/usr/local/bin/stop-*.sh` 스크립트로 수동 기동/중지한다 (아래 표의 "시작 스크립트" 참고).
 WSL을 재시작했다면 필요한 서비스를 먼저 `start-*.sh`로 올려야 한다.
 
-## 목록
+## 2. 목록
 
 | 구분 | 소프트웨어 | 버전(확인 시점) | 설치 방식 | 주요 포트 | 시작 스크립트 | 상세 문서 |
 |---|---|---|---|---|---|---|
@@ -31,11 +31,11 @@ WSL을 재시작했다면 필요한 서비스를 먼저 `start-*.sh`로 올려�
 | CI/CD | Jenkins | 2.568.3 | Jenkins 공식 저장소 (`pkg.jenkins.io`) | 8080 | `start-jenkins.sh` / `stop-jenkins.sh` | [jenkins.md](software/jenkins.md) |
 | 런타임(부가) | Node.js + npm | 20.20.2 / 10.8.2 | NodeSource 저장소 (`deb.nodesource.com`) | - | - | [nodejs.md](software/nodejs.md) |
 
-## 클라우드 아키텍처 시뮬레이션
+## 3. 클라우드 아키텍처 시뮬레이션
 
 dstone-boot는 [kind](software/kubernetes.md)에 컨테이너 Pod로, dstone-batch/dstone-batchadmin은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운용한다. MySQL/Redis/RabbitMQ/Kafka는 CSP 매니지드 서비스에 대응시켜 클러스터 바깥에 둔다. 설계 배경과 네트워킹/레지스트리/CI-CD 세부사항은 [cloud-architecture.md](cloud-architecture.md) 참고.
 
-## dstone 프로젝트와의 연결 관계
+## 4. dstone 프로젝트와의 연결 관계
 
 - **MySQL**: `dstone-common`/`dstone-boot`/`dstone-batch`/`dstone-batchadmin` 공통 메인 데이터 저장소(`sampleDB` 등). `conf/env.properties`의 `DB_HOST`/`DB_PORT`로 접속 정보 주입.
 - **Redis**: `dstone-boot`의 분산 세션 저장소(`dstone:session` 네임스페이스).

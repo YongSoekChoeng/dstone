@@ -1,6 +1,6 @@
 # dstone-boot
 
-## 개요
+## 1. 개요
 
 `dstone-boot`는 Spring Boot 기반의 통합 웹 애플리케이션 프레임워크입니다. 두 가지 주요 기능을 하나의 애플리케이션으로 제공합니다.
 
@@ -14,7 +14,7 @@
 
 ---
 
-## 기술 스택
+## 2. 기술 스택
 
 | 영역 | 기술 |
 |---|---|
@@ -34,7 +34,7 @@
 
 ---
 
-## 패키지 구조
+## 3. 패키지 구조
 
 ```
 src/main/java/net/dstone/boot/
@@ -81,9 +81,9 @@ src/main/webapp/                        # 웹 리소스 (JSP, CSS, JS)
 
 ---
 
-## 설정 (`conf/application.yml`)
+## 4. 설정 (`conf/application.yml`)
 
-### 서버 설정
+### 4.1 서버 설정
 
 ```yaml
 server:
@@ -100,7 +100,7 @@ server:
     enabled: false    # TLS/SSL 활성화 시 true로 변경
 ```
 
-### 다중 데이터소스
+### 4.2 다중 데이터소스
 
 세 개의 독립적인 데이터소스를 운영합니다:
 
@@ -110,7 +110,7 @@ server:
 | `sample` | 샘플 데이터 | sampleDB |
 | `analyzer` | 분석 결과 저장 | analyzeDB |
 
-### 세션 및 캐시
+### 4.3 세션 및 캐시
 
 ```yaml
 spring:
@@ -125,7 +125,7 @@ spring:
     port: ${REDIS_PORT}
 ```
 
-### 소셜 로그인
+### 4.4 소셜 로그인
 
 ```yaml
 # Naver OAuth2
@@ -143,7 +143,7 @@ google:
   client-secret: ...
 ```
 
-### 파일 업로드
+### 4.5 파일 업로드
 
 ```yaml
 spring.servlet.multipart:
@@ -154,11 +154,11 @@ spring.servlet.multipart:
 
 ---
 
-## 소스 코드 분석기 (Analyzer)
+## 5. 소스 코드 분석기 (Analyzer)
 
 `dstone-boot`의 핵심 차별화 기능입니다. 지정된 경로의 Java 웹 애플리케이션 소스 코드를 정적 분석하여 구조와 의존성을 파악합니다.
 
-### 분석 흐름
+### 5.1 분석 흐름
 
 ```
 사용자 (웹 UI)
@@ -180,7 +180,7 @@ analyzer 데이터베이스 (H2 / MySQL)
 ReportController
 ```
 
-### 주요 클래스
+### 5.2 주요 클래스
 
 | 클래스 | 역할 |
 |---|---|
@@ -189,7 +189,7 @@ ReportController
 | `net.dstone.boot.analyzer.ConfigurationService` | 분석 설정 관리 |
 | `net.dstone.boot.analyzer.ReportController` | 분석 결과 리포트 제공 |
 
-### 분석 대상 및 추출 정보
+### 5.3 분석 대상 및 추출 정보
 
 | 파일 유형 | 파싱 라이브러리 | 추출 정보 |
 |---|---|---|
@@ -199,7 +199,7 @@ ReportController
 
 ---
 
-## 보안 (Spring Security)
+## 6. 보안 (Spring Security)
 
 ```yaml
 spring.security.enabled: true
@@ -212,7 +212,7 @@ spring.security.enabled: true
 
 ---
 
-## AOP (Aspect-Oriented Programming)
+## 7. AOP (Aspect-Oriented Programming)
 
 `ConfigAspect.java`에서 AspectJ를 활용한 횡단 관심사를 처리합니다:
 
@@ -222,7 +222,7 @@ spring.security.enabled: true
 
 ---
 
-## 샘플 코드
+## 8. 샘플 코드
 
 `src/main/java/net/dstone/boot/sample/` 경로에 다음 기능별 샘플을 제공합니다:
 
@@ -238,7 +238,7 @@ spring.security.enabled: true
 
 ---
 
-## 빌드 및 실행
+## 9. 빌드 및 실행
 
 ```bash
 # 빌드 (WAR, executable)
@@ -251,7 +251,7 @@ java -jar target/dstone-boot.war
 # 외부 Tomcat 배포 시 WAR 파일을 webapps/에 배포
 ```
 
-### 컨테이너 / 쿠버네티스 배포
+### 9.1 컨테이너 / 쿠버네티스 배포
 
 `dstone-boot`은 `dstone-boot/Dockerfile`(멀티스테이지 리액터 빌드)로 이미지를 만들어 로컬 `kind` 클러스터에 Pod로 배포한다(`dstone-boot/k8s/`). 상세 설계와 절차는 [cloud-architecture.md](cloud-architecture.md) 참고.
 

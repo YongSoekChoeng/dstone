@@ -1,6 +1,6 @@
 # dstone-batch
 
-## 개요
+## 1. 개요
 
 `dstone-batch`는 Spring Boot, Spring Batch, Spring Cloud Task를 기반으로 구축된 엔터프라이즈급 배치 처리 프레임워크입니다. 반복적인 잡(Job) 설정을 표준화하고, 개발자가 비즈니스 로직에 집중할 수 있도록 설계되었습니다.
 
@@ -11,7 +11,7 @@
 
 ---
 
-## 핵심 특징
+## 2. 핵심 특징
 
 | 특징 | 설명 |
 |---|---|
@@ -25,7 +25,7 @@
 
 ---
 
-## 기술 스택
+## 3. 기술 스택
 
 | 영역 | 기술 |
 |---|---|
@@ -39,7 +39,7 @@
 
 ---
 
-## 프로젝트 구조
+## 4. 프로젝트 구조
 
 ```
 dstone-batch/
@@ -83,9 +83,9 @@ dstone-batch/
 
 ---
 
-## 핵심 개념
+## 5. 핵심 개념
 
-### 잡(Job) 정의 패턴
+### 5.1 잡(Job) 정의 패턴
 
 모든 배치 잡은 `BaseJobConfig`를 상속하고 `@AutoRegJob` 어노테이션을 선언합니다:
 
@@ -118,7 +118,7 @@ public class SampleJobConfig extends BaseJobConfig {
 }
 ```
 
-### BaseJobConfig 제공 메소드
+### 5.2 BaseJobConfig 제공 메소드
 
 | 메소드 | 설명 |
 |---|---|
@@ -129,7 +129,7 @@ public class SampleJobConfig extends BaseJobConfig {
 | `createSimpleFlow(name)` | 여러 스텝을 묶은 순차 Flow 생성 |
 | `createSplitFlow(name)` | 여러 Flow를 병렬로 실행하는 Split Flow 생성 |
 
-### @AutoRegJob 동작 방식
+### 5.3 @AutoRegJob 동작 방식
 
 `ConfigAutoReg.java`가 스캔하여 어노테이션이 붙은 클래스를 Spring Batch `JobRegistry`에 등록합니다.
 
@@ -138,9 +138,9 @@ public class SampleJobConfig extends BaseJobConfig {
 
 ---
 
-## 설정 (`conf/application.yml`)
+## 6. 설정 (`conf/application.yml`)
 
-### 다중 데이터소스
+### 6.1 다중 데이터소스
 
 | 데이터소스 | 용도 | 데이터베이스 | 풀 크기 |
 |---|---|---|---|
@@ -159,7 +159,7 @@ spring.datasource.common.hikari:
   max-lifetime: 1700000
 ```
 
-### Spring Batch 설정
+### 6.2 Spring Batch 설정
 
 ```yaml
 spring.batch:
@@ -169,7 +169,7 @@ spring.batch:
 
 > 배치 테이블 초기 생성: `src/main/resources/schema/*.sql` 스크립트를 수동 실행
 
-### Spring Cloud Task / Data Flow
+### 6.3 Spring Cloud Task / Data Flow
 
 ```yaml
 spring.cloud:
@@ -179,9 +179,9 @@ spring.cloud:
 
 ---
 
-## 잡 실행 방법
+## 7. 잡 실행 방법
 
-### 방법 1 - 로컬 직접 실행 (SimpleBatchRunner)
+### 7.1 방법 1 - 로컬 직접 실행 (SimpleBatchRunner)
 
 ```bash
 # 1. 빌드
@@ -199,7 +199,7 @@ java -jar -Dspring.batch.job.names=tableDataGenType01Job target/dstone-batch-1.0
 2. `setSysProperties()` → `conf/env.properties`를 System Properties로 로드
 3. `SimpleBatchRunner.launchJob()` → `JobLauncher`로 지정 잡 실행
 
-### 방법 2 - Spring Cloud Data Flow 연동
+### 7.2 방법 2 - Spring Cloud Data Flow 연동
 
 1. 빌드된 JAR을 Data Flow에 `task` 애플리케이션으로 등록
 2. Data Flow UI 또는 Shell에서 태스크 정의 후 실행
@@ -207,7 +207,7 @@ java -jar -Dspring.batch.job.names=tableDataGenType01Job target/dstone-batch-1.0
 
 ---
 
-## 샘플 잡 목록
+## 8. 샘플 잡 목록
 
 | 잡 이름 | 디렉토리 | 설명 |
 |---|---|---|
@@ -220,7 +220,7 @@ java -jar -Dspring.batch.job.names=tableDataGenType01Job target/dstone-batch-1.0
 
 ---
 
-## Spring Batch 아키텍처
+## 9. Spring Batch 아키텍처
 
 ```
 Job
@@ -238,7 +238,7 @@ Job
 
 ---
 
-## 빌드
+## 10. 빌드
 
 ```bash
 cd dstone-batch
@@ -248,7 +248,7 @@ mvn clean package
 # target/dstone-batch-1.0.0-SNAPSHOT.jar
 ```
 
-### VM 스타일 운영 (bin/*.sh)
+### 10.1 VM 스타일 운영 (bin/*.sh)
 
 `dstone-batch`는 systemd에 등록하지 않고 `dstone-batch/bin/{startApp,stopApp,statusApp}.sh` 쉘 스크립트로만 기동/중지한다. 설계 배경과 CI/CD 연동은 [cloud-architecture.md](cloud-architecture.md) 참고.
 

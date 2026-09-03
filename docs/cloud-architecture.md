@@ -2,7 +2,7 @@
 
 dstone 프레임워크를 실제 클라우드 배포와 최대한 유사한 구조로 WSL 환경에서 운용하기 위한 설계 기록이다. 소프트웨어 설치 자체는 `docs/environment.md`/`docs/software/*.md`를 참고하고, 이 문서는 "무엇을 무엇에 대응시켰고 왜 그렇게 했는지"를 정리한다.
 
-## 아키텍처 매핑
+## 1. 아키텍처 매핑
 
 | dstone 구성요소 | 클라우드 대응 개념 | WSL 구현 |
 |---|---|---|
@@ -14,7 +14,7 @@ dstone 프레임워크를 실제 클라우드 배포와 최대한 유사한 구�
 
 MySQL/Redis/RabbitMQ/Kafka를 k8s 클러스터 밖에 두는 이유: 실제 클라우드에서도 RDS/ElastiCache 등은 EKS 클러스터 내부가 아니라 VPC의 별도 관리형 엔드포인트로 존재한다. 이 구조를 그대로 흉내내, "클러스터 안에서 뭘 만들지"와 "클러스터 밖 관리형 서비스에 어떻게 접근할지"를 구분해서 학습할 수 있게 했다.
 
-## dstone-boot ↔ kind 네트워킹
+## 2. dstone-boot ↔ kind 네트워킹
 
 kind 클러스터의 Pod는 `kind` 도커 브리지 네트워크(예: `172.18.0.0/16`) 안에 있고, 호스트의 MySQL/Redis는 원래 `127.0.0.1`에만 바인딩되어 있어 Pod에서 접근할 수 없었다. 이를 해결하기 위해:
 
@@ -25,13 +25,13 @@ kind 클러스터의 Pod는 `kind` 도커 브리지 네트워크(예: `172.18.0.
 4. dstone-boot 컨테이너 이미지에는 k8s 전용 프로파일(`env-k8s.properties`, `-Dspring.profiles.active=k8s`)을 포함시켜 `DB_HOST`/`REDIS_HOST`/`RABBITMQ_HOST`/`KAFKA_HOST`를 이 게이트웨이 IP로 지정했다.
 5. **Kafka는 `bind` 문제가 아니라 `advertised.listeners` 문제였다**: 브로커 소켓 자체는 기본이 전체 인터페이스 리슨(`listeners=PLAINTEXT://:9092`)이라 Pod에서 최초 TCP 연결은 되지만, `advertised.listeners`가 `PLAINTEXT://127.0.0.1:9092`로 고정돼 있으면 Kafka가 메타데이터 응답으로 "실제 요청은 `127.0.0.1:9092`로 다시 보내라"고 클라이언트에 알려준다 — Pod 안에서 `127.0.0.1`은 Pod 자신이므로 이후 모든 produce/fetch가 `Topic ... not present in metadata after 60000 ms` 타임아웃으로 실패한다. `/opt/kafka/kafka_2.13-4.2.1/config/server.properties`의 `advertised.listeners`를 `PLAINTEXT://172.18.0.1:9092`로 바꾸고 Kafka를 재기동해야 한다(`/opt/kafka/kafka-stop.sh` → `/opt/kafka/kafka-start.sh`, 파일이 `jysn007` 소유라 sudo 불필요). `172.18.0.1`은 WSL 호스트 자신도 접근 가능한 주소라 Kafbat UI 등 기존 로컬 도구(`bootstrapServers: 127.0.0.1:9092`)는 영향받지 않는다. dstone-boot 쪽은 `bootstrap-servers`를 `DB_HOST`/`REDIS_HOST`와 동일한 패턴으로 `${KAFKA_HOST}:${KAFKA_PORT}`로 파라미터화했다(`dstone-boot/conf/application.yml`, `dstone-boot/k8s/configmap.yaml`, 각 `env-*.properties`).
 
-## 로컬 사설 레지스트리 (kind-registry)
+## 3. 로컬 사설 레지스트리 (kind-registry)
 
-### 정체와 역할
+### 3.1 정체와 역할
 
 `kind-registry`는 표준 **Docker Registry v2**(`registry:2` 이미지 그대로 — Docker Hub/ECR/GCR/ACR을 구성하는 것과 동일한 오픈소스 컴포넌트)를 로컬에 하나 띄운 것이다. CSP의 ECR/GCR/ACR을 흉내내는 자리로, `docker build`로 만든 이미지를 kind 클러스터의 Pod가 실제로 pull해갈 수 있도록 중계하는 **사설 이미지 저장소** 역할을 한다.
 
-### 구성 요소와 동작 원리
+### 3.2 구성 요소와 동작 원리
 
 세 가지 조각이 맞물려 동작한다(생성 로직은 `/usr/local/bin/k8s-start.sh`에 멱등적으로 들어 있음 — 상세는 [kubernetes.md](software/kubernetes.md)):
 
@@ -53,7 +53,7 @@ kind 클러스터의 Pod는 `kind` 도커 브리지 네트워크(예: `172.18.0.
    - 즉 Pod 스펙에 `image: localhost:5000/dstone-boot:...`라고 써도, 노드 입장의 `localhost`는 원래 자기 자신이라 실패해야 정상이지만, 이 미러 규칙 덕분에 containerd가 요청을 `kind-registry:5000`(진짜 레지스트리 컨테이너)으로 자동 리다이렉트한다.
    - 확인 방법: `docker network inspect kind`로 두 컨테이너가 같은 네트워크에 있는지, `docker exec dev-control-plane cat /etc/containerd/config.toml`로 미러 설정이 들어있는지, `kubectl get pod ... -o jsonpath='{.status.containerStatuses[0].imageID}'`로 실제 pull 경로(`localhost:5000/dstone-boot@sha256:...`)를 확인할 수 있다.
 
-### 실사용 흐름
+### 3.3 실사용 흐름
 
 ```bash
 docker build -f dstone-boot/Dockerfile -t localhost:5000/dstone-boot:<TAG> .
@@ -64,7 +64,7 @@ kubectl set image deployment/dstone-boot dstone-boot=localhost:5000/dstone-boot:
 ```
 `docker build → docker push localhost:5000/... → kubectl apply(image: localhost:5000/...)`가 실제 클라우드의 "빌드 → 레지스트리 푸시 → 클러스터 배포" 흐름과 동일하다.
 
-### 조회 방법 (UI 없음 — API만)
+### 3.4 조회 방법 (UI 없음 — API만)
 
 `kind-registry`엔 웹 UI가 없다. Registry HTTP API v2를 직접 호출해서 확인한다:
 ```bash
@@ -73,7 +73,7 @@ curl -s http://localhost:5000/v2/dstone-boot/tags/list        # 특정 이미지
 ```
 웹 UI가 필요하면 `joxit/docker-registry-ui` 같은 경량 컨테이너를 별도로 붙여 `REGISTRY_URL=http://localhost:5000`을 가리키게 하는 방법이 있다(현재 구성엔 없음).
 
-### 실제 클라우드 레지스트리(ECR/GCR/ACR)와의 비교
+### 3.5 실제 클라우드 레지스트리(ECR/GCR/ACR)와의 비교
 
 WSL 시뮬레이션이 "빌드→푸시→배포" 흐름 자체는 그대로 재현하지만, 매니지드 레지스트리가 제공하는 부가 기능은 대부분 없다 — 학습 목적상 이 gap을 명확히 인지하고 있는 편이 좋다.
 
@@ -92,7 +92,7 @@ WSL 시뮬레이션이 "빌드→푸시→배포" 흐름 자체는 그대로 재
 
 이 gap 자체가 "관리형 서비스가 인증·암호화·스캐닝·복제를 대신 해준다"는 걸 체감하는 학습 포인트다 — kind-registry는 그 앞단의 "이미지 저장 + pull 경로 연결"이라는 핵심 매커니즘만 최소 구현으로 재현한 것.
 
-## dstone-batch / dstone-batchadmin — VM 스타일
+## 4. dstone-batch / dstone-batchadmin — VM 스타일
 
 systemd로 자동 등록하지 않고, EC2에 SSH로 접속해 배포 스크립트를 수동 실행하는 감각을 재현하기 위해 순수 쉘 스크립트(`bin/startApp.sh`/`stopApp.sh`/`statusApp.sh`)로만 제어한다. 두 앱 모두 같은 WSL 호스트에서 포트로만 분리되어 있다(6081/5081) — 실제 EC2 수준의 네트워크·방화벽 격리는 없지만, "무엇을 언제 어떻게 배포하는지"의 운영 감각(수동 기동/정지, 배포 디렉터리 분리, 롤링 없는 단일 프로세스 재시작)에 집중하기 위한 절충이다.
 
@@ -107,7 +107,7 @@ systemd로 자동 등록하지 않고, EC2에 SSH로 접속해 배포 스크립�
 
 `bin/startApp.sh`는 `DSTONE_PROFILE` 환경변수로 프로파일을 오버라이드할 수 있다(기본값 `wsl`). Jenkinsfile은 `DSTONE_PROFILE=vm`으로 실행한다.
 
-## CI/CD 파이프라인
+## 5. CI/CD 파이프라인
 
 - `dstone-boot/Jenkinsfile`: Checkout → Maven 리액터 빌드(`dstone-common` 먼저) → `docker build`/`push`(로컬 레지스트리) → `kubectl apply` + `kubectl set image` + `rollout status`(kind 배포) → 헬스체크.
 - `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile`: Checkout → Maven 리액터 빌드 → 아티팩트+conf+bin을 `/workshop/dstone/<module>`로 복사 → 기존 프로세스 정지(`bin/stopApp.sh`) → 재기동(`bin/startApp.sh`, `DSTONE_PROFILE=vm`) → `bin/statusApp.sh`로 헬스체크.
@@ -115,11 +115,11 @@ systemd로 자동 등록하지 않고, EC2에 SSH로 접속해 배포 스크립�
 - Jenkins Controller는 계속 WSL 호스트(VM 역할)에 상주한다. `jenkins` 시스템 계정을 `docker` 그룹에 포함시켜 별도 인프라 추가 없이 `docker`/`kubectl`을 실행한다.
 - 전제: 각 Jenkins Job의 SCM 체크아웃 범위는 모노레포 루트 전체여야 한다(멀티모듈 리액터 빌드 및 `dstone-boot`의 Docker 빌드 컨텍스트가 루트를 요구하기 때문).
 
-## kubectl 운영 명령 (dstone-boot)
+## 6. kubectl 운영 명령 (dstone-boot)
 
 `dstone-boot`은 오직 kind 클러스터의 Pod로만 존재한다(VM 스타일 `bin/*.sh` 없음). 이 문서만 보고도 배포/조회/재시작/중지까지 전부 처리할 수 있도록 실제 사용하는 `kubectl`/`docker`/`kind` 명령을 정리한다. 매니페스트는 `dstone-boot/k8s/{namespace,configmap,deployment,service}.yaml`, 네임스페이스는 `dstone`, 리소스명은 전부 `dstone-boot`이다.
 
-### 0. 사전 준비
+### 6.1 사전 준비
 
 ```bash
 kubectl config current-context        # ~/.bashrc에 KUBECONFIG=/etc/kind/dev.config 등록되어 있으면 별도 설정 불필요
@@ -128,7 +128,7 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 ```
 클러스터 자체가 안 떠 있다면(아래 "클러스터 자체 시작/중지" 참고) 나머지 명령은 전부 실패한다.
 
-### 빠른 참조표
+### 6.2 빠른 참조표
 
 | 하고 싶은 것 | 명령 |
 |---|---|
@@ -144,7 +144,7 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 | 이전 버전으로 롤백 | `kubectl rollout undo deployment/dstone-boot -n dstone` |
 | 완전 삭제 | `kubectl delete -f dstone-boot/k8s/` |
 
-### 1. 최초 배포 / 전체 재적용
+### 6.3 최초 배포 / 전체 재적용
 
 ```bash
 kubectl apply -f dstone-boot/k8s/namespace.yaml
@@ -157,7 +157,7 @@ kubectl apply -f dstone-boot/k8s/service.yaml
 kubectl apply -f dstone-boot/k8s/
 ```
 
-### 2. 새 이미지 빌드 후 배포 (Jenkins 파이프라인이 자동 수행하는 것과 동일한 수동 절차)
+### 6.4 새 이미지 빌드 후 배포 (Jenkins 파이프라인이 자동 수행하는 것과 동일한 수동 절차)
 
 ```bash
 docker build -f dstone-boot/Dockerfile -t localhost:5000/dstone-boot:<TAG> -t localhost:5000/dstone-boot:latest .
@@ -169,7 +169,7 @@ kubectl rollout status deployment/dstone-boot -n dstone --timeout=120s
 ```
 `imagePullPolicy: IfNotPresent`이므로 `latest` 태그만 다시 push하고 `kubectl rollout restart`만 하면 새 이미지를 못 당겨오는 경우가 있다 — 태그를 바꿔 `set image`로 명시적으로 갱신하는 편이 안전하다.
 
-### 3. 상태 조회
+### 6.5 상태 조회
 
 ```bash
 kubectl get pods -n dstone -l app=dstone-boot -o wide     # Pod 목록/노드/IP
@@ -182,7 +182,7 @@ kubectl get events -n dstone --sort-by=.lastTimestamp        # 최근 이벤트(
 kubectl top pod -n dstone -l app=dstone-boot                 # CPU/메모리 (metrics-server 필요, 미설치 시 에러)
 ```
 
-### 4. 로그 조회
+### 6.6 로그 조회
 
 ```bash
 kubectl logs -n dstone deploy/dstone-boot --tail=100     # 최근 100줄
@@ -190,7 +190,7 @@ kubectl logs -n dstone deploy/dstone-boot -f              # 실시간 tail
 kubectl logs -n dstone <pod-name> --previous                # 직전에 죽은 컨테이너 로그 (CrashLoopBackOff 디버깅용)
 ```
 
-### 5. 애플리케이션 접속 (호스트 → Pod)
+### 6.7 애플리케이션 접속 (호스트 → Pod)
 
 kind 클러스터가 `extraPortMappings` 없이 생성돼 있어 NodePort(`30081`)로 호스트에서 바로 접속할 수 없다("알려진 한계" 참고). `kubectl port-forward`가 유일한 접근 경로다.
 
@@ -216,7 +216,7 @@ kill <PID>                                # 중지
 
 WSL2 환경에서는 `localhost` 포트가 Windows 호스트로 자동 포워딩되므로, 위 명령을 WSL에서 실행해두면 Windows 브라우저에서도 `http://localhost:7081`로 그대로 접속된다.
 
-### 6. 헬스체크 직접 확인 (Pod 내부에서)
+### 6.8 헬스체크 직접 확인 (Pod 내부에서)
 
 ```bash
 kubectl exec -n dstone deploy/dstone-boot -- wget -qO- http://localhost:7081/actuator/health/readiness
@@ -224,20 +224,20 @@ kubectl exec -n dstone deploy/dstone-boot -- wget -qO- http://localhost:7081/act
 kubectl exec -n dstone deploy/dstone-boot -- wget -qO- http://localhost:7081/actuator/health   # 전체 — Kafka 미연결로 DOWN일 수 있음(정상, "알려진 한계" 참고)
 ```
 
-### 7. Pod 안에 직접 접속 (디버깅용 셸)
+### 6.9 Pod 안에 직접 접속 (디버깅용 셸)
 
 ```bash
 kubectl exec -it -n dstone deploy/dstone-boot -- sh
 ```
 
-### 8. 재시작 (이미지/설정 변경 없이 프로세스만 새로 기동)
+### 6.10 재시작 (이미지/설정 변경 없이 프로세스만 새로 기동)
 
 ```bash
 kubectl rollout restart deployment/dstone-boot -n dstone
 kubectl rollout status deployment/dstone-boot -n dstone
 ```
 
-### 9. 중지 / 시작 (재개)
+### 6.11 중지 / 시작 (재개)
 
 쿠버네티스에는 VM처럼 "정지" 개념이 없다 — 대신 replica 수를 0으로 낮춰 Pod를 없애고(Service/Deployment 정의는 그대로 유지), 다시 1로 올려 재개한다.
 
@@ -249,7 +249,7 @@ kubectl scale deployment/dstone-boot -n dstone --replicas=1   # 시작(재개)
 kubectl rollout status deployment/dstone-boot -n dstone --timeout=120s
 ```
 
-### 10. 롤백 (배포 실패 시 이전 버전으로 복구)
+### 6.12 롤백 (배포 실패 시 이전 버전으로 복구)
 
 ```bash
 kubectl rollout history deployment/dstone-boot -n dstone
@@ -257,7 +257,7 @@ kubectl rollout undo deployment/dstone-boot -n dstone                  # 바로 
 kubectl rollout undo deployment/dstone-boot -n dstone --to-revision=2  # 특정 리비전 지정
 ```
 
-### 11. ConfigMap(`dstone-boot-conf`) 변경 반영
+### 6.13 ConfigMap(`dstone-boot-conf`) 변경 반영
 
 ConfigMap을 고쳐 `kubectl apply`해도 이미 떠 있는 Pod는 자동으로 재시작되지 않는다(볼륨 마운트 내용은 갱신되지만 JVM은 재시작 전까지 옛 값을 들고 있음) — 반드시 수동으로 롤아웃 재시작해야 한다.
 
@@ -266,7 +266,7 @@ kubectl apply -f dstone-boot/k8s/configmap.yaml
 kubectl rollout restart deployment/dstone-boot -n dstone
 ```
 
-### 12. 리소스 완전 삭제
+### 6.14 리소스 완전 삭제
 
 ```bash
 kubectl delete -f dstone-boot/k8s/service.yaml
@@ -278,7 +278,7 @@ kubectl delete -f dstone-boot/k8s/namespace.yaml   # 네임스페이스를 지�
 kubectl delete -f dstone-boot/k8s/
 ```
 
-### 13. 클러스터 자체 시작/중지 (인프라 레벨)
+### 6.15 클러스터 자체 시작/중지 (인프라 레벨)
 
 앱 배포 이전에 kind 클러스터/Docker 데몬 자체가 떠 있어야 한다. 상세는 [software/kubernetes.md](software/kubernetes.md) 참고.
 
@@ -288,7 +288,7 @@ kubectl delete -f dstone-boot/k8s/
 /usr/local/bin/stop-kube.sh --delete  # kind 클러스터까지 완전 삭제 후 docker 데몬 정지
 ```
 
-## 알려진 한계 / 후속 과제
+## 7. 알려진 한계 / 후속 과제
 
 - ~~`dstone-boot`은 `bootstrap-servers`가 `localhost:9092`로 하드코딩되어 있어 컨테이너에서는 연결되지 않는다~~ → **해결됨**: `bootstrap-servers`를 `${KAFKA_HOST}:${KAFKA_PORT}`로 환경변수화하고, Kafka `advertised.listeners`를 kind 게이트웨이 IP(`172.18.0.1`)로 변경해 Pod에서도 정상 연결된다("dstone-boot ↔ kind 네트워킹" 5번 항목 참고). `/actuator/health`(전체)가 `DOWN`으로 보이는 경우가 여전히 있다면 Kafka/DB/Redis 중 하나가 실제로 내려가 있는 것이니 `kubectl logs`로 원인을 확인한다(k8s 프로브는 `/actuator/health/readiness`·`/actuator/health/liveness`만 사용하므로 배포 자체에는 영향 없음).
 - `dstone-boot/conf/application.yml`의 `sftp.password`가 평문으로 하드코딩되어 있음 — 이번 작업 범위 밖이라 손대지 않았지만 별도로 정리가 필요하다.

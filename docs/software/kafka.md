@@ -1,15 +1,15 @@
 # Apache Kafka (KRaft 모드)
 
-## 개요
+## 1. 개요
 로컬 메시징 실습/개발용 단일 브로커 Kafka. Zookeeper 없이 KRaft(Kafka Raft) 모드로 broker+controller 역할을 한 프로세스에서 수행한다. apt 패키지가 아닌 공식 tar.gz 배포판을 `/opt/kafka`에 수동 설치했다.
 
-## 설치 정보
+## 2. 설치 정보
 - 버전: Kafka 4.2.1 (Scala 2.13 빌드, `kafka_2.13-4.2.1`)
 - 설치 방식: 수동 설치 (Apache 공식 배포 tar.gz)
 - 설치 경로: `/opt/kafka/kafka_2.13-4.2.1`
 - 데이터 디렉터리: `/opt/kafka/kafka_2.13-4.2.1/data/kraft-combined-logs`
 
-## 설치 방법 (실제 수행된 절차)
+## 3. 설치 방법 (실제 수행된 절차)
 ```bash
 sudo mkdir -p /opt/kafka
 sudo chown "$USER":"$USER" /opt/kafka
@@ -25,7 +25,7 @@ KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
 bin/kafka-storage.sh format --standalone -t "$KAFKA_CLUSTER_ID" -c config/server.properties
 ```
 
-## 주요 설정
+## 4. 주요 설정
 설정 파일: `/opt/kafka/kafka_2.13-4.2.1/config/server.properties`
 ```properties
 process.roles=broker,controller
@@ -35,7 +35,7 @@ advertised.listeners=PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093
 log.dirs=/opt/kafka/kafka_2.13-4.2.1/data/kraft-combined-logs
 ```
 
-## 서비스 시작/중지
+## 5. 서비스 시작/중지
 전용 스크립트를 작성해 사용 중이다 (systemd 미등록, 수동 실행).
 
 - `/opt/kafka/kafka-start.sh`: `nohup bin/kafka-server-start.sh config/server.properties`로 백그라운드 기동, PID를 `kafka-server.pid`에 기록. 이미 실행 중이면 중복 실행 방지.
@@ -49,7 +49,7 @@ log.dirs=/opt/kafka/kafka_2.13-4.2.1/data/kraft-combined-logs
 
 로그: `/opt/kafka/kafka_2.13-4.2.1/logs/kafka-server.out`
 
-## 동작 확인
+## 6. 동작 확인
 ```bash
 cd /opt/kafka/kafka_2.13-4.2.1/bin
 ./kafka-topics.sh --create --topic test-topic --bootstrap-server localhost:9092
@@ -58,8 +58,8 @@ cd /opt/kafka/kafka_2.13-4.2.1/bin
 ./kafka-console-consumer.sh --topic test-topic --bootstrap-server localhost:9092 --from-beginning
 ```
 
-## 관리 콘솔
+## 7. 관리 콘솔
 [Kafbat UI](kafbat-ui.md)를 통해 웹에서 토픽/컨슈머 등을 확인한다 (http://localhost:9099).
 
-## dstone 프로젝트에서의 역할
+## 8. dstone 프로젝트에서의 역할
 `dstone-boot`의 SAGA + Outbox 패턴 샘플 기능(`net.dstone.common.messaging.saga`, `net.dstone.boot.sample.saga`)이 `OutboxRelay`→`KafkaTemplate`로 이벤트를 발행하고 `OrderSagaReplyListener`가 구독하는 방식으로 사용한다(자세한 흐름: [dstone-saga.md](../dstone-saga.md)). 다만 `dstone-boot/conf/application.yml`의 `spring.kafka.bootstrap-servers`가 `localhost:9092`로 하드코딩돼 있어, kind Pod처럼 로컬호스트가 아닌 환경에서는 연결되지 않는다 — [cloud-architecture.md](../cloud-architecture.md)의 "알려진 한계"에 기록되어 있다.
