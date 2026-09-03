@@ -33,7 +33,17 @@ server:
         key-store-password: ENC(vZbjr2NF87hEmiRHka9fUVIay5zvZeNtIRlNGHxvid8=)
         key-store-alias: dstone-ssl
 
-spring: 
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health
+    endpoint:
+        health:
+            probes:
+                enabled: true
+
+spring:
     main: 
         allow-bean-definition-overriding: true
     ##########################################################################################

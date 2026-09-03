@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dstone-boot
+  namespace: dstone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dstone-boot
+  template:
+    metadata:
+      labels:
+        app: dstone-boot
+    spec:
+      containers:
+        - name: dstone-boot
+          image: localhost:5000/dstone-boot:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7081
+          volumeMounts:
+            - name: conf
+              mountPath: /workshop/conf
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 7081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 7081
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - name: conf
+          configMap:
+            name: dstone-boot-conf

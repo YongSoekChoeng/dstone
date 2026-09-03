@@ -43,7 +43,7 @@ java -jar target/dstone-boot.war
 # dstone-batch — run a specific job
 java -jar -Dspring.batch.job.names=sampleJob target/dstone-batch-1.0.0-SNAPSHOT.jar
 
-# dstone-batchadmin (port 7082)
+# dstone-batchadmin (port 5081)
 java -jar target/dstone-batchadmin.war
 ```
 
@@ -168,11 +168,17 @@ Security is simplified vs. `dstone-boot`: login is required (`TB_ADMIN_USER`, `B
 | `FILE_UPLOAD_ROOT` | File upload root path (dstone-boot) |
 | `jasypt.encryptor.password` | Jasypt decryption key |
 
+## Cloud Architecture Simulation
+
+The WSL dev environment mirrors a cloud deployment shape: `dstone-boot` runs as a containerized Pod in a local `kind` Kubernetes cluster (`dstone-boot/Dockerfile`, `dstone-boot/k8s/`), while `dstone-batch` and `dstone-batchadmin` run as VM-style processes controlled by plain shell scripts (`bin/startApp.sh`/`stopApp.sh`/`statusApp.sh` — **no systemd**), and MySQL/Redis/RabbitMQ/Kafka stand in for CSP-managed services outside the cluster. See `docs/cloud-architecture.md` for the full mapping, networking, and CI/CD design.
+
 ## CI/CD
 
 Jenkins pipelines are defined in:
-- `dstone-batch/Jenkinsfile` — builds with `mvn clean package -DskipTests`, deploys via Docker Compose
-- `dstone-boot/Jenkinsfile` — same pattern
+- `dstone-boot/Jenkinsfile` — Maven reactor build → Docker build/push to a local registry (`localhost:5000`) → deploy to the `dstone` namespace in `kind` via `kubectl`
+- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile` — Maven reactor build → copy artifact/conf/bin to `/workshop/dstone/<module>` → redeploy via that module's `bin/stopApp.sh` + `bin/startApp.sh` (`DSTONE_PROFILE=vm`)
+
+Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse checkout) since builds use `mvn -pl <module> -am` reactor builds and the Docker build context needs `dstone-common` alongside `dstone-boot`.
 
 ## Module Ports
 
@@ -180,4 +186,4 @@ Jenkins pipelines are defined in:
 |---|---|---|
 | dstone-boot | 7081 | WAR |
 | dstone-batch | 6081 | JAR |
-| dstone-batchadmin | 7082 | WAR |
+| dstone-batchadmin | 5081 | WAR |

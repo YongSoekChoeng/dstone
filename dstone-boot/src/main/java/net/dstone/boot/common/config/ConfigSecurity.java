@@ -67,6 +67,7 @@ public class ConfigSecurity extends BaseObject{
 	public static String WEBSOCKET_STOMP_PUB_ACTION		= ConfigWebSocket.WEBSOCKET_STOMP_PUB_PREFIX + "/**";	// 웹소켓(stomp) 발행프리픽스
 	public static String WEBSOCKET_STOMP_SUB_ACTION		= ConfigWebSocket.WEBSOCKET_STOMP_SUB_PREFIX + "/**";	// 웹소켓(stomp) 구독프리픽스
 	public static String TEST_ACTION 					= "/test/**/*.do";										// 테스트 액션
+	public static String ACTUATOR_HEALTH_ACTION			= "/actuator/health/**";								// k8s liveness/readiness probe 액션
 
 	public static String ERROR_URL_PATTERN				= "/error/**"; 											// 에러 URL패턴.(스프링 내부적으로 호출되는 에러 URL패턴 존재. Permit All로 설정)
 	
@@ -188,6 +189,7 @@ public class ConfigSecurity extends BaseObject{
 				,new AntPathRequestMatcher(PROXY_ACTION)
 				,new AntPathRequestMatcher(MQ_ACTION)
 				,new AntPathRequestMatcher(TEST_ACTION)
+				,new AntPathRequestMatcher(ACTUATOR_HEALTH_ACTION)
 				,new AntPathRequestMatcher(WEBSOCKET_WS_ACTION)
 				,new AntPathRequestMatcher(WEBSOCKET_STOMP_ACTION)
 				,new AntPathRequestMatcher(WEBSOCKET_STOMP_PUB_ACTION)

@@ -1,104 +1,74 @@
+// 전제: Jenkins Job의 SCM 체크아웃 범위는 리포지토리 루트 전체(모노레포)여야 한다.
+// dstone-boot이 dstone-common에 의존하는 멀티모듈 구조이고, Docker 빌드 컨텍스트도 루트가 필요하기 때문.
 pipeline {
     agent any
-    
+
     environment {
         APP_NAME = 'dstone-boot'
-        WORKSPACE_DIR = '/workshop/dstone/dstone-boot'
-        DOCKER_COMPOSE_FILE = "${WORKSPACE_DIR}/01.dstone-boot-docker.yml"
-        DOCKER_PROJECT = 'dstone'
+        NAMESPACE = 'dstone'
+        REGISTRY = 'localhost:5000'
+        IMAGE = "${REGISTRY}/${APP_NAME}"
+        KUBECONFIG = '/etc/kind/dev.config'
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
                 echo '====== Git Checkout ======'
                 checkout scm
-                script {
-                    echo "Current branch: ${env.GIT_BRANCH}"
-                }
             }
         }
-        
+
         stage('Build') {
             steps {
-                echo '====== Maven Build ======'
-                sh '''
-                    mvn clean package -DskipTests
-                    echo "Build completed: target/dstone-boot.war"
-                '''
+                echo '====== Maven Build (Reactor: dstone-common -> dstone-boot) ======'
+                sh 'mvn -pl dstone-common,dstone-boot -am -DskipTests clean package'
             }
         }
-        
-        stage('Prepare Deployment Directory') {
+
+        stage('Docker Build & Push') {
             steps {
-                echo '====== Prepare Deployment Files ======'
-                sh '''
-                    # 작업 디렉토리 생성
-                    mkdir -p ${WORKSPACE_DIR}/target
-                    mkdir -p ${WORKSPACE_DIR}/conf
-                    
-                    # WAR 파일 복사
-                    cp target/dstone-boot.war ${WORKSPACE_DIR}/target/
-                    
-                    # 설정 파일 복사
-                    cp -r conf/* ${WORKSPACE_DIR}/conf/
-                    
-                    # Docker Compose 파일 복사
-                    cp docs/docker/dstone-boot/01.dstone-boot-docker.yml ${WORKSPACE_DIR}/
-                    
-                    # 권한 설정
-                    chmod 644 ${WORKSPACE_DIR}/target/dstone-boot.war
-                '''
+                echo '====== Docker Build & Push (로컬 사설 레지스트리) ======'
+                sh """
+                    docker build -f dstone-boot/Dockerfile -t ${IMAGE}:${BUILD_NUMBER} -t ${IMAGE}:latest .
+                    docker push ${IMAGE}:${BUILD_NUMBER}
+                    docker push ${IMAGE}:latest
+                """
             }
         }
-        
-        stage('Stop Existing Container') {
+
+        stage('Deploy to kind') {
             steps {
-                echo '====== Stop Existing Container ======'
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose -p ${DOCKER_PROJECT} -f ${DOCKER_COMPOSE_FILE} down || true
-                '''
+                echo '====== Deploy to kind(Kubernetes) ======'
+                sh """
+                    kubectl apply -f dstone-boot/k8s/namespace.yaml
+                    kubectl apply -f dstone-boot/k8s/configmap.yaml
+                    kubectl apply -f dstone-boot/k8s/deployment.yaml
+                    kubectl apply -f dstone-boot/k8s/service.yaml
+                    kubectl set image deployment/${APP_NAME} ${APP_NAME}=${IMAGE}:${BUILD_NUMBER} -n ${NAMESPACE}
+                    kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE} --timeout=120s
+                """
             }
         }
-        
-        stage('Deploy') {
-            steps {
-                echo '====== Deploy Application ======'
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose -p ${DOCKER_PROJECT} -f ${DOCKER_COMPOSE_FILE} up -d
-                '''
-            }
-        }
-        
+
         stage('Health Check') {
             steps {
                 echo '====== Health Check ======'
-                sh '''
-                    echo "Waiting for application to start..."
-                    sleep 15
-                    
-                    # 컨테이너 상태 확인
-                    docker ps | grep dstone-boot || (echo "Container not running" && exit 1)
-                    
-                    # 로그 확인
-                    docker logs dstone-boot --tail 50
-                '''
+                sh """
+                    kubectl get pods -n ${NAMESPACE} -l app=${APP_NAME}
+                    kubectl logs -n ${NAMESPACE} deploy/${APP_NAME} --tail=30
+                """
             }
         }
     }
-    
+
     post {
         success {
             echo '====== Deployment Successful ======'
         }
         failure {
             echo '====== Deployment Failed ======'
-            sh '''
-                # 실패 시 로그 출력
-                docker logs dstone-boot --tail 100 || true
-            '''
+            sh 'kubectl logs -n ${NAMESPACE} deploy/${APP_NAME} --tail=100 || true'
         }
         always {
             echo '====== Cleanup ======'

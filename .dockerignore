@@ -1,0 +1,6 @@
+.git
+**/target
+**/logs
+**/LOGS
+**/*.pid
+hi-framework

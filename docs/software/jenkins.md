@@ -52,6 +52,9 @@ sudo cat /var/lib/jenkins/secrets/initialAdminPassword   # 최초 관리자 비�
 ```
 브라우저에서 http://localhost:8080 접속 후 플러그인 설치 마법사를 진행한다. Git, Pipeline, Docker 관련 플러그인이 필요하다.
 
+## docker/kubectl 실행 권한
+`dstone-boot` 파이프라인이 Jenkins 에이전트(로컬 실행)에서 직접 `docker build/push`, `kubectl apply`를 수행하므로 `jenkins` 시스템 계정이 `docker` 그룹에 속해 있어야 한다(`sudo usermod -aG docker jenkins`). `/etc/kind/dev.config`도 `docker` 그룹에 read 권한이 열려 있어 별도 설정 없이 읽을 수 있다.
+
 ## dstone 프로젝트에서의 역할 (CLAUDE.md 기준)
 - `dstone-batch/Jenkinsfile`: `mvn clean package -DskipTests` 빌드 후 Docker Compose로 배포
 - `dstone-boot/Jenkinsfile`: 동일 패턴

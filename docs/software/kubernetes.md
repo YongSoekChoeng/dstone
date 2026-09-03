@@ -47,8 +47,15 @@ kind version
 `k8s-start.sh` 동작:
 1. 현재 사용자가 `docker` 그룹인지 확인 (아니면 에러 종료)
 2. `docker info` 실패 시 `sudo systemctl start docker` 후 최대 30초 대기
-3. `kind get clusters`에 `dev`가 없으면 `kind create cluster --name dev --kubeconfig /etc/kind/dev.config`로 신규 생성 (있으면 기존 컨테이너 재사용)
-4. `kubectl get nodes`로 노드 준비 상태 확인
+3. 로컬 사설 레지스트리 컨테이너(`kind-registry`, `registry:2`, 호스트 포트 5000)가 없으면 생성
+4. `kind get clusters`에 `dev`가 없으면, 위 레지스트리를 `containerdConfigPatches`로 미러 등록하는 kind config와 함께 `kind create cluster --name dev --kubeconfig /etc/kind/dev.config`로 신규 생성 (있으면 기존 컨테이너 재사용 — 기존 클러스터는 이미 이 설정을 포함하고 있으므로 별도 조치 불필요)
+5. `kind-registry` 컨테이너를 `kind` 도커 네트워크에 연결(아직 연결 안 돼 있으면)
+6. `kubectl get nodes`로 노드 준비 상태 확인
+
+## 로컬 사설 레지스트리 (dstone-boot 이미지 배포용)
+- kind 공식 "local registry" 레시피 적용: `docker build` → `docker push localhost:5000/<image>` → Pod가 `localhost:5000/<image>`를 그대로 `image:`에 지정하면 클러스터 노드의 containerd가 `kind-registry:5000`으로 라우팅해서 pull한다.
+- 클러스터를 수동으로 재생성해야 한다면(`kind delete cluster --name dev` 후) 반드시 `k8s-start.sh`를 통해 재생성하거나, 그 안의 `containerdConfigPatches` kind config를 그대로 사용해야 레지스트리 미러가 다시 인식된다 (`kind create cluster`만 단독으로 실행하면 미러 설정이 빠진다).
+- 확인: `docker network inspect kind`에 `kind-registry` 컨테이너가 보여야 하고, `kubectl get pods -A`에서 이미지 pull 이벤트가 `localhost:5000/...`을 정상적으로 가져오는지 `kubectl describe pod`로 확인.
 
 `k8s-stop.sh` 동작:
 - 기본: docker 데몬만 정지 (`sudo systemctl stop docker`), kind 클러스터 컨테이너는 유지되어 다음 `start-kube.sh` 실행 시 자동 복원됨
@@ -61,4 +68,4 @@ kind get clusters
 ```
 
 ## dstone 프로젝트에서의 역할
-현재 dstone 배포 파이프라인(Jenkinsfile)은 Docker Compose 기반이며 쿠버네티스 매니페스트는 아직 없다. 이 환경은 향후 쿠버네티스 전환 검토/실습용 로컬 클러스터다.
+`dstone-boot`이 이 클러스터의 `dstone` 네임스페이스에 Deployment/Service/ConfigMap으로 배포된다(매니페스트: `dstone-boot/k8s/`). `dstone-boot/Jenkinsfile`이 이미지를 빌드해 로컬 레지스트리에 푸시한 뒤 `kubectl apply`/`kubectl set image`로 배포한다. 자세한 클라우드 아키텍처 대응 관계는 [cloud-architecture.md](../cloud-architecture.md) 참고.

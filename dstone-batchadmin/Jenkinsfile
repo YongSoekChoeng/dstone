@@ -1,11 +1,11 @@
 // 전제: Jenkins Job의 SCM 체크아웃 범위는 리포지토리 루트 전체(모노레포)여야 한다.
-// dstone-batch가 dstone-common에 의존하는 멀티모듈 구조이기 때문(reactor 빌드).
+// dstone-batchadmin이 dstone-common에 의존하는 멀티모듈 구조이기 때문(reactor 빌드).
 pipeline {
     agent any
 
     environment {
-        APP_NAME = 'dstone-batch'
-        WORKSPACE_DIR = '/workshop/dstone/dstone-batch'
+        APP_NAME = 'dstone-batchadmin'
+        WORKSPACE_DIR = '/workshop/dstone/dstone-batchadmin'
         DSTONE_PROFILE = 'vm'
     }
 
@@ -19,8 +19,8 @@ pipeline {
 
         stage('Build') {
             steps {
-                echo '====== Maven Build (Reactor: dstone-common -> dstone-batch) ======'
-                sh 'mvn -pl dstone-common,dstone-batch -am -DskipTests clean package'
+                echo '====== Maven Build (Reactor: dstone-common -> dstone-batchadmin) ======'
+                sh 'mvn -pl dstone-common,dstone-batchadmin -am -DskipTests clean package'
             }
         }
 
@@ -32,9 +32,9 @@ pipeline {
                     mkdir -p ${WORKSPACE_DIR}/conf
                     mkdir -p ${WORKSPACE_DIR}/bin
 
-                    cp dstone-batch/target/dstone-batch-*.jar ${WORKSPACE_DIR}/target/
-                    cp -r dstone-batch/conf/* ${WORKSPACE_DIR}/conf/
-                    cp -r dstone-batch/bin/* ${WORKSPACE_DIR}/bin/
+                    cp dstone-batchadmin/target/dstone-batchadmin.war ${WORKSPACE_DIR}/target/
+                    cp -r dstone-batchadmin/conf/* ${WORKSPACE_DIR}/conf/
+                    cp -r dstone-batchadmin/bin/* ${WORKSPACE_DIR}/bin/
                     chmod +x ${WORKSPACE_DIR}/bin/*.sh
                 '''
             }

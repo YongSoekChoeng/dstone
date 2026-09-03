@@ -1,11 +1,11 @@
 #!/bin/sh
-# dstone-batch 중지 스크립트
+# dstone-batchadmin 중지 스크립트
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PID_FILE="$SCRIPT_DIR/application.pid"
 
 if [ ! -f "$PID_FILE" ]; then
-    echo "PID 파일이 없습니다. dstone-batch가 실행 중이지 않은 것으로 보입니다."
+    echo "PID 파일이 없습니다. dstone-batchadmin이 실행 중이지 않은 것으로 보입니다."
     exit 0
 fi
 
@@ -17,7 +17,7 @@ if ! kill -0 "$PID" 2>/dev/null; then
     exit 0
 fi
 
-echo "dstone-batch를 종료합니다... (PID: $PID)"
+echo "dstone-batchadmin을 종료합니다... (PID: $PID)"
 kill -15 "$PID"
 
 COUNT=0
@@ -32,4 +32,4 @@ while kill -0 "$PID" 2>/dev/null; do
 done
 
 rm -f "$PID_FILE"
-echo "dstone-batch가 종료되었습니다."
+echo "dstone-batchadmin이 종료되었습니다."

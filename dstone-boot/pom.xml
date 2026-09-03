@@ -47,8 +47,14 @@
 		<dependency>
 		    <groupId>net.dstone</groupId>
 		    <artifactId>dstone-common</artifactId>
-		</dependency>	
-		
+		</dependency>
+
+		<!-- Actuator(k8s liveness/readiness probe) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -306,6 +312,13 @@
 			            </dependency>
 			        </requiresUnpack>
 				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 
 		</plugins>
