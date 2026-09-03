@@ -187,3 +187,8 @@ Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse
 | dstone-boot | 7081 | WAR |
 | dstone-batch | 6081 | JAR |
 | dstone-batchadmin | 5081 | WAR |
+
+## Documentation
+
+Whenever changes are made on resources, Check if docs should be changed too.
+And Rewrite docs if it is necessary.
