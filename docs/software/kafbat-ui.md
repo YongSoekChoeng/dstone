@@ -23,11 +23,14 @@
 mkdir -p /opt/kafka/admin-tools/KafbatUI
 cd /opt/kafka/admin-tools/KafbatUI
 
-# Kafbat UI GitHub 릴리즈에서 실행 가능 jar 다운로드
-# https://github.com/kafbat/kafka-ui/releases 에서 최신 kafbat-ui-api-*.jar를 받아
-# kafbat-ui.jar 이름으로 배치한다.
+# GitHub Releases API로 최신 릴리즈의 실행 가능 jar(assets 중 api-*.jar) 다운로드 URL을 조회해서 받는다
+JAR_URL="$(curl -s https://api.github.com/repos/kafbat/kafka-ui/releases/latest \
+  | grep -oE '"browser_download_url":\s*"[^"]*api[^"]*\.jar"' \
+  | grep -oE 'https://[^"]+' | head -1)"
+wget -O kafbat-ui.jar "$JAR_URL"
 ```
-> 참고: 최초 설치 시 사용한 정확한 다운로드 URL은 셸 히스토리에 남아있지 않다. 재설치/버전 업그레이드 시에는 위 릴리즈 페이지에서 최신 jar를 받아 동일 경로에 교체하면 된다.
+- `https://github.com/kafbat/kafka-ui/releases`에서 직접 최신 버전을 확인하고 특정 버전을 고정해 받고 싶다면 `.../releases/latest`를 `.../releases/tags/<tag>`로 바꾼다.
+- 재설치/업그레이드 시에는 위 명령을 다시 실행해 `kafbat-ui.jar`를 덮어쓰면 된다(서비스 재시작 필요: [5절](#5-서비스-시작중지) 참고).
 
 ## 4. 설정
 설정 파일: `/opt/kafka/admin-tools/KafbatUI/conf/application-local.yml`

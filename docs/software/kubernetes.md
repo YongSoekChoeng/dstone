@@ -10,9 +10,13 @@
 - [6. 로컬 사설 레지스트리 (dstone-boot 이미지 배포용)](#6-로컬-사설-레지스트리-dstone-boot-이미지-배포용)
 - [7. 동작 확인](#7-동작-확인)
 - [8. dstone 프로젝트에서의 역할](#8-dstone-프로젝트에서의-역할)
+- [9. 호스트 포트로 직접 노출하고 싶다면 (`extraPortMappings`)](#9-호스트-포트로-직접-노출하고-싶다면-extraportmappings)
+- [10. 트러블슈팅](#10-트러블슈팅)
 
 ## 1. 개요
 [Docker](docker.md) 위에서 동작하는 로컬 쿠버네티스 클러스터. `kind`(Kubernetes IN Docker)로 클러스터를 구성하고 `kubectl`로 제어한다. 쿠버네티스 배포/운영 실습 및 향후 dstone 컴포넌트 컨테이너 오케스트레이션 검토용으로 설치되어 있다.
+
+> 전제 조건: [Docker](docker.md)가 먼저 설치되어 있고 `docker` 그룹 권한이 적용된 상태여야 한다(`kind`는 노드를 Docker 컨테이너로 띄운다). WSL2는 최소 4GB 이상의 메모리 할당(`.wslconfig`)을 권장 — 리소스가 부족하면 `kind create cluster`가 노드 컨테이너의 kubelet/컨트롤플레인 기동 단계에서 타임아웃으로 실패할 수 있다.
 
 ## 2. 설치 정보
 | 도구 | 버전 | 설치 경로 |
@@ -79,4 +83,39 @@ kind get clusters
 ```
 
 ## 8. dstone 프로젝트에서의 역할
-`dstone-boot`이 이 클러스터의 `dstone` 네임스페이스에 Deployment/Service/ConfigMap으로 배포된다(매니페스트: `dstone-boot/k8s/`). `dstone-boot/Jenkinsfile`이 이미지를 빌드해 로컬 레지스트리에 푸시한 뒤 `kubectl apply`/`kubectl set image`로 배포한다. 자세한 클라우드 아키텍처 대응 관계는 [cloud-architecture.md](../cloud-architecture.md) 참고.
+`dstone-boot`이 이 클러스터의 `dstone` 네임스페이스에 Deployment/Service/ConfigMap으로 배포된다(매니페스트: `dstone-boot/k8s/`, Service는 `NodePort`로 `nodePort: 30081` ↔ `port: 7081` 매핑). `dstone-boot/Jenkinsfile`이 이미지를 빌드해 로컬 레지스트리에 푸시한 뒤 `kubectl apply`/`kubectl set image`로 배포한다. 실제 배포/조회/재시작/롤백 등 운영 명령 전체 목록은 [cloud-architecture.md 6절](../cloud-architecture.md#6-kubectl-운영-명령-dstone-boot) 참고.
+
+## 9. 호스트 포트로 직접 노출하고 싶다면 (`extraPortMappings`)
+현재 `k8s-start.sh`가 만드는 클러스터는 `extraPortMappings` 없이 생성되어 있어, 호스트에서 `http://localhost:30081`처럼 NodePort로 바로 접속할 수 없다 — [cloud-architecture.md 6.7절](../cloud-architecture.md#67-애플리케이션-접속-호스트--pod)에 정리된 대로 `kubectl port-forward`가 유일한 접근 경로다. `kubectl port-forward` 없이 `localhost:30081`로 바로 붙고 싶다면, 클러스터를 아래 설정을 포함해 재생성하면 된다(**주의: 클러스터 재생성은 그 안의 모든 리소스를 지운다** — 재생성 후 [cloud-architecture.md 6.3절](../cloud-architecture.md#63-최초-배포--전체-재적용)의 매니페스트를 다시 `apply`해야 함).
+
+```bash
+/usr/local/bin/stop-kube.sh --delete   # 기존 클러스터 완전 삭제
+
+cat > /tmp/kind-config-with-ports.yaml <<'EOF'
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+      endpoint = ["http://kind-registry:5000"]
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30081
+        hostPort: 30081
+        protocol: TCP
+EOF
+
+kind create cluster --name dev --kubeconfig /etc/kind/dev.config --config /tmp/kind-config-with-ports.yaml
+docker network connect kind kind-registry   # 이미 연결돼 있다면 에러 무시
+```
+- `containerdConfigPatches`는 [3절](#3-설치-방법-실제-수행된-절차) `k8s-start.sh`가 자동으로 넣어주던 것과 동일한 내용이다 — 수동 재생성 시 반드시 함께 넣어야 로컬 레지스트리 미러가 계속 동작한다.
+- 이후 `k8s-start.sh`를 다시 실행하면 "이미 `dev` 클러스터가 있음"으로 인식해 이 설정을 그대로 재사용한다(컨테이너를 지우지 않는 한 유지됨).
+
+## 10. 트러블슈팅
+| 증상 | 원인 | 대처 |
+|---|---|---|
+| `kind create cluster`가 오래 걸리다 타임아웃 | Docker 데몬이 아직 준비 안 됨 / WSL2 메모리 부족 | `docker info`로 데몬 상태 먼저 확인, `.wslconfig`에서 `memory` 값 상향 후 WSL 재시작 |
+| `kubectl` 실행 시 `error loading config file "/etc/kind/dev.config": permission denied` | 현재 사용자가 `docker` 그룹이 아니거나 그룹 적용 전 | `groups $USER`로 `docker` 포함 여부 확인, 안 되어 있으면 [docker.md 5절](docker.md#5-권한) 참고 |
+| `kubectl get pods`에서 `ImagePullBackOff`/`ErrImagePull` (`localhost:5000/...`) | `kind-registry`가 `kind` 네트워크에 연결 안 됨, 또는 이미지를 push하지 않음 | `docker network inspect kind`로 `kind-registry` 존재 확인, `docker push localhost:5000/<image>:<tag>` 재실행 |
+| `kind get clusters`엔 `dev`가 있는데 `kubectl`이 아무 응답 없음 | 컨트롤플레인 컨테이너가 멈춰있거나 크래시 | `docker ps -a`로 `dev-control-plane` 컨테이너 상태 확인, 필요 시 `/usr/local/bin/stop-kube.sh --delete` 후 `start-kube.sh`로 재생성 |

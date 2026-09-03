@@ -69,6 +69,23 @@ cd /opt/kafka/kafka_2.13-4.2.1/bin
 ./kafka-console-consumer.sh --topic test-topic --bootstrap-server localhost:9092 --from-beginning
 ```
 
+### dstone-boot가 실제로 사용하는 토픽
+`server.properties`에 `auto.create.topics.enable`을 별도로 끄지 않았으므로(KRaft 기본값 `true`) 아래 토픽들은 `dstone-boot`가 처음 발행/구독할 때 자동 생성된다 — 미리 만들어두지 않아도 동작하지만, 헬스체크/디버깅 시 아래 이름을 알고 있으면 편하다.
+
+| 토픽 | 발행(Producer) | 구독(Consumer) |
+|---|---|---|
+| `order-events` | `net.dstone.boot.sample.kafka.service.KafkaService.publish()` | 같은 클래스의 `@KafkaListener(topics = "order-events")` |
+| `step01-inventoryReserve-reply` | `OutboxRelay`(SAGA 1단계 처리 결과) | `OrderSagaReplyListener` |
+| `step02-payment-reply` | `OutboxRelay`(SAGA 2단계 처리 결과) | `OrderSagaReplyListener` |
+| `step03-orderConfirm-reply` | `OutboxRelay`(SAGA 3단계 처리 결과) | `OrderSagaReplyListener` |
+
+SAGA/Outbox 흐름 전체는 [dstone-saga.md](../dstone-saga.md) 참고. 수동으로 미리 만들어두고 싶다면:
+```bash
+for t in order-events step01-inventoryReserve-reply step02-payment-reply step03-orderConfirm-reply; do
+  ./kafka-topics.sh --create --topic "$t" --bootstrap-server localhost:9092 --if-not-exists
+done
+```
+
 ## 7. 관리 콘솔
 [Kafbat UI](kafbat-ui.md)를 통해 웹에서 토픽/컨슈머 등을 확인한다 (http://localhost:9099).
 
