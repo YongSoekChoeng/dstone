@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1230 364" width="1230" height="364" font-family="Segoe UI, Pretendard, Malgun Gothic, sans-serif">
+<rect x="0" y="0" width="1230" height="364" fill="#FFFFFF"/>
+<defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#667085"/>
+      </marker>
+    </defs>
+<text x="615.0" y="52" text-anchor="middle" font-size="18" font-weight="700" fill="#1B2A3C">Jenkins Pipeline Job 생성 절차</text>
+<rect x="30.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#E8F0FE" stroke="#4C7CD1" stroke-width="2"/>
+<text x="150.0" y="111.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">1. Jenkins 대시보드</text>
+<text x="150.0" y="131.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">"새로운 Item" 클릭</text>
+<rect x="340.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#E8F0FE" stroke="#4C7CD1" stroke-width="2"/>
+<text x="460.0" y="111.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">2. 이름 입력 +</text>
+<text x="460.0" y="131.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">"Pipeline" 유형 선택 → OK</text>
+<rect x="650.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#EFF3F8" stroke="#5B7FA6" stroke-width="2"/>
+<text x="770.0" y="101.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">3. Pipeline 섹션 →</text>
+<text x="770.0" y="121.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">Definition:</text>
+<text x="770.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">"Pipeline script from SCM"</text>
+<rect x="960.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#EFF3F8" stroke="#5B7FA6" stroke-width="2"/>
+<text x="1080.0" y="101.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">4. SCM: Git</text>
+<text x="1080.0" y="121.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">Repository URL / Branch /</text>
+<text x="1080.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">Script Path 입력</text>
+<rect x="185.0" y="242.0" width="240" height="92" rx="12" ry="12" fill="#FFF4E5" stroke="#C98A2B" stroke-width="2"/>
+<text x="305.0" y="283.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">5. 저장</text>
+<text x="305.0" y="303.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">(Save)</text>
+<rect x="495.0" y="242.0" width="240" height="92" rx="12" ry="12" fill="#E7F7EE" stroke="#2F9E5B" stroke-width="2"/>
+<text x="615.0" y="283.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">6. "지금 빌드"</text>
+<text x="615.0" y="303.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">(Build Now)</text>
+<rect x="805.0" y="242.0" width="240" height="92" rx="12" ry="12" fill="#F3E8FD" stroke="#8B5CF6" stroke-width="2"/>
+<text x="925.0" y="283.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">7. Console Output 확인</text>
+<text x="925.0" y="303.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">(파이프라인 실행 로그)</text>
+<line x1="270.0" y1="116.0" x2="334.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="580.0" y1="116.0" x2="644.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="890.0" y1="116.0" x2="954.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="425.0" y1="288.0" x2="489.0" y2="288.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="735.0" y1="288.0" x2="799.0" y2="288.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M 1080.0 162.0 L 1080.0 202.0 L 305.0 202.0 L 305.0 236.0" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+</svg>

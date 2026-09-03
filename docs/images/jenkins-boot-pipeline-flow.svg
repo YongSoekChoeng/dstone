@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1540 192" width="1540" height="192" font-family="Segoe UI, Pretendard, Malgun Gothic, sans-serif">
+<rect x="0" y="0" width="1540" height="192" fill="#FFFFFF"/>
+<defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#667085"/>
+      </marker>
+    </defs>
+<text x="770.0" y="52" text-anchor="middle" font-size="18" font-weight="700" fill="#1B2A3C">dstone-boot/Jenkinsfile 파이프라인 스테이지</text>
+<rect x="30.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#E8F0FE" stroke="#4C7CD1" stroke-width="2"/>
+<text x="150.0" y="111.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Checkout</text>
+<text x="150.0" y="131.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">Git Checkout</text>
+<rect x="340.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#FFF4E5" stroke="#C98A2B" stroke-width="2"/>
+<text x="460.0" y="101.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Build</text>
+<text x="460.0" y="121.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">Maven Reactor:</text>
+<text x="460.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">dstone-common → dstone-boot</text>
+<rect x="650.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#E7F7EE" stroke="#2F9E5B" stroke-width="2"/>
+<text x="770.0" y="101.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Docker Build &amp; Push</text>
+<text x="770.0" y="121.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">로컬 레지스트리</text>
+<text x="770.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">localhost:5000</text>
+<rect x="960.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#E7F7EE" stroke="#2F9E5B" stroke-width="2"/>
+<text x="1080.0" y="101.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Deploy to kind</text>
+<text x="1080.0" y="121.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">kubectl apply +</text>
+<text x="1080.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">set image + rollout status</text>
+<rect x="1270.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#F3E8FD" stroke="#8B5CF6" stroke-width="2"/>
+<text x="1390.0" y="111.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Health Check</text>
+<text x="1390.0" y="131.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">kubectl get pods / logs</text>
+<line x1="270.0" y1="116.0" x2="334.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="580.0" y1="116.0" x2="644.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="890.0" y1="116.0" x2="954.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="1200.0" y1="116.0" x2="1264.0" y2="116.0" stroke="#667085" stroke-width="2.5" marker-end="url(#arrow)"/>
+</svg>
