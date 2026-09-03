@@ -71,7 +71,7 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 | 새 이미지로 배포 | `kubectl set image deployment/dstone-boot dstone-boot=<image> -n dstone` |
 | 실행 상태 확인 | `kubectl get pods -n dstone -l app=dstone-boot` |
 | 로그 보기 | `kubectl logs -n dstone deploy/dstone-boot -f` |
-| 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081` |
+| 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081` (백그라운드: `nohup ... & disown`) |
 | 재시작(코드 변경 없이) | `kubectl rollout restart deployment/dstone-boot -n dstone` |
 | 중지 | `kubectl scale deployment/dstone-boot -n dstone --replicas=0` |
 | 시작(재개) | `kubectl scale deployment/dstone-boot -n dstone --replicas=1` |
@@ -129,10 +129,26 @@ kubectl logs -n dstone <pod-name> --previous                # 직전에 죽은 �
 kind 클러스터가 `extraPortMappings` 없이 생성돼 있어 NodePort(`30081`)로 호스트에서 바로 접속할 수 없다("알려진 한계" 참고). `kubectl port-forward`가 유일한 접근 경로다.
 
 ```bash
-kubectl port-forward -n dstone svc/dstone-boot 7081:7081   # 이후 http://localhost:7081
+kubectl port-forward -n dstone svc/dstone-boot 7081:7081   # 이후 http://localhost:7081 (포그라운드 — 터미널 종료 시 같이 끊김)
 # 또는 특정 파드에 직접:
 kubectl port-forward -n dstone pod/<pod-name> 7081:7081
 ```
+
+세션을 유지한 채로 계속 열어두려면(백그라운드 실행):
+
+```bash
+nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 &
+disown
+```
+
+동작/중지 확인:
+```bash
+ps aux | grep "port-forward -n dstone"   # 실행 중인 PID 확인
+curl -s http://localhost:7081/actuator/health/readiness   # {"status":"UP"} 확인
+kill <PID>                                # 중지
+```
+
+WSL2 환경에서는 `localhost` 포트가 Windows 호스트로 자동 포워딩되므로, 위 명령을 WSL에서 실행해두면 Windows 브라우저에서도 `http://localhost:7081`로 그대로 접속된다.
 
 ### 6. 헬스체크 직접 확인 (Pod 내부에서)
 
