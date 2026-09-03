@@ -1,5 +1,27 @@
 # dstone-batch
 
+## 목차
+
+- [1. 개요](#1-개요)
+- [2. 핵심 특징](#2-핵심-특징)
+- [3. 기술 스택](#3-기술-스택)
+- [4. 프로젝트 구조](#4-프로젝트-구조)
+- [5. 핵심 개념](#5-핵심-개념)
+  - [5.1 잡(Job) 정의 패턴](#51-잡job-정의-패턴)
+  - [5.2 BaseJobConfig 제공 메소드](#52-basejobconfig-제공-메소드)
+  - [5.3 @AutoRegJob 동작 방식](#53-autoregjob-동작-방식)
+- [6. 설정 (`conf/application.yml`)](#6-설정-confapplicationyml)
+  - [6.1 다중 데이터소스](#61-다중-데이터소스)
+  - [6.2 Spring Batch 설정](#62-spring-batch-설정)
+  - [6.3 Spring Cloud Task / Data Flow](#63-spring-cloud-task--data-flow)
+- [7. 잡 실행 방법](#7-잡-실행-방법)
+  - [7.1 방법 1 - 로컬 직접 실행 (SimpleBatchRunner)](#71-방법-1---로컬-직접-실행-simplebatchrunner)
+  - [7.2 방법 2 - Spring Cloud Data Flow 연동](#72-방법-2---spring-cloud-data-flow-연동)
+- [8. 샘플 잡 목록](#8-샘플-잡-목록)
+- [9. Spring Batch 아키텍처](#9-spring-batch-아키텍처)
+- [10. 빌드](#10-빌드)
+  - [10.1 VM 스타일 운영 (bin/*.sh)](#101-vm-스타일-운영-binsh)
+
 ## 1. 개요
 
 `dstone-batch`는 Spring Boot, Spring Batch, Spring Cloud Task를 기반으로 구축된 엔터프라이즈급 배치 처리 프레임워크입니다. 반복적인 잡(Job) 설정을 표준화하고, 개발자가 비즈니스 로직에 집중할 수 있도록 설계되었습니다.

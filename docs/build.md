@@ -1,5 +1,17 @@
 # 빌드 가이드
 
+## 목차
+
+- [1. 전제 조건](#1-전제-조건)
+- [2. 모듈 구성과 산출물](#2-모듈-구성과-산출물)
+- [3. 로컬 빌드 명령](#3-로컬-빌드-명령)
+- [4. 실행](#4-실행)
+- [5. 설정 프로파일 (`-Dspring.profiles.active=<profile>`)](#5-설정-프로파일--dspringprofilesactiveprofile)
+- [6. dstone-boot — 컨테이너 빌드 & kind 배포](#6-dstone-boot--컨테이너-빌드--kind-배포)
+- [7. dstone-batch / dstone-batchadmin — VM 스타일 배포 (`bin/*.sh`)](#7-dstone-batch--dstone-batchadmin--vm-스타일-배포-binsh)
+- [8. CI/CD (Jenkins)](#8-cicd-jenkins)
+- [9. 빌드 관련 트러블슈팅](#9-빌드-관련-트러블슈팅)
+
 dstone 멀티모듈 프로젝트의 빌드 명령, 모듈별 산출물, 배포 방식(VM 스타일 / 컨테이너·쿠버네티스)과 CI/CD 파이프라인을 한 곳에 모은 문서다. 각 모듈의 기능/설정 상세는 모듈별 문서([dstone-common.md](dstone-common.md), [dstone-boot.md](dstone-boot.md), [dstone-batch.md](dstone-batch.md), [dstone-batchadmin.md](dstone-batchadmin.md))를, 배포 아키텍처 설계 배경은 [cloud-architecture.md](cloud-architecture.md)를 참고한다.
 
 ## 1. 전제 조건

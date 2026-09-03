@@ -1,5 +1,21 @@
 # SAGA 테스트 시 dstone-common + dstone-boot 전체 흐름 (순서대로)
 
+## 목차
+
+- [1. SAGA 패턴 주된 기능 정리](#1-saga-패턴-주된-기능-정리)
+- [2. 전체 개요 시퀀스 다이어그램](#2-전체-개요-시퀀스-다이어그램)
+- [3. 0단계. 사전 조건 — 애플리케이션 기동 시 컴포넌트 초기화](#3-0단계-사전-조건--애플리케이션-기동-시-컴포넌트-초기화)
+- [4. 1~2단계. HTTP 요청 → 사가 시작 (스레드: 톰캣 요청 스레드)](#4-12단계-http-요청--사가-시작-스레드-톰캣-요청-스레드)
+  - [4.1 `SagaOrchestrator.start()` (dstone-common, 같은 스레드/같은 트랜잭션) — `SagaOrchestrator.java:88`](#41-sagaorchestratorstart-dstone-common-같은-스레드같은-트랜잭션--sagaorchestratorjava88)
+  - [4.2 `runStep()` 내부 — `SagaOrchestrator.java:167`](#42-runstep-내부--sagaorchestratorjava167)
+  - [4.3 `OutboxAppenderImpl.append()` (dstone-common)](#43-outboxappenderimplappend-dstone-common)
+  - [4.4 트랜잭션 커밋](#44-트랜잭션-커밋)
+- [5. 3단계. Outbox 릴레이 — 실제 Kafka 발행 (스레드: 스프링 스케줄러 스레드, 최대 1초 뒤)](#5-3단계-outbox-릴레이--실제-kafka-발행-스레드-스프링-스케줄러-스레드-최대-1초-뒤)
+- [6. 4단계. Kafka 컨슈머가 메시지 수신 → 다음 스텝 트리거 (스레드: Kafka 리스너 컨테이너 스레드)](#6-4단계-kafka-컨슈머가-메시지-수신--다음-스텝-트리거-스레드-kafka-리스너-컨테이너-스레드)
+- [7. 5~6단계. 위 3~4단계 반복 (payment-reply 발행 → orderConfirm 트리거)](#7-56단계-위-34단계-반복-payment-reply-발행--orderconfirm-트리거)
+- [8. 7단계. 마지막 릴레이 + 마지막 리스너 → 사가 종결](#8-7단계-마지막-릴레이--마지막-리스너--사가-종결)
+- [9. 정리: DB/Kafka 왕복 횟수](#9-정리-dbkafka-왕복-횟수)
+- [10. 실패 시 보상(compensate) 플로우 (예: QTY=100으로 호출)](#10-실패-시-보상compensate-플로우-예-qty100으로-호출)
 
 ## 1. SAGA 패턴 주된 기능 정리
 

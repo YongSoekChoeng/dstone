@@ -1,5 +1,13 @@
 # JDK (OpenJDK 21)
 
+## 목차
+
+- [1. 개요](#1-개요)
+- [2. 설치 정보](#2-설치-정보)
+- [3. 설치 방법](#3-설치-방법)
+- [4. 환경 변수](#4-환경-변수)
+- [5. dstone 프로젝트에서의 역할](#5-dstone-프로젝트에서의-역할)
+
 ## 1. 개요
 dstone 전 모듈(dstone-common/boot/batch/batchadmin)의 실행/빌드에 사용하는 Java 런타임 및 개발 키트. Spring Boot 3.5는 Java 17 이상이 필요하며, 본 환경은 Java 21(LTS)을 사용한다.
 
