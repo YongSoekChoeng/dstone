@@ -25,9 +25,72 @@ kind 클러스터의 Pod는 `kind` 도커 브리지 네트워크(예: `172.18.0.
 4. dstone-boot 컨테이너 이미지에는 k8s 전용 프로파일(`env-k8s.properties`, `-Dspring.profiles.active=k8s`)을 포함시켜 `DB_HOST`/`REDIS_HOST`/`RABBITMQ_HOST`/`KAFKA_HOST`를 이 게이트웨이 IP로 지정했다.
 5. **Kafka는 `bind` 문제가 아니라 `advertised.listeners` 문제였다**: 브로커 소켓 자체는 기본이 전체 인터페이스 리슨(`listeners=PLAINTEXT://:9092`)이라 Pod에서 최초 TCP 연결은 되지만, `advertised.listeners`가 `PLAINTEXT://127.0.0.1:9092`로 고정돼 있으면 Kafka가 메타데이터 응답으로 "실제 요청은 `127.0.0.1:9092`로 다시 보내라"고 클라이언트에 알려준다 — Pod 안에서 `127.0.0.1`은 Pod 자신이므로 이후 모든 produce/fetch가 `Topic ... not present in metadata after 60000 ms` 타임아웃으로 실패한다. `/opt/kafka/kafka_2.13-4.2.1/config/server.properties`의 `advertised.listeners`를 `PLAINTEXT://172.18.0.1:9092`로 바꾸고 Kafka를 재기동해야 한다(`/opt/kafka/kafka-stop.sh` → `/opt/kafka/kafka-start.sh`, 파일이 `jysn007` 소유라 sudo 불필요). `172.18.0.1`은 WSL 호스트 자신도 접근 가능한 주소라 Kafbat UI 등 기존 로컬 도구(`bootstrapServers: 127.0.0.1:9092`)는 영향받지 않는다. dstone-boot 쪽은 `bootstrap-servers`를 `DB_HOST`/`REDIS_HOST`와 동일한 패턴으로 `${KAFKA_HOST}:${KAFKA_PORT}`로 파라미터화했다(`dstone-boot/conf/application.yml`, `dstone-boot/k8s/configmap.yaml`, 각 `env-*.properties`).
 
-## 로컬 사설 레지스트리
+## 로컬 사설 레지스트리 (kind-registry)
 
-CSP의 ECR/GCR을 흉내내기 위해 `registry:2` 컨테이너(`kind-registry`, `localhost:5000`)를 kind 공식 "local registry" 레시피로 구성했다: kind 클러스터를 `containerdConfigPatches`로 이 레지스트리를 미러로 인식하도록 생성하고, `kind-registry` 컨테이너를 `kind` 도커 네트워크에 연결한다. `docker build → docker push localhost:5000/... → kubectl apply(image: localhost:5000/...)` 흐름이 실제 클라우드의 "빌드 → 레지스트리 푸시 → 클러스터 배포" 흐름과 동일하다. 설정은 `/usr/local/bin/k8s-start.sh`에 멱등적으로 포함되어 있다(자세한 내용은 [kubernetes.md](software/kubernetes.md)).
+### 정체와 역할
+
+`kind-registry`는 표준 **Docker Registry v2**(`registry:2` 이미지 그대로 — Docker Hub/ECR/GCR/ACR을 구성하는 것과 동일한 오픈소스 컴포넌트)를 로컬에 하나 띄운 것이다. CSP의 ECR/GCR/ACR을 흉내내는 자리로, `docker build`로 만든 이미지를 kind 클러스터의 Pod가 실제로 pull해갈 수 있도록 중계하는 **사설 이미지 저장소** 역할을 한다.
+
+### 구성 요소와 동작 원리
+
+세 가지 조각이 맞물려 동작한다(생성 로직은 `/usr/local/bin/k8s-start.sh`에 멱등적으로 들어 있음 — 상세는 [kubernetes.md](software/kubernetes.md)):
+
+1. **컨테이너 자체 (이미지 저장)**
+   ```bash
+   docker run -d --restart=always -p "127.0.0.1:5000:5000" --network bridge --name kind-registry registry:2
+   ```
+   `docker push localhost:5000/<image>:<tag>`로 push하면 이 컨테이너에 레이어/매니페스트가 저장된다. `-v`(볼륨) 없이 컨테이너 자체 writable layer에만 저장하므로 **`docker rm kind-registry`로 컨테이너를 지우면 안의 이미지도 전부 사라진다**(재시작만 하는 건 무관 — `--restart=always`로 데이터 유지).
+
+2. **호스트 접근용 포트 매핑**: `-p 127.0.0.1:5000:5000`이라 WSL 호스트에서 `docker push/pull localhost:5000/...`가 별도 설정 없이 바로 된다.
+
+3. **kind 네트워크 연결 + containerd 미러 (Pod가 실제로 pull 가능하게 하는 핵심)**
+   - `kind-registry` 컨테이너를 클러스터 노드(`dev-control-plane`)와 같은 `kind` 도커 브리지 네트워크에 연결(`docker network connect kind kind-registry`) — 서로 컨테이너 이름으로 통신 가능.
+   - `kind create cluster`를 아래 `containerdConfigPatches`와 함께 실행해, 노드 안의 containerd에 미러 규칙을 심어둔다:
+     ```toml
+     [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+       endpoint = ["http://kind-registry:5000"]
+     ```
+   - 즉 Pod 스펙에 `image: localhost:5000/dstone-boot:...`라고 써도, 노드 입장의 `localhost`는 원래 자기 자신이라 실패해야 정상이지만, 이 미러 규칙 덕분에 containerd가 요청을 `kind-registry:5000`(진짜 레지스트리 컨테이너)으로 자동 리다이렉트한다.
+   - 확인 방법: `docker network inspect kind`로 두 컨테이너가 같은 네트워크에 있는지, `docker exec dev-control-plane cat /etc/containerd/config.toml`로 미러 설정이 들어있는지, `kubectl get pod ... -o jsonpath='{.status.containerStatuses[0].imageID}'`로 실제 pull 경로(`localhost:5000/dstone-boot@sha256:...`)를 확인할 수 있다.
+
+### 실사용 흐름
+
+```bash
+docker build -f dstone-boot/Dockerfile -t localhost:5000/dstone-boot:<TAG> .
+docker push localhost:5000/dstone-boot:<TAG>            # ① 호스트 → kind-registry (포트 매핑 경유)
+kubectl set image deployment/dstone-boot dstone-boot=localhost:5000/dstone-boot:<TAG> -n dstone
+# ② kind 노드의 containerd가 image: localhost:5000/... 를 mirrors 설정으로 가로채
+#    kind 도커 네트워크 안에서 kind-registry:5000 으로 pull
+```
+`docker build → docker push localhost:5000/... → kubectl apply(image: localhost:5000/...)`가 실제 클라우드의 "빌드 → 레지스트리 푸시 → 클러스터 배포" 흐름과 동일하다.
+
+### 조회 방법 (UI 없음 — API만)
+
+`kind-registry`엔 웹 UI가 없다. Registry HTTP API v2를 직접 호출해서 확인한다:
+```bash
+curl -s http://localhost:5000/v2/_catalog                    # 저장된 이미지(repository) 목록
+curl -s http://localhost:5000/v2/dstone-boot/tags/list        # 특정 이미지의 태그 목록
+```
+웹 UI가 필요하면 `joxit/docker-registry-ui` 같은 경량 컨테이너를 별도로 붙여 `REGISTRY_URL=http://localhost:5000`을 가리키게 하는 방법이 있다(현재 구성엔 없음).
+
+### 실제 클라우드 레지스트리(ECR/GCR/ACR)와의 비교
+
+WSL 시뮬레이션이 "빌드→푸시→배포" 흐름 자체는 그대로 재현하지만, 매니지드 레지스트리가 제공하는 부가 기능은 대부분 없다 — 학습 목적상 이 gap을 명확히 인지하고 있는 편이 좋다.
+
+| 기능 | kind-registry (로컬) | ECR / GCR / ACR (실제 클라우드) |
+|---|---|---|
+| 이미지 저장(OCI 표준) | O (`registry:2`, 동일 API) | O (동일 OCI Distribution API) |
+| 인증/접근 제어 | 없음 — 완전 오픈, 누구나 push/pull | IAM 정책/서비스 계정 기반 세밀한 RBAC |
+| 전송 암호화 | 없음(HTTP, "insecure registry"로 등록) | 기본 TLS 종단 암호화 |
+| 가용성/복제 | 단일 컨테이너, 단일 인스턴스 — 장애 시 전체 중단 | 멀티 AZ, 리전 간 복제(예: ECR replication) |
+| 저장 영속성 | 컨테이너 writable layer(볼륨 미마운트) — 컨테이너 삭제 시 이미지 유실 | 관리형 오브젝트 스토리지, 자동 내구성 보장 |
+| 취약점 스캐닝 | 없음 | push 시 자동 스캔(ECR Scan on Push, GCR Container Analysis 등) |
+| 태그 불변성 / Lifecycle Policy | 없음 — 수동 관리, 태그 덮어쓰기 자유 | 정책 기반 자동 만료·보존, 태그 불변(immutable tag) 옵션 |
+| 네트워크 노출 범위 | kind 도커 네트워크 + `127.0.0.1`만(브리지 게이트웨이 대역 밖 미노출) | VPC 엔드포인트/프라이빗 링크로 사설망 한정 가능, 필요 시 공인 엔드포인트 |
+| 관측성/UI | 없음 — REST API(`/v2/_catalog` 등)만 | 콘솔 UI에서 리포지토리/태그/스캔결과/용량 조회 |
+| 과금 | 없음(로컬 디스크만 소비) | 저장 용량 + 데이터 전송량 기준 과금 |
+
+이 gap 자체가 "관리형 서비스가 인증·암호화·스캐닝·복제를 대신 해준다"는 걸 체감하는 학습 포인트다 — kind-registry는 그 앞단의 "이미지 저장 + pull 경로 연결"이라는 핵심 매커니즘만 최소 구현으로 재현한 것.
 
 ## dstone-batch / dstone-batchadmin — VM 스타일
 
