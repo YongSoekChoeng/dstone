@@ -42,5 +42,5 @@ dstone-boot는 [kind](software/kubernetes.md)에 컨테이너 Pod로, dstone-bat
 - **RabbitMQ**: `dstone-boot`의 메시지 큐 연동.
 - **Kafka**: 애플리케이션에서 메시징 연동 실험/개발용 (로컬 KRaft 단일 브로커).
 - **Jenkins**: `dstone-batch/Jenkinsfile`, `dstone-boot/Jenkinsfile` 파이프라인 실행.
-- **Docker / kind**: `dstone-boot/docs/docker/`, `dstone-batch/docs/docker/`의 Docker Compose 배포 스크립트 실행 및 로컬 쿠버네티스 실습 환경.
+- **Docker / kind**: `dstone-boot`을 컨테이너 이미지로 빌드해 로컬 `kind` 클러스터에 Pod로 배포하는 환경(`dstone-boot/Dockerfile`, `dstone-boot/k8s/`). 상세는 [cloud-architecture.md](cloud-architecture.md) 참고.
 - **PostgreSQL / Node.js**: 현재 dstone 서비스 자체 설정(`application.yml`)에서는 사용하지 않는 것으로 보이며, 개발 환경 실습/부가 도구 용도로 설치되어 있음. 실제 프로젝트 연동이 생기면 이 문서와 CLAUDE.md를 갱신할 것.

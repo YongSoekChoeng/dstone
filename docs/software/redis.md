@@ -28,8 +28,9 @@ redis-cli --version
 ```
 
 ## 주요 설정
-- 포트: 6379 (기본값, `/etc/redis/redis.conf` 미변경)
+- 포트: 6379 (기본값)
 - `systemd` unit이 `redis-server.service`로 `/etc/redis/redis.conf`를 `--supervised systemd` 모드로 구동한다.
+- `bind` 설정을 기본값(`127.0.0.1 -::1`)에서 `127.0.0.1 172.18.0.1 -::1`로 확장해, `kind` 클러스터의 Pod(브리지 게이트웨이 IP `172.18.0.1`)에서도 접속할 수 있도록 했다 — [cloud-architecture.md](../cloud-architecture.md) 참고. `protected-mode yes`는 유지.
 - 인증(`requirepass`)은 로컬 개발환경 특성상 미설정 상태. 외부 노출 시 반드시 설정할 것.
 
 ## GUI 도구

@@ -248,4 +248,6 @@ mvn clean package
 # target/dstone-batch-1.0.0-SNAPSHOT.jar
 ```
 
-> 상세 Docker 배포 절차: [`dstone-batch/docs/02.Docker빌드(dstone-batch).md`](../dstone-batch/docs/02.Docker빌드(dstone-batch).md)
+### VM 스타일 운영 (bin/*.sh)
+
+`dstone-batch`는 systemd에 등록하지 않고 `dstone-batch/bin/{startApp,stopApp,statusApp}.sh` 쉘 스크립트로만 기동/중지한다. 설계 배경과 CI/CD 연동은 [cloud-architecture.md](cloud-architecture.md) 참고.

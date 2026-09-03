@@ -47,7 +47,7 @@ java -jar -Dspring.batch.job.names=sampleJob target/dstone-batch-1.0.0-SNAPSHOT.
 java -jar target/dstone-batchadmin.war
 ```
 
-Docker deployment scripts are in `dstone-boot/docs/docker/` and `dstone-batch/docs/docker/` (not yet added for `dstone-batchadmin`).
+See "Cloud Architecture Simulation" below for how each module is deployed in this environment.
 
 ## Architecture
 

@@ -36,7 +36,7 @@ sudo mysql -u root -p
 [mysqld]
 mysql_native_password = ON
 user                   = mysql
-bind-address           = 127.0.0.1
+bind-address           = 127.0.0.1,172.18.0.1
 mysqlx-bind-address    = 127.0.0.1
 key_buffer_size        = 16M
 myisam-recover-options = BACKUP
@@ -44,7 +44,7 @@ log_error              = /var/log/mysql/error.log
 max_binlog_size        = 100M
 ```
 - 포트: 3306 (기본값, 미변경)
-- `bind-address=127.0.0.1`로 로컬(WSL 내부)에서만 접속 가능하다. Windows 호스트나 외부에서 접속하려면 바인딩 주소 변경 및 방화벽 설정이 추가로 필요하다.
+- `bind-address`는 기본값(`127.0.0.1`)에 `172.18.0.1`(kind 도커 브리지 게이트웨이 IP)을 추가해, `kind` 클러스터의 Pod에서도 접속할 수 있도록 확장했다(클라우드 아키텍처 시뮬레이션의 일부 — [cloud-architecture.md](../cloud-architecture.md) 참고). 그 외 인터페이스(Windows 호스트, 외부 네트워크)로는 여전히 노출되지 않는다.
 
 ## dstone 프로젝트에서의 역할
 - `dstone-boot`: `common`/`sample` 데이터소스가 `sampleDB`를 바라봄 (`ConfigDatasource.java`).

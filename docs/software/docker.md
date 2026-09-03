@@ -1,7 +1,7 @@
 # Docker
 
 ## 개요
-컨테이너 런타임. dstone-boot/dstone-batch의 Docker Compose 배포 스크립트(`docs/docker/`) 실행 및 [kind](kubernetes.md) 기반 로컬 쿠버네티스 클러스터 구동에 사용한다.
+컨테이너 런타임. `dstone-boot` 이미지 빌드/로컬 사설 레지스트리 운영 및 [kind](kubernetes.md) 기반 로컬 쿠버네티스 클러스터 구동에 사용한다.
 
 ## 설치 정보
 - 버전: Docker CE 29.7.2, Docker Compose plugin v5.5.0
@@ -55,6 +55,6 @@ WSL 환경 특성상 `dockerd`를 systemd로 자동 기동하지 않고, 전용 
 현재 사용자(`jysn007`)는 `docker` 그룹에 속해 있어 `sudo` 없이 `docker` 명령을 사용할 수 있다. 그룹 변경 후에는 재로그인(WSL 재시작)이 필요하다.
 
 ## dstone 프로젝트에서의 역할
-- `dstone-boot/docs/docker/`, `dstone-batch/docs/docker/`의 Docker Compose 배포 스크립트 실행 환경.
+- `dstone-boot` 이미지 빌드/실행 환경(`dstone-boot/Dockerfile`) — 로컬 사설 레지스트리(`localhost:5000`)를 거쳐 kind에 배포한다. 상세는 [cloud-architecture.md](../cloud-architecture.md) 참고.
 - `dstone-batchadmin`은 아직 Docker 배포 스크립트가 추가되지 않은 상태 (CLAUDE.md 참고).
 - [kind](kubernetes.md) 클러스터의 컨테이너 런타임으로도 사용된다.

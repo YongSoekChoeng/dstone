@@ -241,21 +241,16 @@ spring.security.enabled: true
 ## 빌드 및 실행
 
 ```bash
-# 빌드 (WAR)
+# 빌드 (WAR, executable)
 cd dstone-boot
 mvn clean package
 
 # 로컬 실행 (내장 Tomcat)
-java -jar target/dstone-boot-1.0.0-SNAPSHOT.war
+java -jar target/dstone-boot.war
 
 # 외부 Tomcat 배포 시 WAR 파일을 webapps/에 배포
 ```
 
-### Docker 실행
+### 컨테이너 / 쿠버네티스 배포
 
-```bash
-# Docker 빌드 및 실행 참고
-# dstone-boot/docs/docker/ 경로의 스크립트 참조
-```
-
-> 상세 Docker 배포 절차: [`dstone-boot/docs/02.Docker빌드(dstone-boot).md`](../dstone-boot/docs/02.Docker빌드(dstone-boot).md)
+`dstone-boot`은 `dstone-boot/Dockerfile`(멀티스테이지 리액터 빌드)로 이미지를 만들어 로컬 `kind` 클러스터에 Pod로 배포한다(`dstone-boot/k8s/`). 상세 설계와 절차는 [cloud-architecture.md](cloud-architecture.md) 참고.

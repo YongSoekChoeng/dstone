@@ -62,4 +62,4 @@ cd /opt/kafka/kafka_2.13-4.2.1/bin
 [Kafbat UI](kafbat-ui.md)를 통해 웹에서 토픽/컨슈머 등을 확인한다 (http://localhost:9099).
 
 ## dstone 프로젝트에서의 역할
-현재 dstone 각 모듈의 `application.yml`에서 직접 연동되어 있지는 않으며, 메시징 기능 실습/향후 연동을 위한 로컬 브로커로 준비되어 있다. 실제 프로젝트 연동 시 이 문서와 `docs/environment.md`를 갱신한다.
+`dstone-boot`의 SAGA + Outbox 패턴 샘플 기능(`net.dstone.common.messaging.saga`, `net.dstone.boot.sample.saga`)이 `OutboxRelay`→`KafkaTemplate`로 이벤트를 발행하고 `OrderSagaReplyListener`가 구독하는 방식으로 사용한다(자세한 흐름: [dstone-saga.md](../dstone-saga.md)). 다만 `dstone-boot/conf/application.yml`의 `spring.kafka.bootstrap-servers`가 `localhost:9092`로 하드코딩돼 있어, kind Pod처럼 로컬호스트가 아닌 환경에서는 연결되지 않는다 — [cloud-architecture.md](../cloud-architecture.md)의 "알려진 한계"에 기록되어 있다.
