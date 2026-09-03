@@ -73,7 +73,8 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 | 새 이미지로 배포 | `kubectl set image deployment/dstone-boot dstone-boot=<image> -n dstone` |
 | 실행 상태 확인 | `kubectl get pods -n dstone -l app=dstone-boot` |
 | 로그 보기 | `kubectl logs -n dstone deploy/dstone-boot -f` |
-| 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081` (백그라운드: `nohup ... & disown`) |
+| 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081`|
+| 호스트에서 접속(백그라운드) | `nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 & disown` |
 | 재시작(코드 변경 없이) | `kubectl rollout restart deployment/dstone-boot -n dstone` |
 | 중지 | `kubectl scale deployment/dstone-boot -n dstone --replicas=0` |
 | 시작(재개) | `kubectl scale deployment/dstone-boot -n dstone --replicas=1` |
