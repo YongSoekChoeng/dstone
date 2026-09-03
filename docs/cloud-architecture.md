@@ -20,8 +20,10 @@ kind 클러스터의 Pod는 `kind` 도커 브리지 네트워크(예: `172.18.0.
 
 1. `docker network inspect kind`로 브리지 게이트웨이 IP(예: `172.18.0.1`, 호스트 인터페이스 `br-xxxx`)를 확인.
 2. MySQL(`bind-address`)과 Redis(`bind`)를 `127.0.0.1`에 이 게이트웨이 IP를 추가해 바인딩(`127.0.0.1,172.18.0.1` 형태) — 즉 kind 네트워크에서만 추가로 열어주고 그 외 인터페이스로는 노출하지 않는다. 이 서브넷 자체가 WSL 내부에서만 존재하므로, 실사용 VPC 보안그룹처럼 접근 범위를 좁히는 효과를 낸다(호스트에 `ufw` 등 방화벽 데몬 자체가 없어 별도 규칙은 두지 않았다).
+   - **Redis 추가 조치**: `bind`만 열어도 Redis의 `protected-mode`(기본 `yes`)가 "비밀번호 없는 상태에서 loopback이 아닌 곳에서 온 연결"을 자체적으로 거부한다(`-DENIED ... protected mode ...`). `bind`로 이미 접근 범위를 kind 대역으로 제한했으므로 `/etc/redis/redis.conf`에서 `protected-mode no`로 변경 후 `sudo systemctl restart redis-server`가 추가로 필요하다.
 3. RabbitMQ는 기본이 전체 인터페이스 리슨이라 별도 조치 불필요.
-4. dstone-boot 컨테이너 이미지에는 k8s 전용 프로파일(`env-k8s.properties`, `-Dspring.profiles.active=k8s`)을 포함시켜 `DB_HOST`/`REDIS_HOST`/`RABBITMQ_HOST`를 이 게이트웨이 IP로 지정했다.
+4. dstone-boot 컨테이너 이미지에는 k8s 전용 프로파일(`env-k8s.properties`, `-Dspring.profiles.active=k8s`)을 포함시켜 `DB_HOST`/`REDIS_HOST`/`RABBITMQ_HOST`/`KAFKA_HOST`를 이 게이트웨이 IP로 지정했다.
+5. **Kafka는 `bind` 문제가 아니라 `advertised.listeners` 문제였다**: 브로커 소켓 자체는 기본이 전체 인터페이스 리슨(`listeners=PLAINTEXT://:9092`)이라 Pod에서 최초 TCP 연결은 되지만, `advertised.listeners`가 `PLAINTEXT://127.0.0.1:9092`로 고정돼 있으면 Kafka가 메타데이터 응답으로 "실제 요청은 `127.0.0.1:9092`로 다시 보내라"고 클라이언트에 알려준다 — Pod 안에서 `127.0.0.1`은 Pod 자신이므로 이후 모든 produce/fetch가 `Topic ... not present in metadata after 60000 ms` 타임아웃으로 실패한다. `/opt/kafka/kafka_2.13-4.2.1/config/server.properties`의 `advertised.listeners`를 `PLAINTEXT://172.18.0.1:9092`로 바꾸고 Kafka를 재기동해야 한다(`/opt/kafka/kafka-stop.sh` → `/opt/kafka/kafka-start.sh`, 파일이 `jysn007` 소유라 sudo 불필요). `172.18.0.1`은 WSL 호스트 자신도 접근 가능한 주소라 Kafbat UI 등 기존 로컬 도구(`bootstrapServers: 127.0.0.1:9092`)는 영향받지 않는다. dstone-boot 쪽은 `bootstrap-servers`를 `DB_HOST`/`REDIS_HOST`와 동일한 패턴으로 `${KAFKA_HOST}:${KAFKA_PORT}`로 파라미터화했다(`dstone-boot/conf/application.yml`, `dstone-boot/k8s/configmap.yaml`, 각 `env-*.properties`).
 
 ## 로컬 사설 레지스트리
 
@@ -224,6 +226,6 @@ kubectl delete -f dstone-boot/k8s/
 
 ## 알려진 한계 / 후속 과제
 
-- `dstone-boot`은 `spring.kafka.enabled: true`이지만 `bootstrap-servers`가 `localhost:9092`로 하드코딩되어 있어 컨테이너에서는 연결되지 않는다(백그라운드에서 재시도만 계속함). `/actuator/health`(전체) 는 이 때문에 `DOWN`으로 보일 수 있으나, k8s 프로브가 실제로 사용하는 `/actuator/health/readiness`·`/actuator/health/liveness`는 정상적으로 `UP`을 반환하므로 배포 자체에는 영향 없다. Kafka를 dstone-boot에 실제로 연동하게 되면 `bootstrap-servers`를 환경변수화해야 한다.
+- ~~`dstone-boot`은 `bootstrap-servers`가 `localhost:9092`로 하드코딩되어 있어 컨테이너에서는 연결되지 않는다~~ → **해결됨**: `bootstrap-servers`를 `${KAFKA_HOST}:${KAFKA_PORT}`로 환경변수화하고, Kafka `advertised.listeners`를 kind 게이트웨이 IP(`172.18.0.1`)로 변경해 Pod에서도 정상 연결된다("dstone-boot ↔ kind 네트워킹" 5번 항목 참고). `/actuator/health`(전체)가 `DOWN`으로 보이는 경우가 여전히 있다면 Kafka/DB/Redis 중 하나가 실제로 내려가 있는 것이니 `kubectl logs`로 원인을 확인한다(k8s 프로브는 `/actuator/health/readiness`·`/actuator/health/liveness`만 사용하므로 배포 자체에는 영향 없음).
 - `dstone-boot/conf/application.yml`의 `sftp.password`가 평문으로 하드코딩되어 있음 — 이번 작업 범위 밖이라 손대지 않았지만 별도로 정리가 필요하다.
 - `dstone-boot` NodePort 서비스는 kind 클러스터가 `extraPortMappings` 없이 생성되어 있어 호스트에서 바로 접속하려면 `kubectl port-forward`가 필요하다. 호스트 포트로 직접 노출하려면 kind 클러스터를 `extraPortMappings` 설정과 함께 재생성해야 한다.
