@@ -251,3 +251,5 @@ mvn clean package
 ### VM 스타일 운영 (bin/*.sh)
 
 `dstone-batch`는 systemd에 등록하지 않고 `dstone-batch/bin/{startApp,stopApp,statusApp}.sh` 쉘 스크립트로만 기동/중지한다. 설계 배경과 CI/CD 연동은 [cloud-architecture.md](cloud-architecture.md) 참고.
+
+> 전체 모듈 빌드 명령, 배포 방식, CI/CD 파이프라인 종합 정리는 [build.md](build.md) 참고.

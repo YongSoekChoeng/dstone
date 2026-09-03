@@ -254,3 +254,5 @@ java -jar target/dstone-boot.war
 ### 컨테이너 / 쿠버네티스 배포
 
 `dstone-boot`은 `dstone-boot/Dockerfile`(멀티스테이지 리액터 빌드)로 이미지를 만들어 로컬 `kind` 클러스터에 Pod로 배포한다(`dstone-boot/k8s/`). 상세 설계와 절차는 [cloud-architecture.md](cloud-architecture.md) 참고.
+
+> 전체 모듈 빌드 명령, 배포 방식, CI/CD 파이프라인 종합 정리는 [build.md](build.md) 참고.

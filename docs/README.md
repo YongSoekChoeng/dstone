@@ -55,6 +55,8 @@ cd dstone-batchadmin && mvn clean package  # WAR
 mvn clean install
 ```
 
+빌드 명령/산출물, VM 스타일(`bin/*.sh`) 및 컨테이너(kind) 배포, Jenkins CI/CD 파이프라인을 종합 정리한 문서는 [build.md](build.md) 참고.
+
 ## 문서 목록
 
 ### 모듈별 문서
@@ -65,6 +67,7 @@ mvn clean install
 | [dstone-batch.md](dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
 | [dstone-batchadmin.md](dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
 | [dstone-saga.md](dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
+| [build.md](build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 
 ### 개발 환경 / 인프라
 | 문서 | 내용 |

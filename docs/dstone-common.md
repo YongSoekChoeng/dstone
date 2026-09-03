@@ -138,3 +138,5 @@ mvn clean install
 ```
 
 빌드 시 `conf/` 디렉토리의 `.properties` 파일이 `target/classes`로 복사됩니다.
+
+> 전체 모듈 빌드 명령, 배포 방식, CI/CD 파이프라인 종합 정리는 [build.md](build.md) 참고.

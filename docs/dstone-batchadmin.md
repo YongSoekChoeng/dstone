@@ -114,3 +114,5 @@ java -jar target/dstone-batchadmin.war
 ```
 
 > CLAUDE.md 기준 CI/CD 파이프라인: `dstone-batchadmin/Jenkinsfile`이 Maven 리액터 빌드 후 `bin/startApp.sh`로 재기동한다.
+
+> 전체 모듈 빌드 명령, 배포 방식, CI/CD 파이프라인 종합 정리는 [build.md](build.md) 참고.

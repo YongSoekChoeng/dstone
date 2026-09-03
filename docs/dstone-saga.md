@@ -188,7 +188,7 @@ sequenceDiagram
 
 ## 1~2단계. HTTP 요청 → 사가 시작 (스레드: 톰캣 요청 스레드)
 
-`OrderSagaController.start()` (`OrderSagaController.java:46`)
+`OrderSagaController.start()` (`OrderSagaController.java:47`)
 
 1. 쿼리파라미터로 `command` Map 생성: `ORDER_ID`, `ITEM_ID`, `QTY`, `AMOUNT`, `IS_ORDER_COMPLETED="N"`
 2. `sagaTransactionService.insertSaga("ORDER", "step01-inventoryReserve", command)` 호출
@@ -201,7 +201,7 @@ sequenceDiagram
 2. `sagaStore.insert(...)` → **[DB WRITE①]** `TB_SAGA_INSTANCE`에 1행 삽입: `STATUS=STARTED, CURRENT_STEP=step01-inventoryReserve`
 3. `runStep(sagaId, "step01-inventoryReserve", command)` 호출
 
-### `runStep()` 내부 — `SagaOrchestrator.java:163`
+### `runStep()` 내부 — `SagaOrchestrator.java:167`
 
 1. `existsSuccessStep(sagaId, "step01-inventoryReserve")` → 첫 실행이므로 false, 통과
 2. `findHandler("step01-inventoryReserve")` → Spring이 모아준 `List<SagaStepHandler>` 중 `Step01InventoryReserveService` 를 찾음
@@ -342,7 +342,7 @@ sequenceDiagram
 
 ## 4단계. Kafka 컨슈머가 메시지 수신 → 다음 스텝 트리거 (스레드: Kafka 리스너 컨테이너 스레드)
 
-`OrderSagaReplyListener.onInventoryReserved()` (`OrderSagaReplyListener.java:48`)
+`OrderSagaReplyListener.onInventoryReserved()` (`OrderSagaReplyListener.java:54`)
 - groupId `step01-inventoryReserve-reply-consumer-group`이 해당 토픽 파티션을 poll 하고 있다가 메시지 수신
 - `payload`(Map)에서 `SAGA_ID` 꺼냄
 - `sagaTransactionService.updateSagaStep(sagaId, "step02-payment", payload)` 호출
@@ -477,7 +477,7 @@ sequenceDiagram
 ## 실패 시 보상(compensate) 플로우 (예: QTY=100으로 호출)
 
 1. 1~2단계 동일하게 진행하다가 `Step01InventoryReserveService.handle()`이 `IllegalStateException` 던짐
-2. `runStep()`의 `catch(Exception e)` 진입 (`SagaOrchestrator.java:194`)
+2. `runStep()`의 `catch(Exception e)` 진입 (`SagaOrchestrator.java:196`)
 3. `insertStepHistory(...)` → `TB_SAGA_STEP_HISTORY`에 `RESULT=FAILED` 행 삽입
 4. `compensate(sagaId, "step01-inventoryReserve")` 호출
    - `TB_SAGA_INSTANCE.STATUS=COMPENSATING`
