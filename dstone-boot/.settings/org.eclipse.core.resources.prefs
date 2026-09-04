@@ -1,5 +1,4 @@
 eclipse.preferences.version=1
-encoding//conf/env-dev.properties=UTF-8
 encoding//conf/env-k8s.properties=UTF-8
 encoding//conf/env-wsl.properties=UTF-8
 encoding//src/main/java=UTF-8
