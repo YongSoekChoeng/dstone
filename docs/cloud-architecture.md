@@ -280,7 +280,7 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 | 호스트에서 접속(백그라운드) | `nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 & disown` | 위와 동일하지만 터미널을 안 붙잡음. 끊고 싶으면 `pkill -f "port-forward.*dstone-boot"`. |
 | 재시작(코드 변경 없이) | `kubectl rollout restart deployment/dstone-boot -n dstone` | 이미지·설정은 그대로 두고 pod만 새로 띄움(메모리 누수 의심될 때 등). **주의**: `imagePullPolicy: IfNotPresent`라 같은 태그면 새로 pull하지 않고 노드에 캐시된 이미지를 그대로 재사용한다 — 이미지 자체를 바꾸고 싶으면 이 명령이 아니라 [6.4](#64-새-이미지-빌드-후-배포-jenkins-파이프라인이-자동-수행하는-것과-동일한-수동-절차)의 `set image`를 써야 한다. |
 | 중지 | `kubectl scale deployment/dstone-boot -n dstone --replicas=0` | pod 개수를 0으로 — Deployment 자체는 남기고 실행만 멈춤(디스크에 뭘 지우지 않는 안전한 중지). `docker-compose down`의 감각과 비슷하지만 리소스 정의는 삭제되지 않는다. |
-| 시작(재개) | `kubectl scale deployment/dstone-boot --replicas=1 -n dstone` | 0으로 내렸던 걸 다시 1로. 이때도 이미지는 Deployment에 이미 박혀 있는 그대로 쓴다(재빌드/재pull 아님). |
+| 시작(재개) | `kubectl scale deployment/dstone-boot -n dstone --replicas=1` | 0으로 내렸던 걸 다시 1로. 이때도 이미지는 Deployment에 이미 박혀 있는 그대로 쓴다(재빌드/재pull 아님). |
 | 이전 버전으로 롤백 | `kubectl rollout undo deployment/dstone-boot -n dstone` | 직전 `kubectl apply`/`set image` 이전 리비전으로 되돌림. `kubectl rollout history deployment/dstone-boot -n dstone`으로 리비전 목록을 먼저 봐도 됨. |
 | 완전 삭제 | `kubectl delete -f dstone-boot/k8s/` | namespace까지 통째로 삭제 — 다시 쓰려면 [6.3](#63-최초-배포--전체-재적용)부터 재적용. 스테이징을 잠깐 비우고 싶을 뿐이면 "중지"(replicas=0)로 충분하고 이 명령은 필요 없다. |
 
