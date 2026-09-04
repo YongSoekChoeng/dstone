@@ -277,6 +277,7 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 | 실행 상태 확인 | `kubectl get pods -n dstone -l app=dstone-boot` | `-l app=dstone-boot`은 라벨 필터. `STATUS`가 `Running`, `READY`가 `1/1`이면 정상. `CrashLoopBackOff`/`ImagePullBackOff`면 `kubectl describe pod`/`kubectl get events`로 원인 확인([6.5](#65-상태-조회)). |
 | 로그 보기 | `kubectl logs -n dstone deploy/dstone-boot -f` | `-f`는 tail -f처럼 실시간 스트리밍. 이건 컨테이너의 **stdout**(log4j2의 Console appender)만 보여준다 — 파일로 남는 로그(`/app/dstone/LOGS/...`)는 별개이고 pod가 사라지면 같이 사라진다. |
 | 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081`| 터미널을 점유한 채로 로컬 `7081` 포트를 클러스터 안 Service `7081`에 연결. `Ctrl+C`하면 끊긴다. 브라우저로 `http://localhost:7081`에 접속해 확인할 때 씀. |
+| 호스트에서 접속(Pod별) | `kubectl port-forward -n dstone pod/1번POD아이디 7091:7081`<br>`kubectl port-forward -n dstone pod/2번POD아이디 7092:7081`| Pod별로 접속해 확인할 때 씀. |
 | 호스트에서 접속(백그라운드) | `nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 & disown` | 위와 동일하지만 터미널을 안 붙잡음. 끊고 싶으면 `pkill -f "port-forward.*dstone-boot"`. |
 | 재시작(코드 변경 없이) | `kubectl rollout restart deployment/dstone-boot -n dstone` | 이미지·설정은 그대로 두고 pod만 새로 띄움(메모리 누수 의심될 때 등). **주의**: `imagePullPolicy: IfNotPresent`라 같은 태그면 새로 pull하지 않고 노드에 캐시된 이미지를 그대로 재사용한다 — 이미지 자체를 바꾸고 싶으면 이 명령이 아니라 [6.4](#64-새-이미지-빌드-후-배포-jenkins-파이프라인이-자동-수행하는-것과-동일한-수동-절차)의 `set image`를 써야 한다. |
 | 중지 | `kubectl scale deployment/dstone-boot -n dstone --replicas=0` | pod 개수를 0으로 — Deployment 자체는 남기고 실행만 멈춤(디스크에 뭘 지우지 않는 안전한 중지). `docker-compose down`의 감각과 비슷하지만 리소스 정의는 삭제되지 않는다. |
