@@ -17,7 +17,7 @@ public class TestBean {
 
 	public static void main(String[] args) {
 		
-		TestBean.KAFKA테스트();
+		TestBean.테스트();
 		
 		//TestBean.테스트();
 		//TestBean.암복호화();
@@ -30,30 +30,37 @@ public class TestBean {
 	
 
 	public static void 테스트() {
+		
+		net.dstone.common.utils.DateUtil.stopWatchStart("01.연습장");
+
 		try {
 			
-			String[] fileList = net.dstone.common.utils.FileUtil.readFileListAll("D:\\AppHome\\framework");
-			for( String file : fileList ) {
-				if( file.endsWith(".md") ) {
-
-//					String filePath = net.dstone.common.utils.FileUtil.getFilePath(file);
-//					String fileName = net.dstone.common.utils.FileUtil.getFileName(file, true);
-//					String fileConts = net.dstone.common.utils.FileUtil.readFile(file);
-
-					System.out.println(file);
-					
-//					String str = "docker-compose -";
-//					if(fileConts.indexOf(str) > -1) {
-//						String repl = "docker compose -";
-//						fileConts = net.dstone.common.utils.StringUtil.replace(fileConts, str, repl);
-//						net.dstone.common.utils.FileUtil.writeFile(filePath, fileName, fileConts);
-//					}
-					
+			String basePath = "D:/Swap/현대해상-클라우드컨설팅";
+			
+			String[] files = net.dstone.common.utils.FileUtil.readFileListAll(basePath);
+			
+			for(String file : files){
+				String newFile = "";
+				if(file.endsWith(".XLS_Copy") || file.endsWith(".xls_Copy")){
+					String filePath = net.dstone.common.utils.FileUtil.getFilePath(file);
+					newFile = filePath + ".xls";
+				}else if(file.endsWith(".XLSX_Copy") || file.endsWith(".xlsx_Copy")){
+					String filePath = net.dstone.common.utils.FileUtil.getFilePath(file);
+					newFile = filePath + ".xlsx";
+				}
+				if( !"".equals(newFile) ){
+					System.out.println( "file["+file+"] ==>> newFile["+newFile+"]" );
+					//net.dstone.common.utils.FileUtil.moveFile(file, newFile);
 				}
 			}
+
+		    
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally{
+			net.dstone.common.utils.DateUtil.stopWatchEnd("01.연습장");
 		}
+
 	}
 
 	
