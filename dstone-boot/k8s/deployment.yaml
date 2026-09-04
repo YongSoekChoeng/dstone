@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: dstone-boot
-          image: localhost:5000/dstone-boot:latest
+          image: localhost:5000/dstone-boot:20260904-1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 7081
