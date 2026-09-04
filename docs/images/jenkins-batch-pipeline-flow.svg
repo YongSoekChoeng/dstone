@@ -15,7 +15,7 @@
 <rect x="650.0" y="70.0" width="240" height="92" rx="12" ry="12" fill="#E7F7EE" stroke="#2F9E5B" stroke-width="2"/>
 <text x="770.0" y="101.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Prepare Deployment Dir</text>
 <text x="770.0" y="121.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">target/conf/bin →</text>
-<text x="770.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">/workshop/dstone/&lt;module&gt;</text>
+<text x="770.0" y="141.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">/app/dstone/&lt;module&gt;</text>
 <rect x="30.0" y="242.0" width="240" height="92" rx="12" ry="12" fill="#E7F7EE" stroke="#2F9E5B" stroke-width="2"/>
 <text x="150.0" y="283.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1B2A3C">Stop Existing Process</text>
 <text x="150.0" y="303.0" text-anchor="middle" font-size="13" font-weight="400" fill="#3D4A5C">bin/stopApp.sh</text>

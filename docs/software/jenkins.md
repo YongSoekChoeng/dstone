@@ -71,11 +71,11 @@ sudo usermod -aG docker jenkins
 sudo systemctl restart jenkins   # 그룹 변경은 프로세스 재시작 후에 적용됨
 groups jenkins                    # "jenkins docker" 확인
 ```
-`/etc/kind/dev.config`(KUBECONFIG)도 `docker` 그룹에 read 권한이 열려 있어(`chmod g+r`) 별도 설정 없이 읽을 수 있다. `dstone-batch`/`dstone-batchadmin` 파이프라인이 배포 파일을 복사하는 `/workshop/dstone/`도 `docker` 그룹 쓰기 권한(setgid)이 필요하다 — 없다면 `sudo chown root:docker /workshop/dstone && sudo chmod g+ws /workshop/dstone`.
+`/etc/kind/dev.config`(KUBECONFIG)도 `docker` 그룹에 read 권한이 열려 있어(`chmod g+r`) 별도 설정 없이 읽을 수 있다. `dstone-batch`/`dstone-batchadmin` 파이프라인은 배포 파일을 별도 디렉터리가 아니라 리포지토리 자기 자신(`/app/dstone/dstone-batch`, `/app/dstone/dstone-batchadmin`)에 직접 복사하므로, `jenkins` 계정이 `jysn007` 그룹(리포지토리 소유 그룹)에도 속해 있어야 하고 두 디렉터리(및 하위 `target`/`conf`/`bin`)에 그룹 쓰기 권한(setgid)이 필요하다 — 없다면 `sudo usermod -aG jysn007 jenkins && sudo systemctl restart jenkins`, `sudo chmod g+ws /app/dstone/dstone-batch /app/dstone/dstone-batchadmin`.
 
 ## 8. dstone 프로젝트에서의 역할
 - `dstone-boot/Jenkinsfile`: Maven 리액터 빌드 → Docker 이미지 빌드/푸시(로컬 레지스트리) → kind 클러스터에 `kubectl`로 배포
-- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile`: Maven 리액터 빌드 → 배포 디렉터리(`/workshop/dstone/<module>`)로 복사 → 해당 모듈의 `bin/stopApp.sh`+`bin/startApp.sh`로 재기동(VM 스타일, systemd 미사용)
+- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile`: Maven 리액터 빌드 → 리포지토리 자기 자신의 모듈 디렉터리(`/app/dstone/<module>`)로 복사 → 해당 모듈의 `bin/stopApp.sh`+`bin/startApp.sh`로 재기동(VM 스타일, systemd 미사용)
 - 파이프라인 실행에는 [Maven](maven.md), [JDK](jdk.md), [Docker](docker.md), [kubernetes](kubernetes.md)(dstone-boot에 한함)가 함께 필요하다. 설계 배경은 [cloud-architecture.md](../cloud-architecture.md) 참고.
 
 ## 9. Job 생성

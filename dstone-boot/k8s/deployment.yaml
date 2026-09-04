@@ -21,7 +21,7 @@ spec:
             - containerPort: 7081
           volumeMounts:
             - name: conf
-              mountPath: /workshop/conf
+              mountPath: /app/dstone/dstone-boot/conf
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness

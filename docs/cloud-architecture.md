@@ -138,18 +138,19 @@ systemd로 자동 등록하지 않고, EC2에 SSH로 접속해 배포 스크립�
 | 프로파일 | 대상 | APP_CONF_DIR |
 |---|---|---|
 | (기본/local) | Windows 개발자 PC | `D:/AppHome/...` |
-| dev | 기존 Docker Compose 배포 | `/workshop/dstone/<module>/conf` (컨테이너 내부) |
 | wsl | WSL에서 git 체크아웃 그대로 수동 테스트 | `/app/dstone/<module>/conf` |
-| vm | Jenkins CI/CD가 배포하는 안정적 실행 경로 | `/workshop/dstone/<module>/conf` (호스트 디렉터리, `docker`그룹 공유) |
+| vm | Jenkins CI/CD가 배포하는 안정적 실행 경로 | `/app/dstone/<module>/conf` (호스트 리포지토리 디렉터리 그 자체, `jysn007`그룹 공유) |
+
+> 기존에는 `dev` 프로파일(Docker Compose 배포용)과 별도의 `/workshop/dstone/<module>` 배포 디렉터리가 있었으나, 리포지토리(`/app/dstone`)와 이중으로 관리되는 것을 피하기 위해 제거했다 — `vm` 프로파일도 이제 `wsl`과 동일하게 리포지토리 경로를 그대로 가리키며, Jenkins가 그 경로에 직접 빌드산출물을 배포한다.
 
 `bin/startApp.sh`는 `DSTONE_PROFILE` 환경변수로 프로파일을 오버라이드할 수 있다(기본값 `wsl`). Jenkinsfile은 `DSTONE_PROFILE=vm`으로 실행한다.
 
 ## 5. CI/CD 파이프라인
 
 - `dstone-boot/Jenkinsfile`: Checkout → Maven 리액터 빌드(`dstone-common` 먼저) → `docker build`/`push`(로컬 레지스트리) → `kubectl apply` + `kubectl set image` + `rollout status`(kind 배포) → 헬스체크.
-- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile`: Checkout → Maven 리액터 빌드 → 아티팩트+conf+bin을 `/workshop/dstone/<module>`로 복사 → 기존 프로세스 정지(`bin/stopApp.sh`) → 재기동(`bin/startApp.sh`, `DSTONE_PROFILE=vm`) → `bin/statusApp.sh`로 헬스체크.
+- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile`: Checkout → Maven 리액터 빌드 → 아티팩트+conf+bin을 `/app/dstone/<module>`(리포지토리 자기 자신의 모듈 디렉터리)로 복사(덮어쓰기) → 기존 프로세스 정지(`bin/stopApp.sh`) → 재기동(`bin/startApp.sh`, `DSTONE_PROFILE=vm`) → `bin/statusApp.sh`로 헬스체크.
 - 기존에는 세 Jenkinsfile 모두 `docker-compose up/down`으로 배포했고, 이미지 배포는 Jenkinsfile 밖의 `docs/docker/*/02.*-docker-reg.sh`가 `docker commit` + Docker Hub 하드코딩 비밀번호로 처리했다 — 이번에 위 구조로 전면 교체했다. `dstone-boot/docs/docker/`, `dstone-batch/docs/docker/`의 기존 Docker Compose 자산(및 그 안의 오래된 스키마 SQL 사본)은 완전히 삭제했다 — 실제 스키마는 각 모듈의 `src/main/resources/schema/*.sql`이 이미 최신 상태로 관리하고 있었고, MySQL/Redis/RabbitMQ/Kafka 자체도 이제 Docker가 아닌 WSL 네이티브 설치로 운용하기 때문이다.
-- Jenkins Controller는 계속 WSL 호스트(VM 역할)에 상주한다. `jenkins` 시스템 계정을 `docker` 그룹에 포함시켜 별도 인프라 추가 없이 `docker`/`kubectl`을 실행한다.
+- Jenkins Controller는 계속 WSL 호스트(VM 역할)에 상주한다. `jenkins` 시스템 계정을 `docker` 그룹에 포함시켜 별도 인프라 추가 없이 `docker`/`kubectl`을 실행하고, `jysn007` 그룹에도 포함시켜 리포지토리(`/app/dstone`) 안의 `dstone-batch`/`dstone-batchadmin` 모듈 디렉터리에 배포 파일을 직접 쓸 수 있게 한다(별도의 `/workshop` 같은 배포 전용 디렉터리를 두지 않고, 리포지토리 자체를 배포 대상으로 삼아 이중 관리를 피한다).
 - 전제: 각 Jenkins Job의 SCM 체크아웃 범위는 모노레포 루트 전체여야 한다(멀티모듈 리액터 빌드 및 `dstone-boot`의 Docker 빌드 컨텍스트가 루트를 요구하기 때문).
 
 아래는 위 요약을 실제로 Jenkins 화면(`http://localhost:8080`)에서 손으로 따라 하기 위한 상세 절차다 — 이 절만 보고도 3개 Job(`dstone-boot`, `dstone-batch`, `dstone-batchadmin`)을 처음부터 구성할 수 있게 정리했다.
@@ -164,7 +165,7 @@ Job을 만들기 전에 아래가 이미 준비돼 있는지 확인한다(이 �
 | 필요 플러그인 | Git, GitHub, Pipeline(`workflow-aggregator`), SSH Credentials 등 기본 설치됨 | Jenkins 설치 시 "Install suggested plugins"로 충분 — Docker/Kubernetes 전용 플러그인은 **불필요**(Jenkinsfile이 `sh` 스텝으로 `docker`/`kubectl` CLI를 직접 호출) |
 | `jenkins` 시스템 계정이 `docker` 그룹 소속 | `groups jenkins` → `jenkins docker` | 아니면 `sudo usermod -aG docker jenkins` 후 Jenkins 재시작 |
 | `/etc/kind/dev.config`(KUBECONFIG) 읽기 권한 | `docker` 그룹에 읽기 권한 부여됨 | `dstone-boot` Job이 `kubectl`을 쓰려면 필요 |
-| `/workshop/dstone/` 쓰기 권한 | `docker` 그룹에 쓰기 권한(setgid) 부여됨 | `dstone-batch`/`dstone-batchadmin` Job이 배포 파일을 복사하는 대상 |
+| `/app/dstone/dstone-batch`, `/app/dstone/dstone-batchadmin` 쓰기 권한 | `jenkins` 계정이 `jysn007` 그룹에 포함되고, 두 디렉터리(및 하위 `target`/`conf`/`bin`)에 `jysn007` 그룹 쓰기 권한(setgid) 부여됨 | `dstone-batch`/`dstone-batchadmin` Job이 배포 파일을 복사하는 대상(리포지토리 자기 자신) |
 
 ### 5.2 Git 저장소 연결 방법 (SCM 설정값)
 
@@ -222,7 +223,7 @@ Job을 만들기 전에 아래가 이미 준비돼 있는지 확인한다(이 �
 정상 로그 흐름:
 - `====== Git Checkout ======`
 - `====== Maven Build (Reactor: dstone-common -> dstone-batch) ======` (batchadmin Job은 `dstone-batchadmin`)
-- `====== Prepare Deployment Files (VM 배포 경로) ======` → `/workshop/dstone/<module>/{target,conf,bin}`로 파일 복사
+- `====== Prepare Deployment Files (VM 배포 경로) ======` → `/app/dstone/<module>/{target,conf,bin}`(리포지토리 자기 자신)로 파일 복사
 - `====== Stop Existing Process ======` → 최초 배포라면 실행 중인 프로세스가 없어 `|| true`로 그냥 통과
 - `====== Deploy(Start) Application ======` → `bin/startApp.sh` 실행
 - `====== Health Check ======` → `bin/statusApp.sh` 결과가 `RUNNING`이면 성공. `RUNNING`이 아니면 빌드가 실패(`grep -q RUNNING`가 non-zero 반환) 처리된다.
@@ -241,8 +242,8 @@ Job을 만들기 전에 아래가 이미 준비돼 있는지 확인한다(이 �
 | `docker: permission denied` 또는 `Cannot connect to the Docker daemon` | `jenkins` 계정이 `docker` 그룹이 아니거나, Jenkins 프로세스가 그룹 변경 이전에 떠 있음 | `sudo usermod -aG docker jenkins` 후 `sudo systemctl restart jenkins` |
 | `kubectl` 실행 시 `error: error loading config file "/etc/kind/dev.config"` (Permission denied) | KUBECONFIG 파일 그룹 권한 문제 | `ls -l /etc/kind/dev.config`로 `docker` 그룹 읽기 권한 확인, 없으면 `sudo chmod g+r /etc/kind/dev.config` |
 | `docker build` 시 `dstone-common`을 찾을 수 없다는 컴파일/COPY 에러 | Job의 Repository URL이 `dstone-boot/` 서브디렉터리만 가리키도록 잘못 설정됨(Sparse checkout 등) | Repository URL은 항상 모노레포 루트(`file:///app/dstone`)를 가리켜야 한다 — Script Path로만 모듈을 구분한다 |
-| `dstone-batch`/`dstone-batchadmin` Job의 Prepare Deployment Files 단계에서 `mkdir`/`cp` 실패 | `/workshop/dstone/<module>` 디렉터리 소유권/권한 문제 | `ls -ld /workshop/dstone`로 `docker` 그룹 쓰기 권한(`rwxrwsr-x`) 확인 |
-| Health Check에서 `grep -q RUNNING` 실패로 빌드 실패(빨간 공) | 애플리케이션이 기동에 10초 이상 걸림, 또는 이전 프로세스의 PID 파일이 꼬여 있음 | `/workshop/dstone/<module>/logs/*.out` 로그 확인(빌드 실패 시 Console Output에 자동 tail됨) |
+| `dstone-batch`/`dstone-batchadmin` Job의 Prepare Deployment Files 단계에서 `mkdir`/`cp` 실패 | `/app/dstone/<module>` 디렉터리 소유권/권한 문제 | `ls -ld /app/dstone/dstone-batch`로 `jysn007` 그룹 쓰기 권한(`rwxrwsr-x` 이상) 확인, `groups jenkins`로 `jysn007` 그룹 포함 여부 확인 |
+| Health Check에서 `grep -q RUNNING` 실패로 빌드 실패(빨간 공) | 애플리케이션이 기동에 10초 이상 걸림, 또는 이전 프로세스의 PID 파일이 꼬여 있음 | `/app/dstone/<module>/logs/*.out` 로그 확인(빌드 실패 시 Console Output에 자동 tail됨) |
 | Script Path 오타로 `... Jenkinsfile not found` | Script Path 값이 실제 파일 경로와 다름 | 정확히 `dstone-boot/Jenkinsfile`, `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile` 중 하나와 일치해야 함(대소문자 포함) |
 
 ### 5.7 자동 트리거 구성 (후속 과제)

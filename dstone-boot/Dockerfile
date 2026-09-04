@@ -16,10 +16,10 @@ COPY dstone-batchadmin/pom.xml dstone-batchadmin/pom.xml
 RUN mvn -q -pl dstone-common,dstone-boot -am -DskipTests clean package
 
 FROM eclipse-temurin:21-jre
-WORKDIR /workshop
+WORKDIR /app/dstone/dstone-boot
 
 COPY --from=build /workspace/dstone-boot/target/dstone-boot.war ./dstone-boot.war
 
 EXPOSE 7081
 
-ENTRYPOINT ["java", "-Dspring.profiles.active=k8s", "-jar", "/workshop/dstone-boot.war", "net.dstone.boot.DstoneBootApplication"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=k8s", "-jar", "/app/dstone/dstone-boot/dstone-boot.war", "net.dstone.boot.DstoneBootApplication"]

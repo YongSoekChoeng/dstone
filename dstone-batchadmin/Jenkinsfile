@@ -5,7 +5,7 @@ pipeline {
 
     environment {
         APP_NAME = 'dstone-batchadmin'
-        WORKSPACE_DIR = '/workshop/dstone/dstone-batchadmin'
+        WORKSPACE_DIR = '/app/dstone/dstone-batchadmin'
         DSTONE_PROFILE = 'vm'
     }
 

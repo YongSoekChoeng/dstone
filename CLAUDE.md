@@ -176,7 +176,7 @@ The WSL dev environment mirrors a cloud deployment shape: `dstone-boot` runs as 
 
 Jenkins pipelines are defined in:
 - `dstone-boot/Jenkinsfile` — Maven reactor build → Docker build/push to a local registry (`localhost:5000`) → deploy to the `dstone` namespace in `kind` via `kubectl`
-- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile` — Maven reactor build → copy artifact/conf/bin to `/workshop/dstone/<module>` → redeploy via that module's `bin/stopApp.sh` + `bin/startApp.sh` (`DSTONE_PROFILE=vm`)
+- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile` — Maven reactor build → copy artifact/conf/bin to `/app/dstone/<module>` (the module's own directory in this same repo — no separate deploy tree) → redeploy via that module's `bin/stopApp.sh` + `bin/startApp.sh` (`DSTONE_PROFILE=vm`)
 
 Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse checkout) since builds use `mvn -pl <module> -am` reactor builds and the Docker build context needs `dstone-common` alongside `dstone-boot`.
 

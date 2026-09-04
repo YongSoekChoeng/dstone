@@ -132,8 +132,8 @@ DSTONE_PROFILE=vm ./startApp.sh   # Jenkins CI/CD 배포 경로용 프로파일
 | 파이프라인 | 빌드 | 배포 단계 |
 |---|---|---|
 | `dstone-boot/Jenkinsfile` | `mvn -pl dstone-common,dstone-boot -am -DskipTests clean package` | `docker build/push`(로컬 레지스트리) → `kubectl apply` + `kubectl set image` + `rollout status`(kind `dstone` 네임스페이스) → 헬스체크(`kubectl get pods`/`logs`) |
-| `dstone-batch/Jenkinsfile` | `mvn -pl dstone-common,dstone-batch -am -DskipTests clean package` | 아티팩트+`conf/`+`bin/`을 `/workshop/dstone/dstone-batch`로 복사 → `bin/stopApp.sh` → `bin/startApp.sh`(`DSTONE_PROFILE=vm`) → `bin/statusApp.sh`로 `RUNNING` 확인 |
-| `dstone-batchadmin/Jenkinsfile` | `mvn -pl dstone-common,dstone-batchadmin -am -DskipTests clean package` | 위 dstone-batch와 동일 패턴, 배포 경로 `/workshop/dstone/dstone-batchadmin` |
+| `dstone-batch/Jenkinsfile` | `mvn -pl dstone-common,dstone-batch -am -DskipTests clean package` | 아티팩트+`conf/`+`bin/`을 `/app/dstone/dstone-batch`(리포지토리 자기 자신)로 복사 → `bin/stopApp.sh` → `bin/startApp.sh`(`DSTONE_PROFILE=vm`) → `bin/statusApp.sh`로 `RUNNING` 확인 |
+| `dstone-batchadmin/Jenkinsfile` | `mvn -pl dstone-common,dstone-batchadmin -am -DskipTests clean package` | 위 dstone-batch와 동일 패턴, 배포 경로 `/app/dstone/dstone-batchadmin` |
 
 - 세 파이프라인 모두 실패 시 `post.failure`에서 로그 tail(`kubectl logs` 또는 `logs/*.out`)을 출력하고, `post.always`에서 워크스페이스를 정리(`deleteDir()`)한다.
 - Jenkins Controller는 WSL 호스트에 상주하며, `jenkins` 시스템 계정이 `docker` 그룹에 속해 있어 별도 인프라 없이 `docker`/`kubectl`을 실행한다. 설치/권한 설정은 [software/jenkins.md](software/jenkins.md) 참고.
