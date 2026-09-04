@@ -1,0 +1,595 @@
+2026-09-04 09:29:38  INFO [org.hibernate.validator.internal.util.Version] HV000001: Hibernate Validator 8.0.3.Final
+2026-09-04 09:29:38  INFO [net.dstone.boot.DstoneBootApplication] Starting DstoneBootApplication using Java 21.0.12 with PID 41079 (/app/dstone/dstone-boot/target/dstone-boot.war started by jysn007 in /app/dstone/dstone-boot)
+2026-09-04 09:29:38  INFO [net.dstone.boot.DstoneBootApplication] The following 1 profile is active: "wsl"
+2026-09-04 09:29:40  INFO [org.springframework.data.repository.config.RepositoryConfigurationDelegate] Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-04 09:29:40  INFO [org.springframework.data.repository.config.RepositoryConfigurationDelegate] Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-04 09:29:40  INFO [org.springframework.data.repository.config.RepositoryConfigurationDelegate] Finished Spring Data repository scanning in 43 ms. Found 0 Redis repository interfaces.
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.configuration.EnableEncryptablePropertiesBeanFactoryPostProcessor] Post-processing PropertySource instances
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Skipping PropertySource configurationProperties [class org.springframework.boot.context.properties.source.ConfigurationPropertySourcesPropertySource
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Skipping PropertySource servletConfigInitParams [class org.springframework.core.env.PropertySource$StubPropertySource
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Skipping PropertySource servletContextInitParams [class org.springframework.core.env.PropertySource$StubPropertySource
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource systemProperties [org.springframework.core.env.PropertiesPropertySource] to EncryptableMapPropertySourceWrapper
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource systemEnvironment [org.springframework.boot.env.SystemEnvironmentPropertySourceEnvironmentPostProcessor$OriginAwareSystemEnvironmentPropertySource] to EncryptableSystemEnvironmentPropertySourceWrapper
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource random [org.springframework.boot.env.RandomValuePropertySource] to EncryptablePropertySourceWrapper
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource Config resource 'file [/app/dstone/dstone-boot/conf/application.yml]' via location '/app/dstone/dstone-boot/conf/application.yml' [org.springframework.boot.env.OriginTrackedMapPropertySource] to EncryptableMapPropertySourceWrapper
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource applicationInfo [org.springframework.boot.ApplicationInfoPropertySource] to EncryptableMapPropertySourceWrapper
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource class path resource [env.properties] [org.springframework.core.io.support.ResourcePropertySource] to EncryptableMapPropertySourceWrapper
+2026-09-04 09:29:40  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource defaultProperties [org.springframework.boot.DefaultPropertiesPropertySource] to EncryptableMapPropertySourceWrapper
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'configTransaction' of type [net.dstone.boot.common.config.ConfigTransaction] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'configProperty' of type [net.dstone.common.config.ConfigProperty] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'configDatasource' of type [net.dstone.boot.common.config.ConfigDatasource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'net.dstone.common.config.ConfigAspect' of type [net.dstone.common.config.ConfigAspect] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  INFO [com.ulisesbocchio.jasyptspringboot.filter.DefaultLazyPropertyFilter] Property Filter custom Bean not found with name 'encryptablePropertyFilter'. Initializing Default Property Filter
+2026-09-04 09:29:41  INFO [com.ulisesbocchio.jasyptspringboot.resolver.DefaultLazyPropertyResolver] Property Resolver custom Bean not found with name 'encryptablePropertyResolver'. Initializing Default Property Resolver
+2026-09-04 09:29:41  INFO [com.ulisesbocchio.jasyptspringboot.detector.DefaultLazyPropertyDetector] Property Detector custom Bean not found with name 'encryptablePropertyDetector'. Initializing Default Property Detector
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'net.dstone.boot.common.config.ConfigEnc' of type [net.dstone.boot.common.config.ConfigEnc] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'jasyptStringEncryptor' of type [org.jasypt.encryption.pbe.PooledPBEStringEncryptor] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  INFO [com.ulisesbocchio.jasyptspringboot.encryptor.DefaultLazyEncryptor] Found Custom Encryptor Bean org.jasypt.encryption.pbe.PooledPBEStringEncryptor@288b73c1 with name: jasyptStringEncryptor
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'dataSourceAnalyzer' of type [com.zaxxer.hikari.HikariDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'txManagerAnalyzer' of type [org.springframework.jdbc.datasource.DataSourceTransactionManager] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'txAdvisorAnalyzer' of type [org.springframework.aop.support.DefaultPointcutAdvisor] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'dataSourceSample' of type [com.zaxxer.hikari.HikariDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'txManagerSample' of type [org.springframework.jdbc.datasource.DataSourceTransactionManager] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'txAdvisorSample' of type [org.springframework.aop.support.DefaultPointcutAdvisor] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'dataSourceCommon' of type [com.zaxxer.hikari.HikariDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'txManagerCommon' of type [org.springframework.jdbc.datasource.DataSourceTransactionManager] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:41  WARN [org.springframework.context.support.PostProcessorRegistrationDelegate$BeanPostProcessorChecker] Bean 'txAdvisorCommon' of type [org.springframework.aop.support.DefaultPointcutAdvisor] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [meterRegistryPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-09-04 09:29:42  INFO [org.springframework.boot.web.embedded.tomcat.TomcatWebServer] Tomcat initialized with port 7081 (http)
+2026-09-04 09:29:42  INFO [org.apache.coyote.http11.Http11NioProtocol] Initializing ProtocolHandler ["http-nio-7081"]
+2026-09-04 09:29:42  INFO [org.apache.catalina.core.StandardService] Starting service [Tomcat]
+2026-09-04 09:29:42  INFO [org.apache.catalina.core.StandardEngine] Starting Servlet engine: [Apache Tomcat/10.1.54]
+2026-09-04 09:29:47  INFO [org.apache.jasper.servlet.TldScanner] At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+2026-09-04 09:29:47  INFO [org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/]] Initializing Spring embedded WebApplicationContext
+2026-09-04 09:29:47  INFO [org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext] Root WebApplicationContext: initialization completed in 8953 ms
+2026-09-04 09:29:51  INFO [org.springframework.security.config.annotation.authentication.configuration.InitializeAuthenticationProviderBeanManagerConfigurer$InitializeAuthenticationProviderManagerConfigurer] Global AuthenticationManager configured with AuthenticationProvider bean with name customAuthenticationProvider
+2026-09-04 09:29:52  INFO [net.dstone.boot.common.config.ConfigWebSocket$$SpringCGLIB$$0] registerStompEndpoints(org.springframework.web.socket.config.annotation.WebMvcStompEndpointRegistry@15c0a8ad) has been called !!!
+2026-09-04 09:29:53  INFO [org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver] Exposing 1 endpoint beneath base path '/actuator'
+2026-09-04 09:29:54  INFO [net.dstone.boot.common.config.ConfigWebSocket$$SpringCGLIB$$0] configureMessageBroker(org.springframework.messaging.simp.config.MessageBrokerRegistry@14d294f4) has been called !!!
+2026-09-04 09:29:55  INFO [org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler] Starting...
+2026-09-04 09:29:55  INFO [org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler] BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@96b00fb]]
+2026-09-04 09:29:55  INFO [org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler] Started.
+2026-09-04 09:29:55  INFO [org.apache.coyote.http11.Http11NioProtocol] Starting ProtocolHandler ["http-nio-7081"]
+2026-09-04 09:29:55  INFO [org.springframework.boot.web.embedded.tomcat.TomcatWebServer] Tomcat started on port 7081 (http) with context path '/'
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.RefreshScopeRefreshedEventListener] Refreshing cached encryptable property sources on ServletWebServerInitializedEvent
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source systemProperties refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source systemEnvironment refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source random refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source Config resource 'file [/app/dstone/dstone-boot/conf/application.yml]' via location '/app/dstone/dstone-boot/conf/application.yml' refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source applicationInfo refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source class path resource [env.properties] refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.caching.CachingDelegateEncryptablePropertySource] Property Source defaultProperties refreshed
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource server.ports [org.springframework.core.env.MapPropertySource] to EncryptableMapPropertySourceWrapper
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Skipping PropertySource configurationProperties [class org.springframework.boot.context.properties.source.ConfigurationPropertySourcesPropertySource
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Skipping PropertySource servletConfigInitParams [class org.springframework.core.env.PropertySource$StubPropertySource
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource servletContextInitParams [org.springframework.web.context.support.ServletContextPropertySource] to EncryptableEnumerablePropertySourceWrapper
+2026-09-04 09:29:55  INFO [com.ulisesbocchio.jasyptspringboot.EncryptablePropertySourceConverter] Converting PropertySource Management Server [org.springframework.boot.actuate.autoconfigure.web.server.ManagementContextAutoConfiguration$LocalManagementPortPropertySource] to EncryptableEnumerablePropertySourceWrapper
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.ConsumerConfig] ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = earliest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-step02-payment-reply-consumer-group-1
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = step02-payment-reply-consumer-group
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_committed
+	key.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.telemetry.internals.KafkaMetricsCollector] initializing Kafka metrics collector
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka version: 3.9.2
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka commitId: 5e9866f43ab8e7e4
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka startTimeMs: 1788481795608
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Subscribed to topic(s): step02-payment-reply
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.ConsumerConfig] ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = earliest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-step03-orderConfirm-reply-consumer-group-2
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = step03-orderConfirm-reply-consumer-group
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_committed
+	key.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.telemetry.internals.KafkaMetricsCollector] initializing Kafka metrics collector
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka version: 3.9.2
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka commitId: 5e9866f43ab8e7e4
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka startTimeMs: 1788481795642
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Subscribed to topic(s): step03-orderConfirm-reply
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.ConsumerConfig] ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = earliest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-order-events-consumer-group-3
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = order-events-consumer-group
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_committed
+	key.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.telemetry.internals.KafkaMetricsCollector] initializing Kafka metrics collector
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka version: 3.9.2
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka commitId: 5e9866f43ab8e7e4
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka startTimeMs: 1788481795656
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Subscribed to topic(s): order-events
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.ConsumerConfig] ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = earliest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-step01-inventoryReserve-reply-consumer-group-4
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = step01-inventoryReserve-reply-consumer-group
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_committed
+	key.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.telemetry.internals.KafkaMetricsCollector] initializing Kafka metrics collector
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka version: 3.9.2
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka commitId: 5e9866f43ab8e7e4
+2026-09-04 09:29:55  INFO [org.apache.kafka.common.utils.AppInfoParser] Kafka startTimeMs: 1788481795678
+2026-09-04 09:29:55  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Subscribed to topic(s): step01-inventoryReserve-reply
+2026-09-04 09:29:55  INFO [net.dstone.boot.DstoneBootApplication] Started DstoneBootApplication in 17.908 seconds (process running for 18.978)
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.Metadata] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Cluster ID: hXt_iW8VQ-mPqDcS1Qz-VQ
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.Metadata] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Cluster ID: hXt_iW8VQ-mPqDcS1Qz-VQ
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Discovered group coordinator 172.18.0.1:9092 (id: 2147483646 rack: null)
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Discovered group coordinator 172.18.0.1:9092 (id: 2147483646 rack: null)
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.Metadata] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Cluster ID: hXt_iW8VQ-mPqDcS1Qz-VQ
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Discovered group coordinator 172.18.0.1:9092 (id: 2147483646 rack: null)
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.Metadata] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Cluster ID: hXt_iW8VQ-mPqDcS1Qz-VQ
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Discovered group coordinator 172.18.0.1:9092 (id: 2147483646 rack: null)
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Request joining group due to: need to re-join with the given member-id: consumer-step01-inventoryReserve-reply-consumer-group-4-495a1497-83d1-44b4-9bd9-c9ff1cb6e8c4
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Request joining group due to: need to re-join with the given member-id: consumer-step03-orderConfirm-reply-consumer-group-2-65344f56-ca3f-4785-a397-c9d3a25fa41a
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Request joining group due to: need to re-join with the given member-id: consumer-step02-payment-reply-consumer-group-1-1b3e512b-3bfe-40cf-9057-a5f0aac1a18f
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Request joining group due to: need to re-join with the given member-id: consumer-order-events-consumer-group-3-9f11f365-289e-4c75-a805-0770b9ad03c3
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] (Re-)joining group
+2026-09-04 09:29:56  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] (Re-)joining group
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Successfully joined group with generation Generation{generationId=25, memberId='consumer-step02-payment-reply-consumer-group-1-1b3e512b-3bfe-40cf-9057-a5f0aac1a18f', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Successfully joined group with generation Generation{generationId=25, memberId='consumer-step01-inventoryReserve-reply-consumer-group-4-495a1497-83d1-44b4-9bd9-c9ff1cb6e8c4', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Successfully joined group with generation Generation{generationId=19, memberId='consumer-order-events-consumer-group-3-9f11f365-289e-4c75-a805-0770b9ad03c3', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Successfully joined group with generation Generation{generationId=25, memberId='consumer-step03-orderConfirm-reply-consumer-group-2-65344f56-ca3f-4785-a397-c9d3a25fa41a', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Finished assignment for group at generation 25: {consumer-step01-inventoryReserve-reply-consumer-group-4-495a1497-83d1-44b4-9bd9-c9ff1cb6e8c4=Assignment(partitions=[step01-inventoryReserve-reply-0])}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Finished assignment for group at generation 19: {consumer-order-events-consumer-group-3-9f11f365-289e-4c75-a805-0770b9ad03c3=Assignment(partitions=[order-events-0])}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Finished assignment for group at generation 25: {consumer-step03-orderConfirm-reply-consumer-group-2-65344f56-ca3f-4785-a397-c9d3a25fa41a=Assignment(partitions=[step03-orderConfirm-reply-0])}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Finished assignment for group at generation 25: {consumer-step02-payment-reply-consumer-group-1-1b3e512b-3bfe-40cf-9057-a5f0aac1a18f=Assignment(partitions=[step02-payment-reply-0])}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Successfully synced group in generation Generation{generationId=25, memberId='consumer-step02-payment-reply-consumer-group-1-1b3e512b-3bfe-40cf-9057-a5f0aac1a18f', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Notifying assignor about the new Assignment(partitions=[step02-payment-reply-0])
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Successfully synced group in generation Generation{generationId=19, memberId='consumer-order-events-consumer-group-3-9f11f365-289e-4c75-a805-0770b9ad03c3', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Notifying assignor about the new Assignment(partitions=[order-events-0])
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Successfully synced group in generation Generation{generationId=25, memberId='consumer-step01-inventoryReserve-reply-consumer-group-4-495a1497-83d1-44b4-9bd9-c9ff1cb6e8c4', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Notifying assignor about the new Assignment(partitions=[step01-inventoryReserve-reply-0])
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Successfully synced group in generation Generation{generationId=25, memberId='consumer-step03-orderConfirm-reply-consumer-group-2-65344f56-ca3f-4785-a397-c9d3a25fa41a', protocol='range'}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Notifying assignor about the new Assignment(partitions=[step03-orderConfirm-reply-0])
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Adding newly assigned partitions: step02-payment-reply-0
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Adding newly assigned partitions: step01-inventoryReserve-reply-0
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Adding newly assigned partitions: step03-orderConfirm-reply-0
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Adding newly assigned partitions: order-events-0
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerUtils] Setting offset for partition step03-orderConfirm-reply-0 to the committed offset FetchPosition{offset=5, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[172.18.0.1:9092 (id: 1 rack: null)], epoch=20}}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerUtils] Setting offset for partition order-events-0 to the committed offset FetchPosition{offset=4, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[172.18.0.1:9092 (id: 1 rack: null)], epoch=20}}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerUtils] Setting offset for partition step01-inventoryReserve-reply-0 to the committed offset FetchPosition{offset=11, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[172.18.0.1:9092 (id: 1 rack: null)], epoch=20}}
+2026-09-04 09:29:59  INFO [org.apache.kafka.clients.consumer.internals.ConsumerUtils] Setting offset for partition step02-payment-reply-0 to the committed offset FetchPosition{offset=6, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[172.18.0.1:9092 (id: 1 rack: null)], epoch=20}}
+2026-09-04 09:29:59  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step03-orderConfirm-reply-consumer-group: partitions assigned: [step03-orderConfirm-reply-0]
+2026-09-04 09:29:59  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step02-payment-reply-consumer-group: partitions assigned: [step02-payment-reply-0]
+2026-09-04 09:29:59  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step01-inventoryReserve-reply-consumer-group: partitions assigned: [step01-inventoryReserve-reply-0]
+2026-09-04 09:29:59  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] order-events-consumer-group: partitions assigned: [order-events-0]
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Revoke previously assigned partitions step02-payment-reply-0
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Revoke previously assigned partitions step01-inventoryReserve-reply-0
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Revoke previously assigned partitions step03-orderConfirm-reply-0
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step02-payment-reply-consumer-group: partitions revoked: [step02-payment-reply-0]
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step03-orderConfirm-reply-consumer-group: partitions revoked: [step03-orderConfirm-reply-0]
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step01-inventoryReserve-reply-consumer-group: partitions revoked: [step01-inventoryReserve-reply-0]
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Member consumer-step03-orderConfirm-reply-consumer-group-2-65344f56-ca3f-4785-a397-c9d3a25fa41a sending LeaveGroup request to coordinator 172.18.0.1:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Member consumer-step01-inventoryReserve-reply-consumer-group-4-495a1497-83d1-44b4-9bd9-c9ff1cb6e8c4 sending LeaveGroup request to coordinator 172.18.0.1:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerRebalanceListenerInvoker] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Revoke previously assigned partitions order-events-0
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] order-events-consumer-group: partitions revoked: [order-events-0]
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Member consumer-order-events-consumer-group-3-9f11f365-289e-4c75-a805-0770b9ad03c3 sending LeaveGroup request to coordinator 172.18.0.1:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Member consumer-step02-payment-reply-consumer-group-1-1b3e512b-3bfe-40cf-9057-a5f0aac1a18f sending LeaveGroup request to coordinator 172.18.0.1:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Unsubscribed all topics or patterns and assigned partitions
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Unsubscribed all topics or patterns and assigned partitions
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Unsubscribed all topics or patterns and assigned partitions
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Unsubscribed all topics or patterns and assigned partitions
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step03-orderConfirm-reply-consumer-group-2, groupId=step03-orderConfirm-reply-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step01-inventoryReserve-reply-consumer-group-4, groupId=step01-inventoryReserve-reply-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-order-events-consumer-group-3, groupId=order-events-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.clients.consumer.internals.ConsumerCoordinator] [Consumer clientId=consumer-step02-payment-reply-consumer-group-1, groupId=step02-payment-reply-consumer-group] Request joining group due to: consumer pro-actively leaving the group
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics scheduler closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics scheduler closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics reporters closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics reporters closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics scheduler closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics reporters closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics scheduler closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.metrics.Metrics] Metrics reporters closed
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.utils.AppInfoParser] App info kafka.consumer for consumer-step02-payment-reply-consumer-group-1 unregistered
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.utils.AppInfoParser] App info kafka.consumer for consumer-step03-orderConfirm-reply-consumer-group-2 unregistered
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step02-payment-reply-consumer-group: Consumer stopped
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.utils.AppInfoParser] App info kafka.consumer for consumer-step01-inventoryReserve-reply-consumer-group-4 unregistered
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step03-orderConfirm-reply-consumer-group: Consumer stopped
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] step01-inventoryReserve-reply-consumer-group: Consumer stopped
+2026-09-04 09:30:01  INFO [org.apache.kafka.common.utils.AppInfoParser] App info kafka.consumer for consumer-order-events-consumer-group-3 unregistered
+2026-09-04 09:30:01  INFO [org.springframework.kafka.listener.KafkaMessageListenerContainer] order-events-consumer-group: Consumer stopped
+2026-09-04 09:30:02  INFO [org.springframework.boot.web.embedded.tomcat.GracefulShutdown] Commencing graceful shutdown. Waiting for active requests to complete
+2026-09-04 09:30:02  INFO [org.springframework.boot.web.embedded.tomcat.GracefulShutdown] Graceful shutdown complete
+2026-09-04 09:30:02  INFO [org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler] Stopping...
+2026-09-04 09:30:02  INFO [org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler] BrokerAvailabilityEvent[available=false, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@96b00fb]]
+2026-09-04 09:30:02  INFO [org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler] Stopped.
