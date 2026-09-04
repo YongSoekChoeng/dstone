@@ -268,19 +268,40 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 
 ### 6.2 빠른 참조표
 
-| 하고 싶은 것 | 명령 |
-|---|---|
-| 최초 배포 / 전체 재적용 | `kubectl apply -f dstone-boot/k8s/` |
-| 새 이미지로 배포 | `kubectl set image deployment/dstone-boot dstone-boot=<image> -n dstone` |
-| 실행 상태 확인 | `kubectl get pods -n dstone -l app=dstone-boot` |
-| 로그 보기 | `kubectl logs -n dstone deploy/dstone-boot -f` |
-| 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081`|
-| 호스트에서 접속(백그라운드) | `nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 & disown` |
-| 재시작(코드 변경 없이) | `kubectl rollout restart deployment/dstone-boot -n dstone` |
-| 중지 | `kubectl scale deployment/dstone-boot -n dstone --replicas=0` |
-| 시작(재개) | `kubectl scale deployment/dstone-boot -n dstone --replicas=1` |
-| 이전 버전으로 롤백 | `kubectl rollout undo deployment/dstone-boot -n dstone` |
-| 완전 삭제 | `kubectl delete -f dstone-boot/k8s/` |
+아래 표는 "하고 싶은 일 → 명령 한 줄"만 빠르게 찾기 위한 참조용이다. 명령 안의 `-n dstone`은 매번 네임스페이스를 지정하는 부분(리소스명이 전부 `dstone-boot`으로 겹치므로 생략하면 다른 네임스페이스를 잘못 건드릴 수 있다), `deploy/dstone-boot`·`svc/dstone-boot`은 각각 Deployment·Service 리소스를 가리키는 축약 표기다. 각 행의 자세한 절차/배경은 뒤따르는 6.3 이후 절을 참고.
+
+| 하고 싶은 것 | 명령 | 비고 |
+|---|---|---|
+| 최초 배포 / 전체 재적용 | `kubectl apply -f dstone-boot/k8s/` | `namespace`/`configmap`/`deployment`/`service` 4개 매니페스트를 한 번에 적용. 이미 존재하면 변경분만 갱신(멱등). → [6.3](#63-최초-배포--전체-재적용) |
+| 새 이미지로 배포 | `kubectl set image deployment/dstone-boot dstone-boot=<image> -n dstone` | `<image>`는 `localhost:5000/dstone-boot:<TAG>`처럼 **레지스트리+저장소명+태그를 전부 포함한 전체 문자열**이어야 한다. `<TAG>`는 임의로 정하면 되고(Jenkins는 `${BUILD_NUMBER}` 자동 사용), 매번 새 태그를 쓰는 게 안전하다 — 이유와 태그 확인법은 아래 "이미지 태그, 왜 매번 새로 붙여야 하나" 참고. → [6.4](#64-새-이미지-빌드-후-배포-jenkins-파이프라인이-자동-수행하는-것과-동일한-수동-절차) |
+| 실행 상태 확인 | `kubectl get pods -n dstone -l app=dstone-boot` | `-l app=dstone-boot`은 라벨 필터. `STATUS`가 `Running`, `READY`가 `1/1`이면 정상. `CrashLoopBackOff`/`ImagePullBackOff`면 `kubectl describe pod`/`kubectl get events`로 원인 확인([6.5](#65-상태-조회)). |
+| 로그 보기 | `kubectl logs -n dstone deploy/dstone-boot -f` | `-f`는 tail -f처럼 실시간 스트리밍. 이건 컨테이너의 **stdout**(log4j2의 Console appender)만 보여준다 — 파일로 남는 로그(`/app/dstone/LOGS/...`)는 별개이고 pod가 사라지면 같이 사라진다. |
+| 호스트에서 접속 | `kubectl port-forward -n dstone svc/dstone-boot 7081:7081`| 터미널을 점유한 채로 로컬 `7081` 포트를 클러스터 안 Service `7081`에 연결. `Ctrl+C`하면 끊긴다. 브라우저로 `http://localhost:7081`에 접속해 확인할 때 씀. |
+| 호스트에서 접속(백그라운드) | `nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 & disown` | 위와 동일하지만 터미널을 안 붙잡음. 끊고 싶으면 `pkill -f "port-forward.*dstone-boot"`. |
+| 재시작(코드 변경 없이) | `kubectl rollout restart deployment/dstone-boot -n dstone` | 이미지·설정은 그대로 두고 pod만 새로 띄움(메모리 누수 의심될 때 등). **주의**: `imagePullPolicy: IfNotPresent`라 같은 태그면 새로 pull하지 않고 노드에 캐시된 이미지를 그대로 재사용한다 — 이미지 자체를 바꾸고 싶으면 이 명령이 아니라 [6.4](#64-새-이미지-빌드-후-배포-jenkins-파이프라인이-자동-수행하는-것과-동일한-수동-절차)의 `set image`를 써야 한다. |
+| 중지 | `kubectl scale deployment/dstone-boot -n dstone --replicas=0` | pod 개수를 0으로 — Deployment 자체는 남기고 실행만 멈춤(디스크에 뭘 지우지 않는 안전한 중지). `docker-compose down`의 감각과 비슷하지만 리소스 정의는 삭제되지 않는다. |
+| 시작(재개) | `kubectl scale deployment/dstone-boot --replicas=1 -n dstone` | 0으로 내렸던 걸 다시 1로. 이때도 이미지는 Deployment에 이미 박혀 있는 그대로 쓴다(재빌드/재pull 아님). |
+| 이전 버전으로 롤백 | `kubectl rollout undo deployment/dstone-boot -n dstone` | 직전 `kubectl apply`/`set image` 이전 리비전으로 되돌림. `kubectl rollout history deployment/dstone-boot -n dstone`으로 리비전 목록을 먼저 봐도 됨. |
+| 완전 삭제 | `kubectl delete -f dstone-boot/k8s/` | namespace까지 통째로 삭제 — 다시 쓰려면 [6.3](#63-최초-배포--전체-재적용)부터 재적용. 스테이징을 잠깐 비우고 싶을 뿐이면 "중지"(replicas=0)로 충분하고 이 명령은 필요 없다. |
+
+#### 이미지 태그, 왜 매번 새로 붙여야 하나 / 지금 뭐가 떠 있는지 확인하기
+
+`<TAG>`는 형식 제약이 없는 임의 문자열이다 — 날짜(`20260904-1`), 목적을 담은 이름(`kafka-fix`), 커밋 해시 등 뭐든 된다. 다만 **같은 태그를 재사용하면 곤란해지는 경우가 있다**: `deployment.yaml`이 `imagePullPolicy: IfNotPresent`로 설정돼 있어서, kind 노드에 그 태그의 이미지가 이미 캐시돼 있으면 `docker push`로 레지스트리 쪽만 새 내용으로 덮어써도 노드는 그걸 다시 안 당겨오고 캐시를 그대로 쓴다. 그래서 `kubectl rollout restart`나 `kubectl scale`로 pod만 새로 띄워봐야 옛날 이미지가 계속 뜨는 상황이 생긴다 — 이게 바로 이 문서의 앞 절에서 "properties 고쳤는데 반영이 안 된다"의 원인이었다. 매번 다른 태그를 쓰고 `kubectl set image`로 그 태그를 명시적으로 지정하면 이 문제를 원천적으로 피할 수 있다(Jenkins가 `${BUILD_NUMBER}`를 쓰는 이유).
+
+"지금 실제로 뭐가 떠 있나"는 목적에 따라 확인하는 곳이 다르다:
+
+```bash
+# 1) 클러스터에 실제로 떠 있는 태그 (가장 신뢰할 수 있는 "현재 상태" — 이것만 믿으면 된다)
+kubectl get deployment dstone-boot -n dstone -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# 2) 로컬 사설 레지스트리(localhost:5000)에 올라가 있는 전체 태그 목록
+curl -s http://localhost:5000/v2/dstone-boot/tags/list
+
+# 3) 이 WSL 호스트에 로컬로 캐시된(빌드/pull된 적 있는) 이미지 태그들
+docker images localhost:5000/dstone-boot
+```
+
+`dstone-boot/k8s/deployment.yaml` 파일에는 `image: localhost:5000/dstone-boot:latest`라고 적혀 있지만, 이건 **최초 적용 시점의 기본값일 뿐**이다. 이후 `kubectl set image`로 태그를 바꾸면 클러스터에 실제로 적용된 Deployment 객체와 git의 매니페스트 파일이 서로 다른 값을 가리키게 된다(이른바 "매니페스트 드리프트") — 그래서 파일이 아니라 위 1번 명령으로 클러스터에 직접 물어보는 게 진짜 정답이다.
 
 ### 6.3 최초 배포 / 전체 재적용
 
