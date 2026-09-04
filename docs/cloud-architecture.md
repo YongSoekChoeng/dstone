@@ -284,6 +284,63 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 | 이전 버전으로 롤백 | `kubectl rollout undo deployment/dstone-boot -n dstone` | 직전 `kubectl apply`/`set image` 이전 리비전으로 되돌림. `kubectl rollout history deployment/dstone-boot -n dstone`으로 리비전 목록을 먼저 봐도 됨. |
 | 완전 삭제 | `kubectl delete -f dstone-boot/k8s/` | namespace까지 통째로 삭제 — 다시 쓰려면 [6.3](#63-최초-배포--전체-재적용)부터 재적용. 스테이징을 잠깐 비우고 싶을 뿐이면 "중지"(replicas=0)로 충분하고 이 명령은 필요 없다. |
 
+#### 진행 샘플(이미지 수정 및 재적용)
+```bash
+## 0단계 — 사전 확인
+kind get clusters                      # dev 나오는지
+kubectl config current-context         # kind-dev 인지
+docker ps --filter name=kind-registry  # kind-registry Up 상태인지
+
+## 1단계 — 기존 것 전부 삭제
+# **k8s 리소스 삭제** (namespace를 지우면 그 안의 deployment/service/configmap/pod가 다 같이 사라짐):
+kubectl delete -f dstone-boot/k8s/
+kubectl get all -n dstone              # "No resources found" 나올 때까지 기다리기 (namespace 삭제는 몇 초 걸림)
+# **로컬에 캐시된 옛날 이미지 삭제**:
+docker rmi localhost:5000/dstone-boot:kafka-fix localhost:5000/dstone-boot:latest
+# 레지스트리(`localhost:5000`) 안에 저장된 이미지 데이터 자체까지 지우는 건 별도 GC 절차가 필요해서 번거롭습니다(`REGISTRY_STORAGE_DELETE_ENABLED` 설정 + exec 후 garbage-collect). 
+# 어차피 새 태그로 push하면 덮어써지는 개념이 아니라 새 항목이 생기는 거라, 레지스트리 내부 정리는 건너뛰셔도 실습엔 지장 없습니다.
+
+## 2단계 — 새 이미지 빌드
+docker build -f dstone-boot/Dockerfile -t localhost:5000/dstone-boot:<원하는태그> .
+# Docker 빌드 컨텍스트는 반드시 리포지토리 루트여야 합니다(`dstone-common` 소스가 같이 필요해서).
+# <원하는태그>는 임의 문자열입니다. 예: docker build -f dstone-boot/Dockerfile -t localhost:5000/dstone-boot:20260904-1 .
+# **확인 포인트**: 빌드 로그 마지막이 `naming to localhost:5000/dstone-boot:<태그>` 같은 줄로 끝나면 성공.
+
+## 3단계 — 레지스트리에 push
+docker push localhost:5000/dstone-boot:<원하는태그>
+curl -s http://localhost:5000/v2/dstone-boot/tags/list   # 방금 push한 태그가 목록에 보이는지 확인
+
+## 4단계 — 매니페스트 반영
+# dstone-boot/k8s/deployment.yaml`을 열어서 `image: localhost:5000/dstone-boot:태그` 줄을 방금 만든 태그로 수정 (예: `image: localhost:5000/dstone-boot:20260904-1`) 
+# 그다음 4개 매니페스트를 순서대로 적용 (namespace 먼저)
+kubectl apply -f dstone-boot/k8s/namespace.yaml
+kubectl apply -f dstone-boot/k8s/configmap.yaml
+kubectl apply -f dstone-boot/k8s/deployment.yaml
+kubectl apply -f dstone-boot/k8s/service.yaml
+kubectl rollout status deployment/dstone-boot -n dstone --timeout=120s
+# rollout status`가 `deployment "dstone-boot" successfully rolled out`을 출력하면 성공.
+
+## 5단계 — 검증
+# 실제로 새 태그가 떴는지
+kubectl get deployment dstone-boot -n dstone -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+# pod 상태
+kubectl get pods -n dstone -l app=dstone-boot
+# 로그
+kubectl logs -n dstone deploy/dstone-boot --tail=50
+# 수정 경로가 실제로 반영됐는지 (WAR 위치 + LOGS 디렉토리 자동 생성 확인)
+kubectl exec -it -n dstone deploy/dstone-boot -- sh
+# pwd가 /app/dstone/dstone-boot로 나오고, WAR도 그 경로에 있어야 정상.
+
+## 6단계 — 접속 확인
+kubectl get svc dstone-boot -n dstone   # NodePort 확인 (지금은 30081)
+# 방법 A: port-forward 이후 확인
+nohup kubectl port-forward -n dstone svc/dstone-boot 7081:7081 > /tmp/port-forward.log 2>&1 & disown
+curl -I http://localhost:7081/actuator/health/readiness
+# 방법 B: NodePort로 바로 (kind 노드 IP 확인 필요시 kubectl get nodes -o wide)
+curl -I http://localhost:30081/actuator/health/readiness
+
+```
+
 #### 이미지 태그, 왜 매번 새로 붙여야 하나 / 지금 뭐가 떠 있는지 확인하기
 
 `<TAG>`는 형식 제약이 없는 임의 문자열이다 — 날짜(`20260904-1`), 목적을 담은 이름(`kafka-fix`), 커밋 해시 등 뭐든 된다. 다만 **같은 태그를 재사용하면 곤란해지는 경우가 있다**: `deployment.yaml`이 `imagePullPolicy: IfNotPresent`로 설정돼 있어서, kind 노드에 그 태그의 이미지가 이미 캐시돼 있으면 `docker push`로 레지스트리 쪽만 새 내용으로 덮어써도 노드는 그걸 다시 안 당겨오고 캐시를 그대로 쓴다. 그래서 `kubectl rollout restart`나 `kubectl scale`로 pod만 새로 띄워봐야 옛날 이미지가 계속 뜨는 상황이 생긴다 — 이게 바로 이 문서의 앞 절에서 "properties 고쳤는데 반영이 안 된다"의 원인이었다. 매번 다른 태그를 쓰고 `kubectl set image`로 그 태그를 명시적으로 지정하면 이 문제를 원천적으로 피할 수 있다(Jenkins가 `${BUILD_NUMBER}`를 쓰는 이유).
