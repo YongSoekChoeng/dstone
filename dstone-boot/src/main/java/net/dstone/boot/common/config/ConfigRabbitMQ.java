@@ -50,7 +50,11 @@ public class ConfigRabbitMQ extends BaseObject {
     /** 1. Exchange 구성합니다. */
     @Bean
     public FanoutExchange exchangeNotifications() {
-        return new FanoutExchange(configProperty.getProperty("spring.rabbitmq.bindings.binding-notifications.exchange-id"));
+        return new FanoutExchange(
+        	configProperty.getProperty("spring.rabbitmq.bindings.binding-notifications.exchange-id"),
+        	Boolean.valueOf(configProperty.getProperty("spring.rabbitmq.bindings.binding-notifications.exchange-durable")),
+        	false // autoDelete
+        );
     }
     /** 2. 큐를 구성합니다. */
     @Bean
@@ -69,7 +73,11 @@ public class ConfigRabbitMQ extends BaseObject {
     /** 1. Exchange 구성합니다. */
     @Bean
     public DirectExchange exchangeOrders() {
-        return new DirectExchange(configProperty.getProperty("spring.rabbitmq.bindings.binding-orders.exchange-id"));
+        return new DirectExchange(
+        	configProperty.getProperty("spring.rabbitmq.bindings.binding-orders.exchange-id"),
+        	Boolean.valueOf(configProperty.getProperty("spring.rabbitmq.bindings.binding-orders.exchange-durable")),
+        	false // autoDelete
+        );
     }
     /** 2. 큐를 구성합니다. */
     @Bean
