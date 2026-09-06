@@ -34,8 +34,37 @@ redis-cli --version
 
 ## 4. 서비스 시작/중지
 ```bash
-/usr/local/bin/start-redis.sh   # sudo systemctl start redis-server
-/usr/local/bin/stop-redis.sh    # sudo systemctl stop redis-server
+/usr/local/bin/start-redis.sh
+/usr/local/bin/stop-redis.sh
+```
+
+`start-redis.sh`:
+```sh
+#!/bin/sh
+
+# 이전 실행에서 StartLimitBurst에 걸려 failed 상태로 남아있으면 start가 거부되므로 먼저 리셋
+sudo systemctl reset-failed redis-server.service >/dev/null 2>&1
+
+sudo systemctl start redis-server
+
+for i in 1 2 3 4 5; do
+    if systemctl is-active --quiet redis-server.service; then
+        echo "Redis started !!! For realtime administration, Use Tool /DB/Tools/Redis-Desktop-Manager/Version/Another Redis Desktop Manager.exe"
+        exit 0
+    fi
+    sleep 1
+done
+
+echo "Redis FAILED to start. Check: sudo systemctl status redis-server.service / sudo journalctl -xeu redis-server.service" >&2
+exit 1
+```
+
+`redis-server.service`는 `disabled`라 WSL 부팅 시 자동으로 뜨지 않는다. `bind`에 `172.18.0.1`([5절](#5-주요-설정) 참고)이 포함되어 있어 Docker/kind 네트워크가 뜨기 전에 redis를 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패하는 레이스 컨디션이 있다 — 그래서 `~/start.sh`는 반드시 Docker/kind를 먼저 올린 뒤 redis를 올리도록 순서가 고정되어 있다 (상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh)). 2026-09-06 이전 버전은 무조건 "Redis started !!!"를 출력했는데, 재시도 간격이 너무 짧아 `StartLimitBurst`(기본 5회/10초)에 걸려 기동이 완전히 실패했는데도 성공한 것처럼 보이는 문제가 있었다. 지금은 mysql([mysql.md 4절](mysql.md#4-서비스-시작중지))과 동일한 패턴 — `reset-failed` → `start` → 최대 5초 `is-active` 재확인 — 으로 정확한 성공/실패를 출력한다.
+
+`stop-redis.sh`:
+```sh
+sudo systemctl stop redis-server
+echo "Redis stopped !!!"
 ```
 
 ## 5. 주요 설정

@@ -47,16 +47,26 @@ log.dirs=/opt/kafka/kafka_2.13-4.2.1/data/kraft-combined-logs
 ```
 
 ## 5. 서비스 시작/중지
-전용 스크립트를 작성해 사용 중이다 (systemd 미등록, 수동 실행).
+전용 스크립트를 작성해 사용 중이다 (systemd 미등록, 수동 실행). 최상위 래퍼(`~/start.sh`/`~/stop.sh`가 호출):
+
+```sh
+# /usr/local/bin/start-kafka.sh
+/opt/kafka/kafka-start.sh
+echo "Kafka started !!!"
+/opt/kafka/admin-tools/KafbatUI/start.sh
+echo "KafbatUI(Kafka관리툴) started !!! Admin Console URL : http://localhost:9099"
+```
+```sh
+# /usr/local/bin/stop-kafka.sh
+/opt/kafka/kafka-stop.sh
+echo "Kafka stopped !!!"
+/opt/kafka/admin-tools/KafbatUI/stop.sh
+echo "KafbatUI(Kafka관리툴) stopped !!!"
+```
 
 - `/opt/kafka/kafka-start.sh`: `nohup bin/kafka-server-start.sh config/server.properties`로 백그라운드 기동, PID를 `kafka-server.pid`에 기록. 이미 실행 중이면 중복 실행 방지.
 - `/opt/kafka/kafka-stop.sh`: PID 파일 기준 `kill` (정상 종료 최대 30초 대기 후 `kill -9` 강제 종료), 없으면 `kafka-server-stop.sh` 사용.
-- `/usr/local/bin/start-kafka.sh` / `stop-kafka.sh`: 위 두 스크립트 + [Kafbat UI](kafbat-ui.md) 시작/중지까지 한 번에 처리하는 최상위 스크립트.
-
-```bash
-/usr/local/bin/start-kafka.sh
-/usr/local/bin/stop-kafka.sh
-```
+- Kafbat UI(`start.sh`/`stop.sh`) 상세는 [kafbat-ui.md 5절](kafbat-ui.md#5-서비스-시작중지) 참고.
 
 로그: `/opt/kafka/kafka_2.13-4.2.1/logs/kafka-server.out`
 

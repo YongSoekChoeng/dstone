@@ -31,10 +31,17 @@ pg_lsclusters
 ```
 
 ## 4. 서비스 시작/중지
-```bash
-/usr/local/bin/start-postgresql.sh   # sudo systemctl start postgresql
-/usr/local/bin/stop-postgresql.sh    # sudo systemctl stop postgresql
+```sh
+# /usr/local/bin/start-postgresql.sh
+sudo systemctl start postgresql
+echo "Postgresql started !!!"
 ```
+```sh
+# /usr/local/bin/stop-postgresql.sh
+sudo systemctl stop postgresql
+echo "Postgresql stopped !!!"
+```
+`postgresql.service`는 `systemctl is-enabled` 기준 **enabled**라 WSL 부팅 시 이미 떠 있는 경우가 대부분이며, 이 경우 `start-postgresql.sh`는 사실상 no-op이다. 정지는 자동으로 다시 일어나지 않으므로 `stop-postgresql.sh`로 내리면 WSL을 재기동하기 전까지 유지된다.
 
 ## 5. 접속
 ```bash

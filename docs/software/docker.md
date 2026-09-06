@@ -52,14 +52,89 @@ docker compose version
 ```
 
 ## 4. 서비스 시작/중지
-WSL 환경 특성상 `dockerd`를 systemd로 자동 기동하지 않고, 전용 스크립트로 백그라운드에서 직접 기동한다.
+WSL 환경 특성상 `dockerd`를 systemd로 자동 기동하지 않고, 전용 스크립트로 백그라운드에서 직접 기동한다. `docker.service`는 `systemctl is-enabled` 기준 `disabled`.
 
-```bash
-/usr/local/bin/docker-start.sh    # nohup dockerd, /home/<user>/.docker/dockerd.log 에 로그, 최대 30초 대기 후 준비 확인
-/usr/local/bin/docker-stop.sh     # pgrep dockerd 후 kill
-/usr/local/bin/docker-status.sh   # docker info로 실행 여부 및 서버 버전 출력
+최상위 래퍼(`~/start.sh`/`~/stop.sh`가 호출):
+```sh
+# /usr/local/bin/start-docker.sh
+/usr/local/bin/docker-start.sh
+echo "Docker started !!!"
 ```
-최상위 래퍼: `/usr/local/bin/start-docker.sh` / `stop-docker.sh`.
+```sh
+# /usr/local/bin/stop-docker.sh
+/usr/local/bin/docker-stop.sh
+echo "Docker stopped !!!"
+```
+
+실제 로직(`docker-start.sh`):
+```bash
+#!/bin/bash
+
+LOG_DIR="$HOME/.docker"
+LOG_FILE="$LOG_DIR/dockerd.log"
+
+mkdir -p "$LOG_DIR"
+
+if pgrep -x dockerd >/dev/null; then
+    echo "Docker is already running."
+    exit 0
+fi
+
+echo "Starting Docker..."
+
+sudo sh -c "nohup dockerd > '$LOG_FILE' 2>&1 &"
+
+echo -n "Waiting for Docker"
+
+for i in {1..30}; do
+    if docker info >/dev/null 2>&1; then
+        echo
+        echo "Docker is ready."
+        exit 0
+    fi
+
+    echo -n "."
+    sleep 1
+done
+
+echo
+echo "Failed to start Docker."
+echo "Check: $LOG_FILE"
+
+tail -30 "$LOG_FILE"
+
+exit 1
+```
+`pgrep -x dockerd`로 이미 떠 있는지 확인 → 없으면 `sudo dockerd`를 `nohup`으로 백그라운드 기동(로그: `~/.docker/dockerd.log`) → `docker info`가 성공할 때까지 최대 30초 동안 1초 간격 폴링 → 시간 안에 못 뜨면 실패로 종료하고 로그 tail을 보여준다.
+
+실제 로직(`docker-stop.sh`):
+```bash
+#!/bin/bash
+
+PID=$(pgrep -x dockerd)
+
+if [ -z "$PID" ]; then
+    echo "Docker is not running."
+    exit 0
+fi
+
+echo "Stopping Docker..."
+
+sudo kill "$PID"
+
+sleep 2
+
+if pgrep -x dockerd > /dev/null; then
+    echo "Docker is still running."
+    exit 1
+else
+    echo "Docker stopped."
+fi
+```
+
+그 외 보조 스크립트: `/usr/local/bin/docker-status.sh` (`docker info`로 실행 여부/서버 버전 출력).
+
+`dockerd`가 Docker/kind 네트워크(`kind` 브리지, `172.18.0.1`)를 올리는 주체이므로, `~/start.sh`는 반드시 이 스크립트를 [MySQL](mysql.md#4-서비스-시작중지)/[Redis](redis.md#4-서비스-시작중지)보다 먼저 실행해야 한다 — 상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh).
 
 ## 5. 권한
 현재 사용자(`jysn007`)는 `docker` 그룹에 속해 있어 `sudo` 없이 `docker` 명령을 사용할 수 있다. 그룹 변경 후에는 재로그인(WSL 재시작)이 필요하다.

@@ -54,10 +54,19 @@ kind version
 ## 5. 서비스(클러스터) 시작/중지
 전용 스크립트로 docker 데몬 기동 확인 → kind 클러스터 생성/재사용까지 자동화되어 있다.
 
-```bash
-/usr/local/bin/start-kube.sh   # -> /usr/local/bin/k8s-start.sh
-/usr/local/bin/stop-kube.sh    # -> /usr/local/bin/k8s-stop.sh
+최상위 래퍼(`~/start.sh`/`~/stop.sh`가 호출):
+```sh
+# /usr/local/bin/start-kube.sh
+/usr/local/bin/k8s-start.sh
+echo "Kubenetes started !!!"
 ```
+```sh
+# /usr/local/bin/stop-kube.sh
+/usr/local/bin/k8s-stop.sh
+echo "Kubenetes stopped !!!"
+```
+
+이 클러스터([Docker](docker.md) 위에서 동작)가 뜨는 시점에 `kind` 브리지 네트워크(`172.18.0.1`)가 생기므로, `~/start.sh`는 반드시 이 스크립트를 [MySQL](mysql.md#4-서비스-시작중지)/[Redis](redis.md#4-서비스-시작중지)보다 먼저 실행해야 한다 — 상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh).
 
 `k8s-start.sh` 동작:
 1. 현재 사용자가 `docker` 그룹인지 확인 (아니면 에러 종료)

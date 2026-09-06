@@ -41,8 +41,37 @@ sudo mysql -u root -p
 
 ## 4. 서비스 시작/중지
 ```bash
-/usr/local/bin/start-mysql.sh   # sudo systemctl start mysql
-/usr/local/bin/stop-mysql.sh    # sudo systemctl stop mysql
+/usr/local/bin/start-mysql.sh
+/usr/local/bin/stop-mysql.sh
+```
+
+`start-mysql.sh`:
+```sh
+#!/bin/sh
+
+# 이전 실행에서 StartLimitBurst에 걸려 failed 상태로 남아있으면 start가 거부되므로 먼저 리셋
+sudo systemctl reset-failed mysql.service >/dev/null 2>&1
+
+sudo systemctl start mysql
+
+for i in 1 2 3 4 5; do
+    if systemctl is-active --quiet mysql.service; then
+        echo "Mysql started !!!"
+        exit 0
+    fi
+    sleep 1
+done
+
+echo "Mysql FAILED to start. Check: sudo systemctl status mysql.service / sudo journalctl -xeu mysql.service" >&2
+exit 1
+```
+
+`mysql.service`는 `disabled`라 WSL 부팅 시 자동으로 뜨지 않는다. `bind-address`에 `172.18.0.1`([5절](#5-주요-설정) 참고)이 포함되어 있어 Docker/kind 네트워크가 뜨기 전에 mysql을 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패하는 레이스 컨디션이 있다 — 그래서 `~/start.sh`는 반드시 Docker/kind를 먼저 올린 뒤 mysql을 올리도록 순서가 고정되어 있다 (상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh)). 2026-09-06 이전 버전은 `sudo systemctl start mysql`의 종료 코드를 확인하지 않고 무조건 "Mysql started !!!"를 출력해서, 이 레이스로 실제 기동이 실패했을 때도 성공한 것처럼 로그가 찍히는 문제가 있었다. 지금은 `systemctl reset-failed`로 이전 실행에서 남은 실패 상태를 지운 뒤 `start` → 최대 5초간 `systemctl is-active` 재확인으로 실제 상태에 따라 정확한 성공/실패 메시지를 출력한다.
+
+`stop-mysql.sh`:
+```sh
+sudo systemctl stop mysql
+echo "Mysql stopped !!!"
 ```
 
 ## 5. 주요 설정

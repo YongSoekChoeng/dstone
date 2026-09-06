@@ -53,10 +53,17 @@ JENKINS_ARGS="--webroot=/var/cache/jenkins/war --httpPort=8080"
 - `jenkins.service`는 systemd에 `enabled` 상태로 등록되어 있다 (다른 서비스와 달리 부팅 시 자동 기동 대상).
 
 ## 5. 서비스 시작/중지
-```bash
-/usr/local/bin/start-jenkins.sh   # sudo systemctl start jenkins
-/usr/local/bin/stop-jenkins.sh    # sudo systemctl stop jenkins
+```sh
+# /usr/local/bin/start-jenkins.sh
+sudo systemctl start jenkins
+echo "Jenkins started !!!"
 ```
+```sh
+# /usr/local/bin/stop-jenkins.sh
+sudo systemctl stop jenkins
+echo "Jenkins stopped !!!"
+```
+`jenkins.service`는 [4절](#4-서비스-설정)에서 언급한 대로 **enabled**라 WSL 부팅 시 이미 떠 있는 경우가 대부분이며, 이 경우 `start-jenkins.sh`는 사실상 no-op이다. postgresql과 마찬가지로 정지 후에는 자동으로 다시 뜨지 않는다.
 
 ## 6. 초기 설정
 ```bash

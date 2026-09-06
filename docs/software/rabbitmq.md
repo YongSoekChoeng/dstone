@@ -36,10 +36,17 @@ sudo rabbitmqctl version
 ```
 
 ## 4. 서비스 시작/중지
-```bash
-/usr/local/bin/start-rabbitmq.sh   # sudo systemctl start rabbitmq-server
-/usr/local/bin/stop-rabbitmq.sh    # sudo systemctl stop rabbitmq-server
+```sh
+# /usr/local/bin/start-rabbitmq.sh
+sudo systemctl start rabbitmq-server
+echo "Rabbitmq started !!! Admin Console URL : http://localhost:15672"
 ```
+```sh
+# /usr/local/bin/stop-rabbitmq.sh
+sudo systemctl stop rabbitmq-server
+echo "Rabbitmq stopped !!!"
+```
+`rabbitmq-server.service`는 `disabled`라 WSL 부팅 시 자동으로 뜨지 않아 매번 수동 기동이 필요하다.
 
 ## 5. 접속 정보
 - AMQP 포트: 5672

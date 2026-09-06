@@ -90,109 +90,31 @@ start-jenkins.sh
 
 `/usr/local/bin`에 있는 개별 `start-*.sh`를 순서대로 실행하기만 하는 쉘 스크립트다. **순서가 이렇게 정해진 이유**: MySQL(`mysqld.cnf`)과 Redis(`redis.conf`)는 `bind-address`/`bind`에 `127.0.0.1`뿐 아니라 `172.18.0.1`(Docker의 `kind` 브리지 네트워크 게이트웨이)도 포함하고 있다. `kind` 클러스터 안에서 도는 `dstone-boot` Pod가 host의 MySQL/Redis에 접근하려면 이 게이트웨이 IP로 접속해야 하기 때문이다. 이 IP는 dockerd가 뜨고 `kind` 네트워크 브리지(`br-*`)가 attach된 뒤에만 존재하므로, **Docker/kind가 뜨기 전에 mysql·redis를 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패한다.** (2026-09-06 장애 진단 참고 — 과거에는 mysql/postgresql/rabbitmq/redis/kafka → docker → kube 순서였고, MySQL은 systemd 자동 재시작 타이밍이 맞아 우연히 살아났지만 Redis는 `StartLimitBurst`(기본 5회/10초)에 걸려 항상 죽어 있었다.) 이 레이스 컨디션 때문에 현재는 **Docker(및 kind 네트워크)를 가장 먼저 올리고, mysql/redis를 포함한 나머지 서비스는 그 뒤에** 올리는 순서로 고정되어 있다. 순서를 바꿀 때는 이 제약을 반드시 유지할 것.
 
+각 `start-*.sh`의 실제 내용과 상세 설명은 해당 소프트웨어 문서에 있다 (스크립트 원문을 이 문서에 중복 기재하지 않고 링크만 둔다):
+
 #### 5.1.1 Docker 시작 (`/usr/local/bin/start-docker.sh`)
-
-```sh
-/usr/local/bin/docker-start.sh
-echo "Docker started !!!"
-```
-
-실제 로직은 `docker-start.sh`에 있다: `pgrep -x dockerd`로 이미 떠 있는지 확인하고, 없으면 `sudo dockerd`를 `nohup`으로 백그라운드 기동한 뒤 `docker info`가 성공할 때까지 최대 30초 동안 1초 간격으로 폴링한다. 30초 안에 뜨지 않으면 실패로 종료하고 dockerd 로그(`~/.docker/dockerd.log`)를 tail로 보여준다. `docker.service`는 `systemctl is-enabled docker` 기준 `disabled`라 systemd가 아니라 이 스크립트가 직접 프로세스를 관리한다.
+→ [docker.md 4절](software/docker.md#4-서비스-시작중지)
 
 #### 5.1.2 Kubernetes 시작 (`/usr/local/bin/start-kube.sh`)
-
-```sh
-/usr/local/bin/k8s-start.sh
-echo "Kubenetes started !!!"
-```
-
-실제 로직은 `k8s-start.sh`에 있다: ① 현재 사용자가 `docker` 그룹에 속해 있는지 확인 → ② dockerd가 응답하는지 확인하고 안 되면 `sudo systemctl start docker`로 기동 후 최대 30초 대기 → ③ 로컬 사설 레지스트리 컨테이너(`kind-registry`, `127.0.0.1:5000`, ECR/GCR 대체용)가 없으면 생성 → ④ `kind` 클러스터(`dev`)가 없으면 위 레지스트리를 미러로 등록한 설정과 함께 새로 생성하고, 있으면 그대로 재사용(재시작 시 자동 복원) → ⑤ 레지스트리 컨테이너를 `kind` 도커 네트워크에 연결(이때 `172.18.0.1` 브리지가 확정적으로 존재하게 됨) → ⑥ `kubectl get nodes`로 노드 상태를 확인한다. `KUBECONFIG` 기본값은 `/etc/kind/dev.config`.
+→ [kubernetes.md 5절](software/kubernetes.md#5-서비스클러스터-시작중지)
 
 #### 5.1.3 MySQL 시작 (`/usr/local/bin/start-mysql.sh`)
-
-```sh
-#!/bin/sh
-
-# 이전 실행에서 StartLimitBurst에 걸려 failed 상태로 남아있으면 start가 거부되므로 먼저 리셋
-sudo systemctl reset-failed mysql.service >/dev/null 2>&1
-
-sudo systemctl start mysql
-
-for i in 1 2 3 4 5; do
-    if systemctl is-active --quiet mysql.service; then
-        echo "Mysql started !!!"
-        exit 0
-    fi
-    sleep 1
-done
-
-echo "Mysql FAILED to start. Check: sudo systemctl status mysql.service / sudo journalctl -xeu mysql.service" >&2
-exit 1
-```
-
-`mysql.service`는 `disabled`라 WSL 부팅 시 자동으로 뜨지 않는다. 과거 버전은 `sudo systemctl start mysql`의 종료 코드를 확인하지 않고 무조건 "Mysql started !!!"를 출력해서, 5.1 상단의 레이스 컨디션으로 실제 기동이 실패했을 때도 성공한 것처럼 로그가 찍히는 문제가 있었다. 2026-09-06에 다음과 같이 수정했다: `systemctl reset-failed`로 이전 실행에서 남은 실패 상태를 지우고 → `start` 실행 → 최대 5초간 `systemctl is-active`를 재확인해서 실제 상태에 따라 정확한 성공/실패 메시지를 출력하도록 함.
+→ [mysql.md 4절](software/mysql.md#4-서비스-시작중지)
 
 #### 5.1.4 PostgreSQL 시작 (`/usr/local/bin/start-postgresql.sh`)
-
-```sh
-sudo systemctl start postgresql
-echo "Postgresql started !!!"
-```
-
-`postgresql.service`는 `systemctl is-enabled` 기준 **enabled**라 WSL 부팅 시 이미 떠 있는 경우가 대부분이며, 이 경우 `systemctl start`는 사실상 no-op이다.
+→ [postgresql.md 4절](software/postgresql.md#4-서비스-시작중지)
 
 #### 5.1.5 RabbitMQ 시작 (`/usr/local/bin/start-rabbitmq.sh`)
-
-```sh
-sudo systemctl start rabbitmq-server
-echo "Rabbitmq started !!! Admin Console URL : http://localhost:15672"
-```
-
-`rabbitmq-server.service`는 `disabled`라 매번 수동 기동이 필요하다. 관리 콘솔은 `http://localhost:15672`.
+→ [rabbitmq.md 4절](software/rabbitmq.md#4-서비스-시작중지)
 
 #### 5.1.6 Redis 시작 (`/usr/local/bin/start-redis.sh`)
-
-```sh
-#!/bin/sh
-
-# 이전 실행에서 StartLimitBurst에 걸려 failed 상태로 남아있으면 start가 거부되므로 먼저 리셋
-sudo systemctl reset-failed redis-server.service >/dev/null 2>&1
-
-sudo systemctl start redis-server
-
-for i in 1 2 3 4 5; do
-    if systemctl is-active --quiet redis-server.service; then
-        echo "Redis started !!! For realtime administration, Use Tool /DB/Tools/Redis-Desktop-Manager/Version/Another Redis Desktop Manager.exe"
-        exit 0
-    fi
-    sleep 1
-done
-
-echo "Redis FAILED to start. Check: sudo systemctl status redis-server.service / sudo journalctl -xeu redis-server.service" >&2
-exit 1
-```
-
-`redis-server.service`도 `disabled`. MySQL과 같은 이유(5.1 상단 참고)로 5.1.3과 동일한 패턴 — `reset-failed` → `start` → 최대 5초 `is-active` 재확인 후 정확한 성공/실패 출력 — 으로 2026-09-06에 수정했다. 수정 전에는 실제로 `StartLimitBurst`(기본 5회/10초)에 걸려 기동이 완전히 실패했는데도 "Redis started !!!"가 출력되는 문제가 있었다.
+→ [redis.md 4절](software/redis.md#4-서비스-시작중지)
 
 #### 5.1.7 Kafka 시작 (`/usr/local/bin/start-kafka.sh`)
-
-```sh
-/opt/kafka/kafka-start.sh
-echo "Kafka started !!!"
-/opt/kafka/admin-tools/KafbatUI/start.sh
-echo "KafbatUI(Kafka관리툴) started !!! Admin Console URL : http://localhost:9099"
-```
-
-systemd를 쓰지 않고 자체 쉘 스크립트로 nohup 기동한다. `/opt/kafka/kafka-start.sh`는 KRaft 모드 단일 브로커를 백그라운드로 띄우고(로그: `/opt/kafka/kafka_2.13-4.2.1/logs/kafka-server.out`), 이어서 관리 UI인 Kafbat UI를 기동한다(관리 콘솔: `http://localhost:9099`).
+→ [kafka.md 5절](software/kafka.md#5-서비스-시작중지) (+ [kafbat-ui.md 5절](software/kafbat-ui.md#5-서비스-시작중지))
 
 #### 5.1.8 Jenkins 시작 (`/usr/local/bin/start-jenkins.sh`)
-
-```sh
-sudo systemctl start jenkins
-echo "Jenkins started !!!"
-```
-
-`jenkins.service`는 **enabled**라 WSL 부팅 시 이미 떠 있는 경우가 대부분이며, `systemctl start`는 사실상 no-op이다.
+→ [jenkins.md 5절](software/jenkins.md#5-서비스-시작중지)
 
 ### 5.2 개발환경 정지 (`~/stop.sh`)
 
@@ -224,74 +146,32 @@ stop-kube.sh
 stop-jenkins.sh
 ```
 
-`/usr/local/bin`에 있는 개별 `stop-*.sh`를 순서대로 실행하기만 하는 쉘 스크립트다. 정지 순서는 기동 순서(5.1)만큼 엄격하지 않다 — Docker/kind가 살아있는 동안 mysql/redis를 먼저 내려도 재현되는 장애는 없다.
+`/usr/local/bin`에 있는 개별 `stop-*.sh`를 순서대로 실행하기만 하는 쉘 스크립트다. 정지 순서는 기동 순서(5.1)만큼 엄격하지 않다 — Docker/kind가 살아있는 동안 mysql/redis를 먼저 내려도 재현되는 장애는 없다. 5.1과 마찬가지로 각 `stop-*.sh`의 상세는 해당 소프트웨어 문서를 참고한다.
 
 #### 5.2.1 MySQL 정지 (`/usr/local/bin/stop-mysql.sh`)
-
-```sh
-sudo systemctl stop mysql
-echo "Mysql stopped !!!"
-```
+→ [mysql.md 4절](software/mysql.md#4-서비스-시작중지)
 
 #### 5.2.2 PostgreSQL 정지 (`/usr/local/bin/stop-postgresql.sh`)
-
-```sh
-sudo systemctl stop postgresql
-echo "Postgresql stopped !!!"
-```
-
-`postgresql.service`는 **enabled**이지만 정지는 자동으로 다시 일어나지 않는다 — WSL을 재기동하기 전까지는 내린 상태가 유지된다.
+→ [postgresql.md 4절](software/postgresql.md#4-서비스-시작중지)
 
 #### 5.2.3 RabbitMQ 정지 (`/usr/local/bin/stop-rabbitmq.sh`)
-
-```sh
-sudo systemctl stop rabbitmq-server
-echo "Rabbitmq stopped !!!"
-```
+→ [rabbitmq.md 4절](software/rabbitmq.md#4-서비스-시작중지)
 
 #### 5.2.4 Redis 정지 (`/usr/local/bin/stop-redis.sh`)
-
-```sh
-sudo systemctl stop redis-server
-echo "Redis stopped !!!"
-```
+→ [redis.md 4절](software/redis.md#4-서비스-시작중지)
 
 #### 5.2.5 Kafka 정지 (`/usr/local/bin/stop-kafka.sh`)
-
-```sh
-/opt/kafka/kafka-stop.sh
-echo "Kafka stopped !!!"
-/opt/kafka/admin-tools/KafbatUI/stop.sh
-echo "KafbatUI(Kafka관리툴) stopped !!!"
-```
+→ [kafka.md 5절](software/kafka.md#5-서비스-시작중지) (+ [kafbat-ui.md 5절](software/kafbat-ui.md#5-서비스-시작중지))
 
 #### 5.2.6 Docker 정지 (`/usr/local/bin/stop-docker.sh`)
-
-```sh
-/usr/local/bin/docker-stop.sh
-echo "Docker stopped !!!"
-```
-
-실제 로직은 `docker-stop.sh`에 있다: `pgrep -x dockerd`로 PID를 찾아 `sudo kill`로 종료하고, 2초 대기 후에도 프로세스가 남아있으면 실패로 표시한다. `kind` 클러스터/컨테이너 자체는 삭제되지 않고 dockerd 프로세스만 내려간다.
+→ [docker.md 4절](software/docker.md#4-서비스-시작중지)
 
 #### 5.2.7 Kubernetes 정지 (`/usr/local/bin/stop-kube.sh`)
+→ [kubernetes.md 5절](software/kubernetes.md#5-서비스클러스터-시작중지) — `--delete` 옵션(클러스터 완전 삭제)은 [kubernetes.md 6절](software/kubernetes.md#6-로컬-사설-레지스트리-dstone-boot-이미지-배포용)에 정리되어 있으며, `~/stop.sh` 경유로는 전달할 수 없어 필요하면 `k8s-stop.sh --delete`를 직접 호출해야 한다.
 
-```sh
-/usr/local/bin/k8s-stop.sh
-echo "Kubenetes stopped !!!"
-```
-
-실제 로직은 `k8s-stop.sh`에 있다: 옵션 없이 실행하면(=`~/stop.sh` 경유 시 항상 이 경로) `kind` 클러스터는 그대로 두고 `sudo systemctl stop docker`로 dockerd만 정지한다 — 컨테이너들은 `restart-policy`에 의해 다음 `start-kube.sh` 실행 시 자동 복원된다. `k8s-stop.sh --delete`로 직접 실행하면 `kind delete cluster`까지 수행해 클러스터를 완전히 삭제하지만, 이 옵션은 `~/stop.sh`를 통해서는 전달할 수 없으므로 클러스터를 완전히 지우고 싶으면 `k8s-stop.sh --delete`를 직접 호출해야 한다.
-
-**주의**: 5.2.6(`stop-docker.sh`)과 5.2.7(`stop-kube.sh`)이 각각 dockerd를 내리는 경로를 갖고 있어 dockerd 정지 시도가 사실상 중복 실행된다. 5.2.6에서 `kill`로 이미 내려가 있으면 5.2.7의 `docker info` 체크가 "이미 정지됨"으로 바로 종료되어 실질적인 문제는 없다.
+**주의**: 5.2.6(`stop-docker.sh`)과 5.2.7(`stop-kube.sh`)이 각각 dockerd를 내리는 경로를 갖고 있어 dockerd 정지 시도가 사실상 중복 실행된다(문제는 없음 — 상세는 두 문서 참고).
 
 #### 5.2.8 Jenkins 정지 (`/usr/local/bin/stop-jenkins.sh`)
+→ [jenkins.md 5절](software/jenkins.md#5-서비스-시작중지)
 
-```sh
-sudo systemctl stop jenkins
-echo "Jenkins stopped !!!"
-```
-
-`jenkins.service`는 **enabled**이지만 postgresql과 마찬가지로 정지 후 자동으로 다시 뜨지 않는다.
-
-트러블슈팅(예: mysql/redis 기동 실패 시 진단 절차, `bind-address`/`172.18.0.1` 레이스 컨디션 상세)은 이 세션의 대화 기록 및 각 소프트웨어 문서(`mysql.md`, `redis.md`)를 참고.
+트러블슈팅(예: mysql/redis 기동 실패 시 진단 절차, `bind-address`/`172.18.0.1` 레이스 컨디션 상세)은 각 소프트웨어 문서(`mysql.md`, `redis.md`, `docker.md`, `kubernetes.md`)의 시작/중지 절을 참고.
