@@ -157,7 +157,7 @@ data:
         devtools: 
             restart: 
                 enabled: true
-        # RabbitMq 설정		
+        # RabbitMq 설정
         rabbitmq: 
             enabled: true # RabbitMq사용 여부(true/false)
             host: ${RABBITMQ_HOST}
@@ -165,19 +165,21 @@ data:
             virtual-host: /dstone-mq
             username: ENC(IIOITvsB1izl1mH7iw/A3eM5QUQ0z7HHj7sJqS9rrWI=)
             password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
-            bindings: 
-                binding-notifications: 
-                    queue-id: app.notifications.queue
-                    queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
-                    exchange-id: app.fanout.exchange # (fanout)라우팅 키와 상관없이 바인딩된 모든 큐로 메시지를 전달
-                    #exchange-durable: false
-                    routing-key: 
-                binding-orders: 
-                    queue-id: app.orders.queue
-                    queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
-                    exchange-id: app.direct.exchange # (direct)라우팅 키가 정확히 일치하는 큐로 메시지를 전달
-                    #exchange-durable: false
-                    routing-key: orders.process
+            # bindings 는 리스트입니다. Exchange/Queue 조합을 늘리려면 이 목록에 항목만 추가하면 되고,
+            # ConfigRabbitMQ.java 코드는 손댈 필요가 없습니다.
+            bindings:
+                - exchange-type: fanout # fanout(브로드캐스트) / direct(정확일치) / topic(패턴) 중 하나
+                  exchange-id: app.fanout.exchange # (fanout)라우팅 키와 상관없이 바인딩된 모든 큐로 메시지를 전달
+                  exchange-durable: true # exchange 정의 자체의 영구 저장 여부(브로커 재시작 후에도 exchange 정의가 유지될지). 운영모드에서는 true로 하는게 좋음.
+                  queue-id: app.notifications.queue
+                  queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
+                  routing-key: # fanout은 routing-key를 사용하지 않음(비워둠)
+                - exchange-type: direct
+                  exchange-id: app.direct.exchange # (direct)라우팅 키가 정확히 일치하는 큐로 메시지를 전달
+                  exchange-durable: true # exchange 정의 자체의 영구 저장 여부(브로커 재시작 후에도 exchange 정의가 유지될지). 운영모드에서는 true로 하는게 좋음.
+                  queue-id: app.orders.queue
+                  queue-durable: true # queue 내용 영구 저장 여부(실제 큐의 Durability와 동일해야 함. 운영모드에서는 true로 하는게 좋음.)
+                  routing-key: orders.process
         # 스웨거 생성기능(http://xxxxx:xxxx/swagger-ui.html 로 접근)
         swagger: 
             enabled: false
@@ -354,7 +356,10 @@ data:
                 <AppenderRef ref="console"/>
                 <AppenderRef ref="rollingFile"/>
     	    </Logger>
-    	    
+    	    <Logger name="org.apache.kafka.clients" level="OFF" additivity="false"> 
+    	    	<AppenderRef ref="console"/>
+    	    	<AppenderRef ref="rollingFile"/>
+    	    </Logger>
     	    <Logger name="net.dstone.boot" level="${level.dstone}" additivity="false">
                 <AppenderRef ref="console"/>
                 <AppenderRef ref="rollingFile"/>
