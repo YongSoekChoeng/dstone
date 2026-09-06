@@ -598,3 +598,22 @@ Now update `ConfigRabbitMQ.java` to read this property for both exchanges.
 - `ConfigRabbitMQ.java`: `exchangeNotifications()`/`exchangeOrders()`가 이제 `queue-durable`과 동일한 패턴으로 `exchange-durable` 값을 읽어 `FanoutExchange`/`DirectExchange`의 3-인자 생성자(`name, durable, autoDelete`)에 반영
 
 큐와 마찬가지로, RabbitMQ에 이미 해당 exchange가 다른 durable 값으로 선언되어 있으면 재선언 시 `PRECONDITION_FAILED`가 날 수 있습니다 — 지금은 기존 동작(암묵적 durable=true)과 값이 같으니(true) 문제없지만, 나중에 `false`로 바꾸려면 기존 exchange를 먼저 삭제해야 합니다.
+
+---
+
+## 질문
+
+그런데 통상 운영모드에서는 exchange-durable 를 어떤 값으로 운용하는가?
+
+---
+
+## 답변
+
+일반적으로 운영모드에서는 **`true`**로 운용합니다. 지금 설정해드린 값과 같습니다.
+
+이유:
+- exchange가 non-durable(`false`)이면 브로커 재시작 시 exchange 정의 자체가 사라지고, 큐는 durable이라 남아있어도 **바인딩(익스체인지→큐 연결)이 끊어진 상태**가 됩니다. 애플리케이션이 재기동해서 다시 선언(declare)해줄 때까지 그 사이 발행되는 메시지는 라우팅될 곳이 없어 유실됩니다.
+- 큐만 durable=true이고 exchange는 false인 조합은 실무에서 흔히 하는 실수로 꼽힙니다 — "메시지는 안전하게 저장되겠지"라고 생각했는데 정작 exchange가 날아가서 못 들어오는 경우.
+- 그래서 **exchange durable=true + queue durable=true + 메시지 발행 시 persistent(디스크저장) 옵션**, 이 세 가지를 세트로 맞추는 게 표준적인 "안전한 메시징" 구성입니다.
+
+`false`(non-durable)를 쓰는 경우는 브로커 재시작 시 사라져도 상관없는 임시/테스트용 exchange, 혹은 애플리케이션 기동 시마다 매번 새로 선언되는 단기성 익스체인지 정도로, 운영 환경에서는 거의 쓰지 않습니다.
