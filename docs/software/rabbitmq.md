@@ -49,7 +49,7 @@ sudo rabbitmqctl version
 
 ## 6. dstone용 가상호스트/사용자 구성 (설치 후 필수)
 
-`dstone-boot/conf/application.yml`의 `spring.rabbitmq.virtual-host`가 기본(`/`)이 아닌 **`/dstone-mq`**로 고정되어 있다(`spring.rabbitmq.host`/`port`/`username`/`password`와 함께 [ConfigMq.java](../../dstone-boot/src/main/java/net/dstone/boot/common/config/ConfigMq.java)가 읽어 `ConnectionFactory`를 구성한다) — RabbitMQ를 apt로 설치한 상태 그대로는 이 vhost가 없어 애플리케이션 기동 시 커넥션 자체가 실패한다. 최초 1회 아래처럼 vhost와 계정을 만들어야 한다.
+`dstone-boot/conf/application.yml`의 `spring.rabbitmq.virtual-host`가 기본(`/`)이 아닌 **`/dstone-mq`**로 고정되어 있다(`spring.rabbitmq.host`/`port`/`username`/`password`와 함께 [ConfigRabbitMQ.java](../../dstone-boot/src/main/java/net/dstone/boot/common/config/ConfigRabbitMQ.java)가 읽어 `ConnectionFactory`를 구성한다) — RabbitMQ를 apt로 설치한 상태 그대로는 이 vhost가 없어 애플리케이션 기동 시 커넥션 자체가 실패한다. 최초 1회 아래처럼 vhost와 계정을 만들어야 한다.
 
 ```bash
 sudo rabbitmqctl add_vhost /dstone-mq
@@ -60,7 +60,7 @@ sudo rabbitmqctl set_permissions -p /dstone-mq dstone ".*" ".*" ".*"   # configu
 sudo rabbitmqctl set_user_tags dstone management     # 관리 콘솔(15672) 로그인 허용(선택)
 ```
 - `application.yml`의 `spring.rabbitmq.username`/`password`는 Jasypt `ENC(...)` 값이라 이 문서만으로 원래 평문을 알 수 없다 — 위 예시처럼 **새 계정/비밀번호를 만들었다면 그 평문을 [mysql.md 7절](mysql.md#7-비밀번호jasypt-enc-다루기)의 방법으로 `ENC(...)`로 암호화**해 `spring.rabbitmq.username`/`password`에 채워 넣어야 한다. (RabbitMQ가 로컬호스트에서만 붙는 개발 환경이라면, 대신 `guest` 계정에 `/dstone-mq` 권한만 추가로 부여하고(`sudo rabbitmqctl set_permissions -p /dstone-mq guest ".*" ".*" ".*"`) `application.yml`의 username/password를 `guest`로 암호화해 넣는 방법이 더 간단하다.)
-- **큐/익스체인지는 직접 만들 필요가 없다.** `app.notifications.queue`(fanout, `app.fanout.exchange`)와 `app.orders.queue`(direct, `app.direct.exchange`, routing-key `orders.process`)는 `ConfigMq`가 Spring AMQP `Queue`/`FanoutExchange`/`DirectExchange`/`Binding` 빈으로 선언해두어 `dstone-boot` 기동 시 RabbitMQ의 내장 `RabbitAdmin`이 자동으로 선언(declare)한다 — vhost와 계정 권한만 맞으면 나머지는 애플리케이션이 알아서 만든다.
+- **큐/익스체인지는 직접 만들 필요가 없다.** `app.notifications.queue`(fanout, `app.fanout.exchange`)와 `app.orders.queue`(direct, `app.direct.exchange`, routing-key `orders.process`)는 `application.yml`의 `spring.rabbitmq.bindings`(리스트) 항목으로 정의되어 있고, `ConfigRabbitMQ`가 이 리스트를 순회하며 Spring AMQP `Queue`/`Exchange`/`Binding`을 만들어 `Declarables` 빈 하나로 묶어두면 `dstone-boot` 기동 시 RabbitMQ의 내장 `RabbitAdmin`이 자동으로 선언(declare)한다 — vhost와 계정 권한만 맞으면 나머지는 애플리케이션이 알아서 만든다. 큐/익스체인지를 더 추가하려면 `ConfigRabbitMQ.java` 코드를 건드릴 필요 없이 `bindings` 리스트에 항목만(`exchange-type`: fanout/direct/topic, `exchange-id`, `exchange-durable`, `queue-id`, `queue-durable`, `routing-key`) 추가하면 된다.
 - 확인: 관리 콘솔(http://localhost:15672)에서 좌측 상단 vhost를 `/dstone-mq`로 전환한 뒤 `dstone-boot` 기동 후 **Queues** 탭에 `app.notifications.queue`/`app.orders.queue`가 나타나는지 확인한다. CLI로는 `sudo rabbitmqctl list_queues -p /dstone-mq name messages`.
 
 ## 7. dstone 프로젝트에서의 역할
