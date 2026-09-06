@@ -20,7 +20,7 @@ import net.dstone.common.core.BaseObject;
 
 @Configuration
 @ConditionalOnProperty(name = "spring.rabbitmq.enabled", havingValue = "true")
-public class ConfigMq extends BaseObject {
+public class ConfigRabbitMQ extends BaseObject {
 
 	@Autowired
 	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
