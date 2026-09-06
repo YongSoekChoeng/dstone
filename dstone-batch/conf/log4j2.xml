@@ -126,6 +126,10 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>
 	    </Logger>
+	    <Logger name="org.apache.kafka.clients" level="OFF" additivity="false"> 
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>
+	    </Logger>
 	    
 	    <Logger name="net.dstone" level="${level.dstone}" additivity="false">
             <AppenderRef ref="console"/>
