@@ -40,7 +40,8 @@ data:
                 - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
         ai:
             anthropic:
-                api-key: ${ANTHROPIC_API_KEY}
+                # DB 패스워드와 동일한 컨벤션: Jasypt로 암호화해 ENC(...) 형태로 직접 넣는다.
+                api-key: ENC(iTbr7/33NEFc5gCOapVTLZsks5dU96gITu6OUXr2UqAVntTkq5p1nFjlVI/3RVVx/fZzBOAKEdngosd4zialqNUgfEq31RU3u8HUa/VBIaBnFViQCLJBPW8O81lcTpsHsQQPfRbeToKYHAm2BVMWP0cZhkx145+bnmoH7nXsXQE=)
                 # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
                 # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
                 # chat:

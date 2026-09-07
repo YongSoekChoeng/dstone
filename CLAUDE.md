@@ -90,7 +90,11 @@ DB passwords and other secrets in `application.yml` use `ENC(...)` format:
 password: ENC(ydLjxrknr8dD59e6E+HvxdxRaGiFa9jOCpJJDtb0uak=)
 ```
 
-The decryption key is `jasypt.encryptor.password` in `conf/env.properties`.
+The decryption key is **not** `jasypt.encryptor.password` (jasypt-spring-boot-starter's default) — each module supplies its own `StringEncryptor` bean instead: a `ConfigEnc` class (`net.dstone.<module>.common.config.ConfigEnc` or, for `dstone-ai-engine`, `net.dstone.ai.config.ConfigEnc`) annotated `@EnableEncryptableProperties` with a `@Bean("jasyptStringEncryptor")` that returns `EncUtil.getEncryptor()` (`net.dstone.common.utils.EncUtil`, PBEWithSHA256And128BitAES-CBC-BC, key hardcoded in that class). To generate a new `ENC(...)` value locally without ever typing the plaintext secret into Claude Code's chat (run this in a separate terminal, not via the assistant):
+
+```bash
+cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<plaintext>"
+```
 
 ### Security
 
@@ -174,6 +178,8 @@ A Spring AI-based, provider-agnostic engine meant to be built out incrementally 
 
 Phase 0 ships a single hardcoded provider (Anthropic, via `spring-ai-starter-model-anthropic`) behind `POST /api/ai/chat`, to validate the skeleton end-to-end before building out the gateway abstraction. Bulk/offline AI work (re-embedding, periodic eval, session cleanup) is delegated to `dstone-batch` (`@AutoRegJob`) rather than scheduled inside the engine itself, per the existing dstone-batch pattern.
 
+`spring.ai.anthropic.api-key` in `dstone-ai-engine/conf/application.yml` follows the same `ENC(...)` convention as DB passwords (see "Sensitive Config Encryption" above) rather than sourcing from `env.properties` — there is no `ANTHROPIC_API_KEY` env var.
+
 Spring AI is pinned to the 1.x line (`spring-ai.version` in `dstone-ai-engine/pom.xml`) because Spring AI 2.x targets Spring Boot 4 — the whole reactor is still on Spring Boot 3.5.x. Revisit this pin if/when the reactor moves to Boot 4.
 
 ## Required Infrastructure
@@ -195,8 +201,8 @@ Spring AI is pinned to the 1.x line (`spring-ai.version` in `dstone-ai-engine/po
 | `REDIS_HOST` / `REDIS_PORT` | Redis server |
 | `RABBITMQ_HOST` / `RABBITMQ_PORT` | RabbitMQ server (dstone-boot) |
 | `FILE_UPLOAD_ROOT` | File upload root path (dstone-boot) |
-| `jasypt.encryptor.password` | Jasypt decryption key |
-| `ANTHROPIC_API_KEY` | Anthropic API key (dstone-ai-engine) |
+
+Jasypt's decryption key is **not** an env var — see "Sensitive Config Encryption" above.
 
 ## Cloud Architecture Simulation
 

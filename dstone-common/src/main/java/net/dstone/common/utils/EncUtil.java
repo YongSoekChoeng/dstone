@@ -46,6 +46,19 @@ public class EncUtil {
 	}
 
 	/**
+	 * 로컬 CLI 암호화 도구. 평문 비밀값이 대화 기록에 남지 않도록, 이 명령은 Claude Code가 아니라
+	 * 별도 터미널에서 직접 실행할 것.
+	 *   cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<평문>"
+	 */
+	public static void main(String[] args) {
+		if (args.length != 1) {
+			System.err.println("Usage: mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args=\"<평문>\"");
+			System.exit(1);
+		}
+		System.out.println(encrypt(args[0]));
+	}
+
+	/**
      * 간단 암호화 메소드.
      * @return
      */

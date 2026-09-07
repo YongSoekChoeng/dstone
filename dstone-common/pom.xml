@@ -390,7 +390,15 @@
 					<parameters>true</parameters>
 				</configuration>
 			</plugin>
-			 
+
+			<!-- ENC(...) 값을 로컬에서 생성하기 위한 CLI 실행용(패키징에는 영향 없음).
+			     mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<평문>" -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.5.0</version>
+			</plugin>
+
 		</plugins>
 		
     </build>

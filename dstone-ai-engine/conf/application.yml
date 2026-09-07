@@ -33,7 +33,10 @@ spring:
             - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     ai:
         anthropic:
-            api-key: ${ANTHROPIC_API_KEY}
+            # DB 패스워드와 동일한 컨벤션: Jasypt로 암호화해 ENC(...) 형태로 직접 넣는다(env.properties 경유 안 함).
+            # 로컬에서 생성: cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<실제 키>"
+            # (이 명령은 Claude Code가 아니라 별도 터미널에서 직접 실행할 것 — 평문 키가 대화 기록에 남지 않도록)
+            api-key: ENC(iTbr7/33NEFc5gCOapVTLZsks5dU96gITu6OUXr2UqAVntTkq5p1nFjlVI/3RVVx/fZzBOAKEdngosd4zialqNUgfEq31RU3u8HUa/VBIaBnFViQCLJBPW8O81lcTpsHsQQPfRbeToKYHAm2BVMWP0cZhkx145+bnmoH7nXsXQE=)
             # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
             # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
             # chat:
