@@ -41,10 +41,15 @@ bin/kafka-storage.sh format --standalone -t "$KAFKA_CLUSTER_ID" -c config/server
 ```properties
 process.roles=broker,controller
 node.id=1
-listeners=PLAINTEXT://:9092,CONTROLLER://:9093
-advertised.listeners=PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093
+listeners=PLAINTEXT://:9092,DOCKER://:9094,CONTROLLER://:9093
+advertised.listeners=PLAINTEXT://127.0.0.1:9092,DOCKER://172.18.0.1:9094,CONTROLLER://127.0.0.1:9093
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,DOCKER:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
 log.dirs=/opt/kafka/kafka_2.13-4.2.1/data/kraft-combined-logs
 ```
+- **(2026-09-07 변경) 리스너를 용도별로 분리**: `advertised.listeners`는 브로커가 클라이언트에게 "실제로는 이 주소로 다시 접속해서 produce/fetch 하라"고 알려주는 값이라, mysql/redis의 `bind`처럼 "모든 인터페이스"로 열 수 있는 개념이 없다(리스너 하나에 주소 하나). 그래서 포트별로 리스너를 나눴다:
+  - `9092`(PLAINTEXT) → 로컬 PC/WSL 네이티브 클라이언트(콘솔 도구, Kafbat UI, `dstone-boot`의 `wsl` 프로파일 등)용. 항상 `127.0.0.1`을 광고하므로 Docker/kind 기동 여부와 무관하게 동작한다.
+  - `9094`(DOCKER) → kind Pod 전용. `172.18.0.1`(kind 도커 브리지 게이트웨이 IP)을 광고한다 — 이 IP는 Docker/kind가 떠 있을 때만 존재하지만, kind Pod 자체가 Docker/kind가 떠야만 존재하므로 문제 없다.
+  - 상세 배경은 [cloud-architecture.md 2절](../cloud-architecture.md#2-dstone-boot--kind-네트워킹) 참고. 이전에는 `advertised.listeners`를 `172.18.0.1` 하나로 통째로 바꿨었는데, 그러면 로컬 PC에서 Kafka로 요청을 보내도 응답이 없는(그 IP가 Docker/kind 없이는 존재하지 않아 메타데이터 재접속이 계속 실패하는) 문제가 있었다.
 
 ## 5. 서비스 시작/중지
 전용 스크립트를 작성해 사용 중이다 (systemd 미등록, 수동 실행). 최상위 래퍼(`~/start.sh`/`~/stop.sh`가 호출):
@@ -100,4 +105,4 @@ done
 [Kafbat UI](kafbat-ui.md)를 통해 웹에서 토픽/컨슈머 등을 확인한다 (http://localhost:9099).
 
 ## 8. dstone 프로젝트에서의 역할
-`dstone-boot`의 SAGA + Outbox 패턴 샘플 기능(`net.dstone.common.messaging.saga`, `net.dstone.boot.sample.saga`)이 `OutboxRelay`→`KafkaTemplate`로 이벤트를 발행하고 `OrderSagaReplyListener`가 구독하는 방식으로 사용한다(자세한 흐름: [dstone-saga.md](../dstone-saga.md)). 다만 `dstone-boot/conf/application.yml`의 `spring.kafka.bootstrap-servers`가 `localhost:9092`로 하드코딩돼 있어, kind Pod처럼 로컬호스트가 아닌 환경에서는 연결되지 않는다 — [cloud-architecture.md](../cloud-architecture.md)의 "알려진 한계"에 기록되어 있다.
+`dstone-boot`의 SAGA + Outbox 패턴 샘플 기능(`net.dstone.common.messaging.saga`, `net.dstone.boot.sample.saga`)이 `OutboxRelay`→`KafkaTemplate`로 이벤트를 발행하고 `OrderSagaReplyListener`가 구독하는 방식으로 사용한다(자세한 흐름: [dstone-saga.md](../dstone-saga.md)). `dstone-boot/conf/application.yml`의 `spring.kafka.bootstrap-servers`는 `DB_HOST`/`REDIS_HOST`와 같은 패턴으로 `${KAFKA_HOST}:${KAFKA_PORT}`로 파라미터화되어 있다 — `wsl` 프로파일은 `localhost:9092`, `k8s` 프로파일은 `172.18.0.1:9094`(위 DOCKER 리스너)를 가리킨다.
