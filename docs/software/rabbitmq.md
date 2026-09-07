@@ -8,7 +8,8 @@
 - [4. 서비스 시작/중지](#4-서비스-시작중지)
 - [5. 접속 정보](#5-접속-정보)
 - [6. dstone용 가상호스트/사용자 구성 (설치 후 필수)](#6-dstone용-가상호스트사용자-구성-설치-후-필수)
-- [7. dstone 프로젝트에서의 역할](#7-dstone-프로젝트에서의-역할)
+- [7. 기본 설정 Import](#7-기본-설정-import)
+- [8. dstone 프로젝트에서의 역할](#8-dstone-프로젝트에서의-역할)
 
 ## 1. 개요
 `dstone-boot`에서 사용하는 메시지 큐 브로커(AMQP 0.9.1).
@@ -70,5 +71,17 @@ sudo rabbitmqctl set_user_tags dstone management     # 관리 콘솔(15672) 로�
 - **큐/익스체인지는 직접 만들 필요가 없다.** `app.notifications.queue`(fanout, `app.fanout.exchange`)와 `app.orders.queue`(direct, `app.direct.exchange`, routing-key `orders.process`)는 `application.yml`의 `spring.rabbitmq.bindings`(리스트) 항목으로 정의되어 있고, `ConfigRabbitMQ`가 이 리스트를 순회하며 Spring AMQP `Queue`/`Exchange`/`Binding`을 만들어 `Declarables` 빈 하나로 묶어두면 `dstone-boot` 기동 시 RabbitMQ의 내장 `RabbitAdmin`이 자동으로 선언(declare)한다 — vhost와 계정 권한만 맞으면 나머지는 애플리케이션이 알아서 만든다. 큐/익스체인지를 더 추가하려면 `ConfigRabbitMQ.java` 코드를 건드릴 필요 없이 `bindings` 리스트에 항목만(`exchange-type`: fanout/direct/topic, `exchange-id`, `exchange-durable`, `queue-id`, `queue-durable`, `routing-key`) 추가하면 된다.
 - 확인: 관리 콘솔(http://localhost:15672)에서 좌측 상단 vhost를 `/dstone-mq`로 전환한 뒤 `dstone-boot` 기동 후 **Queues** 탭에 `app.notifications.queue`/`app.orders.queue`가 나타나는지 확인한다. CLI로는 `sudo rabbitmqctl list_queues -p /dstone-mq name messages`.
 
-## 7. dstone 프로젝트에서의 역할
+## 7. 기본 설정 Import
+
+`dstone-batch`의 REST API(`/batch/restapi/{jobName}` 등, 포트 6081)를 브라우저/curl 없이 바로 테스트할 수 있도록 Postman 컬렉션을 리포지토리에 포함해뒀다: `docs/data/dstone-batch-postman-collection.json`.
+
+Postman에서 가져오는 방법:
+1. Postman 실행 → **File → Import** (또는 좌측 상단 **Import** 버튼)
+2. `docs/data/dstone-batch-postman-collection.json` 파일을 선택하거나 드래그 앤 드롭
+3. **배치샘플** 컬렉션이 생성되며, 아래 폴더/요청이 함께 들어온다:
+   - `common`: 등록된 job 목록 조회(`regtasks`), job 실행 상태 조회(`status/{id}`)
+   - `job001`~`job006`: `sampleJob`, 테이블/파일 배치 샘플(`tableDataGenType0*Job`, `tableUpdateType0*Job`, `fileDataGenJob`, `fileCopyType0*Job`, `fileToTableJob`, `tableToFileJob`) 등 각 배치 Job을 호출하는 요청
+4. 요청 URL은 `http://localhost:6081/...`로 고정되어 있으므로, `dstone-batch`가 로컬(WSL)에서 6081 포트로 떠 있는 상태에서 바로 실행하면 된다. 다른 호스트에서 기동한 경우 컬렉션 변수나 각 요청의 호스트를 맞춰 바꿔준다.
+
+## 8. dstone 프로젝트에서의 역할
 `dstone-boot`의 메시징 연동(알림 fanout 발행/구독, 주문 처리 큐)에 사용된다. 접속 정보는 `conf/env.properties`의 `RABBITMQ_HOST`/`RABBITMQ_PORT`와 `application.yml`의 `spring.rabbitmq.virtual-host`/`username`/`password`(Jasypt `ENC(...)`)로 구성된다 — vhost/계정 최초 구성은 [6절](#6-dstone용-가상호스트사용자-구성-설치-후-필수) 참고.
