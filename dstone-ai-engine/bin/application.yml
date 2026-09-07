@@ -1,0 +1,41 @@
+server:
+    port: 8081
+    error:
+        whitelabel:
+            enabled: true
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health
+    endpoint:
+        health:
+            probes:
+                enabled: true
+
+spring:
+    main:
+        allow-bean-definition-overriding: true
+    ##########################################################################################
+    # <자동설정기능>
+    # Phase 0은 DB/Redis/RabbitMQ/Kafka/Security를 쓰지 않는 순수 Chat API 스켈레톤이다.
+    # 클래스패스에는 dstone-common을 통해 이미 올라와 있으므로(자동설정이 붙잡으려 시도함),
+    # 실제로 해당 Phase(세션=Phase1, 메시징=후속)에서 쓰기 시작할 때 이 목록에서 해당 줄을 지운다.
+    ##########################################################################################
+    autoconfigure:
+        exclude:
+            - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+            - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+            - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+            - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+            - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+            - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+    ai:
+        anthropic:
+            api-key: ${ANTHROPIC_API_KEY}
+            # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
+            # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
+            # chat:
+            #     options:
+            #         model: claude-sonnet-4-5-20250929
