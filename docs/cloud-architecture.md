@@ -296,6 +296,7 @@ kubectl get nodes                     # dev-control-plane 이 Ready 여야 함
 #### 진행 샘플(이미지 수정 및 재적용)
 ```bash
 ## 0단계 — 사전 확인
+cd /app/dstone                         # App 홈으로 이동
 kind get clusters                      # dev 나오는지
 kubectl config current-context         # kind-dev 인지
 docker ps --filter name=kind-registry  # kind-registry Up 상태인지
