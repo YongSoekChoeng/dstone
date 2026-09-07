@@ -9,9 +9,10 @@ WORKDIR /workspace
 COPY pom.xml .
 COPY dstone-common dstone-common
 COPY dstone-boot dstone-boot
-# 루트 pom.xml이 4개 모듈을 모두 선언하므로, 리액터 구성을 위해 나머지 두 모듈은 pom.xml만 둔다(-pl로 실제 빌드는 제외).
+# 루트 pom.xml이 5개 모듈을 모두 선언하므로, 리액터 구성을 위해 나머지 모듈은 pom.xml만 둔다(-pl로 실제 빌드는 제외).
 COPY dstone-batch/pom.xml dstone-batch/pom.xml
 COPY dstone-batchadmin/pom.xml dstone-batchadmin/pom.xml
+COPY dstone-ai-engine/pom.xml dstone-ai-engine/pom.xml
 
 RUN mvn -q -pl dstone-common,dstone-boot -am -DskipTests clean package
 

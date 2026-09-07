@@ -9,8 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **dstone-boot**: Web application framework (WAR) — includes a Java source code static analyzer feature
 - **dstone-batch**: Spring Batch processing framework (JAR) — standardized job development
 - **dstone-batchadmin**: Web application (WAR) — manages `dstone-batch` jobs (list/detail/register screens, start/stop/restart, CRON auto-scheduling) across one or more `dstone-batch` server instances
+- **dstone-ai-engine**: AI & MLOps Core Engine (JAR) — Spring AI-based, provider-agnostic AI serving platform intended for reuse across future SI projects (root package `net.dstone.ai`)
 
-`dstone-boot`, `dstone-batch`, and `dstone-batchadmin` all depend on `dstone-common`.
+`dstone-boot`, `dstone-batch`, `dstone-batchadmin`, and `dstone-ai-engine` all depend on `dstone-common`.
 
 ## Build Commands
 
@@ -26,6 +27,9 @@ cd dstone-batch && mvn clean package
 
 # Build batch admin web app (WAR)
 cd dstone-batchadmin && mvn clean package
+
+# Build AI Core Engine (JAR)
+cd dstone-ai-engine && mvn clean package
 
 # Build all from root
 mvn clean install
@@ -45,6 +49,9 @@ java -jar -Dspring.batch.job.names=sampleJob target/dstone-batch-1.0.0-SNAPSHOT.
 
 # dstone-batchadmin (port 5081)
 java -jar target/dstone-batchadmin.war
+
+# dstone-ai-engine (port 8081)
+java -jar target/dstone-ai-engine.jar
 ```
 
 See "Cloud Architecture Simulation" below for how each module is deployed in this environment.
@@ -89,6 +96,7 @@ The decryption key is `jasypt.encryptor.password` in `conf/env.properties`.
 
 - **dstone-boot**: Spring Security enabled (`spring.security.enabled: true`), with custom auth handlers in `net.dstone.boot.common.security`, OAuth2 social login (Google/Naver/Kakao), and Redis-based distributed sessions (`dstone:session` namespace).
 - **dstone-batch**: Spring Security excluded via `spring.autoconfigure.exclude`.
+- **dstone-ai-engine**: Spring Security (and its Actuator management-endpoint security) excluded via `spring.autoconfigure.exclude` in Phase 0 — no auth yet. Real auth (API key / OAuth2 client-credentials) is planned for the `governance` package in a later phase.
 
 ### dstone-boot: Multiple Datasources
 
@@ -148,13 +156,34 @@ Registered Job metadata (`TB_BATCH_JOB.JOB_NM`) must match the `@AutoRegJob(name
 
 Security is simplified vs. `dstone-boot`: login is required (`TB_ADMIN_USER`, `BCryptPasswordEncoder`) but there is no per-URL role/permission check — it's a single-role internal admin tool.
 
+### dstone-ai-engine: AI & MLOps Core Engine
+
+A Spring AI-based, provider-agnostic engine meant to be built out incrementally and reused across future SI projects — not a single-purpose feature. Root package `net.dstone.ai`, with one package per concern, each mapped to a build phase (see each package's `package-info.java`):
+
+| Package | Purpose | Phase |
+|---|---|---|
+| `config` | `ChatClient` wiring | 0 |
+| `api` | REST controllers (Chat/RAG/Admin API) | 0 |
+| `gateway` / `gateway.provider` | LLM provider abstraction (OpenAI/Anthropic/Azure/local vLLM-Ollama), swappable via config | 1 |
+| `prompt` | Prompt template management/versioning — SI-specific customization point | 1 |
+| `session` | Conversation session/history, reusing `dstone-common`'s Redis infra | 1 |
+| `rag` (`ingest`/`embedding`/`retrieval`) | Document ingestion → embedding → vector search | 2 |
+| `agent` | Tool/function calling, orchestration, memory | 3 |
+| `governance` | Guardrails, PII filtering, rate limiting, cost tracking, auth | 4 |
+| `observability` | Token usage, cost, tracing, eval results | 4 |
+
+Phase 0 ships a single hardcoded provider (Anthropic, via `spring-ai-starter-model-anthropic`) behind `POST /api/ai/chat`, to validate the skeleton end-to-end before building out the gateway abstraction. Bulk/offline AI work (re-embedding, periodic eval, session cleanup) is delegated to `dstone-batch` (`@AutoRegJob`) rather than scheduled inside the engine itself, per the existing dstone-batch pattern.
+
+Spring AI is pinned to the 1.x line (`spring-ai.version` in `dstone-ai-engine/pom.xml`) because Spring AI 2.x targets Spring Boot 4 — the whole reactor is still on Spring Boot 3.5.x. Revisit this pin if/when the reactor moves to Boot 4.
+
 ## Required Infrastructure
 
 | Infrastructure | Purpose | Modules |
 |---|---|---|
-| MySQL | Main data store | All |
-| Redis | Session store, cache | dstone-boot |
+| MySQL | Main data store | All (except dstone-ai-engine in Phase 0) |
+| Redis | Session store, cache | dstone-boot (dstone-ai-engine from Phase 1) |
 | RabbitMQ | Message queue | dstone-boot |
+| Anthropic API (or other LLM provider) | Model inference | dstone-ai-engine |
 
 ## Key Environment Variables (`conf/env.properties`)
 
@@ -167,15 +196,16 @@ Security is simplified vs. `dstone-boot`: login is required (`TB_ADMIN_USER`, `B
 | `RABBITMQ_HOST` / `RABBITMQ_PORT` | RabbitMQ server (dstone-boot) |
 | `FILE_UPLOAD_ROOT` | File upload root path (dstone-boot) |
 | `jasypt.encryptor.password` | Jasypt decryption key |
+| `ANTHROPIC_API_KEY` | Anthropic API key (dstone-ai-engine) |
 
 ## Cloud Architecture Simulation
 
-The WSL dev environment mirrors a cloud deployment shape: `dstone-boot` runs as a containerized Pod in a local `kind` Kubernetes cluster (`dstone-boot/Dockerfile`, `dstone-boot/k8s/`), while `dstone-batch` and `dstone-batchadmin` run as VM-style processes controlled by plain shell scripts (`bin/startApp.sh`/`stopApp.sh`/`statusApp.sh` — **no systemd**), and MySQL/Redis/RabbitMQ/Kafka stand in for CSP-managed services outside the cluster. See `docs/cloud-architecture.md` for the full mapping, networking, and CI/CD design.
+The WSL dev environment mirrors a cloud deployment shape: `dstone-boot` and `dstone-ai-engine` run as containerized Pods in a local `kind` Kubernetes cluster (`<module>/Dockerfile`, `<module>/k8s/`), while `dstone-batch` and `dstone-batchadmin` run as VM-style processes controlled by plain shell scripts (`bin/startApp.sh`/`stopApp.sh`/`statusApp.sh` — **no systemd**), and MySQL/Redis/RabbitMQ/Kafka stand in for CSP-managed services outside the cluster. `dstone-ai-engine`'s manifests (`dstone-ai-engine/k8s/`) and Dockerfile follow `dstone-boot`'s pattern exactly (same namespace `dstone`, same `localhost:5000` local registry) — see `docs/cloud-architecture.md` for the full mapping, networking, and CI/CD design.
 
 ## CI/CD
 
 Jenkins pipelines are defined in:
-- `dstone-boot/Jenkinsfile` — Maven reactor build → Docker build/push to a local registry (`localhost:5000`) → deploy to the `dstone` namespace in `kind` via `kubectl`
+- `dstone-boot/Jenkinsfile`, `dstone-ai-engine/Jenkinsfile` — Maven reactor build → Docker build/push to a local registry (`localhost:5000`) → deploy to the `dstone` namespace in `kind` via `kubectl`
 - `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile` — Maven reactor build → copy artifact/conf/bin to `/app/dstone/<module>` (the module's own directory in this same repo — no separate deploy tree) → redeploy via that module's `bin/stopApp.sh` + `bin/startApp.sh` (`DSTONE_PROFILE=vm`)
 
 Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse checkout) since builds use `mvn -pl <module> -am` reactor builds and the Docker build context needs `dstone-common` alongside `dstone-boot`.
@@ -187,6 +217,7 @@ Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse
 | dstone-boot | 7081 | WAR |
 | dstone-batch | 6081 | JAR |
 | dstone-batchadmin | 5081 | WAR |
+| dstone-ai-engine | 8081 | JAR |
 
 ## Documentation
 

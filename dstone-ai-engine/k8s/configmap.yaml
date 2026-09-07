@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dstone-ai-engine-conf
+  namespace: dstone
+data:
+  application.yml: |
+    server:
+        port: 8081
+        error:
+            whitelabel:
+                enabled: true
+
+    management:
+        endpoints:
+            web:
+                exposure:
+                    include: health
+        endpoint:
+            health:
+                probes:
+                    enabled: true
+
+    spring:
+        main:
+            allow-bean-definition-overriding: true
+        ##########################################################################################
+        # <자동설정기능>
+        # Phase 0은 DB/Redis/RabbitMQ/Kafka/Security를 쓰지 않는 순수 Chat API 스켈레톤이다.
+        # 클래스패스에는 dstone-common을 통해 이미 올라와 있으므로(자동설정이 붙잡으려 시도함),
+        # 실제로 해당 Phase(세션=Phase1, 메시징=후속)에서 쓰기 시작할 때 이 목록에서 해당 줄을 지운다.
+        ##########################################################################################
+        autoconfigure:
+            exclude:
+                - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+                - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+                - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+                - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+                - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+                - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+        ai:
+            anthropic:
+                api-key: ${ANTHROPIC_API_KEY}
+                # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
+                # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
+                # chat:
+                #     options:
+                #         model: claude-sonnet-4-5-20250929
+  log4j2.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Configuration>
+
+        <Properties>
+            <Property name="logging.root-path">${sys:APP_HOME}/LOGS</Property>
+            <Property name="level.default">INFO</Property>
+            <Property name="level.dstone">INFO</Property>
+        </Properties>
+
+        <Appenders>
+            <Console name="console" target="SYSTEM_OUT">
+                <PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss} %5p [%c] %m%n"/>
+            </Console>
+            <RollingFile name="rollingFile" filePermissions="rwxrwxr--">
+                <FileName>${logging.root-path}/${sys:APP_NAME}/execution/execution.log</FileName>
+                <FilePattern>${logging.root-path}/${sys:APP_NAME}/execution/backup/%d{yyyy-MM-dd}-execution.zip</FilePattern>
+                <PatternLayout>
+                    <Pattern>%d{yyyy-MM-dd HH:mm:ss} %5p [%c] %m%n</Pattern>
+                </PatternLayout>
+                <Policies>
+                    <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                </Policies>
+                <DefaultRolloverStrategy max="7" fileIndex="max">
+                    <Delete basePath="${logging.root-path}/${sys:APP_NAME}/execution/backup" maxDepth="1">
+                        <IfLastModified age="3d"/>
+                    </Delete>
+                </DefaultRolloverStrategy>
+            </RollingFile>
+        </Appenders>
+
+        <Loggers>
+            <Root level="${level.default}" additivity="false">
+                <AppenderRef ref="console"/>
+                <AppenderRef ref="rollingFile"/>
+            </Root>
+
+            <Logger name="org.springframework" level="${level.default}" additivity="false">
+                <AppenderRef ref="console"/>
+                <AppenderRef ref="rollingFile"/>
+            </Logger>
+
+            <Logger name="org.springframework.ai" level="${level.dstone}" additivity="false">
+                <AppenderRef ref="console"/>
+                <AppenderRef ref="rollingFile"/>
+            </Logger>
+
+            <Logger name="net.dstone.ai" level="${level.dstone}" additivity="false">
+                <AppenderRef ref="console"/>
+                <AppenderRef ref="rollingFile"/>
+            </Logger>
+
+        </Loggers>
+
+    </Configuration>

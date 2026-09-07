@@ -45,6 +45,7 @@ dstone 프레임워크를 실제 클라우드 배포와 최대한 유사한 구�
 |---|---|---|
 | MySQL / Redis / RabbitMQ / Kafka | RDS / ElastiCache / Amazon MQ / MSK (매니지드 서비스) | 기존 WSL 설치 그대로, k8s 클러스터 **바깥**에서 네트워크로 접근 |
 | dstone-boot | EKS/GKE 위 Deployment (stateless 웹 티어) | 컨테이너화(`dstone-boot/Dockerfile`) 후 로컬 `kind` 클러스터에 Pod로 배포(`dstone-boot/k8s/`) |
+| dstone-ai-engine | EKS/GKE 위 Deployment (AI 서빙 티어) | dstone-boot과 동일 패턴: 컨테이너화(`dstone-ai-engine/Dockerfile`) 후 `kind` 클러스터에 Pod로 배포(`dstone-ai-engine/k8s/`, 같은 `dstone` 네임스페이스, 포트 8081). **(2026-09-07 추가)** 매니페스트/Dockerfile/Jenkinsfile은 작성 완료했으나, 이 클러스터에는 아직 최초 배포(`kubectl apply`)를 하지 않은 상태 — Phase 0은 MySQL/Redis/RabbitMQ/Kafka에 의존하지 않아 dstone-boot의 게이트웨이 IP 네트워킹 조치(2절)가 필요 없다. |
 | dstone-batch | EC2 (배치 워커 VM) | systemd **미사용**. `dstone-batch/bin/*.sh`로 기동/중지하는 순수 프로세스, 포트 6081 |
 | dstone-batchadmin | EC2 (배치 관제/스케줄러 VM) | 동일하게 `dstone-batchadmin/bin/*.sh`, 포트 5081 |
 | Jenkins | 자체 관리형 CI 서버(VM 상주) | WSL 호스트에 Controller 상주 유지. 에이전트도 로컬 실행(향후 Kubernetes Plugin으로 에이전트만 kind Pod화하는 것을 다음 단계로 고려) |
