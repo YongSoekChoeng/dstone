@@ -134,7 +134,7 @@ fi
 
 그 외 보조 스크립트: `/usr/local/bin/docker-status.sh` (`docker info`로 실행 여부/서버 버전 출력).
 
-`dockerd`가 Docker/kind 네트워크(`kind` 브리지, `172.18.0.1`)를 올리는 주체이므로, `~/start.sh`는 반드시 이 스크립트를 [MySQL](mysql.md#4-서비스-시작중지)/[Redis](redis.md#4-서비스-시작중지)보다 먼저 실행해야 한다 — 상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh).
+**(2026-09-07 이전 이력)** `dockerd`가 Docker/kind 네트워크(`kind` 브리지, `172.18.0.1`)를 올리는 주체라서, 한때는 `~/start.sh`가 이 스크립트를 [MySQL](mysql.md#4-서비스-시작중지)/[Redis](redis.md#4-서비스-시작중지)보다 반드시 먼저 실행해야 했다. MySQL/Redis의 바인딩을 `0.0.0.0`으로 바꾼 뒤로는 이 순서 제약이 사라져, Docker/kind 없이도 MySQL/Redis만 독립적으로 기동할 수 있다 — 상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh).
 
 ## 5. 권한
 현재 사용자(`jysn007`)는 `docker` 그룹에 속해 있어 `sudo` 없이 `docker` 명령을 사용할 수 있다. 그룹 변경 후에는 재로그인(WSL 재시작)이 필요하다.

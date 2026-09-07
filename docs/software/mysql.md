@@ -66,7 +66,7 @@ echo "Mysql FAILED to start. Check: sudo systemctl status mysql.service / sudo j
 exit 1
 ```
 
-`mysql.service`는 `disabled`라 WSL 부팅 시 자동으로 뜨지 않는다. `bind-address`에 `172.18.0.1`([5절](#5-주요-설정) 참고)이 포함되어 있어 Docker/kind 네트워크가 뜨기 전에 mysql을 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패하는 레이스 컨디션이 있다 — 그래서 `~/start.sh`는 반드시 Docker/kind를 먼저 올린 뒤 mysql을 올리도록 순서가 고정되어 있다 (상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh)). 2026-09-06 이전 버전은 `sudo systemctl start mysql`의 종료 코드를 확인하지 않고 무조건 "Mysql started !!!"를 출력해서, 이 레이스로 실제 기동이 실패했을 때도 성공한 것처럼 로그가 찍히는 문제가 있었다. 지금은 `systemctl reset-failed`로 이전 실행에서 남은 실패 상태를 지운 뒤 `start` → 최대 5초간 `systemctl is-active` 재확인으로 실제 상태에 따라 정확한 성공/실패 메시지를 출력한다.
+`mysql.service`는 `disabled`라 WSL 부팅 시 자동으로 뜨지 않는다. **(2026-09-07 이전 이력)** 한때 `bind-address`에 `172.18.0.1`([5절](#5-주요-설정) 참고)이 포함되어 있어서, Docker/kind 네트워크가 뜨기 전에 mysql을 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패하는 레이스 컨디션이 있었다 — 그래서 한동안 `~/start.sh`는 반드시 Docker/kind를 먼저 올린 뒤 mysql을 올리도록 순서가 고정되어 있었다. 지금은 `bind-address`를 `0.0.0.0`으로 바꿔 이 제약 자체가 사라졌다(상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh), [5절](#5-주요-설정)) — Docker/kind 기동 여부와 무관하게 mysql만 독립적으로 켜고 끌 수 있다. 2026-09-06 이전 버전은 `sudo systemctl start mysql`의 종료 코드를 확인하지 않고 무조건 "Mysql started !!!"를 출력해서, 그 시절의 레이스로 실제 기동이 실패했을 때도 성공한 것처럼 로그가 찍히는 문제가 있었다. 지금은 `systemctl reset-failed`로 이전 실행에서 남은 실패 상태를 지운 뒤 `start` → 최대 5초간 `systemctl is-active` 재확인으로 실제 상태에 따라 정확한 성공/실패 메시지를 출력한다.
 
 `stop-mysql.sh`:
 ```sh
@@ -80,7 +80,7 @@ echo "Mysql stopped !!!"
 [mysqld]
 mysql_native_password = ON
 user                   = mysql
-bind-address           = 127.0.0.1,172.18.0.1
+bind-address           = 0.0.0.0
 mysqlx-bind-address    = 127.0.0.1
 key_buffer_size        = 16M
 myisam-recover-options = BACKUP
@@ -88,7 +88,7 @@ log_error              = /var/log/mysql/error.log
 max_binlog_size        = 100M
 ```
 - 포트: 3306 (기본값, 미변경)
-- `bind-address`는 기본값(`127.0.0.1`)에 `172.18.0.1`(kind 도커 브리지 게이트웨이 IP)을 추가해, `kind` 클러스터의 Pod에서도 접속할 수 있도록 확장했다(클라우드 아키텍처 시뮬레이션의 일부 — [cloud-architecture.md](../cloud-architecture.md) 참고). 그 외 인터페이스(Windows 호스트, 외부 네트워크)로는 여전히 노출되지 않는다.
+- **(2026-09-07 변경)** `bind-address`는 원래 기본값(`127.0.0.1`)에 `172.18.0.1`(kind 도커 브리지 게이트웨이 IP)만 추가한 `127.0.0.1,172.18.0.1` 형태였다. `kind` 클러스터의 Pod에서 접속하려면 이 게이트웨이 IP가 필요했기 때문인데(클라우드 아키텍처 시뮬레이션의 일부 — [cloud-architecture.md](../cloud-architecture.md) 참고), 이 IP는 Docker/kind가 떠야만 존재해서 mysql을 Docker보다 먼저 켜면 바인딩에 실패하는 순서 제약이 생겼다. 이를 없애기 위해 `0.0.0.0`(모든 인터페이스)으로 바꿨다 — Docker/kind 기동 여부와 무관하게 mysql이 항상 뜰 수 있고, 나중에 게이트웨이 IP가 새로 생겨도 재시작 없이 바로 접근된다. 대신 Windows 호스트 등 그 외 인터페이스로도 소켓 자체는 열리는데, WSL 네트워크가 Windows NAT 뒤의 사설 환경이라 실질적 노출 차이는 크지 않다고 보고 감수했다.
 
 ## 6. dstone 데이터베이스/사용자/스키마 초기화 (설치 후 필수)
 

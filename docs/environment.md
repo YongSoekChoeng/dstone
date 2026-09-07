@@ -62,8 +62,7 @@ WSL을 새로 띄운 뒤 개발환경 전체를 한 번에 올리고 내리기 �
 ```sh
 #! /bin/sh
 
-# docker (kind 브리지 네트워크(172.18.0.1)가 떠 있어야 mysql/redis 바인딩이 성공하므로
-#         이 두 서비스보다 먼저 기동해야 한다)
+# docker
 start-docker.sh
 
 # kubenetes
@@ -88,7 +87,12 @@ start-kafka.sh
 start-jenkins.sh
 ```
 
-`/usr/local/bin`에 있는 개별 `start-*.sh`를 순서대로 실행하기만 하는 쉘 스크립트다. **순서가 이렇게 정해진 이유**: MySQL(`mysqld.cnf`)과 Redis(`redis.conf`)는 `bind-address`/`bind`에 `127.0.0.1`뿐 아니라 `172.18.0.1`(Docker의 `kind` 브리지 네트워크 게이트웨이)도 포함하고 있다. `kind` 클러스터 안에서 도는 `dstone-boot` Pod가 host의 MySQL/Redis에 접근하려면 이 게이트웨이 IP로 접속해야 하기 때문이다. 이 IP는 dockerd가 뜨고 `kind` 네트워크 브리지(`br-*`)가 attach된 뒤에만 존재하므로, **Docker/kind가 뜨기 전에 mysql·redis를 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패한다.** (2026-09-06 장애 진단 참고 — 과거에는 mysql/postgresql/rabbitmq/redis/kafka → docker → kube 순서였고, MySQL은 systemd 자동 재시작 타이밍이 맞아 우연히 살아났지만 Redis는 `StartLimitBurst`(기본 5회/10초)에 걸려 항상 죽어 있었다.) 이 레이스 컨디션 때문에 현재는 **Docker(및 kind 네트워크)를 가장 먼저 올리고, mysql/redis를 포함한 나머지 서비스는 그 뒤에** 올리는 순서로 고정되어 있다. 순서를 바꿀 때는 이 제약을 반드시 유지할 것.
+`/usr/local/bin`에 있는 개별 `start-*.sh`를 순서대로 실행하기만 하는 쉘 스크립트다. **(2026-09-07 변경) 순서 제약이 사라졌다.** 예전에는 MySQL(`mysqld.cnf`)과 Redis(`redis.conf`)가 `bind-address`/`bind`에 `127.0.0.1`뿐 아니라 `172.18.0.1`(Docker의 `kind` 브리지 네트워크 게이트웨이)도 명시적으로 나열하고 있었다. `kind` 클러스터 안에서 도는 `dstone-boot` Pod가 host의 MySQL/Redis에 접근하려면 이 게이트웨이 IP로 접속해야 하기 때문인데, 이 IP는 dockerd가 뜨고 `kind` 네트워크 브리지(`br-*`)가 attach된 뒤에만 존재해서 **Docker/kind가 뜨기 전에 mysql·redis를 먼저 켜면 `bind: Cannot assign requested address`로 기동이 실패**했다 (2026-09-06 장애 진단 참고 — 과거에는 mysql/postgresql/rabbitmq/redis/kafka → docker → kube 순서였고, MySQL은 systemd 자동 재시작 타이밍이 맞아 우연히 살아났지만 Redis는 `StartLimitBurst`(기본 5회/10초)에 걸려 항상 죽어 있었다).
+
+이 레이스 컨디션을 근본적으로 없애기 위해 MySQL/Redis의 바인딩을 `0.0.0.0`(모든 인터페이스)으로 바꿨다(상세는 [mysql.md 4절](software/mysql.md#4-서비스-시작중지), [redis.md 4절](software/redis.md#4-서비스-시작중지) 참고). 이러면 mysql/redis 기동 시점에 `172.18.0.1`이 존재하든 안 하든 상관없고, 이후 Docker/kind가 떠서 그 IP가 새로 생겨도 mysql/redis 재시작 없이 바로 접근된다. **따라서 이제 위 목록의 순서는 예시일 뿐이며, 필요에 따라 선택적으로 구성하면 된다:**
+
+- **온프레미스만(Docker/kind 불필요)**: mysql/postgresql/rabbitmq/redis/kafka 등 "일반 소프트웨어 그룹"만 올리고, `dstone-boot`은 `dstone-boot/bin/startApp.sh`(`-Dspring.profiles.active=wsl`, `localhost` 접속)로 WSL에 네이티브 기동한다.
+- **클라우드(kind)까지 포함**: 위에 더해 `start-docker.sh`/`start-kube.sh`로 Docker/kind를 올리고, `k8s` 프로파일 기반 컨테이너로 `dstone-boot`을 배포한다([cloud-architecture.md](cloud-architecture.md) 참고).
 
 각 `start-*.sh`의 실제 내용과 상세 설명은 해당 소프트웨어 문서에 있다 (스크립트 원문을 이 문서에 중복 기재하지 않고 링크만 둔다):
 
@@ -174,4 +178,4 @@ stop-jenkins.sh
 #### 5.2.8 Jenkins 정지 (`/usr/local/bin/stop-jenkins.sh`)
 → [jenkins.md 5절](software/jenkins.md#5-서비스-시작중지)
 
-트러블슈팅(예: mysql/redis 기동 실패 시 진단 절차, `bind-address`/`172.18.0.1` 레이스 컨디션 상세)은 각 소프트웨어 문서(`mysql.md`, `redis.md`, `docker.md`, `kubernetes.md`)의 시작/중지 절을 참고.
+트러블슈팅(예: mysql/redis 기동 실패 시 진단 절차, 과거의 `bind-address`/`172.18.0.1` 레이스 컨디션 이력)은 각 소프트웨어 문서(`mysql.md`, `redis.md`, `docker.md`, `kubernetes.md`)의 시작/중지 절을 참고.

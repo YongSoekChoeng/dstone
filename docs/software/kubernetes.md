@@ -66,7 +66,7 @@ echo "Kubenetes started !!!"
 echo "Kubenetes stopped !!!"
 ```
 
-이 클러스터([Docker](docker.md) 위에서 동작)가 뜨는 시점에 `kind` 브리지 네트워크(`172.18.0.1`)가 생기므로, `~/start.sh`는 반드시 이 스크립트를 [MySQL](mysql.md#4-서비스-시작중지)/[Redis](redis.md#4-서비스-시작중지)보다 먼저 실행해야 한다 — 상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh).
+**(2026-09-07 이전 이력)** 이 클러스터([Docker](docker.md) 위에서 동작)가 뜨는 시점에 `kind` 브리지 네트워크(`172.18.0.1`)가 생기는데, 한때는 이 IP가 있어야만 MySQL/Redis가 바인딩에 성공해서 `~/start.sh`가 이 스크립트를 [MySQL](mysql.md#4-서비스-시작중지)/[Redis](redis.md#4-서비스-시작중지)보다 반드시 먼저 실행해야 했다. MySQL/Redis의 바인딩을 `0.0.0.0`으로 바꾼 뒤로는 이 순서 제약이 사라져, kind/Docker 없이도 MySQL/Redis만 독립적으로 기동할 수 있다 — 상세: [environment.md 5.1절](../environment.md#51-개발환경-시작-startsh).
 
 `k8s-start.sh` 동작:
 1. 현재 사용자가 `docker` 그룹인지 확인 (아니면 에러 종료)
