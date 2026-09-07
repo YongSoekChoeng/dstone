@@ -1,11 +1,14 @@
 package net.dstone.ai.gateway;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * 현재 활성화된 LLM provider(spring.ai.model.chat)를 읽어 검증하고, 다른 패키지
@@ -19,18 +22,18 @@ import net.dstone.common.utils.LogUtil;
 @Component
 public class GatewayProperties extends BaseObject {
 
-	@Value("${spring.ai.model.chat:}")
-	private String chatProviderValue;
-
+	@Autowired 
+	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
+	
 	private AiProvider provider;
 
 	@PostConstruct
 	public void validate() {
-		if (this.chatProviderValue == null || this.chatProviderValue.isBlank()) {
-			throw new IllegalStateException(
-					"spring.ai.model.chat 설정이 없습니다. anthropic/openai/azure-openai/ollama 중 하나를 명시해야 합니다.");
+		
+		if( StringUtil.isEmpty(configProperty.getProperty("spring.ai.model.chat")) ) {
+			throw new IllegalStateException("spring.ai.model.chat 설정이 없습니다. anthropic/openai/azure-openai/ollama 중 하나를 명시해야 합니다.");
 		}
-		this.provider = AiProvider.fromPropertyValue(this.chatProviderValue);
+		this.provider = AiProvider.fromPropertyValue(configProperty.getProperty("spring.ai.model.chat"));
 		LogUtil.sysout("dstone-ai-engine gateway: 활성 LLM provider = " + this.provider);
 	}
 
