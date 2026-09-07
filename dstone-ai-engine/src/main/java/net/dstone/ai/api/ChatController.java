@@ -8,10 +8,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
+import net.dstone.common.biz.BaseController;
 
 @RestController
 @RequestMapping("/api/ai/chat")
-public class ChatController {
+public class ChatController extends BaseController {
 
 	private final ChatClient chatClient;
 
