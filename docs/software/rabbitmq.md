@@ -73,15 +73,19 @@ sudo rabbitmqctl set_user_tags dstone management     # 관리 콘솔(15672) 로�
 
 ## 7. 기본 설정 Import
 
-`dstone-batch`의 REST API(`/batch/restapi/{jobName}` 등, 포트 6081)를 브라우저/curl 없이 바로 테스트할 수 있도록 Postman 컬렉션을 리포지토리에 포함해뒀다: `docs/data/dstone-batch-postman-collection.json`.
+[6절](#6-dstone용-가상호스트사용자-구성-설치-후-필수)의 vhost/사용자/큐/익스체인지/바인딩 구성을 `rabbitmqctl` 명령을 하나씩 치는 대신, RabbitMQ의 표준 **Definitions(정의) 파일** 하나로 한 번에 반영할 수 있도록 리포지토리에 내보내둔 파일이 `docs/data/rabbitmq-basic-config.json`이다. `/dstone-mq`/`/` 두 vhost, `guest`/`jysn007` 사용자(+ 권한), `app.notifications.queue`/`app.orders.queue`, `app.fanout.exchange`/`app.direct.exchange`와 그 바인딩까지 6절에서 만드는 것과 동일한 구성이 전부 들어있다.
 
-Postman에서 가져오는 방법:
-1. Postman 실행 → **File → Import** (또는 좌측 상단 **Import** 버튼)
-2. `docs/data/dstone-batch-postman-collection.json` 파일을 선택하거나 드래그 앤 드롭
-3. **배치샘플** 컬렉션이 생성되며, 아래 폴더/요청이 함께 들어온다:
-   - `common`: 등록된 job 목록 조회(`regtasks`), job 실행 상태 조회(`status/{id}`)
-   - `job001`~`job006`: `sampleJob`, 테이블/파일 배치 샘플(`tableDataGenType0*Job`, `tableUpdateType0*Job`, `fileDataGenJob`, `fileCopyType0*Job`, `fileToTableJob`, `tableToFileJob`) 등 각 배치 Job을 호출하는 요청
-4. 요청 URL은 `http://localhost:6081/...`로 고정되어 있으므로, `dstone-batch`가 로컬(WSL)에서 6081 포트로 떠 있는 상태에서 바로 실행하면 된다. 다른 호스트에서 기동한 경우 컬렉션 변수나 각 요청의 호스트를 맞춰 바꿔준다.
+**방법 A — 관리 콘솔(웹 UI)에서 Import**
+1. http://localhost:15672 접속 후 로그인
+2. 상단 **Admin** 탭 → **Overview** → **Definitions** 항목의 **Upload a file and import it** 선택
+3. `docs/data/rabbitmq-basic-config.json` 파일 선택 후 업로드 — 기존에 없는 vhost/사용자/큐/익스체인지/바인딩만 추가되고, 이미 있는 것은 건드리지 않는다.
+
+**방법 B — CLI (`rabbitmqctl import_definitions`)**
+```bash
+sudo rabbitmqctl import_definitions /app/dstone/docs/data/rabbitmq-basic-config.json
+```
+
+> 사용자 비밀번호는 해시(`password_hash`)로만 들어있어 평문은 복구되지 않는다 — 새 환경에 처음 적용하는 것이라면 import 후 `sudo rabbitmqctl change_password <user> <new-password>`로 비밀번호를 재설정하고, `application.yml`의 `spring.rabbitmq.username`/`password`(Jasypt `ENC(...)`)도 그 값에 맞춰 다시 암호화해야 한다.
 
 ## 8. dstone 프로젝트에서의 역할
 `dstone-boot`의 메시징 연동(알림 fanout 발행/구독, 주문 처리 큐)에 사용된다. 접속 정보는 `conf/env.properties`의 `RABBITMQ_HOST`/`RABBITMQ_PORT`와 `application.yml`의 `spring.rabbitmq.virtual-host`/`username`/`password`(Jasypt `ENC(...)`)로 구성된다 — vhost/계정 최초 구성은 [6절](#6-dstone용-가상호스트사용자-구성-설치-후-필수) 참고.
