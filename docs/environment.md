@@ -7,6 +7,7 @@
 - [3. 클라우드 아키텍처 시뮬레이션](#3-클라우드-아키텍처-시뮬레이션)
 - [4. dstone 프로젝트와의 연결 관계](#4-dstone-프로젝트와의-연결-관계)
 - [5. 개발환경 시작/정지 (`~/start.sh` / `~/stop.sh`)](#5-개발환경-시작정지-startsh--stopsh)
+- [6. WSL Export/Import로 개발 환경 이전하기](#6-wsl-exportimport로-개발-환경-이전하기)
 
 dstone 프로젝트를 개발하기 위해 WSL(Ubuntu) 환경에 수동으로 설치·구성한 소프트웨어 목록이다.
 각 항목의 설치 방법 및 상세 설정은 `docs/software/{소프트웨어명}.md` 문서를 참고한다.
@@ -179,3 +180,115 @@ stop-jenkins.sh
 → [jenkins.md 5절](software/jenkins.md#5-서비스-시작중지)
 
 트러블슈팅(예: mysql/redis 기동 실패 시 진단 절차, 과거의 `bind-address`/`172.18.0.1` 레이스 컨디션 이력)은 각 소프트웨어 문서(`mysql.md`, `redis.md`, `docker.md`, `kubernetes.md`)의 시작/중지 절을 참고.
+
+## 6. WSL Export/Import로 개발 환경 이전하기
+
+`wsl --export` / `wsl --import`로 WSL 배포판 전체를 다른 PC로 옮기면, [2. 목록](#2-목록)의 소프트웨어를 하나씩 재설치하지 않고도 이 문서가 기술하는 개발 환경(및 `/app/dstone` 프로젝트 자체)을 거의 그대로 복제할 수 있다. 아래는 그 절차와, 자동으로 복사되지 않는 부분을 정리한 것이다.
+
+### 6.1 배경 — 왜 export/import 한 번으로 재현되는가
+
+- 이 환경의 소프트웨어(JDK, Maven, MySQL, PostgreSQL, Redis, RabbitMQ, Kafka, Docker, kind, Jenkins)와 그 데이터/설정, 그리고 `/app/dstone` 프로젝트(git 저장소, `conf/env*.properties` 포함) 전부가 `/mnt/c` 같은 Windows 쪽 경로가 아니라 **WSL 배포판 자체의 ext4 루트 파일시스템(`/`) 안**에 있다. `df -h /` 기준 현재 사용량은 약 45G(전체 가상 디스크 크기는 1007G, `.wslconfig`의 `sparseVhd=true`로 실제 사용한 만큼만 디스크를 차지). 배포판을 통째로 tar로 내보내고(export) 다른 PC에서 그대로 복원하면(import), 이 파일시스템 전체가 그대로 옮겨진다.
+- 현재 등록된 배포판은 `wsl -l -v` 기준 이름 `Ubuntu`(WSL 버전 2)이며, `/etc/wsl.conf`에 `systemd=true`와 기본 사용자 `jysn007`이 이미 지정되어 있어 이 설정도 export/import에 포함된다.
+- 단, Windows 쪽에만 있는 설정(`.wslconfig`)이나 "PC 동시 사용" 관점에서 충돌 가능성이 있는 것(Jenkins 등)은 자동으로 해결되지 않으므로 6.4/6.6절에서 별도로 다룬다.
+
+### 6.2 원본 PC에서 사전 준비
+
+1. 서비스 정상 종료: [5.2절](#52-개발환경-정지-stopsh)의 `~/stop.sh`로 mysql/postgresql/rabbitmq/redis/kafka/docker/kube/jenkins를 내린다.
+2. Windows PowerShell에서 WSL 전체를 완전히 종료한다.
+   ```powershell
+   wsl --shutdown
+   ```
+   실행 중인 배포판을 export하면 파일시스템 일관성이 깨질 수 있으므로, 반드시 `--shutdown` 이후에 export한다.
+3. 대상 드라이브 여유 공간을 확인한다. export되는 tar 파일은 현재 `/` 사용량(약 45G)과 비슷한 크기가 될 수 있다.
+
+### 6.3 Export (원본 PC, Windows PowerShell)
+
+```powershell
+# 배포판 이름 확인
+wsl -l -v
+
+# 배포판 전체를 tar로 내보내기 (반드시 wsl --shutdown 이후에 실행)
+wsl --export Ubuntu D:\wsl-backup\dstone-ubuntu.tar
+
+# 압축본으로 내보내고 싶다면 (지원하는 WSL 버전 기준)
+wsl --export Ubuntu D:\wsl-backup\dstone-ubuntu.tar.gz --format tar.gz
+```
+
+만들어진 tar 파일을 USB, 외장 드라이브, 사내 네트워크 공유, 클라우드 스토리지 등으로 대상 PC에 옮긴다. 이 파일 안에는 DB 계정, Jasypt 키, Jenkins Credential/SSH 배포 키 등 민감정보가 그대로 들어있으므로(6.6절 참고) 전송·보관 경로의 보안에 유의한다.
+
+### 6.4 대상 PC 준비
+
+- Windows 11(또는 WSL2를 지원하는 Windows 10) + "Linux용 Windows 하위 시스템" 기능과 WSL2 자체를 미리 설치해 둔다(`wsl --install --no-distribution`). Microsoft Store의 Ubuntu 앱을 따로 받을 필요는 없다 — import 자체가 새 배포판을 만드는 과정이다.
+- `.wslconfig` 이전: 원본 PC의 `C:\Users\<사용자명>\.wslconfig`를 대상 PC의 동일 경로로 복사한다. 현재 값:
+  ```ini
+  [wsl2]
+  networkingMode=mirrored
+
+  memory=8GB
+  processors=4
+  swap=2GB
+
+  [experimental]
+  hostAddressLoopback=true
+  autoProxy=true
+  autoMemoryReclaim=gradual
+  sparseVhd=true
+  ```
+  - `memory`/`processors`/`swap`은 대상 PC의 실제 사양에 맞게 다시 조정한다(원본 PC 값을 그대로 쓰지 않는다).
+  - `networkingMode=mirrored`는 Windows 11 22H2 이상 + 최신 WSL 커널이 필요하다. 대상 PC가 조건을 만족하지 못해 이 줄을 빼야 한다면 기본(NAT) 네트워킹으로 동작하게 되는데, 이 경우 [cloud-architecture.md](cloud-architecture.md)에 정리된 kind 브리지 게이트웨이 IP(`172.18.0.1`) 관련 전제가 달라질 수 있으니 해당 문서를 재확인한다.
+
+### 6.5 Import (대상 PC, Windows PowerShell)
+
+```powershell
+# wsl --import <배포판이름> <설치위치(빈 폴더)> <tar 파일 경로> --version 2
+wsl --import Ubuntu-dstone D:\WSL\Ubuntu-dstone D:\wsl-backup\dstone-ubuntu.tar --version 2
+
+# 확인
+wsl -l -v
+wsl -d Ubuntu-dstone
+```
+
+- 배포판 이름은 자유롭게 정할 수 있다(원본과 똑같이 `Ubuntu`로 해도 되고, 대상 PC에 이미 다른 용도의 `Ubuntu` 배포판이 있다면 `Ubuntu-dstone`처럼 구분되는 이름을 쓴다). 이 프로젝트나 문서 어디에도 배포판 이름 자체를 코드에서 참조하는 곳은 없으므로 이름은 운영에 영향을 주지 않는다.
+- `/etc/wsl.conf`에 이미 기본 사용자(`jysn007`)와 `systemd=true`가 들어있는 상태로 import되므로, 별도 설정 없이 `wsl -d Ubuntu-dstone` 실행 시 jysn007 사용자로 systemd가 뜬 상태로 들어가야 한다. 혹시 root로 진입한다면 `wsl -d Ubuntu-dstone -u jysn007`로 확인하면서 `/etc/wsl.conf` 내용이 온전히 복사됐는지 점검한다.
+
+### 6.6 Import 후 반드시 점검할 것들
+
+"파일시스템은 그대로 복사되지만, 떠 있던 프로세스 상태나 PC 고유 정보는 복사되지 않는다"는 원칙으로 아래를 점검한다.
+
+| 항목 | Import 후 상태 | 조치 |
+|---|---|---|
+| 설치된 소프트웨어 바이너리·설정·데이터(JDK/Maven/MySQL/PostgreSQL/Redis/RabbitMQ/Kafka/Docker/kind/Jenkins) | 파일시스템 그대로 복사됨 | 재설치 불필요. [5.1절](#51-개발환경-시작-startsh)의 `~/start.sh`로 기동만 하면 됨 |
+| `/app/dstone` 프로젝트(git 저장소, `conf/env*.properties` 등 절대경로 포함) | 파일시스템 그대로 복사되고 절대경로(`/app/dstone`)도 동일하게 유지됨 | 추가 조치 불필요 |
+| Docker 이미지·컨테이너(`/var/lib/docker`), kind 클러스터 노드 컨테이너 | 데이터는 복사되지만 dockerd·컨테이너는 꺼진 상태로 시작됨 | `start-docker.sh` → `start-kube.sh`(`k8s-start.sh`) 실행 후 `docker ps -a`, `kind get clusters`로 노드가 정상 기동되는지 확인. 이상하면 `k8s-start.sh`로 클러스터를 재생성 |
+| MySQL/PostgreSQL/Redis/RabbitMQ 데이터 디렉터리 | 데이터 그대로 복사됨 | 해당 `start-*.sh`로 기동 후 접속·데이터 확인 |
+| Jenkins 홈(`/var/lib/jenkins`: 잡 설정, 빌드 이력, GitHub 배포용 SSH 키 등) | 그대로 복사됨(재설정 불필요) | 두 PC에서 **동시에** 같은 Jenkins를 띄우지 않는다 — 같은 Job이 양쪽에서 동시에 GitHub/에이전트에 접속하면 충돌한다. 이전이 목적이면 원본 Jenkins는 내려두거나 6.7절대로 배포판을 등록 해제한다 |
+| Windows `.wslconfig` | 배포판 밖(Windows 사용자 프로필)에 있어 **자동으로 복사되지 않음** | 6.4절대로 수동 복사 후 사양 재조정 |
+| VS Code Remote-WSL 서버(`~/.vscode-server`) | 배포판 안에 있어 함께 복사됨 | Windows 쪽 VS Code에서 새 배포판(`Ubuntu-dstone`)으로 다시 연결만 하면 재사용됨 |
+| Jasypt 복호화 키, Jenkins Credential, GitHub Deploy Key 등 민감정보 | 배포판 안의 파일이므로 그대로 복사됨(재발급 불필요) | 파일로 존재한다는 것 자체가 6.3절에서 언급한 tar 파일 보안 유의사항의 근거이기도 하다 |
+
+### 6.7 (선택) 원본 PC 배포판 정리 — "이전"이 목적일 때만
+
+완전히 새 PC로 옮기고 원본은 더 이상 쓰지 않을 계획이라면, 원본 PC에서 배포판을 등록 해제할 수 있다. **배포판 파일 자체가 삭제되는 되돌릴 수 없는 작업**이므로, 대상 PC에서 서비스가 모두 정상 기동되는 것을 확인한 뒤에만 실행한다.
+
+```powershell
+wsl --unregister Ubuntu
+```
+
+단순히 "복제해서 여러 PC에서 같이 쓰고 싶다"는 경우라면 이 단계는 생략하고 두 배포판을 각자 이름으로 유지하되, 6.6절의 Jenkins처럼 동시 실행 시 충돌하는 것만 한쪽에서 꺼두는 방식으로 운용한다.
+
+### 6.8 검증 체크리스트 (대상 PC)
+
+```bash
+java -version && mvn -v && git --version
+mysql -u root -p -e "select 1"
+redis-cli ping
+sudo rabbitmqctl status
+/opt/kafka/kafka_2.13-4.2.1/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+docker ps
+kubectl get nodes
+curl -I http://localhost:8080          # Jenkins
+
+cd /app/dstone && mvn -pl dstone-common -am clean install
+```
+
+모듈별 기동/빌드 확인은 [build.md](build.md), 클라우드 아키텍처 관련 검증(kind Pod 상태 등)은 [cloud-architecture.md](cloud-architecture.md)를 참고.

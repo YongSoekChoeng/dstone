@@ -10,7 +10,8 @@
 - [2. 문서 목록](#2-문서-목록)
   - [2.1 모듈별 문서](#21-모듈별-문서)
   - [2.2 개발 환경 / 인프라](#22-개발-환경--인프라)
-  - [2.3 기타 자료](#23-기타-자료)
+  - [2.3 다이어그램 (`images/`)](#23-다이어그램-images)
+  - [2.4 데이터 파일 (`data/`)](#24-데이터-파일-data)
 - [3. 공통 아키텍처 패턴](#3-공통-아키텍처-패턴)
   - [3.1 설정 분리 구조](#31-설정-분리-구조)
   - [3.2 보안 (Jasypt 암호화)](#32-보안-jasypt-암호화)
@@ -91,14 +92,44 @@ mvn clean install
 ### 2.2 개발 환경 / 인프라
 | 문서 | 내용 |
 |---|---|
-| [environment.md](environment.md) | WSL 개발 환경에 설치된 전체 소프트웨어 목록 |
-| [software/](software/) | 소프트웨어별 설치 방법 상세 문서 (JDK, Maven, Docker, MySQL, Redis, RabbitMQ, Kafka, Kubernetes, Jenkins 등) |
+| [environment.md](environment.md) | WSL 개발 환경에 설치된 전체 소프트웨어 목록, 시작/정지 스크립트 운용, WSL export/import로 개발 환경을 다른 PC로 이전하는 절차 |
 | [cloud-architecture.md](cloud-architecture.md) | dstone을 클라우드 아키텍처와 유사하게 운용하기 위한 설계(쿠버네티스 배포, VM 스타일 운영, CI/CD) |
 
-### 2.3 기타 자료
-| 자료 | 내용 |
+`software/` 디렉터리에는 [environment.md 2절](environment.md#2-목록) 표에 나열된 소프트웨어별 설치·설정 상세 문서가 있다:
+
+| 문서 | 내용 |
 |---|---|
-| [dstone-batch-postman-collection.json](dstone-batch-postman-collection.json) | dstone-batch 샘플 잡 호출용 Postman 컬렉션 |
+| [software/jdk.md](software/jdk.md) | OpenJDK 21 설치 |
+| [software/maven.md](software/maven.md) | Apache Maven 설치 |
+| [software/git.md](software/git.md) | Git 설치 |
+| [software/mysql.md](software/mysql.md) | MySQL Server 설치·계정/스키마 구성·서비스 시작/정지 |
+| [software/postgresql.md](software/postgresql.md) | PostgreSQL 설치 |
+| [software/redis.md](software/redis.md) | Redis 설치·서비스 시작/정지 |
+| [software/rabbitmq.md](software/rabbitmq.md) | RabbitMQ 설치·dstone용 vhost/사용자/큐/익스체인지 구성·서비스 시작/정지 |
+| [software/kafka.md](software/kafka.md) | Apache Kafka(KRaft 모드) 설치·리스너 구성·서비스 시작/정지 |
+| [software/kafbat-ui.md](software/kafbat-ui.md) | Kafka 관리 콘솔(Kafbat UI) 설치 |
+| [software/docker.md](software/docker.md) | Docker CE + Compose plugin 설치·서비스 시작/정지 |
+| [software/kubernetes.md](software/kubernetes.md) | kubectl + kind(로컬 K8s) 설치·클러스터/로컬 레지스트리 시작·정지 |
+| [software/jenkins.md](software/jenkins.md) | Jenkins 설치·서비스 시작/정지 |
+| [software/nodejs.md](software/nodejs.md) | Node.js + npm 설치 |
+
+### 2.3 다이어그램 (`images/`)
+
+각 문서 안에 인라인으로 삽입되는 SVG 다이어그램이다. 별도로 열람하기보다, 아래 문서 본문에서 문맥과 함께 보는 것을 권장한다.
+
+| 파일 | 삽입 위치 | 내용 |
+|---|---|---|
+| [images/jenkins-job-setup-flow.svg](images/jenkins-job-setup-flow.svg) | [cloud-architecture.md](cloud-architecture.md) | Jenkins Pipeline Job 생성 절차 |
+| [images/jenkins-boot-pipeline-flow.svg](images/jenkins-boot-pipeline-flow.svg) | [cloud-architecture.md](cloud-architecture.md) | `dstone-boot/Jenkinsfile` 파이프라인 스테이지(Docker 빌드/푸시 → kind 배포) |
+| [images/jenkins-batch-pipeline-flow.svg](images/jenkins-batch-pipeline-flow.svg) | [cloud-architecture.md](cloud-architecture.md) | `dstone-batch`/`dstone-batchadmin` Jenkinsfile 파이프라인 스테이지(VM 스타일 재배포) |
+| [images/saga-00-overview.svg](images/saga-00-overview.svg) ~ [saga-06-compensate.svg](images/saga-06-compensate.svg) (7개) | [dstone-saga.md](dstone-saga.md) | SAGA + Outbox 샘플 기능의 단계별 실행 흐름(기동 초기화 → 사가 시작 → Outbox 릴레이 → Kafka 컨슈머 → 종결/보상) |
+
+### 2.4 데이터 파일 (`data/`)
+
+| 파일 | 내용 |
+|---|---|
+| [data/dstone-batch-postman-collection.json](data/dstone-batch-postman-collection.json) | dstone-batch 샘플 잡 호출용 Postman 컬렉션 |
+| [data/rabbitmq-basic-config.json](data/rabbitmq-basic-config.json) | RabbitMQ Definitions 파일 — [software/rabbitmq.md](software/rabbitmq.md)에서 만드는 dstone용 vhost/사용자/큐/익스체인지/바인딩 구성을 `rabbitmqctl import_definitions` 한 번으로 반영하기 위한 내보내기 파일 |
 
 ## 3. 공통 아키텍처 패턴
 
