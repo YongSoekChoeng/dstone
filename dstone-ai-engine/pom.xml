@@ -66,11 +66,27 @@
 			</exclusions>
 		</dependency>
 
-		<!-- Spring AI Model Gateway(1단계): 우선 Anthropic 단일 provider로 시작.
-		     이후 gateway 패키지에서 provider별 어댑터로 추상화. -->
+		<!-- Spring AI Model Gateway(Phase 1): provider별 starter를 모두 클래스패스에 올려두고,
+		     application.yml의 spring.ai.model.chat 값(net.dstone.ai.gateway.AiProvider) 하나로
+		     실제 활성화되는 ChatModel/ChatClient를 교체한다(각 starter의 자동설정이
+		     spring.ai.model.chat=<provider명> 조건부로 동작 — 코드 변경 불필요).
+		     local(vLLM)은 OpenAI 호환 API이므로 openai starter를 base-url만 바꿔 재사용하고,
+		     local(Ollama)은 ollama starter를 그대로 사용한다. -->
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-anthropic</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-openai</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-azure-openai</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-ollama</artifactId>
 		</dependency>
 
 		<!-- Lombok -->

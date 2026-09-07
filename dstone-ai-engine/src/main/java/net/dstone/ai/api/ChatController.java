@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
+import net.dstone.ai.gateway.GatewayProperties;
 import net.dstone.common.biz.BaseController;
 
 @RestController
@@ -15,15 +16,17 @@ import net.dstone.common.biz.BaseController;
 public class ChatController extends BaseController {
 
 	private final ChatClient chatClient;
+	private final GatewayProperties gatewayProperties;
 
-	public ChatController(ChatClient chatClient) {
+	public ChatController(ChatClient chatClient, GatewayProperties gatewayProperties) {
 		this.chatClient = chatClient;
+		this.gatewayProperties = gatewayProperties;
 	}
 
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request) {
 		String answer = chatClient.prompt().user(request.message()).call().content();
-		return new ChatResponse(answer);
+		return new ChatResponse(answer, this.gatewayProperties.activeProvider().propertyValue());
 	}
 
 }

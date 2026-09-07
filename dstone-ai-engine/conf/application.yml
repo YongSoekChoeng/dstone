@@ -32,6 +32,22 @@ spring:
             - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
             - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     ai:
+        # Gateway(Phase 1): 아래 4개 provider의 starter가 모두 클래스패스에 있으므로
+        # 반드시 하나를 명시해야 한다(값을 지우면 4개 provider가 동시에 활성화되어 기동에 실패한다).
+        # net.dstone.ai.gateway.AiProvider의 propertyValue와 정확히 일치해야 한다.
+        #
+        # chat 외 capability(embedding/audio/image/moderation)는 openai starter가 클래스패스에
+        # 있으면 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서
+        # 즉시 기동 실패로 이어진다), 아직 Phase 1(Chat) 범위 밖이라 전부 명시적으로 꺼둔다.
+        # RAG(Phase 2)에서 embedding이 실제로 필요해지면 그때 embedding 값만 provider명으로 바꾼다.
+        model:
+            chat: anthropic # anthropic | openai | azure-openai | ollama
+            embedding: none
+            audio:
+                speech: none
+                transcription: none
+            image: none
+            moderation: none
         anthropic:
             # DB 패스워드와 동일한 컨벤션: Jasypt로 암호화해 ENC(...) 형태로 직접 넣는다(env.properties 경유 안 함).
             # 로컬에서 생성: cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<실제 키>"
@@ -42,3 +58,33 @@ spring:
             # chat:
             #     options:
             #         model: claude-sonnet-4-5-20250929
+
+        # spring.ai.model.chat=openai 일 때 사용. api-key도 위 anthropic과 동일하게 ENC(...)로 관리.
+        # openai:
+        #     api-key: ENC(...)
+        #     chat:
+        #         options:
+        #             model: gpt-4o-mini
+        #     # local vLLM(OpenAI 호환 API)을 붙일 때는 provider는 그대로 openai로 두고
+        #     # base-url만 vLLM 서버로 돌린다(api-key는 vLLM이 검증하지 않으면 임의 문자열로 둔다).
+        #     base-url: http://<vllm-host>:8000
+
+        # azure-openai starter는 spring.ai.model.chat 값과 무관하게 OpenAIClientBuilder 빈을
+        # 기동 시점에 무조건 생성하면서 endpoint가 비어 있으면 즉시 실패한다(다른 provider가
+        # 활성화되어 있어도 마찬가지). 그래서 endpoint만은 주석 처리하지 않고 더미 값을 채워둔다.
+        # spring.ai.model.chat=azure-openai로 바꿔서 실제로 쓸 때 endpoint/api-key/deployment-name을
+        # 아래처럼 실값으로 교체한다.
+        azure:
+            openai:
+                endpoint: https://placeholder.openai.azure.com
+                # api-key: ENC(...)
+                # chat:
+                #     options:
+                #         deployment-name: <azure-deployment-name>
+
+        # spring.ai.model.chat=ollama 일 때 사용(로컬/사내망 Ollama 서버, API 키 불필요).
+        # ollama:
+        #     base-url: http://<ollama-host>:11434
+        #     chat:
+        #         options:
+        #             model: llama3.1
