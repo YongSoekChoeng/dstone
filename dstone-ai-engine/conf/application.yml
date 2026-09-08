@@ -26,11 +26,28 @@ spring:
             host: ${REDIS_HOST}
             port: ${REDIS_PORT}
             timeout: 10000
+    # RAG(Phase 2): pgvector(PgVectorStoreAutoConfiguration)가 이 DataSource를 그대로 쓴다.
+    # dstone-boot처럼 여러 datasource가 아니라 하나뿐이라 표준 Spring Boot 단일 datasource
+    # 자동설정(spring.datasource.*)을 그대로 쓴다 - 별도 ConfigDatasource 클래스 불필요.
+    # 로컬 설치/역할 생성 절차: docs/software/postgresql.md 참고.
+    datasource:
+        driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+        url: jdbc:log4jdbc:postgresql://${DB_HOST}:${DB_PORT}/dstone_ai
+        username: dstone_ai
+        password: ENC(6agKS1MMMV76VQYFmfkiM+C29O7tacXyW27QP4O03eV2QDRSvWV/3rUzfNG1hoHn)
+        hikari:
+            maximum-pool-size: 10
+    servlet:
+        multipart:
+            # RAG(Phase 2) 문서 업로드(/api/ai/rag/documents) 대비 기본 1MB보다 넉넉하게.
+            max-file-size: 20MB
+            max-request-size: 20MB
     ##########################################################################################
     # <자동설정기능>
     # Phase 0은 DB/Redis/RabbitMQ/Kafka/Security를 쓰지 않는 순수 Chat API 스켈레톤이었다.
-    # session(Phase 1)에서 대화 히스토리 저장에 Redis를 쓰기 시작하면서 Redis 관련 두 줄은 제외
-    # 목록에서 뺐다(net.dstone.ai.config.ConfigRedis 참고). DB/RabbitMQ/Kafka는 아직 미사용.
+    # session(Phase 1)에서 대화 히스토리 저장에 Redis를 쓰기 시작하면서 Redis 관련 두 줄은,
+    # RAG(Phase 2)에서 pgvector에 DB를 쓰기 시작하면서 DB 관련 줄은 제외 목록에서 뺐다.
+    # RabbitMQ/Kafka는 아직 미사용.
     #
     # Boot 4에서 Security 자동설정이 org.springframework.boot.autoconfigure.security.* 에서
     # org.springframework.boot.security.autoconfigure.* 로 통째로 옮겨갔다. spring.autoconfigure.exclude는
@@ -52,13 +69,16 @@ spring:
         # net.dstone.ai.gateway.AiProvider의 propertyValue와 정확히 일치해야 한다.
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
-        # chat 외 capability(embedding/audio/image/moderation)는 openai starter가 클래스패스에 있으면
+        # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
-        # 아직 Phase 1(Chat) 범위 밖이라 전부 명시적으로 꺼둔다.
-        # Phase 2(RAG)에서 embedding이 실제로 필요해지면 그때 embedding 값만 provider명으로 바꾼다.
+        # 아직 쓰지 않으므로 전부 명시적으로 꺼둔다.
+        #
+        # embedding(Phase 2, RAG): Anthropic은 임베딩 모델을 제공하지 않아 chat과 별개로 정해야 한다
+        # (net.dstone.ai.rag.embedding.EmbeddingProvider 참고). 이 환경엔 OpenAI 키 대신 로컬 Ollama를
+        # 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/ollama.md.
         model:
             chat: anthropic # anthropic | openai | ollama
-            embedding: none
+            embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
             audio:
                 speech: none
                 transcription: none
@@ -100,6 +120,25 @@ spring:
         #         options:
         #             model: llama3.1
 
+        ##########################################################################################
+        # spring.ai.model.embedding=ollama 용 설정(Phase 2, RAG). chat 쪽 provider와 무관하게 항상 적용된다
+        # (base-url은 spring.ai.ollama.* 하나뿐이라 chat=ollama로 쓰게 되면 이 base-url을 공유한다).
+        # 로컬에 docs/software/ollama.md대로 설치 후 bge-m3(다국어/한국어 지원 임베딩 모델, 1024차원) pull 필요.
+        ##########################################################################################
+        ollama:
+            base-url: http://localhost:11434
+            embedding:
+                model: bge-m3
+
+        ##########################################################################################
+        # RAG(Phase 2) VectorStore = pgvector. dimensions는 spring.ai.ollama.embedding.model(bge-m3)의
+        # 실제 출력 차원과 반드시 일치해야 한다 - 모델을 바꾸면 이 값도 같이 바꾸고 테이블을 재생성해야 한다.
+        ##########################################################################################
+        vectorstore:
+            pgvector:
+                initialize-schema: true
+                dimensions: 1024
+
 dstone:
     ai:
         # session(Phase 1): 대화 히스토리(ChatMemory) 설정.
@@ -113,3 +152,14 @@ dstone:
             default-version: v1
             # versions:
             #     sample-system: v1
+        # RAG(Phase 2): 이 값이 true여야 rag.ingest/rag.embedding/rag.retrieval 빈과
+        # RagController, ChatController의 ragEnabled 옵션이 활성화된다(net.dstone.ai.rag 패키지 참고).
+        # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 Postgres/pgvector/임베딩 설정
+        # 없이도 그대로 기동된다.
+        rag:
+            enabled: true
+            ingest:
+                chunk-size: 800 # 청크당 최대 토큰 수
+            retrieval:
+                top-k: 5
+                similarity-threshold: 0.5

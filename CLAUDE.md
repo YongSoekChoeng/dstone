@@ -171,7 +171,7 @@ A Spring AI-based, provider-agnostic engine meant to be built out incrementally 
 | `gateway` / `gateway.provider` | LLM provider abstraction (OpenAI/Anthropic/local vLLM-Ollama), swappable via config | 1 |
 | `prompt` | Prompt template management/versioning — SI-specific customization point | 1 |
 | `session` | Conversation session/history, reusing `dstone-common`'s Redis infra | 1 |
-| `rag` (`ingest`/`embedding`/`retrieval`) | Document ingestion → embedding → vector search | 2 |
+| `rag` (`ingest`/`embedding`/`retrieval`) | Document ingestion → embedding → vector search (pgvector), gated by `dstone.ai.rag.enabled` | 2 |
 | `agent` | Tool/function calling, orchestration, memory | 3 |
 | `governance` | Guardrails, PII filtering, rate limiting, cost tracking, auth | 4 |
 | `observability` | Token usage, cost, tracing, eval results | 4 |
@@ -182,14 +182,23 @@ Phase 0 ships a single hardcoded provider (Anthropic, via `spring-ai-starter-mod
 
 Spring AI is on the 2.x line (`spring-ai.version` in `dstone-ai-engine/pom.xml`), matching the reactor's Spring Boot 4 / Spring Framework 7 baseline. Azure OpenAI was dropped from `AiProvider`/the gateway starters — Spring AI 2.x removed `spring-ai-starter-model-azure-openai` as a chat model provider (Azure remains only as a vector-store integration).
 
+Phase 2 (RAG) is implemented behind a single flag, `dstone.ai.rag.enabled` — when `false` (default), `dstone-ai-engine` boots with no Postgres/pgvector/embedding dependency at all, so SI projects that don't need RAG are unaffected. When `true`:
+- `rag.ingest.DocumentIngestService` extracts text via Tika (`spring-ai-tika-document-reader`, covers PDF/DOCX/PPTX/HTML/TXT/etc.), splits it with `TokenTextSplitter`, and writes chunks to a `VectorStore`. Re-ingesting the same caller-assigned `sourceId` deletes that source's old chunks first (upsert semantics), matched via a metadata filter (`FilterExpressionBuilder`), not a primary key.
+- `rag.embedding.EmbeddingProperties` validates `spring.ai.model.embedding` (openai | ollama — **not** anthropic, which has no embeddings API) the same fail-fast way `gateway.GatewayProperties` validates `spring.ai.model.chat`.
+- The vector store is Postgres + pgvector (`spring-ai-starter-vector-store-pgvector`), using the same single-`DataSource` Spring Boot autoconfiguration as any other module (no `ConfigDatasource`-style multi-datasource class needed since there's only one). `spring.ai.vectorstore.pgvector.dimensions` must match the active embedding model's output size.
+- `rag.retrieval.RetrievalService` wraps `VectorStore.similaritySearch` for the standalone `POST /api/ai/rag/search` endpoint; `api.ChatController` also accepts `ChatRequest.ragEnabled` to attach a `QuestionAnswerAdvisor` (built from the same `VectorStore`, via `ObjectProvider` so it stays optional) for retrieval-augmented chat. `api.RagController` (`/api/ai/rag/documents`, multipart upload + delete) is the ingest-side HTTP entry point.
+- This environment's actual embedding provider is a locally-installed Ollama (`bge-m3`, 1024 dims) — see `docs/software/ollama.md` — because Anthropic has no embeddings API and no OpenAI key is configured here; a real SI deployment can switch to `openai` purely via config.
+
 ## Required Infrastructure
 
 | Infrastructure | Purpose | Modules |
 |---|---|---|
-| MySQL | Main data store | All (except dstone-ai-engine in Phase 0) |
+| MySQL | Main data store | dstone-boot, dstone-batch, dstone-batchadmin |
 | Redis | Session store, cache | dstone-boot (dstone-ai-engine from Phase 1) |
 | RabbitMQ | Message queue | dstone-boot |
-| Anthropic API (or other LLM provider) | Model inference | dstone-ai-engine |
+| Anthropic API (or other LLM provider) | Chat model inference | dstone-ai-engine |
+| PostgreSQL + pgvector | RAG vector store | dstone-ai-engine (Phase 2, when `dstone.ai.rag.enabled=true`) |
+| Ollama (or OpenAI) | Embedding model inference for RAG | dstone-ai-engine (Phase 2, when `dstone.ai.rag.enabled=true`) |
 
 ## Key Environment Variables (`conf/env.properties`)
 

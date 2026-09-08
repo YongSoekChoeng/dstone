@@ -9,6 +9,11 @@ import java.util.Map;
  *
  * promptName을 지정하면 net.dstone.ai.prompt.PromptTemplateRegistry가 해당 템플릿을
  * variables로 렌더링해 시스템 프롬프트로 사용한다.
+ *
+ * ragEnabled를 true로 보내면(dstone.ai.rag.enabled=true로 RAG가 켜져 있어야 함) VectorStore에서
+ * message와 유사한 문서 조각을 찾아 QuestionAnswerAdvisor로 자동으로 컨텍스트에 끼워넣는다
+ * (검색 자체를 직접 다루려면 /api/ai/rag/search를 쓴다).
  */
-public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables) {
+public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
+		Boolean ragEnabled) {
 }

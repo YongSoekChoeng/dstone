@@ -88,6 +88,27 @@
 			<artifactId>spring-ai-starter-model-ollama</artifactId>
 		</dependency>
 
+		<!-- RAG(Phase 2): pgvector 기반 VectorStore. DataSource(spring.datasource.*)와 EmbeddingModel
+		     (spring.ai.model.embedding) 빈이 둘 다 있어야 자동설정된다. DataSource 자체는 dstone-common이
+		     이미 제공하는 HikariCP/postgresql-driver/log4jdbc로 표준 Spring Boot 단일 datasource
+		     자동설정(spring.datasource.*)을 그대로 쓴다(dstone-boot처럼 여러 datasource가 아니라 하나뿐이라
+		     별도 ConfigDatasource 클래스 없이도 충분하다). -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+		</dependency>
+		<!-- QuestionAnswerAdvisor(검색된 문서를 시스템프롬프트에 자동으로 끼워넣는 ChatClient Advisor) -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-vector-store-advisor</artifactId>
+		</dependency>
+
+		<!-- RAG(Phase 2) 문서 적재: Tika 하나로 PDF/DOCX/PPTX/HTML/TXT 등 대부분의 SI 문서 포맷을 커버한다. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-tika-document-reader</artifactId>
+		</dependency>
+
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

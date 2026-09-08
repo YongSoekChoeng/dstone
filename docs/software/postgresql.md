@@ -10,7 +10,7 @@
 - [6. dstone 프로젝트에서의 역할](#6-dstone-프로젝트에서의-역할)
 
 ## 1. 개요
-로컬 개발/실습용으로 설치된 관계형 데이터베이스. 현재 dstone 각 모듈의 `application.yml`에서는 사용하지 않으며, 필요 시 대체 DB 실습이나 향후 연동을 위해 준비된 상태다.
+로컬 개발/실습용으로 설치된 관계형 데이터베이스. **(2026-09-08 변경)** `dstone-ai-engine`의 RAG(Phase 2) VectorStore(pgvector)가 사용하기 시작했다 - 그 외 모듈(`dstone-boot`/`dstone-batch`/`dstone-batchadmin`)은 여전히 MySQL만 쓴다.
 
 ## 2. 설치 정보
 - 버전: PostgreSQL 18.6 (Ubuntu 26.04 공식 패키지)
@@ -49,5 +49,23 @@ sudo -u postgres psql
 ```
 - 포트: 5432 (기본값)
 
+`dstone_ai` 전용 계정으로 접속하려면:
+```bash
+psql -h 127.0.0.1 -p 5432 -U dstone_ai -d dstone_ai
+```
+
 ## 6. dstone 프로젝트에서의 역할
-현재는 직접 연동된 모듈 없음. 실제로 특정 모듈이 PostgreSQL을 사용하게 되면 `docs/environment.md`와 이 문서에 데이터소스/스키마 정보를 추가한다.
+`dstone-ai-engine`의 RAG(Phase 2) VectorStore가 이 인스턴스를 쓴다 - `net.dstone.ai.rag.ingest.DocumentIngestService`가 청크로 쪼갠 문서를 [Ollama](ollama.md)로 임베딩한 뒤 pgvector 테이블에 저장하고, `net.dstone.ai.rag.retrieval.RetrievalService`가 유사도 검색을 한다. 전용 롤/DB/확장을 아래처럼 한 번 생성해뒀다(최초 1회, `postgres` 슈퍼유저 권한 필요):
+
+```bash
+sudo -u postgres psql <<'SQL'
+CREATE ROLE dstone_ai LOGIN PASSWORD '<비밀번호>';
+CREATE DATABASE dstone_ai OWNER dstone_ai;
+SQL
+sudo -u postgres psql -d dstone_ai -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+- 롤/DB: `dstone_ai` / `dstone_ai` (비밀번호는 `dstone-ai-engine/conf/application.yml`의 `spring.datasource.password`에 프로젝트 컨벤션대로 Jasypt `ENC(...)`로 암호화해 저장 - "Sensitive Config Encryption" 참고)
+- 접속 정보(`DB_HOST`/`DB_PORT`)는 `dstone-ai-engine/conf/env*.properties`로 주입(다른 모듈의 MySQL과 동일한 패턴)
+- 테이블(`vector_store`)은 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 최초 기동 시 자동 생성한다 - 별도 스키마 SQL 파일 없음
+- **k8s(kind) 미배포**: mysql/redis와 달리 아직 kind 브리지 게이트웨이(`172.18.0.1`)로 열어주는 작업은 하지 않았다. `dstone-ai-engine`을 실제로 kind에 배포하기 전에 `listen_addresses`/`pg_hba.conf`를 mysql.md/redis.md와 같은 방식으로 조정해야 한다.

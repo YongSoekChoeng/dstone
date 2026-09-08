@@ -39,6 +39,7 @@ WSL을 재시작했다면 필요한 서비스를 먼저 `start-*.sh`로 올려�
 | 컨테이너 오케스트레이션 | kubectl + kind (로컬 K8s) | kubectl v1.37.0 / kind v0.27.0 | 수동 설치 (바이너리 다운로드, `/usr/local/bin`) | kind API 서버는 임의 포트 | `start-kube.sh` (`k8s-start.sh`) / `stop-kube.sh` (`k8s-stop.sh`) | [kubernetes.md](software/kubernetes.md) |
 | CI/CD | Jenkins | 2.568.3 | Jenkins 공식 저장소 (`pkg.jenkins.io`) | 8080 | `start-jenkins.sh` / `stop-jenkins.sh` | [jenkins.md](software/jenkins.md) |
 | 런타임(부가) | Node.js + npm | 20.20.2 / 10.8.2 | NodeSource 저장소 (`deb.nodesource.com`) | - | - | [nodejs.md](software/nodejs.md) |
+| AI 모델 런타임 | Ollama | v0.33.3 | 수동 설치 (tar.zst, `/opt/ollama`, systemd 미등록) | 11434 | `start-ollama.sh` / `stop-ollama.sh` | [ollama.md](software/ollama.md) |
 
 ## 3. 클라우드 아키텍처 시뮬레이션
 
@@ -52,7 +53,9 @@ dstone-boot는 [kind](software/kubernetes.md)에 컨테이너 Pod로, dstone-bat
 - **Kafka**: 애플리케이션에서 메시징 연동 실험/개발용 (로컬 KRaft 단일 브로커).
 - **Jenkins**: `dstone-batch/Jenkinsfile`, `dstone-boot/Jenkinsfile` 파이프라인 실행.
 - **Docker / kind**: `dstone-boot`을 컨테이너 이미지로 빌드해 로컬 `kind` 클러스터에 Pod로 배포하는 환경(`dstone-boot/Dockerfile`, `dstone-boot/k8s/`). 상세는 [cloud-architecture.md](cloud-architecture.md) 참고.
-- **PostgreSQL / Node.js**: 현재 dstone 서비스 자체 설정(`application.yml`)에서는 사용하지 않는 것으로 보이며, 개발 환경 실습/부가 도구 용도로 설치되어 있음. 실제 프로젝트 연동이 생기면 이 문서와 CLAUDE.md를 갱신할 것.
+- **PostgreSQL**: **(2026-09-08 변경)** `dstone-ai-engine`의 RAG(Phase 2) VectorStore(pgvector)가 사용한다 - `dstone_ai` 롤/DB에 `vector` 확장을 켜서 문서 임베딩을 저장한다. 상세: [postgresql.md 6절](software/postgresql.md#6-dstone-프로젝트에서의-역할).
+- **Ollama**: `dstone-ai-engine`의 RAG(Phase 2) 임베딩 전용 로컬 모델 런타임(`bge-m3`). Anthropic은 임베딩 API가 없고 이 환경엔 OpenAI 키 대신 로컬 모델을 쓰기로 해서 추가했다 - 채팅(Claude)과는 무관하다.
+- **Node.js**: 현재 dstone 서비스 자체 설정(`application.yml`)에서는 사용하지 않는 것으로 보이며, 개발 환경 실습/부가 도구 용도로 설치되어 있음. 실제 프로젝트 연동이 생기면 이 문서와 CLAUDE.md를 갱신할 것.
 
 ## 5. 개발환경 시작/정지 (`~/start.sh` / `~/stop.sh`)
 
@@ -83,6 +86,9 @@ start-redis.sh
 
 # kafka
 start-kafka.sh
+
+# ollama
+start-ollama.sh
 
 # jenkins
 start-jenkins.sh
@@ -118,7 +124,10 @@ start-jenkins.sh
 #### 5.1.7 Kafka 시작 (`/usr/local/bin/start-kafka.sh`)
 → [kafka.md 5절](software/kafka.md#5-서비스-시작중지) (+ [kafbat-ui.md 5절](software/kafbat-ui.md#5-서비스-시작중지))
 
-#### 5.1.8 Jenkins 시작 (`/usr/local/bin/start-jenkins.sh`)
+#### 5.1.8 Ollama 시작 (`/usr/local/bin/start-ollama.sh`)
+→ [ollama.md 4절](software/ollama.md#4-서비스-시작중지)
+
+#### 5.1.9 Jenkins 시작 (`/usr/local/bin/start-jenkins.sh`)
 → [jenkins.md 5절](software/jenkins.md#5-서비스-시작중지)
 
 ### 5.2 개발환경 정지 (`~/stop.sh`)
@@ -140,6 +149,9 @@ stop-redis.sh
 
 # kafka
 stop-kafka.sh
+
+# ollama
+stop-ollama.sh
 
 # docker
 stop-docker.sh
@@ -168,15 +180,18 @@ stop-jenkins.sh
 #### 5.2.5 Kafka 정지 (`/usr/local/bin/stop-kafka.sh`)
 → [kafka.md 5절](software/kafka.md#5-서비스-시작중지) (+ [kafbat-ui.md 5절](software/kafbat-ui.md#5-서비스-시작중지))
 
-#### 5.2.6 Docker 정지 (`/usr/local/bin/stop-docker.sh`)
+#### 5.2.6 Ollama 정지 (`/usr/local/bin/stop-ollama.sh`)
+→ [ollama.md 4절](software/ollama.md#4-서비스-시작중지)
+
+#### 5.2.7 Docker 정지 (`/usr/local/bin/stop-docker.sh`)
 → [docker.md 4절](software/docker.md#4-서비스-시작중지)
 
-#### 5.2.7 Kubernetes 정지 (`/usr/local/bin/stop-kube.sh`)
+#### 5.2.8 Kubernetes 정지 (`/usr/local/bin/stop-kube.sh`)
 → [kubernetes.md 5절](software/kubernetes.md#5-서비스클러스터-시작중지) — `--delete` 옵션(클러스터 완전 삭제)은 [kubernetes.md 6절](software/kubernetes.md#6-로컬-사설-레지스트리-dstone-boot-이미지-배포용)에 정리되어 있으며, `~/stop.sh` 경유로는 전달할 수 없어 필요하면 `k8s-stop.sh --delete`를 직접 호출해야 한다.
 
-**주의**: 5.2.6(`stop-docker.sh`)과 5.2.7(`stop-kube.sh`)이 각각 dockerd를 내리는 경로를 갖고 있어 dockerd 정지 시도가 사실상 중복 실행된다(문제는 없음 — 상세는 두 문서 참고).
+**주의**: 5.2.7(`stop-docker.sh`)과 5.2.8(`stop-kube.sh`)이 각각 dockerd를 내리는 경로를 갖고 있어 dockerd 정지 시도가 사실상 중복 실행된다(문제는 없음 — 상세는 두 문서 참고).
 
-#### 5.2.8 Jenkins 정지 (`/usr/local/bin/stop-jenkins.sh`)
+#### 5.2.9 Jenkins 정지 (`/usr/local/bin/stop-jenkins.sh`)
 → [jenkins.md 5절](software/jenkins.md#5-서비스-시작중지)
 
 트러블슈팅(예: mysql/redis 기동 실패 시 진단 절차, 과거의 `bind-address`/`172.18.0.1` 레이스 컨디션 이력)은 각 소프트웨어 문서(`mysql.md`, `redis.md`, `docker.md`, `kubernetes.md`)의 시작/중지 절을 참고.
@@ -187,13 +202,13 @@ stop-jenkins.sh
 
 ### 6.1 배경 — 왜 export/import 한 번으로 재현되는가
 
-- 이 환경의 소프트웨어(JDK, Maven, MySQL, PostgreSQL, Redis, RabbitMQ, Kafka, Docker, kind, Jenkins)와 그 데이터/설정, 그리고 `/app/dstone` 프로젝트(git 저장소, `conf/env*.properties` 포함) 전부가 `/mnt/c` 같은 Windows 쪽 경로가 아니라 **WSL 배포판 자체의 ext4 루트 파일시스템(`/`) 안**에 있다. `df -h /` 기준 현재 사용량은 약 45G(전체 가상 디스크 크기는 1007G, `.wslconfig`의 `sparseVhd=true`로 실제 사용한 만큼만 디스크를 차지). 배포판을 통째로 tar로 내보내고(export) 다른 PC에서 그대로 복원하면(import), 이 파일시스템 전체가 그대로 옮겨진다.
+- 이 환경의 소프트웨어(JDK, Maven, MySQL, PostgreSQL, Redis, RabbitMQ, Kafka, Ollama, Docker, kind, Jenkins)와 그 데이터/설정, 그리고 `/app/dstone` 프로젝트(git 저장소, `conf/env*.properties` 포함) 전부가 `/mnt/c` 같은 Windows 쪽 경로가 아니라 **WSL 배포판 자체의 ext4 루트 파일시스템(`/`) 안**에 있다. `df -h /` 기준 현재 사용량은 약 45G(전체 가상 디스크 크기는 1007G, `.wslconfig`의 `sparseVhd=true`로 실제 사용한 만큼만 디스크를 차지). 배포판을 통째로 tar로 내보내고(export) 다른 PC에서 그대로 복원하면(import), 이 파일시스템 전체가 그대로 옮겨진다.
 - 현재 등록된 배포판은 `wsl -l -v` 기준 이름 `Ubuntu`(WSL 버전 2)이며, `/etc/wsl.conf`에 `systemd=true`와 기본 사용자 `jysn007`이 이미 지정되어 있어 이 설정도 export/import에 포함된다.
 - 단, Windows 쪽에만 있는 설정(`.wslconfig`)이나 "PC 동시 사용" 관점에서 충돌 가능성이 있는 것(Jenkins 등)은 자동으로 해결되지 않으므로 6.4/6.6절에서 별도로 다룬다.
 
 ### 6.2 원본 PC에서 사전 준비
 
-1. 서비스 정상 종료: [5.2절](#52-개발환경-정지-stopsh)의 `~/stop.sh`로 mysql/postgresql/rabbitmq/redis/kafka/docker/kube/jenkins를 내린다.
+1. 서비스 정상 종료: [5.2절](#52-개발환경-정지-stopsh)의 `~/stop.sh`로 mysql/postgresql/rabbitmq/redis/kafka/ollama/docker/kube/jenkins를 내린다.
 2. Windows PowerShell에서 WSL 전체를 완전히 종료한다.
    ```powershell
    wsl --shutdown
@@ -257,7 +272,7 @@ wsl -d Ubuntu-dstone
 
 | 항목 | Import 후 상태 | 조치 |
 |---|---|---|
-| 설치된 소프트웨어 바이너리·설정·데이터(JDK/Maven/MySQL/PostgreSQL/Redis/RabbitMQ/Kafka/Docker/kind/Jenkins) | 파일시스템 그대로 복사됨 | 재설치 불필요. [5.1절](#51-개발환경-시작-startsh)의 `~/start.sh`로 기동만 하면 됨 |
+| 설치된 소프트웨어 바이너리·설정·데이터(JDK/Maven/MySQL/PostgreSQL/Redis/RabbitMQ/Kafka/Ollama/Docker/kind/Jenkins) | 파일시스템 그대로 복사됨 | 재설치 불필요. [5.1절](#51-개발환경-시작-startsh)의 `~/start.sh`로 기동만 하면 됨 |
 | `/app/dstone` 프로젝트(git 저장소, `conf/env*.properties` 등 절대경로 포함) | 파일시스템 그대로 복사되고 절대경로(`/app/dstone`)도 동일하게 유지됨 | 추가 조치 불필요 |
 | Docker 이미지·컨테이너(`/var/lib/docker`), kind 클러스터 노드 컨테이너 | 데이터는 복사되지만 dockerd·컨테이너는 꺼진 상태로 시작됨 | `start-docker.sh` → `start-kube.sh`(`k8s-start.sh`) 실행 후 `docker ps -a`, `kind get clusters`로 노드가 정상 기동되는지 확인. 이상하면 `k8s-start.sh`로 클러스터를 재생성 |
 | MySQL/PostgreSQL/Redis/RabbitMQ 데이터 디렉터리 | 데이터 그대로 복사됨 | 해당 `start-*.sh`로 기동 후 접속·데이터 확인 |

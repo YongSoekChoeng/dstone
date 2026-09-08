@@ -3,7 +3,11 @@ package net.dstone.ai.api;
 import java.util.UUID;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +17,7 @@ import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.gateway.GatewayProperties;
 import net.dstone.ai.prompt.PromptTemplateRegistry;
+import net.dstone.ai.rag.retrieval.RetrievalService;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.utils.StringUtil;
 
@@ -23,12 +28,19 @@ public class ChatController extends BaseController {
 	private final ChatClient chatClient;
 	private final GatewayProperties gatewayProperties;
 	private final PromptTemplateRegistry promptTemplateRegistry;
+	// RAG(Phase 2)는 dstone.ai.rag.enabled=true일 때만 존재하는 빈이라, 이 컨트롤러는 항상 켜져 있어야 하므로
+	// (Phase 0/1만 쓰는 배포에서도 기동돼야 함) 필수 의존성이 아니라 ObjectProvider로 선택 주입받는다.
+	private final ObjectProvider<VectorStore> vectorStoreProvider;
+	private final ObjectProvider<RetrievalService> retrievalServiceProvider;
 
 	public ChatController(ChatClient chatClient, GatewayProperties gatewayProperties,
-			PromptTemplateRegistry promptTemplateRegistry) {
+			PromptTemplateRegistry promptTemplateRegistry, ObjectProvider<VectorStore> vectorStoreProvider,
+			ObjectProvider<RetrievalService> retrievalServiceProvider) {
 		this.chatClient = chatClient;
 		this.gatewayProperties = gatewayProperties;
 		this.promptTemplateRegistry = promptTemplateRegistry;
+		this.vectorStoreProvider = vectorStoreProvider;
+		this.retrievalServiceProvider = retrievalServiceProvider;
 	}
 
 	@PostMapping
@@ -40,6 +52,19 @@ public class ChatController extends BaseController {
 
 		if (!StringUtil.isEmpty(request.promptName())) {
 			spec = spec.system(this.promptTemplateRegistry.render(request.promptName(), request.variables()));
+		}
+
+		if (Boolean.TRUE.equals(request.ragEnabled())) {
+			VectorStore vectorStore = this.vectorStoreProvider.getIfAvailable();
+			if (vectorStore == null) {
+				throw new IllegalStateException("RAG가 비활성화되어 있습니다(dstone.ai.rag.enabled=false 또는 미설정).");
+			}
+			RetrievalService retrievalService = this.retrievalServiceProvider.getObject();
+			SearchRequest searchRequest = SearchRequest.builder()
+				.topK(retrievalService.defaultTopK())
+				.similarityThreshold(retrievalService.defaultSimilarityThreshold())
+				.build();
+			spec = spec.advisors(QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build());
 		}
 
 		String answer = spec.user(request.message()).call().content();
