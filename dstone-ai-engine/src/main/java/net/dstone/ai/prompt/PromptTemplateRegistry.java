@@ -33,7 +33,7 @@ public class PromptTemplateRegistry extends BaseObject {
 	}
 
 	private PromptTemplate template(String name) {
-		String version = this.promptProperties.getVersions().getOrDefault(name, this.promptProperties.getDefaultVersion());
+		String version = this.promptProperties.versionOf(name);
 		return this.cache.computeIfAbsent(name + "@" + version, key -> {
 			String path = "classpath:prompts/" + name + "/" + version + ".st";
 			Resource resource = this.resourceLoader.getResource(path);

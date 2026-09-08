@@ -12,14 +12,15 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * Spring AI의 {@link ChatMemoryRepository} SPI를 dstone-common의 Redis 인프라
@@ -40,13 +41,14 @@ public class RedisChatMemoryRepository extends BaseObject implements ChatMemoryR
 
 	private final RedisTemplate<String, Object> redisTemplate;
 	private final ObjectMapper objectMapper;
+	private final long ttlSeconds;
 
-	@Value("${dstone.ai.session.ttl-seconds:86400}")
-	private long ttlSeconds;
-
-	public RedisChatMemoryRepository(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
+	public RedisChatMemoryRepository(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper,
+			ConfigProperty configProperty) {
 		this.redisTemplate = redisTemplate;
 		this.objectMapper = objectMapper;
+		String ttlSeconds = configProperty.getProperty("dstone.ai.session.ttl-seconds");
+		this.ttlSeconds = StringUtil.isEmpty(ttlSeconds) ? 86400L : Long.parseLong(ttlSeconds);
 	}
 
 	/** Message를 Redis에 저장하기 위한 최소 표현. Jackson record 지원(컴파일러 -parameters 옵션) 기반으로 직렬화/역직렬화한다. */

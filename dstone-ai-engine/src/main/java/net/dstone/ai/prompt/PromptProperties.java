@@ -1,36 +1,30 @@
 package net.dstone.ai.prompt;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import net.dstone.common.config.ConfigProperty;
+import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.StringUtil;
+
 /**
- * dstone.ai.prompt.* 설정 바인딩. 템플릿명별 활성 버전을 versions에 지정하지 않으면
- * default-version을 쓴다(SI 프로젝트가 특정 템플릿만 새 버전으로 올릴 때 versions에 한 줄만 추가).
+ * dstone.ai.prompt.* 설정을 net.dstone.common.config.ConfigProperty로 읽는다(@ConfigurationProperties
+ * 대신 GatewayProperties와 동일한 방식). 템플릿명별 활성 버전을 dstone.ai.prompt.versions.{name}에
+ * 지정하지 않으면 dstone.ai.prompt.default-version을 쓴다.
  */
 @Component
-@ConfigurationProperties(prefix = "dstone.ai.prompt")
-public class PromptProperties {
+public class PromptProperties extends BaseObject {
 
-	private String defaultVersion = "v1";
-	private Map<String, String> versions = new HashMap<>();
+	@Autowired
+	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
 
-	public String getDefaultVersion() {
-		return this.defaultVersion;
-	}
-
-	public void setDefaultVersion(String defaultVersion) {
-		this.defaultVersion = defaultVersion;
-	}
-
-	public Map<String, String> getVersions() {
-		return this.versions;
-	}
-
-	public void setVersions(Map<String, String> versions) {
-		this.versions = versions;
+	public String versionOf(String templateName) {
+		String override = this.configProperty.getProperty("dstone.ai.prompt.versions." + templateName);
+		if (!StringUtil.isEmpty(override)) {
+			return override;
+		}
+		String defaultVersion = this.configProperty.getProperty("dstone.ai.prompt.default-version");
+		return StringUtil.isEmpty(defaultVersion) ? "v1" : defaultVersion;
 	}
 
 }
