@@ -17,6 +17,10 @@ import net.dstone.common.core.BaseObject;
  * "ChatModel 빈이 없다"는 원인불명 메시지뿐이다. GatewayProperties를 먼저 파라미터로 받아
  * (Bean 팩토리 메서드 파라미터는 선언 순서대로 해석된다) 그 검증(@PostConstruct)이
  * chatClientBuilder 해석보다 먼저 실행되게 해서 원인을 명확히 드러낸다.
+ *
+ * GatewayProperties가 net.dstone.common.config.ConfigProperty에 의존하는데, 이 모듈의
+ * @ComponentScan은 net.dstone.ai만 훑으므로(net.dstone.common 미포함) {@link Config}에서
+ * dstone-boot/batch/batchadmin과 동일하게 명시적으로 @Import 해준다.
  */
 @Configuration
 public class ConfigChatClient extends BaseObject {
