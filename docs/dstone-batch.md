@@ -51,8 +51,8 @@
 
 | 영역 | 기술 |
 |---|---|
-| 코어 | Java 21, Spring Boot 3.5.x, dstone-common |
-| 배치 | Spring Batch (spring-boot-starter-batch) |
+| 코어 | Java 21, Spring Boot 4.1.x (Spring Framework 7), dstone-common |
+| 배치 | Spring Batch 6.x (spring-boot-starter-batch) — `org.springframework.batch.core.job`/`.step`/`.listener`, `org.springframework.batch.infrastructure.item` 등으로 패키지가 재편됨(옛 `org.springframework.batch.core.Job`/`.item.*` 아님) |
 | 클라우드 | Spring Cloud Task, Spring Cloud Data Flow |
 | 데이터 | MyBatis, HikariCP, MySQL |
 | AOP | AspectJ |
@@ -189,7 +189,7 @@ spring.batch:
   job.enabled: false          # 기동 시 자동 잡 실행 비활성화 (명시적 실행만 허용)
 ```
 
-> 배치 테이블 초기 생성: `src/main/resources/schema/*.sql` 스크립트를 수동 실행
+> 배치 테이블 초기 생성: `src/main/resources/schema/*.sql` 스크립트를 수동 실행. Spring Batch 6부터 시퀀스 테이블명이 `BATCH_JOB_SEQ` → `BATCH_JOB_INSTANCE_SEQ`로 바뀌어, 옛 스키마로 이미 생성된 DB는 `RENAME TABLE BATCH_JOB_SEQ TO BATCH_JOB_INSTANCE_SEQ;`가 필요하다(안 하면 Job 실행 시 "Could not increment ID for BATCH_JOB_INSTANCE_SEQ sequence table" 오류).
 
 ### 6.3 Spring Cloud Task / Data Flow
 

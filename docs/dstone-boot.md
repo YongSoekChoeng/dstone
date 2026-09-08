@@ -39,7 +39,7 @@
 
 | 영역 | 기술 |
 |---|---|
-| 코어 | Java 21, Spring Boot 3.5.x, dstone-common |
+| 코어 | Java 21, Spring Boot 4.1.x (Spring Framework 7), dstone-common |
 | 웹 | Spring MVC, JSP/JSTL, jQuery |
 | 보안 | Spring Security, OAuth2 (Google/Naver/Kakao) |
 | 데이터 | MyBatis, HikariCP, MySQL / Oracle / PostgreSQL / H2 |
@@ -47,7 +47,7 @@
 | 메시징 | RabbitMQ, WebSocket |
 | 코드 분석 | javaparser 3.28.1, JSQLParser 4.7, ClassGraph 4.8.165, jsoup 1.11.3 |
 | AOP | AspectJ (aspectjrt, aspectjweaver, aspectjtools) |
-| API 문서 | Springfox Swagger 2.9.2 |
+| API 문서 | springdoc-openapi 3.1.1 (OpenAPI 3, springfox는 2020년 마지막 릴리스 이후 방치되어 Spring Framework 7 비호환이라 교체됨) |
 | 규칙 엔진 | Easy Rules 4.1.0 |
 | 외부 연동 | Google Drive API, Google Sheets API |
 | 기타 | Weka (머신러닝), Tess4j (OCR), ByteBuddy, Lombok |
@@ -75,7 +75,6 @@ src/main/java/net/dstone/boot/
     │   ├── ConfigMapper.java           # MyBatis 매퍼 설정
     │   ├── ConfigRedis.java            # Redis 설정
     │   ├── ConfigAspect.java           # AOP/AspectJ 설정
-    │   ├── ConfigEnc.java              # 암호화 설정
     │   ├── ConfigListener.java         # 애플리케이션 리스너
     │   ├── ConfigWebMvc.java           # Spring MVC 설정
     │   └── ConfigWebSocket.java        # WebSocket 설정

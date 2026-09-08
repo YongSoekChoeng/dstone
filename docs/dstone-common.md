@@ -26,9 +26,9 @@
 
 | 영역 | 기술 |
 |---|---|
-| 코어 | Java 21, Spring Boot 3.5.x |
+| 코어 | Java 21, Spring Boot 4.1.x (Spring Framework 7) |
 | 웹 | Spring Web, Spring WebFlux (WebClient) |
-| 보안 | Spring Security, Jasypt 3.0.4, BouncyCastle 1.81, JJWT 0.11.5 |
+| 보안 | Spring Security, jasypt(core) 1.9.3, BouncyCastle 1.81, JJWT 0.11.5 |
 | 데이터 | MyBatis 3.5.19, HikariCP, MySQL, PostgreSQL, Oracle(ojdbc8), H2, HSQLDB |
 | 캐시/세션 | Spring Data Redis (Lettuce), Spring Session Data Redis |
 | 메시징 | Spring AMQP (RabbitMQ), Spring WebSocket |
@@ -38,7 +38,7 @@
 | 유틸 | Apache Commons Lang3 3.18.0, Commons BeanUtils 1.11.0, juniversalchardet 1.0.3 |
 | SQL 파싱 | JSQLParser 4.7 |
 | 이메일 | Jakarta Mail 2.1.4 |
-| JSON | Jackson, json-simple 1.1.1 |
+| JSON | Jackson 3.x (`tools.jackson.*` — Boot 4 기본 JSON 스택, 옛 `com.fasterxml.jackson.databind`/`.core`와는 groupId까지 다름), json-simple 1.1.1 |
 
 ---
 
@@ -124,7 +124,7 @@ spring.datasource.<name>.hikari:
 
 ## 7. 보안 아키텍처
 
-- **Jasypt**: `application.yml` 내 민감 정보(DB 비밀번호 등)를 `ENC(...)` 형식으로 암호화 저장. 복호화 키는 `env.properties`의 `jasypt.encryptor.password`에 설정
+- **Jasypt**: `application.yml` 내 민감 정보(DB 비밀번호 등)를 `ENC(...)` 형식으로 암호화 저장. 복호화 키는 `EncUtil.java`에 하드코딩되어 있으며(`env.properties`가 아님), 복호화 자체는 `ConfigProperty`의 static nested `EncPropertyEnvironmentPostProcessor`(`META-INF/spring.factories`로 등록)가 PropertySource 레벨에서 처리한다 — jasypt-spring-boot-starter는 Boot 4를 지원하지 않아 제거했고, 모듈별 `ConfigEnc` 빈도 더 이상 없다
 - **BouncyCastle**: JDK 17+ 환경에서의 중첩 JAR 보안 문제 해결 및 암호화 알고리즘 확장
 - **JJWT 0.11.5**: JWT 토큰 생성 및 검증
 

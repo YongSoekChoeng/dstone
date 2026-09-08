@@ -54,7 +54,7 @@ dstone-batchadmin/
     ├── java/net/dstone/batchadmin/
     │   ├── DstoneBatchAdminApplication.java   # 메인 진입점
     │   ├── common/
-    │   │   ├── config/             # Config, ConfigDatasource, ConfigTransaction, ConfigMapper, ConfigScheduler, ConfigAspect, ConfigEnc, ConfigWebMvc
+    │   │   ├── config/             # Config, ConfigDatasource, ConfigTransaction, ConfigMapper, ConfigScheduler, ConfigAspect, ConfigWebMvc
     │   │   ├── datasource/         # RoutingDataSource, RoutingDataSourceContextHolder, BatchServerDataSourceRegistry
     │   │   ├── rest/                # BatchRestClient - 대상 dstone-batch 서버 REST 호출
     │   │   ├── scheduler/          # JobScheduleManager - CRON 자동 기동

@@ -10,7 +10,7 @@
 - [6. 트러블슈팅](#6-트러블슈팅)
 
 ## 1. 개요
-dstone 전 모듈(dstone-common/boot/batch/batchadmin)의 실행/빌드에 사용하는 Java 런타임 및 개발 키트. Spring Boot 3.5는 Java 17 이상이 필요하며, 본 환경은 Java 21(LTS)을 사용한다.
+dstone 전 모듈(dstone-common/boot/batch/batchadmin/ai-engine)의 실행/빌드에 사용하는 Java 런타임 및 개발 키트. Spring Boot 4.1(Spring Framework 7)도 Java 17 이상을 요구하며, 본 환경은 Java 21(LTS)을 사용한다.
 
 ## 2. 설치 정보
 - 버전: OpenJDK 21.0.12 (build 21.0.12+8-1-26.04-Ubuntu)

@@ -149,7 +149,7 @@ mysql -u dataflow -pdataflow -h 127.0.0.1 -e "SHOW TABLES;" dataflow
 
 ## 7. 비밀번호(Jasypt `ENC(...)`) 다루기
 
-각 모듈 `conf/application.yml`의 DB/RabbitMQ 계정은 평문이 아니라 Jasypt로 암호화된 `ENC(...)` 형식이다. 복호화 키는 **`conf/env.properties`의 `jasypt.encryptor.password`가 아니라**, `dstone-common`의 `net.dstone.common.utils.EncUtil`(`ENC_KEY` 상수, 알고리즘 `PBEWithSHA256And128BitAES-CBC-BC`, BouncyCastle 제공)에 **소스 코드로 하드코딩**되어 있고, 각 모듈의 `ConfigEnc` 클래스(`@EnableEncryptableProperties` + `@Bean("jasyptStringEncryptor")`)가 이 값을 그대로 jasypt-spring-boot-starter에 등록해서 쓴다. CLAUDE.md/`dstone-common.md`에 적힌 "복호화 키는 `env.properties`의 `jasypt.encryptor.password`" 서술은 실제 코드와 다르므로 참고만 하고 실제로는 `EncUtil.java`를 기준으로 삼는다.
+각 모듈 `conf/application.yml`의 DB/RabbitMQ 계정은 평문이 아니라 Jasypt로 암호화된 `ENC(...)` 형식이다. 복호화 키는 **`conf/env.properties`의 `jasypt.encryptor.password`가 아니라**, `dstone-common`의 `net.dstone.common.utils.EncUtil`(`ENC_KEY` 상수, 알고리즘 `PBEWithSHA256And128BitAES-CBC-BC`, BouncyCastle 제공)에 **소스 코드로 하드코딩**되어 있다. 복호화 자체는 jasypt-spring-boot-starter(Boot 4 미지원으로 제거됨)가 아니라 `net.dstone.common.config.ConfigProperty`의 static nested `EncPropertyEnvironmentPostProcessor`(`dstone-common/src/main/resources/META-INF/spring.factories`로 등록)가 담당하며, `dstone-common`을 의존하는 모든 모듈에 자동 적용된다 — 모듈별 `ConfigEnc` 빈은 더 이상 없다.
 
 즉 위 6.1절의 평문 비밀번호를 그대로 쓰는 한 `application.yml`을 전혀 건드릴 필요가 없다. **DB/큐 비밀번호를 다른 값으로 바꾸고 싶을 때만** 새 `ENC(...)` 값을 만들어 넣어야 하며, 방법은 두 가지다.
 

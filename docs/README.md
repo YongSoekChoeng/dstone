@@ -24,12 +24,12 @@
 
 ## 1. 프로젝트 개요
 
-**dstone**은 Java 21 / Spring Boot 3.5 기반의 멀티모듈 엔터프라이즈 프레임워크다. 웹 애플리케이션 개발(`dstone-boot`), 대용량 배치 처리(`dstone-batch`), 배치 잡 운영 관리(`dstone-batchadmin`)에 필요한 공통 기반(`dstone-common`)을 통합 제공한다.
+**dstone**은 Java 21 / Spring Boot 4.1(Spring Framework 7) 기반의 멀티모듈 엔터프라이즈 프레임워크다. 웹 애플리케이션 개발(`dstone-boot`), 대용량 배치 처리(`dstone-batch`), 배치 잡 운영 관리(`dstone-batchadmin`)에 필요한 공통 기반(`dstone-common`)을 통합 제공한다.
 
 - **Group ID:** `net.dstone`
 - **Version:** `1.0.0-SNAPSHOT`
 - **Java:** 21
-- **Spring Boot:** 3.5.x
+- **Spring Boot:** 4.1.x (Spring Framework 7)
 - **빌드 도구:** Maven (멀티모듈 POM)
 
 ### 1.1 모듈 구성
@@ -146,7 +146,7 @@ conf/
 
 ### 3.2 보안 (Jasypt 암호화)
 
-`application.yml`의 DB 비밀번호 등 민감 정보는 `ENC(...)` 형식으로 암호화한다. 복호화 키는 `dstone-common`의 `EncUtil.java`에 고정되어 있다(환경변수로 별도 주입하지 않음).
+`application.yml`의 DB 비밀번호 등 민감 정보는 `ENC(...)` 형식으로 암호화한다. 복호화 키는 `dstone-common`의 `EncUtil.java`에 고정되어 있다(환경변수로 별도 주입하지 않음). 복호화 자체는 jasypt-spring-boot-starter(Boot 4 미지원으로 제거) 대신 `ConfigProperty`의 `EncPropertyEnvironmentPostProcessor`가 담당하며, `dstone-common`을 의존하는 모든 모듈에 자동 적용된다(모듈별 `ConfigEnc` 빈 불필요).
 
 ### 3.3 데이터베이스 (HikariCP + MyBatis + log4jdbc)
 
@@ -168,9 +168,12 @@ spring.datasource.<name>.hikari:
 # dstone-boot: Spring Security 활성화
 spring.security.enabled: true
 
-# dstone-batch: Spring Security 비활성화
+# dstone-batch: Spring Security 비활성화 (Boot 4부터 org.springframework.boot.security.autoconfigure.* 로 패키지 이동)
 spring.autoconfigure.exclude:
-  - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+  - org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
+  - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  - org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
+  - org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration
 
 # dstone-batchadmin: 로그인은 필요하지만 URL별 권한 체크는 없는 단일 역할 내부 관리 도구
 ```
