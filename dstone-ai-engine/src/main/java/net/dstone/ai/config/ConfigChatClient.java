@@ -1,6 +1,8 @@
 package net.dstone.ai.config;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -21,13 +23,18 @@ import net.dstone.common.core.BaseObject;
  * GatewayProperties가 net.dstone.common.config.ConfigProperty에 의존하는데, 이 모듈의
  * @ComponentScan은 net.dstone.ai만 훑으므로(net.dstone.common 미포함) {@link Config}에서
  * dstone-boot/batch/batchadmin과 동일하게 명시적으로 @Import 해준다.
+ *
+ * session(Phase 1): ChatMemory(ConfigChatMemory 참고)를 MessageChatMemoryAdvisor로 감싸
+ * 기본 advisor로 붙인다. 호출 쪽은 ChatClient.Builder를 건드릴 필요 없이
+ * .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))만 넘기면 된다.
  */
 @Configuration
 public class ConfigChatClient extends BaseObject {
 
 	@Bean
-	public ChatClient chatClient(GatewayProperties gatewayProperties, ChatClient.Builder chatClientBuilder) {
-		return chatClientBuilder.build();
+	public ChatClient chatClient(GatewayProperties gatewayProperties, ChatClient.Builder chatClientBuilder,
+			ChatMemory chatMemory) {
+		return chatClientBuilder.defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build()).build();
 	}
 
 }

@@ -17,18 +17,25 @@ management:
 spring:
     main:
         allow-bean-definition-overriding: true
+    data:
+        # session(Phase 1): 대화 히스토리 저장(net.dstone.ai.session.RedisChatMemoryRepository).
+        # dstone-boot의 dstone:session(HTTP 세션) 네임스페이스와 겹치지 않게
+        # 키는 dstone:ai:session:{conversationId}로 별도로 둔다.
+        redis:
+            enabled: true # Redis사용 여부(true/false)
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT}
+            timeout: 10000
     ##########################################################################################
     # <자동설정기능>
-    # Phase 0은 DB/Redis/RabbitMQ/Kafka/Security를 쓰지 않는 순수 Chat API 스켈레톤이다.
-    # 클래스패스에는 dstone-common을 통해 이미 올라와 있으므로(자동설정이 붙잡으려 시도함),
-    # 실제로 해당 Phase(세션=Phase1, 메시징=후속)에서 쓰기 시작할 때 이 목록에서 해당 줄을 지운다.
+    # Phase 0은 DB/Redis/RabbitMQ/Kafka/Security를 쓰지 않는 순수 Chat API 스켈레톤이었다.
+    # session(Phase 1)에서 대화 히스토리 저장에 Redis를 쓰기 시작하면서 Redis 관련 두 줄은 제외
+    # 목록에서 뺐다(net.dstone.ai.config.ConfigRedis 참고). DB/RabbitMQ/Kafka는 아직 미사용.
     ##########################################################################################
     autoconfigure:
         exclude:
             - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
             - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
-            - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-            - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
             - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
             - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     ai:
@@ -98,3 +105,17 @@ spring:
         #     chat:
         #         options:
         #             model: llama3.1
+
+dstone:
+    ai:
+        # session(Phase 1): 대화 히스토리(ChatMemory) 설정.
+        session:
+            max-messages: 20 # 세션당 유지할 최대 메시지 수(넘으면 오래된 메시지부터 잘림)
+            ttl-seconds: 86400 # Redis에 저장된 세션 히스토리의 만료 시간(1일)
+        # prompt(Phase 1): SI 프로젝트별 프롬프트 템플릿 버전 관리.
+        # classpath:prompts/{name}/{version}.st 파일을 읽어 렌더링한다.
+        # 특정 템플릿명을 versions에 명시하지 않으면 default-version을 쓴다.
+        prompt:
+            default-version: v1
+            # versions:
+            #     sample-system: v1

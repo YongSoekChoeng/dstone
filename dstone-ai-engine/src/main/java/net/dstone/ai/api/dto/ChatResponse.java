@@ -1,4 +1,4 @@
 package net.dstone.ai.api.dto;
 
-public record ChatResponse(String message, String provider) {
+public record ChatResponse(String message, String provider, String sessionId) {
 }
