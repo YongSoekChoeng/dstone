@@ -306,8 +306,15 @@ docker ps --filter name=kind-registry  # kind-registry Up 상태인지
 # **k8s 리소스 삭제** (namespace를 지우면 그 안의 deployment/service/configmap/pod가 다 같이 사라짐):
 kubectl delete -f dstone-boot/k8s/
 kubectl get all -n dstone              # "No resources found" 나올 때까지 기다리기 (namespace 삭제는 몇 초 걸림)
+# **이미지 조회**:
+## 전체 이미지 목록 (생성일자 포함)
+docker images
+## 이미지/컨테이너/캐시별 디스크 사용량 요약
+docker system df -v
+## dstone 환경(로컬 레지스트리 localhost:5000) 기준 조회
+docker images | grep "localhost:5000"
 # **로컬에 캐시된 옛날 이미지 삭제**:
-docker rmi localhost:5000/dstone-boot:kafka-fix localhost:5000/dstone-boot:latest
+docker rmi localhost:5000/dstone-boot:20260907-1
 # 레지스트리(`localhost:5000`) 안에 저장된 이미지 데이터 자체까지 지우는 건 별도 GC 절차가 필요해서 번거롭습니다(`REGISTRY_STORAGE_DELETE_ENABLED` 설정 + exec 후 garbage-collect). 
 # 어차피 새 태그로 push하면 덮어써지는 개념이 아니라 새 항목이 생기는 거라, 레지스트리 내부 정리는 건너뛰셔도 실습엔 지장 없습니다.
 
