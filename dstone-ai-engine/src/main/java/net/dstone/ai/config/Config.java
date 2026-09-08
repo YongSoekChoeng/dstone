@@ -14,6 +14,7 @@ import net.dstone.common.core.BaseObject;
 @Configuration
 @Import({
 	ConfigChatClient.class,
+	ConfigAspect.class,
 	ConfigEnc.class,
 	ConfigProperty.class
 })
