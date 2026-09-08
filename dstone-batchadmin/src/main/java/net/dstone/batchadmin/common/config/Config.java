@@ -13,7 +13,6 @@ import net.dstone.common.core.BaseObject;
 @Import({
 	ConfigAspect.class,
 	ConfigDatasource.class,
-	ConfigEnc.class,
 	ConfigListener.class,
 	ConfigMapper.class,
 	net.dstone.common.config.ConfigProperty.class,

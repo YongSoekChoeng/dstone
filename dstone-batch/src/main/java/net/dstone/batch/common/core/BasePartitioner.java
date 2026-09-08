@@ -1,16 +1,16 @@
 package net.dstone.batch.common.core;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.batch.core.ExitStatus;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobParameter;
-import org.springframework.batch.core.StepExecution;
-import org.springframework.batch.core.partition.support.Partitioner;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.job.parameters.JobParameter;
+import org.springframework.batch.core.step.StepExecution;
+import org.springframework.batch.core.partition.Partitioner;
 import org.springframework.batch.core.scope.context.JobSynchronizationManager;
-import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.infrastructure.item.ExecutionContext;
 
 import net.dstone.common.utils.FileUtil;
 
@@ -110,12 +110,9 @@ public abstract class BasePartitioner extends BaseItem implements Partitioner {
     	if( JobSynchronizationManager.getContext() != null && JobSynchronizationManager.getContext().getJobExecution() != null ) {
         	JobExecution jobExecution = JobSynchronizationManager.getContext().getJobExecution();
         	if( jobExecution != null && jobExecution.getJobParameters() != null) {
-        		Map<String, JobParameter<?>> jobParamMap = jobExecution.getJobParameters().getParameters();
-        		Iterator<String > jobParamMapKey = jobParamMap.keySet().iterator();
-        		while(jobParamMapKey.hasNext()) {
-        			String key = jobParamMapKey.next();
-        			JobParameter val = jobParamMap.get(key);
-        			map.put(key, val.getValue());
+        		Set<JobParameter<?>> jobParamSet = jobExecution.getJobParameters().parameters();
+        		for (JobParameter val : jobParamSet) {
+        			map.put(val.name(), val.value());
         		}
         	}
     	}

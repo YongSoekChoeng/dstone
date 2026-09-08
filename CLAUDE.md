@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**dstone** is a Java 21 / Spring Boot 3.5 enterprise multi-module framework providing:
+**dstone** is a Java 21 / Spring Boot 4.1 (Spring Framework 7) enterprise multi-module framework providing:
 - **dstone-common**: Shared library (JAR) — utilities, security, data access, messaging
 - **dstone-boot**: Web application framework (WAR) — includes a Java source code static analyzer feature
 - **dstone-batch**: Spring Batch processing framework (JAR) — standardized job development
@@ -90,7 +90,7 @@ DB passwords and other secrets in `application.yml` use `ENC(...)` format:
 password: ENC(ydLjxrknr8dD59e6E+HvxdxRaGiFa9jOCpJJDtb0uak=)
 ```
 
-The decryption key is **not** `jasypt.encryptor.password` (jasypt-spring-boot-starter's default) — each module supplies its own `StringEncryptor` bean instead: a `ConfigEnc` class (`net.dstone.<module>.common.config.ConfigEnc` or, for `dstone-ai-engine`, `net.dstone.ai.config.ConfigEnc`) annotated `@EnableEncryptableProperties` with a `@Bean("jasyptStringEncryptor")` that returns `EncUtil.getEncryptor()` (`net.dstone.common.utils.EncUtil`, PBEWithSHA256And128BitAES-CBC-BC, key hardcoded in that class). To generate a new `ENC(...)` value locally without ever typing the plaintext secret into Claude Code's chat (run this in a separate terminal, not via the assistant):
+Decryption is **not** handled by jasypt-spring-boot-starter (it has no Spring Boot 4-compatible release) — `dstone-common`'s `net.dstone.common.config.ConfigProperty` declares a nested static `EncPropertyEnvironmentPostProcessor` (registered via `dstone-common/src/main/resources/META-INF/spring.factories`) that wraps every `PropertySource` and transparently decrypts any `ENC(...)` value using `EncUtil.getEncryptor()` (`net.dstone.common.utils.EncUtil`, PBEWithSHA256And128BitAES-CBC-BC, key hardcoded in that class) before Spring binds it — including `@ConfigurationProperties`-bound values like `ConfigDatasource`'s HikariCP passwords, which never pass through `ConfigProperty.getProperty()` at all. This applies automatically to every module that depends on `dstone-common`; no per-module `ConfigEnc`/`@EnableEncryptableProperties` bean is needed anymore. To generate a new `ENC(...)` value locally without ever typing the plaintext secret into Claude Code's chat (run this in a separate terminal, not via the assistant):
 
 ```bash
 cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<plaintext>"
@@ -142,7 +142,7 @@ public class MyJobConfig extends BaseJobConfig {
 - `auto-register-jobs: true` → all jobs registered at startup (REST API mode)
 - `auto-register-jobs: false` → jobs registered individually at execution time (CLI / SCDF mode)
 
-Spring Batch metadata tables must be created manually from `src/main/resources/schema/*.sql` (`initialize-schema: NEVER`).
+Spring Batch metadata tables must be created manually from `src/main/resources/schema/*.sql` (`initialize-schema: NEVER`). Spring Batch 6 renamed the `BATCH_JOB_SEQ` sequence table to `BATCH_JOB_INSTANCE_SEQ` — existing databases created from an older schema file need that table renamed (or the updated `02-create-table-mysql-dstone-batch.sql` re-run) before job launches will work.
 
 ### dstone-batchadmin: Batch Job Management
 
@@ -168,7 +168,7 @@ A Spring AI-based, provider-agnostic engine meant to be built out incrementally 
 |---|---|---|
 | `config` | `ChatClient` wiring | 0 |
 | `api` | REST controllers (Chat/RAG/Admin API) | 0 |
-| `gateway` / `gateway.provider` | LLM provider abstraction (OpenAI/Anthropic/Azure/local vLLM-Ollama), swappable via config | 1 |
+| `gateway` / `gateway.provider` | LLM provider abstraction (OpenAI/Anthropic/local vLLM-Ollama), swappable via config | 1 |
 | `prompt` | Prompt template management/versioning — SI-specific customization point | 1 |
 | `session` | Conversation session/history, reusing `dstone-common`'s Redis infra | 1 |
 | `rag` (`ingest`/`embedding`/`retrieval`) | Document ingestion → embedding → vector search | 2 |
@@ -180,7 +180,7 @@ Phase 0 ships a single hardcoded provider (Anthropic, via `spring-ai-starter-mod
 
 `spring.ai.anthropic.api-key` in `dstone-ai-engine/conf/application.yml` follows the same `ENC(...)` convention as DB passwords (see "Sensitive Config Encryption" above) rather than sourcing from `env.properties` — there is no `ANTHROPIC_API_KEY` env var.
 
-Spring AI is pinned to the 1.x line (`spring-ai.version` in `dstone-ai-engine/pom.xml`) because Spring AI 2.x targets Spring Boot 4 — the whole reactor is still on Spring Boot 3.5.x. Revisit this pin if/when the reactor moves to Boot 4.
+Spring AI is on the 2.x line (`spring-ai.version` in `dstone-ai-engine/pom.xml`), matching the reactor's Spring Boot 4 / Spring Framework 7 baseline. Azure OpenAI was dropped from `AiProvider`/the gateway starters — Spring AI 2.x removed `spring-ai-starter-model-azure-openai` as a chat model provider (Azure remains only as a vector-store integration).
 
 ## Required Infrastructure
 

@@ -3,9 +3,9 @@ package net.dstone.batch.common.partitioner;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.core.configuration.annotation.StepScope;
-import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.stereotype.Component;
 
 import net.dstone.batch.common.consts.Constants;

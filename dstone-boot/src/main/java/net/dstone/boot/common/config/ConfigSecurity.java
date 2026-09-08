@@ -22,7 +22,7 @@ import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import jakarta.annotation.Resource;
 import jakarta.servlet.DispatcherType;
@@ -61,12 +61,15 @@ public class ConfigSecurity extends BaseObject{
 	public static String LOGOUT_SUCCS_ACTION 			= "/com/login/logoutSuccess.do";						// 로그아웃 처리 성공시 진행될 액션
 	public static String ACCESS_DENIED_ACTION 			= "/com/login/accessDenied.do"; 						// 접근권한이 없을 시 진행될 액션
 	public static String PROXY_ACTION 					= "/proxy.do"; 											// 프락시 액션
-	public static String MQ_ACTION 						= "/dstone-mq/rabbitmq/**/*.do"; 						// RabbitMQ 액션
+	// PathPatternRequestMatcher(Spring Security 7의 AntPathRequestMatcher 대체)는 **가 패턴의
+	// 시작/끝에만 오는 것을 허용해 "/dstone-mq/rabbitmq/**/*.do"(중간에 **)는 파싱 자체가 실패한다.
+	// permitAll 대상 URL이라 .do 확장자 제한을 풀고 이 하위 경로 전체를 허용하는 것으로 완화한다.
+	public static String MQ_ACTION 						= "/dstone-mq/rabbitmq/**"; 						// RabbitMQ 액션
 	public static String WEBSOCKET_WS_ACTION			= ConfigWebSocket.WEBSOCKET_WS_END_POINT + "/**";		// 웹소켓 액션
 	public static String WEBSOCKET_STOMP_ACTION			= ConfigWebSocket.WEBSOCKET_STOMP_END_POINT + "/**";	// 웹소켓(stomp) 액션
 	public static String WEBSOCKET_STOMP_PUB_ACTION		= ConfigWebSocket.WEBSOCKET_STOMP_PUB_PREFIX + "/**";	// 웹소켓(stomp) 발행프리픽스
 	public static String WEBSOCKET_STOMP_SUB_ACTION		= ConfigWebSocket.WEBSOCKET_STOMP_SUB_PREFIX + "/**";	// 웹소켓(stomp) 구독프리픽스
-	public static String TEST_ACTION 					= "/test/**/*.do";										// 테스트 액션
+	public static String TEST_ACTION 					= "/test/**";										// 테스트 액션(PathPatternRequestMatcher 제약으로 중간 ** 패턴에서 완화, MQ_ACTION 주석 참고)
 	public static String ACTUATOR_HEALTH_ACTION			= "/actuator/health/**";								// k8s liveness/readiness probe 액션
 
 	public static String ERROR_URL_PATTERN				= "/error/**"; 											// 에러 URL패턴.(스프링 내부적으로 호출되는 에러 URL패턴 존재. Permit All로 설정)
@@ -166,38 +169,38 @@ public class ConfigSecurity extends BaseObject{
 		http.authorizeHttpRequests(auth -> auth
 			.requestMatchers(	
 				/*** 정적자원 ***/
-				new AntPathRequestMatcher("/*")	
-				,new AntPathRequestMatcher("/analyzer/**")	
-				,new AntPathRequestMatcher("/assets/**")	
-				,new AntPathRequestMatcher("/images/**")	
-				,new AntPathRequestMatcher("/js/**")
+				PathPatternRequestMatcher.pathPattern("/*")	
+				,PathPatternRequestMatcher.pathPattern("/analyzer/**")	
+				,PathPatternRequestMatcher.pathPattern("/assets/**")	
+				,PathPatternRequestMatcher.pathPattern("/images/**")	
+				,PathPatternRequestMatcher.pathPattern("/js/**")
 				/*** 동적자원중 권한체크가 필요없는 자원들 ***/
-				,new AntPathRequestMatcher("/ui/" + MAIN_PAGE)
-				,new AntPathRequestMatcher("/ui/" + LOGIN_PAGE)
-				,new AntPathRequestMatcher("/ui/common/**")
-				,new AntPathRequestMatcher("/ui/test/**")
-				,new AntPathRequestMatcher("/ui/websocket/**")
-				,new AntPathRequestMatcher(LOGIN_GO_ACTION)
-				,new AntPathRequestMatcher(LOGIN_PROCESS_ACTION)
-				,new AntPathRequestMatcher(LOGIN_PROCESS_SUCCESS_ACTION)
-				,new AntPathRequestMatcher(LOGIN_PROCESS_FAILURE_ACTION)
-				,new AntPathRequestMatcher(LOGIN_CHECK_ACTION)
-				,new AntPathRequestMatcher(LOGOUT_ACTION)
-				,new AntPathRequestMatcher(LOGOUT_SUCCS_ACTION)
-				,new AntPathRequestMatcher(ACCESS_DENIED_ACTION)
-				,new AntPathRequestMatcher(ERROR_URL_PATTERN)
-				,new AntPathRequestMatcher(PROXY_ACTION)
-				,new AntPathRequestMatcher(MQ_ACTION)
-				,new AntPathRequestMatcher(TEST_ACTION)
-				,new AntPathRequestMatcher(ACTUATOR_HEALTH_ACTION)
-				,new AntPathRequestMatcher(WEBSOCKET_WS_ACTION)
-				,new AntPathRequestMatcher(WEBSOCKET_STOMP_ACTION)
-				,new AntPathRequestMatcher(WEBSOCKET_STOMP_PUB_ACTION)
-				,new AntPathRequestMatcher(WEBSOCKET_STOMP_SUB_ACTION)
+				,PathPatternRequestMatcher.pathPattern("/ui/" + MAIN_PAGE)
+				,PathPatternRequestMatcher.pathPattern("/ui/" + LOGIN_PAGE)
+				,PathPatternRequestMatcher.pathPattern("/ui/common/**")
+				,PathPatternRequestMatcher.pathPattern("/ui/test/**")
+				,PathPatternRequestMatcher.pathPattern("/ui/websocket/**")
+				,PathPatternRequestMatcher.pathPattern(LOGIN_GO_ACTION)
+				,PathPatternRequestMatcher.pathPattern(LOGIN_PROCESS_ACTION)
+				,PathPatternRequestMatcher.pathPattern(LOGIN_PROCESS_SUCCESS_ACTION)
+				,PathPatternRequestMatcher.pathPattern(LOGIN_PROCESS_FAILURE_ACTION)
+				,PathPatternRequestMatcher.pathPattern(LOGIN_CHECK_ACTION)
+				,PathPatternRequestMatcher.pathPattern(LOGOUT_ACTION)
+				,PathPatternRequestMatcher.pathPattern(LOGOUT_SUCCS_ACTION)
+				,PathPatternRequestMatcher.pathPattern(ACCESS_DENIED_ACTION)
+				,PathPatternRequestMatcher.pathPattern(ERROR_URL_PATTERN)
+				,PathPatternRequestMatcher.pathPattern(PROXY_ACTION)
+				,PathPatternRequestMatcher.pathPattern(MQ_ACTION)
+				,PathPatternRequestMatcher.pathPattern(TEST_ACTION)
+				,PathPatternRequestMatcher.pathPattern(ACTUATOR_HEALTH_ACTION)
+				,PathPatternRequestMatcher.pathPattern(WEBSOCKET_WS_ACTION)
+				,PathPatternRequestMatcher.pathPattern(WEBSOCKET_STOMP_ACTION)
+				,PathPatternRequestMatcher.pathPattern(WEBSOCKET_STOMP_PUB_ACTION)
+				,PathPatternRequestMatcher.pathPattern(WEBSOCKET_STOMP_SUB_ACTION)
 
 				/*** 기타 ***/
-				,new AntPathRequestMatcher("/favicon.ico")	// 크롬에서 보내지는 요청
-				,new AntPathRequestMatcher(".well-known/**") // 크롬 개발자모드에서 보내지는 요청
+				,PathPatternRequestMatcher.pathPattern("/favicon.ico")	// 크롬에서 보내지는 요청
+				,PathPatternRequestMatcher.pathPattern("/.well-known/**") // 크롬 개발자모드에서 보내지는 요청(PathPatternRequestMatcher는 '/'로 시작하지 않는 패턴을 거부해 선행 슬래시 추가)
 			).permitAll()
 			/*** 페이지마다 include/forward 되는 자원은 모두 허용 ***/
 			.dispatcherTypeMatchers(DispatcherType.INCLUDE, DispatcherType.FORWARD).permitAll() 
@@ -227,7 +230,7 @@ public class ConfigSecurity extends BaseObject{
 				String[] roles = new String[roleList.size()];
 				roleList.toArray(roles);
 				// hasAnyAuthority 대신 hasAnyRole 사용 (동일하게 유지 가능)
-				http.authorizeHttpRequests(auth -> auth.requestMatchers(new AntPathRequestMatcher(url)).hasAnyRole(roles));
+				http.authorizeHttpRequests(auth -> auth.requestMatchers(PathPatternRequestMatcher.pathPattern(url)).hasAnyRole(roles));
 			}
 			http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated());
 

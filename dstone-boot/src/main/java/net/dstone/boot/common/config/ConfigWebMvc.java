@@ -23,9 +23,10 @@ import org.springframework.web.servlet.view.BeanNameViewResolver;
 import org.springframework.web.servlet.view.ContentNegotiatingViewResolver;
 import org.springframework.web.servlet.view.JstlView;
 import org.springframework.web.servlet.view.UrlBasedViewResolver;
-import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
+import org.springframework.web.servlet.view.json.JacksonJsonView;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.exception.resolver.DsExceptionResolver;
@@ -93,11 +94,14 @@ public class ConfigWebMvc  extends WebMvcConfigurationSupport {
      * @return
      */
 	@Bean
-	public MappingJackson2JsonView jsonView(ObjectMapper objectMapper) {
-	    MappingJackson2JsonView view = new MappingJackson2JsonView(objectMapper);
-	    //view.setExtractValueFromSingleKeyModel(true);
-	    view.setPrettyPrint(true);
-	    return view;
+	public JacksonJsonView jsonView(JsonMapper objectMapper) {
+		// Jackson 3 기반 JacksonJsonView는 setPrettyPrint(boolean) 같은 세터가 없고
+		// ObjectMapper/JsonMapper 자체의 설정으로 pretty-print를 켠다. 공유 빈인 objectMapper를
+		// 직접 바꾸지 않도록 rebuild()로 새 빌더를 얻어 이 뷰 전용 매퍼를 별도로 만든다.
+		JsonMapper prettyMapper = objectMapper.rebuild()
+				.configure(SerializationFeature.INDENT_OUTPUT, true)
+				.build();
+		return new JacksonJsonView(prettyMapper);
 	}
     
 	/**
@@ -149,7 +153,7 @@ public class ConfigWebMvc  extends WebMvcConfigurationSupport {
 	 * @return
 	 */
 	@Bean
-	public ContentNegotiatingViewResolver contentNegotiatingViewResolver(MappingJackson2JsonView jsonView, UrlBasedViewResolver jspResolver) {
+	public ContentNegotiatingViewResolver contentNegotiatingViewResolver(JacksonJsonView jsonView, UrlBasedViewResolver jspResolver) {
 	    ContentNegotiatingViewResolver resolver = new ContentNegotiatingViewResolver();
 	    // 우선순위
 	    resolver.setOrder(0);

@@ -3,9 +3,9 @@ package net.dstone.batch.sample.jobs.job001.items;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import org.springframework.batch.item.NonTransientResourceException;
-import org.springframework.batch.item.ParseException;
-import org.springframework.batch.item.UnexpectedInputException;
+import org.springframework.batch.infrastructure.item.NonTransientResourceException;
+import org.springframework.batch.infrastructure.item.ParseException;
+import org.springframework.batch.infrastructure.item.UnexpectedInputException;
 
 import net.dstone.batch.common.items.AbstractItemReader;
 

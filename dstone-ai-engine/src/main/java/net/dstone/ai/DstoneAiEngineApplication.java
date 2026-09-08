@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.ApplicationPidFileWriter;
 import org.springframework.context.annotation.ComponentScan;
@@ -17,10 +16,12 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Phase 0 단계에서는 DB/Redis/RabbitMQ/Kafka를 사용하지 않으므로 DataSourceAutoConfiguration을 제외한다.
- * RAG/세션(Phase1~2)에서 실제로 필요해지는 시점에 dstone-boot의 ConfigDatasource 패턴을 따라 추가한다.
+ * Boot 4에서는 JDBC 자동설정이 별도 모듈(spring-boot-jdbc)로 빠지면서, JDBC 관련 starter를
+ * 전혀 의존하지 않는 이 모듈의 클래스패스에는 DataSourceAutoConfiguration 자체가 존재하지 않아
+ * exclude 대상도 없다(Phase 0 시절엔 exclude로 명시했었음). RAG/세션(Phase1~2)에서 DB가 실제로
+ * 필요해지는 시점에 dstone-boot의 ConfigDatasource 패턴을 따라 JDBC starter를 추가한다.
  */
-@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
+@SpringBootApplication
 @ComponentScan(basePackages = { "net.dstone.ai" })
 public class DstoneAiEngineApplication {
 

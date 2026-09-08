@@ -33,7 +33,12 @@ spring:
     autoconfigure:
         exclude:
             # 스프링시큐리티사용 시 주석처리. 비사용 시 주석제거.
-            #- org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+            # Boot 4부터 org.springframework.boot.security.autoconfigure.* 로 패키지가 옮겨감(dstone-batch 참고).
+            #- org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
     security:
         enabled: true # 스프링시큐리티사용 여부(true/false)
     datasource:

@@ -1,18 +1,19 @@
 package net.dstone.batch.sample.jobs.job001;
 
-import org.springframework.batch.core.Step;
-import org.springframework.batch.core.StepContribution;
+import org.springframework.batch.core.step.Step;
+import org.springframework.batch.core.step.StepContribution;
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.batch.core.job.flow.support.SimpleFlow;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.tasklet.Tasklet;
-import org.springframework.batch.item.ItemProcessor;
-import org.springframework.batch.item.ItemReader;
-import org.springframework.batch.item.ItemWriter;
-import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
+import org.springframework.batch.infrastructure.item.ItemReader;
+import org.springframework.batch.infrastructure.item.ItemWriter;
+import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import net.dstone.batch.common.annotation.AutoRegJob;
@@ -72,12 +73,16 @@ public class SampleJobConfig extends BaseJobConfig {
 	
 	private Step createMultiThreadStep(String stepName, int chunkSize, int threadNum, ItemReader<String> reader, ItemProcessor<String, String> processor, ItemWriter<String> writer) {
 		callLog(this, "createStep");
+		// Spring Batch 6부터 throttleLimit(int)가 제거되어, 동시 스레드 수는 taskExecutor 풀 크기로만 제어한다.
+		ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+		taskExecutor.setCorePoolSize(threadNum);
+		taskExecutor.setMaxPoolSize(threadNum);
+		taskExecutor.initialize();
 		return new StepBuilder(stepName, jobRepository).<String, String>chunk(chunkSize, txManagerCommon)
 				.reader(reader)
 				.processor(processor)
 				.writer(writer)
-				.taskExecutor(new SimpleAsyncTaskExecutor()) // 스레드 풀 지정 가능
-				.throttleLimit(threadNum) // 동시에 실행할 스레드 개수
+				.taskExecutor(taskExecutor) // 동시에 실행할 스레드 개수만큼 풀 크기 지정
 				.build();
 	}
 	

@@ -21,13 +21,14 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
-import com.fasterxml.jackson.databind.introspect.AnnotatedField;
-import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
-import com.fasterxml.jackson.databind.introspect.AnnotatedParameter;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.cfg.MapperConfig;
+import tools.jackson.databind.introspect.AnnotatedField;
+import tools.jackson.databind.introspect.AnnotatedMethod;
+import tools.jackson.databind.introspect.AnnotatedParameter;
+import tools.jackson.databind.json.JsonMapper;
 
 public class BeanUtil {
 	
@@ -1255,11 +1256,12 @@ public class BeanUtil {
 	public static String toJson(Object bean) {
 		String json = "";
 		try {
-			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-			
-			mapper.setPropertyNamingStrategy(new JsonPropertyNamingStrategy());
-			mapper.configure(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN, true);
-			mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+			// Jackson 3는 BigDecimal을 항상 plain 표기로 직렬화한다(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN
+			// 자체가 제거됨 — 과학적 표기 옵션이 없어져 이 설정이 더 이상 필요 없다).
+			JsonMapper mapper = JsonMapper.builder()
+					.propertyNamingStrategy(new JsonPropertyNamingStrategy())
+					.configure(SerializationFeature.INDENT_OUTPUT, true)
+					.build();
 			json = mapper.writeValueAsString(bean);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -1299,12 +1301,13 @@ public class BeanUtil {
 		Object bean = null;
 
 		try {
-			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-			mapper.setPropertyNamingStrategy(new JsonPropertyNamingStrategy());
-			mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-			mapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+			JsonMapper mapper = JsonMapper.builder()
+					.propertyNamingStrategy(new JsonPropertyNamingStrategy())
+					.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+					.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+					.build();
 			bean = mapper.readValue(json, clzz);
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1324,15 +1327,17 @@ public class BeanUtil {
 	public static Object fromJson(String json, String nodeName, Class clzz) {
 		Object bean = null;
 		try {
-			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-			com.fasterxml.jackson.databind.JsonNode treeNode = mapper.readTree(json);
-			com.fasterxml.jackson.databind.JsonNode childNode = treeNode.get(nodeName);
+			JsonMapper mapper = JsonMapper.builder().build();
+			tools.jackson.databind.JsonNode treeNode = mapper.readTree(json);
+			tools.jackson.databind.JsonNode childNode = treeNode.get(nodeName);
 			if( childNode != null ){
 				if( childNode.isArray() ){
-					mapper.setPropertyNamingStrategy(new JsonPropertyNamingStrategy());
-					mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-					mapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
-					bean =  mapper.readValue(childNode.toString(), mapper.getTypeFactory().constructArrayType(clzz));
+					JsonMapper arrayMapper = JsonMapper.builder()
+							.propertyNamingStrategy(new JsonPropertyNamingStrategy())
+							.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+							.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+							.build();
+					bean =  arrayMapper.readValue(childNode.toString(), arrayMapper.getTypeFactory().constructArrayType(clzz));
 				}else{
 					bean = fromJson(childNode.toString(), clzz);
 				}
@@ -1352,11 +1357,12 @@ public class BeanUtil {
 	public static java.util.Map<String, Object> fromJsonToMap(String json) {
 		java.util.Map<String, Object> bean = null;
 		try {
-			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-			mapper.setPropertyNamingStrategy(new JsonPropertyNamingStrategy());
-			mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-			mapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
-			bean = (java.util.Map<String, Object>)mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>(){});
+			JsonMapper mapper = JsonMapper.builder()
+					.propertyNamingStrategy(new JsonPropertyNamingStrategy())
+					.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+					.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+					.build();
+			bean = (java.util.Map<String, Object>)mapper.readValue(json, new tools.jackson.core.type.TypeReference<Map<String, Object>>(){});
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1373,11 +1379,12 @@ public class BeanUtil {
 	public static List<Map<String, Object>> fromJsonToList(String json) {
 		List<Map<String, Object>> bean = null;
 		try {
-			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-			mapper.setPropertyNamingStrategy(new JsonPropertyNamingStrategy());
-			mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-			mapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
-			bean = (List<Map<String, Object>>)mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>(){});
+			JsonMapper mapper = JsonMapper.builder()
+					.propertyNamingStrategy(new JsonPropertyNamingStrategy())
+					.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+					.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+					.build();
+			bean = (List<Map<String, Object>>)mapper.readValue(json, new tools.jackson.core.type.TypeReference<List<Map<String, Object>>>(){});
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

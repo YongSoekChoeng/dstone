@@ -1,13 +1,12 @@
 package net.dstone.boot.sample.swagger.vo;
 
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-@ApiModel(description = "호출결과를 담는 모델")
+@Schema(description = "호출결과를 담는 모델")
 public class ResultVo {
-	@ApiModelProperty(value = "성공여부", example = "Y")
+	@Schema(description = "성공여부", example = "Y")
     private String successYn;
-	@ApiModelProperty(value = "오류메세지", example = "")
+	@Schema(description = "오류메세지", example = "")
     private String errMsg;
 	public String getSuccessYn() {
 		return successYn;

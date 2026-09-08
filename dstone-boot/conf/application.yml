@@ -55,7 +55,12 @@ spring:
         # 제외할 설정.
         exclude: 
             # 스프링시큐리티사용 시 주석처리. 비사용 시 주석제거.(스프링시큐리티는 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작함)
-            #- org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+            # Boot 4부터 org.springframework.boot.security.autoconfigure.* 로 패키지가 옮겨감(dstone-batch 참고).
+            #- org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration
+            #- org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
             # Redis사용 시 주석처리. 비사용 시 주석제거.(아래의 설정을 생략한 채 spring.data.redis.~ 가 존재할 경우 Spring Boot는 무조건 Redis 연결을 시도)
             #- org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
             #- org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration

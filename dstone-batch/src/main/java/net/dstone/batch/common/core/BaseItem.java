@@ -1,13 +1,13 @@
 package net.dstone.batch.common.core;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.batch.core.ExitStatus;
-import org.springframework.batch.core.JobParameter;
-import org.springframework.batch.core.StepExecution;
-import org.springframework.batch.core.StepExecutionListener;
+import org.springframework.batch.core.job.parameters.JobParameter;
+import org.springframework.batch.core.step.StepExecution;
+import org.springframework.batch.core.listener.StepExecutionListener;
 import org.springframework.batch.core.annotation.BeforeStep;
 
 import net.dstone.common.utils.FileUtil;
@@ -27,14 +27,12 @@ public abstract class BaseItem extends BaseBatchObject implements StepExecutionL
     	this.stepExecution = stepExecution;
     	// JobParameter 를 StepExecution Parameter 로 카피.
     	if( this.stepExecution != null && this.stepExecution.getJobParameters() != null ) {
-    		Map<String, JobParameter<?>> jobParamMap = this.stepExecution.getJobParameters().getParameters();
-    		if( jobParamMap != null ) {
-        		Iterator<String > jobParamMapKey = jobParamMap.keySet().iterator();
-        		while(jobParamMapKey.hasNext()) {
-        			String key = jobParamMapKey.next();
-        			JobParameter val = jobParamMap.get(key);
+    		Set<JobParameter<?>> jobParamSet = this.stepExecution.getJobParameters().parameters();
+    		if( jobParamSet != null ) {
+        		for (JobParameter val : jobParamSet) {
+        			String key = val.name();
         			if( val != null && StringUtil.isEmpty(this.getStepParam(key)) ) {
-        				this.setStepParam(key, val.getValue());
+        				this.setStepParam(key, val.value());
         			}
         		}
     		}
@@ -71,12 +69,9 @@ public abstract class BaseItem extends BaseBatchObject implements StepExecutionL
 	public Map<String,Object> getJobParamMap() {
     	Map<String,Object> map = new HashMap<String,Object>();
     	if( this.stepExecution != null && this.stepExecution.getJobParameters() != null ) {
-    		Map<String, JobParameter<?>> jobParamMap = this.stepExecution.getJobParameters().getParameters();
-    		Iterator<String > jobParamMapKey = jobParamMap.keySet().iterator();
-    		while(jobParamMapKey.hasNext()) {
-    			String key = jobParamMapKey.next();
-    			JobParameter val = jobParamMap.get(key);
-    			map.put(key, val.getValue());
+    		Set<JobParameter<?>> jobParamSet = this.stepExecution.getJobParameters().parameters();
+    		for (JobParameter val : jobParamSet) {
+    			map.put(val.name(), val.value());
     		}
     	}
     	return map;

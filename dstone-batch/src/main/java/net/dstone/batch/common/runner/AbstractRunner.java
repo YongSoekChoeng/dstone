@@ -3,8 +3,8 @@ package net.dstone.batch.common.runner;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.job.parameters.JobParameters;
+import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
@@ -63,7 +63,7 @@ public abstract class AbstractRunner extends BaseBatchObject {
 	 * @param transactionId
 	 */
 	protected static void jobConfigRegister(String transactionId, JobParameters jobParameters) {
-		ConstMaps.JobParamRegistry.registerByThread(transactionId, jobParameters.getParameters());
+		ConstMaps.JobParamRegistry.registerByThread(transactionId, jobParameters.parameters());
 	}
 	
 	/**

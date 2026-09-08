@@ -3,14 +3,14 @@ package net.dstone.common.utils;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
-import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import org.springframework.web.socket.sockjs.client.SockJsClient;
 import org.springframework.web.socket.sockjs.client.Transport;
@@ -87,9 +87,9 @@ public class WsClientUtil extends net.dstone.common.core.BaseObject {
 	        SockJsClient sockJsClient = new SockJsClient(transports);
 
 	        WebSocketStompClient stompClient = new WebSocketStompClient(sockJsClient);
-	        stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+	        stompClient.setMessageConverter(new JacksonJsonMessageConverter());
 
-	        ListenableFuture<StompSession> connectFuture = stompClient.connect(url, new StompSessionHandlerAdapter() {
+	        CompletableFuture<StompSession> connectFuture = stompClient.connectAsync(url, new StompSessionHandlerAdapter() {
 	            @Override
 	            public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
 	            	net.dstone.common.utils.LogUtil.sysout("STOMP 연결 성공");

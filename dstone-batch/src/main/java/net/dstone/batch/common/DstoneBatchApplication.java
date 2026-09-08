@@ -35,7 +35,8 @@ import net.dstone.common.utils.StringUtil;
 
 @EnableBatchProcessing
 @SpringBootApplication(exclude = {
-	org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
+	// Boot 4에서 org.springframework.boot.autoconfigure.jdbc → org.springframework.boot.jdbc.autoconfigure 로 이동.
+	org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration.class
 })
 @ComponentScan(basePackages={"net.dstone.batch"})
 public class DstoneBatchApplication extends SpringBootServletInitializer {

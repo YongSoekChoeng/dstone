@@ -1,7 +1,7 @@
 package net.dstone.batch.sample.jobs.job001.items;
 
-import org.springframework.batch.item.Chunk;
-import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.infrastructure.item.Chunk;
+import org.springframework.batch.infrastructure.item.ItemWriter;
 
 import net.dstone.batch.common.items.AbstractItemWriter;
 import net.dstone.common.utils.FileUtil;

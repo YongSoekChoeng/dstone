@@ -1,13 +1,12 @@
 package net.dstone.boot.sample.swagger.vo;
 
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-@ApiModel(description = "사용자 정보를 담는 모델")
+@Schema(description = "사용자 정보를 담는 모델")
 public class UserVo {
-	@ApiModelProperty(value = "사용자 고유 ID", example = "user_001", required = true)
+	@Schema(description = "사용자 고유 ID", example = "user_001", requiredMode = Schema.RequiredMode.REQUIRED)
     private String id;
-	@ApiModelProperty(value = "사용자 이름", example = "홍길동", required = true)
+	@Schema(description = "사용자 이름", example = "홍길동", requiredMode = Schema.RequiredMode.REQUIRED)
     private String name;
 	
 	public String getId() {

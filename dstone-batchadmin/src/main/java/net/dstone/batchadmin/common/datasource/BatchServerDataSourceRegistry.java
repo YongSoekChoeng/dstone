@@ -6,7 +6,6 @@ import java.util.Map;
 
 import javax.sql.DataSource;
 
-import org.jasypt.encryption.StringEncryptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -33,10 +32,6 @@ public class BatchServerDataSourceRegistry extends BaseObject {
 	@Autowired
 	@Qualifier("routingDataSourceBatch")
 	private RoutingDataSource routingDataSource;
-
-	@Autowired
-	@Qualifier("jasyptStringEncryptor")
-	private StringEncryptor stringEncryptor;
 
 	private final Map<Long, HikariDataSource> dataSourceMap = new HashMap<Long, HikariDataSource>();
 

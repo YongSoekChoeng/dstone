@@ -1,7 +1,7 @@
 package net.dstone.batch.common.items;
 
 import org.springframework.batch.core.ExitStatus;
-import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.step.StepExecution;
 
 import net.dstone.batch.common.core.BaseItem;
 

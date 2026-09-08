@@ -32,14 +32,14 @@ public class ConfigAspect extends BaseBatchObject{
 			@Override
             public Object invoke(MethodInvocation invocation) throws Throwable {
             	boolean isJob = false;
-            	org.springframework.batch.core.Job job = null;
+            	org.springframework.batch.core.job.Job job = null;
             	Object result = null;
             	Object[] args = invocation.getArguments();
             	if( args != null ) {
             		for( Object arg : args) {
-            			if( arg instanceof org.springframework.batch.core.Job ) {
+            			if( arg instanceof org.springframework.batch.core.job.Job ) {
             				isJob = true;
-            				job = (org.springframework.batch.core.Job)arg;
+            				job = (org.springframework.batch.core.job.Job)arg;
             				break;
             			}
             		}

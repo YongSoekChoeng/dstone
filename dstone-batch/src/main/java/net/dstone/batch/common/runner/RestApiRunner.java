@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.batch.core.BatchStatus;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobInstance;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.job.JobInstance;
+import org.springframework.batch.core.job.parameters.JobParameters;
+import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.ResponseEntity;
@@ -216,14 +216,14 @@ public class RestApiRunner extends AbstractRunner{
 			
 			if(returnMap.containsKey(BaseService.SUCCESS_YN) && returnMap.get(BaseService.SUCCESS_YN).equals("Y") ) {
 	    		response = ResponseEntity.ok(Map.of(
-	    				"jobInstanceId", (execution==null?"":execution.getJobId()),
+	    				"jobInstanceId", (execution==null?"":execution.getJobInstanceId()),
 	    		        "jobExecutionId", (execution==null?"":execution.getId()),
 	    	            "status", BatchStatus.STARTED,
 	    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN)
 	    	            ));
 			}else {
 				response = ResponseEntity.ok(Map.of(
-	    				"jobInstanceId", (execution==null?"":execution.getJobId()),
+	    				"jobInstanceId", (execution==null?"":execution.getJobInstanceId()),
 	    		        "jobExecutionId", (execution==null?"":execution.getId()),
 	    	            "status", BatchStatus.FAILED,
 	    	            "success", (String)returnMap.get(BaseService.SUCCESS_YN),

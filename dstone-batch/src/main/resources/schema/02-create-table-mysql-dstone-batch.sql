@@ -4,7 +4,9 @@ Spring Batch 데이터베이스[배치] 테이블
 **********************************************/
 
 -- ============================================
--- Spring Batch 5.1.0 Schema for MySQL 5.7
+-- Spring Batch 6.0.5 Schema for MySQL
+-- (BATCH_JOB_SEQ was renamed to BATCH_JOB_INSTANCE_SEQ in Spring Batch 6 —
+--  matches org/springframework/batch/core/schema-mysql.sql bundled in spring-batch-core 6.0.5)
 -- ============================================
 USE dataflow;
 
@@ -97,11 +99,11 @@ CREATE TABLE IF NOT EXISTS BATCH_JOB_EXECUTION_SEQ (
 
 INSERT INTO BATCH_JOB_EXECUTION_SEQ (ID, UNIQUE_KEY) SELECT * FROM (SELECT 0 AS ID, '0' AS UNIQUE_KEY) AS TMP WHERE NOT EXISTS(SELECT * FROM BATCH_JOB_EXECUTION_SEQ);
 
-CREATE TABLE IF NOT EXISTS BATCH_JOB_SEQ (
+CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE_SEQ (
     ID BIGINT NOT NULL,
     UNIQUE_KEY CHAR(1) NOT NULL,
     CONSTRAINT UNIQUE_KEY_UN UNIQUE (UNIQUE_KEY)
 ) ;
 
-INSERT INTO BATCH_JOB_SEQ (ID, UNIQUE_KEY) SELECT * FROM (SELECT 0 AS ID, '0' AS UNIQUE_KEY) AS TMP WHERE NOT EXISTS(SELECT * FROM BATCH_JOB_SEQ);
+INSERT INTO BATCH_JOB_INSTANCE_SEQ (ID, UNIQUE_KEY) SELECT * FROM (SELECT 0 AS ID, '0' AS UNIQUE_KEY) AS TMP WHERE NOT EXISTS(SELECT * FROM BATCH_JOB_INSTANCE_SEQ);
 

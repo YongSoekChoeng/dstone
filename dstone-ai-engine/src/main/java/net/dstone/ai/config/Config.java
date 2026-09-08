@@ -16,7 +16,6 @@ import net.dstone.common.core.BaseObject;
 	ConfigChatClient.class,
 	ConfigChatMemory.class,
 	ConfigAspect.class,
-	ConfigEnc.class,
 	ConfigProperty.class,
 	ConfigRedis.class
 })

@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import net.dstone.boot.common.biz.BaseController;
 
 /**
@@ -29,7 +29,7 @@ import net.dstone.boot.common.biz.BaseController;
  * 2025/02/17  정용석  						   Swagger 테스트                                                   			
  *------------------------------------------------------------------------------
  */
-@Api(tags = "SwaggerSampleController API")                                      		
+@Tag(name = "SwaggerSampleController API")
 @Controller
 public class SwaggerSampleController  extends BaseController {
 
@@ -39,7 +39,7 @@ public class SwaggerSampleController  extends BaseController {
 	 * @return                                                                                                              	
 	 * @throws Exception                                                                                                   	
 	 */   
-	@ApiOperation(value = "사용자(User)목록조회", nickname = "selectUsers", notes = "GET방식으로 사용자(User)목록을 조회.")
+	@Operation(summary = "사용자(User)목록조회", description = "GET방식으로 사용자(User)목록을 조회.")
 	@RequestMapping(value = "/restapi/sample/users", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<List<net.dstone.boot.sample.swagger.vo.UserVo>> selectUsers() throws Exception {
 
@@ -68,9 +68,9 @@ public class SwaggerSampleController  extends BaseController {
 	 * @return                                                                                                              	
 	 * @throws Exception                                                                                                   	
 	 */   
-	@ApiOperation(value = "사용자(User)단건조회", nickname = "selectUser", notes = "GET방식으로 사용자(User)단건 조회.")
+	@Operation(summary = "사용자(User)단건조회", description = "GET방식으로 사용자(User)단건 조회.")
 	@RequestMapping(value = "/restapi/sample/users/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<net.dstone.boot.sample.swagger.vo.UserVo> selectUser(@ApiParam(value = "사용자 ID", required = true) @PathVariable String id) throws Exception {
+	public ResponseEntity<net.dstone.boot.sample.swagger.vo.UserVo> selectUser(@Parameter(description = "사용자 ID", required = true) @PathVariable String id) throws Exception {
 		
 		//info("net.dstone.boot.sample.swagger.web.SwaggerSampleController.selectUser() =======================>>> id["+id+"]");
 		
@@ -91,9 +91,9 @@ public class SwaggerSampleController  extends BaseController {
 	 * @return                                                                                                              	
 	 * @throws Exception                                                                                                   	
 	 */   
-	@ApiOperation(value = "신규 사용자(User)입력", nickname = "insertUser", notes = "POST방식으로 신규 사용자(User)입력.")
+	@Operation(summary = "신규 사용자(User)입력", description = "POST방식으로 신규 사용자(User)입력.")
 	@RequestMapping(value = "/restapi/sample/users", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<net.dstone.boot.sample.swagger.vo.ResultVo> insertUser(@RequestBody @ApiParam(value = "사용자(User) 정보", required = true) net.dstone.boot.sample.swagger.vo.UserVo newUser) throws Exception {
+	public ResponseEntity<net.dstone.boot.sample.swagger.vo.ResultVo> insertUser(@RequestBody @Parameter(description = "사용자(User) 정보", required = true) net.dstone.boot.sample.swagger.vo.UserVo newUser) throws Exception {
 		
 		//info("net.dstone.boot.sample.swagger.web.SwaggerSampleController.insertUser() =======================>>> newUser["+newUser+"]");
 

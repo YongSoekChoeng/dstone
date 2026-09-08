@@ -10,15 +10,12 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
-import com.ulisesbocchio.jasyptspringboot.annotation.EnableEncryptableProperties;
-
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.common.core.BaseObject;
 
 @Aspect
 @Component
 @EnableAspectJAutoProxy(proxyTargetClass = true)
-@EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
 	
 

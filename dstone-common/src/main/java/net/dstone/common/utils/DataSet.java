@@ -18,11 +18,12 @@ import java.util.Map;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
 
 import net.dstone.common.utils.BeanUtil.JsonPropertyNamingStrategy;
 import net.dstone.common.utils.FldUtil.Member;
@@ -383,13 +384,15 @@ public class DataSet implements java.io.Serializable {
 	
 	private ObjectMapper getJsonMapper(){
 		try {
-			this.jsonMapper = new ObjectMapper();
-			this.jsonMapper.setPropertyNamingStrategy(new JsonPropertyNamingStrategy());
-			this.jsonMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-			this.jsonMapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
-			this.jsonMapper.configure(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN, true);
-			this.jsonMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-			this.jsonMapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+			// Jackson 3는 BigDecimal을 항상 plain 표기로 직렬화한다(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN
+			// 자체가 제거됨 — 과학적 표기 옵션이 없어져 이 설정이 더 이상 필요 없다).
+			this.jsonMapper = JsonMapper.builder()
+					.propertyNamingStrategy(new JsonPropertyNamingStrategy())
+					.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+					.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+					.configure(SerializationFeature.INDENT_OUTPUT, true)
+					.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+					.build();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -585,7 +588,7 @@ public class DataSet implements java.io.Serializable {
 		DataSet childDs = null;
 		String debugStr = "";
 		try {
-			cNodeKeys = pNode.fieldNames();
+			cNodeKeys = pNode.propertyNames().iterator();
 			while( cNodeKeys.hasNext() ){
 				cNodeKey = cNodeKeys.next();
 				cNode = pNode.get(cNodeKey);
@@ -596,7 +599,7 @@ public class DataSet implements java.io.Serializable {
 						for(int i=0; i<cNodeArray.size(); i++){
 							JsonNode cNodeArrayItem = cNodeArray.get(i);
 							// COMPLEX 타입일 경우
-							if( cNodeArrayItem.isContainerNode() ){
+							if( cNodeArrayItem.isContainer() ){
 								childDs = this.addDataSet(cNodeKey);
 								childDs.buildFromJson(cNodeArrayItem);
 							// ATOMIC 타입일 경우	
@@ -608,7 +611,7 @@ public class DataSet implements java.io.Serializable {
 				// 단일건일 경우	
 				}else{
 					// COMPLEX 타입일 경우
-					if( cNode.isContainerNode() ){
+					if( cNode.isContainer() ){
 						childDs = this.addDataSet(cNodeKey);
 						childDs.buildFromJson(cNode);
 					// ATOMIC 타입일 경우	
@@ -616,7 +619,7 @@ public class DataSet implements java.io.Serializable {
 						this.addDatum(cNodeKey, cNode.isNumber()?cNode.asText():cNode.textValue());
 					}
 				}
-				//debugStr = cNodeKey + " : isArray["+cNode.isArray()+"] isObject["+cNode.isObject()+"] isContainerNode["+cNode.isContainerNode()+"] cNode.get(0).isContainerNode["+(cNode.get(0)==null?false:cNode.get(0).isContainerNode())+"]" ;
+				//debugStr = cNodeKey + " : isArray["+cNode.isArray()+"] isObject["+cNode.isObject()+"] isContainerNode["+cNode.isContainer()+"] cNode.get(0).isContainerNode["+(cNode.get(0)==null?false:cNode.get(0).isContainer())+"]" ;
 				//debug(debugStr);			
 			}
 		} catch (Exception e) {

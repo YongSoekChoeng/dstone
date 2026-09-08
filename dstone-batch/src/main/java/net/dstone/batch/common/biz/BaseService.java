@@ -8,14 +8,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.batch.core.BatchStatus;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobInstance;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.job.JobInstance;
+import org.springframework.batch.core.job.parameters.JobParameters;
+import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.configuration.JobRegistry;
-import org.springframework.batch.core.configuration.support.ReferenceJobFactory;
-import org.springframework.batch.core.explore.JobExplorer;
+import org.springframework.batch.core.repository.explore.JobExplorer;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.batch.core.repository.JobRepository;
@@ -151,9 +150,8 @@ public class BaseService extends BaseBatchObject {
 						if( autoRegJobName.equals(jobName) ) {
 							abstractJob.setName(jobName);
 							Job job = abstractJob.buildAutoRegJob();
-							ReferenceJobFactory factory = new ReferenceJobFactory(job);
 							this.info("jobName["+jobName+"] job["+job+"] is registered !!!");
-							jobRegistry.register(factory);
+							jobRegistry.register(job); // Spring Batch 6부터 JobRegistry.register(Job)가 직접 Job을 받아, ReferenceJobFactory 래핑 불필요
 							break;
 						}
 					}
@@ -177,7 +175,7 @@ public class BaseService extends BaseBatchObject {
 	 * 
 	 * 등록 흐름:
 	 * 1. ApplicationContext에서 jobName으로 Job 빈 조회
-	 * 2. ReferenceJobFactory로 감싸서 JobRegistry(인메모리 레지스트리)에 등록
+	 * 2. JobRegistry(인메모리 레지스트리)에 등록(Spring Batch 6부터 JobRegistry.register(Job)가 Job을 직접 받음)
 	 * 3. JobLauncherObj.run()이 호출되어 실제 배치가 시작될 때 DB(BATCH_JOB_INSTANCE, BATCH_JOB_EXECUTION 테이블)에 행(Row)이 삽입.
 	 * </pre>
 	 * @param transactionId

@@ -1,7 +1,8 @@
 /**
- * provider별(OpenAI/Anthropic/Azure/local) 어댑터 구현체(Phase 1).
+ * provider별(OpenAI/Anthropic/local) 어댑터 구현체(Phase 1).
+ * (Azure OpenAI는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 지원하지 않는다.)
  *
- * anthropic/openai/azure-openai/ollama는 각각 spring-ai-starter-model-* 의 자동설정이
+ * anthropic/openai/ollama는 각각 spring-ai-starter-model-* 의 자동설정이
  * ChatModel 어댑터 역할을 이미 하고 있어 이 패키지에 별도 구현을 두지 않는다
  * (application.yml + {@link net.dstone.ai.gateway.AiProvider} 참고).
  *

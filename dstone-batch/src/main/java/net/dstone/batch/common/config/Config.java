@@ -10,7 +10,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 	ConfigAspect.class,
 	ConfigAutoReg.class,
 	ConfigDatasource.class,
-	ConfigEnc.class,
 	ConfigInterceptor.class,
 	ConfigJob.class,
 	ConfigListener.class,

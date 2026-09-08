@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.springframework.kafka.core.KafkaTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.core.BaseObject;

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.mybatis.spring.SqlSessionTemplate;
-import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.infrastructure.item.ExecutionContext;
 
 import net.dstone.batch.common.consts.Constants;
 import net.dstone.batch.common.core.BasePartitioner;

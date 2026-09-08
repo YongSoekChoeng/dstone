@@ -1,6 +1,6 @@
 package net.dstone.batch.sample.jobs.job001.items;
 
-import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
 
 import net.dstone.batch.common.items.AbstractItemProcessor;
 

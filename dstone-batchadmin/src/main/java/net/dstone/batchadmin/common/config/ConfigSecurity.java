@@ -13,7 +13,7 @@ import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import jakarta.annotation.Resource;
 import jakarta.servlet.DispatcherType;
@@ -140,23 +140,23 @@ public class ConfigSecurity extends BaseObject {
 		http.authorizeHttpRequests(auth -> auth
 			.requestMatchers(
 				/*** 정적자원 ***/
-				new AntPathRequestMatcher("/*")
-				, new AntPathRequestMatcher("/assets/**")
-				, new AntPathRequestMatcher("/images/**")
-				, new AntPathRequestMatcher("/js/**")
+				PathPatternRequestMatcher.pathPattern("/*")
+				, PathPatternRequestMatcher.pathPattern("/assets/**")
+				, PathPatternRequestMatcher.pathPattern("/images/**")
+				, PathPatternRequestMatcher.pathPattern("/js/**")
 				/*** 동적자원중 권한체크가 필요없는 자원들 ***/
-				, new AntPathRequestMatcher(LOGIN_GO_ACTION)
-				, new AntPathRequestMatcher(LOGIN_PROCESS_ACTION)
-				, new AntPathRequestMatcher(LOGIN_PROCESS_SUCCESS_ACTION)
-				, new AntPathRequestMatcher(LOGIN_PROCESS_FAILURE_ACTION)
-				, new AntPathRequestMatcher(LOGIN_CHECK_ACTION)
-				, new AntPathRequestMatcher(LOGOUT_ACTION)
-				, new AntPathRequestMatcher(LOGOUT_SUCCS_ACTION)
-				, new AntPathRequestMatcher(ACCESS_DENIED_ACTION)
-				, new AntPathRequestMatcher(ERROR_URL_PATTERN)
+				, PathPatternRequestMatcher.pathPattern(LOGIN_GO_ACTION)
+				, PathPatternRequestMatcher.pathPattern(LOGIN_PROCESS_ACTION)
+				, PathPatternRequestMatcher.pathPattern(LOGIN_PROCESS_SUCCESS_ACTION)
+				, PathPatternRequestMatcher.pathPattern(LOGIN_PROCESS_FAILURE_ACTION)
+				, PathPatternRequestMatcher.pathPattern(LOGIN_CHECK_ACTION)
+				, PathPatternRequestMatcher.pathPattern(LOGOUT_ACTION)
+				, PathPatternRequestMatcher.pathPattern(LOGOUT_SUCCS_ACTION)
+				, PathPatternRequestMatcher.pathPattern(ACCESS_DENIED_ACTION)
+				, PathPatternRequestMatcher.pathPattern(ERROR_URL_PATTERN)
 				/*** 기타 ***/
-				, new AntPathRequestMatcher("/favicon.ico")
-				, new AntPathRequestMatcher(".well-known/**")
+				, PathPatternRequestMatcher.pathPattern("/favicon.ico")
+				, PathPatternRequestMatcher.pathPattern("/.well-known/**") // PathPatternRequestMatcher는 '/'로 시작하지 않는 패턴을 거부해 선행 슬래시 추가
 			).permitAll()
 			/*** 페이지마다 include/forward 되는 자원은 모두 허용 ***/
 			.dispatcherTypeMatchers(DispatcherType.INCLUDE, DispatcherType.FORWARD).permitAll()

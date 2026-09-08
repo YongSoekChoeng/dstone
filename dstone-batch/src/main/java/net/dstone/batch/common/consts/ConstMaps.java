@@ -1,11 +1,11 @@
 package net.dstone.batch.common.consts;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.batch.core.JobParameter;
+import org.springframework.batch.core.job.parameters.JobParameter;
 
 import net.dstone.common.utils.StringUtil;
 
@@ -22,23 +22,19 @@ public class ConstMaps {
 	public static class JobParamRegistry {
 		public static final String EXE_PREFIX 		= "Execution-";
 		public static final String THREAD_PREFIX 	= "Thread-";
-		public static synchronized void registerByExecution(Object executionId, Map<String, JobParameter<?>> jParamMap) {
-			register(EXE_PREFIX+executionId, jParamMap);
+		public static synchronized void registerByExecution(Object executionId, Set<JobParameter<?>> jParamSet) {
+			register(EXE_PREFIX+executionId, jParamSet);
 		}
-		public static synchronized void registerByThread(Object threadId, Map<String, JobParameter<?>> jParamMap) {
-			register(THREAD_PREFIX+threadId, jParamMap);
+		public static synchronized void registerByThread(Object threadId, Set<JobParameter<?>> jParamSet) {
+			register(THREAD_PREFIX+threadId, jParamSet);
 		}
-	    @SuppressWarnings("rawtypes")
-		protected static synchronized void register(String id, Map<String, JobParameter<?>> jParamMap) {
+		protected static synchronized void register(String id, Set<JobParameter<?>> jParamSet) {
 	        Map<String,String> jobParameters = new HashMap<String,String>();
-	    	if( jParamMap != null ) {
-	    		Iterator<String> keys = jParamMap.keySet().iterator();
-	    		while(keys.hasNext()) {
-	    			String key = keys.next();
-	    			JobParameter jobParameterVal = jParamMap.get(key);
+	    	if( jParamSet != null ) {
+	    		for (JobParameter<?> jobParameterVal : jParamSet) {
 	    			if(  jobParameterVal != null) {
-	    				String val = StringUtil.nullCheck(jobParameterVal.getValue(), "");
-	        			jobParameters.put(key, val);
+	    				String val = StringUtil.nullCheck(jobParameterVal.value(), "");
+	        			jobParameters.put(jobParameterVal.name(), val);
 	    			}
 	    		}
 	    	}

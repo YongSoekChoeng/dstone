@@ -2,8 +2,10 @@ package net.dstone.batch.common.config;
 
 import javax.sql.DataSource;
 
-import org.springframework.batch.core.explore.JobExplorer;
-import org.springframework.batch.core.explore.support.JobExplorerFactoryBean;
+import org.springframework.batch.core.configuration.JobRegistry;
+import org.springframework.batch.core.configuration.support.MapJobRegistry;
+import org.springframework.batch.core.repository.explore.JobExplorer;
+import org.springframework.batch.core.repository.explore.support.JobExplorerFactoryBean;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import net.dstone.batch.common.core.BaseBatchObject;
@@ -42,6 +45,30 @@ public class ConfigJob extends BaseBatchObject {
         factoryBean.setTransactionManager(transactionManager);
         factoryBean.afterPropertiesSet();
         return factoryBean.getObject();
+    }
+
+    /**
+     * Spring Batch 6부터 @EnableBatchProcessing이 기본 JobRegistry 빈도 더 이상 자동 제공하지 않는다.
+     * 옛 기본 구현체와 동일한 인메모리 MapJobRegistry를 그대로 명시적으로 등록한다.
+     */
+    @Bean("jobRegistry")
+    public JobRegistry jobRegistry() {
+        return new MapJobRegistry();
+    }
+
+    /**
+     * Spring Batch 6부터 @EnableBatchProcessing이 JobRepository/JobExplorer를 직접 정의한
+     * 프로젝트에서 더 이상 기본 "jobLauncher" 빈을 자동 제공하지 않는다(이전엔 자동 제공되던 것을
+     * BaseService가 @Qualifier("jobLauncher")로 의존). 동기 실행 방식(SyncTaskExecutor)으로
+     * 옛 기본 SimpleJobLauncher와 동일한 동작을 재현해 명시적으로 등록한다.
+     */
+    @Bean("jobLauncher")
+    public JobLauncher jobLauncher(JobRepository jobRepository) throws Exception {
+        TaskExecutorJobLauncher jobLauncher = new TaskExecutorJobLauncher();
+        jobLauncher.setJobRepository(jobRepository);
+        jobLauncher.setTaskExecutor(new SyncTaskExecutor());
+        jobLauncher.afterPropertiesSet();
+        return jobLauncher;
     }
 
     @Bean("asyncJobLauncher")

@@ -12,8 +12,6 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
-import com.ulisesbocchio.jasyptspringboot.annotation.EnableEncryptableProperties;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.common.core.BaseObject;
@@ -23,7 +21,6 @@ import net.dstone.common.utils.StringUtil;
 @Aspect
 @Component
 @EnableAspectJAutoProxy(proxyTargetClass = true)
-@EnableEncryptableProperties
 public class ConfigAspect extends BaseObject {
 	
 	/****************************************** 1. 로깅 관련 AOP 설정 시작 ******************************************/

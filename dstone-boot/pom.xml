@@ -16,8 +16,8 @@
 		<java.version>21</java.version>
 		<!-- Web -->
 		<jsp.version>3.0.0</jsp.version>
-		<jstl.version>3.0.1</jstl.version>
-		<servlet.version>6.0.0</servlet.version>
+		<jstl.version>3.0.2</jstl.version>
+		<servlet.version>6.1.0</servlet.version>
 		<!-- Maven-Plugin -->
 		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
 		<!-- Log4j -->
@@ -68,16 +68,12 @@
 			<scope>provided</scope>
 		</dependency>
 		
-		<!-- Swagger -->
+		<!-- Swagger: springfox는 2020년 마지막 릴리스(3.0.0) 이후 방치되어 Spring Framework 7과
+		     호환되지 않는다. springdoc-openapi로 교체(OpenAPI 3, swagger-ui 포함 번들). -->
 		<dependency>
-			<groupId>io.springfox</groupId>
-			<artifactId>springfox-swagger2</artifactId>
-			<version>2.9.2</version>
-		</dependency>
-		<dependency>
-			<groupId>io.springfox</groupId>
-			<artifactId>springfox-swagger-ui</artifactId>
-			<version>2.9.2</version>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.1.1</version>
 		</dependency>
 		
 		<!-- Java Parser -->

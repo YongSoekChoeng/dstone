@@ -27,7 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.servlet.ModelAndView;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -272,7 +272,7 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 				if( httpHeaders.getContentType().equals(MediaType.MULTIPART_FORM_DATA) ) {
 					requestEntity = this.createMultipartHttpEntity((MultipartHttpServletRequest)request);
 				// Json 방식	
-				}else if( httpHeaders.getContentType().equals(MediaType.APPLICATION_JSON) ||  httpHeaders.getContentType().equals(MediaType.APPLICATION_JSON_UTF8) ) {
+				}else if( httpHeaders.getContentType().equals(MediaType.APPLICATION_JSON) ) {
 					String encoding = request.getCharacterEncoding();
 					Charset charset = (encoding != null) ? Charset.forName(encoding) : StandardCharsets.UTF_8;
 					requestEntity = this.createJsonHttpEntity(request, charset);

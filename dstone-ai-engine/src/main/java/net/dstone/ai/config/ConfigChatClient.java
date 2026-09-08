@@ -10,7 +10,7 @@ import net.dstone.ai.gateway.GatewayProperties;
 import net.dstone.common.core.BaseObject;
 
 /**
- * 어떤 provider(anthropic/openai/azure-openai/ollama)가 활성화되어 있든, Spring AI가
+ * 어떤 provider(anthropic/openai/ollama)가 활성화되어 있든, Spring AI가
  * spring.ai.model.chat 값에 따라 단 하나의 ChatModel만 자동설정하고 그 ChatModel로
  * ChatClient.Builder를 만들어주므로 이 지점은 provider와 무관하게 그대로 build()만 하면 된다.
  *

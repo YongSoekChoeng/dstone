@@ -31,24 +31,33 @@ spring:
     # Phase 0은 DB/Redis/RabbitMQ/Kafka/Security를 쓰지 않는 순수 Chat API 스켈레톤이었다.
     # session(Phase 1)에서 대화 히스토리 저장에 Redis를 쓰기 시작하면서 Redis 관련 두 줄은 제외
     # 목록에서 뺐다(net.dstone.ai.config.ConfigRedis 참고). DB/RabbitMQ/Kafka는 아직 미사용.
+    #
+    # Boot 4에서 Security 자동설정이 org.springframework.boot.autoconfigure.security.* 에서
+    # org.springframework.boot.security.autoconfigure.* 로 통째로 옮겨갔다. spring.autoconfigure.exclude는
+    # 존재하지 않는 클래스명을 조용히 무시하므로(에러 없이), 옛 FQN을 그대로 두면 실제로는 아무것도
+    # 제외되지 않고 Boot4의 기본 인증(HTTP Basic + 랜덤 생성 비밀번호)이 그대로 켜져버린다.
     ##########################################################################################
     autoconfigure:
         exclude:
-            - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-            - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+            - org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
+            - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+            - org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
+            - org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration
+            - org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
             - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
             - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     ai:
-        # Gateway(Phase 1): 아래 4개 provider의 starter가 모두 클래스패스에 있으므로
-        # 반드시 하나를 명시해야 한다(값을 지우면 4개 provider가 동시에 활성화되어 기동에 실패한다).
+        # Gateway(Phase 1): 아래 3개 provider의 starter가 모두 클래스패스에 있으므로
+        # 반드시 하나를 명시해야 한다(값을 지우면 3개 provider가 동시에 활성화되어 기동에 실패한다).
         # net.dstone.ai.gateway.AiProvider의 propertyValue와 정확히 일치해야 한다.
+        # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
-        # chat 외 capability(embedding/audio/image/moderation)는 openai starter가 클래스패스에 있으면 
-        # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다), 
+        # chat 외 capability(embedding/audio/image/moderation)는 openai starter가 클래스패스에 있으면
+        # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
         # 아직 Phase 1(Chat) 범위 밖이라 전부 명시적으로 꺼둔다.
         # Phase 2(RAG)에서 embedding이 실제로 필요해지면 그때 embedding 값만 provider명으로 바꾼다.
         model:
-            chat: anthropic # anthropic | openai | azure-openai | ollama
+            chat: anthropic # anthropic | openai | ollama
             embedding: none
             audio:
                 speech: none
@@ -81,21 +90,6 @@ spring:
         #     # local vLLM(OpenAI 호환 API)을 붙일 때는 provider는 그대로 openai로 두고
         #     # base-url만 vLLM 서버로 돌린다(api-key는 vLLM이 검증하지 않으면 임의 문자열로 둔다).
         #     base-url: http://<vllm-host>:8000
-
-        ##########################################################################################
-        # spring.ai.model.chat=azure 일 때 설정.
-        # azure-openai starter는 spring.ai.model.chat 값과 무관하게 OpenAIClientBuilder 빈을
-        # 기동 시점에 무조건 생성하면서 endpoint가 비어 있으면 즉시 실패한다(다른 provider가 활성화되어 있어도 마찬가지). 
-        # 그래서 endpoint만은 주석 처리하지 않고 더미 값을 채워둔다.
-        # spring.ai.model.chat=azure-openai로 바꿔서 실제로 쓸 때 endpoint/api-key/deployment-name을 아래처럼 실값으로 교체한다.
-        ##########################################################################################
-        azure:
-            openai:
-                endpoint: https://placeholder.openai.azure.com
-                # api-key: ENC(...)
-                # chat:
-                #     options:
-                #         deployment-name: <azure-deployment-name>
 
         ##########################################################################################
         # spring.ai.model.chat=ollama 일 때 설정. (로컬/사내망 Ollama 서버, API 키 불필요).

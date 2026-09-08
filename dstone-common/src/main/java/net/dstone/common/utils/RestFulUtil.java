@@ -8,13 +8,16 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.util.TimeValue;
+import java.net.URI;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -59,7 +62,13 @@ public class RestFulUtil {
 			connManager.setMaxTotal(100); // 최대로 연결할 수 있는 커넥션 쓰레드 수
 			connManager.setDefaultMaxPerRoute(60); // (IP + PORT) 당 커넥션 쓰레드 수
 			connManager.closeIdle(TimeValue.of(60, TimeUnit.SECONDS)); // 최대 연결 유효시간을 지정한다
-			
+			// HttpComponentsClientHttpRequestFactory.setConnectTimeout(int)가 Spring Framework 7에서
+			// 제거되어(연결풀 대기시간/응답시간만 남음), TCP 연결시도제한시간은 커넥션매니저의
+			// ConnectionConfig로 직접 설정한다.
+			connManager.setDefaultConnectionConfig(ConnectionConfig.custom()
+					.setConnectTimeout(connectTimeout, TimeUnit.SECONDS)
+					.build());
+
 			RequestConfig requestConfig = RequestConfig.custom()
 	        .setConnectionRequestTimeout(connectTimeout, TimeUnit.SECONDS) //  HttpClient가 커넥션 풀에서 사용 가능한 연결을 가져오기 위해 대기하는 최대 시간을 지정하는 옵션. 커넥션 풀에서 사용 가능한 연결이 없을 때, 요청은 커넥션 풀에 새로운 연결이 생성될 때까지 해당 시간만큼 대기.
 	        .setResponseTimeout(readTimeout, TimeUnit.SECONDS) // 응답 타임아웃 (read timeout)
@@ -69,9 +78,8 @@ public class RestFulUtil {
 	        .setConnectionManager(connManager)
 	        .setDefaultRequestConfig(requestConfig)
 	        .build();
-			
+
 			HTTP_CLIENT_FACTORY = new HttpComponentsClientHttpRequestFactory();
-			HTTP_CLIENT_FACTORY.setConnectTimeout(connectTimeout);
 			HTTP_CLIENT_FACTORY.setHttpClient(httpClient);
 			/***************** 설정 종료 *****************/
 		} catch (Exception e) {
@@ -110,7 +118,10 @@ public class RestFulUtil {
 		connManager.setMaxTotal(100); // 최대로 연결할 수 있는 커넥션 쓰레드 수
 		connManager.setDefaultMaxPerRoute(60); // (IP + PORT) 당 커넥션 쓰레드 수
 		connManager.closeIdle(TimeValue.of(60, TimeUnit.SECONDS)); // 최대 연결 유효시간을 지정한다
-		
+		connManager.setDefaultConnectionConfig(ConnectionConfig.custom()
+				.setConnectTimeout(connectTimeout, TimeUnit.SECONDS)
+				.build());
+
 		RequestConfig requestConfig = RequestConfig.custom()
         .setConnectionRequestTimeout(connectTimeout, TimeUnit.SECONDS) //  HttpClient가 커넥션 풀에서 사용 가능한 연결을 가져오기 위해 대기하는 최대 시간을 지정하는 옵션. 커넥션 풀에서 사용 가능한 연결이 없을 때, 요청은 커넥션 풀에 새로운 연결이 생성될 때까지 해당 시간만큼 대기.
         .setResponseTimeout(readTimeout, TimeUnit.SECONDS) // 응답 타임아웃 (read timeout)
@@ -120,9 +131,8 @@ public class RestFulUtil {
         .setConnectionManager(connManager)
         .setDefaultRequestConfig(requestConfig)
         .build();
-		
+
         HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory();
-        factory.setConnectTimeout(connectTimeout);
         factory.setHttpClient(httpClient);
 
         restTemplate = new RestTemplate(factory);
@@ -173,7 +183,7 @@ public class RestFulUtil {
 		private boolean isThrowExceptionOnError = true;
 		
 		@Override
-		public void handleError(ClientHttpResponse response) throws IOException {
+		public void handleError(URI url, HttpMethod method, ClientHttpResponse response) throws IOException {
 			//logger.info( "handleError :: response.getRawStatusCode()================>>>" + response.getRawStatusCode() );
 			if (response.getStatusCode().value() != 520) {
 				HttpStatusCode statusCode = response.getStatusCode();

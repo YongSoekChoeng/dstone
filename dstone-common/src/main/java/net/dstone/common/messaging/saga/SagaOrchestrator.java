@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import org.springframework.dao.DuplicateKeyException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.messaging.outbox.OutboxAppender;

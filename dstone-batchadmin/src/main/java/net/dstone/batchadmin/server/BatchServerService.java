@@ -3,9 +3,7 @@ package net.dstone.batchadmin.server;
 import java.util.List;
 import java.util.Map;
 
-import org.jasypt.encryption.StringEncryptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 
 import net.dstone.batchadmin.common.datasource.BatchServerDataSourceRegistry;
 import net.dstone.batchadmin.common.rest.BatchRestClient;
@@ -25,10 +23,6 @@ public class BatchServerService extends net.dstone.batchadmin.common.biz.BaseSer
 
 	@Autowired
 	private BatchRestClient batchRestClient;
-
-	@Autowired
-	@Qualifier("jasyptStringEncryptor")
-	private StringEncryptor stringEncryptor;
 
 	public List<BatchServerVo> listServer(BatchServerVo paramVo) throws BizException {
 		try {

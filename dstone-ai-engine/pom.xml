@@ -14,9 +14,9 @@
 	<properties>
 		<java.version>21</java.version>
 		<log4j.version>2.24.3</log4j.version>
-		<!-- Spring AI 2.x는 Spring Boot 4(Spring Framework 7) 대상이라 아직 사용 불가.
-		     현재 루트 pom의 spring-boot.version(3.5.x)과 맞는 마지막 1.x 라인을 사용. -->
-		<spring-ai.version>1.1.8</spring-ai.version>
+		<!-- 루트 pom의 spring-boot.version이 4.x(Spring Framework 7)로 올라감에 따라
+		     Spring AI도 그에 맞는 2.x 라인으로 함께 올린다. -->
+		<spring-ai.version>2.0.1</spring-ai.version>
 	</properties>
 
 	<repositories>
@@ -71,7 +71,10 @@
 		     실제 활성화되는 ChatModel/ChatClient를 교체한다(각 starter의 자동설정이
 		     spring.ai.model.chat=<provider명> 조건부로 동작 — 코드 변경 불필요).
 		     local(vLLM)은 OpenAI 호환 API이므로 openai starter를 base-url만 바꿔 재사용하고,
-		     local(Ollama)은 ollama starter를 그대로 사용한다. -->
+		     local(Ollama)은 ollama starter를 그대로 사용한다.
+		     azure-openai는 Spring AI 2.x에서 chat model provider로는 완전히 제거되어
+		     (spring-ai-starter-model-azure-openai가 2.0.0-M4 이후 더 이상 배포되지 않음,
+		     Azure는 vector-store 용도만 남음) 더 이상 지원 목록에 없다. -->
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-anthropic</artifactId>
@@ -79,10 +82,6 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-openai</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-starter-model-azure-openai</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
