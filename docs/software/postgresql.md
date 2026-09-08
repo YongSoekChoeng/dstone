@@ -8,6 +8,7 @@
 - [4. 서비스 시작/중지](#4-서비스-시작중지)
 - [5. 접속](#5-접속)
 - [6. dstone 프로젝트에서의 역할](#6-dstone-프로젝트에서의-역할)
+- [7. 문제 해결 (Phase 2 설치 중 실제로 겪은 에러)](#7-문제-해결-phase-2-설치-중-실제로-겪은-에러)
 
 ## 1. 개요
 로컬 개발/실습용으로 설치된 관계형 데이터베이스. **(2026-09-08 변경)** `dstone-ai-engine`의 RAG(Phase 2) VectorStore(pgvector)가 사용하기 시작했다 - 그 외 모듈(`dstone-boot`/`dstone-batch`/`dstone-batchadmin`)은 여전히 MySQL만 쓴다.
@@ -17,17 +18,20 @@
 - 설치 방식: Ubuntu 공식 저장소 apt 패키지
 - 서비스명: `postgresql.service` (systemd, 활성화되어 있음)
 - 클러스터: `18/main`, 데이터 디렉터리 `/var/lib/postgresql/18/main`, 로그 `/var/log/postgresql/postgresql-18-main.log`
+- 확장: `pgvector` 0.8.1-2 (`postgresql-18-pgvector`, Ubuntu 공식 저장소 apt 패키지) - RAG(Phase 2) VectorStore에 필요, PostgreSQL 자체 설치에는 포함되지 않아 별도 설치했다([7절](#7-문제-해결-phase-2-설치-중-실제로-겪은-에러) 참고)
 
 ## 3. 설치 방법
 ```bash
 sudo apt update
 sudo apt install -y postgresql
+sudo apt install -y postgresql-18-pgvector
 ```
 
 설치 확인:
 ```bash
 psql --version
 pg_lsclusters
+apt list --installed 2>/dev/null | grep pgvector
 ```
 
 ## 4. 서비스 시작/중지
@@ -58,10 +62,18 @@ psql -h 127.0.0.1 -p 5432 -U dstone_ai -d dstone_ai
 `dstone-ai-engine`의 RAG(Phase 2) VectorStore가 이 인스턴스를 쓴다 - `net.dstone.ai.rag.ingest.DocumentIngestService`가 청크로 쪼갠 문서를 [Ollama](ollama.md)로 임베딩한 뒤 pgvector 테이블에 저장하고, `net.dstone.ai.rag.retrieval.RetrievalService`가 유사도 검색을 한다. 전용 롤/DB/확장을 아래처럼 한 번 생성해뒀다(최초 1회, `postgres` 슈퍼유저 권한 필요):
 
 ```bash
+# 0) PostgreSQL이 떠 있어야 한다 (start-postgresql.sh, 4절 참고)
+# 1) pgvector 확장 패키지 설치 (PostgreSQL 자체 설치엔 포함 안 됨 - 7절 참고)
+sudo apt-get update -y
+sudo apt-get install -y postgresql-18-pgvector
+
+# 2) 전용 롤/DB 생성
 sudo -u postgres psql <<'SQL'
 CREATE ROLE dstone_ai LOGIN PASSWORD '<비밀번호>';
 CREATE DATABASE dstone_ai OWNER dstone_ai;
 SQL
+
+# 3) 그 DB 안에서 확장 활성화
 sudo -u postgres psql -d dstone_ai -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
@@ -69,3 +81,15 @@ sudo -u postgres psql -d dstone_ai -c "CREATE EXTENSION IF NOT EXISTS vector;"
 - 접속 정보(`DB_HOST`/`DB_PORT`)는 `dstone-ai-engine/conf/env*.properties`로 주입(다른 모듈의 MySQL과 동일한 패턴)
 - 테이블(`vector_store`)은 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 최초 기동 시 자동 생성한다 - 별도 스키마 SQL 파일 없음
 - **k8s(kind) 미배포**: mysql/redis와 달리 아직 kind 브리지 게이트웨이(`172.18.0.1`)로 열어주는 작업은 하지 않았다. `dstone-ai-engine`을 실제로 kind에 배포하기 전에 `listen_addresses`/`pg_hba.conf`를 mysql.md/redis.md와 같은 방식으로 조정해야 한다.
+
+## 7. 문제 해결 (Phase 2 설치 중 실제로 겪은 에러)
+
+이 서버에 RAG(Phase 2)용 롤/DB/확장을 처음 만들 때 실제로 순서대로 겪은 에러 두 가지. 둘 다 [6절](#6-dstone-프로젝트에서의-역할)의 스크립트를 처음부터(위에 반영된 순서로) 실행하면 재현되지 않는다.
+
+### 7.1 `connection to server on socket ".../.s.PGSQL.5432" failed: No such file or directory`
+- **원인**: PostgreSQL 서비스가 내려가 있는 상태에서 `sudo -u postgres psql`을 바로 실행함. 이 환경은 [1. 운영 원칙](../environment.md#1-운영-원칙-중요)대로 systemd 서비스가 WSL 부팅 시 자동 기동되지 않는다.
+- **조치**: `start-postgresql.sh`로 먼저 띄운 뒤([4절](#4-서비스-시작중지)) 재시도.
+
+### 7.2 `ERROR: extension "vector" is not available` / `HINT: The extension must first be installed on the system where PostgreSQL is running.`
+- **원인**: `CREATE EXTENSION vector`는 PostgreSQL 서버 자체가 아니라 별도 apt 패키지(`postgresql-18-pgvector`)가 설치돼 있어야 동작한다. `postgresql`/`postgresql-18` 패키지 설치만으로는 pgvector가 딸려오지 않는다.
+- **조치**: `sudo apt-get install -y postgresql-18-pgvector` 설치 후 `CREATE EXTENSION IF NOT EXISTS vector;` 재시도. 패키지명은 PostgreSQL 메이저 버전에 종속적이므로(`postgresql-<버전>-pgvector`), 버전을 올리면 이 패키지명도 같이 바뀐다.

@@ -34,8 +34,11 @@ public class RetrievalService extends BaseObject {
 		this.vectorStore = vectorStore;
 		String topK = configProperty.getProperty("dstone.ai.rag.retrieval.top-k");
 		this.defaultTopK = StringUtil.isEmpty(topK) ? 5 : Integer.parseInt(topK);
+		// bge-m3(Ollama, 이 환경 기본 임베딩 모델) 기준 실측: 실제로 관련 있는 문서/질의 쌍도
+		// 코사인 유사도가 0.5를 넘지 못하는 경우가 흔해서(0.48 등) 0.5를 기본값으로 두면 데이터가
+		// 있어도 검색 결과가 통째로 비어버린다 - 임베딩 모델/도메인마다 분포가 달라 튜닝이 필요한 값이다.
 		String threshold = configProperty.getProperty("dstone.ai.rag.retrieval.similarity-threshold");
-		this.defaultSimilarityThreshold = StringUtil.isEmpty(threshold) ? 0.5 : Double.parseDouble(threshold);
+		this.defaultSimilarityThreshold = StringUtil.isEmpty(threshold) ? 0.35 : Double.parseDouble(threshold);
 	}
 
 	public List<Document> search(String query, Integer topK, Double similarityThreshold, String sourceId) {

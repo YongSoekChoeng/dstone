@@ -162,4 +162,7 @@ dstone:
                 chunk-size: 800 # 청크당 최대 토큰 수
             retrieval:
                 top-k: 5
-                similarity-threshold: 0.5
+                # bge-m3(로컬 임베딩) 기준 실측: 실제로 관련 있는 문서/질의 쌍도 코사인 유사도가
+                # 0.5를 못 넘는 경우가 흔해서(0.48 등) 0.5로 두면 데이터가 있어도 결과가 통째로 빈다.
+                # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
+                similarity-threshold: 0.35
