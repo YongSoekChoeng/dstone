@@ -4,6 +4,9 @@ import javax.sql.DataSource;
 
 import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.configuration.support.MapJobRegistry;
+import org.springframework.batch.core.repository.dao.JobExecutionDao;
+import org.springframework.batch.core.repository.dao.jdbc.JdbcJobExecutionDao;
+import org.springframework.batch.core.repository.dao.jdbc.JdbcJobInstanceDao;
 import org.springframework.batch.core.repository.explore.JobExplorer;
 import org.springframework.batch.core.repository.explore.support.JobExplorerFactoryBean;
 import org.springframework.batch.core.launch.JobLauncher;
@@ -38,9 +41,23 @@ public class ConfigJob extends BaseBatchObject {
         return factoryBean.getObject();
     }
 
+    /**
+     * Spring Batch 6.0.5의 JobExplorerFactoryBean은 내부적으로 JdbcJobExecutionDao를 만들 때
+     * JdbcJobInstanceDao를 교차 연결(setJobInstanceDao)해주는 걸 빠뜨리는 버그가 있다
+     * (JobRepositoryFactoryBean은 정상적으로 연결함 — 실제로 JdbcJobExecutionDao.getJobExecution()
+     * 내부에서 this.jobInstanceDao를 참조하는데, JobExplorerFactoryBean이 만든 인스턴스는 이 필드가
+     * null이라 NPE가 난다). createJobExecutionDao()를 오버라이드해 빠진 연결을 직접 채워준다.
+     */
     @Bean("jobExplorer")
     public JobExplorer jobExplorer(DataSource dataSource, @Qualifier("txManagerCommon") PlatformTransactionManager transactionManager) throws Exception {
-        JobExplorerFactoryBean factoryBean = new JobExplorerFactoryBean();
+        JobExplorerFactoryBean factoryBean = new JobExplorerFactoryBean() {
+            @Override
+            protected JobExecutionDao createJobExecutionDao() throws Exception {
+                JdbcJobExecutionDao dao = (JdbcJobExecutionDao) super.createJobExecutionDao();
+                dao.setJobInstanceDao((JdbcJobInstanceDao) super.createJobInstanceDao());
+                return dao;
+            }
+        };
         factoryBean.setDataSource(dataSource);
         factoryBean.setTransactionManager(transactionManager);
         factoryBean.afterPropertiesSet();
