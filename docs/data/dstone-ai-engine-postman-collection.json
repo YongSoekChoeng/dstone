@@ -1,0 +1,188 @@
+{
+	"info": {
+		"_postman_id": "b3f2a6e0-1c4d-4b1a-9a7e-2d6f8c0e5a11",
+		"name": "dstone-ai-engine",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "chat",
+			"item": [
+				{
+					"name": "chat - 일반 (RAG 없음)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"안녕, 짧게 인사만 해줘.\",\n    \"sessionId\": null,\n    \"promptName\": null,\n    \"variables\": null,\n    \"ragEnabled\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8081/api/ai/chat",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"api",
+								"ai",
+								"chat"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "chat - RAG-증강 (ragEnabled=true)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"우리 RAG 파이프라인에서 임베딩 모델로 뭘 쓰는지, 몇 차원 벡터를 쓰는지 알려줘.\",\n    \"sessionId\": null,\n    \"promptName\": null,\n    \"variables\": null,\n    \"ragEnabled\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8081/api/ai/chat",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"api",
+								"ai",
+								"chat"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "rag",
+			"item": [
+				{
+					"name": "rag - 문서 업로드",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "sourceId",
+									"value": "sample-doc-1",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:8081/api/ai/rag/documents",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"api",
+								"ai",
+								"rag",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "rag - 문서 삭제",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8081/api/ai/rag/documents/sample-doc-1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"api",
+								"ai",
+								"rag",
+								"documents",
+								"sample-doc-1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "rag - 단독 검색",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"임베딩 모델로 뭘 쓰나요?\",\n    \"topK\": 3,\n    \"similarityThreshold\": null,\n    \"sourceId\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8081/api/ai/rag/search",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"api",
+								"ai",
+								"rag",
+								"search"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

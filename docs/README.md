@@ -136,6 +136,7 @@ mvn clean install
 | 파일 | 내용 |
 |---|---|
 | [data/dstone-batch-postman-collection.json](data/dstone-batch-postman-collection.json) | dstone-batch 샘플 잡 호출용 Postman 컬렉션 |
+| [data/dstone-ai-engine-postman-collection.json](data/dstone-ai-engine-postman-collection.json) | dstone-ai-engine 채팅(일반/RAG-증강)·RAG 문서 업로드/삭제/검색 API 호출용 Postman 컬렉션 |
 | [data/rabbitmq-basic-config.json](data/rabbitmq-basic-config.json) | RabbitMQ Definitions 파일 — [software/rabbitmq.md](software/rabbitmq.md)에서 만드는 dstone용 vhost/사용자/큐/익스체인지/바인딩 구성을 `rabbitmqctl import_definitions` 한 번으로 반영하기 위한 내보내기 파일 |
 
 ## 3. 공통 아키텍처 패턴
