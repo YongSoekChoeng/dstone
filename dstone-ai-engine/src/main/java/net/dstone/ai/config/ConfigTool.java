@@ -1,4 +1,4 @@
-package net.dstone.ai.agent.tool;
+package net.dstone.ai.config;
 
 import java.util.Arrays;
 import java.util.List;
@@ -26,12 +26,12 @@ import net.dstone.common.utils.LogUtil;
  * 등록된 @AiTool 빈이 하나도 없으면 그냥 빈 provider가 된다(에러 아님).
  */
 @Component
-public class ToolRegistry extends BaseObject {
+public class ConfigTool extends BaseObject {
 
 	private final ApplicationContext applicationContext;
 	private ToolCallbackProvider toolCallbackProvider;
 
-	public ToolRegistry(ApplicationContext applicationContext) {
+	public ConfigTool(ApplicationContext applicationContext) {
 		this.applicationContext = applicationContext;
 	}
 

@@ -17,7 +17,8 @@ import net.dstone.common.core.BaseObject;
 	ConfigChatMemory.class,
 	ConfigAspect.class,
 	ConfigProperty.class,
-	ConfigRedis.class
+	ConfigRedis.class,
+	ConfigTool.class
 })
 public class Config extends BaseObject {
 

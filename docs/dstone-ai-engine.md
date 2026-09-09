@@ -75,7 +75,8 @@ src/main/java/net/dstone/ai/
 │   ├── ConfigChatClient.java        # provider 무관하게 동작하는 ChatClient 빈
 │   ├── ConfigChatMemory.java        # ChatMemory(windowing) 빈 - Phase 1
 │   ├── ConfigRedis.java             # Redis 인프라
-│   └── ConfigAspect.java            # AOP(컨트롤러/서비스 프로파일링)
+│   ├── ConfigAspect.java            # AOP(컨트롤러/서비스 프로파일링)
+│   └── ConfigTool.java              # @AiTool 빈을 기동 시 스캔해 ToolCallbackProvider로 묶음 - Phase 3
 ├── common/                          # dstone-ai-engine 자체 공통 유틸(AI 특화) - dstone-common과는 별개
 │   └── annotation/AiTool.java       # Tool 등록용 마커 애노테이션 - agent 밖(rag.retrieval)에서도 써서 여기 둠
 ├── api/                             # Phase 0 — REST 컨트롤러
@@ -100,8 +101,8 @@ src/main/java/net/dstone/ai/
 │       └── RetrievalTools.java                # @AiTool - RAG 검색을 Tool로 노출("Agentic RAG", Phase 3)
 ├── agent/                           # Phase 3 — Tool/Function calling
 │   └── tool/
-│       ├── ToolRegistry.java        # @AiTool 빈을 기동 시 스캔해 ToolCallbackProvider로 묶음
 │       └── sample/DateTimeTools.java  # 샘플 Tool(현재 날짜/시간) - dstone-boot의 sample/과 같은 성격
+│                                       # (등록 로직 자체는 config/ConfigTool.java, config/Config.java에서 @Import)
 ├── governance/     # Phase 4(예정) — Guardrail, PII 필터, rate limit, 인증
 └── observability/  # Phase 4(예정) — 토큰 사용량/비용/트레이싱/Eval
 ```
@@ -125,7 +126,7 @@ timeline
 | 0 | ✅ 완료 | `ChatController`, Anthropic 하드코딩, Jasypt `ENC(...)` 키 관리 |
 | 1 | ✅ 완료 | `gateway`(provider 추상화), `session`(Redis 히스토리), `prompt`(템플릿 버저닝) |
 | 2 | ✅ 완료 (실동작 검증됨) | `rag.ingest`/`rag.embedding`/`rag.retrieval`, pgvector, `RagController`, `ChatController.ragEnabled` |
-| 3 | ✅ 완료 (실동작 검증됨) | `agent.tool`(`@AiTool` 등록 체계, `ToolRegistry`), `ChatController.toolsEnabled`, 샘플 `DateTimeTools`, Agentic RAG `RetrievalTools` |
+| 3 | ✅ 완료 (실동작 검증됨) | `@AiTool` 등록 체계, `config.ConfigTool`, `ChatController.toolsEnabled`, 샘플 `DateTimeTools`, Agentic RAG `RetrievalTools` |
 | 4 | ⏳ 예정 | `governance`/`observability` — Guardrail, 인증, 비용/토큰 추적, Eval |
 
 ---
@@ -338,7 +339,7 @@ sequenceDiagram
     participant Tool as @AiTool 빈<br/>(예: DateTimeTools)
 
     Client->>Ctrl: POST /api/ai/chat<br/>{message, toolsEnabled: true}
-    Ctrl->>CC: toolCallbacks(ToolRegistry의 provider) 연결
+    Ctrl->>CC: toolCallbacks(ConfigTool의 provider) 연결
     CC->>LLM: 사용자 메시지 + 사용 가능한 Tool 목록 전달
     LLM-->>CC: "getCurrentDateTime을 호출해줘"(Tool 호출 요청)
     Note over CC: 이 왕복은 사람이 짜는 게 아니라<br/>Spring AI ChatClient가 자동으로 처리(= "단순 오케스트레이션")
@@ -363,7 +364,7 @@ public class DateTimeTools {
 }
 ```
 
-- `ToolRegistry`가 기동 시점에 `@AiTool`이 붙은 모든 스프링 빈을 찾아, 그 안의 `@Tool` 메소드들을 `ToolCallbackProvider`로 묶는다(`MethodToolCallbackProvider` 기반).
+- `config.ConfigTool`이 기동 시점에 `@AiTool`이 붙은 모든 스프링 빈을 찾아, 그 안의 `@Tool` 메소드들을 `ToolCallbackProvider`로 묶는다(`MethodToolCallbackProvider` 기반) - dstone-boot/batch/batchadmin과 동일한 컨벤션대로 `config.Config`에서 다른 `Config*` 클래스들과 함께 `@Import`된다.
 - `@Tool(description = ...)`이 곧 LLM에게 "이 도구가 뭘 하는지" 알려주는 설명이다 — LLM은 이 설명만 보고 언제 호출할지 스스로 판단한다(사람이 if/else로 분기하지 않음).
 - 새 Tool이 필요하면 이 패턴 그대로 클래스 하나 추가하면 끝 — `gateway`/`prompt` 패키지와 동일한 "설정/컨벤션만 따르면 코드 추가 없이 동작"하는 철학이다.
 - SI 프로젝트마다 실제로 필요한 Tool은 완전히 다를 것이므로(사내 시스템 API 호출, 계산기, 검색 등), 지금 포함된 `DateTimeTools`는 **패턴을 보여주는 샘플**이다(`dstone-boot`의 `sample/` 패키지와 같은 성격 - 실제 배포 시 지우거나 자기 도메인 Tool로 교체).
@@ -454,7 +455,7 @@ curl -X POST http://localhost:8081/api/ai/chat \
 | `promptName` | String | 지정 시 `PromptTemplateRegistry`가 렌더링해 시스템 프롬프트로 사용 |
 | `variables` | Map | `promptName` 템플릿 렌더링용 변수 |
 | `ragEnabled` | Boolean | `true`면 `QuestionAnswerAdvisor`로 검색 결과 자동 삽입 (RAG 꺼져 있으면 `IllegalStateException`) |
-| `toolsEnabled` | Boolean | `true`면 `ToolRegistry`에 등록된 모든 Tool을 ChatClient에 연결(Phase 3) — RAG와 달리 항상 사용 가능 |
+| `toolsEnabled` | Boolean | `true`면 `ConfigTool`에 등록된 모든 Tool을 ChatClient에 연결(Phase 3) — RAG와 달리 항상 사용 가능 |
 
 ### `POST /api/ai/rag/documents` — 문서 적재 (Phase 2, RAG 활성 시)
 

@@ -1,6 +1,6 @@
 /**
  * Tool/Function calling(Phase 3): {@link net.dstone.ai.agent.tool}의 {@code @AiTool} 등록 체계 +
- * {@link net.dstone.ai.agent.tool.ToolRegistry}가 만든 {@code ToolCallbackProvider}를
+ * {@link net.dstone.ai.config.ConfigTool}이 만든 {@code ToolCallbackProvider}를
  * {@code ChatController}가 {@code toolsEnabled}일 때 ChatClient에 붙이는 구조다.
  *
  * "오케스트레이션"은 별도 워크플로우/그래프 엔진을 직접 만드는 게 아니라, Spring AI의 ChatClient가
