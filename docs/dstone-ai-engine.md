@@ -76,6 +76,8 @@ src/main/java/net/dstone/ai/
 │   ├── ConfigChatMemory.java        # ChatMemory(windowing) 빈 - Phase 1
 │   ├── ConfigRedis.java             # Redis 인프라
 │   └── ConfigAspect.java            # AOP(컨트롤러/서비스 프로파일링)
+├── common/                          # dstone-ai-engine 자체 공통 유틸(AI 특화) - dstone-common과는 별개
+│   └── annotation/AiTool.java       # Tool 등록용 마커 애노테이션 - agent 밖(rag.retrieval)에서도 써서 여기 둠
 ├── api/                             # Phase 0 — REST 컨트롤러
 │   ├── ChatController.java          # POST /api/ai/chat (+ RAG-증강 옵션)
 │   ├── RagController.java           # /api/ai/rag/* (Phase 2)
@@ -98,7 +100,6 @@ src/main/java/net/dstone/ai/
 │       └── RetrievalTools.java                # @AiTool - RAG 검색을 Tool로 노출("Agentic RAG", Phase 3)
 ├── agent/                           # Phase 3 — Tool/Function calling
 │   └── tool/
-│       ├── AiTool.java              # Tool 등록용 마커 애노테이션(@Component 메타애노테이션 포함)
 │       ├── ToolRegistry.java        # @AiTool 빈을 기동 시 스캔해 ToolCallbackProvider로 묶음
 │       └── sample/DateTimeTools.java  # 샘플 Tool(현재 날짜/시간) - dstone-boot의 sample/과 같은 성격
 ├── governance/     # Phase 4(예정) — Guardrail, PII 필터, rate limit, 인증
@@ -351,7 +352,7 @@ sequenceDiagram
 ### 7.2 Tool 등록 체계 — `@AiTool` 하나로 등록
 
 ```java
-@AiTool                       // net.dstone.ai.agent.tool.AiTool - 이 한 줄이면 자동으로 발견됨
+@AiTool                       // net.dstone.ai.common.annotation.AiTool - 이 한 줄이면 자동으로 발견됨
 public class DateTimeTools {
 
     @Tool(description = "현재 날짜와 시간을 ISO-8601 형식으로 반환한다. "

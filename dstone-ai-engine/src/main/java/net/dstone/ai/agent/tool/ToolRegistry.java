@@ -10,6 +10,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 

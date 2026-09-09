@@ -8,7 +8,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
-import net.dstone.ai.agent.tool.AiTool;
+import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.common.core.BaseObject;
 
 /**
