@@ -166,3 +166,16 @@ dstone:
                 # 0.5를 못 넘는 경우가 흔해서(0.48 등) 0.5로 두면 데이터가 있어도 결과가 통째로 빈다.
                 # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
                 similarity-threshold: 0.35
+        # governance.auth(Phase 4): API Key 인증. enabled=false(기본값)면 이전 Phase와 동일하게
+        # 인증 없이 전부 통과한다(net.dstone.ai.governance.auth.ApiKeyProperties 참고).
+        # 켤 때는 headerName과 keys를 아래처럼 채운다 - key는 DB 패스워드와 동일한 컨벤션으로
+        # ENC(...) 암호화를 권장한다(생성법은 이 파일 위쪽 anthropic.api-key 주석 참고).
+        governance:
+            auth:
+                enabled: false
+                # header-name: X-API-Key
+                # keys:
+                #     - key: ENC(...)
+                #       caller: sample-si-project
+                #     - key: ENC(...)
+                #       caller: another-caller

@@ -23,12 +23,16 @@
   - [7.3 "단순 오케스트레이션"이 의미하는 것](#73-단순-오케스트레이션이-의미하는-것)
   - [7.4 실동작 검증](#74-실동작-검증)
   - [7.5 Agentic RAG — RAG 검색도 Tool로](#75-agentic-rag--rag-검색도-tool로)
-- [8. API 레퍼런스](#8-api-레퍼런스)
-- [9. 설정 레퍼런스 (`conf/application.yml`)](#9-설정-레퍼런스-confapplicationyml)
-- [10. 필요 인프라](#10-필요-인프라)
-- [11. 빌드 및 실행](#11-빌드-및-실행)
-- [12. 문제 해결 (실제로 겪은 에러 모음)](#12-문제-해결-실제로-겪은-에러-모음)
-- [13. 다음 단계 (Phase 4)](#13-다음-단계-phase-4)
+  - [7.6 tool_choice 강제 — `requiredTool`](#76-tool_choice-강제--requiredtool)
+- [8. Phase 4 — Governance (API Key 인증)](#8-phase-4--governance-api-key-인증)
+  - [8.1 왜 API Key인가](#81-왜-api-key인가)
+  - [8.2 설정과 동작](#82-설정과-동작)
+- [9. API 레퍼런스](#9-api-레퍼런스)
+- [10. 설정 레퍼런스 (`conf/application.yml`)](#10-설정-레퍼런스-confapplicationyml)
+- [11. 필요 인프라](#11-필요-인프라)
+- [12. 빌드 및 실행](#12-빌드-및-실행)
+- [13. 문제 해결 (실제로 겪은 에러 모음)](#13-문제-해결-실제로-겪은-에러-모음)
+- [14. 다음 단계 (Phase 4)](#14-다음-단계-phase-4)
 
 ## 1. 개요
 
@@ -103,7 +107,11 @@ src/main/java/net/dstone/ai/
 │   └── tool/
 │       └── sample/DateTimeTools.java  # 샘플 Tool(현재 날짜/시간) - dstone-boot의 sample/과 같은 성격
 │                                       # (등록 로직 자체는 config/ConfigTool.java, config/Config.java에서 @Import)
-├── governance/     # Phase 4(예정) — Guardrail, PII 필터, rate limit, 인증
+├── governance/                      # Phase 4 — Guardrail, PII 필터, rate limit, 비용 트래킹, 인증
+│   └── auth/                        # ✅ 구현됨 — API Key 인증(rate limit/비용 트래킹은 아직 예정)
+│       ├── ApiKeyProperties.java    # dstone.ai.governance.auth.keys 바인딩(Binder) + key→caller 매핑
+│       ├── ApiKeyAuthFilter.java    # X-API-Key 헤더 검증(OncePerRequestFilter, /actuator/** 제외)
+│       └── CallerContext.java       # 인증 통과한 caller를 request attribute로 전달(후속 기능 재사용 지점)
 └── observability/  # Phase 4(예정) — 토큰 사용량/비용/트레이싱/Eval
 ```
 
@@ -118,7 +126,7 @@ timeline
     Phase 1 : Gateway (provider 추상화) : Session (Redis 대화 히스토리) : Prompt (템플릿 버저닝)
     Phase 2 : RAG 파이프라인 : ingest(Tika+청킹) : embedding(Ollama/OpenAI) : retrieval(pgvector)
     Phase 3 : Agent/Tool : Function calling : @AiTool 등록 체계 : 단순 오케스트레이션
-    Phase 4 (예정) : Governance : Observability : Guardrail·비용추적·Eval
+    Phase 4 (진행중) : Governance - API Key 인증(완료) : rate limit·PII·Guardrail(예정) : Observability(예정)
 ```
 
 | Phase | 상태 | 핵심 산출물 |
@@ -127,7 +135,7 @@ timeline
 | 1 | ✅ 완료 | `gateway`(provider 추상화), `session`(Redis 히스토리), `prompt`(템플릿 버저닝) |
 | 2 | ✅ 완료 (실동작 검증됨) | `rag.ingest`/`rag.embedding`/`rag.retrieval`, pgvector, `RagController`, `ChatController.ragEnabled` |
 | 3 | ✅ 완료 (실동작 검증됨, `requiredTool`은 미검증) | `@AiTool` 등록 체계, `config.ConfigTool`, `ChatController.toolsEnabled`/`requiredTool`(tool_choice 강제), 샘플 `DateTimeTools`, Agentic RAG `RetrievalTools` |
-| 4 | ⏳ 예정 | `governance`/`observability` — Guardrail, 인증, 비용/토큰 추적, Eval |
+| 4 | 🚧 진행 중 (`governance.auth`만 완료, 미검증) | `governance.auth` — API Key 인증(`ApiKeyAuthFilter`/`CallerContext`). 남은 것: rate limit/비용 트래킹/PII 필터/Guardrail(`governance`), 토큰·비용·트레이싱·Eval(`observability`) |
 
 ---
 
@@ -480,9 +488,68 @@ curl -X POST http://localhost:8081/api/ai/chat -H "Content-Type: application/jso
 
 ---
 
-## 8. API 레퍼런스
+## 8. Phase 4 — Governance (API Key 인증)
+
+Phase 4는 `governance`(Guardrail/PII 필터/rate limit/비용 트래킹/인증)와 `observability`(토큰/비용/트레이싱/Eval) 두 패키지를 다루는데, 그중 `governance.auth`(API Key 인증)부터 구현했다 — rate limit/비용 트래킹은 "누가 호출했는지"가 먼저 정해져야 의미가 있기 때문이다.
+
+### 8.1 왜 API Key인가
+
+모노레포 어디에도 OAuth2 Authorization Server(IdP)가 없다 — `dstone-boot`의 OAuth2는 소셜 로그인(Google/Naver/Kakao)의 **client**일 뿐, `dstone-ai-engine`을 호출하는 SI 프로젝트들에게 토큰을 발급해줄 **서버**가 아니다. client-credentials 플로우를 타려면 Spring Authorization Server 같은 IdP를 이 Phase에서 새로 구축해야 하는데, 이 엔진을 호출하는 대상이 정해진 SI 프로젝트들(서비스-투-서비스)이라는 점을 감안하면 과한 투자다. 그래서 SI 프로젝트별로 키를 하나씩 발급하는 API Key 방식을 골랐다.
+
+이 모듈은 Phase 0부터 `SecurityAutoConfiguration`을 통째로 제외해왔다(conf/application.yml, CLAUDE.md 참고). Spring Security를 다시 끌어와 인가 규칙을 구성하는 대신, 헤더 하나만 검증하는 `OncePerRequestFilter`로 최소 구현했다 — 세션/쿠키 없이 매 요청마다 조회 한 번으로 끝나 이 엔진의 무상태(stateless) REST 호출 패턴에 그대로 맞는다.
+
+### 8.2 설정과 동작
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Filter as ApiKeyAuthFilter
+    participant Props as ApiKeyProperties
+    participant Ctx as CallerContext
+    participant Ctrl as ChatController/RagController
+
+    Client->>Filter: POST /api/ai/chat<br/>(X-API-Key 헤더)
+    Filter->>Props: dstone.ai.governance.auth.enabled?
+    alt enabled=false(기본값)
+        Filter->>Ctrl: 그대로 통과(이전 Phase와 동일)
+    else enabled=true
+        Filter->>Props: callerFor(apiKey)
+        alt 키 없음/불일치
+            Filter-->>Client: 401 {"error":"unauthorized",...}
+        else 일치
+            Filter->>Ctx: set(request, caller)
+            Filter->>Ctrl: 통과 (컨트롤러는 인증을 모른다)
+        end
+    end
+```
+
+- `dstone.ai.governance.auth.enabled`(기본 `false`)를 켜야만 실제로 막는다 — `dstone.ai.rag.enabled`와 동일한 옵트인 철학이라, 이 기능을 안 쓰는 기존 배포는 이 변경만으로 깨지지 않는다.
+- `dstone.ai.governance.auth.keys`는 YAML 시퀀스(`key`/`caller` 쌍)다. `key`는 DB 패스워드와 동일한 컨벤션으로 `ENC(...)` 암호화를 권장한다. 이 값은 리스트-오브-오브젝트라 `GatewayProperties`/`PromptProperties`처럼 `ConfigProperty.getProperty(String)`(단순 스칼라 조회)로는 못 읽어서, `ApiKeyProperties`만 Spring Boot의 `Binder`를 직접 써서 바인딩한다 — `ENC(...)` 복호화는 PropertySource 레벨에서 일어나므로(`net.dstone.common.config.ConfigProperty`) `Binder`로 읽어도 `@ConfigurationProperties`와 동일하게 적용된다.
+- `/actuator/**`는 인증 없이 통과한다 — 이 모듈은 `management.server.port`를 따로 안 쓰고 앱과 같은 포트를 공유하므로(conf/application.yml), 필터가 걸리면 k8s liveness/readiness probe가 막혀버린다.
+- 인증을 통과한 요청의 caller는 `CallerContext`(request attribute)에 담긴다 — 아직 소비하는 곳은 없지만, 뒤에 만들 rate limit/비용 트래킹이 헤더를 다시 파싱하지 않고 여기서 재사용하도록 만든 연결 지점이다.
+- `ChatController.chat()`이 이미 쓰던 `AnthropicChatOptions`(7.6절, `requiredTool`)와는 무관한 별도 계층이다 — API Key 인증은 "누가 호출했는지", `tool_choice` 강제는 "무엇을 호출해야 하는지"를 다룬다.
+
+```bash
+# enabled=true, keys에 caller=sample-si-project로 등록된 키라고 가정
+curl -X POST http://localhost:8081/api/ai/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <발급받은 키>" \
+  -d '{"message": "안녕"}'
+
+# 헤더를 빼먹거나 등록 안 된 키를 보내면
+curl -X POST http://localhost:8081/api/ai/chat -H "Content-Type: application/json" -d '{"message": "안녕"}'
+# → 401 {"error":"unauthorized","message":"API Key 헤더[X-API-Key]가 없습니다."}
+```
+
+> ⚠️ 아직 실제 기동 상태에서 e2e 검증은 안 했다(설정 바인딩 로직만 별도 스크립트로 확인) — 7.4절처럼 "실동작 검증됨" 표시는 위 curl로 직접 확인한 뒤에 붙일 것.
+
+---
+
+## 9. API 레퍼런스
 
 > 💡 아래 요청들을 curl 없이 바로 눌러보고 싶다면 [Postman 컬렉션](data/dstone-ai-engine-postman-collection.json)을 import한다 — 일반 채팅/RAG-증강/Tool 사용 채팅과 RAG 문서 업로드/삭제/검색까지 전부 준비돼 있다.
+>
+> 🔒 `dstone.ai.governance.auth.enabled=true`(8절)면 아래 `/api/ai/**` 요청 전부(문서 업로드/삭제/검색 포함)에 `X-API-Key`(기본 헤더명) 헤더가 필요하다 — 아래 curl 예시들은 인증이 꺼진(기본값) 상태 기준이다.
 
 ### `POST /api/ai/chat` — 채팅 (일반 / RAG-증강 / Tool 사용)
 
@@ -564,7 +631,7 @@ curl -X POST http://localhost:8081/api/ai/rag/search \
 
 ---
 
-## 9. 설정 레퍼런스 (`conf/application.yml`)
+## 10. 설정 레퍼런스 (`conf/application.yml`)
 
 <details>
 <summary>전체 설정 트리 펼쳐보기 (실제 값은 예시로 마스킹)</summary>
@@ -614,12 +681,19 @@ dstone:
       retrieval:
         top-k: 5
         similarity-threshold: 0.35
+    governance:
+      auth:
+        enabled: false                           # true면 X-API-Key 헤더 필수(8절)
+        header-name: X-API-Key                   # 생략 시 기본값
+        keys:
+          - key: ENC(...)
+            caller: sample-si-project
 ```
 </details>
 
 ---
 
-## 10. 필요 인프라
+## 11. 필요 인프라
 
 | 인프라 | 용도 | 필수 여부 |
 |---|---|:---:|
@@ -632,7 +706,7 @@ dstone:
 
 ---
 
-## 11. 빌드 및 실행
+## 12. 빌드 및 실행
 
 ```bash
 # dstone-common을 먼저 설치해야 함(다른 모듈과 동일)
@@ -655,7 +729,7 @@ dstone-ai-engine rag: 활성 임베딩 provider = OLLAMA
 
 ---
 
-## 12. 문제 해결 (실제로 겪은 에러 모음)
+## 13. 문제 해결 (실제로 겪은 에러 모음)
 
 Phase 2를 실제로 붙이고 e2e 테스트하는 과정에서 겪은 진짜 에러들이다 — 같은 삽질을 반복하지 않도록 원인/조치를 남긴다.
 
@@ -668,12 +742,13 @@ Phase 2를 실제로 붙이고 e2e 테스트하는 과정에서 겪은 진짜 �
 
 ---
 
-## 13. 다음 단계 (Phase 4)
+## 14. 다음 단계 (Phase 4)
 
-| Phase | 패키지 | 계획 |
-|---|---|---|
-| 4 | `governance` | Guardrail, PII 필터링, rate limiting, 비용 트래킹, 인증/인가(API 키 또는 OAuth2 client-credentials) |
-| 4 | `observability` | 토큰 사용량/비용/트레이싱, Eval 결과 로깅 |
+| Phase | 패키지 | 상태 | 계획 |
+|---|---|:---:|---|
+| 4 | `governance.auth` | ✅ 완료 (미검증, 8절 참고) | API Key 인증 — `ApiKeyAuthFilter`/`ApiKeyProperties`/`CallerContext` |
+| 4 | `governance` (auth 제외) | ⏳ 예정 | Guardrail, PII 필터링, rate limiting, 비용 트래킹 — `CallerContext`로 caller를 이미 식별할 수 있으므로 caller별 제한/집계로 이어서 구현 |
+| 4 | `observability` | ⏳ 예정 | 토큰 사용량/비용/트레이싱, Eval 결과 로깅 |
 
 Phase 3(`agent.tool`)는 "단순 오케스트레이션"(Spring AI ChatClient의 내장 tool-calling 루프)까지 완료된 상태다. 여러 Tool을 사람이 미리 정한 순서로 묶어 실행하는 멀티스텝 워크플로우/그래프 엔진처럼 더 복잡한 오케스트레이션이 필요해지면 그건 별도 후속 작업으로 다룬다.
 
