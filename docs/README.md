@@ -79,46 +79,48 @@ cd dstone-ai-engine && mvn clean package   # JAR
 mvn clean install
 ```
 
-빌드 명령/산출물, VM 스타일(`bin/*.sh`) 및 컨테이너(kind) 배포, Jenkins CI/CD 파이프라인을 종합 정리한 문서는 [build.md](build.md) 참고.
+빌드 명령/산출물, VM 스타일(`bin/*.sh`) 및 컨테이너(kind) 배포, Jenkins CI/CD 파이프라인을 종합 정리한 문서는 [03.build.md](03.build.md) 참고.
 
 ## 2. 문서 목록
+
+> 📚 표 없이 한눈에 훑어보고 싶다면 [01.index.md](01.index.md) — `docs/` 전체(및 `software/` 하위) md 문서를 번호순 인덱스로 정리해둔 문서다.
 
 ### 2.1 모듈별 문서
 | 문서 | 내용 |
 |---|---|
-| [dstone-common.md](dstone-common.md) | 공통 유틸리티, 설정, 보안, 환경 변수 |
-| [dstone-boot.md](dstone-boot.md) | 웹 애플리케이션 프레임워크 및 소스 코드 분석기 |
-| [dstone-batch.md](dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
-| [dstone-batchadmin.md](dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
-| [dstone-ai-engine.md](dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2), Agent/Tool·Function Calling(Phase 3) |
-| [dstone-saga.md](dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
-| [build.md](build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
+| [05.dstone-common.md](05.dstone-common.md) | 공통 유틸리티, 설정, 보안, 환경 변수 |
+| [06.dstone-boot.md](06.dstone-boot.md) | 웹 애플리케이션 프레임워크 및 소스 코드 분석기 |
+| [07.dstone-batch.md](07.dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
+| [08.dstone-batchadmin.md](08.dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
+| [09.dstone-ai-engine.md](09.dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2), Agent/Tool·Function Calling(Phase 3), Governance·API Key 인증(Phase 4, 진행 중) |
+| [10.dstone-saga.md](10.dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
+| [03.build.md](03.build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 
 ### 2.2 개발 환경 / 인프라
 | 문서 | 내용 |
 |---|---|
-| [environment.md](environment.md) | WSL 개발 환경에 설치된 전체 소프트웨어 목록, 시작/정지 스크립트 운용, WSL export/import로 개발 환경을 다른 PC로 이전하는 절차 |
-| [cloud-architecture.md](cloud-architecture.md) | dstone을 클라우드 아키텍처와 유사하게 운용하기 위한 설계(쿠버네티스 배포, VM 스타일 운영, CI/CD) |
+| [02.environment.md](02.environment.md) | WSL 개발 환경에 설치된 전체 소프트웨어 목록, 시작/정지 스크립트 운용, WSL export/import로 개발 환경을 다른 PC로 이전하는 절차 |
+| [04.cloud-architecture.md](04.cloud-architecture.md) | dstone을 클라우드 아키텍처와 유사하게 운용하기 위한 설계(쿠버네티스 배포, VM 스타일 운영, CI/CD) |
 
-`software/` 디렉터리에는 [environment.md 2절](environment.md#2-목록) 표에 나열된 소프트웨어별 설치·설정 상세 문서가 있다:
+`software/` 디렉터리에는 [02.environment.md 2절](02.environment.md#2-목록) 표에 나열된 소프트웨어별 설치·설정 상세 문서가 있다:
 
 | 문서 | 내용 |
 |---|---|
-| [software/jdk.md](software/jdk.md) | OpenJDK 21 설치 |
-| [software/maven.md](software/maven.md) | Apache Maven 설치 |
-| [software/git.md](software/git.md) | Git 설치 |
-| [software/mysql.md](software/mysql.md) | MySQL Server 설치·계정/스키마 구성·서비스 시작/정지 |
-| [software/postgresql.md](software/postgresql.md) | PostgreSQL 설치 |
-| [software/redis.md](software/redis.md) | Redis 설치·서비스 시작/정지 |
-| [software/rabbitmq.md](software/rabbitmq.md) | RabbitMQ 설치·dstone용 vhost/사용자/큐/익스체인지 구성·서비스 시작/정지 |
-| [software/kafka.md](software/kafka.md) | Apache Kafka(KRaft 모드) 설치·리스너 구성·서비스 시작/정지 |
-| [software/kafbat-ui.md](software/kafbat-ui.md) | Kafka 관리 콘솔(Kafbat UI) 설치 |
-| [software/docker.md](software/docker.md) | Docker CE + Compose plugin 설치·서비스 시작/정지 |
-| [software/kubernetes.md](software/kubernetes.md) | kubectl + kind(로컬 K8s) 설치·클러스터/로컬 레지스트리 시작·정지 |
-| [software/jenkins.md](software/jenkins.md) | Jenkins 설치·서비스 시작/정지 |
-| [software/nodejs.md](software/nodejs.md) | Node.js + npm 설치 |
-| [software/ollama.md](software/ollama.md) | Ollama(로컬 LLM/임베딩 모델 런타임) 설치·`dstone-ai-engine` RAG 임베딩(`bge-m3`) 연동·서비스 시작/정지 |
-| [software/ollama-webui-lite.md](software/ollama-webui-lite.md) | Ollama 관리 콘솔(Ollama Web UI Lite) 설치·CORS/IPv6 연동 이슈 해결 |
+| [software/01.jdk.md](software/01.jdk.md) | OpenJDK 21 설치 |
+| [software/02.maven.md](software/02.maven.md) | Apache Maven 설치 |
+| [software/03.git.md](software/03.git.md) | Git 설치 |
+| [software/04.mysql.md](software/04.mysql.md) | MySQL Server 설치·계정/스키마 구성·서비스 시작/정지 |
+| [software/05.postgresql.md](software/05.postgresql.md) | PostgreSQL 설치 |
+| [software/06.redis.md](software/06.redis.md) | Redis 설치·서비스 시작/정지 |
+| [software/07.rabbitmq.md](software/07.rabbitmq.md) | RabbitMQ 설치·dstone용 vhost/사용자/큐/익스체인지 구성·서비스 시작/정지 |
+| [software/08.kafka.md](software/08.kafka.md) | Apache Kafka(KRaft 모드) 설치·리스너 구성·서비스 시작/정지 |
+| [software/09.kafbat-ui.md](software/09.kafbat-ui.md) | Kafka 관리 콘솔(Kafbat UI) 설치 |
+| [software/10.docker.md](software/10.docker.md) | Docker CE + Compose plugin 설치·서비스 시작/정지 |
+| [software/11.kubernetes.md](software/11.kubernetes.md) | kubectl + kind(로컬 K8s) 설치·클러스터/로컬 레지스트리 시작·정지 |
+| [software/12.jenkins.md](software/12.jenkins.md) | Jenkins 설치·서비스 시작/정지 |
+| [software/13.nodejs.md](software/13.nodejs.md) | Node.js + npm 설치 |
+| [software/14.ollama.md](software/14.ollama.md) | Ollama(로컬 LLM/임베딩 모델 런타임) 설치·`dstone-ai-engine` RAG 임베딩(`bge-m3`) 연동·서비스 시작/정지 |
+| [software/15.ollama-webui-lite.md](software/15.ollama-webui-lite.md) | Ollama 관리 콘솔(Ollama Web UI Lite) 설치·CORS/IPv6 연동 이슈 해결 |
 
 ### 2.3 다이어그램 (`images/`)
 
@@ -126,10 +128,10 @@ mvn clean install
 
 | 파일 | 삽입 위치 | 내용 |
 |---|---|---|
-| [images/jenkins-job-setup-flow.svg](images/jenkins-job-setup-flow.svg) | [cloud-architecture.md](cloud-architecture.md) | Jenkins Pipeline Job 생성 절차 |
-| [images/jenkins-boot-pipeline-flow.svg](images/jenkins-boot-pipeline-flow.svg) | [cloud-architecture.md](cloud-architecture.md) | `dstone-boot/Jenkinsfile` 파이프라인 스테이지(Docker 빌드/푸시 → kind 배포) |
-| [images/jenkins-batch-pipeline-flow.svg](images/jenkins-batch-pipeline-flow.svg) | [cloud-architecture.md](cloud-architecture.md) | `dstone-batch`/`dstone-batchadmin` Jenkinsfile 파이프라인 스테이지(VM 스타일 재배포) |
-| [images/saga-00-overview.svg](images/saga-00-overview.svg) ~ [saga-06-compensate.svg](images/saga-06-compensate.svg) (7개) | [dstone-saga.md](dstone-saga.md) | SAGA + Outbox 샘플 기능의 단계별 실행 흐름(기동 초기화 → 사가 시작 → Outbox 릴레이 → Kafka 컨슈머 → 종결/보상) |
+| [images/jenkins-job-setup-flow.svg](images/jenkins-job-setup-flow.svg) | [04.cloud-architecture.md](04.cloud-architecture.md) | Jenkins Pipeline Job 생성 절차 |
+| [images/jenkins-boot-pipeline-flow.svg](images/jenkins-boot-pipeline-flow.svg) | [04.cloud-architecture.md](04.cloud-architecture.md) | `dstone-boot/Jenkinsfile` 파이프라인 스테이지(Docker 빌드/푸시 → kind 배포) |
+| [images/jenkins-batch-pipeline-flow.svg](images/jenkins-batch-pipeline-flow.svg) | [04.cloud-architecture.md](04.cloud-architecture.md) | `dstone-batch`/`dstone-batchadmin` Jenkinsfile 파이프라인 스테이지(VM 스타일 재배포) |
+| [images/saga-00-overview.svg](images/saga-00-overview.svg) ~ [saga-06-compensate.svg](images/saga-06-compensate.svg) (7개) | [10.dstone-saga.md](10.dstone-saga.md) | SAGA + Outbox 샘플 기능의 단계별 실행 흐름(기동 초기화 → 사가 시작 → Outbox 릴레이 → Kafka 컨슈머 → 종결/보상) |
 
 ### 2.4 데이터 파일 (`data/`)
 
@@ -137,7 +139,7 @@ mvn clean install
 |---|---|
 | [data/dstone-batch-postman-collection.json](data/dstone-batch-postman-collection.json) | dstone-batch 샘플 잡 호출용 Postman 컬렉션 |
 | [data/dstone-ai-engine-postman-collection.json](data/dstone-ai-engine-postman-collection.json) | dstone-ai-engine 채팅(일반/RAG-증강)·RAG 문서 업로드/삭제/검색 API 호출용 Postman 컬렉션 |
-| [data/rabbitmq-basic-config.json](data/rabbitmq-basic-config.json) | RabbitMQ Definitions 파일 — [software/rabbitmq.md](software/rabbitmq.md)에서 만드는 dstone용 vhost/사용자/큐/익스체인지/바인딩 구성을 `rabbitmqctl import_definitions` 한 번으로 반영하기 위한 내보내기 파일 |
+| [data/rabbitmq-basic-config.json](data/rabbitmq-basic-config.json) | RabbitMQ Definitions 파일 — [software/07.rabbitmq.md](software/07.rabbitmq.md)에서 만드는 dstone용 vhost/사용자/큐/익스체인지/바인딩 구성을 `rabbitmqctl import_definitions` 한 번으로 반영하기 위한 내보내기 파일 |
 
 ## 3. 공통 아키텍처 패턴
 
@@ -150,7 +152,7 @@ conf/
 └── log4j2.xml           → 로깅 설정, 역시 APP_CONF_DIR에서 외부 로드
 ```
 
-애플리케이션 기동 시 `setSysProperties()`가 `-Dspring.profiles.active=<profile>`에 대응하는 `env-<profile>.properties`(기본은 `env.properties`)를 클래스패스에서 읽어 System Properties로 먼저 등록하고, 그 안의 `APP_CONF_DIR` 값을 이용해 `application.yml`/`log4j2.xml`을 디스크에서 로드한다. 프로파일별 배포 대상은 [cloud-architecture.md](cloud-architecture.md#4-dstone-batch--dstone-batchadmin--vm-스타일)에 정리되어 있다.
+애플리케이션 기동 시 `setSysProperties()`가 `-Dspring.profiles.active=<profile>`에 대응하는 `env-<profile>.properties`(기본은 `env.properties`)를 클래스패스에서 읽어 System Properties로 먼저 등록하고, 그 안의 `APP_CONF_DIR` 값을 이용해 `application.yml`/`log4j2.xml`을 디스크에서 로드한다. 프로파일별 배포 대상은 [04.cloud-architecture.md](04.cloud-architecture.md#4-dstone-batch--dstone-batchadmin--vm-스타일)에 정리되어 있다.
 
 ### 3.2 보안 (Jasypt 암호화)
 
@@ -170,7 +172,7 @@ spring.datasource.<name>.hikari:
 
 각 모듈의 실제 테이블 생성 스크립트는 `src/main/resources/schema/*.sql`(dstone-boot/dstone-batch/dstone-batchadmin 각각에 있음)에 있다 — Spring Batch/Boot이 자동으로 스키마를 만들지 않으므로(`initialize-schema: NEVER`) 최초 1회 수동 실행해야 한다.
 
-> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓰고, 벡터 테이블(`vector_store`)도 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성한다(수동 스키마 SQL 없음). 상세: [dstone-ai-engine.md 6.2절](dstone-ai-engine.md#62-문서-적재-ingest).
+> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓰고, 벡터 테이블(`vector_store`)도 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성한다(수동 스키마 SQL 없음). 상세: [09.dstone-ai-engine.md 6.2절](09.dstone-ai-engine.md#62-문서-적재-ingest).
 
 ### 3.4 Spring Security 설정 방식
 
@@ -200,8 +202,8 @@ spring.autoconfigure.exclude:
 | PostgreSQL + pgvector | RAG 벡터 저장소 | dstone-ai-engine (Phase 2, `dstone.ai.rag.enabled=true`일 때만) |
 | Ollama (또는 OpenAI) | RAG 임베딩 모델 추론 | dstone-ai-engine (Phase 2, `dstone.ai.rag.enabled=true`일 때만) |
 
-WSL 환경 설치 방법은 [environment.md](environment.md)와 [software/](software/) 참고. `dstone-ai-engine`의 상세 아키텍처/설정/API는 [dstone-ai-engine.md](dstone-ai-engine.md) 참고.
+WSL 환경 설치 방법은 [02.environment.md](02.environment.md)와 [software/](software/) 참고. `dstone-ai-engine`의 상세 아키텍처/설정/API는 [09.dstone-ai-engine.md](09.dstone-ai-engine.md) 참고.
 
 ## 5. 클라우드 아키텍처 시뮬레이션
 
-`dstone-boot`과 `dstone-ai-engine`은 컨테이너화되어 로컬 `kind` 쿠버네티스 클러스터에 Pod로 배포되고(단, `dstone-ai-engine`은 매니페스트만 준비된 상태로 아직 실제 배포 전), `dstone-batch`/`dstone-batchadmin`은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운영된다. MySQL/Redis/RabbitMQ/Kafka/PostgreSQL/Ollama는 클러스터 밖의 CSP 매니지드 서비스에 대응한다. 자세한 설계와 CI/CD 파이프라인 구성은 [cloud-architecture.md](cloud-architecture.md) 참고.
+`dstone-boot`과 `dstone-ai-engine`은 컨테이너화되어 로컬 `kind` 쿠버네티스 클러스터에 Pod로 배포되고(단, `dstone-ai-engine`은 매니페스트만 준비된 상태로 아직 실제 배포 전), `dstone-batch`/`dstone-batchadmin`은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운영된다. MySQL/Redis/RabbitMQ/Kafka/PostgreSQL/Ollama는 클러스터 밖의 CSP 매니지드 서비스에 대응한다. 자세한 설계와 CI/CD 파이프라인 구성은 [04.cloud-architecture.md](04.cloud-architecture.md) 참고.

@@ -29,7 +29,7 @@ spring:
     # RAG(Phase 2): pgvector(PgVectorStoreAutoConfiguration)가 이 DataSource를 그대로 쓴다.
     # dstone-boot처럼 여러 datasource가 아니라 하나뿐이라 표준 Spring Boot 단일 datasource
     # 자동설정(spring.datasource.*)을 그대로 쓴다 - 별도 ConfigDatasource 클래스 불필요.
-    # 로컬 설치/역할 생성 절차: docs/software/postgresql.md 참고.
+    # 로컬 설치/역할 생성 절차: docs/software/05.postgresql.md 참고.
     datasource:
         driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
         url: jdbc:log4jdbc:postgresql://${DB_HOST}:${DB_PORT}/dstone_ai
@@ -75,7 +75,7 @@ spring:
         #
         # embedding(Phase 2, RAG): Anthropic은 임베딩 모델을 제공하지 않아 chat과 별개로 정해야 한다
         # (net.dstone.ai.rag.embedding.EmbeddingProvider 참고). 이 환경엔 OpenAI 키 대신 로컬 Ollama를
-        # 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/ollama.md.
+        # 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/14.ollama.md.
         model:
             chat: anthropic # anthropic | openai | ollama
             embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
@@ -123,7 +123,7 @@ spring:
         ##########################################################################################
         # spring.ai.model.embedding=ollama 용 설정(Phase 2, RAG). chat 쪽 provider와 무관하게 항상 적용된다
         # (base-url은 spring.ai.ollama.* 하나뿐이라 chat=ollama로 쓰게 되면 이 base-url을 공유한다).
-        # 로컬에 docs/software/ollama.md대로 설치 후 bge-m3(다국어/한국어 지원 임베딩 모델, 1024차원) pull 필요.
+        # 로컬에 docs/software/14.ollama.md대로 설치 후 bge-m3(다국어/한국어 지원 임베딩 모델, 1024차원) pull 필요.
         ##########################################################################################
         ollama:
             base-url: http://localhost:11434
