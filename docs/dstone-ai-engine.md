@@ -17,12 +17,18 @@
   - [6.3 임베딩 (embedding)](#63-임베딩-embedding)
   - [6.4 검색 (retrieval) 과 RAG-증강 채팅](#64-검색-retrieval-과-rag-증강-채팅)
   - [6.5 on/off 스위치 하나로 켜고 끄기](#65-onoff-스위치-하나로-켜고-끄기)
-- [7. API 레퍼런스](#7-api-레퍼런스)
-- [8. 설정 레퍼런스 (`conf/application.yml`)](#8-설정-레퍼런스-confapplicationyml)
-- [9. 필요 인프라](#9-필요-인프라)
-- [10. 빌드 및 실행](#10-빌드-및-실행)
-- [11. 문제 해결 (실제로 겪은 에러 모음)](#11-문제-해결-실제로-겪은-에러-모음)
-- [12. 다음 단계 (Phase 3~4)](#12-다음-단계-phase-34)
+- [7. Phase 3 — Agent/Tool (Function Calling)](#7-phase-3--agenttool-function-calling)
+  - [7.1 Tool 호출 흐름](#71-tool-호출-흐름)
+  - [7.2 Tool 등록 체계 — `@AiTool` 하나로 등록](#72-tool-등록-체계--aitool-하나로-등록)
+  - [7.3 "단순 오케스트레이션"이 의미하는 것](#73-단순-오케스트레이션이-의미하는-것)
+  - [7.4 실동작 검증](#74-실동작-검증)
+  - [7.5 Agentic RAG — RAG 검색도 Tool로](#75-agentic-rag--rag-검색도-tool로)
+- [8. API 레퍼런스](#8-api-레퍼런스)
+- [9. 설정 레퍼런스 (`conf/application.yml`)](#9-설정-레퍼런스-confapplicationyml)
+- [10. 필요 인프라](#10-필요-인프라)
+- [11. 빌드 및 실행](#11-빌드-및-실행)
+- [12. 문제 해결 (실제로 겪은 에러 모음)](#12-문제-해결-실제로-겪은-에러-모음)
+- [13. 다음 단계 (Phase 4)](#13-다음-단계-phase-4)
 
 ## 1. 개요
 
@@ -87,8 +93,14 @@ src/main/java/net/dstone/ai/
 │   ├── ingest/DocumentIngestService.java     # Tika 추출 → 청킹 → VectorStore 저장(upsert)
 │   ├── embedding/EmbeddingProvider.java      # openai | ollama (anthropic 불가)
 │   ├── embedding/EmbeddingProperties.java    # spring.ai.model.embedding 검증(fail-fast)
-│   └── retrieval/RetrievalService.java       # 유사도 검색 (topK/threshold 기본값 관리)
-├── agent/          # Phase 3(예정) — Tool/Function calling, 오케스트레이션, memory
+│   └── retrieval/
+│       ├── RetrievalService.java             # 유사도 검색 (topK/threshold 기본값 관리)
+│       └── RetrievalTools.java                # @AiTool - RAG 검색을 Tool로 노출("Agentic RAG", Phase 3)
+├── agent/                           # Phase 3 — Tool/Function calling
+│   └── tool/
+│       ├── AiTool.java              # Tool 등록용 마커 애노테이션(@Component 메타애노테이션 포함)
+│       ├── ToolRegistry.java        # @AiTool 빈을 기동 시 스캔해 ToolCallbackProvider로 묶음
+│       └── sample/DateTimeTools.java  # 샘플 Tool(현재 날짜/시간) - dstone-boot의 sample/과 같은 성격
 ├── governance/     # Phase 4(예정) — Guardrail, PII 필터, rate limit, 인증
 └── observability/  # Phase 4(예정) — 토큰 사용량/비용/트레이싱/Eval
 ```
@@ -103,7 +115,7 @@ timeline
     Phase 0 : Chat API 스켈레톤 : Anthropic 하드코딩 : POST /api/ai/chat
     Phase 1 : Gateway (provider 추상화) : Session (Redis 대화 히스토리) : Prompt (템플릿 버저닝)
     Phase 2 : RAG 파이프라인 : ingest(Tika+청킹) : embedding(Ollama/OpenAI) : retrieval(pgvector)
-    Phase 3 (예정) : Agent : Tool/Function calling : 오케스트레이션
+    Phase 3 : Agent/Tool : Function calling : @AiTool 등록 체계 : 단순 오케스트레이션
     Phase 4 (예정) : Governance : Observability : Guardrail·비용추적·Eval
 ```
 
@@ -112,7 +124,7 @@ timeline
 | 0 | ✅ 완료 | `ChatController`, Anthropic 하드코딩, Jasypt `ENC(...)` 키 관리 |
 | 1 | ✅ 완료 | `gateway`(provider 추상화), `session`(Redis 히스토리), `prompt`(템플릿 버저닝) |
 | 2 | ✅ 완료 (실동작 검증됨) | `rag.ingest`/`rag.embedding`/`rag.retrieval`, pgvector, `RagController`, `ChatController.ragEnabled` |
-| 3 | ⏳ 예정 | `agent` — Tool calling, 오케스트레이션 |
+| 3 | ✅ 완료 (실동작 검증됨) | `agent.tool`(`@AiTool` 등록 체계, `ToolRegistry`), `ChatController.toolsEnabled`, 샘플 `DateTimeTools`, Agentic RAG `RetrievalTools` |
 | 4 | ⏳ 예정 | `governance`/`observability` — Guardrail, 인증, 비용/토큰 추적, Eval |
 
 ---
@@ -310,9 +322,94 @@ dstone:
 
 ---
 
-## 7. API 레퍼런스
+## 7. Phase 3 — Agent/Tool (Function Calling)
 
-### `POST /api/ai/chat` — 채팅 (일반 / RAG-증강)
+Spring AI의 Tool Calling(Function Calling)을 감싸서, **SI 프로젝트가 애노테이션 하나로 자기만의 Tool을 추가**할 수 있게 하는 게 이 Phase의 전부다. RAG처럼 새 인프라가 필요하지 않다(순수 Java 코드 실행) — 그래서 on/off 플래그 없이 항상 켜져 있고, 등록된 Tool이 없으면 그냥 빈 상태로 존재한다.
+
+### 7.1 Tool 호출 흐름
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Ctrl as ChatController
+    participant CC as ChatClient
+    participant LLM as Claude
+    participant Tool as @AiTool 빈<br/>(예: DateTimeTools)
+
+    Client->>Ctrl: POST /api/ai/chat<br/>{message, toolsEnabled: true}
+    Ctrl->>CC: toolCallbacks(ToolRegistry의 provider) 연결
+    CC->>LLM: 사용자 메시지 + 사용 가능한 Tool 목록 전달
+    LLM-->>CC: "getCurrentDateTime을 호출해줘"(Tool 호출 요청)
+    Note over CC: 이 왕복은 사람이 짜는 게 아니라<br/>Spring AI ChatClient가 자동으로 처리(= "단순 오케스트레이션")
+    CC->>Tool: getCurrentDateTime() 실행
+    Tool-->>CC: "2026-09-09T13:37:29"
+    CC->>LLM: Tool 실행 결과를 다시 전달
+    LLM-->>CC: 그 결과를 반영한 최종 답변 생성
+    CC-->>Client: 최종 답변
+```
+
+### 7.2 Tool 등록 체계 — `@AiTool` 하나로 등록
+
+```java
+@AiTool                       // net.dstone.ai.agent.tool.AiTool - 이 한 줄이면 자동으로 발견됨
+public class DateTimeTools {
+
+    @Tool(description = "현재 날짜와 시간을 ISO-8601 형식으로 반환한다. "
+            + "사용자가 '오늘', '지금 몇 시' 등을 물어볼 때 사용한다.")
+    public String getCurrentDateTime() {
+        return LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    }
+}
+```
+
+- `ToolRegistry`가 기동 시점에 `@AiTool`이 붙은 모든 스프링 빈을 찾아, 그 안의 `@Tool` 메소드들을 `ToolCallbackProvider`로 묶는다(`MethodToolCallbackProvider` 기반).
+- `@Tool(description = ...)`이 곧 LLM에게 "이 도구가 뭘 하는지" 알려주는 설명이다 — LLM은 이 설명만 보고 언제 호출할지 스스로 판단한다(사람이 if/else로 분기하지 않음).
+- 새 Tool이 필요하면 이 패턴 그대로 클래스 하나 추가하면 끝 — `gateway`/`prompt` 패키지와 동일한 "설정/컨벤션만 따르면 코드 추가 없이 동작"하는 철학이다.
+- SI 프로젝트마다 실제로 필요한 Tool은 완전히 다를 것이므로(사내 시스템 API 호출, 계산기, 검색 등), 지금 포함된 `DateTimeTools`는 **패턴을 보여주는 샘플**이다(`dstone-boot`의 `sample/` 패키지와 같은 성격 - 실제 배포 시 지우거나 자기 도메인 Tool로 교체).
+
+### 7.3 "단순 오케스트레이션"이 의미하는 것
+
+별도의 워크플로우/그래프 엔진을 직접 만들지 않는다. Spring AI의 `ChatClient`가 이미 "LLM이 Tool 호출을 요청 → 실행 → 결과를 다시 LLM에 전달 → 최종 답변이 나올 때까지 반복"하는 루프를 내장하고 있고, `dstone-ai-engine`은 그 루프에 어떤 Tool을 쓸 수 있는지만 알려주는 역할이다. 대화 히스토리(memory)도 Phase 1의 `ChatMemory`(Redis)를 그대로 공유한다 — Tool 호출을 위한 별도 memory를 새로 만들지 않았다.
+
+### 7.4 실동작 검증
+
+Tool 없이 물으면 모른다고 답하고, `toolsEnabled: true`로 물으면 실제 Tool을 호출해서 정확한 값으로 답하는 것을 실제로 확인했다:
+
+```bash
+# toolsEnabled 없음 - 모델이 "실시간 정보에 접근할 수 없다"고 답함
+curl -X POST http://localhost:8081/api/ai/chat -H "Content-Type: application/json" \
+  -d '{"message":"지금 정확한 날짜와 시간이 몇 시야?","toolsEnabled":false}'
+
+# toolsEnabled: true - getCurrentDateTime을 호출해서 실제 시스템 시간으로 정확히 답함
+curl -X POST http://localhost:8081/api/ai/chat -H "Content-Type: application/json" \
+  -d '{"message":"지금 정확한 날짜와 시간이 몇 시야?","toolsEnabled":true}'
+# → "2026-09-09T13:37:29" (실제 시스템 시간과 1초 이내로 일치)
+```
+
+기동 로그에서도 등록된 Tool 목록을 바로 확인할 수 있다:
+```
+dstone-ai-engine agent: 등록된 Tool = getCurrentDateTime, searchKnowledgeBase
+```
+
+### 7.5 Agentic RAG — RAG 검색도 Tool로
+
+`rag.retrieval.RetrievalTools`(`@AiTool` + `dstone.ai.rag.enabled=true`일 때만 존재)가 `RetrievalService.search`를 `searchKnowledgeBase` Tool로 노출한다. `ChatController.ragEnabled`(6.4절)는 **요청마다 무조건** `QuestionAnswerAdvisor`로 검색부터 하고 시작하는 반면, 이 Tool은 `toolsEnabled: true`로 붙여두면 **LLM이 질문 성격을 스스로 판단해서 필요할 때만** 호출한다 — 잡담·일반 상식 질문에서는 검색을 건너뛴다.
+
+실제로 세 가지 질문으로 검증했다(Ollama의 `/api/embed` 호출 로그로 실제 검색 여부까지 교차 확인):
+
+| 질문 | LLM의 판단 | 실제 검색 호출 |
+|---|---|:---:|
+| "ollama-webui-lite Uh-oh 에러 원인이 뭐였어?" (지식베이스에 있는 내용) | 검색 필요 → 정확한 원인/해결법으로 답변 | ✅ |
+| "1부터 10까지 더하면?" | 검색 없이 직접 계산 | ❌ |
+| "파이썬 리스트 정렬 방법?" | 검색 없이 직접 답변 (9초 관찰 동안 새 임베딩 호출 없음) | ❌ |
+
+`ragEnabled`와 `toolsEnabled`(+`searchKnowledgeBase`)는 같이 켜도 되지만 중복이다 - 보통은 "항상 이 지식베이스를 참고해야 하는 챗봇"이면 `ragEnabled`를, "여러 판단을 스스로 해야 하는 좀 더 범용적인 어시스턴트"면 `toolsEnabled`를 쓰는 식으로 용도에 따라 고른다.
+
+---
+
+## 8. API 레퍼런스
+
+### `POST /api/ai/chat` — 채팅 (일반 / RAG-증강 / Tool 사용)
 
 <details>
 <summary>요청/응답 예시 펼쳐보기</summary>
@@ -326,7 +423,8 @@ curl -X POST http://localhost:8081/api/ai/chat \
         "sessionId": null,
         "promptName": null,
         "variables": null,
-        "ragEnabled": false
+        "ragEnabled": false,
+        "toolsEnabled": false
       }'
 # → {"message":"안녕하세요! 😊","provider":"anthropic","sessionId":"3fde76a9-..."}
 ```
@@ -338,15 +436,24 @@ curl -X POST http://localhost:8081/api/ai/chat \
   -d '{"message": "우리 RAG 파이프라인에서 임베딩 모델로 뭘 쓰는지 알려줘.", "ragEnabled": true}'
 # → Claude가 pgvector에 저장된 관련 문서 조각을 인용해서 답변
 ```
+
+```bash
+# Tool 사용 채팅 (Phase 3)
+curl -X POST http://localhost:8081/api/ai/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "지금 정확한 날짜와 시간이 몇 시야?", "toolsEnabled": true}'
+# → getCurrentDateTime Tool을 호출해서 실제 시스템 시간으로 답변
+```
 </details>
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `message` | String | 사용자 메시지 (필수) |
+| `message` | String | 사용자 메시지 (필수, 비어있으면 `400 Bad Request`) |
 | `sessionId` | String | 비워두면 서버가 새로 발급 (응답의 `sessionId`로 이어서 사용) |
 | `promptName` | String | 지정 시 `PromptTemplateRegistry`가 렌더링해 시스템 프롬프트로 사용 |
 | `variables` | Map | `promptName` 템플릿 렌더링용 변수 |
 | `ragEnabled` | Boolean | `true`면 `QuestionAnswerAdvisor`로 검색 결과 자동 삽입 (RAG 꺼져 있으면 `IllegalStateException`) |
+| `toolsEnabled` | Boolean | `true`면 `ToolRegistry`에 등록된 모든 Tool을 ChatClient에 연결(Phase 3) — RAG와 달리 항상 사용 가능 |
 
 ### `POST /api/ai/rag/documents` — 문서 적재 (Phase 2, RAG 활성 시)
 
@@ -381,7 +488,7 @@ curl -X POST http://localhost:8081/api/ai/rag/search \
 
 ---
 
-## 8. 설정 레퍼런스 (`conf/application.yml`)
+## 9. 설정 레퍼런스 (`conf/application.yml`)
 
 <details>
 <summary>전체 설정 트리 펼쳐보기 (실제 값은 예시로 마스킹)</summary>
@@ -436,7 +543,7 @@ dstone:
 
 ---
 
-## 9. 필요 인프라
+## 10. 필요 인프라
 
 | 인프라 | 용도 | 필수 여부 |
 |---|---|:---:|
@@ -449,7 +556,7 @@ dstone:
 
 ---
 
-## 10. 빌드 및 실행
+## 11. 빌드 및 실행
 
 ```bash
 # dstone-common을 먼저 설치해야 함(다른 모듈과 동일)
@@ -472,7 +579,7 @@ dstone-ai-engine rag: 활성 임베딩 provider = OLLAMA
 
 ---
 
-## 11. 문제 해결 (실제로 겪은 에러 모음)
+## 12. 문제 해결 (실제로 겪은 에러 모음)
 
 Phase 2를 실제로 붙이고 e2e 테스트하는 과정에서 겪은 진짜 에러들이다 — 같은 삽질을 반복하지 않도록 원인/조치를 남긴다.
 
@@ -485,13 +592,14 @@ Phase 2를 실제로 붙이고 e2e 테스트하는 과정에서 겪은 진짜 �
 
 ---
 
-## 12. 다음 단계 (Phase 3~4)
+## 13. 다음 단계 (Phase 4)
 
 | Phase | 패키지 | 계획 |
 |---|---|---|
-| 3 | `agent` | Tool/Function calling, 멀티스텝 오케스트레이션, 에이전트 메모리 |
 | 4 | `governance` | Guardrail, PII 필터링, rate limiting, 비용 트래킹, 인증/인가(API 키 또는 OAuth2 client-credentials) |
 | 4 | `observability` | 토큰 사용량/비용/트레이싱, Eval 결과 로깅 |
+
+Phase 3(`agent.tool`)는 "단순 오케스트레이션"(Spring AI ChatClient의 내장 tool-calling 루프)까지 완료된 상태다. 여러 Tool을 사람이 미리 정한 순서로 묶어 실행하는 멀티스텝 워크플로우/그래프 엔진처럼 더 복잡한 오케스트레이션이 필요해지면 그건 별도 후속 작업으로 다룬다.
 
 대량/오프라인 AI 작업(재임베딩, 주기적 Eval, 세션 정리)은 엔진 자체에 스케줄러를 두지 않고 기존 `dstone-batch`(`@AutoRegJob`) 패턴에 위임할 계획이다.
 

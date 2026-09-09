@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import net.dstone.ai.agent.tool.ToolRegistry;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.gateway.GatewayProperties;
@@ -34,15 +35,18 @@ public class ChatController extends BaseController {
 	// (Phase 0/1만 쓰는 배포에서도 기동돼야 함) 필수 의존성이 아니라 ObjectProvider로 선택 주입받는다.
 	private final ObjectProvider<VectorStore> vectorStoreProvider;
 	private final ObjectProvider<RetrievalService> retrievalServiceProvider;
+	// Tool(Phase 3)은 RAG와 달리 외부 인프라 의존이 없어 항상 존재하는 빈이라 ObjectProvider가 필요 없다.
+	private final ToolRegistry toolRegistry;
 
 	public ChatController(ChatClient chatClient, GatewayProperties gatewayProperties,
 			PromptTemplateRegistry promptTemplateRegistry, ObjectProvider<VectorStore> vectorStoreProvider,
-			ObjectProvider<RetrievalService> retrievalServiceProvider) {
+			ObjectProvider<RetrievalService> retrievalServiceProvider, ToolRegistry toolRegistry) {
 		this.chatClient = chatClient;
 		this.gatewayProperties = gatewayProperties;
 		this.promptTemplateRegistry = promptTemplateRegistry;
 		this.vectorStoreProvider = vectorStoreProvider;
 		this.retrievalServiceProvider = retrievalServiceProvider;
+		this.toolRegistry = toolRegistry;
 	}
 
 	@PostMapping
@@ -74,6 +78,10 @@ public class ChatController extends BaseController {
 				.similarityThreshold(retrievalService.defaultSimilarityThreshold())
 				.build();
 			spec = spec.advisors(QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build());
+		}
+
+		if (Boolean.TRUE.equals(request.toolsEnabled())) {
+			spec = spec.toolCallbacks(this.toolRegistry.toolCallbackProvider());
 		}
 
 		String answer = spec.user(request.message()).call().content();

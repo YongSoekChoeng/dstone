@@ -13,7 +13,11 @@ import java.util.Map;
  * ragEnabled를 true로 보내면(dstone.ai.rag.enabled=true로 RAG가 켜져 있어야 함) VectorStore에서
  * message와 유사한 문서 조각을 찾아 QuestionAnswerAdvisor로 자동으로 컨텍스트에 끼워넣는다
  * (검색 자체를 직접 다루려면 /api/ai/rag/search를 쓴다).
+ *
+ * toolsEnabled를 true로 보내면(Phase 3) net.dstone.ai.agent.tool.ToolRegistry에 등록된 Tool들을
+ * ChatClient에 붙인다 - 이후 실제로 어떤 Tool을 호출할지, 몇 번 호출할지는 LLM과 Spring AI의
+ * ChatClient가 알아서 주고받으며 처리한다(사람이 미리 정해두는 게 아님).
  */
 public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
-		Boolean ragEnabled) {
+		Boolean ragEnabled, Boolean toolsEnabled) {
 }

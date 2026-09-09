@@ -79,6 +79,42 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "chat - Tool 사용 (toolsEnabled=true)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"지금 정확한 날짜와 시간이 몇 시야?\",\n    \"sessionId\": null,\n    \"promptName\": null,\n    \"variables\": null,\n    \"toolsEnabled\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8081/api/ai/chat",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"api",
+								"ai",
+								"chat"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
