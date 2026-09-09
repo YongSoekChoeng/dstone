@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import net.dstone.common.biz.BaseService;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
@@ -26,7 +27,7 @@ import net.dstone.common.utils.StringUtil;
  */
 @Service
 @ConditionalOnProperty(name = "dstone.ai.rag.enabled", havingValue = "true")
-public class DocumentIngestService extends BaseObject {
+public class DocumentIngestService extends BaseService {
 
 	private static final String SOURCE_ID_METADATA_KEY = "sourceId";
 
