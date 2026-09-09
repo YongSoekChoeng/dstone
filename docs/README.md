@@ -24,7 +24,7 @@
 
 ## 1. 프로젝트 개요
 
-**dstone**은 Java 21 / Spring Boot 4.1(Spring Framework 7) 기반의 멀티모듈 엔터프라이즈 프레임워크다. 웹 애플리케이션 개발(`dstone-boot`), 대용량 배치 처리(`dstone-batch`), 배치 잡 운영 관리(`dstone-batchadmin`)에 필요한 공통 기반(`dstone-common`)을 통합 제공한다.
+**dstone**은 Java 21 / Spring Boot 4.1(Spring Framework 7) 기반의 멀티모듈 엔터프라이즈 프레임워크다. 웹 애플리케이션 개발(`dstone-boot`), 대용량 배치 처리(`dstone-batch`), 배치 잡 운영 관리(`dstone-batchadmin`), Spring AI 기반 AI/MLOps 서빙(`dstone-ai-engine`)에 필요한 공통 기반(`dstone-common`)을 통합 제공한다.
 
 - **Group ID:** `net.dstone`
 - **Version:** `1.0.0-SNAPSHOT`
@@ -39,7 +39,8 @@ dstone/                         (루트 POM)
 ├── dstone-common/              공통 기반 라이브러리 (JAR)
 ├── dstone-boot/                웹 애플리케이션 프레임워크 (WAR) — kind(K8s)에 Pod로 배포
 ├── dstone-batch/                배치 처리 프레임워크 (JAR) — VM 스타일(bin/*.sh)로 운영
-└── dstone-batchadmin/           배치 잡 관리 웹 애플리케이션 (WAR) — VM 스타일(bin/*.sh)로 운영
+├── dstone-batchadmin/           배치 잡 관리 웹 애플리케이션 (WAR) — VM 스타일(bin/*.sh)로 운영
+└── dstone-ai-engine/            Spring AI 기반 AI/MLOps 코어 엔진 (JAR) — kind(K8s)에 Pod로 배포(아직 미배포)
 ```
 
 ### 1.2 모듈 의존 관계
@@ -47,10 +48,11 @@ dstone/                         (루트 POM)
 ```
 dstone-boot       ──┐
 dstone-batch      ──┼──▶  dstone-common
-dstone-batchadmin ──┘
+dstone-batchadmin ──┤
+dstone-ai-engine  ──┘
 ```
 
-`dstone-common`은 독립 라이브러리로 나머지 세 모듈 모두에 포함된다. `dstone-batchadmin`은 `dstone-batch` 서버 인스턴스를 REST로 원격 제어할 뿐, 컴파일 의존성은 없다.
+`dstone-common`은 독립 라이브러리로 나머지 네 모듈 모두에 포함된다. `dstone-batchadmin`은 `dstone-batch` 서버 인스턴스를 REST로 원격 제어할 뿐, 컴파일 의존성은 없다.
 
 ### 1.3 빠른 참조
 
@@ -59,6 +61,7 @@ dstone-batchadmin ──┘
 | dstone-boot | 7081 | `net.dstone.boot.DstoneBootApplication` | WAR |
 | dstone-batch | 6081 | `net.dstone.batch.common.DstoneBatchApplication` | JAR |
 | dstone-batchadmin | 5081 | `net.dstone.batchadmin.DstoneBatchAdminApplication` | WAR |
+| dstone-ai-engine | 8081 | `net.dstone.ai.DstoneAiEngineApplication` | JAR |
 
 ### 1.4 빌드 순서
 
@@ -70,6 +73,7 @@ cd dstone-common && mvn clean install
 cd dstone-boot && mvn clean package        # WAR
 cd dstone-batch && mvn clean package       # JAR
 cd dstone-batchadmin && mvn clean package  # WAR
+cd dstone-ai-engine && mvn clean package   # JAR
 
 # 또는 루트에서 전체 빌드
 mvn clean install
@@ -86,6 +90,7 @@ mvn clean install
 | [dstone-boot.md](dstone-boot.md) | 웹 애플리케이션 프레임워크 및 소스 코드 분석기 |
 | [dstone-batch.md](dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
 | [dstone-batchadmin.md](dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
+| [dstone-ai-engine.md](dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2) |
 | [dstone-saga.md](dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
 | [build.md](build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 
@@ -112,6 +117,8 @@ mvn clean install
 | [software/kubernetes.md](software/kubernetes.md) | kubectl + kind(로컬 K8s) 설치·클러스터/로컬 레지스트리 시작·정지 |
 | [software/jenkins.md](software/jenkins.md) | Jenkins 설치·서비스 시작/정지 |
 | [software/nodejs.md](software/nodejs.md) | Node.js + npm 설치 |
+| [software/ollama.md](software/ollama.md) | Ollama(로컬 LLM/임베딩 모델 런타임) 설치·`dstone-ai-engine` RAG 임베딩(`bge-m3`) 연동·서비스 시작/정지 |
+| [software/ollama-webui-lite.md](software/ollama-webui-lite.md) | Ollama 관리 콘솔(Ollama Web UI Lite) 설치·CORS/IPv6 연동 이슈 해결 |
 
 ### 2.3 다이어그램 (`images/`)
 
@@ -162,6 +169,8 @@ spring.datasource.<name>.hikari:
 
 각 모듈의 실제 테이블 생성 스크립트는 `src/main/resources/schema/*.sql`(dstone-boot/dstone-batch/dstone-batchadmin 각각에 있음)에 있다 — Spring Batch/Boot이 자동으로 스키마를 만들지 않으므로(`initialize-schema: NEVER`) 최초 1회 수동 실행해야 한다.
 
+> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓰고, 벡터 테이블(`vector_store`)도 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성한다(수동 스키마 SQL 없음). 상세: [dstone-ai-engine.md 6.2절](dstone-ai-engine.md#62-문서-적재-ingest).
+
 ### 3.4 Spring Security 설정 방식
 
 ```yaml
@@ -182,13 +191,16 @@ spring.autoconfigure.exclude:
 
 | 인프라 | 용도 | 모듈 |
 |---|---|---|
-| MySQL | 메인 데이터 저장 | 모든 모듈 |
-| Redis | 세션 저장, 캐시 | dstone-boot |
+| MySQL | 메인 데이터 저장 | dstone-boot, dstone-batch, dstone-batchadmin |
+| Redis | 세션 저장, 캐시 | dstone-boot, dstone-ai-engine(Phase 1부터, 대화 히스토리) |
 | RabbitMQ | 메시지 큐 | dstone-boot |
 | Kafka | SAGA/Outbox 샘플 기능의 이벤트 발행/구독 | dstone-boot (샘플 기능 한정) |
+| Anthropic API (또는 다른 LLM provider) | Chat 모델 추론 | dstone-ai-engine |
+| PostgreSQL + pgvector | RAG 벡터 저장소 | dstone-ai-engine (Phase 2, `dstone.ai.rag.enabled=true`일 때만) |
+| Ollama (또는 OpenAI) | RAG 임베딩 모델 추론 | dstone-ai-engine (Phase 2, `dstone.ai.rag.enabled=true`일 때만) |
 
-WSL 환경 설치 방법은 [environment.md](environment.md)와 [software/](software/) 참고.
+WSL 환경 설치 방법은 [environment.md](environment.md)와 [software/](software/) 참고. `dstone-ai-engine`의 상세 아키텍처/설정/API는 [dstone-ai-engine.md](dstone-ai-engine.md) 참고.
 
 ## 5. 클라우드 아키텍처 시뮬레이션
 
-`dstone-boot`은 컨테이너화되어 로컬 `kind` 쿠버네티스 클러스터에 Pod로 배포되고, `dstone-batch`/`dstone-batchadmin`은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운영된다. MySQL/Redis/RabbitMQ/Kafka는 클러스터 밖의 CSP 매니지드 서비스에 대응한다. 자세한 설계와 CI/CD 파이프라인 구성은 [cloud-architecture.md](cloud-architecture.md) 참고.
+`dstone-boot`과 `dstone-ai-engine`은 컨테이너화되어 로컬 `kind` 쿠버네티스 클러스터에 Pod로 배포되고(단, `dstone-ai-engine`은 매니페스트만 준비된 상태로 아직 실제 배포 전), `dstone-batch`/`dstone-batchadmin`은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운영된다. MySQL/Redis/RabbitMQ/Kafka/PostgreSQL/Ollama는 클러스터 밖의 CSP 매니지드 서비스에 대응한다. 자세한 설계와 CI/CD 파이프라인 구성은 [cloud-architecture.md](cloud-architecture.md) 참고.

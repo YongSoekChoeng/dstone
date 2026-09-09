@@ -1,0 +1,87 @@
+# Ollama Web UI Lite
+
+## 목차
+
+- [1. 개요](#1-개요)
+- [2. 설치 정보](#2-설치-정보)
+- [3. 설치 방법 (재현 절차)](#3-설치-방법-재현-절차)
+- [4. 설정](#4-설정)
+- [5. 서비스 시작/중지](#5-서비스-시작중지)
+- [6. 접속](#6-접속)
+- [7. dstone 프로젝트에서의 역할](#7-dstone-프로젝트에서의-역할)
+- [8. 문제 해결 (실제로 겪은 에러)](#8-문제-해결-실제로-겪은-에러)
+
+## 1. 개요
+[Ollama](ollama.md)를 웹에서 조회/관리하기 위한 관리 콘솔([ollama-webui/ollama-webui-lite](https://github.com/ollama-webui/ollama-webui-lite)). 모델 목록 조회/pull/삭제, 여러 모델과의 채팅, 채팅 import/export 등을 지원하는 SvelteKit(Vite) 앱이다. Kafka의 [Kafbat UI](kafbat-ui.md)와 같은 역할(부가 관리 도구)이며 설치/기동 방식도 동일한 패턴(수동 설치, systemd 미등록, 메인 서비스 스크립트에 편승)을 따른다.
+
+## 2. 설치 정보
+- 배포 형태: 소스 clone 후 Vite 개발 서버로 구동 (프로덕션 빌드 아님 - 로컬 관리 도구 용도라 `npm run dev`로 충분)
+- 설치 방식: 수동 설치 (`git clone`)
+- 설치 경로: `/opt/ollama-webui-lite`
+- 요구사항: Node.js/npm (이미 설치됨, [nodejs.md](nodejs.md) 참고), Ollama가 `http://localhost:11434`에서 떠 있어야 함
+
+## 3. 설치 방법 (재현 절차)
+```bash
+sudo mkdir -p /opt/ollama-webui-lite
+sudo chown "$USER":"$USER" /opt/ollama-webui-lite
+
+git clone https://github.com/ollama-webui/ollama-webui-lite.git /opt/ollama-webui-lite
+cd /opt/ollama-webui-lite
+npm ci
+```
+재설치/업그레이드 시에는 `git pull` 후 `npm ci`를 다시 실행하고 서비스를 재시작한다([5절](#5-서비스-시작중지)).
+
+## 4. 설정
+- Ollama API 주소는 `src/lib/constants.ts`의 `OLLAMA_API_BASE_URL`에 `http://localhost:11434/api`로 하드코딩되어 있다 - 이 환경의 [Ollama](ollama.md) 기본 설정(로컬, 11434 포트)과 정확히 일치해서 별도 수정이 필요 없다.
+- **CORS**: 브라우저에서 `http://localhost:3000`(이 UI)이 `http://localhost:11434`(Ollama API)로 fetch를 보내는 건 포트가 달라 cross-origin 요청이다. Ollama의 기본 CORS 허용 목록에는 3000 포트가 없어 그대로 두면 API 호출이 브라우저에서 막힌다 - 그래서 `/opt/ollama/ollama-start.sh`가 Ollama를 띄울 때 `OLLAMA_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`을 함께 지정하도록 해뒀다([ollama.md 4절](ollama.md#4-서비스-시작중지) 참고).
+
+## 5. 서비스 시작/중지
+전용 스크립트를 작성해 사용 중이다 (systemd 미등록, 수동 실행 - kafka/kafbat-ui와 동일한 PID파일 방식). **`/usr/local/bin/start-ollama.sh`/`stop-ollama.sh`가 Ollama 서버 기동/중지와 함께 이 UI도 같이 기동/중지한다** (kafka가 Kafbat UI를 같이 다루는 것과 동일한 구조):
+
+```sh
+# /usr/local/bin/start-ollama.sh
+/opt/ollama/ollama-start.sh
+echo "Ollama started !!! ..."
+/opt/ollama-webui-lite/start.sh
+echo "Ollama Web UI Lite started !!! http://localhost:3000"
+```
+```sh
+# /usr/local/bin/stop-ollama.sh
+/opt/ollama/ollama-stop.sh
+echo "Ollama stopped !!!"
+/opt/ollama-webui-lite/stop.sh
+echo "Ollama Web UI Lite stopped !!!"
+```
+
+- `/opt/ollama-webui-lite/start.sh`: `setsid nohup npm run dev`(Vite dev 서버, `--host --port 3000`은 `package.json`의 `dev` 스크립트에 이미 포함)로 백그라운드 기동, PID를 `webui.pid`에 기록.
+- `/opt/ollama-webui-lite/stop.sh`: PID 파일 기준으로 **프로세스 그룹째**(`kill -- -PID`) 종료한다 - npm이 감싸는 실제 vite 자식 프로세스까지 같이 죽이기 위함(단순히 PID 하나만 죽이면 vite 프로세스가 남는 경우가 있음). 정상 종료 최대 30초 대기 후 `kill -9`로 강제 종료.
+
+로그: `/opt/ollama-webui-lite/logs/webui.out`
+
+## 6. 접속
+http://localhost:3000
+
+## 7. dstone 프로젝트에서의 역할
+[Ollama](ollama.md) 로컬 모델 운영/확인용 부가 도구(모델 pull/삭제, 수동 채팅 테스트). `dstone-ai-engine` 애플리케이션 자체와 직접적인 런타임 의존관계는 없다 - `dstone-ai-engine`은 Spring AI를 통해 Ollama API를 직접 호출하고, 이 UI는 그 뒤에서 운영자가 모델을 관리/점검하기 위한 도구일 뿐이다.
+
+## 8. 문제 해결 (실제로 겪은 에러)
+
+### 8.1 채팅 시 항상 `Uh-oh! There was an issue connecting to Ollama.`만 뜸 (원인이 매번 다를 수 있음)
+이 UI 자체의 버그다: `src/routes/(app)/+page.svelte`(그리고 `c/[id]/+page.svelte`)의 에러 처리 코드가, 서버가 정상적인 JSON 에러 응답을 줬든(`res.ok === false`) 아예 연결이 안 됐든(`res === null`, fetch 자체가 reject) **상관없이 채팅창에는 항상 이 문구만 덮어쓴다** - `toast.error(...)`로 잠깐 뜨는 알림에는 실제 원인이 찍히지만 놓치기 쉽고, 채팅 버블 텍스트는 무조건 이 일반 문구로 바뀐다. 그래서 실제로는 서로 다른 두 가지 원인이 겉으로는 완전히 같은 증상으로 보였다:
+
+1. **연결 자체가 안 됨(`res === null`)**: [ollama.md 7.1절](ollama.md#71-웹ui에서-채팅-시-uh-oh-there-was-an-issue-connecting-to-ollama) 참고 - Ollama가 IPv6 루프백을 안 듣고 있어서 브라우저의 `localhost` IPv6 시도가 connection refused로 실패한 경우.
+2. **연결은 되지만 Ollama가 400을 응답함(`res.ok === false`)**: 아래 8.2절.
+
+원인을 구분하려면 브라우저 개발자도구 Network 탭에서 `/api/chat` 요청이 애초에 응답을 받았는지(Status 컬럼에 값이 있는지) 확인하거나, 이 UI를 거치지 않고 직접 재현해보는 게 빠르다:
+```bash
+curl -s -X POST http://localhost:11434/api/chat \
+  -d '{"model":"<선택한 모델명>","messages":[{"role":"user","content":"hi"}]}'
+```
+
+### 8.2 `curl`로 재현하면 `{"error":"\"<모델명>\" does not support chat"}`
+- **원인**: 이 환경에 처음 설치된 모델이 `bge-m3`뿐이었는데, 이건 [dstone-ai-engine의 RAG(Phase 2) 임베딩 전용](ollama.md#6-dstone-프로젝트에서의-역할)으로 받아둔 임베딩 전용 모델이라 애초에 채팅(`/api/chat`, `/api/generate`)을 지원하지 않는다. 웹UI에서 모델 선택을 `bge-m3`로 둔 채 채팅을 시도하면 Ollama가 요청 자체를 400으로 거부한다.
+- **조치**: 채팅 가능한 일반 모델을 별도로 pull한다(예: 이 환경은 CPU 전용에 가용 메모리가 넉넉하지 않아 3B급의 `llama3.2`를 받았다):
+  ```bash
+  /opt/ollama/bin/ollama pull llama3.2
+  ```
+  받은 뒤 웹UI 채팅 화면에서 모델을 `bge-m3`가 아니라 `llama3.2`로 선택해야 한다. `bge-m3`는 [RetrievalService](ollama.md#6-dstone-프로젝트에서의-역할)/`DocumentIngestService`의 임베딩 전용 용도로만 남겨둔다 - 채팅용으로는 쓸 수 없다.

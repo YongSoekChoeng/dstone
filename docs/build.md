@@ -7,18 +7,18 @@
 - [3. 로컬 빌드 명령](#3-로컬-빌드-명령)
 - [4. 실행](#4-실행)
 - [5. 설정 프로파일 (`-Dspring.profiles.active=<profile>`)](#5-설정-프로파일--dspringprofilesactiveprofile)
-- [6. dstone-boot — 컨테이너 빌드 & kind 배포](#6-dstone-boot--컨테이너-빌드--kind-배포)
+- [6. dstone-boot / dstone-ai-engine — 컨테이너 빌드 & kind 배포](#6-dstone-boot--dstone-ai-engine--컨테이너-빌드--kind-배포)
 - [7. dstone-batch / dstone-batchadmin — VM 스타일 배포 (`bin/*.sh`)](#7-dstone-batch--dstone-batchadmin--vm-스타일-배포-binsh)
 - [8. CI/CD (Jenkins)](#8-cicd-jenkins)
 - [9. 빌드 관련 트러블슈팅](#9-빌드-관련-트러블슈팅)
 
-dstone 멀티모듈 프로젝트의 빌드 명령, 모듈별 산출물, 배포 방식(VM 스타일 / 컨테이너·쿠버네티스)과 CI/CD 파이프라인을 한 곳에 모은 문서다. 각 모듈의 기능/설정 상세는 모듈별 문서([dstone-common.md](dstone-common.md), [dstone-boot.md](dstone-boot.md), [dstone-batch.md](dstone-batch.md), [dstone-batchadmin.md](dstone-batchadmin.md))를, 배포 아키텍처 설계 배경은 [cloud-architecture.md](cloud-architecture.md)를 참고한다.
+dstone 멀티모듈 프로젝트의 빌드 명령, 모듈별 산출물, 배포 방식(VM 스타일 / 컨테이너·쿠버네티스)과 CI/CD 파이프라인을 한 곳에 모은 문서다. 각 모듈의 기능/설정 상세는 모듈별 문서([dstone-common.md](dstone-common.md), [dstone-boot.md](dstone-boot.md), [dstone-batch.md](dstone-batch.md), [dstone-batchadmin.md](dstone-batchadmin.md), [dstone-ai-engine.md](dstone-ai-engine.md))를, 배포 아키텍처 설계 배경은 [cloud-architecture.md](cloud-architecture.md)를 참고한다.
 
 ## 1. 전제 조건
 
 - JDK 21, Maven 3.9.x — 설치 방법은 [software/jdk.md](software/jdk.md), [software/maven.md](software/maven.md)
 - 빌드 도구 버전은 로컬에 설치된 것을 그대로 쓴다(별도 wrapper 없음): `java -version`, `mvn -version`으로 확인
-- `dstone-common`은 나머지 세 모듈이 참조하는 라이브러리이므로 **항상 먼저 빌드**돼야 한다 (`mvn install`로 로컬 저장소에 설치되어야 다른 모듈이 참조 가능)
+- `dstone-common`은 나머지 네 모듈이 참조하는 라이브러리이므로 **항상 먼저 빌드**돼야 한다 (`mvn install`로 로컬 저장소에 설치되어야 다른 모듈이 참조 가능)
 
 ## 2. 모듈 구성과 산출물
 
@@ -27,7 +27,8 @@ dstone/                         (루트 aggregator POM, groupId: net.dstone, ver
 ├── dstone-common/              JAR (라이브러리) — 다른 모든 모듈이 의존
 ├── dstone-boot/                WAR (executable) — dstone-boot.war
 ├── dstone-batch/                JAR (executable) — dstone-batch-1.0.0-SNAPSHOT.jar
-└── dstone-batchadmin/           WAR (executable) — dstone-batchadmin.war
+├── dstone-batchadmin/           WAR (executable) — dstone-batchadmin.war
+└── dstone-ai-engine/            JAR (executable) — dstone-ai-engine.jar
 ```
 
 | 모듈 | Packaging | 산출물 경로 | Main Class | 포트 |
@@ -36,8 +37,9 @@ dstone/                         (루트 aggregator POM, groupId: net.dstone, ver
 | dstone-boot | WAR | `dstone-boot/target/dstone-boot.war` | `net.dstone.boot.DstoneBootApplication` | 7081 |
 | dstone-batch | JAR | `dstone-batch/target/dstone-batch-1.0.0-SNAPSHOT.jar` | `net.dstone.batch.common.DstoneBatchApplication` | 6081 |
 | dstone-batchadmin | WAR | `dstone-batchadmin/target/dstone-batchadmin.war` | `net.dstone.batchadmin.DstoneBatchAdminApplication` | 5081 |
+| dstone-ai-engine | JAR | `dstone-ai-engine/target/dstone-ai-engine.jar` | `net.dstone.ai.DstoneAiEngineApplication` | 8081 |
 
-dstone-boot/dstone-batchadmin의 WAR는 `<finalName>${artifactId}</finalName>`로 고정되어 항상 `dstone-boot.war`/`dstone-batchadmin.war`로 나온다(버전 접미사 없음). dstone-batch JAR는 `${artifactId}-${version}` 형식이라 버전이 파일명에 포함된다.
+dstone-boot/dstone-batchadmin의 WAR는 `<finalName>${artifactId}</finalName>`로 고정되어 항상 `dstone-boot.war`/`dstone-batchadmin.war`로 나온다(버전 접미사 없음). dstone-ai-engine JAR도 동일하게 `<finalName>${project.artifactId}</finalName>`로 고정되어 항상 `dstone-ai-engine.jar`로 나온다. dstone-batch JAR만 `${artifactId}-${version}` 형식이라 버전이 파일명에 포함된다.
 
 ## 3. 로컬 빌드 명령
 
@@ -49,6 +51,7 @@ cd dstone-common && mvn clean install
 cd dstone-boot && mvn clean package        # WAR
 cd dstone-batch && mvn clean package       # JAR
 cd dstone-batchadmin && mvn clean package  # WAR
+cd dstone-ai-engine && mvn clean package   # JAR
 
 # 또는 루트에서 전체 리액터 빌드 (순서 자동 해결)
 mvn clean install
@@ -73,9 +76,12 @@ java -jar -Dspring.batch.job.names=sampleJob dstone-batch/target/dstone-batch-1.
 
 # dstone-batchadmin (포트 5081)
 java -jar dstone-batchadmin/target/dstone-batchadmin.war
+
+# dstone-ai-engine (포트 8081) - wsl 프로파일로 로컬 네이티브 실행
+java -Dspring.profiles.active=wsl -jar dstone-ai-engine/target/dstone-ai-engine.jar
 ```
 
-Spring Batch(`dstone-batch`)/애플리케이션 스키마(`dstone-boot`, `dstone-batchadmin`) 테이블은 각 모듈 `src/main/resources/schema/*.sql`을 최초 1회 수동 실행해야 한다(`initialize-schema: NEVER` — 자동 생성 안 됨).
+Spring Batch(`dstone-batch`)/애플리케이션 스키마(`dstone-boot`, `dstone-batchadmin`) 테이블은 각 모듈 `src/main/resources/schema/*.sql`을 최초 1회 수동 실행해야 한다(`initialize-schema: NEVER` — 자동 생성 안 됨). `dstone-ai-engine`은 예외로, RAG(Phase 2)의 pgvector 테이블(`vector_store`)을 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 최초 기동 시 직접 생성한다(수동 스키마 SQL 없음) — 상세: [dstone-ai-engine.md 6.2절](dstone-ai-engine.md#62-문서-적재-ingest).
 
 ## 5. 설정 프로파일 (`-Dspring.profiles.active=<profile>`)
 
@@ -85,15 +91,16 @@ Spring Batch(`dstone-batch`)/애플리케이션 스키마(`dstone-boot`, `dstone
 |---|---|---|
 | (기본, `env.properties`) | Windows 개발자 PC | 전체 |
 | `dev` | 기존 Docker Compose 배포(레거시) | 전체 |
-| `wsl` | WSL git 체크아웃 그대로 수동 테스트 (bin 스크립트 기본값) | dstone-batch, dstone-batchadmin |
+| `wsl` | WSL git 체크아웃 그대로 수동 테스트 (bin 스크립트 기본값) | dstone-batch, dstone-batchadmin, dstone-ai-engine |
 | `vm` | Jenkins CI/CD가 배포하는 VM 스타일 실행 경로 | dstone-batch, dstone-batchadmin |
-| `k8s` | kind 클러스터 Pod (컨테이너) | dstone-boot |
+| `k8s` | kind 클러스터 Pod (컨테이너) | dstone-boot, dstone-ai-engine(매니페스트 준비완료, 아직 미배포) |
 
-## 6. dstone-boot — 컨테이너 빌드 & kind 배포
+## 6. dstone-boot / dstone-ai-engine — 컨테이너 빌드 & kind 배포
 
-`dstone-boot`은 VM 스타일 `bin/*.sh`로 운영하지 않고 컨테이너 이미지로 빌드해 로컬 `kind` 쿠버네티스 클러스터에 Pod로 배포한다.
+`dstone-boot`과 `dstone-ai-engine`은 VM 스타일 `bin/*.sh`로 운영하지 않고 컨테이너 이미지로 빌드해 로컬 `kind` 쿠버네티스 클러스터에 Pod로 배포한다(같은 `dstone` 네임스페이스). 둘 다 완전히 동일한 패턴을 따른다.
 
 ```bash
+# dstone-boot
 # 빌드 컨텍스트는 반드시 리포지토리 루트 (dstone-common 소스가 함께 필요)
 docker build -f dstone-boot/Dockerfile -t localhost:5000/dstone-boot:latest .
 docker push localhost:5000/dstone-boot:latest
@@ -105,9 +112,22 @@ kubectl apply -f dstone-boot/k8s/service.yaml
 kubectl rollout status deployment/dstone-boot -n dstone --timeout=120s
 ```
 
-- `dstone-boot/Dockerfile`은 멀티스테이지 빌드: 1단계(`maven:3.9-eclipse-temurin-21`)에서 루트 `pom.xml` + `dstone-common` + `dstone-boot`(+ 나머지 두 모듈은 리액터 구성을 위해 `pom.xml`만) 복사 후 `mvn -pl dstone-common,dstone-boot -am -DskipTests clean package`, 2단계(`eclipse-temurin:21-jre`)에서 `dstone-boot.war`만 담아 `-Dspring.profiles.active=k8s`로 기동.
+```bash
+# dstone-ai-engine — dstone-boot과 동일한 절차(⚠️ 이 클러스터엔 아직 최초 배포한 적 없음)
+docker build -f dstone-ai-engine/Dockerfile -t localhost:5000/dstone-ai-engine:latest .
+docker push localhost:5000/dstone-ai-engine:latest
+
+kubectl apply -f dstone-ai-engine/k8s/namespace.yaml
+kubectl apply -f dstone-ai-engine/k8s/configmap.yaml
+kubectl apply -f dstone-ai-engine/k8s/deployment.yaml
+kubectl apply -f dstone-ai-engine/k8s/service.yaml
+kubectl rollout status deployment/dstone-ai-engine -n dstone --timeout=120s
+```
+
+- `dstone-boot/Dockerfile`은 멀티스테이지 빌드: 1단계(`maven:3.9-eclipse-temurin-21`)에서 루트 `pom.xml` + `dstone-common` + `dstone-boot`(+ 나머지 모듈은 리액터 구성을 위해 `pom.xml`만) 복사 후 `mvn -pl dstone-common,dstone-boot -am -DskipTests clean package`, 2단계(`eclipse-temurin:21-jre`)에서 `dstone-boot.war`만 담아 `-Dspring.profiles.active=k8s`로 기동. `dstone-ai-engine/Dockerfile`도 모듈명만 다를 뿐 동일한 구조다.
 - 이미지 태그는 로컬 사설 레지스트리(`localhost:5000`, kind 클러스터의 containerd에 미러로 등록됨)를 거친다. 레지스트리/클러스터 구성은 [software/kubernetes.md](software/kubernetes.md) 참고.
-- 배포 후 헬스체크: `kubectl get pods -n dstone -l app=dstone-boot`, `kubectl logs -n dstone deploy/dstone-boot --tail=30`. Readiness/Liveness 프로브는 각각 `/actuator/health/readiness`, `/actuator/health/liveness`.
+- 배포 후 헬스체크: `kubectl get pods -n dstone -l app=<dstone-boot|dstone-ai-engine>`, `kubectl logs -n dstone deploy/<...> --tail=30`. Readiness/Liveness 프로브는 각각 `/actuator/health/readiness`, `/actuator/health/liveness`.
+- ⚠️ **`dstone-ai-engine`을 실제 배포하기 전에 확인할 것**: RAG(Phase 2)가 의존하는 PostgreSQL(pgvector)과 Ollama가 아직 kind 게이트웨이 IP(`172.18.0.1`)로 열려있지 않다(dstone-boot이 겪었던 MySQL/Redis 게이트웨이 IP 조치가 이 둘에는 아직 적용 안 됨) — 상세: [cloud-architecture.md 7절](cloud-architecture.md#7-알려진-한계--후속-과제).
 
 ## 7. dstone-batch / dstone-batchadmin — VM 스타일 배포 (`bin/*.sh`)
 
@@ -127,15 +147,16 @@ DSTONE_PROFILE=vm ./startApp.sh   # Jenkins CI/CD 배포 경로용 프로파일
 
 ## 8. CI/CD (Jenkins)
 
-전제: 세 파이프라인 모두 Jenkins Job의 SCM 체크아웃 범위가 **모노레포 루트 전체**여야 한다(리액터 빌드 `-am` 옵션과 Docker 빌드 컨텍스트가 `dstone-common`을 함께 요구하기 때문).
+전제: 네 파이프라인 모두 Jenkins Job의 SCM 체크아웃 범위가 **모노레포 루트 전체**여야 한다(리액터 빌드 `-am` 옵션과 Docker 빌드 컨텍스트가 `dstone-common`을 함께 요구하기 때문).
 
 | 파이프라인 | 빌드 | 배포 단계 |
 |---|---|---|
 | `dstone-boot/Jenkinsfile` | `mvn -pl dstone-common,dstone-boot -am -DskipTests clean package` | `docker build/push`(로컬 레지스트리) → `kubectl apply` + `kubectl set image` + `rollout status`(kind `dstone` 네임스페이스) → 헬스체크(`kubectl get pods`/`logs`) |
+| `dstone-ai-engine/Jenkinsfile` | `mvn -pl dstone-common,dstone-ai-engine -am -DskipTests clean package` | dstone-boot과 동일 패턴(`docker build/push` → `kubectl apply`/`set image`/`rollout status` → 헬스체크). 파이프라인 자체는 완성돼 있으나 이 클러스터에서 아직 실행/최초 배포한 적은 없다. |
 | `dstone-batch/Jenkinsfile` | `mvn -pl dstone-common,dstone-batch -am -DskipTests clean package` | 아티팩트+`conf/`+`bin/`을 `/app/dstone/dstone-batch`(리포지토리 자기 자신)로 복사 → `bin/stopApp.sh` → `bin/startApp.sh`(`DSTONE_PROFILE=vm`) → `bin/statusApp.sh`로 `RUNNING` 확인 |
 | `dstone-batchadmin/Jenkinsfile` | `mvn -pl dstone-common,dstone-batchadmin -am -DskipTests clean package` | 위 dstone-batch와 동일 패턴, 배포 경로 `/app/dstone/dstone-batchadmin` |
 
-- 세 파이프라인 모두 실패 시 `post.failure`에서 로그 tail(`kubectl logs` 또는 `logs/*.out`)을 출력하고, `post.always`에서 워크스페이스를 정리(`deleteDir()`)한다.
+- 네 파이프라인 모두 실패 시 `post.failure`에서 로그 tail(`kubectl logs` 또는 `logs/*.out`)을 출력하고, `post.always`에서 워크스페이스를 정리(`deleteDir()`)한다.
 - Jenkins Controller는 WSL 호스트에 상주하며, `jenkins` 시스템 계정이 `docker` 그룹에 속해 있어 별도 인프라 없이 `docker`/`kubectl`을 실행한다. 설치/권한 설정은 [software/jenkins.md](software/jenkins.md) 참고.
 
 ## 9. 빌드 관련 트러블슈팅
@@ -144,3 +165,4 @@ DSTONE_PROFILE=vm ./startApp.sh   # Jenkins CI/CD 배포 경로용 프로파일
 - **`bin/startApp.sh` 실행 시 "실행할 jar/war 파일을 찾을 수 없습니다"**: 해당 모듈 디렉터리에서 `mvn clean package`를 먼저 실행해 `target/`에 아티팩트를 생성해야 한다.
 - **`docker build -f dstone-boot/Dockerfile ...`을 `dstone-boot/` 안에서 실행하면 실패**: 빌드 컨텍스트가 리포지토리 루트여야 한다(`dstone-common` 소스를 함께 COPY하므로) — 반드시 루트에서 `-f dstone-boot/Dockerfile ... .` 형태로 실행.
 - **Jenkins 파이프라인이 스파스 체크아웃(모듈 디렉터리만)으로 설정된 경우**: 리액터 빌드(`-am`)와 Docker 빌드 컨텍스트가 실패한다 — Job의 SCM 설정을 모노레포 루트 전체 체크아웃으로 변경해야 한다.
+- **`dstone-ai-engine`에서 RAG(Phase 2) 문서 적재 시 `NoClassDefFoundError: ChecksumInputStream`**: `dstone-common`이 직접 고정한 `commons-io 2.15.1`을 Maven이 "nearest wins"로 선택해, `spring-ai-tika-document-reader`가 필요로 하는 `commons-io 2.16.0+`의 클래스가 빠진다 — `dstone-ai-engine/pom.xml`의 `dependencyManagement`에서 이 모듈만 `commons-io`를 상향 고정해 해결했다. 상세: [dstone-ai-engine.md 11절](dstone-ai-engine.md#11-문제-해결-실제로-겪은-에러-모음).

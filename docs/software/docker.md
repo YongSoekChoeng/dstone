@@ -11,7 +11,7 @@
 - [7. 트러블슈팅](#7-트러블슈팅)
 
 ## 1. 개요
-컨테이너 런타임. `dstone-boot` 이미지 빌드/로컬 사설 레지스트리 운영 및 [kind](kubernetes.md) 기반 로컬 쿠버네티스 클러스터 구동에 사용한다.
+컨테이너 런타임. `dstone-boot`/`dstone-ai-engine` 이미지 빌드/로컬 사설 레지스트리 운영 및 [kind](kubernetes.md) 기반 로컬 쿠버네티스 클러스터 구동에 사용한다.
 
 ## 2. 설치 정보
 - 버전: Docker CE 29.7.2, Docker Compose plugin v5.5.0
@@ -140,7 +140,7 @@ fi
 현재 사용자(`jysn007`)는 `docker` 그룹에 속해 있어 `sudo` 없이 `docker` 명령을 사용할 수 있다. 그룹 변경 후에는 재로그인(WSL 재시작)이 필요하다.
 
 ## 6. dstone 프로젝트에서의 역할
-- `dstone-boot` 이미지 빌드/실행 환경(`dstone-boot/Dockerfile`) — `docker-buildx-plugin`이 있어야 하는 멀티스테이지 빌드(`maven:3.9-eclipse-temurin-21` → `eclipse-temurin:21-jre`)이며, 로컬 사설 레지스트리(`localhost:5000`)를 거쳐 kind에 배포한다. 빌드 컨텍스트는 반드시 리포지토리 루트(`dstone-common` 소스를 함께 COPY하므로). 상세는 [cloud-architecture.md](../cloud-architecture.md), [../build.md](../build.md#6-dstone-boot--컨테이너-빌드--kind-배포) 참고.
+- `dstone-boot`/`dstone-ai-engine` 이미지 빌드/실행 환경(`dstone-boot/Dockerfile`, `dstone-ai-engine/Dockerfile` — 동일한 구조) — `docker-buildx-plugin`이 있어야 하는 멀티스테이지 빌드(`maven:3.9-eclipse-temurin-21` → `eclipse-temurin:21-jre`)이며, 로컬 사설 레지스트리(`localhost:5000`)를 거쳐 kind에 배포한다. 빌드 컨텍스트는 반드시 리포지토리 루트(`dstone-common` 소스를 함께 COPY하므로). `dstone-ai-engine`은 매니페스트/이미지는 준비돼 있으나 아직 이 클러스터에 최초 배포한 적은 없다. 상세는 [cloud-architecture.md](../cloud-architecture.md), [../build.md](../build.md#6-dstone-boot--dstone-ai-engine--컨테이너-빌드--kind-배포) 참고.
 - `dstone-batch`/`dstone-batchadmin`은 Docker 이미지가 아니라 VM 스타일 `bin/*.sh`로 운영한다 — 이 두 모듈에는 Docker가 직접 관여하지 않는다.
 - [kind](kubernetes.md) 클러스터의 컨테이너 런타임으로도 사용된다(모든 클러스터 노드/레지스트리가 결국 Docker 컨테이너로 뜬다).
 

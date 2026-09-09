@@ -40,10 +40,42 @@ WSL을 재시작했다면 필요한 서비스를 먼저 `start-*.sh`로 올려�
 | CI/CD | Jenkins | 2.568.3 | Jenkins 공식 저장소 (`pkg.jenkins.io`) | 8080 | `start-jenkins.sh` / `stop-jenkins.sh` | [jenkins.md](software/jenkins.md) |
 | 런타임(부가) | Node.js + npm | 20.20.2 / 10.8.2 | NodeSource 저장소 (`deb.nodesource.com`) | - | - | [nodejs.md](software/nodejs.md) |
 | AI 모델 런타임 | Ollama | v0.33.3 | 수동 설치 (tar.zst, `/opt/ollama`, systemd 미등록) | 11434 | `start-ollama.sh` / `stop-ollama.sh` | [ollama.md](software/ollama.md) |
+| 관리 도구 | Ollama Web UI Lite | git HEAD | 수동 설치 (`git clone`, `/opt/ollama-webui-lite`) | 3000 | `/opt/ollama-webui-lite/start.sh` (`start-ollama.sh`에 포함) | [ollama-webui-lite.md](software/ollama-webui-lite.md) |
+
+한눈에 보는 그룹 구성:
+
+```mermaid
+flowchart TB
+    subgraph Lang["언어/빌드/형상관리"]
+        JDK["OpenJDK 21"] --- Maven["Maven"] --- Git["Git"]
+    end
+    subgraph Data["데이터 계층"]
+        MySQL[("MySQL 3306")]
+        PG[("PostgreSQL + pgvector 5432")]
+        Redis[("Redis 6379")]
+    end
+    subgraph MQ["메시징"]
+        RMQ["RabbitMQ 5672/15672"]
+        Kafka["Kafka 9092/9094/9093"] --- KafbatUI["Kafbat UI 9099"]
+    end
+    subgraph AI["AI 런타임 (신규)"]
+        Ollama["Ollama 11434"] --- WebUI["Ollama Web UI Lite 3000"]
+    end
+    subgraph Infra["컨테이너/오케스트레이션/CI"]
+        Docker["Docker CE"] --- Kind["kubectl + kind"]
+        Jenkins["Jenkins 8080"]
+    end
+
+    Data -.-> Apps(["dstone-boot / dstone-batch<br/>dstone-batchadmin"])
+    AI -.-> AiEngine(["dstone-ai-engine"])
+    MQ -.-> Apps
+    Infra -.-> Apps
+    Infra -.-> AiEngine
+```
 
 ## 3. 클라우드 아키텍처 시뮬레이션
 
-dstone-boot는 [kind](software/kubernetes.md)에 컨테이너 Pod로, dstone-batch/dstone-batchadmin은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운용한다. MySQL/Redis/RabbitMQ/Kafka는 CSP 매니지드 서비스에 대응시켜 클러스터 바깥에 둔다. 설계 배경과 네트워킹/레지스트리/CI-CD 세부사항은 [cloud-architecture.md](cloud-architecture.md) 참고.
+dstone-boot와 dstone-ai-engine은 [kind](software/kubernetes.md)에 컨테이너 Pod로(단, dstone-ai-engine은 매니페스트만 준비된 상태로 아직 미배포), dstone-batch/dstone-batchadmin은 systemd 없이 `bin/*.sh` 쉘 스크립트로 제어되는 VM 스타일 프로세스로 운용한다. MySQL/Redis/RabbitMQ/Kafka/PostgreSQL/Ollama는 CSP 매니지드 서비스(또는 자체 호스팅 추론 서버)에 대응시켜 클러스터 바깥에 둔다. 설계 배경과 네트워킹/레지스트리/CI-CD 세부사항은 [cloud-architecture.md](cloud-architecture.md) 참고.
 
 ## 4. dstone 프로젝트와의 연결 관계
 
@@ -55,6 +87,7 @@ dstone-boot는 [kind](software/kubernetes.md)에 컨테이너 Pod로, dstone-bat
 - **Docker / kind**: `dstone-boot`을 컨테이너 이미지로 빌드해 로컬 `kind` 클러스터에 Pod로 배포하는 환경(`dstone-boot/Dockerfile`, `dstone-boot/k8s/`). 상세는 [cloud-architecture.md](cloud-architecture.md) 참고.
 - **PostgreSQL**: **(2026-09-08 변경)** `dstone-ai-engine`의 RAG(Phase 2) VectorStore(pgvector)가 사용한다 - `dstone_ai` 롤/DB에 `vector` 확장을 켜서 문서 임베딩을 저장한다. 상세: [postgresql.md 6절](software/postgresql.md#6-dstone-프로젝트에서의-역할).
 - **Ollama**: `dstone-ai-engine`의 RAG(Phase 2) 임베딩 전용 로컬 모델 런타임(`bge-m3`). Anthropic은 임베딩 API가 없고 이 환경엔 OpenAI 키 대신 로컬 모델을 쓰기로 해서 추가했다 - 채팅(Claude)과는 무관하다.
+- **Ollama Web UI Lite**: Ollama 모델 조회/pull/삭제·수동 채팅 테스트용 관리 콘솔. `dstone` 애플리케이션 자체와는 직접적인 런타임 의존관계가 없는 부가 도구(Kafka의 Kafbat UI와 같은 역할) - `start-ollama.sh`/`stop-ollama.sh`가 Ollama와 함께 기동/중지한다.
 - **Node.js**: 현재 dstone 서비스 자체 설정(`application.yml`)에서는 사용하지 않는 것으로 보이며, 개발 환경 실습/부가 도구 용도로 설치되어 있음. 실제 프로젝트 연동이 생기면 이 문서와 CLAUDE.md를 갱신할 것.
 
 ## 5. 개발환경 시작/정지 (`~/start.sh` / `~/stop.sh`)
@@ -187,7 +220,7 @@ stop-jenkins.sh
 → [docker.md 4절](software/docker.md#4-서비스-시작중지)
 
 #### 5.2.8 Kubernetes 정지 (`/usr/local/bin/stop-kube.sh`)
-→ [kubernetes.md 5절](software/kubernetes.md#5-서비스클러스터-시작중지) — `--delete` 옵션(클러스터 완전 삭제)은 [kubernetes.md 6절](software/kubernetes.md#6-로컬-사설-레지스트리-dstone-boot-이미지-배포용)에 정리되어 있으며, `~/stop.sh` 경유로는 전달할 수 없어 필요하면 `k8s-stop.sh --delete`를 직접 호출해야 한다.
+→ [kubernetes.md 5절](software/kubernetes.md#5-서비스클러스터-시작중지) — `--delete` 옵션(클러스터 완전 삭제)은 [kubernetes.md 6절](software/kubernetes.md#6-로컬-사설-레지스트리-dstone-boot--dstone-ai-engine-이미지-배포용)에 정리되어 있으며, `~/stop.sh` 경유로는 전달할 수 없어 필요하면 `k8s-stop.sh --delete`를 직접 호출해야 한다.
 
 **주의**: 5.2.7(`stop-docker.sh`)과 5.2.8(`stop-kube.sh`)이 각각 dockerd를 내리는 경로를 갖고 있어 dockerd 정지 시도가 사실상 중복 실행된다(문제는 없음 — 상세는 두 문서 참고).
 

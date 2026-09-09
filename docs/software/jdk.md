@@ -38,7 +38,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 ```
 
 ## 5. dstone 프로젝트에서의 역할
-모든 모듈(`pom.xml`)의 컴파일/실행 대상 JDK. `dstone-boot`(WAR, 7081), `dstone-batch`(JAR, 6081), `dstone-batchadmin`(WAR, 5081) 실행 시 `java -jar` 명령의 런타임으로 사용된다.
+모든 모듈(`pom.xml`)의 컴파일/실행 대상 JDK. `dstone-boot`(WAR, 7081), `dstone-batch`(JAR, 6081), `dstone-batchadmin`(WAR, 5081), `dstone-ai-engine`(JAR, 8081) 실행 시 `java -jar` 명령의 런타임으로 사용된다.
 
 ## 6. 트러블슈팅
 - **여러 JDK가 공존하는 환경**: `update-alternatives --list java`로 후보를 확인하고 `sudo update-alternatives --config java`로 21을 기본으로 선택한다. IDE(Eclipse/IntelliJ)에서 별도 프로젝트 JDK를 지정하는 경우 IDE 설정도 `/usr/lib/jvm/java-21-openjdk-amd64`로 맞춰야 한다.

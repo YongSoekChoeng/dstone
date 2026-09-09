@@ -8,6 +8,7 @@
 - [4. 서비스 시작/중지](#4-서비스-시작중지)
 - [5. 동작 확인](#5-동작-확인)
 - [6. dstone 프로젝트에서의 역할](#6-dstone-프로젝트에서의-역할)
+- [7. 문제 해결 (Ollama Web UI Lite 연동 중 실제로 겪은 에러)](#7-문제-해결-ollama-web-ui-lite-연동-중-실제로-겪은-에러)
 
 ## 1. 개요
 `dstone-ai-engine`의 RAG(Phase 2) 임베딩 전용 로컬 모델 런타임. Anthropic(Claude, 채팅용)은 임베딩 생성 API를 제공하지 않고, 이 환경엔 OpenAI API 키도 없어서 로컬에서 무료로 돌릴 수 있는 임베딩 모델을 위해 설치했다 - 채팅(Claude) 자체와는 무관하다. apt 패키지가 아닌 공식 tar.zst 배포판을 `/opt/ollama`에 수동 설치했고, kafka와 동일하게 systemd에 등록하지 않았다.
@@ -17,7 +18,9 @@
 - 설치 방식: 수동 설치 (공식 GitHub Releases tar.zst)
 - 설치 경로: `/opt/ollama`
 - 모델 데이터 디렉터리: `/opt/ollama/data` (`OLLAMA_MODELS` 환경변수로 지정 - 홈 디렉터리 기본 경로 대신 kafka의 데이터 디렉터리처럼 설치 경로 안에 자체 포함시킴)
-- 설치된 모델: `bge-m3` (다국어/한국어 지원 임베딩 모델, 1024차원)
+- 설치된 모델:
+  - `bge-m3` - 다국어/한국어 지원 임베딩 모델, 1024차원. `dstone-ai-engine` RAG(Phase 2) 전용, **채팅 불가**([ollama-webui-lite.md 8.2절](ollama-webui-lite.md#82-curl로-재현하면-error-모델명-does-not-support-chat) 참고)
+  - `llama3.2` (3B) - [Ollama Web UI Lite](ollama-webui-lite.md)에서 수동 채팅 테스트용으로 추가. CPU 전용 + 가용 메모리 제약(이 WSL 환경 기준 4~5GB) 때문에 가벼운 모델로 골랐다 - `dstone-ai-engine`은 이 모델을 쓰지 않는다(채팅은 Anthropic Claude가 담당)
 
 ## 3. 설치 방법 (실제 수행된 절차)
 최신 릴리스는 `.tgz`가 아니라 `.tar.zst`로 배포되므로 `zstd` 패키지가 먼저 필요하다.
@@ -55,15 +58,20 @@ mkdir -p /opt/ollama/data /opt/ollama/logs
 # /usr/local/bin/start-ollama.sh
 /opt/ollama/ollama-start.sh
 echo "Ollama started !!! (dstone-ai-engine RAG 임베딩 전용 로컬 모델 런타임, http://localhost:11434)"
+/opt/ollama-webui-lite/start.sh
+echo "Ollama Web UI Lite started !!! http://localhost:3000"
 ```
 ```sh
 # /usr/local/bin/stop-ollama.sh
 /opt/ollama/ollama-stop.sh
 echo "Ollama stopped !!!"
+/opt/ollama-webui-lite/stop.sh
+echo "Ollama Web UI Lite stopped !!!"
 ```
 
-- `/opt/ollama/ollama-start.sh`: `OLLAMA_MODELS=/opt/ollama/data nohup bin/ollama serve`로 백그라운드 기동, PID를 `ollama-server.pid`에 기록. 이미 실행 중이면 중복 실행 방지. 기본 포트 11434는 `127.0.0.1`에만 바인딩된다(`OLLAMA_HOST` 미지정) - mysql/redis처럼 kind 브리지 게이트웨이(`172.18.0.1`)로 열어주는 건 `dstone-ai-engine`을 실제로 kind에 배포하는 시점에 처리한다.
+- `/opt/ollama/ollama-start.sh`: `OLLAMA_MODELS=/opt/ollama/data OLLAMA_HOST=[::]:11434 OLLAMA_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 nohup bin/ollama serve`로 백그라운드 기동, PID를 `ollama-server.pid`에 기록. 이미 실행 중이면 중복 실행 방지. `OLLAMA_HOST=[::]:11434`(IPv6 wildcard, 리눅스에서 기본적으로 IPv4도 함께 받는 dual-stack)로 바인딩한다 - 원래 기본값(`127.0.0.1`, IPv4 전용)이었다가 [Ollama Web UI Lite](ollama-webui-lite.md) 연동 중 IPv6 루프백 미지원 문제로 넓혔다([7절](#7-문제-해결-ollama-web-ui-lite-연동-중-실제로-겪은-에러) 참고). mysql/redis도 WSL 네트워크 특성상 같은 이유로 바인딩을 넓힌 전례가 있다 - kind 브리지 게이트웨이(`172.18.0.1`)로의 실제 노출/방화벽 조정은 `dstone-ai-engine`을 kind에 배포하는 시점에 별도로 처리한다. `OLLAMA_ORIGINS`는 웹UI(포트 3000)의 브라우저 cross-origin 호출을 허용하기 위한 것.
 - `/opt/ollama/ollama-stop.sh`: PID 파일 기준 `kill` (정상 종료 최대 30초 대기 후 `kill -9` 강제 종료).
+- **(2026-09-09 추가)** `/usr/local/bin/start-ollama.sh`/`stop-ollama.sh`가 Ollama 서버와 [Ollama Web UI Lite](ollama-webui-lite.md)(관리 콘솔, 포트 3000)를 함께 기동/중지한다 - kafka가 [Kafbat UI](kafbat-ui.md)를 같이 다루는 것과 동일한 구조.
 
 로그: `/opt/ollama/logs/ollama-server.out`
 
@@ -77,3 +85,15 @@ curl http://localhost:11434/api/embed -d '{"model": "bge-m3", "input": "테스�
 
 ## 6. dstone 프로젝트에서의 역할
 `dstone-ai-engine`의 `spring.ai.model.embedding: ollama`(`conf/application.yml`)가 이 서버를 가리킨다(`spring.ai.ollama.base-url: http://localhost:11434`, `spring.ai.ollama.embedding.model: bge-m3`). `net.dstone.ai.rag.ingest.DocumentIngestService`가 문서를 청크로 쪼갠 뒤 이 임베딩 모델로 벡터화해서 [PostgreSQL(pgvector)](postgresql.md#6-dstone-프로젝트에서의-역할)에 저장하고, `net.dstone.ai.rag.retrieval.RetrievalService`/`ChatController`의 RAG-증강 채팅이 검색 시에도 동일한 모델로 질의를 벡터화한다. `dstone.ai.rag.enabled=false`(또는 미설정)면 이 서버가 없어도 `dstone-ai-engine`은 그대로 기동된다.
+
+## 7. 문제 해결 (Ollama Web UI Lite 연동 중 실제로 겪은 에러)
+
+### 7.1 웹UI에서 채팅 시 `Uh-oh! There was an issue connecting to Ollama.`
+- **증상**: http://localhost:3000 페이지 자체는 정상 로딩되는데, 모델 목록 조회는 되는 경우도 있으나 채팅(`/api/chat`) 요청이 브라우저에서 실패한다.
+- **원인**: Ollama가 `OLLAMA_HOST` 기본값(`127.0.0.1`, **IPv4 전용**)으로만 리슨하고 있었다. [Ollama Web UI Lite](ollama-webui-lite.md)를 서빙하는 Vite 개발 서버는 IPv4/IPv6를 모두 열어두는데, 브라우저가 `localhost`를 IPv6(`::1`)로 먼저 시도하면 Ollama가 IPv6 루프백은 듣고 있지 않아 그 자리에서 connection refused가 나고, 이게 브라우저 fetch() 자체의 실패(네트워크 레벨)로 이어져 위 메시지가 뜬다. CORS 문제가 아니었다 - `curl -H "Origin: ..."`로 확인한 CORS 헤더는 처음부터 정상이었음.
+  ```bash
+  # 진단: IPv4는 되는데 IPv6는 거부됨
+  curl -4 http://127.0.0.1:11434/api/tags   # 정상
+  curl -6 http://[::1]:11434/api/tags       # Connection refused
+  ```
+- **조치**: `OLLAMA_HOST=[::]:11434`(IPv6 wildcard - 리눅스에서 기본적으로 IPv4 연결도 함께 받는 dual-stack)로 바인딩을 넓혔다([4절](#4-서비스-시작중지) 참고). 재시작 후 `curl -6 http://[::1]:11434/api/tags`도 정상 응답하는 것으로 확인.

@@ -43,14 +43,15 @@ dstone 프레임워크를 실제 클라우드 배포와 최대한 유사한 구�
 
 | dstone 구성요소 | 클라우드 대응 개념 | WSL 구현 |
 |---|---|---|
-| MySQL / Redis / RabbitMQ / Kafka | RDS / ElastiCache / Amazon MQ / MSK (매니지드 서비스) | 기존 WSL 설치 그대로, k8s 클러스터 **바깥**에서 네트워크로 접근 |
+| MySQL / Redis / RabbitMQ / Kafka / PostgreSQL | RDS / ElastiCache / Amazon MQ / MSK (매니지드 서비스) | 기존 WSL 설치 그대로, k8s 클러스터 **바깥**에서 네트워크로 접근 |
+| Ollama | SageMaker/Bedrock 같은 매니지드 추론 엔드포인트(단, 실제로는 자체 호스팅) | WSL에 수동 설치한 순수 프로세스(systemd 미등록, `/opt/ollama`) - k8s 클러스터와 무관하게 항상 클러스터 바깥에 존재 |
 | dstone-boot | EKS/GKE 위 Deployment (stateless 웹 티어) | 컨테이너화(`dstone-boot/Dockerfile`) 후 로컬 `kind` 클러스터에 Pod로 배포(`dstone-boot/k8s/`) |
-| dstone-ai-engine | EKS/GKE 위 Deployment (AI 서빙 티어) | dstone-boot과 동일 패턴: 컨테이너화(`dstone-ai-engine/Dockerfile`) 후 `kind` 클러스터에 Pod로 배포(`dstone-ai-engine/k8s/`, 같은 `dstone` 네임스페이스, 포트 8081). **(2026-09-07 추가)** 매니페스트/Dockerfile/Jenkinsfile은 작성 완료했으나, 이 클러스터에는 아직 최초 배포(`kubectl apply`)를 하지 않은 상태 — Phase 0은 MySQL/Redis/RabbitMQ/Kafka에 의존하지 않아 dstone-boot의 게이트웨이 IP 네트워킹 조치(2절)가 필요 없다. |
+| dstone-ai-engine | EKS/GKE 위 Deployment (AI 서빙 티어) | dstone-boot과 동일 패턴: 컨테이너화(`dstone-ai-engine/Dockerfile`) 후 `kind` 클러스터에 Pod로 배포(`dstone-ai-engine/k8s/`, 같은 `dstone` 네임스페이스, 포트 8081). 매니페스트/Dockerfile/Jenkinsfile은 작성 완료했으나, 이 클러스터에는 아직 최초 배포(`kubectl apply`)를 하지 않은 상태다. **(2026-09-09 갱신)** Phase 0 시점엔 어떤 인프라에도 의존하지 않았지만, 이후 Phase 1(Redis, 대화 히스토리)과 Phase 2(PostgreSQL+pgvector, Ollama — RAG용)가 추가되면서 실제 kind 배포 시에는 dstone-boot이 겪었던 것과 동일한 게이트웨이 IP 네트워킹 조치(2절)가 **Redis뿐 아니라 PostgreSQL/Ollama에 대해서도** 필요해질 전망이다(아직 미착수 - [software/postgresql.md 6절](software/postgresql.md#6-dstone-프로젝트에서의-역할), [software/ollama.md 4절](software/ollama.md#4-서비스-시작중지)의 "k8s 미배포" 메모 참고). |
 | dstone-batch | EC2 (배치 워커 VM) | systemd **미사용**. `dstone-batch/bin/*.sh`로 기동/중지하는 순수 프로세스, 포트 6081 |
 | dstone-batchadmin | EC2 (배치 관제/스케줄러 VM) | 동일하게 `dstone-batchadmin/bin/*.sh`, 포트 5081 |
 | Jenkins | 자체 관리형 CI 서버(VM 상주) | WSL 호스트에 Controller 상주 유지. 에이전트도 로컬 실행(향후 Kubernetes Plugin으로 에이전트만 kind Pod화하는 것을 다음 단계로 고려) |
 
-MySQL/Redis/RabbitMQ/Kafka를 k8s 클러스터 밖에 두는 이유: 실제 클라우드에서도 RDS/ElastiCache 등은 EKS 클러스터 내부가 아니라 VPC의 별도 관리형 엔드포인트로 존재한다. 이 구조를 그대로 흉내내, "클러스터 안에서 뭘 만들지"와 "클러스터 밖 관리형 서비스에 어떻게 접근할지"를 구분해서 학습할 수 있게 했다.
+MySQL/Redis/RabbitMQ/Kafka/PostgreSQL/Ollama를 k8s 클러스터 밖에 두는 이유: 실제 클라우드에서도 RDS/ElastiCache 등은 EKS 클러스터 내부가 아니라 VPC의 별도 관리형 엔드포인트(또는 별도 호스팅되는 추론 서버)로 존재한다. 이 구조를 그대로 흉내내, "클러스터 안에서 뭘 만들지"와 "클러스터 밖 관리형 서비스에 어떻게 접근할지"를 구분해서 학습할 수 있게 했다.
 
 ## 2. dstone-boot ↔ kind 네트워킹
 
@@ -527,3 +528,4 @@ kubectl delete -f dstone-boot/k8s/
 - ~~`dstone-boot`은 `bootstrap-servers`가 `localhost:9092`로 하드코딩되어 있어 컨테이너에서는 연결되지 않는다~~ → **해결됨**: `bootstrap-servers`를 `${KAFKA_HOST}:${KAFKA_PORT}`로 환경변수화했다. Kafka 쪽은 처음엔 `advertised.listeners`를 kind 게이트웨이 IP(`172.18.0.1`) 하나로 바꿔서 Pod 연결을 해결했었는데, 2026-09-07에 로컬 PC/WSL 네이티브 클라이언트가 먹통이 되는 부작용이 드러나 리스너를 `9092`(로컬 전용, `127.0.0.1`)/`9094`(kind Pod 전용, `172.18.0.1`)로 분리했다 — 지금은 `k8s` 프로파일의 `KAFKA_PORT=9094`, `wsl` 프로파일의 `KAFKA_PORT=9092`가 최종 상태다("dstone-boot ↔ kind 네트워킹" 5번 항목 참고). `/actuator/health`(전체)가 `DOWN`으로 보이는 경우가 여전히 있다면 Kafka/DB/Redis 중 하나가 실제로 내려가 있는 것이니 `kubectl logs`로 원인을 확인한다(k8s 프로브는 `/actuator/health/readiness`·`/actuator/health/liveness`만 사용하므로 배포 자체에는 영향 없음).
 - `dstone-boot/conf/application.yml`의 `sftp.password`가 평문으로 하드코딩되어 있음 — 이번 작업 범위 밖이라 손대지 않았지만 별도로 정리가 필요하다.
 - `dstone-boot` NodePort 서비스는 kind 클러스터가 `extraPortMappings` 없이 생성되어 있어 호스트에서 바로 접속하려면 `kubectl port-forward`가 필요하다. 호스트 포트로 직접 노출하려면 kind 클러스터를 `extraPortMappings` 설정과 함께 재생성해야 한다.
+- **(2026-09-09 추가)** `dstone-ai-engine`을 실제로 kind에 배포하기 전에 처리해야 할 것: RAG(Phase 2)가 의존하는 PostgreSQL(`5432`)과 Ollama(`11434`)는 현재 `127.0.0.1`/`[::]`(로컬)에만 바인딩돼 있어 kind Pod에서 접근이 안 된다 — mysql/redis가 이미 겪었던 것과 동일한 성격의 작업(`listen_addresses`/`OLLAMA_HOST`를 kind 게이트웨이 IP `172.18.0.1`까지 포함하도록 확장 + `env-k8s.properties`의 `DB_HOST`가 이미 `172.18.0.1`로 채워져 있음 - 실제 접속 테스트만 남음)이 필요하다. 상세: [dstone-ai-engine.md 9절](dstone-ai-engine.md#9-필요-인프라).

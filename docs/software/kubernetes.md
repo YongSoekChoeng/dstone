@@ -7,7 +7,7 @@
 - [3. 설치 방법 (실제 수행된 절차)](#3-설치-방법-실제-수행된-절차)
 - [4. 클러스터 구성](#4-클러스터-구성)
 - [5. 서비스(클러스터) 시작/중지](#5-서비스클러스터-시작중지)
-- [6. 로컬 사설 레지스트리 (dstone-boot 이미지 배포용)](#6-로컬-사설-레지스트리-dstone-boot-이미지-배포용)
+- [6. 로컬 사설 레지스트리 (dstone-boot / dstone-ai-engine 이미지 배포용)](#6-로컬-사설-레지스트리-dstone-boot--dstone-ai-engine-이미지-배포용)
 - [7. 동작 확인](#7-동작-확인)
 - [8. dstone 프로젝트에서의 역할](#8-dstone-프로젝트에서의-역할)
 - [9. 호스트 포트로 직접 노출하고 싶다면 (`extraPortMappings`)](#9-호스트-포트로-직접-노출하고-싶다면-extraportmappings)
@@ -76,7 +76,7 @@ echo "Kubenetes stopped !!!"
 5. `kind-registry` 컨테이너를 `kind` 도커 네트워크에 연결(아직 연결 안 돼 있으면)
 6. `kubectl get nodes`로 노드 준비 상태 확인
 
-## 6. 로컬 사설 레지스트리 (dstone-boot 이미지 배포용)
+## 6. 로컬 사설 레지스트리 (dstone-boot / dstone-ai-engine 이미지 배포용)
 - kind 공식 "local registry" 레시피 적용: `docker build` → `docker push localhost:5000/<image>` → Pod가 `localhost:5000/<image>`를 그대로 `image:`에 지정하면 클러스터 노드의 containerd가 `kind-registry:5000`으로 라우팅해서 pull한다.
 - 클러스터를 수동으로 재생성해야 한다면(`kind delete cluster --name dev` 후) 반드시 `k8s-start.sh`를 통해 재생성하거나, 그 안의 `containerdConfigPatches` kind config를 그대로 사용해야 레지스트리 미러가 다시 인식된다 (`kind create cluster`만 단독으로 실행하면 미러 설정이 빠진다).
 - 확인: `docker network inspect kind`에 `kind-registry` 컨테이너가 보여야 하고, `kubectl get pods -A`에서 이미지 pull 이벤트가 `localhost:5000/...`을 정상적으로 가져오는지 `kubectl describe pod`로 확인.
@@ -93,6 +93,8 @@ kind get clusters
 
 ## 8. dstone 프로젝트에서의 역할
 `dstone-boot`이 이 클러스터의 `dstone` 네임스페이스에 Deployment/Service/ConfigMap으로 배포된다(매니페스트: `dstone-boot/k8s/`, Service는 `NodePort`로 `nodePort: 30081` ↔ `port: 7081` 매핑). `dstone-boot/Jenkinsfile`이 이미지를 빌드해 로컬 레지스트리에 푸시한 뒤 `kubectl apply`/`kubectl set image`로 배포한다. 실제 배포/조회/재시작/롤백 등 운영 명령 전체 목록은 [cloud-architecture.md 6절](../cloud-architecture.md#6-kubectl-운영-명령-dstone-boot) 참고.
+
+`dstone-ai-engine`도 같은 `dstone` 네임스페이스에 동일한 패턴(매니페스트: `dstone-ai-engine/k8s/`, 포트 8081)으로 배포하도록 준비되어 있으나, **이 클러스터에는 아직 최초 배포(`kubectl apply`)를 한 적이 없다** — RAG(Phase 2)가 의존하는 PostgreSQL/Ollama가 아직 kind 게이트웨이 IP로 열려있지 않아서다. 상세: [dstone-ai-engine.md](../dstone-ai-engine.md), [cloud-architecture.md 7절](../cloud-architecture.md#7-알려진-한계--후속-과제).
 
 ## 9. 호스트 포트로 직접 노출하고 싶다면 (`extraPortMappings`)
 현재 `k8s-start.sh`가 만드는 클러스터는 `extraPortMappings` 없이 생성되어 있어, 호스트에서 `http://localhost:30081`처럼 NodePort로 바로 접속할 수 없다 — [cloud-architecture.md 6.7절](../cloud-architecture.md#67-애플리케이션-접속-호스트--pod)에 정리된 대로 `kubectl port-forward`가 유일한 접근 경로다. `kubectl port-forward` 없이 `localhost:30081`로 바로 붙고 싶다면, 클러스터를 아래 설정을 포함해 재생성하면 된다(**주의: 클러스터 재생성은 그 안의 모든 리소스를 지운다** — 재생성 후 [cloud-architecture.md 6.3절](../cloud-architecture.md#63-최초-배포--전체-재적용)의 매니페스트를 다시 `apply`해야 함).

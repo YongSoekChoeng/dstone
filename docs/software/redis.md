@@ -12,7 +12,7 @@
 - [8. dstone 프로젝트에서의 역할](#8-dstone-프로젝트에서의-역할)
 
 ## 1. 개요
-`dstone-boot`의 분산 세션 저장소(`dstone:session` 네임스페이스) 및 캐시 용도로 사용하는 인메모리 데이터 저장소.
+`dstone-boot`의 분산 세션 저장소(`dstone:session` 네임스페이스) 및 캐시 용도로 사용하는 인메모리 데이터 저장소. **(2026-09 업데이트)** `dstone-ai-engine`도 Phase 1부터 대화 히스토리(ChatMemory) 저장에 별도 네임스페이스(`dstone:ai:session:*`)로 같은 Redis 인스턴스를 재사용한다.
 
 ## 2. 설치 정보
 - 버전: Redis 8.0.5
@@ -92,4 +92,7 @@ redis-cli keys "dstone:session:*"
 `start-redis.sh` 실행 시 안내되는 대로, Windows 쪽 `Another Redis Desktop Manager`로 접속해 실시간 확인 가능 (`localhost:6379`).
 
 ## 8. dstone 프로젝트에서의 역할
-`dstone-boot`의 Spring Session 저장소로 사용되며, Redis 기반 분산 세션 구성(`dstone:session` 네임스페이스)에 필요하다. 접속 정보는 `conf/env.properties`의 `REDIS_HOST`/`REDIS_PORT`로 주입된다.
+- **`dstone-boot`**: Spring Session 저장소로 사용되며, Redis 기반 분산 세션 구성(`dstone:session` 네임스페이스)에 필요하다.
+- **`dstone-ai-engine`**: `net.dstone.ai.session.RedisChatMemoryRepository`가 대화 히스토리(ChatMemory)를 `dstone:ai:session:{conversationId}` 키(List)에, 존재하는 대화 ID 목록은 `dstone:ai:session:index`(Set)에 저장한다 - `dstone-boot`의 HTTP 세션 네임스페이스와 겹치지 않도록 별도 prefix를 쓴다. 상세: [dstone-ai-engine.md 5.3절](../dstone-ai-engine.md#53-session--redis-기반-대화-히스토리).
+
+두 모듈 모두 접속 정보는 각자의 `conf/env*.properties`의 `REDIS_HOST`/`REDIS_PORT`로 주입된다.
