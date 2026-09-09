@@ -8,10 +8,12 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
@@ -45,6 +47,13 @@ public class ChatController extends BaseController {
 
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request) {
+		if (StringUtil.isEmpty(request.message())) {
+			// message 없이 호출하면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
+			// IllegalArgumentException을 던지는데, 이게 그대로 500으로 나가버려 원인을 알 수 없었다.
+			// 여기서 먼저 막아 400과 함께 명확한 사유를 준다.
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
+		}
+
 		String sessionId = StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId();
 
 		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt()
