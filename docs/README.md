@@ -90,7 +90,7 @@ mvn clean install
 | [dstone-boot.md](dstone-boot.md) | 웹 애플리케이션 프레임워크 및 소스 코드 분석기 |
 | [dstone-batch.md](dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
 | [dstone-batchadmin.md](dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
-| [dstone-ai-engine.md](dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2) |
+| [dstone-ai-engine.md](dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2), Agent/Tool·Function Calling(Phase 3) |
 | [dstone-saga.md](dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
 | [build.md](build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 

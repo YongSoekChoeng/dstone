@@ -411,6 +411,8 @@ dstone-ai-engine agent: 등록된 Tool = getCurrentDateTime, searchKnowledgeBase
 
 ## 8. API 레퍼런스
 
+> 💡 아래 요청들을 curl 없이 바로 눌러보고 싶다면 [Postman 컬렉션](data/dstone-ai-engine-postman-collection.json)을 import한다 — 일반 채팅/RAG-증강/Tool 사용 채팅과 RAG 문서 업로드/삭제/검색까지 전부 준비돼 있다.
+
 ### `POST /api/ai/chat` — 채팅 (일반 / RAG-증강 / Tool 사용)
 
 <details>
