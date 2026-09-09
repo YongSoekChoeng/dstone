@@ -330,6 +330,8 @@ Spring AI의 Tool Calling(Function Calling)을 감싸서, **SI 프로젝트가 �
 
 ### 7.1 Tool 호출 흐름
 
+한눈에 보면 이렇다 — 등록(기동 시 1회) → LLM에게 통지(요청마다) → 실행 루프(tool_use가 나올 때마다), 3단계로 나뉜다.
+
 ```mermaid
 sequenceDiagram
     actor Client
@@ -350,6 +352,61 @@ sequenceDiagram
     CC-->>Client: 최종 답변
 ```
 
+#### 1단계 — 기동 시점: Tool 등록 (Reflection 기반)
+
+```mermaid
+flowchart LR
+    A["@AiTool 클래스<br/>(DateTimeTools, RetrievalTools)"] -->|ApplicationContext.getBeansWithAnnotation| B["ConfigTool.discover()"]
+    B -->|리플렉션으로 @Tool 메소드 스캔| C["MethodToolCallbackProvider"]
+    C -->|메소드 시그니처 → JSON Schema 자동 생성| D["ToolCallback[]<br/>(name, description, inputSchema)"]
+```
+
+`ConfigTool`이 `@AiTool` 빈들을 찾아서, 그 안의 **`public` + `@Tool` 붙은 메소드**를 리플렉션으로 뒤진다. 각 메소드마다 `ToolDefinition`을 만드는데, 이때 메소드의 **파라미터 타입/이름(`-parameters` 컴파일 옵션 필요)과 `@ToolParam` 설명**을 보고 **JSON Schema를 자동 생성**한다.
+
+| 메소드 | 생성되는 JSON Schema(개념) |
+|---|---|
+| `getCurrentDateTime()` (파라미터 없음) | 빈 스키마 |
+| `searchKnowledgeBase(@ToolParam(description="검색할 질문 또는 키워드") String query)` | `{"query": {"type":"string", "description":"검색할 질문 또는 키워드"}}` |
+
+#### 2단계 — 채팅 요청 시: LLM에게 "이런 도구들이 있다"고 알려줌
+
+`ChatController`가 `.toolCallbacks(configTool.toolCallbackProvider())`로 붙이면, 이 요청이 Claude API로 나갈 때 **`tools` 파라미터에 방금 만든 ToolDefinition 목록(이름/설명/스키마)이 그대로 실린다**. Claude는 이 설명"만" 보고 — 실제 코드는 전혀 모른 채로 — "이 질문엔 이 도구를 써야겠다"를 스스로 판단한다. **이 판단 자체가 별도 로직이 아니라 Claude 모델 자체의 생성 결과**다(tool-use를 학습한 LLM이 다음 토큰으로 "일반 텍스트" 대신 "도구 호출 요청" 형태를 생성하는 것 - 6.5절/7.5절에서 본 "LLM이 스스로 판단"이 바로 이 지점이다).
+
+#### 3단계 — 실제 실행 루프: `ToolCallingManager`
+
+```mermaid
+sequenceDiagram
+    participant Ctrl as ChatController
+    participant CM as AnthropicChatModel
+    participant TCM as ToolCallingManager
+    participant Claude as Claude API
+    participant Method as 실제 Java 메소드<br/>(예: searchKnowledgeBase)
+
+    Ctrl->>CM: call() (message + tools)
+    CM->>Claude: 1차 요청 (message + tool 목록)
+    Claude-->>CM: "searchKnowledgeBase(query='...')를 호출해줘" (tool_use)
+    CM->>TCM: executeToolCalls(prompt, response)
+    TCM->>Method: 이름으로 ToolCallback 찾아서 실제 메소드 리플렉션 호출
+    Method-->>TCM: 리턴값(String)
+    TCM-->>CM: 대화 히스토리에 tool 결과 추가된 새 Prompt
+    CM->>Claude: 2차 요청 (원래 메시지 + tool_use + tool 결과)
+    Claude-->>CM: 최종 자연어 답변 (더 이상 tool_use 없음)
+    CM-->>Ctrl: 최종 답변만 반환
+```
+
+핵심은 `org.springframework.ai.model.tool.ToolCallingManager`(구현체 `DefaultToolCallingManager`)다:
+- `resolveToolDefinitions()` — 요청에 실을 도구 목록 준비
+- `executeToolCalls(Prompt, ChatResponse)` — Claude 응답에 tool 호출 요청이 있으면, **이름으로 매칭되는 `ToolCallback`을 찾아 실제 자바 메소드를 리플렉션으로 실행**하고, 결과를 새 메시지(`ToolResponseMessage`)로 만들어 대화 히스토리에 추가
+
+이 왕복(1차 요청 → tool 실행 → 2차 요청 → 최종 답변)이 **Claude가 더 이상 tool을 요청하지 않을 때까지 자동으로 반복**되는 게 바로 7.3절에서 말하는 "단순 오케스트레이션"의 정체다 — `ChatModel.call()` 내부에서 다 처리되고, `ChatController` 입장에선 `.call().content()` 한 줄이 끝날 때까지 이 왕복이 몇 번 일어났는지조차 알 필요가 없다.
+
+| 단계 | 누가 | 뭘 함 |
+|---|---|---|
+| 등록 | `ConfigTool` (기동 시 1회) | 리플렉션으로 `@Tool` 메소드 → JSON Schema 생성 |
+| 판단 | Claude (매 요청) | 도구 설명만 보고 호출 여부/인자 스스로 결정 |
+| 실행 | `ToolCallingManager` (매 tool_use마다) | 이름 매칭 → 실제 메소드 리플렉션 호출 |
+| 반복 | `ChatModel` 내부 루프 | tool_use 없어질 때까지 1~3 반복 |
+
 ### 7.2 Tool 등록 체계 — `@AiTool` 하나로 등록
 
 ```java
@@ -364,14 +421,14 @@ public class DateTimeTools {
 }
 ```
 
-- `config.ConfigTool`이 기동 시점에 `@AiTool`이 붙은 모든 스프링 빈을 찾아, 그 안의 `@Tool` 메소드들을 `ToolCallbackProvider`로 묶는다(`MethodToolCallbackProvider` 기반) - dstone-boot/batch/batchadmin과 동일한 컨벤션대로 `config.Config`에서 다른 `Config*` 클래스들과 함께 `@Import`된다.
+- `config.ConfigTool`이 기동 시점에 이 빈을 찾아 등록하는 정확한 과정은 7.1절 1단계 참고 - dstone-boot/batch/batchadmin과 동일한 컨벤션대로 `config.Config`에서 다른 `Config*` 클래스들과 함께 `@Import`된다.
 - `@Tool(description = ...)`이 곧 LLM에게 "이 도구가 뭘 하는지" 알려주는 설명이다 — LLM은 이 설명만 보고 언제 호출할지 스스로 판단한다(사람이 if/else로 분기하지 않음).
 - 새 Tool이 필요하면 이 패턴 그대로 클래스 하나 추가하면 끝 — `gateway`/`prompt` 패키지와 동일한 "설정/컨벤션만 따르면 코드 추가 없이 동작"하는 철학이다.
 - SI 프로젝트마다 실제로 필요한 Tool은 완전히 다를 것이므로(사내 시스템 API 호출, 계산기, 검색 등), 지금 포함된 `DateTimeTools`는 **패턴을 보여주는 샘플**이다(`dstone-boot`의 `sample/` 패키지와 같은 성격 - 실제 배포 시 지우거나 자기 도메인 Tool로 교체).
 
 ### 7.3 "단순 오케스트레이션"이 의미하는 것
 
-별도의 워크플로우/그래프 엔진을 직접 만들지 않는다. Spring AI의 `ChatClient`가 이미 "LLM이 Tool 호출을 요청 → 실행 → 결과를 다시 LLM에 전달 → 최종 답변이 나올 때까지 반복"하는 루프를 내장하고 있고, `dstone-ai-engine`은 그 루프에 어떤 Tool을 쓸 수 있는지만 알려주는 역할이다. 대화 히스토리(memory)도 Phase 1의 `ChatMemory`(Redis)를 그대로 공유한다 — Tool 호출을 위한 별도 memory를 새로 만들지 않았다.
+별도의 워크플로우/그래프 엔진을 직접 만들지 않는다. 7.1절 3단계에서 본 `ToolCallingManager`의 반복 루프가 이미 Spring AI `ChatModel` 안에 내장돼 있고, `dstone-ai-engine`은 그 루프에 어떤 Tool을 쓸 수 있는지만 알려주는 역할이다. 대화 히스토리(memory)도 Phase 1의 `ChatMemory`(Redis)를 그대로 공유한다 — Tool 호출을 위한 별도 memory를 새로 만들지 않았다.
 
 ### 7.4 실동작 검증
 
