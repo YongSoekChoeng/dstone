@@ -23,28 +23,54 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.servlet.ModelAndView;
 
-import tools.jackson.databind.ObjectMapper;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import net.dstone.common.consts.ErrCd;
 import net.dstone.common.utils.Base64Util;
 import net.dstone.common.utils.RequestUtil;
 import net.dstone.common.utils.StringUtil;
+import tools.jackson.databind.ObjectMapper;
 
 @Controller
 public abstract class BaseController extends net.dstone.common.core.BaseObject {
 
-	public static String RETURN_SUCCESS = "0";
-	public static String RETURN_FAIL 	= "1";
+	public static String RETURN_SUCCESS 			= "0";
+	public static String RETURN_FAIL 				= "1";
 
-	protected static String CALL_DIV_LINE 	= "********************************************************" ;
-	protected static String DIV_LINE 		= "===========================" ; 
+	protected static String CALL_DIV_LINE 			= "********************************************************" ;
+	protected static String DIV_LINE 				= "===========================" ; 
 
+	protected static String DEFAULT_SESSION_KEY		= "DEFAULT_SESSION_KEY";
+	
+	/**
+	 * @return
+	 */
+	protected HttpSession getSession() {
+		return getSession(true);
+	}
+	
+	/**
+	 * @param true (현재 세션이 없을 경우 새로 생성) / false (현재 세션이 없을 경우 null 반환)
+	 * @return
+	 */
+	protected HttpSession getSession(boolean flag) {
+		HttpSession session = null;
+		ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+		if( attributes != null ) {
+			session = attributes.getRequest().getSession();
+		}
+		return session;
+	}
+
+	
+	
 	protected String nullCheck(Object o) {
 		return net.dstone.common.utils.StringUtil.nullCheck(o, "");
 	}

@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.anthropic.models.messages.ToolChoice;
 import com.anthropic.models.messages.ToolChoiceTool;
 
+import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.config.ConfigTool;
@@ -36,11 +37,10 @@ public class ChatController extends BaseController {
 	private final ChatClient chatClient;
 	private final GatewayProperties gatewayProperties;
 	private final PromptTemplateRegistry promptTemplateRegistry;
-	// RAG(Phase 2)는 dstone.ai.rag.enabled=true일 때만 존재하는 빈이라, 이 컨트롤러는 항상 켜져 있어야 하므로
-	// (Phase 0/1만 쓰는 배포에서도 기동돼야 함) 필수 의존성이 아니라 ObjectProvider로 선택 주입받는다.
 	private final ObjectProvider<VectorStore> vectorStoreProvider;
+	// RAG 는 dstone.ai.rag.enabled=true일 때만 존재하는 빈이라, ChatController 컨트롤러는 항상 올라와 있어야 하므로 필수 의존성이 아니라 ObjectProvider로 선택 주입받는다.
 	private final ObjectProvider<RetrievalService> retrievalServiceProvider;
-	// Tool(Phase 3)은 RAG와 달리 외부 인프라 의존이 없어 항상 존재하는 빈이라 ObjectProvider가 필요 없다.
+	// Tool은 RAG와 달리 외부 인프라 의존이 없어 항상 존재하는 빈이라 ObjectProvider가 필요 없다.
 	private final ConfigTool configTool;
 
 	public ChatController(ChatClient chatClient, GatewayProperties gatewayProperties,
@@ -56,22 +56,27 @@ public class ChatController extends BaseController {
 
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request) {
+		
+		// message 없이 호출했을 때 처리.
 		if (StringUtil.isEmpty(request.message())) {
 			// message 없이 호출하면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
-			// IllegalArgumentException을 던지는데, 이게 그대로 500으로 나가버려 원인을 알 수 없었다.
-			// 여기서 먼저 막아 400과 함께 명확한 사유를 준다.
+			// IllegalArgumentException을 던지는데, 여기서 먼저 막아 400과 함께 명확한 사유를 준다.
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
 		}
 
-		String sessionId = StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId();
+		// 세션ID 생성
+		HttpSession session = this.getSession(true);
+		String sessionId = ( session.getAttribute(DEFAULT_SESSION_KEY) != null?session.getAttribute(DEFAULT_SESSION_KEY).toString() : ( StringUtil.isEmpty(request.sessionId())?UUID.randomUUID().toString() : request.sessionId() ) );
 
-		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt()
-			.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
+		// 세션ID 가 진행한 대화 누적치 가 적용된 요청스펙
+		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt().advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
 
+		// 현재 요청 프롬프트 가 적용된 요청스펙
 		if (!StringUtil.isEmpty(request.promptName())) {
 			spec = spec.system(this.promptTemplateRegistry.render(request.promptName(), request.variables()));
 		}
 
+		// RAG 가 적용된 요청스펙
 		if (Boolean.TRUE.equals(request.ragEnabled())) {
 			VectorStore vectorStore = this.vectorStoreProvider.getIfAvailable();
 			if (vectorStore == null) {
@@ -79,15 +84,16 @@ public class ChatController extends BaseController {
 			}
 			RetrievalService retrievalService = this.retrievalServiceProvider.getObject();
 			SearchRequest searchRequest = SearchRequest.builder()
-				.topK(retrievalService.defaultTopK())
-				.similarityThreshold(retrievalService.defaultSimilarityThreshold())
+				.topK(retrievalService.defaultTopK()) // 검색할 청크 수
+				.similarityThreshold(retrievalService.defaultSimilarityThreshold()) // 실측 기반 조정값
 				.build();
 			spec = spec.advisors(QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build());
 		}
 
+		// Tool 이 적용된 요청스펙
 		if (!StringUtil.isEmpty(request.requiredTool())) {
-			// tool_choice=tool 강제는 Anthropic Messages API 고유 기능이라 gateway abstraction을
-			// 아직 안 탄다 - provider가 바뀌면 여기서 바로 막아 조용히 auto로 흘러가는 걸 방지한다.
+			// 강제옵션(Anthropic은 지원하지 않음)
+			// tool_choice=tool 강제는 Anthropic Messages API 고유 기능이라 gateway abstraction을 아직 안 탄다 - provider가 바뀌면 여기서 바로 막아 조용히 auto로 흘러가는 걸 방지한다.
 			if (this.gatewayProperties.activeProvider() != AiProvider.ANTHROPIC) {
 				throw new IllegalStateException(
 					"requiredTool(tool_choice 강제)은 spring.ai.model.chat=anthropic일 때만 지원합니다. 현재 provider="
@@ -101,8 +107,7 @@ public class ChatController extends BaseController {
 				.options(AnthropicChatOptions.builder()
 					.toolChoice(ToolChoice.ofTool(ToolChoiceTool.builder().name(request.requiredTool()).build()))
 					.disableParallelToolUse(true));
-		}
-		else if (Boolean.TRUE.equals(request.toolsEnabled())) {
+		}else if (Boolean.TRUE.equals(request.toolsEnabled())) {
 			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider());
 		}
 
