@@ -2,6 +2,7 @@ package net.dstone.ai.api;
 
 import java.util.UUID;
 
+import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -15,9 +16,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.anthropic.models.messages.ToolChoice;
+import com.anthropic.models.messages.ToolChoiceTool;
+
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.config.ConfigTool;
+import net.dstone.ai.gateway.AiProvider;
 import net.dstone.ai.gateway.GatewayProperties;
 import net.dstone.ai.prompt.PromptTemplateRegistry;
 import net.dstone.ai.rag.retrieval.RetrievalService;
@@ -80,7 +85,24 @@ public class ChatController extends BaseController {
 			spec = spec.advisors(QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build());
 		}
 
-		if (Boolean.TRUE.equals(request.toolsEnabled())) {
+		if (!StringUtil.isEmpty(request.requiredTool())) {
+			// tool_choice=tool 강제는 Anthropic Messages API 고유 기능이라 gateway abstraction을
+			// 아직 안 탄다 - provider가 바뀌면 여기서 바로 막아 조용히 auto로 흘러가는 걸 방지한다.
+			if (this.gatewayProperties.activeProvider() != AiProvider.ANTHROPIC) {
+				throw new IllegalStateException(
+					"requiredTool(tool_choice 강제)은 spring.ai.model.chat=anthropic일 때만 지원합니다. 현재 provider="
+						+ this.gatewayProperties.activeProvider().propertyValue());
+			}
+			if (!this.configTool.toolNames().contains(request.requiredTool())) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"requiredTool[" + request.requiredTool() + "]이 등록된 Tool 목록에 없습니다: " + this.configTool.toolNames());
+			}
+			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider())
+				.options(AnthropicChatOptions.builder()
+					.toolChoice(ToolChoice.ofTool(ToolChoiceTool.builder().name(request.requiredTool()).build()))
+					.disableParallelToolUse(true));
+		}
+		else if (Boolean.TRUE.equals(request.toolsEnabled())) {
 			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider());
 		}
 

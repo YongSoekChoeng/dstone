@@ -16,8 +16,12 @@ import java.util.Map;
  *
  * toolsEnabled를 true로 보내면(Phase 3) net.dstone.ai.config.ConfigTool에 등록된 Tool들을
  * ChatClient에 붙인다 - 이후 실제로 어떤 Tool을 호출할지, 몇 번 호출할지는 LLM과 Spring AI의
- * ChatClient가 알아서 주고받으며 처리한다(사람이 미리 정해두는 게 아님).
+ * ChatClient가 알아서 주고받으며 처리한다(사람이 미리 정해두는 게 아님, tool_choice=auto).
+ *
+ * requiredTool을 지정하면(ConfigTool에 등록된 @AiTool 메서드명과 정확히 일치해야 함) 위 auto 판단을
+ * 건너뛰고 Anthropic의 tool_choice=tool을 걸어 해당 Tool을 반드시 한 번 호출하도록 강제한다
+ * (toolsEnabled 값과 무관하게 동작하며, 현재는 spring.ai.model.chat=anthropic일 때만 지원한다).
  */
 public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
-		Boolean ragEnabled, Boolean toolsEnabled) {
+		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool) {
 }

@@ -126,7 +126,7 @@ timeline
 | 0 | ✅ 완료 | `ChatController`, Anthropic 하드코딩, Jasypt `ENC(...)` 키 관리 |
 | 1 | ✅ 완료 | `gateway`(provider 추상화), `session`(Redis 히스토리), `prompt`(템플릿 버저닝) |
 | 2 | ✅ 완료 (실동작 검증됨) | `rag.ingest`/`rag.embedding`/`rag.retrieval`, pgvector, `RagController`, `ChatController.ragEnabled` |
-| 3 | ✅ 완료 (실동작 검증됨) | `@AiTool` 등록 체계, `config.ConfigTool`, `ChatController.toolsEnabled`, 샘플 `DateTimeTools`, Agentic RAG `RetrievalTools` |
+| 3 | ✅ 완료 (실동작 검증됨, `requiredTool`은 미검증) | `@AiTool` 등록 체계, `config.ConfigTool`, `ChatController.toolsEnabled`/`requiredTool`(tool_choice 강제), 샘플 `DateTimeTools`, Agentic RAG `RetrievalTools` |
 | 4 | ⏳ 예정 | `governance`/`observability` — Guardrail, 인증, 비용/토큰 추적, Eval |
 
 ---
@@ -464,6 +464,20 @@ dstone-ai-engine agent: 등록된 Tool = getCurrentDateTime, searchKnowledgeBase
 
 `ragEnabled`와 `toolsEnabled`(+`searchKnowledgeBase`)는 같이 켜도 되지만 중복이다 - 보통은 "항상 이 지식베이스를 참고해야 하는 챗봇"이면 `ragEnabled`를, "여러 판단을 스스로 해야 하는 좀 더 범용적인 어시스턴트"면 `toolsEnabled`를 쓰는 식으로 용도에 따라 고른다.
 
+### 7.6 tool_choice 강제 — `requiredTool`
+
+`toolsEnabled: true`는 Tool을 "쓸 수 있게" 붙여줄 뿐, 실제로 호출할지 말지는 여전히 LLM의 판단(Anthropic `tool_choice=auto`)에 맡긴다. 반드시 특정 Tool을 한 번 호출하고 넘어가야 하는 흐름(예: 특정 액션을 확정하기 전에 항상 검증 Tool을 태워야 하는 경우)에는 `requiredTool`에 `@AiTool` 메서드명을 지정한다 — `ChatController`가 Anthropic의 `tool_choice={"type":"tool","name":...}` + `disable_parallel_tool_use:true`를 걸어 그 Tool을 강제로, 정확히 한 번 호출하게 만든다(`toolsEnabled` 값과 무관하게 동작).
+
+```bash
+curl -X POST http://localhost:8081/api/ai/chat -H "Content-Type: application/json" \
+  -d '{"message":"지금 몇 시야?","requiredTool":"getCurrentDateTime"}'
+```
+
+주의할 점:
+- **Anthropic 전용.** `tool_choice` 강제는 Spring AI의 `AnthropicChatOptions`를 통해서만 걸리므로, `spring.ai.model.chat`이 `openai`/`ollama`면 `IllegalStateException`으로 막는다(gateway 추상화를 아직 안 탐 — provider별로 조용히 auto로 흘러가는 것을 방지하기 위함).
+- `requiredTool` 값이 `ConfigTool`에 등록된 이름과 정확히 일치하지 않으면 400을 반환한다.
+- Anthropic API 자체가 `tool_choice=any`/`tool`을 지원하지 않는 모델(예: Claude Fable/Mythos 5.1 계열)로 바뀌면 400 에러가 나므로, 강제 호출이 필요한 배포는 사용 모델이 forced tool use를 지원하는지 먼저 확인한다.
+
 ---
 
 ## 8. API 레퍼런스
@@ -514,7 +528,8 @@ curl -X POST http://localhost:8081/api/ai/chat \
 | `promptName` | String | 지정 시 `PromptTemplateRegistry`가 렌더링해 시스템 프롬프트로 사용 |
 | `variables` | Map | `promptName` 템플릿 렌더링용 변수 |
 | `ragEnabled` | Boolean | `true`면 `QuestionAnswerAdvisor`로 검색 결과 자동 삽입 (RAG 꺼져 있으면 `IllegalStateException`) |
-| `toolsEnabled` | Boolean | `true`면 `ConfigTool`에 등록된 모든 Tool을 ChatClient에 연결(Phase 3) — RAG와 달리 항상 사용 가능 |
+| `toolsEnabled` | Boolean | `true`면 `ConfigTool`에 등록된 모든 Tool을 ChatClient에 연결(Phase 3) — RAG와 달리 항상 사용 가능. 실제 호출 여부는 LLM 판단(`tool_choice=auto`) |
+| `requiredTool` | String | 지정하면 해당 Tool명으로 `tool_choice=tool` 강제(7.6절) — Anthropic 전용, `toolsEnabled` 값과 무관 |
 
 ### `POST /api/ai/rag/documents` — 문서 적재 (Phase 2, RAG 활성 시)
 
