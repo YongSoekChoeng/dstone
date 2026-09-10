@@ -9,6 +9,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,16 +59,22 @@ public class ChatController extends BaseController {
 	private final ObjectProvider<RetrievalService> retrievalServiceProvider;
 	// Tool은 RAG와 달리 외부 인프라 의존이 없어 항상 존재하는 빈이라 ObjectProvider가 필요 없다.
 	private final ConfigTool configTool;
+	// config.ConfigOllamaOverride가 dstone.ai.gateway.ollama-override.enabled=true일 때만 만드는 빈이라
+	// ObjectProvider로 받는다 - 꺼져 있으면 provider=ollama 요청에 명확한 에러를 던지고, 켜져 있으면
+	// 기본 chatClient(spring.ai.model.chat) 대신 이 빈으로 라우팅한다.
+	private final ObjectProvider<ChatClient> ollamaChatClientProvider;
 
 	public ChatController(ChatClient chatClient, GatewayProperties gatewayProperties,
 			PromptTemplateRegistry promptTemplateRegistry, ObjectProvider<VectorStore> vectorStoreProvider,
-			ObjectProvider<RetrievalService> retrievalServiceProvider, ConfigTool configTool) {
+			ObjectProvider<RetrievalService> retrievalServiceProvider, ConfigTool configTool,
+			@Qualifier("ollamaChatClient") ObjectProvider<ChatClient> ollamaChatClientProvider) {
 		this.chatClient = chatClient;
 		this.gatewayProperties = gatewayProperties;
 		this.promptTemplateRegistry = promptTemplateRegistry;
 		this.vectorStoreProvider = vectorStoreProvider;
 		this.retrievalServiceProvider = retrievalServiceProvider;
 		this.configTool = configTool;
+		this.ollamaChatClientProvider = ollamaChatClientProvider;
 	}
 
 	/************************************************************************
@@ -118,8 +125,9 @@ public class ChatController extends BaseController {
 	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		this.validateMessage(request);
 		String sessionId = this.resolveSessionId(request);
-		String answer = this.buildRequestSpec(request, servletRequest, sessionId).call().content();
-		return new ChatResponse(answer, this.gatewayProperties.activeProvider().propertyValue(), sessionId);
+		ResolvedChatClient resolved = this.resolveChatClient(request);
+		String answer = this.buildRequestSpec(resolved, request, servletRequest, sessionId).call().content();
+		return new ChatResponse(answer, resolved.provider().propertyValue(), sessionId);
 	}
 
 	/**
@@ -131,7 +139,8 @@ public class ChatController extends BaseController {
 	public Flux<String> chatStream(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		this.validateMessage(request);
 		String sessionId = this.resolveSessionId(request);
-		return this.buildRequestSpec(request, servletRequest, sessionId).stream().content();
+		ResolvedChatClient resolved = this.resolveChatClient(request);
+		return this.buildRequestSpec(resolved, request, servletRequest, sessionId).stream().content();
 	}
 
 	private void validateMessage(ChatRequest request) {
@@ -148,10 +157,40 @@ public class ChatController extends BaseController {
 				: (StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId());
 	}
 
-	private ChatClient.ChatClientRequestSpec buildRequestSpec(ChatRequest request, HttpServletRequest servletRequest, String sessionId) {
+	private record ResolvedChatClient(ChatClient chatClient, AiProvider provider) {
+	}
+
+	/**
+	 * provider가 비어있거나 기본 provider(spring.ai.model.chat)와 같으면 기존과 동일하게 기본 chatClient를
+	 * 쓴다. provider=ollama면 ConfigOllamaOverride의 별도 빈으로 라우팅한다(꺼져 있으면 명확한 에러).
+	 * 그 외 provider는 override용 빈이 없어 지원하지 않는다는 걸 바로 알려준다.
+	 */
+	private ResolvedChatClient resolveChatClient(ChatRequest request) {
+		if (StringUtil.isEmpty(request.provider())) {
+			return new ResolvedChatClient(this.chatClient, this.gatewayProperties.activeProvider());
+		}
+		AiProvider requested = AiProvider.fromPropertyValue(request.provider());
+		if (requested == this.gatewayProperties.activeProvider()) {
+			return new ResolvedChatClient(this.chatClient, requested);
+		}
+		if (requested == AiProvider.OLLAMA) {
+			ChatClient override = this.ollamaChatClientProvider.getIfAvailable();
+			if (override == null) {
+				throw new IllegalStateException(
+					"provider=ollama override가 비활성화되어 있습니다(dstone.ai.gateway.ollama-override.enabled=false 또는 미설정).");
+			}
+			return new ResolvedChatClient(override, AiProvider.OLLAMA);
+		}
+		throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+			"provider[" + request.provider() + "]는 override를 지원하지 않습니다. 기본 provider("
+				+ this.gatewayProperties.activeProvider().propertyValue() + ")와 같을 때만, 또는 ollama override가 켜져 있을 때만 지정할 수 있습니다.");
+	}
+
+	private ChatClient.ChatClientRequestSpec buildRequestSpec(ResolvedChatClient resolved, ChatRequest request,
+			HttpServletRequest servletRequest, String sessionId) {
 
 		// 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 한 요청 스펙.
-		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt().advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
+		ChatClient.ChatClientRequestSpec spec = resolved.chatClient().prompt().advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
 
 		// governance.auth로 caller가 식별됐으면, observability.usage의 사용량 로깅이 쓸 수 있게 함께 넘겨준다.
 		String caller = CallerContext.get(servletRequest);
@@ -181,12 +220,12 @@ public class ChatController extends BaseController {
 		// requiredTool이 있으면 그 Tool 하나를 반드시 호출하도록 강제한다.
 		if (!StringUtil.isEmpty(request.requiredTool())) {
 			// tool_choice=tool로 강제 호출하는 기능은 Anthropic Messages API 고유 기능이라 아직 gateway
-			// abstraction을 타지 않는다 - provider가 바뀌면 여기서 바로 막아서, 모르는 새 auto로 조용히
-			// 흘러가는 일이 없게 한다.
-			if (this.gatewayProperties.activeProvider() != AiProvider.ANTHROPIC) {
+			// abstraction을 타지 않는다 - provider가 바뀌면(기본 provider든 이번 요청의 override든) 여기서
+			// 바로 막아서, 모르는 새 auto로 조용히 흘러가는 일이 없게 한다.
+			if (resolved.provider() != AiProvider.ANTHROPIC) {
 				throw new IllegalStateException(
-					"requiredTool(tool_choice 강제)은 spring.ai.model.chat=anthropic일 때만 지원합니다. 현재 provider="
-						+ this.gatewayProperties.activeProvider().propertyValue());
+					"requiredTool(tool_choice 강제)은 provider=anthropic일 때만 지원합니다. 이번 요청의 provider="
+						+ resolved.provider().propertyValue());
 			}
 			if (!this.configTool.toolNames().contains(request.requiredTool())) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

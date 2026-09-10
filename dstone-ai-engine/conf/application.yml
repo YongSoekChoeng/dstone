@@ -153,6 +153,18 @@ dstone:
             versions:
                 #sample-system: v1
                 oracle-to-postgresql: v1
+        # gateway override: spring.ai.model.chat(기본 provider)과 별개로, 요청마다 ChatRequest.provider로
+        # 지정해서 강제로 라우팅할 수 있는 provider. 지금은 ollama만 지원한다(net.dstone.ai.config.ConfigOllamaOverride
+        # 참고) - API 키가 필요 없어 base-url 하나로 기본 provider와 무관하게 항상 띄워둘 수 있어서다.
+        # 필요 없으면 enabled: false(또는 이 블록 자체를 삭제)로 끌 수 있다.
+        gateway:
+            ollama-override:
+                enabled: true
+                # 이 WSL 환경엔 CPU 전용 + 메모리 제약(4~5GB)으로 llama3.2(3B)만 채팅용으로 pull해뒀다
+                # (docs/software/14.ollama.md 참고, bge-m3는 임베딩 전용이라 채팅에 못 쓴다). 더 정확한
+                # 오라클→PostgreSQL SQL 변환이 필요하면 코드/SQL 특화 모델(qwen2.5-coder 등)을 pull해서
+                # 이 값만 바꾸면 된다 - 실제로 pull한 모델 태그와 정확히 같아야 한다("ollama list"로 확인).
+                model: llama3.2
         # RAG(Phase 2): 이 값이 true여야 rag.ingest/rag.embedding/rag.retrieval 빈과
         # RagController, ChatController의 ragEnabled 옵션이 활성화된다(net.dstone.ai.rag 패키지 참고).
         # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 Postgres/pgvector/임베딩 설정

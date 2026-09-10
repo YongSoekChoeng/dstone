@@ -21,7 +21,13 @@ import java.util.Map;
  * requiredTool을 지정하면(ConfigTool에 등록된 @AiTool 메서드 이름과 정확히 같아야 한다) 방금 말한
  * auto 판단을 건너뛰고 Anthropic의 tool_choice=tool로 그 Tool을 반드시 한 번은 호출하게 만든다.
  * toolsEnabled 값과는 상관없이 동작하고, 지금은 spring.ai.model.chat=anthropic일 때만 지원한다.
+ *
+ * provider를 지정하면 spring.ai.model.chat으로 정해진 기본 provider 대신 그 provider로 라우팅한다.
+ * 값은 gateway.AiProvider의 propertyValue(anthropic/openai/ollama)와 같아야 한다. 다만 실제로
+ * 기본값과 별개로 항상 띄워둘 수 있는 override 빈이 있는 provider만 지원되는데, 지금은 ollama뿐이다
+ * (dstone.ai.gateway.ollama-override.enabled=true일 때만 사용 가능 - net.dstone.ai.config.ConfigOllamaOverride
+ * 참고). 비워두면 기존과 동일하게 기본 provider를 쓴다.
  */
 public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
-		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool) {
+		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider) {
 }
