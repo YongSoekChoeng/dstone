@@ -149,9 +149,9 @@ dstone:
         # classpath:prompts/{name}/{version}.st 파일을 읽어 렌더링한다.
         # 특정 템플릿명을 versions에 명시하지 않으면 default-version을 쓴다.
         prompt:
-            default-version: v1
-            # versions:
-            #     sample-system: v1
+            # default-version: v1
+            versions:
+                sample-system: v1
         # RAG(Phase 2): 이 값이 true여야 rag.ingest/rag.embedding/rag.retrieval 빈과
         # RagController, ChatController의 ragEnabled 옵션이 활성화된다(net.dstone.ai.rag 패키지 참고).
         # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 Postgres/pgvector/임베딩 설정
