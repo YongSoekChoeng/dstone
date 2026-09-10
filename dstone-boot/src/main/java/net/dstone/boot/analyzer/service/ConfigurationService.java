@@ -1,4 +1,4 @@
-package net.dstone.boot.analyzer; 
+package net.dstone.boot.analyzer.service; 
  
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.dstone.boot.common.tools.analyzer.AppAnalyzer;
+import net.dstone.boot.analyzer.dao.ConfigurationDao;
 import net.dstone.boot.common.biz.BaseService;
 import net.dstone.common.consts.ErrCd;
 import net.dstone.common.exception.BizException;
@@ -23,7 +24,7 @@ public class ConfigurationService extends BaseService {
     /********* 공통 입력/수정/삭제 DAO 정의부분 끝 *********/
     /********* DAO 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.analyzer.ConfigurationDao configurationDao; 
+    private net.dstone.boot.analyzer.dao.ConfigurationDao configurationDao; 
     /********* DAO 정의부분 끝 *********/
     /** 
      * 시스템정보 리스트조회 

@@ -1,4 +1,4 @@
-package net.dstone.boot.analyzer; 
+package net.dstone.boot.analyzer.controller; 
  
 import java.util.ArrayList;
 import java.util.Map;
@@ -8,6 +8,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
+import net.dstone.boot.analyzer.service.ConfigurationService;
 import net.dstone.common.utils.RequestUtil;
 import net.dstone.common.utils.StringUtil;
 import net.dstone.common.utils.XmlUtil;
@@ -18,7 +19,7 @@ public class ConfigurationController extends net.dstone.boot.common.biz.BaseCont
 
     /********* SVC 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.analyzer.ConfigurationService configurationService; 
+    private net.dstone.boot.analyzer.service.ConfigurationService configurationService; 
     /********* SVC 정의부분 끝 *********/
     
     /** 

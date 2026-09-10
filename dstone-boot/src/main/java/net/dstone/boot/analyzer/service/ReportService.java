@@ -1,4 +1,4 @@
-package net.dstone.boot.analyzer; 
+package net.dstone.boot.analyzer.service; 
  
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +7,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import net.dstone.boot.analyzer.dao.ReportDao;
 import net.dstone.boot.common.biz.BaseService;
 import net.dstone.common.consts.ErrCd;
 import net.dstone.common.exception.BizException;
@@ -17,7 +18,7 @@ public class ReportService extends BaseService {
      
     /********* DAO 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.analyzer.ReportDao reportDao; 
+    private net.dstone.boot.analyzer.dao.ReportDao reportDao; 
     /********* DAO 정의부분 끝 *********/
     /** 
      * 종합결과 리스트조회 

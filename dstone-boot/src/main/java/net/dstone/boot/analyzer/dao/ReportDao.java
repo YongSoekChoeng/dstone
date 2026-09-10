@@ -1,4 +1,4 @@
-package net.dstone.boot.analyzer; 
+package net.dstone.boot.analyzer.dao; 
  
 import java.util.List;
 

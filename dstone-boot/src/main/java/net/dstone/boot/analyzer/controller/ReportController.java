@@ -1,4 +1,4 @@
-package net.dstone.boot.analyzer; 
+package net.dstone.boot.analyzer.controller; 
  
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
+import net.dstone.boot.analyzer.service.ReportService;
 import net.dstone.common.utils.RequestUtil;
 import net.dstone.common.utils.StringUtil;
 @Controller
@@ -19,7 +20,7 @@ public class ReportController extends net.dstone.boot.common.biz.BaseController 
 
     /********* SVC 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.analyzer.ReportService reportService; 
+    private net.dstone.boot.analyzer.service.ReportService reportService; 
     /********* SVC 정의부분 끝 *********/
     
     /** 

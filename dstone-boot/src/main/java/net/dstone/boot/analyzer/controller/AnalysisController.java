@@ -1,4 +1,4 @@
-package net.dstone.boot.analyzer; 
+package net.dstone.boot.analyzer.controller; 
  
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
+import net.dstone.boot.analyzer.service.ConfigurationService;
 import net.dstone.boot.analyzer.taskitem.AnalysisItem;
 import net.dstone.boot.common.tools.analyzer.AppAnalyzer;
 import net.dstone.common.queue.QueueHandler;
@@ -25,7 +26,7 @@ public class AnalysisController extends net.dstone.boot.common.biz.BaseControlle
 	
     /********* SVC 정의부분 시작 *********/
     @Autowired 
-    private net.dstone.boot.analyzer.ConfigurationService configurationService; 
+    private net.dstone.boot.analyzer.service.ConfigurationService configurationService; 
     /********* SVC 정의부분 끝 *********/
     
     /** 
