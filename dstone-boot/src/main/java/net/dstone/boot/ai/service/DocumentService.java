@@ -36,7 +36,10 @@ public class DocumentService extends net.dstone.boot.common.biz.BaseService {
 		multipartBodyBuilder.part("file", new FileSystemResource(savedFile)).filename(originalFileName);
 		multipartBodyBuilder.part("sourceId", sourceId);
 
-		IngestResult ingestResult = this.getWebClient().post()
+		// Tika 텍스트추출+청킹+임베딩(로컬 Ollama)까지 끝나야 응답이 오는 동기 호출이라, 문서 크기에 따라
+		// 기본 60초를 쉽게 넘긴다. dstone-ai-engine 쪽은 끝까지 정상 처리되는데 클라이언트만 먼저 타임아웃
+		// 나던 문제라(WebClientRequestException/ReadTimeoutException), 이 호출만 넉넉하게 5분을 준다.
+		IngestResult ingestResult = this.getWebClient(300).post()
 				.uri(baseUrl + "/api/ai/rag/documents")
 				.contentType(MediaType.MULTIPART_FORM_DATA)
 				.bodyValue(multipartBodyBuilder.build())

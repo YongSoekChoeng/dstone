@@ -62,8 +62,16 @@ public class WcUtil {
 	 * 연동에 쓴다. 기존 execute(Bean)/Bean 기반 API와는 별개로 동작하며 서로 영향을 주지 않는다.
 	 */
 	public WebClient getWebClient() {
-		int connectTimeoutMillis = 20000; 	// 연결시도제한시간(ms). RestFulUtil의 connectTimeout(20초)과 동일.
-		int readTimeoutSeconds = 60;		// 응답대기시간(초). 채팅 스트리밍처럼 응답이 오래 걸릴 수 있어 RestFulUtil 기본값(30초)보다 넉넉하게.
+		return this.getWebClient(60); // 응답대기시간(초) 기본값. 채팅 스트리밍처럼 응답이 오래 걸릴 수 있어 RestFulUtil 기본값(30초)보다 넉넉하게.
+	}
+
+	/**
+	 * 문서 적재(Tika 텍스트추출+청킹+임베딩)처럼 기본 60초보다 훨씬 오래 걸릴 수 있는 연동을 위한 오버로드.
+	 * RestFulUtil.getRestTemplate(charset, connectTimeout, readTimeout, connectionRequestTimeout)와
+	 * 같은 이유로 둔다 - 호출부마다 응답대기시간이 다를 수 있어서다.
+	 */
+	public WebClient getWebClient(int readTimeoutSeconds) {
+		int connectTimeoutMillis = 20000; // 연결시도제한시간(ms). RestFulUtil의 connectTimeout(20초)과 동일.
 
 		HttpClient httpClient = HttpClient.create()
 				.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
