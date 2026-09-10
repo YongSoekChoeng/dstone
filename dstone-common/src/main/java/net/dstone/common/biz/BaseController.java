@@ -47,7 +47,7 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	protected static String CALL_DIV_LINE 			= "********************************************************" ;
 	protected static String DIV_LINE 				= "===========================" ; 
 
-	protected static String DEFAULT_SESSION_KEY		= "DEFAULT_SESSION_KEY";
+	protected final static String DEFAULT_SESSION_KEY		= "DEFAULT_SESSION_KEY";
 	
 	/**
 	 * @return
