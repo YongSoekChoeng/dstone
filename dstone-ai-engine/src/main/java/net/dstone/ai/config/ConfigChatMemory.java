@@ -13,9 +13,9 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * session(Phase 1): Redis에 저장된 대화 히스토리를 최근 N개 메시지로 잘라(windowing)
- * 제공하는 ChatMemory 빈. ConfigChatClient가 이 빈을 MessageChatMemoryAdvisor로 감싸
- * ChatClient에 기본 advisor로 붙인다.
+ * session(Phase 1): Redis에 저장된 대화 히스토리 중 최근 N개 메시지만 잘라서(windowing) 내주는
+ * ChatMemory 빈이다. ConfigChatClient가 이 빈을 MessageChatMemoryAdvisor로 감싸 ChatClient의
+ * 기본 advisor로 붙여준다.
  */
 @Configuration
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")

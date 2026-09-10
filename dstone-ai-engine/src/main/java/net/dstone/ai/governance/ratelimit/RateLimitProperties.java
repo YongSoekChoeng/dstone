@@ -19,17 +19,18 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.governance.ratelimit.* 설정을 읽어 caller별 요청 한도를 만든다(Phase 4, rate limit).
- * enabled=false(기본값)면 이전 Phase와 동일하게 제한 없이 전부 통과한다 - dstone.ai.rag.enabled /
- * dstone.ai.governance.auth.enabled와 동일한 옵트인 철학이라, 이 기능을 안 켜는 기존 배포는 이 커밋만으로
- * 깨지지 않는다.
+ * dstone.ai.governance.ratelimit.* 설정을 읽어서 caller별 요청 한도를 만들어준다(Phase 4, rate
+ * limit). enabled=false(기본값)면 이전 Phase와 똑같이 제한 없이 전부 통과시킨다 -
+ * dstone.ai.rag.enabled나 dstone.ai.governance.auth.enabled와 같은 옵트인 방식이라, 이 기능을
+ * 켜지 않은 기존 배포는 영향을 받지 않는다.
  *
- * rate limit은 Redis 카운터(RateLimiter)가 있어야만 의미가 있으므로, enabled=true인데 Redis가
- * 꺼져 있으면(spring.data.redis.enabled=false) "RedisTemplate 빈이 없다"는 원인불명 에러 대신
- * 여기서 먼저 막아 명확한 사유를 준다(ConfigChatClient가 GatewayProperties로 하는 것과 동일한 패턴).
+ * rate limit은 Redis 카운터(RateLimiter)가 있어야 의미가 있다. 그래서 enabled=true인데 Redis가
+ * 꺼져 있으면(spring.data.redis.enabled=false) "RedisTemplate 빈이 없다"는, 원인을 알기 어려운
+ * 에러 대신 여기서 먼저 막아서 명확한 이유를 알려준다 - ConfigChatClient가 GatewayProperties로
+ * 똑같이 하고 있는 방식이다.
  *
- * overrides는 리스트-오브-오브젝트(YAML 시퀀스)라 ApiKeyProperties.keys와 동일한 이유로
- * ConfigProperty의 단순 getProperty(String)로는 못 읽어서 Binder를 직접 쓴다.
+ * overrides는 리스트-오브-오브젝트(YAML 시퀀스)라서 ApiKeyProperties.keys와 같은 이유로
+ * ConfigProperty의 단순한 getProperty(String)로는 읽을 수 없어 Binder를 직접 쓴다.
  */
 @Component
 public class RateLimitProperties extends BaseObject {
@@ -102,7 +103,7 @@ public class RateLimitProperties extends BaseObject {
 		return this.windowSeconds;
 	}
 
-	/** caller가 null이거나 overrides에 없으면 default-limit을 쓴다(governance.auth가 꺼져 있어 caller를 모를 때도 이 경로). */
+	/** caller가 null이거나 overrides에 없으면 default-limit을 쓴다 - governance.auth가 꺼져 있어서 caller를 모를 때도 이 경로를 탄다. */
 	public int limitFor(String caller) {
 		if (caller == null) {
 			return this.defaultLimit;

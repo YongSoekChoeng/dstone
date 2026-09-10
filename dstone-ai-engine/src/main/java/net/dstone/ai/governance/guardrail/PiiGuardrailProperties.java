@@ -10,8 +10,8 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.governance.guardrail.pii.* 설정을 읽는다(Phase 4, guardrail). enabled=false(기본값)면
- * 이전 Phase와 동일하게 검사 없이 통과한다 - governance.auth/ratelimit과 동일한 옵트인 철학.
+ * dstone.ai.governance.guardrail.pii.* 설정을 읽어온다(Phase 4, guardrail). enabled=false(기본값)면
+ * 이전 Phase와 똑같이 아무 검사 없이 통과시킨다 - governance.auth/ratelimit과 같은 옵트인 방식이다.
  */
 @Component
 public class PiiGuardrailProperties extends BaseObject {
@@ -19,9 +19,9 @@ public class PiiGuardrailProperties extends BaseObject {
 	private static final String PREFIX = "dstone.ai.governance.guardrail.pii";
 
 	public enum Mode {
-		/** 매칭된 부분만 [REDACTED_...]로 치환해 LLM에 전달한다(기본값) - 요청 자체는 그대로 처리된다. */
+		/** 기본값. 매칭된 부분만 [REDACTED_...]로 치환해서 LLM에 보낸다 - 요청 자체는 그대로 처리된다. */
 		MASK,
-		/** PII가 하나라도 매칭되면 LLM 호출 자체를 하지 않고 400으로 거부한다. */
+		/** PII가 하나라도 매칭되면 LLM은 아예 호출하지 않고 400으로 거부한다. */
 		REJECT
 	}
 

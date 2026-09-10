@@ -11,12 +11,13 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * RAG(dstone.ai.rag.enabled=true)가 켜져 있을 때만 존재하는 빈이다 - gateway.GatewayProperties와 달리
- * chat은 항상 필요하지만 embedding/RAG는 이 엔진을 가져다 쓰는 SI 프로젝트가 선택하는 부가 기능이라,
- * RAG를 안 쓰는 배포에서는 spring.ai.model.embedding을 아예 안 정해도 기동에 지장이 없어야 한다.
+ * RAG(dstone.ai.rag.enabled=true)가 켜져 있을 때만 만들어지는 빈이다. gateway.GatewayProperties와
+ * 다른 점이 있다면, chat은 항상 필요하지만 embedding/RAG는 이 엔진을 가져다 쓰는 SI 프로젝트가
+ * 선택하는 부가 기능이라는 점이다 - 그래서 RAG를 안 쓰는 배포라면 spring.ai.model.embedding을
+ * 아예 정하지 않아도 기동에 아무 문제가 없어야 한다.
  *
- * RAG가 켜졌는데 spring.ai.model.embedding이 없거나 none이면 그건 설정 실수이므로,
- * GatewayProperties와 동일하게 여기서 먼저 막아 원인을 명확히 드러낸다.
+ * 반대로 RAG를 켜뒀는데 spring.ai.model.embedding이 비어있거나 none이면 그건 설정을 빠뜨린
+ * 것이므로, GatewayProperties와 똑같은 방식으로 여기서 먼저 막아서 원인을 분명하게 알려준다.
  */
 @Component
 @ConditionalOnProperty(name = "dstone.ai.rag.enabled", havingValue = "true")

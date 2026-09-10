@@ -14,8 +14,8 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.RedisUtil;
 
 /**
- * dstone-boot의 ConfigRedis와 동일한 방식(net.dstone.common.utils.RedisUtil 재사용)으로
- * session(Phase 1)의 대화 히스토리 저장에 쓸 RedisTemplate을 제공한다.
+ * dstone-boot의 ConfigRedis와 같은 방식으로(net.dstone.common.utils.RedisUtil을 그대로 재사용)
+ * session(Phase 1)의 대화 히스토리를 저장할 RedisTemplate을 만들어 제공한다.
  */
 @Configuration
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")

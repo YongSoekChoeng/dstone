@@ -18,16 +18,16 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.governance.auth.* 설정을 읽어 API Key -> caller 매핑을 만든다(Phase 4, governance.auth).
- * enabled=false(기본값)면 이전 Phase와 동일하게 인증 없이 전부 통과한다 - dstone.ai.rag.enabled와 동일한
- * 옵트인 철학이라, 이 기능을 안 켜는 기존 배포는 이 커밋만으로 깨지지 않는다.
+ * dstone.ai.governance.auth.* 설정을 읽어서 API Key -> caller 매핑을 만들어준다(Phase 4,
+ * governance.auth). enabled=false(기본값)면 이전 Phase와 똑같이 인증 없이 전부 통과시킨다 -
+ * dstone.ai.rag.enabled와 같은 옵트인 방식이라, 이 기능을 켜지 않은 기존 배포는 영향을 받지 않는다.
  *
- * keys는 리스트-오브-오브젝트(YAML 시퀀스)라 GatewayProperties/PromptProperties처럼 ConfigProperty의
- * 단순 getProperty(String)로는 못 읽는다 - Environment.getProperty(key, Class)는 key[0]/key[1] 같은
- * 인덱스 프로퍼티를 하나의 List/객체로 재조립해주지 않는다. 그래서 이 클래스만 Spring Boot의 Binder를
- * 직접 쓴다. EncPropertyEnvironmentPostProcessor의 ENC(...) 복호화는 PropertySource 레벨에서 일어나므로
- * (net.dstone.common.config.ConfigProperty 참고) Binder로 읽어도 @ConfigurationProperties와 동일하게
- * 적용된다.
+ * keys는 리스트-오브-오브젝트(YAML 시퀀스)라서 GatewayProperties나 PromptProperties처럼
+ * ConfigProperty의 단순한 getProperty(String)로는 읽을 수 없다 - Environment.getProperty(key,
+ * Class)는 key[0], key[1]처럼 인덱스가 붙은 프로퍼티들을 하나의 List나 객체로 다시 조립해주지
+ * 않기 때문이다. 그래서 이 클래스만 예외적으로 Spring Boot의 Binder를 직접 쓴다. ENC(...)
+ * 복호화는 PropertySource 레벨에서 이미 끝나 있으므로(net.dstone.common.config.ConfigProperty
+ * 참고), Binder로 읽어도 @ConfigurationProperties로 읽을 때와 똑같이 복호화된 값이 들어온다.
  */
 @Component
 public class ApiKeyProperties extends BaseObject {

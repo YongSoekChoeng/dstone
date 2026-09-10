@@ -15,15 +15,15 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * @AiTool이 붙은 빈들을 기동 시점에 스캔해서 Spring AI ToolCallbackProvider 로 묶어준다.
- * ChatController 요청에 [toolsEnabled: true]가 있으면, 이후 실제로
- * 어떤 Tool을 언제 호출할지(0개~여러 개, 순차/반복 호출 포함)는 Spring AI의 ChatClient가 LLM과
- * 주고받으며 자동으로 처리한다.
- * 이게 이 엔진이 다루는 "단순 오케스트레이션"의 전부다. 별도의 워크플로우/그래프 엔진을 직접 구현하지 않는다(Phase 3 범위를 "단순"으로 한정한 이유).
+ * @AiTool이 붙은 빈들을 기동 시점에 스캔해서 Spring AI ToolCallbackProvider로 묶어준다.
+ * ChatController가 받은 요청에 toolsEnabled: true가 있으면, 그 다음부터 어떤 Tool을 언제(0개일
+ * 수도, 여러 개를 순차/반복으로 부를 수도 있음) 호출할지는 Spring AI의 ChatClient가 LLM과 대화를
+ * 주고받으며 알아서 처리해준다 - 이 엔진이 다루는 "단순 오케스트레이션"은 딱 여기까지이고, 별도의
+ * 워크플로우/그래프 엔진 같은 건 직접 만들지 않는다(그래서 Phase 3 범위를 "단순"이라고 부른다).
  *
- * RAG와 달리 Tool 자체는 외부 인프라 의존이 없어(순수 Java 코드 실행) 이 빈은
- * dstone.ai.rag.enabled 같은 on/off 플래그 없이 항상 존재한다.
- * 등록된 @AiTool 빈이 하나도 없으면 그냥 빈 provider가 된다(에러 아님).
+ * Tool은 RAG와 달리 순수 Java 코드만 실행하면 돼서 외부 인프라가 필요 없다 - 그래서 이 빈은
+ * dstone.ai.rag.enabled 같은 on/off 플래그 없이 항상 떠 있다. 등록된 @AiTool 빈이 하나도 없어도
+ * 에러는 아니고, 그냥 빈 provider가 만들어질 뿐이다.
  */
 @Component
 public class ConfigTool extends BaseObject {

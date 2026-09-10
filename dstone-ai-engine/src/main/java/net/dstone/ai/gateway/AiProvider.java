@@ -3,19 +3,21 @@ package net.dstone.ai.gateway;
 import java.util.Arrays;
 
 /**
- * spring.ai.model.chat 값(각 Spring AI provider starter의 자동설정이 참조하는 값)과
- * 1:1로 매핑되는 provider 목록. 이 값을 바꾸는 것만으로 실제 활성화되는 ChatModel/ChatClient가
- * 교체된다(개별 provider의 자동설정 클래스가 spring.ai.model.chat=&lt;propertyValue&gt; 조건으로
- * 켜지거나 꺼진다).
+ * spring.ai.model.chat 값(각 Spring AI provider starter의 자동설정이 참조하는 값)과 하나씩 짝지어지는
+ * provider 목록이다. 이 값을 바꾸는 것만으로 실제로 켜지는 ChatModel/ChatClient가 통째로 교체된다 -
+ * provider별 자동설정 클래스가 spring.ai.model.chat=&lt;propertyValue&gt; 조건으로 켜지거나 꺼지기
+ * 때문이다.
  *
- * azure-openai는 Spring AI 2.x에서 chat model provider로 완전히 제거되어(2.0.0-M4 이후
- * spring-ai-starter-model-azure-openai 미배포, Azure는 vector-store 용도만 남음) 목록에서 뺐다.
+ * azure-openai는 목록에 없다. Spring AI 2.x부터 chat model provider에서 완전히 빠졌기 때문인데
+ * (2.0.0-M4 이후로 spring-ai-starter-model-azure-openai 자체가 더 이상 배포되지 않는다), Azure는
+ * 이제 vector-store 용도로만 쓸 수 있다.
  *
  * anthropic/openai/ollama는 각각 spring-ai-starter-model-*의 자동설정이 이미 ChatModel 어댑터
- * 역할을 하고 있어 provider별 커스텀 어댑터 구현체를 따로 두지 않는다. local vLLM처럼 starter가
- * 없는 OpenAI 호환 서버는 provider는 OPENAI로 두고 spring.ai.openai.base-url만 vLLM 엔드포인트로
- * override해서 재사용한다. 향후 provider별 커스터마이징(요청/응답 인터셉터, 모델명 기본값 등)이
- * 실제로 필요해지면 net.dstone.ai.gateway.provider 패키지를 그 구현을 담는 자리로 새로 만든다.
+ * 역할을 해주고 있어서, provider별로 커스텀 어댑터를 따로 만들 필요가 없다. local vLLM처럼 전용
+ * starter가 없는 OpenAI 호환 서버를 붙이고 싶으면 provider는 그냥 OPENAI로 두고
+ * spring.ai.openai.base-url만 vLLM 엔드포인트로 바꿔주면 그대로 재사용할 수 있다. 나중에 provider별
+ * 커스터마이징(요청/응답 인터셉터, 모델명 기본값 등)이 실제로 필요해지면, 그때 gateway 패키지
+ * 밑에 provider 패키지를 새로 만들어 그 구현을 담으면 된다.
  */
 public enum AiProvider {
 

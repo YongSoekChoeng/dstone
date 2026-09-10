@@ -19,14 +19,15 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.observability.usage.* 설정을 읽는다(Phase 4, observability). enabled 기본값은 true다 -
- * 이 기능은 로그 한 줄 남기는 것뿐이라 외부 인프라 의존이나 부작용이 없어서, governance.auth/ratelimit/
- * guardrail.pii(옵트인, 기본 false)와 달리 dstone-ai-engine의 기존 AOP 로깅(ConfigAspect)처럼
- * 기본으로 켜둔다.
+ * dstone.ai.observability.usage.* 설정을 읽어온다(Phase 4, observability). enabled의 기본값은
+ * true다 - 이 기능은 로그 한 줄 남기는 게 전부라 외부 인프라에 기대는 것도 없고 부작용도 없어서,
+ * governance.auth/ratelimit/guardrail.pii처럼 옵트인(기본 false)으로 두지 않고, dstone-ai-engine의
+ * 기존 AOP 로깅(ConfigAspect)과 마찬가지로 기본으로 켜뒀다.
  *
- * pricing은 리스트-오브-오브젝트(YAML 시퀀스)라 ApiKeyProperties.keys/RateLimitProperties.overrides와
- * 동일한 이유로 Binder를 직접 쓴다. 등록 안 된 model은 에러가 아니라 "비용 unknown"으로 처리한다 -
- * 가격표는 provider가 수시로 바꾸는 값이라 이 모듈이 강제할 수 없다.
+ * pricing은 리스트-오브-오브젝트(YAML 시퀀스)라서 ApiKeyProperties.keys나
+ * RateLimitProperties.overrides와 같은 이유로 Binder를 직접 쓴다. 가격표에 없는 model이 나와도
+ * 에러를 내지 않고 "비용 unknown"으로 처리하는데, 가격은 provider가 수시로 바꾸는 값이라 이
+ * 모듈이 강제로 맞춰둘 수 없기 때문이다.
  */
 @Component
 public class UsageProperties extends BaseObject {
@@ -73,7 +74,7 @@ public class UsageProperties extends BaseObject {
 		return this.enabled;
 	}
 
-	/** model이 가격표에 없거나 provider가 로컬(ollama 등)이라 usage 자체가 비어있으면 null(비용 unknown)을 반환한다. */
+	/** model이 가격표에 없거나, provider가 로컬(ollama 등)이라 usage 자체가 비어있으면 null(비용 unknown)을 돌려준다. */
 	public BigDecimal estimateCostUsd(String model, Integer promptTokens, Integer completionTokens) {
 		if (model == null || promptTokens == null || completionTokens == null) {
 			return null;

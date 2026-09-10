@@ -7,9 +7,9 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 
 /**
- * dstone-boot/dstone-batch/dstone-batchadmin과 동일한 컨벤션: 이 모듈의 모든 Configuration
- * 클래스와, @ComponentScan(net.dstone.ai) 범위 밖에 있는 net.dstone.common의 공용 Config 빈을
- * 한 곳에 모아 @Import 한다.
+ * dstone-boot/dstone-batch/dstone-batchadmin과 같은 방식이다 - 이 모듈의 Configuration 클래스들과,
+ * @ComponentScan(net.dstone.ai) 범위 밖이라 자동으로는 안 잡히는 net.dstone.common의 공용 Config
+ * 빈을 여기 한 곳에 모아 @Import 해준다.
  */
 @Configuration
 @Import({

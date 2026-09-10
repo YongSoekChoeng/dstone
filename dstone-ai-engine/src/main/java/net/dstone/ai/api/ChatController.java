@@ -32,6 +32,12 @@ import net.dstone.ai.rag.retrieval.RetrievalService;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.utils.StringUtil;
 
+/**
+ * 이 엔진의 핵심 엔드포인트, POST /api/ai/chat을 처리한다. 옵션 하나 없이 message만 보내면 기본 채팅이
+ * 되고, promptName/ragEnabled/toolsEnabled/requiredTool을 조합해서 시스템 프롬프트 적용, RAG-증강,
+ * Tool 사용까지 한 요청 안에서 켜고 끌 수 있다. 각 옵션이 정확히 무엇을 하는지는 ChatRequest의
+ * 필드별 설명을 참고하면 된다.
+ */
 @RestController
 @RequestMapping("/api/ai/chat")
 public class ChatController extends BaseController {
@@ -40,7 +46,8 @@ public class ChatController extends BaseController {
 	private final GatewayProperties gatewayProperties;
 	private final PromptTemplateRegistry promptTemplateRegistry;
 	private final ObjectProvider<VectorStore> vectorStoreProvider;
-	// RAG 는 dstone.ai.rag.enabled=true일 때만 존재하는 빈이라, ChatController 컨트롤러는 항상 올라와 있어야 하므로 필수 의존성이 아니라 ObjectProvider로 선택 주입받는다.
+	// RAG는 dstone.ai.rag.enabled=true일 때만 존재하는 빈이다. ChatController는 RAG를 안 쓰는 배포에서도
+	// 항상 떠 있어야 하므로, 필수 의존성이 아니라 ObjectProvider로 있으면 쓰고 없으면 마는 식으로 받는다.
 	private final ObjectProvider<RetrievalService> retrievalServiceProvider;
 	// Tool은 RAG와 달리 외부 인프라 의존이 없어 항상 존재하는 빈이라 ObjectProvider가 필요 없다.
 	private final ConfigTool configTool;
@@ -60,7 +67,7 @@ public class ChatController extends BaseController {
 	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		
 		/************************************************************************
-		<Spring AI chatClient 의 기능 흐름>
+		<Spring AI chatClient의 기능 흐름>
 		chatClient
 		    │
 		    ▼
@@ -103,32 +110,32 @@ public class ChatController extends BaseController {
 		content()
 		************************************************************************/
 		
-		// message 없이 호출했을 때 처리.
+		// message가 비어있으면 여기서 먼저 막는다.
 		if (StringUtil.isEmpty(request.message())) {
-			// message 없이 호출하면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
-			// IllegalArgumentException을 던지는데, 여기서 먼저 막아 400과 함께 명확한 사유를 준다.
+			// 이대로 두면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
+			// IllegalArgumentException을 던지는데, 그보다 먼저 막아서 400과 함께 명확한 사유를 알려준다.
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
 		}
 
-		// 세션ID 생성
+		// 이번 요청에서 쓸 세션 ID를 정한다.
 		HttpSession session = this.getSession(true);
 		String sessionId = ( session.getAttribute(DEFAULT_SESSION_KEY) != null?session.getAttribute(DEFAULT_SESSION_KEY).toString() : ( StringUtil.isEmpty(request.sessionId())?UUID.randomUUID().toString() : request.sessionId() ) );
 
-		// 세션ID 가 진행한 대화 누적치 가 적용된 요청스펙
+		// 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 한 요청 스펙.
 		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt().advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
 
-		// governance.auth로 식별된 caller가 있으면 usage 로깅(net.dstone.ai.observability.usage)이 쓸 수 있게 넘겨준다.
+		// governance.auth로 caller가 식별됐으면, observability.usage의 사용량 로깅이 쓸 수 있게 함께 넘겨준다.
 		String caller = CallerContext.get(servletRequest);
 		if (caller != null) {
 			spec = spec.advisors(a -> a.param(CallerContext.ADVISOR_CONTEXT_KEY, caller));
 		}
 
-		// 현재 요청 프롬프트 가 적용된 요청스펙
+		// promptName이 있으면 그 템플릿을 시스템 프롬프트로 적용한다.
 		if (!StringUtil.isEmpty(request.promptName())) {
 			spec = spec.system(this.promptTemplateRegistry.render(request.promptName(), request.variables()));
 		}
 
-		// RAG 가 적용된 요청스펙
+		// ragEnabled면 RAG 검색 결과를 컨텍스트에 끼워 넣는다.
 		if (Boolean.TRUE.equals(request.ragEnabled())) {
 			VectorStore vectorStore = this.vectorStoreProvider.getIfAvailable();
 			if (vectorStore == null) {
@@ -142,10 +149,11 @@ public class ChatController extends BaseController {
 			spec = spec.advisors(QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build());
 		}
 
-		// Tool 이 적용된 요청스펙
+		// requiredTool이 있으면 그 Tool 하나를 반드시 호출하도록 강제한다.
 		if (!StringUtil.isEmpty(request.requiredTool())) {
-			// 강제옵션(Anthropic은 지원하지 않음)
-			// tool_choice=tool 강제는 Anthropic Messages API 고유 기능이라 gateway abstraction을 아직 안 탄다 - provider가 바뀌면 여기서 바로 막아 조용히 auto로 흘러가는 걸 방지한다.
+			// tool_choice=tool로 강제 호출하는 기능은 Anthropic Messages API 고유 기능이라 아직 gateway
+			// abstraction을 타지 않는다 - provider가 바뀌면 여기서 바로 막아서, 모르는 새 auto로 조용히
+			// 흘러가는 일이 없게 한다.
 			if (this.gatewayProperties.activeProvider() != AiProvider.ANTHROPIC) {
 				throw new IllegalStateException(
 					"requiredTool(tool_choice 강제)은 spring.ai.model.chat=anthropic일 때만 지원합니다. 현재 provider="
@@ -160,6 +168,7 @@ public class ChatController extends BaseController {
 					.toolChoice(ToolChoice.ofTool(ToolChoiceTool.builder().name(request.requiredTool()).build()))
 					.disableParallelToolUse(true));
 		}else if (Boolean.TRUE.equals(request.toolsEnabled())) {
+			// toolsEnabled만 켜져 있으면 강제 호출 없이, 필요한지는 LLM이 알아서 판단하게 둔다(tool_choice=auto).
 			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider());
 		}
 

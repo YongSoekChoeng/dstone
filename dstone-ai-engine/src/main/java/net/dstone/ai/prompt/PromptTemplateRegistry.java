@@ -11,10 +11,10 @@ import org.springframework.stereotype.Component;
 import net.dstone.common.core.BaseObject;
 
 /**
- * classpath:prompts/{name}/{version}.st 에 있는 프롬프트 템플릿을 이름+버전으로 찾아 렌더링한다.
- * 버전은 {@link PromptProperties}에서 템플릿명별로 override 가능하고, 지정 안 하면
- * default-version을 쓴다 — SI 프로젝트는 이 리소스 파일을 추가/교체하고 설정 한 줄만
- * 바꾸는 것으로 프롬프트를 커스터마이징한다(코드 변경 불필요).
+ * classpath:prompts/{name}/{version}.st에 있는 프롬프트 템플릿을 이름과 버전으로 찾아서
+ * 렌더링해준다. 버전은 PromptProperties에서 템플릿명별로 override할 수 있고, 따로 지정하지
+ * 않으면 default-version을 쓴다. SI 프로젝트는 이 리소스 파일을 추가하거나 바꾸고 설정 한 줄만
+ * 고치면 되고, 코드를 건드릴 필요는 없다.
  */
 @Component
 public class PromptTemplateRegistry extends BaseObject {

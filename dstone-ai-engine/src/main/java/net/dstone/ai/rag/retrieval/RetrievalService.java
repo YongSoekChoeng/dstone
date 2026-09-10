@@ -15,11 +15,11 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * VectorStore(pgvector) 유사도 검색(Phase 2). 기본 topK/similarityThreshold는
- * dstone.ai.rag.retrieval.*에서 가져오고, 요청별로 override할 수 있다.
+ * VectorStore(pgvector)에서 유사도 검색을 해주는 서비스다(Phase 2). 기본 topK/similarityThreshold는
+ * dstone.ai.rag.retrieval.* 설정값을 쓰고, 요청마다 원하면 다른 값으로 override할 수 있다.
  *
- * defaultTopK()/defaultSimilarityThreshold()는 net.dstone.ai.api.ChatController가
- * RAG-증강 채팅(QuestionAnswerAdvisor)을 구성할 때도 같은 기본값을 쓰도록 노출해둔 것이다.
+ * defaultTopK()/defaultSimilarityThreshold()를 public으로 열어둔 이유는, ChatController가
+ * RAG-증강 채팅(QuestionAnswerAdvisor)을 구성할 때도 여기와 같은 기본값을 쓰게 하기 위해서다.
  */
 @Service
 @ConditionalOnProperty(name = "dstone.ai.rag.enabled", havingValue = "true")

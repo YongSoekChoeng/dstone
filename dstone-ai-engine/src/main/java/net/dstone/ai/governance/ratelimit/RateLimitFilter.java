@@ -13,12 +13,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.governance.auth.CallerContext;
 
 /**
- * dstone.ai.governance.ratelimit.enabled=true일 때만 실제로 막는다(꺼져 있으면 이전 Phase와 동일하게 무해).
- * {@link net.dstone.ai.governance.auth.ApiKeyAuthFilter}(@Order(1))보다 뒤에서(@Order(2)) 돌아야
- * {@link CallerContext}에 caller가 이미 채워진 상태로 키를 결정할 수 있다 - governance.auth가 꺼져 있으면
- * CallerContext가 항상 비어있으므로 그때는 클라이언트 IP(anon:{ip})를 키로 쓴다(X-Forwarded-For 같은
- * 프록시 헤더 처리는 아직 안 함 - k8s Ingress/Service 뒤에서 정확한 클라이언트 식별이 필요해지면 이 지점에서
- * 개선 예정).
+ * dstone.ai.governance.ratelimit.enabled=true일 때만 실제로 막고, 꺼져 있으면 이전 Phase와 똑같이
+ * 아무 영향도 주지 않는다. governance.auth 패키지의 ApiKeyAuthFilter(@Order(1))보다 뒤에서
+ * (@Order(2)) 돌아야, CallerContext에 caller가 이미 채워진 상태에서 요청을 구분할 키를 정할 수
+ * 있다. governance.auth가 꺼져 있으면 CallerContext는 항상 비어있으니까, 그럴 때는 대신 클라이언트
+ * IP(anon:{ip})를 키로 쓴다. 다만 X-Forwarded-For 같은 프록시 헤더는 아직 처리하지 않는데, k8s의
+ * Ingress/Service 뒤에서 정확한 클라이언트 식별이 필요해지면 여기를 손보면 된다.
  */
 @Component
 @Order(2)

@@ -13,13 +13,14 @@ import net.dstone.ai.rag.retrieval.RetrievalService;
 import net.dstone.common.core.BaseObject;
 
 /**
- * RAG(Phase 2) 검색을 Tool(Phase 3)로 노출한다 - "Agentic RAG"라고도 부르는 패턴이다.
- * {@code ChatController.ragEnabled}는 요청마다 무조건 검색부터 하고 시작하는 반면(QuestionAnswerAdvisor),
- * 이 Tool은 {@code toolsEnabled}로 붙여두면 **LLM이 스스로 판단**해서 "이 질문은 지식베이스를
- * 찾아봐야겠다" 싶을 때만 호출한다 - 잡담이나 일반 상식 질문에는 검색을 건너뛸 수 있어 더 유연하다.
+ * RAG(Phase 2) 검색을 Tool(Phase 3)로 노출한다 - 흔히 "Agentic RAG"라고 부르는 패턴이다.
+ * ChatController의 ragEnabled 옵션은 요청이 오면 무조건 먼저 검색부터 하고 시작하는 방식인데
+ * (QuestionAnswerAdvisor), 이 Tool은 toolsEnabled로 붙여두면 LLM이 스스로 "이 질문은 지식베이스를
+ * 찾아봐야겠다"고 판단할 때만 호출한다. 그래서 잡담이나 일반 상식 질문에는 검색을 건너뛸 수 있어
+ * 더 유연하게 동작한다.
  *
- * RetrievalService와 마찬가지로 dstone.ai.rag.enabled=true일 때만 존재한다 - RAG 자체가
- * 꺼져 있으면 검색할 VectorStore가 없으므로 이 Tool도 등록되지 않는 게 맞다.
+ * RetrievalService와 마찬가지로 dstone.ai.rag.enabled=true일 때만 존재한다 - RAG 자체가 꺼져
+ * 있으면 검색할 VectorStore가 없으니, 이 Tool도 함께 등록되지 않는 게 맞다.
  */
 @AiTool
 @ConditionalOnProperty(name = "dstone.ai.rag.enabled", havingValue = "true")

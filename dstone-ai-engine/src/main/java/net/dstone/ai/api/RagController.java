@@ -21,9 +21,9 @@ import net.dstone.ai.rag.retrieval.RetrievalService;
 import net.dstone.common.biz.BaseController;
 
 /**
- * dstone.ai.rag.enabled=true일 때만 등록되는 RAG 전용 API - net.dstone.ai.api.ChatController의
- * ragEnabled 플래그(채팅에 자동으로 검색 결과를 끼워넣는 경로)와 달리, 여기는 적재/검색 자체를
- * 직접 다루는 관리/디버깅용 엔드포인트다.
+ * dstone.ai.rag.enabled=true일 때만 등록되는 RAG 전용 API다. net.dstone.ai.api.ChatController의
+ * ragEnabled 플래그가 "채팅 도중 자동으로 검색 결과를 끼워 넣는" 경로라면, 여기는 문서 적재나 검색
+ * 자체를 직접 확인해보고 싶을 때 쓰는 관리·디버깅용 엔드포인트다.
  */
 @RestController
 @RequestMapping("/api/ai/rag")
