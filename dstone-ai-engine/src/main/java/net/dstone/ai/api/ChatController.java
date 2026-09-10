@@ -241,11 +241,11 @@ public class ChatController extends BaseController {
 			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider());
 		}
 
-		// model이 있으면(provider=ollama일 때만 의미 있다) ollamaChatClient 빈에 고정된 기본 모델
+		// ollamaModel이 있으면(provider=ollama일 때만 의미 있다) ollamaChatClient 빈에 고정된 기본 모델
 		// (dstone.ai.gateway.ollama-override.model) 대신 이번 요청만 그 모델로 호출한다. 존재하지 않거나
 		// 채팅을 지원하지 않는 모델명이면 여기서 막지 않고 Ollama가 반환하는 에러를 그대로 흘려보낸다.
-		if (resolved.provider() == AiProvider.OLLAMA && !StringUtil.isEmpty(request.model())) {
-			spec = spec.options(ChatOptions.builder().model(request.model()));
+		if (resolved.provider() == AiProvider.OLLAMA && !StringUtil.isEmpty(request.ollamaModel())) {
+			spec = spec.options(ChatOptions.builder().model(request.ollamaModel()));
 		}
 
 		return spec.user(request.message());

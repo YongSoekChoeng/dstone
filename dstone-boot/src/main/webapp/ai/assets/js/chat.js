@@ -1,7 +1,7 @@
 var DstoneAiChat = (function () {
 
 	var sendUrl = "";
-	var messagesEl, inputEl, formEl, ragCheckEl, toolsCheckEl, providerSelectEl, sendBtnEl;
+	var messagesEl, inputEl, formEl, ragCheckEl, toolsCheckEl, ollamaModelEl, sendBtnEl;
 
 	function init(url) {
 		sendUrl = url;
@@ -10,7 +10,7 @@ var DstoneAiChat = (function () {
 		formEl = document.getElementById("chat-form");
 		ragCheckEl = document.getElementById("chat-rag-enabled");
 		toolsCheckEl = document.getElementById("chat-tools-enabled");
-		providerSelectEl = document.getElementById("chat-provider");
+		ollamaModelEl = document.getElementById("ollama-model");
 		sendBtnEl = document.getElementById("chat-send");
 
 		formEl.addEventListener("submit", function (e) {
@@ -63,14 +63,14 @@ var DstoneAiChat = (function () {
 		var assistantBubble = appendMessage("assistant", "");
 		assistantBubble.classList.add("chat-bubble-pending");
 
-		// 화면의 "provider" 드롭다운은 실제로는 Ollama 모델명(sqlcoder/llama3.2/bge-m3)을 고르는 값이라,
-		// dstone-ai-engine에는 provider=ollama로 고정해서 보내고 그 모델명은 model 필드로 따로 보낸다.
+		// ollama-model 드롭다운은 Ollama 모델명(sqlcoder/llama3.2/bge-m3)을 고르는 값이라,
+		// dstone-ai-engine에는 provider=ollama로 고정해서 보내고 그 모델명은 ollamaModel 필드로 따로 보낸다.
 		var requestBody = JSON.stringify({
 			message: message,
 			ragEnabled: ragCheckEl.checked,
 			toolsEnabled: toolsCheckEl.checked,
 			provider: "ollama",
-			model: providerSelectEl.value
+			ollamaModel: ollamaModelEl.value
 		});
 
 		fetch(sendUrl, {

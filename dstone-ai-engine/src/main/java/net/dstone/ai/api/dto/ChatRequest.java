@@ -28,11 +28,11 @@ import java.util.Map;
  * (dstone.ai.gateway.ollama-override.enabled=true일 때만 사용 가능 - net.dstone.ai.config.ConfigOllamaOverride
  * 참고). 비워두면 기존과 동일하게 기본 provider를 쓴다.
  *
- * model을 지정하면(provider=ollama일 때만 의미 있다) dstone.ai.gateway.ollama-override.model에 고정된
+ * ollamaModel을 지정하면(provider=ollama일 때만 의미 있다) dstone.ai.gateway.ollama-override.model에 고정된
  * 기본 모델 대신 이 요청 한 번만 그 모델로 호출한다(예: "sqlcoder", "llama3.2"). 실제로 Ollama에
  * pull되어 있는 모델 태그와 정확히 같아야 하고, 채팅을 지원하지 않는 모델(예: 임베딩 전용인 bge-m3)을
  * 넣으면 Ollama가 그대로 에러를 반환한다 - 이 필드는 어떤 모델명이 유효한지 검증하지 않는다.
  */
 public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
-		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String model) {
+		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String ollamaModel) {
 }
