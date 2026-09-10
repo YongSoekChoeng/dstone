@@ -2,6 +2,7 @@ package net.dstone.common.utils;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -33,13 +34,46 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.ssl.TrustStrategy;
 
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import io.netty.channel.ChannelOption;
+import reactor.netty.http.client.HttpClient;
+
 /**
  * Web Client Util
  * 웹호출을 담당한다.
  * @author Default
  */
 public class WcUtil {
-	
+
+	private static WcUtil wcUtil = null;
+
+	public static WcUtil getInstance() {
+		if (wcUtil == null) {
+			wcUtil = new WcUtil();
+		}
+		return wcUtil;
+	}
+
+	/**
+	 * WebClient(리액티브)를 얻기 위한 메소드. RestFulUtil.getRestTemplate()의 WebClient 버전 -
+	 * SSE 스트리밍 응답(예: dstone-ai-engine 챗 스트리밍 연동)처럼 RestTemplate로는 다룰 수 없는
+	 * 연동에 쓴다. 기존 execute(Bean)/Bean 기반 API와는 별개로 동작하며 서로 영향을 주지 않는다.
+	 */
+	public WebClient getWebClient() {
+		int connectTimeoutMillis = 20000; 	// 연결시도제한시간(ms). RestFulUtil의 connectTimeout(20초)과 동일.
+		int readTimeoutSeconds = 60;		// 응답대기시간(초). 채팅 스트리밍처럼 응답이 오래 걸릴 수 있어 RestFulUtil 기본값(30초)보다 넉넉하게.
+
+		HttpClient httpClient = HttpClient.create()
+				.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
+				.responseTimeout(Duration.ofSeconds(readTimeoutSeconds));
+
+		return WebClient.builder()
+				.clientConnector(new ReactorClientHttpConnector(httpClient))
+				.build();
+	}
+
 	public static int HTTP_OK 			= 200;
 
 	public static String CONT_TYPE_HTML = "text/html";

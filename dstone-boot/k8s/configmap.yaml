@@ -208,8 +208,11 @@ data:
             biz: 
                 simple-encrypt-key: jysn007db2admin!
     
-    interface: 
-        naver: 
+    interface:
+        ai-engine:
+          # dstone-ai-engine 연동 주소. 같은 네임스페이스(dstone)의 Service DNS를 가리킨다.
+          base-url: http://${AI_ENGINE_HOST}:${AI_ENGINE_PORT}
+        naver:
           # 발급받은 클라이언트ID
           client-id: WCdNwqKh3uohtkernz7O
           # 발급받은 클라이언트패스워드

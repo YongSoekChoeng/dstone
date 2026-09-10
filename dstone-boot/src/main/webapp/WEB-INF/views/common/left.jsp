@@ -15,6 +15,7 @@
 				<li><a href="<%=request.getContextPath()%>/views/sample/user/listUser">멤버조회</a></li>
 				<li><a href="<%=request.getContextPath()%>/views/sample/admin/manageUser">멤머입력</a></li>
 				<li><a href="<%=request.getContextPath()%>/views/analyzer/index">분석툴</a></li>
+				<li><a href="<%=request.getContextPath()%>/views/ai/index">AI</a></li>
 				<li><a href="<%=request.getContextPath()%>/views/test/test">테스트1</a></li>
 
 				<li><a href="<%=request.getContextPath()%>/views/sample/google/maps/main">구글맵</a></li>

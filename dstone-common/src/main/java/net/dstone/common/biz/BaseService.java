@@ -9,18 +9,25 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import net.dstone.common.utils.RestFulUtil;
+import net.dstone.common.utils.WcUtil;
 
 @Service
 public abstract class BaseService extends net.dstone.common.core.BaseObject {
 
 	/*** 외부 인터페이스를 위하 RestTemplate 관련 기능 시작 ***/
-	
+
 	protected RestTemplate getRestTemplate() {
 		return RestFulUtil.getInstance().getRestTemplate();
 	}
-	
+
+	/** RestTemplate로는 다룰 수 없는 스트리밍(SSE) 연동에 사용. */
+	protected WebClient getWebClient() {
+		return WcUtil.getInstance().getWebClient();
+	}
+
 	protected HttpEntity<String> getEntity( MediaType mediaType, String input){
 		HttpHeaders headers = new HttpHeaders();
 		headers.setAccept(Arrays.asList(new MediaType[] { mediaType }));

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.boot.ai.dao.DocumentDao">
+
+	<!-- TB_AI_DOCUMENT 등록 -->
+	<insert id="insertDocument" parameterType="net.dstone.boot.ai.vo.DocumentVo">
+		INSERT INTO TB_AI_DOCUMENT (
+			SOURCE_ID, FILE_NAME, CHUNK_COUNT, UPLOADER_ID, INPUT_DT
+		) VALUES (
+			#{SOURCE_ID}, #{FILE_NAME}, #{CHUNK_COUNT}, #{UPLOADER_ID}, CURRENT_TIMESTAMP
+		)
+	</insert>
+
+	<!-- TB_AI_DOCUMENT 목록조회(업로드일시 역순) -->
+	<select id="listDocument" resultType="net.dstone.boot.ai.vo.DocumentVo">
+		SELECT
+			SOURCE_ID, FILE_NAME, CHUNK_COUNT, UPLOADER_ID, INPUT_DT
+		FROM
+			TB_AI_DOCUMENT
+		ORDER BY
+			INPUT_DT DESC
+	</select>
+
+	<!-- TB_AI_DOCUMENT 삭제 -->
+	<delete id="deleteDocument" parameterType="String">
+		DELETE FROM TB_AI_DOCUMENT WHERE SOURCE_ID = #{SOURCE_ID}
+	</delete>
+
+</mapper>

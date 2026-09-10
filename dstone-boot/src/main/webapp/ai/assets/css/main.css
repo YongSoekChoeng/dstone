@@ -1,0 +1,264 @@
+.ai-body {
+	margin: 0;
+	font-family: -apple-system, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+	background: #f5f6f8;
+	color: #1f2328;
+}
+
+#ai-page-wrapper {
+	max-width: 960px;
+	margin: 0 auto;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #fff;
+	box-shadow: 0 0 24px rgba(0, 0, 0, 0.05);
+}
+
+#ai-header-wrapper {
+	border-bottom: 1px solid #e5e7eb;
+	padding: 16px 24px;
+}
+
+#ai-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+#ai-logo {
+	font-size: 18px;
+	font-weight: 700;
+	color: #111827;
+	text-decoration: none;
+}
+
+#ai-nav a {
+	margin-left: 16px;
+	color: #4b5563;
+	text-decoration: none;
+	font-size: 14px;
+	padding-bottom: 4px;
+}
+
+#ai-nav a.current-page-item,
+#ai-nav a:hover {
+	color: #2563eb;
+	border-bottom: 2px solid #2563eb;
+}
+
+#ai-main {
+	flex: 1;
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.ai-banner h2 {
+	margin: 0 0 8px;
+}
+
+.ai-banner p {
+	color: #4b5563;
+	line-height: 1.6;
+}
+
+.ai-card-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 16px;
+}
+
+.ai-card {
+	display: block;
+	padding: 20px;
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	text-decoration: none;
+	color: inherit;
+	transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.ai-card:hover {
+	border-color: #2563eb;
+	box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+
+.ai-card h3 {
+	margin: 0 0 8px;
+	color: #111827;
+}
+
+.ai-card p {
+	margin: 0;
+	color: #4b5563;
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+.ai-panel {
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	padding: 20px;
+}
+
+.ai-panel h3 {
+	margin: 0 0 8px;
+}
+
+.ai-hint {
+	color: #6b7280;
+	font-size: 13px;
+	margin: 0 0 16px;
+}
+
+/* 채팅 화면 */
+
+.ai-chat-main {
+	padding: 0;
+	height: calc(100vh - 140px);
+}
+
+.chat-messages {
+	flex: 1;
+	overflow-y: auto;
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.chat-message {
+	display: flex;
+}
+
+.chat-message-user {
+	justify-content: flex-end;
+}
+
+.chat-message-assistant {
+	justify-content: flex-start;
+}
+
+.chat-bubble {
+	max-width: 70%;
+	padding: 10px 14px;
+	border-radius: 14px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.chat-message-user .chat-bubble {
+	background: #2563eb;
+	color: #fff;
+	border-bottom-right-radius: 4px;
+}
+
+.chat-message-assistant .chat-bubble {
+	background: #f3f4f6;
+	color: #1f2328;
+	border-bottom-left-radius: 4px;
+}
+
+.chat-bubble-pending::after {
+	content: "…";
+	opacity: 0.5;
+}
+
+.chat-form {
+	border-top: 1px solid #e5e7eb;
+	padding: 16px 24px 24px;
+}
+
+.chat-options {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 8px;
+	font-size: 13px;
+	color: #4b5563;
+}
+
+.chat-input-row {
+	display: flex;
+	gap: 8px;
+}
+
+.chat-input {
+	flex: 1;
+	resize: none;
+	border: 1px solid #d1d5db;
+	border-radius: 10px;
+	padding: 10px 12px;
+	font-size: 14px;
+	font-family: inherit;
+}
+
+.chat-send {
+	border: none;
+	border-radius: 10px;
+	padding: 0 20px;
+	background: #2563eb;
+	color: #fff;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.chat-send:disabled {
+	background: #9ca3af;
+	cursor: default;
+}
+
+/* 문서업로드 화면 */
+
+.document-upload-form {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.document-upload-form input[type="text"] {
+	flex: 1;
+	min-width: 160px;
+	padding: 8px 10px;
+	border: 1px solid #d1d5db;
+	border-radius: 8px;
+}
+
+.document-upload-form button {
+	border: none;
+	border-radius: 8px;
+	padding: 8px 16px;
+	background: #2563eb;
+	color: #fff;
+	cursor: pointer;
+}
+
+.document-list-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.document-list-table th,
+.document-list-table td {
+	text-align: left;
+	padding: 8px 10px;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.document-list-table button {
+	border: 1px solid #d1d5db;
+	background: #fff;
+	border-radius: 6px;
+	padding: 4px 10px;
+	cursor: pointer;
+}
+
+#ai-footer-wrapper {
+	padding: 16px 24px;
+	border-top: 1px solid #e5e7eb;
+	color: #9ca3af;
+	font-size: 12px;
+}
