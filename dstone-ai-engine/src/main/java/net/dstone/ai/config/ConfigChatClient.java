@@ -1,12 +1,17 @@
 package net.dstone.ai.config;
 
+import java.util.List;
+
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import net.dstone.ai.gateway.GatewayProperties;
+import net.dstone.ai.governance.guardrail.PiiGuardrailAdvisor;
+import net.dstone.ai.observability.usage.UsageLoggingAdvisor;
 import net.dstone.common.core.BaseObject;
 
 /**
@@ -27,14 +32,22 @@ import net.dstone.common.core.BaseObject;
  * session(Phase 1): ChatMemory(ConfigChatMemory 참고)를 MessageChatMemoryAdvisor로 감싸
  * 기본 advisor로 붙인다. 호출 쪽은 ChatClient.Builder를 건드릴 필요 없이
  * .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))만 넘기면 된다.
+ *
+ * governance.guardrail(PII 필터)/observability.usage(사용량 로깅, Phase 4)도 여기서 기본 advisor로
+ * 등록한다 - 둘 다 활성화 여부를 내부적으로 자체 체크하므로(ApiKeyAuthFilter/RateLimitFilter의
+ * shouldNotFilter와 동일한 패턴) 항상 빈으로 등록해도 무해하다. order는 PiiGuardrailAdvisor/
+ * UsageLoggingAdvisor 각 클래스의 getOrder() 주석 참고 - 리스트에 담는 순서 자체는 의미 없다(Spring
+ * AI가 advisor 체인을 만들 때 getOrder() 값으로 다시 정렬한다).
  */
 @Configuration
 public class ConfigChatClient extends BaseObject {
 
 	@Bean
 	public ChatClient chatClient(GatewayProperties gatewayProperties, ChatClient.Builder chatClientBuilder,
-			ChatMemory chatMemory) {
-		return chatClientBuilder.defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build()).build();
+			ChatMemory chatMemory, PiiGuardrailAdvisor piiGuardrailAdvisor, UsageLoggingAdvisor usageLoggingAdvisor) {
+		List<Advisor> advisors = List.of(usageLoggingAdvisor, piiGuardrailAdvisor,
+				MessageChatMemoryAdvisor.builder(chatMemory).build());
+		return chatClientBuilder.defaultAdvisors(advisors).build();
 	}
 
 }

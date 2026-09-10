@@ -179,3 +179,42 @@ dstone:
                 #       caller: sample-si-project
                 #     - key: ENC(...)
                 #       caller: another-caller
+            # governance.ratelimit(Phase 4): caller별(governance.auth가 꺼져 있으면 클라이언트 IP별)
+            # 요청 개수 제한. enabled=false(기본값)면 이전과 동일하게 제한 없이 전부 통과한다
+            # (net.dstone.ai.governance.ratelimit.RateLimitProperties 참고). enabled=true인데 Redis가
+            # 꺼져 있으면(spring.data.redis.enabled=false) 기동이 실패한다 - rate limit은 Redis 고정
+            # 윈도우 카운터가 필요하다(RateLimiter 참고, 윈도우 경계에서 최대 2배까지 허용될 수 있는
+            # 알려진 한계가 있음).
+            ratelimit:
+                enabled: false
+                # window-seconds: 60
+                # default-limit: 60 # window당 caller(또는 IP)별 기본 허용 요청 수
+                # overrides:
+                #     - caller: sample-si-project
+                #       limit: 200
+                #     - caller: another-caller
+                #       limit: 30
+            # governance.guardrail.pii(Phase 4): 정규식 기반 PII(주민등록번호/전화번호/이메일/카드번호)
+            # 탐지. enabled=false(기본값)면 이전과 동일하게 검사 없이 통과한다
+            # (net.dstone.ai.governance.guardrail.PiiGuardrailProperties 참고). mode=mask(기본값)면
+            # 매칭된 부분만 [REDACTED_...]로 치환해 LLM에 전달하고(대화 히스토리에도 마스킹된 텍스트가
+            # 저장됨), mode=reject면 PII가 하나라도 있으면 LLM 호출 자체를 하지 않고 400을 반환한다.
+            guardrail:
+                pii:
+                    enabled: false
+                    # mode: mask # mask | reject
+        # observability.usage(Phase 4): 토큰 사용량/추정비용/지연시간을 로그 한 줄로 남긴다
+        # (net.dstone.ai.observability.usage.UsageLoggingAdvisor 참고). 외부 인프라 의존이나 부작용이
+        # 없는 순수 로깅이라 enabled 기본값은 true다(governance.auth/ratelimit/guardrail.pii와 달리
+        # 옵트인이 아님).
+        observability:
+            usage:
+                enabled: true
+                # pricing: 아래는 예시일 뿐이다 - 실제 요금은 provider의 최신 가격표를 확인해서 채울 것
+                # (model 값은 ChatResponseMetadata.getModel()이 실제로 응답하는 문자열과 정확히
+                # 일치해야 매칭된다). 여기 없는 model은 에러가 아니라 비용을 "unknown"으로 로깅한다 -
+                # ollama(로컬)처럼 원래 무료인 provider는 애초에 등록할 필요가 없다.
+                # pricing:
+                #     - model: claude-sonnet-4-5-20250929
+                #       input-price-per-1k: 0.003
+                #       output-price-per-1k: 0.015

@@ -19,12 +19,14 @@ import org.springframework.web.server.ResponseStatusException;
 import com.anthropic.models.messages.ToolChoice;
 import com.anthropic.models.messages.ToolChoiceTool;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.config.ConfigTool;
 import net.dstone.ai.gateway.AiProvider;
 import net.dstone.ai.gateway.GatewayProperties;
+import net.dstone.ai.governance.auth.CallerContext;
 import net.dstone.ai.prompt.PromptTemplateRegistry;
 import net.dstone.ai.rag.retrieval.RetrievalService;
 import net.dstone.common.biz.BaseController;
@@ -55,7 +57,7 @@ public class ChatController extends BaseController {
 	}
 
 	@PostMapping
-	public ChatResponse chat(@RequestBody ChatRequest request) {
+	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		
 		/************************************************************************
 		<Spring AI chatClient 의 기능 흐름>
@@ -114,6 +116,12 @@ public class ChatController extends BaseController {
 
 		// 세션ID 가 진행한 대화 누적치 가 적용된 요청스펙
 		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt().advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
+
+		// governance.auth로 식별된 caller가 있으면 usage 로깅(net.dstone.ai.observability.usage)이 쓸 수 있게 넘겨준다.
+		String caller = CallerContext.get(servletRequest);
+		if (caller != null) {
+			spec = spec.advisors(a -> a.param(CallerContext.ADVISOR_CONTEXT_KEY, caller));
+		}
 
 		// 현재 요청 프롬프트 가 적용된 요청스펙
 		if (!StringUtil.isEmpty(request.promptName())) {
