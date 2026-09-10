@@ -23,9 +23,14 @@ public abstract class BaseService extends net.dstone.common.core.BaseObject {
 		return RestFulUtil.getInstance().getRestTemplate();
 	}
 
-	/** RestTemplate로는 다룰 수 없는 스트리밍(SSE) 연동에 사용. */
+	/** RestTemplate로는 다룰 수 없는 스트리밍(SSE) 연동에 사용. 응답대기시간 기본 60초. */
 	protected WebClient getWebClient() {
 		return WcUtil.getInstance().getWebClient();
+	}
+
+	/** 문서 적재처럼 60초보다 오래 걸릴 수 있는 연동을 위한 오버로드. */
+	protected WebClient getWebClient(int readTimeoutSeconds) {
+		return WcUtil.getInstance().getWebClient(readTimeoutSeconds);
 	}
 
 	protected HttpEntity<String> getEntity( MediaType mediaType, String input){
