@@ -2,6 +2,7 @@ package net.dstone.ai.governance.auth;
 
 import java.io.IOException;
 
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,8 +21,12 @@ import net.dstone.common.utils.StringUtil;
  * OncePerRequestFilter를 구현한 @Component는 Spring Boot가 자동으로 서블릿 필터로 등록해준다
  * (별도 FilterRegistrationBean 불필요). /actuator/**는 k8s liveness/readiness probe가 쓰므로
  * (management.server.port를 따로 안 쓰고 같은 포트를 공유하는 구성) 인증 없이 통과시킨다.
+ *
+ * {@link net.dstone.ai.governance.ratelimit.RateLimitFilter}(@Order(2))가 caller 식별을 이 필터의
+ * {@link CallerContext} 기록에 의존하므로, 반드시 이 필터가 먼저(@Order(1)) 실행돼야 한다.
  */
 @Component
+@Order(1)
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
 	private final ApiKeyProperties apiKeyProperties;
