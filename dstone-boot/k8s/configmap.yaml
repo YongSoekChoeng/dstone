@@ -51,8 +51,13 @@ data:
                     enabled: true
     
     spring:
-        main: 
+        main:
             allow-bean-definition-overriding: true
+        servlet:
+            multipart:
+                # RequestUtil/FileUpUtil이 자체적으로 멀티파트를 파싱하므로 Spring 기본 리졸버는 꺼둔다.
+                # (dstone-boot/conf/application.yml 주석 참고)
+                enabled: false
         ##########################################################################################
         # <자동설정기능>
         # 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작하는 기능들이 있음. 

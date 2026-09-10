@@ -44,8 +44,16 @@ management:
                 enabled: true
 
 spring:
-    main: 
+    main:
         allow-bean-definition-overriding: true
+    servlet:
+        multipart:
+            # 이 프로젝트는 파일업로드를 자체 RequestUtil/FileUpUtil(commons-fileupload)로 직접 파싱한다.
+            # Spring의 기본 멀티파트리졸버(StandardServletMultipartResolver)를 켜두면 컨트롤러 진입 전에
+            # DispatcherServlet이 먼저 request.getParts()로 멀티파트를 통째로 소비해버려서, FileUpUtil이
+            # 같은 요청의 InputStream을 다시 읽으려 할 때 이미 비어있는 스트림만 남는다(파라메터/파일 둘 다
+            # 못 읽음). 그래서 비활성화 필요.
+            enabled: false
     ##########################################################################################
     # <자동설정기능>
     # 설정의도와 다르게 비활성화시켜도 클래스패스에 있으면 스프링부트-자동설정기능에 의해 자동으로 동작하는 기능들이 있음. 
