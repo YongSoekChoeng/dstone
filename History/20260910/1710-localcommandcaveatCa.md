@@ -661,3 +661,15 @@ dstone-boot도 정상 컴파일 확인됐습니다. SQL 변환 결과가 나올 
 - 더 나은 결과를 원하면 `qwen2.5-coder` 같은 코드특화 모델 pull 후 `dstone.ai.gateway.ollama-override.model` 값만 바꾸면 됨.
 
 테스트용 dstone-ai-engine 인스턴스는 계속 띄워둘지, 내릴지 답변 기다리고 있었습니다 — 어떻게 할까요?
+
+---
+
+## 질문
+
+내려줘
+
+---
+
+## 답변
+
+정상 종료됐습니다.
