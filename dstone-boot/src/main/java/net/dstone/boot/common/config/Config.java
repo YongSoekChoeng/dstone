@@ -25,6 +25,7 @@ import net.dstone.common.core.BaseObject;
 	ConfigTransaction.class,
 	ConfigWebMvc.class,
 	ConfigWebSocket.class,
+	net.dstone.common.utils.SpringUtil.class,
 	net.dstone.common.websocket.controller.WebSocketController.class
 })
 public class Config extends BaseObject{
