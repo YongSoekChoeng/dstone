@@ -6,6 +6,7 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
@@ -238,6 +239,13 @@ public class ChatController extends BaseController {
 		}else if (Boolean.TRUE.equals(request.toolsEnabled())) {
 			// toolsEnabled만 켜져 있으면 강제 호출 없이, 필요한지는 LLM이 알아서 판단하게 둔다(tool_choice=auto).
 			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider());
+		}
+
+		// model이 있으면(provider=ollama일 때만 의미 있다) ollamaChatClient 빈에 고정된 기본 모델
+		// (dstone.ai.gateway.ollama-override.model) 대신 이번 요청만 그 모델로 호출한다. 존재하지 않거나
+		// 채팅을 지원하지 않는 모델명이면 여기서 막지 않고 Ollama가 반환하는 에러를 그대로 흘려보낸다.
+		if (resolved.provider() == AiProvider.OLLAMA && !StringUtil.isEmpty(request.model())) {
+			spec = spec.options(ChatOptions.builder().model(request.model()));
 		}
 
 		return spec.user(request.message());
