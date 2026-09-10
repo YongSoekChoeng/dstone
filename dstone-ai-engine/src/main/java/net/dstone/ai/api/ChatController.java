@@ -162,26 +162,66 @@ public class ChatController extends BaseController {
 	}
 
 	/**
-	 * provider가 비어있거나 기본 provider(spring.ai.model.chat)와 같으면 기존과 동일하게 기본 chatClient를
-	 * 쓴다. provider=ollama면 ConfigOllamaOverride의 별도 빈으로 라우팅한다(꺼져 있으면 명확한 에러).
-	 * 그 외 provider는 override용 빈이 없어 지원하지 않는다는 걸 바로 알려준다.
+	 * 이번 요청이 실제로 어떤 ChatClient로 나가야 하는지 결정한다. 기본 provider(spring.ai.model.chat)
+	 * 하나만 있던 예전과 달리, 지금은 요청마다 ChatRequest.provider로 다른 provider를 지정할 수 있어서
+	 * "어느 빈을 쓸지"와 "그 결과로 최종 provider가 뭐라고 응답해야 하는지"를 한 번에 정리해서
+	 * ResolvedChatClient로 묶어 돌려준다 - 호출하는 쪽(chat()/chatStream())이 이 두 값을 따로따로
+	 * 판단할 필요가 없게 하기 위해서다.
+	 *
+	 * 아래 4단계를 순서대로(먼저 해당하는 조건에서 바로 return/throw) 검사한다:
+	 *
+	 * 1단계) provider가 아예 안 왔으면(null/빈 문자열) - 지금까지와 완전히 동일하게 동작해야 하므로
+	 *        아무 판단도 하지 않고 기본 chatClient(spring.ai.model.chat으로 이미 결정된 빈)와 기본
+	 *        provider를 그대로 돌려준다. 여기서 끝나면 2~4단계는 전혀 실행되지 않는다.
+	 *
+	 * 2단계) provider가 왔으면 먼저 문자열을 AiProvider enum으로 바꾼다(AiProvider.fromPropertyValue).
+	 *        이 시점에 "anthropic/openai/ollama가 아닌 값"이 오면 그 메서드 안에서 바로
+	 *        IllegalArgumentException이 터진다 - 오타 같은 걸 여기서 걸러주는 셈이다.
+	 *
+	 * 3단계) 변환된 requested가 현재 기본 provider(gatewayProperties.activeProvider())와 "우연히"
+	 *        같다면, 굳이 별도 override 빈을 찾을 필요가 없다. 그냥 기본 chatClient를 그대로 쓰면
+	 *        결과가 완전히 동일하기 때문이다(예: spring.ai.model.chat=ollama로 이미 떠 있는 상태에서
+	 *        provider=ollama를 또 지정한 경우).
+	 *
+	 * 4단계) 3단계까지 안 걸렸다는 건 "기본 provider와는 다른 provider로 라우팅해야 한다"는 뜻이다.
+	 *        지금 실제로 override 빈이 준비된 provider는 ollama뿐이라서:
+	 *        - requested가 OLLAMA면 ollamaChatClientProvider(ConfigOllamaOverride가 조건부로 만든 빈,
+	 *          dstone.ai.gateway.ollama-override.enabled=true일 때만 존재)를 ObjectProvider로 찾아본다.
+	 *          존재하면 그 빈 + AiProvider.OLLAMA로 완성해서 돌려준다. 존재하지 않으면(설정이 꺼져
+	 *          있으면) "그냥 기본으로 조용히 넘어가는" 대신 IllegalStateException으로 바로 실패시켜서,
+	 *          호출한 쪽이 자기가 요청한 provider가 실제로는 적용되지 않았다는 걸 모르고 넘어가는
+	 *          일이 없게 한다.
+	 *        - requested가 OLLAMA도, 기본 provider도 아니면(예: 기본은 anthropic인데 openai를 요청한
+	 *          경우) override 빈 자체가 없으므로 더 볼 것도 없이 400 Bad Request로 바로 막는다.
 	 */
 	private ResolvedChatClient resolveChatClient(ChatRequest request) {
+
+		// 1단계: provider 미지정 -> 기존 동작과 100% 동일(기본 chatClient + 기본 provider).
 		if (StringUtil.isEmpty(request.provider())) {
 			return new ResolvedChatClient(this.chatClient, this.gatewayProperties.activeProvider());
 		}
+
+		// 2단계: 문자열 -> enum 변환. 지원하지 않는 값이면 여기서 바로 예외가 던져진다.
 		AiProvider requested = AiProvider.fromPropertyValue(request.provider());
+
+		// 3단계: 요청한 provider가 이미 기본 provider와 같다 -> override 빈을 찾을 필요 없이 기본 그대로.
 		if (requested == this.gatewayProperties.activeProvider()) {
 			return new ResolvedChatClient(this.chatClient, requested);
 		}
+
+		// 4단계: 기본과 다른 provider로 라우팅해야 한다. 지금은 ollama override만 실제로 존재한다.
 		if (requested == AiProvider.OLLAMA) {
 			ChatClient override = this.ollamaChatClientProvider.getIfAvailable();
 			if (override == null) {
+				// override 빈 자체가 없다(껐거나 설정 안 함) - 조용히 기본 provider로 넘기지 않고,
+				// 요청한 provider가 실제로 적용되지 않는다는 걸 명확한 에러로 바로 알려준다.
 				throw new IllegalStateException(
 					"provider=ollama override가 비활성화되어 있습니다(dstone.ai.gateway.ollama-override.enabled=false 또는 미설정).");
 			}
 			return new ResolvedChatClient(override, AiProvider.OLLAMA);
 		}
+
+		// ollama도 아니고 기본 provider도 아닌 provider 요청 - override 빈이 없어 지원 불가.
 		throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 			"provider[" + request.provider() + "]는 override를 지원하지 않습니다. 기본 provider("
 				+ this.gatewayProperties.activeProvider().propertyValue() + ")와 같을 때만, 또는 ollama override가 켜져 있을 때만 지정할 수 있습니다.");
