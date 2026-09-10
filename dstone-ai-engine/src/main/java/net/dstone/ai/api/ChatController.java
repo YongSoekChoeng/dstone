@@ -57,6 +57,50 @@ public class ChatController extends BaseController {
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request) {
 		
+		/************************************************************************
+		<Spring AI chatClient 의 기능 흐름>
+		chatClient
+		    │
+		    ▼
+			prompt() / prompt(String content) / prompt(Prompt prompt)
+			    │
+			    │  "이번 AI 요청을 구성하겠다"
+			    ▼
+			ChatClientRequestSpec
+			    │
+			    ├── system(...) => 시스템 프롬프트(AI의 역할/행동 방식/규칙을 정의)
+			    ├── user(...) => 유저 프롬프트(실제 클라이언트가 요청한 내용)
+			    │   user(u -> u
+			    │       .text("고흐의 작품 중 {name}에 대해 알려줘.")
+			    │       .param("name", "해바라기"))
+			    ├── advisors(...) => Advisor는 AI 호출 전후에 개입해서 요청이나 응답을 보강
+			    │       Chat Memory
+			    │       RAG
+			    │       Vector Search
+			    │       Logging
+			    │       Tool Calling
+			    │       Security
+			    │       Context Injection
+			    ├── options(...)
+			    ├── tools(...)
+			    └── ...
+			    │
+			    ▼
+			call() - 전체 응답을 받은 후 반환 / stream() - 응답이 시작되면 반환 시작
+			    │
+			    ▼
+			ChatModel
+			    │
+			    ▼
+			LLM
+			    │
+			    ▼
+		ChatResponse
+		    │
+		    ▼
+		content()
+		************************************************************************/
+		
 		// message 없이 호출했을 때 처리.
 		if (StringUtil.isEmpty(request.message())) {
 			// message 없이 호출하면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서

@@ -1,4 +1,4 @@
-package net.dstone.ai.agent.tool.sample;
+package net.dstone.ai.tools.sample;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;

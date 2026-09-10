@@ -1,4 +1,4 @@
-package net.dstone.ai.rag.retrieval;
+package net.dstone.ai.tools.rag;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -9,6 +9,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.rag.retrieval.RetrievalService;
 import net.dstone.common.core.BaseObject;
 
 /**
