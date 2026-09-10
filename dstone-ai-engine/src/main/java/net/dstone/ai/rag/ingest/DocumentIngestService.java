@@ -24,6 +24,14 @@ import net.dstone.common.utils.StringUtil;
  * sourceId는 호출 쪽이 부여하는 논리적 문서 식별자(파일명/업무키 등)다 - 같은 sourceId로 재적재하면
  * upsert처럼 동작하도록, 새 청크를 넣기 전에 그 sourceId로 색인된 기존 청크를 먼저 지운다
  * (그대로 두면 문서를 갱신할 때마다 오래된 청크가 검색 결과에 계속 섞여 나온다).
+ *
+ * 이 클래스는 RAG(Retrieval-Augmented Generation) 파이프라인의 첫 단계다: 문서 적재(여기)
+ * → 임베딩 provider 검증({@link net.dstone.ai.rag.embedding}) → VectorStore 검색
+ * ({@link net.dstone.ai.rag.retrieval}). VectorStore 자체(pgvector)는 spring-ai의
+ * PgVectorStoreAutoConfiguration이 DataSource(spring.datasource.*)와 EmbeddingModel
+ * (spring.ai.model.embedding) 빈으로부터 자동설정한다. 전부 dstone.ai.rag.enabled=true일 때만
+ * 활성화된다 - RAG가 필요 없는 SI 프로젝트는 이 설정을 안 켜면 Postgres/pgvector/임베딩 설정 없이도
+ * 그대로 기동된다.
  */
 @Service
 @ConditionalOnProperty(name = "dstone.ai.rag.enabled", havingValue = "true")

@@ -24,6 +24,12 @@ import net.dstone.common.utils.StringUtil;
  *
  * {@link net.dstone.ai.governance.ratelimit.RateLimitFilter}(@Order(2))가 caller 식별을 이 필터의
  * {@link CallerContext} 기록에 의존하므로, 반드시 이 필터가 먼저(@Order(1)) 실행돼야 한다.
+ *
+ * OAuth2 client-credentials 대신 API Key를 고른 이유: 모노레포에 Authorization Server가 없다
+ * (dstone-boot의 OAuth2는 소셜 로그인의 client일 뿐 IdP가 아니다) - client-credentials를 타려면
+ * 별도 IdP를 새로 구축해야 하는데, 이 엔진을 호출하는 대상이 정해진 SI 프로젝트들(서비스-투-서비스
+ * 호출)이라는 점을 감안하면 과한 투자다. SI 프로젝트별로 키를 하나씩 발급하는 API Key 방식으로
+ * 충분하다.
  */
 @Component
 @Order(1)

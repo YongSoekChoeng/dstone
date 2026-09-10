@@ -10,6 +10,12 @@ import java.util.Arrays;
  *
  * azure-openai는 Spring AI 2.x에서 chat model provider로 완전히 제거되어(2.0.0-M4 이후
  * spring-ai-starter-model-azure-openai 미배포, Azure는 vector-store 용도만 남음) 목록에서 뺐다.
+ *
+ * anthropic/openai/ollama는 각각 spring-ai-starter-model-*의 자동설정이 이미 ChatModel 어댑터
+ * 역할을 하고 있어 provider별 커스텀 어댑터 구현체를 따로 두지 않는다. local vLLM처럼 starter가
+ * 없는 OpenAI 호환 서버는 provider는 OPENAI로 두고 spring.ai.openai.base-url만 vLLM 엔드포인트로
+ * override해서 재사용한다. 향후 provider별 커스터마이징(요청/응답 인터셉터, 모델명 기본값 등)이
+ * 실제로 필요해지면 net.dstone.ai.gateway.provider 패키지를 그 구현을 담는 자리로 새로 만든다.
  */
 public enum AiProvider {
 

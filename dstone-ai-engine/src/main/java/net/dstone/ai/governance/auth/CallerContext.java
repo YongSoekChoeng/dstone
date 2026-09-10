@@ -6,6 +6,10 @@ import jakarta.servlet.http.HttpServletRequest;
  * {@link ApiKeyAuthFilter}가 인증에 성공하면 request attribute에 caller를 담아두는 곳.
  * 이후 rate limit/비용 트래킹 등이 "누가 호출했는지"를 헤더를 다시 파싱하지 않고 여기서 꺼내
  * 쓴다. dstone.ai.governance.auth.enabled=false면 인증 자체를 안 타므로 항상 비어있다.
+ *
+ * governance(Phase 4: Guardrail, PII 필터, rate limit, 비용 트래킹, 인증/인가) 전체에서 caller
+ * 식별이 다른 기능들보다 선행돼야 의미가 있어 auth를 가장 먼저 구현했고, 이 클래스가 그 연결
+ * 지점이다 - {@link net.dstone.ai.governance.ratelimit}(caller별 요청 제한)가 그 첫 소비자다.
  */
 public final class CallerContext {
 

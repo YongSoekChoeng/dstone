@@ -25,6 +25,10 @@ import net.dstone.common.utils.StringUtil;
  * ({@code net.dstone.ai.session})에도 원본 PII 대신 그대로 저장되게 한다.
  * {@code net.dstone.ai.observability.usage.UsageLoggingAdvisor}(order=HIGHEST_PRECEDENCE, 전체
  * 요청을 감싸 지연시간을 재야 하므로 가장 바깥쪽)보다는 한 단계 안쪽이다.
+ *
+ * 이 클래스가 속한 net.dstone.ai.governance.guardrail 패키지는 현재 PII 탐지/마스킹 하나뿐이다 -
+ * sensitive-word 차단 같은 다른 종류의 Guardrail이 필요해지면 이 패키지에 이어서 추가한다
+ * (Spring AI가 기본 제공하는 {@code SafeGuardAdvisor}가 그 용도에 가깝다).
  */
 @Component
 public class PiiGuardrailAdvisor implements CallAdvisor {

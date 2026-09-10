@@ -24,6 +24,10 @@ import net.dstone.common.utils.LogUtil;
  * {@link net.dstone.ai.governance.guardrail.PiiGuardrailAdvisor}의 PII 마스킹, ChatMemory의 히스토리
  * 조회/저장, 실제 LLM 호출까지 전체를 감싸야 "이 요청 전체"의 지연시간을 정확히 잴 수 있기 때문이다.
  * REJECT(guardrail)처럼 체인 중간에서 예외가 나는 경우도 실패로 별도 로깅한다.
+ *
+ * net.dstone.ai.observability 산하에서 토큰 사용량/비용/지연시간 로깅은 이 클래스(usage 하위 패키지)로
+ * 구현했다 - Eval(품질 평가) 결과 로깅은 아직 다루지 않는다(평가 데이터셋/채점 로직 등 이 모듈에 없는
+ * 전제가 먼저 정해져야 하므로, 구체적인 요구가 생기면 별도 하위 패키지로 착수한다).
  */
 @Component
 public class UsageLoggingAdvisor implements CallAdvisor {
