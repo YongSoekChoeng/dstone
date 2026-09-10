@@ -33,7 +33,7 @@ public class ChatController extends net.dstone.boot.common.biz.BaseController {
 		}
 		boolean ragEnabled = Boolean.TRUE.equals(request.ragEnabled());
 		boolean toolsEnabled = Boolean.TRUE.equals(request.toolsEnabled());
-		return this.chatService.streamChat(servletRequest, request.message(), ragEnabled, toolsEnabled);
+		return this.chatService.streamChat(servletRequest, request.message(), ragEnabled, toolsEnabled, request.provider());
 	}
 
 }
