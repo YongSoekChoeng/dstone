@@ -26,7 +26,10 @@ public class SqlSyntaxTools extends BaseObject {
 	public String validateSqlSyntax(@ToolParam(description = "검증할 단일 SQL 문(SELECT/INSERT/UPDATE/DELETE)") String sql) {
 		Statements statements;
 		try {
+			this.sysout("net.dstone.ai.tools.sql.SqlSyntaxTools.validateSqlSyntax INPUT("+sql+")");
 			statements = CCJSqlParserUtil.parseStatements(sql);
+			
+			this.sysout("net.dstone.ai.tools.sql.SqlSyntaxTools.validateSqlSyntax OUTPUT("+statements+")");
 		} catch (JSQLParserException e) {
 			return "실패: 문법 오류 - " + e.getMessage();
 		}
