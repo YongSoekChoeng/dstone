@@ -19,13 +19,6 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div class="chat-options">
 					<label><input type="checkbox" id="chat-rag-enabled" /> 문서검색(RAG)</label>
 					<label><input type="checkbox" id="chat-tools-enabled" /> 도구호출(Tool)</label>
-					<label>ollama-model
-						<select id="ollama-model">
-							<option value="sqlcoder">sqlcoder</option>
-							<option value="llama3.2">llama3.2</option>
-							<option value="bge-m3" selected>bge-m3</option>
-						</select>
-					</label>
 				</div>
 				<div class="chat-input-row">
 					<textarea id="chat-input" class="chat-input" placeholder="메시지를 입력하세요..." rows="2"></textarea>

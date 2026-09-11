@@ -60,22 +60,16 @@ public class ChatController extends BaseController {
 	private final ObjectProvider<RetrievalService> retrievalServiceProvider;
 	// Tool은 RAG와 달리 외부 인프라 의존이 없어 항상 존재하는 빈이라 ObjectProvider가 필요 없다.
 	private final ConfigTool configTool;
-	// config.ConfigOllamaOverride가 dstone.ai.gateway.ollama-override.enabled=true일 때만 만드는 빈이라
-	// ObjectProvider로 받는다 - 꺼져 있으면 provider=ollama 요청에 명확한 에러를 던지고, 켜져 있으면
-	// 기본 chatClient(spring.ai.model.chat) 대신 이 빈으로 라우팅한다.
-	private final ObjectProvider<ChatClient> ollamaChatClientProvider;
 
 	public ChatController(ChatClient chatClient, GatewayProperties gatewayProperties,
 			PromptTemplateRegistry promptTemplateRegistry, ObjectProvider<VectorStore> vectorStoreProvider,
-			ObjectProvider<RetrievalService> retrievalServiceProvider, ConfigTool configTool,
-			@Qualifier("ollamaChatClient") ObjectProvider<ChatClient> ollamaChatClientProvider) {
+			ObjectProvider<RetrievalService> retrievalServiceProvider, ConfigTool configTool) {
 		this.chatClient = chatClient;
 		this.gatewayProperties = gatewayProperties;
 		this.promptTemplateRegistry = promptTemplateRegistry;
 		this.vectorStoreProvider = vectorStoreProvider;
 		this.retrievalServiceProvider = retrievalServiceProvider;
 		this.configTool = configTool;
-		this.ollamaChatClientProvider = ollamaChatClientProvider;
 	}
 
 	/************************************************************************
@@ -209,22 +203,10 @@ public class ChatController extends BaseController {
 			return new ResolvedChatClient(this.chatClient, requested);
 		}
 
-		// 4단계: 기본과 다른 provider로 라우팅해야 한다. 지금은 ollama override만 실제로 존재한다.
-		if (requested == AiProvider.OLLAMA) {
-			ChatClient override = this.ollamaChatClientProvider.getIfAvailable();
-			if (override == null) {
-				// override 빈 자체가 없다(껐거나 설정 안 함) - 조용히 기본 provider로 넘기지 않고,
-				// 요청한 provider가 실제로 적용되지 않는다는 걸 명확한 에러로 바로 알려준다.
-				throw new IllegalStateException(
-					"provider=ollama override가 비활성화되어 있습니다(dstone.ai.gateway.ollama-override.enabled=false 또는 미설정).");
-			}
-			return new ResolvedChatClient(override, AiProvider.OLLAMA);
-		}
-
 		// ollama도 아니고 기본 provider도 아닌 provider 요청 - override 빈이 없어 지원 불가.
 		throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 			"provider[" + request.provider() + "]는 override를 지원하지 않습니다. 기본 provider("
-				+ this.gatewayProperties.activeProvider().propertyValue() + ")와 같을 때만, 또는 ollama override가 켜져 있을 때만 지정할 수 있습니다.");
+				+ this.gatewayProperties.activeProvider().propertyValue() + ")와 같을 때만 지정할 수 있습니다.");
 	}
 
 	private ChatClient.ChatClientRequestSpec buildRequestSpec(ResolvedChatClient resolved, ChatRequest request,
@@ -279,13 +261,6 @@ public class ChatController extends BaseController {
 		}else if (Boolean.TRUE.equals(request.toolsEnabled())) {
 			// toolsEnabled만 켜져 있으면 강제 호출 없이, 필요한지는 LLM이 알아서 판단하게 둔다(tool_choice=auto).
 			spec = spec.toolCallbacks(this.configTool.toolCallbackProvider());
-		}
-
-		// ollamaModel이 있으면(provider=ollama일 때만 의미 있다) ollamaChatClient 빈에 고정된 기본 모델
-		// (dstone.ai.gateway.ollama-override.model) 대신 이번 요청만 그 모델로 호출한다. 존재하지 않거나
-		// 채팅을 지원하지 않는 모델명이면 여기서 막지 않고 Ollama가 반환하는 에러를 그대로 흘려보낸다.
-		if (resolved.provider() == AiProvider.OLLAMA && !StringUtil.isEmpty(request.ollamaModel())) {
-			spec = spec.options(ChatOptions.builder().model(request.ollamaModel()));
 		}
 
 		return spec.user(request.message());

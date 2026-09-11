@@ -26,7 +26,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 * dstone-boot ↔ dstone-ai-engine은 서버 대 서버 호출이라 쿠키가 전달되지 않으므로, sessionId를
 	 * 매 요청 명시적으로 실어 보내야 대화가 끊기지 않는다.
 	 */
-	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, boolean ragEnabled, boolean toolsEnabled, String provider, String ollamaModel) {
+	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, boolean ragEnabled, boolean toolsEnabled) {
 
 		String sessionId = this.resolveSessionId(servletRequest);
 
@@ -35,8 +35,6 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		body.put("sessionId", sessionId);
 		body.put("ragEnabled", ragEnabled);
 		body.put("toolsEnabled", toolsEnabled);
-		body.put("provider", provider);
-		body.put("ollamaModel", ollamaModel);
 
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 

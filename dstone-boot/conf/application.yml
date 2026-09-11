@@ -119,8 +119,8 @@ spring:
             hikari: 
                 driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
                 jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
-                username: ENC(ydLjxrknr8dD59e6E+HvxdxRaGiFa9jOCpJJDtb0uak=)
-                password: ENC(ydLjxrknr8dD59e6E+HvxdxRaGiFa9jOCpJJDtb0uak=)
+                username: sampleuser
+                password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
                 maximum-pool-size: 30
                 connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
                 max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
@@ -134,8 +134,8 @@ spring:
             hikari: 
                 driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
                 jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
-                username: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)
-                password: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)
+                username: sampleuser
+                password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
                 maximum-pool-size: 30
                 connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
                 max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
@@ -149,8 +149,8 @@ spring:
             hikari: 
                 driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
                 jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/analyzeDB?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
-                username: ENC(/V7LzByd6FKQ2uPexJOOaY8E6gCVnRc9TcoPT/pu1y8=)
-                password: ENC(/V7LzByd6FKQ2uPexJOOaY8E6gCVnRc9TcoPT/pu1y8=)
+                username: analyzeuser
+                password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
                 maximum-pool-size: 30
                 connection-timeout: 30000  # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
                 max-lifetime: 1700000      # 커넥션의 최대 생존시간 (DB timeout 보다 짧게 설정 필요). 기본값 30분.
@@ -169,7 +169,7 @@ spring:
         host: ${RABBITMQ_HOST}
         port: ${RABBITMQ_PORT}
         virtual-host: /dstone-mq
-        username: ENC(IIOITvsB1izl1mH7iw/A3eM5QUQ0z7HHj7sJqS9rrWI=)
+        username: jysn007
         password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
         # bindings 는 리스트입니다. Exchange/Queue 조합을 늘리려면 이 목록에 항목만 추가하면 되고,
         # ConfigRabbitMQ.java 코드는 손댈 필요가 없습니다.

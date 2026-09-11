@@ -15,7 +15,6 @@ import net.dstone.common.core.BaseObject;
 @Import({
 	ConfigChatClient.class,
 	ConfigChatMemory.class,
-	ConfigOllamaOverride.class,
 	ConfigAspect.class,
 	ConfigProperty.class,
 	ConfigRedis.class,

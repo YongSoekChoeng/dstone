@@ -40,8 +40,8 @@ spring:
             hikari: 
                 driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy        # 데이터베이스 드라이버 클래스 이름
                 jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/dataflow  # 데이터베이스 연결 URL
-                username: ENC(VElaOj1pF3IdRCrKXHIQFVRCQv4hE6Oniig5ohsQ1wY=)     # 데이터베이스 사용자 이름
-                password: ENC(VElaOj1pF3IdRCrKXHIQFVRCQv4hE6Oniig5ohsQ1wY=)     # 데이터베이스 사용자 비밀번호
+                username: dataflow                                              # 데이터베이스 사용자 이름
+                password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)     # 데이터베이스 사용자 비밀번호
                 minimum-idle: 2                                                 # 최소 Idle 커넥션 수
                 maximum-pool-size: 50                                           # 커넥션 풀의 최대 크기
                 connection-timeout: 30000                                       # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
@@ -65,8 +65,8 @@ spring:
             hikari: 
                 driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy        # 데이터베이스 드라이버 클래스 이름
                 jdbc-url: jdbc:log4jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB  # 데이터베이스 연결 URL
-                username: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)     # 데이터베이스 사용자 이름
-                password: ENC(RxKuJmDmzNwlIYKQOUjUlAC4mm4RPraeCDJWbUh99w0=)     # 데이터베이스 사용자 비밀번호
+                username: sampleuser                                            # 데이터베이스 사용자 이름
+                password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)     # 데이터베이스 사용자 비밀번호
                 minimum-idle: 2                                                 # 최소 Idle 커넥션 수
                 maximum-pool-size: 100                                          # 커넥션 풀의 최대 크기
                 connection-timeout: 600000                                      # 커넥션 풀에서 커넥션을 얻기 위한 최대 대기시간(ms). 기본값 30초.
