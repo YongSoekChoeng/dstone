@@ -901,7 +901,7 @@ node -v && npm -v
 # 7.12 Jenkins 설치 및 파이프라인 권한 설정
 ########################################################################
 sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | \
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key | \
   sudo tee /etc/apt/keyrings/jenkins-keyring.asc > /dev/null
 
 echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | \
