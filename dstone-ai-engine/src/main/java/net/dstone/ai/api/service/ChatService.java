@@ -1,15 +1,9 @@
 package net.dstone.ai.api.service;
 
-import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
-
-import com.anthropic.models.messages.ToolChoice;
-import com.anthropic.models.messages.ToolChoiceTool;
 
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.common.consts.AiProvider;
