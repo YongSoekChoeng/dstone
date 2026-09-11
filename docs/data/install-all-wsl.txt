@@ -336,7 +336,7 @@ sudo chmod +x /opt/kafka/kafka-start.sh /opt/kafka/kafka-stop.sh
 mkdir -p /opt/kafka/admin-tools/KafbatUI
 cd /opt/kafka/admin-tools/KafbatUI
 
-JAR_URL="$(curl -s https://api.github.com/repos/kafbat/kafka-ui/releases/latest \
+JAR_URL="$(curl -s https://api.github.com/repos/kafbat/kafka-ui/releases/207609969 \
   | grep -oE '"browser_download_url":\s*"[^"]*api[^"]*\.jar"' \
   | grep -oE 'https://[^"]+' | head -1)"
 wget -O kafbat-ui.jar "$JAR_URL"
