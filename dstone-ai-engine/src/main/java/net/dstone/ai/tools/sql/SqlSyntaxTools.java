@@ -28,7 +28,6 @@ public class SqlSyntaxTools extends BaseObject {
 		try {
 			this.sysout("net.dstone.ai.tools.sql.SqlSyntaxTools.validateSqlSyntax INPUT("+sql+")");
 			statements = CCJSqlParserUtil.parseStatements(sql);
-			
 			this.sysout("net.dstone.ai.tools.sql.SqlSyntaxTools.validateSqlSyntax OUTPUT("+statements+")");
 		} catch (JSQLParserException e) {
 			return "실패: 문법 오류 - " + e.getMessage();
