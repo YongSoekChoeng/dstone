@@ -89,7 +89,7 @@ mvn clean install
 | 문서 | 내용 |
 |---|---|
 | [05.dstone-common.md](05.dstone-common.md) | 공통 유틸리티, 설정, 보안, 환경 변수 |
-| [06.dstone-boot.md](06.dstone-boot.md) | 웹 애플리케이션 프레임워크 및 소스 코드 분석기 |
+| [06.dstone-boot.md](06.dstone-boot.md) | 웹 애플리케이션 프레임워크, 소스 코드 분석기, `dstone-ai-engine` 연동 채팅/RAG 문서업로드 화면 |
 | [07.dstone-batch.md](07.dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
 | [08.dstone-batchadmin.md](08.dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
 | [09.dstone-ai-engine.md](09.dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2), Agent/Tool·Function Calling(Phase 3), Governance(API Key 인증·Rate Limit·PII Guardrail) & Observability(사용량 로깅)(Phase 4, 진행 중) |

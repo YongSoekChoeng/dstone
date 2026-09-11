@@ -1,0 +1,1147 @@
+#!/usr/bin/env bash
+########################################################################
+# dstone 개발 환경 — WSL 일괄 설치 스크립트
+#
+# 이 파일은 docs/02.environment.md "7. WSL 개발 환경 신규 구축" 절(7.2~7.14)에
+# 실제로 검증된 명령들을 그대로 이어붙인 것이다 - 새 문서가 아니라 그 문서의
+# "실행판"이며, 각 블록이 어느 절 내용인지는 아래 "#####...#####" 배너 주석으로
+# 표시해뒀다. 명령 자체가 바뀌면(설치 방법이 달라지면) 02.environment.md 7절을
+# 먼저 고치고 이 파일에 그대로 반영하는 순서를 지킨다 - 이 파일 혼자 임의로
+# 앞서나가지 않는다.
+#
+# ⚠️ 전제조건 — 이 스크립트를 실행하기 "전에" 아래가 이미 돼 있어야 한다
+# (Windows PowerShell에서 하는 작업이라 WSL 안에서는 실행 불가 - 02.environment.md
+# 7.1절 참고):
+#   1) `wsl --install -d Ubuntu-26.04` 로 WSL2 + Ubuntu 배포판 설치, 재부팅, 리눅스
+#      사용자 계정 생성까지 마친 상태
+#   2) (권장) `%USERPROFILE%\.wslconfig` 에 7.1절의 메모리/프로세서 설정을 적용
+#   3) 이 셸이 그 Ubuntu 배포판 "안"에서 실행되고 있는 상태
+#
+# 이 스크립트는 그 다음부터, 즉 "깨끗한 Ubuntu WSL 하나"에서 dstone 프로젝트가
+# 요구하는 MySQL/PostgreSQL(pgvector)/Redis/RabbitMQ/Kafka/Docker(kind)/Ollama/
+# Node.js/Jenkins 전부와 관리용 시작/정지 스크립트(~/start.sh, ~/stop.sh)까지
+# 한 번에 구성한다.
+#
+# ⏸ 완전 무인(non-interactive) 스크립트는 아니다 — 실제로 사람이 판단해야 하는
+# 지점(GitHub SSH 키 등록, MySQL 초기 보안 위저드, Docker 그룹 반영을 위한 새
+# 셸 필요) 세 곳에서 스크립트가 스스로 멈추고 안내 문구를 띄운다. 코드 안에서
+# "⏸ [MANUAL]"로 검색하면 그 지점들을 바로 찾을 수 있다.
+#
+# 사용법:
+#   1) 아래 "0) 커스터마이즈 변수"를 실제 값으로 고친다(비워두면 실행이 거부된다).
+#   2) bash install-all-wsl.txt 2>&1 | tee ~/dstone-install.log
+#      (tee로 로그를 남겨두면 중간에 실패했을 때 어디까지 됐는지 확인하기 쉽다)
+#   3) ⏸ 표시가 뜨면 화면 안내를 그대로 따른다.
+#
+# set -e를 걸지 않았다: 이 안에는 설정 직후 확인용 grep도 여러 군데 섞여있는데
+# (예: "SHOW DATABASES | grep ...") grep이 매칭 실패 시 exit 1이라 set -e면
+# 정상 상황에서도 스크립트가 중간에 죽을 수 있다. 각 블록의 성공 여부는 화면
+# 출력(또는 tee로 남긴 로그)으로 직접 확인하고, 실패한 블록만 그 부분을 다시
+# 복사해 재실행하는 걸 권장한다 - 02.environment.md 7절 문서 자체도 "위에서
+# 아래로 붙여넣는" 러닝북 성격이라 이 스크립트도 같은 성격을 유지했다.
+set -uo pipefail
+
+########################################################################
+# 0) 커스터마이즈 변수 — 실행 전에 반드시 실제 값으로 채운다
+########################################################################
+GIT_USER_NAME="__CHANGE_ME__"                 # 예: "홍길동"
+GIT_USER_EMAIL="__CHANGE_ME__"                # 예: "you@example.com" (GitHub 계정 이메일과 맞추면 커밋 연동이 편하다)
+DSTONE_REPO_URL="git@github.com:YongSoekChoeng/dstone.git"   # 이 저장소를 포크했다면 본인 URL로 교체(HTTPS로 하려면 https://github.com/<계정>/dstone.git)
+PG_MAJOR_VERSION="18"                         # `apt list -a postgresql` 등으로 실제 설치되는 메이저 버전과 다르면 맞춰 수정
+POSTGRES_DSTONE_AI_PASSWORD="__CHANGE_ME__"   # dstone-ai-engine/conf/application.yml의 spring.datasource.password(ENC(...))를
+                                               # `cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<이 값>"`로
+                                               # 복호화했을 때 나오는 평문과 반드시 일치해야 한다(터미널에서 직접 실행 - 평문을 대화형 AI 도구에 붙여넣지 말 것)
+RABBITMQ_PASSWORD="dstone123"                  # 예시값 그대로도 로컬 개발용으로는 동작한다 - 바꾸고 싶으면 여기만 수정
+
+for v in GIT_USER_NAME GIT_USER_EMAIL POSTGRES_DSTONE_AI_PASSWORD; do
+    if [ "${!v}" = "__CHANGE_ME__" ]; then
+        echo "ERROR: 상단 '0) 커스터마이즈 변수'의 ${v}를(을) 실제 값으로 채우지 않았습니다. 파일을 열어 수정한 뒤 다시 실행하세요." >&2
+        exit 1
+    fi
+done
+
+echo "== dstone WSL 일괄 설치 시작: $(date) =="
+
+
+########################################################################
+# 7.2 WSL 안 기초 설정
+########################################################################
+# 시간대(한국 기준, 필요 시 조정)
+sudo timedatectl set-timezone Asia/Seoul
+
+# 기본 패키지 인덱스 최신화
+sudo apt update && sudo apt upgrade -y
+
+# 프로젝트 루트가 위치할 디렉터리 준비 (/app/dstone에 클론할 예정)
+sudo mkdir -p /app
+sudo chown "$USER":"$USER" /app
+cat /etc/wsl.conf
+
+
+########################################################################
+# 7.3 JDK / Maven / Git 설치 + 저장소 클론
+########################################################################
+# JDK 21
+sudo apt install -y openjdk-21-jdk
+java -version && javac -version
+
+# Maven
+sudo apt install -y maven
+mvn -version   # "Java version"이 21로 잡히는지 확인
+
+# ~/.bashrc에 Maven 환경변수 등록 (JDK는 update-alternatives 기본 경로를 그대로 사용, 별도 등록 불필요)
+cat >> ~/.bashrc << 'EOF'
+export MAVEN_HOME=/usr/share/maven
+export PATH=$PATH:$MAVEN_HOME/bin
+EOF
+source ~/.bashrc
+
+# Git
+sudo apt install -y git
+git --version
+git config --global user.name "$GIT_USER_NAME"
+git config --global user.email "$GIT_USER_EMAIL"
+
+# ⏸ [MANUAL] SSH 키 - 이미 등록된 키가 있다면 이 블록 전체를 건너뛰어도 된다.
+if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+    ssh-keygen -t ed25519 -C "$GIT_USER_EMAIL" -N "" -f "$HOME/.ssh/id_ed25519"
+fi
+echo "================================================================"
+echo " 아래 공개키를 GitHub 계정 -> Settings -> SSH and GPG keys 에 등록하세요."
+echo "================================================================"
+cat "$HOME/.ssh/id_ed25519.pub"
+read -r -p "GitHub에 키 등록을 마쳤으면 Enter (SSH 대신 HTTPS로 클론할 거라면 DSTONE_REPO_URL을 https:// 형식으로 바꾼 뒤 Enter) >>> "
+ssh -T git@github.com || true   # "Hi <계정>! You've successfully authenticated..." 확인(HTTPS 클론이면 실패해도 무방)
+
+[ -d /app/dstone/.git ] || git clone "$DSTONE_REPO_URL" /app/dstone
+
+cd /app/dstone && git log --oneline -3
+
+
+########################################################################
+# 7.4 MySQL 설치 및 dstone 스키마 초기화
+########################################################################
+# 설치
+sudo apt install -y mysql-server
+
+# ⏸ [MANUAL, 선택/권장] 초기 보안 설정 — 대화형 위저드(root 비밀번호/익명 사용자 제거 등 예/아니오 질문).
+# 비밀번호 정책을 강하게 걸면 아래 스키마 초기화 SQL의 SET GLOBAL로 다시 낮춰야 한다(바로 아래 주석 참고).
+# 건너뛰려면 이 줄을 지우거나 주석 처리한다.
+sudo mysql_secure_installation
+
+# 예외사항 ①: apt 설치 직후 mysql.service는 기본 enabled 상태다 - 이 환경 정책(1절)대로 비활성화한다
+sudo systemctl disable mysql
+sudo tee /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null << 'EOF'
+[mysqld]
+mysql_native_password = ON
+user                   = mysql
+bind-address           = 0.0.0.0
+mysqlx-bind-address    = 127.0.0.1
+key_buffer_size        = 16M
+myisam-recover-options = BACKUP
+log_error              = /var/log/mysql/error.log
+max_binlog_size        = 100M
+EOF
+
+sudo systemctl restart mysql
+sudo mysql -u root -e "select 1"   # OS 사용자 소켓 인증으로 바로 접속돼야 함
+cd /app/dstone
+
+# 1) DB + 사용자 생성
+sudo mysql -u root < dstone-boot/src/main/resources/schema/01-init-mysql-dstone-boot.sql        # sampleDB + sampleuser
+sudo mysql -u root < dstone-boot/src/main/resources/schema/01-init-mysql-dstone-analyze.sql      # analyzeDB + analyzeuser
+sudo mysql -u root < dstone-batch/src/main/resources/schema/01-init-mysql-dstone-batch.sql       # sampleDB(중복,무해) + dataflow + 사용자
+sudo mysql -u root < dstone-batchadmin/src/main/resources/schema/01-init-mysql-dstone-batchadmin.sql  # batchadmin + 사용자
+
+# 2) 테이블 생성
+sudo mysql -u root < dstone-boot/src/main/resources/schema/02-create-table-mysql-dstone-boot.sql
+sudo mysql -u root < dstone-boot/src/main/resources/schema/02-create-table-mysql-dstone-analyze.sql
+sudo mysql -u root < dstone-batch/src/main/resources/schema/02-create-table-mysql-dstone-batch.sql
+sudo mysql -u root < dstone-batchadmin/src/main/resources/schema/02-create-table-mysql-dstone-batchadmin.sql
+
+# 3) (선택, 권장) 샘플/초기 데이터
+sudo mysql -u root < dstone-boot/src/main/resources/schema/03-create-data-mysql-dstone-boot.sql
+sudo mysql -u root < dstone-batchadmin/src/main/resources/schema/03-create-data-mysql-dstone-batchadmin.sql
+sudo mysql -u root -e "SHOW DATABASES;"   # sampleDB / analyzeDB / dataflow / batchadmin 확인
+mysql -u sampleuser -psampleuser -h 127.0.0.1 -e "SHOW TABLES;" sampleDB
+mysql -u dataflow -pdataflow -h 127.0.0.1 -e "SHOW TABLES;" dataflow
+
+
+########################################################################
+# 7.5 PostgreSQL + pgvector 설치 및 `dstone_ai` 구성 (RAG용)
+########################################################################
+# 설치 (pgvector 확장 패키지는 postgresql 본체와 별도 - 버전에 종속된 패키지명이라 postgresql-<major>-pgvector 형태)
+sudo apt install -y postgresql
+sudo apt install -y postgresql-${PG_MAJOR_VERSION}-pgvector
+
+psql --version
+pg_lsclusters
+# ⚠️ POSTGRES_DSTONE_AI_PASSWORD는 dstone-ai-engine/conf/application.yml의 spring.datasource.password
+# (ENC(...) 값을 EncUtil로 복호화한 평문)과 반드시 일치해야 한다 - 스크립트 상단 변수를 미리 맞춰뒀는지 확인.
+sudo -u postgres psql <<SQL
+CREATE ROLE dstone_ai LOGIN PASSWORD '${POSTGRES_DSTONE_AI_PASSWORD}';
+CREATE DATABASE dstone_ai OWNER dstone_ai;
+SQL
+
+sudo -u postgres psql -d dstone_ai -c "CREATE EXTENSION IF NOT EXISTS vector;"
+sudo -u postgres psql -c "\du" | grep dstone_ai
+sudo -u postgres psql -l | grep dstone_ai
+sudo -u postgres psql -d dstone_ai -c "\dx" | grep vector
+
+
+########################################################################
+# 7.6 Redis 설치 및 설정
+########################################################################
+sudo apt install -y redis
+redis-server --version
+
+# 예외사항 ⑤: 자동시작 비활성화
+sudo systemctl disable redis-server
+sudo sed -i "s/^bind .*/bind 0.0.0.0 -::1/" /etc/redis/redis.conf
+sudo sed -i 's/^protected-mode yes/protected-mode no/' /etc/redis/redis.conf
+sudo systemctl restart redis-server
+redis-cli ping   # PONG
+
+
+########################################################################
+# 7.7 RabbitMQ 설치 및 dstone용 vhost/사용자 구성
+########################################################################
+sudo apt install -y rabbitmq-server
+sudo rabbitmq-plugins enable rabbitmq_management
+
+# 예외사항 ⑦: 자동시작 비활성화
+sudo systemctl disable rabbitmq-server
+
+sudo systemctl start rabbitmq-server
+sudo rabbitmqctl status
+sudo rabbitmqctl add_vhost /dstone-mq
+
+sudo rabbitmqctl add_user dstone "$RABBITMQ_PASSWORD"
+sudo rabbitmqctl set_permissions -p /dstone-mq dstone ".*" ".*" ".*"
+sudo rabbitmqctl set_user_tags dstone management     # 관리 콘솔(15672) 로그인 허용(선택)
+
+# (대안, 실행 안 함) 위 4줄 대신 docs/data/rabbitmq-basic-config.json을 한 번에 import하는 방법도 있다
+# (02.environment.md 7.7절 참고) - 그 파일의 사용자 비밀번호는 해시로만 들어있어 import 후
+# `sudo rabbitmqctl change_password dstone <새비밀번호>`로 평문 재설정이 필요하다. 두 방법 중 하나만
+# 쓴다 - 이 스크립트는 위의 CLI 방식을 기본으로 택했다.
+# sudo rabbitmqctl import_definitions /app/dstone/docs/data/rabbitmq-basic-config.json
+# sudo rabbitmqctl change_password dstone "$RABBITMQ_PASSWORD"
+sudo rabbitmqctl list_vhosts
+sudo rabbitmqctl list_queues -p /dstone-mq name
+
+
+########################################################################
+# 7.8 Kafka(KRaft 모드) + Kafbat UI 설치
+########################################################################
+# 1) 설치 디렉터리 준비 + 다운로드
+sudo mkdir -p /opt/kafka
+sudo chown "$USER":"$USER" /opt/kafka
+cd /opt/kafka
+
+wget https://downloads.apache.org/kafka/4.2.1/kafka_2.13-4.2.1.tgz
+tar -xzf kafka_2.13-4.2.1.tgz
+rm kafka_2.13-4.2.1.tgz
+cd kafka_2.13-4.2.1
+# 기존 값(활성/주석 어느 쪽이든) 제거 후 최종 값 추가 - 스톡 템플릿 상태에 안전하게 동작
+for key in listeners advertised.listeners listener.security.protocol.map log.dirs; do
+  sudo sed -i -E "/^#?${key//./\\.}=.*/d" config/server.properties
+done
+cat >> config/server.properties << 'EOF'
+listeners=PLAINTEXT://:9092,DOCKER://:9094,CONTROLLER://:9093
+advertised.listeners=PLAINTEXT://127.0.0.1:9092,DOCKER://172.18.0.1:9094,CONTROLLER://127.0.0.1:9093
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,DOCKER:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+log.dirs=/opt/kafka/kafka_2.13-4.2.1/data/kraft-combined-logs
+EOF
+
+# 9092(PLAINTEXT)=로컬/WSL 클라이언트용(항상 127.0.0.1), 9094(DOCKER)=kind Pod 전용(172.18.0.1, 아직 존재 안 해도 무방 - "광고"만 하는 값이라 실제 바인딩과 무관)
+
+# KRaft 스토리지 초기화 (최초 1회)
+KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
+bin/kafka-storage.sh format --standalone -t "$KAFKA_CLUSTER_ID" -c config/server.properties
+sudo tee /opt/kafka/kafka-start.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Kafka 시작 스크립트 (백그라운드 실행, KRaft 모드)
+
+KAFKA_HOME="/opt/kafka/kafka_2.13-4.2.1"
+LOG_FILE="$KAFKA_HOME/logs/kafka-server.out"
+PID_FILE="$KAFKA_HOME/kafka-server.pid"
+
+# 이미 실행 중인지 확인
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Kafka가 이미 실행 중입니다. (PID: $(cat "$PID_FILE"))"
+    exit 1
+fi
+
+mkdir -p "$KAFKA_HOME/logs"
+
+echo "Kafka를 백그라운드로 시작합니다..."
+nohup "$KAFKA_HOME/bin/kafka-server-start.sh" "$KAFKA_HOME/config/server.properties" \
+    > "$LOG_FILE" 2>&1 &
+
+echo $! > "$PID_FILE"
+
+sleep 2
+
+if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Kafka가 시작되었습니다. (PID: $(cat "$PID_FILE"))"
+    echo "로그: $LOG_FILE"
+else
+    echo "Kafka 시작에 실패했습니다. 로그를 확인하세요: $LOG_FILE"
+    rm -f "$PID_FILE"
+    exit 1
+fi
+EOF
+
+sudo tee /opt/kafka/kafka-stop.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Kafka 중지 스크립트
+
+KAFKA_HOME="/opt/kafka/kafka_2.13-4.2.1"
+PID_FILE="$KAFKA_HOME/kafka-server.pid"
+
+if [ ! -f "$PID_FILE" ]; then
+    echo "PID 파일이 없습니다. kafka-server-stop.sh로 시도합니다..."
+    "$KAFKA_HOME/bin/kafka-server-stop.sh"
+    exit 0
+fi
+
+PID="$(cat "$PID_FILE")"
+
+if ! kill -0 "$PID" 2>/dev/null; then
+    echo "PID $PID 프로세스가 이미 종료된 상태입니다."
+    rm -f "$PID_FILE"
+    exit 0
+fi
+
+echo "Kafka를 종료합니다... (PID: $PID)"
+kill "$PID"
+
+# 정상 종료 대기 (최대 30초)
+COUNT=0
+while kill -0 "$PID" 2>/dev/null; do
+    sleep 1
+    COUNT=$((COUNT + 1))
+    if [ "$COUNT" -ge 30 ]; then
+        echo "정상 종료가 지연되어 강제 종료합니다 (kill -9)."
+        kill -9 "$PID"
+        break
+    fi
+done
+
+rm -f "$PID_FILE"
+echo "Kafka가 종료되었습니다."
+EOF
+
+sudo chmod +x /opt/kafka/kafka-start.sh /opt/kafka/kafka-stop.sh
+mkdir -p /opt/kafka/admin-tools/KafbatUI
+cd /opt/kafka/admin-tools/KafbatUI
+
+JAR_URL="$(curl -s https://api.github.com/repos/kafbat/kafka-ui/releases/latest \
+  | grep -oE '"browser_download_url":\s*"[^"]*api[^"]*\.jar"' \
+  | grep -oE 'https://[^"]+' | head -1)"
+wget -O kafbat-ui.jar "$JAR_URL"
+
+mkdir -p conf
+tee conf/application-local.yml > /dev/null << 'EOF'
+server:
+  port: 9099
+
+kafka:
+  clusters:
+    - name: local
+      bootstrapServers: 127.0.0.1:9092
+EOF
+
+tee start.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Kafbat UI 시작 스크립트 (백그라운드 실행)
+
+APP_HOME="/opt/kafka/admin-tools/KafbatUI"
+APP_JAR="$APP_HOME/kafbat-ui.jar"
+CONF_DIR="$APP_HOME/conf"
+LOG_FILE="$APP_HOME/logs/kafbat-ui.out"
+PID_FILE="$APP_HOME/kafbat-ui.pid"
+
+# 이미 실행 중인지 확인
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Kafbat UI가 이미 실행 중입니다. (PID: $(cat "$PID_FILE"))"
+    exit 1
+fi
+
+mkdir -p "$APP_HOME/logs"
+
+echo "Kafbat UI를 백그라운드로 시작합니다..."
+# setsid + stdin 분리: 터미널(tty)과 완전히 분리해야 세션 종료 시 프롬프트가 걸리지 않음
+setsid nohup java -jar "$APP_JAR" \
+    --spring.config.additional-location="$CONF_DIR/application-local.yml" \
+    < /dev/null > "$LOG_FILE" 2>&1 &
+
+echo $! > "$PID_FILE"
+
+sleep 2
+
+if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Kafbat UI가 시작되었습니다. (PID: $(cat "$PID_FILE"))"
+    echo "로그: $LOG_FILE"
+else
+    echo "Kafbat UI 시작에 실패했습니다. 로그를 확인하세요: $LOG_FILE"
+    rm -f "$PID_FILE"
+    exit 1
+fi
+EOF
+
+tee stop.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Kafbat UI 중지 스크립트
+
+APP_HOME="/opt/kafka/admin-tools/KafbatUI"
+PID_FILE="$APP_HOME/kafbat-ui.pid"
+
+if [ ! -f "$PID_FILE" ]; then
+    echo "PID 파일이 없습니다. Kafbat UI가 실행 중이 아닌 것으로 보입니다."
+    exit 0
+fi
+
+PID="$(cat "$PID_FILE")"
+
+if ! kill -0 "$PID" 2>/dev/null; then
+    echo "PID $PID 프로세스가 이미 종료된 상태입니다."
+    rm -f "$PID_FILE"
+    exit 0
+fi
+
+echo "Kafbat UI를 종료합니다... (PID: $PID)"
+kill "$PID"
+
+# 정상 종료 대기 (최대 30초)
+COUNT=0
+while kill -0 "$PID" 2>/dev/null; do
+    sleep 1
+    COUNT=$((COUNT + 1))
+    if [ "$COUNT" -ge 30 ]; then
+        echo "정상 종료가 지연되어 강제 종료합니다 (kill -9)."
+        kill -9 "$PID"
+        break
+    fi
+done
+
+rm -f "$PID_FILE"
+echo "Kafbat UI가 종료되었습니다."
+EOF
+
+chmod +x start.sh stop.sh
+/opt/kafka/kafka-start.sh
+/opt/kafka/admin-tools/KafbatUI/start.sh
+cd /opt/kafka/kafka_2.13-4.2.1/bin && ./kafka-topics.sh --list --bootstrap-server localhost:9092
+curl -I http://localhost:9099   # Kafbat UI
+
+
+########################################################################
+# 7.9 Docker CE + kind(Kubernetes) 설치
+########################################################################
+# 1) Docker 공식 저장소 등록
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 2) 현재 사용자를 docker 그룹에 추가
+sudo usermod -aG docker "$USER"
+
+# 예외사항 ⑨: WSL은 dockerd를 systemd로 자동기동하지 않고 직접 nohup으로 띄운다 - 자동시작 비활성화
+sudo systemctl disable docker
+
+# ⏸ [MANUAL] docker 그룹 반영에는 새 로그인 셸이 필요하다(원본 문서: "재로그인 필요 - WSL 재시작으로
+# 적용"). 지금 셸을 그대로 쓰면 이후 docker/kind 명령이 permission denied로 실패한다. 아래 중 하나로
+# 새 그룹을 반영한 뒤, "### 7.9 계속" 배너부터 이어서 실행한다:
+#   A) 이 터미널은 그대로 두고 새 WSL 터미널을 하나 더 열어 이어서 진행(가장 간단)
+#   B) 지금 이 셸에서 바로:  exec newgrp docker   (그룹이 반영된 새 셸로 교체된다)
+echo "================================================================"
+echo " docker 그룹이 방금 추가되었습니다. 새 터미널을 열거나 'newgrp docker'를 실행한 뒤"
+echo " 이어서 진행하세요(아래 kubectl/kind부터)."
+echo "================================================================"
+read -r -p "새 셸에서 'groups' 출력에 docker가 보이는 것을 확인했다면 Enter >>> "
+groups   # docker가 보여야 함(안 보이면 위 A/B를 다시 수행)
+
+########################################################################
+# 7.9 계속 (kubectl / kind - docker 그룹이 반영된 셸에서 실행)
+########################################################################
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/kubectl
+
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+chmod +x kind
+sudo mv kind /usr/local/bin/kind
+
+kubectl version --client
+kind version
+sudo mkdir -p /etc/kind
+sudo chgrp docker /etc/kind
+sudo chmod 2775 /etc/kind
+cat >> ~/.bashrc << 'EOF'
+export KUBECONFIG=/etc/kind/dev.config
+EOF
+source ~/.bashrc
+sudo tee /usr/local/bin/docker-start.sh > /dev/null << 'EOF'
+#!/bin/bash
+
+LOG_DIR="$HOME/.docker"
+LOG_FILE="$LOG_DIR/dockerd.log"
+
+mkdir -p "$LOG_DIR"
+
+if pgrep -x dockerd >/dev/null; then
+    echo "Docker is already running."
+    exit 0
+fi
+
+echo "Starting Docker..."
+
+sudo sh -c "nohup dockerd > '$LOG_FILE' 2>&1 &"
+
+echo -n "Waiting for Docker"
+
+for i in {1..30}; do
+    if docker info >/dev/null 2>&1; then
+        echo
+        echo "Docker is ready."
+        exit 0
+    fi
+
+    echo -n "."
+    sleep 1
+done
+
+echo
+echo "Failed to start Docker."
+echo "Check: $LOG_FILE"
+
+tail -30 "$LOG_FILE"
+
+exit 1
+EOF
+
+sudo tee /usr/local/bin/docker-stop.sh > /dev/null << 'EOF'
+#!/bin/bash
+
+PID=$(pgrep -x dockerd)
+
+if [ -z "$PID" ]; then
+    echo "Docker is not running."
+    exit 0
+fi
+
+echo "Stopping Docker..."
+
+sudo kill "$PID"
+
+sleep 2
+
+if pgrep -x dockerd > /dev/null; then
+    echo "Docker is still running."
+    exit 1
+else
+    echo "Docker stopped."
+fi
+EOF
+
+sudo chmod +x /usr/local/bin/docker-start.sh /usr/local/bin/docker-stop.sh
+sudo tee /usr/local/bin/k8s-start.sh > /dev/null << 'SCRIPT'
+#!/usr/bin/env bash
+#
+# k8s-start.sh
+# WSL에서 docker(dockerd) + kind 클러스터 + 로컬 사설 레지스트리를 수동으로 기동합니다.
+# 모든 사용자가 실행 가능해야 하며, docker 그룹 소속이어야 합니다.
+#
+set -euo pipefail
+
+CLUSTER_NAME="${KIND_CLUSTER_NAME:-dev}"
+KUBECONFIG_PATH="${KUBECONFIG:-/etc/kind/dev.config}"
+DOCKER_WAIT_TIMEOUT=30
+REGISTRY_NAME="kind-registry"
+REGISTRY_PORT="5000"
+
+log() { echo "[k8s-start] $*"; }
+
+# 0. 사전 체크: docker 그룹 소속 여부
+if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+  echo "[k8s-start] ERROR: 사용자 '$USER'가 docker 그룹에 속해있지 않습니다." >&2
+  echo "            관리자가 'sudo usermod -aG docker $USER' 실행 후 재로그인하세요." >&2
+  exit 1
+fi
+
+# 1. dockerd 기동 여부 확인 및 시작
+if docker info >/dev/null 2>&1; then
+  log "docker 데몬이 이미 실행 중입니다."
+else
+  log "docker 데몬을 시작합니다. (sudo systemctl start docker)"
+  sudo systemctl start docker
+
+  log "docker 데몬이 응답할 때까지 대기합니다 (최대 ${DOCKER_WAIT_TIMEOUT}s)..."
+  waited=0
+  until docker info >/dev/null 2>&1; do
+    sleep 1
+    waited=$((waited + 1))
+    if [ "$waited" -ge "$DOCKER_WAIT_TIMEOUT" ]; then
+      echo "[k8s-start] ERROR: docker 데몬이 시간 내에 기동되지 않았습니다." >&2
+      exit 1
+    fi
+  done
+  log "docker 데몬 기동 완료."
+fi
+
+# 2. 로컬 사설 레지스트리 컨테이너 기동(없으면 생성) - ECR/GCR 대체용
+if [ "$(docker inspect -f '{{.State.Running}}' "$REGISTRY_NAME" 2>/dev/null || true)" != 'true' ]; then
+  log "로컬 레지스트리 컨테이너(${REGISTRY_NAME}:${REGISTRY_PORT})를 생성합니다."
+  docker run -d --restart=always -p "127.0.0.1:${REGISTRY_PORT}:5000" --network bridge --name "$REGISTRY_NAME" registry:2 >/dev/null
+else
+  log "로컬 레지스트리 컨테이너가 이미 실행 중입니다."
+fi
+
+# 3. kind 클러스터 존재 여부 확인 후 생성(레지스트리 미러 설정 포함) 또는 재사용
+if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
+  log "kind 클러스터 '$CLUSTER_NAME' 는 이미 존재합니다. (재시작 시 자동 복원됨)"
+else
+  log "kind 클러스터 '$CLUSTER_NAME' 를 로컬 레지스트리 미러 설정과 함께 새로 생성합니다."
+  mkdir -p "$(dirname "$KUBECONFIG_PATH")" 2>/dev/null || true
+  kind create cluster --name "$CLUSTER_NAME" --kubeconfig "$KUBECONFIG_PATH" --config=- <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${REGISTRY_PORT}"]
+    endpoint = ["http://${REGISTRY_NAME}:${REGISTRY_PORT}"]
+EOF
+  chmod g+r "$KUBECONFIG_PATH" 2>/dev/null || true
+fi
+
+# 4. 레지스트리 컨테이너를 kind 도커 네트워크에 연결(클러스터가 생성된 후에만 "kind" 네트워크가 존재함)
+if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "$REGISTRY_NAME" 2>/dev/null)" = 'null' ]; then
+  log "레지스트리 컨테이너를 kind 도커 네트워크에 연결합니다."
+  docker network connect "kind" "$REGISTRY_NAME"
+fi
+
+# 5. 클러스터 노드가 실제로 떠있는지(재시작 케이스 포함) 확인
+log "노드 상태 확인 중..."
+if ! kubectl --kubeconfig "$KUBECONFIG_PATH" get nodes >/dev/null 2>&1; then
+  echo "[k8s-start] WARNING: kubectl로 노드 조회에 실패했습니다. kind 컨테이너 상태를 확인하세요." >&2
+  docker ps -a --filter "label=io.x-k8s.kind.cluster=${CLUSTER_NAME}"
+  exit 1
+fi
+
+log "클러스터 준비 완료. KUBECONFIG=${KUBECONFIG_PATH}, 레지스트리=localhost:${REGISTRY_PORT}"
+kubectl --kubeconfig "$KUBECONFIG_PATH" get nodes
+SCRIPT
+
+sudo tee /usr/local/bin/k8s-stop.sh > /dev/null << 'SCRIPT'
+#!/usr/bin/env bash
+#
+# k8s-stop.sh
+# WSL에서 kind 클러스터 / docker(dockerd) 를 수동으로 정지합니다.
+#
+# 사용법:
+#   k8s-stop.sh              # docker 데몬만 정지 (클러스터는 유지, 다음 start 시 자동 복원)
+#   k8s-stop.sh --delete     # kind 클러스터까지 완전 삭제 후 docker 데몬 정지
+#
+set -euo pipefail
+
+CLUSTER_NAME="${KIND_CLUSTER_NAME:-dev}"
+KUBECONFIG_PATH="${KUBECONFIG:-/etc/kind/dev.config}"
+DELETE_CLUSTER=false
+
+if [ "${1:-}" = "--delete" ]; then
+  DELETE_CLUSTER=true
+fi
+
+log() { echo "[k8s-stop] $*"; }
+
+if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+  echo "[k8s-stop] ERROR: 사용자 '$USER'가 docker 그룹에 속해있지 않습니다." >&2
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  log "docker 데몬이 이미 정지된 상태입니다."
+  exit 0
+fi
+
+if [ "$DELETE_CLUSTER" = true ]; then
+  if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
+    log "kind 클러스터 '$CLUSTER_NAME' 를 삭제합니다."
+    kind delete cluster --name "$CLUSTER_NAME" --kubeconfig "$KUBECONFIG_PATH"
+  else
+    log "삭제할 kind 클러스터 '$CLUSTER_NAME' 가 없습니다."
+  fi
+else
+  log "클러스터는 유지한 채 docker 데몬만 정지합니다. (컨테이너는 restart-policy에 의해 다음 start 시 자동 복원)"
+fi
+
+log "docker 데몬을 정지합니다. (sudo systemctl stop docker)"
+sudo systemctl stop docker
+
+log "정지 완료."
+SCRIPT
+
+sudo chmod +x /usr/local/bin/k8s-start.sh /usr/local/bin/k8s-stop.sh
+/usr/local/bin/k8s-start.sh
+kubectl get nodes                                              # Ready 확인
+docker network inspect kind --format '{{(index .IPAM.Config 0).Gateway}}'   # 172.18.0.1 이면 이 문서의 다른 값(Kafka DOCKER 리스너 등)과 그대로 맞음
+
+
+########################################################################
+# 7.10 Ollama + Ollama Web UI Lite 설치 (RAG 임베딩 런타임)
+########################################################################
+sudo apt-get install -y zstd   # 최신 Ollama 릴리스가 tar.zst로 배포됨
+
+sudo mkdir -p /opt/ollama
+sudo chown "$USER":"$USER" /opt/ollama
+cd /opt/ollama
+
+curl -L -o ollama.tar.zst \
+  "https://github.com/ollama/ollama/releases/download/v0.33.3/ollama-linux-amd64.tar.zst"
+tar --zstd -xf ollama.tar.zst
+rm ollama.tar.zst
+
+mkdir -p /opt/ollama/data /opt/ollama/logs
+/opt/ollama/bin/ollama --version
+tee /opt/ollama/ollama-start.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Ollama 시작 스크립트 (백그라운드 실행, systemd 미사용 - dstone-batch/kafka와 동일한 PID파일 방식)
+
+OLLAMA_HOME="/opt/ollama"
+LOG_FILE="$OLLAMA_HOME/logs/ollama-server.out"
+PID_FILE="$OLLAMA_HOME/ollama-server.pid"
+
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Ollama가 이미 실행 중입니다. (PID: $(cat "$PID_FILE"))"
+    exit 1
+fi
+
+mkdir -p "$OLLAMA_HOME/logs"
+
+echo "Ollama를 백그라운드로 시작합니다..."
+# OLLAMA_MODELS: 모델 데이터를 /opt/ollama 안에 두어 kafka 데이터 디렉터리와 같은 방식으로 자체 포함시킴.
+# OLLAMA_HOST: 원래 기본값(127.0.0.1, IPv4 루프백 전용)이었는데, ollama-webui-lite(vite dev 서버)는
+# IPv4/IPv6 둘 다 열려있어서 브라우저가 "localhost"를 IPv6(::1)로 먼저 시도하면 Ollama가 IPv6
+# 루프백은 안 듣고 있어 connection refused가 나고 웹UI에서 "Uh-oh! There was an issue connecting
+# to Ollama."로 이어졌다(실측 확인: `curl -6 http://[::1]:11434/...`가 거부됨). "[::]"(IPv6 wildcard)로
+# 바인딩하면 리눅스에서 기본적으로 IPv4도 함께 받아 dual-stack으로 동작한다 - 결과적으로 바인딩
+# 범위가 루프백에서 전체 인터페이스로 넓어지지만, mysql/redis도 WSL 네트워크 특성상 같은 이유로
+# 0.0.0.0으로 넓힌 전례가 있다(각 문서의 4-5절 참고). k8s(kind) 게이트웨이 노출은 여전히 별개 작업.
+# OLLAMA_ORIGINS: ollama-webui-lite(브라우저에서 http://localhost:3000으로 서빙)가 다른 포트인
+# http://localhost:11434로 fetch를 보내는 건 브라우저 기준 cross-origin이라, Ollama의 기본
+# CORS 허용 목록에 3000 포트를 추가해줘야 웹UI에서 API 호출이 막히지 않는다.
+OLLAMA_MODELS="$OLLAMA_HOME/data" \
+    OLLAMA_HOST="[::]:11434" \
+    OLLAMA_ORIGINS="http://localhost:3000,http://127.0.0.1:3000" \
+    nohup "$OLLAMA_HOME/bin/ollama" serve \
+    > "$LOG_FILE" 2>&1 &
+
+echo $! > "$PID_FILE"
+
+sleep 2
+
+if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Ollama가 시작되었습니다. (PID: $(cat "$PID_FILE"))"
+    echo "로그: $LOG_FILE"
+else
+    echo "Ollama 시작에 실패했습니다. 로그를 확인하세요: $LOG_FILE"
+    rm -f "$PID_FILE"
+    exit 1
+fi
+EOF
+
+tee /opt/ollama/ollama-stop.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Ollama 중지 스크립트
+
+OLLAMA_HOME="/opt/ollama"
+PID_FILE="$OLLAMA_HOME/ollama-server.pid"
+
+if [ ! -f "$PID_FILE" ]; then
+    echo "PID 파일이 없습니다. Ollama가 실행 중이 아닌 것 같습니다."
+    exit 0
+fi
+
+PID="$(cat "$PID_FILE")"
+
+if ! kill -0 "$PID" 2>/dev/null; then
+    echo "PID $PID 프로세스가 이미 종료된 상태입니다."
+    rm -f "$PID_FILE"
+    exit 0
+fi
+
+echo "Ollama를 종료합니다... (PID: $PID)"
+kill "$PID"
+
+COUNT=0
+while kill -0 "$PID" 2>/dev/null; do
+    sleep 1
+    COUNT=$((COUNT + 1))
+    if [ "$COUNT" -ge 30 ]; then
+        echo "정상 종료가 지연되어 강제 종료합니다 (kill -9)."
+        kill -9 "$PID"
+        break
+    fi
+done
+
+rm -f "$PID_FILE"
+echo "Ollama가 종료되었습니다."
+EOF
+
+chmod +x /opt/ollama/ollama-start.sh /opt/ollama/ollama-stop.sh
+
+# 모델 pull (서버가 떠 있어야 함)
+/opt/ollama/ollama-start.sh
+/opt/ollama/bin/ollama pull bge-m3      # dstone-ai-engine RAG 임베딩 전용, 1024차원
+/opt/ollama/bin/ollama pull llama3.2    # Ollama Web UI Lite 수동 채팅 테스트용(가벼운 3B 모델 - CPU 전용 환경 고려)
+sudo mkdir -p /opt/ollama-webui-lite
+sudo chown "$USER":"$USER" /opt/ollama-webui-lite
+git clone https://github.com/ollama-webui/ollama-webui-lite.git /opt/ollama-webui-lite
+cd /opt/ollama-webui-lite
+npm ci
+tee /opt/ollama-webui-lite/start.sh > /dev/null << 'EOF'
+#!/bin/bash
+# ollama-webui-lite 시작 스크립트 (백그라운드 실행, systemd 미사용 - kafka/kafbat-ui와 동일한 방식)
+
+WEBUI_HOME="/opt/ollama-webui-lite"
+LOG_FILE="$WEBUI_HOME/logs/webui.out"
+PID_FILE="$WEBUI_HOME/webui.pid"
+
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "ollama-webui-lite가 이미 실행 중입니다. (PID: $(cat "$PID_FILE"))"
+    exit 1
+fi
+
+mkdir -p "$WEBUI_HOME/logs"
+cd "$WEBUI_HOME" || exit 1
+
+echo "ollama-webui-lite를 백그라운드로 시작합니다..."
+# setsid로 새 세션을 만들어야 stop.sh에서 프로세스 그룹(-PID) 전체를 죽여
+# npm이 spawn하는 실제 vite 자식 프로세스까지 함께 종료할 수 있다.
+setsid nohup npm run dev > "$LOG_FILE" 2>&1 &
+
+echo $! > "$PID_FILE"
+
+sleep 3
+
+if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "ollama-webui-lite가 시작되었습니다. (PID: $(cat "$PID_FILE"))"
+    echo "로그: $LOG_FILE"
+else
+    echo "ollama-webui-lite 시작에 실패했습니다. 로그를 확인하세요: $LOG_FILE"
+    rm -f "$PID_FILE"
+    exit 1
+fi
+EOF
+
+tee /opt/ollama-webui-lite/stop.sh > /dev/null << 'EOF'
+#!/bin/bash
+# ollama-webui-lite 중지 스크립트
+
+WEBUI_HOME="/opt/ollama-webui-lite"
+PID_FILE="$WEBUI_HOME/webui.pid"
+
+if [ ! -f "$PID_FILE" ]; then
+    echo "PID 파일이 없습니다. ollama-webui-lite가 실행 중이 아닌 것 같습니다."
+    exit 0
+fi
+
+PID="$(cat "$PID_FILE")"
+
+if ! kill -0 "$PID" 2>/dev/null; then
+    echo "PID $PID 프로세스가 이미 종료된 상태입니다."
+    rm -f "$PID_FILE"
+    exit 0
+fi
+
+echo "ollama-webui-lite를 종료합니다... (PID: $PID)"
+# PID 하나만 죽이면 npm이 감싼 실제 vite 프로세스가 남을 수 있어 프로세스 그룹째 종료한다.
+kill -- "-$PID" 2>/dev/null || kill "$PID"
+
+COUNT=0
+while kill -0 "$PID" 2>/dev/null; do
+    sleep 1
+    COUNT=$((COUNT + 1))
+    if [ "$COUNT" -ge 30 ]; then
+        echo "정상 종료가 지연되어 강제 종료합니다 (kill -9)."
+        kill -9 -- "-$PID" 2>/dev/null || kill -9 "$PID"
+        break
+    fi
+done
+
+rm -f "$PID_FILE"
+echo "ollama-webui-lite가 종료되었습니다."
+EOF
+
+chmod +x /opt/ollama-webui-lite/start.sh /opt/ollama-webui-lite/stop.sh
+curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"'   # bge-m3, llama3.2 확인
+/opt/ollama-webui-lite/start.sh
+curl -I http://localhost:3000
+
+
+########################################################################
+# 7.11 Node.js 설치 (보조 도구)
+########################################################################
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v && npm -v
+
+
+########################################################################
+# 7.12 Jenkins 설치 및 파이프라인 권한 설정
+########################################################################
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | \
+  sudo tee /etc/apt/keyrings/jenkins-keyring.asc > /dev/null
+
+echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | \
+  sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt update
+sudo apt install -y jenkins   # JDK가 선행 설치돼 있어야 함(7.3절)
+sudo usermod -aG docker jenkins
+sudo usermod -aG "$(id -gn "$USER")" jenkins   # dstone-batch/batchadmin이 리포지토리 자기 디렉터리에 배포 파일을 직접 복사하므로 필요
+sudo systemctl restart jenkins                  # 그룹 변경은 재시작 후 적용
+groups jenkins                                  # "jenkins docker <내 그룹>" 확인
+
+sudo chmod g+ws /app/dstone/dstone-batch /app/dstone/dstone-batchadmin
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+
+########################################################################
+# 7.13 `/usr/local/bin` 최상위 시작/정지 스크립트 등록
+########################################################################
+# --- MySQL ---
+sudo tee /usr/local/bin/start-mysql.sh > /dev/null << 'EOF'
+#!/bin/sh
+
+# 이전 실행에서 StartLimitBurst에 걸려 failed 상태로 남아있으면 start가 거부되므로 먼저 리셋
+sudo systemctl reset-failed mysql.service >/dev/null 2>&1
+
+sudo systemctl start mysql
+
+for i in 1 2 3 4 5; do
+    if systemctl is-active --quiet mysql.service; then
+        echo "Mysql started !!!"
+        exit 0
+    fi
+    sleep 1
+done
+
+echo "Mysql FAILED to start. Check: sudo systemctl status mysql.service / sudo journalctl -xeu mysql.service" >&2
+exit 1
+EOF
+sudo tee /usr/local/bin/stop-mysql.sh > /dev/null << 'EOF'
+sudo systemctl stop mysql
+echo "Mysql stopped !!!"
+EOF
+
+# --- PostgreSQL ---
+sudo tee /usr/local/bin/start-postgresql.sh > /dev/null << 'EOF'
+sudo systemctl start postgresql
+echo "Postgresql started !!!"
+EOF
+sudo tee /usr/local/bin/stop-postgresql.sh > /dev/null << 'EOF'
+sudo systemctl stop postgresql
+echo "Postgresql stopped !!!"
+EOF
+
+# --- Redis ---
+sudo tee /usr/local/bin/start-redis.sh > /dev/null << 'EOF'
+#!/bin/sh
+
+# 이전 실행에서 StartLimitBurst에 걸려 failed 상태로 남아있으면 start가 거부되므로 먼저 리셋
+sudo systemctl reset-failed redis-server.service >/dev/null 2>&1
+
+sudo systemctl start redis-server
+
+for i in 1 2 3 4 5; do
+    if systemctl is-active --quiet redis-server.service; then
+        echo "Redis started !!! For realtime administration, Use Tool /DB/Tools/Redis-Desktop-Manager/Version/Another Redis Desktop Manager.exe"
+        exit 0
+    fi
+    sleep 1
+done
+
+echo "Redis FAILED to start. Check: sudo systemctl status redis-server.service / sudo journalctl -xeu redis-server.service" >&2
+exit 1
+EOF
+sudo tee /usr/local/bin/stop-redis.sh > /dev/null << 'EOF'
+sudo systemctl stop redis-server
+echo "Redis stopped !!!"
+EOF
+
+# --- RabbitMQ ---
+sudo tee /usr/local/bin/start-rabbitmq.sh > /dev/null << 'EOF'
+sudo systemctl start rabbitmq-server
+echo "Rabbitmq started !!! Admin Console URL : http://localhost:15672"
+EOF
+sudo tee /usr/local/bin/stop-rabbitmq.sh > /dev/null << 'EOF'
+sudo systemctl stop rabbitmq-server
+echo "Rabbitmq stopped !!!"
+EOF
+
+# --- Kafka (+ Kafbat UI) ---
+sudo tee /usr/local/bin/start-kafka.sh > /dev/null << 'EOF'
+/opt/kafka/kafka-start.sh
+echo "Kafka started !!!"
+/opt/kafka/admin-tools/KafbatUI/start.sh
+echo "KafbatUI(Kafka관리툴) started !!! Admin Console URL : http://localhost:9099"
+EOF
+sudo tee /usr/local/bin/stop-kafka.sh > /dev/null << 'EOF'
+/opt/kafka/kafka-stop.sh
+echo "Kafka stopped !!!"
+/opt/kafka/admin-tools/KafbatUI/stop.sh
+echo "KafbatUI(Kafka관리툴) stopped !!!"
+EOF
+
+# --- Ollama (+ Ollama Web UI Lite) ---
+sudo tee /usr/local/bin/start-ollama.sh > /dev/null << 'EOF'
+#!/bin/sh
+/opt/ollama/ollama-start.sh
+echo "Ollama started !!! (dstone-ai-engine RAG 임베딩 전용 로컬 모델 런타임, http://localhost:11434)"
+/opt/ollama-webui-lite/start.sh
+echo "Ollama Web UI Lite started !!! http://localhost:3000"
+EOF
+sudo tee /usr/local/bin/stop-ollama.sh > /dev/null << 'EOF'
+#!/bin/sh
+/opt/ollama/ollama-stop.sh
+echo "Ollama stopped !!!"
+/opt/ollama-webui-lite/stop.sh
+echo "Ollama Web UI Lite stopped !!!"
+EOF
+
+# --- Docker / Kubernetes ---
+sudo tee /usr/local/bin/start-docker.sh > /dev/null << 'EOF'
+/usr/local/bin/docker-start.sh
+echo "Docker started !!!"
+EOF
+sudo tee /usr/local/bin/stop-docker.sh > /dev/null << 'EOF'
+/usr/local/bin/docker-stop.sh
+echo "Docker stopped !!!"
+EOF
+sudo tee /usr/local/bin/start-kube.sh > /dev/null << 'EOF'
+/usr/local/bin/k8s-start.sh
+echo "Kubenetes started !!!"
+EOF
+sudo tee /usr/local/bin/stop-kube.sh > /dev/null << 'EOF'
+/usr/local/bin/k8s-stop.sh
+echo "Kubenetes stopped !!!"
+EOF
+
+# --- Jenkins ---
+sudo tee /usr/local/bin/start-jenkins.sh > /dev/null << 'EOF'
+sudo systemctl start jenkins
+echo "Jenkins started !!!"
+EOF
+sudo tee /usr/local/bin/stop-jenkins.sh > /dev/null << 'EOF'
+sudo systemctl stop jenkins
+echo "Jenkins stopped !!!"
+EOF
+
+sudo chmod +x /usr/local/bin/start-*.sh /usr/local/bin/stop-*.sh
+tee ~/start.sh > /dev/null << 'EOF'
+#! /bin/sh
+# docker
+start-docker.sh
+# kubenetes
+start-kube.sh
+# mysql
+start-mysql.sh
+# postgresql
+start-postgresql.sh
+# rabbitmq
+start-rabbitmq.sh
+# redis
+start-redis.sh
+# kafka
+start-kafka.sh
+# ollama
+start-ollama.sh
+# jenkins
+start-jenkins.sh
+EOF
+
+tee ~/stop.sh > /dev/null << 'EOF'
+#! /bin/sh
+# mysql
+stop-mysql.sh
+# postgresql
+stop-postgresql.sh
+# rabbitmq
+stop-rabbitmq.sh
+# redis
+stop-redis.sh
+# kafka
+stop-kafka.sh
+# ollama
+stop-ollama.sh
+# docker
+stop-docker.sh
+# kubenetes
+stop-kube.sh
+# jenkins
+stop-jenkins.sh
+EOF
+
+chmod +x ~/start.sh ~/stop.sh
+~/stop.sh
+~/start.sh
+
+
+########################################################################
+# 7.14 최종 빌드 & 통합 기동 검증
+########################################################################
+cd /app/dstone
+mvn -pl dstone-common -am clean install     # 공통 라이브러리 먼저
+mvn clean install                            # 전체 모듈 빌드
+echo "== 언어/빌드 도구 =="
+java -version && mvn -v && git --version
+
+echo "== MySQL =="
+sudo mysql -u root -e "SHOW DATABASES;" | grep -E "sampleDB|analyzeDB|dataflow|batchadmin"
+
+echo "== PostgreSQL + pgvector =="
+sudo -u postgres psql -d dstone_ai -c "\dx" | grep vector
+
+echo "== Redis =="
+redis-cli ping
+
+echo "== RabbitMQ =="
+sudo rabbitmqctl list_vhosts | grep dstone-mq
+sudo rabbitmqctl list_queues -p /dstone-mq name
+
+echo "== Kafka =="
+/opt/kafka/kafka_2.13-4.2.1/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+
+echo "== Ollama =="
+curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"'
+
+echo "== Docker / kind =="
+docker ps
+kubectl get nodes
+
+echo "== Jenkins =="
+curl -I http://localhost:8080
+
+
+########################################################################
+# 완료
+########################################################################
+echo "================================================================"
+echo " dstone WSL 개발 환경 구성이 끝났습니다: $(date)"
+echo " 위 '== ... ==' 검증 블록들의 출력을 한 번 더 눈으로 확인하세요."
+echo " 각 모듈을 실제로 기동해 애플리케이션 레벨까지 확인하려면 03.build.md,"
+echo " dstone-boot을 kind에 배포하는 것까지 진행하려면 04.cloud-architecture.md를 참고하세요."
+echo " 이후 개발 중 서비스 재기동은 이 스크립트가 아니라 ~/start.sh / ~/stop.sh 를 사용합니다."
+echo "================================================================"
