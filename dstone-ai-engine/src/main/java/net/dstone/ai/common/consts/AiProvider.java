@@ -1,4 +1,4 @@
-package net.dstone.ai.gateway;
+package net.dstone.ai.common.consts;
 
 import java.util.Arrays;
 

@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -28,16 +29,14 @@ import net.dstone.common.utils.LogUtil;
 @Component
 public class ConfigTool extends BaseObject {
 
-	private final ApplicationContext applicationContext;
+	@Autowired
+	private ApplicationContext applicationContext;
+	
 	private ToolCallbackProvider toolCallbackProvider;
-
-	public ConfigTool(ApplicationContext applicationContext) {
-		this.applicationContext = applicationContext;
-	}
-
+	
 	@PostConstruct
 	public void discover() {
-		Map<String, Object> toolBeans = this.applicationContext.getBeansWithAnnotation(AiTool.class);
+		Map<String, Object> toolBeans = applicationContext.getBeansWithAnnotation(AiTool.class);
 		if (toolBeans.isEmpty()) {
 			this.toolCallbackProvider = ToolCallbackProvider.from();
 			LogUtil.sysout("dstone-ai-engine agent: 등록된 Tool 없음 (@AiTool 빈을 찾지 못함)");
