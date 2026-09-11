@@ -109,10 +109,9 @@ public class ChatService extends BaseService {
 		}
 
 		// 4. 요청 스펙 - RAG 적용
-		// 선택적원칙: ragEnabled가 true로 온 요청에만 붙인다. 최상위원칙(dstone.ai.rag.enabled=true)
-		// 검사와 VectorStore 존재 확인은 ragService.buildQuestionAnswerAdvisor() 내부에서 처리한다.
 		if (Boolean.TRUE.equals(request.ragEnabled())) {
-			spec = spec.advisors(this.ragService.buildQuestionAnswerAdvisor());
+			// ragEnabled가 true로 온 요청에만 붙인다.
+			spec = spec.advisors(this.ragService.getRagSpecAdvisor());
 		}
 
 		// 5. 요청 스펙 - Tool 적용

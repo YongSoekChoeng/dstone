@@ -51,8 +51,7 @@ public class RagService extends BaseService {
 		}
 		VectorStore vectorStore = this.vectorStoreProvider.getIfAvailable();
 		if (vectorStore == null) {
-			throw new IllegalStateException(
-				"dstone.ai.rag.enabled=true인데 VectorStore 빈이 없습니다. spring.ai.model.embedding 설정을 확인하십시오.");
+			throw new IllegalStateException("dstone.ai.rag.enabled=true인데 VectorStore 빈이 없습니다. spring.ai.model.embedding 설정을 확인하십시오.");
 		}
 		return vectorStore;
 	}
@@ -70,7 +69,7 @@ public class RagService extends BaseService {
 	}
 
 	/** 선택적원칙: ChatService가 ragEnabled=true인 요청에만 이 Advisor를 붙인다. */
-	public Advisor buildQuestionAnswerAdvisor() {
+	public Advisor getRagSpecAdvisor() {
 		VectorStore vectorStore = this.requireVectorStore();
 		SearchRequest searchRequest = SearchRequest.builder()
 			.topK(this.defaultTopK())
