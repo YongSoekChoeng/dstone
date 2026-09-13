@@ -228,3 +228,45 @@ dstone-batchadmin 문서 작업도 완료됐습니다 (2/7). 남은 5개 계속 
 ## 답변
 
 dstone-boot/SAGA 문서 작업도 완료됐습니다 (3/7) — 패키지 구조 트리가 실제 코드와 꽤 어긋나 있던 걸 바로잡았네요. 남은 4개 계속 대기 중입니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a91b5644fde668bee</task-id>
+<tool-use-id>toolu_012GLscvhKcLvhnLwGo5EX3Y</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a91b5644fde668bee.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-batch docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>dstone-batch 담당 작업 완료.
+
+**(a) 수정한 파일**
+- `docs/07.dstone-batch.md`
+- `dstone-batch/src/main/java/net/dstone/batch/common/DstoneBatchApplication.java`
+- `.../common/biz/BaseService.java`
+- `.../common/config/ConfigAutoReg.java`
+- `.../common/runner/RestApiRunner.java`
+- `.../common/runner/ScdfTaskRunner.java`
+
+**(b) 문서에서 실제로 바뀐 핵심 내용**
+- 신규 "7.3 방법 3 - REST API로 제어 (`RestApiRunner`)" 절 추가: 실제 `/batch/**` 엔드포인트 12개 전체 표로 정리 + `startJob`이 즉시 `STARTED`로 응답하는 이유(sync `jobLauncher` vs async `asyncJobLauncher` 이원화, `ConfigJob.java` 실제 코드 근거)를 콜아웃과 mermaid 시퀀스 다이어그램으로 설명.
+- "8. 샘플 잡 목록" 표를 `(update 관련 잡들)` 같은 뭉뚱그린 표현 대신 코드에서 확인한 실제 `@AutoRegJob(name=...)` 11개 전부로 교체(`tableDataGenType01/02Job`, `tableUpdateType01/02/03Job`, `fileDataGenJob`, `fileCopyType01/02Job`, `fileToTableJob`, `tableToFileJob`).
+- 목차에 7.3 항목 추가.
+- `BATCH_JOB_SEQ`→`BATCH_JOB_INSTANCE_SEQ` 관련 기존 서술은 실제 스키마 파일(`02-create-table-mysql-dstone-batch.sql`)과 대조해 정확함을 확인, 변경 없음.
+
+**(c) 고친 주석**
+- `DstoneBatchApplication.java:1-15` — 이 프로젝트와 무관한 Apache 2.0 "Copyright 2012-2013 the original author or authors" 라이선스 헤더(다른 어떤 파일에도 없는 유일한 잔재, 어딘가에서 복붙된 흔적) 제거.
+- `RestApiRunner.java:28-34` — 클래스 Javadoc이 존재하지 않는 URL 패턴 `/batch/restapi/{jobName}`을 설명하고 있었음 → 실제 12개 엔드포인트 목록으로 교체.
+- `RestApiRunner.java:77`, `ConfigAutoReg.java:44`, `BaseService.java:144`, `ScdfTaskRunner.java:143` — 4곳 모두 존재하지 않는 어노테이션 `@AutoRegisteredJob`을 언급하는 동일한 주석이 반복돼 있었음 → 실제 어노테이션명 `@AutoRegJob`으로 통일.
+
+git commit은 하지 않았습니다.</result>
+<usage><subagent_tokens>157267</subagent_tokens><tool_uses>27</tool_uses><duration_ms>156096</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-batch도 완료됐습니다 (4/7) — 존재하지도 않는 어노테이션(`@AutoRegisteredJob`)을 언급하던 주석 4곳과 무관한 라이선스 헤더 하나를 정리했네요. 3개 남았습니다.
