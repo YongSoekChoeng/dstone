@@ -72,7 +72,7 @@ spring:
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
         # 아직 쓰지 않으므로 전부 명시적으로 꺼둔다.
         model:
-            chat: anthropic # anthropic | openai | ollama
+            chat: ollama # anthropic | openai | ollama
             embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
             audio:
                 speech: none
@@ -107,22 +107,16 @@ spring:
         #     base-url: http://<vllm-host>:8000
 
         ##########################################################################################
-        # spring.ai.model.chat=ollama 일 때 설정. (로컬/사내망 Ollama 서버, API 키 불필요).
-        ##########################################################################################
-        # ollama:
-        #     base-url: http://<ollama-host>:11434
-        #     chat:
-        #         options:
-        #             model: llama3.1
-
-        ##########################################################################################
-        # spring.ai.model.embedding=ollama 용 설정(RAG). chat 쪽 provider와 무관하게 항상 적용된다
+        # spring.ai.model.embedding=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
         # (base-url은 spring.ai.ollama.* 하나뿐이라 chat=ollama로 쓰게 되면 이 base-url을 공유한다).
         # 로컬에 docs/software/14.ollama.md대로 설치 후 bge-m3(다국어/한국어 지원 임베딩 모델, 1024차원) pull 필요.
         ##########################################################################################
         ollama:
             base-url: http://localhost:11434 # ollama 와 통신할 URL
-            embedding:
+            chat: 
+                options: 
+                    model: llama3.2   # 로컬에 pull된 채팅 모델
+            embedding: # spring.ai.model.embedding=ollama 용 설정.
                 model: bge-m3
 
         ##########################################################################################
