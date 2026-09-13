@@ -57,8 +57,8 @@ public class SagaOrchestrator extends BaseObject {
 	/**
 	 * 사가(Orchestration Saga) 엔진으로 Spring 컴퍼넌트에서 생성시킬 때 아래의 파라메터를 넘겨야 함.
 	 * @param sagaStore - 사가 인스턴스 및 이력등을 저장 할 수 있도록 SagaStore 를 구현한 DAO컴퍼넌트.
-	 * @param outboxAppender - 
-	 * @param stepHandlers
+	 * @param outboxAppender - 스텝 실행 결과를 Kafka로 바로 보내지 않고 TB_OUTBOX_MESSAGE에 예약(append)하기 위한 컴퍼넌트.
+	 * @param stepHandlers - 이 오케스트레이터가 실행할 수 있는 SagaStepHandler 전체 목록. runStep()이 stepName으로 찾아 실행한다.
 	 */
 	public SagaOrchestrator(SagaStore sagaStore, OutboxAppender outboxAppender, List<SagaStepHandler> stepHandlers) {
 		this.sagaStore = sagaStore;

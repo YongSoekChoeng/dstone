@@ -140,7 +140,7 @@ public class ScdfTaskRunner extends AbstractRunner implements ApplicationRunner 
 		RestTemplate restTemplate = null;
 		try {
 			ConfigProperty configProperty = (ConfigProperty)context.getBean("configProperty");
-			// @AutoRegisteredJob 애노테이션이 붙은 모든 빈 검색
+			// @AutoRegJob 애노테이션이 붙은 모든 빈 검색
 			Map<String, Object> jobs = context.getBeansWithAnnotation(AutoRegJob.class);
 			for(Object jobObj : jobs.values()) {
 				if (jobObj instanceof BaseJobConfig) {

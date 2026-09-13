@@ -18,7 +18,9 @@ import net.dstone.common.utils.LogUtil;
 
 /**
  * dstone.ai.observability.usage.enabled=true(기본값)일 때, 호출 한 번마다 사용량/비용/지연시간을
- * 로그 한 줄로 남겨준다. ConfigChatClient에서 ChatClient의 기본 advisor로 등록해서 동작한다.
+ * 로그 한 줄로 남겨주는 CallAdvisor다.
+ *
+ * config.ConfigChatClient가 ChatClient.Builder에 .defaultAdvisors(...)로 이 빈을 등록한다.
  *
  * order는 Ordered.HIGHEST_PRECEDENCE로 잡아서 advisor 체인에서 가장 바깥쪽에 둔다 - 그래야
  * governance.guardrail 패키지의 PiiGuardrailAdvisor가 하는 PII 마스킹, ChatMemory의 히스토리

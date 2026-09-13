@@ -41,7 +41,7 @@ public class ConfigAutoReg extends BaseBatchObject {
 	public void registerAllJobs() throws Exception {
 		this.info(this.getClass().getName() + ".registerAllJobs() has been called !!!");
 		try {
-			// @AutoRegisteredJob 애노테이션이 붙은 모든 빈 검색
+			// @AutoRegJob 애노테이션이 붙은 모든 빈 검색
 			Map<String, Object> jobs = applicationContext.getBeansWithAnnotation(AutoRegJob.class);
 			for(Object jobObj : jobs.values()) {
 				if (jobObj instanceof BaseJobConfig) {

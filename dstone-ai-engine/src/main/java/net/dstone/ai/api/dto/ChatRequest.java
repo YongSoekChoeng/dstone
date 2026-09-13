@@ -18,20 +18,23 @@ import java.util.Map;
  * ChatClient에 붙여준다. 실제로 어떤 Tool을 언제, 몇 번 호출할지는 사람이 미리 정해두는 게 아니라
  * LLM과 Spring AI의 ChatClient가 대화를 주고받으며 그때그때 알아서 판단한다(tool_choice=auto).
  *
+ * requiredTool/provider/ollamaModel 세 필드는 아래에 적힌 대로 동작하도록 "의도"하고 만들어 둔
+ * 자리이지만, 2026-09-11 gateway/RAG 재설계 이후 net.dstone.ai.api.service.ChatService.getSpec()가
+ * 이 세 필드를 전혀 읽지 않는다 - 즉 지금은 요청에 넣어 보내도 조용히 무시된다(docs/09.dstone-ai-engine.md
+ * 7.6절 참고). 아래 설명은 구현 예정 사양이지 현재 동작이 아니다.
+ *
  * requiredTool을 지정하면(ConfigTool에 등록된 @AiTool 메서드 이름과 정확히 같아야 한다) 방금 말한
- * auto 판단을 건너뛰고 Anthropic의 tool_choice=tool로 그 Tool을 반드시 한 번은 호출하게 만든다.
- * toolsEnabled 값과는 상관없이 동작하고, 지금은 spring.ai.model.chat=anthropic일 때만 지원한다.
+ * auto 판단을 건너뛰고 provider의 tool_choice 강제 옵션(예: Anthropic이면 tool_choice=tool)으로 그
+ * Tool을 반드시 한 번은 호출하게 만들 계획이다. toolsEnabled 값과는 상관없이 동작할 예정이다.
  *
- * provider를 지정하면 spring.ai.model.chat으로 정해진 기본 provider 대신 그 provider로 라우팅한다.
- * 값은 gateway.AiProvider의 propertyValue(anthropic/openai/ollama)와 같아야 한다. 다만 실제로
- * 기본값과 별개로 항상 띄워둘 수 있는 override 빈이 있는 provider만 지원되는데, 지금은 ollama뿐이다
- * (dstone.ai.gateway.ollama-override.enabled=true일 때만 사용 가능 - net.dstone.ai.config.ConfigOllamaOverride
- * 참고). 비워두면 기존과 동일하게 기본 provider를 쓴다.
+ * provider를 지정하면 spring.ai.model.chat으로 정해진 기본 provider 대신 그 provider로 라우팅할
+ * 계획이다. 값은 net.dstone.ai.common.consts.AiProvider의 propertyValue(anthropic/openai/ollama)와
+ * 같아야 한다. 비워두면 기존과 동일하게 기본 provider를 쓴다.
  *
- * ollamaModel을 지정하면(provider=ollama일 때만 의미 있다) dstone.ai.gateway.ollama-override.model에 고정된
- * 기본 모델 대신 이 요청 한 번만 그 모델로 호출한다(예: "sqlcoder", "llama3.2"). 실제로 Ollama에
- * pull되어 있는 모델 태그와 정확히 같아야 하고, 채팅을 지원하지 않는 모델(예: 임베딩 전용인 bge-m3)을
- * 넣으면 Ollama가 그대로 에러를 반환한다 - 이 필드는 어떤 모델명이 유효한지 검증하지 않는다.
+ * ollamaModel을 지정하면(provider=ollama일 때만 의미 있다) 이 요청 한 번만 그 모델로 호출할 계획이다
+ * (예: "sqlcoder", "llama3.2"). 실제로 Ollama에 pull되어 있는 모델 태그와 정확히 같아야 하고,
+ * 채팅을 지원하지 않는 모델(예: 임베딩 전용인 bge-m3)을 넣으면 Ollama가 그대로 에러를 반환할 것이다
+ * - 이 필드는 어떤 모델명이 유효한지 검증하지 않을 예정이다.
  */
 public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
 		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String ollamaModel) {

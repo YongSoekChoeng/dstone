@@ -26,8 +26,8 @@ import net.dstone.common.utils.StringUtil;
  *
  * rate limit은 Redis 카운터(RateLimiter)가 있어야 의미가 있다. 그래서 enabled=true인데 Redis가
  * 꺼져 있으면(spring.data.redis.enabled=false) "RedisTemplate 빈이 없다"는, 원인을 알기 어려운
- * 에러 대신 여기서 먼저 막아서 명확한 이유를 알려준다 - ConfigChatClient가 GatewayProperties로
- * 똑같이 하고 있는 방식이다.
+ * 에러 대신 여기서 먼저 막아서 명확한 이유를 알려준다 - governance.auth 패키지의 ApiKeyProperties가
+ * governance.auth.keys에 대해 하는 fail-fast 검증과 같은 방식이다.
  *
  * overrides는 리스트-오브-오브젝트(YAML 시퀀스)라서 ApiKeyProperties.keys와 같은 이유로
  * ConfigProperty의 단순한 getProperty(String)로는 읽을 수 없어 Binder를 직접 쓴다.

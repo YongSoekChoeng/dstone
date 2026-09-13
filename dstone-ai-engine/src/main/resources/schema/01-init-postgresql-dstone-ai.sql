@@ -1,6 +1,6 @@
 -- dstone-ai-engine RAG(Phase 2) 전용 롤/데이터베이스 초기화.
 -- postgres 슈퍼유저 권한으로 실행해야 한다: sudo -u postgres psql -f 01-init-postgresql-dstone-ai.sql
--- 상세 배경: docs/software/postgresql.md 6절, docs/dstone-ai-engine.md 9절 참고.
+-- 상세 배경: docs/software/05.postgresql.md 6절, docs/09.dstone-ai-engine.md 참고.
 
 -- dstone_ai 롤(앱 전용 계정) 생성 - 이미 있으면 건너뜀
 DO $$

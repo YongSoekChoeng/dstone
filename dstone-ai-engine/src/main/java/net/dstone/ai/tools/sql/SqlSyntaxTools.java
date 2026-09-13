@@ -14,8 +14,12 @@ import net.sf.jsqlparser.statement.Statements;
  * 최종 답변을 내놓기 전에 스스로 문법을 검증하고 틀렸으면 고치는 자기수정 루프에 쓰라고 만든 Tool이다.
  * JSQLParser는 특정 DB 실서버 없이 순수 그래머 파싱만 하므로(대상 테이블이 실제로 존재하는지는 모름)
  * 어떤 대상 스키마의 쿼리든 항상 쓸 수 있다는 게 장점이고, 대신 PostgreSQL 고유 문법의 세부까지
- * 완벽히 검증하지는 못한다 - 더 정확한 검증이 필요하면 dstone.ai.rag.enabled=true일 때만 쓸 수 있는
- * PostgresExplainValidationTools(실제 PostgreSQL 파서로 검증)를 같이 쓴다.
+ * 완벽히 검증하지는 못한다.
+ *
+ * 한때 실제 PostgreSQL EXPLAIN으로 2차 검증하는 PostgresExplainValidationTools(dstone.ai.rag.enabled=true일
+ * 때만 존재, pgvector용 DataSource 재사용)를 이어 붙인 2단계 구성이었으나, 이 서버(dstone_ai DB)엔 실제
+ * 업무 테이블이 없는 게 보통이라 애매한 부분 통과 결과가 흔했고 실효성 대비 복잡도가 맞지 않아
+ * 2026-09-11 재설계에서 함께 삭제했다(docs/09.dstone-ai-engine.md 7.5절 참고). 지금은 이 클래스 하나뿐이다.
  */
 @AiTool
 public class SqlSyntaxTools extends BaseObject {

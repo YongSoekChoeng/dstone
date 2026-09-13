@@ -26,10 +26,13 @@ import net.dstone.batch.common.core.BaseJobConfig;
 import net.dstone.common.config.ConfigProperty;
 
 /**
- * SpringBoot WebApplicaton 형식으로 기동하여 Rest Api로 호출되는 모든 요청을 처리한다.
+ * SpringBoot WebApplicaton 형식으로 기동하여 dstone-batchadmin이 호출하는 Job 제어 Rest Api를 처리한다.
  * <pre>
- * - URL 형식 : /batch/restapi/{jobName}
- * - 비동기로 Job을 처리.
+ * - 공통 경로: /batch
+ * - 주요 엔드포인트: /healthCheck, /registerJobs, /registerJob/{jobName}, /getJobs,
+ *   /startJob/{jobName}(비동기 실행), /stopJob/{jobExecutionId}, /statusJob/{jobExecutionId},
+ *   /restartJob/{jobExecutionId}, /abandonJob/{jobExecutionId}, /unregisterJob/{jobName},
+ *   /deleteJob/{jobExecutionId}, /deleteJobInstance/{jobInstanceId}
  * </pre>
  */
 @RestController
@@ -74,7 +77,7 @@ public class RestApiRunner extends AbstractRunner{
 		
 		/*** Job 등록 시작 ***/
 		try {
-			// @AutoRegisteredJob 애노테이션이 붙은 모든 빈 검색
+			// @AutoRegJob 애노테이션이 붙은 모든 빈 검색
 			Map<String, Object> jobs = context.getBeansWithAnnotation(AutoRegJob.class);
 			for(Object jobObj : jobs.values()) {
 				if (jobObj instanceof BaseJobConfig) {

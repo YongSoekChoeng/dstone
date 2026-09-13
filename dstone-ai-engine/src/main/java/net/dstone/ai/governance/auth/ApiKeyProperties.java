@@ -22,7 +22,7 @@ import net.dstone.common.utils.StringUtil;
  * governance.auth). enabled=false(기본값)면 이전 Phase와 똑같이 인증 없이 전부 통과시킨다 -
  * dstone.ai.rag.enabled와 같은 옵트인 방식이라, 이 기능을 켜지 않은 기존 배포는 영향을 받지 않는다.
  *
- * keys는 리스트-오브-오브젝트(YAML 시퀀스)라서 GatewayProperties나 PromptProperties처럼
+ * keys는 리스트-오브-오브젝트(YAML 시퀀스)라서 PromptProperties처럼
  * ConfigProperty의 단순한 getProperty(String)로는 읽을 수 없다 - Environment.getProperty(key,
  * Class)는 key[0], key[1]처럼 인덱스가 붙은 프로퍼티들을 하나의 List나 객체로 다시 조립해주지
  * 않기 때문이다. 그래서 이 클래스만 예외적으로 Spring Boot의 Binder를 직접 쓴다. ENC(...)

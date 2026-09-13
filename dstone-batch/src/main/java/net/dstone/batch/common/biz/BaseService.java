@@ -141,7 +141,7 @@ public class BaseService extends BaseBatchObject {
 		boolean isSucceded = true;
 		try {
 			if( !this.isRegisteredJob(jobName) ) {
-				// @AutoRegisteredJob 애노테이션이 붙은 모든 빈 검색
+				// @AutoRegJob 애노테이션이 붙은 모든 빈 검색
 				Map<String, Object> jobs = context.getBeansWithAnnotation(AutoRegJob.class);
 				for(Object jobObj : jobs.values()) {
 					if (jobObj instanceof BaseJobConfig) {

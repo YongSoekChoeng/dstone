@@ -99,7 +99,7 @@ public class DstoneBatchAdminApplication extends SpringBootServletInitializer {
 				LogUtil.sysout(msg);
 
 			} catch (Exception e) {
-				// TODO: handle exception
+				// env 파일 로딩 실패는 기동을 막을 이유가 아니므로 무시하고 기본 System Properties로 계속 진행한다.
 			}
 		}
 	}

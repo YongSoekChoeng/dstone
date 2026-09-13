@@ -127,7 +127,7 @@ public class RedisChatMemoryRepository extends BaseObject implements ChatMemoryR
 			case ASSISTANT -> new AssistantMessage(stored.text());
 			case SYSTEM -> new SystemMessage(stored.text());
 			case TOOL -> throw new IllegalStateException(
-					"TOOL 타입 메시지는 아직 지원하지 않는다(Phase 3 agent/tool-calling에서 다룰 예정): " + json);
+					"TOOL 타입 메시지는 아직 지원하지 않는다(Phase 3 tool-calling 자체는 이미 구현돼 있지만, 그 결과 메시지의 Redis 직렬화는 아직 처리하지 않는다): " + json);
 		};
 	}
 
