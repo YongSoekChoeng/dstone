@@ -50,7 +50,10 @@ public class ConfigChatClient {
 	@Bean
 	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, UsageLoggingAdvisor usageLoggingAdvisor, PiiGuardrailAdvisor piiGuardrailAdvisor) {
 		return builder
-			.defaultAdvisors(usageLoggingAdvisor, piiGuardrailAdvisor, MessageChatMemoryAdvisor.builder(chatMemory).build())
-			.build();
+			.defaultAdvisors(
+				usageLoggingAdvisor // 사용량기록
+				, piiGuardrailAdvisor // 개인정보보호
+				, MessageChatMemoryAdvisor.builder(chatMemory).build() // 세션메모리
+			).build();
 	}
 }
