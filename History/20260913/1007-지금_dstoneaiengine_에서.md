@@ -270,3 +270,42 @@ git commit은 하지 않았습니다.</result>
 ## 답변
 
 dstone-batch도 완료됐습니다 (4/7) — 존재하지도 않는 어노테이션(`@AutoRegisteredJob`)을 언급하던 주석 4곳과 무관한 라이선스 헤더 하나를 정리했네요. 3개 남았습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a9427295f028ce7c2</task-id>
+<tool-use-id>toolu_01V9R72hj49zgK7PTyaQeAu3</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a9427295f028ce7c2.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-common docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Numbering is consistent. Task complete.
+
+**(a) 수정한 파일**
+- `docs/05.dstone-common.md`
+- `dstone-common/src/main/java/net/dstone/common/messaging/saga/SagaOrchestrator.java` (주석만)
+
+**(b) 문서에서 실제로 바뀐 핵심 내용**
+- `config/` 패키지 설명 정정: "Redis/RabbitMQ/WebSocket 설정"이라는 기존 서술이 틀렸음을 확인 — 실제로는 각 모듈이 자기 `config/`에서 직접 구성하고, `dstone-common`의 `config/`는 ENC 복호화(`ConfigProperty`)와 로깅 AOP 뼈대(`ConfigAspect`)만 담당. 콜아웃으로 명시.
+- 신규 5절 "공통 베이스 클래스" 추가 — `BaseController`/`BaseService`/`BaseDao`/`BaseVo`(리포지토리 전체 31곳에서 상속)를 mermaid 클래스 다이어그램 + 표로 정리, `ErrCd`/`DsExceptionResolver` 에러 응답 체계도 함께 설명.
+- `BaseVo`의 `@XmlRootElement(name="MemberVo")`가 모든 하위 VO에 고정 적용되는 실제 동작을 경고 콜아웃으로 문서화(코드는 스코프 밖이라 안 건드림, 문서에만 기록).
+- "애플리케이션 기동 순서" 절: `setSysProperties()`가 `dstone-common`의 공유 구현이 아니라 **4개 모듈이 각자 구현한 동일 컨벤션**이라는 점을 명확히 정정. 미사용 레거시 `InitServlet`(참조 0건 확인)도 명시.
+- 패키지 구조 트리에 `queue`/`socket`/`task`/`websocket` 각각의 실제 사용처(또는 미사용) 주석 추가 — `socket`은 grep 결과 리포지토리 전체에서 참조 0건인 레거시로 확인.
+- 헤더 번호를 5~9 → 6~10으로 재정렬, 목차와 상호 참조(`7절 참고` 등) 동기화.
+
+**(c) 고친 주석**
+- `SagaOrchestrator.java:60-61` — 생성자 Javadoc의 `@param outboxAppender -`(내용 없음), `@param stepHandlers`(설명 없음)를 실제 역할 설명으로 채움.
+- 그 외 `ConfigProperty`/`EncUtil`/`Config`/`ConfigAspect`/`OutboxRelay`/`OutboxAppender(Impl)`/`NoAspectLog` 주석은 실제 구현과 대조 확인했으나 전부 정확해서 손대지 않음.
+
+범위 밖 발견 사항(수정 안 함, 참고용): `BaseVo`의 `@XmlRootElement` 하드코딩은 문서에만 기록.</result>
+<usage><subagent_tokens>172838</subagent_tokens><tool_uses>33</tool_uses><duration_ms>184063</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-common도 완료됐습니다 (5/7) — 공통 베이스 클래스(BaseController/Service/Dao/Vo) 설명이 통째로 문서에 빠져 있던 걸 새로 추가했네요. 2개 남았습니다 (ai-engine, 환경/소프트웨어 가이드).
