@@ -23,19 +23,16 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Spring AI의 ChatMemoryRepository SPI를, dstone-common의 Redis 인프라(net.dstone.ai.config.
- * ConfigRedis가 제공하는 RedisTemplate)를 써서 직접 구현한 것이다. Spring AI가 공식으로 제공하는
- * chat-memory-repository는 jdbc/cassandra/neo4j뿐이라 Redis용은 없어서(2026-09 기준 spring-ai
- * 1.1.8) 직접 만들었다.
+ * Spring AI의 ChatMemoryRepository SPI를, dstone-common의 Redis 인프라(net.dstone.ai.config. ConfigRedis가 제공하는 RedisTemplate)를 써서 직접 구현한 것이다. 
+ * Spring AI가 공식으로 제공하는 chat-memory-repository는 jdbc/cassandra/neo4j뿐이라 Redis용은 없어서(2026-09 기준 spring-ai 1.1.8) 직접 만들었다.
  *
  * 대화 하나당 Redis List를 하나씩 쓴다(키: dstone:ai:session:{conversationId}). 여기에 메시지를
- * JSON으로 순서대로 담아두고, 지금 존재하는 conversationId 목록은 별도의 Set(키:
- * dstone:ai:session:index)으로 따로 관리한다 - 이렇게 하면 전체 키를 훑는 KEYS/SCAN 없이도
+ * JSON으로 순서대로 담아두고, 지금 존재하는 conversationId 목록은 별도의 Set(키: dstone:ai:session:index)으로 따로 관리한다 - 이렇게 하면 전체 키를 훑는 KEYS/SCAN 없이도
  * conversationId 목록을 바로 조회할 수 있다.
  */
 @Repository
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")
-public class RedisChatMemoryRepository extends BaseObject implements ChatMemoryRepository {
+public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepository {
 
 	private static final String KEY_PREFIX = "dstone:ai:session:";
 	private static final String INDEX_KEY = KEY_PREFIX + "index";
@@ -44,8 +41,7 @@ public class RedisChatMemoryRepository extends BaseObject implements ChatMemoryR
 	private final ObjectMapper objectMapper;
 	private final long ttlSeconds;
 
-	public RedisChatMemoryRepository(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper,
-			ConfigProperty configProperty) {
+	public RedisChatMemorySession(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper, ConfigProperty configProperty) {
 		this.redisTemplate = redisTemplate;
 		this.objectMapper = objectMapper;
 		String ttlSeconds = configProperty.getProperty("dstone.ai.session.ttl-seconds");
@@ -127,7 +123,7 @@ public class RedisChatMemoryRepository extends BaseObject implements ChatMemoryR
 			case ASSISTANT -> new AssistantMessage(stored.text());
 			case SYSTEM -> new SystemMessage(stored.text());
 			case TOOL -> throw new IllegalStateException(
-					"TOOL 타입 메시지는 아직 지원하지 않는다(Phase 3 tool-calling 자체는 이미 구현돼 있지만, 그 결과 메시지의 Redis 직렬화는 아직 처리하지 않는다): " + json);
+					"TOOL 타입 메시지는 아직 지원하지 않는다(tool-calling 자체는 이미 구현돼 있지만, 그 결과 메시지의 Redis 직렬화는 아직 처리하지 않는다): " + json);
 		};
 	}
 

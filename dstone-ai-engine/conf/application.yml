@@ -18,7 +18,7 @@ spring:
     main:
         allow-bean-definition-overriding: true
     data:
-        # session(Phase 1): 대화 히스토리 저장(net.dstone.ai.session.RedisChatMemoryRepository).
+        # session(Phase 1): 대화 히스토리 저장(net.dstone.ai.session.RedisChatMemorySession).
         # dstone-boot의 dstone:session(HTTP 세션) 네임스페이스와 겹치지 않게
         # 키는 dstone:ai:session:{conversationId}로 별도로 둔다.
         redis:
