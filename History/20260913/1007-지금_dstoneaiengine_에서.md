@@ -188,3 +188,43 @@ altri 언어를 포함합니다."
 ## 답변
 
 dstone-batchadmin 문서 작업도 완료됐습니다 (2/7). 남은 5개 계속 진행 중입니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a1e7ec9406ee7746d</task-id>
+<tool-use-id>toolu_015EopgYtUsUcjr4AbDwd97u</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a1e7ec9406ee7746d.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-boot and saga docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**작업 완료 보고**
+
+**(a) 수정한 파일**
+- `docs/06.dstone-boot.md` (수정)
+- `docs/10.dstone-saga.md` — 실제 코드(OrderSagaController.java:47, OutboxRelayScheduler.java:27, OrderSagaReplyListener.java:54, saga-*.svg 7종 존재)와 전부 대조 확인했으나 이미 정확해서 **수정 없음**
+- dstone-boot 소스 주석 — 점검 결과 수정할 만큼 잘못되거나 불필요한 주석을 찾지 못해 **수정 없음**
+
+**(b) docs/06.dstone-boot.md에서 실제로 바뀐 내용**
+1. **3절 패키지 구조 트리 전면 수정**(가장 큰 오류): 
+   - `analyzer/`가 실제로는 `AnalysisController.java`가 바로 밑에 있는 게 아니라 `controller/`·`service/`·`dao/`·`cud/`·`taskitem/`·`vo/` 하위 패키지 구조임 → 반영
+   - `ConfigSecurity.java`가 문서엔 `common/security/`로 돼 있었는데 실제로는 `common/config/`에 있고, `common/security/`엔 인증 핸들러/프로바이더/dao/svc/vo/web이 들어있음 → 정정
+   - `common/messaging/`(SAGA/Outbox 배선: `saga/`, `outbox/`) 패키지가 트리에서 통째로 빠져 있었음 → 추가하고 10.dstone-saga.md로 상호참조
+   - `common/tools/`에 `bizgen/`·`datagen/`·`rule/`이 누락돼 있었음 → 추가
+   - `sample/` 하위에 실제 존재하는 `admin/`·`kafka/`·`rabbitmq/`·`saga/`·`user/`·`vo/`가 문서에 없었음 → 추가
+2. **5.2절 주요 클래스 표**: FQCN이 실제와 다름(`analyzer.AnalysisController` → `analyzer.controller.AnalysisController` 등), 빠져 있던 `ConfigurationController` 추가
+3. **8절 샘플 코드 표**: `admin/`·`kafka/`·`rabbitmq/`·`saga/`·`user/` 행 추가, 특히 `saga/`는 10.dstone-saga.md로 링크
+
+**검증만 하고 문제없어 그대로 둔 것**: 10절(AI 연동) 전체 — ChatController/ChatService/DocumentController/DocumentService 실제 코드, JSP 경로(`ai/chat/chat.jsp` 등), `interface.ai-engine.base-url` 설정 키까지 하나하나 대조했고 문서 내용과 100% 일치.
+
+**(c) 고친 주석**: 없음. TODO 마커(DstoneBootApplication 3곳, BizGenerator/TestBiz1/2)는 실제 미구현 상태를 정확히 나타내는 정상 마커라 "잘못된 주석"이 아니어서 그대로 뒀고, ConfigDatasource/ConfigSecurity/OutboxRelayScheduler 등 핵심 클래스 주석도 실제 동작과 일치함을 확인.</result>
+<usage><subagent_tokens>182797</subagent_tokens><tool_uses>22</tool_uses><duration_ms>158578</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-boot/SAGA 문서 작업도 완료됐습니다 (3/7) — 패키지 구조 트리가 실제 코드와 꽤 어긋나 있던 걸 바로잡았네요. 남은 4개 계속 대기 중입니다.
