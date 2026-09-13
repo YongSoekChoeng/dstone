@@ -1,0 +1,438 @@
+# 지금_dstoneaiengine_에서
+
+> 생성일시: 2026-09-13 10:16
+
+## 질문
+
+지금 dstone-ai-engine 에서 LLM을 anthropic 을 사용하지 않고 ollama로 사용하려 한다면 아래 부분만 변경하면되는게 아닌가?
+<application.yml>
+spring.ai.model.chat: ollama
+
+---
+
+## 답변
+
+dstone-ai-engine 코드 상태를 먼저 확인해보겠습니다.
+
+---
+
+## 답변
+
+확인해봤습니다. 결론부터 말하면 **아니요, 그 한 줄만으로는 안 됩니다.**
+
+## Java 코드는 손댈 필요 없음 (맞는 부분)
+
+이미 Phase 1 게이트웨이 패턴이 코드에 구현돼 있어서:
+- `pom.xml`에 anthropic/openai/ollama 스타터가 전부 이미 포함돼 있고 (`dstone-ai-engine/pom.xml:88-99`)
+- `AiProvider` enum에 `OLLAMA`가 이미 있고 (`common/consts/AiProvider.java:26`)
+- `ConfigChatClient`는 provider 무관하게 `ChatClient.Builder`만 주입받아 build()만 함 (`config/ConfigChatClient.java:16`)
+
+→ `spring.ai.model.chat` 값만 바꾸면 실제로 활성화되는 provider의 자동설정이 통째로 바뀌는 구조가 맞습니다.
+
+## 하지만 application.yml에서 추가로 손볼 게 있습니다
+
+1. **YAML 키 중복 문제** — `application.yml:112-116`에 주석 처리된 `# ollama:` chat 설정 블록이 있는데, 이걸 그대로 주석 해제하면 **123번째 줄에 이미 있는 임베딩용 `ollama:` 블록과 같은 레벨에 키가 두 번** 생깁니다. YAML은 같은 레벨 중복 키를 뒤엣것이 덮어써버려서, 임베딩(`bge-m3`) 설정이 날아갈 수 있습니다. 반드시 하나의 `ollama:` 블록으로 합쳐서 `chat.options.model`을 추가해야 합니다:
+```yaml
+ollama:
+    base-url: http://localhost:11434
+    chat:
+        options:
+            model: llama3.1   # 로컬에 pull된 채팅 모델
+    embedding:
+        model: bge-m3
+```
+
+2. **chat 모델 지정 필수** — 로컬 Ollama엔 지금 임베딩 전용 `bge-m3`만 설치돼 있습니다(`docs/software/14.ollama.md`). 이건 채팅을 못 하는 모델이라, `chat.options.model`을 비워두면 Spring AI 기본값(대략 mistral)으로 요청했다가 로컬에 없어서 실패합니다. `ollama pull llama3.1` 등으로 채팅 가능한 모델을 별도로 받아야 합니다.
+
+## 참고로 발견한 별개 이슈
+
+`ChatRequest.java:21-33` 주석에는 요청 단위로 `provider`/`ollamaModel`을 지정해 기본 provider와 별개로 라우팅하는 기능(`ConfigOllamaOverride`, `dstone.ai.gateway.ollama-override.*`)이 설명돼 있는데, 실제로는 `ConfigOllamaOverride` 클래스 자체가 존재하지 않고 `ChatService.getSpec()`도 이 필드들을 전혀 참조하지 않습니다 — 즉 지금은 문서만 있고 미구현 상태입니다. 요청에 `provider`를 넣어도 무시되고, 여전히 `spring.ai.model.chat` 전역 설정 하나로만 라우팅됩니다. (별도 작업 필요 여부는 말씀 주시면 확인하겠습니다.)
+
+---
+
+## 질문
+
+ollama 는 응답할 때 띄어쓰기가 안되나?
+이 ai모델이 어느정도 스마트하게 응답처리를 할 수 있는지 궁금해.
+ollama를 조금 더 똑똑하게 할 수 있는 방법이 있을까?
+
+---
+
+## 답변
+
+llama3.2를 실제로 호출해서 확인해봤습니다.
+
+---
+
+## 답변
+
+실제 테스트로 재현됐습니다. 짧은 질문엔 멀쩡하지만,
+
+```
+"저는 지능형 아이프onia 인입니다... 다양한 도메인에서 자격이 있습니다...
+altri 언어를 포함합니다."
+```
+
+자유 응답에서는 "아이프onia"(한국어+영어가 공백 없이 붙음), "altri"(이탈리아어 단어가 갑자기 튐) 같은 깨짐이 나옵니다. 이건 버그가 아니라 **모델 자체의 한계**입니다 — 지금 붙어있는 `llama3.2:latest`는 3.2B 파라미터짜리 소형 모델이고(Q4_K_M 양자화), 학습 데이터가 영어 중심이라 한국어 토큰 경계 처리가 약합니다. Claude/GPT급 모델은 파라미터 규모와 다국어 학습량 자체가 다르니, 지금 환경(WSL, CPU 전용, RAM 8GB, GPU 없음)에서 로컬로 그 수준을 기대하긴 어렵습니다.
+
+**똑똑하게 만드는 현실적인 방법 (자원 제약 고려)**
+
+| 방법 | 효과 | 트레이드오프 |
+|---|---|---|
+| 모델 교체 (`ollama pull exaone3.5:2.4b` 또는 `qwen2.5:3b`) | 비슷한 크기에서 한국어 품질 크게 개선 (EXAONE은 LG가 한국어 특화 학습) | 다운로드/디스크 필요, 여전히 소형 모델의 reasoning 한계는 있음 |
+| 시스템 프롬프트에 "한국어로만, 정확한 띄어쓰기로" 명시 (`dstone.ai.prompt`) | 즉시 적용 가능, 실제로 완화 효과 있음 | 근본 해결은 아님 |
+| `temperature` 낮추기 (`spring.ai.ollama.chat.options.temperature`) | 헛소리/언어 뒤섞임 확률 감소 | 창의성/다양성 감소 |
+| RAG로 사실 근거 제공 (이미 `dstone.ai.rag.enabled=true`) | 사실 기반 답변 품질 개선 | 언어 유창성 자체는 안 고쳐짐 |
+| 더 큰 모델(7B~14B) | 확실히 똑똑해짐 | 지금 RAM 8GB/GPU 없는 환경에선 체감 속도 크게 느려질 가능성 높음 |
+
+가장 먼저 시도해볼 만한 건 **모델 교체**입니다. 지금 크기 그대로 한국어 품질만 올릴 수 있어서 비용이 가장 낮습니다. `ollama pull exaone3.5:2.4b` 해보고 `spring.ai.ollama.chat.options.model`을 그걸로 바꿔서 비교해볼까요?
+
+---
+
+## 질문
+
+/app/dstone/docs 의 모든 md 파일들을 갱신해줘.
+- 현재까지 진행된 모든 추가/수정 작업에 대해서 유관한 md 파일이 존재하지 않을 경우 신규 작성.
+- 현재까지 진행된 모든 추가/수정 작업에 대해서 유관한 md 파일들이 존재하면 내용을 수정.
+- 내용은 최대한 친절하고 풍부하고 비주얼적으로 풍성하게 표현한다.
+- /app/dstone 소스 내에 불필요하거나 구현내용과 동일하지 않은 주석이 있을 경우 주석을 바로잡아줘.
+
+---
+
+## 답변
+
+범위가 `/app/dstone/docs` 전체(26개 md 파일)와 5개 모듈 소스 전체의 주석 점검이라 상당히 큽니다. 모듈별로 나눠 병렬로 감사(실제 코드 vs 문서 대조)한 뒤 직접 갱신하도록 7개로 나눠 진행하겠습니다.
+
+---
+
+## 답변
+
+7개 모듈/영역별로 나눠서 백그라운드에서 문서 감사·갱신 및 주석 정리 작업을 병렬로 시작했습니다:
+
+1. dstone-ai-engine → `docs/09.dstone-ai-engine.md`
+2. dstone-common → `docs/05.dstone-common.md`
+3. dstone-boot + SAGA → `docs/06.dstone-boot.md`, `docs/10.dstone-saga.md`
+4. dstone-batch → `docs/07.dstone-batch.md`
+5. dstone-batchadmin → `docs/08.dstone-batchadmin.md`
+6. 빌드/CI-CD/클라우드 아키텍처 → `docs/03.build.md`, `docs/04.cloud-architecture.md`
+7. 환경/인덱스/소프트웨어 설치 가이드 → `docs/01.index.md`, `docs/README.md`, `docs/02.environment.md`, `docs/software/*.md`(15개)
+
+각 에이전트가 실제 소스 코드를 읽고 문서와 대조해 갱신하고, 담당 모듈의 소스 주석 중 실제 구현과 다르거나 불필요한 것만 바로잡습니다. 완료되는 대로 결과를 모아서 정리해 알려드리겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>af7067bf4a1d5dd7e</task-id>
+<tool-use-id>toolu_01Kg3eump3toeDRCE7ZqdnTq</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/af7067bf4a1d5dd7e.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit build and cloud-architecture docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>docs/03.build.md와 docs/04.cloud-architecture.md 문서 갱신 완료.
+
+**수정한 파일**
+- `docs/03.build.md`
+- `docs/04.cloud-architecture.md`
+
+**확인 결과 (대체로 정확했음)**
+- 두 문서 모두 이미 매우 상세하고 실제 Dockerfile/Jenkinsfile/bin 스크립트/k8s manifest와 정확히 일치했음(포트, namespace `dstone`, registry `localhost:5000`, `DSTONE_PROFILE=vm`, 4개 Jenkinsfile 전부 대조 확인). `docs/images/`의 SVG 3종(jenkins-job-setup-flow, jenkins-boot-pipeline-flow, jenkins-batch-pipeline-flow)도 실제 존재하고 04.cloud-architecture.md에서 정확히 참조 중.
+
+**실제로 바뀐 핵심 내용**
+- 유일하게 발견한 실질적 드리프트: `dstone-ai-engine/k8s/configmap.yaml`이 Phase 0 시점 스냅샷 그대로 방치돼 있고, 실제 `dstone-ai-engine/conf/application.yml`(Phase 1~4까지 진행)과 크게 어긋남 — `spring.ai.model.chat` 값 누락(현재 상태로 배포하면 기동 실패), `RedisAutoConfiguration` exclude로 세션 기능이 깨지는 상태, `autoconfigure.exclude` 경로가 Boot 4 이전 패키지, PostgreSQL/RAG/세션/프롬프트/거버넌스/관측 설정 통째로 누락.
+- 두 문서 모두에 이 내용을 구체적 체크리스트로 추가(`03.build.md` 6절, `04.cloud-architecture.md` 7절), 서로 교차 링크 처리.
+- Dockerfile/Jenkinsfile/bin 스크립트 자체의 주석은 실제 동작과 전부 일치해 수정 불필요.</result>
+<usage><subagent_tokens>171877</subagent_tokens><tool_uses>15</tool_uses><duration_ms>93661</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+빌드/클라우드 아키텍처 문서 작업이 끝났습니다 (7개 중 1개). 그 과정에서 실제 배포 이슈 하나를 발견했습니다: `dstone-ai-engine/k8s/configmap.yaml`이 Phase 0 시점 스냅샷 그대로 방치돼 있어서, 실제 `application.yml`(Phase 1~4까지 진행된 내용)과 어긋나 있습니다 — 지금 그대로 배포하면 `spring.ai.model.chat` 누락 등으로 기동 실패할 수 있습니다. 일단 문서(`03.build.md`, `04.cloud-architecture.md`)에 체크리스트로 남겨뒀고, 나머지 6개 작업 마저 기다리는 중입니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a3c0ed15a8f47fb52</task-id>
+<tool-use-id>toolu_01B8txuJvShDNJAn9w9RDTCp</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a3c0ed15a8f47fb52.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-batchadmin docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>작업 완료했습니다.
+
+**(a) 수정한 파일**
+- `docs/08.dstone-batchadmin.md`
+- `dstone-batchadmin/src/main/java/net/dstone/batchadmin/DstoneBatchAdminApplication.java`
+
+**(b) 문서에서 실제로 바뀐 핵심 내용**
+- 프로젝트 구조 트리의 오류 수정: `web/` 패키지가 "BaseController 등 공통 웹 처리"로 잘못 설명돼 있었음 → 실제로는 `SessionListener`(세션/중복로그인 추적)만 있고, `BaseController`는 `biz/` 패키지에 있음(코드 확인 완료).
+- 4장 도입부에 두 연동 경로(직접 DB 조회 vs REST 제어)를 한눈에 보여주는 mermaid flowchart 추가.
+- 4.5절(CRON 스케줄링)에 "저장 시점 즉시 반영" 동작과 "수동 시작/자동 스케줄이 결국 같은 경로를 탄다"는 설명 보강.
+- 신규 4.6절 "데이터 모델 한눈에 보기" 추가 — `TB_ADMIN_USER`/`TB_BATCH_SERVER`/`TB_BATCH_JOB`/`TB_BATCH_JOB_PARAM` ER 다이어그램, `DBMS_TYPE`이 서버별로 MySQL/PostgreSQL을 독립 지정할 수 있다는 점(코드로 실제 구현 확인됨), 샘플 데이터에 `dstone-batch`의 11개 실제 샘플 잡이 미리 등록돼 있다는 점을 명시.
+- 목차에 4.6 항목 추가.
+
+**(c) 고친 주석**
+- `DstoneBatchAdminApplication.java:102` — `// TODO: handle exception`(IDE 자동생성 플레이스홀더, 실제로는 아무 처리도 안 하고 의도적으로 무시하는 코드) → `// env 파일 로딩 실패는 기동을 막을 이유가 아니므로 무시하고 기본 System Properties로 계속 진행한다.`로 실제 동작을 설명하도록 수정.
+
+**참고(범위 밖, 손대지 않음):** `dstone-batchadmin`의 나머지 소스(Controller/Service/Dao/VO, MyBatis XML)는 전수 검토했지만 주석이 실제 구현과 대체로 정확하게 일치했다 — 추가로 고칠 만한 항목은 없었다.</result>
+<usage><subagent_tokens>176113</subagent_tokens><tool_uses>30</tool_uses><duration_ms>124238</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-batchadmin 문서 작업도 완료됐습니다 (2/7). 남은 5개 계속 진행 중입니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a1e7ec9406ee7746d</task-id>
+<tool-use-id>toolu_015EopgYtUsUcjr4AbDwd97u</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a1e7ec9406ee7746d.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-boot and saga docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**작업 완료 보고**
+
+**(a) 수정한 파일**
+- `docs/06.dstone-boot.md` (수정)
+- `docs/10.dstone-saga.md` — 실제 코드(OrderSagaController.java:47, OutboxRelayScheduler.java:27, OrderSagaReplyListener.java:54, saga-*.svg 7종 존재)와 전부 대조 확인했으나 이미 정확해서 **수정 없음**
+- dstone-boot 소스 주석 — 점검 결과 수정할 만큼 잘못되거나 불필요한 주석을 찾지 못해 **수정 없음**
+
+**(b) docs/06.dstone-boot.md에서 실제로 바뀐 내용**
+1. **3절 패키지 구조 트리 전면 수정**(가장 큰 오류): 
+   - `analyzer/`가 실제로는 `AnalysisController.java`가 바로 밑에 있는 게 아니라 `controller/`·`service/`·`dao/`·`cud/`·`taskitem/`·`vo/` 하위 패키지 구조임 → 반영
+   - `ConfigSecurity.java`가 문서엔 `common/security/`로 돼 있었는데 실제로는 `common/config/`에 있고, `common/security/`엔 인증 핸들러/프로바이더/dao/svc/vo/web이 들어있음 → 정정
+   - `common/messaging/`(SAGA/Outbox 배선: `saga/`, `outbox/`) 패키지가 트리에서 통째로 빠져 있었음 → 추가하고 10.dstone-saga.md로 상호참조
+   - `common/tools/`에 `bizgen/`·`datagen/`·`rule/`이 누락돼 있었음 → 추가
+   - `sample/` 하위에 실제 존재하는 `admin/`·`kafka/`·`rabbitmq/`·`saga/`·`user/`·`vo/`가 문서에 없었음 → 추가
+2. **5.2절 주요 클래스 표**: FQCN이 실제와 다름(`analyzer.AnalysisController` → `analyzer.controller.AnalysisController` 등), 빠져 있던 `ConfigurationController` 추가
+3. **8절 샘플 코드 표**: `admin/`·`kafka/`·`rabbitmq/`·`saga/`·`user/` 행 추가, 특히 `saga/`는 10.dstone-saga.md로 링크
+
+**검증만 하고 문제없어 그대로 둔 것**: 10절(AI 연동) 전체 — ChatController/ChatService/DocumentController/DocumentService 실제 코드, JSP 경로(`ai/chat/chat.jsp` 등), `interface.ai-engine.base-url` 설정 키까지 하나하나 대조했고 문서 내용과 100% 일치.
+
+**(c) 고친 주석**: 없음. TODO 마커(DstoneBootApplication 3곳, BizGenerator/TestBiz1/2)는 실제 미구현 상태를 정확히 나타내는 정상 마커라 "잘못된 주석"이 아니어서 그대로 뒀고, ConfigDatasource/ConfigSecurity/OutboxRelayScheduler 등 핵심 클래스 주석도 실제 동작과 일치함을 확인.</result>
+<usage><subagent_tokens>182797</subagent_tokens><tool_uses>22</tool_uses><duration_ms>158578</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-boot/SAGA 문서 작업도 완료됐습니다 (3/7) — 패키지 구조 트리가 실제 코드와 꽤 어긋나 있던 걸 바로잡았네요. 남은 4개 계속 대기 중입니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a91b5644fde668bee</task-id>
+<tool-use-id>toolu_012GLscvhKcLvhnLwGo5EX3Y</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a91b5644fde668bee.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-batch docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>dstone-batch 담당 작업 완료.
+
+**(a) 수정한 파일**
+- `docs/07.dstone-batch.md`
+- `dstone-batch/src/main/java/net/dstone/batch/common/DstoneBatchApplication.java`
+- `.../common/biz/BaseService.java`
+- `.../common/config/ConfigAutoReg.java`
+- `.../common/runner/RestApiRunner.java`
+- `.../common/runner/ScdfTaskRunner.java`
+
+**(b) 문서에서 실제로 바뀐 핵심 내용**
+- 신규 "7.3 방법 3 - REST API로 제어 (`RestApiRunner`)" 절 추가: 실제 `/batch/**` 엔드포인트 12개 전체 표로 정리 + `startJob`이 즉시 `STARTED`로 응답하는 이유(sync `jobLauncher` vs async `asyncJobLauncher` 이원화, `ConfigJob.java` 실제 코드 근거)를 콜아웃과 mermaid 시퀀스 다이어그램으로 설명.
+- "8. 샘플 잡 목록" 표를 `(update 관련 잡들)` 같은 뭉뚱그린 표현 대신 코드에서 확인한 실제 `@AutoRegJob(name=...)` 11개 전부로 교체(`tableDataGenType01/02Job`, `tableUpdateType01/02/03Job`, `fileDataGenJob`, `fileCopyType01/02Job`, `fileToTableJob`, `tableToFileJob`).
+- 목차에 7.3 항목 추가.
+- `BATCH_JOB_SEQ`→`BATCH_JOB_INSTANCE_SEQ` 관련 기존 서술은 실제 스키마 파일(`02-create-table-mysql-dstone-batch.sql`)과 대조해 정확함을 확인, 변경 없음.
+
+**(c) 고친 주석**
+- `DstoneBatchApplication.java:1-15` — 이 프로젝트와 무관한 Apache 2.0 "Copyright 2012-2013 the original author or authors" 라이선스 헤더(다른 어떤 파일에도 없는 유일한 잔재, 어딘가에서 복붙된 흔적) 제거.
+- `RestApiRunner.java:28-34` — 클래스 Javadoc이 존재하지 않는 URL 패턴 `/batch/restapi/{jobName}`을 설명하고 있었음 → 실제 12개 엔드포인트 목록으로 교체.
+- `RestApiRunner.java:77`, `ConfigAutoReg.java:44`, `BaseService.java:144`, `ScdfTaskRunner.java:143` — 4곳 모두 존재하지 않는 어노테이션 `@AutoRegisteredJob`을 언급하는 동일한 주석이 반복돼 있었음 → 실제 어노테이션명 `@AutoRegJob`으로 통일.
+
+git commit은 하지 않았습니다.</result>
+<usage><subagent_tokens>157267</subagent_tokens><tool_uses>27</tool_uses><duration_ms>156096</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-batch도 완료됐습니다 (4/7) — 존재하지도 않는 어노테이션(`@AutoRegisteredJob`)을 언급하던 주석 4곳과 무관한 라이선스 헤더 하나를 정리했네요. 3개 남았습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a9427295f028ce7c2</task-id>
+<tool-use-id>toolu_01V9R72hj49zgK7PTyaQeAu3</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a9427295f028ce7c2.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-common docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Numbering is consistent. Task complete.
+
+**(a) 수정한 파일**
+- `docs/05.dstone-common.md`
+- `dstone-common/src/main/java/net/dstone/common/messaging/saga/SagaOrchestrator.java` (주석만)
+
+**(b) 문서에서 실제로 바뀐 핵심 내용**
+- `config/` 패키지 설명 정정: "Redis/RabbitMQ/WebSocket 설정"이라는 기존 서술이 틀렸음을 확인 — 실제로는 각 모듈이 자기 `config/`에서 직접 구성하고, `dstone-common`의 `config/`는 ENC 복호화(`ConfigProperty`)와 로깅 AOP 뼈대(`ConfigAspect`)만 담당. 콜아웃으로 명시.
+- 신규 5절 "공통 베이스 클래스" 추가 — `BaseController`/`BaseService`/`BaseDao`/`BaseVo`(리포지토리 전체 31곳에서 상속)를 mermaid 클래스 다이어그램 + 표로 정리, `ErrCd`/`DsExceptionResolver` 에러 응답 체계도 함께 설명.
+- `BaseVo`의 `@XmlRootElement(name="MemberVo")`가 모든 하위 VO에 고정 적용되는 실제 동작을 경고 콜아웃으로 문서화(코드는 스코프 밖이라 안 건드림, 문서에만 기록).
+- "애플리케이션 기동 순서" 절: `setSysProperties()`가 `dstone-common`의 공유 구현이 아니라 **4개 모듈이 각자 구현한 동일 컨벤션**이라는 점을 명확히 정정. 미사용 레거시 `InitServlet`(참조 0건 확인)도 명시.
+- 패키지 구조 트리에 `queue`/`socket`/`task`/`websocket` 각각의 실제 사용처(또는 미사용) 주석 추가 — `socket`은 grep 결과 리포지토리 전체에서 참조 0건인 레거시로 확인.
+- 헤더 번호를 5~9 → 6~10으로 재정렬, 목차와 상호 참조(`7절 참고` 등) 동기화.
+
+**(c) 고친 주석**
+- `SagaOrchestrator.java:60-61` — 생성자 Javadoc의 `@param outboxAppender -`(내용 없음), `@param stepHandlers`(설명 없음)를 실제 역할 설명으로 채움.
+- 그 외 `ConfigProperty`/`EncUtil`/`Config`/`ConfigAspect`/`OutboxRelay`/`OutboxAppender(Impl)`/`NoAspectLog` 주석은 실제 구현과 대조 확인했으나 전부 정확해서 손대지 않음.
+
+범위 밖 발견 사항(수정 안 함, 참고용): `BaseVo`의 `@XmlRootElement` 하드코딩은 문서에만 기록.</result>
+<usage><subagent_tokens>172838</subagent_tokens><tool_uses>33</tool_uses><duration_ms>184063</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-common도 완료됐습니다 (5/7) — 공통 베이스 클래스(BaseController/Service/Dao/Vo) 설명이 통째로 문서에 빠져 있던 걸 새로 추가했네요. 2개 남았습니다 (ai-engine, 환경/소프트웨어 가이드).
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a39cecc2dde31c5e6</task-id>
+<tool-use-id>toolu_01FX9o3JPxAVFx7dcyvHBdGz</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a39cecc2dde31c5e6.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit environment, index, and software install docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**담당**: docs/01.index.md, docs/README.md, docs/02.environment.md, docs/software/01~15 (총 17개 문서) 정확성 검증 + 시각적 보강. (소스 주석 수정은 범위 밖)
+
+## (a) 실제로 수정한 파일
+- `docs/software/14.ollama.md` — 가용 메모리 근거를 실측치(`free -h` 기준 가용 ~2GB)에 맞게 수정, "3B급 소형 모델 한계로 한국어 응답에 언어 뒤섞임이 생길 수 있다"는 실측 기반 설명 추가(한국어 자유 응답 테스트에서 실제로 재현됨)
+- `docs/02.environment.md` — `df -h /` 사용량 45G→53G(실측치로 갱신)
+- `docs/software/01.jdk.md`, `02.maven.md`, `03.git.md` — 이모지 제목/콜아웃/mermaid 추가해 다른 문서들과 시각적 톤 맞춤(사실관계는 원래 정확했음)
+
+## (b) 핵심 확인 결과
+- **버전 정보는 전부 정확했다**: JDK 21.0.12, Maven 3.9.12, Git 2.53.0, MySQL 8.4.11, PostgreSQL 18.6, Redis 8.0.5, RabbitMQ 4.0.5(미검증, 접속 불가), Kafka 4.2.1, Docker 29.7.2, kubectl 1.37.0/kind 0.27.0, Node 20.20.2, Jenkins 2.568.3, Ollama v0.33.3 — 전부 실제 설치본과 일치. `docs/01.index.md`, `docs/README.md`의 모듈 구성/포트/의존관계도 각 `pom.xml`/`application.yml`과 대조해 확인 — 수정 불필요.
+- **⚠️ 중요 발견 (문서 밖 실제 인프라 이슈)**: `docs/software/03.git.md`가 "Jenkins가 `file:///app/dstone` 로컬 경로 체크아웃 방식도 쓴다"고 기술한 부분을 실제 Jenkins Job(`dstone-boot-deploy`) 설정 파일로 확인해보니 **지금도 실제로 `file:///app/dstone`으로 설정되어 있다** — 그런데 이전 세션에서 사용자가 "Jenkins는 실제 GitHub 원격을 pull해야 한다, file:// 로컬 경로 우회는 안 된다"고 명시적으로 정정한 이력이 있다(memory: `feedback_real-git-checkout-not-local-bypass`). 즉 **문서가 아니라 실제 Jenkins Job 설정이 사용자 방침과 어긋나 있는 상태**다. 이번 작업 범위(문서)에서는 이 사실을 03.git.md에 실측 경고로 명시만 해뒀고, Jenkins Job 설정 자체는 건드리지 않았다 — 별도로 GitHub 원격 URL + Credential로 전환할지 사용자 확인이 필요하다.
+- `docs/02.environment.md`(1897줄)와 나머지 software 문서들은 이미 mermaid/표/콜아웃이 풍부하고 실측과 정확히 일치해, 추가 서술 왜곡 위험을 피하기 위해 전면 재작성 대신 사실 오차만 핀포인트로 고쳤다.</result>
+<usage><subagent_tokens>163809</subagent_tokens><tool_uses>30</tool_uses><duration_ms>470333</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+dstone-common과 이번 환경/소프트웨어 문서 작업도 끝났습니다 (6/7). 한 가지 중요한 걸 발견했는데요 — Jenkins Job(`dstone-boot-deploy`)이 지금도 `file:///app/dstone` 로컬 경로를 체크아웃하도록 설정돼 있습니다. 이전에 "Jenkins는 반드시 실제 GitHub 원격을 pull해야 하고 file:// 로컬 우회는 안 된다"고 정정해주셨던 내용과 어긋나는 상태예요. 문서(`03.git.md`)에는 경고로 남겨뒀고, Jenkins Job 설정 자체는 건드리지 않았습니다 — 마지막 ai-engine 작업까지 끝나면 이 부분 어떻게 할지 여쭤보겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>a13da7f4b53b4ed74</task-id>
+<tool-use-id>toolu_0183dxsKg6NburL7Z9dhE8rV</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/7acaa229-0ae5-4fbd-9d28-0a284f158bb2/tasks/a13da7f4b53b4ed74.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit and update dstone-ai-engine docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>No errors — compiles clean (only an unrelated annotation-processing notice). Report:
+
+**(a) Files modified**
+
+Docs:
+- `docs/09.dstone-ai-engine.md`
+
+Source (comments only):
+- `dstone-ai-engine/src/main/java/net/dstone/ai/api/dto/ChatRequest.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/governance/auth/ApiKeyProperties.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/governance/ratelimit/RateLimitProperties.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/prompt/PromptProperties.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/session/RedisChatMemoryRepository.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/tools/sql/SqlSyntaxTools.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/governance/guardrail/PiiGuardrailAdvisor.java`
+- `dstone-ai-engine/src/main/java/net/dstone/ai/observability/usage/UsageLoggingAdvisor.java`
+- `dstone-ai-engine/src/main/resources/schema/01-init-postgresql-dstone-ai.sql`
+
+**(b) Key doc changes**
+- Removed all references to `PostgresExplainValidationTools` (package tree, roadmap, mermaid diagrams, §7.5) — confirmed via `git log` that this class was deleted from the repo on 2026-09-11 alongside the RAG/gateway redesign, but the doc was never updated; §7.5 rewritten to describe the single remaining `SqlSyntaxTools`-only self-correction loop, with a history note on why the 2-tier version was dropped.
+- Rewrote §7.6: `requiredTool`/`provider`/`ollamaModel` are documented as working features but `ChatService.getSpec()` never reads them — confirmed by reading the full method body (only `AiProvider.fromPropertyValue(providerId)` is called, result unused) and the unused `AnthropicChatOptions`/`ToolChoice` imports. Marked as "API 계약만 존재, 미구현" in §7.6, the API reference table, and the roadmap table.
+- Added a ⚠️ callout at the top of §8 (Phase 4): static analysis of `config/ConfigChatClient.java` (literally `return builder.build();`, no `.defaultAdvisors(...)`) plus decompiled Spring AI 2.0.1 `ChatClientAutoConfiguration`/`ChatMemoryAutoConfiguration` bytecode shows neither wires `CallAdvisor` beans automatically — meaning `PiiGuardrailAdvisor`/`UsageLoggingAdvisor`/`MessageChatMemoryAdvisor` may not actually be attached to the live `ChatClient`, despite the doc's own dated 2026-09-10 verification notes (likely a regression from the 2026-09-11 cleanup). Recommended re-verifying against a running instance. Did not touch the historical verification blocks themselves.
+
+**(c) Comments fixed**
+- `ChatRequest.java:17-33` — javadoc rewritten from "this is how it works" to "this is the intended design; not implemented yet."
+- `ApiKeyProperties.java:25`, `PromptProperties.java:12`, `RateLimitProperties.java:29-30` — all referenced a `GatewayProperties` class that no longer exists anywhere in the codebase; reworded to reference existing classes/patterns instead.
+- `RedisChatMemoryRepository.java:130` — said TOOL-message support was "예정" (Phase 3 upcoming); Phase 3 tool-calling is already implemented, only the Redis serialization case is missing — reworded.
+- `SqlSyntaxTools.java:1-8` — said it's "used together with" `PostgresExplainValidationTools`; that class doesn't exist, reworded to a historical note.
+- `PiiGuardrailAdvisor.java`/`UsageLoggingAdvisor.java` — removed the false "ConfigChatClient에서 기본 advisor로 등록" claim, added the same wiring-gap warning as the doc.
+- `01-init-postgresql-dstone-ai.sql:3` — fixed broken doc paths (`docs/dstone-ai-engine.md` → `docs/09.dstone-ai-engine.md`, `docs/software/postgresql.md` → `docs/software/05.postgresql.md`).
+
+No git commit made. One item outside my scope worth the parent's attention: the `ConfigChatClient` advisor-wiring gap is a real code issue (not just docs), flagged but not fixed per your instructions.</result>
+<usage><subagent_tokens>256454</subagent_tokens><tool_uses>84</tool_uses><duration_ms>632674</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+マ 마지막 ai-engine 작업까지 전부 끝났습니다 (7/7). 다만 마지막 리포트에서 꽤 심각한 주장(governance/observability 어드바이저들이 실제로 ChatClient에 연결 안 될 수도 있다는 것)이 나왔는데, "바이트코드 디컴파일" 같은 표현이 섞여 있어 그대로 믿기 전에 직접 검증해보겠습니다.
+
+---
+
+## 답변
+
+7개 작업이 모두 끝났고, 마지막 ai-engine 리포트에서 나온 "어드바이저 연결" 주장을 직접 코드로 검증했습니다. 결과부터 말씀드리면 — **이건 사실이고, 꽤 중요한 문제입니다.**
+
+## ⚠️ 결정이 필요한 발견 2건
+
+**1. Governance/Observability/Session 어드바이저가 실제로는 하나도 연결돼 있지 않음**
+`ConfigChatClient.java`가 하는 일은 딱 이거 하나입니다:
+```java
+@Bean
+ChatClient chatClient(ChatClient.Builder builder) {
+    return builder.build();   // .defaultAdvisors(...) 호출이 없음
+}
+```
+`PiiGuardrailAdvisor`, `UsageLoggingAdvisor`는 `@Component`로 빈 등록만 돼 있을 뿐 `ChatClient`에 붙는 코드가 어디에도 없고, 세션 기억 기능(`MessageChatMemoryAdvisor`)은 아예 인스턴스화되는 곳조차 없습니다 — `ChatService.getSpec()`이 `ChatMemory.CONVERSATION_ID` 파라미터를 세팅하긴 하지만, 그 값을 읽어서 실제로 대화 이력을 불러오고 저장할 어드바이저 자체가 체인에 없어서 아무 효과가 없습니다.
+
+즉 지금 상태로는:
+- PII 마스킹/차단(governance.guardrail) → **작동 안 함**
+- 사용량 로깅(observability.usage) → **작동 안 함**
+- 멀티턴 대화 기억(session, Redis) → **작동 안 함** (매 요청이 사실상 단발성)
+
+세 기능 다 코드/설정/문서는 다 갖춰져 있는데 마지막 배선 한 줄이 빠진 상태입니다. `ConfigChatClient`에 `ChatMemory` 빈 + 세 어드바이저를 `.defaultAdvisors(...)`로 등록하면 해결됩니다 — 원하시면 지금 바로 고쳐드릴까요?
+
+**2. Jenkins Job이 여전히 `file:///app/dstone` 로컬 경로를 체크아웃함**
+이전에 "Jenkins는 실제 GitHub 원격을 pull해야 한다"고 정정해주신 방침과 다르게, `dstone-boot-deploy` Job이 지금도 로컬 경로 SCM으로 설정돼 있습니다. GitHub 원격 URL + Credential로 바꿔드릴까요?
+
+---
+
+## 완료된 문서/주석 작업 요약 (7개 모두)
+
+| 영역 | 문서 | 주요 변경 |
+|---|---|---|
+| ai-engine | 09 | 삭제된 `PostgresExplainValidationTools` 잔재 제거, `requiredTool`/`provider`/`ollamaModel` 미구현 명시, 위 어드바이저 이슈 경고 추가 |
+| common | 05 | `BaseController/Service/Dao/Vo` 공통 베이스 클래스 절 신규 추가, `config/` 패키지 설명 정정 |
+| boot + saga | 06, 10 | 패키지 구조 트리 전면 정정(analyzer/security/messaging/sample 누락분 보강) |
+| batch | 07 | REST API 제어(`RestApiRunner`) 절 신규, 실제 잡 11개 표로 정리, 잘못된 어노테이션명(`@AutoRegisteredJob`→`@AutoRegJob`) 4곳 수정 |
+| batchadmin | 08 | 데이터 모델 ER 다이어그램 신규, 패키지 설명 오류 정정 |
+| build/cloud | 03, 04 | `dstone-ai-engine/k8s/configmap.yaml`이 Phase 0 스냅샷으로 방치돼 실배포 시 기동 실패 위험 있음을 체크리스트로 명시 |
+| 환경/설치 가이드 | 01, 02, README, software/01~15 | 버전/실측치는 전부 정확했음, ollama 실제 모델(llama3.2, bge-m3) 반영, 시각 스타일 보강 |
+
+커밋은 하지 않았으니 `git status`/`git diff`로 먼저 검토하실 수 있습니다. 위 두 가지(어드바이저 배선, Jenkins) 어떻게 할지 알려주세요.
