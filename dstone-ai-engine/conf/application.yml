@@ -17,6 +17,13 @@ management:
 spring:
     main:
         allow-bean-definition-overriding: true
+    http:
+        clients:
+            # 로컬 Ollama(CPU 추론)는 간단한 인사말도 몇 초, 프롬프트가 길거나 Tool 호출이
+            # 붙은 요청(예: capability=oracle-to-postgresql)은 더 오래 걸린다. Spring AI의
+            # OllamaApi가 이 전역 설정으로 만들어지는 RestClient.Builder를 그대로 쓰므로, 여기를
+            # 안 올려두면 "Read timed out"으로 끊긴다(anthropic/openai를 쓸 때는 영향 없음).
+            read-timeout: 5m
     data:
         # session(Phase 1): 대화 히스토리 저장(net.dstone.ai.session.RedisChatMemorySession).
         # dstone-boot의 dstone:session(HTTP 세션) 네임스페이스와 겹치지 않게
