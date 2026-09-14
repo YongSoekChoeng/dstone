@@ -29,9 +29,9 @@ import net.dstone.common.utils.StringUtil;
  * probe가 사용하는 경로라서(management.server.port를 따로 두지 않고 앱과 같은 포트를 쓰는 구성이라)
  * 인증 없이 그냥 통과시켜준다.
  *
- * governance.ratelimit 패키지의 RateLimitFilter(@Order(2))가 caller가 누구인지 판단할 때 이 필터가
- * CallerContext에 기록해둔 값을 그대로 가져다 쓴다. 그래서 이 필터가 반드시 먼저(@Order(1)) 실행돼야
- * 한다.
+ * 바로 아래(같은 common.filter 패키지)의 RateLimitFilter(@Order(2))가 caller가 누구인지 판단할 때 이
+ * 필터가 CallerContext에 기록해둔 값을 그대로 가져다 쓴다. 그래서 이 필터가 반드시 먼저(@Order(1))
+ * 실행돼야 한다.
  *
  * OAuth2의 client-credentials 대신 API Key를 고른 이유는, 이 모노레포 어디에도 Authorization
  * Server가 없기 때문이다(dstone-boot의 OAuth2는 소셜 로그인을 위한 client일 뿐 IdP는 아니다).
@@ -48,12 +48,6 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
 	@Autowired
 	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
-
-	//private final ApiKeyProperties apiKeyProperties;
-
-//	public ApiKeyAuthFilter(ApiKeyProperties apiKeyProperties) {
-//		this.apiKeyProperties = apiKeyProperties;
-//	}
 
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {

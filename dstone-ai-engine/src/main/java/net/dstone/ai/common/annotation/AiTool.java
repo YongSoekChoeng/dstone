@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * SI 프로젝트가 새 Tool을 추가하는 방법은 간단하다 - 클래스에 @AiTool을 붙이고, 그 안에 @Tool을
- * 붙인 public 메소드를 만들면 끝이다. 나머지는 net.dstone.ai.config.ConfigTool이 기동 시 자동으로
- * 찾아서 등록해준다. 샘플은 net.dstone.ai.tools.sample.DateTimeTools를 참고하면 된다.
+ * 붙인 public 메소드를 만들면 끝이다. 나머지는 net.dstone.ai.common.config.ConfigTool이 기동 시
+ * 자동으로 찾아서 등록해준다. 샘플은 net.dstone.ai.tools.sample.DateTimeTools를 참고하면 된다.
  * @Component를 메타애노테이션으로 이미 포함하고 있어서, 클래스에 @Component를 따로 더 붙일 필요는
  * 없다.
  *

@@ -18,11 +18,11 @@ import net.dstone.common.utils.StringUtil;
  * dstone.ai.governance.guardrail.pii.enabled=true일 때만 실제로 검사하고, 꺼져 있으면 이전 Phase와
  * 똑같이 아무 영향도 주지 않는다. 매 요청의 마지막 사용자 메시지를 검사하는 CallAdvisor로 만들었다.
  *
- * config.ConfigChatClient가 ChatClient.Builder에 .defaultAdvisors(...)로 이 빈을 등록한다.
+ * common.config.ConfigChatClient가 ChatClient.Builder에 .defaultAdvisors(...)로 이 빈을 등록한다.
  *
  * order는 MessageChatMemoryAdvisor의 기본 order(Advisor.DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER)보다
  * 앞서도록(더 작은 값으로) 잡았다 - 그래야 mask 모드일 때, 마스킹된 텍스트가 Redis 대화 히스토리
- * (session 패키지)에도 원본 PII 없이 마스킹된 채로 저장된다. observability.usage 패키지의
+ * (session 패키지)에도 원본 PII 없이 마스킹된 채로 저장된다. 같은 governance 밑의 usage 패키지의
  * UsageLoggingAdvisor(order=HIGHEST_PRECEDENCE, 요청 전체를 감싸 지연시간을 재야 해서 가장 바깥쪽에
  * 있다)보다는 한 단계 안쪽에 위치한다.
  *

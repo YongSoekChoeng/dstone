@@ -59,14 +59,15 @@ spring:
             - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
             - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     ai:
-        # chat(Gateway): 아래 3개 provider의 starter가 모두 클래스패스에 있으므로
+        # chat(provider 선택): 아래 3개 provider의 starter가 모두 클래스패스에 있으므로
         # 반드시 하나를 명시해야 한다(값을 지우면 3개 provider가 동시에 활성화되어 기동에 실패한다).
-        # net.dstone.ai.gateway.AiProvider의 propertyValue와 정확히 일치해야 한다.
+        # net.dstone.ai.common.consts.AiProvider의 propertyValue와 정확히 일치해야 한다. 별도의
+        # gateway 패키지는 없다 - ChatController가 이 값을 요청마다 직접 읽어 ChatService에 넘긴다.
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
         # embedding(RAG): Anthropic은 임베딩 모델을 제공하지 않아 chat과 별개로 정해야 한다
-        # (net.dstone.ai.rag.embedding.EmbeddingProvider 참고). 이 환경엔 OpenAI 키 대신 로컬 Ollama를
-        # 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/14.ollama.md.
+        # (net.dstone.ai.api.service.RagService.requireVectorStore() 참고). 이 환경엔 OpenAI 키 대신
+        # 로컬 Ollama를 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/14.ollama.md.
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
@@ -142,8 +143,9 @@ dstone:
             versions:
                 sample-system: v1
                 #oracle-to-postgresql: v1
-        # RAG(Phase 2): 이 값이 true여야 rag.ingest/rag.embedding/rag.retrieval 빈과
-        # RagController, ChatController의 ragEnabled 옵션이 활성화된다(net.dstone.ai.rag 패키지 참고).
+        # RAG(Phase 2): 이 값이 true여야 net.dstone.ai.api.service.RagService의 메서드들과
+        # RagController, ChatController의 ragEnabled 옵션이 실제로 동작한다(RagService.
+        # requireVectorStore() 참고 - RagController/RagService 빈 자체는 이 값과 무관하게 항상 존재).
         # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 Postgres/pgvector/임베딩 설정
         # 없이도 그대로 기동된다.
         rag:
@@ -157,7 +159,9 @@ dstone:
                 # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
                 similarity-threshold: 0.35
         # governance.auth(Phase 4): API Key 인증. enabled=false(기본값)면 이전 Phase와 동일하게
-        # 인증 없이 전부 통과한다(net.dstone.ai.governance.auth.ApiKeyProperties 참고).
+        # 인증 없이 전부 통과한다(net.dstone.ai.common.filter.ApiKeyAuthFilter 참고 - 예전에 바인딩을
+        # 전담하던 ApiKeyProperties 클래스는 2026-09-14에 삭제됐고, ConfigProperty.getListProperty()가
+        # 직접 List<Map>으로 바인딩해준다).
         # 켤 때는 headerName과 keys를 아래처럼 채운다 - key는 DB 패스워드와 동일한 컨벤션으로
         # ENC(...) 암호화를 권장한다(생성법은 이 파일 위쪽 anthropic.api-key 주석 참고).
         governance:
@@ -171,9 +175,11 @@ dstone:
                 #       caller: another-caller
             # governance.ratelimit(Phase 4): caller별(governance.auth가 꺼져 있으면 클라이언트 IP별)
             # 요청 개수 제한. enabled=false(기본값)면 이전과 동일하게 제한 없이 전부 통과한다
-            # (net.dstone.ai.governance.ratelimit.RateLimitProperties 참고). enabled=true인데 Redis가
-            # 꺼져 있으면(spring.data.redis.enabled=false) 기동이 실패한다 - rate limit은 Redis 고정
-            # 윈도우 카운터가 필요하다(RateLimiter 참고, 윈도우 경계에서 최대 2배까지 허용될 수 있는
+            # (net.dstone.ai.common.filter.RateLimitFilter 참고 - 예전에 있던 RateLimitProperties/
+            # RateLimiter 클래스는 2026-09-14에 삭제됐고, 이 필터 안에 직접 구현돼 있다). enabled=true인데
+            # Redis가 꺼져 있으면(spring.data.redis.enabled=false) 기동 시점이 아니라 그 요청을 처음
+            # 받는 시점에 IllegalStateException으로 실패한다 - rate limit은 Redis 고정 윈도우 카운터가
+            # 필요하다(RateLimitFilter.increment() 참고, 윈도우 경계에서 최대 2배까지 허용될 수 있는
             # 알려진 한계가 있음).
             ratelimit:
                 enabled: false

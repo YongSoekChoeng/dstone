@@ -19,15 +19,18 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.observability.usage.* 설정을 읽어온다(Phase 4, observability). enabled의 기본값은
- * true다 - 이 기능은 로그 한 줄 남기는 게 전부라 외부 인프라에 기대는 것도 없고 부작용도 없어서,
- * governance.auth/ratelimit/guardrail.pii처럼 옵트인(기본 false)으로 두지 않고, dstone-ai-engine의
- * 기존 AOP 로깅(ConfigAspect)과 마찬가지로 기본으로 켜뒀다.
+ * dstone.ai.observability.usage.* 설정을 읽어온다(설정 키 이름만 observability이고, 실제로는
+ * governance.usage 패키지 - UsageLoggingAdvisor 참고). enabled의 기본값은 true다 - 이 기능은 로그
+ * 한 줄 남기는 게 전부라 외부 인프라에 기대는 것도 없고 부작용도 없어서, governance.guardrail.pii나
+ * common.filter의 인증/rate limit처럼 옵트인(기본 false)으로 두지 않고, dstone-ai-engine의 기존 AOP
+ * 로깅(ConfigAspect)과 마찬가지로 기본으로 켜뒀다.
  *
- * pricing은 리스트-오브-오브젝트(YAML 시퀀스)라서 ApiKeyProperties.keys나
- * RateLimitProperties.overrides와 같은 이유로 Binder를 직접 쓴다. 가격표에 없는 model이 나와도
- * 에러를 내지 않고 "비용 unknown"으로 처리하는데, 가격은 provider가 수시로 바꾸는 값이라 이
- * 모듈이 강제로 맞춰둘 수 없기 때문이다.
+ * pricing은 model당 단가 2개를 갖는 UsagePricing 레코드의 리스트(YAML 시퀀스)라서, 이 클래스만 아직
+ * Binder를 직접 쓴다 - ConfigProperty.getListProperty()는 List&lt;Object&gt;(사실상 List&lt;Map&gt;)만
+ * 돌려주지, 이렇게 특정 레코드 타입으로 바로 바인딩해주지는 않는다(common.filter의
+ * ApiKeyAuthFilter/RateLimitFilter는 Map을 그대로 다뤄도 충분해서 getListProperty()로 바꿀 수
+ * 있었지만, 이 클래스는 그럴 수 없다). 가격표에 없는 model이 나와도 에러를 내지 않고 "비용 unknown"
+ * 으로 처리하는데, 가격은 provider가 수시로 바꾸는 값이라 이 모듈이 강제로 맞춰둘 수 없기 때문이다.
  */
 @Component
 public class UsageProperties extends BaseObject {

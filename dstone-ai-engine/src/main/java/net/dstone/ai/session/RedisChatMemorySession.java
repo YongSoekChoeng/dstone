@@ -23,7 +23,8 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Spring AI의 ChatMemoryRepository SPI를, dstone-common의 Redis 인프라(net.dstone.ai.config. ConfigRedis가 제공하는 RedisTemplate)를 써서 직접 구현한 것이다. 
+ * Spring AI의 ChatMemoryRepository SPI를, dstone-common의 Redis 인프라(net.dstone.ai.common.config.
+ * ConfigRedis가 제공하는 RedisTemplate)를 써서 직접 구현한 것이다.
  * Spring AI가 공식으로 제공하는 chat-memory-repository는 jdbc/cassandra/neo4j뿐이라 Redis용은 없어서(2026-09 기준 spring-ai 1.1.8) 직접 만들었다.
  *
  * 대화 하나당 Redis List를 하나씩 쓴다(키: dstone:ai:session:{conversationId}). 여기에 메시지를

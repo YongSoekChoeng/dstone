@@ -8,10 +8,13 @@ import jakarta.servlet.http.HttpServletRequest;
  * 다시 파싱하지 않고 여기서 바로 꺼내 쓸 수 있다. dstone.ai.governance.auth.enabled=false면 애초에
  * 인증 자체를 거치지 않으므로 항상 비어있다.
  *
- * governance(Phase 4: Guardrail, PII 필터, rate limit, 비용 트래킹, 인증/인가) 전체를 놓고 보면,
- * "누가 호출했는지"를 아는 게 다른 기능들보다 먼저 필요해서 auth를 가장 먼저 만들었고, 이 클래스가
- * 그 연결 지점 역할을 한다. governance.ratelimit 패키지(caller별 요청 제한)가 이 값을 쓰는 첫 번째
- * 사례다.
+ * Phase 4 전체(API Key 인증, caller별 rate limit, PII Guardrail, 사용량 로깅)를 놓고 보면, "누가
+ * 호출했는지"를 아는 게 다른 기능들보다 먼저 필요해서 인증을 가장 먼저 만들었고, 이 클래스가 그
+ * 연결 지점 역할을 한다. 같은 common.filter 패키지의 RateLimitFilter(caller별 요청 제한)가 이 값을
+ * 쓰는 첫 번째 사례다. (2026-09-14 리팩터링으로 이 클래스와 ApiKeyAuthFilter/RateLimitFilter는
+ * governance.auth/governance.ratelimit 패키지에서 common.context/common.filter로 옮겨왔다 - 아래
+ * REQUEST_ATTRIBUTE/ADVISOR_CONTEXT_KEY 문자열 값 자체는 하위 호환을 위해 옛 패키지명을 그대로
+ * 쓰고 있을 뿐, 실제 클래스 위치와는 무관하다.)
  */
 public final class CallerContext {
 

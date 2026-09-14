@@ -14,7 +14,7 @@ import java.util.Map;
  * message와 비슷한 문서 조각을 찾아 QuestionAnswerAdvisor가 자동으로 컨텍스트에 끼워 넣어준다.
  * 검색 결과만 따로 확인해보고 싶을 때는 /api/ai/rag/search를 쓰면 된다.
  *
- * toolsEnabled를 true로 보내면(Phase 3) net.dstone.ai.config.ConfigTool에 등록된 Tool들을
+ * toolsEnabled를 true로 보내면(Phase 3) net.dstone.ai.common.config.ConfigTool에 등록된 Tool들을
  * ChatClient에 붙여준다. 실제로 어떤 Tool을 언제, 몇 번 호출할지는 사람이 미리 정해두는 게 아니라
  * LLM과 Spring AI의 ChatClient가 대화를 주고받으며 그때그때 알아서 판단한다(tool_choice=auto).
  *

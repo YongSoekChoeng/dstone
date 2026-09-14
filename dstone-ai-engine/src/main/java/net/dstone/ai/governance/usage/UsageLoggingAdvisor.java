@@ -20,17 +20,18 @@ import net.dstone.common.utils.LogUtil;
  * dstone.ai.observability.usage.enabled=true(기본값)일 때, 호출 한 번마다 사용량/비용/지연시간을
  * 로그 한 줄로 남겨주는 CallAdvisor다.
  *
- * config.ConfigChatClient가 ChatClient.Builder에 .defaultAdvisors(...)로 이 빈을 등록한다.
+ * common.config.ConfigChatClient가 ChatClient.Builder에 .defaultAdvisors(...)로 이 빈을 등록한다.
  *
  * order는 Ordered.HIGHEST_PRECEDENCE로 잡아서 advisor 체인에서 가장 바깥쪽에 둔다 - 그래야
- * governance.guardrail 패키지의 PiiGuardrailAdvisor가 하는 PII 마스킹, ChatMemory의 히스토리
- * 조회/저장, 그리고 실제 LLM 호출까지 전부 감싸서 "이 요청 전체"의 지연시간을 정확하게 잴 수 있다.
- * guardrail이 REJECT로 체인 중간에서 예외를 던지는 경우도 실패로 따로 로깅해준다.
+ * 같은 governance 밑의 guardrail 패키지의 PiiGuardrailAdvisor가 하는 PII 마스킹, ChatMemory의
+ * 히스토리 조회/저장, 그리고 실제 LLM 호출까지 전부 감싸서 "이 요청 전체"의 지연시간을 정확하게 잴
+ * 수 있다. guardrail이 REJECT로 체인 중간에서 예외를 던지는 경우도 실패로 따로 로깅해준다.
  *
- * observability 패키지 안에서 토큰 사용량/비용/지연시간 로깅은 이 클래스(usage 하위 패키지)가
- * 맡고 있다. Eval(품질 평가) 결과를 로깅하는 기능은 아직 없다 - 평가 데이터셋이나 채점 로직처럼
- * 이 모듈에 없는 전제가 먼저 갖춰져야 하므로, 구체적인 요구가 생기면 그때 별도 하위 패키지로
- * 시작하면 된다.
+ * 별도의 observability 패키지가 있는 게 아니라, 토큰 사용량/비용/지연시간 로깅은 governance.usage
+ * 패키지(이 클래스가 속한 패키지)가 맡고 있다 - 설정 프리픽스만 dstone.ai.observability.usage.*로
+ * 남아있다(관측성 관련 설정이라는 의미로 붙인 이름일 뿐, 실제 Java 패키지 위치와는 무관하다).
+ * Eval(품질 평가) 결과를 로깅하는 기능은 아직 없다 - 평가 데이터셋이나 채점 로직처럼 이 모듈에 없는
+ * 전제가 먼저 갖춰져야 하므로, 구체적인 요구가 생기면 그때 별도 하위 패키지로 시작하면 된다.
  */
 @Component
 public class UsageLoggingAdvisor implements CallAdvisor {
