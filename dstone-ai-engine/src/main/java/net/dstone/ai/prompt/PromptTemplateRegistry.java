@@ -2,6 +2,7 @@ package net.dstone.ai.prompt;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.core.io.Resource;
@@ -34,13 +35,16 @@ public class PromptTemplateRegistry extends BaseObject {
 
 	private PromptTemplate template(String name) {
 		String version = this.promptProperties.versionOf(name);
-		return this.cache.computeIfAbsent(name + "@" + version, key -> {
-			String path = "classpath:prompts/" + name + "/" + version + ".st";
-			Resource resource = this.resourceLoader.getResource(path);
-			if (!resource.exists()) {
-				throw new IllegalArgumentException("프롬프트 템플릿을 찾을 수 없습니다: " + path);
+		return this.cache.computeIfAbsent(name + "@" + version, new Function<String, PromptTemplate>() {
+			@Override
+			public PromptTemplate apply(String key) {
+				String path = "classpath:prompts/" + name + "/" + version + ".st";
+				Resource resource = PromptTemplateRegistry.this.resourceLoader.getResource(path);
+				if (!resource.exists()) {
+					throw new IllegalArgumentException("프롬프트 템플릿을 찾을 수 없습니다: " + path);
+				}
+				return new PromptTemplate(resource);
 			}
-			return new PromptTemplate(resource);
 		});
 	}
 

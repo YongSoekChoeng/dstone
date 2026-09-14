@@ -52,14 +52,17 @@ public class ProcessJobService extends BaseService {
 		String sessionId = UUID.randomUUID().toString();
 		this.writeState(jobId, "RUNNING", null, null);
 
-		CompletableFuture.runAsync(() -> {
-			try {
-				String providerId = this.configProperty.getProperty("spring.ai.model.chat");
-				String result = this.chatService.chat(sessionId, caller, providerId, request);
-				this.writeState(jobId, "DONE", result, null);
-			}
-			catch (Exception e) {
-				this.writeState(jobId, "FAILED", null, e.getMessage());
+		CompletableFuture.runAsync(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					String providerId = ProcessJobService.this.configProperty.getProperty("spring.ai.model.chat");
+					String result = ProcessJobService.this.chatService.chat(sessionId, caller, providerId, request);
+					ProcessJobService.this.writeState(jobId, "DONE", result, null);
+				}
+				catch (Exception e) {
+					ProcessJobService.this.writeState(jobId, "FAILED", null, e.getMessage());
+				}
 			}
 		});
 

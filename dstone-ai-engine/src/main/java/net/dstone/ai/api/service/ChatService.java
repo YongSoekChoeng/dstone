@@ -1,6 +1,7 @@
 package net.dstone.ai.api.service;
 
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -140,7 +141,12 @@ public class ChatService extends BaseService {
 		ChatClient.ChatClientRequestSpec spec = chatClient.prompt(); 
 		
 		// 2. 요청 스펙 - 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치
-		spec = spec.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
+		spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>() {
+			@Override
+			public void accept(ChatClient.AdvisorSpec a) {
+				a.param(ChatMemory.CONVERSATION_ID, sessionId);
+			}
+		});
 
 		// 3. 요청 스펙 - 시스템 프롬프트로 적용
 		if (!StringUtil.isEmpty(promptName)) {
@@ -160,7 +166,12 @@ public class ChatService extends BaseService {
 
 		// 6. 요청 스펙 - 사용량 로깅 적용
 		if (caller != null) {
-			spec = spec.advisors(a -> a.param(CallerContext.ADVISOR_CONTEXT_KEY, caller));
+			spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>() {
+				@Override
+				public void accept(ChatClient.AdvisorSpec a) {
+					a.param(CallerContext.ADVISOR_CONTEXT_KEY, caller);
+				}
+			});
 		}
 		
 		return spec;

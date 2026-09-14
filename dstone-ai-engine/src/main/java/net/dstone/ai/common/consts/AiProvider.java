@@ -36,11 +36,13 @@ public enum AiProvider {
 	}
 
 	public static AiProvider fromPropertyValue(String propertyValue) {
-		return Arrays.stream(values())
-				.filter(provider -> provider.propertyValue.equals(propertyValue))
-				.findFirst()
-				.orElseThrow(() -> new IllegalArgumentException(
-						"지원하지 않는 spring.ai.model.chat 값입니다: [" + propertyValue + "], 지원값: " + Arrays.toString(values())));
+		for (AiProvider provider : values()) {
+			if (provider.propertyValue.equals(propertyValue)) {
+				return provider;
+			}
+		}
+		throw new IllegalArgumentException(
+				"지원하지 않는 spring.ai.model.chat 값입니다: [" + propertyValue + "], 지원값: " + Arrays.toString(values()));
 	}
 
 }

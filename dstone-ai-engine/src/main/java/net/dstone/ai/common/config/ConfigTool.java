@@ -1,6 +1,6 @@
 package net.dstone.ai.common.config;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -69,9 +69,13 @@ public class ConfigTool extends BaseObject {
 		if (allowedToolNames == null) {
 			return this.toolCallbackProvider;
 		}
-		ToolCallback[] filtered = Arrays.stream(this.toolCallbackProvider.getToolCallbacks())
-			.filter(callback -> allowedToolNames.contains(callback.getToolDefinition().name()))
-			.toArray(ToolCallback[]::new);
+		List<ToolCallback> filteredList = new ArrayList<>();
+		for (ToolCallback callback : this.toolCallbackProvider.getToolCallbacks()) {
+			if (allowedToolNames.contains(callback.getToolDefinition().name())) {
+				filteredList.add(callback);
+			}
+		}
+		ToolCallback[] filtered = filteredList.toArray(new ToolCallback[0]);
 		return ToolCallbackProvider.from(filtered);
 	}
 
@@ -102,19 +106,32 @@ public class ConfigTool extends BaseObject {
 	@SuppressWarnings("rawtypes")
 	private List<String> parseTools(Object toolsValue) {
 		if (toolsValue instanceof List<?> toolsList) {
-			return toolsList.stream().map(String::valueOf).toList();
+			List<String> result = new ArrayList<>(toolsList.size());
+			for (Object item : toolsList) {
+				result.add(String.valueOf(item));
+			}
+			return result;
 		}
 		if (toolsValue instanceof String toolsString) {
-			return toolsString.isBlank() ? List.of()
-				: Arrays.stream(toolsString.split(",")).map(String::trim).toList();
+			if (toolsString.isBlank()) {
+				return List.of();
+			}
+			String[] parts = toolsString.split(",");
+			List<String> result = new ArrayList<>(parts.length);
+			for (String part : parts) {
+				result.add(part.trim());
+			}
+			return result;
 		}
 		return List.of();
 	}
 
 	public List<String> toolNames() {
-		return Arrays.stream(this.toolCallbackProvider.getToolCallbacks())
-			.map(toolCallback -> toolCallback.getToolDefinition().name())
-			.toList();
+		List<String> names = new ArrayList<>();
+		for (ToolCallback toolCallback : this.toolCallbackProvider.getToolCallbacks()) {
+			names.add(toolCallback.getToolDefinition().name());
+		}
+		return names;
 	}
 
 }

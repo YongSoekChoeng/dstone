@@ -1,11 +1,11 @@
 package net.dstone.ai.process;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,9 +74,10 @@ public class ProcessExecutor extends BaseObject {
 	public String run(String name, String sessionId, String caller, Map<String, Object> variables,
 			String userMessage) {
 		ProcessDefinition definition = this.processRegistry.resolve(name);
-		Map<String, ProcessStep> stepsById = definition.steps()
-			.stream()
-			.collect(Collectors.toMap(ProcessStep::id, step -> step, (a, b) -> a, LinkedHashMap::new));
+		Map<String, ProcessStep> stepsById = new LinkedHashMap<>();
+		for (ProcessStep step : definition.steps()) {
+			stepsById.put(step.id(), step);
+		}
 		int maxIterations = definition.maxIterations() == null ? DEFAULT_MAX_ITERATIONS : definition.maxIterations();
 
 		String previousResult = userMessage;
@@ -98,8 +99,21 @@ public class ProcessExecutor extends BaseObject {
 			boolean success;
 			if (group.size() > 1) {
 				Map<String, StepResult> results = this.runParallel(group, sessionId, caller, variables, previousResult);
-				previousResult = results.values().stream().map(StepResult::text).collect(Collectors.joining("\n"));
-				success = results.values().stream().allMatch(StepResult::success);
+				StringBuilder combinedText = new StringBuilder();
+				boolean allSuccess = true;
+				boolean first = true;
+				for (StepResult result : results.values()) {
+					if (!first) {
+						combinedText.append("\n");
+					}
+					combinedText.append(result.text());
+					first = false;
+					if (!result.success()) {
+						allSuccess = false;
+					}
+				}
+				previousResult = combinedText.toString();
+				success = allSuccess;
 				step = group.get(group.size() - 1); // 다음 step 결정은 그룹의 마지막 step 기준
 			}
 			else {
@@ -157,7 +171,14 @@ public class ProcessExecutor extends BaseObject {
 	private String runRagStep(String caller, String previousResult) {
 		List<RetrievedChunk> chunks = this.ragService.search(new RagSearchRequest(previousResult, null, null, null),
 			caller);
-		return chunks.stream().map(RetrievedChunk::text).collect(Collectors.joining("\n---\n"));
+		StringBuilder combined = new StringBuilder();
+		for (int i = 0; i < chunks.size(); i++) {
+			if (i > 0) {
+				combined.append("\n---\n");
+			}
+			combined.append(chunks.get(i).text());
+		}
+		return combined.toString();
 	}
 
 	/**
@@ -169,11 +190,17 @@ public class ProcessExecutor extends BaseObject {
 	 */
 	private StepResult runToolStep(ProcessStep step, String caller, Map<String, Object> variables,
 			String previousResult) {
-		ToolCallback callback = Arrays.stream(this.configTool.toolCallbackProvider(caller).getToolCallbacks())
-			.filter(tc -> tc.getToolDefinition().name().equals(step.ref()))
-			.findFirst()
-			.orElseThrow(() -> new IllegalStateException(
-				"caller[" + caller + "]가 쓸 수 있는 Tool 중 '" + step.ref() + "'가 없습니다(화이트리스트 또는 이름을 확인하십시오)."));
+		ToolCallback callback = null;
+		for (ToolCallback candidate : this.configTool.toolCallbackProvider(caller).getToolCallbacks()) {
+			if (candidate.getToolDefinition().name().equals(step.ref())) {
+				callback = candidate;
+				break;
+			}
+		}
+		if (callback == null) {
+			throw new IllegalStateException(
+				"caller[" + caller + "]가 쓸 수 있는 Tool 중 '" + step.ref() + "'가 없습니다(화이트리스트 또는 이름을 확인하십시오).");
+		}
 		// ToolCallback.call()의 원본 반환값은 순수 텍스트가 아니라 Spring AI의
 		// DefaultToolCallResultConverter가 JSON으로 감싼 값이다(String 리턴 타입도 예외 없이
 		// JsonHelper.toJson()을 거치므로, 실제로는 "실패: ..."가 아니라 "\"실패: ...\""가 온다) - LLM이
@@ -219,19 +246,32 @@ public class ProcessExecutor extends BaseObject {
 		if (StringUtil.isEmpty(step.parallelGroup())) {
 			return List.of(step);
 		}
-		return steps.stream().filter(candidate -> step.parallelGroup().equals(candidate.parallelGroup())).toList();
+		List<ProcessStep> group = new ArrayList<>();
+		for (ProcessStep candidate : steps) {
+			if (step.parallelGroup().equals(candidate.parallelGroup())) {
+				group.add(candidate);
+			}
+		}
+		return group;
 	}
 
 	private Map<String, StepResult> runParallel(List<ProcessStep> group, String sessionId, String caller,
 			Map<String, Object> variables, String previousResult) {
 		Map<String, CompletableFuture<StepResult>> futures = new LinkedHashMap<>();
 		for (ProcessStep step : group) {
-			futures.put(step.id(),
-				CompletableFuture.supplyAsync(() -> this.runStep(step, sessionId, caller, variables, previousResult)));
+			final ProcessStep currentStep = step;
+			futures.put(step.id(), CompletableFuture.supplyAsync(new Supplier<StepResult>() {
+				@Override
+				public StepResult get() {
+					return ProcessExecutor.this.runStep(currentStep, sessionId, caller, variables, previousResult);
+				}
+			}));
 		}
 		CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
 		Map<String, StepResult> results = new LinkedHashMap<>();
-		futures.forEach((id, future) -> results.put(id, future.join()));
+		for (Map.Entry<String, CompletableFuture<StepResult>> entry : futures.entrySet()) {
+			results.put(entry.getKey(), entry.getValue().join());
+		}
 		return results;
 	}
 

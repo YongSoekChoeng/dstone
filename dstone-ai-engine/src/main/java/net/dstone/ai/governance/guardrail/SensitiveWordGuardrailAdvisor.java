@@ -1,5 +1,7 @@
 package net.dstone.ai.governance.guardrail;
 
+import java.util.function.Function;
+
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
@@ -67,7 +69,12 @@ public class SensitiveWordGuardrailAdvisor implements CallAdvisor {
 		}
 
 		LogUtil.sysout("dstone-ai-engine governance: sensitive-word 탐지(MASK) - 단어=" + result.matchedWords());
-		Prompt maskedPrompt = request.prompt().augmentUserMessage(um -> new UserMessage(result.maskedText()));
+		Prompt maskedPrompt = request.prompt().augmentUserMessage(new Function<UserMessage, UserMessage>() {
+			@Override
+			public UserMessage apply(UserMessage um) {
+				return new UserMessage(result.maskedText());
+			}
+		});
 		return chain.nextCall(request.mutate().prompt(maskedPrompt).build());
 	}
 

@@ -1,5 +1,6 @@
 package net.dstone.ai.api.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.ai.chat.client.advisor.api.Advisor;
@@ -118,7 +119,11 @@ public class RagService extends BaseService {
 			builder.filterExpression(filter);
 		}
 		List<Document> documents = vectorStore.similaritySearch(builder.build());
-		return documents.stream().map(doc -> new RetrievedChunk(doc.getText(), doc.getMetadata(), doc.getScore())).toList();
+		List<RetrievedChunk> retrieved = new ArrayList<>(documents.size());
+		for (Document doc : documents) {
+			retrieved.add(new RetrievedChunk(doc.getText(), doc.getMetadata(), doc.getScore()));
+		}
+		return retrieved;
 	}
 
 	/**
@@ -143,15 +148,14 @@ public class RagService extends BaseService {
 
 		List<Document> extracted = new TikaDocumentReader(resource).get();
 		List<Document> chunks = textSplitter.apply(extracted);
-		List<Document> tagged = chunks.stream()
-			.map(chunk -> {
-				var mutator = chunk.mutate().metadata(SOURCE_ID_METADATA_KEY, sourceId);
-				if (!StringUtil.isEmpty(caller)) {
-					mutator.metadata(TENANT_METADATA_KEY, caller);
-				}
-				return mutator.build();
-			})
-			.toList();
+		List<Document> tagged = new ArrayList<>(chunks.size());
+		for (Document chunk : chunks) {
+			var mutator = chunk.mutate().metadata(SOURCE_ID_METADATA_KEY, sourceId);
+			if (!StringUtil.isEmpty(caller)) {
+				mutator.metadata(TENANT_METADATA_KEY, caller);
+			}
+			tagged.add(mutator.build());
+		}
 
 		if (tagged.isEmpty()) {
 			// 텍스트 추출/청킹 결과가 비어 있으면 아무 것도 하지 않는다 - 여기서도 기존 청크를 지워버리면

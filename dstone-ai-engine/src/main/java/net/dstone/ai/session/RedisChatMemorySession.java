@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -59,7 +58,11 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		if (members == null) {
 			return List.of();
 		}
-		return members.stream().map(Object::toString).collect(Collectors.toList());
+		List<String> conversationIds = new ArrayList<>(members.size());
+		for (Object member : members) {
+			conversationIds.add(member.toString());
+		}
+		return conversationIds;
 	}
 
 	@Override
@@ -80,7 +83,10 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		String key = conversationKey(conversationId);
 		this.redisTemplate.delete(key);
 		if (messages != null && !messages.isEmpty()) {
-			List<Object> serialized = messages.stream().map(this::toJson).collect(Collectors.toList());
+			List<Object> serialized = new ArrayList<>(messages.size());
+			for (Message message : messages) {
+				serialized.add(this.toJson(message));
+			}
 			this.redisTemplate.opsForList().rightPushAll(key, serialized);
 			this.redisTemplate.expire(key, this.ttlSeconds, TimeUnit.SECONDS);
 			this.redisTemplate.opsForSet().add(INDEX_KEY, conversationId);

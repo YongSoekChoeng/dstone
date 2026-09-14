@@ -4,7 +4,10 @@
       "PowerShell(wsl -d Ubuntu ls /app/dstone/)",
       "PowerShell(wsl -d Ubuntu -u root mkdir /app/dstone/docs)",
       "PowerShell(wsl -d Ubuntu -u root chmod 777 /app/dstone/docs)",
-      "PowerShell(wsl -d Ubuntu ls -la /app/dstone/docs/)"
+      "PowerShell(wsl -d Ubuntu ls -la /app/dstone/docs/)",
+      "PowerShell(Test-NetConnection *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(Get-Process *)"
     ]
   }
 }
