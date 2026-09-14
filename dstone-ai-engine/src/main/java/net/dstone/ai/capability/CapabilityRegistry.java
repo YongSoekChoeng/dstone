@@ -45,9 +45,12 @@ public class CapabilityRegistry extends BaseObject {
 
 		Map<String, CapabilityDefinition> resolved = new HashMap<>();
 		for (CapabilityDefinition definition : definitions) {
-			if (StringUtil.isEmpty(definition.name()) || StringUtil.isEmpty(definition.promptName())) {
+			// processName이 있으면(Phase 6) ChatService가 단일 호출을 아예 안 쓰므로 promptName은
+			// 필요 없다 - 그래서 "promptName 필수"가 아니라 "둘 중 하나는 있어야 한다"로 완화한다.
+			if (StringUtil.isEmpty(definition.name())
+					|| (StringUtil.isEmpty(definition.promptName()) && StringUtil.isEmpty(definition.processName()))) {
 				throw new IllegalStateException(
-					PREFIX + ".definitions 항목은 name과 prompt-name이 둘 다 있어야 합니다: " + definition);
+					PREFIX + ".definitions 항목은 name이 있어야 하고, prompt-name/process-name 중 하나는 있어야 합니다: " + definition);
 			}
 			resolved.put(definition.name(), definition);
 		}
@@ -57,11 +60,21 @@ public class CapabilityRegistry extends BaseObject {
 			+ (this.byName.isEmpty() ? "없음" : this.byName.keySet()));
 	}
 
-	/** 모르는 이름이 오면 그건 요청이 잘못된 것이니, 조용히 넘어가지 않고 바로 에러로 알려준다. */
-	public CapabilityDefinition resolve(String name) {
+	/**
+	 * 모르는 이름이 오면 그건 요청이 잘못된 것이니, 조용히 넘어가지 않고 바로 에러로 알려준다.
+	 * caller(=tenant_id)는 이 capability의 allowedCallers 화이트리스트 검사에 쓰인다 - 화이트리스트가
+	 * 비어있는 capability는 caller가 null(governance.auth가 꺼져있는 배포)이어도 그대로 통과한다.
+	 */
+	public CapabilityDefinition resolve(String name, String caller) {
 		CapabilityDefinition definition = this.byName.get(name);
 		if (definition == null) {
 			throw new IllegalArgumentException("등록되지 않은 capability입니다: " + name);
+		}
+		List<String> allowedCallers = definition.allowedCallers();
+		if (allowedCallers != null && !allowedCallers.isEmpty()
+				&& (caller == null || !allowedCallers.contains(caller))) {
+			throw new IllegalArgumentException(
+				"capability[" + name + "]는 caller[" + caller + "]에게 허용되지 않았습니다.");
 		}
 		return definition;
 	}

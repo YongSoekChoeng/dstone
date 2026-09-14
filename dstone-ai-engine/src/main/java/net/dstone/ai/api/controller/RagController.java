@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.ai.api.dto.IngestResponse;
 import net.dstone.ai.api.dto.RagSearchRequest;
 import net.dstone.ai.api.dto.RetrievedChunk;
 import net.dstone.ai.api.service.RagService;
+import net.dstone.ai.common.context.CallerContext;
 import net.dstone.common.biz.BaseController;
 
 /**
@@ -35,18 +37,19 @@ public class RagController extends BaseController {
 	RagService ragService;
 
 	@PostMapping("/documents")
-	public IngestResponse ingest(@RequestParam("file") MultipartFile file, @RequestParam("sourceId") String sourceId) {
-		return this.ragService.ingest(file.getResource(), sourceId);
+	public IngestResponse ingest(@RequestParam("file") MultipartFile file, @RequestParam("sourceId") String sourceId,
+			HttpServletRequest servletRequest) {
+		return this.ragService.ingest(file.getResource(), sourceId, CallerContext.get(servletRequest));
 	}
 
 	@DeleteMapping("/documents/{sourceId}")
-	public void delete(@PathVariable String sourceId) {
-		this.ragService.deleteBySourceId(sourceId);
+	public void delete(@PathVariable String sourceId, HttpServletRequest servletRequest) {
+		this.ragService.deleteBySourceId(sourceId, CallerContext.get(servletRequest));
 	}
 
 	@PostMapping("/search")
-	public List<RetrievedChunk> search(@RequestBody RagSearchRequest request) {
-		return this.ragService.search(request);
+	public List<RetrievedChunk> search(@RequestBody RagSearchRequest request, HttpServletRequest servletRequest) {
+		return this.ragService.search(request, CallerContext.get(servletRequest));
 	}
 
 }

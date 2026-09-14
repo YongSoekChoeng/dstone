@@ -48,7 +48,13 @@ public class ConfigProperty extends BaseObject{
 	}
 
 	/**
-	 * 리스트 형식의 건을 조회. 주의)값은 제네릭 타입 정보가 없어 Object 기반으로 처리됨.
+	 * 리스트 형식의 건을 조회. YAML 시퀀스의 각 항목이 중첩 맵(예: {@code - key: ..., caller: ...})인
+	 * 경우를 위한 것이라 원소 타입은 Map으로 바인딩한다(호출부는 전부 List&lt;Map&gt;만 다룬다 - 예:
+	 * net.dstone.ai.common.filter.ApiKeyAuthFilter/RateLimitFilter). 원소 타입을 Object로 두면
+	 * Spring의 Binder가 중첩 맵을 JavaBean 프로퍼티로 취급해 바인딩을 시도하다가 "unbound children"
+	 * 오류로 실패한다(Object에는 caller/key 같은 setter가 없기 때문) - 원소를 그냥 Map으로 두면
+	 * Binder가 Map을 잘 알려진 집합 타입으로 인식해 각 키를 그대로 채워준다. 값은 제네릭 타입 정보가
+	 * 없어 Object 기반으로 처리됨.
 	 * @param key
 	 * @return
 	 */
@@ -57,7 +63,7 @@ public class ConfigProperty extends BaseObject{
 	    return Binder.get(env)
 	    	.bind(
 	            key,
-	            Bindable.listOf(Object.class)
+	            Bindable.listOf(Map.class)
 	        )
 	        .orElseGet(ArrayList::new);
 	}

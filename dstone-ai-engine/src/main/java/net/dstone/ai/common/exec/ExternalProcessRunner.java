@@ -1,0 +1,70 @@
+package net.dstone.ai.common.exec;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * tools.shell.ShellExecTool/tools.python.PythonExecTool이 공유하는 "OS 프로세스 하나를 안전하게
+ * 실행하고 텍스트로 결과를 돌려주는" 로직이다 - 두 Tool 다 같은 위험(임의 실행 시간, 무한 출력, 멈춘
+ * 프로세스)을 안고 있어서, 각자 따로 구현하는 대신 여기 하나로 모았다.
+ *
+ * ProcessBuilder(command)는 셸을 거치지 않고 OS에 프로세스를 직접 실행시키므로(/bin/sh -c로 감싸지
+ * 않음), command 리스트의 각 원소에 `;`/`&&`/`|` 같은 셸 메타문자가 들어있어도 셸 문법으로 해석되지
+ * 않고 그 프로세스의 단순 인자 문자열로만 전달된다 - LLM이 만든 인자값이라도 명령 주입으로 이어지지
+ * 않는 이유다. 대신 command[0](실행 파일 경로) 자체는 반드시 호출부가 화이트리스트로 확정한 값이어야
+ * 한다(이 클래스는 그 검증을 하지 않는다 - 화이트리스트 검사는 호출부 책임).
+ */
+public final class ExternalProcessRunner {
+
+	private ExternalProcessRunner() {
+	}
+
+	public static String run(List<String> command, Duration timeout, int maxOutputChars) {
+		Process process;
+		try {
+			process = new ProcessBuilder(command).redirectErrorStream(true).start();
+		}
+		catch (IOException e) {
+			return "실패: 프로세스를 시작하지 못했습니다 - " + e.getMessage();
+		}
+
+		StringBuilder output = new StringBuilder();
+		try (BufferedReader reader = new BufferedReader(
+				new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+			String line;
+			while ((line = reader.readLine()) != null) {
+				if (output.length() < maxOutputChars) {
+					output.append(line).append('\n');
+				}
+			}
+		}
+		catch (IOException e) {
+			// 프로세스가 강제 종료되면 출력 스트림 읽기 중 끊길 수 있다 - 지금까지 모은 출력은 그대로 쓴다.
+		}
+
+		boolean finished;
+		try {
+			finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			process.destroyForcibly();
+			return "실패: 실행이 중단되었습니다.";
+		}
+		if (!finished) {
+			process.destroyForcibly();
+			return "실패: 실행 시간이 초과되었습니다(제한 " + timeout.toSeconds() + "초).";
+		}
+
+		String text = output.length() > maxOutputChars ? output.substring(0, maxOutputChars) + "...(생략)"
+			: output.toString();
+		int exitCode = process.exitValue();
+		return exitCode == 0 ? "통과: " + text : "실패: 종료 코드 " + exitCode + "\n" + text;
+	}
+
+}

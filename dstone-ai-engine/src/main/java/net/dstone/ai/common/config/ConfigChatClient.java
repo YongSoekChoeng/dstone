@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import net.dstone.ai.governance.guardrail.PiiGuardrailAdvisor;
+import net.dstone.ai.governance.guardrail.SensitiveWordGuardrailAdvisor;
 import net.dstone.ai.governance.usage.UsageLoggingAdvisor;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
@@ -48,11 +49,13 @@ public class ConfigChatClient {
 	advisor 체인순서(advisor1, advisor2, advisor3, ...) : 가장 바깥쪽(advisor3)이 먼저 동작하고 순차적으로(advisor2, advisor1)이 동작.
 	*************************************************************************************/
 	@Bean
-	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, UsageLoggingAdvisor usageLoggingAdvisor, PiiGuardrailAdvisor piiGuardrailAdvisor) {
+	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, UsageLoggingAdvisor usageLoggingAdvisor,
+			PiiGuardrailAdvisor piiGuardrailAdvisor, SensitiveWordGuardrailAdvisor sensitiveWordGuardrailAdvisor) {
 		return builder
 			.defaultAdvisors(
-				usageLoggingAdvisor // 사용량기록
+				usageLoggingAdvisor // 사용량기록 + Phase 9 caller별 토큰 쿼터
 				, piiGuardrailAdvisor // 개인정보보호
+				, sensitiveWordGuardrailAdvisor // Phase 9 - 사내 민감 단어 차단
 				, MessageChatMemoryAdvisor.builder(chatMemory).build() // 세션메모리
 			).build();
 	}

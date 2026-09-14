@@ -9,7 +9,9 @@ import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -38,6 +40,7 @@ import net.dstone.common.utils.StringUtil;
 public class RagService extends BaseService {
 
 	private static final String SOURCE_ID_METADATA_KEY = "sourceId";
+	private static final String TENANT_METADATA_KEY = "tenant";
 
 	@Autowired
 	private ObjectProvider<VectorStore> vectorStoreProvider;
@@ -68,25 +71,51 @@ public class RagService extends BaseService {
 		return StringUtil.isEmpty(threshold) ? 0.35 : Double.parseDouble(threshold);
 	}
 
-	/** 선택적원칙: ChatService가 ragEnabled=true인 요청에만 이 Advisor를 붙인다. */
-	public Advisor getRagSpecAdvisor() {
-		VectorStore vectorStore = this.requireVectorStore();
-		SearchRequest searchRequest = SearchRequest.builder()
-			.topK(this.defaultTopK())
-			.similarityThreshold(this.defaultSimilarityThreshold())
-			.build();
-		return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build();
+	/**
+	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐준다. 둘 다 없으면
+	 * null(=필터 없음)을 돌려준다 - caller가 없는 경우(governance.auth가 꺼진 배포)는 기존과 동일하게
+	 * tenant 필터 없이 동작해야 하므로, 이 메서드가 유일하게 "격리를 켤지" 판단하는 지점이다.
+	 */
+	private Filter.Expression buildFilter(String caller, String sourceId) {
+		FilterExpressionBuilder builder = new FilterExpressionBuilder();
+		Op tenantOp = StringUtil.isEmpty(caller) ? null : builder.eq(TENANT_METADATA_KEY, caller);
+		Op sourceOp = StringUtil.isEmpty(sourceId) ? null : builder.eq(SOURCE_ID_METADATA_KEY, sourceId);
+		if (tenantOp != null && sourceOp != null) {
+			return builder.and(tenantOp, sourceOp).build();
+		}
+		if (tenantOp != null) {
+			return tenantOp.build();
+		}
+		if (sourceOp != null) {
+			return sourceOp.build();
+		}
+		return null;
 	}
 
-	public List<RetrievedChunk> search(RagSearchRequest request) {
+	/** 선택적원칙: ChatService가 ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다. */
+	public Advisor getRagSpecAdvisor(String caller) {
+		VectorStore vectorStore = this.requireVectorStore();
+		SearchRequest.Builder requestBuilder = SearchRequest.builder()
+			.topK(this.defaultTopK())
+			.similarityThreshold(this.defaultSimilarityThreshold());
+		Filter.Expression filter = this.buildFilter(caller, null);
+		if (filter != null) {
+			requestBuilder.filterExpression(filter);
+		}
+		return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(requestBuilder.build()).build();
+	}
+
+	/** caller(=tenant_id)의 문서 범위로만 검색을 제한한다 - caller가 없으면(governance.auth 꺼짐) 기존과 동일하게 전체 검색. */
+	public List<RetrievedChunk> search(RagSearchRequest request, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
 		SearchRequest.Builder builder = SearchRequest.builder()
 			.query(request.query())
 			.topK(request.topK() == null ? this.defaultTopK() : request.topK())
 			.similarityThreshold(
 				request.similarityThreshold() == null ? this.defaultSimilarityThreshold() : request.similarityThreshold());
-		if (!StringUtil.isEmpty(request.sourceId())) {
-			builder.filterExpression(new FilterExpressionBuilder().eq(SOURCE_ID_METADATA_KEY, request.sourceId()).build());
+		Filter.Expression filter = this.buildFilter(caller, request.sourceId());
+		if (filter != null) {
+			builder.filterExpression(filter);
 		}
 		List<Document> documents = vectorStore.similaritySearch(builder.build());
 		return documents.stream().map(doc -> new RetrievedChunk(doc.getText(), doc.getMetadata(), doc.getScore())).toList();
@@ -96,8 +125,12 @@ public class RagService extends BaseService {
 	 * 원문을 Tika로 추출 → TokenTextSplitter로 청킹 → VectorStore(pgvector)에 저장한다. sourceId는
 	 * 호출하는 쪽이 정하는 논리적 문서 식별자(파일명, 업무키 등)로, 같은 sourceId로 다시 적재하면
 	 * upsert처럼 동작하도록 새 청크를 넣기 전에 그 sourceId로 색인돼 있던 기존 청크를 먼저 지운다.
+	 *
+	 * caller(=tenant_id)가 있으면 청크마다 tenant metadata를 함께 태깅해서, search()/getRagSpecAdvisor()가
+	 * 같은 caller의 문서만 검색하도록 격리한다 - caller가 없으면(governance.auth 꺼짐) 이전과 동일하게
+	 * tenant 구분 없이 적재된다.
 	 */
-	public IngestResponse ingest(Resource resource, String sourceId) {
+	public IngestResponse ingest(Resource resource, String sourceId, String caller) {
 		if (StringUtil.isEmpty(sourceId)) {
 			throw new IllegalArgumentException("sourceId는 필수입니다(재적재 시 upsert 기준 키로 쓰임).");
 		}
@@ -111,7 +144,13 @@ public class RagService extends BaseService {
 		List<Document> extracted = new TikaDocumentReader(resource).get();
 		List<Document> chunks = textSplitter.apply(extracted);
 		List<Document> tagged = chunks.stream()
-			.map(chunk -> chunk.mutate().metadata(SOURCE_ID_METADATA_KEY, sourceId).build())
+			.map(chunk -> {
+				var mutator = chunk.mutate().metadata(SOURCE_ID_METADATA_KEY, sourceId);
+				if (!StringUtil.isEmpty(caller)) {
+					mutator.metadata(TENANT_METADATA_KEY, caller);
+				}
+				return mutator.build();
+			})
 			.toList();
 
 		if (tagged.isEmpty()) {
@@ -120,14 +159,15 @@ public class RagService extends BaseService {
 			return new IngestResponse(sourceId, 0);
 		}
 
-		this.deleteBySourceId(sourceId);
+		this.deleteBySourceId(sourceId, caller);
 		vectorStore.add(tagged);
 		return new IngestResponse(sourceId, tagged.size());
 	}
 
-	public void deleteBySourceId(String sourceId) {
+	/** sourceId와 caller(=tenant_id) 조건을 함께 걸어 삭제한다 - 다른 tenant가 같은 sourceId를 썼어도 서로의 문서를 지우지 못한다. */
+	public void deleteBySourceId(String sourceId, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
-		vectorStore.delete(new FilterExpressionBuilder().eq(SOURCE_ID_METADATA_KEY, sourceId).build());
+		vectorStore.delete(this.buildFilter(caller, sourceId));
 	}
 
 }
