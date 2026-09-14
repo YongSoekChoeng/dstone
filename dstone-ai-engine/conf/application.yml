@@ -121,9 +121,9 @@ spring:
         ##########################################################################################
         ollama:
             base-url: http://localhost:11434 # ollama 와 통신할 URL
-            chat: 
-                options: 
-                    model: llama3.2   # 로컬에 pull된 채팅 모델
+            chat:
+                options:
+                    model: qwen2.5-coder:7b   # 로컬에 pull된 채팅 모델 - Ollama tool-calling 신뢰성 문제(13절)로 llama3.2에서 교체
             embedding: # spring.ai.model.embedding=ollama 용 설정.
                 model: bge-m3
 
