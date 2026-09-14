@@ -142,12 +142,22 @@ dstone:
             # default-version: v1
             versions:
                 sample-system: v1
-                #oracle-to-postgresql: v1
+                oracle-to-postgresql: v1
         # RAG(Phase 2): 이 값이 true여야 net.dstone.ai.api.service.RagService의 메서드들과
         # RagController, ChatController의 ragEnabled 옵션이 실제로 동작한다(RagService.
         # requireVectorStore() 참고 - RagController/RagService 빈 자체는 이 값과 무관하게 항상 존재).
         # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 Postgres/pgvector/임베딩 설정
         # 없이도 그대로 기동된다.
+        # capability(신규): "이 요청, 뭘 하려는 거야?"에 이름 하나(capability)만 실어 보내면
+        # 어떤 프롬프트를 쓰고 Tool을 켤지 알아서 정해주는 설정이다. 요청에 promptName/
+        # toolsEnabled/ragEnabled를 직접 넣으면 그 값이 항상 우선한다(capability는 기본값을
+        # 채워주는 것 뿐) - 그래서 지금까지 쓰던 일반 채팅 방식은 이 설정과 상관없이 그대로 동작한다.
+        capability:
+            definitions:
+                - name: oracle-to-postgresql
+                  prompt-name: oracle-to-postgresql
+                  tools-enabled: true
+                  rag-enabled: false
         rag:
             enabled: true
             ingest:

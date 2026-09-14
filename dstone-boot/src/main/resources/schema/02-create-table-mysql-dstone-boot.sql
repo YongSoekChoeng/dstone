@@ -121,3 +121,22 @@ CREATE TABLE IF NOT EXISTS TB_AI_DOCUMENT (
   INPUT_DT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (SOURCE_ID)
 ) ;
+
+/**********************************************
+TB_AI_SQLCONVERT는 "오라클 SQL을 PostgreSQL SQL로 바꿔줘" 화면에서, 누가 무슨 SQL을 넣었고
+결과가 뭐였는지를 남겨두는 이력 테이블이다. dstone-ai-engine의 capability="oracle-to-postgresql"
+채팅 한 번(POST /api/ai/chat)을 그대로 호출해서 받은 결과를 그대로 저장한다 - 화면은 이 결과를
+기다렸다가 바로 보여주고, 이 테이블에는 나중에 "누가 언제 무엇을 변환했는지" 찾아보기 위해 기록만
+남긴다(진행상태를 따로 폴링하는 큐는 없음).
+**********************************************/
+
+CREATE TABLE IF NOT EXISTS TB_AI_SQLCONVERT (
+  ID              BIGINT        NOT NULL AUTO_INCREMENT,
+  ORIGINAL_SQL    TEXT          NOT NULL,
+  CONVERTED_SQL   TEXT,
+  SUCCESS_YN      CHAR(1)       NOT NULL,
+  ERROR_MESSAGE   VARCHAR(1000),
+  REQUESTER_ID    VARCHAR(30)   NOT NULL,
+  INPUT_DT        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (ID)
+) ;

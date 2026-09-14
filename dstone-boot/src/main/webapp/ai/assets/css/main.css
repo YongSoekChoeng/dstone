@@ -256,6 +256,71 @@
 	cursor: pointer;
 }
 
+/* SQL 변환 화면 */
+
+.sqlconvert-columns {
+	display: flex;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.sqlconvert-column {
+	flex: 1;
+	min-width: 260px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.sqlconvert-column label {
+	font-size: 13px;
+	color: #4b5563;
+}
+
+.sqlconvert-textarea {
+	min-height: 200px;
+	resize: vertical;
+	border: 1px solid #d1d5db;
+	border-radius: 8px;
+	padding: 10px 12px;
+	font-size: 13px;
+	font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.sqlconvert-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-top: 12px;
+}
+
+.sqlconvert-actions button {
+	border: none;
+	border-radius: 8px;
+	padding: 8px 20px;
+	background: #2563eb;
+	color: #fff;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.sqlconvert-actions button:disabled {
+	background: #9ca3af;
+	cursor: default;
+}
+
+.sqlconvert-status {
+	font-size: 13px;
+	color: #4b5563;
+}
+
+.sqlconvert-history-sql {
+	max-width: 320px;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: "SFMono-Regular", Consolas, monospace;
+}
+
 #ai-footer-wrapper {
 	padding: 16px 24px;
 	border-top: 1px solid #e5e7eb;

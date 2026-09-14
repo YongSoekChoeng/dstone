@@ -35,7 +35,16 @@ import java.util.Map;
  * (예: "sqlcoder", "llama3.2"). 실제로 Ollama에 pull되어 있는 모델 태그와 정확히 같아야 하고,
  * 채팅을 지원하지 않는 모델(예: 임베딩 전용인 bge-m3)을 넣으면 Ollama가 그대로 에러를 반환할 것이다
  * - 이 필드는 어떤 모델명이 유효한지 검증하지 않을 예정이다.
+ *
+ * capability를 지정하면 "이 요청이 뭘 하려는 건지" 이름 하나로 알려줄 수 있다(예:
+ * "oracle-to-postgresql"). net.dstone.ai.capability.CapabilityRegistry에 미리 등록해둔 대로
+ * promptName/toolsEnabled/ragEnabled를 대신 채워준다 - 매번 이 조합을 직접 만들 필요가 없어진다.
+ * 등록 안 된 이름을 보내면 그 자리에서 바로 에러가 난다(promptName에 없는 템플릿 이름을 넣었을 때와
+ * 동일하게 처리됨). 이 필드는 그냥 "자주 쓰는 조합에 이름 붙인 것"일 뿐이라, promptName/toolsEnabled/
+ * ragEnabled를 요청에 직접 넣으면 그 값이 항상 우선한다 - 그래서
+ * 지금까지 쓰던 일반 채팅 방식은 이 필드와 상관없이 그대로 동작한다.
  */
 public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
-		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String ollamaModel) {
+		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String ollamaModel,
+		String capability) {
 }

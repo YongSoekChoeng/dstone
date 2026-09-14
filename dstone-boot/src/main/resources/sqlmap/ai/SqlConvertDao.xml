@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.boot.ai.dao.SqlConvertDao">
+
+	<!-- TB_AI_SQLCONVERT 이력 등록 -->
+	<insert id="insertHistory" parameterType="net.dstone.boot.ai.vo.SqlConvertVo" useGeneratedKeys="true" keyProperty="ID">
+		INSERT INTO TB_AI_SQLCONVERT (
+			ORIGINAL_SQL, CONVERTED_SQL, SUCCESS_YN, ERROR_MESSAGE, REQUESTER_ID, INPUT_DT
+		) VALUES (
+			#{ORIGINAL_SQL}, #{CONVERTED_SQL}, #{SUCCESS_YN}, #{ERROR_MESSAGE}, #{REQUESTER_ID}, CURRENT_TIMESTAMP
+		)
+	</insert>
+
+	<!-- TB_AI_SQLCONVERT 최근 이력 조회(최신순 20건) -->
+	<select id="listHistory" resultType="net.dstone.boot.ai.vo.SqlConvertVo">
+		SELECT
+			ID, ORIGINAL_SQL, CONVERTED_SQL, SUCCESS_YN, ERROR_MESSAGE, REQUESTER_ID, INPUT_DT
+		FROM
+			TB_AI_SQLCONVERT
+		ORDER BY
+			INPUT_DT DESC
+		LIMIT 20
+	</select>
+
+</mapper>
