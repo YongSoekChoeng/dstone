@@ -1325,3 +1325,29 @@ Phase 7–10 are implemented and verified end-to-end with real Anthropic calls w
 All test-only config was reverted from `conf/application.yml` (confirmed byte-identical to backup); permanent additions are the new Java packages/classes and the 3 real prompt templates. Docs (`docs/09.dstone-ai-engine.md` §16–19, `CLAUDE.md`) are updated with honest verification notes, including the two non-obvious limitations found along the way (successful `TOOL` steps discard the tool's own output text, and Haiku is unreliable at precise counting in Supervisor prompts).
 
 The full 8-phase roadmap (Tenant Context → Process → Agent → Tool sandboxing → Governance → Async API) is now complete. Nothing is committed to git yet — let me know if you'd like that done.
+
+---
+
+## 질문
+
+작업이 완료된거야 ?
+
+---
+
+## 답변
+
+**네, Phase 7~10 구현·실동작 검증까지는 완료됐습니다.** 상태 그대로 유지되고 있습니다(변경사항 30개 파일, 테스트 앱 프로세스 없음, `conf/application.yml`은 원본과 동일하게 원복됨).
+
+다만 "완료"의 범위를 정확히 말씀드리면:
+
+**끝난 것**
+- Phase 5~10 전체 로드맵 구현 + 실동작 검증 (Tenant Context, Process Engine, Agent Runtime, Tool 샌드박싱, Governance 완성, 비동기 API)
+- 문서 갱신 (`docs/09.dstone-ai-engine.md`, `docs/05.dstone-common.md`, `CLAUDE.md`)
+
+**아직 안 끝난/의도적으로 남겨둔 것**
+- **git commit 안 함** — 30개 파일 변경사항이 워킹 디렉터리에만 있습니다.
+- RAG 신규 문서 검색 버그 — Phase 5 검증 중 발견했지만 원인 미규명 상태로 문서에만 기록해뒀습니다(Phase 2에 속한 별개 이슈).
+- Eval(품질 평가) 로깅 — Phase 4의 마지막 남은 조각, 평가 데이터셋/채점 로직이 없어 보류.
+- Database Tool(Phase 8) — 조회할 실제 업무 테이블이 이 환경에 없어서 의도적으로 안 만듦.
+
+지금 커밋할까요, 아니면 더 진행할 작업이 있을까요?
