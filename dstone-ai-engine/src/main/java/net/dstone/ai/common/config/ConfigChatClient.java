@@ -1,4 +1,4 @@
-package net.dstone.ai.config;
+package net.dstone.ai.common.config;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import net.dstone.ai.governance.guardrail.PiiGuardrailAdvisor;
-import net.dstone.ai.observability.usage.UsageLoggingAdvisor;
+import net.dstone.ai.governance.usage.UsageLoggingAdvisor;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 

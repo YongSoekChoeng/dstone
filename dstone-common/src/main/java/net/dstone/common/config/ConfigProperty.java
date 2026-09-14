@@ -1,11 +1,16 @@
 package net.dstone.common.config;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jasypt.encryption.StringEncryptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.annotation.PropertySources;
@@ -15,8 +20,6 @@ import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.EncUtil;
@@ -34,18 +37,50 @@ public class ConfigProperty extends BaseObject{
 	@Autowired
 	Environment env;
 
+	/**
+	 * 프로퍼티 단 건을 조회.
+	 * @param key
+	 * @return
+	 */
 	public String getProperty(String key) {
 		String val = env.getProperty(key);
 		return val;
 	}
 
+	/**
+	 * 리스트 형식의 건을 조회. 주의)값은 제네릭 타입 정보가 없어 Object 기반으로 처리됨.
+	 * @param key
+	 * @return
+	 */
 	@SuppressWarnings("rawtypes")
 	public List getListProperty(String key) {
-		List val = env.getProperty(key, List.class);
-		if(val == null) {
-			val = (List)new ArrayList();
-		}
-		return val;
+	    return Binder.get(env)
+	    	.bind(
+	            key,
+	            Bindable.listOf(Object.class)
+	        )
+	        .orElseGet(ArrayList::new);
+	}
+	
+	/**
+	 * 맵 형식의 건을 조회. 주의)값은 제네릭 타입 정보가 없어 Object 기반으로 처리됨.
+	 * @param key
+	 * @return
+	 */
+	public Map<String, Object> getMapProperty(String key) {
+	    return Binder.get(env)
+	        .bind(
+	            key,
+	            Bindable.mapOf(String.class, Object.class)
+	        )
+	        .orElseGet(HashMap::new);
+	}
+
+	/**
+	 * @return
+	 */
+	public Environment getEnv() {
+		return env;
 	}
 
 	/**

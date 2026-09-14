@@ -1,4 +1,4 @@
-package net.dstone.ai.config;
+package net.dstone.ai.common.config;
 
 import java.util.Arrays;
 import java.util.List;

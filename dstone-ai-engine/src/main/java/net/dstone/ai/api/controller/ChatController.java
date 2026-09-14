@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.api.service.ChatService;
-import net.dstone.ai.governance.auth.CallerContext;
+import net.dstone.ai.common.context.CallerContext;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;

@@ -6,9 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.dstone.ai.api.dto.ChatRequest;
+import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.AiProvider;
-import net.dstone.ai.config.ConfigTool;
-import net.dstone.ai.governance.auth.CallerContext;
+import net.dstone.ai.common.context.CallerContext;
 import net.dstone.ai.prompt.PromptTemplateRegistry;
 import net.dstone.common.biz.BaseService;
 import net.dstone.common.config.ConfigProperty;
@@ -42,6 +42,14 @@ public class ChatService extends BaseService {
 		return answer;
 	}
 	
+	/**
+	 * Spring AI에서 AI 모델(예: ChatGPT, Claude 등)에게 보낼 요청(Request) 내용을 단계별로 조립하는 '명세서(Specification) 작성 도구' 메소드
+	 * @param sessionId
+	 * @param caller
+	 * @param providerId
+	 * @param request
+	 * @return
+	 */
 	private ChatClient.ChatClientRequestSpec getSpec(String sessionId, String caller, String providerId, ChatRequest request){
 
 		/************************************************************************
@@ -90,7 +98,7 @@ public class ChatService extends BaseService {
 		
 		AiProvider provider = AiProvider.fromPropertyValue(providerId); 
 		
-		// 1. 요청 스펙 - 기본
+		// 1. 요청 스펙 - 기본. 프롬프트 및 메시지 구성 (Prompt & Messages)
 		ChatClient.ChatClientRequestSpec spec = chatClient.prompt(); 
 		
 		// 2. 요청 스펙 - 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치

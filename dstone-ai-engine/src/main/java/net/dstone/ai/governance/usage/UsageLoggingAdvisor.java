@@ -1,4 +1,4 @@
-package net.dstone.ai.observability.usage;
+package net.dstone.ai.governance.usage;
 
 import java.math.BigDecimal;
 
@@ -13,7 +13,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
-import net.dstone.ai.governance.auth.CallerContext;
+import net.dstone.ai.common.context.CallerContext;
 import net.dstone.common.utils.LogUtil;
 
 /**

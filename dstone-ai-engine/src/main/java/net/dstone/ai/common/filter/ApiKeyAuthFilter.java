@@ -1,7 +1,10 @@
-package net.dstone.ai.governance.auth;
+package net.dstone.ai.common.filter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -10,6 +13,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.dstone.ai.common.context.CallerContext;
+import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
@@ -37,33 +42,62 @@ import net.dstone.common.utils.StringUtil;
 @Component
 @Order(1)
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
+	
+	private static final String PREFIX = "dstone.ai.governance.auth";
+	private static final String DEFAULT_HEADER_NAME = "X-API-Key";
 
-	private final ApiKeyProperties apiKeyProperties;
+	@Autowired
+	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
 
-	public ApiKeyAuthFilter(ApiKeyProperties apiKeyProperties) {
-		this.apiKeyProperties = apiKeyProperties;
-	}
+	//private final ApiKeyProperties apiKeyProperties;
+
+//	public ApiKeyAuthFilter(ApiKeyProperties apiKeyProperties) {
+//		this.apiKeyProperties = apiKeyProperties;
+//	}
 
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return !this.apiKeyProperties.isEnabled() || request.getRequestURI().startsWith("/actuator");
+		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(PREFIX + ".enabled"));
+		return !enabled || request.getRequestURI().startsWith("/actuator");
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		String apiKey = request.getHeader(this.apiKeyProperties.headerName());
+		String apiKey = request.getHeader(DEFAULT_HEADER_NAME);
 		if (StringUtil.isEmpty(apiKey)) {
-			reject(response, "API Key 헤더[" + this.apiKeyProperties.headerName() + "]가 없습니다.");
+			reject(response, "API Key 헤더[" + DEFAULT_HEADER_NAME + "]가 없습니다.");
 			return;
 		}
-
-		String caller = this.apiKeyProperties.callerFor(apiKey).orElse(null);
-		if (caller == null) {
+		
+		List governanceAuthKeyList = configProperty.getListProperty(PREFIX + ".keys");
+		boolean isQualified = false;
+		String callerKey = "";
+		String caller = "";
+		if( governanceAuthKeyList != null ) {
+			for(int i=0; i<governanceAuthKeyList.size(); i++) {
+				callerKey = "";
+				caller = "";
+				Map governanceAuthKeyMap = (Map)governanceAuthKeyList.get(i);
+				if( governanceAuthKeyMap.containsKey("key") ) {
+					callerKey = governanceAuthKeyMap.get("key").toString();
+				}
+				if( governanceAuthKeyMap.containsKey("caller") ) {
+					caller = governanceAuthKeyMap.get("caller").toString();
+				}
+				if( apiKey.equals(callerKey) ) {
+					isQualified = true;
+					break;
+				}
+			}
+		}
+		if(!isQualified) {
 			reject(response, "유효하지 않은 API Key 입니다.");
 			return;
 		}
-
+		
+		
 		CallerContext.set(request, caller);
 		filterChain.doFilter(request, response);
 	}

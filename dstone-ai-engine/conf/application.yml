@@ -194,7 +194,7 @@ dstone:
                     enabled: false
                     # mode: mask # mask | reject
         # observability.usage(Phase 4): 토큰 사용량/추정비용/지연시간을 로그 한 줄로 남긴다
-        # (net.dstone.ai.observability.usage.UsageLoggingAdvisor 참고). 외부 인프라 의존이나 부작용이
+        # (net.dstone.ai.governance.usage.UsageLoggingAdvisor 참고). 외부 인프라 의존이나 부작용이
         # 없는 순수 로깅이라 enabled 기본값은 true다(governance.auth/ratelimit/guardrail.pii와 달리
         # 옵트인이 아님).
         observability:

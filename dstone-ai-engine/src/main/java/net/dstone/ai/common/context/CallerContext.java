@@ -1,4 +1,4 @@
-package net.dstone.ai.governance.auth;
+package net.dstone.ai.common.context;
 
 import jakarta.servlet.http.HttpServletRequest;
 

@@ -1,4 +1,4 @@
-package net.dstone.ai.observability.usage;
+package net.dstone.ai.governance.usage;
 
 import java.math.BigDecimal;
 
