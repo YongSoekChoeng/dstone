@@ -2,6 +2,7 @@ package net.dstone.boot.ai.service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -17,6 +18,8 @@ import reactor.core.publisher.Flux;
 @Service
 public class ChatService extends net.dstone.boot.common.biz.BaseService {
 
+	private static final String CAPABILITY = "sample-system";
+
 	@Autowired
 	private ConfigProperty configProperty;
 
@@ -28,11 +31,10 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 */
 	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, boolean ragEnabled, boolean toolsEnabled) {
 
-		String sessionId = this.resolveSessionId(servletRequest);
-
 		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("sessionId", this.resolveSessionId(servletRequest));
+		body.put("capability", CAPABILITY);
 		body.put("message", message);
-		body.put("sessionId", sessionId);
 		body.put("ragEnabled", ragEnabled);
 		body.put("toolsEnabled", toolsEnabled);
 

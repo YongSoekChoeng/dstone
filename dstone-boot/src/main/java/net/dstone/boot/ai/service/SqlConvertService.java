@@ -35,10 +35,12 @@ public class SqlConvertService extends net.dstone.boot.common.biz.BaseService {
 
 	public SqlConvertVo convert(String originalSql, String requesterId) {
 
+		String additionalUserMsg = "너는 Oracle SQL을 PostgreSQL SQL로 변환하는 전문 컴파일러야. 생각 과정이나 설명은 절대 생략하고, 오직 변환된 SQL 결과만 Markdown 코드 블록 없이 순수 텍스트로 출력해. ";
+		
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 
 		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("message", originalSql);
+		body.put("message", additionalUserMsg  + originalSql);
 		body.put("sessionId", UUID.randomUUID().toString());
 		body.put("capability", CAPABILITY);
 
@@ -47,9 +49,8 @@ public class SqlConvertService extends net.dstone.boot.common.biz.BaseService {
 		sqlConvertVo.setREQUESTER_ID(requesterId);
 
 		try {
-			// 자기수정 루프(문법 검증 Tool 재호출 포함)까지 끝나야 응답이 오는 동기 호출이라 넉넉하게
-			// 120초를 준다 - 일반 채팅(기본 60초)보다 오래 걸릴 수 있다.
-			ChatCallResult chatCallResult = this.getWebClient(120).post()
+			// 자기수정 루프(문법 검증 Tool 재호출 포함)까지 끝나야 응답이 오는 동기 호출이라 넉넉하게 준다 - 일반 채팅(기본 60초)보다 오래 걸릴 수 있다.
+			ChatCallResult chatCallResult = this.getWebClient( (5 * 60) ).post()
 					.uri(baseUrl + "/api/ai/chat")
 					.contentType(MediaType.APPLICATION_JSON)
 					.bodyValue(body)
@@ -69,6 +70,9 @@ public class SqlConvertService extends net.dstone.boot.common.biz.BaseService {
 		}
 
 		try {
+			if(sqlConvertVo != null && sqlConvertVo.getCONVERTED_SQL() != null) {
+				this.info(sqlConvertVo.getCONVERTED_SQL());
+			}
 			this.sqlConvertDao.insertHistory(sqlConvertVo);
 		} catch (Exception e) {
 			throw new RuntimeException(e);

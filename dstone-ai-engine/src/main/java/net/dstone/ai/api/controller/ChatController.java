@@ -49,7 +49,7 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		String providerId = configProperty.getProperty("spring.ai.model.chat"); // 프로바이더(anthropic | openai | ollama)
 		String answer = chatService.chat(sessionId, caller, providerId, request);
-		return new ChatResponse(answer, providerId, sessionId);
+		return new ChatResponse(answer, providerId, sessionId, request.capability());
 	}
 
 	/**
@@ -71,6 +71,9 @@ public class ChatController extends BaseController {
 			// 이대로 두면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
 			// IllegalArgumentException을 던지는데, 그보다 먼저 막아서 400과 함께 명확한 사유를 알려준다.
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
+		}
+		if (StringUtil.isEmpty(request.capability())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "capability는 필수입니다.");
 		}
 	}
 

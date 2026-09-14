@@ -44,7 +44,6 @@ import java.util.Map;
  * ragEnabled를 요청에 직접 넣으면 그 값이 항상 우선한다 - 그래서
  * 지금까지 쓰던 일반 채팅 방식은 이 필드와 상관없이 그대로 동작한다.
  */
-public record ChatRequest(String message, String sessionId, String promptName, Map<String, Object> variables,
-		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String ollamaModel,
-		String capability) {
+public record ChatRequest(String message, String sessionId, String capability, Map<String, Object> variables,
+		Boolean ragEnabled, Boolean toolsEnabled, String requiredTool, String provider, String ollamaModel) {
 }

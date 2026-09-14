@@ -54,6 +54,7 @@ public class ChatService extends BaseService {
 	 * @param request
 	 * @return
 	 */
+	@SuppressWarnings("unused")
 	private ChatClient.ChatClientRequestSpec getSpec(String sessionId, String caller, String providerId, ChatRequest request){
 
 		/************************************************************************
@@ -100,38 +101,21 @@ public class ChatService extends BaseService {
 		content()
 		************************************************************************/
 		
-		AiProvider provider = AiProvider.fromPropertyValue(providerId); 
-		
 		// 1. 요청 스펙 - 기본. 프롬프트 및 메시지 구성 (Prompt & Messages)
 		ChatClient.ChatClientRequestSpec spec = chatClient.prompt(); 
 		
 		// 2. 요청 스펙 - 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치
 		spec = spec.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId));
 
-		// 2.5. capability가 왔으면 "미리 정해둔 기본 조합"을 가져온다 - promptName/toolsEnabled/
-		// ragEnabled를 요청에 직접 넣으면 그 값이 이 기본값보다 항상 우선한다(그래야 capability를
-		// 안 쓰는 기존 채팅 방식이 그대로 동작한다). CapabilityRegistry.resolve()는 등록 안 된
-		// 이름이면 바로 예외를 던진다.
-		CapabilityDefinition capability = StringUtil.isEmpty(request.capability())
-				? null
-				: this.capabilityRegistry.resolve(request.capability());
-
-		String promptName = !StringUtil.isEmpty(request.promptName())
-				? request.promptName()
-				: (capability != null ? capability.promptName() : null);
-
-		boolean ragEnabled = request.ragEnabled() != null
-				? request.ragEnabled()
-				: (capability != null && Boolean.TRUE.equals(capability.ragEnabled()));
-
-		boolean toolsEnabled = request.toolsEnabled() != null
-				? request.toolsEnabled()
-				: (capability != null && Boolean.TRUE.equals(capability.toolsEnabled()));
-
+		// 2-1. capability가 왔으면 "미리 정해둔 기본 조합"을 가져온다 
+		CapabilityDefinition capability = this.capabilityRegistry.resolve(request.capability());
+		boolean ragEnabled = Boolean.valueOf(StringUtil.ifEmpty(request.ragEnabled(), "false"));
+		boolean toolsEnabled = Boolean.valueOf(StringUtil.ifEmpty(request.toolsEnabled(), "true"));
+		
 		// 3. 요청 스펙 - 시스템 프롬프트로 적용
-		if (!StringUtil.isEmpty(promptName)) {
+		if (!StringUtil.isEmpty(request.capability())) {
 			// promptName이 있으면 그 템플릿(dstone.ai.prompt.version.{promptName}와 맵핑되는 src/main/resources/prompts/{promptName}/version.st 프롬프트)을 시스템 프롬프트로 적용한다.
-			spec = spec.system(this.promptTemplateRegistry.render(promptName, request.variables()));
+			spec = spec.system(this.promptTemplateRegistry.render(request.capability(), request.variables()));
 		}
 
 		// 4. 요청 스펙 - RAG 적용
