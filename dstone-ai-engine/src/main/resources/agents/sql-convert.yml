@@ -1,11 +1,8 @@
-# 단위업무를 처리하기 위해 필요한 role(prompt)들을 기술한다.
+# 단위업무를 처리하기 위해 필요한 agent 들을 기술한다.
+# agent의 업무처리 내용은 /resources/prompts/{promptName}/v1.st 에 기술되어 있다.
+# agent 파일명은 agents.name들을 순수하게 편의상 파일명으로 그룹핑 해놓은 것이고 기능적인 의미는 없음. 
+# 만일 agents/*.yml 파일들 내에 동일한 agents.name가 존재 할 경우 에러 발생.
 agents:
-
-  - name: general-chat
-    description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.
-    promptName: sample-system
-    toolsEnabled: true
-    ragEnabled: false
 
   - name: sql-analysis-agent
     description: Oracle SQL의 Oracle 전용 문법을 분석한다(oracle-to-postgresql Workflow의 analyze step).
