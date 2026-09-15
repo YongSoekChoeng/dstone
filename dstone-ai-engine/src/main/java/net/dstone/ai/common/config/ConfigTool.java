@@ -61,7 +61,10 @@ public class ConfigTool extends BaseObject {
 		return this.toolCallbackProvider;
 	}
 
-	/** caller의 Tool 화이트리스트를 통과한 것만 골라낸 provider를 만들어 돌려준다(화이트리스트 없으면 전체 허용). */
+	/**
+	 * caller의 Tool 화이트리스트를 통과한 것만 골라낸 provider를 만들어 돌려준다(화이트리스트 없으면 전체 허용).
+	 * @param caller Tool 화이트리스트를 조회할 호출 주체(tenant)
+	 */
 	@SuppressWarnings("rawtypes")
 	public ToolCallbackProvider toolCallbackProvider(String caller) {
 		List<String> allowedToolNames = this.allowedToolNames(caller);
@@ -78,7 +81,11 @@ public class ConfigTool extends BaseObject {
 		return ToolCallbackProvider.from(filtered);
 	}
 
-	/** ToolExecutor가 TOOL step 하나를 LLM 없이 이름으로 직접 찾아 호출할 때 쓴다. 못 찾으면 null. */
+	/**
+	 * ToolExecutor가 TOOL step 하나를 LLM 없이 이름으로 직접 찾아 호출할 때 쓴다. 못 찾으면 null.
+	 * @param caller Tool 화이트리스트를 조회할 호출 주체(tenant)
+	 * @param toolName 찾을 Tool 이름
+	 */
 	public ToolCallback findByName(String caller, String toolName) {
 		for (ToolCallback candidate : this.toolCallbackProvider(caller).getToolCallbacks()) {
 			if (candidate.getToolDefinition().name().equals(toolName)) {
@@ -88,7 +95,10 @@ public class ConfigTool extends BaseObject {
 		return null;
 	}
 
-	/** caller에 대해 설정된 화이트리스트를 찾는다 - 설정 자체가 없으면(caller가 null이거나 목록에 없으면) null(=전체 허용)을 돌려준다. */
+	/**
+	 * caller에 대해 설정된 화이트리스트를 찾는다 - 설정 자체가 없으면(caller가 null이거나 목록에 없으면) null(=전체 허용)을 돌려준다.
+	 * @param caller 화이트리스트를 조회할 호출 주체(tenant)
+	 */
 	@SuppressWarnings("rawtypes")
 	private List<String> allowedToolNames(String caller) {
 		if (caller == null) {
@@ -109,6 +119,7 @@ public class ConfigTool extends BaseObject {
 	 * 자체는 있는데 tools가 비어 있으면(YAML `[]`) "허용된 Tool 0개"를 뜻해야 하므로, 빈 문자열도 빈
 	 * 리스트와 동일하게 처리한다(그냥 무시하면 화이트리스트가 있는지조차 모르는 caller와 똑같이 "전체
 	 * 허용"이 돼버려서 화이트리스트가 있으나 마나 해진다).
+	 * @param toolsValue 파싱할 tools 설정값(List 또는 콤마 구분 String)
 	 */
 	@SuppressWarnings("rawtypes")
 	private List<String> parseTools(Object toolsValue) {

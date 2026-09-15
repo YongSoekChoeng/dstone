@@ -23,6 +23,9 @@ import net.dstone.common.utils.StringUtil;
 @ComponentScan(basePackages = { "net.dstone.ai" })
 public class DstoneAiEngineApplication {
 
+	/**
+	 * @param args 커맨드라인 인자
+	 */
 	public static void main(String[] args) {
 
 		/*** env.properties의 항목들을 System변수로 세팅 ***/

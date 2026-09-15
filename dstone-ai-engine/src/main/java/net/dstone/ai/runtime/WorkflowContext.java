@@ -13,15 +13,25 @@ public class WorkflowContext {
 
 	private final Map<String, Object> data = new HashMap<>();
 
+	/**
+	 * @param key 저장할 값의 키
+	 * @param value 저장할 값
+	 */
 	public void put(String key, Object value) {
 		this.data.put(key, value);
 	}
 
 	@SuppressWarnings("unchecked")
+	/**
+	 * @param key 조회할 값의 키
+	 */
 	public <T> T get(String key) {
 		return (T) this.data.get(key);
 	}
 
+	/**
+	 * @param key 존재 여부를 확인할 키
+	 */
 	public boolean contains(String key) {
 		return this.data.containsKey(key);
 	}

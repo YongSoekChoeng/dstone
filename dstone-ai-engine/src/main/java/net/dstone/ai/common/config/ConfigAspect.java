@@ -23,7 +23,7 @@ public class ConfigAspect extends BaseObject {
 	private final static String NO_LOG_REGEX = "@annotation(net.dstone.common.annotation.NoAspectLog)";
 	/**
 	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint
+	 * @param joinPoint 가로챈 컨트롤러 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
@@ -55,7 +55,7 @@ public class ConfigAspect extends BaseObject {
 	}
 	/**
 	 * 서비스 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint
+	 * @param joinPoint 가로챈 서비스 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
@@ -66,7 +66,7 @@ public class ConfigAspect extends BaseObject {
 	}
 	/**
 	 * DAO 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint
+	 * @param joinPoint 가로챈 DAO 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
@@ -90,7 +90,7 @@ public class ConfigAspect extends BaseObject {
 	
 	/**
 	 * runtime 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint
+	 * @param joinPoint 가로챈 runtime 패키지 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
@@ -102,7 +102,7 @@ public class ConfigAspect extends BaseObject {
 
 	/**
 	 * tools 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint
+	 * @param joinPoint 가로챈 tools 패키지 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */

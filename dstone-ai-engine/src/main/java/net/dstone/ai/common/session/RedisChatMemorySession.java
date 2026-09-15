@@ -41,6 +41,11 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 	private final ObjectMapper objectMapper;
 	private final long ttlSeconds;
 
+	/**
+	 * @param redisTemplate Redis 접근용 템플릿
+	 * @param objectMapper 메시지 직렬화/역직렬화에 쓰는 JSON 매퍼
+	 * @param configProperty 설정값 조회 유틸
+	 */
 	public RedisChatMemorySession(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper, ConfigProperty configProperty) {
 		this.redisTemplate = redisTemplate;
 		this.objectMapper = objectMapper;
@@ -48,7 +53,11 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		this.ttlSeconds = StringUtil.isEmpty(ttlSeconds) ? 86400L : Long.parseLong(ttlSeconds);
 	}
 
-	/** Message를 Redis에 저장하기 위한 최소 표현. Jackson record 지원(컴파일러 -parameters 옵션) 기반으로 직렬화/역직렬화한다. */
+	/**
+	 * Message를 Redis에 저장하기 위한 최소 표현. Jackson record 지원(컴파일러 -parameters 옵션) 기반으로 직렬화/역직렬화한다.
+	 * @param type 메시지 종류(USER/ASSISTANT/SYSTEM 등)
+	 * @param text 메시지 본문
+	 */
 	private record StoredMessage(String type, String text) {
 	}
 
@@ -65,6 +74,9 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		return conversationIds;
 	}
 
+	/**
+	 * @param conversationId 대화 세션 식별자
+	 */
 	@Override
 	public List<Message> findByConversationId(String conversationId) {
 		List<Object> raw = this.redisTemplate.opsForList().range(conversationKey(conversationId), 0, -1);
@@ -78,6 +90,10 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		return messages;
 	}
 
+	/**
+	 * @param conversationId 대화 세션 식별자
+	 * @param messages 저장할 대화 메시지 목록
+	 */
 	@Override
 	public void saveAll(String conversationId, List<Message> messages) {
 		String key = conversationKey(conversationId);
@@ -96,16 +112,25 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		}
 	}
 
+	/**
+	 * @param conversationId 대화 세션 식별자
+	 */
 	@Override
 	public void deleteByConversationId(String conversationId) {
 		this.redisTemplate.delete(conversationKey(conversationId));
 		this.redisTemplate.opsForSet().remove(INDEX_KEY, conversationId);
 	}
 
+	/**
+	 * @param conversationId 대화 세션 식별자
+	 */
 	private String conversationKey(String conversationId) {
 		return KEY_PREFIX + conversationId;
 	}
 
+	/**
+	 * @param message 직렬화할 메시지
+	 */
 	private String toJson(Message message) {
 		try {
 			return this.objectMapper
@@ -116,6 +141,9 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		}
 	}
 
+	/**
+	 * @param json 역직렬화할 JSON 문자열
+	 */
 	private Message toMessage(String json) {
 		StoredMessage stored;
 		try {

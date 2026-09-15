@@ -74,6 +74,8 @@ public class RagService extends BaseService {
 	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐준다. 둘 다 없으면
 	 * null(=필터 없음)을 돌려준다 - caller가 없는 경우(security.auth가 꺼진 배포)는 기존과 동일하게
 	 * tenant 필터 없이 동작해야 하므로, 이 메서드가 유일하게 "격리를 켤지" 판단하는 지점이다.
+	 * @param caller 호출한 앱/서비스 식별자
+	 * @param sourceId 문서 논리 식별자
 	 */
 	private Filter.Expression buildFilter(String caller, String sourceId) {
 		FilterExpressionBuilder builder = new FilterExpressionBuilder();
@@ -91,7 +93,10 @@ public class RagService extends BaseService {
 		return null;
 	}
 
-	/** 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다. */
+	/**
+	 * 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다.
+	 * @param caller 호출한 앱/서비스 식별자
+	 */
 	public Advisor getRagSpecAdvisor(String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
 		SearchRequest.Builder requestBuilder = SearchRequest.builder()
@@ -104,7 +109,11 @@ public class RagService extends BaseService {
 		return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(requestBuilder.build()).build();
 	}
 
-	/** caller(=tenant_id)의 문서 범위로만 검색을 제한한다 - caller가 없으면(security.auth 꺼짐) 기존과 동일하게 전체 검색. */
+	/**
+	 * caller(=tenant_id)의 문서 범위로만 검색을 제한한다 - caller가 없으면(security.auth 꺼짐) 기존과 동일하게 전체 검색.
+	 * @param request 검색 조건(질의어, topK 등)
+	 * @param caller 호출한 앱/서비스 식별자
+	 */
 	public List<RetrievedChunk> search(RagSearchRequest request, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
 		SearchRequest.Builder builder = SearchRequest.builder()
@@ -131,6 +140,9 @@ public class RagService extends BaseService {
 	 *
 	 * caller(=tenant_id)가 있으면 청크마다 tenant metadata를 함께 태깅해서, search()/getRagSpecAdvisor()가
 	 * 같은 caller의 문서만 검색하도록 격리한다.
+	 * @param resource 적재할 원문 파일
+	 * @param sourceId 문서 논리 식별자(재적재 시 upsert 기준 키)
+	 * @param caller 호출한 앱/서비스 식별자
 	 */
 	public IngestResponse ingest(Resource resource, String sourceId, String caller) {
 		if (StringUtil.isEmpty(sourceId)) {
@@ -165,7 +177,11 @@ public class RagService extends BaseService {
 		return new IngestResponse(sourceId, tagged.size());
 	}
 
-	/** sourceId와 caller(=tenant_id) 조건을 함께 걸어 삭제한다 - 다른 tenant가 같은 sourceId를 썼어도 서로의 문서를 지우지 못한다. */
+	/**
+	 * sourceId와 caller(=tenant_id) 조건을 함께 걸어 삭제한다 - 다른 tenant가 같은 sourceId를 썼어도 서로의 문서를 지우지 못한다.
+	 * @param sourceId 문서 논리 식별자
+	 * @param caller 호출한 앱/서비스 식별자
+	 */
 	public void deleteBySourceId(String sourceId, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
 		vectorStore.delete(this.buildFilter(caller, sourceId));

@@ -40,7 +40,11 @@ public class ConfigChatClient {
 		return new InMemoryChatMemoryRepository();
 	}
 
-	/** dstone.ai.session.max-messages(기본 20)만큼만 최근 대화를 유지하는 슬라이딩 윈도우. */
+	/**
+	 * dstone.ai.session.max-messages(기본 20)만큼만 최근 대화를 유지하는 슬라이딩 윈도우.
+	 * @param chatMemoryRepository 대화 내역을 저장할 저장소
+	 * @param configProperty 설정값을 조회할 객체
+	 */
 	@Bean
 	ChatMemory chatMemory(ChatMemoryRepository chatMemoryRepository, ConfigProperty configProperty) {
 		String maxMessages = configProperty.getProperty("dstone.ai.session.max-messages");
@@ -57,6 +61,11 @@ public class ConfigChatClient {
 	advisor 체인 순서(advisor1, advisor2, advisor3, ...): 가장 바깥쪽(리스트 마지막)이 먼저 동작하고
 	순차적으로 안쪽으로 진행한다.
 	*************************************************************************************/
+	/**
+	 * @param builder ChatClient를 조립할 빌더
+	 * @param chatMemory 세션별 대화 내역을 담당할 메모리
+	 * @param governanceAdvisors governance 모듈 등이 추가한 Advisor 목록(현재는 비어 있음)
+	 */
 	@Bean
 	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, List<Advisor> governanceAdvisors) {
 		List<Advisor> advisors = new ArrayList<>(governanceAdvisors);

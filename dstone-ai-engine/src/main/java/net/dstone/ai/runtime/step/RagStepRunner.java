@@ -16,6 +16,10 @@ public class RagStepRunner {
 	@Autowired
 	private RagService ragService;
 
+	/**
+	 * @param caller 호출한 앱/서비스 식별자
+	 * @param query 검색 질의어
+	 */
 	public String run(String caller, String query) {
 		List<RetrievedChunk> chunks = this.ragService.search(new RagSearchRequest(query, null, null, null), caller);
 		StringBuilder combined = new StringBuilder();

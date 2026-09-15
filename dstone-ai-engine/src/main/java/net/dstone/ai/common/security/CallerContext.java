@@ -22,10 +22,17 @@ public final class CallerContext {
 	private CallerContext() {
 	}
 
+	/**
+	 * @param request 들어온 요청
+	 * @param caller 호출한 앱/서비스 식별자
+	 */
 	public static void set(HttpServletRequest request, String caller) {
 		request.setAttribute(REQUEST_ATTRIBUTE, caller);
 	}
 
+	/**
+	 * @param request 들어온 요청
+	 */
 	public static String get(HttpServletRequest request) {
 		Object value = request.getAttribute(REQUEST_ATTRIBUTE);
 		return value == null ? null : value.toString();

@@ -11,6 +11,11 @@ import java.util.List;
  *
  * allowedCallers를 비워두면(null 또는 빈 리스트) 누구나 이 Workflow를 실행할 수 있다는 뜻이고,
  * 채워두면 그 목록의 caller(=tenant_id, ApiKeyAuthFilter가 식별)만 실행할 수 있다.
+ * @param id Workflow 식별자
+ * @param description Workflow 설명(문서화용)
+ * @param steps 순서대로 실행할 step 목록
+ * @param maxIterations 전체 step 실행 횟수 상한(비우면 기본값 5)
+ * @param allowedCallers 이 Workflow 실행이 허용된 caller(tenant) 목록
  */
 public record WorkflowDefinition(String id, String description, List<StepDefinition> steps, Integer maxIterations,
 		List<String> allowedCallers) {

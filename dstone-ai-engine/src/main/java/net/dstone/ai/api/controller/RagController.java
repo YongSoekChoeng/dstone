@@ -35,17 +35,30 @@ public class RagController extends BaseController {
 	@Autowired
 	RagService ragService;
 
+	/**
+	 * @param file 적재할 문서 파일
+	 * @param sourceId 문서 식별자
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@PostMapping("/documents")
 	public IngestResponse ingest(@RequestParam("file") MultipartFile file, @RequestParam("sourceId") String sourceId,
 			HttpServletRequest servletRequest) {
 		return this.ragService.ingest(file.getResource(), sourceId, CallerContext.get(servletRequest));
 	}
 
+	/**
+	 * @param sourceId 삭제할 문서 식별자
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@DeleteMapping("/documents/{sourceId}")
 	public void delete(@PathVariable String sourceId, HttpServletRequest servletRequest) {
 		this.ragService.deleteBySourceId(sourceId, CallerContext.get(servletRequest));
 	}
 
+	/**
+	 * @param request 검색어/topK 등 검색 조건
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@PostMapping("/search")
 	public List<RetrievedChunk> search(@RequestBody RagSearchRequest request, HttpServletRequest servletRequest) {
 		return this.ragService.search(request, CallerContext.get(servletRequest));

@@ -41,12 +41,20 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	@Autowired
 	ConfigProperty configProperty;
 
+	/**
+	 * @param request 들어온 요청
+	 */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(PREFIX + ".enabled"));
 		return !enabled || request.getRequestURI().startsWith("/actuator");
 	}
 
+	/**
+	 * @param request 들어온 요청
+	 * @param response 내려줄 응답
+	 * @param filterChain 다음 필터로 넘기는 체인
+	 */
 	@SuppressWarnings("rawtypes")
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -87,6 +95,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 		filterChain.doFilter(request, response);
 	}
 
+	/**
+	 * @param response 내려줄 응답
+	 * @param message 거부 사유 메시지
+	 */
 	private void reject(HttpServletResponse response, String message) throws IOException {
 		response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 		response.setContentType("application/json;charset=UTF-8");

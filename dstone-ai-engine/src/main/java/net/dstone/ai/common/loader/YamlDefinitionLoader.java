@@ -33,11 +33,17 @@ public class YamlDefinitionLoader extends BaseObject {
 	private static final String WORKFLOW_LOCATION_PATTERN = "classpath*:workflows/*.yml";
 	private static final String AGENT_LOCATION_PATTERN = "classpath*:agents/*.yml";
 
-	/** workflows/*.yml 파일 하나의 최상위 구조(workflow: 키 하나). */
+	/**
+	 * workflows/*.yml 파일 하나의 최상위 구조(workflow: 키 하나).
+	 * @param workflow workflow 키에 바인딩된 정의
+	 */
 	private record WorkflowFile(WorkflowDefinition workflow) {
 	}
 
-	/** agents/*.yml 파일 하나의 최상위 구조(agents: 리스트 - 한 파일에 여러 Agent를 같이 둘 수 있다). */
+	/**
+	 * agents/*.yml 파일 하나의 최상위 구조(agents: 리스트 - 한 파일에 여러 Agent를 같이 둘 수 있다).
+	 * @param agents agents 키에 바인딩된 정의 목록
+	 */
 	private record AgentFile(List<AgentDefinition> agents) {
 	}
 
@@ -73,6 +79,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		return definitions;
 	}
 
+	/** @param locationPattern 리소스를 찾을 classpath 패턴 */
 	private Resource[] resolve(String locationPattern) {
 		try {
 			return this.resourceResolver.getResources(locationPattern);
@@ -82,6 +89,10 @@ public class YamlDefinitionLoader extends BaseObject {
 		}
 	}
 
+	/**
+	 * @param resource 읽어올 리소스 파일
+	 * @param type 바인딩할 대상 타입
+	 */
 	private <T> T readAs(Resource resource, Class<T> type) {
 		try (InputStream input = resource.getInputStream()) {
 			Object rawMap = this.yaml.load(input);

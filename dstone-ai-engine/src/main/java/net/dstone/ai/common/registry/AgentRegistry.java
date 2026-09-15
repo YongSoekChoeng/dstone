@@ -46,8 +46,8 @@ public class AgentRegistry extends BaseObject {
 	/**
 	 * caller 에게 허용된 agentName 에 해당하는 AgentDefinition 을 반환한다.
 	 * 모르는 이름이거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
-	 * @param agentName
-	 * @param caller
+	 * @param agentName 조회할 agent 이름
+	 * @param caller 호출한 앱/서비스 식별자
 	 * @return
 	 */
 	public AgentDefinition resolve(String agentName, String caller) {

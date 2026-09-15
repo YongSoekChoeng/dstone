@@ -22,6 +22,11 @@ public final class ExternalProcessRunner {
 	private ExternalProcessRunner() {
 	}
 
+	/**
+	 * @param command 실행할 명령어와 인자 목록
+	 * @param timeout 최대 대기 시간
+	 * @param maxOutputChars 출력 결과로 남길 최대 글자 수
+	 */
 	public static String run(List<String> command, Duration timeout, int maxOutputChars) {
 		Process process;
 		try {

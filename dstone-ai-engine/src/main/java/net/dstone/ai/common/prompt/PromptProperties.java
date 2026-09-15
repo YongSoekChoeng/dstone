@@ -17,6 +17,7 @@ public class PromptProperties extends BaseObject {
 	@Autowired
 	ConfigProperty configProperty;
 
+	/** @param templateName 버전을 조회할 프롬프트 템플릿 이름 */
 	public String versionOf(String templateName) {
 		String override = this.configProperty.getProperty("dstone.ai.prompt.versions." + templateName);
 		if (!StringUtil.isEmpty(override)) {

@@ -22,6 +22,11 @@ public class ToolExecutor extends BaseObject {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
+	/**
+	 * @param caller 호출 주체(caller) 식별자
+	 * @param toolName 호출할 Tool 이름
+	 * @param jsonInput Tool에 넘길 JSON 인자 문자열
+	 */
 	public String call(String caller, String toolName, String jsonInput) {
 		ToolCallback callback = this.configTool.findByName(caller, toolName);
 		if (callback == null) {
@@ -34,6 +39,9 @@ public class ToolExecutor extends BaseObject {
 		return this.unwrap(callback.call(jsonInput));
 	}
 
+	/**
+	 * @param rawResult Tool 호출 원본 응답(Spring AI가 JSON으로 감싼 값)
+	 */
 	private String unwrap(String rawResult) {
 		try {
 			return this.objectMapper.readValue(rawResult, String.class);

@@ -41,6 +41,15 @@ public class AgentExecutor extends BaseObject {
 	@Autowired
 	private ConfigTool configTool;
 
+	/**
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller 호출한 앱/서비스 식별자
+	 * @param agent 호출할 Agent 정의
+	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
+	 * @param userMessage 사용자 입력 텍스트
+	 * @param ragOverride RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 */
 	public String call(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables,
 			String userMessage, Boolean ragOverride, Boolean toolsOverride) {
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride).user(userMessage)
@@ -48,7 +57,16 @@ public class AgentExecutor extends BaseObject {
 			.content();
 	}
 
-	/** call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다. */
+	/**
+	 * call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다.
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller 호출한 앱/서비스 식별자
+	 * @param agent 호출할 Agent 정의
+	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
+	 * @param userMessage 사용자 입력 텍스트
+	 * @param ragOverride RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 */
 	public Flux<String> stream(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables,
 			String userMessage, Boolean ragOverride, Boolean toolsOverride) {
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride).user(userMessage)
@@ -56,6 +74,14 @@ public class AgentExecutor extends BaseObject {
 			.content();
 	}
 
+	/**
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller 호출한 앱/서비스 식별자
+	 * @param agent 호출할 Agent 정의
+	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
+	 * @param ragOverride RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 */
 	private ChatClient.ChatClientRequestSpec buildSpec(String sessionId, String caller, AgentDefinition agent,
 			Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride) {
 

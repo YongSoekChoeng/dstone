@@ -43,6 +43,10 @@ public class ChatController extends BaseController {
 	@Autowired
 	AgentExecutor agentExecutor;
 
+	/**
+	 * @param request 채팅 요청 내용(agent, message 등)
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		this.validateRequest(request);
@@ -55,7 +59,11 @@ public class ChatController extends BaseController {
 		return new ChatResponse(answer, provider, sessionId, request.agent());
 	}
 
-	/** chat()과 요청 계약은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 text/event-stream으로 흘려보낸다. */
+	/**
+	 * chat()과 요청 계약은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 text/event-stream으로 흘려보낸다.
+	 * @param request 채팅 요청 내용(agent, message 등)
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<String> chatStream(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		this.validateRequest(request);
@@ -66,6 +74,7 @@ public class ChatController extends BaseController {
 			request.ragEnabled(), request.toolsEnabled());
 	}
 
+	/** @param request 필수값(message, agent) 검증 대상 요청 */
 	private void validateRequest(ChatRequest request) {
 		if (StringUtil.isEmpty(request.message())) {
 			// 이대로 두면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
@@ -77,6 +86,7 @@ public class ChatController extends BaseController {
 		}
 	}
 
+	/** @param request sessionId를 꺼내올 채팅 요청 */
 	private String resolveSessionId(ChatRequest request) {
 		HttpSession session = this.getSession(true);
 		return session.getAttribute(DEFAULT_SESSION_KEY) != null ? session.getAttribute(DEFAULT_SESSION_KEY).toString()

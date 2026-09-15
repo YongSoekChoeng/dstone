@@ -23,15 +23,24 @@ public class PromptTemplateRegistry extends BaseObject {
 	private final PromptProperties promptProperties;
 	private final Map<String, PromptTemplate> cache = new ConcurrentHashMap<>();
 
+	/**
+	 * @param resourceLoader 클래스패스 리소스를 읽어올 로더
+	 * @param promptProperties 템플릿 버전 설정을 조회할 객체
+	 */
 	public PromptTemplateRegistry(ResourceLoader resourceLoader, PromptProperties promptProperties) {
 		this.resourceLoader = resourceLoader;
 		this.promptProperties = promptProperties;
 	}
 
+	/**
+	 * @param name 렌더링할 템플릿 이름
+	 * @param variables 템플릿에 채워 넣을 변수 값
+	 */
 	public String render(String name, Map<String, Object> variables) {
 		return template(name).render(variables == null ? Map.of() : variables);
 	}
 
+	/** @param name 조회할 템플릿 이름 */
 	private PromptTemplate template(String name) {
 		String version = this.promptProperties.versionOf(name);
 		return this.cache.computeIfAbsent(name + "@" + version, new Function<String, PromptTemplate>() {

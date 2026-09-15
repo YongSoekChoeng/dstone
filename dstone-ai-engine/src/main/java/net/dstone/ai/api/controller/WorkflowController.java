@@ -46,6 +46,11 @@ public class WorkflowController extends BaseController {
 	@Autowired
 	AsyncJobService asyncJobService;
 
+	/**
+	 * @param workflowId 실행할 Workflow의 id
+	 * @param request Workflow 입력 메시지/변수
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@PostMapping("/{workflowId}/execute")
 	public WorkflowResponse execute(@PathVariable String workflowId, @RequestBody WorkflowRequest request, HttpServletRequest servletRequest) {
 		this.validateMessage(request);
@@ -56,6 +61,11 @@ public class WorkflowController extends BaseController {
 		return new WorkflowResponse(context.<String>get("result"), sessionId, workflowId);
 	}
 
+	/**
+	 * @param workflowId 실행할 Workflow의 id
+	 * @param request Workflow 입력 메시지/변수
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
 	@PostMapping("/{workflowId}/submit")
 	public WorkflowSubmitResponse submit(@PathVariable String workflowId, @RequestBody WorkflowRequest request,
 			HttpServletRequest servletRequest) {
@@ -68,17 +78,20 @@ public class WorkflowController extends BaseController {
 		return new WorkflowSubmitResponse(jobId);
 	}
 
+	/** @param jobId 조회할 비동기 작업 id */
 	@GetMapping("/status/{jobId}")
 	public WorkflowStatusResponse status(@PathVariable String jobId) {
 		return this.asyncJobService.status(jobId);
 	}
 
+	/** @param request 필수값(message) 검증 대상 요청 */
 	private void validateMessage(WorkflowRequest request) {
 		if (StringUtil.isEmpty(request.message())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
 		}
 	}
 
+	/** @param request sessionId를 꺼내올 Workflow 요청 */
 	private String resolveSessionId(WorkflowRequest request) {
 		return StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId();
 	}

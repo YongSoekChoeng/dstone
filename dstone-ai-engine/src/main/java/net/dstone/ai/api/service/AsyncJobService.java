@@ -41,7 +41,14 @@ public class AsyncJobService extends BaseService {
 	@Autowired
 	private WorkflowExecutor workflowExecutor;
 
-	/** jobId를 즉시 돌려주고, 실제 실행은 백그라운드에서 진행한다. */
+	/**
+	 * jobId를 즉시 돌려주고, 실제 실행은 백그라운드에서 진행한다.
+	 * @param jobId 이 작업에 부여할 id
+	 * @param workflow 실행할 Workflow 정의
+	 * @param sessionId 대화 세션 ID
+	 * @param caller 호출한 앱(tenant) 식별자
+	 * @param request Workflow 입력 메시지/변수
+	 */
 	public String submit(String jobId, WorkflowDefinition workflow, String sessionId, String caller, WorkflowRequest request) {
 		this.requireRedis();
 		this.writeState(jobId, "RUNNING", null, null);
@@ -62,6 +69,7 @@ public class AsyncJobService extends BaseService {
 		return jobId;
 	}
 
+	/** @param jobId 조회할 작업 id */
 	public WorkflowStatusResponse status(String jobId) {
 		this.requireRedis();
 		Map<Object, Object> entries = this.redisTemplate.opsForHash().entries(JOB_KEY_PREFIX + jobId);
@@ -72,6 +80,12 @@ public class AsyncJobService extends BaseService {
 			this.stringOrNull(entries.get("result")), this.stringOrNull(entries.get("error")));
 	}
 
+	/**
+	 * @param jobId 상태를 기록할 작업 id
+	 * @param status 작업 상태(RUNNING/DONE/FAILED)
+	 * @param result 작업 성공 결과(없으면 null)
+	 * @param error 작업 실패 사유(없으면 null)
+	 */
 	private void writeState(String jobId, String status, String result, String error) {
 		Map<String, Object> fields = new HashMap<>();
 		fields.put("status", status);
@@ -86,6 +100,7 @@ public class AsyncJobService extends BaseService {
 		this.redisTemplate.expire(key, JOB_TTL_SECONDS, TimeUnit.SECONDS);
 	}
 
+	/** @param value 문자열로 변환할 Redis Hash 값 */
 	private String stringOrNull(Object value) {
 		return value == null ? null : value.toString();
 	}

@@ -32,6 +32,10 @@ public class PythonExecTool extends BaseObject {
 	@Autowired
 	private ConfigProperty configProperty;
 
+	/**
+	 * @param scriptName 실행할 스크립트의 등록된 이름(화이트리스트에 등록된 이름과 정확히 일치해야 함)
+	 * @param args 스크립트에 전달할 인자 목록(필요 없으면 빈 배열)
+	 */
 	@Tool(description = "사전에 허용된 Python 스크립트 하나를 실행한다. scriptName은 관리자가 미리 등록해둔 이름과 "
 			+ "정확히 일치해야 하며, 등록되지 않은 이름이나 임의의 Python 코드 문자열은 실행할 수 없다.")
 	public String runPythonScript(
@@ -55,6 +59,9 @@ public class PythonExecTool extends BaseObject {
 	}
 
 	@SuppressWarnings("rawtypes")
+	/**
+	 * @param scriptName 경로를 찾을 스크립트의 등록된 이름
+	 */
 	private String resolvePath(String scriptName) {
 		List allowed = this.configProperty.getListProperty(PREFIX + ".allowed-scripts");
 		for (Object entry : allowed) {

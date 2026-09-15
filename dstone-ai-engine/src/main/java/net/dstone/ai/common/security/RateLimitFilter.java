@@ -38,12 +38,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	private static final long DEFAULT_WINDOW_SECONDS = 60L;
 	private static final int DEFAULT_LIMIT = 60;
 
+	/**
+	 * @param request 들어온 요청
+	 */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(PREFIX + ".enabled"));
 		return !enabled || request.getRequestURI().startsWith("/actuator");
 	}
 
+	/**
+	 * @param request 들어온 요청
+	 * @param response 내려줄 응답
+	 * @param filterChain 다음 필터로 넘기는 체인
+	 */
 	@SuppressWarnings("rawtypes")
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -98,7 +106,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 		filterChain.doFilter(request, response);
 	}
 
-	/** callerKey의 이번 윈도우 누적 요청 수를 1 증가시키고 그 값을 반환한다. */
+	/**
+	 * callerKey의 이번 윈도우 누적 요청 수를 1 증가시키고 그 값을 반환한다.
+	 * @param callerKey 요청 건수를 세는 기준 키(caller 또는 IP)
+	 * @param windowSeconds 카운트를 유지할 기간(초)
+	 */
 	@SuppressWarnings("deprecation")
 	public long increment(String callerKey, long windowSeconds) {
 		String key = PREFIX + callerKey;
@@ -109,6 +121,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 		return count == null ? 0L : count;
 	}
 
+	/**
+	 * @param response 내려줄 응답
+	 * @param limit 허용 요청 한도
+	 * @param windowSeconds 카운트를 유지할 기간(초)
+	 */
 	private void reject(HttpServletResponse response, int limit, long windowSeconds) throws IOException {
 		response.setStatus(429); // Servlet API에 SC_TOO_MANY_REQUESTS 상수가 없어 리터럴 사용.
 		response.setHeader("Retry-After", String.valueOf(windowSeconds));

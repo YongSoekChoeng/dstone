@@ -43,7 +43,14 @@ public class WorkflowExecutor extends BaseObject {
 	@Autowired
 	private RagStepRunner ragStepRunner;
 
-	/** name으로 등록된 Workflow를 실행하고, 마지막 step 결과가 담긴 WorkflowContext를 돌려준다. */
+	/**
+	 * name으로 등록된 Workflow를 실행하고, 마지막 step 결과가 담긴 WorkflowContext를 돌려준다.
+	 * @param workflow 실행할 Workflow 정의
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller 호출 주체(caller) 식별자
+	 * @param variables Workflow 호출 시 넘겨받은 변수 맵
+	 * @param initialInput Workflow 최초 입력값
+	 */
 	public WorkflowContext run(WorkflowDefinition workflow, String sessionId, String caller, Map<String, Object> variables,
 			String initialInput) {
 		WorkflowContext context = new WorkflowContext();
@@ -92,6 +99,12 @@ public class WorkflowExecutor extends BaseObject {
 		return context;
 	}
 
+	/**
+	 * @param step 실행할 step 정의
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller 호출 주체(caller) 식별자
+	 * @param context step들이 공유하는 실행 컨텍스트
+	 */
 	private StepOutcome runStep(StepDefinition step, String sessionId, String caller, WorkflowContext context) {
 		String input = context.<String>get("result");
 		Map<String, Object> variables = context.get("variables");
@@ -103,6 +116,11 @@ public class WorkflowExecutor extends BaseObject {
 		};
 	}
 
+	/**
+	 * @param workflow 실행 중인 Workflow 정의
+	 * @param step 방금 실행한 step 정의
+	 * @param outcome 방금 실행한 step의 결과
+	 */
 	private StepResult decideTransition(WorkflowDefinition workflow, StepDefinition step, StepOutcome outcome) {
 		String nextId = outcome.success() ? step.onSuccess() : step.onFailure();
 		if (nextId == null) {
@@ -126,7 +144,11 @@ public class WorkflowExecutor extends BaseObject {
 		return nextIndex <= currentIndex ? StepResult.loop(nextId) : StepResult.next(nextId);
 	}
 
-	/** step이 parallelGroup을 갖고 있으면 같은 그룹의 인접 step 전체를, 아니면 자기 자신만 담은 목록을 돌려준다. */
+	/**
+	 * step이 parallelGroup을 갖고 있으면 같은 그룹의 인접 step 전체를, 아니면 자기 자신만 담은 목록을 돌려준다.
+	 * @param steps 전체 step 목록
+	 * @param step 그룹을 찾을 기준 step
+	 */
 	private List<StepDefinition> parallelGroupOf(List<StepDefinition> steps, StepDefinition step) {
 		if (StringUtil.isEmpty(step.parallelGroup())) {
 			return List.of(step);
@@ -140,6 +162,12 @@ public class WorkflowExecutor extends BaseObject {
 		return group;
 	}
 
+	/**
+	 * @param group 동시 실행할 병렬 step 그룹
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller 호출 주체(caller) 식별자
+	 * @param context step들이 공유하는 실행 컨텍스트
+	 */
 	private StepOutcome runParallel(List<StepDefinition> group, String sessionId, String caller, WorkflowContext context) {
 		Map<String, CompletableFuture<StepOutcome>> futures = new LinkedHashMap<>();
 		for (StepDefinition step : group) {
@@ -170,7 +198,11 @@ public class WorkflowExecutor extends BaseObject {
 		return new StepOutcome(allSuccess, combinedText.toString());
 	}
 
-	/** 목록상 currentId 바로 다음 step의 id를 돌려준다 - currentId가 마지막이면 null(=Workflow 종료). */
+	/**
+	 * 목록상 currentId 바로 다음 step의 id를 돌려준다 - currentId가 마지막이면 null(=Workflow 종료).
+	 * @param steps 전체 step 목록
+	 * @param currentId 기준이 되는 현재 step id
+	 */
 	private String nextSequentialId(List<StepDefinition> steps, String currentId) {
 		for (int i = 0; i < steps.size(); i++) {
 			if (steps.get(i).id().equals(currentId) && i + 1 < steps.size()) {
@@ -180,6 +212,10 @@ public class WorkflowExecutor extends BaseObject {
 		return null;
 	}
 
+	/**
+	 * @param steps 전체 step 목록
+	 * @param id 찾을 step id
+	 */
 	private int indexOf(List<StepDefinition> steps, String id) {
 		for (int i = 0; i < steps.size(); i++) {
 			if (steps.get(i).id().equals(id)) {

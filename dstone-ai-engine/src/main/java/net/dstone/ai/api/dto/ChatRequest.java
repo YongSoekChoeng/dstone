@@ -15,6 +15,13 @@ import java.util.Map;
  * 켜고 끄고 싶은 화면(예: dstone-boot 채팅 화면의 체크박스)을 위한 것이다.
  *
  * variables는 promptName 템플릿을 렌더링할 때 쓰이는 값이다(common.prompt.PromptTemplateRegistry).
+ *
+ * @param message 사용자 메시지
+ * @param sessionId 대화 세션 ID
+ * @param agent 호출할 Agent 이름
+ * @param variables 프롬프트 템플릿에 채울 값
+ * @param ragEnabled RAG 사용 여부 override
+ * @param toolsEnabled Tool 사용 여부 override
  */
 public record ChatRequest(String message, String sessionId, String agent, Map<String, Object> variables,
 		Boolean ragEnabled, Boolean toolsEnabled) {

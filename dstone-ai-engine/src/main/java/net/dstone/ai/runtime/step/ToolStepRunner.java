@@ -23,6 +23,12 @@ public class ToolStepRunner {
 	@Autowired
 	private ToolExecutor toolExecutor;
 
+	/**
+	 * @param step 실행할 TOOL step 정의
+	 * @param caller 호출 주체(caller) 식별자
+	 * @param variables Workflow 호출 시 넘겨받은 변수 맵
+	 * @param input 이전 step 결과(또는 최초 입력) 텍스트
+	 */
 	public StepOutcome run(StepDefinition step, String caller, Map<String, Object> variables, String input) {
 		String jsonInput = this.renderToolInput(step.inputTemplate(), input, variables);
 		String toolResult = this.toolExecutor.call(caller, step.ref(), jsonInput);
@@ -32,7 +38,12 @@ public class ToolStepRunner {
 		return new StepOutcome(true, input);
 	}
 
-	/** {previous}/{변수명} 토큰을 실제 값으로 바꿔 Tool 호출용 JSON 인자를 만든다 - 별도 템플릿 엔진 없이 단순 치환이면 충분하다. */
+	/**
+	 * {previous}/{변수명} 토큰을 실제 값으로 바꿔 Tool 호출용 JSON 인자를 만든다 - 별도 템플릿 엔진 없이 단순 치환이면 충분하다.
+	 * @param inputTemplate {previous}/{변수명} 토큰을 담고 있는 입력 템플릿
+	 * @param input {previous} 토큰 자리에 채워 넣을 이전 step 결과
+	 * @param variables {변수명} 토큰 자리에 채워 넣을 변수 맵
+	 */
 	private String renderToolInput(String inputTemplate, String input, Map<String, Object> variables) {
 		String rendered = inputTemplate.replace("{previous}", this.jsonEscape(input));
 		if (variables != null) {
@@ -43,6 +54,9 @@ public class ToolStepRunner {
 		return rendered;
 	}
 
+	/**
+	 * @param value JSON 문자열 안에 안전하게 넣을 원본 값
+	 */
 	private String jsonEscape(String value) {
 		return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
 	}
