@@ -3,21 +3,25 @@
 agents:
 
   - name: general-chat
+    description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.
     promptName: sample-system
     toolsEnabled: true
     ragEnabled: false
 
   - name: sql-analysis-agent
+    description: Oracle SQL의 Oracle 전용 문법을 분석한다(oracle-to-postgresql Workflow의 analyze step).
     promptName: oracle-sql-analyzer
     toolsEnabled: false
     ragEnabled: false
 
   - name: sql-conversion-agent
+    description: 분석된 Oracle SQL을 PostgreSQL SQL로 변환한다(oracle-to-postgresql Workflow의 convert step).
     promptName: oracle-sql-converter
     toolsEnabled: false
     ragEnabled: false
 
   - name: sql-fix-agent
+    description: 문법 검증에 실패한 변환 SQL을 검토 후 다시 작성한다(oracle-to-postgresql Workflow의 fix step).
     promptName: oracle-sql-reviewer
     toolsEnabled: true
     ragEnabled: false
