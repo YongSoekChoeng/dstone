@@ -43,15 +43,21 @@ public class AgentRegistry extends BaseObject {
 		LogUtil.sysout("dstone-ai-engine agent: 등록된 Agent = " + (this.byName.isEmpty() ? "없음" : this.byName.keySet()));
 	}
 
-	/** 모르는 이름이거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다. */
-	public AgentDefinition resolve(String name, String caller) {
-		AgentDefinition definition = this.byName.get(name);
+	/**
+	 * caller 에게 허용된 agentName 에 해당하는 AgentDefinition 을 반환한다.
+	 * 모르는 이름이거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
+	 * @param agentName
+	 * @param caller
+	 * @return
+	 */
+	public AgentDefinition resolve(String agentName, String caller) {
+		AgentDefinition definition = this.byName.get(agentName);
 		if (definition == null) {
-			throw new IllegalArgumentException("등록되지 않은 agent입니다: " + name);
+			throw new IllegalArgumentException("등록되지 않은 agent입니다: " + agentName);
 		}
 		List<String> allowedCallers = definition.allowedCallers();
 		if (allowedCallers != null && !allowedCallers.isEmpty() && (caller == null || !allowedCallers.contains(caller))) {
-			throw new IllegalArgumentException("agent[" + name + "]는 caller[" + caller + "]에게 허용되지 않았습니다.");
+			throw new IllegalArgumentException("agent[" + agentName + "]는 caller[" + caller + "]에게 허용되지 않았습니다.");
 		}
 		return definition;
 	}

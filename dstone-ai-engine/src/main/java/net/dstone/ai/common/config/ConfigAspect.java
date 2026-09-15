@@ -87,6 +87,31 @@ public class ConfigAspect extends BaseObject {
 			}
 		}
 	}
+	
+	/**
+	 * runtime 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX)
+	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
+		this.info("+----->[Runtime ] {"+signatureLog(joinPoint)+"}");
+		return joinPoint.proceed();
+	}
+
+	/**
+	 * tools 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * @param joinPoint
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
+	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
+		this.info("+----->[Tools ] {"+signatureLog(joinPoint)+"}");
+		return joinPoint.proceed();
+	}
+	
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
 
 }

@@ -1,5 +1,4 @@
-# common.registry.AgentRegistry가 기동 시 이 파일을 읽어 이름으로 등록한다.
-# promptName은 src/main/resources/prompts/{promptName}/{version}.st와 매칭된다.
+# 단위업무를 처리하기 위해 필요한 role(prompt)들을 기술한다.
 agents:
 
   - name: general-chat
