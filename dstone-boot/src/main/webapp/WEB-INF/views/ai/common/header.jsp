@@ -11,6 +11,7 @@ String currentLink = requestUtil.getParameter("defaultLink", "");
 						<a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/chat/chat" class="<%=(currentLink.equals("ai/chat/chat")?"current-page-item":"")%>">채팅</a>
 						<a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/document/document" class="<%=(currentLink.equals("ai/document/document")?"current-page-item":"")%>">문서업로드</a>
 						<a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/sqlconvert/sqlconvert" class="<%=(currentLink.equals("ai/sqlconvert/sqlconvert")?"current-page-item":"")%>">SQL 변환</a>
+						<a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow" class="<%=(currentLink.equals("ai/workflow/workflow")?"current-page-item":"")%>">Workflow 테스트</a>
 					</nav>
 				</header>
 			</div>
