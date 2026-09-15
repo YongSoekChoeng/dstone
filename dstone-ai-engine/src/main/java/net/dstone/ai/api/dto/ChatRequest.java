@@ -8,10 +8,14 @@ import java.util.Map;
  * common.session.RedisChatMemorySession이 Redis에 저장해 관리한다).
  *
  * agent는 필수다 - common.registry.AgentRegistry에 미리 등록해둔(resources/agents/*.yml) Agent
- * 이름이어야 한다. 그 Agent의 promptName/toolsEnabled/ragEnabled 설정 그대로 호출된다 - 요청에서
- * 이 셋을 따로 켜고 끌 수는 없다(호출할 때마다 다른 조합이 필요하면 Agent를 하나 더 등록한다).
+ * 이름이어야 한다. promptName은 항상 그 Agent 정의값 그대로 쓰인다.
+ *
+ * ragEnabled/toolsEnabled는 비워두면(null) Agent 정의값을 그대로 쓰고, true/false를 명시하면 그
+ * 요청 한 번만 Agent 정의값을 무시하고 강제로 켜거나 끈다 - 같은 Agent를 쓰면서도 요청마다 RAG/Tool을
+ * 켜고 끄고 싶은 화면(예: dstone-boot 채팅 화면의 체크박스)을 위한 것이다.
  *
  * variables는 promptName 템플릿을 렌더링할 때 쓰이는 값이다(common.prompt.PromptTemplateRegistry).
  */
-public record ChatRequest(String message, String sessionId, String agent, Map<String, Object> variables) {
+public record ChatRequest(String message, String sessionId, String agent, Map<String, Object> variables,
+		Boolean ragEnabled, Boolean toolsEnabled) {
 }

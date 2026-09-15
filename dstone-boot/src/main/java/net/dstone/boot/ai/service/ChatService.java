@@ -18,7 +18,8 @@ import reactor.core.publisher.Flux;
 @Service
 public class ChatService extends net.dstone.boot.common.biz.BaseService {
 
-	private static final String CAPABILITY = "sample-system";
+	private static final String AGENT = "general-chat";
+	private static final String AGENT_ROLE = "친절한 AI 어시스턴트";
 
 	@Autowired
 	private ConfigProperty configProperty;
@@ -28,13 +29,18 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 * 로그인 사용자 ID를 그대로 쓴다 - 사용자 한 명당 대화가 하나 계속 이어지는 구조다(멀티 대화방 아님).
 	 * dstone-boot ↔ dstone-ai-engine은 서버 대 서버 호출이라 쿠키가 전달되지 않으므로, sessionId를
 	 * 매 요청 명시적으로 실어 보내야 대화가 끊기지 않는다.
+	 *
+	 * general-chat Agent의 promptName(sample-system)이 시스템 프롬프트에 {role} 자리표시자를 쓰므로
+	 * (prompts/sample-system/v1.st), variables로 role을 채워 보내야 한다 - 안 보내면
+	 * PromptTemplate 렌더링이 IllegalStateException("Not all variables were replaced")으로 실패한다.
 	 */
 	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, boolean ragEnabled, boolean toolsEnabled) {
 
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("sessionId", this.resolveSessionId(servletRequest));
-		body.put("capability", CAPABILITY);
+		body.put("agent", AGENT);
 		body.put("message", message);
+		body.put("variables", Map.of("role", AGENT_ROLE));
 		body.put("ragEnabled", ragEnabled);
 		body.put("toolsEnabled", toolsEnabled);
 

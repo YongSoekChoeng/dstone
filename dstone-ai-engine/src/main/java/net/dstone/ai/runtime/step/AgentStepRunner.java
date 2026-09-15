@@ -41,7 +41,9 @@ public class AgentStepRunner {
 
 	private String call(String ref, String sessionId, String caller, Map<String, Object> variables, String input) {
 		AgentDefinition agent = this.agentRegistry.resolve(ref, caller);
-		return this.agentExecutor.call(sessionId, caller, agent, variables, input);
+		// Workflow step은 항상 Agent 정의값 그대로 쓴다(null, null) - 요청별 RAG/Tool 오버라이드는
+		// api.controller.ChatController(단일 Agent 직접 호출)에만 있는 기능이다.
+		return this.agentExecutor.call(sessionId, caller, agent, variables, input, null, null);
 	}
 
 }

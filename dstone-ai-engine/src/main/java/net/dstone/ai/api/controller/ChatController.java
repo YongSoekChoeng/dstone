@@ -49,7 +49,8 @@ public class ChatController extends BaseController {
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
-		String answer = this.agentExecutor.call(sessionId, caller, agent, request.variables(), request.message());
+		String answer = this.agentExecutor.call(sessionId, caller, agent, request.variables(), request.message(),
+			request.ragEnabled(), request.toolsEnabled());
 		String provider = this.configProperty.getProperty("spring.ai.model.chat");
 		return new ChatResponse(answer, provider, sessionId, request.agent());
 	}
@@ -61,7 +62,8 @@ public class ChatController extends BaseController {
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
-		return this.agentExecutor.stream(sessionId, caller, agent, request.variables(), request.message());
+		return this.agentExecutor.stream(sessionId, caller, agent, request.variables(), request.message(),
+			request.ragEnabled(), request.toolsEnabled());
 	}
 
 	private void validateRequest(ChatRequest request) {
