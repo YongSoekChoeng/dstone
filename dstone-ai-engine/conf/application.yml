@@ -127,9 +127,9 @@ spring:
                 max-retries: 1   
             chat:
                 options:
-                    model: qwen2.5-coder:7b   # 로컬에 pull된 채팅 모델 - Ollama tool-calling 신뢰성 문제(13절)로 llama3.2에서 교체
+                    model: qwen2.5-coder:7b # 로컬에 pull된 채팅 모델 - Ollama tool-calling 신뢰성 문제(13절)로 llama3.2에서 교체
                     timeout: 300s # 충분하게 5분(300초) 등으로 조절
-                    temperature: 0.0  # 💡 모든 Ollama 요청의 토큰 생성 다양성을 제거하여 속도 및 일관성 향상
+                    #temperature: 0.0  # 💡 모든 Ollama 요청의 토큰 생성 다양성을 제거하여 속도 및 일관성 향상
             embedding: # spring.ai.model.embedding=ollama 용 설정.
                 model: bge-m3
 
