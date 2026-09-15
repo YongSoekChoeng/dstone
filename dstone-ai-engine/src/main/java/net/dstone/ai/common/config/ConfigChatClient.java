@@ -29,10 +29,10 @@ import net.dstone.common.utils.StringUtil;
 public class ConfigChatClient {
 
 	/**
-	 * session.RedisChatMemorySession은 spring.data.redis.enabled=true일 때만 빈으로 등록된다.
-	 * @ConditionalOnMissingBean으로, Redis가 꺼져 있어도(ChatMemoryRepository 빈이 없어도) 프로세스
-	 * 메모리 기반 기본 구현으로 대체해 chatMemory()가 항상 정상적으로 주입받을 수 있게 한다(재시작/다중
-	 * 인스턴스 간 공유는 안 되지만 로컬 개발 환경에서는 충분하다).
+	 * session.RedisChatMemorySession(ChatMemoryRepository의 구현체)은 spring.data.redis.enabled=true일 때만 빈으로 등록된다.
+	 * 그리고 파라메터로 사용되는 ChatMemoryRepository chatMemoryRepository 는 빈으로 등록된 RedisChatMemorySession 를 가리키므로 구동되는데 문제가 없다.
+	 * 다만, spring.data.redis.enabled=false일 때(ChatMemoryRepository 가 등록되어있지 않을때) @ConditionalOnMissingBean 을 활용하여
+	 * InMemoryChatMemoryRepository 을 등록함으로써 chatMemory()가 항상 정상적으로 주입받을 수 있게 한다(재시작/다중 인스턴스 간 공유는 안 되지만 로컬 개발 환경에서는 충분하다).
 	 */
 	@Bean
 	@ConditionalOnMissingBean(ChatMemoryRepository.class)
