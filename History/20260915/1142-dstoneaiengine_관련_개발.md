@@ -1407,3 +1407,25 @@ Boots clean with `description` loaded. Let's stop it.
 - 내용물도 "역할(role)"보다는 "시스템 프롬프트"에 더 가깝습니다. `sample-system`만 "{role} 역할을 맡은..." 형태고, `oracle-sql-analyzer`/`-converter`/`-reviewer`는 역할 한 줄이 아니라 상세 작업 지시문이에요 — `roles`라는 이름이 후자 쪽엔 오히려 좁게 느껴질 수 있습니다.
 
 `prompts`가 (1) 코드 전반의 기존 명명과 일치하고 (2) 실제 내용(지시문 전체)을 더 정확히 나타낸다고 봅니다. 그래도 `roles`가 더 낫다고 생각하시면 패키지/클래스/설정 접두사까지 전부 맞춰서 한 번에 바꿔드릴게요 — 어떻게 할까요?
+
+---
+
+## 질문
+
+질문하나 할께. src/main/resources/prompts 보다는 src/main/resources/roles 가 어울리지 않아?
+
+---
+
+## 답변
+
+지난 답변과 같은 결론입니다 — 이름만 보면 `roles`가 더 직관적으로 들릴 수 있지만, `common.prompt` 패키지/`PromptTemplateRegistry`/`dstone.ai.prompt.*` 설정 키가 전부 "prompt"로 이미 굳어 있어서 폴더만 바꾸면 코드-설정-디렉터리 이름이 어긋납니다. 게다가 내용물(`oracle-sql-analyzer` 등)도 한 줄짜리 역할 정의가 아니라 상세 작업 지시문이라 "roles"보다 "prompts"가 실제 내용에 더 맞습니다.
+
+그래도 `roles`로 가고 싶으시면, 이름 불일치를 남기지 않도록 아래를 한 번에 같이 바꿀게요:
+
+- `src/main/resources/prompts/` → `roles/`
+- `net.dstone.ai.common.prompt` 패키지 → `common.role`
+- `PromptTemplateRegistry`/`PromptProperties` → `RoleTemplateRegistry`/`RoleProperties`
+- `dstone.ai.prompt.*` 설정 키 → `dstone.ai.role.*`
+- 관련 문서(`docs/09.dstone-ai-engine.md`) 갱신
+
+진행할까요, 아니면 `prompts`로 유지할까요?
