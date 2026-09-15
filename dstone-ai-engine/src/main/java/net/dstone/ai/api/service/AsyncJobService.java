@@ -50,8 +50,7 @@ public class AsyncJobService extends BaseService {
 			@Override
 			public void run() {
 				try {
-					WorkflowContext context = AsyncJobService.this.workflowExecutor.run(workflow, sessionId, caller,
-						request.variables(), request.message());
+					WorkflowContext context = AsyncJobService.this.workflowExecutor.run(workflow, sessionId, caller, request.variables(), request.message());
 					AsyncJobService.this.writeState(jobId, "DONE", context.<String>get("result"), null);
 				}
 				catch (Exception e) {

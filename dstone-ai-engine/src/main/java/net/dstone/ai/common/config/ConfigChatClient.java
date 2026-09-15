@@ -20,7 +20,7 @@ import net.dstone.common.utils.StringUtil;
 /**
  * 엔진 전체가 공유하는 단일 ChatClient(Provider는 dstone.ai.model.chat=anthropic 하나)를 조립한다.
  *
- * governance(PII/민감어 가드레일, 사용량 로깅·쿼터)는 이번 재설계 범위에서 뺐다 - 대신 List&lt;Advisor&gt;를
+ * governance(PII/민감어 가드레일, 사용량 로깅·쿼터)는 이번 재설계 범위에서 뺐다 - 대신 List<Advisor>를
  * 그대로 주입받게 해서, 나중에 governance 모듈이 @Bean Advisor를 하나 추가하기만 하면(Spring이 다건
  * 빈을 자동으로 이 리스트에 모아준다) 이 클래스를 고치지 않고도 Advisor 체인에 끼워 넣을 수 있다.
  * 지금은 등록된 Advisor 빈이 없으므로 이 리스트는 항상 비어 있다.

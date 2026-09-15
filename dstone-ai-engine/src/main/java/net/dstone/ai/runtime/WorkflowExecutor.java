@@ -62,8 +62,7 @@ public class WorkflowExecutor extends BaseObject {
 
 		while (currentId != null) {
 			if (++executed > maxIterations) {
-				throw new IllegalStateException("workflow[" + workflow.id() + "]가 최대 실행 횟수(" + maxIterations
-					+ ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
+				throw new IllegalStateException("workflow[" + workflow.id() + "]가 최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
 			}
 			StepDefinition step = stepsById.get(currentId);
 			if (step == null) {

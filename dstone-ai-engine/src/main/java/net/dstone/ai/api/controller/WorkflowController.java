@@ -31,10 +31,9 @@ import net.dstone.common.utils.StringUtil;
  * api.controller.ChatController가 Agent 하나를 1회 호출하는 경로라면, 여긴 여러 Agent/Tool/RAG
  * step을 정해진 순서(또는 분기/병렬/루프)로 이어서 실행하는 경로다.
  *
- * /execute는 결과를 바로 받는 동기 호출이고, /submit + /status/{jobId}는 오래 걸릴 수 있는 Workflow를
- * 위한 비동기 계약이다(api.service.AsyncJobService 참고) - 어느 쪽이든 workflowId/caller 검증은
- * 이 컨트롤러가 먼저 끝내둔다(잘못된 workflowId를 비동기로 던져놓고 한참 뒤 폴링에서야 실패를
- * 알게 되는 걸 피하기 위해서다).
+ * /execute는 결과를 바로 받는 동기 호출이고
+ * /submit + /status/{jobId}는 오래 걸릴 수 있는 Workflow를 위한 비동기 계약이다(api.service.AsyncJobService 참고) 
+ * 어느 쪽이든 workflowId/caller 검증은 이 컨트롤러가 먼저 끝내둔다(잘못된 workflowId를 비동기로 던져놓고 한참 뒤 폴링에서야 실패를 알게 되는 걸 피하기 위해서다).
  */
 @RestController
 @RequestMapping("/api/ai/workflow")
@@ -48,8 +47,7 @@ public class WorkflowController extends BaseController {
 	AsyncJobService asyncJobService;
 
 	@PostMapping("/{workflowId}/execute")
-	public WorkflowResponse execute(@PathVariable String workflowId, @RequestBody WorkflowRequest request,
-			HttpServletRequest servletRequest) {
+	public WorkflowResponse execute(@PathVariable String workflowId, @RequestBody WorkflowRequest request, HttpServletRequest servletRequest) {
 		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
 		WorkflowDefinition workflow = this.workflowRegistry.resolve(workflowId, caller);
