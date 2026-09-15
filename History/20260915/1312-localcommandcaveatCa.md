@@ -190,3 +190,44 @@ Note: an unrelated pre-existing uncommitted diff in `runtime/agent/AgentExecutor
 ## 답변
 
 Group 4(runtime/tools) 완료 — 8개 파일 수정, 2개 파일은 파라미터 있는 메소드가 없어 변경 불필요. 2개 그룹 남았습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>ae1e7a97f316b4e12</task-id>
+<tool-use-id>toolu_01MiHjcsQFVfmBRrVEKbip7k</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/887562cd-4ebe-4429-b580-d1ea8a00eb64/tasks/ae1e7a97f316b4e12.output</output-file>
+<status>completed</status>
+<summary>Agent "Add javadoc @param to common config/definition files" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Comment blocks all balanced. Task complete.
+
+Summary:
+
+**10 files edited** (of the 14 in the target list):
+- `common/config/ConfigAspect.java` — filled in the 5 empty `@param joinPoint` tags with a description of what each advice point intercepts (controller/service/DAO/runtime/tools method call)
+- `common/config/ConfigChatClient.java` — added `@param` blocks to `chatMemory(...)` and `chatClient(...)`
+- `common/config/ConfigTool.java` — added `@param` to `toolCallbackProvider(String caller)`, `findByName(...)`, `allowedToolNames(...)`, `parseTools(...)`
+- `common/definition/AgentDefinition.java` — added `@param` for all 6 record components to the existing class javadoc
+- `common/definition/StepDefinition.java` — added `@param` for all 7 record components
+- `common/definition/WorkflowDefinition.java` — added `@param` for all 5 record components
+- `common/exec/ExternalProcessRunner.java` — added new `@param` block for `run(...)`
+- `common/loader/YamlDefinitionLoader.java` — added `@param` to the private `WorkflowFile`/`AgentFile` record components and to private helpers `resolve(...)`/`readAs(...)`
+- `common/prompt/PromptProperties.java` — added `@param` for `versionOf(...)`
+- `common/prompt/PromptTemplateRegistry.java` — added `@param` for the constructor, `render(...)`, and private `template(...)`
+
+**4 files needed no changes** (no method/constructor with ≥1 parameter): `AiTool.java`, `Config.java`, `ConfigRedis.java`, `StepType.java`.
+
+Skipped per rule 6: the anonymous `Function&lt;String, PromptTemplate&gt;` override (`apply(String key)`) inside `PromptTemplateRegistry.template(...)` — a bare functional-interface impl whose parameter meaning is already obvious.
+
+Final grep for empty `@param name` (nothing after the name) across all 14 target files returned zero matches — confirmed no empty `@param` tags remain. No code logic, imports, signatures, or existing prose/comments were altered.</result>
+<usage><subagent_tokens>84749</subagent_tokens><tool_uses>40</tool_uses><duration_ms>150924</duration_ms></usage>
+</task-notification>
+
+---
+
+## 답변
+
+Group 2(common/config, definition) 완료 — 10개 파일 수정, 4개는 변경 불필요. 마지막 1개 그룹만 남았습니다.
