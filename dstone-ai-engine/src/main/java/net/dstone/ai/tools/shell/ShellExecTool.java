@@ -18,15 +18,14 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Phase 8 — 사전에 화이트리스트로 등록된 셸 스크립트만 실행할 수 있는 Tool이다. 이 리포지토리의 다른
- * 위험 기능(governance.auth/ratelimit/guardrail 등)과 동일한 옵트인 컨벤션을 따른다:
- * dstone.ai.tool.shell.enabled(기본 false)가 꺼져 있으면 이 빈 자체가 뜨지 않고(@ConditionalOnProperty),
- * 화이트리스트(allowed-commands)가 비어있으면 켜져 있어도 호출할 게 없다.
+ * 사전에 화이트리스트로 등록된 셸 스크립트만 실행할 수 있는 Tool이다. dstone.ai.tool.shell.enabled
+ * (기본 false)가 꺼져 있으면 이 빈 자체가 뜨지 않고, 화이트리스트(allowed-commands)가 비어있으면
+ * 켜져 있어도 호출할 게 없다.
  *
  * LLM은 스크립트를 고를 이름(scriptName)과 인자만 줄 수 있고, 실제로 실행되는 실행 파일 경로는 항상
- * 설정에 미리 등록된 값이다 - 임의의 셸 명령 문자열을 통째로 받아 실행하는 방식은 애초에 만들지 않았다
- * (common.exec.ExternalProcessRunner 참고 - ProcessBuilder가 셸을 거치지 않아 인자에 셸 메타문자가
- * 있어도 명령 주입으로 이어지지 않는다).
+ * 설정에 미리 등록된 값이다 - 임의의 셸 명령 문자열을 통째로 받아 실행하는 방식은 만들지 않았다
+ * (common.exec.ExternalProcessRunner가 셸을 거치지 않아 인자에 셸 메타문자가 있어도 명령 주입으로
+ * 이어지지 않는다).
  */
 @AiTool
 @ConditionalOnProperty(name = "dstone.ai.tool.shell.enabled", havingValue = "true")

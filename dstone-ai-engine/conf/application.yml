@@ -68,12 +68,12 @@ spring:
     ai:
         # chat(provider 선택): 아래 3개 provider의 starter가 모두 클래스패스에 있으므로
         # 반드시 하나를 명시해야 한다(값을 지우면 3개 provider가 동시에 활성화되어 기동에 실패한다).
-        # net.dstone.ai.common.consts.AiProvider의 propertyValue와 정확히 일치해야 한다. 별도의
-        # gateway 패키지는 없다 - ChatController가 이 값을 요청마다 직접 읽어 ChatService에 넘긴다.
+        # 엔진 전체가 이 값 하나(common.config.ConfigChatClient가 조립하는 단일 ChatClient)를
+        # 공유한다 - Agent별로 다른 provider/model을 쓰는 기능은 없다.
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
         # embedding(RAG): Anthropic은 임베딩 모델을 제공하지 않아 chat과 별개로 정해야 한다
-        # (net.dstone.ai.api.service.RagService.requireVectorStore() 참고). 이 환경엔 OpenAI 키 대신
+        # (rag.RagService.requireVectorStore() 참고). 이 환경엔 OpenAI 키 대신
         # 로컬 Ollama를 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/14.ollama.md.
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
@@ -144,33 +144,35 @@ spring:
 
 dstone:
     ai:
-        # session(Phase 1): 대화 히스토리(ChatMemory) 설정.
+        # 대화 히스토리(ChatMemory) 설정.
         session:
             max-messages: 20 # 세션당 유지할 최대 메시지 수(넘으면 오래된 메시지부터 잘림)
             ttl-seconds: 86400 # Redis에 저장된 세션 히스토리의 만료 시간(1일)
-        # prompt(Phase 1): SI 프로젝트별 프롬프트 템플릿 버전 관리.
+        # SI 프로젝트별 프롬프트 템플릿 버전 관리.
         # classpath:prompts/{name}/{version}.st 파일을 읽어 렌더링한다.
         # 특정 템플릿명을 versions에 명시하지 않으면 default-version을 쓴다.
         prompt:
             # default-version: v1
             versions:
                 sample-system: v1
-                oracle-to-postgresql: v1
-        # RAG(Phase 2): 이 값이 true여야 net.dstone.ai.api.service.RagService의 메서드들과
-        # RagController, ChatController의 ragEnabled 옵션이 실제로 동작한다(RagService.
-        # requireVectorStore() 참고 - RagController/RagService 빈 자체는 이 값과 무관하게 항상 존재).
-        # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 Postgres/pgvector/임베딩 설정
-        # 없이도 그대로 기동된다.
-        # capability(신규): "이 요청, 뭘 하려는 거야?"에 이름 하나(capability)만 실어 보내면
-        # 어떤 프롬프트를 쓰고 Tool을 켤지 알아서 정해주는 설정이다. 요청에 promptName/
-        # toolsEnabled/ragEnabled를 직접 넣으면 그 값이 항상 우선한다(capability는 기본값을
-        # 채워주는 것 뿐) - 그래서 지금까지 쓰던 일반 채팅 방식은 이 설정과 상관없이 그대로 동작한다.
-        capability:
-            definitions:
-                - name: oracle-to-postgresql
-                  prompt-name: oracle-to-postgresql
-                  tools-enabled: true
-                  rag-enabled: false
+                oracle-sql-analyzer: v1
+                oracle-sql-converter: v1
+                oracle-sql-reviewer: v1
+        # Agent/Workflow 정의는 여기(application.yml)가 아니라 각각 별도 파일에 둔다 -
+        # classpath:agents/*.yml(common.registry.AgentRegistry), classpath:workflows/*.yml
+        # (common.registry.WorkflowRegistry). Agent나 Workflow를 하나 추가/변경할 때 이 파일을
+        # 건드릴 필요가 없다는 게 이 구조의 핵심이다.
+        #
+        # Tool 호출은 caller별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) - 설정이
+        # 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
+        # tool:
+        #     allowed-by-caller:
+        #         - caller: sample-si-project
+        #           tools: getCurrentDateTime,validateSqlSyntax
+        # RAG. 이 값이 true여야 rag.RagService의 메서드들과 RagController, Agent의 ragEnabled 설정이
+        # 실제로 동작한다(RagService.requireVectorStore() 참고 - RagController/RagService 빈 자체는
+        # 이 값과 무관하게 항상 존재). RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면
+        # Postgres/pgvector/임베딩 설정 없이도 그대로 기동된다.
         rag:
             enabled: true
             ingest:
@@ -181,29 +183,27 @@ dstone:
                 # 0.5를 못 넘는 경우가 흔해서(0.48 등) 0.5로 두면 데이터가 있어도 결과가 통째로 빈다.
                 # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
                 similarity-threshold: 0.35
-        # governance.auth(Phase 4): API Key 인증. enabled=false(기본값)면 이전 Phase와 동일하게
-        # 인증 없이 전부 통과한다(net.dstone.ai.common.filter.ApiKeyAuthFilter 참고 - 예전에 바인딩을
-        # 전담하던 ApiKeyProperties 클래스는 2026-09-14에 삭제됐고, ConfigProperty.getListProperty()가
-        # 직접 List<Map>으로 바인딩해준다).
-        # 켤 때는 headerName과 keys를 아래처럼 채운다 - key는 DB 패스워드와 동일한 컨벤션으로
-        # ENC(...) 암호화를 권장한다(생성법은 이 파일 위쪽 anthropic.api-key 주석 참고).
-        governance:
+        # security.auth: API Key 인증. enabled=false(기본값)면 인증 없이 전부 통과한다
+        # (common.security.ApiKeyAuthFilter 참고). 켤 때는 keys를 아래처럼 채운다 - key는 DB
+        # 패스워드와 동일한 컨벤션으로 ENC(...) 암호화를 권장한다(생성법은 이 파일 위쪽
+        # anthropic.api-key 주석 참고).
+        #
+        # security.ratelimit: caller별(security.auth가 꺼져 있으면 클라이언트 IP별) 요청 개수 제한.
+        # enabled=true인데 Redis가 꺼져 있으면(spring.data.redis.enabled=false) 그 요청을 처음 받는
+        # 시점에 IllegalStateException으로 실패한다(common.security.RateLimitFilter 참고, Redis 고정
+        # 윈도우 카운터를 쓰므로 윈도우 경계에서 최대 2배까지 허용될 수 있는 알려진 한계가 있음).
+        #
+        # PII/민감어 가드레일, 사용량 로깅·쿼터 같은 governance 기능은 이번 재설계 범위에서 뺐다 -
+        # 필요해지면 common.config.ConfigChatClient가 주입받는 List<Advisor>에 @Bean Advisor 하나를
+        # 추가하는 것만으로 다시 붙일 수 있게 설계돼 있다(그 밖의 코드는 손댈 필요 없음).
+        security:
             auth:
                 enabled: false
-                # header-name: X-API-Key
                 # keys:
                 #     - key: ENC(...)
                 #       caller: sample-si-project
                 #     - key: ENC(...)
                 #       caller: another-caller
-            # governance.ratelimit(Phase 4): caller별(governance.auth가 꺼져 있으면 클라이언트 IP별)
-            # 요청 개수 제한. enabled=false(기본값)면 이전과 동일하게 제한 없이 전부 통과한다
-            # (net.dstone.ai.common.filter.RateLimitFilter 참고 - 예전에 있던 RateLimitProperties/
-            # RateLimiter 클래스는 2026-09-14에 삭제됐고, 이 필터 안에 직접 구현돼 있다). enabled=true인데
-            # Redis가 꺼져 있으면(spring.data.redis.enabled=false) 기동 시점이 아니라 그 요청을 처음
-            # 받는 시점에 IllegalStateException으로 실패한다 - rate limit은 Redis 고정 윈도우 카운터가
-            # 필요하다(RateLimitFilter.increment() 참고, 윈도우 경계에서 최대 2배까지 허용될 수 있는
-            # 알려진 한계가 있음).
             ratelimit:
                 enabled: false
                 # window-seconds: 60
@@ -213,27 +213,3 @@ dstone:
                 #       limit: 200
                 #     - caller: another-caller
                 #       limit: 30
-            # governance.guardrail.pii(Phase 4): 정규식 기반 PII(주민등록번호/전화번호/이메일/카드번호)
-            # 탐지. enabled=false(기본값)면 이전과 동일하게 검사 없이 통과한다
-            # (net.dstone.ai.governance.guardrail.PiiGuardrailProperties 참고). mode=mask(기본값)면
-            # 매칭된 부분만 [REDACTED_...]로 치환해 LLM에 전달하고(대화 히스토리에도 마스킹된 텍스트가
-            # 저장됨), mode=reject면 PII가 하나라도 있으면 LLM 호출 자체를 하지 않고 400을 반환한다.
-            guardrail:
-                pii:
-                    enabled: false
-                    # mode: mask # mask | reject
-        # observability.usage(Phase 4): 토큰 사용량/추정비용/지연시간을 로그 한 줄로 남긴다
-        # (net.dstone.ai.governance.usage.UsageLoggingAdvisor 참고). 외부 인프라 의존이나 부작용이
-        # 없는 순수 로깅이라 enabled 기본값은 true다(governance.auth/ratelimit/guardrail.pii와 달리
-        # 옵트인이 아님).
-        observability:
-            usage:
-                enabled: true
-                # pricing: 아래는 예시일 뿐이다 - 실제 요금은 provider의 최신 가격표를 확인해서 채울 것
-                # (model 값은 ChatResponseMetadata.getModel()이 실제로 응답하는 문자열과 정확히
-                # 일치해야 매칭된다). 여기 없는 model은 에러가 아니라 비용을 "unknown"으로 로깅한다 -
-                # ollama(로컬)처럼 원래 무료인 provider는 애초에 등록할 필요가 없다.
-                # pricing:
-                #     - model: claude-sonnet-4-5-20250929
-                #       input-price-per-1k: 0.003
-                #       output-price-per-1k: 0.015

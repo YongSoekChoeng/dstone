@@ -15,23 +15,22 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
-import net.dstone.ai.api.service.ChatService;
-import net.dstone.ai.common.context.CallerContext;
+import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.registry.AgentRegistry;
+import net.dstone.ai.common.security.CallerContext;
+import net.dstone.ai.runtime.agent.AgentExecutor;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
- * 이 엔진의 핵심 엔드포인트, POST /api/ai/chat을 처리한다. 옵션 하나 없이 message만 보내면 기본 채팅이
- * 되고, promptName/ragEnabled/toolsEnabled/requiredTool을 조합해서 시스템 프롬프트 적용, RAG-증강,
- * Tool 사용까지 한 요청 안에서 켜고 끌 수 있다. 각 옵션이 정확히 무엇을 하는지는 ChatRequest의
- * 필드별 설명을 참고하면 된다.
+ * 이 엔진의 기본 엔드포인트, POST /api/ai/chat을 처리한다 - resources/agents/*.yml에 등록된 Agent
+ * 하나를 1회 호출한다(여러 step을 이어 실행하려면 api.controller.WorkflowController를 쓴다).
  *
  * POST /api/ai/chat/stream은 같은 요청 계약에 응답만 text/event-stream(SSE)으로 토큰 단위 흘려보낸다.
  * Servlet 기반 Spring MVC 컨트롤러에서도 reactor-core가 클래스패스에 있으면(dstone-common이
- * spring-boot-starter-webflux를 물고 있어 항상 있음) Flux&lt;String&gt; 반환만으로 SSE가 동작한다 -
- * 별도로 WebFlux 런타임(Netty)으로 옮길 필요는 없다.
+ * spring-boot-starter-webflux를 물고 있어 항상 있음) Flux&lt;String&gt; 반환만으로 SSE가 동작한다.
  */
 @RestController
 @RequestMapping("/api/ai/chat")
@@ -40,40 +39,39 @@ public class ChatController extends BaseController {
 	@Autowired
 	ConfigProperty configProperty;
 	@Autowired
-	ChatService chatService;
-	
+	AgentRegistry agentRegistry;
+	@Autowired
+	AgentExecutor agentExecutor;
+
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
-		this.validateMessage(request);
+		this.validateRequest(request);
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
-		String providerId = configProperty.getProperty("spring.ai.model.chat"); // 프로바이더(anthropic | openai | ollama)
-		String answer = chatService.chat(sessionId, caller, providerId, request);
-		return new ChatResponse(answer, providerId, sessionId, request.capability());
+		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
+		String answer = this.agentExecutor.call(sessionId, caller, agent, request.variables(), request.message());
+		String provider = this.configProperty.getProperty("spring.ai.model.chat");
+		return new ChatResponse(answer, provider, sessionId, request.agent());
 	}
 
-	/**
-	 * chat()과 요청 계약은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 text/event-stream으로 흘려보낸다.
-	 * sessionId는 SSE 바디에 실어 보내지 않는다 - 호출자는 이미 자기가 보낸 sessionId(또는 서버가
-	 * HttpSession에 들고 있는 값)를 알고 있어 되돌려줄 필요가 없다.
-	 */
+	/** chat()과 요청 계약은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 text/event-stream으로 흘려보낸다. */
 	@PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<String> chatStream(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
-		this.validateMessage(request);
+		this.validateRequest(request);
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
-		String providerId = configProperty.getProperty("spring.ai.model.chat"); // 프로바이더(anthropic | openai | ollama)
-		return chatService.chatStream(sessionId, caller, providerId, request);
+		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
+		return this.agentExecutor.stream(sessionId, caller, agent, request.variables(), request.message());
 	}
 
-	private void validateMessage(ChatRequest request) {
+	private void validateRequest(ChatRequest request) {
 		if (StringUtil.isEmpty(request.message())) {
 			// 이대로 두면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
 			// IllegalArgumentException을 던지는데, 그보다 먼저 막아서 400과 함께 명확한 사유를 알려준다.
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
 		}
-		if (StringUtil.isEmpty(request.capability())) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "capability는 필수입니다.");
+		if (StringUtil.isEmpty(request.agent())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agent는 필수입니다.");
 		}
 	}
 

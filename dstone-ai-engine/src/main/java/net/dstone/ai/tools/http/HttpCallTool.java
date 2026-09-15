@@ -23,15 +23,14 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Phase 8 — 사전에 허용된 호스트에 한해 HTTP GET만 보낼 수 있는 Tool이다(옵트인: dstone.ai.tool.http.enabled,
+ * 사전에 허용된 호스트에 한해 HTTP GET만 보낼 수 있는 Tool이다(옵트인: dstone.ai.tool.http.enabled,
  * 기본 false). Shell/Python Tool과 달리 "실행 파일 화이트리스트"가 아니라 "호스트 화이트리스트"가
  * 위험 경계다 - LLM이 내부망 임의 주소로 요청을 보내는(SSRF) 걸 막는 게 목적이라, 호스트가 정확히
  * 일치하는지만 확인하고 그 외 URL 형태(경로/쿼리스트링)는 자유롭게 허용한다. POST 등 상태를 바꾸는
  * 메소드는 지원하지 않는다 - 지금은 "조회" 용도만 필요하다고 보고 범위를 좁혔다.
  *
  * allowed-hosts는 caller/tools 화이트리스트(List&lt;Map&gt;)와 달리 그냥 문자열 목록이라
- * ConfigProperty.getListProperty()(Map 전용으로 고정됨, 05.dstone-common.md 참고) 대신 Binder로
- * List&lt;String&gt;을 직접 바인딩한다.
+ * ConfigProperty.getListProperty()(Map 전용) 대신 Binder로 List&lt;String&gt;을 직접 바인딩한다.
  */
 @AiTool
 @ConditionalOnProperty(name = "dstone.ai.tool.http.enabled", havingValue = "true")

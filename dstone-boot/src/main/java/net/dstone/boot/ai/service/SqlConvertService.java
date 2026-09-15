@@ -10,14 +10,17 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import net.dstone.boot.ai.dao.SqlConvertDao;
-import net.dstone.boot.ai.vo.ChatCallResult;
 import net.dstone.boot.ai.vo.SqlConvertVo;
+import net.dstone.boot.ai.vo.WorkflowCallResult;
 import net.dstone.common.config.ConfigProperty;
 
 /**
  * "오라클 SQL을 PostgreSQL SQL로 바꿔줘" 화면의 실제 일꾼이다. dstone-ai-engine의
- * capability="oracle-to-postgresql" 채팅 한 번(POST /api/ai/chat)을 그대로 호출해서 답을 받고,
- * 그 결과(성공/실패 모두)를 TB_AI_SQLCONVERT에 이력으로 남긴 뒤 화면에 돌려준다.
+ * oracle-to-postgresql Workflow(analyze→convert→validate, POST /api/ai/workflow/{id}/execute)를
+ * 동기로 호출해서 답을 받고, 그 결과(성공/실패 모두)를 TB_AI_SQLCONVERT에 이력으로 남긴 뒤 화면에
+ * 돌려준다(2026-09-15 dstone-ai-engine 재설계로 capability 기반 /api/ai/chat 호출에서 이 Workflow
+ * 호출로 바뀌었다 - 프롬프트를 직접 얹어 보내는 대신, Workflow 자체가 이미 분석→변환→문법검증까지
+ * 끝낸 SQL을 돌려준다).
  *
  * 변환 하나하나는 완전히 독립된 요청으로 취급한다 - sessionId를 매번 새로 발급해서, 이전 변환 내용이
  * 다음 변환에 실수로 섞여 들어가지 않게 한다(로그인 사용자의 일반 채팅 세션과도 당연히 무관하다).
@@ -25,7 +28,7 @@ import net.dstone.common.config.ConfigProperty;
 @Service
 public class SqlConvertService extends net.dstone.boot.common.biz.BaseService {
 
-	private static final String CAPABILITY = "oracle-to-postgresql";
+	private static final String WORKFLOW_ID = "oracle-to-postgresql";
 
 	@Autowired
 	private ConfigProperty configProperty;
@@ -35,30 +38,27 @@ public class SqlConvertService extends net.dstone.boot.common.biz.BaseService {
 
 	public SqlConvertVo convert(String originalSql, String requesterId) {
 
-		String additionalUserMsg = "너는 Oracle SQL을 PostgreSQL SQL로 변환하는 전문 컴파일러야. 생각 과정이나 설명은 절대 생략하고, 오직 변환된 SQL 결과만 Markdown 코드 블록 없이 순수 텍스트로 출력해. ";
-		
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 
 		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("message", additionalUserMsg  + originalSql);
+		body.put("message", originalSql);
 		body.put("sessionId", UUID.randomUUID().toString());
-		body.put("capability", CAPABILITY);
 
 		SqlConvertVo sqlConvertVo = new SqlConvertVo();
 		sqlConvertVo.setORIGINAL_SQL(originalSql);
 		sqlConvertVo.setREQUESTER_ID(requesterId);
 
 		try {
-			// 자기수정 루프(문법 검증 Tool 재호출 포함)까지 끝나야 응답이 오는 동기 호출이라 넉넉하게 준다 - 일반 채팅(기본 60초)보다 오래 걸릴 수 있다.
-			ChatCallResult chatCallResult = this.getWebClient( (5 * 60) ).post()
-					.uri(baseUrl + "/api/ai/chat")
+			// 분석→변환→문법검증 3 step(실패 시 재작성 루프 포함)까지 끝나야 응답이 오는 동기 호출이라 넉넉하게 준다 - 일반 채팅(기본 60초)보다 오래 걸릴 수 있다.
+			WorkflowCallResult workflowCallResult = this.getWebClient( (5 * 60) ).post()
+					.uri(baseUrl + "/api/ai/workflow/" + WORKFLOW_ID + "/execute")
 					.contentType(MediaType.APPLICATION_JSON)
 					.bodyValue(body)
 					.retrieve()
-					.bodyToMono(ChatCallResult.class)
+					.bodyToMono(WorkflowCallResult.class)
 					.block();
 
-			sqlConvertVo.setCONVERTED_SQL(chatCallResult != null ? chatCallResult.message() : null);
+			sqlConvertVo.setCONVERTED_SQL(workflowCallResult != null ? workflowCallResult.message() : null);
 			sqlConvertVo.setSUCCESS_YN("Y");
 		} catch (Exception e) {
 			// dstone-ai-engine이 응답을 못 주는 경우(타임아웃, 5xx 등)도 화면에는 "왜 실패했는지"를

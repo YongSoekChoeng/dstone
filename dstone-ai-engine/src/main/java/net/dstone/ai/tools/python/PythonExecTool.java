@@ -18,10 +18,10 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Phase 8 — ShellExecTool과 완전히 같은 원칙의 Python 버전이다: dstone.ai.tool.python.enabled(기본
- * false)로 옵트인, allowed-scripts 화이트리스트에 등록된 .py 파일만 `python3 <경로> <인자...>`로
- * 실행한다. LLM이 임의 코드 문자열을 만들어 `python3 -c`로 실행시키는 방식은 만들지 않았다 - 항상
- * 화이트리스트에 있는 스크립트 "파일"만 실행 대상이 된다.
+ * ShellExecTool과 같은 원칙의 Python 버전이다: dstone.ai.tool.python.enabled(기본 false)로
+ * 옵트인, allowed-scripts 화이트리스트에 등록된 .py 파일만 `python3 <경로> <인자...>`로 실행한다.
+ * LLM이 임의 코드 문자열을 만들어 `python3 -c`로 실행시키는 방식은 만들지 않았다 - 항상 화이트리스트에
+ * 있는 스크립트 "파일"만 실행 대상이 된다.
  */
 @AiTool
 @ConditionalOnProperty(name = "dstone.ai.tool.python.enabled", havingValue = "true")

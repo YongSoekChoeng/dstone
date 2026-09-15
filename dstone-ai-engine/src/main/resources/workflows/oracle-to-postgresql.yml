@@ -1,0 +1,30 @@
+# common.registry.WorkflowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# analyze -> convert -> validate 순서로 진행하고, validate가 실패하면 fix로 갔다가 다시 validate로
+# 되돌아간다(루프) - maxIterations가 무한루프를 막는다.
+workflow:
+  id: oracle-to-postgresql
+  description: Oracle MyBatis SQL을 PostgreSQL MyBatis SQL로 변환한다(분석 -> 변환 -> 검증 -> 실패 시 재작성 루프).
+  maxIterations: 5
+  steps:
+
+    - id: analyze
+      type: AGENT
+      ref: sql-analysis-agent
+      onSuccess: convert
+
+    - id: convert
+      type: AGENT
+      ref: sql-conversion-agent
+      onSuccess: validate
+
+    - id: validate
+      type: TOOL
+      ref: validateSqlSyntax
+      inputTemplate: '{"sql":"{previous}"}'
+      onSuccess: SUCCESS
+      onFailure: fix
+
+    - id: fix
+      type: AGENT
+      ref: sql-fix-agent
+      onSuccess: validate

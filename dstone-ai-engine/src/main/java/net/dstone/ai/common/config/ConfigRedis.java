@@ -14,15 +14,16 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.RedisUtil;
 
 /**
- * dstone-boot의 ConfigRedis와 같은 방식으로(net.dstone.common.utils.RedisUtil을 그대로 재사용)
- * session(Phase 1)의 대화 히스토리를 저장할 RedisTemplate을 만들어 제공한다.
+ * dstone-boot의 ConfigRedis와 같은 방식으로 net.dstone.common.utils.RedisUtil을 그대로 재사용해서
+ * 세션(common.session.RedisChatMemorySession)/RateLimit(common.security.RateLimitFilter)/비동기
+ * Job 상태(api.service.AsyncJobService)가 함께 쓰는 RedisTemplate 빈 하나를 만든다.
  */
 @Configuration
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")
 public class ConfigRedis extends BaseObject {
 
 	@Autowired
-	ConfigProperty configProperty; // 프로퍼티 가져오는 bean
+	ConfigProperty configProperty;
 
 	@Bean
 	public RedisTemplate<String, Object> redisTemplate() {

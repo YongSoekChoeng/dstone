@@ -16,10 +16,8 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Boot 4부터는 JDBC 자동설정이 별도 모듈(spring-boot-jdbc)로 빠져나갔다. 그래서 JDBC 관련
- * starter를 전혀 의존하지 않는 이 모듈의 클래스패스에는 DataSourceAutoConfiguration 자체가 없어서
- * exclude할 대상도 없다(Phase 0 때는 exclude를 명시해뒀었다). RAG/세션(Phase 1~2)에서 DB가 실제로
- * 필요해진 시점에 dstone-boot의 ConfigDatasource 패턴을 따라 JDBC starter를 추가해서 쓴다.
+ * Boot 4부터 JDBC 자동설정이 별도 모듈(spring-boot-jdbc)로 빠졌다. 이 모듈은 RAG(pgvector)용
+ * DataSource가 필요해진 시점부터 dstone-boot의 ConfigDatasource 패턴을 따라 JDBC starter를 쓴다.
  */
 @SpringBootApplication
 @ComponentScan(basePackages = { "net.dstone.ai" })
