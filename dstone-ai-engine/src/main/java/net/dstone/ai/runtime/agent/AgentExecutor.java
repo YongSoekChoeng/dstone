@@ -53,6 +53,24 @@ public class AgentExecutor extends BaseObject {
 	}
 
 	/**
+	 * call()과 요청 조립은 동일하고, 자유 텍스트 대신 구조화된 Verdict(pass/reason)로 응답을 받는다.
+	 * runtime.step.AgentStepRunner의 SUPERVISOR step처럼 "성공/실패를 LLM이 판정해야 하는" 호출 전용이다 -
+	 * Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱해주므로,
+	 * "통과: .../실패: ..." 텍스트 접두사를 사람이 프롬프트로 지시하고 코드가 문자열로 매칭하던 예전 방식보다
+	 * 형식 준수율이 높다. ragOverride/toolsOverride는 없다 - SUPERVISOR는 항상 Agent 정의값 그대로 쓴다
+	 * (요청별 override는 단일 대화 턴인 ChatController 전용 기능이라 여기엔 의미가 없다).
+	 *
+	 * @param sessionId   대화 세션 식별자
+	 * @param caller      호출한 앱/서비스 식별자
+	 * @param agent       호출할 Agent 정의
+	 * @param variables   프롬프트 템플릿에 바인딩할 변수 맵
+	 * @param userMessage 사용자 입력 텍스트
+	 */
+	public Verdict callForVerdict(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage) {
+		return this.buildSpec(sessionId, caller, agent, variables, null, null).user(userMessage).call().entity(Verdict.class);
+	}
+
+	/**
 	 * call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다.
 	 * 
 	 * @param sessionId     대화 세션 식별자

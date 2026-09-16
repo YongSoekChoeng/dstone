@@ -15,8 +15,13 @@ public enum StepType {
 	TOOL,
 
 	/**
-	 * AGENT와 똑같이 Agent를 호출하지만, 응답 텍스트가 "실패"로 시작하는지로 성공/실패를 가른다(TOOL과 같은 판정 컨벤션). 여러 step의 결과를 감독/재검토하는 역할이라, Agent의 프롬프트
-	 * 자체가 "통과: .../실패: 이유" 형식으로 답하도록 작성돼 있어야 한다(강제 장치는 없다 - 프롬프트 설계 컨벤션이다).
+	 * AGENT와 똑같이 Agent를 호출하지만, 응답을 자유 텍스트가 아니라 구조화된 Verdict(pass/reason)로
+	 * 받아서 성공/실패를 가른다(runtime.agent.AgentExecutor.callForVerdict, runtime.agent.Verdict
+	 * 참고). 여러 step의 결과를 감독/재검토하는 역할인데, TOOL처럼 응답이 결정론적 자바 코드에서
+	 * 나오지 않고 LLM이 만든 텍스트라서 "실패로 시작하는지" 같은 문자열 접두사 판정은 신뢰할 수 없다 -
+	 * 대신 Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰
+	 * 파싱하게 한다(그래도 100% 확정적이진 않다 - 스키마 자체를 어기면 파싱 예외가 나는데, 그 경우도
+	 * 실패로 처리된다).
 	 */
 	SUPERVISOR
 

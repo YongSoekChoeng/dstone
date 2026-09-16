@@ -5,13 +5,14 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.StepOutcome;
 import net.dstone.ai.runtime.agent.AgentExecutor;
+import net.dstone.ai.runtime.agent.Verdict;
+import net.dstone.common.utils.StringUtil;
 
-/** AGENT/SUPERVISOR step - ref로 지정된 Agent를 호출한다. SUPERVISOR만 "통과"/"실패" 접두사로 성공/실패를 가른다. */
+/** AGENT/SUPERVISOR step - ref로 지정된 Agent를 호출한다. SUPERVISOR만 구조화된 Verdict(pass/reason)로 성공/실패를 가른다. */
 @Component
 public class AgentStepRunner {
 
@@ -34,11 +35,16 @@ public class AgentStepRunner {
 	}
 
 	/**
-	 * SUPERVISOR step - AGENT와 똑같이 Agent를 호출하지만, 그 프롬프트가 "통과: .../실패: 이유" 형식으로 답하도록 작성돼 있다고 가정하고 그 텍스트로 성공/실패를 가른다(TOOL과 같은 판정 컨벤션).
-	 * 여러 step의 결과를 감독/재검토하는 역할이라, 강제 장치는 없고 프롬프트 설계로 지켜야 하는 관례다.
-	 * LLM이 그 컨벤션을 안 지킬 수 있다는 전제로, "통과"로 시작하는 경우에만 성공으로 인정하고(코드펜스나 다른 표현으로 답하는 등) 그 외에는 전부 실패로 처리한다(fail-closed). 
-	 * TOOL step은 응답이 결정론적인 자바 코드(SqlSyntaxTools 등)에서 나오므로 fail-open("실패"로 시작할 때만 실패)이어도 안전하지만, 
-	 * SUPERVISOR는 LLM이 만든 텍스트라 같은 방식이면 컨벤션을 벗어난 응답을 조용히 성공으로 흘려보낼 위험이 있다.
+	 * SUPERVISOR step - AGENT와 똑같이 Agent를 호출하지만, 응답을 자유 텍스트가 아니라 구조화된
+	 * Verdict(pass/reason)로 받아서 그걸로 성공/실패를 가른다(runtime.agent.AgentExecutor.callForVerdict
+	 * 참고 - Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰
+	 * 파싱해준다). 예전에는 "통과: .../실패: 이유" 텍스트 접두사를 프롬프트로 지시하고 코드가 문자열
+	 * 매칭으로 판정했는데, LLM이 그 컨벤션을 매번 정확히 지킨다는 보장이 없어서(코드펜스로 감싸거나
+	 * 다른 단어로 시작하는 식의 이탈이 실제로 있었다) 구조화 출력으로 바꿨다.
+	 *
+	 * 그래도 100% 확정적인 건 아니다 - 모델이 스키마 자체를 어기면 entity() 파싱이 예외를 던지는데,
+	 * 그런 경우와 verdict.pass()가 명시적으로 false인 경우를 구분하지 않고 둘 다 실패로 묶는다
+	 * (fail-closed - 판정을 신뢰할 수 없으면 안전한 쪽인 실패로 처리한다).
 	 *
 	 * @param ref       호출할 Agent 이름
 	 * @param sessionId 대화 세션 식별자
@@ -47,29 +53,17 @@ public class AgentStepRunner {
 	 * @param input     사용자 입력 텍스트
 	 */
 	public StepOutcome runSupervisor(String ref, String sessionId, String caller, Map<String, Object> variables, String input) {
-		String result = this.sanitizeForJudgment(this.call(ref, sessionId, caller, variables, input));
-		if (result.startsWith(Constants.Outcome.PASS_PREFIX)) {
+		Verdict verdict;
+		try {
+			verdict = this.callForVerdict(ref, sessionId, caller, variables, input);
+		} catch (Exception e) {
+			return new StepOutcome(false, input + "\n\n[검토 결과] 실패: 감독 Agent 응답을 구조화된 형식(pass/reason)으로 해석하지 못했습니다 - " + e.getMessage());
+		}
+		if (verdict != null && verdict.pass()) {
 			return new StepOutcome(true, input);
 		}
-		return new StepOutcome(false, input + "\n\n[검토 결과] " + result);
-	}
-
-	/**
-	 * "통과"/"실패" 판정 전에 선행/후행 공백과 마크다운 코드펜스(```)를 벗겨낸다.
-	 * LLM이 컨벤션 자체는 지키면서도 앞뒤에 공백이나 코드펜스를 붙이는 바람에 접두사 판정이 깨지는 것을 막는 최소한의 방어 코드다
-	 * (코드펜스를 완전히 무시하고 아예 다른 형식으로 답하는 경우까지는 못 막지만, 그런 경우는 fail-closed 판정으로 실패 처리된다).
-	 * @param text 판정에 쓸 원본 응답
-	 */
-	private String sanitizeForJudgment(String text) {
-		String trimmed = text == null ? "" : text.trim();
-		if (trimmed.startsWith("```")) {
-			int firstNewline = trimmed.indexOf('\n');
-			trimmed = firstNewline < 0 ? "" : trimmed.substring(firstNewline + 1).trim();
-		}
-		if (trimmed.endsWith("```")) {
-			trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
-		}
-		return trimmed;
+		String reason = verdict == null || StringUtil.isEmpty(verdict.reason()) ? "(사유 없음)" : verdict.reason();
+		return new StepOutcome(false, input + "\n\n[검토 결과] 실패: " + reason);
 	}
 
 	/**
@@ -84,6 +78,18 @@ public class AgentStepRunner {
 		// Workflow step은 항상 Agent 정의값 그대로 쓴다(null, null) - 요청별 ragOverride/toolsOverride 는
 		// api.controller.ChatController(단일 Agent 직접 호출)에만 있는 기능이다.
 		return this.agentExecutor.call(sessionId, caller, agent, variables, input, null, null);
+	}
+
+	/**
+	 * @param ref       호출할 Agent 이름
+	 * @param sessionId 대화 세션 식별자
+	 * @param caller    호출한 앱/서비스 식별자
+	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
+	 * @param input     사용자 입력 텍스트
+	 */
+	private Verdict callForVerdict(String ref, String sessionId, String caller, Map<String, Object> variables, String input) {
+		AgentDefinition agent = this.agentRegistry.resolve(ref, caller);
+		return this.agentExecutor.callForVerdict(sessionId, caller, agent, variables, input);
 	}
 
 }

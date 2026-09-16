@@ -73,9 +73,13 @@ public final class Constants {
 		public final static String FAIL_SENTINEL = "FAIL";
 	}
 
-	/** runtime.step.AgentStepRunner(SUPERVISOR)/ToolStepRunner(TOOL) - "통과: .../실패: ..." 성공·실패 판정 컨벤션. */
+	/**
+	 * runtime.step.ToolStepRunner(TOOL) - "실패: ..."로 시작하는지로 판정하는 컨벤션. Tool 응답이
+	 * 결정론적인 자바 코드(SqlSyntaxTools 등)에서 나오므로 이 방식이어도 안전하다. SUPERVISOR는
+	 * 같은 방식이 안전하지 않아서(LLM이 만든 자유 텍스트) 구조화 출력(runtime.agent.Verdict)으로
+	 * 바꿨다 - 더 이상 이 접두사 컨벤션을 쓰지 않는다.
+	 */
 	public static final class Outcome {
-		public final static String PASS_PREFIX = "통과";
 		public final static String FAIL_PREFIX = "실패";
 	}
 
