@@ -1,6 +1,6 @@
 # common.registry.WorkflowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# parallelGroup 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다 - LLM을 쓰는 AGENT step 없이
-# TOOL step(validateSqlSyntax) 두 개만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
+# parallelGroup 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다.
+# LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax) 두 개만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
 #
 # validate-a/validate-b가 같은 parallelGroup(check) 값을 가지므로 WorkflowExecutor가 둘을 동시에
 # 실행한다(runtime.WorkflowExecutor.runParallel 참고). 다음 step 판단은 그룹의 마지막 step인
