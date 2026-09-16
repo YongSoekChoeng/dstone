@@ -98,9 +98,9 @@ spring:
             api-key: ENC(iTbr7/33NEFc5gCOapVTLZsks5dU96gITu6OUXr2UqAVntTkq5p1nFjlVI/3RVVx/fZzBOAKEdngosd4zialqNUgfEq31RU3u8HUa/VBIaBnFViQCLJBPW8O81lcTpsHsQQPfRbeToKYHAm2BVMWP0cZhkx145+bnmoH7nXsXQE=)
             # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
             # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
-            # chat:
-            #     options:
-            #         model: claude-sonnet-4-5-20250929
+            chat:
+                 options:
+                     model: claude-sonnet-4-5-20250929
 
         ##########################################################################################
         # spring.ai.model.chat=openai 일 때 설정.
@@ -141,7 +141,8 @@ spring:
             pgvector:
                 initialize-schema: true
                 dimensions: 1024
-
+                index-type: HNSW
+                distance-type: COSINE_DISTANCE
 dstone:
     ai:
         ##########################################################################################
