@@ -163,6 +163,7 @@ dstone:
                 oracle-sql-analyzer: v1
                 oracle-to-postgresql: v1
                 oracle-sql-reviewer: v1
+                oracle-sql-fixer: v1
         ##########################################################################################
         # Tool 설정. 
         # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
