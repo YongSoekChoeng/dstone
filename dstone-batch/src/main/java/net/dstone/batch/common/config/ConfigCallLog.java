@@ -13,7 +13,7 @@ import net.dstone.batch.common.core.BaseBatchObject;
 import net.dstone.common.config.ConfigProperty;
 
 @Configuration
-public class ConfigAspect extends BaseBatchObject{
+public class ConfigCallLog extends BaseBatchObject{
 
 	@Autowired 
 	ConfigProperty configProperty; // 프로퍼티 가져오는 bean

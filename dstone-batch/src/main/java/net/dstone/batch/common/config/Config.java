@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 @Configuration
 @Import({ 
-	ConfigAspect.class,
+	ConfigCallLog.class,
 	ConfigAutoReg.class,
 	ConfigDatasource.class,
 	ConfigInterceptor.class,

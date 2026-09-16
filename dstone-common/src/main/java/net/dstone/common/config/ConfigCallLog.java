@@ -11,7 +11,7 @@ import net.dstone.common.core.BaseObject;
 @Aspect
 @Component
 @EnableAspectJAutoProxy(proxyTargetClass = true)
-public class ConfigAspect extends BaseObject {
+public class ConfigCallLog extends BaseObject {
 	
 	/****************************************** 1. 로깅 관련 AOP 설정 시작 ******************************************/
 	public static final ThreadLocal<ProceedingJoinPoint> CURRENT_JOIN_POINT = new ThreadLocal<>();

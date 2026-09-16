@@ -11,8 +11,8 @@ import net.dstone.common.core.BaseObject;
 @EnableScheduling
 @Configuration
 @Import({ 
-	net.dstone.common.config.ConfigAspect.class,
-	ConfigAspect.class,
+	net.dstone.common.config.ConfigCallLog.class,
+	ConfigCallLog.class,
 	ConfigDatasource.class,
 	ConfigKafka.class,
 	ConfigListener.class,

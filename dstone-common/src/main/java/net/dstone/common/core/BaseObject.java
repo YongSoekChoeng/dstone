@@ -62,7 +62,7 @@ public class BaseObject {
 
 	protected String signatureLog() {
 		StringBuffer buffer = new StringBuffer();
-		ProceedingJoinPoint joinPoint = net.dstone.common.config.ConfigAspect.CURRENT_JOIN_POINT.get();
+		ProceedingJoinPoint joinPoint = net.dstone.common.config.ConfigCallLog.CURRENT_JOIN_POINT.get();
 		if(joinPoint!=null) {
 			buffer.append("[CALL]" + this.signatureLog(joinPoint));
 		} else {

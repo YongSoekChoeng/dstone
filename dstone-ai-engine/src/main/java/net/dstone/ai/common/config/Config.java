@@ -13,7 +13,7 @@ import net.dstone.common.core.BaseObject;
  */
 @Configuration
 @Import({
-	ConfigAspect.class,
+	ConfigCallLog.class,
 	ConfigChatClient.class,
 	ConfigProperty.class,
 	ConfigRedis.class,

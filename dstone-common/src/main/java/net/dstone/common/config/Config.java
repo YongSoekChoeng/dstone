@@ -9,7 +9,7 @@ import net.dstone.common.core.BaseObject;
 @EnableAsync
 @Configuration
 @Import({ 
-	ConfigAspect.class,
+	ConfigCallLog.class,
 	ConfigProperty.class
 })
 public class Config extends BaseObject{

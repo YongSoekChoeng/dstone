@@ -1,7 +1,9 @@
-package net.dstone.ai.common.config;
+package net.dstone.batchadmin.common.config;
 
 import java.lang.reflect.Method;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -10,28 +12,30 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.ConvertUtil;
+import net.dstone.common.utils.StringUtil;
 
 @Aspect
 @Component
 @EnableAspectJAutoProxy(proxyTargetClass = true)
-public class ConfigAspect extends BaseObject {
-
-
-	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
-	private final static String NO_LOG_REGEX = "@annotation(net.dstone.common.annotation.NoAspectLog)";
+public class ConfigCallLog extends BaseObject {
+	
+	/****************************************** 1. 로깅 관련 AOP 설정 시작 ******************************************/
+	private final static String NO_LOG_ASPECT = "@annotation(net.dstone.common.annotation.NoAspectLog)";
 	/**
 	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint 가로챈 컨트롤러 메소드 호출 지점
+	 * @param joinPoint
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.ai.*..*Controller.*(..))" + " && !" + NO_LOG_REGEX)
+	@Around("execution(* net.dstone.batchadmin.*..*Controller.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
 		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
-
+		
 		/*****************************************************************************************************
 		컨트롤러 호출 시 응답헤더에 기본값 세팅
 		  - Response 헤더[successYn]에 "Y"를 자동세팅한다. 컨크롤러 로직 수행중 오류 발생 시(setErrCd 호출 시) 자동으로 "N"으로 세팅된다.
@@ -40,7 +44,7 @@ public class ConfigAspect extends BaseObject {
 		Object[] args = joinPoint.getArgs();
 		if(args != null) {
 			for(Object arg : args) {
-				if(arg instanceof HttpServletResponse) {
+				if(arg instanceof HttpServletResponse) {			
 					((HttpServletResponse)arg).setHeader("successYn", "Y");
 					break;
 				}
@@ -53,24 +57,26 @@ public class ConfigAspect extends BaseObject {
 		this.sysout("||===================================== [" + joinPoint.getTarget().getClass().getName() + "] END ======================================||\n");
 		return retObj;
 	}
+
 	/**
 	 * 서비스 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint 가로챈 서비스 메소드 호출 지점
+	 * @param joinPoint
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.ai.*..*Service*.*(..))" + " && !" + NO_LOG_REGEX)
+	@Around("execution(* net.dstone.batchadmin.*..*Service*.*(..))" + " && !" + NO_LOG_ASPECT)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
 		return joinPoint.proceed();
 	}
+
 	/**
 	 * DAO 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint 가로챈 DAO 메소드 호출 지점
+	 * @param joinPoint
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.ai.*..*Dao.*(..))")
+	@Around("execution(* net.dstone.batchadmin.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		Method method = ((MethodSignature)joinPoint.getSignature()).getMethod();
 		boolean noLog = method.getAnnotation(net.dstone.common.annotation.NoAspectLog.class) != null;
@@ -87,31 +93,6 @@ public class ConfigAspect extends BaseObject {
 			}
 		}
 	}
+	/****************************************** 1. 로깅 관련 AOP 설정 종료 ******************************************/
 	
-	/**
-	 * runtime 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint 가로챈 runtime 패키지 메소드 호출 지점
-	 * @return
-	 * @throws Throwable
-	 */
-	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX)
-	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Runtime ] {"+signatureLog(joinPoint)+"}");
-		return joinPoint.proceed();
-	}
-
-	/**
-	 * tools 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
-	 * @param joinPoint 가로챈 tools 패키지 메소드 호출 지점
-	 * @return
-	 * @throws Throwable
-	 */
-	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
-	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Tools ] {"+signatureLog(joinPoint)+"}");
-		return joinPoint.proceed();
-	}
-	
-	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
-
 }
