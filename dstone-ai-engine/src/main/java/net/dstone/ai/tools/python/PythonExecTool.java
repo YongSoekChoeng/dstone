@@ -8,7 +8,6 @@ import java.util.Map;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
@@ -19,9 +18,9 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * ShellExecTool과 같은 원칙의 Python 버전이다: dstone.ai.tool.python.enabled(기본 false)로 옵트인, allowed-scripts 화이트리스트에 등록된 .py 파일만
+ * ShellExecTool과 같은 원칙의 Python 버전이다: allowed-scripts 화이트리스트에 등록된 .py 파일만
  * `python3 <경로> <인자...>`로 실행한다. LLM이 임의 코드 문자열을 만들어 `python3 -c`로 실행시키는 방식은 만들지 않았다 - 항상 화이트리스트에 있는 스크립트 "파일"만 실행 대상이
- * 된다.
+ * 된다. ShellExecTool과 마찬가지로 별도의 on/off 플래그는 없다 - allowed-scripts를 비워두면(기본값) 곧 비활성 상태다.
  */
 @AiTool
 public class PythonExecTool extends BaseObject {
