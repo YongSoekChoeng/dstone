@@ -21,3 +21,9 @@ agents:
     promptName: oracle-sql-fixer
     toolsEnabled: true
     ragEnabled: false
+
+  - name: sql-conversion-report
+    description: 문법 검증까지 통과한 PostgreSQL SQL을 최종 검토해서, 이 결과를 받아볼 사람에게 짧게 보고한다(oracle-to-postgresql Workflow의 report step).
+    promptName: oracle-sql-reviewer
+    toolsEnabled: false
+    ragEnabled: false
