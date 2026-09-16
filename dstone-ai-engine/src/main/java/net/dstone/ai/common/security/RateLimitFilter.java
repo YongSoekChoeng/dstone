@@ -16,6 +16,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
@@ -32,16 +33,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	@Autowired
 	RedisTemplate<String, Object> redisTemplate;
 
-	private static final String PREFIX = "dstone.ai.security.ratelimit";
-	private static final long DEFAULT_WINDOW_SECONDS = 60L;
-	private static final int DEFAULT_LIMIT = 60;
-
 	/**
 	 * @param request 들어온 요청
 	 */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(PREFIX + ".enabled"));
+		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(Constants.Security.RateLimit.PREFIX + ".enabled"));
 		return !enabled || request.getRequestURI().startsWith("/actuator");
 	}
 
@@ -53,21 +50,21 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	@SuppressWarnings("rawtypes")
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-		boolean redisEnabled = Boolean.parseBoolean(this.configProperty.getProperty(PREFIX + ".enabled"));
+		boolean redisEnabled = Boolean.parseBoolean(this.configProperty.getProperty(Constants.Security.RateLimit.PREFIX + ".enabled"));
 		if (!redisEnabled) {
-			throw new IllegalStateException(PREFIX + ".enabled=true인데 Redis가 비활성화되어 있습니다(spring.data.redis.enabled=false) - rate limit은 Redis 카운터가 필요합니다.");
+			throw new IllegalStateException(Constants.Security.RateLimit.PREFIX + ".enabled=true인데 Redis가 비활성화되어 있습니다(spring.data.redis.enabled=false) - rate limit은 Redis 카운터가 필요합니다.");
 		}
 
-		String windowSecondsStr = this.configProperty.getProperty(PREFIX + ".window-seconds");
-		long windowSeconds = StringUtil.isEmpty(windowSecondsStr) ? DEFAULT_WINDOW_SECONDS : Long.parseLong(windowSecondsStr);
-		String defaultLimitStr = this.configProperty.getProperty(PREFIX + ".default-limit");
-		long defaultLimit = StringUtil.isEmpty(defaultLimitStr) ? DEFAULT_LIMIT : Integer.parseInt(defaultLimitStr);
+		String windowSecondsStr = this.configProperty.getProperty(Constants.Security.RateLimit.PREFIX + ".window-seconds");
+		long windowSeconds = StringUtil.isEmpty(windowSecondsStr) ? Constants.Security.RateLimit.DEFAULT_WINDOW_SECONDS : Long.parseLong(windowSecondsStr);
+		String defaultLimitStr = this.configProperty.getProperty(Constants.Security.RateLimit.PREFIX + ".default-limit");
+		long defaultLimit = StringUtil.isEmpty(defaultLimitStr) ? Constants.Security.RateLimit.DEFAULT_LIMIT : Integer.parseInt(defaultLimitStr);
 		if (windowSeconds <= 0 || defaultLimit <= 0) {
-			throw new IllegalStateException(PREFIX + ".window-seconds와 " + PREFIX + ".default-limit은 모두 양수여야 합니다.");
+			throw new IllegalStateException(Constants.Security.RateLimit.PREFIX + ".window-seconds와 " + Constants.Security.RateLimit.PREFIX + ".default-limit은 모두 양수여야 합니다.");
 		}
 
 		Map<String, Integer> resolved = new HashMap<>();
-		List rateLimitOverrideList = configProperty.getListProperty(PREFIX + ".overrides");
+		List rateLimitOverrideList = configProperty.getListProperty(Constants.Security.RateLimit.PREFIX + ".overrides");
 		String caller = "";
 		String limitStr = "";
 		if (rateLimitOverrideList != null) {
@@ -82,10 +79,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 					caller = rateLimitOverrideMap.get("caller").toString();
 				}
 				if (StringUtil.isEmpty(caller) || StringUtil.isEmpty(limitStr) || !StringUtil.isNumber(limitStr) || Integer.parseInt(limitStr) <= 0) {
-					throw new IllegalStateException(PREFIX + ".overrides 항목은 caller와 양수 limit이 모두 있어야 합니다: " + rateLimitOverrideMap);
+					throw new IllegalStateException(Constants.Security.RateLimit.PREFIX + ".overrides 항목은 caller와 양수 limit이 모두 있어야 합니다: " + rateLimitOverrideMap);
 				}
 				if (resolved.putIfAbsent(caller, Integer.valueOf(limitStr)) != null) {
-					throw new IllegalStateException(PREFIX + ".overrides에 caller=" + caller + "가 중복 등록되어 있습니다.");
+					throw new IllegalStateException(Constants.Security.RateLimit.PREFIX + ".overrides에 caller=" + caller + "가 중복 등록되어 있습니다.");
 				}
 			}
 		}
@@ -112,7 +109,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	 */
 	@SuppressWarnings("deprecation")
 	public long increment(String callerKey, long windowSeconds) {
-		String key = PREFIX + callerKey;
+		String key = Constants.Security.RateLimit.PREFIX + callerKey;
 		Long count = redisTemplate.opsForValue().increment(key);
 		if (count != null && count == 1L) {
 			redisTemplate.expire(key, windowSeconds, TimeUnit.SECONDS);

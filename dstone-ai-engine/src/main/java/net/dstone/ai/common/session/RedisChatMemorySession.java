@@ -17,6 +17,7 @@ import org.springframework.stereotype.Repository;
 
 import tools.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
@@ -31,9 +32,6 @@ import net.dstone.common.utils.StringUtil;
 @Repository
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")
 public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepository {
-
-	private static final String KEY_PREFIX = "dstone:ai:session:";
-	private static final String INDEX_KEY = KEY_PREFIX + "index";
 
 	private final RedisTemplate<String, Object> redisTemplate;
 	private final ObjectMapper objectMapper;
@@ -62,7 +60,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 
 	@Override
 	public List<String> findConversationIds() {
-		Set<Object> members = this.redisTemplate.opsForSet().members(INDEX_KEY);
+		Set<Object> members = this.redisTemplate.opsForSet().members(Constants.Session.INDEX_KEY);
 		if (members == null) {
 			return List.of();
 		}
@@ -104,9 +102,9 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 			}
 			this.redisTemplate.opsForList().rightPushAll(key, serialized);
 			this.redisTemplate.expire(key, this.ttlSeconds, TimeUnit.SECONDS);
-			this.redisTemplate.opsForSet().add(INDEX_KEY, conversationId);
+			this.redisTemplate.opsForSet().add(Constants.Session.INDEX_KEY, conversationId);
 		} else {
-			this.redisTemplate.opsForSet().remove(INDEX_KEY, conversationId);
+			this.redisTemplate.opsForSet().remove(Constants.Session.INDEX_KEY, conversationId);
 		}
 	}
 
@@ -116,14 +114,14 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 	@Override
 	public void deleteByConversationId(String conversationId) {
 		this.redisTemplate.delete(conversationKey(conversationId));
-		this.redisTemplate.opsForSet().remove(INDEX_KEY, conversationId);
+		this.redisTemplate.opsForSet().remove(Constants.Session.INDEX_KEY, conversationId);
 	}
 
 	/**
 	 * @param conversationId 대화 세션 식별자
 	 */
 	private String conversationKey(String conversationId) {
-		return KEY_PREFIX + conversationId;
+		return Constants.Session.KEY_PREFIX + conversationId;
 	}
 
 	/**

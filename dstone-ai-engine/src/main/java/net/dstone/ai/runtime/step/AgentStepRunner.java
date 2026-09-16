@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.StepOutcome;
@@ -13,8 +14,6 @@ import net.dstone.ai.runtime.agent.AgentExecutor;
 /** AGENT/SUPERVISOR step - ref로 지정된 Agent를 호출한다. SUPERVISOR만 "통과"/"실패" 접두사로 성공/실패를 가른다. */
 @Component
 public class AgentStepRunner {
-
-	private static final String PASS_PREFIX = "통과";
 
 	@Autowired
 	private AgentRegistry agentRegistry;
@@ -49,7 +48,7 @@ public class AgentStepRunner {
 	 */
 	public StepOutcome runSupervisor(String ref, String sessionId, String caller, Map<String, Object> variables, String input) {
 		String result = this.sanitizeForJudgment(this.call(ref, sessionId, caller, variables, input));
-		if (result.startsWith(PASS_PREFIX)) {
+		if (result.startsWith(Constants.Outcome.PASS_PREFIX)) {
 			return new StepOutcome(true, input);
 		}
 		return new StepOutcome(false, input + "\n\n[검토 결과] " + result);

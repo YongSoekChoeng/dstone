@@ -13,6 +13,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
@@ -32,9 +33,6 @@ import net.dstone.common.utils.StringUtil;
 @Order(1)
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
-	private static final String PREFIX = "dstone.ai.security.auth";
-	private static final String DEFAULT_HEADER_NAME = "X-API-Key";
-
 	@Autowired
 	ConfigProperty configProperty;
 
@@ -43,7 +41,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	 */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(PREFIX + ".enabled"));
+		boolean enabled = Boolean.parseBoolean(this.configProperty.getProperty(Constants.Security.Auth.PREFIX + ".enabled"));
 		return !enabled || request.getRequestURI().startsWith("/actuator");
 	}
 
@@ -55,13 +53,13 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	@SuppressWarnings("rawtypes")
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-		String apiKey = request.getHeader(DEFAULT_HEADER_NAME);
+		String apiKey = request.getHeader(Constants.Security.Auth.DEFAULT_HEADER_NAME);
 		if (StringUtil.isEmpty(apiKey)) {
-			reject(response, "API Key 헤더[" + DEFAULT_HEADER_NAME + "]가 없습니다.");
+			reject(response, "API Key 헤더[" + Constants.Security.Auth.DEFAULT_HEADER_NAME + "]가 없습니다.");
 			return;
 		}
 
-		List authKeyList = configProperty.getListProperty(PREFIX + ".keys");
+		List authKeyList = configProperty.getListProperty(Constants.Security.Auth.PREFIX + ".keys");
 		boolean isQualified = false;
 		String callerKey = "";
 		String caller = "";

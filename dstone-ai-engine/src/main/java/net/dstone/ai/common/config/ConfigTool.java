@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
@@ -26,8 +27,6 @@ import net.dstone.common.utils.LogUtil;
  */
 @Component
 public class ConfigTool extends BaseObject {
-
-	private static final String TOOL_POLICY_PREFIX = "dstone.ai.tool";
 
 	@Autowired
 	private ApplicationContext applicationContext;
@@ -98,7 +97,7 @@ public class ConfigTool extends BaseObject {
 		if (caller == null) {
 			return null;
 		}
-		List policyList = this.configProperty.getListProperty(TOOL_POLICY_PREFIX + ".allowed-by-caller");
+		List policyList = this.configProperty.getListProperty(Constants.Tool.POLICY_PREFIX + ".allowed-by-caller");
 		for (Object entry : policyList) {
 			Map policyMap = (Map) entry;
 			if (caller.equals(String.valueOf(policyMap.get("caller")))) {

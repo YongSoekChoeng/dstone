@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.StepOutcome;
 import net.dstone.ai.runtime.tool.ToolExecutor;
@@ -16,8 +17,6 @@ import net.dstone.ai.runtime.tool.ToolExecutor;
  */
 @Component
 public class ToolStepRunner {
-
-	private static final String FAILURE_PREFIX = "실패";
 
 	@Autowired
 	private ToolExecutor toolExecutor;
@@ -31,7 +30,7 @@ public class ToolStepRunner {
 	public StepOutcome run(StepDefinition step, String caller, Map<String, Object> variables, String input) {
 		String jsonInput = this.renderToolInput(step.inputTemplate(), input, variables);
 		String toolResult = this.toolExecutor.call(caller, step.ref(), jsonInput);
-		if (toolResult.startsWith(FAILURE_PREFIX)) {
+		if (toolResult.startsWith(Constants.Outcome.FAIL_PREFIX)) {
 			return new StepOutcome(false, input + "\n\n[검증 결과] " + toolResult);
 		}
 		return new StepOutcome(true, input);

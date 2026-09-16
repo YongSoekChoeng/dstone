@@ -9,9 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.config.ConfigTool;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.prompt.PromptTemplateRegistry;
-import net.dstone.ai.common.security.CallerContext;
 import net.dstone.ai.rag.RagService;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
@@ -114,7 +114,7 @@ public class AgentExecutor extends BaseObject {
 				{
 					@Override
 					public void accept(ChatClient.AdvisorSpec a) {
-						a.param(CallerContext.ADVISOR_CONTEXT_KEY, caller);
+						a.param(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller);
 					}
 				});
 		}

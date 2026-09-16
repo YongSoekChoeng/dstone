@@ -17,6 +17,7 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
@@ -27,8 +28,6 @@ import net.dstone.common.utils.StringUtil;
  */
 @AiTool
 public class HttpCallTool extends BaseObject {
-
-	private static final String PREFIX = "dstone.ai.tool.http";
 
 	@Autowired
 	private ConfigProperty configProperty;
@@ -75,17 +74,17 @@ public class HttpCallTool extends BaseObject {
 		if (StringUtil.isEmpty(host)) {
 			return false;
 		}
-		List<String> allowedHosts = Binder.get(this.environment).bind(PREFIX + ".allowed-hosts", Bindable.listOf(String.class)).orElse(List.of());
+		List<String> allowedHosts = Binder.get(this.environment).bind(Constants.Tool.Http.PREFIX + ".allowed-hosts", Bindable.listOf(String.class)).orElse(List.of());
 		return allowedHosts.contains(host);
 	}
 
 	private Duration timeout() {
-		String seconds = this.configProperty.getProperty(PREFIX + ".timeout-seconds");
+		String seconds = this.configProperty.getProperty(Constants.Tool.Http.PREFIX + ".timeout-seconds");
 		return Duration.ofSeconds(StringUtil.isEmpty(seconds) ? 10 : Long.parseLong(seconds));
 	}
 
 	private int maxResponseChars() {
-		String chars = this.configProperty.getProperty(PREFIX + ".max-response-chars");
+		String chars = this.configProperty.getProperty(Constants.Tool.Http.PREFIX + ".max-response-chars");
 		return StringUtil.isEmpty(chars) ? 4000 : Integer.parseInt(chars);
 	}
 

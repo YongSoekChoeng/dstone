@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.ai.api.dto.WorkflowRequest;
 import net.dstone.ai.api.dto.WorkflowStatusResponse;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.WorkflowDefinition;
 import net.dstone.ai.runtime.WorkflowContext;
 import net.dstone.ai.runtime.WorkflowExecutor;
@@ -29,9 +30,6 @@ import net.dstone.common.biz.BaseService;
  */
 @Service
 public class AsyncJobService extends BaseService {
-
-	private static final String JOB_KEY_PREFIX = "dstone:ai:workflow:job:";
-	private static final long JOB_TTL_SECONDS = 3600L; // 폴링이 끝난 결과를 계속 남겨둘 이유가 없어 1시간 후 자동 소멸
 
 	@Autowired(required = false)
 	private RedisTemplate<String, Object> redisTemplate;
@@ -70,7 +68,7 @@ public class AsyncJobService extends BaseService {
 	/** @param jobId 조회할 작업 id */
 	public WorkflowStatusResponse status(String jobId) {
 		this.requireRedis();
-		Map<Object, Object> entries = this.redisTemplate.opsForHash().entries(JOB_KEY_PREFIX + jobId);
+		Map<Object, Object> entries = this.redisTemplate.opsForHash().entries(Constants.AsyncJob.JOB_KEY_PREFIX + jobId);
 		if (entries.isEmpty()) {
 			throw new IllegalArgumentException("존재하지 않거나 만료된 jobId입니다: " + jobId);
 		}
@@ -92,9 +90,9 @@ public class AsyncJobService extends BaseService {
 		if (error != null) {
 			fields.put("error", error);
 		}
-		String key = JOB_KEY_PREFIX + jobId;
+		String key = Constants.AsyncJob.JOB_KEY_PREFIX + jobId;
 		this.redisTemplate.opsForHash().putAll(key, fields);
-		this.redisTemplate.expire(key, JOB_TTL_SECONDS, TimeUnit.SECONDS);
+		this.redisTemplate.expire(key, Constants.AsyncJob.JOB_TTL_SECONDS, TimeUnit.SECONDS);
 	}
 
 	/** @param value 문자열로 변환할 Redis Hash 값 */

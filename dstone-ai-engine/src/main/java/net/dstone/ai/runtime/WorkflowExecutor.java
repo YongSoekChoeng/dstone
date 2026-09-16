@@ -10,6 +10,7 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.common.definition.WorkflowDefinition;
 import net.dstone.ai.runtime.step.AgentStepRunner;
@@ -29,10 +30,6 @@ import net.dstone.common.utils.StringUtil;
  */
 @Component
 public class WorkflowExecutor extends BaseObject {
-
-	private static final int DEFAULT_MAX_ITERATIONS = 5;
-	private static final String SUCCESS_SENTINEL = "SUCCESS";
-	private static final String FAIL_SENTINEL = "FAIL";
 
 	@Autowired
 	private AgentStepRunner agentStepRunner;
@@ -60,7 +57,7 @@ public class WorkflowExecutor extends BaseObject {
 		for (StepDefinition step : workflow.steps()) {
 			stepsById.put(step.id(), step);
 		}
-		int maxIterations = workflow.maxIterations() == null ? DEFAULT_MAX_ITERATIONS : workflow.maxIterations();
+		int maxIterations = workflow.maxIterations() == null ? Constants.Workflow.DEFAULT_MAX_ITERATIONS : workflow.maxIterations();
 
 		String currentId = workflow.steps().get(0).id();
 		int executed = 0;
@@ -132,10 +129,10 @@ public class WorkflowExecutor extends BaseObject {
 			String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
 			return sequentialNextId == null ? StepResult.success(outcome.text()) : StepResult.next(sequentialNextId);
 		}
-		if (SUCCESS_SENTINEL.equals(nextId)) {
+		if (Constants.Workflow.SUCCESS_SENTINEL.equals(nextId)) {
 			return StepResult.success(outcome.text());
 		}
-		if (FAIL_SENTINEL.equals(nextId)) {
+		if (Constants.Workflow.FAIL_SENTINEL.equals(nextId)) {
 			return StepResult.fail(outcome.text());
 		}
 		int currentIndex = this.indexOf(workflow.steps(), step.id());

@@ -12,6 +12,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.definition.WorkflowDefinition;
 import net.dstone.common.core.BaseObject;
@@ -27,9 +28,6 @@ import net.dstone.common.utils.LogUtil;
  */
 @Component
 public class YamlDefinitionLoader extends BaseObject {
-
-	private static final String WORKFLOW_LOCATION_PATTERN = "classpath*:workflows/*.yml";
-	private static final String AGENT_LOCATION_PATTERN = "classpath*:agents/*.yml";
 
 	/**
 	 * workflows/*.yml 파일 하나의 최상위 구조(workflow: 키 하나).
@@ -53,7 +51,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	public List<WorkflowDefinition> loadWorkflows() {
 		List<WorkflowDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(WORKFLOW_LOCATION_PATTERN)) {
+		for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
 			WorkflowFile file = this.readAs(resource, WorkflowFile.class);
 			if (file.workflow() == null) {
 				throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
@@ -66,7 +64,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	public List<AgentDefinition> loadAgents() {
 		List<AgentDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(AGENT_LOCATION_PATTERN)) {
+		for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
 			AgentFile file = this.readAs(resource, AgentFile.class);
 			if (file.agents() == null || file.agents().isEmpty()) {
 				throw new IllegalStateException(resource.getFilename() + "에 agents: 최상위 키(1개 이상)가 없습니다.");

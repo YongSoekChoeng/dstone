@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import net.dstone.ai.api.dto.IngestResponse;
 import net.dstone.ai.api.dto.RagSearchRequest;
 import net.dstone.ai.api.dto.RetrievedChunk;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.biz.BaseService;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
@@ -35,9 +36,6 @@ import net.dstone.common.utils.StringUtil;
  */
 @Service
 public class RagService extends BaseService {
-
-	private static final String SOURCE_ID_METADATA_KEY = "sourceId";
-	private static final String TENANT_METADATA_KEY = "tenant";
 
 	@Autowired
 	private ObjectProvider<VectorStore> vectorStoreProvider;
@@ -77,8 +75,8 @@ public class RagService extends BaseService {
 	 */
 	private Filter.Expression buildFilter(String caller, String sourceId) {
 		FilterExpressionBuilder builder = new FilterExpressionBuilder();
-		Op tenantOp = StringUtil.isEmpty(caller) ? null : builder.eq(TENANT_METADATA_KEY, caller);
-		Op sourceOp = StringUtil.isEmpty(sourceId) ? null : builder.eq(SOURCE_ID_METADATA_KEY, sourceId);
+		Op tenantOp = StringUtil.isEmpty(caller) ? null : builder.eq(Constants.Rag.TENANT_METADATA_KEY, caller);
+		Op sourceOp = StringUtil.isEmpty(sourceId) ? null : builder.eq(Constants.Rag.SOURCE_ID_METADATA_KEY, sourceId);
 		if (tenantOp != null && sourceOp != null) {
 			return builder.and(tenantOp, sourceOp).build();
 		}
@@ -151,9 +149,9 @@ public class RagService extends BaseService {
 		List<Document> chunks = textSplitter.apply(extracted);
 		List<Document> tagged = new ArrayList<>(chunks.size());
 		for (Document chunk : chunks) {
-			var mutator = chunk.mutate().metadata(SOURCE_ID_METADATA_KEY, sourceId);
+			var mutator = chunk.mutate().metadata(Constants.Rag.SOURCE_ID_METADATA_KEY, sourceId);
 			if (!StringUtil.isEmpty(caller)) {
-				mutator.metadata(TENANT_METADATA_KEY, caller);
+				mutator.metadata(Constants.Rag.TENANT_METADATA_KEY, caller);
 			}
 			tagged.add(mutator.build());
 		}

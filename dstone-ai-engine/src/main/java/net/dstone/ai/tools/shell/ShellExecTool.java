@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.exec.ExternalProcessRunner;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
@@ -23,8 +24,6 @@ import net.dstone.common.utils.StringUtil;
  */
 @AiTool
 public class ShellExecTool extends BaseObject {
-
-	private static final String PREFIX = "dstone.ai.tool.shell";
 
 	@Autowired
 	private ConfigProperty configProperty;
@@ -54,7 +53,7 @@ public class ShellExecTool extends BaseObject {
 	 * @param scriptName 경로를 찾을 스크립트의 등록된 이름
 	 */
 	private String resolvePath(String scriptName) {
-		List allowed = this.configProperty.getListProperty(PREFIX + ".allowed-commands");
+		List allowed = this.configProperty.getListProperty(Constants.Tool.Shell.PREFIX + ".allowed-commands");
 		for (Object entry : allowed) {
 			Map map = (Map) entry;
 			if (scriptName.equals(String.valueOf(map.get("name")))) {
@@ -65,12 +64,12 @@ public class ShellExecTool extends BaseObject {
 	}
 
 	private Duration timeout() {
-		String seconds = this.configProperty.getProperty(PREFIX + ".timeout-seconds");
+		String seconds = this.configProperty.getProperty(Constants.Tool.Shell.PREFIX + ".timeout-seconds");
 		return Duration.ofSeconds(StringUtil.isEmpty(seconds) ? 10 : Long.parseLong(seconds));
 	}
 
 	private int maxOutputChars() {
-		String chars = this.configProperty.getProperty(PREFIX + ".max-output-chars");
+		String chars = this.configProperty.getProperty(Constants.Tool.Shell.PREFIX + ".max-output-chars");
 		return StringUtil.isEmpty(chars) ? 4000 : Integer.parseInt(chars);
 	}
 
