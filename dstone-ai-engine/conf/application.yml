@@ -80,7 +80,7 @@ spring:
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
         # 아직 쓰지 않으므로 전부 명시적으로 꺼둔다.
         model:
-            chat: anthropic # anthropic | openai | ollama
+            chat: ollama # anthropic | openai | ollama
             embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
             audio:
                 speech: none
@@ -127,7 +127,7 @@ spring:
                 max-retries: 1   
             chat:
                 options:
-                    model: qwen2.5-coder:7b # 로컬에 pull된 채팅 모델 - Ollama tool-calling 신뢰성 문제(13절)로 llama3.2에서 교체
+                    model: qwen2.5-coder:3b # 로컬에 pull된 채팅 모델 (qwen2.5-coder:3b, qwen2.5-coder:7b, llama3.2:latest, bge-m3:latest)
                     timeout: 300s # 충분하게 5분(300초) 등으로 조절
                     #temperature: 0.0  # 💡 모든 Ollama 요청의 토큰 생성 다양성을 제거하여 속도 및 일관성 향상
             embedding: # spring.ai.model.embedding=ollama 용 설정.
