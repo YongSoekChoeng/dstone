@@ -637,3 +637,21 @@ Compiles cleanly and the logic is consistent. Implementation complete.
 - `StepType.java`의 SUPERVISOR 자바독, `docs/09.dstone-ai-engine.md` 5절 "성공/실패 판정 관례"를 새 구조에 맞게 다시 씀 — TOOL은 기존 텍스트 접두사 방식 그대로(결정론적 코드라 안전), SUPERVISOR만 구조화 출력으로 분리했다는 점을 명시
 
 `mvn compile` 통과 확인했습니다. 다만 현재 `resources/agents/*.yml`/`resources/workflows/*.yml`에 SUPERVISOR를 실제로 쓰는 정의가 없어서(전에 확인했던 대로), 실제 모델 호출로는 검증되지 않은 상태입니다 — 필요하시면 지난번 `parallel-test.yml`처럼 SUPERVISOR 하나 쓰는 간단한 테스트 Workflow를 만들어서 dstone-boot 화면에서 돌려볼 수 있게 준비해드릴까요?
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>bju8qn37v</task-id>
+<tool-use-id>toolu_0143bKwMPeZ1sRa1vdNr9pG8</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/861f4495-5c7a-4965-a4a7-600ac42b39fc/tasks/bju8qn37v.output</output-file>
+<status>completed</status>
+<summary>Background command "find ~/.m2 -iname "spring-ai-model-*.jar" 2&gt;/dev/null | head -5; find / -iname "spring-ai-model-*.jar" 2&gt;/dev/null | head -5" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+## 답변
+
+That background `find` command finished (it was superseded by the more targeted jar lookup I already used) — no action needed, nothing else pending.
