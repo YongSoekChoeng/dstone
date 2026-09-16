@@ -12,7 +12,13 @@ import net.dstone.common.core.BaseObject;
  * @ComponentScan(net.dstone.ai) 범위 밖이라 자동으로는 안 잡히는 net.dstone.common의 공용 Config 빈을 여기 한 곳에 모아 @Import 해준다.
  */
 @Configuration
-@Import({ ConfigCallLog.class, ConfigChatClient.class, ConfigProperty.class, ConfigRedis.class, ConfigTool.class })
+@Import({ 
+	ConfigCallLog.class
+	, ConfigChatClient.class
+	, ConfigProperty.class
+	, ConfigRedis.class
+	, ConfigTool.class 
+})
 public class Config extends BaseObject {
 
 }
