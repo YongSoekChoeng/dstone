@@ -1,19 +1,18 @@
 # common.registry.WorkflowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# analyze -> convert -> validate 순서로 진행하고, validate가 실패하면 fix로 갔다가 다시 validate로
-# 되돌아간다(루프) - maxIterations가 무한루프를 막는다. validate를 통과하면 report(SUPERVISOR)가
-# 최종 SQL을 한 번 더 검토해서 통과/실패를 판정한다 - 통과하면 그대로 종료, 실패하면 Workflow
-# 전체가 실패로 끝난다(runtime.step.AgentStepRunner.runSupervisor 참고 - 구조화된 Verdict(pass/
-# reason)로 판정하며, report는 항상 fix로 되돌아가지 않는다는 점에서 validate의 재작성 루프와는
+# analyze -> convert -> validate -> report 순서로 진행.
+# validate가 실패하면 fix로 갔다가 다시 validate로 되돌아간다(루프). maxIterations가 무한루프를 막는다. 
+# validate를 통과하면 report(SUPERVISOR)가 최종 SQL을 한 번 더 검토해서 통과/실패를 판정한다. 
+# 통과하면 그대로 종료, 실패하면 Workflow 전체가 실패로 끝난다(runtime.step.AgentStepRunner.runSupervisor 참고)
+# 구조화된 Verdict(pass/reason)로 판정하며, report는 항상 fix로 되돌아가지 않는다는 점에서 validate의 재작성 루프와는
 # 역할이 다르다: validate는 "문법이 맞는가"라는 기계적 판정이라 자동 재작성이 적합하지만, report는
 # 사람이 검토해야 할 -- NOTE: 같은 판단 문제를 잡아내는 최종 게이트라 자동 루프로 되돌리지 않는다).
 #
-# maxIterations=6인 이유: analyze(1)->convert(2)->validate(3, 실패)->fix(4)->validate(5, 성공)
-# ->report(6) 처럼 재작성이 정확히 1번 걸리는 경우까지 커버해야 한다(재작성 없이 바로 통과하면
-# analyze->convert->validate->report 4단계로 여유가 있다).
+# maxIterations 이 6 이상이어야 하는 이유: analyze(1)->convert(2)->validate(3, 실패)->fix(4)->validate(5, 성공)->report(6) 처럼 
+# 재작성이 정확히 1번 걸리는 경우까지 커버해야 한다(재작성 없이 바로 통과하면 analyze->convert->validate->report 4단계로 여유가 있다).
 workflow:
   id: oracle-to-postgresql
   description: Oracle MyBatis SQL을 PostgreSQL MyBatis SQL로 변환한다(분석 -> 변환 -> 검증 -> 실패 시 재작성 루프 -> 최종 검토).
-  maxIterations: 6
+  maxIterations: 10
   steps:
 
     - id: analyze
