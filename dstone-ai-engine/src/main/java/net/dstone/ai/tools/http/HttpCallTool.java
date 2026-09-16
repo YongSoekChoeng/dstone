@@ -43,8 +43,7 @@ public class HttpCallTool extends BaseObject {
 		URI uri;
 		try {
 			uri = URI.create(url);
-		}
-		catch (IllegalArgumentException e) {
+		} catch (IllegalArgumentException e) {
 			return "실패: URL 형식이 올바르지 않습니다 - " + e.getMessage();
 		}
 		if (!this.isAllowedHost(uri.getHost())) {
@@ -56,19 +55,14 @@ public class HttpCallTool extends BaseObject {
 		try {
 			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 			String body = response.body() == null ? "" : response.body();
-			String truncated = body.length() > this.maxResponseChars() ? body.substring(0, this.maxResponseChars()) + "...(생략)"
-				: body;
-			String result = response.statusCode() >= 200 && response.statusCode() < 300
-				? "통과: HTTP " + response.statusCode() + "\n" + truncated
-				: "실패: HTTP " + response.statusCode() + "\n" + truncated;
+			String truncated = body.length() > this.maxResponseChars() ? body.substring(0, this.maxResponseChars()) + "...(생략)" : body;
+			String result = response.statusCode() >= 200 && response.statusCode() < 300 ? "통과: HTTP " + response.statusCode() + "\n" + truncated : "실패: HTTP " + response.statusCode() + "\n" + truncated;
 			LogUtil.sysout("dstone-ai-engine tool-audit: http url=" + url + " -> HTTP " + response.statusCode());
 			return result;
-		}
-		catch (InterruptedException e) {
+		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			return "실패: 호출이 중단되었습니다.";
-		}
-		catch (IOException e) {
+		} catch (IOException e) {
 			LogUtil.sysout("dstone-ai-engine tool-audit: http url=" + url + " -> 실패 " + e.getMessage());
 			return "실패: 호출 실패 - " + e.getMessage();
 		}
@@ -81,9 +75,7 @@ public class HttpCallTool extends BaseObject {
 		if (StringUtil.isEmpty(host)) {
 			return false;
 		}
-		List<String> allowedHosts = Binder.get(this.environment)
-			.bind(PREFIX + ".allowed-hosts", Bindable.listOf(String.class))
-			.orElse(List.of());
+		List<String> allowedHosts = Binder.get(this.environment).bind(PREFIX + ".allowed-hosts", Bindable.listOf(String.class)).orElse(List.of());
 		return allowedHosts.contains(host);
 	}
 

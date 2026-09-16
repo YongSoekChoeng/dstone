@@ -15,9 +15,9 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * classpath:workflows/*.yml 전체를 기동 시 한 번 읽어 id로 찾아주는 등록소다.
- * api.controller.WorkflowController가 이 레지스트리에서 바로 WorkflowDefinition을 찾아
- * runtime.WorkflowExecutor에 넘긴다.
+ * Workflow 정보를 저장하는 컴퍼넌트. YamlDefinitionLoader => WorkflowDefinition => WorkflowRegistry 순서로 내용이 로딩된다.
+ * classpath:workflows/*.yml 전체를 기동 시 한 번 읽어 id로 찾아주는 등록소다. api.controller.WorkflowController가 이 레지스트리에서 바로
+ * WorkflowDefinition을 찾아 runtime.WorkflowExecutor에 넘긴다.
  */
 @Component
 public class WorkflowRegistry extends BaseObject {
@@ -44,7 +44,8 @@ public class WorkflowRegistry extends BaseObject {
 
 	/**
 	 * 모르는 id거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
-	 * @param id 조회할 workflow id
+	 * 
+	 * @param id     조회할 workflow id
 	 * @param caller 호출한 앱/서비스 식별자
 	 */
 	public WorkflowDefinition resolve(String id, String caller) {

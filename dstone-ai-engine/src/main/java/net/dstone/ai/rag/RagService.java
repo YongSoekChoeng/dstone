@@ -26,14 +26,12 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * RAG(검색-증강 생성) 기능 - 문서 적재/삭제(api.controller.RagController)와 채팅 중 자동 검색
- * 증강(runtime.agent.AgentExecutor), Workflow의 RAG step(runtime.step.RagStepRunner)이 모두 이
- * 클래스 하나를 통해 VectorStore를 다룬다.
+ * RAG(검색-증강 생성) 기능 - 문서 적재/삭제(api.controller.RagController)와 채팅 중 자동 검색 증강(runtime.agent.AgentExecutor), Workflow의 RAG
+ * step(runtime.step.RagStepRunner)이 모두 이 클래스 하나를 통해 VectorStore를 다룬다.
  *
- * 실제 검색에 쓰이는 VectorStore(pgvector)는 dstone.ai.rag.enabled=true이고 spring.ai.model.embedding이
- * 올바르게 설정돼 있을 때만 Spring AI가 만들어주는 빈이라(VectorStore가 아예 없을 수 있다), 이 빈의
- * 존재 여부를 requireVectorStore() 한 곳에서만 흡수한다 - 그래서 이 클래스는 항상 등록되고, "RAG를
- * 실제로 쓸 수 있는가"는 메서드를 호출한 시점에만 판단된다.
+ * 실제 검색에 쓰이는 VectorStore(pgvector)는 dstone.ai.rag.enabled=true이고 spring.ai.model.embedding이 올바르게 설정돼 있을 때만 Spring AI가
+ * 만들어주는 빈이라(VectorStore가 아예 없을 수 있다), 이 빈의 존재 여부를 requireVectorStore() 한 곳에서만 흡수한다 - 그래서 이 클래스는 항상 등록되고, "RAG를 실제로 쓸 수
+ * 있는가"는 메서드를 호출한 시점에만 판단된다.
  */
 @Service
 public class RagService extends BaseService {
@@ -71,10 +69,10 @@ public class RagService extends BaseService {
 	}
 
 	/**
-	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐준다. 둘 다 없으면
-	 * null(=필터 없음)을 돌려준다 - caller가 없는 경우(security.auth가 꺼진 배포)는 기존과 동일하게
-	 * tenant 필터 없이 동작해야 하므로, 이 메서드가 유일하게 "격리를 켤지" 판단하는 지점이다.
-	 * @param caller 호출한 앱/서비스 식별자
+	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐준다. 둘 다 없으면 null(=필터 없음)을 돌려준다 - caller가 없는
+	 * 경우(security.auth가 꺼진 배포)는 기존과 동일하게 tenant 필터 없이 동작해야 하므로, 이 메서드가 유일하게 "격리를 켤지" 판단하는 지점이다.
+	 * 
+	 * @param caller   호출한 앱/서비스 식별자
 	 * @param sourceId 문서 논리 식별자
 	 */
 	private Filter.Expression buildFilter(String caller, String sourceId) {
@@ -95,13 +93,12 @@ public class RagService extends BaseService {
 
 	/**
 	 * 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다.
+	 * 
 	 * @param caller 호출한 앱/서비스 식별자
 	 */
 	public Advisor getRagSpecAdvisor(String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
-		SearchRequest.Builder requestBuilder = SearchRequest.builder()
-			.topK(this.defaultTopK())
-			.similarityThreshold(this.defaultSimilarityThreshold());
+		SearchRequest.Builder requestBuilder = SearchRequest.builder().topK(this.defaultTopK()).similarityThreshold(this.defaultSimilarityThreshold());
 		Filter.Expression filter = this.buildFilter(caller, null);
 		if (filter != null) {
 			requestBuilder.filterExpression(filter);
@@ -111,16 +108,14 @@ public class RagService extends BaseService {
 
 	/**
 	 * caller(=tenant_id)의 문서 범위로만 검색을 제한한다 - caller가 없으면(security.auth 꺼짐) 기존과 동일하게 전체 검색.
+	 * 
 	 * @param request 검색 조건(질의어, topK 등)
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller  호출한 앱/서비스 식별자
 	 */
 	public List<RetrievedChunk> search(RagSearchRequest request, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
-		SearchRequest.Builder builder = SearchRequest.builder()
-			.query(request.query())
-			.topK(request.topK() == null ? this.defaultTopK() : request.topK())
-			.similarityThreshold(
-				request.similarityThreshold() == null ? this.defaultSimilarityThreshold() : request.similarityThreshold());
+		SearchRequest.Builder builder = SearchRequest.builder().query(request.query()).topK(request.topK() == null ? this.defaultTopK() : request.topK())
+			.similarityThreshold(request.similarityThreshold() == null ? this.defaultSimilarityThreshold() : request.similarityThreshold());
 		Filter.Expression filter = this.buildFilter(caller, request.sourceId());
 		if (filter != null) {
 			builder.filterExpression(filter);
@@ -134,15 +129,14 @@ public class RagService extends BaseService {
 	}
 
 	/**
-	 * 원문을 Tika로 추출 → TokenTextSplitter로 청킹 → VectorStore(pgvector)에 저장한다. sourceId는
-	 * 호출하는 쪽이 정하는 논리적 문서 식별자(파일명, 업무키 등)로, 같은 sourceId로 다시 적재하면
-	 * upsert처럼 동작하도록 새 청크를 넣기 전에 그 sourceId로 색인돼 있던 기존 청크를 먼저 지운다.
+	 * 원문을 Tika로 추출 → TokenTextSplitter로 청킹 → VectorStore(pgvector)에 저장한다. sourceId는 호출하는 쪽이 정하는 논리적 문서 식별자(파일명, 업무키 등)로, 같은
+	 * sourceId로 다시 적재하면 upsert처럼 동작하도록 새 청크를 넣기 전에 그 sourceId로 색인돼 있던 기존 청크를 먼저 지운다.
 	 *
-	 * caller(=tenant_id)가 있으면 청크마다 tenant metadata를 함께 태깅해서, search()/getRagSpecAdvisor()가
-	 * 같은 caller의 문서만 검색하도록 격리한다.
+	 * caller(=tenant_id)가 있으면 청크마다 tenant metadata를 함께 태깅해서, search()/getRagSpecAdvisor()가 같은 caller의 문서만 검색하도록 격리한다.
+	 * 
 	 * @param resource 적재할 원문 파일
 	 * @param sourceId 문서 논리 식별자(재적재 시 upsert 기준 키)
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller   호출한 앱/서비스 식별자
 	 */
 	public IngestResponse ingest(Resource resource, String sourceId, String caller) {
 		if (StringUtil.isEmpty(sourceId)) {
@@ -151,9 +145,7 @@ public class RagService extends BaseService {
 		VectorStore vectorStore = this.requireVectorStore();
 
 		String chunkSize = this.configProperty.getProperty("dstone.ai.rag.ingest.chunk-size");
-		TokenTextSplitter textSplitter = TokenTextSplitter.builder()
-			.withChunkSize(StringUtil.isEmpty(chunkSize) ? 800 : Integer.parseInt(chunkSize))
-			.build();
+		TokenTextSplitter textSplitter = TokenTextSplitter.builder().withChunkSize(StringUtil.isEmpty(chunkSize) ? 800 : Integer.parseInt(chunkSize)).build();
 
 		List<Document> extracted = new TikaDocumentReader(resource).get();
 		List<Document> chunks = textSplitter.apply(extracted);
@@ -179,8 +171,9 @@ public class RagService extends BaseService {
 
 	/**
 	 * sourceId와 caller(=tenant_id) 조건을 함께 걸어 삭제한다 - 다른 tenant가 같은 sourceId를 썼어도 서로의 문서를 지우지 못한다.
+	 * 
 	 * @param sourceId 문서 논리 식별자
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller   호출한 앱/서비스 식별자
 	 */
 	public void deleteBySourceId(String sourceId, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();

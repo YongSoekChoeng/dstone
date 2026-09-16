@@ -19,15 +19,13 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * WorkflowDefinition을 순차/분기/병렬/루프 4패턴으로 실행한다 - Workflow의 큰 흐름(어떤 step 다음에
- * 어떤 step, 언제 멈출지)은 이 클래스가 통제하고, step 하나하나의 지능적인 판단은 각 StepType 러너를
- * 거쳐 결국 LLM에게 맡긴다. 별도 워크플로우 그래프 엔진을 새로 설계하지 않고, "지금 step의 id → 다음에
- * 실행할 step의 id"를 계속 따라가는 단순한 상태 기계로 구현했다.
+ * Workflow 를 진행하는 핵심 클래스. WorkflowDefinition을 순차/분기/병렬/루프 4패턴으로 실행한다. Workflow의 큰 흐름(어떤 step 다음에 어떤 step, 언제 멈출지)은 이
+ * 클래스가 통제하고, step 하나하나의 지능적인 판단은 각 StepType 러너를 거쳐 결국 LLM에게 맡긴다. 별도 워크플로우 그래프 엔진을 새로 설계하지 않고, "지금 step의 id → 다음에 실행할
+ * step의 id"를 계속 따라가는 단순한 상태 기계로 구현했다.
  *
- * StepDefinition.onSuccess/onFailure로 지정한 다음 step id가 지금 step보다 앞에 있으면 LOOP로,
- * 뒤에 있으면 NEXT_STEP으로 본다(둘 다 동작은 같다 - StepStatus는 로그/가독성을 위한 구분일 뿐이고,
- * 실제 무한루프 방지는 maxIterations 하나가 담당한다). onSuccess/onFailure에 예약어 "SUCCESS"/"FAIL"을
- * 쓰면 그 자리에서 Workflow를 즉시 종료한다.
+ * StepDefinition.onSuccess/onFailure로 지정한 다음 step id가 지금step보다 앞에 있으면 LOOP로, 뒤에 있으면 NEXT_STEP으로 본다(둘 다 동작은 같다 -
+ * StepStatus는 로그/가독성을 위한 구분일 뿐이고, 실제 무한루프 방지는 maxIterations 하나가 담당한다). onSuccess/onFailure에 예약어 "SUCCESS"/"FAIL"을 쓰면 그
+ * 자리에서 Workflow를 즉시 종료한다.
  */
 @Component
 public class WorkflowExecutor extends BaseObject {
@@ -45,14 +43,14 @@ public class WorkflowExecutor extends BaseObject {
 
 	/**
 	 * name으로 등록된 Workflow를 실행하고, 마지막 step 결과가 담긴 WorkflowContext를 돌려준다.
-	 * @param workflow 실행할 Workflow 정의
-	 * @param sessionId 대화 세션 식별자
-	 * @param caller 호출 주체(caller) 식별자
-	 * @param variables Workflow 호출 시 넘겨받은 변수 맵
+	 * 
+	 * @param workflow     실행할 Workflow 정의
+	 * @param sessionId    대화 세션 식별자
+	 * @param caller       호출 주체(caller) 식별자
+	 * @param variables    Workflow 호출 시 넘겨받은 변수 맵
 	 * @param initialInput Workflow 최초 입력값
 	 */
-	public WorkflowContext run(WorkflowDefinition workflow, String sessionId, String caller, Map<String, Object> variables,
-			String initialInput) {
+	public WorkflowContext run(WorkflowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
 		WorkflowContext context = new WorkflowContext();
 		context.put("input", initialInput);
 		context.put("result", initialInput);
@@ -76,50 +74,54 @@ public class WorkflowExecutor extends BaseObject {
 				throw new IllegalStateException("workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + currentId);
 			}
 
-			List<StepDefinition> group = this.parallelGroupOf(workflow.steps(), step);
 			StepOutcome outcome;
+			List<StepDefinition> group = this.parallelGroupOf(workflow.steps(), step);
 			if (group.size() > 1) {
 				outcome = this.runParallel(group, sessionId, caller, context);
 				step = group.get(group.size() - 1); // 다음 step 결정은 그룹의 마지막 step 기준
-			}
-			else {
+			} else {
 				outcome = this.runStep(step, sessionId, caller, context);
 			}
 			context.put("result", outcome.text());
 
 			StepResult transition = this.decideTransition(workflow, step, outcome);
+
 			switch (transition.status()) {
-				case SUCCESS -> {
+				case SUCCESS: 	// 성공일 경우 WorkflowContext 를 반환
 					return context;
-				}
-				case FAIL -> throw new IllegalStateException("workflow[" + workflow.id() + "] 실패: " + transition.message());
-				case NEXT_STEP, LOOP -> currentId = transition.nextStepId();
+				case FAIL: 		// 실패일 경우 예외발생.
+					throw new IllegalStateException("workflow[" + workflow.id() + "] 실패: " + transition.message());
+				case NEXT_STEP:	// 다음스텝으로 넘겨야 할 경우 아무것도 하지 않음
+					// Do Nothing !
+				case LOOP: 		// 루프로 돌려야 할 경우 스텝아이디만 다음번 스텝아이디로 세팅
+					currentId = transition.nextStepId();
+					break;
 			}
 		}
 		return context;
 	}
 
 	/**
-	 * @param step 실행할 step 정의
+	 * @param step      실행할 step 정의
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller 호출 주체(caller) 식별자
-	 * @param context step들이 공유하는 실행 컨텍스트
+	 * @param caller    호출 주체(caller) 식별자
+	 * @param context   step들이 공유하는 실행 컨텍스트
 	 */
 	private StepOutcome runStep(StepDefinition step, String sessionId, String caller, WorkflowContext context) {
 		String input = context.<String>get("result");
 		Map<String, Object> variables = context.get("variables");
 		return switch (step.type()) {
-			case AGENT -> this.agentStepRunner.runAgent(step.ref(), sessionId, caller, variables, input);
+			case AGENT 		-> this.agentStepRunner.runAgent(step.ref(), sessionId, caller, variables, input);
 			case SUPERVISOR -> this.agentStepRunner.runSupervisor(step.ref(), sessionId, caller, variables, input);
-			case RAG -> new StepOutcome(true, this.ragStepRunner.run(caller, input));
-			case TOOL -> this.toolStepRunner.run(step, caller, variables, input);
+			case RAG 		-> new StepOutcome(true, this.ragStepRunner.run(caller, input));
+			case TOOL 		-> this.toolStepRunner.run(step, caller, variables, input);
 		};
 	}
 
 	/**
 	 * @param workflow 실행 중인 Workflow 정의
-	 * @param step 방금 실행한 step 정의
-	 * @param outcome 방금 실행한 step의 결과
+	 * @param step     방금 실행한 step 정의
+	 * @param outcome  방금 실행한 step의 결과
 	 */
 	private StepResult decideTransition(WorkflowDefinition workflow, StepDefinition step, StepOutcome outcome) {
 		String nextId = outcome.success() ? step.onSuccess() : step.onFailure();
@@ -146,8 +148,9 @@ public class WorkflowExecutor extends BaseObject {
 
 	/**
 	 * step이 parallelGroup을 갖고 있으면 같은 그룹의 인접 step 전체를, 아니면 자기 자신만 담은 목록을 돌려준다.
+	 * 
 	 * @param steps 전체 step 목록
-	 * @param step 그룹을 찾을 기준 step
+	 * @param step  그룹을 찾을 기준 step
 	 */
 	private List<StepDefinition> parallelGroupOf(List<StepDefinition> steps, StepDefinition step) {
 		if (StringUtil.isEmpty(step.parallelGroup())) {
@@ -163,21 +166,22 @@ public class WorkflowExecutor extends BaseObject {
 	}
 
 	/**
-	 * @param group 동시 실행할 병렬 step 그룹
+	 * @param group     동시 실행할 병렬 step 그룹
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller 호출 주체(caller) 식별자
-	 * @param context step들이 공유하는 실행 컨텍스트
+	 * @param caller    호출 주체(caller) 식별자
+	 * @param context   step들이 공유하는 실행 컨텍스트
 	 */
 	private StepOutcome runParallel(List<StepDefinition> group, String sessionId, String caller, WorkflowContext context) {
 		Map<String, CompletableFuture<StepOutcome>> futures = new LinkedHashMap<>();
 		for (StepDefinition step : group) {
 			final StepDefinition currentStep = step;
-			futures.put(step.id(), CompletableFuture.supplyAsync(new Supplier<StepOutcome>() {
-				@Override
-				public StepOutcome get() {
-					return WorkflowExecutor.this.runStep(currentStep, sessionId, caller, context);
-				}
-			}));
+			futures.put(step.id(), CompletableFuture.supplyAsync(new Supplier<StepOutcome>()
+				{
+					@Override
+					public StepOutcome get() {
+						return WorkflowExecutor.this.runStep(currentStep, sessionId, caller, context);
+					}
+				}));
 		}
 		CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
 
@@ -200,7 +204,8 @@ public class WorkflowExecutor extends BaseObject {
 
 	/**
 	 * 목록상 currentId 바로 다음 step의 id를 돌려준다 - currentId가 마지막이면 null(=Workflow 종료).
-	 * @param steps 전체 step 목록
+	 * 
+	 * @param steps     전체 step 목록
 	 * @param currentId 기준이 되는 현재 step id
 	 */
 	private String nextSequentialId(List<StepDefinition> steps, String currentId) {
@@ -214,7 +219,7 @@ public class WorkflowExecutor extends BaseObject {
 
 	/**
 	 * @param steps 전체 step 목록
-	 * @param id 찾을 step id
+	 * @param id    찾을 step id
 	 */
 	private int indexOf(List<StepDefinition> steps, String id) {
 		for (int i = 0; i < steps.size(); i++) {

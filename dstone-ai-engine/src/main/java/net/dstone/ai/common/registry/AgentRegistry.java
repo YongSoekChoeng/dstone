@@ -15,10 +15,9 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * classpath:agents/*.yml 전체를 기동 시 한 번 읽어 이름으로 찾아주는 등록소다.
- * api.controller.ChatController가 request.agent()로 직접 찾을 수도 있고, runtime.step의
- * AgentStepRunner/ToolStepRunner가 StepDefinition.ref로 찾을 수도 있다 - 어느 경로든 caller
- * 화이트리스트 검사는 여기 한 곳에서만 이뤄진다.
+ * Agent 정보를 저장하는 컴퍼넌트. YamlDefinitionLoader => AgentDefinition => AgentRegistry 순서로 내용이 로딩된다. classpath:agents/*.yml
+ * 전체를 기동 시 한 번 읽어 이름으로 찾아주는 등록소다. api.controller.ChatController가 request.agent()로 직접 찾을 수도 있고, runtime.step의
+ * AgentStepRunner/ToolStepRunner가 StepDefinition.ref로 찾을 수도 있다 - 어느 경로든 caller 화이트리스트 검사는 여기 한 곳에서만 이뤄진다.
  */
 @Component
 public class AgentRegistry extends BaseObject {
@@ -44,10 +43,10 @@ public class AgentRegistry extends BaseObject {
 	}
 
 	/**
-	 * caller 에게 허용된 agentName 에 해당하는 AgentDefinition 을 반환한다.
-	 * 모르는 이름이거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
+	 * caller 에게 허용된 agentName 에 해당하는 AgentDefinition 을 반환한다. 모르는 이름이거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
+	 * 
 	 * @param agentName 조회할 agent 이름
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller    호출한 앱/서비스 식별자
 	 * @return
 	 */
 	public AgentDefinition resolve(String agentName, String caller) {

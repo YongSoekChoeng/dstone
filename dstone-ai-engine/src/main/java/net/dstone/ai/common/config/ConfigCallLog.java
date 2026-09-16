@@ -18,11 +18,12 @@ import net.dstone.common.core.BaseObject;
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 public class ConfigCallLog extends BaseObject {
 
-
 	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
 	private final static String NO_LOG_REGEX = "@annotation(net.dstone.common.annotation.NoAspectLog)";
+
 	/**
 	 * 컨트롤러 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * 
 	 * @param joinPoint 가로챈 컨트롤러 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
@@ -30,88 +31,93 @@ public class ConfigCallLog extends BaseObject {
 	@Around("execution(* net.dstone.ai.*..*Controller.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
-		this.info("+->[CONTROLLER] {"+signatureLog(joinPoint)+"}");
+		this.info("+->[CONTROLLER] {" + signatureLog(joinPoint) + "}");
 
 		/*****************************************************************************************************
-		컨트롤러 호출 시 응답헤더에 기본값 세팅
-		  - Response 헤더[successYn]에 "Y"를 자동세팅한다. 컨크롤러 로직 수행중 오류 발생 시(setErrCd 호출 시) 자동으로 "N"으로 세팅된다.
-		  - Exception 발생 시 DsExceptionResolver에 의해 Response 헤더[successYn]는 N"으로 자동세팅된다.
-		*****************************************************************************************************/
+		 * 컨트롤러 호출 시 응답헤더에 기본값 세팅 - Response 헤더[successYn]에 "Y"를 자동세팅한다. 컨크롤러 로직 수행중 오류 발생 시(setErrCd 호출 시) 자동으로 "N"으로 세팅된다. -
+		 * Exception 발생 시 DsExceptionResolver에 의해 Response 헤더[successYn]는 N"으로 자동세팅된다.
+		 *****************************************************************************************************/
 		Object[] args = joinPoint.getArgs();
-		if(args != null) {
-			for(Object arg : args) {
-				if(arg instanceof HttpServletResponse) {
-					((HttpServletResponse)arg).setHeader("successYn", "Y");
+		if (args != null) {
+			for (Object arg : args) {
+				if (arg instanceof HttpServletResponse) {
+					((HttpServletResponse) arg).setHeader("successYn", "Y");
 					break;
 				}
 			}
 		}
 		/*****************************************************************************************************
-		객체 실행
-		*****************************************************************************************************/
+		 * 객체 실행
+		 *****************************************************************************************************/
 		Object retObj = joinPoint.proceed();
 		this.sysout("||===================================== [" + joinPoint.getTarget().getClass().getName() + "] END ======================================||\n");
 		return retObj;
 	}
+
 	/**
 	 * 서비스 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * 
 	 * @param joinPoint 가로챈 서비스 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
 	@Around("execution(* net.dstone.ai.*..*Service*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+--->[SERVICE ] {"+signatureLog(joinPoint)+"}");
+		this.info("+--->[SERVICE ] {" + signatureLog(joinPoint) + "}");
 		return joinPoint.proceed();
 	}
+
 	/**
 	 * DAO 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * 
 	 * @param joinPoint 가로챈 DAO 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
 	@Around("execution(* net.dstone.ai.*..*Dao.*(..))")
 	public Object doDaoProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		Method method = ((MethodSignature)joinPoint.getSignature()).getMethod();
+		Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
 		boolean noLog = method.getAnnotation(net.dstone.common.annotation.NoAspectLog.class) != null;
 		try {
-			if( noLog ) {
+			if (noLog) {
 				ThreadContext.put("SUPPRESS_SQL_LOG", "Y");
-			}else {
-				this.info("+----->[DAO   ] {"+signatureLog(joinPoint)+"}");
+			} else {
+				this.info("+----->[DAO   ] {" + signatureLog(joinPoint) + "}");
 			}
 			return joinPoint.proceed();
 		} finally {
-			if( noLog ) {
+			if (noLog) {
 				ThreadContext.remove("SUPPRESS_SQL_LOG");
 			}
 		}
 	}
-	
+
 	/**
 	 * runtime 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * 
 	 * @param joinPoint 가로챈 runtime 패키지 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
 	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Runtime ] {"+signatureLog(joinPoint)+"}");
+		this.info("+----->[Runtime ] {" + signatureLog(joinPoint) + "}");
 		return joinPoint.proceed();
 	}
 
 	/**
 	 * tools 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
+	 * 
 	 * @param joinPoint 가로챈 tools 패키지 메소드 호출 지점
 	 * @return
 	 * @throws Throwable
 	 */
 	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Tools ] {"+signatureLog(joinPoint)+"}");
+		this.info("+----->[Tools ] {" + signatureLog(joinPoint) + "}");
 		return joinPoint.proceed();
 	}
-	
+
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
 
 }

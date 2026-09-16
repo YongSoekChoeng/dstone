@@ -20,8 +20,8 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.security.ratelimit.enabled=true일 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않는다. 
- * caller 를 결정하는 ApiKeyAuthFilter(@Order(1))보다 뒤에서(@Order(2)) 돌아야 CallerContext에 caller가 이미 채워진 상태에서 요청을 구분할 키를 정할 수 있다. 
+ * dstone.ai.security.ratelimit.enabled=true일 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않는다. caller 를 결정하는
+ * ApiKeyAuthFilter(@Order(1))보다 뒤에서(@Order(2)) 돌아야 CallerContext에 caller가 이미 채워진 상태에서 요청을 구분할 키를 정할 수 있다.
  */
 @Component
 @Order(2)
@@ -46,8 +46,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	/**
-	 * @param request 들어온 요청
-	 * @param response 내려줄 응답
+	 * @param request     들어온 요청
+	 * @param response    내려줄 응답
 	 * @param filterChain 다음 필터로 넘기는 체인
 	 */
 	@SuppressWarnings("rawtypes")
@@ -106,7 +106,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
 	/**
 	 * callerKey의 이번 윈도우 누적 요청 수를 1 증가시키고 그 값을 반환한다.
-	 * @param callerKey 요청 건수를 세는 기준 키(caller 또는 IP)
+	 * 
+	 * @param callerKey     요청 건수를 세는 기준 키(caller 또는 IP)
 	 * @param windowSeconds 카운트를 유지할 기간(초)
 	 */
 	@SuppressWarnings("deprecation")
@@ -120,17 +121,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	/**
-	 * @param response 내려줄 응답
-	 * @param limit 허용 요청 한도
+	 * @param response      내려줄 응답
+	 * @param limit         허용 요청 한도
 	 * @param windowSeconds 카운트를 유지할 기간(초)
 	 */
 	private void reject(HttpServletResponse response, int limit, long windowSeconds) throws IOException {
 		response.setStatus(429); // Servlet API에 SC_TOO_MANY_REQUESTS 상수가 없어 리터럴 사용.
 		response.setHeader("Retry-After", String.valueOf(windowSeconds));
 		response.setContentType("application/json;charset=UTF-8");
-		response.getWriter()
-			.write("{\"error\":\"too_many_requests\",\"message\":\"요청 한도(" + limit + "회/" + windowSeconds
-					+ "초)를 초과했습니다.\"}");
+		response.getWriter().write("{\"error\":\"too_many_requests\",\"message\":\"요청 한도(" + limit + "회/" + windowSeconds + "초)를 초과했습니다.\"}");
 	}
 
 }

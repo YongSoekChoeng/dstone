@@ -22,13 +22,11 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Spring AI의 ChatMemoryRepository SPI를 dstone-common의 Redis 인프라(common.config.ConfigRedis가
- * 제공하는 RedisTemplate)로 직접 구현한 것이다. Spring AI가 공식 제공하는 chat-memory-repository는
- * jdbc/cassandra/neo4j뿐이라 Redis용은 직접 만들었다.
+ * Spring AI의 ChatMemoryRepository SPI를 dstone-common의 Redis 인프라(common.config.ConfigRedis가 제공하는 RedisTemplate)로 직접 구현한
+ * 클래스 Spring AI가 공식 제공하는 chat-memory-repository는 jdbc/cassandra/neo4j뿐이라 Redis용은 직접 만들었다.
  *
- * 대화 하나당 Redis List를 하나씩 쓴다(키: dstone:ai:session:{conversationId}). 메시지를 JSON으로
- * 순서대로 담아두고, 존재하는 conversationId 목록은 별도 Set(키: dstone:ai:session:index)으로
- * 관리한다 - 전체 키를 훑는 KEYS/SCAN 없이도 목록을 바로 조회할 수 있게 하기 위해서다.
+ * 대화 하나당 Redis List를 하나씩 쓴다(키: dstone:ai:session:{conversationId}). 메시지를 JSON으로 순서대로 담아두고, 존재하는 conversationId 목록은 별도
+ * Set(키: dstone:ai:session:index)으로 관리한다. 전체 키를 훑는 KEYS/SCAN 없이도 목록을 바로 조회할 수 있게 하기 위해서다.
  */
 @Repository
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")
@@ -42,8 +40,8 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 	private final long ttlSeconds;
 
 	/**
-	 * @param redisTemplate Redis 접근용 템플릿
-	 * @param objectMapper 메시지 직렬화/역직렬화에 쓰는 JSON 매퍼
+	 * @param redisTemplate  Redis 접근용 템플릿
+	 * @param objectMapper   메시지 직렬화/역직렬화에 쓰는 JSON 매퍼
 	 * @param configProperty 설정값 조회 유틸
 	 */
 	public RedisChatMemorySession(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper, ConfigProperty configProperty) {
@@ -55,6 +53,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 
 	/**
 	 * Message를 Redis에 저장하기 위한 최소 표현. Jackson record 지원(컴파일러 -parameters 옵션) 기반으로 직렬화/역직렬화한다.
+	 * 
 	 * @param type 메시지 종류(USER/ASSISTANT/SYSTEM 등)
 	 * @param text 메시지 본문
 	 */
@@ -92,7 +91,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 
 	/**
 	 * @param conversationId 대화 세션 식별자
-	 * @param messages 저장할 대화 메시지 목록
+	 * @param messages       저장할 대화 메시지 목록
 	 */
 	@Override
 	public void saveAll(String conversationId, List<Message> messages) {
@@ -106,8 +105,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 			this.redisTemplate.opsForList().rightPushAll(key, serialized);
 			this.redisTemplate.expire(key, this.ttlSeconds, TimeUnit.SECONDS);
 			this.redisTemplate.opsForSet().add(INDEX_KEY, conversationId);
-		}
-		else {
+		} else {
 			this.redisTemplate.opsForSet().remove(INDEX_KEY, conversationId);
 		}
 	}
@@ -133,10 +131,8 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 	 */
 	private String toJson(Message message) {
 		try {
-			return this.objectMapper
-				.writeValueAsString(new StoredMessage(message.getMessageType().name(), message.getText()));
-		}
-		catch (Exception e) {
+			return this.objectMapper.writeValueAsString(new StoredMessage(message.getMessageType().name(), message.getText()));
+		} catch (Exception e) {
 			throw new IllegalStateException("대화 메시지를 JSON으로 직렬화하지 못했습니다: " + message.getMessageType(), e);
 		}
 	}
@@ -148,8 +144,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 		StoredMessage stored;
 		try {
 			stored = this.objectMapper.readValue(json, StoredMessage.class);
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			throw new IllegalStateException("Redis에 저장된 대화 메시지를 역직렬화하지 못했습니다: " + json, e);
 		}
 		MessageType type = MessageType.valueOf(stored.type());
@@ -157,8 +152,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 			case USER -> new UserMessage(stored.text());
 			case ASSISTANT -> new AssistantMessage(stored.text());
 			case SYSTEM -> new SystemMessage(stored.text());
-			case TOOL -> throw new IllegalStateException(
-					"TOOL 타입 메시지는 아직 지원하지 않는다(tool-calling 자체는 이미 구현돼 있지만, 그 결과 메시지의 Redis 직렬화는 아직 처리하지 않는다): " + json);
+			case TOOL -> throw new IllegalStateException("TOOL 타입 메시지는 아직 지원하지 않는다(tool-calling 자체는 이미 구현돼 있지만, 그 결과 메시지의 Redis 직렬화는 아직 처리하지 않는다): " + json);
 		};
 	}
 

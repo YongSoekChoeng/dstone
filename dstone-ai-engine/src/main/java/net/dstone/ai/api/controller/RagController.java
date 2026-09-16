@@ -21,12 +21,10 @@ import net.dstone.ai.rag.RagService;
 import net.dstone.common.biz.BaseController;
 
 /**
- * RAG 문서 적재/삭제/검색 API다. Agent의 ragEnabled 옵션이 "채팅 도중 자동으로 검색 결과를 끼워
- * 넣는" 경로라면, 여기는 문서 적재나 검색 자체를 직접 확인해보고 싶을 때 쓰는 관리·디버깅용
- * 엔드포인트다.
+ * RAG 문서 적재/삭제/검색 API다. Agent의 ragEnabled 옵션이 "채팅 도중 자동으로 검색 결과를 끼워 넣는" 경로라면, 여기는 문서 적재나 검색 자체를 직접 확인해보고 싶을 때 쓰는
+ * 관리·디버깅용 엔드포인트다.
  *
- * dstone.ai.rag.enabled 여부와 무관하게 항상 등록된다 - 실제로 RAG를 쓸 수 있는지는
- * rag.RagService가 호출 시점에 판단해서, 꺼져 있으면 명확한 에러 메시지로 알려준다.
+ * dstone.ai.rag.enabled 여부와 무관하게 항상 등록된다 - 실제로 RAG를 쓸 수 있는지는 rag.RagService가 호출 시점에 판단해서, 꺼져 있으면 명확한 에러 메시지로 알려준다.
  */
 @RestController
 @RequestMapping("/api/ai/rag")
@@ -36,18 +34,17 @@ public class RagController extends BaseController {
 	RagService ragService;
 
 	/**
-	 * @param file 적재할 문서 파일
-	 * @param sourceId 문서 식별자
+	 * @param file           적재할 문서 파일
+	 * @param sourceId       문서 식별자
 	 * @param servletRequest caller 식별을 위한 HTTP 요청
 	 */
 	@PostMapping("/documents")
-	public IngestResponse ingest(@RequestParam("file") MultipartFile file, @RequestParam("sourceId") String sourceId,
-			HttpServletRequest servletRequest) {
+	public IngestResponse ingest(@RequestParam("file") MultipartFile file, @RequestParam("sourceId") String sourceId, HttpServletRequest servletRequest) {
 		return this.ragService.ingest(file.getResource(), sourceId, CallerContext.get(servletRequest));
 	}
 
 	/**
-	 * @param sourceId 삭제할 문서 식별자
+	 * @param sourceId       삭제할 문서 식별자
 	 * @param servletRequest caller 식별을 위한 HTTP 요청
 	 */
 	@DeleteMapping("/documents/{sourceId}")
@@ -56,7 +53,7 @@ public class RagController extends BaseController {
 	}
 
 	/**
-	 * @param request 검색어/topK 등 검색 조건
+	 * @param request        검색어/topK 등 검색 조건
 	 * @param servletRequest caller 식별을 위한 HTTP 요청
 	 */
 	@PostMapping("/search")

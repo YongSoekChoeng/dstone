@@ -8,8 +8,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import net.dstone.ai.common.annotation.AiTool;
 
 /**
- * Tool 등록 방법을 보여주는 샘플(dstone-boot의 sample/ 패키지와 같은 성격 - 실제 SI 프로젝트에서는
- * 지우거나 자기 도메인 Tool로 바꿔도 된다).
+ * Tool 등록 방법을 보여주는 샘플(dstone-boot의 sample/ 패키지와 같은 성격 - 실제 SI 프로젝트에서는 지우거나 자기 도메인 Tool로 바꿔도 된다).
  */
 @AiTool
 public class DateTimeTools {
