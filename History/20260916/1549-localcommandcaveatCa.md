@@ -773,3 +773,26 @@ All source and documentation references cleaned up. Final check of the three Too
 4. **`CLAUDE.md`** — 해당 문장을 고치면서, 예전에 `.enabled` 플래그가 문서화만 되고 실제로 연결된 적이 없었다는 사실도 함께 남겨뒀습니다(나중에 다시 헷갈리지 않도록)
 
 `mvn compile` 통과 확인했습니다. 코드 동작 자체는 원래부터 화이트리스트 기준으로 안전했기 때문에 기능적인 변화는 없고, 문서/주석이 실제 동작과 일치하도록 바로잡은 것입니다.
+
+---
+
+## 질문
+
+/conf/application.yml 에서 dstone.ai.tool.{shell,python,http}.enabled 항목을 없애도 별 문제 없겠지?
+
+---
+
+## 답변
+
+확인해봤는데, `conf/application.yml`에는 애초에 `dstone.ai.tool.{shell,python,http}.enabled` 항목 자체가 없습니다.
+
+172~175번 줄의 `tool:` 블록이 전부 주석 처리돼 있고, 그 안엔 `allowed-by-caller` 예시만 있습니다:
+
+```yaml
+# tool:
+#     allowed-by-caller:
+#         - caller: sample-si-project
+#           tools: getCurrentDateTime,validateSqlSyntax
+```
+
+`shell`/`python`/`http`의 `.enabled` 키는 이 파일에 한 번도 등장한 적이 없어서 — 지워야 할 게 없는 상태입니다. 지난번에 정리한 것처럼 코드에서도 이 플래그를 참조한 적이 없었으니(문서/주석에만 있던 유령 설정), `application.yml` 쪽도 이미 일관된 상태입니다. 별도로 손댈 것 없이 안전합니다.
