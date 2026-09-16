@@ -20,10 +20,8 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.security.ratelimit.enabled=true일 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지
- * 않는다. 같은 패키지의 ApiKeyAuthFilter(@Order(1))보다 뒤에서(@Order(2)) 돌아야 CallerContext에
- * caller가 이미 채워진 상태에서 요청을 구분할 키를 정할 수 있다. auth가 꺼져 있으면 CallerContext는
- * 항상 비어있으니 그럴 때는 클라이언트 IP(anon:{ip})를 키로 쓴다.
+ * dstone.ai.security.ratelimit.enabled=true일 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않는다. 
+ * caller 를 결정하는 ApiKeyAuthFilter(@Order(1))보다 뒤에서(@Order(2)) 돌아야 CallerContext에 caller가 이미 채워진 상태에서 요청을 구분할 키를 정할 수 있다. 
  */
 @Component
 @Order(2)

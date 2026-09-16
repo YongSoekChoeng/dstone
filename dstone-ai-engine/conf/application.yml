@@ -144,35 +144,40 @@ spring:
 
 dstone:
     ai:
+        ##########################################################################################
         # 대화 히스토리(ChatMemory) 설정.
+        ##########################################################################################
         session:
             max-messages: 20 # 세션당 유지할 최대 메시지 수(넘으면 오래된 메시지부터 잘림)
             ttl-seconds: 86400 # Redis에 저장된 세션 히스토리의 만료 시간(1일)
-        # SI 프로젝트별 프롬프트 템플릿 버전 관리.
+        ##########################################################################################
+        # 프롬프트 템플릿 
         # classpath:prompts/{name}/{version}.st 파일을 읽어 렌더링한다.
         # 특정 템플릿명을 versions에 명시하지 않으면 default-version을 쓴다.
+        # Agent 정의(classpath:agents/*.yml)에서 주로 활용한다.
+        ##########################################################################################
         prompt:
-            # default-version: v1
+            default-version: v1
             versions:
                 sample-system: v1
                 oracle-sql-analyzer: v1
-                oracle-sql-converter: v1
+                oracle-to-postgresql: v1
                 oracle-sql-reviewer: v1
-        # Agent/Workflow 정의는 여기(application.yml)가 아니라 각각 별도 파일에 둔다 -
-        # classpath:agents/*.yml(common.registry.AgentRegistry), classpath:workflows/*.yml
-        # (common.registry.WorkflowRegistry). Agent나 Workflow를 하나 추가/변경할 때 이 파일을
-        # 건드릴 필요가 없다는 게 이 구조의 핵심이다.
-        #
-        # Tool 호출은 caller별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) - 설정이
-        # 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
+        ##########################################################################################
+        # Tool 설정. 
+        # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
+        # 설정이 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
+        ##########################################################################################      
         # tool:
         #     allowed-by-caller:
         #         - caller: sample-si-project
         #           tools: getCurrentDateTime,validateSqlSyntax
-        # RAG. 이 값이 true여야 rag.RagService의 메서드들과 RagController, Agent의 ragEnabled 설정이
-        # 실제로 동작한다(RagService.requireVectorStore() 참고 - RagController/RagService 빈 자체는
-        # 이 값과 무관하게 항상 존재). RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면
-        # Postgres/pgvector/임베딩 설정 없이도 그대로 기동된다.
+        
+        ##########################################################################################
+        # RAG 설정. 
+        # 이 값이 true여야 rag.RagService의 메서드들과 RagController, Agent의 ragEnabled 설정이 실제로 동작한다(RagService.requireVectorStore() 참고)
+        # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 임베딩 설정 없이도 그대로 기동된다.
+        ########################################################################################## 
         rag:
             enabled: true
             ingest:
@@ -183,19 +188,12 @@ dstone:
                 # 0.5를 못 넘는 경우가 흔해서(0.48 등) 0.5로 두면 데이터가 있어도 결과가 통째로 빈다.
                 # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
                 similarity-threshold: 0.35
-        # security.auth: API Key 인증. enabled=false(기본값)면 인증 없이 전부 통과한다
-        # (common.security.ApiKeyAuthFilter 참고). 켤 때는 keys를 아래처럼 채운다 - key는 DB
-        # 패스워드와 동일한 컨벤션으로 ENC(...) 암호화를 권장한다(생성법은 이 파일 위쪽
-        # anthropic.api-key 주석 참고).
-        #
-        # security.ratelimit: caller별(security.auth가 꺼져 있으면 클라이언트 IP별) 요청 개수 제한.
-        # enabled=true인데 Redis가 꺼져 있으면(spring.data.redis.enabled=false) 그 요청을 처음 받는
-        # 시점에 IllegalStateException으로 실패한다(common.security.RateLimitFilter 참고, Redis 고정
-        # 윈도우 카운터를 쓰므로 윈도우 경계에서 최대 2배까지 허용될 수 있는 알려진 한계가 있음).
-        #
-        # PII/민감어 가드레일, 사용량 로깅·쿼터 같은 governance 기능은 이번 재설계 범위에서 뺐다 -
-        # 필요해지면 common.config.ConfigChatClient가 주입받는 List<Advisor>에 @Bean Advisor 하나를
-        # 추가하는 것만으로 다시 붙일 수 있게 설계돼 있다(그 밖의 코드는 손댈 필요 없음).
+
+        ##########################################################################################
+        # Security 설정. 
+        # security.auth: API Key 인증. enabled=false(기본값)면 인증 없이 전부 통과한다. 현재는 미사용.
+        # security.ratelimit: caller별(security.auth가 꺼져 있으면 클라이언트 IP별) 요청 개수 제한. 현재는 미사용.
+        ########################################################################################## 
         security:
             auth:
                 enabled: false

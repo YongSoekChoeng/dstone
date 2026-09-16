@@ -30,13 +30,14 @@ public class SqlSyntaxTools extends BaseObject {
 			//this.sysout("net.dstone.ai.tools.sql.SqlSyntaxTools.validateSqlSyntax INPUT("+sql+")");
 			statements = CCJSqlParserUtil.parseStatements(sql);
 			//this.sysout("net.dstone.ai.tools.sql.SqlSyntaxTools.validateSqlSyntax OUTPUT("+statements+")");
+			if (statements.size() != 1) {
+				return "실패: 한 번에 하나의 SQL 문만 검증할 수 있습니다(세미콜론으로 여러 문장을 이어붙이지 마십시오). 문장 수=" + statements.size();
+			}
 		} catch (JSQLParserException e) {
 			return "실패: 문법 오류 - " + e.getMessage();
-		}
-		if (statements.size() != 1) {
-			return "실패: 한 번에 하나의 SQL 문만 검증할 수 있습니다(세미콜론으로 여러 문장을 이어붙이지 마십시오). 문장 수="
-					+ statements.size();
-		}
+		} catch (Exception e) {
+			return "실패: 기타 오류 - " + e.getMessage();
+		} 
 		return "통과: 문법 구조상 문제가 없습니다.";
 	}
 

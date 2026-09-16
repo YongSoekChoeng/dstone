@@ -12,7 +12,7 @@ agents:
 
   - name: sql-conversion-agent
     description: 분석된 Oracle SQL을 PostgreSQL SQL로 변환한다(oracle-to-postgresql Workflow의 convert step).
-    promptName: oracle-sql-converter
+    promptName: oracle-to-postgresql
     toolsEnabled: false
     ragEnabled: false
 

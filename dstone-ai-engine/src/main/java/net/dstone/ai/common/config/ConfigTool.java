@@ -18,20 +18,12 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * @AiTool이 붙은 빈들을 기동 시점에 스캔해서 Spring AI ToolCallbackProvider로 묶어준다 - 이게 이
- * 엔진의 유일한 Tool 등록소다(tools.shell/tools.python/tools.http도 실행 로직만 다를 뿐 결국
- * @AiTool 빈이라 똑같이 여기서 잡힌다). AGENT step에서는 어떤 Tool을 언제 호출할지 Spring AI의
- * ChatClient가 LLM과 대화를 주고받으며 알아서 처리하고, TOOL step에서는
- * runtime.tool.ToolExecutor가 이름으로 직접 찾아 LLM 없이 호출한다.
+ * @AiTool이 붙은 빈들을 기동 시점에 스캔해서 Spring AI ToolCallbackProvider로 묶어준다.
+ * - type이 AGENT인 step에서는 어떤 Tool을 언제 호출할지 Spring AI의 ChatClient가 LLM과 대화를 주고받으며 알아서 처리.
+ * - type이 TOOL인 step에서는 runtime.tool.ToolExecutor가 이름으로 직접 찾아 LLM 없이 호출.
  *
- * Tool은 RAG와 달리 순수 Java 코드만 실행하면 돼서 외부 인프라가 필요 없다 - 그래서 이 빈은
- * dstone.ai.rag.enabled 같은 on/off 플래그 없이 항상 떠 있다. 등록된 @AiTool 빈이 하나도 없어도
- * 에러는 아니고, 그냥 빈 provider가 만들어질 뿐이다.
- *
- * caller별 Tool 화이트리스트(dstone.ai.tool.allowed-by-caller, ApiKeyAuthFilter/RateLimitFilter의
- * keys/overrides와 동일한 List-of-Map 컨벤션 - caller/tools 두 키)는 toolCallbackProvider(String
- * caller)가 담당한다 - 여러 앱이 공유하는 엔진에서 한 앱에게만 허용된 Tool을 다른 앱이 붙여 쓰지
- * 못하게 막는다. 설정에 없는 caller는 화이트리스트가 없는 것으로 보고 등록된 Tool 전체를 허용한다.
+ * caller별 Tool 화이트리스트 설정은 여러 앱이 공유하는 엔진에서 한 앱에게만 허용된 Tool을 다른 앱이 붙여 쓰지못하게 막는다. 
+ * Tool 화이트리스트 설정이 없는 caller는 화이트리스트가 없는 것으로 보고 등록된 Tool 전체를 허용한다.
  */
 @Component
 public class ConfigTool extends BaseObject {

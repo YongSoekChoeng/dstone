@@ -14,9 +14,12 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.RedisUtil;
 
 /**
- * dstone-boot의 ConfigRedis와 같은 방식으로 net.dstone.common.utils.RedisUtil을 그대로 재사용해서
- * 세션(common.session.RedisChatMemorySession)/RateLimit(common.security.RateLimitFilter)/비동기
- * Job 상태(api.service.AsyncJobService)가 함께 쓰는 RedisTemplate 빈 하나를 만든다.
+ * dstone-boot의 ConfigRedis와 같은 방식으로 net.dstone.common.utils.RedisUtil을 그대로 재사용해서 RedisTemplate 빈 하나를 만든다.
+ * 
+ * <사용처>
+ * 세션(common.session.RedisChatMemorySession)
+ * 비동기Job 상태조회(api.service.AsyncJobService)
+ * 사용량(common.security.RateLimitFilter)
  */
 @Configuration
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")

@@ -55,21 +55,20 @@ public class ConfigChatClient {
 	}
 
 	/*************************************************************************************
-	Spring AI에서 ChatClient는 기본 생성자가 없고 단독 @Autowired로 직접 주입받을 수 없다 - 자동설정이
-	등록해주는 ChatClient.Builder를 주입받아 조립하는 게 공식 표준 방식이다.
-
-	advisor 체인 순서(advisor1, advisor2, advisor3, ...): 가장 바깥쪽(리스트 마지막)이 먼저 동작하고
-	순차적으로 안쪽으로 진행한다.
+	- Spring AI에서 ChatClient는 기본 생성자가 없고 단독 @Autowired로 직접 주입받을 수 없다 
+	- 자동설정이 등록해주는 ChatClient.Builder를 주입받아 조립하는 게 공식 표준 방식이다.
+	- org.springframework.ai.chat.client.advisor.api.BaseAdvisor 를 구현하는 모든 Advisor들을 Spring이 자동으로 모아서 넘겨준다.
+	- advisor 체인 순서(advisor1, advisor2, advisor3, ...): 가장 바깥쪽(리스트 마지막)이 먼저 동작하고 순차적으로 안쪽으로 진행한다.
 	*************************************************************************************/
 	/**
 	 * @param builder ChatClient를 조립할 빌더
 	 * @param chatMemory 세션별 대화 내역을 담당할 메모리
-	 * @param governanceAdvisors governance 모듈 등이 추가한 Advisor 목록(현재는 비어 있음)
+	 * @param advisor 목록(현재는 비어 있음). 스프링에서 List<T> 타입은 단일 Bean과 다르게 빈 List로 주입 하므로 문제 없음.
 	 */
 	@Bean
-	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, List<Advisor> governanceAdvisors) {
-		List<Advisor> advisors = new ArrayList<>(governanceAdvisors);
+	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, List<Advisor> advisors) {
+		List<Advisor> advisorList = new ArrayList<>(advisors);
 		advisors.add(MessageChatMemoryAdvisor.builder(chatMemory).build()); // 세션 메모리 - 항상 마지막(가장 안쪽)
-		return builder.defaultAdvisors(advisors.toArray(new Advisor[0])).build();
+		return builder.defaultAdvisors(advisorList.toArray(new Advisor[0])).build();
 	}
 }
