@@ -1,6 +1,8 @@
 package net.dstone.ai.runtime.step;
 
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,19 @@ import net.dstone.common.utils.StringUtil;
 @Component
 public class ToolStepRunner {
 
+	/**
+	 * <pre>
+	 * 앞 step(AGENT)이 "설명/레이블/마크다운 코드펜스를 절대 출력하지 말라"는 prompt 지시를 지키지 않고
+	 * 대괄호 레이블 한 줄([변환된 SQL], [변경된 SQL] 등 - 매번 문구가 바뀐다)이나 코드펜스로 실제 값을
+	 * 감싸서 반환하는 경우가 실전에서 반복적으로 관찰됐다. prompt를 아무리 일반화해도 LLM이 새 표현을
+	 * 계속 만들어내므로, TOOL step은 "이전 step 출력 = 다음 step이 쓸 순수 데이터"라는 계약이 흔들리지
+	 * 않도록 이 흔한 포장만 벗겨내고 방어적으로 정규화한다. Tool 자체의 검증 로직(SqlSyntaxTools 등)은
+	 * 이 정규화 이후의 텍스트에 대해 그대로 엄격하게 동작하므로, 실제 문법 오류를 가려주지는 않는다.
+	 * </pre>
+	 */
+	private static final Pattern CODE_FENCE_WRAPPER = Pattern.compile("^```[a-zA-Z]*\\s*\\n?([\\s\\S]*?)\\n?```$");
+	private static final Pattern LEADING_LABEL = Pattern.compile("^\\[[^\\[\\]\\n]{1,60}\\]\\s*\\n*");
+
 	@Autowired
 	private ToolExecutor toolExecutor;
 
@@ -31,12 +46,36 @@ public class ToolStepRunner {
 	 * @param input     이전 step 결과(또는 최초 입력) 텍스트
 	 */
 	public StepOutcome run(StepDefinition step, String caller, Map<String, Object> variables, String input) {
-		String jsonInput = this.renderToolInput(step.inputTemplate(), input, variables);
+		String normalized = this.stripLlmArtifacts(input);
+		String jsonInput = this.renderToolInput(step.inputTemplate(), normalized, variables);
 		String toolResult = this.toolExecutor.call(caller, step.ref(), jsonInput);
 		if (toolResult.startsWith(Constants.Outcome.FAIL_PREFIX)) {
-			return new StepOutcome(false, input + "\n\n[검증 결과] " + toolResult);
+			return new StepOutcome(false, normalized + "\n\n[검증 결과] " + toolResult);
 		}
-		return new StepOutcome(true, input);
+		return new StepOutcome(true, normalized);
+	}
+
+	/**
+	 * @param text 정규화할 이전 step 출력 텍스트
+	 */
+	private String stripLlmArtifacts(String text) {
+		if (text == null) {
+			return "";
+		}
+		String result = text.strip();
+		String previous;
+		do {
+			previous = result;
+			Matcher fence = CODE_FENCE_WRAPPER.matcher(result);
+			if (fence.matches()) {
+				result = fence.group(1).strip();
+			}
+			Matcher label = LEADING_LABEL.matcher(result);
+			if (label.lookingAt()) {
+				result = result.substring(label.end()).strip();
+			}
+		} while (!result.equals(previous));
+		return result;
 	}
 
 	/**
