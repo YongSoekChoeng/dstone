@@ -2,8 +2,6 @@ package net.dstone.ai.common.definition;
 
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-
 /**
  * resources/agents/*.yml 파일에 등록된 Agent 하나("LLM에게 일을 시키는 단위" - promptName으로 무엇을 시스템 프롬프트로 쓸지, toolsEnabled/ragEnabled로
  * Tool/RAG를 붙일지를 갖고 있다). net.dstone.ai.common.loader.YamlDefinitionLoader 에 의해서 로딩된다.
@@ -19,7 +17,6 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * @param model          이 Agent 호출에만 쓸 모델명(runtime.agent.AgentExecutor 참고). null이면 spring.ai.{provider}.chat.options.model(엔진 공통 기본값)
  * @param allowedCallers 이 Agent 호출이 허용된 caller(tenant) 목록
  */
-@JsonPropertyOrder({ "name", "promptName", "toolsEnabled", "ragEnabled", "model", "allowedCallers", "description"})
 public record AgentDefinition(String name, String description, String promptName, boolean toolsEnabled, boolean ragEnabled, String model, List<String> allowedCallers) {
 
     @Override
