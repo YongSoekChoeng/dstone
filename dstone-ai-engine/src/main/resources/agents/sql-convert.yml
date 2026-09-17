@@ -14,7 +14,7 @@ agents:
     description: 분석된 Oracle SQL을 PostgreSQL SQL로 변환한다(oracle-to-postgresql Workflow의 convert step).
     promptName: oracle-to-postgresql
     toolsEnabled: false
-    ragEnabled: false
+    ragEnabled: true
 
   - name: sql-fix-agent
     description: 문법 검증에 실패한 변환 SQL을 실패 사유에 맞춰 실제로 고쳐 쓴다(oracle-to-postgresql Workflow의 fix step).

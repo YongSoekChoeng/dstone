@@ -1,7 +1,13 @@
 package net.dstone.ai.rag;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -17,6 +23,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.api.dto.IngestResponse;
 import net.dstone.ai.api.dto.RagSearchRequest;
@@ -154,11 +163,9 @@ public class RagService extends BaseService {
 		}
 		VectorStore vectorStore = this.requireVectorStore();
 
-		String chunkSize = this.configProperty.getProperty("dstone.ai.rag.ingest.chunk-size");
-		TokenTextSplitter textSplitter = TokenTextSplitter.builder().withChunkSize(StringUtil.isEmpty(chunkSize) ? 800 : Integer.parseInt(chunkSize)).build();
+		List<Document> chunks = isJsonlSource(resource) ? readJsonlAsDocuments(resource) // JSONL: 한 줄 = 원자적 단위 -> 청킹 생략
+			: splitGenericDocument(resource); // PDF/DOCX 등 비정형 문서: 기존 Tika + 청킹 경로
 
-		List<Document> extracted = new TikaDocumentReader(resource).get();
-		List<Document> chunks = textSplitter.apply(extracted);
 		List<Document> tagged = new ArrayList<>(chunks.size());
 		for (Document chunk : chunks) {
 			var mutator = chunk.mutate().metadata(Constants.Rag.SOURCE_ID_METADATA_KEY, sourceId);
@@ -167,6 +174,8 @@ public class RagService extends BaseService {
 			}
 			tagged.add(mutator.build());
 		}
+
+		vectorStore.add(tagged);
 
 		if (tagged.isEmpty()) {
 			// 텍스트 추출/청킹 결과가 비어 있으면 아무 것도 하지 않는다 - 여기서도 기존 청크를 지워버리면
@@ -191,5 +200,61 @@ public class RagService extends BaseService {
 		VectorStore vectorStore = this.requireVectorStore();
 		vectorStore.delete(this.buildFilter(caller, sourceId));
 	}
+	
+	private boolean isJsonlSource(Resource resource) {
+	    String filename = resource.getFilename();
+	    return filename != null && (filename.endsWith(".jsonl") || filename.endsWith(".json"));
+	}
 
+	private List<Document> splitGenericDocument(Resource resource) {
+		String chunkSize = this.configProperty.getProperty("dstone.ai.rag.ingest.chunk-size");
+		TokenTextSplitter textSplitter = TokenTextSplitter.builder().withChunkSize(StringUtil.isEmpty(chunkSize) ? 800 : Integer.parseInt(chunkSize)).build();
+		List<Document> extracted = new TikaDocumentReader(resource).get();
+		return textSplitter.apply(extracted);
+	}
+
+	private List<Document> readJsonlAsDocuments(Resource resource) {
+		List<Document> documents = new ArrayList<>();
+		ObjectMapper mapper = new ObjectMapper();
+
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+			String line;
+			while ((line = reader.readLine()) != null) {
+				line = line.strip();
+				if (line.isEmpty())
+					continue;
+
+				JsonNode node = mapper.readTree(line);
+				String instruction = textOf(node, "instruction");
+				String input = textOf(node, "input");
+				String output = textOf(node, "output");
+				String notes = textOf(node, "notes");
+
+				String content = """
+					[오라클 쿼리]
+					%s
+
+					[PostgreSQL 변환 결과]
+					%s
+
+					[설명/주의사항]
+					%s
+					""".formatted(input, output, notes.isEmpty() ? "-" : notes);
+
+				Map<String, Object> metadata = new HashMap<>();
+				metadata.put("instruction", instruction);
+				metadata.put("has_notes", !notes.isEmpty());
+
+				documents.add(new Document(content, metadata));
+			}
+		} catch (IOException e) {
+			throw new IllegalStateException("JSONL 파싱 실패: " + resource.getFilename(), e);
+		}
+		return documents;
+	}
+
+	private String textOf(JsonNode node, String field) {
+		JsonNode v = node.get(field);
+		return (v == null || v.isNull()) ? "" : v.asText();
+	}
 }
