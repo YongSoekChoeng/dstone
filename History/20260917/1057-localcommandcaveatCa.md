@@ -98,3 +98,21 @@ No direct constructor usages to break (YAML binding is by name, order-independen
 **주의할 점**: 여전히 provider(`spring.ai.model.chat`)는 엔진 전체가 하나 공유하므로, agent별 `model`은 그 provider가 실제로 서빙하는 모델명이어야 함 — 잘못된 값은 기동 시가 아니라 그 agent를 처음 호출할 때 런타임 에러로 드러남 (검증 로직은 의도적으로 넣지 않음, 위 분석 때 얘기했던 대로).
 
 `dstone-ai-engine/src/main/java` 컴파일/테스트컴파일 모두 통과 확인했어. 실제로 다른 모델을 쓰는 agent를 하나 만들어서 `/api/ai/chat`으로 호출해보고 싶으면 알려줘.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>bikt51rhv</task-id>
+<tool-use-id>toolu_01EveXZzpQoeGw8aioemG2Ga</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/a1eee9c2-e792-41bf-a87f-0ccf895a7f36/tasks/bikt51rhv.output</output-file>
+<status>completed</status>
+<summary>Background command "find / -name "spring-ai-model-*.jar" 2&gt;/dev/null | head -3" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+## 답변
+
+That earlier background `find` command has finished — it was superseded by the local `.m2` lookup I already used, so no action needed there. Implementation is done and waiting on you if you want to try a live call.
