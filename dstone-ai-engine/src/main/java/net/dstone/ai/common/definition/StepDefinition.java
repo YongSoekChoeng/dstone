@@ -1,7 +1,5 @@
 package net.dstone.ai.common.definition;
 
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-
 /**
  * WorkflowDefinition.steps의 항목 하나. ref의 의미는 type에 따라 다르다: AGENT/SUPERVISOR는 common.registry.AgentRegistry에 등록된 Agent
  * 이름, TOOL은 ConfigTool에 등록된 Tool 이름, RAG는 쓰지 않는다.
@@ -22,6 +20,18 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * @param onSuccess     성공 시 이동할 다음 step id(또는 예약어 SUCCESS)
  * @param onFailure     실패 시 이동할 다음 step id(또는 예약어 FAIL)
  */
-@JsonPropertyOrder({ "id", "type", "ref", "inputTemplate", "parallelGroup", "onSuccess", "onFailure"})
 public record StepDefinition(String id, StepType type, String ref, String inputTemplate, String parallelGroup, String onSuccess, String onFailure) {
+	
+    @Override
+    public String toString() {
+        return "StepDefinition[" +
+               "id=" + id + 
+               ", type=" + type + 
+               ", ref=" + ref +
+               ", inputTemplate=" + inputTemplate +
+               ", parallelGroup=" + parallelGroup + 
+               ", onSuccess=" + onSuccess + 
+               ", onFailure=" + onFailure + 
+               "]";
+    }
 }

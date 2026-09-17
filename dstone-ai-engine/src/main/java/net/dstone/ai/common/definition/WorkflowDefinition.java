@@ -2,8 +2,6 @@ package net.dstone.ai.common.definition;
 
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-
 /**
  * resources/workflows/*.yml 파일 하나가 이 구조로 바인딩된다(net.dstone.ai.common.loader.YamlDefinitionLoader 에 의해서 로딩된다.).
  * api.controller.WorkflowController가 id로 이 정의를 찾아 runtime.WorkflowExecutor에 넘긴다.
@@ -19,6 +17,15 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * @param maxIterations  전체 step 실행 횟수 상한(비우면 기본값 5)
  * @param allowedCallers 이 Workflow 실행이 허용된 caller(tenant) 목록
  */
-@JsonPropertyOrder({ "id", "description", "steps", "maxIterations", "allowedCallers"})
 public record WorkflowDefinition(String id, String description, List<StepDefinition> steps, Integer maxIterations, List<String> allowedCallers) {
+    @Override
+    public String toString() {
+        return "WorkflowDefinition[" +
+               "id=" + id + 
+               ", description=" + description + 
+               ", maxIterations=" + maxIterations +
+               ", allowedCallers=" + allowedCallers + 
+               ", steps=" + steps +
+               "]";
+    }
 }
