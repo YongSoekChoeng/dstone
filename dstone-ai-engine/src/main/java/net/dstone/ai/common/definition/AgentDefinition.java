@@ -21,4 +21,17 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonPropertyOrder({ "name", "promptName", "toolsEnabled", "ragEnabled", "model", "allowedCallers", "description"})
 public record AgentDefinition(String name, String description, String promptName, boolean toolsEnabled, boolean ragEnabled, String model, List<String> allowedCallers) {
+
+    @Override
+    public String toString() {
+        return "AgentDefinition[" +
+               "name=" + name + 
+               ", promptName=" + promptName + 
+               ", toolsEnabled=" + toolsEnabled +
+               ", ragEnabled=" + ragEnabled +
+               ", model=" + model + 
+               ", allowedCallers=" + allowedCallers + 
+               ", description=" + description + 
+               "]";
+    }
 }
