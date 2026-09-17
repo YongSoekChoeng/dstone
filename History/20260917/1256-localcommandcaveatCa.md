@@ -443,3 +443,15 @@ advisorList.add(MessageChatMemoryAdvisor.builder(chatMemory).build()); // (기�
 2. 스트리밍 호출(`/api/ai/chat/stream`)도 동일하게 확인 — 토큰이 SSE로 흘러나온 뒤 Redis에 USER/ASSISTANT 메시지가 정상 저장됨
 
 빌드(`mvn clean package`)도 클린하게 통과했고, 지금 이 수정이 반영된 jar로 서버가 계속 떠 있어(PID 10447, 로그: `dstone-ai-engine/logs/dstone-ai-engine.out`). 필요하면 이대로 두고 `dstone-boot` 채팅 화면까지 띄워서 직접 확인해볼 수도 있고, 진단 끝났으니 내려도 괜찮아 — 어느 쪽으로 할까?
+
+---
+
+## 질문
+
+내려줘
+
+---
+
+## 답변
+
+서버 내렸어.
