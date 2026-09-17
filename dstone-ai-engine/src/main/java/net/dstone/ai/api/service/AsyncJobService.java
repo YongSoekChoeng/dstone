@@ -37,8 +37,10 @@ public class AsyncJobService extends BaseService {
 	private WorkflowExecutor workflowExecutor;
 
 	/**
+	 * <pre>
 	 * jobId를 즉시 돌려주고, 실제 실행은 백그라운드에서 진행한다.
-	 * 
+	 * </pre>
+	 *
 	 * @param jobId     이 작업에 부여할 id
 	 * @param workflow  실행할 Workflow 정의
 	 * @param sessionId 대화 세션 ID

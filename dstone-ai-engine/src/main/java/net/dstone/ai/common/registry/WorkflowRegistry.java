@@ -43,8 +43,10 @@ public class WorkflowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 모르는 id거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
-	 * 
+	 * </pre>
+	 *
 	 * @param id     조회할 workflow id
 	 * @param caller 호출한 앱/서비스 식별자
 	 */

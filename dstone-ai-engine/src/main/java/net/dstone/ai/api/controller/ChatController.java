@@ -58,8 +58,10 @@ public class ChatController extends BaseController {
 	}
 
 	/**
+	 * <pre>
 	 * chat()과 요청 계약은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 text/event-stream으로 흘려보낸다.
-	 * 
+	 * </pre>
+	 *
 	 * @param request        채팅 요청 내용(agent, message 등)
 	 * @param servletRequest caller 식별을 위한 HTTP 요청
 	 */

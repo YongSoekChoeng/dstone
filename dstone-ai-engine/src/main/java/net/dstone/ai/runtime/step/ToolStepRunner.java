@@ -37,8 +37,10 @@ public class ToolStepRunner {
 	}
 
 	/**
+	 * <pre>
 	 * {previous}/{변수명} 토큰을 실제 값으로 바꿔 Tool 호출용 JSON 인자를 만든다 - 별도 템플릿 엔진 없이 단순 치환이면 충분하다.
-	 * 
+	 * </pre>
+	 *
 	 * @param inputTemplate {previous}/{변수명} 토큰을 담고 있는 입력 템플릿
 	 * @param input         {previous} 토큰 자리에 채워 넣을 이전 step 결과
 	 * @param variables     {변수명} 토큰 자리에 채워 넣을 변수 맵

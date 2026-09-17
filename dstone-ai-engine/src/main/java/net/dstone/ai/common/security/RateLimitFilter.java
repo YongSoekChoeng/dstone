@@ -102,8 +102,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	/**
+	 * <pre>
 	 * callerKey의 이번 윈도우 누적 요청 수를 1 증가시키고 그 값을 반환한다.
-	 * 
+	 * </pre>
+	 *
 	 * @param callerKey     요청 건수를 세는 기준 키(caller 또는 IP)
 	 * @param windowSeconds 카운트를 유지할 기간(초)
 	 */

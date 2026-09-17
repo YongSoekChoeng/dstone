@@ -28,10 +28,12 @@ import net.dstone.common.utils.StringUtil;
 public class ConfigChatClient {
 
 	/**
+	 * <pre>
 	 * session.RedisChatMemorySession(ChatMemoryRepository의 구현체)은 spring.data.redis.enabled=true일 때만 빈으로 등록된다. 그리고 파라메터로
 	 * 사용되는 ChatMemoryRepository chatMemoryRepository 는 빈으로 등록된 RedisChatMemorySession 를 가리키므로 구동되는데 문제가 없다. 다만,
 	 * spring.data.redis.enabled=false일 때(ChatMemoryRepository 가 등록되어있지 않을때) @ConditionalOnMissingBean 을 활용하여
 	 * InMemoryChatMemoryRepository 을 등록함으로써 chatMemory()가 항상 정상적으로 주입받을 수 있게 한다(재시작/다중 인스턴스 간 공유는 안 되지만 로컬 개발 환경에서는 충분하다).
+	 * </pre>
 	 */
 	@Bean
 	@ConditionalOnMissingBean(ChatMemoryRepository.class)
@@ -40,8 +42,10 @@ public class ConfigChatClient {
 	}
 
 	/**
+	 * <pre>
 	 * dstone.ai.session.max-messages(기본 20)만큼만 최근 대화를 유지하는 슬라이딩 윈도우.
-	 * 
+	 * </pre>
+	 *
 	 * @param chatMemoryRepository 대화 내역을 저장할 저장소
 	 * @param configProperty       설정값을 조회할 객체
 	 */

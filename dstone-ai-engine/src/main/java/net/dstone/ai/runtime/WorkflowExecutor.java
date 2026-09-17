@@ -39,8 +39,10 @@ public class WorkflowExecutor extends BaseObject {
 	private RagStepRunner ragStepRunner;
 
 	/**
+	 * <pre>
 	 * name으로 등록된 Workflow를 실행하고, 마지막 step 결과가 담긴 WorkflowContext를 돌려준다.
-	 * 
+	 * </pre>
+	 *
 	 * @param workflow     실행할 Workflow 정의
 	 * @param sessionId    대화 세션 식별자
 	 * @param caller       호출 주체(caller) 식별자
@@ -144,8 +146,10 @@ public class WorkflowExecutor extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * step이 parallelGroup을 갖고 있으면 같은 그룹의 인접 step 전체를, 아니면 자기 자신만 담은 목록을 돌려준다.
-	 * 
+	 * </pre>
+	 *
 	 * @param steps 전체 step 목록
 	 * @param step  그룹을 찾을 기준 step
 	 */
@@ -200,8 +204,10 @@ public class WorkflowExecutor extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 목록상 currentId 바로 다음 step의 id를 돌려준다 - currentId가 마지막이면 null(=Workflow 종료).
-	 * 
+	 * </pre>
+	 *
 	 * @param steps     전체 step 목록
 	 * @param currentId 기준이 되는 현재 step id
 	 */

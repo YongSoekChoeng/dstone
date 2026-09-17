@@ -65,7 +65,10 @@ public class HttpCallTool extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * WebClient 응답(상태코드/본문)을 이 Tool의 "통과: .../실패: ..." 응답 문자열 컨벤션으로 바꾼다.
+	 * </pre>
+	 *
 	 * @param statusCode HTTP 상태 코드
 	 * @param success    2xx 여부
 	 * @param body       응답 본문(없으면 빈 문자열)

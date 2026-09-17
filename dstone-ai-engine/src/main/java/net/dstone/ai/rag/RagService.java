@@ -42,7 +42,11 @@ public class RagService extends BaseService {
 	@Autowired
 	private ConfigProperty configProperty;
 
-	/** 최상위원칙: dstone.ai.rag.enabled=true이고 VectorStore 빈이 실제로 떠 있을 때만 통과시킨다. */
+	/**
+	 * <pre>
+	 * 최상위원칙: dstone.ai.rag.enabled=true이고 VectorStore 빈이 실제로 떠 있을 때만 통과시킨다.
+	 * </pre>
+	 */
 	private VectorStore requireVectorStore() {
 		if (!Boolean.parseBoolean(this.configProperty.getProperty("dstone.ai.rag.enabled"))) {
 			throw new IllegalStateException("RAG가 비활성화되어 있습니다(dstone.ai.rag.enabled=false 또는 미설정).");
@@ -67,9 +71,11 @@ public class RagService extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐준다. 둘 다 없으면 null(=필터 없음)을 돌려준다 - caller가 없는
 	 * 경우(security.auth가 꺼진 배포)는 기존과 동일하게 tenant 필터 없이 동작해야 하므로, 이 메서드가 유일하게 "격리를 켤지" 판단하는 지점이다.
-	 * 
+	 * </pre>
+	 *
 	 * @param caller   호출한 앱/서비스 식별자
 	 * @param sourceId 문서 논리 식별자
 	 */
@@ -90,8 +96,10 @@ public class RagService extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다.
-	 * 
+	 * </pre>
+	 *
 	 * @param caller 호출한 앱/서비스 식별자
 	 */
 	public Advisor getRagSpecAdvisor(String caller) {
@@ -105,8 +113,10 @@ public class RagService extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * caller(=tenant_id)의 문서 범위로만 검색을 제한한다 - caller가 없으면(security.auth 꺼짐) 기존과 동일하게 전체 검색.
-	 * 
+	 * </pre>
+	 *
 	 * @param request 검색 조건(질의어, topK 등)
 	 * @param caller  호출한 앱/서비스 식별자
 	 */
@@ -127,11 +137,13 @@ public class RagService extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * 원문을 Tika로 추출 → TokenTextSplitter로 청킹 → VectorStore(pgvector)에 저장한다. sourceId는 호출하는 쪽이 정하는 논리적 문서 식별자(파일명, 업무키 등)로, 같은
 	 * sourceId로 다시 적재하면 upsert처럼 동작하도록 새 청크를 넣기 전에 그 sourceId로 색인돼 있던 기존 청크를 먼저 지운다.
 	 *
 	 * caller(=tenant_id)가 있으면 청크마다 tenant metadata를 함께 태깅해서, search()/getRagSpecAdvisor()가 같은 caller의 문서만 검색하도록 격리한다.
-	 * 
+	 * </pre>
+	 *
 	 * @param resource 적재할 원문 파일
 	 * @param sourceId 문서 논리 식별자(재적재 시 upsert 기준 키)
 	 * @param caller   호출한 앱/서비스 식별자
@@ -168,8 +180,10 @@ public class RagService extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * sourceId와 caller(=tenant_id) 조건을 함께 걸어 삭제한다 - 다른 tenant가 같은 sourceId를 썼어도 서로의 문서를 지우지 못한다.
-	 * 
+	 * </pre>
+	 *
 	 * @param sourceId 문서 논리 식별자
 	 * @param caller   호출한 앱/서비스 식별자
 	 */

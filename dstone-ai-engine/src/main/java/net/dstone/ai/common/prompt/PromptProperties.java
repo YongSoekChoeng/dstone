@@ -18,8 +18,10 @@ public class PromptProperties extends BaseObject {
 	ConfigProperty configProperty;
 
 	/**
+	 * <pre>
 	 * 해당버전의 프롬프트명 반환
-	 * 
+	 * </pre>
+	 *
 	 * @param templateName 버전을 조회할 프롬프트 템플릿 이름
 	 */
 	public String versionOf(String templateName) {
