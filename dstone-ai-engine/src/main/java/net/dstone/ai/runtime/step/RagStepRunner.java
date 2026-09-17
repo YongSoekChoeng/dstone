@@ -17,7 +17,7 @@ public class RagStepRunner {
 	private RagService ragService;
 
 	/**
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller 호출한 앱/서비스 식별자(tenant)
 	 * @param query  검색 질의어
 	 */
 	public String run(String caller, String query) {

@@ -76,7 +76,7 @@ public class RagService extends BaseService {
 	 * 경우(security.auth가 꺼진 배포)는 기존과 동일하게 tenant 필터 없이 동작해야 하므로, 이 메서드가 유일하게 "격리를 켤지" 판단하는 지점이다.
 	 * </pre>
 	 *
-	 * @param caller   호출한 앱/서비스 식별자
+	 * @param caller   호출한 앱/서비스 식별자(tenant)
 	 * @param sourceId 문서 논리 식별자
 	 */
 	private Filter.Expression buildFilter(String caller, String sourceId) {
@@ -100,7 +100,7 @@ public class RagService extends BaseService {
 	 * 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다.
 	 * </pre>
 	 *
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller 호출한 앱/서비스 식별자(tenant)
 	 */
 	public Advisor getRagSpecAdvisor(String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
@@ -118,7 +118,7 @@ public class RagService extends BaseService {
 	 * </pre>
 	 *
 	 * @param request 검색 조건(질의어, topK 등)
-	 * @param caller  호출한 앱/서비스 식별자
+	 * @param caller  호출한 앱/서비스 식별자(tenant)
 	 */
 	public List<RetrievedChunk> search(RagSearchRequest request, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
@@ -146,7 +146,7 @@ public class RagService extends BaseService {
 	 *
 	 * @param resource 적재할 원문 파일
 	 * @param sourceId 문서 논리 식별자(재적재 시 upsert 기준 키)
-	 * @param caller   호출한 앱/서비스 식별자
+	 * @param caller   호출한 앱/서비스 식별자(tenant)
 	 */
 	public IngestResponse ingest(Resource resource, String sourceId, String caller) {
 		if (StringUtil.isEmpty(sourceId)) {
@@ -185,7 +185,7 @@ public class RagService extends BaseService {
 	 * </pre>
 	 *
 	 * @param sourceId 문서 논리 식별자
-	 * @param caller   호출한 앱/서비스 식별자
+	 * @param caller   호출한 앱/서비스 식별자(tenant)
 	 */
 	public void deleteBySourceId(String sourceId, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();

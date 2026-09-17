@@ -45,7 +45,7 @@ public class WorkflowExecutor extends BaseObject {
 	 *
 	 * @param workflow     실행할 Workflow 정의
 	 * @param sessionId    대화 세션 식별자
-	 * @param caller       호출 주체(caller) 식별자
+	 * @param caller       호출 주체 식별자(tenant)
 	 * @param variables    Workflow 호출 시 넘겨받은 변수 맵
 	 * @param initialInput Workflow 최초 입력값
 	 */
@@ -103,7 +103,7 @@ public class WorkflowExecutor extends BaseObject {
 	/**
 	 * @param step      실행할 step 정의
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller    호출 주체(caller) 식별자
+	 * @param caller    호출 주체 식별자(tenant)
 	 * @param context   step들이 공유하는 실행 컨텍스트
 	 */
 	private StepOutcome runStep(StepDefinition step, String sessionId, String caller, WorkflowContext context) {
@@ -169,7 +169,7 @@ public class WorkflowExecutor extends BaseObject {
 	/**
 	 * @param group     동시 실행할 병렬 step 그룹
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller    호출 주체(caller) 식별자
+	 * @param caller    호출 주체 식별자(tenant)
 	 * @param context   step들이 공유하는 실행 컨텍스트
 	 */
 	private StepOutcome runParallel(List<StepDefinition> group, String sessionId, String caller, WorkflowContext context) {

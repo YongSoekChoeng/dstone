@@ -23,7 +23,7 @@ public class ToolExecutor extends BaseObject {
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/**
-	 * @param caller    호출 주체(caller) 식별자
+	 * @param caller    호출 주체 식별자(tenant)
 	 * @param toolName  호출할 Tool 이름
 	 * @param jsonInput Tool에 넘길 JSON 인자 문자열
 	 */

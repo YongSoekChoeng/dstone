@@ -48,7 +48,7 @@ public class AgentRegistry extends BaseObject {
 	 * </pre>
 	 *
 	 * @param agentName 조회할 agent 이름
-	 * @param caller    호출한 앱/서비스 식별자
+	 * @param caller    호출한 앱/서비스 식별자(tenant)
 	 * @return
 	 */
 	public AgentDefinition resolve(String agentName, String caller) {

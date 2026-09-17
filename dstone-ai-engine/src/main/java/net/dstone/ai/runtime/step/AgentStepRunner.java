@@ -28,7 +28,7 @@ public class AgentStepRunner {
 	 *
 	 * @param ref       호출할 Agent 이름
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller    호출한 앱/서비스 식별자
+	 * @param caller    호출한 앱/서비스 식별자(tenant)
 	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param input     사용자 입력 텍스트
 	 */
@@ -50,7 +50,7 @@ public class AgentStepRunner {
 	 *
 	 * @param ref       호출할 Agent 이름
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller    호출한 앱/서비스 식별자
+	 * @param caller    호출한 앱/서비스 식별자(tenant)
 	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param input     사용자 입력 텍스트
 	 */
@@ -71,7 +71,7 @@ public class AgentStepRunner {
 	/**
 	 * @param ref       호출할 Agent 이름
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller    호출한 앱/서비스 식별자
+	 * @param caller    호출한 앱/서비스 식별자(tenant)
 	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param input     사용자 입력 텍스트
 	 */
@@ -85,7 +85,7 @@ public class AgentStepRunner {
 	/**
 	 * @param ref       호출할 Agent 이름
 	 * @param sessionId 대화 세션 식별자
-	 * @param caller    호출한 앱/서비스 식별자
+	 * @param caller    호출한 앱/서비스 식별자(tenant)
 	 * @param variables 프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param input     사용자 입력 텍스트
 	 */

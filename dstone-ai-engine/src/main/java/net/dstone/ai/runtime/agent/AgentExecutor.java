@@ -41,8 +41,14 @@ public class AgentExecutor extends BaseObject {
 	private ConfigTool configTool;
 
 	/**
+	 * <pre>
+	 * AGENT 용 LLM호출 메소드.
+	 *
+	 * Stream 형식이 아닌라 결과가 완전히 나온 후에야 클라이언트에게 전달.
+	 * </pre>
+	 *
 	 * @param sessionId     대화 세션 식별자
-	 * @param caller        호출한 앱/서비스 식별자
+	 * @param caller        호출한 앱/서비스 식별자(tenant)
 	 * @param agent         호출할 Agent 정의
 	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param userMessage   사용자 입력 텍스트
@@ -56,6 +62,8 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
+	 * SUPERVISOR 용 LLM호출 메소드.
+	 * 
 	 * call()과 요청 조립은 동일하고, 자유 텍스트 대신 구조화된 Verdict(pass/reason)로 응답을 받는다.
 	 * runtime.step.AgentStepRunner의 SUPERVISOR step처럼 "성공/실패를 LLM이 판정해야 하는" 호출 전용이다.
 	 * Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱해주므로,
@@ -65,7 +73,7 @@ public class AgentExecutor extends BaseObject {
 	 * </pre>
 	 *
 	 * @param sessionId   대화 세션 식별자
-	 * @param caller      호출한 앱/서비스 식별자
+	 * @param caller      호출한 앱/서비스 식별자(tenant)
 	 * @param agent       호출할 Agent 정의
 	 * @param variables   프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param userMessage 사용자 입력 텍스트
@@ -76,11 +84,13 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다.
+	 * AGENT 용 LLM호출 메소드.
+	 *
+	 * call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다.(Stream 형식)
 	 * </pre>
 	 *
 	 * @param sessionId     대화 세션 식별자
-	 * @param caller        호출한 앱/서비스 식별자
+	 * @param caller        호출한 앱/서비스 식별자(tenant)
 	 * @param agent         호출할 Agent 정의
 	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param userMessage   사용자 입력 텍스트
@@ -93,8 +103,12 @@ public class AgentExecutor extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * LLM 호출을위한 Spec을 정의하는 메소드.
+	 * </pre>
+	 * 
 	 * @param sessionId     대화 세션 식별자
-	 * @param caller        호출한 앱/서비스 식별자
+	 * @param caller        호출한 앱/서비스 식별자(tenant)
 	 * @param agent         호출할 Agent 정의
 	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
@@ -114,14 +128,19 @@ public class AgentExecutor extends BaseObject {
 
 		/************************************************************************
 		2. 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치
+			- ConfigChatClient.chatClient 에서 defaultAdvisors 로 등록 된 MessageChatMemoryAdvisor가 참조 할 sessionId 를 주입.
+			- MessageChatMemoryAdvisor 는 ChatMemory(구현체는 RedisChatMemorySession)를 생성자 파라메터로 받음.
+			- ChatMemory(구현체는 RedisChatMemorySession).findByConversationId(String conversationId)는 Spring 내부적으로 호출됨.
 		************************************************************************/
-		spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>()
-			{
+		spec = spec.advisors(
+			new Consumer<ChatClient.AdvisorSpec>(){
 				@Override
 				public void accept(ChatClient.AdvisorSpec a) {
+					// ChatMemory(구현체는 RedisChatMemorySession).findByConversationId(String conversationId)가 읽어갈 conversationId 세팅.
 					a.param(ChatMemory.CONVERSATION_ID, sessionId);
 				}
-			});
+			}
+		);
 
 		/************************************************************************
 		3. 시스템 프롬프트 적용.
@@ -157,16 +176,20 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		/************************************************************************
-		7. Advisor 체인(나중에 붙는 governance Advisor 포함)이 caller를 읽을 수 있게 전달
+		7. Advisor 체인
+			- 세션 ID를 거는 것과 마찬가지로  caller를 읽을 수 있게 전달.(아직 미사용.)
 		************************************************************************/
 		if (caller != null) {
-			spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>()
-				{
-					@Override
-					public void accept(ChatClient.AdvisorSpec a) {
-						a.param(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller);
-					}
-				});
+			spec = spec.advisors(
+			    new Consumer<ChatClient.AdvisorSpec>() {
+			        @Override
+			        public void accept(ChatClient.AdvisorSpec a) {
+			        	// TO-DO: 추후 caller 를 사용하는 Advisor 가 추가되면 할 작업.
+			            // a.advisors(new Advisor1(), new Advisor2(), ...);
+			            // a.param(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller);
+			        }
+			    }
+			);
 		}
 		
 		return spec;

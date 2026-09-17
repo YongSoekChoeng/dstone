@@ -25,11 +25,12 @@ import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
- * 이 엔진의 기본 엔드포인트, POST /api/ai/chat을 처리한다 - resources/agents/*.yml에 등록된 Agent 하나를 1회 호출한다(여러 step을 이어 실행하려면
- * api.controller.WorkflowController를 쓴다).
+ * 이 엔진의 기본 엔드포인트.
+ * POST /api/ai/chat을 처리한다 
+ * resources/agents/*.yml에 등록된 Agent 하나를 1회 호출한다(여러 step을 이어 실행하려면 api.controller.WorkflowController를 쓴다).
  *
- * POST /api/ai/chat/stream은 같은 요청 계약에 응답만 text/event-stream(SSE)으로 토큰 단위 흘려보낸다. Servlet 기반 Spring MVC 컨트롤러에서도
- * reactor-core가 클래스패스에 있으면(dstone-common이 spring-boot-starter-webflux를 물고 있어 항상 있음) Flux&lt;String&gt; 반환만으로 SSE가 동작한다.
+ * POST /api/ai/chat/stream은 같은 요청 계약에 응답만 text/event-stream(SSE)으로 토큰 단위 흘려보낸다. 
+ * Servlet 기반 Spring MVC 컨트롤러에서도 reactor-core가 클래스패스에 있으면(dstone-common이 spring-boot-starter-webflux를 물고 있어 항상 있음) Flux<String> 반환만으로 SSE가 동작한다.
  */
 @RestController
 @RequestMapping("/api/ai/chat")

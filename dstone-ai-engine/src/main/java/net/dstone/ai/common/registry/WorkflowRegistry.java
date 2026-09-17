@@ -48,7 +48,7 @@ public class WorkflowRegistry extends BaseObject {
 	 * </pre>
 	 *
 	 * @param id     조회할 workflow id
-	 * @param caller 호출한 앱/서비스 식별자
+	 * @param caller 호출한 앱/서비스 식별자(tenant)
 	 */
 	public WorkflowDefinition resolve(String id, String caller) {
 		WorkflowDefinition definition = this.byId.get(id);

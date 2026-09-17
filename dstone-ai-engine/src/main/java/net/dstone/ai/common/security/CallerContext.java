@@ -18,7 +18,7 @@ public final class CallerContext {
 
 	/**
 	 * @param request 들어온 요청
-	 * @param caller  호출한 앱/서비스 식별자
+	 * @param caller  호출한 앱/서비스 식별자(tenant)
 	 */
 	public static void set(HttpServletRequest request, String caller) {
 		request.setAttribute(Constants.Security.Caller.REQUEST_ATTRIBUTE, caller);

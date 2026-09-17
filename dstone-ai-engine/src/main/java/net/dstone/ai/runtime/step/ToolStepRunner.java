@@ -23,7 +23,7 @@ public class ToolStepRunner {
 
 	/**
 	 * @param step      실행할 TOOL step 정의
-	 * @param caller    호출 주체(caller) 식별자
+	 * @param caller    호출 주체 식별자(tenant)
 	 * @param variables Workflow 호출 시 넘겨받은 변수 맵
 	 * @param input     이전 step 결과(또는 최초 입력) 텍스트
 	 */
