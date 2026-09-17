@@ -139,17 +139,18 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		/************************************************************************
-		5. Tool 적용(caller의 Tool 화이트리스트를 통과한 것만 붙는다)
+		5. Tool 적용
+			- caller의 Tool 화이트리스트를 통과한 것만 붙는다.
+			- 화이트리스트설정(dstone.ai.tool.allowed-by-caller)이 없으면 전체 허용.
 		************************************************************************/
 		if (toolsEnabled) {
 			spec.tools(this.configTool.toolCallbackProvider(caller));
 		}
 
 		/************************************************************************
-		6. 모델 override(modelOverride > agent.model() 순으로 먼저 있는 값을 쓰고, 둘 다 없으면
-			spring.ai.{provider}.chat.options.model 그대로 씀). 지금 활성화된 provider(spring.ai.model.chat)
-			안에서 모델만 바꾸는 것이며, 다른 provider의 모델명을 넣으면 이 호출 시점에 그 provider API가
-			에러를 낸다(기동 시점엔 검증하지 않음).
+		6. 모델 override 적용
+			- modelOverride > agent.model() 순으로 먼저 있는 값을 쓰고, 둘 다 없으면 spring.ai.{provider}.chat.options.model 그대로 씀. 
+			- 지금 활성화된 provider(spring.ai.model.chat) 안에서 모델만 바꾸는 것이며, 다른 provider의 모델명을 넣으면 이 호출 시점에 그 provider API가 에러를 낸다(기동 시점엔 검증하지 않음).
 		************************************************************************/
 		if (!StringUtil.isEmpty(model)) {
 			spec = spec.options(ChatOptions.builder().model(model));
