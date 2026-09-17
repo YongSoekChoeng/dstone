@@ -15,6 +15,7 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.WorkflowDefinition;
 import net.dstone.ai.runtime.WorkflowContext;
 import net.dstone.ai.runtime.WorkflowExecutor;
+import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseService;
 
 /**
@@ -68,6 +69,7 @@ public class AsyncJobService extends BaseService {
 	}
 
 	/** @param jobId 조회할 작업 id */
+	@NoAspectLog
 	public WorkflowStatusResponse status(String jobId) {
 		this.requireRedis();
 		Map<Object, Object> entries = this.redisTemplate.opsForHash().entries(Constants.AsyncJob.JOB_KEY_PREFIX + jobId);

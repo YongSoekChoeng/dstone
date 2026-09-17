@@ -23,6 +23,7 @@ import net.dstone.ai.common.registry.WorkflowRegistry;
 import net.dstone.ai.common.security.CallerContext;
 import net.dstone.ai.runtime.WorkflowContext;
 import net.dstone.ai.runtime.WorkflowExecutor;
+import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.utils.StringUtil;
 
@@ -79,6 +80,7 @@ public class WorkflowController extends BaseController {
 
 	/** @param jobId 조회할 비동기 작업 id */
 	@GetMapping("/status/{jobId}")
+	@NoAspectLog
 	public WorkflowStatusResponse status(@PathVariable String jobId) {
 		return this.asyncJobService.status(jobId);
 	}

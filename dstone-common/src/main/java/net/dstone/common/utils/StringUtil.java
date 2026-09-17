@@ -20,12 +20,17 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.mozilla.universalchardet.UniversalDetector;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class StringUtil {
 
 	/**
 	 * 깨진문자(surrogate characters)를 필터링하기위한 정규식
 	 */
 	public static String BAD_CHAR_REXP = "([\\ud800-\\udbff\\udc00-\\udfff])";
+	
+	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 	
 	/**
 	 * null 체크하는 메소드
@@ -1452,6 +1457,25 @@ public class StringUtil {
 		}
 		return flag;
 	}
+	
+	/**
+	 * Json형식인지 체크하는 메소드
+	 * 
+	 * @param input - 체크할 스트링
+	 * @return boolean
+	 */
+	public static boolean isJson(String inputStr) {
+		boolean flag = false;
+		inputStr = nullCheck(inputStr, "");
+        try {
+            JSON_MAPPER.readTree(inputStr);
+            flag = true;
+        } catch (JsonProcessingException e) {
+        	flag = false;
+        }
+		return flag;
+	}
+
 	
 	/**
 	 * 두문자의 유사치를 측정하는 메소드. 비교대상 스트링이 체크대상 스트링을 모두 포함하고 있으나(similarity100%) 동일하지 않을 경우 99%를 반환한다.

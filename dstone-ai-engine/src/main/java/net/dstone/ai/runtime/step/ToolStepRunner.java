@@ -11,6 +11,7 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.StepOutcome;
 import net.dstone.ai.runtime.tool.ToolExecutor;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * TOOL step - LLM 없이 caller가 쓸 수 있는 Tool 하나를 직접 호출한다(예: SqlSyntaxTools.validateSqlSyntax로 결정적 검증). 성공하면 Tool의 응답 문구가
@@ -49,6 +50,11 @@ public class ToolStepRunner {
 	 */
 	private String renderToolInput(String inputTemplate, String input, Map<String, Object> variables) {
 		String rendered = inputTemplate.replace("{previous}", this.jsonEscape(input));
+		if( StringUtil.isJson(input) ) {
+			rendered = inputTemplate.replace("{previous}", this.jsonEscape(input));
+		}else {
+			rendered = inputTemplate.replace("{previous}", input);
+		}
 		if (variables != null) {
 			for (Map.Entry<String, Object> entry : variables.entrySet()) {
 				rendered = rendered.replace("{" + entry.getKey() + "}", this.jsonEscape(String.valueOf(entry.getValue())));
