@@ -78,7 +78,7 @@ public class AgentStepRunner {
 		AgentDefinition agent = this.agentRegistry.resolve(ref, caller);
 		// Workflow step은 항상 Agent 정의값 그대로 쓴다(null, null, null) - 요청별 ragOverride/toolsOverride/modelOverride 는
 		// api.controller.ChatController(단일 Agent 직접 호출)에만 있는 기능이다.
-		return this.agentExecutor.call(sessionId, caller, agent, variables, input, null, null, null);
+		return this.agentExecutor.call(agent, sessionId, caller, variables, input, null, null, null);
 	}
 
 	/**
@@ -90,7 +90,7 @@ public class AgentStepRunner {
 	 */
 	private Verdict callForVerdict(String ref, String sessionId, String caller, Map<String, Object> variables, String input) {
 		AgentDefinition agent = this.agentRegistry.resolve(ref, caller);
-		return this.agentExecutor.callForVerdict(sessionId, caller, agent, variables, input);
+		return this.agentExecutor.callForVerdict(agent, sessionId, caller, variables, input);
 	}
 
 }

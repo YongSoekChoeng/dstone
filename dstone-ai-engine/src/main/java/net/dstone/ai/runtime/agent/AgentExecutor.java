@@ -46,17 +46,16 @@ public class AgentExecutor extends BaseObject {
 	 *
 	 * Stream 형식이 아닌라 결과가 완전히 나온 후에야 클라이언트에게 전달.
 	 * </pre>
-	 *
+	 * @param agent         호출할 Agent 정의
 	 * @param sessionId     대화 세션 식별자
 	 * @param caller        호출한 앱/서비스 식별자(tenant)
-	 * @param agent         호출할 Agent 정의
 	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param userMessage   사용자 입력 텍스트
 	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
 	 */
-	public String call(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public String call(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).call().content();
 	}
 
@@ -71,14 +70,13 @@ public class AgentExecutor extends BaseObject {
 	 * ragOverride/toolsOverride는 없다.
 	 * SUPERVISOR는 항상 Agent 정의값 그대로 쓴다(요청별 override는 단일 대화 턴인 ChatController 전용 기능이라 여기엔 의미가 없다).
 	 * </pre>
-	 *
+	 * @param agent       호출할 Agent 정의
 	 * @param sessionId   대화 세션 식별자
 	 * @param caller      호출한 앱/서비스 식별자(tenant)
-	 * @param agent       호출할 Agent 정의
 	 * @param variables   프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param userMessage 사용자 입력 텍스트
 	 */
-	public Verdict callForVerdict(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage) {
+	public Verdict callForVerdict(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage) {
 		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(Verdict.class);
 	}
 
@@ -88,17 +86,16 @@ public class AgentExecutor extends BaseObject {
 	 *
 	 * call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다.(Stream 형식)
 	 * </pre>
-	 *
+	 * @param agent         호출할 Agent 정의
 	 * @param sessionId     대화 세션 식별자
 	 * @param caller        호출한 앱/서비스 식별자(tenant)
-	 * @param agent         호출할 Agent 정의
 	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param userMessage   사용자 입력 텍스트
 	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
 	 */
-	public Flux<String> stream(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public Flux<String> stream(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
 	}
 

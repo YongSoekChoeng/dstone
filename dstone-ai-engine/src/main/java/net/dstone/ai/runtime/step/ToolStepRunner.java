@@ -50,11 +50,6 @@ public class ToolStepRunner {
 	 */
 	private String renderToolInput(String inputTemplate, String input, Map<String, Object> variables) {
 		String rendered = inputTemplate.replace("{previous}", this.jsonEscape(input));
-		if( StringUtil.isJson(input) ) {
-			rendered = inputTemplate.replace("{previous}", this.jsonEscape(input));
-		}else {
-			rendered = inputTemplate.replace("{previous}", input);
-		}
 		if (variables != null) {
 			for (Map.Entry<String, Object> entry : variables.entrySet()) {
 				rendered = rendered.replace("{" + entry.getKey() + "}", this.jsonEscape(String.valueOf(entry.getValue())));
