@@ -12,26 +12,12 @@ package net.dstone.ai.common.definition;
  *
  * parallelGroup이 같은 값인 인접 step들은 WorkflowExecutor가 동시에 실행한다(지원하는 4패턴 중 병렬).
  * 
- * @param id            step 식별자
- * @param type          step이 실제로 무엇을 실행하는지 구분하는 종류(AGENT/SUPERVISOR/RAG/TOOL)
- * @param ref           type에 따라 가리키는 대상 이름(Agent 이름 또는 Tool 이름, RAG는 미사용)
- * @param inputTemplate step 입력값을 만들 템플릿
- * @param parallelGroup 함께 병렬 실행할 step들을 묶는 그룹 식별자
- * @param onSuccess     성공 시 이동할 다음 step id(또는 예약어 SUCCESS)
  * @param onFailure     실패 시 이동할 다음 step id(또는 예약어 FAIL)
+ * @param onSuccess     성공 시 이동할 다음 step id(또는 예약어 SUCCESS)
+ * @param parallelGroup 함께 병렬 실행할 step들을 묶는 그룹 식별자
+ * @param inputTemplate step 입력값을 만들 템플릿
+ * @param ref           type에 따라 가리키는 대상 이름(Agent 이름 또는 Tool 이름, RAG는 미사용)
+ * @param type          step이 실제로 무엇을 실행하는지 구분하는 종류(AGENT/SUPERVISOR/RAG/TOOL)
+ * @param id            step 식별자
  */
-public record StepDefinition(String id, StepType type, String ref, String inputTemplate, String parallelGroup, String onSuccess, String onFailure) {
-	
-    @Override
-    public String toString() {
-        return "StepDefinition[" +
-               "id=" + id + 
-               ", type=" + type + 
-               ", ref=" + ref +
-               ", inputTemplate=" + inputTemplate +
-               ", parallelGroup=" + parallelGroup + 
-               ", onSuccess=" + onSuccess + 
-               ", onFailure=" + onFailure + 
-               "]";
-    }
-}
+public record StepDefinition(String onFailure, String onSuccess, String parallelGroup, String inputTemplate, String ref, StepType type, String id) {}

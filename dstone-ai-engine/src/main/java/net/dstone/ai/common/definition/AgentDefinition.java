@@ -17,18 +17,4 @@ import java.util.List;
  * @param model          이 Agent 호출에만 쓸 모델명(runtime.agent.AgentExecutor 참고). null이면 spring.ai.{provider}.chat.options.model(엔진 공통 기본값)
  * @param allowedCallers 이 Agent 호출이 허용된 caller(tenant) 목록
  */
-public record AgentDefinition(String name, String description, String promptName, boolean toolsEnabled, boolean ragEnabled, String model, List<String> allowedCallers) {
-
-    @Override
-    public String toString() {
-        return "AgentDefinition[" +
-               "name=" + name + 
-               ", promptName=" + promptName + 
-               ", toolsEnabled=" + toolsEnabled +
-               ", ragEnabled=" + ragEnabled +
-               ", model=" + model + 
-               ", allowedCallers=" + allowedCallers + 
-               ", description=" + description + 
-               "]";
-    }
-}
+public record AgentDefinition(String description, List<String> allowedCallers, String model, boolean ragEnabled, boolean toolsEnabled, String promptName, String name) {}

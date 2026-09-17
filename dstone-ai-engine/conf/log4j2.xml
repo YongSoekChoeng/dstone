@@ -93,7 +93,7 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	
-		<Logger name="jdbc.resultsettable" level="INFO" additivity="false">  
+		<Logger name="jdbc.resultsettable" level="OFF" additivity="false">  
             <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
             	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
             </ThreadContextMapFilter>		  
