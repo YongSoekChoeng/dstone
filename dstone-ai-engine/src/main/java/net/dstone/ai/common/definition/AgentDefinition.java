@@ -14,9 +14,7 @@ import java.util.List;
  * @param promptName     시스템 프롬프트로 쓸 프롬프트 템플릿 이름
  * @param toolsEnabled   Tool 사용 허용 여부
  * @param ragEnabled     RAG 사용 허용 여부
- * @param model          이 Agent 호출에만 쓸 모델명(runtime.agent.AgentExecutor 참고). null이면 spring.ai.{provider}.chat.options.model(엔진 공통 기본값)을
- *                       그대로 쓴다 - 지금 활성화된 provider(spring.ai.model.chat)가 실제로 서빙하는 모델명이어야 하며, 다른 provider의 모델명을 넣어도 걸러지지
- *                       않고 그 Agent를 처음 호출할 때 런타임 에러로 드러난다. Agent별로 다른 provider를 쓰는 기능은 아직 없다(엔진 전체가 provider 하나를 공유).
+ * @param model          이 Agent 호출에만 쓸 모델명(runtime.agent.AgentExecutor 참고). null이면 spring.ai.{provider}.chat.options.model(엔진 공통 기본값)
  * @param allowedCallers 이 Agent 호출이 허용된 caller(tenant) 목록
  */
 public record AgentDefinition(String name, String description, String promptName, boolean toolsEnabled, boolean ragEnabled, String model, List<String> allowedCallers) {
