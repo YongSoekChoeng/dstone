@@ -52,9 +52,9 @@ public class ChatController extends BaseController {
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
-		String answer = this.agentExecutor.call(sessionId, caller, agent, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled());
+		String answer = this.agentExecutor.call(sessionId, caller, agent, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled(), request.model());
 		String provider = this.configProperty.getProperty("spring.ai.model.chat");
-		return new ChatResponse(answer, provider, sessionId, request.agent());
+		return new ChatResponse(answer, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}
 
 	/**
@@ -71,7 +71,7 @@ public class ChatController extends BaseController {
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
-		return this.agentExecutor.stream(sessionId, caller, agent, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled());
+		return this.agentExecutor.stream(sessionId, caller, agent, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled(), request.model());
 	}
 
 	/** @param request 필수값(message, agent) 검증 대상 요청 */
@@ -90,6 +90,24 @@ public class ChatController extends BaseController {
 	private String resolveSessionId(ChatRequest request) {
 		HttpSession session = this.getSession(true);
 		return session.getAttribute(DEFAULT_SESSION_KEY) != null ? session.getAttribute(DEFAULT_SESSION_KEY).toString() : (StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId());
+	}
+
+	/**
+	 * 응답에 실어줄 "실제로 쓰인 모델명"을 runtime.agent.AgentExecutor와 같은 우선순위(request.model() > agent.model() > provider 공통
+	 * 기본값)로 계산한다 - 호출 결과에는 영향이 없는, ChatResponse 표시 전용 계산이다.
+	 *
+	 * @param request  채팅 요청(model override)
+	 * @param agent    호출한 Agent 정의
+	 * @param provider 활성화된 provider 이름
+	 */
+	private String resolveModel(ChatRequest request, AgentDefinition agent, String provider) {
+		if (!StringUtil.isEmpty(request.model())) {
+			return request.model();
+		}
+		if (!StringUtil.isEmpty(agent.model())) {
+			return agent.model();
+		}
+		return this.configProperty.getProperty("spring.ai." + provider + ".chat.options.model");
 	}
 
 }

@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpSession;
 import net.dstone.boot.common.security.vo.CustomUserDetails;
 import net.dstone.boot.common.web.SessionListener;
 import net.dstone.common.config.ConfigProperty;
+import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 @Service
@@ -33,8 +34,11 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 * general-chat Agent의 promptName(sample-system)이 시스템 프롬프트에 {role} 자리표시자를 쓰므로
 	 * (prompts/sample-system/v1.st), variables로 role을 채워 보내야 한다 - 안 보내면
 	 * PromptTemplate 렌더링이 IllegalStateException("Not all variables were replaced")으로 실패한다.
+	 *
+	 * model은 화면의 모델 override 입력칸 값을 그대로 흘려보낸다 - 비어 있으면 body에 아예 안 실어서
+	 * dstone-ai-engine이 general-chat Agent 정의값(그마저 없으면 provider 공통 기본값)을 쓰게 둔다.
 	 */
-	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, boolean ragEnabled, boolean toolsEnabled) {
+	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, boolean ragEnabled, boolean toolsEnabled, String model) {
 
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("sessionId", this.resolveSessionId(servletRequest));
@@ -43,6 +47,9 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		body.put("variables", Map.of("role", AGENT_ROLE));
 		body.put("ragEnabled", ragEnabled);
 		body.put("toolsEnabled", toolsEnabled);
+		if (!StringUtil.isEmpty(model)) {
+			body.put("model", model);
+		}
 
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 

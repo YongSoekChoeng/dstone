@@ -1,7 +1,7 @@
 var DstoneAiChat = (function () {
 
 	var sendUrl = "";
-	var messagesEl, inputEl, formEl, ragCheckEl, toolsCheckEl, sendBtnEl;
+	var messagesEl, inputEl, formEl, ragCheckEl, toolsCheckEl, modelInputEl, sendBtnEl;
 
 	function init(url) {
 		sendUrl = url;
@@ -10,6 +10,7 @@ var DstoneAiChat = (function () {
 		formEl = document.getElementById("chat-form");
 		ragCheckEl = document.getElementById("chat-rag-enabled");
 		toolsCheckEl = document.getElementById("chat-tools-enabled");
+		modelInputEl = document.getElementById("chat-model-override");
 		sendBtnEl = document.getElementById("chat-send");
 
 		formEl.addEventListener("submit", function (e) {
@@ -55,7 +56,8 @@ var DstoneAiChat = (function () {
 		if (!message) {
 			return;
 		}
-		appendMessage("user", message);
+		var model = modelInputEl.value.trim();
+		appendMessage("user", model ? message + " (model: " + model + ")" : message);
 		inputEl.value = "";
 		sendBtnEl.disabled = true;
 
@@ -65,7 +67,8 @@ var DstoneAiChat = (function () {
 		var requestBody = JSON.stringify({
 			message: message,
 			ragEnabled: ragCheckEl.checked,
-			toolsEnabled: toolsCheckEl.checked
+			toolsEnabled: toolsCheckEl.checked,
+			model: model ? model : null
 		});
 
 		fetch(sendUrl, {

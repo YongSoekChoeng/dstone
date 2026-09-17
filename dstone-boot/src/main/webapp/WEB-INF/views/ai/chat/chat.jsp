@@ -19,6 +19,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div class="chat-options">
 					<label><input type="checkbox" id="chat-rag-enabled" /> 문서검색(RAG)</label>
 					<label><input type="checkbox" id="chat-tools-enabled" /> 도구호출(Tool)</label>
+					<label>모델 override
+						<input type="text" id="chat-model-override" class="chat-model-input" placeholder="비우면 기본값(Agent 정의값)" />
+					</label>
 				</div>
 				<div class="chat-input-row">
 					<textarea id="chat-input" class="chat-input" placeholder="메시지를 입력하세요..." rows="2"></textarea>

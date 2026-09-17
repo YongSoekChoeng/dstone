@@ -174,10 +174,20 @@
 
 .chat-options {
 	display: flex;
+	align-items: center;
 	gap: 16px;
 	margin-bottom: 8px;
 	font-size: 13px;
 	color: #4b5563;
+}
+
+.chat-model-input {
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	padding: 3px 8px;
+	font-size: 13px;
+	width: 220px;
+	margin-left: 6px;
 }
 
 .chat-input-row {

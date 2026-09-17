@@ -12,6 +12,10 @@ import java.util.Map;
  * ragEnabled/toolsEnabled는 비워두면(null) Agent 정의값을 그대로 쓰고, true/false를 명시하면 그 요청 한 번만 Agent 정의값을 무시하고 강제로 켜거나 끈다 - 같은
  * Agent를 쓰면서도 요청마다 RAG/Tool을 켜고 끄고 싶은 화면(예: dstone-boot 채팅 화면의 체크박스)을 위한 것이다.
  *
+ * model도 같은 방식이다 - 비워두면(null/빈 문자열) Agent 정의(agents/*.yml의 model, 그마저 없으면 provider 공통 기본값)를 그대로 쓰고, 값을 채우면 그
+ * 요청 한 번만 그 모델로 강제한다(common.definition.AgentDefinition.model 참고). 지금 활성화된 provider(spring.ai.model.chat) 안에서 모델만
+ * 바꾸는 것이라, 다른 provider의 모델명을 넣으면 이 요청 시점에 그 provider API가 에러를 낸다.
+ *
  * variables는 promptName 템플릿을 렌더링할 때 쓰이는 값이다(common.prompt.PromptTemplateRegistry).
  *
  * @param message      사용자 메시지
@@ -20,6 +24,7 @@ import java.util.Map;
  * @param variables    프롬프트 템플릿에 채울 값
  * @param ragEnabled   RAG 사용 여부 override
  * @param toolsEnabled Tool 사용 여부 override
+ * @param model        모델명 override
  */
-public record ChatRequest(String message, String sessionId, String agent, Map<String, Object> variables, Boolean ragEnabled, Boolean toolsEnabled) {
+public record ChatRequest(String message, String sessionId, String agent, Map<String, Object> variables, Boolean ragEnabled, Boolean toolsEnabled, String model) {
 }

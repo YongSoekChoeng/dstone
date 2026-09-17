@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +23,10 @@ import reactor.core.publisher.Flux;
  * 곳은 여기 한 곳뿐이다 - api.controller.ChatController(단일 대화 턴)와 runtime.step.AgentStepRunner(Workflow의 AGENT/ SUPERVISOR
  * step)가 똑같이 이 클래스를 통해 호출한다.
  *
- * ragOverride/toolsOverride는 null이면 Agent 정의값을 그대로 쓰고, true/false를 주면 그 호출 한 번만 Agent 정의값을 무시하고 강제로 켜거나 끈다 -
- * api.controller.ChatController가 요청의 ChatRequest.ragEnabled()/toolsEnabled()를 그대로 넘겨서, 같은 Agent를 쓰면서도 요청마다 RAG/Tool을 켜고
- * 끄고 싶은 화면(예: dstone-boot의 채팅 화면 체크박스)을 지원한다. Workflow의 AGENT/SUPERVISOR step(runtime.step.AgentStepRunner)은 이 둘을 항상
- * null로 넘겨 Agent 정의값 그대로 쓴다.
+ * ragOverride/toolsOverride/modelOverride는 null이면 Agent 정의값(agent.model()이 null이면 provider 공통 기본값)을 그대로 쓰고, 값을 주면 그
+ * 호출 한 번만 Agent 정의값을 무시하고 강제로 적용한다 - api.controller.ChatController가 요청의 ChatRequest.ragEnabled()/toolsEnabled()/model()을
+ * 그대로 넘겨서, 같은 Agent를 쓰면서도 요청마다 RAG/Tool/모델을 바꿔보고 싶은 화면(예: dstone-boot의 채팅 화면)을 지원한다. Workflow의 AGENT/SUPERVISOR
+ * step(runtime.step.AgentStepRunner)은 셋 다 항상 null로 넘겨 Agent 정의값 그대로 쓴다.
  */
 @Component
 public class AgentExecutor extends BaseObject {
@@ -47,9 +48,10 @@ public class AgentExecutor extends BaseObject {
 	 * @param userMessage   사용자 입력 텍스트
 	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
 	 */
-	public String call(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride) {
-		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride).user(userMessage).call().content();
+	public String call(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).call().content();
 	}
 
 	/**
@@ -69,7 +71,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param userMessage 사용자 입력 텍스트
 	 */
 	public Verdict callForVerdict(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage) {
-		return this.buildSpec(sessionId, caller, agent, variables, null, null).user(userMessage).call().entity(Verdict.class);
+		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(Verdict.class);
 	}
 
 	/**
@@ -84,9 +86,10 @@ public class AgentExecutor extends BaseObject {
 	 * @param userMessage   사용자 입력 텍스트
 	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
 	 */
-	public Flux<String> stream(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride) {
-		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride).user(userMessage).stream().content();
+	public Flux<String> stream(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
 	}
 
 	/**
@@ -96,11 +99,13 @@ public class AgentExecutor extends BaseObject {
 	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
 	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
 	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
+	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		boolean toolsEnabled = toolsOverride != null ? toolsOverride : agent.toolsEnabled();
+		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : agent.model();
 
 		/************************************************************************
 		1. 요청 스펙 시작
@@ -141,7 +146,17 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		/************************************************************************
-		6. Advisor 체인(나중에 붙는 governance Advisor 포함)이 caller를 읽을 수 있게 전달
+		6. 모델 override(modelOverride > agent.model() 순으로 먼저 있는 값을 쓰고, 둘 다 없으면
+			spring.ai.{provider}.chat.options.model 그대로 씀). 지금 활성화된 provider(spring.ai.model.chat)
+			안에서 모델만 바꾸는 것이며, 다른 provider의 모델명을 넣으면 이 호출 시점에 그 provider API가
+			에러를 낸다(기동 시점엔 검증하지 않음).
+		************************************************************************/
+		if (!StringUtil.isEmpty(model)) {
+			spec = spec.options(ChatOptions.builder().model(model));
+		}
+
+		/************************************************************************
+		7. Advisor 체인(나중에 붙는 governance Advisor 포함)이 caller를 읽을 수 있게 전달
 		************************************************************************/
 		if (caller != null) {
 			spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>()
