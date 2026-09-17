@@ -71,7 +71,7 @@ public class ConfigChatClient {
 	@Bean
 	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, List<Advisor> advisors) {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
-		advisors.add(MessageChatMemoryAdvisor.builder(chatMemory).build()); // 세션 메모리 - 항상 마지막(가장 안쪽)
+		advisorList.add(MessageChatMemoryAdvisor.builder(chatMemory).build()); // 세션 메모리 - 항상 마지막(가장 안쪽)
 		return builder.defaultAdvisors(advisorList.toArray(new Advisor[0])).build();
 	}
 }
