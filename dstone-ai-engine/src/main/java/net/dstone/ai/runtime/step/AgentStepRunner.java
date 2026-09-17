@@ -40,8 +40,7 @@ public class AgentStepRunner {
 	/**
 	 * <pre>
 	 * SUPERVISOR step - AGENT와 똑같이 Agent를 호출하지만, 응답을 자유 텍스트가 아니라 구조화된 Verdict(pass/reason)로 받아서 그걸로 성공/실패를 가른다.
-	 * (runtime.agent.AgentExecutor.callForVerdict 참고.
-	 * Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱해준다).
+	 * (runtime.agent.AgentExecutor.callForVerdict 참고.Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱해준다).
 	 *
 	 * 그래도 100% 확정적인 건 아니다 - 모델이 스키마 자체를 어기면 entity() 파싱이 예외를 던지는데,
 	 * 그런 경우와 verdict.pass()가 명시적으로 false인 경우를 구분하지 않고 둘 다 실패로 묶는다
