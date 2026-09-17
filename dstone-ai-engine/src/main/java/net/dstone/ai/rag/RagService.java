@@ -11,6 +11,7 @@ import java.util.Map;
 
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -45,6 +46,29 @@ import net.dstone.common.utils.StringUtil;
  */
 @Service
 public class RagService extends BaseService {
+
+	/**
+	 * <pre>
+	 * QuestionAnswerAdvisor 기본 템플릿은 "컨텍스트에 없으면 모른다고 답하라"고 강제한다 - 지식 베이스 QA봇에는
+	 * 맞는 동작이지만, 이 프로젝트의 ragEnabled Agent(예: sql-conversion-agent)는 이미 자신의 system prompt에
+	 * 해당 업무를 수행할 규칙/전문 지식을 전부 갖고 있고, RAG는 그 위에 참고 자료를 얹어주는 보조 수단일 뿐이다.
+	 * 기본 템플릿을 그대로 쓰면 검색된 문서가 질문과 안 맞을 때 LLM이 "컨텍스트가 관련 없다"며 본연의 작업(SQL
+	 * 변환 등)까지 거부해버린다 - 그래서 컨텍스트는 "도움이 되면 참고, 아니면 무시하고 원래 알던 대로 작업을
+	 * 끝까지 수행"하도록 지시를 바꾼다.
+	 * </pre>
+	 */
+	private static final PromptTemplate RAG_SPEC_PROMPT_TEMPLATE = new PromptTemplate("""
+		{query}
+
+		아래는 참고용으로 검색된 자료입니다(질문과 관련이 없거나 비어 있을 수 있습니다):
+		---------------------
+		{question_answer_context}
+		---------------------
+
+		이 자료가 실제로 도움이 되면 참고하고, 관련이 없거나 부족하면 무시하십시오. 참고 자료가 없거나
+		질문과 무관하다는 이유로 답변을 거부하거나 작업을 중단하지 말고, 당신이 이미 갖고 있는 지식과
+		system prompt에 명시된 규칙만으로 작업을 반드시 끝까지 수행하십시오.
+		""");
 
 	@Autowired
 	private ObjectProvider<VectorStore> vectorStoreProvider;
@@ -118,7 +142,7 @@ public class RagService extends BaseService {
 		if (filter != null) {
 			requestBuilder.filterExpression(filter);
 		}
-		return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(requestBuilder.build()).build();
+		return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(requestBuilder.build()).promptTemplate(RAG_SPEC_PROMPT_TEMPLATE).build();
 	}
 
 	/**
