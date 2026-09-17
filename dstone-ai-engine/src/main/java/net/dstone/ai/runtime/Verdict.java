@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.agent;
+package net.dstone.ai.runtime;
 
 /**
  * SUPERVISOR step처럼 Agent 호출 결과가 "통과했는지 아닌지"를 판정해야 하는 경우에 쓰는 구조화 응답이다.

@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.StepOutcome;
+import net.dstone.ai.runtime.Verdict;
 import net.dstone.ai.runtime.agent.AgentExecutor;
-import net.dstone.ai.runtime.agent.Verdict;
 import net.dstone.common.utils.StringUtil;
 
 /** AGENT/SUPERVISOR step - ref로 지정된 Agent를 호출한다. SUPERVISOR만 구조화된 Verdict(pass/reason)로 성공/실패를 가른다. */

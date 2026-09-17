@@ -109,8 +109,10 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Runtime ] {" + signatureLog(joinPoint) + "}");
-		return joinPoint.proceed();
+		this.info("+----->[Runtime ] Start {" + signatureLog(joinPoint) + "}");
+		Object retObj = joinPoint.proceed();
+		this.info("+----->[Runtime ] End {" + retObj + "}");
+		return retObj;
 	}
 
 	/**
@@ -124,8 +126,10 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Tools ] {" + signatureLog(joinPoint) + "}");
-		return joinPoint.proceed();
+		this.info("+----->[Tools ] Start {" + signatureLog(joinPoint) + "}");
+		Object retObj = joinPoint.proceed();
+		this.info("+----->[Tools ] End {" + retObj + "}");
+		return retObj;
 	}
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/

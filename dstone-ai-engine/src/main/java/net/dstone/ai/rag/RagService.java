@@ -53,12 +53,7 @@ public class RagService extends BaseService {
 	 * 맞는 동작이지만, 이 프로젝트의 ragEnabled Agent(예: sql-conversion-agent)는 이미 자신의 system prompt에
 	 * 해당 업무를 수행할 규칙/전문 지식을 전부 갖고 있고, RAG는 그 위에 참고 자료를 얹어주는 보조 수단일 뿐이다.
 	 *
-	 * "컨텍스트를 어떻게 다뤄야 하는지"에 대한 지시문을 여기(user 턴)에 자연어로 섞어 넣었더니, 모델이 그
-	 * 지시문 자체를 지켜야 할 명령이 아니라 언급해도 되는 대화 내용처럼 취급해서 최종 답변에 그대로 echo하는
-	 * 사고가 실전에서 관찰됐다(예: SQL만 반환해야 하는 Agent가 "참고 자료가 도움이 되면 참고하고..." 문구를
-	 * 답변에 끼워 넣음). system prompt(각 Agent의 promptName)는 상대적으로 훨씬 안정적으로 지켜지므로,
-	 * 컨텍스트를 어떻게 취급할지는 이 템플릿이 아니라 각 Agent의 system prompt에 규칙으로 명시하게 하고,
-	 * 여기서는 "참고자료를 보여주기만" 하는 중립적인 최소 형태로 유지한다.
+	 * {question_answer_context} 는 Spring AI 프레임워크 자체에서 치환 되는 항목.
 	 * </pre>
 	 */
 	private static final PromptTemplate RAG_SPEC_PROMPT_TEMPLATE = new PromptTemplate("""
