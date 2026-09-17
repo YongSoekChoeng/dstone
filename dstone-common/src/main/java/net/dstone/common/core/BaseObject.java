@@ -100,6 +100,8 @@ public class BaseObject {
 				continue;
 			}else if (param instanceof HttpServletResponse) {
 				continue;
+	        } else if (param instanceof Record) {
+	            paramListInfo.append(param.toString());
 			}else if (param instanceof String) {
 				paramListInfo.append("String" + "[" + param + "]");
 			}else{
