@@ -5,6 +5,8 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.io.JsonStringEncoder;
+
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.StepOutcome;
@@ -56,10 +58,16 @@ public class ToolStepRunner {
 	}
 
 	/**
+	 * <pre>
+	 * \, ", \n만 직접 치환하면 LLM 출력에 섞인 \r(CRLF 줄바꿈) 같은 다른 제어문자가 이스케이프되지 않은
+	 * 채 JSON 문자열에 그대로 남아 무효한 JSON이 된다(예: MethodToolCallback의 JSON->Map 변환 실패).
+	 * Jackson의 JsonStringEncoder는 JSON 문자열 리터럴에 필요한 모든 제어문자 이스케이프를 처리해준다.
+	 * </pre>
+	 *
 	 * @param value JSON 문자열 안에 안전하게 넣을 원본 값
 	 */
 	private String jsonEscape(String value) {
-		return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+		return value == null ? "" : new String(JsonStringEncoder.getInstance().quoteAsString(value));
 	}
 
 }
