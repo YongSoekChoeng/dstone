@@ -168,7 +168,7 @@ dstone:
         ##########################################################################################
         # Tool 설정. 
         # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
-        # 설정이 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
+        # 설정(dstone.ai.tool.allowed-by-caller)이 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
         ##########################################################################################      
         # tool:
         #     allowed-by-caller:

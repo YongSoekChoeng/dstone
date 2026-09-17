@@ -54,11 +54,11 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * call()과 요청 조립은 동일하고, 자유 텍스트 대신 구조화된 Verdict(pass/reason)로 응답을 받는다.
-	 * runtime.step.AgentStepRunner의 SUPERVISOR step처럼 "성공/실패를 LLM이 판정해야 하는" 호출 전용이다 -
+	 * runtime.step.AgentStepRunner의 SUPERVISOR step처럼 "성공/실패를 LLM이 판정해야 하는" 호출 전용이다.
 	 * Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱해주므로,
-	 * "통과: .../실패: ..." 텍스트 접두사를 사람이 프롬프트로 지시하고 코드가 문자열로 매칭하던 예전 방식보다
-	 * 형식 준수율이 높다. ragOverride/toolsOverride는 없다 - SUPERVISOR는 항상 Agent 정의값 그대로 쓴다
-	 * (요청별 override는 단일 대화 턴인 ChatController 전용 기능이라 여기엔 의미가 없다).
+	 * "통과: .../실패: ..." 텍스트 접두사를 사람이 프롬프트로 지시하고 코드가 문자열로 매칭하던 예전 방식보다 형식 준수율이 높다. 
+	 * ragOverride/toolsOverride는 없다.
+	 * SUPERVISOR는 항상 Agent 정의값 그대로 쓴다(요청별 override는 단일 대화 턴인 ChatController 전용 기능이라 여기엔 의미가 없다).
 	 *
 	 * @param sessionId   대화 세션 식별자
 	 * @param caller      호출한 앱/서비스 식별자
@@ -98,10 +98,14 @@ public class AgentExecutor extends BaseObject {
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		boolean toolsEnabled = toolsOverride != null ? toolsOverride : agent.toolsEnabled();
 
-		// 1. 요청 스펙 시작
+		/************************************************************************
+		1. 요청 스펙 시작
+		************************************************************************/
 		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt();
 
-		// 2. 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치
+		/************************************************************************
+		2. 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치
+		************************************************************************/
 		spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>()
 			{
 				@Override
@@ -110,23 +114,31 @@ public class AgentExecutor extends BaseObject {
 				}
 			});
 
-		// 3. 시스템 프롬프트 적용(dstone.ai.prompt.version.{promptName}과 맵핑되는
-		// src/main/resources/prompts/{promptName}/{version}.st)
+		/************************************************************************
+		3. 시스템 프롬프트 적용.
+			- dstone.ai.prompt.version.{promptName}과 맵핑되는 src/main/resources/prompts/{promptName}/{version}.st 를 시스템 프롬프트로 삽입한다.
+		************************************************************************/
 		if (!StringUtil.isEmpty(agent.promptName())) {
 			spec = spec.system(this.promptTemplateRegistry.render(agent.promptName(), variables));
 		}
 
-		// 4. RAG 적용(caller의 문서만 검색되도록 tenant 필터가 함께 걸린다)
+		/************************************************************************
+		4. RAG 적용(caller의 문서만 검색되도록 tenant 필터가 함께 걸린다)
+		************************************************************************/
 		if (ragEnabled) {
 			spec = spec.advisors(this.ragService.getRagSpecAdvisor(caller));
 		}
 
-		// 5. Tool 적용(caller의 Tool 화이트리스트를 통과한 것만 붙는다)
+		/************************************************************************
+		5. Tool 적용(caller의 Tool 화이트리스트를 통과한 것만 붙는다)
+		************************************************************************/
 		if (toolsEnabled) {
 			spec.tools(this.configTool.toolCallbackProvider(caller));
 		}
 
-		// 6. Advisor 체인(나중에 붙는 governance Advisor 포함)이 caller를 읽을 수 있게 전달
+		/************************************************************************
+		6. Advisor 체인(나중에 붙는 governance Advisor 포함)이 caller를 읽을 수 있게 전달
+		************************************************************************/
 		if (caller != null) {
 			spec = spec.advisors(new Consumer<ChatClient.AdvisorSpec>()
 				{
