@@ -85,30 +85,36 @@ record StepHistoryEntry(String stepId, StepType type, boolean success, String ou
 
 `dstone-batch`의 "스키마는 수동 실행" 관례를 그대로 따른다 (`initialize-schema: NEVER` 패턴).
 
-```sql
-CREATE TABLE ai_workflow_execution (
-    execution_id      VARCHAR(36) PRIMARY KEY,
-    workflow_id       VARCHAR(100) NOT NULL,
-    caller            VARCHAR(100),
-    status            VARCHAR(20) NOT NULL,      -- RUNNING/WAITING_APPROVAL/DONE/FAILED/CANCELLED
-    current_step_index INT NOT NULL DEFAULT 0,
-    variables_json    JSONB NOT NULL DEFAULT '{}',
-    result_text       TEXT,
-    error_message     TEXT,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_ai_workflow_execution_status ON ai_workflow_execution(status);
+테이블명·컬럼명 모두 대문자 스네이크케이스로 통일한다 — `dstone-batch`/`dstone-batchadmin`의 `BATCH_JOB_INSTANCE`, `TB_ADMIN_USER`, `TB_BATCH_SERVER` 등 리포지토리 전반의 SQL 명명 관례와 맞춘다 (사용자 지시: 테이블명 대문자화, 컬럼명도 동일 관례로 확장 적용).
 
-CREATE TABLE ai_workflow_execution_step_history (
-    id                BIGSERIAL PRIMARY KEY,
-    execution_id      VARCHAR(36) NOT NULL REFERENCES ai_workflow_execution(execution_id),
-    step_id           VARCHAR(100) NOT NULL,
-    step_type         VARCHAR(20) NOT NULL,
-    success           BOOLEAN NOT NULL,
-    output_summary    TEXT,
-    executed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+```sql
+CREATE TABLE AI_WORKFLOW_EXECUTION (
+    EXECUTION_ID        VARCHAR(36) PRIMARY KEY,
+    WORKFLOW_ID          VARCHAR(100) NOT NULL,
+    CALLER               VARCHAR(100),
+    STATUS               VARCHAR(20) NOT NULL,      -- RUNNING/WAITING_APPROVAL/DONE/FAILED/CANCELLED
+    CURRENT_STEP_INDEX   INT NOT NULL DEFAULT 0,
+    VARIABLES_JSON       JSONB NOT NULL DEFAULT '{}',
+    RESULT_TEXT          TEXT,
+    ERROR_MESSAGE        TEXT,
+    CREATED_AT           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UPDATED_AT           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IDX_AI_WORKFLOW_EXECUTION_STATUS ON AI_WORKFLOW_EXECUTION(STATUS);
+
+CREATE TABLE AI_WORKFLOW_EXECUTION_STEP_HISTORY (
+    ID                BIGSERIAL PRIMARY KEY,
+    EXECUTION_ID      VARCHAR(36) NOT NULL REFERENCES AI_WORKFLOW_EXECUTION(EXECUTION_ID),
+    STEP_ID           VARCHAR(100) NOT NULL,
+    STEP_TYPE         VARCHAR(20) NOT NULL,
+    STEP_REF          VARCHAR(200),      -- 사용된 에이전트/툴/MCP 이름 (StepDefinition.ref) — §1.6 로깅과 동일 정보를 조회 API(§10)에서도 볼 수 있도록 컬럼화
+    SUCCESS           BOOLEAN NOT NULL,
+    DURATION_MS        BIGINT,            -- 스텝 처리 소요시간
+    OUTPUT_SUMMARY     TEXT,
+    FAILURE_REASON     TEXT,              -- 실패/에러 사유 (StepOutput.failureReason 또는 예외 메시지)
+    EXECUTED_AT        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IDX_AI_WORKFLOW_EXECUTION_STEP_HISTORY_EXEC ON AI_WORKFLOW_EXECUTION_STEP_HISTORY(EXECUTION_ID);
 ```
 
 MyBatis는 이 모듈에 없으므로(현재도 없음) 새 sqlmap을 도입하지 않고, `JdbcTemplate` + 간단한 RowMapper로 `WorkflowExecutionStore`를 짠다 — 모듈의 기존 경량 스타일(라이브러리 최소 의존)과 일치.
@@ -140,6 +146,35 @@ Step은 두 계층에서 "끝"을 판단한다 — (a) 개별 스텝 러너의 �
 | `WAITING_APPROVAL` (신규) | `StepType.APPROVAL` 도달 | `WorkflowExecution.status=WAITING_APPROVAL`로 저장, 실행 중단. `decision` API 호출 시 `approved` 값에 따라 `onSuccess`/`onFailure` 쪽 `NEXT_STEP`으로 재평가하며 재개 |
 
 핵심 설계 판단: **ERROR(시스템 예외)와 FAILURE(비즈니스 실패)를 분리**한다. 기존 코드는 TOOL의 `"실패:"` 접두어 하나로 실패를 판정했는데, 이 규칙을 예외 상황까지 확장하면 "DB가 죽어서 응답을 못 받은 것"과 "SQL 문법이 틀려서 실패한 것"이 같은 `onFailure` 분기(예: fix-loop)로 흘러가 버려 무한 재시도/오탐이 날 수 있다. `ERROR`는 `onFailure`를 거치지 않고 바로 워크플로우를 죽인다.
+
+### 1.6 Step IN/OUT 로깅
+
+목표: 로그 한 줄(또는 시작/종료 두 줄)만 보고 **"이 실행에서, 이 스텝이, 무슨 유형으로, 어떤 Agent/Tool을 불러서, 어떻게 끝났는지"**가 바로 보여야 한다. 지금의 `ConfigCallLog`(AOP 메서드 entry/exit 로그)는 범용이라 이 정보를 한 줄로 안 보여준다 — 별도로 워크플로우 전용 감사 로그를 추가한다.
+
+- **위치**: `WorkflowExecutor`가 각 스텝을 실행하기 직전/직후에 신규 `runtime.WorkflowAuditLogger`(정적 유틸리티, 전용 로거 `net.dstone.ai.workflow.audit`)를 호출한다. 스텝 러너 내부가 아니라 `WorkflowExecutor` 한 곳에서만 로깅하므로 러너를 늘려도 로그 형식이 깨지지 않는다.
+- **포맷**: 사람이 grep하기 쉬운 logfmt 스타일(`key=value`) 한 줄. 필드 순서 고정.
+
+```
+# 스텝 시작
+WF_STEP phase=START executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent input="CREATE TABLE ... (500자 초과 시 자름)"
+
+# 스텝 종료 - 성공
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent result=SUCCESS transition=NEXT_STEP durationMs=842 output="COALESCE(...) LIMIT 10"
+
+# 스텝 종료 - 비즈니스 실패 (loop로 이어짐)
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=validate stepType=TOOL ref=sql-syntax-validator result=FAILURE transition=LOOP durationMs=12 failureReason="구문 오류: ..."
+
+# 스텝 종료 - 시스템 예외
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent result=ERROR transition=FAIL durationMs=5002 error="Anthropic API timeout"
+
+# 스텝 종료 - 승인 대기
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=sample-approval-flow stepId=approve-step stepType=APPROVAL result=PENDING transition=WAITING_APPROVAL
+```
+
+- **필드 고정 세트**: `executionId`, `workflowId`, `stepId`, `stepType`, `ref`(Agent/Tool/MCP 이름 — 없으면 생략), `phase`(START/END), `result`(END에만: SUCCESS/FAILURE/ERROR/PENDING), `transition`(END에만: StepStatus 값), `durationMs`(END에만), `input`/`output`/`failureReason`/`error`(있는 것만).
+- **긴 값 처리**: `input`/`output`은 `ExternalProcessRunner`가 이미 쓰는 것과 동일한 방식으로 길이 제한(기본 500자, `Constants`에 상수화) 후 말줄임 처리 — 로그가 한 줄을 넘어가지 않게.
+- **로그 라우팅**: 이 전용 로거는 `conf/log4j2.xml`에 별도 Logger로 선언해 기존에 이미 존재하는 `LOGS/dstone-ai-engine/execution/execution.log` 어펜더로 보낸다 (이미 이 경로로 로테이션/백업까지 되고 있으므로 새 파일을 만들 필요가 없다).
+- **DB 연동**: 같은 정보(`ref`, `durationMs`, `failureReason`)를 `AI_WORKFLOW_EXECUTION_STEP_HISTORY`(§1.4) 컬럼에도 그대로 적재해, 로그 파일을 안 보고도 §10 조회 API로 동일한 내용을 확인할 수 있게 한다 — 로그와 DB가 같은 소스(`WorkflowAuditLogger` 호출 시점)에서 나오므로 서로 어긋나지 않는다.
 
 ---
 
@@ -183,7 +218,7 @@ net.dstone.ai
 │   │   ├── ChatController
 │   │   ├── RagController
 │   │   ├── WorkflowController              (동기 /execute 는 유지, 비동기 submit/status는 execution 기반으로 내부 교체)
-│   │   └── WorkflowExecutionController     **신규** — GET /executions?status=, GET /executions/{id}, POST /executions/{id}/decision
+│   │   └── WorkflowExecutionController     **신규** — 진행상태/내역 조회 + 승인 처리 API, 상세는 §10
 │   ├── dto
 │   └── service
 │       └── (AsyncJobService 삭제 → runtime.execution.WorkflowExecutionService 로 대체)
@@ -205,6 +240,7 @@ net.dstone.ai
 │   └── RagService     (§5 대로 체인 구성 리팩터)
 ├── runtime
 │   ├── WorkflowContext, WorkflowExecutor(재작성), StepStatus, StepInput/StepOutput **(신규, StepOutcome 대체)**, Verdict
+│   ├── WorkflowAuditLogger **신규** — §1.6의 IN/OUT logfmt 로그를 담당하는 전용 유틸리티
 │   ├── execution **신규 패키지**
 │   │   ├── WorkflowExecution, WorkflowExecutionStatus, StepHistoryEntry
 │   │   ├── WorkflowExecutionStore   (JdbcTemplate 영속화)
@@ -352,12 +388,47 @@ abstract class ExternalProcessTool {
 ## 9. 진행 순서 (단계별)
 
 1. **Phase 1** — `StepInput`/`StepOutput` 도입 + Runner 시그니처 정리 + `StepType.RAG`/`RagStepRunner` 제거 + Tools 리네임/공통클래스 추출 + `RagSearchTool` 추가 (위험 낮음, 회귀 테스트로 검증 쉬움)
-2. **Phase 2** — PostgreSQL 스키마 추가 + `runtime.execution` 패키지(WorkflowExecutionStore/Service) + `WorkflowExecutor` 재작성 + `APPROVAL` StepType + `WorkflowExecutionController` (핵심/가장 큰 변경)
+2. **Phase 2** — PostgreSQL 스키마 추가 + `runtime.execution` 패키지(WorkflowExecutionStore/Service) + `WorkflowExecutor` 재작성 + `APPROVAL` StepType + `WorkflowAuditLogger`(§1.6) + `WorkflowExecutionController`(§10, 조회+승인 API) (핵심/가장 큰 변경)
 3. **Phase 3** — RAG 체인 분리 (`RetrievalAugmentationAdvisor` 전환)
 4. **Phase 4** — MCP 클라이언트 (`ConfigMcp`, `McpServerDefinition/Registry`, `resources/mcp/*.yml`)
-5. **Phase 5 (향후 과제, 이번 범위 아님)** — MCP 서버로 자체 노출, 승인 알림(Slack/메일) 연동, 재랭킹 고도화
+5. **Phase 5** — `dstone-boot`의 `net.dstone.boot.ai.*` 테스트 화면(§11)을 새 API 계약(`executionId`, `/executions` 조회, `/decision`)에 맞춰 갱신 — Phase 2가 끝나야 붙일 수 있으므로 그 뒤에 진행
+6. **Phase 6 (향후 과제, 이번 범위 아님)** — MCP 서버로 자체 노출, 승인 알림(Slack/메일) 연동, 재랭킹 고도화
 
-각 Phase 종료 시 `docs/09.dstone-ai-engine.md`를 갱신한다 (CLAUDE.md 지침: "리소스 변경 시 문서도 갱신"). 특히 §5 실행모델, §6 Agent와 Tool, §7 Session/RAG/Security, §10 API 레퍼런스, §14 변경이력 섹션이 영향받는다.
+각 Phase 종료 시 `docs/09.dstone-ai-engine.md`를 갱신한다 (CLAUDE.md 지침: "리소스 변경 시 문서도 갱신"). 특히 §5 실행모델, §6 Agent와 Tool, §7 Session/RAG/Security, §10 API 레퍼런스(본 계획서의 §10 조회 API 반영), §11 설정 레퍼런스(로깅 관련 log4j2 설정 추가), §14 변경이력 섹션이 영향받는다.
+
+## 10. Workflow 실행 상태/내역 조회 API
+
+`WorkflowExecutionController`(§3)가 `AI_WORKFLOW_EXECUTION`/`AI_WORKFLOW_EXECUTION_STEP_HISTORY`(§1.4)를 `WorkflowExecutionStore`를 통해 조회해 제공한다. 승인 처리(§1.2의 decision)도 같은 컨트롤러에 둔다 — "실행을 보고 판단해서 조작한다"는 하나의 흐름이기 때문.
+
+| Method/Path | 설명 | 응답 |
+|---|---|---|
+| `GET /api/ai/workflow/executions?status=&workflowId=&caller=&page=&size=` | 실행 목록 조회 (필터: 상태/워크플로우id/호출자, 페이징) | 목록 각 항목: `executionId, workflowId, caller, status, currentStepIndex, createdAt, updatedAt` (가벼운 요약, history 미포함) |
+| `GET /api/ai/workflow/executions/{executionId}` | 실행 1건 상세 + 전체 스텝 히스토리 | `executionId, workflowId, caller, status, currentStepIndex, variables, resultText, errorMessage, createdAt, updatedAt, history: [{stepId, stepType, ref, success, durationMs, outputSummary, failureReason, executedAt}, ...]` |
+| `POST /api/ai/workflow/executions/{executionId}/decision` | `WAITING_APPROVAL` 상태의 실행을 승인/반려 | 요청 `{approved, approver, comment}` → 응답은 재개된 실행의 최신 상태 (동기 재개 시 최종 상태까지, 비동기면 `RUNNING`) |
+
+- `status` 필터는 특히 `WAITING_APPROVAL`로 필터링해 "지금 승인 기다리는 실행 목록" 화면을 그대로 만들 수 있게 하는 것이 목적이다.
+- `history` 배열의 각 필드는 §1.6에서 로그로도 남기는 것과 동일한 값(`ref`, `durationMs`, `failureReason`)이라 로그 파일과 API 응답이 항상 일치한다.
+- 기존 `WorkflowController`의 `GET /status/{jobId}`(Redis 기반, §8에서 폐기 대상)는 이 API로 흡수되므로 별도 엔드포인트를 유지하지 않는다 — 다만 기존 클라이언트 호환이 필요하면 `jobId==executionId`로 간주해 얇은 리다이렉트만 남기는 것도 가능 (필요 시에만).
+
+---
+
+## 11. dstone-boot 테스트 화면 연동
+
+`dstone-boot`에 이미 `net.dstone.boot.ai.*`(ChatController/DocumentController/SqlConvertController/**WorkflowTestController**) + `webapp/ai/assets/js/*.js`로 이루어진, `dstone-ai-engine`을 `WebClient`로 호출해보는 수동 테스트 화면이 있다 (`interface.ai-engine.base-url` 설정 사용). 새로 만들 필요 없이 이 자산을 이번 API 변경에 맞춰 확장한다.
+
+**기존 코드 중 API 계약 변경으로 반드시 손대야 하는 부분** (`WorkflowTestController`/`WorkflowTestService`):
+- `submit.do`가 호출하는 `POST /api/ai/workflow/{id}/submit`은 그대로 두되, 응답의 `jobId`를 **`executionId`로 리네임**해 엔진 쪽 §1.3/§10 변경과 용어를 맞춘다 (`WorkflowSubmitResult`, `WorkflowSubmitCallResult` 필드명 변경).
+- `status.do`가 부르던 `GET /api/ai/workflow/status/{jobId}`는 **폐기** — 대신 `GET /api/ai/workflow/executions/{executionId}`(§10)를 호출하도록 `WorkflowTestService.status()`를 교체한다. 응답 상태값에 `WAITING_APPROVAL`/`CANCELLED`가 새로 추가되므로 `WorkflowStatusResult`/`WorkflowStatusCallResult`도 그 값을 그대로 통과시키게 확인.
+
+**신규로 추가할 화면/액션** (같은 `WorkflowTestController`/`workflow.js`에 기능 추가, 컨트롤러를 새로 쪼개지 않음 — 이미 "Workflow 테스트"라는 하나의 화면 주제이므로):
+- **승인 처리 테스트**: 상태가 `WAITING_APPROVAL`이면 화면에 승인/반려 입력(approver, comment)과 버튼을 노출하고, `POST /decision.do` 신규 액션이 `POST /api/ai/workflow/executions/{executionId}/decision`(§10)을 호출한다.
+- **실행 목록/이력 조회 화면**: `GET /list.do`(상태 필터 포함, `?status=WAITING_APPROVAL` 등)가 `GET /api/ai/workflow/executions`를 호출해 테이블로 보여주고, 행 클릭 시 `GET /detail.do?executionId=`가 `GET /api/ai/workflow/executions/{executionId}`를 호출해 `history`(스텝별 유형/ref/성공여부/소요시간/실패사유)까지 그대로 화면에 표시한다 — 이번 요청의 "WorkFlow 진행상태 및 내역 조회"를 사람이 직접 눈으로 확인하는 화면이 된다.
+
+**변경 불필요한 부분**:
+- `ChatController`/`DocumentController`(RAG)/`SqlConvertController`는 API 계약이 그대로라 수정할 필요 없다. MCP로 추가되는 툴이나 신규 `RagSearchTool`은 AGENT의 tool-calling 경로에 투명하게 얹히므로, 기존 Chat 테스트 화면과 (RagSearchTool을 쓰는) Workflow 테스트 화면만으로 별도 화면 없이 검증된다.
+- `interface.ai-engine.base-url` 설정은 변경 없음.
+
+---
 
 ## 검증 방법
 
@@ -366,3 +437,6 @@ abstract class ExternalProcessTool {
 - 신규: APPROVAL 스텝이 포함된 샘플 워크플로우로 `/execute` 호출 → 응답이 `WAITING_APPROVAL` 인지 확인 → `POST /executions/{id}/decision` 호출 → 다음 스텝까지 완료되는지 확인.
 - 신규: 로컬 MCP 서버(예: `@modelcontextprotocol/server-filesystem`) 하나 붙여 AGENT 스텝에서 해당 툴이 호출되는지 확인.
 - RAG: 문서 ingest 후 `RagController` 검색 API 및 `RagSearchTool`(TOOL 스텝) 양쪽에서 동일한 검색 결과가 나오는지 확인.
+- 로깅: 워크플로우 1회 실행 후 `execution.log`에서 `WF_STEP` 라인만 grep해, 스텝 수만큼 START/END 쌍이 찍히고 `stepType`/`ref`/`result`/`transition` 값이 실제 실행과 일치하는지 확인. 의도적으로 LLM 호출을 실패시켜(예: 잘못된 API 키) `result=ERROR`가 `result=FAILURE`와 다른 로그로 구분되는지 확인.
+- 조회 API: `GET /api/ai/workflow/executions?status=WAITING_APPROVAL`로 대기 중인 실행이 잡히는지, `GET /api/ai/workflow/executions/{id}`의 `history` 배열 내용이 위 로그/DB 값과 일치하는지 확인.
+- dstone-boot 연동: `dstone-boot`의 Workflow 테스트 화면에서 APPROVAL 스텝이 있는 워크플로우를 `submit.do`로 실행 → 화면에 승인 대기 표시 → 승인/반려 버튼으로 `decision.do` 호출 → 최종 결과까지 화면에서 눈으로 확인. `list.do`/`detail.do` 화면에서도 같은 실행의 상태·히스토리가 보이는지 확인.
