@@ -113,6 +113,34 @@ CREATE TABLE ai_workflow_execution_step_history (
 
 MyBatis는 이 모듈에 없으므로(현재도 없음) 새 sqlmap을 도입하지 않고, `JdbcTemplate` + 간단한 RowMapper로 `WorkflowExecutionStore`를 짠다 — 모듈의 기존 경량 스타일(라이브러리 최소 의존)과 일치.
 
+### 1.5 Step 종료 경우의 수 (StepStatus)
+
+Step은 두 계층에서 "끝"을 판단한다 — (a) 개별 스텝 러너의 실행 결과, (b) 그 결과를 받아 `WorkflowExecutor`가 내리는 다음 동작 결정.
+
+**(a) 스텝 러너의 실행 결과 (`StepOutput` 기준, 4가지)**
+
+| 결과 | 의미 | 발생 조건 |
+|---|---|---|
+| SUCCESS | 정상 성공 | `success=true` — AGENT 정상 응답, TOOL 결과에 `"실패:"` 없음, SUPERVISOR `Verdict.pass()==true` |
+| FAILURE | 비즈니스 로직상 실패 | `success=false, failureReason` 有 — TOOL `"실패:"` 접두어, SUPERVISOR `Verdict.pass()==false` |
+| ERROR | 처리 불가능한 예외 | LLM API 타임아웃/오류, DB 연결 끊김, MCP 서버 무응답 등 — 러너가 던진 예외를 `WorkflowExecutor`가 캐치. `StepOutput`으로 정상 반환되지 않는다 |
+| PENDING (APPROVAL 전용) | 아직 끝나지 않음 | `APPROVAL` 스텝 도달 시 — 러너를 아예 호출하지 않고 `WorkflowExecutor`가 실행을 중단 (§2 참고) |
+
+**(b) `WorkflowExecutor`의 다음 동작 결정 (`StepStatus`, 기존 4종 + 신규 2종)**
+
+기존 `StepStatus`(`NEXT_STEP`/`LOOP`/`SUCCESS`/`FAIL`)에 `ERROR`, `WAITING_APPROVAL`을 추가해 6가지로 확장한다.
+
+| StepStatus | 트리거 | 워크플로우 동작 |
+|---|---|---|
+| `NEXT_STEP` | SUCCESS/FAILURE + `onSuccess`/`onFailure`가 다른 스텝 id를 가리킴 | 그 스텝으로 진행, 실행 상태 영속화 |
+| `LOOP` | `onSuccess`/`onFailure`가 이전/현재 스텝을 다시 가리킴 (validate↔fix) | `maxIterations` 카운트 증가 후 재실행, 초과 시 강제 `FAIL` |
+| `SUCCESS` | `onSuccess`/`onFailure`가 `"SUCCESS"` sentinel | `WorkflowExecution.status=DONE`, 워크플로우 정상 종료 |
+| `FAIL` | `onSuccess`/`onFailure`가 `"FAIL"` sentinel, 또는 `LOOP` 초과 | `WorkflowExecution.status=FAILED`, 워크플로우 종료 |
+| `ERROR` (신규) | 스텝 러너가 예외를 던짐 | `onFailure` 분기를 **무시**하고 즉시 `WorkflowExecution.status=FAILED` + `errorMessage` 기록 |
+| `WAITING_APPROVAL` (신규) | `StepType.APPROVAL` 도달 | `WorkflowExecution.status=WAITING_APPROVAL`로 저장, 실행 중단. `decision` API 호출 시 `approved` 값에 따라 `onSuccess`/`onFailure` 쪽 `NEXT_STEP`으로 재평가하며 재개 |
+
+핵심 설계 판단: **ERROR(시스템 예외)와 FAILURE(비즈니스 실패)를 분리**한다. 기존 코드는 TOOL의 `"실패:"` 접두어 하나로 실패를 판정했는데, 이 규칙을 예외 상황까지 확장하면 "DB가 죽어서 응답을 못 받은 것"과 "SQL 문법이 틀려서 실패한 것"이 같은 `onFailure` 분기(예: fix-loop)로 흘러가 버려 무한 재시도/오탐이 날 수 있다. `ERROR`는 `onFailure`를 거치지 않고 바로 워크플로우를 죽인다.
+
 ---
 
 ## 2. Step Input/Output 계약 명확화
