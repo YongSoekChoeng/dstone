@@ -1,13 +1,10 @@
-# 단위업무를 처리하기 위해 필요한 agent 들을 기술한다.
-# prompt는 이 파일 안에 직접 적는다 - agent 하나의 정의(설명/프롬프트/RAG여부/툴여부)가 파일 하나로 완결된다.
-# agent 파일명은 agents.name들을 순수하게 편의상 파일명으로 그룹핑 해놓은 것이고 기능적인 의미는 없음.
-# 만일 agents/*.yml 파일들 내에 동일한 agents.name가 존재 할 경우 에러 발생.
-agents:
-
-  - name: general-chat
-    description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.
-    prompt: |
-      당신은 {role} 역할을 맡은 AI 어시스턴트입니다.
-      답변은 항상 한국어로, 간결하게 합니다.
-    toolsEnabled: true
-    ragEnabled: false
+# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다 - 파일명과 agent.name이 다르면 로딩 시 헷갈리니 반드시 맞춘다.
+# 프롬프트는 이 파일 안에 직접 적는다 - agent 하나의 정의(설명/프롬프트/RAG여부/툴여부)가 파일 하나로 완결된다.
+agent:
+  name: general-chat
+  description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.
+  prompt: |
+    당신은 {role} 역할을 맡은 AI 어시스턴트입니다.
+    답변은 항상 한국어로, 간결하게 합니다.
+  toolsEnabled: true
+  ragEnabled: false

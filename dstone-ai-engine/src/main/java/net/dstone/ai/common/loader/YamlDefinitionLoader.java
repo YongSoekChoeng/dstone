@@ -40,11 +40,11 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
-	 * agents/*.yml 파일 하나의 최상위 구조(agents: 리스트 - 한 파일에 여러 Agent를 같이 둘 수 있다).
-	 * 
-	 * @param agents agents 키에 바인딩된 정의 목록
+	 * agents/*.yml 파일 하나의 최상위 구조(agent: 키 하나 - workflows/*.yml, mcp/*.yml과 동일하게 파일 하나에 Agent 하나. 파일명이 곧 agent 이름).
+	 *
+	 * @param agent agent 키에 바인딩된 정의
 	 */
-	private record AgentFile(List<AgentDefinition> agents) {
+	private record AgentFile(AgentDefinition agent) {
 	}
 
 	/**
@@ -76,13 +76,11 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<AgentDefinition> definitions = new ArrayList<>();
 		for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
 			AgentFile file = this.readAs(resource, AgentFile.class);
-			if (file.agents() == null || file.agents().isEmpty()) {
-				throw new IllegalStateException(resource.getFilename() + "에 agents: 최상위 키(1개 이상)가 없습니다.");
+			if (file.agent() == null) {
+				throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
 			}
-			for (AgentDefinition agent : file.agents()) {
-				definitions.add(agent);
-			}
-			LogUtil.sysout("dstone-ai-engine loader: agent " + file.agents().size() + "개 <- " + resource.getFilename());
+			definitions.add(file.agent());
+			LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().name() + "] <- " + resource.getFilename());
 		}
 		return definitions;
 	}

@@ -10,7 +10,7 @@ import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statements;
 
 /**
- * SQL을 생성하는 프롬프트(agents/sql-convert.yml에 인라인된 프롬프트 등)에서, 최종 답변을 내놓기 전에 스스로 문법을 검증하고 틀렸으면 고치는 자기수정 루프에 쓰라고 만든 Tool이다.
+ * SQL을 생성하는 프롬프트(agents/sql-conversion-agent.yml, agents/sql-fix-agent.yml에 인라인된 프롬프트 등)에서, 최종 답변을 내놓기 전에 스스로 문법을 검증하고 틀렸으면 고치는 자기수정 루프에 쓰라고 만든 Tool이다.
  * JSQLParser는 특정 DB 실서버 없이 순수 그래머 파싱만 하므로(대상 테이블이 실제로 존재하는지는 모름) 어떤 대상 스키마의 쿼리든 항상 쓸 수 있지만, PostgreSQL 고유 문법의 세부까지 완벽히
  * 검증하지는 못한다.
  */
