@@ -66,7 +66,7 @@ public final class Constants {
 		}
 	}
 
-	/** runtime.WorkflowExecutor. */
+	/** runtime.WorkFlowExecutor. */
 	public static final class Workflow {
 		public final static int DEFAULT_MAX_ITERATIONS = 5;
 		public final static String SUCCESS_SENTINEL = "SUCCESS";

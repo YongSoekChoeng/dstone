@@ -5,12 +5,14 @@ import java.util.List;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,20 +28,32 @@ import net.dstone.common.utils.StringUtil;
  */
 @Configuration
 public class ConfigChatClient {
+	
+	@Autowired
+	ConfigProperty configProperty;
+	
 
 	/**
 	 * <pre>
 	 * session.RedisChatMemorySession(ChatMemoryRepository의 구현체)은 spring.data.redis.enabled=true일 때만 빈으로 등록된다. 그리고 파라메터로
 	 * 사용되는 ChatMemoryRepository chatMemoryRepository 는 빈으로 등록된 RedisChatMemorySession 를 가리키므로 구동되는데 문제가 없다. 다만,
 	 * spring.data.redis.enabled=false일 때(ChatMemoryRepository 가 등록되어있지 않을때) @ConditionalOnMissingBean 을 활용하여
-	 * InMemoryChatMemoryRepository 을 등록함으로써 chatMemory()가 항상 정상적으로 주입받을 수 있게 한다(재시작/다중 인스턴스 간 공유는 안 되지만 로컬 개발 환경에서는 충분하다).
+	 * InMemoryChatMemoryRepository 를 등록함으로써 chatMemory()가 항상 정상적으로 주입받을 수 있게 한다.
+	 * InMemoryChatMemoryRepository 는 재시작/다중 인스턴스 간 공유가 안된다는 점을 유의.
 	 * </pre>
 	 */
-	@Bean
-	@ConditionalOnMissingBean(ChatMemoryRepository.class)
-	ChatMemoryRepository chatMemoryRepository() {
-		return new InMemoryChatMemoryRepository();
-	}
+    @Bean
+    public ChatMemoryRepository chatMemoryRepository(ObjectProvider<ChatMemoryRepository> repositoryProvider) {
+        // getIfAvailable()은 빈이 있으면 가져오고, 없으면 null을 반환합니다.
+        ChatMemoryRepository existingRepository = repositoryProvider.getIfAvailable();
+        if (existingRepository != null) {
+            // 이미 등록된 빈이 있으면 그것을 그대로 사용
+            return existingRepository;
+        } else {
+            // 없으면 새로 생성
+            return new InMemoryChatMemoryRepository();
+        }
+    }
 
 	/**
 	 * <pre>
@@ -50,9 +64,34 @@ public class ConfigChatClient {
 	 * @param configProperty       설정값을 조회할 객체
 	 */
 	@Bean
-	ChatMemory chatMemory(ChatMemoryRepository chatMemoryRepository, ConfigProperty configProperty) {
+	ChatMemory chatMemory(ChatMemoryRepository chatMemoryRepository) {
 		String maxMessages = configProperty.getProperty("dstone.ai.session.max-messages");
-		return MessageWindowChatMemory.builder().chatMemoryRepository(chatMemoryRepository).maxMessages(StringUtil.isEmpty(maxMessages) ? 20 : Integer.parseInt(maxMessages)).build();
+		int intMaxMessages = Integer.parseInt(StringUtil.ifEmpty(maxMessages, "20"));
+		ChatMemory chatMemory = MessageWindowChatMemory.builder().chatMemoryRepository(chatMemoryRepository).maxMessages(intMaxMessages).build();
+		return chatMemory;
+	}
+
+	/**
+	 * <pre>
+	 * 시스템 디폴트 Advisor를 등록하는 메소드.
+	 * </pre>
+	 *
+	 * @param chatMemory 세션별 대화 내역을 담당할 메모리
+	 * @param advisor    목록(현재는 비어 있음). 스프링에서 List<T> 타입은 단일 Bean과 다르게 빈 List로 주입 하므로 문제 없음.
+	 */
+	@Bean
+	List<Advisor> defaultAdvisors(ChatMemory chatMemory, List<Advisor> advisors) {
+		List<Advisor> advisorList = new ArrayList<>(advisors);
+		
+		// 1. 로깅하는 Advisor 등록
+		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().build();
+		advisorList.add(simpleLoggerAdvisor);
+
+		// 2. 세션별 대화 내역을 기억하게 저장하는 Advisor 등록
+		MessageChatMemoryAdvisor mssageChatMemoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory).build();
+		advisorList.add(mssageChatMemoryAdvisor);
+		
+		return advisorList;
 	}
 
 	/**
@@ -65,13 +104,10 @@ public class ConfigChatClient {
 	 * </pre>
 	 * 
 	 * @param builder    ChatClient를 조립할 빌더
-	 * @param chatMemory 세션별 대화 내역을 담당할 메모리
-	 * @param advisor    목록(현재는 비어 있음). 스프링에서 List<T> 타입은 단일 Bean과 다르게 빈 List로 주입 하므로 문제 없음.
 	 */
 	@Bean
-	ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory, List<Advisor> advisors) {
-		List<Advisor> advisorList = new ArrayList<>(advisors);
-		advisorList.add(MessageChatMemoryAdvisor.builder(chatMemory).build()); // 세션 메모리 - 항상 마지막(가장 안쪽)
-		return builder.defaultAdvisors(advisorList.toArray(new Advisor[0])).build();
+	ChatClient chatClient(ChatClient.Builder builder, List<Advisor> defaultAdvisors) {
+		return builder.defaultAdvisors(defaultAdvisors.toArray(new Advisor[0])).build();
 	}
+	
 }

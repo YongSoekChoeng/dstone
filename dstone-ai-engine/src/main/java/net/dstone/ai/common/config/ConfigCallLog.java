@@ -11,7 +11,11 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.StepDefinition;
+import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.StringUtil;
 
 @Aspect
 @Component
@@ -109,9 +113,10 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Runtime ] Start {" + signatureLog(joinPoint) + "}");
+		String identity = getIdentity(joinPoint);
+		this.info("+----->[Runtime - "+identity+"] Start {" + signatureLog(joinPoint) + "}");
 		Object retObj = joinPoint.proceed();
-		this.info("+----->[Runtime ] End {" + retObj + "}");
+		this.info("+----->[Runtime - "+identity+"] End {" + retObj + "}");
 		return retObj;
 	}
 
@@ -126,10 +131,43 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+----->[Tools ] Start {" + signatureLog(joinPoint) + "}");
+		String identity = getIdentity(joinPoint);
+		this.info("+----->[Tools - "+identity+"] Start {" + signatureLog(joinPoint) + "}");
 		Object retObj = joinPoint.proceed();
-		this.info("+----->[Tools ] End {" + retObj + "}");
+		this.info("+----->[Tools - "+identity+"] End {" + getIdentity(joinPoint) + " Return [" + retObj + "] }");
 		return retObj;
+	}
+	
+	public String getIdentity(ProceedingJoinPoint joinPoint) {
+		String className = "";
+		String methodName = "";
+		String identity = "";
+		if(joinPoint != null) {
+			className = joinPoint.getTarget().getClass().getSimpleName();
+			methodName = joinPoint.getSignature().getName();
+			int args = joinPoint.getArgs().length;
+			boolean isSelcted = false;
+			for (int i = 0; i < args; i++) {
+				Object param = joinPoint.getArgs()[i];
+				if( param instanceof WorkFlowDefinition ) {
+					WorkFlowDefinition workFlowDefinition = (WorkFlowDefinition)param;
+					identity = "workFlow(id=" + workFlowDefinition.id()+")" ;
+					isSelcted = true;
+				}else if( param instanceof StepDefinition ) {
+					StepDefinition stepDefinition = (StepDefinition)param;
+					identity = "step(id=" + stepDefinition.id() + ", type="+stepDefinition.type() + ", ref="+stepDefinition.ref()+")" ;
+					isSelcted = true;
+				}else if( param instanceof AgentDefinition ) {
+					AgentDefinition agentDefinition = (AgentDefinition)param;
+					identity = "agent(name=" + agentDefinition.name() + ", promptName="+agentDefinition.promptName()+")" ;
+					isSelcted = true;
+				}
+				if(isSelcted) {
+					break;
+				}
+			}
+		}
+		return (className + "." + methodName + "(" + (StringUtil.isEmpty(identity)?"":"[") + identity + (StringUtil.isEmpty(identity)?"":"]") + ")");
 	}
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/

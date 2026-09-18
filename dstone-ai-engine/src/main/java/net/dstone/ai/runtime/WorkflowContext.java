@@ -7,7 +7,7 @@ import java.util.Map;
  * Workflow 실행 중 step들이 공유하는 값 저장소 클래스. "input"(최초 입력)과 "result"(가장 최근 step의 출력)를 담아두고, 호출 시 넘긴 variables는 "variables"
  * 키에 통째로 들어간다.
  */
-public class WorkflowContext {
+public class WorkFlowContext {
 
 	private final Map<String, Object> data = new HashMap<>();
 

@@ -1788,4 +1788,24 @@ public class StringUtil {
         }
     	return resultBool;
     }
+
+    /***
+     * 입력 스트링이 여러 라인으로 이루어 져 있을 경우 앞에 tabSpace 만큼 붙여서 반환
+     * @param msg
+     * @param tabSpace
+     * @return
+     */
+    public static String splitToLines(String msg, String tabSpace) {
+		StringBuffer buffer = new StringBuffer();
+		String[] lines = StringUtil.toStrArray(msg, "\n");
+		for(int i=0; i < lines.length; i++) {
+			String line = lines[i];
+			buffer.append(tabSpace).append(line);
+			if(i < lines.length-1) {
+				buffer.append("\n");
+			}
+		}
+		return buffer.toString();
+	}
+
 }

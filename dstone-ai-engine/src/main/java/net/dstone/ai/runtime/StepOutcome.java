@@ -6,5 +6,4 @@ package net.dstone.ai.runtime;
  * @param success step 성공 여부
  * @param text    step 실행 결과 텍스트
  */
-public record StepOutcome(boolean success, String text) {
-}
+public record StepOutcome(boolean success, String text) {}

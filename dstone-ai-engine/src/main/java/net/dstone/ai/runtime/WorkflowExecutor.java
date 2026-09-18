@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.WorkflowDefinition;
+import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.runtime.step.AgentStepRunner;
 import net.dstone.ai.runtime.step.RagStepRunner;
 import net.dstone.ai.runtime.step.ToolStepRunner;
@@ -29,7 +29,7 @@ import net.dstone.common.utils.StringUtil;
  * 자리에서 Workflow를 즉시 종료한다.
  */
 @Component
-public class WorkflowExecutor extends BaseObject {
+public class WorkFlowExecutor extends BaseObject {
 
 	@Autowired
 	private AgentStepRunner agentStepRunner;
@@ -49,8 +49,8 @@ public class WorkflowExecutor extends BaseObject {
 	 * @param variables    Workflow 호출 시 넘겨받은 변수 맵
 	 * @param initialInput Workflow 최초 입력값
 	 */
-	public WorkflowContext run(WorkflowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
-		WorkflowContext context = new WorkflowContext();
+	public WorkFlowContext run(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
+		WorkFlowContext context = new WorkFlowContext();
 		context.put("input", initialInput);
 		context.put("result", initialInput);
 		context.put("variables", variables);
@@ -83,10 +83,10 @@ public class WorkflowExecutor extends BaseObject {
 			}
 			context.put("result", outcome.text());
 
-			StepResult transition = this.decideTransition(workflow, step, outcome);
+			StepFlow transition = this.decideTransition(workflow, step, outcome);
 
 			switch (transition.status()) {
-				case SUCCESS: 	// 성공일 경우 WorkflowContext 를 반환
+				case SUCCESS: 	// 성공일 경우 WorkFlowContext 를 반환
 					return context;
 				case FAIL: 		// 실패일 경우 예외발생.
 					throw new IllegalStateException("workflow[" + workflow.id() + "] 실패: " + transition.message());
@@ -106,14 +106,14 @@ public class WorkflowExecutor extends BaseObject {
 	 * @param caller    호출 주체 식별자(tenant)
 	 * @param context   step들이 공유하는 실행 컨텍스트
 	 */
-	private StepOutcome runStep(StepDefinition step, String sessionId, String caller, WorkflowContext context) {
+	private StepOutcome runStep(StepDefinition step, String sessionId, String caller, WorkFlowContext context) {
 		String input = context.<String>get("result");
 		Map<String, Object> variables = context.get("variables");
 		return switch (step.type()) {
-			case AGENT 		-> this.agentStepRunner.runAgent(step.ref(), sessionId, caller, variables, input);
+			case AGENT -> this.agentStepRunner.runAgent(step.ref(), sessionId, caller, variables, input);
 			case SUPERVISOR -> this.agentStepRunner.runSupervisor(step.ref(), sessionId, caller, variables, input);
-			case RAG 		-> new StepOutcome(true, this.ragStepRunner.run(caller, input));
-			case TOOL 		-> this.toolStepRunner.run(step, caller, variables, input);
+			case RAG -> new StepOutcome(true, this.ragStepRunner.run(caller, input));
+			case TOOL -> this.toolStepRunner.run(step, caller, variables, input);
 		};
 	}
 
@@ -122,27 +122,27 @@ public class WorkflowExecutor extends BaseObject {
 	 * @param step     방금 실행한 step 정의
 	 * @param outcome  방금 실행한 step의 결과
 	 */
-	private StepResult decideTransition(WorkflowDefinition workflow, StepDefinition step, StepOutcome outcome) {
+	private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition step, StepOutcome outcome) {
 		String nextId = outcome.success() ? step.onSuccess() : step.onFailure();
 		if (nextId == null) {
 			if (!outcome.success()) {
-				return StepResult.fail("step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + outcome.text());
+				return StepFlow.fail("step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + outcome.text());
 			}
 			String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
-			return sequentialNextId == null ? StepResult.success(outcome.text()) : StepResult.next(sequentialNextId);
+			return sequentialNextId == null ? StepFlow.success(outcome.text()) : StepFlow.next(sequentialNextId);
 		}
 		if (Constants.Workflow.SUCCESS_SENTINEL.equals(nextId)) {
-			return StepResult.success(outcome.text());
+			return StepFlow.success(outcome.text());
 		}
 		if (Constants.Workflow.FAIL_SENTINEL.equals(nextId)) {
-			return StepResult.fail(outcome.text());
+			return StepFlow.fail(outcome.text());
 		}
 		int currentIndex = this.indexOf(workflow.steps(), step.id());
 		int nextIndex = this.indexOf(workflow.steps(), nextId);
 		if (nextIndex < 0) {
 			throw new IllegalStateException("workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
 		}
-		return nextIndex <= currentIndex ? StepResult.loop(nextId) : StepResult.next(nextId);
+		return nextIndex <= currentIndex ? StepFlow.loop(nextId) : StepFlow.next(nextId);
 	}
 
 	/**
@@ -172,7 +172,7 @@ public class WorkflowExecutor extends BaseObject {
 	 * @param caller    호출 주체 식별자(tenant)
 	 * @param context   step들이 공유하는 실행 컨텍스트
 	 */
-	private StepOutcome runParallel(List<StepDefinition> group, String sessionId, String caller, WorkflowContext context) {
+	private StepOutcome runParallel(List<StepDefinition> group, String sessionId, String caller, WorkFlowContext context) {
 		Map<String, CompletableFuture<StepOutcome>> futures = new LinkedHashMap<>();
 		for (StepDefinition step : group) {
 			final StepDefinition currentStep = step;
@@ -180,7 +180,7 @@ public class WorkflowExecutor extends BaseObject {
 				{
 					@Override
 					public StepOutcome get() {
-						return WorkflowExecutor.this.runStep(currentStep, sessionId, caller, context);
+						return WorkFlowExecutor.this.runStep(currentStep, sessionId, caller, context);
 					}
 				}));
 		}

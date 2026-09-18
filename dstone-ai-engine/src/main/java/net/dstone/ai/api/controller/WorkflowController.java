@@ -18,11 +18,11 @@ import net.dstone.ai.api.dto.WorkflowResponse;
 import net.dstone.ai.api.dto.WorkflowStatusResponse;
 import net.dstone.ai.api.dto.WorkflowSubmitResponse;
 import net.dstone.ai.api.service.AsyncJobService;
-import net.dstone.ai.common.definition.WorkflowDefinition;
+import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkflowRegistry;
 import net.dstone.ai.common.security.CallerContext;
-import net.dstone.ai.runtime.WorkflowContext;
-import net.dstone.ai.runtime.WorkflowExecutor;
+import net.dstone.ai.runtime.WorkFlowContext;
+import net.dstone.ai.runtime.WorkFlowExecutor;
 import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.utils.StringUtil;
@@ -38,12 +38,12 @@ import net.dstone.common.utils.StringUtil;
  */
 @RestController
 @RequestMapping("/api/ai/workflow")
-public class WorkflowController extends BaseController {
+public class WorkFlowController extends BaseController {
 
 	@Autowired
 	WorkflowRegistry workflowRegistry;
 	@Autowired
-	WorkflowExecutor workflowExecutor;
+	WorkFlowExecutor workFlowExecutor;
 	@Autowired
 	AsyncJobService asyncJobService;
 
@@ -56,9 +56,9 @@ public class WorkflowController extends BaseController {
 	public WorkflowResponse execute(@PathVariable String workflowId, @RequestBody WorkflowRequest request, HttpServletRequest servletRequest) {
 		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
-		WorkflowDefinition workflow = this.workflowRegistry.resolve(workflowId, caller);
+		WorkFlowDefinition workflow = this.workflowRegistry.resolve(workflowId, caller);
 		String sessionId = this.resolveSessionId(request);
-		WorkflowContext context = this.workflowExecutor.run(workflow, sessionId, caller, request.variables(), request.message());
+		WorkFlowContext context = this.workFlowExecutor.run(workflow, sessionId, caller, request.variables(), request.message());
 		return new WorkflowResponse(context.<String>get("result"), sessionId, workflowId);
 	}
 
@@ -71,7 +71,7 @@ public class WorkflowController extends BaseController {
 	public WorkflowSubmitResponse submit(@PathVariable String workflowId, @RequestBody WorkflowRequest request, HttpServletRequest servletRequest) {
 		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
-		WorkflowDefinition workflow = this.workflowRegistry.resolve(workflowId, caller);
+		WorkFlowDefinition workflow = this.workflowRegistry.resolve(workflowId, caller);
 		String sessionId = this.resolveSessionId(request);
 		String jobId = UUID.randomUUID().toString();
 		this.asyncJobService.submit(jobId, workflow, sessionId, caller, request);

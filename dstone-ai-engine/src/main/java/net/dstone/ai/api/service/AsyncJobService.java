@@ -12,9 +12,9 @@ import org.springframework.stereotype.Service;
 import net.dstone.ai.api.dto.WorkflowRequest;
 import net.dstone.ai.api.dto.WorkflowStatusResponse;
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.definition.WorkflowDefinition;
-import net.dstone.ai.runtime.WorkflowContext;
-import net.dstone.ai.runtime.WorkflowExecutor;
+import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.runtime.WorkFlowContext;
+import net.dstone.ai.runtime.WorkFlowExecutor;
 import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseService;
 
@@ -35,7 +35,7 @@ public class AsyncJobService extends BaseService {
 	@Autowired(required = false)
 	private RedisTemplate<String, Object> redisTemplate;
 	@Autowired
-	private WorkflowExecutor workflowExecutor;
+	private WorkFlowExecutor workFlowExecutor;
 
 	/**
 	 * <pre>
@@ -48,7 +48,7 @@ public class AsyncJobService extends BaseService {
 	 * @param caller    호출한 앱(tenant) 식별자
 	 * @param request   Workflow 입력 메시지/변수
 	 */
-	public String submit(String jobId, WorkflowDefinition workflow, String sessionId, String caller, WorkflowRequest request) {
+	public String submit(String jobId, WorkFlowDefinition workflow, String sessionId, String caller, WorkflowRequest request) {
 		this.requireRedis();
 		this.writeState(jobId, "RUNNING", null, null);
 
@@ -57,7 +57,7 @@ public class AsyncJobService extends BaseService {
 				@Override
 				public void run() {
 					try {
-						WorkflowContext context = AsyncJobService.this.workflowExecutor.run(workflow, sessionId, caller, request.variables(), request.message());
+						WorkFlowContext context = AsyncJobService.this.workFlowExecutor.run(workflow, sessionId, caller, request.variables(), request.message());
 						AsyncJobService.this.writeState(jobId, "DONE", context.<String>get("result"), null);
 					} catch (Exception e) {
 						AsyncJobService.this.writeState(jobId, "FAILED", null, e.getMessage());

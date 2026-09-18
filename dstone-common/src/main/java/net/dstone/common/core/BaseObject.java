@@ -96,14 +96,27 @@ public class BaseObject {
 		int setNum = 0;
 		for (int i = 0; i < args; i++) {
 			Object param = joinPoint.getArgs()[i];
+			paramListInfo.append(buildParamStr( param));
+			if (setNum > 0) {
+				paramListInfo.append(", ");
+			}
+			setNum++;
+		}
+		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
+		return StringUtil.splitToLines(buffer.toString(),  tabSpace);
+	}
+
+	private String buildParamStr(Object param) {
+		StringBuffer paramStr = new StringBuffer();
+		if( param != null ) {
 			if (param instanceof HttpServletRequest) {
-				continue;
+				// Do Nothing
 			}else if (param instanceof HttpServletResponse) {
-				continue;
+				// Do Nothing
 	        } else if (param instanceof Record) {
-	            paramListInfo.append(param.toString());
+	        	paramStr.append(param.toString());
 			}else if (param instanceof String) {
-				paramListInfo.append("String" + "[" + param + "]");
+				paramStr.append("String" + "[" + param + "]");
 			}else{
 				String result = "";
 				try {
@@ -112,28 +125,10 @@ public class BaseObject {
 					result = ConvertUtil.convertToJson(param);
 					result = StringUtil.replace(result, "\n", "");
 				}
-				paramListInfo.append(result);
-			}
-			if (setNum > 0) {
-				paramListInfo.append(", ");
-			}
-			setNum++;
-		}
-		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
-		return splitToLines(buffer.toString(),  tabSpace);
-	}
-	
-	private String splitToLines(String msg, String tabSpace) {
-		StringBuffer buffer = new StringBuffer();
-		String[] lines = StringUtil.toStrArray(msg, "\n");
-		for(int i=0; i < lines.length; i++) {
-			String line = lines[i];
-			buffer.append(tabSpace).append(line);
-			if(i < lines.length-1) {
-				buffer.append("\n");
+				paramStr.append(result);
 			}
 		}
-		return buffer.toString();
+		return paramStr.toString();
 	}
 
 }

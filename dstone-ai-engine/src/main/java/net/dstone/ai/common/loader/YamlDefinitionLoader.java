@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
-import net.dstone.ai.common.definition.WorkflowDefinition;
+import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
@@ -34,7 +34,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * 
 	 * @param workflow workflow 키에 바인딩된 정의
 	 */
-	private record WorkflowFile(WorkflowDefinition workflow) {
+	private record WorkflowFile(WorkFlowDefinition workflow) {
 	}
 
 	/**
@@ -49,8 +49,8 @@ public class YamlDefinitionLoader extends BaseObject {
 	private final Yaml yaml = new Yaml();
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	public List<WorkflowDefinition> loadWorkflows() {
-		List<WorkflowDefinition> definitions = new ArrayList<>();
+	public List<WorkFlowDefinition> loadWorkflows() {
+		List<WorkFlowDefinition> definitions = new ArrayList<>();
 		for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
 			WorkflowFile file = this.readAs(resource, WorkflowFile.class);
 			if (file.workflow() == null) {

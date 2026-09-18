@@ -17,4 +17,4 @@ import java.util.List;
  * @param allowedCallers 이 Workflow 실행이 허용된 caller(tenant) 목록
  * @param steps          순서대로 실행할 step 목록
  */
-public record WorkflowDefinition(String id, String description, Integer maxIterations, List<String> allowedCallers, List<StepDefinition> steps) {}
+public record WorkFlowDefinition(String id, String description, Integer maxIterations, List<String> allowedCallers, List<StepDefinition> steps) {}
