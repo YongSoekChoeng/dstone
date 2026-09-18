@@ -1,0 +1,340 @@
+# dstone-ai-engine 구조 재설계 계획
+
+## Context (왜 다시 손대는가)
+
+`dstone-ai-engine`은 2026-09-15에 이미 한 차례 전면 재작성되어 `Workflow → Step(Agent/Tool)` 모델, YAML 정의, 동기/비동기 실행, RAG, 세션, 인증/레이트리밋까지 갖춘 상태다 (`docs/09.dstone-ai-engine.md` 참고). 이번 요청은 그 위에 patch를 얹는 게 아니라, 아래 두 가지 **구조적 공백**을 메우기 위해 실행 엔진과 패키지 일부를 과감히 다시 짜는 것이다.
+
+1. **휴먼 승인(HITL) 개념이 아예 없다.** 현재 `WorkflowExecutor.run()`은 한 번 호출되면 끝까지 동기적으로 실행되는 단일 상태 머신이고, 중간 상태를 영속화하지 않는다. `SUPERVISOR` 스텝은 LLM 자기검증이지 사람 승인이 아니다. → Step 사이에 "승인 대기"로 멈췄다가 외부 신호로 재개되는 지점이 새로 필요하다.
+2. **MCP 연동이 전무하다.** 코드/설정 전체에 MCP 관련 의존성·클래스가 0건 (grep 확인 완료). → 외부 MCP 서버의 툴을 가져다 쓰는 클라이언트 경로를 신규로 설계해야 한다.
+
+그 외 패키지 구조(`api/common/runtime/tools`)와 리소스 구조(`resources/workflows`, `resources/agents`)는 사용자가 제시한 초안과 이미 거의 일치하므로, **잘 맞는 부분은 유지**하고 신규 요구사항이 실제로 요구하는 지점만 바꾼다 (무조건 전부 새로 쓰지 않음 — "기존 소스가 방해될 때만 과감히 포기"라는 공통지침을 그대로 따름).
+
+사용자 결정 사항(질의응답으로 확정):
+- 승인 대기 상태 영속화 → **PostgreSQL 신규 테이블** (기존 pgvector용 datasource 재사용, Redis TTL 방식 폐기)
+- 이번 범위 → **MCP 클라이언트만** 설계/구현. MCP 서버(외부 노출)는 이번엔 제외, 향후 과제로만 언급.
+- **RAG는 별도 Step 유형이 아니다** — LLM 프롬프트에 Advising되는 것이므로 `AgentDefinition.ragEnabled` 경로로만 존재하고, LLM 없는 순수 검색은 `RagSearchTool`(TOOL 스텝)로 처리한다.
+
+---
+
+## 1. 작업단위 정의: Workflow → Step → (Agent / Tool / Approval)
+
+### 1.1 Step 유형 재정리
+
+기존 `StepType`: `AGENT`, `TOOL`, `RAG`, `SUPERVISOR`. 이번에 **`RAG`를 폐지**하고 **`APPROVAL`**을 추가한다 — RAG는 "검색 결과를 어디에 꽂을지"의 문제이지 독립된 작업 단위가 아니기 때문.
+
+**RAG 유형을 없앤 이유**: 현재 `RAG` StepType(`RagStepRunner`)은 벡터 검색만 하고 LLM을 부르지 않는 스텝인데, 실제 YAML 어디에도 쓰이지 않고 있고(`oracle-to-postgresql`/`parallel-test` 모두 미사용), `AgentDefinition.ragEnabled`로 이미 존재하는 "Advisor를 통한 프롬프트 증강" 경로와 검색 로직이 두 곳(`RagStepRunner` vs Advisor 빌더)으로 쪼개져 있었다. RAG는 본질적으로 "LLM 호출 전에 컨텍스트를 채워주는 것"이므로:
+- **LLM이 필요한 경우** → `AgentDefinition.ragEnabled: true` (AGENT 스텝의 Advisor로 자동 적용, §5)
+- **LLM 없이 검색 결과만 필요한 경우** (예: 검색된 문서를 그대로 외부 스크립트에 넘기고 싶을 때) → 별도 StepType이 아니라 **`tools.rag.RagSearchTool`**(신규, `@AiTool`)을 만들어 일반 `TOOL` 스텝에서 호출한다. `SqlSyntaxTool`처럼 위험하지 않은 조회성 동작이라 화이트리스트 없이 항상 활성화.
+
+이렇게 하면 "검색"이라는 동작이 `RagRetrievalChain`(§5) 하나로 통일되고, Step 유형은 실행 주체 기준으로 4가지로 단순해진다.
+
+| Step 유형 | 실행 주체 | 성공/실패 판정 | 비고 |
+|---|---|---|---|
+| `AGENT` | LLM 호출 (`AgentExecutor`) | 항상 성공 | 기존 유지. `ragEnabled: true`면 `RagRetrievalChain`이 만든 Advisor가 자동으로 프롬프트를 증강 |
+| `TOOL` | 내부/외부 프로그램 (`ToolExecutor`) | 결과 문자열 `"실패:"` 접두어 | 기존 유지. LLM 없는 순수 검색이 필요하면 `RagSearchTool`을 이 경로로 호출 |
+| `SUPERVISOR` | LLM 구조화 판정(`Verdict`) | `Verdict.pass()` | 기존 유지 — **사람이 아닌 LLM 자기검증**이라는 의미를 문서/주석에 명확히 남긴다 |
+| `APPROVAL` (신규) | 사람 (외부 API 호출) | 승인/반려 | 실행을 **중단(PAUSE)**하고 외부 신호를 기다린다 |
+
+### 1.2 HITL 흐름 설계
+
+예시: `Step1 -> Step2 -> 승인자 승인 -> Step3`
+
+```
+WorkflowExecutor.run(executionId)
+  ├─ Step1 실행 → 결과를 WorkflowExecution에 영속화(step index 증가)
+  ├─ Step2 실행 → 결과 영속화
+  ├─ Step(APPROVAL) 도달
+  │     → WorkflowExecution.status = WAITING_APPROVAL 로 저장하고 즉시 리턴 (스레드 반납)
+  │     → 승인자는 GET /api/ai/workflow/executions?status=WAITING_APPROVAL 로 대기 목록 조회
+  │     → 승인자가 POST /api/ai/workflow/executions/{executionId}/decision
+  │        { approved: true|false, approver: "...", comment: "..." } 호출
+  │     → 서버는 decision을 WorkflowContext.variables.approvals.{stepId} 에 기록,
+  │        status = RUNNING 으로 바꾸고 다음 스텝(onSuccess/onFailure)부터 **재개**
+  └─ Step3 실행 → ... → DONE/FAILED
+```
+
+핵심 설계 원칙: **모든 스텝 실행 후 상태를 저장한다.** 승인 스텝만 특별 취급하는 게 아니라, `WorkflowExecutor`를 "매 스텝마다 영속화 → 다음 스텝 판단" 루프로 바꾼다. 이렇게 하면:
+- 승인 대기뿐 아니라 서버 재기동/장애 후에도 마지막 완료 스텝부터 재개 가능해진다 (부가 이득).
+- 기존 동기 실행(`/execute`)과 비동기 실행(`/submit`+`/status`)이 **같은 영속화 모델 위에서 동작**하게 되어, `AsyncJobService`(Redis Hash)와 새 승인-대기 모델(PostgreSQL)이 서로 다른 저장소로 쪼개져 있던 것도 하나로 합쳐진다.
+
+### 1.3 신규 실행 상태 모델
+
+```java
+enum WorkflowExecutionStatus { RUNNING, WAITING_APPROVAL, DONE, FAILED, CANCELLED }
+
+record WorkflowExecution(
+    String executionId,
+    String workflowId,
+    String caller,
+    WorkflowExecutionStatus status,
+    int currentStepIndex,
+    Map<String, Object> variables,   // WorkflowContext 스냅샷
+    List<StepHistoryEntry> history,  // 스텝별 StepOutput 기록 (감사/디버깅용)
+    String resultText,
+    String errorMessage,
+    Instant createdAt,
+    Instant updatedAt
+) {}
+
+record StepHistoryEntry(String stepId, StepType type, boolean success, String outputSummary, Instant executedAt) {}
+```
+
+기존 `AsyncJobService`는 폐기하고 `runtime.execution.WorkflowExecutionService` + `WorkflowExecutionStore`(JdbcTemplate 기반)로 대체한다. `/execute`(동기)도 내부적으로는 같은 `WorkflowExecutionService.runToCompletionOrPause()`를 호출하되, `WAITING_APPROVAL`이 되면 즉시 그 상태를 응답으로 반환(폴링 안내 메시지 포함)한다.
+
+### 1.4 PostgreSQL 스키마 (신규, `dstone-ai-engine/src/main/resources/schema/01-create-table-postgresql-ai-workflow-execution.sql`)
+
+`dstone-batch`의 "스키마는 수동 실행" 관례를 그대로 따른다 (`initialize-schema: NEVER` 패턴).
+
+```sql
+CREATE TABLE ai_workflow_execution (
+    execution_id      VARCHAR(36) PRIMARY KEY,
+    workflow_id       VARCHAR(100) NOT NULL,
+    caller            VARCHAR(100),
+    status            VARCHAR(20) NOT NULL,      -- RUNNING/WAITING_APPROVAL/DONE/FAILED/CANCELLED
+    current_step_index INT NOT NULL DEFAULT 0,
+    variables_json    JSONB NOT NULL DEFAULT '{}',
+    result_text       TEXT,
+    error_message     TEXT,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ai_workflow_execution_status ON ai_workflow_execution(status);
+
+CREATE TABLE ai_workflow_execution_step_history (
+    id                BIGSERIAL PRIMARY KEY,
+    execution_id      VARCHAR(36) NOT NULL REFERENCES ai_workflow_execution(execution_id),
+    step_id           VARCHAR(100) NOT NULL,
+    step_type         VARCHAR(20) NOT NULL,
+    success           BOOLEAN NOT NULL,
+    output_summary    TEXT,
+    executed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+MyBatis는 이 모듈에 없으므로(현재도 없음) 새 sqlmap을 도입하지 않고, `JdbcTemplate` + 간단한 RowMapper로 `WorkflowExecutionStore`를 짠다 — 모듈의 기존 경량 스타일(라이브러리 최소 의존)과 일치.
+
+---
+
+## 2. Step Input/Output 계약 명확화
+
+현재는 `WorkflowContext`(느슨한 `Map<String,Object>`)와 각 `*StepRunner`가 알아서 문자열을 다듬는 방식이라 "이 스텝이 뭘 받고 뭘 돌려주는지"가 코드를 읽어야만 보인다. 아래처럼 타입을 명시한다 (`runtime` 패키지, 기존 `StepOutcome`을 대체/흡수):
+
+```java
+// runtime.StepInput — 각 StepRunner에 전달되는 입력
+record StepInput(
+    String stepId,
+    String renderedText,        // inputTemplate 렌더링 결과 (TOOL/AGENT 공통 입력 원문)
+    Map<String, Object> variables  // 워크플로우 전역 변수(읽기 전용 뷰)
+) {}
+
+// runtime.StepOutput — 각 StepRunner가 반환하는 출력 (기존 StepOutcome 대체)
+record StepOutput(
+    String stepId,
+    boolean success,
+    String primaryText,         // 다음 스텝의 {previous} 로 이어지는 주 결과
+    Map<String, Object> data,   // 워크플로우 변수에 병합될 구조화 결과 (선택)
+    String failureReason        // 실패 시 사유, 성공 시 null
+) {}
+```
+
+`AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner`(신규)는 전부 `StepInput → StepOutput` 시그니처로 통일한다. `WorkflowExecutor`는 `StepOutput.data`를 `WorkflowContext.variables`에 병합하고, `primaryText`를 다음 스텝의 `{previous}` 토큰에 바인딩한다. 이렇게 하면 YAML의 `inputTemplate` 문서화(§4)와 코드 계약이 1:1로 맞아떨어진다.
+
+`ApprovalStepRunner`는 특수 케이스: `StepOutput.success`가 아니라 **"PENDING" 이라는 제3의 결과**가 필요하므로, `StepOutput`에 `pending` 플래그를 추가하거나(`success=false && failureReason=null && pending=true`) `WorkflowExecutor`가 `StepType.APPROVAL`을 별도 분기로 먼저 체크해 러너 호출 전에 대기 상태를 처리하는 방식 중 택1 — 구현 시엔 후자(WorkflowExecutor가 APPROVAL을 스텝 실행 전에 가로채는 방식)가 더 명확하므로 채택.
+
+---
+
+## 3. 패키지 구조 (증분 변경)
+
+기존 구조를 대부분 유지하고, 신규/이름변경만 굵게 표시:
+
+```
+net.dstone.ai
+├── DstoneAiEngineApplication
+├── api
+│   ├── controller
+│   │   ├── ChatController
+│   │   ├── RagController
+│   │   ├── WorkflowController              (동기 /execute 는 유지, 비동기 submit/status는 execution 기반으로 내부 교체)
+│   │   └── WorkflowExecutionController     **신규** — GET /executions?status=, GET /executions/{id}, POST /executions/{id}/decision
+│   ├── dto
+│   └── service
+│       └── (AsyncJobService 삭제 → runtime.execution.WorkflowExecutionService 로 대체)
+├── common
+│   ├── config        (Config, ConfigChatClient, ConfigTool, ConfigRedis, ConfigCallLog)
+│   │   └── ConfigMcp **신규** — MCP 클라이언트 ToolCallbackProvider 구성
+│   ├── consts
+│   ├── definition     (WorkflowDefinition, StepDefinition, StepType(RAG 폐지+APPROVAL 추가), AgentDefinition)
+│   │   └── McpServerDefinition **신규** — mcp yml 바인딩 레코드
+│   ├── loader         (YamlDefinitionLoader — mcp/*.yml 패턴 추가)
+│   ├── prompt
+│   ├── registry       (WorkflowRegistry, AgentRegistry)
+│   │   └── McpServerRegistry **신규**
+│   ├── security
+│   ├── session
+│   ├── annotation
+│   └── exec           (ExternalProcessRunner)
+├── rag
+│   └── RagService     (§5 대로 체인 구성 리팩터)
+├── runtime
+│   ├── WorkflowContext, WorkflowExecutor(재작성), StepStatus, StepInput/StepOutput **(신규, StepOutcome 대체)**, Verdict
+│   ├── execution **신규 패키지**
+│   │   ├── WorkflowExecution, WorkflowExecutionStatus, StepHistoryEntry
+│   │   ├── WorkflowExecutionStore   (JdbcTemplate 영속화)
+│   │   └── WorkflowExecutionService (동기/비동기/승인대기 실행의 단일 진입점)
+│   ├── agent          (AgentExecutor)
+│   ├── step           (AgentStepRunner, ToolStepRunner — RagStepRunner는 삭제)
+│   │   └── ApprovalStepRunner **신규**
+│   └── tool           (ToolExecutor — MCP 툴도 동일 경로로 호출되므로 변경 없음)
+├── mcp **신규 패키지 (클라이언트 전용)**
+│   └── McpToolProvider — resources/mcp/*.yml 로 정의된 서버들에 접속해 ToolCallbackProvider를 만들고 ConfigTool에 합류
+└── tools
+    ├── ExternalProcessTool **신규 추상클래스** — ShellExecTool/PythonExecTool 공통 로직(화이트리스트 조회 + ExternalProcessRunner 호출 + 성공/실패 접두어 판정) 추출
+    ├── sample.DateTimeTool        (DateTimeTools → 단수형으로 리네임, 명명 통일)
+    ├── sql.SqlSyntaxTool          (SqlSyntaxTools → 단수형으로 리네임)
+    ├── rag.RagSearchTool          **신규** — StepType.RAG 폐지를 대체. RagRetrievalChain을 감싸 LLM 없이 검색 결과만 필요할 때 TOOL 스텝에서 호출
+    ├── shell.ShellExecTool        (ExternalProcessTool 상속)
+    ├── python.PythonExecTool      (ExternalProcessTool 상속)
+    └── http.HttpCallTool
+```
+
+**명명 규칙 통일**: 모든 `@AiTool` 클래스는 단수형 `...Tool` (복수형 `...Tools` 금지 — 현재 `DateTimeTools`/`SqlSyntaxTools`만 예외였음). 모든 정의 로딩 3종 세트(Workflow/Agent/McpServer)는 `definition`/`loader`/`registry`/`config` 4계층을 동일하게 반복해 구조적 일관성을 유지한다.
+
+---
+
+## 4. 리소스 구조
+
+```
+resources/
+├── workflows/*.yml      (기존 유지, StepType에서 RAG 제거·APPROVAL 추가)
+├── agents/*.yml         (기존 유지)
+├── mcp/*.yml            **신규** — MCP 서버 접속 정의, 파일명 무관·내부 id가 식별자
+├── prompts/{name}/{version}.st   (기존 유지)
+└── schema/*.sql         **신규** — §1.4의 ai_workflow_execution DDL (수동 실행, dstone-batch 관례와 동일)
+```
+
+### 4.1 APPROVAL 스텝 YAML 예시 (`workflows/*.yml`)
+
+```yaml
+workflow:
+  id: sample-approval-flow
+  steps:
+    - id: step2
+      type: AGENT
+      ref: draft-agent
+      onSuccess: approve-step
+    - id: approve-step
+      type: APPROVAL
+      approverRole: "team-lead"      # 문서/감사용 메타데이터, 서버가 강제하진 않음(누가 호출하든 decision API로 승인 가능 — 실제 권한 검증은 dstone-ai-engine 밖의 API Gateway/캐스팅 시스템 책임으로 명시)
+      onSuccess: step3                 # 승인(approved=true) 시 다음 스텝
+      onFailure: FAIL                  # 반려(approved=false) 시 처리
+    - id: step3
+      type: TOOL
+      ref: someTool
+```
+
+### 4.2 MCP 서버 정의 YAML 예시 (`mcp/filesystem.yml`)
+
+```yaml
+mcpServer:
+  id: filesystem
+  transport: STDIO            # STDIO | SSE
+  command: "npx"
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "/data"]
+  allowedTools: ["read_file", "list_directory"]   # 비워두면 전체 허용 — 기존 tool whitelist와 동일한 "빈 값 fail-open은 위험하니 명시적으로 채우는 걸 권장" 관례
+  allowedCallers: []           # AgentDefinition.allowedCallers 와 동일한 패턴
+```
+
+SSE 예시(`mcp/internal-search.yml`)는 `transport: SSE`, `url: http://...` 형태로 동일 스키마를 공유.
+
+---
+
+## 5. RAG 체인 재설계
+
+현재 `RagService`는 Ingest(Tika→TokenTextSplitter→pgvector)와 Retrieval(단순 유사도 검색 + `QuestionAnswerAdvisor`)이 한 클래스에 섞여 있다. "체인"이라는 요구에 맞춰 Spring AI 2.x의 `RetrievalAugmentationAdvisor`(pluggable QueryTransformer/DocumentRetriever/QueryExpander) 기반으로 명시적 파이프라인화한다.
+
+**Ingest 체인** (변경 없음, 그대로 유지):
+```
+Source(File/JSONL) → DocumentReader(Tika | JsonlReader) → TokenTextSplitter(chunk-size) → tenant 메타데이터 태깅 → VectorStore.add()
+```
+
+**Retrieval 체인** (신규, `rag.chain` 서브패키지로 분리):
+```
+사용자 질의
+  → QueryTransformer (선택, 대화맥락 압축 — CompressionQueryTransformer)
+  → VectorStoreDocumentRetriever (topK, similarityThreshold, tenant 필터)
+  → DocumentPostProcessor (선택, 중복 제거 — 재랭킹은 1단계 범위 밖, 확장 지점으로만 남김)
+  → RetrievalAugmentationAdvisor 가 프롬프트에 컨텍스트 주입
+```
+
+`RagService`를 `rag.RagIngestService` + `rag.RagRetrievalChain`(Advisor 빌더 + 순수 검색 메서드) 두 개로 분리한다. `AgentExecutor.buildSpec()`은 `ragEnabled=true`일 때 `RagRetrievalChain.buildAdvisor(caller)`만 호출하면 되므로 결합도가 낮아진다. `RagController`(검색 디버깅 API)도 같은 체인을 재사용.
+
+**Step 모델과의 연결**: `StepType.RAG`는 폐지한다(§1.1). AGENT 스텝은 `ragEnabled: true`일 때 이 체인을 Advisor로 자동 적용받고, LLM 없이 검색 결과만 필요한 워크플로우는 `tools.rag.RagSearchTool`(신규, `RagRetrievalChain.search()`를 그대로 호출하는 얇은 `@AiTool` 래퍼)을 일반 TOOL 스텝으로 호출한다. 검색 로직 자체(tenant 필터·topK·threshold)는 항상 `RagRetrievalChain` 한 곳에만 존재한다.
+
+---
+
+## 6. Tools 골격 (내부/외부 프로그램)
+
+- **내부 Java 툴**: `@AiTool` + `@Tool` 메서드. `tools.sample.DateTimeTool`, `tools.sql.SqlSyntaxTool`, `tools.rag.RagSearchTool` 모두 명명 단수형 통일, 화이트리스트 없이 항상 활성(조회성/무해 동작).
+- **외부 프로그램 공통 골격**: 신규 추상 클래스
+
+```java
+// tools.ExternalProcessTool — Shell/Python 공통 로직
+abstract class ExternalProcessTool {
+    protected abstract Map<String, String> allowedCommands(); // name -> 실제 경로/스크립트 (설정에서 주입)
+    protected String runWhitelisted(String name, List<String> args) {
+        String path = allowedCommands().get(name);
+        if (path == null) return "실패: 허용되지 않은 명령입니다 - " + name;
+        return ExternalProcessRunner.run(path, args); // 기존 그대로 재사용
+    }
+}
+```
+
+`ShellExecTool`/`PythonExecTool`은 이 클래스를 상속해 `allowedCommands()`만 각자의 설정 프로퍼티(`dstone.ai.tool.shell.allowed-commands` / `.python.allowed-scripts`)에서 읽어오도록 구현 — 중복 제거, "빈 화이트리스트 = 비활성"이라는 fail-closed 설계는 그대로 유지.
+- **HttpCallTool**: 프로세스가 아니라 HTTP 호출이므로 상속 대상 아님. 대신 동일한 "빈 화이트리스트=비활성" 관례와 성공/실패 접두어 관례(`Constants`에 정의된 통과/실패 프리픽스)를 그대로 따르도록 코드 리뷰 체크리스트에 명시.
+
+---
+
+## 7. MCP 클라이언트 설계 (이번 범위)
+
+- `pom.xml`에 `spring-ai-starter-mcp-client` 추가 (Spring AI 2.0.1과 호환 버전 확인 필요 — 실제 착수 시 `mvn dependency:tree`로 검증).
+- `common.definition.McpServerDefinition` — `mcp/*.yml`을 바인딩하는 레코드 (§4.2 스키마).
+- `common.loader.YamlDefinitionLoader`에 `classpath*:mcp/*.yml` 패턴 추가.
+- `common.registry.McpServerRegistry` — id → 정의 맵, `allowedCallers` 검사 (Agent/Workflow 레지스트리와 동일 패턴).
+- `common.config.ConfigMcp` — 등록된 MCP 서버마다 클라이언트(STDIO/SSE)를 만들고 `McpToolCallbackProvider`로 감싸, 기존 `ConfigTool`이 만드는 `ToolCallbackProvider`와 **병합**한다. 결과적으로 AGENT 스텝의 LLM 툴 호출 루프와 TOOL 스텝의 `ToolExecutor.findByName()` 양쪽 모두 로컬 `@AiTool`과 MCP 툴을 구분 없이 쓸 수 있다 — **신규 StepType 불필요**, 기존 `TOOL`/tool-calling 경로 그대로 확장.
+- 실패 격리: 특정 MCP 서버 접속 실패가 앱 기동을 막지 않도록 `ConfigMcp`는 서버별로 try-catch 후 로그만 남기고 넘어간다 (한 서버 장애가 전체 툴 목록을 무너뜨리지 않게).
+- MCP 서버(외부 노출)는 이번 계획에서 제외 — §9 "향후 과제"에만 기록.
+
+---
+
+## 8. 유지/폐기 정리
+
+| 대상 | 처리 |
+|---|---|
+| `WorkflowExecutor`, `AsyncJobService` | **재작성** — §1.3의 영속화 루프로 교체, AsyncJobService 삭제 |
+| `StepOutcome` | **대체** — `StepInput`/`StepOutput`으로 교체 (§2) |
+| `StepType.RAG` / `RagStepRunner` | **폐지** — Advisor(`ragEnabled`) 경로와 신규 `RagSearchTool`(TOOL 스텝)로 대체 (§1.1, §5) |
+| `AgentStepRunner`/`ToolStepRunner` | **시그니처만 조정** (StepInput/StepOutput), 내부 로직 대부분 유지 |
+| `RagService` | **분리** — Ingest/Retrieval 체인으로 리팩터 (§5), 로직 재사용 |
+| `ConfigTool`, `ToolExecutor`, `AgentExecutor` | **유지** — MCP 툴도 같은 경로로 흡수되므로 변경 최소화 |
+| `DateTimeTools`/`SqlSyntaxTools` | **리네임만** (`DateTimeTool`/`SqlSyntaxTool`) |
+| `ShellExecTool`/`PythonExecTool` | **공통 부모 클래스로 추출**, 동작은 동일 |
+| `WorkflowController`/`ChatController`/`RagController` | **대부분 유지**, WorkflowController의 submit/status만 새 execution 모델 호출로 교체 |
+| `common.session`, `common.security`, `ConfigChatClient` | **변경 없음** |
+
+## 9. 진행 순서 (단계별)
+
+1. **Phase 1** — `StepInput`/`StepOutput` 도입 + Runner 시그니처 정리 + `StepType.RAG`/`RagStepRunner` 제거 + Tools 리네임/공통클래스 추출 + `RagSearchTool` 추가 (위험 낮음, 회귀 테스트로 검증 쉬움)
+2. **Phase 2** — PostgreSQL 스키마 추가 + `runtime.execution` 패키지(WorkflowExecutionStore/Service) + `WorkflowExecutor` 재작성 + `APPROVAL` StepType + `WorkflowExecutionController` (핵심/가장 큰 변경)
+3. **Phase 3** — RAG 체인 분리 (`RetrievalAugmentationAdvisor` 전환)
+4. **Phase 4** — MCP 클라이언트 (`ConfigMcp`, `McpServerDefinition/Registry`, `resources/mcp/*.yml`)
+5. **Phase 5 (향후 과제, 이번 범위 아님)** — MCP 서버로 자체 노출, 승인 알림(Slack/메일) 연동, 재랭킹 고도화
+
+각 Phase 종료 시 `docs/09.dstone-ai-engine.md`를 갱신한다 (CLAUDE.md 지침: "리소스 변경 시 문서도 갱신"). 특히 §5 실행모델, §6 Agent와 Tool, §7 Session/RAG/Security, §10 API 레퍼런스, §14 변경이력 섹션이 영향받는다.
+
+## 검증 방법
+
+- `cd dstone-ai-engine && mvn clean package` 컴파일 통과.
+- 기존 수동 검증 시나리오 재실행: `POST /api/ai/chat` (일반/툴콜링), `oracle-to-postgresql` 워크플로우 동기 실행.
+- 신규: APPROVAL 스텝이 포함된 샘플 워크플로우로 `/execute` 호출 → 응답이 `WAITING_APPROVAL` 인지 확인 → `POST /executions/{id}/decision` 호출 → 다음 스텝까지 완료되는지 확인.
+- 신규: 로컬 MCP 서버(예: `@modelcontextprotocol/server-filesystem`) 하나 붙여 AGENT 스텝에서 해당 툴이 호출되는지 확인.
+- RAG: 문서 ingest 후 `RagController` 검색 API 및 `RagSearchTool`(TOOL 스텝) 양쪽에서 동일한 검색 결과가 나오는지 확인.
