@@ -516,3 +516,15 @@ That's it — the script isn't marked executable (`-rw-r--r--`, no `x` bits), so
 `chmod +x`로 실행 권한을 추가했습니다. 다음 Stop 이벤트부터는 이 오류 없이 정상 실행될 겁니다.
 
 참고로 이 스크립트는 git으로 추적되는 파일이면, git이 파일 모드(실행 비트)를 저장하기 때문에 새로 clone/checkout할 때 다시 권한이 풀릴 수 있습니다 — 그런 경우 `git update-index --chmod=+x .claude/hooks/save-history.sh`로 실행 비트를 커밋해두면 재발을 막을 수 있습니다. 확인해드릴까요?
+
+---
+
+## 질문
+
+응 그렇게 해줘
+
+---
+
+## 답변
+
+실행 비트 변경만 커밋했습니다 (`58966ca`). `docs/temp/dstone-ai-engine-restructure-plan.md` 변경분은 요청하신 게 아니라서 건드리지 않고 작업 디렉토리에 그대로 남겨뒀습니다.
