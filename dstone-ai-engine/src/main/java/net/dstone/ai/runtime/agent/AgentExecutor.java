@@ -6,21 +6,21 @@ import java.util.function.Consumer;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
-import net.dstone.ai.common.prompt.PromptTemplateRegistry;
-import net.dstone.ai.rag.RagService;
-import net.dstone.ai.runtime.Verdict;
+import net.dstone.ai.common.rag.RagRetrievalChain;
+import net.dstone.ai.runtime.status.Verdict;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
- * "LLM에게 일을 시키는 단위"인 Agent 하나를 실제로 호출한다. AgentDefinition의 promptName/ toolsEnabled/ragEnabled를 읽어 ChatClient 요청을 조립하는
+ * "LLM에게 일을 시키는 단위"인 Agent 하나를 실제로 호출한다. AgentDefinition의 prompt/toolsEnabled/ragEnabled를 읽어 ChatClient 요청을 조립하는
  * 곳은 여기 한 곳뿐이다 - api.controller.ChatController(단일 대화 턴)와 runtime.step.AgentStepRunner(Workflow의 AGENT/ SUPERVISOR
  * step)가 똑같이 이 클래스를 통해 호출한다.
  *
@@ -35,9 +35,7 @@ public class AgentExecutor extends BaseObject {
 	@Autowired
 	private ChatClient chatClient;
 	@Autowired
-	private PromptTemplateRegistry promptTemplateRegistry;
-	@Autowired
-	private RagService ragService;
+	private RagRetrievalChain ragRetrievalChain;
 	@Autowired
 	private ConfigTool configTool;
 
@@ -142,17 +140,18 @@ public class AgentExecutor extends BaseObject {
 
 		/************************************************************************
 		3. 시스템 프롬프트 적용.
-			- dstone.ai.prompt.version.{promptName}과 맵핑되는 src/main/resources/prompts/{promptName}/{version}.st 를 시스템 프롬프트로 삽입한다.
+			- AgentDefinition.prompt() 원문을 그대로 시스템 프롬프트로 쓴다. {caller}/{today} 같은 토큰이 들어있으면
+			  Spring AI의 PromptTemplate으로 그 자리에서 렌더링한다(resources/agents/*.yml에 인라인된 프롬프트).
 		************************************************************************/
-		if (!StringUtil.isEmpty(agent.promptName())) {
-			spec = spec.system(this.promptTemplateRegistry.render(agent.promptName(), variables));
+		if (!StringUtil.isEmpty(agent.prompt())) {
+			spec = spec.system(new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables));
 		}
 
 		/************************************************************************
 		4. RAG 적용(caller의 문서만 검색되도록 tenant 필터가 함께 걸린다)
 		************************************************************************/
 		if (ragEnabled) {
-			spec = spec.advisors(this.ragService.getRagSpecAdvisor(caller));
+			spec = spec.advisors(this.ragRetrievalChain.buildAdvisor(caller));
 		}
 
 		/************************************************************************

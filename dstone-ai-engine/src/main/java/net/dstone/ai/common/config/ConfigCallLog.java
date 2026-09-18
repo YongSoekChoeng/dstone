@@ -2,6 +2,8 @@ package net.dstone.ai.common.config;
 
 import java.lang.reflect.Method;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -14,6 +16,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.runtime.status.StepInput;
+import net.dstone.ai.runtime.status.StepOutput;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
@@ -111,13 +116,71 @@ public class ConfigCallLog extends BaseObject {
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX)
+	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX + " && !execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
 	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		String identity = getIdentity(joinPoint);
 		this.info("+----->[Runtime - "+identity+"] Start {" + signatureLog(joinPoint) + "}");
 		Object retObj = joinPoint.proceed();
 		this.info("+----->[Runtime - "+identity+"] End {" + retObj + "}");
 		return retObj;
+	}
+
+	/** Step IN/OUT 전용 로거 - net.dstone.ai 하위라 log4j2.xml의 net.dstone.ai Logger 설정(콘솔+execution.log)을 그대로 물려받는다. */
+	private static final Logger STEP_AUDIT_LOG = LogManager.getLogger("net.dstone.ai.workflow.audit");
+
+	/** 로그 한 줄에 담는 입력/출력 텍스트의 최대 길이 - 이보다 길면 잘라서 "...(생략)"을 붙인다. */
+	private static final int STEP_AUDIT_MAX_CHARS = 500;
+
+	/**
+	 * <pre>
+	 * StepRunner.run(execution, definition, input) 전용 로깅. 모든 StepType(AGENT/TOOL/SUPERVISOR/APPROVAL)이
+	 * 이 시그니처 하나로 호출되므로(runtime.step.StepRunner 참고), 이 advice 하나만으로 모든 스텝의 IN/OUT을
+	 * "이 실행에서, 이 스텝이, 무슨 유형으로, 어떤 Agent/Tool을 불러서, 어떻게 끝났는지" 한 줄로 남긴다.
+	 *
+	 * 흐름 제어(NEXT_STEP/LOOP/SUCCESS/FAIL)는 여기서 안 남긴다 - 그건 이 메서드가 끝난 뒤 WorkFlowExecutor가
+	 * 결정하는 것이라 이 시점엔 알 수 없다. 같은 executionId로 로그를 grep하면 스텝이 실행된 순서 자체가
+	 * 곧 흐름이므로 그걸로 충분하다.
+	 * </pre>
+	 *
+	 * @param joinPoint 가로챈 StepRunner.run(..) 호출 지점
+	 * @return
+	 * @throws Throwable
+	 */
+	@Around("execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
+	public Object doStepAuditLog(ProceedingJoinPoint joinPoint) throws Throwable {
+		WorkFlowExecution execution = (WorkFlowExecution) joinPoint.getArgs()[0];
+		StepDefinition step = (StepDefinition) joinPoint.getArgs()[1];
+		StepInput input = (StepInput) joinPoint.getArgs()[2];
+
+		STEP_AUDIT_LOG.info("WF_STEP phase=START executionId={} workflowId={} stepId={} stepType={} ref={} input=\"{}\"",
+			execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), this.truncate(input.renderedText()));
+
+		long start = System.nanoTime();
+		try {
+			StepOutput output = (StepOutput) joinPoint.proceed();
+			long durationMs = (System.nanoTime() - start) / 1_000_000;
+			if (output.failureReason() != null) {
+				STEP_AUDIT_LOG.info("WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} failureReason=\"{}\"",
+					execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), output.result(), durationMs, this.truncate(output.failureReason()));
+			} else {
+				STEP_AUDIT_LOG.info("WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} output=\"{}\"",
+					execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), output.result(), durationMs, this.truncate(output.primaryText()));
+			}
+			return output;
+		} catch (Throwable e) {
+			long durationMs = (System.nanoTime() - start) / 1_000_000;
+			STEP_AUDIT_LOG.info("WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result=ERROR durationMs={} error=\"{}\"",
+				execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), durationMs, e.getMessage());
+			throw e;
+		}
+	}
+
+	/** @param text 로그 한 줄 길이를 넘지 않도록 자를 텍스트 */
+	private String truncate(String text) {
+		if (text == null) {
+			return "";
+		}
+		return text.length() > STEP_AUDIT_MAX_CHARS ? text.substring(0, STEP_AUDIT_MAX_CHARS) + "...(생략)" : text;
 	}
 
 	/**
@@ -159,7 +222,8 @@ public class ConfigCallLog extends BaseObject {
 					isSelcted = true;
 				}else if( param instanceof AgentDefinition ) {
 					AgentDefinition agentDefinition = (AgentDefinition)param;
-					identity = "agent(name=" + agentDefinition.name() + ", promptName="+agentDefinition.promptName()+")" ;
+					// prompt 원문은 여러 줄짜리 큰 텍스트라 로그 한 줄에 담지 않는다(name만으로도 어떤 Agent인지는 충분히 식별된다).
+					identity = "agent(name=" + agentDefinition.name() + ")" ;
 					isSelcted = true;
 				}
 				if(isSelcted) {

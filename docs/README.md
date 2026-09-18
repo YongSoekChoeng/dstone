@@ -92,7 +92,7 @@ mvn clean install
 | [06.dstone-boot.md](06.dstone-boot.md) | 웹 애플리케이션 프레임워크, 소스 코드 분석기, `dstone-ai-engine` 연동 채팅/RAG 문서업로드 화면 |
 | [07.dstone-batch.md](07.dstone-batch.md) | Spring Batch 기반 배치 잡 개발 프레임워크 |
 | [08.dstone-batchadmin.md](08.dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
-| [09.dstone-ai-engine.md](09.dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Chat/Gateway/Session/Prompt(Phase 0~1), RAG(Phase 2), Agent/Tool·Function Calling(Phase 3), Governance(API Key 인증·Rate Limit·PII Guardrail) & Observability(사용량 로깅)(Phase 4, 진행 중) |
+| [09.dstone-ai-engine.md](09.dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Workflow→Step→Agent→Tool, 휴먼 승인(HITL)/PostgreSQL 영속화 실행, RAG(Embedding 적재와 분리), MCP 클라이언트, API Key 인증·Rate Limit(옵트인) |
 | [10.dstone-saga.md](10.dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
 | [03.build.md](03.build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 
@@ -172,7 +172,7 @@ spring.datasource.<name>.hikari:
 
 각 모듈의 실제 테이블 생성 스크립트는 `src/main/resources/schema/*.sql`(dstone-boot/dstone-batch/dstone-batchadmin 각각에 있음)에 있다 — Spring Batch/Boot이 자동으로 스키마를 만들지 않으므로(`initialize-schema: NEVER`) 최초 1회 수동 실행해야 한다.
 
-> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓰고, 벡터 테이블(`vector_store`)도 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성한다(수동 스키마 SQL 없음). 상세: [09.dstone-ai-engine.md 6.2절](09.dstone-ai-engine.md#62-문서-적재-ingest).
+> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓴다. 벡터 테이블(`vector_store`)은 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성하지만, Workflow 실행 영속화 테이블(`AI_WORKFLOW_EXECUTION*`)은 다른 dstone 모듈과 동일하게 수동 스키마 SQL(`schema/01-create-table-postgresql-ai-workflow-execution.sql`)을 배포 전에 한 번 실행해야 한다. 상세: [09.dstone-ai-engine.md 11절](09.dstone-ai-engine.md#11-설정-레퍼런스-confapplicationyml).
 
 ### 3.4 Spring Security 설정 방식
 

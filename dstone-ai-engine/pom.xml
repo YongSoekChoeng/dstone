@@ -107,10 +107,18 @@
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
 		</dependency>
-		<!-- QuestionAnswerAdvisor(검색된 문서를 시스템프롬프트에 자동으로 끼워넣는 ChatClient Advisor) -->
+		<!-- RAG 검색 체인(RetrievalAugmentationAdvisor/VectorStoreDocumentRetriever/ContextualQueryAugmenter) -
+		     검색된 문서를 프롬프트에 끼워넣는 ChatClient Advisor를 조립하는 파이프라인이다(common.rag.RagRetrievalChain). -->
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-vector-store-advisor</artifactId>
+			<artifactId>spring-ai-rag</artifactId>
+		</dependency>
+
+		<!-- MCP 클라이언트(Phase 4): resources/mcp/*.yml로 정의된 외부 MCP 서버에 접속해 그 서버의 Tool을
+		     끌어온다(common.config.ConfigMcp). STDIO/SSE 트랜스포트 둘 다 이 starter 하나로 커버된다. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-mcp-client</artifactId>
 		</dependency>
 
 		<!-- RAG(Phase 2) 문서 적재: Tika 하나로 PDF/DOCX/PPTX/HTML/TXT 등 대부분의 SI 문서 포맷을 커버한다. -->

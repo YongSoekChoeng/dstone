@@ -14,14 +14,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.McpServerDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * Workflow/Agent 정의는 application.yml이 아니라 classpath:workflows/*.yml, classpath:agents/*.yml 각각의 별도 파일에 둔다 - Workflow
- * 하나를 새로 만들거나 바꿀 때 application.yml을 건드리지 않고 YAML 파일 하나만 추가/수정하면 되게 하려는 게 이번 재설계의 핵심이다(common.registry.WorkflowRegistry/
- * AgentRegistry가 기동 시 이 클래스를 불러 적재한다).
+ * Workflow/Agent/McpServer 정의는 application.yml이 아니라 classpath:workflows/*.yml, classpath:agents/*.yml,
+ * classpath:mcp/*.yml 각각의 별도 파일에 둔다 - 새로 하나를 만들거나 바꿀 때 application.yml을 건드리지 않고 YAML 파일 하나만
+ * 추가/수정하면 되게 하려는 게 이번 재설계의 핵심이다(common.registry.WorkFlowRegistry/AgentRegistry/McpServerRegistry가 기동 시
+ * 이 클래스를 불러 적재한다).
  *
  * Spring Boot의 application.yml 자체를 읽을 때 쓰는 SnakeYAML로 파싱해서 평범한 Map으로 만든 뒤, Jackson ObjectMapper.convertValue()로
  * definition record에 바인딩한다 - record 필드 바인딩은 컴파일러 -parameters 옵션(pom.xml에 이미 설정됨) 덕분에 별도 생성자/애노테이션 없이 그대로 된다.
@@ -43,6 +45,14 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * @param agents agents 키에 바인딩된 정의 목록
 	 */
 	private record AgentFile(List<AgentDefinition> agents) {
+	}
+
+	/**
+	 * mcp/*.yml 파일 하나의 최상위 구조(mcpServer: 키 하나 - workflows/*.yml과 동일하게 파일 하나에 서버 하나).
+	 *
+	 * @param mcpServer mcpServer 키에 바인딩된 정의
+	 */
+	private record McpServerFile(McpServerDefinition mcpServer) {
 	}
 
 	private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
@@ -73,6 +83,19 @@ public class YamlDefinitionLoader extends BaseObject {
 				definitions.add(agent);
 			}
 			LogUtil.sysout("dstone-ai-engine loader: agent " + file.agents().size() + "개 <- " + resource.getFilename());
+		}
+		return definitions;
+	}
+
+	public List<McpServerDefinition> loadMcpServers() {
+		List<McpServerDefinition> definitions = new ArrayList<>();
+		for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
+			McpServerFile file = this.readAs(resource, McpServerFile.class);
+			if (file.mcpServer() == null) {
+				throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
+			}
+			definitions.add(file.mcpServer());
+			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + resource.getFilename());
 		}
 		return definitions;
 	}

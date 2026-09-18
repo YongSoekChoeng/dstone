@@ -11,17 +11,18 @@ import com.fasterxml.jackson.core.io.JsonStringEncoder;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.runtime.StepOutcome;
+import net.dstone.ai.runtime.status.StepInput;
+import net.dstone.ai.runtime.status.StepOutput;
 import net.dstone.ai.runtime.tool.ToolExecutor;
-import net.dstone.common.utils.StringUtil;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
- * TOOL step - LLM 없이 caller가 쓸 수 있는 Tool 하나를 직접 호출한다(예: SqlSyntaxTools.validateSqlSyntax로 결정적 검증). 성공하면 Tool의 응답 문구가
+ * TOOL step - LLM 없이 caller가 쓸 수 있는 Tool 하나를 직접 호출한다(예: SqlSyntaxTool.validateSqlSyntax로 결정적 검증). 성공하면 Tool의 응답 문구가
  * 아니라 검증받은 원본 값(input)을 그대로 다음 step에 넘긴다 - "통과했다"는 메시지 자체는 다음 step에 새로운 정보가 아니기 때문이다. 실패하면 원본 값 뒤에 Tool이 알려준 이유를 덧붙인다 -
  * onFailure로 되돌아간 step이 "무엇을, 왜 고쳐야 하는지" 둘 다 볼 수 있어야 한다.
  */
 @Component
-public class ToolStepRunner {
+public class ToolStepRunner implements StepRunner {
 
 	/**
 	 * <pre>
@@ -29,7 +30,7 @@ public class ToolStepRunner {
 	 * 대괄호 레이블 한 줄([변환된 SQL], [변경된 SQL] 등 - 매번 문구가 바뀐다)이나 코드펜스로 실제 값을
 	 * 감싸서 반환하는 경우가 실전에서 반복적으로 관찰됐다. prompt를 아무리 일반화해도 LLM이 새 표현을
 	 * 계속 만들어내므로, TOOL step은 "이전 step 출력 = 다음 step이 쓸 순수 데이터"라는 계약이 흔들리지
-	 * 않도록 이 흔한 포장만 벗겨내고 방어적으로 정규화한다. Tool 자체의 검증 로직(SqlSyntaxTools 등)은
+	 * 않도록 이 흔한 포장만 벗겨내고 방어적으로 정규화한다. Tool 자체의 검증 로직(SqlSyntaxTool 등)은
 	 * 이 정규화 이후의 텍스트에 대해 그대로 엄격하게 동작하므로, 실제 문법 오류를 가려주지는 않는다.
 	 * </pre>
 	 */
@@ -39,20 +40,15 @@ public class ToolStepRunner {
 	@Autowired
 	private ToolExecutor toolExecutor;
 
-	/**
-	 * @param step      실행할 TOOL step 정의
-	 * @param caller    호출 주체 식별자(tenant)
-	 * @param variables Workflow 호출 시 넘겨받은 변수 맵
-	 * @param input     이전 step 결과(또는 최초 입력) 텍스트
-	 */
-	public StepOutcome run(StepDefinition step, String caller, Map<String, Object> variables, String input) {
-		String normalized = this.stripLlmArtifacts(input);
-		String jsonInput = this.renderToolInput(step.inputTemplate(), normalized, variables);
-		String toolResult = this.toolExecutor.call(caller, step.ref(), jsonInput);
+	@Override
+	public StepOutput run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
+		String normalized = this.stripLlmArtifacts(input.renderedText());
+		String jsonInput = this.renderToolInput(definition.inputTemplate(), normalized, input.variables());
+		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), jsonInput);
 		if (toolResult.startsWith(Constants.Outcome.FAIL_PREFIX)) {
-			return new StepOutcome(false, normalized + "\n\n[검증 결과] " + toolResult);
+			return StepOutput.failure(normalized + "\n\n[검증 결과] " + toolResult, toolResult);
 		}
-		return new StepOutcome(true, normalized);
+		return StepOutput.success(normalized);
 	}
 
 	/**

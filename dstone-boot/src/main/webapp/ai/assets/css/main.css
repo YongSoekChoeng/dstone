@@ -462,6 +462,16 @@
 	color: #b91c1c;
 }
 
+.workflow-badge-waiting_approval {
+	background: #fef3c7;
+	color: #b45309;
+}
+
+.workflow-badge-cancelled {
+	background: #e5e7eb;
+	color: #6b7280;
+}
+
 .workflow-history-jobid {
 	font-family: "SFMono-Regular", Consolas, monospace;
 	color: #2563eb;

@@ -1,4 +1,4 @@
-# common.registry.WorkflowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
 # analyze -> convert -> validate -> report 순서로 진행.
 # validate가 실패하면 fix로 갔다가 다시 validate로 되돌아간다(루프). maxIterations가 무한루프를 막는다. 
 # validate를 통과하면 report(SUPERVISOR)가 최종 SQL을 한 번 더 검토해서 통과/실패를 판정한다. 

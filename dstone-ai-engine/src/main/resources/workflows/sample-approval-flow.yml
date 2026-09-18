@@ -1,0 +1,21 @@
+# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# APPROVAL 스텝의 일시중단/재개 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다.
+# LLM/Tool 호출 없이 APPROVAL 스텝 하나만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
+#
+# 확인 절차:
+#   1. POST /api/ai/workflow/sample-approval-flow/execute { "message": "승인 테스트" } 호출
+#      -> 응답 status가 WAITING_APPROVAL, executionId가 함께 온다.
+#   2. GET /api/ai/workflow/executions?status=WAITING_APPROVAL 로 방금 만든 실행이 목록에 보이는지 확인.
+#   3. POST /api/ai/workflow/executions/{executionId}/decision { "approved": true, "approver": "...", "comment": "..." }
+#      -> approved=true면 SUCCESS(status=DONE), false면 FAIL(status=FAILED)로 끝난다.
+workflow:
+  id: sample-approval-flow
+  description: APPROVAL 스텝의 일시중단(WAITING_APPROVAL)/재개 동작 확인용 테스트 Workflow.
+  maxIterations: 5
+  steps:
+
+    - id: approve-step
+      type: APPROVAL
+      approverRole: "team-lead"
+      onSuccess: SUCCESS
+      onFailure: FAIL

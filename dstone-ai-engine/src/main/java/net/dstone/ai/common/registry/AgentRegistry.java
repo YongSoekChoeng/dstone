@@ -31,8 +31,8 @@ public class AgentRegistry extends BaseObject {
 	public void load() {
 		Map<String, AgentDefinition> resolved = new HashMap<>();
 		for (AgentDefinition definition : this.loader.loadAgents()) {
-			if (StringUtil.isEmpty(definition.name()) || StringUtil.isEmpty(definition.promptName())) {
-				throw new IllegalStateException("agents/*.yml 항목은 name과 promptName이 모두 있어야 합니다: " + definition);
+			if (StringUtil.isEmpty(definition.name()) || StringUtil.isEmpty(definition.prompt())) {
+				throw new IllegalStateException("agents/*.yml 항목은 name과 prompt가 모두 있어야 합니다: " + definition);
 			}
 			if (resolved.putIfAbsent(definition.name(), definition) != null) {
 				throw new IllegalStateException("agent 이름이 중복 등록되었습니다: " + definition.name());

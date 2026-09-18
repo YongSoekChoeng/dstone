@@ -46,7 +46,7 @@ spring:
             maximum-pool-size: 10
     servlet:
         multipart:
-            # RAG용 문서 업로드(/api/ai/rag/documents) 대비 기본 1MB보다 넉넉하게.
+            # 문서 임베딩 업로드(/api/ai/embed/documents) 대비 기본 1MB보다 넉넉하게.
             max-file-size: 20MB
             max-request-size: 20MB
     ##########################################################################################
@@ -73,7 +73,7 @@ spring:
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
         # embedding(RAG): Anthropic은 임베딩 모델을 제공하지 않아 chat과 별개로 정해야 한다
-        # (rag.RagService.requireVectorStore() 참고). 이 환경엔 OpenAI 키 대신
+        # (api.service.EmbedService/common.rag.RagRetrievalChain의 requireVectorStore() 참고). 이 환경엔 OpenAI 키 대신
         # 로컬 Ollama를 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/14.ollama.md.
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
@@ -153,19 +153,7 @@ dstone:
             max-messages: 20 # 세션당 유지할 최대 메시지 수(넘으면 오래된 메시지부터 잘림)
             ttl-seconds: 86400 # Redis에 저장된 세션 히스토리의 만료 시간(1일)
         ##########################################################################################
-        # 프롬프트 템플릿 
-        # classpath:prompts/{name}/{version}.st 파일을 읽어 렌더링한다.
-        # 특정 템플릿명을 versions에 명시하지 않으면 default-version을 쓴다.
-        # Agent 정의(classpath:agents/*.yml)에서 주로 활용한다.
-        ##########################################################################################
-        prompt:
-            default-version: v1
-            versions:
-                sample-system: v1
-                oracle-sql-analyzer: v1
-                oracle-to-postgresql: v1
-                oracle-sql-reviewer: v1
-                oracle-sql-fixer: v1
+        # 프롬프트는 여기 없다 - classpath:agents/*.yml의 각 Agent 항목 안에 prompt로 직접 적혀 있다.
         ##########################################################################################
         # Tool 설정. 
         # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
@@ -177,8 +165,8 @@ dstone:
         #           tools: getCurrentDateTime,validateSqlSyntax
         
         ##########################################################################################
-        # RAG 설정. 
-        # 이 값이 true여야 rag.RagService의 메서드들과 RagController, Agent의 ragEnabled 설정이 실제로 동작한다(RagService.requireVectorStore() 참고)
+        # RAG 설정.
+        # 이 값이 true여야 api.service.EmbedService/EmbedController(적재)와 common.rag.RagRetrievalChain(검색), Agent의 ragEnabled 설정이 실제로 동작한다(requireVectorStore() 참고)
         # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 임베딩 설정 없이도 그대로 기동된다.
         ########################################################################################## 
         rag:

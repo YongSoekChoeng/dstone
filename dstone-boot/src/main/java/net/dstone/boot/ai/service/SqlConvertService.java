@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.boot.ai.dao.SqlConvertDao;
 import net.dstone.boot.ai.vo.SqlConvertVo;
-import net.dstone.boot.ai.vo.WorkflowCallResult;
+import net.dstone.boot.ai.vo.WorkFlowCallResult;
 import net.dstone.common.config.ConfigProperty;
 
 /**
@@ -50,12 +50,12 @@ public class SqlConvertService extends net.dstone.boot.common.biz.BaseService {
 
 		try {
 			// 분석→변환→문법검증 3 step(실패 시 재작성 루프 포함)까지 끝나야 응답이 오는 동기 호출이라 넉넉하게 준다 - 일반 채팅(기본 60초)보다 오래 걸릴 수 있다.
-			WorkflowCallResult workflowCallResult = this.getWebClient( (5 * 60) ).post()
+			WorkFlowCallResult workflowCallResult = this.getWebClient( (5 * 60) ).post()
 					.uri(baseUrl + "/api/ai/workflow/" + WORKFLOW_ID + "/execute")
 					.contentType(MediaType.APPLICATION_JSON)
 					.bodyValue(body)
 					.retrieve()
-					.bodyToMono(WorkflowCallResult.class)
+					.bodyToMono(WorkFlowCallResult.class)
 					.block();
 
 			sqlConvertVo.setCONVERTED_SQL(workflowCallResult != null ? workflowCallResult.message() : null);

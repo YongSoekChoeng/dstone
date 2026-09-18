@@ -5,12 +5,12 @@ var DstoneAiWorkflow = (function () {
 
 	var workflowIdEl, sessionIdEl, messageEl, variablesEl;
 	var submitBtn, submitStatusEl;
-	var jobIdEl, statusBadgeEl, resultEl, pollStopBtn, pollRefreshBtn;
+	var executionIdEl, statusBadgeEl, resultEl, pollStopBtn, pollRefreshBtn;
 	var historyBodyEl;
 
 	var pollTimer = null;
-	var activeJobId = null;
-	var historyRows = {}; // jobId -> <tr> element, 화면에서 제출한 작업만 기억(서버 저장 아님)
+	var activeExecutionId = null;
+	var historyRows = {}; // executionId -> <tr> element, 화면에서 제출한 작업만 기억(서버 저장 아님)
 
 	function init(options) {
 		urls = options;
@@ -23,7 +23,7 @@ var DstoneAiWorkflow = (function () {
 		submitBtn = document.getElementById("workflow-submit-btn");
 		submitStatusEl = document.getElementById("workflow-submit-status");
 
-		jobIdEl = document.getElementById("workflow-job-id");
+		executionIdEl = document.getElementById("workflow-job-id");
 		statusBadgeEl = document.getElementById("workflow-status-badge");
 		resultEl = document.getElementById("workflow-result");
 		pollStopBtn = document.getElementById("workflow-poll-stop-btn");
@@ -34,8 +34,8 @@ var DstoneAiWorkflow = (function () {
 		submitBtn.addEventListener("click", submit);
 		pollStopBtn.addEventListener("click", stopPolling);
 		pollRefreshBtn.addEventListener("click", function () {
-			if (activeJobId) {
-				fetchStatus(activeJobId);
+			if (activeExecutionId) {
+				fetchStatus(activeExecutionId);
 			}
 		});
 	}
@@ -87,7 +87,7 @@ var DstoneAiWorkflow = (function () {
 					return;
 				}
 				submitStatusEl.textContent = "제출 완료";
-				startTracking(workflowId, result.jobId);
+				startTracking(workflowId, result.executionId);
 			})
 			.catch(function (err) {
 				submitStatusEl.textContent = "요청 실패: " + err.message;
@@ -102,49 +102,49 @@ var DstoneAiWorkflow = (function () {
 		submitStatusEl.textContent = loading ? "제출 중입니다..." : submitStatusEl.textContent;
 	}
 
-	function startTracking(workflowId, jobId) {
+	function startTracking(workflowId, executionId) {
 		stopPolling();
 
-		activeJobId = jobId;
-		jobIdEl.textContent = jobId;
+		activeExecutionId = executionId;
+		executionIdEl.textContent = executionId;
 		setBadge("RUNNING");
 		resultEl.value = "";
 		pollStopBtn.disabled = false;
 		pollRefreshBtn.disabled = false;
 
-		addHistoryRow(workflowId, jobId);
+		addHistoryRow(workflowId, executionId);
 
-		fetchStatus(jobId);
+		fetchStatus(executionId);
 		pollTimer = setInterval(function () {
-			fetchStatus(jobId);
+			fetchStatus(executionId);
 		}, POLL_INTERVAL_MS);
 	}
 
-	function fetchStatus(jobId) {
+	function fetchStatus(executionId) {
 		fetch(urls.statusUrl, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ jobId: jobId })
+			body: JSON.stringify({ executionId: executionId })
 		})
 			.then(function (response) { return response.json(); })
 			.then(function (result) {
-				if (jobId !== activeJobId) {
-					// 그 사이 다른 jobId를 선택했으면(이력 클릭) 이 응답은 화면에 반영하지 않는다.
-					updateHistoryRow(jobId, result.status);
+				if (executionId !== activeExecutionId) {
+					// 그 사이 다른 executionId를 선택했으면(이력 클릭) 이 응답은 화면에 반영하지 않는다.
+					updateHistoryRow(executionId, result.status);
 					return;
 				}
 				setBadge(result.status);
 				resultEl.value = result.status === "FAILED" || result.status === "ERROR"
 					? (result.error || "")
 					: (result.result || "");
-				updateHistoryRow(jobId, result.status);
+				updateHistoryRow(executionId, result.status);
 
 				if (result.status === "DONE" || result.status === "FAILED" || result.status === "ERROR") {
 					stopPolling();
 				}
 			})
 			.catch(function (err) {
-				if (jobId === activeJobId) {
+				if (executionId === activeExecutionId) {
 					setBadge("ERROR");
 					resultEl.value = "상태 조회 실패: " + err.message;
 					stopPolling();
@@ -165,39 +165,39 @@ var DstoneAiWorkflow = (function () {
 		statusBadgeEl.className = "workflow-badge workflow-badge-" + (status || "unknown").toLowerCase();
 	}
 
-	function addHistoryRow(workflowId, jobId) {
+	function addHistoryRow(workflowId, executionId) {
 		var tr = document.createElement("tr");
 		tr.innerHTML =
 			"<td>" + escapeHtml(new Date().toLocaleTimeString()) + "</td>" +
 			"<td>" + escapeHtml(workflowId) + "</td>" +
-			"<td><a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + escapeHtml(jobId) + "</a></td>" +
+			"<td><a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + escapeHtml(executionId) + "</a></td>" +
 			"<td class=\"workflow-history-status\">RUNNING</td>";
 		tr.querySelector(".workflow-history-jobid").addEventListener("click", function () {
-			trackExisting(jobId);
+			trackExisting(executionId);
 		});
 		historyBodyEl.insertBefore(tr, historyBodyEl.firstChild);
-		historyRows[jobId] = tr;
+		historyRows[executionId] = tr;
 	}
 
-	function updateHistoryRow(jobId, status) {
-		var tr = historyRows[jobId];
+	function updateHistoryRow(executionId, status) {
+		var tr = historyRows[executionId];
 		if (tr) {
 			tr.querySelector(".workflow-history-status").textContent = status || "-";
 		}
 	}
 
-	/** 이력 목록에서 이전에 제출한 jobId를 다시 클릭했을 때, 그 작업의 폴링을 다시 시작한다. */
-	function trackExisting(jobId) {
+	/** 이력 목록에서 이전에 제출한 executionId를 다시 클릭했을 때, 그 작업의 폴링을 다시 시작한다. */
+	function trackExisting(executionId) {
 		stopPolling();
-		activeJobId = jobId;
-		jobIdEl.textContent = jobId;
+		activeExecutionId = executionId;
+		executionIdEl.textContent = executionId;
 		resultEl.value = "";
 		pollStopBtn.disabled = false;
 		pollRefreshBtn.disabled = false;
 
-		fetchStatus(jobId);
+		fetchStatus(executionId);
 		pollTimer = setInterval(function () {
-			fetchStatus(jobId);
+			fetchStatus(executionId);
 		}, POLL_INTERVAL_MS);
 	}
 

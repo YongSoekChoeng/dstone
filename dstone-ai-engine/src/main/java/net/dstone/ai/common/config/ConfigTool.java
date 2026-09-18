@@ -19,11 +19,12 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * @AiTool이 붙은 빈들을 기동 시점에 스캔해서 Spring AI ToolCallbackProvider로 묶어준다. 
- * - type이 AGENT인 step에서는 어떤 Tool을 언제 호출할지 Spring AI의 ChatClient가 LLM과 대화를 주고받으며 알아서 처리. 
+ * @AiTool이 붙은 빈들을 기동 시점에 스캔하고, ConfigMcp가 MCP 서버에서 가져온 Tool까지 합쳐서 하나의 Spring AI
+ * ToolCallbackProvider로 묶어준다 - 합쳐진 뒤에는 로컬 Tool인지 MCP Tool인지 구분하지 않는다.
+ * - type이 AGENT인 step에서는 어떤 Tool을 언제 호출할지 Spring AI의 ChatClient가 LLM과 대화를 주고받으며 알아서 처리.
  * - type이 TOOL인 step에서는 runtime.tool.ToolExecutor가 이름으로 직접 찾아 LLM 없이 호출.
  *
- * caller별 Tool 화이트리스트 설정은 여러 앱이 공유하는 엔진에서 한 앱에게만 허용된 Tool을 다른 앱이 붙여 쓰지못하게 막는다. 
+ * caller별 Tool 화이트리스트 설정은 여러 앱이 공유하는 엔진에서 한 앱에게만 허용된 Tool을 다른 앱이 붙여 쓰지못하게 막는다.
  * Tool 화이트리스트 설정이 없는 caller는 화이트리스트가 없는 것으로 보고 등록된 Tool 전체를 허용한다.
  */
 @Component
@@ -33,19 +34,32 @@ public class ConfigTool extends BaseObject {
 	private ApplicationContext applicationContext;
 	@Autowired
 	private ConfigProperty configProperty;
+	@Autowired
+	private ConfigMcp configMcp;
 
 	private ToolCallbackProvider toolCallbackProvider;
 
+	/**
+	 * <pre>
+	 * 로컬 @AiTool 빈과 ConfigMcp가 접속해 둔 MCP 서버 Tool을 하나의 ToolCallbackProvider로 합친다 - 합쳐진
+	 * 뒤에는 어느 쪽에서 왔는지 구분 없이 caller 화이트리스트(allowedToolNames)를 똑같이 적용받는다.
+	 * </pre>
+	 */
 	@PostConstruct
 	public void discover() {
 		Map<String, Object> toolBeans = applicationContext.getBeansWithAnnotation(AiTool.class);
-		if (toolBeans.isEmpty()) {
-			this.toolCallbackProvider = ToolCallbackProvider.from();
-			LogUtil.sysout("dstone-ai-engine tool: 등록된 Tool 없음 (@AiTool 빈을 찾지 못함)");
-			return;
+		List<ToolCallback> merged = new ArrayList<>();
+		if (!toolBeans.isEmpty()) {
+			merged.addAll(List.of(MethodToolCallbackProvider.builder().toolObjects(toolBeans.values().toArray()).build().getToolCallbacks()));
 		}
-		this.toolCallbackProvider = MethodToolCallbackProvider.builder().toolObjects(toolBeans.values().toArray()).build();
-		LogUtil.sysout("dstone-ai-engine tool: 등록된 Tool = " + String.join(", ", toolNames()));
+		merged.addAll(this.configMcp.toolCallbacks());
+
+		this.toolCallbackProvider = ToolCallbackProvider.from(merged.toArray(new ToolCallback[0]));
+		if (merged.isEmpty()) {
+			LogUtil.sysout("dstone-ai-engine tool: 등록된 Tool 없음 (@AiTool 빈도, MCP Tool도 없음)");
+		} else {
+			LogUtil.sysout("dstone-ai-engine tool: 등록된 Tool = " + String.join(", ", toolNames()));
+		}
 	}
 
 	public ToolCallbackProvider toolCallbackProvider() {
