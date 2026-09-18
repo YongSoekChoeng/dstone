@@ -53,6 +53,8 @@ WorkflowExecutor.run(executionId)
   └─ Step3 실행 → ... → DONE/FAILED
 ```
 
+`ApprovalStepRunner`도 다른 러너와 **완전히 동일한 방식으로 호출**된다(§2) — `WorkflowExecutor`가 `StepType.APPROVAL`을 미리 분기해서 특별 취급하지 않는다. 대신 `ApprovalStepRunner.run()` 내부에서 `WorkflowContext.variables.approvals.{stepId}`에 결정이 이미 들어있는지 확인해, 없으면 `PENDING`을 반환한다. **재개(resume)는 "다음 스텝으로 건너뛰기"가 아니라 "같은 스텝을 다시 실행하기"다** — `decision` API가 호출되면 결정을 `variables`에 기록한 뒤 같은 `approve-step`을 다시 실행하고, 이번엔 결정이 있으니 `SUCCESS`/`FAILURE`를 반환해 정상적으로 `onSuccess`/`onFailure`로 흘러간다. 이 덕분에 `WorkflowExecutor`의 스텝 디스패치 루프가 모든 StepType에 대해 완전히 균일해진다.
+
 핵심 설계 원칙: **모든 스텝 실행 후 상태를 저장한다.** 승인 스텝만 특별 취급하는 게 아니라, `WorkflowExecutor`를 "매 스텝마다 영속화 → 다음 스텝 판단" 루프로 바꾼다. 이렇게 하면:
 - 승인 대기뿐 아니라 서버 재기동/장애 후에도 마지막 완료 스텝부터 재개 가능해진다 (부가 이득).
 - 기존 동기 실행(`/execute`)과 비동기 실행(`/submit`+`/status`)이 **같은 영속화 모델 위에서 동작**하게 되어, `AsyncJobService`(Redis Hash)와 새 승인-대기 모델(PostgreSQL)이 서로 다른 저장소로 쪼개져 있던 것도 하나로 합쳐진다.
@@ -79,7 +81,7 @@ record WorkflowExecution(
 record StepHistoryEntry(String stepId, StepType type, boolean success, String outputSummary, Instant executedAt) {}
 ```
 
-기존 `AsyncJobService`는 폐기하고 `runtime.execution.WorkflowExecutionService` + `WorkflowExecutionStore`(JdbcTemplate 기반)로 대체한다. `/execute`(동기)도 내부적으로는 같은 `WorkflowExecutionService.runToCompletionOrPause()`를 호출하되, `WAITING_APPROVAL`이 되면 즉시 그 상태를 응답으로 반환(폴링 안내 메시지 포함)한다.
+기존 `AsyncJobService`는 폐기하고 `runtime.workflow.execution.WorkflowExecutionService` + `WorkflowExecutionStore`(JdbcTemplate 기반)로 대체한다. `/execute`(동기)도 내부적으로는 같은 `WorkflowExecutionService.runToCompletionOrPause()`를 호출하되, `WAITING_APPROVAL`이 되면 즉시 그 상태를 응답으로 반환(폴링 안내 메시지 포함)한다.
 
 ### 1.4 PostgreSQL 스키마 (신규, `dstone-ai-engine/src/main/resources/schema/01-create-table-postgresql-ai-workflow-execution.sql`)
 
@@ -123,14 +125,14 @@ MyBatis는 이 모듈에 없으므로(현재도 없음) 새 sqlmap을 도입하�
 
 Step은 두 계층에서 "끝"을 판단한다 — (a) 개별 스텝 러너의 실행 결과, (b) 그 결과를 받아 `WorkflowExecutor`가 내리는 다음 동작 결정.
 
-**(a) 스텝 러너의 실행 결과 (`StepOutput` 기준, 4가지)**
+**(a) 스텝 러너의 실행 결과 (`StepOutput.result`, `StepResult` enum 3가지 + 예외 1가지 = 4가지)**
 
 | 결과 | 의미 | 발생 조건 |
 |---|---|---|
-| SUCCESS | 정상 성공 | `success=true` — AGENT 정상 응답, TOOL 결과에 `"실패:"` 없음, SUPERVISOR `Verdict.pass()==true` |
-| FAILURE | 비즈니스 로직상 실패 | `success=false, failureReason` 有 — TOOL `"실패:"` 접두어, SUPERVISOR `Verdict.pass()==false` |
-| ERROR | 처리 불가능한 예외 | LLM API 타임아웃/오류, DB 연결 끊김, MCP 서버 무응답 등 — 러너가 던진 예외를 `WorkflowExecutor`가 캐치. `StepOutput`으로 정상 반환되지 않는다 |
-| PENDING (APPROVAL 전용) | 아직 끝나지 않음 | `APPROVAL` 스텝 도달 시 — 러너를 아예 호출하지 않고 `WorkflowExecutor`가 실행을 중단 (§2 참고) |
+| `StepResult.SUCCESS` | 정상 성공 | AGENT 정상 응답, TOOL 결과에 `"실패:"` 없음, SUPERVISOR `Verdict.pass()==true`, APPROVAL 결정이 승인 |
+| `StepResult.FAILURE` | 비즈니스 로직상 실패 | `failureReason` 有 — TOOL `"실패:"` 접두어, SUPERVISOR `Verdict.pass()==false`, APPROVAL 결정이 반려 |
+| `StepResult.PENDING` | 아직 끝나지 않음 | `ApprovalStepRunner`가 아직 결정이 없는 걸 확인하고 반환 (§2) — `StepType.APPROVAL`만 반환 가능 |
+| ERROR (enum 아님, 예외) | 처리 불가능한 예외 | LLM API 타임아웃/오류, DB 연결 끊김, MCP 서버 무응답 등 — 러너가 던진 예외를 `WorkflowExecutor`가 캐치. `StepOutput`으로 정상 반환되지 않는다 |
 
 **(b) `WorkflowExecutor`의 다음 동작 결정 (`StepStatus`, 기존 4종 + 신규 2종)**
 
@@ -143,15 +145,19 @@ Step은 두 계층에서 "끝"을 판단한다 — (a) 개별 스텝 러너의 �
 | `SUCCESS` | `onSuccess`/`onFailure`가 `"SUCCESS"` sentinel | `WorkflowExecution.status=DONE`, 워크플로우 정상 종료 |
 | `FAIL` | `onSuccess`/`onFailure`가 `"FAIL"` sentinel, 또는 `LOOP` 초과 | `WorkflowExecution.status=FAILED`, 워크플로우 종료 |
 | `ERROR` (신규) | 스텝 러너가 예외를 던짐 | `onFailure` 분기를 **무시**하고 즉시 `WorkflowExecution.status=FAILED` + `errorMessage` 기록 |
-| `WAITING_APPROVAL` (신규) | `StepType.APPROVAL` 도달 | `WorkflowExecution.status=WAITING_APPROVAL`로 저장, 실행 중단. `decision` API 호출 시 `approved` 값에 따라 `onSuccess`/`onFailure` 쪽 `NEXT_STEP`으로 재평가하며 재개 |
+| `WAITING_APPROVAL` (신규) | 러너가 `StepOutput.result()==PENDING` 반환 (`ApprovalStepRunner`만 해당) | `WorkflowExecution.status=WAITING_APPROVAL`로 저장, 실행 중단. `decision` API 호출 시 같은 스텝을 재실행 → 이번엔 `SUCCESS`/`FAILURE`로 `NEXT_STEP` 재평가 |
 
 핵심 설계 판단: **ERROR(시스템 예외)와 FAILURE(비즈니스 실패)를 분리**한다. 기존 코드는 TOOL의 `"실패:"` 접두어 하나로 실패를 판정했는데, 이 규칙을 예외 상황까지 확장하면 "DB가 죽어서 응답을 못 받은 것"과 "SQL 문법이 틀려서 실패한 것"이 같은 `onFailure` 분기(예: fix-loop)로 흘러가 버려 무한 재시도/오탐이 날 수 있다. `ERROR`는 `onFailure`를 거치지 않고 바로 워크플로우를 죽인다.
 
 ### 1.6 Step IN/OUT 로깅
 
-목표: 로그 한 줄(또는 시작/종료 두 줄)만 보고 **"이 실행에서, 이 스텝이, 무슨 유형으로, 어떤 Agent/Tool을 불러서, 어떻게 끝났는지"**가 바로 보여야 한다. 지금의 `ConfigCallLog`(AOP 메서드 entry/exit 로그)는 범용이라 이 정보를 한 줄로 안 보여준다 — 별도로 워크플로우 전용 감사 로그를 추가한다.
+목표: 로그 한 줄(또는 시작/종료 두 줄)만 보고 **"이 실행에서, 이 스텝이, 무슨 유형으로, 어떤 Agent/Tool을 불러서, 어떻게 끝났는지"**가 바로 보여야 한다.
 
-- **위치**: `WorkflowExecutor`가 각 스텝을 실행하기 직전/직후에 신규 `runtime.WorkflowAuditLogger`(정적 유틸리티, 전용 로거 `net.dstone.ai.workflow.audit`)를 호출한다. 스텝 러너 내부가 아니라 `WorkflowExecutor` 한 곳에서만 로깅하므로 러너를 늘려도 로그 형식이 깨지지 않는다.
+**새 클래스를 만들지 않고 기존 `common.config.ConfigCallLog`(AOP 메서드 entry/exit 로그를 담당하는 그 Aspect)를 확장**한다. 이게 가능한 이유: 모든 StepRunner가 §2에서 정의하는 동일한 인터페이스 한 메서드(`StepOutput run(WorkflowExecution execution, StepDefinition definition, StepInput input)`)로 통일되므로, `ConfigCallLog`에 이 시그니처 하나만 겨냥하는 전용 `@Around` advice를 추가하면 인자/반환값에서 필요한 필드를 전부 그대로 꺼낼 수 있다. 기존의 범용 entry/exit 로깅 advice와는 별개의 advice 메서드로 같은 클래스 안에 공존시킨다(포인트컷이 다르므로 겹치지 않음).
+
+- **위치**: `common.config.ConfigCallLog`에 `@Around("execution(* net.dstone.ai.runtime.step.StepRunner.run(..))")` advice 1개 추가. 전용 로거(`net.dstone.ai.workflow.audit`)를 이 advice 안에서만 쓴다.
+- **필드 추출**: 첫 인자 `WorkflowExecution`에서 `executionId`/`workflowId`, 둘째 인자 `StepDefinition`에서 `stepId`/`stepType`/`ref`, 셋째 인자 `StepInput`에서 `renderedText`(=input) — 전부 리플렉션 없이 타입 그대로 캐스팅해서 꺼낸다. 반환값 `StepOutput`에서 `result`/`primaryText`/`failureReason`을 꺼내고, advice가 직접 `System.nanoTime()` 전후 차이로 `durationMs`를 잰다.
+- **`transition`은 이 로그에 없다** — `NEXT_STEP`/`LOOP`/`SUCCESS`/`FAIL` 같은 워크플로우 전이는 `WorkflowExecutor`가 join point가 끝난 **뒤에** 결정하는 것이라 advice가 알 수 없다. 이 로그는 "스텝 자체의 IN/OUT"만 책임지고, 흐름 제어는 로그 순서(같은 `executionId`로 grep했을 때 stepId가 나열되는 순서)와 §10의 DB 조회로 충분히 재구성된다.
 - **포맷**: 사람이 grep하기 쉬운 logfmt 스타일(`key=value`) 한 줄. 필드 순서 고정.
 
 ```
@@ -159,50 +165,55 @@ Step은 두 계층에서 "끝"을 판단한다 — (a) 개별 스텝 러너의 �
 WF_STEP phase=START executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent input="CREATE TABLE ... (500자 초과 시 자름)"
 
 # 스텝 종료 - 성공
-WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent result=SUCCESS transition=NEXT_STEP durationMs=842 output="COALESCE(...) LIMIT 10"
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent result=SUCCESS durationMs=842 output="COALESCE(...) LIMIT 10"
 
-# 스텝 종료 - 비즈니스 실패 (loop로 이어짐)
-WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=validate stepType=TOOL ref=sql-syntax-validator result=FAILURE transition=LOOP durationMs=12 failureReason="구문 오류: ..."
+# 스텝 종료 - 비즈니스 실패
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=validate stepType=TOOL ref=sql-syntax-validator result=FAILURE durationMs=12 failureReason="구문 오류: ..."
 
-# 스텝 종료 - 시스템 예외
-WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent result=ERROR transition=FAIL durationMs=5002 error="Anthropic API timeout"
+# 스텝 종료 - 시스템 예외 (advice의 catch 블록에서 기록)
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=oracle-to-postgresql stepId=convert stepType=AGENT ref=sql-conversion-agent result=ERROR durationMs=5002 error="Anthropic API timeout"
 
 # 스텝 종료 - 승인 대기
-WF_STEP phase=END   executionId=8f3a2b.. workflowId=sample-approval-flow stepId=approve-step stepType=APPROVAL result=PENDING transition=WAITING_APPROVAL
+WF_STEP phase=END   executionId=8f3a2b.. workflowId=sample-approval-flow stepId=approve-step stepType=APPROVAL ref=team-lead result=PENDING durationMs=3
 ```
 
-- **필드 고정 세트**: `executionId`, `workflowId`, `stepId`, `stepType`, `ref`(Agent/Tool/MCP 이름 — 없으면 생략), `phase`(START/END), `result`(END에만: SUCCESS/FAILURE/ERROR/PENDING), `transition`(END에만: StepStatus 값), `durationMs`(END에만), `input`/`output`/`failureReason`/`error`(있는 것만).
 - **긴 값 처리**: `input`/`output`은 `ExternalProcessRunner`가 이미 쓰는 것과 동일한 방식으로 길이 제한(기본 500자, `Constants`에 상수화) 후 말줄임 처리 — 로그가 한 줄을 넘어가지 않게.
-- **로그 라우팅**: 이 전용 로거는 `conf/log4j2.xml`에 별도 Logger로 선언해 기존에 이미 존재하는 `LOGS/dstone-ai-engine/execution/execution.log` 어펜더로 보낸다 (이미 이 경로로 로테이션/백업까지 되고 있으므로 새 파일을 만들 필요가 없다).
-- **DB 연동**: 같은 정보(`ref`, `durationMs`, `failureReason`)를 `AI_WORKFLOW_EXECUTION_STEP_HISTORY`(§1.4) 컬럼에도 그대로 적재해, 로그 파일을 안 보고도 §10 조회 API로 동일한 내용을 확인할 수 있게 한다 — 로그와 DB가 같은 소스(`WorkflowAuditLogger` 호출 시점)에서 나오므로 서로 어긋나지 않는다.
+- **로그 라우팅**: `net.dstone.ai.workflow.audit` 로거를 `conf/log4j2.xml`에서 기존에 이미 존재하는 `LOGS/dstone-ai-engine/execution/execution.log` 어펜더로 보낸다 (이미 이 경로로 로테이션/백업까지 되고 있으므로 새 파일을 만들 필요가 없다).
+- **DB 연동**: 같은 정보(`ref`, `durationMs`, `failureReason`)를 같은 advice가 `WorkflowExecutionStore`를 통해 `AI_WORKFLOW_EXECUTION_STEP_HISTORY`(§1.4)에도 적재할지, 아니면 `WorkflowExecutionService`가 스텝 실행 후 별도로 적재할지는 Phase 2 구현 시 결정 — 어느 쪽이든 로그와 DB가 같은 값(같은 join point 시점)에서 나오므로 서로 어긋나지 않는다.
 
 ---
 
 ## 2. Step Input/Output 계약 명확화
 
-현재는 `WorkflowContext`(느슨한 `Map<String,Object>`)와 각 `*StepRunner`가 알아서 문자열을 다듬는 방식이라 "이 스텝이 뭘 받고 뭘 돌려주는지"가 코드를 읽어야만 보인다. 아래처럼 타입을 명시한다 (`runtime` 패키지, 기존 `StepOutcome`을 대체/흡수):
+현재는 `WorkflowContext`(느슨한 `Map<String,Object>`)와 각 `*StepRunner`가 알아서 문자열을 다듬는 방식이라 "이 스텝이 뭘 받고 뭘 돌려주는지"가 코드를 읽어야만 보인다. 아래처럼 타입을 명시하고, **모든 StepRunner가 구현하는 공통 인터페이스 하나**로 통일한다 (`runtime.status`/`runtime.step` 패키지, §4의 패키지 구조 참고. 기존 `StepOutcome`을 대체/흡수):
 
 ```java
-// runtime.StepInput — 각 StepRunner에 전달되는 입력
+// runtime.status.StepInput — 각 StepRunner에 전달되는 입력
 record StepInput(
-    String stepId,
-    String renderedText,        // inputTemplate 렌더링 결과 (TOOL/AGENT 공통 입력 원문)
+    String renderedText,           // inputTemplate 렌더링 결과 (TOOL/AGENT 공통 입력 원문)
     Map<String, Object> variables  // 워크플로우 전역 변수(읽기 전용 뷰)
 ) {}
 
-// runtime.StepOutput — 각 StepRunner가 반환하는 출력 (기존 StepOutcome 대체)
+// runtime.status.StepResult — Step 종료 경우의 수(§1.5-a) 중 StepOutput으로 표현되는 3가지
+enum StepResult { SUCCESS, FAILURE, PENDING }   // ERROR는 예외로 표현되므로 이 enum에 없음(§1.5)
+
+// runtime.status.StepOutput — 각 StepRunner가 반환하는 출력 (기존 StepOutcome 대체)
 record StepOutput(
-    String stepId,
-    boolean success,
+    StepResult result,
     String primaryText,         // 다음 스텝의 {previous} 로 이어지는 주 결과
     Map<String, Object> data,   // 워크플로우 변수에 병합될 구조화 결과 (선택)
-    String failureReason        // 실패 시 사유, 성공 시 null
+    String failureReason        // FAILURE일 때 사유, 그 외 null
 ) {}
+
+// runtime.step.StepRunner — 4개 StepType 러너가 전부 구현하는 공통 인터페이스
+interface StepRunner {
+    StepOutput run(WorkflowExecution execution, StepDefinition definition, StepInput input);
+}
 ```
 
-`AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner`(신규)는 전부 `StepInput → StepOutput` 시그니처로 통일한다. `WorkflowExecutor`는 `StepOutput.data`를 `WorkflowContext.variables`에 병합하고, `primaryText`를 다음 스텝의 `{previous}` 토큰에 바인딩한다. 이렇게 하면 YAML의 `inputTemplate` 문서화(§4)와 코드 계약이 1:1로 맞아떨어진다.
+`AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner`가 전부 이 인터페이스 하나를 구현한다. `WorkflowExecutor`는 `StepType`으로 러너를 찾아 항상 똑같이 `runner.run(execution, definition, input)`을 호출하고, `StepOutput.result`만 보고 분기한다 — `StepType.APPROVAL`을 미리 갈라내는 특수 분기가 없다. `StepOutput.data`는 `WorkflowContext.variables`에 병합되고, `primaryText`는 다음 스텝의 `{previous}` 토큰에 바인딩된다. 이렇게 하면 YAML의 `inputTemplate` 문서화(§4)와 코드 계약이 1:1로 맞아떨어지고, 이 하나의 메서드 시그니처를 §1.6의 `ConfigCallLog` advice가 그대로 겨냥할 수 있다.
 
-`ApprovalStepRunner`는 특수 케이스: `StepOutput.success`가 아니라 **"PENDING" 이라는 제3의 결과**가 필요하므로, `StepOutput`에 `pending` 플래그를 추가하거나(`success=false && failureReason=null && pending=true`) `WorkflowExecutor`가 `StepType.APPROVAL`을 별도 분기로 먼저 체크해 러너 호출 전에 대기 상태를 처리하는 방식 중 택1 — 구현 시엔 후자(WorkflowExecutor가 APPROVAL을 스텝 실행 전에 가로채는 방식)가 더 명확하므로 채택.
+**`ApprovalStepRunner`의 PENDING/재개 동작** (§1.2에서 이미 설명): `WorkflowContext.variables.approvals.{stepId}`에 결정이 없으면 `StepOutput(PENDING, ...)`을 반환한다. `decision` API가 호출되면 그 결정을 `variables`에 기록한 뒤 **같은 스텝을 다시 `run()`**하고, 이번엔 결정이 있으니 `SUCCESS`(승인)/`FAILURE`(반려)를 반환한다 — "재개"는 워크플로우 엔진 입장에서 특별한 코드 경로가 아니라 그냥 같은 스텝의 재실행이다.
 
 ---
 
@@ -216,39 +227,45 @@ net.dstone.ai
 ├── api
 │   ├── controller
 │   │   ├── ChatController
-│   │   ├── RagController
+│   │   ├── RagController                   (ingest/delete만 유지, search 액션은 삭제 — §5)
 │   │   ├── WorkflowController              (동기 /execute 는 유지, 비동기 submit/status는 execution 기반으로 내부 교체)
 │   │   └── WorkflowExecutionController     **신규** — 진행상태/내역 조회 + 승인 처리 API, 상세는 §10
 │   ├── dto
 │   └── service
-│       └── (AsyncJobService 삭제 → runtime.execution.WorkflowExecutionService 로 대체)
+│       └── (AsyncJobService 삭제 → runtime.workflow.execution.WorkflowExecutionService 로 대체)
 ├── common
-│   ├── config        (Config, ConfigChatClient, ConfigTool, ConfigRedis, ConfigCallLog)
+│   ├── config        (Config, ConfigChatClient, ConfigTool, ConfigRedis)
+│   │   ├── ConfigCallLog **확장** — 기존 범용 entry/exit advice에 §1.6의 `StepRunner.run(..)` 전용 advice 추가 (신규 클래스 없이 여기서 처리)
 │   │   └── ConfigMcp **신규** — MCP 클라이언트 ToolCallbackProvider 구성
 │   ├── consts
-│   ├── definition     (WorkflowDefinition, StepDefinition, StepType(RAG 폐지+APPROVAL 추가), AgentDefinition)
+│   ├── definition     (WorkflowDefinition, StepDefinition, StepType(RAG 폐지+APPROVAL 추가), AgentDefinition(promptName 필드 삭제 → prompt 필드로 대체, §4))
 │   │   └── McpServerDefinition **신규** — mcp yml 바인딩 레코드
 │   ├── loader         (YamlDefinitionLoader — mcp/*.yml 패턴 추가)
-│   ├── prompt
 │   ├── registry       (WorkflowRegistry, AgentRegistry)
 │   │   └── McpServerRegistry **신규**
 │   ├── security
 │   ├── session
 │   ├── annotation
 │   └── exec           (ExternalProcessRunner)
+│   └── ~~prompt~~ **삭제** — PromptTemplateRegistry/PromptProperties 폐지, §4 참고
 ├── rag
-│   └── RagService     (§5 대로 체인 구성 리팩터)
+│   ├── RagIngestService   (Tika/JSONL → 청킹 → tenant 태깅 → VectorStore.add/delete, §5)
+│   └── RagRetrievalChain  (Advisor 빌더 + 순수 검색 메서드, §5)
 ├── runtime
-│   ├── WorkflowContext, WorkflowExecutor(재작성), StepStatus, StepInput/StepOutput **(신규, StepOutcome 대체)**, Verdict
-│   ├── WorkflowAuditLogger **신규** — §1.6의 IN/OUT logfmt 로그를 담당하는 전용 유틸리티
-│   ├── execution **신규 패키지**
-│   │   ├── WorkflowExecution, WorkflowExecutionStatus, StepHistoryEntry
-│   │   ├── WorkflowExecutionStore   (JdbcTemplate 영속화)
-│   │   └── WorkflowExecutionService (동기/비동기/승인대기 실행의 단일 진입점)
-│   ├── agent          (AgentExecutor)
-│   ├── step           (AgentStepRunner, ToolStepRunner — RagStepRunner는 삭제)
-│   │   └── ApprovalStepRunner **신규**
-│   └── tool           (ToolExecutor — MCP 툴도 동일 경로로 호출되므로 변경 없음)
+│   ├── workflow
+│   │   ├── WorkflowContext, WorkflowExecutor(재작성 — StepRunner 균일 호출 루프, §2)
+│   │   └── execution **신규 패키지**
+│   │       ├── WorkflowExecution, StepHistoryEntry
+│   │       ├── WorkflowExecutionStore   (JdbcTemplate 영속화)
+│   │       └── WorkflowExecutionService (동기/비동기/승인대기 실행의 단일 진입점)
+│   ├── agent
+│   │   └── AgentExecutor
+│   ├── step
+│   │   └── StepRunner(공통 인터페이스, 신규, §2), AgentStepRunner, ToolStepRunner, ApprovalStepRunner **신규** — RagStepRunner는 삭제
+│   ├── tool
+│   │   └── ToolExecutor (MCP 툴도 동일 경로로 호출되므로 변경 없음)
+│   └── status **신규 패키지** — 상태/결과를 나타내는 순수 타입만 모음
+│       └── WorkflowExecutionStatus, StepStatus, StepInput, StepOutput, StepResult **(신규, StepOutcome 대체)**, Verdict
 ├── mcp **신규 패키지 (클라이언트 전용)**
 │   └── McpToolProvider — resources/mcp/*.yml 로 정의된 서버들에 접속해 ToolCallbackProvider를 만들고 ConfigTool에 합류
 └── tools
@@ -261,7 +278,7 @@ net.dstone.ai
     └── http.HttpCallTool
 ```
 
-**명명 규칙 통일**: 모든 `@AiTool` 클래스는 단수형 `...Tool` (복수형 `...Tools` 금지 — 현재 `DateTimeTools`/`SqlSyntaxTools`만 예외였음). 모든 정의 로딩 3종 세트(Workflow/Agent/McpServer)는 `definition`/`loader`/`registry`/`config` 4계층을 동일하게 반복해 구조적 일관성을 유지한다.
+**명명 규칙 통일**: 모든 `@AiTool` 클래스는 단수형 `...Tool` (복수형 `...Tools` 금지 — 현재 `DateTimeTools`/`SqlSyntaxTools`만 예외였음). 모든 정의 로딩 3종 세트(Workflow/Agent/McpServer)는 `definition`/`loader`/`registry`/`config` 4계층을 동일하게 반복해 구조적 일관성을 유지한다. `runtime` 하위는 역할별로 `workflow`(엔진+영속화) / `agent` / `step` / `tool` / `status`(순수 타입) 5개 패키지로 나눠, "무슨 역할의 코드를 찾는지"만 알면 바로 위치를 알 수 있게 한다.
 
 ---
 
@@ -270,11 +287,28 @@ net.dstone.ai
 ```
 resources/
 ├── workflows/*.yml      (기존 유지, StepType에서 RAG 제거·APPROVAL 추가)
-├── agents/*.yml         (기존 유지)
+├── agents/*.yml         (프롬프트를 파일 안에 인라인, §4.0 — prompts/ 디렉토리 폐지)
 ├── mcp/*.yml            **신규** — MCP 서버 접속 정의, 파일명 무관·내부 id가 식별자
-├── prompts/{name}/{version}.st   (기존 유지)
-└── schema/*.sql         **신규** — §1.4의 ai_workflow_execution DDL (수동 실행, dstone-batch 관례와 동일)
+└── schema/*.sql         **신규** — §1.4의 AI_WORKFLOW_EXECUTION DDL (수동 실행, dstone-batch 관례와 동일)
 ```
+
+### 4.0 프롬프트를 Agent YAML에 인라인
+
+`resources/prompts/{name}/{version}.st` + `dstone.ai.prompt.default-version`/`.versions.*` 설정 + `common.prompt.PromptTemplateRegistry`/`PromptProperties` 전부 **폐지**한다. `agentId → promptName → version → .st 파일` 4단 간접참조가 "이 에이전트가 정확히 무슨 프롬프트로 동작하는지" 확인하려면 두 디렉토리를 오가야 하게 만들었는데, 지금 설정엔 실질적인 버전 분기(A/B 등)가 전혀 쓰이고 있지 않다 — 실제로 쓰는 값은 항상 `v1` 하나뿐이었다. 프롬프트를 통째로 `agents/*.yml`에 넣으면 에이전트 하나의 정의(설명/프롬프트/RAG여부/툴여부)가 파일 하나로 완결된다. "이전 프롬프트로 되돌리고 싶다"는 요구는 이 YAML 파일의 git 이력이 그대로 대신한다.
+
+```yaml
+agents:
+  - name: sql-conversion-agent
+    description: Oracle SQL을 PostgreSQL로 변환한다
+    prompt: |
+      당신은 Oracle SQL을 PostgreSQL로 변환하는 전문가입니다.
+      NVL(...)은 COALESCE(...)로, ROWNUM 페이징은 LIMIT으로 변환하십시오.
+      ...
+    toolsEnabled: false
+    ragEnabled: true
+```
+
+`common.definition.AgentDefinition`은 `promptName` 필드를 `prompt`(원문 문자열)로 바꾼다. 변수 치환({caller}, {today} 등)이 필요하면 `runtime.agent.AgentExecutor`가 Spring AI의 `PromptTemplate`을 그 자리에서 직접 써서 렌더링한다(`new PromptTemplate(definition.prompt()).render(variables)`) — 커스텀 레지스트리 클래스 없이도 템플릿 치환 기능 자체는 그대로 유지된다.
 
 ### 4.1 APPROVAL 스텝 YAML 예시 (`workflows/*.yml`)
 
@@ -330,9 +364,11 @@ Source(File/JSONL) → DocumentReader(Tika | JsonlReader) → TokenTextSplitter(
   → RetrievalAugmentationAdvisor 가 프롬프트에 컨텍스트 주입
 ```
 
-`RagService`를 `rag.RagIngestService` + `rag.RagRetrievalChain`(Advisor 빌더 + 순수 검색 메서드) 두 개로 분리한다. `AgentExecutor.buildSpec()`은 `ragEnabled=true`일 때 `RagRetrievalChain.buildAdvisor(caller)`만 호출하면 되므로 결합도가 낮아진다. `RagController`(검색 디버깅 API)도 같은 체인을 재사용.
+`RagService`를 `rag.RagIngestService` + `rag.RagRetrievalChain`(Advisor 빌더 + 순수 검색 메서드) 두 개로 분리한다. `AgentExecutor.buildSpec()`은 `ragEnabled=true`일 때 `RagRetrievalChain.buildAdvisor(caller)`만 호출하면 되므로 결합도가 낮아진다.
 
 **Step 모델과의 연결**: `StepType.RAG`는 폐지한다(§1.1). AGENT 스텝은 `ragEnabled: true`일 때 이 체인을 Advisor로 자동 적용받고, LLM 없이 검색 결과만 필요한 워크플로우는 `tools.rag.RagSearchTool`(신규, `RagRetrievalChain.search()`를 그대로 호출하는 얇은 `@AiTool` 래퍼)을 일반 TOOL 스텝으로 호출한다. 검색 로직 자체(tenant 필터·topK·threshold)는 항상 `RagRetrievalChain` 한 곳에만 존재한다.
+
+**`RagController`는 남지만 범위를 줄인다.** 검색 경로가 Advisor(§1.1)와 `RagSearchTool`(위 문단) 두 곳으로 이미 커버되므로, `RagController`의 `/api/ai/rag/search` 액션은 **삭제**한다 — 지금도 어디서도 호출되지 않는 중복 경로였다 (확인: `dstone-boot`의 `DocumentController`는 upload/list/delete만 쓰고 search는 쓰지 않는다). 반면 `/api/ai/rag/documents`의 **ingest/delete는 그대로 유지**한다 — `dstone-boot`의 `net.dstone.boot.ai.controller.DocumentController` → `DocumentService.uploadDocument()`/`.deleteDocument()`가 이 두 엔드포인트를 실제로 호출하고 있어(§11), 없애면 dstone-boot의 문서 업로드 화면이 깨진다. 즉 `RagController`는 "문서를 벡터스토어에 넣고 빼는" 관리 작업 전용으로 남고, "검색"은 전부 Advisor/Tool 경로로 일원화된다.
 
 ---
 
@@ -374,21 +410,24 @@ abstract class ExternalProcessTool {
 
 | 대상 | 처리 |
 |---|---|
-| `WorkflowExecutor`, `AsyncJobService` | **재작성** — §1.3의 영속화 루프로 교체, AsyncJobService 삭제 |
-| `StepOutcome` | **대체** — `StepInput`/`StepOutput`으로 교체 (§2) |
+| `WorkflowExecutor`, `AsyncJobService` | **재작성** — §1.3/§2의 영속화 루프 + 균일 StepRunner 호출로 교체, AsyncJobService 삭제, `runtime.workflow`로 이동 |
+| `StepOutcome` | **대체** — `runtime.status.StepInput`/`StepOutput`/`StepResult`로 교체 (§2) |
 | `StepType.RAG` / `RagStepRunner` | **폐지** — Advisor(`ragEnabled`) 경로와 신규 `RagSearchTool`(TOOL 스텝)로 대체 (§1.1, §5) |
-| `AgentStepRunner`/`ToolStepRunner` | **시그니처만 조정** (StepInput/StepOutput), 내부 로직 대부분 유지 |
-| `RagService` | **분리** — Ingest/Retrieval 체인으로 리팩터 (§5), 로직 재사용 |
+| `AgentStepRunner`/`ToolStepRunner` | **`StepRunner` 인터페이스 구현으로 조정** (§2), 내부 로직 대부분 유지, `runtime.step`으로 이동 |
+| `RagService` | **분리** — `RagIngestService`+`RagRetrievalChain`으로 리팩터 (§5), 로직 재사용 |
+| `RagController.search()` | **삭제** — 아무도 호출하지 않는 중복 경로, Advisor/`RagSearchTool`로 흡수 (§5). ingest/delete는 dstone-boot 의존으로 유지 |
+| `common.prompt`(`PromptTemplateRegistry`/`PromptProperties`), `resources/prompts/*.st` | **폐지** — `AgentDefinition.prompt` 필드에 인라인 (§4.0) |
 | `ConfigTool`, `ToolExecutor`, `AgentExecutor` | **유지** — MCP 툴도 같은 경로로 흡수되므로 변경 최소화 |
 | `DateTimeTools`/`SqlSyntaxTools` | **리네임만** (`DateTimeTool`/`SqlSyntaxTool`) |
 | `ShellExecTool`/`PythonExecTool` | **공통 부모 클래스로 추출**, 동작은 동일 |
-| `WorkflowController`/`ChatController`/`RagController` | **대부분 유지**, WorkflowController의 submit/status만 새 execution 모델 호출로 교체 |
+| `WorkflowController`/`ChatController` | **대부분 유지**, WorkflowController의 submit/status만 새 execution 모델 호출로 교체 |
+| `ConfigCallLog` | **확장** — §1.6의 `StepRunner.run(..)` 전용 `@Around` advice 추가 (신규 `WorkflowAuditLogger` 클래스는 만들지 않음) |
 | `common.session`, `common.security`, `ConfigChatClient` | **변경 없음** |
 
 ## 9. 진행 순서 (단계별)
 
-1. **Phase 1** — `StepInput`/`StepOutput` 도입 + Runner 시그니처 정리 + `StepType.RAG`/`RagStepRunner` 제거 + Tools 리네임/공통클래스 추출 + `RagSearchTool` 추가 (위험 낮음, 회귀 테스트로 검증 쉬움)
-2. **Phase 2** — PostgreSQL 스키마 추가 + `runtime.execution` 패키지(WorkflowExecutionStore/Service) + `WorkflowExecutor` 재작성 + `APPROVAL` StepType + `WorkflowAuditLogger`(§1.6) + `WorkflowExecutionController`(§10, 조회+승인 API) (핵심/가장 큰 변경)
+1. **Phase 1** — `runtime` 패키지를 `workflow`/`agent`/`step`/`tool`/`status`로 재편(§3) + `StepRunner` 공통 인터페이스와 `StepInput`/`StepOutput`/`StepResult` 도입(§2) + `StepType.RAG`/`RagStepRunner` 제거 + Tools 리네임/공통클래스 추출 + `RagSearchTool` 추가 + 프롬프트를 `agents/*.yml`에 인라인하고 `common.prompt`/`resources/prompts` 삭제(§4.0) (위험 낮음, 회귀 테스트로 검증 쉬움)
+2. **Phase 2** — PostgreSQL 스키마 추가 + `runtime.workflow.execution` 패키지(WorkflowExecutionStore/Service) + `WorkflowExecutor` 재작성 + `APPROVAL` StepType(`ApprovalStepRunner`) + `ConfigCallLog`에 Step IN/OUT advice 추가(§1.6) + `WorkflowExecutionController`(§10, 조회+승인 API) (핵심/가장 큰 변경)
 3. **Phase 3** — RAG 체인 분리 (`RetrievalAugmentationAdvisor` 전환)
 4. **Phase 4** — MCP 클라이언트 (`ConfigMcp`, `McpServerDefinition/Registry`, `resources/mcp/*.yml`)
 5. **Phase 5** — `dstone-boot`의 `net.dstone.boot.ai.*` 테스트 화면(§11)을 새 API 계약(`executionId`, `/executions` 조회, `/decision`)에 맞춰 갱신 — Phase 2가 끝나야 붙일 수 있으므로 그 뒤에 진행
@@ -436,7 +475,8 @@ abstract class ExternalProcessTool {
 - 기존 수동 검증 시나리오 재실행: `POST /api/ai/chat` (일반/툴콜링), `oracle-to-postgresql` 워크플로우 동기 실행.
 - 신규: APPROVAL 스텝이 포함된 샘플 워크플로우로 `/execute` 호출 → 응답이 `WAITING_APPROVAL` 인지 확인 → `POST /executions/{id}/decision` 호출 → 다음 스텝까지 완료되는지 확인.
 - 신규: 로컬 MCP 서버(예: `@modelcontextprotocol/server-filesystem`) 하나 붙여 AGENT 스텝에서 해당 툴이 호출되는지 확인.
-- RAG: 문서 ingest 후 `RagController` 검색 API 및 `RagSearchTool`(TOOL 스텝) 양쪽에서 동일한 검색 결과가 나오는지 확인.
+- RAG: `RagController`로 문서 ingest 후, `RagSearchTool`(TOOL 스텝)과 `ragEnabled` Agent(Advisor 경로) 양쪽에서 같은 문서가 검색되는지 확인. `RagController.search()`는 삭제했으므로 더 이상 존재하지 않는지도 확인.
+- 프롬프트 인라인: `agents/*.yml`의 `prompt` 필드만으로 `ChatController`/`AgentExecutor`가 정상 동작하는지, `resources/prompts` 디렉토리와 `dstone.ai.prompt.*` 설정을 지워도 기동에 문제가 없는지 확인.
 - 로깅: 워크플로우 1회 실행 후 `execution.log`에서 `WF_STEP` 라인만 grep해, 스텝 수만큼 START/END 쌍이 찍히고 `stepType`/`ref`/`result`/`transition` 값이 실제 실행과 일치하는지 확인. 의도적으로 LLM 호출을 실패시켜(예: 잘못된 API 키) `result=ERROR`가 `result=FAILURE`와 다른 로그로 구분되는지 확인.
 - 조회 API: `GET /api/ai/workflow/executions?status=WAITING_APPROVAL`로 대기 중인 실행이 잡히는지, `GET /api/ai/workflow/executions/{id}`의 `history` 배열 내용이 위 로그/DB 값과 일치하는지 확인.
 - dstone-boot 연동: `dstone-boot`의 Workflow 테스트 화면에서 APPROVAL 스텝이 있는 워크플로우를 `submit.do`로 실행 → 화면에 승인 대기 표시 → 승인/반려 버튼으로 `decision.do` 호출 → 최종 결과까지 화면에서 눈으로 확인. `list.do`/`detail.do` 화면에서도 같은 실행의 상태·히스토리가 보이는지 확인.
