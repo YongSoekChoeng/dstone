@@ -13,6 +13,7 @@
 - 승인 대기 상태 영속화 → **PostgreSQL 신규 테이블** (기존 pgvector용 datasource 재사용, Redis TTL 방식 폐기)
 - 이번 범위 → **MCP 클라이언트만** 설계/구현. MCP 서버(외부 노출)는 이번엔 제외, 향후 과제로만 언급.
 - **RAG는 별도 Step 유형이 아니다** — LLM 프롬프트에 Advising되는 것이므로 `AgentDefinition.ragEnabled` 경로로만 존재하고, LLM 없는 순수 검색은 `RagSearchTool`(TOOL 스텝)로 처리한다.
+- **Embedding(적재)과 RAG(검색·증강)를 이름/위치로 분리한다** — 문서를 벡터스토어에 넣고 빼는 일(`RagController`/`RagService`)은 `EmbedController`/`EmbedService`로 리네임+이동, RAG가 실제로 그 임베딩을 읽어 쓰는 검색 로직(`RagRetrievalChain`)만 `rag` 패키지에 남는다 (§5). dstone-boot의 문서 업로드 화면(`DocumentController`)은 이 임베딩 적재 기능을 테스트하는 화면이므로 삭제하지 않고 유지, 호출 URL만 갱신한다 (§11).
 
 ---
 
@@ -227,11 +228,12 @@ net.dstone.ai
 ├── api
 │   ├── controller
 │   │   ├── ChatController
-│   │   ├── RagController                   (ingest/delete만 유지, search 액션은 삭제 — §5)
+│   │   ├── EmbedController                 **리네임(RagController→)** — 문서→임베딩 적재/삭제 전용, `/api/ai/embed/documents`(§5)
 │   │   ├── WorkflowController              (동기 /execute 는 유지, 비동기 submit/status는 execution 기반으로 내부 교체)
 │   │   └── WorkflowExecutionController     **신규** — 진행상태/내역 조회 + 승인 처리 API, 상세는 §10
 │   ├── dto
 │   └── service
+│       ├── EmbedService                    **리네임+이동(rag.RagIngestService→)** — Tika/JSONL 추출·청킹·tenant 태깅·VectorStore 적재/삭제, §5
 │       └── (AsyncJobService 삭제 → runtime.workflow.execution.WorkflowExecutionService 로 대체)
 ├── common
 │   ├── config        (Config, ConfigChatClient, ConfigTool, ConfigRedis)
@@ -249,8 +251,7 @@ net.dstone.ai
 │   └── exec           (ExternalProcessRunner)
 │   └── ~~prompt~~ **삭제** — PromptTemplateRegistry/PromptProperties 폐지, §4 참고
 ├── rag
-│   ├── RagIngestService   (Tika/JSONL → 청킹 → tenant 태깅 → VectorStore.add/delete, §5)
-│   └── RagRetrievalChain  (Advisor 빌더 + 순수 검색 메서드, §5)
+│   └── RagRetrievalChain  (Advisor 빌더 + 순수 검색 메서드 — "임베딩을 읽어서 LLM에 증강"하는 쪽, §5. 적재 쪽은 api.service.EmbedService로 이동)
 ├── runtime
 │   ├── workflow
 │   │   ├── WorkflowContext, WorkflowExecutor(재작성 — StepRunner 균일 호출 루프, §2)
@@ -346,16 +347,21 @@ SSE 예시(`mcp/internal-search.yml`)는 `transport: SSE`, `url: http://...` 형
 
 ---
 
-## 5. RAG 체인 재설계
+## 5. Embedding(적재)과 RAG(검색·증강)의 분리
 
-현재 `RagService`는 Ingest(Tika→TokenTextSplitter→pgvector)와 Retrieval(단순 유사도 검색 + `QuestionAnswerAdvisor`)이 한 클래스에 섞여 있다. "체인"이라는 요구에 맞춰 Spring AI 2.x의 `RetrievalAugmentationAdvisor`(pluggable QueryTransformer/DocumentRetriever/QueryExpander) 기반으로 명시적 파이프라인화한다.
+현재 `RagService`는 이름은 하나지만 실제로는 성격이 다른 두 가지 일을 한다: **① 문서를 임베딩으로 만들어 벡터스토어에 넣고 빼는 것**(Ingest/Delete)과 **② 이미 임베딩된 내용을 검색해서 LLM 프롬프트에 증강하는 것**(Retrieval)이다. ①은 "RAG가 내부적으로 동작하기 위한 재료(임베딩)를 준비하는" 별개의 데이터 파이프라인 작업이고, ②가 진짜 의미의 RAG(Retrieval-Augmented Generation)다. 지금까지 이 둘이 `rag` 패키지/`RagController`라는 이름 아래 섞여 있었는데, 이번에 이름과 위치로 그 경계를 명확히 한다.
 
-**Ingest 체인** (변경 없음, 그대로 유지):
+- **Embedding(적재) — `api.controller.EmbedController` + `api.service.EmbedService`** (각각 `RagController`/`RagService`의 ingest·delete 부분을 리네임+이동): 문서를 Tika/JSONL로 읽어 청킹하고 tenant 메타데이터를 태깅해 벡터스토어에 넣고 빼는 일. `api` 패키지 아래 두는 이유는 이게 "LLM 서빙 내부 로직"이 아니라 다른 시스템(=dstone-boot의 문서 업로드 화면, 또는 미래의 다른 SI 프로젝트)이 호출하는 **공개 관리 API**이기 때문이다.
+- **RAG(검색·증강) — `rag.RagRetrievalChain`** (기존 `RagService`의 검색 부분, 이름·위치 유지): Embedding이 만들어 둔 벡터스토어 내용을 읽어서, AGENT 스텝의 Advisor(`ragEnabled: true`)나 `tools.rag.RagSearchTool`(TOOL 스텝)에 검색 결과를 제공하는 내부 로직.
+
+"체인"이라는 요구에 맞춰 각각을 파이프라인으로 명시한다.
+
+**Embedding 체인** (`EmbedService`, 변경 없음, 그대로 유지):
 ```
 Source(File/JSONL) → DocumentReader(Tika | JsonlReader) → TokenTextSplitter(chunk-size) → tenant 메타데이터 태깅 → VectorStore.add()
 ```
 
-**Retrieval 체인** (신규, `rag.chain` 서브패키지로 분리):
+**RAG 검색 체인** (`RagRetrievalChain`, 신규 `rag.chain` 서브패키지로 분리, Spring AI 2.x `RetrievalAugmentationAdvisor` 기반):
 ```
 사용자 질의
   → QueryTransformer (선택, 대화맥락 압축 — CompressionQueryTransformer)
@@ -364,11 +370,11 @@ Source(File/JSONL) → DocumentReader(Tika | JsonlReader) → TokenTextSplitter(
   → RetrievalAugmentationAdvisor 가 프롬프트에 컨텍스트 주입
 ```
 
-`RagService`를 `rag.RagIngestService` + `rag.RagRetrievalChain`(Advisor 빌더 + 순수 검색 메서드) 두 개로 분리한다. `AgentExecutor.buildSpec()`은 `ragEnabled=true`일 때 `RagRetrievalChain.buildAdvisor(caller)`만 호출하면 되므로 결합도가 낮아진다.
+`AgentExecutor.buildSpec()`은 `ragEnabled=true`일 때 `RagRetrievalChain.buildAdvisor(caller)`만 호출하면 되므로 결합도가 낮다. `EmbedService`와 `RagRetrievalChain`은 완전히 분리된 클래스지만 둘 다 같은 `VectorStore` 빈을 다루므로, `requireVectorStore()`(`dstone.ai.rag.enabled` + 빈 존재 확인) 가드는 각자 자기 클래스에 짧게 하나씩 둔다 — 두 줄짜리 가드를 공유하려고 별도 유틸리티를 만들 정도는 아니다.
 
-**Step 모델과의 연결**: `StepType.RAG`는 폐지한다(§1.1). AGENT 스텝은 `ragEnabled: true`일 때 이 체인을 Advisor로 자동 적용받고, LLM 없이 검색 결과만 필요한 워크플로우는 `tools.rag.RagSearchTool`(신규, `RagRetrievalChain.search()`를 그대로 호출하는 얇은 `@AiTool` 래퍼)을 일반 TOOL 스텝으로 호출한다. 검색 로직 자체(tenant 필터·topK·threshold)는 항상 `RagRetrievalChain` 한 곳에만 존재한다.
+**Step 모델과의 연결**: `StepType.RAG`는 폐지한다(§1.1). AGENT 스텝은 `ragEnabled: true`일 때 `RagRetrievalChain`을 Advisor로 자동 적용받고, LLM 없이 검색 결과만 필요한 워크플로우는 `tools.rag.RagSearchTool`(신규, `RagRetrievalChain.search()`를 그대로 호출하는 얇은 `@AiTool` 래퍼)을 일반 TOOL 스텝으로 호출한다.
 
-**`RagController`는 남지만 범위를 줄인다.** 검색 경로가 Advisor(§1.1)와 `RagSearchTool`(위 문단) 두 곳으로 이미 커버되므로, `RagController`의 `/api/ai/rag/search` 액션은 **삭제**한다 — 지금도 어디서도 호출되지 않는 중복 경로였다 (확인: `dstone-boot`의 `DocumentController`는 upload/list/delete만 쓰고 search는 쓰지 않는다). 반면 `/api/ai/rag/documents`의 **ingest/delete는 그대로 유지**한다 — `dstone-boot`의 `net.dstone.boot.ai.controller.DocumentController` → `DocumentService.uploadDocument()`/`.deleteDocument()`가 이 두 엔드포인트를 실제로 호출하고 있어(§11), 없애면 dstone-boot의 문서 업로드 화면이 깨진다. 즉 `RagController`는 "문서를 벡터스토어에 넣고 빼는" 관리 작업 전용으로 남고, "검색"은 전부 Advisor/Tool 경로로 일원화된다.
+**엔드포인트도 이름을 따라간다**: `EmbedController`는 `/api/ai/rag/documents` 대신 **`/api/ai/embed/documents`**(POST 적재/DELETE 삭제)를 쓴다. `search` 액션은 만들지 않는다 — 검색은 Embedding의 책임이 아니라 RAG(Advisor/`RagSearchTool`)의 책임이므로, 애초에 `EmbedController`에 있을 이유가 없다. 이 경로 변경은 `dstone-boot`의 `DocumentService`가 호출하는 URL도 함께 바꿔야 한다는 뜻이다(§11).
 
 ---
 
@@ -414,8 +420,8 @@ abstract class ExternalProcessTool {
 | `StepOutcome` | **대체** — `runtime.status.StepInput`/`StepOutput`/`StepResult`로 교체 (§2) |
 | `StepType.RAG` / `RagStepRunner` | **폐지** — Advisor(`ragEnabled`) 경로와 신규 `RagSearchTool`(TOOL 스텝)로 대체 (§1.1, §5) |
 | `AgentStepRunner`/`ToolStepRunner` | **`StepRunner` 인터페이스 구현으로 조정** (§2), 내부 로직 대부분 유지, `runtime.step`으로 이동 |
-| `RagService` | **분리** — `RagIngestService`+`RagRetrievalChain`으로 리팩터 (§5), 로직 재사용 |
-| `RagController.search()` | **삭제** — 아무도 호출하지 않는 중복 경로, Advisor/`RagSearchTool`로 흡수 (§5). ingest/delete는 dstone-boot 의존으로 유지 |
+| `RagService`/`RagController` | **분리+리네임** — ingest/delete는 `api.service.EmbedService`+`api.controller.EmbedController`(`/api/ai/embed/documents`)로, 검색은 `rag.RagRetrievalChain`으로 (§5) |
+| `RagController.search()` | **삭제** — 아무도 호출하지 않는 중복 경로, Advisor/`RagSearchTool`로 흡수 (§5) |
 | `common.prompt`(`PromptTemplateRegistry`/`PromptProperties`), `resources/prompts/*.st` | **폐지** — `AgentDefinition.prompt` 필드에 인라인 (§4.0) |
 | `ConfigTool`, `ToolExecutor`, `AgentExecutor` | **유지** — MCP 툴도 같은 경로로 흡수되므로 변경 최소화 |
 | `DateTimeTools`/`SqlSyntaxTools` | **리네임만** (`DateTimeTool`/`SqlSyntaxTool`) |
@@ -426,11 +432,11 @@ abstract class ExternalProcessTool {
 
 ## 9. 진행 순서 (단계별)
 
-1. **Phase 1** — `runtime` 패키지를 `workflow`/`agent`/`step`/`tool`/`status`로 재편(§3) + `StepRunner` 공통 인터페이스와 `StepInput`/`StepOutput`/`StepResult` 도입(§2) + `StepType.RAG`/`RagStepRunner` 제거 + Tools 리네임/공통클래스 추출 + `RagSearchTool` 추가 + 프롬프트를 `agents/*.yml`에 인라인하고 `common.prompt`/`resources/prompts` 삭제(§4.0) (위험 낮음, 회귀 테스트로 검증 쉬움)
+1. **Phase 1** — `runtime` 패키지를 `workflow`/`agent`/`step`/`tool`/`status`로 재편(§3) + `StepRunner` 공통 인터페이스와 `StepInput`/`StepOutput`/`StepResult` 도입(§2) + `StepType.RAG`/`RagStepRunner` 제거 + `RagService`/`RagController`를 `EmbedService`/`EmbedController`(`/api/ai/embed`)와 `RagRetrievalChain`으로 분리(§5) + Tools 리네임/공통클래스 추출 + `RagSearchTool` 추가 + 프롬프트를 `agents/*.yml`에 인라인하고 `common.prompt`/`resources/prompts` 삭제(§4.0) (위험 낮음, 회귀 테스트로 검증 쉬움)
 2. **Phase 2** — PostgreSQL 스키마 추가 + `runtime.workflow.execution` 패키지(WorkflowExecutionStore/Service) + `WorkflowExecutor` 재작성 + `APPROVAL` StepType(`ApprovalStepRunner`) + `ConfigCallLog`에 Step IN/OUT advice 추가(§1.6) + `WorkflowExecutionController`(§10, 조회+승인 API) (핵심/가장 큰 변경)
 3. **Phase 3** — RAG 체인 분리 (`RetrievalAugmentationAdvisor` 전환)
 4. **Phase 4** — MCP 클라이언트 (`ConfigMcp`, `McpServerDefinition/Registry`, `resources/mcp/*.yml`)
-5. **Phase 5** — `dstone-boot`의 `net.dstone.boot.ai.*` 테스트 화면(§11)을 새 API 계약(`executionId`, `/executions` 조회, `/decision`)에 맞춰 갱신 — Phase 2가 끝나야 붙일 수 있으므로 그 뒤에 진행
+5. **Phase 5** — `dstone-boot`의 `net.dstone.boot.ai.*` 테스트 화면(§11): Workflow 테스트 화면을 새 API 계약(`executionId`, `/executions` 조회, `/decision`)에 맞춰 갱신하고, `DocumentController`/`DocumentService`가 부르는 URL을 `/api/ai/embed/documents`로 갱신 — Phase 1(Embed 리네임)·Phase 2(Workflow 재작성)가 끝나야 붙일 수 있으므로 그 뒤에 진행
 6. **Phase 6 (향후 과제, 이번 범위 아님)** — MCP 서버로 자체 노출, 승인 알림(Slack/메일) 연동, 재랭킹 고도화
 
 각 Phase 종료 시 `docs/09.dstone-ai-engine.md`를 갱신한다 (CLAUDE.md 지침: "리소스 변경 시 문서도 갱신"). 특히 §5 실행모델, §6 Agent와 Tool, §7 Session/RAG/Security, §10 API 레퍼런스(본 계획서의 §10 조회 API 반영), §11 설정 레퍼런스(로깅 관련 log4j2 설정 추가), §14 변경이력 섹션이 영향받는다.
@@ -453,7 +459,12 @@ abstract class ExternalProcessTool {
 
 ## 11. dstone-boot 테스트 화면 연동
 
-`dstone-boot`에 이미 `net.dstone.boot.ai.*`(ChatController/DocumentController/SqlConvertController/**WorkflowTestController**) + `webapp/ai/assets/js/*.js`로 이루어진, `dstone-ai-engine`을 `WebClient`로 호출해보는 수동 테스트 화면이 있다 (`interface.ai-engine.base-url` 설정 사용). 새로 만들 필요 없이 이 자산을 이번 API 변경에 맞춰 확장한다.
+`dstone-boot`에 이미 `net.dstone.boot.ai.*`(ChatController/DocumentController/SqlConvertController/**WorkflowTestController**) + `webapp/ai/assets/js/*.js`로 이루어진, `dstone-ai-engine`을 `WebClient`로 호출해보는 수동 테스트 화면이 있다 (`interface.ai-engine.base-url` 설정 사용). `DocumentController`는 실제로 **문서 임베딩 적재 기능 자체를 테스트하는 화면**이었으므로 그대로 유지한다 — 지난 턴에 "RAG 테스트 관련 dstone-boot 화면을 전부 제거"라고 정리했던 건, 엔진 쪽을 Embedding(적재)/RAG(검색) 두 개념으로 분리(§5)하면서 뒤집는다. 대신 §5의 엔드포인트 리네임을 따라가야 한다:
+
+**`DocumentController`/`DocumentService` — 유지, URL만 변경**:
+- `DocumentService.uploadDocument()`가 부르는 `POST /api/ai/rag/documents` → **`POST /api/ai/embed/documents`**
+- `DocumentService.deleteDocument()`가 부르는 `DELETE /api/ai/rag/documents/{sourceId}` → **`DELETE /api/ai/embed/documents/{sourceId}`**
+- 클래스/필드명(`DocumentController`, `DocumentVo`, `TB_AI_DOCUMENT` 등)은 dstone-boot 화면 관점("문서 업로드 이력")에서는 여전히 자연스러운 이름이라 그대로 둔다 — 엔진 쪽 리네임(Rag→Embed)을 dstone-boot까지 억지로 따라갈 필요는 없다.
 
 **기존 코드 중 API 계약 변경으로 반드시 손대야 하는 부분** (`WorkflowTestController`/`WorkflowTestService`):
 - `submit.do`가 호출하는 `POST /api/ai/workflow/{id}/submit`은 그대로 두되, 응답의 `jobId`를 **`executionId`로 리네임**해 엔진 쪽 §1.3/§10 변경과 용어를 맞춘다 (`WorkflowSubmitResult`, `WorkflowSubmitCallResult` 필드명 변경).
@@ -464,8 +475,8 @@ abstract class ExternalProcessTool {
 - **실행 목록/이력 조회 화면**: `GET /list.do`(상태 필터 포함, `?status=WAITING_APPROVAL` 등)가 `GET /api/ai/workflow/executions`를 호출해 테이블로 보여주고, 행 클릭 시 `GET /detail.do?executionId=`가 `GET /api/ai/workflow/executions/{executionId}`를 호출해 `history`(스텝별 유형/ref/성공여부/소요시간/실패사유)까지 그대로 화면에 표시한다 — 이번 요청의 "WorkFlow 진행상태 및 내역 조회"를 사람이 직접 눈으로 확인하는 화면이 된다.
 
 **변경 불필요한 부분**:
-- `ChatController`/`DocumentController`(RAG)/`SqlConvertController`는 API 계약이 그대로라 수정할 필요 없다. MCP로 추가되는 툴이나 신규 `RagSearchTool`은 AGENT의 tool-calling 경로에 투명하게 얹히므로, 기존 Chat 테스트 화면과 (RagSearchTool을 쓰는) Workflow 테스트 화면만으로 별도 화면 없이 검증된다.
-- `interface.ai-engine.base-url` 설정은 변경 없음.
+- `ChatController`/`SqlConvertController`는 API 계약이 그대로라 수정할 필요 없다. MCP로 추가되는 툴이나 신규 `RagSearchTool`은 AGENT의 tool-calling 경로에 투명하게 얹히므로, 별도 화면 없이 기존 Chat/Workflow 테스트 화면만으로 검증된다.
+- `interface.ai-engine.base-url` 설정은 변경 없음 (base-url은 그대로, path만 `/rag/documents`→`/embed/documents`로 바뀐다).
 
 ---
 
@@ -475,8 +486,9 @@ abstract class ExternalProcessTool {
 - 기존 수동 검증 시나리오 재실행: `POST /api/ai/chat` (일반/툴콜링), `oracle-to-postgresql` 워크플로우 동기 실행.
 - 신규: APPROVAL 스텝이 포함된 샘플 워크플로우로 `/execute` 호출 → 응답이 `WAITING_APPROVAL` 인지 확인 → `POST /executions/{id}/decision` 호출 → 다음 스텝까지 완료되는지 확인.
 - 신규: 로컬 MCP 서버(예: `@modelcontextprotocol/server-filesystem`) 하나 붙여 AGENT 스텝에서 해당 툴이 호출되는지 확인.
-- RAG: `RagController`로 문서 ingest 후, `RagSearchTool`(TOOL 스텝)과 `ragEnabled` Agent(Advisor 경로) 양쪽에서 같은 문서가 검색되는지 확인. `RagController.search()`는 삭제했으므로 더 이상 존재하지 않는지도 확인.
+- Embedding/RAG: `EmbedController`(`/api/ai/embed/documents`)로 문서 ingest 후, `RagSearchTool`(TOOL 스텝)과 `ragEnabled` Agent(Advisor 경로) 양쪽에서 같은 문서가 검색되는지 확인. `/api/ai/rag/search`는 삭제했으므로 더 이상 존재하지 않는지도 확인.
 - 프롬프트 인라인: `agents/*.yml`의 `prompt` 필드만으로 `ChatController`/`AgentExecutor`가 정상 동작하는지, `resources/prompts` 디렉토리와 `dstone.ai.prompt.*` 설정을 지워도 기동에 문제가 없는지 확인.
-- 로깅: 워크플로우 1회 실행 후 `execution.log`에서 `WF_STEP` 라인만 grep해, 스텝 수만큼 START/END 쌍이 찍히고 `stepType`/`ref`/`result`/`transition` 값이 실제 실행과 일치하는지 확인. 의도적으로 LLM 호출을 실패시켜(예: 잘못된 API 키) `result=ERROR`가 `result=FAILURE`와 다른 로그로 구분되는지 확인.
+- 로깅: 워크플로우 1회 실행 후 `execution.log`에서 `WF_STEP` 라인만 grep해, 스텝 수만큼 START/END 쌍이 찍히고 `stepType`/`ref`/`result` 값이 실제 실행과 일치하는지 확인. 의도적으로 LLM 호출을 실패시켜(예: 잘못된 API 키) `result=ERROR`가 `result=FAILURE`와 다른 로그로 구분되는지 확인.
 - 조회 API: `GET /api/ai/workflow/executions?status=WAITING_APPROVAL`로 대기 중인 실행이 잡히는지, `GET /api/ai/workflow/executions/{id}`의 `history` 배열 내용이 위 로그/DB 값과 일치하는지 확인.
 - dstone-boot 연동: `dstone-boot`의 Workflow 테스트 화면에서 APPROVAL 스텝이 있는 워크플로우를 `submit.do`로 실행 → 화면에 승인 대기 표시 → 승인/반려 버튼으로 `decision.do` 호출 → 최종 결과까지 화면에서 눈으로 확인. `list.do`/`detail.do` 화면에서도 같은 실행의 상태·히스토리가 보이는지 확인.
+- dstone-boot 문서 업로드 화면: `EmbedController`로 엔드포인트가 바뀐 뒤에도 `dstone-boot`의 `/ai/document/document` 화면에서 업로드/목록/삭제가 그대로 되는지 확인 (URL만 바뀌고 화면 자체는 삭제되지 않았음을 확인).
