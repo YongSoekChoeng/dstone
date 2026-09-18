@@ -111,12 +111,6 @@ public class ConfigCallLog extends BaseObject {
 	private final static String SAPERATE_LINE_FRONT = "\n|-------------------------------------------";
 	private final static String SAPERATE_LINE_END = "-------------------------------------------|\n";
 	
-	/** Step IN/OUT 전용 로거 - net.dstone.ai 하위라 log4j2.xml의 net.dstone.ai Logger 설정(콘솔+execution.log)을 그대로 물려받는다. */
-	private static final Logger STEP_AUDIT_LOG = LogManager.getLogger("net.dstone.ai.workflow.audit");
-
-	/** 로그 한 줄에 담는 입력/출력 텍스트의 최대 길이 - 이보다 길면 잘라서 "...(생략)"을 붙인다. */
-	private static final int STEP_AUDIT_MAX_CHARS = 500;
-
 	/**
 	 * <pre>
 	 * runtime 패키지 메소드 로깅.(AOP는 public 메소드에 대해서만 캐치할 수 있음)
@@ -148,7 +142,13 @@ public class ConfigCallLog extends BaseObject {
 		
 		return retObj;
 	}
-	
+
+	/** Step IN/OUT 전용 로거 - net.dstone.ai 하위라 log4j2.xml의 net.dstone.ai Logger 설정(콘솔+execution.log)을 그대로 물려받는다. */
+	private static final Logger STEP_AUDIT_LOG = LogManager.getLogger("net.dstone.ai.workflow.audit");
+
+	/** 로그 한 줄에 담는 입력/출력 텍스트의 최대 길이 - 이보다 길면 잘라서 "...(생략)"을 붙인다. */
+	private static final int STEP_AUDIT_MAX_CHARS = 500;
+
 	/**
 	 * <pre>
 	 * StepRunner.run(execution, definition, input) 전용 로깅. 
@@ -164,30 +164,30 @@ public class ConfigCallLog extends BaseObject {
 	 * @return
 	 * @throws Throwable
 	 */
-	//@Around("execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
+	@Around("execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
 	public Object doStepAuditLog(ProceedingJoinPoint joinPoint) throws Throwable {
 		WorkFlowExecution execution = (WorkFlowExecution) joinPoint.getArgs()[0];
 		StepDefinition step = (StepDefinition) joinPoint.getArgs()[1];
 		StepInput input = (StepInput) joinPoint.getArgs()[2];
 
-		STEP_AUDIT_LOG.info(SAPERATE_LINE+"WF_STEP phase=START executionId={} workflowId={} stepId={} stepType={} ref={} input=\"{}\""+SAPERATE_LINE,
-			execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), this.truncate(input.renderedText()));
+		STEP_AUDIT_LOG.info("\n" + SAPERATE_LINE+"WF_STEP phase=START executionId={} workflowId={} stepId={} stepType={} ref={} input=\"{}\""+SAPERATE_LINE+"\n",
+			execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), this.truncate(input.renderedText())+"\n");
 
 		long start = System.nanoTime();
 		try {
 			StepOutput output = (StepOutput) joinPoint.proceed();
 			long durationMs = (System.nanoTime() - start) / 1_000_000;
 			if (output.failureReason() != null) {
-				STEP_AUDIT_LOG.info(SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} failureReason=\"{}\""+SAPERATE_LINE,
+				STEP_AUDIT_LOG.info("\n"+SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} failureReason=\"{}\""+SAPERATE_LINE+"\n",
 					execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), output.result(), durationMs, this.truncate(output.failureReason()));
 			} else {
-				STEP_AUDIT_LOG.info(SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} output=\"{}\""+SAPERATE_LINE,
+				STEP_AUDIT_LOG.info("\n"+SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} output=\"{}\""+SAPERATE_LINE+"\n",
 					execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), output.result(), durationMs, this.truncate(output.primaryText()));
 			}
 			return output;
 		} catch (Throwable e) {
 			long durationMs = (System.nanoTime() - start) / 1_000_000;
-			STEP_AUDIT_LOG.info(SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result=ERROR durationMs={} error=\"{}\""+SAPERATE_LINE,
+			STEP_AUDIT_LOG.info("\n"+SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result=ERROR durationMs={} error=\"{}\""+SAPERATE_LINE+"\n",
 				execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), durationMs, e.getMessage());
 			throw e;
 		}
