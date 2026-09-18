@@ -248,10 +248,9 @@ net.dstone.ai
 │   ├── security
 │   ├── session
 │   ├── annotation
-│   └── exec           (ExternalProcessRunner)
-│   └── ~~prompt~~ **삭제** — PromptTemplateRegistry/PromptProperties 폐지, §4 참고
-├── rag
-│   └── RagRetrievalChain  (Advisor 빌더 + 순수 검색 메서드 — "임베딩을 읽어서 LLM에 증강"하는 쪽, §5. 적재 쪽은 api.service.EmbedService로 이동)
+│   ├── exec           (ExternalProcessRunner)
+│   ├── ~~prompt~~ **삭제** — PromptTemplateRegistry/PromptProperties 폐지, §4 참고
+│   └── rag            **이동(net.dstone.ai.rag→)** — RagRetrievalChain (Advisor 빌더 + 순수 검색 메서드 — "임베딩을 읽어서 LLM에 증강"하는 쪽, §5. 적재 쪽은 api.service.EmbedService)
 ├── runtime
 │   ├── workflow
 │   │   ├── WorkflowContext, WorkflowExecutor(재작성 — StepRunner 균일 호출 루프, §2)
@@ -352,7 +351,7 @@ SSE 예시(`mcp/internal-search.yml`)는 `transport: SSE`, `url: http://...` 형
 현재 `RagService`는 이름은 하나지만 실제로는 성격이 다른 두 가지 일을 한다: **① 문서를 임베딩으로 만들어 벡터스토어에 넣고 빼는 것**(Ingest/Delete)과 **② 이미 임베딩된 내용을 검색해서 LLM 프롬프트에 증강하는 것**(Retrieval)이다. ①은 "RAG가 내부적으로 동작하기 위한 재료(임베딩)를 준비하는" 별개의 데이터 파이프라인 작업이고, ②가 진짜 의미의 RAG(Retrieval-Augmented Generation)다. 지금까지 이 둘이 `rag` 패키지/`RagController`라는 이름 아래 섞여 있었는데, 이번에 이름과 위치로 그 경계를 명확히 한다.
 
 - **Embedding(적재) — `api.controller.EmbedController` + `api.service.EmbedService`** (각각 `RagController`/`RagService`의 ingest·delete 부분을 리네임+이동): 문서를 Tika/JSONL로 읽어 청킹하고 tenant 메타데이터를 태깅해 벡터스토어에 넣고 빼는 일. `api` 패키지 아래 두는 이유는 이게 "LLM 서빙 내부 로직"이 아니라 다른 시스템(=dstone-boot의 문서 업로드 화면, 또는 미래의 다른 SI 프로젝트)이 호출하는 **공개 관리 API**이기 때문이다.
-- **RAG(검색·증강) — `rag.RagRetrievalChain`** (기존 `RagService`의 검색 부분, 이름·위치 유지): Embedding이 만들어 둔 벡터스토어 내용을 읽어서, AGENT 스텝의 Advisor(`ragEnabled: true`)나 `tools.rag.RagSearchTool`(TOOL 스텝)에 검색 결과를 제공하는 내부 로직.
+- **RAG(검색·증강) — `common.rag.RagRetrievalChain`** (기존 `RagService`의 검색 부분, `net.dstone.ai.rag` → `net.dstone.ai.common.rag`로 이동): Embedding이 만들어 둔 벡터스토어 내용을 읽어서, AGENT 스텝의 Advisor(`ragEnabled: true`)나 `tools.rag.RagSearchTool`(TOOL 스텝)에 검색 결과를 제공하는 내부 로직. `common` 아래로 옮기는 이유는 `AgentExecutor`/`RagSearchTool` 양쪽이 공유해서 쓰는 코어 컴포넌트라 `common.config`/`common.session` 같은 다른 코어 컴포넌트들과 같은 층위에 두는 게 맞기 때문.
 
 "체인"이라는 요구에 맞춰 각각을 파이프라인으로 명시한다.
 
@@ -361,7 +360,7 @@ SSE 예시(`mcp/internal-search.yml`)는 `transport: SSE`, `url: http://...` 형
 Source(File/JSONL) → DocumentReader(Tika | JsonlReader) → TokenTextSplitter(chunk-size) → tenant 메타데이터 태깅 → VectorStore.add()
 ```
 
-**RAG 검색 체인** (`RagRetrievalChain`, 신규 `rag.chain` 서브패키지로 분리, Spring AI 2.x `RetrievalAugmentationAdvisor` 기반):
+**RAG 검색 체인** (`RagRetrievalChain`, 신규 `common.rag.chain` 서브패키지로 분리, Spring AI 2.x `RetrievalAugmentationAdvisor` 기반):
 ```
 사용자 질의
   → QueryTransformer (선택, 대화맥락 압축 — CompressionQueryTransformer)
@@ -420,7 +419,7 @@ abstract class ExternalProcessTool {
 | `StepOutcome` | **대체** — `runtime.status.StepInput`/`StepOutput`/`StepResult`로 교체 (§2) |
 | `StepType.RAG` / `RagStepRunner` | **폐지** — Advisor(`ragEnabled`) 경로와 신규 `RagSearchTool`(TOOL 스텝)로 대체 (§1.1, §5) |
 | `AgentStepRunner`/`ToolStepRunner` | **`StepRunner` 인터페이스 구현으로 조정** (§2), 내부 로직 대부분 유지, `runtime.step`으로 이동 |
-| `RagService`/`RagController` | **분리+리네임** — ingest/delete는 `api.service.EmbedService`+`api.controller.EmbedController`(`/api/ai/embed/documents`)로, 검색은 `rag.RagRetrievalChain`으로 (§5) |
+| `RagService`/`RagController` | **분리+리네임** — ingest/delete는 `api.service.EmbedService`+`api.controller.EmbedController`(`/api/ai/embed/documents`)로, 검색은 `common.rag.RagRetrievalChain`으로 이동 (§5) |
 | `RagController.search()` | **삭제** — 아무도 호출하지 않는 중복 경로, Advisor/`RagSearchTool`로 흡수 (§5) |
 | `common.prompt`(`PromptTemplateRegistry`/`PromptProperties`), `resources/prompts/*.st` | **폐지** — `AgentDefinition.prompt` 필드에 인라인 (§4.0) |
 | `ConfigTool`, `ToolExecutor`, `AgentExecutor` | **유지** — MCP 툴도 같은 경로로 흡수되므로 변경 최소화 |
