@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -196,7 +197,13 @@ public class WorkFlowExecutor extends BaseObject {
 		StepInput input = new StepInput(this.previousText(execution), execution.variables());
 		Map<StepDefinition, CompletableFuture<StepOutput>> futures = new LinkedHashMap<>();
 		for (StepDefinition step : group) {
-			futures.put(step, CompletableFuture.supplyAsync(() -> this.runnerFor(step.type()).run(execution, step, input)));
+			final StepDefinition groupStep = step;
+			futures.put(step, CompletableFuture.supplyAsync(new Supplier<StepOutput>() {
+				@Override
+				public StepOutput get() {
+					return WorkFlowExecutor.this.runnerFor(groupStep.type()).run(execution, groupStep, input);
+				}
+			}));
 		}
 
 		boolean allSuccess = true;

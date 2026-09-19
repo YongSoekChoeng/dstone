@@ -10,6 +10,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -57,7 +58,7 @@ public class WorkFlowExecutionStore {
 
 	/** @param executionId 조회할 실행 id */
 	public WorkFlowExecution find(String executionId) {
-		List<WorkFlowExecution> found = this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION WHERE EXECUTION_ID = ?", this::mapExecution, executionId);
+		List<WorkFlowExecution> found = this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION WHERE EXECUTION_ID = ?", this.executionRowMapper(), executionId);
 		if (found.isEmpty()) {
 			throw new IllegalArgumentException("존재하지 않는 실행입니다: " + executionId);
 		}
@@ -93,7 +94,7 @@ public class WorkFlowExecutionStore {
 		sql.append(" ORDER BY CREATED_AT DESC LIMIT ? OFFSET ?");
 		args.add(size);
 		args.add(page * size);
-		return this.jdbcTemplate.query(sql.toString(), this::mapExecution, args.toArray());
+		return this.jdbcTemplate.query(sql.toString(), this.executionRowMapper(), args.toArray());
 	}
 
 	/**
@@ -109,7 +110,27 @@ public class WorkFlowExecutionStore {
 
 	/** @param executionId 이력을 조회할 실행 id */
 	public List<StepHistoryEntry> findHistory(String executionId) {
-		return this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION_STEP_HISTORY WHERE EXECUTION_ID = ? ORDER BY EXECUTED_AT ASC, ID ASC", this::mapHistoryEntry, executionId);
+		return this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION_STEP_HISTORY WHERE EXECUTION_ID = ? ORDER BY EXECUTED_AT ASC, ID ASC", this.historyRowMapper(), executionId);
+	}
+
+	/** find()/list()가 함께 쓰는 AI_WORKFLOW_EXECUTION 한 행 → WorkFlowExecution 매핑기. */
+	private RowMapper<WorkFlowExecution> executionRowMapper() {
+		return new RowMapper<WorkFlowExecution>() {
+			@Override
+			public WorkFlowExecution mapRow(ResultSet rs, int rowNum) throws SQLException {
+				return WorkFlowExecutionStore.this.mapExecution(rs, rowNum);
+			}
+		};
+	}
+
+	/** findHistory()가 쓰는 AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행 → StepHistoryEntry 매핑기. */
+	private RowMapper<StepHistoryEntry> historyRowMapper() {
+		return new RowMapper<StepHistoryEntry>() {
+			@Override
+			public StepHistoryEntry mapRow(ResultSet rs, int rowNum) throws SQLException {
+				return WorkFlowExecutionStore.this.mapHistoryEntry(rs, rowNum);
+			}
+		};
 	}
 
 	private WorkFlowExecution mapExecution(ResultSet rs, int rowNum) throws SQLException {

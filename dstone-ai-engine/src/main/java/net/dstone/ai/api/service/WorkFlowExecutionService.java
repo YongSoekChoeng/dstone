@@ -67,7 +67,12 @@ public class WorkFlowExecutionService extends BaseService {
 		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, initialInput);
 		this.executionStore.insert(execution);
 		// 기본 ForkJoinPool.commonPool()을 그대로 쓴다. 전용 스레드풀/큐잉/동시 실행 수 제한은 실제 운영에서 동시 submit이 많아지면 그때 도입한다.
-		CompletableFuture.runAsync(() -> this.workFlowExecutor.run(workflow, execution));
+		CompletableFuture.runAsync(new Runnable() {
+			@Override
+			public void run() {
+				WorkFlowExecutionService.this.workFlowExecutor.run(workflow, execution);
+			}
+		});
 		return execution.executionId();
 	}
 
@@ -144,7 +149,15 @@ public class WorkFlowExecutionService extends BaseService {
 	 */
 	@SuppressWarnings("unchecked")
 	private void recordDecision(WorkFlowExecution execution, String stepId, boolean approved, String approver, String comment) {
-		Map<String, Object> approvals = (Map<String, Object>) execution.variables().computeIfAbsent(Constants.WorkFlow.APPROVALS_VARIABLE_KEY, key -> new LinkedHashMap<String, Object>());
+		Map<String, Object> variables = execution.variables();
+		Object existingApprovals = variables.get(Constants.WorkFlow.APPROVALS_VARIABLE_KEY);
+		Map<String, Object> approvals;
+		if (existingApprovals instanceof Map) {
+			approvals = (Map<String, Object>) existingApprovals;
+		} else {
+			approvals = new LinkedHashMap<String, Object>();
+			variables.put(Constants.WorkFlow.APPROVALS_VARIABLE_KEY, approvals);
+		}
 		Map<String, Object> decision = new LinkedHashMap<>();
 		decision.put("approved", approved);
 		decision.put("approver", approver);

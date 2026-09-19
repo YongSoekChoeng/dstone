@@ -3,6 +3,7 @@ package net.dstone.ai.tools.http;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Function;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -10,7 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import reactor.core.publisher.Mono;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
@@ -52,9 +56,19 @@ public class HttpCallTool extends BaseObject {
 		try {
 			HttpOutcome outcome = webClient.get()
 				.uri(uri)
-				.exchangeToMono(response -> response.bodyToMono(String.class)
-					.defaultIfEmpty("")
-					.map(body -> this.toOutcome(response.statusCode().value(), response.statusCode().is2xxSuccessful(), body)))
+				.exchangeToMono(new Function<ClientResponse, Mono<HttpOutcome>>() {
+					@Override
+					public Mono<HttpOutcome> apply(final ClientResponse response) {
+						return response.bodyToMono(String.class)
+							.defaultIfEmpty("")
+							.map(new Function<String, HttpOutcome>() {
+								@Override
+								public HttpOutcome apply(String body) {
+									return HttpCallTool.this.toOutcome(response.statusCode().value(), response.statusCode().is2xxSuccessful(), body);
+								}
+							});
+					}
+				})
 				.block();
 			LogUtil.sysout("dstone-ai-engine tool-audit: http url=" + url + " -> HTTP " + outcome.statusCode());
 			return outcome.result();
@@ -79,7 +93,7 @@ public class HttpCallTool extends BaseObject {
 		return new HttpOutcome(statusCode, result);
 	}
 
-	/** exchangeToMono() 람다 밖에서 상태코드(로그용)와 최종 응답 문자열을 함께 꺼내기 위한 홀더. */
+	/** exchangeToMono() 콜백 밖에서 상태코드(로그용)와 최종 응답 문자열을 함께 꺼내기 위한 홀더. */
 	private record HttpOutcome(int statusCode, String result) {
 	}
 

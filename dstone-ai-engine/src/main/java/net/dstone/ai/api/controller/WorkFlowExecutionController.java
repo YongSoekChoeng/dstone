@@ -1,5 +1,6 @@
 package net.dstone.ai.api.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +48,11 @@ public class WorkFlowExecutionController extends BaseController {
 	public List<WorkFlowExecutionSummary> list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String caller,
 		@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
 		List<WorkFlowExecution> executions = this.workFlowExecutionService.list(status, workflowId, caller, page, size);
-		return executions.stream().map(WorkFlowExecutionSummary::from).toList();
+		List<WorkFlowExecutionSummary> summaries = new ArrayList<WorkFlowExecutionSummary>();
+		for (WorkFlowExecution execution : executions) {
+			summaries.add(WorkFlowExecutionSummary.from(execution));
+		}
+		return summaries;
 	}
 
 	/** @param executionId 상세를 조회할 실행 id */
