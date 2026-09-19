@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import net.dstone.ai.api.dto.WorkFlowDecisionRequest;
 import net.dstone.ai.api.dto.WorkFlowExecutionDetail;
 import net.dstone.ai.api.dto.WorkFlowExecutionSummary;
+import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
-import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionService;
 import net.dstone.common.biz.BaseController;
 
 /**

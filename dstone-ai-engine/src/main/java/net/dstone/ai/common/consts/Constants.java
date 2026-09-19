@@ -62,7 +62,7 @@ public final class Constants {
 
 	/** runtime.workflow.WorkFlowExecutor / runtime.workflow.execution.WorkFlowExecutionService. */
 	public static final class WorkFlow {
-		public final static int DEFAULT_MAX_ITERATIONS = 5;
+		public final static int DEFAULT_MAX_ITERATIONS = 10;
 		public final static String SUCCESS_SENTINEL = "SUCCESS";
 		public final static String FAIL_SENTINEL = "FAIL";
 		/** variables 안에서 "직전 스텝 결과 텍스트"를 담아두는 예약 키. 사용자가 넘기는 변수 이름과 겹치지 않도록 밑줄 2개로 시작한다. */

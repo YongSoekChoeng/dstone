@@ -17,9 +17,12 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Workflow 정보를 저장하는 컴퍼넌트. YamlDefinitionLoader => WorkFlowDefinition => WorkFlowRegistry 순서로 내용이 로딩된다.
- * classpath:workflows/*.yml 전체를 기동 시 한 번 읽어 id로 찾아주는 등록소다. api.controller.WorkFlowController가 이 레지스트리에서 바로
- * WorkFlowDefinition을 찾아 runtime.workflow.WorkFlowExecutor에 넘긴다.
+ * <pre>
+ * Workflow 정보를 저장하는 컴퍼넌트. 
+ * YamlDefinitionLoader => WorkFlowDefinition => WorkFlowRegistry 순서로 내용이 로딩된다.
+ * classpath:workflows/*.yml 전체를 기동 시 한 번 읽어 id로 찾아주는 저장소. 
+ * api.controller.WorkFlowController가 이 레지스트리에서 바로 WorkFlowDefinition을 찾아 runtime.workflow.WorkFlowExecutor에 넘긴다.
+ * </pre>
  */
 @Component
 public class WorkFlowRegistry extends BaseObject {

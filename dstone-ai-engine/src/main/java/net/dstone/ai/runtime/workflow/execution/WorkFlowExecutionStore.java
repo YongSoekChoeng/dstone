@@ -38,8 +38,11 @@ public class WorkFlowExecutionStore {
 	/** @param execution 새로 저장할 실행 상태 */
 	public void insert(WorkFlowExecution execution) {
 		this.jdbcTemplate.update(
-			"INSERT INTO AI_WORKFLOW_EXECUTION (EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, VARIABLES_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT) "
-				+ "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)",
+			"INSERT INTO AI_WORKFLOW_EXECUTION ("
+			+ "  EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, VARIABLES_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT "
+			+ ") VALUES ( "
+			+ "  ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ? "
+			+ ")",
 			execution.executionId(), execution.workflowId(), execution.caller(), execution.sessionId(), execution.status().name(), execution.currentStepIndex(), this.toJson(execution.variables()),
 			execution.resultText(), execution.errorMessage(), Timestamp.from(execution.createdAt()), Timestamp.from(execution.updatedAt()));
 	}

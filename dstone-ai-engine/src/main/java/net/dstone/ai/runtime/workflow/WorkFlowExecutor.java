@@ -55,54 +55,87 @@ public class WorkFlowExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * execution.currentStepIndex()부터 이어서 Workflow를 실행한다 - 새 실행이면 0부터, 승인 대기에서 재개하는 실행이면
-	 * 멈췄던 그 스텝부터 다시 실행된다. SUCCESS/FAIL/WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고 돌려준다.
+	 * 1. 기능 정의
+	 * - execution.currentStepIndex()부터 이어서 Workflow를 실행한다. 새 실행이면 0부터, 승인 대기에서 재개하는 실행이면 멈췄던 그 스텝부터 다시 실행된다. 
+	 *   SUCCESS/FAIL/WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고 돌려준다.
+	 * 
+	 * - YAML로 정의된 Workflow(steps 목록)를 처음부터 끝까지(또는 멈춰야 할 때까지) 한 스텝씩 실행하는 엔진으로 
+	 *   LOOP["지금 몇 번째 step인가?" → "그 step을 실행한다" → "성공/실패에 따라 다음 step 번호를 계산한다"]
+	 *   이 단순한 루프만으로 순차 실행 / 분기 / 병렬 실행 / 루프(재시도) 4가지 패턴을 전부 처리한다.
+	 *   
+	 * 2. 호출 시점
+	 * - 신규실행: 
+	 *          사용자가 POST /api/ai/workflow/{id}/execute(동기) 또는 /submit(비동기)을 호출 
+	 *          → WorkFlowExecution.start(...)로 currentStepIndex=0, status=RUNNING인 새 실행이 만들어지고 
+	 *          → run() 호출 
+	 * - 승인(APPROVAL)재개: 
+	 *          이전에 run()이 WAITING_APPROVAL 상태로 멈춰서 리턴한 실행 건에 대해, 나중에 사람이 승인/반려 결정을 내리면 
+	 *          → 그 결정이 variables.approvals.{stepId}에 기록된 뒤 
+	 *          → 같은 실행(같은 executionId, 같은 currentStepIndex) 을 가지고 run()이 다시 호출됨 
 	 * </pre>
 	 *
-	 * @param workflow  실행할 Workflow 정의
-	 * @param execution 지금 실행 상태(신규면 currentStepIndex=0, 재개면 멈췄던 스텝)
+	 * @param workflow  실행할 Workflow 정의. YAML에서 읽어온 설계도. steps 목록, maxIterations(반복 상한) 등을 담음.
+	 *                  WorkFlowExecution은 불변 객체(record). 
+	 *                  상태가 바뀔 때마다(advanceTo/done/failed/waitingApproval) 새 인스턴스를 만들어서 돌려주는 방식이라, 
+	 *                  "지금 이 실행이 어떤 상태였는지"를 어느 시점에 봐도 안전하게 추적할 수 있다. 
+	 *                  다만 variables 맵만은 예외적으로 같은 Map 인스턴스를 계속 공유해서, 스텝들이 값을 계속 누적해 넣을 수 있음.
+	 * @param execution 지금 진행 중인 실행 1건(신규면 currentStepIndex=0, 재개면 멈췄던 스텝)
 	 */
 	public WorkFlowExecution run(WorkFlowDefinition workflow, WorkFlowExecution execution) {
 		int maxIterations = workflow.maxIterations() == null ? Constants.WorkFlow.DEFAULT_MAX_ITERATIONS : workflow.maxIterations();
-		int currentIndex = execution.currentStepIndex();
+		int currentIndex = execution.currentStepIndex(); 
 		WorkFlowExecution current = execution;
 		int executed = 0;
 
 		while (true) {
+			
+			// 1) 실행 횟수 체크 → maxIterations 초과 시 FAILED로 종료
 			if (++executed > maxIterations) {
 				return this.persistFailed(current, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
 			}
 
+			// 2) 지금 step 번호(currentIndex)로 StepDefinition 조회
 			StepDefinition step = workflow.steps().get(currentIndex);
+			
+			// 3) 같은 parallelGroup을 가진 인접 step이 있으면 묶어서 "그룹"으로 취급
 			List<StepDefinition> group = this.parallelGroupOf(workflow.steps(), step);
 
+			// 4) 핵심로직(Run)수행. 그룹 크기가 1이면 runOne(), 2개 이상이면 runGroup() 실행 
 			GroupResult groupResult;
 			try {
 				groupResult = group.size() > 1 ? this.runGroup(group, current) : this.runOne(step, current);
 			} catch (Exception e) {
+				// 실행 중 예외 발생 → 그 자리에서 FAILED로 종료
 				return this.persistFailed(current, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
 			}
 
+			// 5) 결과가 PENDING(APPROVAL 대기)이면
 			if (groupResult.pending()) {
+				// WAITING_APPROVAL 상태로 저장하고 즉시 리턴 (루프 탈출)
 				current = current.waitingApproval(currentIndex);
 				this.executionStore.update(current);
 				return current;
 			}
 
+			// 6) 결과 데이터를 variables에 병합, 결과 텍스트를 "__previous"에 저장
 			this.mergeVariables(current.variables(), groupResult.mergedData());
 			current.variables().put(Constants.WorkFlow.PREVIOUS_TEXT_VARIABLE_KEY, groupResult.combinedText());
 
+			// 7) decideTransition()으로 다음 행동 결정
 			StepDefinition lastOfGroup = group.get(group.size() - 1);
 			StepFlow transition = this.decideTransition(workflow, lastOfGroup, groupResult.success(), groupResult.combinedText());
 
 			switch (transition.status()) {
+				// SUCCESS → DONE으로 저장하고 리턴 (루프 탈출)
 				case SUCCESS:
 					current = current.done(transition.message());
 					this.executionStore.update(current);
 					return current;
+				// FAIL    → FAILED로 저장하고 리턴 (루프 탈출)	
 				case FAIL:
 					return this.persistFailed(current, transition.message());
 				case NEXT_STEP:
+				// LOOP → currentIndex 갱신, RUNNING으로 저장, 루프 계속	
 				case LOOP:
 					currentIndex = this.indexOf(workflow.steps(), transition.nextStepId());
 					current = current.advanceTo(currentIndex);

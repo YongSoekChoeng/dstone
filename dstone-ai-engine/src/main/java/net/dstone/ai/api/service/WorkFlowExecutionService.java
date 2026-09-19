@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.workflow.execution;
+package net.dstone.ai.api.service;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +14,9 @@ import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.runtime.status.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
+import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.biz.BaseService;
 
 /**
@@ -63,8 +66,7 @@ public class WorkFlowExecutionService extends BaseService {
 	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
 		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, initialInput);
 		this.executionStore.insert(execution);
-		// ⚠️ MVP 수준 구현 - 기본 ForkJoinPool.commonPool()을 그대로 쓴다. 전용 스레드풀/큐잉/동시 실행 수
-		// 제한은 실제 운영에서 동시 submit이 많아지면 그때 도입한다.
+		// 기본 ForkJoinPool.commonPool()을 그대로 쓴다. 전용 스레드풀/큐잉/동시 실행 수 제한은 실제 운영에서 동시 submit이 많아지면 그때 도입한다.
 		CompletableFuture.runAsync(() -> this.workFlowExecutor.run(workflow, execution));
 		return execution.executionId();
 	}
@@ -90,12 +92,17 @@ public class WorkFlowExecutionService extends BaseService {
 		return this.workFlowExecutor.run(workflow, execution);
 	}
 
-	/** @param executionId 조회할 실행 id */
+	/**
+	 * executionId 에 해당하는 WorkFlowExecution 조회
+	 * @param executionId executionId 조회할 실행 id
+	 * @return
+	 */
 	public WorkFlowExecution find(String executionId) {
 		return this.executionStore.find(executionId);
 	}
 
 	/**
+	 * WorkFlowExecution 목록조회
 	 * @param status     상태로 좁히고 싶을 때(없으면 전체)
 	 * @param workflowId 특정 workflow로 좁히고 싶을 때(없으면 전체)
 	 * @param caller     특정 호출 주체로 좁히고 싶을 때(없으면 전체)
@@ -106,7 +113,11 @@ public class WorkFlowExecutionService extends BaseService {
 		return this.executionStore.list(status, workflowId, caller, page, size);
 	}
 
-	/** @param executionId 이력을 조회할 실행 id */
+	/**
+	 * executionId 에 해당하는 이력을 조회
+	 * @param executionId 이력을 조회할 실행 id
+	 * @return
+	 */
 	public List<StepHistoryEntry> history(String executionId) {
 		return this.executionStore.findHistory(executionId);
 	}

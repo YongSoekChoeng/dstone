@@ -6,12 +6,14 @@ import java.util.Map;
 import net.dstone.ai.runtime.status.WorkFlowExecutionStatus;
 
 /**
- * Workflow 실행 1건의 현재 상태다. AI_WORKFLOW_EXECUTION 테이블 한 행과 그대로 대응되고,
- * WorkFlowExecutionStore가 이 상태를 읽고 쓴다.
+ * <pre>
+ * Workflow 실행 1건의 현재 상태다. 
+ * AI_WORKFLOW_EXECUTION 테이블 한 행과 그대로 대응되고, WorkFlowExecutionStore가 이 상태를 읽고 쓴다.
  *
- * variables는 매 스텝마다 값이 채워지는 살아있는 Map이다 - 상태가 바뀔 때마다(advanceTo/done/failed/
- * waitingApproval) 새 WorkFlowExecution을 만들어 돌려주지만, variables는 항상 같은 Map 인스턴스를
- * 그대로 넘겨서 참조를 공유한다(WorkFlowExecutor가 스텝 결과를 이 Map에 계속 누적해 넣는다).
+ * variables는 매 스텝마다 값이 채워지는 살아있는 Map이다. 상태가 바뀔 때마다(advanceTo/done/failed/ waitingApproval) 새 WorkFlowExecution을 만들어 돌려주지만
+ * variables는 항상 같은 Map 인스턴스를 그대로 넘겨서 참조를 공유한다(WorkFlowExecutor가 스텝 결과를 이 Map에 계속 누적해 넣는다).
+ * 
+ * </pre>
  *
  * @param executionId     실행 식별자(UUID)
  * @param workflowId      실행한 Workflow의 id
@@ -55,22 +57,50 @@ public record WorkFlowExecution(
 		return new WorkFlowExecution(executionId, workflowId, caller, sessionId, WorkFlowExecutionStatus.RUNNING, 0, variables, null, null, now, now);
 	}
 
-	/** @param stepIndex 다음으로 실행할 스텝의 순번 */
+	/**
+	 * <pre>
+	 * 다음 실행을 시작할 때 쓰는 상태
+	 * </pre>
+	 *
+	 * @param stepIndex 다음으로 실행할 스텝의 순번 
+	 * @return
+	 */
 	public WorkFlowExecution advanceTo(int stepIndex) {
 		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.variables, this.resultText, this.errorMessage, this.createdAt, Instant.now());
 	}
 
-	/** @param resultText 최종 성공 결과 */
+	/**
+	 * <pre>
+	 * 최종 성공 상태
+	 * </pre>
+	 *
+	 * @param resultText 최종 성공 결과
+	 * @return
+	 */
 	public WorkFlowExecution done(String resultText) {
 		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.DONE, this.currentStepIndex, this.variables, resultText, null, this.createdAt, Instant.now());
 	}
 
-	/** @param errorMessage 실패/에러 사유 */
+	/**
+	 * <pre>
+	 * 최종 실패 상태
+	 * </pre>
+	 *
+	 * @param errorMessage 실패/에러 사유
+	 * @return
+	 */
 	public WorkFlowExecution failed(String errorMessage) {
 		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.FAILED, this.currentStepIndex, this.variables, this.resultText, errorMessage, this.createdAt, Instant.now());
 	}
 
-	/** @param stepIndex 승인 대기 중인 APPROVAL 스텝의 순번 */
+	/**
+	 * <pre>
+	 * 승인 대기 상태
+	 * </pre>
+	 *
+	 * @param stepIndex 승인 대기 중인 APPROVAL 스텝의 순번
+	 * @return
+	 */
 	public WorkFlowExecution waitingApproval(int stepIndex) {
 		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.WAITING_APPROVAL, stepIndex, this.variables, this.resultText, this.errorMessage, this.createdAt, Instant.now());
 	}
