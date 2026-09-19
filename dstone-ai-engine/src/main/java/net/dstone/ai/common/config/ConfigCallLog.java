@@ -74,7 +74,7 @@ public class ConfigCallLog extends BaseObject {
 	 * @return
 	 * @throws Throwable
 	 */
-	@Around("execution(* net.dstone.ai.*..*Service*.*(..))" + " && !" + NO_LOG_REGEX)
+	@Around("execution(* net.dstone.ai.api.*..*Service*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.info("+--->[SERVICE ] {" + signatureLog(joinPoint) + "}");
 		return joinPoint.proceed();
@@ -143,12 +143,6 @@ public class ConfigCallLog extends BaseObject {
 		return retObj;
 	}
 
-	/** Step IN/OUT 전용 로거 - net.dstone.ai 하위라 log4j2.xml의 net.dstone.ai Logger 설정(콘솔+execution.log)을 그대로 물려받는다. */
-	private static final Logger STEP_AUDIT_LOG = LogManager.getLogger("net.dstone.ai.workflow.audit");
-
-	/** 로그 한 줄에 담는 입력/출력 텍스트의 최대 길이 - 이보다 길면 잘라서 "...(생략)"을 붙인다. */
-	private static final int STEP_AUDIT_MAX_CHARS = 500;
-
 	/**
 	 * <pre>
 	 * StepRunner.run(execution, definition, input) 전용 로깅. 
@@ -165,40 +159,56 @@ public class ConfigCallLog extends BaseObject {
 	 * @throws Throwable
 	 */
 	@Around("execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
-	public Object doStepAuditLog(ProceedingJoinPoint joinPoint) throws Throwable {
+	public Object doStepAuditLog(ProceedingJoinPoint joinPoint) throws Throwable{
+		StepOutput output = null;
+		StringBuffer log = new StringBuffer();
+		String identity = "";
 		WorkFlowExecution execution = (WorkFlowExecution) joinPoint.getArgs()[0];
 		StepDefinition step = (StepDefinition) joinPoint.getArgs()[1];
-		StepInput input = (StepInput) joinPoint.getArgs()[2];
-
-		STEP_AUDIT_LOG.info("\n" + SAPERATE_LINE+"WF_STEP phase=START executionId={} workflowId={} stepId={} stepType={} ref={} input=\"{}\""+SAPERATE_LINE+"\n",
-			execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), this.truncate(input.renderedText())+"\n");
-
-		long start = System.nanoTime();
-		try {
-			StepOutput output = (StepOutput) joinPoint.proceed();
-			long durationMs = (System.nanoTime() - start) / 1_000_000;
-			if (output.failureReason() != null) {
-				STEP_AUDIT_LOG.info("\n"+SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} failureReason=\"{}\""+SAPERATE_LINE+"\n",
-					execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), output.result(), durationMs, this.truncate(output.failureReason()));
-			} else {
-				STEP_AUDIT_LOG.info("\n"+SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result={} durationMs={} output=\"{}\""+SAPERATE_LINE+"\n",
-					execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), output.result(), durationMs, this.truncate(output.primaryText()));
-			}
-			return output;
-		} catch (Throwable e) {
-			long durationMs = (System.nanoTime() - start) / 1_000_000;
-			STEP_AUDIT_LOG.info("\n"+SAPERATE_LINE+"WF_STEP phase=END   executionId={} workflowId={} stepId={} stepType={} ref={} result=ERROR durationMs={} error=\"{}\""+SAPERATE_LINE+"\n",
-				execution.executionId(), execution.workflowId(), step.id(), step.type(), step.ref(), durationMs, e.getMessage());
-			throw e;
-		}
+		StepInput input = (StepInput) joinPoint.getArgs()[2];		
+		identity = "StepRunner.run([workflowId="+execution.workflowId()+" step="+step.id()+"])";
+		
+		log.append("\n");
+		log.append(SAPERATE_LINE_FRONT+"[Runtime - "+identity+"] Start"+SAPERATE_LINE_END);
+		log.append("executionId={"+execution.executionId()+"}");
+		log.append(", workflowId={"+execution.workflowId()+"}");
+		log.append(", stepId={"+step.id()+"}");
+		log.append(", stepType={"+step.type()+"}");
+		log.append(", ref={"+step.ref()+"}");
+		log.append(", input={"+this.truncate(input.renderedText())+"}");
+		log.append(SAPERATE_LINE);
+		this.info(log.toString());
+		
+		output = (StepOutput) joinPoint.proceed();
+		
+		log.setLength(0);
+		log.append("\n");
+		log.append(SAPERATE_LINE_FRONT+"[Runtime - "+identity+"] End"+SAPERATE_LINE_END);
+		log.append("executionId={"+execution.executionId()+"}");
+		log.append(", workflowId={"+execution.workflowId()+"}");
+		log.append(", stepId={"+step.id()+"}");
+		log.append(", stepType={"+step.type()+"}");
+		log.append(", ref={"+step.ref()+"}");
+		log.append(", result={"+output.result()+"}");
+		log.append(", output={"+this.truncate(output.primaryText())+"}");
+		log.append(SAPERATE_LINE);
+		this.info(log.toString());
+		
+		return output;
+		
+		
 	}
 
-	/** @param text 로그 한 줄 길이를 넘지 않도록 자를 텍스트 */
+	/** 
+	 * @param text 로그 한 줄로 보여줄 텍스트 
+	 */
 	private String truncate(String text) {
 		if (text == null) {
 			return "";
 		}
-		return text.length() > STEP_AUDIT_MAX_CHARS ? text.substring(0, STEP_AUDIT_MAX_CHARS) + "...(생략)" : text;
+		text = StringUtil.replace(text, "\r\n", "");
+		text = StringUtil.replace(text, "\n", "");
+		return text;
 	}
 
 	/**
