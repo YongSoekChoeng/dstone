@@ -43,6 +43,7 @@ public class WorkFlowRegistry extends BaseObject {
 				throw new IllegalStateException("workflow id가 중복 등록되었습니다: " + definition.id());
 			}
 			this.validateApprovalStepsNotParallel(definition);
+			this.validateParallelGroups(definition);
 		}
 		this.byId = Map.copyOf(resolved);
 		LogUtil.sysout("dstone-ai-engine workflow: 등록된 Workflow = " + (this.byId.isEmpty() ? "없음" : this.byId.keySet()));
@@ -60,6 +61,73 @@ public class WorkFlowRegistry extends BaseObject {
 		for (StepDefinition step : definition.steps()) {
 			if (step.type() == StepType.APPROVAL && !StringUtil.isEmpty(step.parallelGroup())) {
 				throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + step.id() + "]: APPROVAL 스텝은 parallelGroup을 가질 수 없습니다.");
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * parallelGroup(병렬로 묶어서 실행할 스텝들)을 쓸 때 꼭 지켜야 하는 규칙 두 가지를 기동 시점에 미리 확인한다.
+	 *
+	 * 왜 이 검사가 필요하냐면, WorkFlowExecutor가 병렬 그룹 하나를 다 실행하고 나서 "그 다음에 어디로 갈까?"를
+	 * 정할 때 그룹 안의 스텝 전부를 보는 게 아니라 딱 하나, steps 목록에서 제일 뒤에 적힌(=마지막) 스텝의
+	 * onSuccess/onFailure만 보고 정하기 때문이다. 그래서:
+	 *
+	 * 규칙 1) 같은 parallelGroup 값을 가진 스텝들은 steps 목록에서 서로 붙어 있어야 한다.
+	 *         중간에 다른 스텝이 하나라도 끼어 있으면, "그룹 다음 스텝을 찾는 계산"이 엉뚱한 스텝을
+	 *         가리키게 될 수 있다.
+	 *
+	 * 규칙 2) onSuccess/onFailure는 그 그룹의 "제일 마지막 스텝"에만 적어야 한다.
+	 *         마지막이 아닌 스텝에 적어봤자 실행 시점에 조용히 무시되기만 하고 아무 효과가 없으므로,
+	 *         혼란을 막기 위해 애초에 YAML 작성 단계에서부터 못 적게 막는다.
+	 *
+	 * 두 규칙 모두 어기면 Workflow를 실행해봐야 뒤늦게 이상하게 동작하므로, 서버가 뜨는 시점에 바로
+	 * 에러를 내서 YAML을 고치도록 유도한다.
+	 * </pre>
+	 *
+	 * @param definition 검증할 workflow 정의
+	 */
+	private void validateParallelGroups(WorkFlowDefinition definition) {
+		List<StepDefinition> steps = definition.steps();
+
+		// 그룹 이름(parallelGroup 값)별로 "steps 목록에서 처음 나온 위치", "마지막으로 나온 위치", "몇 번 나왔는지"를 센다.
+		Map<String, Integer> firstIndexByGroup = new HashMap<>();
+		Map<String, Integer> lastIndexByGroup = new HashMap<>();
+		Map<String, Integer> countByGroup = new HashMap<>();
+		for (int i = 0; i < steps.size(); i++) {
+			String group = steps.get(i).parallelGroup();
+			if (StringUtil.isEmpty(group)) {
+				continue;
+			}
+			if (!firstIndexByGroup.containsKey(group)) {
+				firstIndexByGroup.put(group, i);
+			}
+			lastIndexByGroup.put(group, i);
+			Integer countSoFar = countByGroup.get(group);
+			countByGroup.put(group, countSoFar == null ? 1 : countSoFar + 1);
+		}
+
+		for (Map.Entry<String, Integer> entry : lastIndexByGroup.entrySet()) {
+			String group = entry.getKey();
+			int firstIndex = firstIndexByGroup.get(group);
+			int lastIndex = entry.getValue();
+			int count = countByGroup.get(group);
+
+			// 규칙 1 검사: 만약 이 그룹이 정말로 붙어 있다면, firstIndex부터 lastIndex까지의 칸 수(lastIndex - firstIndex + 1)와
+			// 실제로 이 그룹인 스텝 개수(count)가 정확히 같아야 한다. 둘이 다르다면 그 사이에 남의 스텝이 끼어 있다는 뜻이다.
+			if (lastIndex - firstIndex + 1 != count) {
+				throw new IllegalStateException("workflow[" + definition.id() + "]의 parallelGroup[" + group
+					+ "]: 같은 그룹의 스텝들은 steps 목록에서 서로 붙어 있어야 합니다(중간에 다른 그룹/스텝이 끼어 있습니다).");
+			}
+
+			// 규칙 2 검사: 마지막 스텝(lastIndex)을 뺀 나머지 멤버(firstIndex ~ lastIndex-1)는 onSuccess/onFailure를 적으면 안 된다.
+			for (int i = firstIndex; i < lastIndex; i++) {
+				StepDefinition notLastMember = steps.get(i);
+				if (!StringUtil.isEmpty(notLastMember.onSuccess()) || !StringUtil.isEmpty(notLastMember.onFailure())) {
+					throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + notLastMember.id() + "]: parallelGroup[" + group
+						+ "]의 마지막 스텝이 아니라서 여기 적은 onSuccess/onFailure는 무시됩니다. 그룹이 끝난 뒤 진행할 경로는 이 그룹의 마지막 스텝인 ["
+						+ steps.get(lastIndex).id() + "]에 적어주세요.");
+				}
 			}
 		}
 	}
