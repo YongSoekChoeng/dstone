@@ -321,3 +321,15 @@ if (step.type() == StepType.APPROVAL && !StringUtil.isEmpty(step.parallelGroup()
 - YAML을 그렇게 작성하는 순간 서버 기동 시 `IllegalStateException`으로 즉시 실패합니다.
 
 즉 "parallelGroup 안에 APPROVAL이 껴서 대기 상태가 되는" 시나리오는 지금 코드에서 **문법적으로 아예 등록조차 안 되도록** 막혀 있어서, 걱정하신 문제는 발생하지 않습니다.
+
+---
+
+## 질문
+
+응 알았어
+
+---
+
+## 답변
+
+네, 알겠습니다. 추가로 확인하거나 진행할 게 있으면 말씀해주세요.
