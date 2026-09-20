@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,11 +21,14 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.api.dto.DocumentSourceSummary;
 import net.dstone.ai.api.dto.IngestResponse;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.biz.BaseService;
@@ -44,6 +49,8 @@ public class EmbedService extends BaseService {
 	private ObjectProvider<VectorStore> vectorStoreProvider;
 	@Autowired
 	private ConfigProperty configProperty;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
 
 	/**
 	 * <pre>
@@ -135,6 +142,45 @@ public class EmbedService extends BaseService {
 	public void deleteBySourceId(String sourceId, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
 		vectorStore.delete(this.buildFilter(caller, sourceId));
+	}
+
+	/**
+	 * <pre>
+	 * 지금 vector_store에 어떤 sourceId들이(몇 청크씩, 어떤 tenant로) 적재돼 있는지 조회한다. VectorStore
+	 * 인터페이스 자체에는 "메타데이터 기준 집계 조회"가 없어서, pgvector 테이블을 JdbcTemplate으로 직접
+	 * 조회한다(runtime.workflow.execution.WorkFlowExecutionStore와 동일하게 이 모듈은 MyBatis를 쓰지 않는다).
+	 * 테이블명은 하드코딩하지 않고 spring.ai.vectorstore.pgvector.table-name 설정에서 읽는다 - 다만 그
+	 * 값을 SQL 문자열에 그대로 이어붙여야 하므로(JdbcTemplate은 테이블명을 바인드 파라미터로 못 받는다),
+	 * validateTableName()으로 영숫자/밑줄만 허용해 방어한다.
+	 * </pre>
+	 *
+	 * @param caller 호출한 앱/서비스 식별자(tenant). 있으면 이 tenant로 태깅된 문서만 돌려준다
+	 */
+	public List<DocumentSourceSummary> listSources(String caller) {
+		this.requireVectorStore();
+		String table = this.validateTableName(this.vectorStoreTableName());
+		String sql = "SELECT metadata->>'" + Constants.Rag.SOURCE_ID_METADATA_KEY + "' AS source_id, metadata->>'" + Constants.Rag.TENANT_METADATA_KEY + "' AS tenant, COUNT(*) AS chunk_count FROM "
+			+ table + (StringUtil.isEmpty(caller) ? "" : " WHERE metadata->>'" + Constants.Rag.TENANT_METADATA_KEY + "' = ?") + " GROUP BY 1, 2 ORDER BY 1";
+		RowMapper<DocumentSourceSummary> rowMapper = new RowMapper<DocumentSourceSummary>() {
+			@Override
+			public DocumentSourceSummary mapRow(ResultSet rs, int rowNum) throws SQLException {
+				return new DocumentSourceSummary(rs.getString("source_id"), rs.getString("tenant"), rs.getLong("chunk_count"));
+			}
+		};
+		return StringUtil.isEmpty(caller) ? this.jdbcTemplate.query(sql, rowMapper) : this.jdbcTemplate.query(sql, rowMapper, caller);
+	}
+
+	private String vectorStoreTableName() {
+		String table = this.configProperty.getProperty("spring.ai.vectorstore.pgvector.table-name");
+		return StringUtil.isEmpty(table) ? "vector_store" : table;
+	}
+
+	/** @param table SQL 문자열에 직접 이어붙이기 전에 영숫자/밑줄만으로 이뤄져 있는지 검증할 테이블명 */
+	private String validateTableName(String table) {
+		if (!table.matches("[A-Za-z0-9_]+")) {
+			throw new IllegalStateException("spring.ai.vectorstore.pgvector.table-name 설정값이 올바르지 않습니다: " + table);
+		}
+		return table;
 	}
 
 	private boolean isJsonlSource(Resource resource) {

@@ -371,7 +371,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
 즉 "Tool 호출 체인에 caller를 실어 보낸다"는 §11-3의 해법이 실제로 이 프로젝트가 쓰는 Spring AI 버전에서
 그대로 가능합니다(추가 라이브러리 불필요).
 
-### 13.1 [§11-1] 검색 미리보기 API 신설
+### 13.1 [§11-1] 검색 미리보기 API 신설 — ✅ 완료(2026-09-20, 코드 변경/컴파일 완료, 라이브 검증 대기)
 
 - **무엇을**: `RagRetrievalChain.search()`를 직접 호출하는 REST 엔드포인트를 새로 연다.
 - **어디에**: 새 컨트롤러 `api.controller.RagController` (`@RequestMapping("/api/ai/rag")`) →
@@ -383,7 +383,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
 - **리스크**: 낮음. 기존 `search()`를 그대로 노출만 하는 얇은 컨트롤러라 `RagRetrievalChain` 변경이
   필요 없다.
 
-### 13.2 [§11-2] 적재 문서 목록 조회 API
+### 13.2 [§11-2] 적재 문서 목록 조회 API — ✅ 완료(2026-09-20, 코드 변경/컴파일 완료, 라이브 검증 대기)
 
 - **무엇을**: 지금 `vector_store`에 어떤 `sourceId`들이(몇 청크씩, 어떤 tenant로) 적재돼 있는지 보는
   `GET /api/ai/embed/documents` 신설.
@@ -397,7 +397,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
   것이므로, Spring AI의 `PgVectorStore` 내부 스키마가 버전업 때 바뀌면 같이 깨질 수 있다는 점을 주석으로
   남겨둔다.
 
-### 13.3 [§11-3] `RagSearchTool` tenant 격리
+### 13.3 [§11-3] `RagSearchTool` tenant 격리 — ✅ 완료(2026-09-20, 코드 변경/컴파일 완료, 라이브 검증 대기)
 
 - **무엇을**: AGENT 경로처럼 TOOL 경로에도 caller를 실어서 `RagSearchTool.searchDocuments()`가
   `ragRetrievalChain.search(request, caller)`를 `null` 대신 실제 caller로 호출하게 만든다.
@@ -417,7 +417,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
   다른 `@AiTool`(Shell/Python/HTTP 등)도 `ToolContext` 파라미터를 원하면 같은 방식으로 caller를 받을 수
   있게 되는 부수 효과가 있다(원치 않는 Tool은 그냥 파라미터를 안 받으면 그만이라 강제되지 않음).
 
-### 13.4 [§11-4] 임의 메타데이터 필터
+### 13.4 [§11-4] 임의 메타데이터 필터 — ⏸ 보류(2026-09-20 시점 미착수 - 아래 사유 참고)
 
 - **무엇을**: tenant/sourceId 2개로 고정된 `buildFilter()`를 일반화한다.
 - **어디에**: `RagSearchRequest`에 `Map<String, String> metadataFilters`(nullable) 추가 → `RagRetrievalChain.
@@ -453,7 +453,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
   청킹 자체를 안 탐)이 주력이 될 것이므로, 이 개선의 체감 효과는 §13.7(JSONL 일반화) 이후 "비정형 문서도
   같이 쓰기 시작할 때" 체감된다.
 
-### 13.7 [§11-7] JSONL 전용 포맷 일반화
+### 13.7 [§11-7] JSONL 전용 포맷 일반화 — ⏸ 보류(2026-09-20 시점 미착수 - 아래 사유 참고)
 
 - **무엇을**: `EmbedService.readJsonlAsDocuments()`에 하드코딩된 `instruction/input/output/notes` 필드와
   `[오라클 쿼리]/[PostgreSQL 변환 결과]/[설명/주의사항]` 라벨을 도메인 무관하게 만든다.
@@ -466,7 +466,22 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
   워크플로우 하나만 쓰는 상황에서는 시급하지 않다 - 두 번째 RAG 활용 사례(다른 도메인)가 생기는 시점에
   맞춰 착수하는 편이 과설계를 피할 수 있다.
 
-### 13.8 [§11-8] 실제 지식베이스 시딩 (최우선 · 코드 변경 없음)
+### 13.8 [§11-8] 실제 지식베이스 시딩 (최우선 · 코드 변경 없음) — ✅ 데이터 작성 완료, 적재는 대기
+
+`docs/data/oracle-to-postgresql-rag-seed.jsonl`에 §5.2 규칙을 거의 전부 커버하는 24건(NVL/NVL2/DECODE/
+LISTAGG/MINUS, `(+)` 양방향 아우터조인, ROWNUM 페이징 2패턴 + ROW_NUMBER 이미 쓰는 경우(변환 불필요
+사례), START WITH/CONNECT BY, NEXTVAL, SYSDATE 날짜연산, ROWID/TO_DATE RR/빈문자열-NULL/식별자
+대소문자(각각 한계를 NOTE 주석으로 남기는 사례), DUAL, ADD_MONTHS/MONTHS_BETWEEN, TRUNC(date), DDL
+데이터타입, DATE→TIMESTAMP 매핑, 변환 불필요 사례 2건)을 작성해 `python3 -c "json.loads(...)"`로 24줄
+전부 파싱 가능함을 확인했다. **아직 실제로 적재(`POST /api/ai/embed/documents`)하지는 않았다** - 이
+세션에는 인프라(Postgres+pgvector, Ollama)가 떠 있지 않아 실행할 수 없었다. 인프라가 뜬 뒤 아래 명령으로
+적재한다:
+
+```bash
+curl -X POST http://localhost:8081/api/ai/embed/documents \
+  -F "file=@docs/data/oracle-to-postgresql-rag-seed.jsonl" \
+  -F "sourceId=oracle-to-postgresql-kb-v1"
+```
 
 - **무엇을**: `sql-conversion-agent.yml`의 SQL 변환 규칙(24개 함수/JOIN/ROWNUM/계층형쿼리/날짜형변환 등)을
   근거로 실제 Oracle→PostgreSQL 변환 사례를 JSONL로 만들어 시딩한다.
@@ -478,7 +493,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
   3. §13.1의 검색 미리보기 API(있으면)로 실제 검색이 되는지 확인, 없으면 `RagSearchTool`을 통해 임시 확인.
 - **코드 변경 불필요** - 이미 있는 파이프라인만으로 되는 작업이라 가장 먼저, 가장 빠르게 효과를 볼 수 있다.
 
-### 13.9 [§11-9] Agent 설정-프롬프트 불일치 정리
+### 13.9 [§11-9] Agent 설정-프롬프트 불일치 정리 — ✅ 완료(2026-09-20)
 
 - **무엇을**: `sql-conversion-agent`를 `ragEnabled: true`로 켠다(§13.8로 실제 지식베이스가 생긴 뒤).
 - **왜 "끄기"가 아니라 "켜기"인가**: 프롬프트에 이미 `[참고자료]` 처리 지시문이 정교하게 쓰여 있고(무관하면
@@ -499,7 +514,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
 - 이 문서(`docs/temp/dstone-ai-engine-rag.md`) 자체도 §13 항목들이 실제로 구현되면 "완료" 표시를 남겨서
   계획 문서에서 실행 기록으로 갱신한다.
 
-### 13.11 [§11-11] 프롬프트 템플릿 전역 고정 해소
+### 13.11 [§11-11] 프롬프트 템플릿 전역 고정 해소 — ⏸ 보류(2026-09-20 시점 미착수 - 아래 사유 참고)
 
 - **무엇을**: `RagRetrievalChain.CONTEXT_PROMPT_TEMPLATE`(`static final`, 한국어 `[참고자료]` 라벨 고정)을
   Agent별로 override 가능하게 만든다 - §5.3에서 이미 만든 `ragTopK`/`ragSimilarityThreshold`/
@@ -513,20 +528,32 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
 
 ### 13.12 우선순위 로드맵 요약
 
-| 단계 | 항목 | 우선순위 | 코드 변경 규모 | 선행조건 |
-|---|---|---|---|---|
-| 1 | §13.8 실 지식베이스 시딩 | **최우선** | 없음(데이터 작업만) | - |
-| 1 | §13.9 `sql-conversion-agent` ragEnabled 정리 | **최우선** | 매우 작음(YAML 1줄 + topK 등 튜닝) | §13.8 |
-| 2 | §13.3 `RagSearchTool` tenant 격리 | 높음(보안) | 작음 | §13.0 스파이크(완료) |
-| 3 | §13.1 검색 미리보기 API | 중간(운영 편의) | 작음 | - |
-| 3 | §13.2 적재 목록 조회 API | 중간(운영 편의) | 중간 | - |
-| 4 | §13.4 임의 메타데이터 필터 | 중간(확장성) | 중간 | - |
-| 4 | §13.11 프롬프트 템플릿 override | 낮음(확장성) | 작음 | - |
-| 4 | §13.7 JSONL 포맷 일반화 | 중간(재사용성) | 중간~큼 | 두 번째 RAG 활용 사례 등장 시 |
-| 5 | §13.6 청킹 개선 | 낮음 | 작음 | 비정형 문서 사용 시작 시 |
-| 5 | §13.5 재랭킹/하이브리드 검색 | 낮음(장기) | 큼 | §13.8로 품질 실측 후 |
-| 각 단계 후 | §13.10 문서 정합성 복구 | - | 문서만 | 해당 단계 완료 시마다 |
+| 단계 | 항목 | 우선순위 | 코드 변경 규모 | 선행조건 | 상태(2026-09-20) |
+|---|---|---|---|---|---|
+| 1 | §13.8 실 지식베이스 시딩 | **최우선** | 없음(데이터 작업만) | - | ✅ 데이터 작성 완료 / 적재는 인프라 필요 |
+| 1 | §13.9 `sql-conversion-agent` ragEnabled 정리 | **최우선** | 매우 작음(YAML 1줄 + topK 등 튜닝) | §13.8 | ✅ 완료 |
+| 2 | §13.3 `RagSearchTool` tenant 격리 | 높음(보안) | 작음 | §13.0 스파이크(완료) | ✅ 완료(컴파일 검증) |
+| 3 | §13.1 검색 미리보기 API | 중간(운영 편의) | 작음 | - | ✅ 완료(컴파일 검증) |
+| 3 | §13.2 적재 목록 조회 API | 중간(운영 편의) | 중간 | - | ✅ 완료(컴파일 검증) |
+| 4 | §13.4 임의 메타데이터 필터 | 중간(확장성) | 중간 | - | ⏸ 보류 |
+| 4 | §13.11 프롬프트 템플릿 override | 낮음(확장성) | 작음 | - | ⏸ 보류 |
+| 4 | §13.7 JSONL 포맷 일반화 | 중간(재사용성) | 중간~큼 | 두 번째 RAG 활용 사례 등장 시 | ⏸ 보류(트리거 미충족) |
+| 5 | §13.6 청킹 개선 | 낮음 | 작음 | 비정형 문서 사용 시작 시 | ⏸ 보류(트리거 미충족) |
+| 5 | §13.5 재랭킹/하이브리드 검색 | 낮음(장기) | 큼 | §13.8로 품질 실측 후 | ⏸ 보류(트리거 미충족) |
+| 각 단계 후 | §13.10 문서 정합성 복구 | - | 문서만 | 해당 단계 완료 시마다 | ✅ 1~3단계분 반영(`CLAUDE.md`, `docs/09.dstone-ai-engine.md` §13) |
 
-지금 가장 먼저 손댈 가치가 있는 건 **§13.8(시딩) → §13.9(플래그 정리) → §13.3(tenant 격리)** 순서입니다 -
-앞의 둘은 "RAG가 있으나 마나 한 상태"를 실질적으로 풀어주고, 셋째는 이후 데이터가 늘어나기 전에 보안 gap을
-먼저 막아두는 것이 안전하기 때문입니다.
+**2026-09-20 진행 결과**: 1~3단계(§13.8/13.9/13.3/13.1/13.2)를 순차적으로 구현하고 `mvn clean compile`로
+검증했다(`dstone-ai-engine`). §13.4/13.7/13.11은 계획 수립 시점에 이미 "중간/낮음 우선순위 + 별도 트리거
+조건"으로 분류돼 있었고 그 트리거(두 번째 RAG 활용 사례, 다국어 재사용 수요 등)가 아직 발생하지 않아 이번
+착수 범위에서 의도적으로 제외했다 - 필요해지면 §13.3에서 확립한 것과 동일한 패턴(선택적 오버로드 +
+AgentDefinition 필드 추가)을 그대로 반복 적용하면 된다. §13.5/13.6도 계획대로 보류 상태를 유지한다.
+
+**아직 남은 것(라이브 검증)**: 이 세션에는 kind 클러스터/Postgres+pgvector/Ollama가 떠 있지 않아 컴파일
+검증까지만 했다. 인프라가 뜬 뒤 ① `docs/data/oracle-to-postgresql-rag-seed.jsonl` 적재(§13.8의 curl
+명령) ② `oracle-to-postgresql` Workflow 재실행 → `convert` 스텝이 실제 변환 사례를 참고하는지 확인
+③ `POST /api/ai/rag/search`/`GET /api/ai/embed/documents`가 실제로 동작하는지 확인 ④ `security.auth`를
+잠시 켜서 `RagSearchTool`의 tenant 격리가 실제로 걸리는지 확인 - 이 네 가지가 남아 있다.
+
+지금까지 가장 먼저 손댈 가치가 있던 건 **§13.8(시딩) → §13.9(플래그 정리) → §13.3(tenant 격리)** 순서였고
+실제로 그 순서대로 진행했다 - 앞의 둘은 "RAG가 있으나 마나 한 상태"를 실질적으로 풀어주고, 셋째는 이후
+데이터가 늘어나기 전에 보안 gap을 먼저 막아두는 것이 안전하기 때문이다.

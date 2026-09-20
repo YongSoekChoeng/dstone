@@ -1,5 +1,8 @@
 package net.dstone.ai.runtime.tool;
 
+import java.util.Map;
+
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -8,6 +11,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.config.ConfigTool;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.core.BaseObject;
 
 /**
@@ -35,7 +39,11 @@ public class ToolExecutor extends BaseObject {
 		// ToolCallback.call()의 반환값은 순수 텍스트가 아니라 Spring AI가 JSON으로 감싼 값이다(String
 		// 리턴 타입도 예외 없이 감싸지므로 "실패: ..."가 아니라 "\"실패: ...\""로 온다) - 이 값을 두고
 		// 직접 "실패" 접두사를 검사해야 하므로 먼저 JSON을 벗겨낸다.
-		return this.unwrap(callback.call(jsonInput));
+		// caller가 있으면 ToolContext에 실어 보낸다 - tools.rag.RagSearchTool처럼 caller(tenant) 기준으로
+		// 검색 범위를 좁혀야 하는 Tool이 AGENT의 tool-calling 경로(runtime.agent.AgentExecutor)와 동일하게
+		// 이 값을 받을 수 있게 하기 위함이다.
+		String rawResult = caller == null ? callback.call(jsonInput) : callback.call(jsonInput, new ToolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller)));
+		return this.unwrap(rawResult);
 	}
 
 	/**

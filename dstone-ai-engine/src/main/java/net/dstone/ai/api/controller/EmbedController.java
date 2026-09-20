@@ -1,7 +1,10 @@
 package net.dstone.ai.api.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletRequest;
+import net.dstone.ai.api.dto.DocumentSourceSummary;
 import net.dstone.ai.api.dto.IngestResponse;
 import net.dstone.ai.api.service.EmbedService;
 import net.dstone.ai.common.security.CallerContext;
@@ -47,6 +51,17 @@ public class EmbedController extends BaseController {
 	@DeleteMapping("/documents/{sourceId}")
 	public void delete(@PathVariable String sourceId, HttpServletRequest servletRequest) {
 		this.embedService.deleteBySourceId(sourceId, CallerContext.get(servletRequest));
+	}
+
+	/**
+	 * 지금 vector_store에 어떤 sourceId들이 적재돼 있는지(청크 개수 포함) 조회한다. 적재 내용을 검색해보려면
+	 * 이 API가 아니라 api.controller.RagController(POST /api/ai/rag/search)를 쓴다.
+	 *
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
+	@GetMapping("/documents")
+	public List<DocumentSourceSummary> list(HttpServletRequest servletRequest) {
+		return this.embedService.listSources(CallerContext.get(servletRequest));
 	}
 
 }

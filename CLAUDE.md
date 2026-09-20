@@ -176,10 +176,10 @@ A Spring AI-based, provider-agnostic engine meant to be reused across future SI 
 | `runtime` | `WorkflowContext`/`StepStatus`/`StepResult`/`StepOutcome`/`WorkflowExecutor` — the Workflow state machine |
 | `runtime.agent` | `AgentExecutor` — the one place that turns an `AgentDefinition` into a `ChatClient` call |
 | `runtime.tool` | `ToolExecutor` — the one place a `TOOL` step calls a Tool by name without going through the LLM |
-| `runtime.step` | `AgentStepRunner`/`ToolStepRunner`/`RagStepRunner` — per-`StepType` dispatch used by `WorkflowExecutor` |
-| `rag` | `RagService` — ingest/search/delete, gated by `dstone.ai.rag.enabled` |
-| `tools` | `@AiTool` implementations: `sample`/`sql`/`shell`/`python`/`http` |
-| `api` | `ChatController` (`POST /api/ai/chat[/stream]`, one Agent call), `WorkflowController` (`POST /api/ai/workflow/{id}/execute`, sync; `/submit`+`/status/{jobId}`, async via `AsyncJobService`), `RagController` |
+| `runtime.step` | `AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner` — per-`StepType` dispatch used by `WorkflowExecutor` (no `StepType.RAG`/`RagStepRunner` — RAG is either an AGENT's `ragEnabled` advisor or the `RagSearchTool` `@AiTool`) |
+| `common.rag` | `RagRetrievalChain` — the only place that turns an already-ingested `VectorStore` into search results/an `Advisor` (`buildAdvisor()`/`search()`); ingest/delete is `api.service.EmbedService` instead, gated by `dstone.ai.rag.enabled` |
+| `tools` | `@AiTool` implementations: `sample`/`sql`/`shell`/`python`/`http`/`rag` (`RagSearchTool`) |
+| `api` | `ChatController` (`POST /api/ai/chat[/stream]`, one Agent call), `WorkFlowController` (`POST /api/ai/workflow/{id}/execute`, sync; `/submit`+`/status/{jobId}`, async via `AsyncJobService`), `WorkFlowExecutionController`, `EmbedController` (`/api/ai/embed/documents` - ingest/delete/list), `RagController` (`POST /api/ai/rag/search` - search preview) |
 
 Full architecture, YAML authoring guide, API/config reference, and the 2026-09-15 live-verification record live in `docs/09.dstone-ai-engine.md`.
 

@@ -117,4 +117,8 @@ agent:
         코드펜스/설명이 하나라도 섞여 있는가? 어긋난 부분이 있으면 그 즉시 규칙에 맞게 다시 써서
         반환하십시오.
   toolsEnabled: true
-  ragEnabled: false
+  ragEnabled: true
+  # analyze 단계(sql-analysis-agent)보다 좁고 확실한 근거만 보도록 튜닝한다 - 변환 단계는 애매한 참고자료보다
+  # 확실히 관련 있는 소수의 실제 변환 사례만 보는 편이 낫다(dstone-ai-engine-rag.md §13.9 계획대로).
+  ragTopK: 3
+  ragSimilarityThreshold: 0.5

@@ -160,9 +160,14 @@ public class AgentExecutor extends BaseObject {
 		5. Tool 적용
 			- caller의 Tool 화이트리스트를 통과한 것만 붙는다.
 			- 화이트리스트설정(dstone.ai.tool.allowed-by-caller)이 없으면 전체 허용.
+			- toolContext로 caller를 함께 실어 보낸다 - tools.rag.RagSearchTool처럼 caller(tenant) 기준으로
+			  검색 범위를 좁혀야 하는 Tool이 ToolContext 파라미터로 이 값을 받을 수 있게 한다.
 		************************************************************************/
 		if (toolsEnabled) {
 			spec.tools(this.configTool.toolCallbackProvider(caller));
+			if (caller != null) {
+				spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller));
+			}
 		}
 
 		/************************************************************************
