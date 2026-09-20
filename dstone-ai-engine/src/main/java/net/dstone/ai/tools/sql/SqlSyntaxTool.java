@@ -4,6 +4,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.runtime.status.ToolOutcome;
 import net.dstone.common.core.BaseObject;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -21,19 +22,19 @@ public class SqlSyntaxTool extends BaseObject {
 	 * @param sql 검증할 단일 SQL 문(SELECT/INSERT/UPDATE/DELETE)
 	 */
 	@Tool(description = "SQL 문 하나의 문법이 구조적으로 올바른지 파싱해서 검사한다(특정 DB 서버 없이 순수 문법 검사). " + "세미콜론으로 여러 문장을 이어붙인 입력은 거부한다. SQL을 최종 답변으로 반환하기 전에 반드시 이 도구로 먼저 검증하고, " + "실패하면 보고된 오류를 근거로 SQL을 고친 뒤 다시 검증하라.")
-	public String validateSqlSyntax(@ToolParam(description = "검증할 단일 SQL 문(SELECT/INSERT/UPDATE/DELETE)") String sql) {
+	public ToolOutcome validateSqlSyntax(@ToolParam(description = "검증할 단일 SQL 문(SELECT/INSERT/UPDATE/DELETE)") String sql) {
 		Statements statements;
 		try {
 			statements = CCJSqlParserUtil.parseStatements(sql);
 			if (statements.size() != 1) {
-				return "실패: 한 번에 하나의 SQL 문만 검증할 수 있습니다(세미콜론으로 여러 문장을 이어붙이지 마십시오). 문장 수=" + statements.size();
+				return ToolOutcome.fail("한 번에 하나의 SQL 문만 검증할 수 있습니다(세미콜론으로 여러 문장을 이어붙이지 마십시오). 문장 수=" + statements.size());
 			}
 		} catch (JSQLParserException e) {
-			return "실패: 문법 오류 - " + e.getMessage();
+			return ToolOutcome.fail("문법 오류 - " + e.getMessage());
 		} catch (Exception e) {
-			return "실패: 기타 오류 - " + e.getMessage();
+			return ToolOutcome.fail("기타 오류 - " + e.getMessage());
 		}
-		return "통과: 문법 구조상 문제가 없습니다.";
+		return ToolOutcome.pass("문법 구조상 문제가 없습니다.");
 	}
 
 }

@@ -1,5 +1,6 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -61,13 +62,9 @@ public class AgentExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * SUPERVISOR 용 LLM호출 메소드.
-	 * 
-	 * call()과 요청 조립은 동일하고, 자유 텍스트 대신 구조화된 Verdict(pass/reason)로 응답을 받는다.
-	 * runtime.step.AgentStepRunner의 SUPERVISOR step처럼 "성공/실패를 LLM이 판정해야 하는" 호출 전용이다.
-	 * Spring AI가 Verdict의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱해주므로,
-	 * "통과: .../실패: ..." 텍스트 접두사를 사람이 프롬프트로 지시하고 코드가 문자열로 매칭하던 예전 방식보다 형식 준수율이 높다.
-	 * ragOverride/toolsOverride는 없다.
-	 * SUPERVISOR는 항상 Agent 정의값 그대로 쓴다(요청별 override는 단일 대화 턴인 ChatController 전용 기능이라 여기엔 의미가 없다).
+	 *
+	 * callForEntity(..., Verdict.class)의 얇은 별칭이다 - 호출부(runtime.step.AgentStepRunner.runSupervisor)의 가독성을 위해
+	 * 타입을 명시한 이름으로 남겨뒀다.
 	 * </pre>
 	 * @param agent       호출할 Agent 정의
 	 * @param sessionId   대화 세션 식별자
@@ -76,7 +73,29 @@ public class AgentExecutor extends BaseObject {
 	 * @param userMessage 사용자 입력 텍스트
 	 */
 	public Verdict callForVerdict(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage) {
-		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(Verdict.class);
+		return this.callForEntity(agent, sessionId, caller, variables, userMessage, Verdict.class);
+	}
+
+	/**
+	 * <pre>
+	 * 자유 텍스트 대신 구조화된 응답이 필요한 모든 호출이 거치는 공통 메소드다. call()과 요청 조립은 동일하고, 응답만
+	 * ChatClient.entity(type)로 받는다 - Spring AI가 type의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰
+	 * 파싱해주므로, "통과: .../실패: ..." 같은 텍스트 접두사를 사람이 프롬프트로 지시하고 코드가 문자열로 매칭하던 예전 방식보다
+	 * 형식 준수율이 높다(그래도 100% 확정적이진 않다 - 모델이 스키마 자체를 어기면 entity()가 예외를 던지는데, 그건 호출부가
+	 * 다뤄야 한다. runtime.step.AgentStepRunner의 SUPERVISOR/ROUTER/structuredOutput=true AGENT step이 각각 Verdict/
+	 * RouteDecision/StepPayload를 이 메소드로 받는다).
+	 * ragOverride/toolsOverride/modelOverride는 없다 - 구조화 응답이 필요한 호출은 전부 Workflow step 전용이라 요청별
+	 * override(ChatController 전용 기능)가 의미가 없다.
+	 * </pre>
+	 * @param agent       호출할 Agent 정의
+	 * @param sessionId   대화 세션 식별자
+	 * @param caller      호출한 앱/서비스 식별자(tenant)
+	 * @param variables   프롬프트 템플릿에 바인딩할 변수 맵
+	 * @param userMessage 사용자 입력 텍스트
+	 * @param type        파싱해서 받을 구조화 응답 타입
+	 */
+	public <T> T callForEntity(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Class<T> type) {
+		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(type);
 	}
 
 	/**
@@ -144,7 +163,7 @@ public class AgentExecutor extends BaseObject {
 			  Spring AI의 PromptTemplate으로 그 자리에서 렌더링한다(resources/agents/*.yml에 인라인된 프롬프트).
 		************************************************************************/
 		if (!StringUtil.isEmpty(agent.prompt())) {
-			spec = spec.system(new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables));
+			spec = spec.system(new PromptTemplate(agent.prompt()).render(this.promptSafeVariables(variables)));
 		}
 
 		/************************************************************************
@@ -201,6 +220,38 @@ public class AgentExecutor extends BaseObject {
 		}
 		
 		return spec;
+	}
+
+	/**
+	 * <pre>
+	 * Spring AI의 PromptTemplate은 내부적으로 StringTemplate(ST4)을 쓰는데, ST4는 속성 이름에 '.'이 있으면
+	 * ST.add()에서 IllegalArgumentException("cannot have '.' in attribute names")을 던진다 - 그것도 그
+	 * 템플릿이 실제로 그 토큰을 참조하는지와 무관하게, variables 맵의 모든 엔트리를 무조건 add()하기 때문에
+	 * (StTemplateRenderer.apply()) 프롬프트에 그 토큰을 안 쓰는 Agent까지 도매금으로 예외가 난다.
+	 *
+	 * runtime.workflow.WorkFlowExecutor가 병렬/forEach 반복이나 structuredOutput=true AGENT step의
+	 * 구조화 data를 {stepId.키}로 네임스페이싱해서 variables에 넣어주므로(runtime.status.StepOutput.data()
+	 * 참고), 이 필터 없이 variables를 그대로 render()에 넘기면 그런 데이터가 하나라도 쌓인 뒤로는 이후 모든
+	 * Workflow의 AGENT/SUPERVISOR/ROUTER step이 깨진다. 그래서 prompt 렌더링 직전에만 dot이 섞인 키를
+	 * 걸러낸다 - {stepId.키} 참조는 TOOL step의 inputTemplate(ST가 아니라 단순 문자열 치환이라 dot이 아무
+	 * 문제 없음)에서만 쓸 수 있고, Agent의 prompt: 안에서는 원래도 쓸 수 없다(걸러진 토큰은 예외 대신
+	 * "치환되지 않은 리터럴 {stepId.키} 문자열"로 프롬프트에 그대로 남는다 - 크래시보다는 훨씬 나은
+	 * 실패 방식이다).
+	 * </pre>
+	 *
+	 * @param variables 필터링할 원본 변수 맵(null이면 빈 Map으로 취급)
+	 */
+	private Map<String, Object> promptSafeVariables(Map<String, Object> variables) {
+		if (variables == null || variables.isEmpty()) {
+			return Map.of();
+		}
+		Map<String, Object> safe = new LinkedHashMap<>();
+		for (Map.Entry<String, Object> entry : variables.entrySet()) {
+			if (entry.getKey() != null && entry.getKey().indexOf('.') < 0) {
+				safe.put(entry.getKey(), entry.getValue());
+			}
+		}
+		return safe;
 	}
 
 }

@@ -7,12 +7,15 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.io.JsonStringEncoder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.status.StepInput;
 import net.dstone.ai.runtime.status.StepOutput;
+import net.dstone.ai.runtime.status.ToolOutcome;
 import net.dstone.ai.runtime.tool.ToolExecutor;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
@@ -23,6 +26,8 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  */
 @Component
 public class ToolStepRunner implements StepRunner {
+
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/**
 	 * <pre>
@@ -45,10 +50,33 @@ public class ToolStepRunner implements StepRunner {
 		String normalized = this.stripLlmArtifacts(input.renderedText());
 		String jsonInput = this.renderToolInput(definition.inputTemplate(), normalized, input.variables());
 		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), jsonInput);
-		if (toolResult.startsWith(Constants.Outcome.FAIL_PREFIX)) {
-			return StepOutput.failure(normalized + "\n\n[검증 결과] " + toolResult, toolResult);
+
+		ToolOutcome outcome = this.tryParseOutcome(toolResult);
+		boolean failed = outcome != null ? Boolean.FALSE.equals(outcome.success()) : toolResult.startsWith(Constants.Outcome.FAIL_PREFIX);
+		if (!failed) {
+			return StepOutput.success(normalized);
 		}
-		return StepOutput.success(normalized);
+		String reasonText = outcome != null && outcome.message() != null ? outcome.message() : toolResult;
+		return StepOutput.failure(normalized + "\n\n[검증 결과] " + reasonText, reasonText);
+	}
+
+	/**
+	 * <pre>
+	 * Tool이 runtime.status.ToolOutcome(success/message)을 반환했으면(권장) 그걸 그대로 쓰고, 아니면 null을 돌려줘서
+	 * run()이 예전 접두사 컨벤션(Constants.Outcome.FAIL_PREFIX)으로 되돌아가게 한다. "실패로 해석되지 않는 JSON이지만
+	 * 우연히 success 필드를 가진 무관한 객체"까지 성공/실패로 오판하지 않도록, success 필드가 아예 없는 경우(null)도
+	 * "ToolOutcome이 아니다"로 취급한다.
+	 * </pre>
+	 *
+	 * @param toolResult Tool 호출 원본 응답(runtime.tool.ToolExecutor.unwrap()을 거친 텍스트)
+	 */
+	private ToolOutcome tryParseOutcome(String toolResult) {
+		try {
+			ToolOutcome outcome = this.objectMapper.readValue(toolResult, ToolOutcome.class);
+			return outcome.success() == null ? null : outcome;
+		} catch (JsonProcessingException e) {
+			return null;
+		}
 	}
 
 	/**

@@ -69,13 +69,15 @@ public final class Constants {
 		public final static String PREVIOUS_TEXT_VARIABLE_KEY = "__previous";
 		/** variables 안에서 APPROVAL 스텝별 승인/반려 결정을 담아두는 예약 키(stepId -> {approved, approver, comment}). */
 		public final static String APPROVALS_VARIABLE_KEY = "approvals";
+		/** StepDefinition.forEachVariable 반복 중 itemVariable을 비워뒀을 때 각 항목을 바인딩하는 기본 변수 이름. */
+		public final static String DEFAULT_ITEM_VARIABLE_KEY = "item";
 	}
 
 	/**
-	 * runtime.step.ToolStepRunner(TOOL) - "실패: ..."로 시작하는지로 판정하는 컨벤션. Tool 응답이
-	 * 결정론적인 자바 코드(SqlSyntaxTools 등)에서 나오므로 이 방식이어도 안전하다. SUPERVISOR는
-	 * 같은 방식이 안전하지 않아서(LLM이 만든 자유 텍스트) 구조화 출력(runtime.agent.Verdict)으로
-	 * 바꿨다 - 더 이상 이 접두사 컨벤션을 쓰지 않는다.
+	 * runtime.step.ToolStepRunner(TOOL) - Tool이 runtime.status.ToolOutcome(구조화 값)을 반환하지 않는 경우에만 쓰는
+	 * 하위호환 컨벤션: 원본 응답 텍스트가 "실패: ..."로 시작하는지로 판정한다. Tool 응답이 결정론적인 자바 코드(SqlSyntaxTool 등)에서
+	 * 나오므로 이 방식이어도 비교적 안전하긴 하지만, 컴파일 타임에 강제되지 않는 매직 스트링이라 새로 만드는 Tool은 ToolOutcome을 쓰는
+	 * 게 낫다. SUPERVISOR는 이 방식이 안전하지 않아서(LLM이 만든 자유 텍스트) 애초에 구조화 출력(runtime.status.Verdict)만 쓴다.
 	 */
 	public static final class Outcome {
 		public final static String FAIL_PREFIX = "실패";

@@ -44,6 +44,8 @@ public class WorkFlowRegistry extends BaseObject {
 			}
 			this.validateApprovalStepsNotParallel(definition);
 			this.validateParallelGroups(definition);
+			this.validateRouterSteps(definition);
+			this.validateForEachSteps(definition);
 		}
 		this.byId = Map.copyOf(resolved);
 		LogUtil.sysout("dstone-ai-engine workflow: 등록된 Workflow = " + (this.byId.isEmpty() ? "없음" : this.byId.keySet()));
@@ -128,6 +130,50 @@ public class WorkFlowRegistry extends BaseObject {
 						+ "]의 마지막 스텝이 아니라서 여기 적은 onSuccess/onFailure는 무시됩니다. 그룹이 끝난 뒤 진행할 경로는 이 그룹의 마지막 스텝인 ["
 						+ steps.get(lastIndex).id() + "]에 적어주세요.");
 				}
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * ROUTER step은 routes(route 이름 -> 다음 step id)가 있어야 라우팅을 할 수 있고, parallelGroup/forEachVariable과는
+	 * 함께 쓸 수 없다 - 병렬로 도는 형제 중 누구의 route를 따라야 하는지, 또는 반복 중 어느 반복의 route를 따라야 하는지가
+	 * 모호해지기 때문이다(WorkFlowExecutor.decideTransition은 그룹/반복의 "마지막 step 하나"의 결과만 보고 다음을 정하는데,
+	 * ROUTER의 route는 애초에 여러 개가 나올 수 있는 값이 아니라 "이 step 하나가 고른 값"이어야 의미가 있다).
+	 * </pre>
+	 *
+	 * @param definition 검증할 workflow 정의
+	 */
+	private void validateRouterSteps(WorkFlowDefinition definition) {
+		for (StepDefinition step : definition.steps()) {
+			if (step.type() != StepType.ROUTER) {
+				continue;
+			}
+			if (step.routes() == null || step.routes().isEmpty()) {
+				throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + step.id() + "]: ROUTER step은 routes를 최소 1개 이상 정의해야 합니다.");
+			}
+			if (!StringUtil.isEmpty(step.parallelGroup())) {
+				throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + step.id() + "]: ROUTER step은 parallelGroup을 가질 수 없습니다.");
+			}
+			if (!StringUtil.isEmpty(step.forEachVariable())) {
+				throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + step.id() + "]: ROUTER step은 forEachVariable을 가질 수 없습니다.");
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * forEachVariable(동적 팬아웃)이 설정된 step은 parallelGroup(정적 병렬 그룹)과 함께 쓸 수 없다 - "정적으로 묶인 그룹 안의
+	 * 한 step이 다시 동적으로 반복되는" 조합까지 다루려면 그룹/반복이 이중으로 얽혀서 "그 다음엔 어디로 갈까" 계산이 급격히
+	 * 복잡해지므로, 필요해지기 전까지는 아예 막아둔다.
+	 * </pre>
+	 *
+	 * @param definition 검증할 workflow 정의
+	 */
+	private void validateForEachSteps(WorkFlowDefinition definition) {
+		for (StepDefinition step : definition.steps()) {
+			if (!StringUtil.isEmpty(step.forEachVariable()) && !StringUtil.isEmpty(step.parallelGroup())) {
+				throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + step.id() + "]: forEachVariable과 parallelGroup을 함께 쓸 수 없습니다.");
 			}
 		}
 	}
