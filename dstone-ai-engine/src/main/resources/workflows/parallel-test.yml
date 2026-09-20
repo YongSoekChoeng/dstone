@@ -1,35 +1,27 @@
 # common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# parallelGroup 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다.
-# LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax) 두 개만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
+# forEachVariable(병렬 실행) 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다.
+# LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax) 하나만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
 #
-# validate-a/validate-b가 같은 parallelGroup(check) 값을 가지므로 WorkFlowExecutor가 둘을 동시에
-# 실행한다(runtime.workflow.WorkFlowExecutor.runGroup 참고). 다음 step 판단은 그룹의 마지막 step인
-# validate-b의 onSuccess/onFailure만 쓰이므로, validate-a에는 굳이 onSuccess/onFailure를 적지
-# 않는다.
+# validate-each가 forEachVariable: sqlList를 가지므로, WorkFlowExecutor가 variables.sqlList(List)의
+# 항목 수만큼 이 step 하나를 동시에 실행한다(runtime.workflow.WorkFlowExecutor.runForEach 참고). 각 반복에서는
+# 그 항목이 {item} 토큰으로 들어오므로 inputTemplate이 {"sql":"{item}"}이다.
 #
 # dstone-boot의 "Workflow 비동기 테스트" 화면(/ai/workflow.do)에서 이렇게 호출해보면 된다:
 #   workflowId: parallel-test
-#   message   : validate-a가 검증할 SQL 한 줄 (예: SELECT 1 FROM dual)
-#   variables : {"sqlB": "validate-b가 검증할 SQL 한 줄 (예: SELECT * FROM WRONG SYNTAX)"}
-# message/sqlB 둘 다 문법이 올바르면 최종 결과가 SUCCESS로, 하나라도 문법 오류면 FAIL로 끝나면서
-# 어느 쪽이 실패했는지 [검증 결과] 뒤에 실패 사유가 붙어 나온다 - 두 step이 실제로 각자 독립적으로
-# 실행/판정된다는 것을 확인할 수 있다.
+#   variables : {"sqlList": ["SELECT 1 FROM dual", "SELECT * FROM WRONG SYNTAX"]}
+# sqlList 안의 모든 SQL이 문법상 올바르면 최종 결과가 SUCCESS로, 하나라도 문법 오류면 FAIL로 끝나면서
+# 어느 것이 실패했는지 [검증 결과] 뒤에 실패 사유가 붙어 나온다 - 두 항목이 실제로 각자 독립적으로
+# 동시에 실행/판정된다는 것을 확인할 수 있다. 항목을 3개, 10개로 늘려도 YAML은 그대로 두면 된다.
 workflow:
   id: parallel-test
-  description: parallelGroup 동작 확인용 테스트 Workflow - TOOL step 두 개(validate-a/validate-b)를 동시에 실행한다.
+  description: forEachVariable 동작 확인용 테스트 Workflow - TOOL step 하나를 sqlList 항목 수만큼 동시 실행한다.
   maxIterations: 5
   steps:
 
-    - id: validate-a
+    - id: validate-each
       type: TOOL
       ref: validateSqlSyntax
-      inputTemplate: '{"sql":"{previous}"}'
-      parallelGroup: check
-
-    - id: validate-b
-      type: TOOL
-      ref: validateSqlSyntax
-      inputTemplate: '{"sql":"{sqlB}"}'
-      parallelGroup: check
+      inputTemplate: '{"sql":"{item}"}'
+      forEachVariable: sqlList
       onSuccess: SUCCESS
       onFailure: FAIL

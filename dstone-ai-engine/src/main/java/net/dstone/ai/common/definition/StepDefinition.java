@@ -14,16 +14,18 @@ import java.util.Map;
  * 텍스트가 "실패"로 시작하는지(하위호환)로, SUPERVISOR/APPROVAL은 각각 Verdict/사람의 결정으로 정한다. AGENT step은 structuredOutput=false(기본값)면
  * 항상 성공으로 취급되고, structuredOutput=true인데 응답을 StepPayload 스키마로 못 읽으면(모델이 스키마를 어김) 실패로 처리된다(fail-closed).
  *
- * parallelGroup이 같은 값인 인접 step들은 WorkFlowExecutor가 동시에 실행한다(지원하는 병렬 패턴). forEachVariable을 쓰면 그 변수에 담긴
- * List의 항목 개수만큼 이 step 하나를 동적으로 병렬 실행한다(YAML 작성 시점에 개수를 몰라도 되는 팬아웃 - 정적으로 개수가 고정된 parallelGroup과는
- * 다르다). type이 APPROVAL/ROUTER인 step은 parallelGroup/forEachVariable을 가질 수 없고, forEachVariable과 parallelGroup도 서로
- * 함께 쓸 수 없다 - 승인 대기·라우팅 결정·정적 그룹과 동적 반복이 뒤섞이는 조합은 "다음에 어디로 갈지"가 모호해지므로 아직 다루지 않는다
+ * forEachVariable을 쓰면 variables에 담긴 같은 이름의 List 항목 수만큼 이 step 하나를 동시에 실행한다 - "서로 다른 step을 YAML
+ * 작성 시점에 미리 정해둔 개수만큼 병렬로 묶는" 정적 그룹 개념은 없고, "같은 step을 실행 시점에 정해지는 개수만큼 반복"하는 이 한 가지
+ * 방식으로만 병렬 실행을 표현한다(둘 다 있으면 개념이 늘어 YAML을 읽기 어려워지므로, 정적 병렬이 필요한 경우도 List 하나로 표현할 수 있는
+ * forEachVariable로 통일했다 - {previous}/{sqlB}처럼 서로 다른 값을 담은 List를 넘기면 결과적으로 "정적으로 정해진 개수의 병렬 호출"과
+ * 동일하게 동작한다. 대신 "서로 다른 tool/agent를 동시에 호출"하는 것처럼 반복마다 대상 자체가 달라지는 조합은 이 방식으로 표현할 수 없다).
+ * type이 APPROVAL/ROUTER인 step은 forEachVariable을 가질 수 없다 - APPROVAL은 사람의 승인/반려 결정이 stepId 하나로만 식별되어
+ * 반복마다 서로 다른 결정을 구분할 방법이 없고, ROUTER는 반복 중 "누구의 route를 따라야 하는지"가 모호해지기 때문이다
  * (common.registry.WorkFlowRegistry가 기동 시 검증).
  *
  * @param id              step 식별자
  * @param type            step이 실제로 무엇을 실행하는지 구분하는 종류(AGENT/TOOL/SUPERVISOR/APPROVAL/ROUTER)
  * @param ref             type에 따라 가리키는 대상 이름(Agent 이름 또는 Tool 이름, APPROVAL은 미사용)
- * @param parallelGroup   함께 병렬 실행할 step들을 묶는 그룹 식별자
  * @param onFailure       실패 시 이동할 다음 step id(또는 예약어 FAIL). type이 ROUTER면 무시된다
  * @param onSuccess       성공 시 이동할 다음 step id(또는 예약어 SUCCESS). type이 ROUTER면 무시된다
  * @param inputTemplate   step 입력값을 만들 템플릿
@@ -32,9 +34,9 @@ import java.util.Map;
  *                         응답을 받아 data를 그대로 다음 step들이 {id.키}로 참조할 구조화 값으로 쓴다(runtime.step.AgentStepRunner 참고)
  * @param routes          ROUTER step 전용. LLM이 고른 route 이름(runtime.status.RouteDecision.route()) -> 다음 step id(또는 SUCCESS/FAIL
  *                        예약어) 매핑. ROUTER가 아니면 무시된다
- * @param forEachVariable 설정하면 이 step을 variables에 담긴 같은 이름의 List 항목 수만큼 동적으로 병렬 실행한다(비우면 한 번만 실행). 각 항목은
+ * @param forEachVariable 설정하면 이 step을 variables에 담긴 같은 이름의 List 항목 수만큼 동시에 실행한다(비우면 한 번만 실행). 각 항목은
  *                        그 반복 안에서 itemVariable(기본값 "item")이라는 이름으로 {item} 토큰에 바인딩된다
  * @param itemVariable    forEachVariable 반복 중 각 항목을 바인딩할 변수 이름(비우면 기본값 "item")
  */
-public record StepDefinition(String id, StepType type, String ref, String parallelGroup, String onFailure, String onSuccess, String inputTemplate, String approverRole, Boolean structuredOutput,
+public record StepDefinition(String id, StepType type, String ref, String onFailure, String onSuccess, String inputTemplate, String approverRole, Boolean structuredOutput,
 	Map<String, String> routes, String forEachVariable, String itemVariable) {}

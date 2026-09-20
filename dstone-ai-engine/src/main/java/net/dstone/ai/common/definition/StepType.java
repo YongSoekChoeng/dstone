@@ -32,7 +32,8 @@ public enum StepType {
 	 * 사람의 승인/반려를 기다리는 스텝이다(ref는 쓰지 않음).
 	 * 첫 실행에서는 아직 결정이 없으니 Workflow 실행 자체를 WAITING_APPROVAL 상태로 멈추고,
 	 * 외부에서 결정 API가 호출되면 같은 스텝을 다시 실행해 이번엔 결정에 따라 성공/실패로 진행한다(runtime.step.ApprovalStepRunner 참고).
-	 * parallelGroup 에서는 는 함께 쓸 수 없다(common.registry.WorkFlowRegistry가 기동 시 검증).
+	 * forEachVariable과는 함께 쓸 수 없다 - 승인/반려 결정이 stepId 하나로만 식별되는데, 반복마다 서로 다른 결정을 구분할 방법이 없기
+	 * 때문이다(common.registry.WorkFlowRegistry가 기동 시 검증).
 	 */
 	APPROVAL,
 
@@ -43,8 +44,8 @@ public enum StepType {
 	 * 여러 겹 쌓아야 하는데 그 대신 한 step으로 표현하기 위한 타입이다.
 	 *
 	 * onSuccess/onFailure는 쓰지 않고 대신 routes(route 이름 -> 다음 step id, SUCCESS/FAIL 예약어도 값으로 쓸 수 있음)를 쓴다. LLM이 고른
-	 * route가 routes에 없는 키면(오타/환각) Workflow가 FAILED로 끝난다. parallelGroup/forEachVariable과는 함께 쓸 수 없다(그룹/반복 중 어느
-	 * route를 따라야 하는지가 모호해지므로 - common.registry.WorkFlowRegistry가 기동 시 검증).
+	 * route가 routes에 없는 키면(오타/환각) Workflow가 FAILED로 끝난다. forEachVariable과는 함께 쓸 수 없다(반복 중 어느 route를 따라야
+	 * 하는지가 모호해지므로 - common.registry.WorkFlowRegistry가 기동 시 검증).
 	 */
 	ROUTER
 
