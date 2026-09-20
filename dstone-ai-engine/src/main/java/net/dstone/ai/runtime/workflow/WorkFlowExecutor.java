@@ -121,9 +121,13 @@ public class WorkFlowExecutor extends BaseObject {
 			****************************************************************************************/
 			GroupResult groupResult;
 			try {
-				groupResult = group.size() > 1 ? this.runGroup(group, current)
-					: !StringUtil.isEmpty(step.forEachVariable()) ? this.runForEach(step, current)
-					: this.runOne(step, current);
+			    if (group.size() > 1) {
+			        groupResult = this.runGroup(group, current);
+			    } else if (!StringUtil.isEmpty(step.forEachVariable())) {
+			        groupResult = this.runForEach(step, current);
+			    } else {
+			        groupResult = this.runOne(step, current);
+			    }
 			} catch (Exception e) {
 				// 실행 중 예외 발생 → 그 자리에서 FAILED로 종료
 				return this.persistFailed(current, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
