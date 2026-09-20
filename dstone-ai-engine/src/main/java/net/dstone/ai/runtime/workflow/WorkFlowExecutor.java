@@ -411,7 +411,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * 방금 실행한 스텝의 결과에 따라 다음 전환 방향을 결정하는 메소드.
 	 * 성공/실패는 스텝 종류(StepType)마다 판정 방식이 다름.
 	 *   - AGENT는 structuredOutput=false(기본값)면 항상 성공, true면 StepPayload 파싱 성공 여부.
-	 *   - TOOL은 ToolOutcome.success()(구조화 값, 우선) 또는 응답 텍스트가 "실패:"로 시작하는지(하위호환)로 판단.
+	 *   - TOOL은 ToolOutput.success()(구조화 값, 우선) 또는 응답 텍스트가 "실패:"로 시작하는지(하위호환)로 판단.
 	 *   - SUPERVISOR는 구조화된 Verdict.pass(true/false)로 판단.
 	 *   - APPROVAL은 사람의 승인/반려로 정해짐.
 	 *   - ROUTER는 성공/실패가 아니라 route(LLM이 고른 이름표)로 다음 step을 정한다 - onSuccess/onFailure는 아예 보지 않는다.

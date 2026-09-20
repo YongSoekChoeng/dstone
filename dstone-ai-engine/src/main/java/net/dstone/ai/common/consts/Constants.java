@@ -74,7 +74,7 @@ public final class Constants {
 	}
 
 	/**
-	 * runtime.step.ToolStepRunner(TOOL) - Tool이 runtime.status.ToolOutcome(구조화 값)을 반환하지 않는 경우에만 쓰는
+	 * runtime.step.ToolStepRunner(TOOL) - Tool이 runtime.status.ToolOutput(구조화 값)을 반환하지 않는 경우에만 쓰는
 	 * 하위호환 컨벤션: 원본 응답 텍스트가 "실패: ..."로 시작하는지로 판정한다. Tool 응답이 결정론적인 자바 코드(SqlSyntaxTool 등)에서
 	 * 나오므로 이 방식이어도 비교적 안전하긴 하지만, 컴파일 타임에 강제되지 않는 매직 스트링이라 새로 만드는 Tool은 ToolOutcome을 쓰는
 	 * 게 낫다. SUPERVISOR는 이 방식이 안전하지 않아서(LLM이 만든 자유 텍스트) 애초에 구조화 출력(runtime.status.Verdict)만 쓴다.

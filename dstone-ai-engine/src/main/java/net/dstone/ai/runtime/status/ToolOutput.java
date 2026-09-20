@@ -13,16 +13,16 @@ package net.dstone.ai.runtime.status;
  * @param success 성공/실패 여부
  * @param message 성공/실패 사유(다음 step에 그대로 이어붙는 메시지)
  */
-public record ToolOutcome(Boolean success, String message) {
+public record ToolOutput(Boolean success, String message) {
 
 	/** @param message 성공 사유/결과 요약 */
-	public static ToolOutcome pass(String message) {
-		return new ToolOutcome(true, message);
+	public static ToolOutput pass(String message) {
+		return new ToolOutput(true, message);
 	}
 
 	/** @param message 실패 사유 */
-	public static ToolOutcome fail(String message) {
-		return new ToolOutcome(false, message);
+	public static ToolOutput fail(String message) {
+		return new ToolOutput(false, message);
 	}
 
 }

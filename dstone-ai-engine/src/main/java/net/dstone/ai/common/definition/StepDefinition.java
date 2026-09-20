@@ -10,7 +10,7 @@ import java.util.Map;
  * 넣으면 루프(예: 검증 실패 시 변환 step으로 되돌아가기)가 되고, WorkFlowDefinition.maxIterations가 무한루프를 막는다. onSuccess/onFailure에 예약어
  * "SUCCESS"/"FAIL"을 넣으면 그 자리에서 바로 Workflow를 종료한다. type이 ROUTER인 step은 onSuccess/onFailure 대신 routes를 쓴다(아래 참고).
  *
- * 성공/실패 판정은 TOOL/SUPERVISOR/APPROVAL만 대상이고, TOOL은 원본 응답이 runtime.status.ToolOutcome(구조화 값, 우선)이거나 그게 아니면
+ * 성공/실패 판정은 TOOL/SUPERVISOR/APPROVAL만 대상이고, TOOL은 원본 응답이 runtime.status.ToolOutput(구조화 값, 우선)이거나 그게 아니면
  * 텍스트가 "실패"로 시작하는지(하위호환)로, SUPERVISOR/APPROVAL은 각각 Verdict/사람의 결정으로 정한다. AGENT step은 structuredOutput=false(기본값)면
  * 항상 성공으로 취급되고, structuredOutput=true인데 응답을 StepPayload 스키마로 못 읽으면(모델이 스키마를 어김) 실패로 처리된다(fail-closed).
  *

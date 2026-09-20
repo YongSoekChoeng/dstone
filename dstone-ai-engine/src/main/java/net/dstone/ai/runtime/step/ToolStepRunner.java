@@ -15,7 +15,7 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.status.StepInput;
 import net.dstone.ai.runtime.status.StepOutput;
-import net.dstone.ai.runtime.status.ToolOutcome;
+import net.dstone.ai.runtime.status.ToolOutput;
 import net.dstone.ai.runtime.tool.ToolExecutor;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
@@ -51,7 +51,7 @@ public class ToolStepRunner implements StepRunner {
 		String jsonInput = this.renderToolInput(definition.inputTemplate(), normalized, input.variables());
 		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), jsonInput);
 
-		ToolOutcome outcome = this.tryParseOutcome(toolResult);
+		ToolOutput outcome = this.tryParseOutcome(toolResult);
 		boolean failed = outcome != null ? Boolean.FALSE.equals(outcome.success()) : toolResult.startsWith(Constants.Outcome.FAIL_PREFIX);
 		if (!failed) {
 			return StepOutput.success(normalized);
@@ -62,7 +62,7 @@ public class ToolStepRunner implements StepRunner {
 
 	/**
 	 * <pre>
-	 * Tool이 runtime.status.ToolOutcome(success/message)을 반환했으면(권장) 그걸 그대로 쓰고, 아니면 null을 돌려줘서
+	 * Tool이 runtime.status.ToolOutput(success/message)을 반환했으면(권장) 그걸 그대로 쓰고, 아니면 null을 돌려줘서
 	 * run()이 예전 접두사 컨벤션(Constants.Outcome.FAIL_PREFIX)으로 되돌아가게 한다. "실패로 해석되지 않는 JSON이지만
 	 * 우연히 success 필드를 가진 무관한 객체"까지 성공/실패로 오판하지 않도록, success 필드가 아예 없는 경우(null)도
 	 * "ToolOutcome이 아니다"로 취급한다.
@@ -70,9 +70,9 @@ public class ToolStepRunner implements StepRunner {
 	 *
 	 * @param toolResult Tool 호출 원본 응답(runtime.tool.ToolExecutor.unwrap()을 거친 텍스트)
 	 */
-	private ToolOutcome tryParseOutcome(String toolResult) {
+	private ToolOutput tryParseOutcome(String toolResult) {
 		try {
-			ToolOutcome outcome = this.objectMapper.readValue(toolResult, ToolOutcome.class);
+			ToolOutput outcome = this.objectMapper.readValue(toolResult, ToolOutput.class);
 			return outcome.success() == null ? null : outcome;
 		} catch (JsonProcessingException e) {
 			return null;
