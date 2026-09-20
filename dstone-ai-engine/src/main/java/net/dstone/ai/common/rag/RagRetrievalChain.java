@@ -144,18 +144,41 @@ public class RagRetrievalChain extends BaseService {
 	/**
 	 * <pre>
 	 * 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다.
-	 * allowEmptyContext(true)로 둬서, 검색 결과가 하나도 없어도(또는 RAG 자체가 이 요청에 무관해도) 질의를
-	 * "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킨다 - Agent의 system prompt에 이미
-	 * 있는 업무 지식만으로도 충분히 답할 수 있어야 하기 때문이다.
+	 * topK/similarityThreshold/allowEmptyContext를 전부 기본값(null → 전역 설정, allowEmptyContext는 true)으로 쓰는
+	 * 얇은 진입점이다 - Agent 정의에 개별 설정이 없을 때 buildAdvisor(caller, null, null, null)과 동일하다.
 	 * </pre>
 	 *
 	 * @param caller 호출한 앱/서비스 식별자(tenant)
 	 */
 	public Advisor buildAdvisor(String caller) {
-		VectorStoreDocumentRetriever retriever = this.buildRetriever(null, null, caller, null);
+		return this.buildAdvisor(caller, null, null, null);
+	}
+
+	/**
+	 * <pre>
+	 * 선택적원칙: ragEnabled=true인 요청에만 이 Advisor를 붙인다 - caller의 문서만 검색되도록 tenant 필터를 강제한다.
+	 * topK/similarityThreshold/allowEmptyContext는 전부 null이면 전역 기본값(dstone.ai.rag.retrieval.*, allowEmptyContext는
+	 * true)을 쓰고, 값을 주면 이 호출(주로 AgentDefinition.ragTopK/ragSimilarityThreshold/ragAllowEmptyContext)에만
+	 * 적용된다 - RAG를 쓰는 Agent가 늘어나도 검색 범위/개수, 그리고 "근거 없으면 어떻게 답할지"를 Agent마다 다르게
+	 * 가져갈 수 있게 하기 위함이다.
+	 *
+	 * allowEmptyContext가 true(기본값)면, 검색 결과가 하나도 없어도(또는 RAG 자체가 이 요청에 무관해도) 질의를
+	 * "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킨다 - 지금 이 프로젝트의 Agent들처럼
+	 * system prompt에 이미 업무 지식을 갖고 있어 RAG가 보조 수단일 때 맞는 동작이다. false를 주면 Spring AI
+	 * ContextualQueryAugmenter의 원래 동작(근거 없으면 "모른다"고 답하도록 강제)으로 돌아간다 - 순수 지식베이스
+	 * QA처럼 "컨텍스트 밖 답변을 절대 허용하면 안 되는" Agent에 쓴다.
+	 * </pre>
+	 *
+	 * @param caller              호출한 앱/서비스 식별자(tenant)
+	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값)
+	 * @param similarityThreshold 검색 결과 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값)
+	 * @param allowEmptyContext   검색 결과가 없을 때 원 질의 그대로 진행할지(null이면 true)
+	 */
+	public Advisor buildAdvisor(String caller, Integer topK, Double similarityThreshold, Boolean allowEmptyContext) {
+		VectorStoreDocumentRetriever retriever = this.buildRetriever(topK, similarityThreshold, caller, null);
 		ContextualQueryAugmenter queryAugmenter = ContextualQueryAugmenter.builder()
 			.promptTemplate(CONTEXT_PROMPT_TEMPLATE)
-			.allowEmptyContext(true)
+			.allowEmptyContext(allowEmptyContext == null ? true : allowEmptyContext)
 			.build();
 		return RetrievalAugmentationAdvisor.builder()
 			.documentRetriever(retriever)

@@ -149,9 +149,11 @@ public class AgentExecutor extends BaseObject {
 
 		/************************************************************************
 		4. RAG 적용(caller의 문서만 검색되도록 tenant 필터가 함께 걸린다)
+			- topK/similarityThreshold/allowEmptyContext는 AgentDefinition.ragTopK/ragSimilarityThreshold/ragAllowEmptyContext를 그대로 넘긴다.
+			  전부 null이면 RagRetrievalChain의 전역 기본값(dstone.ai.rag.retrieval.*, allowEmptyContext=true)을 쓴다.
 		************************************************************************/
 		if (ragEnabled) {
-			spec = spec.advisors(this.ragRetrievalChain.buildAdvisor(caller));
+			spec = spec.advisors(this.ragRetrievalChain.buildAdvisor(caller, agent.ragTopK(), agent.ragSimilarityThreshold(), agent.ragAllowEmptyContext()));
 		}
 
 		/************************************************************************

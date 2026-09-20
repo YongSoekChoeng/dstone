@@ -14,8 +14,13 @@ import java.util.List;
  *                       PromptTemplate으로 렌더링해서 적용한다
  * @param description    Agent 설명(문서화용, 코드에서는 읽지 않음)
  * @param model          이 Agent 호출에만 쓸 모델명(runtime.agent.AgentExecutor 참고). null이면 spring.ai.{provider}.chat.options.model(엔진 공통 기본값)
- * @param toolsEnabled   Tool 사용 허용 여부
- * @param ragEnabled     RAG 사용 허용 여부
- * @param allowedCallers 이 Agent 호출이 허용된 caller(tenant) 목록
+ * @param toolsEnabled           Tool 사용 허용 여부
+ * @param ragEnabled             RAG 사용 허용 여부
+ * @param ragTopK                이 Agent의 RAG 검색 결과 최대 개수. null이면 common.rag.RagRetrievalChain의 전역 기본값(dstone.ai.rag.retrieval.top-k)을 그대로 씀
+ * @param ragSimilarityThreshold 이 Agent의 RAG 검색 유사도 임계값. null이면 common.rag.RagRetrievalChain의 전역 기본값(dstone.ai.rag.retrieval.similarity-threshold)을 그대로 씀
+ * @param ragAllowEmptyContext   검색 결과가 하나도 없을 때 질의를 그대로 진행시킬지(true, 기본값) 아니면 Spring AI 기본 동작대로 "모른다"고 답하게 강제할지(false).
+ *                               null이면 true(기존 동작)
+ * @param allowedCallers         이 Agent 호출이 허용된 caller(tenant) 목록
  */
-public record AgentDefinition(String name, String prompt, String description, String model, boolean toolsEnabled, boolean ragEnabled, List<String> allowedCallers) {}
+public record AgentDefinition(String name, String prompt, String description, String model, boolean toolsEnabled, boolean ragEnabled, Integer ragTopK, Double ragSimilarityThreshold,
+	Boolean ragAllowEmptyContext, List<String> allowedCallers) {}
