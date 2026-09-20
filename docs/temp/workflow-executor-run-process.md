@@ -179,12 +179,23 @@ current.variables().put(Constants.WorkFlow.PREVIOUS_TEXT_VARIABLE_KEY, groupResu
 
 ```java
 StepDefinition lastOfGroup = group.get(group.size() - 1);
-StepFlow transition = this.decideTransition(workflow, lastOfGroup, groupResult.success(), groupResult.combinedText());
+StepFlow transition;
+try {
+    transition = this.decideTransition(workflow, lastOfGroup, groupResult.success(), groupResult.combinedText());
+} catch (Exception e) {
+    return this.persistFailed(current, "step[" + lastOfGroup.id() + "]의 다음 전이(transition)를 계산하는 중 예외가 발생했습니다 - " + e.getMessage());
+}
 ```
 
 병렬 그룹이었다면 **그룹의 마지막 스텝**(선언 순서 기준)의 `onSuccess`/`onFailure`만 보고 다음 행동을
 결정합니다(그룹 안의 다른 스텝들의 onSuccess/onFailure는 무시됩니다 — 병렬 그룹을 만들 때 이 점을
 염두에 둬야 합니다). 이 메서드가 실제로 어떻게 판단하는지는 6절에서 따로 자세히 다룹니다.
+
+> **`decideTransition()` 전용 try/catch**: `onSuccess`/`onFailure`에 존재하지 않는 step id(오타 등)를
+> 적어두면 `decideTransition()`이 `IllegalStateException`을 던집니다(6절 [경우 4] 참고). 이 호출은
+> 5-4절의 스텝 실행 try/catch와는 **별개의 try/catch**로 감싸져 있어서, 이 예외도 스텝 실행 예외와
+> 똑같이 `FAILED`로 곱게 저장된 뒤 리턴됩니다 — `run()` 밖으로 예외가 그대로 새나가서
+> `WorkFlowExecution` 상태가 갱신 안 된 채 남는 일이 없도록 막아둔 것입니다.
 
 ### 5-8. 전이 결과에 따라 분기
 
@@ -223,30 +234,43 @@ switch (transition.status()) {
 
 ## 6. `decideTransition` 상세 — "다음 스텝을 어떻게 정하는가"
 
+이 메서드는 **if~else if~else 사슬 하나**로 되어 있고, 사슬의 각 가지 안쪽도 전부 if~else 쌍으로만
+구성되어 있습니다. "이 if는 참일 때만 처리하고 거짓이면 그냥 다음 줄로 넘어간다" 같은, 빠져나갈 틈이
+있는 단독 `if`가 하나도 없도록 일부러 이렇게 짜여 있습니다 — 그래서 어떤 입력이 들어와도 아래 4가지
+경우 중 반드시 하나에는 걸립니다.
+
 ```java
 private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String text) {
     String nextId = success ? step.onSuccess() : step.onFailure();
-    if (nextId == null) {
+
+    if (nextId == null) {                                        // [경우 1] 다음 step id를 안 적어둔 경우
         if (!success) {
-            return StepFlow.fail(...);                       // ① onFailure 없이 실패 → 즉시 Workflow 실패
+            return StepFlow.fail(...);                            // [경우 1-1] 실패 + onFailure 없음 → 즉시 Workflow 실패
+        } else {
+            String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
+            if (sequentialNextId == null) {
+                return StepFlow.success(text);                    // [경우 1-2-a] 성공 + onSuccess 없음 + 마지막 스텝 → 전체 성공
+            } else {
+                return StepFlow.next(sequentialNextId);           // [경우 1-2-b] 성공 + onSuccess 없음 + 다음 스텝 있음 → 그 스텝으로
+            }
         }
-        String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
-        return sequentialNextId == null ? StepFlow.success(text) : StepFlow.next(sequentialNextId);
-                                                              // ② onSuccess 없이 성공 → 목록상 다음 스텝(없으면 전체 성공)
+    } else if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
+        return StepFlow.success(text);                            // [경우 2] onSuccess/onFailure == "SUCCESS" 예약어
+    } else if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
+        return StepFlow.fail(text);                               // [경우 3] onSuccess/onFailure == "FAIL" 예약어
+    } else {                                                       // [경우 4] 그 외 - 진짜 다른 step의 id
+        int currentIndex = this.indexOf(workflow.steps(), step.id());
+        int nextIndex = this.indexOf(workflow.steps(), nextId);
+        if (nextIndex < 0) {
+            throw new IllegalStateException(...);                  // [경우 4-1] workflow에 없는 id(오타) → 예외
+        } else {
+            if (nextIndex <= currentIndex) {
+                return StepFlow.loop(nextId);                      // [경우 4-2-a] 목표가 같거나 더 앞 → LOOP
+            } else {
+                return StepFlow.next(nextId);                      // [경우 4-2-b] 목표가 더 뒤 → NEXT_STEP
+            }
+        }
     }
-    if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
-        return StepFlow.success(text);                       // ③ onSuccess/onFailure == "SUCCESS" 예약어
-    }
-    if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
-        return StepFlow.fail(text);                          // ④ onSuccess/onFailure == "FAIL" 예약어
-    }
-    int currentIndex = this.indexOf(workflow.steps(), step.id());
-    int nextIndex = this.indexOf(workflow.steps(), nextId);
-    if (nextIndex < 0) {
-        throw new IllegalStateException(...);                // ⑤ 존재하지 않는 step id → 예외(→ 5-4의 catch에서 FAILED 처리)
-    }
-    return nextIndex <= currentIndex ? StepFlow.loop(nextId) : StepFlow.next(nextId);
-                                                              // ⑥ 지정된 step id의 위치로 순서 비교해서 LOOP/NEXT_STEP 결정
 }
 ```
 
@@ -260,6 +284,10 @@ private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition st
 3. 값이 있는데 예약어 `"SUCCESS"`/`"FAIL"`이면 → 그 자리에서 즉시 Workflow를 종료시킨다.
 4. 그 외의 값(다른 스텝의 id)이면 → 그 스텝이 지금 스텝보다 **목록에서 앞쪽에 있으면 LOOP**,
    **뒤쪽(또는 같은 자리)에 있으면 NEXT_STEP** 으로 표시한다(동작은 동일, 이름만 다름).
+
+> 이렇게 if~else로 완전히 채워두면, "혹시 이 조건도 저 조건도 아닌 경우가 있어서 조용히 아무것도
+> 안 하고 넘어가지 않을까?"라는 걱정을 코드 구조만 보고도 지울 수 있습니다 — 모든 가지 끝이 `return`
+> 아니면 `throw`이고, else 없이 끝나는 if가 하나도 없기 때문입니다.
 
 > 성공/실패는 스텝 종류(`StepType`)마다 판정 방식이 다릅니다. `AGENT`는 항상 성공, `TOOL`은 응답 텍스트가
 > "실패:"로 시작하는지, `SUPERVISOR`는 구조화된 `Verdict.pass()`, `APPROVAL`은 사람의 승인/반려로 정해집니다.
@@ -377,9 +405,9 @@ private GroupResult runGroup(List<StepDefinition> group, WorkFlowExecution execu
 | ① 최대 반복 초과 | `executed > maxIterations` | `FAILED` | onFailure 루프 설계 오류를 의심해봐야 함 |
 | ② 스텝 실행 중 예외 | `runOne`/`runGroup`이 예외를 던짐 | `FAILED` | 5-4절의 catch. Tool/Agent 호출 자체가 죽은 경우 등 |
 | ③ 승인 대기 | APPROVAL 스텝이 아직 결정 없음 | `WAITING_APPROVAL` | 나중에 같은 실행으로 재개 가능 (유일하게 "끝나지 않고 잠시 멈추는" 경로) |
-| ④ onFailure 없이 실패 | 스텝 실패인데 `onFailure`가 null | `FAILED` | decideTransition ①번 규칙 |
-| ⑤ onSuccess/onFailure == "FAIL" | 예약어 사용 | `FAILED` | decideTransition ④번 규칙 |
-| ⑥ 존재하지 않는 step id로 이동 시도 | `onSuccess`/`onFailure`에 오타 등 | `FAILED` | `IllegalStateException`이 던져지고 ②경로로 흡수됨 |
+| ④ onFailure 없이 실패 | 스텝 실패인데 `onFailure`가 null | `FAILED` | decideTransition [경우 1-1] |
+| ⑤ onSuccess/onFailure == "FAIL" | 예약어 사용 | `FAILED` | decideTransition [경우 3] |
+| ⑥ 존재하지 않는 step id로 이동 시도 | `onSuccess`/`onFailure`에 오타 등 | `FAILED` | `decideTransition()` 호출 자체가 별도 try/catch로 감싸져 있어 `IllegalStateException`이 여기서 바로 FAILED로 흡수됨(②경로와는 다른, 전이 계산 전용 catch) |
 | ⑦ 정상 종료(성공) | 마지막 스텝까지 순조롭게 진행되었거나 `onSuccess`가 예약어 "SUCCESS" | `DONE` | 가장 흔한 정상 경로 |
 
 ---

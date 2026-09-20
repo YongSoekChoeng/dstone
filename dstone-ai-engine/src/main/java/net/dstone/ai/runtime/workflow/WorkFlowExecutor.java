@@ -138,9 +138,17 @@ public class WorkFlowExecutor extends BaseObject {
 			7) decideTransition()으로 다음 행동 결정
 			  - 병렬 그룹이었다면 그룹의 마지막 스텝(선언 순서 기준)의 onSuccess/onFailure만 보고 다음 행동을 결정함.
 			    그룹 안의 다른 스텝들의 onSuccess/onFailure는 무시되므로 /workflow/*.yml 에서 병렬 그룹을 만들 때 이 점을 염두에 둬야 함.
+			  - onSuccess/onFailure에 오타로 존재하지 않는 step id를 적어두면 decideTransition()이 예외를 던지는데,
+			    4)번 스텝 실행 예외와 똑같이 여기서도 잡아서 FAILED로 곱게 남긴다 - 이 예외가 run() 밖으로
+			    그냥 새나가서 WorkFlowExecution 상태가 갱신 안 된 채로 남는 일이 없도록 하기 위함이다.
 			****************************************************************************************/
 			StepDefinition lastOfGroup = group.get(group.size() - 1);
-			StepFlow transition = this.decideTransition(workflow, lastOfGroup, groupResult.success(), groupResult.combinedText());
+			StepFlow transition;
+			try {
+				transition = this.decideTransition(workflow, lastOfGroup, groupResult.success(), groupResult.combinedText());
+			} catch (Exception e) {
+				return this.persistFailed(current, "step[" + lastOfGroup.id() + "]의 다음 전이(transition)를 계산하는 중 예외가 발생했습니다 - " + e.getMessage());
+			}
 
 			switch (transition.status()) {
 				/*************************************
@@ -318,47 +326,54 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param text     방금 실행 결과 텍스트
 	 */
 	private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String text) {
-		
-		// nextId : 예약어 SUCCESS / 예약어 FAIL
+
+		// nextId : 성공이면 onSuccess에, 실패면 onFailure에 적어둔 값. YAML에 안 적었으면 null.
 		String nextId = success ? step.onSuccess() : step.onFailure();
-		
-		// 방금 실행한 스텝이 성공도 실패도 아닌 경우(계속 진행해야 할 경우)
+
+		// 아래는 "nextId가 없다 / SUCCESS 예약어다 / FAIL 예약어다 / 그 외(진짜 다른 step id)다" 이 4가지 경우를
+		// if~else if~else 하나로 쭉 이어서, 어떤 경우든 반드시 이 사슬 중 하나에는 걸리도록(빠져나가는 틈이 없도록) 정리했다.
+		// 각 가지의 안쪽도 전부 if~else 쌍으로만 구성해서, "이 if는 참일 때만 처리하고 거짓일 때는 그냥 넘어간다" 같은
+		// 애매한 지점이 하나도 없게 했다(거짓일 때 뭘 해야 하는지가 항상 else 쪽에 명시적으로 적혀 있다).
 		if (nextId == null) {
-			// 현재스텝 실행 결과가 실패 라면
+			// [경우 1] 다음 step id를 아예 안 적어둔 경우 - 실패/성공 여부로 다시 나뉜다.
 			if (!success) {
-				// onFailure 없이 실패 → 즉시 Workflow 실패
+				// [경우 1-1] 실패했는데 onFailure가 없다 → 이 실패를 이어받을 곳이 없으니 그대로 Workflow 실패.
 				return StepFlow.fail("step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + text);
+			} else {
+				// [경우 1-2] 성공했는데 onSuccess가 없다 → "그냥 목록상 다음 스텝으로" 넘어가는 가장 흔한 순차 실행.
+				String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
+				if (sequentialNextId == null) {
+					// 목록상 다음 스텝이 없다(=지금 스텝이 마지막) → Workflow 전체 성공으로 종료.
+					return StepFlow.success(text);
+				} else {
+					// 목록상 다음 스텝이 있다 → 그 스텝으로 진행.
+					return StepFlow.next(sequentialNextId);
+				}
 			}
-			// 현재스텝 실행 결과가 실패가 아니라면 (다음 스텝을 진행하거나 성공 종료 해야 함) 다음 스텝 Id 를 구한다.
-			String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
-			// 다음 스텝 Id가 없다면 → 목록상 다음 스텝 없으면 전체 성공
-			if( sequentialNextId == null ) {
-				return StepFlow.success(text);
-			// 다음 스텝 Id가 있다면 → 다음 스텝 반환
-			}else {
-				return StepFlow.next(sequentialNextId);
-			}
-		}
-		
-		// 방금 실행한 스텝이 성공 일 경우
-		if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
+		} else if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
+			// [경우 2] 예약어 "SUCCESS"를 적어둔 경우 → 그 자리에서 바로 Workflow 성공 종료.
 			return StepFlow.success(text);
-		}
-		
-		// 방금 실행한 스텝이 실패 일 경우
-		if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
+		} else if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
+			// [경우 3] 예약어 "FAIL"을 적어둔 경우 → 그 자리에서 바로 Workflow 실패 종료.
 			return StepFlow.fail(text);
+		} else {
+			// [경우 4] 예약어가 아닌, 진짜 다른 step의 id를 적어둔 경우(명시적 분기/재시도 루프) → 그 step으로 이동해야 한다.
+			int currentIndex = this.indexOf(workflow.steps(), step.id());
+			int nextIndex = this.indexOf(workflow.steps(), nextId);
+			if (nextIndex < 0) {
+				// 그런 id를 가진 step이 workflow 안에 없다(YAML 오타 등) → 더는 진행할 수 없으니 예외로 알린다.
+				// (이 예외는 run()이 catch해서 FAILED로 곱게 남긴다 - 아래 run() 쪽 주석 참고)
+				throw new IllegalStateException("workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
+			} else {
+				if (nextIndex <= currentIndex) {
+					// 목표 step이 지금 step과 같거나 목록상 더 앞에 있다 → 뒤로 되돌아가는 것이니 LOOP(재시도).
+					return StepFlow.loop(nextId);
+				} else {
+					// 목표 step이 지금 step보다 목록상 더 뒤에 있다 → 앞으로 나아가는 것이니 NEXT_STEP.
+					return StepFlow.next(nextId);
+				}
+			}
 		}
-		
-		// 현재 스텝의 인덱스를 구한다.
-		int currentIndex = this.indexOf(workflow.steps(), step.id());
-		// 다음 스텝의 인덱스를 구한다.
-		int nextIndex = this.indexOf(workflow.steps(), nextId);
-		// 다음 스텝 id 의 존재여부 체크.
-		if (nextIndex < 0) {
-			throw new IllegalStateException("workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
-		}
-		return nextIndex <= currentIndex ? StepFlow.loop(nextId) : StepFlow.next(nextId);
 	}
 
 	/**
