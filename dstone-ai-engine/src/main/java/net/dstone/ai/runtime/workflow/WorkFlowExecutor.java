@@ -90,18 +90,26 @@ public class WorkFlowExecutor extends BaseObject {
 
 		while (true) {
 			
-			// 1) 실행 횟수 체크 → maxIterations 초과 시 FAILED로 종료
+			/****************************************************************************************
+			1) 실행 횟수 체크 → maxIterations 초과 시 FAILED로 종료
+			****************************************************************************************/
 			if (++executed > maxIterations) {
 				return this.persistFailed(current, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
 			}
 
-			// 2) 지금 step 번호(currentIndex)로 StepDefinition 조회
+			/****************************************************************************************
+			2) 지금 step 번호(currentIndex)로 StepDefinition 조회
+			****************************************************************************************/
 			StepDefinition step = workflow.steps().get(currentIndex);
-			
-			// 3) 같은 parallelGroup을 가진 인접 step이 있으면 묶어서 "그룹"으로 취급
-			List<StepDefinition> group = this.parallelGroupOf(workflow.steps(), step);
 
-			// 4) 핵심로직(Run)수행. 그룹 크기가 1이면 runOne(), 2개 이상이면 runGroup() 실행 
+			/****************************************************************************************
+			3) 같은 parallelGroup을 가진 인접 step이 있으면 묶어서 "그룹"으로 취급
+			****************************************************************************************/
+			List<StepDefinition> group = this.parallelGroupOf(workflow.steps(), step);
+			
+			/****************************************************************************************
+			4) 핵심로직(Run)수행. 그룹 크기가 1이면 runOne(), 2개 이상이면 runGroup() 실행 
+			****************************************************************************************/
 			GroupResult groupResult;
 			try {
 				groupResult = group.size() > 1 ? this.runGroup(group, current) : this.runOne(step, current);
@@ -110,7 +118,9 @@ public class WorkFlowExecutor extends BaseObject {
 				return this.persistFailed(current, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
 			}
 
-			// 5) 결과가 PENDING(APPROVAL 대기)이면
+			/****************************************************************************************
+			5) 결과가 PENDING(APPROVAL 대기)이면
+			****************************************************************************************/
 			if (groupResult.pending()) {
 				// WAITING_APPROVAL 상태로 저장하고 즉시 리턴 (루프 탈출)
 				current = current.waitingApproval(currentIndex);
@@ -118,33 +128,55 @@ public class WorkFlowExecutor extends BaseObject {
 				return current;
 			}
 
-			// 6) 결과 데이터를 variables에 병합, 결과 텍스트를 "__previous"에 저장
+			/****************************************************************************************
+			6) 결과 데이터를 variables에 병합, 결과 텍스트를 "__previous"에 저장
+			****************************************************************************************/
 			this.mergeVariables(current.variables(), groupResult.mergedData());
 			current.variables().put(Constants.WorkFlow.PREVIOUS_TEXT_VARIABLE_KEY, groupResult.combinedText());
 
-			// 7) decideTransition()으로 다음 행동 결정
+			/****************************************************************************************
+			7) decideTransition()으로 다음 행동 결정
+			  - 병렬 그룹이었다면 그룹의 마지막 스텝(선언 순서 기준)의 onSuccess/onFailure만 보고 다음 행동을 결정함.
+			    그룹 안의 다른 스텝들의 onSuccess/onFailure는 무시되므로 /workflow/*.yml 에서 병렬 그룹을 만들 때 이 점을 염두에 둬야 함.
+			****************************************************************************************/
 			StepDefinition lastOfGroup = group.get(group.size() - 1);
 			StepFlow transition = this.decideTransition(workflow, lastOfGroup, groupResult.success(), groupResult.combinedText());
 
 			switch (transition.status()) {
-				// SUCCESS → DONE으로 저장하고 리턴 (루프 탈출)
-				case SUCCESS:
+				/*************************************
+				SUCCESS : DONE 으로 저장하고 리턴 (루프 탈출)	
+					- Workflow 전체가 성공적으로 끝남
+					- status=DONE, resultText에 마지막 결과 텍스트 저장 후 리턴
+				*************************************/
+				case SUCCESS: 
 					current = current.done(transition.message());
 					this.executionStore.update(current);
 					return current;
-				// FAIL    → FAILED로 저장하고 리턴 (루프 탈출)	
+				/*************************************
+				FAIL : FAILED로 저장하고 리턴 (루프 탈출)	
+					- Workflow 전체가 실패로 끝남
+					- status=FAILED, errorMessage에 실패 사유 저장 후 리턴
+				*************************************/
 				case FAIL:
 					return this.persistFailed(current, transition.message());
-				case NEXT_STEP:
-				// LOOP → currentIndex 갱신, RUNNING으로 저장, 루프 계속	
-				case LOOP:
+				/*************************************
+				NEXT_STEP, LOOP : RUNNING 저장 후 이동(루프 지속)	
+					- 앞으로 있는 다른 스텝으로 이동
+					- currentIndex 갱신, status=RUNNING 저장 후 while 루프 계속
+					- NEXT_STEP 과 LOOP 의 동작은 완전히 동일 — 로그/가독성 구분용일 뿐
+				*************************************/
+				case NEXT_STEP, LOOP:
 					currentIndex = this.indexOf(workflow.steps(), transition.nextStepId());
 					current = current.advanceTo(currentIndex);
 					this.executionStore.update(current);
 					break;
+				/*************************************
+				나머지 ERROR/WAITING_APPROVAL 
+					- ERROR/WAITING_APPROVAL은 decideTransition이 만들어내지 않는다.
+					  각각 위의 catch, groupResult.pending()에서 먼저 처리됨.
+					- 컴파일러의 switch 완결성 요구를 맞추기 위한 방어적 분기일 뿐 실제로 타지 않는다.
+				*************************************/
 				default:
-					// ERROR/WAITING_APPROVAL은 decideTransition이 만들어내지 않는다(각각 위의 catch, groupResult.pending()에서
-					// 먼저 처리됨) - 컴파일러의 switch 완결성 요구를 맞추기 위한 방어적 분기일 뿐 실제로 타지 않는다.
 					return this.persistFailed(current, "알 수 없는 스텝 전이 상태입니다: " + transition.status());
 			}
 		}
@@ -271,28 +303,62 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * 방금 실행한 스텝의 결과에 따라 다음 전환에 대한 전환 방향을 결정하는 메소드.
+	 * 성공/실패는 스텝 종류(StepType)마다 판정 방식이 다름. 
+	 *   - AGENT는 항상 성공
+	 *   - TOOL은 응답 텍스트가 "실패:"로 시작하면 실패. 아니면 성공.
+	 *   - SUPERVISOR는 구조화된 Verdict.pass(true/false)로 판단.
+	 *   - APPROVAL은 사람의 승인/반려로 정해짐.
+	 * </pre>
+	 * 
 	 * @param workflow 실행 중인 Workflow 정의
 	 * @param step     방금 실행한 스텝(그룹이었다면 그룹의 마지막 스텝) 정의
 	 * @param success  방금 실행 결과의 성공 여부
 	 * @param text     방금 실행 결과 텍스트
 	 */
 	private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String text) {
+		
+		/*************************************************************
+		
+		*************************************************************/
+		
+		// nextId : 예약어 SUCCESS / 예약어 FAIL
 		String nextId = success ? step.onSuccess() : step.onFailure();
+		
+		// 방금 실행한 스텝이 성공도 실패도 아닌 경우(계속 진행해야 할 경우)
 		if (nextId == null) {
+			// 현재스텝 실행 결과가 실패 라면
 			if (!success) {
+				// onFailure 없이 실패 → 즉시 Workflow 실패
 				return StepFlow.fail("step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + text);
 			}
+			// 현재스텝 실행 결과가 실패가 아니라면 (다음 스텝을 진행하거나 성공 종료 해야 함) 다음 스텝 Id 를 구한다.
 			String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
-			return sequentialNextId == null ? StepFlow.success(text) : StepFlow.next(sequentialNextId);
+			// 다음 스텝 Id가 없다면 → 목록상 다음 스텝 없으면 전체 성공
+			if( sequentialNextId == null ) {
+				return StepFlow.success(text);
+			// 다음 스텝 Id가 있다면 → 다음 스텝 반환
+			}else {
+				return StepFlow.next(sequentialNextId);
+			}
 		}
+		
+		// 방금 실행한 스텝이 성공 일 경우
 		if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
 			return StepFlow.success(text);
 		}
+		
+		// 방금 실행한 스텝이 실패 일 경우
 		if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
 			return StepFlow.fail(text);
 		}
+		
+		// 현재 스텝의 인덱스를 구한다.
 		int currentIndex = this.indexOf(workflow.steps(), step.id());
+		// 다음 스텝의 인덱스를 구한다.
 		int nextIndex = this.indexOf(workflow.steps(), nextId);
+		// 다음 스텝 id 의 존재여부 체크.
 		if (nextIndex < 0) {
 			throw new IllegalStateException("workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
 		}
