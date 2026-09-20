@@ -161,13 +161,17 @@ public class AgentExecutor extends BaseObject {
 			- caller의 Tool 화이트리스트를 통과한 것만 붙는다.
 			- 화이트리스트설정(dstone.ai.tool.allowed-by-caller)이 없으면 전체 허용.
 			- toolContext로 caller를 함께 실어 보낸다 - tools.rag.RagSearchTool처럼 caller(tenant) 기준으로
-			  검색 범위를 좁혀야 하는 Tool이 ToolContext 파라미터로 이 값을 받을 수 있게 한다.
+			  검색 범위를 좁혀야 하는 Tool이 ToolContext 파라미터로 이 값을 받을 수 있게 한다. caller가 없어도
+			  키 자체는 반드시 채워 넣어야 한다(값은 빈 문자열) - Spring AI MethodToolCallback.
+			  validateToolContextSupport()는 @Tool 메서드가 ToolContext 파라미터를 선언했는데 toolContext가
+			  null이거나 "빈 Map"이면(CollectionUtils.isEmpty) "ToolContext is required by the method as an
+			  argument" IllegalArgumentException을 던진다 - Map.of()(엔트리 0개)도 빈 Map으로 취급되므로
+			  caller==null일 때도 엔트리 1개는 있어야 한다. 값이 빈 문자열이면 StringUtil.isEmpty()가 캐치해서
+			  RagSearchTool 쪽에서는 caller 없음과 동일하게 처리된다.
 		************************************************************************/
 		if (toolsEnabled) {
 			spec.tools(this.configTool.toolCallbackProvider(caller));
-			if (caller != null) {
-				spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller));
-			}
+			spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
 		}
 
 		/************************************************************************

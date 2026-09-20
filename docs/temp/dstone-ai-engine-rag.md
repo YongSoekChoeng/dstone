@@ -298,6 +298,16 @@ dstone:
 '스톤이'..." 수준의 무관한 문장). **Oracle→PostgreSQL 변환 지식베이스는 한 번도 시딩된 적이 없다** - §4.2에서
 설명한 JSONL 전용 포맷(`readJsonlAsDocuments`)이 구현돼 있음에도 실제 사용 사례가 없는 상태다.
 
+> **2026-09-20 갱신**: 이 문서를 처음 작성한 시점 이후, WSL에서 서버를 직접 기동해 `GET /api/ai/embed/
+> documents`(§13.2로 이번에 신설)로 실제 `vector_store` 상태를 다시 확인해보니 위 서술이 더 이상 맞지
+> 않았다 - 이 세션이 시작되기 전 어느 시점엔가 `sourceId=ora-to-pg-0002`로 **325개 청크**짜리 실제
+> Oracle→PostgreSQL MyBatis SQL 변환 사례 지식베이스가 이미 적재돼 있었다(NVL/NVL2/ROWNUM 페이징 등
+> 커버, `<if>`/`${orderBy}` 같은 MyBatis 동적 태그까지 포함된 실전 사례). 즉 "지식베이스가 비어 있다"는
+> §10/§11-8의 진단은 이 문서를 쓴 시점 기준으로는 맞았지만 현재는 틀렸다 - `ora-to-pg-0002`(325건, 기존)
+> + `oracle-to-postgresql-kb-v1`(24건, §13.8에서 이번에 추가) 두 지식베이스가 함께 검색 대상이다. §11-8/
+> §13.8의 "지식베이스가 비어 있다"는 진단과 그 처방(시딩)은 결과적으로 여전히 유효했다 - 다만 "완전히
+> 0건"은 아니었고 이미 상당한 실제 데이터가 있었다는 점을 정정한다.
+
 ---
 
 ## 11. 부족한 부분
@@ -371,7 +381,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
 즉 "Tool 호출 체인에 caller를 실어 보낸다"는 §11-3의 해법이 실제로 이 프로젝트가 쓰는 Spring AI 버전에서
 그대로 가능합니다(추가 라이브러리 불필요).
 
-### 13.1 [§11-1] 검색 미리보기 API 신설 — ✅ 완료(2026-09-20, 코드 변경/컴파일 완료, 라이브 검증 대기)
+### 13.1 [§11-1] 검색 미리보기 API 신설 — ✅ 완료(2026-09-20, 라이브 검증 완료)
 
 - **무엇을**: `RagRetrievalChain.search()`를 직접 호출하는 REST 엔드포인트를 새로 연다.
 - **어디에**: 새 컨트롤러 `api.controller.RagController` (`@RequestMapping("/api/ai/rag")`) →
@@ -383,7 +393,7 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
 - **리스크**: 낮음. 기존 `search()`를 그대로 노출만 하는 얇은 컨트롤러라 `RagRetrievalChain` 변경이
   필요 없다.
 
-### 13.2 [§11-2] 적재 문서 목록 조회 API — ✅ 완료(2026-09-20, 코드 변경/컴파일 완료, 라이브 검증 대기)
+### 13.2 [§11-2] 적재 문서 목록 조회 API — ✅ 완료(2026-09-20, 라이브 검증 완료)
 
 - **무엇을**: 지금 `vector_store`에 어떤 `sourceId`들이(몇 청크씩, 어떤 tenant로) 적재돼 있는지 보는
   `GET /api/ai/embed/documents` 신설.
@@ -397,22 +407,38 @@ ToolContext(Map<String, Object>) / getContext()                     ← 존재�
   것이므로, Spring AI의 `PgVectorStore` 내부 스키마가 버전업 때 바뀌면 같이 깨질 수 있다는 점을 주석으로
   남겨둔다.
 
-### 13.3 [§11-3] `RagSearchTool` tenant 격리 — ✅ 완료(2026-09-20, 코드 변경/컴파일 완료, 라이브 검증 대기)
+### 13.3 [§11-3] `RagSearchTool` tenant 격리 — ✅ 완료(2026-09-20, 라이브 검증 완료 - 버그 1건 발견/수정)
+
+> **라이브 검증 중 발견한 버그(2026-09-20)**: 처음 구현(아래 원래 계획)은 `caller == null`일 때
+> `toolContext()`를 아예 호출하지 않거나 `Map.of()`(빈 Map)로 호출했는데, 둘 다 실제로 WSL에 서버를 띄워
+> `general-chat`(RAG는 꺼져 있고 `toolsEnabled: true`만 켜진 Agent)로 `searchDocuments` Tool을
+> 호출시켜보니 `java.lang.IllegalArgumentException: ToolContext is required by the method as an
+> argument`로 500 에러가 났다. 원인은 실제 의존 버전(`mvn dependency:tree`로 확인한 spring-ai
+> **2.0.1** - §13.0에서 처음 스파이크할 때 로컬 `.m2`에 남아있던 다른 프로젝트의 1.1.8 아티팩트를 잘못
+> 참조해서 확인했던 것과 달랐다) `MethodToolCallback.validateToolContextSupport()`가 "메서드가 ToolContext
+> 파라미터를 선언했는데 `toolContext == null`이거나 `CollectionUtils.isEmpty(toolContext.getContext())`
+> 면 예외"로 판정하기 때문 - **엔트리 0개인 `Map.of()`도 "빈 Map"으로 쳐서 걸린다.** 그래서 caller가 없을
+> 때도 `Map.of(KEY, "")`처럼 엔트리는 반드시 1개 이상 채워야 한다(값이 빈 문자열이면
+> `RagSearchTool.callerOf()`→`StringUtil.isEmpty()` 경로에서 "caller 없음"과 동일하게 처리되므로 안전).
+> 아래 "두 호출 경로" 서술은 이 수정을 반영해 갱신했다. **교훈**: 컴파일 성공은 이런 프레임워크 런타임
+> 계약(런타임에만 검증되는 "메서드 시그니처 vs 호출 시 넘긴 컨텍스트" 매칭)을 전혀 잡아주지 못한다 -
+> §13.0류 스파이크도 반드시 실제 의존성 버전으로, 그리고 최종적으로는 실제 기동 후 호출까지 해봐야 한다.
 
 - **무엇을**: AGENT 경로처럼 TOOL 경로에도 caller를 실어서 `RagSearchTool.searchDocuments()`가
   `ragRetrievalChain.search(request, caller)`를 `null` 대신 실제 caller로 호출하게 만든다.
 - **두 호출 경로를 둘 다 고쳐야 한다**(§13.0에서 둘 다 가능함을 확인):
-  1. **Agent의 tool-calling 경로**(`AgentExecutor.buildSpec()` 5단계, `AgentExecutor.java:157-164`) -
-     `spec.tools(...)` 옆에 `spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller));`
-     추가.
-  2. **Workflow TOOL step 경로**(`runtime.tool.ToolExecutor.call()`) - `callback.call(jsonInput)`을
-     `callback.call(jsonInput, new ToolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller)))`로
-     교체(`caller` 파라미터는 이미 메서드 시그니처에 있어 추가 배선 불필요).
+  1. **Agent의 tool-calling 경로**(`AgentExecutor.buildSpec()` 5단계) - `spec.tools(...)` 옆에
+     `spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));`
+     추가 - caller 유무와 무관하게 매 요청 항상 호출(위 버그 설명 참고).
+  2. **Workflow TOOL step 경로**(`runtime.tool.ToolExecutor.call()`) - `callback.call(jsonInput)`(1-인자)을
+     전부 없애고 `callback.call(jsonInput, new ToolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller)))`
+     (2-인자)로 항상 호출하도록 교체.
 - **`RagSearchTool` 쪽**: `searchDocuments(String query, Integer topK, ToolContext toolContext)`로
   파라미터 하나를 추가한다(Spring AI가 `@Tool` 메서드의 `ToolContext` 타입 파라미터는 LLM에게 노출되는
   JSON 스키마에서 자동으로 제외하고 프레임워크가 직접 주입해준다). `toolContext.getContext().get(...)`에서
-  caller를 꺼내 `search()`에 넘긴다. `toolContext`가 `null`이거나 caller 키가 없으면(예: 과거 호출 경로가
-  남아있는 경우) 기존과 동일하게 `null`로 폴백해 하위호환을 유지한다.
+  caller를 꺼내 `search()`에 넘긴다 - 빈 문자열이면 `StringUtil.isEmpty()`가 잡아서 caller 없음과 동일하게
+  처리되므로 별도 분기가 필요 없다. `toolContext`가 `null`인 경우(이론상 안 생기지만)도 방어적으로 `null`
+  폴백을 남겨뒀다.
 - **리스크**: 낮음~중간. `ConfigTool.toolCallbackProvider()`가 만드는 Tool들이 전부 이 변경의 영향권이라,
   다른 `@AiTool`(Shell/Python/HTTP 등)도 `ToolContext` 파라미터를 원하면 같은 방식으로 caller를 받을 수
   있게 되는 부수 효과가 있다(원치 않는 Tool은 그냥 파라미터를 안 받으면 그만이라 강제되지 않음).
@@ -530,11 +556,11 @@ curl -X POST http://localhost:8081/api/ai/embed/documents \
 
 | 단계 | 항목 | 우선순위 | 코드 변경 규모 | 선행조건 | 상태(2026-09-20) |
 |---|---|---|---|---|---|
-| 1 | §13.8 실 지식베이스 시딩 | **최우선** | 없음(데이터 작업만) | - | ✅ 데이터 작성 완료 / 적재는 인프라 필요 |
-| 1 | §13.9 `sql-conversion-agent` ragEnabled 정리 | **최우선** | 매우 작음(YAML 1줄 + topK 등 튜닝) | §13.8 | ✅ 완료 |
-| 2 | §13.3 `RagSearchTool` tenant 격리 | 높음(보안) | 작음 | §13.0 스파이크(완료) | ✅ 완료(컴파일 검증) |
-| 3 | §13.1 검색 미리보기 API | 중간(운영 편의) | 작음 | - | ✅ 완료(컴파일 검증) |
-| 3 | §13.2 적재 목록 조회 API | 중간(운영 편의) | 중간 | - | ✅ 완료(컴파일 검증) |
+| 1 | §13.8 실 지식베이스 시딩 | **최우선** | 없음(데이터 작업만) | - | ✅ WSL에서 적재 완료(24건, 기존 325건과 별도 공존) |
+| 1 | §13.9 `sql-conversion-agent` ragEnabled 정리 | **최우선** | 매우 작음(YAML 1줄 + topK 등 튜닝) | §13.8 | ✅ 완료, 라이브 확인(NVL/NVL2/(+)/ROWNUM 동시 변환 성공) |
+| 2 | §13.3 `RagSearchTool` tenant 격리 | 높음(보안) | 작음 | §13.0 스파이크(완료) | ✅ 완료 - 라이브 검증 중 버그 1건 발견/수정(위 §13.3 참고) |
+| 3 | §13.1 검색 미리보기 API | 중간(운영 편의) | 작음 | - | ✅ 완료, 라이브 확인 |
+| 3 | §13.2 적재 목록 조회 API | 중간(운영 편의) | 중간 | - | ✅ 완료, 라이브 확인 |
 | 4 | §13.4 임의 메타데이터 필터 | 중간(확장성) | 중간 | - | ⏸ 보류 |
 | 4 | §13.11 프롬프트 템플릿 override | 낮음(확장성) | 작음 | - | ⏸ 보류 |
 | 4 | §13.7 JSONL 포맷 일반화 | 중간(재사용성) | 중간~큼 | 두 번째 RAG 활용 사례 등장 시 | ⏸ 보류(트리거 미충족) |
@@ -542,17 +568,32 @@ curl -X POST http://localhost:8081/api/ai/embed/documents \
 | 5 | §13.5 재랭킹/하이브리드 검색 | 낮음(장기) | 큼 | §13.8로 품질 실측 후 | ⏸ 보류(트리거 미충족) |
 | 각 단계 후 | §13.10 문서 정합성 복구 | - | 문서만 | 해당 단계 완료 시마다 | ✅ 1~3단계분 반영(`CLAUDE.md`, `docs/09.dstone-ai-engine.md` §13) |
 
-**2026-09-20 진행 결과**: 1~3단계(§13.8/13.9/13.3/13.1/13.2)를 순차적으로 구현하고 `mvn clean compile`로
-검증했다(`dstone-ai-engine`). §13.4/13.7/13.11은 계획 수립 시점에 이미 "중간/낮음 우선순위 + 별도 트리거
-조건"으로 분류돼 있었고 그 트리거(두 번째 RAG 활용 사례, 다국어 재사용 수요 등)가 아직 발생하지 않아 이번
-착수 범위에서 의도적으로 제외했다 - 필요해지면 §13.3에서 확립한 것과 동일한 패턴(선택적 오버로드 +
-AgentDefinition 필드 추가)을 그대로 반복 적용하면 된다. §13.5/13.6도 계획대로 보류 상태를 유지한다.
+**2026-09-20 진행 결과 1차(코드 작성)**: 1~3단계(§13.8/13.9/13.3/13.1/13.2)를 순차적으로 구현하고
+`mvn clean compile`로 검증했다(`dstone-ai-engine`). §13.4/13.7/13.11은 계획 수립 시점에 이미 "중간/낮음
+우선순위 + 별도 트리거 조건"으로 분류돼 있었고 그 트리거(두 번째 RAG 활용 사례, 다국어 재사용 수요 등)가
+아직 발생하지 않아 이번 착수 범위에서 의도적으로 제외했다 - 필요해지면 §13.3에서 확립한 것과 동일한 패턴
+(선택적 오버로드 + AgentDefinition 필드 추가)을 그대로 반복 적용하면 된다. §13.5/13.6도 계획대로 보류
+상태를 유지한다.
 
-**아직 남은 것(라이브 검증)**: 이 세션에는 kind 클러스터/Postgres+pgvector/Ollama가 떠 있지 않아 컴파일
-검증까지만 했다. 인프라가 뜬 뒤 ① `docs/data/oracle-to-postgresql-rag-seed.jsonl` 적재(§13.8의 curl
-명령) ② `oracle-to-postgresql` Workflow 재실행 → `convert` 스텝이 실제 변환 사례를 참고하는지 확인
-③ `POST /api/ai/rag/search`/`GET /api/ai/embed/documents`가 실제로 동작하는지 확인 ④ `security.auth`를
-잠시 켜서 `RagSearchTool`의 tenant 격리가 실제로 걸리는지 확인 - 이 네 가지가 남아 있다.
+**2026-09-20 진행 결과 2차(라이브 검증, 같은 날 WSL에 직접 서버 기동)**: kind 대신 WSL에서 `bin/startApp.sh`
+(`conf/env-wsl.properties`, `DSTONE_PROFILE=wsl`)로 직접 기동 - 이미 로컬에 떠 있던 Ollama(`bge-m3`)/
+Redis/PostgreSQL+pgvector를 그대로 사용했다. 확인한 것:
+- ① seed 데이터 적재: `curl -F file=@docs/data/oracle-to-postgresql-rag-seed.jsonl -F sourceId=oracle-to-postgresql-kb-v1` → `{"chunkCount":24}` 정상
+- ② `oracle-to-postgresql` Workflow 재실행(NVL/NVL2/`(+)`/ROWNUM 섞은 새 쿼리) → `analyze`(topK/threshold 기본값)와
+  `convert`(topK=3/threshold=0.5, §13.9 튜닝값 그대로 로그에 찍힘) 둘 다 벡터 검색이 실제로 발생, 4스텝 전부
+  `SUCCESS`로 `DONE` - `COALESCE`/`CASE WHEN`/`LEFT JOIN`/`LIMIT`로 정확히 변환됨
+- ③ `POST /api/ai/rag/search`, `GET /api/ai/embed/documents` 둘 다 정상 응답 확인(아래 §10 갱신 참고 -
+  기존에 이미 있던 325건짜리 지식베이스까지 함께 검색됨)
+- ③-보너스: `general-chat`(ragEnabled=false, toolsEnabled=true)에게 "검색 도구로 NVL 변환법을 찾아 요약"을
+  시켜 `searchDocuments` Tool-calling 경로까지 별도로 검증 - 정확한 답변("NVL → COALESCE") 확인
+- **④ tenant 격리 자체(=security.auth를 켜서 실제로 다른 tenant 문서가 걸러지는지)는 아직 미검증**으로
+  남아 있다 - `security.auth`가 꺼져 있어 caller가 항상 null인 현재 배포로는 격리 동작 자체를 재현할 방법이
+  없었다(§13.3의 코드 경로는 caller가 있을 때를 전제로 하며, 코드 검토상 기존 AGENT `ragEnabled` 경로와
+  동일한 필터 로직을 타므로 동작은 할 것으로 보이나, 실측은 아님)
+- 이 검증 과정에서 §13.3 구현의 실제 버그 1건을 발견해 수정했다 - 자세한 내용은 위 §13.3의 "라이브 검증
+  중 발견한 버그" 박스 참고. **결과적으로 "컴파일만 검증"과 "라이브로 실제 호출까지 검증"이 잡아내는 문제가
+  다르다는 걸 이번 라운드가 직접 보여줬다** - RAG 리팩토링류는 앞으로도 컴파일 성공만으로 완료 처리하지
+  않는다.
 
 지금까지 가장 먼저 손댈 가치가 있던 건 **§13.8(시딩) → §13.9(플래그 정리) → §13.3(tenant 격리)** 순서였고
 실제로 그 순서대로 진행했다 - 앞의 둘은 "RAG가 있으나 마나 한 상태"를 실질적으로 풀어주고, 셋째는 이후
