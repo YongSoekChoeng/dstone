@@ -319,10 +319,6 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String text) {
 		
-		/*************************************************************
-		
-		*************************************************************/
-		
 		// nextId : 예약어 SUCCESS / 예약어 FAIL
 		String nextId = success ? step.onSuccess() : step.onFailure();
 		
