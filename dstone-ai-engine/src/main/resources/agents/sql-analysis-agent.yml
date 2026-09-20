@@ -15,4 +15,4 @@ agent:
     (발견한 순서대로 번호를 매겨, 무엇을 왜 바꿔야 하는지 한 줄씩 - 예: "1. (+) 아우터조인 표기 → LEFT JOIN으로 변환 필요, NULL 허용 쪽은 b 테이블")
     (변환이 필요한 요소가 없으면 "특별한 변환 포인트 없음"이라고만 적으십시오)
   toolsEnabled: false
-  ragEnabled: false
+  ragEnabled: true
