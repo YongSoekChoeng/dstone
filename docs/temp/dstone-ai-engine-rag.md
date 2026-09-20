@@ -348,3 +348,185 @@ dstone:
 맞추고, (b) 검색 미리보기/목록 조회 같은 운영 편의 API를 보강하고, (c) 무엇보다 **실제 Oracle→PostgreSQL
 변환 지식베이스를 JSONL로 만들어 시딩**하는 작업이 선행되어야 합니다 - 지금은 파이프라인만 검증됐을 뿐
 그 파이프라인에 태울 실제 데이터가 없는 상태입니다.
+
+---
+
+## 13. 부족한 부분 보충 계획
+
+§11의 11개 항목을 실제로 고칠 수 있는 단위 작업으로 쪼갠 계획입니다. 항목 번호는 §11과 그대로 대응됩니다.
+각 항목은 실제 코드를 뒤져서(§13.0 스파이크 포함) 실현 가능성을 확인한 뒤 적었습니다 - 추측성 제안은
+없습니다.
+
+### 13.0 사전 확인(스파이크) 결과
+
+계획을 세우기 전에 Spring AI 1.1.8(현재 `spring-ai.version`)의 실제 클래스를 `javap`으로 직접 까봐서
+아래 두 가지를 확인했습니다 - §13-3(Tool 경로 tenant 격리) 계획의 전제입니다.
+
+```
+ChatClient.ChatClientRequestSpec#toolContext(Map<String, Object>)   ← 존재함 (spring-ai-client-chat)
+ToolCallback#call(String, ToolContext)                              ← 존재함, default 메서드 (spring-ai-model)
+ToolContext(Map<String, Object>) / getContext()                     ← 존재함 (org.springframework.ai.chat.model.ToolContext)
+```
+
+즉 "Tool 호출 체인에 caller를 실어 보낸다"는 §11-3의 해법이 실제로 이 프로젝트가 쓰는 Spring AI 버전에서
+그대로 가능합니다(추가 라이브러리 불필요).
+
+### 13.1 [§11-1] 검색 미리보기 API 신설
+
+- **무엇을**: `RagRetrievalChain.search()`를 직접 호출하는 REST 엔드포인트를 새로 연다.
+- **어디에**: 새 컨트롤러 `api.controller.RagController` (`@RequestMapping("/api/ai/rag")`) →
+  `POST /api/ai/rag/search` (body: `RagSearchRequest`, `CallerContext.get(request)`로 caller 전달).
+  기존 `EmbedController`는 "적재 전용"이라는 책임 분리 원칙(클래스 주석)을 지키기 위해 여기에 search를
+  얹지 않고 분리한다.
+- **부수 효과**: §11-10(문서상 `RagController`가 이미 언급돼 있는데 실제로는 없는 불일치)이 "문서를
+  코드에 맞게 고치기"가 아니라 "코드를 문서에 맞게 만들기"로 자연스럽게 해소된다.
+- **리스크**: 낮음. 기존 `search()`를 그대로 노출만 하는 얇은 컨트롤러라 `RagRetrievalChain` 변경이
+  필요 없다.
+
+### 13.2 [§11-2] 적재 문서 목록 조회 API
+
+- **무엇을**: 지금 `vector_store`에 어떤 `sourceId`들이(몇 청크씩, 어떤 tenant로) 적재돼 있는지 보는
+  `GET /api/ai/embed/documents` 신설.
+- **어디에**: `EmbedController` + `EmbedService`. `VectorStore` 인터페이스 자체에는 "메타데이터 기준
+  집계 조회"가 없으므로, `EmbedService`에 `JdbcTemplate`(또는 dstone 관례상 MyBatis mapper 하나)로
+  `SELECT metadata->>'sourceId' AS source_id, metadata->>'tenant' AS tenant, COUNT(*) AS chunk_count
+  FROM {table-name} GROUP BY 1, 2`를 직접 실행하는 조회 메서드를 추가한다. `table-name`은 하드코딩하지
+  않고 `spring.ai.vectorstore.pgvector.table-name`(`ConfigProperty`)에서 읽어와, 설정을 바꿔도 깨지지
+  않게 한다.
+- **리스크**: 중간. pgvector 테이블 스키마(`metadata` 컬럼이 JSONB)에 직접 의존하는 코드가 처음 생기는
+  것이므로, Spring AI의 `PgVectorStore` 내부 스키마가 버전업 때 바뀌면 같이 깨질 수 있다는 점을 주석으로
+  남겨둔다.
+
+### 13.3 [§11-3] `RagSearchTool` tenant 격리
+
+- **무엇을**: AGENT 경로처럼 TOOL 경로에도 caller를 실어서 `RagSearchTool.searchDocuments()`가
+  `ragRetrievalChain.search(request, caller)`를 `null` 대신 실제 caller로 호출하게 만든다.
+- **두 호출 경로를 둘 다 고쳐야 한다**(§13.0에서 둘 다 가능함을 확인):
+  1. **Agent의 tool-calling 경로**(`AgentExecutor.buildSpec()` 5단계, `AgentExecutor.java:157-164`) -
+     `spec.tools(...)` 옆에 `spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller));`
+     추가.
+  2. **Workflow TOOL step 경로**(`runtime.tool.ToolExecutor.call()`) - `callback.call(jsonInput)`을
+     `callback.call(jsonInput, new ToolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller)))`로
+     교체(`caller` 파라미터는 이미 메서드 시그니처에 있어 추가 배선 불필요).
+- **`RagSearchTool` 쪽**: `searchDocuments(String query, Integer topK, ToolContext toolContext)`로
+  파라미터 하나를 추가한다(Spring AI가 `@Tool` 메서드의 `ToolContext` 타입 파라미터는 LLM에게 노출되는
+  JSON 스키마에서 자동으로 제외하고 프레임워크가 직접 주입해준다). `toolContext.getContext().get(...)`에서
+  caller를 꺼내 `search()`에 넘긴다. `toolContext`가 `null`이거나 caller 키가 없으면(예: 과거 호출 경로가
+  남아있는 경우) 기존과 동일하게 `null`로 폴백해 하위호환을 유지한다.
+- **리스크**: 낮음~중간. `ConfigTool.toolCallbackProvider()`가 만드는 Tool들이 전부 이 변경의 영향권이라,
+  다른 `@AiTool`(Shell/Python/HTTP 등)도 `ToolContext` 파라미터를 원하면 같은 방식으로 caller를 받을 수
+  있게 되는 부수 효과가 있다(원치 않는 Tool은 그냥 파라미터를 안 받으면 그만이라 강제되지 않음).
+
+### 13.4 [§11-4] 임의 메타데이터 필터
+
+- **무엇을**: tenant/sourceId 2개로 고정된 `buildFilter()`를 일반화한다.
+- **어디에**: `RagSearchRequest`에 `Map<String, String> metadataFilters`(nullable) 추가 → `RagRetrievalChain.
+  buildFilter()`가 tenant/sourceId eq 조건에 이어 `metadataFilters`의 각 key=value를 전부 AND로 묶는다
+  (`FilterExpressionBuilder.and(...)`를 가변 개수로 접는 루프 하나만 추가하면 됨 - 기존 빌더 API로 충분).
+- **선행 조건**: 필터링할 메타데이터가 애초에 적재 시점에 태깅돼 있어야 의미가 있다. 그래서 `EmbedController.
+  ingest()`/`EmbedService.ingest()`에도 임의의 `Map<String,String> metadata` 파라미터를 같이 열어줘야
+  완결된다(예: `category=migration-guide`, `department=dba팀` 같은 태그를 적재 시점에 붙일 수 있게).
+- **범위**: `buildAdvisor()`(AGENT 경로)는 여전히 sourceId를 `null`로 고정해둔 설계를 유지할지, Agent
+  YAML에도 `ragMetadataFilters` 같은 필드를 추가로 열지는 실제 수요가 생겼을 때 판단 - 지금은 `search()`
+  (TOOL/API 경로)까지만 넓히는 것을 1차 범위로 한다.
+
+### 13.5 [§11-5] 재랭킹/하이브리드 검색 (장기 과제)
+
+- **무엇을**: 순수 코사인 유사도만이 아니라 키워드 매칭(테이블명/함수명 등 SQL 변환에서 특히 중요한 고유
+  명사)을 보강한다.
+- **접근 후보**(우선순위 낮음, 실제 착수 전 별도 검토 필요):
+  - 1안(저비용): `VectorStoreDocumentRetriever`가 가진 것보다 넓게 뽑은 뒤(예: topK를 15로), Java에서
+    질의어 토큰이 청크 텍스트에 그대로 등장하는지로 2차 스코어를 매겨 재정렬하는 간단한
+    `DocumentPostProcessor`를 `RetrievalAugmentationAdvisor.builder().documentPostProcessors(...)`에
+    끼워넣는다(Spring AI RAG 모듈이 이미 이 확장점을 제공).
+  - 2안(고비용): 외부 재랭킹 API(Cohere rerank 등) 연동 - 이 프로젝트가 로컬/무비용 스택(Ollama)을
+    지향하는 기조와 맞는지 먼저 확인 필요.
+- **우선순위**: 낮음. §13.8(실 데이터 시딩)로 검색 품질을 먼저 실측해보고, 실제로 고유명사 매칭 실패가
+  관찰될 때 착수해도 늦지 않다.
+
+### 13.6 [§11-6] 청킹 개선
+
+- **무엇을**: `TokenTextSplitter`의 overlap을 설정 가능하게 열고(`dstone.ai.rag.ingest.chunk-overlap`,
+  `TokenTextSplitter.builder().withChunkOverlap(...)`), 문서 구조 인식은 범위에서 제외한다(Tika가 주는
+  건 평문 텍스트라 구조 인식은 별도 파서가 필요해 비용 대비 효과가 낮음).
+- **우선순위**: 낮음. 지금 실제로 적재되는 문서가 PDF/DOCX 같은 비정형 원문이 아니라 JSONL(SQL 변환쌍,
+  청킹 자체를 안 탐)이 주력이 될 것이므로, 이 개선의 체감 효과는 §13.7(JSONL 일반화) 이후 "비정형 문서도
+  같이 쓰기 시작할 때" 체감된다.
+
+### 13.7 [§11-7] JSONL 전용 포맷 일반화
+
+- **무엇을**: `EmbedService.readJsonlAsDocuments()`에 하드코딩된 `instruction/input/output/notes` 필드와
+  `[오라클 쿼리]/[PostgreSQL 변환 결과]/[설명/주의사항]` 라벨을 도메인 무관하게 만든다.
+- **접근**: JSONL 한 줄을 임의의 flat JSON 객체로 받아, 별도의 `contentTemplate`(ingest 요청 파라미터 또는
+  `sourceId`별 설정)로 필드를 프롬프트 템플릿처럼 렌더링한다 - 이미 `AgentExecutor`가 `PromptTemplate`으로
+  `{caller}`/`{today}` 같은 토큰을 치환하는 것과 동일한 방식을 재사용할 수 있다(`{input}`, `{output}` 등
+  JSON의 키를 그대로 토큰으로 씀). `contentTemplate`이 없으면 지금의 Oracle/PostgreSQL 라벨을 **기본값**으로
+  유지해 하위호환을 지킨다(지금 유일한 실사용처가 SQL 변환이므로).
+- **우선순위**: 중간. "여러 SI 프로젝트 재사용"이라는 엔진의 목표에는 중요하지만, 지금 당장 SQL 변환
+  워크플로우 하나만 쓰는 상황에서는 시급하지 않다 - 두 번째 RAG 활용 사례(다른 도메인)가 생기는 시점에
+  맞춰 착수하는 편이 과설계를 피할 수 있다.
+
+### 13.8 [§11-8] 실제 지식베이스 시딩 (최우선 · 코드 변경 없음)
+
+- **무엇을**: `sql-conversion-agent.yml`의 SQL 변환 규칙(24개 함수/JOIN/ROWNUM/계층형쿼리/날짜형변환 등)을
+  근거로 실제 Oracle→PostgreSQL 변환 사례를 JSONL로 만들어 시딩한다.
+- **절차**:
+  1. `{instruction, input, output, notes}` 형식으로 대표 사례 15~30건 작성(NVL/DECODE/LISTAGG/MINUS,
+     `(+)` 아우터조인, ROWNUM 페이징 3가지 패턴, START WITH/CONNECT BY, SYSDATE/ROWID, DUAL, TO_DATE
+     포맷, VARCHAR2/NUMBER 등 §5.2 규칙 각각을 최소 1건씩 커버).
+  2. `POST /api/ai/embed/documents` (`sourceId=oracle-to-postgresql-kb-v1`)로 적재.
+  3. §13.1의 검색 미리보기 API(있으면)로 실제 검색이 되는지 확인, 없으면 `RagSearchTool`을 통해 임시 확인.
+- **코드 변경 불필요** - 이미 있는 파이프라인만으로 되는 작업이라 가장 먼저, 가장 빠르게 효과를 볼 수 있다.
+
+### 13.9 [§11-9] Agent 설정-프롬프트 불일치 정리
+
+- **무엇을**: `sql-conversion-agent`를 `ragEnabled: true`로 켠다(§13.8로 실제 지식베이스가 생긴 뒤).
+- **왜 "끄기"가 아니라 "켜기"인가**: 프롬프트에 이미 `[참고자료]` 처리 지시문이 정교하게 쓰여 있고(무관하면
+  조용히 무시하라는 안전장치까지 포함), `convert` step이야말로 실제 변환 사례의 도움을 가장 많이 받을
+  수 있는 단계이기 때문이다. `sql-analysis-agent`(`ragEnabled: true`, 분석 단계)보다 오히려 `convert`
+  단계에 실제 변환 사례를 붙여주는 쪽이 원래 의도에 더 가깝다.
+- **함께 튜닝**: 이번에 추가된 `ragTopK`/`ragSimilarityThreshold`/`ragAllowEmptyContext`를
+  `sql-conversion-agent.yml`에 명시해서(예: `ragTopK: 3`) 변환 단계는 분석 단계보다 더 좁고 확실한
+  근거만 보게 튜닝하는 것을 권장한다.
+
+### 13.10 [§11-10] 문서 정합성 복구
+
+- `CLAUDE.md`의 `dstone-ai-engine` 패키지 표: §13.1로 `RagController`가 실제로 생기면 표가 다시 맞아지므로
+  별도 수정 불필요. §13.1을 하지 않기로 결정한다면 표에서 `RagController` 언급을 제거해야 한다.
+- `docs/09.dstone-ai-engine.md` §13(검증 상태): "`convert` 스텝이 `ragEnabled: true`"라는 2026-09-18
+  기록 문구를 현재 상태(`sql-conversion-agent`는 이 계획 §13.9 이전엔 `false`)에 맞게 정정하고, §13.8~13.9
+  작업이 실제로 라이브 검증되면 그 결과를 새 항목으로 추가한다.
+- 이 문서(`docs/temp/dstone-ai-engine-rag.md`) 자체도 §13 항목들이 실제로 구현되면 "완료" 표시를 남겨서
+  계획 문서에서 실행 기록으로 갱신한다.
+
+### 13.11 [§11-11] 프롬프트 템플릿 전역 고정 해소
+
+- **무엇을**: `RagRetrievalChain.CONTEXT_PROMPT_TEMPLATE`(`static final`, 한국어 `[참고자료]` 라벨 고정)을
+  Agent별로 override 가능하게 만든다 - §5.3에서 이미 만든 `ragTopK`/`ragSimilarityThreshold`/
+  `ragAllowEmptyContext`와 동일한 패턴을 그대로 반복 적용하면 된다.
+- **어디에**: `AgentDefinition`에 `String ragPromptTemplate`(nullable) 추가 → `RagRetrievalChain.
+  buildAdvisor(...)`에 `String promptTemplate` 파라미터를 하나 더 받는 오버로드 추가(`null`이면 기존
+  `CONTEXT_PROMPT_TEMPLATE` 상수 사용, 값이 있으면 `new PromptTemplate(promptTemplate)`으로 대체) →
+  `AgentExecutor.buildSpec()`에서 `agent.ragPromptTemplate()` 전달.
+- **우선순위**: 낮음. 지금은 RAG를 쓰는 Agent가 전부 한국어 프로젝트 안에 있어 시급하지 않다 - 다국어 SI
+  프로젝트에 이 엔진을 재사용하는 시점에 맞춰 착수.
+
+### 13.12 우선순위 로드맵 요약
+
+| 단계 | 항목 | 우선순위 | 코드 변경 규모 | 선행조건 |
+|---|---|---|---|---|
+| 1 | §13.8 실 지식베이스 시딩 | **최우선** | 없음(데이터 작업만) | - |
+| 1 | §13.9 `sql-conversion-agent` ragEnabled 정리 | **최우선** | 매우 작음(YAML 1줄 + topK 등 튜닝) | §13.8 |
+| 2 | §13.3 `RagSearchTool` tenant 격리 | 높음(보안) | 작음 | §13.0 스파이크(완료) |
+| 3 | §13.1 검색 미리보기 API | 중간(운영 편의) | 작음 | - |
+| 3 | §13.2 적재 목록 조회 API | 중간(운영 편의) | 중간 | - |
+| 4 | §13.4 임의 메타데이터 필터 | 중간(확장성) | 중간 | - |
+| 4 | §13.11 프롬프트 템플릿 override | 낮음(확장성) | 작음 | - |
+| 4 | §13.7 JSONL 포맷 일반화 | 중간(재사용성) | 중간~큼 | 두 번째 RAG 활용 사례 등장 시 |
+| 5 | §13.6 청킹 개선 | 낮음 | 작음 | 비정형 문서 사용 시작 시 |
+| 5 | §13.5 재랭킹/하이브리드 검색 | 낮음(장기) | 큼 | §13.8로 품질 실측 후 |
+| 각 단계 후 | §13.10 문서 정합성 복구 | - | 문서만 | 해당 단계 완료 시마다 |
+
+지금 가장 먼저 손댈 가치가 있는 건 **§13.8(시딩) → §13.9(플래그 정리) → §13.3(tenant 격리)** 순서입니다 -
+앞의 둘은 "RAG가 있으나 마나 한 상태"를 실질적으로 풀어주고, 셋째는 이후 데이터가 늘어나기 전에 보안 gap을
+먼저 막아두는 것이 안전하기 때문입니다.
