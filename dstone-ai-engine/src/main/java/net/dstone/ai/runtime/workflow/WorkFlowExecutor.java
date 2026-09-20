@@ -330,10 +330,7 @@ public class WorkFlowExecutor extends BaseObject {
 		// nextId : 성공이면 onSuccess에, 실패면 onFailure에 적어둔 값. YAML에 안 적었으면 null.
 		String nextId = success ? step.onSuccess() : step.onFailure();
 
-		// 아래는 "nextId가 없다 / SUCCESS 예약어다 / FAIL 예약어다 / 그 외(진짜 다른 step id)다" 이 4가지 경우를
-		// if~else if~else 하나로 쭉 이어서, 어떤 경우든 반드시 이 사슬 중 하나에는 걸리도록(빠져나가는 틈이 없도록) 정리했다.
-		// 각 가지의 안쪽도 전부 if~else 쌍으로만 구성해서, "이 if는 참일 때만 처리하고 거짓일 때는 그냥 넘어간다" 같은
-		// 애매한 지점이 하나도 없게 했다(거짓일 때 뭘 해야 하는지가 항상 else 쪽에 명시적으로 적혀 있다).
+		// 아래는 "nextId가 없다 / SUCCESS 예약어다 / FAIL 예약어다 / 그 외(진짜 다른 step id)다" 이 4가지 경우.
 		if (nextId == null) {
 			// [경우 1] 다음 step id를 아예 안 적어둔 경우 - 실패/성공 여부로 다시 나뉜다.
 			if (!success) {
