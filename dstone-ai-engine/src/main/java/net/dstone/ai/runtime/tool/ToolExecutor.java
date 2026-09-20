@@ -32,18 +32,12 @@ public class ToolExecutor extends BaseObject {
 	 * @param jsonInput Tool에 넘길 JSON 인자 문자열
 	 */
 	public String call(String caller, String toolName, String jsonInput) {
+		// caller 별 ToolCallback 을 구한다.
 		ToolCallback callback = this.configTool.findByName(caller, toolName);
 		if (callback == null) {
 			throw new IllegalStateException("caller[" + caller + "]가 쓸 수 있는 Tool 중 '" + toolName + "'가 없습니다(화이트리스트 또는 이름을 확인하십시오).");
 		}
-		// ToolCallback.call()의 반환값은 순수 텍스트가 아니라 Spring AI가 JSON으로 감싼 값이다(String
-		// 리턴 타입도 예외 없이 감싸지므로 "실패: ..."가 아니라 "\"실패: ...\""로 온다) - 이 값을 두고
-		// 직접 "실패" 접두사를 검사해야 하므로 먼저 JSON을 벗겨낸다.
-		// caller를 ToolContext에 실어 보낸다 - tools.rag.RagSearchTool처럼 caller(tenant) 기준으로 검색
-		// 범위를 좁혀야 하는 Tool이 AGENT의 tool-calling 경로(runtime.agent.AgentExecutor)와 동일하게 이
-		// 값을 받을 수 있게 하기 위함이다. caller가 없어도 키는 반드시 채워 넣는다(값은 빈 문자열) -
-		// runtime.agent.AgentExecutor의 toolContext 설명과 동일하게, Spring AI는 @Tool 메서드가 ToolContext
-		// 파라미터를 선언했는데 ToolContext가 null이거나 엔트리 0개인 빈 Map이면 예외를 던진다.
+		// caller 별 ToolContext 를 구한다.
 		ToolContext toolContext = new ToolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
 		String rawResult = callback.call(jsonInput, toolContext);
 		return this.unwrap(rawResult);
