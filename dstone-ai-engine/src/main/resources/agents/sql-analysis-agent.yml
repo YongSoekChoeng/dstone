@@ -16,3 +16,6 @@ agent:
     (변환이 필요한 요소가 없으면 "특별한 변환 포인트 없음"이라고만 적으십시오)
   toolsEnabled: false
   ragEnabled: true
+  ragTopK: 5
+  ragSimilarityThreshold: 0.3
+  ragAllowEmptyContext: true
