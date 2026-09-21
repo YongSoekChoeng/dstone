@@ -99,8 +99,16 @@
             </ThreadContextMapFilter>		  
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
-		</Logger>  
+		</Logger>
+		  
+		<!-- Spring AI --> 	
+		<!--SimpleLoggerAdvisor logger DEBUG 레벨에서만 동작함. --> 	
+		<Logger name="org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor" level="OFF" additivity="false">  
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="rollingFile"/>	
+		</Logger>  	
 		
+		<!-- Dstone --> 	
         <Logger name="net.dstone.ai" level="${level.dstone}" additivity="false">
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>

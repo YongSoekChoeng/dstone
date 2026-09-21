@@ -15,6 +15,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
@@ -84,7 +85,7 @@ public class ConfigChatClient {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
 		// 1. 로깅하는 Advisor 등록
-		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().build();
+		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().order(Ordered.LOWEST_PRECEDENCE).build();
 		advisorList.add(simpleLoggerAdvisor);
 
 		// 2. 세션별 대화 내역을 기억하게 저장하는 Advisor 등록
