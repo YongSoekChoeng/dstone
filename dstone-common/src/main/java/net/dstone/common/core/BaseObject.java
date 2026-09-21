@@ -88,10 +88,15 @@ public class BaseObject {
 		StringBuffer buffer = new StringBuffer();
 		String className = "";
 		String methodName = "";
-		StringBuffer paramListInfo = new StringBuffer();
 		
 		className = joinPoint.getTarget().getClass().getSimpleName();
 		methodName = joinPoint.getSignature().getName();
+		buffer.append(className + "." + methodName + "(" + this.buildParamInfo(joinPoint) + ")");
+		return StringUtil.splitToLines(buffer.toString(),  tabSpace);
+	}
+	
+	protected String buildParamInfo(ProceedingJoinPoint joinPoint) {
+		StringBuffer paramListInfo = new StringBuffer();
 		int args = joinPoint.getArgs().length;
 		int setNum = 0;
 		for (int i = 0; i < args; i++) {
@@ -102,8 +107,7 @@ public class BaseObject {
 			}
 			setNum++;
 		}
-		buffer.append(className + "." + methodName + "(" + paramListInfo + ")");
-		return StringUtil.splitToLines(buffer.toString(),  tabSpace);
+		return paramListInfo.toString();
 	}
 
 	private String buildParamStr(Object param) {

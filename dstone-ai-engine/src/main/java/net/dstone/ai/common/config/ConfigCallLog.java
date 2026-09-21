@@ -135,53 +135,54 @@ public class ConfigCallLog extends BaseObject {
 	}
 
 	private final static String SAPERATE_LINE = "\n|--------------------------------------------------------------------------------------------------------------------------------------|\n";
-	private final static String SAPERATE_LINE_FRONT = "\n|-------------------------------------------";
-	private final static String SAPERATE_LINE_END = "-------------------------------------------|\n";
 	
+	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))";
+	private final static String STEPRUNNER_POINTCUT = "execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))";
+	private final static String AGENT_POINTCUT = "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))";
+
 	/**
 	 * <pre>
-	 * runtime 패키지(Workflow를 실제로 실행하는 엔진 코드가 들어있는 패키지)의 메소드가 호출될
-	 * 때마다 "시작"과 "끝" 두 줄을 로그로 남깁니다. 시작할 때는 어떤 메소드가 어떤 값으로
-	 * 호출됐는지, 끝날 때는 그 결과가 무엇인지 남기므로, Workflow가 내부적으로 어떤 순서로
-	 * 동작하는지 로그만 보고도 따라갈 수 있습니다.
-	 *
-	 * 단, StepRunner.run(...) 메소드는 이 로깅에서 제외됩니다. 그 메소드는 바로 아래의
-	 * doStepAuditLog()가 훨씬 더 보기 좋은 형태로 따로 로그를 남기기 때문입니다.
-	 *
-	 * 참고: 스프링 AOP는 public 메소드만 감시할 수 있습니다.
-	 * </pre>
-	 *
-	 * @param joinPoint 지금 호출되고 있는 runtime 패키지 메소드에 대한 정보
-	 * @return 원래 메소드가 반환하는 값을 그대로 돌려줍니다
+	 * Workflow 가 호출 될때마다 로그를 남깁니다.
+	 * @param joinPoint 지금 호출되고 있는 WorkFlowExecutor.run(...) 메소드에 대한 정보
+	 * @return 원래 메소드가 반환하는 WorkFlowExecution(실행 결과)을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
-	@Around("execution(* net.dstone.ai.runtime.*..*.*(..))" + " && !" + NO_LOG_REGEX + " && !execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
-	public Object doRuntimeProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
+	@Around(WORKFLOW_POINTCUT)
+	public Object doWorkflowLog(ProceedingJoinPoint joinPoint) throws Throwable{
+		WorkFlowExecution output = null;
 		StringBuffer log = new StringBuffer();
-		String identity = getIdentity(joinPoint);
-		
+		String identity = this.getIdentity(joinPoint);
+
 		log.append("\n");
-		log.append(SAPERATE_LINE_FRONT+"[Runtime - "+identity+"] Start"+SAPERATE_LINE_END);
-		log.append( signatureLog(joinPoint) );
+		log.append(SAPERATE_LINE);
+		log.append("[WorkFlowExecutor - "+identity+"] Start !!!");
+		log.append("\n");
+		log.append("<input>");
+		log.append("\n");
+		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		Object retObj = joinPoint.proceed();
+		output = (WorkFlowExecution)joinPoint.proceed();
 		
 		log.setLength(0);
 		log.append("\n");
-		log.append(SAPERATE_LINE_FRONT+"[Runtime - "+identity+"] End"+SAPERATE_LINE_END);
-		log.append(retObj);
+		log.append(SAPERATE_LINE);
+		log.append("[WorkFlowExecutor - "+identity+"] End !!!");
+		log.append("\n");
+		log.append("<output>");
+		log.append("\n");
+		log.append("{"+output.toString()+"}");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		return retObj;
+		return output;
 	}
 
 	/**
 	 * <pre>
-	 * Workflow의 스텝 하나가 실행될 때마다(StepRunner.run(execution, definition, input) 호출될
-	 * 때마다) 그 스텝의 입력과 출력을 로그 한 줄씩으로 남겨줍니다.
+	 * Workflow의 스텝 하나가 실행될 때마다(StepRunner.run(execution, definition, input) 호출될 때마다) 
+	 * 그 스텝의 입력과 출력을 로그 한 줄씩으로 남겨줍니다.
 	 *
 	 * AGENT/TOOL/SUPERVISOR/APPROVAL 등 스텝 종류(StepType)가 다르더라도 전부 똑같은
 	 * StepRunner.run(...) 메소드 하나를 거쳐 실행되므로(자세한 내용은 runtime.step.StepRunner
@@ -200,24 +201,19 @@ public class ConfigCallLog extends BaseObject {
 	 * @return 원래 메소드가 반환하는 StepOutput(이 스텝의 실행 결과)을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
-	@Around("execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))")
-	public Object doStepAuditLog(ProceedingJoinPoint joinPoint) throws Throwable{
+	@Around(STEPRUNNER_POINTCUT)
+	public Object doStepRunnerLog(ProceedingJoinPoint joinPoint) throws Throwable{
 		StepOutput output = null;
 		StringBuffer log = new StringBuffer();
-		String identity = "";
-		WorkFlowExecution execution = (WorkFlowExecution) joinPoint.getArgs()[0];
-		StepDefinition step = (StepDefinition) joinPoint.getArgs()[1];
-		StepInput input = (StepInput) joinPoint.getArgs()[2];		
-		identity = "StepRunner.run([workflowId="+execution.workflowId()+" step="+step.id()+"])";
-		
+		String identity = this.getIdentity(joinPoint);
+
 		log.append("\n");
-		log.append(SAPERATE_LINE_FRONT+"[Runtime - "+identity+"] Start"+SAPERATE_LINE_END);
-		log.append("executionId={"+execution.executionId()+"}");
-		log.append(", workflowId={"+execution.workflowId()+"}");
-		log.append(", stepId={"+step.id()+"}");
-		log.append(", stepType={"+step.type()+"}");
-		log.append(", ref={"+step.ref()+"}");
-		log.append(", input={"+this.truncate(input.renderedText())+"}");
+		log.append(SAPERATE_LINE);
+		log.append("[StepRunner - "+identity+"] Start !!!");
+		log.append("\n");
+		log.append("<input>");
+		log.append("\n");
+		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -225,37 +221,58 @@ public class ConfigCallLog extends BaseObject {
 		
 		log.setLength(0);
 		log.append("\n");
-		log.append(SAPERATE_LINE_FRONT+"[Runtime - "+identity+"] End"+SAPERATE_LINE_END);
-		log.append("executionId={"+execution.executionId()+"}");
-		log.append(", workflowId={"+execution.workflowId()+"}");
-		log.append(", stepId={"+step.id()+"}");
-		log.append(", stepType={"+step.type()+"}");
-		log.append(", ref={"+step.ref()+"}");
-		log.append(", result={"+output.result()+"}");
-		log.append(", output={"+this.truncate(output.primaryText())+"}");
+		log.append(SAPERATE_LINE);
+		log.append("[StepRunner - "+identity+"] End !!!");
+		log.append("\n");
+		log.append("<output>");
+		log.append("\n");
+		log.append("{"+output.toString()+"}");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
 		return output;
-		
-		
 	}
 
 	/**
-	 * 여러 줄로 된 텍스트를 로그 한 줄에 깔끔하게 담기 위해, 줄바꿈 문자를 전부 지워서
-	 * 한 줄짜리 텍스트로 만들어 줍니다.
-	 *
-	 * @param text 한 줄로 줄여서 로그에 보여줄 원본 텍스트
+	 * <pre>
+	 * Agent 하나가 실행될 때마다 로깅을 남겨줍니다.
+	 * @param joinPoint 지금 호출되고 있는 AgentExecutor.*(...) 메소드에 대한 정보
+	 * @return 원래 메소드가 반환하는 객체를 그대로 돌려줍니다
+	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
-	private String truncate(String text) {
-		if (text == null) {
-			return "";
-		}
-		text = StringUtil.replace(text, "\r\n", "");
-		text = StringUtil.replace(text, "\n", "");
-		return text;
+	@Around(AGENT_POINTCUT)
+	public Object doAgentLog(ProceedingJoinPoint joinPoint) throws Throwable{
+		Object output = null;
+		StringBuffer log = new StringBuffer();
+		String identity = this.getIdentity(joinPoint);
+
+		log.append("\n");
+		log.append(SAPERATE_LINE);
+		log.append("[AgentExecutor - "+identity+"] Start !!!");
+		log.append("\n");
+		log.append("<input>");
+		log.append("\n");
+		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
+		log.append(SAPERATE_LINE);
+		this.info(log.toString());
+		
+		output = joinPoint.proceed();
+		
+		log.setLength(0);
+		log.append("\n");
+		log.append(SAPERATE_LINE);
+		log.append("[AgentExecutor - "+identity+"] End !!!");
+		log.append("\n");
+		log.append("<output>");
+		log.append("\n");
+		log.append("{"+output.toString()+"}");
+		log.append(SAPERATE_LINE);
+		this.info(log.toString());
+
+		return output;
 	}
 
+	
 	/**
 	 * <pre>
 	 * tools 패키지(Agent나 TOOL 스텝이 호출할 수 있는 Tool들이 들어있는 패키지)의 메소드가
@@ -274,22 +291,31 @@ public class ConfigCallLog extends BaseObject {
 		StringBuffer log = new StringBuffer();
 		String identity = getIdentity(joinPoint);
 
+
 		log.append("\n");
-		log.append(SAPERATE_LINE_FRONT+"[Tools - "+identity+"] Start"+SAPERATE_LINE_END);
-		log.append( signatureLog(joinPoint) );
+		log.append(SAPERATE_LINE);
+		log.append("[Tools - "+identity+"] Start !!!");
+		log.append("\n");
+		log.append("<input>");
+		log.append("\n");
+		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		Object retObj = joinPoint.proceed();
+		Object output = (StepOutput) joinPoint.proceed();
 		
 		log.setLength(0);
 		log.append("\n");
-		log.append(SAPERATE_LINE_FRONT+"[Tools - "+identity+"] End"+SAPERATE_LINE_END);
-		log.append(retObj);
+		log.append(SAPERATE_LINE);
+		log.append("[Tools - "+identity+"] End !!!");
+		log.append("\n");
+		log.append("<output>");
+		log.append("\n");
+		log.append("{"+output.toString()+"}");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		return retObj;
+		return output;
 	}
 	
 	/**
@@ -304,37 +330,34 @@ public class ConfigCallLog extends BaseObject {
 	 * @param joinPoint 식별자를 만들 대상이 되는 메소드 호출 정보
 	 */
 	public String getIdentity(ProceedingJoinPoint joinPoint) {
-		String className = "";
-		String methodName = "";
-		String identity = "";
+		StringBuffer identity = new StringBuffer();
+		String div = "-";
 		if(joinPoint != null) {
-			className = joinPoint.getTarget().getClass().getSimpleName();
-			methodName = joinPoint.getSignature().getName();
 			int args = joinPoint.getArgs().length;
 			boolean isSelcted = false;
 			for (int i = 0; i < args; i++) {
 				Object param = joinPoint.getArgs()[i];
 				if( param instanceof WorkFlowDefinition ) {
 					WorkFlowDefinition workFlowDefinition = (WorkFlowDefinition)param;
-					identity = "workFlow(id=" + workFlowDefinition.id()+")" ;
-					isSelcted = true;
+					if(identity.length() > 0) {identity.append(div);}
+					identity.append("workFlow(id=" + workFlowDefinition.id()+")");
 				}else if( param instanceof StepDefinition ) {
 					StepDefinition stepDefinition = (StepDefinition)param;
-					identity = "step(id=" + stepDefinition.id() + ", type="+stepDefinition.type() + ", ref="+stepDefinition.ref()+")" ;
-					isSelcted = true;
+					if(identity.length() > 0) {identity.append(div);}
+					identity.append("step(id=" + stepDefinition.id() + ", type="+stepDefinition.type() + ", ref="+stepDefinition.ref()+")");
 				}else if( param instanceof AgentDefinition ) {
 					AgentDefinition agentDefinition = (AgentDefinition)param;
+					if(identity.length() > 0) {identity.append(div);}
 					// Agent의 prompt 원문은 여러 줄짜리 긴 텍스트라 로그 한 줄에 담기엔 너무 깁니다.
 					// name만 남겨도 어떤 Agent인지 충분히 알아볼 수 있으므로 name만 사용합니다.
-					identity = "agent(name=" + agentDefinition.name() + ")" ;
-					isSelcted = true;
+					identity.append("agent(name=" + agentDefinition.name()+")");
 				}
 				if(isSelcted) {
 					break;
 				}
 			}
 		}
-		return (className + "." + methodName + "(" + (StringUtil.isEmpty(identity)?"":"[") + identity + (StringUtil.isEmpty(identity)?"":"]") + ")");
+		return identity.toString();
 	}
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
