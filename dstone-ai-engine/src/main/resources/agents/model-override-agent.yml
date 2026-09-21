@@ -1,0 +1,23 @@
+# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+#
+# model 필드로 provider 공통 기본값(spring.ai.{provider}.chat.options.model)과 다른 모델을 이 Agent
+# 호출에만 강제 적용하는 예시다(runtime.agent.AgentExecutor.buildSpec() 6단계). 응답 끝에 "(model=...)"
+# 문구를 붙이게 시켜서, 실제로 어떤 모델이 응답했는지 눈으로 구분할 수 있게 했다 - 정확한 모델명을
+# 모델 스스로 모를 수도 있으니 100% 신뢰할 근거는 아니고, 어디까지나 "요청이 잘 갔는지"를 보는 보조
+# 확인용이다(진짜 확인은 dstone-ai-engine 로그의 요청/응답 또는 api.dto.ChatResponse.model()로 한다).
+#
+# conf/application.yml 기준 지금 활성 provider(spring.ai.model.chat)가 ollama면 아래 model 값도 그
+# provider의 모델명이어야 한다 - qwen2.5-coder:7b는 conf/application.yml의 안내 주석에 "로컬에 pull된
+# 채팅 모델" 중 하나로 적혀 있어(기본값 qwen2.5-coder:3b와 다른 걸 골랐다) 바로 확인할 수 있다.
+# provider를 anthropic으로 바꿔 쓰는 환경이면 이 값을 claude-haiku-4-5-20251001 같은 Anthropic 모델
+# id로 바꿔야 한다 - 다른 provider의 모델명을 넣으면 이 Agent를 호출하는 시점에 그 provider API가
+# 에러를 낸다(기동 시점엔 검증하지 않는다).
+agent:
+  name: model-override-agent
+  description: per-Agent model override 확인용 Agent. 활성 provider의 기본 모델과 다른 모델을 강제한다.
+  prompt: |
+    당신은 AI 어시스턴트입니다. 질문에 간결히 한국어로 답한 뒤, 마지막 줄에
+    "(model=여기에 당신이 아는 자기 모델명을 적으십시오)"를 덧붙이십시오.
+  model: qwen2.5-coder:7b
+  toolsEnabled: false
+  ragEnabled: false

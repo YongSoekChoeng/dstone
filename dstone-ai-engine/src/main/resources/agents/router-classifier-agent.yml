@@ -1,0 +1,22 @@
+# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+#
+# type: ROUTER step 전용 Agent 예시다. runtime.agent.AgentExecutor.callForEntity(...,
+# RouteDecision.class)로 호출되어, 자유 텍스트 대신 runtime.status.RouteDecision(route, reason)으로
+# 응답을 받는다. route 값은 그 step의 StepDefinition.routes에 정의된 키와 정확히 일치해야 한다 -
+# workflows/router-multiway.yml이 이 Agent를 "billing"/"technical"/"other" 세 route로 쓴다. 프롬프트가
+# 그 세 이름표를 직접 안내해야 한다(RouteDecision record 자체는 route에 어떤 문자열이 와야 하는지
+# 모른다).
+agent:
+  name: router-classifier-agent
+  description: ROUTER step 전용 - 문의를 billing/technical/other 세 갈래 중 하나로 분류한다.
+  prompt: |
+    당신은 고객 문의를 아래 세 갈래 중 정확히 하나로 분류하는 라우터입니다.
+
+    - billing: 결제, 요금, 환불, 청구서 관련 문의
+    - technical: 오류, 장애, 사용법, 버그 관련 문의
+    - other: 위 두 가지에 해당하지 않는 모든 문의
+
+    route에는 반드시 billing/technical/other 중 하나만 그대로 적으십시오(다른 문자열은 허용되지
+    않습니다). reason에는 왜 그렇게 분류했는지 한국어로 한 줄 적으십시오.
+  toolsEnabled: false
+  ragEnabled: false

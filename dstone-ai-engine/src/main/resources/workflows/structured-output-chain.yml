@@ -1,0 +1,33 @@
+# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# structuredOutput=true AGENT step -> 그 data를 {stepId.키}로 참조하는 TOOL step, 이 두 단계 연결을
+# 확인하기 위한 테스트 전용 Workflow다(docs/09.dstone-ai-engine.md §9 "AGENT step에 structuredOutput:
+# true를 주면..." 예시와 같은 패턴).
+#
+# extract step(structured-extract-agent, structuredOutput:true)이 runtime.status.StepPayload(primaryText,
+# data)로 응답하면, runtime.workflow.WorkFlowExecutor가 data를 "extract.키"로 네임스페이싱해서
+# variables에 병합한다. 그래서 다음 validate step의 inputTemplate에서 {extract.sql}로 그 값을 꺼내 쓸 수
+# 있다({stepId.키} 토큰은 TOOL step의 inputTemplate에서만 쓸 수 있다 - Agent의 prompt:는 dot 섞인
+# 키를 못 받는다. runtime.agent.AgentExecutor.promptSafeVariables 참고).
+#
+# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+#   workflowId: structured-output-chain
+#   message   : 이 테이블에서 이름이 김철수인 사람을 찾고 싶어. SELECT * FROM member WHERE name = '김철수' 이렇게 쓰면 되지?
+workflow:
+  id: structured-output-chain
+  description: structuredOutput=true AGENT step의 data를 다음 TOOL step이 {extract.sql}로 참조하는 흐름 확인용 Workflow.
+  maxIterations: 3
+  steps:
+
+    - id: extract
+      type: AGENT
+      ref: structured-extract-agent
+      structuredOutput: true
+      onSuccess: validate
+      onFailure: FAIL
+
+    - id: validate
+      type: TOOL
+      ref: validateSqlSyntax
+      inputTemplate: '{"sql":"{extract.sql}"}'
+      onSuccess: SUCCESS
+      onFailure: FAIL

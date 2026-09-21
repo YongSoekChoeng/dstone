@@ -179,7 +179,7 @@ A Spring AI-based, provider-agnostic engine meant to be reused across future SI 
 | `runtime.step` | `AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner` — per-`StepType` dispatch used by `WorkflowExecutor` (no `StepType.RAG`/`RagStepRunner` — RAG is either an AGENT's `ragEnabled` advisor or the `RagSearchTool` `@AiTool`) |
 | `common.rag` | `RagRetrievalChain` — the only place that turns an already-ingested `VectorStore` into search results/an `Advisor` (`buildAdvisor()`/`search()`); ingest/delete is `api.service.EmbedService` instead, gated by `dstone.ai.rag.enabled` |
 | `tools` | `@AiTool` implementations: `sample`/`sql`/`shell`/`python`/`http`/`rag` (`RagSearchTool`) |
-| `api` | `ChatController` (`POST /api/ai/chat[/stream]`, one Agent call), `WorkFlowController` (`POST /api/ai/workflow/{id}/execute`, sync; `/submit`+`/status/{jobId}`, async via `AsyncJobService`), `WorkFlowExecutionController`, `EmbedController` (`/api/ai/embed/documents` - ingest/delete/list), `RagController` (`POST /api/ai/rag/search` - search preview) |
+| `api` | `ChatController` (`POST /api/ai/chat[/stream]`, one Agent call), `WorkFlowController` (`GET /api/ai/workflow` - id+description list; `POST /api/ai/workflow/{id}/execute`, sync; `/submit`+`/status/{jobId}`, async via `AsyncJobService`), `WorkFlowExecutionController`, `EmbedController` (`/api/ai/embed/documents` - ingest/delete/list), `RagController` (`POST /api/ai/rag/search` - search preview) |
 
 Full architecture, YAML authoring guide, API/config reference, and the 2026-09-15 live-verification record live in `docs/09.dstone-ai-engine.md`.
 
@@ -191,7 +191,7 @@ Tool calling has no infrastructure dependency — it's plain Java executed on de
 
 Governance (PII/sensitive-word guardrails, usage logging/quota) is out of scope for this redesign, but two seams exist so it can be re-added without touching call sites: `common.config.ConfigChatClient.chatClient(...)` takes a plain `List<Advisor>` (Spring auto-collects any `@Bean Advisor`, so a governance module just adds one), and `runtime.tool.ToolExecutor.call(...)` is the single choke point every `TOOL` step call passes through.
 
-Verified live end-to-end on 2026-09-15 (real Anthropic calls, local Redis/PostgreSQL+pgvector/Ollama): `POST /api/ai/chat` with a plain question and with a tool-calling question (`getCurrentDateTime`), and the `oracle-to-postgresql` sample Workflow (`analyze`→`convert`→`validate` AGENT/AGENT/TOOL steps) both synchronously (`/execute`) and via the async `/submit`+`/status/{jobId}` contract — an Oracle `NVL(...)`/`ROWNUM` query converted correctly to PostgreSQL `COALESCE(...)`/`LIMIT` and passed syntax validation on the first pass in both cases.
+Verified live end-to-end on 2026-09-15 (real Anthropic calls, local Redis/PostgreSQL+pgvector/Ollama): `POST /api/ai/chat` with a plain question and with a tool-calling question (`getCurrentDateTime`), and the `oracle-to-postgresql` sample Workflow (`analyze`→`convert`→`validate` AGENT/AGENT/TOOL steps) both synchronously (`/execute`) and via the async `/submit`+`/status/{jobId}` contract — an Oracle `NVL(...)`/`ROWNUM` query converted correctly to PostgreSQL `COALESCE(...)`/`LIMIT` and passed syntax validation on the first pass in both cases. (`oracle-to-postgresql` itself was replaced on 2026-09-21 by a broader 8-Agent/13-Workflow test-coverage set under `resources/{agents,workflows}/` — see `docs/09.dstone-ai-engine.md` §9/§13 for the current file list and the old→new mapping.)
 
 ## Required Infrastructure
 

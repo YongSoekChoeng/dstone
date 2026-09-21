@@ -1,0 +1,20 @@
+# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# AGENT step 하나가 model 필드를 명시한 Agent(model-override-agent)를 호출해서, per-Agent model
+# override(runtime.agent.AgentExecutor.buildSpec() 6단계)가 Workflow 안에서도 그대로 적용되는지
+# 확인하기 위한 테스트 전용 Workflow다.
+#
+# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+#   workflowId: agent-model-override
+#   message   : 너는 누구니?
+# agents/model-override-agent.yml의 안내대로, conf/application.yml의 활성 provider(spring.ai.model.chat)에
+# 맞는 model 값으로 agents/model-override-agent.yml을 먼저 맞춰둬야 정상 호출된다.
+workflow:
+  id: agent-model-override
+  description: per-Agent model override 확인용 Workflow. conf/application.yml 기본 모델과 다른 모델로 응답한다.
+  maxIterations: 3
+  steps:
+
+    - id: ask
+      type: AGENT
+      ref: model-override-agent
+      onSuccess: SUCCESS

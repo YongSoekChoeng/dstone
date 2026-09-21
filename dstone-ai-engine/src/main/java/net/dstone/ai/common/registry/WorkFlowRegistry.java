@@ -1,5 +1,7 @@
 package net.dstone.ai.common.registry;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +90,29 @@ public class WorkFlowRegistry extends BaseObject {
 				throw new IllegalStateException("workflow[" + definition.id() + "]의 step[" + step.id() + "]: ROUTER step은 forEachVariable을 가질 수 없습니다.");
 			}
 		}
+	}
+
+	/**
+	 * <pre>
+	 * caller가 실행할 수 있는 Workflow 전체를 돌려준다(api.controller.WorkFlowController의
+	 * GET /api/ai/workflow가 이 목록을 dstone-boot "Workflow 테스트" 화면의 드롭다운에 그대로 넘긴다).
+	 * resolve()와 동일한 allowedCallers 규칙을 쓴다 - caller가 못 쓰는 Workflow는 resolve()에서
+	 * 막히기 전에 애초에 이 목록에도 안 보여야, 드롭다운에서 고를 수 있는 것과 실제로 실행할 수 있는
+	 * 것이 항상 일치한다.
+	 * </pre>
+	 *
+	 * @param caller 호출한 앱/서비스 식별자(tenant)
+	 */
+	public List<WorkFlowDefinition> list(String caller) {
+		List<WorkFlowDefinition> result = new ArrayList<>();
+		for (WorkFlowDefinition definition : this.byId.values()) {
+			List<String> allowedCallers = definition.allowedCallers();
+			if (allowedCallers == null || allowedCallers.isEmpty() || (caller != null && allowedCallers.contains(caller))) {
+				result.add(definition);
+			}
+		}
+		result.sort(Comparator.comparing(WorkFlowDefinition::id));
+		return result;
 	}
 
 	/**

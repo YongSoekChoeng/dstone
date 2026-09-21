@@ -15,24 +15,20 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<div id="ai-main">
 			<section class="ai-banner">
 				<h2>Dstone AI</h2>
-				<p>dstone-ai-engine과 연동되는 AI 기능 모음입니다. "테스트"는 개발자가 기능을 직접 눌러보는 화면이고,
+				<p>dstone-ai-engine과 연동되는 AI 기능 모음입니다. "사용자"는 누구나 기능을 직접 눌러보는 화면이고,
 					"관리자"는 이미 진행 중인 작업(문서 임베딩, Workflow 실행)을 보고 판단·조작하는 화면입니다.</p>
 			</section>
 
 			<section class="ai-panel">
-				<h3>테스트</h3>
+				<h3>사용자</h3>
 				<div class="ai-card-list">
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/chat/chat">
 						<h3>채팅</h3>
 						<p>dstone-ai-engine과 실시간으로 대화합니다. RAG 검색증강, Tool 호출을 선택적으로 켤 수 있습니다.</p>
 					</a>
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/sqlconvert/sqlconvert">
-						<h3>SQL 변환</h3>
-						<p>오라클 SQL을 입력하면 dstone-ai-engine이 PostgreSQL SQL로 바꿔줍니다.</p>
-					</a>
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">
 						<h3>WorkFlow 테스트</h3>
-						<p>workflowId를 직접 입력해 submit/status 비동기 Workflow 호출을 확인합니다.</p>
+						<p>등록된 Workflow 중 하나를 골라 submit/status 비동기 Workflow 호출을 확인합니다.</p>
 					</a>
 				</div>
 			</section>

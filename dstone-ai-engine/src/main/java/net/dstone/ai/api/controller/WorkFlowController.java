@@ -1,5 +1,7 @@
 package net.dstone.ai.api.controller;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +19,7 @@ import net.dstone.ai.api.dto.WorkFlowRequest;
 import net.dstone.ai.api.dto.WorkFlowResponse;
 import net.dstone.ai.api.dto.WorkFlowStatusResponse;
 import net.dstone.ai.api.dto.WorkFlowSubmitResponse;
+import net.dstone.ai.api.dto.WorkFlowSummary;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
@@ -48,6 +51,26 @@ public class WorkFlowController extends BaseController {
 	WorkFlowRegistry workFlowRegistry;
 	@Autowired
 	WorkFlowExecutionService workFlowExecutionService;
+
+	/**
+	 * <pre>
+	 * caller가 실행할 수 있는 Workflow의 id+description 목록을 돌려준다. dstone-boot "Workflow 테스트"
+	 * 화면이 workflowId를 자유 텍스트로 입력받던 것을 드롭다운으로 바꾸면서 이 목록을 그대로 채워 넣는다
+	 * (common.registry.WorkFlowRegistry.list() 참고 - resolve()와 동일한 allowedCallers 규칙을 쓰므로
+	 * 여기 나온 id는 그대로 /execute·/submit에 넘겨도 caller 검증에서 막히지 않는다).
+	 * </pre>
+	 *
+	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 */
+	@GetMapping
+	public List<WorkFlowSummary> list(HttpServletRequest servletRequest) {
+		String caller = CallerContext.get(servletRequest);
+		List<WorkFlowSummary> summaries = new ArrayList<>();
+		for (WorkFlowDefinition definition : this.workFlowRegistry.list(caller)) {
+			summaries.add(WorkFlowSummary.from(definition));
+		}
+		return summaries;
+	}
 
 	/**
 	 * @param workflowId     실행할 Workflow의 id

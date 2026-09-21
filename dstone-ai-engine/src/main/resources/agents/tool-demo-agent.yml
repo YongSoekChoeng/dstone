@@ -1,0 +1,34 @@
+# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+#
+# toolsEnabled=true인 Agent 하나로 등록된 로컬 Tool(tools 패키지, common.config.ConfigTool이 스캔)을
+# LLM이 스스로 골라 호출하는 tool-calling 루프를 확인하기 위한 예시다. 프롬프트에서 각 Tool의 이름과
+# 용도를 안내해서(실제 스키마/설명은 각 Tool의 @Tool(description=...)에서 나오지만, 여기서도 안내해두면
+# 어떤 메시지를 넣어야 어떤 Tool이 불릴지 테스트하기 쉽다), workflows/agent-tool-calling.yml이 이 Agent를
+# 가리킨다.
+#
+# getCurrentDateTime(sample.DateTimeTool)/validateSqlSyntax(sql.SqlSyntaxTool)는 화이트리스트 없이
+# 항상 동작한다. httpGet(http.HttpCallTool)/runShellScript(shell.ShellExecTool)/
+# runPythonScript(python.PythonExecTool)는 conf/application.yml의 dstone.ai.tool.http.allowed-hosts/
+# .shell.allowed-commands/.python.allowed-scripts가 비어있으면(기본값) 항상 "실패: ..."를 돌려준다
+# (deny-by-default) - LLM이 그 Tool을 골라 호출은 하지만 결과가 실패로 나오는 것도 정상 동작이다.
+# searchDocuments(rag.RagSearchTool)는 dstone.ai.rag.enabled=true이고 문서가 적재돼 있어야 결과가 나온다.
+agent:
+  name: tool-demo-agent
+  description: 등록된 로컬 Tool을 LLM이 스스로 골라 호출하는 tool-calling 루프 확인용 Agent.
+  prompt: |
+    당신은 아래 Tool을 상황에 맞게 골라 호출할 수 있는 AI 어시스턴트입니다. 사용자가 굳이 Tool 이름을
+    말하지 않아도, 질문 내용에 맞는 Tool이 있으면 먼저 호출해서 그 결과를 근거로 답하십시오.
+
+    - getCurrentDateTime: 지금 날짜/시간을 물어보면 호출합니다.
+    - validateSqlSyntax: SQL 문 하나의 문법이 올바른지 검증해 달라고 하면 호출합니다.
+    - searchDocuments: 적재된 문서에서 특정 내용을 찾아 달라고 하면 호출합니다.
+    - httpGet: 특정 URL의 내용을 가져와 달라고 하면 호출합니다.
+    - runShellScript / runPythonScript: 등록된 스크립트를 실행해 달라고 하면 scriptName을 그대로 넘겨
+      호출합니다.
+
+    Tool 호출 결과가 "실패:"로 시작하면 그 이유를 그대로 사용자에게 알려주십시오 - 임의로 답을
+    지어내지 마십시오.
+
+    답변은 항상 한국어로 합니다.
+  toolsEnabled: true
+  ragEnabled: false

@@ -3,7 +3,7 @@ var DstoneAiWorkflow = (function () {
 	var urls = {};
 	var POLL_INTERVAL_MS = 2000;
 
-	var workflowIdEl, sessionIdEl, messageEl, variablesEl;
+	var workflowIdEl, workflowIdDescEl, sessionIdEl, messageEl, variablesEl;
 	var submitBtn, submitStatusEl;
 	var executionIdEl, statusBadgeEl, resultEl, pollStopBtn, pollRefreshBtn;
 	var historyBodyEl;
@@ -11,11 +11,13 @@ var DstoneAiWorkflow = (function () {
 	var pollTimer = null;
 	var activeExecutionId = null;
 	var historyRows = {}; // executionId -> <tr> element, 화면에서 제출한 작업만 기억(서버 저장 아님)
+	var workflowsById = {}; // id -> description, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
 
 	function init(options) {
 		urls = options;
 
 		workflowIdEl = document.getElementById("workflow-id");
+		workflowIdDescEl = document.getElementById("workflow-id-desc");
 		sessionIdEl = document.getElementById("workflow-session-id");
 		messageEl = document.getElementById("workflow-message");
 		variablesEl = document.getElementById("workflow-variables");
@@ -38,13 +40,46 @@ var DstoneAiWorkflow = (function () {
 				fetchStatus(activeExecutionId);
 			}
 		});
+		workflowIdEl.addEventListener("change", updateWorkflowDescription);
+
+		loadWorkflowList();
+	}
+
+	function loadWorkflowList() {
+		fetch(urls.listUrl)
+			.then(function (response) {
+				if (!response.ok) {
+					throw new Error("서버 오류(" + response.status + ")");
+				}
+				return response.json();
+			})
+			.then(function (workflows) {
+				workflowIdEl.innerHTML = "";
+				workflowsById = {};
+				(workflows || []).forEach(function (workflow) {
+					workflowsById[workflow.id] = workflow.description;
+					var option = document.createElement("option");
+					option.value = workflow.id;
+					option.textContent = workflow.id;
+					workflowIdEl.appendChild(option);
+				});
+				updateWorkflowDescription();
+			})
+			.catch(function (err) {
+				workflowIdDescEl.textContent = "workflow 목록을 불러오지 못했습니다: " + err.message;
+			});
+	}
+
+	function updateWorkflowDescription() {
+		var description = workflowsById[workflowIdEl.value];
+		workflowIdDescEl.textContent = description || "";
 	}
 
 	function submit() {
 		var workflowId = workflowIdEl.value.trim();
 		var message = messageEl.value.trim();
 		if (!workflowId) {
-			alert("workflowId를 입력하세요.");
+			alert("workflowId를 선택하세요.");
 			return;
 		}
 		if (!message) {

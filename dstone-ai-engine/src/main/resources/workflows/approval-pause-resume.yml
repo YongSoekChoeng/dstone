@@ -1,0 +1,28 @@
+# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# APPROVAL 스텝의 일시중단/재개 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다.
+# LLM/Tool 호출 없이 APPROVAL 스텝 하나만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
+#
+# 확인 절차:
+#   1. dstone-boot "Workflow 테스트" 화면에서 workflowId=approval-pause-resume, message="승인 테스트"로
+#      제출(submit) -> executionId가 바로 발급되고, status가 곧 WAITING_APPROVAL로 바뀐다.
+#   2. dstone-boot "관리자 > Workflow 실행 관리" 화면에서 상태를 WAITING_APPROVAL로 걸어 방금 만든
+#      실행이 목록에 보이는지 확인하고, 그 실행을 승인 또는 반려한다.
+#   3. approved=true면 SUCCESS(status=DONE), false면 FAIL(status=FAILED)로 끝난다 - "Workflow 테스트"
+#      화면으로 돌아가 같은 executionId로 상태를 다시 조회해도(또는 자동 폴링이 그대로) 최종 상태가
+#      반영된다.
+# API로 직접 확인하려면(dstone-ai-engine 기준):
+#   POST /api/ai/workflow/approval-pause-resume/execute { "message": "승인 테스트" }
+#     -> 응답 status가 WAITING_APPROVAL, executionId가 함께 온다.
+#   GET /api/ai/workflow/executions?status=WAITING_APPROVAL
+#   POST /api/ai/workflow/executions/{executionId}/decision { "approved": true, "approver": "...", "comment": "..." }
+workflow:
+  id: approval-pause-resume
+  description: APPROVAL 스텝의 일시중단(WAITING_APPROVAL)/재개 동작 확인용 테스트 Workflow.
+  maxIterations: 5
+  steps:
+
+    - id: approve-step
+      type: APPROVAL
+      approverRole: "team-lead"
+      onSuccess: SUCCESS
+      onFailure: FAIL

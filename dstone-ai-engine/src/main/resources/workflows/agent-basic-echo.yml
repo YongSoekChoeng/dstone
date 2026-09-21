@@ -1,0 +1,27 @@
+# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
+# AGENT step 하나만으로 구성된, Workflow의 가장 기본 형태를 확인하기 위한 테스트 전용 Workflow다.
+# StepType.AGENT는 항상 성공으로 취급되므로 onFailure가 없다(common.definition.StepType 참고).
+#
+# general-chat Agent는 prompt에 {role} 토큰을 쓰므로(agents/general-chat.yml), 이 Workflow를 호출할 때
+# variables에 role을 반드시 채워야 한다 - 안 채우면 Spring AI PromptTemplate 렌더링이
+# IllegalStateException("Not all variables were replaced")을 던지고, 이 Workflow는 FAILED로 끝난다
+# (runtime.workflow.WorkFlowExecutor.runOne이 그 예외를 잡아 곱게 FAILED로 남긴다 - dstone-boot
+# ai/service/ChatService.java의 채팅 화면도 그래서 매 요청 variables.role을 채워 보낸다). AGENT/
+# SUPERVISOR/ROUTER step은 StepDefinition.inputTemplate을 아예 쓰지 않는다 - 항상 직전 결과({previous})
+# 텍스트를 그대로 Agent의 user 메시지로 넘긴다(runtime.step.AgentStepRunner 참고, inputTemplate은
+# TOOL step 전용).
+#
+# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+#   workflowId: agent-basic-echo
+#   message   : 오늘 기분이 어때?
+#   variables : {"role": "친절한 상담원"}
+workflow:
+  id: agent-basic-echo
+  description: AGENT step 1개만으로 구성된 가장 기본적인 Workflow. 프롬프트 템플릿 변수({role}) 렌더링을 확인한다.
+  maxIterations: 3
+  steps:
+
+    - id: reply
+      type: AGENT
+      ref: general-chat
+      onSuccess: SUCCESS
