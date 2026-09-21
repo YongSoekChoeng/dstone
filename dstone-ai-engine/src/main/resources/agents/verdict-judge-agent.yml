@@ -1,10 +1,10 @@
-# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다.
 #
-# type: SUPERVISOR step 전용 Agent 예시다. AGENT와 호출 방식은 같지만
-# runtime.agent.AgentExecutor.callForVerdict()로 호출되어, 자유 텍스트 대신 구조화된
-# runtime.status.Verdict(pass, reason)로 응답을 받는다 - Spring AI가 Verdict의 JSON 스키마를 프롬프트에
-# 자동으로 삽입하고 응답을 그 스키마에 맞춰 파싱한다. workflows/supervisor-verdict-gate.yml이 이 Agent를
-# 가리킨다.
+# 이 Agent는 SUPERVISOR step 전용 예시입니다. 호출하는 방식 자체는 일반 AGENT step과 같지만,
+# 실제로는 runtime.agent.AgentExecutor.callForVerdict()로 호출되기 때문에, 자유롭게 쓴 텍스트
+# 대신 정해진 형식인 runtime.status.Verdict(pass, reason)로 응답을 받습니다. Spring AI가 이
+# Verdict의 JSON 스키마를 프롬프트에 자동으로 끼워 넣고, LLM의 응답을 그 스키마에 맞춰
+# 해석해 줍니다. workflows/supervisor-verdict-gate.yml에서 이 Agent를 가져다 씁니다.
 agent:
   name: verdict-judge-agent
   description: SUPERVISOR step 전용 - 주어진 텍스트를 pass/fail + 이유로 판정한다.

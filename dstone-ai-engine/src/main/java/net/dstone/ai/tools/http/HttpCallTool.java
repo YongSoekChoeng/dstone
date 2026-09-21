@@ -25,9 +25,10 @@ import net.dstone.common.utils.StringUtil;
 import net.dstone.common.utils.WcUtil;
 
 /**
- * 사전에 허용된 호스트에 한해 HTTP GET만 보낼 수 있는 Tool이다. 별도의 on/off 플래그는 없다 -
- * allowed-hosts를 아무것도 등록하지 않으면(기본값) 어떤 URL을 줘도 화이트리스트에서 못 찾아
- * 항상 실패하므로, 설정을 안 하는 것 자체가 곧 비활성 상태다.
+ * 미리 허용해 둔 호스트에만 HTTP GET 요청을 보낼 수 있는 Tool입니다. 이 Tool은 따로 켜고 끄는
+ * on/off 설정이 없습니다 - allowed-hosts에 아무 호스트도 등록하지 않으면(기본값) 어떤 URL을
+ * 줘도 화이트리스트에서 찾지 못해 항상 실패로 끝나기 때문에, 설정을 비워두는 것 자체가 곧
+ * "이 Tool을 끈 상태"가 됩니다.
  */
 @AiTool
 public class HttpCallTool extends BaseObject {
@@ -38,7 +39,7 @@ public class HttpCallTool extends BaseObject {
 	private Environment environment;
 
 	/**
-	 * @param url 요청할 전체 URL(http 또는 https) - 호스트가 화이트리스트에 등록되어 있어야 함
+	 * @param url 요청할 전체 URL입니다(http 또는 https). 이 URL의 호스트가 화이트리스트에 등록되어 있어야 합니다.
 	 */
 	@Tool(description = "사전에 허용된 호스트에 한해 HTTP GET 요청을 보내고 응답 본문을 반환한다.  url의 호스트가 화이트리스트에 없으면 거부된다.")
 	public String httpGet(@ToolParam(description = "요청할 전체 URL(http 또는 https)") String url) {
@@ -80,12 +81,13 @@ public class HttpCallTool extends BaseObject {
 
 	/**
 	 * <pre>
-	 * WebClient 응답(상태코드/본문)을 이 Tool의 "통과: .../실패: ..." 응답 문자열 컨벤션으로 바꾼다.
+	 * WebClient가 돌려준 응답(상태 코드, 본문)을, 이 Tool이 항상 쓰는 "통과: .../실패: ..."로
+	 * 시작하는 응답 문자열 형식으로 바꿔줍니다.
 	 * </pre>
 	 *
-	 * @param statusCode HTTP 상태 코드
-	 * @param success    2xx 여부
-	 * @param body       응답 본문(없으면 빈 문자열)
+	 * @param statusCode HTTP 상태 코드입니다.
+	 * @param success    상태 코드가 2xx(성공)인지 여부입니다.
+	 * @param body       응답 본문입니다(없으면 빈 문자열).
 	 */
 	private HttpOutcome toOutcome(int statusCode, boolean success, String body) {
 		String truncated = body.length() > this.maxResponseChars() ? body.substring(0, this.maxResponseChars()) + "...(생략)" : body;
@@ -93,12 +95,12 @@ public class HttpCallTool extends BaseObject {
 		return new HttpOutcome(statusCode, result);
 	}
 
-	/** exchangeToMono() 콜백 밖에서 상태코드(로그용)와 최종 응답 문자열을 함께 꺼내기 위한 홀더. */
+	/** exchangeToMono() 콜백 안에서 벗어난 뒤에도 상태 코드(로그용)와 최종 응답 문자열을 함께 꺼내 쓰기 위한 작은 보관용 클래스입니다. */
 	private record HttpOutcome(int statusCode, String result) {
 	}
 
 	/**
-	 * @param host 화이트리스트 포함 여부를 검사할 호스트명
+	 * @param host 화이트리스트에 들어있는지 확인할 호스트명입니다.
 	 */
 	private boolean isAllowedHost(String host) {
 		if (StringUtil.isEmpty(host)) {

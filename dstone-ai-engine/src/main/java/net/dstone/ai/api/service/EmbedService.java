@@ -36,11 +36,14 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * 문서를 임베딩으로 만들어 벡터스토어(pgvector)에 넣고 빼는 일만 한다 - "RAG가 내부적으로 동작하기 위한 재료(임베딩)를 준비"하는
- * 데이터 파이프라인이지, RAG(검색-증강) 자체는 아니다. 검색은 common.rag.RagRetrievalChain의 책임이다.
+ * 문서를 임베딩으로 만들어서 벡터스토어(pgvector)에 넣고 빼는 일을 담당합니다.
  *
- * api.controller.EmbedController(문서 업로드/삭제 API, dstone-boot의 문서 관리 화면이 호출)와 api.controller.WorkFlowController
- * 같은 "외부에서 호출하는 관리 작업"의 진입점이라 rag 패키지가 아니라 api.service 패키지에 둔다.
+ * 이 클래스가 하는 일은 "RAG가 나중에 검색할 수 있도록 재료(임베딩)를 미리 준비해두는 것"까지입니다.
+ * 실제로 검색어를 받아 검색하는 RAG(검색-증강) 기능 자체는 common.rag.RagRetrievalChain이 따로 담당합니다.
+ *
+ * 이 클래스는 api.controller.EmbedController(문서 업로드/삭제 API, dstone-boot의 문서 관리 화면이
+ * 호출합니다)나 api.controller.WorkFlowController처럼 "외부에서 호출하는 관리 작업"의 진입점 역할을
+ * 하기 때문에, rag 패키지가 아니라 api.service 패키지에 두었습니다.
  */
 @Service
 public class EmbedService extends BaseService {
@@ -53,9 +56,8 @@ public class EmbedService extends BaseService {
 	private JdbcTemplate jdbcTemplate;
 
 	/**
-	 * <pre>
-	 * 최상위원칙: dstone.ai.rag.enabled=true이고 VectorStore 빈이 실제로 떠 있을 때만 통과시킨다.
-	 * </pre>
+	 * RAG 관련 기능을 쓰기 전에 항상 거치는 관문입니다. dstone.ai.rag.enabled=true로 켜져 있고,
+	 * VectorStore 빈이 실제로 떠 있을 때만 통과시키고, 그렇지 않으면 바로 예외를 던집니다.
 	 */
 	private VectorStore requireVectorStore() {
 		if (!Boolean.parseBoolean(this.configProperty.getProperty("dstone.ai.rag.enabled"))) {
@@ -69,8 +71,11 @@ public class EmbedService extends BaseService {
 	}
 
 	/**
-	 * @param caller   호출한 앱/서비스 식별자(tenant)
-	 * @param sourceId 문서 논리 식별자
+	 * caller(tenant)와 sourceId 조건으로 벡터스토어를 걸러낼 필터 조건식을 만들어줍니다. 둘 다
+	 * 비어 있으면 아무 조건 없이 전체를 대상으로 하겠다는 뜻으로 null을 돌려줍니다.
+	 *
+	 * @param caller   이 문서를 적재한 앱이나 서비스를 가리키는 식별자(tenant)입니다. 비워도 됩니다.
+	 * @param sourceId 문서를 가리키는 논리적인 식별자입니다. 비워도 됩니다.
 	 */
 	private Filter.Expression buildFilter(String caller, String sourceId) {
 		FilterExpressionBuilder builder = new FilterExpressionBuilder();
@@ -89,16 +94,19 @@ public class EmbedService extends BaseService {
 	}
 
 	/**
-	 * <pre>
-	 * 원문을 Tika로 추출 → TokenTextSplitter로 청킹 → VectorStore(pgvector)에 저장한다. sourceId는 호출하는 쪽이 정하는 논리적 문서 식별자(파일명, 업무키 등)로, 같은
-	 * sourceId로 다시 적재하면 upsert처럼 동작하도록 새 청크를 넣기 전에 그 sourceId로 색인돼 있던 기존 청크를 먼저 지운다.
+	 * 문서 하나를 벡터스토어에 적재합니다. 순서는 이렇습니다: 먼저 Tika로 원문 텍스트를 뽑아내고,
+	 * TokenTextSplitter로 잘게 청크(조각)로 나눈 다음, 그 청크들을 VectorStore(pgvector)에 저장합니다.
 	 *
-	 * caller(=tenant_id)가 있으면 청크마다 tenant metadata를 함께 태깅해서, search()/buildAdvisor()가 같은 caller의 문서만 검색하도록 격리한다.
-	 * </pre>
+	 * sourceId는 호출하는 쪽이 정해서 넘기는 논리적인 문서 식별자입니다(파일명이나 업무 키 등을 쓰면
+	 * 됩니다). 같은 sourceId로 다시 적재하면 upsert처럼 동작하도록, 새 청크를 넣기 전에 그 sourceId로
+	 * 이미 적재되어 있던 기존 청크를 먼저 지웁니다.
 	 *
-	 * @param resource 적재할 원문 파일
-	 * @param sourceId 문서 논리 식별자(재적재 시 upsert 기준 키)
-	 * @param caller   호출한 앱/서비스 식별자(tenant)
+	 * caller(=tenant_id) 값이 있으면 각 청크에 tenant metadata를 함께 붙여둡니다. 이렇게 태깅해두면
+	 * search()나 buildAdvisor()가 검색할 때 같은 caller의 문서끼리만 서로 보이도록 격리할 수 있습니다.
+	 *
+	 * @param resource 적재할 원문 파일입니다.
+	 * @param sourceId 문서를 가리키는 논리적인 식별자입니다. 재적재할 때 upsert 여부를 판단하는 기준 키로도 쓰입니다.
+	 * @param caller   이 문서를 적재하는 앱이나 서비스를 가리키는 식별자(tenant)입니다.
 	 */
 	public IngestResponse ingest(Resource resource, String sourceId, String caller) {
 		if (StringUtil.isEmpty(sourceId)) {
@@ -121,8 +129,9 @@ public class EmbedService extends BaseService {
 		vectorStore.add(tagged);
 
 		if (tagged.isEmpty()) {
-			// 텍스트 추출/청킹 결과가 비어 있으면 아무 것도 하지 않는다 - 여기서도 기존 청크를 지워버리면
-			// 손상된 파일을 잘못 재적재했을 때 기존에 정상 적재돼 있던 데이터까지 날아간다.
+			// 텍스트 추출이나 청킹 결과가 비어 있으면 아무 것도 하지 않고 그대로 돌아갑니다. 여기서도
+			// 기존 청크를 지워버리면, 손상된 파일을 실수로 재적재했을 때 기존에 멀쩡히 적재돼 있던
+			// 데이터까지 함께 날아가 버립니다.
 			return new IngestResponse(sourceId, 0);
 		}
 
@@ -132,12 +141,11 @@ public class EmbedService extends BaseService {
 	}
 
 	/**
-	 * <pre>
-	 * sourceId와 caller(=tenant_id) 조건을 함께 걸어 삭제한다 - 다른 tenant가 같은 sourceId를 썼어도 서로의 문서를 지우지 못한다.
-	 * </pre>
+	 * sourceId와 caller(=tenant_id) 조건을 함께 걸어서 삭제합니다. 이렇게 두 조건을 같이 걸어두면,
+	 * 다른 tenant가 우연히 같은 sourceId를 썼더라도 서로의 문서를 지울 수 없습니다.
 	 *
-	 * @param sourceId 문서 논리 식별자
-	 * @param caller   호출한 앱/서비스 식별자(tenant)
+	 * @param sourceId 지울 문서를 가리키는 논리적인 식별자입니다.
+	 * @param caller   이 요청을 보낸 앱이나 서비스를 가리키는 식별자(tenant)입니다.
 	 */
 	public void deleteBySourceId(String sourceId, String caller) {
 		VectorStore vectorStore = this.requireVectorStore();
@@ -145,16 +153,17 @@ public class EmbedService extends BaseService {
 	}
 
 	/**
-	 * <pre>
-	 * 지금 vector_store에 어떤 sourceId들이(몇 청크씩, 어떤 tenant로) 적재돼 있는지 조회한다. VectorStore
-	 * 인터페이스 자체에는 "메타데이터 기준 집계 조회"가 없어서, pgvector 테이블을 JdbcTemplate으로 직접
-	 * 조회한다(runtime.workflow.execution.WorkFlowExecutionStore와 동일하게 이 모듈은 MyBatis를 쓰지 않는다).
-	 * 테이블명은 하드코딩하지 않고 spring.ai.vectorstore.pgvector.table-name 설정에서 읽는다 - 다만 그
-	 * 값을 SQL 문자열에 그대로 이어붙여야 하므로(JdbcTemplate은 테이블명을 바인드 파라미터로 못 받는다),
-	 * validateTableName()으로 영숫자/밑줄만 허용해 방어한다.
-	 * </pre>
+	 * 지금 vector_store에 어떤 sourceId들이 적재되어 있는지, 각각 몇 개의 청크로 어떤 tenant에
+	 * 태깅되어 있는지를 조회합니다.
 	 *
-	 * @param caller 호출한 앱/서비스 식별자(tenant). 있으면 이 tenant로 태깅된 문서만 돌려준다
+	 * VectorStore 인터페이스 자체에는 "메타데이터 기준으로 집계해서 조회하는" 기능이 없기 때문에,
+	 * pgvector 테이블을 JdbcTemplate으로 직접 조회합니다(runtime.workflow.execution.WorkFlowExecutionStore와
+	 * 마찬가지로, 이 모듈은 MyBatis를 쓰지 않습니다). 테이블명은 코드에 직접 박아두지 않고
+	 * spring.ai.vectorstore.pgvector.table-name 설정값에서 읽어옵니다. 다만 JdbcTemplate은 테이블명을
+	 * 바인드 파라미터로 넘길 수 없어서 SQL 문자열에 그대로 이어붙여야 하는데, 이때 임의의 값이 SQL에
+	 * 섞여 들어가지 않도록 validateTableName()으로 영숫자와 밑줄만 허용해 방어합니다.
+	 *
+	 * @param caller 이 tenant로 태깅된 문서만 걸러서 보고 싶을 때 지정합니다. 비워두면 전체를 돌려줍니다.
 	 */
 	public List<DocumentSourceSummary> listSources(String caller) {
 		this.requireVectorStore();
@@ -175,7 +184,12 @@ public class EmbedService extends BaseService {
 		return StringUtil.isEmpty(table) ? "vector_store" : table;
 	}
 
-	/** @param table SQL 문자열에 직접 이어붙이기 전에 영숫자/밑줄만으로 이뤄져 있는지 검증할 테이블명 */
+	/**
+	 * 테이블명을 SQL 문자열에 직접 이어붙이기 전에, 영숫자와 밑줄만으로 이루어져 있는지 확인합니다.
+	 * 이 검사를 통과하지 못하면 설정값이 잘못된 것으로 보고 예외를 던집니다.
+	 *
+	 * @param table 검증할 테이블명입니다.
+	 */
 	private String validateTableName(String table) {
 		if (!table.matches("[A-Za-z0-9_]+")) {
 			throw new IllegalStateException("spring.ai.vectorstore.pgvector.table-name 설정값이 올바르지 않습니다: " + table);

@@ -1,10 +1,18 @@
-# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다 - 파일명과 agent.name이 다르면 로딩 시 헷갈리니 반드시 맞춘다.
-# 프롬프트는 이 파일 안에 직접 적는다 - agent 하나의 정의(설명/프롬프트/RAG여부/툴여부)가 파일 하나로 완결된다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다. 그래서 파일
+# 이름과 아래 agent.name 값은 반드시 똑같이 맞춰야 합니다 - 다르면 나중에 로딩될 때 헷갈립니다.
+# 이 Agent에게 시킬 시스템 프롬프트도 바로 이 파일 안에 함께 적습니다. 즉 Agent 하나에 필요한
+# 정보(설명, 프롬프트, RAG를 쓸지, Tool을 쓸지)가 이 파일 하나로 전부 정리되어 있습니다.
 #
-# 이름/{role} 프롬프트 토큰/toolsEnabled=true/ragEnabled=false는 그대로 유지해야 한다 - dstone-boot의
-# ai/service/ChatService.java가 AGENT="general-chat"을 하드코딩하고 있고, 채팅 화면에서 RAG/Tool을
-# 요청별로 켜고 끄는(ChatRequest.ragEnabled()/toolsEnabled() override) 것도 이 Agent 기본값(toolsEnabled
-# 켜짐/ragEnabled 꺼짐)을 전제로 한다. 이름이나 {role} 토큰을 바꾸면 기존 채팅 화면이 깨진다.
+# ⚠️ 이 파일은 다른 곳에서 이미 쓰이고 있으므로, 아래 값들은 함부로 바꾸면 안 됩니다.
+# dstone-boot의 채팅 화면(ai/service/ChatService.java)이 "general-chat"이라는 Agent 이름을 코드
+# 안에 그대로 박아두고 호출하고 있습니다. 그래서:
+# - agent.name 값을 "general-chat"이 아닌 다른 이름으로 바꾸면, 채팅 화면이 더 이상 이 Agent를
+#   찾지 못해 동작하지 않게 됩니다.
+# - 프롬프트 안의 {role} 토큰을 지우면, 채팅 화면이 매번 role 값을 채워서 보내주고 있는데 그 값을
+#   쓸 자리가 없어져 버립니다.
+# - toolsEnabled: true / ragEnabled: false라는 기본값도 그대로 둬야 합니다. 채팅 화면은 요청마다
+#   RAG/Tool을 켜고 끌 수 있는데(ChatRequest의 ragEnabled/toolsEnabled로 이 기본값을 덮어씀), 그
+#   기능이 정상 동작하려면 이 기본값이 지금 그대로여야 합니다.
 agent:
   name: general-chat
   description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.

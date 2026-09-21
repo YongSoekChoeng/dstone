@@ -1,19 +1,23 @@
-# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# ROUTER step 하나로 3갈래 분기를 확인하기 위한 테스트 전용 Workflow다(common.definition.StepType.ROUTER,
-# runtime.step.AgentStepRunner.runRouter 참고). onSuccess/onFailure 대신 routes(route 이름 ->
-# 다음 step id)를 쓴다 - router-classifier-agent가 고른 route가 billing/technical/other 중 하나면
-# 각각의 종착 step으로, routes에 없는 값을 고르면(오타/환각) Workflow가 FAILED로 끝난다.
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# 세 종착 step은 전부 general-chat을 재사용해서 "어느 route로 왔는지"를 그대로 답하게 한다 - route
-# 별로 서로 다른 Agent를 쓸 수도 있다는 걸 보여주려는 게 아니라(그건 그냥 각 step의 ref를 다르게
-# 하면 된다), 3갈래 분기 자체가 실제로 서로 다른 step으로 이어지는지가 이 Workflow의 확인 대상이다.
+# 이 Workflow는 ROUTER step 하나로 세 갈래 분기가 잘 되는지 확인해보기 위한 테스트 전용
+# Workflow입니다(자세한 내용은 common.definition.StepType.ROUTER,
+# runtime.step.AgentStepRunner.runRouter 참고). ROUTER step은 onSuccess/onFailure 대신
+# routes(route 이름 -> 다음 step id 매핑)를 씁니다 - router-classifier-agent가 고른 route가
+# billing/technical/other 중 하나면 그에 맞는 종착 step으로 이동하고, routes에 없는 값을
+# 고르면(오타를 냈거나 없는 route를 지어낸 경우) Workflow가 FAILED로 끝납니다.
 #
-# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+# 세 종착 step은 모두 general-chat을 그대로 재사용해서 "어느 route로 왔는지"를 그대로 답하게
+# 했습니다 - route마다 서로 다른 Agent를 쓸 수도 있다는 걸 보여주려는 목적이 아니라(그건 그냥
+# 각 step의 ref를 다르게 지정하면 되는 문제입니다), 세 갈래 분기 자체가 실제로 서로 다른
+# step으로 잘 이어지는지를 확인하는 것이 이 Workflow의 목적이기 때문입니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: router-multiway
 #   message   : 지난달 카드 요금이 잘못 청구된 것 같아요.
 #   variables : {"role": "친절한 상담원"}
-# message를 "로그인이 안 돼요"(technical) / "회사 위치가 어디인가요"(other)로 바꿔서 호출해보면 각각
-# 다른 종착 step으로 가는 걸 확인할 수 있다.
+# message를 "로그인이 안 돼요"(technical로 분기) 또는 "회사 위치가 어디인가요"(other로 분기)로
+# 바꿔서 호출해보면, 각각 다른 종착 step으로 가는 것을 확인할 수 있습니다.
 workflow:
   id: router-multiway
   description: ROUTER step(billing/technical/other 3갈래)이 실제로 서로 다른 step으로 분기하는지 확인용 Workflow.

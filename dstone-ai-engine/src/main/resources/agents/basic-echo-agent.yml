@@ -1,11 +1,18 @@
-# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다.
 #
-# AGENT step 자체의 가장 기본적인 동작("Workflow가 Agent 하나를 호출해서 응답을 그대로 다음/최종
-# 결과로 흘려보낸다")만 확인하기 위한 전용 Agent다. workflows/agent-basic-echo.yml이 이 Agent를 쓴다.
-# 프롬프트에 템플릿 토큰을 하나도 쓰지 않으므로 variables 없이 message만 보내도 항상 렌더링이
-# 성공하고, toolsEnabled=false라 tool-calling과도 얽히지 않는다 - "AGENT step 하나 호출"이라는
-# 최소 동작만 확인하고 싶을 때 쓴다(tool-calling 자체는 agents/tool-demo-agent.yml +
-# workflows/agent-tool-calling.yml이 따로 다룬다).
+# 이 Agent는 "Workflow 안에서 AGENT step 하나를 호출하면 어떤 일이 일어나는가"라는, 가장 단순한
+# 동작만 보여주기 위해 만들어졌습니다. 동작은 아주 간단합니다: Workflow가 이 Agent를 부르면, 이
+# Agent는 받은 메시지에 짧게 답하고, 그 답을 그대로 다음 단계(또는 최종 결과)로 넘깁니다.
+# workflows/agent-basic-echo.yml이 바로 이 Agent를 사용합니다.
+#
+# 이 Agent를 쓰기 위해 미리 준비할 게 전혀 없다는 점이 특징입니다.
+# - 프롬프트 안에 {변수} 같은 템플릿 토큰이 하나도 없어서, variables를 안 보내고 message만 보내도
+#   항상 정상적으로 동작합니다.
+# - toolsEnabled가 false라서 Tool을 부를지 말지 고민할 필요가 없습니다(Tool을 실제로 호출해보는
+#   예시는 agents/tool-demo-agent.yml과 workflows/agent-tool-calling.yml에 따로 있습니다).
+#
+# 그래서 "일단 아무 워크플로우나 하나 실행해서 잘 도는지 보고 싶다"고 할 때 가장 먼저 시도해보기
+# 좋은 Agent입니다.
 agent:
   name: basic-echo-agent
   description: AGENT step 자체의 기본 동작 확인 전용 - 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는다.

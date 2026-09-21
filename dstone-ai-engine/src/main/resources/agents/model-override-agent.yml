@@ -1,17 +1,25 @@
-# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다.
 #
-# model 필드로 provider 공통 기본값(spring.ai.{provider}.chat.options.model)과 다른 모델을 이 Agent
-# 호출에만 강제 적용하는 예시다(runtime.agent.AgentExecutor.buildSpec() 6단계). 응답 끝에 "(model=...)"
-# 문구를 붙이게 시켜서, 실제로 어떤 모델이 응답했는지 눈으로 구분할 수 있게 했다 - 정확한 모델명을
-# 모델 스스로 모를 수도 있으니 100% 신뢰할 근거는 아니고, 어디까지나 "요청이 잘 갔는지"를 보는 보조
-# 확인용이다(진짜 확인은 dstone-ai-engine 로그의 요청/응답 또는 api.dto.ChatResponse.model()로 한다).
+# 이 Agent는 "특정 Agent 하나에만 다른 LLM 모델을 강제로 쓰게 할 수 있다"는 기능(model 필드)을
+# 보여주기 위한 예시입니다. 보통은 spring.ai.{provider}.chat.options.model에 설정된 provider
+# 공통 기본 모델을 쓰지만, 아래 model 필드에 값을 적어두면 이 Agent를 호출할 때만 그 모델을
+# 강제로 씁니다(자세한 동작은 runtime.agent.AgentExecutor.buildSpec()의 6단계를 참고하세요).
 #
-# conf/application.yml 기준 지금 활성 provider(spring.ai.model.chat)가 ollama면 아래 model 값도 그
-# provider의 모델명이어야 한다 - qwen2.5-coder:7b는 conf/application.yml의 안내 주석에 "로컬에 pull된
-# 채팅 모델" 중 하나로 적혀 있어(기본값 qwen2.5-coder:3b와 다른 걸 골랐다) 바로 확인할 수 있다.
-# provider를 anthropic으로 바꿔 쓰는 환경이면 이 값을 claude-haiku-4-5-20251001 같은 Anthropic 모델
-# id로 바꿔야 한다 - 다른 provider의 모델명을 넣으면 이 Agent를 호출하는 시점에 그 provider API가
-# 에러를 낸다(기동 시점엔 검증하지 않는다).
+# 실제로 어떤 모델이 답했는지 눈으로 바로 확인할 수 있도록, 프롬프트에서 "답변 끝에
+# (model=...) 문구를 붙여라"라고 시키고 있습니다. 다만 모델이 자기 자신의 정확한 이름을 모를 수도
+# 있으므로 이 문구를 100% 믿을 수는 없습니다 - "요청이 의도한 대로 잘 갔는지" 눈으로 얼른 확인하는
+# 보조 수단 정도로만 생각하세요. 진짜 확실하게 확인하려면 dstone-ai-engine 서버 로그에 남는 요청/응답
+# 내용을 보거나, api.dto.ChatResponse.model() 값을 확인하면 됩니다.
+#
+# 아래 model 값은 지금 conf/application.yml에서 활성화되어 있는 provider(spring.ai.model.chat)에
+# 맞춰져 있어야 정상적으로 동작합니다. 지금은 provider가 ollama이므로 model 값도 ollama에서 쓸 수
+# 있는 모델 이름이어야 합니다. qwen2.5-coder:7b를 예시로 골랐는데, 이건 conf/application.yml의
+# 안내 주석에 "로컬에 이미 받아둔(pull된) 채팅 모델" 중 하나로 적혀 있고, 기본으로 쓰이는
+# qwen2.5-coder:3b와는 다른 모델이라서 "정말 다른 모델이 쓰였는지"를 눈으로 구분하기 좋습니다.
+# 만약 여러분의 환경이 provider를 anthropic으로 바꿔서 쓰고 있다면, 이 값도
+# claude-haiku-4-5-20251001처럼 Anthropic 모델 id로 바꿔줘야 합니다. provider와 맞지 않는 모델
+# 이름을 넣으면, 서버가 켜질 때는 아무 문제 없이 넘어가지만 실제로 이 Agent를 호출하는 순간에 그
+# provider의 API가 에러를 내니 주의하세요.
 agent:
   name: model-override-agent
   description: per-Agent model override 확인용 Agent. 활성 provider의 기본 모델과 다른 모델을 강제한다.

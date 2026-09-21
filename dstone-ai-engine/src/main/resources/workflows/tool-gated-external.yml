@@ -1,20 +1,24 @@
-# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# 화이트리스트가 있어야만 동작하는 위험 Tool 3개(httpGet/runShellScript/runPythonScript)를 전부
-# 한 번씩 호출해보는 테스트 전용 Workflow다. conf/application.yml의 dstone.ai.tool.http.allowed-hosts/
-# .shell.allowed-commands/.python.allowed-scripts가 전부 비어있으면(기본값) 셋 다 deny-by-default로
-# "실패: ..."를 돌려주는 게 정상이다(tools.http.HttpCallTool/tools.shell.ShellExecTool/
-# tools.python.PythonExecTool 클래스 주석 참고 - 별도 on/off 플래그가 없고 화이트리스트가 비어있는
-# 것 자체가 비활성 상태다).
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# 그래서 이 Workflow는 개별 step이 실패해도 onFailure로 다음 step으로 그냥 넘어가게 구성했다 - 전체
-# 결과(SUCCESS/FAIL)가 아니라, dstone-boot "관리자 > Workflow 실행 관리" 화면의 실행 상세(스텝별
-# 이력)에서 세 Tool 각각이 지금 화이트리스트 설정 기준으로 통과/실패했는지 확인하는 게 이 Workflow의
-# 목적이다. 화이트리스트를 채워서(예: httpGet에 dstone.ai.tool.http.allowed-hosts: ["example.com"])
-# 다시 호출해보면 그 step만 성공으로 바뀌는 걸 확인할 수 있다.
+# 이 Workflow는 화이트리스트를 등록해야만 실제로 동작하는 위험한 Tool 3개(httpGet,
+# runShellScript, runPythonScript)를 한 번씩 순서대로 호출해보는 테스트 전용 Workflow입니다.
+# conf/application.yml에서 dstone.ai.tool.http.allowed-hosts / .shell.allowed-commands /
+# .python.allowed-scripts가 전부 비어있는 상태(기본값)라면, 세 Tool 모두 "기본적으로 막혀있는"
+# 상태라서 "실패: ..."를 돌려주는 것이 정상입니다(자세한 내용은 tools.http.HttpCallTool,
+# tools.shell.ShellExecTool, tools.python.PythonExecTool 클래스의 주석을 참고하세요 - 이
+# Tool들은 따로 켜고 끄는 on/off 플래그가 없고, 화이트리스트가 비어있는 것 자체가 곧 비활성
+# 상태입니다).
 #
-# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+# 그래서 이 Workflow는 개별 step이 실패하더라도 onFailure로 그냥 다음 step으로 넘어가도록
+# 만들었습니다 - Workflow 전체의 성공/실패(SUCCESS/FAIL)를 보려는 게 아니라, dstone-boot의
+# "관리자 > Workflow 실행 관리" 화면에서 실행 상세(step별 이력)를 열어 세 Tool이 지금
+# 화이트리스트 설정 기준으로 각각 통과했는지 실패했는지 확인해보는 것이 이 Workflow의
+# 목적입니다. 화이트리스트를 채워 넣고(예: httpGet이면 dstone.ai.tool.http.allowed-hosts:
+# ["example.com"]) 다시 호출해보면, 그 step만 성공으로 바뀌는 것을 확인할 수 있습니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: tool-gated-external
-#   message   : (아무 문자열이나 - 이 Workflow의 step들은 message를 안 씀)
+#   message   : (아무 문자열이나 넣으면 됩니다 - 이 Workflow의 step들은 message를 쓰지 않습니다)
 workflow:
   id: tool-gated-external
   description: httpGet/runShellScript/runPythonScript deny-by-default 확인용 Workflow. 화이트리스트 미설정 시 각 step이 실패하는 게 정상이다.

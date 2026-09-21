@@ -25,12 +25,18 @@ import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
- * 이 엔진의 기본 엔드포인트.
- * POST /api/ai/chat을 처리한다 
- * resources/agents/*.yml에 등록된 Agent 하나를 1회 호출한다(여러 step을 이어 실행하려면 api.controller.WorkflowController를 쓴다).
+ * 이 엔진에서 가장 기본이 되는 채팅 엔드포인트를 제공하는 컨트롤러입니다.
  *
- * POST /api/ai/chat/stream은 같은 요청 계약에 응답만 text/event-stream(SSE)으로 토큰 단위 흘려보낸다. 
- * Servlet 기반 Spring MVC 컨트롤러에서도 reactor-core가 클래스패스에 있으면(dstone-common이 spring-boot-starter-webflux를 물고 있어 항상 있음) Flux<String> 반환만으로 SSE가 동작한다.
+ * POST /api/ai/chat 요청을 받으면, resources/agents/*.yml 파일로 등록해 둔 Agent(챗봇 하나의 설정이라고
+ * 생각하면 됩니다) 중 하나를 딱 한 번 호출해서 답을 돌려줍니다. 만약 여러 단계(step)를 순서대로 이어서
+ * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkflowController를 사용하면 됩니다.
+ *
+ * POST /api/ai/chat/stream 은 요청 형식은 위와 완전히 같지만, 응답 방식이 다릅니다. LLM(대규모 언어 모델)이
+ * 답변을 한 글자씩(정확히는 토큰 단위로) 만들어내는 대로 바로바로 흘려보내 주는 text/event-stream(SSE, 실시간
+ * 스트리밍) 방식입니다. 이 컨트롤러는 원래 요청-응답이 한 번에 끝나는 서블릿 기반 Spring MVC 컨트롤러이지만,
+ * dstone-common 모듈이 spring-boot-starter-webflux 의존성을 이미 포함하고 있어서 reactor-core 라이브러리를
+ * 클래스패스에서 항상 쓸 수 있습니다. 덕분에 메서드가 Flux&lt;String&gt; 타입만 반환하면, 별도 설정 없이도
+ * 스트리밍 응답이 그대로 동작합니다.
  */
 @RestController
 @RequestMapping("/api/ai/chat")
@@ -44,8 +50,10 @@ public class ChatController extends BaseController {
 	AgentExecutor agentExecutor;
 
 	/**
-	 * @param request        채팅 요청 내용(agent, message 등)
-	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 * Agent 하나를 호출해서 답변을 한 번에(스트리밍 없이) 받아 돌려줍니다.
+	 *
+	 * @param request        채팅 요청 내용입니다. 어떤 Agent를 쓸지(agent), 사용자가 보낸 메시지(message) 등을 담고 있습니다.
+	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
@@ -59,12 +67,11 @@ public class ChatController extends BaseController {
 	}
 
 	/**
-	 * <pre>
-	 * chat()과 요청 계약은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 text/event-stream으로 흘려보낸다.
-	 * </pre>
+	 * chat() 메서드와 요청 형식은 완전히 똑같지만, 응답만 다릅니다. LLM이 답변을 만들어내는 대로
+	 * 토큰(글자 조각) 하나하나를 text/event-stream 방식으로 실시간으로 흘려보내 줍니다.
 	 *
-	 * @param request        채팅 요청 내용(agent, message 등)
-	 * @param servletRequest caller 식별을 위한 HTTP 요청
+	 * @param request        채팅 요청 내용입니다. 어떤 Agent를 쓸지(agent), 사용자가 보낸 메시지(message) 등을 담고 있습니다.
+	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<String> chatStream(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
@@ -75,11 +82,16 @@ public class ChatController extends BaseController {
 		return this.agentExecutor.stream(agent, sessionId, caller, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled(), request.model());
 	}
 
-	/** @param request 필수값(message, agent) 검증 대상 요청 */
+	/**
+	 * 요청에 message와 agent 값이 제대로 들어 있는지 미리 확인합니다.
+	 *
+	 * @param request 검증할 채팅 요청입니다.
+	 */
 	private void validateRequest(ChatRequest request) {
 		if (StringUtil.isEmpty(request.message())) {
-			// 이대로 두면 Spring AI의 ChatClientRequestSpec.user()가 Assert.hasText()에서
-			// IllegalArgumentException을 던지는데, 그보다 먼저 막아서 400과 함께 명확한 사유를 알려준다.
+			// message가 비어 있으면 Spring AI 내부의 ChatClientRequestSpec.user() 메서드가
+			// IllegalArgumentException을 던지면서 실패합니다. 그 전에 여기서 먼저 걸러내면, 사용자에게
+			// 원인을 정확히 알려주는 400 Bad Request 응답을 바로 줄 수 있습니다.
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
 		}
 		if (StringUtil.isEmpty(request.agent())) {
@@ -87,19 +99,28 @@ public class ChatController extends BaseController {
 		}
 	}
 
-	/** @param request sessionId를 꺼내올 채팅 요청 */
+	/**
+	 * 이번 대화에 쓸 sessionId(대화를 구분하는 식별자)를 정합니다.
+	 *
+	 * @param request sessionId 값을 가져올 채팅 요청입니다.
+	 */
 	private String resolveSessionId(ChatRequest request) {
 		HttpSession session = this.getSession(true);
 		return session.getAttribute(DEFAULT_SESSION_KEY) != null ? session.getAttribute(DEFAULT_SESSION_KEY).toString() : (StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId());
 	}
 
 	/**
-	 * 응답에 실어줄 "실제로 쓰인 모델명"을 runtime.agent.AgentExecutor와 같은 우선순위(request.model() > agent.model() > provider 공통
-	 * 기본값)로 계산한다 - 호출 결과에는 영향이 없는, ChatResponse 표시 전용 계산이다.
+	 * 이번 응답에 "실제로 어떤 모델을 썼는지" 표시하기 위해, 그 모델 이름을 계산합니다.
 	 *
-	 * @param request  채팅 요청(model override)
-	 * @param agent    호출한 Agent 정의
-	 * @param provider 활성화된 provider 이름
+	 * 우선순위는 이렇습니다: 먼저 요청에 model 값이 있으면 그걸 쓰고, 없으면 Agent 정의에 적힌 model 값을
+	 * 쓰고, 그것마저 없으면 provider(예: anthropic, openai)의 공통 기본 모델을 씁니다. 이 우선순위는
+	 * runtime.agent.AgentExecutor가 실제로 LLM을 호출할 때 쓰는 순서와 똑같습니다. 참고로 이 메서드는
+	 * 실제 LLM 호출 결과에는 아무 영향을 주지 않고, 오직 ChatResponse에 "어떤 모델이 답했는지" 표시하기
+	 * 위한 용도로만 쓰입니다.
+	 *
+	 * @param request  채팅 요청입니다. 사용자가 직접 지정한 model 값(있다면)을 여기서 확인합니다.
+	 * @param agent    이번에 호출한 Agent의 정의입니다.
+	 * @param provider 지금 활성화되어 있는 provider(예: anthropic, openai) 이름입니다.
 	 */
 	private String resolveModel(ChatRequest request, AgentDefinition agent, String provider) {
 		if (!StringUtil.isEmpty(request.model())) {

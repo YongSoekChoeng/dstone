@@ -21,12 +21,14 @@ import net.dstone.ai.common.definition.StepType;
 import net.dstone.ai.runtime.status.WorkFlowExecutionStatus;
 
 /**
- * AI_WORKFLOW_EXECUTION / AI_WORKFLOW_EXECUTION_STEP_HISTORY 두 테이블(schema/01-create-table-postgresql-
- * ai-workflow-execution.sql)을 JdbcTemplate로 직접 다룬다. 이 모듈은 MyBatis를 쓰지 않으므로 별도 sqlmap 없이
- * 이 클래스 하나가 영속화를 전담한다.
+ * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 이 두 테이블(schema/01-create-table-postgresql-
+ * ai-workflow-execution.sql에 정의되어 있습니다)을 JdbcTemplate로 직접 다루는 클래스입니다. 이 모듈은
+ * MyBatis를 쓰지 않기 때문에, 별도의 sqlmap 파일 없이 이 클래스 하나가 저장과 조회를 전담합니다.
  *
- * variables는 Map이라 JSONB 컬럼에 문자열로 넣고 빼야 한다 - Jackson으로 직렬화/역직렬화하고, INSERT/UPDATE에서는
- * PostgreSQL이 문자열을 jsonb로 자동 변환하지 않으므로 "?::jsonb" 캐스트를 명시한다.
+ * variables는 자바에서는 Map이지만, DB에는 JSONB 컬럼에 문자열로 저장해야 합니다. 그래서 저장할 때는
+ * Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다. INSERT/UPDATE 쿼리에서는
+ * PostgreSQL이 일반 문자열을 jsonb 타입으로 자동으로 바꿔주지 않으므로, "?::jsonb"라고 캐스트를
+ * 직접 명시해 줍니다.
  */
 @Repository
 public class WorkFlowExecutionStore {
@@ -36,7 +38,7 @@ public class WorkFlowExecutionStore {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	/** @param execution 새로 저장할 실행 상태 */
+	/** 새 실행 상태를 한 행으로 저장합니다. @param execution 새로 저장할 실행 상태입니다. */
 	public void insert(WorkFlowExecution execution) {
 		this.jdbcTemplate.update(
 			"INSERT INTO AI_WORKFLOW_EXECUTION ("
@@ -48,7 +50,7 @@ public class WorkFlowExecutionStore {
 			execution.resultText(), execution.errorMessage(), Timestamp.from(execution.createdAt()), Timestamp.from(execution.updatedAt()));
 	}
 
-	/** @param execution 최신 상태로 덮어쓸 실행 상태 */
+	/** 기존에 저장된 실행 상태를 최신 상태로 덮어씁니다. @param execution 덮어쓸 최신 실행 상태입니다. */
 	public void update(WorkFlowExecution execution) {
 		this.jdbcTemplate.update(
 			"UPDATE AI_WORKFLOW_EXECUTION SET STATUS = ?, CURRENT_STEP_INDEX = ?, VARIABLES_JSON = ?::jsonb, RESULT_TEXT = ?, ERROR_MESSAGE = ?, UPDATED_AT = ? WHERE EXECUTION_ID = ?",
@@ -56,7 +58,7 @@ public class WorkFlowExecutionStore {
 			execution.executionId());
 	}
 
-	/** @param executionId 조회할 실행 id */
+	/** id로 실행 상태 한 건을 조회합니다. @param executionId 조회할 실행의 id입니다. */
 	public WorkFlowExecution find(String executionId) {
 		List<WorkFlowExecution> found = this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION WHERE EXECUTION_ID = ?", this.executionRowMapper(), executionId);
 		if (found.isEmpty()) {
@@ -66,15 +68,14 @@ public class WorkFlowExecutionStore {
 	}
 
 	/**
-	 * <pre>
-	 * 실행 목록을 최신순으로 조회한다. status/workflowId/caller는 값이 있을 때만 필터로 걸리고, 셋 다 없으면 전체를 돌려준다.
-	 * </pre>
+	 * 실행 목록을 최신순으로 조회합니다. status, workflowId, caller는 값이 있을 때만 필터로 적용되고,
+	 * 셋 다 비어 있으면 전체를 돌려줍니다.
 	 *
-	 * @param status     WAITING_APPROVAL 등으로 좁히고 싶을 때(없으면 전체)
-	 * @param workflowId 특정 workflow의 실행만 보고 싶을 때(없으면 전체)
-	 * @param caller     특정 호출 주체의 실행만 보고 싶을 때(없으면 전체)
-	 * @param page       0부터 시작하는 페이지 번호
-	 * @param size       페이지당 개수
+	 * @param status     WAITING_APPROVAL처럼 특정 상태로만 좁혀서 보고 싶을 때 씁니다(비우면 전체를 봅니다).
+	 * @param workflowId 특정 Workflow의 실행만 보고 싶을 때 씁니다(비우면 전체를 봅니다).
+	 * @param caller     특정 호출 주체의 실행만 보고 싶을 때 씁니다(비우면 전체를 봅니다).
+	 * @param page       0부터 시작하는 페이지 번호입니다.
+	 * @param size       한 페이지에 담을 개수입니다.
 	 */
 	public List<WorkFlowExecution> list(String status, String workflowId, String caller, int page, int size) {
 		StringBuilder sql = new StringBuilder("SELECT * FROM AI_WORKFLOW_EXECUTION WHERE 1=1");
@@ -98,8 +99,10 @@ public class WorkFlowExecutionStore {
 	}
 
 	/**
-	 * @param executionId 이력을 남길 실행 id
-	 * @param entry       스텝 실행 결과 1건
+	 * 스텝 하나가 실행된 이력을 한 줄 추가합니다.
+	 *
+	 * @param executionId 이 이력이 속한 실행의 id입니다.
+	 * @param entry       기록할 스텝 실행 결과 한 건입니다.
 	 */
 	public void appendHistory(String executionId, StepHistoryEntry entry) {
 		this.jdbcTemplate.update(
@@ -108,12 +111,12 @@ public class WorkFlowExecutionStore {
 			executionId, entry.stepId(), entry.stepType().name(), entry.ref(), entry.success(), entry.durationMs(), entry.outputSummary(), entry.failureReason(), Timestamp.from(entry.executedAt()));
 	}
 
-	/** @param executionId 이력을 조회할 실행 id */
+	/** 실행 한 건의 스텝 이력을 전부 조회합니다. @param executionId 이력을 조회할 실행의 id입니다. */
 	public List<StepHistoryEntry> findHistory(String executionId) {
 		return this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION_STEP_HISTORY WHERE EXECUTION_ID = ? ORDER BY EXECUTED_AT ASC, ID ASC", this.historyRowMapper(), executionId);
 	}
 
-	/** find()/list()가 함께 쓰는 AI_WORKFLOW_EXECUTION 한 행 → WorkFlowExecution 매핑기. */
+	/** find()와 list()가 함께 쓰는, AI_WORKFLOW_EXECUTION의 한 행을 WorkFlowExecution으로 바꿔주는 매핑기입니다. */
 	private RowMapper<WorkFlowExecution> executionRowMapper() {
 		return new RowMapper<WorkFlowExecution>() {
 			@Override
@@ -123,7 +126,7 @@ public class WorkFlowExecutionStore {
 		};
 	}
 
-	/** findHistory()가 쓰는 AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행 → StepHistoryEntry 매핑기. */
+	/** findHistory()가 쓰는, AI_WORKFLOW_EXECUTION_STEP_HISTORY의 한 행을 StepHistoryEntry로 바꿔주는 매핑기입니다. */
 	private RowMapper<StepHistoryEntry> historyRowMapper() {
 		return new RowMapper<StepHistoryEntry>() {
 			@Override
@@ -164,7 +167,7 @@ public class WorkFlowExecutionStore {
 		return timestamp == null ? null : timestamp.toInstant();
 	}
 
-	/** @param variables JSON 문자열로 바꿀 변수 맵 */
+	/** 변수 맵을 DB에 저장할 수 있도록 JSON 문자열로 바꿉니다. @param variables JSON 문자열로 바꿀 변수 맵입니다. */
 	private String toJson(Map<String, Object> variables) {
 		try {
 			return this.objectMapper.writeValueAsString(variables == null ? Map.of() : variables);
@@ -173,7 +176,7 @@ public class WorkFlowExecutionStore {
 		}
 	}
 
-	/** @param json 변수 맵으로 되돌릴 JSON 문자열 */
+	/** DB에서 읽어온 JSON 문자열을 다시 변수 맵으로 되돌립니다. @param json 변수 맵으로 되돌릴 JSON 문자열입니다. */
 	private Map<String, Object> fromJson(String json) {
 		if (!StringUtils.hasText(json)) {
 			return new LinkedHashMap<>();

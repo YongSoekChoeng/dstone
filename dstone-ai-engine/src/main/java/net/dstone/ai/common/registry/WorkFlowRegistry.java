@@ -19,12 +19,12 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * <pre>
- * Workflow 정보를 저장하는 컴퍼넌트.
- * YamlDefinitionLoader => WorkFlowDefinition => WorkFlowRegistry 순서로 내용이 로딩된다.
- * classpath:workflows/*.yml 전체를 기동 시 한 번 읽어 id로 찾아주는 저장소.
- * api.controller.WorkFlowController가 이 레지스트리에서 바로 WorkFlowDefinition을 찾아 runtime.workflow.WorkFlowExecutor에 넘긴다.
- * </pre>
+ * 모든 Workflow 정보를 담아두고, id로 찾아 주는 등록소입니다. 로딩 순서는 YamlDefinitionLoader가
+ * classpath:workflows/*.yml 파일들을 읽어서 WorkFlowDefinition으로 바꾸고, 이 WorkFlowRegistry가
+ * 앱이 기동될 때 그것들을 한 번 모아서 보관하는 식입니다.
+ *
+ * api.controller.WorkFlowController는 이 레지스트리에서 WorkFlowDefinition을 바로 찾아
+ * runtime.workflow.WorkFlowExecutor에게 넘겨 실행을 시킵니다.
  */
 @Component
 public class WorkFlowRegistry extends BaseObject {
@@ -34,6 +34,12 @@ public class WorkFlowRegistry extends BaseObject {
 
 	private Map<String, WorkFlowDefinition> byId = Map.of();
 
+	/**
+	 * 앱이 기동될 때 한 번 호출되어, workflows/*.yml에 정의된 Workflow를 전부 읽어 id를 키로
+	 * 하는 맵에 채워 넣습니다. id나 steps가 비어 있는 정의가 있거나, 같은 id가 둘 이상 있거나,
+	 * APPROVAL/ROUTER step의 조합 규칙을 어기면 기동 자체를 실패시켜서 잘못된 설정이 조용히
+	 * 넘어가지 않게 합니다.
+	 */
 	@PostConstruct
 	public void load() {
 		Map<String, WorkFlowDefinition> resolved = new HashMap<>();
@@ -52,13 +58,13 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * APPROVAL 스텝은 forEachVariable을 가질 수 없다 - 사람의 승인/반려 결정이 variables.approvals.{stepId}처럼
-	 * step id 하나로만 식별되는데, forEachVariable로 같은 step을 N번 반복하면 그 N개의 반복이 전부 같은 stepId를 공유하게
-	 * 되어 "몇 번째 반복이 승인됐는지"를 구분할 방법이 없다. 그런 조합이 YAML에 있으면 기동 시점에 바로 막는다.
-	 * </pre>
+	 * APPROVAL step은 forEachVariable과 함께 쓸 수 없다는 규칙을 검사합니다. 사람의 승인/반려
+	 * 결정은 variables.approvals.{stepId}처럼 step id 하나로만 구분되는데, forEachVariable로
+	 * 같은 step을 N번 반복해 버리면 그 N개의 반복이 전부 같은 stepId를 공유하게 되어서 "몇 번째
+	 * 반복이 승인됐는지"를 구분할 방법이 없어집니다. 이런 잘못된 조합이 YAML에 있으면 여기서
+	 * 앱 기동 시점에 바로 막습니다.
 	 *
-	 * @param definition 검증할 workflow 정의
+	 * @param definition 검증할 Workflow 정의
 	 */
 	private void validateApprovalSteps(WorkFlowDefinition definition) {
 		for (StepDefinition step : definition.steps()) {
@@ -69,14 +75,13 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * ROUTER step은 routes(route 이름 -> 다음 step id)가 있어야 라우팅을 할 수 있고, forEachVariable과는 함께 쓸 수
-	 * 없다 - 반복 중 어느 반복의 route를 따라야 하는지가 모호해지기 때문이다(WorkFlowExecutor.decideTransition은 "이 step
-	 * 하나"의 결과만 보고 다음을 정하는데, ROUTER의 route는 애초에 여러 개가 나올 수 있는 값이 아니라 "이 step 하나가 고른
-	 * 값"이어야 의미가 있다).
-	 * </pre>
+	 * ROUTER step에 관한 두 가지 규칙을 검사합니다. 첫째, ROUTER step은 routes(route 이름 →
+	 * 다음 step id 매핑)가 최소 하나는 있어야 실제로 라우팅을 할 수 있습니다. 둘째, ROUTER step은
+	 * forEachVariable과 함께 쓸 수 없습니다 - WorkFlowExecutor.decideTransition은 "이 step
+	 * 하나"의 결과만 보고 다음 단계를 정하는데, 만약 같은 step을 여러 번 반복하면 그중 어느
+	 * 반복이 고른 route를 따라야 하는지가 모호해지기 때문입니다.
 	 *
-	 * @param definition 검증할 workflow 정의
+	 * @param definition 검증할 Workflow 정의
 	 */
 	private void validateRouterSteps(WorkFlowDefinition definition) {
 		for (StepDefinition step : definition.steps()) {
@@ -93,15 +98,15 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * caller가 실행할 수 있는 Workflow 전체를 돌려준다(api.controller.WorkFlowController의
-	 * GET /api/ai/workflow가 이 목록을 dstone-boot "Workflow 테스트" 화면의 드롭다운에 그대로 넘긴다).
-	 * resolve()와 동일한 allowedCallers 규칙을 쓴다 - caller가 못 쓰는 Workflow는 resolve()에서
-	 * 막히기 전에 애초에 이 목록에도 안 보여야, 드롭다운에서 고를 수 있는 것과 실제로 실행할 수 있는
-	 * 것이 항상 일치한다.
-	 * </pre>
+	 * caller가 실행할 수 있는 Workflow만 골라 목록으로 돌려줍니다. api.controller.WorkFlowController의
+	 * GET /api/ai/workflow가 이 목록을 그대로 dstone-boot의 "Workflow 테스트" 화면 드롭다운에
+	 * 보여줍니다.
 	 *
-	 * @param caller 호출한 앱/서비스 식별자(tenant)
+	 * resolve()와 똑같은 allowedCallers 규칙을 씁니다. caller가 쓸 수 없는 Workflow는 나중에
+	 * resolve()에서 막히기 전에, 애초에 이 목록에서부터 보이지 않아야 합니다. 그래야 드롭다운에서
+	 * 고를 수 있는 Workflow와 실제로 실행할 수 있는 Workflow가 항상 일치합니다.
+	 *
+	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
 	 */
 	public List<WorkFlowDefinition> list(String caller) {
 		List<WorkFlowDefinition> result = new ArrayList<>();
@@ -116,12 +121,12 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * 모르는 id거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
-	 * </pre>
+	 * id로 Workflow를 찾아서 돌려줍니다. 이때 caller가 그 Workflow를 쓸 수 있는지도 함께
+	 * 확인합니다. 등록되지 않은 id이거나, caller가 화이트리스트를 통과하지 못하면 조용히
+	 * 넘어가지 않고 바로 예외를 던져서 알려줍니다.
 	 *
-	 * @param id     조회할 workflow id
-	 * @param caller 호출한 앱/서비스 식별자(tenant)
+	 * @param id     조회할 Workflow id
+	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
 	 */
 	public WorkFlowDefinition resolve(String id, String caller) {
 		WorkFlowDefinition definition = this.byId.get(id);

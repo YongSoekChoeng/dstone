@@ -18,16 +18,25 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.security.auth.enabled=true일 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않는다. 이 모듈은 SecurityAutoConfiguration을 통째로 빼뒀기
- * 때문에(conf/application.yml 참고) Spring Security를 다시 가져오는 대신, 헤더 하나만 확인하는 가벼운 Filter로 최소한만 구현했다.
+ * 요청 헤더에 담긴 API Key를 확인해서 인증하는 필터입니다. dstone.ai.security.auth.enabled=true로
+ * 설정되어 있을 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않습니다.
  *
- * OncePerRequestFilter를 구현한 @Component는 Spring Boot가 알아서 서블릿 필터로 등록해준다. /actuator/**는 k8s의 liveness/readiness probe
- * 경로라서 인증 없이 통과시킨다.
+ * 이 모듈은 Spring Security 자동 설정(SecurityAutoConfiguration) 자체를 통째로 빼둔 상태입니다
+ * (conf/application.yml 참고). 그래서 Spring Security를 다시 가져오는 무거운 방법 대신, 헤더 하나만
+ * 확인하는 가벼운 Filter로 최소한의 인증만 구현했습니다.
  *
- * 같은 패키지의 RateLimitFilter(@Order(2))가 CallerContext에 기록해둔 caller를 그대로 가져다 쓰므로, 이 필터가 반드시 먼저(@Order(1)) 실행돼야 한다.
+ * OncePerRequestFilter를 구현한 @Component는 Spring Boot가 알아서 서블릿 필터로 등록해 줍니다.
+ * /actuator/** 경로는 쿠버네티스의 liveness/readiness probe(살아있는지 확인하는 헬스체크)가
+ * 호출하는 경로라서 인증 없이 통과시킵니다.
  *
- * OAuth2 client-credentials 대신 API Key를 고른 이유: 이 모노레포 어디에도 Authorization Server가 없고(dstone-boot의 OAuth2는 소셜 로그인용
- * client일 뿐 IdP는 아니다), 이 엔진을 부르는 쪽이 정해진 SI 프로젝트들끼리의 서비스 간 호출이라 SI 프로젝트마다 키를 하나씩 발급하는 것으로 충분하다.
+ * 같은 패키지의 RateLimitFilter(@Order(2))는 이 필터가 CallerContext에 기록해 둔 caller 값을
+ * 그대로 가져다 씁니다. 그래서 이 필터가 반드시 RateLimitFilter보다 먼저(@Order(1)) 실행되어야
+ * 합니다.
+ *
+ * 인증 방식으로 OAuth2 client-credentials 대신 API Key를 고른 이유는, 이 모노레포 어디에도
+ * Authorization Server가 없기 때문입니다(dstone-boot의 OAuth2는 소셜 로그인을 위한 client일 뿐,
+ * IdP 역할을 하는 서버는 아닙니다). 이 엔진을 호출하는 쪽도 정해진 SI 프로젝트들끼리의 서비스 간
+ * 호출이라서, SI 프로젝트마다 키를 하나씩 발급해 주는 것만으로 충분합니다.
  */
 @Component
 @Order(1)
@@ -37,6 +46,9 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	ConfigProperty configProperty;
 
 	/**
+	 * 이 요청을 인증 검사 없이 그냥 통과시킬지 정합니다. 인증 기능 자체가 꺼져 있거나, 요청
+	 * 경로가 /actuator로 시작하는 헬스체크 요청이면 true를 돌려줍니다.
+	 *
 	 * @param request 들어온 요청
 	 */
 	@Override
@@ -46,6 +58,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	}
 
 	/**
+	 * 요청 헤더에서 API Key를 꺼내 설정된 키 목록과 비교합니다. 헤더가 없거나 일치하는 키가
+	 * 없으면 401 응답으로 바로 거부하고, 일치하면 그 키에 매핑된 caller를 CallerContext에
+	 * 기록한 뒤 다음 필터로 넘깁니다.
+	 *
 	 * @param request     들어온 요청
 	 * @param response    내려줄 응답
 	 * @param filterChain 다음 필터로 넘기는 체인
@@ -90,6 +106,8 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	}
 
 	/**
+	 * 인증에 실패한 요청에 401 Unauthorized 상태와 함께 사유를 JSON으로 담아 응답합니다.
+	 *
 	 * @param response 내려줄 응답
 	 * @param message  거부 사유 메시지
 	 */

@@ -9,12 +9,15 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * tool 중 내부 java프로그램이 아닌 외부 Tool을 호출해주는 클래스. ShellExecTool/PythonExecTool이 공유하는 "OS 프로세스 하나를 안전하게 실행하고 텍스트로 결과를 돌려주는"
- * 로직이다.
+ * 자바 코드가 아니라 OS 프로세스로 실행해야 하는 외부 Tool을 위한 공용 실행기입니다.
+ * ShellExecTool과 PythonExecTool이 이 클래스를 함께 씁니다 - "OS 프로세스 하나를 안전하게
+ * 실행하고, 그 결과를 텍스트로 돌려주는" 로직을 한곳에 모아둔 것입니다.
  *
- * ProcessBuilder(command)는 셸을 거치지 않고 프로세스를 직접 실행하므로(/bin/sh -c로 감싸지 않음), 인자에 [ ; / && / | ] 같은 셸 메타문자가 들어있어도 셸 문법으로
- * 해석되지 않고 단순 인자 문자열로만 전달된다 LLM이 만든 인자값이라도 명령 주입으로 이어지지 않는 이유다. 다만 command[0](실행 파일 경로) 자체는 호출부가 화이트리스트로 확정한 값이어야 한다(이
- * 클래스는 그 검증을 하지 않는다).
+ * ProcessBuilder(command)는 셸(/bin/sh -c)을 거치지 않고 프로세스를 곧바로 실행합니다. 그래서
+ * 인자에 `;`, `&&`, `|` 같은 셸 특수문자가 들어 있어도 셸 문법으로 해석되지 않고, 그냥 평범한
+ * 문자열 인자 하나로만 전달됩니다. LLM이 만들어낸 인자값이 들어오더라도 명령어 주입 공격으로
+ * 이어지지 않는 이유가 바로 이것입니다. 다만 command[0](실제로 실행할 파일 경로)은 이 클래스가
+ * 직접 검증하지 않으므로, 호출하는 쪽에서 화이트리스트로 미리 확정해 둔 값이어야 합니다.
  */
 public final class ExternalProcessRunner {
 
@@ -22,9 +25,12 @@ public final class ExternalProcessRunner {
 	}
 
 	/**
-	 * @param command        실행할 명령어와 인자 목록
-	 * @param timeout        최대 대기 시간
-	 * @param maxOutputChars 출력 결과로 남길 최대 글자 수
+	 * 명령어를 실행하고, 그 표준출력/표준에러를 합쳐서 텍스트로 돌려줍니다. 제한 시간을 넘기면
+	 * 프로세스를 강제 종료하고, 종료 코드가 0이 아니면 "실패:"로 시작하는 문자열을 돌려줍니다.
+	 *
+	 * @param command        실행할 명령어와 그 인자들의 목록(command[0]이 실제 실행 파일 경로)
+	 * @param timeout        프로세스가 끝나기를 기다릴 최대 시간
+	 * @param maxOutputChars 결과 텍스트로 남길 최대 글자 수(넘으면 잘라내고 "...(생략)"을 붙임)
 	 */
 	public static String run(List<String> command, Duration timeout, int maxOutputChars) {
 		Process process;
@@ -43,7 +49,7 @@ public final class ExternalProcessRunner {
 				}
 			}
 		} catch (IOException e) {
-			// 프로세스가 강제 종료되면 출력 스트림 읽기 중 끊길 수 있다 - 지금까지 모은 출력은 그대로 쓴다.
+			// 프로세스가 강제 종료되면 출력을 읽는 도중에 끊길 수 있습니다. 그때까지 모은 출력은 그대로 사용합니다.
 		}
 
 		boolean finished;

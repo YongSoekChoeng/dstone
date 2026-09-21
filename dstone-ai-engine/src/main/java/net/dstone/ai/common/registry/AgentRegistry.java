@@ -15,9 +15,14 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Agent 정보를 저장하는 컴퍼넌트. YamlDefinitionLoader => AgentDefinition => AgentRegistry 순서로 내용이 로딩된다. classpath:agents/*.yml
- * 전체를 기동 시 한 번 읽어 이름으로 찾아주는 등록소다. api.controller.ChatController가 request.agent()로 직접 찾을 수도 있고, runtime.step의
- * AgentStepRunner/ToolStepRunner가 StepDefinition.ref로 찾을 수도 있다 - 어느 경로든 caller 화이트리스트 검사는 여기 한 곳에서만 이뤄진다.
+ * 모든 Agent 정보를 담아두고, 이름으로 찾아 주는 등록소입니다. 로딩 순서는 YamlDefinitionLoader가
+ * classpath:agents/*.yml 파일들을 읽어서 AgentDefinition으로 바꾸고, 이 AgentRegistry가 그
+ * AgentDefinition들을 앱이 기동될 때 한 번 모아서 보관하는 식입니다.
+ *
+ * Agent를 찾아 쓰는 경로는 두 가지입니다: api.controller.ChatController가 request.agent() 값으로
+ * 직접 찾는 경우와, runtime.step의 AgentStepRunner/ToolStepRunner가 StepDefinition.ref 값으로
+ * 찾는 경우입니다. 어느 경로로 찾든 caller 화이트리스트 검사는 이 클래스 안에서 딱 한 번만
+ * 이뤄집니다.
  */
 @Component
 public class AgentRegistry extends BaseObject {
@@ -27,6 +32,11 @@ public class AgentRegistry extends BaseObject {
 
 	private Map<String, AgentDefinition> byName = Map.of();
 
+	/**
+	 * 앱이 기동될 때 한 번 호출되어, agents/*.yml에 정의된 Agent를 전부 읽어 이름을 키로 하는
+	 * 맵에 채워 넣습니다. name이나 prompt가 비어 있는 Agent가 있거나, 같은 이름의 Agent가
+	 * 둘 이상 있으면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
+	 */
 	@PostConstruct
 	public void load() {
 		Map<String, AgentDefinition> resolved = new HashMap<>();
@@ -43,13 +53,13 @@ public class AgentRegistry extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * caller 에게 허용된 agentName 에 해당하는 AgentDefinition 을 반환한다. 모르는 이름이거나 caller가 화이트리스트를 통과하지 못하면 조용히 넘어가지 않고 바로 에러로 알려준다.
-	 * </pre>
+	 * 이름으로 Agent를 찾아서 돌려줍니다. 이때 caller가 그 Agent를 쓸 수 있는지도 함께
+	 * 확인합니다. 등록되지 않은 이름이거나, caller가 그 Agent의 화이트리스트를 통과하지
+	 * 못하면 조용히 넘어가지 않고 바로 예외를 던져서 알려줍니다.
 	 *
-	 * @param agentName 조회할 agent 이름
-	 * @param caller    호출한 앱/서비스 식별자(tenant)
-	 * @return
+	 * @param agentName 조회할 Agent 이름
+	 * @param caller    호출한 앱/서비스를 나타내는 식별자(tenant)
+	 * @return 조건을 통과한 AgentDefinition
 	 */
 	public AgentDefinition resolve(String agentName, String caller) {
 		AgentDefinition definition = this.byName.get(agentName);

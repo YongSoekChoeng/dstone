@@ -21,14 +21,19 @@ import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
- * "LLM에게 일을 시키는 단위"인 Agent 하나를 실제로 호출한다. AgentDefinition의 prompt/toolsEnabled/ragEnabled를 읽어 ChatClient 요청을 조립하는
- * 곳은 여기 한 곳뿐이다 - api.controller.ChatController(단일 대화 턴)와 runtime.step.AgentStepRunner(Workflow의 AGENT/ SUPERVISOR
- * step)가 똑같이 이 클래스를 통해 호출한다.
+ * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
+ * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 toolsEnabled(Tool 사용 여부), ragEnabled(RAG 사용 여부)를
+ * 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 그래서 api.controller.ChatController
+ * (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 runtime.step.AgentStepRunner(Workflow 안에서 AGENT/SUPERVISOR
+ * step을 실행하는 경우) 둘 다 결국 이 클래스를 통해서 LLM을 호출합니다.
  *
- * ragOverride/toolsOverride/modelOverride는 null이면 Agent 정의값(agent.model()이 null이면 provider 공통 기본값)을 그대로 쓰고, 값을 주면 그
- * 호출 한 번만 Agent 정의값을 무시하고 강제로 적용한다 - api.controller.ChatController가 요청의 ChatRequest.ragEnabled()/toolsEnabled()/model()을
- * 그대로 넘겨서, 같은 Agent를 쓰면서도 요청마다 RAG/Tool/모델을 바꿔보고 싶은 화면(예: dstone-boot의 채팅 화면)을 지원한다. Workflow의 AGENT/SUPERVISOR
- * step(runtime.step.AgentStepRunner)은 셋 다 항상 null로 넘겨 Agent 정의값 그대로 쓴다.
+ * call()/callForVerdict()/callForEntity()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는
+ * 파라미터가 있습니다. 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도
+ * null이면 provider 공통 기본 모델을 씁니다), 값을 직접 주면 그 한 번의 호출에서만 Agent 정의를 무시하고
+ * 그 값을 강제로 적용합니다. 예를 들어 dstone-boot의 채팅 화면에서는 같은 Agent를 쓰면서도 사용자가 화면에서
+ * RAG/Tool을 켜고 끄거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 override 값들을
+ * 그대로 넘겨줍니다. 반면 Workflow의 AGENT/SUPERVISOR step(runtime.step.AgentStepRunner)은 이 세 값을
+ * 항상 null로 넘겨서, Agent 정의에 적힌 값을 그대로 씁니다.
  */
 @Component
 public class AgentExecutor extends BaseObject {
@@ -42,18 +47,18 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * AGENT 용 LLM호출 메소드.
+	 * AGENT step(또는 채팅 화면)이 쓰는, 가장 기본적인 LLM 호출 메서드입니다.
 	 *
-	 * Stream 형식이 아닌라 결과가 완전히 나온 후에야 클라이언트에게 전달.
+	 * Stream 방식이 아니라서, LLM이 답변을 다 만들 때까지 기다렸다가 완성된 결과를 한 번에 돌려줍니다.
 	 * </pre>
-	 * @param agent         호출할 Agent 정의
-	 * @param sessionId     대화 세션 식별자
-	 * @param caller        호출한 앱/서비스 식별자(tenant)
-	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
-	 * @param userMessage   사용자 입력 텍스트
-	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
-	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
-	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
+	 * @param agent         호출할 Agent의 정의(프롬프트, Tool/RAG 사용 여부 등)
+	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param userMessage   사용자가 입력한 메시지 원문
+	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 */
 	public String call(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).call().content();
@@ -61,16 +66,17 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * SUPERVISOR 용 LLM호출 메소드.
+	 * SUPERVISOR step 전용 LLM 호출 메서드입니다.
 	 *
-	 * callForEntity(..., Verdict.class)의 얇은 별칭이다 - 호출부(runtime.step.AgentStepRunner.runSupervisor)의 가독성을 위해
-	 * 타입을 명시한 이름으로 남겨뒀다.
+	 * 사실 내부적으로는 callForEntity(..., Verdict.class)를 그대로 호출하는 아주 얇은 래퍼입니다. 그런데도
+	 * 이렇게 이름을 따로 지어둔 이유는, 이 메서드를 호출하는 쪽(runtime.step.AgentStepRunner.runSupervisor)
+	 * 코드를 읽을 때 "여기서 SUPERVISOR 판정을 받는다"는 게 한눈에 보이게 하기 위해서입니다.
 	 * </pre>
-	 * @param agent       호출할 Agent 정의
-	 * @param sessionId   대화 세션 식별자
-	 * @param caller      호출한 앱/서비스 식별자(tenant)
-	 * @param variables   프롬프트 템플릿에 바인딩할 변수 맵
-	 * @param userMessage 사용자 입력 텍스트
+	 * @param agent       호출할 Agent의 정의
+	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param userMessage 사용자가 입력한 메시지 원문
 	 */
 	public Verdict callForVerdict(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage) {
 		return this.callForEntity(agent, sessionId, caller, variables, userMessage, Verdict.class);
@@ -78,21 +84,28 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 자유 텍스트 대신 구조화된 응답이 필요한 모든 호출이 거치는 공통 메소드다. call()과 요청 조립은 동일하고, 응답만
-	 * ChatClient.entity(type)로 받는다 - Spring AI가 type의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰
-	 * 파싱해주므로, 사람이 텍스트 접두사 컨벤션을 프롬프트로 지시하고 코드가 문자열로 매칭하는 방식보다 형식 준수율이
-	 * 높다(그래도 100% 확정적이진 않다 - 모델이 스키마 자체를 어기면 entity()가 예외를 던지는데, 그건 호출부가
-	 * 다뤄야 한다. runtime.step.AgentStepRunner의 SUPERVISOR/ROUTER/structuredOutput=true AGENT step이 각각 Verdict/
-	 * RouteDecision/StepPayload를 이 메소드로 받는다).
-	 * ragOverride/toolsOverride/modelOverride는 없다 - 구조화 응답이 필요한 호출은 전부 Workflow step 전용이라 요청별
-	 * override(ChatController 전용 기능)가 의미가 없다.
+	 * 자유롭게 쓴 텍스트가 아니라, 정해진 형태(JSON 구조)로 응답을 받아야 하는 모든 호출이 공통으로 거치는
+	 * 메서드입니다. 요청을 조립하는 과정은 call()과 똑같고, 응답을 받는 방식만 다릅니다 - ChatClient.entity(type)를
+	 * 쓰면, Spring AI가 우리가 원하는 타입(type)의 JSON 스키마를 자동으로 만들어서 프롬프트에 함께 넣어주고,
+	 * LLM이 답한 내용을 그 스키마에 맞춰 파싱해서 돌려줍니다.
+	 *
+	 * 이 방식이 좋은 이유는, "통과: ..." 같은 문구를 사람이 프롬프트에 써 놓고 코드가 문자열을 비교해서
+	 * 판단하는 방식보다 LLM이 형식을 훨씬 더 잘 지켜서 답하기 때문입니다. 다만 100% 완벽하게 보장되는
+	 * 것은 아닙니다 - LLM이 그래도 스키마를 어기고 엉뚱한 형태로 답하면 entity() 호출 자체가 예외를
+	 * 던지는데, 그 예외를 처리하는 것은 이 메서드를 호출하는 쪽의 몫입니다. 실제로는
+	 * runtime.step.AgentStepRunner 안의 SUPERVISOR step이 Verdict를, ROUTER step이 RouteDecision을,
+	 * structuredOutput=true로 설정된 AGENT step이 StepPayload를 각각 이 메서드로 받습니다.
+	 *
+	 * 참고로 이 메서드에는 ragOverride/toolsOverride/modelOverride 파라미터가 없습니다. 정해진 형태의
+	 * 응답이 필요한 호출은 전부 Workflow의 step에서만 일어나는데, Workflow의 step은 애초에 요청마다
+	 * 값을 바꿔 부르는 기능(ChatController에서만 쓰는 기능입니다)을 쓰지 않기 때문입니다.
 	 * </pre>
-	 * @param agent       호출할 Agent 정의
-	 * @param sessionId   대화 세션 식별자
-	 * @param caller      호출한 앱/서비스 식별자(tenant)
-	 * @param variables   프롬프트 템플릿에 바인딩할 변수 맵
-	 * @param userMessage 사용자 입력 텍스트
-	 * @param type        파싱해서 받을 구조화 응답 타입
+	 * @param agent       호출할 Agent의 정의
+	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param userMessage 사용자가 입력한 메시지 원문
+	 * @param type        LLM 응답을 파싱해서 담을 구조화된 응답 타입(예: Verdict.class)
 	 */
 	public <T> T callForEntity(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Class<T> type) {
 		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(type);
@@ -100,18 +113,20 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * AGENT 용 LLM호출 메소드.
+	 * AGENT step(또는 채팅 화면)이 쓰는 스트리밍 방식의 LLM 호출 메서드입니다.
 	 *
-	 * call()과 요청 조립은 동일하고, 응답만 LLM이 토큰을 생성하는 대로 흘려보낸다.(Stream 형식)
+	 * 요청을 조립하는 과정은 call()과 완전히 같습니다. 차이는 응답을 받는 방식뿐인데, LLM이 답변을 다 만들
+	 * 때까지 기다리지 않고 토큰(글자 조각)이 만들어지는 대로 바로바로 흘려보내 줍니다. 그래서 채팅
+	 * 화면에서 답변이 타이핑되듯 실시간으로 나타나게 만들 때 이 메서드를 씁니다.
 	 * </pre>
-	 * @param agent         호출할 Agent 정의
-	 * @param sessionId     대화 세션 식별자
-	 * @param caller        호출한 앱/서비스 식별자(tenant)
-	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
-	 * @param userMessage   사용자 입력 텍스트
-	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
-	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
-	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
+	 * @param agent         호출할 Agent의 정의
+	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param userMessage   사용자가 입력한 메시지 원문
+	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 */
 	public Flux<String> stream(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
@@ -119,16 +134,18 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * LLM 호출을위한 Spec을 정의하는 메소드.
+	 * 위의 call()/callForVerdict()/callForEntity()/stream() 메서드가 공통으로 쓰는, "LLM에게 보낼 요청을
+	 * 하나씩 조립하는" 메서드입니다. 세션 유지 → 시스템 프롬프트 → RAG → Tool → 모델 지정 → Advisor 순서로
+	 * 차례차례 설정을 붙여서 최종 요청 스펙(ChatClientRequestSpec)을 만들어 돌려줍니다.
 	 * </pre>
-	 * 
-	 * @param sessionId     대화 세션 식별자
-	 * @param caller        호출한 앱/서비스 식별자(tenant)
-	 * @param agent         호출할 Agent 정의
-	 * @param variables     프롬프트 템플릿에 바인딩할 변수 맵
-	 * @param ragOverride   RAG 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
-	 * @param toolsOverride Tool 사용 여부 강제 지정(null이면 Agent 정의값을 그대로 씀)
-	 * @param modelOverride 모델명 강제 지정(null이면 agent.model(), 그마저 null이면 provider 공통 기본값을 씀)
+	 *
+	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param agent         호출할 Agent의 정의
+	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 */
 	private ChatClient.ChatClientRequestSpec buildSpec(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 
@@ -137,56 +154,65 @@ public class AgentExecutor extends BaseObject {
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : agent.model();
 
 		/************************************************************************
-		1. 요청 스펙 시작
+		1. 요청 스펙을 만들기 시작합니다.
 		************************************************************************/
 		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt();
 
 		/************************************************************************
-		2. 세션 ID를 걸어서 지금까지의 대화 히스토리가 이어지도록 조치
-			- ConfigChatClient.chatClient 에서 defaultAdvisors 로 등록 된 MessageChatMemoryAdvisor가 참조 할 sessionId 를 주입.
-			- MessageChatMemoryAdvisor 는 ChatMemory(구현체는 RedisChatMemorySession)를 생성자 파라메터로 받음.
-			- ChatMemory(구현체는 RedisChatMemorySession).findByConversationId(String conversationId)는 Spring 내부적으로 호출됨.
+		2. 세션 ID를 걸어서, 지금까지 나눈 대화 히스토리가 자연스럽게 이어지도록 합니다.
+			- ConfigChatClient.chatClient()에서 defaultAdvisors로 등록해 둔 MessageChatMemoryAdvisor가
+			  바로 이 sessionId 값을 읽어서 "어느 대화의 이어지는 내용인지"를 판단합니다.
+			- MessageChatMemoryAdvisor는 생성될 때 ChatMemory 구현체(여기서는 RedisChatMemorySession)를
+			  전달받습니다.
+			- ChatMemory.findByConversationId(String conversationId) 메서드는 Spring이 내부적으로
+			  자동 호출해 줍니다. 우리가 직접 호출할 필요는 없습니다.
 		************************************************************************/
 		spec = spec.advisors(
 			new Consumer<ChatClient.AdvisorSpec>(){
 				@Override
 				public void accept(ChatClient.AdvisorSpec a) {
-					// ChatMemory(구현체는 RedisChatMemorySession).findByConversationId(String conversationId)가 읽어갈 conversationId 세팅.
+					// MessageChatMemoryAdvisor가 findByConversationId(conversationId)를 호출할 때 쓸 conversationId 값을 여기서 넣어줍니다.
 					a.param(ChatMemory.CONVERSATION_ID, sessionId);
 				}
 			}
 		);
 
 		/************************************************************************
-		3. 시스템 프롬프트 적용.
-			- AgentDefinition.prompt() 원문을 그대로 시스템 프롬프트로 쓴다. {caller}/{today} 같은 토큰이 들어있으면
-			  Spring AI의 PromptTemplate으로 그 자리에서 렌더링한다(resources/agents/*.yml에 인라인된 프롬프트).
+		3. 시스템 프롬프트를 적용합니다.
+			- AgentDefinition.prompt()에 적힌 문구를 그대로 시스템 프롬프트로 씁니다. 만약 그 문구 안에
+			  {caller}나 {today} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 그
+			  자리에서 실제 값으로 바꿔치기해 줍니다. 이 프롬프트는 resources/agents/*.yml 파일 안에
+			  직접 적혀 있습니다.
 		************************************************************************/
 		if (!StringUtil.isEmpty(agent.prompt())) {
 			spec = spec.system(new PromptTemplate(agent.prompt()).render(this.promptSafeVariables(variables)));
 		}
 
 		/************************************************************************
-		4. RAG 적용(caller의 문서만 검색되도록 tenant 필터가 함께 걸린다)
-			- topK/similarityThreshold/allowEmptyContext는 AgentDefinition.ragTopK/ragSimilarityThreshold/ragAllowEmptyContext를 그대로 넘긴다.
-			  전부 null이면 RagRetrievalChain의 전역 기본값(dstone.ai.rag.retrieval.*, allowEmptyContext=true)을 쓴다.
+		4. RAG(검색 증강)를 적용합니다. caller의 문서만 검색 대상이 되도록 tenant 필터도 함께 걸립니다.
+			- topK(검색 결과 개수)/similarityThreshold(유사도 기준)/allowEmptyContext(검색 결과가
+			  없을 때 어떻게 할지)는 AgentDefinition에 적힌 ragTopK/ragSimilarityThreshold/
+			  ragAllowEmptyContext 값을 그대로 씁니다. 셋 다 값이 없으면(null) RagRetrievalChain에 정해진
+			  전체 공통 기본값(dstone.ai.rag.retrieval.*, allowEmptyContext는 기본 true)을 씁니다.
 		************************************************************************/
 		if (ragEnabled) {
 			spec = spec.advisors(this.ragRetrievalChain.buildAdvisor(caller, agent.ragTopK(), agent.ragSimilarityThreshold(), agent.ragAllowEmptyContext()));
 		}
 
 		/************************************************************************
-		5. Tool 적용
-			- caller의 Tool 화이트리스트를 통과한 것만 붙는다.
-			- 화이트리스트설정(dstone.ai.tool.allowed-by-caller)이 없으면 전체 허용.
-			- toolContext로 caller를 함께 실어 보낸다 - tools.rag.RagSearchTool처럼 caller(tenant) 기준으로
-			  검색 범위를 좁혀야 하는 Tool이 ToolContext 파라미터로 이 값을 받을 수 있게 한다. caller가 없어도
-			  키 자체는 반드시 채워 넣어야 한다(값은 빈 문자열) - Spring AI MethodToolCallback.
-			  validateToolContextSupport()는 @Tool 메서드가 ToolContext 파라미터를 선언했는데 toolContext가
-			  null이거나 "빈 Map"이면(CollectionUtils.isEmpty) "ToolContext is required by the method as an
-			  argument" IllegalArgumentException을 던진다 - Map.of()(엔트리 0개)도 빈 Map으로 취급되므로
-			  caller==null일 때도 엔트리 1개는 있어야 한다. 값이 빈 문자열이면 StringUtil.isEmpty()가 캐치해서
-			  RagSearchTool 쪽에서는 caller 없음과 동일하게 처리된다.
+		5. Tool(도구) 사용을 적용합니다.
+			- caller에게 허용된 Tool 화이트리스트를 통과한 Tool만 이 요청에 붙습니다.
+			- 화이트리스트 설정(dstone.ai.tool.allowed-by-caller)이 아예 없으면 등록된 Tool을 전부 허용합니다.
+			- toolContext라는 값에 caller를 함께 실어 보냅니다. 이렇게 하는 이유는, tools.rag.RagSearchTool처럼
+			  "caller(tenant)별로 검색 범위를 좁혀야 하는" Tool이 있을 때, 그 Tool이 ToolContext 파라미터를
+			  통해 caller 값을 받아볼 수 있게 하기 위해서입니다. caller 값이 없더라도(null이더라도) 이
+			  toolContext 맵 자체에는 반드시 키가 하나 채워져 있어야 합니다(값은 빈 문자열로 넣습니다) -
+			  Spring AI의 MethodToolCallback.validateToolContextSupport()가, @Tool 메서드에 ToolContext
+			  파라미터가 선언되어 있는데 toolContext가 null이거나 완전히 빈 Map이면("ToolContext is
+			  required by the method as an argument"라는) IllegalArgumentException을 던지기 때문입니다.
+			  Map.of()처럼 엔트리가 0개인 Map도 "빈 Map"으로 취급되므로, caller가 null인 경우에도 엔트리를
+			  최소 1개는 넣어 둡니다. 그 값이 빈 문자열이면 RagSearchTool 쪽의 StringUtil.isEmpty() 검사에서
+			  "caller 없음"과 똑같이 처리됩니다.
 		************************************************************************/
 		if (toolsEnabled) {
 			spec.tools(this.configTool.toolCallbackProvider(caller));
@@ -194,52 +220,62 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		/************************************************************************
-		6. 모델 override 적용
-			- modelOverride > agent.model() 순으로 먼저 있는 값을 쓰고, 둘 다 없으면 spring.ai.{provider}.chat.options.model 그대로 씀. 
-			- 지금 활성화된 provider(spring.ai.model.chat) 안에서 모델만 바꾸는 것이며, 다른 provider의 모델명을 넣으면 이 호출 시점에 그 provider API가 에러를 낸다(기동 시점엔 검증하지 않음).
+		6. 모델(model)을 원하는 것으로 지정합니다.
+			- modelOverride가 있으면 그 값을, 없으면 agent.model()을, 그것도 없으면 spring.ai.{provider}.chat.options.model에
+			  설정된 공통 기본 모델을 그대로 씁니다.
+			- 여기서 바꾸는 것은 지금 활성화된 provider(spring.ai.model.chat) 안에서의 모델명뿐입니다.
+			  다른 provider가 쓰는 모델명을 넣으면, 지금 이 호출 시점에 그 provider의 API가 오류를
+			  돌려줍니다(앱이 시작될 때는 이 값이 맞는지 미리 검사해 주지 않습니다).
 		************************************************************************/
 		if (!StringUtil.isEmpty(model)) {
 			spec = spec.options(ChatOptions.builder().model(model));
 		}
 
 		/************************************************************************
-		7. Advisor 체인
-			- 세션 ID를 거는 것과 마찬가지로  caller를 읽을 수 있게 전달.(아직 미사용.)
+		7. 추가 Advisor를 붙일 자리입니다.
+			- 앞서 세션 ID를 건 것과 같은 방식으로, caller 값을 Advisor가 읽을 수 있게 전달해 둔
+			  자리입니다. 다만 지금은 이 값을 실제로 읽어서 쓰는 Advisor가 아직 없습니다.
 		************************************************************************/
 		if (caller != null) {
 			spec = spec.advisors(
 			    new Consumer<ChatClient.AdvisorSpec>() {
 			        @Override
 			        public void accept(ChatClient.AdvisorSpec a) {
-			        	// TO-DO: 추후 caller 를 사용하는 Advisor 가 추가되면 할 작업.
+			        	// 앞으로 caller 값을 활용하는 Advisor가 추가되면, 여기서 등록하고 caller 값을 넘겨주면 됩니다.
 			            // a.advisors(new Advisor1(), new Advisor2(), ...);
 			            // a.param(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller);
 			        }
 			    }
 			);
 		}
-		
+
 		return spec;
 	}
 
 	/**
 	 * <pre>
-	 * Spring AI의 PromptTemplate은 내부적으로 StringTemplate(ST4)을 쓰는데, ST4는 속성 이름에 '.'이 있으면
-	 * ST.add()에서 IllegalArgumentException("cannot have '.' in attribute names")을 던진다 - 그것도 그
-	 * 템플릿이 실제로 그 토큰을 참조하는지와 무관하게, variables 맵의 모든 엔트리를 무조건 add()하기 때문에
-	 * (StTemplateRenderer.apply()) 프롬프트에 그 토큰을 안 쓰는 Agent까지 도매금으로 예외가 난다.
+	 * Spring AI의 PromptTemplate은 내부적으로 StringTemplate(ST4)이라는 템플릿 엔진을 씁니다. 그런데 ST4는
+	 * 속성 이름(변수명)에 마침표(.)가 들어 있으면 "cannot have '.' in attribute names"라는
+	 * IllegalArgumentException을 던집니다. 문제는, 그 프롬프트가 실제로 그 변수를 쓰는지와 상관없이
+	 * variables 맵에 들어 있는 모든 항목을 ST4가 무조건 다 추가해 버린다는 점입니다(StTemplateRenderer.apply()
+	 * 내부 동작입니다). 그래서 그 변수를 쓰지 않는 Agent라도, variables 맵 안에 마침표가 섞인 키가 하나라도
+	 * 있으면 프롬프트 렌더링 자체가 예외로 실패해 버립니다.
 	 *
-	 * runtime.workflow.WorkFlowExecutor가 병렬/forEach 반복이나 structuredOutput=true AGENT step의
-	 * 구조화 data를 {stepId.키}로 네임스페이싱해서 variables에 넣어주므로(runtime.status.StepOutput.data()
-	 * 참고), 이 필터 없이 variables를 그대로 render()에 넘기면 그런 데이터가 하나라도 쌓인 뒤로는 이후 모든
-	 * Workflow의 AGENT/SUPERVISOR/ROUTER step이 깨진다. 그래서 prompt 렌더링 직전에만 dot이 섞인 키를
-	 * 걸러낸다 - {stepId.키} 참조는 TOOL step의 inputTemplate(ST가 아니라 단순 문자열 치환이라 dot이 아무
-	 * 문제 없음)에서만 쓸 수 있고, Agent의 prompt: 안에서는 원래도 쓸 수 없다(걸러진 토큰은 예외 대신
-	 * "치환되지 않은 리터럴 {stepId.키} 문자열"로 프롬프트에 그대로 남는다 - 크래시보다는 훨씬 나은
-	 * 실패 방식이다).
+	 * 그런데 runtime.workflow.WorkFlowExecutor는 병렬 실행(forEach 반복)이나 structuredOutput=true로
+	 * 설정된 AGENT step의 결과 데이터를 {stepId.키} 형태로 이름을 붙여서(namespacing) variables 맵에
+	 * 넣어줍니다(자세한 내용은 runtime.status.StepOutput.data()를 참고하세요). 그러니까 이런 마침표 섞인
+	 * 키가 variables 맵에 하나라도 쌓이고 나면, 이 필터링 없이 그대로 render()에 넘길 경우 그 뒤로 실행되는
+	 * 모든 Workflow의 AGENT/SUPERVISOR/ROUTER step이 전부 예외로 깨지게 됩니다. 그래서 프롬프트를 렌더링하기
+	 * 바로 직전에만, 이 메서드로 마침표가 섞인 키를 걸러내고 나머지만 넘깁니다.
+	 *
+	 * 참고로 {stepId.키} 형태의 참조는 TOOL step의 inputTemplate에서만 쓸 수 있습니다(ST4 같은 템플릿
+	 * 엔진이 아니라 단순 문자열 치환이라 마침표가 있어도 아무 문제가 없습니다). Agent의 prompt: 안에서는
+	 * 원래부터 이런 형태를 쓸 수 없습니다. 이 메서드가 걸러낸 토큰은 예외를 던지는 대신, "치환되지 않은
+	 * {stepId.키} 문자열 그대로"가 프롬프트에 남게 됩니다 - 앱이 죽어버리는 것보다는 훨씬 안전한
+	 * 실패 방식입니다.
 	 * </pre>
 	 *
-	 * @param variables 필터링할 원본 변수 맵(null이면 빈 Map으로 취급)
+	 * @param variables 마침표 섞인 키를 걸러낼 원본 변수 맵(null이면 빈 Map으로 취급합니다)
 	 */
 	private Map<String, Object> promptSafeVariables(Map<String, Object> variables) {
 		if (variables == null || variables.isEmpty()) {

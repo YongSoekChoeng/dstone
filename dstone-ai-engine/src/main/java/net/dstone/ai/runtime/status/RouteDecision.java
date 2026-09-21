@@ -1,16 +1,20 @@
 package net.dstone.ai.runtime.status;
 
 /**
- * StepType.ROUTER 전용 구조화 응답. SUPERVISOR의 Verdict(pass/reason)가 "통과/실패" 2지선다만 판정하는 것과 달리, ROUTER는 StepDefinition.routes에
- * 정의된 임의 개수의 이름표(route) 중 하나를 LLM이 고르게 한다 - 업무 로직상 3갈래 이상 분기(예: 금액 구간별 처리, 문의 유형별 라우팅)가 필요할 때 SUPERVISOR를
- * 여러 겹 쌓지 않고 한 step으로 표현하기 위한 타입이다.
+ * StepType이 ROUTER인 step 전용으로 쓰는, LLM의 구조화된 응답 형식입니다. SUPERVISOR가 쓰는 Verdict가
+ * "통과했다/실패했다" 둘 중 하나만 고르는 것과 달리, ROUTER는 StepDefinition.routes에 정의해 둔 여러 개의
+ * 이름표(route) 중 하나를 LLM이 직접 고르게 합니다. 업무 성격상 세 갈래 이상으로 나뉘어야 하는 경우(예:
+ * 금액 구간별로 다르게 처리하거나, 문의 유형별로 담당을 나누는 경우)에, SUPERVISOR를 여러 겹 쌓지 않고도
+ * step 하나로 간단히 표현할 수 있게 해주는 타입입니다.
  *
- * route 값은 StepDefinition.routes의 키와 정확히 일치해야 한다 - 일치하지 않으면 runtime.workflow.WorkFlowExecutor가 Workflow를 FAILED로
- * 끝낸다(오타/환각 모두 여기서 걸러진다). 어떤 route를 고르고 어떤 이름표를 쓸 수 있는지는 이 record가 강제하지 않고, agent.prompt()가 안내해야 한다
- * (Spring AI가 이 record의 필드 이름/타입만 스키마로 넣어줄 뿐, route에 어떤 문자열이 와야 하는지는 모른다).
+ * route 값은 반드시 StepDefinition.routes에 있는 키 중 하나와 정확히 같아야 합니다. 만약 다르면(LLM이
+ * 오타를 냈거나 없는 이름을 지어낸 경우) runtime.workflow.WorkFlowExecutor가 그 자리에서 Workflow를
+ * FAILED로 끝냅니다. 다만 어떤 route 이름들을 쓸 수 있는지는 이 record 자체가 정해주지 않습니다 -
+ * Spring AI는 이 record의 필드 이름과 타입만 보고 응답 스키마를 만들어 줄 뿐, route에 실제로 어떤
+ * 문자열이 와야 하는지는 모르기 때문에, 그건 agent.prompt() 안에 직접 안내해 둬야 합니다.
  *
- * @param route  StepDefinition.routes의 키 중 하나(정의되지 않은 값이면 실행 시점에 실패로 처리됨)
- * @param reason 이 route를 고른 근거(감사/디버깅 목적)
+ * @param route  StepDefinition.routes에 정의된 키 중 하나입니다. 정의되지 않은 값이 오면 실행 시점에 실패로 처리됩니다.
+ * @param reason LLM이 이 route를 고른 이유입니다. 나중에 감사하거나 디버깅할 때 참고하는 용도입니다.
  */
 public record RouteDecision(String route, String reason) {
 }

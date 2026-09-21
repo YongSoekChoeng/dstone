@@ -8,10 +8,14 @@ import java.lang.annotation.Target;
 import org.springframework.stereotype.Component;
 
 /**
- * SI 프로젝트가 새 Tool을 추가하는 방법: 클래스에 @AiTool을 붙이고, 그 안에 @Tool이 붙은 public 메소드를 만들면 끝이다. 나머지는 common.config.ConfigTool이 기동 시
- * 자동으로 찾아서 등록해준다. 샘플은 tools.sample.DateTimeTools 참고. @Component를 메타애노테이션으로 포함하고 있어 클래스에
- * 
- * @Component를 따로 붙일 필요는 없다.
+ * 새 Tool(LLM이 호출해서 쓸 수 있는 기능)을 추가하고 싶을 때 쓰는 애노테이션입니다.
+ *
+ * 사용법은 간단합니다: Tool을 담을 클래스에 이 @AiTool을 붙이고, 그 안에 실제 기능을 하는 public
+ * 메소드를 만들어서 @Tool 애노테이션을 붙이면 끝입니다. 그러면 나머지는 common.config.ConfigTool이
+ * 기동할 때 자동으로 찾아서 등록해줍니다. 예시가 필요하면 tools.sample.DateTimeTools를 참고하세요.
+ *
+ * 이 애노테이션 자체가 이미 @Component를 포함하고 있으므로, 클래스에 @Component를 따로 붙이지
+ * 않아도 스프링 빈으로 등록됩니다.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)

@@ -20,10 +20,15 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.biz.BaseController;
 
 /**
- * Workflow 실행의 진행상태/내역을 조회하고 승인/반려를 처리하는 API다. WorkFlowController(동기/비동기 실행 자체)와는
- * 성격이 달라서 별도 컨트롤러로 뒀다 - 여긴 "이미 시작된 실행을 보고 판단·조작"하는 쪽이다.
+ * Workflow 실행이 지금 어떤 상태인지, 지금까지 어떻게 진행되었는지 조회하고, 사람의 승인이 필요한
+ * 경우 승인/반려를 처리하는 API를 모아 둔 컨트롤러입니다.
  *
- * dstone-boot에서는 이 API를 개발자용 "Workflow 테스트" 화면이 아니라 운영자용 "WorkFlow 실행 관리" 관리자 화면이 호출한다.
+ * WorkFlowController는 Workflow를 새로 "시작"시키는 역할(동기/비동기 실행)을 맡고, 이 컨트롤러는
+ * "이미 시작된 실행을 들여다보고 판단하거나 조작"하는 역할을 맡습니다. 역할이 서로 다르다고 보고
+ * 클래스를 따로 나눴습니다.
+ *
+ * dstone-boot에서는 개발자가 직접 Workflow를 테스트해 보는 화면이 아니라, 운영자가 실행 현황을
+ * 관리하는 "Workflow 실행 관리" 관리자 화면이 이 API를 호출합니다.
  */
 @RestController
 @RequestMapping("/api/ai/workflow/executions")
@@ -33,16 +38,16 @@ public class WorkFlowExecutionController extends BaseController {
 	WorkFlowExecutionService workFlowExecutionService;
 
 	/**
-	 * <pre>
-	 * 실행 목록을 최신순으로 조회한다. 파라미터를 안 주면 전체를 돌려준다 - status=WAITING_APPROVAL로 걸면
-	 * "지금 승인 기다리는 실행"만 볼 수 있다.
-	 * </pre>
+	 * Workflow 실행 목록을 최근에 시작된 순서대로 조회합니다.
 	 *
-	 * @param status     WorkFlowExecutionStatus 값으로 좁히고 싶을 때(없으면 전체)
-	 * @param workflowId 특정 workflow의 실행만 보고 싶을 때(없으면 전체)
-	 * @param caller     특정 호출 주체의 실행만 보고 싶을 때(없으면 전체)
-	 * @param page       0부터 시작하는 페이지 번호(기본 0)
-	 * @param size       페이지당 개수(기본 20)
+	 * 파라미터를 아무것도 안 주면 전체 실행 목록이 나옵니다. 예를 들어 status에 WAITING_APPROVAL을
+	 * 넣으면 "지금 사람의 승인을 기다리고 있는 실행"만 골라서 볼 수 있습니다.
+	 *
+	 * @param status     이 값으로 상태를 좁혀서 보고 싶을 때 씁니다(WorkFlowExecutionStatus에 정의된 값 중 하나, 비우면 전체).
+	 * @param workflowId 특정 Workflow의 실행만 보고 싶을 때 씁니다(비우면 전체).
+	 * @param caller     특정 호출 주체(caller)의 실행만 보고 싶을 때 씁니다(비우면 전체).
+	 * @param page       조회할 페이지 번호입니다. 0부터 시작하며, 기본값은 0입니다.
+	 * @param size       한 페이지에 몇 개씩 보여줄지입니다. 기본값은 20입니다.
 	 */
 	@GetMapping
 	public List<WorkFlowExecutionSummary> list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String caller,
@@ -55,7 +60,11 @@ public class WorkFlowExecutionController extends BaseController {
 		return summaries;
 	}
 
-	/** @param executionId 상세를 조회할 실행 id */
+	/**
+	 * 실행 하나의 자세한 정보(입력 변수, 스텝별 실행 이력 등)를 조회합니다.
+	 *
+	 * @param executionId 상세 정보를 조회할 실행의 id입니다.
+	 */
 	@GetMapping("/{executionId}")
 	public WorkFlowExecutionDetail detail(@PathVariable String executionId) {
 		WorkFlowExecution execution = this.workFlowExecutionService.find(executionId);
@@ -63,12 +72,12 @@ public class WorkFlowExecutionController extends BaseController {
 	}
 
 	/**
-	 * <pre>
-	 * WAITING_APPROVAL 상태인 실행에 승인/반려를 기록하고, 같은 스텝부터 재개한다(동기 - 최종 상태까지 진행한 뒤 응답한다).
-	 * </pre>
+	 * WAITING_APPROVAL(승인 대기) 상태인 실행에 대해 승인 또는 반려 결정을 기록하고, 멈춰 있던 그
+	 * 스텝부터 다시 실행을 이어갑니다. 동기 방식이라서, 이어진 실행이 완전히 끝날 때까지(성공이든
+	 * 실패든) 기다렸다가 최종 상태로 응답합니다.
 	 *
-	 * @param executionId 결정을 내릴 실행 id
-	 * @param request     승인 여부/결정자/사유
+	 * @param executionId 승인 또는 반려를 결정할 실행의 id입니다.
+	 * @param request     승인 여부(approved), 결정한 사람(approver), 사유(comment)를 담고 있습니다.
 	 */
 	@PostMapping("/{executionId}/decision")
 	public WorkFlowExecutionDetail decision(@PathVariable String executionId, @RequestBody WorkFlowDecisionRequest request) {

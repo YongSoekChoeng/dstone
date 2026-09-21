@@ -6,16 +6,19 @@ import net.dstone.ai.runtime.status.StepOutput;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
- * AGENT/TOOL/SUPERVISOR/APPROVAL 4개 StepType 러너(AgentStepRunner/ToolStepRunner/ApprovalStepRunner)가 전부 구현하는
- * 공통 인터페이스다. WorkFlowExecutor는 StepType으로 이 인터페이스의 구현체를 찾아 항상 똑같은 방식(run 한 번 호출)으로
- * 스텝을 실행하고, 반환된 StepOutput.result만 보고 다음 동작을 정한다 - StepType별로 분기해서 다르게 호출하지 않는다.
+ * AGENT/TOOL/SUPERVISOR/APPROVAL, 이 네 가지 StepType을 실제로 처리하는 러너들(AgentStepRunner,
+ * ToolStepRunner, ApprovalStepRunner)이 모두 구현하는 공통 인터페이스입니다. WorkFlowExecutor는
+ * StepType 값만 보고 이 인터페이스의 구현체를 하나 골라서, 항상 똑같은 방식으로(run 메서드를 한 번
+ * 호출해서) 스텝을 실행합니다. 그리고 그 결과로 돌아온 StepOutput.result만 보고 다음에 뭘 할지
+ * 정합니다 - 즉 StepType마다 실행 방식을 따로따로 분기하지 않고 한 가지 방식으로 통일해서 다룹니다.
  *
- * 이렇게 시그니처를 하나로 통일해 둔 덕분에 common.config.ConfigCallLog가 이 메서드 하나만 겨냥하는 AOP advice로
- * 모든 스텝의 IN/OUT을 한 곳에서 균일하게 로깅할 수 있다.
+ * 이렇게 메서드 시그니처를 하나로 통일해 둔 덕분에, common.config.ConfigCallLog가 이 run 메서드
+ * 하나만 겨냥하는 AOP advice 하나로도 모든 스텝의 입력/출력을 한곳에서 똑같은 형식으로 로깅할 수
+ * 있습니다.
  *
- * @param execution  실행 중인 Workflow 실행 상태(executionId/workflowId 등 - 로깅/영속화에 쓰인다)
- * @param definition 실행할 스텝 정의(type/ref/inputTemplate 등)
- * @param input      렌더링된 입력 텍스트와 전역 변수
+ * @param execution  지금 실행 중인 Workflow의 실행 상태입니다(executionId, workflowId 등을 담고 있고, 로깅이나 상태 저장에 쓰입니다).
+ * @param definition 실행할 스텝의 정의입니다(type, ref, inputTemplate 등을 담고 있습니다).
+ * @param input      이 스텝에 실제로 넘어갈, 미리 렌더링된 입력 텍스트와 전역 변수입니다.
  */
 public interface StepRunner {
 

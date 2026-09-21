@@ -1,22 +1,27 @@
-# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# forEachVariable(병렬 실행) 동작을 눈으로 확인하기 위한 테스트 전용 Workflow다.
-# LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax) 하나만으로 구성해서 API 비용/네트워크 의존 없이 바로 돌려볼 수 있다.
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# validate-each가 forEachVariable: sqlList를 가지므로, WorkFlowExecutor가 variables.sqlList(List)의
-# 항목 수만큼 이 step 하나를 동시에 실행한다(runtime.workflow.WorkFlowExecutor.runForEach 참고). 각 반복에서는
-# 그 항목이 {item} 토큰으로 들어오므로 inputTemplate이 {"sql":"{item}"}이다.
+# 이 Workflow는 forEachVariable(같은 step을 여러 번 동시에 실행하는 기능)의 동작을 눈으로 직접
+# 확인해보기 위한 테스트 전용 Workflow입니다. LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax)
+# 하나만으로 이루어져 있어서, API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
-# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+# validate-each에 forEachVariable: sqlList가 설정되어 있어서, WorkFlowExecutor가 variables.sqlList
+# (List)에 담긴 항목 개수만큼 이 step 하나를 한꺼번에 실행합니다(자세한 동작은
+# runtime.workflow.WorkFlowExecutor.runForEach 참고). 각 실행에서는 자신이 맡은 항목 값이 {item}
+# 토큰으로 채워지기 때문에, inputTemplate이 {"sql":"{item}"}으로 되어 있습니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: foreach-parallel
-#   message   : (아무 문자열이나 - api.controller.WorkFlowController가 필수값으로 검증하지만, 이
-#               Workflow의 step은 {item}만 쓰고 message/{previous}는 쓰지 않는다)
+#   message   : (아무 문자열이나 넣으면 됩니다 - api.controller.WorkFlowController가 필수값으로
+#               검증은 하지만, 이 Workflow의 step은 {item}만 쓸 뿐 message나 {previous}는 쓰지 않습니다)
 #   variables : {"sqlList": ["SELECT 1 FROM dual", "SELEC 1 FROM dual"]}
-# ("SELEC"은 SELECT의 오타 - JSQLParser가 실제로 거부하는 문법 오류다. "SELECT * FROM WRONG SYNTAX"처럼
-# 얼핏 이상해 보여도 "WRONG 테이블을 SYNTAX로 별칭"으로 해석되어 문법상 유효로 통과하는 문자열은 이
-# 예시로 쓰지 않는다 - 직접 실행해서 실제로 FAIL이 나는 걸 확인했다.)
-# sqlList 안의 모든 SQL이 문법상 올바르면 최종 결과가 SUCCESS로, 하나라도 문법 오류면 FAIL로 끝나면서
-# 어느 것이 실패했는지 [검증 결과] 뒤에 실패 사유가 붙어 나온다 - 두 항목이 실제로 각자 독립적으로
-# 동시에 실행/판정된다는 것을 확인할 수 있다. 항목을 3개, 10개로 늘려도 YAML은 그대로 두면 된다.
+# ("SELEC"은 SELECT를 일부러 잘못 쓴 오타로, JSQLParser가 실제로 문법 오류로 거부합니다. 참고로
+# "SELECT * FROM WRONG SYNTAX"처럼 얼핏 이상해 보이는 문자열은 "WRONG이라는 테이블을 SYNTAX라는
+# 이름으로 별칭 붙인 것"으로 해석되어 문법상으로는 오히려 유효하게 통과해버리기 때문에, 이 예시에는
+# 일부러 쓰지 않았습니다 - 직접 실행해서 실제로 FAIL이 나는 것까지 확인해 둔 값입니다.)
+# sqlList 안의 SQL이 전부 문법상 올바르면 최종 결과가 SUCCESS로 끝나고, 하나라도 문법 오류가 있으면
+# FAIL로 끝나면서 어느 것이 왜 실패했는지가 [검증 결과] 뒤에 이유와 함께 붙어 나옵니다 - 두 항목이
+# 실제로 각자 독립적으로 동시에 실행되고 판정된다는 것을 이 결과로 확인할 수 있습니다. 항목을
+# 3개, 10개로 늘리고 싶다면 YAML은 그대로 두고 variables의 sqlList 목록만 늘리면 됩니다.
 workflow:
   id: foreach-parallel
   description: forEachVariable 동작 확인용 테스트 Workflow - TOOL step 하나를 sqlList 항목 수만큼 동시 실행한다.

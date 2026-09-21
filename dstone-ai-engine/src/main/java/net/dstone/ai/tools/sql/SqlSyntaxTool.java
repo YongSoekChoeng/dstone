@@ -11,15 +11,18 @@ import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statements;
 
 /**
- * SQL을 생성하는 프롬프트(agents/sql-conversion-agent.yml, agents/sql-fix-agent.yml에 인라인된 프롬프트 등)에서, 최종 답변을 내놓기 전에 스스로 문법을 검증하고 틀렸으면 고치는 자기수정 루프에 쓰라고 만든 Tool이다.
- * JSQLParser는 특정 DB 실서버 없이 순수 그래머 파싱만 하므로(대상 테이블이 실제로 존재하는지는 모름) 어떤 대상 스키마의 쿼리든 항상 쓸 수 있지만, PostgreSQL 고유 문법의 세부까지 완벽히
- * 검증하지는 못한다.
+ * SQL을 만들어내는 프롬프트(agents/sql-conversion-agent.yml, agents/sql-fix-agent.yml에 직접
+ * 써 있는 프롬프트 등)가, 최종 답변을 내놓기 전에 스스로 문법을 검증해 보고 틀렸으면 고치는
+ * 자기수정 루프에 쓰라고 만든 Tool입니다. JSQLParser는 실제 DB 서버에 연결하지 않고 순수하게
+ * 문법(그래머)만 파싱하기 때문에(대상 테이블이 진짜로 존재하는지는 모릅니다) 어떤 대상 스키마의
+ * 쿼리에도 항상 쓸 수 있지만, 그 대신 PostgreSQL 고유 문법의 세부적인 부분까지는 완벽하게
+ * 검증하지 못한다는 한계도 있습니다.
  */
 @AiTool
 public class SqlSyntaxTool extends BaseObject {
 
 	/**
-	 * @param sql 검증할 단일 SQL 문(SELECT/INSERT/UPDATE/DELETE)
+	 * @param sql 검증할 SQL 문 하나입니다(SELECT/INSERT/UPDATE/DELETE).
 	 */
 	@Tool(description = "SQL 문 하나의 문법이 구조적으로 올바른지 파싱해서 검사한다(특정 DB 서버 없이 순수 문법 검사). " + "세미콜론으로 여러 문장을 이어붙인 입력은 거부한다. SQL을 최종 답변으로 반환하기 전에 반드시 이 도구로 먼저 검증하고, " + "실패하면 보고된 오류를 근거로 SQL을 고친 뒤 다시 검증하라.")
 	public ToolOutput validateSqlSyntax(@ToolParam(description = "검증할 단일 SQL 문(SELECT/INSERT/UPDATE/DELETE)") String sql) {

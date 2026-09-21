@@ -1,16 +1,19 @@
-# common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
-# AGENT step 하나만으로 구성된, Workflow의 가장 기본 형태를 확인하기 위한 테스트 전용 Workflow다.
-# StepType.AGENT는 항상 성공으로 취급되므로 onFailure가 없다(common.definition.StepType 참고).
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# basic-echo-agent(agents/basic-echo-agent.yml)는 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는
-# 전용 Agent라, message 하나만 보내면 항상 성공한다 - variables는 필요 없다. 프롬프트 템플릿 변수
-# 렌더링 자체를 확인하려면 workflows/agent-model-override.yml처럼 별도 Agent를 참고하거나,
-# agents/general-chat.yml을 직접 chat API로 호출해서 확인한다.
+# 이 Workflow는 AGENT step 하나만으로 이루어진, Workflow의 가장 기본적인 형태를 확인해보기
+# 위한 테스트 전용 Workflow입니다. StepType.AGENT는 항상 성공으로 취급되기 때문에 onFailure를
+# 따로 정해두지 않았습니다(자세한 내용은 common.definition.StepType 참고).
 #
-# dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
+# 여기서 쓰는 basic-echo-agent(agents/basic-echo-agent.yml)는 프롬프트 템플릿 변수도, Tool도
+# 전혀 쓰지 않는 아주 단순한 Agent라서, message 하나만 보내면 항상 성공합니다 - variables는
+# 넘기지 않아도 됩니다. 만약 프롬프트 템플릿 변수가 실제로 잘 채워지는지 확인해보고 싶다면,
+# workflows/agent-model-override.yml처럼 변수를 쓰는 다른 Agent를 참고하거나, agents/general-chat.yml을
+# chat API로 직접 호출해서 확인해보면 됩니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: agent-basic-echo
 #   message   : 오늘 기분이 어때?
-#   variables : (비워도 됨)
+#   variables : (비워도 됩니다)
 workflow:
   id: agent-basic-echo
   description: AGENT step 1개만으로 구성된 가장 기본적인 Workflow. variables 없이 message만 보내면 된다.

@@ -16,14 +16,20 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Boot 4부터 JDBC 자동설정이 별도 모듈(spring-boot-jdbc)로 빠졌다. 이 모듈은 RAG(pgvector)용 DataSource가 필요해진 시점부터 dstone-boot의
- * ConfigDatasource 패턴을 따라 JDBC starter를 쓴다.
+ * dstone-ai-engine을 시작하는 진입점 클래스입니다.
+ *
+ * 참고로 Spring Boot 4부터는 JDBC 자동 설정이 별도 모듈(spring-boot-jdbc)로 빠졌습니다. 이
+ * 모듈은 RAG(pgvector)용 DataSource가 필요해진 시점부터, dstone-boot가 쓰는 ConfigDatasource
+ * 패턴을 그대로 따라서 JDBC starter를 가져다 씁니다.
  */
 @SpringBootApplication
 @ComponentScan(basePackages = { "net.dstone.ai" })
 public class DstoneAiEngineApplication {
 
 	/**
+	 * env.properties를 System 프로퍼티로 먼저 세팅한 뒤, conf/application.yml과
+	 * conf/log4j2.xml을 설정 위치로 지정해서 Spring Boot 앱을 실행합니다.
+	 *
 	 * @param args 커맨드라인 인자
 	 */
 	public static void main(String[] args) {
@@ -51,6 +57,11 @@ public class DstoneAiEngineApplication {
 
 	public static boolean IS_SYS_PROPERTIES_SET = false;
 
+	/**
+	 * conf/env.properties(또는 프로파일별 env-{profile}.properties)를 읽어서, 그 안의 값들을
+	 * System 프로퍼티로 세팅합니다. 한 번 세팅되고 나면 다시 호출해도 아무 일도 하지 않습니다
+	 * (IS_SYS_PROPERTIES_SET 플래그로 막습니다).
+	 */
 	@SuppressWarnings("rawtypes")
 	public static void setSysProperties() {
 		if (!IS_SYS_PROPERTIES_SET) {

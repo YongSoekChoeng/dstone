@@ -21,8 +21,13 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone.ai.security.ratelimit.enabled=true일 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않는다. caller 를 결정하는
- * ApiKeyAuthFilter(@Order(1))보다 뒤에서(@Order(2)) 돌아야 CallerContext에 caller가 이미 채워진 상태에서 요청을 구분할 키를 정할 수 있다.
+ * caller(또는 IP)별로 일정 시간 동안 요청 횟수를 제한하는 필터입니다.
+ * dstone.ai.security.ratelimit.enabled=true로 설정되어 있을 때만 실제로 막고, 꺼져 있으면 아무
+ * 영향도 주지 않습니다.
+ *
+ * caller가 누구인지를 정하는 건 ApiKeyAuthFilter(@Order(1))의 역할이므로, 이 필터는 그보다
+ * 뒤에서(@Order(2)) 돌아야 합니다. 그래야 CallerContext에 caller 값이 이미 채워진 상태에서,
+ * "이 요청을 어떤 키로 카운트할지"를 정할 수 있습니다.
  */
 @Component
 @Order(2)
@@ -34,6 +39,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	RedisTemplate<String, Object> redisTemplate;
 
 	/**
+	 * 이 요청을 요청 제한 검사 없이 그냥 통과시킬지 정합니다. 요청 제한 기능 자체가 꺼져 있거나,
+	 * 요청 경로가 /actuator로 시작하는 헬스체크 요청이면 true를 돌려줍니다.
+	 *
 	 * @param request 들어온 요청
 	 */
 	@Override
@@ -43,6 +51,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	/**
+	 * 설정에서 시간 창(window-seconds), 기본 한도(default-limit), caller별 한도 재정의
+	 * (overrides)를 읽어온 뒤, 이번 요청을 보낸 caller(또는 IP)의 이번 시간 창 누적 요청 수를
+	 * Redis로 세어서 한도를 넘었으면 429로 거부하고, 아니면 다음 필터로 넘깁니다.
+	 *
 	 * @param request     들어온 요청
 	 * @param response    내려줄 응답
 	 * @param filterChain 다음 필터로 넘기는 체인
@@ -102,11 +114,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	/**
-	 * <pre>
-	 * callerKey의 이번 윈도우 누적 요청 수를 1 증가시키고 그 값을 반환한다.
-	 * </pre>
+	 * callerKey의 이번 시간 창(window) 누적 요청 수를 1 증가시키고, 증가된 값을 돌려줍니다.
+	 * 이번이 첫 요청이면(카운트가 1이 되면) 그 키에 만료 시간을 걸어서, windowSeconds가
+	 * 지나면 카운트가 자동으로 리셋되게 합니다.
 	 *
-	 * @param callerKey     요청 건수를 세는 기준 키(caller 또는 IP)
+	 * @param callerKey     요청 건수를 세는 기준이 되는 키(caller 또는 IP)
 	 * @param windowSeconds 카운트를 유지할 기간(초)
 	 */
 	@SuppressWarnings("deprecation")
@@ -120,12 +132,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	/**
+	 * 요청 한도를 초과한 요청에 429 Too Many Requests 상태와 함께 사유를 JSON으로 담아
+	 * 응답합니다.
+	 *
 	 * @param response      내려줄 응답
 	 * @param limit         허용 요청 한도
 	 * @param windowSeconds 카운트를 유지할 기간(초)
 	 */
 	private void reject(HttpServletResponse response, int limit, long windowSeconds) throws IOException {
-		response.setStatus(429); // Servlet API에 SC_TOO_MANY_REQUESTS 상수가 없어 리터럴 사용.
+		response.setStatus(429); // Servlet API에는 SC_TOO_MANY_REQUESTS 상수가 없어서 숫자를 직접 씁니다.
 		response.setHeader("Retry-After", String.valueOf(windowSeconds));
 		response.setContentType("application/json;charset=UTF-8");
 		response.getWriter().write("{\"error\":\"too_many_requests\",\"message\":\"요청 한도(" + limit + "회/" + windowSeconds + "초)를 초과했습니다.\"}");

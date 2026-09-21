@@ -19,13 +19,20 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * @AiTool이 붙은 빈들을 기동 시점에 스캔하고, ConfigMcp가 MCP 서버에서 가져온 Tool까지 합쳐서 하나의 Spring AI
- * ToolCallbackProvider로 묶어준다 - 합쳐진 뒤에는 로컬 Tool인지 MCP Tool인지 구분하지 않는다.
- * - type이 AGENT인 step에서는 어떤 Tool을 언제 호출할지 Spring AI의 ChatClient가 LLM과 대화를 주고받으며 알아서 처리.
- * - type이 TOOL인 step에서는 runtime.tool.ToolExecutor가 이름으로 직접 찾아 LLM 없이 호출.
+ * 앱이 기동될 때 @AiTool이 붙은 빈들을 모두 찾아서, ConfigMcp가 MCP 서버에서 가져온 Tool까지 한데
+ * 합쳐 하나의 Spring AI ToolCallbackProvider로 만들어 주는 클래스입니다. 이렇게 합쳐지고 나면
+ * 로컬에서 만든 Tool인지 MCP 서버에서 가져온 Tool인지 더는 구분하지 않고 똑같이 다룹니다.
  *
- * caller별 Tool 화이트리스트 설정은 여러 앱이 공유하는 엔진에서 한 앱에게만 허용된 Tool을 다른 앱이 붙여 쓰지못하게 막는다.
- * Tool 화이트리스트 설정이 없는 caller는 화이트리스트가 없는 것으로 보고 등록된 Tool 전체를 허용한다.
+ * 이 Tool들이 실제로 쓰이는 방식은 두 가지입니다:
+ * - type이 AGENT인 step에서는, 어떤 Tool을 언제 호출할지를 Spring AI의 ChatClient가 LLM과 대화를
+ *   주고받으면서 알아서 판단하고 호출합니다.
+ * - type이 TOOL인 step에서는, runtime.tool.ToolExecutor가 이름으로 Tool을 직접 찾아서 LLM을
+ *   거치지 않고 바로 호출합니다.
+ *
+ * 이 엔진은 여러 앱이 함께 쓰는 공유 서버이기 때문에, caller(호출 주체)별로 Tool 화이트리스트를
+ * 둘 수 있습니다. 이렇게 하면 한 앱에게만 허용된 Tool을 다른 앱이 가져다 쓰는 일을 막을 수 있습니다.
+ * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로
+ * 보고 등록된 Tool을 전부 허용합니다.
  */
 @Component
 public class ConfigTool extends BaseObject {
@@ -40,10 +47,9 @@ public class ConfigTool extends BaseObject {
 	private ToolCallbackProvider toolCallbackProvider;
 
 	/**
-	 * <pre>
-	 * 로컬 @AiTool 빈과 ConfigMcp가 접속해 둔 MCP 서버 Tool을 하나의 ToolCallbackProvider로 합친다 - 합쳐진
-	 * 뒤에는 어느 쪽에서 왔는지 구분 없이 caller 화이트리스트(allowedToolNames)를 똑같이 적용받는다.
-	 * </pre>
+	 * 로컬 @AiTool 빈들과 ConfigMcp가 미리 접속해 둔 MCP 서버 Tool들을 모아서 하나의
+	 * ToolCallbackProvider로 합칩니다. 합쳐지고 나면 어느 쪽에서 왔는지 구분하지 않고, caller
+	 * 화이트리스트(allowedToolNames)도 똑같은 기준으로 적용됩니다.
 	 */
 	@PostConstruct
 	public void discover() {
@@ -62,15 +68,15 @@ public class ConfigTool extends BaseObject {
 		}
 	}
 
+	/** 등록된 Tool 전체를 담은 ToolCallbackProvider를 그대로 돌려줍니다(caller 화이트리스트를 거치지 않은 원본입니다). */
 	public ToolCallbackProvider toolCallbackProvider() {
 		return this.toolCallbackProvider;
 	}
 
 	/**
-	 * <pre>
-	 * caller의 Tool 화이트리스트를 통과한 것만 골라낸 provider를 만들어 돌려준다.
-	 * 화이트리스트설정(dstone.ai.tool.allowed-by-caller)이 없으면 전체 허용.
-	 * </pre>
+	 * 이 caller의 Tool 화이트리스트를 통과한 Tool만 골라서 담은 새 ToolCallbackProvider를 만들어
+	 * 돌려줍니다. 화이트리스트 설정(dstone.ai.tool.allowed-by-caller)이 아예 없는 caller라면
+	 * 걸러내지 않고 전체를 그대로 돌려줍니다.
 	 *
 	 * @param caller Tool 화이트리스트를 조회할 호출 주체(tenant)
 	 */
@@ -90,12 +96,12 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * ToolExecutor가 TOOL step 하나를 LLM 없이 이름으로 직접 찾아 호출할 때 쓴다. 못 찾으면 null.
-	 * </pre>
+	 * 이름으로 Tool 하나를 직접 찾아줍니다. runtime.tool.ToolExecutor가 TOOL step을 처리할 때, LLM을
+	 * 거치지 않고 곧바로 원하는 Tool을 찾기 위해 이 메소드를 씁니다. 찾는 이름의 Tool이 없으면(또는
+	 * caller의 화이트리스트에 없으면) null을 돌려줍니다.
 	 *
 	 * @param caller   Tool 화이트리스트를 조회할 호출 주체(tenant)
-	 * @param toolName 찾을 Tool 이름
+	 * @param toolName 찾으려는 Tool의 이름
 	 */
 	public ToolCallback findByName(String caller, String toolName) {
 		for (ToolCallback candidate : this.toolCallbackProvider(caller).getToolCallbacks()) {
@@ -107,10 +113,9 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * caller에 대해 설정된 화이트리스트를 찾는다
-	 *  - 설정 자체가 없으면(caller가 null이거나 목록에 없으면) null(=전체 허용)을 돌려준다.
-	 * </pre>
+	 * 이 caller에게 설정된 Tool 화이트리스트를 찾아서 돌려줍니다. caller가 null이거나, 설정
+	 * 목록 안에 이 caller가 아예 없으면 null을 돌려주는데, 이 null은 "화이트리스트가 없으니
+	 * 전체 허용"이라는 뜻으로 쓰입니다.
 	 *
 	 * @param caller 화이트리스트를 조회할 호출 주체(tenant)
 	 */
@@ -130,14 +135,15 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
-	 * <pre>
-	 * "tools" 값을 List 또는 콤마 구분 String 어느 쪽으로 와도 다루기 위한 파싱이다.
-	 * caller 화이트리스트 자체는 있는데 tools가 비어 있으면(YAML `[]`) "허용된 Tool 0개"를 뜻해야 하므로,
-	 * 빈 문자열도 빈 리스트와 동일하게 처리한다.
-	 * (그냥 무시하면 화이트리스트가 있는지조차 모르는 caller와 똑같이 "전체 허용"이 돼버려서 화이트리스트가 있으나 마나 해진다).
-	 * </pre>
+	 * 설정 파일의 "tools" 값은 YAML List로 쓸 수도 있고, 콤마로 구분한 문자열로 쓸 수도 있습니다.
+	 * 이 메소드는 둘 중 어느 형식으로 오든 똑같이 List&lt;String&gt;으로 바꿔 줍니다.
 	 *
-	 * @param toolsValue 파싱할 tools 설정값(List 또는 콤마 구분 String)
+	 * 한 가지 주의할 점이 있습니다: caller에 화이트리스트 자체는 있는데 tools 값이 비어 있으면
+	 * (YAML의 `[]`), 이건 "허용된 Tool이 0개"라는 뜻이어야 합니다. 그래서 빈 문자열이 들어와도
+	 * 빈 리스트로 처리합니다. 만약 이걸 그냥 무시해 버리면, 화이트리스트가 있는지조차 모르는
+	 * caller와 똑같이 "전체 허용"으로 취급되어 버려서 화이트리스트를 설정한 의미가 없어집니다.
+	 *
+	 * @param toolsValue 파싱할 tools 설정값(List 또는 콤마로 구분한 문자열)
 	 */
 	private List<String> parseTools(Object toolsValue) {
 		if (toolsValue instanceof List<?> toolsList) {
@@ -161,6 +167,7 @@ public class ConfigTool extends BaseObject {
 		return List.of();
 	}
 
+	/** 등록된 Tool들의 이름만 뽑아서 목록으로 돌려줍니다(로그 출력용). */
 	public List<String> toolNames() {
 		List<String> names = new ArrayList<>();
 		for (ToolCallback toolCallback : this.toolCallbackProvider.getToolCallbacks()) {
