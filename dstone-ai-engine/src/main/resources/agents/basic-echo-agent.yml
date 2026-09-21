@@ -1,0 +1,24 @@
+# Agent 하나를 정의한다. 파일명이 곧 agent 이름(ID)이다.
+#
+# AGENT step 자체의 가장 기본적인 동작("Workflow가 Agent 하나를 호출해서 응답을 그대로 다음/최종
+# 결과로 흘려보낸다")만 확인하기 위한 전용 Agent다. 처음엔 workflows/agent-basic-echo.yml이
+# general-chat을 재사용했는데, 그 과정에서 두 가지 문제가 드러나 이 Agent를 따로 만들었다:
+#
+# 1. general-chat의 프롬프트는 {role} 토큰을 쓰므로(agents/general-chat.yml), 호출할 때 variables에
+#    role을 채워야만 한다 - "가장 기본적인" 테스트인데 그 사실을 YAML 주석을 읽어야만 알 수 있는 건
+#    적절하지 않았다. 이 Agent의 프롬프트는 아무 토큰도 쓰지 않는다 - variables 없이 message만
+#    보내도 항상 렌더링이 성공한다.
+# 2. general-chat은 toolsEnabled=true가 기본값인데, StepType.AGENT/SUPERVISOR step은 요청별로 그걸
+#    끌 방법이 없다(runtime.step.AgentStepRunner.runAgent()가 항상 (null,null,null)로 호출해서 Agent
+#    정의값을 그대로 쓴다 - api.controller.ChatController의 요청별 override와 다르다). 로컬 소형
+#    모델(예: qwen2.5-coder:3b)에서는 이게 실제 Tool 호출 대신 tool-call 형태의 텍스트를 그대로
+#    답변으로 뱉어버리는 결과로 이어질 수 있었다(관찰됨). tool-calling 자체는
+#    agents/tool-demo-agent.yml + workflows/agent-tool-calling.yml이 따로 다루므로, 이 Agent는
+#    toolsEnabled=false로 그 혼선을 원천 차단한다.
+agent:
+  name: basic-echo-agent
+  description: AGENT step 자체의 기본 동작 확인 전용 - 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는다.
+  prompt: |
+    당신은 짧고 명확하게 한국어로 답하는 AI 어시스턴트입니다.
+  toolsEnabled: false
+  ragEnabled: false

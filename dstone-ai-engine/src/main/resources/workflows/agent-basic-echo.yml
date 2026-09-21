@@ -2,26 +2,24 @@
 # AGENT step 하나만으로 구성된, Workflow의 가장 기본 형태를 확인하기 위한 테스트 전용 Workflow다.
 # StepType.AGENT는 항상 성공으로 취급되므로 onFailure가 없다(common.definition.StepType 참고).
 #
-# general-chat Agent는 prompt에 {role} 토큰을 쓰므로(agents/general-chat.yml), 이 Workflow를 호출할 때
-# variables에 role을 반드시 채워야 한다 - 안 채우면 Spring AI PromptTemplate 렌더링이
-# IllegalStateException("Not all variables were replaced")을 던지고, 이 Workflow는 FAILED로 끝난다
-# (runtime.workflow.WorkFlowExecutor.runOne이 그 예외를 잡아 곱게 FAILED로 남긴다 - dstone-boot
-# ai/service/ChatService.java의 채팅 화면도 그래서 매 요청 variables.role을 채워 보낸다). AGENT/
-# SUPERVISOR/ROUTER step은 StepDefinition.inputTemplate을 아예 쓰지 않는다 - 항상 직전 결과({previous})
-# 텍스트를 그대로 Agent의 user 메시지로 넘긴다(runtime.step.AgentStepRunner 참고, inputTemplate은
-# TOOL step 전용).
+# basic-echo-agent(agents/basic-echo-agent.yml)는 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는
+# 전용 Agent라, message 하나만 보내면 항상 성공한다 - variables는 필요 없다(처음에는 general-chat을
+# 재사용했었는데, {role} 프롬프트 토큰 미입력 시 FAILED, toolsEnabled=true로 인한 로컬 모델
+# tool-calling 혼선 두 가지 문제가 있어 전용 Agent로 분리했다 - agents/basic-echo-agent.yml 주석 참고).
+# 프롬프트 템플릿 변수 렌더링 자체를 확인하려면 workflows/agent-model-override.yml처럼 별도 Agent를
+# 참고하거나, agents/general-chat.yml을 직접 chat API로 호출해서 확인한다.
 #
 # dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
 #   workflowId: agent-basic-echo
 #   message   : 오늘 기분이 어때?
-#   variables : {"role": "친절한 상담원"}
+#   variables : (비워도 됨)
 workflow:
   id: agent-basic-echo
-  description: AGENT step 1개만으로 구성된 가장 기본적인 Workflow. 프롬프트 템플릿 변수({role}) 렌더링을 확인한다.
+  description: AGENT step 1개만으로 구성된 가장 기본적인 Workflow. variables 없이 message만 보내면 된다.
   maxIterations: 3
   steps:
 
     - id: reply
       type: AGENT
-      ref: general-chat
+      ref: basic-echo-agent
       onSuccess: SUCCESS
