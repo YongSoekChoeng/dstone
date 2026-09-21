@@ -334,7 +334,6 @@ public class ConfigCallLog extends BaseObject {
 		String div = "-";
 		if(joinPoint != null) {
 			int args = joinPoint.getArgs().length;
-			boolean isSelcted = false;
 			for (int i = 0; i < args; i++) {
 				Object param = joinPoint.getArgs()[i];
 				if( param instanceof WorkFlowDefinition ) {
@@ -348,12 +347,7 @@ public class ConfigCallLog extends BaseObject {
 				}else if( param instanceof AgentDefinition ) {
 					AgentDefinition agentDefinition = (AgentDefinition)param;
 					if(identity.length() > 0) {identity.append(div);}
-					// Agent의 prompt 원문은 여러 줄짜리 긴 텍스트라 로그 한 줄에 담기엔 너무 깁니다.
-					// name만 남겨도 어떤 Agent인지 충분히 알아볼 수 있으므로 name만 사용합니다.
 					identity.append("agent(name=" + agentDefinition.name()+")");
-				}
-				if(isSelcted) {
-					break;
 				}
 			}
 		}
