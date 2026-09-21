@@ -15,14 +15,14 @@ import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.common.core.BaseObject;
 
 /**
- * StepType.RAG가 없어진 자리를 대신한다 - LLM 호출 없이 검색 결과만 필요한 워크플로우는 이 Tool을 일반 TOOL
- * 스텝에서 호출한다. common.rag.RagRetrievalChain을 그대로 감싸는 얇은 래퍼라 검색 로직은 여기 새로 만들지 않는다.
+ * LLM 호출 없이 검색 결과만 필요한 워크플로우가 일반 TOOL 스텝에서 호출하는 순수 RAG 검색 Tool이다.
+ * common.rag.RagRetrievalChain을 그대로 감싸는 얇은 래퍼라 검색 로직은 여기 새로 만들지 않는다.
  * SqlSyntaxTool처럼 위험하지 않은 조회성 동작이라 화이트리스트 없이 항상 활성화된다.
  *
  * caller(tenant)는 파라미터로 직접 받지 않고 Spring AI의 ToolContext로 전달받는다 - runtime.agent.AgentExecutor
  * (Agent의 tool-calling 경로)와 runtime.tool.ToolExecutor(Workflow TOOL step 경로) 둘 다 caller를 ToolContext에
- * 실어서 호출하므로, 이제 AGENT의 ragEnabled 경로와 동일하게 tenant 필터가 걸린다. ToolContext가 없거나 caller
- * 키가 비어 있으면(예: security.auth가 꺼진 배포) 기존과 동일하게 격리 없이 전체 문서를 대상으로 검색한다.
+ * 실어서 호출하므로, AGENT의 ragEnabled 경로와 동일하게 tenant 필터가 걸린다. ToolContext가 없거나 caller
+ * 키가 비어 있으면(예: security.auth가 꺼진 배포) 격리 없이 전체 문서를 대상으로 검색한다.
  */
 @AiTool
 public class RagSearchTool extends BaseObject {
@@ -56,7 +56,7 @@ public class RagSearchTool extends BaseObject {
 		return combined.toString();
 	}
 
-	/** @param toolContext Spring AI가 넘겨준 호출 컨텍스트(null일 수 있음 - 구버전 호출 경로 등) */
+	/** @param toolContext Spring AI가 넘겨준 호출 컨텍스트(호출 경로에 따라 null일 수 있음) */
 	private String callerOf(ToolContext toolContext) {
 		if (toolContext == null) {
 			return null;

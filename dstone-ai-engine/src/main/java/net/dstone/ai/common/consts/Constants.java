@@ -89,11 +89,15 @@ public final class Constants {
 		public final static String TENANT_METADATA_KEY = "tenant";
 	}
 
-	/** common.loader.YamlDefinitionLoader - Workflow/Agent/McpServer YAML을 찾는 classpath 위치 패턴. */
+	/**
+	 * common.loader.YamlDefinitionLoader - Workflow/Agent/McpServer YAML을 찾는 classpath 위치 패턴.
+	 * "**" 가 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, workflows/agents/mcp 바로 아래뿐 아니라
+	 * workflows/billing/*.yml 처럼 서브 디렉토리로 묶어서 관리해도 그대로 인식된다.
+	 */
 	public static final class Definition {
-		public final static String WORKFLOW_LOCATION_PATTERN = "classpath*:workflows/*.yml";
-		public final static String AGENT_LOCATION_PATTERN = "classpath*:agents/*.yml";
-		public final static String MCP_LOCATION_PATTERN = "classpath*:mcp/*.yml";
+		public final static String WORKFLOW_LOCATION_PATTERN = "classpath*:workflows/**/*.yml";
+		public final static String AGENT_LOCATION_PATTERN = "classpath*:agents/**/*.yml";
+		public final static String MCP_LOCATION_PATTERN = "classpath*:mcp/**/*.yml";
 	}
 
 }

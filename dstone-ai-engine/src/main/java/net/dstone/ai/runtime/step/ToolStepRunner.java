@@ -63,7 +63,7 @@ public class ToolStepRunner implements StepRunner {
 	/**
 	 * <pre>
 	 * Tool이 runtime.status.ToolOutput(success/message)을 반환했으면(권장) 그걸 그대로 쓰고, 아니면 null을 돌려줘서
-	 * run()이 예전 접두사 컨벤션(Constants.Outcome.FAIL_PREFIX)으로 되돌아가게 한다. "실패로 해석되지 않는 JSON이지만
+	 * run()이 문자열 접두사 컨벤션(Constants.Outcome.FAIL_PREFIX)으로 판정하게 한다. "실패로 해석되지 않는 JSON이지만
 	 * 우연히 success 필드를 가진 무관한 객체"까지 성공/실패로 오판하지 않도록, success 필드가 아예 없는 경우(null)도
 	 * "ToolOutcome이 아니다"로 취급한다.
 	 * </pre>

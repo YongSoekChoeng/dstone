@@ -3,11 +3,9 @@
 # StepType.AGENT는 항상 성공으로 취급되므로 onFailure가 없다(common.definition.StepType 참고).
 #
 # basic-echo-agent(agents/basic-echo-agent.yml)는 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는
-# 전용 Agent라, message 하나만 보내면 항상 성공한다 - variables는 필요 없다(처음에는 general-chat을
-# 재사용했었는데, {role} 프롬프트 토큰 미입력 시 FAILED, toolsEnabled=true로 인한 로컬 모델
-# tool-calling 혼선 두 가지 문제가 있어 전용 Agent로 분리했다 - agents/basic-echo-agent.yml 주석 참고).
-# 프롬프트 템플릿 변수 렌더링 자체를 확인하려면 workflows/agent-model-override.yml처럼 별도 Agent를
-# 참고하거나, agents/general-chat.yml을 직접 chat API로 호출해서 확인한다.
+# 전용 Agent라, message 하나만 보내면 항상 성공한다 - variables는 필요 없다. 프롬프트 템플릿 변수
+# 렌더링 자체를 확인하려면 workflows/agent-model-override.yml처럼 별도 Agent를 참고하거나,
+# agents/general-chat.yml을 직접 chat API로 호출해서 확인한다.
 #
 # dstone-boot "Workflow 테스트" 화면에서 이렇게 호출해보면 된다:
 #   workflowId: agent-basic-echo

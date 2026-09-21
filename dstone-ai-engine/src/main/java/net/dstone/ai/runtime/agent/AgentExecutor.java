@@ -80,8 +80,8 @@ public class AgentExecutor extends BaseObject {
 	 * <pre>
 	 * 자유 텍스트 대신 구조화된 응답이 필요한 모든 호출이 거치는 공통 메소드다. call()과 요청 조립은 동일하고, 응답만
 	 * ChatClient.entity(type)로 받는다 - Spring AI가 type의 JSON 스키마를 프롬프트에 자동으로 삽입하고 응답을 그 스키마에 맞춰
-	 * 파싱해주므로, "통과: .../실패: ..." 같은 텍스트 접두사를 사람이 프롬프트로 지시하고 코드가 문자열로 매칭하던 예전 방식보다
-	 * 형식 준수율이 높다(그래도 100% 확정적이진 않다 - 모델이 스키마 자체를 어기면 entity()가 예외를 던지는데, 그건 호출부가
+	 * 파싱해주므로, 사람이 텍스트 접두사 컨벤션을 프롬프트로 지시하고 코드가 문자열로 매칭하는 방식보다 형식 준수율이
+	 * 높다(그래도 100% 확정적이진 않다 - 모델이 스키마 자체를 어기면 entity()가 예외를 던지는데, 그건 호출부가
 	 * 다뤄야 한다. runtime.step.AgentStepRunner의 SUPERVISOR/ROUTER/structuredOutput=true AGENT step이 각각 Verdict/
 	 * RouteDecision/StepPayload를 이 메소드로 받는다).
 	 * ragOverride/toolsOverride/modelOverride는 없다 - 구조화 응답이 필요한 호출은 전부 Workflow step 전용이라 요청별

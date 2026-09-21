@@ -21,7 +21,7 @@ import net.dstone.common.utils.StringUtil;
 /**
  * AGENT/SUPERVISOR/ROUTER step - ref로 지정된 Agent를 호출한다. SUPERVISOR는 구조화된 Verdict(pass/reason)로 성공/실패를,
  * ROUTER는 구조화된 RouteDecision(route/reason)으로 다음 갈 곳을 가른다. AGENT는 StepDefinition.structuredOutput이 true일 때만
- * 구조화된 StepPayload(primaryText/data)로 응답을 받고, 그 외에는(기본값) 예전처럼 자유 텍스트로 받는다.
+ * 구조화된 StepPayload(primaryText/data)로 응답을 받고, 그 외에는(기본값) 자유 텍스트로 받는다.
  */
 @Component
 public class AgentStepRunner implements StepRunner {

@@ -20,10 +20,11 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * Workflow/Agent/McpServer 정의는 application.yml이 아니라 classpath:workflows/*.yml, classpath:agents/*.yml,
- * classpath:mcp/*.yml 각각의 별도 파일에 둔다 - 새로 하나를 만들거나 바꿀 때 application.yml을 건드리지 않고 YAML 파일 하나만
- * 추가/수정하면 되게 하려는 게 이번 재설계의 핵심이다(common.registry.WorkFlowRegistry/AgentRegistry/McpServerRegistry가 기동 시
- * 이 클래스를 불러 적재한다).
+ * Workflow/Agent/McpServer 정의는 application.yml이 아니라 classpath:workflows/**\/*.yml, classpath:agents/**\/*.yml,
+ * classpath:mcp/**\/*.yml 각각의 별도 파일에 둔다 - 새로 하나를 만들거나 바꿀 때 application.yml을 건드리지 않고 YAML 파일 하나만
+ * 추가/수정하면 되게 하려는 게 핵심이다(common.registry.WorkFlowRegistry/AgentRegistry/McpServerRegistry가 기동 시 이 클래스를
+ * 불러 적재한다). "**"가 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, 세 디렉토리 바로 아래에 두거나 도메인별
+ * 서브 디렉토리(예: workflows/billing/*.yml)로 묶어서 관리하거나 자유롭게 선택할 수 있다.
  *
  * Spring Boot의 application.yml 자체를 읽을 때 쓰는 SnakeYAML로 파싱해서 평범한 Map으로 만든 뒤, Jackson ObjectMapper.convertValue()로
  * definition record에 바인딩한다 - record 필드 바인딩은 컴파일러 -parameters 옵션(pom.xml에 이미 설정됨) 덕분에 별도 생성자/애노테이션 없이 그대로 된다.
@@ -67,7 +68,7 @@ public class YamlDefinitionLoader extends BaseObject {
 				throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
 			}
 			definitions.add(file.workflow());
-			LogUtil.sysout("dstone-ai-engine loader: workflow[" + file.workflow().id() + "] <- " + resource.getFilename());
+			LogUtil.sysout("dstone-ai-engine loader: workflow[" + file.workflow().id() + "] <- " + this.relativePath(resource, "workflows"));
 		}
 		return definitions;
 	}
@@ -80,7 +81,7 @@ public class YamlDefinitionLoader extends BaseObject {
 				throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
 			}
 			definitions.add(file.agent());
-			LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().name() + "] <- " + resource.getFilename());
+			LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().name() + "] <- " + this.relativePath(resource, "agents"));
 		}
 		return definitions;
 	}
@@ -93,7 +94,7 @@ public class YamlDefinitionLoader extends BaseObject {
 				throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
 			}
 			definitions.add(file.mcpServer());
-			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + resource.getFilename());
+			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + this.relativePath(resource, "mcp"));
 		}
 		return definitions;
 	}
@@ -104,6 +105,24 @@ public class YamlDefinitionLoader extends BaseObject {
 			return this.resourceResolver.getResources(locationPattern);
 		} catch (IOException e) {
 			throw new IllegalStateException(locationPattern + " 리소스를 찾는 중 오류가 발생했습니다.", e);
+		}
+	}
+
+	/**
+	 * 로그에 파일명 하나만 찍으면 서브 디렉토리로 나눠 관리할 때(예: workflows/billing/a.yml,
+	 * workflows/support/a.yml) 어느 파일인지 구분이 안 된다 - baseDir 이후의 경로까지 보여준다.
+	 * URL을 못 읽는 등 예외 상황이면 파일명만이라도 남긴다.
+	 *
+	 * @param resource 경로를 구할 리소스
+	 * @param baseDir  이 리소스를 찾은 classpath 기준 디렉토리(workflows/agents/mcp)
+	 */
+	private String relativePath(Resource resource, String baseDir) {
+		try {
+			String path = resource.getURL().getPath().replace('\\', '/');
+			int index = path.lastIndexOf("/" + baseDir + "/");
+			return index < 0 ? resource.getFilename() : path.substring(index + 1);
+		} catch (IOException e) {
+			return resource.getFilename();
 		}
 	}
 

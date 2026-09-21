@@ -1,9 +1,7 @@
 # common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
 # TOOL step이 실패하면 AGENT step(fix-agent)으로 갔다가 다시 TOOL step으로 되돌아가는 onFailure 루프를
-# 확인하기 위한 테스트 전용 Workflow다(StepDefinition.onFailure에 "이전 step의 id"를 적으면 루프가 되고,
-# WorkFlowDefinition.maxIterations가 무한루프를 막는다는 게 이 Workflow의 핵심 - 예전 oracle-to-postgresql
-# 예시의 validate<->fix 루프와 같은 패턴을, SQL 변환이라는 무거운 도메인 없이 검증/수정 그 자체만
-# 보여주도록 단순화했다).
+# 확인하기 위한 테스트 전용 Workflow다(StepDefinition.onFailure에 목록상 앞선 step의 id를 적으면 루프가
+# 되고, WorkFlowDefinition.maxIterations가 무한루프를 막는다는 게 이 Workflow의 핵심).
 #
 # validate(TOOL validateSqlSyntax)가 실패하면 fix(AGENT fix-agent)로 가서 그 실패 사유({previous}로
 # 전달됨)를 근거로 SQL을 고치고, 다시 validate로 돌아간다. maxIterations=6이면

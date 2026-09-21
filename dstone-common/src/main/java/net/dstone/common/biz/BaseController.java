@@ -500,7 +500,7 @@ public abstract class BaseController extends net.dstone.common.core.BaseObject {
 	/**
 	 * 브라우져 더미요청 처리
 	 * 크롬, 사파리, 엣지 등 대부분의 브라우저는 사이트를 방문하면 자동으로 /favicon.ico 요청을 보냅니다.(특별히 설정하지 않아도 무조건 요청합니다.)
-	 * 예전에는 단순히 404 Not Found 로 내려갔는데, Spring Boot 3.x부터는 NoResourceFoundException 을 발생시켜 로그에 찍히도록 바뀌었습니다.
+	 * 이 요청이 매핑 없이 흘러가면 NoResourceFoundException 이 발생해 에러 로그가 남으므로, 빈 응답으로 조용히 처리합니다.
 	 */
     @RequestMapping("favicon.ico")
     @ResponseBody

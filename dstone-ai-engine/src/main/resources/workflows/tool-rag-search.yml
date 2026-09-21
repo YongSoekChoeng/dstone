@@ -1,8 +1,7 @@
 # common.registry.WorkFlowRegistry가 기동 시 이 파일을 읽어 id로 등록한다.
 # TOOL step 1개(searchDocuments, tools.rag.RagSearchTool)로 RAG를 "LLM 호출 없이 순수 검색"만
 # 하는 경로를 확인하기 위한 테스트 전용 Workflow다. common.rag.RagRetrievalChain을 AGENT의 ragEnabled
-# Advisor 경로가 아니라 TOOL step에서 직접 호출하는 경우다(StepType.RAG가 없어진 자리를 이 Tool이
-# 대신한다 - tools.rag.RagSearchTool 클래스 주석 참고).
+# Advisor 경로가 아니라 TOOL step에서 직접 호출하는 경우다(tools.rag.RagSearchTool 클래스 주석 참고).
 #
 # dstone.ai.rag.enabled=false(기본값)면 tools.rag.RagSearchTool이 "실패: RAG가 비활성화되어
 # 있습니다..." 텍스트를 돌려주고(ToolStepRunner가 접두사 "실패"를 보고 실패로 판정), 이 Workflow는
