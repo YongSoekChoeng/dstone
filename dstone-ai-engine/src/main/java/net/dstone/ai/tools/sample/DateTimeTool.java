@@ -13,7 +13,7 @@ import net.dstone.ai.common.annotation.AiTool;
 @AiTool
 public class DateTimeTool {
 
-	@Tool(description = "현재 날짜와 시간을 ISO-8601 형식(yyyy-MM-ddTHH:mm:ss)으로 반환한다. 사용자가 '오늘', '지금 몇 시', '현재 날짜/시간' 등을 물어볼 때 사용한다.")
+	@Tool(description = "현재 날짜와 시간을 ISO-8601 형식(yyyy-MM-ddTHH:mm:ss)으로 반환한다. 사용자가 '오늘 며칠', '날짜', '지금 몇 시', '현재 날짜/시간' 등을 물어볼 때 사용한다.")
 	public String getCurrentDateTime() {
 		return LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 	}
