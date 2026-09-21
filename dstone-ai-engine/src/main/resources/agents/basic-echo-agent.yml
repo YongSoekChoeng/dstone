@@ -18,5 +18,5 @@ agent:
   description: AGENT step 자체의 기본 동작 확인 전용 - 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는다.
   prompt: |
     당신은 짧고 명확하게 한국어로 답하는 AI 어시스턴트입니다.
-  toolsEnabled: false
+  toolsEnabled: true
   ragEnabled: false
