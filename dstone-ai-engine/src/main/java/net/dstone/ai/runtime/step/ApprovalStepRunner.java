@@ -43,9 +43,10 @@ public class ApprovalStepRunner implements StepRunner {
 
 		if (approved) {
 			return StepOutput.success(input.renderedText() + "\n\n[승인] " + approver + (comment == null || comment.isBlank() || "null".equals(comment) ? "" : " - " + comment));
+		}else {
+			String reason = comment == null || comment.isBlank() || "null".equals(comment) ? "(사유 없음)" : comment;
+			return StepOutput.failure(input.renderedText() + "\n\n[반려] " + approver + " - " + reason, reason);
 		}
-		String reason = comment == null || comment.isBlank() || "null".equals(comment) ? "(사유 없음)" : comment;
-		return StepOutput.failure(input.renderedText() + "\n\n[반려] " + approver + " - " + reason, reason);
 	}
 
 }

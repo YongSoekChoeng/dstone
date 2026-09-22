@@ -2,8 +2,6 @@ package net.dstone.ai.common.config;
 
 import java.lang.reflect.Method;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -16,7 +14,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
-import net.dstone.ai.runtime.status.StepInput;
 import net.dstone.ai.runtime.status.StepOutput;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.core.BaseObject;
@@ -139,6 +136,7 @@ public class ConfigCallLog extends BaseObject {
 	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))";
 	private final static String STEPRUNNER_POINTCUT = "execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))";
 	private final static String AGENT_POINTCUT = "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))";
+	private final static boolean PARAM_MULTI_LINE = false;
 
 	/**
 	 * <pre>
@@ -159,7 +157,11 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ this.buildParamInfo(joinPoint) +"");
+		}else {
+			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -172,7 +174,11 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<output>");
 		log.append("\n");
-		log.append("{"+output.toString()+"}");
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ output.toString() +"");
+		}else {
+			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -213,7 +219,11 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ this.buildParamInfo(joinPoint) +"");
+		}else {
+			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -225,8 +235,12 @@ public class ConfigCallLog extends BaseObject {
 		log.append("[StepRunner - "+identity+"] End !!!");
 		log.append("\n");
 		log.append("<output>");
-		log.append("\n");
-		log.append("{"+output.toString()+"}");
+		log.append("\n");		
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ output.toString() +"");
+		}else {
+			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -252,7 +266,11 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ this.buildParamInfo(joinPoint) +"");
+		}else {
+			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -264,8 +282,12 @@ public class ConfigCallLog extends BaseObject {
 		log.append("[AgentExecutor - "+identity+"] End !!!");
 		log.append("\n");
 		log.append("<output>");
-		log.append("\n");
-		log.append("{"+output.toString()+"}");
+		log.append("\n");	
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ output.toString() +"");
+		}else {
+			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 
@@ -289,7 +311,12 @@ public class ConfigCallLog extends BaseObject {
 	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		StringBuffer log = new StringBuffer();
-		String identity = getIdentity(joinPoint);
+		String className = "";
+		String methodName = "";
+		
+		className = joinPoint.getTarget().getClass().getSimpleName();
+		methodName = joinPoint.getSignature().getName();
+		String identity = className + "." + methodName +"("+ getIdentity(joinPoint) + ")";
 
 
 		log.append("\n");
@@ -298,7 +325,11 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		log.append("{"+ this.buildParamInfo(joinPoint) +"}");
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ this.buildParamInfo(joinPoint) +"");
+		}else {
+			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -310,8 +341,12 @@ public class ConfigCallLog extends BaseObject {
 		log.append("[Tools - "+identity+"] End !!!");
 		log.append("\n");
 		log.append("<output>");
-		log.append("\n");
-		log.append("{"+output.toString()+"}");
+		log.append("\n");	
+		if(PARAM_MULTI_LINE) {
+			log.append(""+ output.toString() +"");
+		}else {
+			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+		}
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
