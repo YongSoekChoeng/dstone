@@ -36,7 +36,7 @@ import net.dstone.common.utils.StringUtil;
  */
 @Repository
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")
-public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepository {
+public class RedisChatMemoryRepository extends BaseObject implements ChatMemoryRepository {
 
 	private final RedisTemplate<String, Object> redisTemplate;
 	private final ObjectMapper objectMapper;
@@ -50,7 +50,7 @@ public class RedisChatMemorySession extends BaseObject implements ChatMemoryRepo
 	 * @param objectMapper   메시지 직렬화/역직렬화에 쓰는 JSON 매퍼
 	 * @param configProperty 설정값 조회 유틸
 	 */
-	public RedisChatMemorySession(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper, ConfigProperty configProperty) {
+	public RedisChatMemoryRepository(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper, ConfigProperty configProperty) {
 		this.redisTemplate = redisTemplate;
 		this.objectMapper = objectMapper;
 		String ttlSeconds = configProperty.getProperty("dstone.ai.session.ttl-seconds");

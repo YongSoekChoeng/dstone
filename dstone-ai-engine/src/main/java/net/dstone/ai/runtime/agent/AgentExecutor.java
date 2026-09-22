@@ -162,7 +162,7 @@ public class AgentExecutor extends BaseObject {
 		2. 세션 ID를 걸어서, 지금까지 나눈 대화 히스토리가 자연스럽게 이어지도록 합니다.
 			- ConfigChatClient.chatClient()에서 defaultAdvisors로 등록해 둔 MessageChatMemoryAdvisor가
 			  바로 이 sessionId 값을 읽어서 "어느 대화의 이어지는 내용인지"를 판단합니다.
-			- MessageChatMemoryAdvisor는 생성될 때 ChatMemory 구현체(여기서는 RedisChatMemorySession)를
+			- MessageChatMemoryAdvisor는 생성될 때 ChatMemory 구현체(여기서는 RedisChatMemoryRepository)를
 			  전달받습니다.
 			- ChatMemory.findByConversationId(String conversationId) 메서드는 Spring이 내부적으로
 			  자동 호출해 줍니다. 우리가 직접 호출할 필요는 없습니다.
