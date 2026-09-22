@@ -103,7 +103,7 @@
 		  
 		<!-- Spring AI --> 	
 		<!--SimpleLoggerAdvisor logger DEBUG 레벨에서만 동작함. --> 	
-		<Logger name="org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor" level="OFF" additivity="false">  
+		<Logger name="org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor" level="DEBUG" additivity="false">  
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>  	

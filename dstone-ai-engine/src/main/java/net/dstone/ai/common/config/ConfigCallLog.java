@@ -20,17 +20,12 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * 이 클래스 하나가 dstone-ai-engine 전체의 실행 흐름을 자동으로 로그로 남겨줍니다.
  *
- * "AOP(관점 지향 프로그래밍)"라는 스프링 기능을 사용합니다. 쉽게 말해, 우리가 로그를 남기고 싶은
- * 메소드마다 직접 로그 코드를 써넣지 않아도, 이 클래스에 적어둔 규칙(어떤 패키지의 어떤 메소드를
- * 감시할지)에 해당하는 메소드가 호출될 때마다 스프링이 자동으로 이 클래스의 코드를 먼저/나중에
- * 실행해줍니다. 그래서 컨트롤러·서비스·DAO·runtime 패키지·tools 패키지의 메소드를 호출할 때마다
- * "누가 무엇을 호출했고 어떤 값을 주고받았는지"가 자동으로 로그에 남습니다.
- *
- * 다만 AOP는 public 메소드에만 적용됩니다(private/protected 메소드는 감시할 수 없습니다). 그리고
- * @NoAspectLog 애노테이션이 붙은 메소드는 이 로깅 대상에서 제외됩니다(예: SQL 로그를 억제하고
- * 싶을 때 사용).
+ * AOP 스프링 기능을 사용합니다. 다만 AOP는 public 메소드에만 적용됩니다(private/protected 메소드는 감시할 수 없습니다). 
+ * 그리고 @NoAspectLog 애노테이션이 붙은 메소드는 이 로깅 대상에서 제외됩니다(예: SQL 로그를 억제하고 싶을 때 사용).
+ * </pre>
  */
 @Aspect
 @Component
@@ -38,7 +33,9 @@ import net.dstone.common.utils.StringUtil;
 public class ConfigCallLog extends BaseObject {
 
 	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
-	/** @NoAspectLog 애노테이션이 붙은 메소드는 로깅 대상에서 제외하기 위한 표현식입니다. */
+	/** 
+	 * @NoAspectLog 애노테이션이 붙은 메소드는 로깅 대상에서 제외하기 위한 표현식입니다. 
+	 */
 	private final static String NO_LOG_REGEX = "@annotation(net.dstone.common.annotation.NoAspectLog)";
 
 	/**
@@ -133,21 +130,24 @@ public class ConfigCallLog extends BaseObject {
 
 	private final static String SAPERATE_LINE = "\n|--------------------------------------------------------------------------------------------------------------------------------------|\n";
 	
-	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))";
-	private final static String STEPRUNNER_POINTCUT = "execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))";
-	private final static String AGENT_POINTCUT = "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))";
+	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))" + " && !" + NO_LOG_REGEX;
+	private final static String STEPRUNNER_POINTCUT = "execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))" + " && !" + NO_LOG_REGEX;
+	private final static String AGENT_POINTCUT = "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))" + " && !" + NO_LOG_REGEX;
+	private final static String TOOL_POINTCUT = "execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX;
 	private final static boolean PARAM_MULTI_LINE = false;
 
 	/**
 	 * <pre>
 	 * Workflow 가 호출 될때마다 로그를 남깁니다.
+	 * </pre>
+	 * 
 	 * @param joinPoint 지금 호출되고 있는 WorkFlowExecutor.run(...) 메소드에 대한 정보
 	 * @return 원래 메소드가 반환하는 WorkFlowExecution(실행 결과)을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
 	@Around(WORKFLOW_POINTCUT)
 	public Object doWorkflowLog(ProceedingJoinPoint joinPoint) throws Throwable{
-		WorkFlowExecution output = null;
+		Object output = null;
 		StringBuffer log = new StringBuffer();
 		String identity = this.getIdentity(joinPoint);
 
@@ -165,7 +165,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		output = (WorkFlowExecution)joinPoint.proceed();
+		output = joinPoint.proceed();
 		
 		log.setLength(0);
 		log.append("\n");
@@ -209,7 +209,7 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	@Around(STEPRUNNER_POINTCUT)
 	public Object doStepRunnerLog(ProceedingJoinPoint joinPoint) throws Throwable{
-		StepOutput output = null;
+		Object output = null;
 		StringBuffer log = new StringBuffer();
 		String identity = this.getIdentity(joinPoint);
 
@@ -227,7 +227,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		output = (StepOutput) joinPoint.proceed();
+		output = joinPoint.proceed();
 		
 		log.setLength(0);
 		log.append("\n");
@@ -308,7 +308,7 @@ public class ConfigCallLog extends BaseObject {
 	 * @return 원래 메소드가 반환하는 값을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
-	@Around("execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX)
+	@Around(TOOL_POINTCUT)
 	public Object doToolsProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		StringBuffer log = new StringBuffer();
 		String className = "";

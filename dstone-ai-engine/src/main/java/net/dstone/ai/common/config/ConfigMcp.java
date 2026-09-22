@@ -24,12 +24,11 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * resources/mcp/*.yml에 적어둔 MCP 서버들에 하나씩 접속해서, 그 서버가 제공하는 Tool을
- * common.config.ConfigTool의 ToolCallbackProvider에 합류시켜 주는 클래스입니다. 한번 합류되고
- * 나면 원래부터 있던 로컬 @AiTool Tool과 구분 없이 똑같이 취급됩니다 - AGENT step의 tool-calling에서도,
- * TOOL step에서 이름으로 직접 부를 때도 그대로 쓸 수 있습니다(따로 새 StepType을 만들지 않고, 기존
- * TOOL 경로를 그대로 확장한 것입니다).
- *
+ * <pre>
+ * resources/mcp/*.yml에 적어둔 MCP 서버들에 하나씩 접속해서, 
+ * 그 서버가 제공하는 Tool을 common.config.ConfigTool의 ToolCallbackProvider에 합류시켜 주는 클래스입니다. 
+ * 한번 합류되고 나면 원래부터 있던 로컬 @AiTool Tool과 구분 없이 똑같이 취급됩니다 
+ * 
  * MCP 서버 중 하나가 접속에 실패하더라도(커맨드를 잘못 적었거나, URL이 응답하지 않는 경우 등) 앱
  * 전체의 기동이 막히지는 않습니다. 서버 하나하나를 try-catch로 감싸서 접속을 시도하고, 실패한
  * 서버는 로그만 남기고 건너뛰기 때문입니다.
@@ -37,6 +36,7 @@ import net.dstone.common.utils.LogUtil;
  * ConfigTool이 이 클래스를 @Autowired로 의존하고 있기 때문에, 스프링은 ConfigTool을 초기화하기
  * 전에 이 클래스의 @PostConstruct 메소드(connect())가 먼저 끝나도록 순서를 보장해 줍니다. 즉
  * ConfigTool이 Tool 목록을 모을 때는 이미 MCP 서버 접속이 다 끝난 상태입니다.
+ * </pre>
  */
 @Component
 public class ConfigMcp extends BaseObject {

@@ -21,17 +21,18 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정
- * 클래스입니다. ChatClient는 Spring AI에서 "LLM한테 말을 걸 때 쓰는 창구"라고 생각하면 됩니다.
+ * <pre>
+ * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정 클래스입니다. 
+ * ChatClient는 Spring AI에서 "LLM한테 말을 걸 때 쓰는 창구"라고 생각하면 됩니다.
  * 이 엔진은 provider(dstone.ai.model.chat 설정값 - 예: anthropic, ollama)를 하나만 정해서 쓰는데,
  * 그 provider로 가는 ChatClient를 여기서 딱 한 번 조립해서 스프링 빈으로 등록해 둡니다.
  *
- * PII 가리기, 금지어 검사, 사용량 로깅·쿼터 같은 "거버넌스" 기능은 이 클래스가 직접 처리하지
- * 않습니다. 대신 이 클래스는 List&lt;Advisor&gt;(LLM 요청/응답을 가로채서 처리할 수 있는 부가 기능
- * 목록)를 그대로 주입받는 구조로 되어 있습니다. 그래서 나중에 거버넌스 기능이 필요해지면, 새로운
- * 모듈에서 @Bean으로 Advisor 하나만 추가하면 됩니다(스프링이 등록된 Advisor 빈들을 자동으로 모아서
- * 이 리스트에 넣어주기 때문에, 이 클래스 코드를 고칠 필요가 없습니다). 지금은 그렇게 추가로 등록된
- * Advisor 빈이 하나도 없으므로, 이 리스트는 비어 있는 상태로 시작합니다.
+ * PII 가리기, 금지어 검사, 사용량 로깅·쿼터 같은 "거버넌스" 기능은 이 클래스가 직접 처리하지 않습니다. 
+ * 대신 이 클래스는 List<Advisor>를 그대로 주입받는 구조로 되어 있습니다. 
+ * 그래서 나중에 거버넌스 기능이 필요해지면, 새로운 모듈에서 @Bean으로 Advisor 하나만 추가하면 됩니다
+ * (스프링이 등록된 Advisor 빈들을 자동으로 모아서 이 리스트에 넣어주기 때문에, 이 클래스 코드를 고칠 필요가 없습니다). 
+ * 지금은 그렇게 추가로 등록된 Advisor 빈이 하나도 없으므로, 이 리스트는 비어 있는 상태로 시작합니다.
+ * </pre>
  */
 @Configuration
 public class ConfigChatClient {
@@ -44,22 +45,16 @@ public class ConfigChatClient {
 	 * <pre>
 	 * 대화 내용을 어디에 저장할지 결정하는 저장소(ChatMemoryRepository)를 준비해 줍니다.
 	 *
-	 * dstone.ai.session.redis.enabled 설정이 true이면 session.RedisChatMemorySession이라는
-	 * 클래스가 이미 이 저장소 역할의 스프링 빈으로 등록되어 있습니다. 그 값이 true라면 이 메소드는
-	 * 그 빈을 그대로 가져다 씁니다.
+	 * dstone.ai.session.redis.enabled 설정이 true 일 경우 session.RedisChatMemorySession 사용
 	 *
-	 * 반대로 그 설정이 false여서 아무 빈도 등록되어 있지 않다면(즉 Redis를 안 쓰는 환경이라면), 이
-	 * 메소드가 대신 InMemoryChatMemoryRepository(자바 메모리 위에만 대화 내용을 저장하는 간단한
-	 * 저장소)를 새로 만들어서 씁니다. 이렇게 해두면 Redis가 있든 없든 chatMemory() 메소드는 항상
-	 * 문제없이 저장소를 주입받을 수 있습니다.
+	 * dstone.ai.session.redis.enabled 설정이 false 일 경우(즉 Redis를 안 쓰는 환경이라면) 이 메소드가 대신 
+	 * InMemoryChatMemoryRepository(자바 메모리 위에만 대화 내용을 저장하는 간단한 저장소)를 새로 만들어서 사용
 	 *
-	 * 다만 InMemoryChatMemoryRepository를 쓸 경우, 서버를 재시작하면 저장했던 대화 내용이
-	 * 사라지고, 서버 인스턴스가 여러 대이면 인스턴스끼리 대화 내용을 공유하지 못한다는 점은
-	 * 꼭 기억해 두세요.
+	 * InMemoryChatMemoryRepository를 쓸 경우, 서버를 재시작하면 저장했던 대화 내용이 사라지고, 서버 인스턴스가 여러 대이면 인스턴스끼리 대화 내용을 공유하지 못함.
 	 * </pre>
 	 */
     @Bean
-    public ChatMemoryRepository chatMemoryRepository(ObjectProvider<ChatMemoryRepository> repositoryProvider) {
+    ChatMemoryRepository chatMemoryRepository(ObjectProvider<ChatMemoryRepository> repositoryProvider) {
         // getIfAvailable()은 이미 등록된 빈이 있으면 그 빈을 가져오고, 없으면 null을 돌려줍니다.
         ChatMemoryRepository existingRepository = repositoryProvider.getIfAvailable();
         if (existingRepository != null) {
