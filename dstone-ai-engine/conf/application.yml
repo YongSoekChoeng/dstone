@@ -98,9 +98,17 @@ spring:
             api-key: ENC(iTbr7/33NEFc5gCOapVTLZsks5dU96gITu6OUXr2UqAVntTkq5p1nFjlVI/3RVVx/fZzBOAKEdngosd4zialqNUgfEq31RU3u8HUa/VBIaBnFViQCLJBPW8O81lcTpsHsQQPfRbeToKYHAm2BVMWP0cZhkx145+bnmoH7nXsXQE=)
             # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
             # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
+            #
+            # max-tokens: Spring AI의 Anthropic 기본값(500)은 structuredOutput(primaryText/data를
+            # JSON으로 강제하는 AGENT step)에서는 너무 작다 - 응답이 JSON을 다 못 닫고 잘려서
+            # "Unexpected end-of-input: expected close marker for Object" 파싱 실패로 이어지는 걸
+            # 실제로 겪었다(testApp-sdlc의 analyze step, 5개 항목을 갖춘 분석서를 요구하는 프롬프트).
+            # AgentDefinition에는 max-tokens를 개별 지정하는 필드가 없어(model만 override 가능)
+            # 엔진 전체 공통값을 올려서 대응한다.
             chat:
                  options:
                      model: claude-sonnet-4-5-20250929
+                     max-tokens: 4096
 
         ##########################################################################################
         # spring.ai.model.chat=openai 일 때 설정.
@@ -164,6 +172,18 @@ dstone:
         #     allowed-by-caller:
         #         - caller: sample-si-project
         #           tools: getCurrentDateTime,validateSqlSyntax
+        tool:
+            # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
+            # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를
+            # 채우는 것 자체가 곧 "이 Tool을 켠 상태"다. api-token은 DB 비밀번호와 동일한 ENC(...)
+            # 컨벤션(EncUtil)을 그대로 쓴다 - Jenkins 화면에서 "내 계정 > Configure > API Token >
+            # Add new Token"으로 발급받은 값을 절대 평문으로 여기 넣지 말고 반드시 암호화해서 넣을 것.
+            jenkins:
+                base-url: http://localhost:8080
+                user: jysn007
+                api-token: ENC(koeh9W9G8vYjPVBZAeO3GWxg8Uv3PYssUy8aykBFHNMVke4YNjWubBwxGu7xp+hDZbfMwSgwbXj7ZE87Gp1cpQ==)
+                allowed-jobs:
+                    - testApp
         
         ##########################################################################################
         # RAG 설정.

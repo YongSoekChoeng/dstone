@@ -59,6 +59,11 @@ public final class Constants {
 		public static final class Http {
 			public final static String PREFIX = "dstone.ai.tool.http";
 		}
+
+		/** Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool)의 설정 키 접두사입니다. */
+		public static final class Jenkins {
+			public final static String PREFIX = "dstone.ai.tool.jenkins";
+		}
 	}
 
 	/** Workflow를 실행하는 엔진(runtime.workflow.WorkFlowExecutor, runtime.workflow.execution.WorkFlowExecutionService)이 사용하는 상수들입니다. */

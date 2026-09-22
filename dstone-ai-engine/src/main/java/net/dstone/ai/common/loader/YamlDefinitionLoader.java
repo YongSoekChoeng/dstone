@@ -3,7 +3,6 @@ package net.dstone.ai.common.loader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.core.io.Resource;
@@ -18,7 +17,6 @@ import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.definition.McpServerDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.common.core.BaseObject;
-import net.dstone.common.utils.FileUtil;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
@@ -77,7 +75,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<WorkFlowDefinition> definitions = new ArrayList<>();
 		try {
 			for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
-				if( !FileUtil.isFileExist(resource.getFilePath().toString()) ) {continue;}
+				if( !resource.isReadable() ) {continue;}
 				WorkflowFile file = this.readAs(resource, WorkflowFile.class);
 				if (file.workflow() == null) {
 					throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
@@ -97,7 +95,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<AgentDefinition> definitions = new ArrayList<>();
 		try {
 			for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
-				if( !FileUtil.isFileExist(resource.getFilePath().toString()) ) {continue;}
+				if( !resource.isReadable() ) {continue;}
 				AgentFile file = this.readAs(resource, AgentFile.class);
 				if (file.agent() == null) {
 					throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
@@ -116,7 +114,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<McpServerDefinition> definitions = new ArrayList<>();
 		try {
 			for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
-				if( !FileUtil.isFileExist(resource.getFilePath().toString()) ) {continue;}
+				if( !resource.isReadable() ) {continue;}
 				McpServerFile file = this.readAs(resource, McpServerFile.class);
 				if (file.mcpServer() == null) {
 					throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
@@ -171,54 +169,21 @@ public class YamlDefinitionLoader extends BaseObject {
 	/**
 	 * 리소스 파일 하나를 읽어서 SnakeYAML로 파싱한 뒤, 지정한 타입(레코드)으로 바인딩해 줍니다.
 	 *
+	 * 클래스 상단 설명대로 서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐이라, id/name은 YAML에
+	 * 적힌 값을 그대로 씁니다 - 파일 경로를 바탕으로 접두사를 덧붙이는 처리는 하지 않습니다(과거에
+	 * 그런 처리가 있었으나, resource.getFilePath()가 패키징된 jar 안에서는 항상 예외를 던져서
+	 * java -jar로 실행할 때 Workflow/Agent가 단 하나도 등록되지 않는 문제가 있었고, 접두사 계산
+	 * 로직 자체도 의도한 "한 단계 서브 디렉토리는 접두사를 안 붙인다"는 조건이 실제로는 한 번도
+	 * 맞아떨어지지 않아 항상 ">디렉토리명>" 형태가 그대로 id 앞에 붙어버리는 버그가 있었다. 이
+	 * 문서(§4)가 설명하는 동작, 그리고 sample Workflow들의 실제 기대 id(예: agent-basic-echo)와
+	 * 맞추기 위해 제거했다).
+	 *
 	 * @param resource 읽어올 리소스 파일
 	 * @param type     바인딩할 대상 타입
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private <T> T readAs(Resource resource, Class<T> type) {
 		try (InputStream input = resource.getInputStream()) {
 			Object rawMap = this.yaml.load(input);
-			HashMap newMap = new HashMap();
-			
-			String allPath = resource.getFilePath().toString();
-			String fileName = FileUtil.getFileName(allPath, true);
-			String midPath = "";
-			String subPath = "";
-			String div = ">";
-			
-			if( type == WorkflowFile.class) {
-				midPath = resourceResolver.getResource(Constants.Definition.WORKFLOW_LOCATION).getFilePath().toString();
-				subPath = StringUtil.replace(allPath, midPath, "");
-				subPath = StringUtil.replace(subPath, "\\", "/");
-				subPath = StringUtil.replace(subPath, fileName, "");
-				subPath = StringUtil.replace(subPath, "/", div);
-				if( StringUtil.countString(subPath, div) == 1) {
-					subPath = StringUtil.replace(subPath, div, "");
-				}
-				newMap = (HashMap)rawMap;
-				if( newMap.containsKey("workflow") ) {
-					HashMap workflow = (HashMap)newMap.get("workflow");
-					workflow.put("id", subPath + workflow.get("id"));
-				}
-				rawMap = newMap;
-			}else if( type == AgentFile.class) {
-				midPath = resourceResolver.getResource(Constants.Definition.AGENT_LOCATION).getFilePath().toString();
-				subPath = StringUtil.replace(allPath, midPath, "");
-				subPath = StringUtil.replace(subPath, "\\", "/");
-				subPath = StringUtil.replace(subPath, fileName, "");
-				subPath = StringUtil.replace(subPath, "/", div);
-				if( StringUtil.countString(subPath, div) == 1) {
-					subPath = StringUtil.replace(subPath, div, "");
-				}
-				newMap = (HashMap)rawMap;
-				if( newMap.containsKey("agent") ) {
-					HashMap agent = (HashMap)newMap.get("agent");
-					agent.put("name", subPath + agent.get("name"));
-				}
-				rawMap = newMap;
-			}
-			
-			
 			return this.objectMapper.convertValue(rawMap, type);
 		} catch (IOException e) {
 			e.printStackTrace();

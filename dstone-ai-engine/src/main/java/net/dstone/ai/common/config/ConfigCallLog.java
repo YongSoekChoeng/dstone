@@ -302,8 +302,8 @@ public class ConfigCallLog extends BaseObject {
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
-		Object output = (StepOutput) joinPoint.proceed();
-		
+		Object output = joinPoint.proceed();
+
 		log.setLength(0);
 		log.append("\n");
 		log.append(SAPERATE_LINE);

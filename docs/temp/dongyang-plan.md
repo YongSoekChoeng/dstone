@@ -375,3 +375,101 @@ GitHub에 올려도 안전하다.
 ### 결과
 빌드 #21에서 Checkout→Build→Sync→Stop→Deploy→Health Check 전 단계 SUCCESS, 빌드 종료 40초 후에도
 Tomcat 생존 확인, 그 상태에서 로그인(`admin`/`test1234!`)까지 302로 정상 동작 확인함.
+
+---
+
+## 13. `testApp-sdlc` Workflow 구현 (2026-09-22)
+
+1~7절의 설계를 실제로 구현했다. 사용자 요청으로 Workflow/Agent 이름을 원래 계획의 `dongyang-sdlc`
+대신 **`testApp-sdlc`**로 붙였다(대상 프로젝트·Jenkins Job 이름과 통일). 11절에서 이미 정리한
+JIRA 철회 방침에 따라 `intake(JIRA)` step은 없고, `analyze`가 바로 `message` 원문을 입력받는다.
+
+### 구현물
+- `dstone-ai-engine/src/main/java/net/dstone/ai/tools/jenkins/JenkinsTriggerBuildTool.java` - 신규
+  Tool(`triggerBuild`). Jenkins CSRF 크럼이 세션 쿠키에 묶여 발급되는 것 때문에(12절에서 이미 겪은
+  문제) 크럼 발급 응답의 Set-Cookie를 그대로 보관해 빌드 기동 요청에 재사용한다.
+- `dstone-ai-engine/conf/application.yml` - `dstone.ai.tool.jenkins.*`(base-url/user/api-token(ENC)/
+  allowed-jobs: `testApp`) 추가. API 토큰은 Jenkins REST API로 `dstone-ai-engine-jenkins-tool`이라는
+  이름으로 직접 발급받아 `EncUtil`로 암호화해 넣었다(평문은 대화에 남기지 않음).
+  `spring.ai.anthropic.chat.options.max-tokens: 4096`도 함께 추가(Spring AI 기본값 500은 분석서처럼
+  긴 응답에는 너무 작아서 응답이 중간에 잘리는 문제를 실제로 겪었다).
+- `dstone-ai-engine/src/main/resources/agents/testApp-{analysis,spec-writer,codegen}-agent.yml` - 신규
+  Agent 3종. **자유 텍스트 응답**을 쓴다(아래 "설계 변경" 참고) - 처음엔 계획대로 `structuredOutput:
+  true`로 만들었었다.
+- `dstone-ai-engine/src/main/resources/workflows/testApp/testApp-sdlc.yml` - 8단계 전체
+  (`analyze` → `design-review`(APPROVAL) → `write-spec` → `spec-review`(APPROVAL) → `generate-code`
+  → `dev-submit`(APPROVAL) → `code-review`(APPROVAL) → `trigger-jenkins`(TOOL)).
+
+### 원래 계획(3절)과 달라진 점
+
+**1) 반려 시 "루프백" 대신 "종료".** 3절 다이어그램은 각 승인 게이트가 반려되면 앞 단계로 되돌아가
+다시 시도하는 구조였다. 실제 엔진 구현(`runtime.step.ApprovalStepRunner`)을 확인해보니 승인/반려
+결정은 `variables.approvals.{stepId}`에 저장되고 **실행이 끝날 때까지 지워지지 않는다** - 그래서
+반려 후 같은 승인 step id로 루프백하면, 그 step은 "새로 대기"가 아니라 예전 반려 결정을 그대로 다시
+읽어서 즉시 또 반려 처리해버려 결국 `maxIterations` 초과로 실패한다. `docs/09.dstone-ai-engine.md`
+§8의 공식 샘플도 이 이유로 `onFailure: FAIL`을 쓰고 있어, 이 Workflow도 그 원칙을 그대로 따랐다
+(모든 게이트: 반려 시 워크플로우 즉시 실패 종료, 재작성은 사람이 요청사항에 반려 사유를 반영해서
+새 실행을 다시 제출하는 방식). "같은 실행을 이어서 고쳐 쓰기"가 실제로 필요해지면 그건 YAML
+설계가 아니라 `ApprovalStepRunner` 쪽에 재시도 시맨틱을 추가하는 엔진 변경이 필요하다.
+
+**2) 3개 Agent 모두 `structuredOutput: true`를 빼고 자유 텍스트로 바꿨다.** 애초 설계는(4절)
+`primaryText/data` 구조화 응답을 쓰는 것이었으나, 실제로 돌려보니 `write-spec`/`generate-code`
+단계에서 재현성 있게 `Unexpected character ('`' ...)` JSON 파싱 실패가 났다 - 길고 마크다운/코드
+서식이 많은 문서를 JSON 문자열 값 하나로 완벽히 이스케이프하라고 강제한 게 원인으로 보인다.
+확인해보니애초에 이 세 Agent의 `data` 필드를 실제로 참조하는 `TOOL` step이 하나도 없었다(다음
+step은 전부 APPROVAL이거나 그냥 `{previous}`로 텍스트만 이어받는 AGENT) - 즉 구조화 응답이 애초에
+불필요한 복잡성이었다. 자유 텍스트로 바꾸니(AGENT step은 `structuredOutput`이 아니면 항상 성공
+취급) 이 파싱 실패 자체가 사라졌다.
+
+**3) `allowedCallers`를 Workflow/Agent 어디에도 넣지 않았다.** 지금 엔진은
+`dstone.ai.security.auth.enabled: false`라서 caller가 항상 `null`로 들어오는데,
+`AgentRegistry.resolve()`/`WorkFlowRegistry.resolve()`는 "caller가 null이면 무조건 거부"로
+판단한다 - `allowedCallers`를 채우면 이 Workflow/Agent를 영원히 아무도 호출할 수 없게 스스로
+걸어 잠그는 셈이 된다. caller별 API Key 인증을 실제로 켤 때 같이 채워 넣어야 한다.
+
+### 진행 중 발견한 엔진 버그 3건(테스트하며 발견, 전부 수정함 - 내 Workflow만의 문제가 아니라
+기존 sample Workflow/Agent 전체에 영향을 주는 버그였다)
+
+1. **`YamlDefinitionLoader`가 패키징된 jar에서는 Workflow/Agent를 단 하나도 못 읽었다.**
+   `resource.getFilePath()`가 nested jar 리소스에서는 항상 예외를 던지는데, 그 호출이
+   `loadWorkflows()`/`loadAgents()`/`loadMcpServers()`의 파일 존재 확인과 `readAs()`의 서브디렉토리
+   기반 id 접두사 계산 양쪽에 다 쓰이고 있었다. `java -jar`로 실행하는(dstone-ai-engine의 문서화된
+   실행 방식이자, k8s Pod 배포도 결국 이 방식이다) 한 이 문제를 100% 재현한다 - 즉 지금까지 이
+   방식으로 배포된 환경에서는 Workflow/Agent가 전혀 등록되지 않았을 것이다. 존재 확인은
+   `resource.isReadable()`로(jar-safe), id 접두사 계산 로직은 통째로 제거했다(§4 문서가 이미
+   "서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐 동작에 영향 없다"고 명시하고 있고, 실제로도
+   접두사 계산 코드 자체에 버그가 있어서 항상 `>디렉토리명>`이 id 앞에 그대로 붙어버렸다).
+2. **`spring.ai.anthropic.chat.options.max-tokens` 미설정** - 위 "구현물" 참고.
+3. **`ConfigCallLog.doToolsProfiling()`의 복붙 버그.** `@AiTool` 메소드 호출을 감싸는 로깅
+   Around-advice가 `(StepOutput) joinPoint.proceed()`로 반환값을 캐스팅하고 있었다(바로 위
+   `doStepRunnerLog`에서 복사해오면서 타입을 안 바꾼 것으로 보인다) - Tool 메소드는 `String`이나
+   `ToolOutput`을 돌려주지 `StepOutput`을 돌려주는 일이 없으므로, **`ToolOutput`을 반환하는
+   모든 Tool 호출(`validateSqlSyntax`, 이번에 만든 `triggerBuild` 포함)이 무조건
+   `ClassCastException`으로 실패하는 상태**였다. `doAgentLog`(반환 타입이 텍스트/구조화 응답 등
+   제각각이라 애초에 캐스팅을 안 함)와 같은 패턴으로 캐스팅을 제거해서 고쳤다.
+
+### 검증 결과 (2026-09-22, 실제 Anthropic 호출로 확인)
+
+로컬 Ollama(`spring.ai.model.chat: ollama`, 1.5B 양자화 모델)로 먼저 시도했을 때는 응답이 중국어로
+나오거나(다국어 소형 모델의 흔한 경향), 요구한 5개 항목을 다 안 쓰고 한 줄 요약만 내놓는 등 이
+Workflow의 프롬프트 품질 요구를 따라가지 못했다 - **AI SDLC처럼 긴 문서·구조화된 판단을 요구하는
+용도에는 로컬 소형 모델이 부적합하다는 걸 확인한 것**이다. `spring.ai.model.chat`을 일시적으로
+`anthropic`으로 바꿔 검증한 뒤(검증 완료 후 `ollama`로 원복 - 엔진 전체가 공유하는 기본값이라
+비용/동작에 영향이 있어 임의로 바꿔둔 채로 남기지 않았다) 8단계 전체를 실제로 끝까지 돌렸다:
+
+```
+POST /api/ai/workflow/testApp-sdlc/submit {"message":"회원 목록 화면에 가입일자로 검색할 수 있는 조건을 추가해줘"}
+ -> WAITING_APPROVAL(design-review)   [analyze: 5개 항목 갖춘 완전한 분석서, 한국어로 정상 생성]
+decision(design-review, approved=true) -> WAITING_APPROVAL(spec-review)     [write-spec 통과]
+decision(spec-review,   approved=true) -> WAITING_APPROVAL(code-review 이전 dev-submit) [generate-code 통과]
+decision(dev-submit,    approved=true) -> WAITING_APPROVAL(code-review)
+decision(code-review,   approved=true) -> DONE  [trigger-jenkins 통과]
+```
+`trigger-jenkins`가 실제로 Jenkins `testApp` Job의 빌드 #24를 큐에 올렸고, 그 빌드는 73.3초 만에
+**SUCCESS**로 끝났다(Checkout→Build→Sync→Stop→Deploy→Health Check 전부 통과, 12절에서 만든
+파이프라인 그대로). "요청사항 한 줄 → 승인 게이트 4개 → 실제 배포"까지 엔드투엔드로 검증 완료.
+
+### 남은 것 (7절 Phase 3, 그대로 유효)
+- RAG에 testApp 개발표준 문서 적재 후 3개 Agent `ragEnabled: true` 전환
+- 승인자 실제 권한 검증(지금은 감사 기록 수준)
+- 소스 자동 커밋(지금은 텍스트 산출물만 - `generate-code` Agent 정의 파일의 comment 참고)
