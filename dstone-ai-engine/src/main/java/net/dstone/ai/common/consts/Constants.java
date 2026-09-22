@@ -101,11 +101,11 @@ public final class Constants {
 	 * 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
 	 */
 	public static final class Definition {
-		public final static String WORKFLOW_LOCATION = "classpath*:workflows";
+		public final static String WORKFLOW_LOCATION = "classpath:workflows";
 		public final static String WORKFLOW_LOCATION_PATTERN = WORKFLOW_LOCATION + "/**/*.yml";
-		public final static String AGENT_LOCATION = "classpath*:agents";
+		public final static String AGENT_LOCATION = "classpath:agents";
 		public final static String AGENT_LOCATION_PATTERN = AGENT_LOCATION + "/**/*.yml";
-		public final static String MCP_LOCATION = "classpath*:mcp";
+		public final static String MCP_LOCATION = "classpath:mcp";
 		public final static String MCP_LOCATION_PATTERN = MCP_LOCATION + "/**/*.yml";
 	}
 

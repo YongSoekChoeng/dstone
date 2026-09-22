@@ -1,7 +1,7 @@
 var DstoneAiWorkflow = (function () {
 
 	var urls = {};
-	var POLL_INTERVAL_MS = 2000;
+	var POLL_INTERVAL_MS = 5000;
 
 	var workflowIdEl, workflowIdDescEl, sessionIdEl, messageEl, variablesEl;
 	var submitBtn, submitStatusEl;

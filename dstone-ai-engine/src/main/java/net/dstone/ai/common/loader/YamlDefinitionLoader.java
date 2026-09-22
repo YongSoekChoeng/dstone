@@ -3,6 +3,7 @@ package net.dstone.ai.common.loader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.core.io.Resource;
@@ -17,7 +18,9 @@ import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.definition.McpServerDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.FileUtil;
 import net.dstone.common.utils.LogUtil;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * Workflow, Agent, McpServer의 정의는 application.yml 안에 넣지 않고, 각각
@@ -72,27 +75,38 @@ public class YamlDefinitionLoader extends BaseObject {
 	/** classpath 상의 workflows/*.yml 파일을 전부 찾아서 읽고, WorkFlowDefinition 목록으로 돌려줍니다. */
 	public List<WorkFlowDefinition> loadWorkflows() {
 		List<WorkFlowDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
-			WorkflowFile file = this.readAs(resource, WorkflowFile.class);
-			if (file.workflow() == null) {
-				throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
+		try {
+			for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
+				if( !FileUtil.isFileExist(resource.getFilePath().toString()) ) {continue;}
+				WorkflowFile file = this.readAs(resource, WorkflowFile.class);
+				if (file.workflow() == null) {
+					throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
+				}
+				definitions.add(file.workflow());
+				LogUtil.sysout("dstone-ai-engine loader: workflow[" + file.workflow().id() + "] <- " + this.relativePath(resource, "workflows"));
 			}
-			definitions.add(file.workflow());
-			LogUtil.sysout("dstone-ai-engine loader: workflow[" + file.workflow().id() + "] <- " + this.relativePath(resource, "workflows"));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
+
 		return definitions;
 	}
 
 	/** classpath 상의 agents/*.yml 파일을 전부 찾아서 읽고, AgentDefinition 목록으로 돌려줍니다. */
 	public List<AgentDefinition> loadAgents() {
 		List<AgentDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
-			AgentFile file = this.readAs(resource, AgentFile.class);
-			if (file.agent() == null) {
-				throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
+		try {
+			for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
+				if( !FileUtil.isFileExist(resource.getFilePath().toString()) ) {continue;}
+				AgentFile file = this.readAs(resource, AgentFile.class);
+				if (file.agent() == null) {
+					throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
+				}
+				definitions.add(file.agent());
+				LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().name() + "] <- " + this.relativePath(resource, "agents"));
 			}
-			definitions.add(file.agent());
-			LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().name() + "] <- " + this.relativePath(resource, "agents"));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 		return definitions;
 	}
@@ -100,13 +114,18 @@ public class YamlDefinitionLoader extends BaseObject {
 	/** classpath 상의 mcp/*.yml 파일을 전부 찾아서 읽고, McpServerDefinition 목록으로 돌려줍니다. */
 	public List<McpServerDefinition> loadMcpServers() {
 		List<McpServerDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
-			McpServerFile file = this.readAs(resource, McpServerFile.class);
-			if (file.mcpServer() == null) {
-				throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
+		try {
+			for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
+				if( !FileUtil.isFileExist(resource.getFilePath().toString()) ) {continue;}
+				McpServerFile file = this.readAs(resource, McpServerFile.class);
+				if (file.mcpServer() == null) {
+					throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
+				}
+				definitions.add(file.mcpServer());
+				LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + this.relativePath(resource, "mcp"));
 			}
-			definitions.add(file.mcpServer());
-			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + this.relativePath(resource, "mcp"));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 		return definitions;
 	}
@@ -117,11 +136,16 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * @param locationPattern 리소스를 찾을 classpath 패턴
 	 */
 	private Resource[] resolve(String locationPattern) {
+		Resource[] resources = new Resource[0];
 		try {
-			return this.resourceResolver.getResources(locationPattern);
-		} catch (IOException e) {
+			String locationPatternPath = StringUtil.replace(locationPattern, "/**/*.yml", "");
+			if( this.resourceResolver.getResource(locationPatternPath).exists() ) {
+				resources = this.resourceResolver.getResources(locationPattern);
+			}
+		} catch (Exception e) {
 			throw new IllegalStateException(locationPattern + " 리소스를 찾는 중 오류가 발생했습니다.", e);
 		}
+		return resources;
 	}
 
 	/**
@@ -150,11 +174,54 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * @param resource 읽어올 리소스 파일
 	 * @param type     바인딩할 대상 타입
 	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private <T> T readAs(Resource resource, Class<T> type) {
 		try (InputStream input = resource.getInputStream()) {
 			Object rawMap = this.yaml.load(input);
+			HashMap newMap = new HashMap();
+			
+			String allPath = resource.getFilePath().toString();
+			String fileName = FileUtil.getFileName(allPath, true);
+			String midPath = "";
+			String subPath = "";
+			String div = ">";
+			
+			if( type == WorkflowFile.class) {
+				midPath = resourceResolver.getResource(Constants.Definition.WORKFLOW_LOCATION).getFilePath().toString();
+				subPath = StringUtil.replace(allPath, midPath, "");
+				subPath = StringUtil.replace(subPath, "\\", "/");
+				subPath = StringUtil.replace(subPath, fileName, "");
+				subPath = StringUtil.replace(subPath, "/", div);
+				if( StringUtil.countString(subPath, div) == 1) {
+					subPath = StringUtil.replace(subPath, div, "");
+				}
+				newMap = (HashMap)rawMap;
+				if( newMap.containsKey("workflow") ) {
+					HashMap workflow = (HashMap)newMap.get("workflow");
+					workflow.put("id", subPath + workflow.get("id"));
+				}
+				rawMap = newMap;
+			}else if( type == AgentFile.class) {
+				midPath = resourceResolver.getResource(Constants.Definition.AGENT_LOCATION).getFilePath().toString();
+				subPath = StringUtil.replace(allPath, midPath, "");
+				subPath = StringUtil.replace(subPath, "\\", "/");
+				subPath = StringUtil.replace(subPath, fileName, "");
+				subPath = StringUtil.replace(subPath, "/", div);
+				if( StringUtil.countString(subPath, div) == 1) {
+					subPath = StringUtil.replace(subPath, div, "");
+				}
+				newMap = (HashMap)rawMap;
+				if( newMap.containsKey("agent") ) {
+					HashMap agent = (HashMap)newMap.get("agent");
+					agent.put("name", subPath + agent.get("name"));
+				}
+				rawMap = newMap;
+			}
+			
+			
 			return this.objectMapper.convertValue(rawMap, type);
 		} catch (IOException e) {
+			e.printStackTrace();
 			throw new IllegalStateException(resource.getFilename() + "를 읽는 중 오류가 발생했습니다.", e);
 		}
 	}
