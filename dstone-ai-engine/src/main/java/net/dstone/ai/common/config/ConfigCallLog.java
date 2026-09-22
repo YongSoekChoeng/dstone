@@ -382,7 +382,7 @@ public class ConfigCallLog extends BaseObject {
 				}else if( param instanceof AgentDefinition ) {
 					AgentDefinition agentDefinition = (AgentDefinition)param;
 					if(identity.length() > 0) {identity.append(div);}
-					identity.append("agent(name=" + agentDefinition.name()+")");
+					identity.append("agent(id=" + agentDefinition.id()+")");
 				}
 			}
 		}

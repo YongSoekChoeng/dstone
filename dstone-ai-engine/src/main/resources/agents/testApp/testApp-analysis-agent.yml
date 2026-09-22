@@ -1,4 +1,4 @@
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
 #
 # workflows/testApp/testApp-sdlc.yml의 analyze step 전용 Agent입니다. 현업의 요청사항 원문(자유
 # 텍스트)을 입력받아 "분석/설계 초안"을 작성합니다 - 8단계 SDLC 워크플로우의 2단계(AI 분석/설계)에
@@ -12,7 +12,7 @@
 # 재현됐다(예: "Unexpected character ('`')..." 파싱 실패). 자유 텍스트로 바꾸면 이런 파싱 실패
 # 자체가 있을 수 없다 - AGENT step은 structuredOutput이 아니면 항상 성공으로 취급된다.
 agent:
-  name: testApp-analysis-agent
+  id: testApp-analysis-agent
   description: 요청사항 원문 -> 분석/설계 초안 작성(testApp-sdlc 2단계).
   prompt: |
     당신은 소프트웨어 개발 프로젝트의 시니어 분석/설계 담당자입니다. 입력으로 현업(업무 담당자)이

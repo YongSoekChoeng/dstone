@@ -1,4 +1,4 @@
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
 #
 # workflows/testApp/testApp-sdlc.yml의 write-spec step 전용 Agent입니다. business-reviewer가
 # 승인한 분석/설계 초안(입력)을 받아 "개발명세서"로 구체화합니다 - 8단계 SDLC 워크플로우의
@@ -10,7 +10,7 @@
 # 재현됐다(analyze는 같은 구조로도 통과했지만 write-spec은 재현성 있게 실패했다 - 내용의 코드성/
 # 특수문자 비중 차이로 보인다). 자유 텍스트면 이 위험 자체가 없다.
 agent:
-  name: testApp-spec-writer-agent
+  id: testApp-spec-writer-agent
   description: 승인된 분석/설계 -> 개발명세서 작성(testApp-sdlc 4단계).
   prompt: |
     당신은 개발 프로젝트의 기술 리드입니다. 입력으로 이미 검토를 통과한 분석/설계서를 받습니다.

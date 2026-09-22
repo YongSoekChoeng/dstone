@@ -49,7 +49,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * agents/*.yml 파일 하나가 가지는 최상위 구조입니다. workflows/*.yml, mcp/*.yml과 마찬가지로
-	 * 파일 하나에 Agent 하나만 담기고, 파일 이름이 곧 그 Agent의 이름이 됩니다. 최상위 키는
+	 * 파일 하나에 Agent 하나만 담기고, 파일 이름이 곧 그 Agent의 id가 됩니다. 최상위 키는
 	 * agent: 입니다.
 	 *
 	 * @param agent agent 키 아래에 있는 실제 정의 내용
@@ -101,7 +101,7 @@ public class YamlDefinitionLoader extends BaseObject {
 					throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
 				}
 				definitions.add(file.agent());
-				LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().name() + "] <- " + this.relativePath(resource, "agents"));
+				LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().id() + "] <- " + this.relativePath(resource, "agents"));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -169,7 +169,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	/**
 	 * 리소스 파일 하나를 읽어서 SnakeYAML로 파싱한 뒤, 지정한 타입(레코드)으로 바인딩해 줍니다.
 	 *
-	 * 클래스 상단 설명대로 서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐이라, id/name은 YAML에
+	 * 클래스 상단 설명대로 서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐이라, id는 YAML에
 	 * 적힌 값을 그대로 씁니다 - 파일 경로를 바탕으로 접두사를 덧붙이는 처리는 하지 않습니다(과거에
 	 * 그런 처리가 있었으나, resource.getFilePath()가 패키징된 jar 안에서는 항상 예외를 던져서
 	 * java -jar로 실행할 때 Workflow/Agent가 단 하나도 등록되지 않는 문제가 있었고, 접두사 계산

@@ -1,4 +1,4 @@
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 이름(ID)이 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
 #
 # workflows/testApp/testApp-sdlc.yml의 generate-code step 전용 Agent입니다. PL이 승인한
 # 개발명세서(입력)를 받아 "기본 소스 초안"을 생성합니다 - 8단계 SDLC 워크플로우의 5단계(AI 기본
@@ -16,7 +16,7 @@
 # 만든 결과물은 dev-submit/code-review 승인 절차를 거친 뒤에도 여전히 텍스트일 뿐이며, 개발자가
 # 그 내용을 직접 프로젝트(예: testApp)에 반영해야 한다.
 agent:
-  name: testApp-codegen-agent
+  id: testApp-codegen-agent
   description: 승인된 개발명세서 -> 기본 소스 초안 생성(testApp-sdlc 5단계). 실제 파일 반영은 개발자가 직접 한다.
   prompt: |
     당신은 Java/Spring 백엔드 개발자입니다. 입력으로 이미 검토를 통과한 개발명세서를 받습니다.

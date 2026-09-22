@@ -15,7 +15,7 @@ import java.util.List;
  * 어느 경로로 호출되든, "이 caller(호출 주체)가 이 Agent를 써도 되는지"는 항상 allowedCallers 값으로 똑같이
  * 검사합니다(자세한 검사 로직은 common.registry.AgentRegistry.resolve() 참고).
  *
- * @param name           이 Agent를 식별하는 이름
+ * @param id             이 Agent를 식별하는 id입니다
  * @param prompt         시스템 프롬프트 원문입니다. 이 안에 {caller}나 {today}처럼 중괄호로 감싼 변수 이름을
  *                       넣어두면, runtime.agent.AgentExecutor가 실제 호출 시점에 그 값을 채워서(Spring AI의
  *                       PromptTemplate 기능을 사용) 프롬프트를 완성합니다
@@ -34,5 +34,5 @@ import java.util.List;
  *                               답하도록 강제합니다. 비워두면(null) true로 동작합니다
  * @param allowedCallers         이 Agent를 호출할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다
  */
-public record AgentDefinition(String name, String prompt, String description, String model, boolean toolsEnabled, boolean ragEnabled, Integer ragTopK, Double ragSimilarityThreshold,
+public record AgentDefinition(String id, String prompt, String description, String model, boolean toolsEnabled, boolean ragEnabled, Integer ragTopK, Double ragSimilarityThreshold,
 	Boolean ragAllowEmptyContext, List<String> allowedCallers) {}
