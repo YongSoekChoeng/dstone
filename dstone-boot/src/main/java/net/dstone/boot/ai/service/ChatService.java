@@ -19,7 +19,7 @@ import reactor.core.publisher.Flux;
 @Service
 public class ChatService extends net.dstone.boot.common.biz.BaseService {
 
-	private static final String AGENT = "general-chat";
+	private static final String AGENT = "sample-general-chat";
 	private static final String AGENT_ROLE = "친절한 AI 어시스턴트";
 
 	@Autowired

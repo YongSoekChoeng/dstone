@@ -6,7 +6,7 @@
 # Verdict의 JSON 스키마를 프롬프트에 자동으로 끼워 넣고, LLM의 응답을 그 스키마에 맞춰
 # 해석해 줍니다. workflows/supervisor-verdict-gate.yml에서 이 Agent를 가져다 씁니다.
 agent:
-  name: verdict-judge-agent
+  name: sample-verdict-judge-agent
   description: SUPERVISOR step 전용 - 주어진 텍스트를 pass/fail + 이유로 판정한다.
   prompt: |
     당신은 앞 단계에서 나온 텍스트가 "안녕"이라는 단어를 포함하는지만 엄격히 검사하는 검수자입니다.

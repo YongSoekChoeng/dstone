@@ -12,7 +12,7 @@
 # RouteDecision이라는 데이터 구조 자체는 route 자리에 어떤 문자열이 와야 하는지 전혀 모르기
 # 때문에, 아래 prompt 안에서 이 세 이름표를 직접 알려주고 있는 것입니다.
 agent:
-  name: router-classifier-agent
+  name: sample-router-classifier-agent
   description: ROUTER step 전용 - 문의를 billing/technical/other 세 갈래 중 하나로 분류한다.
   prompt: |
     당신은 고객 문의를 아래 세 갈래 중 정확히 하나로 분류하는 라우터입니다.

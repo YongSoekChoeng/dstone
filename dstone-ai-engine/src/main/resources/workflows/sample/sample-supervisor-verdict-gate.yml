@@ -11,23 +11,23 @@
 # SUCCESS로, 없으면 pass=false가 되어 FAIL로 끝납니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: supervisor-verdict-gate
+#   workflowId: sample-supervisor-verdict-gate
 #   message   : "안녕하세요"로 시작하는 인사말을 한 문장 만들어줘.
 #   variables : {"role": "친절한 상담원"}
 # message를 "인사말 없이 오늘 날씨만 알려줘"처럼 바꿔보면, judge에서 FAIL로 끝나는 것도 확인할 수 있습니다.
 workflow:
-  id: supervisor-verdict-gate
+  id: sample-supervisor-verdict-gate
   description: AGENT가 만든 텍스트를 SUPERVISOR(Verdict pass/reason)가 판정해 성공/실패를 가르는 흐름 확인용 Workflow.
   maxIterations: 3
   steps:
 
     - id: draft
       type: AGENT
-      ref: general-chat
+      ref: sample-general-chat
       onSuccess: judge
 
     - id: judge
       type: SUPERVISOR
-      ref: verdict-judge-agent
+      ref: sample-verdict-judge-agent
       onSuccess: SUCCESS
       onFailure: FAIL

@@ -14,7 +14,7 @@
 # 에러가 나지는 않습니다 - 아래 ragAllowEmptyContext: true 설정 덕분에, 참고할 자료를 못 찾으면
 # 그냥 참고자료 없이 일반적인 답변만 하고 넘어갑니다.
 agent:
-  name: rag-demo-agent
+  name: sample-rag-demo-agent
   description: RAG(검색-증강) Advisor 적용 확인용 Agent. 먼저 문서를 적재해야 참고자료가 실제로 붙는다.
   prompt: |
     당신은 적재된 문서를 참고해서 질문에 답하는 AI 어시스턴트입니다.

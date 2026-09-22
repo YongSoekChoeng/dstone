@@ -11,15 +11,15 @@
 # (자세한 동작은 common.rag.RagRetrievalChain.buildAdvisor 참고).
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: agent-rag-augmented
+#   workflowId: sample-agent-rag-augmented
 #   message   : 적재된 문서 중에 (문서에 실제로 있는 키워드)에 대해 설명해줘.
 workflow:
-  id: agent-rag-augmented
+  id: sample-agent-rag-augmented
   description: ragEnabled=true Agent의 RAG Advisor 증강 확인용 Workflow. 먼저 문서를 적재해야 참고자료가 실제로 붙는다.
   maxIterations: 3
   steps:
 
     - id: ask
       type: AGENT
-      ref: rag-demo-agent
+      ref: sample-rag-demo-agent
       onSuccess: SUCCESS

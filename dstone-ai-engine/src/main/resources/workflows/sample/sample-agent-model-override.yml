@@ -5,18 +5,18 @@
 # Workflow 안에서도 똑같이 잘 적용되는지 확인해보기 위한 테스트 전용 Workflow입니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: agent-model-override
+#   workflowId: sample-agent-model-override
 #   message   : 너는 누구니?
 # 다만 agents/model-override-agent.yml에 적힌 안내대로, conf/application.yml에서 지금 활성화된
 # provider(spring.ai.model.chat)에 맞는 model 값으로 agents/model-override-agent.yml을 먼저
 # 맞춰 두어야 정상적으로 호출됩니다.
 workflow:
-  id: agent-model-override
+  id: sample-agent-model-override
   description: per-Agent model override 확인용 Workflow. conf/application.yml 기본 모델과 다른 모델로 응답한다.
   maxIterations: 3
   steps:
 
     - id: ask
       type: AGENT
-      ref: model-override-agent
+      ref: sample-model-override-agent
       onSuccess: SUCCESS

@@ -5,7 +5,7 @@
 # 이루어져 있어서, API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
 # 확인해보는 순서는 이렇습니다:
-#   1. dstone-boot의 "Workflow 테스트" 화면에서 workflowId=approval-pause-resume, message="승인 테스트"로
+#   1. dstone-boot의 "Workflow 테스트" 화면에서 workflowId=sample-approval-pause-resume, message="승인 테스트"로
 #      제출(submit)합니다 -> executionId가 바로 발급되고, 곧이어 status가 WAITING_APPROVAL(승인 대기)로 바뀝니다.
 #   2. dstone-boot의 "관리자 > Workflow 실행 관리" 화면에서 상태를 WAITING_APPROVAL로 걸어두면 방금
 #      만든 실행이 목록에 보입니다. 그 실행을 승인하거나 반려해봅니다.
@@ -13,12 +13,12 @@
 #      끝납니다 - "Workflow 테스트" 화면으로 돌아가 같은 executionId로 상태를 다시 조회해보면
 #      (또는 자동 폴링이 켜져 있다면 그대로) 이 최종 상태가 반영되어 있는 것을 볼 수 있습니다.
 # API로 직접 확인해보고 싶다면(dstone-ai-engine 기준) 이렇게 호출하면 됩니다:
-#   POST /api/ai/workflow/approval-pause-resume/execute { "message": "승인 테스트" }
+#   POST /api/ai/workflow/sample-approval-pause-resume/execute { "message": "승인 테스트" }
 #     -> 응답 status가 WAITING_APPROVAL, executionId가 함께 온다.
 #   GET /api/ai/workflow/executions?status=WAITING_APPROVAL
 #   POST /api/ai/workflow/executions/{executionId}/decision { "approved": true, "approver": "...", "comment": "..." }
 workflow:
-  id: approval-pause-resume
+  id: sample-approval-pause-resume
   description: APPROVAL 스텝의 일시중단(WAITING_APPROVAL)/재개 동작 확인용 테스트 Workflow.
   maxIterations: 5
   steps:

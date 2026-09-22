@@ -13,20 +13,20 @@
 # step으로 잘 이어지는지를 확인하는 것이 이 Workflow의 목적이기 때문입니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: router-multiway
+#   workflowId: sample-router-multiway
 #   message   : 지난달 카드 요금이 잘못 청구된 것 같아요.
 #   variables : {"role": "친절한 상담원"}
 # message를 "로그인이 안 돼요"(technical로 분기) 또는 "회사 위치가 어디인가요"(other로 분기)로
 # 바꿔서 호출해보면, 각각 다른 종착 step으로 가는 것을 확인할 수 있습니다.
 workflow:
-  id: router-multiway
+  id: sample-router-multiway
   description: ROUTER step(billing/technical/other 3갈래)이 실제로 서로 다른 step으로 분기하는지 확인용 Workflow.
   maxIterations: 3
   steps:
 
     - id: classify
       type: ROUTER
-      ref: router-classifier-agent
+      ref: sample-router-classifier-agent
       routes:
         billing: billing-step
         technical: technical-step
@@ -34,15 +34,15 @@ workflow:
 
     - id: billing-step
       type: AGENT
-      ref: general-chat
+      ref: sample-general-chat
       onSuccess: SUCCESS
 
     - id: technical-step
       type: AGENT
-      ref: general-chat
+      ref: sample-general-chat
       onSuccess: SUCCESS
 
     - id: other-step
       type: AGENT
-      ref: general-chat
+      ref: sample-general-chat
       onSuccess: SUCCESS

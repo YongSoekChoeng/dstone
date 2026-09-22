@@ -12,12 +12,12 @@
 # 끝내 못 고치면 결국 "최대 실행 횟수 초과"로 FAILED가 되는 것도 이 Workflow로 확인할 수 있습니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: loop-retry-until-valid
+#   workflowId: sample-loop-retry-until-valid
 #   message   : SELECT * FORM member WHERE id = 1
 # ("FORM"은 "FROM"을 일부러 잘못 쓴 오타입니다 - fix-agent가 이 오타를 고치고 나면 validate를
 # 통과하면서 SUCCESS로 끝납니다)
 workflow:
-  id: loop-retry-until-valid
+  id: sample-loop-retry-until-valid
   description: TOOL 검증 실패 -> AGENT 수정 -> TOOL 재검증, onFailure 루프 + maxIterations 상한 확인용 Workflow.
   maxIterations: 6
   steps:
@@ -31,5 +31,5 @@ workflow:
 
     - id: fix
       type: AGENT
-      ref: fix-agent
+      ref: sample-fix-agent
       onSuccess: validate

@@ -17,10 +17,10 @@
 # ["example.com"]) 다시 호출해보면, 그 step만 성공으로 바뀌는 것을 확인할 수 있습니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: tool-gated-external
+#   workflowId: sample-tool-gated-external
 #   message   : (아무 문자열이나 넣으면 됩니다 - 이 Workflow의 step들은 message를 쓰지 않습니다)
 workflow:
-  id: tool-gated-external
+  id: sample-tool-gated-external
   description: httpGet/runShellScript/runPythonScript deny-by-default 확인용 Workflow. 화이트리스트 미설정 시 각 step이 실패하는 게 정상이다.
   maxIterations: 4
   steps:

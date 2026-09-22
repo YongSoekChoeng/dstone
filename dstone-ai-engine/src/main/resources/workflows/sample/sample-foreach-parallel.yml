@@ -10,7 +10,7 @@
 # 토큰으로 채워지기 때문에, inputTemplate이 {"sql":"{item}"}으로 되어 있습니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: foreach-parallel
+#   workflowId: sample-foreach-parallel
 #   message   : (아무 문자열이나 넣으면 됩니다 - api.controller.WorkFlowController가 필수값으로
 #               검증은 하지만, 이 Workflow의 step은 {item}만 쓸 뿐 message나 {previous}는 쓰지 않습니다)
 #   variables : {"sqlList": ["SELECT 1 FROM dual", "SELEC 1 FROM dual"]}
@@ -23,7 +23,7 @@
 # 실제로 각자 독립적으로 동시에 실행되고 판정된다는 것을 이 결과로 확인할 수 있습니다. 항목을
 # 3개, 10개로 늘리고 싶다면 YAML은 그대로 두고 variables의 sqlList 목록만 늘리면 됩니다.
 workflow:
-  id: foreach-parallel
+  id: sample-foreach-parallel
   description: forEachVariable 동작 확인용 테스트 Workflow - TOOL step 하나를 sqlList 항목 수만큼 동시 실행한다.
   maxIterations: 5
   steps:

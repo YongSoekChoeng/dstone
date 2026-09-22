@@ -13,7 +13,7 @@
 # 그 다음에 오는 TOOL step은 {extract.sql}이라는 토큰으로, 이 Agent가 채워 넣은 data.sql 값을
 # 그대로 가져다 씁니다.
 agent:
-  name: structured-extract-agent
+  name: sample-structured-extract-agent
   description: structuredOutput=true AGENT step 전용 - 입력 문장에서 SQL 문 하나를 추출해 data.sql로 돌려준다.
   prompt: |
     입력 문장 안에 SQL 문이 섞여 있으면 그 SQL 문 하나를 있는 그대로(수정하지 말고) 추출해서

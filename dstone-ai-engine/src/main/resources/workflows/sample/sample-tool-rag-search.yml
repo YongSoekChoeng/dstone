@@ -15,10 +15,10 @@
 # 호출해보면 됩니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: tool-rag-search
+#   workflowId: sample-tool-rag-search
 #   message   : (적재해 둔 문서에 실제로 들어있는 키워드를 넣으면 됩니다)
 workflow:
-  id: tool-rag-search
+  id: sample-tool-rag-search
   description: TOOL step으로 RAG 검색만 직접 호출(LLM 없음). RAG가 꺼져있거나 적재된 문서가 없으면 FAIL이 정상이다.
   maxIterations: 2
   steps:

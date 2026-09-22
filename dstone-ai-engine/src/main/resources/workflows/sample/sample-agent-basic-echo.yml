@@ -7,20 +7,20 @@
 # 여기서 쓰는 basic-echo-agent(agents/basic-echo-agent.yml)는 프롬프트 템플릿 변수도, Tool도
 # 전혀 쓰지 않는 아주 단순한 Agent라서, message 하나만 보내면 항상 성공합니다 - variables는
 # 넘기지 않아도 됩니다. 만약 프롬프트 템플릿 변수가 실제로 잘 채워지는지 확인해보고 싶다면,
-# workflows/agent-model-override.yml처럼 변수를 쓰는 다른 Agent를 참고하거나, agents/general-chat.yml을
+# workflows/sample-agent-model-override.yml처럼 변수를 쓰는 다른 Agent를 참고하거나, agents/general-chat.yml을
 # chat API로 직접 호출해서 확인해보면 됩니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: agent-basic-echo
+#   workflowId: sample-agent-basic-echo
 #   message   : 오늘 기분이 어때?
 #   variables : (비워도 됩니다)
 workflow:
-  id: agent-basic-echo
+  id: sample-agent-basic-echo
   description: AGENT step 1개만으로 구성된 가장 기본적인 Workflow. variables 없이 message만 보내면 된다.
   maxIterations: 3
   steps:
 
     - id: reply
       type: AGENT
-      ref: basic-echo-agent
+      ref: sample-basic-echo-agent
       onSuccess: SUCCESS

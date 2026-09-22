@@ -14,17 +14,17 @@
 # runtime.agent.AgentExecutor.promptSafeVariables 참고).
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
-#   workflowId: structured-output-chain
+#   workflowId: sample-structured-output-chain
 #   message   : 이 테이블에서 이름이 김철수인 사람을 찾고 싶어. SELECT * FROM member WHERE name = '김철수' 이렇게 쓰면 되지?
 workflow:
-  id: structured-output-chain
+  id: sample-structured-output-chain
   description: structuredOutput=true AGENT step의 data를 다음 TOOL step이 {extract.sql}로 참조하는 흐름 확인용 Workflow.
   maxIterations: 3
   steps:
 
     - id: extract
       type: AGENT
-      ref: structured-extract-agent
+      ref: sample-structured-extract-agent
       structuredOutput: true
       onSuccess: validate
       onFailure: FAIL

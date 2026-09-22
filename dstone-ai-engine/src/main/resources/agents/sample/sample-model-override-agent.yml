@@ -21,7 +21,7 @@
 # 이름을 넣으면, 서버가 켜질 때는 아무 문제 없이 넘어가지만 실제로 이 Agent를 호출하는 순간에 그
 # provider의 API가 에러를 내니 주의하세요.
 agent:
-  name: model-override-agent
+  name: sample-model-override-agent
   description: per-Agent model override 확인용 Agent. 활성 provider의 기본 모델과 다른 모델을 강제한다.
   prompt: |
     당신은 AI 어시스턴트입니다. 질문에 간결히 한국어로 답한 뒤, 마지막 줄에
