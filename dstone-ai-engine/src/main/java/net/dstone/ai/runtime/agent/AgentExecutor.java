@@ -15,7 +15,6 @@ import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.rag.RagRetrievalChain;
-import net.dstone.ai.runtime.status.Verdict;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -263,7 +262,7 @@ public class AgentExecutor extends BaseObject {
 	 *
 	 * 그런데 runtime.workflow.WorkFlowExecutor는 병렬 실행(forEach 반복)이나 structuredOutput=true로
 	 * 설정된 AGENT step의 결과 데이터를 {stepId.키} 형태로 이름을 붙여서(namespacing) variables 맵에
-	 * 넣어줍니다(자세한 내용은 runtime.status.StepOutput.data()를 참고하세요). 그러니까 이런 마침표 섞인
+	 * 넣어줍니다(자세한 내용은 runtime.step.StepOutcome.data()를 참고하세요). 그러니까 이런 마침표 섞인
 	 * 키가 variables 맵에 하나라도 쌓이고 나면, 이 필터링 없이 그대로 render()에 넘길 경우 그 뒤로 실행되는
 	 * 모든 Workflow의 AGENT/SUPERVISOR/ROUTER step이 전부 예외로 깨지게 됩니다. 그래서 프롬프트를 렌더링하기
 	 * 바로 직전에만, 이 메서드로 마침표가 섞인 키를 걸러내고 나머지만 넘깁니다.

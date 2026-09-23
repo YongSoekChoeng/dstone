@@ -13,10 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.runtime.status.StepInput;
-import net.dstone.ai.runtime.status.StepOutput;
-import net.dstone.ai.runtime.status.ToolOutput;
 import net.dstone.ai.runtime.tool.ToolExecutor;
+import net.dstone.ai.runtime.tool.ToolOutcome;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
@@ -49,22 +47,22 @@ public class ToolStepRunner implements StepRunner {
 	private ToolExecutor toolExecutor;
 
 	@Override
-	public StepOutput run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
+	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
 		String normalized = this.stripLlmArtifacts(input.renderedText());
 		String jsonInput = this.renderToolInput(definition.inputTemplate(), normalized, input.variables());
 		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), jsonInput);
 
-		ToolOutput outcome = this.tryParseOutcome(toolResult);
+		ToolOutcome outcome = this.tryParseOutcome(toolResult);
 		boolean failed = outcome != null ? Boolean.FALSE.equals(outcome.success()) : toolResult.startsWith(Constants.Outcome.FAIL_PREFIX);
 		if (!failed) {
-			return StepOutput.success(normalized);
+			return StepOutcome.success(normalized);
 		}
 		String reasonText = outcome != null && outcome.message() != null ? outcome.message() : toolResult;
-		return StepOutput.failure(normalized + "\n\n[검증 결과] " + reasonText, reasonText);
+		return StepOutcome.failure(normalized + "\n\n[검증 결과] " + reasonText, reasonText);
 	}
 
 	/**
-	 * Tool이 runtime.status.ToolOutput 형식(success/message 필드)으로 응답했다면(이게 권장하는
+	 * Tool이 runtime.tool.ToolOutcome 형식(success/message 필드)으로 응답했다면(이게 권장하는
 	 * 방식입니다) 그 값을 그대로 씁니다. 그게 아니라면 null을 돌려줘서, run() 메서드가 대신 문자열
 	 * 접두사 방식(Constants.Outcome.FAIL_PREFIX)으로 성공/실패를 판정하게 합니다. 이때 "success
 	 * 필드가 우연히 들어있긴 하지만 사실은 전혀 다른 목적의 JSON 객체"를 잘못 성공/실패로 오해하지
@@ -73,9 +71,9 @@ public class ToolStepRunner implements StepRunner {
 	 *
 	 * @param toolResult Tool을 호출한 원본 응답 텍스트입니다(runtime.tool.ToolExecutor.unwrap()을 거친 결과입니다).
 	 */
-	private ToolOutput tryParseOutcome(String toolResult) {
+	private ToolOutcome tryParseOutcome(String toolResult) {
 		try {
-			ToolOutput outcome = this.objectMapper.readValue(toolResult, ToolOutput.class);
+			ToolOutcome outcome = this.objectMapper.readValue(toolResult, ToolOutcome.class);
 			return outcome.success() == null ? null : outcome;
 		} catch (JsonProcessingException e) {
 			return null;

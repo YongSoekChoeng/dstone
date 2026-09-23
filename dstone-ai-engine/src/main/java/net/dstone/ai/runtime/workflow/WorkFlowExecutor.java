@@ -12,15 +12,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.consts.StepType;
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.StepType;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
-import net.dstone.ai.runtime.status.StepFlow;
-import net.dstone.ai.runtime.status.StepInput;
-import net.dstone.ai.runtime.status.StepOutput;
-import net.dstone.ai.runtime.status.StepResult;
 import net.dstone.ai.runtime.step.AgentStepRunner;
 import net.dstone.ai.runtime.step.ApprovalStepRunner;
+import net.dstone.ai.runtime.step.StepInput;
+import net.dstone.ai.runtime.step.StepOutcome;
 import net.dstone.ai.runtime.step.StepRunner;
 import net.dstone.ai.runtime.step.ToolStepRunner;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
@@ -51,12 +49,12 @@ import net.dstone.common.utils.StringUtil;
  * 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 끝낸 step부터 이어서 계속 진행할 수 있습니다.
  *
  * StepDefinition의 onSuccess/onFailure(또는 ROUTER의 routes)에 적어둔 다음 step의 id가 지금 step보다
- * 앞쪽에 있으면 LOOP로, 뒤쪽에 있으면 NEXT_STEP으로 판단합니다(둘 다 실제 동작은 똑같습니다 -
- * StepStatus는 로그를 읽을 때 구분하기 좋으라고 나눠둔 것뿐이고, 진짜 무한 루프를 막는 역할은
- * maxIterations 하나가 맡습니다). onSuccess/onFailure/routes에 "SUCCESS"나 "FAIL"이라는 예약어를
- * 적어두면 그 자리에서 바로 Workflow 전체를 끝냅니다.
+ * 앞쪽에 있으면 WorkflowTransition.Loop로, 뒤쪽에 있으면 WorkflowTransition.NextStep으로 판단합니다
+ * (둘 다 실제 동작은 똑같습니다 - 로그를 읽을 때 구분하기 좋으라고 나눠둔 것뿐이고, 진짜 무한 루프를
+ * 막는 역할은 maxIterations 하나가 맡습니다). onSuccess/onFailure/routes에 "SUCCESS"나 "FAIL"이라는
+ * 예약어를 적어두면 그 자리에서 바로 Workflow 전체를 끝냅니다.
  *
- * step 하나(또는 forEach의 반복 하나)가 돌려준 StepOutput.data()는 그 step의 id를 앞에 붙인 형태로
+ * step 하나(또는 forEach의 반복 하나)가 돌려준 StepOutcome.data()는 그 step의 id를 앞에 붙인 형태로
  * ({stepId.키}) variables에 합쳐집니다(자세한 내용은 namespaced() 참고) - 이렇게 해두면 forEach로
  * 동시에 실행되는 반복들이 우연히 같은 데이터 키를 써도 서로 덮어쓰지 않습니다. 다만 이렇게 '.'이 섞인
  * 키는 TOOL step의 inputTemplate처럼 단순 문자열 치환을 쓰는 곳에서만 참조할 수 있습니다 - Agent의
@@ -161,47 +159,51 @@ public class WorkFlowExecutor extends BaseObject {
 			    이 예외가 run() 밖으로 그냥 새나가서 WorkFlowExecution의 상태가 갱신되지 않은 채로 어중간하게
 			    남는 일을 막을 수 있습니다.
 			****************************************************************************************/
-			StepFlow transition;
+			WorkflowTransition transition;
 			try {
 				transition = this.decideTransition(workflow, step, stepResult.success(), stepResult.combinedText(), stepResult.route());
 			} catch (Exception e) {
 				return this.persistFailed(current, "step[" + step.id() + "]의 다음 전이(transition)를 계산하는 중 예외가 발생했습니다 - " + e.getMessage());
 			}
 
-			switch (transition.status()) {
+			// WorkflowTransition은 sealed interface라 4가지 경우(Done/Failed/NextStep/Loop)를 컴파일러가
+			// 빠짐없이 다뤘는지 검사해 줍니다 - 예전처럼 "여기로 올 리 없는" default 분기를 방어적으로 남겨둘
+			// 필요가 없습니다.
+			switch (transition) {
 				/*************************************
-				SUCCESS: Workflow 전체가 성공적으로 끝났다는 뜻입니다.
+				Done: Workflow 전체가 성공적으로 끝났다는 뜻입니다.
 					- status를 DONE으로, resultText에 마지막 결과 텍스트를 저장한 뒤 리턴합니다(루프를 빠져나갑니다).
 				*************************************/
-				case SUCCESS:
-					current = current.done(transition.message());
+				case WorkflowTransition.Done done -> {
+					current = current.done(done.message());
 					this.executionStore.update(current);
 					return current;
+				}
 				/*************************************
-				FAIL: Workflow 전체가 실패로 끝났다는 뜻입니다.
+				Failed: Workflow 전체가 실패로 끝났다는 뜻입니다.
 					- status를 FAILED로, errorMessage에 실패 사유를 저장한 뒤 리턴합니다(루프를 빠져나갑니다).
 				*************************************/
-				case FAIL:
-					return this.persistFailed(current, transition.message());
+				case WorkflowTransition.Failed failed -> {
+					return this.persistFailed(current, failed.message());
+				}
 				/*************************************
-				NEXT_STEP, LOOP: 아직 끝나지 않고 다른 step으로 계속 진행한다는 뜻입니다.
+				NextStep: 아직 끝나지 않고 다른 step으로 계속 진행한다는 뜻입니다.
 					- currentIndex를 갱신하고 status를 RUNNING으로 저장한 뒤 while 루프를 계속 돕니다.
-					- NEXT_STEP과 LOOP는 실제 동작이 완전히 같습니다 - 로그를 읽을 때 구분하기 좋으라고 나눠둔 것뿐입니다.
 				*************************************/
-				case NEXT_STEP, LOOP:
-					currentIndex = this.indexOf(workflow.steps(), transition.nextStepId());
+				case WorkflowTransition.NextStep next -> {
+					currentIndex = this.indexOf(workflow.steps(), next.stepId());
 					current = current.advanceTo(currentIndex);
 					this.executionStore.update(current);
-					break;
+				}
 				/*************************************
-				나머지(ERROR/WAITING_APPROVAL)는 여기로 오지 않습니다.
-					- ERROR와 WAITING_APPROVAL은 decideTransition()이 만들어내는 값이 아니라, 각각 위쪽의
-					  catch 블록과 stepResult.pending() 분기에서 이미 먼저 처리되기 때문입니다.
-					- 이 default는 컴파일러가 switch문이 모든 경우를 다뤘는지 확인하는 규칙을 만족시키기
-					  위한 방어적인 코드일 뿐, 실제로 실행될 일은 없습니다.
+				Loop: 실패해서 앞쪽의 다른 step으로 되돌아가 다시 시도한다는 뜻입니다.
+					- NextStep과 실제 동작은 완전히 같습니다 - 로그를 읽을 때 구분하기 좋으라고 나눠둔 것뿐입니다.
 				*************************************/
-				default:
-					return this.persistFailed(current, "알 수 없는 스텝 전이 상태입니다: " + transition.status());
+				case WorkflowTransition.Loop loop -> {
+					currentIndex = this.indexOf(workflow.steps(), loop.stepId());
+					current = current.advanceTo(currentIndex);
+					this.executionStore.update(current);
+				}
 			}
 		}
 	}
@@ -228,15 +230,15 @@ public class WorkFlowExecutor extends BaseObject {
 	private StepRunResult runOne(StepDefinition step, WorkFlowExecution execution) {
 		StepInput input = new StepInput(this.previousText(execution), execution.variables());
 		long start = System.nanoTime();
-		StepOutput output = this.runnerFor(step.type()).run(execution, step, input);
+		StepOutcome output = this.runnerFor(step.type()).run(execution, step, input);
 		long durationMs = (System.nanoTime() - start) / 1_000_000;
 
-		if (output.result() == StepResult.PENDING) {
+		if (output instanceof StepOutcome.Pending) {
 			return StepRunResult.pendingResult();
 		}
 
-		boolean success = output.result() == StepResult.SUCCESS;
-		this.executionStore.appendHistory(execution.executionId(), new StepHistoryEntry(step.id(), step.type(), step.ref(), success, durationMs, success ? output.primaryText() : null, output.failureReason(), Instant.now()));
+		boolean success = !(output instanceof StepOutcome.Failure);
+		this.executionStore.appendHistory(execution.executionId(), new StepHistoryEntry(step.id(), step.type(), step.type().kind(), step.ref(), success, durationMs, success ? output.primaryText() : null, output.failureReason(), Instant.now()));
 		return new StepRunResult(false, success, output.primaryText(), this.namespaced(step.id(), output.data()), output.route());
 	}
 
@@ -271,7 +273,7 @@ public class WorkFlowExecutor extends BaseObject {
 
 		String itemKey = StringUtil.isEmpty(step.itemVariable()) ? Constants.WorkFlow.DEFAULT_ITEM_VARIABLE_KEY : step.itemVariable();
 		String baseText = this.previousText(execution);
-		List<CompletableFuture<StepOutput>> futures = new ArrayList<>(items.size());
+		List<CompletableFuture<StepOutcome>> futures = new ArrayList<>(items.size());
 		for (Object item : items) {
 			Map<String, Object> iterationVariables = new LinkedHashMap<>(execution.variables());
 			iterationVariables.put(itemKey, item);
@@ -285,20 +287,20 @@ public class WorkFlowExecutor extends BaseObject {
 		List<String> resultTexts = new ArrayList<>();
 		for (int i = 0; i < futures.size(); i++) {
 			long start = System.nanoTime();
-			StepOutput output;
+			StepOutcome output;
 			try {
 				output = futures.get(i).join();
 			} catch (Exception e) {
 				this.executionStore.appendHistory(execution.executionId(),
-					new StepHistoryEntry(step.id() + "[" + i + "]", step.type(), step.ref(), false, (System.nanoTime() - start) / 1_000_000, null, e.getMessage(), Instant.now()));
+					new StepHistoryEntry(step.id() + "[" + i + "]", step.type(), step.type().kind(), step.ref(), false, (System.nanoTime() - start) / 1_000_000, null, e.getMessage(), Instant.now()));
 				allSuccess = false;
 				continue;
 			}
 			long durationMs = (System.nanoTime() - start) / 1_000_000;
-			boolean success = output.result() == StepResult.SUCCESS;
+			boolean success = !(output instanceof StepOutcome.Failure);
 			allSuccess &= success;
 			this.executionStore.appendHistory(execution.executionId(),
-				new StepHistoryEntry(step.id() + "[" + i + "]", step.type(), step.ref(), success, durationMs, success ? output.primaryText() : null, output.failureReason(), Instant.now()));
+				new StepHistoryEntry(step.id() + "[" + i + "]", step.type(), step.type().kind(), step.ref(), success, durationMs, success ? output.primaryText() : null, output.failureReason(), Instant.now()));
 			if (combinedText.length() > 0) {
 				combinedText.append("\n");
 			}
@@ -317,7 +319,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * 만들어 줍니다.
 	 *
 	 * @param stepId 이 데이터를 만들어낸 step의 id입니다.
-	 * @param data   그 step이 돌려준 구조화 결과입니다(StepOutput.data()).
+	 * @param data   그 step이 돌려준 구조화 결과입니다(StepOutcome.data()).
 	 */
 	private Map<String, Object> namespaced(String stepId, Map<String, Object> data) {
 		if (data == null || data.isEmpty()) {
@@ -348,7 +350,13 @@ public class WorkFlowExecutor extends BaseObject {
 		}
 	}
 
-	/** 스텝 종류에 맞는 StepRunner를 찾아 돌려줍니다. @param type 러너를 찾을 스텝 종류입니다. */
+	/**
+	 * 스텝 종류에 맞는 StepRunner를 찾아 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 모두 StepType.Kind.AGENT_CALL
+	 * 계열이라 agentStepRunner 하나로 묶여 있고, TOOL/APPROVAL은 각각 StepType.Kind.DETERMINISTIC 계열이지만
+	 * 서로 하는 일이 완전히 달라서(Tool 호출 vs 사람의 결정 대기) 별도의 Runner를 씁니다.
+	 *
+	 * @param type 러너를 찾을 스텝 종류입니다.
+	 */
 	private StepRunner runnerFor(StepType type) {
 		return switch (type) {
 			case AGENT, SUPERVISOR, ROUTER -> this.agentStepRunner;
@@ -361,9 +369,9 @@ public class WorkFlowExecutor extends BaseObject {
 	 * 방금 실행한 스텝의 결과를 보고, 다음에 어디로 가야 할지를 정합니다.
 	 *
 	 * 성공했는지 실패했는지를 판정하는 방식은 스텝 종류(StepType)마다 다릅니다.
-	 *   - AGENT: structuredOutput이 false(기본값)면 항상 성공으로 봅니다. true면 StepPayload로
+	 *   - AGENT: structuredOutput이 false(기본값)면 항상 성공으로 봅니다. true면 StepOutcome.Success로
 	 *     제대로 파싱됐는지 여부로 판정합니다.
-	 *   - TOOL: ToolOutput.success() 값이 있으면 그걸 우선으로 쓰고, 없으면 응답 텍스트가 "실패:"로
+	 *   - TOOL: ToolOutcome.success() 값이 있으면 그걸 우선으로 쓰고, 없으면 응답 텍스트가 "실패:"로
 	 *     시작하는지로 판단합니다(예전 방식과의 호환을 위해 남겨둔 규칙입니다).
 	 *   - SUPERVISOR: 구조화된 Verdict의 pass 값(true/false)으로 판정합니다.
 	 *   - APPROVAL: 사람이 승인했는지 반려했는지로 정해집니다.
@@ -375,7 +383,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param text     방금 실행한 결과 텍스트입니다.
 	 * @param route    ROUTER가 고른 route입니다(ROUTER가 아니면 항상 null입니다).
 	 */
-	private StepFlow decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String text, String route) {
+	private WorkflowTransition decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String text, String route) {
 		if (step.type() == StepType.ROUTER) {
 			return this.decideRouterTransition(workflow, step, route, text);
 		}
@@ -390,11 +398,11 @@ public class WorkFlowExecutor extends BaseObject {
 		if (nextId == null) {
 			if (!success) {
 				// 실패했는데 onFailure가 없습니다 → 이 실패를 이어받을 곳이 없으므로 Workflow 전체를 실패로 끝냅니다.
-				return StepFlow.fail("step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + text);
+				return WorkflowTransition.failed("step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + text);
 			}
 			// 성공했는데 onSuccess가 없습니다 → 목록상 그냥 다음 스텝으로 넘어가는, 가장 흔한 순차 실행입니다.
 			String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
-			return sequentialNextId == null ? StepFlow.success(text) : StepFlow.next(sequentialNextId);
+			return sequentialNextId == null ? WorkflowTransition.done(text) : WorkflowTransition.next(sequentialNextId);
 		}
 		return this.resolveNextIdToFlow(workflow, step, nextId, text);
 	}
@@ -410,7 +418,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param route    LLM이 고른 route입니다.
 	 * @param text     방금 실행한 결과 텍스트입니다.
 	 */
-	private StepFlow decideRouterTransition(WorkFlowDefinition workflow, StepDefinition step, String route, String text) {
+	private WorkflowTransition decideRouterTransition(WorkFlowDefinition workflow, StepDefinition step, String route, String text) {
 		Map<String, String> routes = step.routes();
 		String nextId = routes == null ? null : routes.get(route);
 		if (nextId == null) {
@@ -422,24 +430,24 @@ public class WorkFlowExecutor extends BaseObject {
 
 	/**
 	 * "이 step 다음엔 nextId로 가라"는 값(SUCCESS/FAIL 예약어, 또는 진짜 다른 step의 id)을 실제
-	 * StepFlow 값으로 바꿔줍니다. decideTransition(onSuccess/onFailure에 적힌 값을 처리)과
+	 * WorkflowTransition 값으로 바꿔줍니다. decideTransition(onSuccess/onFailure에 적힌 값을 처리)과
 	 * decideRouterTransition(routes에서 찾은 값을 처리) 둘 다 결국 이 메서드로 모입니다 - "다음
-	 * step id 문자열 하나를 어떻게 StepFlow로 바꾸는가"라는 로직 자체는 두 경로에서 완전히 똑같기
-	 * 때문입니다.
+	 * step id 문자열 하나를 어떻게 WorkflowTransition으로 바꾸는가"라는 로직 자체는 두 경로에서 완전히
+	 * 똑같기 때문입니다.
 	 *
 	 * @param workflow 지금 실행 중인 Workflow의 정의입니다.
 	 * @param step     기준이 되는, 지금 막 끝난 step의 정의입니다.
 	 * @param nextId   SUCCESS/FAIL 예약어이거나, 다른 step의 id입니다.
 	 * @param text     성공했거나 실패했을 때 남길 텍스트입니다.
 	 */
-	private StepFlow resolveNextIdToFlow(WorkFlowDefinition workflow, StepDefinition step, String nextId, String text) {
+	private WorkflowTransition resolveNextIdToFlow(WorkFlowDefinition workflow, StepDefinition step, String nextId, String text) {
 		if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
 			// 예약어 "SUCCESS"가 적혀 있습니다 → 그 자리에서 바로 Workflow를 성공으로 끝냅니다.
-			return StepFlow.success(text);
+			return WorkflowTransition.done(text);
 		}
 		if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
 			// 예약어 "FAIL"이 적혀 있습니다 → 그 자리에서 바로 Workflow를 실패로 끝냅니다.
-			return StepFlow.fail(text);
+			return WorkflowTransition.failed(text);
 		}
 		// 예약어가 아니라 진짜 다른 step의 id가 적혀 있습니다(명시적인 분기이거나 재시도 루프입니다) → 그 step으로 이동해야 합니다.
 		int currentIndex = this.indexOf(workflow.steps(), step.id());
@@ -450,11 +458,11 @@ public class WorkFlowExecutor extends BaseObject {
 			throw new IllegalStateException("workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
 		}
 		if (nextIndex <= currentIndex) {
-			// 목표 step이 지금 step과 같거나 목록상 더 앞에 있습니다 → 뒤로 되돌아가는 것이므로 LOOP(재시도)로 봅니다.
-			return StepFlow.loop(nextId);
+			// 목표 step이 지금 step과 같거나 목록상 더 앞에 있습니다 → 뒤로 되돌아가는 것이므로 Loop(재시도)로 봅니다.
+			return WorkflowTransition.loop(nextId);
 		}
-		// 목표 step이 지금 step보다 목록상 더 뒤에 있습니다 → 앞으로 나아가는 것이므로 NEXT_STEP으로 봅니다.
-		return StepFlow.next(nextId);
+		// 목표 step이 지금 step보다 목록상 더 뒤에 있습니다 → 앞으로 나아가는 것이므로 NextStep으로 봅니다.
+		return WorkflowTransition.next(nextId);
 	}
 
 	/**

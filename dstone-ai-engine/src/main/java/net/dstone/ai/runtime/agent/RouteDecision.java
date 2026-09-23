@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.status;
+package net.dstone.ai.runtime.agent;
 
 /**
  * StepType이 ROUTER인 step 전용으로 쓰는, LLM의 구조화된 응답 형식입니다. SUPERVISOR가 쓰는 Verdict가

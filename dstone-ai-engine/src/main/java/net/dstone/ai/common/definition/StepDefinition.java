@@ -2,6 +2,8 @@ package net.dstone.ai.common.definition;
 
 import java.util.Map;
 
+import net.dstone.ai.common.consts.StepType;
+
 /**
  * Workflow를 이루는 여러 단계(step) 중 하나를 표현하는 클래스입니다. WorkFlowDefinition의 steps 목록에
  * 담기는 항목이 바로 이 클래스입니다.
@@ -22,12 +24,12 @@ import java.util.Map;
  *
  * ## 성공/실패는 어떻게 판정하는가
  * 성공/실패를 따지는 건 TOOL, SUPERVISOR, APPROVAL 세 타입뿐입니다(AGENT는 아래에서 따로 설명합니다).
- * TOOL은 Tool이 돌려준 값이 runtime.status.ToolOutput(성공 여부를 담은 구조화된 값)이면 그 값을 그대로
+ * TOOL은 Tool이 돌려준 값이 runtime.tool.ToolOutcome(성공 여부를 담은 구조화된 값)이면 그 값을 그대로
  * 쓰고, 그게 아니라 평범한 문자열이면 그 문자열이 "실패"라는 글자로 시작하는지를 보고 판정합니다.
  * SUPERVISOR는 Verdict라는 판정 결과로, APPROVAL은 사람이 실제로 승인했는지 반려했는지로 판정합니다.
  * AGENT step은 structuredOutput이 false(기본값)이면 항상 성공으로 취급됩니다. structuredOutput이
- * true인데 LLM의 응답을 StepPayload라는 정해진 형식으로 읽어내지 못하면(모델이 형식을 지키지 않은
- * 경우) 그 step은 실패로 처리됩니다 - 형식이 깨졌을 때는 안전하게 실패로 보는 것입니다.
+ * true인데 LLM의 응답을 StepOutcome.Success라는 정해진 형식으로 읽어내지 못하면(모델이 형식을 지키지
+ * 않은 경우) 그 step은 실패로 처리됩니다 - 형식이 깨졌을 때는 안전하게 실패로 보는 것입니다.
  *
  * ## 같은 step을 여러 번 동시에 실행하기 (forEachVariable)
  * forEachVariable을 설정하면, Workflow를 부를 때 넘긴 variables 안에 있는 같은 이름의 목록(List)을
@@ -52,10 +54,10 @@ import java.util.Map;
  * @param approverRole    type이 APPROVAL인 step에서만 쓰입니다. 누가 승인해야 하는지를 문서나 감사 기록 목적으로
  *                        남겨두는 값일 뿐이며, 서버가 실제로 그 역할인지 검사하지는 않습니다
  * @param structuredOutput type이 AGENT인 step에서만 쓰입니다(기본값은 false 또는 비워둠). true로 설정하면
- *                         LLM이 자유롭게 쓴 글 대신 정해진 형식(runtime.status.StepPayload의 primaryText,
+ *                         LLM이 자유롭게 쓴 글 대신 정해진 형식(runtime.step.StepOutcome.Success의 primaryText,
  *                         data)으로 응답하게 하고, 그 data 값을 다음 step들이 {id.키} 형태로 그대로 가져다
  *                         쓸 수 있습니다(자세한 동작은 runtime.step.AgentStepRunner 참고)
- * @param routes          type이 ROUTER인 step에서만 쓰입니다. LLM이 고른 경로 이름(runtime.status.RouteDecision의
+ * @param routes          type이 ROUTER인 step에서만 쓰입니다. LLM이 고른 경로 이름(runtime.agent.RouteDecision의
  *                        route 값)을 키로 하고, 그 경로를 골랐을 때 이동할 다음 step의 id(또는 "SUCCESS"/"FAIL"
  *                        예약어)를 값으로 하는 매핑입니다. ROUTER가 아닌 step에서는 쓰이지 않습니다
  * @param forEachVariable 이 값을 설정하면, Workflow 호출 시 넘긴 variables에서 같은 이름의 목록(List)을 찾아

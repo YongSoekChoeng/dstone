@@ -3,8 +3,6 @@ package net.dstone.ai.runtime.workflow.execution;
 import java.time.Instant;
 import java.util.Map;
 
-import net.dstone.ai.runtime.status.WorkFlowExecutionStatus;
-
 /**
  * Workflow 실행 1건의 현재 상태를 담고 있습니다. AI_WORKFLOW_EXECUTION 테이블의 한 행과 그대로
  * 대응되고, WorkFlowExecutionStore가 이 상태를 읽고 씁니다.

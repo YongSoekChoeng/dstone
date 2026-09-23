@@ -1,4 +1,4 @@
-package net.dstone.ai.common.definition;
+package net.dstone.ai.common.consts;
 
 /**
  * Workflow의 각 step이 실제로 무슨 일을 하는지 나타내는 다섯 가지 종류입니다. Workflow가 실행될 때
@@ -12,20 +12,20 @@ public enum StepType {
 	 * common.registry.AgentRegistry에서 찾아 그 Agent를 한 번 호출합니다. AGENT step은 항상
 	 * 성공으로 취급됩니다(실패로 끝나는 경우가 없습니다).
 	 */
-	AGENT,
+	AGENT(Kind.AGENT_CALL),
 
 	/**
 	 * 미리 만들어둔 Tool(자바로 작성한 기능) 하나를 LLM을 거치지 않고 직접 호출하는 step입니다.
 	 * StepDefinition의 ref 값이 곧 common.config.ConfigTool에 등록된 Tool의 이름입니다. 결과가
 	 * 항상 똑같이 정해져 있는(결정적인) 검증 작업을 할 때 씁니다.
 	 */
-	TOOL,
+	TOOL(Kind.DETERMINISTIC),
 
 	/**
 	 * AGENT와 마찬가지로 Agent를 호출하지만, 응답을 자유로운 글이 아니라 "통과했는지 아닌지, 그리고
 	 * 왜 그런지"를 담은 정해진 형식(Verdict record - pass/reason)으로 받아서 그걸로 성공/실패를
 	 * 판정하는 step입니다(자세한 호출 방식은 runtime.agent.AgentExecutor.callForVerdict, 반환값의
-	 * 구조는 runtime.status.Verdict 참고).
+	 * 구조는 runtime.agent.Verdict 참고).
 	 *
 	 * 여러 step의 결과물이 괜찮은지 감독하고 다시 검토하는 역할에 씁니다. TOOL step처럼 결과가
 	 * 자바 코드에서 정해진 값으로 나오는 게 아니라 LLM이 자유롭게 만든 글이기 때문에, "글이 '실패'로
@@ -34,7 +34,7 @@ public enum StepType {
 	 * 형식에 맞춰 해석합니다. 다만 이 방식도 100% 완벽하지는 않습니다 - LLM이 그 형식 자체를 지키지
 	 * 않고 엉뚱하게 응답하면 해석 과정에서 오류가 나는데, 이 경우도 실패로 처리됩니다.
 	 */
-	SUPERVISOR,
+	SUPERVISOR(Kind.AGENT_CALL),
 
 	/**
 	 * 사람이 승인하거나 반려할 때까지 기다리는 step입니다(ref는 쓰이지 않습니다).
@@ -48,13 +48,13 @@ public enum StepType {
 	 * 동시에 돌리면 "그중 어느 실행에 대한 결정인지"를 구분할 방법이 없기 때문입니다. 이런
 	 * 잘못된 조합은 엔진이 켜질 때 common.registry.WorkFlowRegistry가 미리 검사해서 막아줍니다.
 	 */
-	APPROVAL,
+	APPROVAL(Kind.DETERMINISTIC),
 
 	/**
 	 * AGENT나 SUPERVISOR처럼 Agent를 호출하지만, "성공했는가 실패했는가"라는 두 갈래 판정이 아니라
 	 * StepDefinition의 routes에 미리 정의해 둔 여러 개의 경로 이름표 중에서 하나를 LLM이 직접 고르게
 	 * 하는 step입니다(자세한 호출 방식은 runtime.agent.AgentExecutor.callForEntity(...,
-	 * RouteDecision.class), 반환값의 구조는 runtime.status.RouteDecision 참고).
+	 * RouteDecision.class), 반환값의 구조는 runtime.agent.RouteDecision 참고).
 	 *
 	 * 업무 성격상 세 갈래 이상으로 나뉘어야 하는 경우(예: 문의 내용에 따라 담당 부서를 나누는 경우)에
 	 * 쓰기 위한 타입입니다. onSuccess/onFailure처럼 두 갈래만 고를 수 있는 다른 StepType으로 이런
@@ -68,6 +68,30 @@ public enum StepType {
 	 * 쓸 수 없습니다 - 여러 번 동시에 실행하면 "그중 어느 실행이 고른 경로를 따라가야 하는지"가
 	 * 애매해지기 때문입니다(이 검사 역시 엔진이 켜질 때 common.registry.WorkFlowRegistry가 해줍니다).
 	 */
-	ROUTER
+	ROUTER(Kind.AGENT_CALL);
+
+	private final Kind kind;
+
+	StepType(Kind kind) {
+		this.kind = kind;
+	}
+
+	/**
+	 * 이 StepType이 LLM을 호출하는 계열(AGENT_CALL)인지, LLM 없이 결정적으로 처리되는 계열
+	 * (DETERMINISTIC)인지를 돌려줍니다. runtime.step.AgentStepRunner가 AGENT_CALL 세 가지(AGENT/
+	 * SUPERVISOR/ROUTER)를 한 클래스에서 다루고, TOOL/APPROVAL이 각각 다른 Runner를 쓰는 것도 이
+	 * 분류를 그대로 따른 구조입니다(자세한 내용은 runtime.workflow.WorkFlowExecutor.runnerFor 참고).
+	 */
+	public Kind kind() {
+		return this.kind;
+	}
+
+	/** StepType을 "LLM을 호출하는가"라는 기준 하나로만 나눈, 더 굵은 단위의 분류입니다. */
+	public enum Kind {
+		/** AGENT/SUPERVISOR/ROUTER - Agent(LLM)를 실제로 호출하는 step입니다. */
+		AGENT_CALL,
+		/** TOOL/APPROVAL - LLM을 부르지 않고, 자바 코드나 사람의 결정만으로 결과가 정해지는 step입니다. */
+		DETERMINISTIC
+	}
 
 }

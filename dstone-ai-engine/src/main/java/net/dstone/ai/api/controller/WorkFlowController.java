@@ -24,7 +24,7 @@ import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.security.CallerContext;
-import net.dstone.ai.runtime.status.WorkFlowExecutionStatus;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseController;

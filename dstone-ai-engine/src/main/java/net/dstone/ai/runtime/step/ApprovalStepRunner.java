@@ -6,8 +6,6 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.runtime.status.StepInput;
-import net.dstone.ai.runtime.status.StepOutput;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
@@ -29,11 +27,11 @@ public class ApprovalStepRunner implements StepRunner {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public StepOutput run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
+	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
 		Map<String, Object> approvals = (Map<String, Object>) execution.variables().get(Constants.WorkFlow.APPROVALS_VARIABLE_KEY);
 		Object decisionValue = approvals == null ? null : approvals.get(definition.id());
 		if (!(decisionValue instanceof Map)) {
-			return StepOutput.pending();
+			return StepOutcome.pending();
 		}
 
 		Map<String, Object> decision = (Map<String, Object>) decisionValue;
@@ -42,10 +40,10 @@ public class ApprovalStepRunner implements StepRunner {
 		String comment = String.valueOf(decision.get("comment"));
 
 		if (approved) {
-			return StepOutput.success(input.renderedText() + "\n\n[승인] " + approver + (comment == null || comment.isBlank() || "null".equals(comment) ? "" : " - " + comment));
+			return StepOutcome.success(input.renderedText() + "\n\n[승인] " + approver + (comment == null || comment.isBlank() || "null".equals(comment) ? "" : " - " + comment));
 		}else {
 			String reason = comment == null || comment.isBlank() || "null".equals(comment) ? "(사유 없음)" : comment;
-			return StepOutput.failure(input.renderedText() + "\n\n[반려] " + approver + " - " + reason, reason);
+			return StepOutcome.failure(input.renderedText() + "\n\n[반려] " + approver + " - " + reason, reason);
 		}
 	}
 

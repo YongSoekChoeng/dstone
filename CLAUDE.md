@@ -166,17 +166,18 @@ A Spring AI-based, provider-agnostic engine meant to be reused across future SI 
 
 | Package | Purpose |
 |---|---|
-| `common.definition` | Pure records the YAML binds to: `WorkflowDefinition`/`StepDefinition`/`StepType`, `AgentDefinition` |
+| `common.definition` | Pure records the YAML binds to: `WorkFlowDefinition`/`StepDefinition`/`AgentDefinition`/`McpServerDefinition` — enums live in `common.consts` instead, see below |
+| `common.consts` | `Constants` (config-key/reserved-word constants) plus the enums `StepType` (`AGENT`/`SUPERVISOR`/`ROUTER`/`TOOL`/`APPROVAL`, each tagged with a `Kind` of `AGENT_CALL` or `DETERMINISTIC`) and `McpTransport` (`STDIO`/`SSE`) |
 | `common.loader` | `YamlDefinitionLoader` — SnakeYAML + Jackson `convertValue` from `classpath:workflows/*.yml` / `agents/*.yml` into the records above |
-| `common.registry` | `WorkflowRegistry`/`AgentRegistry` — id/name → definition, plus `allowedCallers` (tenant) whitelist check |
+| `common.registry` | `WorkFlowRegistry`/`AgentRegistry` — id/name → definition, plus `allowedCallers` (tenant) whitelist check |
 | `common.config` | `Config`/`ConfigAspect`/`ConfigChatClient` (single shared `ChatClient`)/`ConfigRedis`/`ConfigTool` (`@AiTool` bean scanning) |
 | `common.prompt` | `PromptTemplateRegistry`/`PromptProperties` — `classpath:prompts/{name}/{version}.st` |
 | `common.session` | `RedisChatMemorySession` — Spring AI `ChatMemoryRepository` over Redis |
 | `common.security` | `ApiKeyAuthFilter`/`RateLimitFilter`/`CallerContext` |
-| `runtime` | `WorkflowContext`/`StepStatus`/`StepResult`/`StepOutcome`/`WorkflowExecutor` — the Workflow state machine |
-| `runtime.agent` | `AgentExecutor` — the one place that turns an `AgentDefinition` into a `ChatClient` call |
-| `runtime.tool` | `ToolExecutor` — the one place a `TOOL` step calls a Tool by name without going through the LLM |
-| `runtime.step` | `AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner` — per-`StepType` dispatch used by `WorkflowExecutor` (no `StepType.RAG`/`RagStepRunner` — RAG is either an AGENT's `ragEnabled` advisor or the `RagSearchTool` `@AiTool`) |
+| `runtime.workflow` | `WorkFlowExecutor` — the sequential/branch/parallel/loop/approval-wait state machine — and `WorkflowTransition` (sealed interface: `NextStep`/`Loop`/`Done`/`Failed`), its per-step "what next" decision. `runtime.workflow.execution` holds the persisted `WorkFlowExecution`/`WorkFlowExecutionStatus`/`StepHistoryEntry`/`WorkFlowExecutionStore` |
+| `runtime.agent` | `AgentExecutor` — the one place that turns an `AgentDefinition` into a `ChatClient` call — plus the LLM structured-reply schemas `Verdict` (SUPERVISOR) and `RouteDecision` (ROUTER) |
+| `runtime.tool` | `ToolExecutor` — the one place a `TOOL` step calls a Tool by name without going through the LLM — plus `ToolOutcome`, the structured success/message reply schema a `@Tool` method can return |
+| `runtime.step` | `StepRunner`'s IN/OUT (`StepInput`, and `StepOutcome` — a sealed interface: `Success`/`Routed`/`Failure`/`Pending`) alongside its implementations `AgentStepRunner`/`ToolStepRunner`/`ApprovalStepRunner` — per-`StepType` dispatch used by `WorkFlowExecutor` (no `StepType.RAG`/`RagStepRunner` — RAG is either an AGENT's `ragEnabled` advisor or the `RagSearchTool` `@AiTool`) |
 | `common.rag` | `RagRetrievalChain` — the only place that turns an already-ingested `VectorStore` into search results/an `Advisor` (`buildAdvisor()`/`search()`); ingest/delete is `api.service.EmbedService` instead, gated by `dstone.ai.rag.enabled` |
 | `tools` | `@AiTool` implementations: `sample`/`sql`/`shell`/`python`/`http`/`rag` (`RagSearchTool`) |
 | `api` | `ChatController` (`POST /api/ai/chat[/stream]`, one Agent call), `WorkFlowController` (`GET /api/ai/workflow` - id+description list; `POST /api/ai/workflow/{id}/execute`, sync; `/submit`+`/status/{jobId}`, async via `AsyncJobService`), `WorkFlowExecutionController`, `EmbedController` (`/api/ai/embed/documents` - ingest/delete/list), `RagController` (`POST /api/ai/rag/search` - search preview) |

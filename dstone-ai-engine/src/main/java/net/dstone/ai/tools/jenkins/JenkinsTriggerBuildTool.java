@@ -21,7 +21,7 @@ import reactor.core.publisher.Mono;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.runtime.status.ToolOutput;
+import net.dstone.ai.runtime.tool.ToolOutcome;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
@@ -53,33 +53,33 @@ public class JenkinsTriggerBuildTool extends BaseObject {
 	 */
 	@Tool(description = "사전에 허용된 Jenkins Job 하나를 REST API로 원격 기동한다(큐에 등록만 하고 빌드 완료를 기다리지 않는다). "
 		+ "jobName은 관리자가 미리 등록해둔 이름과 정확히 일치해야 하며, 등록되지 않은 이름은 기동할 수 없다.")
-	public ToolOutput triggerBuild(@ToolParam(description = "기동할 Jenkins Job의 등록된 이름") String jobName) {
+	public ToolOutcome triggerBuild(@ToolParam(description = "기동할 Jenkins Job의 등록된 이름") String jobName) {
 		if (!this.isAllowedJob(jobName)) {
 			LogUtil.sysout("dstone-ai-engine tool-audit: jenkins jobName=" + jobName + " -> 실패 화이트리스트에 없는 Job");
-			return ToolOutput.fail("화이트리스트에 없는 Job입니다: " + jobName);
+			return ToolOutcome.fail("화이트리스트에 없는 Job입니다: " + jobName);
 		}
 		String baseUrl = this.property("base-url");
 		String authHeader = this.basicAuthHeader();
 		if (StringUtil.isEmpty(baseUrl) || authHeader == null) {
-			return ToolOutput.fail("Jenkins 연결 설정이 비어 있습니다(dstone.ai.tool.jenkins.base-url / .user / .api-token을 확인하세요).");
+			return ToolOutcome.fail("Jenkins 연결 설정이 비어 있습니다(dstone.ai.tool.jenkins.base-url / .user / .api-token을 확인하세요).");
 		}
 
 		WebClient webClient = WcUtil.getInstance().getWebClient((int) this.timeout().toSeconds());
 		try {
 			CrumbOutcome crumb = this.fetchCrumb(webClient, baseUrl, authHeader);
 			if (crumb == null) {
-				return ToolOutput.fail("Jenkins 크럼(CSRF 토큰) 발급에 실패했습니다 - 접속 정보(base-url/user/api-token)를 확인하세요.");
+				return ToolOutcome.fail("Jenkins 크럼(CSRF 토큰) 발급에 실패했습니다 - 접속 정보(base-url/user/api-token)를 확인하세요.");
 			}
 			BuildOutcome outcome = this.postBuild(webClient, baseUrl, jobName, authHeader, crumb);
 			LogUtil.sysout("dstone-ai-engine tool-audit: jenkins jobName=" + jobName + " -> HTTP " + outcome.statusCode() + " queue=" + outcome.queueLocation());
 			if (!outcome.success()) {
-				return ToolOutput.fail("Jenkins 빌드 기동 실패 - HTTP " + outcome.statusCode());
+				return ToolOutcome.fail("Jenkins 빌드 기동 실패 - HTTP " + outcome.statusCode());
 			}
-			return ToolOutput.pass("Jenkins Job[" + jobName + "] 빌드를 큐에 등록했습니다."
+			return ToolOutcome.pass("Jenkins Job[" + jobName + "] 빌드를 큐에 등록했습니다."
 				+ (StringUtil.isEmpty(outcome.queueLocation()) ? "" : " (" + outcome.queueLocation() + ")"));
 		} catch (Exception e) {
 			LogUtil.sysout("dstone-ai-engine tool-audit: jenkins jobName=" + jobName + " -> 실패 " + e.getMessage());
-			return ToolOutput.fail("Jenkins 호출 실패 - " + e.getMessage());
+			return ToolOutcome.fail("Jenkins 호출 실패 - " + e.getMessage());
 		}
 	}
 

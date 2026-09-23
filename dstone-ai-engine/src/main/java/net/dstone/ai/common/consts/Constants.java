@@ -81,13 +81,13 @@ public final class Constants {
 
 	/**
 	 * TOOL step(runtime.step.ToolStepRunner)이 Tool의 성공/실패를 판정할 때 쓰는 문자열 규칙입니다.
-	 * Tool이 runtime.status.ToolOutput(성공 여부를 명확히 담은 값)을 돌려주지 않고 평범한 문자열을
+	 * Tool이 runtime.tool.ToolOutcome(성공 여부를 명확히 담은 값)을 돌려주지 않고 평범한 문자열을
 	 * 돌려준 경우에만 이 규칙이 쓰입니다: 그 문자열이 "실패: ..."로 시작하면 실패로, 아니면 성공으로
 	 * 봅니다. Tool의 동작이 자바 코드로 정해져 있는 경우(SqlSyntaxTool 등)에는 이 방식도 비교적
 	 * 안전하지만, 컴파일 시점에 강제되는 규칙이 아니라 사람이 접두사를 정확히 맞춰 써야 하는 방식이므로,
-	 * 새로 Tool을 만들 때는 ToolOutput을 쓰는 쪽을 권장합니다. SUPERVISOR step은 이 문자열 방식을
+	 * 새로 Tool을 만들 때는 ToolOutcome을 쓰는 쪽을 권장합니다. SUPERVISOR step은 이 문자열 방식을
 	 * 아예 쓰지 않습니다 - LLM이 자유롭게 쓴 글에 문자열 비교를 적용하는 건 안전하지 않기 때문에,
-	 * 처음부터 구조화된 응답(runtime.status.Verdict)만 사용합니다.
+	 * 처음부터 구조화된 응답(runtime.agent.Verdict)만 사용합니다.
 	 */
 	public static final class Outcome {
 		public final static String FAIL_PREFIX = "실패";

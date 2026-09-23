@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import net.dstone.ai.common.consts.StepType;
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.StepType;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.common.core.BaseObject;

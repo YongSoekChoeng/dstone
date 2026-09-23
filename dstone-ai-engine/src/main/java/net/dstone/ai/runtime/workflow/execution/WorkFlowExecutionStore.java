@@ -17,8 +17,7 @@ import org.springframework.util.StringUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import net.dstone.ai.common.definition.StepType;
-import net.dstone.ai.runtime.status.WorkFlowExecutionStatus;
+import net.dstone.ai.common.consts.StepType;
 
 /**
  * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 이 두 테이블(schema/01-create-table-postgresql-
@@ -152,9 +151,11 @@ public class WorkFlowExecutionStore {
 	}
 
 	private StepHistoryEntry mapHistoryEntry(ResultSet rs, int rowNum) throws SQLException {
+		StepType stepType = StepType.valueOf(rs.getString("STEP_TYPE"));
 		return new StepHistoryEntry(
 			rs.getString("STEP_ID"),
-			StepType.valueOf(rs.getString("STEP_TYPE")),
+			stepType,
+			stepType.kind(),
 			rs.getString("STEP_REF"),
 			rs.getBoolean("SUCCESS"),
 			rs.getLong("DURATION_MS"),

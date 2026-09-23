@@ -4,7 +4,7 @@ package net.dstone.ai.api.dto;
  * WorkFlowController의 GET /status/{executionId} 엔드포인트가 돌려주는 응답입니다.
  *
  * status에는 RUNNING(실행 중), WAITING_APPROVAL(승인 대기), DONE(완료), FAILED(실패),
- * CANCELLED(취소) 중 하나가 담깁니다(자세한 값은 runtime.status.WorkFlowExecutionStatus 참고).
+ * CANCELLED(취소) 중 하나가 담깁니다(자세한 값은 runtime.workflow.execution.WorkFlowExecutionStatus 참고).
  * status가 DONE이면 result가 채워지고, FAILED면 error가 채워집니다. 스텝별 실행 이력처럼 더 자세한
  * 정보가 필요하다면 GET /executions/{executionId}를 대신 쓰면 됩니다.
  *

@@ -1,4 +1,4 @@
-package net.dstone.ai.common.definition;
+package net.dstone.ai.common.consts;
 
 /**
  * MCP(Model Context Protocol) 서버에 접속하는 두 가지 방식을 나타냅니다. common.config.ConfigMcp가

@@ -2,6 +2,8 @@ package net.dstone.ai.common.definition;
 
 import java.util.List;
 
+import net.dstone.ai.common.consts.McpTransport;
+
 /**
  * 외부 MCP(Model Context Protocol) 서버 하나를 어떻게 연결할지 정의하는 클래스입니다. resources/mcp/*.yml
  * 파일 하나(그 안의 mcpServer: 라는 최상위 키)가 이 클래스의 값으로 채워집니다.

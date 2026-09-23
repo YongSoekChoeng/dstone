@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.status;
+package net.dstone.ai.runtime.agent;
 
 /**
  * SUPERVISOR step처럼 "Agent를 호출한 결과가 통과했는지 아닌지"를 판정해야 할 때 쓰는, LLM의 구조화된

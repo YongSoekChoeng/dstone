@@ -1,16 +1,15 @@
 package net.dstone.ai.runtime.step;
 
 import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.runtime.status.StepInput;
-import net.dstone.ai.runtime.status.StepOutput;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
  * AGENT/TOOL/SUPERVISOR/APPROVAL, 이 네 가지 StepType을 실제로 처리하는 러너들(AgentStepRunner,
  * ToolStepRunner, ApprovalStepRunner)이 모두 구현하는 공통 인터페이스입니다. WorkFlowExecutor는
  * StepType 값만 보고 이 인터페이스의 구현체를 하나 골라서, 항상 똑같은 방식으로(run 메서드를 한 번
- * 호출해서) 스텝을 실행합니다. 그리고 그 결과로 돌아온 StepOutput.result만 보고 다음에 뭘 할지
- * 정합니다 - 즉 StepType마다 실행 방식을 따로따로 분기하지 않고 한 가지 방식으로 통일해서 다룹니다.
+ * 호출해서) 스텝을 실행합니다. 그리고 그 결과로 돌아온 StepOutcome이 성공/실패/대기 중 어느 경우인지만
+ * 보고 다음에 뭘 할지 정합니다 - 즉 StepType마다 실행 방식을 따로따로 분기하지 않고 한 가지 방식으로
+ * 통일해서 다룹니다.
  *
  * 이렇게 메서드 시그니처를 하나로 통일해 둔 덕분에, common.config.ConfigCallLog가 이 run 메서드
  * 하나만 겨냥하는 AOP advice 하나로도 모든 스텝의 입력/출력을 한곳에서 똑같은 형식으로 로깅할 수
@@ -22,6 +21,6 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  */
 public interface StepRunner {
 
-	StepOutput run(WorkFlowExecution execution, StepDefinition definition, StepInput input);
+	StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input);
 
 }

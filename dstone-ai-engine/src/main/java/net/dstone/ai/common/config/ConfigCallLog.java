@@ -14,7 +14,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.definition.AgentDefinition;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
-import net.dstone.ai.runtime.status.StepOutput;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
@@ -204,7 +203,7 @@ public class ConfigCallLog extends BaseObject {
 	 * </pre>
 	 *
 	 * @param joinPoint 지금 호출되고 있는 StepRunner.run(...) 메소드에 대한 정보
-	 * @return 원래 메소드가 반환하는 StepOutput(이 스텝의 실행 결과)을 그대로 돌려줍니다
+	 * @return 원래 메소드가 반환하는 StepOutcome(이 스텝의 실행 결과)을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
 	@Around(STEPRUNNER_POINTCUT)

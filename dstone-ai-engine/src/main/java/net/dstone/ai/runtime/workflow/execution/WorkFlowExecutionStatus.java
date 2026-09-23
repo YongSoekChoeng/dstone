@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.status;
+package net.dstone.ai.runtime.workflow.execution;
 
 /**
  * 하나의 Workflow 실행(runtime.workflow.execution.WorkFlowExecution)이 지금 어느 단계에 있는지 나타낸다.
