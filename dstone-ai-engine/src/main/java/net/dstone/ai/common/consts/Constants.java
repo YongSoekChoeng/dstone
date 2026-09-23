@@ -1,9 +1,9 @@
 package net.dstone.ai.common.consts;
 
 /**
- * dstone-ai-engine 전체에서 함께 쓰는 상수 값들을 한 곳에 모아둔 클래스입니다. 설정 키 이름이나
- * 특수한 예약어처럼, 여러 클래스가 똑같은 값을 정확히 맞춰 써야 하는 것들을 여기 모아두면, 값이
- * 하나라도 바뀔 때 이 파일 하나만 고치면 되어서 실수를 줄일 수 있습니다.
+ * dstone-ai-engine 전체에서 함께 쓰는 상수 값들을 한 곳에 모아둔 클래스입니다. 
+ * 설정 키 이름이나 특수한 예약어처럼, 여러 클래스가 똑같은 값을 정확히 맞춰 써야 하는 것들을 여기 모아두면, 
+ * 값이 하나라도 바뀔 때 이 파일 하나만 고치면 되어서 실수를 줄일 수 있습니다.
  */
 public final class Constants {
 
@@ -68,6 +68,7 @@ public final class Constants {
 
 	/** Workflow를 실행하는 엔진(runtime.workflow.WorkFlowExecutor, runtime.workflow.execution.WorkFlowExecutionService)이 사용하는 상수들입니다. */
 	public static final class WorkFlow {
+		/** 디폴트 Max Step 실행 횟수 */
 		public final static int DEFAULT_MAX_ITERATIONS = 10;
 		public final static String SUCCESS_SENTINEL = "SUCCESS";
 		public final static String FAIL_SENTINEL = "FAIL";

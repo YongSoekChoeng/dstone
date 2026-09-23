@@ -19,9 +19,9 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 
 /**
- * 앱이 기동될 때 @AiTool이 붙은 빈들을 모두 찾아서, ConfigMcp가 MCP 서버에서 가져온 Tool까지 한데
- * 합쳐 하나의 Spring AI ToolCallbackProvider로 만들어 주는 클래스입니다. 이렇게 합쳐지고 나면
- * 로컬에서 만든 Tool인지 MCP 서버에서 가져온 Tool인지 더는 구분하지 않고 똑같이 다룹니다.
+ * <pre>
+ * 앱이 기동될 때 @AiTool이 붙은 빈들을 모두 찾아서, ConfigMcp가 MCP 서버에서 가져온 Tool까지 한데 합쳐 하나의 Spring AI ToolCallbackProvider로 만들어 주는 클래스입니다. 
+ * 이렇게 합쳐지고 나면 로컬에서 만든 Tool인지 MCP 서버에서 가져온 Tool인지 더는 구분하지 않고 똑같이 다룹니다.
  *
  * 이 Tool들이 실제로 쓰이는 방식은 두 가지입니다:
  * - type이 AGENT인 step에서는, 어떤 Tool을 언제 호출할지를 Spring AI의 ChatClient가 LLM과 대화를
@@ -33,6 +33,7 @@ import net.dstone.common.utils.LogUtil;
  * 둘 수 있습니다. 이렇게 하면 한 앱에게만 허용된 Tool을 다른 앱이 가져다 쓰는 일을 막을 수 있습니다.
  * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로
  * 보고 등록된 Tool을 전부 허용합니다.
+ * </pre>
  */
 @Component
 public class ConfigTool extends BaseObject {
