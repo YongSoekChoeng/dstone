@@ -1,13 +1,16 @@
 var DstoneAiChat = (function () {
 
-	var sendUrl = "";
-	var messagesEl, inputEl, formEl, ragCheckEl, toolsCheckEl, modelInputEl, sendBtnEl;
+	var urls = {};
+	var messagesEl, inputEl, formEl, agentEl, agentDescEl, ragCheckEl, toolsCheckEl, modelInputEl, sendBtnEl;
+	var agentsById = {}; // id -> description, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
 
-	function init(url) {
-		sendUrl = url;
+	function init(options) {
+		urls = options;
 		messagesEl = document.getElementById("chat-messages");
 		inputEl = document.getElementById("chat-input");
 		formEl = document.getElementById("chat-form");
+		agentEl = document.getElementById("chat-agent");
+		agentDescEl = document.getElementById("chat-agent-desc");
 		ragCheckEl = document.getElementById("chat-rag-enabled");
 		toolsCheckEl = document.getElementById("chat-tools-enabled");
 		modelInputEl = document.getElementById("chat-model-override");
@@ -23,6 +26,39 @@ var DstoneAiChat = (function () {
 				sendMessage();
 			}
 		});
+		agentEl.addEventListener("change", updateAgentDescription);
+
+		loadAgentList();
+	}
+
+	// "Workflow 테스트" 화면(workflow.js)의 loadWorkflowList()/updateWorkflowDescription()과 같은 패턴이다.
+	function loadAgentList() {
+		fetch(urls.listUrl)
+			.then(function (response) {
+				if (!response.ok) {
+					throw new Error("서버 오류(" + response.status + ")");
+				}
+				return response.json();
+			})
+			.then(function (agents) {
+				agentEl.innerHTML = "";
+				agentsById = {};
+				(agents || []).forEach(function (agent) {
+					agentsById[agent.id] = agent.description;
+					var option = document.createElement("option");
+					option.value = agent.id;
+					option.textContent = agent.id;
+					agentEl.appendChild(option);
+				});
+				updateAgentDescription();
+			})
+			.catch(function (err) {
+				agentDescEl.textContent = "agent 목록을 불러오지 못했습니다: " + err.message;
+			});
+	}
+
+	function updateAgentDescription() {
+		agentDescEl.textContent = agentsById[agentEl.value] || "";
 	}
 
 	function appendMessage(role, text) {
@@ -66,12 +102,13 @@ var DstoneAiChat = (function () {
 
 		var requestBody = JSON.stringify({
 			message: message,
+			agent: agentEl.value,
 			ragEnabled: ragCheckEl.checked,
 			toolsEnabled: toolsCheckEl.checked,
 			model: model ? model : null
 		});
 
-		fetch(sendUrl, {
+		fetch(urls.sendUrl, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: requestBody

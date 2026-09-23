@@ -1,5 +1,7 @@
 package net.dstone.ai.common.registry;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,28 @@ public class AgentRegistry extends BaseObject {
 		}
 		this.byId = Map.copyOf(resolved);
 		LogUtil.sysout("dstone-ai-engine agent: 등록된 Agent = " + (this.byId.isEmpty() ? "없음" : this.byId.keySet()));
+	}
+
+	/**
+	 * caller가 쓸 수 있는 Agent만 골라 목록으로 돌려줍니다. api.controller.ChatController의
+	 * GET /api/ai/chat가 이 목록을 그대로 dstone-boot의 "채팅" 화면 드롭다운에 보여줍니다
+	 * (common.registry.WorkFlowRegistry.list()와 완전히 같은 패턴입니다).
+	 *
+	 * resolve()와 똑같은 allowedCallers 규칙을 씁니다. caller가 쓸 수 없는 Agent는 나중에
+	 * resolve()에서 막히기 전에, 애초에 이 목록에서부터 보이지 않아야 합니다.
+	 *
+	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
+	 */
+	public List<AgentDefinition> list(String caller) {
+		List<AgentDefinition> result = new ArrayList<>();
+		for (AgentDefinition definition : this.byId.values()) {
+			List<String> allowedCallers = definition.allowedCallers();
+			if (allowedCallers == null || allowedCallers.isEmpty() || (caller != null && allowedCallers.contains(caller))) {
+				result.add(definition);
+			}
+		}
+		result.sort(Comparator.comparing(AgentDefinition::id));
+		return result;
 	}
 
 	/**

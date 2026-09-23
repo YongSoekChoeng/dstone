@@ -17,12 +17,16 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 			<form id="chat-form" class="chat-form">
 				<div class="chat-options">
+					<label>Agent
+						<select id="chat-agent"></select>
+					</label>
 					<label><input type="checkbox" id="chat-rag-enabled" /> 문서검색(RAG)</label>
 					<label><input type="checkbox" id="chat-tools-enabled" /> 도구호출(Tool)</label>
 					<label>모델 override
 						<input type="text" id="chat-model-override" class="chat-model-input" placeholder="비우면 기본값(Agent 정의값)" />
 					</label>
 				</div>
+				<p id="chat-agent-desc" class="ai-hint"></p>
 				<div class="chat-input-row">
 					<textarea id="chat-input" class="chat-input" placeholder="메시지를 입력하세요..." rows="2"></textarea>
 					<button type="submit" id="chat-send" class="chat-send">전송</button>
@@ -36,7 +40,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/chat.js"></script>
 	<script>
-		DstoneAiChat.init("<%=requestUtil.getStrContextPath()%>/ai/chat/sendMessage.do");
+		DstoneAiChat.init({
+			listUrl: "<%=requestUtil.getStrContextPath()%>/ai/chat/list.do",
+			sendUrl: "<%=requestUtil.getStrContextPath()%>/ai/chat/sendMessage.do"
+		});
 	</script>
 </body>
 </html>

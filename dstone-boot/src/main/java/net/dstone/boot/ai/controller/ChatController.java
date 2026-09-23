@@ -1,8 +1,11 @@
 package net.dstone.boot.ai.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.boot.ai.service.ChatService;
+import net.dstone.boot.ai.vo.AgentSummaryResult;
 import net.dstone.boot.ai.vo.ChatMessageRequest;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -26,6 +30,12 @@ public class ChatController extends net.dstone.boot.common.biz.BaseController {
 	@Autowired
 	private ChatService chatService;
 
+	/** 등록된 Agent의 id+description 목록을 조회한다(agent 드롭다운용, WorkFlowTestController.list()와 같은 패턴). */
+	@GetMapping(value = "/list.do")
+	public List<AgentSummaryResult> list() {
+		return this.chatService.listAgents();
+	}
+
 	@PostMapping(value = "/sendMessage.do", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<String> sendMessage(@RequestBody ChatMessageRequest request, HttpServletRequest servletRequest) {
 		if (StringUtil.isEmpty(request.message())) {
@@ -33,7 +43,7 @@ public class ChatController extends net.dstone.boot.common.biz.BaseController {
 		}
 		boolean ragEnabled = Boolean.TRUE.equals(request.ragEnabled());
 		boolean toolsEnabled = Boolean.TRUE.equals(request.toolsEnabled());
-		return this.chatService.streamChat(servletRequest, request.message(), ragEnabled, toolsEnabled, request.model());
+		return this.chatService.streamChat(servletRequest, request.message(), request.agent(), ragEnabled, toolsEnabled, request.model());
 	}
 
 }

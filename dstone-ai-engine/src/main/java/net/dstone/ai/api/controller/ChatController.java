@@ -1,10 +1,13 @@
 package net.dstone.ai.api.controller;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import net.dstone.ai.api.dto.AgentSummary;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.common.definition.AgentDefinition;
@@ -31,6 +35,10 @@ import reactor.core.publisher.Flux;
  * 생각하면 됩니다) 중 하나를 딱 한 번 호출해서 답을 돌려줍니다. 만약 여러 단계(step)를 순서대로 이어서
  * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkflowController를 사용하면 됩니다.
  *
+ * GET /api/ai/chat는 등록된 Agent id+description 목록을 돌려줍니다 - dstone-boot의 "채팅" 화면이
+ * agent 선택 드롭다운을 채우는 데 씁니다(api.controller.WorkFlowController의 GET /api/ai/workflow와
+ * 같은 패턴입니다).
+ *
  * POST /api/ai/chat/stream 은 요청 형식은 위와 완전히 같지만, 응답 방식이 다릅니다. LLM(대규모 언어 모델)이
  * 답변을 한 글자씩(정확히는 토큰 단위로) 만들어내는 대로 바로바로 흘려보내 주는 text/event-stream(SSE, 실시간
  * 스트리밍) 방식입니다. 이 컨트롤러는 원래 요청-응답이 한 번에 끝나는 서블릿 기반 Spring MVC 컨트롤러이지만,
@@ -48,6 +56,23 @@ public class ChatController extends BaseController {
 	AgentRegistry agentRegistry;
 	@Autowired
 	AgentExecutor agentExecutor;
+
+	/**
+	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명)만 담아서
+	 * 돌려줍니다. dstone-boot의 "채팅" 화면이 이 목록을 그대로 받아서 agent 선택 드롭다운을
+	 * 채우는 데 씁니다(api.controller.WorkFlowController.list()와 완전히 같은 패턴입니다).
+	 *
+	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
+	 */
+	@GetMapping
+	public List<AgentSummary> list(HttpServletRequest servletRequest) {
+		String caller = CallerContext.get(servletRequest);
+		List<AgentSummary> summaries = new ArrayList<>();
+		for (AgentDefinition definition : this.agentRegistry.list(caller)) {
+			summaries.add(AgentSummary.from(definition));
+		}
+		return summaries;
+	}
 
 	/**
 	 * Agent 하나를 호출해서 답변을 한 번에(스트리밍 없이) 받아 돌려줍니다.
