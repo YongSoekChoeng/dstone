@@ -11,17 +11,24 @@
 # 실행될 때는 message 원문 그대로입니다 - 그래서 message 자리에 mcp/server-filesystem 아래
 # 디렉토리의 절대경로를 넣어서 호출해야 합니다(그 밖의 경로를 넣으면 MCP 서버가 거부해서 list
 # step이 FAIL로 끝납니다 - 그것도 정상 동작입니다, 화이트리스트 밖 접근이 실제로 막히는지 확인하는
-# 셈입니다). list step은 structuredOutput을 켜지 않았으므로(기본값 false) 지금처럼 원본 입력(message)을
-# 그대로 다음 step에 넘깁니다 - list_directory가 실제로 찾아낸 목록 자체는 이 Workflow에서 쓰지
-# 않기 때문입니다(목록을 실제로 써야 한다면 structuredOutput: true를 켜면 됩니다 - 2026-09-23
-# docs/temp/dstone-ai-engine-refactory-20260923-1.md 예시 B 참고, 이 샘플은 아직 그 예시까지는
-# 다루지 않습니다).
+# 셈입니다). list step도 structuredOutput: true라서, list_directory가 실제로 찾아낸 목록 텍스트
+# (파일이 하나뿐이면 "[FILE] 파일명" 한 줄)를 다음 step에 그대로 넘깁니다.
 #
-# read-notes step은 structuredOutput: true라서, read_text_file이 실제로 읽어온 파일 내용을
-# 다음 step(여기서는 Workflow의 최종 resultText)으로 그대로 돌려받습니다 - inputTemplate에 적힌
-# ${APP_HOME}/${APP_NAME}/mcp/server-filesystem/sample/notes.txt를 항상 고정으로 읽습니다(${...}는
+# read-notes step은 그 목록을 {previous}로 받아서 읽을 파일의 경로를 조립합니다
+# (inputTemplate: '.../sample/{previous}'). ToolStepRunner.stripLlmArtifacts()가 renderedText
+# 맨 앞의 "[레이블]" 형태(코드펜스와 함께, 원래는 LLM이 답변에 덧붙이는 군더더기를 벗겨내려고
+# 만든 정규식)를 자동으로 벗겨내는데, list_directory의 "[FILE] 파일명"도 우연히 이 모양과
+# 똑같아서 파일명만 깔끔하게 남는다(이 부분은 정식 기능이 아니라 정규식이 우연히 맞아떨어지는
+# 것입니다). **그래서 이 방식은 디렉토리 안에 파일이 정확히 하나일 때만 안전합니다** - 파일이
+# 여러 개면 list_directory의 응답이 여러 줄이 되어 "[FILE] a.txt\n[FILE] b.txt"를 그대로 경로에
+# 이어붙이게 되므로 깨집니다. 여러 파일을 각각 처리해야 한다면 AGENT(structuredOutput: true)로
+# 목록을 실제 배열(data.files)로 구조화한 뒤 forEachVariable로 반복하는 쪽이 맞습니다 - 2026-09-23
+# docs/temp/dstone-ai-engine-refactory-20260923-1.md 예시 B 참고(아직 미구현).
+#
+# read-notes의 결과(read_text_file이 실제로 읽어온 파일 내용)는 다음 step(여기서는 Workflow의
+# 최종 resultText)으로 그대로 돌려받습니다. ${APP_HOME}/${APP_NAME}는
 # common.loader.YamlDefinitionLoader가 conf/env{-profile}.properties의 값으로 치환해 줍니다 -
-# 실행 환경(Windows 로컬/WSL/k8s)마다 실제 경로가 자동으로 달라집니다).
+# 실행 환경(Windows 로컬/WSL/k8s)마다 실제 경로가 자동으로 달라집니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다(message는 지금 실행 중인
 # conf/env{-profile}.properties의 APP_HOME 값에 맞춰서 넣어야 합니다 - 예를 들어 Windows
@@ -41,13 +48,14 @@ workflow:
       type: TOOL
       ref: list_directory
       inputTemplate: '{"path":"{previous}"}'
+      structuredOutput: true   # list_directory가 실제로 찾아낸 목록 텍스트를 그대로 다음 step에 넘긴다(원본 입력 에코 대신)
       onSuccess: read-notes
       onFailure: FAIL
 
     - id: read-notes
       type: TOOL
       ref: read_text_file
-      inputTemplate: '{"path":"${APP_HOME}/${APP_NAME}/mcp/server-filesystem/sample/notes.txt"}'
+      inputTemplate: '{"path":"${APP_HOME}/${APP_NAME}/mcp/server-filesystem/sample/{previous}"}'   # list가 찾아낸 파일명을 그대로 이어붙인다(파일이 하나일 때만 안전 - 위 주석 참고)
       structuredOutput: true   # read_text_file이 실제로 읽어온 파일 내용을 그대로 돌려받는다(원본 입력 에코 대신)
       onSuccess: SUCCESS
       onFailure: FAIL
