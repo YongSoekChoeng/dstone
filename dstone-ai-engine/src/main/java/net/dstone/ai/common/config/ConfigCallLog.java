@@ -131,9 +131,9 @@ public class ConfigCallLog extends BaseObject {
 	
 	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))" + " && !" + NO_LOG_REGEX;
 	private final static String STEPRUNNER_POINTCUT = "execution(* net.dstone.ai.runtime.step.StepRunner+.run(..))" + " && !" + NO_LOG_REGEX;
-	private final static String AGENT_POINTCUT = "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))" + " && !" + NO_LOG_REGEX;
-	private final static String TOOL_POINTCUT = "execution(* net.dstone.ai.tools.*..*.*(..))" + " && !" + NO_LOG_REGEX;
-	private final static boolean PARAM_MULTI_LINE = false;
+	private final static String AGENT_POINTCUT 		= "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))" + " && !" + NO_LOG_REGEX;
+	private final static String TOOL_POINTCUT 		= "execution(* net.dstone.ai.runtime.tool.ToolExecutor.*(..))" + " && !" + NO_LOG_REGEX;
+	private final static boolean PARAM_MULTI_LINE 	= false;
 
 	/**
 	 * <pre>

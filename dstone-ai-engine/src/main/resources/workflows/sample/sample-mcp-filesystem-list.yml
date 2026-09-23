@@ -39,6 +39,6 @@ workflow:
     - id: read-notes
       type: TOOL
       ref: read_text_file
-      inputTemplate: '{"path":"${APP_HOME}/dstone-ai-engine/mcp-sandbox/sample/notes.txt"}'
+      inputTemplate: '{"path":"${APP_HOME}/dstone-ai-engine/mcp/server-filesystem/sample/notes.txt"}'
       onSuccess: SUCCESS
       onFailure: FAIL
