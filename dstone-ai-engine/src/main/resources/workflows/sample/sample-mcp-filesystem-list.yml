@@ -11,11 +11,18 @@
 # 실행될 때는 message 원문 그대로입니다 - 그래서 message 자리에 mcp-sandbox/sample의 절대경로를
 # 넣어서 호출해야 합니다(그 밖의 경로를 넣으면 MCP 서버가 거부해서 list step이 FAIL로 끝납니다 -
 # 그것도 정상 동작입니다, 화이트리스트 밖 접근이 실제로 막히는지 확인하는 셈입니다). read step은
-# 항상 notes.txt를 고정으로 읽습니다.
+# ${APP_HOME}/dstone-ai-engine/mcp-sandbox/sample/notes.txt를 항상 고정으로 읽습니다(${...}는
+# common.loader.YamlDefinitionLoader가 conf/env{-profile}.properties의 값으로 치환해 줍니다 -
+# 실행 환경(Windows 로컬/WSL/k8s)마다 실제 경로가 자동으로 달라집니다).
 #
-# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다(message는 지금 실행 중인
+# conf/env{-profile}.properties의 APP_HOME 값에 맞춰서 넣어야 합니다 - 예를 들어 Windows
+# 로컬이면 conf/env.properties의 APP_HOME이 D:/AppHome/framework/dstone이므로
+# "D:/AppHome/framework/dstone/dstone-ai-engine/mcp-sandbox/sample"을, WSL이면 conf/env-wsl.
+# properties의 APP_HOME이 /app/dstone이므로 "/app/dstone/dstone-ai-engine/mcp-sandbox/sample"을
+# 넣으면 됩니다):
 #   workflowId: sample-mcp-filesystem-list
-#   message   : /app/dstone/dstone-ai-engine/mcp-sandbox/sample
+#   message   : (지금 환경의 APP_HOME)/dstone-ai-engine/mcp-sandbox/sample
 workflow:
   id: sample-mcp-filesystem-list
   description: 외부 MCP 서버(filesystem)의 Tool 2개(list_directory→read_text_file)를 TOOL step에서 LLM 없이 직접 호출하는 확인용 Workflow.
@@ -32,6 +39,6 @@ workflow:
     - id: read-notes
       type: TOOL
       ref: read_text_file
-      inputTemplate: '{"path":"/app/dstone/dstone-ai-engine/mcp-sandbox/sample/notes.txt"}'
+      inputTemplate: '{"path":"${APP_HOME}/dstone-ai-engine/mcp-sandbox/sample/notes.txt"}'
       onSuccess: SUCCESS
       onFailure: FAIL

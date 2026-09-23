@@ -215,6 +215,7 @@ Verified live end-to-end on 2026-09-15 (real Anthropic calls, local Redis/Postgr
 | `REDIS_HOST` / `REDIS_PORT` | Redis server |
 | `RABBITMQ_HOST` / `RABBITMQ_PORT` | RabbitMQ server (dstone-boot) |
 | `FILE_UPLOAD_ROOT` | File upload root path (dstone-boot) |
+| `MCP_STDIO_COMMAND_PREFIX` | dstone-ai-engine only, Windows-only: tokens prepended to every STDIO MCP server's command (e.g. `cmd.exe /c`) so `.cmd`/`.bat`-based commands like `npx` can be launched — `ProcessBuilder` can't run them directly on Windows without going through the command interpreter. Unset on Linux/WSL/k8s. |
 
 Jasypt's decryption key is **not** an env var — see "Sensitive Config Encryption" above.
 

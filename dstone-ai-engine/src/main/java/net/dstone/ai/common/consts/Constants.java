@@ -100,6 +100,22 @@ public final class Constants {
 		public final static String TENANT_METADATA_KEY = "tenant";
 	}
 
+	/** common.config.ConfigMcp가 MCP 서버(STDIO)를 실제로 띄울 때 쓰는 상수입니다. */
+	public static final class Mcp {
+		/**
+		 * STDIO MCP 서버를 실행하는 커맨드 앞에 덧붙일 접두사를, System 프로퍼티(conf/env.properties
+		 * 관례 - DstoneAiEngineApplication.setSysProperties() 참고) 이름으로 지정해 둔 키입니다.
+		 * Linux/WSL/k8s에서는 이 값을 아예 안 정해도(System.getProperty가 null) npx 같은 스크립트를
+		 * ProcessBuilder가 바로 실행할 수 있어서 문제가 없습니다. 반면 Windows에서는 npx가 실제로는
+		 * npx.cmd(배치 스크립트)라서, cmd.exe 없이 ProcessBuilder가 곧바로 실행시키려 하면 "지정된
+		 * 파일을 찾을 수 없습니다"(CreateProcess error=2)로 항상 실패합니다 - .cmd/.bat 파일은
+		 * 원래 cmd.exe가 해석해 줘야 실행되는 것이지, 그 자체로 독립 실행 파일이 아니기 때문입니다.
+		 * 그래서 Windows용 conf/env.properties에는 이 값을 "cmd.exe /c"로 채워 둔다 - ConfigMcp가
+		 * 이 값을 공백으로 쪼개서 실제 커맨드/인자 맨 앞에 그대로 이어 붙입니다.
+		 */
+		public final static String STDIO_COMMAND_PREFIX_PROPERTY = "MCP_STDIO_COMMAND_PREFIX";
+	}
+
 	/**
 	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 YAML 파일들을 찾을 때 쓰는
 	 * 위치 패턴입니다. 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서

@@ -3,7 +3,11 @@ package net.dstone.ai.common.loader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -34,6 +38,15 @@ import net.dstone.common.utils.StringUtil;
  * 같은 SnakeYAML로 파싱해서 평범한 Map으로 만들고, 그다음 Jackson의 ObjectMapper.convertValue()로
  * 그 Map을 definition record에 바인딩합니다. record의 필드에 바로 바인딩되는 건 pom.xml에 이미
  * 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
+ *
+ * application.yml과 달리 이 파일들은 Spring이 읽는 게 아니라서 ${...} 값이 원래는 자동으로
+ * 채워지지 않습니다. 그런데 실행 환경(로컬 Windows/WSL/k8s)마다 값이 달라져야 하는 경로 같은
+ * 게 YAML 안에 있으면 곤란하므로, Map으로 바꾼 직후에 이 클래스가 직접 문자열 값 안의
+ * ${VAR_NAME} 토큰을 System 프로퍼티(conf/env{-profile}.properties가 기동 시 여기에 그대로
+ * 심어 둡니다 - DstoneAiEngineApplication.setSysProperties() 참고)로 치환해 줍니다(찾지
+ * 못하면 OS 환경변수도 한 번 더 찾아봅니다). 예를 들어 mcp/*.yml의 args에 "${APP_HOME}/..."라고
+ * 적어두면, Windows에서는 conf/env.properties의 APP_HOME(예: D:/AppHome/...)로, WSL에서는
+ * conf/env-wsl.properties의 APP_HOME(예: /app/dstone)으로 각각 알맞게 채워집니다.
  */
 @Component
 public class YamlDefinitionLoader extends BaseObject {
@@ -184,11 +197,69 @@ public class YamlDefinitionLoader extends BaseObject {
 	private <T> T readAs(Resource resource, Class<T> type) {
 		try (InputStream input = resource.getInputStream()) {
 			Object rawMap = this.yaml.load(input);
+			rawMap = this.resolvePlaceholders(rawMap);
 			return this.objectMapper.convertValue(rawMap, type);
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new IllegalStateException(resource.getFilename() + "를 읽는 중 오류가 발생했습니다.", e);
 		}
+	}
+
+	/** ${VAR_NAME} 토큰을 찾는 정규식입니다. 변수 이름은 env.properties 관례를 따라 영문 대문자/숫자/밑줄만 허용합니다. */
+	private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Z0-9_]+)\\}");
+
+	/**
+	 * SnakeYAML이 만들어준 Map/List/String 구조를 그대로 따라 내려가면서, 문자열 값 안에 있는
+	 * ${VAR_NAME} 토큰을 전부 찾아 치환합니다. Map과 List는 값만 바꾸면 되므로 구조 자체는
+	 * 그대로 유지하고, 문자열이 아닌 값(숫자, boolean 등)은 건드리지 않고 그대로 돌려줍니다.
+	 *
+	 * @param value 치환할 대상입니다(YAML 최상위 Map이거나, 그 안에 중첩된 Map/List/String 등입니다).
+	 */
+	@SuppressWarnings("unchecked")
+	private Object resolvePlaceholders(Object value) {
+		if (value instanceof String text) {
+			return this.resolvePlaceholders(text);
+		}
+		if (value instanceof Map) {
+			Map<String, Object> resolved = new LinkedHashMap<>();
+			for (Map.Entry<String, Object> entry : ((Map<String, Object>) value).entrySet()) {
+				resolved.put(entry.getKey(), this.resolvePlaceholders(entry.getValue()));
+			}
+			return resolved;
+		}
+		if (value instanceof List) {
+			List<Object> resolved = new ArrayList<>();
+			for (Object item : (List<Object>) value) {
+				resolved.add(this.resolvePlaceholders(item));
+			}
+			return resolved;
+		}
+		return value;
+	}
+
+	/**
+	 * 문자열 하나 안의 ${VAR_NAME} 토큰을 전부 System 프로퍼티(없으면 OS 환경변수) 값으로
+	 * 바꿔치기합니다. 둘 다에 없는 이름이면 건드리지 않고 ${VAR_NAME} 문자열 그대로 남겨둡니다 -
+	 * (조용히 빈 문자열로 지워버리면 설정을 깜빡 잊었을 때 원인을 찾기 훨씬 어려워지기 때문입니다.)
+	 *
+	 * @param text 치환할 대상 문자열입니다.
+	 */
+	private String resolvePlaceholders(String text) {
+		if (text == null || text.indexOf("${") < 0) {
+			return text;
+		}
+		Matcher matcher = PLACEHOLDER.matcher(text);
+		StringBuilder result = new StringBuilder();
+		while (matcher.find()) {
+			String name = matcher.group(1);
+			String replacement = System.getProperty(name);
+			if (StringUtil.isEmpty(replacement)) {
+				replacement = System.getenv(name);
+			}
+			matcher.appendReplacement(result, StringUtil.isEmpty(replacement) ? Matcher.quoteReplacement(matcher.group(0)) : Matcher.quoteReplacement(replacement));
+		}
+		matcher.appendTail(result);
+		return result.toString();
 	}
 
 }

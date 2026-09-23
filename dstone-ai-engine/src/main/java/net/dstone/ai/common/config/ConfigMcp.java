@@ -18,10 +18,12 @@ import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapperSupplier;
 import io.modelcontextprotocol.spec.McpClientTransport;
 import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.annotation.PostConstruct;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.McpServerDefinition;
 import net.dstone.ai.common.registry.McpServerRegistry;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
@@ -89,13 +91,39 @@ public class ConfigMcp extends BaseObject {
 		McpJsonMapper jsonMapper = new JacksonMcpJsonMapperSupplier().get();
 		return switch (definition.transport()) {
 			case STDIO -> {
-				ServerParameters params = ServerParameters.builder(definition.command())
-					.args(definition.args() == null ? List.of() : definition.args())
-					.build();
+				ServerParameters params = this.buildStdioParams(definition);
 				yield new StdioClientTransport(params, jsonMapper);
 			}
 			case SSE -> HttpClientSseClientTransport.builder(definition.url()).jsonMapper(jsonMapper).build();
 		};
+	}
+
+	/**
+	 * STDIO MCP 서버를 실제로 띄울 커맨드/인자를 조립합니다. YAML에 적힌 command/args 그대로 쓰는 게
+	 * 기본이지만, Constants.Mcp.STDIO_COMMAND_PREFIX_PROPERTY(MCP_STDIO_COMMAND_PREFIX) 시스템
+	 * 프로퍼티가 설정되어 있으면(주로 Windows에서만 - conf/env.properties 참고) 그 값을 공백으로
+	 * 쪼갠 토큰들을 커맨드/인자 맨 앞에 그대로 이어 붙입니다. 예를 들어 이 값이 "cmd.exe /c"이면,
+	 * YAML의 "command: npx, args: [-y, ...]"는 실제로는
+	 * "cmd.exe /c npx -y ..."로 실행됩니다 - npx처럼 .cmd/.bat인 커맨드는 Windows에서 cmd.exe 없이
+	 * ProcessBuilder가 곧바로 실행시킬 수 없기 때문입니다.
+	 *
+	 * @param definition 커맨드/인자를 조립할 MCP 서버 정의(STDIO 전용)
+	 */
+	private ServerParameters buildStdioParams(McpServerDefinition definition) {
+		List<String> commandLine = new ArrayList<>();
+		String prefix = System.getProperty(Constants.Mcp.STDIO_COMMAND_PREFIX_PROPERTY);
+		if (!StringUtil.isEmpty(prefix)) {
+			for (String token : prefix.trim().split("\\s+")) {
+				commandLine.add(token);
+			}
+		}
+		commandLine.add(definition.command());
+		if (definition.args() != null) {
+			commandLine.addAll(definition.args());
+		}
+		return ServerParameters.builder(commandLine.get(0))
+			.args(commandLine.subList(1, commandLine.size()))
+			.build();
 	}
 
 	/**

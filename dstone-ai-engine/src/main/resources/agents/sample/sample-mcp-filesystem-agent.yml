@@ -18,7 +18,7 @@ agent:
     상황에 맞게 스스로 호출해서 답하십시오.
 
     - list_directory: 폴더 안에 어떤 파일/폴더가 있는지 물어보면 호출합니다(path 인자에
-      "/app/dstone/dstone-ai-engine/mcp-sandbox/sample"을 넣으십시오).
+      "${APP_HOME}/dstone-ai-engine/mcp-sandbox/sample"을 넣으십시오).
     - read_text_file: 특정 파일의 내용을 읽어 달라고 하면 호출합니다(path 인자에 그 파일의
       전체 경로를 넣으십시오. 파일 목록을 먼저 모른다면 list_directory로 먼저 확인하십시오).
 
