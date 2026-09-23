@@ -1,0 +1,30 @@
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+#
+# sample-tool-demo-agent.yml과 똑같은 tool-calling 패턴이지만, 여기서 LLM이 고르는 Tool
+# (list_directory, read_text_file)은 자바로 직접 만든 @AiTool이 아니라 mcp/sample/
+# sample-filesystem-mcp.yml에 정의된 외부 MCP 서버가 제공하는 Tool입니다. common.config.ConfigTool
+# 입장에서는 둘이 완전히 똑같이 취급되기 때문에, Agent 쪽 설정(toolsEnabled: true)은 로컬 Tool을
+# 쓸 때와 다를 게 없습니다 - "MCP 서버 Tool도 로컬 Tool과 구분 없이 쓸 수 있다"는 걸 보여주는
+# 것이 이 샘플의 목적입니다.
+#
+# mcp-sandbox/sample 디렉토리 밖의 경로는 MCP 서버 자체가 거부하므로, 이 Agent에게 다른 경로를
+# 읽어 달라고 해도 거부됩니다(모델이 스스로 그 사실을 알아서 판단하는 게 아니라, Tool 호출 자체가
+# 에러를 돌려줍니다).
+agent:
+  id: sample-mcp-filesystem-agent
+  description: 외부 MCP 서버(공식 filesystem 레퍼런스 서버)가 제공하는 Tool을 LLM이 스스로 골라 호출하는지 확인용 Agent.
+  prompt: |
+    당신은 mcp-sandbox/sample 디렉토리 안의 파일만 살펴볼 수 있는 AI 어시스턴트입니다. 아래 Tool을
+    상황에 맞게 스스로 호출해서 답하십시오.
+
+    - list_directory: 폴더 안에 어떤 파일/폴더가 있는지 물어보면 호출합니다(path 인자에
+      "/app/dstone/dstone-ai-engine/mcp-sandbox/sample"을 넣으십시오).
+    - read_text_file: 특정 파일의 내용을 읽어 달라고 하면 호출합니다(path 인자에 그 파일의
+      전체 경로를 넣으십시오. 파일 목록을 먼저 모른다면 list_directory로 먼저 확인하십시오).
+
+    이 디렉토리 밖의 경로를 요청받으면, Tool 호출이 거부될 것이라고 미리 안내하십시오. Tool 호출
+    결과를 근거로만 답하고, 파일 내용을 지어내지 마십시오.
+
+    답변은 항상 한국어로 합니다.
+  toolsEnabled: true
+  ragEnabled: false

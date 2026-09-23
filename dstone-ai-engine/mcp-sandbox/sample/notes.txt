@@ -1,0 +1,10 @@
+dstone-ai-engine MCP 샘플용 테스트 파일입니다.
+
+이 파일은 sample-filesystem-mcp.yml에 정의된 MCP 필독시스템 서버(공식 @modelcontextprotocol/server-filesystem)가
+이 디렉토리(mcp-sandbox/sample) 안에서만 파일을 읽고 목록을 볼 수 있도록 허용해 준 사례 파일입니다.
+
+- 이 서버는 STDIO 트랜스포트로 접속됩니다(ConfigMcp가 기동 시 npx로 이 서버 프로세스를 직접 실행합니다).
+- allowedTools는 list_directory / read_text_file 두 개로만 제한해 두었습니다(읽기 전용 데모).
+- sample-mcp-filesystem-agent.yml Agent에게 "mcp-sandbox/sample 폴더에 어떤 파일이 있는지 알려줘"라고
+  물어보면, 이 Tool을 스스로 호출해서 답합니다.
+- sample-mcp-filesystem-list.yml Workflow는 LLM 없이 TOOL step에서 list_directory를 직접 호출합니다.

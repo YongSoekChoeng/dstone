@@ -1,0 +1,37 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# sample-tool-chain-basic.yml과 같은 패턴(TOOL step 2개 연속 실행, LLM 비용 없음)이지만, 여기서
+# 부르는 두 Tool(list_directory, read_text_file)은 로컬 @AiTool이 아니라 mcp/sample/
+# sample-filesystem-mcp.yml에 정의된 외부 MCP 서버의 Tool입니다. runtime.tool.ToolExecutor
+# 입장에서는 로컬 Tool을 부를 때와 완전히 동일한 경로(caller 화이트리스트 → ToolCallback.call())로
+# 처리되므로, TOOL step도 MCP Tool을 LLM 없이 그대로 직접 호출할 수 있다는 걸 보여주는 것이 이
+# Workflow의 목적입니다.
+#
+# list step의 inputTemplate('{"path":"{previous}"}')이 쓰는 {previous}는, Workflow가 처음
+# 실행될 때는 message 원문 그대로입니다 - 그래서 message 자리에 mcp-sandbox/sample의 절대경로를
+# 넣어서 호출해야 합니다(그 밖의 경로를 넣으면 MCP 서버가 거부해서 list step이 FAIL로 끝납니다 -
+# 그것도 정상 동작입니다, 화이트리스트 밖 접근이 실제로 막히는지 확인하는 셈입니다). read step은
+# 항상 notes.txt를 고정으로 읽습니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-mcp-filesystem-list
+#   message   : /app/dstone/dstone-ai-engine/mcp-sandbox/sample
+workflow:
+  id: sample-mcp-filesystem-list
+  description: 외부 MCP 서버(filesystem)의 Tool 2개(list_directory→read_text_file)를 TOOL step에서 LLM 없이 직접 호출하는 확인용 Workflow.
+  maxIterations: 3
+  steps:
+
+    - id: list
+      type: TOOL
+      ref: list_directory
+      inputTemplate: '{"path":"{previous}"}'
+      onSuccess: read-notes
+      onFailure: FAIL
+
+    - id: read-notes
+      type: TOOL
+      ref: read_text_file
+      inputTemplate: '{"path":"/app/dstone/dstone-ai-engine/mcp-sandbox/sample/notes.txt"}'
+      onSuccess: SUCCESS
+      onFailure: FAIL
