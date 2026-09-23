@@ -1,28 +1,13 @@
 # common.registry.McpServerRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 두고,
-# common.config.ConfigMcp가 그 즉시 이 서버에 접속을 시도합니다(STDIO면 여기 적힌
-# command/args로 실제 OS 프로세스를 하나 띄워서 표준입출력으로 대화합니다).
+# common.config.ConfigMcp가 그 즉시 이 서버에 접속을 시도합니다(STDIO면 여기 적힌 command/args로 실제 OS 프로세스를 하나 띄워서 표준입출력으로 대화합니다).
 #
-# 이 파일은 공식 MCP 레퍼런스 서버인 @modelcontextprotocol/server-filesystem을 그대로 씁니다
-# (자바 코드를 새로 만들지 않았습니다 - "외부에서 이미 만들어진 MCP 서버의 Tool을 가져다 쓴다"는
-# 이 엔진의 MCP 클라이언트 기능을 있는 그대로 보여주는 게 이 샘플의 목적입니다). npx가 최초
-# 접속 시점에 이 패키지를 내려받으므로(그 뒤로는 npm 캐시를 씀), 앱을 처음 켤 때는 인터넷 연결이
-# 한 번 필요합니다. args의 마지막 값(${APP_HOME}/dstone-ai-engine/mcp-sandbox/sample)이
-# "이 서버가 접근할 수 있는 유일한 디렉토리"입니다 - 그 밖의 경로는 요청해도 거부됩니다(서버
-# 자체가 강제하는 샌드박스이고, dstone-ai-engine 코드가 따로 검사하는 게 아닙니다). 다른 SI
-# 프로젝트에서 이 패턴을 재사용할 때는 이 경로를 그 프로젝트의 절대경로로 바꿔서 쓰면 됩니다.
-#
-# ${APP_HOME}처럼 ${...}로 적어두면 common.loader.YamlDefinitionLoader가 conf/env{-profile}.
-# properties에 설정된 값(System 프로퍼티)으로 치환해 줍니다 - 그래서 이 파일 하나로 Windows
-# 로컬(conf/env.properties의 APP_HOME=D:/AppHome/framework/dstone)과 WSL/k8s(conf/env-wsl.
-# properties 등의 APP_HOME=/app/dstone) 양쪽 모두에서 올바른 절대경로가 만들어집니다.
-#
-# command: npx도 환경마다 그냥 되는 게 아닙니다 - Windows에서는 npx가 실제로는 npx.cmd(배치
-# 스크립트)라서, ProcessBuilder가 cmd.exe 없이 곧바로 실행시키면 "지정된 파일을 찾을 수
-# 없습니다"(CreateProcess error=2)로 항상 실패합니다. conf/env.properties(Windows용)에
-# MCP_STDIO_COMMAND_PREFIX=cmd.exe /c 를 넣어 두면, ConfigMcp가 이 값을 커맨드 앞에 붙여서
-# "cmd.exe /c npx -y ..."로 실행해 줍니다(Linux/WSL/k8s에는 이 값이 없으므로 npx를 그대로
-# 실행합니다 - 자세한 내용은 common.config.ConfigMcp.buildStdioParams 참고).
-#
+# 이 파일은 공식 MCP 레퍼런스 서버인 @modelcontextprotocol/server-filesystem을 그대로 씁니다.
+# NodeJS 가 설치되어 있어야 합니다.(npx 명령 사용)
+# (자바 코드를 새로 만들지 않았습니다 - "외부에서 이미 만들어진 MCP 서버의 Tool을 가져다 쓴다"는 이 엔진의 MCP 클라이언트 기능을 있는 그대로 보여주는 게 이 샘플의 목적입니다). 
+# npx가 최초 접속 시점에 이 패키지를 내려받으므로(그 뒤로는 npm 캐시를 씀), 앱을 처음 켤 때는 인터넷 연결이 한 번 필요합니다. args의 마지막 값(${APP_HOME}/${APP_NAME}/mcp/server-filesystem/sample)이
+# "이 서버가 접근할 수 있는 유일한 디렉토리"입니다. 그 밖의 경로는 요청해도 거부됩니다(서버 자체가 강제하는 샌드박스이고, dstone-ai-engine 코드가 따로 검사하는 게 아닙니다). 
+# 다른 SI 프로젝트에서 이 패턴을 재사용할 때는 이 경로를 그 프로젝트의 절대경로로 바꿔서 쓰면 됩니다.
+# 
 # allowedTools를 list_directory/read_text_file 두 개(읽기 전용)로만 제한해 두었습니다. 이
 # 서버는 실제로 write_file/edit_file/move_file처럼 파일을 바꾸는 Tool도 제공하지만, "화이트리스트에
 # 없으면 등록 자체가 안 된다"는 걸 보여주기 위해 일부러 읽기 전용만 허용했습니다 - 전체 목록은
@@ -36,5 +21,5 @@ mcpServer:
   id: sample-filesystem
   transport: STDIO            # STDIO | SSE
   command: npx
-  args: ["-y", "@modelcontextprotocol/server-filesystem", "${APP_HOME}/dstone-ai-engine/mcp-sandbox/sample"]
-  allowedTools: ["list_directory", "read_text_file"]   # 비우면 이 서버의 Tool을 전부 허용
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "${APP_HOME}/${APP_NAME}/mcp/server-filesystem/sample"]
+  allowedTools: ["list_directory", "read_text_file", "write_file", "edit_file", "move_file"]   # 비우면 이 서버의 Tool을 전부 허용

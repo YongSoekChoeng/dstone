@@ -65,21 +65,27 @@ public class ConfigMcp extends BaseObject {
 	 * @param definition 접속할 MCP 서버의 정의(주소, 접속 방식, 허용 Tool 목록 등)
 	 */
 	private void connectOne(McpServerDefinition definition) {
-		McpClientTransport transport = this.buildTransport(definition);
-		McpSyncClient client = McpClient.sync(transport)
-			.clientInfo(new McpSchema.Implementation("dstone-ai-engine", "1.0.0"))
-			.build();
-		client.initialize();
+		try {
+			this.debug("PATH=" + System.getenv("PATH"));
+			this.debug("definition=" + definition);
+			McpClientTransport transport = this.buildTransport(definition);
+			McpSyncClient client = McpClient.sync(transport)
+				.clientInfo(new McpSchema.Implementation("dstone-ai-engine", "1.0.0"))
+				.build();
+			client.initialize();
 
-		List<ToolCallback> discovered = SyncMcpToolCallbackProvider.syncToolCallbacks(List.of(client));
-		int added = 0;
-		for (ToolCallback callback : discovered) {
-			if (this.isAllowed(definition, callback)) {
-				this.toolCallbacks.add(callback);
-				added++;
+			List<ToolCallback> discovered = SyncMcpToolCallbackProvider.syncToolCallbacks(List.of(client));
+			int added = 0;
+			for (ToolCallback callback : discovered) {
+				if (this.isAllowed(definition, callback)) {
+					this.toolCallbacks.add(callback);
+					added++;
+				}
 			}
+			LogUtil.sysout("dstone-ai-engine mcp: [" + definition.id() + "] 접속 성공 - Tool " + discovered.size() + "개 중 " + added + "개 등록");
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		LogUtil.sysout("dstone-ai-engine mcp: [" + definition.id() + "] 접속 성공 - Tool " + discovered.size() + "개 중 " + added + "개 등록");
 	}
 
 	/**
