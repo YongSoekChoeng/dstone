@@ -477,3 +477,29 @@ Windowsの`npx`は実体が`.cmd`(バッチスクリプト)で、JavaのProcessB
 WSL環境で再ビルド→再起動し、MCPサーバへの接続成功、TOOL stepワークフローの`DONE`まで、以前と同じ結果になることを確認しました(プレースホルダ置換自体が何も壊していないことの確認)。ただし`cmd.exe /c npx ...`の実際のWindows上での成功自体は、このLinuxサンドボックスでは再現できないため未検証です — 貴殿のWindows環境で試していただく必要があります(Node.js/npmがPATHに通っていれば動くはずです)。
 
 ドキュメント(`docs/09.dstone-ai-engine.md`, `CLAUDE.md`)も更新済みです。コミットしましょうか?
+
+---
+
+## 질문
+
+작업 끝났나 ?
+
+---
+
+## 답변
+
+코드 작업 자체는 끝났습니다. 정리하면:
+
+**완료**
+- `YamlDefinitionLoader`에 `${VAR_NAME}` 플레이스홀더 해석 추가
+- `ConfigMcp`에 `MCP_STDIO_COMMAND_PREFIX` 지원 추가 (Windows에서 `cmd.exe /c`로 npx 실행)
+- `conf/env.properties`(Windows 로컬용)에 `MCP_STDIO_COMMAND_PREFIX=cmd.exe /c` 추가
+- MCP 샘플(mcp/agent/workflow yml)의 하드코딩된 경로를 전부 `${APP_HOME}` 기반으로 교체
+- WSL에서 재빌드·재기동해서 기존 동작(접속 성공, Workflow `DONE`)이 그대로 유지되는 것까지 재검증 완료
+- 문서(`docs/09.dstone-ai-engine.md`, `CLAUDE.md`)도 갱신 완료
+
+**아직 안 한 것**
+- 실제 Windows 머신에서 `cmd.exe /c npx ...`가 진짜로 성공하는지는 이 환경(Linux 샌드박스)에서는 재현이 불가능해서 검증 못 했습니다 — 사용자님 쪽에서 직접 재기동해서 확인해주셔야 합니다.
+- git commit — 아직 안 했습니다.
+
+커밋할까요?
