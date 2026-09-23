@@ -27,6 +27,18 @@ import net.dstone.ai.common.consts.StepType;
  * type이 AGENT인 경우는 structuredOutput이 false(기본값)이면 항상 성공으로 취급됩니다. structuredOutput이 true인데 LLM의 응답을 StepOutcome.Success라는 정해진 형식으로 읽어내지 못하면
  * (모델이 형식을 지키지 않은 경우) 그 step은 실패로 처리됩니다 - 형식이 깨졌을 때는 안전하게 실패로 보는 것입니다.
  *
+ * ## TOOL step이 성공했을 때 다음 step에 무엇을 넘기는가 (structuredOutput)
+ * structuredOutput은 AGENT뿐 아니라 TOOL에서도 쓰이는데, "형식을 못 지켰을 때 어떻게 하는가"가
+ * 서로 반대입니다. type이 TOOL이고 structuredOutput이 false(기본값)면, Tool이 돌려준 응답 문구가
+ * 아니라 검증받은 원본 입력값을 그대로 다음 step에 넘깁니다(SqlSyntaxTool처럼 "이 값이 맞는지"만
+ * 확인하는 검증형 Tool을 염두에 둔 기본값입니다 - "통과했다"는 메시지 자체는 다음 step에 새 정보가
+ * 아니기 때문입니다). structuredOutput이 true면 반대로, Tool이 실제로 돌려준 응답을 다음 step에
+ * 넘깁니다(list_directory/read_text_file처럼 "새 데이터를 가져오는" Tool을 염두에 둔 값입니다).
+ * 이때 Tool이 runtime.tool.ToolPayload(primaryText, data) 모양으로 응답했다면 그 data까지 살려서
+ * 넘기고, 그 모양이 아니면(MCP Tool을 포함해 대부분의 Tool이 여기 해당합니다) 응답 텍스트 전체를
+ * primaryText로 씁니다 - AGENT와 달리 이 모양을 지키지 않았다고 실패로 처리하지는 않습니다(자세한
+ * 이유는 runtime.step.ToolStepRunner.runStructuredOutput 참고).
+ *
  * ## 같은 step을 여러 번 동시에 실행하기 (forEachVariable)
  * forEachVariable을 설정하면, Workflow를 호출할 때 넘긴 variables 안에 있는 같은 이름의 목록(List)을
  * 찾아서, 그 목록에 들어있는 항목 개수만큼 이 step 하나를 한꺼번에(병렬로) 실행합니다. 
@@ -50,9 +62,14 @@ import net.dstone.ai.common.consts.StepType;
  * @param onSuccess        성공했을 때 다음으로 갈 step의 id(또는 "SUCCESS"라는 예약어)입니다. type이 ROUTER면 이 값은 쓰이지 않습니다
  * @param inputTemplate    이 step에 넣어줄 입력값을 만드는 템플릿입니다
  * @param approverRole     type이 APPROVAL인 step에서만 쓰입니다. 누가 승인해야 하는지를 문서나 감사 기록 목적으로 남겨두는 값일 뿐이며, 서버가 실제로 그 역할인지 검사하지는 않습니다.
- * @param structuredOutput type이 AGENT인 step에서만 쓰입니다(기본값은 false 또는 비워둠). 
- *                         true로 설정하면 LLM이 자유롭게 쓴 글 대신 정해진 형식(runtime.step.StepOutcome.Success의 primaryText, data)으로 응답하게 하고, 
- *                         그 data 값을 다음 step들이 {id.키} 형태로 그대로 가져다 쓸 수 있습니다(자세한 동작은 runtime.step.AgentStepRunner 참고)
+ * @param structuredOutput type이 AGENT 또는 TOOL인 step에서 쓰입니다(기본값은 false 또는 비워둠).
+ *                         AGENT면 true일 때 LLM이 자유롭게 쓴 글 대신 정해진 형식(runtime.step.StepOutcome.Success의
+ *                         primaryText, data)으로 응답하게 하고, 형식을 안 지키면 실패로 처리합니다(자세한 동작은
+ *                         runtime.step.AgentStepRunner 참고). TOOL이면 true일 때 검증받은 원본 입력값 대신 Tool이
+ *                         실제로 돌려준 응답(가능하면 runtime.tool.ToolPayload의 primaryText, data)을 넘기고,
+ *                         형식을 안 지켜도 실패로 보지 않고 응답 텍스트를 그대로 씁니다(자세한 동작은
+ *                         runtime.step.ToolStepRunner 참고). 두 경우 모두 data 값을 다음 step들이 {id.키} 형태로
+ *                         그대로 가져다 쓸 수 있습니다
  * @param routes           type이 ROUTER인 step에서만 쓰입니다. 
  *                         LLM이 고른 경로 이름(runtime.agent.RouteDecision의 route 값)을 키로 하고, 
  *                         그 경로를 골랐을 때 이동할 다음 step의 id(또는 "SUCCESS"/"FAIL" 예약어)를 값으로 하는 매핑입니다. ROUTER가 아닌 step에서는 쓰이지 않습니다.

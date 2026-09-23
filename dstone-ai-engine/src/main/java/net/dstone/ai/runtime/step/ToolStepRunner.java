@@ -15,15 +15,29 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.tool.ToolExecutor;
 import net.dstone.ai.runtime.tool.ToolOutcome;
+import net.dstone.ai.runtime.tool.ToolPayload;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * TOOL step을 처리하는 러너입니다. LLM을 거치지 않고, caller가 쓸 수 있는 Tool 하나를 코드로 직접
- * 호출합니다(예: SqlSyntaxTool.validateSqlSyntax로 SQL 문법을 결정적으로 검증하는 경우). 검증에
- * 성공하면 Tool이 돌려준 응답 문구가 아니라, 검증받은 원본 값(input)을 그대로 다음 step에 넘깁니다 -
- * "통과했다"는 메시지 자체는 다음 step 입장에서 딱히 새로운 정보가 아니기 때문입니다. 반대로 실패하면
- * 원본 값 뒤에 Tool이 알려준 실패 이유를 덧붙여서 넘깁니다 - onFailure로 되돌아간 step이 "무엇을
- * 고쳐야 하는지"와 "왜 고쳐야 하는지"를 둘 다 볼 수 있어야 하기 때문입니다.
+ * 호출합니다(예: SqlSyntaxTool.validateSqlSyntax로 SQL 문법을 결정적으로 검증하는 경우). 성공했을 때
+ * 다음 step에 무엇을 넘길지는 StepDefinition.structuredOutput 값에 따라 둘로 갈립니다.
+ *
+ * - structuredOutput이 false(기본값)면 Tool이 돌려준 응답 문구가 아니라, 검증받은 원본 값(input)을
+ *   그대로 다음 step에 넘깁니다 - "통과했다"는 메시지 자체는 다음 step 입장에서 딱히 새로운 정보가
+ *   아니기 때문입니다(SqlSyntaxTool처럼 "이 값이 맞는지"만 확인하는 검증형 Tool을 염두에 둔
+ *   기본값입니다).
+ * - structuredOutput이 true면 반대로, Tool이 실제로 돌려준 응답을 다음 step에 넘깁니다 -
+ *   list_directory/read_text_file처럼 "새 데이터를 가져오는" Tool은 그 응답 자체가 다음 step이
+ *   원하는 데이터이기 때문입니다. Tool이 runtime.tool.ToolPayload(primaryText, data) 모양으로
+ *   응답했다면 그 data까지 그대로 살려서 넘기고, 그게 아니라면(MCP Tool을 포함해 대부분의 Tool이
+ *   이 경우입니다) 응답 텍스트 전체를 primaryText로 씁니다 - AGENT의 structuredOutput과 달리, 이
+ *   모양을 지키지 않았다고 실패로 처리하지는 않습니다(자세한 이유는 runStructuredOutput() 참고).
+ *
+ * 실패하면(structuredOutput 값과 무관하게) 원본 값 뒤에 Tool이 알려준 실패 이유를 덧붙여서
+ * 넘깁니다 - onFailure로 되돌아간 step이 "무엇을 고쳐야 하는지"와 "왜 고쳐야 하는지"를 둘 다 볼 수
+ * 있어야 하기 때문입니다.
  */
 @Component
 public class ToolStepRunner implements StepRunner {
@@ -54,11 +68,53 @@ public class ToolStepRunner implements StepRunner {
 
 		ToolOutcome outcome = this.tryParseOutcome(toolResult);
 		boolean failed = outcome != null ? Boolean.FALSE.equals(outcome.success()) : toolResult.startsWith(Constants.Outcome.FAIL_PREFIX);
-		if (!failed) {
-			return StepOutcome.success(normalized);
+		if (failed) {
+			String reasonText = outcome != null && outcome.message() != null ? outcome.message() : toolResult;
+			return StepOutcome.failure(normalized + "\n\n[검증 결과] " + reasonText, reasonText);
 		}
-		String reasonText = outcome != null && outcome.message() != null ? outcome.message() : toolResult;
-		return StepOutcome.failure(normalized + "\n\n[검증 결과] " + reasonText, reasonText);
+		return Boolean.TRUE.equals(definition.structuredOutput()) ? this.runStructuredOutput(toolResult) : StepOutcome.success(normalized);
+	}
+
+	/**
+	 * <pre>
+	 * structuredOutput=true인 TOOL step의 성공 처리입니다. Tool이 runtime.tool.ToolPayload(primaryText,
+	 * data) 모양으로 응답했다면 그 값을 그대로 옮겨 담고, 그렇지 않다면 응답 텍스트 전체를 primaryText로
+	 * 씁니다(data는 빈 Map).
+	 *
+	 * AGENT의 structuredOutput=true(runtime.step.AgentStepRunner.runStructuredAgent)는 이 모양을
+	 * 지키지 않으면 실패로 처리합니다 - LLM에게 이 스키마를 지키라고 프롬프트로 직접 지시했는데
+	 * 지키지 않았다면, 그 자체가 신뢰할 수 없는 응답이라는 신호이기 때문입니다(fail-closed). TOOL은
+	 * 정반대로 갑니다 - 애초에 어떤 Tool에게도 "이 스키마를 지켜라"라고 요구한 적이 없고, 오히려
+	 * list_directory/read_text_file처럼 이 모양을 전혀 모르는 Tool(특히 MCP Tool은 전부 여기
+	 * 해당합니다)을 그대로 쓰는 것이 정상적인 다수 사례입니다. 그래서 파싱 실패를 에러가 아니라
+	 * "이 Tool은 구조화된 데이터가 없다"는 흔한 정상 경우로 보고, 응답 텍스트를 그대로 살려서
+	 * 성공으로 돌려줍니다(graceful fallback).
+	 * </pre>
+	 *
+	 * @param toolResult Tool을 호출한 원본 응답 텍스트입니다(runtime.tool.ToolExecutor.call()을 거친, 이미 풀린 결과입니다).
+	 */
+	private StepOutcome runStructuredOutput(String toolResult) {
+		ToolPayload payload = this.tryParsePayload(toolResult);
+		if (payload != null && !StringUtil.isEmpty(payload.primaryText())) {
+			return StepOutcome.successWithData(payload.primaryText(), payload.data());
+		}
+		return StepOutcome.success(toolResult);
+	}
+
+	/**
+	 * Tool이 runtime.tool.ToolPayload 형식(primaryText/data 필드)으로 응답했다면 그 값을 그대로
+	 * 씁니다. 그게 아니라면(대부분의 Tool이 여기 해당합니다) null을 돌려줘서, runStructuredOutput()이
+	 * 대신 응답 텍스트 전체를 primaryText로 쓰게 합니다. tryParseOutcome()과 같은 이유로, primaryText
+	 * 필드 자체가 아예 없는 경우(null인 경우)도 "이건 ToolPayload가 아니다"로 취급합니다.
+	 *
+	 * @param toolResult Tool을 호출한 원본 응답 텍스트입니다(runtime.tool.ToolExecutor.call()을 거친, 이미 풀린 결과입니다).
+	 */
+	private ToolPayload tryParsePayload(String toolResult) {
+		try {
+			return this.objectMapper.readValue(toolResult, ToolPayload.class);
+		} catch (JsonProcessingException e) {
+			return null;
+		}
 	}
 
 	/**
