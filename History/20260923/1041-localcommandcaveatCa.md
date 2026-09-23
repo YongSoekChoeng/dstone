@@ -593,3 +593,15 @@ I'll wait for the background startup to finish before checking the logs.
 작업을 모두 중지했습니다. 테스트용으로 띄웠던 dstone-ai-engine 앱과 그 안의 MCP(npx) 서브프로세스는 정지시켰고, 백그라운드 대기 작업도 취소했습니다.
 
 **현재 상태**: 코드/설정 변경(`NPX_CMD` 추가, `${NPX_CMD}`로 command 파라미터화)은 이미 파일에 저장되어 있지만, WSL 재검증과 커밋은 안 한 상태입니다. 이어서 진행할까요, 아니면 여기서 멈출까요?
+
+---
+
+## 질문
+
+멈춰
+
+---
+
+## 답변
+
+알겠습니다. 여기서 멈추겠습니다.
