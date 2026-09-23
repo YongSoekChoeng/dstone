@@ -229,18 +229,71 @@ filesystem-list`의 `list` step 등)은 2.2의 표에서 "기존과 동일" 행 
 7. `mvn compile` + 실제 기동 후 라이브 재검증(list→read-notes 체인이 이제 실제 파일 내용을
    돌려주는지, 기존 `sample-tool-chain-basic` 등이 여전히 예전과 동일하게 동작하는지 둘 다 확인).
 
-## 7. 사용자 확인이 필요한 결정 사항
+## 7. 사용자 확인이 필요한 결정 사항 (2026-09-23 결정 완료, 구현·라이브 검증·커밋까지 끝남)
 
 1. **필드 재사용(2.1) 동의 여부** - `structuredOutput`을 TOOL까지 의미를 넓히는 것 vs 새 이름의
    별도 필드를 쓰는 것. 재사용을 권장하지만, "AGENT와 TOOL은 실패 시 동작이 정반대(fail-closed vs
    graceful-fallback)인데 이름을 같이 쓰는 게 오히려 헷갈리지 않겠냐"는 반론도 있을 수 있음.
+   → **결정: 재사용.** (`common.definition.StepDefinition.structuredOutput`, `runtime.step.ToolStepRunner.runStructuredOutput()`으로 구현)
 2. **예시 B(디렉토리 전체 읽기)까지 이번에 같이 만들지, 예시 A(파일 하나)만 우선 처리하고 예시 B는
    실제 필요해졌을 때 그때 가서 YAML만 추가할지.** 어차피 Java 변경은 예시 A만으로 끝나고, 예시
    B는 그 이후 순수 YAML 추가이므로 "지금 당장 안 만들어도 나중에 언제든 Java 재배포 없이 추가
    가능"하다는 점을 참고.
+   → **결정: 예시 A만.** (예시 B는 여전히 미구현 - 8절의 후속 논의가 정리되면 그때 다시 고려)
 3. **로컬 Tool이 구조화 데이터를 내고 싶을 때 `runtime.step.StepOutcome.Success`를 직접
    import해서 반환 타입으로 쓰게 할지**(2.2안), 아니면 `tools` 패키지 전용의 별도 DTO를 하나 더
    만들지. 전자는 타입을 하나 더 줄이지만 `tools` 패키지가 `runtime.step` 패키지를 의존하게
    된다(지금은 `tools` → `runtime.tool`(`ToolOutcome`)만 의존하고 `runtime.step`을 몰라도 됨 -
    계층이 한 겹 더 얽힌다는 뜻). 후자는 타입이 하나 늘지만 `tools` 패키지의 의존 방향이 지금처럼
    깔끔하게 유지됨.
+   → **결정: 후자.** (`runtime.tool.ToolPayload` 신설)
+
+## 8. 후속 논의(2026-09-23, 미결) — step 간 I/O를 어떻게 일관되게 할 것인가
+
+7절을 구현하고 `sample-mcp-filesystem-list`를 실제로 테스트하는 과정에서(파일명을 바꾸니 Workflow가
+깨지는 걸 발견 → `list`도 `structuredOutput: true`로 켜고 `read-notes`가 `{previous}`로 파일명을
+동적으로 받게 고침), `{previous}` 토큰이 정확히 뭘 의미하는지에 대한 질문이 나왔고, 거기서 더
+근본적인 질문("여러 step/여러 Tool 사이의 I/O를 어떻게 일관되게 설계할 것인가")으로 이어졌다.
+**아직 결론을 내리지 않았고, 코드도 건드리지 않았다** - 다음에 이어서 논의하기 위해 지금까지 나온
+내용만 정리해 둔다.
+
+### 8.1 지금까지 확인한 사실
+
+- **AGENT와 TOOL은 애초에 "이전 step의 결과를 받는 방식" 자체가 다르다.** TOOL의 `inputTemplate`은
+  `{previous}`(직전 step의 결과 텍스트)/`{변수명}`/`{stepId.키}` 세 종류 토큰을 문자열 치환하는
+  명시적 템플릿이다. AGENT는 애초에 이런 템플릿이 없다 - 직전 step의 결과 텍스트 전체가 그대로
+  LLM의 사용자 메시지가 된다(자연어 턴 전달이지 템플릿 치환이 아니다). 그래서 "`{previous}`가
+  TOOL에서만 있다"는 관찰은 정확하지만, 그 원인은 "TOOL만 특별 취급해서"가 아니라 "AGENT는 애초에
+  토큰이라는 개념 자체를 쓰지 않아서"다.
+- **`{previous}`로 치환되는 값은 "가공 전 원본"이 아니라 "그 step 자신이 `stripLlmArtifacts()`로
+  한 번 정리한 값"이다**(`ToolStepRunner.run()`의 `normalized`). `stripLlmArtifacts()`는 원래
+  "LLM이 답변에 코드펜스나 `[레이블]`을 덧붙이는 습관"을 방어하려고 만든 로직인데,
+  `list_directory`의 응답 형식(`[FILE] 파일명`)이 우연히 그 정규식과 겹쳐서 같이 벗겨진다 - 즉
+  지금 `sample-mcp-filesystem-list.yml`의 동적 파일명 연결은 **의도된 기능이 아니라 두 정규식이
+  우연히 맞아떨어진 결과**다. 파일이 여러 개면(다중 줄 목록) 깨진다.
+- **`data`/`{stepId.키}`는 이미 "이름 붙은, 구조화된 핸드오프" 채널이다.** `structuredOutput: true`인
+  step이 낸 `data`는 `{stepId.키}`로 네임스페이싱되어 `variables`에 합쳐지고, 다음 step이 그 키를
+  정확히 지정해서 가져다 쓴다 - `{previous}`처럼 "직전 것"을 암묵적으로 가져오는 게 아니라, 누구의
+  어떤 값인지 명시적으로 주소를 매긴다.
+
+### 8.2 일반적으로 다른 시스템들은 어떻게 하는가
+
+- **파이프 스타일(암묵적)** - Unix 파이프(`cmd1 | cmd2`)처럼, 직전 단계의 출력 전체가 그대로 다음
+  단계의 입력이 된다. 간단하지만 "이게 정확히 무슨 형식인지"가 암묵적이라, 형식이 다른 여러 생산자
+  (사람이 쓴 텍스트, JSON, MCP 고유 포맷 등)가 섞이면 소비하는 쪽이 방어적으로 정리해야 한다 - 지금
+  `{previous}` + `stripLlmArtifacts()`가 정확히 이 패턴이다.
+- **이름 붙은 타입드 핸드오프(명시적)** - Airflow의 XCom(`xcom_pull(task_ids=...)`),
+  n8n/GitHub Actions의 `steps.<id>.outputs.<name>`, LangGraph의 공유 state 딕셔너리처럼, 각
+  step의 출력을 **step id로 주소를 매긴 구조화된 값**(보통 JSON)으로 저장해두고, 다음 step이
+  필요한 값을 명시적으로 가져다 쓴다. 이 엔진의 `data`/`{stepId.키}`가 이미 이 패턴이다.
+- 성숙한 워크플로우 오케스트레이션 시스템일수록 방식 2로 수렴하는 경향이 있다 - 방식 1(파이프)은
+  단순한 선형 파이프라인에서는 편리하지만, 생산자가 여러 형식을 섞어 쓰기 시작하는 순간(지금
+  겪은 것처럼) 소비자 쪽에 정리 로직이 쌓이기 시작한다.
+
+### 8.3 현재 잠정 방향 (미확정, 다음 논의에서 다시 다룰 것)
+
+`{previous}`를 없애자는 게 아니라, **"진짜 데이터 전달"은 항상 `structuredOutput`+`data`(방식 2)로
+하고, `{previous}`는 "직전 단계 텍스트를 대충 이어붙이는 편의 기능" 정도로 용도를 명확히 분리하는
+쪽**을 제안했었다. 다만 이것도 아직 사용자와 합의된 결론이 아니고, 구체적으로 어떻게 나눌지(예:
+`stripLlmArtifacts()`를 소비 시점이 아니라 생산 시점으로 옮길지, `{previous}`의 의미 자체를
+문서화만 명확히 하고 둘 다 유지할지 등)는 더 논의가 필요하다. **다음 세션에서 이어서 진행.**
