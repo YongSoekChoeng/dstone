@@ -2,7 +2,7 @@
 #
 # 이 Agent는 SUPERVISOR step 전용 예시입니다. 호출하는 방식 자체는 일반 AGENT step과 같지만,
 # 실제로는 runtime.agent.AgentExecutor.callForVerdict()로 호출되기 때문에, 자유롭게 쓴 텍스트
-# 대신 정해진 형식인 runtime.status.Verdict(pass, reason)로 응답을 받습니다. Spring AI가 이
+# 대신 정해진 형식인 runtime.agent.Verdict(pass, reason)로 응답을 받습니다. Spring AI가 이
 # Verdict의 JSON 스키마를 프롬프트에 자동으로 끼워 넣고, LLM의 응답을 그 스키마에 맞춰
 # 해석해 줍니다. workflows/supervisor-verdict-gate.yml에서 이 Agent를 가져다 씁니다.
 agent:

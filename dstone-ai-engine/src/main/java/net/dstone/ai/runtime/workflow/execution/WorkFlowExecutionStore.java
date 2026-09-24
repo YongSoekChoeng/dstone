@@ -20,11 +20,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.dstone.ai.common.consts.StepType;
 
 /**
- * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 이 두 테이블(schema/01-create-table-postgresql-
- * ai-workflow-execution.sql에 정의되어 있습니다)을 JdbcTemplate로 직접 다루는 클래스입니다. 이 모듈은
+ * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 이 두 테이블(schema/02-create-table-postgresql-
+ * dstone-ai.sql에 정의되어 있습니다)을 JdbcTemplate로 직접 다루는 클래스입니다. 이 모듈은
  * MyBatis를 쓰지 않기 때문에, 별도의 sqlmap 파일 없이 이 클래스 하나가 저장과 조회를 전담합니다.
  *
- * variables는 자바에서는 Map이지만, DB에는 JSONB 컬럼에 문자열로 저장해야 합니다. 그래서 저장할 때는
+ * context(실행 컨텍스트 트리)는 자바에서는 Map이지만, DB에는 CONTEXT_JSON(JSONB) 컬럼에 문자열로 저장해야 합니다. 그래서 저장할 때는
  * Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다. INSERT/UPDATE 쿼리에서는
  * PostgreSQL이 일반 문자열을 jsonb 타입으로 자동으로 바꿔주지 않으므로, "?::jsonb"라고 캐스트를
  * 직접 명시해 줍니다.
@@ -41,19 +41,19 @@ public class WorkFlowExecutionStore {
 	public void insert(WorkFlowExecution execution) {
 		this.jdbcTemplate.update(
 			"INSERT INTO AI_WORKFLOW_EXECUTION ("
-			+ "  EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, VARIABLES_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT "
+			+ "  EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, CONTEXT_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT "
 			+ ") VALUES ( "
 			+ "  ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ? "
 			+ ")",
-			execution.executionId(), execution.workflowId(), execution.caller(), execution.sessionId(), execution.status().name(), execution.currentStepIndex(), this.toJson(execution.variables()),
+			execution.executionId(), execution.workflowId(), execution.caller(), execution.sessionId(), execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()),
 			execution.resultText(), execution.errorMessage(), Timestamp.from(execution.createdAt()), Timestamp.from(execution.updatedAt()));
 	}
 
 	/** 기존에 저장된 실행 상태를 최신 상태로 덮어씁니다. @param execution 덮어쓸 최신 실행 상태입니다. */
 	public void update(WorkFlowExecution execution) {
 		this.jdbcTemplate.update(
-			"UPDATE AI_WORKFLOW_EXECUTION SET STATUS = ?, CURRENT_STEP_INDEX = ?, VARIABLES_JSON = ?::jsonb, RESULT_TEXT = ?, ERROR_MESSAGE = ?, UPDATED_AT = ? WHERE EXECUTION_ID = ?",
-			execution.status().name(), execution.currentStepIndex(), this.toJson(execution.variables()), execution.resultText(), execution.errorMessage(), Timestamp.from(execution.updatedAt()),
+			"UPDATE AI_WORKFLOW_EXECUTION SET STATUS = ?, CURRENT_STEP_INDEX = ?, CONTEXT_JSON = ?::jsonb, RESULT_TEXT = ?, ERROR_MESSAGE = ?, UPDATED_AT = ? WHERE EXECUTION_ID = ?",
+			execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()), execution.resultText(), execution.errorMessage(), Timestamp.from(execution.updatedAt()),
 			execution.executionId());
 	}
 
@@ -143,7 +143,7 @@ public class WorkFlowExecutionStore {
 			rs.getString("SESSION_ID"),
 			WorkFlowExecutionStatus.valueOf(rs.getString("STATUS")),
 			rs.getInt("CURRENT_STEP_INDEX"),
-			this.fromJson(rs.getString("VARIABLES_JSON")),
+			this.fromJson(rs.getString("CONTEXT_JSON")),
 			rs.getString("RESULT_TEXT"),
 			rs.getString("ERROR_MESSAGE"),
 			this.toInstant(rs.getTimestamp("CREATED_AT")),
@@ -168,16 +168,16 @@ public class WorkFlowExecutionStore {
 		return timestamp == null ? null : timestamp.toInstant();
 	}
 
-	/** 변수 맵을 DB에 저장할 수 있도록 JSON 문자열로 바꿉니다. @param variables JSON 문자열로 바꿀 변수 맵입니다. */
-	private String toJson(Map<String, Object> variables) {
+	/** 컨텍스트 맵을 DB에 저장할 수 있도록 JSON 문자열로 바꿉니다. @param context JSON 문자열로 바꿀 컨텍스트 맵입니다. */
+	private String toJson(Map<String, Object> context) {
 		try {
-			return this.objectMapper.writeValueAsString(variables == null ? Map.of() : variables);
+			return this.objectMapper.writeValueAsString(context == null ? Map.of() : context);
 		} catch (Exception e) {
-			throw new IllegalStateException("Workflow 변수를 JSON으로 직렬화하지 못했습니다.", e);
+			throw new IllegalStateException("Workflow 컨텍스트를 JSON으로 직렬화하지 못했습니다.", e);
 		}
 	}
 
-	/** DB에서 읽어온 JSON 문자열을 다시 변수 맵으로 되돌립니다. @param json 변수 맵으로 되돌릴 JSON 문자열입니다. */
+	/** DB에서 읽어온 JSON 문자열을 다시 컨텍스트 맵으로 되돌립니다. @param json 컨텍스트 맵으로 되돌릴 JSON 문자열입니다. */
 	private Map<String, Object> fromJson(String json) {
 		if (!StringUtils.hasText(json)) {
 			return new LinkedHashMap<>();
@@ -186,7 +186,7 @@ public class WorkFlowExecutionStore {
 			return this.objectMapper.readValue(json, new TypeReference<LinkedHashMap<String, Object>>() {
 			});
 		} catch (Exception e) {
-			throw new IllegalStateException("저장된 Workflow 변수를 파싱하지 못했습니다: " + json, e);
+			throw new IllegalStateException("저장된 Workflow 컨텍스트를 파싱하지 못했습니다: " + json, e);
 		}
 	}
 

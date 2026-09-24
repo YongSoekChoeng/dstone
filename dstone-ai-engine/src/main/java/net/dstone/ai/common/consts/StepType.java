@@ -9,15 +9,17 @@ public enum StepType {
 
 	/**
 	 * LLM에게 일을 한 번 시키는 step입니다. StepDefinition의 ref 값으로 지정한 이름을
-	 * common.registry.AgentRegistry에서 찾아 그 Agent를 한 번 호출합니다. AGENT step은 항상
-	 * 성공으로 취급됩니다(실패로 끝나는 경우가 없습니다).
+	 * common.registry.AgentRegistry에서 찾아 그 Agent를 한 번 호출합니다. output.schema가 없으면
+	 * 항상 성공으로 취급되고, output.schema가 있으면 LLM이 그 모양의 JSON으로 답하지 않았을 때만
+	 * 실패합니다(runtime.step.AgentStepRunner 참고).
 	 */
 	AGENT(Kind.AGENT_CALL),
 
 	/**
-	 * 미리 만들어둔 Tool(자바로 작성한 기능) 하나를 LLM을 거치지 않고 직접 호출하는 step입니다.
-	 * StepDefinition의 ref 값이 곧 common.config.ConfigTool에 등록된 Tool의 이름입니다. 결과가
-	 * 항상 똑같이 정해져 있는(결정적인) 검증 작업을 할 때 씁니다.
+	 * 등록된 Tool(@AiTool로 만든 자바 기능 또는 MCP 서버의 Tool) 하나를 LLM을 거치지 않고 직접 호출하는
+	 * step입니다. StepDefinition의 ref 값이 곧 common.config.ConfigTool에 등록된 Tool의 이름입니다. 값을
+	 * 검증하거나, 파일/문서/외부 시스템에서 데이터를 가져오는 것처럼 결과가 코드로 정해지는(결정적인)
+	 * 작업에 씁니다.
 	 */
 	TOOL(Kind.DETERMINISTIC),
 
@@ -43,7 +45,7 @@ public enum StepType {
 	 * 같은 step을 다시 한번 실행하는데, 이번에는 그 결정 내용에 따라 성공 또는 실패로 진행됩니다
 	 * (자세한 동작은 runtime.step.ApprovalStepRunner 참고).
 	 *
-	 * APPROVAL step은 forEachVariable(같은 step을 여러 번 동시에 실행하는 기능)과 함께 쓸 수
+	 * APPROVAL step은 forEach(같은 step을 여러 번 동시에 실행하는 기능)와 함께 쓸 수
 	 * 없습니다. 승인/반려 결정은 오직 그 step의 id 하나로만 구분되는데, 같은 step을 여러 번
 	 * 동시에 돌리면 "그중 어느 실행에 대한 결정인지"를 구분할 방법이 없기 때문입니다. 이런
 	 * 잘못된 조합은 엔진이 켜질 때 common.registry.WorkFlowRegistry가 미리 검사해서 막아줍니다.
@@ -64,7 +66,7 @@ public enum StepType {
 	 * ROUTER step은 onSuccess/onFailure를 쓰지 않고, 대신 routes를 씁니다. routes는 "경로 이름 →
 	 * 다음에 갈 step의 id" 형태의 매핑이며, 값으로 "SUCCESS"나 "FAIL"이라는 예약어를 넣을 수도
 	 * 있습니다. 만약 LLM이 고른 경로 이름이 routes에 없는 이름이라면(오타를 냈거나 없는 경로를
-	 * 지어낸 경우) Workflow는 그 자리에서 FAILED로 끝납니다. ROUTER step도 forEachVariable과 함께
+	 * 지어낸 경우) Workflow는 그 자리에서 FAILED로 끝납니다. ROUTER step도 forEach와 함께
 	 * 쓸 수 없습니다 - 여러 번 동시에 실행하면 "그중 어느 실행이 고른 경로를 따라가야 하는지"가
 	 * 애매해지기 때문입니다(이 검사 역시 엔진이 켜질 때 common.registry.WorkFlowRegistry가 해줍니다).
 	 */

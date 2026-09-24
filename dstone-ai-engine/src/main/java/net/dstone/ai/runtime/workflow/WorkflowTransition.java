@@ -7,11 +7,9 @@ package net.dstone.ai.runtime.workflow;
  * 되돌아가서 다시 시도한다는 뜻입니다. Done은 Workflow 전체가 성공으로 끝났다는 뜻이고, Failed는 반대로
  * 실패로 끝났다는 뜻입니다.
  *
- * 예전에는 StepStatus라는 enum에 NEXT_STEP/LOOP/SUCCESS/FAIL 외에 ERROR/WAITING_APPROVAL까지 6가지
- * 값이 있었지만, 뒤의 두 값은 실제로 한 번도 만들어지는 일이 없었습니다 - 스텝 실행 중 예외가 나거나
- * 승인 대기 상태가 되는 경우는 WorkFlowExecutor.run()이 이 타입을 거치지 않고 직접 처리하기 때문입니다
- * (예외는 persistFailed로 바로, 승인 대기는 StepRunResult.pendingResult()로 바로 처리됩니다). 그래서
- * 이번에 정리하면서 실제로 쓰이는 4가지 경우만 남겼습니다.
+ * 스텝 실행 중 예외가 나거나 승인 대기 상태가 되는 경우는 이 타입으로 표현하지 않습니다.
+ * WorkFlowExecutor.run()이 그 경우를 직접 처리합니다(예외는 persistFailed로, 승인 대기는
+ * StepRunResult.pendingResult()로 바로 처리됩니다).
  */
 public sealed interface WorkflowTransition {
 

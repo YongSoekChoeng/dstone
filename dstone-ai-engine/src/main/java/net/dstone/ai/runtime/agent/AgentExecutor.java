@@ -1,6 +1,5 @@
 package net.dstone.ai.runtime.agent;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Component;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.FieldDefinition;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
@@ -92,8 +92,8 @@ public class AgentExecutor extends BaseObject {
 	 * 판단하는 방식보다 LLM이 형식을 훨씬 더 잘 지켜서 답하기 때문입니다. 다만 100% 완벽하게 보장되는
 	 * 것은 아닙니다 - LLM이 그래도 스키마를 어기고 엉뚱한 형태로 답하면 entity() 호출 자체가 예외를
 	 * 던지는데, 그 예외를 처리하는 것은 이 메서드를 호출하는 쪽의 몫입니다. 실제로는
-	 * runtime.step.AgentStepRunner 안의 SUPERVISOR step이 Verdict를, ROUTER step이 RouteDecision을,
-	 * structuredOutput=true로 설정된 AGENT step이 StepPayload를 각각 이 메서드로 받습니다.
+	 * runtime.step.AgentStepRunner 안의 SUPERVISOR step이 Verdict를, ROUTER step이 RouteDecision을 각각
+	 * 이 메서드로 받습니다(output.schema를 선언한 AGENT step은 callForSchema()를 씁니다).
 	 *
 	 * 참고로 이 메서드에는 ragOverride/toolsOverride/modelOverride 파라미터가 없습니다. 정해진 형태의
 	 * 응답이 필요한 호출은 전부 Workflow의 step에서만 일어나는데, Workflow의 step은 애초에 요청마다
@@ -108,6 +108,26 @@ public class AgentExecutor extends BaseObject {
 	 */
 	public <T> T callForEntity(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Class<T> type) {
 		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(type);
+	}
+
+	/**
+	 * <pre>
+	 * output.schema를 선언한 AGENT step 전용 LLM 호출 메서드입니다.
+	 *
+	 * callForEntity()가 자바 클래스(Verdict 등)로 응답 모양을 정한다면, 이 메서드는 YAML에 선언한 필드 목록으로
+	 * 응답 모양을 정합니다. 필드 목록을 JSON Schema로 바꿔 프롬프트에 붙이고, LLM의 답을 그 모양의 맵으로
+	 * 읽어서 돌려줍니다(자세한 동작은 SchemaOutputConverter 참고). LLM이 모양을 지키지 않으면 예외를 던지며,
+	 * 그 예외를 실패로 처리하는 것은 호출하는 쪽(runtime.step.AgentStepRunner)의 몫입니다.
+	 * </pre>
+	 * @param agent       호출할 Agent의 정의
+	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param userMessage LLM에게 보낼 사용자 메시지
+	 * @param schema      LLM이 지켜야 할 응답 필드 목록(step의 output.schema)
+	 */
+	public Map<String, Object> callForSchema(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Map<String, FieldDefinition> schema) {
+		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(new SchemaOutputConverter(schema));
 	}
 
 	/**
@@ -179,12 +199,15 @@ public class AgentExecutor extends BaseObject {
 		/************************************************************************
 		3. 시스템 프롬프트를 적용합니다.
 			- AgentDefinition.prompt()에 적힌 문구를 그대로 시스템 프롬프트로 씁니다. 만약 그 문구 안에
-			  {caller}나 {today} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 그
-			  자리에서 실제 값으로 바꿔치기해 줍니다. 이 프롬프트는 resources/agents/*.yml 파일 안에
-			  직접 적혀 있습니다.
+			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
+			  바꿔치기해 줍니다. variables는 Workflow에서는 실행 컨텍스트의 input(요청의 message와
+			  variables), 채팅 화면에서는 요청의 variables입니다. 이 프롬프트는 resources/agents/*.yml
+			  파일 안에 직접 적혀 있습니다.
+			- 시스템 프롬프트는 "이 Agent가 어떤 역할인가"만 담습니다. 이전 step의 결과 같은 "이번에 할
+			  일의 데이터"는 step의 input 템플릿({{ ... }})으로 채워져 사용자 메시지로 들어옵니다.
 		************************************************************************/
 		if (!StringUtil.isEmpty(agent.prompt())) {
-			spec = spec.system(new PromptTemplate(agent.prompt()).render(this.promptSafeVariables(variables)));
+			spec = spec.system(new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables));
 		}
 
 		/************************************************************************
@@ -249,44 +272,6 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		return spec;
-	}
-
-	/**
-	 * <pre>
-	 * Spring AI의 PromptTemplate은 내부적으로 StringTemplate(ST4)이라는 템플릿 엔진을 씁니다. 그런데 ST4는
-	 * 속성 이름(변수명)에 마침표(.)가 들어 있으면 "cannot have '.' in attribute names"라는
-	 * IllegalArgumentException을 던집니다. 문제는, 그 프롬프트가 실제로 그 변수를 쓰는지와 상관없이
-	 * variables 맵에 들어 있는 모든 항목을 ST4가 무조건 다 추가해 버린다는 점입니다(StTemplateRenderer.apply()
-	 * 내부 동작입니다). 그래서 그 변수를 쓰지 않는 Agent라도, variables 맵 안에 마침표가 섞인 키가 하나라도
-	 * 있으면 프롬프트 렌더링 자체가 예외로 실패해 버립니다.
-	 *
-	 * 그런데 runtime.workflow.WorkFlowExecutor는 병렬 실행(forEach 반복)이나 structuredOutput=true로
-	 * 설정된 AGENT step의 결과 데이터를 {stepId.키} 형태로 이름을 붙여서(namespacing) variables 맵에
-	 * 넣어줍니다(자세한 내용은 runtime.step.StepOutcome.data()를 참고하세요). 그러니까 이런 마침표 섞인
-	 * 키가 variables 맵에 하나라도 쌓이고 나면, 이 필터링 없이 그대로 render()에 넘길 경우 그 뒤로 실행되는
-	 * 모든 Workflow의 AGENT/SUPERVISOR/ROUTER step이 전부 예외로 깨지게 됩니다. 그래서 프롬프트를 렌더링하기
-	 * 바로 직전에만, 이 메서드로 마침표가 섞인 키를 걸러내고 나머지만 넘깁니다.
-	 *
-	 * 참고로 {stepId.키} 형태의 참조는 TOOL step의 inputTemplate에서만 쓸 수 있습니다(ST4 같은 템플릿
-	 * 엔진이 아니라 단순 문자열 치환이라 마침표가 있어도 아무 문제가 없습니다). Agent의 prompt: 안에서는
-	 * 원래부터 이런 형태를 쓸 수 없습니다. 이 메서드가 걸러낸 토큰은 예외를 던지는 대신, "치환되지 않은
-	 * {stepId.키} 문자열 그대로"가 프롬프트에 남게 됩니다 - 앱이 죽어버리는 것보다는 훨씬 안전한
-	 * 실패 방식입니다.
-	 * </pre>
-	 *
-	 * @param variables 마침표 섞인 키를 걸러낼 원본 변수 맵(null이면 빈 Map으로 취급합니다)
-	 */
-	private Map<String, Object> promptSafeVariables(Map<String, Object> variables) {
-		if (variables == null || variables.isEmpty()) {
-			return Map.of();
-		}
-		Map<String, Object> safe = new LinkedHashMap<>();
-		for (Map.Entry<String, Object> entry : variables.entrySet()) {
-			if (entry.getKey() != null && entry.getKey().indexOf('.') < 0) {
-				safe.put(entry.getKey(), entry.getValue());
-			}
-		}
-		return safe;
 	}
 
 }

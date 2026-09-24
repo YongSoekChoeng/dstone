@@ -1,7 +1,8 @@
 # dstone-ai-engine: Step 간 I/O 규약 재설계 (2026-09-24)
 
 > 이 문서는 `dstone-ai-engine-refactory-20260923-1.md` §8(미결)의 결론이다.
-> 2026-09-24 논의에서 방향에 합의했고, 이 문서는 그 합의 내용과 구현 계획을 담는다. **아직 코드는 바꾸지 않았다.**
+> 2026-09-24 논의에서 방향에 합의했고, 같은 날 §5의 결정을 모두 권장안대로 확정해 구현·라이브 검증까지 마쳤다
+> (구현 중 계획과 달라진 점은 §7 참고).
 
 ## 0. 목표 다시 확인
 
@@ -361,7 +362,7 @@ APPROVAL은 텍스트를 그대로 통과시키므로, 명시하지 않아도 `p
      `sample-mcp-filesystem-list`(파일 2개 이상), `sample-foreach-parallel`, `testApp-sdlc`(승인 재개 포함)
 5. dstone-boot의 "Workflow 테스트" 화면과 관리자 실행 상세 화면에서 정상 동작 확인
 
-## 5. 구현 전에 확인받을 결정 사항
+## 5. 구현 전에 확인받을 결정 사항 (2026-09-24 전부 권장안으로 결정)
 
 | # | 결정 | 권장 | 이유 |
 |---|---|---|---|
@@ -377,3 +378,29 @@ APPROVAL은 텍스트를 그대로 통과시키므로, 명시하지 않아도 `p
 - 서로 다른 step을 동시에 실행하는 정적 병렬 그룹
 - 실행 이력(`StepHistoryEntry`)에 렌더링된 input 저장. 지금은 컨텍스트의 `steps.<id>.input`으로 볼 수 있다
 - MCP `structuredContent` 활용(Spring AI 버전 제약, 이전 문서 §0 참고)
+
+## 7. 구현 결과 (2026-09-24)
+
+§3~§4의 계획대로 구현했고, `docs/09.dstone-ai-engine.md` §6(전면 재작성)·§10·§14·§15와 `CLAUDE.md`에
+반영했다. 라이브 검증 기록은 `docs/09.dstone-ai-engine.md` §14의 2026-09-24 항목에 있다.
+
+계획과 달라지거나 계획에 없던 부분:
+
+1. **MCP 호출 서버별 직렬화 추가** - `sample-mcp-filesystem-list`를 `forEach`로 바꾸자, 같은 MCP 서버의
+   `read_text_file`을 동시에 두 번 부르는 순간 STDIO 클라이언트가 `Failed to enqueue message`로 한쪽을
+   실패시켰다. `ConfigMcp`가 서버마다 공용 잠금을 가진 `SerializedToolCallback`으로 Tool을 감싸서 해결했다.
+2. **forEach 반복의 시스템 예외 처리 통일** - 기존 forEach는 반복 하나가 예외를 던지면 "반복 실패"로
+   삼켜서 onFailure로 흘려보냈다. `docs/09` §2의 "ERROR와 FAILURE 분리" 원칙(러너 예외는 onFailure를
+   거치지 않고 즉시 FAILED)에 맞춰, 단일 step과 똑같이 이력을 남긴 뒤 실행 전체를 FAILED로 끝내게 했다.
+   반면 템플릿 참조를 못 찾은 경우는 계획대로 step 실패(onFailure를 따름)다.
+3. **`sample-mcp-filesystem-list`의 호출 방법 변경** - `message`에 `.../mcp/server-filesystem/sample`
+   (파일이 있는 디렉토리)을 넣고, 읽을 경로도 `{{input.message}}/{{fileName}}`으로 같은 값에서 만든다.
+   여러 파일을 확인하려고 `mcp/server-filesystem/sample/todo.txt`를 추가했다.
+4. **YAML/주석 정리 범위** - 원칙 2에 따라, 손댄 Java 파일과 YAML 파일(testApp 3개 Agent·Workflow 포함)의
+   수정 이력/경위 주석을 기능 설명으로 바꿨다. `WorkflowTransition`의 "예전에는 ~" 주석도 함께 정리했다.
+5. **로컬 DB 이관** - `ALTER TABLE AI_WORKFLOW_EXECUTION RENAME COLUMN VARIABLES_JSON TO CONTEXT_JSON`을
+   로컬 PostgreSQL에 실행했다(스키마 파일 `02-create-table-postgresql-dstone-ai.sql`도 `CONTEXT_JSON`으로 수정).
+   다른 환경(k8s 등)의 DB도 같은 ALTER가 필요하다.
+
+아직 확인하지 못한 것: TOOL `output.parse: json`의 라이브 동작(구조화 JSON을 반환하는 샘플 Tool이 없음),
+`testApp-sdlc`의 Jenkins 기동 구간, dstone-boot 관리자 화면의 실제 동작(컴파일만 확인).

@@ -1,35 +1,54 @@
 # common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# 이 Workflow는 TOOL step이 실패하면 AGENT step(fix-agent)으로 넘어갔다가 다시 TOOL step으로
-# 되돌아가는 onFailure 루프를 확인해보기 위한 테스트 전용 Workflow입니다. 이 Workflow에서 핵심은
-# StepDefinition.onFailure에 목록상 앞에 있는 step의 id를 적으면 루프가 만들어진다는 것과,
-# WorkFlowDefinition.maxIterations가 그 루프가 끝없이 돌지 않도록 막아준다는 것입니다.
+# 이 Workflow는 TOOL step이 실패하면 AGENT step(fix)으로 넘어갔다가 다시 TOOL step으로 되돌아가는
+# onFailure 루프를 확인해보기 위한 테스트 전용 Workflow입니다. 핵심은 onFailure에 목록상 앞에 있는
+# step의 id를 적으면 루프가 만들어진다는 것과, maxIterations가 그 루프가 끝없이 돌지 않도록 막아준다는
+# 것입니다.
 #
-# 동작 흐름은 이렇습니다: validate(TOOL validateSqlSyntax)가 실패하면 fix(AGENT fix-agent)로
-# 넘어가서, 그 실패 사유({previous}로 전달됩니다)를 보고 SQL을 고친 뒤 다시 validate로
-# 돌아갑니다. maxIterations=6으로 설정해 두면 validate(1번째,실패) -> fix(2번째) ->
-# validate(3번째,성공)처럼 고쳐 쓰기가 몇 번 더 걸리더라도 넉넉하게 여유가 있습니다 - 그래도
-# 끝내 못 고치면 결국 "최대 실행 횟수 초과"로 FAILED가 되는 것도 이 Workflow로 확인할 수 있습니다.
+# 동작 흐름
+# 1) validate: 검사할 SQL로 {{previous.data.sql ?? input.message}}를 씁니다.
+#    - 처음 실행될 때는 직전 step이 없으므로 previous.data.sql이 없어서 사용자 메시지(input.message)를 씁니다.
+#    - fix를 거쳐 되돌아왔을 때는 fix가 내놓은 data.sql(고친 SQL)을 씁니다.
+# 2) fix: validate가 실패하면 실행됩니다. 실패한 SQL({{steps.validate.input.sql}})과 실패 사유
+#    ({{steps.validate.error}})를 함께 받아서 고친 SQL을 output.schema의 sql 필드로 돌려줍니다.
+#    schema로 받기 때문에 LLM이 설명이나 코드펜스를 덧붙여도 sql 값만 깔끔하게 다음 step으로 넘어갑니다.
+# 3) 성공하면 Workflow의 output({{steps.validate.input.sql}}) - 최종적으로 검증을 통과한 SQL - 을 돌려줍니다.
+#
+# maxIterations=6이면 validate(실패) → fix → validate(성공)처럼 고쳐 쓰기가 몇 번 더 걸려도 여유가 있습니다.
+# 끝내 못 고치면 "최대 실행 횟수 초과"로 FAILED가 되는 것도 이 Workflow로 확인할 수 있습니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-loop-retry-until-valid
 #   message   : SELECT * FORM member WHERE id = 1
-# ("FORM"은 "FROM"을 일부러 잘못 쓴 오타입니다 - fix-agent가 이 오타를 고치고 나면 validate를
-# 통과하면서 SUCCESS로 끝납니다)
+# ("FORM"은 "FROM"을 일부러 잘못 쓴 오타입니다 - fix가 이 오타를 고치고 나면 validate를 통과하면서
+# SUCCESS로 끝납니다)
 workflow:
   id: sample-loop-retry-until-valid
   description: TOOL 검증 실패 -> AGENT 수정 -> TOOL 재검증, onFailure 루프 + maxIterations 상한 확인용 Workflow.
   maxIterations: 6
+  output: "{{steps.validate.input.sql}}"
   steps:
 
     - id: validate
       type: TOOL
       ref: validateSqlSyntax
-      inputTemplate: '{"sql":"{previous}"}'
+      input:
+        sql: "{{previous.data.sql ?? input.message}}"
       onSuccess: SUCCESS
       onFailure: fix
 
     - id: fix
       type: AGENT
       ref: sample-fix-agent
+      input: |
+        [검증에 실패한 SQL]
+        {{steps.validate.input.sql}}
+
+        [실패 사유]
+        {{steps.validate.error}}
+      output:
+        schema:
+          sql:
+            type: string
+            description: 문법 오류를 고친 단일 SQL 문
       onSuccess: validate

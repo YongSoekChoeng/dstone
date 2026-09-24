@@ -250,6 +250,8 @@ filesystem-list`의 `list` step 등)은 2.2의 표에서 "기존과 동일" 행 
 
 ## 8. 후속 논의(2026-09-23, 미결) — step 간 I/O를 어떻게 일관되게 할 것인가
 
+> → 2026-09-24 결론 및 구현: `docs/temp/dstone-ai-engine-refactory-20260924-1.md`
+
 7절을 구현하고 `sample-mcp-filesystem-list`를 실제로 테스트하는 과정에서(파일명을 바꾸니 Workflow가
 깨지는 걸 발견 → `list`도 `structuredOutput: true`로 켜고 `read-notes`가 `{previous}`로 파일명을
 동적으로 받게 고침), `{previous}` 토큰이 정확히 뭘 의미하는지에 대한 질문이 나왔고, 거기서 더

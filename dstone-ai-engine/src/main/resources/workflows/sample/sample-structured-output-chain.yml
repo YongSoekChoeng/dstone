@@ -1,37 +1,43 @@
 # common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# 이 Workflow는 structuredOutput=true인 AGENT step이 만든 data를, 뒤이은 TOOL step이
-# {stepId.키} 형태로 가져다 쓰는 연결 흐름을 확인해보기 위한 테스트 전용 Workflow입니다
-# (docs/09.dstone-ai-engine.md §9의 "AGENT step에 structuredOutput: true를 주면..." 예시와
-# 같은 패턴입니다).
+# 이 Workflow는 output.schema를 선언한 AGENT step이 만든 data를, 뒤이은 TOOL step이
+# {{steps.extract.data.sql}}로 이름을 콕 집어 가져다 쓰는 흐름을 확인해보기 위한 테스트 전용 Workflow입니다.
 #
-# extract step(structured-extract-agent, structuredOutput:true)이 runtime.status.StepPayload
-# (primaryText, data)라는 정해진 형식으로 응답하면, runtime.workflow.WorkFlowExecutor가 그
-# data를 "extract.키"라는 이름으로 묶어서(네임스페이싱) variables에 합쳐 넣습니다. 그래서
-# 다음에 오는 validate step의 inputTemplate에서 {extract.sql}이라고 쓰면 그 값을 그대로 꺼내
-# 쓸 수 있습니다({stepId.키} 형태의 토큰은 TOOL step의 inputTemplate에서만 쓸 수 있습니다 -
-# Agent의 prompt:는 점(.)이 섞인 키를 받을 수 없기 때문입니다. 자세한 내용은
-# runtime.agent.AgentExecutor.promptSafeVariables 참고).
+# 동작 흐름
+# 1) extract: 사용자 메시지(input을 생략했으므로 {{previous.text}} = 사용자 메시지)에서 SQL 문 하나를
+#    뽑아냅니다. output.schema에 sql 필드를 선언했으므로, LLM은 {"sql": "..."} 모양의 JSON으로만 답해야
+#    합니다. 이 모양을 지키지 않으면 extract가 실패합니다.
+# 2) validate: {{steps.extract.data.sql}}을 validateSqlSyntax의 sql 인자로 넘겨 문법을 검사합니다.
+# 3) 성공하면 Workflow의 output({{steps.extract.data.sql}}) - 뽑아내서 검증까지 통과한 SQL - 을 돌려줍니다.
+#
+# steps.extract.data.sql이라는 참조가 올바른지(extract step이 있는지, 그 schema에 sql이 있는지)는
+# 엔진이 켜질 때 common.registry.WorkFlowRegistry가 미리 검사합니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-structured-output-chain
 #   message   : 이 테이블에서 이름이 김철수인 사람을 찾고 싶어. SELECT * FROM member WHERE name = '김철수' 이렇게 쓰면 되지?
 workflow:
   id: sample-structured-output-chain
-  description: structuredOutput=true AGENT step의 data를 다음 TOOL step이 {extract.sql}로 참조하는 흐름 확인용 Workflow.
+  description: output.schema를 선언한 AGENT step의 data를 다음 TOOL step이 {{steps.extract.data.sql}}로 참조하는 흐름 확인용 Workflow.
   maxIterations: 3
+  output: "{{steps.extract.data.sql}}"
   steps:
 
     - id: extract
       type: AGENT
       ref: sample-structured-extract-agent
-      structuredOutput: true
+      output:
+        schema:
+          sql:
+            type: string
+            description: 입력 문장에서 그대로 뽑아낸 SQL 문 하나(없으면 SELECT 1)
       onSuccess: validate
       onFailure: FAIL
 
     - id: validate
       type: TOOL
       ref: validateSqlSyntax
-      inputTemplate: '{"sql":"{extract.sql}"}'
+      input:
+        sql: "{{steps.extract.data.sql}}"
       onSuccess: SUCCESS
       onFailure: FAIL

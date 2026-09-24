@@ -28,20 +28,25 @@ workflow:
     - id: http-check
       type: TOOL
       ref: httpGet
-      inputTemplate: '{"url":"https://example.com"}'
+      input:
+        url: https://example.com
       onSuccess: shell-check
       onFailure: shell-check
 
     - id: shell-check
       type: TOOL
       ref: runShellScript
-      inputTemplate: '{"scriptName":"sample-script","args":[]}'
+      input:
+        scriptName: sample-script
+        args: []
       onSuccess: python-check
       onFailure: python-check
 
     - id: python-check
       type: TOOL
       ref: runPythonScript
-      inputTemplate: '{"scriptName":"sample-script","args":[]}'
+      input:
+        scriptName: sample-script
+        args: []
       onSuccess: SUCCESS
       onFailure: SUCCESS

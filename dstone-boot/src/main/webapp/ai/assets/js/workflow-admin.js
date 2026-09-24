@@ -2,7 +2,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 	var urls = {};
 	var statusFilterEl, refreshBtn, listBodyEl;
-	var detailPanelEl, detailIdEl, detailBadgeEl, detailResultEl, detailVariablesEl, historyBodyEl;
+	var detailPanelEl, detailIdEl, detailBadgeEl, detailResultEl, detailContextEl, historyBodyEl;
 	var decisionFormEl, approverEl, commentEl, approveBtn, rejectBtn, decisionStatusEl;
 
 	var activeExecutionId = null;
@@ -18,7 +18,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		detailIdEl = document.getElementById("workflow-admin-detail-id");
 		detailBadgeEl = document.getElementById("workflow-admin-detail-badge");
 		detailResultEl = document.getElementById("workflow-admin-detail-result");
-		detailVariablesEl = document.getElementById("workflow-admin-detail-variables");
+		detailContextEl = document.getElementById("workflow-admin-detail-context");
 		historyBodyEl = document.getElementById("workflow-admin-history-body");
 
 		decisionFormEl = document.getElementById("workflow-admin-decision-form");
@@ -77,7 +77,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		detailBadgeEl.textContent = detail.status;
 		detailBadgeEl.className = "workflow-badge workflow-badge-" + (detail.status || "unknown").toLowerCase();
 		detailResultEl.value = detail.resultText || detail.errorMessage || "";
-		detailVariablesEl.value = detail.variables ? JSON.stringify(detail.variables, null, 2) : "";
+		detailContextEl.value = detail.context ? JSON.stringify(detail.context, null, 2) : "";
 
 		historyBodyEl.innerHTML = "";
 		(detail.history || []).forEach(function (h) {

@@ -4,7 +4,7 @@ import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
- * AGENT/TOOL/SUPERVISOR/APPROVAL, 이 네 가지 StepType을 실제로 처리하는 러너들(AgentStepRunner,
+ * AGENT/SUPERVISOR/ROUTER/TOOL/APPROVAL, 이 다섯 가지 StepType을 실제로 처리하는 러너들(AgentStepRunner,
  * ToolStepRunner, ApprovalStepRunner)이 모두 구현하는 공통 인터페이스입니다. WorkFlowExecutor는
  * StepType 값만 보고 이 인터페이스의 구현체를 하나 골라서, 항상 똑같은 방식으로(run 메서드를 한 번
  * 호출해서) 스텝을 실행합니다. 그리고 그 결과로 돌아온 StepOutcome이 성공/실패/대기 중 어느 경우인지만
@@ -16,8 +16,8 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * 있습니다.
  *
  * @param execution  지금 실행 중인 Workflow의 실행 상태입니다(executionId, workflowId 등을 담고 있고, 로깅이나 상태 저장에 쓰입니다).
- * @param definition 실행할 스텝의 정의입니다(type, ref, inputTemplate 등을 담고 있습니다).
- * @param input      이 스텝에 실제로 넘어갈, 미리 렌더링된 입력 텍스트와 전역 변수입니다.
+ * @param definition 실행할 스텝의 정의입니다(type, ref, output 등을 담고 있습니다).
+ * @param input      이 스텝에 실제로 넘어갈, 템플릿이 이미 채워진 입력입니다(StepInput 참고).
  */
 public interface StepRunner {
 

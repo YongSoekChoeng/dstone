@@ -62,8 +62,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * agents/*.yml 파일 하나가 가지는 최상위 구조입니다. workflows/*.yml, mcp/*.yml과 마찬가지로
-	 * 파일 하나에 Agent 하나만 담기고, 파일 이름이 곧 그 Agent의 id가 됩니다. 최상위 키는
-	 * agent: 입니다.
+	 * 파일 하나에 Agent 하나만 담기고, 최상위 키는 agent: 입니다.
 	 *
 	 * @param agent agent 키 아래에 있는 실제 정의 내용
 	 */
@@ -86,38 +85,29 @@ public class YamlDefinitionLoader extends BaseObject {
 	/** classpath 상의 workflows/*.yml 파일을 전부 찾아서 읽고, WorkFlowDefinition 목록으로 돌려줍니다. */
 	public List<WorkFlowDefinition> loadWorkflows() {
 		List<WorkFlowDefinition> definitions = new ArrayList<>();
-		try {
-			for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
-				if( !resource.isReadable() ) {continue;}
-				WorkflowFile file = this.readAs(resource, WorkflowFile.class);
-				if (file.workflow() == null) {
-					throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
-				}
-				definitions.add(file.workflow());
-				LogUtil.sysout("dstone-ai-engine loader: workflow[" + file.workflow().id() + "] <- " + this.relativePath(resource, "workflows"));
+		for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
+			if( !resource.isReadable() ) {continue;}
+			WorkflowFile file = this.readAs(resource, WorkflowFile.class);
+			if (file.workflow() == null) {
+				throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
+			definitions.add(file.workflow());
+			LogUtil.sysout("dstone-ai-engine loader: workflow[" + file.workflow().id() + "] <- " + this.relativePath(resource, "workflows"));
 		}
-
 		return definitions;
 	}
 
 	/** classpath 상의 agents/*.yml 파일을 전부 찾아서 읽고, AgentDefinition 목록으로 돌려줍니다. */
 	public List<AgentDefinition> loadAgents() {
 		List<AgentDefinition> definitions = new ArrayList<>();
-		try {
-			for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
-				if( !resource.isReadable() ) {continue;}
-				AgentFile file = this.readAs(resource, AgentFile.class);
-				if (file.agent() == null) {
-					throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
-				}
-				definitions.add(file.agent());
-				LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().id() + "] <- " + this.relativePath(resource, "agents"));
+		for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
+			if( !resource.isReadable() ) {continue;}
+			AgentFile file = this.readAs(resource, AgentFile.class);
+			if (file.agent() == null) {
+				throw new IllegalStateException(resource.getFilename() + "에 agent: 최상위 키가 없습니다.");
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
+			definitions.add(file.agent());
+			LogUtil.sysout("dstone-ai-engine loader: agent[" + file.agent().id() + "] <- " + this.relativePath(resource, "agents"));
 		}
 		return definitions;
 	}
@@ -125,18 +115,14 @@ public class YamlDefinitionLoader extends BaseObject {
 	/** classpath 상의 mcp/*.yml 파일을 전부 찾아서 읽고, McpServerDefinition 목록으로 돌려줍니다. */
 	public List<McpServerDefinition> loadMcpServers() {
 		List<McpServerDefinition> definitions = new ArrayList<>();
-		try {
-			for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
-				if( !resource.isReadable() ) {continue;}
-				McpServerFile file = this.readAs(resource, McpServerFile.class);
-				if (file.mcpServer() == null) {
-					throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
-				}
-				definitions.add(file.mcpServer());
-				LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + this.relativePath(resource, "mcp"));
+		for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
+			if( !resource.isReadable() ) {continue;}
+			McpServerFile file = this.readAs(resource, McpServerFile.class);
+			if (file.mcpServer() == null) {
+				throw new IllegalStateException(resource.getFilename() + "에 mcpServer: 최상위 키가 없습니다.");
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
+			definitions.add(file.mcpServer());
+			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + file.mcpServer().id() + "] <- " + this.relativePath(resource, "mcp"));
 		}
 		return definitions;
 	}
@@ -182,14 +168,11 @@ public class YamlDefinitionLoader extends BaseObject {
 	/**
 	 * 리소스 파일 하나를 읽어서 SnakeYAML로 파싱한 뒤, 지정한 타입(레코드)으로 바인딩해 줍니다.
 	 *
-	 * 클래스 상단 설명대로 서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐이라, id는 YAML에
-	 * 적힌 값을 그대로 씁니다 - 파일 경로를 바탕으로 접두사를 덧붙이는 처리는 하지 않습니다(과거에
-	 * 그런 처리가 있었으나, resource.getFilePath()가 패키징된 jar 안에서는 항상 예외를 던져서
-	 * java -jar로 실행할 때 Workflow/Agent가 단 하나도 등록되지 않는 문제가 있었고, 접두사 계산
-	 * 로직 자체도 의도한 "한 단계 서브 디렉토리는 접두사를 안 붙인다"는 조건이 실제로는 한 번도
-	 * 맞아떨어지지 않아 항상 ">디렉토리명>" 형태가 그대로 id 앞에 붙어버리는 버그가 있었다. 이
-	 * 문서(§4)가 설명하는 동작, 그리고 sample Workflow들의 실제 기대 id(예: agent-basic-echo)와
-	 * 맞추기 위해 제거했다).
+	 * 서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐이라, id는 YAML에 적힌 값을 그대로 씁니다.
+	 *
+	 * 파일을 읽지 못하거나, YAML의 키가 record와 맞지 않으면(모르는 키가 있거나 값의 모양이 다르면)
+	 * 파일 경로를 담은 예외를 던져서 엔진 기동을 멈춥니다. 잘못된 파일을 조용히 건너뛰면 그 Workflow나
+	 * Agent가 등록되지 않은 이유를 찾기 어렵기 때문입니다.
 	 *
 	 * @param resource 읽어올 리소스 파일
 	 * @param type     바인딩할 대상 타입
@@ -199,9 +182,8 @@ public class YamlDefinitionLoader extends BaseObject {
 			Object rawMap = this.yaml.load(input);
 			rawMap = this.resolvePlaceholders(rawMap);
 			return this.objectMapper.convertValue(rawMap, type);
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new IllegalStateException(resource.getFilename() + "를 읽는 중 오류가 발생했습니다.", e);
+		} catch (IOException | IllegalArgumentException e) {
+			throw new IllegalStateException(resource.getDescription() + "를 읽는 중 오류가 발생했습니다 - " + e.getMessage(), e);
 		}
 	}
 

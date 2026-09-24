@@ -26,6 +26,7 @@ workflow:
     - id: search
       type: TOOL
       ref: searchDocuments
-      inputTemplate: '{"query":"{previous}"}'
+      input:
+        query: "{{input.message}}"
       onSuccess: SUCCESS
       onFailure: FAIL

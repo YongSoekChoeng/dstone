@@ -1,0 +1,4 @@
+dstone-ai-engine MCP 샘플용 두 번째 테스트 파일입니다.
+
+sample-mcp-filesystem-list.yml Workflow가 디렉토리 안의 파일을 여러 개 찾았을 때도, forEach로
+파일마다 read_text_file을 한 번씩 호출해서 모두 읽어오는지 확인하는 용도입니다.

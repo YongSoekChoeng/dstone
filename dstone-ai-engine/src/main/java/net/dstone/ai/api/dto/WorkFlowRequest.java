@@ -5,12 +5,14 @@ import java.util.Map;
 /**
  * Workflow 실행 요청에 담을 내용입니다.
  *
- * message는 Workflow의 맨 첫 번째 step에 들어가는 입력값이 됩니다. variables는 그 뒤로 이어지는
- * 각 step의 프롬프트나 Tool 입력 템플릿에 있는 {변수명} 자리를 채우는 값입니다.
+ * message와 variables는 모두 실행 컨텍스트의 input 아래에 들어갑니다. message는 input.message가 되고,
+ * variables의 각 값은 input.{이름}이 됩니다. step의 input 템플릿은 {{input.message}}, {{input.이름}}으로,
+ * Agent의 system prompt는 {message}, {이름}으로 이 값들을 가져다 씁니다. 첫 step이 input을 따로 적지
+ * 않았다면 message가 그대로 첫 step의 입력이 됩니다.
  *
- * @param message   Workflow의 첫 step에 넘겨줄 입력 메시지입니다.
+ * @param message   Workflow에 넘겨줄 메시지입니다(필수).
  * @param sessionId 대화를 구분하는 세션 ID입니다.
- * @param variables 각 step의 프롬프트나 Tool 입력 템플릿을 채우는 데 쓰는 값들입니다.
+ * @param variables message 외에 Workflow에 넘겨줄 값들입니다(Workflow가 inputs를 선언했다면 그 계약을 지켜야 합니다).
  */
 public record WorkFlowRequest(String message, String sessionId, Map<String, Object> variables) {
 }

@@ -1,12 +1,17 @@
 package net.dstone.ai.runtime.step;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import net.dstone.ai.common.consts.StepType;
 import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.FieldDefinition;
 import net.dstone.ai.common.definition.StepDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.agent.AgentExecutor;
@@ -16,19 +21,30 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER)를 처리하는 클래스입니다. 셋 다 공통적으로
- * StepDefinition.ref()에 적힌 이름의 Agent를 호출한다는 점은 같지만, 응답을 어떤 형태로 받고 그걸로
- * 무엇을 판단하는지가 다릅니다.
+ * <pre>
+ * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER)를 처리하는 클래스입니다. 셋 다 StepDefinition.ref()에
+ * 적힌 Agent를 부르고, 채워진 input 텍스트(StepInput.text)를 사용자 메시지로 보낸다는 점은 같습니다.
+ * 응답을 어떤 모양으로 받고 무엇을 결과로 남기는지가 다릅니다.
  *
- * - AGENT: 기본값(structuredOutput=false)이면 LLM이 자유롭게 쓴 텍스트를 그대로 받습니다.
- *   structuredOutput=true로 설정하면 자유 텍스트 대신 정해진 구조(StepOutcome.Success)로 응답을 받습니다.
- * - SUPERVISOR: 자유 텍스트가 아니라 "통과했는지 아닌지"를 담은 구조화된 응답(Verdict의 pass/reason)을
- *   받아서, 그 값으로 이 step의 성공/실패를 결정합니다.
- * - ROUTER: 역시 자유 텍스트가 아니라 "다음에 어디로 갈지"를 담은 구조화된 응답(RouteDecision의
- *   route/reason)을 받아서, 그 값으로 Workflow가 다음에 어느 step으로 이동할지를 정합니다.
+ *   종류                    text(결과 텍스트)        data(구조화된 결과)         실패하는 경우
+ *   AGENT (schema 없음)     LLM 답변 원문            없음                       없음(항상 성공)
+ *   AGENT (schema 있음)     data를 JSON 글자로       output.schema대로 읽은 값  LLM이 schema를 지키지 않음
+ *   SUPERVISOR              받은 input 그대로        {pass, reason}             pass=false, 또는 응답 모양이 깨짐
+ *   ROUTER                  받은 input 그대로        {route, reason}            route를 고르지 못함, 또는 응답 모양이 깨짐
+ *
+ * SUPERVISOR와 ROUTER는 "판정"과 "선택"만 하는 관문이라서, 받은 input을 결과 텍스트로 그대로 넘깁니다.
+ * 판정 사유는 결과 텍스트에 덧붙이지 않고 data(또는 실패 시 error)에만 담으므로, 다음 step이 필요할 때
+ * {{steps.id.data.reason}}이나 {{steps.id.error}}로 따로 꺼내 씁니다.
+ *
+ * Workflow의 step에서 Agent를 부를 때는 요청마다 RAG/Tool/모델을 바꾸는 기능(ragOverride 등)을 쓰지 않고
+ * 항상 Agent 정의값을 그대로 씁니다. 그 기능은 api.controller.ChatController처럼 Agent 하나를 직접 부르는
+ * 화면에서만 씁니다.
+ * </pre>
  */
 @Component
 public class AgentStepRunner implements StepRunner {
+
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@Autowired
 	private AgentRegistry agentRegistry;
@@ -44,127 +60,120 @@ public class AgentStepRunner implements StepRunner {
 		if (definition.type() == StepType.ROUTER) {
 			return this.runRouter(execution, agent, input);
 		}
-		if (Boolean.TRUE.equals(definition.structuredOutput())) {
-			return this.runStructuredAgent(execution, agent, input);
+		if (definition.output() != null && definition.output().schema() != null) {
+			return this.runSchemaAgent(execution, agent, input, definition.output().schema());
 		}
 		return this.runAgent(execution, agent, input);
 	}
 
 	/**
-	 * <pre>
-	 * AGENT step을 처리합니다(structuredOutput이 false이거나 아예 설정되지 않은, 가장 기본적인 경우입니다).
-	 * LLM이 답한 자유 텍스트를 그대로 다음 step으로 넘기고, 이 step 자체는 항상 성공으로 취급합니다.
-	 * </pre>
+	 * output.schema가 없는 AGENT step을 처리합니다. LLM이 답한 글을 그대로 결과 텍스트로 남기고, 항상 성공으로 봅니다.
 	 *
 	 * @param execution 지금 진행 중인 Workflow 실행 상태
 	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력 텍스트와 전역 변수
+	 * @param input     이 step에 들어온 입력
 	 */
 	private StepOutcome runAgent(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
-		// Workflow의 step에서 Agent를 부를 때는 항상 (null, null, null)을 넘겨서 Agent 정의값을 그대로 씁니다.
-		// 요청마다 RAG/Tool/모델을 바꿔서 호출하는 기능(ragOverride/toolsOverride/modelOverride)은
-		// api.controller.ChatController처럼 Agent 하나를 직접 호출하는 화면에서만 쓰는 기능입니다.
-		String answer = this.agentExecutor.call(agent, execution.sessionId(), execution.caller(), input.variables(), input.renderedText(), null, null, null);
+		String answer = this.agentExecutor.call(agent, execution.sessionId(), execution.caller(), input.workflowInput(), input.text(), null, null, null);
 		return StepOutcome.success(answer);
 	}
 
 	/**
-	 * <pre>
-	 * structuredOutput=true로 설정된 AGENT step을 처리합니다. 자유 텍스트 대신, 정해진 구조를 가진
-	 * StepOutcome.Success(primaryText와 data 두 필드)로 응답을 받습니다. LLM에게 강제하는 JSON 스키마와
-	 * 성공한 step이 돌려주는 값의 모양이 원래도 같았기 때문에, 별도의 스키마 타입(예전의 StepPayload)을
-	 * 더 두지 않고 StepOutcome.Success를 그대로 재사용합니다. 여기서 받은 data는 그대로
-	 * StepOutcome.data()에 담기고, runtime.workflow.WorkFlowExecutor가 이 값을 {stepId.키}라는 이름으로
-	 * variables에 합쳐 넣어줍니다 - 그래서 다음 step이 이 데이터를 참조할 수 있게 됩니다.
+	 * output.schema가 있는 AGENT step을 처리합니다. LLM이 schema 모양의 JSON으로 답하게 하고, 그 JSON을 data로 남깁니다.
+	 * 결과 텍스트에는 같은 data를 JSON 글자로 담습니다.
 	 *
-	 * 만약 LLM 응답을 StepOutcome.Success 구조로 해석하지 못하면(모델이 정해진 형식을 지키지 않은 경우)
-	 * 이 step은 실패로 처리됩니다. 원래 AGENT step은 "항상 성공"으로 취급하는 게 기본 원칙이지만, 여기서는
-	 * 예외를 둡니다. structuredOutput=true로 설정했다는 것은 "다음 step이 이 data 값을 믿고 그대로
-	 * 쓰겠다"는 뜻인데, 만약 형식이 깨진 응답을 그냥 성공으로 흘려보내면 다음 step이 엉뚱한 값을
-	 * 받게 되기 때문입니다(SUPERVISOR step에서 판정이 불확실할 때 안전하게 실패로 처리하는 것과
-	 * 같은 이유입니다).
-	 * </pre>
+	 * LLM이 schema를 지키지 않으면(필드가 빠졌거나 타입이 다르면) 실패로 처리합니다. schema를 선언했다는 것은
+	 * 다음 step이 그 data를 믿고 그대로 쓰겠다는 뜻이므로, 모양이 깨진 답을 성공으로 넘기지 않습니다.
 	 *
 	 * @param execution 지금 진행 중인 Workflow 실행 상태
 	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력 텍스트와 전역 변수
+	 * @param input     이 step에 들어온 입력
+	 * @param schema    LLM이 지켜야 할 응답 필드 목록(step의 output.schema)
 	 */
-	private StepOutcome runStructuredAgent(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
-		StepOutcome.Success payload;
+	private StepOutcome runSchemaAgent(WorkFlowExecution execution, AgentDefinition agent, StepInput input, Map<String, FieldDefinition> schema) {
+		Map<String, Object> data;
 		try {
-			payload = this.agentExecutor.callForEntity(agent, execution.sessionId(), execution.caller(), input.variables(), input.renderedText(), StepOutcome.Success.class);
+			data = this.agentExecutor.callForSchema(agent, execution.sessionId(), execution.caller(), input.workflowInput(), input.text(), schema);
 		} catch (Exception e) {
-			String reason = "Agent 응답을 구조화된 형식(primaryText/data)으로 해석하지 못했습니다 - " + e.getMessage();
-			return StepOutcome.failure(input.renderedText(), reason);
+			return StepOutcome.failure(null, "Agent 응답을 output.schema 모양으로 읽지 못했습니다 - " + e.getMessage());
 		}
-		if (payload == null || StringUtil.isEmpty(payload.primaryText())) {
-			return StepOutcome.failure(input.renderedText(), "Agent가 primaryText 없는 구조화 응답을 반환했습니다.");
-		}
-		return payload;
+		return StepOutcome.success(this.toJson(data), data);
 	}
 
 	/**
 	 * <pre>
-	 * ROUTER step을 처리합니다. 자유 텍스트나 Verdict가 아니라, "어디로 갈지"를 담은 구조화된
-	 * RouteDecision(route와 reason 두 필드)으로 응답을 받습니다. 이 step 자체는 라우팅이 판정이 아니라
-	 * 선택이기 때문에 항상 SUCCESS(성공)로 취급됩니다. LLM이 고른 route 값이 StepDefinition.routes에
-	 * 실제로 정의되어 있는지 확인하고, 그 route에 맞춰 다음에 어느 step으로 이동할지 정하는 일은
-	 * runtime.workflow.WorkFlowExecutor.decideTransition이 이어받아 처리합니다.
+	 * ROUTER step을 처리합니다. LLM에게 "어디로 갈지"를 담은 RouteDecision(route, reason)으로 답하게 합니다.
+	 * 받은 input은 결과 텍스트로 그대로 넘기고, 고른 경로는 data에 {route, reason}으로 남깁니다.
+	 * 그 route가 StepDefinition.routes에 실제로 있는지 확인하고 다음 step을 정하는 일은
+	 * runtime.workflow.WorkFlowExecutor가 이어받습니다.
 	 *
-	 * 만약 LLM 응답을 RouteDecision 구조로 해석하지 못하면(모델이 정해진 형식을 지키지 않은 경우) 이
-	 * step은 실패로 처리됩니다. 어디로 가야 할지 하나도 고르지 못한 상태로 계속 진행할 수는 없기
-	 * 때문입니다 - runStructuredAgent와 같은 이유로, 판단이 불확실하면 안전하게 실패로 처리합니다.
+	 * 응답을 RouteDecision 모양으로 읽지 못하거나 route가 비어 있으면 실패로 처리합니다. 갈 곳을 고르지
+	 * 못한 채로 계속 진행할 수는 없기 때문입니다.
 	 * </pre>
 	 *
 	 * @param execution 지금 진행 중인 Workflow 실행 상태
 	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력 텍스트와 전역 변수
+	 * @param input     이 step에 들어온 입력
 	 */
 	private StepOutcome runRouter(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
 		RouteDecision decision;
 		try {
-			decision = this.agentExecutor.callForEntity(agent, execution.sessionId(), execution.caller(), input.variables(), input.renderedText(), RouteDecision.class);
+			decision = this.agentExecutor.callForEntity(agent, execution.sessionId(), execution.caller(), input.workflowInput(), input.text(), RouteDecision.class);
 		} catch (Exception e) {
-			String reason = "라우팅 Agent 응답을 구조화된 형식(route/reason)으로 해석하지 못했습니다 - " + e.getMessage();
-			return StepOutcome.failure(input.renderedText(), reason);
+			return StepOutcome.failure(input.text(), "라우팅 Agent 응답을 구조화된 형식(route/reason)으로 해석하지 못했습니다 - " + e.getMessage());
 		}
 		if (decision == null || StringUtil.isEmpty(decision.route())) {
-			return StepOutcome.failure(input.renderedText(), "라우팅 Agent가 route를 고르지 않았습니다.");
+			return StepOutcome.failure(input.text(), "라우팅 Agent가 route를 고르지 않았습니다.");
 		}
-		return StepOutcome.routed(input.renderedText(), Map.of(), decision.route());
+		Map<String, Object> data = new LinkedHashMap<>();
+		data.put("route", decision.route());
+		data.put("reason", decision.reason());
+		return StepOutcome.routed(input.text(), data, decision.route());
 	}
 
 	/**
 	 * <pre>
-	 * SUPERVISOR step을 처리합니다. AGENT step과 마찬가지로 Agent를 호출하지만, 응답을 자유 텍스트가
-	 * 아니라 "통과했는지 아닌지"를 담은 구조화된 Verdict(pass와 reason 두 필드)로 받아서, 그 값으로
-	 * 이 step의 성공/실패를 결정합니다(자세한 호출 방식은 runtime.agent.AgentExecutor.callForVerdict를
-	 * 참고하세요 - Spring AI가 Verdict의 JSON 형태를 자동으로 프롬프트에 알려주고, LLM의 답변을 그
-	 * 형태에 맞게 파싱해 줍니다).
+	 * SUPERVISOR step을 처리합니다. LLM에게 "통과했는지 아닌지"를 담은 Verdict(pass, reason)로 답하게 해서,
+	 * 그 값으로 이 step의 성공/실패를 정합니다(Spring AI가 Verdict의 JSON 모양을 프롬프트에 알려주고, 답을 그
+	 * 모양으로 읽어줍니다 - runtime.agent.AgentExecutor.callForVerdict 참고).
 	 *
-	 * 다만 이 방식도 100% 완벽하지는 않습니다. LLM이 정해진 형식을 지키지 않으면 파싱 과정에서
-	 * 예외가 발생하는데, 이 경우와 "verdict.pass()가 명확히 false로 나온 경우"를 굳이 구분하지 않고
-	 * 둘 다 똑같이 실패로 처리합니다. 판정 결과를 믿을 수 없는 상황이라면, 안전한 쪽인 "실패"로
-	 * 처리하는 것이 맞기 때문입니다.
+	 * - 통과: 받은 input을 결과 텍스트로 그대로 넘기고, data에 {pass, reason}을 남깁니다.
+	 * - 불통과: 실패로 처리하고, reason을 실패 사유(error)로 남깁니다.
+	 * - 응답 모양이 깨짐: 판정을 믿을 수 없으므로 안전하게 실패로 처리합니다.
 	 * </pre>
 	 *
 	 * @param execution 지금 진행 중인 Workflow 실행 상태
 	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력 텍스트와 전역 변수
+	 * @param input     이 step에 들어온 입력
 	 */
 	private StepOutcome runSupervisor(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
 		Verdict verdict;
 		try {
-			verdict = this.agentExecutor.callForVerdict(agent, execution.sessionId(), execution.caller(), input.variables(), input.renderedText());
+			verdict = this.agentExecutor.callForVerdict(agent, execution.sessionId(), execution.caller(), input.workflowInput(), input.text());
 		} catch (Exception e) {
-			String reason = "감독 Agent 응답을 구조화된 형식(pass/reason)으로 해석하지 못했습니다 - " + e.getMessage();
-			return StepOutcome.failure(input.renderedText() + "\n\n[검토 결과] 실패: " + reason, reason);
-		}
-		if (verdict != null && verdict.pass()) {
-			return StepOutcome.success(input.renderedText());
+			return StepOutcome.failure(input.text(), "감독 Agent 응답을 구조화된 형식(pass/reason)으로 해석하지 못했습니다 - " + e.getMessage());
 		}
 		String reason = verdict == null || StringUtil.isEmpty(verdict.reason()) ? "(사유 없음)" : verdict.reason();
-		return StepOutcome.failure(input.renderedText() + "\n\n[검토 결과] 실패: " + reason, reason);
+		if (verdict != null && verdict.pass()) {
+			Map<String, Object> data = new LinkedHashMap<>();
+			data.put("pass", true);
+			data.put("reason", reason);
+			return StepOutcome.success(input.text(), data);
+		}
+		return StepOutcome.failure(input.text(), reason);
+	}
+
+	/**
+	 * data를 결과 텍스트로 남길 JSON 글자로 바꿉니다.
+	 *
+	 * @param data JSON 글자로 바꿀 값입니다.
+	 */
+	private String toJson(Map<String, Object> data) {
+		try {
+			return this.objectMapper.writeValueAsString(data);
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Agent 응답 data를 JSON으로 바꾸지 못했습니다: " + data, e);
+		}
 	}
 
 }

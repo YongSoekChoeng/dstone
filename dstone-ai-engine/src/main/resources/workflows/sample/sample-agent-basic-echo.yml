@@ -1,8 +1,9 @@
 # common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
 # 이 Workflow는 AGENT step 하나만으로 이루어진, Workflow의 가장 기본적인 형태를 확인해보기
-# 위한 테스트 전용 Workflow입니다. StepType.AGENT는 항상 성공으로 취급되기 때문에 onFailure를
-# 따로 정해두지 않았습니다(자세한 내용은 common.definition.StepType 참고).
+# 위한 테스트 전용 Workflow입니다. output.schema가 없는 AGENT step은 항상 성공으로 취급되기 때문에
+# onFailure를 따로 정해두지 않았습니다(자세한 내용은 common.consts.StepType 참고). input을 생략했으므로
+# 사용자 메시지({{previous.text}})가 그대로 LLM에게 전달됩니다.
 #
 # 여기서 쓰는 basic-echo-agent(agents/basic-echo-agent.yml)는 프롬프트 템플릿 변수도, Tool도
 # 전혀 쓰지 않는 아주 단순한 Agent라서, message 하나만 보내면 항상 성공합니다 - variables는

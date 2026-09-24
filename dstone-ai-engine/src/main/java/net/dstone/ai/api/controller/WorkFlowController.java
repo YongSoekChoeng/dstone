@@ -98,6 +98,7 @@ public class WorkFlowController extends BaseController {
 		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, caller);
+		this.checkInputs(workflow, request);
 		String sessionId = this.resolveSessionId(request);
 
 		WorkFlowExecution result = this.workFlowExecutionService.executeSync(workflow, sessionId, caller, request.variables(), request.message());
@@ -123,6 +124,7 @@ public class WorkFlowController extends BaseController {
 		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, caller);
+		this.checkInputs(workflow, request);
 		String sessionId = this.resolveSessionId(request);
 		String executionId = this.workFlowExecutionService.submitAsync(workflow, sessionId, caller, request.variables(), request.message());
 		return new WorkFlowSubmitResponse(executionId);
@@ -152,6 +154,21 @@ public class WorkFlowController extends BaseController {
 	private void validateMessage(WorkFlowRequest request) {
 		if (StringUtil.isEmpty(request.message())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
+		}
+	}
+
+	/**
+	 * Workflow에 inputs(입력 계약)가 선언되어 있으면, 요청이 그 계약을 지켰는지 실행 전에 확인합니다.
+	 * 지키지 않았으면 실행을 시작하지 않고 400(Bad Request)으로 거절합니다.
+	 *
+	 * @param workflow 실행할 Workflow의 정의입니다.
+	 * @param request  검증할 Workflow 요청입니다.
+	 */
+	private void checkInputs(WorkFlowDefinition workflow, WorkFlowRequest request) {
+		try {
+			this.workFlowExecutionService.checkInputs(workflow, request.variables(), request.message());
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
 	}
 

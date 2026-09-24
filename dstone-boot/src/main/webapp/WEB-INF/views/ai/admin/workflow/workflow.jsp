@@ -60,8 +60,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<textarea id="workflow-admin-detail-result" class="workflow-textarea" readonly></textarea>
 				</div>
 				<div class="workflow-field">
-					<label>variables</label>
-					<textarea id="workflow-admin-detail-variables" class="workflow-textarea workflow-textarea-small" readonly></textarea>
+					<label>context</label>
+					<textarea id="workflow-admin-detail-context" class="workflow-textarea workflow-textarea-small" readonly></textarea>
 				</div>
 
 				<table id="workflow-admin-history-table" class="document-list-table">

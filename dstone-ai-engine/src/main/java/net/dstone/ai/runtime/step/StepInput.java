@@ -3,13 +3,16 @@ package net.dstone.ai.runtime.step;
 import java.util.Map;
 
 /**
- * StepRunner 하나를 실행할 때 넘겨주는 입력값을 담는 record입니다. renderedText는
- * StepDefinition.inputTemplate에 있던 {previous}나 {변수명} 같은 토큰들을 실제 값으로 다 바꿔치기한
- * 결과 텍스트로, AGENT step과 TOOL step이 공통으로 쓰는 입력 원문입니다. variables는 Workflow를 처음
- * 호출할 때 넘겨받은 전역 변수 맵을 그대로 읽기 전용으로 전달한 것입니다.
+ * StepRunner 하나를 실행할 때 넘겨주는 입력값입니다. step의 input 템플릿은 runtime.workflow.WorkFlowExecutor가
+ * 미리 채워서 넘겨주므로, StepRunner는 템플릿을 전혀 몰라도 됩니다.
  *
- * @param renderedText 이전 스텝의 결과(또는 처음 시작할 때의 입력)가 반영된, 이번 스텝에 실제로 넘어갈 입력 텍스트입니다.
- * @param variables    Workflow 실행 전체에서 공유하는 전역 변수 맵입니다.
+ * step 종류에 따라 쓰는 필드가 다릅니다.
+ * - AGENT / SUPERVISOR / ROUTER / APPROVAL: text를 씁니다(LLM에게 보낼 사용자 메시지, 또는 그대로 넘길 텍스트).
+ * - TOOL: arguments를 씁니다(JSON으로 바꿔서 Tool에게 넘길 인자).
+ *
+ * @param text          채워진 입력 텍스트입니다. TOOL step에서는 null입니다.
+ * @param arguments     채워진 Tool 인자입니다. TOOL step이 아니면 null입니다.
+ * @param workflowInput Workflow를 실행할 때 넘긴 값(컨텍스트의 input)입니다. Agent의 system prompt 안의 {변수명}을 채우는 데 씁니다.
  */
-public record StepInput(String renderedText, Map<String, Object> variables) {
+public record StepInput(String text, Map<String, Object> arguments, Map<String, Object> workflowInput) {
 }

@@ -4,11 +4,12 @@
 # 판정이 실제로 성공/실패를 잘 가르는지 확인해보기 위한 테스트 전용 Workflow입니다(자세한 내용은
 # runtime.step.AgentStepRunner.runSupervisor 참고).
 #
-# draft step(general-chat)이 만든 응답 텍스트가 그대로 judge step(verdict-judge-agent)의
-# 입력(userMessage)으로 들어갑니다(AGENT/SUPERVISOR step은 inputTemplate을 따로 쓰지 않고
-# 항상 바로 앞 step의 결과인 {previous}를 그대로 넘겨받습니다). verdict-judge-agent는 그
-# 텍스트에 "안녕"이라는 단어가 들어 있는지만 검사합니다 - 들어 있으면 pass=true가 되어
-# SUCCESS로, 없으면 pass=false가 되어 FAIL로 끝납니다.
+# 두 step 모두 input을 생략했으므로 기본값인 {{previous.text}}를 받습니다. draft step(general-chat)은
+# 사용자 메시지를, judge step(verdict-judge-agent)은 draft가 만든 응답 텍스트를 사용자 메시지로 받습니다.
+# verdict-judge-agent는 그 텍스트에 "안녕"이라는 단어가 들어 있는지만 검사합니다 - 들어 있으면 pass=true가
+# 되어 SUCCESS로, 없으면 pass=false가 되어 FAIL로 끝납니다. SUPERVISOR는 받은 텍스트를 그대로 넘기므로
+# 성공 시 최종 결과는 draft의 응답이고, 판정 사유는 context.steps.judge.data.reason(실패면
+# steps.judge.error)에 남습니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-supervisor-verdict-gate

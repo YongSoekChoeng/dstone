@@ -3,8 +3,11 @@ package net.dstone.ai.common.config;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -75,10 +78,11 @@ public class ConfigMcp extends BaseObject {
 			client.initialize();
 
 			List<ToolCallback> discovered = SyncMcpToolCallbackProvider.syncToolCallbacks(List.of(client));
+			Object serverLock = new Object();
 			int added = 0;
 			for (ToolCallback callback : discovered) {
 				if (this.isAllowed(definition, callback)) {
-					this.toolCallbacks.add(callback);
+					this.toolCallbacks.add(new SerializedToolCallback(callback, serverLock));
 					added++;
 				}
 			}
@@ -145,6 +149,54 @@ public class ConfigMcp extends BaseObject {
 			return true;
 		}
 		return allowedTools.contains(callback.getToolDefinition().name());
+	}
+
+	/**
+	 * MCP 서버 하나에 대한 Tool 호출을 한 번에 하나씩만 보내도록 감싸는 ToolCallback입니다.
+	 *
+	 * MCP 클라이언트 하나는 서버와의 연결(STDIO면 프로세스의 표준 입출력 한 쌍) 하나를 씁니다. 여기에 여러
+	 * 스레드가 동시에 요청을 보내면 "Failed to enqueue message" 오류로 일부 호출이 실패합니다. Workflow의
+	 * forEach가 같은 MCP Tool을 동시에 여러 번 부르거나, LLM이 Tool 여러 개를 한꺼번에 부를 때 이런 일이
+	 * 생깁니다. 그래서 같은 서버에서 온 Tool들은 모두 같은 잠금(serverLock)을 나눠 갖고, 호출을 차례대로
+	 * 보냅니다. 서로 다른 MCP 서버끼리는 잠금이 달라서 동시에 호출될 수 있습니다.
+	 */
+	private static final class SerializedToolCallback implements ToolCallback {
+
+		private final ToolCallback delegate;
+		private final Object serverLock;
+
+		/**
+		 * @param delegate   실제 MCP Tool 호출을 맡는 원래 ToolCallback입니다.
+		 * @param serverLock 같은 MCP 서버의 Tool들이 함께 쓰는 잠금입니다.
+		 */
+		private SerializedToolCallback(ToolCallback delegate, Object serverLock) {
+			this.delegate = delegate;
+			this.serverLock = serverLock;
+		}
+
+		@Override
+		public ToolDefinition getToolDefinition() {
+			return this.delegate.getToolDefinition();
+		}
+
+		@Override
+		public ToolMetadata getToolMetadata() {
+			return this.delegate.getToolMetadata();
+		}
+
+		@Override
+		public String call(String toolInput) {
+			synchronized (this.serverLock) {
+				return this.delegate.call(toolInput);
+			}
+		}
+
+		@Override
+		public String call(String toolInput, ToolContext toolContext) {
+			synchronized (this.serverLock) {
+				return this.delegate.call(toolInput, toolContext);
+			}
+		}
 	}
 
 	/** 접속에 성공한 MCP 서버들에서 모아온 Tool 전체 목록입니다. common.config.ConfigTool이 이 목록을 로컬 @AiTool Tool들과 합쳐서 씁니다. */

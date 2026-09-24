@@ -1,6 +1,6 @@
 package net.dstone.ai.api.service;
 
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -10,10 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.definition.FieldDefinition;
 import net.dstone.ai.common.definition.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
+import net.dstone.ai.common.schema.FieldTypes;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
@@ -45,11 +48,11 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
 	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다.
-	 * @param initialInput Workflow에 처음 넣어줄 입력값입니다.
+	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 input 아래에 들어갑니다).
+	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 input.message에 들어갑니다).
 	 */
-	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
-		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, initialInput);
+	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String message) {
+		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, message);
 		this.executionStore.insert(execution);
 		return this.workFlowExecutor.run(workflow, execution);
 	}
@@ -61,11 +64,11 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
 	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다.
-	 * @param initialInput Workflow에 처음 넣어줄 입력값입니다.
+	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 input 아래에 들어갑니다).
+	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 input.message에 들어갑니다).
 	 */
-	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
-		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, initialInput);
+	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String message) {
+		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, message);
 		this.executionStore.insert(execution);
 		// 지금은 기본 ForkJoinPool.commonPool()을 그대로 쓰고 있습니다. 전용 스레드풀이나 큐잉,
 		// 동시 실행 개수 제한 같은 건 실제 운영 환경에서 동시에 들어오는 submit이 많아지면 그때 도입할 계획입니다.
@@ -94,7 +97,7 @@ public class WorkFlowExecutionService extends BaseService {
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
 		String pendingStepId = workflow.steps().get(execution.currentStepIndex()).id();
-		this.recordDecision(execution, pendingStepId, approved, approver, comment);
+		WorkFlowContext.recordApproval(execution.context(), pendingStepId, approved, approver, comment);
 		return this.workFlowExecutor.run(workflow, execution);
 	}
 
@@ -130,47 +133,45 @@ public class WorkFlowExecutionService extends BaseService {
 	}
 
 	/**
-	 * 새 실행 상태를 만듭니다. initialInput은 첫 스텝이 {previous} 토큰으로 참조할 수 있도록
-	 * variables 안에 함께 넣어둡니다.
+	 * Workflow에 inputs(입력 계약)가 선언되어 있으면, 요청에 그 값들이 빠짐없이 올바른 타입으로 들어 있는지
+	 * 확인합니다. message는 항상 input.message로 들어가므로 inputs에 선언되어 있다면 message 값으로 검사합니다.
+	 * 계약에 없는 값이 더 들어 있는 것은 허용합니다.
 	 *
-	 * @param workflowId   이 새 실행이 속할 Workflow의 id입니다.
-	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
-	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다. null이면 빈 Map으로 시작합니다.
-	 * @param initialInput Workflow에 처음 넣어줄 입력값입니다. 첫 스텝의 {previous} 자리에 채워집니다.
+	 * @param workflow  실행할 Workflow의 정의입니다.
+	 * @param variables 요청의 variables입니다.
+	 * @param message   요청의 message입니다.
+	 * @throws IllegalArgumentException 빠진 값이나 타입이 다른 값이 있을 때(어떤 값이 왜 문제인지 메시지에 담깁니다)
 	 */
-	private WorkFlowExecution newExecution(String workflowId, String sessionId, String caller, Map<String, Object> variables, String initialInput) {
-		Map<String, Object> mutableVariables = variables == null ? new LinkedHashMap<>() : new LinkedHashMap<>(variables);
-		mutableVariables.put(Constants.WorkFlow.PREVIOUS_TEXT_VARIABLE_KEY, initialInput);
-		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflowId, caller, sessionId, mutableVariables);
+	public void checkInputs(WorkFlowDefinition workflow, Map<String, Object> variables, String message) {
+		if (workflow.inputs() == null || workflow.inputs().isEmpty()) {
+			return;
+		}
+		List<String> problems = new ArrayList<>();
+		for (Map.Entry<String, FieldDefinition> entry : workflow.inputs().entrySet()) {
+			String name = entry.getKey();
+			Object value = Constants.WorkFlow.Context.MESSAGE.equals(name) ? message : (variables == null ? null : variables.get(name));
+			if (value == null) {
+				problems.add(name + "(없음)");
+			} else if (!FieldTypes.matches(entry.getValue().type(), value)) {
+				problems.add(name + "(" + entry.getValue().type() + " 타입이어야 함)");
+			}
+		}
+		if (!problems.isEmpty()) {
+			throw new IllegalArgumentException("workflow[" + workflow.id() + "]의 inputs 계약을 지키지 않았습니다: " + problems);
+		}
 	}
 
 	/**
-	 * APPROVAL 스텝의 결정 내용을 실행의 variables 안에 기록합니다. execution의 variables를
-	 * 직접 수정하는 방식으로 동작합니다.
+	 * 새 실행 상태를 만듭니다. 요청의 message와 variables로 새 컨텍스트를 만들어 담습니다(WorkFlowContext.create() 참고).
 	 *
-	 * @param execution 결정을 기록할 실행입니다(variables가 그대로 바뀝니다).
-	 * @param stepId    결정을 기록할 대상 APPROVAL 스텝의 id입니다.
-	 * @param approved  승인이면 true, 반려면 false입니다.
-	 * @param approver  이 결정을 내린 사람이나 역할입니다.
-	 * @param comment   결정한 이유나 메모입니다.
+	 * @param workflowId 이 새 실행이 속할 Workflow의 id입니다.
+	 * @param sessionId  대화를 구분하는 세션 식별자입니다.
+	 * @param caller     이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
+	 * @param variables  Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(없으면 null).
+	 * @param message    Workflow를 호출할 때 넘겨받은 메시지입니다.
 	 */
-	@SuppressWarnings("unchecked")
-	private void recordDecision(WorkFlowExecution execution, String stepId, boolean approved, String approver, String comment) {
-		Map<String, Object> variables = execution.variables();
-		Object existingApprovals = variables.get(Constants.WorkFlow.APPROVALS_VARIABLE_KEY);
-		Map<String, Object> approvals;
-		if (existingApprovals instanceof Map) {
-			approvals = (Map<String, Object>) existingApprovals;
-		} else {
-			approvals = new LinkedHashMap<String, Object>();
-			variables.put(Constants.WorkFlow.APPROVALS_VARIABLE_KEY, approvals);
-		}
-		Map<String, Object> decision = new LinkedHashMap<>();
-		decision.put("approved", approved);
-		decision.put("approver", approver);
-		decision.put("comment", comment);
-		approvals.put(stepId, decision);
+	private WorkFlowExecution newExecution(String workflowId, String sessionId, String caller, Map<String, Object> variables, String message) {
+		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflowId, caller, sessionId, WorkFlowContext.create(message, variables));
 	}
 
 }
