@@ -317,11 +317,15 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
-	 * step을 실제로 한 번 실행합니다: input 템플릿을 채우고 → StepRunner를 부르고 → 걸린 시간을 잽니다.
-	 * 템플릿이 가리키는 값을 찾지 못하면 StepRunner를 부르지 않고 실패 결과를 돌려줍니다(YAML을 잘못
-	 * 조립한 비즈니스 실패이므로 onFailure를 따릅니다). StepRunner가 던진 예외(시스템 오류)는 잡지 않고
-	 * 그대로 올려보내서, run()이 onFailure를 거치지 않고 실행 전체를 FAILED로 끝내게 합니다.
+	 * <pre>
+	 * step을 실제로 한 번 실행합니다.
+	 * - input 템플릿을 채우고 
+	 * - StepRunner를 부르고 
+	 * - 걸린 시간을 잽니다.
+	 * 템플릿이 가리키는 값을 찾지 못하면 StepRunner를 부르지 않고 실패 결과를 돌려줍니다(YAML을 잘못 조립한 비즈니스 실패이므로 onFailure를 따릅니다). 
+	 * StepRunner가 던진 예외(시스템 오류)는 잡지 않고 그대로 올려보내서, run()이 onFailure를 거치지 않고 실행 전체를 FAILED로 끝내게 합니다.
 	 * forEach의 반복들이 동시에 부를 수 있도록, 이 메서드는 실행 이력을 직접 남기지 않습니다.
+	 * </pre>
 	 *
 	 * @param step      실행할 step의 정의입니다.
 	 * @param execution 지금 진행 중인 실행입니다.

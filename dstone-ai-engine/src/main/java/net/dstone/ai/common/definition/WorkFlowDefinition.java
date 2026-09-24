@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * <pre>
  * Workflow 하나 전체를 표현하는 클래스입니다. resources/workflows/*.yml 파일 하나하나가 이 클래스의
  * 값으로 채워지며, 이 작업은 net.dstone.ai.common.loader.YamlDefinitionLoader 가 담당합니다.
  * 사용자가 API로 어떤 Workflow를 실행해 달라고 요청하면, api.controller.WorkFlowController가 그
@@ -13,11 +14,11 @@ import java.util.Map;
  * inputs에 이 Workflow가 필요로 하는 입력값을 선언해 두면, 실행 요청이 들어올 때 그 값이 빠져 있거나
  * 타입이 다르면 실행하기 전에 바로 거절합니다(HTTP 400). 요청의 message는 항상 input.message로 들어가므로
  * 따로 선언하지 않아도 됩니다. inputs를 비워두면 입력 검사를 하지 않습니다.
- * <pre>
+ * 
  *   inputs:
  *     sqlList: list<string>
  *     targetVersion: { type: string, description: PostgreSQL 버전 }
- * </pre>
+ * 
  *
  * ## 최종 결과 (output)
  * output에 템플릿을 적으면 Workflow가 성공으로 끝났을 때 그 값을 최종 결과로 돌려줍니다
@@ -30,7 +31,8 @@ import java.util.Map;
  *
  * allowedCallers를 비워두면 누구나 이 Workflow를 실행할 수 있습니다. 값을 채워두면 그 목록에 있는
  * caller(ApiKeyAuthFilter가 요청에서 알아낸 호출 주체)만 실행할 수 있습니다.
- *
+ * </pre>
+ * 
  * @param id             이 Workflow를 가리키는 이름입니다.
  * @param description    이 Workflow가 무엇을 하는지 사람이 읽기 위한 설명입니다(예: 화면의 안내 문구로 쓰입니다).
  * @param maxIterations  이 Workflow가 전체적으로 실행할 수 있는 step의 최대 횟수입니다.

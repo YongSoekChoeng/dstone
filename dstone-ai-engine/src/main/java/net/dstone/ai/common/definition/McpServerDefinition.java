@@ -5,6 +5,7 @@ import java.util.List;
 import net.dstone.ai.common.consts.McpTransport;
 
 /**
+ * <pre>
  * 외부 MCP(Model Context Protocol) 서버 하나를 어떻게 연결할지 정의하는 클래스입니다. resources/mcp/*.yml
  * 파일 하나(그 안의 mcpServer: 라는 최상위 키)가 이 클래스의 값으로 채워집니다.
  *
@@ -20,6 +21,7 @@ import net.dstone.ai.common.consts.McpTransport;
  * Agent는 "id로 찾을 때마다 caller를 검사"하는 방식이지만, MCP 서버는 "엔진이 켜질 때 한 번 접속해서
  * Tool 목록에 합류시켜 두는" 방식이라, 서버마다 별도의 caller 규칙을 두지 않고 화이트리스트 하나로
  * 통일해서 관리합니다.
+ * </pre>
  *
  * @param id           이 MCP 서버를 가리키는 이름입니다(로그에 남기거나 구분할 때 씁니다)
  * @param transport    이 서버에 어떤 방식으로 접속할지를 정합니다(STDIO 또는 SSE)

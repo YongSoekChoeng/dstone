@@ -5,19 +5,20 @@ import java.util.Map;
 import net.dstone.ai.common.consts.StepType;
 
 /**
+ * <pre>
  * Workflow를 이루는 여러 단계(step) 중 하나를 표현하는 클래스입니다. WorkFlowDefinition의 steps 목록에
  * 담기는 항목이 바로 이 클래스입니다.
  *
  * ## step은 무엇을 받는가 (input)
  * input에는 이 step에 넣어줄 값을 템플릿으로 적습니다. 템플릿 안의 {{ ... }} 자리는 step이 실행되기
  * 직전에 엔진(runtime.workflow.WorkFlowExecutor)이 실제 값으로 채웁니다(문법은 common.template.Template 참고).
- * <pre>
+ * 
  *   {{input.message}}              Workflow를 실행할 때 넘긴 값
  *   {{steps.analyze.data.tables}}  analyze step이 남긴 결과
  *   {{previous.text}}              바로 직전에 실행된 step의 결과
  *   {{item}}                       forEach로 반복 중일 때 이번 반복이 맡은 항목
  *   {{a.b ?? c.d}}                 왼쪽 값이 없으면 오른쪽 값을 씀
- * </pre>
+ * 
  * step 종류에 따라 input의 모양이 다릅니다.
  * - AGENT / SUPERVISOR / ROUTER: 문자열입니다. 채워진 문자열이 그대로 LLM에게 보내는 사용자 메시지가 됩니다.
  *   비워두면 {{previous.text}}(직전 step의 결과 텍스트)를 씁니다.
@@ -55,6 +56,7 @@ import net.dstone.ai.common.consts.StepType;
  * ROUTER는 여러 반복 중 어느 반복의 선택을 따라야 할지 정할 수 없기 때문입니다.
  *
  * YAML이 이 규칙들을 지켰는지는 엔진이 켜질 때 common.registry.WorkFlowRegistry가 모두 검사합니다.
+ * </pre>
  *
  * @param id           이 step을 가리키는 이름입니다. onSuccess/onFailure/routes와 {{steps.id...}} 참조가 이 이름을 씁니다.
  * @param type         이 step이 실제로 무엇을 하는지 정하는 값입니다(AGENT/TOOL/SUPERVISOR/APPROVAL/ROUTER).

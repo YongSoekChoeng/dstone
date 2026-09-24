@@ -11,6 +11,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * APPROVAL step을 처리하는 러너입니다. 사람이 승인하거나 반려할 때까지 기다리는 역할을 합니다. 다른
  * 러너들과 마찬가지로 run() 메서드가 한 번 호출되는 것으로 끝이고, "지금 결정이 이미 나 있는가"만 확인합니다.
  *
@@ -24,6 +25,7 @@ import net.dstone.common.utils.StringUtil;
  * 결정 내용은 결과 텍스트에 덧붙이지 않고 따로 남깁니다.
  * - 승인: data에 {approved, approver, comment}를 남깁니다. 다음 step은 {{steps.id.data.comment}}처럼 꺼내 씁니다.
  * - 반려: 실패로 처리하고, 반려 사유(comment)를 error에 남깁니다.
+ * </pre>
  */
 @Component
 public class ApprovalStepRunner implements StepRunner {

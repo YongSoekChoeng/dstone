@@ -20,19 +20,18 @@ import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
+ * <pre>
  * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
- * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 toolsEnabled(Tool 사용 여부), ragEnabled(RAG 사용 여부)를
- * 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 그래서 api.controller.ChatController
- * (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 runtime.step.AgentStepRunner(Workflow 안에서 AGENT/SUPERVISOR
- * step을 실행하는 경우) 둘 다 결국 이 클래스를 통해서 LLM을 호출합니다.
+ * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 toolsEnabled(Tool 사용 여부), ragEnabled(RAG 사용 여부)를 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
+ * 그래서 api.controller.ChatController (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 
+ * runtime.step.AgentStepRunner(Workflow 안에서 AGENT/SUPERVISOR step을 실행하는 경우) 둘 다 결국 이 클래스를 통해서 LLM을 호출합니다.
  *
- * call()/callForVerdict()/callForEntity()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는
- * 파라미터가 있습니다. 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도
- * null이면 provider 공통 기본 모델을 씁니다), 값을 직접 주면 그 한 번의 호출에서만 Agent 정의를 무시하고
- * 그 값을 강제로 적용합니다. 예를 들어 dstone-boot의 채팅 화면에서는 같은 Agent를 쓰면서도 사용자가 화면에서
- * RAG/Tool을 켜고 끄거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 override 값들을
- * 그대로 넘겨줍니다. 반면 Workflow의 AGENT/SUPERVISOR step(runtime.step.AgentStepRunner)은 이 세 값을
- * 항상 null로 넘겨서, Agent 정의에 적힌 값을 그대로 씁니다.
+ * call()/callForVerdict()/callForEntity()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는 파라미터가 있습니다. 
+ * 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도 null이면 provider 공통 기본 모델을 씁니다), 
+ * 값을 직접 주면 그 한 번의 호출에서만 Agent 정의를 무시하고 그 값을 강제로 적용합니다. 
+ * 예를 들어 dstone-boot의 채팅 화면에서는 같은 Agent를 쓰면서도 사용자가 화면에서 RAG/Tool을 켜고 끄거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 override 값들을 그대로 넘겨줍니다. 
+ * 반면 Workflow의 AGENT/SUPERVISOR step(runtime.step.AgentStepRunner)은 이 세 값을 항상 null로 넘겨서, Agent 정의에 적힌 값을 그대로 씁니다.
+ * </pre>
  */
 @Component
 public class AgentExecutor extends BaseObject {

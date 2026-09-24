@@ -3,6 +3,7 @@ package net.dstone.ai.runtime.step;
 import java.util.Map;
 
 /**
+ * <pre>
  * StepRunner가 step 하나를 실행하고 나서 돌려주는 결과입니다. 경우마다 필요한 값만 갖도록 네 가지로 나뉩니다.
  * - Success: 성공. text와 data를 갖습니다.
  * - Routed : ROUTER step의 성공. text와 data에 더해, LLM이 고른 route를 갖습니다.
@@ -16,6 +17,7 @@ import java.util.Map;
  *
  * runtime.workflow.WorkFlowExecutor는 이 결과를 컨텍스트의 steps.{stepId}에 {input, text, data, error}로
  * 남기고, 다음 step들은 {{steps.id.text}}, {{steps.id.data.키}}, {{steps.id.error}}로 가져다 씁니다.
+ * </pre>
  */
 public sealed interface StepOutcome {
 
