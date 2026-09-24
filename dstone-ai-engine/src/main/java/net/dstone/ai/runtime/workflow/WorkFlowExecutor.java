@@ -82,10 +82,9 @@ public class WorkFlowExecutor extends BaseObject {
 	 * 결과를 돌려줍니다.
 	 *
 	 * 이 메서드가 호출되는 경우는 두 가지입니다.
-	 * - 새로 실행할 때: 사용자가 POST /api/ai/workflow/{id}/execute(동기 방식) 또는 /submit(비동기
-	 *   방식)을 호출하면, currentStepIndex가 0이고 status가 RUNNING인 새 실행이 만들어지고,
-	 *   곧바로 이 run()이 호출됩니다.
-	 * - 승인(APPROVAL)이 끝나서 이어갈 때: 사람이 승인 또는 반려 결정을 내리면, 그 결정이 먼저
+	 * - 새로 실행할 때: 
+	 * 		사용자가 POST /api/ai/workflow/{id}/execute(동기 방식) 또는 /submit(비동기 방식)을 호출하면, 
+	 * 		currentStepIndex가 0이고 status가 RUNNING인 새 실행이 만들어지고, 승인(APPROVAL)이 끝나서 이어갈 때: 사람이 승인 또는 반려 결정을 내리면, 그 결정이 먼저
 	 *   컨텍스트의 approvals.{stepId}에 기록되고, 같은 실행(같은 executionId, 같은
 	 *   currentStepIndex)을 가지고 run()이 다시 호출됩니다.
 	 *
@@ -120,7 +119,11 @@ public class WorkFlowExecutor extends BaseObject {
 			****************************************************************************************/
 			StepRunResult stepResult;
 			try {
-				stepResult = StringUtil.isEmpty(step.forEach()) ? this.runOne(step, current) : this.runForEach(step, current);
+				if( !StringUtil.isEmpty(step.forEach()) ) {
+					stepResult = this.runForEach(step, current);
+				}else {
+					stepResult = this.runOne(step, current);
+				}
 			} catch (Exception e) {
 				// StepRunner가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
 				// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
@@ -158,8 +161,9 @@ public class WorkFlowExecutor extends BaseObject {
 				return this.persistFailed(current, "step[" + step.id() + "]의 다음 전이(transition)를 계산하는 중 예외가 발생했습니다 - " + e.getMessage());
 			}
 
-			// WorkflowTransition은 sealed interface라 4가지 경우(Done/Failed/NextStep/Loop)를 컴파일러가
-			// 빠짐없이 다뤘는지 검사해 줍니다.
+			/****************************************************************************************
+			WorkflowTransition은 sealed interface라 4가지 경우(Done/Failed/NextStep/Loop)를 컴파일러가 빠짐없이 다뤘는지 검사해 줍니다.
+			****************************************************************************************/
 			switch (transition) {
 				/****************************************************************************************
 				Done: Workflow 전체가 성공적으로 끝났다는 뜻입니다.

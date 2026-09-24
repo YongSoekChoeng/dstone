@@ -15,7 +15,7 @@ import java.util.Map;
  * 따로 선언하지 않아도 됩니다. inputs를 비워두면 입력 검사를 하지 않습니다.
  * <pre>
  *   inputs:
- *     sqlList: list&lt;string&gt;
+ *     sqlList: list<string>
  *     targetVersion: { type: string, description: PostgreSQL 버전 }
  * </pre>
  *

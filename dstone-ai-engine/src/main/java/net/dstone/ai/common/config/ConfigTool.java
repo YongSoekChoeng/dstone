@@ -137,7 +137,7 @@ public class ConfigTool extends BaseObject {
 
 	/**
 	 * 설정 파일의 "tools" 값은 YAML List로 쓸 수도 있고, 콤마로 구분한 문자열로 쓸 수도 있습니다.
-	 * 이 메소드는 둘 중 어느 형식으로 오든 똑같이 List&lt;String&gt;으로 바꿔 줍니다.
+	 * 이 메소드는 둘 중 어느 형식으로 오든 똑같이 List<String>으로 바꿔 줍니다.
 	 *
 	 * 한 가지 주의할 점이 있습니다: caller에 화이트리스트 자체는 있는데 tools 값이 비어 있으면
 	 * (YAML의 `[]`), 이건 "허용된 Tool이 0개"라는 뜻이어야 합니다. 그래서 빈 문자열이 들어와도

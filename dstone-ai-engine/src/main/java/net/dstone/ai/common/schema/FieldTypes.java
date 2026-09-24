@@ -9,7 +9,7 @@ import net.dstone.ai.common.definition.FieldDefinition;
 
 /**
  * <pre>
- * common.definition.FieldDefinition의 타입 이름(string, list&lt;string&gt; 등)을 다루는 도구 모음입니다.
+ * common.definition.FieldDefinition의 타입 이름(string, list<string> 등)을 다루는 도구 모음입니다.
  * 세 곳에서 같은 규칙을 씁니다.
  * - 엔진이 켜질 때: 타입 이름이 올바른지 검사합니다(isValid, common.registry.WorkFlowRegistry).
  * - LLM을 부를 때: 선언한 필드 목록을 JSON Schema로 바꿔서 LLM에게 알려줍니다(toJsonSchema, runtime.agent.SchemaOutputConverter).
@@ -21,7 +21,7 @@ import net.dstone.ai.common.definition.FieldDefinition;
  *   integer  정수
  *   boolean  true / false
  *   object   아무 모양의 맵
- *   list&lt;T&gt;  T 타입 항목의 리스트(예: list&lt;string&gt;, list&lt;list&lt;integer&gt;&gt;)
+ *   list<T>  T 타입 항목의 리스트(예: list<string>, list<list<integer>>)
  * </pre>
  */
 public final class FieldTypes {
@@ -123,7 +123,7 @@ public final class FieldTypes {
 	}
 
 	/**
-	 * list&lt;T&gt; 모양이면 T를, 아니면 null을 돌려줍니다.
+	 * list<T> 모양이면 T를, 아니면 null을 돌려줍니다.
 	 *
 	 * @param type 확인할 타입 이름입니다.
 	 */

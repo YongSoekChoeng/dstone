@@ -16,7 +16,7 @@ import net.dstone.ai.common.consts.ToolParse;
  *           output:
  *             schema:
  *               sql: string
- *               tables: list&lt;string&gt;
+ *               tables: list<string>
  * - TOOL  : parse(+ pattern)만 씁니다. Tool 응답 텍스트를 data로 정리하는 방법입니다(common.consts.ToolParse 참고).
  *           output:
  *             parse: lines

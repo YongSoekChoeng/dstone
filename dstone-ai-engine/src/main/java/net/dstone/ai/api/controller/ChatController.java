@@ -43,7 +43,7 @@ import reactor.core.publisher.Flux;
  * 답변을 한 글자씩(정확히는 토큰 단위로) 만들어내는 대로 바로바로 흘려보내 주는 text/event-stream(SSE, 실시간
  * 스트리밍) 방식입니다. 이 컨트롤러는 원래 요청-응답이 한 번에 끝나는 서블릿 기반 Spring MVC 컨트롤러이지만,
  * dstone-common 모듈이 spring-boot-starter-webflux 의존성을 이미 포함하고 있어서 reactor-core 라이브러리를
- * 클래스패스에서 항상 쓸 수 있습니다. 덕분에 메서드가 Flux&lt;String&gt; 타입만 반환하면, 별도 설정 없이도
+ * 클래스패스에서 항상 쓸 수 있습니다. 덕분에 메서드가 Flux<String> 타입만 반환하면, 별도 설정 없이도
  * 스트리밍 응답이 그대로 동작합니다.
  */
 @RestController

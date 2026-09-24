@@ -16,8 +16,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *     description: 변환된 PostgreSQL SQL
  * </pre>
  *
- * 쓸 수 있는 타입은 string / number / integer / boolean / object / list&lt;타입&gt; 입니다
- * (예: list&lt;string&gt;, list&lt;object&gt;). 타입 이름이 올바른지는 엔진이 켜질 때
+ * 쓸 수 있는 타입은 string / number / integer / boolean / object / list<타입> 입니다
+ * (예: list<string>, list<object>). 타입 이름이 올바른지는 엔진이 켜질 때
  * common.registry.WorkFlowRegistry가 검사합니다(검사 규칙은 common.schema.FieldTypes 참고).
  *
  * @param type        값의 타입입니다.
