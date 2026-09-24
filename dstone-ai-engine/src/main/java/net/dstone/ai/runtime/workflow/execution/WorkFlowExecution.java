@@ -4,14 +4,15 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Workflow 실행 1건의 현재 상태를 담고 있습니다. AI_WORKFLOW_EXECUTION 테이블의 한 행과 그대로
- * 대응되고, WorkFlowExecutionStore가 이 상태를 읽고 씁니다.
+ * <pre>
+ * Workflow 실행 1건의 현재 상태를 담고 있습니다. 
+ * AI_WORKFLOW_EXECUTION 테이블의 한 행과 그대로 대응되고, WorkFlowExecutionStore가 이 상태를 읽고 씁니다.
  *
  * context는 이 실행의 모든 상태(사용자 입력, step별 결과, 직전 결과, 승인 결정)를 담은 트리이고,
- * 스텝이 실행될 때마다 값이 계속 채워지는 살아있는 Map입니다(모양은 WorkFlowContext 참고). 상태가 바뀔
- * 때마다(advanceTo/done/failed/waitingApproval 메서드를 호출할 때마다) 새로운 WorkFlowExecution
- * 인스턴스를 만들어서 돌려주지만, context만큼은 항상 같은 Map 인스턴스를 그대로 넘겨서 여러 인스턴스가
- * 그 참조를 공유합니다(WorkFlowExecutor가 각 스텝의 결과를 이 Map에 계속 누적해서 넣기 때문입니다).
+ * 스텝이 실행될 때마다 값이 계속 채워지는 살아있는 Map입니다(모양은 WorkFlowContext 참고). 
+ * 상태가 바뀔 때마다(advanceTo/done/failed/waitingApproval 메서드를 호출할 때마다) 새로운 WorkFlowExecution 인스턴스를 만들어서 돌려주지만, 
+ * context만큼은 항상 같은 Map 인스턴스를 그대로 넘겨서 여러 인스턴스가 그 참조를 공유합니다(WorkFlowExecutor가 각 스텝의 결과를 이 Map에 계속 누적해서 넣기 때문입니다).
+ * </pre>
  *
  * @param executionId     이 실행 건을 가리키는 식별자입니다(UUID).
  * @param workflowId      실행한 Workflow의 id입니다.

@@ -47,8 +47,11 @@ public final class Template {
 	}
 
 	/**
-	 * 템플릿(문자열/맵/리스트)의 {{ ... }} 자리를 모두 채워서 돌려줍니다. 맵과 리스트는 모양을 그대로 유지하고
-	 * 안쪽 문자열만 채웁니다. 문자열 전체가 {{ ... }} 하나뿐이면 그 값을 원래 타입 그대로 돌려줍니다.
+	 * <pre>
+	 * 템플릿(문자열/맵/리스트)의 {{ ... }} 자리를 모두 채워서 돌려줍니다. 
+	 * 맵과 리스트는 모양을 그대로 유지하고 안쪽 문자열만 채웁니다. 
+	 * 문자열 전체가 {{ ... }} 하나뿐이면 그 값을 원래 타입 그대로 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param template 채울 템플릿입니다(문자열, 맵, 리스트, 또는 숫자 같은 그 밖의 값).
 	 * @param context  값을 찾아볼 컨텍스트 트리입니다.
@@ -80,8 +83,10 @@ public final class Template {
 	}
 
 	/**
+	 * <pre>
 	 * 문자열 템플릿의 {{ ... }} 자리를 모두 글자로 바꿔 끼워서, 항상 문자열로 돌려줍니다.
 	 * LLM에게 보낼 메시지처럼 결과가 반드시 글자여야 할 때 씁니다.
+	 * </pre>
 	 *
 	 * @param template 채울 문자열 템플릿입니다.
 	 * @param context  값을 찾아볼 컨텍스트 트리입니다.
@@ -101,8 +106,10 @@ public final class Template {
 	}
 
 	/**
+	 * <pre>
 	 * 표현식 하나(괄호 없이, 예: "steps.a.text ?? input.message")를 계산해서 값을 돌려줍니다.
 	 * forEach처럼 {{ }} 없이 경로만 적는 자리에서 씁니다.
+	 * </pre>
 	 *
 	 * @param expression 계산할 표현식입니다.
 	 * @param context    값을 찾아볼 컨텍스트 트리입니다.
@@ -119,8 +126,10 @@ public final class Template {
 	}
 
 	/**
+	 * <pre>
 	 * 템플릿(문자열/맵/리스트) 안에 들어 있는 {{ ... }} 표현식을 모두 찾아서 돌려줍니다(괄호는 뺀 안쪽 내용).
 	 * 엔진이 켜질 때 참조가 올바른지 미리 검사하는 용도로 씁니다(common.registry.WorkFlowRegistry 참고).
+	 * </pre>
 	 *
 	 * @param template 표현식을 찾을 템플릿입니다.
 	 */
@@ -145,8 +154,10 @@ public final class Template {
 	}
 
 	/**
+	 * <pre>
 	 * 표현식 하나를 ?? 기준으로 나눠서, 차례로 찾아볼 경로 목록으로 돌려줍니다.
 	 * 예: "a.b ?? c" → ["a.b", "c"]
+	 * </pre>
 	 *
 	 * @param expression 나눌 표현식입니다.
 	 */
@@ -159,8 +170,10 @@ public final class Template {
 	}
 
 	/**
+	 * <pre>
 	 * 경로 하나(예: "steps.list.data.lines.0")를 컨텍스트 트리에서 따라 내려가 값을 찾습니다.
 	 * 중간에 길이 끊기면 null을 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param path    점(.)으로 이어진 경로입니다.
 	 * @param context 값을 찾아볼 컨텍스트 트리입니다.
