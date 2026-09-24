@@ -539,6 +539,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	private record StepRunResult(boolean pending, boolean success, Map<String, Object> record, String route) {
 
+		/** APPROVAL step이 사람의 결정을 기다리는 중이라는 결과입니다. 컨텍스트에 남길 값이 아직 없어서 record는 null입니다. */
 		private static StepRunResult pendingResult() {
 			return new StepRunResult(true, false, null, null);
 		}

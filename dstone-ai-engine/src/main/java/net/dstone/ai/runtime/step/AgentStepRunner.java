@@ -51,6 +51,10 @@ public class AgentStepRunner implements StepRunner {
 	@Autowired
 	private AgentExecutor agentExecutor;
 
+	/**
+	 * ref에 적힌 Agent를 찾아서(caller가 쓸 수 있는 Agent인지도 함께 검사합니다) step 종류에 맞는 방법으로 부릅니다.
+	 * SUPERVISOR → runSupervisor, ROUTER → runRouter, output.schema가 있는 AGENT → runSchemaAgent, 그 밖의 AGENT → runAgent.
+	 */
 	@Override
 	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
 		AgentDefinition agent = this.agentRegistry.resolve(definition.ref(), execution.caller());

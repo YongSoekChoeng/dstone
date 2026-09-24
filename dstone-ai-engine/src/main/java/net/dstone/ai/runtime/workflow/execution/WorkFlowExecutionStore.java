@@ -135,6 +135,7 @@ public class WorkFlowExecutionStore {
 		};
 	}
 
+	/** AI_WORKFLOW_EXECUTION 한 행을 WorkFlowExecution으로 바꿉니다. CONTEXT_JSON 컬럼은 다시 컨텍스트 맵으로 되돌립니다. */
 	private WorkFlowExecution mapExecution(ResultSet rs, int rowNum) throws SQLException {
 		return new WorkFlowExecution(
 			rs.getString("EXECUTION_ID"),
@@ -150,6 +151,7 @@ public class WorkFlowExecutionStore {
 			this.toInstant(rs.getTimestamp("UPDATED_AT")));
 	}
 
+	/** AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행을 StepHistoryEntry로 바꿉니다. kind(AGENT_CALL/DETERMINISTIC)는 저장하지 않고 STEP_TYPE에서 다시 계산합니다. */
 	private StepHistoryEntry mapHistoryEntry(ResultSet rs, int rowNum) throws SQLException {
 		StepType stepType = StepType.valueOf(rs.getString("STEP_TYPE"));
 		return new StepHistoryEntry(
@@ -164,6 +166,7 @@ public class WorkFlowExecutionStore {
 			this.toInstant(rs.getTimestamp("EXECUTED_AT")));
 	}
 
+	/** DB의 Timestamp를 Instant로 바꿉니다. 값이 없으면(null) 그대로 null입니다. */
 	private Instant toInstant(Timestamp timestamp) {
 		return timestamp == null ? null : timestamp.toInstant();
 	}

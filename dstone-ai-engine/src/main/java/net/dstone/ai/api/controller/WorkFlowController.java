@@ -43,7 +43,7 @@ import net.dstone.common.utils.StringUtil;
  * - /submit + /status/{executionId}: 시간이 오래 걸릴 수 있는 Workflow를 위한 비동기 방식입니다.
  *   먼저 /submit으로 실행을 시작시키고, 나중에 /status로 진행 상황을 확인합니다.
  *
- * 자세한 내용은 runtime.workflow.execution.WorkFlowExecutionService를 참고하세요. 두 방식 모두 내부적으로는
+ * 자세한 내용은 api.service.WorkFlowExecutionService를 참고하세요. 두 방식 모두 내부적으로는
  * 같은 방식으로 저장된 실행 상태를 보고 동작하기 때문에, /execute로 실행하더라도 중간에 사람의 승인이
  * 필요한 APPROVAL 단계를 만나면, 결과를 기다리지 않고 바로 WAITING_APPROVAL(승인 대기) 상태로 응답합니다.
  * 실행 중인 Workflow의 진행 상황이나 지난 이력을 자세히 보거나, 승인/반려를 처리하고 싶다면

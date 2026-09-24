@@ -7,7 +7,7 @@ import java.util.Map;
  *
  * sessionId는 비워서 보내도 괜찮습니다. 비워서 보내면 서버가 새로 하나 만들어서 응답의 sessionId
  * 값으로 돌려줍니다. 그다음부터 같은 대화를 이어가고 싶다면, 그 sessionId 값을 다음 요청에도 똑같이
- * 담아서 보내면 됩니다. 대화 내용은 common.session.RedisChatMemorySession이 Redis에 저장해서
+ * 담아서 보내면 됩니다. 대화 내용은 common.session.RedisChatMemoryRepository이 Redis에 저장해서
  * 관리합니다.
  *
  * agent는 꼭 있어야 하는 값입니다. common.registry.AgentRegistry에 미리 등록해 둔 Agent(즉

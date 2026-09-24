@@ -33,7 +33,7 @@ import reactor.core.publisher.Flux;
  *
  * POST /api/ai/chat 요청을 받으면, resources/agents/*.yml 파일로 등록해 둔 Agent(챗봇 하나의 설정이라고
  * 생각하면 됩니다) 중 하나를 딱 한 번 호출해서 답을 돌려줍니다. 만약 여러 단계(step)를 순서대로 이어서
- * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkflowController를 사용하면 됩니다.
+ * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkFlowController를 사용하면 됩니다.
  *
  * GET /api/ai/chat는 등록된 Agent id+description 목록을 돌려줍니다 - dstone-boot의 "채팅" 화면이
  * agent 선택 드롭다운을 채우는 데 씁니다(api.controller.WorkFlowController의 GET /api/ai/workflow와

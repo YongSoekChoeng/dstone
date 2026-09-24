@@ -44,6 +44,10 @@ public class ToolStepRunner implements StepRunner {
 	@Autowired
 	private ToolExecutor toolExecutor;
 
+	/**
+	 * TOOL step 하나를 실행합니다. 인자를 JSON으로 바꿔 Tool을 부르고, 성공/실패를 판정한 뒤,
+	 * 성공이면 output.parse에 따라 data까지 만들어서 돌려줍니다(순서는 클래스 설명의 1~4 참고).
+	 */
 	@Override
 	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
 		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), this.toJson(input.arguments()));

@@ -33,7 +33,7 @@ public final class Constants {
 		}
 	}
 
-	/** 대화 이력을 Redis에 저장할 때 쓰는 키 이름과 관련된 상수입니다(common.session.RedisChatMemorySession이 사용합니다). */
+	/** 대화 이력을 Redis에 저장할 때 쓰는 키 이름과 관련된 상수입니다(common.session.RedisChatMemoryRepository이 사용합니다). */
 	public static final class Session {
 		public final static String KEY_PREFIX = "dstone:ai:session:";
 		public final static String INDEX_KEY = KEY_PREFIX + "index";
@@ -66,7 +66,7 @@ public final class Constants {
 		}
 	}
 
-	/** Workflow를 실행하는 엔진(runtime.workflow.WorkFlowExecutor, runtime.workflow.execution.WorkFlowExecutionService)이 사용하는 상수들입니다. */
+	/** Workflow를 실행하는 엔진(runtime.workflow.WorkFlowExecutor, api.service.WorkFlowExecutionService)이 사용하는 상수들입니다. */
 	public static final class WorkFlow {
 		/** 디폴트 Max Step 실행 횟수 */
 		public final static int DEFAULT_MAX_ITERATIONS = 10;

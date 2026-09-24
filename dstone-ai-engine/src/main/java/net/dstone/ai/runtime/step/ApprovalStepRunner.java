@@ -28,6 +28,10 @@ import net.dstone.common.utils.StringUtil;
 @Component
 public class ApprovalStepRunner implements StepRunner {
 
+	/**
+	 * 컨텍스트의 approvals.{stepId}에 사람의 결정이 들어 있는지 봅니다.
+	 * 없으면 대기(Pending), 승인이면 성공, 반려면 실패를 돌려줍니다.
+	 */
 	@Override
 	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
 		Map<String, Object> decision = WorkFlowContext.approval(execution.context(), definition.id());
