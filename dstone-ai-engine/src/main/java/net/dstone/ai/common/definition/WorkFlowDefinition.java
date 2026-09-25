@@ -18,7 +18,6 @@ import java.util.Map;
  *   inputs:
  *     sqlList: list<string>
  *     targetVersion: { type: string, description: PostgreSQL 버전 }
- * 
  *
  * ## 최종 결과 (output)
  * output에 템플릿을 적으면 Workflow가 성공으로 끝났을 때 그 값을 최종 결과로 돌려줍니다
