@@ -70,5 +70,17 @@ import net.dstone.ai.common.consts.StepType;
  * @param forEach      이 step을 반복 실행할 리스트의 참조 경로입니다(예: inputs.sqlList). 비워두면 한 번만 실행합니다.
  * @param itemVariable forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"입니다.
  */
-public record StepDefinition(String id, StepType type, String ref, String onFailure, String onSuccess, Object input, StepOutputDefinition output, String approverRole,
-	Map<String, String> routes, String forEach, String itemVariable) {}
+public record StepDefinition(
+	String id
+	, StepType type
+	, String ref
+	, String onFailure
+	, String onSuccess
+	, Object input
+	, StepOutputDefinition output
+	, String approverRole
+	, Map<String, String> routes
+	, String forEach
+	, String itemVariable
+	) {
+}

@@ -37,5 +37,16 @@ import java.util.List;
  *                               비워두면(null) true로 동작합니다
  * @param allowedCallers         이 Agent를 호출할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다
  */
-public record AgentDefinition(String id, String prompt, String description, String model, boolean toolsEnabled, boolean ragEnabled, Integer ragTopK, Double ragSimilarityThreshold,
-	Boolean ragAllowEmptyContext, List<String> allowedCallers) {}
+public record AgentDefinition(
+	String id
+	, String prompt
+	, String description
+	, String model
+	, boolean toolsEnabled
+	, boolean ragEnabled
+	, Integer ragTopK
+	, Double ragSimilarityThreshold
+	, Boolean ragAllowEmptyContext
+	, List<String> allowedCallers
+	) {
+}

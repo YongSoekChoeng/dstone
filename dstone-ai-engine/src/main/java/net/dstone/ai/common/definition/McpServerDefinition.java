@@ -31,5 +31,12 @@ import net.dstone.ai.common.consts.McpTransport;
  * @param allowedTools 이 서버가 제공하는 여러 Tool 중에서 실제로 가져다 쓸 Tool의 이름 목록입니다.
  *                     비워두면 이 서버가 제공하는 Tool을 전부 가져옵니다
  */
-public record McpServerDefinition(String id, McpTransport transport, String command, List<String> args, String url, List<String> allowedTools) {
+public record McpServerDefinition(
+	String id
+	, McpTransport transport
+	, String command
+	, List<String> args
+	, String url
+	, List<String> allowedTools
+	) {
 }

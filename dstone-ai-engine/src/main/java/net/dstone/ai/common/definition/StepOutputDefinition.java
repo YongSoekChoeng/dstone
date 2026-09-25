@@ -29,5 +29,9 @@ import net.dstone.ai.common.consts.ToolParse;
  * @param parse   TOOL 전용. Tool 응답을 output으로 정리하는 방법입니다. 비워두면 TEXT(output 없음)입니다.
  * @param pattern TOOL + parse: lines 전용. 이 정규식에 맞는 줄만 남깁니다(괄호 그룹이 있으면 첫 번째 그룹만 씁니다).
  */
-public record StepOutputDefinition(Map<String, FieldDefinition> schema, ToolParse parse, String pattern) {
+public record StepOutputDefinition(
+	Map<String, FieldDefinition> schema
+	, ToolParse parse
+	, String pattern
+	) {
 }

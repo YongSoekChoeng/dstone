@@ -46,5 +46,13 @@ import java.util.Map;
  * @param output         (옵셔널)Workflow가 성공했을 때 돌려줄 최종 결과의 템플릿입니다.
  * @param steps          (필수)WWorkflow가 실행할 step들의 목록입니다.
  */
-public record WorkFlowDefinition(String id, String description, Integer maxIterations, List<String> allowedCallers, Map<String, FieldDefinition> inputs, String output,
-	List<StepDefinition> steps) {}
+public record WorkFlowDefinition(
+	String id
+	, String description
+	, Integer maxIterations
+	, List<String> allowedCallers
+	, Map<String, FieldDefinition> inputs
+	, String output
+	, List<StepDefinition> steps
+	) {
+}

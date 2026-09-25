@@ -23,7 +23,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param type        값의 타입입니다.
  * @param description 이 값이 무엇인지 설명하는 문구입니다(없어도 됩니다).
  */
-public record FieldDefinition(String type, String description) {
+public record FieldDefinition(
+	String type
+	, String description
+	) {
 
 	/**
 	 * 확장형(type/description을 따로 적은 형태)을 읽을 때 쓰입니다.
