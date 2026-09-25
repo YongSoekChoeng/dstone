@@ -32,13 +32,19 @@ import java.util.Map;
  * caller(ApiKeyAuthFilter가 요청에서 알아낸 호출 주체)만 실행할 수 있습니다.
  * </pre>
  * 
- * @param id             이 Workflow를 가리키는 이름입니다.
- * @param description    이 Workflow가 무엇을 하는지 사람이 읽기 위한 설명입니다(예: 화면의 안내 문구로 쓰입니다).
- * @param maxIterations  이 Workflow가 전체적으로 실행할 수 있는 step의 최대 횟수입니다.
- * @param allowedCallers 이 Workflow를 실행할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다.
- * @param inputs         이 Workflow를 실행할 때 요청에 들어 있어야 하는 입력값의 이름과 모양입니다.
- * @param output         Workflow가 성공했을 때 돌려줄 최종 결과의 템플릿입니다.
- * @param steps          이 Workflow가 실행할 step들의 목록입니다.
+ * @param id             (필수)Workflow를 가리키는 이름입니다.
+ * @param description    (옵셔널)Workflow가 무엇을 하는지 사람이 읽기 위한 설명입니다(예: 화면의 안내 문구로 쓰입니다).
+ * @param maxIterations  (옵셔널)Workflow가 전체적으로 실행할 수 있는 step의 최대 횟수입니다.
+ * @param allowedCallers (옵셔널)Workflow를 실행할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다.
+ * @param inputs         (옵셔널)Workflow를 실행할 때 요청에 들어 있어야 하는 입력값의 이름과 모양입니다. 
+ *                       축약형 과 확장형 두가지로 입력 가능.
+ *                       예)
+ *                       sqlList: list<string>          # 축약형: 타입만
+ *                       targetVersion:                 # 확장형: 타입과 설명
+ *                         type: string
+ *                         description: PostgreSQL 버전
+ * @param output         (옵셔널)Workflow가 성공했을 때 돌려줄 최종 결과의 템플릿입니다.
+ * @param steps          (필수)WWorkflow가 실행할 step들의 목록입니다.
  */
 public record WorkFlowDefinition(String id, String description, Integer maxIterations, List<String> allowedCallers, Map<String, FieldDefinition> inputs, String output,
 	List<StepDefinition> steps) {}
