@@ -12,7 +12,7 @@ import java.util.Map;
  *
  * ## 입력 계약 (inputs)
  * inputs에 이 Workflow가 필요로 하는 입력값을 선언해 두면, 실행 요청이 들어올 때 그 값이 빠져 있거나
- * 타입이 다르면 실행하기 전에 바로 거절합니다(HTTP 400). 요청의 message는 항상 input.message로 들어가므로
+ * 타입이 다르면 실행하기 전에 바로 거절합니다(HTTP 400). 요청의 message는 항상 inputs.message로 들어가므로
  * 따로 선언하지 않아도 됩니다. inputs를 비워두면 입력 검사를 하지 않습니다.
  * 
  *   inputs:
@@ -21,7 +21,7 @@ import java.util.Map;
  *
  * ## 최종 결과 (output)
  * output에 템플릿을 적으면 Workflow가 성공으로 끝났을 때 그 값을 최종 결과로 돌려줍니다
- * (예: "{{steps.convert.data.sql}}"). 비워두면 마지막으로 실행된 step의 text가 최종 결과입니다.
+ * (예: "{{steps.convert.output.sql}}"). 비워두면 마지막으로 실행된 step의 text가 최종 결과입니다.
  *
  * ## 그 밖의 값
  * maxIterations는 "이 Workflow가 전체적으로 몇 번까지 step을 실행할 수 있는가"를 정하는 상한선입니다.

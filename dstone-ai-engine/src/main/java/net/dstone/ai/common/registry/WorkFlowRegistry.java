@@ -44,13 +44,15 @@ import net.dstone.common.utils.StringUtil;
  *    - APPROVAL/ROUTER는 forEach를 쓸 수 없음, ROUTER는 routes가 최소 1개 있어야 함
  * 3) Workflow inputs의 타입 이름이 올바른가
  * 4) 참조 검사(validateExpression): step input, forEach, Workflow output 안의 모든 {{ ... }} 경로가
- *    - input / steps / previous / (forEach step 안에서만) item 중 하나로 시작하는가
- *    - input.이름: Workflow가 inputs를 선언했다면 message이거나 inputs에 있는 이름인가
- *    - steps.id: 이 Workflow에 있는 step인가, 그 다음 필드가 input/text/data/error/items 중 하나인가
- *    - steps.id.data.키: 그 step이 실제로 그 키를 내놓는가(아래 표)
- *    - previous.필드: 필드가 input/text/data/error/items 중 하나인가
+ *    - inputs / steps / previous / (forEach step 안에서만) item 중 하나로 시작하는가
+ *    - inputs.이름: Workflow가 inputs를 선언했다면 message이거나 inputs에 있는 이름인가
+ *    - steps.id: 이 Workflow에 있는 step인가, 그 다음 필드가 input/output/text/error/items 중 하나인가
+ *    - steps.id.output.키: 그 step이 실제로 그 키를 내놓는가(아래 표)
+ *    - previous.필드: 필드가 input/output/text/error/items 중 하나인가
+ *   참조 이름은 YAML에 적는 이름과 같습니다(workflow.inputs → inputs, step의 input/output → steps.id.input/output).
+ *   예전 이름(input, data)을 쓰면 새 이름을 알려 주면서 기동을 실패시킵니다.
  *
- *   step 종류                   data에 들어 있는 키
+ *   step 종류                   output에 들어 있는 키
  *   AGENT (output.schema 있음)  schema에 선언한 필드들
  *   AGENT (schema 없음)         없음
  *   TOOL (parse: json)          알 수 없음(Tool 응답에 따라 다름 → 실행 중에 검사)
@@ -61,15 +63,21 @@ import net.dstone.common.utils.StringUtil;
  *   APPROVAL                    approved, approver, comment
  *   forEach step                없음(반복별 결과는 items에 있음)
  *
- * previous.data.* 처럼 실행 순서에 따라 달라지는 값은 미리 알 수 없으므로, 실행 중에 값을 못 찾으면 그 step이
+ * previous.output.* 처럼 실행 순서에 따라 달라지는 값은 미리 알 수 없으므로, 실행 중에 값을 못 찾으면 그 step이
  * 실패하는 방식으로 다룹니다(common.template.Template 참고).
  * </pre>
  */
 @Component
 public class WorkFlowRegistry extends BaseObject {
 
-	/** step 결과({input, text, data, error, items})에서 꺼낼 수 있는 필드 이름들입니다. */
-	private static final Set<String> RECORD_FIELDS = Set.of(Context.FIELD_INPUT, Context.FIELD_TEXT, Context.FIELD_DATA, Context.FIELD_ERROR, Context.FIELD_ITEMS);
+	/** step 결과({input, output, text, error, items})에서 꺼낼 수 있는 필드 이름들입니다. */
+	private static final List<String> RECORD_FIELDS = List.of(Context.FIELD_INPUT, Context.FIELD_OUTPUT, Context.FIELD_TEXT, Context.FIELD_ERROR, Context.FIELD_ITEMS);
+
+	/** 예전에 쓰던 시작 이름입니다. 지금은 YAML의 workflow.inputs와 같은 inputs를 씁니다. */
+	private static final String OLD_INPUTS_ROOT = "input";
+
+	/** 예전에 쓰던 step 결과 필드 이름입니다. 지금은 YAML step의 output과 같은 output을 씁니다. */
+	private static final String OLD_OUTPUT_FIELD = "data";
 
 	@Autowired
 	private YamlDefinitionLoader loader;
@@ -192,7 +200,7 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * 표현식 하나(예: "steps.a.text ?? input.message")의 모든 경로를 검사합니다.
+	 * 표현식 하나(예: "steps.a.text ?? inputs.message")의 모든 경로를 검사합니다.
 	 *
 	 * @param definition   검사 중인 Workflow 정의
 	 * @param stepsById    이 Workflow의 step id → step
@@ -215,7 +223,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param definition  검사 중인 Workflow 정의
 	 * @param stepsById   이 Workflow의 step id → step
 	 * @param owner       이 경로가 들어 있는 step(Workflow output이면 null)
-	 * @param path        검사할 경로(예: "steps.extract.data.sql")
+	 * @param path        검사할 경로(예: "steps.extract.output.sql")
 	 * @param inStepInput step의 input 안에 있는 경로인지 여부
 	 */
 	private String checkPath(WorkFlowDefinition definition, Map<String, StepDefinition> stepsById, StepDefinition owner, String path, boolean inStepInput) {
@@ -226,16 +234,16 @@ public class WorkFlowRegistry extends BaseObject {
 			return null;
 		}
 		switch (root) {
-			case Context.INPUT -> {
+			case Context.INPUTS -> {
 				if (segments.length >= 2 && definition.inputs() != null && !definition.inputs().isEmpty()
 					&& !Context.MESSAGE.equals(segments[1]) && !definition.inputs().containsKey(segments[1])) {
-					return "input." + segments[1] + "는 Workflow의 inputs에 선언되어 있지 않습니다(선언된 inputs = message, " + definition.inputs().keySet() + ").";
+					return "inputs." + segments[1] + "는 Workflow의 inputs에 선언되어 있지 않습니다(선언된 inputs = message, " + definition.inputs().keySet() + ").";
 				}
 				return null;
 			}
 			case Context.PREVIOUS -> {
 				if (segments.length >= 2 && !RECORD_FIELDS.contains(segments[1])) {
-					return "previous 다음에는 " + RECORD_FIELDS + " 중 하나가 와야 합니다.";
+					return "previous 다음에는 " + RECORD_FIELDS + " 중 하나가 와야 합니다." + this.oldFieldHint(segments[1]);
 				}
 				return null;
 			}
@@ -248,29 +256,41 @@ public class WorkFlowRegistry extends BaseObject {
 					return "이 Workflow에 '" + segments[1] + "' step이 없습니다(있는 step = " + stepsById.keySet() + ").";
 				}
 				if (segments.length >= 3 && !RECORD_FIELDS.contains(segments[2])) {
-					return "steps." + segments[1] + " 다음에는 " + RECORD_FIELDS + " 중 하나가 와야 합니다.";
+					return "steps." + segments[1] + " 다음에는 " + RECORD_FIELDS + " 중 하나가 와야 합니다." + this.oldFieldHint(segments[2]);
 				}
-				if (segments.length >= 4 && Context.FIELD_DATA.equals(segments[2])) {
-					return this.checkDataKey(target, segments[3]);
+				if (segments.length >= 4 && Context.FIELD_OUTPUT.equals(segments[2])) {
+					return this.checkOutputKey(target, segments[3]);
 				}
 				return null;
 			}
 			default -> {
+				if (OLD_INPUTS_ROOT.equals(root)) {
+					return "input은 inputs로 이름이 바뀌었습니다(YAML의 workflow.inputs와 같은 이름). " + Context.INPUTS + path.substring(root.length()) + "로 적으십시오.";
+				}
 				String itemHint = owner != null && !StringUtil.isEmpty(owner.forEach()) ? ", " + this.itemKey(owner) : "";
-				return "알 수 없는 시작 이름입니다(쓸 수 있는 이름 = input, steps, previous" + itemHint + ").";
+				return "알 수 없는 시작 이름입니다(쓸 수 있는 이름 = inputs, steps, previous" + itemHint + ").";
 			}
 		}
 	}
 
 	/**
-	 * steps.{target}.data.{key}에서 target step이 실제로 그 key를 내놓는지 검사합니다(규칙은 클래스 설명의 표 참고).
+	 * 예전 필드 이름(data)을 적었다면 새 이름(output)을 알려 주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
 	 *
-	 * @param target data를 내놓는 step
-	 * @param key    꺼내려는 data의 키
+	 * @param field steps.id 또는 previous 다음에 적힌 필드 이름
 	 */
-	private String checkDataKey(StepDefinition target, String key) {
+	private String oldFieldHint(String field) {
+		return OLD_OUTPUT_FIELD.equals(field) ? " data는 output으로 이름이 바뀌었습니다(YAML step의 output과 같은 이름)." : "";
+	}
+
+	/**
+	 * steps.{target}.output.{key}에서 target step이 실제로 그 key를 내놓는지 검사합니다(규칙은 클래스 설명의 표 참고).
+	 *
+	 * @param target output을 내놓는 step
+	 * @param key    꺼내려는 output의 키
+	 */
+	private String checkOutputKey(StepDefinition target, String key) {
 		if (!StringUtil.isEmpty(target.forEach())) {
-			return "'" + target.id() + "'는 forEach step이라 data가 없습니다. 반복별 결과는 steps." + target.id() + ".items.번호.data." + key + "처럼 꺼내십시오.";
+			return "'" + target.id() + "'는 forEach step이라 output이 없습니다. 반복별 결과는 steps." + target.id() + ".items.번호.output." + key + "처럼 꺼내십시오.";
 		}
 		StepOutputDefinition output = target.output();
 		Set<String> keys = switch (target.type()) {
@@ -291,9 +311,9 @@ public class WorkFlowRegistry extends BaseObject {
 			return null;
 		}
 		if (keys.isEmpty()) {
-			return "'" + target.id() + "' step은 data를 내놓지 않습니다(AGENT는 output.schema, TOOL은 output.parse를 선언해야 data가 생깁니다).";
+			return "'" + target.id() + "' step은 output을 내놓지 않습니다(AGENT는 output.schema, TOOL은 output.parse를 선언해야 output이 생깁니다).";
 		}
-		return "'" + target.id() + "' step의 data에는 " + keys + "만 있습니다.";
+		return "'" + target.id() + "' step의 output에는 " + keys + "만 있습니다.";
 	}
 
 	/**

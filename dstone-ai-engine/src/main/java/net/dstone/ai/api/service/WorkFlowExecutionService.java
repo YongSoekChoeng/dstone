@@ -48,8 +48,8 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
 	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 input 아래에 들어갑니다).
-	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 input.message에 들어갑니다).
+	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 inputs 아래에 들어갑니다).
+	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 inputs.message에 들어갑니다).
 	 */
 	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String message) {
 		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, message);
@@ -64,8 +64,8 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
 	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 input 아래에 들어갑니다).
-	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 input.message에 들어갑니다).
+	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 inputs 아래에 들어갑니다).
+	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 inputs.message에 들어갑니다).
 	 */
 	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String message) {
 		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, message);
@@ -134,7 +134,7 @@ public class WorkFlowExecutionService extends BaseService {
 
 	/**
 	 * Workflow에 inputs(입력 계약)가 선언되어 있으면, 요청에 그 값들이 빠짐없이 올바른 타입으로 들어 있는지
-	 * 확인합니다. message는 항상 input.message로 들어가므로 inputs에 선언되어 있다면 message 값으로 검사합니다.
+	 * 확인합니다. message는 항상 inputs.message로 들어가므로 inputs에 선언되어 있다면 message 값으로 검사합니다.
 	 * 계약에 없는 값이 더 들어 있는 것은 허용합니다.
 	 *
 	 * @param workflow  실행할 Workflow의 정의입니다.

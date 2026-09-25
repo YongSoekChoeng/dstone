@@ -44,8 +44,8 @@ import net.dstone.common.utils.StringUtil;
  * 1) step을 실행하기 직전에, 그 step의 input 템플릿({{ ... }})을 컨텍스트로 채웁니다(renderInput()).
  *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 템플릿 규칙을 씁니다.
  * 2) 채워진 입력을 StepRunner에게 넘기고, StepRunner는 결과(StepOutcome)를 돌려줍니다.
- * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, text, data, error}로 남기고, previous도 이 결과로 바꿉니다.
- * 그래서 다음 step들은 {{steps.id.data.키}}처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다.
+ * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, text, error}로 남기고, previous도 이 결과로 바꿉니다.
+ * 그래서 다음 step들은 {{steps.id.output.키}}처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다.
  * input 템플릿이 가리키는 값을 찾지 못하면 그 step은 실패로 처리되고, 사유가 error에 남습니다.
  *
  * ## 병렬 실행
@@ -236,7 +236,7 @@ public class WorkFlowExecutor extends BaseObject {
 		this.appendHistory(execution, step, step.id(), call);
 		StepOutcome outcome = call.outcome();
 		boolean success = !(outcome instanceof StepOutcome.Failure);
-		return new StepRunResult(false, success, WorkFlowContext.stepRecord(call.renderedInput(), outcome.text(), outcome.data(), outcome.failureReason()), outcome.route());
+		return new StepRunResult(false, success, WorkFlowContext.stepRecord(call.renderedInput(), outcome.output(), outcome.text(), outcome.failureReason()), outcome.route());
 	}
 
 	/**
@@ -296,7 +296,7 @@ public class WorkFlowExecutor extends BaseObject {
 			if (outcome.text() != null) {
 				texts.add(outcome.text());
 			}
-			itemRecords.add(WorkFlowContext.stepRecord(call.renderedInput(), outcome.text(), outcome.data(), outcome.failureReason()));
+			itemRecords.add(WorkFlowContext.stepRecord(call.renderedInput(), outcome.output(), outcome.text(), outcome.failureReason()));
 		}
 		String error = errors.isEmpty() ? null : String.join("\n", errors);
 		return new StepRunResult(false, allSuccess, WorkFlowContext.forEachRecord(String.join("\n", texts), error, itemRecords), null);
@@ -368,14 +368,14 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * @param step          실행할 step의 정의입니다.
 	 * @param renderedInput renderInput()이 채운 입력입니다.
-	 * @param context       실행 컨텍스트입니다(system prompt 변수로 쓸 input을 꺼냅니다).
+	 * @param context       실행 컨텍스트입니다(system prompt 변수로 쓸 inputs를 꺼냅니다).
 	 */
 	@SuppressWarnings("unchecked")
 	private StepInput toStepInput(StepDefinition step, Object renderedInput, Map<String, Object> context) {
 		if (step.type() == StepType.TOOL) {
-			return new StepInput(null, (Map<String, Object>) renderedInput, WorkFlowContext.input(context));
+			return new StepInput(null, (Map<String, Object>) renderedInput, WorkFlowContext.inputs(context));
 		}
-		return new StepInput((String) renderedInput, null, WorkFlowContext.input(context));
+		return new StepInput((String) renderedInput, null, WorkFlowContext.inputs(context));
 	}
 
 	/**

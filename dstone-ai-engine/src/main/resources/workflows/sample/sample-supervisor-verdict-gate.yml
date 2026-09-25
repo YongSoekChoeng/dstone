@@ -8,7 +8,7 @@
 # 사용자 메시지를, judge step(verdict-judge-agent)은 draft가 만든 응답 텍스트를 사용자 메시지로 받습니다.
 # verdict-judge-agent는 그 텍스트에 "안녕"이라는 단어가 들어 있는지만 검사합니다 - 들어 있으면 pass=true가
 # 되어 SUCCESS로, 없으면 pass=false가 되어 FAIL로 끝납니다. SUPERVISOR는 받은 텍스트를 그대로 넘기므로
-# 성공 시 최종 결과는 draft의 응답이고, 판정 사유는 context.steps.judge.data.reason(실패면
+# 성공 시 최종 결과는 draft의 응답이고, 판정 사유는 context.steps.judge.output.reason(실패면
 # steps.judge.error)에 남습니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:

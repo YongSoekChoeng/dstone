@@ -16,7 +16,7 @@ package net.dstone.ai.runtime.tool;
  *
  * 다음 step이 쓸 구조화된 데이터를 돌려주고 싶은 Tool은, 이 record 대신 원하는 모양의 record(또는 Map)를
  * 반환하면 됩니다. Spring AI가 그 값을 JSON으로 바꿔 주고, Workflow YAML에서 그 TOOL step에
- * output.parse: json을 적으면 그 JSON이 그대로 step의 data가 됩니다(runtime.step.ToolStepRunner 참고).
+ * output.parse: json을 적으면 그 JSON이 그대로 step의 output이 됩니다(runtime.step.ToolStepRunner 참고).
  *
  * @param success 성공했는지 실패했는지를 나타냅니다.
  * @param message 성공했거나 실패한 이유를 담은 메시지입니다. 실패면 이 값이 step의 error로 남아서, 다음 step이

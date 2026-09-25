@@ -6,9 +6,9 @@
 # 것입니다.
 #
 # 동작 흐름
-# 1) validate: 검사할 SQL로 {{previous.data.sql ?? input.message}}를 씁니다.
-#    - 처음 실행될 때는 직전 step이 없으므로 previous.data.sql이 없어서 사용자 메시지(input.message)를 씁니다.
-#    - fix를 거쳐 되돌아왔을 때는 fix가 내놓은 data.sql(고친 SQL)을 씁니다.
+# 1) validate: 검사할 SQL로 {{previous.output.sql ?? inputs.message}}를 씁니다.
+#    - 처음 실행될 때는 직전 step이 없으므로 previous.output.sql이 없어서 사용자 메시지(inputs.message)를 씁니다.
+#    - fix를 거쳐 되돌아왔을 때는 fix가 내놓은 output.sql(고친 SQL)을 씁니다.
 # 2) fix: validate가 실패하면 실행됩니다. 실패한 SQL({{steps.validate.input.sql}})과 실패 사유
 #    ({{steps.validate.error}})를 함께 받아서 고친 SQL을 output.schema의 sql 필드로 돌려줍니다.
 #    schema로 받기 때문에 LLM이 설명이나 코드펜스를 덧붙여도 sql 값만 깔끔하게 다음 step으로 넘어갑니다.
@@ -33,7 +33,7 @@ workflow:
       type: TOOL
       ref: validateSqlSyntax
       input:
-        sql: "{{previous.data.sql ?? input.message}}"
+        sql: "{{previous.output.sql ?? inputs.message}}"
       onSuccess: SUCCESS
       onFailure: fix
 

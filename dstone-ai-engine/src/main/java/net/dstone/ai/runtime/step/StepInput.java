@@ -13,8 +13,8 @@ import java.util.Map;
  *
  * @param text          채워진 입력 텍스트입니다. TOOL step에서는 null입니다.
  * @param arguments     채워진 Tool 인자입니다. TOOL step이 아니면 null입니다.
- * @param workflowInput Workflow를 실행할 때 넘긴 값(컨텍스트의 input)입니다. Agent의 system prompt 안의 {변수명}을 채우는 데 씁니다.
+ * @param workflowInputs Workflow를 실행할 때 넘긴 값(컨텍스트의 inputs)입니다. Agent의 system prompt 안의 {변수명}을 채우는 데 씁니다.
  * </pre>
  */
-public record StepInput(String text, Map<String, Object> arguments, Map<String, Object> workflowInput) {
+public record StepInput(String text, Map<String, Object> arguments, Map<String, Object> workflowInputs) {
 }

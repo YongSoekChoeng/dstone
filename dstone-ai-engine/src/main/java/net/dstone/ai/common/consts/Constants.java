@@ -79,30 +79,30 @@ public final class Constants {
 		 * Workflow 실행 컨텍스트(runtime.workflow.execution.WorkFlowContext)의 모양을 정하는 이름들입니다.
 		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML 템플릿의 {{ ... }} 참조는 이 트리를 그대로 따라갑니다.
 		 * <pre>
-		 * input:     { message: "...", 요청의 variables... }
-		 * steps:     { stepId: { input, text, data, error, items } }
-		 * previous:  { input, text, data, error, items }   ← 바로 직전에 실행된 step의 결과
+		 * inputs:    { message: "...", 요청의 variables... }   ← YAML workflow.inputs에 선언한 이름 그대로
+		 * steps:     { stepId: { input, output, text, error, items } }   ← input/output은 YAML step의 input/output과 같은 이름
+		 * previous:  { input, output, text, error, items }   ← 바로 직전에 실행된 step의 결과
 		 * approvals: { stepId: { approved, approver, comment } }   ← 엔진 내부용 승인 결정 수신함
 		 * </pre>
 		 */
 		public static final class Context {
-			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다({{input.xxx}}). */
-			public final static String INPUT = "input";
+			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다({{inputs.xxx}}). YAML의 workflow.inputs와 같은 이름입니다. */
+			public final static String INPUTS = "inputs";
 			/** 실행된 step들의 결과가 step id별로 쌓이는 루트입니다({{steps.id.xxx}}). */
 			public final static String STEPS = "steps";
 			/** 바로 직전에 실행된 step의 결과가 들어가는 루트입니다({{previous.xxx}}). */
 			public final static String PREVIOUS = "previous";
-			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 템플릿에서는 참조하지 않고 steps.id.data로 읽습니다. */
+			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 템플릿에서는 참조하지 않고 steps.id.output으로 읽습니다. */
 			public final static String APPROVALS = "approvals";
-			/** 실행 요청의 message가 들어가는 input 아래의 예약 이름입니다({{input.message}}). */
+			/** 실행 요청의 message가 들어가는 inputs 아래의 예약 이름입니다({{inputs.message}}). */
 			public final static String MESSAGE = "message";
 
-			/** step 결과: 이 step이 실제로 받은 입력(템플릿을 채운 뒤의 값)입니다. */
+			/** step 결과: 이 step이 실제로 받은 입력(YAML step의 input 템플릿을 채운 뒤의 값)입니다. */
 			public final static String FIELD_INPUT = "input";
 			/** step 결과: 결과 텍스트입니다. */
 			public final static String FIELD_TEXT = "text";
-			/** step 결과: 구조화된 결과입니다(모양은 StepOutputDefinition 참고). */
-			public final static String FIELD_DATA = "data";
+			/** step 결과: 구조화된 결과입니다. 모양은 YAML step의 output(schema/parse)에 선언한 대로입니다(StepOutputDefinition 참고). */
+			public final static String FIELD_OUTPUT = "output";
 			/** step 결과: 실패했을 때의 사유입니다(성공이면 null). */
 			public final static String FIELD_ERROR = "error";
 			/** step 결과: forEach로 반복 실행했을 때 반복별 결과 목록입니다. */

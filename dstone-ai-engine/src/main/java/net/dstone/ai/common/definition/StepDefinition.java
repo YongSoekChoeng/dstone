@@ -13,11 +13,11 @@ import net.dstone.ai.common.consts.StepType;
  * input에는 이 step에 넣어줄 값을 템플릿으로 적습니다. 템플릿 안의 {{ ... }} 자리는 step이 실행되기
  * 직전에 엔진(runtime.workflow.WorkFlowExecutor)이 실제 값으로 채웁니다(문법은 common.template.Template 참고).
  * 
- *   {{input.message}}              Workflow를 실행할 때 넘긴 값
- *   {{steps.analyze.data.tables}}  analyze step이 남긴 결과
- *   {{previous.text}}              바로 직전에 실행된 step의 결과
- *   {{item}}                       forEach로 반복 중일 때 이번 반복이 맡은 항목
- *   {{a.b ?? c.d}}                 왼쪽 값이 없으면 오른쪽 값을 씀
+ *   {{inputs.message}}                Workflow를 실행할 때 넘긴 값
+ *   {{steps.analyze.output.tables}}   analyze step이 남긴 결과
+ *   {{previous.text}}                 바로 직전에 실행된 step의 결과
+ *   {{item}}                          forEach로 반복 중일 때 이번 반복이 맡은 항목
+ *   {{a.b ?? c.d}}                    왼쪽 값이 없으면 오른쪽 값을 씀
  * 
  * step 종류에 따라 input의 모양이 다릅니다.
  * - AGENT / SUPERVISOR / ROUTER: 문자열입니다. 채워진 문자열이 그대로 LLM에게 보내는 사용자 메시지가 됩니다.
@@ -27,9 +27,9 @@ import net.dstone.ai.common.consts.StepType;
  * - APPROVAL: input을 쓰지 않습니다. 직전 step의 결과 텍스트를 그대로 다음 step에 넘깁니다.
  *
  * ## step은 무엇을 내놓는가 (output)
- * 모든 step은 실행이 끝나면 자기 id 아래에 {input, text, data, error}를 남깁니다(forEach면 items도 남깁니다).
- * 다음 step들은 이 값을 {{steps.이id.text}}, {{steps.이id.data.키}}처럼 이름으로 가져다 씁니다.
- * data를 어떤 모양으로 만들지는 output에 선언합니다(자세한 규칙은 StepOutputDefinition 참고).
+ * 모든 step은 실행이 끝나면 자기 id 아래에 {input, output, text, error}를 남깁니다(forEach면 items도 남깁니다).
+ * 다음 step들은 이 값을 {{steps.이id.text}}, {{steps.이id.output.키}}처럼 이름으로 가져다 씁니다.
+ * steps.id.output이 어떤 모양일지는 이 step의 output에 선언합니다. 선언한 이름과 꺼내는 이름이 같습니다(StepOutputDefinition 참고).
  *
  * ## 다음 step으로 어떻게 넘어가는가 (onSuccess / onFailure)
  * onSuccess와 onFailure를 둘 다 비워두면 가장 단순한 동작이 됩니다: 성공하면 목록에서 바로 다음 step으로 넘어가고,
@@ -49,7 +49,7 @@ import net.dstone.ai.common.consts.StepType;
  * 실패 사유는 그 step의 error에 남으므로, onFailure로 이동한 step이 {{steps.id.error}}로 읽을 수 있습니다.
  *
  * ## 같은 step을 여러 번 동시에 실행하기 (forEach)
- * forEach에 리스트를 가리키는 참조 경로를 적으면(예: input.sqlList, steps.list.data.lines), 그 리스트의
+ * forEach에 리스트를 가리키는 참조 경로를 적으면(예: inputs.sqlList, steps.list.output.lines), 그 리스트의
  * 항목 개수만큼 이 step을 한꺼번에(병렬로) 실행합니다. 각 실행에서는 자기가 맡은 항목을
  * {{item}}(itemVariable로 이름을 바꿀 수 있음)으로 꺼내 씁니다. 결과는 steps.이id.items에 반복 순서대로 쌓입니다.
  * APPROVAL과 ROUTER는 forEach를 쓸 수 없습니다. APPROVAL은 사람의 결정이 step id 하나로만 구분되고,
@@ -64,10 +64,10 @@ import net.dstone.ai.common.consts.StepType;
  * @param onFailure    실패했을 때 다음으로 갈 step의 id(또는 "FAIL" 예약어)입니다. ROUTER는 쓰지 않습니다.
  * @param onSuccess    성공했을 때 다음으로 갈 step의 id(또는 "SUCCESS" 예약어)입니다. ROUTER는 쓰지 않습니다.
  * @param input        이 step에 넣어줄 값의 템플릿입니다. AGENT/SUPERVISOR/ROUTER는 문자열, TOOL은 맵입니다.
- * @param output       이 step이 data를 어떤 모양으로 내놓을지 선언합니다(StepOutputDefinition 참고).
+ * @param output       이 step이 output을 어떤 모양으로 내놓을지 선언합니다(StepOutputDefinition 참고).
  * @param approverRole APPROVAL 전용. 누가 승인해야 하는지 기록해 두는 값입니다. 서버가 실제로 역할을 검사하지는 않습니다.
  * @param routes       ROUTER 전용. LLM이 고른 경로 이름 → 이동할 step id(또는 "SUCCESS"/"FAIL")입니다.
- * @param forEach      이 step을 반복 실행할 리스트의 참조 경로입니다(예: input.sqlList). 비워두면 한 번만 실행합니다.
+ * @param forEach      이 step을 반복 실행할 리스트의 참조 경로입니다(예: inputs.sqlList). 비워두면 한 번만 실행합니다.
  * @param itemVariable forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"입니다.
  */
 public record StepDefinition(String id, StepType type, String ref, String onFailure, String onSuccess, Object input, StepOutputDefinition output, String approverRole,

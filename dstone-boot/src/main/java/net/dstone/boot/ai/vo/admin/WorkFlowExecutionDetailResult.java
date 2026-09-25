@@ -13,7 +13,7 @@ import java.util.Map;
  * @param caller           호출한 앱/서비스 식별자(tenant)
  * @param status           실행 상태
  * @param currentStepIndex 지금 실행 중이거나 막 끝낸 스텝의 순번
- * @param context          실행 컨텍스트 트리(input/steps/previous 등, 디버깅용으로 그대로 노출)
+ * @param context          실행 컨텍스트 트리(inputs/steps/previous 등, 디버깅용으로 그대로 노출)
  * @param resultText       최종 성공 결과(끝나기 전에는 null)
  * @param errorMessage     실패/에러 사유(끝나기 전이거나 성공했으면 null)
  * @param createdAt        생성 시각

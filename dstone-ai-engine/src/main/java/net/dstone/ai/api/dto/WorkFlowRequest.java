@@ -5,8 +5,8 @@ import java.util.Map;
 /**
  * Workflow 실행 요청에 담을 내용입니다.
  *
- * message와 variables는 모두 실행 컨텍스트의 input 아래에 들어갑니다. message는 input.message가 되고,
- * variables의 각 값은 input.{이름}이 됩니다. step의 input 템플릿은 {{input.message}}, {{input.이름}}으로,
+ * message와 variables는 모두 실행 컨텍스트의 inputs 아래에 들어갑니다. message는 inputs.message가 되고,
+ * variables의 각 값은 inputs.{이름}이 됩니다. step의 input 템플릿은 {{inputs.message}}, {{inputs.이름}}으로,
  * Agent의 system prompt는 {message}, {이름}으로 이 값들을 가져다 씁니다. 첫 step이 input을 따로 적지
  * 않았다면 message가 그대로 첫 step의 입력이 됩니다.
  *

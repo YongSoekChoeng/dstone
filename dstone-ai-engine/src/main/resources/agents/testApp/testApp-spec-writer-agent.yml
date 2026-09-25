@@ -5,7 +5,7 @@
 # 4단계(AI 개발명세서 작성)에 해당합니다.
 #
 # write-spec step의 input은 [승인된 분석/설계서]({{steps.analyze.text}})와 [검수 의견]
-# ({{steps.design-review.data.comment}}) 두 부분으로 채워집니다.
+# ({{steps.design-review.output.comment}}) 두 부분으로 채워집니다.
 #
 # output.schema 없이 자유 텍스트로 답을 받습니다. testApp-analysis-agent.yml과 같은 이유입니다:
 # 다음 step은 이 명세서를 통째로 받기만 하면 되고, SQL 예시나 명명규칙 표기처럼 서식이 많은 문서를

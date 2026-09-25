@@ -23,7 +23,7 @@ import net.dstone.common.utils.StringUtil;
  *
  * APPROVAL은 사람이 결정만 하는 관문이라서, 받은 input(직전 step의 결과 텍스트)을 결과 텍스트로 그대로 넘깁니다.
  * 결정 내용은 결과 텍스트에 덧붙이지 않고 따로 남깁니다.
- * - 승인: data에 {approved, approver, comment}를 남깁니다. 다음 step은 {{steps.id.data.comment}}처럼 꺼내 씁니다.
+ * - 승인: output에 {approved, approver, comment}를 남깁니다. 다음 step은 {{steps.id.output.comment}}처럼 꺼내 씁니다.
  * - 반려: 실패로 처리하고, 반려 사유(comment)를 error에 남깁니다.
  * </pre>
  */
@@ -46,11 +46,11 @@ public class ApprovalStepRunner implements StepRunner {
 		Object comment = decision.get("comment");
 
 		if (approved) {
-			Map<String, Object> data = new LinkedHashMap<>();
-			data.put("approved", true);
-			data.put("approver", approver == null ? "" : approver);
-			data.put("comment", comment == null ? "" : comment);
-			return StepOutcome.success(input.text(), data);
+			Map<String, Object> output = new LinkedHashMap<>();
+			output.put("approved", true);
+			output.put("approver", approver == null ? "" : approver);
+			output.put("comment", comment == null ? "" : comment);
+			return StepOutcome.success(input.text(), output);
 		}
 		String reason = comment == null || StringUtil.isEmpty(comment.toString()) ? "(사유 없음)" : comment.toString();
 		return StepOutcome.failure(input.text(), reason);

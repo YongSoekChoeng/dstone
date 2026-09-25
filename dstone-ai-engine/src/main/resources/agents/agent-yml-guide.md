@@ -7,7 +7,7 @@
 | 항목 | 필수 | 타입 | 설명 |
 |---|---|---|---|
 | `id` | ✅ | 문자열 | Agent 이름. step의 `ref`와 채팅 API의 `agent`가 이 값을 쓴다. 중복 불가 |
-| `prompt` | ✅ | 문자열(여러 줄) | 시스템 프롬프트 원문. `{변수}`는 호출 시 채워진다(Workflow에서는 컨텍스트의 `input`, 채팅에서는 요청의 `variables`) |
+| `prompt` | ✅ | 문자열(여러 줄) | 시스템 프롬프트 원문. `{변수}`는 호출 시 채워진다(Workflow에서는 컨텍스트의 `inputs`, 채팅에서는 요청의 `variables`) |
 | `description` | | 문자열 | 사람이 읽는 설명. `GET /api/ai/chat` 목록에 쓰인다 |
 | `model` | | 문자열 | 이 Agent만 쓸 모델 이름(같은 provider 안에서). 비우면 공통 기본값. 다른 provider의 모델 이름이면 기동이 아니라 첫 호출 때 실패한다 |
 | `toolsEnabled` | | boolean | LLM이 Tool을 스스로 골라 부를 수 있는지. 기본 `false` |
@@ -34,7 +34,7 @@
 | | 채팅 API(`POST /api/ai/chat[/stream]`) | Workflow step(AGENT/SUPERVISOR/ROUTER의 `ref`) |
 |---|---|---|
 | Agent 지정 | 요청의 `agent` | step의 `ref` |
-| prompt `{변수}` 값 | 요청의 `variables`(`message`는 **들어가지 않는다**) | 실행 컨텍스트의 `input`(요청 `message` + `variables`) |
+| prompt `{변수}` 값 | 요청의 `variables`(`message`는 **들어가지 않는다**) | 실행 컨텍스트의 `inputs`(요청 `message` + `variables`) |
 | 사용자 메시지 | 요청의 `message` | step의 `input`을 채운 글자 |
 | `ragEnabled`/`toolsEnabled`/`model`을 요청마다 바꾸기 | 가능(요청의 같은 이름 값이 있으면 그 값을 쓴다) | 불가. 항상 Agent 정의값 |
 | 대화 기억(sessionId) | 요청의 `sessionId`(비우면 새로 발급) | Workflow 실행의 sessionId. **같은 실행의 모든 Agent step이 공유**한다 |
@@ -88,10 +88,10 @@ system 메시지       "당신은 금융 분야 전문 번역가입니다. 결�
 | 모양 | 어디에 쓰나 | 언제 채우나 | 무엇으로 채우나 |
 |---|---|---|---|
 | `${APP_HOME}` | 모든 YAML의 문자열 | **엔진 기동 시** 한 번(`YamlDefinitionLoader`) | `conf/env{-profile}.properties`(System 프로퍼티), 없으면 OS 환경변수 |
-| `{domain}` | Agent `prompt` | **Agent를 호출할 때마다**(`AgentExecutor.buildSpec()`) | 채팅: 요청 `variables` / Workflow: 컨텍스트 `input` |
-| `{{input.x}}` | Workflow의 step `input`/`forEach`/`output` | **step을 실행할 때마다**(`WorkFlowExecutor`) | 실행 컨텍스트(`input`/`steps`/`previous`) |
+| `{domain}` | Agent `prompt` | **Agent를 호출할 때마다**(`AgentExecutor.buildSpec()`) | 채팅: 요청 `variables` / Workflow: 컨텍스트 `inputs` |
+| `{{inputs.x}}` | Workflow의 step `input`/`forEach`/`output` | **step을 실행할 때마다**(`WorkFlowExecutor`) | 실행 컨텍스트(`inputs`/`steps`/`previous`) |
 
-- Agent prompt에 `{{input.x}}`를 적으면 Workflow 값으로 채워지지 **않는다**. 오류도 나지 않고 `input.x`라는 글자가 그대로 들어가므로 알아차리기 어렵다. prompt에서는 `{x}`로 쓴다.
+- Agent prompt에 `{{inputs.x}}`를 적으면 Workflow 값으로 채워지지 **않는다**. 오류도 나지 않고 `inputs.x`라는 글자가 그대로 들어가므로 알아차리기 어렵다. prompt에서는 `{x}`로 쓴다.
 
 ##### 1.2.1 한눈에 보기 — 값이 흘러가는 길
 
@@ -108,9 +108,9 @@ system 메시지       "당신은 금융 분야 전문 번역가입니다. 결�
              ┌──────────────────────────────┴──────────────────────────────┐
    경로 A: 채팅 API                                            경로 B: Workflow step
    POST /api/ai/chat                                          type: AGENT, ref: doc-translator-agent
-   { agent, message, variables }                              요청 { message, variables } → context.input
+   { agent, message, variables }                              요청 { message, variables } → context.inputs
              │                                                              │
-   ④ variables       ─────▶ {변수} 값                    ④' context.input 전체 ─────▶ {변수} 값
+   ④ variables       ─────▶ {변수} 값                    ④' context.inputs 전체 ─────▶ {변수} 값
    ⑤ message         ─────▶ user 메시지                  ⑤' step input 템플릿을 채운 글자 ─▶ user 메시지
              └──────────────────────────────┬──────────────────────────────┘
                          ⑥ AgentExecutor.buildSpec()
@@ -151,7 +151,7 @@ workflow:
       ref: doc-translator-agent
       input: |
         아래 글을 번역하세요.
-        {{input.message}}
+        {{inputs.message}}
 ```
 
 ##### 1.2.3 단계별로 따라가기
@@ -216,17 +216,17 @@ POST /api/ai/workflow/doc-translate/execute
 ```
 
 ```
-context.input = { domain: "금융", language: "한국어", message: "Interest rates rose sharply." }
+context.inputs = { domain: "금융", language: "한국어", message: "Interest rates rose sharply." }
         │
         ├─▶ step input 템플릿 채우기 ──▶ "아래 글을 번역하세요.\nInterest rates rose sharply."   → user 메시지
         │
-        └─▶ StepInput.workflowInput = context.input 전체                                → {변수} 값
+        └─▶ StepInput.workflowInputs = context.inputs 전체                                → {변수} 값
                    │
-AgentStepRunner ──▶ AgentExecutor.call(agent, variables = workflowInput, userMessage = 채운 step input)
+AgentStepRunner ──▶ AgentExecutor.call(agent, variables = workflowInputs, userMessage = 채운 step input)
 ```
 
-- `{변수}` 값은 컨텍스트의 `input` 전체다. 그래서 Workflow에서는 `{message}`도 쓸 수 있다.
-- step `input`이 무엇이든 `{변수}` 값은 **늘 같다**(`input`은 실행 중에 바뀌지 않는다). 앞 step의 결과를 `{변수}`로 받을 방법은 없다.
+- `{변수}` 값은 컨텍스트의 `inputs` 전체다. 그래서 Workflow에서는 `{message}`도 쓸 수 있다.
+- step `input`이 무엇이든 `{변수}` 값은 **늘 같다**(`inputs`는 실행 중에 바뀌지 않는다). 앞 step의 결과를 `{변수}`로 받을 방법은 없다.
   앞 step 결과는 step `input`의 `{{steps.<id>.text}}`로 user 메시지에 넣는다.
 
 **⑥ 메시지 조립** — `AgentExecutor.buildSpec()`이 prompt 틀을 채우고, 나머지 설정을 붙인다.
@@ -259,7 +259,7 @@ PromptTemplate("당신은 {domain} 분야 ... {language}로만 ...").render({ do
 
 | | 경로 A: 채팅 | 경로 B: Workflow step |
 |---|---|---|
-| `{domain}`, `{language}` | 요청 `variables.domain`, `.language` | `context.input.domain`, `.language`(= 요청 `variables`) |
+| `{domain}`, `{language}` | 요청 `variables.domain`, `.language` | `context.inputs.domain`, `.language`(= 요청 `variables`) |
 | `{message}` | ❌ 채워지지 않음 → 예외 | ✅ 요청 `message` |
 | `{그 밖의 이름}` | 요청 `variables`에 있으면 됨 | 요청 `variables`에 있으면 됨(Workflow `inputs`에 선언 안 해도 됨) |
 | user 메시지 | 요청 `message` 그대로 | step `input`을 채운 글자(생략하면 `{{previous.text}}`) |
@@ -334,12 +334,12 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 | 채팅에서 `{message}` 사용 | 위와 같은 예외(채팅은 `message`를 variables에 넣지 않는다) |
 | 쓰지 않는 값이 더 들어옴 | 무시 |
 | JSON 예시처럼 **중괄호 글자**를 그대로 적음(`{"a": 1}`) | 변수로 읽히거나 템플릿 문법 오류로 호출이 실패한다. prompt에는 중괄호를 쓰지 않고 말로 설명한다(JSON 형식 지시가 필요하면 step의 `output.schema`를 쓴다) |
-| Workflow 문법 `{{input.x}}`를 prompt에 적음 | 오류 없이 `input.x`라는 **글자**가 들어간다(값이 채워지지 않는다). prompt에서는 `{x}`로 쓴다 |
+| Workflow 문법 `{{inputs.x}}`를 prompt에 적음 | 오류 없이 `inputs.x`라는 **글자**가 들어간다(값이 채워지지 않는다). prompt에서는 `{x}`로 쓴다 |
 | 변수 이름에 `-`, 공백, 한글 | 변수 이름으로 읽히지 않을 수 있다. 영문, 숫자, `_`만 쓴다 |
 | `{options.strict}`(맵 값의 안쪽 키) | 동작한다. `options = {strict: true}`이면 `true`가 들어간다 |
 | 값이 리스트 | 항목이 **구분자 없이** 붙는다. `["a","b"]` → `ab` |
 | 값이 맵 | **키 이름만** 붙는다. `{strict: true}` → `strict` |
-| ↳ 리스트/맵을 LLM에게 보여 줘야 할 때 | prompt `{x}` 대신 step `input`의 `{{input.x}}`로 넘긴다(JSON 글자 `["a","b"]`로 들어간다) |
+| ↳ 리스트/맵을 LLM에게 보여 줘야 할 때 | prompt `{x}` 대신 step `input`의 `{{inputs.x}}`로 넘긴다(JSON 글자 `["a","b"]`로 들어간다) |
 | 생략하거나 빈 문자열 | 기동 실패 `id와 prompt가 모두 있어야 합니다` |
 
 ##### 1.2.7 step 종류별로 엔진이 prompt에 덧붙이는 것
@@ -527,10 +527,10 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 | AGENT의 RAG(ragEnabled) 증강 | `sample/sample-agent-rag-augmented.yml` |
 | Agent별 model override | `sample/sample-agent-model-override.yml` |
 | TOOL step 연쇄(LLM 없이) | `sample/sample-tool-chain-basic.yml` |
-| MCP Tool + `output.parse: lines` + 앞 step data로 `forEach` | `sample/sample-mcp-filesystem-list.yml` |
+| MCP Tool + `output.parse: lines` + 앞 step output으로 `forEach` | `sample/sample-mcp-filesystem-list.yml` |
 | TOOL로 RAG 검색만 직접 호출 | `sample/sample-tool-rag-search.yml` |
 | 위험 Tool(http/shell/python) 기본 거부 확인 | `sample/sample-tool-gated-external.yml` |
-| AGENT `output.schema` → `{{steps.<id>.data.<키>}}`, Workflow `output` | `sample/sample-structured-output-chain.yml` |
+| AGENT `output.schema` → `{{steps.<id>.output.<키>}}`, Workflow `output` | `sample/sample-structured-output-chain.yml` |
 | SUPERVISOR(pass/reason) 판정 | `sample/sample-supervisor-verdict-gate.yml` |
 | ROUTER 다지 분기(routes) | `sample/sample-router-multiway.yml` |
 | onFailure 재시도 루프 + `previous`/`??`/`steps.<id>.error` | `sample/sample-loop-retry-until-valid.yml` |

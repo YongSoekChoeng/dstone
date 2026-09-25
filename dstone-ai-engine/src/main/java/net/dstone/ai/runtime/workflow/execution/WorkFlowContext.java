@@ -11,19 +11,20 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
  * Workflow 실행 1건의 컨텍스트(실행 중 모든 상태를 담은 트리)를 만들고 고치는 도구 모음입니다.
  * 컨텍스트 자체는 평범한 Map이라서 그대로 JSON으로 DB에 저장되고(WorkFlowExecutionStore), 실행 상세
  * 조회 API로도 그대로 보입니다. YAML 템플릿의 {{ ... }} 참조는 이 트리의 경로를 그대로 따라갑니다.
+ * 이름은 YAML에 적는 이름과 맞춰 두었습니다(workflow.inputs → inputs, step의 input/output → steps.id.input/output).
  *
- * input:                    ← Workflow를 시작할 때 한 번 채워지고 바뀌지 않음
+ * inputs:                   ← Workflow를 시작할 때 한 번 채워지고 바뀌지 않음(YAML workflow.inputs에 선언한 값들)
  *   message: "사용자 메시지"
  *   sqlList: [...]          ← 요청의 variables가 여기에 펼쳐짐
  * steps:                    ← step이 끝날 때마다 자기 id 아래에 결과를 남김(같은 step이 다시 돌면 덮어씀)
  *   analyze:
- *     input: "채워진 입력"
- *     text:  "결과 텍스트"
- *     data:  { ... }
- *     error: null
+ *     input:  "채워진 입력"   ← YAML step의 input을 채운 값
+ *     output: { ... }        ← YAML step의 output(schema/parse)에 선언한 모양의 값
+ *     text:   "결과 텍스트"
+ *     error:  null
  *   validate-each:          ← forEach step은 반복별 결과를 items에 담음
  *     text: "..."
- *     items: [ { input, text, data, error }, ... ]
+ *     items: [ { input, output, text, error }, ... ]
  * previous:                 ← 바로 직전에 실행된 step의 결과(첫 step에서는 { text: message })
  * approvals:                ← APPROVAL step별 사람의 결정(엔진 내부용)
  *   design-review: { approved, approver, comment }
@@ -35,36 +36,36 @@ public final class WorkFlowContext {
 	}
 
 	/**
-	 * 새 실행의 컨텍스트를 만듭니다. 요청의 variables와 message는 input 아래에 들어가고, 첫 step이
+	 * 새 실행의 컨텍스트를 만듭니다. 요청의 variables와 message는 inputs 아래에 들어가고, 첫 step이
 	 * {{previous.text}}로 사용자 메시지를 받을 수 있도록 previous.text에도 message를 넣어 둡니다.
 	 *
 	 * @param message   실행 요청의 message입니다.
 	 * @param variables 실행 요청의 variables입니다(없으면 null).
 	 */
 	public static Map<String, Object> create(String message, Map<String, Object> variables) {
-		Map<String, Object> input = variables == null ? new LinkedHashMap<>() : new LinkedHashMap<>(variables);
-		input.put(Context.MESSAGE, message);
+		Map<String, Object> inputs = variables == null ? new LinkedHashMap<>() : new LinkedHashMap<>(variables);
+		inputs.put(Context.MESSAGE, message);
 
 		Map<String, Object> previous = new LinkedHashMap<>();
 		previous.put(Context.FIELD_TEXT, message);
 
 		Map<String, Object> context = new LinkedHashMap<>();
-		context.put(Context.INPUT, input);
+		context.put(Context.INPUTS, inputs);
 		context.put(Context.STEPS, new LinkedHashMap<String, Object>());
 		context.put(Context.PREVIOUS, previous);
 		return context;
 	}
 
 	/**
-	 * 컨텍스트의 input(사용자가 넘긴 값) 맵을 돌려줍니다. Agent의 system prompt에 있는 {변수명}을
+	 * 컨텍스트의 inputs(사용자가 넘긴 값) 맵을 돌려줍니다. Agent의 system prompt에 있는 {변수명}을
 	 * 채울 때 이 맵을 씁니다.
 	 *
 	 * @param context 실행 컨텍스트입니다.
 	 */
 	@SuppressWarnings("unchecked")
-	public static Map<String, Object> input(Map<String, Object> context) {
-		Object input = context.get(Context.INPUT);
-		return input instanceof Map ? (Map<String, Object>) input : Map.of();
+	public static Map<String, Object> inputs(Map<String, Object> context) {
+		Object inputs = context.get(Context.INPUTS);
+		return inputs instanceof Map ? (Map<String, Object>) inputs : Map.of();
 	}
 
 	/**
@@ -86,18 +87,18 @@ public final class WorkFlowContext {
 	}
 
 	/**
-	 * step 한 번의 결과를 컨텍스트에 남길 모양({input, text, data, error})으로 만듭니다.
+	 * step 한 번의 결과를 컨텍스트에 남길 모양({input, output, text, error})으로 만듭니다.
 	 *
-	 * @param input 이 step이 실제로 받은 입력입니다(템플릿을 채운 뒤의 값).
-	 * @param text  결과 텍스트입니다.
-	 * @param data  구조화된 결과입니다(없으면 빈 맵).
-	 * @param error 실패 사유입니다(성공이면 null).
+	 * @param input  이 step이 실제로 받은 입력입니다(템플릿을 채운 뒤의 값).
+	 * @param output 구조화된 결과입니다(없으면 빈 맵).
+	 * @param text   결과 텍스트입니다.
+	 * @param error  실패 사유입니다(성공이면 null).
 	 */
-	public static Map<String, Object> stepRecord(Object input, String text, Map<String, Object> data, String error) {
+	public static Map<String, Object> stepRecord(Object input, Map<String, Object> output, String text, String error) {
 		Map<String, Object> record = new LinkedHashMap<>();
 		record.put(Context.FIELD_INPUT, input);
+		record.put(Context.FIELD_OUTPUT, output == null ? Map.of() : output);
 		record.put(Context.FIELD_TEXT, text);
-		record.put(Context.FIELD_DATA, data == null ? Map.of() : data);
 		record.put(Context.FIELD_ERROR, error);
 		return record;
 	}
@@ -111,7 +112,7 @@ public final class WorkFlowContext {
 	 * @param items 반복별 결과 목록입니다(각각 stepRecord() 모양).
 	 */
 	public static Map<String, Object> forEachRecord(String text, String error, List<Map<String, Object>> items) {
-		Map<String, Object> record = stepRecord(null, text, Map.of(), error);
+		Map<String, Object> record = stepRecord(null, Map.of(), text, error);
 		record.put(Context.FIELD_ITEMS, items);
 		return record;
 	}

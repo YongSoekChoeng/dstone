@@ -16,10 +16,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * step의 input, Workflow의 output, step의 forEach가 모두 이 규칙 하나로 처리됩니다.
  *
  * ## 문법
- *   {{input.message}}                  컨텍스트 트리를 점(.)으로 따라 내려간 값
- *   {{steps.list.data.lines.0}}        리스트는 숫자로 몇 번째 항목인지 고름(0부터)
- *   {{previous.data.sql ?? input.message}}
- *                                      왼쪽 값이 없으면 오른쪽 값을 씀(여러 번 이어 쓸 수 있음)
+ *   {{inputs.message}}                   컨텍스트 트리를 점(.)으로 따라 내려간 값
+ *   {{steps.list.output.lines.0}}        리스트는 숫자로 몇 번째 항목인지 고름(0부터)
+ *   {{previous.output.sql ?? inputs.message}}
+ *                                        왼쪽 값이 없으면 오른쪽 값을 씀(여러 번 이어 쓸 수 있음)
  * 계산식이나 조건식은 지원하지 않습니다. 값을 가공해야 한다면 Tool로 만들어서 TOOL step으로 처리합니다.
  *
  * ## 채우는 규칙
@@ -107,7 +107,7 @@ public final class Template {
 
 	/**
 	 * <pre>
-	 * 표현식 하나(괄호 없이, 예: "steps.a.text ?? input.message")를 계산해서 값을 돌려줍니다.
+	 * 표현식 하나(괄호 없이, 예: "steps.a.text ?? inputs.message")를 계산해서 값을 돌려줍니다.
 	 * forEach처럼 {{ }} 없이 경로만 적는 자리에서 씁니다.
 	 * </pre>
 	 *
@@ -171,7 +171,7 @@ public final class Template {
 
 	/**
 	 * <pre>
-	 * 경로 하나(예: "steps.list.data.lines.0")를 컨텍스트 트리에서 따라 내려가 값을 찾습니다.
+	 * 경로 하나(예: "steps.list.output.lines.0")를 컨텍스트 트리에서 따라 내려가 값을 찾습니다.
 	 * 중간에 길이 끊기면 null을 돌려줍니다.
 	 * </pre>
 	 *

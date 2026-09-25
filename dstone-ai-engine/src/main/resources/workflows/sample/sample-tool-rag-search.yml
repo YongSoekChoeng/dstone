@@ -27,6 +27,6 @@ workflow:
       type: TOOL
       ref: searchDocuments
       input:
-        query: "{{input.message}}"
+        query: "{{inputs.message}}"
       onSuccess: SUCCESS
       onFailure: FAIL

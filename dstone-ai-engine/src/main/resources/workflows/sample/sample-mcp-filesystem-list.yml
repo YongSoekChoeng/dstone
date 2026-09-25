@@ -8,11 +8,11 @@
 # Workflow의 목적입니다.
 #
 # 동작 흐름
-# 1) list: message로 받은 디렉토리({{input.message}})의 목록을 list_directory로 가져옵니다.
+# 1) list: message로 받은 디렉토리({{inputs.message}})의 목록을 list_directory로 가져옵니다.
 #    list_directory는 "[FILE] notes.txt", "[DIR] sub"처럼 한 줄에 하나씩 답합니다.
 #    output.parse: lines + pattern으로 "[FILE] "로 시작하는 줄만 남기고 파일명 부분만 꺼내서,
-#    data.lines에 파일명 리스트(예: ["notes.txt", "todo.txt"])를 만듭니다.
-# 2) read-notes: forEach: steps.list.data.lines라서, 찾아낸 파일 개수만큼 read_text_file을 동시에
+#    output.lines에 파일명 리스트(예: ["notes.txt", "todo.txt"])를 만듭니다.
+# 2) read-notes: forEach: steps.list.output.lines라서, 찾아낸 파일 개수만큼 read_text_file을 동시에
 #    호출합니다. 각 반복은 자기가 맡은 파일명을 {{fileName}}(itemVariable)으로 받아 경로를 만듭니다.
 #    파일이 몇 개든 YAML을 고칠 필요가 없습니다.
 # 3) Workflow의 최종 결과는 마지막 step(read-notes)의 text, 즉 읽어온 파일 내용들을 줄바꿈으로 이은 값입니다.
@@ -38,7 +38,7 @@ workflow:
       type: TOOL
       ref: list_directory
       input:
-        path: "{{input.message}}"
+        path: "{{inputs.message}}"
       output:
         parse: lines
         pattern: '^\[FILE\] (.+)$'
@@ -48,9 +48,9 @@ workflow:
     - id: read-notes
       type: TOOL
       ref: read_text_file
-      forEach: steps.list.data.lines
+      forEach: steps.list.output.lines
       itemVariable: fileName
       input:
-        path: "{{input.message}}/{{fileName}}"
+        path: "{{inputs.message}}/{{fileName}}"
       onSuccess: SUCCESS
       onFailure: FAIL

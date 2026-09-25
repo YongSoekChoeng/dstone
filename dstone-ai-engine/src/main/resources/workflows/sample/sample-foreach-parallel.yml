@@ -6,7 +6,7 @@
 #
 # - inputs: sqlList를 list<string>으로 선언해 두었습니다. 요청에 sqlList가 없거나 리스트가 아니면
 #   실행하기 전에 400으로 거절됩니다.
-# - validate-each: forEach: input.sqlList라서, sqlList 항목 개수만큼 이 step 하나를 한꺼번에
+# - validate-each: forEach: inputs.sqlList라서, sqlList 항목 개수만큼 이 step 하나를 한꺼번에
 #   실행합니다(자세한 동작은 runtime.workflow.WorkFlowExecutor.runForEach 참고). 각 실행에서는
 #   자기가 맡은 항목이 {{item}}으로 채워집니다.
 # - 반복별 결과는 실행 상세 조회의 context.steps.validate-each.items에 순서대로 쌓입니다.
@@ -32,7 +32,7 @@ workflow:
     - id: validate-each
       type: TOOL
       ref: validateSqlSyntax
-      forEach: input.sqlList
+      forEach: inputs.sqlList
       input:
         sql: "{{item}}"
       onSuccess: SUCCESS

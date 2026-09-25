@@ -5,7 +5,7 @@
 # 소스 생성)에 해당합니다.
 #
 # generate-code step의 input은 [승인된 개발명세서]({{steps.write-spec.text}})와 [PL 검토 의견]
-# ({{steps.spec-review.data.comment}}) 두 부분으로 채워집니다.
+# ({{steps.spec-review.output.comment}}) 두 부분으로 채워집니다.
 #
 # output.schema 없이 자유 텍스트로 답을 받습니다. 따옴표/역슬래시/줄바꿈이 잔뜩 섞인 Java 소스 여러
 # 개를 JSON 문자열 값 하나에 담게 하면 이스케이프가 깨지기 쉽기 때문입니다. 코드는 평범한 마크다운

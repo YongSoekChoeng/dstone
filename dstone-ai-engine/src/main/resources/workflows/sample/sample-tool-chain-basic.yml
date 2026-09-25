@@ -6,7 +6,7 @@
 # 두 Tool 모두 화이트리스트 없이 항상 켜져 있는 Tool이라서(tools.sql.SqlSyntaxTool,
 # tools.sample.DateTimeTool) API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
-# validate step은 사용자 메시지({{input.message}})를 sql 인자로 넘기므로, 이 Workflow를 호출할 때는
+# validate step은 사용자 메시지({{inputs.message}})를 sql 인자로 넘기므로, 이 Workflow를 호출할 때는
 # message 자리에 SQL 문을 넣어야 합니다. now step은 인자가 필요 없어서 input을 생략했습니다(빈 인자 {}로
 # 호출됩니다). 최종 결과는 마지막 step(now)의 text, 즉 현재 날짜/시간입니다.
 #
@@ -26,7 +26,7 @@ workflow:
       type: TOOL
       ref: validateSqlSyntax
       input:
-        sql: "{{input.message}}"
+        sql: "{{inputs.message}}"
       onSuccess: now
       onFailure: FAIL
 

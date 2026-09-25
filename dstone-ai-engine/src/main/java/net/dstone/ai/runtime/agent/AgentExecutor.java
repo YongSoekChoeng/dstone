@@ -199,7 +199,7 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- AgentDefinition.prompt()에 적힌 문구를 그대로 시스템 프롬프트로 씁니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
-			  바꿔치기해 줍니다. variables는 Workflow에서는 실행 컨텍스트의 input(요청의 message와
+			  바꿔치기해 줍니다. variables는 Workflow에서는 실행 컨텍스트의 inputs(요청의 message와
 			  variables), 채팅 화면에서는 요청의 variables입니다. 이 프롬프트는 resources/agents/*.yml
 			  파일 안에 직접 적혀 있습니다.
 			- 시스템 프롬프트는 "이 Agent가 어떤 역할인가"만 담습니다. 이전 step의 결과 같은 "이번에 할

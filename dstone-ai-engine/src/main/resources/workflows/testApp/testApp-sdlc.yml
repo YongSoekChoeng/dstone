@@ -7,12 +7,12 @@
 #
 # ## 단계 사이에 무엇이 넘어가는가
 # 각 AGENT step은 input에 "무엇을 받을지"를 이름으로 명시합니다.
-#   analyze       <- {{input.message}}                         (현업 요청사항 원문)
+#   analyze       <- {{inputs.message}}                        (현업 요청사항 원문)
 #   write-spec    <- {{steps.analyze.text}}                    (승인된 분석/설계서)
-#                    {{steps.design-review.data.comment}}      (검수 의견)
+#                    {{steps.design-review.output.comment}}    (검수 의견)
 #   generate-code <- {{steps.write-spec.text}}                 (승인된 개발명세서)
-#                    {{steps.spec-review.data.comment}}        (PL 검토 의견)
-# APPROVAL step은 받은 텍스트를 그대로 넘기고, 승인 코멘트는 data.comment에 따로 남깁니다. 그래서
+#                    {{steps.spec-review.output.comment}}      (PL 검토 의견)
+# APPROVAL step은 받은 텍스트를 그대로 넘기고, 승인 코멘트는 output.comment에 따로 남깁니다. 그래서
 # 다음 AGENT step은 문서 본문과 승인 코멘트를 섞이지 않은 채로 각각 받습니다.
 #
 # ## 반려되면 그 자리에서 종료한다
@@ -57,7 +57,7 @@ workflow:
     - id: analyze
       type: AGENT
       ref: testApp-analysis-agent
-      input: "{{input.message}}"
+      input: "{{inputs.message}}"
       onSuccess: design-review
       onFailure: FAIL
 
@@ -75,7 +75,7 @@ workflow:
         {{steps.analyze.text}}
 
         [검수 의견]
-        {{steps.design-review.data.comment}}
+        {{steps.design-review.output.comment}}
       onSuccess: spec-review
       onFailure: FAIL
 
@@ -93,7 +93,7 @@ workflow:
         {{steps.write-spec.text}}
 
         [PL 검토 의견]
-        {{steps.spec-review.data.comment}}
+        {{steps.spec-review.output.comment}}
       onSuccess: dev-submit
       onFailure: FAIL
 
