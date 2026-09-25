@@ -38,8 +38,8 @@ var DstoneAiWorkflow = (function () {
 		},
 		"sample-foreach-parallel": {
 			message: "foreach 테스트",
-			variables: { sqlList: ["SELECT 1 FROM dual", "SELEC 1 FROM dual"] },
-			note: "message는 쓰지 않습니다. \"SELEC\"는 일부러 넣은 오타라 FAIL로 끝나는 게 정상입니다."
+			variables: { sqlList: ["SELECT 1 FROM dual", "SELECT name FROM member WHERE id = 1"] },
+			note: "message는 쓰지 않습니다. sqlList에 \"SELEC 1 FROM dual\"처럼 틀린 SQL을 하나 넣으면 FAIL로 끝나는 것도 확인할 수 있습니다."
 		},
 		"sample-loop-retry-until-valid": {
 			message: "SELECT * FORM member WHERE id = 1",

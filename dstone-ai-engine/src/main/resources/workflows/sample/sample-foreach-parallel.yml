@@ -14,7 +14,8 @@
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-foreach-parallel
 #   message   : (아무 문자열이나 넣으면 됩니다 - message는 필수값이지만 이 Workflow는 쓰지 않습니다)
-#   variables : {"sqlList": ["SELECT 1 FROM dual", "SELEC 1 FROM dual"]}
+#   variables : {"sqlList": ["SELECT 1 FROM dual", "SELECT name FROM member WHERE id = 1"]}
+# 실패하는 경우도 보고 싶다면 sqlList에 "SELEC 1 FROM dual"을 하나 더 넣어보면 됩니다
 # ("SELEC"은 SELECT를 일부러 잘못 쓴 오타로, JSQLParser가 실제로 문법 오류로 거부합니다. 참고로
 # "SELECT * FROM WRONG SYNTAX"처럼 얼핏 이상해 보이는 문자열은 "WRONG이라는 테이블을 SYNTAX라는
 # 이름으로 별칭 붙인 것"으로 해석되어 문법상으로는 유효하게 통과하므로 예시로 쓰지 않았습니다.)
