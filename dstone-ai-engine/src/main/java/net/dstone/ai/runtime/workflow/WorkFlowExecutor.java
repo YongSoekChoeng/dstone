@@ -98,7 +98,7 @@ public class WorkFlowExecutor extends BaseObject {
 	public WorkFlowExecution run(WorkFlowDefinition workflow, WorkFlowExecution execution) {
 		int maxIterations = workflow.maxIterations() == null ? Constants.WorkFlow.DEFAULT_MAX_ITERATIONS : workflow.maxIterations();
 		int currentIndex = execution.currentStepIndex();
-		WorkFlowExecution current = execution;
+		WorkFlowExecution currentExecution = execution;
 		int executed = 0;
 
 		while (true) {
@@ -107,7 +107,7 @@ public class WorkFlowExecutor extends BaseObject {
 			1) 실행 횟수를 확인합니다. maxIterations를 넘어서면 무한 루프로 보고 FAILED로 끝냅니다.
 			****************************************************************************************/
 			if (++executed > maxIterations) {
-				return this.persistFailed(current, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
+				return this.persistFailed(currentExecution, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
 			}
 
 			/****************************************************************************************
@@ -122,15 +122,15 @@ public class WorkFlowExecutor extends BaseObject {
 			StepRunResult stepResult;
 			try {
 				if( !StringUtil.isEmpty(step.forEach()) ) {
-					stepResult = this.runForEach(step, current);
+					stepResult = this.runForEach(step, currentExecution);
 				}else {
-					stepResult = this.runOne(step, current);
+					stepResult = this.runOne(step, currentExecution);
 				}
 			} catch (Exception e) {
 				// StepRunner가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
 				// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
 				// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
-				return this.persistFailed(current, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
+				return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
 			}
 
 			/****************************************************************************************
@@ -138,16 +138,16 @@ public class WorkFlowExecutor extends BaseObject {
 			****************************************************************************************/
 			if (stepResult.pending()) {
 				// WAITING_APPROVAL 상태로 저장하고 곧바로 리턴합니다(루프를 빠져나갑니다).
-				current = current.waitingApproval(currentIndex);
-				this.executionStore.update(current);
-				return current;
+				currentExecution = currentExecution.waitingApproval(currentIndex);
+				this.executionStore.update(currentExecution);
+				return currentExecution;
 			}
 
 			/****************************************************************************************
 			5) 이번 step의 결과를 컨텍스트의 steps.{stepId}와 previous에 남겨서,
 			   다음 step들이 {{steps.id...}}나 {{previous...}}로 가져다 쓸 수 있게 합니다.
 			****************************************************************************************/
-			WorkFlowContext.recordStep(current.context(), step.id(), stepResult.record());
+			WorkFlowContext.recordStep(currentExecution.context(), step.id(), stepResult.record());
 
 			/****************************************************************************************
 			6) decideTransition()으로 다음에 무엇을 할지 정합니다.
@@ -160,7 +160,7 @@ public class WorkFlowExecutor extends BaseObject {
 				String message = stepResult.success() ? stepResult.text() : stepResult.error();
 				transition = this.decideTransition(workflow, step, stepResult.success(), message, stepResult.route());
 			} catch (Exception e) {
-				return this.persistFailed(current, "step[" + step.id() + "]의 다음 전이(transition)를 계산하는 중 예외가 발생했습니다 - " + e.getMessage());
+				return this.persistFailed(currentExecution, "step[" + step.id() + "]의 다음 전이(transition)를 계산하는 중 예외가 발생했습니다 - " + e.getMessage());
 			}
 
 			/****************************************************************************************
@@ -175,20 +175,20 @@ public class WorkFlowExecutor extends BaseObject {
 				case WorkflowTransition.Done done -> {
 					String result;
 					try {
-						result = this.renderOutput(workflow, current.context(), done.message());
+						result = this.renderOutput(workflow, currentExecution.context(), done.message());
 					} catch (TemplateException e) {
-						return this.persistFailed(current, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
+						return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
 					}
-					current = current.done(result);
-					this.executionStore.update(current);
-					return current;
+					currentExecution = currentExecution.done(result);
+					this.executionStore.update(currentExecution);
+					return currentExecution;
 				}
 				/****************************************************************************************
 				Failed: Workflow 전체가 실패로 끝났다는 뜻입니다.
 					- status를 FAILED로, errorMessage에 실패 사유를 저장한 뒤 리턴합니다(루프를 빠져나갑니다).
 				****************************************************************************************/
 				case WorkflowTransition.Failed failed -> {
-					return this.persistFailed(current, failed.message());
+					return this.persistFailed(currentExecution, failed.message());
 				}
 				/****************************************************************************************
 				NextStep: 아직 끝나지 않고 다른 step으로 계속 진행한다는 뜻입니다.
@@ -196,8 +196,8 @@ public class WorkFlowExecutor extends BaseObject {
 				****************************************************************************************/
 				case WorkflowTransition.NextStep next -> {
 					currentIndex = this.indexOf(workflow.steps(), next.stepId());
-					current = current.advanceTo(currentIndex);
-					this.executionStore.update(current);
+					currentExecution = currentExecution.advanceTo(currentIndex);
+					this.executionStore.update(currentExecution);
 				}
 				/****************************************************************************************
 				Loop: 실패해서 앞쪽의 다른 step으로 되돌아가 다시 시도한다는 뜻입니다.
@@ -205,8 +205,8 @@ public class WorkFlowExecutor extends BaseObject {
 				****************************************************************************************/
 				case WorkflowTransition.Loop loop -> {
 					currentIndex = this.indexOf(workflow.steps(), loop.stepId());
-					current = current.advanceTo(currentIndex);
-					this.executionStore.update(current);
+					currentExecution = currentExecution.advanceTo(currentIndex);
+					this.executionStore.update(currentExecution);
 				}
 			}
 		}
@@ -450,7 +450,9 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * ROUTER step이 고른 route를 routes에서 찾아 다음 step을 정합니다. routes에 없는 이름이면 예외를 던집니다.
+	 * </pre>
 	 *
 	 * @param workflow 실행 중인 Workflow의 정의입니다.
 	 * @param step     방금 끝난 ROUTER step의 정의입니다.

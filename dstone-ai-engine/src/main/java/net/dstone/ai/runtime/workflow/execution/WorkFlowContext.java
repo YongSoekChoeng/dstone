@@ -36,8 +36,10 @@ public final class WorkFlowContext {
 	}
 
 	/**
-	 * 새 실행의 컨텍스트를 만듭니다. 요청의 variables와 message는 inputs 아래에 들어가고, 첫 step이
-	 * {{previous.text}}로 사용자 메시지를 받을 수 있도록 previous.text에도 message를 넣어 둡니다.
+	 * <pre>
+	 * 새 실행의 컨텍스트를 만듭니다. 요청의 variables와 message는 inputs 아래에 들어가고, 
+	 * 첫 step이 {{previous.text}}로 사용자 메시지를 받을 수 있도록 previous.text에도 message를 넣어 둡니다.
+	 * </pre>
 	 *
 	 * @param message   실행 요청의 message입니다.
 	 * @param variables 실행 요청의 variables입니다(없으면 null).
@@ -57,8 +59,10 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * 컨텍스트의 inputs(사용자가 넘긴 값) 맵을 돌려줍니다. Agent의 system prompt에 있는 {변수명}을
 	 * 채울 때 이 맵을 씁니다.
+	 * </pre>
 	 *
 	 * @param context 실행 컨텍스트입니다.
 	 */
@@ -69,7 +73,9 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * step 하나의 결과를 steps.{stepId}에 남기고, previous도 이 결과로 바꿉니다.
+	 * </pre>
 	 *
 	 * @param context 실행 컨텍스트입니다(이 맵을 직접 고칩니다).
 	 * @param stepId  결과를 남길 step의 id입니다.
@@ -87,7 +93,9 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * step 한 번의 결과를 컨텍스트에 남길 모양({input, output, text, error})으로 만듭니다.
+	 * </pre>
 	 *
 	 * @param input  이 step이 실제로 받은 입력입니다(템플릿을 채운 뒤의 값).
 	 * @param output 구조화된 결과입니다(없으면 빈 맵).
@@ -104,8 +112,10 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * forEach step의 결과를 남길 모양으로 만듭니다. text는 반복별 text를 줄바꿈으로 이은 값이고,
 	 * error는 실패한 반복들의 사유를 이은 값입니다(모두 성공이면 null). 반복별 결과는 items에 순서대로 담깁니다.
+	 * </pre>
 	 *
 	 * @param text  반복별 text를 이은 값입니다.
 	 * @param error 실패한 반복들의 사유를 이은 값입니다(모두 성공이면 null).
@@ -118,8 +128,10 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * forEach의 반복 하나를 위해, 원래 컨텍스트에 {{item}} 변수 하나만 더한 복사본을 만듭니다.
 	 * 원래 컨텍스트는 건드리지 않으므로, 여러 반복이 동시에 돌아도 서로의 item이 섞이지 않습니다.
+	 * </pre>
 	 *
 	 * @param context 원래 실행 컨텍스트입니다.
 	 * @param itemKey 항목을 담을 변수 이름입니다(기본값 "item").
@@ -132,7 +144,9 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * APPROVAL step에 대해 사람이 내린 결정을 approvals.{stepId}에 기록합니다.
+	 * </pre>
 	 *
 	 * @param context  실행 컨텍스트입니다(이 맵을 직접 고칩니다).
 	 * @param stepId   결정을 기록할 APPROVAL step의 id입니다.
@@ -155,7 +169,9 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * <pre>
 	 * APPROVAL step에 대해 기록된 결정을 돌려줍니다. 아직 결정이 없으면 null입니다.
+	 * </pre>
 	 *
 	 * @param context 실행 컨텍스트입니다.
 	 * @param stepId  결정을 찾을 APPROVAL step의 id입니다.

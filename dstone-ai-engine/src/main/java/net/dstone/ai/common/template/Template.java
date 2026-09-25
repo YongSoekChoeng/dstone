@@ -16,11 +16,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * step의 input, Workflow의 output, step의 forEach가 모두 이 규칙 하나로 처리됩니다.
  *
  * ## 문법
- *   {{inputs.message}}                   컨텍스트 트리를 점(.)으로 따라 내려간 값
- *   {{steps.list.output.lines.0}}        리스트는 숫자로 몇 번째 항목인지 고름(0부터)
- *   {{previous.output.sql ?? inputs.message}}
- *                                        왼쪽 값이 없으면 오른쪽 값을 씀(여러 번 이어 쓸 수 있음)
- * 계산식이나 조건식은 지원하지 않습니다. 값을 가공해야 한다면 Tool로 만들어서 TOOL step으로 처리합니다.
+ *   {{inputs.message}}                         컨텍스트 트리를 점(.)으로 따라 내려간 값
+ *   {{steps.list.output.lines.0}}              리스트는 숫자로 몇 번째 항목인지 고름(0부터)
+ *   {{previous.output.sql ?? inputs.message}}  왼쪽 값이 없으면 오른쪽 값을 씀(여러 번 이어 쓸 수 있음) 계산식이나 조건식은 지원하지 않습니다. 
+ *                                              값을 가공해야 한다면 Tool로 만들어서 TOOL step으로 처리합니다.
  *
  * ## 채우는 규칙
  * - 문자열 안에 다른 글자와 섞여 있으면: 값을 글자로 바꿔 끼웁니다(맵이나 리스트는 JSON 글자로 바뀝니다).
@@ -29,8 +28,63 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * - 맵과 리스트는 안으로 들어가면서 모든 문자열 값을 같은 규칙으로 채웁니다.
  * - 가리킨 값이 없으면(null이거나 경로가 없으면) 빈 글자로 넘어가지 않고 TemplateException을 던집니다.
  *
- * ${...}는 이 클래스와 상관없습니다. ${APP_HOME} 같은 값은 엔진이 켜질 때 YamlDefinitionLoader가
- * 환경값으로 미리 바꿔 둡니다. {{ ... }}는 Workflow가 실행되는 도중의 데이터를 가리킵니다.
+ * 1. {{item}}이 채워지는 과정
+ * 
+ * 	  forEach: inputs.sqlList        # ["SELECT 1 FROM dual", "SELEC 1 FROM dual"]
+ * 	  input:
+ * 		sql: "{{item}}"              # ← 빈칸
+ * 
+ * 	  엔진은 forEach 리스트의 항목마다 이 step을 한 번씩 실행합니다. 실행할 때마다 이번 항목을 item이라는 이름으로 잠깐 넣어 두고 빈칸을 채웁니다.
+ * 
+ * 	  반복 [0]:  item = "SELECT 1 FROM dual"
+ * 				sql: "{{item}}"   →   sql: "SELECT 1 FROM dual"    → Tool 호출
+ * 	  반복 [1]:  item = "SELEC 1 FROM dual"
+ * 				sql: "{{item}}"   →   sql: "SELEC 1 FROM dual"     → Tool 호출
+ * 
+ * 	  - item은 반복 변수 이름입니다. 기본값이 item이고, itemVariable: sql처럼 바꾸면 {{sql}}로 씁니다.
+ * 	  - item은 그 step의 반복 안에서만 존재합니다. 다른 step에서 {{item}}을 쓰면 기동이 실패합니다.
+ * 
+ * 2. 왜 중괄호가 두 겹인가
+ * 
+ * 	  같은 YAML 파일 안에서 한 겹 중괄호 { }는 이미 다른 뜻으로 쓰이고 있어서 두 겹으로 구분합니다. * 
+ * 	  ┌──────────────┬─────────────────────────────────────────────┬──────────────────────────┐
+ * 	  │     모양      │                     뜻                       │      누가 처리하나           │
+ * 	  ├──────────────┼─────────────────────────────────────────────┼──────────────────────────┤
+ * 	  │ {a: 1, b: 2} │ YAML의 맵(객체) 표기                            │ YAML 파서                │
+ * 	  ├──────────────┼─────────────────────────────────────────────┼──────────────────────────┤
+ * 	  │ {role}       │ Agent prompt의 변수 자리                       │ Spring AI PromptTemplate │
+ * 	  ├──────────────┼─────────────────────────────────────────────┼──────────────────────────┤
+ * 	  │ {{item}}     │ Workflow 실행 중 값 자리(step마다 치환)           │ common.template.Template │
+ * 	  └──────────────┴─────────────────────────────────────────────┴──────────────────────────┘
+ * 	  예를 들어 한 겹으로 sql: {item}이라고 적으면, YAML은 이것을 "item이라는 키를 가진 맵"으로 읽어 버립니다. 
+ *    두 겹 {{ }}는 다른 표기들과 겹치지 않으므로 엔진이 "여기가 채울 자리"라고 확실히 알 수 있습니다. 
+ *    Mustache, Jinja, Handlebars 같은 템플릿 도구가 쓰는 관례이기도 합니다.
+ * 
+ * 3. 왜 따옴표로 감쌌나 ("{{item}}")
+ * 
+ * 	  두 겹이라도 YAML은 {로 시작하는 값을 맵으로 읽으려고 합니다. 따옴표로 감싸야 YAML이 "이건 그냥 글자"로 받아 두고, 나중에 엔진이 그 글자 속 {{item}}을 채웁니다.
+ * 
+ * 	  sql: "{{item}}"     # ✅ 글자 "{{item}}" → 실행 때 엔진(common.template.Template)이 채움
+ * 	  sql: {{item}}       # ❌ YAML이 맵 안의 맵으로 읽으려다 기동 실패
+ * 
+ * 4. 같은 규칙의 다른 빈칸들
+ * 
+ * 	  {{ }} 안에는 항상 실행 컨텍스트에서 값을 찾아갈 경로가 들어갑니다. item은 그중 하나입니다.
+ * 
+ * 	  ┌──────────────────────────────────────────────────────────────
+ * 	  │         빈칸                        채워지는 값                 
+ * 	  ├──────────────────────────────────────────────────────────────
+ * 	  │ {{item}}               forEach 반복 중 이번 항목                
+ * 	  ├──────────────────────────────────────────────────────────────
+ * 	  │ {{item.sql}}           이번 항목이 객체일 때 그 안의 sql 값         
+ * 	  ├──────────────────────────────────────────────────────────────
+ * 	  │ {{inputs.sqlList}}     요청에 들어온 sqlList 값                 
+ * 	  ├──────────────────────────────────────────────────────────────
+ * 	  │ {{steps.check.text}}   check step의 결과 글자                  
+ * 	  ├──────────────────────────────────────────────────────────────
+ * 	  │ {{a ?? b}}             a가 없으면 b                            
+ * 	  └──────────────────────────────────────────────────────────────
+ * 
  * </pre>
  */
 public final class Template {
@@ -182,11 +236,14 @@ public final class Template {
 	private static Object resolve(String path, Map<String, Object> context) {
 		Object current = context;
 		for (String segment : path.split("\\.")) {
+			// 컨텍스트 가 Map 형식 이라면
 			if (current instanceof Map) {
 				current = ((Map<String, Object>) current).get(segment);
+			// 컨텍스트 가 리스트 형식이고 경로(segment)글자가 '숫자로만 이루어진 한 글자 이상의 문자열' 이라면(예:inputs.sqlList.0)
 			} else if (current instanceof List<?> list && segment.matches("\\d+")) {
 				int index = Integer.parseInt(segment);
 				current = index < list.size() ? list.get(index) : null;
+			// 나머지	
 			} else {
 				return null;
 			}
