@@ -217,6 +217,31 @@ POST /api/ai/workflow/sql-review/execute
 }
 ```
 
+> ⚠️ **헷갈리기 쉬운 점 — `{{ }}`는 YAML 구조가 아니라 "실행 컨텍스트"를 가리킨다**
+>
+> YAML에는 `input`도, `steps.check.text`도, `item`도 없다. 이것들은 **실행할 때 엔진이 따로 만드는 트리**의 경로다.
+>
+> ```
+> [YAML 파일 = 설계도, 기동 시 한 번 읽힘]      [실행 컨텍스트 = 실행마다 새로 생김]
+> workflow:                                  context
+>   inputs:        ← 타입 선언만(값 없음)       ├── input    ← 요청에 실제로 온 값(variables + message)
+>     sqlList: list<string>                  ├── steps    ← 끝난 step의 결과 { input, text, data, error, items }
+>   steps:                                   │    ├── check
+>     - id: check  ← 결과를 담을 키 이름         │    └── review
+>     - id: review                           ├── previous ← 바로 앞 step의 결과
+>                                            └── item     ← forEach 반복 중에만, 반복별 복사본에
+> ```
+>
+> | 템플릿 | 가리키는 곳 | 누가, 언제 넣나 |
+> |---|---|---|
+> | `{{input.sqlList}}` | `context.input.sqlList` | 요청이 오면 `WorkFlowContext.create()`가 요청 `variables`를 복사. `inputs.sqlList`는 **타입 선언**일 뿐이고, 값은 요청에서 온다 |
+> | `{{steps.check.text}}` | `context.steps.check.text` | `check` step이 끝나면 `WorkFlowContext.stepRecord()`가 기록. `text`는 YAML 항목이 아니라 **실행 결과 필드**(3절 "모든 step이 남기는 결과") |
+> | `{{steps.review.text}}` (`output`) | `context.steps.review.text` | `review`가 끝난 뒤 기록. `output`은 모든 step이 끝난 뒤에 채우므로 이미 값이 있다 |
+> | `{{item}}` | 반복별 컨텍스트 복사본의 `item` | `runForEach()`가 `forEach:` 리스트의 항목마다 `WorkFlowContext.withItem()`으로 복사본을 만들어 넣는다. `inputs`와 직접 관계없다 |
+>
+> Java로 치면 `inputs`는 **매개변수 선언**(`List<String> sqlList`), `input`은 호출 때 넘어온 **인자 값**이다.
+> 템플릿은 항상 값 쪽(`input`)을 읽고, `inputs`는 기동 시 `{{input.이름}}` 오타 검사와 요청 타입 검사에만 쓰인다.
+
 ##### 2.5.3 단계별로 따라가기
 
 **① YAML 글자 → Map** — `YamlDefinitionLoader`가 SnakeYAML로 파일을 읽는다. 아직은 평범한 Map/List/String이다.
