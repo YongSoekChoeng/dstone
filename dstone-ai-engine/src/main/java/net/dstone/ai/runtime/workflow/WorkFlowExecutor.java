@@ -74,20 +74,22 @@ public class WorkFlowExecutor extends BaseObject {
 	private WorkFlowExecutionStore executionStore;
 
 	/**
+	 * <pre>
 	 * Workflow 하나를 실제로 실행합니다.
 	 *
-	 * execution.currentStepIndex()가 가리키는 스텝부터 이어서 실행합니다. 처음 시작하는 실행이면
-	 * 0번(첫 스텝)부터, 승인 대기 상태에서 다시 이어가는 실행이면 멈췄던 바로 그 스텝부터 다시
-	 * 실행됩니다. 실행 도중 SUCCESS, FAIL, WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고
-	 * 결과를 돌려줍니다.
+	 * execution.currentStepIndex()가 가리키는 스텝부터 이어서 실행합니다. 
+	 * 처음 시작하는 실행이면 0번(첫 스텝)부터, 승인 대기 상태에서 다시 이어가는 실행이면 멈췄던 바로 그 스텝부터 다시 실행됩니다. 
+	 * 실행 도중 SUCCESS, FAIL, WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고 결과를 돌려줍니다.
 	 *
 	 * 이 메서드가 호출되는 경우는 두 가지입니다.
 	 * - 새로 실행할 때: 
 	 * 		사용자가 POST /api/ai/workflow/{id}/execute(동기 방식) 또는 /submit(비동기 방식)을 호출하면, 
-	 * 		currentStepIndex가 0이고 status가 RUNNING인 새 실행이 만들어지고, 승인(APPROVAL)이 끝나서 이어갈 때: 사람이 승인 또는 반려 결정을 내리면, 그 결정이 먼저
-	 *   컨텍스트의 approvals.{stepId}에 기록되고, 같은 실행(같은 executionId, 같은
-	 *   currentStepIndex)을 가지고 run()이 다시 호출됩니다.
-	 *
+	 * 		currentStepIndex가 0이고 status가 RUNNING인 새 실행이 만들어지고, 
+	 * - 승인(APPROVAL)이 끝나서 이어갈 때: 
+	 *   사람이 승인 또는 반려 결정을 내리면, 그 결정이 먼저 컨텍스트의 approvals.{stepId}에 기록되고, 
+	 *   같은 실행(같은 executionId, 같은 currentStepIndex)을 가지고 run()이 다시 호출됩니다.
+	 * </pre>
+	 * 
 	 * @param workflow  실행할 Workflow의 정의입니다(steps 목록, maxIterations, output 등).
 	 * @param execution 지금 진행 중인 실행 1건입니다. WorkFlowExecution은 상태가 바뀔 때마다 새 인스턴스를
 	 *                  만드는 불변 객체지만, context 맵만은 같은 Map 인스턴스를 계속 공유해서 여러 스텝의
