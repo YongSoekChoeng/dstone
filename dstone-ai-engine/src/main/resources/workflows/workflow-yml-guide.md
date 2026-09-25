@@ -101,91 +101,449 @@ workflow:
 
 #### 2.5 `inputs`
 
-실행 요청이 반드시 지켜야 하는 입력값의 조건(입력 계약)이다. 실행 전에 요청을 검사하고, 엔진이 켜질 때 `{{input.*}}` 참조도 이 목록으로 확인한다.
+**한 줄 요약** — "이 Workflow를 실행하려면 요청에 **이런 값을 꼭 넣어 와라**"는 약속(입력 계약)이다.
 
-**모양** — `Map<String, FieldDefinition>`. 값 하나는 축약형과 확장형 두 가지로 적는다([4절](#4-값-타입-inputs-outputschema)).
+Java 메서드의 매개변수 선언이라고 생각하면 쉽다.
+
+```
+YAML의 inputs                       ≒  Java 메서드 매개변수
+──────────────────────────────────     ──────────────────────────────────────────────
+inputs:                                String review(
+  sqlList: list<string>                    List<String>        sqlList,
+  targetVersion: string                    String              targetVersion,
+  maxRows: integer                         Integer             maxRows,
+  options: object                          Map<String,Object>  options,
+(선언하지 않아도 항상 있음)                   String              message )   ← 요청의 message
+
+실행 요청의 variables               ≒  메서드를 부를 때 넘기는 값(인자)
+```
+
+- 선언한 값은 **모두 필수**다. "있어도 되고 없어도 되는 값"을 표현하는 방법은 없다([2.5.5](#255-자주-쓰는-선언-패턴) 패턴 F 참고).
+- `message`는 요청마다 항상 들어오므로 선언하지 않는다.
+- `inputs`를 적으면 두 번 검사한다. **엔진이 켜질 때** `{{input.*}}` 참조가 선언된 이름인지, **요청이 올 때** 값이 빠지거나 타입이 틀리지 않았는지.
+
+##### 2.5.1 한눈에 보기 — 값이 흘러가는 길
+
+```
+ ┌────────────────────────────┐                ┌──────────────────────────────────────────┐
+ │ 개발자: workflows/xxx.yml   │                │ 호출자: POST /api/ai/workflow/{id}/execute │
+ │   inputs:                  │                │   { "message": "...",                    │
+ │     sqlList: list<string>  │                │     "variables": { "sqlList": [...] } }  │
+ └─────────────┬──────────────┘                └────────────────────┬─────────────────────┘
+               │                                                    │
+   ════════ 엔진 기동 시 (한 번) ═════════            ════════ 요청이 올 때 (매번) ═════════
+               ▼                                                    ▼
+   ① YAML 글자 → Map          (SnakeYAML)            ⑤ message가 비었나?        → 400
+   ② Map → WorkFlowDefinition (Jackson)              ⑥ 이 caller가 써도 되나?   (allowedCallers)
+   ③ 타입 이름이 올바른가?      → 기동 실패             ⑦ inputs 계약을 지켰나?    → 400
+   ④ {{input.x}}가 선언된 이름인가? → 기동 실패        ⑧ 실행 컨텍스트 만들기     (context.input)
+               │                                                    │
+               └──────────── WorkFlowRegistry에 등록 ──────────────┐ │
+                                                                  ▼ ▼
+                                  ═════════ step을 실행할 때 (step마다) ═════════
+                                  ⑨  forEach: input.sqlList      → 리스트를 꺼내 항목 수만큼 반복
+                                  ⑩  step input의 {{input.x}}    → Tool 인자 / LLM 사용자 메시지
+                                  ⑪  Agent prompt의 {x}          → LLM 시스템 메시지
+                                  ⑫  Workflow output의 {{input.x}} → 최종 응답
+```
+
+- ①~④는 엔진이 켜질 때 한 번, ⑤~⑧은 요청마다 한 번, ⑨~⑫는 step마다 일어난다.
+- `input` 값은 ⑧에서 한 번 만들어진 뒤 **실행이 끝날 때까지 바뀌지 않는다**. 어느 step에서 꺼내도 같은 값이다.
+
+##### 2.5.2 샘플 Workflow
+
+아래 두 파일을 예로 ①~⑫를 따라가 본다.
+(설명을 위해 만든 예시라 실제 파일은 없다. 그대로 돌려 볼 수 있는 가장 가까운 샘플은 `sample/sample-foreach-parallel.yml`이다.)
+
+```yaml
+# workflows/sql-review.yml (설명용 예시)
+workflow:
+  id: sql-review
+  description: SQL 목록을 문법 검사한 뒤, 대상 PostgreSQL 버전 기준으로 검토한다
+  maxIterations: 5
+  inputs:
+    sqlList: list<string>                 # 축약형: 타입만
+    targetVersion:                        # 확장형: 타입 + 설명(설명은 사람만 읽는다)
+      type: string
+      description: 대상 PostgreSQL 버전(예 "16")
+    maxRows: integer
+    options: object
+  output: "{{steps.review.text}}"
+  steps:
+
+    - id: check                           # ❶ 리스트를 forEach로 쪼개서 TOOL에 넘기기
+      type: TOOL
+      ref: validateSqlSyntax
+      forEach: input.sqlList
+      input:
+        sql: "{{item}}"
+
+    - id: review                          # ❷ 글자 안에 섞어 LLM에게 넘기기
+      type: AGENT
+      ref: sql-review-agent
+      input: |
+        아래 SQL을 PostgreSQL {{input.targetVersion}} 기준으로 검토해 주세요.
+        조회 결과는 최대 {{input.maxRows}}건으로 제한해 주세요.
+        엄격 모드: {{input.options.strict}}
+
+        [SQL 목록]
+        {{input.sqlList}}
+
+        [문법 검사 결과]
+        {{steps.check.text}}
+```
+
+```yaml
+# agents/sql-review-agent.yml (설명용 예시)
+agent:
+  id: sql-review-agent
+  prompt: |
+    당신은 PostgreSQL {targetVersion} 전문 DBA입니다.
+    요청자의 원래 메시지는 "{message}"입니다.
+```
+
+호출 요청:
+
+```json
+POST /api/ai/workflow/sql-review/execute
+{
+  "message": "운영 반영 전에 SQL 검토 부탁합니다",
+  "variables": {
+    "sqlList": ["SELECT * FROM emp", "SELECT name FROM dept"],
+    "targetVersion": "16",
+    "maxRows": 100,
+    "options": { "strict": true }
+  }
+}
+```
+
+##### 2.5.3 단계별로 따라가기
+
+**① YAML 글자 → Map** — `YamlDefinitionLoader`가 SnakeYAML로 파일을 읽는다. 아직은 평범한 Map/List/String이다.
+이때 `${VAR}`(환경 값) 치환도 같이 한다.
+
+```
+{ workflow = {
+    id = "sql-review",
+    inputs = {
+      sqlList       = "list<string>",                                   ← 축약형은 그냥 글자
+      targetVersion = { type = "string", description = "대상 PostgreSQL ..." },   ← 확장형은 맵
+      maxRows       = "integer",
+      options       = "object"
+    },
+    steps = [ {...}, {...} ], ...
+} }
+```
+
+**② Map → Java record** — Jackson `convertValue()`가 `WorkFlowDefinition`으로 바꾼다.
+축약형과 확장형은 여기서 **같은 모양**(`FieldDefinition`)이 된다.
+
+```
+WorkFlowDefinition.inputs : Map<String, FieldDefinition>
+  "sqlList"       → FieldDefinition(type="list<string>", description=null)     ← 글자 → FieldDefinition.of(글자)
+  "targetVersion" → FieldDefinition(type="string",       description="대상 ...") ← 맵   → 생성자(type, description)
+  "maxRows"       → FieldDefinition(type="integer",      description=null)
+  "options"       → FieldDefinition(type="object",       description=null)
+```
+
+**③ 타입 이름 검사** — `WorkFlowRegistry`가 `FieldTypes.invalidFields()`로 확인한다.
+`list<str>`처럼 틀린 이름, `x:`처럼 빈 값이 하나라도 있으면 기동 실패다.
+
+```
+inputs의 타입 이름이 올바르지 않습니다: [x(list<str>)]
+```
+
+**④ `{{input.*}}` 참조 검사** — Workflow 안의 모든 템플릿에서 `input.` 뒤의 **첫 번째 이름**만 확인한다.
+
+| 샘플 속 참조 | 위치 | 기동 시 | 이유 |
+|---|---|---|---|
+| `input.sqlList` | `check.forEach` | ✅ | 선언됨 |
+| `{{input.targetVersion}}` | `review.input` | ✅ | 선언됨 |
+| `{{input.options.strict}}` | `review.input` | ✅ | `options`만 검사한다. `strict`는 실행 중에 찾는다 |
+| `{{input.message}}` | 어디든 | ✅ | 선언하지 않아도 항상 허용 |
+| `{{input.targetVer}}` (오타) | — | ❌ 기동 실패 | `input.targetVer는 Workflow의 inputs에 선언되어 있지 않습니다(선언된 inputs = message, [sqlList, targetVersion, maxRows, options])` |
+| Agent prompt의 `{targetVersion}` | Agent YAML | 검사 안 함 | Agent는 어느 Workflow에서 불릴지 모른다. 값이 없으면 호출할 때 예외 |
+
+> `inputs`를 **생략하면 ④를 건너뛴다**. 그래서 오타가 기동 때 잡히지 않고, 실행 중에 그 step이 "값을 찾을 수 없습니다"로 실패한다.
+> 오타를 미리 잡고 싶다면 쓰는 값을 `inputs`에 선언해 두는 것이 좋다.
+
+**⑤~⑦ 요청 검사** — `WorkFlowController`가 이 순서로 확인한다. `/execute`(동기)와 `/submit`(비동기) 모두 **실행을 시작하기 전에** 검사하므로,
+실패해도 실행 이력(FAILED)이 남지 않고 HTTP **400**으로 바로 돌아간다.
+
+```
+⑤ validateMessage()           message가 비었나?          → 400 "message는 필수입니다."
+⑥ WorkFlowRegistry.resolve()  등록된 id인가? caller 허용?  → 거절
+⑦ checkInputs()               inputs 계약을 지켰나?       → 400 (문제를 모두 모아서 한 번에)
+```
+
+⑦에서는 요청 JSON이 Jackson을 거쳐 **Java 값**이 된 뒤에 타입을 비교한다(`FieldTypes.matches()`).
+
+```
+요청 JSON                                   Java 값                                선언 타입         결과
+"sqlList":       ["SELECT * FROM emp", ...]  → ArrayList<String>                    list<string>      ✅
+"targetVersion": "16"                        → String                               string            ✅
+"maxRows":       100                         → Integer                              integer           ✅
+"options":       { "strict": true }          → LinkedHashMap                        object            ✅ (안쪽은 검사 안 함)
+```
+
+**⑧ 실행 컨텍스트 만들기** — `WorkFlowContext.create(message, variables)`가 아래 트리를 만든다.
+이 트리가 실행 전체의 저장소이고, `{{ }}`는 모두 이 트리에서 값을 찾는다(DB에는 `CONTEXT_JSON` 컬럼으로 저장된다).
+
+```
+context
+├── input                               ← variables를 그대로 복사 + message 추가
+│   ├── sqlList       : ["SELECT * FROM emp", "SELECT name FROM dept"]
+│   ├── targetVersion : "16"
+│   ├── maxRows       : 100
+│   ├── options       : { strict: true }
+│   └── message       : "운영 반영 전에 SQL 검토 부탁합니다"
+├── steps          : { }                ← 아직 실행된 step이 없다
+└── previous
+    └── text       : "운영 반영 전에 SQL 검토 부탁합니다"   ← 첫 step이 {{previous.text}}로 message를 받게
+```
+
+**⑨ step `check` — `forEach`로 리스트 나누기**
+
+```
+forEach: input.sqlList
+   │
+   └─▶ context.input.sqlList = ["SELECT * FROM emp", "SELECT name FROM dept"]   (리스트 아니면 step 실패)
+          │
+          ├── 반복 [0] ── 컨텍스트 복사본 + item = "SELECT * FROM emp"
+          │                input { sql: "{{item}}" }  →  { sql: "SELECT * FROM emp" }
+          │                StepInput(text=null, arguments={sql: "SELECT * FROM emp"}, workflowInput=context.input)
+          │                → validateSqlSyntax(sql = "SELECT * FROM emp")
+          │
+          └── 반복 [1] ── (동시에) item = "SELECT name FROM dept" → validateSqlSyntax(sql = "SELECT name FROM dept")
+
+결과 → context.steps.check = { text: "<반복별 text를 줄바꿈으로 이은 것>", data: {}, items: [ {...}, {...} ] }
+```
+
+**⑩ step `review` — `{{input.x}}`를 글자 안에 채우기** — AGENT의 `input`은 항상 글자가 된다.
+숫자/boolean은 `toString()`, 리스트/맵은 **JSON 글자**로 끼워진다.
+
+```
+채우기 전 (YAML)                                     채운 뒤 (LLM 사용자 메시지)
+──────────────────────────────────────────────────  ─────────────────────────────────────────────────
+아래 SQL을 PostgreSQL {{input.targetVersion}} 기준…  아래 SQL을 PostgreSQL 16 기준으로 검토해 주세요.
+조회 결과는 최대 {{input.maxRows}}건으로…           조회 결과는 최대 100건으로 제한해 주세요.
+엄격 모드: {{input.options.strict}}                  엄격 모드: true
+
+[SQL 목록]                                          [SQL 목록]
+{{input.sqlList}}                                   ["SELECT * FROM emp","SELECT name FROM dept"]
+
+[문법 검사 결과]                                     [문법 검사 결과]
+{{steps.check.text}}                                <check step의 결과 text>
+```
+
+이 글자는 `StepInput(text=<위 글자>, arguments=null, workflowInput=context.input)`에 담겨 `AgentStepRunner`로 간다.
+
+**⑪ Agent prompt의 `{x}` 채우기** — `AgentExecutor`가 `workflowInput`(= `context.input` 전체)으로 system prompt를 채운다.
+`{{ }}`가 아니라 **`{ }` 한 겹**(Spring AI `PromptTemplate`)이다.
+
+```
+LLM에게 실제로 가는 메시지
+┌─ system ───────────────────────────────────────────────────────┐
+│ 당신은 PostgreSQL 16 전문 DBA입니다.                               │  ← {targetVersion}
+│ 요청자의 원래 메시지는 "운영 반영 전에 SQL 검토 부탁합니다"입니다.      │  ← {message}
+└────────────────────────────────────────────────────────────────┘
+┌─ (같은 sessionId의 이전 대화) ────────────────────────────────────┐
+└────────────────────────────────────────────────────────────────┘
+┌─ user ─────────────────────────────────────────────────────────┐
+│ 아래 SQL을 PostgreSQL 16 기준으로 검토해 주세요. ...               │  ← ⑩에서 채운 step input
+└────────────────────────────────────────────────────────────────┘
+```
+
+> **같은 `input` 값이 LLM에게 가는 문은 두 개다.**
+> - `{{input.x}}` in step `input` → **user 메시지**. "이번 step에서 처리할 데이터". step마다 다르게 쓸 수 있다.
+> - `{x}` in Agent `prompt` → **system 메시지**. "이 Agent의 역할/규칙". 그 Agent를 쓰는 모든 step에 똑같이 들어간다.
+
+**⑫ Workflow `output`** — 성공으로 끝나면 `{{steps.review.text}}`를 채워 응답의 `message`로 돌려준다.
+`output`에서도 `{{input.x}}`를 쓸 수 있다(예: `"[{{input.targetVersion}}] {{steps.review.text}}"`).
+
+##### 2.5.4 같은 값, 다른 자리 — 모양이 어떻게 바뀌나
+
+같은 `input` 값이라도 **어디에 쓰느냐**에 따라 넘어가는 모양이 다르다.
+
+| 요청 값 (선언 타입) | TOOL 인자 `"{{input.x}}"` (값 전체가 참조 하나) | 글자에 섞음 `"n={{input.x}}"` / AGENT `input` | Agent prompt `{x}` | `forEach: input.x` |
+|---|---|---|---|---|
+| `"16"` (`string`) | `"16"` | `n=16` | `16` | ❌ step 실패(리스트 아님) |
+| `100` (`integer`) | `100` (**숫자 그대로**) | `n=100` | `100` | ❌ step 실패 |
+| `true` (`boolean`) | `true` (**boolean 그대로**) | `n=true` | `true` | ❌ step 실패 |
+| `["a","b"]` (`list<string>`) | `["a","b"]` (**리스트 그대로**) | `n=["a","b"]` (JSON 글자) | ⚠️ `ab` (구분자 없이 붙음) | ✅ 2회 반복, `{{item}}` = `"a"`, `"b"` |
+| `{"strict":true}` (`object`) | `{strict: true}` (**맵 그대로**) | `n={"strict":true}` (JSON 글자) | ⚠️ `strict` (키 이름만) | ❌ step 실패 |
+| `{"strict":true}`의 안쪽 | `"{{input.options.strict}}"` → `true` | `n={{input.options.strict}}` → `n=true` | `{options.strict}` → `true` | — |
+
+- TOOL 인자에 리스트/숫자를 **타입 그대로** 넘기려면 따옴표 안에 `{{ }}` 하나만 적는다(`maxRows: "{{input.maxRows}}"` → `100`).
+- Agent prompt `{x}`에는 **문자열 값**을 쓰는 것이 안전하다. 리스트/맵이 필요하면 step `input`의 `{{input.x}}`로 넘긴다.
+
+##### 2.5.5 자주 쓰는 선언 패턴
+
+**A. 선언 없음 — message 하나로 충분할 때**
+
+```yaml
+workflow:
+  id: summarize
+  # inputs 생략
+  steps:
+    - id: sum
+      type: AGENT
+      ref: summary-agent
+      input: "{{input.message}}"          # input을 생략해도 첫 step은 message를 받는다
+```
+
+```json
+{ "message": "요약할 긴 글..." }
+```
+
+**B. 문자열 하나 — 옵션 값을 받을 때**
 
 ```yaml
   inputs:
-    sqlList: list<string>          # 축약형: 타입만
-    targetVersion:                 # 확장형: 타입과 설명
-      type: string
-      description: PostgreSQL 버전
+    language: string
+  steps:
+    - id: translate
+      type: AGENT
+      ref: translator-agent
+      input: |
+        아래 글을 {{input.language}}로 번역하세요.
+        {{input.message}}
 ```
-
-- `inputs`에서 `description`은 **설명용일 뿐**이다. 검사에도 쓰지 않고 LLM에게도 전달되지 않는다
-  (같은 `FieldDefinition`이라도 `output.schema`에서는 LLM에게 전달된다).
-
-**요청 값이 들어가는 곳**
 
 ```json
-POST /api/ai/workflow/{id}/execute
-{ "message": "...", "sessionId": "...", "variables": { "sqlList": ["SELECT 1 FROM dual"] } }
+{ "message": "안녕하세요", "variables": { "language": "English" } }
 ```
 
-`WorkFlowContext.create(message, variables)`가 실행 컨텍스트를 이렇게 만든다.
+**C. 문자열 리스트 — 항목마다 같은 일을 할 때 (`forEach`)**
 
+```yaml
+  inputs:
+    sqlList: list<string>
+  steps:
+    - id: validate-each
+      type: TOOL
+      ref: validateSqlSyntax
+      forEach: input.sqlList
+      input:
+        sql: "{{item}}"
 ```
-input:
-  sqlList: [...]      ← variables를 그대로 복사
-  message: "..."      ← 요청의 message(항상 들어간다)
-previous:
-  text: "..."         ← 첫 step이 {{previous.text}}로 message를 받을 수 있게 넣어 둔다
+
+```json
+{ "message": "검사", "variables": { "sqlList": ["SELECT 1 FROM dual", "SELEC 1 FROM dual"] } }
 ```
 
-- step `input`/`forEach`/Workflow `output`에서는 `{{input.sqlList}}`, `forEach: input.sqlList`로 쓴다.
-- Agent의 system prompt에서는 `{sqlList}`, `{message}`로 쓴다(`StepInput.workflowInput` → `AgentExecutor`의 프롬프트 변수).
-- 템플릿 값 전체가 `{{input.x}}` 하나뿐이면 **원래 타입을 유지**한다. 그래서 TOOL 인자에 리스트나 숫자를 그대로 넘길 수 있다.
+**D. 객체 리스트 — 항목마다 여러 값이 필요할 때 (`list<object>` + `{{item.키}}`)**
 
-**검사 ① 엔진 기동 시** (`WorkFlowRegistry`)
+```yaml
+  inputs:
+    tables: list<object>
+  steps:
+    - id: describe-each
+      type: AGENT
+      ref: table-doc-agent
+      forEach: input.tables
+      itemVariable: t                     # {{item}} 대신 {{t}}
+      input: |
+        테이블 {{t.name}}의 설명을 작성하세요.
+        컬럼: {{t.columns}}
+```
 
-1. 타입 이름 검사: `FieldTypes.invalidFields()`로 확인하고, 잘못된 것이 있으면 기동 실패.
-   - `x: list<str>` → `inputs의 타입 이름이 올바르지 않습니다: [x(list<str>)]`
-   - `x:`처럼 값을 비워 둔 경우 → `x(null)`로 잡혀 역시 기동 실패.
-2. `{{input.xxx}}` 참조 검사: `inputs`가 **비어 있지 않을 때만** 검사한다.
-   - `input.message`는 선언하지 않아도 항상 허용된다.
-   - `input.<이름>`은 `inputs`에 선언된 이름이어야 한다. 아니면 기동 실패
-     `input.x는 Workflow의 inputs에 선언되어 있지 않습니다(선언된 inputs = message, [...])`.
-   - 두 번째 부분(이름)만 검사한다. `{{input.sqlList.0}}`처럼 더 깊은 경로는 기동 시 통과하고, 실행 중에 값을 찾는다.
+```json
+{ "message": "문서화", "variables": { "tables": [
+    { "name": "EMP",  "columns": ["EMPNO", "ENAME"] },
+    { "name": "DEPT", "columns": ["DEPTNO", "DNAME"] } ] } }
+```
 
-**검사 ② 실행 요청 시** (`WorkFlowExecutionService.checkInputs()`)
+- `list<object>`는 항목이 **맵인지만** 검사한다. `name`/`columns`가 있는지는 실행 중에 찾고, 없으면 그 반복이 실패한다.
 
-`/execute`(동기)와 `/submit`(비동기) 모두 **실행 전에** 검사한다.
+**E. 숫자/boolean — Tool 인자로 타입 그대로 넘길 때**
 
-- 선언된 이름마다 `request.variables[이름]`을 확인한다.
-  - 값이 없거나 `null` → `이름(없음)`
-  - 타입이 맞지 않음 → `이름(list<string> 타입이어야 함)`
-- 문제를 **전부 모아서** 한 번에 알려 준다. 컨트롤러가 **HTTP 400**으로 거절한다.
-  ```
-  workflow[sample-foreach-parallel]의 inputs 계약을 지키지 않았습니다: [sqlList(없음)]
-  ```
-- `inputs`에 **선언하지 않은 추가 값은 허용한다**. 그대로 `input.*` 아래에 들어간다.
-- `message` 자체의 필수 여부는 `inputs`와 따로 검사한다(`validateMessage()`, 비어 있으면 400 `message는 필수입니다.`).
+```yaml
+  inputs:
+    limit: integer
+    dryRun: boolean
+  steps:
+    - id: run
+      type: TOOL
+      ref: <tool-name>
+      input:
+        limit: "{{input.limit}}"          # → 100 (숫자)
+        dryRun: "{{input.dryRun}}"        # → true (boolean)
+        label: "limit={{input.limit}}"    # → "limit=100" (섞으면 글자)
+```
 
-**타입별로 통과하는 값** (요청 JSON이 Jackson으로 바뀐 뒤의 Java 타입 기준, `FieldTypes.matches()`)
+```json
+{ "message": "실행", "variables": { "limit": 100, "dryRun": true } }
+```
+
+- `integer`에 `100.0`이나 `"100"`을 보내면 400이다. `number`는 정수/실수를 모두 받는다.
+
+**F. 있어도 되고 없어도 되는 값 — `object`로 묶고 `??`로 대체값**
+
+`inputs`에 선언한 값은 모두 필수라서, "선택값"은 `object` 하나로 묶어 두고 안쪽 키를 `??`로 꺼낸다.
+기동 시에는 `options`까지만 검사하므로 안쪽 키는 요청에 없어도 된다.
+
+```yaml
+  inputs:
+    options: object
+  steps:
+    - id: answer
+      type: AGENT
+      ref: <agent-id>
+      input: |
+        말투: {{input.options.tone ?? input.message}}
+        ...
+```
+
+```json
+{ "message": "...", "variables": { "options": {} } }                       ← tone 없음 → ?? 오른쪽 값
+{ "message": "...", "variables": { "options": { "tone": "정중하게" } } }   ← tone 있음
+```
+
+- `??`의 오른쪽 끝은 **반드시 있는 값**(`input.message` 등)으로 둔다. 모든 경로가 없으면 step이 실패한다.
+- `options` 자체는 필수다. 선택값이 없어도 `"options": {}`는 보내야 한다.
+
+##### 2.5.6 타입별로 통과하는 값
+
+요청 JSON이 Jackson으로 바뀐 뒤의 Java 타입 기준이다(`FieldTypes.matches()`).
 
 | 타입 | 통과 | 통과 못 함 |
 |---|---|---|
-| `string` | `"abc"` | `123`, `true` |
+| `string` | `"abc"`, `""` | `123`, `true` |
 | `number` | `3`, `3.5` (모든 `Number`) | `"3.5"` |
 | `integer` | `3` (`Integer`/`Long`/`BigInteger`) | `3.0`(Double이 된다), `"3"` |
 | `boolean` | `true` | `"true"`, `1` |
 | `object` | `{...}` (안쪽 모양은 검사하지 않음) | 배열, 문자열 |
 | `list<T>` | 모든 항목이 T에 맞는 배열. **빈 배열 `[]`도 통과** | 항목 하나라도 타입이 다름 |
 
-**경우별 정리**
+##### 2.5.7 요청별 결과
+
+샘플 `sql-review`(2.5.2)에 여러 요청을 보냈을 때:
+
+| 보낸 `variables` | 결과 |
+|---|---|
+| 2.5.2의 요청 그대로 | 정상 실행 |
+| `sqlList` 빠짐 | 400 `workflow[sql-review]의 inputs 계약을 지키지 않았습니다: [sqlList(없음)]` |
+| `"sqlList": "SELECT 1"` (리스트 아님) | 400 `[sqlList(list<string> 타입이어야 함)]` |
+| `"sqlList": ["SELECT 1", 1]` (항목 하나만 숫자) | 400 `[sqlList(list<string> 타입이어야 함)]` |
+| `"sqlList": []` | 통과. `check`는 0회 실행 후 성공 |
+| `"maxRows": "100"` (글자) | 400 `[maxRows(integer 타입이어야 함)]` |
+| `"maxRows": null` | 400 `[maxRows(없음)]` |
+| `sqlList`와 `maxRows`가 모두 틀림 | 400 한 번에 모두 `[sqlList(없음), maxRows(integer 타입이어야 함)]` |
+| `"options": {}` | 통과. 그러나 `{{input.options.strict}}`를 찾지 못해 `review` step이 실패 → `onFailure`가 없으므로 Workflow FAILED |
+| 선언하지 않은 `"extra": "x"`를 더 보냄 | 통과. `context.input.extra`로 들어간다(템플릿 `{{input.extra}}`는 기동 실패라 못 쓰고, Agent prompt `{extra}`로는 쓸 수 있다) |
+| `"message": "덮어쓰기"`를 variables에 넣음 | 요청 최상위의 `message`가 **덮어쓴다** |
+| `variables` 자체를 생략 | 400. 선언된 값이 모두 `(없음)` |
+
+##### 2.5.8 선언 쪽 경우별 정리
 
 | 경우 | 결과 |
 |---|---|
 | `inputs` 생략 또는 `{}` | 요청 검사 없음. `{{input.아무이름}}`도 기동 시 검사하지 않음. 실행 중 값이 없으면 **그 step이 실패**하고 `onFailure`를 따름(`??`로 대체값 가능) |
-| `inputs` 선언, 요청이 지킴 | 정상 실행 |
-| 선언한 값이 `variables`에 없거나 `null` | 400 `이름(없음)` |
-| 타입이 다름(예: `sqlList: "SELECT 1"`) | 400 `sqlList(list<string> 타입이어야 함)` |
-| 리스트 항목 하나만 타입이 다름(`["a", 1]`) | 400 |
-| 선언하지 않은 값이 더 들어옴 | 허용. 다만 `inputs`가 선언되어 있으면 템플릿에서 `{{input.extra}}`는 **기동 실패**라 못 쓰고, system prompt의 `{extra}`로는 쓸 수 있음 |
+| 잘못된 타입 이름(`list<str>`) 또는 빈 값(`x:`) | 기동 실패 |
+| `description` 적음 | **설명용일 뿐**이다. 검사에도 쓰지 않고 LLM에게도 전달되지 않는다(같은 `FieldDefinition`이라도 `output.schema`에서는 LLM에게 전달된다) |
 | `inputs`에 `message`를 선언 | 코드는 허용하며 `variables`가 아니라 요청 `message`로 검사한다. message는 항상 문자열이라 `string`이 아니면 **모든 요청이 400**. 선언하지 않는 것이 맞다 |
-| `variables`에 `message` 키를 넣음 | 요청의 `message`가 **덮어쓴다** |
-| 잘못된 타입 이름 또는 빈 값 | 기동 실패 |
+| `itemVariable`을 `input`으로 지음 | 그 반복 안에서 `{{input.x}}`가 항목을 가리키게 된다. 쓰지 않는다([3.12](#312-itemvariable)) |
 
 샘플: `sample/sample-foreach-parallel.yml` — `sqlList: list<string>`을 선언하고 `forEach: input.sqlList`로 항목 수만큼 병렬 실행한다.
 

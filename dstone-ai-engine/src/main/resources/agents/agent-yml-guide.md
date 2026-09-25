@@ -72,24 +72,277 @@ agent:
   - prompt: "이 Agent가 누구이고 어떤 규칙을 지키는가"(바뀌지 않는 것)
   - 사용자 메시지: "이번에 처리할 데이터"(Workflow에서는 step `input`, 채팅에서는 `message`)
 
-**`{변수}` 채우기** — Spring AI `PromptTemplate`(StringTemplate 문법)으로 채운다. Workflow의 `{{ }}`와는 **다른 문법**이다.
+**`{변수}` 채우기** — prompt 안의 `{이름}` 자리는 **호출할 때마다** 값으로 바뀐다. Spring AI `PromptTemplate`(StringTemplate 문법)이 채운다.
 
-| 호출 경로 | `{변수}`를 채우는 값 |
-|---|---|
-| Workflow step | 컨텍스트의 `input` → `{message}`와 요청 `variables`의 모든 이름(`{sqlList}` 등) |
-| 채팅 | 요청의 `variables`만. `{message}`는 채팅에서 **채워지지 않는다** |
+Java로 비유하면 prompt는 `String.format()`의 틀이고, `{변수}`는 그 틀의 빈칸이다.
+
+```
+prompt 틀          "당신은 {domain} 분야 전문 번역가입니다. 결과는 {language}로만 작성합니다."
+채울 값(Map)        { domain: "금융", language: "English" }
+────────────────────────────────────────────────────────────────────────────────
+system 메시지       "당신은 금융 분야 전문 번역가입니다. 결과는 English로만 작성합니다."
+```
+
+**중괄호 세 가지를 헷갈리지 않는다**
+
+| 모양 | 어디에 쓰나 | 언제 채우나 | 무엇으로 채우나 |
+|---|---|---|---|
+| `${APP_HOME}` | 모든 YAML의 문자열 | **엔진 기동 시** 한 번(`YamlDefinitionLoader`) | `conf/env{-profile}.properties`(System 프로퍼티), 없으면 OS 환경변수 |
+| `{domain}` | Agent `prompt` | **Agent를 호출할 때마다**(`AgentExecutor.buildSpec()`) | 채팅: 요청 `variables` / Workflow: 컨텍스트 `input` |
+| `{{input.x}}` | Workflow의 step `input`/`forEach`/`output` | **step을 실행할 때마다**(`WorkFlowExecutor`) | 실행 컨텍스트(`input`/`steps`/`previous`) |
+
+- Agent prompt에 `{{input.x}}`를 적으면 Workflow 값으로 채워지지 **않는다**. 오류도 나지 않고 `input.x`라는 글자가 그대로 들어가므로 알아차리기 어렵다. prompt에서는 `{x}`로 쓴다.
+
+##### 1.2.1 한눈에 보기 — 값이 흘러가는 길
+
+```
+                         ┌──────────────────────────────────────┐
+                         │ agents/doc-translator-agent.yml      │
+                         │   prompt: "... {domain} ... {language}"│
+                         └──────────────────┬───────────────────┘
+                   ═══════ 엔진 기동 시 (한 번) ═══════
+                         ① YAML 글자 → Map        (SnakeYAML, ${VAR}만 치환)
+                         ② Map → AgentDefinition  (Jackson, prompt의 {domain}은 글자 그대로 보관)
+                         ③ AgentRegistry에 id로 등록 ({변수}는 검사하지 않음)
+                                            │
+             ┌──────────────────────────────┴──────────────────────────────┐
+   경로 A: 채팅 API                                            경로 B: Workflow step
+   POST /api/ai/chat                                          type: AGENT, ref: doc-translator-agent
+   { agent, message, variables }                              요청 { message, variables } → context.input
+             │                                                              │
+   ④ variables       ─────▶ {변수} 값                    ④' context.input 전체 ─────▶ {변수} 값
+   ⑤ message         ─────▶ user 메시지                  ⑤' step input 템플릿을 채운 글자 ─▶ user 메시지
+             └──────────────────────────────┬──────────────────────────────┘
+                         ⑥ AgentExecutor.buildSpec()
+                            PromptTemplate(prompt).render(값) → system 메시지
+                            + 대화 기억(sessionId) + RAG/Tool/model/응답 형식
+                                            ▼
+                         ⑦ LLM 호출 → 답변
+```
+
+##### 1.2.2 샘플 Agent
+
+(설명을 위해 만든 예시라 실제 파일은 없다. 실제 파일로는 `sample/sample-general-chat.yml`이 `{role}` 변수 하나를 쓴다.)
+
+```yaml
+# agents/doc-translator-agent.yml (설명용 예시)
+agent:
+  id: doc-translator-agent
+  description: 분야와 대상 언어를 받아 문서를 번역한다
+  prompt: |
+    당신은 {domain} 분야 전문 번역가입니다.
+    결과는 {language}로만 작성하고, 전문 용어는 원문을 괄호에 함께 적습니다.
+  toolsEnabled: false
+  ragEnabled: false
+```
+
+이 Agent를 부르는 Workflow:
+
+```yaml
+# workflows/doc-translate.yml (설명용 예시)
+workflow:
+  id: doc-translate
+  inputs:
+    domain: string            # Agent prompt의 {domain}을 채울 값
+    language: string          # Agent prompt의 {language}를 채울 값
+  steps:
+    - id: translate
+      type: AGENT
+      ref: doc-translator-agent
+      input: |
+        아래 글을 번역하세요.
+        {{input.message}}
+```
+
+##### 1.2.3 단계별로 따라가기
+
+**① YAML 글자 → Map** — SnakeYAML이 읽는다. 이때 바뀌는 것은 `${VAR}`뿐이다. `{domain}`은 **글자 그대로** 남는다.
+
+```
+{ agent = { id = "doc-translator-agent",
+            prompt = "당신은 {domain} 분야 전문 번역가입니다.\n결과는 {language}로만 ...\n",   ← |는 줄바꿈 유지
+            toolsEnabled = false, ragEnabled = false } }
+```
+
+**② Map → `AgentDefinition`** — Jackson `convertValue()`. 적지 않은 항목은 `null`(boolean은 `false`)이 된다.
+
+```
+AgentDefinition(
+  id                    = "doc-translator-agent",
+  description           = "분야와 대상 언어를 받아 문서를 번역한다",
+  prompt                = "당신은 {domain} 분야 전문 번역가입니다.\n...",   ← 아직 틀(template) 상태
+  model                 = null      → 호출 때 공통 기본 모델
+  toolsEnabled          = false,
+  ragEnabled            = false,
+  ragTopK               = null      → 호출 때 설정 파일 값
+  ragSimilarityThreshold= null,
+  ragAllowEmptyContext  = null      → 호출 때 true로 본다
+  allowedCallers        = null      → 누구나
+)
+```
+
+**③ 등록** — `AgentRegistry`가 `id`로 등록한다. `{domain}`에 값이 들어올지는 **검사하지 않는다**.
+Agent는 채팅에서도, 여러 Workflow에서도 불릴 수 있어서 기동 시점에는 어떤 값이 올지 알 수 없기 때문이다.
+
+**④⑤ 경로 A — 채팅 API**
+
+```json
+POST /api/ai/chat
+{
+  "agent": "doc-translator-agent",
+  "message": "Interest rates rose sharply.",
+  "variables": { "domain": "금융", "language": "한국어" }
+}
+```
+
+```
+ChatRequest ──▶ ChatController ──▶ AgentExecutor.call(
+                                      agent       = doc-translator-agent,
+                                      variables   = { domain: "금융", language: "한국어" },   ← request.variables 그대로
+                                      userMessage = "Interest rates rose sharply."          ← request.message
+                                   )
+```
+
+- `{변수}` 값은 요청의 `variables` **만** 쓴다. `message`는 variables에 들어가지 않으므로 **채팅에서 `{message}`는 채워지지 않는다**(예외).
+
+**④'⑤' 경로 B — Workflow step**
+
+```json
+POST /api/ai/workflow/doc-translate/execute
+{
+  "message": "Interest rates rose sharply.",
+  "variables": { "domain": "금융", "language": "한국어" }
+}
+```
+
+```
+context.input = { domain: "금융", language: "한국어", message: "Interest rates rose sharply." }
+        │
+        ├─▶ step input 템플릿 채우기 ──▶ "아래 글을 번역하세요.\nInterest rates rose sharply."   → user 메시지
+        │
+        └─▶ StepInput.workflowInput = context.input 전체                                → {변수} 값
+                   │
+AgentStepRunner ──▶ AgentExecutor.call(agent, variables = workflowInput, userMessage = 채운 step input)
+```
+
+- `{변수}` 값은 컨텍스트의 `input` 전체다. 그래서 Workflow에서는 `{message}`도 쓸 수 있다.
+- step `input`이 무엇이든 `{변수}` 값은 **늘 같다**(`input`은 실행 중에 바뀌지 않는다). 앞 step의 결과를 `{변수}`로 받을 방법은 없다.
+  앞 step 결과는 step `input`의 `{{steps.<id>.text}}`로 user 메시지에 넣는다.
+
+**⑥ 메시지 조립** — `AgentExecutor.buildSpec()`이 prompt 틀을 채우고, 나머지 설정을 붙인다.
+
+```
+PromptTemplate("당신은 {domain} 분야 ... {language}로만 ...").render({ domain: "금융", language: "한국어", ... })
+   = "당신은 금융 분야 전문 번역가입니다.\n결과는 한국어로만 작성하고, ..."
+```
+
+**⑦ LLM에게 실제로 가는 메시지** (경로 B 기준)
+
+```
+┌─ system ─────────────────────────────────────────────────────┐
+│ 당신은 금융 분야 전문 번역가입니다.                                │  ← prompt + {변수}
+│ 결과는 한국어로만 작성하고, 전문 용어는 원문을 괄호에 함께 적습니다.  │
+└──────────────────────────────────────────────────────────────┘
+┌─ (같은 sessionId의 이전 대화 — MessageChatMemoryAdvisor) ────────┐
+│ user: ... / assistant: ...                                   │  ← Workflow면 앞 AGENT step들의 대화
+└──────────────────────────────────────────────────────────────┘
+┌─ user ───────────────────────────────────────────────────────┐
+│ 아래 글을 번역하세요.                                           │  ← 채팅: message / Workflow: 채운 step input
+│ Interest rates rose sharply.                                 │
+│ (ragEnabled면)  [참고자료] <검색된 문서 조각들>                   │  ← 1.6
+│ (output.schema/SUPERVISOR/ROUTER면) JSON 형식 지시문            │  ← 엔진이 자동으로 붙임
+└──────────────────────────────────────────────────────────────┘
+  + toolsEnabled면 후보 Tool 목록, model이 있으면 그 모델 이름(ChatOptions)
+```
+
+##### 1.2.4 같은 Agent, 두 경로 비교
+
+| | 경로 A: 채팅 | 경로 B: Workflow step |
+|---|---|---|
+| `{domain}`, `{language}` | 요청 `variables.domain`, `.language` | `context.input.domain`, `.language`(= 요청 `variables`) |
+| `{message}` | ❌ 채워지지 않음 → 예외 | ✅ 요청 `message` |
+| `{그 밖의 이름}` | 요청 `variables`에 있으면 됨 | 요청 `variables`에 있으면 됨(Workflow `inputs`에 선언 안 해도 됨) |
+| user 메시지 | 요청 `message` 그대로 | step `input`을 채운 글자(생략하면 `{{previous.text}}`) |
+| 값이 빠지면 | 채팅 요청 오류 | step 종류에 따라 FAILED 또는 step 실패([workflow-yml-guide.md 3절](../workflows/workflow-yml-guide.md#3-step-항목)) |
+| 미리 막는 방법 | 호출하는 쪽이 항상 보낸다 | Workflow `inputs`에 선언하면 값이 없을 때 실행 전에 **400**으로 막힌다([workflow-yml-guide.md 2.5](../workflows/workflow-yml-guide.md#25-inputs)) |
+
+> Workflow에서 Agent의 `{변수}`를 쓴다면, 그 이름을 Workflow `inputs`에 **같은 이름으로 선언**해 두는 것이 안전하다.
+> 선언하지 않으면 값이 빠진 요청도 실행이 시작되고, 그 Agent step에 가서야 실패한다.
+
+##### 1.2.5 자주 쓰는 패턴
+
+**A. 변수 없음 — 가장 안전**
+
+```yaml
+  prompt: |
+    당신은 SQL을 PostgreSQL로 변환하는 전문가입니다.
+```
+
+어느 경로에서든 `variables` 없이 항상 동작한다. 처리할 데이터는 모두 user 메시지(step `input`)로 넘긴다.
+
+**B. 역할/말투를 바꿔 끼우기 — 채팅 화면에서 주로 사용**
+
+```yaml
+  prompt: |
+    당신은 {role} 역할을 맡은 AI 어시스턴트입니다.     # sample-general-chat.yml
+```
+
+```json
+{ "agent": "sample-general-chat", "message": "안녕", "variables": { "role": "친절한 상담원" } }
+```
+
+**C. Workflow `inputs`와 짝지어 쓰기**
+
+```yaml
+# workflow                              # agent
+  inputs:                                 prompt: |
+    targetVersion: string                   당신은 PostgreSQL {targetVersion} 전문 DBA입니다.
+```
+
+Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이 비는 일이 없다.
+
+**D. 요청 원문을 system에 박아 두기 — Workflow 전용 `{message}`**
+
+```yaml
+  prompt: |
+    사용자의 원래 요청은 "{message}"입니다. 모든 판단은 이 요청을 기준으로 합니다.
+```
+
+뒤쪽 step(SUPERVISOR 등)의 user 메시지가 앞 step의 결과로 바뀌어도, 원래 요청을 system 쪽에서 계속 볼 수 있다.
+⚠️ 이 Agent를 **채팅에서 부르면 예외**다. 채팅에서도 쓸 Agent라면 `{message}`를 쓰지 않는다.
+
+**E. JSON 예시를 보여 주고 싶을 때 — 중괄호 대신 말로**
+
+```yaml
+  # ❌ 중괄호가 변수로 읽혀 호출이 실패한다
+  prompt: |
+    {"sql": "...", "tables": [...]} 모양으로 답하세요.
+
+  # ✅ 형식은 말로 설명하거나, step의 output.schema에 맡긴다
+  prompt: |
+    변환한 SQL과, 그 SQL이 쓰는 테이블 이름 목록을 답하세요.
+```
+
+`output.schema`를 쓰면 엔진이 JSON 형식 지시문을 user 메시지 끝에 자동으로 붙인다.
+
+##### 1.2.6 경우별 결과
 
 | 경우 | 결과 |
 |---|---|
 | `{변수}`가 없음 | 원문 그대로. variables를 보내지 않아도 항상 동작 |
 | `{role}`이 있는데 호출에 `role` 값이 없음 | **예외** `Not all variables were replaced in the template. Missing variable names are: [role]`(Spring AI 기본 검증 모드가 THROW). 채팅은 오류, Workflow는 step 종류에 따라 FAILED 또는 step 실패 |
+| 채팅에서 `{message}` 사용 | 위와 같은 예외(채팅은 `message`를 variables에 넣지 않는다) |
 | 쓰지 않는 값이 더 들어옴 | 무시 |
 | JSON 예시처럼 **중괄호 글자**를 그대로 적음(`{"a": 1}`) | 변수로 읽히거나 템플릿 문법 오류로 호출이 실패한다. prompt에는 중괄호를 쓰지 않고 말로 설명한다(JSON 형식 지시가 필요하면 step의 `output.schema`를 쓴다) |
+| Workflow 문법 `{{input.x}}`를 prompt에 적음 | 오류 없이 `input.x`라는 **글자**가 들어간다(값이 채워지지 않는다). prompt에서는 `{x}`로 쓴다 |
 | 변수 이름에 `-`, 공백, 한글 | 변수 이름으로 읽히지 않을 수 있다. 영문, 숫자, `_`만 쓴다 |
-| 값이 리스트/맵 | 글자로 바뀌어 들어가지만 모양을 보장하지 않는다. 문자열 값을 쓰는 것이 안전하다 |
+| `{options.strict}`(맵 값의 안쪽 키) | 동작한다. `options = {strict: true}`이면 `true`가 들어간다 |
+| 값이 리스트 | 항목이 **구분자 없이** 붙는다. `["a","b"]` → `ab` |
+| 값이 맵 | **키 이름만** 붙는다. `{strict: true}` → `strict` |
+| ↳ 리스트/맵을 LLM에게 보여 줘야 할 때 | prompt `{x}` 대신 step `input`의 `{{input.x}}`로 넘긴다(JSON 글자 `["a","b"]`로 들어간다) |
 | 생략하거나 빈 문자열 | 기동 실패 `id와 prompt가 모두 있어야 합니다` |
 
-**step 종류별로 엔진이 prompt에 덧붙이는 것**
+##### 1.2.7 step 종류별로 엔진이 prompt에 덧붙이는 것
 
 | 용도 | 엔진이 자동으로 하는 일 | prompt에 적을 것 |
 |---|---|---|
