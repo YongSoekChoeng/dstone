@@ -181,6 +181,21 @@
 	color: #4b5563;
 }
 
+/* 드롭다운(채팅 Agent, Workflow 선택, 상태 필터 등) - 브라우저 기본 높이가 너무 작아서 조금 키운다 */
+.ai-body select {
+	min-height: 34px;
+	padding: 6px 10px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	background-color: #ffffff;
+	font-size: 13px;
+	color: #111827;
+}
+
+.chat-options select {
+	margin-left: 6px;
+}
+
 .chat-model-input {
 	border: 1px solid #d1d5db;
 	border-radius: 6px;
