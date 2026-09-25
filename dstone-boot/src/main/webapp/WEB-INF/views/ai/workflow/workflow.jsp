@@ -34,6 +34,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<div class="workflow-field">
 						<label for="workflow-message">message</label>
 						<textarea id="workflow-message" class="workflow-textarea" placeholder="예: SELECT NVL(a, 0) FROM dual WHERE ROWNUM &lt;= 10"></textarea>
+						<p id="workflow-sample-note" class="ai-hint"></p>
 					</div>
 					<div class="workflow-field">
 						<label for="workflow-variables">variables (선택, JSON 객체)</label>
