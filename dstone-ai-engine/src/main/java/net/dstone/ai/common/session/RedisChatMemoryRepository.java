@@ -23,6 +23,7 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * 대화 내용을 Redis에 저장하는 클래스입니다. Spring AI가 정의한 ChatMemoryRepository라는
  * 인터페이스(SPI)를, dstone-common의 Redis 인프라(common.config.ConfigRedis가 만들어 주는
  * RedisTemplate)를 이용해 직접 구현했습니다. Spring AI가 공식으로 제공하는
@@ -33,6 +34,7 @@ import net.dstone.common.utils.StringUtil;
  * 안에는 메시지들이 JSON 형태로 순서대로 쌓입니다. 그리고 지금까지 만들어진 conversationId
  * 목록은 따로 Set(키: dstone:ai:session:index)으로 관리합니다. 이렇게 목록을 따로 관리해 두면,
  * 전체 키를 다 훑어야 하는 KEYS나 SCAN 명령 없이도 목록 조회를 바로 할 수 있습니다.
+ * </pre>
  */
 @Repository
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true")

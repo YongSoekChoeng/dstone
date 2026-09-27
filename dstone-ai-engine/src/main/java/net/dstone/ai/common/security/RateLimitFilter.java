@@ -21,6 +21,7 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * caller(또는 IP)별로 일정 시간 동안 요청 횟수를 제한하는 필터입니다.
  * dstone.ai.security.ratelimit.enabled=true로 설정되어 있을 때만 실제로 막고, 꺼져 있으면 아무
  * 영향도 주지 않습니다.
@@ -28,6 +29,7 @@ import net.dstone.common.utils.StringUtil;
  * caller가 누구인지를 정하는 건 ApiKeyAuthFilter(@Order(1))의 역할이므로, 이 필터는 그보다
  * 뒤에서(@Order(2)) 돌아야 합니다. 그래야 CallerContext에 caller 값이 이미 채워진 상태에서,
  * "이 요청을 어떤 키로 카운트할지"를 정할 수 있습니다.
+ * </pre>
  */
 @Component
 @Order(2)

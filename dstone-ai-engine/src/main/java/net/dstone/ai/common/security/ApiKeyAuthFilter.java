@@ -18,6 +18,7 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * 요청 헤더에 담긴 API Key를 확인해서 인증하는 필터입니다. dstone.ai.security.auth.enabled=true로
  * 설정되어 있을 때만 실제로 막고, 꺼져 있으면 아무 영향도 주지 않습니다.
  *
@@ -37,6 +38,7 @@ import net.dstone.common.utils.StringUtil;
  * Authorization Server가 없기 때문입니다(dstone-boot의 OAuth2는 소셜 로그인을 위한 client일 뿐,
  * IdP 역할을 하는 서버는 아닙니다). 이 엔진을 호출하는 쪽도 정해진 SI 프로젝트들끼리의 서비스 간
  * 호출이라서, SI 프로젝트마다 키를 하나씩 발급해 주는 것만으로 충분합니다.
+ * </pre>
  */
 @Component
 @Order(1)

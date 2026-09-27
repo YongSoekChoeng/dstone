@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.ai.common.consts.Constants;
 
 /**
+ * <pre>
  * "이 요청을 호출한 게 누구인가(caller)"를 request 안에 담아두고 꺼내 쓰는 작은 도우미 클래스입니다.
  *
  * ApiKeyAuthFilter가 인증에 성공하면 이 클래스를 통해 request attribute에 caller 값을 기록해
@@ -15,6 +16,7 @@ import net.dstone.ai.common.consts.Constants;
  * key로 쓰이는 값(Constants.Security.Caller.REQUEST_ATTRIBUTE / ADVISOR_CONTEXT_KEY)은
  * request attribute 쪽과 ChatClient의 Advisor 체인 쪽 양쪽에서 서로 같은 caller를 가리키도록
  * 똑같은 값으로 맞춰져 있습니다(자세한 값은 common.consts.Constants 참고).
+ * </pre>
  */
 public final class CallerContext {
 
