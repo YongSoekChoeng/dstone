@@ -24,23 +24,20 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER = AgentCallStep)를 처리하는 클래스입니다. 셋 다 ref에
- * 적힌 Agent를 부르고, 채워진 input 텍스트(StepInput.text)를 사용자 메시지로 보낸다는 점은 같습니다.
+ * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER = AgentCallStep)를 처리하는 클래스입니다. 
+ * 셋 다 ref에 적힌 Agent를 부르고, 채워진 input 텍스트(StepInput.text)를 사용자 메시지로 보낸다는 점은 같습니다.
  * 응답을 어떤 모양으로 받고 무엇을 결과로 남기는지가 다릅니다.
  *
- *   종류                    text(결과 텍스트)        output(구조화된 결과)      실패하는 경우
- *   AGENT (schema 없음)     LLM 답변 원문            없음                       없음(항상 성공)
- *   AGENT (schema 있음)     output을 JSON 글자로     output.schema대로 읽은 값  LLM이 schema를 지키지 않음
- *   SUPERVISOR              받은 input 그대로        {pass, reason}             pass=false, 또는 응답 모양이 깨짐
- *   ROUTER                  받은 input 그대로        {route, reason}            route를 고르지 못함, 또는 응답 모양이 깨짐
+ *   종류                    text(결과 텍스트)        output(구조화된 결과)          실패하는 경우
+ *   AGENT (schema 없음)     LLM 답변 원문            없음                        없음(항상 성공)
+ *   AGENT (schema 있음)     output을 JSON 글자로     output.schema대로 읽은 값     LLM이 schema를 지키지 않음
+ *   SUPERVISOR             받은 input 그대로        {pass, reason}             pass=false, 또는 응답 모양이 깨짐
+ *   ROUTER                 받은 input 그대로        {route, reason}            route를 고르지 못함, 또는 응답 모양이 깨짐
  *
- * SUPERVISOR와 ROUTER는 "판정"과 "선택"만 하는 관문이라서, 받은 input을 결과 텍스트로 그대로 넘깁니다.
- * 판정 사유는 결과 텍스트에 덧붙이지 않고 output(또는 실패 시 error)에만 담으므로, 다음 step이 필요할 때
- * {{steps.id.output.reason}}이나 {{steps.id.error}}로 따로 꺼내 씁니다.
+ * SUPERVISOR와 ROUTER는 "판정"과 "선택"만 하는 관문이라서, 받은 input을 결과 텍스트로 그대로 넘깁니다.(특별히 사용할 일 없음)
+ * 판정 사유는 결과 텍스트에 덧붙이지 않고 output(또는 실패 시 error)에만 담으므로, 
+ * 다음 step이 필요할 때 {{steps.id.output.reason}}이나 {{steps.id.error}}로 따로 꺼내 씁니다.
  *
- * Workflow의 step에서 Agent를 부를 때는 요청마다 RAG/Tool/모델을 바꾸는 기능(ragOverride 등)을 쓰지 않고
- * 항상 Agent 정의값을 그대로 씁니다. 그 기능은 api.controller.ChatController처럼 Agent 하나를 직접 부르는
- * 화면에서만 씁니다.
  * </pre>
  */
 @Component

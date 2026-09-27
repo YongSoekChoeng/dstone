@@ -16,9 +16,11 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.core.BaseObject;
 
 /**
- * TOOL step이 LLM을 거치지 않고 Tool 하나를 이름만으로 직접 호출할 때 반드시 지나가는 유일한
- * 통로입니다. 모든 TOOL 호출이 예외 없이 이 클래스를 거치기 때문에, 나중에 governance 기능이
- * 생겨서 Tool 호출 내역을 감사하거나 제한하고 싶어질 때도 이 클래스 하나만 손보면 됩니다.
+ * <pre>
+ * TOOL step이 LLM을 거치지 않고 Tool 하나를 이름만으로 직접 호출할 때 반드시 지나가는 유일한 통로입니다. 
+ * 모든 TOOL 호출이 예외 없이 이 클래스를 거치기 때문에, 나중에 governance 기능이 생겨서 Tool 호출 내역을 감사하거나 제한하고 싶어질 때도 
+ * 이 클래스 하나만 손보면 됩니다.
+ * </pre>
  */
 @Component
 public class ToolExecutor extends BaseObject {
