@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * <pre>
- * StepRunner가 step 하나를 실행하고 나서 돌려주는 결과입니다. 경우마다 필요한 값만 갖도록 네 가지로 나뉩니다.
+ * StepExecutor가 step 하나를 실행하고 나서 돌려주는 결과입니다. 경우마다 필요한 값만 갖도록 네 가지로 나뉩니다.
  * - Success: 성공. text와 output을 갖습니다.
  * - Routed : ROUTER step의 성공. text와 output에 더해, LLM이 고른 route를 갖습니다.
  * - Failure: 실패. text와 실패 사유(failureReason)를 갖습니다.
@@ -71,7 +71,7 @@ public sealed interface StepOutcome {
 	record Failure(String text, String failureReason) implements StepOutcome {
 	}
 
-	/** 사람의 승인/반려 결정이 아직 나지 않아서 기다리는 중입니다(ApprovalStepRunner 전용). */
+	/** 사람의 승인/반려 결정이 아직 나지 않아서 기다리는 중입니다(ApprovalStepExecutor 전용). */
 	record Pending() implements StepOutcome {
 	}
 
@@ -100,7 +100,7 @@ public sealed interface StepOutcome {
 		return new Failure(text, reason);
 	}
 
-	/** 사람의 결정을 기다리는 중일 때 씁니다(ApprovalStepRunner 전용). */
+	/** 사람의 결정을 기다리는 중일 때 씁니다(ApprovalStepExecutor 전용). */
 	static StepOutcome pending() {
 		return new Pending();
 	}

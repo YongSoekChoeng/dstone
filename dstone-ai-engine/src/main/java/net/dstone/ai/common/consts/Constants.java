@@ -111,7 +111,7 @@ public final class Constants {
 	}
 
 	/**
-	 * TOOL step(runtime.step.ToolStepRunner)이 Tool의 성공/실패를 판정할 때 쓰는 문자열 규칙입니다.
+	 * TOOL step(runtime.step.ToolStepExecutor)이 Tool의 성공/실패를 판정할 때 쓰는 문자열 규칙입니다.
 	 * Tool이 runtime.tool.ToolOutcome(성공 여부를 명확히 담은 값)을 돌려주지 않고 평범한 문자열을
 	 * 돌려준 경우에만 이 규칙이 쓰입니다: 그 문자열이 "실패: ..."로 시작하면 실패로, 아니면 성공으로
 	 * 봅니다. Tool의 동작이 자바 코드로 정해져 있는 경우(SqlSyntaxTool 등)에는 이 방식도 비교적

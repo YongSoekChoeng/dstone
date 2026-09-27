@@ -5,7 +5,7 @@ import net.dstone.ai.common.consts.StepType;
 /**
  * <pre>
  * type: AGENT - LLM에게 일을 한 번 시키는 step입니다. ref에 적은 Agent를 한 번 부르고, 답을 결과로 남깁니다
- * (runtime.step.AgentStepRunner 참고).
+ * (runtime.step.AgentStepExecutor 참고).
  *
  * output.schema를 적지 않으면 LLM의 답 원문이 text가 되고 항상 성공입니다.
  * output.schema를 적으면 LLM이 그 모양의 JSON으로 답하도록 강제하고, 그 JSON이 output이 됩니다.

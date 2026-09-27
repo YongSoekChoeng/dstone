@@ -76,7 +76,7 @@ public class ToolExecutor extends BaseObject {
 	 * 모양인지 확인해서, 맞으면 각 항목의 text 값을 순서대로 줄바꿈으로 이어붙인 텍스트를
 	 * 돌려줍니다. 이 모양이 아니면(배열이 아니거나, 항목 중 하나라도 text 필드가 없으면) null을
 	 * 돌려줘서 호출한 쪽이 원본 rawResult를 그대로 쓰게 합니다 - "이 값이 MCP content 배열이
-	 * 맞는지 확신할 수 없다면 손대지 않는다"는 원칙입니다(runtime.step.ToolStepRunner의
+	 * 맞는지 확신할 수 없다면 손대지 않는다"는 원칙입니다(runtime.step.ToolStepExecutor의
 	 * tryParseOutcome/tryParsePayload가 애매하면 null을 돌려주는 것과 같은 이유입니다).
 	 *
 	 * @param rawResult String으로 풀어내는 데 실패한 원본 응답입니다.

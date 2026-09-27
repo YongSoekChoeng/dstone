@@ -367,7 +367,7 @@ forEach: inputs.sqlList
 {{steps.check.text}}                                <check step의 결과 text>
 ```
 
-이 글자는 `StepInput(text=<위 글자>, arguments=null, workflowInputs=context.inputs)`에 담겨 `AgentStepRunner`로 간다.
+이 글자는 `StepInput(text=<위 글자>, arguments=null, workflowInputs=context.inputs)`에 담겨 `AgentStepExecutor`로 간다.
 
 **⑪ Agent prompt의 `{x}` 채우기** — `AgentExecutor`가 `workflowInputs`(= `context.inputs` 전체)으로 system prompt를 채운다.
 `{{ }}`가 아니라 **`{ }` 한 겹**(Spring AI `PromptTemplate`)이다.
@@ -724,7 +724,7 @@ steps:
 
 > 아래 3.1~3.13은 step 항목마다 자세히 적었다. 기동 시 검사는 `YamlDefinitionLoader`(쓸 수 없는 키, 값 모양)와
 > `WorkFlowRegistry.validateStepShape()`/`validateExpression()`(필수 값, 타입 이름, 정규식, 참조),
-> 실행 동작은 `WorkFlowExecutor`와 각 `StepRunner`가 한다.
+> 실행 동작은 `WorkFlowExecutor`와 각 `StepExecutor`가 한다.
 
 #### 3.1 `id`
 
@@ -750,13 +750,13 @@ steps:
       type: AGENT        # AGENT | TOOL | SUPERVISOR | ROUTER | APPROVAL
 ```
 
-| 값 | 하는 일 | 계열(`Kind`) | record | 담당 러너 |
+| 값 | 하는 일 | 계열(`Kind`) | record | 담당 실행기 |
 |---|---|---|---|---|
-| `AGENT` | Agent(LLM)를 한 번 부른다 | AGENT_CALL | `AgentStep` | `AgentStepRunner` |
-| `SUPERVISOR` | Agent에게 pass/fail을 판정하게 한다 | AGENT_CALL | `SupervisorStep` | `AgentStepRunner` |
-| `ROUTER` | Agent에게 여러 갈래 중 하나를 고르게 한다 | AGENT_CALL | `RouterStep` | `AgentStepRunner` |
-| `TOOL` | Tool 하나를 LLM 없이 이름으로 직접 부른다 | DETERMINISTIC | `ToolStep` | `ToolStepRunner` |
-| `APPROVAL` | 사람의 승인/반려를 기다린다 | DETERMINISTIC | `ApprovalStep` | `ApprovalStepRunner` |
+| `AGENT` | Agent(LLM)를 한 번 부른다 | AGENT_CALL | `AgentStep` | `AgentStepExecutor` |
+| `SUPERVISOR` | Agent에게 pass/fail을 판정하게 한다 | AGENT_CALL | `SupervisorStep` | `AgentStepExecutor` |
+| `ROUTER` | Agent에게 여러 갈래 중 하나를 고르게 한다 | AGENT_CALL | `RouterStep` | `AgentStepExecutor` |
+| `TOOL` | Tool 하나를 LLM 없이 이름으로 직접 부른다 | DETERMINISTIC | `ToolStep` | `ToolStepExecutor` |
+| `APPROVAL` | 사람의 승인/반려를 기다린다 | DETERMINISTIC | `ApprovalStep` | `ApprovalStepExecutor` |
 
 - `type` 값이 어느 record로 읽을지를 정한다. 그래서 `type`은 다른 항목보다 먼저 결정되고, 나머지 키는 그 record에 있는 것만 쓸 수 있다.
 - **대문자로 정확히** 적는다. `agent`, `Agent`는 기동 실패 `step의 type이 없거나 올바르지 않습니다(적은 값 = agent, 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL)`다
@@ -818,7 +818,7 @@ step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍
           strict: true
 ```
 
-- 템플릿이 가리키는 값이 없으면(경로가 없거나 null) 빈 글자로 넘어가지 않는다. StepRunner를 부르지 않고 **step 실패**
+- 템플릿이 가리키는 값이 없으면(경로가 없거나 null) 빈 글자로 넘어가지 않는다. StepExecutor를 부르지 않고 **step 실패**
   `input을 채우지 못했습니다 - {{...}}: 값을 찾을 수 없습니다`가 되고 `onFailure`를 따른다. 대체값이 필요하면 `??`를 쓴다.
 - 채운 값은 `steps.<id>.input`에 남는다. 그래서 다음 step이 `{{steps.validate.input.sql}}`처럼 "실패한 입력값"을 다시 꺼낼 수 있다.
 - system prompt의 `{변수}`는 step `input`과 관계없이 항상 컨텍스트의 `inputs`(요청 message+variables)으로 채운다.
@@ -884,7 +884,7 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 | `json` | 응답이 JSON 객체면 그 객체, JSON 배열이면 `{items: [...]}` | 키를 미리 알 수 없어 **검사하지 않음**(실행 중 없으면 step 실패) |
 | `lines` | `{lines: [...]}`(빈 줄은 버리고 앞뒤 공백 제거) | `lines`만 허용 |
 
-- 성공/실패 판정은 `parse`보다 **먼저** 한다(`ToolStepRunner`).
+- 성공/실패 판정은 `parse`보다 **먼저** 한다(`ToolStepExecutor`).
   - 응답이 `{"success": ..., "message": ...}` 모양(`runtime.tool.ToolOutcome`)이면 `success` 값으로 판정한다.
   - 아니면 응답이 `실패`로 시작하는지로 판정한다.
   - 실패면 `parse`를 하지 않는다.

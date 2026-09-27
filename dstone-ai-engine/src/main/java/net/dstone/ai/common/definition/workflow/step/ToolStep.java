@@ -8,7 +8,7 @@ import net.dstone.ai.common.consts.StepType;
  * <pre>
  * type: TOOL - 등록된 Tool(@AiTool로 만든 자바 기능 또는 MCP 서버의 Tool) 하나를 LLM을 거치지 않고 직접 호출하는 step입니다.
  * 값을 검증하거나, 파일/문서/외부 시스템에서 데이터를 가져오는 것처럼 결과가 코드로 정해지는 작업에 씁니다
- * (runtime.step.ToolStepRunner 참고).
+ * (runtime.step.ToolStepExecutor 참고).
  *
  * input은 맵입니다. 채워진 맵이 JSON으로 바뀌어 Tool의 인자가 됩니다. 비워두면 빈 인자({})로 호출합니다.
  * 값 전체가 {{ ... }} 하나뿐이면 원래 타입(리스트, 숫자 등)을 그대로 유지해서 넘깁니다.

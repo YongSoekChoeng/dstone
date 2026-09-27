@@ -4,7 +4,7 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * type: APPROVAL - 사람이 승인하거나 반려할 때까지 기다리는 step입니다(runtime.step.ApprovalStepRunner 참고).
+ * type: APPROVAL - 사람이 승인하거나 반려할 때까지 기다리는 step입니다(runtime.step.ApprovalStepExecutor 참고).
  *
  * 처음 실행될 때는 아직 결정이 없으므로 Workflow 전체를 WAITING_APPROVAL(승인 대기) 상태로 멈춰 둡니다.
  * 나중에 누군가 승인 또는 반려 API를 호출하면 같은 step을 다시 실행하고, 이번에는 그 결정에 따라

@@ -2,7 +2,7 @@
 #
 # 이 Workflow는 ROUTER step 하나로 세 갈래 분기가 잘 되는지 확인해보기 위한 테스트 전용
 # Workflow입니다(자세한 내용은 common.definition.StepType.ROUTER,
-# runtime.step.AgentStepRunner.runRouter 참고). ROUTER step은 onSuccess/onFailure 대신
+# runtime.step.AgentStepExecutor.runRouter 참고). ROUTER step은 onSuccess/onFailure 대신
 # routes(route 이름 -> 다음 step id 매핑)를 씁니다 - router-classifier-agent가 고른 route가
 # billing/technical/other 중 하나면 그에 맞는 종착 step으로 이동하고, routes에 없는 값을
 # 고르면(오타를 냈거나 없는 route를 지어낸 경우) Workflow가 FAILED로 끝납니다.

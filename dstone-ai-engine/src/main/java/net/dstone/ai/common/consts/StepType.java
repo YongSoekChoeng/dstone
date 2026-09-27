@@ -6,7 +6,7 @@ package net.dstone.ai.common.consts;
  * YAML step의 type 값이며, 이 값에 따라 step이 common.definition.workflow.step 패키지의
  * record(AgentStep/SupervisorStep/ApprovalStep/RouterStep/ToolStep) 중 하나로 읽힙니다.
  * Workflow가 실행될 때 runtime.workflow.WorkFlowExecutor가 그 record 타입을 보고,
- * 일을 실제로 처리할 담당자(runtime.step 패키지에 있는 StepRunner 중 하나)에게 넘겨줍니다.
+ * 일을 실제로 처리할 담당자(runtime.step 패키지에 있는 StepExecutor 중 하나)에게 넘겨줍니다.
  * </pre>
  */
 public enum StepType {
@@ -16,7 +16,7 @@ public enum StepType {
 	 * LLM에게 일을 한 번 시키는 step입니다. 
 	 * ref 값으로 지정한 이름을 common.registry.AgentRegistry에서 찾아 그 Agent를 한 번 호출합니다. 
 	 * output.schema가 없으면 항상 성공으로 취급되고, 
-	 * output.schema가 있으면 LLM이 그 모양의 JSON으로 답하지 않았을 때만 실패합니다(runtime.step.AgentStepRunner 참고).
+	 * output.schema가 있으면 LLM이 그 모양의 JSON으로 답하지 않았을 때만 실패합니다(runtime.step.AgentStepExecutor 참고).
 	 * 
 	 * <b>YAML 키 - common.definition.workflow.step.AgentStep</b>
 	 * 필수: ref(Agent id)
@@ -56,7 +56,7 @@ public enum StepType {
 	 * 이 step이 처음 실행될 때는 아직 아무도 결정을 내리지 않았으므로, Workflow 전체 실행을
 	 * WAITING_APPROVAL(승인 대기) 상태로 멈춰 둡니다. 나중에 누군가 승인 또는 반려 API를 호출하면,
 	 * 같은 step을 다시 한번 실행하는데, 이번에는 그 결정 내용에 따라 성공 또는 실패로 진행됩니다
-	 * (자세한 동작은 runtime.step.ApprovalStepRunner 참고).
+	 * (자세한 동작은 runtime.step.ApprovalStepExecutor 참고).
 	 *
 	 * APPROVAL step은 forEach(같은 step을 여러 번 동시에 실행하는 기능)와 함께 쓸 수
 	 * 없습니다. 승인/반려 결정은 오직 그 step의 id 하나로만 구분되는데, 같은 step을 여러 번
@@ -123,8 +123,8 @@ public enum StepType {
 	/**
 	 * <pre>
 	 * 이 StepType이 LLM을 호출하는 계열(AGENT_CALL)인지, LLM 없이 결정적으로 처리되는 계열(DETERMINISTIC)인지를 돌려줍니다. 
-	 * runtime.step.AgentStepRunner가 세 가지(AGENT/SUPERVISOR/ROUTER)를 한 클래스에서 다루고, 
-	 * TOOL, APPROVAL이 각각 다른 Runner를 쓰는 것도 이 분류를 그대로 따른 구조입니다
+	 * runtime.step.AgentStepExecutor가 세 가지(AGENT/SUPERVISOR/ROUTER)를 한 클래스에서 다루고, 
+	 * TOOL, APPROVAL이 각각 다른 StepExecutor를 쓰는 것도 이 분류를 그대로 따른 구조입니다
 	 * (자세한 내용은 runtime.workflow.WorkFlowExecutor.runStep 참고).
 	 * </pre>
 	 */

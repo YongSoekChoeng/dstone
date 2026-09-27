@@ -6,7 +6,7 @@ import net.dstone.ai.common.consts.StepType;
  * <pre>
  * type: SUPERVISOR - LLM에게 "통과인가 아닌가, 그리고 왜 그런가"를 판정받는 step입니다.
  * 답을 자유로운 글이 아니라 정해진 모양(runtime.agent.Verdict - pass/reason)으로 받아서 그걸로 성공/실패를 정합니다.
- * 앞선 step들의 결과가 괜찮은지 감독하고 다시 검토하는 역할에 씁니다(runtime.step.AgentStepRunner 참고).
+ * 앞선 step들의 결과가 괜찮은지 감독하고 다시 검토하는 역할에 씁니다(runtime.step.AgentStepExecutor 참고).
  *
  * - 통과: 받은 input을 결과 텍스트로 그대로 넘기고, output에 {pass, reason}을 남깁니다.
  * - 불통과(또는 답의 모양이 깨짐): 실패로 처리하고, reason을 error에 남깁니다.

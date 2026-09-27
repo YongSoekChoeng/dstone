@@ -12,8 +12,8 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * APPROVAL step을 처리하는 러너입니다. 사람이 승인하거나 반려할 때까지 기다리는 역할을 합니다. 다른
- * 러너들과 마찬가지로 run() 메서드가 한 번 호출되는 것으로 끝이고, "지금 결정이 이미 나 있는가"만 확인합니다.
+ * APPROVAL step을 처리하는 실행기입니다. 사람이 승인하거나 반려할 때까지 기다리는 역할을 합니다. 다른
+ * 실행기들과 마찬가지로 run() 메서드가 한 번 호출되는 것으로 끝이고, "지금 결정이 이미 나 있는가"만 확인합니다.
  *
  * - 아직 결정이 없으면 PENDING을 돌려줍니다. WorkFlowExecutor는 이 값을 보고 Workflow 실행 전체를
  *   WAITING_APPROVAL 상태로 멈춰 둡니다.
@@ -28,7 +28,7 @@ import net.dstone.common.utils.StringUtil;
  * </pre>
  */
 @Component
-public class ApprovalStepRunner implements StepRunner<ApprovalStep> {
+public class ApprovalStepExecutor implements StepExecutor<ApprovalStep> {
 
 	/**
 	 * 컨텍스트의 approvals.{stepId}에 사람의 결정이 들어 있는지 봅니다.

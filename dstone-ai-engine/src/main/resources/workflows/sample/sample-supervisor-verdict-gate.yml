@@ -2,7 +2,7 @@
 #
 # 이 Workflow는 AGENT step 다음에 SUPERVISOR step이 이어지면서, 구조화된 Verdict(pass/reason)
 # 판정이 실제로 성공/실패를 잘 가르는지 확인해보기 위한 테스트 전용 Workflow입니다(자세한 내용은
-# runtime.step.AgentStepRunner.runSupervisor 참고).
+# runtime.step.AgentStepExecutor.runSupervisor 참고).
 #
 # 두 step 모두 input을 생략했으므로 기본값인 {{previous.text}}를 받습니다. draft step(general-chat)은
 # 사용자 메시지를, judge step(verdict-judge-agent)은 draft가 만든 응답 텍스트를 사용자 메시지로 받습니다.

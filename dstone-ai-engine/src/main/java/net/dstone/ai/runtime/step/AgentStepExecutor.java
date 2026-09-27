@@ -44,7 +44,7 @@ import net.dstone.common.utils.StringUtil;
  * </pre>
  */
 @Component
-public class AgentStepRunner implements StepRunner<AgentCallStep> {
+public class AgentStepExecutor implements StepExecutor<AgentCallStep> {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 

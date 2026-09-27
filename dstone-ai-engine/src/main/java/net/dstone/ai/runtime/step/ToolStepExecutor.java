@@ -23,7 +23,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
  * <pre>
- * TOOL step을 처리하는 러너입니다. LLM을 거치지 않고, caller가 쓸 수 있는 Tool 하나를 코드로 직접 호출합니다.
+ * TOOL step을 처리하는 실행기입니다. LLM을 거치지 않고, caller가 쓸 수 있는 Tool 하나를 코드로 직접 호출합니다.
  *
  * 1) 인자 만들기: runtime.workflow.WorkFlowExecutor가 step의 input 맵을 이미 채워서 넘겨주므로(StepInput.arguments),
  *    그 맵을 JSON으로 바꾸기만 하면 Tool 인자가 됩니다.
@@ -37,7 +37,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * </pre>
  */
 @Component
-public class ToolStepRunner implements StepRunner<ToolStep> {
+public class ToolStepExecutor implements StepExecutor<ToolStep> {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 

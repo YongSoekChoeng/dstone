@@ -222,7 +222,7 @@ context.inputs = { domain: "금융", language: "한국어", message: "Interest r
         │
         └─▶ StepInput.workflowInputs = context.inputs 전체                                → {변수} 값
                    │
-AgentStepRunner ──▶ AgentExecutor.call(agent, variables = workflowInputs, userMessage = 채운 step input)
+AgentStepExecutor ──▶ AgentExecutor.call(agent, variables = workflowInputs, userMessage = 채운 step input)
 ```
 
 - `{변수}` 값은 컨텍스트의 `inputs` 전체다. 그래서 Workflow에서는 `{message}`도 쓸 수 있다.

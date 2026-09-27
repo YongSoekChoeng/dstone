@@ -4,8 +4,8 @@ import java.util.Map;
 
 /**
  * <pre>
- * StepRunner 하나를 실행할 때 넘겨주는 입력값입니다. 
- * step의 input 템플릿은 runtime.workflow.WorkFlowExecutor가 미리 채워서 넘겨주므로, StepRunner는 템플릿을 전혀 몰라도 됩니다.
+ * StepExecutor 하나를 실행할 때 넘겨주는 입력값입니다. 
+ * step의 input 템플릿은 runtime.workflow.WorkFlowExecutor가 미리 채워서 넘겨주므로, StepExecutor는 템플릿을 전혀 몰라도 됩니다.
  *
  * step 종류에 따라 쓰는 필드가 다릅니다.
  * - AGENT / SUPERVISOR / ROUTER / APPROVAL: text를 씁니다(LLM에게 보낼 사용자 메시지, 또는 그대로 넘길 텍스트).

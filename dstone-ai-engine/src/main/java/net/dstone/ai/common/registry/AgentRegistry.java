@@ -22,7 +22,7 @@ import net.dstone.common.utils.StringUtil;
  * AgentDefinition들을 앱이 기동될 때 한 번 모아서 보관하는 식입니다.
  *
  * Agent를 찾아 쓰는 경로는 두 가지입니다: api.controller.ChatController가 request.agent() 값으로
- * 직접 찾는 경우와, runtime.step의 AgentStepRunner가 step의 ref 값(AgentCallStep.ref)으로
+ * 직접 찾는 경우와, runtime.step의 AgentStepExecutor가 step의 ref 값(AgentCallStep.ref)으로
  * 찾는 경우입니다. 어느 경로로 찾든 caller 화이트리스트 검사는 이 클래스 안에서 딱 한 번만
  * 이뤄집니다.
  */

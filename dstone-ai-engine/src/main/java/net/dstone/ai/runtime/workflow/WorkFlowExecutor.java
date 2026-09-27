@@ -24,11 +24,11 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStep;
 import net.dstone.ai.common.template.Template;
 import net.dstone.ai.common.template.TemplateException;
-import net.dstone.ai.runtime.step.AgentStepRunner;
-import net.dstone.ai.runtime.step.ApprovalStepRunner;
+import net.dstone.ai.runtime.step.AgentStepExecutor;
+import net.dstone.ai.runtime.step.ApprovalStepExecutor;
 import net.dstone.ai.runtime.step.StepInput;
 import net.dstone.ai.runtime.step.StepOutcome;
-import net.dstone.ai.runtime.step.ToolStepRunner;
+import net.dstone.ai.runtime.step.ToolStepExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
@@ -41,14 +41,14 @@ import net.dstone.common.utils.StringUtil;
  * 분기(둘 중 하나를 고르는 onSuccess/onFailure, 여러 개 중 하나를 고르는 ROUTER의 routes), 병렬 실행
  * (forEach - 같은 step 하나를 리스트 항목 개수만큼 동시에 실행), 루프(재시도) 패턴으로 실행합니다.
  * "어느 step 다음에 어느 step으로 갈지, 언제 멈출지" 같은 Workflow의 큰 흐름은 이 클래스가 직접 통제하고,
- * step 하나하나에서 필요한 똑똑한 판단은 각 StepRunner를 거쳐 결국 LLM에게 맡깁니다. "지금 몇 번째
+ * step 하나하나에서 필요한 똑똑한 판단은 각 StepExecutor를 거쳐 결국 LLM에게 맡깁니다. "지금 몇 번째
  * step인가 → 다음엔 몇 번째 step으로 가는가"를 계속 따라가는 단순한 상태 기계로 구현했습니다.
  *
  * ## step 사이에 데이터가 오가는 방법
  * 모든 데이터는 실행 컨텍스트(WorkFlowContext) 트리 하나를 거쳐서 오갑니다.
  * 1) step을 실행하기 직전에, 그 step의 input 템플릿({{ ... }})을 컨텍스트로 채웁니다(renderInput()).
  *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 템플릿 규칙을 씁니다.
- * 2) 채워진 입력을 StepRunner에게 넘기고, StepRunner는 결과(StepOutcome)를 돌려줍니다.
+ * 2) 채워진 입력을 StepExecutor에게 넘기고, StepExecutor는 결과(StepOutcome)를 돌려줍니다.
  * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, text, error}로 남기고, previous도 이 결과로 바꿉니다.
  * 그래서 다음 step들은 {{steps.id.output.키}}처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다.
  * input 템플릿이 가리키는 값을 찾지 못하면 그 step은 실패로 처리되고, 사유가 error에 남습니다.
@@ -70,11 +70,11 @@ import net.dstone.common.utils.StringUtil;
 public class WorkFlowExecutor extends BaseObject {
 
 	@Autowired
-	private AgentStepRunner agentStepRunner;
+	private AgentStepExecutor agentStepExecutor;
 	@Autowired
-	private ToolStepRunner toolStepRunner;
+	private ToolStepExecutor toolStepExecutor;
 	@Autowired
-	private ApprovalStepRunner approvalStepRunner;
+	private ApprovalStepExecutor approvalStepExecutor;
 	@Autowired
 	private WorkFlowExecutionStore executionStore;
 
@@ -132,7 +132,7 @@ public class WorkFlowExecutor extends BaseObject {
 					stepResult = this.runOne(step, currentExecution);
 				}
 			} catch (Exception e) {
-				// StepRunner가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
+				// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
 				// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
 				// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
 				return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
@@ -255,7 +255,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * 반복이 하나라도 실패하면 이 step 전체가 실패입니다. 반복할 항목이 하나도 없으면 빈 결과로 성공 처리합니다.
 	 *
 	 * forEach 경로의 값을 찾지 못하거나 그 값이 리스트가 아니면, 이 step은 실패로 처리됩니다(onFailure를 따릅니다).
-	 * 반복 하나가 StepRunner 예외(시스템 오류)를 던지면, 그 반복의 실행 이력을 남긴 뒤 예외를 그대로 올려보내서 실행 전체를 FAILED로 끝냅니다(run()의 3번 설명 참고).
+	 * 반복 하나가 StepExecutor 예외(시스템 오류)를 던지면, 그 반복의 실행 이력을 남긴 뒤 예외를 그대로 올려보내서 실행 전체를 FAILED로 끝냅니다(run()의 3번 설명 참고).
 	 * </pre>
 	 *
 	 * @param step      실행할 step의 정의입니다(forEach가 설정되어 있습니다).
@@ -315,7 +315,7 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
-	 * StepRunner를 부르기 전에 이미 실패한 경우(forEach 리스트를 찾지 못한 경우 등)의 결과를 만듭니다.
+	 * StepExecutor를 부르기 전에 이미 실패한 경우(forEach 리스트를 찾지 못한 경우 등)의 결과를 만듭니다.
 	 * 실행 이력도 한 줄 남깁니다.
 	 *
 	 * @param execution 지금 진행 중인 실행입니다.
@@ -332,10 +332,10 @@ public class WorkFlowExecutor extends BaseObject {
 	 * <pre>
 	 * step을 실제로 한 번 실행합니다.
 	 * - input 템플릿을 채우고 
-	 * - StepRunner를 부르고 
+	 * - StepExecutor를 부르고 
 	 * - 걸린 시간을 잽니다.
-	 * 템플릿이 가리키는 값을 찾지 못하면 StepRunner를 부르지 않고 실패 결과를 돌려줍니다(YAML을 잘못 조립한 비즈니스 실패이므로 onFailure를 따릅니다). 
-	 * StepRunner가 던진 예외(시스템 오류)는 잡지 않고 그대로 올려보내서, run()이 onFailure를 거치지 않고 실행 전체를 FAILED로 끝내게 합니다.
+	 * 템플릿이 가리키는 값을 찾지 못하면 StepExecutor를 부르지 않고 실패 결과를 돌려줍니다(YAML을 잘못 조립한 비즈니스 실패이므로 onFailure를 따릅니다). 
+	 * StepExecutor가 던진 예외(시스템 오류)는 잡지 않고 그대로 올려보내서, run()이 onFailure를 거치지 않고 실행 전체를 FAILED로 끝내게 합니다.
 	 * forEach의 반복들이 동시에 부를 수 있도록, 이 메서드는 실행 이력을 직접 남기지 않습니다.
 	 * </pre>
 	 *
@@ -380,7 +380,7 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
-	 * 채워진 입력을 StepRunner에게 넘길 StepInput으로 감쌉니다. TOOL이면 arguments에, 그 밖의 step이면 text에 담습니다.
+	 * 채워진 입력을 StepExecutor에게 넘길 StepInput으로 감쌉니다. TOOL이면 arguments에, 그 밖의 step이면 text에 담습니다.
 	 *
 	 * @param step          실행할 step의 정의입니다.
 	 * @param renderedInput renderInput()이 채운 입력입니다.
@@ -423,8 +423,8 @@ public class WorkFlowExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step 종류에 맞는 StepRunner에게 step을 넘겨 실행합니다.
-	 * Agent를 부르는 세 종류(AGENT/SUPERVISOR/ROUTER = AgentCallStep)는 AgentStepRunner가 함께 맡습니다.
+	 * step 종류에 맞는 StepExecutor에게 step을 넘겨 실행합니다.
+	 * Agent를 부르는 세 종류(AGENT/SUPERVISOR/ROUTER = AgentCallStep)는 AgentStepExecutor가 함께 맡습니다.
 	 * StepDefinition이 sealed interface라서, 새 step 종류를 추가하고 여기를 빠뜨리면 컴파일 오류로 알려줍니다.
 	 * </pre>
 	 *
@@ -435,11 +435,11 @@ public class WorkFlowExecutor extends BaseObject {
 	private StepOutcome runStep(WorkFlowExecution execution, StepDefinition step, StepInput input) {
 		switch (step) {
 			case AgentCallStep agentCallStep:
-				return this.agentStepRunner.run(execution, agentCallStep, input);
+				return this.agentStepExecutor.run(execution, agentCallStep, input);
 			case ToolStep toolStep:
-				return this.toolStepRunner.run(execution, toolStep, input);
+				return this.toolStepExecutor.run(execution, toolStep, input);
 			case ApprovalStep approvalStep:
-				return this.approvalStepRunner.run(execution, approvalStep, input);
+				return this.approvalStepExecutor.run(execution, approvalStep, input);
 		}
 	}
 
@@ -559,7 +559,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * step을 한 번 실행한 결과입니다(call()이 돌려줍니다).
 	 *
 	 * @param renderedInput 템플릿을 채운 뒤 실제로 넘긴 입력입니다(채우기 전에 실패했으면 null).
-	 * @param outcome       StepRunner가 돌려준 결과입니다.
+	 * @param outcome       StepExecutor가 돌려준 결과입니다.
 	 * @param durationMs    걸린 시간(밀리초)입니다.
 	 */
 	private record StepCall(Object renderedInput, StepOutcome outcome, long durationMs) {

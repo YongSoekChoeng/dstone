@@ -3,7 +3,7 @@
 # 이 Workflow는 AGENT step 하나가 toolsEnabled=true로 설정된 Agent(tool-demo-agent)를 호출해서,
 # LLM이 스스로 필요한 Tool을 고르고 불러 쓰는 tool-calling 루프가 Workflow 안에서도 똑같이 잘
 # 동작하는지 확인해보기 위한 테스트 전용 Workflow입니다(api.controller.ChatController로 직접
-# 호출하는 경로와 달리, 이 경로는 runtime.step.AgentStepRunner를 거쳐서 실행됩니다).
+# 호출하는 경로와 달리, 이 경로는 runtime.step.AgentStepExecutor를 거쳐서 실행됩니다).
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-agent-tool-calling
