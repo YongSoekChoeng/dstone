@@ -15,8 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.consts.ToolParse;
-import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.StepOutputDefinition;
+import net.dstone.ai.common.definition.workflow.step.ToolOutput;
+import net.dstone.ai.common.definition.workflow.step.ToolStep;
 import net.dstone.ai.runtime.tool.ToolExecutor;
 import net.dstone.ai.runtime.tool.ToolOutcome;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
@@ -37,7 +37,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * </pre>
  */
 @Component
-public class ToolStepRunner implements StepRunner {
+public class ToolStepRunner implements StepRunner<ToolStep> {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -49,7 +49,7 @@ public class ToolStepRunner implements StepRunner {
 	 * 성공이면 output.parse에 따라 output까지 만들어서 돌려줍니다(순서는 클래스 설명의 1~4 참고).
 	 */
 	@Override
-	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
+	public StepOutcome run(WorkFlowExecution execution, ToolStep definition, StepInput input) {
 		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), this.toJson(input.arguments()));
 
 		ToolOutcome outcome = this.tryParseOutcome(toolResult);
@@ -73,13 +73,17 @@ public class ToolStepRunner implements StepRunner {
 	 * @param output     step의 output 선언입니다(없으면 null).
 	 * @param toolResult Tool 응답 원문입니다.
 	 */
-	private StepOutcome parse(StepOutputDefinition output, String toolResult) {
-		ToolParse parse = output == null || output.parse() == null ? ToolParse.TEXT : output.parse();
-		return switch (parse) {
-			case TEXT -> StepOutcome.success(toolResult);
-			case JSON -> this.parseJson(toolResult);
-			case LINES -> StepOutcome.success(toolResult, Map.of("lines", this.parseLines(toolResult, output.pattern())));
-		};
+	private StepOutcome parse(ToolOutput output, String toolResult) {
+		ToolParse parse = output == null ? ToolParse.TEXT : output.parseOrText();
+		switch (parse) {
+			case JSON:
+				return this.parseJson(toolResult);
+			case LINES:
+				return StepOutcome.success(toolResult, Map.of("lines", this.parseLines(toolResult, output.pattern())));
+			case TEXT:
+			default:
+				return StepOutcome.success(toolResult);
+		}
 	}
 
 	/**

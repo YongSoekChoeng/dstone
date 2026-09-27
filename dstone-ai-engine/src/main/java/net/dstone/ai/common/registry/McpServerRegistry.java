@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
-import net.dstone.ai.common.definition.McpServerDefinition;
+import net.dstone.ai.common.definition.mcp.McpServerDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;

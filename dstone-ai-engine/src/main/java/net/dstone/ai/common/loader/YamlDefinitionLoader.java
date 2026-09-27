@@ -14,12 +14,16 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.definition.AgentDefinition;
-import net.dstone.ai.common.definition.McpServerDefinition;
-import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.definition.mcp.McpServerDefinition;
+import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -38,6 +42,11 @@ import net.dstone.common.utils.StringUtil;
  * 같은 SnakeYAML로 파싱해서 평범한 Map으로 만들고, 그다음 Jackson의 ObjectMapper.convertValue()로
  * 그 Map을 definition record에 바인딩합니다. record의 필드에 바로 바인딩되는 건 pom.xml에 이미
  * 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
+ *
+ * Workflow의 steps 항목은 type 값에 따라 서로 다른 record(AgentStep/ToolStep 등)로 읽힙니다
+ * (common.definition.workflow.step.StepDefinition의 @JsonSubTypes 참고). record마다 그 종류가 쓰는
+ * 키만 있으므로, 다른 종류의 키를 적으면 "쓸 수 없는 키"로 여기서 바로 막힙니다. 이때 Jackson의 영문
+ * 오류 대신 "어느 파일의 어느 자리에서 무엇이 틀렸는지"를 한국어로 알려줍니다(describe() 참고).
  *
  * application.yml과 달리 이 파일들은 Spring이 읽는 게 아니라서 ${...} 값이 원래는 자동으로
  * 채워지지 않습니다. 그런데 실행 환경(로컬 Windows/WSL/k8s)마다 값이 달라져야 하는 경로 같은
@@ -182,9 +191,86 @@ public class YamlDefinitionLoader extends BaseObject {
 			Object rawMap = this.yaml.load(input);
 			rawMap = this.resolvePlaceholders(rawMap);
 			return this.objectMapper.convertValue(rawMap, type);
-		} catch (IOException | IllegalArgumentException e) {
+		} catch (IllegalArgumentException e) {
+			throw new IllegalStateException(resource.getDescription() + "를 읽는 중 오류가 발생했습니다 - " + this.describe(e), e);
+		} catch (IOException e) {
 			throw new IllegalStateException(resource.getDescription() + "를 읽는 중 오류가 발생했습니다 - " + e.getMessage(), e);
 		}
+	}
+
+	/**
+	 * <pre>
+	 * YAML을 record로 바꾸다 실패한 이유를 사람이 읽기 쉬운 문장으로 바꿉니다. 자리는 YAML 경로로 보여줍니다
+	 * (예: workflow.steps[2].routes). Jackson 오류가 아니면 원래 메시지를 그대로 씁니다.
+	 * - 쓸 수 없는 키: 그 자리에 쓸 수 있는 키 목록을 함께 알려줍니다(예: TOOL step에 routes를 적은 경우).
+	 * - type 값이 없거나 틀림: 쓸 수 있는 type 값을 알려줍니다.
+	 * - 값의 모양이 다름: 예를 들어 TOOL step의 input을 맵이 아니라 문자열로 적은 경우입니다.
+	 * - 값을 만들다 실패함: 예를 들어 output.parse에 text/json/lines가 아닌 값을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
+	 * </pre>
+	 *
+	 * @param e convertValue()가 던진 예외
+	 */
+	private String describe(IllegalArgumentException e) {
+		if (!(e.getCause() instanceof JsonMappingException cause)) {
+			return e.getMessage();
+		}
+		String where = this.yamlPath(cause);
+		if (cause instanceof UnrecognizedPropertyException unknown) {
+			String owner = where.lastIndexOf('.') < 0 ? "" : where.substring(0, where.lastIndexOf('.'));
+			return "[" + where + "] '" + unknown.getPropertyName() + "'는 이 자리(" + unknown.getReferringClass().getSimpleName() + ")에서 쓸 수 없는 키입니다"
+				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ").";
+		}
+		if (cause instanceof InvalidTypeIdException invalidType) {
+			return "[" + where + "] step의 type이 없거나 올바르지 않습니다(적은 값 = " + invalidType.getTypeId()
+				+ ", 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL).";
+		}
+		if (cause instanceof MismatchedInputException mismatched && mismatched.getTargetType() != null) {
+			return "[" + where + "] 값의 모양이 맞지 않습니다(" + this.shapeName(mismatched.getTargetType()) + "이어야 합니다"
+				+ " - 예: TOOL step의 input은 맵, AGENT step의 input은 문자열).";
+		}
+		if (cause.getCause() != null && cause.getCause().getMessage() != null) {
+			// 값을 만들다 우리 코드가 던진 오류(예: ToolParse.from의 "output.parse에는 ...")는 그 메시지를 그대로 보여줍니다.
+			return "[" + where + "] " + cause.getCause().getMessage();
+		}
+		return "[" + where + "] " + cause.getOriginalMessage();
+	}
+
+	/**
+	 * 값의 자바 타입을 YAML 쪽 말로 바꿉니다(Map → 맵, List → 리스트, String → 문자열).
+	 *
+	 * @param type Jackson이 기대한 자바 타입
+	 */
+	private String shapeName(Class<?> type) {
+		if (Map.class.isAssignableFrom(type)) {
+			return "맵";
+		}
+		if (java.util.Collection.class.isAssignableFrom(type)) {
+			return "리스트";
+		}
+		if (String.class.equals(type)) {
+			return "문자열";
+		}
+		return type.getSimpleName();
+	}
+
+	/**
+	 * Jackson 오류가 가리키는 자리를 YAML 경로 모양(예: workflow.steps[2].routes)으로 만듭니다.
+	 *
+	 * @param e 자리 정보를 담고 있는 Jackson 오류
+	 */
+	private String yamlPath(JsonMappingException e) {
+		StringBuilder path = new StringBuilder();
+		for (JsonMappingException.Reference reference : e.getPath()) {
+			if (reference.getFieldName() != null) {
+				if (path.length() > 0) {
+					path.append('.');
+				}
+				path.append(reference.getFieldName());
+			} else if (reference.getIndex() >= 0) {
+				path.append('[').append(reference.getIndex()).append(']');
+			}
+		}
+		return path.toString();
 	}
 
 	/** ${VAR_NAME} 토큰을 찾는 정규식입니다. 변수 이름은 env.properties 관례를 따라 영문 대문자/숫자/밑줄만 허용합니다. */

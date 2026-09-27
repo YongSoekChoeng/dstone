@@ -21,7 +21,7 @@ import net.dstone.ai.api.dto.WorkFlowStatusResponse;
 import net.dstone.ai.api.dto.WorkFlowSubmitResponse;
 import net.dstone.ai.api.dto.WorkFlowSummary;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
-import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.security.CallerContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStatus;

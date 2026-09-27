@@ -13,13 +13,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
-import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
-import net.dstone.ai.common.consts.StepType;
 import net.dstone.ai.common.consts.ToolParse;
-import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.StepOutputDefinition;
-import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.step.AgentOutput;
+import net.dstone.ai.common.definition.workflow.step.AgentStep;
+import net.dstone.ai.common.definition.workflow.step.ApprovalStep;
+import net.dstone.ai.common.definition.workflow.step.ForEachStep;
+import net.dstone.ai.common.definition.workflow.step.RouterStep;
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.SupervisorStep;
+import net.dstone.ai.common.definition.workflow.step.ToolOutput;
+import net.dstone.ai.common.definition.workflow.step.ToolStep;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.FieldTypes;
 import net.dstone.ai.common.template.Template;
@@ -37,11 +42,15 @@ import net.dstone.common.utils.StringUtil;
  * ## 기동 시점 검증
  * Workflow를 YAML만으로 조립하려면, 잘못 조립된 YAML이 실행 도중이 아니라 엔진이 켜질 때 바로 드러나야 합니다.
  * 그래서 등록하기 전에 아래 규칙을 모두 검사하고, 하나라도 어기면 기동 자체를 실패시킵니다.
+ 0) (이 클래스보다 앞에서) step 종류별로 쓸 수 있는 키: step은 type에 따라 AgentStep/ToolStep 같은 record로 읽히고,
+ *    record마다 그 종류가 쓰는 키만 있습니다. 그래서 다른 종류의 키(TOOL의 routes, APPROVAL의 input 등)를 적거나
+ *    input의 모양이 틀리면(TOOL input이 문자열 등) YAML을 읽는 단계에서 이미 막힙니다(common.loader.YamlDefinitionLoader).
  * 1) 기본 구조: id와 steps가 있는가, id가 중복되지 않는가, step id가 중복되지 않는가
- * 2) step 모양(validateStepShape)
- *    - AGENT/SUPERVISOR/ROUTER의 input은 문자열, TOOL의 input은 맵, APPROVAL은 input을 쓰지 않음
- *    - output.schema는 AGENT만, output.parse/pattern은 TOOL만 쓸 수 있음. 타입 이름과 정규식이 올바른가
- *    - APPROVAL/ROUTER는 forEach를 쓸 수 없음, ROUTER는 routes가 최소 1개 있어야 함
+ * 2) step 모양(validateStepShape) - 키가 있는지만으로는 알 수 없는 값의 내용을 검사합니다.
+ *    - ref가 필요한 step(AGENT/SUPERVISOR/ROUTER/TOOL)에 ref가 있는가
+ *    - AGENT output.schema: 필드가 1개 이상 있는가, 타입 이름이 올바른가
+ *    - TOOL output.pattern: parse: lines와 함께 썼는가, 올바른 정규식인가
+ *    - ROUTER routes: 최소 1개 있는가
  * 3) Workflow inputs의 타입 이름이 올바른가
  * 4) 참조 검사(validateExpression): step input, forEach, Workflow output 안의 모든 {{ ... }} 경로가
  *    - inputs / steps / previous / (forEach step 안에서만) item 중 하나로 시작하는가
@@ -112,8 +121,8 @@ public class WorkFlowRegistry extends BaseObject {
 	private void validate(WorkFlowDefinition definition) {
 		Map<String, StepDefinition> stepsById = new HashMap<>();
 		for (StepDefinition step : definition.steps()) {
-			if (StringUtil.isEmpty(step.id()) || step.type() == null) {
-				throw this.error(definition, null, "모든 step은 id와 type이 있어야 합니다: " + step);
+			if (StringUtil.isEmpty(step.id())) {
+				throw this.error(definition, null, "모든 step은 id가 있어야 합니다: " + step);
 			}
 			if (stepsById.putIfAbsent(step.id(), step) != null) {
 				throw this.error(definition, step, "step id가 중복되었습니다.");
@@ -127,11 +136,11 @@ public class WorkFlowRegistry extends BaseObject {
 			}
 		}
 		for (StepDefinition step : definition.steps()) {
-			for (String expression : Template.expressions(step.input())) {
+			for (String expression : Template.expressions(this.inputOf(step))) {
 				this.validateExpression(definition, stepsById, step, expression, true);
 			}
-			if (!StringUtil.isEmpty(step.forEach())) {
-				this.validateExpression(definition, stepsById, step, step.forEach(), false);
+			if (step instanceof ForEachStep forEachStep && forEachStep.repeats()) {
+				this.validateExpression(definition, stepsById, step, forEachStep.forEach(), false);
 			}
 		}
 		for (String expression : Template.expressions(definition.output())) {
@@ -140,62 +149,84 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * step 하나의 모양(input/output/forEach/routes를 step 종류에 맞게 썼는지)을 검사합니다.
+	 * <pre>
+	 * step 하나의 값 내용을 검사합니다. 어떤 키를 쓸 수 있는지와 값의 모양(문자열/맵 등)은 step record가 이미 정해 두었으므로,
+	 * 여기서는 그것만으로 알 수 없는 것(필수 값이 비었는지, 타입 이름/정규식이 올바른지)만 봅니다.
+	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param step       검사할 step
 	 */
 	private void validateStepShape(WorkFlowDefinition definition, StepDefinition step) {
-		StepType type = step.type();
-		StepOutputDefinition output = step.output();
-
-		// input 모양
-		if (type == StepType.APPROVAL && step.input() != null) {
-			throw this.error(definition, step, "APPROVAL step은 input을 쓸 수 없습니다(직전 step의 결과 텍스트를 그대로 넘깁니다).");
+		if (!(step instanceof ApprovalStep) && StringUtil.isEmpty(step.ref())) {
+			throw this.error(definition, step, step.type() + " step은 ref(" + (step instanceof ToolStep ? "Tool 이름" : "Agent id") + ")가 있어야 합니다.");
 		}
-		if (type == StepType.TOOL && step.input() != null && !(step.input() instanceof Map)) {
-			throw this.error(definition, step, "TOOL step의 input은 맵(Tool 인자 이름: 값)이어야 합니다.");
+		if (step instanceof AgentStep agentStep && agentStep.output() != null) {
+			this.validateAgentOutput(definition, step, agentStep.output());
 		}
-		if (type.kind() == StepType.Kind.AGENT_CALL && step.input() != null && !(step.input() instanceof String)) {
-			throw this.error(definition, step, type + " step의 input은 문자열(LLM에게 보낼 메시지)이어야 합니다.");
+		if (step instanceof ToolStep toolStep && toolStep.output() != null) {
+			this.validateToolOutput(definition, step, toolStep.output());
 		}
-
-		// output 모양
-		if (output != null) {
-			if (output.schema() != null) {
-				if (type != StepType.AGENT) {
-					throw this.error(definition, step, "output.schema는 AGENT step에서만 쓸 수 있습니다.");
-				}
-				if (output.schema().isEmpty()) {
-					throw this.error(definition, step, "output.schema에 필드가 하나도 없습니다.");
-				}
-				List<String> invalid = FieldTypes.invalidFields(output.schema());
-				if (!invalid.isEmpty()) {
-					throw this.error(definition, step, "output.schema의 타입 이름이 올바르지 않습니다: " + invalid);
-				}
-			}
-			if ((output.parse() != null || output.pattern() != null) && type != StepType.TOOL) {
-				throw this.error(definition, step, "output.parse/pattern은 TOOL step에서만 쓸 수 있습니다.");
-			}
-			if (output.pattern() != null) {
-				if (output.parse() != ToolParse.LINES) {
-					throw this.error(definition, step, "output.pattern은 output.parse: lines와 함께만 쓸 수 있습니다.");
-				}
-				try {
-					Pattern.compile(output.pattern());
-				} catch (PatternSyntaxException e) {
-					throw this.error(definition, step, "output.pattern이 올바른 정규식이 아닙니다: " + e.getMessage());
-				}
-			}
-		}
-
-		// 반복 실행과 분기
-		if ((type == StepType.APPROVAL || type == StepType.ROUTER) && !StringUtil.isEmpty(step.forEach())) {
-			throw this.error(definition, step, type + " step은 forEach를 쓸 수 없습니다. APPROVAL은 사람의 결정이 step id 하나로만 구분되고, "
-				+ "ROUTER는 여러 반복 중 어느 반복의 선택을 따라야 할지 정할 수 없기 때문입니다.");
-		}
-		if (type == StepType.ROUTER && (step.routes() == null || step.routes().isEmpty())) {
+		if (step instanceof RouterStep routerStep && (routerStep.routes() == null || routerStep.routes().isEmpty())) {
 			throw this.error(definition, step, "ROUTER step은 routes를 최소 1개 이상 정의해야 합니다.");
+		}
+	}
+
+	/**
+	 * AGENT step의 output.schema를 검사합니다. 필드가 1개 이상 있어야 하고, 타입 이름이 올바라야 합니다.
+	 *
+	 * @param definition 검사 중인 Workflow 정의
+	 * @param step       검사할 step
+	 * @param output     그 step의 output 선언
+	 */
+	private void validateAgentOutput(WorkFlowDefinition definition, StepDefinition step, AgentOutput output) {
+		if (output.schema() == null || output.schema().isEmpty()) {
+			throw this.error(definition, step, "output.schema에 필드가 하나도 없습니다.");
+		}
+		List<String> invalid = FieldTypes.invalidFields(output.schema());
+		if (!invalid.isEmpty()) {
+			throw this.error(definition, step, "output.schema의 타입 이름이 올바르지 않습니다: " + invalid);
+		}
+	}
+
+	/**
+	 * TOOL step의 output.pattern을 검사합니다. parse: lines와 함께 써야 하고, 올바른 정규식이어야 합니다.
+	 *
+	 * @param definition 검사 중인 Workflow 정의
+	 * @param step       검사할 step
+	 * @param output     그 step의 output 선언
+	 */
+	private void validateToolOutput(WorkFlowDefinition definition, StepDefinition step, ToolOutput output) {
+		if (output.pattern() == null) {
+			return;
+		}
+		if (output.parse() != ToolParse.LINES) {
+			throw this.error(definition, step, "output.pattern은 output.parse: lines와 함께만 쓸 수 있습니다.");
+		}
+		try {
+			Pattern.compile(output.pattern());
+		} catch (PatternSyntaxException e) {
+			throw this.error(definition, step, "output.pattern이 올바른 정규식이 아닙니다: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * step의 input 템플릿을 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 문자열, TOOL은 맵이고, APPROVAL은 input이 없어서 null입니다.
+	 *
+	 * @param step input을 꺼낼 step
+	 */
+	private Object inputOf(StepDefinition step) {
+		switch (step) {
+			case AgentStep agentStep:
+				return agentStep.input();
+			case SupervisorStep supervisorStep:
+				return supervisorStep.input();
+			case RouterStep routerStep:
+				return routerStep.input();
+			case ToolStep toolStep:
+				return toolStep.input();
+			case ApprovalStep approvalStep:
+				return null;
 		}
 	}
 
@@ -230,7 +261,8 @@ public class WorkFlowRegistry extends BaseObject {
 		String[] segments = path.split("\\.");
 		String root = segments[0];
 
-		if (owner != null && inStepInput && !StringUtil.isEmpty(owner.forEach()) && root.equals(this.itemKey(owner))) {
+		ForEachStep repeatingOwner = this.repeatingStep(owner);
+		if (repeatingOwner != null && inStepInput && root.equals(repeatingOwner.itemKey())) {
 			return null;
 		}
 		switch (root) {
@@ -267,7 +299,7 @@ public class WorkFlowRegistry extends BaseObject {
 				if (OLD_INPUTS_ROOT.equals(root)) {
 					return "input은 inputs로 이름이 바뀌었습니다(YAML의 workflow.inputs와 같은 이름). " + Context.INPUTS + path.substring(root.length()) + "로 적으십시오.";
 				}
-				String itemHint = owner != null && !StringUtil.isEmpty(owner.forEach()) ? ", " + this.itemKey(owner) : "";
+				String itemHint = repeatingOwner != null ? ", " + repeatingOwner.itemKey() : "";
 				return "알 수 없는 시작 이름입니다(쓸 수 있는 이름 = inputs, steps, previous" + itemHint + ").";
 			}
 		}
@@ -289,24 +321,10 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param key    꺼내려는 output의 키
 	 */
 	private String checkOutputKey(StepDefinition target, String key) {
-		if (!StringUtil.isEmpty(target.forEach())) {
+		if (this.repeatingStep(target) != null) {
 			return "'" + target.id() + "'는 forEach step이라 output이 없습니다. 반복별 결과는 steps." + target.id() + ".items.번호.output." + key + "처럼 꺼내십시오.";
 		}
-		StepOutputDefinition output = target.output();
-		Set<String> keys = switch (target.type()) {
-			case AGENT -> output != null && output.schema() != null ? output.schema().keySet() : Set.of();
-			case TOOL -> {
-				ToolParse parse = output == null || output.parse() == null ? ToolParse.TEXT : output.parse();
-				yield switch (parse) {
-					case JSON -> null;
-					case LINES -> Set.of("lines");
-					case TEXT -> Set.of();
-				};
-			}
-			case SUPERVISOR -> Set.of("pass", "reason");
-			case ROUTER -> Set.of("route", "reason");
-			case APPROVAL -> Set.of("approved", "approver", "comment");
-		};
+		Set<String> keys = this.outputKeysOf(target);
 		if (keys == null || keys.contains(key)) {
 			return null;
 		}
@@ -317,12 +335,39 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * forEach step에서 항목을 담는 변수 이름을 돌려줍니다(itemVariable이 없으면 "item").
+	 * step이 내놓는 output의 키 목록을 돌려줍니다(클래스 설명의 표 참고). 미리 알 수 없으면(TOOL parse: json) null입니다.
 	 *
-	 * @param step forEach가 설정된 step
+	 * @param step output을 내놓는 step
 	 */
-	private String itemKey(StepDefinition step) {
-		return StringUtil.isEmpty(step.itemVariable()) ? Constants.WorkFlow.DEFAULT_ITEM_VARIABLE_KEY : step.itemVariable();
+	private Set<String> outputKeysOf(StepDefinition step) {
+		switch (step) {
+			case AgentStep agentStep:
+				return agentStep.output() == null ? Set.of() : agentStep.output().schema().keySet();
+			case ToolStep toolStep:
+				ToolParse parse = toolStep.output() == null ? ToolParse.TEXT : toolStep.output().parseOrText();
+				if (parse == ToolParse.JSON) {
+					return null;
+				}
+				return parse == ToolParse.LINES ? Set.of("lines") : Set.of();
+			case SupervisorStep supervisorStep:
+				return Set.of("pass", "reason");
+			case RouterStep routerStep:
+				return Set.of("route", "reason");
+			case ApprovalStep approvalStep:
+				return Set.of("approved", "approver", "comment");
+		}
+	}
+
+	/**
+	 * forEach가 적혀 있어서 반복 실행하는 step이면 ForEachStep으로 돌려주고, 아니면(forEach를 쓸 수 없는 step이거나 비워둔 경우) null입니다.
+	 *
+	 * @param step 확인할 step(Workflow output이면 null)
+	 */
+	private ForEachStep repeatingStep(StepDefinition step) {
+		if (step instanceof ForEachStep forEachStep && forEachStep.repeats()) {
+			return forEachStep;
+		}
+		return null;
 	}
 
 	/**

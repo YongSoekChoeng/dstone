@@ -22,7 +22,7 @@ import io.modelcontextprotocol.spec.McpClientTransport;
 import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.definition.McpServerDefinition;
+import net.dstone.ai.common.definition.mcp.McpServerDefinition;
 import net.dstone.ai.common.registry.McpServerRegistry;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;

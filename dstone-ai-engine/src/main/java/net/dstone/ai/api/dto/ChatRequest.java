@@ -20,7 +20,7 @@ import java.util.Map;
  *
  * model도 같은 방식으로 동작합니다. 비워 두면(null이거나 빈 문자열) Agent 정의에 적힌 model 값을
  * 쓰고(그마저 없으면 provider 공통 기본 모델을 씁니다), 값을 채우면 이번 요청 한 번만 그 모델을
- * 강제로 씁니다(자세한 우선순위는 common.definition.AgentDefinition.model을 참고하세요). 다만 이건
+ * 강제로 씁니다(자세한 우선순위는 common.definition.agent.AgentDefinition.model을 참고하세요). 다만 이건
  * 지금 활성화된 provider(spring.ai.model.chat 설정값) 안에서만 모델을 바꾸는 기능입니다. 만약 다른
  * provider의 모델 이름을 넣으면, 이 요청을 처리하는 시점에 그 provider의 API가 에러를 냅니다.
  *

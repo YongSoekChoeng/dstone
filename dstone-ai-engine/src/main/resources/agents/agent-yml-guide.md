@@ -2,7 +2,7 @@
 
 ### 1. Agent 항목
 
-`agent:` 아래에 적는다(`common.definition.AgentDefinition`).
+`agent:` 아래에 적는다(`common.definition.agent.AgentDefinition`).
 
 | 항목 | 필수 | 타입 | 설명 |
 |---|---|---|---|

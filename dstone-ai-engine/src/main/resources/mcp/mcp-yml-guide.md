@@ -1,7 +1,7 @@
 
 ### 1 MCP 서버 항목
 
-`mcpServer:` 아래에 적는다(`common.definition.McpServerDefinition`).
+`mcpServer:` 아래에 적는다(`common.definition.mcp.McpServerDefinition`).
 
 | 항목 | 필수 | 설명 |
 |---|---|---|

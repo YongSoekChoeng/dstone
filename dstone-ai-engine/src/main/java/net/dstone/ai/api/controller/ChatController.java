@@ -19,7 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.AgentSummary;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
-import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.security.CallerContext;
 import net.dstone.ai.runtime.agent.AgentExecutor;

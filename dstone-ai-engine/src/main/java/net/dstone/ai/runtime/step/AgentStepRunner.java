@@ -9,10 +9,12 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import net.dstone.ai.common.consts.StepType;
-import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.FieldDefinition;
-import net.dstone.ai.common.definition.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.AgentCallStep;
+import net.dstone.ai.common.definition.workflow.step.AgentStep;
+import net.dstone.ai.common.definition.workflow.step.RouterStep;
+import net.dstone.ai.common.definition.workflow.step.SupervisorStep;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.agent.AgentExecutor;
 import net.dstone.ai.runtime.agent.RouteDecision;
@@ -22,7 +24,7 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER)를 처리하는 클래스입니다. 셋 다 StepDefinition.ref()에
+ * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER = AgentCallStep)를 처리하는 클래스입니다. 셋 다 ref에
  * 적힌 Agent를 부르고, 채워진 input 텍스트(StepInput.text)를 사용자 메시지로 보낸다는 점은 같습니다.
  * 응답을 어떤 모양으로 받고 무엇을 결과로 남기는지가 다릅니다.
  *
@@ -42,7 +44,7 @@ import net.dstone.common.utils.StringUtil;
  * </pre>
  */
 @Component
-public class AgentStepRunner implements StepRunner {
+public class AgentStepRunner implements StepRunner<AgentCallStep> {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -54,22 +56,23 @@ public class AgentStepRunner implements StepRunner {
 	/**
 	 * <pre>
 	 * ref에 적힌 Agent를 찾아서(caller가 쓸 수 있는 Agent인지도 함께 검사합니다) step 종류에 맞는 방법으로 부릅니다.
-	 * SUPERVISOR → runSupervisor, ROUTER → runRouter, output.schema가 있는 AGENT → runSchemaAgent, 그 밖의 AGENT → runAgent.
+	 * SupervisorStep → runSupervisor, RouterStep → runRouter, output.schema가 있는 AgentStep → runSchemaAgent, 그 밖의 AgentStep → runAgent.
 	 * </pre>
 	 */
 	@Override
-	public StepOutcome run(WorkFlowExecution execution, StepDefinition definition, StepInput input) {
+	public StepOutcome run(WorkFlowExecution execution, AgentCallStep definition, StepInput input) {
 		AgentDefinition agent = this.agentRegistry.resolve(definition.ref(), execution.caller());
-		if (definition.type() == StepType.SUPERVISOR) {
-			return this.runSupervisor(execution, agent, input);
+		switch (definition) {
+			case SupervisorStep supervisorStep:
+				return this.runSupervisor(execution, agent, input);
+			case RouterStep routerStep:
+				return this.runRouter(execution, agent, input);
+			case AgentStep agentStep:
+				if (agentStep.output() != null) {
+					return this.runSchemaAgent(execution, agent, input, agentStep.output().schema());
+				}
+				return this.runAgent(execution, agent, input);
 		}
-		if (definition.type() == StepType.ROUTER) {
-			return this.runRouter(execution, agent, input);
-		}
-		if (definition.output() != null && definition.output().schema() != null) {
-			return this.runSchemaAgent(execution, agent, input, definition.output().schema());
-		}
-		return this.runAgent(execution, agent, input);
 	}
 
 	/**
@@ -110,7 +113,7 @@ public class AgentStepRunner implements StepRunner {
 	 * <pre>
 	 * ROUTER step을 처리합니다. LLM에게 "어디로 갈지"를 담은 RouteDecision(route, reason)으로 답하게 합니다.
 	 * 받은 input은 결과 텍스트로 그대로 넘기고, 고른 경로는 output에 {route, reason}으로 남깁니다.
-	 * 그 route가 StepDefinition.routes에 실제로 있는지 확인하고 다음 step을 정하는 일은
+	 * 그 route가 RouterStep.routes에 실제로 있는지 확인하고 다음 step을 정하는 일은
 	 * runtime.workflow.WorkFlowExecutor가 이어받습니다.
 	 *
 	 * 응답을 RouteDecision 모양으로 읽지 못하거나 route가 비어 있으면 실패로 처리합니다. 갈 곳을 고르지

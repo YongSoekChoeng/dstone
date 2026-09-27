@@ -53,11 +53,11 @@ public sealed interface StepOutcome {
 
 	/**
 	 * ROUTER step이 경로를 고르는 데 성공했을 때의 결과입니다. 그 route를 실제로 어느 step으로 이어줄지는
-	 * runtime.workflow.WorkFlowExecutor가 StepDefinition.routes를 보고 정합니다.
+	 * runtime.workflow.WorkFlowExecutor가 RouterStep.routes를 보고 정합니다.
 	 *
 	 * @param text   결과 텍스트입니다(ROUTER는 받은 입력을 그대로 넘깁니다).
 	 * @param output 구조화된 결과입니다({route, reason}).
-	 * @param route  StepDefinition.routes에 정의된 키 중 하나입니다.
+	 * @param route  RouterStep.routes에 정의된 키 중 하나입니다.
 	 */
 	record Routed(String text, Map<String, Object> output, String route) implements StepOutcome {
 	}
@@ -110,7 +110,7 @@ public sealed interface StepOutcome {
 	 *
 	 * @param text   결과 텍스트입니다(ROUTER는 받은 입력을 그대로 넘깁니다).
 	 * @param output 구조화된 결과입니다({route, reason}).
-	 * @param route  StepDefinition.routes에 정의된 키 중 하나입니다.
+	 * @param route  RouterStep.routes에 정의된 키 중 하나입니다.
 	 */
 	static StepOutcome routed(String text, Map<String, Object> output, String route) {
 		return new Routed(text, output == null ? Map.of() : output, route);

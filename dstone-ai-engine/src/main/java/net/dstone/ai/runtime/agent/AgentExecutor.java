@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.FieldDefinition;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.common.core.BaseObject;

@@ -72,7 +72,7 @@ public final class Constants {
 		public final static int DEFAULT_MAX_ITERATIONS = 10;
 		public final static String SUCCESS_SENTINEL = "SUCCESS";
 		public final static String FAIL_SENTINEL = "FAIL";
-		/** StepDefinition의 forEach로 반복 실행할 때, itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 변수 이름입니다({{item}}). */
+		/** step의 forEach로 반복 실행할 때(ForEachStep 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 변수 이름입니다({{item}}). */
 		public final static String DEFAULT_ITEM_VARIABLE_KEY = "item";
 
 		/**
@@ -101,7 +101,7 @@ public final class Constants {
 			public final static String FIELD_INPUT = "input";
 			/** step 결과: 결과 텍스트입니다. */
 			public final static String FIELD_TEXT = "text";
-			/** step 결과: 구조화된 결과입니다. 모양은 YAML step의 output(schema/parse)에 선언한 대로입니다(StepOutputDefinition 참고). */
+			/** step 결과: 구조화된 결과입니다. 모양은 YAML step의 output에 선언한 대로입니다(AGENT는 AgentOutput, TOOL은 ToolOutput 참고). */
 			public final static String FIELD_OUTPUT = "output";
 			/** step 결과: 실패했을 때의 사유입니다(성공이면 null). */
 			public final static String FIELD_ERROR = "error";

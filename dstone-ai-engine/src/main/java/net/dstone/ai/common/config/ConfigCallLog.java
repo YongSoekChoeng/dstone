@@ -11,9 +11,9 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.http.HttpServletResponse;
-import net.dstone.ai.common.definition.AgentDefinition;
-import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;

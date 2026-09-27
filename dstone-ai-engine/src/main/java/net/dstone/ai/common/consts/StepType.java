@@ -3,8 +3,10 @@ package net.dstone.ai.common.consts;
 /**
  * <pre>
  * Workflow의 각 step이 실제로 무슨 일을 하는지 나타내는 다섯 가지 종류입니다. 
- * Workflow가 실행될 때 runtime.workflow.WorkFlowExecutor가 이 값을 보고, 
- * 그 일을 실제로 처리할 담당자(runtime.step 패키지에 있는 StepRunner 중 하나)에게 넘겨줍니다.
+ * YAML step의 type 값이며, 이 값에 따라 step이 common.definition.workflow.step 패키지의
+ * record(AgentStep/SupervisorStep/ApprovalStep/RouterStep/ToolStep) 중 하나로 읽힙니다.
+ * Workflow가 실행될 때 runtime.workflow.WorkFlowExecutor가 그 record 타입을 보고,
+ * 일을 실제로 처리할 담당자(runtime.step 패키지에 있는 StepRunner 중 하나)에게 넘겨줍니다.
  * </pre>
  */
 public enum StepType {
@@ -12,23 +14,15 @@ public enum StepType {
 	/**
 	 * <pre>
 	 * LLM에게 일을 한 번 시키는 step입니다. 
-	 * StepDefinition의 ref 값으로 지정한 이름을 common.registry.AgentRegistry에서 찾아 그 Agent를 한 번 호출합니다. 
+	 * ref 값으로 지정한 이름을 common.registry.AgentRegistry에서 찾아 그 Agent를 한 번 호출합니다. 
 	 * output.schema가 없으면 항상 성공으로 취급되고, 
 	 * output.schema가 있으면 LLM이 그 모양의 JSON으로 답하지 않았을 때만 실패합니다(runtime.step.AgentStepRunner 참고).
 	 * 
-	 * <b><사용항목> 범례 : ✅ 사용, ⭕ 선택, ❌ 사용하면에러, — 무시</b>
-     * ref                ✅ (agent 아이디)
-     * input              ⭕ (문자열)
-     * output.schema      ⭕
-     * output.parse       ❌
-     * output.pattern     ❌
-     * onSuccess          ⭕
-     * onFailure          ⭕
-     * routes             —
-     * forEach            ⭕
-     * itemVariable       ⭕
-     * approverRole       —
-     * 
+	 * <b>YAML 키 - common.definition.workflow.step.AgentStep</b>
+	 * 필수: ref(Agent id)
+	 * 선택: input(문자열), output.schema, onSuccess, onFailure, forEach, itemVariable
+	 * 이 밖의 키(routes, approverRole, output.parse 등)를 적으면 엔진이 켜질 때 막힙니다.
+	 * 
 	 * </pre>
 	 */
 	AGENT(Kind.AGENT_CALL),
@@ -47,19 +41,11 @@ public enum StepType {
 	 * LLM의 응답을 그 형식에 맞춰 해석합니다. 다만 이 방식도 100% 완벽하지는 않습니다. 
 	 * LLM이 그 형식 자체를 지키지 않고 엉뚱하게 응답하면 해석 과정에서 오류가 나는데, 이 경우도 실패로 처리됩니다.
 	 * 
-	 * <b><사용항목> 범례 : ✅ 사용, ⭕ 선택, ❌ 사용하면에러, — 무시</b>
-     * ref                ✅ (agent 아이디)
-     * input              ⭕ (문자열)
-     * output.schema      ❌
-     * output.parse       ❌
-     * output.pattern     ❌
-     * onSuccess          ⭕
-     * onFailure          ⭕
-     * routes             —
-     * forEach            ⭕
-     * itemVariable       ⭕
-     * approverRole       —
-     * 
+	 * <b>YAML 키 - common.definition.workflow.step.SupervisorStep</b>
+	 * 필수: ref(Agent id)
+	 * 선택: input(문자열), onSuccess, onFailure, forEach, itemVariable
+	 * 이 밖의 키(output, routes, approverRole 등)를 적으면 엔진이 켜질 때 막힙니다.
+	 * 
 	 * </pre>
 	 */
 	SUPERVISOR(Kind.AGENT_CALL),
@@ -75,21 +61,12 @@ public enum StepType {
 	 * APPROVAL step은 forEach(같은 step을 여러 번 동시에 실행하는 기능)와 함께 쓸 수
 	 * 없습니다. 승인/반려 결정은 오직 그 step의 id 하나로만 구분되는데, 같은 step을 여러 번
 	 * 동시에 돌리면 "그중 어느 실행에 대한 결정인지"를 구분할 방법이 없기 때문입니다. 이런
-	 * 잘못된 조합은 엔진이 켜질 때 common.registry.WorkFlowRegistry가 미리 검사해서 막아줍니다.
+	 * 잘못된 조합은 ApprovalStep에 forEach 키가 아예 없어서 YAML을 읽을 때 바로 막힙니다.
 	 * 
-	 * <b><사용항목> 범례 : ✅ 사용, ⭕ 선택, ❌ 사용하면에러, — 무시</b>
-     * ref                —
-     * input              ❌
-     * output.schema      ❌
-     * output.parse       ❌
-     * output.pattern     ❌
-     * onSuccess          ⭕
-     * onFailure          ⭕
-     * routes             —
-     * forEach            ❌
-     * itemVariable       ❌
-     * approverRole       ⭕
-     * 
+	 * <b>YAML 키 - common.definition.workflow.step.ApprovalStep</b>
+	 * 선택: approverRole, onSuccess, onFailure
+	 * 이 밖의 키(ref, input, output, forEach 등)를 적으면 엔진이 켜질 때 막힙니다.
+	 * 
 	 * </pre>
 	 */
 	APPROVAL(Kind.DETERMINISTIC),
@@ -97,7 +74,7 @@ public enum StepType {
 	/**
 	 * <pre>
 	 * AGENT나 SUPERVISOR처럼 LLM을 호출하지만, "성공했는가 실패했는가"라는 두 갈래 판정이 아니라
-	 * StepDefinition의 routes에 미리 정의해 둔 여러 개의 경로 이름표 중에서 하나를 LLM이 직접 고르게 하는 step입니다.
+	 * routes에 미리 정의해 둔 여러 개의 경로 이름표 중에서 하나를 LLM이 직접 고르게 하는 step입니다.
 	 * 자세한 호출 방식은 runtime.agent.AgentExecutor.callForEntity(..., RouteDecision.class)를 참고.
 	 * 반환값의 구조는 runtime.agent.RouteDecision를 참고.
 	 *
@@ -105,26 +82,18 @@ public enum StepType {
 	 * onSuccess/onFailure처럼 두 갈래만 고를 수 있는 다른 StepType으로 이런 다지선다 분기를 표현하려면 SUPERVISOR를 여러 겹 쌓아야 하는데, 
 	 * ROUTER는 이걸 step 하나로 간단하게 표현할 수 있게 해줍니다.
 	 *
-	 * ROUTER step은 onSuccess/onFailure를 쓰지 않고, 대신 routes를 씁니다. 
+	 * ROUTER step은 onSuccess를 쓰지 않고, 대신 routes를 씁니다(route를 고르지 못해 실패했을 때만 onFailure를 따릅니다). 
 	 * routes는 "경로 이름 → 다음에 갈 step의 id" 형태의 매핑이며, 값으로 "SUCCESS"나 "FAIL"이라는 예약어를 넣을 수도 있습니다. 
 	 * 만약 LLM이 고른 경로 이름이 routes에 없는 이름이라면(오타를 냈거나 없는 경로를 지어낸 경우) Workflow는 그 자리에서 FAILED로 끝납니다. 
 	 * ROUTER step도 forEach와 함께 쓸 수 없습니다.
 	 * 여러 번 동시에 실행하면 "그중 어느 실행이 고른 경로를 따라가야 하는지"가 애매해지기 때문입니다
-	 * (이 검사 역시 엔진이 켜질 때 common.registry.WorkFlowRegistry가 해줍니다).
+	 * (RouterStep에 forEach 키가 아예 없어서 YAML을 읽을 때 바로 막힙니다).
 	 * 
-	 * <b><사용항목> 범례 : ✅ 사용, ⭕ 선택, ❌ 사용하면에러, — 무시</b>
-     * ref                ✅ (agent 아이디)
-     * input              ⭕ (문자열)
-     * output.schema      ❌
-     * output.parse       ❌
-     * output.pattern     ❌
-     * onSuccess          —
-     * onFailure          ⭕ (route를 고르지 못했을 때)
-     * routes             ✅
-     * forEach            ❌
-     * itemVariable       ❌
-     * approverRole       —
-     * 
+	 * <b>YAML 키 - common.definition.workflow.step.RouterStep</b>
+	 * 필수: ref(Agent id), routes
+	 * 선택: input(문자열), onFailure(route를 고르지 못했을 때)
+	 * 이 밖의 키(onSuccess, output, forEach 등)를 적으면 엔진이 켜질 때 막힙니다.
+	 * 
 	 * </pre>
 	 */
 	ROUTER(Kind.AGENT_CALL),
@@ -132,23 +101,15 @@ public enum StepType {
 	/**
 	 * <pre>
 	 * 등록된 Tool(@AiTool로 만든 자바 기능 또는 MCP 서버의 Tool) 하나를 LLM을 거치지 않고 직접 호출하는
-	 * step입니다. StepDefinition의 ref 값이 곧 common.config.ConfigTool에 등록된 Tool의 이름입니다. 값을
+	 * step입니다. ref 값이 곧 common.config.ConfigTool에 등록된 Tool의 이름입니다. 값을
 	 * 검증하거나, 파일/문서/외부 시스템에서 데이터를 가져오는 것처럼 결과가 코드로 정해지는(결정적인)
 	 * 작업에 씁니다.
 	 * 
-	 * <b><사용항목> 범례 : ✅ 사용, ⭕ 선택, ❌ 사용하면에러, — 무시</b>
-     * ref                ✅ (Tool 이름)	
-     * input              ⭕ (맵)
-     * output.schema      ❌
-     * output.parse       ⭕
-     * output.pattern     ⭕
-     * onSuccess          ⭕
-     * onFailure          ⭕
-     * routes             —
-     * forEach            ⭕
-     * itemVariable       ⭕
-     * approverRole       —
-     * 
+	 * <b>YAML 키 - common.definition.workflow.step.ToolStep</b>
+	 * 필수: ref(Tool 이름)
+	 * 선택: input(맵), output.parse, output.pattern, onSuccess, onFailure, forEach, itemVariable
+	 * 이 밖의 키(routes, approverRole, output.schema 등)를 적으면 엔진이 켜질 때 막힙니다.
+	 * 
 	 * </pre>
 	 */
 	TOOL(Kind.DETERMINISTIC);
@@ -164,7 +125,7 @@ public enum StepType {
 	 * 이 StepType이 LLM을 호출하는 계열(AGENT_CALL)인지, LLM 없이 결정적으로 처리되는 계열(DETERMINISTIC)인지를 돌려줍니다. 
 	 * runtime.step.AgentStepRunner가 세 가지(AGENT/SUPERVISOR/ROUTER)를 한 클래스에서 다루고, 
 	 * TOOL, APPROVAL이 각각 다른 Runner를 쓰는 것도 이 분류를 그대로 따른 구조입니다
-	 * (자세한 내용은 runtime.workflow.WorkFlowExecutor.runnerFor 참고).
+	 * (자세한 내용은 runtime.workflow.WorkFlowExecutor.runStep 참고).
 	 * </pre>
 	 */
 	public Kind kind() {
@@ -178,7 +139,7 @@ public enum StepType {
 	 */
 	public enum Kind {
 		/** 
-		 * AGENT/SUPERVISOR/ROUTER - Agent(LLM)를 실제로 호출하는 step입니다. 
+		 * AGENT/SUPERVISOR/ROUTER - Agent(LLM)를 실제로 호출하는 step입니다(common.definition.workflow.step.AgentCallStep). 
 		 */
 		AGENT_CALL,
 		/** 

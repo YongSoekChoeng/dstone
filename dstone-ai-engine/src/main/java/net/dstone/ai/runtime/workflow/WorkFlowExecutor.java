@@ -7,22 +7,27 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
-import net.dstone.ai.common.consts.StepType;
-import net.dstone.ai.common.definition.StepDefinition;
-import net.dstone.ai.common.definition.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.step.AgentCallStep;
+import net.dstone.ai.common.definition.workflow.step.ApprovalStep;
+import net.dstone.ai.common.definition.workflow.step.ForEachStep;
+import net.dstone.ai.common.definition.workflow.step.PassFailStep;
+import net.dstone.ai.common.definition.workflow.step.RouterStep;
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.ToolStep;
 import net.dstone.ai.common.template.Template;
 import net.dstone.ai.common.template.TemplateException;
 import net.dstone.ai.runtime.step.AgentStepRunner;
 import net.dstone.ai.runtime.step.ApprovalStepRunner;
 import net.dstone.ai.runtime.step.StepInput;
 import net.dstone.ai.runtime.step.StepOutcome;
-import net.dstone.ai.runtime.step.StepRunner;
 import net.dstone.ai.runtime.step.ToolStepRunner;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
@@ -117,12 +122,12 @@ public class WorkFlowExecutor extends BaseObject {
 
 			/****************************************************************************************
 			3) 실제로 이 step을 실행합니다. forEach가 없으면 한 번만 실행하는 runOne()을,
-			   있으면 여러 번 동시에 실행하는 runForEach()를 씁니다.
+			   있으면 여러 번 동시에 실행하는 runForEach()를 씁니다(forEach는 ForEachStep만 가질 수 있습니다).
 			****************************************************************************************/
 			StepRunResult stepResult;
 			try {
-				if( !StringUtil.isEmpty(step.forEach()) ) {
-					stepResult = this.runForEach(step, currentExecution);
+				if( step instanceof ForEachStep forEachStep && forEachStep.repeats() ) {
+					stepResult = this.runForEach(forEachStep, currentExecution);
 				}else {
 					stepResult = this.runOne(step, currentExecution);
 				}
@@ -256,7 +261,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param step      실행할 step의 정의입니다(forEach가 설정되어 있습니다).
 	 * @param execution 지금 진행 중인 실행입니다.
 	 */
-	private StepRunResult runForEach(StepDefinition step, WorkFlowExecution execution) {
+	private StepRunResult runForEach(ForEachStep step, WorkFlowExecution execution) {
 		Map<String, Object> context = execution.context();
 		Object rawList;
 		try {
@@ -268,11 +273,16 @@ public class WorkFlowExecutor extends BaseObject {
 			return this.failedBeforeRun(execution, step, "forEach[" + step.forEach() + "]의 값이 리스트가 아닙니다(현재 값=" + rawList + ").");
 		}
 
-		String itemKey = StringUtil.isEmpty(step.itemVariable()) ? Constants.WorkFlow.DEFAULT_ITEM_VARIABLE_KEY : step.itemVariable();
+		String itemKey = step.itemKey();
 		List<CompletableFuture<StepCall>> futures = new ArrayList<>(items.size());
 		for (Object item : items) {
 			Map<String, Object> iterationContext = WorkFlowContext.withItem(context, itemKey, item);
-			futures.add(CompletableFuture.supplyAsync(() -> this.call(step, execution, iterationContext)));
+			futures.add(CompletableFuture.supplyAsync(new Supplier<StepCall>() {
+				@Override
+				public StepCall get() {
+					return WorkFlowExecutor.this.call(step, execution, iterationContext);
+				}
+			}));
 		}
 
 		boolean allSuccess = true;
@@ -339,7 +349,7 @@ public class WorkFlowExecutor extends BaseObject {
 		StepOutcome outcome;
 		try {
 			renderedInput = this.renderInput(step, context);
-			outcome = this.runnerFor(step.type()).run(execution, step, this.toStepInput(step, renderedInput, context));
+			outcome = this.runStep(execution, step, this.toStepInput(step, renderedInput, context));
 		} catch (TemplateException e) {
 			outcome = StepOutcome.failure(null, "input을 채우지 못했습니다 - " + e.getMessage());
 		}
@@ -350,19 +360,23 @@ public class WorkFlowExecutor extends BaseObject {
 	 * <pre>
 	 * step의 input 템플릿을 컨텍스트로 채웁니다.
 	 * - TOOL: input(맵)을 채워서 맵으로 돌려줍니다. input이 없으면 빈 맵입니다.
-	 * - 그 밖의 step: input(문자열)을 채워서 문자열로 돌려줍니다. input이 없으면 {{previous.text}}를 씁니다.
-	 *   APPROVAL은 input을 적을 수 없으므로 항상 {{previous.text}}입니다.
+	 * - AGENT/SUPERVISOR/ROUTER: input(문자열)을 채워서 문자열로 돌려줍니다. input이 없으면 {{previous.text}}를 씁니다.
+	 * - APPROVAL: input이 없는 step이라 항상 {{previous.text}}입니다.
 	 * </pre>
 	 *
 	 * @param step    input을 채울 step의 정의입니다.
 	 * @param context 값을 찾아볼 컨텍스트입니다.
 	 */
 	private Object renderInput(StepDefinition step, Map<String, Object> context) {
-		if (step.type() == StepType.TOOL) {
-			return step.input() == null ? Map.of() : Template.render(step.input(), context);
+		String previousText = "{{" + Context.PREVIOUS + "." + Context.FIELD_TEXT + "}}";
+		switch (step) {
+			case ToolStep toolStep:
+				return toolStep.input() == null ? Map.of() : Template.render(toolStep.input(), context);
+			case AgentCallStep agentCallStep:
+				return Template.renderText(agentCallStep.input() == null ? previousText : agentCallStep.input(), context);
+			case ApprovalStep approvalStep:
+				return Template.renderText(previousText, context);
 		}
-		String template = step.input() == null ? "{{" + Context.PREVIOUS + "." + Context.FIELD_TEXT + "}}" : step.input().toString();
-		return Template.renderText(template, context);
 	}
 
 	/**
@@ -374,7 +388,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	@SuppressWarnings("unchecked")
 	private StepInput toStepInput(StepDefinition step, Object renderedInput, Map<String, Object> context) {
-		if (step.type() == StepType.TOOL) {
+		if (step instanceof ToolStep) {
 			return new StepInput(null, (Map<String, Object>) renderedInput, WorkFlowContext.inputs(context));
 		}
 		return new StepInput((String) renderedInput, null, WorkFlowContext.inputs(context));
@@ -408,16 +422,25 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
-	 * StepType에 맞는 StepRunner를 고릅니다. Agent를 부르는 세 종류(AGENT/SUPERVISOR/ROUTER)는 AgentStepRunner가 함께 맡습니다.
+	 * <pre>
+	 * step 종류에 맞는 StepRunner에게 step을 넘겨 실행합니다.
+	 * Agent를 부르는 세 종류(AGENT/SUPERVISOR/ROUTER = AgentCallStep)는 AgentStepRunner가 함께 맡습니다.
+	 * StepDefinition이 sealed interface라서, 새 step 종류를 추가하고 여기를 빠뜨리면 컴파일 오류로 알려줍니다.
+	 * </pre>
 	 *
-	 * @param type 실행할 step의 종류입니다.
+	 * @param execution 지금 진행 중인 실행입니다.
+	 * @param step      실행할 step의 정의입니다.
+	 * @param input     템플릿이 채워진 입력입니다.
 	 */
-	private StepRunner runnerFor(StepType type) {
-		return switch (type) {
-			case AGENT, SUPERVISOR, ROUTER -> this.agentStepRunner;
-			case TOOL -> this.toolStepRunner;
-			case APPROVAL -> this.approvalStepRunner;
-		};
+	private StepOutcome runStep(WorkFlowExecution execution, StepDefinition step, StepInput input) {
+		switch (step) {
+			case AgentCallStep agentCallStep:
+				return this.agentStepRunner.run(execution, agentCallStep, input);
+			case ToolStep toolStep:
+				return this.toolStepRunner.run(execution, toolStep, input);
+			case ApprovalStep approvalStep:
+				return this.approvalStepRunner.run(execution, approvalStep, input);
+		}
 	}
 
 	/**
@@ -430,12 +453,13 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param route    ROUTER step이 고른 경로 이름입니다(ROUTER가 아니면 null).
 	 */
 	private WorkflowTransition decideTransition(WorkFlowDefinition workflow, StepDefinition step, boolean success, String message, String route) {
-		if (step.type() == StepType.ROUTER && success) {
-			return this.decideRouterTransition(workflow, step, route, message);
+		if (step instanceof RouterStep routerStep && success) {
+			return this.decideRouterTransition(workflow, routerStep, route, message);
 		}
 
 		// nextId: 성공이면 onSuccess에, 실패면 onFailure에 적어둔 값입니다. YAML에 적어두지 않았으면 null입니다.
-		String nextId = success ? step.onSuccess() : step.onFailure();
+		// (성공한 ROUTER는 위에서 이미 처리했으므로, 여기서 성공한 step은 모두 onSuccess가 있는 PassFailStep입니다.)
+		String nextId = success ? ((PassFailStep) step).onSuccess() : step.onFailure();
 
 		if (nextId == null) {
 			if (!success) {
@@ -459,7 +483,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param route    LLM이 고른 경로 이름입니다.
 	 * @param message  결과 텍스트입니다.
 	 */
-	private WorkflowTransition decideRouterTransition(WorkFlowDefinition workflow, StepDefinition step, String route, String message) {
+	private WorkflowTransition decideRouterTransition(WorkFlowDefinition workflow, RouterStep step, String route, String message) {
 		Map<String, String> routes = step.routes();
 		String nextId = routes == null ? null : routes.get(route);
 		if (nextId == null) {

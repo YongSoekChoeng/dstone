@@ -1,4 +1,4 @@
-package net.dstone.ai.common.definition;
+package net.dstone.ai.common.definition.mcp;
 
 import java.util.List;
 

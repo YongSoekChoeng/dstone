@@ -1,6 +1,6 @@
 package net.dstone.ai.api.dto;
 
-import net.dstone.ai.common.definition.AgentDefinition;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
 
 /**
  * GET /api/ai/chat(등록된 Agent 목록 조회) 응답에 담기는 항목 하나입니다.
@@ -9,8 +9,8 @@ import net.dstone.ai.common.definition.AgentDefinition;
  * 타이핑하지 않고 드롭다운으로 고를 수 있게 하기 위한 DTO입니다. prompt 원문 같은 나머지 상세
  * 정의는 담지 않습니다.
  *
- * @param id          Agent를 가리키는 식별자입니다(common.definition.AgentDefinition.id()).
- * @param description 이 Agent가 무슨 일을 하는지 설명하는 문구입니다(common.definition.AgentDefinition.description()).
+ * @param id          Agent를 가리키는 식별자입니다(common.definition.agent.AgentDefinition.id()).
+ * @param description 이 Agent가 무슨 일을 하는지 설명하는 문구입니다(common.definition.agent.AgentDefinition.description()).
  */
 public record AgentSummary(String id, String description) {
 

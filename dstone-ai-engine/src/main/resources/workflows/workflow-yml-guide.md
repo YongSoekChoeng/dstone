@@ -15,7 +15,7 @@
 
 ### 2 Workflow 항목
 
-`workflow:` 아래에 적는다(`common.definition.WorkFlowDefinition`).
+`workflow:` 아래에 적는다(`common.definition.workflow.WorkFlowDefinition`).
 
 | 항목 | 필수 | 타입 | 설명 |
 |---|---|---|---|
@@ -614,12 +614,27 @@ workflow:
 | 경우 | 결과 |
 |---|---|
 | 생략하거나 빈 리스트 | 기동 실패 `id와 steps가 모두 있어야 합니다` |
-| step 하나에 `id`나 `type`이 없음 | 기동 실패 `모든 step은 id와 type이 있어야 합니다` |
+| step 하나에 `id`가 없음 | 기동 실패 `모든 step은 id가 있어야 합니다` |
+| step 하나에 `type`이 없음 | 기동 실패 `[workflow.steps[i]] step의 type이 없거나 올바르지 않습니다(...)` |
 | step id 중복 | 기동 실패 `step id가 중복되었습니다` |
 
 ### 3 Step 항목
 
-`steps:` 리스트의 항목 하나(`common.definition.StepDefinition`).
+`steps:` 리스트의 항목 하나. `type` 값에 따라 `common.definition.workflow.step` 패키지의 record 하나로 읽힌다.
+
+| `type` | record | 공통 interface |
+|---|---|---|
+| `AGENT` | `AgentStep` | `AgentCallStep`, `ForEachStep`, `PassFailStep` |
+| `SUPERVISOR` | `SupervisorStep` | `AgentCallStep`, `ForEachStep`, `PassFailStep` |
+| `ROUTER` | `RouterStep` | `AgentCallStep` |
+| `TOOL` | `ToolStep` | `ForEachStep`, `PassFailStep` |
+| `APPROVAL` | `ApprovalStep` | `PassFailStep` |
+
+- 모든 record는 sealed interface `StepDefinition`(`id`/`type`/`onFailure`)을 구현한다. `AgentCallStep` = `ref` + 문자열 `input`,
+  `ForEachStep` = `forEach`/`itemVariable`, `PassFailStep` = `onSuccess`.
+- record마다 **그 종류가 쓰는 키만** 있다. 다른 종류의 키를 적으면 YAML을 읽는 단계에서 기동이 실패한다. 오류 메시지는 YAML 경로와 쓸 수 있는 키를 알려 준다.
+  예: `[workflow.steps[2].routes] 'routes'는 이 자리(ToolStep)에서 쓸 수 없는 키입니다 (workflow.steps[2]에서 쓸 수 있는 키 = [output, ref, onSuccess, input, id, itemVariable, onFailure, forEach])`
+- `output`도 종류별로 나뉜다: AGENT는 `AgentOutput`(`schema`), TOOL은 `ToolOutput`(`parse`/`pattern`). 나머지 종류는 `output` 키가 없다.
 
 | 항목 | 설명 |
 |---|---|
@@ -637,21 +652,21 @@ workflow:
 | `itemVariable` | `forEach` 반복에서 항목을 받는 이름. 비우면 `item`(→ `{{item}}`) |
 | `approverRole` | APPROVAL 전용 기록용 값(누가 승인해야 하는지). 서버가 실제 권한을 검사하지는 않는다 |
 
-**StepType별로 쓸 수 있는 항목** (✅ 사용, ⭕ 선택, ❌ 쓰면 기동 실패, — 무시됨)
+**StepType별로 쓸 수 있는 항목** (✅ 필수, ⭕ 선택, ❌ 쓰면 기동 실패 — 해당 record에 그 키가 없음)
 
 | 항목 | AGENT | SUPERVISOR | ROUTER | TOOL | APPROVAL |
 |---|---|---|---|---|---|
-| `ref` | ✅ Agent id | ✅ Agent id | ✅ Agent id | ✅ Tool 이름 | — |
+| `ref` | ✅ Agent id | ✅ Agent id | ✅ Agent id | ✅ Tool 이름 | ❌ |
 | `input` | ⭕ 문자열 | ⭕ 문자열 | ⭕ 문자열 | ⭕ 맵 | ❌ |
 | `output.schema` | ⭕ | ❌ | ❌ | ❌ | ❌ |
 | `output.parse` | ❌ | ❌ | ❌ | ⭕ | ❌ |
 | `output.pattern` | ❌ | ❌ | ❌ | ⭕ | ❌ |
-| `onSuccess`| ⭕ | ⭕ | — | ⭕ | ⭕ |
+| `onSuccess`| ⭕ | ⭕ | ❌ | ⭕ | ⭕ |
 | `onFailure` | ⭕ | ⭕ | ⭕ (route를 고르지 못했을 때) | ⭕ | ⭕ |
-| `routes` | — | — | ✅ | — | — |
+| `routes` | ❌ | ❌ | ✅ | ❌ | ❌ |
 | `forEach` | ⭕ | ⭕ | ❌ | ⭕ | ❌ |
 | `itemVariable` | ⭕ | ⭕ | ❌ | ⭕ | ❌ |
-| `approverRole` | — | — | — | — | ⭕ |
+| `approverRole` | ❌ | ❌ | ❌ | ❌ | ⭕ |
 
 **각 step이 내놓는 `output` 키** — `{{steps.<id>.output.<키>}}`로 참조할 수 있는 키. 여기 없는 키를 참조하면 기동이 실패한다.
 
@@ -707,7 +722,8 @@ steps:
 | ROUTER가 route를 고르지 못함(호출 예외 포함) | `maxIterations` 초과 |
 | APPROVAL 반려 | Workflow `output`을 채우지 못함 |
 
-> 아래 3.1~3.13은 step 항목마다 자세히 적었다. 기동 시 검사는 `WorkFlowRegistry.validateStepShape()`/`validateExpression()`,
+> 아래 3.1~3.13은 step 항목마다 자세히 적었다. 기동 시 검사는 `YamlDefinitionLoader`(쓸 수 없는 키, 값 모양)와
+> `WorkFlowRegistry.validateStepShape()`/`validateExpression()`(필수 값, 타입 이름, 정규식, 참조),
 > 실행 동작은 `WorkFlowExecutor`와 각 `StepRunner`가 한다.
 
 #### 3.1 `id`
@@ -724,7 +740,7 @@ steps:
 
 | 경우 | 결과 |
 |---|---|
-| 생략 | 기동 실패 `모든 step은 id와 type이 있어야 합니다` |
+| 생략 | 기동 실패 `모든 step은 id가 있어야 합니다` |
 | 같은 Workflow 안에서 중복 | 기동 실패 `step id가 중복되었습니다` |
 | 없는 id를 `{{steps.x...}}`로 참조 | 기동 실패 `이 Workflow에 'x' step이 없습니다` |
 
@@ -734,16 +750,18 @@ steps:
       type: AGENT        # AGENT | TOOL | SUPERVISOR | ROUTER | APPROVAL
 ```
 
-| 값 | 하는 일 | 계열(`Kind`) | 담당 러너 |
-|---|---|---|---|
-| `AGENT` | Agent(LLM)를 한 번 부른다 | AGENT_CALL | `AgentStepRunner` |
-| `SUPERVISOR` | Agent에게 pass/fail을 판정하게 한다 | AGENT_CALL | `AgentStepRunner` |
-| `ROUTER` | Agent에게 여러 갈래 중 하나를 고르게 한다 | AGENT_CALL | `AgentStepRunner` |
-| `TOOL` | Tool 하나를 LLM 없이 이름으로 직접 부른다 | DETERMINISTIC | `ToolStepRunner` |
-| `APPROVAL` | 사람의 승인/반려를 기다린다 | DETERMINISTIC | `ApprovalStepRunner` |
+| 값 | 하는 일 | 계열(`Kind`) | record | 담당 러너 |
+|---|---|---|---|---|
+| `AGENT` | Agent(LLM)를 한 번 부른다 | AGENT_CALL | `AgentStep` | `AgentStepRunner` |
+| `SUPERVISOR` | Agent에게 pass/fail을 판정하게 한다 | AGENT_CALL | `SupervisorStep` | `AgentStepRunner` |
+| `ROUTER` | Agent에게 여러 갈래 중 하나를 고르게 한다 | AGENT_CALL | `RouterStep` | `AgentStepRunner` |
+| `TOOL` | Tool 하나를 LLM 없이 이름으로 직접 부른다 | DETERMINISTIC | `ToolStep` | `ToolStepRunner` |
+| `APPROVAL` | 사람의 승인/반려를 기다린다 | DETERMINISTIC | `ApprovalStep` | `ApprovalStepRunner` |
 
-- **대문자로 정확히** 적는다. `agent`, `Agent`는 기동 실패(YAML 바인딩 오류)다(`output.parse`와 달리 대소문자를 가리지 않는 처리가 없다).
-- 생략하면 기동 실패. 어떤 항목을 같이 쓸 수 있는지는 위의 "StepType별로 쓸 수 있는 항목" 표를 따른다.
+- `type` 값이 어느 record로 읽을지를 정한다. 그래서 `type`은 다른 항목보다 먼저 결정되고, 나머지 키는 그 record에 있는 것만 쓸 수 있다.
+- **대문자로 정확히** 적는다. `agent`, `Agent`는 기동 실패 `step의 type이 없거나 올바르지 않습니다(적은 값 = agent, 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL)`다
+  (`output.parse`와 달리 대소문자를 가리지 않는 처리가 없다).
+- 생략해도 같은 메시지로 기동 실패. 어떤 항목을 같이 쓸 수 있는지는 위의 "StepType별로 쓸 수 있는 항목" 표를 따른다.
 
 #### 3.3 `ref`
 
@@ -754,8 +772,9 @@ steps:
 
 - AGENT/SUPERVISOR/ROUTER: `agents/**/*.yml`의 `agent.id`.
 - TOOL: `@Tool` 메서드 이름(메서드 이름이 기본값, `@Tool(name=...)`이면 그 이름) 또는 MCP 서버가 알려 준 Tool 이름(예: `list_directory`).
-- APPROVAL: 쓰지 않는다(적어도 무시된다).
-- ⚠️ **`ref`는 기동 시 검사하지 않는다.** 이름이 틀렸는지는 그 step이 처음 실행될 때 드러나고, 그때는 `onFailure`를 무시하고 바로 FAILED다.
+- APPROVAL: `ref` 키가 없다. 적으면 기동 실패 `'ref'는 이 자리(ApprovalStep)에서 쓸 수 없는 키입니다`.
+- AGENT/SUPERVISOR/ROUTER/TOOL에서 생략하면 기동 실패 `AGENT step은 ref(Agent id)가 있어야 합니다`(TOOL은 `ref(Tool 이름)`).
+- ⚠️ **`ref`가 가리키는 Agent/Tool이 실제로 있는지는 기동 시 검사하지 않는다.** 이름이 틀렸는지는 그 step이 처음 실행될 때 드러나고, 그때는 `onFailure`를 무시하고 바로 FAILED다.
   새 Workflow를 만들면 모든 분기를 한 번씩 실행해 보는 것이 안전하다.
 
 | 경우 | 결과 |
@@ -808,9 +827,9 @@ step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍
 
 | 경우 | 결과 |
 |---|---|
-| AGENT류에 맵을 적음 | 기동 실패 `AGENT step의 input은 문자열(LLM에게 보낼 메시지)이어야 합니다` |
-| TOOL에 문자열을 적음 | 기동 실패 `TOOL step의 input은 맵(Tool 인자 이름: 값)이어야 합니다` |
-| APPROVAL에 적음 | 기동 실패 `APPROVAL step은 input을 쓸 수 없습니다` |
+| AGENT류에 맵을 적음 | 기동 실패 `[workflow.steps[i].input] 값의 모양이 맞지 않습니다(문자열이어야 합니다 ...)` |
+| TOOL에 문자열을 적음 | 기동 실패 `[workflow.steps[i].input] 값의 모양이 맞지 않습니다(맵이어야 합니다 ...)` |
+| APPROVAL에 적음 | 기동 실패 `'input'는 이 자리(ApprovalStep)에서 쓸 수 없는 키입니다` |
 | 참조 경로가 틀림(없는 step, 없는 output 키, 선언 안 된 `inputs.x`) | 기동 실패([5절](#5-템플릿-참조-문법) 기동 시 검사) |
 | 첫 step에서 `{{previous.output.x}}` | 기동은 통과. 실행 중 값이 없어 step 실패. `{{previous.output.x ?? inputs.message}}`로 쓴다 |
 | 분기로 아직 실행되지 않은 step 참조 | 기동은 통과. 실행 중 step 실패 |
@@ -838,7 +857,8 @@ step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍
 
 | 경우 | 결과 |
 |---|---|
-| AGENT가 아닌 step에 적음 | 기동 실패 `output.schema는 AGENT step에서만 쓸 수 있습니다` |
+| TOOL에 적음 | 기동 실패 `'schema'는 이 자리(ToolOutput)에서 쓸 수 없는 키입니다` |
+| SUPERVISOR/ROUTER/APPROVAL에 적음(`output` 자체가 없음) | 기동 실패 `'output'는 이 자리(SupervisorStep 등)에서 쓸 수 없는 키입니다` |
 | `schema: {}` | 기동 실패 `output.schema에 필드가 하나도 없습니다` |
 | 타입 이름이 틀림 | 기동 실패 `output.schema의 타입 이름이 올바르지 않습니다` |
 | 선언하지 않은 필드를 `{{steps.<id>.output.x}}`로 참조 | 기동 실패 `'id' step의 output에는 [...]만 있습니다` |
@@ -873,7 +893,8 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 
 | 경우 | 결과 |
 |---|---|
-| TOOL이 아닌 step에 적음 | 기동 실패 `output.parse/pattern은 TOOL step에서만 쓸 수 있습니다` |
+| AGENT에 적음 | 기동 실패 `'parse'는 이 자리(AgentOutput)에서 쓸 수 없는 키입니다`(`pattern`도 같다) |
+| SUPERVISOR/ROUTER/APPROVAL에 적음(`output` 자체가 없음) | 기동 실패 `'output'는 이 자리(...)에서 쓸 수 없는 키입니다` |
 | `text`/`json`/`lines`가 아닌 값 | 기동 실패 `output.parse에는 text/json/lines 중 하나만 쓸 수 있습니다` |
 | `json`인데 응답이 JSON 객체/배열이 아님 | step 실패 `output.parse=json인데 Tool 응답이 JSON 객체나 배열이 아닙니다` → `onFailure` |
 | `json`인데 응답 JSON에 `"success": false`가 있음 | ToolOutcome으로 읽혀 **실패**로 판정된다. 구조화된 결과를 내는 Tool은 `success` 필드 이름을 피한다 |
@@ -915,7 +936,7 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 
 - 예약어는 **대문자로 정확히** 적는다. `success`는 step id로 읽혀서, 그런 step이 없으면 실행 중 FAILED `없는 step id로 이동하려 했습니다`.
 - ⚠️ 이동 대상 step id는 **기동 시 검사하지 않는다**. 오타는 그 분기를 실제로 탈 때 FAILED로 드러난다.
-- ROUTER는 `onSuccess`를 쓰지 않는다(적어도 무시). 성공하면 `routes`로 간다.
+- ROUTER에는 `onSuccess` 키가 없다(적으면 기동 실패 `'onSuccess'는 이 자리(RouterStep)에서 쓸 수 없는 키입니다`). 성공하면 `routes`로 간다.
 
 #### 3.9 `onFailure`
 
@@ -956,7 +977,7 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 | 경우 | 결과 |
 |---|---|
 | ROUTER인데 생략 또는 `{}` | 기동 실패 `ROUTER step은 routes를 최소 1개 이상 정의해야 합니다` |
-| ROUTER가 아닌 step에 적음 | 무시된다 |
+| ROUTER가 아닌 step에 적음 | 기동 실패 `'routes'는 이 자리(...)에서 쓸 수 없는 키입니다` |
 | LLM이 routes에 없는 이름을 고름(오타, 지어낸 이름) | 바로 FAILED `route['x']가 routes에 정의되어 있지 않습니다(정의된 route=[...])` |
 | LLM 응답을 route/reason으로 읽지 못함, route가 빔 | step 실패 → `onFailure`(없으면 Workflow 실패) |
 | 값(이동 대상)이 없는 step id | 기동은 통과. 그 route를 탈 때 FAILED |
@@ -982,7 +1003,7 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 |---|---|
 | `{{inputs.sqlList}}`처럼 괄호를 붙임 | 기동 실패(시작 이름을 `{{input`으로 읽는다) |
 | 경로가 틀림(없는 step, 선언 안 된 `inputs.x`) | 기동 실패 |
-| APPROVAL이나 ROUTER에 적음 | 기동 실패(APPROVAL은 결정이 step id 하나로만 구분되고, ROUTER는 어느 반복의 선택을 따를지 정할 수 없다) |
+| APPROVAL이나 ROUTER에 적음 | 기동 실패 `'forEach'는 이 자리(ApprovalStep/RouterStep)에서 쓸 수 없는 키입니다` — 두 record에는 `forEach` 키가 없다(APPROVAL은 결정이 step id 하나로만 구분되고, ROUTER는 어느 반복의 선택을 따를지 정할 수 없다) |
 | 실행 중 값이 없음 | step 실패 `forEach[...] - 값을 찾을 수 없습니다` → `onFailure` |
 | 값이 리스트가 아님(문자열, 맵) | step 실패 `forEach[...]의 값이 리스트가 아닙니다` → `onFailure` |
 | 빈 리스트 | 0회 실행, **성공**(`items = []`) |
@@ -1005,7 +1026,7 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 ```
 
 - forEach 반복에서 이번 항목을 받는 이름이다. 생략하면 `item`.
-- `forEach`가 없는 step에 적으면 무시된다.
+- AGENT/SUPERVISOR/TOOL에서 `forEach`를 비워 두고 적으면 무시된다. APPROVAL/ROUTER에는 `itemVariable` 키가 없어서 적으면 기동 실패다.
 - ⚠️ 컨텍스트의 시작 이름 `inputs`/`steps`/`previous`/`approvals`를 쓰지 않는다. 항목이 컨텍스트 맨 위에 같은 이름으로 들어가므로
   그 반복 안에서 `{{inputs.message}}` 같은 참조가 항목을 가리키게 되고, 기동 시 검사도 건너뛴다.
 
@@ -1017,7 +1038,7 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
       approverRole: "PL"
 ```
 
-- "누가 승인해야 하는지"를 YAML을 읽는 사람에게 알려 주는 **기록용 값**이다.
+- "누가 승인해야 하는지"를 YAML을 읽는 사람에게 알려 주는 **기록용 값**이다. `ApprovalStep`에만 있는 키라서 다른 step에 적으면 기동 실패다.
 - 엔진은 이 값을 **어디에도 쓰지 않는다**. 권한 검사를 하지 않고, API 응답에도 나가지 않는다. 승인 API(`POST /api/ai/workflow/executions/{executionId}/decision`)는
   누가 부르든 받아들인다. 실제 권한 통제는 호출하는 쪽 화면이나 서비스가 맡는다.
 - 참고로 APPROVAL의 동작은 이렇다.

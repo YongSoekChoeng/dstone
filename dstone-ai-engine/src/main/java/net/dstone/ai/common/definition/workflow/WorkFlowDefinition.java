@@ -1,7 +1,10 @@
-package net.dstone.ai.common.definition;
+package net.dstone.ai.common.definition.workflow;
 
 import java.util.List;
 import java.util.Map;
+
+import net.dstone.ai.common.definition.FieldDefinition;
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 
 /**
  * <pre>
@@ -44,7 +47,8 @@ import java.util.Map;
  *                         type: string
  *                         description: PostgreSQL 버전
  * @param output         (옵셔널)Workflow가 성공했을 때 돌려줄 최종 결과의 템플릿입니다.
- * @param steps          (필수)WWorkflow가 실행할 step들의 목록입니다.
+ * @param steps          (필수)Workflow가 실행할 step들의 목록입니다. 각 항목은 type 값에 따라
+ *                       AgentStep/SupervisorStep/RouterStep/ToolStep/ApprovalStep 중 하나로 읽힙니다(StepDefinition 참고).
  */
 public record WorkFlowDefinition(
 	String id
