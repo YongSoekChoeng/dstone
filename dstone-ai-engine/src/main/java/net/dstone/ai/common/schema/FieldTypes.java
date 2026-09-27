@@ -5,11 +5,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.dstone.ai.common.definition.FieldDefinition;
+import net.dstone.ai.common.definition.workflow.FieldDefinition;
 
 /**
  * <pre>
- * common.definition.FieldDefinition의 타입 이름(string, list<string> 등)을 다루는 도구 모음입니다.
+ * common.definition.workflow.FieldDefinition의 타입 이름(string, list<string> 등)을 다루는 도구 모음입니다.
  * 세 곳에서 같은 규칙을 씁니다.
  * - 엔진이 켜질 때: 타입 이름이 올바른지 검사합니다(isValid, common.registry.WorkFlowRegistry).
  * - LLM을 부를 때: 선언한 필드 목록을 JSON Schema로 바꿔서 LLM에게 알려줍니다(toJsonSchema, runtime.agent.SchemaOutputConverter).

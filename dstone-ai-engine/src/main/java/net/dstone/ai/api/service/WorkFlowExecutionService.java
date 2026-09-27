@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.definition.FieldDefinition;
+import net.dstone.ai.common.definition.workflow.FieldDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.schema.FieldTypes;

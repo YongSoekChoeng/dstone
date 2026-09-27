@@ -1,6 +1,5 @@
 package net.dstone.ai.runtime.step;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,38 +9,26 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.definition.agent.AgentDefinition;
-import net.dstone.ai.common.definition.FieldDefinition;
-import net.dstone.ai.common.definition.workflow.step.AgentCallStep;
-import net.dstone.ai.common.definition.workflow.step.AgentStep;
-import net.dstone.ai.common.definition.workflow.step.RouterStep;
-import net.dstone.ai.common.definition.workflow.step.SupervisorStep;
+import net.dstone.ai.common.definition.workflow.step.AgentStepDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.agent.AgentExecutor;
-import net.dstone.ai.runtime.agent.RouteDecision;
-import net.dstone.ai.runtime.agent.Verdict;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
-import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * Workflow의 세 가지 step 종류(AGENT, SUPERVISOR, ROUTER = AgentCallStep)를 처리하는 클래스입니다. 
- * 셋 다 ref에 적힌 Agent를 부르고, 채워진 input 텍스트(StepInput.text)를 사용자 메시지로 보낸다는 점은 같습니다.
- * 응답을 어떤 모양으로 받고 무엇을 결과로 남기는지가 다릅니다.
+ * type: AGENT step(AgentStepDefinition)을 실행합니다. ref에 적힌 Agent를 한 번 부르고, 채워진 input을 사용자 메시지로 보냅니다.
  *
- *   종류                    text(결과 텍스트)        output(구조화된 결과)          실패하는 경우
- *   AGENT (schema 없음)     LLM 답변 원문            없음                        없음(항상 성공)
- *   AGENT (schema 있음)     output을 JSON 글자로     output.schema대로 읽은 값     LLM이 schema를 지키지 않음
- *   SUPERVISOR             받은 input 그대로        {pass, reason}             pass=false, 또는 응답 모양이 깨짐
- *   ROUTER                 받은 input 그대로        {route, reason}            route를 고르지 못함, 또는 응답 모양이 깨짐
+ *   YAML                    text(결과 텍스트)        output(구조화된 결과)   실패하는 경우
+ *   output 없음             LLM 답변 원문            없음                    없음(항상 성공)
+ *   output 있음             output을 JSON 글자로     output대로 읽은 값      LLM이 output 모양을 지키지 않음
  *
- * SUPERVISOR와 ROUTER는 "판정"과 "선택"만 하는 관문이라서, 받은 input을 결과 텍스트로 그대로 넘깁니다.(특별히 사용할 일 없음)
- * 판정 사유는 결과 텍스트에 덧붙이지 않고 output(또는 실패 시 error)에만 담으므로, 
- * 다음 step이 필요할 때 {{steps.id.output.reason}}이나 {{steps.id.error}}로 따로 꺼내 씁니다.
- *
+ * Workflow의 step에서 Agent를 부를 때는 요청마다 RAG/Tool/모델을 바꾸는 기능(ragOverride 등)을 쓰지 않고
+ * 항상 Agent 정의값을 그대로 씁니다. 그 기능은 api.controller.ChatController처럼 Agent 하나를 직접 부르는
+ * 화면에서만 씁니다.
  * </pre>
  */
 @Component
-public class AgentStepExecutor implements StepExecutor<AgentCallStep> {
+public class AgentStepExecutor {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -52,121 +39,31 @@ public class AgentStepExecutor implements StepExecutor<AgentCallStep> {
 
 	/**
 	 * <pre>
-	 * ref에 적힌 Agent를 찾아서(caller가 쓸 수 있는 Agent인지도 함께 검사합니다) step 종류에 맞는 방법으로 부릅니다.
-	 * SupervisorStep → runSupervisor, RouterStep → runRouter, output.schema가 있는 AgentStep → runSchemaAgent, 그 밖의 AgentStep → runAgent.
+	 * AGENT step 하나를 실행합니다. ref의 Agent를 찾고(caller가 쓸 수 있는 Agent인지도 함께 검사합니다),
+	 * output이 없으면 답 원문을, 있으면 그 모양으로 읽은 JSON을 결과로 남깁니다.
+	 *
+	 * output을 선언했는데 LLM이 그 모양을 지키지 않으면(필드가 빠졌거나 타입이 다르면) 실패로 처리합니다.
+	 * output을 선언했다는 것은 다음 step이 그 값을 믿고 그대로 쓰겠다는 뜻이므로, 모양이 깨진 답을 성공으로 넘기지 않습니다.
 	 * </pre>
+	 *
+	 * @param execution      지금 진행 중인 Workflow 실행 상태입니다.
+	 * @param step           실행할 step의 정의입니다.
+	 * @param input          템플릿이 채워진 사용자 메시지입니다.
+	 * @param workflowInputs Workflow를 실행할 때 넘긴 값(컨텍스트의 inputs)입니다. Agent system prompt의 {변수}를 채웁니다.
 	 */
-	@Override
-	public StepOutcome run(WorkFlowExecution execution, AgentCallStep definition, StepInput input) {
-		AgentDefinition agent = this.agentRegistry.resolve(definition.ref(), execution.caller());
-		switch (definition) {
-			case SupervisorStep supervisorStep:
-				return this.runSupervisor(execution, agent, input);
-			case RouterStep routerStep:
-				return this.runRouter(execution, agent, input);
-			case AgentStep agentStep:
-				if (agentStep.output() != null) {
-					return this.runSchemaAgent(execution, agent, input, agentStep.output().schema());
-				}
-				return this.runAgent(execution, agent, input);
+	public StepOutcome run(WorkFlowExecution execution, AgentStepDefinition step, String input, Map<String, Object> workflowInputs) {
+		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
+		if (step.output() == null) {
+			String answer = this.agentExecutor.call(agent, execution.sessionId(), execution.caller(), workflowInputs, input, null, null, null);
+			return StepOutcome.success(answer);
 		}
-	}
-
-	/**
-	 * output.schema가 없는 AGENT step을 처리합니다. LLM이 답한 글을 그대로 결과 텍스트로 남기고, 항상 성공으로 봅니다.
-	 *
-	 * @param execution 지금 진행 중인 Workflow 실행 상태
-	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력
-	 */
-	private StepOutcome runAgent(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
-		String answer = this.agentExecutor.call(agent, execution.sessionId(), execution.caller(), input.workflowInputs(), input.text(), null, null, null);
-		return StepOutcome.success(answer);
-	}
-
-	/**
-	 * output.schema가 있는 AGENT step을 처리합니다. LLM이 schema 모양의 JSON으로 답하게 하고, 그 JSON을 output으로 남깁니다.
-	 * 결과 텍스트에는 같은 output을 JSON 글자로 담습니다.
-	 *
-	 * LLM이 schema를 지키지 않으면(필드가 빠졌거나 타입이 다르면) 실패로 처리합니다. schema를 선언했다는 것은
-	 * 다음 step이 그 output을 믿고 그대로 쓰겠다는 뜻이므로, 모양이 깨진 답을 성공으로 넘기지 않습니다.
-	 *
-	 * @param execution 지금 진행 중인 Workflow 실행 상태
-	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력
-	 * @param schema    LLM이 지켜야 할 응답 필드 목록(step의 output.schema)
-	 */
-	private StepOutcome runSchemaAgent(WorkFlowExecution execution, AgentDefinition agent, StepInput input, Map<String, FieldDefinition> schema) {
 		Map<String, Object> output;
 		try {
-			output = this.agentExecutor.callForSchema(agent, execution.sessionId(), execution.caller(), input.workflowInputs(), input.text(), schema);
+			output = this.agentExecutor.callForSchema(agent, execution.sessionId(), execution.caller(), workflowInputs, input, step.output());
 		} catch (Exception e) {
-			return StepOutcome.failure(null, "Agent 응답을 output.schema 모양으로 읽지 못했습니다 - " + e.getMessage());
+			return StepOutcome.failure(null, "Agent 응답을 output 모양으로 읽지 못했습니다 - " + e.getMessage());
 		}
 		return StepOutcome.success(this.toJson(output), output);
-	}
-
-	/**
-	 * <pre>
-	 * ROUTER step을 처리합니다. LLM에게 "어디로 갈지"를 담은 RouteDecision(route, reason)으로 답하게 합니다.
-	 * 받은 input은 결과 텍스트로 그대로 넘기고, 고른 경로는 output에 {route, reason}으로 남깁니다.
-	 * 그 route가 RouterStep.routes에 실제로 있는지 확인하고 다음 step을 정하는 일은
-	 * runtime.workflow.WorkFlowExecutor가 이어받습니다.
-	 *
-	 * 응답을 RouteDecision 모양으로 읽지 못하거나 route가 비어 있으면 실패로 처리합니다. 갈 곳을 고르지
-	 * 못한 채로 계속 진행할 수는 없기 때문입니다.
-	 * </pre>
-	 *
-	 * @param execution 지금 진행 중인 Workflow 실행 상태
-	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력
-	 */
-	private StepOutcome runRouter(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
-		RouteDecision decision;
-		try {
-			decision = this.agentExecutor.callForEntity(agent, execution.sessionId(), execution.caller(), input.workflowInputs(), input.text(), RouteDecision.class);
-		} catch (Exception e) {
-			return StepOutcome.failure(input.text(), "라우팅 Agent 응답을 구조화된 형식(route/reason)으로 해석하지 못했습니다 - " + e.getMessage());
-		}
-		if (decision == null || StringUtil.isEmpty(decision.route())) {
-			return StepOutcome.failure(input.text(), "라우팅 Agent가 route를 고르지 않았습니다.");
-		}
-		Map<String, Object> output = new LinkedHashMap<>();
-		output.put("route", decision.route());
-		output.put("reason", decision.reason());
-		return StepOutcome.routed(input.text(), output, decision.route());
-	}
-
-	/**
-	 * <pre>
-	 * SUPERVISOR step을 처리합니다. LLM에게 "통과했는지 아닌지"를 담은 Verdict(pass, reason)로 답하게 해서,
-	 * 그 값으로 이 step의 성공/실패를 정합니다(Spring AI가 Verdict의 JSON 모양을 프롬프트에 알려주고, 답을 그
-	 * 모양으로 읽어줍니다 - runtime.agent.AgentExecutor.callForVerdict 참고).
-	 *
-	 * - 통과: 받은 input을 결과 텍스트로 그대로 넘기고, output에 {pass, reason}을 남깁니다.
-	 * - 불통과: 실패로 처리하고, reason을 실패 사유(error)로 남깁니다.
-	 * - 응답 모양이 깨짐: 판정을 믿을 수 없으므로 안전하게 실패로 처리합니다.
-	 * </pre>
-	 *
-	 * @param execution 지금 진행 중인 Workflow 실행 상태
-	 * @param agent     호출할 Agent의 정의
-	 * @param input     이 step에 들어온 입력
-	 */
-	private StepOutcome runSupervisor(WorkFlowExecution execution, AgentDefinition agent, StepInput input) {
-		Verdict verdict;
-		try {
-			verdict = this.agentExecutor.callForVerdict(agent, execution.sessionId(), execution.caller(), input.workflowInputs(), input.text());
-		} catch (Exception e) {
-			return StepOutcome.failure(input.text(), "감독 Agent 응답을 구조화된 형식(pass/reason)으로 해석하지 못했습니다 - " + e.getMessage());
-		}
-		String reason = verdict == null || StringUtil.isEmpty(verdict.reason()) ? "(사유 없음)" : verdict.reason();
-		if (verdict != null && verdict.pass()) {
-			Map<String, Object> output = new LinkedHashMap<>();
-			output.put("pass", true);
-			output.put("reason", reason);
-			return StepOutcome.success(input.text(), output);
-		}
-		return StepOutcome.failure(input.text(), reason);
 	}
 
 	/**

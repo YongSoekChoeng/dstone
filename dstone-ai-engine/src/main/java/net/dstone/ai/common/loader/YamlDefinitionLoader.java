@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.consts.ToolParse;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.mcp.McpServerDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
@@ -43,7 +44,7 @@ import net.dstone.common.utils.StringUtil;
  * 그 Map을 definition record에 바인딩합니다. record의 필드에 바로 바인딩되는 건 pom.xml에 이미
  * 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
  *
- * Workflow의 steps 항목은 type 값에 따라 서로 다른 record(AgentStep/ToolStep 등)로 읽힙니다
+ * Workflow의 steps 항목은 type 값에 따라 서로 다른 record(AgentStepDefinition/ToolStepDefinition 등)로 읽힙니다
  * (common.definition.workflow.step.StepDefinition의 @JsonSubTypes 참고). record마다 그 종류가 쓰는
  * 키만 있으므로, 다른 종류의 키를 적으면 "쓸 수 없는 키"로 여기서 바로 막힙니다. 이때 Jackson의 영문
  * 오류 대신 "어느 파일의 어느 자리에서 무엇이 틀렸는지"를 한국어로 알려줍니다(describe() 참고).
@@ -205,7 +206,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * - 쓸 수 없는 키: 그 자리에 쓸 수 있는 키 목록을 함께 알려줍니다(예: TOOL step에 routes를 적은 경우).
 	 * - type 값이 없거나 틀림: 쓸 수 있는 type 값을 알려줍니다.
 	 * - 값의 모양이 다름: 예를 들어 TOOL step의 input을 맵이 아니라 문자열로 적은 경우입니다.
-	 * - 값을 만들다 실패함: 예를 들어 output.parse에 text/json/lines가 아닌 값을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
+	 * - 값을 만들다 실패함: 예를 들어 TOOL step의 output에 text/json/lines가 아닌 값을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
 	 * </pre>
 	 *
 	 * @param e convertValue()가 던진 예외
@@ -218,21 +219,40 @@ public class YamlDefinitionLoader extends BaseObject {
 		if (cause instanceof UnrecognizedPropertyException unknown) {
 			String owner = where.lastIndexOf('.') < 0 ? "" : where.substring(0, where.lastIndexOf('.'));
 			return "[" + where + "] '" + unknown.getPropertyName() + "'는 이 자리(" + unknown.getReferringClass().getSimpleName() + ")에서 쓸 수 없는 키입니다"
-				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ").";
+				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ")." + this.oldOutputHint(where);
 		}
 		if (cause instanceof InvalidTypeIdException invalidType) {
 			return "[" + where + "] step의 type이 없거나 올바르지 않습니다(적은 값 = " + invalidType.getTypeId()
 				+ ", 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL).";
+		}
+		if (cause instanceof MismatchedInputException mismatched && ToolParse.class.equals(mismatched.getTargetType())) {
+			return "[" + where + "] TOOL step의 output에는 text/json/lines 중 하나를 바로 적습니다(예: output: lines)." + this.oldOutputHint(where);
 		}
 		if (cause instanceof MismatchedInputException mismatched && mismatched.getTargetType() != null) {
 			return "[" + where + "] 값의 모양이 맞지 않습니다(" + this.shapeName(mismatched.getTargetType()) + "이어야 합니다"
 				+ " - 예: TOOL step의 input은 맵, AGENT step의 input은 문자열).";
 		}
 		if (cause.getCause() != null && cause.getCause().getMessage() != null) {
-			// 값을 만들다 우리 코드가 던진 오류(예: ToolParse.from의 "output.parse에는 ...")는 그 메시지를 그대로 보여줍니다.
+			// 값을 만들다 우리 코드가 던진 오류(예: ToolParse.from의 "TOOL step의 output에는 ...")는 그 메시지를 그대로 보여줍니다.
 			return "[" + where + "] " + cause.getCause().getMessage();
 		}
 		return "[" + where + "] " + cause.getOriginalMessage();
+	}
+
+	/**
+	 * 예전 output 모양(output.schema / output.parse / output.pattern)으로 적은 것 같으면 새 모양을 알려주는 안내 문구를 돌려줍니다.
+	 * 아니면 빈 문자열입니다.
+	 *
+	 * @param where 오류가 난 YAML 경로(예: workflow.steps[0].output.schema.sql)
+	 */
+	private String oldOutputHint(String where) {
+		if (where.contains(".output.schema")) {
+			return " output.schema는 없어졌습니다. AGENT step은 output 아래에 필드를 바로 적습니다(예: output: {sql: string}).";
+		}
+		if (where.endsWith(".output")) {
+			return " output.parse/output.pattern은 없어졌습니다. TOOL step은 output: lines, pattern: '...'처럼 step 바로 아래에 적습니다.";
+		}
+		return "";
 	}
 
 	/**

@@ -15,29 +15,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.consts.ToolParse;
-import net.dstone.ai.common.definition.workflow.step.ToolOutput;
-import net.dstone.ai.common.definition.workflow.step.ToolStep;
+import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.runtime.tool.ToolExecutor;
 import net.dstone.ai.runtime.tool.ToolOutcome;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
  * <pre>
- * TOOL step을 처리하는 실행기입니다. LLM을 거치지 않고, caller가 쓸 수 있는 Tool 하나를 코드로 직접 호출합니다.
+ * type: TOOL step(ToolStepDefinition)을 실행합니다. LLM을 거치지 않고, caller가 쓸 수 있는 Tool 하나를 코드로 직접 호출합니다.
  *
- * 1) 인자 만들기: runtime.workflow.WorkFlowExecutor가 step의 input 맵을 이미 채워서 넘겨주므로(StepInput.arguments),
+ * 1) 인자 만들기: runtime.workflow.WorkFlowExecutor가 step의 input 맵을 이미 채워서 넘겨주므로(arguments),
  *    그 맵을 JSON으로 바꾸기만 하면 Tool 인자가 됩니다.
  * 2) 호출하기: runtime.tool.ToolExecutor로 Tool을 부릅니다(caller별 Tool 화이트리스트 검사도 여기서 함께 이뤄집니다).
  * 3) 성공/실패 판정: Tool이 runtime.tool.ToolOutcome({"success":..., "message":...})으로 답하면 success 값으로,
  *    평범한 문자열로 답하면 그 문자열이 "실패"(Constants.Outcome.FAIL_PREFIX)로 시작하는지로 판정합니다.
  * 4) 결과 남기기: 성공이든 실패든 결과 텍스트에는 Tool 응답 원문을 그대로 남깁니다.
- *    - 성공: step의 output.parse에 따라 응답을 output으로 정리합니다(common.consts.ToolParse 참고).
+ *    - 성공: step의 output(text/json/lines)과 pattern에 따라 응답을 output으로 정리합니다(common.consts.ToolParse 참고).
  *    - 실패: ToolOutcome의 message(없으면 응답 원문)를 실패 사유(error)로 남깁니다.
  *      onFailure로 이동한 step은 {{steps.id.error}}로 실패 이유를, {{steps.id.input.인자명}}으로 실패한 입력값을 읽을 수 있습니다.
  * </pre>
  */
 @Component
-public class ToolStepExecutor implements StepExecutor<ToolStep> {
+public class ToolStepExecutor {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -46,11 +45,14 @@ public class ToolStepExecutor implements StepExecutor<ToolStep> {
 
 	/**
 	 * TOOL step 하나를 실행합니다. 인자를 JSON으로 바꿔 Tool을 부르고, 성공/실패를 판정한 뒤,
-	 * 성공이면 output.parse에 따라 output까지 만들어서 돌려줍니다(순서는 클래스 설명의 1~4 참고).
+	 * 성공이면 output에 따라 output까지 만들어서 돌려줍니다(순서는 클래스 설명의 1~4 참고).
+	 *
+	 * @param execution 지금 진행 중인 Workflow 실행 상태입니다.
+	 * @param step      실행할 step의 정의입니다.
+	 * @param arguments 템플릿이 채워진 Tool 인자입니다.
 	 */
-	@Override
-	public StepOutcome run(WorkFlowExecution execution, ToolStep definition, StepInput input) {
-		String toolResult = this.toolExecutor.call(execution.caller(), definition.ref(), this.toJson(input.arguments()));
+	public StepOutcome run(WorkFlowExecution execution, ToolStepDefinition step, Map<String, Object> arguments) {
+		String toolResult = this.toolExecutor.call(execution.caller(), step.ref(), this.toJson(arguments));
 
 		ToolOutcome outcome = this.tryParseOutcome(toolResult);
 		boolean failed = outcome != null ? Boolean.FALSE.equals(outcome.success()) : toolResult.startsWith(Constants.Outcome.FAIL_PREFIX);
@@ -58,28 +60,28 @@ public class ToolStepExecutor implements StepExecutor<ToolStep> {
 			String reason = outcome != null && outcome.message() != null ? outcome.message() : toolResult;
 			return StepOutcome.failure(toolResult, reason);
 		}
-		return this.parse(definition.output(), toolResult);
+		return this.parse(step, toolResult);
 	}
 
 	/**
 	 * <pre>
-	 * 성공한 Tool 응답을 step의 output.parse에 따라 output으로 정리합니다. 결과 텍스트는 항상 응답 원문입니다.
+	 * 성공한 Tool 응답을 step의 output에 따라 output으로 정리합니다. 결과 텍스트는 항상 응답 원문입니다.
 	 * - text(기본): output 없음
 	 * - json : 응답 JSON 객체를 그대로 output으로, JSON 배열이면 {items: [...]}로 씁니다. JSON이 아니면 실패입니다.
 	 * - lines: 응답을 줄로 나눠 {lines: [...]}로 씁니다(빈 줄은 버림). pattern이 있으면 맞는 줄만 남기고,
 	 *          pattern에 괄호 그룹이 있으면 첫 번째 그룹에 잡힌 부분만 씁니다.
 	 * </pre>
 	 *
-	 * @param output     step의 output 선언입니다(없으면 null).
+	 * @param step       실행한 step의 정의입니다(output, pattern을 봅니다).
 	 * @param toolResult Tool 응답 원문입니다.
 	 */
-	private StepOutcome parse(ToolOutput output, String toolResult) {
-		ToolParse parse = output == null ? ToolParse.TEXT : output.parseOrText();
+	private StepOutcome parse(ToolStepDefinition step, String toolResult) {
+		ToolParse parse = step.output() == null ? ToolParse.TEXT : step.output();
 		switch (parse) {
 			case JSON:
 				return this.parseJson(toolResult);
 			case LINES:
-				return StepOutcome.success(toolResult, Map.of("lines", this.parseLines(toolResult, output.pattern())));
+				return StepOutcome.success(toolResult, Map.of("lines", this.parseLines(toolResult, step.pattern())));
 			case TEXT:
 			default:
 				return StepOutcome.success(toolResult);
@@ -107,7 +109,7 @@ public class ToolStepExecutor implements StepExecutor<ToolStep> {
 		} catch (JsonProcessingException e) {
 			// 아래에서 실패로 처리합니다.
 		}
-		return StepOutcome.failure(toolResult, "output.parse=json인데 Tool 응답이 JSON 객체나 배열이 아닙니다.");
+		return StepOutcome.failure(toolResult, "output: json인데 Tool 응답이 JSON 객체나 배열이 아닙니다.");
 	}
 
 	/**

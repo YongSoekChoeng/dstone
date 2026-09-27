@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
-import net.dstone.ai.common.definition.FieldDefinition;
+import net.dstone.ai.common.definition.workflow.FieldDefinition;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
@@ -24,13 +24,19 @@ import reactor.core.publisher.Flux;
  * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
  * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 toolsEnabled(Tool 사용 여부), ragEnabled(RAG 사용 여부)를 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
  * 그래서 api.controller.ChatController (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 
- * runtime.step.AgentStepExecutor(Workflow 안에서 AGENT/SUPERVISOR step을 실행하는 경우) 둘 다 결국 이 클래스를 통해서 LLM을 호출합니다.
+ * runtime.step의 AgentStepExecutor/SupervisorStepExecutor/RouterStepExecutor(Workflow 안에서 AGENT/SUPERVISOR/ROUTER step을 실행하는 경우)
+ * 모두 결국 이 클래스를 통해서 LLM을 호출합니다.
  *
- * call()/callForVerdict()/callForEntity()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는 파라미터가 있습니다. 
+ * LLM에게 받는 답은 두 가지입니다.
+ * - 자유로운 글: call()/stream(). 채팅 화면과 output이 없는 AGENT step이 씁니다.
+ * - 정해진 모양의 JSON: callForSchema(). output을 선언한 AGENT step, SUPERVISOR({pass, reason}), ROUTER({route, reason})가
+ *   모두 이 한 가지 방법으로 받습니다. 모양은 common.definition.workflow.FieldDefinition 맵으로 정합니다.
+ *
+ * call()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는 파라미터가 있습니다. 
  * 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도 null이면 provider 공통 기본 모델을 씁니다), 
  * 값을 직접 주면 그 한 번의 호출에서만 Agent 정의를 무시하고 그 값을 강제로 적용합니다. 
  * 예를 들어 dstone-boot의 채팅 화면에서는 같은 Agent를 쓰면서도 사용자가 화면에서 RAG/Tool을 켜고 끄거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 override 값들을 그대로 넘겨줍니다. 
- * 반면 Workflow의 AGENT/SUPERVISOR step(runtime.step.AgentStepExecutor)은 이 세 값을 항상 null로 넘겨서, Agent 정의에 적힌 값을 그대로 씁니다.
+ * 반면 Workflow의 step은 이 세 값을 항상 null로 넘겨서(callForSchema()에는 아예 없습니다), Agent 정의에 적힌 값을 그대로 씁니다.
  * </pre>
  */
 @Component
@@ -64,66 +70,25 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * SUPERVISOR step 전용 LLM 호출 메서드입니다.
+	 * 정해진 모양의 JSON으로 답을 받는 LLM 호출 메서드입니다. Workflow step에서만 씁니다.
+	 * - AGENT step: YAML에 선언한 output
+	 * - SUPERVISOR step: {pass: boolean, reason: string}
+	 * - ROUTER step: {route: string, reason: string}
 	 *
-	 * 사실 내부적으로는 callForEntity(..., Verdict.class)를 그대로 호출하는 아주 얇은 래퍼입니다. 그런데도
-	 * 이렇게 이름을 따로 지어둔 이유는, 이 메서드를 호출하는 쪽(runtime.step.AgentStepExecutor.runSupervisor)
-	 * 코드를 읽을 때 "여기서 SUPERVISOR 판정을 받는다"는 게 한눈에 보이게 하기 위해서입니다.
-	 * </pre>
-	 * @param agent       호출할 Agent의 정의
-	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
-	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
-	 * @param userMessage 사용자가 입력한 메시지 원문
-	 */
-	public Verdict callForVerdict(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage) {
-		return this.callForEntity(agent, sessionId, caller, variables, userMessage, Verdict.class);
-	}
-
-	/**
-	 * <pre>
-	 * 자유롭게 쓴 텍스트가 아니라, 정해진 형태(JSON 구조)로 응답을 받아야 하는 모든 호출이 공통으로 거치는
-	 * 메서드입니다. 요청을 조립하는 과정은 call()과 똑같고, 응답을 받는 방식만 다릅니다 - ChatClient.entity(type)를
-	 * 쓰면, Spring AI가 우리가 원하는 타입(type)의 JSON 스키마를 자동으로 만들어서 프롬프트에 함께 넣어주고,
-	 * LLM이 답한 내용을 그 스키마에 맞춰 파싱해서 돌려줍니다.
+	 * 필드 목록을 JSON Schema로 바꿔 프롬프트에 붙이고, LLM의 답을 그 모양의 맵으로 읽어서 돌려줍니다
+	 * (자세한 동작은 SchemaOutputConverter 참고). provider 고유의 structured output 기능은 쓰지 않아서 어느 provider든
+	 * 똑같이 동작하지만, 모양을 100% 보장하지는 않습니다. LLM이 모양을 지키지 않으면 예외를 던지며,
+	 * 그 예외를 실패로 처리하는 것은 호출하는 쪽(runtime.step의 각 StepExecutor)의 몫입니다.
 	 *
-	 * 이 방식이 좋은 이유는, "통과: ..." 같은 문구를 사람이 프롬프트에 써 놓고 코드가 문자열을 비교해서
-	 * 판단하는 방식보다 LLM이 형식을 훨씬 더 잘 지켜서 답하기 때문입니다. 다만 100% 완벽하게 보장되는
-	 * 것은 아닙니다 - LLM이 그래도 스키마를 어기고 엉뚱한 형태로 답하면 entity() 호출 자체가 예외를
-	 * 던지는데, 그 예외를 처리하는 것은 이 메서드를 호출하는 쪽의 몫입니다. 실제로는
-	 * runtime.step.AgentStepExecutor 안의 SUPERVISOR step이 Verdict를, ROUTER step이 RouteDecision을 각각
-	 * 이 메서드로 받습니다(output.schema를 선언한 AGENT step은 callForSchema()를 씁니다).
-	 *
-	 * 참고로 이 메서드에는 ragOverride/toolsOverride/modelOverride 파라미터가 없습니다. 정해진 형태의
-	 * 응답이 필요한 호출은 전부 Workflow의 step에서만 일어나는데, Workflow의 step은 애초에 요청마다
-	 * 값을 바꿔 부르는 기능(ChatController에서만 쓰는 기능입니다)을 쓰지 않기 때문입니다.
-	 * </pre>
-	 * @param agent       호출할 Agent의 정의
-	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
-	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
-	 * @param userMessage 사용자가 입력한 메시지 원문
-	 * @param type        LLM 응답을 파싱해서 담을 구조화된 응답 타입(예: Verdict.class)
-	 */
-	public <T> T callForEntity(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Class<T> type) {
-		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(type);
-	}
-
-	/**
-	 * <pre>
-	 * output.schema를 선언한 AGENT step 전용 LLM 호출 메서드입니다.
-	 *
-	 * callForEntity()가 자바 클래스(Verdict 등)로 응답 모양을 정한다면, 이 메서드는 YAML에 선언한 필드 목록으로
-	 * 응답 모양을 정합니다. 필드 목록을 JSON Schema로 바꿔 프롬프트에 붙이고, LLM의 답을 그 모양의 맵으로
-	 * 읽어서 돌려줍니다(자세한 동작은 SchemaOutputConverter 참고). LLM이 모양을 지키지 않으면 예외를 던지며,
-	 * 그 예외를 실패로 처리하는 것은 호출하는 쪽(runtime.step.AgentStepExecutor)의 몫입니다.
+	 * ragOverride/toolsOverride/modelOverride 파라미터는 없습니다. Workflow의 step은 요청마다 값을 바꿔 부르는
+	 * 기능(ChatController에서만 쓰는 기능입니다)을 쓰지 않기 때문입니다.
 	 * </pre>
 	 * @param agent       호출할 Agent의 정의
 	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
 	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
 	 * @param userMessage LLM에게 보낼 사용자 메시지
-	 * @param schema      LLM이 지켜야 할 응답 필드 목록(step의 output.schema)
+	 * @param schema      LLM이 지켜야 할 응답 필드 목록(필드 이름 → 모양)
 	 */
 	public Map<String, Object> callForSchema(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Map<String, FieldDefinition> schema) {
 		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(new SchemaOutputConverter(schema));
@@ -152,7 +117,7 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 위의 call()/callForVerdict()/callForEntity()/stream() 메서드가 공통으로 쓰는, "LLM에게 보낼 요청을
+	 * 위의 call()/callForSchema()/stream() 메서드가 공통으로 쓰는, "LLM에게 보낼 요청을
 	 * 하나씩 조립하는" 메서드입니다. 세션 유지 → 시스템 프롬프트 → RAG → Tool → 모델 지정 → Advisor 순서로
 	 * 차례차례 설정을 붙여서 최종 요청 스펙(ChatClientRequestSpec)을 만들어 돌려줍니다.
 	 * </pre>

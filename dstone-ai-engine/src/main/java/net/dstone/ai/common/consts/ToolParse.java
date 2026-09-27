@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 
 /**
  * TOOL step이 Tool의 응답 텍스트를 어떤 모양의 output으로 정리할지 정하는 값입니다.
- * YAML의 step output.parse 자리에 적습니다(대소문자 구분 없음. 예: parse: lines).
+ * YAML의 TOOL step output 자리에 적습니다(대소문자 구분 없음. 예: output: lines, common.definition.workflow.step.ToolStepDefinition 참고).
  *
  * 어떤 값을 고르든 step의 text에는 항상 Tool 응답 원문이 그대로 남습니다. 이 값은 "다음 step이
  * {{steps.id.output.키}}로 꺼내 쓸 output을 어떻게 만들지"만 정합니다.
@@ -22,7 +22,7 @@ public enum ToolParse {
 
 	/**
 	 * 응답을 줄 단위로 나눠서 {lines: [...]} 모양의 output으로 씁니다. 빈 줄은 버립니다.
-	 * output.pattern(정규식)을 함께 적으면 그 정규식에 맞는 줄만 남기고, 정규식에 괄호 그룹이 있으면
+	 * step의 pattern(정규식)을 함께 적으면 그 정규식에 맞는 줄만 남기고, 정규식에 괄호 그룹이 있으면
 	 * 줄 전체 대신 첫 번째 그룹에 잡힌 부분만 값으로 씁니다.
 	 */
 	LINES;
@@ -39,7 +39,7 @@ public enum ToolParse {
 				return parse;
 			}
 		}
-		throw new IllegalArgumentException("output.parse에는 text/json/lines 중 하나만 쓸 수 있습니다: " + value);
+		throw new IllegalArgumentException("TOOL step의 output에는 text/json/lines 중 하나만 쓸 수 있습니다: " + value);
 	}
 
 }

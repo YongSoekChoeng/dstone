@@ -129,7 +129,7 @@ public class ConfigCallLog extends BaseObject {
 	private final static String SAPERATE_LINE = "\n|--------------------------------------------------------------------------------------------------------------------------------------|\n";
 	
 	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))" + " && !" + NO_LOG_REGEX;
-	private final static String STEPEXECUTOR_POINTCUT = "execution(* net.dstone.ai.runtime.step.StepExecutor+.run(..))" + " && !" + NO_LOG_REGEX;
+	private final static String STEPEXECUTOR_POINTCUT = "execution(* net.dstone.ai.runtime.step.*StepExecutor.run(..))" + " && !" + NO_LOG_REGEX;
 	private final static String AGENT_POINTCUT 		= "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))" + " && !" + NO_LOG_REGEX;
 	private final static String TOOL_POINTCUT 		= "execution(* net.dstone.ai.runtime.tool.ToolExecutor.*(..))" + " && !" + NO_LOG_REGEX;
 	private final static boolean PARAM_MULTI_LINE 	= false;
@@ -185,12 +185,12 @@ public class ConfigCallLog extends BaseObject {
 
 	/**
 	 * <pre>
-	 * Workflow의 스텝 하나가 실행될 때마다(StepExecutor.run(execution, definition, input) 호출될 때마다) 
+	 * Workflow의 스텝 하나가 실행될 때마다(runtime.step의 각 *StepExecutor.run(...)이 호출될 때마다) 
 	 * 그 스텝의 입력과 출력을 로그 한 줄씩으로 남겨줍니다.
 	 *
-	 * AGENT/TOOL/SUPERVISOR/APPROVAL 등 스텝 종류(StepType)가 다르더라도 전부 똑같은
-	 * StepExecutor.run(...) 메소드 하나를 거쳐 실행되므로(자세한 내용은 runtime.step.StepExecutor
-	 * 참고), 이 메소드 하나만 감시해도 모든 스텝의 실행 내역을 다 남길 수 있습니다. 로그에는
+	 * AGENT/SUPERVISOR/ROUTER/TOOL/APPROVAL 스텝 종류마다 StepExecutor가 하나씩 있고, 모두 run(...) 메소드
+	 * 하나로 실행되도록 이름을 맞춰 두었습니다(AgentStepExecutor.run, ToolStepExecutor.run 등).
+	 * 그래서 "runtime.step 패키지의 *StepExecutor.run" 하나만 감시해도 모든 스텝의 실행 내역을 다 남길 수 있습니다. 로그에는
 	 * "이번 실행에서, 어느 스텝이, 어떤 종류로, 어떤 Agent나 Tool을 불러서, 성공했는지 실패했는지"가
 	 * 한 줄로 정리되어 나옵니다.
 	 *
@@ -201,7 +201,7 @@ public class ConfigCallLog extends BaseObject {
 	 * 흐름을 충분히 파악할 수 있습니다.
 	 * </pre>
 	 *
-	 * @param joinPoint 지금 호출되고 있는 StepExecutor.run(...) 메소드에 대한 정보
+	 * @param joinPoint 지금 호출되고 있는 *StepExecutor.run(...) 메소드에 대한 정보
 	 * @return 원래 메소드가 반환하는 StepOutcome(이 스텝의 실행 결과)을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
@@ -376,7 +376,7 @@ public class ConfigCallLog extends BaseObject {
 				}else if( param instanceof StepDefinition ) {
 					StepDefinition stepDefinition = (StepDefinition)param;
 					if(identity.length() > 0) {identity.append(div);}
-					identity.append("step(id=" + stepDefinition.id() + ", type="+stepDefinition.type() + ", ref="+stepDefinition.ref()+")");
+					identity.append("step(id=" + stepDefinition.id() + ", type="+stepDefinition.type() + ", ref="+StepDefinition.refOf(stepDefinition)+")");
 				}else if( param instanceof AgentDefinition ) {
 					AgentDefinition agentDefinition = (AgentDefinition)param;
 					if(identity.length() > 0) {identity.append(div);}

@@ -1,13 +1,16 @@
-package net.dstone.ai.common.definition;
+package net.dstone.ai.common.definition.workflow;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * <pre>
- * 값 하나의 모양(타입)을 선언합니다. 두 곳에서 씁니다.
- * - Workflow의 inputs: 이 Workflow를 실행할 때 요청에 꼭 들어 있어야 하는 입력값
- * - AGENT step의 output.schema: LLM이 반드시 이 모양의 JSON으로 답해야 하는 필드
+ * 값 하나의 모양(타입)을 선언합니다. workflows/*.yml 안의 두 곳에서 씁니다.
+ * - workflow.inputs: 이 Workflow를 실행할 때 요청에 꼭 들어 있어야 하는 입력값
+ * - AGENT step의 output: LLM이 반드시 이 모양의 JSON으로 답해야 하는 필드(step.AgentStepDefinition 참고)
+ *
+ * 엔진 안에서도 같은 모양으로 씁니다. SUPERVISOR/ROUTER step이 LLM에게 받을 답의 모양({pass, reason},
+ * {route, reason})도 이 클래스로 만들어서 AGENT의 output과 똑같은 방식으로 받습니다.
  *
  * YAML에는 두 가지 방법으로 적을 수 있습니다.
  *   sql: string                          # 축약형: 타입만 적습니다

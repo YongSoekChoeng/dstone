@@ -72,7 +72,7 @@ public final class Constants {
 		public final static int DEFAULT_MAX_ITERATIONS = 10;
 		public final static String SUCCESS_SENTINEL = "SUCCESS";
 		public final static String FAIL_SENTINEL = "FAIL";
-		/** step의 forEach로 반복 실행할 때(ForEachStep 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 변수 이름입니다({{item}}). */
+		/** step의 forEach로 반복 실행할 때(StepDefinition.itemKeyOf 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 변수 이름입니다({{item}}). */
 		public final static String DEFAULT_ITEM_VARIABLE_KEY = "item";
 
 		/**
@@ -101,7 +101,7 @@ public final class Constants {
 			public final static String FIELD_INPUT = "input";
 			/** step 결과: 결과 텍스트입니다. */
 			public final static String FIELD_TEXT = "text";
-			/** step 결과: 구조화된 결과입니다. 모양은 YAML step의 output에 선언한 대로입니다(AGENT는 AgentOutput, TOOL은 ToolOutput 참고). */
+			/** step 결과: 구조화된 결과입니다. 모양은 YAML step의 output에 선언한 대로입니다(AgentStepDefinition.output, ToolStepDefinition.output 참고). */
 			public final static String FIELD_OUTPUT = "output";
 			/** step 결과: 실패했을 때의 사유입니다(성공이면 null). */
 			public final static String FIELD_ERROR = "error";
@@ -118,7 +118,7 @@ public final class Constants {
 	 * 안전하지만, 컴파일 시점에 강제되는 규칙이 아니라 사람이 접두사를 정확히 맞춰 써야 하는 방식이므로,
 	 * 새로 Tool을 만들 때는 ToolOutcome을 쓰는 쪽을 권장합니다. SUPERVISOR step은 이 문자열 방식을
 	 * 아예 쓰지 않습니다 - LLM이 자유롭게 쓴 글에 문자열 비교를 적용하는 건 안전하지 않기 때문에,
-	 * 처음부터 구조화된 응답(runtime.agent.Verdict)만 사용합니다.
+	 * 처음부터 {pass, reason} 모양의 JSON 응답(runtime.step.SupervisorStepExecutor)만 사용합니다.
 	 */
 	public static final class Outcome {
 		public final static String FAIL_PREFIX = "실패";

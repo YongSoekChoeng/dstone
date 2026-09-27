@@ -21,8 +21,8 @@
 
 | 용도 | prompt에 꼭 넣을 것 |
 |---|---|
-| AGENT(schema 없음) | 역할과 규칙, 결과물의 형식 |
-| AGENT + `output.schema` | 역할과 규칙. JSON 형식 지시는 엔진이 자동으로 붙이므로 적지 않아도 된다 |
+| AGENT(output 없음) | 역할과 규칙, 결과물의 형식 |
+| AGENT + `output` | 역할과 규칙. JSON 형식 지시는 엔진이 자동으로 붙이므로 적지 않아도 된다 |
 | SUPERVISOR | 무엇을 기준으로 pass/fail을 판정할지, reason에 무엇을 적을지 |
 | ROUTER | route로 쓸 수 있는 이름 목록과 각각의 기준(Workflow의 `routes` 키와 정확히 같게) |
 
@@ -220,7 +220,7 @@ context.inputs = { domain: "금융", language: "한국어", message: "Interest r
         │
         ├─▶ step input 템플릿 채우기 ──▶ "아래 글을 번역하세요.\nInterest rates rose sharply."   → user 메시지
         │
-        └─▶ StepInput.workflowInputs = context.inputs 전체                                → {변수} 값
+        └─▶ StepExecutor.run(..., workflowInputs = context.inputs 전체)                                → {변수} 값
                    │
 AgentStepExecutor ──▶ AgentExecutor.call(agent, variables = workflowInputs, userMessage = 채운 step input)
 ```
@@ -250,7 +250,7 @@ PromptTemplate("당신은 {domain} 분야 ... {language}로만 ...").render({ do
 │ 아래 글을 번역하세요.                                           │  ← 채팅: message / Workflow: 채운 step input
 │ Interest rates rose sharply.                                 │
 │ (ragEnabled면)  [참고자료] <검색된 문서 조각들>                   │  ← 1.6
-│ (output.schema/SUPERVISOR/ROUTER면) JSON 형식 지시문            │  ← 엔진이 자동으로 붙임
+│ (AGENT output/SUPERVISOR/ROUTER면) JSON 형식 지시문             │  ← 엔진이 자동으로 붙임
 └──────────────────────────────────────────────────────────────┘
   + toolsEnabled면 후보 Tool 목록, model이 있으면 그 모델 이름(ChatOptions)
 ```
@@ -318,12 +318,12 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
   prompt: |
     {"sql": "...", "tables": [...]} 모양으로 답하세요.
 
-  # ✅ 형식은 말로 설명하거나, step의 output.schema에 맡긴다
+  # ✅ 형식은 말로 설명하거나, step의 output에 맡긴다
   prompt: |
     변환한 SQL과, 그 SQL이 쓰는 테이블 이름 목록을 답하세요.
 ```
 
-`output.schema`를 쓰면 엔진이 JSON 형식 지시문을 user 메시지 끝에 자동으로 붙인다.
+AGENT step에 `output`을 선언하면 엔진이 JSON 형식 지시문을 user 메시지 끝에 자동으로 붙인다.
 
 ##### 1.2.6 경우별 결과
 
@@ -333,7 +333,7 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 | `{role}`이 있는데 호출에 `role` 값이 없음 | **예외** `Not all variables were replaced in the template. Missing variable names are: [role]`(Spring AI 기본 검증 모드가 THROW). 채팅은 오류, Workflow는 step 종류에 따라 FAILED 또는 step 실패 |
 | 채팅에서 `{message}` 사용 | 위와 같은 예외(채팅은 `message`를 variables에 넣지 않는다) |
 | 쓰지 않는 값이 더 들어옴 | 무시 |
-| JSON 예시처럼 **중괄호 글자**를 그대로 적음(`{"a": 1}`) | 변수로 읽히거나 템플릿 문법 오류로 호출이 실패한다. prompt에는 중괄호를 쓰지 않고 말로 설명한다(JSON 형식 지시가 필요하면 step의 `output.schema`를 쓴다) |
+| JSON 예시처럼 **중괄호 글자**를 그대로 적음(`{"a": 1}`) | 변수로 읽히거나 템플릿 문법 오류로 호출이 실패한다. prompt에는 중괄호를 쓰지 않고 말로 설명한다(JSON 형식 지시가 필요하면 AGENT step의 `output`을 쓴다) |
 | Workflow 문법 `{{inputs.x}}`를 prompt에 적음 | 오류 없이 `inputs.x`라는 **글자**가 들어간다(값이 채워지지 않는다). prompt에서는 `{x}`로 쓴다 |
 | 변수 이름에 `-`, 공백, 한글 | 변수 이름으로 읽히지 않을 수 있다. 영문, 숫자, `_`만 쓴다 |
 | `{options.strict}`(맵 값의 안쪽 키) | 동작한다. `options = {strict: true}`이면 `true`가 들어간다 |
@@ -346,10 +346,10 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 
 | 용도 | 엔진이 자동으로 하는 일 | prompt에 적을 것 |
 |---|---|---|
-| AGENT(schema 없음) | 없음. 답변 원문이 그대로 `text` | 결과물의 형식까지 모두 |
-| AGENT + `output.schema` | "이 JSON Schema를 지키는 JSON 객체 하나로만 답하라"는 지시를 붙이고, 답을 읽어 필드와 타입을 검사한다(`SchemaOutputConverter`) | 역할과 규칙만. 각 필드의 의미는 schema의 `description`에 적는다 |
-| SUPERVISOR | `{pass: boolean, reason: string}` 모양으로 답하라는 형식 지시를 붙인다(`Verdict`) | **판정 기준**, reason에 적을 내용 |
-| ROUTER | `{route: string, reason: string}` 모양으로 답하라는 형식 지시를 붙인다(`RouteDecision`) | **쓸 수 있는 route 이름 목록**(Workflow `routes` 키와 똑같이)과 각각의 기준. 엔진은 route 이름 목록을 LLM에게 알려 주지 않는다 |
+| AGENT(output 없음) | 없음. 답변 원문이 그대로 `text` | 결과물의 형식까지 모두 |
+| AGENT + `output` | "이 JSON Schema를 지키는 JSON 객체 하나로만 답하라"는 지시를 붙이고, 답을 읽어 필드와 타입을 검사한다(`SchemaOutputConverter`) | 역할과 규칙만. 각 필드의 의미는 step `output` 필드의 `description`에 적는다 |
+| SUPERVISOR | `{pass: boolean, reason: string}` 모양으로 답하라는 형식 지시를 붙인다(AGENT `output`과 같은 방식, `SupervisorStepExecutor`) | **판정 기준**, reason에 적을 내용 |
+| ROUTER | `{route: string, reason: string}` 모양으로 답하라는 형식 지시를 붙인다(AGENT `output`과 같은 방식, `RouterStepExecutor`. route 설명에 `routes` 키 목록도 함께 전달) | **쓸 수 있는 route 이름 목록**(Workflow `routes` 키와 똑같이)과 각각의 기준. 엔진은 JSON 형식 지시의 route 설명에 이름 목록만 넣어 주므로, 각 route를 **언제 고르는지** 기준은 prompt에 적는다 |
 
 - 같은 Agent를 여러 step 종류에서 재사용할 수는 있지만, 판정용/분류용 prompt는 보통 그 용도 전용으로 만든다.
 
@@ -403,7 +403,7 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 | `false`인데 prompt에 "Tool을 호출하라"고 적음 | Tool이 붙지 않으므로 LLM이 지어내서 답할 수 있다 |
 | 채팅 요청에 `toolsEnabled` 값을 보냄 | 이번 요청만 그 값으로 바뀐다(Workflow에서는 불가) |
 | Workflow의 **TOOL step** | 이 값과 **관계없다**. TOOL step은 LLM 없이 `ref`의 Tool을 직접 부른다 |
-| `true` + `output.schema`/SUPERVISOR/ROUTER | 함께 쓸 수 있다. Tool로 사실을 확인한 뒤 정해진 모양으로 답한다 |
+| `true` + AGENT `output`/SUPERVISOR/ROUTER | 함께 쓸 수 있다. Tool로 사실을 확인한 뒤 정해진 모양으로 답한다 |
 | `"yes"`처럼 boolean이 아닌 값 | 기동 실패(YAML 바인딩 오류) |
 
 #### 1.6 `ragEnabled`
@@ -527,10 +527,10 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 | AGENT의 RAG(ragEnabled) 증강 | `sample/sample-agent-rag-augmented.yml` |
 | Agent별 model override | `sample/sample-agent-model-override.yml` |
 | TOOL step 연쇄(LLM 없이) | `sample/sample-tool-chain-basic.yml` |
-| MCP Tool + `output.parse: lines` + 앞 step output으로 `forEach` | `sample/sample-mcp-filesystem-list.yml` |
+| MCP Tool + `output: lines` + `pattern` + 앞 step output으로 `forEach` | `sample/sample-mcp-filesystem-list.yml` |
 | TOOL로 RAG 검색만 직접 호출 | `sample/sample-tool-rag-search.yml` |
 | 위험 Tool(http/shell/python) 기본 거부 확인 | `sample/sample-tool-gated-external.yml` |
-| AGENT `output.schema` → `{{steps.<id>.output.<키>}}`, Workflow `output` | `sample/sample-structured-output-chain.yml` |
+| AGENT `output` → `{{steps.<id>.output.<키>}}`, Workflow `output` | `sample/sample-structured-output-chain.yml` |
 | SUPERVISOR(pass/reason) 판정 | `sample/sample-supervisor-verdict-gate.yml` |
 | ROUTER 다지 분기(routes) | `sample/sample-router-multiway.yml` |
 | onFailure 재시도 루프 + `previous`/`??`/`steps.<id>.error` | `sample/sample-loop-retry-until-valid.yml` |
@@ -548,7 +548,7 @@ Workflow가 `targetVersion`을 필수로 받으므로 Agent `{targetVersion}`이
 | `sample-mcp-filesystem-agent` | MCP filesystem Tool 자율 호출 |
 | `sample-rag-demo-agent` | RAG 증강(`ragEnabled: true`, `ragTopK`/`ragSimilarityThreshold`) |
 | `sample-model-override-agent` | Agent별 `model` 지정 |
-| `sample-structured-extract-agent` | `output.schema` AGENT용(문장에서 SQL 추출) |
+| `sample-structured-extract-agent` | `output`을 선언한 AGENT용(문장에서 SQL 추출) |
 | `sample-fix-agent` | 재시도 루프용(검증 실패한 SQL 수정) |
 | `sample-verdict-judge-agent` | SUPERVISOR용(pass/reason 판정) |
 | `sample-router-classifier-agent` | ROUTER용(billing/technical/other 분류) |

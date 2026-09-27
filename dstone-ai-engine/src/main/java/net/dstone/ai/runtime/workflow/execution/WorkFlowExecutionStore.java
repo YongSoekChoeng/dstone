@@ -151,13 +151,11 @@ public class WorkFlowExecutionStore {
 			this.toInstant(rs.getTimestamp("UPDATED_AT")));
 	}
 
-	/** AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행을 StepHistoryEntry로 바꿉니다. kind(AGENT_CALL/DETERMINISTIC)는 저장하지 않고 STEP_TYPE에서 다시 계산합니다. */
+	/** AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행을 StepHistoryEntry로 바꿉니다. */
 	private StepHistoryEntry mapHistoryEntry(ResultSet rs, int rowNum) throws SQLException {
-		StepType stepType = StepType.valueOf(rs.getString("STEP_TYPE"));
 		return new StepHistoryEntry(
 			rs.getString("STEP_ID"),
-			stepType,
-			stepType.kind(),
+			StepType.valueOf(rs.getString("STEP_TYPE")),
 			rs.getString("STEP_REF"),
 			rs.getBoolean("SUCCESS"),
 			rs.getLong("DURATION_MS"),

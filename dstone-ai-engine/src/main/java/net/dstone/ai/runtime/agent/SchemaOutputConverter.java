@@ -11,12 +11,12 @@ import org.springframework.ai.converter.StructuredOutputConverter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import net.dstone.ai.common.definition.FieldDefinition;
+import net.dstone.ai.common.definition.workflow.FieldDefinition;
 import net.dstone.ai.common.schema.FieldTypes;
 
 /**
  * <pre>
- * AGENT step의 output.schema(YAML에 선언한 필드 목록)대로 LLM이 JSON을 답하게 하고, 그 답을 맵으로 읽어주는
+ * step이 정한 필드 목록(AGENT step은 YAML의 output, SUPERVISOR/ROUTER는 엔진이 정한 {pass, reason}/{route, reason})대로 LLM이 JSON을 답하게 하고, 그 답을 맵으로 읽어주는
  * 변환기입니다. Spring AI의 ChatClient.call().entity(변환기)에 그대로 넘겨서 씁니다
  * (runtime.agent.AgentExecutor.callForSchema 참고).
  *
@@ -42,14 +42,14 @@ public class SchemaOutputConverter implements StructuredOutputConverter<Map<Stri
 	private final String jsonSchema;
 
 	/**
-	 * @param schema AGENT step의 output.schema(필드 이름 → 필드 모양)입니다.
+	 * @param schema LLM이 지켜야 할 필드 목록(필드 이름 → 필드 모양)입니다.
 	 */
 	public SchemaOutputConverter(Map<String, FieldDefinition> schema) {
 		this.schema = schema;
 		try {
 			this.jsonSchema = OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(FieldTypes.toJsonSchema(schema));
 		} catch (Exception e) {
-			throw new IllegalStateException("output.schema를 JSON Schema로 바꾸지 못했습니다: " + schema, e);
+			throw new IllegalStateException("응답 필드 목록을 JSON Schema로 바꾸지 못했습니다: " + schema, e);
 		}
 	}
 
@@ -100,7 +100,7 @@ public class SchemaOutputConverter implements StructuredOutputConverter<Map<Stri
 			}
 		}
 		if (!problems.isEmpty()) {
-			throw new IllegalArgumentException("LLM 응답이 output.schema를 지키지 않았습니다: " + problems + " / 응답=" + text);
+			throw new IllegalArgumentException("LLM 응답이 정해진 모양(output)을 지키지 않았습니다: " + problems + " / 응답=" + text);
 		}
 		return data;
 	}

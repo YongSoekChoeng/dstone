@@ -6,7 +6,7 @@
 # fix step의 input 템플릿이 "검증에 실패한 SQL"({{steps.validate.input.sql}})과 "실패 사유"
 # ({{steps.validate.error}})를 채워서 이 Agent에게 사용자 메시지로 보내줍니다.
 #
-# 고친 SQL을 어떤 모양으로 돌려줄지는 이 파일이 아니라 fix step의 output.schema({sql: string})가
+# 고친 SQL을 어떤 모양으로 돌려줄지는 이 파일이 아니라 fix step의 output({sql: string})가
 # 정합니다. 그래서 이 prompt는 "어떻게 고칠지"만 설명합니다. 고친 SQL은 다시 validate로 돌아가
 # 검사를 받고, 이 루프가 끝없이 돌지 않도록 Workflow의 maxIterations가 막아줍니다.
 agent:

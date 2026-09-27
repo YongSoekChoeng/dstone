@@ -5,17 +5,17 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import net.dstone.ai.common.definition.workflow.step.ApprovalStep;
+import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * APPROVAL step을 처리하는 실행기입니다. 사람이 승인하거나 반려할 때까지 기다리는 역할을 합니다. 다른
+ * type: APPROVAL step(ApprovalStepDefinition)을 실행합니다. 사람이 승인하거나 반려할 때까지 기다리는 역할을 합니다. 다른
  * 실행기들과 마찬가지로 run() 메서드가 한 번 호출되는 것으로 끝이고, "지금 결정이 이미 나 있는가"만 확인합니다.
  *
- * - 아직 결정이 없으면 PENDING을 돌려줍니다. WorkFlowExecutor는 이 값을 보고 Workflow 실행 전체를
+ * - 아직 결정이 없으면 대기(StepOutcome.waitingApproval())를 돌려줍니다. WorkFlowExecutor는 이 값을 보고 Workflow 실행 전체를
  *   WAITING_APPROVAL 상태로 멈춰 둡니다.
  * - 나중에 api.controller.WorkFlowExecutionController의 decision API가 호출되면, 그 결정이 컨텍스트의
  *   approvals.{stepId}에 기록된 뒤 같은 스텝이 다시 한번 실행됩니다. 이번에는 결정이 있으니
@@ -28,17 +28,20 @@ import net.dstone.common.utils.StringUtil;
  * </pre>
  */
 @Component
-public class ApprovalStepExecutor implements StepExecutor<ApprovalStep> {
+public class ApprovalStepExecutor {
 
 	/**
 	 * 컨텍스트의 approvals.{stepId}에 사람의 결정이 들어 있는지 봅니다.
-	 * 없으면 대기(Pending), 승인이면 성공, 반려면 실패를 돌려줍니다.
+	 * 없으면 대기, 승인이면 성공, 반려면 실패를 돌려줍니다.
+	 *
+	 * @param execution 지금 진행 중인 Workflow 실행 상태입니다.
+	 * @param step      실행할 step의 정의입니다.
+	 * @param input     직전 step의 결과 텍스트입니다. 결과 텍스트로 그대로 넘깁니다.
 	 */
-	@Override
-	public StepOutcome run(WorkFlowExecution execution, ApprovalStep definition, StepInput input) {
-		Map<String, Object> decision = WorkFlowContext.approval(execution.context(), definition.id());
+	public StepOutcome run(WorkFlowExecution execution, ApprovalStepDefinition step, String input) {
+		Map<String, Object> decision = WorkFlowContext.approval(execution.context(), step.id());
 		if (decision == null) {
-			return StepOutcome.pending();
+			return StepOutcome.waitingApproval();
 		}
 
 		boolean approved = Boolean.TRUE.equals(decision.get("approved"));
@@ -50,10 +53,10 @@ public class ApprovalStepExecutor implements StepExecutor<ApprovalStep> {
 			output.put("approved", true);
 			output.put("approver", approver == null ? "" : approver);
 			output.put("comment", comment == null ? "" : comment);
-			return StepOutcome.success(input.text(), output);
+			return StepOutcome.success(input, output);
 		}
 		String reason = comment == null || StringUtil.isEmpty(comment.toString()) ? "(사유 없음)" : comment.toString();
-		return StepOutcome.failure(input.text(), reason);
+		return StepOutcome.failure(input, reason);
 	}
 
 }

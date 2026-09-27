@@ -1,7 +1,6 @@
 package net.dstone.ai.runtime.workflow.execution;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
@@ -19,7 +18,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
  * steps:                    ← step이 끝날 때마다 자기 id 아래에 결과를 남김(같은 step이 다시 돌면 덮어씀)
  *   analyze:
  *     input:  "채워진 입력"   ← YAML step의 input을 채운 값
- *     output: { ... }        ← YAML step의 output(schema/parse)에 선언한 모양의 값
+ *     output: { ... }        ← YAML step의 output에 선언한 모양의 값
  *     text:   "결과 텍스트"
  *     error:  null
  *   validate-each:          ← forEach step은 반복별 결과를 items에 담음
@@ -79,7 +78,7 @@ public final class WorkFlowContext {
 	 *
 	 * @param context 실행 컨텍스트입니다(이 맵을 직접 고칩니다).
 	 * @param stepId  결과를 남길 step의 id입니다.
-	 * @param record  남길 결과입니다(stepRecord()나 forEachRecord()로 만든 값).
+	 * @param record  남길 결과입니다(runtime.step.StepOutcome.toRecord()로 만든 값).
 	 */
 	@SuppressWarnings("unchecked")
 	public static void recordStep(Map<String, Object> context, String stepId, Map<String, Object> record) {
@@ -90,41 +89,6 @@ public final class WorkFlowContext {
 		}
 		((Map<String, Object>) steps).put(stepId, record);
 		context.put(Context.PREVIOUS, record);
-	}
-
-	/**
-	 * <pre>
-	 * step 한 번의 결과를 컨텍스트에 남길 모양({input, output, text, error})으로 만듭니다.
-	 * </pre>
-	 *
-	 * @param input  이 step이 실제로 받은 입력입니다(템플릿을 채운 뒤의 값).
-	 * @param output 구조화된 결과입니다(없으면 빈 맵).
-	 * @param text   결과 텍스트입니다.
-	 * @param error  실패 사유입니다(성공이면 null).
-	 */
-	public static Map<String, Object> stepRecord(Object input, Map<String, Object> output, String text, String error) {
-		Map<String, Object> record = new LinkedHashMap<>();
-		record.put(Context.FIELD_INPUT, input);
-		record.put(Context.FIELD_OUTPUT, output == null ? Map.of() : output);
-		record.put(Context.FIELD_TEXT, text);
-		record.put(Context.FIELD_ERROR, error);
-		return record;
-	}
-
-	/**
-	 * <pre>
-	 * forEach step의 결과를 남길 모양으로 만듭니다. text는 반복별 text를 줄바꿈으로 이은 값이고,
-	 * error는 실패한 반복들의 사유를 이은 값입니다(모두 성공이면 null). 반복별 결과는 items에 순서대로 담깁니다.
-	 * </pre>
-	 *
-	 * @param text  반복별 text를 이은 값입니다.
-	 * @param error 실패한 반복들의 사유를 이은 값입니다(모두 성공이면 null).
-	 * @param items 반복별 결과 목록입니다(각각 stepRecord() 모양).
-	 */
-	public static Map<String, Object> forEachRecord(String text, String error, List<Map<String, Object>> items) {
-		Map<String, Object> record = stepRecord(null, Map.of(), text, error);
-		record.put(Context.FIELD_ITEMS, items);
-		return record;
 	}
 
 	/**
