@@ -80,7 +80,7 @@ spring:
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
         # 아직 쓰지 않으므로 전부 명시적으로 꺼둔다.
         model:
-            chat: anthropic # anthropic | openai | ollama
+            chat: ollama # anthropic | openai | ollama
             embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
             audio:
                 speech: none
