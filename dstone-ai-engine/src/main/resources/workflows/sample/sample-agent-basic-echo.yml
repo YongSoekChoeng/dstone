@@ -26,3 +26,4 @@ workflow:
       ref: sample-basic-echo-agent
       input: "{{input}}"
       onSuccess: SUCCESS
+      memory: true

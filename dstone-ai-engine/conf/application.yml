@@ -80,7 +80,7 @@ spring:
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
         # 아직 쓰지 않으므로 전부 명시적으로 꺼둔다.
         model:
-            chat: ollama # anthropic | openai | ollama
+            chat: openai # anthropic | openai | ollama
             embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
             audio:
                 speech: none
@@ -114,14 +114,14 @@ spring:
         ##########################################################################################
         # spring.ai.model.chat=openai 일 때 설정.
         ##########################################################################################
-        # openai:
-        #     api-key: ENC(...)
-        #     chat:
-        #         options:
-        #             model: gpt-4o-mini
-        #     # local vLLM(OpenAI 호환 API)을 붙일 때는 provider는 그대로 openai로 두고
-        #     # base-url만 vLLM 서버로 돌린다(api-key는 vLLM이 검증하지 않으면 임의 문자열로 둔다).
-        #     base-url: http://<vllm-host>:8000
+        openai:
+             base-url: https://openrouter.ai/api/v1
+             api-key: ENC(5jqSbTq/PbjnMvBpVAEYIlURuhiynSmmJUqHmoXZbdiFJsTdCRzX9iEOyNdvhsMGUefD5MtBtoyThqFTKEvfiJxNU1x3f+UFFH4pmNRJ0iGLcijIkSa5d/4YJfPRu8m+)
+             chat:
+                 options:
+                     # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
+                     model: google/gemma-2-9b-it:free
+                     temperature: 0.4
 
         ##########################################################################################
         # spring.ai.model.embedding=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
