@@ -63,7 +63,9 @@ public class ConfigMcp extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * MCP 서버 하나에 실제로 접속해서, 그 서버가 내놓는 Tool 중 허용된 것만 골라 등록합니다.
+	 * </pre>
 	 *
 	 * @param definition 접속할 MCP 서버의 정의(주소, 접속 방식, 허용 Tool 목록 등)
 	 */
@@ -93,7 +95,9 @@ public class ConfigMcp extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * MCP 서버 정의에 적힌 접속 방식(STDIO 또는 SSE)에 맞춰 실제 통신에 쓸 트랜스포트를 만들어 줍니다.
+	 * </pre>
 	 *
 	 * @param definition 트랜스포트를 만들 대상이 되는 MCP 서버 정의
 	 */
@@ -109,13 +113,14 @@ public class ConfigMcp extends BaseObject {
 	}
 
 	/**
-	 * STDIO MCP 서버를 실제로 띄울 커맨드/인자를 조립합니다. YAML에 적힌 command/args 그대로 쓰는 게
-	 * 기본이지만, Constants.Mcp.STDIO_COMMAND_PREFIX_PROPERTY(MCP_STDIO_COMMAND_PREFIX) 시스템
+	 * <pre>
+	 * STDIO MCP 서버를 실제로 띄울 커맨드/인자를 조립합니다. 
+	 * YAML에 적힌 command/args 그대로 쓰는 게 기본이지만, Constants.Mcp.STDIO_COMMAND_PREFIX_PROPERTY(MCP_STDIO_COMMAND_PREFIX) 시스템
 	 * 프로퍼티가 설정되어 있으면(주로 Windows에서만 - conf/env.properties 참고) 그 값을 공백으로
-	 * 쪼갠 토큰들을 커맨드/인자 맨 앞에 그대로 이어 붙입니다. 예를 들어 이 값이 "cmd.exe /c"이면,
-	 * YAML의 "command: npx, args: [-y, ...]"는 실제로는
-	 * "cmd.exe /c npx -y ..."로 실행됩니다 - npx처럼 .cmd/.bat인 커맨드는 Windows에서 cmd.exe 없이
-	 * ProcessBuilder가 곧바로 실행시킬 수 없기 때문입니다.
+	 * 쪼갠 토큰들을 커맨드/인자 맨 앞에 그대로 이어 붙입니다. 
+	 * 예를 들어 이 값이 "cmd.exe /c"이면, YAML의 "command: npx, args: [-y, ...]"는 실제로는 "cmd.exe /c npx -y ..."로 실행됩니다. 
+	 * npx처럼 .cmd/.bat인 커맨드는 Windows에서 cmd.exe 없이 ProcessBuilder가 곧바로 실행시킬 수 없기 때문입니다.
+	 * </pre>
 	 *
 	 * @param definition 커맨드/인자를 조립할 MCP 서버 정의(STDIO 전용)
 	 */
@@ -137,8 +142,10 @@ public class ConfigMcp extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 이 Tool을 실제로 등록해도 되는지 판단합니다. 정의에 allowedTools 목록이 비어 있으면 전부
 	 * 허용하고, 목록이 있으면 그 이름 안에 들어있는 Tool만 허용합니다.
+	 * </pre>
 	 *
 	 * @param definition allowedTools 화이트리스트를 갖고 있는 MCP 서버 정의
 	 * @param callback    허용 여부를 판단할 대상 Tool
@@ -152,6 +159,7 @@ public class ConfigMcp extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * MCP 서버 하나에 대한 Tool 호출을 한 번에 하나씩만 보내도록 감싸는 ToolCallback입니다.
 	 *
 	 * MCP 클라이언트 하나는 서버와의 연결(STDIO면 프로세스의 표준 입출력 한 쌍) 하나를 씁니다. 여기에 여러
@@ -159,6 +167,7 @@ public class ConfigMcp extends BaseObject {
 	 * forEach가 같은 MCP Tool을 동시에 여러 번 부르거나, LLM이 Tool 여러 개를 한꺼번에 부를 때 이런 일이
 	 * 생깁니다. 그래서 같은 서버에서 온 Tool들은 모두 같은 잠금(serverLock)을 나눠 갖고, 호출을 차례대로
 	 * 보냅니다. 서로 다른 MCP 서버끼리는 잠금이 달라서 동시에 호출될 수 있습니다.
+	 * </pre>
 	 */
 	private static final class SerializedToolCallback implements ToolCallback {
 
@@ -199,7 +208,11 @@ public class ConfigMcp extends BaseObject {
 		}
 	}
 
-	/** 접속에 성공한 MCP 서버들에서 모아온 Tool 전체 목록입니다. common.config.ConfigTool이 이 목록을 로컬 @AiTool Tool들과 합쳐서 씁니다. */
+	/** 
+	 * <pre>
+	 * 접속에 성공한 MCP 서버들에서 모아온 Tool 전체 목록입니다. common.config.ConfigTool이 이 목록을 로컬 @AiTool Tool들과 합쳐서 씁니다. 
+	 * </pre>
+	 */
 	public List<ToolCallback> toolCallbacks() {
 		return List.copyOf(this.toolCallbacks);
 	}
