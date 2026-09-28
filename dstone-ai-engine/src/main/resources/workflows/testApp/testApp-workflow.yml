@@ -1,0 +1,23 @@
+workflow:
+  id: testApp-workflow
+  description: 테스트용 workflow
+  maxIterations: 10
+  input: string
+  output: string
+  
+  steps:
+
+    - id: step01
+      type: AGENT
+      ref: testApp-agent-01
+      input: "{{input}}"
+      onSuccess: step02
+      onFailure: FAIL
+
+    - id: step02
+      type: AGENT
+      ref: testApp-agent-02
+      input: {value: "{{steps.step01.output}}"}
+      output: {value: "{{steps.step02.output}}"}
+      onSuccess: SUCCESS
+      onFailure: FAIL
