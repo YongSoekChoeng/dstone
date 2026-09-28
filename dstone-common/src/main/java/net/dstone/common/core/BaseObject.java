@@ -105,15 +105,13 @@ public class BaseObject {
 		    return "" ; 
 		}
 		int minLength = Math.min(paramNames.length, paramValues.length);
-		int setNum = 0;
 		for (int i = 0; i < minLength; i++) {
 		    String name = paramNames[i];
 		    Object value = paramValues[i];
-			paramListInfo.append(buildParamStr(name, value));
-			if (setNum > 0) {
+			if (paramListInfo.length() > 0) {
 				paramListInfo.append(", ");
 			}
-			setNum++;
+			paramListInfo.append(buildParamStr(name, value));
 		}
 		return paramListInfo.toString();
 	}
