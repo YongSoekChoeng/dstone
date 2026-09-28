@@ -25,5 +25,5 @@ agent:
         4. 예상 영향 범위: list<string>
         5. 확인이 필요한 질문: list<string>
       required: [1. 요청 배경/목적 요약, 2. 현재 상태(As-Is), 3. 제안 설계(To-Be)]  
-  toolsEnabled: false
+  toolsEnabled: true
   ragEnabled: false
