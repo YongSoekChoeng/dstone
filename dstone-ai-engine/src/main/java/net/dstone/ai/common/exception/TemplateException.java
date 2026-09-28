@@ -1,4 +1,4 @@
-package net.dstone.ai.common.template;
+package net.dstone.ai.common.exception;
 
 /**
  * <pre>

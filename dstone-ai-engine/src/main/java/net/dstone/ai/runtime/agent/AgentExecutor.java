@@ -18,7 +18,7 @@ import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.ai.common.schema.JsonSchemas;
 import net.dstone.ai.common.schema.SchemaOutputConverter;
-import net.dstone.ai.common.template.Template;
+import net.dstone.ai.common.schema.Template;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;

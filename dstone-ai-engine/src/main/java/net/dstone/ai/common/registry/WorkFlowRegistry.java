@@ -28,7 +28,7 @@ import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemas;
 import net.dstone.ai.common.schema.StepOutputSchemas;
-import net.dstone.ai.common.template.Template;
+import net.dstone.ai.common.schema.Template;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;

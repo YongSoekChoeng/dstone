@@ -1,4 +1,4 @@
-package net.dstone.ai.common.template;
+package net.dstone.ai.common.schema;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -9,6 +9,8 @@ import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import net.dstone.ai.common.exception.TemplateException;
 
 /**
  * <pre>
