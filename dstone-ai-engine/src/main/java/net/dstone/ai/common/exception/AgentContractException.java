@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.agent;
+package net.dstone.ai.common.exception;
 
 /**
  * <pre>

@@ -1,4 +1,4 @@
-package net.dstone.ai.runtime.agent;
+package net.dstone.ai.common.schema;
 
 import java.util.List;
 import java.util.Map;
@@ -10,7 +10,7 @@ import org.springframework.ai.converter.StructuredOutputConverter;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.exception.AgentContractException;
 
 /**
  * <pre>

@@ -1,14 +1,13 @@
 package net.dstone.common.core;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.log;
-
 import java.lang.StackWalker.StackFrame;
 import java.util.Optional;
+import java.util.Set;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.apache.logging.log4j.core.tools.Generate.CustomLogger;
 import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -97,11 +96,20 @@ public class BaseObject {
 	
 	protected String buildParamInfo(ProceedingJoinPoint joinPoint) {
 		StringBuffer paramListInfo = new StringBuffer();
-		int args = joinPoint.getArgs().length;
+		
+		MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+		String[] paramNames = signature.getParameterNames();
+		Object[] paramValues = joinPoint.getArgs();
+		
+		if (paramNames == null || paramValues == null) {
+		    return "" ; 
+		}
+		int minLength = Math.min(paramNames.length, paramValues.length);
 		int setNum = 0;
-		for (int i = 0; i < args; i++) {
-			Object param = joinPoint.getArgs()[i];
-			paramListInfo.append(buildParamStr( param));
+		for (int i = 0; i < minLength; i++) {
+		    String name = paramNames[i];
+		    Object value = paramValues[i];
+			paramListInfo.append(buildParamStr(name, value));
 			if (setNum > 0) {
 				paramListInfo.append(", ");
 			}
@@ -110,28 +118,35 @@ public class BaseObject {
 		return paramListInfo.toString();
 	}
 
-	private String buildParamStr(Object param) {
+    private static final Set<Class<?>> PRIMITIVE_WRAPPER_TYPES = Set.of(
+        Boolean.class, Character.class, Byte.class, Short.class, 
+        Integer.class, Long.class, Float.class, Double.class, String.class
+    );
+    
+	private String buildParamStr(String paramName, Object paramValue) {
 		StringBuffer paramStr = new StringBuffer();
-		if( param != null ) {
-			if (param instanceof HttpServletRequest) {
+		paramStr.append( paramName + "=[");
+		if( paramValue != null ) {
+			if (paramValue instanceof HttpServletRequest) {
 				// Do Nothing
-			}else if (param instanceof HttpServletResponse) {
+			}else if (paramValue instanceof HttpServletResponse) {
 				// Do Nothing
-	        } else if (param instanceof Record) {
-	        	paramStr.append(param.toString());
-			}else if (param instanceof String) {
-				paramStr.append("String" + "[" + param + "]");
+	        } else if (paramValue instanceof Record) {
+	        	paramStr.append(paramValue.toString());
+			}else if (PRIMITIVE_WRAPPER_TYPES.contains(paramValue.getClass())) {
+				paramStr.append(paramValue);
 			}else{
 				String result = "";
 				try {
-					result = ToStringBuilder.reflectionToString(param, ToStringStyle.SHORT_PREFIX_STYLE);
+					result = ToStringBuilder.reflectionToString(paramValue, ToStringStyle.SHORT_PREFIX_STYLE);
 				}catch(Exception e) {
-					result = ConvertUtil.convertToJson(param);
+					result = ConvertUtil.convertToJson(paramValue);
 					result = StringUtil.replace(result, "\n", "");
 				}
 				paramStr.append(result);
 			}
 		}
+		paramStr.append( "]");
 		return paramStr.toString();
 	}
 

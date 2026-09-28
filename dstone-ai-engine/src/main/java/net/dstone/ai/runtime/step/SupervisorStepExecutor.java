@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
+import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.schema.StepOutputSchemas;
-import net.dstone.ai.runtime.agent.AgentContractException;
 import net.dstone.ai.runtime.agent.AgentExecutor;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
