@@ -8,8 +8,8 @@ package net.dstone.boot.ai.vo;
  *
  * @param executionId 조회한 실행 id
  * @param status      실행 상태, 조회 자체가 실패했으면 ERROR
- * @param result      실행이 성공했을 때의 결과
+ * @param result      실행이 성공했을 때의 결과(글자 또는 객체)
  * @param error       실행이 실패했거나 조회 자체가 실패했을 때의 사유
  */
-public record WorkFlowStatusResult(String executionId, String status, String result, String error) {
+public record WorkFlowStatusResult(String executionId, String status, Object result, String error) {
 }

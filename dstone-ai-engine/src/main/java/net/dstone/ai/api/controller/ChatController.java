@@ -22,6 +22,7 @@ import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.security.CallerContext;
+import net.dstone.ai.runtime.agent.AgentContractException;
 import net.dstone.ai.runtime.agent.AgentExecutor;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.config.ConfigProperty;
@@ -32,7 +33,8 @@ import reactor.core.publisher.Flux;
  * 이 엔진에서 가장 기본이 되는 채팅 엔드포인트를 제공하는 컨트롤러입니다.
  *
  * POST /api/ai/chat 요청을 받으면, resources/agents/*.yml 파일로 등록해 둔 Agent(챗봇 하나의 설정이라고
- * 생각하면 됩니다) 중 하나를 딱 한 번 호출해서 답을 돌려줍니다. 만약 여러 단계(step)를 순서대로 이어서
+ * 생각하면 됩니다) 중 하나를 딱 한 번 호출해서 답을 돌려줍니다. 요청의 input은 그 Agent의 input 계약 모양이어야
+ * 하고(아니면 400), 답은 그 Agent의 output 계약 모양 그대로 돌려줍니다(string이면 글자, object면 객체). 만약 여러 단계(step)를 순서대로 이어서
  * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkFlowController를 사용하면 됩니다.
  *
  * GET /api/ai/chat는 등록된 Agent id+description 목록을 돌려줍니다 - dstone-boot의 "채팅" 화면이
@@ -41,7 +43,7 @@ import reactor.core.publisher.Flux;
  *
  * POST /api/ai/chat/stream 은 요청 형식은 위와 완전히 같지만, 응답 방식이 다릅니다. LLM(대규모 언어 모델)이
  * 답변을 한 글자씩(정확히는 토큰 단위로) 만들어내는 대로 바로바로 흘려보내 주는 text/event-stream(SSE, 실시간
- * 스트리밍) 방식입니다. 이 컨트롤러는 원래 요청-응답이 한 번에 끝나는 서블릿 기반 Spring MVC 컨트롤러이지만,
+ * 스트리밍) 방식입니다. 조각난 글자는 모양을 검사할 수 없으므로 output이 string인 Agent만 부를 수 있습니다(아니면 400). 이 컨트롤러는 원래 요청-응답이 한 번에 끝나는 서블릿 기반 Spring MVC 컨트롤러이지만,
  * dstone-common 모듈이 spring-boot-starter-webflux 의존성을 이미 포함하고 있어서 reactor-core 라이브러리를
  * 클래스패스에서 항상 쓸 수 있습니다. 덕분에 메서드가 Flux<String> 타입만 반환하면, 별도 설정 없이도
  * 스트리밍 응답이 그대로 동작합니다.
@@ -77,7 +79,7 @@ public class ChatController extends BaseController {
 	/**
 	 * Agent 하나를 호출해서 답변을 한 번에(스트리밍 없이) 받아 돌려줍니다.
 	 *
-	 * @param request        채팅 요청 내용입니다. 어떤 Agent를 쓸지(agent), 사용자가 보낸 메시지(message) 등을 담고 있습니다.
+	 * @param request        채팅 요청 내용입니다. 어떤 Agent를 쓸지(agent), Agent에게 넣을 값(input) 등을 담고 있습니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping
@@ -86,16 +88,17 @@ public class ChatController extends BaseController {
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
-		String answer = this.agentExecutor.call(agent, sessionId, caller, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled(), request.model());
+		this.checkInput(agent, request);
+		Object output = this.agentExecutor.call(agent, sessionId, caller, request.variables(), request.input(), request.ragEnabled(), request.toolsEnabled(), request.model());
 		String provider = this.configProperty.getProperty("spring.ai.model.chat");
-		return new ChatResponse(answer, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
+		return new ChatResponse(output, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}
 
 	/**
 	 * chat() 메서드와 요청 형식은 완전히 똑같지만, 응답만 다릅니다. LLM이 답변을 만들어내는 대로
 	 * 토큰(글자 조각) 하나하나를 text/event-stream 방식으로 실시간으로 흘려보내 줍니다.
 	 *
-	 * @param request        채팅 요청 내용입니다. 어떤 Agent를 쓸지(agent), 사용자가 보낸 메시지(message) 등을 담고 있습니다.
+	 * @param request        채팅 요청 내용입니다. 어떤 Agent를 쓸지(agent), Agent에게 넣을 값(input) 등을 담고 있습니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -104,23 +107,42 @@ public class ChatController extends BaseController {
 		String sessionId = this.resolveSessionId(request);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
-		return this.agentExecutor.stream(agent, sessionId, caller, request.variables(), request.message(), request.ragEnabled(), request.toolsEnabled(), request.model());
+		this.checkInput(agent, request);
+		try {
+			return this.agentExecutor.stream(agent, sessionId, caller, request.variables(), request.input(), request.ragEnabled(), request.toolsEnabled(), request.model());
+		} catch (AgentContractException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
 	}
 
 	/**
-	 * 요청에 message와 agent 값이 제대로 들어 있는지 미리 확인합니다.
+	 * 요청에 input과 agent 값이 제대로 들어 있는지 미리 확인합니다.
 	 *
 	 * @param request 검증할 채팅 요청입니다.
 	 */
 	private void validateRequest(ChatRequest request) {
-		if (StringUtil.isEmpty(request.message())) {
-			// message가 비어 있으면 Spring AI 내부의 ChatClientRequestSpec.user() 메서드가
+		if (request.input() == null || (request.input() instanceof String text && StringUtil.isEmpty(text))) {
+			// input이 비어 있으면 Spring AI 내부의 ChatClientRequestSpec.user() 메서드가
 			// IllegalArgumentException을 던지면서 실패합니다. 그 전에 여기서 먼저 걸러내면, 사용자에게
 			// 원인을 정확히 알려주는 400 Bad Request 응답을 바로 줄 수 있습니다.
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "input은 필수입니다.");
 		}
 		if (StringUtil.isEmpty(request.agent())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agent는 필수입니다.");
+		}
+	}
+
+	/**
+	 * 요청의 input이 Agent의 input 계약 모양인지 LLM을 부르기 전에 확인합니다. 아니면 400으로 거절합니다.
+	 *
+	 * @param agent   부를 Agent의 정의입니다.
+	 * @param request 검증할 채팅 요청입니다.
+	 */
+	private void checkInput(AgentDefinition agent, ChatRequest request) {
+		try {
+			this.agentExecutor.toUserMessage(agent, request.input());
+		} catch (AgentContractException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
 	}
 

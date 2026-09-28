@@ -1,7 +1,10 @@
 package net.dstone.boot.ai.vo;
 
 /**
- * /ai/chat/sendMessage.do 요청 바디. sessionId는 화면에서 받지 않는다 - dstone-boot가 로그인 사용자
+ * /ai/chat/sendMessage.do 요청 바디.
+ *
+ * input은 선택한 Agent의 input 모양이어야 한다 - 보통은 입력창의 글자 그대로이고, Agent input이 object면
+ * 화면이 입력창 글자를 JSON으로 읽어서 객체로 보낸다(/ai/chat/list.do가 돌려주는 input 스키마로 판단). sessionId는 화면에서 받지 않는다 - dstone-boot가 로그인 사용자
  * ID를 자체 sessionId로 써서 dstone-ai-engine에 넘기므로 클라이언트가 관리할 필요가 없다.
  *
  * agent는 비워서 보내면(null/빈 문자열) 기본 Agent(ChatService.AGENT, sample-general-chat)를 그대로
@@ -12,5 +15,5 @@ package net.dstone.boot.ai.vo;
  * 그대로 쓰고, 채워서 보내면 이번 메시지 한 번만 그 모델로 강제한다 - dstone-ai-engine의
  * AgentDefinition.model(Agent별 기본 모델) 기능을 화면에서 재배포 없이 바로 테스트해볼 수 있게 하기 위한 입력칸이다.
  */
-public record ChatMessageRequest(String message, String agent, Boolean ragEnabled, Boolean toolsEnabled, String model) {
+public record ChatMessageRequest(Object input, String agent, Boolean ragEnabled, Boolean toolsEnabled, String model) {
 }

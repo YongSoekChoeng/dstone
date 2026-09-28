@@ -13,6 +13,14 @@
 - 문자열 안의 `${VAR_NAME}`은 기동 시 `conf/env{-profile}.properties` 값으로 바뀐다(`YamlDefinitionLoader`). 찾지 못한 이름은 `${VAR_NAME}` 글자 그대로 남는다. `{{ }}`(실행 중 데이터 참조)와는 다른 것이다.
 - 파일 맨 위에 "이 파일이 무엇을 하는지, 어떻게 호출해 보면 되는지"를 주석으로 적어 두는 것이 이 프로젝트의 관례다.
 
+**이 가이드의 세 가지 원칙**
+
+1. **계약은 부르는 대상이 가진다.** 무엇을 받고 무엇을 돌려주는지는 Agent(`agents/*.yml`의 `input`/`output`)나 Tool(인자 스키마)이 정한다.
+   Workflow의 step은 "무엇을 넣을지(`input`)"와 "다음에 어디로 갈지"만 적는다. step에 `output`을 적는 자리는 없다.
+2. **숨은 이름이 없다.** 실행 중 값은 YAML에 적은 이름 그대로만 꺼낸다 — `{{input...}}`(Workflow 입력)과 `{{steps.<id>.input|output|error}}`(step 결과).
+   엔진이 몰래 채워 넣는 `text`, `previous`, `items`, `message` 같은 이름은 없다.
+3. **모양은 JSON Schema로 적는다.** `input`/`output`의 `schema` 아래에 표준 JSON Schema를 YAML로 그대로 적는다(4절). 타입만 필요하면 축약형(`input: string`)을 쓴다.
+
 ### 2 Workflow 항목
 
 `workflow:` 아래에 적는다(`common.definition.workflow.WorkFlowDefinition`).
@@ -23,12 +31,12 @@
 | `description` | | 문자열 | 사람이 읽는 설명. `GET /api/ai/workflow` 목록과 dstone-boot 화면 안내문에 쓰인다 |
 | `maxIterations` | | 정수 | 전체 step 실행 횟수 상한(루프 방지). 비우면 **10** |
 | `allowedCallers` | | 문자열 리스트 | 실행을 허락할 caller 목록. 비우면 누구나. ⚠️ 인증이 꺼져 있으면 caller가 항상 null이라, 채우는 순간 아무도 실행 못 한다 |
-| `inputs` | | 맵(이름 → 타입) | 입력 계약. 요청의 `variables`에 이 값들이 없거나 타입이 다르면 실행 전에 **400**. `message`는 항상 들어오므로 선언하지 않는다. 선언하면 `{{inputs.이름}}` 참조도 이 목록으로 기동 시 검사한다 |
-| `output` | | 템플릿 문자열 | 성공으로 끝났을 때 돌려줄 최종 결과. 비우면 마지막으로 실행된 step의 `text` |
+| `input` | | 스키마 | 실행 요청의 `input` 모양(입력 계약). 비우면 `string`. 모양이 틀린 요청은 실행 전에 **400** |
+| `output` | ✅ | `{value, schema}` | 성공으로 끝났을 때 돌려줄 최종 결과. `value`(어디서 가져올지)는 필수, `schema`(모양 검사)는 선택 |
 | `steps` | ✅ | step 리스트 | 실행할 step 목록. 목록 순서가 기본 실행 순서다 |
 
-> 아래 2.1~2.7은 항목마다 **모양 → 동작 → 검사 시점 → 경우별 결과** 순서로 자세히 적었다.
-> "기동 실패"는 엔진이 켜질 때 예외로 멈춘다는 뜻이고(`WorkFlowRegistry`), "400"은 실행 요청을 거절한다는 뜻이며,
+> 아래 2.1~2.7은 항목마다 **모양 → 동작 → 검사 시점 → 경우별 결과** 순서로 적었다.
+> "기동 실패"는 엔진이 켜질 때 예외로 멈춘다는 뜻이고(`YamlDefinitionLoader`/`WorkFlowRegistry`), "400"은 실행 요청을 거절한다는 뜻이며,
 > "FAILED"는 실행은 시작됐지만 Workflow 전체가 실패 상태로 끝난다는 뜻이다.
 
 #### 2.1 `id`
@@ -55,7 +63,7 @@ workflow:
 ```
 
 - 사람이 읽는 설명이다. 실행 동작에는 영향이 없다.
-- `GET /api/ai/workflow` 목록에 `id`와 함께 나가고, dstone-boot "Workflow 테스트" 화면 드롭다운의 안내문으로 쓰인다.
+- `GET /api/ai/workflow` 목록에 `id`, `input` 스키마와 함께 나가고, dstone-boot "Workflow 테스트" 화면 드롭다운의 안내문으로 쓰인다.
 - 생략하면 목록에 빈 값으로 나갈 뿐 오류는 없다.
 
 #### 2.3 `maxIterations`
@@ -99,57 +107,60 @@ workflow:
 - Workflow의 `allowedCallers`와 step이 부르는 Agent의 `allowedCallers`는 **따로** 검사한다. Workflow를 실행할 수 있어도
   AGENT step의 Agent가 그 caller를 막으면 그 step에서 FAILED가 된다([3.3 `ref`](#33-ref) 참고).
 
-#### 2.5 `inputs`
+#### 2.5 `input`
 
-**한 줄 요약** — "이 Workflow를 실행하려면 요청에 **이런 값을 꼭 넣어 와라**"는 약속(입력 계약)이다.
+**한 줄 요약** — "이 Workflow를 실행하려면 요청의 `input`에 **이런 모양의 값**을 넣어 와라"는 약속(입력 계약)이다.
 
 Java 메서드의 매개변수 선언이라고 생각하면 쉽다.
 
 ```
-YAML의 inputs                       ≒  Java 메서드 매개변수
+YAML의 workflow.input               ≒  Java 메서드 매개변수
 ──────────────────────────────────     ──────────────────────────────────────────────
-inputs:                                String review(
-  sqlList: list<string>                    List<String>        sqlList,
-  targetVersion: string                    String              targetVersion,
-  maxRows: integer                         Integer             maxRows,
-  options: object                          Map<String,Object>  options,
-(선언하지 않아도 항상 있음)                   String              message )   ← 요청의 message
+input: string                          String run(String input)
+input:                                 String run(Input input)   ← record Input(List<String> sqlList, String targetVersion)
+  schema:
+    type: object
+    properties:
+      sqlList: list<string>
+      targetVersion: string
+    required: [sqlList]
 
-실행 요청의 variables               ≒  메서드를 부를 때 넘기는 값(인자)
+실행 요청의 input                   ≒  메서드를 부를 때 넘기는 값(인자)
 ```
 
-- 선언한 이름 그대로 **`{{inputs.이름}}`**으로 꺼낸다(`inputs: {sqlList: ...}` → `{{inputs.sqlList}}`, `forEach: inputs.sqlList`).
-- 선언한 값은 **모두 필수**다. "있어도 되고 없어도 되는 값"을 표현하는 방법은 없다([2.5.5](#255-자주-쓰는-선언-패턴) 패턴 F 참고).
-- `message`는 요청마다 항상 들어오므로 선언하지 않는다.
-- `inputs`를 적으면 두 번 검사한다. **엔진이 켜질 때** `{{inputs.*}}` 참조가 선언된 이름인지, **요청이 올 때** 값이 빠지거나 타입이 틀리지 않았는지.
+- 모양은 [4절](#4-스키마-json-schema)의 스키마로 적는다. 비우면 `string`이다(글자 하나).
+- 요청 body는 `{"input": <값>, "sessionId": "..."}` 하나다. 예전의 `message`/`variables`는 없다.
+- 요청의 `input`은 그대로 실행 컨텍스트의 `input`이 된다. step은 **`{{input}}`**(글자면 그 글자) 또는 **`{{input.필드}}`**(object면 그 필드)로 꺼낸다.
+- 두 번 검사한다. **엔진이 켜질 때** 스키마가 올바른 JSON Schema인지와 `{{input.x}}` 참조가 스키마에 있는 경로인지, **요청이 올 때** 값이 스키마에 맞는지.
+- `input`이 **object면 그 필드들이 Agent system prompt의 `{변수}`도 채운다**(예: prompt의 `{role}` ← `input.role`). 글자면 prompt 변수는 없다.
 
 ##### 2.5.1 한눈에 보기 — 값이 흘러가는 길
 
 ```
- ┌────────────────────────────┐                ┌──────────────────────────────────────────┐
- │ 개발자: workflows/xxx.yml   │                │ 호출자: POST /api/ai/workflow/{id}/execute │
- │   inputs:                  │                │   { "message": "...",                    │
- │     sqlList: list<string>  │                │     "variables": { "sqlList": [...] } }  │
- └─────────────┬──────────────┘                └────────────────────┬─────────────────────┘
-               │                                                    │
+ ┌──────────────────────────────┐              ┌───────────────────────────────────────────┐
+ │ 개발자: workflows/xxx.yml     │              │ 호출자: POST /api/ai/workflow/{id}/execute  │
+ │   input:                     │              │   { "input": { "sqlList": [...],          │
+ │     schema: {type: object..} │              │                "targetVersion": "16" } }  │
+ └──────────────┬───────────────┘              └─────────────────────┬─────────────────────┘
+                │                                                    │
    ════════ 엔진 기동 시 (한 번) ═════════            ════════ 요청이 올 때 (매번) ═════════
-               ▼                                                    ▼
-   ① YAML 글자 → Map          (SnakeYAML)            ⑤ message가 비었나?        → 400
-   ② Map → WorkFlowDefinition (Jackson)              ⑥ 이 caller가 써도 되나?   (allowedCallers)
-   ③ 타입 이름이 올바른가?      → 기동 실패             ⑦ inputs 계약을 지켰나?    → 400
-   ④ {{inputs.x}}가 선언된 이름인가? → 기동 실패        ⑧ 실행 컨텍스트 만들기     (context.inputs)
-               │                                                    │
-               └──────────── WorkFlowRegistry에 등록 ──────────────┐ │
-                                                                  ▼ ▼
+                ▼                                                    ▼
+   ① YAML 글자 → Map          (SnakeYAML)            ⑤ input이 비었나?          → 400
+   ② Map → WorkFlowDefinition (Jackson, 축약형 펼침)   ⑥ 이 caller가 써도 되나?   (allowedCallers)
+   ③ 스키마가 올바른 JSON Schema인가? → 기동 실패       ⑦ input이 스키마에 맞나?    → 400
+   ④ {{input.x}}가 스키마에 있는 경로인가? → 기동 실패   ⑧ 실행 컨텍스트 만들기     (context.input)
+                │                                                    │
+                └──────────── WorkFlowRegistry에 등록 ──────────────┐ │
+                                                                   ▼ ▼
                                   ═════════ step을 실행할 때 (step마다) ═════════
-                                  ⑨  forEach: inputs.sqlList      → 리스트를 꺼내 항목 수만큼 반복
-                                  ⑩  step input의 {{inputs.x}}    → Tool 인자 / LLM 사용자 메시지
-                                  ⑪  Agent prompt의 {x}          → LLM 시스템 메시지
-                                  ⑫  Workflow output의 {{inputs.x}} → 최종 응답
+                                  ⑨  forEach: input.sqlList       → 리스트를 꺼내 항목 수만큼 반복
+                                  ⑩  step input의 {{input.x}}     → Tool 인자 / Agent input
+                                  ⑪  Agent prompt의 {x}           → LLM 시스템 메시지(input이 object일 때)
+                                  ⑫  output.value의 {{input.x}}   → 최종 결과
 ```
 
 - ①~④는 엔진이 켜질 때 한 번, ⑤~⑧은 요청마다 한 번, ⑨~⑫는 step마다 일어난다.
-- `inputs` 값은 ⑧에서 한 번 만들어진 뒤 **실행이 끝날 때까지 바뀌지 않는다**. 어느 step에서 꺼내도 같은 값이다.
+- `input` 값은 ⑧에서 한 번 들어간 뒤 **실행이 끝날 때까지 바뀌지 않는다**. 어느 step에서 꺼내도 같은 값이다.
 
 ##### 2.5.2 샘플 Workflow
 
@@ -162,36 +173,38 @@ workflow:
   id: sql-review
   description: SQL 목록을 문법 검사한 뒤, 대상 PostgreSQL 버전 기준으로 검토한다
   maxIterations: 5
-  inputs:
-    sqlList: list<string>                 # 축약형: 타입만
-    targetVersion:                        # 확장형: 타입 + 설명(설명은 사람만 읽는다)
-      type: string
-      description: 대상 PostgreSQL 버전(예 "16")
-    maxRows: integer
-    options: object
-  output: "{{steps.review.text}}"
+  input:
+    schema:
+      type: object
+      properties:
+        sqlList: list<string>                  # 축약형: 타입만
+        targetVersion:                         # 표준형: 타입 + 설명
+          type: string
+          description: 대상 PostgreSQL 버전(예 "16")
+        maxRows: { type: integer, minimum: 1 }
+      required: [sqlList, targetVersion]       # maxRows는 선택
+  output:
+    value: "{{steps.review.output}}"
   steps:
 
-    - id: check                           # ❶ 리스트를 forEach로 쪼개서 TOOL에 넘기기
+    - id: check                                # ❶ 리스트를 forEach로 쪼개서 TOOL에 넘기기
       type: TOOL
       ref: validateSqlSyntax
-      forEach: inputs.sqlList
+      forEach: input.sqlList
       input:
         sql: "{{item}}"
 
-    - id: review                          # ❷ 글자 안에 섞어 LLM에게 넘기기
+    - id: review                               # ❷ 글자 안에 섞어 Agent(input: string)에게 넘기기
       type: AGENT
       ref: sql-review-agent
       input: |
-        아래 SQL을 PostgreSQL {{inputs.targetVersion}} 기준으로 검토해 주세요.
-        조회 결과는 최대 {{inputs.maxRows}}건으로 제한해 주세요.
-        엄격 모드: {{inputs.options.strict}}
+        아래 SQL을 PostgreSQL {{input.targetVersion}} 기준으로 검토해 주세요.
 
         [SQL 목록]
-        {{inputs.sqlList}}
+        {{input.sqlList}}
 
         [문법 검사 결과]
-        {{steps.check.text}}
+        {{steps.check.output}}
 ```
 
 ```yaml
@@ -199,8 +212,8 @@ workflow:
 agent:
   id: sql-review-agent
   prompt: |
-    당신은 PostgreSQL {targetVersion} 전문 DBA입니다.
-    요청자의 원래 메시지는 "{message}"입니다.
+    당신은 PostgreSQL {targetVersion} 전문 DBA입니다.     # ← Workflow input.targetVersion
+  # input/output을 비워 두었으므로 둘 다 string
 ```
 
 호출 요청:
@@ -208,12 +221,10 @@ agent:
 ```json
 POST /api/ai/workflow/sql-review/execute
 {
-  "message": "운영 반영 전에 SQL 검토 부탁합니다",
-  "variables": {
+  "input": {
     "sqlList": ["SELECT * FROM emp", "SELECT name FROM dept"],
     "targetVersion": "16",
-    "maxRows": 100,
-    "options": { "strict": true }
+    "maxRows": 100
   }
 }
 ```
@@ -226,376 +237,142 @@ POST /api/ai/workflow/sql-review/execute
 > ```
 > [YAML = 선언, 기동 시 한 번 읽힘]            [실행 컨텍스트 = 값, 실행마다 새로 생김]
 > workflow:                                  context
->   inputs:                    ────────────▶  ├── inputs      ← 요청에 실제로 온 값(variables + message)
->     sqlList: list<string>                  │    └── sqlList : ["SELECT ...", ...]
->   steps:                                   ├── steps
->     - id: check              ────────────▶  │    ├── check  : { input, output, text, error, items }
->       input: {sql: ...}      ────────────▶  │    │              ↑ 채운 값  ↑ 결과 값
->       output: lines          ────────────▶  │    └── review : { input, output, text, error }
->     - id: review                           ├── previous    ← 바로 앞 step의 결과(모양은 steps.<id>와 같음)
->       forEach: ...           ────────────▶  └── item        ← forEach 반복 중에만, 반복별 복사본에
+>   input:                     ────────────▶  ├── input       ← 요청에 실제로 온 값 그대로
+>     schema: {...}                          │    ├── sqlList : ["SELECT ...", ...]
+>   steps:                                   │    └── targetVersion : "16"
+>     - id: check              ────────────▶  ├── steps
+>       input: {sql: ...}      ────────────▶  │    ├── check  : { input, output, error }
+>       forEach: ...                         │    │              ↑ 채운 값  ↑ 돌려준 값
+>     - id: review             ────────────▶  │    └── review : { input, output, error }
+>                                            └── item        ← forEach 반복 중에만, 반복별 복사본에
 > ```
 >
 > | YAML에 적는 곳 (선언) | 템플릿으로 꺼내는 곳 (값) | 누가, 언제 넣나 |
 > |---|---|---|
-> | `workflow.inputs.sqlList` — 타입 | `{{inputs.sqlList}}` — 요청에 온 값 | 요청이 오면 `WorkFlowContext.create()`가 요청 `variables`를 복사 |
+> | `workflow.input` — 모양 | `{{input}}`, `{{input.sqlList}}` — 요청에 온 값 | 요청이 오면 `WorkFlowContext.create()`가 넣음 |
 > | step `input` — 템플릿 | `{{steps.<id>.input}}` — 채운 뒤 실제로 받은 값 | step 실행 직전에 템플릿을 채워서, 끝나면 기록 |
-> | step `output` — 결과 모양(AGENT는 필드 맵, TOOL은 `text`/`json`/`lines`) | `{{steps.<id>.output.<키>}}` — 그 모양의 결과 값 | step이 끝나면 `StepOutcome.toRecord()` 모양으로 기록 |
+> | (Agent `output` / Tool 응답 / 엔진이 정한 모양) | `{{steps.<id>.output}}` — 돌려준 값 | step이 끝나면 `StepOutcome.toRecord()` 모양으로 기록 |
+> | (실패 사유) | `{{steps.<id>.error}}` | step이 실패하면 기록(성공이면 null) |
 > | step `forEach` / `itemVariable` | `{{item}}` — 이번 반복의 항목 | `runForEach()`가 항목마다 `WorkFlowContext.withItem()`으로 복사본을 만들어 넣음 |
-> | (선언 없음 — 엔진이 만듦) | `{{steps.<id>.text}}`, `.error`, `.items`, `{{previous...}}` | step이 끝나면 엔진이 기록(3절 "모든 step이 남기는 결과") |
 >
-> Java로 치면 YAML의 `inputs`는 **매개변수 선언**(`List<String> sqlList`)이고, 컨텍스트의 `inputs`는 호출 때 넘어온 **인자 값**이다.
-> 이름은 같고, 선언 쪽에는 타입이, 값 쪽에는 실제 값이 들어 있다.
-> 예전 이름 `{{input.x}}`, `steps.<id>.data.x`를 쓰면 기동이 실패하고, 오류 메시지가 새 이름을 알려 준다.
+> 없어진 이름(`inputs`, `previous`, `steps.<id>.text`, `steps.<id>.items`)을 쓰면 기동이 실패하고, 오류 메시지가 새 이름을 알려 준다.
 
 ##### 2.5.3 단계별로 따라가기
 
-**① YAML 글자 → Map** — `YamlDefinitionLoader`가 SnakeYAML로 파일을 읽는다. 아직은 평범한 Map/List/String이다.
-이때 `${VAR}`(환경 값) 치환도 같이 한다.
+**① YAML 글자 → Map** — `YamlDefinitionLoader`가 SnakeYAML로 파일을 읽는다. 이때 `${VAR}`(환경 값) 치환도 같이 한다.
 
-```
-{ workflow = {
-    id = "sql-review",
-    inputs = {
-      sqlList       = "list<string>",                                   ← 축약형은 그냥 글자
-      targetVersion = { type = "string", description = "대상 PostgreSQL ..." },   ← 확장형은 맵
-      maxRows       = "integer",
-      options       = "object"
-    },
-    steps = [ {...}, {...} ], ...
-} }
-```
+**② Map → `WorkFlowDefinition`** — Jackson이 record로 바인딩한다. `input`은 `common.definition.SchemaDefinition`으로 읽히면서
+**축약형이 표준 JSON Schema로 펼쳐진다**(`sqlList: list<string>` → `sqlList: {type: array, items: {type: string}}`).
+모르는 키나 모르는 타입 이름(`strng`)은 여기서 기동 실패다.
 
-**② Map → Java record** — Jackson `convertValue()`가 `WorkFlowDefinition`으로 바꾼다.
-축약형과 확장형은 여기서 **같은 모양**(`FieldDefinition`)이 된다.
+**③ 스키마 검사** — `WorkFlowRegistry`가 `input.schema`(와 `output.schema`)를 JSON Schema 2020-12 메타스키마로 검사한다
+(`JsonSchemas.checkSchema()`). 예: `type: strin`, `required: name`(리스트가 아님)은 기동 실패.
 
-```
-WorkFlowDefinition.inputs : Map<String, FieldDefinition>
-  "sqlList"       → FieldDefinition(type="list<string>", description=null)     ← 글자 → FieldDefinition.of(글자)
-  "targetVersion" → FieldDefinition(type="string",       description="대상 ...") ← 맵   → 생성자(type, description)
-  "maxRows"       → FieldDefinition(type="integer",      description=null)
-  "options"       → FieldDefinition(type="object",       description=null)
-```
+**④ 참조 검사** — step `input`, `forEach`, `output.value` 안의 `{{input.x.y}}`를 스키마를 따라 내려가며 검사한다(`JsonSchemas.checkPath()`).
+`properties`에 없는 이름은 기동 실패 `input에는 [sqlList, targetVersion, maxRows]만 있습니다('sqlLis' 없음).`
+(`additionalProperties`를 열어 두었거나 `properties`가 없는 object는 더 들어가 보지 않는다.)
 
-**③ 타입 이름 검사** — `WorkFlowRegistry`가 `FieldTypes.invalidFields()`로 확인한다.
-`list<str>`처럼 틀린 이름, `x:`처럼 빈 값이 하나라도 있으면 기동 실패다.
+**⑤ 요청 확인** — 요청의 `input`이 없거나 빈 글자면 400 `input은 필수입니다`.
 
-```
-inputs의 타입 이름이 올바르지 않습니다: [x(list<str>)]
-```
+**⑥ caller 확인** — [2.4](#24-allowedcallers).
 
-**④ `{{inputs.*}}` 참조 검사** — Workflow 안의 모든 템플릿에서 `input.` 뒤의 **첫 번째 이름**만 확인한다.
+**⑦ 모양 확인** — `WorkFlowExecutionService.checkInput()`이 요청 `input`을 스키마로 검사한다(networknt json-schema-validator).
+틀리면 400 `workflow[x]의 input 모양이 맞지 않습니다: [/sqlList: string 발견, array 예상]`처럼 **위치와 이유**를 알려 준다.
 
-| 샘플 속 참조 | 위치 | 기동 시 | 이유 |
-|---|---|---|---|
-| `inputs.sqlList` | `check.forEach` | ✅ | 선언됨 |
-| `{{inputs.targetVersion}}` | `review.input` | ✅ | 선언됨 |
-| `{{inputs.options.strict}}` | `review.input` | ✅ | `options`만 검사한다. `strict`는 실행 중에 찾는다 |
-| `{{inputs.message}}` | 어디든 | ✅ | 선언하지 않아도 항상 허용 |
-| `{{inputs.targetVer}}` (오타) | — | ❌ 기동 실패 | `inputs.targetVer는 Workflow의 inputs에 선언되어 있지 않습니다(선언된 inputs = message, [sqlList, targetVersion, maxRows, options])` |
-| Agent prompt의 `{targetVersion}` | Agent YAML | 검사 안 함 | Agent는 어느 Workflow에서 불릴지 모른다. 값이 없으면 호출할 때 예외 |
+**⑧ 컨텍스트 생성** — `context.input = 요청의 input`, `context.steps = {}`. 다른 것은 없다.
 
-> `inputs`를 **생략하면 ④를 건너뛴다**. 그래서 오타가 기동 때 잡히지 않고, 실행 중에 그 step이 "값을 찾을 수 없습니다"로 실패한다.
-> 오타를 미리 잡고 싶다면 쓰는 값을 `inputs`에 선언해 두는 것이 좋다.
+**⑨~⑫ 꺼내 쓰기** — `forEach: input.sqlList`, `{{input.targetVersion}}`, prompt의 `{targetVersion}`, `output.value`의 `{{input.x}}`.
 
-**⑤~⑦ 요청 검사** — `WorkFlowController`가 이 순서로 확인한다. `/execute`(동기)와 `/submit`(비동기) 모두 **실행을 시작하기 전에** 검사하므로,
-실패해도 실행 이력(FAILED)이 남지 않고 HTTP **400**으로 바로 돌아간다.
+##### 2.5.4 자주 쓰는 선언 패턴
 
-```
-⑤ validateMessage()           message가 비었나?          → 400 "message는 필수입니다."
-⑥ WorkFlowRegistry.resolve()  등록된 id인가? caller 허용?  → 거절
-⑦ checkInputs()               inputs 계약을 지켰나?       → 400 (문제를 모두 모아서 한 번에)
-```
-
-⑦에서는 요청 JSON이 Jackson을 거쳐 **Java 값**이 된 뒤에 타입을 비교한다(`FieldTypes.matches()`).
-
-```
-요청 JSON                                   Java 값                                선언 타입         결과
-"sqlList":       ["SELECT * FROM emp", ...]  → ArrayList<String>                    list<string>      ✅
-"targetVersion": "16"                        → String                               string            ✅
-"maxRows":       100                         → Integer                              integer           ✅
-"options":       { "strict": true }          → LinkedHashMap                        object            ✅ (안쪽은 검사 안 함)
-```
-
-**⑧ 실행 컨텍스트 만들기** — `WorkFlowContext.create(message, variables)`가 아래 트리를 만든다.
-이 트리가 실행 전체의 저장소이고, `{{ }}`는 모두 이 트리에서 값을 찾는다(DB에는 `CONTEXT_JSON` 컬럼으로 저장된다).
-
-```
-context
-├── input                               ← variables를 그대로 복사 + message 추가
-│   ├── sqlList       : ["SELECT * FROM emp", "SELECT name FROM dept"]
-│   ├── targetVersion : "16"
-│   ├── maxRows       : 100
-│   ├── options       : { strict: true }
-│   └── message       : "운영 반영 전에 SQL 검토 부탁합니다"
-├── steps          : { }                ← 아직 실행된 step이 없다
-└── previous
-    └── text       : "운영 반영 전에 SQL 검토 부탁합니다"   ← 첫 step이 {{previous.text}}로 message를 받게
-```
-
-**⑨ step `check` — `forEach`로 리스트 나누기**
-
-```
-forEach: inputs.sqlList
-   │
-   └─▶ context.inputs.sqlList = ["SELECT * FROM emp", "SELECT name FROM dept"]   (리스트 아니면 step 실패)
-          │
-          ├── 반복 [0] ── 컨텍스트 복사본 + item = "SELECT * FROM emp"
-          │                input { sql: "{{item}}" }  →  { sql: "SELECT * FROM emp" }
-          │                → ToolStepExecutor.run(arguments = {sql: "SELECT * FROM emp"})
-          │                → validateSqlSyntax(sql = "SELECT * FROM emp")
-          │
-          └── 반복 [1] ── (동시에) item = "SELECT name FROM dept" → validateSqlSyntax(sql = "SELECT name FROM dept")
-
-결과 → context.steps.check = { output: {}, text: "<반복별 text를 줄바꿈으로 이은 것>", items: [ {...}, {...} ] }
-```
-
-**⑩ step `review` — `{{inputs.x}}`를 글자 안에 채우기** — AGENT의 `input`은 항상 글자가 된다.
-숫자/boolean은 `toString()`, 리스트/맵은 **JSON 글자**로 끼워진다.
-
-```
-채우기 전 (YAML)                                     채운 뒤 (LLM 사용자 메시지)
-──────────────────────────────────────────────────  ─────────────────────────────────────────────────
-아래 SQL을 PostgreSQL {{inputs.targetVersion}} 기준…  아래 SQL을 PostgreSQL 16 기준으로 검토해 주세요.
-조회 결과는 최대 {{inputs.maxRows}}건으로…           조회 결과는 최대 100건으로 제한해 주세요.
-엄격 모드: {{inputs.options.strict}}                  엄격 모드: true
-
-[SQL 목록]                                          [SQL 목록]
-{{inputs.sqlList}}                                   ["SELECT * FROM emp","SELECT name FROM dept"]
-
-[문법 검사 결과]                                     [문법 검사 결과]
-{{steps.check.text}}                                <check step의 결과 text>
-```
-
-이 글자는 `AgentStepExecutor.run(execution, step, input=<위 글자>, workflowInputs=context.inputs)`로 넘어간다.
-
-**⑪ Agent prompt의 `{x}` 채우기** — `AgentExecutor`가 `workflowInputs`(= `context.inputs` 전체)으로 system prompt를 채운다.
-`{{ }}`가 아니라 **`{ }` 한 겹**(Spring AI `PromptTemplate`)이다.
-
-```
-LLM에게 실제로 가는 메시지
-┌─ system ───────────────────────────────────────────────────────┐
-│ 당신은 PostgreSQL 16 전문 DBA입니다.                               │  ← {targetVersion}
-│ 요청자의 원래 메시지는 "운영 반영 전에 SQL 검토 부탁합니다"입니다.      │  ← {message}
-└────────────────────────────────────────────────────────────────┘
-┌─ (같은 sessionId의 이전 대화) ────────────────────────────────────┐
-└────────────────────────────────────────────────────────────────┘
-┌─ user ─────────────────────────────────────────────────────────┐
-│ 아래 SQL을 PostgreSQL 16 기준으로 검토해 주세요. ...               │  ← ⑩에서 채운 step input
-└────────────────────────────────────────────────────────────────┘
-```
-
-> **같은 `inputs` 값이 LLM에게 가는 문은 두 개다.**
-> - `{{inputs.x}}` in step `input` → **user 메시지**. "이번 step에서 처리할 데이터". step마다 다르게 쓸 수 있다.
-> - `{x}` in Agent `prompt` → **system 메시지**. "이 Agent의 역할/규칙". 그 Agent를 쓰는 모든 step에 똑같이 들어간다.
-
-**⑫ Workflow `output`** — 성공으로 끝나면 `{{steps.review.text}}`를 채워 응답의 `message`로 돌려준다.
-`output`에서도 `{{inputs.x}}`를 쓸 수 있다(예: `"[{{inputs.targetVersion}}] {{steps.review.text}}"`).
-
-##### 2.5.4 같은 값, 다른 자리 — 모양이 어떻게 바뀌나
-
-같은 `inputs` 값이라도 **어디에 쓰느냐**에 따라 넘어가는 모양이 다르다.
-
-| 요청 값 (선언 타입) | TOOL 인자 `"{{inputs.x}}"` (값 전체가 참조 하나) | 글자에 섞음 `"n={{inputs.x}}"` / AGENT `input` | Agent prompt `{x}` | `forEach: inputs.x` |
-|---|---|---|---|---|
-| `"16"` (`string`) | `"16"` | `n=16` | `16` | ❌ step 실패(리스트 아님) |
-| `100` (`integer`) | `100` (**숫자 그대로**) | `n=100` | `100` | ❌ step 실패 |
-| `true` (`boolean`) | `true` (**boolean 그대로**) | `n=true` | `true` | ❌ step 실패 |
-| `["a","b"]` (`list<string>`) | `["a","b"]` (**리스트 그대로**) | `n=["a","b"]` (JSON 글자) | ⚠️ `ab` (구분자 없이 붙음) | ✅ 2회 반복, `{{item}}` = `"a"`, `"b"` |
-| `{"strict":true}` (`object`) | `{strict: true}` (**맵 그대로**) | `n={"strict":true}` (JSON 글자) | ⚠️ `strict` (키 이름만) | ❌ step 실패 |
-| `{"strict":true}`의 안쪽 | `"{{inputs.options.strict}}"` → `true` | `n={{inputs.options.strict}}` → `n=true` | `{options.strict}` → `true` | — |
-
-- TOOL 인자에 리스트/숫자를 **타입 그대로** 넘기려면 따옴표 안에 `{{ }}` 하나만 적는다(`maxRows: "{{inputs.maxRows}}"` → `100`).
-- Agent prompt `{x}`에는 **문자열 값**을 쓰는 것이 안전하다. 리스트/맵이 필요하면 step `input`의 `{{inputs.x}}`로 넘긴다.
-
-##### 2.5.5 자주 쓰는 선언 패턴
-
-**A. 선언 없음 — message 하나로 충분할 때**
-
+**A. 글자 하나(가장 흔함)** — 요청 `{"input": "..."}`, 꺼낼 때 `{{input}}`.
 ```yaml
-workflow:
-  id: summarize
-  # inputs 생략
-  steps:
-    - id: sum
-      type: AGENT
-      ref: summary-agent
-      input: "{{inputs.message}}"          # input을 생략해도 첫 step은 message를 받는다
+  input: string
 ```
 
-```json
-{ "message": "요약할 긴 글..." }
-```
-
-**B. 문자열 하나 — 옵션 값을 받을 때**
-
+**B. 필수 필드 몇 개** — 요청 `{"input": {"message": "...", "role": "..."}}`, 꺼낼 때 `{{input.message}}`. `role`은 Agent prompt `{role}`도 채운다.
 ```yaml
-  inputs:
-    language: string
-  steps:
-    - id: translate
-      type: AGENT
-      ref: translator-agent
-      input: |
-        아래 글을 {{inputs.language}}로 번역하세요.
-        {{inputs.message}}
+  input:
+    schema:
+      type: object
+      properties:
+        message: { type: string, description: 고객 문의 원문 }
+        role: string
+      required: [message, role]
 ```
 
-```json
-{ "message": "안녕하세요", "variables": { "language": "English" } }
-```
-
-**C. 문자열 리스트 — 항목마다 같은 일을 할 때 (`forEach`)**
-
+**C. 선택 필드** — `required`에 넣지 않은 필드는 요청에 없어도 된다. 없는 필드를 `{{input.maxRows}}`로 꺼내면 그 step이 실패하므로 `??`로 대체값을 둔다.
 ```yaml
-  inputs:
-    sqlList: list<string>
-  steps:
-    - id: validate-each
-      type: TOOL
-      ref: validateSqlSyntax
-      forEach: inputs.sqlList
-      input:
-        sql: "{{item}}"
+  input:
+    schema:
+      type: object
+      properties:
+        sql: string
+        maxRows: { type: integer, minimum: 1 }
+      required: [sql]
+# step에서: "{{input.maxRows ?? steps.defaults.output.maxRows}}"
 ```
 
-```json
-{ "message": "검사", "variables": { "sqlList": ["SELECT 1 FROM dual", "SELEC 1 FROM dual"] } }
-```
-
-**D. 객체 리스트 — 항목마다 여러 값이 필요할 때 (`list<object>` + `{{item.키}}`)**
-
+**D. 리스트** — forEach 대상.
 ```yaml
-  inputs:
-    tables: list<object>
-  steps:
-    - id: describe-each
-      type: AGENT
-      ref: table-doc-agent
-      forEach: inputs.tables
-      itemVariable: t                     # {{item}} 대신 {{t}}
-      input: |
-        테이블 {{t.name}}의 설명을 작성하세요.
-        컬럼: {{t.columns}}
+  input:
+    schema:
+      type: object
+      properties:
+        sqlList: { type: array, items: { type: string }, minItems: 1 }
+      required: [sqlList]
 ```
 
-```json
-{ "message": "문서화", "variables": { "tables": [
-    { "name": "EMP",  "columns": ["EMPNO", "ENAME"] },
-    { "name": "DEPT", "columns": ["DEPTNO", "DNAME"] } ] } }
-```
-
-- `list<object>`는 항목이 **맵인지만** 검사한다. `name`/`columns`가 있는지는 실행 중에 찾고, 없으면 그 반복이 실패한다.
-
-**E. 숫자/boolean — Tool 인자로 타입 그대로 넘길 때**
-
+**E. 값 제한** — JSON Schema 키워드를 그대로 쓴다(`enum`, `minimum`, `maxLength`, `pattern` 등).
 ```yaml
-  inputs:
-    limit: integer
-    dryRun: boolean
-  steps:
-    - id: run
-      type: TOOL
-      ref: <tool-name>
-      input:
-        limit: "{{inputs.limit}}"          # → 100 (숫자)
-        dryRun: "{{inputs.dryRun}}"        # → true (boolean)
-        label: "limit={{inputs.limit}}"    # → "limit=100" (섞으면 글자)
+        priority: { type: string, enum: [HIGH, MID, LOW] }
 ```
 
-```json
-{ "message": "실행", "variables": { "limit": 100, "dryRun": true } }
-```
-
-- `integer`에 `100.0`이나 `"100"`을 보내면 400이다. `number`는 정수/실수를 모두 받는다.
-
-**F. 있어도 되고 없어도 되는 값 — `object`로 묶고 `??`로 대체값**
-
-`inputs`에 선언한 값은 모두 필수라서, "선택값"은 `object` 하나로 묶어 두고 안쪽 키를 `??`로 꺼낸다.
-기동 시에는 `options`까지만 검사하므로 안쪽 키는 요청에 없어도 된다.
-
-```yaml
-  inputs:
-    options: object
-  steps:
-    - id: answer
-      type: AGENT
-      ref: <agent-id>
-      input: |
-        말투: {{inputs.options.tone ?? inputs.message}}
-        ...
-```
-
-```json
-{ "message": "...", "variables": { "options": {} } }                       ← tone 없음 → ?? 오른쪽 값
-{ "message": "...", "variables": { "options": { "tone": "정중하게" } } }   ← tone 있음
-```
-
-- `??`의 오른쪽 끝은 **반드시 있는 값**(`inputs.message` 등)으로 둔다. 모든 경로가 없으면 step이 실패한다.
-- `options` 자체는 필수다. 선택값이 없어도 `"options": {}`는 보내야 한다.
-
-##### 2.5.6 타입별로 통과하는 값
-
-요청 JSON이 Jackson으로 바뀐 뒤의 Java 타입 기준이다(`FieldTypes.matches()`).
-
-| 타입 | 통과 | 통과 못 함 |
-|---|---|---|
-| `string` | `"abc"`, `""` | `123`, `true` |
-| `number` | `3`, `3.5` (모든 `Number`) | `"3.5"` |
-| `integer` | `3` (`Integer`/`Long`/`BigInteger`) | `3.0`(Double이 된다), `"3"` |
-| `boolean` | `true` | `"true"`, `1` |
-| `object` | `{...}` (안쪽 모양은 검사하지 않음) | 배열, 문자열 |
-| `list<T>` | 모든 항목이 T에 맞는 배열. **빈 배열 `[]`도 통과** | 항목 하나라도 타입이 다름 |
-
-##### 2.5.7 요청별 결과
-
-샘플 `sql-review`(2.5.2)에 여러 요청을 보냈을 때:
-
-| 보낸 `variables` | 결과 |
-|---|---|
-| 2.5.2의 요청 그대로 | 정상 실행 |
-| `sqlList` 빠짐 | 400 `workflow[sql-review]의 inputs 계약을 지키지 않았습니다: [sqlList(없음)]` |
-| `"sqlList": "SELECT 1"` (리스트 아님) | 400 `[sqlList(list<string> 타입이어야 함)]` |
-| `"sqlList": ["SELECT 1", 1]` (항목 하나만 숫자) | 400 `[sqlList(list<string> 타입이어야 함)]` |
-| `"sqlList": []` | 통과. `check`는 0회 실행 후 성공 |
-| `"maxRows": "100"` (글자) | 400 `[maxRows(integer 타입이어야 함)]` |
-| `"maxRows": null` | 400 `[maxRows(없음)]` |
-| `sqlList`와 `maxRows`가 모두 틀림 | 400 한 번에 모두 `[sqlList(없음), maxRows(integer 타입이어야 함)]` |
-| `"options": {}` | 통과. 그러나 `{{inputs.options.strict}}`를 찾지 못해 `review` step이 실패 → `onFailure`가 없으므로 Workflow FAILED |
-| 선언하지 않은 `"extra": "x"`를 더 보냄 | 통과. `context.inputs.extra`로 들어간다(템플릿 `{{inputs.extra}}`는 기동 실패라 못 쓰고, Agent prompt `{extra}`로는 쓸 수 있다) |
-| `"message": "덮어쓰기"`를 variables에 넣음 | 요청 최상위의 `message`가 **덮어쓴다** |
-| `variables` 자체를 생략 | 400. 선언된 값이 모두 `(없음)` |
-
-##### 2.5.8 선언 쪽 경우별 정리
+##### 2.5.5 경우별 결과
 
 | 경우 | 결과 |
 |---|---|
-| `inputs` 생략 또는 `{}` | 요청 검사 없음. `{{inputs.아무이름}}`도 기동 시 검사하지 않음. 실행 중 값이 없으면 **그 step이 실패**하고 `onFailure`를 따름(`??`로 대체값 가능) |
-| 잘못된 타입 이름(`list<str>`) 또는 빈 값(`x:`) | 기동 실패 |
-| `description` 적음 | **설명용일 뿐**이다. 검사에도 쓰지 않고 LLM에게도 전달되지 않는다(같은 `FieldDefinition`이라도 AGENT `output`에서는 LLM에게 전달된다) |
-| `inputs`에 `message`를 선언 | 코드는 허용하며 `variables`가 아니라 요청 `message`로 검사한다. message는 항상 문자열이라 `string`이 아니면 **모든 요청이 400**. 선언하지 않는 것이 맞다 |
-| `itemVariable`을 `inputs`로 지음 | 그 반복 안에서 `{{inputs.x}}`가 항목을 가리키게 된다. 쓰지 않는다([3.12](#312-itemvariable)) |
-
-샘플: `sample/sample-foreach-parallel.yml` — `sqlList: list<string>`을 선언하고 `forEach: inputs.sqlList`로 항목 수만큼 병렬 실행한다.
+| `input` 생략 | `string`. 요청 `input`은 비어 있지 않은 글자여야 한다 |
+| 요청에 `input`이 없거나 `""` | 400 `input은 필수입니다` |
+| 스키마는 object인데 요청이 글자 | 400 `...: string 발견, object 예상` |
+| `required` 필드가 빠짐 | 400 `필수 속성 'x'을(를) 찾을 수 없습니다` |
+| 스키마에 없는 필드가 더 옴 | 허용(`additionalProperties: false`를 적으면 400) |
+| `{{input.x}}`인데 `x`가 스키마 `properties`에 없음 | 기동 실패 |
+| 글자 input인데 `{{input.x}}` | 기동 실패 `input는 string 값이라 그 아래('x')로 더 들어갈 수 없습니다` |
+| 예전 키 `inputs:` | 기동 실패 `'inputs'는 이 자리(WorkFlowDefinition)에서 쓸 수 없는 키입니다 ... inputs는 input으로 바뀌었습니다` |
+| 스키마 오타(`type: strin`) | 기동 실패 `input.schema가 올바른 JSON Schema가 아닙니다: [...]` |
+| 축약형 오타(`input: strng`) | 기동 실패 `알 수 없는 타입 이름입니다: strng` |
 
 #### 2.6 `output`
 
 ```yaml
-  output: "{{steps.convert.output.sql}}"
+  output:
+    value: "{{steps.convert.output}}"       # (필수) 어디서 가져올지
+    schema: string                          # (선택) 결과 모양 검사
 ```
 
-- Workflow가 **성공(DONE)으로 끝났을 때** 돌려줄 최종 결과의 템플릿이다. 동기 실행 응답의 `message`, 비동기 상태 조회의 결과가 이 값이다.
-- 템플릿 문법은 [5절](#5-템플릿-참조-문법)과 같다. 단, 항상 **글자**로 채운다(`renderText`). 맵/리스트를 가리키면 JSON 글자가 된다.
+- Workflow가 **성공(DONE)으로 끝났을 때** 돌려줄 최종 결과다(`common.definition.workflow.WorkFlowOutputDefinition`).
+  동기 실행 응답의 `output`, 비동기 상태/상세 조회의 `output`이 이 값이다.
+- `value`는 [5절](#5-템플릿-참조-문법) 템플릿이다. **값 전체가 `{{ ... }}` 하나면 원래 타입을 유지**하므로 결과가 객체나 리스트일 수 있다.
+  맵/리스트로 적으면 여러 step의 값을 모아 새 모양으로 돌려준다.
+  ```yaml
+  output:
+    value:
+      sql: "{{steps.convert.output.sql}}"
+      approvedBy: "{{steps.review.output.approver}}"
+  ```
+- `schema`를 적으면 성공 직전에 결과를 검사하고, 맞지 않으면 FAILED로 끝낸다.
 - `{{item}}`은 쓸 수 없다(forEach step 밖이기 때문).
-- 기동 시 `{{ }}` 안의 경로를 모두 검사한다(없는 step id, 없는 output 키 등은 기동 실패).
+- 결과는 DB(`AI_WORKFLOW_EXECUTION.RESULT_TEXT`)에 JSON 글자로 저장되고, 조회할 때 원래 값으로 되돌려진다.
 
 | 경우 | 결과 |
 |---|---|
-| 생략 | 마지막으로 끝난 step이 넘긴 메시지가 결과다. 보통은 그 step의 `text`이고, `onFailure: SUCCESS`로 끝났으면 그 step의 **실패 사유**가 결과가 된다 |
-| 여러 줄/여러 참조를 섞음 | 각 `{{ }}`를 글자로 끼운 문자열이 결과 |
+| `output` 또는 `output.value` 생략 | 기동 실패 `output.value가 있어야 합니다(최종 결과를 어디서 가져올지)` |
+| 예전 모양 `output: "{{...}}"`(글자) | 기동 실패 `workflow.output은 value(와 schema)를 가진 맵입니다` |
 | 가리킨 값이 없음(실행되지 않은 step, null 값) | 성공 직전에 FAILED `Workflow output을 만들지 못했습니다` |
-| `??` 사용(`{{steps.fix.output.sql ?? inputs.message}}`) | 왼쪽부터 처음으로 값이 있는 것을 씀. 분기 때문에 실행되지 않았을 수 있는 step을 가리킬 때 쓴다 |
-| FAILED 또는 WAITING_APPROVAL로 끝남 | `output`은 쓰이지 않는다 |
+| `??` 사용(`{{steps.a.output ?? steps.b.output}}`) | 왼쪽부터 처음으로 값이 있는 것. 분기 때문에 실행되지 않았을 수 있는 step을 가리킬 때 쓴다 |
+| `schema`와 결과 모양이 다름 | FAILED `Workflow output이 output.schema 모양이 아닙니다: [...]` |
+| FAILED 또는 WAITING_APPROVAL로 끝남 | `output`은 쓰이지 않는다(null) |
 
 #### 2.7 `steps`
 
@@ -622,33 +399,30 @@ workflow:
 
 `steps:` 리스트의 항목 하나. `type` 값에 따라 `common.definition.workflow.step` 패키지의 record 하나로 읽힌다.
 
-| `type` | record | 실행기 |
-|---|---|---|
-| `AGENT` | `AgentStepDefinition` | `AgentStepExecutor` |
-| `SUPERVISOR` | `SupervisorStepDefinition` | `SupervisorStepExecutor` |
-| `ROUTER` | `RouterStepDefinition` | `RouterStepExecutor` |
-| `TOOL` | `ToolStepDefinition` | `ToolStepExecutor` |
-| `APPROVAL` | `ApprovalStepDefinition` | `ApprovalStepExecutor` |
+| `type` | record | 실행기 | 계약을 가진 쪽 |
+|---|---|---|---|
+| `AGENT` | `AgentStepDefinition` | `AgentStepExecutor` | Agent(`input`/`output`) |
+| `SUPERVISOR` | `SupervisorStepDefinition` | `SupervisorStepExecutor` | Agent(`input`) + 엔진(`{pass, reason}`) |
+| `ROUTER` | `RouterStepDefinition` | `RouterStepExecutor` | Agent(`input`) + 엔진(`{route, reason}`) |
+| `TOOL` | `ToolStepDefinition` | `ToolStepExecutor` | Tool(인자 스키마 / 응답) |
+| `APPROVAL` | `ApprovalStepDefinition` | `ApprovalStepExecutor` | 엔진(`{approved, approver, comment}`) |
 
 - record의 필드가 곧 그 종류의 step에 적을 수 있는 YAML 키다. step 정의 하나에 실행기(`runtime.step`) 하나가 1:1로 대응한다.
-- 다섯 record는 sealed interface `StepDefinition`(`id`/`type`/`onFailure`만 가짐)을 구현한다. `steps:` 리스트에 여러 종류가 섞여 들어오기 때문에 필요한 공통 타입일 뿐, 그 밖의 공통 부모는 없다.
+- 다섯 record는 sealed interface `StepDefinition`(`id`/`type`/`onFailure`만 가짐)을 구현한다.
 - record마다 **그 종류가 쓰는 키만** 있다. 다른 종류의 키를 적으면 YAML을 읽는 단계에서 기동이 실패한다. 오류 메시지는 YAML 경로와 쓸 수 있는 키를 알려 준다.
-  예: `[workflow.steps[2].routes] 'routes'는 이 자리(ToolStepDefinition)에서 쓸 수 없는 키입니다 (workflow.steps[2]에서 쓸 수 있는 키 = [output, ref, pattern, onSuccess, input, id, itemVariable, onFailure, forEach])`
-- `output`의 모양도 종류마다 다르다: AGENT는 **필드 맵**(`output: {sql: string}`), TOOL은 **정리 방법 값 하나**(`output: lines`). 나머지 종류는 `output` 키가 없다.
+  예: `[workflow.steps[2].routes] 'routes'는 이 자리(ToolStepDefinition)에서 쓸 수 없는 키입니다 (workflow.steps[2]에서 쓸 수 있는 키 = [ref, onSuccess, input, id, itemVariable, onFailure, forEach])`
+- **어떤 step에도 `output` 키는 없다.** 돌려받는 값의 모양은 부르는 대상(Agent/Tool)이나 엔진이 정한다.
 
 | 항목 | 설명 |
 |---|---|
 | `id` | step 이름(필수). `onSuccess`/`onFailure`/`routes`와 `{{steps.<id>...}}` 참조가 이 이름을 쓴다. Workflow 안에서 중복 불가 |
 | `type` | `AGENT` / `TOOL` / `SUPERVISOR` / `ROUTER` / `APPROVAL` (필수) |
 | `ref` | AGENT/SUPERVISOR/ROUTER는 **Agent id**, TOOL은 **Tool 이름**(`@Tool` 메서드 이름 또는 MCP Tool 이름). APPROVAL은 쓰지 않는다 |
-| `input` | 이 step에 넣을 값의 템플릿. AGENT류는 문자열(LLM 사용자 메시지), TOOL은 맵(Tool 인자) |
-| `output` (AGENT) | 필드 이름 → 필드 모양. LLM이 이 모양의 JSON으로 답하게 강제하고, 그 JSON이 `steps.<id>.output`이 된다. 선언한 필드는 모두 필수 |
-| `output` (TOOL) | `text`(기본, output 없음) / `json`(응답 JSON이 output) / `lines`(`{lines: [...]}`). 대소문자 무관 |
-| `pattern` | TOOL + `output: lines` 전용. 이 정규식에 맞는 줄만 남긴다. 괄호 그룹이 있으면 첫 번째 그룹만 값으로 쓴다 |
+| `input` | 이 step에 넣을 값의 템플릿. AGENT류는 **필수**이고 Agent `input` 모양을 따른다(string이면 글자, object면 맵). TOOL은 인자 맵(선택) |
 | `onSuccess` | 성공 시 다음 step id 또는 `SUCCESS`/`FAIL`. 비우면 목록상 다음 step(마지막이면 성공 종료) |
 | `onFailure` | 실패 시 다음 step id 또는 `SUCCESS`/`FAIL`. 비우면 Workflow 실패. 앞쪽 step id를 적으면 재시도 루프 |
 | `routes` | ROUTER 전용(필수, 1개 이상). `route 이름: 다음 step id`(또는 `SUCCESS`/`FAIL`) |
-| `forEach` | 리스트를 가리키는 경로(`{{ }}` 없이 적음, 예: `inputs.sqlList`). 항목 수만큼 이 step을 동시에 실행한다 |
+| `forEach` | 리스트를 가리키는 경로(`{{ }}` 없이 적음, 예: `input.sqlList`). 항목 수만큼 이 step을 동시에 실행한다 |
 | `itemVariable` | `forEach` 반복에서 항목을 받는 이름. 비우면 `item`(→ `{{item}}`) |
 | `approverRole` | APPROVAL 전용 기록용 값(누가 승인해야 하는지). 서버가 실제 권한을 검사하지는 않는다 |
 
@@ -657,9 +431,7 @@ workflow:
 | 항목 | AGENT | SUPERVISOR | ROUTER | TOOL | APPROVAL |
 |---|---|---|---|---|---|
 | `ref` | ✅ Agent id | ✅ Agent id | ✅ Agent id | ✅ Tool 이름 | ❌ |
-| `input` | ⭕ 문자열 | ⭕ 문자열 | ⭕ 문자열 | ⭕ 맵 | ❌ |
-| `output` | ⭕ 필드 맵 | ❌ | ❌ | ⭕ text/json/lines | ❌ |
-| `pattern` | ❌ | ❌ | ❌ | ⭕ | ❌ |
+| `input` | ✅ Agent input 모양 | ✅ Agent input 모양 | ✅ Agent input 모양 | ⭕ 맵 | ❌ |
 | `onSuccess`| ⭕ | ⭕ | ❌ | ⭕ | ⭕ |
 | `onFailure` | ⭕ | ⭕ | ⭕ (route를 고르지 못했을 때) | ⭕ | ⭕ |
 | `routes` | ❌ | ❌ | ✅ | ❌ | ❌ |
@@ -667,42 +439,36 @@ workflow:
 | `itemVariable` | ⭕ | ⭕ | ❌ | ⭕ | ❌ |
 | `approverRole` | ❌ | ❌ | ❌ | ❌ | ⭕ |
 
-**각 step이 내놓는 `output` 키** — `{{steps.<id>.output.<키>}}`로 참조할 수 있는 키. 여기 없는 키를 참조하면 기동이 실패한다.
+**각 step이 돌려주는 값(`steps.<id>.output`)의 모양** — `{{steps.<id>.output.<경로>}}`는 이 모양을 따라 기동 시 검사한다.
 
-| step | `output` 키 |
-|---|---|
-| AGENT + `output` | output에 선언한 필드들 |
-| AGENT(output 없음) | 없음 |
-| TOOL + `output: json` | 알 수 없음(Tool 응답에 따라 다름 → 실행 중에 검사) |
-| TOOL + `output: lines` | `lines` |
-| TOOL(output 없음/`text`) | 없음 |
-| SUPERVISOR | `pass`, `reason` |
-| ROUTER | `route`, `reason` |
-| APPROVAL | `approved`, `approver`, `comment` |
-| `forEach` step | 없음. 반복별 결과는 `steps.<id>.items.<번호>.output.<키>` |
+| step | `output` | 기동 시 경로 검사 |
+|---|---|---|
+| AGENT | ref Agent의 `output` 모양 그대로(비워 두면 **글자**) | Agent `output` 스키마로 |
+| SUPERVISOR | `{pass: boolean, reason: string}` | 엔진 스키마(`StepOutputSchemas.verdict()`)로 |
+| ROUTER | `{route: string, reason: string}` | 엔진 스키마(`StepOutputSchemas.routeDecision()`)로 |
+| APPROVAL | `{approved: boolean, approver: string, comment: string}` | 엔진 스키마(`StepOutputSchemas.approval()`)로 |
+| TOOL | Tool 응답이 JSON이면 그 값(객체/배열/숫자/true·false), 아니면 **글자** | 알 수 없음 → 검사하지 않음(실행 중 없으면 그 step 실패) |
+| `forEach` step | 위 모양의 **리스트**(반복 순서대로) | `steps.<id>.output.0.<경로>`처럼 번호를 붙여 검사 |
 
-**모든 step이 남기는 결과** — step이 끝나면 컨텍스트의 `steps.<id>`와 `previous`에 아래 모양이 남는다(`StepOutcome.toRecord()`).
-같은 step이 루프로 다시 실행되면 **덮어쓴다**.
+**모든 step이 남기는 결과** — step이 끝나면 컨텍스트의 `steps.<id>`에 아래 모양이 남는다(`StepOutcome.toRecord()`).
+같은 step이 루프로 다시 실행되면 **덮어쓴다**. 이 세 이름 말고는 없다.
 
 ```
 steps:
   <id>:
-    input: 템플릿을 채운 뒤 실제로 받은 입력(AGENT류는 문자열, TOOL은 인자 맵, 채우다 실패했으면 null)
-    text:  결과 텍스트
-    output:  구조화된 결과(없으면 {})
-    error: 실패 사유(성공이면 null)
-    items: [ {input, output, text, error}, ... ]   ← forEach step만
+    input:  템플릿을 채운 뒤 실제로 받은 값(forEach면 반복별 값의 리스트, APPROVAL은 null)
+    output: 돌려준 값(위 표. forEach면 반복별 값의 리스트, 실패했으면 받은 만큼 또는 null)
+    error:  실패 사유(성공이면 null)
 ```
 
-| step | `text` | `output` | 실패하면 `error`에 |
-|---|---|---|---|
-| AGENT(output 없음) | LLM 답변 원문 | `{}` | (실패하지 않음. 예외면 FAILED) |
-| AGENT + `output` | output을 JSON 글자로 | output대로 읽은 값 | `Agent 응답을 output 모양으로 읽지 못했습니다 - ...` |
-| TOOL | Tool 응답 원문(성공/실패 모두) | `output`(text/json/lines)에 따름 | `ToolOutcome.message`, 없으면 응답 원문 |
-| SUPERVISOR | 받은 input 그대로 | `{pass: true, reason}` | LLM이 적은 `reason` |
-| ROUTER | 받은 input 그대로 | `{route, reason}` | `라우팅 Agent가 route를 고르지 않았습니다` 등 |
-| APPROVAL | 받은 input(직전 step의 text) 그대로 | `{approved: true, approver, comment}` | 반려 사유(`comment`, 비었으면 `(사유 없음)`) |
-| forEach step | 반복별 text를 줄바꿈으로 이은 것 | `{}` | 실패한 반복마다 `id[i]: 사유`를 줄바꿈으로 이은 것 |
+| step | 성공하면 `output` | 실패하는 경우 → `error` |
+|---|---|---|
+| AGENT | Agent 답(Agent `output` 모양) | input이 Agent input 모양이 아님, LLM 답이 Agent output 모양이 아님 → 그 이유 |
+| TOOL | Tool 응답(JSON이면 값, 아니면 글자) | 응답이 `{success: false, message}`(→ message) 또는 `실패`로 시작하는 글자(→ 그 글자). 이때도 `output`에는 응답이 남는다 |
+| SUPERVISOR | `{pass: true, reason}` | `pass=false`(→ reason, `output`은 `{pass: false, reason}`), 답이 모양을 지키지 않음 |
+| ROUTER | `{route, reason}` | 답이 모양을 지키지 않음(routes에 없는 route를 고른 경우 포함) |
+| APPROVAL | `{approved: true, approver, comment}` | 반려(→ comment, 비었으면 `(사유 없음)`. `output`은 `{approved: false, ...}`) |
+| forEach step | 반복별 output 리스트 | 반복 중 하나라도 실패 → `id[i]: 사유`를 줄바꿈으로 이은 것 |
 
 **실패가 `onFailure`로 가는 경우와 Workflow가 바로 FAILED가 되는 경우**
 
@@ -711,18 +477,18 @@ steps:
 
 | `onFailure`를 따름(step 실패) | `onFailure`를 무시하고 바로 FAILED |
 |---|---|
-| `input` 템플릿이 가리키는 값이 없음 | `ref`의 Agent가 등록되지 않았거나 caller에게 허용되지 않음 |
-| `forEach` 경로의 값이 없거나 리스트가 아님 | TOOL의 Tool 이름이 없거나 caller 화이트리스트에 없음 |
+| `input` 템플릿이 가리키는 값이 없음 | Agent가 caller에게 허용되지 않음 |
+| `forEach` 경로의 값이 없거나 리스트가 아님 | Tool 이름이 없거나 caller 화이트리스트에 없음 |
 | `forEach` 반복 중 하나라도 실패 | Tool 메서드가 예외를 던짐 |
-| TOOL이 실패로 답함(`ToolOutcome.success=false`, `실패`로 시작하는 문자열) | output 없는 AGENT의 LLM 호출 예외(API 오류, prompt `{변수}` 누락, RAG 꺼짐 등) |
-| TOOL `output: json`인데 응답이 JSON이 아님 | `forEach` 반복 중 하나가 예외를 던짐 |
-| AGENT `output`을 LLM이 지키지 않음(이 경우는 LLM 호출 예외도 여기로 온다) | ROUTER가 고른 route가 `routes`에 없음 |
-| SUPERVISOR `pass=false`, 또는 응답을 읽지 못함(호출 예외 포함) | `onSuccess`/`onFailure`/`routes`가 없는 step id를 가리킴 |
-| ROUTER가 route를 고르지 못함(호출 예외 포함) | `maxIterations` 초과 |
-| APPROVAL 반려 | Workflow `output`을 채우지 못함 |
+| 채운 input이 Agent `input` 모양이 아님 | LLM 호출 예외(API 오류, prompt `{변수}` 누락 등) — AGENT/SUPERVISOR/ROUTER 모두 |
+| LLM 답이 Agent `output`(또는 엔진이 정한) 모양이 아님 | `forEach` 반복 중 하나가 예외를 던짐 |
+| TOOL이 실패로 답함(`{success: false}`, `실패`로 시작하는 글자) | `onSuccess`/`onFailure`/`routes`가 없는 step id를 가리킴 |
+| SUPERVISOR `pass=false` | `maxIterations` 초과 |
+| ROUTER가 route를 고르지 못함(routes에 없는 이름 포함) | Workflow `output.value`를 채우지 못함, `output.schema`와 맞지 않음 |
+| APPROVAL 반려 | |
 
-> 아래 3.1~3.13은 step 항목마다 자세히 적었다. 기동 시 검사는 `YamlDefinitionLoader`(쓸 수 없는 키, 값 모양)와
-> `WorkFlowRegistry.validateStepShape()`/`validateExpression()`(필수 값, 타입 이름, 정규식, 참조),
+> 아래 3.1~3.10은 step 항목마다 자세히 적었다. 기동 시 검사는 `YamlDefinitionLoader`(쓸 수 없는 키, 값 모양)와
+> `WorkFlowRegistry.validateStepShape()`/`validateExpression()`(부르는 대상의 계약, 필수 값, 참조),
 > 실행 동작은 `WorkFlowExecutor`와 각 `StepExecutor`가 한다.
 
 #### 3.1 `id`
@@ -733,7 +499,7 @@ steps:
 
 - step 이름이다. `onSuccess`/`onFailure`/`routes`의 이동 대상, `{{steps.<id>...}}` 참조, 실행 이력(`STEP_ID`)에 쓰인다.
 - Workflow 안에서만 유일하면 된다. 다른 Workflow의 step id와 겹쳐도 된다.
-- 템플릿 경로는 `.`으로 나누므로 **id에 `.`을 넣지 않는다**(`steps.a.b.text`는 step `a`로 읽힌다). `-`는 괜찮다.
+- 템플릿 경로는 `.`으로 나누므로 **id에 `.`을 넣지 않는다**(`steps.a.b.output`은 step `a`로 읽힌다). `-`는 괜찮다.
 - 예약어 `SUCCESS`/`FAIL`을 id로 쓰지 않는다. 이동 대상으로 적으면 step이 아니라 종료로 읽힌다.
 - forEach 반복의 실행 이력은 `id[0]`, `id[1]`...로 남는다.
 
@@ -758,9 +524,8 @@ steps:
 | `APPROVAL` | 사람의 승인/반려를 기다린다 | `ApprovalStepDefinition` | `ApprovalStepExecutor` |
 
 - `type` 값이 어느 record로 읽을지를 정한다. 그래서 `type`은 다른 항목보다 먼저 결정되고, 나머지 키는 그 record에 있는 것만 쓸 수 있다.
-- **대문자로 정확히** 적는다. `agent`, `Agent`는 기동 실패 `step의 type이 없거나 올바르지 않습니다(적은 값 = agent, 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL)`다
-  (TOOL의 `output`과 달리 대소문자를 가리지 않는 처리가 없다).
-- 생략해도 같은 메시지로 기동 실패. 어떤 항목을 같이 쓸 수 있는지는 위의 "StepType별로 쓸 수 있는 항목" 표를 따른다.
+- **대문자로 정확히** 적는다. `agent`, `Agent`는 기동 실패 `step의 type이 없거나 올바르지 않습니다(적은 값 = agent, 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL)`다.
+- 생략해도 같은 메시지로 기동 실패.
 
 #### 3.3 `ref`
 
@@ -769,159 +534,85 @@ steps:
       ref: validateSqlSyntax                 # TOOL → Tool 이름
 ```
 
-- AGENT/SUPERVISOR/ROUTER: `agents/**/*.yml`의 `agent.id`.
-- TOOL: `@Tool` 메서드 이름(메서드 이름이 기본값, `@Tool(name=...)`이면 그 이름) 또는 MCP 서버가 알려 준 Tool 이름(예: `list_directory`).
+- AGENT/SUPERVISOR/ROUTER: `agents/**/*.yml`의 `agent.id`. **기동 시 Agent가 있는지 검사**하고, 그 Agent의 계약으로 step `input`과 참조 경로를 검사한다.
+- SUPERVISOR/ROUTER가 부르는 Agent는 **`output`을 선언하지 않는다**(답의 모양은 엔진이 정한다). 선언돼 있으면 기동 실패.
+- TOOL: `@Tool` 메서드 이름(메서드 이름이 기본값, `@Tool(name=...)`이면 그 이름) 또는 MCP 서버가 알려 준 Tool 이름(예: `directory_tree`).
+  기동 시 Tool을 찾으면 인자 이름을 검사하고([3.4](#34-input)), 찾지 못하면(MCP 서버가 아직 안 떴거나 이름 오타) **경고만 남기고** 실행할 때 다시 찾는다.
 - APPROVAL: `ref` 키가 없다. 적으면 기동 실패 `'ref'는 이 자리(ApprovalStepDefinition)에서 쓸 수 없는 키입니다`.
-- AGENT/SUPERVISOR/ROUTER/TOOL에서 생략하면 기동 실패 `AGENT step은 ref(Agent id)가 있어야 합니다`(TOOL은 `ref(Tool 이름)`).
-- ⚠️ **`ref`가 가리키는 Agent/Tool이 실제로 있는지는 기동 시 검사하지 않는다.** 이름이 틀렸는지는 그 step이 처음 실행될 때 드러나고, 그때는 `onFailure`를 무시하고 바로 FAILED다.
-  새 Workflow를 만들면 모든 분기를 한 번씩 실행해 보는 것이 안전하다.
 
 | 경우 | 결과 |
 |---|---|
-| 등록되지 않은 Agent id | 실행 중 FAILED `등록되지 않은 agent입니다: x` |
+| AGENT류/TOOL에서 생략 | 기동 실패 `AGENT step은 ref(Agent id)가 있어야 합니다`(TOOL은 `ref(Tool 이름)`) |
+| 등록되지 않은 Agent id | 기동 실패 `agents/*.yml에 'x' Agent가 없습니다` |
+| SUPERVISOR/ROUTER가 `output`을 선언한 Agent를 부름 | 기동 실패 `SUPERVISOR step이 부르는 agent[x]는 output을 선언하지 않습니다(...)` |
 | Agent의 `allowedCallers`가 이 caller를 막음 | 실행 중 FAILED `agent[x]는 caller[y]에게 허용되지 않았습니다` |
-| 없는 Tool 이름, 또는 `dstone.ai.tool.allowed-by-caller`가 이 caller에게 그 Tool을 막음 | 실행 중 FAILED `caller[y]가 쓸 수 있는 Tool 중 'x'가 없습니다` |
-| MCP Tool인데 MCP 서버 연결에 실패해 Tool이 등록되지 않음 | 위와 같은 FAILED |
-| AGENT류 step에서 `ref` 생략 | 실행 중 FAILED(Agent를 찾는 중 예외) |
+| 기동 시 Tool을 찾지 못함 | 기동은 통과(경고 로그). 실행할 때도 없으면 FAILED `caller[y]가 쓸 수 있는 Tool 중 'x'가 없습니다` |
+| `dstone.ai.tool.allowed-by-caller`가 이 caller에게 그 Tool을 막음 | 실행 중 FAILED(위와 같은 메시지) |
 
 - TOOL step은 Agent의 `toolsEnabled`와 관계없이 Tool을 부른다. Tool 화이트리스트(`allowed-by-caller`)만 적용된다.
 
 #### 3.4 `input`
 
-step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍스트로 채운다(`WorkFlowExecutor.renderInput()`). 문법은 [5절](#5-템플릿-참조-문법).
+step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍스트로 채운다(`WorkFlowExecutor.renderInput()` → `Template.render()`). 문법은 [5절](#5-템플릿-참조-문법).
 
-**step 종류별 모양**
+**step 종류별 모양** — 모양은 부르는 대상의 input 계약이 정한다.
 
-| step | YAML 모양 | 채운 결과 | 생략하면 |
+| step | 부르는 대상의 input | YAML 모양 | 채운 값이 가는 곳 |
 |---|---|---|---|
-| AGENT / SUPERVISOR / ROUTER | 문자열(여러 줄은 `\|`) | 문자열 → LLM **사용자 메시지** | `{{previous.text}}`(직전 step의 text, 첫 step이면 요청 `message`) |
-| TOOL | 맵(인자 이름: 값) | 맵 → JSON으로 바꿔 Tool 인자 | 빈 인자 `{}` |
-| APPROVAL | 쓸 수 없음 | — | 항상 `{{previous.text}}` |
+| AGENT / SUPERVISOR / ROUTER | Agent `input`이 `string`(기본) | 글자(여러 줄은 `\|`) | LLM **사용자 메시지** 그대로 |
+| AGENT / SUPERVISOR / ROUTER | Agent `input`이 `object` | 맵(필드 이름: 값 템플릿) | Agent input 스키마로 검사 → JSON 글자로 바꿔 사용자 메시지 |
+| TOOL | Tool 인자 스키마 | 맵(인자 이름: 값 템플릿) | JSON으로 바꿔 Tool 인자 |
+| APPROVAL | — | 쓸 수 없음 | — |
 
 ```yaml
-      # AGENT류: 문자열. 맵/리스트를 가리키면 JSON 글자로 끼워진다
+      # Agent input이 string: 글자. 맵/리스트를 가리키면 JSON 글자로 끼워진다
       input: |
         [분석 결과]
-        {{steps.analyze.text}}
+        {{steps.analyze.output}}
 
-        [대상 테이블]
-        {{steps.extract.output.tables}}
+        [검수 의견]
+        {{steps.design-review.output.comment}}
+
+      # Agent input이 object(예: {sql, error}): 맵. 필드 이름은 Agent input의 properties와 맞아야 한다
+      input:
+        sql: "{{steps.validate.input.sql}}"
+        error: "{{steps.validate.error}}"
 
       # TOOL: 맵. 값 전체가 {{ }} 하나면 원래 타입(리스트, 숫자, 맵) 그대로 넘어간다
       input:
         sql: "{{steps.extract.output.sql}}"
-        tables: "{{steps.extract.output.tables}}"     # 리스트 그대로
-        label: "대상: {{inputs.message}}"             # 섞여 있으면 글자
+        tables: "{{steps.extract.output.tables}}"    # 리스트 그대로
+        label: "대상: {{input}}"                     # 섞여 있으면 글자
         limit: 100                                   # 템플릿이 아닌 값은 그대로
-        options:                                     # 맵/리스트 안쪽도 같은 규칙으로 채운다
-          strict: true
 ```
 
+- AGENT/SUPERVISOR/ROUTER는 **input이 필수**다. 예전처럼 "생략하면 직전 step 결과"라는 숨은 규칙은 없다.
+- **기동 시 모양 검사** — 부르는 대상의 스키마 타입과 YAML 모양을 비교한다.
+  - string ↔ 글자, object ↔ 맵, array ↔ 리스트여야 한다.
+  - object면 맵의 이름이 `properties`에 있어야 하고(`additionalProperties`를 열어 둔 경우 제외), `required` 이름이 모두 있어야 한다. TOOL도 같은 규칙으로 Tool 인자 스키마와 대조한다.
+  - 값 전체가 `"{{ ... }}"` 하나뿐이면 채워 봐야 모양을 알 수 있으므로 기동 시에는 넘어가고 **실행 중에 검사**한다.
+- **실행 중 모양 검사** — AGENT류는 채운 값을 Agent input 스키마로 다시 검사한다. 틀리면 step 실패 → `onFailure`.
 - 템플릿이 가리키는 값이 없으면(경로가 없거나 null) 빈 글자로 넘어가지 않는다. StepExecutor를 부르지 않고 **step 실패**
   `input을 채우지 못했습니다 - {{...}}: 값을 찾을 수 없습니다`가 되고 `onFailure`를 따른다. 대체값이 필요하면 `??`를 쓴다.
 - 채운 값은 `steps.<id>.input`에 남는다. 그래서 다음 step이 `{{steps.validate.input.sql}}`처럼 "실패한 입력값"을 다시 꺼낼 수 있다.
-- system prompt의 `{변수}`는 step `input`과 관계없이 항상 컨텍스트의 `inputs`(요청 message+variables)으로 채운다.
+- system prompt의 `{변수}`는 step `input`과 관계없이 항상 **Workflow input(object일 때 그 필드들)**으로 채운다.
   "이번에 처리할 데이터"는 `input`으로, "Agent의 역할"은 prompt로 나누는 것이 원칙이다.
-- YAML에서 `{{`로 시작하는 값은 **반드시 따옴표로 감싼다**(`sql: "{{item}}"`). 따옴표가 없으면 YAML이 `{`를 맵으로 읽어 버려서 기동에 실패하거나 템플릿이 아닌 엉뚱한 값이 된다.
+- YAML에서 `{{`로 시작하는 값은 **반드시 따옴표로 감싼다**(`sql: "{{item}}"`). 따옴표가 없으면 YAML이 `{`를 맵으로 읽어 버린다.
 
 | 경우 | 결과 |
 |---|---|
-| AGENT류에 맵을 적음 | 기동 실패 `[workflow.steps[i].input] 값의 모양이 맞지 않습니다(문자열이어야 합니다 ...)` |
-| TOOL에 문자열을 적음 | 기동 실패 `[workflow.steps[i].input] 값의 모양이 맞지 않습니다(맵이어야 합니다 ...)` |
+| AGENT류에서 생략 | 기동 실패 `input이 있어야 합니다(Agent에게 무엇을 넣을지)` |
+| Agent input이 string인데 맵을 적음 | 기동 실패 `agent[x]의 input이 string이라 step의 input은 글자(템플릿)로 적어야 합니다` |
+| Agent input이 object인데 글자를 적음(`{{ }}` 하나뿐인 글자 제외) | 기동 실패 `agent[x]의 input이 object라 step의 input은 맵으로 적어야 합니다` |
+| 맵에 없는 이름 / required 이름 누락 | 기동 실패 `input의 'x'는 agent[y]의 input에 없는 이름입니다` / `input에 'x'가 빠졌습니다` |
+| TOOL 인자 이름이 Tool 스키마에 없음 | 기동 실패 `input의 'query'는 Tool[validateSqlSyntax]의 인자에 없는 이름입니다(쓸 수 있는 이름 = [sql])` |
+| TOOL에 글자를 적음 | 기동 실패 `[workflow.steps[i].input] 값의 모양이 맞지 않습니다(맵이어야 합니다 ...)` |
 | APPROVAL에 적음 | 기동 실패 `'input'는 이 자리(ApprovalStepDefinition)에서 쓸 수 없는 키입니다` |
-| 참조 경로가 틀림(없는 step, 없는 output 키, 선언 안 된 `inputs.x`) | 기동 실패([5절](#5-템플릿-참조-문법) 기동 시 검사) |
-| 첫 step에서 `{{previous.output.x}}` | 기동은 통과. 실행 중 값이 없어 step 실패. `{{previous.output.x ?? inputs.message}}`로 쓴다 |
-| 분기로 아직 실행되지 않은 step 참조 | 기동은 통과. 실행 중 step 실패 |
-| TOOL 인자 이름이 Tool 메서드의 파라미터 이름과 다름 | 엔진은 이름을 검사하지 않는다. Tool 쪽에서 그 인자가 비어서(null) 들어가거나 Spring AI가 인자 변환 중 예외를 던진다(예외면 FAILED) |
+| 참조 경로가 틀림(없는 step, 스키마에 없는 필드) | 기동 실패([5절](#5-템플릿-참조-문법) 기동 시 검사) |
+| 분기나 루프로 아직 실행되지 않은 step 참조 | 기동은 통과. 실행 중 값이 없어 step 실패. `??`로 대체값을 둔다 |
+| 채운 값이 Agent input 모양이 아님(예: `{{ }}`가 가리킨 값의 타입이 다름) | step 실패 `agent[x]의 input 모양이 맞지 않습니다: [...]` → `onFailure` |
 
-#### 3.5 `output` (AGENT) — 답을 받을 모양
-
-```yaml
-      output:
-        sql:
-          type: string
-          description: 입력 문장에서 뽑아낸 SQL 문 하나
-        tables: list<string>
-```
-
-- `output` 아래에 **필드를 바로** 적는다. 이 모양이 그대로 `{{steps.<id>.output.sql}}`로 꺼내는 모양이 된다.
-- LLM이 **이 모양의 JSON 객체 하나로만** 답하게 한다. 값 타입은 [4절](#4-값-타입-inputs-agent-output)과 같다.
-- 동작(`runtime.agent.SchemaOutputConverter`):
-  1. 필드 목록을 JSON Schema로 바꿔(`FieldTypes.toJsonSchema()`) "이 JSON Schema를 지키는 JSON 객체 하나로만 답하라"는 지시문을 프롬프트 끝에 붙인다.
-     **선언한 필드는 모두 필수(required)**이고, `description`도 그대로 전달된다. prompt에 JSON 형식을 따로 적을 필요가 없다.
-  2. 답 전체가 코드펜스(```` ```json ... ``` ````)로 감싸여 있으면 벗겨 낸다.
-  3. JSON 객체로 읽고, 선언한 필드마다 값이 있는지와 타입이 맞는지 확인한다.
-- 성공하면 `output` = 읽은 JSON 객체, `text` = 그 JSON 글자. 다음 step은 `{{steps.<id>.output.<필드>}}`로 꺼낸다.
-- provider 고유의 structured output 기능은 쓰지 않는다. 그래서 어느 provider든 똑같이 동작하지만, 모양을 100% 보장하지는 않는다.
-- SUPERVISOR(`{pass, reason}`)와 ROUTER(`{route, reason}`)도 엔진 안에서 **같은 방식**으로 답을 받는다. 그 둘은 모양이 정해져 있어서 `output` 키가 없다.
-
-| 경우 | 결과 |
-|---|---|
-| 예전 모양 `output: {schema: {...}}`로 적음 | 기동 실패. 메시지 끝에 `output.schema는 없어졌습니다. AGENT step은 output 아래에 필드를 바로 적습니다` 안내가 붙는다 |
-| SUPERVISOR/ROUTER/APPROVAL에 적음 | 기동 실패 `'output'는 이 자리(SupervisorStepDefinition 등)에서 쓸 수 없는 키입니다` |
-| `output: {}` | 기동 실패 `output에 필드가 하나도 없습니다` |
-| 타입 이름이 틀림 | 기동 실패 `output의 타입 이름이 올바르지 않습니다: [sql(strng)]` |
-| 선언하지 않은 필드를 `{{steps.<id>.output.x}}`로 참조 | 기동 실패 `'id' step의 output에는 [...]만 있습니다` |
-| LLM이 JSON이 아닌 글로 답함 | step 실패 → `onFailure` |
-| 필드가 빠졌거나 `null`, 또는 타입이 다름 | step 실패 `LLM 응답이 정해진 모양(output)을 지키지 않았습니다: [sql(없음)]` → `onFailure` |
-| LLM이 선언하지 않은 필드를 더 넣음 | 허용(output에 남지만 기동 시 검사 때문에 템플릿으로는 꺼낼 수 없다) |
-| LLM 호출 자체가 예외(API 오류 등) | output 없는 AGENT와 달리 **step 실패**로 처리되어 `onFailure`를 따른다 |
-
-- output이 **없는** AGENT는 LLM 답변을 그대로 `text`로 남기고 항상 성공이다. `steps.<id>.output`이 비어 있으므로 `{{steps.<id>.output.x}}`는 기동 실패다.
-
-#### 3.6 `output` (TOOL) — 응답을 정리하는 방법
-
-```yaml
-      output: json        # text(기본) | json | lines, 대소문자 무관
-```
-
-Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`common.consts.ToolParse`). 어떤 값이든 `text`에는 **응답 원문**이 그대로 남는다.
-이 값들(`text`/`json`/`lines`)은 MCP나 Spring AI의 규격이 아니라 **이 엔진이 정한 이름**이다.
-
-| 값 | `output` | 기동 시 `{{steps.<id>.output.x}}` 검사 |
-|---|---|---|
-| 생략 / `text` | `{}` | 어떤 키든 기동 실패 |
-| `json` | 응답이 JSON 객체면 그 객체, JSON 배열이면 `{items: [...]}` | 키를 미리 알 수 없어 **검사하지 않음**(실행 중 없으면 step 실패) |
-| `lines` | `{lines: [...]}`(빈 줄은 버리고 앞뒤 공백 제거) | `lines`만 허용 |
-
-- 성공/실패 판정은 정리보다 **먼저** 한다(`ToolStepExecutor`).
-  - 응답이 `{"success": ..., "message": ...}` 모양(`runtime.tool.ToolOutcome`)이면 `success` 값으로 판정한다.
-  - 아니면 응답이 `실패`로 시작하는지로 판정한다.
-  - 실패면 정리를 하지 않는다.
-- Tool 응답은 `ToolExecutor`가 먼저 풀어 준다. 로컬 `@AiTool`이 String을 돌려주면 그 문자열이, MCP Tool이면
-  content 배열의 `text`를 줄바꿈으로 이은 문자열이 응답 원문이다.
-- ⚠️ Tool이 **어떤 모양의 글자를 돌려주는지는 엔진이 모른다.** MCP 서버도 Tool의 이름/설명/인자 모양만 알려 줄 뿐 결과 모양은 약속하지 않는다.
-  `json`/`lines`/`pattern`은 YAML을 쓰는 사람이 Tool 문서나 설명문을 읽거나 한 번 호출해 보고 정한다.
-
-| 경우 | 결과 |
-|---|---|
-| 예전 모양 `output: {parse: ...}`로 적음 | 기동 실패 `TOOL step의 output에는 text/json/lines 중 하나를 바로 적습니다(예: output: lines).` + 새 모양 안내 |
-| `text`/`json`/`lines`가 아닌 값 | 기동 실패 `TOOL step의 output에는 text/json/lines 중 하나만 쓸 수 있습니다: xml` |
-| `json`인데 응답이 JSON 객체/배열이 아님 | step 실패 `output: json인데 Tool 응답이 JSON 객체나 배열이 아닙니다` → `onFailure` |
-| `json`인데 응답 JSON에 `"success": false`가 있음 | ToolOutcome으로 읽혀 **실패**로 판정된다. 구조화된 결과를 내는 Tool은 `success` 필드 이름을 피한다 |
-| `json` + 배열 응답 | `{{steps.<id>.output.items}}`, `forEach: steps.<id>.output.items`로 쓴다 |
-| `lines`인데 응답이 비어 있음 | `output.lines = []`로 성공 |
-
-#### 3.7 `pattern` (TOOL + `output: lines` 전용)
-
-```yaml
-      output: lines
-      pattern: '^\[FILE\] (.+)$'
-```
-
-- step 바로 아래에(`output`과 나란히) 적는다.
-- 줄마다(앞뒤 공백을 뗀 뒤) 정규식을 적용해 **맞는 줄만** 남긴다.
-- 괄호 그룹이 있으면 줄 전체 대신 **첫 번째 그룹**만 값으로 쓴다. 위 예는 `[FILE] notes.txt` → `notes.txt`, `[DIR] sub` → 버림.
-- `Matcher.find()`를 쓰므로 줄의 **일부만 맞아도** 맞는 것으로 본다. 줄 전체를 맞추려면 `^...$`를 붙인다.
-- 역슬래시가 들어가므로 YAML에서는 **작은따옴표**로 감싼다(큰따옴표면 `\\[`처럼 두 번 적어야 한다).
-
-| 경우 | 결과 |
-|---|---|
-| `output: lines` 없이 적음 | 기동 실패 `pattern은 output: lines와 함께만 쓸 수 있습니다` |
-| 올바르지 않은 정규식 | 기동 실패 `pattern이 올바른 정규식이 아닙니다` |
-| 맞는 줄이 하나도 없음 | `output.lines = []`로 성공(실패가 아니다). 이 결과로 `forEach`하면 0회 실행 후 성공. Tool의 출력 모양이 바뀌면 **조용히 빈 결과**가 되니 주의 |
-
-#### 3.8 `onSuccess`
+#### 3.5 `onSuccess`
 
 ```yaml
       onSuccess: validate      # 다른 step id | SUCCESS | FAIL
@@ -930,16 +621,16 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 | 값 | 동작 |
 |---|---|
 | 생략 | 목록상 다음 step. 마지막 step이면 Workflow 성공(DONE) |
-| 뒤쪽 step id | 그 step으로 건너뛴다(`NextStep`) |
-| 앞쪽 step id 또는 자기 자신 | 그 step으로 되돌아간다(`Loop`). `maxIterations`가 상한 |
-| `SUCCESS` | 그 자리에서 Workflow 성공. `output`이 없으면 이 step의 text가 결과 |
-| `FAIL` | 그 자리에서 Workflow 실패. 이 step의 **text가 실패 메시지**가 된다 |
+| 뒤쪽 step id | 그 step으로 건너뛴다 |
+| 앞쪽 step id 또는 자기 자신 | 그 step으로 되돌아간다(루프). `maxIterations`가 상한 |
+| `SUCCESS` | 그 자리에서 Workflow 성공. 결과는 `output.value` |
+| `FAIL` | 그 자리에서 Workflow 실패. 메시지는 `step[id]가 onSuccess: FAIL로 Workflow를 끝냈습니다: <이 step의 output>` |
 
 - 예약어는 **대문자로 정확히** 적는다. `success`는 step id로 읽혀서, 그런 step이 없으면 실행 중 FAILED `없는 step id로 이동하려 했습니다`.
 - ⚠️ 이동 대상 step id는 **기동 시 검사하지 않는다**. 오타는 그 분기를 실제로 탈 때 FAILED로 드러난다.
-- ROUTER에는 `onSuccess` 키가 없다(적으면 기동 실패 `'onSuccess'는 이 자리(RouterStepDefinition)에서 쓸 수 없는 키입니다`). 성공하면 `routes`로 간다.
+- ROUTER에는 `onSuccess` 키가 없다(적으면 기동 실패). 성공하면 `routes`로 간다.
 
-#### 3.9 `onFailure`
+#### 3.6 `onFailure`
 
 ```yaml
       onFailure: fix           # 다른 step id | SUCCESS | FAIL
@@ -950,16 +641,16 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 | 생략 | Workflow 실패. 메시지는 `step[id]가 실패했고 onFailure가 지정되지 않았습니다: <실패 사유>` |
 | 앞쪽 step id | **재시도 루프**. 되돌아간 step은 `{{steps.<실패한 id>.error}}`로 사유를, `{{steps.<id>.input.<인자>}}`로 실패한 입력을 읽는다 |
 | 뒤쪽 step id | 실패 처리용 step으로 건너뛴다 |
-| `SUCCESS` | 실패했지만 Workflow를 **성공**으로 끝낸다. `output`이 없으면 **실패 사유가 결과**가 된다 |
+| `SUCCESS` | 실패했지만 Workflow를 **성공**으로 끝낸다. 결과는 `output.value` |
 | `FAIL` | Workflow 실패. 메시지는 실패 사유 그대로 |
 
-- `onFailure`는 **비즈니스 실패**에만 적용된다. 설정/시스템 오류는 무시하고 바로 FAILED다(위 "onFailure로 가는 경우" 표).
-- ROUTER에서는 LLM이 route를 **고르지 못했을 때**(응답 모양이 깨졌거나 route가 비었을 때) 쓰인다. 고른 route가 `routes`에 없으면 `onFailure`와 관계없이 FAILED다.
+- `onFailure`는 **비즈니스 실패**에만 적용된다. 설정/시스템 오류는 무시하고 바로 FAILED다(3절 "onFailure로 가는 경우" 표).
+- ROUTER에서는 LLM이 route를 **고르지 못했을 때**(답이 `{route, reason}` 모양이 아니거나 routes에 없는 이름을 골랐을 때) 쓰인다.
 - ⚠️ APPROVAL의 `onFailure`로 **앞 step으로 되돌리는 루프는 쓰지 않는다.** 한 번 기록된 결정(`approvals.<id>`)은 실행이
   끝날 때까지 지워지지 않아서, 되돌아와도 같은 APPROVAL step이 예전 반려 결정을 다시 읽고 **즉시 또 반려**된다.
   `onFailure: FAIL`로 끝내고, 고쳐서 다시 하려면 새 실행을 시작한다(`testApp/testApp-sdlc.yml` 참고).
 
-#### 3.10 `routes` (ROUTER 전용)
+#### 3.7 `routes` (ROUTER 전용)
 
 ```yaml
       routes:
@@ -969,69 +660,64 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 ```
 
 - `route 이름: 이동할 곳(step id 또는 SUCCESS/FAIL)` 맵이다.
-- ROUTER Agent는 `{route, reason}` JSON으로 답하도록 강제된다(`runtime.step.RouterStepExecutor`, AGENT `output`과 같은 방식). route 설명에는 `routes`의 키 목록이 함께 전달된다. 엔진은 `route` 값을 이 맵의 **키와 정확히**
-  (대소문자까지) 비교한다.
-- 엔진은 JSON 형식 지시의 route 설명에 `routes` 키 목록("다음 중 정확히 하나: billing, technical, other")만 넣어 준다. **각 route를 언제 고르는지 기준은 Agent prompt에 적어 둬야 한다**([agent-yml-guide.md](../agents/agent-yml-guide.md)의 ROUTER용 Agent).
-- ROUTER의 `text`는 받은 input 그대로다. 그래서 갈라진 다음 step이 `input`을 생략하면 원래 메시지를 그대로 받는다.
-  고른 경로와 이유는 `{{steps.<id>.output.route}}`, `{{steps.<id>.output.reason}}`.
+- ROUTER Agent는 `{route, reason}` JSON으로 답하도록 강제된다(`RouterStepExecutor`). 엔진은 route에 **`enum: [routes의 키들]`**을 건 스키마를 LLM에게 보여주고
+  답도 그 스키마로 검사한다. 그래서 routes에 없는 이름을 고른 답은 "모양이 틀린 답"으로 step 실패 → `onFailure`다.
+- **각 route를 언제 고르는지 기준은 Agent prompt에 적어 둬야 한다**([agent-yml-guide.md](../agents/agent-yml-guide.md)의 ROUTER용 Agent).
+- 고른 경로와 이유는 `{{steps.<id>.output.route}}`, `{{steps.<id>.output.reason}}`. 갈라진 다음 step은 원래 메시지가 필요하면 `{{input...}}` 등으로 **명시해서** 받는다.
 
 | 경우 | 결과 |
 |---|---|
 | ROUTER인데 생략 또는 `{}` | 기동 실패 `ROUTER step은 routes를 최소 1개 이상 정의해야 합니다` |
 | ROUTER가 아닌 step에 적음 | 기동 실패 `'routes'는 이 자리(...)에서 쓸 수 없는 키입니다` |
-| LLM이 routes에 없는 이름을 고름(오타, 지어낸 이름) | 바로 FAILED `route['x']가 routes에 정의되어 있지 않습니다(정의된 route=[...])` |
-| LLM 응답을 route/reason으로 읽지 못함, route가 빔 | step 실패 → `onFailure`(없으면 Workflow 실패) |
+| LLM이 routes에 없는 이름을 고름 | step 실패 `라우팅 Agent 응답을 {route, reason} 모양으로 받지 못했습니다 - ...` → `onFailure` |
 | 값(이동 대상)이 없는 step id | 기동은 통과. 그 route를 탈 때 FAILED |
 
-#### 3.11 `forEach`
+#### 3.8 `forEach`
 
 ```yaml
-      forEach: inputs.sqlList              # {{ }} 없이 경로만
-      forEach: steps.list.output.lines      # 앞 step의 결과도 된다
-      forEach: steps.a.output.items ?? inputs.list   # ?? 대체값도 된다
+      forEach: input.sqlList                  # {{ }} 없이 경로만
+      forEach: steps.tree.output               # 앞 step이 돌려준 리스트도 된다
+      forEach: steps.a.output.items ?? input.list   # ?? 대체값도 된다
 ```
 
 - 경로가 가리키는 **리스트의 항목 수만큼 이 step을 동시에** 실행한다(`WorkFlowExecutor.runForEach()`).
 - 반복마다 컨텍스트 복사본에 `item`(또는 `itemVariable`) 하나만 더해서 `input`을 채운다. 항목이 맵이면 `{{item.name}}`처럼 안으로 들어갈 수 있다.
 - 결과:
-  - `steps.<id>.items[i]` = i번째 반복의 `{input, output, text, error}`. **항목 순서대로** 쌓인다(끝난 순서가 아니다).
-  - `steps.<id>.text` = 반복별 text를 줄바꿈으로 이은 것, `output` = `{}`.
+  - `steps.<id>.input` = 반복별로 받은 값의 리스트, `steps.<id>.output` = 반복별로 돌려준 값의 리스트. **항목 순서대로** 쌓인다(끝난 순서가 아니다).
   - 반복이 **하나라도 실패하면 step 전체가 실패**다. `error`에는 실패한 반복마다 `id[i]: 사유`가 모인다.
   - 실행 이력은 `id[0]`, `id[1]`...로 반복마다 한 줄씩 남는다.
 - `maxIterations`는 항목 수와 관계없이 1로 센다.
 
 | 경우 | 결과 |
 |---|---|
-| `{{inputs.sqlList}}`처럼 괄호를 붙임 | 기동 실패(시작 이름을 `{{input`으로 읽는다) |
-| 경로가 틀림(없는 step, 선언 안 된 `inputs.x`) | 기동 실패 |
-| APPROVAL이나 ROUTER에 적음 | 기동 실패 `'forEach'는 이 자리(ApprovalStepDefinition/RouterStepDefinition)에서 쓸 수 없는 키입니다` — 두 record에는 `forEach` 키가 없다(APPROVAL은 결정이 step id 하나로만 구분되고, ROUTER는 어느 반복의 선택을 따를지 정할 수 없다) |
+| `{{input.sqlList}}`처럼 괄호를 붙임 | 기동 실패(시작 이름을 `{{input`으로 읽는다) |
+| 경로가 틀림(없는 step, 스키마에 없는 필드) | 기동 실패 |
+| APPROVAL이나 ROUTER에 적음 | 기동 실패 `'forEach'는 이 자리(...)에서 쓸 수 없는 키입니다` |
 | 실행 중 값이 없음 | step 실패 `forEach[...] - 값을 찾을 수 없습니다` → `onFailure` |
-| 값이 리스트가 아님(문자열, 맵) | step 실패 `forEach[...]의 값이 리스트가 아닙니다` → `onFailure` |
-| 빈 리스트 | 0회 실행, **성공**(`items = []`) |
+| 값이 리스트가 아님(글자, 맵) | step 실패 `forEach[...]의 값이 리스트가 아닙니다` → `onFailure` |
+| 빈 리스트 | 0회 실행, **성공**(`output = []`) |
 | 반복 하나가 예외(Tool 없음 등) | 그 반복의 이력을 남기고 바로 FAILED |
-| `{{steps.<forEach id>.output.x}}` 참조 | 기동 실패. `{{steps.<id>.items.0.output.x}}`로 꺼낸다 |
 | 다른 step에서 `{{item}}` 사용 | 기동 실패(`item`은 forEach step 자신의 `input` 안에서만 쓸 수 있다) |
 
 - 병렬 실행은 JVM 공용 스레드 풀(`CompletableFuture.supplyAsync`)을 쓴다. 동시에 도는 개수는 CPU 코어 수에 따라 제한된다.
-- AGENT forEach는 모든 반복이 **같은 sessionId(대화 기억)**를 공유한다. 반복끼리 대화 기억이 섞일 수 있으므로, 서로 독립된 판단이 필요하면
-  prompt와 `input`에 필요한 정보를 모두 담는다.
+- AGENT forEach는 모든 반복이 **같은 sessionId(대화 기억)**를 공유한다. 서로 독립된 판단이 필요하면 prompt와 `input`에 필요한 정보를 모두 담는다.
 - MCP Tool 호출은 서버별로 한 번에 하나씩만 실행된다(`ConfigMcp.SerializedToolCallback`). MCP TOOL forEach는 사실상 순차로 돈다.
 
-#### 3.12 `itemVariable`
+#### 3.9 `itemVariable`
 
 ```yaml
-      forEach: inputs.sqlList
-      itemVariable: sql
+      forEach: steps.tree.output
+      itemVariable: entry
       input:
-        sql: "{{sql}}"
+        path: "{{input}}/{{entry.name}}"
 ```
 
 - forEach 반복에서 이번 항목을 받는 이름이다. 생략하면 `item`.
 - AGENT/SUPERVISOR/TOOL에서 `forEach`를 비워 두고 적으면 무시된다. APPROVAL/ROUTER에는 `itemVariable` 키가 없어서 적으면 기동 실패다.
-- ⚠️ 컨텍스트의 시작 이름 `inputs`/`steps`/`previous`/`approvals`를 쓰지 않는다. 항목이 컨텍스트 맨 위에 같은 이름으로 들어가므로
-  그 반복 안에서 `{{inputs.message}}` 같은 참조가 항목을 가리키게 되고, 기동 시 검사도 건너뛴다.
+- ⚠️ 컨텍스트의 시작 이름 `input`/`steps`/`approvals`를 쓰지 않는다. 항목이 컨텍스트 맨 위에 같은 이름으로 들어가므로
+  그 반복 안에서 `{{input}}` 같은 참조가 항목을 가리키게 되고, 기동 시 검사도 건너뛴다.
 
-#### 3.13 `approverRole` (APPROVAL 전용)
+#### 3.10 `approverRole` (APPROVAL 전용)
 
 ```yaml
     - id: design-review
@@ -1045,28 +731,46 @@ Tool 응답 텍스트를 `steps.<id>.output`으로 정리하는 방법이다(`co
 - 참고로 APPROVAL의 동작은 이렇다.
   1. 처음 실행하면 결정이 없으므로 Workflow를 `WAITING_APPROVAL`로 멈추고 저장한다.
   2. `/decision`에 `{approved, approver, comment}`가 오면 `approvals.<id>`에 기록하고 **같은 step을 다시 실행**한다.
-  3. 승인이면 성공(`output = {approved: true, approver, comment}`), 반려면 실패(`error` = comment).
+  3. 결정을 `output = {approved, approver, comment}`로 남기고, 승인이면 성공, 반려면 실패(`error` = comment).
   - 승인 대기 상태가 아닌 실행에 결정을 보내면 거절된다(`지금 승인 대기 상태가 아닙니다`).
+  - 승인할 내용은 사람이 실행 상세 화면의 `context.steps`(앞 step들의 결과)에서 확인한다. APPROVAL은 값을 넘겨주지 않으므로,
+    다음 step은 필요한 문서를 `{{steps.<앞 step>.output}}`으로 직접 가져온다.
 
-### 4 값 타입 (`inputs`, AGENT `output`)
+### 4 스키마 (JSON Schema)
 
-`common.definition.workflow.FieldDefinition`. 두 가지 방법으로 적는다.
+Workflow `input`/`output.schema`와 Agent `input`/`output`의 모양은 **표준 JSON Schema(2020-12)를 YAML로 그대로** 적는다
+(`common.definition.SchemaDefinition`, 도구는 `common.schema.JsonSchemas`, 검사기는 networknt json-schema-validator).
 
 ```yaml
-sql: string                     # 축약형: 타입만
-sql:                            # 확장형: 설명까지(AGENT output에서는 LLM에게 그대로 전달된다)
-  type: string
-  description: 변환된 PostgreSQL SQL
+input: string                        # 축약형 = input: {schema: {type: string}}
+
+input:
+  schema:                            # 표준형: schema 아래에 JSON Schema
+    type: object
+    properties:
+      name: { type: string, description: 사용자의 풀네임 }
+      age: { type: integer, minimum: 0 }
+      skills: list<string>           # properties 값에도 축약형 가능
+    required: [name]
 ```
 
-| 타입 | 맞는 값 |
+**축약형** — 타입만 필요한 세 자리(최상위, `properties`의 값, `items`)에서는 타입 이름 하나만 적어도 된다. 로더가 표준 모양으로 펼친다.
+
+| 축약형 | 펼친 모양 |
 |---|---|
-| `string` | 문자열 |
-| `number` | 숫자(정수/실수) |
-| `integer` | 정수 |
-| `boolean` | `true` / `false` |
-| `object` | JSON 객체(맵) |
-| `list<타입>` | 해당 타입의 리스트. 예: `list<string>`, `list<object>` |
+| `string` / `number` / `integer` / `boolean` / `object` / `array` | `{type: <그 이름>}` |
+| `list<string>` | `{type: array, items: {type: string}}` |
+| `list<list<integer>>` | `{type: array, items: {type: array, items: {type: integer}}}` |
+
+- 그 밖의 JSON Schema 키워드(`required`, `enum`, `minimum`, `maxLength`, `pattern`, `additionalProperties`, `description` 등)는 그대로 쓴다.
+- `description`은 LLM에게 그대로 전달된다(Agent `output`). 필드의 뜻을 적어 두면 답의 품질이 좋아진다.
+- `required`에 넣은 필드만 필수다. **`required`를 빠뜨리면 모든 필드가 선택**이므로, LLM이 빈 객체 `{}`로 답해도 통과한다. 꼭 필요한 필드는 `required`에 넣는다.
+- 스키마 자체가 틀리면(예: `type: strin`) 엔진이 켜질 때 메타스키마 검사로 기동 실패다.
+- **기동 시 참조 검사 규칙**(`JsonSchemas.checkPath()`) — `{{...output.a.b}}` 같은 경로를 스키마를 따라 내려가며 본다.
+  - object: 다음 이름이 `properties`에 있어야 한다(`properties`가 없거나 `additionalProperties`를 열어 두었으면 더 보지 않는다).
+  - array: 다음 이름이 숫자(몇 번째 항목인지, 0부터)여야 한다.
+  - string/number/integer/boolean: 그 아래로 더 들어갈 수 없다.
+  - `type`이 없거나 리스트(`[string, "null"]`)면 더 보지 않는다.
 
 ### 5 템플릿 참조 문법
 
@@ -1075,97 +779,93 @@ sql:                            # 확장형: 설명까지(AGENT output에서는 
 
 | 문법 | 의미 |
 |---|---|
-| `{{inputs.message}}` | 실행 요청의 message |
-| `{{inputs.<이름>}}` | 실행 요청의 `variables.<이름>` |
-| `{{steps.<id>.text}}` | 그 step의 결과 텍스트 |
-| `{{steps.<id>.output.<키>}}` | 그 step의 구조화된 결과([3절 output 키 표](#3-step-항목)) |
-| `{{steps.<id>.input}}` / `.input.<인자>` | 그 step이 실제로 받은 입력(TOOL이면 인자 맵) |
+| `{{input}}` | 실행 요청의 input 전체(글자면 그 글자) |
+| `{{input.<필드>}}` | input이 object일 때 그 필드 |
+| `{{steps.<id>.output}}` / `.output.<경로>` | 그 step이 돌려준 값([3절 output 표](#3-step-항목)) |
+| `{{steps.<id>.input}}` / `.input.<경로>` | 그 step이 실제로 받은 값(TOOL이면 인자 맵) |
 | `{{steps.<id>.error}}` | 그 step의 실패 사유 |
-| `{{steps.<id>.items.0.text}}` | forEach step의 0번째 반복 결과(숫자로 리스트 항목 선택) |
-| `{{previous.text}}` / `{{previous.output.<키>}}` | 바로 직전에 실행된 step의 결과 |
+| `{{steps.<id>.output.0.name}}` | 리스트는 숫자로 항목 선택(forEach step, 배열 응답 등) |
 | `{{item}}` (또는 `itemVariable` 이름) | forEach 반복 중 이번 항목(forEach step의 `input` 안에서만) |
 | `{{a.b ?? c.d ?? e}}` | 왼쪽부터 차례로 찾아 처음으로 값이 있는 것을 씀 |
 
+- **왜 `{{ }}`인가** — 글자와 참조가 섞이는 자리(`"{{steps.a.output.name}}의 행동패턴을 분석해줘"`)에서 "어디서 어디까지가 참조인지"를 가르는 유일한 표시다.
+  한 겹 `{ }`는 YAML 맵 표기와 Agent prompt 변수(`{role}`)가, `${ }`는 기동 시 환경 값 치환이 이미 쓰고 있다.
 - **채우는 규칙**: 다른 글자와 섞여 있으면 값을 글자로 끼운다(맵/리스트는 JSON 글자). 값 전체가 `{{ ... }}` 하나뿐이면
-  **원래 타입을 유지**한다(TOOL 인자에 리스트나 숫자를 그대로 넘길 때).
+  **원래 타입을 유지**한다(TOOL 인자·object Agent input·`output.value`에 리스트나 객체를 그대로 넘길 때).
 - **값이 없으면 실패한다**: 경로가 없거나 값이 null이면 빈 글자로 넘어가지 않고 그 step이 실패한다(onFailure를 따름).
   대체값이 필요하면 `??`를 쓴다.
-- **기동 시 검사**: 시작 이름(`inputs`/`steps`/`previous`/`item`), step id, 필드 이름(`input`/`output`/`text`/`error`/`items`),
-  `steps.<id>.output.<키>`, `inputs.<이름>`(inputs 선언 시)을 미리 검사한다. `previous.output.*`처럼 실행 순서에 따라 달라지는
-  값만 실행 중에 검사한다.
-- **쓰는 곳은 세 군데**: step `input`, step `forEach`(`{{ }}` 없이 경로만), Workflow `output`.
+- **기동 시 검사**: 시작 이름(`input`/`steps`/`item`), step id, 필드 이름(`input`/`output`/`error`), 그리고 그 뒤의 경로를
+  스키마([4절](#4-스키마-json-schema))로 미리 검사한다. TOOL의 output처럼 모양을 알 수 없는 값만 실행 중에 검사한다.
+- **쓰는 곳은 세 군데**: step `input`, step `forEach`(`{{ }}` 없이 경로만), Workflow `output.value`.
   Agent의 system prompt는 이 문법이 아니라 `{변수}`(Spring AI PromptTemplate)를 쓴다.
 
 **시작 이름별 자세한 규칙**
 
 | 시작 | 가리키는 것 | 기동 시 검사 | 주의 |
 |---|---|---|---|
-| `inputs` | 요청의 `message` + `variables` | `inputs`를 선언했으면 `inputs.<이름>`이 `message`이거나 선언된 이름인지 | 실행 내내 바뀌지 않는다 |
-| `steps.<id>` | 그 step이 **마지막으로** 남긴 결과 | step id가 있는지, 다음 필드가 `input`/`output`/`text`/`error`/`items`인지, `output.<키>`를 그 step이 내놓는지 | 루프로 다시 실행되면 최신 결과로 덮어쓴다. 아직 실행되지 않았으면 실행 중 step 실패 |
-| `previous` | 바로 직전에 **실행된** step의 결과(목록상 앞 step이 아니다) | 다음 필드 이름만 | 첫 step에서는 `{text: message}`뿐이다. 루프나 분기에 따라 달라지므로 `output.*`는 실행 중에만 검사한다 |
+| `input` | 요청의 `input` 그대로 | Workflow `input` 스키마로 경로 검사 | 실행 내내 바뀌지 않는다 |
+| `steps.<id>` | 그 step이 **마지막으로** 남긴 결과 | step id가 있는지, 다음 필드가 `input`/`output`/`error`인지, 그 뒤 경로가 그 step의 input/output 스키마에 있는지 | 루프로 다시 실행되면 최신 결과로 덮어쓴다. 아직 실행되지 않았으면 실행 중 step 실패 |
 | `item` / `itemVariable` 이름 | forEach 반복의 이번 항목 | forEach step 자신의 `input` 안에서만 허용 | `forEach` 경로 자체나 다른 step에서는 쓸 수 없다 |
 | 그 밖의 이름 | — | 기동 실패 `알 수 없는 시작 이름입니다` | `approvals`도 템플릿에서는 쓸 수 없다. 승인 내용은 `steps.<id>.output.*`로 꺼낸다 |
-| 예전 이름 `input` / 필드 `data` | — | 기동 실패 `input은 inputs로 이름이 바뀌었습니다...` / `data는 output으로 이름이 바뀌었습니다...` | YAML에 적는 이름(`workflow.inputs`, step `output`)과 맞추려고 바꿨다. 메시지가 알려 주는 새 이름으로 고친다 |
+| 없어진 이름 `inputs` / `previous` / 필드 `text` / `items` | — | 기동 실패 + 새 이름 안내 | `inputs` → `input`, `previous` → `steps.<id>`, `text` → `output`, `items` → forEach step의 `output`(리스트) |
 
 **경우별 결과**
 
 | 템플릿 | 결과 |
 |---|---|
-| `"{{steps.list.output.lines}}"`(TOOL 인자, 값 전체) | 리스트 그대로 |
-| `"파일: {{steps.list.output.lines}}"`(섞임) | `파일: ["a.txt","b.txt"]`(JSON 글자) |
-| AGENT `input`에 `{{steps.extract.output}}` | AGENT류 input은 항상 글자라 JSON 글자로 들어간다 |
-| `{{steps.list.output.lines.0}}` | 첫 항목. 범위를 벗어나면 값 없음 → step 실패 |
-| `{{steps.a.text ?? steps.b.text ?? inputs.message}}` | 왼쪽부터 처음으로 null이 아닌 값. 빈 문자열 `""`도 값이 있는 것으로 본다 |
+| `"{{steps.tree.output}}"`(TOOL 인자, 값 전체) | 리스트 그대로 |
+| `"파일: {{steps.tree.output}}"`(섞임) | `파일: [{"name":"a.txt",...}]`(JSON 글자) |
+| string Agent `input`에 `{{steps.extract.output}}`(object) | 값 전체가 `{{ }}` 하나라 객체가 넘어가고, Agent input(string) 검사에서 step 실패. 글자로 넘기려면 다른 글자와 섞거나 필드를 콕 집는다(`{{steps.extract.output.sql}}`) |
+| `{{steps.tree.output.0}}` | 첫 항목. 범위를 벗어나면 값 없음 → step 실패 |
+| `{{steps.fix.output.sql ?? input}}` | 왼쪽부터 처음으로 null이 아닌 값. 빈 문자열 `""`도 값이 있는 것으로 본다 |
 | `??`의 모든 경로가 없음 | step 실패 `값을 찾을 수 없습니다(찾아본 경로 = [...])` |
-| `{{ inputs.message }}`(괄호 안 공백) | 허용(앞뒤 공백은 무시) |
-| `{{inputs.message \| upper}}`, `{{a + b}}` | 지원하지 않는다. 경로를 찾지 못해 실패하거나 기동 실패. 가공이 필요하면 TOOL step을 쓴다 |
+| `{{ input }}`(괄호 안 공백) | 허용(앞뒤 공백은 무시) |
+| `{{input \| upper}}`, `{{a + b}}` | 지원하지 않는다. 경로를 찾지 못해 실패하거나 기동 실패. 가공이 필요하면 TOOL step을 쓴다 |
 | 값이 숫자/boolean(섞임) | `toString()` 글자로 끼운다 |
-
-
 
 ### 6 제공되는 샘플
 
 `src/main/resources/{agents,workflows,mcp}/` 아래에 두 묶음이 있다. 각 파일 맨 위 주석에 dstone-boot "Workflow 테스트"
-화면에서 어떤 workflowId/message/variables로 호출하면 되는지 적혀 있다.
+화면에서 어떤 workflowId/input으로 호출하면 되는지 적혀 있다.
 
 **Workflow**
 
-| 기능 | Workflow |
-|---|---|
-| AGENT step 기본(변수/Tool 없이) | `sample/sample-agent-basic-echo.yml` |
-| AGENT의 자율 tool-calling | `sample/sample-agent-tool-calling.yml` |
-| AGENT의 RAG(ragEnabled) 증강 | `sample/sample-agent-rag-augmented.yml` |
-| Agent별 model override | `sample/sample-agent-model-override.yml` |
-| TOOL step 연쇄(LLM 없이) | `sample/sample-tool-chain-basic.yml` |
-| MCP Tool + `output: lines` + `pattern` + 앞 step output으로 `forEach` | `sample/sample-mcp-filesystem-list.yml` |
-| TOOL로 RAG 검색만 직접 호출 | `sample/sample-tool-rag-search.yml` |
-| 위험 Tool(http/shell/python) 기본 거부 확인 | `sample/sample-tool-gated-external.yml` |
-| AGENT `output` → `{{steps.<id>.output.<키>}}`, Workflow `output` | `sample/sample-structured-output-chain.yml` |
-| SUPERVISOR(pass/reason) 판정 | `sample/sample-supervisor-verdict-gate.yml` |
-| ROUTER 다지 분기(routes) | `sample/sample-router-multiway.yml` |
-| onFailure 재시도 루프 + `previous`/`??`/`steps.<id>.error` | `sample/sample-loop-retry-until-valid.yml` |
-| `forEach` 병렬 실행 + Workflow `inputs` 계약 | `sample/sample-foreach-parallel.yml` |
-| APPROVAL 일시중단/재개(HITL) | `sample/sample-approval-pause-resume.yml` |
-| 실전 8단계 승인형 SDLC(AGENT+APPROVAL+TOOL 종합) | `testApp/testApp-sdlc.yml` |
+| 기능 | Workflow | input |
+|---|---|---|
+| AGENT step 기본(변수/Tool 없이) | `sample/sample-agent-basic-echo.yml` | string |
+| AGENT의 자율 tool-calling | `sample/sample-agent-tool-calling.yml` | string |
+| AGENT의 RAG(ragEnabled) 증강 | `sample/sample-agent-rag-augmented.yml` | string |
+| Agent별 model override | `sample/sample-agent-model-override.yml` | string |
+| TOOL step 연쇄(LLM 없이) + `output.value`를 맵으로 | `sample/sample-tool-chain-basic.yml` | string |
+| MCP Tool(JSON 응답) + 앞 step output으로 `forEach` + `itemVariable` | `sample/sample-mcp-filesystem-list.yml` | string |
+| TOOL로 RAG 검색만 직접 호출 | `sample/sample-tool-rag-search.yml` | string |
+| 위험 Tool(http/shell/python) 기본 거부 확인 | `sample/sample-tool-gated-external.yml` | string |
+| Agent `output`(object) → `{{steps.<id>.output.<필드>}}`, `output.schema` | `sample/sample-structured-output-chain.yml` | string |
+| SUPERVISOR(pass/reason) 판정 + prompt `{role}` ← input 필드 | `sample/sample-supervisor-verdict-gate.yml` | object `{message, role}` |
+| ROUTER 다지 분기(routes) + `??`로 결과 고르기 | `sample/sample-router-multiway.yml` | object `{message, role}` |
+| onFailure 재시도 루프 + object input Agent + `??`/`steps.<id>.error` | `sample/sample-loop-retry-until-valid.yml` | string |
+| `forEach` 병렬 실행 + object Workflow input | `sample/sample-foreach-parallel.yml` | object `{sqlList}` |
+| APPROVAL 일시중단/재개(HITL) | `sample/sample-approval-pause-resume.yml` | string |
+| 실전 8단계 승인형 SDLC(AGENT+APPROVAL+TOOL 종합) | `testApp/testApp-sdlc.yml` | string |
 
 **Agent**
 
-| Agent | 용도 |
-|---|---|
-| `sample-basic-echo-agent` | 가장 단순한 AGENT(변수/Tool 없음) |
-| `sample-general-chat` | 일반 대화(`{role}` 변수). dstone-boot 채팅 화면 기본값 |
-| `sample-tool-demo-agent` | 로컬 Tool 자율 호출(`toolsEnabled: true`) |
-| `sample-mcp-filesystem-agent` | MCP filesystem Tool 자율 호출 |
-| `sample-rag-demo-agent` | RAG 증강(`ragEnabled: true`, `ragTopK`/`ragSimilarityThreshold`) |
-| `sample-model-override-agent` | Agent별 `model` 지정 |
-| `sample-structured-extract-agent` | `output`을 선언한 AGENT용(문장에서 SQL 추출) |
-| `sample-fix-agent` | 재시도 루프용(검증 실패한 SQL 수정) |
-| `sample-verdict-judge-agent` | SUPERVISOR용(pass/reason 판정) |
-| `sample-router-classifier-agent` | ROUTER용(billing/technical/other 분류) |
-| `testApp-analysis-agent` / `testApp-spec-writer-agent` / `testApp-codegen-agent` | `testApp-sdlc`의 분석/명세/코드 생성 |
+| Agent | input / output | 용도 |
+|---|---|---|
+| `sample-basic-echo-agent` | string / string | 가장 단순한 AGENT(변수/Tool 없음) |
+| `sample-general-chat` | string / string | 일반 대화(`{role}` 변수). dstone-boot 채팅 화면 기본값 |
+| `sample-tool-demo-agent` | string / string | 로컬 Tool 자율 호출(`toolsEnabled: true`) |
+| `sample-mcp-filesystem-agent` | string / string | MCP filesystem Tool 자율 호출 |
+| `sample-rag-demo-agent` | string / string | RAG 증강(`ragEnabled: true`, `ragTopK`/`ragSimilarityThreshold`) |
+| `sample-model-override-agent` | string / string | Agent별 `model` 지정 |
+| `sample-structured-extract-agent` | string / **object `{sql}`** | output을 object로 선언한 예시(문장에서 SQL 추출) |
+| `sample-fix-agent` | **object `{sql, error}`** / **object `{sql}`** | input/output 둘 다 object인 예시(재시도 루프에서 SQL 수정) |
+| `sample-verdict-judge-agent` | string / (엔진) | SUPERVISOR용(pass/reason 판정) |
+| `sample-router-classifier-agent` | string / (엔진) | ROUTER용(billing/technical/other 분류) |
+| `testApp-analysis-agent` / `testApp-spec-writer-agent` / `testApp-codegen-agent` | string / string | `testApp-sdlc`의 분석/명세/코드 생성 |
 
 **MCP 서버**: `mcp/sample/sample-filesystem-mcp.yml` — 공식 filesystem 레퍼런스 서버를 STDIO로 띄워
-`${APP_HOME}/${APP_NAME}/mcp/server-filesystem` 하나만 노출한다(`list_directory`/`read_text_file`/`write_file`/`edit_file`/`move_file`만 허용).
+`${APP_HOME}/${APP_NAME}/mcp/server-filesystem` 하나만 노출한다(`list_directory`/`directory_tree`/`read_text_file`/`write_file`/`edit_file`/`move_file`만 허용).
 
 ### 7 YAML 템플릿 샘플
 
@@ -1178,28 +878,28 @@ sql:                            # 확장형: 설명까지(AGENT output에서는 
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: <workflow-id>
-#   message   : <예시 메시지>
-#   variables : <예시 JSON 또는 (비워도 됩니다)>
+#   input     : <예시 글자 또는 JSON>
 workflow:
   id: <workflow-id>
   description: <사람이 읽는 설명>
   maxIterations: 10                 # 선택. 루프가 있으면 (step 수 × 재시도 횟수)보다 넉넉하게
   # allowedCallers: [<caller>]      # 선택. 인증을 켠 환경에서만 채운다
-  # inputs:                         # 선택. 요청 variables의 계약
-  #   <이름>: string
-  # output: "{{steps.<step-id>.text}}"   # 선택. 비우면 마지막 step의 text
+  input: string                     # 선택(비우면 string). object면 input: {schema: {...}}
+  output:
+    value: "{{steps.<step-id>.output}}"   # 필수. 최종 결과를 어디서 가져올지
+    # schema: string                      # 선택. 결과 모양 검사
   steps:
     - id: <step-id>
       type: AGENT
       ref: <agent-id>
-      input: "{{inputs.message}}"
+      input: "{{input}}"
       onSuccess: SUCCESS
       onFailure: FAIL
 ```
 
 #### 7.2 step 타입별 스니펫
 
-**AGENT — 자유 텍스트**
+**AGENT — Agent input이 string(기본)**
 
 ```yaml
     - id: summarize
@@ -1207,63 +907,45 @@ workflow:
       ref: <agent-id>
       input: |
         [요약할 원문]
-        {{inputs.message}}
-      # input을 생략하면 {{previous.text}}(직전 step의 결과 텍스트)를 받는다
+        {{input}}
+      # → 답은 {{steps.summarize.output}} (Agent output 모양. 비워 뒀으면 글자)
 ```
 
-**AGENT + output — 다음 step이 값을 콕 집어 쓸 때**
+**AGENT — Agent output이 object일 때 필드를 콕 집어 쓰기**
 
 ```yaml
     - id: extract
       type: AGENT
-      ref: <agent-id>
-      input: "{{inputs.message}}"
-      output:
-        sql:
-          type: string
-          description: 입력 문장에서 뽑아낸 SQL 문 하나
-        tables: list<string>
+      ref: <output: {schema: {type: object, properties: {sql: ...}}}을 선언한 agent-id>
+      input: "{{input}}"
       onSuccess: validate
       onFailure: FAIL
-      # → 다음 step에서 {{steps.extract.output.sql}}, {{steps.extract.output.tables}}
+      # → 다음 step에서 {{steps.extract.output.sql}}
 ```
 
-**TOOL — 기본(결과 텍스트만)**
+**AGENT — Agent input이 object일 때**
+
+```yaml
+    - id: fix
+      type: AGENT
+      ref: <input: {schema: {type: object, properties: {sql: ..., error: ...}}}을 선언한 agent-id>
+      input:                            # 맵으로. 이름은 Agent input의 properties와 같아야 한다
+        sql: "{{steps.validate.input.sql}}"
+        error: "{{steps.validate.error}}"
+```
+
+**TOOL**
 
 ```yaml
     - id: validate
       type: TOOL
       ref: validateSqlSyntax            # @Tool 메서드 이름 또는 MCP Tool 이름
-      input:
+      input:                            # 인자 이름은 기동 시 Tool 인자 스키마와 대조한다
         sql: "{{steps.extract.output.sql}}"
       onSuccess: SUCCESS
       onFailure: FAIL
       # 인자가 필요 없는 Tool이면 input을 통째로 생략한다(빈 인자 {}로 호출)
-```
-
-**TOOL + output: json — Tool이 구조화된 JSON을 돌려줄 때**
-
-```yaml
-    - id: lookup
-      type: TOOL
-      ref: <tool-name>
-      input:
-        ids: "{{inputs.idList}}"         # 값 전체가 {{ }} 하나면 리스트 타입 그대로 넘어간다
-      output: json                      # 응답 JSON 객체 → output (배열이면 output.items)
-      # → {{steps.lookup.output.<키>}} (키는 Tool 응답에 따라 다르므로 실행 중에 검사된다)
-```
-
-**TOOL + output: lines — 줄 단위 응답에서 값 목록을 뽑을 때**
-
-```yaml
-    - id: list
-      type: TOOL
-      ref: list_directory
-      input:
-        path: "{{inputs.message}}"
-      output: lines
-      pattern: '^\[FILE\] (.+)$'        # 맞는 줄만 남기고, 괄호 그룹 1을 값으로
-      # → output.lines = ["notes.txt", "todo.txt"]
+      # → {{steps.validate.output}}: 응답이 JSON이면 그 값(여기선 {success, message}), 아니면 글자
 ```
 
 **SUPERVISOR — 앞 step의 결과를 LLM이 판정**
@@ -1271,10 +953,10 @@ workflow:
 ```yaml
     - id: judge
       type: SUPERVISOR
-      ref: <판정용 agent-id>            # prompt에 판정 기준을 적어 둔다
-      # input 생략 → 직전 step의 결과 텍스트를 판정
+      ref: <판정용 agent-id>            # prompt에 판정 기준을 적어 둔다. output은 선언하지 않는다
+      input: "{{steps.draft.output}}"   # 무엇을 판정할지 명시
       onSuccess: SUCCESS                # pass=true
-      onFailure: FAIL                   # pass=false → 사유는 {{steps.judge.error}}
+      onFailure: FAIL                   # pass=false → 사유는 {{steps.judge.error}} / {{steps.judge.output.reason}}
 ```
 
 **ROUTER — 세 갈래 이상 분기**
@@ -1282,8 +964,8 @@ workflow:
 ```yaml
     - id: classify
       type: ROUTER
-      ref: <분류용 agent-id>            # prompt에 route 이름 목록을 routes 키와 똑같이 적어 둔다
-      input: "{{inputs.message}}"
+      ref: <분류용 agent-id>            # prompt에 각 route를 언제 고르는지 적어 둔다. output은 선언하지 않는다
+      input: "{{input}}"
       routes:
         billing: billing-step
         technical: technical-step
@@ -1298,7 +980,7 @@ workflow:
       type: APPROVAL
       approverRole: "PL"                # 기록용. 서버가 권한을 검사하지는 않는다
       onSuccess: next-step              # 승인 → 코멘트는 {{steps.review.output.comment}}
-      onFailure: FAIL                   # 반려 → 앞 step으로 되돌리는 루프는 쓰지 않는다(3.9 경고 참고)
+      onFailure: FAIL                   # 반려 → 앞 step으로 되돌리는 루프는 쓰지 않는다(3.6 경고 참고)
 ```
 
 **forEach — 리스트 항목마다 동시에 실행**
@@ -1307,13 +989,13 @@ workflow:
     - id: validate-each
       type: TOOL
       ref: validateSqlSyntax
-      forEach: inputs.sqlList            # {{ }} 없이 경로만. steps.<id>.output.lines 같은 앞 step 결과도 된다
+      forEach: input.sqlList            # {{ }} 없이 경로만. steps.<id>.output 같은 앞 step 결과도 된다
       itemVariable: sql                 # 선택. 비우면 {{item}}
       input:
         sql: "{{sql}}"
       onSuccess: SUCCESS
       onFailure: FAIL
-      # → steps.validate-each.items[i] = {input, output, text, error}, 하나라도 실패하면 step 실패
+      # → steps.validate-each.output = [반복별 output...], 하나라도 실패하면 step 실패
 ```
 
 **재시도 루프 — 실패하면 고쳐서 다시 검증**
@@ -1322,26 +1004,23 @@ workflow:
 workflow:
   id: <workflow-id>
   maxIterations: 6                      # 검증↔수정 최대 3회전
-  output: "{{steps.validate.input.sql}}"
+  input: string
+  output:
+    value: "{{steps.validate.input.sql}}"
   steps:
     - id: validate
       type: TOOL
       ref: validateSqlSyntax
       input:
-        sql: "{{previous.output.sql ?? inputs.message}}"   # 처음엔 사용자 메시지, 수정 뒤엔 fix의 결과
+        sql: "{{steps.fix.output.sql ?? input}}"   # 처음엔 요청 input, 수정 뒤엔 fix의 결과
       onSuccess: SUCCESS
       onFailure: fix
 
     - id: fix
       type: AGENT
-      ref: <수정용 agent-id>
-      input: |
-        [검증에 실패한 SQL]
-        {{steps.validate.input.sql}}
-
-        [실패 사유]
-        {{steps.validate.error}}
-      output:
-        sql: string
-      onSuccess: validate               # 앞쪽 step으로 → Loop
+      ref: <input {sql, error} / output {sql}을 선언한 agent-id>
+      input:
+        sql: "{{steps.validate.input.sql}}"
+        error: "{{steps.validate.error}}"
+      onSuccess: validate               # 앞쪽 step으로 → 루프
 ```

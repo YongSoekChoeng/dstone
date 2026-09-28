@@ -21,10 +21,13 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.consts.ToolParse;
+import net.dstone.ai.common.definition.SchemaDefinition;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.mcp.McpServerDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.WorkFlowOutputDefinition;
+import net.dstone.ai.common.definition.workflow.step.AgentStepDefinition;
+import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -206,7 +209,8 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * - 쓸 수 없는 키: 그 자리에 쓸 수 있는 키 목록을 함께 알려줍니다(예: TOOL step에 routes를 적은 경우).
 	 * - type 값이 없거나 틀림: 쓸 수 있는 type 값을 알려줍니다.
 	 * - 값의 모양이 다름: 예를 들어 TOOL step의 input을 맵이 아니라 문자열로 적은 경우입니다.
-	 * - 값을 만들다 실패함: 예를 들어 TOOL step의 output에 text/json/lines가 아닌 값을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
+	 * - 값을 만들다 실패함: 예를 들어 스키마 축약형에 없는 타입 이름(output: strng)을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
+	 * 없어진 키(AGENT step의 output, TOOL step의 output/pattern, workflow.inputs)를 적었으면 새 모양도 함께 알려줍니다.
 	 * </pre>
 	 *
 	 * @param e convertValue()가 던진 예외
@@ -219,38 +223,44 @@ public class YamlDefinitionLoader extends BaseObject {
 		if (cause instanceof UnrecognizedPropertyException unknown) {
 			String owner = where.lastIndexOf('.') < 0 ? "" : where.substring(0, where.lastIndexOf('.'));
 			return "[" + where + "] '" + unknown.getPropertyName() + "'는 이 자리(" + unknown.getReferringClass().getSimpleName() + ")에서 쓸 수 없는 키입니다"
-				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ")." + this.oldOutputHint(where);
+				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ")." + this.movedKeyHint(unknown.getReferringClass(), unknown.getPropertyName());
 		}
 		if (cause instanceof InvalidTypeIdException invalidType) {
 			return "[" + where + "] step의 type이 없거나 올바르지 않습니다(적은 값 = " + invalidType.getTypeId()
 				+ ", 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL).";
 		}
-		if (cause instanceof MismatchedInputException mismatched && ToolParse.class.equals(mismatched.getTargetType())) {
-			return "[" + where + "] TOOL step의 output에는 text/json/lines 중 하나를 바로 적습니다(예: output: lines)." + this.oldOutputHint(where);
+		if (cause instanceof MismatchedInputException mismatched && WorkFlowOutputDefinition.class.equals(mismatched.getTargetType())) {
+			return "[" + where + "] workflow.output은 value(와 schema)를 가진 맵입니다. 예: output: {value: \"{{steps.마지막step.output}}\"}";
 		}
 		if (cause instanceof MismatchedInputException mismatched && mismatched.getTargetType() != null) {
 			return "[" + where + "] 값의 모양이 맞지 않습니다(" + this.shapeName(mismatched.getTargetType()) + "이어야 합니다"
 				+ " - 예: TOOL step의 input은 맵, AGENT step의 input은 문자열).";
 		}
 		if (cause.getCause() != null && cause.getCause().getMessage() != null) {
-			// 값을 만들다 우리 코드가 던진 오류(예: ToolParse.from의 "TOOL step의 output에는 ...")는 그 메시지를 그대로 보여줍니다.
+			// 값을 만들다 우리 코드가 던진 오류(예: JsonSchemas.normalize의 "알 수 없는 타입 이름입니다 ...")는 그 메시지를 그대로 보여줍니다.
 			return "[" + where + "] " + cause.getCause().getMessage();
 		}
 		return "[" + where + "] " + cause.getOriginalMessage();
 	}
 
 	/**
-	 * 예전 output 모양(output.schema / output.parse / output.pattern)으로 적은 것 같으면 새 모양을 알려주는 안내 문구를 돌려줍니다.
-	 * 아니면 빈 문자열입니다.
+	 * 없어졌거나 다른 곳으로 옮겨진 키를 적었으면 새 모양을 알려주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
 	 *
-	 * @param where 오류가 난 YAML 경로(예: workflow.steps[0].output.schema.sql)
+	 * @param owner 키를 적은 자리의 record 타입
+	 * @param key   적은 키 이름
 	 */
-	private String oldOutputHint(String where) {
-		if (where.contains(".output.schema")) {
-			return " output.schema는 없어졌습니다. AGENT step은 output 아래에 필드를 바로 적습니다(예: output: {sql: string}).";
+	private String movedKeyHint(Class<?> owner, String key) {
+		if (AgentStepDefinition.class.equals(owner) && "output".equals(key)) {
+			return " AGENT step의 output은 없어졌습니다. 답의 모양은 그 Agent의 YAML(agents/*.yml)에 output: {schema: ...}로 선언합니다.";
 		}
-		if (where.endsWith(".output")) {
-			return " output.parse/output.pattern은 없어졌습니다. TOOL step은 output: lines, pattern: '...'처럼 step 바로 아래에 적습니다.";
+		if (ToolStepDefinition.class.equals(owner) && ("output".equals(key) || "pattern".equals(key))) {
+			return " TOOL step의 output/pattern은 없어졌습니다. Tool 응답이 JSON이면 그 값이, 아니면 글자가 그대로 steps.id.output에 들어갑니다.";
+		}
+		if (WorkFlowDefinition.class.equals(owner) && "inputs".equals(key)) {
+			return " inputs는 input으로 바뀌었습니다. 예: input: {schema: {type: object, properties: {sqlList: list<string>}}}";
+		}
+		if (SchemaDefinition.class.equals(owner)) {
+			return " input/output 아래에는 schema: 하나만 적고, 그 안에 JSON Schema를 적습니다. 예: output: {schema: {type: object, properties: {...}}} 또는 output: string";
 		}
 		return "";
 	}

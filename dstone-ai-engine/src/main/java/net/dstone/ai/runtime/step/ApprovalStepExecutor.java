@@ -18,13 +18,9 @@ import net.dstone.common.utils.StringUtil;
  * - 아직 결정이 없으면 대기(StepOutcome.waitingApproval())를 돌려줍니다. WorkFlowExecutor는 이 값을 보고 Workflow 실행 전체를
  *   WAITING_APPROVAL 상태로 멈춰 둡니다.
  * - 나중에 api.controller.WorkFlowExecutionController의 decision API가 호출되면, 그 결정이 컨텍스트의
- *   approvals.{stepId}에 기록된 뒤 같은 스텝이 다시 한번 실행됩니다. 이번에는 결정이 있으니
- *   승인이면 성공을, 반려면 실패를 돌려줍니다.
- *
- * APPROVAL은 사람이 결정만 하는 관문이라서, 받은 input(직전 step의 결과 텍스트)을 결과 텍스트로 그대로 넘깁니다.
- * 결정 내용은 결과 텍스트에 덧붙이지 않고 따로 남깁니다.
- * - 승인: output에 {approved, approver, comment}를 남깁니다. 다음 step은 {{steps.id.output.comment}}처럼 꺼내 씁니다.
- * - 반려: 실패로 처리하고, 반려 사유(comment)를 error에 남깁니다.
+ *   approvals.{stepId}에 기록된 뒤 같은 스텝이 다시 한번 실행됩니다. 이번에는 결정이 있으니 그 결정을
+ *   output에 {approved, approver, comment}로 남기고, 승인이면 성공을, 반려면 실패(error에 반려 사유)를 돌려줍니다.
+ *   다음 step은 {{steps.id.output.comment}}처럼 꺼내 씁니다.
  * </pre>
  */
 @Component
@@ -36,9 +32,8 @@ public class ApprovalStepExecutor {
 	 *
 	 * @param execution 지금 진행 중인 Workflow 실행 상태입니다.
 	 * @param step      실행할 step의 정의입니다.
-	 * @param input     직전 step의 결과 텍스트입니다. 결과 텍스트로 그대로 넘깁니다.
 	 */
-	public StepOutcome run(WorkFlowExecution execution, ApprovalStepDefinition step, String input) {
+	public StepOutcome run(WorkFlowExecution execution, ApprovalStepDefinition step) {
 		Map<String, Object> decision = WorkFlowContext.approval(execution.context(), step.id());
 		if (decision == null) {
 			return StepOutcome.waitingApproval();
@@ -48,15 +43,15 @@ public class ApprovalStepExecutor {
 		Object approver = decision.get("approver");
 		Object comment = decision.get("comment");
 
+		Map<String, Object> output = new LinkedHashMap<>();
+		output.put("approved", approved);
+		output.put("approver", approver == null ? "" : approver);
+		output.put("comment", comment == null ? "" : comment);
 		if (approved) {
-			Map<String, Object> output = new LinkedHashMap<>();
-			output.put("approved", true);
-			output.put("approver", approver == null ? "" : approver);
-			output.put("comment", comment == null ? "" : comment);
-			return StepOutcome.success(input, output);
+			return StepOutcome.success(output);
 		}
 		String reason = comment == null || StringUtil.isEmpty(comment.toString()) ? "(사유 없음)" : comment.toString();
-		return StepOutcome.failure(input, reason);
+		return StepOutcome.failure(output, reason);
 	}
 
 }

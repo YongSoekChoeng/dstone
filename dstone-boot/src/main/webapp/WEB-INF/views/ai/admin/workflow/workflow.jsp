@@ -56,7 +56,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<span id="workflow-admin-detail-badge" class="workflow-badge">-</span>
 				</div>
 				<div class="workflow-field">
-					<label>결과(resultText) / 실패사유(errorMessage)</label>
+					<label>결과(output) / 실패사유(errorMessage)</label>
 					<textarea id="workflow-admin-detail-result" class="workflow-textarea" readonly></textarea>
 				</div>
 				<div class="workflow-field">

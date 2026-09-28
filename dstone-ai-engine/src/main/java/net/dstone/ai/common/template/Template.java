@@ -13,13 +13,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * <pre>
  * Workflow YAML 안의 {{ ... }} 자리를 실제 값으로 채워주는 템플릿 도구입니다.
- * step의 input, Workflow의 output, step의 forEach가 모두 이 규칙 하나로 처리됩니다.
+ * step의 input, Workflow의 output.value, step의 forEach가 모두 이 규칙 하나로 처리됩니다.
  *
  * ## 문법
- *   {{inputs.message}}                         컨텍스트 트리를 점(.)으로 따라 내려간 값
- *   {{steps.list.output.lines.0}}              리스트는 숫자로 몇 번째 항목인지 고름(0부터)
- *   {{previous.output.sql ?? inputs.message}}  왼쪽 값이 없으면 오른쪽 값을 씀(여러 번 이어 쓸 수 있음) 계산식이나 조건식은 지원하지 않습니다. 
- *                                              값을 가공해야 한다면 Tool로 만들어서 TOOL step으로 처리합니다.
+ *   {{input.requirement}}                        컨텍스트 트리를 점(.)으로 따라 내려간 값
+ *   {{steps.tree.output.0.name}}                 리스트는 숫자로 몇 번째 항목인지 고름(0부터)
+ *   {{steps.fix.output.sql ?? input}}            왼쪽 값이 없으면 오른쪽 값을 씀(여러 번 이어 쓸 수 있음) 계산식이나 조건식은 지원하지 않습니다. 
+ *                                                값을 가공해야 한다면 Tool로 만들어서 TOOL step으로 처리합니다.
  *
  * ## 채우는 규칙
  * - 문자열 안에 다른 글자와 섞여 있으면: 값을 글자로 바꿔 끼웁니다(맵이나 리스트는 JSON 글자로 바뀝니다).
@@ -30,7 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * 1. {{item}}이 채워지는 과정
  * 
- * 	  forEach: inputs.sqlList        # ["SELECT 1 FROM dual", "SELEC 1 FROM dual"]
+ * 	  forEach: input.sqlList         # ["SELECT 1 FROM dual", "SELEC 1 FROM dual"]
  * 	  input:
  * 		sql: "{{item}}"              # ← 빈칸
  * 
@@ -78,9 +78,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * 	  ├──────────────────────────────────────────────────────────────
  * 	  │ {{item.sql}}           이번 항목이 객체일 때 그 안의 sql 값         
  * 	  ├──────────────────────────────────────────────────────────────
- * 	  │ {{inputs.sqlList}}     요청에 들어온 sqlList 값                 
+ * 	  │ {{input.sqlList}}      요청에 들어온 sqlList 값                 
  * 	  ├──────────────────────────────────────────────────────────────
- * 	  │ {{steps.check.text}}   check step의 결과 글자                  
+ * 	  │ {{steps.check.output}} check step이 돌려준 값                  
  * 	  ├──────────────────────────────────────────────────────────────
  * 	  │ {{a ?? b}}             a가 없으면 b                            
  * 	  └──────────────────────────────────────────────────────────────
@@ -137,6 +137,16 @@ public final class Template {
 	}
 
 	/**
+	 * 템플릿이 "{{ ... }} 하나만 있는 글자"인지 봅니다. 이런 템플릿은 가리키는 값의 타입을 그대로 돌려주므로(render 참고),
+	 * 채우기 전에는 모양(글자인지 맵인지)을 알 수 없습니다. 엔진이 켜질 때 input 모양을 검사하면서 이 경우는 실행 중 검사로 넘깁니다.
+	 *
+	 * @param template 볼 템플릿입니다.
+	 */
+	public static boolean isSingleExpression(Object template) {
+		return template instanceof String text && EXPRESSION.matcher(text).matches();
+	}
+
+	/**
 	 * <pre>
 	 * 문자열 템플릿의 {{ ... }} 자리를 모두 글자로 바꿔 끼워서, 항상 문자열로 돌려줍니다.
 	 * LLM에게 보낼 메시지처럼 결과가 반드시 글자여야 할 때 씁니다.
@@ -161,7 +171,7 @@ public final class Template {
 
 	/**
 	 * <pre>
-	 * 표현식 하나(괄호 없이, 예: "steps.a.text ?? inputs.message")를 계산해서 값을 돌려줍니다.
+	 * 표현식 하나(괄호 없이, 예: "steps.a.output ?? input")를 계산해서 값을 돌려줍니다.
 	 * forEach처럼 {{ }} 없이 경로만 적는 자리에서 씁니다.
 	 * </pre>
 	 *
@@ -225,7 +235,7 @@ public final class Template {
 
 	/**
 	 * <pre>
-	 * 경로 하나(예: "steps.list.output.lines.0")를 컨텍스트 트리에서 따라 내려가 값을 찾습니다.
+	 * 경로 하나(예: "steps.tree.output.0.name")를 컨텍스트 트리에서 따라 내려가 값을 찾습니다.
 	 * 중간에 길이 끊기면 null을 돌려줍니다.
 	 * </pre>
 	 *
@@ -239,7 +249,7 @@ public final class Template {
 			// 컨텍스트 가 Map 형식 이라면
 			if (current instanceof Map) {
 				current = ((Map<String, Object>) current).get(segment);
-			// 컨텍스트 가 리스트 형식이고 경로(segment)글자가 '숫자로만 이루어진 한 글자 이상의 문자열' 이라면(예:inputs.sqlList.0)
+			// 컨텍스트 가 리스트 형식이고 경로(segment)글자가 '숫자로만 이루어진 한 글자 이상의 문자열' 이라면(예:input.sqlList.0)
 			} else if (current instanceof List<?> list && segment.matches("\\d+")) {
 				int index = Integer.parseInt(segment);
 				current = index < list.size() ? list.get(index) : null;
@@ -256,10 +266,14 @@ public final class Template {
 
 	/**
 	 * 값을 글자로 바꿉니다. 글자는 그대로, 맵과 리스트는 JSON 글자로, 그 밖의 값(숫자 등)은 toString()으로 바꿉니다.
+	 * null은 null 그대로 돌려줍니다. 문장 속 {{ }}를 채울 때와, step 결과를 실행 이력에 한 줄로 남길 때 씁니다.
 	 *
 	 * @param value 글자로 바꿀 값입니다.
 	 */
-	private static String toText(Object value) {
+	public static String toText(Object value) {
+		if (value == null) {
+			return null;
+		}
 		if (value instanceof String text) {
 			return text;
 		}

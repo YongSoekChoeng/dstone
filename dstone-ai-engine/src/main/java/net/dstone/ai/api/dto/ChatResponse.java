@@ -3,7 +3,7 @@ package net.dstone.ai.api.dto;
 /**
  * POST /api/ai/chat, POST /api/ai/chat/stream 요청에 대한 응답입니다.
  *
- * @param message   Agent가 돌려준 응답 메시지입니다.
+ * @param output    Agent가 돌려준 값입니다. Agent output 계약 모양 그대로입니다(string이면 글자, object면 객체).
  * @param provider  이번 응답을 만드는 데 쓰인 LLM provider(예: anthropic, openai)의 이름입니다.
  * @param sessionId 이 대화를 구분하는 세션 ID입니다.
  * @param agent     이번에 호출된 Agent의 이름입니다.
@@ -12,5 +12,5 @@ package net.dstone.ai.api.dto;
  *                  정해집니다(runtime.agent.AgentExecutor가 실제 호출 시 쓰는 우선순위와 동일합니다). 이 값은
  *                  ChatController.chat()이 계산해서 채워 넣습니다.
  */
-public record ChatResponse(String message, String provider, String sessionId, String agent, String model) {
+public record ChatResponse(Object output, String provider, String sessionId, String agent, String model) {
 }

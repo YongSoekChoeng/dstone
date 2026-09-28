@@ -2,7 +2,7 @@ var DstoneAiChat = (function () {
 
 	var urls = {};
 	var messagesEl, inputEl, formEl, agentEl, agentDescEl, ragCheckEl, toolsCheckEl, modelInputEl, sendBtnEl;
-	var agentsById = {}; // id -> description, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
+	var agentsById = {}; // id -> {description, input, output}, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
 
 	function init(options) {
 		urls = options;
@@ -44,7 +44,7 @@ var DstoneAiChat = (function () {
 				agentEl.innerHTML = "";
 				agentsById = {};
 				(agents || []).forEach(function (agent) {
-					agentsById[agent.id] = agent.description;
+					agentsById[agent.id] = agent;
 					var option = document.createElement("option");
 					option.value = agent.id;
 					option.textContent = agent.id;
@@ -58,7 +58,24 @@ var DstoneAiChat = (function () {
 	}
 
 	function updateAgentDescription() {
-		agentDescEl.textContent = agentsById[agentEl.value] || "";
+		var agent = agentsById[agentEl.value];
+		if (!agent) {
+			agentDescEl.textContent = "";
+			return;
+		}
+		var hint = agent.description || "";
+		if (!isText(agent.input)) {
+			hint += " [input: JSON - 입력창을 JSON으로 읽어 보냅니다. " + JSON.stringify(agent.input) + "]";
+		}
+		if (!isText(agent.output)) {
+			hint += " [output이 string이 아니라 이 채팅 화면(스트리밍)에서는 부를 수 없습니다 - POST /api/ai/chat을 쓰십시오]";
+		}
+		agentDescEl.textContent = hint;
+	}
+
+	/** Agent의 input/output 스키마가 글자(string)인지 본다. 스키마가 없으면 글자로 본다. */
+	function isText(schema) {
+		return !schema || schema.type === "string";
 	}
 
 	function appendMessage(role, text) {
@@ -92,6 +109,17 @@ var DstoneAiChat = (function () {
 		if (!message) {
 			return;
 		}
+		// Agent input이 글자가 아니면(예: object) 입력창 내용을 JSON으로 읽어서 보낸다.
+		var input = message;
+		var agent = agentsById[agentEl.value];
+		if (agent && !isText(agent.input)) {
+			try {
+				input = JSON.parse(message);
+			} catch (e) {
+				alert("이 Agent의 input은 JSON이어야 합니다: " + e.message);
+				return;
+			}
+		}
 		var model = modelInputEl.value.trim();
 		appendMessage("user", model ? message + " (model: " + model + ")" : message);
 		inputEl.value = "";
@@ -101,7 +129,7 @@ var DstoneAiChat = (function () {
 		assistantBubble.classList.add("chat-bubble-pending");
 
 		var requestBody = JSON.stringify({
-			message: message,
+			input: input,
 			agent: agentEl.value,
 			ragEnabled: ragCheckEl.checked,
 			toolsEnabled: toolsCheckEl.checked,

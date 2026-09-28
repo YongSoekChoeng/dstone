@@ -3,18 +3,34 @@
 # 이 Agent는 "실패하면 되돌아가서 다시 시도하는 흐름(onFailure 루프)"을 보여주기 위한 예시입니다.
 # workflows/sample/sample-loop-retry-until-valid.yml의 fix step이 이 Agent를 씁니다. 먼저 TOOL
 # step(validate, validateSqlSyntax)이 SQL 문법을 검사하고, 실패하면 fix step으로 넘어옵니다.
-# fix step의 input 템플릿이 "검증에 실패한 SQL"({{steps.validate.input.sql}})과 "실패 사유"
-# ({{steps.validate.error}})를 채워서 이 Agent에게 사용자 메시지로 보내줍니다.
 #
-# 고친 SQL을 어떤 모양으로 돌려줄지는 이 파일이 아니라 fix step의 output({sql: string})가
-# 정합니다. 그래서 이 prompt는 "어떻게 고칠지"만 설명합니다. 고친 SQL은 다시 validate로 돌아가
-# 검사를 받고, 이 루프가 끝없이 돌지 않도록 Workflow의 maxIterations가 막아줍니다.
+# 입출력 계약을 둘 다 object로 선언한 예시이기도 합니다.
+# - input: {sql, error}. fix step이 input을 맵으로 적어서 "검증에 실패한 SQL"({{steps.validate.input.sql}})과
+#   "실패 사유"({{steps.validate.error}})를 채워 넣습니다. 엔진이 이 맵을 아래 input 스키마로 검사한 뒤
+#   JSON 글자로 바꿔 LLM에게 사용자 메시지로 보냅니다. (prompt 안에는 중괄호를 쓰지 않습니다 - prompt의
+#   {이름}은 Spring AI PromptTemplate이 변수 자리로 읽기 때문에, JSON 예시를 적으면 기동은 되지만 호출할 때 실패합니다.)
+# - output: {sql}. LLM은 이 모양의 JSON으로만 답해야 하고, 고친 SQL은 steps.fix.output.sql로 꺼냅니다.
+#   LLM이 설명이나 코드펜스를 덧붙여도 sql 값만 깔끔하게 다음 step으로 넘어갑니다.
+# 고친 SQL은 다시 validate로 돌아가 검사를 받고, 이 루프가 끝없이 돌지 않도록 Workflow의 maxIterations가 막아줍니다.
 agent:
   id: sample-fix-agent
   description: onFailure 루프 전용 - 검증에 실패한 SQL과 그 사유를 보고 SQL을 고친다.
   prompt: |
-    입력으로 [검증에 실패한 SQL]과 [실패 사유]를 받습니다. 실패 사유를 근거로 원래 의도를 최대한
-    살려서, 문법상 올바른 단일 SQL 문 하나로 고치십시오. 고칠 방법을 알 수 없으면 "SELECT 1"로
-    답하십시오.
+    입력으로 sql(검증에 실패한 SQL)과 error(실패 사유) 두 필드를 가진 JSON을 받습니다. 실패 사유를
+    근거로 원래 의도를 최대한 살려서, 문법상 올바른 단일 SQL 문 하나로 고치십시오. 고칠 방법을 알 수
+    없으면 "SELECT 1"로 답하십시오.
+  input:
+    schema:
+      type: object
+      properties:
+        sql: { type: string, description: 검증에 실패한 SQL }
+        error: { type: string, description: 검증에 실패한 사유 }
+      required: [sql, error]
+  output:
+    schema:
+      type: object
+      properties:
+        sql: { type: string, description: 문법 오류를 고친 단일 SQL 문 }
+      required: [sql]
   toolsEnabled: false
   ragEnabled: false

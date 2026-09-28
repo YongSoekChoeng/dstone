@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.AgentStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
@@ -20,6 +19,7 @@ import net.dstone.ai.common.definition.workflow.step.RouterStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
+import net.dstone.ai.common.schema.JsonSchemas;
 import net.dstone.ai.common.template.Template;
 import net.dstone.ai.common.template.TemplateException;
 import net.dstone.ai.runtime.step.AgentStepExecutor;
@@ -33,7 +33,6 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.core.BaseObject;
-import net.dstone.common.utils.StringUtil;
 
 /**
  * Workflow를 실제로 진행시키는 핵심 클래스입니다. WorkFlowDefinition에 정의된 내용을 순차 실행,
@@ -48,8 +47,8 @@ import net.dstone.common.utils.StringUtil;
  * 1) step을 실행하기 직전에, 그 step의 input 템플릿({{ ... }})을 컨텍스트로 채웁니다(renderInput()).
  *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 템플릿 규칙을 씁니다.
  * 2) 채워진 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
- * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, text, error}로 남기고, previous도 이 결과로 바꿉니다.
- * 그래서 다음 step들은 {{steps.id.output.키}}처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다.
+ * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, error}로 남깁니다.
+ * 그래서 다음 step들은 {{steps.id.output.키}}처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
  * input 템플릿이 가리키는 값을 찾지 못하면 그 step은 실패로 처리되고, 사유가 error에 남습니다.
  *
  * ## 병렬 실행
@@ -150,8 +149,8 @@ public class WorkFlowExecutor extends BaseObject {
 			}
 
 			/****************************************************************************************
-			5) 이번 step의 결과를 컨텍스트의 steps.{stepId}와 previous에 남겨서,
-			   다음 step들이 {{steps.id...}}나 {{previous...}}로 가져다 쓸 수 있게 합니다.
+			5) 이번 step의 결과를 컨텍스트의 steps.{stepId}에 남겨서,
+			   다음 step들이 {{steps.id...}}로 가져다 쓸 수 있게 합니다.
 			****************************************************************************************/
 			WorkFlowContext.recordStep(currentExecution.context(), step.id(), outcome.toRecord());
 
@@ -168,16 +167,23 @@ public class WorkFlowExecutor extends BaseObject {
 
 			/****************************************************************************************
 			7) 다음 곳으로 갑니다.
-			   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. output 템플릿이 있으면 그 값을, 없으면 이 step의 결과를 최종 결과로 남깁니다.
+			   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 채운 값을 최종 결과로 남깁니다
+			              (output.schema가 있으면 그 모양인지 검사하고, 아니면 FAILED로 끝냅니다).
 			   - FAIL   : Workflow 전체를 실패로 끝냅니다.
 			   - step id: 그 step으로 이동해서 while 루프를 계속 돕니다(앞쪽 step이면 재시도 루프).
 			****************************************************************************************/
 			if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
-				String result;
+				Object result;
 				try {
-					result = this.renderOutput(workflow, currentExecution.context(), outcome.success() ? outcome.text() : outcome.error());
+					result = Template.render(workflow.output().value(), currentExecution.context());
 				} catch (TemplateException e) {
 					return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
+				}
+				if (workflow.output().schema() != null) {
+					List<String> problems = JsonSchemas.validate(workflow.output().schema(), result);
+					if (!problems.isEmpty()) {
+						return this.persistFailed(currentExecution, "Workflow output이 output.schema 모양이 아닙니다: " + problems);
+					}
 				}
 				currentExecution = currentExecution.done(result);
 				this.executionStore.update(currentExecution);
@@ -227,7 +233,8 @@ public class WorkFlowExecutor extends BaseObject {
 	 * forEach가 있는 step을 리스트 항목 개수만큼 동시에 실행합니다.
 	 *
 	 * forEach 경로가 가리키는 리스트를 찾아서, 항목마다 {{item}}(또는 itemVariable) 하나만 더한 컨텍스트 복사본으로 input을 채워 실행합니다.
-	 * 모든 반복이 끝나면 반복 순서대로 실행 이력을 남기고, 결과를 items에 모읍니다.
+	 * 모든 반복이 끝나면 반복 순서대로 실행 이력을 남기고, 반복별 input과 output을 각각 순서대로 리스트로 모읍니다
+	 * (steps.id.input / steps.id.output이 리스트가 됩니다).
 	 * 반복이 하나라도 실패하면 이 step 전체가 실패입니다. 반복할 항목이 하나도 없으면 빈 결과로 성공 처리합니다.
 	 *
 	 * forEach 경로의 값을 찾지 못하거나 그 값이 리스트가 아니면, 이 step은 실패로 처리됩니다(onFailure를 따릅니다).
@@ -264,8 +271,8 @@ public class WorkFlowExecutor extends BaseObject {
 		}
 
 		boolean allSuccess = true;
-		List<Map<String, Object>> itemRecords = new ArrayList<>();
-		List<String> texts = new ArrayList<>();
+		List<Object> inputs = new ArrayList<>();
+		List<Object> outputs = new ArrayList<>();
 		List<String> errors = new ArrayList<>();
 		for (int i = 0; i < futures.size(); i++) {
 			String historyId = step.id() + "[" + i + "]";
@@ -282,13 +289,11 @@ public class WorkFlowExecutor extends BaseObject {
 				allSuccess = false;
 				errors.add(historyId + ": " + outcome.error());
 			}
-			if (outcome.text() != null) {
-				texts.add(outcome.text());
-			}
-			itemRecords.add(outcome.toRecord());
+			inputs.add(outcome.input());
+			outputs.add(outcome.output());
 		}
 		String error = errors.isEmpty() ? null : String.join("\n", errors);
-		return StepOutcome.forEach(allSuccess, String.join("\n", texts), error, itemRecords, (System.nanoTime() - start) / 1_000_000);
+		return StepOutcome.forEach(allSuccess, inputs, outputs, error, (System.nanoTime() - start) / 1_000_000);
 	}
 
 	/**
@@ -336,27 +341,28 @@ public class WorkFlowExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * step의 input 템플릿을 컨텍스트로 채웁니다.
+	 * - AGENT/SUPERVISOR/ROUTER: input(Agent input 모양에 따라 글자 또는 맵)을 채워서 돌려줍니다.
+	 *   input은 필수라서 엔진이 켜질 때 이미 검사되어 있습니다.
 	 * - TOOL: input(맵)을 채워서 맵으로 돌려줍니다. input이 없으면 빈 맵입니다.
-	 * - AGENT/SUPERVISOR/ROUTER: input(문자열)을 채워서 문자열로 돌려줍니다. input이 없으면 {{previous.text}}를 씁니다.
-	 * - APPROVAL: input이 없는 step이라 항상 {{previous.text}}입니다.
+	 * - APPROVAL: input이 없는 step이라 null입니다.
+	 * 값 전체가 {{ ... }} 하나뿐이면 원래 타입(객체, 리스트 등)을 그대로 유지합니다(Template.render).
 	 * </pre>
 	 *
 	 * @param step    input을 채울 step의 정의입니다.
 	 * @param context 값을 찾아볼 컨텍스트입니다.
 	 */
 	private Object renderInput(StepDefinition step, Map<String, Object> context) {
-		String previousText = "{{" + Context.PREVIOUS + "." + Context.FIELD_TEXT + "}}";
 		switch (step) {
 			case AgentStepDefinition agent:
-				return Template.renderText(agent.input() == null ? previousText : agent.input(), context);
+				return Template.render(agent.input(), context);
 			case SupervisorStepDefinition supervisor:
-				return Template.renderText(supervisor.input() == null ? previousText : supervisor.input(), context);
+				return Template.render(supervisor.input(), context);
 			case RouterStepDefinition router:
-				return Template.renderText(router.input() == null ? previousText : router.input(), context);
+				return Template.render(router.input(), context);
 			case ToolStepDefinition tool:
 				return tool.input() == null ? Map.of() : Template.render(tool.input(), context);
 			case ApprovalStepDefinition approval:
-				return Template.renderText(previousText, context);
+				return null;
 		}
 	}
 
@@ -368,36 +374,24 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * @param execution     지금 진행 중인 실행입니다.
 	 * @param step          실행할 step의 정의입니다.
-	 * @param renderedInput renderInput()이 채운 입력입니다(TOOL은 맵, 그 밖에는 문자열).
-	 * @param context       실행 컨텍스트입니다(Agent system prompt 변수로 쓸 inputs를 꺼냅니다).
+	 * @param renderedInput renderInput()이 채운 입력입니다(TOOL은 맵, AGENT류는 Agent input 모양, APPROVAL은 null).
+	 * @param context       실행 컨텍스트입니다(Agent system prompt 변수로 쓸 Workflow input을 꺼냅니다).
 	 */
 	@SuppressWarnings("unchecked")
 	private StepOutcome runStep(WorkFlowExecution execution, StepDefinition step, Object renderedInput, Map<String, Object> context) {
-		Map<String, Object> workflowInputs = WorkFlowContext.inputs(context);
+		Map<String, Object> promptVariables = WorkFlowContext.promptVariables(context);
 		switch (step) {
 			case AgentStepDefinition agent:
-				return this.agentStepExecutor.run(execution, agent, (String) renderedInput, workflowInputs);
+				return this.agentStepExecutor.run(execution, agent, renderedInput, promptVariables);
 			case SupervisorStepDefinition supervisor:
-				return this.supervisorStepExecutor.run(execution, supervisor, (String) renderedInput, workflowInputs);
+				return this.supervisorStepExecutor.run(execution, supervisor, renderedInput, promptVariables);
 			case RouterStepDefinition router:
-				return this.routerStepExecutor.run(execution, router, (String) renderedInput, workflowInputs);
+				return this.routerStepExecutor.run(execution, router, renderedInput, promptVariables);
 			case ToolStepDefinition tool:
 				return this.toolStepExecutor.run(execution, tool, (Map<String, Object>) renderedInput);
 			case ApprovalStepDefinition approval:
-				return this.approvalStepExecutor.run(execution, approval, (String) renderedInput);
+				return this.approvalStepExecutor.run(execution, approval);
 		}
-	}
-
-	/**
-	 * Workflow가 성공으로 끝났을 때 돌려줄 최종 결과를 만듭니다. Workflow에 output 템플릿이 있으면 그것을
-	 * 채운 값을, 없으면 마지막 결과 텍스트를 그대로 씁니다.
-	 *
-	 * @param workflow 끝난 Workflow의 정의입니다.
-	 * @param context  실행 컨텍스트입니다.
-	 * @param lastText 마지막으로 실행된 step의 결과 텍스트입니다.
-	 */
-	private String renderOutput(WorkFlowDefinition workflow, Map<String, Object> context, String lastText) {
-		return StringUtil.isEmpty(workflow.output()) ? lastText : Template.renderText(workflow.output(), context);
 	}
 
 	/**
@@ -411,7 +405,7 @@ public class WorkFlowExecutor extends BaseObject {
 	private void appendHistory(WorkFlowExecution execution, StepDefinition step, String historyId, StepOutcome outcome) {
 		this.executionStore.appendHistory(execution.executionId(),
 			new StepHistoryEntry(historyId, step.type(), StepDefinition.refOf(step), outcome.success(), outcome.durationMs(),
-				outcome.success() ? outcome.text() : null, outcome.error(), Instant.now()));
+				outcome.success() ? Template.toText(outcome.output()) : null, outcome.error(), Instant.now()));
 	}
 
 	/**
@@ -459,7 +453,7 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
-	 * Workflow를 FAIL로 끝낼 때 남길 메시지를 만듭니다. 성공했는데 onSuccess가 FAIL이면 결과 텍스트를,
+	 * Workflow를 FAIL로 끝낼 때 남길 메시지를 만듭니다. 성공했는데 onSuccess가 FAIL이면 그 step의 output을 글자로 바꾼 값을,
 	 * 실패했는데 onFailure가 없으면 그 사실을 덧붙인 실패 사유를, 그 밖에는 실패 사유를 씁니다.
 	 *
 	 * @param step    방금 끝난 step의 정의입니다.
@@ -467,7 +461,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	private String failMessage(StepDefinition step, StepOutcome outcome) {
 		if (outcome.success()) {
-			return outcome.text();
+			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + Template.toText(outcome.output());
 		}
 		if (step.onFailure() == null) {
 			return "step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + outcome.error();

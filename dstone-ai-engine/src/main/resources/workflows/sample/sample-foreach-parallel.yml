@@ -4,36 +4,42 @@
 # 위한 테스트 전용 Workflow입니다. LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax) 하나만으로
 # 이루어져 있어서, API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
-# - inputs: sqlList를 list<string>으로 선언해 두었습니다. 요청에 sqlList가 없거나 리스트가 아니면
-#   실행하기 전에 400으로 거절됩니다.
-# - validate-each: forEach: inputs.sqlList라서, sqlList 항목 개수만큼 이 step 하나를 한꺼번에
+# - input: {sqlList: list<string>}을 필수로 선언해 두었습니다. 요청의 input에 sqlList가 없거나 리스트가
+#   아니면 실행하기 전에 400으로 거절됩니다.
+# - validate-each: forEach: input.sqlList라서, sqlList 항목 개수만큼 이 step 하나를 한꺼번에
 #   실행합니다(자세한 동작은 runtime.workflow.WorkFlowExecutor.runForEach 참고). 각 실행에서는
 #   자기가 맡은 항목이 {{item}}으로 채워집니다.
-# - 반복별 결과는 실행 상세 조회의 context.steps.validate-each.items에 순서대로 쌓입니다.
+# - forEach step의 input/output은 반복별 값의 리스트입니다. 최종 결과(steps.validate-each.output)는
+#   항목별 검사 결과({success, message}) 리스트입니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-foreach-parallel
-#   message   : (아무 문자열이나 넣으면 됩니다 - message는 필수값이지만 이 Workflow는 쓰지 않습니다)
-#   variables : {"sqlList": ["SELECT 1 FROM dual", "SELECT name FROM member WHERE id = 1"]}
+#   input     : {"sqlList": ["SELECT 1 FROM dual", "SELECT name FROM member WHERE id = 1"]}
 # 실패하는 경우도 보고 싶다면 sqlList에 "SELEC 1 FROM dual"을 하나 더 넣어보면 됩니다
 # ("SELEC"은 SELECT를 일부러 잘못 쓴 오타로, JSQLParser가 실제로 문법 오류로 거부합니다. 참고로
 # "SELECT * FROM WRONG SYNTAX"처럼 얼핏 이상해 보이는 문자열은 "WRONG이라는 테이블을 SYNTAX라는
 # 이름으로 별칭 붙인 것"으로 해석되어 문법상으로는 유효하게 통과하므로 예시로 쓰지 않았습니다.)
 # sqlList 안의 SQL이 전부 문법상 올바르면 SUCCESS로 끝나고, 하나라도 문법 오류가 있으면 FAIL로 끝나면서
 # 몇 번째 항목이 왜 실패했는지가 실패 사유에 나옵니다. 항목을 늘리고 싶다면 YAML은 그대로 두고
-# variables의 sqlList 목록만 늘리면 됩니다.
+# input의 sqlList 목록만 늘리면 됩니다.
 workflow:
   id: sample-foreach-parallel
-  description: forEach 동작 확인용 테스트 Workflow - TOOL step 하나를 sqlList 항목 수만큼 동시 실행한다.
+  description: forEach 동작 확인용 테스트 Workflow - TOOL step 하나를 input.sqlList 항목 수만큼 동시 실행한다.
   maxIterations: 5
-  inputs:
-    sqlList: list<string>
+  input:
+    schema:
+      type: object
+      properties:
+        sqlList: list<string>
+      required: [sqlList]
+  output:
+    value: "{{steps.validate-each.output}}"
   steps:
 
     - id: validate-each
       type: TOOL
       ref: validateSqlSyntax
-      forEach: inputs.sqlList
+      forEach: input.sqlList
       input:
         sql: "{{item}}"
       onSuccess: SUCCESS

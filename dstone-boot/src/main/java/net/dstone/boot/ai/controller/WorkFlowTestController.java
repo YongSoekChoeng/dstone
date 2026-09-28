@@ -40,14 +40,14 @@ public class WorkFlowTestController extends net.dstone.boot.common.biz.BaseContr
 		return this.workFlowTestService.listWorkflows();
 	}
 
-	/** @param request 호출할 workflowId와 입력 메시지/변수/세션ID */
+	/** @param request 호출할 workflowId와 input(Workflow input 모양)/세션ID */
 	@PostMapping(value = "/submit.do")
 	public WorkFlowSubmitResult submit(@RequestBody WorkFlowTestRequest request) {
 		if (StringUtil.isEmpty(request.workflowId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workflowId는 필수입니다.");
 		}
-		if (StringUtil.isEmpty(request.message())) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
+		if (request.input() == null || (request.input() instanceof String text && StringUtil.isEmpty(text))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "input은 필수입니다.");
 		}
 		return this.workFlowTestService.submit(request);
 	}

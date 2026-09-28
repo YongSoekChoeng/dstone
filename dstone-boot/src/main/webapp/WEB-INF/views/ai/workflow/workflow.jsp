@@ -32,13 +32,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<input type="text" id="workflow-session-id" placeholder="예: 이전 응답에서 이어가고 싶은 세션 ID" />
 					</div>
 					<div class="workflow-field">
-						<label for="workflow-message">message</label>
-						<textarea id="workflow-message" class="workflow-textarea" placeholder="예: SELECT NVL(a, 0) FROM dual WHERE ROWNUM &lt;= 10"></textarea>
+						<label for="workflow-input">input</label>
+						<p id="workflow-input-schema" class="ai-hint"></p>
+						<textarea id="workflow-input" class="workflow-textarea" placeholder="예: SELECT 1 FROM dual"></textarea>
 						<p id="workflow-sample-note" class="ai-hint"></p>
-					</div>
-					<div class="workflow-field">
-						<label for="workflow-variables">variables (선택, JSON 객체)</label>
-						<textarea id="workflow-variables" class="workflow-textarea workflow-textarea-small" placeholder="예: {}"></textarea>
 					</div>
 				</div>
 

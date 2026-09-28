@@ -76,7 +76,12 @@ var DstoneAiWorkflowAdmin = (function () {
 		detailIdEl.textContent = detail.executionId;
 		detailBadgeEl.textContent = detail.status;
 		detailBadgeEl.className = "workflow-badge workflow-badge-" + (detail.status || "unknown").toLowerCase();
-		detailResultEl.value = detail.resultText || detail.errorMessage || "";
+		// output은 Workflow에 따라 글자일 수도, 객체일 수도 있다 - 객체면 보기 좋게 JSON으로 펼친다.
+		var output = detail.output;
+		if (output != null && typeof output !== "string") {
+			output = JSON.stringify(output, null, 2);
+		}
+		detailResultEl.value = output || detail.errorMessage || "";
 		detailContextEl.value = detail.context ? JSON.stringify(detail.context, null, 2) : "";
 
 		historyBodyEl.innerHTML = "";

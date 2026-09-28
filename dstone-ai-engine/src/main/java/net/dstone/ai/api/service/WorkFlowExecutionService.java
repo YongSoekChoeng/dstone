@@ -1,19 +1,15 @@
 package net.dstone.ai.api.service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.common.definition.workflow.FieldDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
-import net.dstone.ai.common.schema.FieldTypes;
+import net.dstone.ai.common.schema.JsonSchemas;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
@@ -21,6 +17,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.biz.BaseService;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * Workflow를 실행하는 세 가지 방법(동기 실행, 비동기 실행, 승인 대기에서 재개)이 모두 거쳐 가는
@@ -48,11 +45,10 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
 	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 inputs 아래에 들어갑니다).
-	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 inputs.message에 들어갑니다).
+	 * @param input        Workflow를 호출할 때 넘겨받은 값입니다(컨텍스트의 input에 들어갑니다).
 	 */
-	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String message) {
-		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, message);
+	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
+		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, input);
 		this.executionStore.insert(execution);
 		return this.workFlowExecutor.run(workflow, execution);
 	}
@@ -64,11 +60,10 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
 	 * @param caller       이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables    Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(컨텍스트의 inputs 아래에 들어갑니다).
-	 * @param message      Workflow를 호출할 때 넘겨받은 메시지입니다(컨텍스트의 inputs.message에 들어갑니다).
+	 * @param input        Workflow를 호출할 때 넘겨받은 값입니다(컨텍스트의 input에 들어갑니다).
 	 */
-	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Map<String, Object> variables, String message) {
-		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, variables, message);
+	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
+		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, input);
 		this.executionStore.insert(execution);
 		// 지금은 기본 ForkJoinPool.commonPool()을 그대로 쓰고 있습니다. 전용 스레드풀이나 큐잉,
 		// 동시 실행 개수 제한 같은 건 실제 운영 환경에서 동시에 들어오는 submit이 많아지면 그때 도입할 계획입니다.
@@ -133,45 +128,32 @@ public class WorkFlowExecutionService extends BaseService {
 	}
 
 	/**
-	 * Workflow에 inputs(입력 계약)가 선언되어 있으면, 요청에 그 값들이 빠짐없이 올바른 타입으로 들어 있는지
-	 * 확인합니다. message는 항상 inputs.message로 들어가므로 inputs에 선언되어 있다면 message 값으로 검사합니다.
-	 * 계약에 없는 값이 더 들어 있는 것은 허용합니다.
+	 * 요청의 input이 Workflow의 input 계약(workflow.input, 비워두면 string) 모양인지 확인합니다.
 	 *
-	 * @param workflow  실행할 Workflow의 정의입니다.
-	 * @param variables 요청의 variables입니다.
-	 * @param message   요청의 message입니다.
-	 * @throws IllegalArgumentException 빠진 값이나 타입이 다른 값이 있을 때(어떤 값이 왜 문제인지 메시지에 담깁니다)
+	 * @param workflow 실행할 Workflow의 정의입니다.
+	 * @param input    요청의 input입니다.
+	 * @throws IllegalArgumentException input이 없거나 모양이 다를 때(어디가 왜 문제인지 메시지에 담깁니다)
 	 */
-	public void checkInputs(WorkFlowDefinition workflow, Map<String, Object> variables, String message) {
-		if (workflow.inputs() == null || workflow.inputs().isEmpty()) {
-			return;
+	public void checkInput(WorkFlowDefinition workflow, Object input) {
+		if (input == null || (input instanceof String text && StringUtil.isEmpty(text))) {
+			throw new IllegalArgumentException("input은 필수입니다(workflow[" + workflow.id() + "]의 input 모양 = " + workflow.inputSchema() + ").");
 		}
-		List<String> problems = new ArrayList<>();
-		for (Map.Entry<String, FieldDefinition> entry : workflow.inputs().entrySet()) {
-			String name = entry.getKey();
-			Object value = Constants.WorkFlow.Context.MESSAGE.equals(name) ? message : (variables == null ? null : variables.get(name));
-			if (value == null) {
-				problems.add(name + "(없음)");
-			} else if (!FieldTypes.matches(entry.getValue().type(), value)) {
-				problems.add(name + "(" + entry.getValue().type() + " 타입이어야 함)");
-			}
-		}
+		List<String> problems = JsonSchemas.validate(workflow.inputSchema(), input);
 		if (!problems.isEmpty()) {
-			throw new IllegalArgumentException("workflow[" + workflow.id() + "]의 inputs 계약을 지키지 않았습니다: " + problems);
+			throw new IllegalArgumentException("workflow[" + workflow.id() + "]의 input 모양이 맞지 않습니다: " + problems);
 		}
 	}
 
 	/**
-	 * 새 실행 상태를 만듭니다. 요청의 message와 variables로 새 컨텍스트를 만들어 담습니다(WorkFlowContext.create() 참고).
+	 * 새 실행 상태를 만듭니다. 요청의 input으로 새 컨텍스트를 만들어 담습니다(WorkFlowContext.create() 참고).
 	 *
 	 * @param workflowId 이 새 실행이 속할 Workflow의 id입니다.
 	 * @param sessionId  대화를 구분하는 세션 식별자입니다.
 	 * @param caller     이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param variables  Workflow를 호출할 때 함께 넘겨받은 변수 맵입니다(없으면 null).
-	 * @param message    Workflow를 호출할 때 넘겨받은 메시지입니다.
+	 * @param input      Workflow를 호출할 때 넘겨받은 값입니다.
 	 */
-	private WorkFlowExecution newExecution(String workflowId, String sessionId, String caller, Map<String, Object> variables, String message) {
-		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflowId, caller, sessionId, WorkFlowContext.create(message, variables));
+	private WorkFlowExecution newExecution(String workflowId, String sessionId, String caller, Object input) {
+		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflowId, caller, sessionId, WorkFlowContext.create(input));
 	}
 
 }

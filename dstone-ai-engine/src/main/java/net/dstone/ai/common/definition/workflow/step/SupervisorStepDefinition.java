@@ -7,10 +7,11 @@ import net.dstone.ai.common.consts.StepType;
  * workflows/*.yml 의 type: SUPERVISOR step입니다. LLM에게 "통과인가 아닌가, 그리고 왜 그런가"를 판정받습니다.
  * 앞선 step들의 결과가 괜찮은지 감독하고 다시 검토하는 역할에 씁니다(runtime.step.SupervisorStepExecutor).
  *
- * - 통과: 받은 input을 결과 텍스트로 그대로 넘기고, output에 {pass, reason}을 남깁니다.
- * - 불통과(또는 답의 모양이 깨짐): 실패로 처리하고, reason을 error에 남깁니다.
+ * - 통과: 성공이고, output에 {pass: true, reason}을 남깁니다.
+ * - 불통과(또는 답의 모양이 깨짐): 실패이고, output에 {pass: false, reason}을, error에 reason을 남깁니다.
  *
- * output 모양이 {pass, reason}으로 정해져 있어서 output 키는 없습니다.
+ * output 모양은 엔진이 {pass, reason}으로 정해 두었으므로(common.schema.StepOutputSchemas), ref의 Agent는 output을 선언하지 않습니다.
+ * input은 AGENT step과 같은 규칙입니다(Agent input 모양에 맞춰 적음).
  *
  *   - id: review
  *     type: SUPERVISOR
@@ -21,7 +22,7 @@ import net.dstone.ai.common.consts.StepType;
  *
  * @param id           (필수)이 step의 이름입니다.
  * @param ref          (필수)부를 Agent의 id입니다.
- * @param input        (옵셔널)LLM에게 보낼 사용자 메시지의 템플릿입니다. 비워두면 {{previous.text}}입니다.
+ * @param input        (필수)Agent에게 넣을 값(판정할 대상)의 템플릿입니다.
  * @param onSuccess    (옵셔널)통과했을 때 갈 step의 id(또는 "SUCCESS")입니다.
  * @param onFailure    (옵셔널)불통과했을 때 갈 step의 id(또는 "FAIL")입니다.
  * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 참조 경로입니다.
@@ -30,7 +31,7 @@ import net.dstone.ai.common.consts.StepType;
 public record SupervisorStepDefinition(
 	String id
 	, String ref
-	, String input
+	, Object input
 	, String onSuccess
 	, String onFailure
 	, String forEach

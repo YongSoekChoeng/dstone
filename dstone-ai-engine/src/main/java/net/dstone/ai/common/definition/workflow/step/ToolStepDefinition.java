@@ -3,7 +3,6 @@ package net.dstone.ai.common.definition.workflow.step;
 import java.util.Map;
 
 import net.dstone.ai.common.consts.StepType;
-import net.dstone.ai.common.consts.ToolParse;
 
 /**
  * <pre>
@@ -11,29 +10,22 @@ import net.dstone.ai.common.consts.ToolParse;
  * LLM을 거치지 않고 직접 호출합니다. 값을 검증하거나 외부 시스템에서 데이터를 가져오는 것처럼 결과가 코드로
  * 정해지는 작업에 씁니다(runtime.step.ToolStepExecutor).
  *
- * input은 맵입니다. 채워진 맵이 JSON으로 바뀌어 Tool의 인자가 됩니다. 비워두면 빈 인자({})로 호출합니다.
- * 값 전체가 {{ ... }} 하나뿐이면 원래 타입(리스트, 숫자 등)을 그대로 유지해서 넘깁니다.
+ * 무엇을 받고 무엇을 돌려주는지는 Tool이 정합니다.
+ * - input: Tool 인자 이름 → 값 템플릿인 맵입니다. 채워진 맵이 JSON으로 바뀌어 Tool 인자가 됩니다.
+ *   인자 이름은 엔진이 켜질 때 Tool의 인자 스키마(@Tool 메서드 파라미터 또는 MCP Tool의 inputSchema)와 대조합니다.
+ *   값 전체가 {{ ... }} 하나뿐이면 원래 타입(리스트, 숫자 등)을 그대로 유지해서 넘깁니다.
+ *   Tool에 인자가 없으면 input을 비워둡니다(빈 인자 {}로 호출).
+ * - output: 따로 적지 않습니다. Tool 응답이 JSON이면 객체/배열/숫자 그대로, 아니면 글자 그대로 steps.이id.output에 들어갑니다.
  *
- * output은 Tool의 답(글자)을 steps.이id.output으로 정리하는 방법입니다(common.consts.ToolParse).
- * text에는 어떤 방법이든 Tool 응답 원문이 그대로 남습니다.
- *   text(기본) : output 없음
- *   json       : 응답 JSON 객체가 그대로 output(배열이면 {items: [...]})
- *   lines      : 응답을 줄로 나눠 {lines: [...]}. pattern을 함께 적으면 맞는 줄만 남김
- *
- *   - id: list
+ *   - id: tree
  *     type: TOOL
- *     ref: list_directory
+ *     ref: directory_tree
  *     input:
- *       path: "{{inputs.message}}"
- *     output: lines
- *     pattern: '^\[FILE\] (.+)$'          # "[FILE] "로 시작하는 줄만 남기고, 괄호 부분(파일명)만 꺼냄
+ *       path: "{{input}}"
  * </pre>
- *
  * @param id           (필수)이 step의 이름입니다.
  * @param ref          (필수)부를 Tool의 이름입니다(@Tool 메서드 이름 또는 MCP Tool 이름).
  * @param input        (옵셔널)Tool 인자 이름 → 값 템플릿입니다. 비워두면 빈 인자입니다.
- * @param output       (옵셔널)Tool 응답을 output으로 정리하는 방법입니다(text/json/lines, 대소문자 무관). 비워두면 text입니다.
- * @param pattern      (옵셔널)output: lines 전용. 이 정규식에 맞는 줄만 남깁니다(괄호 그룹이 있으면 첫 번째 그룹만 씁니다).
  * @param onSuccess    (옵셔널)성공했을 때 갈 step의 id(또는 "SUCCESS")입니다.
  * @param onFailure    (옵셔널)실패했을 때 갈 step의 id(또는 "FAIL")입니다.
  * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 참조 경로입니다.
@@ -43,8 +35,6 @@ public record ToolStepDefinition(
 	String id
 	, String ref
 	, Map<String, Object> input
-	, ToolParse output
-	, String pattern
 	, String onSuccess
 	, String onFailure
 	, String forEach

@@ -17,6 +17,8 @@
 		<!-- 루트 pom의 spring-boot.version이 4.x(Spring Framework 7)로 올라감에 따라
 		     Spring AI도 그에 맞는 2.x 라인으로 함께 올린다. -->
 		<spring-ai.version>2.0.1</spring-ai.version>
+		<!-- Spring AI 2.0.1(spring-ai-client-chat)이 쓰는 버전과 같게 둔다. Spring AI를 올리면 함께 확인한다. -->
+		<json-schema-validator.version>3.0.1</json-schema-validator.version>
 	</properties>
 
 	<repositories>
@@ -96,6 +98,22 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-ollama</artifactId>
+		</dependency>
+
+		<!-- JSON Schema 검사(Agent/Workflow의 input/output 계약, common.schema.JsonSchemas).
+		     spring-ai-client-chat이 이미 끌어오는 라이브러리지만, 엔진 코드가 직접 쓰므로 명시해 둔다.
+		     버전은 Spring AI가 쓰는 것과 같게 맞춘다(properties의 json-schema-validator.version). -->
+		<dependency>
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>${json-schema-validator.version}</version>
+			<exclusions>
+				<!-- Spring AI와 같은 제외. YAML 입력은 쓰지 않는다(YAML은 SnakeYAML로 먼저 맵으로 읽은 뒤 JSON 글자로 검사한다). -->
+				<exclusion>
+					<groupId>tools.jackson.dataformat</groupId>
+					<artifactId>jackson-dataformat-yaml</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<!-- RAG(Phase 2): pgvector 기반 VectorStore. DataSource(spring.datasource.*)와 EmbeddingModel

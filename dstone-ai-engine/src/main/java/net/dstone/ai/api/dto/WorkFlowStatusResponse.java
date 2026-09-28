@@ -5,13 +5,13 @@ package net.dstone.ai.api.dto;
  *
  * status에는 RUNNING(실행 중), WAITING_APPROVAL(승인 대기), DONE(완료), FAILED(실패),
  * CANCELLED(취소) 중 하나가 담깁니다(자세한 값은 runtime.workflow.execution.WorkFlowExecutionStatus 참고).
- * status가 DONE이면 result가 채워지고, FAILED면 error가 채워집니다. 스텝별 실행 이력처럼 더 자세한
+ * status가 DONE이면 output이 채워지고, FAILED면 error가 채워집니다. 스텝별 실행 이력처럼 더 자세한
  * 정보가 필요하다면 GET /executions/{executionId}를 대신 쓰면 됩니다.
  *
  * @param executionId 이 실행을 가리키는 식별자입니다.
  * @param status      지금 이 실행이 어떤 상태인지를 나타냅니다.
- * @param result      실행이 성공적으로 끝났을 때의 결과입니다.
+ * @param output      실행이 성공적으로 끝났을 때의 결과입니다(글자 또는 객체).
  * @param error       실행이 실패했을 때 그 사유입니다.
  */
-public record WorkFlowStatusResponse(String executionId, String status, String result, String error) {
+public record WorkFlowStatusResponse(String executionId, String status, Object output, String error) {
 }

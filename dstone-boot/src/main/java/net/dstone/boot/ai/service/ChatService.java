@@ -46,7 +46,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		List<AgentSummaryResult> summaries = new ArrayList<>();
 		if (results != null) {
 			for (AgentSummaryCallResult result : results) {
-				summaries.add(new AgentSummaryResult(result.id(), result.description()));
+				summaries.add(new AgentSummaryResult(result.id(), result.description(), result.input(), result.output()));
 			}
 		}
 		return summaries;
@@ -67,15 +67,17 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 *
 	 * model은 화면의 모델 override 입력칸 값을 그대로 흘려보낸다 - 비어 있으면 body에 아예 안 실어서
 	 * dstone-ai-engine이 선택된 Agent 정의값(그마저 없으면 provider 공통 기본값)을 쓰게 둔다.
+	 *
+	 * input은 선택한 Agent의 input 모양(글자 또는 객체) 그대로 넘긴다. 모양이 틀리면 dstone-ai-engine이 400으로 거절한다.
 	 */
-	public Flux<String> streamChat(HttpServletRequest servletRequest, String message, String agent, boolean ragEnabled, boolean toolsEnabled, String model) {
+	public Flux<String> streamChat(HttpServletRequest servletRequest, Object input, String agent, boolean ragEnabled, boolean toolsEnabled, String model) {
 
 		String resolvedAgent = StringUtil.isEmpty(agent) ? AGENT : agent;
 
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("sessionId", this.resolveSessionId(servletRequest));
 		body.put("agent", resolvedAgent);
-		body.put("message", message);
+		body.put("input", input);
 		body.put("variables", AGENT.equals(resolvedAgent) ? Map.of("role", AGENT_ROLE) : Map.of());
 		body.put("ragEnabled", ragEnabled);
 		body.put("toolsEnabled", toolsEnabled);

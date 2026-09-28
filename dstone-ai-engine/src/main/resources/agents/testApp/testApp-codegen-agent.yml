@@ -4,10 +4,10 @@
 # 개발명세서(입력)를 받아 "기본 소스 초안"을 생성합니다 - 8단계 SDLC 워크플로우의 5단계(AI 기본
 # 소스 생성)에 해당합니다.
 #
-# generate-code step의 input은 [승인된 개발명세서]({{steps.write-spec.text}})와 [PL 검토 의견]
+# generate-code step의 input은 [승인된 개발명세서]({{steps.write-spec.output}})와 [PL 검토 의견]
 # ({{steps.spec-review.output.comment}}) 두 부분으로 채워집니다.
 #
-# output 없이 자유 텍스트로 답을 받습니다. 따옴표/역슬래시/줄바꿈이 잔뜩 섞인 Java 소스 여러
+# input/output을 선언하지 않았으므로 둘 다 string입니다(자유 텍스트로 답을 받습니다). 따옴표/역슬래시/줄바꿈이 잔뜩 섞인 Java 소스 여러
 # 개를 JSON 문자열 값 하나에 담게 하면 이스케이프가 깨지기 쉽기 때문입니다. 코드는 평범한 마크다운
 # 코드펜스로 감싸서 사람이 읽거나 복사해 쓰기 좋게 씁니다.
 #

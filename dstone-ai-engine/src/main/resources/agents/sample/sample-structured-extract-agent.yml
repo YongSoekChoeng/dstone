@@ -1,19 +1,24 @@
 # 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
 #
-# 이 Agent는 output을 선언한 AGENT step에서 쓰는 예시입니다.
-# workflows/sample/sample-structured-output-chain.yml의 extract step이 이 Agent를 부르면서
-# output에 sql 필드를 선언해 두었습니다. 그래서 엔진이 "이 JSON 모양으로만 답하라"는 지시를
-# 자동으로 붙여주고, LLM의 답을 그 모양으로 읽어서 steps.extract.output.sql에 담습니다.
-# 그 다음 TOOL step은 {{steps.extract.output.sql}}로 이 값을 그대로 가져다 씁니다.
+# 이 Agent는 output을 object로 선언한 예시입니다.
+# workflows/sample/sample-structured-output-chain.yml의 extract step이 이 Agent를 부릅니다.
+# 아래 output.schema 때문에 엔진이 "이 JSON 모양으로만 답하라"는 지시를 자동으로 붙여주고, LLM의 답을
+# 그 모양으로 읽고 검사해서 steps.extract.output에 담습니다. 그 다음 TOOL step은
+# {{steps.extract.output.sql}}로 이 값을 그대로 가져다 씁니다.
 #
-# 응답 모양은 Agent(이 파일)가 아니라 그 Agent를 부르는 step의 output이 정합니다. 같은 Agent라도
-# output이 없는 step에서 부르면 평범한 자유 텍스트 응답이 됩니다. 그래서 이 prompt는 JSON
-# 모양을 설명하지 않고 "무엇을 뽑아낼지"만 설명합니다.
+# 응답 모양은 이 파일(Agent)이 정합니다. 이 Agent를 어느 step에서 부르든, 채팅 API로 부르든 답은 항상
+# {sql: ...} 모양입니다. 그래서 이 prompt는 JSON 모양을 설명하지 않고 "무엇을 뽑아낼지"만 설명합니다.
 agent:
   id: sample-structured-extract-agent
-  description: output을 선언한 AGENT step 전용 - 입력 문장에서 SQL 문 하나를 그대로 뽑아낸다.
+  description: 입력 문장에서 SQL 문 하나를 그대로 뽑아 {sql}로 돌려준다(output을 object로 선언한 예시).
   prompt: |
     입력 문장 안에 SQL 문이 섞여 있으면 그 SQL 문 하나를 있는 그대로(수정하지 말고) 뽑아내십시오.
     SQL 문이 없으면 "SELECT 1"을 쓰십시오.
+  output:
+    schema:
+      type: object
+      properties:
+        sql: { type: string, description: 입력 문장에서 그대로 뽑아낸 SQL 문 하나(없으면 SELECT 1) }
+      required: [sql]
   toolsEnabled: false
   ragEnabled: false

@@ -1,5 +1,6 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -13,8 +14,9 @@ import org.springframework.stereotype.Component;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
-import net.dstone.ai.common.definition.workflow.FieldDefinition;
 import net.dstone.ai.common.rag.RagRetrievalChain;
+import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.template.Template;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -27,10 +29,18 @@ import reactor.core.publisher.Flux;
  * runtime.step의 AgentStepExecutor/SupervisorStepExecutor/RouterStepExecutor(Workflow 안에서 AGENT/SUPERVISOR/ROUTER step을 실행하는 경우)
  * 모두 결국 이 클래스를 통해서 LLM을 호출합니다.
  *
- * LLM에게 받는 답은 두 가지입니다.
- * - 자유로운 글: call()/stream(). 채팅 화면과 output이 없는 AGENT step이 씁니다.
- * - 정해진 모양의 JSON: callForSchema(). output을 선언한 AGENT step, SUPERVISOR({pass, reason}), ROUTER({route, reason})가
- *   모두 이 한 가지 방법으로 받습니다. 모양은 common.definition.workflow.FieldDefinition 맵으로 정합니다.
+ * ## 입출력 계약
+ * Agent가 받는 값과 돌려주는 값의 모양은 Agent가 정합니다(AgentDefinition.inputSchema()/outputSchema()).
+ * 이 클래스는 호출할 때마다 그 계약을 지킵니다.
+ * - 넣는 값: Agent input 스키마로 검사한 뒤, 글자면 그대로, 그 밖의 값(맵 등)이면 JSON 글자로 바꿔 사용자 메시지로 보냅니다.
+ * - 받는 값: output이 string이면 LLM 답 원문을 그대로, 그 밖의 타입이면 LLM이 그 모양의 JSON으로 답하게 하고
+ *   답을 읽어서 검사한 값을 돌려줍니다(SchemaOutputConverter).
+ * - 어느 쪽이든 모양이 틀리면 AgentContractException을 던집니다.
+ *
+ * LLM을 부르는 방법은 세 가지입니다.
+ * - call(): Agent의 output 계약대로 답을 받습니다. 채팅 API와 AGENT step이 씁니다.
+ * - callForSchema(): 엔진이 정한 모양으로 답을 받습니다. SUPERVISOR({pass, reason}), ROUTER({route, reason})가 씁니다.
+ * - stream(): 답을 토큰 단위로 흘려보냅니다. output이 string인 Agent만 쓸 수 있습니다(채팅 화면 전용).
  *
  * call()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는 파라미터가 있습니다. 
  * 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도 null이면 provider 공통 기본 모델을 씁니다), 
@@ -51,68 +61,127 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * AGENT step(또는 채팅 화면)이 쓰는, 가장 기본적인 LLM 호출 메서드입니다.
+	 * Agent를 한 번 부르고, Agent의 output 계약대로 답을 돌려줍니다. AGENT step과 채팅 API가 씁니다.
+	 * 답은 output이 string이면 글자, object면 맵처럼 Agent output 모양 그대로입니다.
 	 *
 	 * Stream 방식이 아니라서, LLM이 답변을 다 만들 때까지 기다렸다가 완성된 결과를 한 번에 돌려줍니다.
 	 * </pre>
-	 * @param agent         호출할 Agent의 정의(프롬프트, Tool/RAG 사용 여부 등)
+	 * @param agent         호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
 	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
-	 * @param userMessage   사용자가 입력한 메시지 원문
+	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
-	public String call(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
-		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).call().content();
+	public Object call(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+		String userMessage = this.toUserMessage(agent, input);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride);
+		return this.ask(spec, userMessage, agent.outputSchema());
 	}
 
 	/**
 	 * <pre>
-	 * 정해진 모양의 JSON으로 답을 받는 LLM 호출 메서드입니다. Workflow step에서만 씁니다.
-	 * - AGENT step: YAML에 선언한 output
+	 * Agent를 한 번 부르되, 답의 모양은 Agent가 아니라 엔진이 정한 스키마를 따르게 합니다.
 	 * - SUPERVISOR step: {pass: boolean, reason: string}
 	 * - ROUTER step: {route: string, reason: string}
-	 *
-	 * 필드 목록을 JSON Schema로 바꿔 프롬프트에 붙이고, LLM의 답을 그 모양의 맵으로 읽어서 돌려줍니다
-	 * (자세한 동작은 SchemaOutputConverter 참고). provider 고유의 structured output 기능은 쓰지 않아서 어느 provider든
-	 * 똑같이 동작하지만, 모양을 100% 보장하지는 않습니다. LLM이 모양을 지키지 않으면 예외를 던지며,
-	 * 그 예외를 실패로 처리하는 것은 호출하는 쪽(runtime.step의 각 StepExecutor)의 몫입니다.
+	 * 넣는 값은 call()과 같이 Agent input 계약으로 검사합니다.
 	 *
 	 * ragOverride/toolsOverride/modelOverride 파라미터는 없습니다. Workflow의 step은 요청마다 값을 바꿔 부르는
 	 * 기능(ChatController에서만 쓰는 기능입니다)을 쓰지 않기 때문입니다.
 	 * </pre>
-	 * @param agent       호출할 Agent의 정의
-	 * @param sessionId   대화가 이어지도록 구분해 주는 세션 식별자
-	 * @param caller      이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables   프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
-	 * @param userMessage LLM에게 보낼 사용자 메시지
-	 * @param schema      LLM이 지켜야 할 응답 필드 목록(필드 이름 → 모양)
+	 * @param agent     호출할 Agent의 정의
+	 * @param sessionId 대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param caller    이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param variables 프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param input     Agent에게 넣을 값(Agent input 모양)
+	 * @param schema    LLM의 답이 따라야 할 JSON Schema
+	 * @throws AgentContractException input이나 LLM의 답이 계약과 맞지 않을 때
 	 */
-	public Map<String, Object> callForSchema(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Map<String, FieldDefinition> schema) {
-		return this.buildSpec(sessionId, caller, agent, variables, null, null, null).user(userMessage).call().entity(new SchemaOutputConverter(schema));
+	public Object callForSchema(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, Object input, Map<String, Object> schema) {
+		String userMessage = this.toUserMessage(agent, input);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(sessionId, caller, agent, variables, null, null, null);
+		return this.ask(spec, userMessage, schema);
 	}
 
 	/**
 	 * <pre>
-	 * AGENT step(또는 채팅 화면)이 쓰는 스트리밍 방식의 LLM 호출 메서드입니다.
+	 * 채팅 화면이 쓰는 스트리밍 방식의 LLM 호출 메서드입니다.
 	 *
 	 * 요청을 조립하는 과정은 call()과 완전히 같습니다. 차이는 응답을 받는 방식뿐인데, LLM이 답변을 다 만들
 	 * 때까지 기다리지 않고 토큰(글자 조각)이 만들어지는 대로 바로바로 흘려보내 줍니다. 그래서 채팅
 	 * 화면에서 답변이 타이핑되듯 실시간으로 나타나게 만들 때 이 메서드를 씁니다.
+	 * 조각난 글자는 모양을 검사할 수 없으므로 output이 string인 Agent만 쓸 수 있습니다.
 	 * </pre>
 	 * @param agent         호출할 Agent의 정의
 	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
-	 * @param userMessage   사용자가 입력한 메시지 원문
+	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
-	public Flux<String> stream(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, String userMessage, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public Flux<String> stream(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+		if (!JsonSchemas.STRING.equals(JsonSchemas.typeOf(agent.outputSchema()))) {
+			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
+		}
+		String userMessage = this.toUserMessage(agent, input);
 		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
+	}
+
+	/**
+	 * <pre>
+	 * 넣을 값을 Agent input 계약으로 검사하고, LLM에게 보낼 사용자 메시지(글자)로 바꿉니다.
+	 * 글자는 그대로, 그 밖의 값(맵, 리스트 등)은 JSON 글자로 바꿉니다.
+	 * </pre>
+	 *
+	 * @param agent 호출할 Agent의 정의
+	 * @param input Agent에게 넣을 값
+	 * @throws AgentContractException 값이 없거나 Agent input 모양이 아닐 때
+	 */
+	public String toUserMessage(AgentDefinition agent, Object input) {
+		if (input == null || (input instanceof String text && StringUtil.isEmpty(text))) {
+			throw new AgentContractException("agent[" + agent.id() + "]에 넣을 input이 비어 있습니다.");
+		}
+		List<String> problems = JsonSchemas.validate(agent.inputSchema(), input);
+		if (!problems.isEmpty()) {
+			throw new AgentContractException("agent[" + agent.id() + "]의 input 모양이 맞지 않습니다: " + problems);
+		}
+		return input instanceof String text ? text : Template.toText(input);
+	}
+
+	/**
+	 * <pre>
+	 * 조립된 요청으로 LLM을 부르고, 답을 스키마대로 읽어 돌려줍니다.
+	 * - 스키마가 string이면: 답 원문을 그대로 씁니다(JSON으로 감싸지 않습니다. 긴 문서를 JSON 글자로 감싸면 이스케이프가 깨지기 쉽습니다).
+	 * - 그 밖의 타입이면: 사용자 메시지 끝에 "이 스키마 모양의 JSON으로만 답하라"는 지시문을 붙이고, 답을 JSON으로 읽습니다.
+	 * 어느 쪽이든 답이 스키마에 맞는지 검사합니다.
+	 * </pre>
+	 *
+	 * @param spec        buildSpec()으로 조립한 요청입니다.
+	 * @param userMessage LLM에게 보낼 사용자 메시지입니다.
+	 * @param schema      답이 따라야 할 JSON Schema입니다.
+	 * @throws AgentContractException 답이 스키마에 맞지 않을 때
+	 */
+	private Object ask(ChatClient.ChatClientRequestSpec spec, String userMessage, Map<String, Object> schema) {
+		if (JsonSchemas.STRING.equals(JsonSchemas.typeOf(schema))) {
+			String answer = spec.user(userMessage).call().content();
+			if (answer == null) {
+				throw new AgentContractException("LLM 응답이 비어 있습니다.");
+			}
+			List<String> problems = JsonSchemas.validate(schema, answer);
+			if (!problems.isEmpty()) {
+				throw new AgentContractException("LLM 응답이 정해진 output 모양을 지키지 않았습니다: " + problems);
+			}
+			return answer;
+		}
+		SchemaOutputConverter converter = new SchemaOutputConverter(schema);
+		String answer = spec.user(userMessage + "\n\n" + converter.getFormat()).call().content();
+		return converter.convert(answer);
 	}
 
 	/**
@@ -164,8 +233,8 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- AgentDefinition.prompt()에 적힌 문구를 그대로 시스템 프롬프트로 씁니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
-			  바꿔치기해 줍니다. variables는 Workflow에서는 실행 컨텍스트의 inputs(요청의 message와
-			  variables), 채팅 화면에서는 요청의 variables입니다. 이 프롬프트는 resources/agents/*.yml
+			  바꿔치기해 줍니다. variables는 Workflow에서는 Workflow input이 object일 때 그 필드들,
+			  채팅 화면에서는 요청의 variables입니다. 이 프롬프트는 resources/agents/*.yml
 			  파일 안에 직접 적혀 있습니다.
 			- 시스템 프롬프트는 "이 Agent가 어떤 역할인가"만 담습니다. 이전 step의 결과 같은 "이번에 할
 			  일의 데이터"는 step의 input 템플릿({{ ... }})으로 채워져 사용자 메시지로 들어옵니다.

@@ -32,19 +32,24 @@ import net.dstone.common.utils.StringUtil;
  * 종류마다 있기도 하고 없기도 한 값(ref, forEach)을 꺼내는 일은 아래 static 메서드가 한곳에서 맡습니다.
  *
  * ## 공통 규칙
- * - input: 이 step에 넣어줄 값의 템플릿입니다. {{ ... }} 자리는 step이 실행되기 직전에 엔진이 채웁니다
- *   (문법은 common.template.Template 참고). 모양은 종류마다 다릅니다(AGENT류는 문자열, TOOL은 맵, APPROVAL은 없음).
+ * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/*.yml 의 input/output)나
+ *   Tool(인자 스키마)이 정하고, step은 "무엇을 넣을지(input)"와 "다음에 어디로 갈지"만 적습니다.
  *
- *     {{inputs.message}}                Workflow를 실행할 때 넘긴 값
- *     {{steps.analyze.output.tables}}   analyze step이 남긴 결과
- *     {{previous.text}}                 바로 직전에 실행된 step의 결과
+ * - input: 이 step에 넣어줄 값의 템플릿입니다. {{ ... }} 자리는 step이 실행되기 직전에 엔진이 채웁니다
+ *   (문법은 common.template.Template 참고). AGENT/SUPERVISOR/ROUTER는 필수이고 모양은 Agent input을 따릅니다
+ *   (string이면 글자, object면 맵). TOOL은 인자 맵(없으면 빈 인자)이고, APPROVAL은 input이 없습니다.
+ *
+ *     {{input}}                         Workflow를 실행할 때 넘긴 값(object면 {{input.필드}})
+ *     {{steps.analyze.output}}          analyze step이 돌려준 값(object면 {{steps.analyze.output.필드}})
+ *     {{steps.validate.input.sql}}      validate step이 실제로 받은 값
+ *     {{steps.validate.error}}          validate step이 실패한 이유
  *     {{item}}                          forEach로 반복 중일 때 이번 반복이 맡은 항목
  *     {{a.b ?? c.d}}                    왼쪽 값이 없으면 오른쪽 값을 씀
  *
- * - 결과: 모든 step은 끝나면 자기 id 아래에 {input, output, text, error}를 남깁니다(forEach면 items도).
- *   다음 step은 {{steps.이id.text}}, {{steps.이id.output.키}}처럼 꺼내 씁니다. output의 모양은 AGENT와 TOOL은
- *   YAML의 output에 선언하고, 나머지는 정해져 있습니다(SUPERVISOR {pass, reason}, ROUTER {route, reason},
- *   APPROVAL {approved, approver, comment}).
+ * - 결과: 모든 step은 끝나면 자기 id 아래에 {input, output, error}를 남깁니다. 숨은 이름은 없습니다.
+ *   output의 모양은 AGENT는 Agent output, TOOL은 Tool 응답(JSON이면 그 값, 아니면 글자)이고, 나머지는 엔진이
+ *   정해 두었습니다(SUPERVISOR {pass, reason}, ROUTER {route, reason}, APPROVAL {approved, approver, comment}).
+ *   forEach step은 input과 output이 반복별 값의 리스트입니다.
  *
  * - 다음 step: onSuccess와 onFailure를 둘 다 비워두면 성공 시 목록의 다음 step으로, 실패 시 Workflow 전체 실패로 끝납니다.
  *   onFailure에 앞쪽 step의 id를 적으면 재시도 루프가 되고, 무한 반복은 WorkFlowDefinition.maxIterations가 막습니다.

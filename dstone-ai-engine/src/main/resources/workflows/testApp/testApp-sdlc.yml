@@ -6,14 +6,15 @@
 # Jenkins Job "testApp"을 대상으로 합니다.
 #
 # ## 단계 사이에 무엇이 넘어가는가
-# 각 AGENT step은 input에 "무엇을 받을지"를 이름으로 명시합니다.
-#   analyze       <- {{inputs.message}}                        (현업 요청사항 원문)
-#   write-spec    <- {{steps.analyze.text}}                    (승인된 분석/설계서)
+# 각 AGENT step은 input에 "무엇을 받을지"를 이름으로 명시합니다. 세 Agent 모두 input/output이 string입니다.
+#   analyze       <- {{input}}                                 (현업 요청사항 원문)
+#   write-spec    <- {{steps.analyze.output}}                  (승인된 분석/설계서)
 #                    {{steps.design-review.output.comment}}    (검수 의견)
-#   generate-code <- {{steps.write-spec.text}}                 (승인된 개발명세서)
+#   generate-code <- {{steps.write-spec.output}}               (승인된 개발명세서)
 #                    {{steps.spec-review.output.comment}}      (PL 검토 의견)
-# APPROVAL step은 받은 텍스트를 그대로 넘기고, 승인 코멘트는 output.comment에 따로 남깁니다. 그래서
-# 다음 AGENT step은 문서 본문과 승인 코멘트를 섞이지 않은 채로 각각 받습니다.
+# APPROVAL step은 사람의 결정만 output({approved, approver, comment})에 남깁니다. 그래서 다음 AGENT step은
+# 문서 본문(앞 AGENT step의 output)과 승인 코멘트를 섞이지 않은 채로 각각 받습니다.
+# 최종 결과(output.value)는 명세서, 소스 초안, Jenkins 기동 결과를 모은 맵입니다.
 #
 # ## 반려되면 그 자리에서 종료한다
 # 모든 승인 step의 onFailure는 FAIL입니다. 승인/반려 결정은 실행 컨텍스트의 approvals.{stepId}에
@@ -35,7 +36,7 @@
 #
 # ## dstone-boot "Workflow 테스트" 화면에서 실행하는 방법
 #   workflowId: testApp-sdlc
-#   message   : (현업 요청사항 원문 - 예: "회원 목록 화면에 가입일자 검색 조건을 추가해줘")
+#   input     : (현업 요청사항 원문 - 예: "회원 목록 화면에 가입일자 검색 조건을 추가해줘")
 # 제출하면 analyze가 끝난 뒤 WAITING_APPROVAL(design-review)로 멈춥니다. "Workflow 실행 관리" 화면에서
 # status=WAITING_APPROVAL로 걸어두면 보이고, 승인/반려를 내리면 다음 단계로 진행되거나(승인) 그 자리에서
 # 종료됩니다(반려). 모든 승인을 통과하면 마지막에 Jenkins Job "testApp" 빌드가 실제로 기동됩니다
@@ -44,7 +45,7 @@
 # Jenkins 기동 전에 멈추는 것도 방법입니다.
 #
 # API로 직접 확인해보고 싶다면:
-#   POST /api/ai/workflow/testApp-sdlc/submit { "message": "..." }
+#   POST /api/ai/workflow/testApp-sdlc/submit { "input": "..." }
 #   GET  /api/ai/workflow/executions?status=WAITING_APPROVAL
 #   POST /api/ai/workflow/executions/{executionId}/decision
 #        { "approved": true, "approver": "business-reviewer", "comment": "..." }
@@ -52,12 +53,18 @@ workflow:
   id: testApp-sdlc
   description: testApp 대상 승인형 AI SDLC(분석-검수-명세-승인-소스생성-제출-최종승인-Jenkins 기동).
   maxIterations: 10
+  input: string
+  output:
+    value:
+      spec: "{{steps.write-spec.output}}"
+      code: "{{steps.generate-code.output}}"
+      build: "{{steps.trigger-jenkins.output}}"
   steps:
 
     - id: analyze
       type: AGENT
       ref: testApp-analysis-agent
-      input: "{{inputs.message}}"
+      input: "{{input}}"
       onSuccess: design-review
       onFailure: FAIL
 
@@ -72,7 +79,7 @@ workflow:
       ref: testApp-spec-writer-agent
       input: |
         [승인된 분석/설계서]
-        {{steps.analyze.text}}
+        {{steps.analyze.output}}
 
         [검수 의견]
         {{steps.design-review.output.comment}}
@@ -90,7 +97,7 @@ workflow:
       ref: testApp-codegen-agent
       input: |
         [승인된 개발명세서]
-        {{steps.write-spec.text}}
+        {{steps.write-spec.output}}
 
         [PL 검토 의견]
         {{steps.spec-review.output.comment}}

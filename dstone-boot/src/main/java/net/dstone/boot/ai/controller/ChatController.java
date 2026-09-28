@@ -38,12 +38,12 @@ public class ChatController extends net.dstone.boot.common.biz.BaseController {
 
 	@PostMapping(value = "/sendMessage.do", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<String> sendMessage(@RequestBody ChatMessageRequest request, HttpServletRequest servletRequest) {
-		if (StringUtil.isEmpty(request.message())) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
+		if (request.input() == null || (request.input() instanceof String text && StringUtil.isEmpty(text))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "input은 필수입니다.");
 		}
 		boolean ragEnabled = Boolean.TRUE.equals(request.ragEnabled());
 		boolean toolsEnabled = Boolean.TRUE.equals(request.toolsEnabled());
-		return this.chatService.streamChat(servletRequest, request.message(), request.agent(), ragEnabled, toolsEnabled, request.model());
+		return this.chatService.streamChat(servletRequest, request.input(), request.agent(), ragEnabled, toolsEnabled, request.model());
 	}
 
 }

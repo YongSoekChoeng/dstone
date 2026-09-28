@@ -1,18 +1,15 @@
 package net.dstone.ai.api.dto;
 
-import java.util.Map;
-
 /**
  * Workflow 실행 요청에 담을 내용입니다.
  *
- * message와 variables는 모두 실행 컨텍스트의 inputs 아래에 들어갑니다. message는 inputs.message가 되고,
- * variables의 각 값은 inputs.{이름}이 됩니다. step의 input 템플릿은 {{inputs.message}}, {{inputs.이름}}으로,
- * Agent의 system prompt는 {message}, {이름}으로 이 값들을 가져다 씁니다. 첫 step이 input을 따로 적지
- * 않았다면 message가 그대로 첫 step의 입력이 됩니다.
+ * input은 그 Workflow의 input 계약(workflows/*.yml 의 workflow.input, 비워두면 string) 모양이어야 하고,
+ * 모양이 다르면 실행하기 전에 400으로 거절합니다. 그대로 실행 컨텍스트의 input이 되어 step의 input 템플릿이
+ * {{input}}(object면 {{input.필드}})으로 꺼내 씁니다. input이 object면 그 필드들은 Agent system prompt의
+ * {변수}도 채웁니다.
  *
- * @param message   Workflow에 넘겨줄 메시지입니다(필수).
+ * @param input     Workflow에 넘겨줄 값입니다(필수. 글자, 객체 등 Workflow input 모양).
  * @param sessionId 대화를 구분하는 세션 ID입니다.
- * @param variables message 외에 Workflow에 넘겨줄 값들입니다(Workflow가 inputs를 선언했다면 그 계약을 지켜야 합니다).
  */
-public record WorkFlowRequest(String message, String sessionId, Map<String, Object> variables) {
+public record WorkFlowRequest(Object input, String sessionId) {
 }

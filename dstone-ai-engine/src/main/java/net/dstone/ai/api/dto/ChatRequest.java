@@ -27,7 +27,10 @@ import java.util.Map;
  * variables는 Agent의 prompt(resources/agents/*.yml 안에 직접 써 있는 프롬프트 원문)에
  * {변수명} 같은 형태의 토큰이 있을 때, 그 자리를 실제 값으로 채워 넣기 위한 값입니다.
  *
- * @param message      사용자가 입력한 메시지입니다.
+ * input은 그 Agent의 input 계약(agents/*.yml 의 agent.input, 비워두면 string) 모양이어야 합니다.
+ * 모양이 다르면 400으로 거절합니다.
+ *
+ * @param input        Agent에게 넣을 값입니다(필수. 보통은 사용자가 입력한 글자, Agent input이 object면 객체).
  * @param sessionId    대화를 구분하는 세션 ID입니다. 비워 보내면 서버가 새로 발급합니다.
  * @param agent        호출할 Agent의 이름입니다. 반드시 있어야 합니다.
  * @param variables    프롬프트의 {변수명} 자리에 채워 넣을 값들입니다.
@@ -35,5 +38,5 @@ import java.util.Map;
  * @param toolsEnabled 이번 요청에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씁니다(비우면 Agent 정의값을 그대로 사용).
  * @param model        이번 요청에서만 쓸 모델명을 강제로 지정하고 싶을 때 씁니다(비우면 Agent 정의값 또는 provider 기본값을 사용).
  */
-public record ChatRequest(String message, String sessionId, String agent, Map<String, Object> variables, Boolean ragEnabled, Boolean toolsEnabled, String model) {
+public record ChatRequest(Object input, String sessionId, String agent, Map<String, Object> variables, Boolean ragEnabled, Boolean toolsEnabled, String model) {
 }

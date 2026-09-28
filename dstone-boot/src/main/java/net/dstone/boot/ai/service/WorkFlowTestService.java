@@ -49,20 +49,19 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 		List<WorkFlowSummaryResult> summaries = new ArrayList<>();
 		if (results != null) {
 			for (WorkFlowSummaryCallResult result : results) {
-				summaries.add(new WorkFlowSummaryResult(result.id(), result.description()));
+				summaries.add(new WorkFlowSummaryResult(result.id(), result.description(), result.input()));
 			}
 		}
 		return summaries;
 	}
 
-	/** @param request 호출할 workflowId와 입력 메시지/변수/세션ID */
+	/** @param request 호출할 workflowId와 input(Workflow input 모양)/세션ID */
 	public WorkFlowSubmitResult submit(WorkFlowTestRequest request) {
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 
 		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("message", request.message());
+		body.put("input", request.input());
 		body.put("sessionId", StringUtil.isEmpty(request.sessionId()) ? null : request.sessionId());
-		body.put("variables", request.variables());
 
 		try {
 			WorkFlowSubmitCallResult callResult = this.getWebClient().post()
@@ -93,7 +92,7 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 			if (callResult == null) {
 				return new WorkFlowStatusResult(executionId, "ERROR", null, "dstone-ai-engine 응답이 비어 있습니다.");
 			}
-			return new WorkFlowStatusResult(callResult.executionId(), callResult.status(), callResult.resultText(), callResult.errorMessage());
+			return new WorkFlowStatusResult(callResult.executionId(), callResult.status(), callResult.output(), callResult.errorMessage());
 		} catch (Exception e) {
 			// executionId가 존재하지 않을 때도 여기로 온다.
 			return new WorkFlowStatusResult(executionId, "ERROR", null, e.getMessage());

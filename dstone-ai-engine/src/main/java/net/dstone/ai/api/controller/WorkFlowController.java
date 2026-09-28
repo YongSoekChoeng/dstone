@@ -90,25 +90,24 @@ public class WorkFlowController extends BaseController {
 	 * Workflow 하나를 실행하고, 끝날 때까지 기다렸다가 결과를 한 번에 돌려줍니다(동기 호출).
 	 *
 	 * @param workflowId     실행할 Workflow의 id입니다.
-	 * @param request        Workflow에 넘길 입력값입니다. 사용자 메시지(message)와 추가 변수(variables)를 담고 있습니다.
+	 * @param request        Workflow에 넘길 입력값(input, Workflow input 모양)과 세션 ID를 담고 있습니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping("/{workflowId}/execute")
 	public WorkFlowResponse execute(@PathVariable String workflowId, @RequestBody WorkFlowRequest request, HttpServletRequest servletRequest) {
-		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, caller);
-		this.checkInputs(workflow, request);
+		this.checkInput(workflow, request);
 		String sessionId = this.resolveSessionId(request);
 
-		WorkFlowExecution result = this.workFlowExecutionService.executeSync(workflow, sessionId, caller, request.variables(), request.message());
+		WorkFlowExecution result = this.workFlowExecutionService.executeSync(workflow, sessionId, caller, request.input());
 		if (result.status() == WorkFlowExecutionStatus.FAILED) {
 			// /execute는 결과를 바로 받는 동기 호출이므로, 실패했다면 그 자리에서 바로 알려줘야 합니다.
 			// 이 API를 호출하는 쪽(dstone-boot 등)은 "실패하면 예외가 날아온다"고 가정하고 코드를
 			// 짜기 때문에, 그 가정이 그대로 맞도록 예외를 던집니다.
 			throw new IllegalStateException("workflow[" + workflowId + "] 실패: " + result.errorMessage());
 		}
-		return new WorkFlowResponse(result.status().name(), result.resultText(), sessionId, workflowId, result.executionId());
+		return new WorkFlowResponse(result.status().name(), result.output(), sessionId, workflowId, result.executionId());
 	}
 
 	/**
@@ -116,17 +115,16 @@ public class WorkFlowController extends BaseController {
 	 * 실행 결과가 궁금하면 나중에 status() 메서드(GET /status/{executionId})로 확인하면 됩니다.
 	 *
 	 * @param workflowId     실행할 Workflow의 id입니다.
-	 * @param request        Workflow에 넘길 입력값입니다. 사용자 메시지(message)와 추가 변수(variables)를 담고 있습니다.
+	 * @param request        Workflow에 넘길 입력값(input, Workflow input 모양)과 세션 ID를 담고 있습니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping("/{workflowId}/submit")
 	public WorkFlowSubmitResponse submit(@PathVariable String workflowId, @RequestBody WorkFlowRequest request, HttpServletRequest servletRequest) {
-		this.validateMessage(request);
 		String caller = CallerContext.get(servletRequest);
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, caller);
-		this.checkInputs(workflow, request);
+		this.checkInput(workflow, request);
 		String sessionId = this.resolveSessionId(request);
-		String executionId = this.workFlowExecutionService.submitAsync(workflow, sessionId, caller, request.variables(), request.message());
+		String executionId = this.workFlowExecutionService.submitAsync(workflow, sessionId, caller, request.input());
 		return new WorkFlowSubmitResponse(executionId);
 	}
 
@@ -135,7 +133,7 @@ public class WorkFlowController extends BaseController {
 	 *
 	 * WorkFlowExecutionController에도 GET /executions/{executionId}라는, 스텝별 이력까지 포함한 더
 	 * 상세한 조회 API가 있습니다. 이 메서드는 그보다 훨씬 가벼운 버전으로, executionId, status(상태),
-	 * result(결과), error(에러 사유) 이 네 가지 값만 필요한 경우를 위해 따로 남겨 두었습니다.
+	 * output(결과), error(에러 사유) 이 네 가지 값만 필요한 경우를 위해 따로 남겨 두었습니다.
 	 *
 	 * @param executionId 상태를 조회할 실행의 id입니다.
 	 */
@@ -143,30 +141,19 @@ public class WorkFlowController extends BaseController {
 	@NoAspectLog
 	public WorkFlowStatusResponse status(@PathVariable String executionId) {
 		WorkFlowExecution execution = this.workFlowExecutionService.find(executionId);
-		return new WorkFlowStatusResponse(execution.executionId(), execution.status().name(), execution.resultText(), execution.errorMessage());
+		return new WorkFlowStatusResponse(execution.executionId(), execution.status().name(), execution.output(), execution.errorMessage());
 	}
 
 	/**
-	 * 요청에 message 값이 꼭 있어야 하므로, 비어 있지 않은지 미리 확인합니다.
-	 *
-	 * @param request 검증할 Workflow 요청입니다.
-	 */
-	private void validateMessage(WorkFlowRequest request) {
-		if (StringUtil.isEmpty(request.message())) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message는 필수입니다.");
-		}
-	}
-
-	/**
-	 * Workflow에 inputs(입력 계약)가 선언되어 있으면, 요청이 그 계약을 지켰는지 실행 전에 확인합니다.
-	 * 지키지 않았으면 실행을 시작하지 않고 400(Bad Request)으로 거절합니다.
+	 * 요청의 input이 Workflow의 input 계약(workflow.input) 모양인지 실행 전에 확인합니다.
+	 * 아니면 실행을 시작하지 않고 400(Bad Request)으로 거절합니다.
 	 *
 	 * @param workflow 실행할 Workflow의 정의입니다.
 	 * @param request  검증할 Workflow 요청입니다.
 	 */
-	private void checkInputs(WorkFlowDefinition workflow, WorkFlowRequest request) {
+	private void checkInput(WorkFlowDefinition workflow, WorkFlowRequest request) {
 		try {
-			this.workFlowExecutionService.checkInputs(workflow, request.variables(), request.message());
+			this.workFlowExecutionService.checkInput(workflow, request.input());
 		} catch (IllegalArgumentException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}

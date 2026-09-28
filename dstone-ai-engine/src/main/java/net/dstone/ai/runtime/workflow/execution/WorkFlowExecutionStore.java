@@ -28,6 +28,9 @@ import net.dstone.ai.common.consts.StepType;
  * Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다. INSERT/UPDATE 쿼리에서는
  * PostgreSQL이 일반 문자열을 jsonb 타입으로 자동으로 바꿔주지 않으므로, "?::jsonb"라고 캐스트를
  * 직접 명시해 줍니다.
+ *
+ * 최종 결과(WorkFlowExecution.output)는 글자일 수도, 객체나 리스트일 수도 있어서 RESULT_TEXT 컬럼에 항상 JSON 글자로
+ * 저장하고, 읽을 때 다시 원래 값으로 되돌립니다(글자 결과는 "..."처럼 따옴표가 붙은 JSON 글자로 저장됩니다).
  */
 @Repository
 public class WorkFlowExecutionStore {
@@ -46,14 +49,14 @@ public class WorkFlowExecutionStore {
 			+ "  ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ? "
 			+ ")",
 			execution.executionId(), execution.workflowId(), execution.caller(), execution.sessionId(), execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()),
-			execution.resultText(), execution.errorMessage(), Timestamp.from(execution.createdAt()), Timestamp.from(execution.updatedAt()));
+			this.toResultJson(execution.output()), execution.errorMessage(), Timestamp.from(execution.createdAt()), Timestamp.from(execution.updatedAt()));
 	}
 
 	/** 기존에 저장된 실행 상태를 최신 상태로 덮어씁니다. @param execution 덮어쓸 최신 실행 상태입니다. */
 	public void update(WorkFlowExecution execution) {
 		this.jdbcTemplate.update(
 			"UPDATE AI_WORKFLOW_EXECUTION SET STATUS = ?, CURRENT_STEP_INDEX = ?, CONTEXT_JSON = ?::jsonb, RESULT_TEXT = ?, ERROR_MESSAGE = ?, UPDATED_AT = ? WHERE EXECUTION_ID = ?",
-			execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()), execution.resultText(), execution.errorMessage(), Timestamp.from(execution.updatedAt()),
+			execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()), this.toResultJson(execution.output()), execution.errorMessage(), Timestamp.from(execution.updatedAt()),
 			execution.executionId());
 	}
 
@@ -145,7 +148,7 @@ public class WorkFlowExecutionStore {
 			WorkFlowExecutionStatus.valueOf(rs.getString("STATUS")),
 			rs.getInt("CURRENT_STEP_INDEX"),
 			this.fromJson(rs.getString("CONTEXT_JSON")),
-			rs.getString("RESULT_TEXT"),
+			this.fromResultJson(rs.getString("RESULT_TEXT")),
 			rs.getString("ERROR_MESSAGE"),
 			this.toInstant(rs.getTimestamp("CREATED_AT")),
 			this.toInstant(rs.getTimestamp("UPDATED_AT")));
@@ -175,6 +178,38 @@ public class WorkFlowExecutionStore {
 			return this.objectMapper.writeValueAsString(context == null ? Map.of() : context);
 		} catch (Exception e) {
 			throw new IllegalStateException("Workflow 컨텍스트를 JSON으로 직렬화하지 못했습니다.", e);
+		}
+	}
+
+	/**
+	 * 최종 결과를 RESULT_TEXT 컬럼에 저장할 JSON 글자로 바꿉니다. 아직 결과가 없으면(null) null입니다.
+	 *
+	 * @param output 최종 결과입니다.
+	 */
+	private String toResultJson(Object output) {
+		if (output == null) {
+			return null;
+		}
+		try {
+			return this.objectMapper.writeValueAsString(output);
+		} catch (Exception e) {
+			throw new IllegalStateException("Workflow 결과를 JSON으로 직렬화하지 못했습니다.", e);
+		}
+	}
+
+	/**
+	 * RESULT_TEXT 컬럼의 JSON 글자를 원래 결과 값으로 되돌립니다. JSON이 아니면(결과를 JSON으로 저장하기 전에 쌓인 행) 글자 그대로 씁니다.
+	 *
+	 * @param json RESULT_TEXT 컬럼 값입니다.
+	 */
+	private Object fromResultJson(String json) {
+		if (json == null) {
+			return null;
+		}
+		try {
+			return this.objectMapper.readValue(json, Object.class);
+		} catch (Exception e) {
+			return json;
 		}
 	}
 

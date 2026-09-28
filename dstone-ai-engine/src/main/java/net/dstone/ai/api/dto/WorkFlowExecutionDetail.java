@@ -21,13 +21,13 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * @param currentStepIndex 지금 실행 중이거나 방금 끝난 스텝이 몇 번째 순서인지를 나타냅니다.
  * @param context          실행 컨텍스트 트리입니다. 호출할 때 넘긴 입력값(input)과, 그동안 각 스텝이
  *                         만들어낸 결과(steps)가 함께 쌓여 있습니다.
- * @param resultText       Workflow가 성공적으로 끝났을 때의 최종 결과입니다. 아직 끝나지 않았다면 null입니다.
+ * @param output           Workflow가 성공적으로 끝났을 때의 최종 결과입니다(글자 또는 객체). 아직 끝나지 않았다면 null입니다.
  * @param errorMessage     Workflow가 실패했을 때 그 사유입니다. 아직 끝나지 않았거나 성공했다면 null입니다.
  * @param createdAt        이 실행이 처음 생성된 시각입니다.
  * @param updatedAt        상태가 마지막으로 바뀐 시각입니다.
  * @param history          이 실행에서 각 스텝이 실행된 이력입니다. 오래된 순서대로 담겨 있습니다.
  */
-public record WorkFlowExecutionDetail(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, String resultText, String errorMessage, Instant createdAt, Instant updatedAt,
+public record WorkFlowExecutionDetail(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, Instant createdAt, Instant updatedAt,
 	List<StepHistoryEntry> history) {
 
 	/**
@@ -37,7 +37,7 @@ public record WorkFlowExecutionDetail(String executionId, String workflowId, Str
 	 * @param history   함께 담을 스텝별 실행 이력입니다.
 	 */
 	public static WorkFlowExecutionDetail from(WorkFlowExecution execution, List<StepHistoryEntry> history) {
-		return new WorkFlowExecutionDetail(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), execution.context(), execution.resultText(), execution.errorMessage(),
+		return new WorkFlowExecutionDetail(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), execution.context(), execution.output(), execution.errorMessage(),
 			execution.createdAt(), execution.updatedAt(), history);
 	}
 

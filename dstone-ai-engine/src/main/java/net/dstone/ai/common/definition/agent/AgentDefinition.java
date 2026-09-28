@@ -1,6 +1,9 @@
 package net.dstone.ai.common.definition.agent;
 
 import java.util.List;
+import java.util.Map;
+
+import net.dstone.ai.common.definition.SchemaDefinition;
 
 /**
  * <pre>
@@ -16,6 +19,26 @@ import java.util.List;
  * 2. Workflow 안의 AGENT/SUPERVISOR 타입 step이 ref 값으로 가리키는 경우입니다.
  * 어느 경로로 호출되든, "이 caller(호출 주체)가 이 Agent를 써도 되는지"는 항상 allowedCallers 값으로 똑같이 검사합니다.
  * (자세한 검사 로직은 common.registry.AgentRegistry.resolve() 참고).
+ *
+ * ## 입출력 계약(input / output)
+ * 이 Agent가 무엇을 받고 무엇을 돌려주는지는 Agent가 정합니다. Agent를 부르는 쪽(Workflow step, 채팅 API)은
+ * 이 계약에 맞춰 값을 넣고, 돌려받은 값을 그대로 씁니다. 계약은 이 파일 한 곳에만 있습니다.
+ * 둘 다 비워두면 {type: string}입니다(글자를 받아 글자로 답함).
+ *
+ *   input: string                   # LLM에게 보낼 사용자 메시지가 글자 하나
+ *   output:
+ *     schema:                       # LLM이 반드시 이 모양의 JSON으로 답함 → steps.id.output.sql로 꺼냄
+ *       type: object
+ *       properties:
+ *         sql: { type: string, description: 변환된 SQL }
+ *       required: [sql]
+ *
+ * - input이 string이 아니면(예: object) 부르는 쪽이 맵으로 값을 넣고, 엔진이 그 맵을 스키마로 검사한 뒤
+ *   JSON 글자로 바꿔 사용자 메시지로 보냅니다.
+ * - output이 string이면 LLM 답 원문이 그대로 결과이고, 그 밖의 타입이면 LLM이 그 모양의 JSON으로 답하도록
+ *   지시하고 답을 스키마로 검사합니다. 모양이 틀린 답은 실패입니다.
+ * - SUPERVISOR/ROUTER step이 부르는 Agent는 output을 적지 않습니다. 답의 모양을 엔진이 정하기 때문입니다
+ *   (common.schema.StepOutputSchemas 참고).
  * </pre>
  *
  * @param id                     이 Agent를 식별하는 id입니다
@@ -36,6 +59,8 @@ import java.util.List;
  *                               없어도 질문에 그냥 답을 시도하고, false면 Spring AI의 기본 동작대로 "모른다"고 답하도록 강제합니다. 
  *                               비워두면(null) true로 동작합니다
  * @param allowedCallers         이 Agent를 호출할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다
+ * @param input                  (옵셔널)이 Agent가 받는 값의 모양입니다. 비워두면 {type: string}입니다
+ * @param output                 (옵셔널)이 Agent가 돌려주는 값의 모양입니다. 비워두면 {type: string}입니다
  */
 public record AgentDefinition(
 	String id
@@ -48,5 +73,18 @@ public record AgentDefinition(
 	, Double ragSimilarityThreshold
 	, Boolean ragAllowEmptyContext
 	, List<String> allowedCallers
+	, SchemaDefinition input
+	, SchemaDefinition output
 	) {
+
+	/** 이 Agent가 받는 값의 JSON Schema입니다. input을 비워뒀으면 {type: string}입니다. */
+	public Map<String, Object> inputSchema() {
+		return (this.input == null ? SchemaDefinition.string() : this.input).schema();
+	}
+
+	/** 이 Agent가 돌려주는 값의 JSON Schema입니다. output을 비워뒀으면 {type: string}입니다. */
+	public Map<String, Object> outputSchema() {
+		return (this.output == null ? SchemaDefinition.string() : this.output).schema();
+	}
+
 }
