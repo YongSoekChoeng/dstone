@@ -49,7 +49,7 @@ public class SupervisorStepExecutor {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		Map<String, Object> answer;
 		try {
-			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.sessionId(), execution.caller(), promptVariables, input, StepOutputSchemas.verdict());
+			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), promptVariables, input, StepOutputSchemas.verdict());
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, "감독 Agent 응답을 {pass, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
 		}

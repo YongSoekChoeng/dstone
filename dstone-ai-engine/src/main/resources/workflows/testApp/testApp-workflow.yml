@@ -6,12 +6,25 @@ workflow:
   output: 
     value: "{{steps.step02.output}}"
   
+  # input: 읽을 문서의 전체 경로입니다.
+  #   MCP filesystem 서버(mcp/sample/sample-filesystem-mcp.yml)가 허용한 폴더
+  #   (${APP_HOME}/${APP_NAME}/mcp/server-filesystem) 안에 있어야 읽을 수 있습니다.
+  #   예: D:/AppHome/framework/dstone/dstone-ai-engine/mcp/server-filesystem/testApp/dongyang-plan.md
   steps:
+
+    # 문서를 LLM에게 "알아서 읽어라"라고 맡기지 않고, TOOL step으로 엔진이 직접 읽습니다.
+    - id: read
+      type: TOOL
+      ref: read_text_file
+      input:
+        path: "{{input}}"
+      onSuccess: step01
+      onFailure: FAIL
 
     - id: step01
       type: AGENT
       ref: testApp-agent-01
-      input: "{{input}}"
+      input: "{{steps.read.output}}"
       onSuccess: step02
       onFailure: FAIL
 

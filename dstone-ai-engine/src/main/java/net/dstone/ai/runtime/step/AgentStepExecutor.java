@@ -51,7 +51,7 @@ public class AgentStepExecutor {
 	public StepOutcome run(WorkFlowExecution execution, AgentStepDefinition step, Object input, Map<String, Object> promptVariables) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		try {
-			return StepOutcome.success(this.agentExecutor.call(agent, execution.sessionId(), execution.caller(), promptVariables, input, null, null, null));
+			return StepOutcome.success(this.agentExecutor.call(agent, execution.conversationIdOf(step), execution.caller(), promptVariables, input, null, null, null));
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, e.getMessage());
 		}

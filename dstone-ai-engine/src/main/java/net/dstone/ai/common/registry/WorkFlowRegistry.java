@@ -54,6 +54,7 @@ import net.dstone.common.utils.StringUtil;
  *    - SUPERVISOR/ROUTER: 부르는 Agent가 output을 선언하지 않았는가(답의 모양은 엔진이 정함)
  *    - TOOL: input의 인자 이름이 Tool의 인자 스키마와 맞는가(Tool을 찾지 못하면 경고만 남기고 실행 중에 검사)
  *    - ROUTER routes: 최소 1개 있는가
+ *    - memory: true와 forEach를 함께 쓰지 않았는가
  * 3) 참조 검사(validateExpression): step input, forEach, Workflow output.value 안의 모든 {{ ... }} 경로가
  *    - input / steps / (forEach step 안에서만) item 중 하나로 시작하는가
  *    - input.필드...: Workflow input 스키마에 그 경로가 있는가
@@ -185,6 +186,9 @@ public class WorkFlowRegistry extends BaseObject {
 	private void validateStepShape(WorkFlowDefinition definition, StepDefinition step) {
 		if (!(step instanceof ApprovalStepDefinition) && StringUtil.isEmpty(StepDefinition.refOf(step))) {
 			throw this.error(definition, step, step.type() + " step은 ref(" + (step instanceof ToolStepDefinition ? "Tool 이름" : "Agent id") + ")가 있어야 합니다.");
+		}
+		if (StepDefinition.memoryOf(step) && StepDefinition.forEachOf(step) != null) {
+			throw this.error(definition, step, "memory: true는 forEach와 함께 쓸 수 없습니다(동시에 도는 반복들이 한 대화방에 섞여 쓰이기 때문입니다).");
 		}
 		switch (step) {
 			case AgentStepDefinition agentStep:

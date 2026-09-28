@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.PromptTemplate;
@@ -57,6 +58,8 @@ public class AgentExecutor extends BaseObject {
 	@Autowired
 	private ChatClient chatClient;
 	@Autowired
+	private ChatMemory chatMemory;
+	@Autowired
 	private RagRetrievalChain ragRetrievalChain;
 	@Autowired
 	private ConfigTool configTool;
@@ -69,7 +72,7 @@ public class AgentExecutor extends BaseObject {
 	 * Stream 방식이 아니라서, LLM이 답변을 다 만들 때까지 기다렸다가 완성된 결과를 한 번에 돌려줍니다.
 	 * </pre>
 	 * @param agent         호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
-	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
@@ -78,9 +81,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
-	public Object call(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public Object call(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, variables, ragOverride, toolsOverride, modelOverride);
 		return this.ask(spec, userMessage, agent.outputSchema());
 	}
 
@@ -95,16 +98,16 @@ public class AgentExecutor extends BaseObject {
 	 * 기능(ChatController에서만 쓰는 기능입니다)을 쓰지 않기 때문입니다.
 	 * </pre>
 	 * @param agent     호출할 Agent의 정의
-	 * @param sessionId 대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller    이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param variables 프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
 	 * @param input     Agent에게 넣을 값(Agent input 모양)
 	 * @param schema    LLM의 답이 따라야 할 JSON Schema
 	 * @throws AgentContractException input이나 LLM의 답이 계약과 맞지 않을 때
 	 */
-	public Object callForSchema(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, Object input, Map<String, Object> schema) {
+	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Map<String, Object> schema) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(sessionId, caller, agent, variables, null, null, null);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, variables, null, null, null);
 		return this.ask(spec, userMessage, schema);
 	}
 
@@ -118,7 +121,7 @@ public class AgentExecutor extends BaseObject {
 	 * 조각난 글자는 모양을 검사할 수 없으므로 output이 string인 Agent만 쓸 수 있습니다.
 	 * </pre>
 	 * @param agent         호출할 Agent의 정의
-	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
@@ -127,12 +130,12 @@ public class AgentExecutor extends BaseObject {
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
-	public Flux<String> stream(AgentDefinition agent, String sessionId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		if (!JsonSchemas.STRING.equals(JsonSchemas.typeOf(agent.outputSchema()))) {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
-		return this.buildSpec(sessionId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
+		return this.buildSpec(conversationId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
 	}
 
 	/**
@@ -193,7 +196,7 @@ public class AgentExecutor extends BaseObject {
 	 * 차례차례 설정을 붙여서 최종 요청 스펙(ChatClientRequestSpec)을 만들어 돌려줍니다.
 	 * </pre>
 	 *
-	 * @param sessionId     대화가 이어지도록 구분해 주는 세션 식별자
+	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param agent         호출할 Agent의 정의
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
@@ -201,7 +204,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String sessionId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		boolean toolsEnabled = toolsOverride != null ? toolsOverride : agent.toolsEnabled();
@@ -213,23 +216,27 @@ public class AgentExecutor extends BaseObject {
 		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt();
 
 		/************************************************************************
-		2. 세션 ID를 걸어서, 지금까지 나눈 대화 히스토리가 자연스럽게 이어지도록 합니다.
-			- ConfigChatClient.chatClient()에서 defaultAdvisors로 등록해 둔 MessageChatMemoryAdvisor가
-			  바로 이 sessionId 값을 읽어서 "어느 대화의 이어지는 내용인지"를 판단합니다.
-			- MessageChatMemoryAdvisor는 생성될 때 ChatMemory 구현체(여기서는 RedisChatMemoryRepository)를
-			  전달받습니다.
-			- ChatMemory.findByConversationId(String conversationId) 메서드는 Spring이 내부적으로
-			  자동 호출해 줍니다. 우리가 직접 호출할 필요는 없습니다.
+		2. 대화방 id(conversationId)가 있으면, 그 대화방의 이전 대화를 기억하는 Advisor를 붙입니다.
+			- 채팅 API는 항상 세션 id를 넘기므로 대화가 이어집니다.
+			- Workflow step은 memory: true인 step만 sessionId:stepId를 넘기고, 나머지는 null을 넘깁니다.
+			  그래서 기본적으로는 이전 대화를 보지 않고 input만 보고 답합니다(앞 step의 지시나 출력 형식이 섞이지 않게).
+			- MessageChatMemoryAdvisor는 부르기 전에 Redis(RedisChatMemoryRepository)에서 그 대화방의 최근 대화를
+			  꺼내 요청 앞에 붙이고, 부른 뒤에는 이번 질문과 답을 저장합니다.
+			- 이 Advisor를 ChatClient 기본 Advisor(ConfigChatClient)에 두지 않는 이유: 기본 Advisor는 호출마다 뺄 수가 없고,
+			  대화방 id 없이 부르면 "conversationId cannot be null"로 실패하기 때문입니다. 필요할 때만 여기서 붙입니다.
 		************************************************************************/
-		spec = spec.advisors(
-			new Consumer<ChatClient.AdvisorSpec>(){
-				@Override
-				public void accept(ChatClient.AdvisorSpec a) {
-					// MessageChatMemoryAdvisor가 findByConversationId(conversationId)를 호출할 때 쓸 conversationId 값을 여기서 넣어줍니다.
-					a.param(ChatMemory.CONVERSATION_ID, sessionId);
+		if (!StringUtil.isEmpty(conversationId)) {
+			spec = spec.advisors(
+				new Consumer<ChatClient.AdvisorSpec>(){
+					@Override
+					public void accept(ChatClient.AdvisorSpec a) {
+						a.advisors(MessageChatMemoryAdvisor.builder(AgentExecutor.this.chatMemory).build());
+						// MessageChatMemoryAdvisor가 findByConversationId(conversationId)를 호출할 때 쓸 값입니다.
+						a.param(ChatMemory.CONVERSATION_ID, conversationId);
+					}
 				}
-			}
-		);
+			);
+		}
 
 		/************************************************************************
 		3. 시스템 프롬프트를 적용합니다.

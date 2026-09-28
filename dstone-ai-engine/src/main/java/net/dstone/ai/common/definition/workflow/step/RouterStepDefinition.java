@@ -31,6 +31,8 @@ import net.dstone.ai.common.consts.StepType;
  * @param input     (필수)Agent에게 넣을 값(분류할 대상)의 템플릿입니다.
  * @param routes    (필수)경로 이름 → 이동할 step id(또는 "SUCCESS"/"FAIL")입니다. 최소 1개 있어야 합니다.
  * @param onFailure (옵셔널)route를 고르지 못했을 때 갈 step의 id(또는 "FAIL")입니다.
+ * @param memory    (옵셔널)true면 이 step이 이전에 자기가 나눈 대화를 기억합니다(대화방 = sessionId:stepId). 비워두면 false입니다.
+ *                  재작성 루프처럼 같은 step이 다시 불릴 때 이전 시도를 기억하게 할 때 씁니다. 다른 step의 대화는 섞이지 않습니다.
  */
 public record RouterStepDefinition(
 	String id
@@ -38,6 +40,7 @@ public record RouterStepDefinition(
 	, Object input
 	, Map<String, String> routes
 	, String onFailure
+	, Boolean memory
 	) implements StepDefinition {
 
 	@Override

@@ -29,6 +29,9 @@ import net.dstone.ai.common.consts.StepType;
  * @param onFailure    (옵셔널)실패했을 때 갈 step의 id(또는 "FAIL")입니다.
  * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 참조 경로입니다(예: input.sqlList).
  * @param itemVariable (옵셔널)forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"입니다.
+ * @param memory       (옵셔널)true면 이 step이 이전에 자기가 나눈 대화를 기억합니다(대화방 = sessionId:stepId). 비워두면 false입니다.
+ *                     재작성 루프처럼 같은 step이 다시 불릴 때 이전 시도를 기억하게 할 때 씁니다. 다른 step의 대화는 섞이지 않습니다.
+ *                     forEach와 함께 쓸 수 없습니다(동시에 도는 반복들이 한 대화방에 섞여 쓰이기 때문입니다).
  */
 public record AgentStepDefinition(
 	String id
@@ -38,6 +41,7 @@ public record AgentStepDefinition(
 	, String onFailure
 	, String forEach
 	, String itemVariable
+	, Boolean memory
 	) implements StepDefinition {
 
 	@Override

@@ -3,6 +3,8 @@ package net.dstone.ai.runtime.workflow.execution;
 import java.time.Instant;
 import java.util.Map;
 
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+
 /**
  * <pre>
  * Workflow 실행 1건의 현재 상태를 담고 있습니다. 
@@ -17,8 +19,8 @@ import java.util.Map;
  * @param executionId     이 실행 건을 가리키는 식별자입니다(UUID).
  * @param workflowId      실행한 Workflow의 id입니다.
  * @param caller          이 실행을 호출한 앱이나 서비스를 식별하는 값입니다(tenant).
- * @param sessionId       대화 세션을 식별하는 값입니다. 이 실행 안의 모든 AGENT/SUPERVISOR 스텝이 같은 값을 공유해야
- *                        ChatMemory(대화 히스토리)가 끊기지 않고 이어집니다(자세한 내용은 runtime.agent.AgentExecutor 참고).
+ * @param sessionId       대화 세션을 식별하는 값입니다. memory: true인 step은 이 값에 step id를 붙인 대화방(sessionId:stepId)을
+ *                        쓰고(conversationIdOf()), 나머지 step은 대화 기억 없이 호출합니다.
  * @param status          지금 이 실행이 어떤 상태인지입니다.
  * @param currentStepIndex 지금 실행 중이거나 방금 끝낸 스텝이 몇 번째인지입니다(0부터 시작하고, workflow.steps() 기준입니다).
  * @param context         이 실행의 컨텍스트 트리입니다(처음 호출할 때 넘긴 입력값에, 각 스텝이 낸 결과가 계속 누적됩니다).
@@ -92,6 +94,17 @@ public record WorkFlowExecution(
 	 */
 	public WorkFlowExecution waitingApproval(int stepIndex) {
 		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.WAITING_APPROVAL, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now());
+	}
+
+	/**
+	 * step이 LLM을 부를 때 쓸 대화방 id를 돌려줍니다.
+	 * - memory: true인 step: sessionId:stepId (같은 step이 다시 불리면 이전에 자기가 나눈 대화를 기억합니다)
+	 * - 그 밖의 step: null (대화 기억 없이 input만 보고 답합니다)
+	 *
+	 * @param step LLM을 부를 step
+	 */
+	public String conversationIdOf(StepDefinition step) {
+		return StepDefinition.memoryOf(step) ? this.sessionId + ":" + step.id() : null;
 	}
 
 }

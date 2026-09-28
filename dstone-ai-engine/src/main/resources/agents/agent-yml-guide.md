@@ -41,7 +41,7 @@
 | 돌려받는 값 | 응답의 `output`(Agent `output` 모양) | `steps.<id>.output`(AGENT는 Agent `output` 모양, SUPERVISOR/ROUTER는 엔진이 정한 모양) |
 | prompt `{변수}` 값 | 요청의 `variables` | Workflow `input`이 object면 그 필드들(글자면 없음) |
 | `ragEnabled`/`toolsEnabled`/`model`을 요청마다 바꾸기 | 가능(요청의 같은 이름 값이 있으면 그 값을 쓴다) | 불가. 항상 Agent 정의값 |
-| 대화 기억(sessionId) | 요청의 `sessionId`(비우면 새로 발급) | Workflow 실행의 sessionId. **같은 실행의 모든 Agent step이 공유**한다 |
+| 대화 기억(sessionId) | 요청의 `sessionId`(비우면 새로 발급) | 기본은 기억 없음. step에 `memory: true`를 적으면 그 step만 `sessionId:stepId` 대화방에서 이전 시도를 기억한다. **step끼리는 공유하지 않는다** |
 | 스트리밍(`/stream`) | `output`이 string인 Agent만 | — |
 | 계약을 어기면 | input이 틀리면 400, LLM 답이 틀리면 오류 | step 실패 → `onFailure`([workflow-yml-guide.md 3절](../workflows/workflow-yml-guide.md#3-step-항목)) |
 
@@ -122,7 +122,7 @@ system 메시지       "당신은 금융 분야 전문 번역가입니다. 결�
                          ⑥ AgentExecutor
                             input을 Agent input 스키마로 검사 → 글자면 그대로, 아니면 JSON 글자로
                             PromptTemplate(prompt).render(값) → system 메시지
-                            + 대화 기억(sessionId) + RAG/Tool/model + (output이 string이 아니면) 응답 형식 지시
+                            + 대화 기억(채팅: sessionId / step: memory: true일 때만) + RAG/Tool/model + (output이 string이 아니면) 응답 형식 지시
                                             ▼
                          ⑦ LLM 호출 → 답을 Agent output 스키마로 검사 → 돌려줌
 ```
@@ -242,8 +242,8 @@ context.input = { text: "Interest rates rose sharply.", domain: "금융", langua
 │ 당신은 금융 분야 전문 번역가입니다.                                │  ← prompt + {변수}
 │ 결과는 한국어로만 작성하고, 전문 용어는 원문을 괄호에 함께 적습니다.  │
 └──────────────────────────────────────────────────────────────┘
-┌─ (같은 sessionId의 이전 대화 — MessageChatMemoryAdvisor) ────────┐
-│ user: ... / assistant: ...                                   │  ← Workflow면 앞 AGENT step들의 대화
+┌─ (대화방의 이전 대화 — MessageChatMemoryAdvisor) ────────────────┐
+│ user: ... / assistant: ...                                   │  ← 채팅은 같은 sessionId, Workflow는 memory: true인 step 자신의 이전 대화만
 └──────────────────────────────────────────────────────────────┘
 ┌─ user ───────────────────────────────────────────────────────┐
 │ 아래 글을 번역하세요.                                           │  ← input(글자면 그대로, 객체면 JSON 글자)
@@ -541,14 +541,14 @@ input이 object일 때도 마찬가지로 "입력으로 sql(검증에 실패한 
 - Workflow의 `allowedCallers`와는 따로 검사한다. Workflow를 실행할 수 있는 caller라도 그 안의 Agent가 막으면 그 step에서 FAILED다.
   Workflow와 그 안의 Agent는 caller 목록을 같게 맞추는 것이 좋다.
 
-#### 1.13 대화 기억(sessionId) — YAML 항목은 아니지만 알아둘 것
+#### 1.13 대화 기억(sessionId) — Agent YAML 항목이 아니다
 
-- 모든 호출에 `MessageChatMemoryAdvisor`가 붙어서, 같은 sessionId의 이전 대화가 Redis(`RedisChatMemoryRepository`)에서 불려 와 함께 전달된다.
-- Workflow에서는 **한 실행의 모든 Agent step이 같은 sessionId**를 쓴다. 그래서 뒤 step의 LLM은 앞 step들이 주고받은 대화도 본다.
-  - 장점: 앞 step의 맥락을 자연스럽게 이어받는다.
-  - 주의: 판정용(SUPERVISOR)이나 분류용(ROUTER) Agent도 앞의 대화를 보고 영향을 받을 수 있다. 판정에 필요한 정보는 step `input`에 분명히 넣는다.
-  - `forEach` AGENT step은 반복들이 같은 기억을 동시에 쓴다. 반복끼리 독립적이어야 하면 필요한 정보를 모두 `input`에 담는다.
-- 채팅에서는 같은 `sessionId`를 다시 보내면 대화가 이어지고, 비우면 새 대화가 된다.
+- 대화를 기억할지는 Agent가 아니라 **부르는 쪽**이 정한다. 같은 Agent라도 부르는 흐름에 따라 필요 여부가 다르기 때문이다.
+- 채팅 API: 요청의 `sessionId`로 항상 대화를 잇는다. 같은 `sessionId`를 다시 보내면 대화가 이어지고, 비우면 새 대화가 된다.
+- Workflow: 기본적으로 **기억 없이** 시스템 프롬프트 + step `input`만 보고 답한다. step끼리 대화는 공유하지 않는다.
+  - step에 `memory: true`를 적으면 그 step만 자기 대화방(`sessionId:stepId`)에서 이전에 자기가 나눈 대화를 기억한다(재작성 루프 등).
+  - 자세한 내용은 [workflow-yml-guide.md 3.11](../workflows/workflow-yml-guide.md#311-memory-agentsupervisorrouter-전용).
+- 기억은 `MessageChatMemoryAdvisor`가 Redis(`RedisChatMemoryRepository`)에서 대화방의 최근 대화(`dstone.ai.session.max-messages`개, 기본 20)를 불러와 붙인다.
 
 ### 2. 제공되는 샘플
 

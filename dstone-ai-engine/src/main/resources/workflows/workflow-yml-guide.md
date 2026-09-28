@@ -424,6 +424,7 @@ POST /api/ai/workflow/sql-review/execute
 | `routes` | ROUTER 전용(필수, 1개 이상). `route 이름: 다음 step id`(또는 `SUCCESS`/`FAIL`) |
 | `forEach` | 리스트를 가리키는 경로(`{{ }}` 없이 적음, 예: `input.sqlList`). 항목 수만큼 이 step을 동시에 실행한다 |
 | `itemVariable` | `forEach` 반복에서 항목을 받는 이름. 비우면 `item`(→ `{{item}}`) |
+| `memory` | AGENT/SUPERVISOR/ROUTER 전용(선택, 기본 `false`). `true`면 이 step이 **자기 대화방(`sessionId:stepId`)**에서 이전에 자기가 나눈 대화를 기억한다(재작성 루프 등). `false`면 대화 기억 없이 `input`만 보고 답한다. 다른 step의 대화는 어느 쪽이든 섞이지 않는다. `forEach`와 함께 쓰면 기동 실패 |
 | `approverRole` | APPROVAL 전용 기록용 값(누가 승인해야 하는지). 서버가 실제 권한을 검사하지는 않는다 |
 
 **StepType별로 쓸 수 있는 항목** (✅ 필수, ⭕ 선택, ❌ 쓰면 기동 실패 — 해당 record에 그 키가 없음)
@@ -437,6 +438,7 @@ POST /api/ai/workflow/sql-review/execute
 | `routes` | ❌ | ❌ | ✅ | ❌ | ❌ |
 | `forEach` | ⭕ | ⭕ | ❌ | ⭕ | ❌ |
 | `itemVariable` | ⭕ | ⭕ | ❌ | ⭕ | ❌ |
+| `memory` | ⭕ | ⭕ | ⭕ | ❌ | ❌ |
 | `approverRole` | ❌ | ❌ | ❌ | ❌ | ⭕ |
 
 **각 step이 돌려주는 값(`steps.<id>.output`)의 모양** — `{{steps.<id>.output.<경로>}}`는 이 모양을 따라 기동 시 검사한다.
@@ -487,7 +489,7 @@ steps:
 | ROUTER가 route를 고르지 못함(routes에 없는 이름 포함) | Workflow `output.value`를 채우지 못함, `output.schema`와 맞지 않음 |
 | APPROVAL 반려 | |
 
-> 아래 3.1~3.10은 step 항목마다 자세히 적었다. 기동 시 검사는 `YamlDefinitionLoader`(쓸 수 없는 키, 값 모양)와
+> 아래 3.1~3.11은 step 항목마다 자세히 적었다. 기동 시 검사는 `YamlDefinitionLoader`(쓸 수 없는 키, 값 모양)와
 > `WorkFlowRegistry.validateStepShape()`/`validateExpression()`(부르는 대상의 계약, 필수 값, 참조),
 > 실행 동작은 `WorkFlowExecutor`와 각 `StepExecutor`가 한다.
 
@@ -700,7 +702,7 @@ step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍
 | 다른 step에서 `{{item}}` 사용 | 기동 실패(`item`은 forEach step 자신의 `input` 안에서만 쓸 수 있다) |
 
 - 병렬 실행은 JVM 공용 스레드 풀(`CompletableFuture.supplyAsync`)을 쓴다. 동시에 도는 개수는 CPU 코어 수에 따라 제한된다.
-- AGENT forEach는 모든 반복이 **같은 sessionId(대화 기억)**를 공유한다. 서로 독립된 판단이 필요하면 prompt와 `input`에 필요한 정보를 모두 담는다.
+- forEach 반복은 대화 기억 없이 각자 `input`만 보고 답한다(`memory: true`와 함께 쓸 수 없다 — 3.11 참고).
 - MCP Tool 호출은 서버별로 한 번에 하나씩만 실행된다(`ConfigMcp.SerializedToolCallback`). MCP TOOL forEach는 사실상 순차로 돈다.
 
 #### 3.9 `itemVariable`
@@ -735,6 +737,34 @@ step에 넣을 값의 템플릿이다. step이 실행되기 **직전에** 컨텍
   - 승인 대기 상태가 아닌 실행에 결정을 보내면 거절된다(`지금 승인 대기 상태가 아닙니다`).
   - 승인할 내용은 사람이 실행 상세 화면의 `context.steps`(앞 step들의 결과)에서 확인한다. APPROVAL은 값을 넘겨주지 않으므로,
     다음 step은 필요한 문서를 `{{steps.<앞 step>.output}}`으로 직접 가져온다.
+
+#### 3.11 `memory` (AGENT/SUPERVISOR/ROUTER 전용)
+
+```yaml
+    - id: convert
+      type: AGENT
+      ref: sql-converter-agent
+      input: "{{steps.validate.error ?? input}}"
+      memory: true        # 비우면 false
+```
+
+- LLM이 **이전 대화를 기억할지**를 step마다 정한다. 기억할지는 Agent가 아니라 "그 Agent를 어떤 흐름에서 부르는지"에 달려
+  있으므로 Agent YAML이 아니라 step에 적는다(같은 Agent라도 한 Workflow에서는 한 번만, 다른 Workflow에서는 재작성 루프로 부를 수 있다).
+
+| 값 | 대화방 | 동작 |
+|---|---|---|
+| `false`(기본) | 없음 | 이전 대화 없이 시스템 프롬프트 + 이번 `input`만 보고 답한다 |
+| `true` | `sessionId:stepId` | 이 step이 이전에 자기가 나눈 대화(질문+답)를 함께 받는다. 답한 뒤 이번 대화도 저장한다 |
+
+- **다른 step의 대화는 어느 쪽이든 섞이지 않는다.** step 사이에 값을 넘기는 방법은 `input` 템플릿(`{{steps.<id>.output}}`) 하나뿐이다.
+  예전처럼 한 실행의 모든 step이 대화를 공유하면, 앞 step의 출력 형식 지시("JSON으로만 답하라" + 스키마)와 역할이 뒤 step에
+  새어 들어가 답의 모양이 흐트러지고, 같은 내용이 `input`과 대화 기록으로 두 번 들어가 토큰이 낭비됐다.
+- `true`가 쓸모 있는 곳: `onFailure`로 같은 step에 되돌아오는 **재작성 루프**. 이전 시도와 그때의 답을 기억하므로 같은 실수를 덜 반복한다.
+- 같은 `sessionId`로 다시 실행하면 이전 실행에서 그 step이 나눈 대화도 이어진다(대화방 이름이 같으므로). 요청에 `sessionId`를 비우면
+  실행마다 새로 발급되므로 섞이지 않는다.
+- 기억하는 양은 대화방마다 최근 `dstone.ai.session.max-messages`개(기본 20)다.
+- `forEach`와 함께 쓰면 **기동 실패**다(동시에 도는 반복들이 한 대화방에 섞여 쓰인다). TOOL/APPROVAL에는 키가 없어서 적으면 기동 실패다.
+- 채팅 API(`/api/ai/chat`)는 이 옵션과 상관없이 항상 요청의 `sessionId`로 대화를 이어 간다.
 
 ### 4 스키마 (JSON Schema)
 
@@ -932,6 +962,7 @@ workflow:
       input:                            # 맵으로. 이름은 Agent input의 properties와 같아야 한다
         sql: "{{steps.validate.input.sql}}"
         error: "{{steps.validate.error}}"
+      memory: true                      # 선택. 재작성 루프에서 이 step의 이전 시도를 기억(대화방 sessionId:stepId). 비우면 false
 ```
 
 **TOOL**

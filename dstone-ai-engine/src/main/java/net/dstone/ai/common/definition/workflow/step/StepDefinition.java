@@ -29,7 +29,7 @@ import net.dstone.common.utils.StringUtil;
  * steps 목록에 다섯 종류가 섞여 들어오므로, 그 목록의 공통 타입으로만 씁니다. 모든 종류에 있는 값(id, type, onFailure)만
  * 여기에 두고, 나머지는 각 record에서 꺼냅니다. sealed interface라서 다섯 record 말고는 step이 될 수 없고,
  * switch로 step 종류를 나눌 때 빠뜨린 종류가 있으면 컴파일러가 알려줍니다.
- * 종류마다 있기도 하고 없기도 한 값(ref, forEach)을 꺼내는 일은 아래 static 메서드가 한곳에서 맡습니다.
+ * 종류마다 있기도 하고 없기도 한 값(ref, forEach, memory)을 꺼내는 일은 아래 static 메서드가 한곳에서 맡습니다.
  *
  * ## 공통 규칙
  * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/*.yml 의 input/output)나
@@ -55,6 +55,10 @@ import net.dstone.common.utils.StringUtil;
  *   onFailure에 앞쪽 step의 id를 적으면 재시도 루프가 되고, 무한 반복은 WorkFlowDefinition.maxIterations가 막습니다.
  *   "SUCCESS"/"FAIL" 예약어를 적으면 그 자리에서 Workflow 전체를 성공/실패로 끝냅니다.
  *   ROUTER는 onSuccess 대신 routes로 갈 곳을 정합니다.
+ *
+ * - 대화 기억: step끼리 넘기는 값은 input 템플릿뿐입니다. LLM을 부르는 step은 기본적으로 이전 대화를 보지 않고
+ *   input만 보고 답합니다. memory: true를 적은 step만 자기 대화방(sessionId:stepId)에서 이전에 자기가 나눈 대화를
+ *   기억합니다(재작성 루프 등). 다른 step의 대화는 섞이지 않습니다.
  *
  * - 실패 사유는 그 step의 error에 남으므로, onFailure로 이동한 step이 {{steps.id.error}}로 읽을 수 있습니다.
  *   input 템플릿이 가리키는 값을 찾지 못해도 그 step은 실패입니다.
@@ -155,6 +159,33 @@ public sealed interface StepDefinition
 				break;
 		}
 		return StringUtil.isEmpty(itemVariable) ? Constants.WorkFlow.DEFAULT_ITEM_VARIABLE_KEY : itemVariable;
+	}
+
+	/**
+	 * step이 이전 대화를 기억하는지(memory: true) 돌려줍니다. 비워뒀거나 LLM을 부르지 않는 종류(TOOL/APPROVAL)면 false입니다.
+	 *
+	 * @param step memory 값을 꺼낼 step
+	 */
+	static boolean memoryOf(StepDefinition step) {
+		Boolean memory;
+		switch (step) {
+			case AgentStepDefinition agent:
+				memory = agent.memory();
+				break;
+			case SupervisorStepDefinition supervisor:
+				memory = supervisor.memory();
+				break;
+			case RouterStepDefinition router:
+				memory = router.memory();
+				break;
+			case ToolStepDefinition tool:
+				memory = null;
+				break;
+			case ApprovalStepDefinition approval:
+				memory = null;
+				break;
+		}
+		return Boolean.TRUE.equals(memory);
 	}
 
 }

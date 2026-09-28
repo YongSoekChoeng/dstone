@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -89,22 +88,20 @@ public class ConfigChatClient {
 	/**
 	 * <pre>
 	 * 시스템 디폴트 Advisor를 등록하는 메소드.
+	 *
+	 * 대화 기억 Advisor(MessageChatMemoryAdvisor)는 여기 두지 않습니다. 대화를 기억할지는 호출마다 다르기 때문에
+	 * (채팅 API는 기억, Workflow step은 memory: true일 때만) runtime.agent.AgentExecutor가 필요할 때만 붙입니다.
 	 * </pre>
 	 *
-	 * @param chatMemory 세션별 대화 내역을 담당할 메모리
 	 * @param advisor    목록(현재는 비어 있음). 스프링에서 List<T> 타입은 단일 Bean과 다르게 빈 List로 주입 하므로 문제 없음.
 	 */
 	@Bean
-	List<Advisor> defaultAdvisors(ChatMemory chatMemory, List<Advisor> advisors) {
+	List<Advisor> defaultAdvisors(List<Advisor> advisors) {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
-		// 1. 로깅하는 Advisor 등록
+		// 로깅하는 Advisor 등록
 		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().order(Ordered.LOWEST_PRECEDENCE).build();
 		advisorList.add(simpleLoggerAdvisor);
-
-		// 2. 세션별 대화 내역을 기억하게 저장하는 Advisor 등록
-		MessageChatMemoryAdvisor mssageChatMemoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory).build();
-		advisorList.add(mssageChatMemoryAdvisor);
 		
 		return advisorList;
 	}
