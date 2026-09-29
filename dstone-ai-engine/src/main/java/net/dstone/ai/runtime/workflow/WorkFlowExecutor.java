@@ -36,32 +36,35 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.core.BaseObject;
 
 /**
- * Workflow를 실제로 진행시키는 핵심 클래스입니다. WorkFlowDefinition에 정의된 내용을 순차 실행,
- * 분기(둘 중 하나를 고르는 onSuccess/onFailure, 여러 개 중 하나를 고르는 ROUTER의 routes), 병렬 실행
- * (forEach - 같은 step 하나를 리스트 항목 개수만큼 동시에 실행), 루프(재시도) 패턴으로 실행합니다.
+ * Workflow를 실제로 진행시키는 핵심 클래스입니다. 
+ * WorkFlowDefinition에 정의된 내용을 
+ *  1. 순차 실행,
+ *  2. 분기(둘 중 하나를 고르는 onSuccess/onFailure, 여러 개 중 하나를 고르는 ROUTER의 routes), 
+ *  3. 병렬 실행 (forEach - 같은 step 하나를 리스트 항목 개수만큼 동시에 실행), 
+ *  4. 루프(재시도) 
+ * 패턴으로 실행합니다.
  * "어느 step 다음에 어느 step으로 갈지, 언제 멈출지" 같은 Workflow의 큰 흐름은 이 클래스가 직접 통제하고,
- * step 하나하나에서 필요한 똑똑한 판단은 각 StepExecutor를 거쳐 결국 LLM에게 맡깁니다. "지금 몇 번째
- * step인가 → 다음엔 몇 번째 step으로 가는가"를 계속 따라가는 단순한 상태 기계로 구현했습니다.
+ * step 하나하나에서 필요한 똑똑한 판단은 각 StepExecutor를 거쳐 결국 LLM에게 맡깁니다. 
+ * "지금 몇 번째 step인가 → 다음엔 몇 번째 step으로 가는가"를 계속 따라가는 단순한 상태 기계로 구현했습니다.
  *
  * ## step 사이에 데이터가 오가는 방법
  * 모든 데이터는 실행 컨텍스트(WorkFlowContext) 트리 하나를 거쳐서 오갑니다.
- * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트로 계산합니다(resolveInput()).
- *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다(common.schema.JqExpEvalUtil).
+ * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트로 계산합니다. (resolveInput())
+ *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다. (common.schema.JqExpEvalUtil)
  * 2) 계산된 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
  * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, error}로 남깁니다.
  * 그래서 다음 step들은 "${ .steps.id.output.키 }"처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
  * 표현식을 계산하지 못하면(jq 오류) 그 step은 실패로 처리되고, 사유가 error에 남습니다.
  *
  * ## 병렬 실행
- * 병렬 실행은 forEach 한 가지 방식으로만 표현합니다. "같은 step을 데이터만 바꿔가며 동시에 반복한다"는
- * 한 가지 모델만 있으므로, YAML을 읽는 사람은 병렬에 대해 forEach 하나만 알면 됩니다. 서로 다른 step을
- * 동시에 실행하는 것은 이 모델로 표현할 수 없고, 순차 실행으로 풀어서 써야 합니다.
+ * 병렬 실행은 forEach 한 가지 방식으로만 표현합니다. "같은 step을 데이터만 바꿔가며 동시에 반복한다"는 한 가지 모델만 있으므로, 
+ * YAML을 읽는 사람은 병렬에 대해 forEach 하나만 알면 됩니다. 서로 다른 step을 동시에 실행하는 것은 이 모델로 표현할 수 없고, 순차 실행으로 풀어서 써야 합니다.
  *
  * ## 상태 저장과 다음 step
- * step 하나를 처리할 때마다 WorkFlowExecutionStore로 상태를 바로 저장해 둡니다. 그래서 APPROVAL step에서
- * 실행이 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 멈춘 step부터 이어서 진행할 수 있습니다.
- * 다음 step은 nextStepId()가 onSuccess/onFailure(또는 ROUTER의 routes)를 보고 정합니다. 앞쪽 step을 가리키면
- * 되돌아가는 재시도 루프가 되고, 무한 루프는 maxIterations가 막습니다.
+ * step 하나를 처리할 때마다 WorkFlowExecutionStore로 상태를 바로 저장해 둡니다. 그
+ * 래서 APPROVAL step에서 실행이 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 멈춘 step부터 이어서 진행할 수 있습니다.
+ * 다음 step은 nextStepId()가 onSuccess/onFailure(또는 ROUTER의 routes)를 보고 정합니다. 
+ * 앞쪽 step을 가리키면 되돌아가는 재시도 루프가 되고, 무한 루프는 maxIterations가 막습니다.
  * "SUCCESS"나 "FAIL" 예약어를 만나면 그 자리에서 Workflow 전체를 끝냅니다.
  */
 @Component
@@ -91,12 +94,12 @@ public class WorkFlowExecutor extends BaseObject {
 	 * 실행 도중 SUCCESS, FAIL, WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고 결과를 돌려줍니다.
 	 *
 	 * 이 메서드가 호출되는 경우는 두 가지입니다.
-	 * - 새로 실행할 때:
-	 * 		사용자가 POST /api/ai/workflow/{id}/execute(동기 방식) 또는 /submit(비동기 방식)을 호출하면,
-	 * 		currentStepIndex가 0이고 status가 RUNNING인 새 실행이 만들어지고,
-	 * - 승인(APPROVAL)이 끝나서 이어갈 때:
-	 *   사람이 승인 또는 반려 결정을 내리면, 그 결정이 먼저 컨텍스트의 approvals.{stepId}에 기록되고,
-	 *   같은 실행(같은 executionId, 같은 currentStepIndex)을 가지고 run()이 다시 호출됩니다.
+	 * - 새로 실행할 때
+	 *     사용자가 POST /api/ai/workflow/{id}/execute(동기 방식) 또는 /submit(비동기 방식)을 호출하면,
+	 * 	   currentStepIndex가 0이고 status가 RUNNING인 새 실행이 만들어지고,
+	 * - 승인(APPROVAL)이 끝나서 이어갈 때
+	 *     사람이 승인 또는 반려 결정을 내리면, 그 결정이 먼저 컨텍스트의 approvals.{stepId}에 기록되고,
+	 *     같은 실행(같은 executionId, 같은 currentStepIndex)을 가지고 run()이 다시 호출됩니다.
 	 * </pre>
 	 *
 	 * @param workflow  실행할 Workflow의 정의입니다(steps 목록, maxIterations, output 등).

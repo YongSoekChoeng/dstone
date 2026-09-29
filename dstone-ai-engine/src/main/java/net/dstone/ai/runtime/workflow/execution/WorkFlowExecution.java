@@ -3,6 +3,7 @@ package net.dstone.ai.runtime.workflow.execution;
 import java.time.Instant;
 import java.util.Map;
 
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 
 /**
@@ -43,7 +44,9 @@ public record WorkFlowExecution(
 	Instant updatedAt) {
 
 	/**
+	 * <pre>
 	 * 새 실행을 시작할 때 쓰는 초기 상태를 만듭니다 - status는 RUNNING이고, currentStepIndex는 0부터 시작합니다.
+	 * </pre>
 	 *
 	 * @param executionId 이 실행을 위해 새로 발급한 id입니다.
 	 * @param workflowId  실행할 Workflow의 id입니다.
@@ -57,7 +60,9 @@ public record WorkFlowExecution(
 	}
 
 	/**
+	 * <pre>
 	 * 다음 스텝으로 넘어갈 때 쓰는 상태를 만듭니다.
+	 * </pre>
 	 *
 	 * @param stepIndex 다음으로 실행할 스텝이 몇 번째인지입니다.
 	 * @return currentStepIndex만 갱신된, 여전히 RUNNING 상태인 새 WorkFlowExecution입니다.
@@ -67,7 +72,9 @@ public record WorkFlowExecution(
 	}
 
 	/**
+	 * <pre>
 	 * Workflow가 최종적으로 성공했을 때의 상태를 만듭니다.
+	 * </pre>
 	 *
 	 * @param output 최종 성공 결과입니다.
 	 * @return status가 DONE으로 바뀐 새 WorkFlowExecution입니다.
@@ -77,7 +84,9 @@ public record WorkFlowExecution(
 	}
 
 	/**
+	 * <pre>
 	 * Workflow가 최종적으로 실패했을 때의 상태를 만듭니다.
+	 * </pre>
 	 *
 	 * @param errorMessage 실패했거나 에러가 난 이유입니다.
 	 * @return status가 FAILED로 바뀐 새 WorkFlowExecution입니다.
@@ -87,7 +96,9 @@ public record WorkFlowExecution(
 	}
 
 	/**
+	 * <pre>
 	 * 사람의 승인을 기다리며 멈춰야 할 때의 상태를 만듭니다.
+	 * </pre>
 	 *
 	 * @param stepIndex 승인을 기다리고 있는 APPROVAL 스텝이 몇 번째인지입니다.
 	 * @return status가 WAITING_APPROVAL로 바뀐 새 WorkFlowExecution입니다.
@@ -97,9 +108,11 @@ public record WorkFlowExecution(
 	}
 
 	/**
+	 * <pre>
 	 * step이 LLM을 부를 때 쓸 대화방 id를 돌려줍니다.
 	 * - memory: true인 step: sessionId:stepId (같은 step이 다시 불리면 이전에 자기가 나눈 대화를 기억합니다)
 	 * - 그 밖의 step: null (대화 기억 없이 input만 보고 답합니다)
+	 * </pre>
 	 *
 	 * @param step LLM을 부를 step
 	 */

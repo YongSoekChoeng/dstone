@@ -18,6 +18,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.StepType;
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 
 /**
  * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 이 두 테이블(schema/02-create-table-postgresql-

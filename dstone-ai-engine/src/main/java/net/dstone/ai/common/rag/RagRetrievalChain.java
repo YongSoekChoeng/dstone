@@ -26,6 +26,7 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * "이미 임베딩해 둔 문서를 검색해서 LLM에게 참고 자료로 넘겨주는" 진짜 의미의 RAG
  * (Retrieval-Augmented Generation, 검색 증강 생성) 담당 클래스입니다. 문서를 임베딩으로 만들어
  * 벡터스토어에 넣거나 빼는 작업(api.service.EmbedService가 담당)과는 완전히 분리되어 있습니다 -
@@ -43,11 +44,13 @@ import net.dstone.common.utils.StringUtil;
  * 있는데, 이 사실을 확인하는 로직은 requireVectorStore() 한 곳에만 모아뒀습니다. 그래서 이
  * RagRetrievalChain 클래스 자체는 RAG 설정 여부와 무관하게 항상 등록되고, "지금 RAG를 실제로
  * 쓸 수 있는 상태인가"는 각 메소드가 실제로 호출되는 시점에만 판단됩니다.
+ * </pre>
  */
 @Component
 public class RagRetrievalChain extends BaseService {
 
 	/**
+	 * <pre>
 	 * 검색 결과가 있을 때 프롬프트에 끼워 넣을 템플릿입니다.
 	 *
 	 * Spring AI의 ContextualQueryAugmenter가 기본으로 쓰는 템플릿은 "컨텍스트(참고 자료)에 없는
@@ -59,6 +62,7 @@ public class RagRetrievalChain extends BaseService {
 	 *
 	 * {context}는 검색된 문서 내용이, {query}는 원래 사용자 질의가 들어가는 자리인데, 둘 다
 	 * Spring AI의 ContextualQueryAugmenter가 알아서 채워주는 플레이스홀더입니다.
+	 * </pre>
 	 */
 	private static final PromptTemplate CONTEXT_PROMPT_TEMPLATE = new PromptTemplate("""
 		{query}
@@ -73,9 +77,11 @@ public class RagRetrievalChain extends BaseService {
 	private ConfigProperty configProperty;
 
 	/**
+	 * <pre>
 	 * RAG를 실제로 쓸 수 있는 상태인지 확인하고, 쓸 수 있으면 VectorStore 빈을 돌려줍니다.
 	 * dstone.ai.rag.enabled=true로 켜져 있고 VectorStore 빈이 실제로 떠 있을 때만 통과시키고,
 	 * 둘 중 하나라도 아니면 예외를 던집니다.
+	 * </pre>
 	 */
 	private VectorStore requireVectorStore() {
 		if (!Boolean.parseBoolean(this.configProperty.getProperty("dstone.ai.rag.enabled"))) {
@@ -105,10 +111,12 @@ public class RagRetrievalChain extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐 줍니다. 둘 다 없으면
 	 * null을 돌려주는데, 이건 "필터 없이 전체 검색"을 뜻합니다. caller가 없는 경우(예:
 	 * security.auth가 꺼진 배포 환경)는 기존과 똑같이 tenant 필터 없이 동작해야 하므로, "여러
 	 * 앱의 문서를 서로 격리할지 말지"를 판단하는 지점은 이 메소드 하나뿐입니다.
+	 * </pre>
 	 *
 	 * @param caller   호출한 앱/서비스를 나타내는 식별자(tenant)
 	 * @param sourceId 검색 범위를 좁힐 문서의 논리적 식별자
@@ -130,8 +138,10 @@ public class RagRetrievalChain extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * "무엇을 검색 대상으로 삼을지"(개수 제한, 유사도 기준, tenant 필터)를 정하는 단 하나의
 	 * 지점입니다. buildAdvisor()와 search() 둘 다 결국 이 메소드를 거쳐서 검색기를 만듭니다.
+	 * </pre>
 	 *
 	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
 	 * @param similarityThreshold 검색 결과 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값을 씁니다)
@@ -152,12 +162,14 @@ public class RagRetrievalChain extends BaseService {
 	}
 
 	/**
-	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 이 Advisor가 붙으면
-	 * caller의 문서만 검색되도록 tenant 필터가 강제로 걸립니다.
+	 * <pre>
+	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 
+	 * 이 Advisor가 붙으면 caller의 문서만 검색되도록 tenant 필터가 강제로 걸립니다.
 	 *
 	 * topK, similarityThreshold, allowEmptyContext를 전부 기본값(null이면 전역 설정값을 쓰고,
 	 * allowEmptyContext는 true)으로 쓰는 간단한 버전입니다. Agent 정의에 개별 설정이 없을 때는
 	 * buildAdvisor(caller, null, null, null)을 호출하는 것과 완전히 같습니다.
+	 * </pre>
 	 *
 	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
 	 */
@@ -166,23 +178,21 @@ public class RagRetrievalChain extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 이 Advisor가 붙으면
 	 * caller의 문서만 검색되도록 tenant 필터가 강제로 걸립니다.
 	 *
 	 * topK, similarityThreshold, allowEmptyContext는 전부 null로 두면 전역 기본값
 	 * (dstone.ai.rag.retrieval.* 설정, allowEmptyContext는 true)을 쓰고, 값을 넣으면 이번
-	 * 호출에만(보통은 AgentDefinition.ragTopK / ragSimilarityThreshold / ragAllowEmptyContext에서
-	 * 넘어온 값) 그 값이 적용됩니다. RAG를 쓰는 Agent가 여러 개 늘어나더라도, 검색 범위나 개수,
-	 * 그리고 "근거 자료가 없을 때 어떻게 답할지"를 Agent마다 다르게 가져갈 수 있도록 하기 위한
-	 * 설계입니다.
+	 * 호출에만(보통은 AgentDefinition.ragTopK / ragSimilarityThreshold / ragAllowEmptyContext에서 넘어온 값) 그 값이 적용됩니다. 
+	 * RAG를 쓰는 Agent가 여러 개 늘어나더라도, 검색 범위나 개수, 그리고 "근거 자료가 없을 때 어떻게 답할지"를 Agent마다 다르게 가져갈 수 있도록 하기 위한 설계입니다.
 	 *
-	 * allowEmptyContext가 true(기본값)이면, 검색 결과가 하나도 없거나 RAG 자체가 이 요청과
-	 * 무관하더라도 질의를 "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로
-	 * 진행시킵니다. 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고
-	 * 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다. false로 주면 Spring AI
-	 * ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로
-	 * 돌아갑니다. "컨텍스트 밖의 답변은 절대 허용하면 안 되는" 순수 지식베이스 QA 같은 Agent에
-	 * 쓰면 됩니다.
+	 * allowEmptyContext가 true(기본값)이면, 검색 결과가 하나도 없거나 RAG 자체가 이 요청과 무관하더라도 
+	 * 질의를 "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킵니다. 
+	 * 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다. 
+	 * false로 주면 Spring AI ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로 돌아갑니다. 
+	 * "컨텍스트 밖의 답변은 절대 허용하면 안 되는" 순수 지식베이스 QA 같은 Agent에 쓰면 됩니다.
+	 * </pre>
 	 *
 	 * @param caller              호출한 앱/서비스를 나타내는 식별자(tenant)
 	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
@@ -202,8 +212,10 @@ public class RagRetrievalChain extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * caller(=tenant_id)의 문서 범위로만 검색을 제한해서 실행합니다. caller가 없으면(예:
 	 * security.auth가 꺼진 환경) 기존과 똑같이 전체 문서를 대상으로 검색합니다.
+	 * </pre>
 	 *
 	 * @param request 검색 조건(질의어, topK 등)
 	 * @param caller  호출한 앱/서비스를 나타내는 식별자(tenant)

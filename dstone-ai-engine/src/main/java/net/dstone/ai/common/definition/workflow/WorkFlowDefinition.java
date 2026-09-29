@@ -59,7 +59,9 @@ public record WorkFlowDefinition(
 	, List<StepDefinition> steps
 	) {
 
-	/** 실행 요청의 input 모양(JSON Schema)입니다. input을 비워뒀으면 {type: string}입니다. */
+	/** 
+	 * 실행 요청의 input 모양(JSON Schema)입니다. input을 비워뒀으면 {type: string}입니다. 
+	 */
 	public Map<String, Object> inputSchema() {
 		return (this.input == null ? SchemaDefinition.string() : this.input).schema();
 	}

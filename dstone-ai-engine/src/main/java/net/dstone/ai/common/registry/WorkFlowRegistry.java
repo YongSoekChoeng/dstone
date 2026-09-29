@@ -103,8 +103,10 @@ public class WorkFlowRegistry extends BaseObject {
 	private Map<String, WorkFlowDefinition> byId = Map.of();
 
 	/**
-	 * 앱이 기동될 때 한 번 호출되어, workflows/**.yml에 정의된 Workflow를 전부 읽고 검사한 뒤 id를 키로 하는
-	 * 맵에 채워 넣습니다. 검사 규칙은 클래스 설명을 참고하세요. 오류가 하나라도 있으면 기동 자체를 실패시킵니다.
+	 * <pre>
+	 * 앱이 기동될 때 한 번 호출되어, workflows/**.yml에 정의된 Workflow를 전부 읽고 검사한 뒤 id를 키로 하는 맵에 채워 넣습니다. 
+	 * 검사 규칙은 클래스 설명을 참고하세요. 오류가 하나라도 있으면 기동 자체를 실패시킵니다.
+	 * </pre>
 	 */
 	@PostConstruct
 	public void load() {
@@ -123,19 +125,24 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * Workflow 하나를 검사합니다(순서는 클래스 설명의 1~4). 오류가 있으면 어떤 Workflow의 어떤 step이 왜 문제인지 담아서 예외를 던집니다.
+	 * <pre>
+	 * Workflow 하나를 검사합니다(순서는 클래스 설명의 1~4). 
+	 * 오류가 있으면 어떤 Workflow의 어떤 step이 왜 문제인지 담아서 예외를 던집니다.
+	 * </pre>
 	 *
 	 * @param definition 검사할 Workflow 정의
 	 */
 	private void validate(WorkFlowDefinition definition) {
+		// 1. input 체크
 		this.checkSchema(definition, "input.schema", definition.inputSchema());
+		// 2. output 체크
 		if (definition.output() == null || definition.output().value() == null) {
 			throw this.error(definition, null, "output.value가 있어야 합니다(최종 결과로 무엇을 돌려줄지). 예: output: {value: \"${ .steps.마지막step.output }\"}");
 		}
 		if (definition.output().schema() != null) {
 			this.checkSchema(definition, "output.schema", definition.output().schema());
 		}
-
+		// 3. steps 체크
 		Map<String, StepDefinition> stepsById = new LinkedHashMap<>();
 		for (StepDefinition step : definition.steps()) {
 			this.checkStepId(definition, step);
@@ -147,7 +154,7 @@ public class WorkFlowRegistry extends BaseObject {
 		for (StepDefinition step : definition.steps()) {
 			this.validateStepShape(definition, step);
 		}
-
+		// 4. 템플릿 체크(step.input, step.forEach, step.output.value)
 		for (StepDefinition step : definition.steps()) {
 			String forEach = StepDefinition.forEachOf(step);
 			List<String> itemVariables = new ArrayList<>();
@@ -161,7 +168,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * Workflow의 input/output 스키마가 올바른 JSON Schema인지 검사합니다.
+	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param where      스키마가 있는 자리(오류 문장에 씁니다)
@@ -175,7 +184,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * step id가 비어 있지 않은지, 표현식에서 읽을 수 있는 이름인지, 예약어가 아닌지 검사합니다.
+	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param step       검사할 step
@@ -270,8 +281,8 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step 하나가 부르는 대상(Agent/Tool)의 계약과 맞는지 검사합니다. 어떤 키를 쓸 수 있는지는 step record가
-	 * 이미 정해 두었으므로, 여기서는 그것만으로 알 수 없는 것(필수 값, 부르는 대상이 있는지, input 모양)을 봅니다.
+	 * step 하나가 부르는 대상(Agent/Tool)의 계약과 맞는지 검사합니다. 
+	 * 어떤 키를 쓸 수 있는지는 step record가 이미 정해 두었으므로, 여기서는 그것만으로 알 수 없는 것(필수 값, 부르는 대상이 있는지, input 모양)을 봅니다.
 	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
@@ -321,7 +332,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * AGENT/SUPERVISOR/ROUTER step이 부르는 Agent의 계약과 맞는지 검사합니다.
+	 * </pre>
 	 *
 	 * @param definition       검사 중인 Workflow 정의
 	 * @param step             검사할 step
@@ -394,8 +407,10 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * Tool의 인자 스키마를 돌려줍니다(@Tool 메서드 파라미터나 MCP Tool의 inputSchema로 Spring AI가 만들어 둔 것).
 	 * Tool을 찾지 못하거나 스키마를 읽지 못하면 null입니다.
+	 * </pre>
 	 *
 	 * @param toolName Tool 이름
 	 */
@@ -413,7 +428,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * step의 input을 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 값 하나나 맵, TOOL은 맵이고, APPROVAL은 input이 없어서 null입니다.
+	 * </pre>
 	 *
 	 * @param step input을 꺼낼 step
 	 */
@@ -434,8 +451,8 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 템플릿(step input, forEach, output.value) 하나를 검사합니다(클래스 설명의 4번).
-	 * 1) 글자마다: 예전 문법 {{ }}, 글자 중간에 섞인 ${ }, 치환되지 않은 ${환경변수}가 없는지 봅니다.
+	 * 템플릿(step.input, step.forEach, step.output.value) 하나를 검사합니다(클래스 설명의 4번).
+	 * 1) 글자마다: 글자 중간에 섞인 ${ }, 치환되지 않은 ${환경변수}가 없는지 봅니다.
 	 * 2) 표현식마다: jq 문법과 함수/변수를 확인하고(JqExpEvalUtil.check), 읽는 경로를 검사합니다(checkReference).
 	 * </pre>
 	 *
@@ -534,8 +551,10 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * step이 돌려주는 값(output)의 스키마를 돌려줍니다(클래스 설명의 표 참고). 알 수 없으면(TOOL) null입니다.
 	 * forEach step이면 그 모양의 리스트입니다.
+	 * </pre>
 	 *
 	 * @param step output을 내놓는 step
 	 */
@@ -562,8 +581,10 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * step이 실제로 받은 값(input)의 스키마를 돌려줍니다. AGENT류는 Agent input, TOOL은 Tool 인자 스키마입니다.
 	 * 알 수 없으면 null이고, forEach step이면 그 모양의 리스트입니다.
+	 * </pre>
 	 *
 	 * @param step input을 받은 step
 	 */
@@ -590,7 +611,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 흐름을 끝내는 예약어(SUCCESS/FAIL)인지 봅니다.
+	 * </pre>
 	 *
 	 * @param id 볼 이름
 	 */
@@ -599,7 +622,10 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * 검사에 실패했을 때 던질 예외를 만듭니다. 어느 Workflow의 어느 step인지 메시지 앞에 붙입니다.
+	 * <pre>
+	 * 검사에 실패했을 때 던질 예외를 만듭니다. 
+	 * 어느 Workflow의 어느 step인지 메시지 앞에 붙입니다.
+	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param step       문제가 있는 step(Workflow 전체의 문제면 null)
@@ -610,7 +636,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 기동을 멈출 정도는 아니지만 확인이 필요한 내용을 로그로 남깁니다.
+	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param step       문제가 있는 step(Workflow 전체의 문제면 null)
@@ -621,7 +649,9 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 오류/경고 문장 앞에 붙일 자리 이름을 만듭니다. 예: workflow[a]의 step[b]
+	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param step       문제가 있는 step(Workflow 전체의 문제면 null)
@@ -631,11 +661,13 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * caller가 실행할 수 있는 Workflow만 골라 목록으로 돌려줍니다. api.controller.WorkFlowController의
-	 * GET /api/ai/workflow가 이 목록을 그대로 dstone-boot의 "Workflow 테스트" 화면 드롭다운에 보여줍니다.
+	 * <pre>
+	 * caller가 실행할 수 있는 Workflow만 골라 목록으로 돌려줍니다. 
+	 * api.controller.WorkFlowController의 GET /api/ai/workflow가 이 목록을 그대로 dstone-boot의 "Workflow 테스트" 화면 드롭다운에 보여줍니다.
 	 *
-	 * resolve()와 똑같은 allowedCallers 규칙을 씁니다. 그래야 드롭다운에서 고를 수 있는 Workflow와
-	 * 실제로 실행할 수 있는 Workflow가 항상 일치합니다.
+	 * resolve()와 똑같은 allowedCallers 규칙을 씁니다. 
+	 * 그래야 드롭다운에서 고를 수 있는 Workflow와 실제로 실행할 수 있는 Workflow가 항상 일치합니다.
+	 * </pre>
 	 *
 	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
 	 */
@@ -657,8 +689,11 @@ public class WorkFlowRegistry extends BaseObject {
 	}
 
 	/**
-	 * id로 Workflow를 찾아서 돌려줍니다. 이때 caller가 그 Workflow를 쓸 수 있는지도 함께 확인합니다.
+	 * <pre>
+	 * id로 Workflow를 찾아서 돌려줍니다. 
+	 * 이때 caller가 그 Workflow를 쓸 수 있는지도 함께 확인합니다.
 	 * 등록되지 않은 id이거나, caller가 화이트리스트를 통과하지 못하면 바로 예외를 던집니다.
+	 * <pre>
 	 *
 	 * @param id     조회할 Workflow id
 	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)

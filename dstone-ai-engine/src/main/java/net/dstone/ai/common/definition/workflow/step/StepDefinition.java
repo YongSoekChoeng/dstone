@@ -162,7 +162,10 @@ public sealed interface StepDefinition
 	}
 
 	/**
-	 * forEach 반복 중 항목을 담을 변수 이름을 돌려줍니다. itemVariable을 비워뒀으면 "item"입니다.
+	 * <pre>
+	 * forEach 반복 중 항목을 담을 변수 이름을 돌려줍니다. 
+	 * itemVariable을 비워뒀으면 "item"입니다.
+	 * </pre>
 	 *
 	 * @param step 변수 이름을 꺼낼 step
 	 */
@@ -189,7 +192,10 @@ public sealed interface StepDefinition
 	}
 
 	/**
-	 * step이 이전 대화를 기억하는지(memory: true) 돌려줍니다. 비워뒀거나 LLM을 부르지 않는 종류(TOOL/APPROVAL)면 false입니다.
+	 * <pre>
+	 * step이 이전 대화를 기억하는지(memory: true) 돌려줍니다. 
+	 * 비워뒀거나 LLM을 부르지 않는 종류(TOOL/APPROVAL)면 false입니다.
+	 * </pre>
 	 *
 	 * @param step memory 값을 꺼낼 step
 	 */

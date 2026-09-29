@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
@@ -14,7 +15,6 @@ import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
-import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.biz.BaseService;
 import net.dstone.common.utils.StringUtil;

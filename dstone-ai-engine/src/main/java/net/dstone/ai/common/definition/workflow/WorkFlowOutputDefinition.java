@@ -30,7 +30,9 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
 public record WorkFlowOutputDefinition(Object value, Map<String, Object> schema) {
 
 	/**
+	 * <pre>
 	 * YAML의 output 맵을 읽을 때 쓰입니다. schema는 축약형도 받습니다(예: schema: string).
+	 * </pre>
 	 *
 	 * @param value  최종 결과입니다.
 	 * @param schema 최종 결과의 모양입니다(없으면 null).

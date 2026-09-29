@@ -33,40 +33,39 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * Workflow, Agent, McpServer의 정의는 application.yml 안에 넣지 않고, 각각
  * classpath:workflows/**\/*.yml, classpath:agents/**\/*.yml, classpath:mcp/**\/*.yml처럼
- * 별도의 YAML 파일로 따로 둡니다. 이렇게 하는 핵심 이유는, 새로 하나를 만들거나 기존 것을 바꿀
- * 때 application.yml을 전혀 건드리지 않고 YAML 파일 하나만 추가하거나 고치면 되게 하려는
- * 것입니다. 이 클래스가 기동 시점에 common.registry.WorkFlowRegistry / AgentRegistry /
- * McpServerRegistry에게 호출되어 이 파일들을 실제로 읽어 들입니다. 경로에 쓰인 "**"는 하위
- * 디렉토리를 몇 단계든 재귀적으로 포함하므로, 세 디렉토리 바로 아래에 파일을 두든, 도메인별로
- * 서브 디렉토리를 나눠서(예: workflows/billing/*.yml) 관리하든 자유롭게 선택할 수 있습니다.
+ * 별도의 YAML 파일로 따로 둡니다. 
+ * 이렇게 하는 핵심 이유는, 새로 하나를 만들거나 기존 것을 바꿀 때 application.yml을 전혀 건드리지 않고 YAML 파일 하나만 추가하거나 고치면 되게 하려는 것입니다. 
+ * 이 클래스가 기동 시점에 common.registry.WorkFlowRegistry / AgentRegistry / McpServerRegistry에게 호출되어 이 파일들을 실제로 읽어 들입니다. 
+ * 경로에 쓰인 "**"는 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, 세 디렉토리 바로 아래에 파일을 두든, 도메인별로 서브 디렉토리를 나눠서(예: workflows/billing/*.yml) 관리하든 자유롭게 선택할 수 있습니다.
  *
- * 파일을 읽는 방식은 이렇습니다: 먼저 Spring Boot가 application.yml 자체를 읽을 때 쓰는 것과
- * 같은 SnakeYAML로 파싱해서 평범한 Map으로 만들고, 그다음 Jackson의 ObjectMapper.convertValue()로
- * 그 Map을 definition record에 바인딩합니다. record의 필드에 바로 바인딩되는 건 pom.xml에 이미
- * 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
+ * 파일을 읽는 방식은 이렇습니다: 먼저 Spring Boot가 application.yml 자체를 읽을 때 쓰는 것과 같은 SnakeYAML로 파싱해서 평범한 Map으로 만들고, 
+ * 그다음 Jackson의 ObjectMapper.convertValue()로 그 Map을 definition record에 바인딩합니다. 
+ * record의 필드에 바로 바인딩되는 건 pom.xml에 이미 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
  *
  * Workflow의 steps 항목은 type 값에 따라 서로 다른 record(AgentStepDefinition/ToolStepDefinition 등)로 읽힙니다
- * (common.definition.workflow.step.StepDefinition의 @JsonSubTypes 참고). record마다 그 종류가 쓰는
- * 키만 있으므로, 다른 종류의 키를 적으면 "쓸 수 없는 키"로 여기서 바로 막힙니다. 이때 Jackson의 영문
- * 오류 대신 "어느 파일의 어느 자리에서 무엇이 틀렸는지"를 한국어로 알려줍니다(describe() 참고).
+ * (common.definition.workflow.step.StepDefinition의 @JsonSubTypes 참고). 
+ * record마다 그 종류가 쓰는 키만 있으므로, 다른 종류의 키를 적으면 "쓸 수 없는 키"로 여기서 바로 막힙니다. 
+ * 이때 Jackson의 영문 류 대신 "어느 파일의 어느 자리에서 무엇이 틀렸는지"를 한국어로 알려줍니다(describe() 참고).
  *
- * application.yml과 달리 이 파일들은 Spring이 읽는 게 아니라서 ${...} 값이 원래는 자동으로
- * 채워지지 않습니다. 그런데 실행 환경(로컬 Windows/WSL/k8s)마다 값이 달라져야 하는 경로 같은
- * 게 YAML 안에 있으면 곤란하므로, Map으로 바꾼 직후에 이 클래스가 직접 문자열 값 안의
- * ${VAR_NAME} 토큰을 System 프로퍼티(conf/env{-profile}.properties가 기동 시 여기에 그대로
- * 심어 둡니다 - DstoneAiEngineApplication.setSysProperties() 참고)로 치환해 줍니다(찾지
- * 못하면 OS 환경변수도 한 번 더 찾아봅니다). 예를 들어 mcp/*.yml의 args에 "${APP_HOME}/..."라고
- * 적어두면, Windows에서는 conf/env.properties의 APP_HOME(예: D:/AppHome/...)로, WSL에서는
- * conf/env-wsl.properties의 APP_HOME(예: /app/dstone)으로 각각 알맞게 채워집니다.
+ * application.yml과 달리 이 파일들은 Spring이 읽는 게 아니라서 ${...} 값이 원래는 자동으로 채워지지 않습니다. 
+ * 그런데 실행 환경(로컬 Windows/WSL/k8s)마다 값이 달라져야 하는 경로 같은게 YAML 안에 있으면 곤란하므로, 
+ * Map으로 바꾼 직후에 이 클래스가 직접 문자열 값 안의 ${VAR_NAME} 토큰을 System 프로퍼티(conf/env{-profile}.properties가 기동 시 여기에 그대로 심어 둡니다.
+ * DstoneAiEngineApplication.setSysProperties() 참고)로 치환해 줍니다(찾지 못하면 OS 환경변수도 한 번 더 찾아봅니다). 
+ * 예를 들어 mcp/*.yml의 args에 "${APP_HOME}/..."라고 적어두면, Windows에서는 conf/env.properties의 APP_HOME(예: D:/AppHome/...)로, 
+ * WSL에서는 conf/env-wsl.properties의 APP_HOME(예: /app/dstone)으로 각각 알맞게 채워집니다.
+ * </pre>
  */
 @Component
 public class YamlDefinitionLoader extends BaseObject {
 
 	/**
+	 * <pre>
 	 * workflows/*.yml 파일 하나가 가지는 최상위 구조를 나타냅니다. 파일 맨 위에 workflow: 라는
 	 * 키가 하나 있고, 그 밑에 실제 Workflow 정의가 들어있는 형태입니다.
+	 * </pre>
 	 *
 	 * @param workflow workflow 키 아래에 있는 실제 정의 내용
 	 */
@@ -74,8 +73,10 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * agents/*.yml 파일 하나가 가지는 최상위 구조입니다. workflows/*.yml, mcp/*.yml과 마찬가지로
 	 * 파일 하나에 Agent 하나만 담기고, 최상위 키는 agent: 입니다.
+	 * </pre>
 	 *
 	 * @param agent agent 키 아래에 있는 실제 정의 내용
 	 */
@@ -83,8 +84,10 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * mcp/*.yml 파일 하나가 가지는 최상위 구조입니다. workflows/*.yml과 마찬가지로 파일 하나에
 	 * MCP 서버 하나만 담기고, 최상위 키는 mcpServer: 입니다.
+	 * </pre>
 	 *
 	 * @param mcpServer mcpServer 키 아래에 있는 실제 정의 내용
 	 */
@@ -141,7 +144,9 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 주어진 classpath 패턴에 맞는 리소스 파일들을 전부 찾아 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param locationPattern 리소스를 찾을 classpath 패턴
 	 */
@@ -159,11 +164,13 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 로그에 남길 경로 문자열을 만들어 줍니다. 로그에 파일 이름만 찍으면, 서브 디렉토리로 나눠서
 	 * 관리하는 경우(예: workflows/billing/a.yml과 workflows/support/a.yml처럼 이름은 같고
 	 * 폴더만 다른 경우) 어느 파일을 말하는 건지 구분할 수가 없습니다. 그래서 baseDir 이후의
 	 * 경로까지 포함해서 보여줍니다. 혹시 URL을 읽지 못하는 등 예외가 생기면, 최소한 파일
 	 * 이름만이라도 남깁니다.
+	 * </pre>
 	 *
 	 * @param resource 경로를 구할 대상 리소스
 	 * @param baseDir  이 리소스를 찾은 classpath 기준 디렉토리(workflows, agents, mcp 중 하나)
@@ -179,6 +186,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 리소스 파일 하나를 읽어서 SnakeYAML로 파싱한 뒤, 지정한 타입(레코드)으로 바인딩해 줍니다.
 	 *
 	 * 서브 디렉토리 구성은 순전히 파일 정리 목적일 뿐이라, id는 YAML에 적힌 값을 그대로 씁니다.
@@ -186,6 +194,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * 파일을 읽지 못하거나, YAML의 키가 record와 맞지 않으면(모르는 키가 있거나 값의 모양이 다르면)
 	 * 파일 경로를 담은 예외를 던져서 엔진 기동을 멈춥니다. 잘못된 파일을 조용히 건너뛰면 그 Workflow나
 	 * Agent가 등록되지 않은 이유를 찾기 어렵기 때문입니다.
+	 * </pre>
 	 *
 	 * @param resource 읽어올 리소스 파일
 	 * @param type     바인딩할 대상 타입
@@ -244,7 +253,9 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 없어졌거나 다른 곳으로 옮겨진 키를 적었으면 새 모양을 알려주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
+	 * </pre>
 	 *
 	 * @param owner 키를 적은 자리의 record 타입
 	 * @param key   적은 키 이름
@@ -266,7 +277,9 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 값의 자바 타입을 YAML 쪽 말로 바꿉니다(Map → 맵, List → 리스트, String → 문자열).
+	 * </pre>
 	 *
 	 * @param type Jackson이 기대한 자바 타입
 	 */
@@ -284,7 +297,9 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * Jackson 오류가 가리키는 자리를 YAML 경로 모양(예: workflow.steps[2].routes)으로 만듭니다.
+	 * </pre>
 	 *
 	 * @param e 자리 정보를 담고 있는 Jackson 오류
 	 */
@@ -307,9 +322,11 @@ public class YamlDefinitionLoader extends BaseObject {
 	private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Z0-9_]+)\\}");
 
 	/**
+	 * <pre>
 	 * SnakeYAML이 만들어준 Map/List/String 구조를 그대로 따라 내려가면서, 문자열 값 안에 있는
 	 * ${VAR_NAME} 토큰을 전부 찾아 치환합니다. Map과 List는 값만 바꾸면 되므로 구조 자체는
 	 * 그대로 유지하고, 문자열이 아닌 값(숫자, boolean 등)은 건드리지 않고 그대로 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param value 치환할 대상입니다(YAML 최상위 Map이거나, 그 안에 중첩된 Map/List/String 등입니다).
 	 */
@@ -336,9 +353,11 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 문자열 하나 안의 ${VAR_NAME} 토큰을 전부 System 프로퍼티(없으면 OS 환경변수) 값으로
 	 * 바꿔치기합니다. 둘 다에 없는 이름이면 건드리지 않고 ${VAR_NAME} 문자열 그대로 남겨둡니다 -
 	 * (조용히 빈 문자열로 지워버리면 설정을 깜빡 잊었을 때 원인을 찾기 훨씬 어려워지기 때문입니다.)
+	 * </pre>
 	 *
 	 * @param text 치환할 대상 문자열입니다.
 	 */

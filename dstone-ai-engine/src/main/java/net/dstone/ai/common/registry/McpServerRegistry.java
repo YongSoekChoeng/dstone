@@ -15,14 +15,15 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * MCP 서버 정보를 담아두는 등록소입니다. 로딩 순서는 YamlDefinitionLoader가
- * classpath:mcp/*.yml 파일들을 읽어서 McpServerDefinition으로 바꾸고, 이 McpServerRegistry가
- * 앱이 기동될 때 그것들을 한 번 모아서 보관하는 식입니다.
+ * <pre>
+ * MCP 서버 정보를 담아두는 등록소입니다. 
+ * 로딩 순서는 YamlDefinitionLoader가 classpath:mcp/*.yml 파일들을 읽어서 McpServerDefinition으로 바꾸고, 
+ * 이 McpServerRegistry가 앱이 기동될 때 그것들을 한 번 모아서 보관하는 식입니다.
  *
- * WorkFlowRegistry나 AgentRegistry와 달리, 여기에는 "caller별로 이 id를 써도 되는지"를 검사하는
- * 조회 기능이 없습니다. common.config.ConfigMcp가 기동 시 이 목록 전체를 한 바퀴 돌면서 서버마다
- * 접속을 시도할 뿐이고, 앱이 실행되는 도중에 "이 id로 서버 하나만 찾아줘" 하는 조회는 애초에
- * 일어나지 않기 때문입니다.
+ * WorkFlowRegistry나 AgentRegistry와 달리, 여기에는 "caller별로 이 id를 써도 되는지"를 검사하는 조회 기능이 없습니다. 
+ * common.config.ConfigMcp가 기동 시 이 목록 전체를 한 바퀴 돌면서 서버마다 접속을 시도할 뿐이고, 
+ * 앱이 실행되는 도중에 "이 id로 서버 하나만 찾아줘" 하는 조회는 애초에 일어나지 않기 때문입니다.
+ * </pre>
  */
 @Component
 public class McpServerRegistry extends BaseObject {
@@ -33,9 +34,10 @@ public class McpServerRegistry extends BaseObject {
 	private Map<String, McpServerDefinition> byId = Map.of();
 
 	/**
-	 * 앱이 기동될 때 한 번 호출되어, mcp/*.yml에 정의된 MCP 서버 정보를 전부 읽어 id를 키로
-	 * 하는 맵에 채워 넣습니다. id나 transport가 비어 있는 정의가 있거나, 같은 id가 둘 이상
-	 * 있으면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
+	 * <pre>
+	 * 앱이 기동될 때 한 번 호출되어, mcp/*.yml에 정의된 MCP 서버 정보를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
+	 * id나 transport가 비어 있는 정의가 있거나, 같은 id가 둘 이상 있으면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
+	 * </pre>
 	 */
 	@PostConstruct
 	public void load() {
