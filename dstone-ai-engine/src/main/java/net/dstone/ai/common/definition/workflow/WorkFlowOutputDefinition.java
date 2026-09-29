@@ -5,7 +5,7 @@ import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 
 /**
  * <pre>
@@ -20,7 +20,7 @@ import net.dstone.ai.common.schema.JsonSchemas;
  *     sql: "${ .steps.convert.output.sql }"
  *     approvedBy: "${ .steps.review.output.approver }"
  *
- * 표현식의 결과는 타입 그대로(객체, 리스트 등) 돌려줍니다(common.schema.ExpressionEvaluator 참고).
+ * 표현식의 결과는 타입 그대로(객체, 리스트 등) 돌려줍니다(common.schema.JqExpEvalUtil 참고).
  * schema를 적었는데 결과가 그 모양이 아니면 Workflow는 FAILED로 끝납니다.
  * </pre>
  *
@@ -37,7 +37,7 @@ public record WorkFlowOutputDefinition(Object value, Map<String, Object> schema)
 	 */
 	@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
 	public static WorkFlowOutputDefinition of(@JsonProperty("value") Object value, @JsonProperty("schema") Object schema) {
-		return new WorkFlowOutputDefinition(value, schema == null ? null : JsonSchemas.normalize(schema));
+		return new WorkFlowOutputDefinition(value, schema == null ? null : JsonSchemaUtil.normalize(schema));
 	}
 
 }

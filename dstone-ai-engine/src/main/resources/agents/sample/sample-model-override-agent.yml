@@ -26,6 +26,7 @@ agent:
   prompt: |
     당신은 AI 어시스턴트입니다. 질문에 간결히 한국어로 답한 뒤, 마지막 줄에
     "(model=여기에 당신이 아는 자기 모델명을 적으십시오)"를 덧붙이십시오.
-  model: qwen2.5-coder:7b
+  #model: qwen2.5-coder:7b
+  model: qwen/qwen-2.5-coder-32b-instruct
   toolsEnabled: false
   ragEnabled: false

@@ -120,7 +120,7 @@ spring:
              chat:
                  options:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
-                     model: google/gemma-4-26b-a4b-it:free
+                     model: google/gemma-4-26b-a4b-it
                      temperature: 0.4
 
         ##########################################################################################

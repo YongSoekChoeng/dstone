@@ -39,7 +39,7 @@ import net.dstone.common.utils.StringUtil;
  *   SUCCESS/FAIL은 예약어라 id로 쓸 수 없습니다.
  *
  * - input: 이 step에 넣어줄 값입니다. 값 전체가 "${ ... }"이면 step이 실행되기 직전에 엔진이 jq로 계산하고,
- *   그 밖의 값은 적힌 그대로 넘깁니다(규칙은 common.schema.ExpressionEvaluator 참고).
+ *   그 밖의 값은 적힌 그대로 넘깁니다(규칙은 common.schema.JqExpEvalUtil 참고).
  *   AGENT/SUPERVISOR/ROUTER는 필수이고 모양은 Agent input을 따릅니다(string이면 값 하나, object면 맵).
  *   TOOL은 인자 맵(없으면 빈 인자)이고, APPROVAL은 input이 없습니다.
  *

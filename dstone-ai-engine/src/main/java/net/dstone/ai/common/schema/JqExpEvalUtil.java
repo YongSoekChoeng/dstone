@@ -57,7 +57,7 @@ import net.thisptr.jackson.jq.exception.JsonQueryException;
  * </pre>
  */
 @Component
-public class ExpressionEvaluator {
+public class JqExpEvalUtil {
 
 	/** 표현식의 시작 표시입니다. */
 	public static final String PREFIX = "${";
@@ -76,7 +76,7 @@ public class ExpressionEvaluator {
 	/** 한 번 컴파일한 표현식을 다시 씁니다(키 = ${ } 안쪽 글자). */
 	private final Map<String, JsonQuery> compiled = new ConcurrentHashMap<>();
 
-	public ExpressionEvaluator() {
+	public JqExpEvalUtil() {
 		this.rootScope = Scope.newEmptyScope();
 		BuiltinFunctionLoader.getInstance().loadFunctions(JQ_VERSION, this.rootScope);
 	}

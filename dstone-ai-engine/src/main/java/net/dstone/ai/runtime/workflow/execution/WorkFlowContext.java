@@ -9,7 +9,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
  * <pre>
  * Workflow 실행 1건의 컨텍스트(실행 중 모든 상태를 담은 트리)를 만들고 고치는 도구 모음입니다.
  * 컨텍스트 자체는 평범한 Map이라서 그대로 JSON으로 DB에 저장되고(WorkFlowExecutionStore), 실행 상세
- * 조회 API로도 그대로 보입니다. YAML의 "${ ... }" 표현식은 이 트리를 jq로 읽습니다(common.schema.ExpressionEvaluator).
+ * 조회 API로도 그대로 보입니다. YAML의 "${ ... }" 표현식은 이 트리를 jq로 읽습니다(common.schema.JqExpEvalUtil).
  * 이름은 YAML에 적는 이름과 맞춰 두었고(workflow.input → .input, step의 input/output → .steps.id.input/output),
  * 엔진이 몰래 채워 넣는 숨은 이름은 없습니다. approvals는 엔진 내부용이라 표현식에는 보이지 않습니다.
  *

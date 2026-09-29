@@ -237,7 +237,7 @@ public class YamlDefinitionLoader extends BaseObject {
 				+ " - 예: TOOL step의 input은 맵, AGENT step의 input은 문자열).";
 		}
 		if (cause.getCause() != null && cause.getCause().getMessage() != null) {
-			// 값을 만들다 우리 코드가 던진 오류(예: JsonSchemas.normalize의 "알 수 없는 타입 이름입니다 ...")는 그 메시지를 그대로 보여줍니다.
+			// 값을 만들다 우리 코드가 던진 오류(예: JsonSchemaUtil.normalize의 "알 수 없는 타입 이름입니다 ...")는 그 메시지를 그대로 보여줍니다.
 			return "[" + where + "] " + cause.getCause().getMessage();
 		}
 		return "[" + where + "] " + cause.getOriginalMessage();

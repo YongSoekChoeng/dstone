@@ -32,9 +32,8 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
-import net.dstone.ai.common.schema.ExpressionEvaluator;
-import net.dstone.ai.common.schema.JsonSchemas;
-import net.dstone.ai.common.schema.StepOutputSchemas;
+import net.dstone.ai.common.schema.JqExpEvalUtil;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -97,7 +96,7 @@ public class WorkFlowRegistry extends BaseObject {
 	@Autowired
 	private ConfigTool configTool;
 	@Autowired
-	private ExpressionEvaluator expressionEvaluator;
+	private JqExpEvalUtil jqExpEvalUtil;
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -169,7 +168,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param schema     검사할 스키마
 	 */
 	private void checkSchema(WorkFlowDefinition definition, String where, Map<String, Object> schema) {
-		List<String> problems = JsonSchemas.checkSchema(schema);
+		List<String> problems = JsonSchemaUtil.checkSchema(schema);
 		if (!problems.isEmpty()) {
 			throw this.error(definition, null, where + "가 올바른 JSON Schema가 아닙니다: " + problems);
 		}
@@ -284,7 +283,7 @@ public class WorkFlowRegistry extends BaseObject {
 		}
 		String forEach = StepDefinition.forEachOf(step);
 		if (forEach != null) {
-			if (!ExpressionEvaluator.isExpression(forEach)) {
+			if (!JqExpEvalUtil.isExpression(forEach)) {
 				throw this.error(definition, step, "forEach는 리스트를 돌려주는 표현식으로 적습니다. 예: forEach: \"${ .input.sqlList }\"");
 			}
 			if (!STEP_ID.matcher(StepDefinition.itemKeyOf(step)).matches()) {
@@ -362,34 +361,34 @@ public class WorkFlowRegistry extends BaseObject {
 	 */
 	@SuppressWarnings("unchecked")
 	private void checkInputShape(WorkFlowDefinition definition, StepDefinition step, String owner, Map<String, Object> schema, Object input) {
-		if (ExpressionEvaluator.isExpression(input)) {
+		if (JqExpEvalUtil.isExpression(input)) {
 			return;
 		}
-		String type = JsonSchemas.typeOf(schema);
-		if (JsonSchemas.STRING.equals(type) && !(input instanceof String)) {
+		String type = JsonSchemaUtil.typeOf(schema);
+		if (JsonSchemaUtil.STRING.equals(type) && !(input instanceof String)) {
 			throw this.error(definition, step, owner + "이 string이라 step의 input은 값 하나로 적어야 합니다. 예: input: \"${ .input }\"");
 		}
-		if (JsonSchemas.ARRAY.equals(type) && !(input instanceof List)) {
+		if (JsonSchemaUtil.ARRAY.equals(type) && !(input instanceof List)) {
 			throw this.error(definition, step, owner + "이 array라 step의 input은 리스트(또는 리스트를 돌려주는 표현식)로 적어야 합니다.");
 		}
-		if (!JsonSchemas.OBJECT.equals(type)) {
+		if (!JsonSchemaUtil.OBJECT.equals(type)) {
 			return;
 		}
 		if (!(input instanceof Map)) {
 			throw this.error(definition, step, owner + "이 object라 step의 input은 맵으로 적어야 합니다(필드마다 표현식 또는 리터럴). 예: input: {필드: \"${ .input }\"}");
 		}
 		Map<String, Object> fields = (Map<String, Object>) input;
-		Map<String, Object> properties = JsonSchemas.properties(schema);
-		if (properties != null && !JsonSchemas.allowsExtraProperties(schema)) {
+		Map<String, Object> properties = JsonSchemaUtil.properties(schema);
+		if (properties != null && !JsonSchemaUtil.allowsExtraProperties(schema)) {
 			for (String name : fields.keySet()) {
 				if (!properties.containsKey(name)) {
 					throw this.error(definition, step, "input의 '" + name + "'는 " + owner + "에 없는 이름입니다(쓸 수 있는 이름 = " + properties.keySet() + ").");
 				}
 			}
 		}
-		for (String name : JsonSchemas.required(schema)) {
+		for (String name : JsonSchemaUtil.required(schema)) {
 			if (!fields.containsKey(name)) {
-				throw this.error(definition, step, "input에 '" + name + "'가 빠졌습니다(" + owner + "의 필수 이름 = " + JsonSchemas.required(schema) + ").");
+				throw this.error(definition, step, "input에 '" + name + "'가 빠졌습니다(" + owner + "의 필수 이름 = " + JsonSchemaUtil.required(schema) + ").");
 			}
 		}
 	}
@@ -437,7 +436,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * <pre>
 	 * 템플릿(step input, forEach, output.value) 하나를 검사합니다(클래스 설명의 4번).
 	 * 1) 글자마다: 예전 문법 {{ }}, 글자 중간에 섞인 ${ }, 치환되지 않은 ${환경변수}가 없는지 봅니다.
-	 * 2) 표현식마다: jq 문법과 함수/변수를 확인하고(ExpressionEvaluator.check), 읽는 경로를 검사합니다(checkReference).
+	 * 2) 표현식마다: jq 문법과 함수/변수를 확인하고(JqExpEvalUtil.check), 읽는 경로를 검사합니다(checkReference).
 	 * </pre>
 	 *
 	 * @param definition     검사 중인 Workflow 정의
@@ -450,25 +449,25 @@ public class WorkFlowRegistry extends BaseObject {
 	 */
 	private void validateTemplate(WorkFlowDefinition definition, Map<String, StepDefinition> stepsById, Map<String, List<String>> nextSteps,
 			StepDefinition owner, String where, Object template, List<String> variableNames) {
-		for (String text : ExpressionEvaluator.texts(template)) {
+		for (String text : JqExpEvalUtil.texts(template)) {
 			if (text.contains("{{")) {
 				throw this.error(definition, owner, where + "의 '" + text + "' - {{ }} 문법은 쓰지 않습니다. 값 전체를 jq 표현식으로 적으십시오. 예: \"${ .steps.id.output }\", \"${ .input }\", \"${ $item }\"");
 			}
-			if (!ExpressionEvaluator.isExpression(text) && text.contains(ExpressionEvaluator.PREFIX)) {
+			if (!JqExpEvalUtil.isExpression(text) && text.contains(JqExpEvalUtil.PREFIX)) {
 				throw this.error(definition, owner, where + "의 '" + text + "' - 글자 중간에 ${ }를 섞어 쓸 수 없습니다. 값 전체를 표현식 하나로 적고, 글자는 jq로 이어 붙이십시오. 예: '${ \"요약: \" + .steps.id.output }'");
 			}
 		}
-		for (String expression : ExpressionEvaluator.expressions(template)) {
-			String body = ExpressionEvaluator.bodyOf(expression);
+		for (String expression : JqExpEvalUtil.expressions(template)) {
+			String body = JqExpEvalUtil.bodyOf(expression);
 			if (UNRESOLVED_ENV.matcher(body).matches()) {
 				throw this.error(definition, owner, where + "의 " + expression + " - 환경변수 " + body + "를 찾지 못했습니다(conf/env*.properties 또는 OS 환경변수를 확인하십시오).");
 			}
-			String problem = this.expressionEvaluator.check(expression, variableNames);
+			String problem = this.jqExpEvalUtil.check(expression, variableNames);
 			if (problem != null) {
 				String hint = variableNames.isEmpty() ? " (이 자리에서는 jq 변수를 쓸 수 없습니다. $item은 forEach step의 input 안에서만 씁니다.)" : " (이 자리에서 쓸 수 있는 변수 = $" + String.join(", $", variableNames) + ")";
 				throw this.error(definition, owner, where + " - " + problem + (problem.contains("is not defined") ? hint : ""));
 			}
-			for (List<String> path : ExpressionEvaluator.references(expression)) {
+			for (List<String> path : JqExpEvalUtil.references(expression)) {
 				this.checkReference(definition, stepsById, nextSteps, owner, where, expression, path);
 			}
 		}
@@ -491,7 +490,7 @@ public class WorkFlowRegistry extends BaseObject {
 			StepDefinition owner, String where, String expression, List<String> path) {
 		String prefix = where + "의 " + expression + " - ";
 		if (Context.INPUT.equals(path.get(0))) {
-			String problem = JsonSchemas.checkPath(definition.inputSchema(), "." + Context.INPUT, path.subList(1, path.size()));
+			String problem = JsonSchemaUtil.checkPath(definition.inputSchema(), "." + Context.INPUT, path.subList(1, path.size()));
 			if (problem != null) {
 				this.warn(definition, owner, prefix + problem + " 이 값의 모양은 workflow.input이 정합니다.");
 			}
@@ -520,12 +519,12 @@ public class WorkFlowRegistry extends BaseObject {
 		List<String> rest = path.subList(3, path.size());
 		String problem = null;
 		if (Context.FIELD_OUTPUT.equals(field)) {
-			problem = JsonSchemas.checkPath(this.outputSchemaOf(target), base, rest);
+			problem = JsonSchemaUtil.checkPath(this.outputSchemaOf(target), base, rest);
 			if (problem != null && target instanceof AgentStepDefinition agentStep) {
 				problem = problem + " 이 값의 모양은 agents/*.yml의 agent[" + agentStep.ref() + "].output이 정합니다.";
 			}
 		} else if (Context.FIELD_INPUT.equals(field)) {
-			problem = target instanceof ApprovalStepDefinition ? "APPROVAL step에는 input이 없어서 항상 null입니다." : JsonSchemas.checkPath(this.inputSchemaOf(target), base, rest);
+			problem = target instanceof ApprovalStepDefinition ? "APPROVAL step에는 input이 없어서 항상 null입니다." : JsonSchemaUtil.checkPath(this.inputSchemaOf(target), base, rest);
 		} else if (!rest.isEmpty()) {
 			problem = base + "는 글자라서 그 아래로 더 들어갈 수 없습니다.";
 		}
@@ -547,19 +546,19 @@ public class WorkFlowRegistry extends BaseObject {
 				schema = this.agentRegistry.find(agentStep.ref()).outputSchema();
 				break;
 			case SupervisorStepDefinition supervisor:
-				schema = StepOutputSchemas.verdict();
+				schema = JsonSchemaUtil.verdict();
 				break;
 			case RouterStepDefinition router:
-				schema = StepOutputSchemas.routeDecision(router.routes().keySet());
+				schema = JsonSchemaUtil.routeDecision(router.routes().keySet());
 				break;
 			case ApprovalStepDefinition approval:
-				schema = StepOutputSchemas.approval();
+				schema = JsonSchemaUtil.approval();
 				break;
 			case ToolStepDefinition tool:
 				schema = null;
 				break;
 		}
-		return StepDefinition.forEachOf(step) == null ? schema : JsonSchemas.arrayOf(schema);
+		return StepDefinition.forEachOf(step) == null ? schema : JsonSchemaUtil.arrayOf(schema);
 	}
 
 	/**
@@ -587,7 +586,7 @@ public class WorkFlowRegistry extends BaseObject {
 				schema = null;
 				break;
 		}
-		return StepDefinition.forEachOf(step) == null ? schema : JsonSchemas.arrayOf(schema);
+		return StepDefinition.forEachOf(step) == null ? schema : JsonSchemaUtil.arrayOf(schema);
 	}
 
 	/**

@@ -5,7 +5,7 @@ import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 
 /**
  * <pre>
@@ -14,7 +14,7 @@ import net.dstone.ai.common.schema.JsonSchemas;
  * - workflows/*.yml 의 workflow.input: 이 Workflow를 실행할 때 요청에 담아야 하는 값의 모양
  *
  * schema 아래에는 표준 JSON Schema를 YAML로 그대로 적습니다. 타입만 필요하면 축약형도 됩니다
- * (규칙은 common.schema.JsonSchemas 참고).
+ * (규칙은 common.schema.JsonSchemaUtil 참고).
  *
  *   output: string                          # 축약형 = output: {schema: {type: string}}
  *   output:
@@ -43,7 +43,7 @@ public record SchemaDefinition(Map<String, Object> schema) {
 		if (schema == null) {
 			throw new IllegalArgumentException("schema가 비어 있습니다(예: schema: {type: string}).");
 		}
-		return new SchemaDefinition(JsonSchemas.normalize(schema));
+		return new SchemaDefinition(JsonSchemaUtil.normalize(schema));
 	}
 
 	/**
@@ -53,12 +53,12 @@ public record SchemaDefinition(Map<String, Object> schema) {
 	 */
 	@JsonCreator(mode = JsonCreator.Mode.DELEGATING)
 	public static SchemaDefinition shorthand(String typeName) {
-		return new SchemaDefinition(JsonSchemas.normalize(typeName));
+		return new SchemaDefinition(JsonSchemaUtil.normalize(typeName));
 	}
 
 	/** 아무것도 선언하지 않았을 때의 계약({type: string})을 돌려줍니다. */
 	public static SchemaDefinition string() {
-		return new SchemaDefinition(JsonSchemas.string());
+		return new SchemaDefinition(JsonSchemaUtil.string());
 	}
 
 }

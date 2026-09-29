@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
-import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -69,7 +69,7 @@ public class AgentRegistry extends BaseObject {
 	 * @param schema     검사할 스키마
 	 */
 	private void checkSchema(AgentDefinition definition, String where, Map<String, Object> schema) {
-		List<String> problems = JsonSchemas.checkSchema(schema);
+		List<String> problems = JsonSchemaUtil.checkSchema(schema);
 		if (!problems.isEmpty()) {
 			throw new IllegalStateException("agent[" + definition.id() + "]의 " + where + ".schema가 올바른 JSON Schema가 아닙니다: " + problems);
 		}

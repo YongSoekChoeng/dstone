@@ -3,8 +3,9 @@ package net.dstone.ai.runtime.agent;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -14,13 +15,15 @@ import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.rag.RagRetrievalChain;
-import net.dstone.ai.common.schema.JsonSchemas;
-import net.dstone.ai.common.schema.SchemaOutputConverter;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -63,6 +66,12 @@ import reactor.core.publisher.Flux;
  */
 @Component
 public class AgentExecutor extends BaseObject {
+
+	/** 답 전체가 코드펜스 하나로 감싸여 있을 때 안쪽 내용만 꺼내는 정규식입니다. "마크다운 코드 블록(```)의 시작과 끝을 제외하고, 그 안에 적힌 순수한 텍스트 내용(알맹이)만 첫 번째 그룹으로 캡처하겠다" 는 의미. */
+	private static final Pattern CODE_FENCE = Pattern.compile("^```[a-zA-Z]*\\s*\\n?([\\s\\S]*?)\\n?```$");
+
+	/** 답 전체가 JSON 하나여야 합니다(JSON 뒤에 설명 글자가 더 붙으면 모양이 틀린 답으로 봅니다). */
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
 	/** prompt의 {변수명}으로 쓸 수 있는 이름입니다(영문/숫자/밑줄). */
 	private static final Pattern PROMPT_VARIABLE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
@@ -142,7 +151,7 @@ public class AgentExecutor extends BaseObject {
 	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
 	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
-		if (!JsonSchemas.STRING.equals(JsonSchemas.typeOf(agent.outputSchema()))) {
+		if (!JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(agent.outputSchema()))) {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
@@ -163,11 +172,11 @@ public class AgentExecutor extends BaseObject {
 		if (input == null || (input instanceof String text && StringUtil.isEmpty(text))) {
 			throw new AgentContractException("agent[" + agent.id() + "]에 넣을 input이 비어 있습니다.");
 		}
-		List<String> problems = JsonSchemas.validate(agent.inputSchema(), input);
+		List<String> problems = JsonSchemaUtil.validate(agent.inputSchema(), input);
 		if (!problems.isEmpty()) {
 			throw new AgentContractException("agent[" + agent.id() + "]의 input 모양이 맞지 않습니다: " + problems);
 		}
-		return JsonSchemas.toText(input);
+		return JsonSchemaUtil.toText(input);
 	}
 
 	/**
@@ -192,7 +201,7 @@ public class AgentExecutor extends BaseObject {
 		Map<String, Object> result = new LinkedHashMap<>();
 		for (Map.Entry<String, Object> entry : merged.entrySet()) {
 			if (PROMPT_VARIABLE_NAME.matcher(entry.getKey()).matches()) {
-				result.put(entry.getKey(), JsonSchemas.toText(entry.getValue()));
+				result.put(entry.getKey(), JsonSchemaUtil.toText(entry.getValue()));
 			}
 		}
 		return result;
@@ -212,20 +221,48 @@ public class AgentExecutor extends BaseObject {
 	 * @throws AgentContractException 답이 스키마에 맞지 않을 때
 	 */
 	private Object ask(ChatClient.ChatClientRequestSpec spec, String userMessage, Map<String, Object> schema) {
-		if (JsonSchemas.STRING.equals(JsonSchemas.typeOf(schema))) {
+		if (JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(schema))) {
 			String answer = spec.user(userMessage).call().content();
 			if (answer == null) {
 				throw new AgentContractException("LLM 응답이 비어 있습니다.");
 			}
-			List<String> problems = JsonSchemas.validate(schema, answer);
+			List<String> problems = JsonSchemaUtil.validate(schema, answer);
 			if (!problems.isEmpty()) {
 				throw new AgentContractException("LLM 응답이 정해진 output 모양을 지키지 않았습니다: " + problems);
 			}
 			return answer;
 		}
-		SchemaOutputConverter converter = new SchemaOutputConverter(schema);
-		String answer = spec.user(userMessage + "\n\n" + converter.getFormat()).call().content();
-		return converter.convert(answer);
+		
+		StringBuffer question = new StringBuffer();
+		String jsonSchema = JsonSchemaUtil.toPrettyJson(schema);
+		question.append(userMessage).append("\n");
+		question.append("-------------------------------------------------------------------------------").append("\n");
+		question.append("Your response must be a single JSON value only.").append("\n");
+		question.append("Do not include any explanations, markdown code blocks, or text outside the JSON.").append("\n");
+		question.append("The JSON value must strictly follow this JSON Schema:").append("\n");
+		question.append(jsonSchema).append("\n");
+		
+		String answer = spec.user(question.toString()).call().content();
+		return this.convert(answer, schema);
+	}
+	
+	private Object convert(String text, Map<String, Object> schema) {
+		String json = text == null ? "" : text.strip();
+		Matcher fence = CODE_FENCE.matcher(json);
+		if (fence.matches()) {
+			json = fence.group(1).strip();
+		}
+		Object value;
+		try {
+			value = OBJECT_MAPPER.readValue(json, Object.class);
+		} catch (Exception e) {
+			throw new AgentContractException("LLM 응답이 JSON이 아닙니다: " + text);
+		}
+		List<String> problems = JsonSchemaUtil.validate(schema, value);
+		if (!problems.isEmpty()) {
+			throw new AgentContractException("LLM 응답이 정해진 output 모양을 지키지 않았습니다: " + problems + " / 응답=" + text);
+		}
+		return value;
 	}
 
 	/**

@@ -10,7 +10,7 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
-import net.dstone.ai.common.schema.StepOutputSchemas;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.agent.AgentExecutor;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
@@ -48,7 +48,7 @@ public class SupervisorStepExecutor {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		Map<String, Object> answer;
 		try {
-			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, StepOutputSchemas.verdict());
+			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.verdict());
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, "감독 Agent 응답을 {pass, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
 		}

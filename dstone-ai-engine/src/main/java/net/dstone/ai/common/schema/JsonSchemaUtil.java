@@ -1,6 +1,7 @@
 package net.dstone.ai.common.schema;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ import com.networknt.schema.SpecificationVersion;
  * 값 검사는 networknt json-schema-validator(Spring AI가 이미 쓰는 라이브러리, JSON Schema 2020-12)로 합니다.
  * </pre>
  */
-public final class JsonSchemas {
+public final class JsonSchemaUtil {
 
 	public static final String TYPE = "type";
 	public static final String PROPERTIES = "properties";
@@ -57,7 +58,7 @@ public final class JsonSchemas {
 	/** 한 번 만든 검사기를 스키마(JSON 글자)별로 다시 씁니다. LLM 응답을 받을 때마다 스키마를 새로 읽지 않기 위해서입니다. */
 	private static final Map<String, Schema> COMPILED = new ConcurrentHashMap<>();
 
-	private JsonSchemas() {
+	private JsonSchemaUtil() {
 	}
 
 	/** 아무것도 선언하지 않았을 때 쓰는 기본 스키마({type: string})를 새로 만들어 돌려줍니다. */
@@ -99,7 +100,7 @@ public final class JsonSchemas {
 	}
 
 	/**
-	 * 타입 이름 하나(축약형)를 JSON Schema 맵으로 바꿉니다. list&lt;T&gt;는 T 항목의 array입니다.
+	 * 타입 이름 하나(축약형)를 JSON Schema 맵으로 바꿉니다. list<T>는 T 항목의 array입니다.
 	 *
 	 * @param typeName 타입 이름입니다.
 	 */
@@ -323,6 +324,64 @@ public final class JsonSchemas {
 			messages.add(error.toString());
 		}
 		return messages;
+	}
+
+	/** SUPERVISOR step의 output 모양입니다: {pass: boolean, reason: string} */
+	public static Map<String, Object> verdict() {
+		Map<String, Object> properties = new LinkedHashMap<>();
+		properties.put("pass", field("boolean", "통과면 true, 통과하지 못했으면 false"));
+		properties.put("reason", field(STRING, "그렇게 판정한 이유"));
+		return object(properties);
+	}
+
+	/**
+	 * ROUTER step의 output 모양입니다: {route: string, reason: string}. route는 routes 이름 중 하나만 허용합니다(enum).
+	 *
+	 * @param routes 고를 수 있는 경로 이름들입니다(ROUTER step의 routes 키).
+	 */
+	public static Map<String, Object> routeDecision(Collection<String> routes) {
+		Map<String, Object> route = field(STRING, "다음 중 정확히 하나: " + String.join(", ", routes));
+		route.put("enum", new ArrayList<>(routes));
+		Map<String, Object> properties = new LinkedHashMap<>();
+		properties.put("route", route);
+		properties.put("reason", field(STRING, "그 경로를 고른 이유"));
+		return object(properties);
+	}
+
+	/** APPROVAL step의 output 모양입니다: {approved: boolean, approver: string, comment: string} */
+	public static Map<String, Object> approval() {
+		Map<String, Object> properties = new LinkedHashMap<>();
+		properties.put("approved", field("boolean", "승인이면 true, 반려면 false"));
+		properties.put("approver", field(STRING, "결정한 사람이나 역할"));
+		properties.put("comment", field(STRING, "결정한 이유나 메모"));
+		return object(properties);
+	}
+
+	/**
+	 * 필드 하나의 스키마({type, description})를 만듭니다.
+	 *
+	 * @param type        필드 타입입니다.
+	 * @param description 필드 설명입니다(LLM에게 그대로 전달됩니다).
+	 */
+	private static Map<String, Object> field(String type, String description) {
+		Map<String, Object> field = new LinkedHashMap<>();
+		field.put(TYPE, type);
+		field.put("description", description);
+		return field;
+	}
+
+	/**
+	 * 필드 목록으로 object 스키마를 만듭니다. 모든 필드가 필수이고, 다른 필드는 받지 않습니다.
+	 *
+	 * @param properties 필드 이름 → 필드 스키마입니다.
+	 */
+	private static Map<String, Object> object(Map<String, Object> properties) {
+		Map<String, Object> schema = new LinkedHashMap<>();
+		schema.put(TYPE, OBJECT);
+		schema.put(PROPERTIES, properties);
+		schema.put(REQUIRED, new ArrayList<String>(properties.keySet()));
+		schema.put(ADDITIONAL_PROPERTIES, false);
+		return schema;
 	}
 
 }

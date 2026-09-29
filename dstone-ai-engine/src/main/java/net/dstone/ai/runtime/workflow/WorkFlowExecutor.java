@@ -21,8 +21,8 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
-import net.dstone.ai.common.schema.ExpressionEvaluator;
-import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.schema.JqExpEvalUtil;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.step.AgentStepExecutor;
 import net.dstone.ai.runtime.step.ApprovalStepExecutor;
 import net.dstone.ai.runtime.step.RouterStepExecutor;
@@ -46,7 +46,7 @@ import net.dstone.common.core.BaseObject;
  * ## step 사이에 데이터가 오가는 방법
  * 모든 데이터는 실행 컨텍스트(WorkFlowContext) 트리 하나를 거쳐서 오갑니다.
  * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트로 계산합니다(resolveInput()).
- *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다(common.schema.ExpressionEvaluator).
+ *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다(common.schema.JqExpEvalUtil).
  * 2) 계산된 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
  * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, error}로 남깁니다.
  * 그래서 다음 step들은 "${ .steps.id.output.키 }"처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
@@ -80,7 +80,7 @@ public class WorkFlowExecutor extends BaseObject {
 	@Autowired
 	private WorkFlowExecutionStore executionStore;
 	@Autowired
-	private ExpressionEvaluator expressionEvaluator;
+	private JqExpEvalUtil jqExpEvalUtil;
 
 	/**
 	 * <pre>
@@ -178,12 +178,12 @@ public class WorkFlowExecutor extends BaseObject {
 			if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
 				Object result;
 				try {
-					result = this.expressionEvaluator.resolve(workflow.output().value(), currentExecution.context(), null);
+					result = this.jqExpEvalUtil.resolve(workflow.output().value(), currentExecution.context(), null);
 				} catch (ExpressionException e) {
 					return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
 				}
 				if (workflow.output().schema() != null) {
-					List<String> problems = JsonSchemas.validate(workflow.output().schema(), result);
+					List<String> problems = JsonSchemaUtil.validate(workflow.output().schema(), result);
 					if (!problems.isEmpty()) {
 						return this.persistFailed(currentExecution, "Workflow output이 output.schema 모양이 아닙니다: " + problems);
 					}
@@ -252,7 +252,7 @@ public class WorkFlowExecutor extends BaseObject {
 		String forEach = StepDefinition.forEachOf(step);
 		Object rawList;
 		try {
-			rawList = this.expressionEvaluator.resolve(forEach, execution.context(), null);
+			rawList = this.jqExpEvalUtil.resolve(forEach, execution.context(), null);
 		} catch (ExpressionException e) {
 			return this.failedBeforeRun(execution, step, "forEach - " + e.getMessage());
 		}
@@ -357,13 +357,13 @@ public class WorkFlowExecutor extends BaseObject {
 	private Object resolveInput(StepDefinition step, Map<String, Object> context, Map<String, Object> variables) {
 		switch (step) {
 			case AgentStepDefinition agent:
-				return this.expressionEvaluator.resolve(agent.input(), context, variables);
+				return this.jqExpEvalUtil.resolve(agent.input(), context, variables);
 			case SupervisorStepDefinition supervisor:
-				return this.expressionEvaluator.resolve(supervisor.input(), context, variables);
+				return this.jqExpEvalUtil.resolve(supervisor.input(), context, variables);
 			case RouterStepDefinition router:
-				return this.expressionEvaluator.resolve(router.input(), context, variables);
+				return this.jqExpEvalUtil.resolve(router.input(), context, variables);
 			case ToolStepDefinition tool:
-				return tool.input() == null ? Map.of() : this.expressionEvaluator.resolve(tool.input(), context, variables);
+				return tool.input() == null ? Map.of() : this.jqExpEvalUtil.resolve(tool.input(), context, variables);
 			case ApprovalStepDefinition approval:
 				return null;
 		}
@@ -406,7 +406,7 @@ public class WorkFlowExecutor extends BaseObject {
 	private void appendHistory(WorkFlowExecution execution, StepDefinition step, String historyId, StepOutcome outcome) {
 		this.executionStore.appendHistory(execution.executionId(),
 			new StepHistoryEntry(historyId, step.type(), StepDefinition.refOf(step), outcome.success(), outcome.durationMs(),
-				outcome.success() ? JsonSchemas.toText(outcome.output()) : null, outcome.error(), Instant.now()));
+				outcome.success() ? JsonSchemaUtil.toText(outcome.output()) : null, outcome.error(), Instant.now()));
 	}
 
 	/**
@@ -449,7 +449,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	private String failMessage(StepDefinition step, StepOutcome outcome) {
 		if (outcome.success()) {
-			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + JsonSchemas.toText(outcome.output());
+			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + JsonSchemaUtil.toText(outcome.output());
 		}
 		if (step.onFailure() == null) {
 			return "step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + outcome.error();

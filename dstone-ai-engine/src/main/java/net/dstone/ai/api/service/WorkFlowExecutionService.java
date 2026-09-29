@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
-import net.dstone.ai.common.schema.JsonSchemas;
+import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
@@ -138,7 +138,7 @@ public class WorkFlowExecutionService extends BaseService {
 		if (input == null || (input instanceof String text && StringUtil.isEmpty(text))) {
 			throw new IllegalArgumentException("input은 필수입니다(workflow[" + workflow.id() + "]의 input 모양 = " + workflow.inputSchema() + ").");
 		}
-		List<String> problems = JsonSchemas.validate(workflow.inputSchema(), input);
+		List<String> problems = JsonSchemaUtil.validate(workflow.inputSchema(), input);
 		if (!problems.isEmpty()) {
 			throw new IllegalArgumentException("workflow[" + workflow.id() + "]의 input 모양이 맞지 않습니다: " + problems);
 		}
