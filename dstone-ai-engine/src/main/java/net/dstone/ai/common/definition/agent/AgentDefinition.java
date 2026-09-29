@@ -41,24 +41,24 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   (common.schema.StepOutputSchemas 참고).
  * </pre>
  *
- * @param id                     이 Agent를 식별하는 id입니다
- * @param prompt                 시스템 프롬프트 원문입니다. 이 안에 {caller}나 {today}처럼 중괄호로 감싼 변수 이름을
- *                               넣어두면, runtime.agent.AgentExecutor가 실제 호출 시점에 그 값을 채워서(Spring AI의
- *                               PromptTemplate 기능을 사용) 프롬프트를 완성합니다
- * @param description            이 Agent가 무엇을 하는지 사람이 읽기 위한 설명입니다. 코드 동작에는 아무 영향을 주지 않습니다
- * @param model                  이 Agent를 호출할 때만 특별히 쓸 모델 이름입니다(자세한 적용 방식은
+ * @param id                     (필수)이 Agent를 식별하는 id입니다. 중복될 수 없습니다
+ * @param prompt                 (필수)시스템 프롬프트 원문입니다. 이 안에 {role}처럼 중괄호로 감싼 변수 이름을 넣어두면,
+ *                               runtime.agent.AgentExecutor가 호출할 때 이 Agent가 받은 input(object)의 같은 이름 필드로
+ *                               채웁니다(Spring AI PromptTemplate. 채팅 API는 요청의 variables를 더 얹을 수 있습니다)
+ * @param description            (옵셔널)이 Agent가 무엇을 하는지 사람이 읽기 위한 설명입니다. 코드 동작에는 아무 영향을 주지 않습니다
+ * @param model                  (옵셔널)이 Agent를 호출할 때만 특별히 쓸 모델 이름입니다(자세한 적용 방식은
  *                               runtime.agent.AgentExecutor 참고). 비워두면(null) 엔진 전체의 기본 모델
  *                               (spring.ai.{provider}.chat.options.model 설정값)을 그대로 사용합니다
- * @param toolsEnabled           이 Agent가 등록된 Tool을 스스로 호출할 수 있는지 여부입니다
- * @param ragEnabled             이 Agent가 RAG(적재된 문서를 검색해서 답변에 참고하는 기능)를 쓸 수 있는지 여부입니다
- * @param ragTopK                RAG 검색 시 가져올 결과의 최대 개수입니다. 비워두면(null) 엔진 전체 기본값
+ * @param toolsEnabled           (옵셔널)이 Agent가 등록된 Tool을 스스로 호출할 수 있는지 여부입니다. 비워두면 false입니다
+ * @param ragEnabled             (옵셔널)이 Agent가 RAG(적재된 문서를 검색해서 답변에 참고하는 기능)를 쓸 수 있는지 여부입니다. 비워두면 false입니다
+ * @param ragTopK                (옵셔널)RAG 검색 시 가져올 결과의 최대 개수입니다. 비워두면(null) 엔진 전체 기본값
  *                               (설정 파일의 dstone.ai.rag.retrieval.top-k, common.rag.RagRetrievalChain 참고)을 그대로 씁니다
- * @param ragSimilarityThreshold RAG 검색에서 "이 정도는 관련 있다고 볼 최소 유사도" 기준값입니다. 비워두면(null)
+ * @param ragSimilarityThreshold (옵셔널)RAG 검색에서 "이 정도는 관련 있다고 볼 최소 유사도" 기준값입니다. 비워두면(null)
  *                               엔진 전체 기본값(dstone.ai.rag.retrieval.similarity-threshold)을 그대로 씁니다
- * @param ragAllowEmptyContext   RAG 검색 결과가 하나도 없을 때의 동작을 정합니다. true(기본값)면 검색 결과가
- *                               없어도 질문에 그냥 답을 시도하고, false면 Spring AI의 기본 동작대로 "모른다"고 답하도록 강제합니다. 
+ * @param ragAllowEmptyContext   (옵셔널)RAG 검색 결과가 하나도 없을 때의 동작을 정합니다. true면 검색 결과가
+ *                               없어도 질문에 그냥 답을 시도하고, false면 Spring AI의 기본 동작대로 "모른다"고 답하도록 강제합니다.
  *                               비워두면(null) true로 동작합니다
- * @param allowedCallers         이 Agent를 호출할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다
+ * @param allowedCallers         (옵셔널)이 Agent를 호출할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다. 비워두면 누구나 호출할 수 있습니다
  * @param input                  (옵셔널)이 Agent가 받는 값의 모양입니다. 비워두면 {type: string}입니다
  * @param output                 (옵셔널)이 Agent가 돌려주는 값의 모양입니다. 비워두면 {type: string}입니다
  */
