@@ -23,13 +23,13 @@ workflow:
   maxIterations: 2
   input: string
   output:
-    value: "{{steps.search.output}}"
+    value: "${ .steps.search.output }"
   steps:
 
     - id: search
       type: TOOL
       ref: searchDocuments
       input:
-        query: "{{input}}"
+        query: "${ .input }"
       onSuccess: SUCCESS
       onFailure: FAIL

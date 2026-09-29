@@ -1,7 +1,9 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.function.Consumer;
 
 import org.springframework.ai.chat.client.ChatClient;
@@ -19,7 +21,6 @@ import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.ai.common.schema.JsonSchemas;
 import net.dstone.ai.common.schema.SchemaOutputConverter;
-import net.dstone.ai.common.schema.Template;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -40,6 +41,14 @@ import reactor.core.publisher.Flux;
  *   답을 읽어서 검사한 값을 돌려줍니다(SchemaOutputConverter).
  * - 어느 쪽이든 모양이 틀리면 AgentContractException을 던집니다.
  *
+ * ## 프롬프트의 {변수}
+ * Agent prompt 안의 {이름} 자리는 Agent가 받은 input으로 채웁니다(Spring AI PromptTemplate).
+ * input이 object면 그 필드들이 변수가 되고, 채팅 API는 요청의 variables를 더 얹을 수 있습니다(같은 이름이면 variables가 이김).
+ * 그래서 Agent 파일은 자기 input 스키마만 보고 prompt를 쓸 수 있습니다.
+ *
+ *   input:  {schema: {type: object, properties: {role: string, message: string}}}
+ *   prompt: 당신은 {role} 역할을 맡은 상담원입니다.
+ *
  * LLM을 부르는 방법은 세 가지입니다.
  * - call(): Agent의 output 계약대로 답을 받습니다. 채팅 API와 AGENT step이 씁니다.
  * - callForSchema(): 엔진이 정한 모양으로 답을 받습니다. SUPERVISOR({pass, reason}), ROUTER({route, reason})가 씁니다.
@@ -54,6 +63,9 @@ import reactor.core.publisher.Flux;
  */
 @Component
 public class AgentExecutor extends BaseObject {
+
+	/** prompt의 {변수명}으로 쓸 수 있는 이름입니다(영문/숫자/밑줄). */
+	private static final Pattern PROMPT_VARIABLE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
 	@Autowired
 	private ChatClient chatClient;
@@ -74,7 +86,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent         호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param variables     프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
@@ -83,7 +95,7 @@ public class AgentExecutor extends BaseObject {
 	 */
 	public Object call(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, variables, ragOverride, toolsOverride, modelOverride);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride);
 		return this.ask(spec, userMessage, agent.outputSchema());
 	}
 
@@ -100,14 +112,13 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent     호출할 Agent의 정의
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller    이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables 프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
 	 * @param input     Agent에게 넣을 값(Agent input 모양)
 	 * @param schema    LLM의 답이 따라야 할 JSON Schema
 	 * @throws AgentContractException input이나 LLM의 답이 계약과 맞지 않을 때
 	 */
-	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Map<String, Object> schema) {
+	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, variables, null, null, null);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, null), null, null, null);
 		return this.ask(spec, userMessage, schema);
 	}
 
@@ -123,7 +134,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent         호출할 Agent의 정의
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param variables     프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
@@ -135,7 +146,7 @@ public class AgentExecutor extends BaseObject {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
-		return this.buildSpec(conversationId, caller, agent, variables, ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
+		return this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
 	}
 
 	/**
@@ -156,7 +167,35 @@ public class AgentExecutor extends BaseObject {
 		if (!problems.isEmpty()) {
 			throw new AgentContractException("agent[" + agent.id() + "]의 input 모양이 맞지 않습니다: " + problems);
 		}
-		return input instanceof String text ? text : Template.toText(input);
+		return JsonSchemas.toText(input);
+	}
+
+	/**
+	 * <pre>
+	 * Agent prompt의 {변수명}을 채울 값들을 만듭니다. input이 object면 그 필드들에 variables를 덮어 얹습니다.
+	 * 값이 글자가 아니면(리스트, 맵 등) JSON 글자로 바꿔 넣습니다.
+	 * 변수 이름으로 쓸 수 없는 필드(공백이나 점이 든 이름 등)는 PromptTemplate이 받지 못하므로 뺍니다.
+	 * </pre>
+	 *
+	 * @param input     Agent에게 넣을 값입니다.
+	 * @param variables 더 얹을 값들입니다(채팅 API의 variables, 없으면 null).
+	 */
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> promptVariables(Object input, Map<String, Object> variables) {
+		Map<String, Object> merged = new LinkedHashMap<>();
+		if (input instanceof Map) {
+			merged.putAll((Map<String, Object>) input);
+		}
+		if (variables != null) {
+			merged.putAll(variables);
+		}
+		Map<String, Object> result = new LinkedHashMap<>();
+		for (Map.Entry<String, Object> entry : merged.entrySet()) {
+			if (PROMPT_VARIABLE_NAME.matcher(entry.getKey()).matches()) {
+				result.put(entry.getKey(), JsonSchemas.toText(entry.getValue()));
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -199,7 +238,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param agent         호출할 Agent의 정의
-	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵
+	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵(promptVariables()로 만든 값)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
@@ -242,11 +281,9 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- AgentDefinition.prompt()에 적힌 문구를 그대로 시스템 프롬프트로 씁니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
-			  바꿔치기해 줍니다. variables는 Workflow에서는 Workflow input이 object일 때 그 필드들,
-			  채팅 화면에서는 요청의 variables입니다. 이 프롬프트는 resources/agents/*.yml
-			  파일 안에 직접 적혀 있습니다.
-			- 시스템 프롬프트는 "이 Agent가 어떤 역할인가"만 담습니다. 이전 step의 결과 같은 "이번에 할
-			  일의 데이터"는 step의 input 템플릿({{ ... }})으로 채워져 사용자 메시지로 들어옵니다.
+			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
+			  요청의 variables를 더 얹습니다(promptVariables() 참고).
+			- 이번에 처리할 데이터(input)는 사용자 메시지로도 함께 들어갑니다.
 		************************************************************************/
 		if (!StringUtil.isEmpty(agent.prompt())) {
 			spec = spec.system(new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables));

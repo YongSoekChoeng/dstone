@@ -16,12 +16,12 @@ package net.dstone.ai.runtime.tool;
  *
  * 다음 step이 쓸 구조화된 데이터를 돌려주고 싶은 Tool은, 이 record 대신 원하는 모양의 record(또는 Map, List)를
  * 반환하면 됩니다. Spring AI가 그 값을 JSON으로 바꿔 주고, 그 JSON이 그대로 step의 output이 됩니다
- * (다음 step은 {{steps.id.output.필드}}로 꺼냅니다. runtime.step.ToolStepExecutor 참고). 이 record로 답해도
+ * (다음 step은 "${ .steps.id.output.필드 }"로 꺼냅니다. runtime.step.ToolStepExecutor 참고). 이 record로 답해도
  * output은 {success, message} 맵입니다.
  *
  * @param success 성공했는지 실패했는지를 나타냅니다.
  * @param message 성공했거나 실패한 이유를 담은 메시지입니다. 실패면 이 값이 step의 error로 남아서, 다음 step이
- *                {{steps.id.error}}로 읽을 수 있습니다.
+ *                "${ .steps.id.error }"로 읽을 수 있습니다.
  */
 public record ToolOutcome(Boolean success, String message) {
 

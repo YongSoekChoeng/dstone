@@ -26,29 +26,29 @@ workflow:
   input: string
   output:
     value:
-      http: "{{steps.http-check.output}}"
-      shell: "{{steps.shell-check.output}}"
-      python: "{{steps.python-check.output}}"
+      http: "${ .steps.httpCheck.output }"
+      shell: "${ .steps.shellCheck.output }"
+      python: "${ .steps.pythonCheck.output }"
   steps:
 
-    - id: http-check
+    - id: httpCheck
       type: TOOL
       ref: httpGet
       input:
         url: https://example.com
-      onSuccess: shell-check
-      onFailure: shell-check
+      onSuccess: shellCheck
+      onFailure: shellCheck
 
-    - id: shell-check
+    - id: shellCheck
       type: TOOL
       ref: runShellScript
       input:
         scriptName: sample-script
         args: []
-      onSuccess: python-check
-      onFailure: python-check
+      onSuccess: pythonCheck
+      onFailure: pythonCheck
 
-    - id: python-check
+    - id: pythonCheck
       type: TOOL
       ref: runPythonScript
       input:

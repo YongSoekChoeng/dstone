@@ -2,6 +2,7 @@ package net.dstone.ai.runtime.workflow;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -19,9 +20,9 @@ import net.dstone.ai.common.definition.workflow.step.RouterStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
-import net.dstone.ai.common.exception.TemplateException;
+import net.dstone.ai.common.exception.ExpressionException;
+import net.dstone.ai.common.schema.ExpressionEvaluator;
 import net.dstone.ai.common.schema.JsonSchemas;
-import net.dstone.ai.common.schema.Template;
 import net.dstone.ai.runtime.step.AgentStepExecutor;
 import net.dstone.ai.runtime.step.ApprovalStepExecutor;
 import net.dstone.ai.runtime.step.RouterStepExecutor;
@@ -44,12 +45,12 @@ import net.dstone.common.core.BaseObject;
  *
  * ## step 사이에 데이터가 오가는 방법
  * 모든 데이터는 실행 컨텍스트(WorkFlowContext) 트리 하나를 거쳐서 오갑니다.
- * 1) step을 실행하기 직전에, 그 step의 input 템플릿({{ ... }})을 컨텍스트로 채웁니다(renderInput()).
- *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 템플릿 규칙을 씁니다.
- * 2) 채워진 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
+ * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트로 계산합니다(resolveInput()).
+ *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다(common.schema.ExpressionEvaluator).
+ * 2) 계산된 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
  * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, error}로 남깁니다.
- * 그래서 다음 step들은 {{steps.id.output.키}}처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
- * input 템플릿이 가리키는 값을 찾지 못하면 그 step은 실패로 처리되고, 사유가 error에 남습니다.
+ * 그래서 다음 step들은 "${ .steps.id.output.키 }"처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
+ * 표현식을 계산하지 못하면(jq 오류) 그 step은 실패로 처리되고, 사유가 error에 남습니다.
  *
  * ## 병렬 실행
  * 병렬 실행은 forEach 한 가지 방식으로만 표현합니다. "같은 step을 데이터만 바꿔가며 동시에 반복한다"는
@@ -78,6 +79,8 @@ public class WorkFlowExecutor extends BaseObject {
 	private ApprovalStepExecutor approvalStepExecutor;
 	@Autowired
 	private WorkFlowExecutionStore executionStore;
+	@Autowired
+	private ExpressionEvaluator expressionEvaluator;
 
 	/**
 	 * <pre>
@@ -150,7 +153,7 @@ public class WorkFlowExecutor extends BaseObject {
 
 			/****************************************************************************************
 			5) 이번 step의 결과를 컨텍스트의 steps.{stepId}에 남겨서,
-			   다음 step들이 {{steps.id...}}로 가져다 쓸 수 있게 합니다.
+			   다음 step들이 "${ .steps.id... }"로 가져다 쓸 수 있게 합니다.
 			****************************************************************************************/
 			WorkFlowContext.recordStep(currentExecution.context(), step.id(), outcome.toRecord());
 
@@ -167,7 +170,7 @@ public class WorkFlowExecutor extends BaseObject {
 
 			/****************************************************************************************
 			7) 다음 곳으로 갑니다.
-			   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 채운 값을 최종 결과로 남깁니다
+			   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 계산한 값을 최종 결과로 남깁니다
 			              (output.schema가 있으면 그 모양인지 검사하고, 아니면 FAILED로 끝냅니다).
 			   - FAIL   : Workflow 전체를 실패로 끝냅니다.
 			   - step id: 그 step으로 이동해서 while 루프를 계속 돕니다(앞쪽 step이면 재시도 루프).
@@ -175,8 +178,8 @@ public class WorkFlowExecutor extends BaseObject {
 			if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
 				Object result;
 				try {
-					result = Template.render(workflow.output().value(), currentExecution.context());
-				} catch (TemplateException e) {
+					result = this.expressionEvaluator.resolve(workflow.output().value(), currentExecution.context(), null);
+				} catch (ExpressionException e) {
 					return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
 				}
 				if (workflow.output().schema() != null) {
@@ -221,7 +224,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param execution 지금 진행 중인 실행입니다.
 	 */
 	private StepOutcome runOne(StepDefinition step, WorkFlowExecution execution) {
-		StepOutcome outcome = this.call(step, execution, execution.context());
+		StepOutcome outcome = this.call(step, execution, null);
 		if (!outcome.pending()) {
 			this.appendHistory(execution, step, step.id(), outcome);
 		}
@@ -232,12 +235,12 @@ public class WorkFlowExecutor extends BaseObject {
 	 * <pre>
 	 * forEach가 있는 step을 리스트 항목 개수만큼 동시에 실행합니다.
 	 *
-	 * forEach 경로가 가리키는 리스트를 찾아서, 항목마다 {{item}}(또는 itemVariable) 하나만 더한 컨텍스트 복사본으로 input을 채워 실행합니다.
+	 * forEach 표현식을 계산한 리스트의 항목마다, 그 항목을 jq 변수($item 또는 $itemVariable)로 넣고 input을 계산해 실행합니다.
 	 * 모든 반복이 끝나면 반복 순서대로 실행 이력을 남기고, 반복별 input과 output을 각각 순서대로 리스트로 모읍니다
 	 * (steps.id.input / steps.id.output이 리스트가 됩니다).
 	 * 반복이 하나라도 실패하면 이 step 전체가 실패입니다. 반복할 항목이 하나도 없으면 빈 결과로 성공 처리합니다.
 	 *
-	 * forEach 경로의 값을 찾지 못하거나 그 값이 리스트가 아니면, 이 step은 실패로 처리됩니다(onFailure를 따릅니다).
+	 * forEach 표현식을 계산하지 못하거나 그 값이 리스트가 아니면, 이 step은 실패로 처리됩니다(onFailure를 따릅니다).
 	 * 반복 하나가 StepExecutor 예외(시스템 오류)를 던지면, 그 반복의 실행 이력을 남긴 뒤 예외를 그대로 올려보내서 실행 전체를 FAILED로 끝냅니다(run()의 3번 설명 참고).
 	 * </pre>
 	 *
@@ -247,12 +250,11 @@ public class WorkFlowExecutor extends BaseObject {
 	private StepOutcome runForEach(StepDefinition step, WorkFlowExecution execution) {
 		long start = System.nanoTime();
 		String forEach = StepDefinition.forEachOf(step);
-		Map<String, Object> context = execution.context();
 		Object rawList;
 		try {
-			rawList = Template.evaluate(forEach, context);
-		} catch (TemplateException e) {
-			return this.failedBeforeRun(execution, step, "forEach[" + forEach + "] - " + e.getMessage());
+			rawList = this.expressionEvaluator.resolve(forEach, execution.context(), null);
+		} catch (ExpressionException e) {
+			return this.failedBeforeRun(execution, step, "forEach - " + e.getMessage());
 		}
 		if (!(rawList instanceof List<?> items)) {
 			return this.failedBeforeRun(execution, step, "forEach[" + forEach + "]의 값이 리스트가 아닙니다(현재 값=" + rawList + ").");
@@ -261,11 +263,12 @@ public class WorkFlowExecutor extends BaseObject {
 		String itemKey = StepDefinition.itemKeyOf(step);
 		List<CompletableFuture<StepOutcome>> futures = new ArrayList<>(items.size());
 		for (Object item : items) {
-			final Map<String, Object> iterationContext = WorkFlowContext.withItem(context, itemKey, item);
+			final Map<String, Object> variables = new HashMap<>();
+			variables.put(itemKey, item);
 			futures.add(CompletableFuture.supplyAsync(new Supplier<StepOutcome>() {
 				@Override
 				public StepOutcome get() {
-					return WorkFlowExecutor.this.call(step, execution, iterationContext);
+					return WorkFlowExecutor.this.call(step, execution, variables);
 				}
 			}));
 		}
@@ -313,54 +316,54 @@ public class WorkFlowExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * step을 실제로 한 번 실행합니다.
-	 * - input 템플릿을 채우고
+	 * - input 표현식을 계산하고
 	 * - step 종류에 맞는 StepExecutor를 부르고
 	 * - 실제로 넘긴 입력과 걸린 시간을 결과에 채웁니다.
-	 * 템플릿이 가리키는 값을 찾지 못하면 StepExecutor를 부르지 않고 실패 결과를 돌려줍니다(YAML을 잘못 조립한 비즈니스 실패이므로 onFailure를 따릅니다).
+	 * 표현식을 계산하지 못하면 StepExecutor를 부르지 않고 실패 결과를 돌려줍니다(onFailure를 따릅니다).
 	 * StepExecutor가 던진 예외(시스템 오류)는 잡지 않고 그대로 올려보내서, run()이 onFailure를 거치지 않고 실행 전체를 FAILED로 끝내게 합니다.
 	 * forEach의 반복들이 동시에 부를 수 있도록, 이 메서드는 실행 이력을 직접 남기지 않습니다.
 	 * </pre>
 	 *
 	 * @param step      실행할 step의 정의입니다.
 	 * @param execution 지금 진행 중인 실행입니다.
-	 * @param context   input 템플릿을 채울 때 쓸 컨텍스트입니다(forEach 반복이면 item이 더해진 복사본).
+	 * @param variables input 표현식에 넣을 jq 변수입니다(forEach 반복이면 {item: 이번 항목}, 아니면 null).
 	 */
-	private StepOutcome call(StepDefinition step, WorkFlowExecution execution, Map<String, Object> context) {
+	private StepOutcome call(StepDefinition step, WorkFlowExecution execution, Map<String, Object> variables) {
 		long start = System.nanoTime();
-		Object renderedInput = null;
+		Object resolvedInput = null;
 		StepOutcome outcome;
 		try {
-			renderedInput = this.renderInput(step, context);
-			outcome = this.runStep(execution, step, renderedInput, context);
-		} catch (TemplateException e) {
-			outcome = StepOutcome.failure(null, "input을 채우지 못했습니다 - " + e.getMessage());
+			resolvedInput = this.resolveInput(step, execution.context(), variables);
+			outcome = this.runStep(execution, step, resolvedInput);
+		} catch (ExpressionException e) {
+			outcome = StepOutcome.failure(null, "input을 계산하지 못했습니다 - " + e.getMessage());
 		}
-		return outcome.withCall(renderedInput, (System.nanoTime() - start) / 1_000_000);
+		return outcome.withCall(resolvedInput, (System.nanoTime() - start) / 1_000_000);
 	}
 
 	/**
 	 * <pre>
-	 * step의 input 템플릿을 컨텍스트로 채웁니다.
-	 * - AGENT/SUPERVISOR/ROUTER: input(Agent input 모양에 따라 글자 또는 맵)을 채워서 돌려줍니다.
+	 * step의 input을 컨텍스트로 계산합니다(표현식은 계산하고, 리터럴은 그대로 둡니다).
+	 * - AGENT/SUPERVISOR/ROUTER: input(Agent input 모양에 따라 값 하나 또는 맵)을 계산해서 돌려줍니다.
 	 *   input은 필수라서 엔진이 켜질 때 이미 검사되어 있습니다.
-	 * - TOOL: input(맵)을 채워서 맵으로 돌려줍니다. input이 없으면 빈 맵입니다.
+	 * - TOOL: input(맵)을 계산해서 맵으로 돌려줍니다. input이 없으면 빈 맵입니다.
 	 * - APPROVAL: input이 없는 step이라 null입니다.
-	 * 값 전체가 {{ ... }} 하나뿐이면 원래 타입(객체, 리스트 등)을 그대로 유지합니다(Template.render).
 	 * </pre>
 	 *
-	 * @param step    input을 채울 step의 정의입니다.
-	 * @param context 값을 찾아볼 컨텍스트입니다.
+	 * @param step      input을 계산할 step의 정의입니다.
+	 * @param context   실행 컨텍스트입니다.
+	 * @param variables 표현식에 넣을 jq 변수입니다(forEach 반복이 아니면 null).
 	 */
-	private Object renderInput(StepDefinition step, Map<String, Object> context) {
+	private Object resolveInput(StepDefinition step, Map<String, Object> context, Map<String, Object> variables) {
 		switch (step) {
 			case AgentStepDefinition agent:
-				return Template.render(agent.input(), context);
+				return this.expressionEvaluator.resolve(agent.input(), context, variables);
 			case SupervisorStepDefinition supervisor:
-				return Template.render(supervisor.input(), context);
+				return this.expressionEvaluator.resolve(supervisor.input(), context, variables);
 			case RouterStepDefinition router:
-				return Template.render(router.input(), context);
+				return this.expressionEvaluator.resolve(router.input(), context, variables);
 			case ToolStepDefinition tool:
-				return tool.input() == null ? Map.of() : Template.render(tool.input(), context);
+				return tool.input() == null ? Map.of() : this.expressionEvaluator.resolve(tool.input(), context, variables);
 			case ApprovalStepDefinition approval:
 				return null;
 		}
@@ -374,21 +377,19 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * @param execution     지금 진행 중인 실행입니다.
 	 * @param step          실행할 step의 정의입니다.
-	 * @param renderedInput renderInput()이 채운 입력입니다(TOOL은 맵, AGENT류는 Agent input 모양, APPROVAL은 null).
-	 * @param context       실행 컨텍스트입니다(Agent system prompt 변수로 쓸 Workflow input을 꺼냅니다).
+	 * @param resolvedInput resolveInput()이 계산한 입력입니다(TOOL은 맵, AGENT류는 Agent input 모양, APPROVAL은 null).
 	 */
 	@SuppressWarnings("unchecked")
-	private StepOutcome runStep(WorkFlowExecution execution, StepDefinition step, Object renderedInput, Map<String, Object> context) {
-		Map<String, Object> promptVariables = WorkFlowContext.promptVariables(context);
+	private StepOutcome runStep(WorkFlowExecution execution, StepDefinition step, Object resolvedInput) {
 		switch (step) {
 			case AgentStepDefinition agent:
-				return this.agentStepExecutor.run(execution, agent, renderedInput, promptVariables);
+				return this.agentStepExecutor.run(execution, agent, resolvedInput);
 			case SupervisorStepDefinition supervisor:
-				return this.supervisorStepExecutor.run(execution, supervisor, renderedInput, promptVariables);
+				return this.supervisorStepExecutor.run(execution, supervisor, resolvedInput);
 			case RouterStepDefinition router:
-				return this.routerStepExecutor.run(execution, router, renderedInput, promptVariables);
+				return this.routerStepExecutor.run(execution, router, resolvedInput);
 			case ToolStepDefinition tool:
-				return this.toolStepExecutor.run(execution, tool, (Map<String, Object>) renderedInput);
+				return this.toolStepExecutor.run(execution, tool, (Map<String, Object>) resolvedInput);
 			case ApprovalStepDefinition approval:
 				return this.approvalStepExecutor.run(execution, approval);
 		}
@@ -405,7 +406,7 @@ public class WorkFlowExecutor extends BaseObject {
 	private void appendHistory(WorkFlowExecution execution, StepDefinition step, String historyId, StepOutcome outcome) {
 		this.executionStore.appendHistory(execution.executionId(),
 			new StepHistoryEntry(historyId, step.type(), StepDefinition.refOf(step), outcome.success(), outcome.durationMs(),
-				outcome.success() ? Template.toText(outcome.output()) : null, outcome.error(), Instant.now()));
+				outcome.success() ? JsonSchemas.toText(outcome.output()) : null, outcome.error(), Instant.now()));
 	}
 
 	/**
@@ -424,27 +425,14 @@ public class WorkFlowExecutor extends BaseObject {
 		if (!outcome.success()) {
 			return step.onFailure() == null ? Constants.WorkFlow.FAIL_SENTINEL : step.onFailure();
 		}
-		String onSuccess;
-		switch (step) {
-			case RouterStepDefinition router:
-				String target = router.routes().get(outcome.route());
-				if (target == null) {
-					throw new IllegalStateException("route['" + outcome.route() + "']가 routes에 정의되어 있지 않습니다(정의된 route=" + router.routes().keySet() + ").");
-				}
-				return target;
-			case AgentStepDefinition agent:
-				onSuccess = agent.onSuccess();
-				break;
-			case SupervisorStepDefinition supervisor:
-				onSuccess = supervisor.onSuccess();
-				break;
-			case ToolStepDefinition tool:
-				onSuccess = tool.onSuccess();
-				break;
-			case ApprovalStepDefinition approval:
-				onSuccess = approval.onSuccess();
-				break;
+		if (step instanceof RouterStepDefinition router) {
+			String target = router.routes().get(outcome.route());
+			if (target == null) {
+				throw new IllegalStateException("route['" + outcome.route() + "']가 routes에 정의되어 있지 않습니다(정의된 route=" + router.routes().keySet() + ").");
+			}
+			return target;
 		}
+		String onSuccess = StepDefinition.onSuccessOf(step);
 		if (onSuccess != null) {
 			return onSuccess;
 		}
@@ -461,7 +449,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	private String failMessage(StepDefinition step, StepOutcome outcome) {
 		if (outcome.success()) {
-			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + Template.toText(outcome.output());
+			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + JsonSchemas.toText(outcome.output());
 		}
 		if (step.onFailure() == null) {
 			return "step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + outcome.error();

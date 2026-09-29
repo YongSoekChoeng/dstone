@@ -8,13 +8,14 @@
 # Workflow의 목적입니다.
 #
 # 동작 흐름
-# 1) tree: input으로 받은 디렉토리({{input}})의 목록을 directory_tree로 가져옵니다.
+# 1) tree: input으로 받은 디렉토리(${ .input })의 목록을 directory_tree로 가져옵니다.
 #    directory_tree는 [{"name": "notes.txt", "type": "file"}, ...] 모양의 JSON으로 답하므로,
 #    엔진이 그 JSON을 그대로 steps.tree.output(리스트)에 넣습니다.
-# 2) read-notes: forEach: steps.tree.output이라서, 찾아낸 항목 개수만큼 read_text_file을 동시에
-#    호출합니다. 각 반복은 자기가 맡은 항목을 {{entry}}(itemVariable)로 받아 {{entry.name}}으로 경로를 만듭니다.
+# 2) readNotes: forEach가 "${ .steps.tree.output }"이라서, 찾아낸 항목 개수만큼 read_text_file을 동시에
+#    호출합니다. 각 반복은 자기가 맡은 항목을 $entry(itemVariable: entry)로 받고, jq로 글자를 이어 붙여
+#    경로를 만듭니다: '${ .input + "/" + $entry.name }'. 표현식 안에 큰따옴표가 있어서 YAML은 작은따옴표로 감쌌습니다.
 #    파일이 몇 개든 YAML을 고칠 필요가 없습니다(예시 디렉토리에는 파일만 있다고 가정합니다).
-# 3) 최종 결과는 read-notes의 output, 즉 파일별 내용의 리스트입니다.
+# 3) 최종 결과는 readNotes의 output, 즉 파일별 내용의 리스트입니다.
 #
 # MCP 서버가 노출하는 디렉토리(${APP_HOME}/${APP_NAME}/mcp/server-filesystem) 밖의 경로를 넣으면
 # MCP 서버가 거부해서 tree step이 FAIL로 끝납니다. 화이트리스트 밖 접근이 실제로 막히는지 확인하는
@@ -32,23 +33,23 @@ workflow:
   maxIterations: 3
   input: string
   output:
-    value: "{{steps.read-notes.output}}"
+    value: "${ .steps.readNotes.output }"
   steps:
 
     - id: tree
       type: TOOL
       ref: directory_tree
       input:
-        path: "{{input}}"
-      onSuccess: read-notes
+        path: "${ .input }"
+      onSuccess: readNotes
       onFailure: FAIL
 
-    - id: read-notes
+    - id: readNotes
       type: TOOL
       ref: read_text_file
-      forEach: steps.tree.output
+      forEach: "${ .steps.tree.output }"
       itemVariable: entry
       input:
-        path: "{{input}}/{{entry.name}}"
+        path: '${ .input + "/" + $entry.name }'
       onSuccess: SUCCESS
       onFailure: FAIL

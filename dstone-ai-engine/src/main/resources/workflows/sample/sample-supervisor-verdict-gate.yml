@@ -4,9 +4,9 @@
 # 실제로 성공/실패를 잘 가르는지 확인해보기 위한 테스트 전용 Workflow입니다(자세한 내용은
 # runtime.step.SupervisorStepExecutor 참고).
 #
-# - draft: 요청의 input.message를 sample-general-chat에게 넣고 답(string)을 받습니다. input.role은 그
-#   Agent prompt의 {role}을 채웁니다.
-# - judge: draft의 답({{steps.draft.output}})을 sample-verdict-judge-agent에게 넣어 판정받습니다. 그 Agent는
+# - draft: 요청의 input(role, message)을 sample-role-reply-agent의 input 맵으로 넘기고 답(string)을 받습니다.
+#   role은 그 Agent prompt의 {role}을 채웁니다(prompt 변수는 Agent가 받은 input 필드로 채워짐).
+# - judge: draft의 답(${ .steps.draft.output })을 sample-verdict-judge-agent에게 넣어 판정받습니다. 그 Agent는
 #   텍스트에 "안녕"이라는 단어가 들어 있는지만 검사합니다 - 들어 있으면 pass=true가 되어 SUCCESS로,
 #   없으면 pass=false가 되어 FAIL로 끝납니다. 판정은 steps.judge.output({pass, reason})에 남습니다.
 # - 성공 시 최종 결과는 draft의 답입니다(output.value).
@@ -24,21 +24,23 @@ workflow:
       type: object
       properties:
         message: { type: string, description: draft step Agent에게 보낼 요청 }
-        role: { type: string, description: draft step Agent(sample-general-chat)의 역할 }
+        role: { type: string, description: draft step Agent(sample-role-reply-agent)의 역할 }
       required: [message, role]
   output:
-    value: "{{steps.draft.output}}"
+    value: "${ .steps.draft.output }"
   steps:
 
     - id: draft
       type: AGENT
-      ref: sample-general-chat
-      input: "{{input.message}}"
+      ref: sample-role-reply-agent
+      input:
+        role: "${ .input.role }"
+        message: "${ .input.message }"
       onSuccess: judge
 
     - id: judge
       type: SUPERVISOR
       ref: sample-verdict-judge-agent
-      input: "{{steps.draft.output}}"
+      input: "${ .steps.draft.output }"
       onSuccess: SUCCESS
       onFailure: FAIL

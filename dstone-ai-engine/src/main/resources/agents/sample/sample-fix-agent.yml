@@ -5,8 +5,8 @@
 # step(validate, validateSqlSyntax)이 SQL 문법을 검사하고, 실패하면 fix step으로 넘어옵니다.
 #
 # 입출력 계약을 둘 다 object로 선언한 예시이기도 합니다.
-# - input: {sql, error}. fix step이 input을 맵으로 적어서 "검증에 실패한 SQL"({{steps.validate.input.sql}})과
-#   "실패 사유"({{steps.validate.error}})를 채워 넣습니다. 엔진이 이 맵을 아래 input 스키마로 검사한 뒤
+# - input: {sql, error}. fix step이 input을 맵으로 적어서 "검증에 실패한 SQL"("${ .steps.validate.input.sql }")과
+#   "실패 사유"("${ .steps.validate.error }")를 채워 넣습니다. 엔진이 이 맵을 아래 input 스키마로 검사한 뒤
 #   JSON 글자로 바꿔 LLM에게 사용자 메시지로 보냅니다. (prompt 안에는 중괄호를 쓰지 않습니다 - prompt의
 #   {이름}은 Spring AI PromptTemplate이 변수 자리로 읽기 때문에, JSON 예시를 적으면 기동은 되지만 호출할 때 실패합니다.)
 # - output: {sql}. LLM은 이 모양의 JSON으로만 답해야 하고, 고친 SQL은 steps.fix.output.sql로 꺼냅니다.

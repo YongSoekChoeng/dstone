@@ -18,7 +18,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * <pre>
  * type: TOOL step(ToolStepDefinition)을 실행합니다. LLM을 거치지 않고, caller가 쓸 수 있는 Tool 하나를 코드로 직접 호출합니다.
  *
- * 1) 인자 만들기: runtime.workflow.WorkFlowExecutor가 step의 input 맵을 이미 채워서 넘겨주므로(arguments),
+ * 1) 인자 만들기: runtime.workflow.WorkFlowExecutor가 step의 input 맵을 이미 계산해서 넘겨주므로(arguments),
  *    그 맵을 JSON으로 바꾸기만 하면 Tool 인자가 됩니다.
  * 2) 호출하기: runtime.tool.ToolExecutor로 Tool을 부릅니다(caller별 Tool 화이트리스트 검사도 여기서 함께 이뤄집니다).
  * 3) output 만들기: Tool 응답이 JSON이면 그 값(객체, 배열, 숫자, true/false)을, 아니면 응답 글자를 그대로 output으로 씁니다.
@@ -26,7 +26,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * 4) 성공/실패 판정: output이 runtime.tool.ToolOutcome 모양({"success":..., "message":...})이면 success 값으로,
  *    글자면 그 글자가 "실패"(Constants.Outcome.FAIL_PREFIX)로 시작하는지로 판정합니다. 그 밖의 모양은 성공입니다.
  *    실패면 ToolOutcome의 message(없으면 응답 글자)를 실패 사유(error)로 남깁니다.
- *    onFailure로 이동한 step은 {{steps.id.error}}로 실패 이유를, {{steps.id.input.인자명}}으로 실패한 입력값을 읽을 수 있습니다.
+ *    onFailure로 이동한 step은 "${ .steps.id.error }"로 실패 이유를, "${ .steps.id.input.인자명 }"으로 실패한 입력값을 읽을 수 있습니다.
  * </pre>
  */
 @Component
@@ -44,7 +44,7 @@ public class ToolStepExecutor {
 	 *
 	 * @param execution 지금 진행 중인 Workflow 실행 상태입니다.
 	 * @param step      실행할 step의 정의입니다.
-	 * @param arguments 템플릿이 채워진 Tool 인자입니다.
+	 * @param arguments 표현식을 계산해 채운 Tool 인자입니다.
 	 */
 	@SuppressWarnings("unchecked")
 	public StepOutcome run(WorkFlowExecution execution, ToolStepDefinition step, Map<String, Object> arguments) {

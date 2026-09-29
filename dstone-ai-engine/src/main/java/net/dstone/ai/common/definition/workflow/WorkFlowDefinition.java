@@ -15,23 +15,21 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
  *
  * ## 입력(input)
  * 실행 요청의 input에 담아야 하는 값의 모양입니다(common.definition.SchemaDefinition). 요청이 이 모양이 아니면
- * 실행하기 전에 바로 거절합니다(HTTP 400). 비워두면 {type: string}입니다. step은 {{input}}(또는 object면
- * {{input.필드}})으로 이 값을 꺼내 씁니다.
+ * 실행하기 전에 바로 거절합니다(HTTP 400). 비워두면 {type: string}입니다. step은 "${ .input }"(또는 object면
+ * "${ .input.필드 }")으로 이 값을 꺼내 씁니다.
  *
- *   input: string                        # 글자 하나 → {{input}}
+ *   input: string                        # 글자 하나 → "${ .input }"
  *   input:
- *     schema:                            # object → {{input.requirement}}
+ *     schema:                            # object → "${ .input.requirement }"
  *       type: object
  *       properties:
  *         requirement: string
  *       required: [requirement]
  *
- * input이 object면 그 필드들은 Agent system prompt의 {변수}를 채우는 데도 쓰입니다(예: prompt의 {role}).
- *
  * ## 최종 결과(output)
  * Workflow가 성공으로 끝났을 때 돌려줄 값입니다(WorkFlowOutputDefinition). value는 필수입니다.
  *   output:
- *     value: "{{steps.convert.output}}"
+ *     value: "${ .steps.convert.output }"
  *
  * ## 그 밖의 값
  * maxIterations는 "이 Workflow가 전체적으로 몇 번까지 step을 실행할 수 있는가"를 정하는 상한선입니다.

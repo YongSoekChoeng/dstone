@@ -1,7 +1,5 @@
 package net.dstone.ai.runtime.step;
 
-import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -45,13 +43,12 @@ public class AgentStepExecutor {
 	 *
 	 * @param execution       지금 진행 중인 Workflow 실행 상태입니다.
 	 * @param step            실행할 step의 정의입니다.
-	 * @param input           템플릿이 채워진 input입니다(Agent input 모양).
-	 * @param promptVariables Agent system prompt의 {변수}를 채울 값입니다(Workflow input이 object면 그 필드들).
+	 * @param input           표현식을 계산해 채운 input입니다(Agent input 모양).
 	 */
-	public StepOutcome run(WorkFlowExecution execution, AgentStepDefinition step, Object input, Map<String, Object> promptVariables) {
+	public StepOutcome run(WorkFlowExecution execution, AgentStepDefinition step, Object input) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		try {
-			return StepOutcome.success(this.agentExecutor.call(agent, execution.conversationIdOf(step), execution.caller(), promptVariables, input, null, null, null));
+			return StepOutcome.success(this.agentExecutor.call(agent, execution.conversationIdOf(step), execution.caller(), null, input, null, null, null));
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, e.getMessage());
 		}

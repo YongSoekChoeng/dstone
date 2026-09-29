@@ -19,16 +19,16 @@ import net.dstone.ai.common.consts.StepType;
  *   - id: classify
  *     type: ROUTER
  *     ref: sample-router-classifier-agent
- *     input: "{{input.message}}"
+ *     input: "${ .input.message }"
  *     routes:
- *       billing: billing-step
- *       technical: technical-step
+ *       billing: billingStep
+ *       technical: technicalStep
  *       other: SUCCESS
  * </pre>
  *
  * @param id        (필수)이 step의 이름입니다.
  * @param ref       (필수)부를 Agent의 id입니다.
- * @param input     (필수)Agent에게 넣을 값(분류할 대상)의 템플릿입니다.
+ * @param input     (필수)Agent에게 넣을 값(분류할 대상)입니다.
  * @param routes    (필수)경로 이름 → 이동할 step id(또는 "SUCCESS"/"FAIL")입니다. 최소 1개 있어야 합니다.
  * @param onFailure (옵셔널)route를 고르지 못했을 때 갈 step의 id(또는 "FAIL")입니다.
  * @param memory    (옵셔널)true면 이 step이 이전에 자기가 나눈 대화를 기억합니다(대화방 = sessionId:stepId). 비워두면 false입니다.

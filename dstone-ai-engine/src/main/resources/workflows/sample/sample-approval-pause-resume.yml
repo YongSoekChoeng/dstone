@@ -3,7 +3,7 @@
 # 이 Workflow는 APPROVAL step이 실행을 잠시 멈췄다가 다시 이어가는 동작을 눈으로 직접 확인해보기
 # 위한 테스트 전용 Workflow입니다. LLM이나 Tool을 전혀 호출하지 않고 APPROVAL step 하나만으로
 # 이루어져 있어서, API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
-# 최종 결과는 사람이 내린 결정({approved, approver, comment}, steps.approve-step.output)입니다.
+# 최종 결과는 사람이 내린 결정({approved, approver, comment}, steps.approve.output)입니다.
 #
 # 확인해보는 순서는 이렇습니다:
 #   1. dstone-boot의 "Workflow 테스트" 화면에서 workflowId=sample-approval-pause-resume, input="승인 테스트"로
@@ -24,10 +24,10 @@ workflow:
   maxIterations: 5
   input: string
   output:
-    value: "{{steps.approve-step.output}}"
+    value: "${ .steps.approve.output }"
   steps:
 
-    - id: approve-step
+    - id: approve
       type: APPROVAL
       approverRole: "team-lead"
       onSuccess: SUCCESS

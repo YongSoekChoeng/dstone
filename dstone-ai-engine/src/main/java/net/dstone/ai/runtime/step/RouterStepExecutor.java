@@ -40,15 +40,14 @@ public class RouterStepExecutor {
 	 *
 	 * @param execution       지금 진행 중인 Workflow 실행 상태입니다.
 	 * @param step            실행할 step의 정의입니다.
-	 * @param input           템플릿이 채워진 input(분류할 대상)입니다.
-	 * @param promptVariables Agent system prompt의 {변수}를 채울 값입니다(Workflow input이 object면 그 필드들).
+	 * @param input           표현식을 계산해 채운 input(분류할 대상)입니다.
 	 */
 	@SuppressWarnings("unchecked")
-	public StepOutcome run(WorkFlowExecution execution, RouterStepDefinition step, Object input, Map<String, Object> promptVariables) {
+	public StepOutcome run(WorkFlowExecution execution, RouterStepDefinition step, Object input) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		Map<String, Object> answer;
 		try {
-			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), promptVariables, input, StepOutputSchemas.routeDecision(step.routes().keySet()));
+			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, StepOutputSchemas.routeDecision(step.routes().keySet()));
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, "라우팅 Agent 응답을 {route, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
 		}

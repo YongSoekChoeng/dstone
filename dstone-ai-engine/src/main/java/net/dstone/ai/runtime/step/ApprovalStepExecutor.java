@@ -20,7 +20,7 @@ import net.dstone.common.utils.StringUtil;
  * - 나중에 api.controller.WorkFlowExecutionController의 decision API가 호출되면, 그 결정이 컨텍스트의
  *   approvals.{stepId}에 기록된 뒤 같은 스텝이 다시 한번 실행됩니다. 이번에는 결정이 있으니 그 결정을
  *   output에 {approved, approver, comment}로 남기고, 승인이면 성공을, 반려면 실패(error에 반려 사유)를 돌려줍니다.
- *   다음 step은 {{steps.id.output.comment}}처럼 꺼내 씁니다.
+ *   다음 step은 "${ .steps.id.output.comment }"처럼 꺼내 씁니다.
  * </pre>
  */
 @Component

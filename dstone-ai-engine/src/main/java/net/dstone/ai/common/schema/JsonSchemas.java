@@ -19,7 +19,7 @@ import com.networknt.schema.SpecificationVersion;
  * YAML에 적은 JSON Schema(agents/*.yml의 input/output, workflows/*.yml의 input/output)를 다루는 도구 모음입니다.
  * 네 곳에서 같은 규칙을 씁니다.
  * - YAML을 읽을 때: 축약형을 표준 JSON Schema로 펼칩니다(normalize).
- * - 엔진이 켜질 때: 스키마 자체가 올바른 JSON Schema인지(checkSchema), {{ }} 참조 경로가 스키마에 있는지(checkPath) 검사합니다.
+ * - 엔진이 켜질 때: 스키마 자체가 올바른 JSON Schema인지(checkSchema), 표현식이 읽는 경로가 스키마에 있는지(checkPath) 검사합니다.
  * - LLM을 부를 때: 스키마를 그대로 LLM에게 알려줍니다(runtime.agent.SchemaOutputConverter).
  * - 값을 받았을 때: 실제 값이 스키마에 맞는지 확인합니다(validate - Workflow 입력, Agent 입력/출력, Workflow 최종 결과).
  *
@@ -219,9 +219,9 @@ public final class JsonSchemas {
 	/**
 	 * <pre>
 	 * 스키마를 경로(예: ["analysis", "tables", "0"])대로 따라 내려가 봐서, 그 경로의 값이 있을 수 있는지 검사합니다.
-	 * 엔진이 켜질 때 {{steps.analyze.output.analysis.tables.0}} 같은 참조를 미리 검사하는 데 씁니다.
+	 * 엔진이 켜질 때 "${ .steps.analyze.output.analysis.tables[0] }" 같은 표현식이 읽는 경로를 미리 검사하는 데 씁니다.
 	 * - object: 다음 이름이 properties에 있어야 합니다(properties가 없거나 additionalProperties를 열어 뒀으면 더 보지 않음).
-	 * - array: 다음 이름이 숫자(몇 번째 항목인지, 0부터)여야 합니다.
+	 * - array: 다음 이름이 숫자(몇 번째 항목인지, 0부터. 표현식에서는 [0])여야 합니다.
 	 * - string/number/integer/boolean: 그 아래로 더 들어갈 수 없습니다.
 	 * - type을 알 수 없으면 더 보지 않습니다.
 	 * 문제가 없거나 판단할 수 없으면 null을, 문제가 있으면 이유를 돌려줍니다.
@@ -250,9 +250,11 @@ public final class JsonSchemas {
 				current = asMap(properties.get(segment));
 			} else if (ARRAY.equals(type)) {
 				if (!segment.matches("\\d+")) {
-					return where + "는 리스트(array)라서 다음 이름은 몇 번째 항목인지를 뜻하는 숫자(0부터)여야 합니다('" + segment + "').";
+					return where + "는 리스트(array)라서 [0]처럼 몇 번째 항목인지(0부터) 적어야 합니다('" + segment + "').";
 				}
 				current = asMap(current.get(ITEMS));
+				where = where + "[" + segment + "]";
+				continue;
 			} else {
 				return where + "는 " + type + " 값이라 그 아래('" + segment + "')로 더 들어갈 수 없습니다.";
 			}
@@ -272,6 +274,19 @@ public final class JsonSchemas {
 		} catch (JsonProcessingException e) {
 			throw new IllegalArgumentException("값을 JSON 글자로 바꾸지 못했습니다: " + value, e);
 		}
+	}
+
+	/**
+	 * 값을 글자로 바꿉니다. 글자는 그대로, null은 null, 그 밖의 값(맵, 리스트, 숫자 등)은 JSON 글자로 바꿉니다.
+	 * LLM에게 보낼 메시지나 실행 이력처럼 결과가 글자여야 하는 곳에서 씁니다.
+	 *
+	 * @param value 바꿀 값입니다.
+	 */
+	public static String toText(Object value) {
+		if (value == null || value instanceof String) {
+			return (String) value;
+		}
+		return toJson(value);
 	}
 
 	/**

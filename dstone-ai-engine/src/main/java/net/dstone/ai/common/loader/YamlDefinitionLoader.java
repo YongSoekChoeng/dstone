@@ -230,7 +230,7 @@ public class YamlDefinitionLoader extends BaseObject {
 				+ ", 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL).";
 		}
 		if (cause instanceof MismatchedInputException mismatched && WorkFlowOutputDefinition.class.equals(mismatched.getTargetType())) {
-			return "[" + where + "] workflow.output은 value(와 schema)를 가진 맵입니다. 예: output: {value: \"{{steps.마지막step.output}}\"}";
+			return "[" + where + "] workflow.output은 value(와 schema)를 가진 맵입니다. 예: output: {value: \"${ .steps.마지막step.output }\"}";
 		}
 		if (cause instanceof MismatchedInputException mismatched && mismatched.getTargetType() != null) {
 			return "[" + where + "] 값의 모양이 맞지 않습니다(" + this.shapeName(mismatched.getTargetType()) + "이어야 합니다"

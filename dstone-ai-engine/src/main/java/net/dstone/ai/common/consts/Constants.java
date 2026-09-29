@@ -72,28 +72,28 @@ public final class Constants {
 		public final static int DEFAULT_MAX_ITERATIONS = 10;
 		public final static String SUCCESS_SENTINEL = "SUCCESS";
 		public final static String FAIL_SENTINEL = "FAIL";
-		/** step의 forEach로 반복 실행할 때(StepDefinition.itemKeyOf 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 변수 이름입니다({{item}}). */
+		/** step의 forEach로 반복 실행할 때(StepDefinition.itemKeyOf 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 jq 변수 이름입니다($item). */
 		public final static String DEFAULT_ITEM_VARIABLE_KEY = "item";
 
 		/**
 		 * Workflow 실행 컨텍스트(runtime.workflow.execution.WorkFlowContext)의 모양을 정하는 이름들입니다.
-		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML 템플릿의 {{ ... }} 참조는 이 트리를 그대로 따라갑니다.
-		 * 이름은 YAML 키와 같습니다(workflow.input → input, step의 input/output → steps.id.input/output). 숨은 이름은 없습니다.
+		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML의 "${ ... }" 표현식은 이 트리를 jq로 읽습니다.
+		 * 이름은 YAML 키와 같습니다(workflow.input → .input, step의 input/output → .steps.id.input/output). 숨은 이름은 없습니다.
 		 * <pre>
-		 * input:     요청의 input 값 그대로(workflow.input 모양)   ← {{input}}, {{input.필드}}
-		 * steps:     { stepId: { input, output, error } }          ← {{steps.id.output}} 등
-		 * approvals: { stepId: { approved, approver, comment } }   ← 엔진 내부용 승인 결정 수신함
+		 * input:     요청의 input 값 그대로(workflow.input 모양)   ← "${ .input }", "${ .input.필드 }"
+		 * steps:     { stepId: { input, output, error } }          ← "${ .steps.id.output }" 등
+		 * approvals: { stepId: { approved, approver, comment } }   ← 엔진 내부용 승인 결정 수신함(표현식에는 보이지 않음)
 		 * </pre>
 		 */
 		public static final class Context {
-			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다({{input}}). YAML의 workflow.input과 같은 이름입니다. */
+			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다(.input). YAML의 workflow.input과 같은 이름입니다. */
 			public final static String INPUT = "input";
-			/** 실행된 step들의 결과가 step id별로 쌓이는 루트입니다({{steps.id.xxx}}). */
+			/** 실행된 step들의 결과가 step id별로 쌓이는 루트입니다(.steps.id.xxx). */
 			public final static String STEPS = "steps";
-			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 템플릿에서는 참조하지 않고 steps.id.output으로 읽습니다. */
+			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 표현식에서는 보이지 않고 .steps.id.output으로 읽습니다. */
 			public final static String APPROVALS = "approvals";
 
-			/** step 결과: 이 step이 실제로 받은 입력(YAML step의 input 템플릿을 채운 뒤의 값)입니다. */
+			/** step 결과: 이 step이 실제로 받은 입력(YAML step의 input 표현식을 계산한 뒤의 값)입니다. */
 			public final static String FIELD_INPUT = "input";
 			/** step 결과: 이 step이 돌려준 값입니다. 모양은 부른 대상(Agent output, Tool 응답)이나 step 종류가 정합니다. */
 			public final static String FIELD_OUTPUT = "output";

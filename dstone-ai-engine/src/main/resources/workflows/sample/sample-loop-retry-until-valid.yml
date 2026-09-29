@@ -6,13 +6,13 @@
 # 것입니다.
 #
 # 동작 흐름
-# 1) validate: 검사할 SQL로 {{steps.fix.output.sql ?? input}}을 씁니다.
+# 1) validate: 검사할 SQL로 ${ .steps.fix.output.sql // .input }을 씁니다.
 #    - 처음 실행될 때는 fix가 아직 돈 적이 없어서 steps.fix.output.sql이 없으므로 요청의 input(SQL 글자)을 씁니다.
 #    - fix를 거쳐 되돌아왔을 때는 fix가 내놓은 output.sql(고친 SQL)을 씁니다.
 # 2) fix: validate가 실패하면 실행됩니다. sample-fix-agent는 input/output을 둘 다 object로 선언한 Agent라서
-#    input을 맵({sql, error})으로 적습니다 - 실패한 SQL({{steps.validate.input.sql}})과 실패 사유
-#    ({{steps.validate.error}})를 채워 넣고, 고친 SQL을 {sql} 모양으로 돌려받습니다.
-# 3) 성공하면 Workflow의 output({{steps.validate.input.sql}}) - 최종적으로 검증을 통과한 SQL - 을 돌려줍니다.
+#    input을 맵({sql, error})으로 적습니다 - 실패한 SQL(${ .steps.validate.input.sql })과 실패 사유
+#    (${ .steps.validate.error })를 채워 넣고, 고친 SQL을 {sql} 모양으로 돌려받습니다.
+# 3) 성공하면 Workflow의 output(${ .steps.validate.input.sql }) - 최종적으로 검증을 통과한 SQL - 을 돌려줍니다.
 #
 # maxIterations=6이면 validate(실패) → fix → validate(성공)처럼 고쳐 쓰기가 몇 번 더 걸려도 여유가 있습니다.
 # 끝내 못 고치면 "최대 실행 횟수 초과"로 FAILED가 되는 것도 이 Workflow로 확인할 수 있습니다.
@@ -28,14 +28,14 @@ workflow:
   maxIterations: 6
   input: string
   output:
-    value: "{{steps.validate.input.sql}}"
+    value: "${ .steps.validate.input.sql }"
   steps:
 
     - id: validate
       type: TOOL
       ref: validateSqlSyntax
       input:
-        sql: "{{steps.fix.output.sql ?? input}}"
+        sql: "${ .steps.fix.output.sql // .input }"
       onSuccess: SUCCESS
       onFailure: fix
 
@@ -43,6 +43,6 @@ workflow:
       type: AGENT
       ref: sample-fix-agent
       input:
-        sql: "{{steps.validate.input.sql}}"
-        error: "{{steps.validate.error}}"
+        sql: "${ .steps.validate.input.sql }"
+        error: "${ .steps.validate.error }"
       onSuccess: validate

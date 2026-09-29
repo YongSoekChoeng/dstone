@@ -25,7 +25,7 @@ import net.dstone.common.utils.StringUtil;
  * - 불통과: 실패이고, output에 {pass: false, reason}을, error에 reason을 남깁니다.
  * - 답의 모양이 깨짐(또는 input이 Agent input 모양이 아님): 판정을 믿을 수 없으므로 안전하게 실패로 처리합니다.
  *
- * 판정 사유는 다음 step이 필요할 때 {{steps.id.output.reason}}이나 {{steps.id.error}}로 꺼내 씁니다.
+ * 판정 사유는 다음 step이 필요할 때 "${ .steps.id.output.reason }"이나 "${ .steps.id.error }"로 꺼내 씁니다.
  * </pre>
  */
 @Component
@@ -41,15 +41,14 @@ public class SupervisorStepExecutor {
 	 *
 	 * @param execution       지금 진행 중인 Workflow 실행 상태입니다.
 	 * @param step            실행할 step의 정의입니다.
-	 * @param input           템플릿이 채워진 input(판정할 대상)입니다.
-	 * @param promptVariables Agent system prompt의 {변수}를 채울 값입니다(Workflow input이 object면 그 필드들).
+	 * @param input           표현식을 계산해 채운 input(판정할 대상)입니다.
 	 */
 	@SuppressWarnings("unchecked")
-	public StepOutcome run(WorkFlowExecution execution, SupervisorStepDefinition step, Object input, Map<String, Object> promptVariables) {
+	public StepOutcome run(WorkFlowExecution execution, SupervisorStepDefinition step, Object input) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		Map<String, Object> answer;
 		try {
-			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), promptVariables, input, StepOutputSchemas.verdict());
+			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, StepOutputSchemas.verdict());
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, "감독 Agent 응답을 {pass, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
 		}

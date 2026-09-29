@@ -35,16 +35,20 @@ import net.dstone.common.utils.StringUtil;
  * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/*.yml 의 input/output)나
  *   Tool(인자 스키마)이 정하고, step은 "무엇을 넣을지(input)"와 "다음에 어디로 갈지"만 적습니다.
  *
- * - input: 이 step에 넣어줄 값의 템플릿입니다. {{ ... }} 자리는 step이 실행되기 직전에 엔진이 채웁니다
- *   (문법은 common.template.Template 참고). AGENT/SUPERVISOR/ROUTER는 필수이고 모양은 Agent input을 따릅니다
- *   (string이면 글자, object면 맵). TOOL은 인자 맵(없으면 빈 인자)이고, APPROVAL은 input이 없습니다.
+ * - id: 영문, 숫자, 밑줄(_)만 씁니다(예: validateEach). 표현식에서 .steps.id로 바로 읽기 위해서입니다.
+ *   SUCCESS/FAIL은 예약어라 id로 쓸 수 없습니다.
  *
- *     {{input}}                         Workflow를 실행할 때 넘긴 값(object면 {{input.필드}})
- *     {{steps.analyze.output}}          analyze step이 돌려준 값(object면 {{steps.analyze.output.필드}})
- *     {{steps.validate.input.sql}}      validate step이 실제로 받은 값
- *     {{steps.validate.error}}          validate step이 실패한 이유
- *     {{item}}                          forEach로 반복 중일 때 이번 반복이 맡은 항목
- *     {{a.b ?? c.d}}                    왼쪽 값이 없으면 오른쪽 값을 씀
+ * - input: 이 step에 넣어줄 값입니다. 값 전체가 "${ ... }"이면 step이 실행되기 직전에 엔진이 jq로 계산하고,
+ *   그 밖의 값은 적힌 그대로 넘깁니다(규칙은 common.schema.ExpressionEvaluator 참고).
+ *   AGENT/SUPERVISOR/ROUTER는 필수이고 모양은 Agent input을 따릅니다(string이면 값 하나, object면 맵).
+ *   TOOL은 인자 맵(없으면 빈 인자)이고, APPROVAL은 input이 없습니다.
+ *
+ *     "${ .input }"                             Workflow를 실행할 때 넘긴 값(object면 .input.필드)
+ *     "${ .steps.analyze.output }"              analyze step이 돌려준 값(object면 .steps.analyze.output.필드)
+ *     "${ .steps.validate.input.sql }"          validate step이 실제로 받은 값
+ *     "${ .steps.validate.error }"              validate step이 실패한 이유
+ *     "${ $item }"                              forEach로 반복 중일 때 이번 반복이 맡은 항목
+ *     "${ .steps.fix.output.sql // .input }"    왼쪽 값이 없으면(null) 오른쪽 값
  *
  * - 결과: 모든 step은 끝나면 자기 id 아래에 {input, output, error}를 남깁니다. 숨은 이름은 없습니다.
  *   output의 모양은 AGENT는 Agent output, TOOL은 Tool 응답(JSON이면 그 값, 아니면 글자)이고, 나머지는 엔진이
@@ -56,12 +60,15 @@ import net.dstone.common.utils.StringUtil;
  *   "SUCCESS"/"FAIL" 예약어를 적으면 그 자리에서 Workflow 전체를 성공/실패로 끝냅니다.
  *   ROUTER는 onSuccess 대신 routes로 갈 곳을 정합니다.
  *
- * - 대화 기억: step끼리 넘기는 값은 input 템플릿뿐입니다. LLM을 부르는 step은 기본적으로 이전 대화를 보지 않고
+ * - 대화 기억: step끼리 넘기는 값은 input 표현식뿐입니다. LLM을 부르는 step은 기본적으로 이전 대화를 보지 않고
  *   input만 보고 답합니다. memory: true를 적은 step만 자기 대화방(sessionId:stepId)에서 이전에 자기가 나눈 대화를
  *   기억합니다(재작성 루프 등). 다른 step의 대화는 섞이지 않습니다.
  *
- * - 실패 사유는 그 step의 error에 남으므로, onFailure로 이동한 step이 {{steps.id.error}}로 읽을 수 있습니다.
- *   input 템플릿이 가리키는 값을 찾지 못해도 그 step은 실패입니다.
+ * - forEach: 이 step을 항목마다 동시에 실행할 리스트를 표현식으로 적습니다(예: "${ .input.sqlList }").
+ *   각 반복의 input 안에서 이번 항목은 $item(또는 itemVariable에 적은 이름)입니다.
+ *
+ * - 실패 사유는 그 step의 error에 남으므로, onFailure로 이동한 step이 "${ .steps.id.error }"로 읽을 수 있습니다.
+ *   input 표현식을 계산하지 못해도(jq 오류) 그 step은 실패입니다.
  *
  * YAML이 이 규칙들을 지켰는지는 엔진이 켜질 때 common.registry.WorkFlowRegistry가 모두 검사합니다.
  * </pre>
@@ -77,7 +84,7 @@ import net.dstone.common.utils.StringUtil;
 public sealed interface StepDefinition
 	permits AgentStepDefinition, SupervisorStepDefinition, RouterStepDefinition, ToolStepDefinition, ApprovalStepDefinition {
 
-	/** 이 step을 가리키는 이름입니다. onSuccess/onFailure/routes와 {{steps.id...}} 참조가 이 이름을 씁니다. */
+	/** 이 step을 가리키는 이름입니다. onSuccess/onFailure/routes와 "${ .steps.id... }" 표현식이 이 이름을 씁니다. */
 	String id();
 
 	/** 이 step의 종류입니다. YAML의 type 값이며, record마다 정해져 있습니다. */
@@ -108,7 +115,27 @@ public sealed interface StepDefinition
 	}
 
 	/**
-	 * step의 forEach 경로를 돌려줍니다. 비워뒀거나 forEach를 쓸 수 없는 종류(ROUTER/APPROVAL)면 null입니다.
+	 * 성공했을 때 갈 곳(onSuccess)을 돌려줍니다. 비워뒀으면 null이고, ROUTER는 routes로 갈 곳을 정하므로 항상 null입니다.
+	 *
+	 * @param step onSuccess를 꺼낼 step
+	 */
+	static String onSuccessOf(StepDefinition step) {
+		switch (step) {
+			case AgentStepDefinition agent:
+				return agent.onSuccess();
+			case SupervisorStepDefinition supervisor:
+				return supervisor.onSuccess();
+			case ToolStepDefinition tool:
+				return tool.onSuccess();
+			case ApprovalStepDefinition approval:
+				return approval.onSuccess();
+			case RouterStepDefinition router:
+				return null;
+		}
+	}
+
+	/**
+	 * step의 forEach 표현식을 돌려줍니다. 비워뒀거나 forEach를 쓸 수 없는 종류(ROUTER/APPROVAL)면 null입니다.
 	 *
 	 * @param step forEach를 꺼낼 step
 	 */

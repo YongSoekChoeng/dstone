@@ -4,7 +4,7 @@ workflow:
   maxIterations: 10
   input: string
   output: 
-    value: "{{steps.step02.output}}"
+    value: "${ .steps.step02.output }"
   
   # input: 읽을 문서의 전체 경로입니다.
   #   MCP filesystem 서버(mcp/sample/sample-filesystem-mcp.yml)가 허용한 폴더
@@ -17,20 +17,20 @@ workflow:
       type: TOOL
       ref: read_text_file
       input:
-        path: "{{input}}"
+        path: "${ .input }"
       onSuccess: step01
       onFailure: FAIL
 
     - id: step01
       type: AGENT
       ref: testApp-agent-01
-      input: "{{steps.read.output}}"
+      input: "${ .steps.read.output }"
       onSuccess: step02
       onFailure: FAIL
 
     - id: step02
       type: AGENT
       ref: testApp-agent-02
-      input: "{{steps.step01.output}}"
+      input: "${ .steps.step01.output }"
       onSuccess: SUCCESS
       onFailure: FAIL

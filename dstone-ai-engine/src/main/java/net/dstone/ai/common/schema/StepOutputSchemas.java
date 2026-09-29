@@ -16,7 +16,7 @@ import java.util.Map;
  *
  * 같은 스키마를 두 곳에서 씁니다.
  * - 실행할 때: LLM에게 이 모양으로 답하라고 알려주고 답을 검사합니다(runtime.step의 각 StepExecutor).
- * - 엔진이 켜질 때: {{steps.id.output.reason}} 같은 참조가 올바른지 검사합니다(common.registry.WorkFlowRegistry).
+ * - 엔진이 켜질 때: "${ .steps.id.output.reason }" 같은 표현식이 읽는 경로가 올바른지 검사합니다(common.registry.WorkFlowRegistry).
  * </pre>
  */
 public final class StepOutputSchemas {

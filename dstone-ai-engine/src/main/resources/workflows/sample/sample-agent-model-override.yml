@@ -15,12 +15,12 @@ workflow:
   maxIterations: 3
   input: string
   output:
-    value: "{{steps.ask.output}}"
+    value: "${ .steps.ask.output }"
   steps:
 
     - id: ask
       type: AGENT
       ref: sample-model-override-agent
-      input: "{{input}}"
+      input: "${ .input }"
       onSuccess: SUCCESS
       memory: true

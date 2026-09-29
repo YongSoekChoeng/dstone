@@ -4,7 +4,7 @@
 # workflows/sample/sample-structured-output-chain.yml의 extract step이 이 Agent를 부릅니다.
 # 아래 output.schema 때문에 엔진이 "이 JSON 모양으로만 답하라"는 지시를 자동으로 붙여주고, LLM의 답을
 # 그 모양으로 읽고 검사해서 steps.extract.output에 담습니다. 그 다음 TOOL step은
-# {{steps.extract.output.sql}}로 이 값을 그대로 가져다 씁니다.
+# "${ .steps.extract.output.sql }"로 이 값을 그대로 가져다 씁니다.
 #
 # 응답 모양은 이 파일(Agent)이 정합니다. 이 Agent를 어느 step에서 부르든, 채팅 API로 부르든 답은 항상
 # {sql: ...} 모양입니다. 그래서 이 prompt는 JSON 모양을 설명하지 않고 "무엇을 뽑아낼지"만 설명합니다.

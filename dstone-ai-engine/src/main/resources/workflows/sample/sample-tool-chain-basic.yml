@@ -6,7 +6,7 @@
 # 두 Tool 모두 화이트리스트 없이 항상 켜져 있는 Tool이라서(tools.sql.SqlSyntaxTool,
 # tools.sample.DateTimeTool) API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
-# validate step은 요청의 input({{input}})을 sql 인자로 넘기므로, 이 Workflow를 호출할 때는
+# validate step은 요청의 input(${ .input })을 sql 인자로 넘기므로, 이 Workflow를 호출할 때는
 # input 자리에 SQL 문을 넣어야 합니다. now step은 인자가 필요 없어서 input을 생략했습니다(빈 인자 {}로
 # 호출됩니다). 최종 결과는 두 Tool의 결과를 모은 맵입니다(output.value를 맵으로 적은 예시).
 #
@@ -23,15 +23,15 @@ workflow:
   input: string
   output:
     value:
-      validation: "{{steps.validate.output}}"
-      checkedAt: "{{steps.now.output}}"
+      validation: "${ .steps.validate.output }"
+      checkedAt: "${ .steps.now.output }"
   steps:
 
     - id: validate
       type: TOOL
       ref: validateSqlSyntax
       input:
-        sql: "{{input}}"
+        sql: "${ .input }"
       onSuccess: now
       onFailure: FAIL
 
