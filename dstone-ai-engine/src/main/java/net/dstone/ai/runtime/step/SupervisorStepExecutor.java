@@ -17,8 +17,8 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * type: SUPERVISOR step(SupervisorStepDefinition)을 실행합니다. LLM에게 "통과했는지 아닌지, 그리고 왜 그런지"를
- * {pass, reason} 모양의 JSON으로 답하게 해서, 그 값으로 이 step의 성공/실패를 정합니다.
+ * type: SUPERVISOR step(SupervisorStepDefinition)을 실행합니다. 
+ * LLM에게 "통과했는지 아닌지, 그리고 왜 그런지"를 {pass, reason} 모양의 JSON으로 답하게 해서, 그 값으로 이 step의 성공/실패를 정합니다.
  * 답의 모양은 엔진이 정한 스키마(common.schema.StepOutputSchemas.verdict())로 강제하고 검사합니다.
  *
  * - 통과: 성공이고, output에 {pass: true, reason}을 남깁니다.

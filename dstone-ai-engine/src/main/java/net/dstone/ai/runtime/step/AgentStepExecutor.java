@@ -48,7 +48,19 @@ public class AgentStepExecutor {
 	public StepOutcome run(WorkFlowExecution execution, AgentStepDefinition step, Object input) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		try {
-			return StepOutcome.success(this.agentExecutor.call(agent, execution.conversationIdOf(step), execution.caller(), null, input, null, null, null));
+			
+			return StepOutcome.success(
+				this.agentExecutor.call(
+					agent								// agent. 호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
+					, execution.conversationIdOf(step)	// conversationId. 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
+					, execution.caller()				// caller. 이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+					, null								// variables. 프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
+					, input								// input. Agent에게 넣을 값(Agent input 모양)
+					, null								// ragOverride 이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+					, null								// toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+					, null								// modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+				)
+			);
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, e.getMessage());
 		}

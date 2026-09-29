@@ -255,6 +255,7 @@ public class WorkFlowExecutor extends BaseObject {
 		String forEach = StepDefinition.forEachOf(step);
 		Object rawList;
 		try {
+			// 현재까지는 yaml 에서 forEach 의 실행값들만 가져올 목적이므로 는 변수맵핑기능을 제공하지 않음. 그래서 variables 는 null 로 세팅.
 			rawList = this.jqExpEvalUtil.resolve(forEach, execution.context(), null);
 		} catch (ExpressionException e) {
 			return this.failedBeforeRun(execution, step, "forEach - " + e.getMessage());
@@ -271,6 +272,7 @@ public class WorkFlowExecutor extends BaseObject {
 			futures.add(CompletableFuture.supplyAsync(new Supplier<StepOutcome>() {
 				@Override
 				public StepOutcome get() {
+					// forEach 의 개별 실행값을 실행시킬 때 비로소 변수값들을 셋팅.
 					return WorkFlowExecutor.this.call(step, execution, variables);
 				}
 			}));
@@ -407,9 +409,19 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param outcome   실행 결과입니다.
 	 */
 	private void appendHistory(WorkFlowExecution execution, StepDefinition step, String historyId, StepOutcome outcome) {
-		this.executionStore.appendHistory(execution.executionId(),
-			new StepHistoryEntry(historyId, step.type(), StepDefinition.refOf(step), outcome.success(), outcome.durationMs(),
-				outcome.success() ? JsonSchemaUtil.toText(outcome.output()) : null, outcome.error(), Instant.now()));
+		StepHistoryEntry stepHistoryEntry = new StepHistoryEntry(
+			historyId, step.type()
+			, StepDefinition.refOf(step)
+			, outcome.success()
+			, outcome.durationMs()
+			, (outcome.success() ? JsonSchemaUtil.toText(outcome.output()) : null)
+			, outcome.error()
+			, Instant.now()
+		);
+		this.executionStore.appendHistory(
+			execution.executionId(),
+			stepHistoryEntry
+		);
 	}
 
 	/**

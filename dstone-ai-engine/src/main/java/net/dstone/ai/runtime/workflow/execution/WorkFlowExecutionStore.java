@@ -21,17 +21,42 @@ import net.dstone.ai.common.consts.StepType;
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 
 /**
- * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 이 두 테이블(schema/02-create-table-postgresql-
- * dstone-ai.sql에 정의되어 있습니다)을 JdbcTemplate로 직접 다루는 클래스입니다. 이 모듈은
- * MyBatis를 쓰지 않기 때문에, 별도의 sqlmap 파일 없이 이 클래스 하나가 저장과 조회를 전담합니다.
+ * <pre>
+ * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 
+ * 이 두 테이블(schema/02-create-table-postgresql- dstone-ai.sql에 정의되어 있습니다)을 JdbcTemplate로 직접 다루는 클래스입니다. 
+ * 이 모듈은 MyBatis를 쓰지 않기 때문에, 별도의 sqlmap 파일 없이 이 클래스 하나가 저장과 조회를 전담합니다.
  *
- * context(실행 컨텍스트 트리)는 자바에서는 Map이지만, DB에는 CONTEXT_JSON(JSONB) 컬럼에 문자열로 저장해야 합니다. 그래서 저장할 때는
- * Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다. INSERT/UPDATE 쿼리에서는
- * PostgreSQL이 일반 문자열을 jsonb 타입으로 자동으로 바꿔주지 않으므로, "?::jsonb"라고 캐스트를
- * 직접 명시해 줍니다.
+ * context(실행 컨텍스트 트리)는 자바에서는 Map이지만, DB에는 CONTEXT_JSON(JSONB) 컬럼에 문자열로 저장해야 합니다. 
+ * 그래서 저장할 때는 Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다. 
+ * INSERT/UPDATE 쿼리에서는 PostgreSQL이 일반 문자열을 jsonb 타입으로 자동으로 바꿔주지 않으므로, "?::jsonb"라고 캐스트를 직접 명시해 줍니다.
  *
- * 최종 결과(WorkFlowExecution.output)는 글자일 수도, 객체나 리스트일 수도 있어서 RESULT_TEXT 컬럼에 항상 JSON 글자로
- * 저장하고, 읽을 때 다시 원래 값으로 되돌립니다(글자 결과는 "..."처럼 따옴표가 붙은 JSON 글자로 저장됩니다).
+ * 최종 결과(WorkFlowExecution.output)는 글자일 수도, 객체나 리스트일 수도 있어서 RESULT_TEXT 컬럼에 항상 JSON 글자로 저장하고, 읽을 때 다시 원래 값으로 되돌립니다
+ * (글자 결과는 "..."처럼 따옴표가 붙은 JSON 글자로 저장됩니다).
+ * 
+ * ## 테이블정의
+ *  <b>(AI_WORKFLOW_EXECUTION - WORKFLOW 실행)</b>
+ *     EXECUTION_ID        실행아이디(KEY)
+ *     WORKFLOW_ID         WORKFLOW아이디
+ *     CALLER              호출클라이언트
+ *     SESSION_ID          세션아이디
+ *     STATUS              상태(RUNNING / WAITING_APPROVAL / DONE / FAILED / CANCELLED)
+ *     CURRENT_STEP_INDEX  현재 STEP 인덱스
+ *     CONTEXT_JSON        컨텍스트
+ *     RESULT_TEXT         결과텍스트
+ *     ERROR_MESSAGE       에러텍스트
+ * 
+ * <b>(AI_WORKFLOW_EXECUTION_STEP_HISTORY - WORKFLOW STEP 실행 이력)</b>
+ *     ID                실행이력아이디(KEY)
+ *     EXECUTION_ID      실행아이디
+ *     STEP_ID           STEP 아이디
+ *     STEP_TYPE         STEP 종류
+ *     STEP_REF          참조 STEP 아이디
+ *     SUCCESS           성공여부
+ *     DURATION_MS       수행시간
+ *     OUTPUT_SUMMARY    STEP 결과텍스트
+ *     FAILURE_REASON    STEP 실패텍스트
+ * 
+ * </pre>
  */
 @Repository
 public class WorkFlowExecutionStore {
