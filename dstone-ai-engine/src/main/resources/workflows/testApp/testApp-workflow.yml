@@ -15,9 +15,9 @@ workflow:
     # 문서를 LLM에게 "알아서 읽어라"라고 맡기지 않고, TOOL step으로 엔진이 직접 읽습니다.
     - id: read
       type: TOOL
-      ref: read_text_file
+      ref: readFile
       input:
-        path: "${ .input }"
+        fileFullPath: "${ .input }"
       onSuccess: step01
       onFailure: FAIL
 
