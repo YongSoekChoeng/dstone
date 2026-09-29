@@ -54,7 +54,11 @@ public class ConfigChatClient {
 	 */
     @Bean
     ChatMemoryRepository chatMemoryRepository(ObjectProvider<ChatMemoryRepository> repositoryProvider) {
-        // getIfAvailable()은 이미 등록된 빈이 있으면 그 빈을 가져오고, 없으면 null을 돌려줍니다.
+    	/**************************************************************************
+    	ChatMemoryRepository를 구현한 RedisChatMemoryRepository 가 반환된다.
+    	그러나 spring.data.redis.enabled 가 false 일 경우 RedisChatMemoryRepository 가 
+    	생성이 되어있지 않으므로 repositoryProvider.getIfAvailable()체크를 거친다.
+    	**************************************************************************/
         ChatMemoryRepository existingRepository = repositoryProvider.getIfAvailable();
         if (existingRepository != null) {
             // 이미 등록된 빈(예: RedisChatMemoryRepository)이 있으면 그것을 그대로 사용합니다.
@@ -100,7 +104,7 @@ public class ConfigChatClient {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
 		// 로깅하는 Advisor 등록
-		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().order(Ordered.LOWEST_PRECEDENCE).build();
+		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().order(Ordered.LOWEST_PRECEDENCE-1).build();
 		advisorList.add(simpleLoggerAdvisor);
 		
 		return advisorList;

@@ -1,9 +1,11 @@
 package net.dstone.ai.common.consts;
 
 /**
+ * <pre>
  * dstone-ai-engine 전체에서 함께 쓰는 상수 값들을 한 곳에 모아둔 클래스입니다. 
  * 설정 키 이름이나 특수한 예약어처럼, 여러 클래스가 똑같은 값을 정확히 맞춰 써야 하는 것들을 여기 모아두면, 
  * 값이 하나라도 바뀔 때 이 파일 하나만 고치면 되어서 실수를 줄일 수 있습니다.
+ * </pre>
  */
 public final class Constants {
 
@@ -76,10 +78,11 @@ public final class Constants {
 		public final static String DEFAULT_ITEM_VARIABLE_KEY = "item";
 
 		/**
+		 * <pre>
 		 * Workflow 실행 컨텍스트(runtime.workflow.execution.WorkFlowContext)의 모양을 정하는 이름들입니다.
 		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML의 "${ ... }" 표현식은 이 트리를 jq로 읽습니다.
 		 * 이름은 YAML 키와 같습니다(workflow.input → .input, step의 input/output → .steps.id.input/output). 숨은 이름은 없습니다.
-		 * <pre>
+		 * 
 		 * input:     요청의 input 값 그대로(workflow.input 모양)   ← "${ .input }", "${ .input.필드 }"
 		 * steps:     { stepId: { input, output, error } }          ← "${ .steps.id.output }" 등
 		 * approvals: { stepId: { approved, approver, comment } }   ← 엔진 내부용 승인 결정 수신함(표현식에는 보이지 않음)
@@ -103,6 +106,7 @@ public final class Constants {
 	}
 
 	/**
+	 * <pre>
 	 * TOOL step(runtime.step.ToolStepExecutor)이 Tool의 성공/실패를 판정할 때 쓰는 문자열 규칙입니다.
 	 * Tool이 runtime.tool.ToolOutcome(성공 여부를 명확히 담은 값)을 돌려주지 않고 평범한 문자열을
 	 * 돌려준 경우에만 이 규칙이 쓰입니다: 그 문자열이 "실패: ..."로 시작하면 실패로, 아니면 성공으로
@@ -111,6 +115,7 @@ public final class Constants {
 	 * 새로 Tool을 만들 때는 ToolOutcome을 쓰는 쪽을 권장합니다. SUPERVISOR step은 이 문자열 방식을
 	 * 아예 쓰지 않습니다 - LLM이 자유롭게 쓴 글에 문자열 비교를 적용하는 건 안전하지 않기 때문에,
 	 * 처음부터 {pass, reason} 모양의 JSON 응답(runtime.step.SupervisorStepExecutor)만 사용합니다.
+	 * </pre>
 	 */
 	public static final class Outcome {
 		public final static String FAIL_PREFIX = "실패";
@@ -125,6 +130,7 @@ public final class Constants {
 	/** common.config.ConfigMcp가 MCP 서버(STDIO)를 실제로 띄울 때 쓰는 상수입니다. */
 	public static final class Mcp {
 		/**
+		 * <pre>
 		 * STDIO MCP 서버를 실행하는 커맨드 앞에 덧붙일 접두사를, System 프로퍼티(conf/env.properties
 		 * 관례 - DstoneAiEngineApplication.setSysProperties() 참고) 이름으로 지정해 둔 키입니다.
 		 * Linux/WSL/k8s에서는 이 값을 아예 안 정해도(System.getProperty가 null) npx 같은 스크립트를
@@ -134,15 +140,18 @@ public final class Constants {
 		 * 원래 cmd.exe가 해석해 줘야 실행되는 것이지, 그 자체로 독립 실행 파일이 아니기 때문입니다.
 		 * 그래서 Windows용 conf/env.properties에는 이 값을 "cmd.exe /c"로 채워 둔다 - ConfigMcp가
 		 * 이 값을 공백으로 쪼개서 실제 커맨드/인자 맨 앞에 그대로 이어 붙입니다.
+		 * </pre>
 		 */
 		public final static String STDIO_COMMAND_PREFIX_PROPERTY = "MCP_STDIO_COMMAND_PREFIX";
 	}
 
 	/**
+	 * <pre>
 	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 YAML 파일들을 찾을 때 쓰는
 	 * 위치 패턴입니다. 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서
 	 * workflows/agents/mcp 폴더 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는
 	 * 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
+	 * </pre>
 	 */
 	public static final class Definition {
 		public final static String WORKFLOW_LOCATION = "classpath:workflows";
