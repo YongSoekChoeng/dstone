@@ -22,7 +22,7 @@ workflow:
       ref: impact-analyzer-agent
       input: 
         workDir: "${ .input }"
-      onSuccess: SUCCESS
+      onSuccess: step03
       onFailure: FAIL
       
     - id: step03
