@@ -15,7 +15,7 @@ agent:
     [완료조건] 
     - 모든 FR에 대해 '충족/미충족/확인불가'를 판정했다.
     [결과형식] 
-    - 모든 FR에 대해 '충족'하면 통과(pass=true)로 판정하고, 나머지는 실패(pass=false)로 판정하라.
+    - 모든 FR에 대해 '충족'하면 통과(pass=true)로 판정하고, 나머지는 실패(pass=false)로 판정하고 반환하라. 
     
     [Tools]
     -readFileListAll
