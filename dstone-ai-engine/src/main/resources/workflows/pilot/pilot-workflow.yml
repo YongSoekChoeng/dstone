@@ -1,6 +1,6 @@
 workflow:
   id: pilot-workflow
-  description: 어플리케이션 운영관리 workflow
+  description: 어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
   maxIterations: 100
   input: string
   output: 
@@ -14,6 +14,13 @@ workflow:
       ref: requirment-analyzer-agent
       input: 
         workDir: "${ .input }"
-      onSuccess: SUCCESS
+      onSuccess: step02
       onFailure: FAIL
 
+    - id: step02
+      type: AGENT
+      ref: impact-analyzer-agent
+      input: 
+        workDir: "${ .input }"
+      onSuccess: SUCCESS
+      onFailure: FAIL

@@ -70,7 +70,7 @@ public class FileUtil {
 		net.dstone.common.utils.FileUtil.deleteFile(fileFullPath);
 	}
 
-	@Tool(description = "절대경로 filePath에 strFileName 이름으로 strContents 내용의 파일을 생성한다. 사용자가 '파일 생성' 등을 요청할 때 사용한다.")
+	@Tool(description = "절대경로 filePath에 fileName 이름으로 fileContents 내용의 파일을 생성한다. 사용자가 '파일 생성' 등을 요청할 때 사용한다.")
 	public void writeFile(@ToolParam String filePath, @ToolParam String fileName, @ToolParam String fileContents) {
 		net.dstone.common.utils.FileUtil.writeFile(filePath, fileName, fileContents);
 	}
