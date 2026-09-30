@@ -4,7 +4,7 @@ workflow:
   maxIterations: 100
   input: string
   output: 
-    value: "${ .steps.step01.output }"
+    value: "${ .steps.step04.output }"
   
   # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
   steps:
@@ -31,9 +31,15 @@ workflow:
       input:
         workDir: "${ .input }"
       onSuccess: step04
-      onFailure: FAIL
+      onFailure: step04
       
     - id: step04
+      type: APPROVAL
+      approverRole: "PL"
+      onSuccess: step05
+      onFailure: FAIL
+      
+    - id: step05
       type: AGENT
       ref: architect-agent
       input: 
