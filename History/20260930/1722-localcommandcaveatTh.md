@@ -581,3 +581,26 @@ D: 쪽 파일 4개를 고쳤습니다. YAML 파싱과 프롬프트 중괄호 점
 - **파일 생성:** `workDir`에 `01-requirements.md`, `02-impact.md`, `04-design.md`, `04-tasks.md`가 실제로 새로 쓰였는지 수정 시각으로 확인해 보세요.
 
 이제 step01의 미해결 질문이 `.steps.step01.output.questions`에 담기므로, 다음에는 step03 리뷰 판정이나 APPROVAL 화면에서 이 값을 활용하도록 연결할 수 있습니다.
+
+---
+
+## 질문
+
+지금 수정한 파일의 절대경로가 어떻게 되지 ?
+
+---
+
+## 답변
+
+수정한 파일 4개는 모두 Windows 쪽 D: 드라이브에 있습니다. Windows 기준 절대경로는 아래와 같습니다.
+
+```
+D:/AppHome/framework/dstone/dstone-ai-engine/src/main/resources/agents/pilot/01.requirment-analyzer-agent.yml
+D:/AppHome/framework/dstone/dstone-ai-engine/src/main/resources/agents/pilot/02.impact-analyzer-agent.yml
+D:/AppHome/framework/dstone/dstone-ai-engine/src/main/resources/agents/pilot/04.architect-agent.yml
+D:/AppHome/framework/dstone/dstone-ai-engine/src/main/resources/workflows/pilot/pilot-workflow.yml
+```
+
+WSL에서는 앞부분 `D:/`만 `/mnt/d/`로 바뀝니다. 예를 들어 `/mnt/d/AppHome/framework/dstone/dstone-ai-engine/src/main/resources/workflows/pilot/pilot-workflow.yml`입니다.
+
+WSL 저장소 `/app/dstone` 쪽 파일은 수정하지 않았습니다. D: 쪽에서 커밋하고 push한 뒤 `/app/dstone`에서 `git pull`을 하면 이 변경이 반영됩니다.
