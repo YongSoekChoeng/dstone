@@ -1,0 +1,18 @@
+workflow:
+  id: pilot-workflow
+  description: 어플리케이션 운영관리 workflow
+  maxIterations: 50
+  input: string
+  output: 
+    value: "${ .steps.step01.output }"
+  
+  # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  steps:
+
+    - id: step01
+      type: AGENT
+      ref: requirment-analyzer-agent
+      input: "${ .input }"
+      onSuccess: SUCCESS
+      onFailure: FAIL
+
