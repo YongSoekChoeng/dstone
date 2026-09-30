@@ -26,6 +26,13 @@ workflow:
       onFailure: FAIL
       
     - id: step03
+      type: SUPERVISOR
+      ref: impact-analyzer-review-agent
+      input: "${ .input }"
+      onSuccess: step04
+      onFailure: FAIL
+      
+    - id: step04
       type: AGENT
       ref: architect-agent
       input: 
