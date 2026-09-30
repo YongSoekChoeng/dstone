@@ -23,6 +23,7 @@ import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
 import net.dstone.ai.common.schema.JqExpEvalUtil;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
+import net.dstone.ai.runtime.agent.ProviderErrorMessage;
 import net.dstone.ai.runtime.step.AgentStepExecutor;
 import net.dstone.ai.runtime.step.ApprovalStepExecutor;
 import net.dstone.ai.runtime.step.RouterStepExecutor;
@@ -142,7 +143,7 @@ public class WorkFlowExecutor extends BaseObject {
 				// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
 				// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
 				// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
-				return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + e.getMessage());
+				return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
 			}
 
 			/****************************************************************************************
@@ -289,7 +290,7 @@ public class WorkFlowExecutor extends BaseObject {
 				outcome = futures.get(i).join();
 			} catch (CompletionException e) {
 				Throwable cause = e.getCause() == null ? e : e.getCause();
-				this.appendHistory(execution, step, historyId, StepOutcome.failure(null, cause.getMessage()));
+				this.appendHistory(execution, step, historyId, StepOutcome.failure(null, ProviderErrorMessage.of(cause)));
 				throw new IllegalStateException(historyId + " - " + cause.getMessage(), cause);
 			}
 			this.appendHistory(execution, step, historyId, outcome);

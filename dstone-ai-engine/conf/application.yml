@@ -122,6 +122,11 @@ spring:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
                      model: google/gemma-4-26b-a4b-it
                      temperature: 0.4
+                     # max-tokens: 비워두면 OpenRouter 뒤의 일부 공급자(vLLM 기반, 예: NextBit)가 "남은 컨텍스트 전부"를
+                     # 출력 한도로 잡는다. 그러면 Tool 결과가 쌓여 입력이 커졌을 때 입력+출력이 모델 한도를 넘어서
+                     # "400: Provider returned error"(maximum context length ... requested N output tokens)로 끊긴다.
+                     # 실제로 pilot-workflow가 error.log를 두 번 읽었을 때 이렇게 실패했다. 적당한 상한을 꼭 둔다.
+                     max-tokens: 4096
 
         ##########################################################################################
         # spring.ai.model.embedding=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
@@ -185,6 +190,11 @@ dstone:
                 api-token: ENC(koeh9W9G8vYjPVBZAeO3GWxg8Uv3PYssUy8aykBFHNMVke4YNjWubBwxGu7xp+hDZbfMwSgwbXj7ZE87Gp1cpQ==)
                 allowed-jobs:
                     - testApp
+            # 파일 Tool(tools.utils.FileUtil) 설정.
+            # max-read-chars: readFile/readFileTail이 한 번에 돌려주는 최대 글자 수(기본 30000).
+            # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 로그를 통째로 주면 컨텍스트 한도를 넘는다.
+            file:
+                max-read-chars: 30000
         
         ##########################################################################################
         # RAG 설정.

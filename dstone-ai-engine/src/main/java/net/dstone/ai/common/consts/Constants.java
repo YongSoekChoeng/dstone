@@ -66,6 +66,11 @@ public final class Constants {
 		public static final class Jenkins {
 			public final static String PREFIX = "dstone.ai.tool.jenkins";
 		}
+
+		/** 파일을 읽고 쓰는 Tool(tools.utils.FileUtil)의 설정 키 접두사입니다. */
+		public static final class File {
+			public final static String PREFIX = "dstone.ai.tool.file";
+		}
 	}
 
 	/** Workflow를 실행하는 엔진(runtime.workflow.WorkFlowExecutor, api.service.WorkFlowExecutionService)이 사용하는 상수들입니다. */
