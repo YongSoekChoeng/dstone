@@ -1,7 +1,7 @@
 workflow:
   id: pilot-workflow
   description: 어플리케이션 운영관리 workflow
-  maxIterations: 50
+  maxIterations: 100
   input: string
   output: 
     value: "${ .steps.step01.output }"
@@ -12,7 +12,8 @@ workflow:
     - id: step01
       type: AGENT
       ref: requirment-analyzer-agent
-      input: "${ .input }"
+      input: 
+        workDir: "${ .input }"
       onSuccess: SUCCESS
       onFailure: FAIL
 
