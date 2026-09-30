@@ -28,7 +28,8 @@ workflow:
     - id: step03
       type: SUPERVISOR
       ref: impact-analyzer-review-agent
-      input: "${ .input }"
+      input:
+        workDir: "${ .input }"
       onSuccess: step04
       onFailure: FAIL
       

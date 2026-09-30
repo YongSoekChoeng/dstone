@@ -21,6 +21,7 @@ agent:
     -readFileListAll
     -readFile
     -readFileTail (로그처럼 큰 파일은 끝부분만 읽는다)
+    -writeFile
   input: 
     schema: 
       type: object
