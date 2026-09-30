@@ -70,9 +70,11 @@ public class FileUtil {
 		net.dstone.common.utils.FileUtil.deleteFile(fileFullPath);
 	}
 
-	@Tool(description = "절대경로 filePath에 fileName 이름으로 fileContents 내용의 파일을 생성한다. 사용자가 '파일 생성' 등을 요청할 때 사용한다.")
-	public void writeFile(@ToolParam String filePath, @ToolParam String fileName, @ToolParam String fileContents) {
-		net.dstone.common.utils.FileUtil.writeFile(filePath, fileName, fileContents);
+	@Tool(description = "절대경로 fileFullPath(폴더+파일명)에 fileContents 내용으로 파일을 저장한다. 폴더가 없으면 만들고, 파일이 있으면 덮어쓴다. 저장 결과 안내 문구를 돌려준다. 사용자가 '파일 생성' 등을 요청할 때 사용한다.")
+	public void writeFile(@ToolParam(description = "저장할 파일의 절대경로(파일명 포함)") String filePath, @ToolParam (description = "파일 내용")String fileContents) {
+		String fileParentPath = net.dstone.common.utils.FileUtil.getFilePath(filePath);
+		String fileName = net.dstone.common.utils.FileUtil.getFileName(filePath, true);
+		net.dstone.common.utils.FileUtil.writeFile(fileParentPath, fileName, fileContents);
 	}
 
 	/** 한 번에 돌려줄 최대 글자 수입니다(dstone.ai.tool.file.max-read-chars, 없으면 기본값). */
