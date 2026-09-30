@@ -6,7 +6,7 @@ agent:
     [컨텍스트] 입력으로 받은 {workDir}/00-request.md, {workDir}/01-requirements.md 를 읽어라.
     [작업] 요구사항 구현 시 영향받는 코드를 조사하라.
     [제약]
-    - 읽기 전용. 어떤 파일도 수정하지 마라.
+    - 읽기 전용. 산출물 파일 말고는 어떤 파일도 수정하지 마라.
     - 추정이 아니라 실제로 열어본 파일만 근거로 삼고, 파일 경로와 클래스/메서드명을 명시하라.
     [산출물] {workDir}/02-impact.md
     - 파일이 존재하지 않을 경우 파일 생성 하고 이미 존재할 경우 수정된 내용으로 재생성 하라.
@@ -22,11 +22,22 @@ agent:
     -readFile
     -readFileTail (로그처럼 큰 파일은 끝부분만 읽는다)
     -writeFile
+
+    [답변]
+    - 영향도 분석서 본문은 반드시 writeFile로 저장하라. 최종 답변에 본문을 넣지 마라.
+    - 최종 답변은 file(저장한 파일 절대경로), summary(변경 대상과 위험 요소 중심 요약 3~5줄) 필드를 가진 JSON 하나만 답하라.
   input: 
     schema: 
       type: object
       properties: 
         workDir: { type: string, description: 수정아이디 경로 }        
       required: [workDir]
+  output:
+    schema:
+      type: object
+      properties:
+        file:    { type: string, description: 저장한 영향도 분석서의 절대경로 }
+        summary: { type: string, description: 변경 대상과 위험 요소 중심 요약(3~5줄) }
+      required: [file, summary]
   toolsEnabled: true
   ragEnabled: false

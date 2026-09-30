@@ -4,7 +4,8 @@ workflow:
   maxIterations: 100
   input: string
   output: 
-    value: "${ .steps.step04.output }"
+    # 실행된 step의 output을 step id별로 모은다. 각 Agent가 본문은 파일로 저장하고 요약만 돌려주므로 결과가 작다.
+    value: "${ .steps | map_values(.output) }"
   
   # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
   steps:

@@ -20,11 +20,23 @@ agent:
     -readFile
     -readFileTail (로그처럼 큰 파일은 끝부분만 읽는다)
     -writeFile
+
+    [답변]
+    - 설계서와 태스크 목록 본문은 반드시 writeFile로 각각 저장하라. 최종 답변에 본문을 넣지 마라.
+    - 최종 답변은 files(저장한 파일 절대경로 목록), summary(설계 방향과 태스크 개수 중심 요약 3~5줄), questions(나에게 결정을 맡긴 사항, 없으면 빈 배열) 필드를 가진 JSON 하나만 답하라.
   input: 
     schema: 
       type: object
       properties: 
         workDir: { type: string, description: 수정아이디 경로 }        
       required: [workDir]
+  output:
+    schema:
+      type: object
+      properties:
+        files:     { type: array, items: { type: string }, description: 저장한 설계서/태스크 목록의 절대경로 }
+        summary:   { type: string, description: 설계 방향과 태스크 개수 중심 요약(3~5줄) }
+        questions: { type: array, items: { type: string }, description: 결정이 필요한 사항(없으면 빈 배열) }
+      required: [files, summary]
   toolsEnabled: true
   ragEnabled: false
