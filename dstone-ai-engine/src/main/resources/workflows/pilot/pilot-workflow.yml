@@ -24,3 +24,11 @@ workflow:
         workDir: "${ .input }"
       onSuccess: SUCCESS
       onFailure: FAIL
+      
+    - id: step03
+      type: AGENT
+      ref: architect-agent
+      input: 
+        workDir: "${ .input }"
+      onSuccess: SUCCESS
+      onFailure: FAIL
