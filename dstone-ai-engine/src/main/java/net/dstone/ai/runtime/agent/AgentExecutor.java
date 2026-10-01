@@ -247,6 +247,7 @@ public class AgentExecutor extends BaseObject {
 			answer = spec.user(question.toString()).call().content();
 		} catch (Exception e) {
 			e.printStackTrace();
+			throw e;
 		}
 		return this.convert(answer, schema);
 	}
