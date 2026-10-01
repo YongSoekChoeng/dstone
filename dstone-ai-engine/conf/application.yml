@@ -120,6 +120,7 @@ spring:
              chat:
                  options:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
+                     # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash
                      model: google/gemma-4-26b-a4b-it
                      temperature: 0.4
                      # max-tokens: 비워두면 OpenRouter 뒤의 일부 공급자(vLLM 기반, 예: NextBit)가 "남은 컨텍스트 전부"를
