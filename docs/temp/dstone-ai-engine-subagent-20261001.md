@@ -416,3 +416,27 @@ AOP(`ConfigCallLog`)에 맡기지 않는 이유: 콜백은 `AgentExecutor` 안�
 **검증**: `sample-approval-routes-loop`(LLM 없음)로 대기 → 없는 이름 400 → `route` 없이 400 → 다시 → 다시 → 완료, 중단(FAILED),
 기존 승인/반려 방식의 승인·반려, 깨진 YAML 3가지(함께 적음, 빈 `routes`, 없는 step)와 경고 1가지(`routes`인데 `output.approved` 참조)를 확인했다.
 `pilot-workflow` 전체 실행과 dstone-boot 화면의 버튼 동작은 직접 돌려 보지 않았다(dstone-boot는 컴파일만 확인).
+
+## 11. 추가: pilot 프롬프트 보완 (2026-10-01)
+
+`pilot-workflow` 실행 중 step03(리뷰)이 계속 불통과였다. 사람이 `02-impact.md`를 직접 고쳐도 마찬가지였다.
+step03은 매번 파일을 새로 읽고 있었고(리뷰 문서에 수정본의 문장이 인용되어 있었다), 원인은 `01-requirements.md`가 틀린 것이었다.
+
+- 요구사항 정의서는 "`selectErrorLogList` 쿼리에 `ORDER BY seq DESC`가 있다"고 적었지만, 그 구문은 `logs-mapper.xml`에 없다.
+  공통 페이징(`comm-mapper.xml`의 `PagingEnd`, `ORDER BY ${sort_column}`)이 화면(JSP의 `field: "seq"`)에서 넘어온 값으로 만들어 붙인다.
+- 요청서는 세 메뉴 모두 오류라고 했는데 FR은 에러로그 하나만 다뤘다.
+- 리뷰 Agent는 소스에서 그 구문을 찾지 못해 FR-01을 미충족으로 판정했다. 영향도 분석서만 고쳐서는 풀리지 않는 불통과였다.
+
+**보완한 것**
+
+| 대상 | 보완 |
+|---|---|
+| `pilot-requirment-analyzer-agent` | `[원인 확인 규칙]` 추가: 요청서의 메뉴를 모두 FR로 다룬다 / 로그에 보이는 구문이 소스 어디서 만들어지는지 직접 찾는다(공통 조각, 동적 치환, 넘어온 파라미터까지) / 확인한 것만 경로:줄 번호와 함께 사실로 적는다. 인수 조건은 원인을 단정하지 않고 사용자가 확인할 수 있는 결과로 적는다. 산출물에 '현상과 확인한 사실' 추가. 재작성용 `feedback` 입력 추가 |
+| `pilot-impact-analyzer-agent` | 요구사항이 소스와 다르면 추정으로 맞추지 않고 '요구사항과 다른 점'을 문서 맨 위와 summary 첫 줄에 적는다. 여러 조각으로 만들어지는 SQL은 조각 모두를 조사한다 |
+| `pilot-impact-analyzer-review-agent` | 요구사항 정의서도 소스와 대조하고 요청서 범위 누락을 확인한다. 불통과면 원인 문서를 가려 reason 첫 줄을 `[수정 대상: 요구사항 정의서/영향도 분석서/둘 다/없음]`으로 시작한다 |
+| `pilot-workflow` step04 | 선택지에 `재요구분석: step01` 추가. step01도 `feedback`을 받는다 |
+
+**확인**: 작업 폴더 사본으로 요구사항 분석 Agent만 실제 실행했다(`google/gemma-4-26b-a4b-it`). 세 메뉴가 모두 FR로 나왔고,
+인수 조건이 "오류 없이 목록이 나온다"로 바뀌었으며, "그 구문이 쿼리 파일에 있다"는 틀린 단정이 사라졌다.
+다만 정렬 구문이 `comm-mapper.xml`과 JSP에서 만들어진다는 것까지는 찾지 못했고(액션로그/로그인이력은 '미확인'으로 적음),
+오류 로그의 실패 쿼리를 `selectErrorLogList`로 잘못 적었다(실제는 `selectLoginHistList`). 리뷰와 영향도 분석 Agent는 실행해 보지 않았다.
