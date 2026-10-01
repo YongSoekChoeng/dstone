@@ -62,9 +62,11 @@ public class ConfigTool extends BaseObject {
 	private ToolCallbackProvider toolCallbackProvider;
 
 	/**
+	 * <pre>
 	 * 로컬 @AiTool 빈들과 ConfigMcp가 미리 접속해 둔 MCP 서버 Tool들을 모아서 하나의
 	 * ToolCallbackProvider로 합칩니다. 합쳐지고 나면 어느 쪽에서 왔는지 구분하지 않고, caller
 	 * 화이트리스트(allowedToolNames)도 똑같은 기준으로 적용됩니다.
+	 * </pre>
 	 */
 	@PostConstruct
 	public void discover() {
@@ -96,9 +98,11 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 이 caller의 Tool 화이트리스트를 통과한 Tool만 골라서 담은 새 ToolCallbackProvider를 만들어
 	 * 돌려줍니다. 화이트리스트 설정(dstone.ai.tool.allowed-by-caller)이 아예 없는 caller라면
 	 * 걸러내지 않고 전체를 그대로 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param caller Tool 화이트리스트를 조회할 호출 주체(tenant)
 	 */
@@ -118,9 +122,11 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 이름으로 Tool 하나를 직접 찾아줍니다. runtime.tool.ToolExecutor가 TOOL step을 처리할 때, LLM을
 	 * 거치지 않고 곧바로 원하는 Tool을 찾기 위해 이 메소드를 씁니다. 찾는 이름의 Tool이 없으면(또는
 	 * caller의 화이트리스트에 없으면) null을 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param caller   Tool 화이트리스트를 조회할 호출 주체(tenant)
 	 * @param toolName 찾으려는 Tool의 이름
@@ -135,9 +141,11 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 이 caller에게 설정된 Tool 화이트리스트를 찾아서 돌려줍니다. caller가 null이거나, 설정
 	 * 목록 안에 이 caller가 아예 없으면 null을 돌려주는데, 이 null은 "화이트리스트가 없으니
 	 * 전체 허용"이라는 뜻으로 쓰입니다.
+	 * </pre>
 	 *
 	 * @param caller 화이트리스트를 조회할 호출 주체(tenant)
 	 */
@@ -157,6 +165,7 @@ public class ConfigTool extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 설정 파일의 "tools" 값은 YAML List로 쓸 수도 있고, 콤마로 구분한 문자열로 쓸 수도 있습니다.
 	 * 이 메소드는 둘 중 어느 형식으로 오든 똑같이 List<String>으로 바꿔 줍니다.
 	 *
@@ -164,6 +173,7 @@ public class ConfigTool extends BaseObject {
 	 * (YAML의 `[]`), 이건 "허용된 Tool이 0개"라는 뜻이어야 합니다. 그래서 빈 문자열이 들어와도
 	 * 빈 리스트로 처리합니다. 만약 이걸 그냥 무시해 버리면, 화이트리스트가 있는지조차 모르는
 	 * caller와 똑같이 "전체 허용"으로 취급되어 버려서 화이트리스트를 설정한 의미가 없어집니다.
+	 * </pre>
 	 *
 	 * @param toolsValue 파싱할 tools 설정값(List 또는 콤마로 구분한 문자열)
 	 */

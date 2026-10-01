@@ -24,6 +24,7 @@ import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
 
 /**
+ * <pre>
  * 파일 목록/검색/읽기/쓰기/삭제 Tool입니다.
  *
  * 이 Tool들은 모두 "한 번에 돌려주는 양"에 상한을 둡니다.
@@ -38,6 +39,7 @@ import net.dstone.ai.common.consts.Constants;
  * - 검색(searchInFiles): 키워드가 들어 있는 "파일:줄번호: 그 줄"만, 건수 상한까지만 줍니다.
  * - 읽기(readFile/readFileTail): 앞부분 또는 끝부분만 글자 수 상한까지 줍니다.
  * 잘렸을 때는 결과에 그 사실과 "어떻게 좁히면 되는지"를 적어 모델이 다음 행동을 정할 수 있게 합니다.
+ * </pre>
  */
 @AiTool
 public class FileUtil {
