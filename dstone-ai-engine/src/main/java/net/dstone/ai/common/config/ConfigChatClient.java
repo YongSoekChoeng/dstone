@@ -104,7 +104,7 @@ public class ConfigChatClient {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
 		// LLM 로깅하는 Advisor 등록
-		if(net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor.IS_LLM_LOGGING_YN) {
+		if(net.dstone.ai.common.config.ConfigCallLog.IS_LLM_LOGGING_YN) {
 			net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor llmLoggerAdvisor = net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor.builder().build();
 			advisorList.add(llmLoggerAdvisor);
 		}

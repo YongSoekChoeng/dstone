@@ -435,11 +435,11 @@ public class ConfigCallLog extends BaseObject {
 	}
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
-	
+
+	public static boolean IS_LLM_LOGGING_YN = false;
+
 	public static class LlmLoggerAdvisor extends BaseObject implements CallAdvisor, StreamAdvisor {
 		
-		public static boolean IS_LLM_LOGGING_YN = true;
-
 		protected void logRequest(ChatClientRequest request) {
 			StringBuffer log = new StringBuffer();
 			log.append("\n");
