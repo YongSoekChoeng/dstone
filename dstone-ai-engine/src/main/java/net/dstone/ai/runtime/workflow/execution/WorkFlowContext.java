@@ -72,12 +72,13 @@ public final class WorkFlowContext {
 	 *
 	 * @param context  실행 컨텍스트입니다(이 맵을 직접 고칩니다).
 	 * @param stepId   결정을 기록할 APPROVAL step의 id입니다.
-	 * @param approved 승인이면 true, 반려면 false입니다.
+	 * @param approved 승인이면 true, 반려면 false입니다(선택지 방식이면 쓰지 않습니다).
+	 * @param route    선택지 방식(routes)일 때 사람이 고른 이름입니다. 승인/반려 방식이면 null입니다.
 	 * @param approver 결정한 사람이나 역할입니다.
 	 * @param comment  결정한 이유나 메모입니다.
 	 */
 	@SuppressWarnings("unchecked")
-	public static void recordApproval(Map<String, Object> context, String stepId, boolean approved, String approver, String comment) {
+	public static void recordApproval(Map<String, Object> context, String stepId, boolean approved, String route, String approver, String comment) {
 		Object approvals = context.get(Context.APPROVALS);
 		if (!(approvals instanceof Map)) {
 			approvals = new LinkedHashMap<String, Object>();
@@ -85,6 +86,7 @@ public final class WorkFlowContext {
 		}
 		Map<String, Object> decision = new LinkedHashMap<>();
 		decision.put("approved", approved);
+		decision.put("route", route);
 		decision.put("approver", approver);
 		decision.put("comment", comment);
 		((Map<String, Object>) approvals).put(stepId, decision);
@@ -106,6 +108,26 @@ public final class WorkFlowContext {
 		}
 		Object decision = ((Map<String, Object>) approvals).get(stepId);
 		return decision instanceof Map ? (Map<String, Object>) decision : null;
+	}
+
+	/**
+	 * <pre>
+	 * APPROVAL step에 기록된 결정을 지웁니다. 결정을 읽어서 쓴 직후에 부릅니다.
+	 *
+	 * 지우는 이유: 결정을 남겨 두면, 흐름이 되돌아와 같은 APPROVAL step에 다시 왔을 때 사람에게 묻지 않고
+	 * 지난번 결정을 그대로 또 씁니다(반려 → 되돌아감 → 또 반려 → ... 로 끝없이 돕니다).
+	 * 지워 두면 다시 올 때마다 새로 묻습니다. 결정 내용은 steps.{stepId}.output에 남으므로 잃는 것은 없습니다.
+	 * </pre>
+	 *
+	 * @param context 실행 컨텍스트입니다(이 맵을 직접 고칩니다).
+	 * @param stepId  결정을 지울 APPROVAL step의 id입니다.
+	 */
+	@SuppressWarnings("unchecked")
+	public static void clearApproval(Map<String, Object> context, String stepId) {
+		Object approvals = context.get(Context.APPROVALS);
+		if (approvals instanceof Map) {
+			((Map<String, Object>) approvals).remove(stepId);
+		}
 	}
 
 }

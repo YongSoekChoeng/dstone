@@ -348,7 +348,23 @@ public final class JsonSchemaUtil {
 		return object(properties);
 	}
 
-	/** APPROVAL step의 output 모양입니다: {approved: boolean, approver: string, comment: string} */
+	/**
+	 * routes를 적은 APPROVAL step의 output 모양입니다: {route: string, approver: string, comment: string}.
+	 * route는 routes 이름 중 하나입니다(enum).
+	 *
+	 * @param routes 고를 수 있는 선택지 이름들입니다(APPROVAL step의 routes 키).
+	 */
+	public static Map<String, Object> approvalRoute(Collection<String> routes) {
+		Map<String, Object> route = field(STRING, "사람이 고른 선택지. 다음 중 하나: " + String.join(", ", routes));
+		route.put("enum", new ArrayList<>(routes));
+		Map<String, Object> properties = new LinkedHashMap<>();
+		properties.put("route", route);
+		properties.put("approver", field(STRING, "결정한 사람이나 역할"));
+		properties.put("comment", field(STRING, "결정한 이유나 메모"));
+		return object(properties);
+	}
+
+	/** routes를 적지 않은 APPROVAL step의 output 모양입니다: {approved: boolean, approver: string, comment: string} */
 	public static Map<String, Object> approval() {
 		Map<String, Object> properties = new LinkedHashMap<>();
 		properties.put("approved", field("boolean", "승인이면 true, 반려면 false"));

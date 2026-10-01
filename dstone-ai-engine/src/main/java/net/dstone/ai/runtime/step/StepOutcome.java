@@ -21,7 +21,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
  * @param input      이 step이 실제로 받은 입력입니다(표현식을 계산한 뒤의 값. 글자, 맵 등).
  * @param output     이 step이 돌려준 값입니다(Agent output 모양, Tool 응답, 엔진이 정한 모양 등). 없으면 null입니다.
  * @param error      실패 사유입니다. 성공이면 null입니다.
- * @param route      ROUTER step이 고른 경로 이름입니다. ROUTER가 아니면 null입니다(다음 step을 정할 때만 쓰고 컨텍스트에는 output.route로 남습니다).
+ * @param route      ROUTER step에서 LLM이, routes를 적은 APPROVAL step에서 사람이 고른 경로 이름입니다. 그 밖에는 null입니다(다음 step을 정할 때만 쓰고 컨텍스트에는 output.route로 남습니다).
  * @param durationMs 이 step을 처리하는 데 걸린 시간(밀리초)입니다. 실행 이력에 남깁니다.
  */
 public record StepOutcome(
@@ -44,10 +44,10 @@ public record StepOutcome(
 	}
 
 	/**
-	 * ROUTER step이 경로를 골랐을 때 씁니다. 그 route를 실제로 어느 step으로 이어줄지는
-	 * runtime.workflow.WorkFlowExecutor가 RouterStepDefinition.routes를 보고 정합니다.
+	 * 경로를 골랐을 때 씁니다(ROUTER step은 LLM이, routes를 적은 APPROVAL step은 사람이 고릅니다).
+	 * 그 route를 실제로 어느 step으로 이어줄지는 runtime.workflow.WorkFlowExecutor가 그 step의 routes를 보고 정합니다.
 	 *
-	 * @param output 이 step이 돌려준 값입니다({route, reason}).
+	 * @param output 이 step이 돌려준 값입니다(ROUTER는 {route, reason}, APPROVAL은 {route, approver, comment}).
 	 * @param route  고른 경로 이름입니다.
 	 */
 	public static StepOutcome routed(Object output, String route) {

@@ -1,14 +1,21 @@
 package net.dstone.ai.api.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import net.dstone.ai.api.dto.PendingApproval;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
+import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
@@ -81,19 +88,51 @@ public class WorkFlowExecutionService extends BaseService {
 	 * 스텝부터 다시 이어서 끝까지(또는 다음 승인 대기가 나올 때까지) 동기로 재개합니다.
 	 *
 	 * @param executionId 결정을 내릴 실행의 id입니다.
-	 * @param approved    승인이면 true, 반려면 false입니다.
+	 * 멈춰 있는 APPROVAL step이 선택지 방식(routes)이면 route가 그 이름 중 하나여야 합니다. 아니면 400으로 거절합니다.
+	 * 틀린 이름을 기록해 두면 다음 step을 찾지 못해 실행 전체가 실패로 끝나 버리기 때문에, 기록하기 전에 막습니다.
+	 *
+	 * @param executionId 결정을 내릴 실행의 id입니다.
+	 * @param approved    승인이면 true, 반려면 false입니다(승인/반려 방식에서만 씁니다).
+	 * @param route       고른 선택지 이름입니다(선택지 방식에서만 씁니다).
 	 * @param approver    이 결정을 내린 사람이나 역할입니다.
 	 * @param comment     결정한 이유나 메모입니다.
 	 */
-	public WorkFlowExecution decide(String executionId, boolean approved, String approver, String comment) {
+	public WorkFlowExecution decide(String executionId, boolean approved, String route, String approver, String comment) {
 		WorkFlowExecution execution = this.executionStore.find(executionId);
 		if (execution.status() != WorkFlowExecutionStatus.WAITING_APPROVAL) {
 			throw new IllegalStateException("실행[" + executionId + "]은 지금 승인 대기 상태가 아닙니다(현재 상태: " + execution.status() + ").");
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
-		String pendingStepId = workflow.steps().get(execution.currentStepIndex()).id();
-		WorkFlowContext.recordApproval(execution.context(), pendingStepId, approved, approver, comment);
+		StepDefinition pendingStep = workflow.steps().get(execution.currentStepIndex());
+		String chosenRoute = null;
+		if (pendingStep instanceof ApprovalStepDefinition approval && approval.hasRoutes()) {
+			if (StringUtil.isEmpty(route) || !approval.routes().containsKey(route)) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 선택지 중 하나를 골라야 합니다. route에 다음 중 하나를 보내십시오: " + approval.routes().keySet()
+					+ (StringUtil.isEmpty(route) ? "" : " (보낸 값: " + route + ")"));
+			}
+			chosenRoute = route;
+		}
+		WorkFlowContext.recordApproval(execution.context(), pendingStep.id(), approved, chosenRoute, approver, comment);
 		return this.workFlowExecutor.run(workflow, execution);
+	}
+
+	/**
+	 * 실행이 승인 대기(WAITING_APPROVAL)로 멈춰 있으면, 지금 어떤 결정을 기다리는지 돌려줍니다. 승인 대기가 아니면 null입니다.
+	 * 승인 화면이 이 값을 보고 승인/반려 버튼을 보여 줄지, 선택지 버튼을 보여 줄지 정합니다.
+	 *
+	 * @param execution 확인할 실행입니다.
+	 */
+	public PendingApproval pendingApproval(WorkFlowExecution execution) {
+		if (execution.status() != WorkFlowExecutionStatus.WAITING_APPROVAL) {
+			return null;
+		}
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
+		StepDefinition pendingStep = workflow.steps().get(execution.currentStepIndex());
+		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
+			return null;
+		}
+		List<String> routes = approval.hasRoutes() ? new ArrayList<>(approval.routes().keySet()) : new ArrayList<>();
+		return new PendingApproval(approval.id(), approval.approverRole(), routes);
 	}
 
 	/**

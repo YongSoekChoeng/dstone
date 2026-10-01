@@ -26,19 +26,21 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * @param createdAt        이 실행이 처음 생성된 시각입니다.
  * @param updatedAt        상태가 마지막으로 바뀐 시각입니다.
  * @param history          이 실행에서 각 스텝이 실행된 이력입니다. 오래된 순서대로 담겨 있습니다.
+ * @param pendingApproval  승인 대기(WAITING_APPROVAL)일 때, 지금 어떤 결정을 기다리는지입니다(step id, 고를 수 있는 선택지). 승인 대기가 아니면 null입니다.
  */
 public record WorkFlowExecutionDetail(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, Instant createdAt, Instant updatedAt,
-	List<StepHistoryEntry> history) {
+	List<StepHistoryEntry> history, PendingApproval pendingApproval) {
 
 	/**
 	 * WorkFlowExecution(실행 상태)과 스텝별 이력을 받아, 응답으로 내려줄 상세 정보 하나로 합쳐줍니다.
 	 *
 	 * @param execution 상세 응답으로 바꿔줄 실행 상태입니다.
 	 * @param history   함께 담을 스텝별 실행 이력입니다.
+	 * @param pendingApproval 승인 대기일 때 기다리는 결정입니다(아니면 null).
 	 */
-	public static WorkFlowExecutionDetail from(WorkFlowExecution execution, List<StepHistoryEntry> history) {
+	public static WorkFlowExecutionDetail from(WorkFlowExecution execution, List<StepHistoryEntry> history, PendingApproval pendingApproval) {
 		return new WorkFlowExecutionDetail(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), execution.context(), execution.output(), execution.errorMessage(),
-			execution.createdAt(), execution.updatedAt(), history);
+			execution.createdAt(), execution.updatedAt(), history, pendingApproval);
 	}
 
 }

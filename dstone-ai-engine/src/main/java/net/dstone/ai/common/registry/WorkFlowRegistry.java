@@ -60,6 +60,7 @@ import net.dstone.common.utils.StringUtil;
  *    - SUPERVISOR/ROUTER: 부르는 Agent가 output을 선언하지 않았는가(답의 모양은 엔진이 정함), subAgents를 가지지 않았는가
  *                         (경고) tools: ["*"]로 Tool을 전부 열어 두지 않았는가
  *    - TOOL: input의 인자 이름이 Tool의 인자 스키마와 맞는가(Tool을 찾지 못하면 경고만 남기고 실행 중에 검사)
+ *    - APPROVAL: routes를 적었으면 onSuccess/onFailure를 함께 적지 않았는가(둘 중 한 방식만), routes가 비어 있지 않은가
  *    - ROUTER routes가 최소 1개 있는가, memory: true와 forEach를 함께 쓰지 않았는가, forEach가 표현식인가
  * 4) 표현식(validateTemplate): step input, forEach, Workflow output.value 안의 모든 값에 대해
  *    - (오류) 예전 문법 {{ }}이나, 글자 중간에 섞인 ${ }가 없는가
@@ -73,7 +74,7 @@ import net.dstone.common.utils.StringUtil;
  *   AGENT            ref Agent의 output(agents/*.yml, 비워두면 string)
  *   SUPERVISOR       {pass, reason}                (common.schema.StepOutputSchemas)
  *   ROUTER           {route, reason}
- *   APPROVAL         {approved, approver, comment}
+ *   APPROVAL         {approved, approver, comment}   (routes를 적었으면 {route, approver, comment})
  *   TOOL             알 수 없음(Tool 응답에 따라 다름)
  *   forEach step     위 모양의 리스트(.steps.id.output[0].필드)
  * </pre>
@@ -207,7 +208,7 @@ public class WorkFlowRegistry extends BaseObject {
 	/**
 	 * <pre>
 	 * step마다 다음에 갈 수 있는 step id들을 모읍니다(SUCCESS/FAIL은 빼고). 그러면서 갈 곳이 올바른지 검사합니다.
-	 * - ROUTER: routes의 값들
+	 * - ROUTER, routes를 적은 APPROVAL: routes의 값들
 	 * - 그 밖: onSuccess(비어 있으면 목록의 다음 step, 마지막이면 SUCCESS)
 	 * - 모두: onFailure(비어 있으면 FAIL)
 	 * </pre>
@@ -221,9 +222,10 @@ public class WorkFlowRegistry extends BaseObject {
 		for (int i = 0; i < steps.size(); i++) {
 			StepDefinition step = steps.get(i);
 			List<String> targets = new ArrayList<>();
-			if (step instanceof RouterStepDefinition router) {
-				if (router.routes() != null) {
-					targets.addAll(router.routes().values());
+			Map<String, String> routes = StepDefinition.routesOf(step);
+			if (step instanceof RouterStepDefinition || routes != null) {
+				if (routes != null) {
+					targets.addAll(routes.values());
 				}
 			} else {
 				String onSuccess = StepDefinition.onSuccessOf(step);
@@ -328,6 +330,13 @@ public class WorkFlowRegistry extends BaseObject {
 				}
 				break;
 			case ApprovalStepDefinition approval:
+				if (approval.routes() != null && approval.routes().isEmpty()) {
+					throw this.error(definition, step, "APPROVAL step의 routes가 비어 있습니다. 선택지를 1개 이상 적거나 routes를 지우십시오(지우면 승인/반려 방식입니다).");
+				}
+				if (approval.hasRoutes() && (approval.onSuccess() != null || approval.onFailure() != null)) {
+					throw this.error(definition, step, "APPROVAL step에 routes와 onSuccess/onFailure를 함께 적을 수 없습니다. "
+						+ "routes를 적으면 사람이 선택지 중 하나를 고르는 방식이고(승인/반려가 없습니다), 적지 않으면 승인(onSuccess)/반려(onFailure) 방식입니다.");
+				}
 				break;
 		}
 	}
@@ -579,7 +588,7 @@ public class WorkFlowRegistry extends BaseObject {
 				schema = JsonSchemaUtil.routeDecision(router.routes().keySet());
 				break;
 			case ApprovalStepDefinition approval:
-				schema = JsonSchemaUtil.approval();
+				schema = approval.hasRoutes() ? JsonSchemaUtil.approvalRoute(approval.routes().keySet()) : JsonSchemaUtil.approval();
 				break;
 			case ToolStepDefinition tool:
 				schema = null;

@@ -80,7 +80,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				</table>
 
 				<div id="workflow-admin-decision-form" class="workflow-form" style="display:none;">
-					<h3>승인/반려</h3>
+					<h3>승인/반려 <span id="workflow-admin-decision-step" class="ai-hint"></span></h3>
 					<div class="workflow-field">
 						<label for="workflow-admin-approver">approver</label>
 						<input type="text" id="workflow-admin-approver" placeholder="결정하는 사람/역할" />
@@ -90,8 +90,11 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<textarea id="workflow-admin-comment" class="workflow-textarea workflow-textarea-small"></textarea>
 					</div>
 					<div class="workflow-actions">
+						<%-- 승인/반려 방식 APPROVAL일 때 보이는 버튼 --%>
 						<button type="button" id="workflow-admin-approve-btn">승인</button>
 						<button type="button" id="workflow-admin-reject-btn">반려</button>
+						<%-- 선택지 방식 APPROVAL(routes)일 때는 선택지 이름마다 버튼이 여기에 하나씩 만들어진다 --%>
+						<span id="workflow-admin-route-buttons"></span>
 						<span id="workflow-admin-decision-status" class="workflow-status"></span>
 					</div>
 				</div>

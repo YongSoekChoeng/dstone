@@ -1,5 +1,7 @@
 package net.dstone.ai.common.definition.workflow.step;
 
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -20,7 +22,7 @@ import net.dstone.common.utils.StringUtil;
  *   SUPERVISOR  SupervisorStepDefinition   LLM이 통과/불통과를 판정함            SupervisorStepExecutor
  *   ROUTER      RouterStepDefinition       LLM이 routes 중 갈 곳 하나를 고름      RouterStepExecutor
  *   TOOL        ToolStepDefinition         Tool 하나를 LLM 없이 직접 호출함       ToolStepExecutor
- *   APPROVAL    ApprovalStepDefinition     사람이 승인/반려할 때까지 기다림       ApprovalStepExecutor
+ *   APPROVAL    ApprovalStepDefinition     사람이 승인/반려(또는 routes 중 하나)를 고를 때까지 기다림   ApprovalStepExecutor
  *
  * record에 없는 키를 적으면(예: TOOL step에 routes, APPROVAL step에 input) 엔진이 켜질 때
  * "쓸 수 없는 키"로 바로 막힙니다.
@@ -132,6 +134,25 @@ public sealed interface StepDefinition
 			case RouterStepDefinition router:
 				return null;
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 이름을 골라서 갈 곳을 정하는 step이면 그 routes(이름 → 갈 곳)를 돌려줍니다. 아니면 null입니다.
+	 * - ROUTER: LLM이 이름을 고릅니다.
+	 * - routes를 적은 APPROVAL: 사람이 이름을 고릅니다.
+	 * </pre>
+	 *
+	 * @param step routes를 꺼낼 step
+	 */
+	static Map<String, String> routesOf(StepDefinition step) {
+		if (step instanceof RouterStepDefinition router) {
+			return router.routes();
+		}
+		if (step instanceof ApprovalStepDefinition approval && approval.hasRoutes()) {
+			return approval.routes();
+		}
+		return null;
 	}
 
 	/**

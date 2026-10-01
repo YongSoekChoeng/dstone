@@ -9,6 +9,9 @@ agent:
     [역할] 너는 이 시스템의 애플리케이션 아키텍트다.
     [컨텍스트]
     - 입력으로 받은 {workDir}/00-request.md, {workDir}/01-requirements.md 를 readFile로 읽어라.
+    - 입력의 feedback이 비어 있지 않으면 재분석 요청이다. feedback에는 검수자의 불통과 사유와 승인자의 의견이 들어 있다.
+      이때는 기존 {workDir}/02-impact.md 와 {workDir}/03-impact-review.md 도 읽고, 지적받은 부분을 다시 조사해서 고쳐라.
+      지적받지 않은 부분은 그대로 살리고, 문서 맨 끝에 '재분석 반영 내역'(지적 사항 | 어떻게 반영했는지)을 덧붙여라.
     - 요청서의 '소스경로'가 조사할 소스의 루트다. 소스는 이 경로 아래에서만 찾아라.
     [작업] 요구사항을 구현할 때 영향받는 코드를 조사하라.
     - 넓은 범위의 조사(진입점 찾기, 호출 관계 따라가기)는 pilot-source-investigator-agent에게 맡겨라.
@@ -39,7 +42,8 @@ agent:
     schema:
       type: object
       properties:
-        workDir: { type: string, description: 작업 폴더의 절대경로(00-request.md가 들어 있는 폴더) }
+        workDir:  { type: string, description: 작업 폴더의 절대경로(00-request.md가 들어 있는 폴더) }
+        feedback: { type: string, description: 재분석일 때 반영할 지적 사항(검수 불통과 사유와 승인자 의견). 처음 분석이면 빈 글자 }
       required: [workDir]
   output:
     schema:

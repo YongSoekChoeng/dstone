@@ -5,9 +5,10 @@ package net.dstone.boot.ai.vo.admin;
  * 그대로 호출하기 위해 executionId까지 화면에서 함께 받는다.
  *
  * @param executionId 결정을 내릴 실행 id
- * @param approved    승인이면 true, 반려면 false
+ * @param approved    승인이면 true, 반려면 false(승인/반려 방식에서만 쓴다)
  * @param approver    결정한 사람/역할
  * @param comment     결정 사유/메모(선택)
+ * @param route       선택지 방식 APPROVAL(step에 routes가 있음)에서 고른 선택지 이름. 승인/반려 방식이면 null
  */
-public record WorkFlowDecisionRequest(String executionId, boolean approved, String approver, String comment) {
+public record WorkFlowDecisionRequest(String executionId, boolean approved, String approver, String comment, String route) {
 }

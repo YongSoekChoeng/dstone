@@ -3,7 +3,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	var urls = {};
 	var statusFilterEl, refreshBtn, listBodyEl;
 	var detailPanelEl, detailIdEl, detailBadgeEl, detailResultEl, detailContextEl, historyBodyEl;
-	var decisionFormEl, approverEl, commentEl, approveBtn, rejectBtn, decisionStatusEl;
+	var decisionFormEl, approverEl, commentEl, approveBtn, rejectBtn, decisionStatusEl, decisionStepEl, routeButtonsEl;
 
 	var activeExecutionId = null;
 
@@ -27,11 +27,13 @@ var DstoneAiWorkflowAdmin = (function () {
 		approveBtn = document.getElementById("workflow-admin-approve-btn");
 		rejectBtn = document.getElementById("workflow-admin-reject-btn");
 		decisionStatusEl = document.getElementById("workflow-admin-decision-status");
+		decisionStepEl = document.getElementById("workflow-admin-decision-step");
+		routeButtonsEl = document.getElementById("workflow-admin-route-buttons");
 
 		refreshBtn.addEventListener("click", loadList);
 		statusFilterEl.addEventListener("change", loadList);
-		approveBtn.addEventListener("click", function () { decide(true); });
-		rejectBtn.addEventListener("click", function () { decide(false); });
+		approveBtn.addEventListener("click", function () { decide(true, null); });
+		rejectBtn.addEventListener("click", function () { decide(false, null); });
 
 		loadList();
 	}
@@ -102,10 +104,42 @@ var DstoneAiWorkflowAdmin = (function () {
 		decisionFormEl.style.display = waitingApproval ? "" : "none";
 		if (waitingApproval) {
 			decisionStatusEl.textContent = "";
+			renderDecisionButtons(detail.pendingApproval);
 		}
 	}
 
-	function decide(approved) {
+	// 기다리는 APPROVAL step이 어떤 방식인지에 따라 버튼을 바꿔 보여 준다.
+	// - routes가 비어 있으면: 승인/반려 버튼
+	// - routes에 이름이 있으면: 그 이름마다 버튼 하나씩(누르면 그 이름을 route로 보낸다)
+	function renderDecisionButtons(pendingApproval) {
+		var routes = (pendingApproval && pendingApproval.routes) || [];
+		var hasRoutes = routes.length > 0;
+
+		approveBtn.style.display = hasRoutes ? "none" : "";
+		rejectBtn.style.display = hasRoutes ? "none" : "";
+
+		routeButtonsEl.innerHTML = "";
+		routes.forEach(function (route) {
+			var button = document.createElement("button");
+			button.type = "button";
+			button.textContent = route;
+			button.addEventListener("click", function () { decide(false, route); });
+			routeButtonsEl.appendChild(button);
+			routeButtonsEl.appendChild(document.createTextNode(" "));
+		});
+
+		var label = "";
+		if (pendingApproval) {
+			label = "step: " + pendingApproval.stepId + (pendingApproval.approverRole ? " / 결정할 사람: " + pendingApproval.approverRole : "");
+			if (hasRoutes) {
+				label += " / 아래 선택지 중 하나를 고르세요";
+			}
+		}
+		decisionStepEl.textContent = label;
+	}
+
+	// approved: 승인/반려 방식일 때의 값. route: 선택지 방식일 때 고른 이름(승인/반려 방식이면 null).
+	function decide(approved, route) {
 		if (!activeExecutionId) {
 			return;
 		}
@@ -120,6 +154,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			body: JSON.stringify({
 				executionId: activeExecutionId,
 				approved: approved,
+				route: route,
 				approver: approverEl.value.trim(),
 				comment: commentEl.value.trim() || null
 			})

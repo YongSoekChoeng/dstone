@@ -428,7 +428,8 @@ public class WorkFlowExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * step 하나가 끝난 뒤 다음에 갈 곳을 정합니다. step id를 돌려주거나, Workflow를 끝낼 때는 "SUCCESS"/"FAIL" 예약어를 돌려줍니다.
-	 * - 성공한 ROUTER: LLM이 고른 route를 routes에서 찾습니다. routes에 없는 이름이면 예외를 던집니다.
+	 * - 성공한 ROUTER, routes를 적은 APPROVAL: 고른 route(ROUTER는 LLM이, APPROVAL은 사람이 고름)를 routes에서 찾습니다.
+	 *   routes에 없는 이름이면 예외를 던집니다.
 	 * - 그 밖의 성공: onSuccess에 적은 곳. 비어 있으면 목록상 다음 step, 마지막 step이면 SUCCESS입니다.
 	 * - 실패: onFailure에 적은 곳. 비어 있으면 FAIL입니다.
 	 * </pre>
@@ -441,10 +442,11 @@ public class WorkFlowExecutor extends BaseObject {
 		if (!outcome.success()) {
 			return step.onFailure() == null ? Constants.WorkFlow.FAIL_SENTINEL : step.onFailure();
 		}
-		if (step instanceof RouterStepDefinition router) {
-			String target = router.routes().get(outcome.route());
+		Map<String, String> routes = StepDefinition.routesOf(step);
+		if (routes != null) {
+			String target = routes.get(outcome.route());
 			if (target == null) {
-				throw new IllegalStateException("route['" + outcome.route() + "']가 routes에 정의되어 있지 않습니다(정의된 route=" + router.routes().keySet() + ").");
+				throw new IllegalStateException("route['" + outcome.route() + "']가 routes에 정의되어 있지 않습니다(정의된 route=" + routes.keySet() + ").");
 			}
 			return target;
 		}
@@ -457,13 +459,17 @@ public class WorkFlowExecutor extends BaseObject {
 	}
 
 	/**
-	 * Workflow를 FAIL로 끝낼 때 남길 메시지를 만듭니다. 성공했는데 onSuccess가 FAIL이면 그 step의 output을 글자로 바꾼 값을,
+	 * Workflow를 FAIL로 끝낼 때 남길 메시지를 만듭니다. 고른 route(ROUTER, routes를 적은 APPROVAL)가 FAIL이거나
+	 * 성공했는데 onSuccess가 FAIL이면 그 step의 output을 글자로 바꾼 값을,
 	 * 실패했는데 onFailure가 없으면 그 사실을 덧붙인 실패 사유를, 그 밖에는 실패 사유를 씁니다.
 	 *
 	 * @param step    방금 끝난 step의 정의입니다.
 	 * @param outcome 그 step의 결과입니다.
 	 */
 	private String failMessage(StepDefinition step, StepOutcome outcome) {
+		if (outcome.success() && outcome.route() != null) {
+			return "step[" + step.id() + "]에서 고른 route '" + outcome.route() + "'가 FAIL이라 Workflow를 끝냈습니다: " + JsonSchemaUtil.toText(outcome.output());
+		}
 		if (outcome.success()) {
 			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + JsonSchemaUtil.toText(outcome.output());
 		}

@@ -56,6 +56,8 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 		body.put("approved", request.approved());
 		body.put("approver", request.approver());
 		body.put("comment", request.comment());
+		// 선택지 방식 APPROVAL이면 고른 이름을 함께 보낸다(승인/반려 방식이면 null이고, 엔진이 무시한다).
+		body.put("route", request.route());
 
 		return this.getWebClient().post()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/decision", request.executionId())

@@ -389,3 +389,30 @@ AOP(`ConfigCallLog`)에 맡기지 않는 이유: 콜백은 `AgentExecutor` 안�
 | `pilot-source-investigator-agent` 단독 호출 | `{summary, findings}` 반환, 잘못된 input은 400 |
 
 `pilot-workflow` 전체 실행은 하지 않았다(작업 폴더에 문서와 소스를 쓰는 Workflow라서).
+
+## 10. 추가: APPROVAL 선택지 방식 (2026-10-01)
+
+`pilot-workflow`에서 리뷰(step03)가 불통과일 때 사람이 "재분석(step02)", "직접 고친 뒤 리뷰만 다시(step03)", "진행(step05)" 중에서
+고르고 싶다는 요구에서 나왔다. 기존 엔진으로는 두 가지가 막혔다.
+
+1. 승인 결정이 `approvals.<stepId>`에 실행이 끝날 때까지 남아서, 되돌아온 APPROVAL step이 사람에게 묻지 않고 지난 결정을 또 읽었다.
+2. APPROVAL의 갈래가 승인/반려 둘뿐이었다.
+
+**결정**
+
+| 주제 | 결정 |
+|---|---|
+| 갈래 | APPROVAL에 `routes`(이름 → 갈 곳)를 적으면 사람이 이름 하나를 고르는 선택지 방식. ROUTER의 `routes`와 같은 모양 |
+| 기존 방식 | `routes`가 없으면 그대로 승인/반려. `routes`와 `onSuccess`/`onFailure`를 함께 적으면 기동 실패 |
+| decision API | `{route, approver, comment}`. `routes`에 없는 이름은 400이고 실행은 대기 상태로 남는다. `approved`는 생략 가능(`Boolean`) |
+| output | 선택지 방식은 `{route, approver, comment}`(엔진 고정) |
+| 결정 지우기 | `ApprovalStepExecutor`가 결정을 읽은 직후 `approvals`에서 지운다. 두 방식 모두 적용. 직전 결정은 `steps.<id>.output`에 남는다 |
+| 화면 | 실행 상세 응답에 `pendingApproval {stepId, approverRole, routes}`를 추가. dstone-boot 관리자 화면이 선택지 이름마다 버튼을 그린다 |
+| 의견 전달 | 엔진이 따로 넘기지 않는다. 되돌아간 step의 `input`이 `"${ .steps.<승인 step>.output.comment }"`로 직접 꺼낸다(숨은 이름 없음 원칙) |
+
+**pilot-workflow**: step04를 `routes: {진행: step05, 재분석: step02, 재리뷰: step03, 중단: FAIL}`로 바꿨고,
+`pilot-impact-analyzer-agent`에 선택 필드 `feedback`(리뷰 불통과 사유 + 승인자 의견)을 추가했다.
+
+**검증**: `sample-approval-routes-loop`(LLM 없음)로 대기 → 없는 이름 400 → `route` 없이 400 → 다시 → 다시 → 완료, 중단(FAILED),
+기존 승인/반려 방식의 승인·반려, 깨진 YAML 3가지(함께 적음, 빈 `routes`, 없는 step)와 경고 1가지(`routes`인데 `output.approved` 참조)를 확인했다.
+`pilot-workflow` 전체 실행과 dstone-boot 화면의 버튼 동작은 직접 돌려 보지 않았다(dstone-boot는 컴파일만 확인).

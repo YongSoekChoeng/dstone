@@ -41,6 +41,10 @@ var DstoneAiWorkflow = (function () {
 			input: "승인 테스트",
 			note: "제출하면 WAITING_APPROVAL로 멈춥니다. 관리자 화면에서 승인/반려하세요."
 		},
+		"sample-approval-routes-loop": {
+			input: "선택지 테스트",
+			note: "제출하면 WAITING_APPROVAL로 멈춥니다. 관리자 화면에서 완료/다시/중단 중 하나를 고르세요. '다시'를 고르면 같은 승인 step으로 되돌아와 다시 묻습니다."
+		},
 		"sample-foreach-parallel": {
 			input: { sqlList: ["SELECT 1 FROM dual", "SELECT name FROM member WHERE id = 1"] },
 			note: "sqlList에 \"SELEC 1 FROM dual\"처럼 틀린 SQL을 하나 넣으면 FAIL로 끝나는 것도 확인할 수 있습니다."

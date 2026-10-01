@@ -19,7 +19,9 @@ import java.util.Map;
  * @param createdAt        생성 시각
  * @param updatedAt        마지막 상태 변경 시각
  * @param history          스텝별 실행 이력(오래된 순)
+ * @param pendingApproval  승인 대기일 때 기다리는 결정({stepId, approverRole, routes}). routes가 비어 있으면 승인/반려,
+ *                         이름이 있으면 그중 하나를 고르는 방식이다. 승인 대기가 아니면 null
  */
 public record WorkFlowExecutionDetailResult(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, String createdAt, String updatedAt,
-	List<WorkFlowStepHistoryResult> history) {
+	List<WorkFlowStepHistoryResult> history, Map<String, Object> pendingApproval) {
 }
