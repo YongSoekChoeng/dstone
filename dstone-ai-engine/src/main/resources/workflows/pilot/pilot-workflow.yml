@@ -42,7 +42,7 @@ workflow:
       type: APPROVAL
       approverRole: "PL"
       onSuccess: step05
-      onFailure: FAIL
+      onFailure: step02
       
     # 아키텍처 설계
     - id: step05
