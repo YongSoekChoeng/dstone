@@ -234,6 +234,7 @@ public class AgentExecutor extends BaseObject {
 		}
 		
 		StringBuffer question = new StringBuffer();
+		String answer = "";
 		String jsonSchema = JsonSchemaUtil.toPrettyJson(schema);
 		question.append(userMessage).append("\n");
 		question.append("-------------------------------------------------------------------------------").append("\n");
@@ -242,7 +243,11 @@ public class AgentExecutor extends BaseObject {
 		question.append("The JSON value must strictly follow this JSON Schema:").append("\n");
 		question.append(jsonSchema).append("\n");
 		
-		String answer = spec.user(question.toString()).call().content();
+		try {
+			answer = spec.user(question.toString()).call().content();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return this.convert(answer, schema);
 	}
 	

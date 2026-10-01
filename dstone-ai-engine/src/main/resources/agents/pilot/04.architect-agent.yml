@@ -1,5 +1,5 @@
 agent:
-  id: architect-agent
+  id: pilot-architect-agent
   description: 설계 에이젼트
   prompt: |
     [역할] 너는 이 시스템의 애플리케이션 아키텍트다.

@@ -1,12 +1,23 @@
 package net.dstone.ai.common.config;
 
 import java.lang.reflect.Method;
+import java.util.function.Function;
 
 import org.apache.logging.log4j.ThreadContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.jspecify.annotations.Nullable;
+import org.springframework.ai.chat.client.ChatClientMessageAggregator;
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.util.JacksonUtils;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +26,9 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.ConvertUtil;
 import net.dstone.common.utils.StringUtil;
+import reactor.core.publisher.Flux;
 
 /**
  * <pre>
@@ -127,6 +140,9 @@ public class ConfigCallLog extends BaseObject {
 	}
 
 	private final static String SAPERATE_LINE = "\n|--------------------------------------------------------------------------------------------------------------------------------------|\n";
+
+	private final static String SAPERATE_LINE_HALF_PRONT = "\n|----------------------------------------------------";
+	private final static String SAPERATE_LINE_HALF_END = "----------------------------------------------------|\n";
 	
 	private final static String WORKFLOW_POINTCUT 	= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))" + " && !" + NO_LOG_REGEX;
 	private final static String STEPEXECUTOR_POINTCUT = "execution(* net.dstone.ai.runtime.step.*StepExecutor.run(..))" + " && !" + NO_LOG_REGEX;
@@ -419,5 +435,102 @@ public class ConfigCallLog extends BaseObject {
 	}
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
+	
+	public static class LlmLoggerAdvisor extends BaseObject implements CallAdvisor, StreamAdvisor {
+		
+		public static boolean IS_LLM_LOGGING_YN = true;
+
+		protected void logRequest(ChatClientRequest request) {
+			StringBuffer log = new StringBuffer();
+			log.append("\n");
+			log.append(SAPERATE_LINE_HALF_PRONT);
+			log.append("[LLM Call Request] Start !!!" );
+			log.append(SAPERATE_LINE_HALF_END);
+			log.append("\n");
+			log.append(ConvertUtil.convertToJson(request));
+			log.append("\n");
+			log.append(SAPERATE_LINE_HALF_PRONT);
+			log.append("[LLM Call Request] End !!!" );
+			log.append(SAPERATE_LINE_HALF_END);
+			this.info(log.toString());
+			//this.debug(log.toString());
+		}
+		protected void logResponse(ChatClientResponse response) {
+			StringBuffer log = new StringBuffer();
+			log.append("\n");
+			log.append(SAPERATE_LINE_HALF_PRONT);
+			log.append("[LLM Call Response] Start !!!" );
+			log.append(SAPERATE_LINE_HALF_END);
+			log.append("\n");
+			log.append(ConvertUtil.convertToJson(response));
+			log.append("\n");
+			log.append(SAPERATE_LINE_HALF_PRONT);
+			log.append("[LLM Call Response] End !!!" );
+			log.append(SAPERATE_LINE_HALF_END);
+			this.info(log.toString());
+			//this.debug(log.toString());
+		}
+
+		public static final Function<@Nullable ChatClientRequest, String> DEFAULT_REQUEST_TO_STRING = chatClientRequest -> chatClientRequest != null ? chatClientRequest.toString() : "null";
+		public static final Function<@Nullable ChatResponse, String> DEFAULT_RESPONSE_TO_STRING = object -> object != null ? JacksonUtils.getDefaultJsonMapper().writerWithDefaultPrettyPrinter().writeValueAsString(object) : "null";
+		private final Function<@Nullable ChatClientRequest, String> requestToString;
+		private final Function<@Nullable ChatResponse, String> responseToString;
+		private final int order;
+
+		public LlmLoggerAdvisor(@Nullable Function<@Nullable ChatClientRequest, String> requestToString,
+				@Nullable Function<@Nullable ChatResponse, String> responseToString, int order) {
+			this.requestToString = requestToString != null ? requestToString : DEFAULT_REQUEST_TO_STRING;
+			this.responseToString = responseToString != null ? responseToString : DEFAULT_RESPONSE_TO_STRING;
+			this.order = order;
+		}
+		
+		@Override
+		public String getName() {
+			return this.getClass().getSimpleName();
+		}
+		@Override
+		public int getOrder() {
+			return this.order;
+		}
+		@Override
+		public ChatClientResponse adviseCall(ChatClientRequest chatClientRequest, CallAdvisorChain callAdvisorChain) {
+			logRequest(chatClientRequest);
+			ChatClientResponse chatClientResponse = callAdvisorChain.nextCall(chatClientRequest);
+			logResponse(chatClientResponse);
+			return chatClientResponse;
+		}
+		@Override
+		public Flux<ChatClientResponse> adviseStream(ChatClientRequest chatClientRequest, StreamAdvisorChain streamAdvisorChain) {
+			logRequest(chatClientRequest);
+			Flux<ChatClientResponse> chatClientResponses = streamAdvisorChain.nextStream(chatClientRequest);
+			return new ChatClientMessageAggregator().aggregateChatClientResponse(chatClientResponses, this::logResponse);
+		}
+		public static Builder builder() {
+			return new Builder();
+		}
+		public static final class Builder {
+			private @Nullable Function<@Nullable ChatClientRequest, String> requestToString;
+			private @Nullable Function<@Nullable ChatResponse, String> responseToString;
+			private int order = 0;
+			private Builder() {
+			}
+			public Builder requestToString(Function<@Nullable ChatClientRequest, String> requestToString) {
+				this.requestToString = requestToString;
+				return this;
+			}
+			public Builder responseToString(Function<@Nullable ChatResponse, String> responseToString) {
+				this.responseToString = responseToString;
+				return this;
+			}
+			public Builder order(int order) {
+				this.order = order;
+				return this;
+			}
+			public LlmLoggerAdvisor build() {
+				return new LlmLoggerAdvisor(this.requestToString, this.responseToString, this.order);
+			}
+		}
+
+	}
 
 }

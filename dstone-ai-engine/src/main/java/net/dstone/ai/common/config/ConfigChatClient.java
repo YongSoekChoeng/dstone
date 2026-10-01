@@ -103,9 +103,11 @@ public class ConfigChatClient {
 	List<Advisor> defaultAdvisors(List<Advisor> advisors) {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
-		// 로깅하는 Advisor 등록
-		SimpleLoggerAdvisor simpleLoggerAdvisor = SimpleLoggerAdvisor.builder().order(Ordered.LOWEST_PRECEDENCE-1).build();
-		advisorList.add(simpleLoggerAdvisor);
+		// LLM 로깅하는 Advisor 등록
+		if(net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor.IS_LLM_LOGGING_YN) {
+			net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor llmLoggerAdvisor = net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor.builder().build();
+			advisorList.add(llmLoggerAdvisor);
+		}
 		
 		return advisorList;
 	}

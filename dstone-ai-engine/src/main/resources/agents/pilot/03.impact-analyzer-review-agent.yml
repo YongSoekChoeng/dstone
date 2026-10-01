@@ -1,5 +1,5 @@
 agent:
-  id: impact-analyzer-review-agent
+  id: pilot-impact-analyzer-review-agent
   description: 영향도 분석 리뷰어
   prompt: |
     [역할] 너는 이 시스템의 애플리케이션 분석에 대해 엄격히 검사하는 검수자이다. 이 코드를 작성하지 않았다.

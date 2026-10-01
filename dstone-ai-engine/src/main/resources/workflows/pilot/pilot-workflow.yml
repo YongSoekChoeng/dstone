@@ -9,41 +9,63 @@ workflow:
   
   # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
   steps:
-
+    
+    # 요구사항 분석
     - id: step01
       type: AGENT
-      ref: requirment-analyzer-agent
+      ref: pilot-requirment-analyzer-agent
       input: 
         workDir: "${ .input }"
       onSuccess: step02
       onFailure: FAIL
 
+    # 영향도 분석
     - id: step02
       type: AGENT
-      ref: impact-analyzer-agent
+      ref: pilot-impact-analyzer-agent
       input: 
         workDir: "${ .input }"
       onSuccess: step03
       onFailure: FAIL
       
+    # 요구사항/영향도 분석문서 리뷰
     - id: step03
       type: SUPERVISOR
-      ref: impact-analyzer-review-agent
+      ref: pilot-impact-analyzer-review-agent
       input:
         workDir: "${ .input }"
       onSuccess: step04
       onFailure: step04
       
+    # 분석문서 리뷰 후 승인
     - id: step04
       type: APPROVAL
       approverRole: "PL"
       onSuccess: step05
       onFailure: FAIL
       
+    # 아키텍처 설계
     - id: step05
       type: AGENT
-      ref: architect-agent
+      ref: pilot-architect-agent
       input: 
         workDir: "${ .input }"
       onSuccess: SUCCESS
       onFailure: FAIL
+      
+    # 설계문서 리뷰 후 승인
+    - id: step06
+      type: APPROVAL
+      approverRole: "PL"
+      onSuccess: step07
+      onFailure: FAIL
+      
+    # 구현
+    - id: step07
+      type: AGENT
+      ref: pilot-developer-agent
+      input: 
+        workDir: "${ .input }"
+      onSuccess: SUCCESS
+      onFailure: FAIL
+      

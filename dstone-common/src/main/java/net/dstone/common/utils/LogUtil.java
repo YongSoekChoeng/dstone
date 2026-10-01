@@ -37,7 +37,6 @@ public class LogUtil {
 		}
 		return this.logger;
 	}
-
 	public static boolean IS_SYS_PROPERTIES_SET = false;
 	@SuppressWarnings("rawtypes")
 	public static void setSysProperties() {

@@ -1,5 +1,5 @@
 agent:
-  id: requirment-analyzer-agent
+  id: pilot-requirment-analyzer-agent
   description: 요구사항 분석/정의 에이젼트
   prompt: |
     [역할] 너는 고객의 업무를 이해하는 시니어 업무 분석가다.

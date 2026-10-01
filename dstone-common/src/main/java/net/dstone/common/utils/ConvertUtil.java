@@ -9,28 +9,33 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import jakarta.servlet.ServletInputStream;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import org.springframework.util.StreamUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 public class ConvertUtil {
+	
+    // Jackson 3.x 방식: JsonMapper 빌더를 통해 불변 ObjectMapper 생성
+    private static final ObjectMapper objectMapper = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT) // 들여쓰기 활성화
+            .build();
 
 	public static Map<String, Object> convertToMap(HttpServletRequest request) {
 		Map<String, Object> map = new HashMap<String, Object>();
-		ObjectMapper mapper = new ObjectMapper();
 		try {
 
 			ServletInputStream inputStream = request.getInputStream();
 			String messageBody = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
 			messageBody = StringUtil.replace(messageBody, ": null", ": \"\"");
 
-			map = mapper.readValue(messageBody, Map.class);
+			map = objectMapper.readValue(messageBody, Map.class);
 		} catch (Exception e) {
 			// e.printStackTrace();
 		}
@@ -39,9 +44,8 @@ public class ConvertUtil {
 
 	public static String convertToJson(Object param) {
 		String jsonStr = "";
-		ObjectMapper mapper = new ObjectMapper();
 		try {
-			jsonStr = mapper.writeValueAsString(param);
+			jsonStr = objectMapper.writeValueAsString(param);
 		} catch (Exception e) {
 			// e.printStackTrace();
 		}
