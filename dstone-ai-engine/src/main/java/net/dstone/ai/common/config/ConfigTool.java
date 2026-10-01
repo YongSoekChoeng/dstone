@@ -39,7 +39,7 @@ import net.dstone.common.utils.LogUtil;
  * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로
  * 보고 등록된 Tool을 전부 허용합니다.
  *
- * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌웁니다(LimitedToolCallback).
+ * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌우고, 호출할 때마다 로그 한 줄(이름, 인자, 결과 길이)을 남깁니다(LimitedToolCallback).
  * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면
  * 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. Tool마다 따로 막으면 새 Tool이나
  * MCP Tool에서 같은 사고가 또 나므로, 여기서 마지막 안전망을 하나 둡니다.
@@ -262,6 +262,9 @@ public class ConfigTool extends BaseObject {
 	 */
 	private static final class LimitedToolCallback implements ToolCallback {
 
+		/** 호출 로그에 남길 인자의 최대 글자 수입니다. */
+		private static final int MAX_LOGGED_ARGUMENT_CHARS = 300;
+
 		private final ToolCallback delegate;
 		private final int maxResultChars;
 
@@ -286,12 +289,28 @@ public class ConfigTool extends BaseObject {
 
 		@Override
 		public String call(String toolInput) {
-			return this.limit(this.delegate.call(toolInput));
+			return this.logged(toolInput, this.limit(this.delegate.call(toolInput)));
 		}
 
 		@Override
 		public String call(String toolInput, ToolContext toolContext) {
-			return this.limit(this.delegate.call(toolInput, toolContext));
+			return this.logged(toolInput, this.limit(this.delegate.call(toolInput, toolContext)));
+		}
+
+		/**
+		 * Tool을 한 번 부를 때마다 이름, 인자, 결과 길이를 한 줄로 남기고 결과를 그대로 돌려줍니다.
+		 * LLM이 스스로 Tool을 고르는 호출은 다른 곳에 기록이 남지 않습니다. 이 한 줄이 없으면 LLM이 같은 검색을
+		 * 수십 번 되풀이할 때 무엇을 찾고 있었는지 알 수 없습니다(실제로 searchInFiles를 40번 반복하다 실패한 적이 있습니다).
+		 * 인자가 길면(파일 내용을 통째로 넘기는 writeFile 등) 앞부분만 남깁니다.
+		 */
+		private String logged(String toolInput, String result) {
+			String arguments = toolInput == null ? "" : toolInput.replace('\n', ' ');
+			if (arguments.length() > MAX_LOGGED_ARGUMENT_CHARS) {
+				arguments = arguments.substring(0, MAX_LOGGED_ARGUMENT_CHARS) + "...(전체 " + toolInput.length() + "자)";
+			}
+			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 호출 - 인자 " + arguments
+				+ " / 결과 " + (result == null ? 0 : result.length()) + "자");
+			return result;
 		}
 
 		/** 결과가 상한을 넘으면 앞부분만 남기고 안내를 붙입니다. */
