@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
@@ -119,6 +120,45 @@ public class ConfigTool extends BaseObject {
 		}
 		ToolCallback[] filtered = filteredList.toArray(new ToolCallback[0]);
 		return ToolCallbackProvider.from(filtered);
+	}
+
+	/**
+	 * <pre>
+	 * Agent 하나에 붙일 Tool을 골라 돌려줍니다. 두 목록을 모두 통과한 Tool만 남습니다.
+	 * - caller 화이트리스트(dstone.ai.tool.allowed-by-caller): 이 앱이 쓸 수 있는 Tool
+	 * - Agent의 tools(agents/*.yml): 이 Agent가 쓰겠다고 적은 Tool
+	 *
+	 * Agent의 tools가 비어 있으면 아무 Tool도 붙지 않습니다. "*" 하나만 적혀 있으면 caller 화이트리스트를
+	 * 통과한 Tool이 전부 붙습니다.
+	 * </pre>
+	 *
+	 * @param caller    Tool 화이트리스트를 조회할 호출 주체(tenant)
+	 * @param toolNames Agent가 쓰겠다고 적은 Tool 이름 목록(AgentDefinition.toolNames())
+	 */
+	public List<ToolCallback> toolCallbacks(String caller, List<String> toolNames) {
+		List<ToolCallback> result = new ArrayList<>();
+		if (toolNames == null || toolNames.isEmpty()) {
+			return result;
+		}
+		boolean all = toolNames.contains(AgentDefinition.ALL_TOOLS);
+		for (ToolCallback callback : this.toolCallbackProvider(caller).getToolCallbacks()) {
+			if (all || toolNames.contains(callback.getToolDefinition().name())) {
+				result.add(callback);
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 엔진이 직접 만든 ToolCallback에도 "결과 크기 상한"을 씌워 돌려줍니다.
+	 * Sub Agent(runtime.agent.SubAgentToolCallback)의 답도 부모의 대화에 쌓이므로, 다른 Tool과 같은 상한을 씁니다.
+	 * </pre>
+	 *
+	 * @param callback 상한을 씌울 ToolCallback
+	 */
+	public ToolCallback limited(ToolCallback callback) {
+		return new LimitedToolCallback(callback, this.maxResultChars());
 	}
 
 	/**

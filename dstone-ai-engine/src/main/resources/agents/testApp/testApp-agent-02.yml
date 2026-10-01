@@ -8,6 +8,7 @@ agent:
     분석/설계서의 내용을 확인하고 리뷰를 작성합니다.
     리뷰의 결과는 진행난이도, 투입인력, 진행예상기간 등을 포함한 종합의견 입니다.
     최대한 상세한 의견을 내되 향후 계획이 포함되어야 합니다.
+    분석/설계서에 적힌 내용만 근거로 삼고, 근거가 부족해 판단하기 어려운 부분은 그렇다고 밝히십시오.
   input: 
     schema: 
       type: object
@@ -19,5 +20,4 @@ agent:
         5. 확인이 필요한 질문: list<string>
       required: [1. 요청 배경/목적 요약, 2. 현재 상태(As-Is), 3. 제안 설계(To-Be)]  
   output: string
-  toolsEnabled: false
   ragEnabled: false

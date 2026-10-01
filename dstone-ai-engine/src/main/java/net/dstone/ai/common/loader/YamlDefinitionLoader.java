@@ -219,7 +219,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * - type 값이 없거나 틀림: 쓸 수 있는 type 값을 알려줍니다.
 	 * - 값의 모양이 다름: 예를 들어 TOOL step의 input을 맵이 아니라 문자열로 적은 경우입니다.
 	 * - 값을 만들다 실패함: 예를 들어 스키마 축약형에 없는 타입 이름(output: strng)을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
-	 * 없어진 키(AGENT step의 output, TOOL step의 output/pattern, workflow.inputs)를 적었으면 새 모양도 함께 알려줍니다.
+	 * 없어진 키(AGENT step의 output, TOOL step의 output/pattern, workflow.inputs, Agent의 toolsEnabled)를 적었으면 새 모양도 함께 알려줍니다.
 	 * </pre>
 	 *
 	 * @param e convertValue()가 던진 예외
@@ -269,6 +269,9 @@ public class YamlDefinitionLoader extends BaseObject {
 		}
 		if (WorkFlowDefinition.class.equals(owner) && "inputs".equals(key)) {
 			return " inputs는 input으로 바뀌었습니다. 예: input: {schema: {type: object, properties: {sqlList: list<string>}}}";
+		}
+		if (AgentDefinition.class.equals(owner) && "toolsEnabled".equals(key)) {
+			return " toolsEnabled는 없어졌습니다. 쓸 Tool을 이름으로 적습니다. 예: tools: [searchInFiles, readFile] (Tool을 쓰지 않으면 tools를 적지 않습니다. 전부 허용은 tools: [\"*\"])";
 		}
 		if (SchemaDefinition.class.equals(owner)) {
 			return " input/output 아래에는 schema: 하나만 적고, 그 안에 JSON Schema를 적습니다. 예: output: {schema: {type: object, properties: {...}}} 또는 output: string";

@@ -57,7 +57,8 @@ import net.dstone.common.utils.StringUtil;
  * 3) step 모양(오류, validateStepShape): 부르는 대상의 계약과 맞는가
  *    - ref가 필요한 step에 ref가 있는가, AGENT류의 ref가 등록된 Agent인가
  *    - AGENT/SUPERVISOR/ROUTER: input이 있는가, 모양이 Agent input과 맞는가(string이면 값 하나, object면 맵 + 필드 이름)
- *    - SUPERVISOR/ROUTER: 부르는 Agent가 output을 선언하지 않았는가(답의 모양은 엔진이 정함)
+ *    - SUPERVISOR/ROUTER: 부르는 Agent가 output을 선언하지 않았는가(답의 모양은 엔진이 정함), subAgents를 가지지 않았는가
+ *                         (경고) tools: ["*"]로 Tool을 전부 열어 두지 않았는가
  *    - TOOL: input의 인자 이름이 Tool의 인자 스키마와 맞는가(Tool을 찾지 못하면 경고만 남기고 실행 중에 검사)
  *    - ROUTER routes가 최소 1개 있는가, memory: true와 forEach를 함께 쓰지 않았는가, forEach가 표현식인가
  * 4) 표현식(validateTemplate): step input, forEach, Workflow output.value 안의 모든 값에 대해
@@ -350,6 +351,13 @@ public class WorkFlowRegistry extends BaseObject {
 		if (engineOwnsOutput && agent.output() != null) {
 			throw this.error(definition, step, step.type() + " step이 부르는 agent[" + ref + "]는 output을 선언하지 않습니다(답의 모양은 엔진이 "
 				+ (step instanceof RouterStepDefinition ? "{route, reason}" : "{pass, reason}") + "으로 정합니다). agents/*.yml에서 output을 지우십시오.");
+		}
+		if (engineOwnsOutput && !agent.subAgentIds().isEmpty()) {
+			throw this.error(definition, step, step.type() + " step이 부르는 agent[" + ref + "]는 subAgents를 가질 수 없습니다"
+				+ "(판정이나 분류만 하는 Agent는 다른 Agent에게 일을 맡기지 않습니다). AGENT step으로 바꾸거나 agents/*.yml에서 subAgents를 지우십시오.");
+		}
+		if (engineOwnsOutput && agent.allowsAllTools()) {
+			this.warn(definition, step, step.type() + " step이 부르는 agent[" + ref + "]가 tools: [\"*\"]로 등록된 Tool을 전부 쓸 수 있습니다. 판정이나 분류에 필요한 Tool만 이름으로 적는 것이 안전합니다.");
 		}
 		if (input == null) {
 			throw this.error(definition, step, "input이 있어야 합니다(Agent에게 무엇을 넣을지). 예: input: \"${ .input }\" 또는 input: \"${ .steps.앞step.output }\"");

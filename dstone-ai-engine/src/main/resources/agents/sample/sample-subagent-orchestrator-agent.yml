@@ -1,0 +1,36 @@
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
+#
+# 이 Agent는 Sub Agent(subAgents) 기능을 보여주는 예시입니다. subAgents에 다른 Agent의 id를 적으면,
+# 이 Agent의 LLM에게 그 Agent가 Tool 하나처럼 보이고, LLM이 필요할 때 스스로 골라 일을 맡깁니다
+# (runtime.agent.SubAgentToolCallback). workflows/sample/sample-agent-subagent-delegate.yml이 이 Agent를 씁니다.
+#
+# 맡는 쪽 Agent는 따로 표시할 것이 없는 평범한 Agent입니다. 여기서는 이미 있는 두 Agent를 그대로 다시 씁니다.
+# - sample-structured-extract-agent: input이 string입니다. Tool 인자는 object여야 하므로 엔진이 {input: 글자}
+#   모양으로 한 겹 감싸서 보여 주고, 호출을 받으면 다시 풀어서 넘깁니다. 답은 {sql} 모양의 JSON 글자로 돌아옵니다.
+# - sample-fix-agent: input이 object({sql, error})입니다. 이 스키마가 그대로 Tool 인자 스키마가 됩니다.
+#
+# 알아 둘 규칙
+# - 맡는 쪽은 빈 대화에서 시작합니다. 이 Agent의 prompt나 대화 내용은 보지 못하고, 넘겨받은 인자만 봅니다.
+#   그래서 맡길 때 필요한 내용을 인자에 모두 담으라고 prompt에 적어 두었습니다.
+# - 맡는 쪽 Agent는 description이 꼭 있어야 합니다. 이 Agent의 LLM이 그 설명을 보고 맡길지 정합니다.
+# - 깊이는 한 단계뿐입니다. subAgents에 적힌 Agent가 또 subAgents를 가지면 엔진이 켜질 때 막힙니다.
+# - 한 번 불렸을 때 Sub Agent를 부를 수 있는 횟수는 dstone.ai.agent.sub-agent.max-calls(기본 10)까지입니다.
+# - tools(validateSqlSyntax)와 subAgents는 따로입니다. Tool은 자바 코드가 바로 실행하고, Sub Agent는 LLM을 한 번 더 부릅니다.
+agent:
+  id: sample-subagent-orchestrator-agent
+  description: Sub Agent 확인용 - 문장에서 SQL을 뽑고 검증하고 고치는 일을 다른 Agent와 Tool에게 맡겨 처리한다.
+  prompt: |
+    당신은 SQL 관련 요청을 받아 처리 순서를 정하고 일을 맡기는 조율 담당 AI 어시스턴트입니다.
+    SQL을 직접 뽑거나 고치지 말고, 아래 순서대로 맡기십시오.
+
+    1. sample-structured-extract-agent에게 사용자 문장 전체를 넘겨 SQL 문 하나를 뽑게 합니다.
+    2. 뽑힌 SQL을 validateSqlSyntax로 검사합니다.
+    3. 검사가 실패하면 sample-fix-agent에게 실패한 SQL과 실패 사유를 넘겨 고치게 하고, 고친 SQL을 다시 검사합니다.
+       고치기는 두 번까지만 시도합니다.
+    4. 최종 SQL과, 어떤 과정을 거쳤는지를 한국어 두세 문장으로 답합니다. 끝내 검사를 통과하지 못했으면 그렇다고 밝힙니다.
+
+    일을 맡은 Agent는 이 대화를 보지 못합니다. 필요한 내용은 인자에 모두 담아 넘기십시오.
+    맡긴 결과가 "실패:"로 시작하면 그 이유를 읽고 인자를 고쳐 다시 맡기십시오.
+  tools: [validateSqlSyntax]
+  subAgents: [sample-structured-extract-agent, sample-fix-agent]
+  ragEnabled: false

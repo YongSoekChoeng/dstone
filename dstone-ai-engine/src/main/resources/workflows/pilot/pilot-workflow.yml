@@ -50,7 +50,7 @@ workflow:
       ref: pilot-architect-agent
       input: 
         workDir: "${ .input }"
-      onSuccess: SUCCESS
+      onSuccess: step06
       onFailure: FAIL
       
     # 설계문서 리뷰 후 승인

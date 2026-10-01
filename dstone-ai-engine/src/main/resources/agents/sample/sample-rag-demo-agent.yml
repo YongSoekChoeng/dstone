@@ -22,7 +22,6 @@ agent:
     간단히 언급하십시오. [참고자료]가 비어 있거나 없으면 일반 지식으로 답하되, 참고자료 없이
     답한다는 점을 밝히십시오.
     답변은 항상 한국어로 합니다.
-  toolsEnabled: false
   ragEnabled: true
   ragTopK: 3
   ragSimilarityThreshold: 0.3

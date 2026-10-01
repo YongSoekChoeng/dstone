@@ -1,8 +1,10 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,7 +14,9 @@ import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -23,7 +27,9 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.rag.RagRetrievalChain;
+import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
+import net.dstone.ai.runtime.prompt.EnginePrompt;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -31,7 +37,7 @@ import reactor.core.publisher.Flux;
 /**
  * <pre>
  * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
- * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 toolsEnabled(Tool 사용 여부), ragEnabled(RAG 사용 여부)를 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
+ * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 tools(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), ragEnabled(RAG 사용 여부)를 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
  * 그래서 api.controller.ChatController (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 
  * runtime.step의 AgentStepExecutor/SupervisorStepExecutor/RouterStepExecutor(Workflow 안에서 AGENT/SUPERVISOR/ROUTER step을 실행하는 경우)
  * 모두 결국 이 클래스를 통해서 LLM을 호출합니다.
@@ -52,6 +58,16 @@ import reactor.core.publisher.Flux;
  *   input:  {schema: {type: object, properties: {role: string, message: string}}}
  *   prompt: 당신은 {role} 역할을 맡은 상담원입니다.
  *
+ * ## 시스템 프롬프트
+ * 시스템 프롬프트는 항상 "엔진 규칙 + 업무 지시(Agent prompt)" 순서입니다(runtime.prompt.EnginePrompt).
+ * 엔진 규칙에는 공통 규칙이 항상 들어가고, 부르는 쪽이 넘긴 규칙(engineRule)이 있으면 그 뒤에 붙습니다.
+ * SUPERVISOR/ROUTER step과 Sub Agent 호출이 자기 규칙을 넘기고, AGENT step과 채팅 API는 넘기지 않습니다(null).
+ *
+ * ## Tool과 Sub Agent
+ * - Tool: Agent의 tools에 적힌 이름 중 caller 화이트리스트도 통과한 것만 LLM에게 보입니다.
+ * - Sub Agent: Agent의 subAgents에 적힌 Agent가 Tool처럼 보입니다(SubAgentToolCallback). LLM이 골라 부르면
+ *   그 Agent를 이 클래스의 call()로 한 번 더 부릅니다. 깊이는 한 단계뿐입니다(기동할 때 AgentRegistry가 검사합니다).
+ *
  * LLM을 부르는 방법은 세 가지입니다.
  * - call(): Agent의 output 계약대로 답을 받습니다. 채팅 API와 AGENT step이 씁니다.
  * - stream(): 답을 토큰 단위로 흘려보냅니다. output이 string인 Agent만 쓸 수 있습니다(채팅 화면 전용).
@@ -59,7 +75,8 @@ import reactor.core.publisher.Flux;
  *
  * call()/stream() 메서드에는 ragOverride/toolsOverride/modelOverride라는 파라미터가 있습니다. 
  * 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도 null이면 provider 공통 기본 모델을 씁니다), 
- * 값을 직접 주면 그 한 번의 호출에서만 Agent 정의를 무시하고 그 값을 강제로 적용합니다. 
+ * 값을 직접 주면 그 한 번의 호출에서만 그 값을 적용합니다.
+ * 단, toolsOverride는 Agent의 tools 목록을 "이번에 쓸지 말지"만 정합니다. true를 줘도 목록에 없는 Tool은 켜지지 않습니다. 
  * 예를 들어 dstone-boot의 채팅 화면에서는 같은 Agent를 쓰면서도 사용자가 화면에서 RAG/Tool을 켜고 끄거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 override 값들을 그대로 넘겨줍니다. 
  * 반면 Workflow의 step은 이 세 값을 항상 null로 넘겨서(callForSchema()에는 아예 없습니다), Agent 정의에 적힌 값을 그대로 씁니다.
  * </pre>
@@ -84,6 +101,10 @@ public class AgentExecutor extends BaseObject {
 	private RagRetrievalChain ragRetrievalChain;
 	@Autowired
 	private ConfigTool configTool;
+	@Autowired
+	private AgentRegistry agentRegistry;
+	@Autowired
+	private Environment environment;
 
 	/**
 	 * <pre>
@@ -98,13 +119,14 @@ public class AgentExecutor extends BaseObject {
 	 * @param variables     프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
-	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @param engineRule    엔진 규칙에 덧붙일 문구(EnginePrompt.SUB_AGENT 등). 덧붙일 것이 없으면 null
 	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
-	public Object call(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public Object call(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride, engineRule);
 		return this.ask(spec, userMessage, agent.outputSchema());
 	}
 
@@ -123,11 +145,12 @@ public class AgentExecutor extends BaseObject {
 	 * @param caller    이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param input     Agent에게 넣을 값(Agent input 모양)
 	 * @param schema    LLM의 답이 따라야 할 JSON Schema
+	 * @param engineRule 엔진 규칙에 덧붙일 문구(EnginePrompt.SUPERVISOR / EnginePrompt.ROUTER). 덧붙일 것이 없으면 null
 	 * @throws AgentContractException input이나 LLM의 답이 계약과 맞지 않을 때
 	 */
-	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema) {
+	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, null), null, null, null);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, null), null, null, null, engineRule);
 		return this.ask(spec, userMessage, schema);
 	}
 
@@ -146,7 +169,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param variables     프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
-	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
@@ -155,7 +178,7 @@ public class AgentExecutor extends BaseObject {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
-		return this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride).user(userMessage).stream().content();
+		return this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride, null).user(userMessage).stream().content();
 	}
 
 	/**
@@ -274,7 +297,7 @@ public class AgentExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * 위의 call()/callForSchema()/stream() 메서드가 공통으로 쓰는, "LLM에게 보낼 요청을
-	 * 하나씩 조립하는" 메서드입니다. 세션 유지 → 시스템 프롬프트 → RAG → Tool → 모델 지정 → Advisor 순서로
+	 * 하나씩 조립하는" 메서드입니다. 세션 유지 → 시스템 프롬프트 → RAG → Tool/Sub Agent → 모델 지정 → Advisor 순서로
 	 * 차례차례 설정을 붙여서 최종 요청 스펙(ChatClientRequestSpec)을 만들어 돌려줍니다.
 	 * </pre>
 	 *
@@ -283,13 +306,15 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent         호출할 Agent의 정의
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵(promptVariables()로 만든 값)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
-	 * @param toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
-		boolean toolsEnabled = toolsOverride != null ? toolsOverride : agent.toolsEnabled();
+		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
+		boolean toolsEnabled = !Boolean.FALSE.equals(toolsOverride);
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : agent.model();
 
 		/************************************************************************
@@ -322,15 +347,16 @@ public class AgentExecutor extends BaseObject {
 
 		/************************************************************************
 		3. 시스템 프롬프트를 적용합니다.
-			- AgentDefinition.prompt()에 적힌 문구를 그대로 시스템 프롬프트로 씁니다. 만약 그 문구 안에
+			- 순서는 "엔진 규칙(공통 + engineRule) → 업무 지시(Agent prompt)"입니다(EnginePrompt.compose()).
+			  엔진 규칙은 변수 치환을 거치지 않습니다. 변수는 Agent prompt에서만 채운 뒤 뒤에 이어 붙입니다.
+			- AgentDefinition.prompt()에 적힌 문구가 업무 지시입니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
 			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
 			  요청의 variables를 더 얹습니다(promptVariables() 참고).
 			- 이번에 처리할 데이터(input)는 사용자 메시지로도 함께 들어갑니다.
 		************************************************************************/
-		if (!StringUtil.isEmpty(agent.prompt())) {
-			spec = spec.system(new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables));
-		}
+		String taskPrompt = StringUtil.isEmpty(agent.prompt()) ? "" : new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables);
+		spec = spec.system(EnginePrompt.compose(engineRule, taskPrompt));
 
 		/************************************************************************
 		4. RAG(검색 증강)를 적용합니다. caller의 문서만 검색 대상이 되도록 tenant 필터도 함께 걸립니다.
@@ -344,9 +370,11 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		/************************************************************************
-		5. Tool(도구) 사용을 적용합니다.
-			- caller에게 허용된 Tool 화이트리스트를 통과한 Tool만 이 요청에 붙습니다.
-			- 화이트리스트 설정(dstone.ai.tool.allowed-by-caller)이 아예 없으면 등록된 Tool을 전부 허용합니다.
+		5. Tool과 Sub Agent를 붙입니다.
+			- Tool: Agent의 tools에 적힌 이름 중, caller 화이트리스트(dstone.ai.tool.allowed-by-caller)도 통과한 것만 붙습니다.
+			  tools가 비어 있으면 붙지 않습니다. caller 화이트리스트 설정이 아예 없으면 그쪽은 전부 통과입니다.
+			- Sub Agent: Agent의 subAgents에 적힌 Agent를 Tool처럼 붙입니다(subAgentCallbacks() 참고).
+			  채팅 요청의 toolsEnabled=false는 Tool만 끄고 Sub Agent는 끄지 않습니다(Sub Agent는 Agent 정의의 일부입니다).
 			- toolContext라는 값에 caller를 함께 실어 보냅니다. 이렇게 하는 이유는, tools.rag.RagSearchTool처럼
 			  "caller(tenant)별로 검색 범위를 좁혀야 하는" Tool이 있을 때, 그 Tool이 ToolContext 파라미터를
 			  통해 caller 값을 받아볼 수 있게 하기 위해서입니다. caller 값이 없더라도(null이더라도) 이
@@ -358,8 +386,13 @@ public class AgentExecutor extends BaseObject {
 			  최소 1개는 넣어 둡니다. 그 값이 빈 문자열이면 RagSearchTool 쪽의 StringUtil.isEmpty() 검사에서
 			  "caller 없음"과 똑같이 처리됩니다.
 		************************************************************************/
+		List<ToolCallback> callbacks = new ArrayList<>();
 		if (toolsEnabled) {
-			spec.tools(this.configTool.toolCallbackProvider(caller));
+			callbacks.addAll(this.configTool.toolCallbacks(caller, agent.toolNames()));
+		}
+		callbacks.addAll(this.subAgentCallbacks(agent, caller));
+		if (!callbacks.isEmpty()) {
+			spec = spec.toolCallbacks(callbacks);
 			spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
 		}
 
@@ -394,6 +427,39 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		return spec;
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 subAgents에 적힌 Agent들을 Tool처럼 쓸 수 있게 감싸서 돌려줍니다.
+	 * - caller가 쓸 수 없는 Agent(allowedCallers)는 붙이지 않습니다. LLM이 볼 수 없으니 부를 수도 없습니다.
+	 * - 부모 호출 한 번 안에서 Sub Agent를 부를 수 있는 횟수는 dstone.ai.agent.sub-agent.max-calls(기본 10)까지입니다.
+	 *   횟수는 이 부모에 붙은 Sub Agent들이 함께 셉니다.
+	 * - Sub Agent의 답도 부모 대화에 쌓이므로 다른 Tool과 같은 결과 크기 상한을 씌웁니다.
+	 *
+	 * 깊이가 한 단계를 넘지 않는지는 여기서 검사하지 않습니다. 기동할 때 AgentRegistry가 "Sub Agent는 subAgents를
+	 * 가질 수 없다"를 이미 검사했으므로, Sub Agent를 부를 때는 붙일 것이 없습니다.
+	 * </pre>
+	 *
+	 * @param agent  부모 Agent의 정의
+	 * @param caller 이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 */
+	private List<ToolCallback> subAgentCallbacks(AgentDefinition agent, String caller) {
+		List<ToolCallback> callbacks = new ArrayList<>();
+		if (agent.subAgentIds().isEmpty()) {
+			return callbacks;
+		}
+		Integer configured = this.environment.getProperty(Constants.Agent.SUB_AGENT_MAX_CALLS, Integer.class);
+		int maxCalls = configured == null || configured.intValue() <= 0 ? Constants.Agent.DEFAULT_SUB_AGENT_MAX_CALLS : configured.intValue();
+		AtomicInteger callCount = new AtomicInteger();
+		for (String subAgentId : agent.subAgentIds()) {
+			if (!this.agentRegistry.isAllowed(subAgentId, caller)) {
+				continue;
+			}
+			AgentDefinition subAgent = this.agentRegistry.find(subAgentId);
+			callbacks.add(this.configTool.limited(new SubAgentToolCallback(this, agent.id(), subAgent, caller, callCount, maxCalls)));
+		}
+		return callbacks;
 	}
 
 }

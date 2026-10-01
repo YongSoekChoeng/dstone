@@ -12,6 +12,7 @@ import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.agent.AgentExecutor;
+import net.dstone.ai.runtime.prompt.EnginePrompt;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
 
@@ -24,6 +25,9 @@ import net.dstone.common.utils.StringUtil;
  * - 통과: 성공이고, output에 {pass: true, reason}을 남깁니다.
  * - 불통과: 실패이고, output에 {pass: false, reason}을, error에 reason을 남깁니다.
  * - 답의 모양이 깨짐(또는 input이 Agent input 모양이 아님): 판정을 믿을 수 없으므로 안전하게 실패로 처리합니다.
+ *
+ * LLM에게는 "판정만 하고 대상을 고쳐 쓰지 말라"는 엔진 규칙(runtime.prompt.EnginePrompt.SUPERVISOR)을 함께 보냅니다.
+ * Agent의 prompt가 이 규칙을 빠뜨려도 SUPERVISOR step이면 항상 들어갑니다.
  *
  * 판정 사유는 다음 step이 필요할 때 "${ .steps.id.output.reason }"이나 "${ .steps.id.error }"로 꺼내 씁니다.
  * </pre>
@@ -48,7 +52,7 @@ public class SupervisorStepExecutor {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
 		Map<String, Object> answer;
 		try {
-			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.verdict());
+			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.verdict(), EnginePrompt.SUPERVISOR);
 		} catch (AgentContractException e) {
 			return StepOutcome.failure(null, "감독 Agent 응답을 {pass, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
 		}

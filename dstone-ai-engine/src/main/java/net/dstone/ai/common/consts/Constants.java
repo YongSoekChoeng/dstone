@@ -41,6 +41,16 @@ public final class Constants {
 		public final static String INDEX_KEY = KEY_PREFIX + "index";
 	}
 
+	/** Agent 호출(runtime.agent.AgentExecutor)이 쓰는 설정 키들입니다. */
+	public static final class Agent {
+
+		/** 부모 Agent 호출 한 번 안에서 Sub Agent를 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.sub-agent.max-calls). */
+		public final static String SUB_AGENT_MAX_CALLS = "dstone.ai.agent.sub-agent.max-calls";
+
+		/** 위 설정이 없을 때 쓰는 값입니다. */
+		public final static int DEFAULT_SUB_AGENT_MAX_CALLS = 10;
+	}
+
 	/** Tool을 caller별로 허용/차단하는 설정 키의 접두사(prefix)들입니다(common.config.ConfigTool과 tools 패키지 아래의 각 Tool이 사용합니다). */
 	public static final class Tool {
 

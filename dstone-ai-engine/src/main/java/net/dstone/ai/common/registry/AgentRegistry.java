@@ -5,11 +5,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
@@ -30,6 +32,14 @@ import net.dstone.common.utils.StringUtil;
  *
  * 기동할 때 각 Agent의 입출력 계약(input/output의 schema)이 올바른 JSON Schema인지도 검사합니다.
  * 스키마가 틀린 Agent가 있으면 기동 자체를 실패시킵니다.
+ *
+ * Tool 허용 목록(tools)과 Sub Agent(subAgents)도 기동할 때 검사합니다(checkTools(), checkSubAgents()).
+ *   오류(기동 실패)                                         경고(로그만)
+ *   tools에 "*"와 다른 이름을 함께 적음                       tools에 등록되지 않은 Tool 이름이 있음(MCP 서버가 꺼져 있을 수 있음)
+ *   subAgents의 id가 없는 Agent임                            부모를 쓸 수 있는 caller가 Sub Agent는 쓸 수 없음
+ *   Sub Agent가 자기 subAgents를 가짐(깊이는 한 단계뿐)
+ *   Sub Agent에 description이 없음
+ *   Sub Agent id가 Tool 이름으로 쓸 수 없는 모양이거나, 등록된 Tool 이름과 같음
  * </pre>
  */
 @Component
@@ -37,6 +47,11 @@ public class AgentRegistry extends BaseObject {
 
 	@Autowired
 	private YamlDefinitionLoader loader;
+	@Autowired
+	private ConfigTool configTool;
+
+	/** Sub Agent는 LLM에게 Tool로 보이므로, id가 LLM provider의 Tool 이름 규칙(영문/숫자/밑줄/하이픈, 64자 이하)에 맞아야 합니다. */
+	private static final Pattern TOOL_NAME = Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
 	private Map<String, AgentDefinition> byId = Map.of();
 
@@ -60,6 +75,12 @@ public class AgentRegistry extends BaseObject {
 			this.checkSchema(definition, "input", definition.inputSchema());
 			this.checkSchema(definition, "output", definition.outputSchema());
 		}
+		// tools/subAgents는 다른 Agent를 가리키므로, 전부 읽은 뒤에 검사합니다.
+		List<String> registeredTools = this.configTool.toolNames();
+		for (AgentDefinition definition : resolved.values()) {
+			this.checkTools(definition, registeredTools);
+			this.checkSubAgents(definition, resolved, registeredTools);
+		}
 		this.byId = Map.copyOf(resolved);
 		LogUtil.sysout("dstone-ai-engine agent: 등록된 Agent = " + (this.byId.isEmpty() ? "없음" : this.byId.keySet()));
 	}
@@ -79,6 +100,104 @@ public class AgentRegistry extends BaseObject {
 		if (!problems.isEmpty()) {
 			throw new IllegalStateException("agent[" + definition.id() + "]의 " + where + ".schema가 올바른 JSON Schema가 아닙니다: " + problems);
 		}
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 tools(쓸 Tool 이름 목록)를 검사합니다.
+	 * - "*"(전부 허용)는 혼자만 적어야 합니다. 다른 이름과 섞으면 "일부만 허용"인지 "전부 허용"인지 알 수 없어서 막습니다.
+	 * - 등록되지 않은 이름은 경고만 남깁니다. MCP 서버가 지금 꺼져 있어서 안 보이는 것일 수 있기 때문입니다.
+	 *   그 Tool은 붙지 않을 뿐이고, 기동은 계속합니다.
+	 * </pre>
+	 *
+	 * @param definition      검사할 Agent 정의
+	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
+	 */
+	private void checkTools(AgentDefinition definition, List<String> registeredTools) {
+		List<String> toolNames = definition.toolNames();
+		if (definition.allowsAllTools()) {
+			if (toolNames.size() > 1) {
+				throw new IllegalStateException("agent[" + definition.id() + "]의 tools에 \"*\"(전부 허용)와 다른 이름을 함께 적을 수 없습니다: " + toolNames);
+			}
+			return;
+		}
+		for (String toolName : toolNames) {
+			if (!registeredTools.contains(toolName)) {
+				LogUtil.sysout("dstone-ai-engine agent: [경고] agent[" + definition.id() + "]의 tools에 적은 '" + toolName
+					+ "'는 지금 등록된 Tool이 아닙니다(이름이 틀렸거나 MCP 서버가 아직 안 떴을 수 있습니다). 이 Tool은 붙지 않습니다. 등록된 Tool = " + registeredTools);
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 subAgents(일을 맡길 Agent 목록)를 검사합니다. 어떤 검사를 하는지는 클래스 설명의 표를 보십시오.
+	 *
+	 * "Sub Agent는 자기 subAgents를 가질 수 없다"는 규칙 하나로 세 가지가 함께 막힙니다.
+	 * - 깊이 2 이상(부모 → 자식 → 손자)
+	 * - 자기 자신을 적은 경우(자기가 subAgents를 가진 Agent이므로)
+	 * - 서로를 적은 경우(A → B → A)
+	 * </pre>
+	 *
+	 * @param definition      검사할 Agent 정의(부모)
+	 * @param all             읽어 들인 Agent 전체(id → 정의)
+	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
+	 */
+	private void checkSubAgents(AgentDefinition definition, Map<String, AgentDefinition> all, List<String> registeredTools) {
+		for (String subAgentId : definition.subAgentIds()) {
+			String where = "agent[" + definition.id() + "]의 subAgents '" + subAgentId + "'";
+			AgentDefinition subAgent = all.get(subAgentId);
+			if (subAgent == null) {
+				throw new IllegalStateException(where + ": agents/*.yml에 그런 Agent가 없습니다.");
+			}
+			if (!subAgent.subAgentIds().isEmpty()) {
+				throw new IllegalStateException(where + ": 이 Agent도 subAgents를 가지고 있습니다. Sub Agent는 한 단계만 둘 수 있습니다(부모 → 자식). "
+					+ "agent[" + subAgentId + "]의 subAgents를 지우십시오.");
+			}
+			if (StringUtil.isEmpty(subAgent.description())) {
+				throw new IllegalStateException(where + ": description이 없습니다. 부모 LLM이 이 설명을 보고 일을 맡길지 정하므로, "
+					+ "agent[" + subAgentId + "]에 무슨 일을 하는 Agent인지 description을 적으십시오.");
+			}
+			if (!TOOL_NAME.matcher(subAgentId).matches()) {
+				throw new IllegalStateException(where + ": Sub Agent의 id는 영문, 숫자, 밑줄(_), 하이픈(-)만 쓰고 64자를 넘지 않아야 합니다(LLM에게 Tool 이름으로 보이기 때문입니다).");
+			}
+			if (registeredTools.contains(subAgentId)) {
+				throw new IllegalStateException(where + ": 같은 이름의 Tool이 이미 등록되어 있습니다. LLM이 둘을 구분할 수 없으니 Agent id를 바꾸십시오.");
+			}
+			// 부모는 쓸 수 있는데 Sub Agent는 쓸 수 없는 caller가 있으면, 그 caller에게는 Sub Agent가 붙지 않습니다. 실수일 수 있어 알려 둡니다.
+			List<String> subCallers = subAgent.allowedCallers();
+			if (subCallers == null || subCallers.isEmpty()) {
+				continue;
+			}
+			List<String> parentCallers = definition.allowedCallers();
+			if (parentCallers == null || parentCallers.isEmpty()) {
+				LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + ": 부모는 누구나 부를 수 있지만 이 Agent는 " + subCallers + "만 쓸 수 있습니다. 그 밖의 caller에게는 이 Sub Agent가 붙지 않습니다.");
+				continue;
+			}
+			for (String parentCaller : parentCallers) {
+				if (!subCallers.contains(parentCaller)) {
+					LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + ": caller[" + parentCaller + "]는 부모는 쓸 수 있지만 이 Agent는 쓸 수 없습니다. 이 caller에게는 이 Sub Agent가 붙지 않습니다.");
+				}
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * caller가 이 Agent를 쓸 수 있는지만 알려줍니다(없는 Agent면 false). resolve()와 같은 규칙이지만 예외를 던지지 않습니다.
+	 * runtime.agent.AgentExecutor가 Sub Agent를 붙일지 말지 정할 때 씁니다.
+	 * </pre>
+	 *
+	 * @param agentId 확인할 Agent id
+	 * @param caller  호출한 앱/서비스를 나타내는 식별자(tenant)
+	 */
+	public boolean isAllowed(String agentId, String caller) {
+		AgentDefinition definition = this.byId.get(agentId);
+		if (definition == null) {
+			return false;
+		}
+		List<String> allowedCallers = definition.allowedCallers();
+		return allowedCallers == null || allowedCallers.isEmpty() || (caller != null && allowedCallers.contains(caller));
 	}
 
 	/**

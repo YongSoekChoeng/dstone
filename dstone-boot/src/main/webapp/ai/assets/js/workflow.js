@@ -30,6 +30,10 @@ var DstoneAiWorkflow = (function () {
 			input: "적재된 문서 중에 Spring Batch에 대해 설명해줘.",
 			note: "RAG 문서 관리 화면에서 적재한 문서에 실제로 있는 키워드로 바꿔서 보내세요."
 		},
+		"sample-agent-subagent-delegate": {
+			input: "회원 테이블에서 1번 회원을 찾으려고 해. SELECT * FORM member WHERE id = 1 이렇게 쓰면 되지?",
+			note: "Agent가 다른 Agent(Sub Agent)에게 SQL 뽑기와 고치기를 맡깁니다. 맡긴 내역은 dstone-ai-engine 로그(sub-agent:)에 남습니다."
+		},
 		"sample-agent-tool-calling": {
 			input: "지금 몇 시야? getCurrentDateTime으로 확인해줘."
 		},

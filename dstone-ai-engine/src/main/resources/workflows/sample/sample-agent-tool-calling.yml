@@ -1,6 +1,6 @@
 # common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# 이 Workflow는 AGENT step 하나가 toolsEnabled=true로 설정된 Agent(sample-tool-demo-agent)를 호출해서,
+# 이 Workflow는 AGENT step 하나가 tools에 Tool 이름을 적어 둔 Agent(sample-tool-demo-agent)를 호출해서,
 # LLM이 스스로 필요한 Tool을 고르고 불러 쓰는 tool-calling 루프가 Workflow 안에서도 똑같이 잘
 # 동작하는지 확인해보기 위한 테스트 전용 Workflow입니다(api.controller.ChatController로 직접
 # 호출하는 경로와 달리, 이 경로는 runtime.step.AgentStepExecutor를 거쳐서 실행됩니다).
@@ -13,7 +13,7 @@
 # ConfigCallLog가 남기는 Tools 관련 로그를 보면 어떤 Tool이 호출됐는지도 확인할 수 있습니다.
 workflow:
   id: sample-agent-tool-calling
-  description: toolsEnabled=true Agent의 자율 tool-calling 확인용 Workflow. "지금 몇 시야?" 같은 글자로 호출한다.
+  description: tools를 선언한 Agent의 자율 tool-calling 확인용 Workflow. "지금 몇 시야?" 같은 글자로 호출한다.
   maxIterations: 3
   input: string
   output:

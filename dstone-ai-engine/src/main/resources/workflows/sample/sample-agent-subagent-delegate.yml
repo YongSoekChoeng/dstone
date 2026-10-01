@@ -1,0 +1,33 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 AGENT step 하나가 Sub Agent를 가진 Agent(sample-subagent-orchestrator-agent)를 호출해서,
+# LLM이 스스로 다른 Agent에게 일을 맡기는 동작을 확인해보기 위한 테스트 전용 Workflow입니다.
+#
+# Workflow에서 보면 평범한 AGENT step 하나입니다. Sub Agent를 부르는 일은 step 안에서 LLM이 판단해서 하므로
+# steps에 따로 적지 않습니다. 그래서 steps.ask에는 조율 Agent의 input과 최종 output만 남고,
+# Sub Agent를 몇 번 어떻게 불렀는지는 dstone-ai-engine 로그에 남습니다.
+#   dstone-ai-engine sub-agent: [sample-subagent-orchestrator-agent -> sample-structured-extract-agent] 호출 시작(1/10) - 인자 ...자
+#   dstone-ai-engine sub-agent: [sample-subagent-orchestrator-agent -> sample-structured-extract-agent] 호출 끝 - ...ms, 결과 ...자
+#
+# 같은 일을 step으로 풀어 쓴 Workflow가 sample-structured-output-chain.yml(뽑기 → 검증)과
+# sample-loop-retry-until-valid.yml(검증 → 고치기 루프)입니다. 순서가 정해져 있으면 step으로 적는 편이
+# 실행 내역이 남고 비용도 예측하기 쉽습니다. Sub Agent는 "무엇을 몇 번 맡길지"를 LLM이 상황을 보고 정해야 할 때 씁니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-agent-subagent-delegate
+#   input     : 회원 테이블에서 1번 회원을 찾으려고 해. SELECT * FORM member WHERE id = 1 이렇게 쓰면 되지?
+# ("FORM"은 "FROM"을 일부러 잘못 쓴 오타입니다 - 뽑기 → 검증 실패 → 고치기 → 재검증 순서로 진행되는 것을 볼 수 있습니다)
+workflow:
+  id: sample-agent-subagent-delegate
+  description: Sub Agent(subAgents)를 가진 Agent가 다른 Agent에게 일을 맡기는 동작 확인용 Workflow. SQL이 섞인 문장을 보낸다.
+  maxIterations: 3
+  input: string
+  output:
+    value: "${ .steps.ask.output }"
+  steps:
+
+    - id: ask
+      type: AGENT
+      ref: sample-subagent-orchestrator-agent
+      input: "${ .input }"
+      onSuccess: SUCCESS

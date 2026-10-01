@@ -21,5 +21,4 @@ agent:
 
     route에는 반드시 billing/technical/other 중 하나만 그대로 적으십시오(다른 문자열은 허용되지
     않습니다). reason에는 왜 그렇게 분류했는지 한국어로 한 줄 적으십시오.
-  toolsEnabled: false
   ragEnabled: false

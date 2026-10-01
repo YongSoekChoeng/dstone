@@ -57,8 +57,9 @@ public class AgentStepExecutor {
 					, null								// variables. 프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 					, input								// input. Agent에게 넣을 값(Agent input 모양)
 					, null								// ragOverride 이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
-					, null								// toolsOverride 이번 호출에서만 Tool 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
+					, null								// toolsOverride false면 이번 호출만 Tool 없이 부름(null이면 Agent의 tools 목록 그대로)
 					, null								// modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+					, null								// engineRule 엔진 규칙에 덧붙일 문구. AGENT step은 공통 규칙만 씁니다
 				)
 			);
 		} catch (AgentContractException e) {

@@ -32,5 +32,4 @@ agent:
       properties:
         sql: { type: string, description: 문법 오류를 고친 단일 SQL 문 }
       required: [sql]
-  toolsEnabled: false
   ragEnabled: false

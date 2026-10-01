@@ -8,11 +8,12 @@
 # "이 서버가 접근할 수 있는 유일한 디렉토리"입니다. 그 밖의 경로는 요청해도 거부됩니다(서버 자체가 강제하는 샌드박스이고, dstone-ai-engine 코드가 따로 검사하는 게 아닙니다). 
 # 다른 SI 프로젝트에서 이 패턴을 재사용할 때는 이 경로를 그 프로젝트의 절대경로로 바꿔서 쓰면 됩니다.
 # 
-# allowedTools를 list_directory/read_text_file 두 개(읽기 전용)로만 제한해 두었습니다. 이
-# 서버는 실제로 write_file/edit_file/move_file처럼 파일을 바꾸는 Tool도 제공하지만, "화이트리스트에
-# 없으면 등록 자체가 안 된다"는 걸 보여주기 위해 일부러 읽기 전용만 허용했습니다 - 전체 목록은
-# 서버가 접속에 성공했을 때 로그(dstone-ai-engine mcp: [sample-filesystem] 접속 성공 - Tool N개
-# 중 2개 등록)에서 확인할 수 있습니다.
+# allowedTools에 적은 Tool만 엔진에 등록됩니다(적지 않은 Tool은 등록 자체가 안 됩니다). 지금은 읽기 Tool
+# (list_directory, directory_tree, read_text_file)과 파일을 바꾸는 Tool(write_file, edit_file, move_file)을
+# 함께 등록해 두었습니다. 전체 목록은 서버가 접속에 성공했을 때 로그(dstone-ai-engine mcp: [sample-filesystem]
+# 접속 성공 - Tool N개 중 6개 등록)에서 확인할 수 있습니다.
+# 여기 등록되었다고 모든 Agent가 쓸 수 있는 것은 아닙니다. Agent는 자기 YAML의 tools에 적은 Tool만 봅니다
+# (예: sample-mcp-filesystem-agent.yml은 읽기 Tool 두 개만 적었습니다).
 #
 # 이 서버의 Tool은 두 가지 방식으로 테스트해볼 수 있습니다.
 # - agents/sample/sample-mcp-filesystem-agent.yml : LLM이 스스로 이 Tool을 골라 호출합니다.

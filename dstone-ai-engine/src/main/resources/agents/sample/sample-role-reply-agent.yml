@@ -23,5 +23,4 @@ agent:
         role: { type: string, description: 이 Agent가 맡을 역할(prompt의 role 변수를 채움) }
         message: { type: string, description: 답할 요청 원문 }
       required: [role, message]
-  toolsEnabled: false
   ragEnabled: false

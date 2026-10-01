@@ -20,5 +20,4 @@ agent:
       properties:
         sql: { type: string, description: 입력 문장에서 그대로 뽑아낸 SQL 문 하나(없으면 SELECT 1) }
       required: [sql]
-  toolsEnabled: false
   ragEnabled: false

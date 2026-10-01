@@ -184,6 +184,13 @@ dstone:
         #     allowed-by-caller:
         #         - caller: sample-si-project
         #           tools: getCurrentDateTime,validateSqlSyntax
+        # Agent 호출(runtime.agent.AgentExecutor) 설정.
+        # sub-agent.max-calls: 부모 Agent를 한 번 부르는 동안 Sub Agent(agents/*.yml의 subAgents)를 부를 수 있는 최대 횟수(기본 10).
+        #                      Sub Agent 호출 하나가 LLM 호출 한 번이라, 부모가 끝없이 맡기면 시간과 비용이 계속 늘어난다.
+        #                      상한을 넘으면 "지금까지의 결과로 답하라"는 안내가 부모 LLM에게 돌아간다.
+        agent:
+            sub-agent:
+                max-calls: 10
         tool:
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를

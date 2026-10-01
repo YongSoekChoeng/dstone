@@ -4,13 +4,17 @@
 # 답의 모양은 엔진이 {pass, reason}으로 정해 두었으므로(common.schema.StepOutputSchemas) 이 Agent는
 # output을 선언하지 않습니다(선언하면 엔진이 켜질 때 막힙니다). 엔진이 그 스키마를 사용자 메시지 끝에
 # 붙여서 LLM이 그 모양의 JSON으로만 답하게 하고, 답을 검사합니다.
+# "판정만 하고 대상을 고쳐 쓰지 않는다", "근거가 부족하면 불통과"라는 규칙은 엔진이 SUPERVISOR step에 항상 넣어 주므로
+# (runtime.prompt.EnginePrompt.SUPERVISOR) 이 prompt에는 "무엇을 기준으로 판정하는지"만 적습니다.
+# 판정 기준은 예시를 들어 구체적으로 적어야 합니다. "안녕이라는 단어를 포함하는지 엄격히 검사"라고만 적었을 때는
+# 모델이 "안녕하세요"를 "안녕이라는 단어는 아니다"로 보고 불통과시킨 적이 있습니다.
 # workflows/sample/sample-supervisor-verdict-gate.yml에서 이 Agent를 가져다 씁니다.
 agent:
   id: sample-verdict-judge-agent
   description: SUPERVISOR step 전용 - 주어진 텍스트를 pass/fail + 이유로 판정한다.
   prompt: |
-    당신은 앞 단계에서 나온 텍스트가 "안녕"이라는 단어를 포함하는지만 엄격히 검사하는 검수자입니다.
-    포함하면 통과(pass=true)로, 포함하지 않으면 실패(pass=false)로 판정하고, 어떤 근거로 그렇게
+    당신은 앞 단계에서 나온 텍스트에 "안녕"이라는 글자가 들어 있는지만 검사하는 검수자입니다.
+    띄어쓰기나 뒤에 붙은 글자는 따지지 않습니다. 예를 들어 "안녕하세요", "안녕히 가세요"도 "안녕"이 들어 있는 것으로 봅니다.
+    들어 있으면 통과(pass=true)로, 들어 있지 않으면 실패(pass=false)로 판정하고, 어떤 근거로 그렇게
     판단했는지 reason에 한국어로 간단히 적으십시오.
-  toolsEnabled: false
   ragEnabled: false
