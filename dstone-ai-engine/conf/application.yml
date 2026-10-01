@@ -127,6 +127,12 @@ spring:
                      # "400: Provider returned error"(maximum context length ... requested N output tokens)로 끊긴다.
                      # 실제로 pilot-workflow가 error.log를 두 번 읽었을 때 이렇게 실패했다. 적당한 상한을 꼭 둔다.
                      max-tokens: 4096
+             # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
+             # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
+             # 4분 가까이 지나서야 실패한다. anthropic 설정과 같은 값으로 맞춰 둔다.
+             # (요청이 너무 커서 생기는 시간 초과는 이 값으로 못 고친다 - 아래 dstone.ai.tool의 크기 상한이 그걸 막는다.)
+             timeout: 5m
+             max-retries: 1
 
         ##########################################################################################
         # spring.ai.model.embedding=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
@@ -190,11 +196,24 @@ dstone:
                 api-token: ENC(koeh9W9G8vYjPVBZAeO3GWxg8Uv3PYssUy8aykBFHNMVke4YNjWubBwxGu7xp+hDZbfMwSgwbXj7ZE87Gp1cpQ==)
                 allowed-jobs:
                     - testApp
-            # 파일 Tool(tools.utils.FileUtil) 설정.
+            # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
+            # "잘렸으니 범위를 좁혀 다시 호출하라"는 안내를 붙인다(common.config.ConfigTool, 기본 60000).
+            # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 결과 하나가 컨텍스트 한도나 응답 대기 시간을 넘긴다.
+            # Tool마다 따로 막아도 새 Tool/MCP Tool에서 또 터질 수 있어서 엔진에 마지막 안전망을 하나 둔 것이다.
+            max-result-chars: 60000
+            # 파일 Tool(tools.utils.FileUtil) 설정. 모두 "한 번에 돌려주는 양"을 줄이기 위한 값이다.
             # max-read-chars: readFile/readFileTail이 한 번에 돌려주는 최대 글자 수(기본 30000).
-            # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 로그를 통째로 주면 컨텍스트 한도를 넘는다.
+            # max-list-files: readFileListAll이 한 번에 돌려주는 최대 파일 수(기본 500). 넘으면 잘렸다는 안내를 준다.
+            # max-search-matches: searchInFiles가 한 번에 돌려주는 최대 건수(기본 100).
+            # max-search-file-bytes: searchInFiles가 검색하는 파일의 최대 크기(기본 1MB). 더 큰 파일은 건너뛴다.
+            # exclude-dirs: 목록/검색에서 빼는 폴더 이름(콤마 구분). 프로젝트 루트를 조회했을 때 .git 속 파일까지
+            #               338KB가 딸려 와서 요청이 700KB로 불어나 실패한 적이 있다.
             file:
                 max-read-chars: 30000
+                max-list-files: 500
+                max-search-matches: 100
+                max-search-file-bytes: 1048576
+                exclude-dirs: .git,.svn,target,node_modules,.settings,.idea,.gradle,.metadata
         
         ##########################################################################################
         # RAG 설정.

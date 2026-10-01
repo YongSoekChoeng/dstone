@@ -4,11 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -33,6 +37,11 @@ import net.dstone.common.utils.LogUtil;
  * 둘 수 있습니다. 이렇게 하면 한 앱에게만 허용된 Tool을 다른 앱이 가져다 쓰는 일을 막을 수 있습니다.
  * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로
  * 보고 등록된 Tool을 전부 허용합니다.
+ *
+ * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌웁니다(LimitedToolCallback).
+ * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면
+ * 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. Tool마다 따로 막으면 새 Tool이나
+ * MCP Tool에서 같은 사고가 또 나므로, 여기서 마지막 안전망을 하나 둡니다.
  * </pre>
  */
 @Component
@@ -44,6 +53,11 @@ public class ConfigTool extends BaseObject {
 	private ConfigProperty configProperty;
 	@Autowired
 	private ConfigMcp configMcp;
+	@Autowired
+	private Environment environment;
+
+	/** 설정이 없을 때 쓰는 Tool 결과 글자 수 상한입니다(대략 2만 토큰 안팎). */
+	private static final int DEFAULT_MAX_RESULT_CHARS = 60000;
 
 	private ToolCallbackProvider toolCallbackProvider;
 
@@ -61,7 +75,14 @@ public class ConfigTool extends BaseObject {
 		}
 		merged.addAll(this.configMcp.toolCallbacks());
 
-		this.toolCallbackProvider = ToolCallbackProvider.from(merged.toArray(new ToolCallback[0]));
+		// 로컬 Tool이든 MCP Tool이든 똑같이 결과 크기 상한을 씌웁니다.
+		int maxResultChars = this.maxResultChars();
+		List<ToolCallback> limited = new ArrayList<>(merged.size());
+		for (ToolCallback callback : merged) {
+			limited.add(new LimitedToolCallback(callback, maxResultChars));
+		}
+
+		this.toolCallbackProvider = ToolCallbackProvider.from(limited.toArray(new ToolCallback[0]));
 		if (merged.isEmpty()) {
 			LogUtil.sysout("dstone-ai-engine tool: 등록된 Tool 없음 (@AiTool 빈도, MCP Tool도 없음)");
 		} else {
@@ -166,6 +187,74 @@ public class ConfigTool extends BaseObject {
 			return result;
 		}
 		return List.of();
+	}
+
+	/** Tool 결과 한 건의 최대 글자 수입니다(dstone.ai.tool.max-result-chars, 없거나 0 이하면 기본값). */
+	private int maxResultChars() {
+		Integer value = this.environment.getProperty(Constants.Tool.POLICY_PREFIX + ".max-result-chars", Integer.class);
+		if (value == null || value.intValue() <= 0) {
+			return DEFAULT_MAX_RESULT_CHARS;
+		}
+		return value.intValue();
+	}
+
+	/**
+	 * <pre>
+	 * Tool 결과가 너무 크면 앞부분만 남기고, 잘랐다는 안내를 붙여 돌려주는 포장지입니다.
+	 *
+	 * 안내를 붙이는 이유: 말없이 자르면 모델은 그게 전부인 줄 알고 틀린 결론을 냅니다.
+	 * "잘렸으니 범위를 좁혀 다시 호출하라"고 알려 주면 모델이 스스로 조회 범위를 줄입니다.
+	 *
+	 * 주의: JSON을 돌려주는 Tool의 결과가 잘리면 더 이상 올바른 JSON이 아닙니다. TOOL step에서는
+	 * 그 결과가 steps.&lt;id&gt;.output에 글자 그대로(text) 들어갑니다. 이런 일이 없도록 큰 결과를
+	 * 낼 수 있는 Tool은 Tool 안에서 먼저 개수를 제한하는 것이 좋습니다(tools.utils.FileUtil 참고).
+	 * </pre>
+	 */
+	private static final class LimitedToolCallback implements ToolCallback {
+
+		private final ToolCallback delegate;
+		private final int maxResultChars;
+
+		/**
+		 * @param delegate       실제 Tool 호출을 맡는 원래 ToolCallback입니다.
+		 * @param maxResultChars 결과로 돌려줄 최대 글자 수입니다.
+		 */
+		private LimitedToolCallback(ToolCallback delegate, int maxResultChars) {
+			this.delegate = delegate;
+			this.maxResultChars = maxResultChars;
+		}
+
+		@Override
+		public ToolDefinition getToolDefinition() {
+			return this.delegate.getToolDefinition();
+		}
+
+		@Override
+		public ToolMetadata getToolMetadata() {
+			return this.delegate.getToolMetadata();
+		}
+
+		@Override
+		public String call(String toolInput) {
+			return this.limit(this.delegate.call(toolInput));
+		}
+
+		@Override
+		public String call(String toolInput, ToolContext toolContext) {
+			return this.limit(this.delegate.call(toolInput, toolContext));
+		}
+
+		/** 결과가 상한을 넘으면 앞부분만 남기고 안내를 붙입니다. */
+		private String limit(String result) {
+			if (result == null || result.length() <= this.maxResultChars) {
+				return result;
+			}
+			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 결과가 커서 잘랐습니다 - 전체 "
+				+ result.length() + "자 중 앞 " + this.maxResultChars + "자만 반환");
+			return result.substring(0, this.maxResultChars)
+				+ "\n\n...(Tool 결과가 너무 커서 전체 " + result.length() + "자 중 앞 " + this.maxResultChars
+				+ "자만 반환했습니다. 조회 범위를 좁혀서 다시 호출하세요.)";
+		}
 	}
 
 	/** 등록된 Tool들의 이름만 뽑아서 목록으로 돌려줍니다(로그 출력용). */

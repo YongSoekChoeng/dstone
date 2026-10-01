@@ -18,10 +18,15 @@ agent:
     [완료조건] 요구사항의 모든 FR이 최소 1개 변경 대상에 매핑되어 있다.
     
     [Tools]
-    -readFileListAll
+    -searchInFiles (찾는 단어가 들어 있는 파일과 줄 번호를 찾는다. 소스를 조사할 때 가장 먼저 쓴다)
+    -readFileListAll (폴더 구조를 볼 때만 쓴다. 프로젝트 루트 전체가 아니라 하위 폴더로 좁혀서 조회한다)
     -readFile
     -readFileTail (로그처럼 큰 파일은 끝부분만 읽는다)
     -writeFile
+    [Tools 사용 규칙]
+    - 소스를 조사할 때는 먼저 searchInFiles로 후보 파일을 찾고, 그중 필요한 파일만 readFile로 열어라.
+    - 찾은 파일이 호출하거나 호출되는 곳은 클래스명/메서드명/쿼리ID로 다시 searchInFiles 해서 따라가라.
+    - 같은 조회를 반복하지 마라. 결과가 잘렸다는 안내(truncated)를 받으면 범위를 좁혀서 다시 조회하라.
 
     [답변]
     - 영향도 분석서 본문은 반드시 writeFile로 저장하라. 최종 답변에 본문을 넣지 마라.
