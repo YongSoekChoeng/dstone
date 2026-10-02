@@ -1,7 +1,6 @@
 package net.dstone.ai.common.config;
 
 import java.lang.reflect.Method;
-import java.util.UUID;
 import java.util.function.Function;
 
 import org.apache.logging.log4j.ThreadContext;
@@ -19,7 +18,6 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.util.JacksonUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
@@ -27,13 +25,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.exec.ExecContext;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
-import net.dstone.common.utils.BeanUtil;
 import net.dstone.common.utils.ConvertUtil;
 import net.dstone.common.utils.DateUtil;
 import net.dstone.common.utils.FileUtil;
-import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.SpringUtil;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
@@ -50,9 +48,6 @@ import reactor.core.publisher.Flux;
 @Component
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 public class ConfigCallLog extends BaseObject {
-
-	@Autowired
-	ConfigProperty configProperty;
 
 	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
 	/** 
@@ -454,6 +449,7 @@ public class ConfigCallLog extends BaseObject {
 		static ConfigProperty configProperty;
 
 		protected void logRequest(ChatClientRequest request) {
+			
 			StringBuffer log = new StringBuffer();
 			log.append("\n");
 			log.append(SAPERATE_LINE_HALF_PRONT);
@@ -465,9 +461,7 @@ public class ConfigCallLog extends BaseObject {
 			log.append(SAPERATE_LINE_HALF_PRONT);
 			log.append("[LLM Call Request] End !!!" );
 			log.append(SAPERATE_LINE_HALF_END);
-			String requestId = DateUtil.getToDate("yyyyMMddHHmmss") + "-" + StringUtil.getRandomNumber(6);
-			request.context().put("LLM_REQ_LOG_ID", requestId);
-			this.writeLog(requestId+"-req", log.toString());
+			this.writeLog("REQ", log.toString());
 		}
 		protected void logResponse(ChatClientResponse response) {
 			StringBuffer log = new StringBuffer();
@@ -481,14 +475,39 @@ public class ConfigCallLog extends BaseObject {
 			log.append(SAPERATE_LINE_HALF_PRONT);
 			log.append("[LLM Call Response] End !!!" );
 			log.append(SAPERATE_LINE_HALF_END);
-			String requestId = StringUtil.ifEmpty(response.context().get("LLM_REQ_LOG_ID"), "no-name");
-			this.writeLog(requestId+"-res", log.toString());
+			this.writeLog("RES", log.toString());
 		}
-		private void writeLog(String requestId, String msg) {
+		
+		private void writeLog(String reqRes, String msg) {
 			if(configProperty == null) {
 				configProperty = (ConfigProperty)SpringUtil.getBean(ConfigProperty.class);
 			}
-			FileUtil.writeFile(configProperty.getProperty("APP_HOME") + "/LOGS/" + configProperty.getProperty("APP_NAME") + "/llm/"+DateUtil.getToDate("yyyyMMdd"), requestId + ".log", msg);
+			String logPath = configProperty.getProperty("APP_HOME") + "/LOGS/" + configProperty.getProperty("APP_NAME") + "/llm/"+DateUtil.getToDate("yyyyMMdd");
+			String logFile =  DateUtil.getToDate("yyyyMMddHHmmss") + "-" + StringUtil.getRandomNumber(6);
+			
+			WorkFlowExecution workFlowExecution = null;
+			StepDefinition stepDefinition = null;
+			AgentDefinition agentDefinition = null;
+
+			if( ExecContext.getInstance().existKey("WorkFlowExecution") ) {
+				workFlowExecution = (WorkFlowExecution)ExecContext.getInstance().get("WorkFlowExecution");
+				logPath = logPath + "/" + workFlowExecution.workflowId() + "/" + workFlowExecution.executionId();
+				logFile = DateUtil.getToDate("HHmmss");
+				if( ExecContext.getInstance().existKey("StepDefinition") ) {
+					stepDefinition = (StepDefinition)ExecContext.getInstance().get("StepDefinition");
+					if( !StringUtil.isEmpty(stepDefinition.id()) ) {
+						logFile = logFile + "-" + stepDefinition.id();
+					}
+				}
+				if( ExecContext.getInstance().existKey("AgentDefinition") ) {
+					agentDefinition = (AgentDefinition)ExecContext.getInstance().get("AgentDefinition");
+					if( !StringUtil.isEmpty(agentDefinition.id()) ) {
+						logFile = logFile + "-" + agentDefinition.id();
+					}
+				}
+			}
+			logFile = logFile + "-" + reqRes + ".log";
+			FileUtil.writeFile(logPath, logFile, msg);
 		}
 
 		public static final Function<@Nullable ChatClientRequest, String> DEFAULT_REQUEST_TO_STRING = chatClientRequest -> chatClientRequest != null ? chatClientRequest.toString() : "null";

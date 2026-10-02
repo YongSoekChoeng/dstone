@@ -64,5 +64,5 @@ agent:
         summary:   { type: string, description: 설계 방향과 태스크 개수 중심 요약(3~5줄) }
         questions: { type: array, items: { type: string }, description: 결정이 필요한 사항(없으면 빈 배열) }
       required: [files, summary]
-  tools: [searchInFiles, readFileListAll, readFile, readFileTail, writeFile]
+  tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileTail, writeFile]
   ragEnabled: false

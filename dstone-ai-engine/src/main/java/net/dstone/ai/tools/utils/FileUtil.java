@@ -206,6 +206,12 @@ public class FileUtil {
 		String fileName = net.dstone.common.utils.FileUtil.getFileName(filePath, true);
 		net.dstone.common.utils.FileUtil.writeFile(fileParentPath, fileName, fileContents);
 	}
+	
+	@Tool(description = "절대경로 fileFullPath(폴더+파일명)파일이 존재하는지 여부를 boolean 값으로 반환한다. 저장 결과 안내 문구를 돌려준다. 사용자가 '파일 존재' 등을 요청할 때 사용한다.")
+	public boolean isFileExist(@ToolParam(description = "저장할 파일의 절대경로(파일명 포함)") String filePath) {
+		return net.dstone.common.utils.FileUtil.isFileExist(filePath);
+	}
+
 
 	/** 경로가 실제로 있는 디렉토리면 File로, 아니면 null로 돌려줍니다. */
 	private File toDirectory(String basePath) {

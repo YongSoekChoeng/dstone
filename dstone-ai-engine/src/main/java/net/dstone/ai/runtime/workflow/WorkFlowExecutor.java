@@ -22,6 +22,7 @@ import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
 import net.dstone.ai.common.exception.ProviderErrorMessage;
+import net.dstone.ai.common.exec.ExecContext;
 import net.dstone.ai.common.schema.JqExpEvalUtil;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.step.AgentStepExecutor;
@@ -114,99 +115,110 @@ public class WorkFlowExecutor extends BaseObject {
 		WorkFlowExecution currentExecution = execution;
 		int executed = 0;
 
-		while (true) {
+		try {
+			
+			ExecContext.getInstance().put("WorkFlowExecution", currentExecution);
 
-			/****************************************************************************************
-			1) 실행 횟수를 확인합니다. maxIterations를 넘어서면 무한 루프로 보고 FAILED로 끝냅니다.
-			****************************************************************************************/
-			if (++executed > maxIterations) {
-				return this.persistFailed(currentExecution, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
-			}
+			while (true) {
 
-			/****************************************************************************************
-			2) 지금 몇 번째 step인지(currentIndex)로 그 StepDefinition을 꺼내옵니다.
-			****************************************************************************************/
-			StepDefinition step = workflow.steps().get(currentIndex);
-
-			/****************************************************************************************
-			3) 실제로 이 step을 실행합니다. forEach가 없으면 한 번만 실행하는 runOne()을,
-			   있으면 여러 번 동시에 실행하는 runForEach()를 씁니다.
-			****************************************************************************************/
-			StepOutcome outcome;
-			try {
-				if (StepDefinition.forEachOf(step) != null) {
-					outcome = this.runForEach(step, currentExecution);
-				} else {
-					outcome = this.runOne(step, currentExecution);
+				/****************************************************************************************
+				1) 실행 횟수를 확인합니다. maxIterations를 넘어서면 무한 루프로 보고 FAILED로 끝냅니다.
+				****************************************************************************************/
+				if (++executed > maxIterations) {
+					return this.persistFailed(currentExecution, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
 				}
-			} catch (Exception e) {
-				// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
-				// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
-				// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
-				return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
-			}
 
-			/****************************************************************************************
-			4) 결과가 대기(APPROVAL이 사람의 결정을 기다리는 중)면, 실행을 여기서 멈춥니다.
-			****************************************************************************************/
-			if (outcome.pending()) {
-				currentExecution = currentExecution.waitingApproval(currentIndex);
-				this.executionStore.update(currentExecution);
-				return currentExecution;
-			}
+				/****************************************************************************************
+				2) 지금 몇 번째 step인지(currentIndex)로 그 StepDefinition을 꺼내옵니다.
+				****************************************************************************************/
+				StepDefinition step = workflow.steps().get(currentIndex);
 
-			/****************************************************************************************
-			5) 이번 step의 결과를 컨텍스트의 steps.{stepId}에 남겨서,
-			   다음 step들이 "${ .steps.id... }"로 가져다 쓸 수 있게 합니다.
-			****************************************************************************************/
-			WorkFlowContext.recordStep(currentExecution.context(), step.id(), outcome.toRecord());
-
-			/****************************************************************************************
-			6) nextStepId()로 다음에 갈 곳을 정합니다(step id, 또는 SUCCESS/FAIL 예약어).
-			   ROUTER가 routes에 없는 경로를 고르면 예외를 던지는데, 여기서 잡아서 FAILED로 남깁니다.
-			****************************************************************************************/
-			String nextId;
-			try {
-				nextId = this.nextStepId(workflow, step, outcome);
-			} catch (Exception e) {
-				return this.persistFailed(currentExecution, "step[" + step.id() + "]의 다음 step을 정하는 중 예외가 발생했습니다 - " + e.getMessage());
-			}
-
-			/****************************************************************************************
-			7) 다음 곳으로 갑니다.
-			   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 계산한 값을 최종 결과로 남깁니다
-			              (output.schema가 있으면 그 모양인지 검사하고, 아니면 FAILED로 끝냅니다).
-			   - FAIL   : Workflow 전체를 실패로 끝냅니다.
-			   - step id: 그 step으로 이동해서 while 루프를 계속 돕니다(앞쪽 step이면 재시도 루프).
-			****************************************************************************************/
-			if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
-				Object result;
+				/****************************************************************************************
+				3) 실제로 이 step을 실행합니다. forEach가 없으면 한 번만 실행하는 runOne()을,
+				   있으면 여러 번 동시에 실행하는 runForEach()를 씁니다.
+				****************************************************************************************/
+				StepOutcome outcome;
 				try {
-					result = this.jqExpEvalUtil.resolve(workflow.output().value(), currentExecution.context(), null);
-				} catch (ExpressionException e) {
-					return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
-				}
-				if (workflow.output().schema() != null) {
-					List<String> problems = JsonSchemaUtil.validate(workflow.output().schema(), result);
-					if (!problems.isEmpty()) {
-						return this.persistFailed(currentExecution, "Workflow output이 output.schema 모양이 아닙니다: " + problems);
+					if (StepDefinition.forEachOf(step) != null) {
+						outcome = this.runForEach(step, currentExecution);
+					} else {
+						outcome = this.runOne(step, currentExecution);
 					}
+				} catch (Exception e) {
+					// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
+					// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
+					// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
+					return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
 				}
-				currentExecution = currentExecution.done(result);
+
+				/****************************************************************************************
+				4) 결과가 대기(APPROVAL이 사람의 결정을 기다리는 중)면, 실행을 여기서 멈춥니다.
+				****************************************************************************************/
+				if (outcome.pending()) {
+					currentExecution = currentExecution.waitingApproval(currentIndex);
+					this.executionStore.update(currentExecution);
+					return currentExecution;
+				}
+
+				/****************************************************************************************
+				5) 이번 step의 결과를 컨텍스트의 steps.{stepId}에 남겨서,
+				   다음 step들이 "${ .steps.id... }"로 가져다 쓸 수 있게 합니다.
+				****************************************************************************************/
+				WorkFlowContext.recordStep(currentExecution.context(), step.id(), outcome.toRecord());
+
+				/****************************************************************************************
+				6) nextStepId()로 다음에 갈 곳을 정합니다(step id, 또는 SUCCESS/FAIL 예약어).
+				   ROUTER가 routes에 없는 경로를 고르면 예외를 던지는데, 여기서 잡아서 FAILED로 남깁니다.
+				****************************************************************************************/
+				String nextId;
+				try {
+					nextId = this.nextStepId(workflow, step, outcome);
+				} catch (Exception e) {
+					return this.persistFailed(currentExecution, "step[" + step.id() + "]의 다음 step을 정하는 중 예외가 발생했습니다 - " + e.getMessage());
+				}
+
+				/****************************************************************************************
+				7) 다음 곳으로 갑니다.
+				   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 계산한 값을 최종 결과로 남깁니다
+				              (output.schema가 있으면 그 모양인지 검사하고, 아니면 FAILED로 끝냅니다).
+				   - FAIL   : Workflow 전체를 실패로 끝냅니다.
+				   - step id: 그 step으로 이동해서 while 루프를 계속 돕니다(앞쪽 step이면 재시도 루프).
+				****************************************************************************************/
+				if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
+					Object result;
+					try {
+						result = this.jqExpEvalUtil.resolve(workflow.output().value(), currentExecution.context(), null);
+					} catch (ExpressionException e) {
+						return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
+					}
+					if (workflow.output().schema() != null) {
+						List<String> problems = JsonSchemaUtil.validate(workflow.output().schema(), result);
+						if (!problems.isEmpty()) {
+							return this.persistFailed(currentExecution, "Workflow output이 output.schema 모양이 아닙니다: " + problems);
+						}
+					}
+					currentExecution = currentExecution.done(result);
+					this.executionStore.update(currentExecution);
+					return currentExecution;
+				}
+				if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
+					return this.persistFailed(currentExecution, this.failMessage(step, outcome));
+				}
+				int nextIndex = this.indexOf(workflow.steps(), nextId);
+				if (nextIndex < 0) {
+					return this.persistFailed(currentExecution, "workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
+				}
+				currentIndex = nextIndex;
+				currentExecution = currentExecution.advanceTo(currentIndex);
 				this.executionStore.update(currentExecution);
-				return currentExecution;
 			}
-			if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
-				return this.persistFailed(currentExecution, this.failMessage(step, outcome));
-			}
-			int nextIndex = this.indexOf(workflow.steps(), nextId);
-			if (nextIndex < 0) {
-				return this.persistFailed(currentExecution, "workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
-			}
-			currentIndex = nextIndex;
-			currentExecution = currentExecution.advanceTo(currentIndex);
-			this.executionStore.update(currentExecution);
+			
+		} catch (Exception e) {
+			throw e;
+		} finally {
+			ExecContext.getInstance().removeCurrentContext();
 		}
+		
 	}
 
 	/**
@@ -387,6 +399,9 @@ public class WorkFlowExecutor extends BaseObject {
 	 */
 	@SuppressWarnings("unchecked")
 	private StepOutcome runStep(WorkFlowExecution execution, StepDefinition step, Object resolvedInput) {
+
+		ExecContext.getInstance().put("StepDefinition", step);
+
 		switch (step) {
 			case AgentStepDefinition agent:
 				return this.agentStepExecutor.run(execution, agent, resolvedInput);

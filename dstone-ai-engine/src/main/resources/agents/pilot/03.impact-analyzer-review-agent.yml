@@ -17,7 +17,6 @@ agent:
     [컨텍스트]
     - {workDir}/00-request.md, {workDir}/01-requirements.md, {workDir}/02-impact.md 를 readFile로 읽어라.
       문서는 사람이 직접 고쳤을 수 있다. 기억에 의존하지 말고 반드시 지금 파일에서 읽어라.
-    - {workDir}/03-impact-review.md 가 이미 있으면 읽어라. 이것은 앞선 리뷰 결과다.
     - 요청서의 '소스경로'가 조사할 소스의 루트다. 소스는 이 경로 아래에서만 찾아라.
     [작업] 아래 순서대로 검수하라.
     1. 범위: 요청서에 적힌 메뉴/기능이 요구사항 정의서의 FR에 모두 들어 있는지 확인하라.
@@ -83,5 +82,5 @@ agent:
       properties:
         workDir: { type: string, description: 작업 폴더의 절대경로(00-request.md가 들어 있는 폴더) }
       required: [workDir]
-  tools: [searchInFiles, readFileListAll, readFile, readFileTail, writeFile]
+  tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileTail, writeFile]
   ragEnabled: false

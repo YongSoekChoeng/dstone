@@ -71,8 +71,8 @@ workflow:
       routes:
         진행: step05
         재요구분석: step01
-        재분석: step02
-        재리뷰: step03
+        재영향도분석: step02
+        재영향도분석리뷰: step03
         중단: FAIL
       
     # 아키텍처 설계
@@ -84,12 +84,17 @@ workflow:
       onSuccess: step06
       onFailure: FAIL
       
-    # 설계문서 리뷰 후 승인
+    # 설계문서 승인
     - id: step06
       type: APPROVAL
       approverRole: "PL"
-      onSuccess: step07
-      onFailure: FAIL
+      routes:
+        진행: step07
+        재요구분석: step01
+        재영향도분석: step02
+        재영향도분석리뷰: step03
+        재설계: step05
+        중단: FAIL
       
     # 구현
     - id: step07

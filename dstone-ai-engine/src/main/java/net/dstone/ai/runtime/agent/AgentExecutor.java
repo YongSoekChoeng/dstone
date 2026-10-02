@@ -26,6 +26,7 @@ import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
+import net.dstone.ai.common.exec.ExecContext;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
@@ -316,7 +317,8 @@ public class AgentExecutor extends BaseObject {
 		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
 		boolean toolsEnabled = !Boolean.FALSE.equals(toolsOverride);
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : agent.model();
-
+		
+		ExecContext.getInstance().put("AgentDefinition", agent);
 		/************************************************************************
 		1. 요청 스펙을 만들기 시작합니다.
 		************************************************************************/
@@ -425,7 +427,7 @@ public class AgentExecutor extends BaseObject {
 			    }
 			);
 		}
-
+		
 		return spec;
 	}
 

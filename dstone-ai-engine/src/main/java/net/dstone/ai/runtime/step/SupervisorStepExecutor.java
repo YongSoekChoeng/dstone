@@ -50,11 +50,12 @@ public class SupervisorStepExecutor {
 	@SuppressWarnings("unchecked")
 	public StepOutcome run(WorkFlowExecution execution, SupervisorStepDefinition step, Object input) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
-		Map<String, Object> answer;
+		Map<String, Object> answer = null;
 		try {
 			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.verdict(), EnginePrompt.SUPERVISOR);
 		} catch (AgentContractException e) {
-			return StepOutcome.failure(null, "감독 Agent 응답을 {pass, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
+			e.printStackTrace();
+			return StepOutcome.failure(null, "감독 Agent 응답을 {pass, reason} 모양으로 받지 못했습니다 - answer[" + answer + "]");
 		}
 		Object reasonValue = answer.get("reason");
 		String reason = reasonValue == null || StringUtil.isEmpty(reasonValue.toString()) ? "(사유 없음)" : reasonValue.toString();

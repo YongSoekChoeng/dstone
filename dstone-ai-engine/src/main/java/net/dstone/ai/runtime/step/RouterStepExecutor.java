@@ -48,11 +48,12 @@ public class RouterStepExecutor {
 	@SuppressWarnings("unchecked")
 	public StepOutcome run(WorkFlowExecution execution, RouterStepDefinition step, Object input) {
 		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
-		Map<String, Object> answer;
+		Map<String, Object> answer = null;
 		try {
 			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.routeDecision(step.routes().keySet()), EnginePrompt.ROUTER);
 		} catch (AgentContractException e) {
-			return StepOutcome.failure(null, "라우팅 Agent 응답을 {route, reason} 모양으로 받지 못했습니다 - " + e.getMessage());
+			e.printStackTrace();
+			return StepOutcome.failure(null, "라우팅 Agent 응답을 {route, reason} 모양으로 받지 못했습니다 - answer[" + answer + "]");
 		}
 		String route = String.valueOf(answer.get("route"));
 		Map<String, Object> output = new LinkedHashMap<>();

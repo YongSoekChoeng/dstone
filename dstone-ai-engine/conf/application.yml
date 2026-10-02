@@ -121,7 +121,7 @@ spring:
                  options:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
                      # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash
-                     model: google/gemma-4-26b-a4b-it
+                     model: deepseek/deepseek-v4.1-flash
                      temperature: 0.4
                      # max-tokens: 비워두면 OpenRouter 뒤의 일부 공급자(vLLM 기반, 예: NextBit)가 "남은 컨텍스트 전부"를
                      # 출력 한도로 잡는다. 그러면 Tool 결과가 쌓여 입력이 커졌을 때 입력+출력이 모델 한도를 넘어서
@@ -148,7 +148,7 @@ spring:
                 max-retries: 1   
             chat:
                 options:
-                    # qwen2.5-coder:7b, llama3.2:latest, bge-m3:latest, hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:latest, ornith:9b
+                    # qwen2.5-coder:7b, llama3.2:latest, bge-m3:latest, hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:latest
                     model: hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:latest
                     timeout: 300s # 충분하게 5분(300초) 등으로 조절
                     temperature: 0.3  # 💡 모든 Ollama 요청의 토큰 생성 다양성을 제거하여 속도 및 일관성 향상
