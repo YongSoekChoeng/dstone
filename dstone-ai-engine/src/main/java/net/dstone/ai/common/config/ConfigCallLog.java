@@ -1,6 +1,7 @@
 package net.dstone.ai.common.config;
 
 import java.lang.reflect.Method;
+import java.util.UUID;
 import java.util.function.Function;
 
 import org.apache.logging.log4j.ThreadContext;
@@ -18,6 +19,7 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.util.JacksonUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
@@ -25,8 +27,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.BeanUtil;
 import net.dstone.common.utils.ConvertUtil;
+import net.dstone.common.utils.DateUtil;
+import net.dstone.common.utils.FileUtil;
+import net.dstone.common.utils.LogUtil;
+import net.dstone.common.utils.SpringUtil;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
@@ -42,6 +50,9 @@ import reactor.core.publisher.Flux;
 @Component
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 public class ConfigCallLog extends BaseObject {
+
+	@Autowired
+	ConfigProperty configProperty;
 
 	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
 	/** 
@@ -436,10 +447,12 @@ public class ConfigCallLog extends BaseObject {
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
 
-	public static boolean IS_LLM_LOGGING_YN = false;
+	public static boolean IS_LLM_LOGGING_YN = true;
 
 	public static class LlmLoggerAdvisor extends BaseObject implements CallAdvisor, StreamAdvisor {
-		
+
+		static ConfigProperty configProperty;
+
 		protected void logRequest(ChatClientRequest request) {
 			StringBuffer log = new StringBuffer();
 			log.append("\n");
@@ -452,8 +465,9 @@ public class ConfigCallLog extends BaseObject {
 			log.append(SAPERATE_LINE_HALF_PRONT);
 			log.append("[LLM Call Request] End !!!" );
 			log.append(SAPERATE_LINE_HALF_END);
-			this.info(log.toString());
-			//this.debug(log.toString());
+			String requestId = DateUtil.getToDate("yyyyMMddHHmmss") + "-" + StringUtil.getRandomNumber(6);
+			request.context().put("LLM_REQ_LOG_ID", requestId);
+			this.writeLog(requestId+"-req", log.toString());
 		}
 		protected void logResponse(ChatClientResponse response) {
 			StringBuffer log = new StringBuffer();
@@ -467,8 +481,14 @@ public class ConfigCallLog extends BaseObject {
 			log.append(SAPERATE_LINE_HALF_PRONT);
 			log.append("[LLM Call Response] End !!!" );
 			log.append(SAPERATE_LINE_HALF_END);
-			this.info(log.toString());
-			//this.debug(log.toString());
+			String requestId = StringUtil.ifEmpty(response.context().get("LLM_REQ_LOG_ID"), "no-name");
+			this.writeLog(requestId+"-res", log.toString());
+		}
+		private void writeLog(String requestId, String msg) {
+			if(configProperty == null) {
+				configProperty = (ConfigProperty)SpringUtil.getBean(ConfigProperty.class);
+			}
+			FileUtil.writeFile(configProperty.getProperty("APP_HOME") + "/LOGS/" + configProperty.getProperty("APP_NAME") + "/llm/"+DateUtil.getToDate("yyyyMMdd"), requestId + ".log", msg);
 		}
 
 		public static final Function<@Nullable ChatClientRequest, String> DEFAULT_REQUEST_TO_STRING = chatClientRequest -> chatClientRequest != null ? chatClientRequest.toString() : "null";

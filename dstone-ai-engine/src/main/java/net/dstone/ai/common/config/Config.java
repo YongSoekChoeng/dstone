@@ -23,6 +23,7 @@ import net.dstone.common.core.BaseObject;
 	, ConfigProperty.class
 	, ConfigRedis.class
 	, ConfigTool.class 
+	, net.dstone.common.utils.SpringUtil.class
 })
 public class Config extends BaseObject {
 

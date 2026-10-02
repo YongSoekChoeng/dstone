@@ -16,6 +16,7 @@ import net.dstone.common.core.BaseObject;
 	ConfigListener.class,
 	ConfigMapper.class,
 	net.dstone.common.config.ConfigProperty.class,
+	net.dstone.common.utils.SpringUtil.class,
 	ConfigScheduler.class,
 	ConfigSecurity.class,
 	ConfigTransaction.class,

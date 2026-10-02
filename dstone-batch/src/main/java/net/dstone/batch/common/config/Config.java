@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 	ConfigListener.class,
 	ConfigMapper.class,
 	net.dstone.common.config.ConfigProperty.class,
+	net.dstone.common.utils.SpringUtil.class,
 	ConfigTransaction.class
 })
 public class Config{
