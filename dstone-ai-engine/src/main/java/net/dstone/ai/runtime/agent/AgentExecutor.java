@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
@@ -103,6 +104,8 @@ public class AgentExecutor extends BaseObject {
 	private RagRetrievalChain ragRetrievalChain;
 	@Autowired
 	private ConfigTool configTool;
+	@Autowired
+	private ConfigChatClient configChatClient;
 	@Autowired
 	private AgentRegistry agentRegistry;
 	@Autowired
@@ -431,9 +434,12 @@ public class AgentExecutor extends BaseObject {
 			- 여기서 바꾸는 것은 지금 활성화된 provider(spring.ai.model.chat) 안에서의 모델명뿐입니다.
 			  다른 provider가 쓰는 모델명을 넣으면, 지금 이 호출 시점에 그 provider의 API가 오류를
 			  돌려줍니다(앱이 시작될 때는 이 값이 맞는지 미리 검사해 주지 않습니다).
+			- provider가 openai면 응답 대기 시간(spring.ai.openai.timeout)도 여기서 함께 실립니다.
+			  설정만으로는 적용되지 않아서 호출마다 넣어야 합니다(ConfigChatClient.requestOptions() 설명 참고).
 		************************************************************************/
-		if (!StringUtil.isEmpty(model)) {
-			spec = spec.options(ChatOptions.builder().model(model));
+		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(model);
+		if (requestOptions != null) {
+			spec = spec.options(requestOptions);
 		}
 
 		/************************************************************************

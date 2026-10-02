@@ -10,8 +10,11 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.convert.DurationStyle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -126,6 +129,42 @@ public class ConfigChatClient {
 	@Bean
 	ChatClient chatClient(ChatClient.Builder builder, List<Advisor> defaultAdvisors) {
 		return builder.defaultAdvisors(defaultAdvisors.toArray(new Advisor[0])).build();
+	}
+
+	/**
+	 * <pre>
+	 * LLM 호출 한 번에 실어 보낼 옵션을 만들어 줍니다. 실어 보낼 것이 없으면 null입니다.
+	 * runtime.agent.AgentExecutor가 호출마다 이 메소드로 옵션을 받아 붙입니다.
+	 *
+	 * provider가 openai일 때는 응답 대기 시간(spring.ai.openai.timeout)을 여기서 직접 넣어 줍니다.
+	 * 이유: Spring AI(2.0.1)의 OpenAiChatModel은 호출할 때마다 "요청 옵션의 timeout"을 꺼내 그 요청의 대기 시간으로 씁니다.
+	 * 그런데 이 값은 설정 파일로 바꿀 길이 없고 기본 60초로 굳어 있습니다. spring.ai.openai.timeout은 HTTP 클라이언트의
+	 * 기본값으로만 들어가고, 요청마다 60초가 그 위를 덮어씁니다. 그래서 설정에 5m을 적어도 60초에 끊깁니다.
+	 * 실제로 느린 모델이 긴 문서를 써 내다가 정확히 60초에 끊겼습니다
+	 * ("Error reading response (원인: InterruptedIOException: timeout <- StreamResetException: stream was reset: CANCEL)").
+	 *
+	 * ChatClient의 기본 옵션(defaultOptions)에 넣지 않는 이유: 호출할 때 옵션을 따로 주면(Agent의 model 지정)
+	 * 기본 옵션이 통째로 바뀌어서 timeout이 사라집니다. 그래서 호출마다 넣습니다.
+	 * 여기서 넣지 않은 값(기본 모델, max-tokens, temperature 등)은 설정 파일의 값이 그대로 쓰입니다.
+	 * </pre>
+	 *
+	 * @param model 이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.
+	 */
+	public ChatOptions.Builder<?> requestOptions(String model) {
+		ChatOptions.Builder<?> options = null;
+		if ("openai".equals(configProperty.getProperty("spring.ai.model.chat"))) {
+			String timeout = configProperty.getProperty("spring.ai.openai.timeout");
+			if (!StringUtil.isEmpty(timeout)) {
+				options = OpenAiChatOptions.builder().timeout(DurationStyle.detectAndParse(timeout.trim()));
+			}
+		}
+		if (!StringUtil.isEmpty(model)) {
+			if (options == null) {
+				options = ChatOptions.builder();
+			}
+			options = options.model(model);
+		}
+		return options;
 	}
 	
 }

@@ -135,6 +135,8 @@ spring:
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
              # 4분 가까이 지나서야 실패한다. anthropic 설정과 같은 값으로 맞춰 둔다.
+             # 주의: timeout은 Spring AI(2.0.1)가 이 설정만으로는 채팅 호출에 적용하지 않는다(호출마다 60초로 덮어쓴다).
+             # 그래서 엔진이 이 값을 읽어 호출마다 요청 옵션에 직접 넣는다(ConfigChatClient.requestOptions()).
              # (요청이 너무 커서 생기는 시간 초과는 이 값으로 못 고친다 - 아래 dstone.ai.tool의 크기 상한이 그걸 막는다.)
              timeout: 5m
              max-retries: 1
