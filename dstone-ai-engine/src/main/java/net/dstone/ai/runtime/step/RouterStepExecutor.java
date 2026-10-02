@@ -52,7 +52,6 @@ public class RouterStepExecutor {
 		try {
 			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.routeDecision(step.routes().keySet()), EnginePrompt.ROUTER);
 		} catch (AgentContractException e) {
-			e.printStackTrace();
 			// 왜 못 받았는지(답이 비었는지, JSON이 아닌지, 출력 한도에 걸렸는지)는 예외 메시지에 들어 있습니다.
 			return StepOutcome.failure(null, "라우팅 Agent 응답을 {route, reason} 모양으로 받지 못했습니다: " + e.getMessage());
 		}

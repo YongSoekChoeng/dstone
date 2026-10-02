@@ -148,6 +148,8 @@ public class WorkFlowExecutor extends BaseObject {
 					// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
 					// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
 					// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
+					// 스택은 로그 파일에 남깁니다. 실행 상태에는 한 줄 메시지만 들어가서, 그것만으로는 원인을 찾기 어렵습니다.
+					this.error("step[" + step.id() + "] 실행 중 예외가 발생했습니다(executionId=" + currentExecution.executionId() + ")\n" + ProviderErrorMessage.stackTraceOf(e));
 					return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
 				}
 

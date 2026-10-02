@@ -268,12 +268,7 @@ public class AgentExecutor extends BaseObject {
 		question.append("The JSON value must strictly follow this JSON Schema:").append("\n");
 		question.append(jsonSchema).append("\n");
 		
-		try {
-			answer = this.textOf(spec.user(question.toString()).call().chatResponse());
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw e;
-		}
+		answer = this.textOf(spec.user(question.toString()).call().chatResponse());
 		return this.convert(answer, schema);
 	}
 
