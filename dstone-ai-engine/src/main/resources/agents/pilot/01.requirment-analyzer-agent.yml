@@ -83,5 +83,5 @@ agent:
         summary:   { type: string, description: 요구사항 핵심 요약(3~5줄) }
         questions: { type: array, items: { type: string }, description: 확인 필요 질문(없으면 빈 배열) }
       required: [file, summary]
-  tools: [searchInFiles, readFileListAll, readFile, readFileLines, readFileTail, writeFile]
+  tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile]
   ragEnabled: false

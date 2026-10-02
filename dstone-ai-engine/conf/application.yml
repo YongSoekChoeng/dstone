@@ -108,7 +108,8 @@ spring:
             chat:
                  options:
                      model: claude-sonnet-4-5-20250929
-                     max-tokens: 4096
+                     # 4096 6144 8192
+                     max-tokens: 6144 
             timeout: 5m
             max-retries: 1
         ##########################################################################################
@@ -120,7 +121,7 @@ spring:
              chat:
                  options:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
-                     # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash
+                     # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash | qwen/qwen3.8-27b
                      model: deepseek/deepseek-v4.1-flash
                      temperature: 0.4
                      # max-tokens: 비워두면 OpenRouter 뒤의 일부 공급자(vLLM 기반, 예: NextBit)가 "남은 컨텍스트 전부"를
@@ -129,7 +130,8 @@ spring:
                      # 실제로 pilot-workflow가 error.log를 두 번 읽었을 때 이렇게 실패했다. 적당한 상한을 꼭 둔다.
                      # 반대로 너무 작아도 안 된다. 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 이 한도에 들어가서,
                      # 추론이 길어지면 답을 한 글자도 쓰지 못하고 끝난다(finishReason=LENGTH, 빈 답).
-                     max-tokens: 4096
+                     # 4096 6144 8192
+                     max-tokens: 8192
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
              # 4분 가까이 지나서야 실패한다. anthropic 설정과 같은 값으로 맞춰 둔다.
