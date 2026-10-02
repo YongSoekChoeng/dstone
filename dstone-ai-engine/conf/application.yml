@@ -127,6 +127,8 @@ spring:
                      # 출력 한도로 잡는다. 그러면 Tool 결과가 쌓여 입력이 커졌을 때 입력+출력이 모델 한도를 넘어서
                      # "400: Provider returned error"(maximum context length ... requested N output tokens)로 끊긴다.
                      # 실제로 pilot-workflow가 error.log를 두 번 읽었을 때 이렇게 실패했다. 적당한 상한을 꼭 둔다.
+                     # 반대로 너무 작아도 안 된다. 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 이 한도에 들어가서,
+                     # 추론이 길어지면 답을 한 글자도 쓰지 못하고 끝난다(finishReason=LENGTH, 빈 답).
                      max-tokens: 4096
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
@@ -210,7 +212,7 @@ dstone:
             # Tool마다 따로 막아도 새 Tool/MCP Tool에서 또 터질 수 있어서 엔진에 마지막 안전망을 하나 둔 것이다.
             max-result-chars: 60000
             # 파일 Tool(tools.utils.FileUtil) 설정. 모두 "한 번에 돌려주는 양"을 줄이기 위한 값이다.
-            # max-read-chars: readFile/readFileTail이 한 번에 돌려주는 최대 글자 수(기본 30000).
+            # max-read-chars: readFile/readFileLines/readFileTail이 한 번에 돌려주는 최대 글자 수(기본 30000).
             # max-list-files: readFileListAll이 한 번에 돌려주는 최대 파일 수(기본 500). 넘으면 잘렸다는 안내를 준다.
             # max-search-matches: searchInFiles가 한 번에 돌려주는 최대 건수(기본 100).
             # max-search-file-bytes: searchInFiles가 검색하는 파일의 최대 크기(기본 1MB). 더 큰 파일은 건너뛴다.

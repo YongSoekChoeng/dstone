@@ -44,6 +44,8 @@ agent:
     - 찾지 못했으면 찾지 못했다고 적어라. 어떤 글자로 어디를 찾아봤는지도 함께 적어라. "없다"는 것도 중요한 조사 결과다.
     [Tools 사용 규칙]
     - 소스는 먼저 searchInFiles로 후보를 찾고, 그중 필요한 파일만 readFile로 열어라. 파일명만 보고 내용을 짐작하지 마라.
+    - 줄 번호를 확인하거나 문서에 적을 때는 readFileLines로 읽어라(결과에 줄 번호가 붙어 있다). 줄을 직접 세지 마라.
+      searchInFiles가 알려 준 줄 번호의 앞뒤만 필요하면 startLine/endLine으로 그 구간만 읽어라.
     - searchInFiles의 keyword는 정규식이 아닌 단순 글자다(대소문자 무시). 결과가 많으면 fileNamePattern(예: *.xml,*.jsp)이나 basePath로 좁혀라.
     - 찾은 곳이 부르거나 불리는 곳은 클래스명/메서드명/쿼리ID/URL로 다시 searchInFiles 해서 따라가라.
     - readFileListAll은 폴더 구조를 볼 때만 쓴다. 소스 루트 전체가 아니라 하위 폴더로 좁혀서 조회하라.
@@ -70,5 +72,5 @@ agent:
         summary:  { type: string, description: question에 대한 답(5줄 이내) }
         findings: { type: array, items: { type: string }, description: 근거 목록(파일 절대경로 | 클래스.메서드 또는 쿼리ID | 줄 번호 | 설명). 찾지 못한 것은 "미발견 | 찾은 글자 | 찾은 범위" }
       required: [summary, findings]
-  tools: [searchInFiles, readFileListAll, readFile, readFileTail]
+  tools: [searchInFiles, readFileListAll, readFile, readFileLines, readFileTail]
   ragEnabled: false

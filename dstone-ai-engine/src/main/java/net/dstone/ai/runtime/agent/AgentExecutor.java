@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.tool.ToolCallback;
@@ -246,7 +247,7 @@ public class AgentExecutor extends BaseObject {
 	 */
 	private Object ask(ChatClient.ChatClientRequestSpec spec, String userMessage, Map<String, Object> schema) {
 		if (JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(schema))) {
-			String answer = spec.user(userMessage).call().content();
+			String answer = this.textOf(spec.user(userMessage).call().chatResponse());
 			if (answer == null) {
 				throw new AgentContractException("LLM 응답이 비어 있습니다.");
 			}
@@ -268,14 +269,44 @@ public class AgentExecutor extends BaseObject {
 		question.append(jsonSchema).append("\n");
 		
 		try {
-			answer = spec.user(question.toString()).call().content();
+			answer = this.textOf(spec.user(question.toString()).call().chatResponse());
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw e;
 		}
 		return this.convert(answer, schema);
 	}
-	
+
+	/**
+	 * <pre>
+	 * LLM 응답에서 답 글자를 꺼냅니다. 응답이 없으면 null입니다.
+	 *
+	 * 답이 비어 있는데 끝난 이유가 LENGTH(출력 토큰 한도)면, 그 사실을 알리는 예외를 던집니다.
+	 * 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 max-tokens에 들어가서, 추론이 길어지면 답을 한 글자도 쓰지 못하고
+	 * 끝납니다. 이때 그냥 넘어가면 "응답이 비어 있다 / JSON이 아니다"로만 보여서 원인을 알 수 없습니다.
+	 * (실제로 리뷰 Agent가 파일의 줄을 세느라 4096 토큰을 추론에 다 쓰고 빈 답을 돌려준 적이 있습니다.)
+	 * </pre>
+	 *
+	 * @param response LLM 응답입니다.
+	 * @throws AgentContractException 출력 토큰 한도에 걸려 답이 비었을 때
+	 */
+	private String textOf(ChatResponse response) {
+		if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+			return null;
+		}
+		String text = response.getResult().getOutput().getText();
+		String finishReason = response.getResult().getMetadata() == null ? null : response.getResult().getMetadata().getFinishReason();
+		if (StringUtil.isEmpty(text) && "LENGTH".equalsIgnoreCase(finishReason)) {
+			String usedTokens = "";
+			if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+				usedTokens = ", 출력 " + response.getMetadata().getUsage().getCompletionTokens() + "토큰";
+			}
+			throw new AgentContractException("LLM이 답을 쓰기 전에 출력 토큰 한도(max-tokens)를 다 썼습니다(finishReason=LENGTH" + usedTokens + "). "
+				+ "추론이 길어져서 생기는 일입니다. max-tokens를 올리거나, Agent가 긴 계산(줄 세기 등)을 머릿속으로 하지 않도록 Tool과 prompt를 고치십시오.");
+		}
+		return text;
+	}
+
 	private Object convert(String text, Map<String, Object> schema) {
 		String json = text == null ? "" : text.strip();
 		Matcher fence = CODE_FENCE.matcher(json);

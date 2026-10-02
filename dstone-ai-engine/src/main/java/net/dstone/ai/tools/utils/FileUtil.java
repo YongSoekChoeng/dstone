@@ -37,7 +37,7 @@ import net.dstone.ai.common.consts.Constants;
  * 그래서 이렇게 합니다.
  * - 목록(readFileListAll): 소스와 상관없는 폴더(.git, target 등)는 빼고, 개수 상한까지만 줍니다.
  * - 검색(searchInFiles): 키워드가 들어 있는 "파일:줄번호: 그 줄"만, 건수 상한까지만 줍니다.
- * - 읽기(readFile/readFileTail): 앞부분 또는 끝부분만 글자 수 상한까지 줍니다.
+ * - 읽기(readFile/readFileLines/readFileTail): 앞부분 또는 끝부분만 글자 수 상한까지 줍니다.
  * 잘렸을 때는 결과에 그 사실과 "어떻게 좁히면 되는지"를 적어 모델이 다음 행동을 정할 수 있게 합니다.
  * </pre>
  */
@@ -179,6 +179,63 @@ public class FileUtil {
 		}
 		return contents.substring(0, maxChars)
 			+ "\n\n...(파일이 커서 전체 " + contents.length() + "자 중 앞 " + maxChars + "자만 반환했습니다. 끝부분이 필요하면 readFileTail을 사용하세요.)";
+	}
+
+	/**
+	 * <pre>
+	 * 파일을 "줄번호: 그 줄 내용" 모양으로 읽어 줍니다.
+	 *
+	 * readFile은 본문만 돌려주기 때문에, "몇 번째 줄에 무엇이 있다"를 확인하려는 모델은 줄을 1번부터 직접 세어야 합니다.
+	 * 실제로 리뷰 Agent가 줄을 세느라 출력 토큰 한도를 추론에 다 써서, 답을 한 글자도 쓰지 못하고 끝난 적이 있습니다.
+	 * 줄 번호가 필요할 때는 이 Tool을 쓰게 합니다.
+	 *
+	 * readFile에 줄 번호를 붙이지 않고 Tool을 따로 둔 이유: 읽은 내용을 writeFile로 되쓰는 Agent가 있어서,
+	 * 줄 번호가 파일 내용에 섞여 들어가면 안 되기 때문입니다.
+	 * 줄 번호는 searchInFiles가 알려 주는 줄 번호와 같은 방식으로 셉니다.
+	 * </pre>
+	 */
+	@Tool(description = "절대경로 fileFullPath의 파일을 '줄번호: 그 줄 내용' 형식으로 읽어서 반환한다. 어느 줄에 무엇이 있는지(줄 번호) 확인하거나 문서에 줄 번호를 적을 때 사용한다. "
+		+ "줄을 직접 세지 말고 이 Tool의 줄 번호를 그대로 써라. startLine/endLine으로 필요한 구간만 읽을 수 있다(searchInFiles가 알려 준 줄 번호의 앞뒤를 볼 때 좋다). "
+		+ "구간이 크면 앞부분만 반환하고 어디까지 반환했는지 안내를 붙인다. 이 결과는 줄 번호가 붙어 있으므로 writeFile의 내용으로 그대로 쓰면 안 된다.")
+	public String readFileLines(
+			@ToolParam(description = "읽을 파일의 절대경로(파일명 포함)") String fileFullPath,
+			@ToolParam(required = false, description = "읽기 시작할 줄 번호(1부터). 비워두면 첫 줄부터") Integer startLine,
+			@ToolParam(required = false, description = "마지막으로 읽을 줄 번호(이 줄 포함). 비워두면 끝까지") Integer endLine) {
+		String contents = net.dstone.common.utils.FileUtil.readFile(fileFullPath);
+		if (contents == null) {
+			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
+		}
+		String[] lines = contents.split("\r?\n", -1);
+		int totalLines = lines.length;
+		// 파일이 줄바꿈으로 끝나면 마지막에 빈 조각이 하나 생깁니다. 그것은 줄로 세지 않습니다.
+		if (totalLines > 0 && lines[totalLines - 1].isEmpty()) {
+			totalLines--;
+		}
+		int from = startLine == null || startLine.intValue() < 1 ? 1 : startLine.intValue();
+		int to = endLine == null || endLine.intValue() > totalLines ? totalLines : endLine.intValue();
+		if (from > to) {
+			return "읽을 줄이 없습니다(파일은 전체 " + totalLines + "줄, 요청한 구간은 " + from + "~" + (endLine == null ? "끝" : String.valueOf(endLine)) + "줄): " + fileFullPath;
+		}
+
+		int maxChars = this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
+		StringBuilder result = new StringBuilder();
+		int lastLine = from - 1;
+		for (int lineNo = from; lineNo <= to; lineNo++) {
+			String numbered = lineNo + ": " + lines[lineNo - 1] + "\n";
+			// 상한을 넘으면 멈춥니다. 다만 한 줄도 못 준 채로 끝나지 않도록 첫 줄은 넘더라도 줍니다.
+			if (result.length() + numbered.length() > maxChars && lastLine >= from) {
+				break;
+			}
+			result.append(numbered);
+			lastLine = lineNo;
+		}
+		if (lastLine < to) {
+			result.append("\n...(구간이 커서 ").append(from).append("~").append(lastLine).append("줄만 반환했습니다. 파일은 전체 ").append(totalLines)
+				.append("줄입니다. 이어서 보려면 startLine=").append(lastLine + 1).append("로 다시 호출하세요.)");
+		} else if (from > 1 || to < totalLines) {
+			result.append("\n(").append(from).append("~").append(to).append("줄을 반환했습니다. 파일은 전체 ").append(totalLines).append("줄입니다.)");
+		}
+		return result.toString();
 	}
 
 	@Tool(description = "절대경로 fileFullPath 파일의 끝부분만 읽어서 반환한다. 로그 파일처럼 크고 최근 내용(끝부분)이 중요한 파일을 읽을 때 사용한다.")
