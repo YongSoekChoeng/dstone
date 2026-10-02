@@ -297,10 +297,11 @@ public class AgentExecutor extends BaseObject {
 		if (StringUtil.isEmpty(text) && "LENGTH".equalsIgnoreCase(finishReason)) {
 			String usedTokens = "";
 			if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
-				usedTokens = ", 출력 " + response.getMetadata().getUsage().getCompletionTokens() + "토큰";
+				// 이 숫자는 Tool을 부르느라 오간 호출까지 모두 더한 값입니다(마지막 호출 하나의 값이 아닙니다).
+				usedTokens = ", Tool 호출을 포함한 누적 출력 " + response.getMetadata().getUsage().getCompletionTokens() + "토큰";
 			}
 			throw new AgentContractException("LLM이 답을 쓰기 전에 출력 토큰 한도(max-tokens)를 다 썼습니다(finishReason=LENGTH" + usedTokens + "). "
-				+ "추론이 길어져서 생기는 일입니다. max-tokens를 올리거나, Agent가 긴 계산(줄 세기 등)을 머릿속으로 하지 않도록 Tool과 prompt를 고치십시오.");
+				+ "추론이 길어져서 생기는 일입니다. max-tokens를 올리거나, Agent가 긴 계산(줄 세기 등)이나 긴 고민을 머릿속으로 하지 않도록 Tool과 prompt를 고치십시오.");
 		}
 		return text;
 	}

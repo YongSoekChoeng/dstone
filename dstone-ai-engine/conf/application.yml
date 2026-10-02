@@ -130,8 +130,13 @@ spring:
                      # 실제로 pilot-workflow가 error.log를 두 번 읽었을 때 이렇게 실패했다. 적당한 상한을 꼭 둔다.
                      # 반대로 너무 작아도 안 된다. 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 이 한도에 들어가서,
                      # 추론이 길어지면 답을 한 글자도 쓰지 못하고 끝난다(finishReason=LENGTH, 빈 답).
-                     # 4096 6144 8192
-                     max-tokens: 8192
+                     # qwen/qwen3.8-27b는 추론의 양을 줄일 방법이 없다. OpenRouter의 reasoning.max_tokens / reasoning.effort(low)와
+                     # reasoning-effort를 넣어 봤지만 추론 토큰이 그대로였고, reasoning.effort: none으로 아예 끄는 것만 통했다
+                     # (끄면 답이 틀렸다). 그래서 한도를 넉넉히 준다. pilot-workflow의 리뷰 step이 8192를 추론에 다 쓴 적이 있다.
+                     # 값을 올리면 한 번의 호출이 그만큼 길어질 수 있으므로 아래 timeout 안에 끝나는지도 함께 본다
+                     # (초당 70토큰쯤이면 16384토큰은 4분 가까이 걸린다).
+                     # 4096 6144 8192 16384
+                     max-tokens: 16384
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
              # 4분 가까이 지나서야 실패한다. anthropic 설정과 같은 값으로 맞춰 둔다.
