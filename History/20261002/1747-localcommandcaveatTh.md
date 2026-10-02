@@ -390,3 +390,19 @@ D 드라이브 인스턴스의 최신 실패 기록을 확인합니다. 이번�
 - `/app/dstone/dstone-ai-engine/target/dstone-ai-engine.jar`가 이번 변경으로 다시 빌드됐습니다.
 
 D 드라이브에 반영하려면 git에 올려야 합니다. 올릴까요?
+
+---
+
+## 질문
+
+응 올려줘
+
+---
+
+## 답변
+
+GitHub `main`에 올렸습니다(`9090e9d..b660509`, 커밋 `b660509`).
+
+포함된 파일은 5개입니다: `ConfigChatClient.java`, `AgentExecutor.java`, `conf/application.yml`(주석), `docs/09.dstone-ai-engine.md`, `CLAUDE.md`. 원격과 갈라진 커밋은 없어서 그대로 push됐습니다.
+
+D 드라이브에서 `git pull` 받고 엔진을 재기동한 뒤 qwen 모델로 pilot-workflow를 다시 돌려 보세요. `conf/application.yml`은 D 쪽에서도 고치고 계셔서 pull할 때 충돌이 날 수 있는데, 제 변경은 `timeout: 5m` 위의 주석 두 줄뿐입니다.
