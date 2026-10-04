@@ -1,0 +1,82 @@
+// 전제: Jenkins Job의 SCM 체크아웃 범위는 리포지토리 루트 전체(모노레포)여야 한다.
+// dstone-knowledge가 dstone-common에 의존하는 멀티모듈 구조이기 때문(reactor 빌드).
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME = 'dstone-knowledge'
+        WORKSPACE_DIR = '/app/dstone/dstone-knowledge'
+        DSTONE_PROFILE = 'vm'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo '====== Git Checkout ======'
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo '====== Maven Build (Reactor: dstone-common -> dstone-knowledge) ======'
+                sh 'mvn -pl dstone-common,dstone-knowledge -am -DskipTests clean package'
+            }
+        }
+
+        stage('Prepare Deployment Directory') {
+            steps {
+                echo '====== Prepare Deployment Files (VM 배포 경로) ======'
+                sh '''
+                    mkdir -p ${WORKSPACE_DIR}/target
+                    mkdir -p ${WORKSPACE_DIR}/conf
+                    mkdir -p ${WORKSPACE_DIR}/bin
+
+                    cp dstone-knowledge/target/dstone-knowledge.jar ${WORKSPACE_DIR}/target/
+                    cp -r dstone-knowledge/conf/* ${WORKSPACE_DIR}/conf/
+                    cp -r dstone-knowledge/bin/* ${WORKSPACE_DIR}/bin/
+                    chmod +x ${WORKSPACE_DIR}/bin/*.sh
+                '''
+            }
+        }
+
+        stage('Stop Existing Process') {
+            steps {
+                echo '====== Stop Existing Process ======'
+                sh '${WORKSPACE_DIR}/bin/stopApp.sh || true'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo '====== Deploy(Start) Application ======'
+                sh '${WORKSPACE_DIR}/bin/startApp.sh'
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                echo '====== Health Check ======'
+                sh '''
+                    sleep 10
+                    ${WORKSPACE_DIR}/bin/statusApp.sh
+                    ${WORKSPACE_DIR}/bin/statusApp.sh | grep -q RUNNING
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '====== Deployment Successful ======'
+        }
+        failure {
+            echo '====== Deployment Failed ======'
+            sh 'tail -100 ${WORKSPACE_DIR}/logs/*.out || true'
+        }
+        always {
+            echo '====== Cleanup ======'
+            deleteDir()
+        }
+    }
+}

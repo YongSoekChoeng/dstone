@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>net.dstone</groupId>
+		<artifactId>dstone</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+	<artifactId>dstone-knowledge</artifactId>
+
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+
+	<repositories>
+        <repository>
+            <id>central</id>
+            <name>Central Repository</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <layout>default</layout>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+	<dependencies>
+
+		<!-- dstone-common (spring-boot-starter-web/log4j2/HikariCP/MyBatis/log4jdbc/postgresql-driver 등을 이미 전이의존성으로 포함) -->
+		<dependency>
+		    <groupId>net.dstone</groupId>
+		    <artifactId>dstone-common</artifactId>
+		</dependency>
+
+		<!-- Java 소스 분석: JavaParser(AST) + JavaSymbolSolver(선언/참조 해석).
+		     버전은 루트 pom의 javaparser.version 하나로 dstone-boot와 같이 쓴다. -->
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-core</artifactId>
+			<version>${javaparser.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-symbol-solver-core</artifactId>
+			<version>${javaparser.version}</version>
+		</dependency>
+
+		<!-- Lombok -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- Test -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+			<!-- 이 제외가 없으면 logback이 실행 jar에까지 딸려 들어와 기동이 깨진다
+			     ("log4j-slf4j2-impl cannot be present with log4j-to-slf4j").
+			     starter-test가 끌어오는 spring-boot-starter가 dstone-common 쪽 경로보다 가까워서,
+			     common에서 해 둔 logging 제외가 적용되지 않기 때문이다. -->
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+	</dependencies>
+
+	<build>
+		<finalName>${project.artifactId}</finalName>
+		<resources>
+			<resource>
+				<directory>conf</directory>
+				<targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>*.properties</include>
+				</includes>
+			</resource>
+			<resource>
+				<directory>src/main/java</directory>
+				<targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>**/*.xml</include>
+				</includes>
+			</resource>
+			<resource>
+				<directory>src/main/resources</directory>
+				<targetPath>${project.basedir}/target/classes</targetPath>
+				<excludes>
+					<exclude>**/*.java</exclude>
+				</excludes>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+		<plugins>
+
+			<!-- 컴파일을 위한 플러그인 -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
+					<showWarnings>true</showWarnings>
+					<showDeprecation>true</showDeprecation>
+					<encoding>UTF-8</encoding>
+					<parameters>true</parameters>
+				</configuration>
+			</plugin>
+
+			<!-- JAR (스프링부트형식-BOOT-INF포함구조-으로) 패키징을 위한 플러그인 -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>net.dstone.knowledge.DstoneKnowledgeApplication</mainClass>
+					<!-- JDK17 이후 보안강화로 발생하는 Nested jar 문제에 대한 처리(dstone-boot과 동일 조치). -->
+					<requiresUnpack>
+						<dependency>
+							<groupId>org.bouncycastle</groupId>
+							<artifactId>bcprov-jdk18on</artifactId>
+						</dependency>
+					</requiresUnpack>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+	</build>
+
+</project>

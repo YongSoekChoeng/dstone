@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="EUC-KR"?>
+<!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
+<web-app>
+    <display-name>주문관리(구버전 표본)</display-name>
+    <servlet>
+        <servlet-name>orderServlet</servlet-name>
+        <servlet-class>com.legacy.order.web.OrderServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>orderServlet</servlet-name>
+        <url-pattern>/order.do</url-pattern>
+    </servlet-mapping>
+</web-app>

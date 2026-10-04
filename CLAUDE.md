@@ -10,8 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **dstone-batch**: Spring Batch processing framework (JAR) — standardized job development
 - **dstone-batchadmin**: Web application (WAR) — manages `dstone-batch` jobs (list/detail/register screens, start/stop/restart, CRON auto-scheduling) across one or more `dstone-batch` server instances
 - **dstone-ai-engine**: AI & MLOps Core Engine (JAR) — Spring AI-based, provider-agnostic AI serving platform intended for reuse across future SI projects (root package `net.dstone.ai`)
+- **dstone-knowledge**: Java static analysis → Knowledge Graph → RAG data platform (JAR, root package `net.dstone.knowledge`) — under construction (M0 skeleton done 2026-10-04); will absorb `dstone-ai-engine`'s embed/RAG feature and `dstone-boot`'s source analyzer, which are then removed
 
-`dstone-boot`, `dstone-batch`, `dstone-batchadmin`, and `dstone-ai-engine` all depend on `dstone-common`.
+`dstone-boot`, `dstone-batch`, `dstone-batchadmin`, `dstone-ai-engine`, and `dstone-knowledge` all depend on `dstone-common`.
 
 ## Build Commands
 
@@ -30,6 +31,9 @@ cd dstone-batchadmin && mvn clean package
 
 # Build AI Core Engine (JAR)
 cd dstone-ai-engine && mvn clean package
+
+# Build knowledge platform (JAR)
+cd dstone-knowledge && mvn clean package
 
 # Build all from root
 mvn clean install
@@ -52,6 +56,9 @@ java -jar target/dstone-batchadmin.war
 
 # dstone-ai-engine (port 8081)
 java -jar target/dstone-ai-engine.jar
+
+# dstone-knowledge (port 4081) — normally via bin/startApp.sh
+java -Dspring.profiles.active=wsl -jar target/dstone-knowledge.jar
 ```
 
 See "Cloud Architecture Simulation" below for how each module is deployed in this environment.
@@ -199,6 +206,19 @@ Governance (PII/sensitive-word guardrails, usage logging/quota) is out of scope 
 
 Verified live end-to-end on 2026-09-15 (real Anthropic calls, local Redis/PostgreSQL+pgvector/Ollama): `POST /api/ai/chat` with a plain question and with a tool-calling question (`getCurrentDateTime`), and the `oracle-to-postgresql` sample Workflow (`analyze`→`convert`→`validate` AGENT/AGENT/TOOL steps) both synchronously (`/execute`) and via the async `/submit`+`/status/{jobId}` contract — an Oracle `NVL(...)`/`ROWNUM` query converted correctly to PostgreSQL `COALESCE(...)`/`LIMIT` and passed syntax validation on the first pass in both cases. (`oracle-to-postgresql` itself was replaced on 2026-09-21 by a broader 9-Agent/13-Workflow test-coverage set under `resources/{agents,workflows}/` — see `docs/09.dstone-ai-engine.md` §7.8 for the current sample list.) The 2026-09-28 contract-model redesign was re-verified the same way against all 15 sample Workflows' boot validation plus live runs (tool chain, forEach, MCP `directory_tree`→`read_text_file` forEach, APPROVAL resume, structured-output chain, retry loop with an object-in/object-out Agent, ROUTER, SUPERVISOR fail path, chat API with string/object Agents) and 11 deliberately broken YAMLs, each rejected at boot with the intended message. The 2026-09-29 switch from `{{ }}` to `${ jq }` was verified the same way: all 15 sample Workflows boot with no warnings, LLM-free runs (tool chain, forEach success/fail, MCP forEach with jq string concat, APPROVAL resume, gated tools) and local-Ollama LLM runs (retry loop, ROUTER + object-input `sample-role-reply-agent` filling prompt `{role}`, SUPERVISOR, structured-output chain, basic echo) all end `DONE`, and 14 deliberately broken/edge YAMLs (old `{{ }}`, mixed `${ }`, jq syntax, hyphen/reserved step ids, unknown step/field, unreachable reference, `$item` outside forEach, path-style `forEach`, bad target, unresolved env → boot failure; unknown schema field → warning; a retry-loop back-reference → accepted).
 
+### dstone-knowledge: Java Analysis → Knowledge Graph → RAG
+
+Analyzes Java applications (Spring **and** legacy plain Java: Java 1.4–7 syntax, XML config, servlets, raw JDBC, JSP) into a structured knowledge model first, then projects that model into a Knowledge Graph and RAG chunks. Current state, design principles, schema and the milestone table (M0–M9) live in `docs/11.dstone-knowledge.md`; the source design is `docs/temp/Java_Application_Knowledge_Graph_RAG_Analysis_Platform_설계서_v1.0.docx`. Rules that were decided with the user and must hold for all later milestones:
+
+- **DB-backed pipeline, never whole-project-in-memory.** Each pass handles one file, writes rows, drops the AST (`analysis_file_pass` tracks per-file/per-pass progress so a run resumes; `analysis_reference` holds not-yet-resolved references between the DECLARE and RESOLVE passes). JavaSymbolSolver's default source type solver caches every parsed file and must be replaced by a DB-index-backed solver with a bounded cache.
+- **Framework-neutral core.** Scan/AST/symbols/call graph need plain Java only; Spring is one semantic-analyzer plugin among others (plain-Java entry points, Spring XML, iBATIS, Struts, JSP).
+- **Lombok handled at declaration time**: generated members go in as `is_synthetic=true` symbols (no delombok — it shifts line numbers).
+- **Embedding keyed by `(content_hash, model)`** in `rag_embedding`, which doubles as the resumable queue; Spring AI is used only for the embedding model call, vector SQL is MyBatis (no `PgVectorStore`).
+- **`analysis_*` is the only source of truth**; `kg_node`/`kg_edge` are VIEWs, `rag_*` is always regenerable. Every analysis row carries `revision_id`; symbol ids are revision-independent hashes. Full snapshot per revision + retention.
+- No LLM chat in this module — `dstone-ai-engine` Agents call its REST API through Tools.
+
+DB access: single `dataSourceCommon` (`spring.datasource.common.hikari.*`, PostgreSQL `dstone_knowledge`), MyBatis `sqlSessionCommon` + `sqlSessionBatch` (`ExecutorType.BATCH`, for bulk writes inside a transaction), and a programmatic `txTemplateCommon` instead of the name-based AOP transactions other modules use (analysis runs for hours and commits every N files). Schema is manual (`src/main/resources/schema/01-init…sql` as postgres superuser, `02-create-table…sql` as the app role; idempotent). `spring-boot-starter-test` carries a `spring-boot-starter-logging` exclusion — without it logback lands in the runnable jar and boot dies with `log4j-slf4j2-impl cannot be present with log4j-to-slf4j`. `src/test/resources/samples/legacy-app` is a deliberately EUC-KR, Java-1.4-syntax sample (do not re-save as UTF-8); its README holds the expected counts.
+
 ## Required Infrastructure
 
 | Infrastructure | Purpose | Modules |
@@ -208,6 +228,7 @@ Verified live end-to-end on 2026-09-15 (real Anthropic calls, local Redis/Postgr
 | RabbitMQ | Message queue | dstone-boot |
 | Anthropic API (or other LLM provider) | Chat model inference | dstone-ai-engine |
 | PostgreSQL + pgvector | RAG vector store | dstone-ai-engine (Phase 2, when `dstone.ai.rag.enabled=true`) |
+| PostgreSQL + pgvector | Analysis results, graph, RAG chunks/embeddings (`dstone_knowledge` DB) | dstone-knowledge |
 | Ollama (or OpenAI) | Embedding model inference for RAG | dstone-ai-engine (Phase 2, when `dstone.ai.rag.enabled=true`) |
 
 ## Key Environment Variables (`conf/env.properties`)
@@ -226,13 +247,13 @@ Jasypt's decryption key is **not** an env var — see "Sensitive Config Encrypti
 
 ## Cloud Architecture Simulation
 
-The WSL dev environment mirrors a cloud deployment shape: `dstone-boot` and `dstone-ai-engine` run as containerized Pods in a local `kind` Kubernetes cluster (`<module>/Dockerfile`, `<module>/k8s/`), while `dstone-batch` and `dstone-batchadmin` run as VM-style processes controlled by plain shell scripts (`bin/startApp.sh`/`stopApp.sh`/`statusApp.sh` — **no systemd**), and MySQL/Redis/RabbitMQ/Kafka stand in for CSP-managed services outside the cluster. `dstone-ai-engine`'s manifests (`dstone-ai-engine/k8s/`) and Dockerfile follow `dstone-boot`'s pattern exactly (same namespace `dstone`, same `localhost:5000` local registry) — see `docs/04.cloud-architecture.md` for the full mapping, networking, and CI/CD design.
+The WSL dev environment mirrors a cloud deployment shape: `dstone-boot` and `dstone-ai-engine` run as containerized Pods in a local `kind` Kubernetes cluster (`<module>/Dockerfile`, `<module>/k8s/`), while `dstone-batch`, `dstone-batchadmin` and `dstone-knowledge` run as VM-style processes controlled by plain shell scripts (`bin/startApp.sh`/`stopApp.sh`/`statusApp.sh` — **no systemd**), and MySQL/Redis/RabbitMQ/Kafka stand in for CSP-managed services outside the cluster. `dstone-ai-engine`'s manifests (`dstone-ai-engine/k8s/`) and Dockerfile follow `dstone-boot`'s pattern exactly (same namespace `dstone`, same `localhost:5000` local registry) — see `docs/04.cloud-architecture.md` for the full mapping, networking, and CI/CD design.
 
 ## CI/CD
 
 Jenkins pipelines are defined in:
 - `dstone-boot/Jenkinsfile`, `dstone-ai-engine/Jenkinsfile` — Maven reactor build → Docker build/push to a local registry (`localhost:5000`) → deploy to the `dstone` namespace in `kind` via `kubectl`
-- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile` — Maven reactor build → copy artifact/conf/bin to `/app/dstone/<module>` (the module's own directory in this same repo — no separate deploy tree) → redeploy via that module's `bin/stopApp.sh` + `bin/startApp.sh` (`DSTONE_PROFILE=vm`)
+- `dstone-batch/Jenkinsfile`, `dstone-batchadmin/Jenkinsfile`, `dstone-knowledge/Jenkinsfile` — Maven reactor build → copy artifact/conf/bin to `/app/dstone/<module>` (the module's own directory in this same repo — no separate deploy tree) → redeploy via that module's `bin/stopApp.sh` + `bin/startApp.sh` (`DSTONE_PROFILE=vm`)
 
 Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse checkout) since builds use `mvn -pl <module> -am` reactor builds and the Docker build context needs `dstone-common` alongside `dstone-boot`.
 
@@ -244,6 +265,7 @@ Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse
 | dstone-batch | 6081 | JAR |
 | dstone-batchadmin | 5081 | WAR |
 | dstone-ai-engine | 8081 | JAR |
+| dstone-knowledge | 4081 | JAR |
 
 ## Documentation
 

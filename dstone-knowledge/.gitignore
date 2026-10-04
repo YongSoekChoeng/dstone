@@ -1,0 +1,7 @@
+application.pid
+/target/
+/.apt_generated/
+/.apt_generated_tests/
+/logs/
+/LOGS/
+/bin/*.pid
