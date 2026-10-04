@@ -265,7 +265,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 	 *
 	 * @return 소스 루트(프로젝트 루트 자체면 "."). 폴더 구조가 패키지와 맞지 않으면 null
 	 */
-	String sourceRootOf(String path, String packageName) {
+	public static String sourceRootOf(String path, String packageName) {
 		int slash = path.lastIndexOf('/');
 		String dir = slash < 0 ? "" : path.substring(0, slash);
 		if (packageName == null || packageName.length() == 0) {

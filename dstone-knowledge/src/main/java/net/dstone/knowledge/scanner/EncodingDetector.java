@@ -109,6 +109,20 @@ public class EncodingDetector {
 		return new String(bytes, result.bomLength, bytes.length - result.bomLength, charset);
 	}
 
+	/**
+	 * 이미 알아낸 인코딩 이름(analysis_file.encoding)으로 파일 내용을 글자로 바꿉니다.
+	 * SCAN 뒤의 단계가 파일을 다시 읽을 때 씁니다. 맨 앞에 BOM이 있으면 떼어 냅니다.
+	 */
+	public String decode(byte[] bytes, String encoding) {
+		int bomLength = 0;
+		if ("UTF-8".equals(encoding) && startsWith(bytes, 0xEF, 0xBB, 0xBF)) {
+			bomLength = 3;
+		} else if (("UTF-16BE".equals(encoding) && startsWith(bytes, 0xFE, 0xFF)) || ("UTF-16LE".equals(encoding) && startsWith(bytes, 0xFF, 0xFE))) {
+			bomLength = 2;
+		}
+		return decode(bytes, new Result(encoding == null ? "ISO-8859-1" : encoding, bomLength, true));
+	}
+
 	private boolean startsWith(byte[] bytes, int... head) {
 		if (bytes.length < head.length) {
 			return false;

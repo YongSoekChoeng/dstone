@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.knowledge.api.service.RevisionService;
+import net.dstone.knowledge.api.service.SymbolService;
 
 /**
  * 리비전 API입니다. 분석 결과를 리비전 단위로 조회하고 지웁니다.
@@ -22,6 +23,9 @@ public class RevisionController {
 
 	@Autowired
 	private RevisionService revisionService;
+
+	@Autowired
+	private SymbolService symbolService;
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */
 	@GetMapping("/{revisionId}")
@@ -39,6 +43,22 @@ public class RevisionController {
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
 		return revisionService.getFileList(revisionId, language, fileType, encoding, path, page, size);
+	}
+
+	/** 타입 목록. kind는 일치 조건, name은 전체 이름에 포함 조건입니다. */
+	@GetMapping("/{revisionId}/symbols")
+	public Map<String, Object> getTypeList(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "kind", required = false) String kind
+			, @RequestParam(name = "name", required = false) String name
+			, @RequestParam(name = "page", defaultValue = "1") int page
+			, @RequestParam(name = "size", defaultValue = "50") int size) {
+		return symbolService.getTypeList(revisionId, kind, name, page, size);
+	}
+
+	/** 타입 하나: 메소드, 필드, 애노테이션, 나가는 참조 */
+	@GetMapping("/{revisionId}/symbols/{symbolId}")
+	public Map<String, Object> getType(@PathVariable("revisionId") long revisionId, @PathVariable("symbolId") String symbolId) {
+		return symbolService.getType(revisionId, symbolId);
 	}
 
 	/** 리비전과 거기에 딸린 분석 결과를 모두 지웁니다. 되돌릴 수 없습니다. */

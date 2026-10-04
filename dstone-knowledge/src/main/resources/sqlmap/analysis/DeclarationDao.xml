@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.DeclarationDao">
+
+    <!-- ================= 저장 (DECLARE 단계) ================= -->
+
+    <!-- 이 파일에서 나온 행을 지운다. 같은 파일을 다시 처리해도 행이 두 번 들어가지 않게, 쓰기 전에 먼저 지운다 -->
+    <delete id="deleteByFile" parameterType="java.util.Map">
+        DELETE FROM ${table} WHERE file_id = #{fileId}
+    </delete>
+
+    <insert id="insertType" parameterType="net.dstone.knowledge.parser.model.TypeRow">
+        INSERT INTO analysis_symbol
+            (revision_id, symbol_id, kind, fqn, simple_name, package_name, outer_symbol_id, visibility
+            , is_abstract, is_final, is_static, properties_json, file_id, line_start, line_end)
+        VALUES
+            (#{revisionId}, #{symbolId}, #{kind}, #{fqn}, #{simpleName}, #{packageName}, #{outerSymbolId}, #{visibility}
+            , #{isAbstract}, #{isFinal}, #{isStatic}, CAST(#{propertiesJson} AS jsonb), #{fileId}
+            , #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
+    </insert>
+
+    <insert id="insertMethod" parameterType="net.dstone.knowledge.parser.model.MethodRow">
+        INSERT INTO analysis_method
+            (revision_id, method_id, owner_symbol_id, name, signature, return_type, param_count, parameters_json
+            , visibility, is_static, is_abstract, is_constructor, is_synthetic, synthetic_origin, properties_json
+            , file_id, line_start, line_end)
+        VALUES
+            (#{revisionId}, #{methodId}, #{ownerSymbolId}, #{name}, #{signature}, #{returnType}, #{paramCount}, CAST(#{parametersJson} AS jsonb)
+            , #{visibility}, #{isStatic}, #{isAbstract}, #{isConstructor}, #{isSynthetic}, #{syntheticOrigin}, CAST(#{propertiesJson} AS jsonb)
+            , #{fileId}, #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
+    </insert>
+
+    <insert id="insertField" parameterType="net.dstone.knowledge.parser.model.FieldRow">
+        INSERT INTO analysis_field
+            (revision_id, field_id, owner_symbol_id, name, type, visibility, is_static, is_final
+            , is_synthetic, synthetic_origin, initializer_summary, file_id, line_start, line_end)
+        VALUES
+            (#{revisionId}, #{fieldId}, #{ownerSymbolId}, #{name}, #{type}, #{visibility}, #{isStatic}, #{isFinal}
+            , #{isSynthetic}, #{syntheticOrigin}, #{initializerSummary}, #{fileId}
+            , #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
+    </insert>
+
+    <insert id="insertAnnotation" parameterType="net.dstone.knowledge.parser.model.AnnotationRow">
+        INSERT INTO analysis_annotation
+            (revision_id, target_kind, target_id, annotation_name, annotation_fqn, attributes_json, file_id, line_start)
+        VALUES
+            (#{revisionId}, #{targetKind}, #{targetId}, #{annotationName}, #{annotationFqn}, CAST(#{attributesJson} AS jsonb)
+            , #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <insert id="insertReference" parameterType="net.dstone.knowledge.parser.model.ReferenceRow">
+        INSERT INTO analysis_reference
+            (revision_id, file_id, from_kind, from_id, ref_kind, name, scope_text, arg_count, line_start, column_start)
+        VALUES
+            (#{revisionId}, #{fileId}, #{fromKind}, #{fromId}, #{refKind}, #{name}, #{scopeText}
+            , #{argCount, jdbcType=INTEGER}, #{lineStart, jdbcType=INTEGER}, #{columnStart, jdbcType=INTEGER})
+    </insert>
+
+    <!-- 이 파일이 선언하려는 타입 가운데, 같은 리비전의 다른 파일이 이미 선언한 것 -->
+    <select id="selectTypesDeclaredElsewhere" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT s.fqn AS "fqn", f.path AS "path", f.file_id AS "fileId"
+          FROM analysis_symbol s
+          JOIN analysis_file f ON f.file_id = s.file_id
+         WHERE s.revision_id = #{revisionId}
+           AND s.file_id &lt;&gt; #{fileId}
+           AND s.symbol_id IN
+        <foreach collection="symbolIds" item="symbolId" open="(" separator="," close=")">#{symbolId}</foreach>
+         ORDER BY s.outer_symbol_id NULLS FIRST, s.fqn
+         LIMIT 5
+    </select>
+
+    <!-- 파싱 결과를 파일 행에 남긴다 -->
+    <update id="updateFileParsed" parameterType="java.util.Map">
+        UPDATE analysis_file
+           SET parse_status = #{parseStatus}
+             , parse_error = #{parseError}
+        <if test="languageLevel != null">
+             , language_level = #{languageLevel}
+        </if>
+        <if test="packageName != null">
+             , package_name = #{packageName}
+             , source_root = #{sourceRoot}
+        </if>
+         WHERE file_id = #{fileId}
+    </update>
+
+
+    <!-- ================= 조회 ================= -->
+
+    <select id="selectTypeSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT kind AS "kind", COUNT(*) AS "count"
+          FROM analysis_symbol
+         WHERE revision_id = #{revisionId}
+         GROUP BY kind
+         ORDER BY kind
+    </select>
+
+    <!-- 메소드/필드/애노테이션 수. 소스에 적힌 것과 만들어 넣은 것(synthetic)을 나눠서 센다 -->
+    <select id="selectMemberSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT
+            (SELECT COUNT(*) FROM analysis_method WHERE revision_id = #{revisionId} AND NOT is_constructor AND NOT is_synthetic) AS "methods"
+            , (SELECT COUNT(*) FROM analysis_method WHERE revision_id = #{revisionId} AND is_constructor AND NOT is_synthetic) AS "constructors"
+            , (SELECT COUNT(*) FROM analysis_method WHERE revision_id = #{revisionId} AND is_synthetic) AS "syntheticMethods"
+            , (SELECT COUNT(*) FROM analysis_field WHERE revision_id = #{revisionId} AND NOT is_synthetic) AS "fields"
+            , (SELECT COUNT(*) FROM analysis_field WHERE revision_id = #{revisionId} AND is_synthetic) AS "syntheticFields"
+            , (SELECT COUNT(*) FROM analysis_annotation WHERE revision_id = #{revisionId}) AS "annotations"
+    </select>
+
+    <select id="selectSyntheticSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT synthetic_origin AS "origin", COUNT(*) AS "count"
+          FROM analysis_method
+         WHERE revision_id = #{revisionId}
+           AND is_synthetic
+         GROUP BY synthetic_origin
+         ORDER BY synthetic_origin
+    </select>
+
+    <select id="selectReferenceSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT ref_kind AS "refKind", status AS "status", COUNT(*) AS "count"
+          FROM analysis_reference
+         WHERE revision_id = #{revisionId}
+         GROUP BY ref_kind, status
+         ORDER BY ref_kind, status
+    </select>
+
+    <!-- 파싱에 성공한 문법 수준별 Java 파일 수 -->
+    <select id="selectParseSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT parse_status AS "parseStatus"
+             , COALESCE(language_level, '') AS "languageLevel"
+             , COUNT(*) AS "fileCount"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND language = 'JAVA'
+         GROUP BY parse_status, language_level
+         ORDER BY parse_status, language_level
+    </select>
+
+    <sql id="typeWhere">
+         WHERE s.revision_id = #{revisionId}
+        <if test="kind != null and kind != ''">AND s.kind = #{kind}</if>
+        <if test="name != null and name != ''">AND s.fqn LIKE '%' || #{name} || '%'</if>
+    </sql>
+
+    <select id="countType" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*) FROM analysis_symbol s
+        <include refid="typeWhere"/>
+    </select>
+
+    <sql id="typeColumns">
+        s.symbol_id AS "symbolId"
+        , s.kind AS "kind"
+        , s.fqn AS "fqn"
+        , s.simple_name AS "simpleName"
+        , s.package_name AS "packageName"
+        , s.outer_symbol_id AS "outerSymbolId"
+        , s.visibility AS "visibility"
+        , s.is_abstract AS "isAbstract"
+        , s.is_final AS "isFinal"
+        , s.is_static AS "isStatic"
+        , s.properties_json::text AS "properties"
+        , s.file_id AS "fileId"
+        , f.path AS "path"
+        , s.line_start AS "lineStart"
+        , s.line_end AS "lineEnd"
+    </sql>
+
+    <select id="selectTypeList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="typeColumns"/>
+          FROM analysis_symbol s
+          JOIN analysis_file f ON f.file_id = s.file_id
+        <include refid="typeWhere"/>
+         ORDER BY s.fqn, s.symbol_id
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectType" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="typeColumns"/>
+          FROM analysis_symbol s
+          JOIN analysis_file f ON f.file_id = s.file_id
+         WHERE s.revision_id = #{revisionId}
+           AND s.symbol_id = #{symbolId}
+    </select>
+
+    <select id="selectMethodListByOwner" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT method_id AS "methodId"
+             , name AS "name"
+             , signature AS "signature"
+             , return_type AS "returnType"
+             , parameters_json::text AS "parameters"
+             , visibility AS "visibility"
+             , is_static AS "isStatic"
+             , is_abstract AS "isAbstract"
+             , is_constructor AS "isConstructor"
+             , is_synthetic AS "isSynthetic"
+             , synthetic_origin AS "syntheticOrigin"
+             , line_start AS "lineStart"
+             , line_end AS "lineEnd"
+          FROM analysis_method
+         WHERE revision_id = #{revisionId}
+           AND owner_symbol_id = #{symbolId}
+         ORDER BY line_start, signature
+    </select>
+
+    <select id="selectFieldListByOwner" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT field_id AS "fieldId"
+             , name AS "name"
+             , type AS "type"
+             , visibility AS "visibility"
+             , is_static AS "isStatic"
+             , is_final AS "isFinal"
+             , is_synthetic AS "isSynthetic"
+             , synthetic_origin AS "syntheticOrigin"
+             , initializer_summary AS "initializer"
+             , line_start AS "lineStart"
+          FROM analysis_field
+         WHERE revision_id = #{revisionId}
+           AND owner_symbol_id = #{symbolId}
+         ORDER BY line_start, name
+    </select>
+
+    <!-- 타입 하나와 그 멤버들에 붙은 애노테이션 -->
+    <select id="selectAnnotationListByType" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT a.target_kind AS "targetKind"
+             , a.target_id AS "targetId"
+             , a.annotation_name AS "name"
+             , a.annotation_fqn AS "fqn"
+             , a.attributes_json::text AS "attributes"
+             , a.line_start AS "lineStart"
+          FROM analysis_annotation a
+         WHERE a.revision_id = #{revisionId}
+           AND (a.target_id = #{symbolId}
+                OR a.target_id IN (SELECT method_id FROM analysis_method WHERE revision_id = #{revisionId} AND owner_symbol_id = #{symbolId})
+                OR a.target_id IN (SELECT field_id FROM analysis_field WHERE revision_id = #{revisionId} AND owner_symbol_id = #{symbolId}))
+         ORDER BY a.line_start, a.annotation_id
+    </select>
+
+    <!-- 타입 하나와 그 멤버들에서 나가는 참조 (아직 안 풀린 것 포함) -->
+    <select id="selectReferenceListByType" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.from_kind AS "fromKind"
+             , r.from_id AS "fromId"
+             , r.ref_kind AS "refKind"
+             , r.name AS "name"
+             , r.scope_text AS "scope"
+             , r.arg_count AS "argCount"
+             , r.status AS "status"
+             , r.line_start AS "lineStart"
+          FROM analysis_reference r
+         WHERE r.revision_id = #{revisionId}
+           AND (r.from_id = #{symbolId}
+                OR r.from_id IN (SELECT method_id FROM analysis_method WHERE revision_id = #{revisionId} AND owner_symbol_id = #{symbolId})
+                OR r.from_id IN (SELECT field_id FROM analysis_field WHERE revision_id = #{revisionId} AND owner_symbol_id = #{symbolId}))
+         ORDER BY r.line_start, r.column_start, r.reference_id
+    </select>
+
+</mapper>

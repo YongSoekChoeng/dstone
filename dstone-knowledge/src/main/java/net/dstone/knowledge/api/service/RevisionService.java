@@ -15,6 +15,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.AnalysisFileDao;
 import net.dstone.knowledge.api.dao.AnalysisJobDao;
+import net.dstone.knowledge.api.dao.DeclarationDao;
+import net.dstone.knowledge.api.dao.FilePassDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
 
@@ -37,6 +39,12 @@ public class RevisionService extends BaseObject {
 
 	@Autowired
 	private AnalysisFileDao analysisFileDao;
+
+	@Autowired
+	private DeclarationDao declarationDao;
+
+	@Autowired
+	private FilePassDao filePassDao;
 
 	@Autowired
 	@Qualifier("txTemplateCommon")
@@ -62,6 +70,16 @@ public class RevisionService extends BaseObject {
 		files.put("byEncoding", analysisFileDao.selectSummaryByEncoding(revisionId));
 		files.put("javaSourceRoots", analysisFileDao.selectSummaryBySourceRoot(revisionId));
 		result.put("files", files);
+
+		// DECLARE 단계의 결과. 아직 돌리지 않았으면 전부 0이거나 비어 있다.
+		Map<String, Object> declarations = new LinkedHashMap<String, Object>();
+		declarations.put("javaFiles", declarationDao.selectParseSummary(revisionId));
+		declarations.put("filePasses", filePassDao.selectFilePassSummary(revisionId));
+		declarations.put("types", declarationDao.selectTypeSummary(revisionId));
+		declarations.put("members", declarationDao.selectMemberSummary(revisionId));
+		declarations.put("synthetic", declarationDao.selectSyntheticSummary(revisionId));
+		declarations.put("references", declarationDao.selectReferenceSummary(revisionId));
+		result.put("declarations", declarations);
 		return result;
 	}
 

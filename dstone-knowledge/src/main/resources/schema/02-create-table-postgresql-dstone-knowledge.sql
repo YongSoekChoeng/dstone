@@ -150,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_analysis_file_pass_todo ON analysis_file_pass(rev
 CREATE TABLE IF NOT EXISTS analysis_symbol (
     revision_id       BIGINT        NOT NULL,
     symbol_id         VARCHAR(40)   NOT NULL,            -- 리비전과 무관한 안정 ID
-    kind              VARCHAR(20)   NOT NULL,            -- CLASS/INTERFACE/ENUM/RECORD/ANNOTATION
+    kind              VARCHAR(20)   NOT NULL,            -- CLASS/INTERFACE/ENUM/RECORD/ANNOTATION/ANONYMOUS(익명 클래스)
     fqn               VARCHAR(1000) NOT NULL,            -- 패키지 포함 전체 이름
     simple_name       VARCHAR(300)  NOT NULL,
     package_name      VARCHAR(500),
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS analysis_reference (
     file_id           BIGINT        NOT NULL,
     from_kind         VARCHAR(20)   NOT NULL,            -- TYPE/METHOD/FIELD
     from_id           VARCHAR(40)   NOT NULL,            -- 참조가 들어 있는 쪽
-    ref_kind          VARCHAR(30)   NOT NULL,            -- CALL/CREATE/FIELD_ACCESS/TYPE_USE/THROWS/EXTENDS/IMPLEMENTS/ANNOTATION
+    ref_kind          VARCHAR(30)   NOT NULL,            -- CALL/CREATE/FIELD_ACCESS/TYPE_USE/THROWS/EXTENDS/IMPLEMENTS/ANONYMOUS_SUPER/METHOD_REF
     name              VARCHAR(1000) NOT NULL,            -- 메소드/타입/필드 이름
     scope_text        VARCHAR(1000),                     -- 호출 대상 식 (예: orderService, this.dao)
     arg_count         INT,
