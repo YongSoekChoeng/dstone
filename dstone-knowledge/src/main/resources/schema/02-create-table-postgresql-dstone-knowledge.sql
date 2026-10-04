@@ -35,7 +35,6 @@ dstone_knowledge 데이터베이스 안에서 앱 계정으로 실행할 것
 대량 저장과 리비전 단위 삭제가 느려지기 때문이다. 정합성은 revision_id 로 묶어 코드에서 관리한다.
 **********************************************/
 
-
 /**********************************************
 1. 프로젝트 / 리비전 / 분석 Job
 **********************************************/
@@ -301,7 +300,7 @@ CREATE TABLE IF NOT EXISTS analysis_config (
     key_path          VARCHAR(1000) NOT NULL,            -- 예: spring.datasource.url
     value             TEXT,
     value_type        VARCHAR(30),
-    placeholder       VARCHAR(500),                      -- 값 안에 들어 있는 ${...} 참조
+    placeholder       VARCHAR(500),                      -- 값 안에 들어 있는 동적 변수 참조
     file_id           BIGINT        NOT NULL,
     line_start        INT
 );

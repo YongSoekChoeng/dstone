@@ -9,7 +9,7 @@ BEGIN
       -- CHANGE_ME: 실제 비밀번호로 바꿔서 실행할 것. dstone-knowledge/conf/application.yml의
       -- spring.datasource.common.hikari.password는 이 값을 Jasypt로 암호화해서 ENC(...) 형태로 넣는다:
       --   cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<실제 비밀번호>"
-      CREATE ROLE dstone_knowledge LOGIN PASSWORD 'CHANGE_ME';
+      CREATE ROLE dstone_knowledge LOGIN PASSWORD 'db2admin!@';
    END IF;
 END
 $$;
