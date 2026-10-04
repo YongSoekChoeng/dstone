@@ -1,13 +1,8 @@
 package net.dstone.knowledge.scanner;
 
-import lombok.Getter;
-import lombok.Setter;
-
 /**
  * 스캔한 파일 하나의 정보입니다. analysis_file 테이블의 한 행이 됩니다.
  */
-@Getter
-@Setter
 public class ScannedFile {
 
 	private long revisionId;
@@ -43,5 +38,109 @@ public class ScannedFile {
 	private String parseStatus;
 
 	private String parseError;
+
+	public long getRevisionId() {
+		return revisionId;
+	}
+
+	public void setRevisionId(long revisionId) {
+		this.revisionId = revisionId;
+	}
+
+	public String getModule() {
+		return module;
+	}
+
+	public void setModule(String module) {
+		this.module = module;
+	}
+
+	public String getPath() {
+		return path;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
+	}
+
+	public String getSourceRoot() {
+		return sourceRoot;
+	}
+
+	public void setSourceRoot(String sourceRoot) {
+		this.sourceRoot = sourceRoot;
+	}
+
+	public String getLanguage() {
+		return language;
+	}
+
+	public void setLanguage(String language) {
+		this.language = language;
+	}
+
+	public String getFileType() {
+		return fileType;
+	}
+
+	public void setFileType(String fileType) {
+		this.fileType = fileType;
+	}
+
+	public String getPackageName() {
+		return packageName;
+	}
+
+	public void setPackageName(String packageName) {
+		this.packageName = packageName;
+	}
+
+	public String getEncoding() {
+		return encoding;
+	}
+
+	public void setEncoding(String encoding) {
+		this.encoding = encoding;
+	}
+
+	public String getChecksum() {
+		return checksum;
+	}
+
+	public void setChecksum(String checksum) {
+		this.checksum = checksum;
+	}
+
+	public long getSizeBytes() {
+		return sizeBytes;
+	}
+
+	public void setSizeBytes(long sizeBytes) {
+		this.sizeBytes = sizeBytes;
+	}
+
+	public Integer getLineCount() {
+		return lineCount;
+	}
+
+	public void setLineCount(Integer lineCount) {
+		this.lineCount = lineCount;
+	}
+
+	public String getParseStatus() {
+		return parseStatus;
+	}
+
+	public void setParseStatus(String parseStatus) {
+		this.parseStatus = parseStatus;
+	}
+
+	public String getParseError() {
+		return parseError;
+	}
+
+	public void setParseError(String parseError) {
+		this.parseError = parseError;
+	}
 
 }
