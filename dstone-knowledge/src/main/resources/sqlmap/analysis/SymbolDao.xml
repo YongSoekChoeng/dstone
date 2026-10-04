@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.SymbolDao">
+
+    <!-- 이 이름의 타입이 어느 파일에 있는지. 타입 해석기가 "이 타입 어디 있나" 를 물을 때 쓴다.
+         같은 이름이 여러 소스 루트에 있으면 파일 번호가 작은 것 하나만 돌려준다 -->
+    <select id="selectTypeLocation" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT s.fqn AS "fqn"
+             , s.package_name AS "packageName"
+             , f.file_id AS "fileId"
+             , f.path AS "path"
+             , f.encoding AS "encoding"
+             , f.language_level AS "languageLevel"
+          FROM analysis_symbol s
+          JOIN analysis_file f ON f.file_id = s.file_id
+         WHERE s.revision_id = #{revisionId}
+           AND s.fqn = #{fqn}
+         ORDER BY s.file_id
+         LIMIT 1
+    </select>
+
+    <!-- 파싱에 성공한 Java 파일 (앞에서부터 몇 개) -->
+    <select id="selectParsedJavaFiles" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT file_id AS "fileId"
+             , path AS "path"
+             , package_name AS "packageName"
+             , encoding AS "encoding"
+             , language_level AS "languageLevel"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND language = 'JAVA'
+           AND parse_status = 'OK'
+         ORDER BY file_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 이 타입에 이 이름/파라미터 수의 메소드가 선언돼 있는지 (만들어 넣은 멤버 포함) -->
+    <select id="countMethod" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_method m
+          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+         WHERE m.revision_id = #{revisionId}
+           AND s.fqn = #{ownerFqn}
+           AND m.name = #{name}
+           AND m.param_count = #{paramCount}
+    </select>
+
+</mapper>

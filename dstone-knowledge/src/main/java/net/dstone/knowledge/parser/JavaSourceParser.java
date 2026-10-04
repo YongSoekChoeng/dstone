@@ -11,6 +11,7 @@ import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ParserConfiguration.LanguageLevel;
 import com.github.javaparser.Problem;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.resolution.SymbolResolver;
 
 /**
  * Java 소스 한 파일을 AST로 바꿉니다. 어느 문법 수준으로 읽어야 하는지도 여기서 알아냅니다.
@@ -63,6 +64,13 @@ public class JavaSourceParser {
 	 * @param projectJavaVersion 프로젝트에 지정해 둔 문법 수준(예: 1.4, 8, 17). 없으면 null
 	 */
 	public Result parse(String text, String projectJavaVersion) {
+		return parse(text, projectJavaVersion, null);
+	}
+
+	/**
+	 * @param symbolResolver 파싱한 AST에 붙여 둘 심볼 해석기. 호출이 누구를 가리키는지 풀 때(RESOLVE) 필요합니다. 없으면 null
+	 */
+	public Result parse(String text, String projectJavaVersion, SymbolResolver symbolResolver) {
 		List<LanguageLevel> levels = new ArrayList<LanguageLevel>();
 		LanguageLevel preferred = levelOf(projectJavaVersion);
 		if (preferred != null) {
@@ -82,6 +90,9 @@ public class JavaSourceParser {
 			configuration.setLanguageLevel(level);
 			// 주석은 지금 단계에서 쓰지 않는다. 붙이지 않으면 AST가 가벼워진다.
 			configuration.setAttributeComments(false);
+			if (symbolResolver != null) {
+				configuration.setSymbolResolver(symbolResolver);
+			}
 
 			ParseResult<CompilationUnit> parsed = new JavaParser(configuration).parse(text);
 			if (parsed.isSuccessful() && parsed.getResult().isPresent()) {
