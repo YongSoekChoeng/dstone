@@ -1,7 +1,9 @@
 package net.dstone.knowledge.parser.model;
 
 /**
+ * <pre>
  * 애노테이션이 붙은 자리 하나. analysis_annotation 테이블의 한 행이 됩니다.
+ * </pre>
  */
 public class AnnotationRow {
 

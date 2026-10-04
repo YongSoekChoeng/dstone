@@ -9,9 +9,12 @@ import net.dstone.knowledge.parser.DeclarationCollector.FieldInfo;
 import net.dstone.knowledge.parser.DeclarationCollector.TypeContext;
 
 /**
+ * <pre>
  * Lombok 애노테이션이 컴파일할 때 만들어 내는 멤버를, 소스를 고치지 않고 심볼로만 만들어 넣습니다.
  *
  * 왜 필요한가:
+ * </pre>
+ *
  * @Getter가 붙은 클래스에는 소스에 getName()이 없습니다. 그대로 두면 다른 클래스의 vo.getName() 호출이
  * "없는 메소드를 부른다"가 되어 호출 관계가 끊깁니다. 그래서 컴파일하면 생길 멤버를 미리 넣어 둡니다
  * (is_synthetic = true, synthetic_origin = LOMBOK_...). 줄 번호는 근거가 된 필드나 애노테이션의 줄입니다.
@@ -210,7 +213,9 @@ class LombokExpander {
 	}
 
 	/**
+	 * <pre>
 	 * 애노테이션에 적힌 접근 수준을 읽습니다. 예: @Getter(AccessLevel.PROTECTED), @NoArgsConstructor(access = AccessLevel.PRIVATE)
+	 * </pre>
 	 *
 	 * @return public / protected / package / private, 만들지 말라는 뜻(AccessLevel.NONE)이면 none
 	 */
@@ -234,8 +239,10 @@ class LombokExpander {
 	}
 
 	/**
+	 * <pre>
 	 * getter/setter 이름의 바탕이 되는 이름입니다.
 	 * boolean 필드 이름이 is로 시작하면 Lombok은 is를 떼어 냅니다. 예: isActive → isActive() / setActive(...)
+	 * </pre>
 	 */
 	private String baseNameOf(String fieldName, boolean isBoolean) {
 		if (isBoolean && fieldName.length() > 2 && fieldName.startsWith("is") && Character.isUpperCase(fieldName.charAt(2))) {

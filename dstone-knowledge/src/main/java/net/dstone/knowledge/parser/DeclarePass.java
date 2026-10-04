@@ -23,6 +23,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
 import net.dstone.knowledge.scanner.ScanPass;
 
 /**
+ * <pre>
  * DECLARE 단계: Java 파일을 하나씩 파싱해서 "무엇이 선언돼 있는지"를 DB에 넣습니다.
  *
  * 파일 하나마다 하는 일:
@@ -35,6 +36,7 @@ import net.dstone.knowledge.scanner.ScanPass;
  * 메모리에는 지금 처리 중인 파일 하나만 올라갑니다. 호출이 누구를 가리키는지는 RESOLVE 단계가 풉니다.
  *
  * 파싱에 실패한 파일은 숨기지 않습니다. analysis_file.parse_status = FAILED 와 오류 내용을 남기고 계속합니다.
+ * </pre>
  */
 @Component
 public class DeclarePass extends BaseObject implements AnalysisPass {

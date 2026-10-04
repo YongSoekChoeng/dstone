@@ -19,12 +19,14 @@ import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.util.ErrorText;
 
 /**
+ * <pre>
  * 분석 Job을 백그라운드에서 실행합니다.
  *
  * 하는 일은 단순합니다. 등록된 단계(AnalysisPass)를 순서대로 하나씩 돌립니다.
  * - 이 리비전에서 이미 끝난(DONE) 단계는 건너뜁니다. 그래서 죽거나 취소된 뒤 다시 시작하면 이어서 합니다.
  * - 단계가 예외를 던지면 Job은 FAILED, 취소 요청으로 멈추면 CANCELLED가 됩니다.
  * - 끝까지 갔는데 분석 오류(analysis_error)가 한 건이라도 있으면 DONE_WITH_WARNING입니다.
+ * </pre>
  */
 @Component
 public class AnalysisJobRunner extends BaseObject {
@@ -47,8 +49,10 @@ public class AnalysisJobRunner extends BaseObject {
 	private final Map<String, AnalysisJobContext> activeJobs = new ConcurrentHashMap<String, AnalysisJobContext>();
 
 	/**
+	 * <pre>
 	 * Job을 실행 대기열에 넣습니다. 바로 돌아오고, 실제 분석은 별도 스레드에서 돕니다.
 	 * 동시에 돌 수 있는 수를 넘으면 차례가 올 때까지 READY 상태로 기다립니다.
+	 * </pre>
 	 */
 	public void submit(final AnalysisJobContext context) {
 		activeJobs.put(context.getAnalysisId(), context);
@@ -75,7 +79,9 @@ public class AnalysisJobRunner extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 취소를 요청합니다. 돌고 있는 단계가 다음 확인 지점에서 멈춥니다.
+	 * </pre>
 	 *
 	 * @return 이 서버에서 대기 중이거나 돌고 있는 Job이면 true
 	 */
@@ -138,9 +144,11 @@ public class AnalysisJobRunner extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * Job을 끝난 상태로 기록합니다.
 	 * 실패 원인이 DB 장애라면 이 기록마저 실패할 수 있습니다. 그때는 로그만 남깁니다.
 	 * (그렇게 RUNNING으로 남은 Job은 다음 기동 때 AnalysisJobRecovery가 정리합니다.)
+	 * </pre>
 	 */
 	private void endQuietly(AnalysisJobContext context, String runningPass, String passStatus, String jobStatus, String message, String revisionStatus) {
 		try {

@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
+ * <pre>
  * 분석 Job(analysis_job)과 분석 오류(analysis_error)를 다루는 Dao입니다.
+ * </pre>
  */
 @Repository("analysisJobDao")
 public class AnalysisJobDao extends BaseDao {

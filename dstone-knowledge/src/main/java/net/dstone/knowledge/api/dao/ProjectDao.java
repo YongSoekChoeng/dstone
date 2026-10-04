@@ -8,7 +8,9 @@ import org.springframework.stereotype.Repository;
 import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
+ * <pre>
  * 분석 대상 프로젝트(analysis_project)를 다루는 Dao입니다.
+ * </pre>
  */
 @Repository("projectDao")
 public class ProjectDao extends BaseDao {

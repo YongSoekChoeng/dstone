@@ -1,7 +1,9 @@
 package net.dstone.knowledge.parser.model;
 
 /**
+ * <pre>
  * 메소드 또는 생성자 하나. analysis_method 테이블의 한 행이 됩니다.
+ * </pre>
  */
 public class MethodRow {
 

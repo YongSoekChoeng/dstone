@@ -34,6 +34,7 @@ import net.dstone.knowledge.job.AnalysisJobReporter;
 import net.dstone.knowledge.job.AnalysisPass;
 
 /**
+ * <pre>
  * SCAN 단계: 프로젝트 폴더를 훑어서 분석할 파일의 목록을 analysis_file에 만듭니다.
  *
  * 파일마다 알아내는 것: 종류(언어/용도), 인코딩, 내용 해시(SHA-256), 크기, 줄 수,
@@ -44,6 +45,7 @@ import net.dstone.knowledge.job.AnalysisPass;
  *
  * 중간에 죽으면 다음에는 처음부터 다시 훑습니다. 이미 들어간 경로는 덮어쓰기 때문에 중복되지 않습니다.
  * (훑는 일은 금방 끝나서 "어디까지 했는지"를 따로 기억하는 것보다 다시 하는 편이 단순합니다.)
+ * </pre>
  */
 @Component
 public class ScanPass extends BaseObject implements AnalysisPass {
@@ -215,8 +217,10 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 	}
 
 	/**
+	 * <pre>
 	 * 모아 둔 파일을 DB에 쓰고 비웁니다.
 	 * 저장은 대량 저장용 세션으로 한 트랜잭션에 묶고, 진행 기록과 취소 확인은 그 트랜잭션이 끝난 뒤에 합니다.
+	 * </pre>
 	 */
 	private void flush(AnalysisJobContext context, final List<ScannedFile> buffer, int[] savedCount) {
 		if (!buffer.isEmpty()) {
@@ -256,12 +260,14 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 	}
 
 	/**
+	 * <pre>
 	 * 소스 루트를 찾습니다. 파일이 놓인 폴더 경로의 끝이 패키지 경로와 같으면, 그 앞부분이 소스 루트입니다.
 	 *
 	 * 예: WEB-INF/src/com/legacy/order/dao/OrderDAO.java + 패키지 com.legacy.order.dao → WEB-INF/src
 	 *
 	 * 빌드 파일이 없는 구버전 프로젝트는 소스가 src/main/java가 아닌 곳(WEB-INF/src, WEB-INF/classes ...)에
 	 * 있어서, 폴더 이름을 미리 정해 두지 않고 패키지 선언으로 거꾸로 찾습니다.
+	 * </pre>
 	 *
 	 * @return 소스 루트(프로젝트 루트 자체면 "."). 폴더 구조가 패키지와 맞지 않으면 null
 	 */

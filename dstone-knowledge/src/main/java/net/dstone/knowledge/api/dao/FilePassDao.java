@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
+ * <pre>
  * 파일별/단계별 진행 상태(analysis_file_pass)를 다루는 Dao입니다.
+ * </pre>
  */
 @Repository("filePassDao")
 public class FilePassDao extends BaseDao {

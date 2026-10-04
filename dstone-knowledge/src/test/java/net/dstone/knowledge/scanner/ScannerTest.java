@@ -13,8 +13,10 @@ import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 
 /**
+ * <pre>
  * SCAN 단계의 판단 로직(인코딩 감지, 파일 분류, 패키지/소스 루트 찾기)을 확인합니다.
  * DB나 Spring 없이 도는 테스트입니다.
+ * </pre>
  */
 public class ScannerTest {
 

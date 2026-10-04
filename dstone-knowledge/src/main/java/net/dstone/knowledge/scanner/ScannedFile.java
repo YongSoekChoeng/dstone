@@ -1,7 +1,9 @@
 package net.dstone.knowledge.scanner;
 
 /**
+ * <pre>
  * 스캔한 파일 하나의 정보입니다. analysis_file 테이블의 한 행이 됩니다.
+ * </pre>
  */
 public class ScannedFile {
 

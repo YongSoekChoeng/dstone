@@ -10,7 +10,9 @@ import net.dstone.knowledge.common.biz.BaseDao;
 import net.dstone.knowledge.parser.model.FileDeclarations;
 
 /**
+ * <pre>
  * 선언(타입/메소드/필드/애노테이션)과 아직 안 풀린 참조를 다루는 Dao입니다.
+ * </pre>
  */
 @Repository("declarationDao")
 public class DeclarationDao extends BaseDao {
@@ -23,8 +25,10 @@ public class DeclarationDao extends BaseDao {
 	};
 
 	/**
+	 * <pre>
 	 * 파일 하나에서 찾은 선언과 참조를 저장합니다. 대량 저장용 세션을 쓰므로 트랜잭션 안에서만 부릅니다.
 	 * 먼저 이 파일에서 전에 나온 행을 지우기 때문에, 같은 파일을 다시 처리해도 중복되지 않습니다.
+	 * </pre>
 	 */
 	public void replaceDeclarationsInBatch(long fileId, FileDeclarations declarations) {
 		deleteDeclarationsInBatch(fileId);
@@ -46,8 +50,10 @@ public class DeclarationDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
 	 * 이 파일이 선언하려는 타입 가운데 다른 파일이 이미 선언한 것을 찾습니다(최대 5건). 없으면 빈 목록입니다.
 	 * 파일 하나를 처리하는 트랜잭션 안에서 부르므로 대량 저장용 세션을 씁니다.
+	 * </pre>
 	 *
 	 * @return [{fqn, path, fileId}] - path와 fileId는 먼저 선언한 파일. 바깥 타입이 앞에 옵니다.
 	 */
@@ -69,7 +75,9 @@ public class DeclarationDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
 	 * 파싱 결과를 파일 행에 남깁니다(대량 저장용 세션).
+	 * </pre>
 	 *
 	 * @param languageLevel 파싱에 성공한 문법 수준. null이면 있던 값을 그대로 둡니다.
 	 * @param packageName 파서가 읽은 패키지. null이면 패키지와 소스 루트는 SCAN이 넣은 값을 그대로 둡니다.

@@ -11,10 +11,12 @@ import net.dstone.knowledge.api.dao.AnalysisJobDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 
 /**
+ * <pre>
  * 분석 단계가 "지금 어디까지 했는지"와 "무엇이 잘못됐는지"를 DB에 남길 때 쓰는 창구입니다.
  *
  * 주의: 대량 저장용 세션으로 묶은 트랜잭션 "밖"에서 불러야 합니다.
  * 여기서는 일반 세션을 쓰는데, 한 트랜잭션 안에서 두 세션을 섞으면 MyBatis가 오류를 냅니다.
+ * </pre>
  */
 @Component
 public class AnalysisJobReporter extends BaseObject {
@@ -29,7 +31,9 @@ public class AnalysisJobReporter extends BaseObject {
 	private RevisionDao revisionDao;
 
 	/**
+	 * <pre>
 	 * 진행 건수를 기록합니다. "살아 있다"는 표시(heartbeat)도 같이 남습니다.
+	 * </pre>
 	 *
 	 * @param totalCount 이 단계가 처리할 전체 건수. 아직 모르면 지금까지 처리한 건수를 넣습니다.
 	 */
@@ -39,8 +43,10 @@ public class AnalysisJobReporter extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 분석 오류를 기록합니다. 분석은 멈추지 않고 계속합니다.
 	 * 실패한 파일을 숨기지 않고 남겨 두어야 나중에 결과를 얼마나 믿을 수 있는지 판단할 수 있습니다.
+	 * </pre>
 	 *
 	 * @param fileId 해당 파일의 ID. 아직 저장 전이라 모르면 null
 	 * @param errorType PARSE_ERROR / ENCODING / IO ...

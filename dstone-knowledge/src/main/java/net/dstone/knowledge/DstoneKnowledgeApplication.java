@@ -16,18 +16,22 @@ import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
 
 /**
+ * <pre>
  * dstone-knowledge를 시작하는 진입점 클래스입니다.
  *
  * Java 애플리케이션을 정적 분석해서 Knowledge Graph와 RAG 청크를 만들어 주는 모듈입니다.
  * 기동 방식은 다른 dstone 모듈과 같습니다(env.properties → application.yml → log4j2.xml 순서).
+ * </pre>
  */
 @SpringBootApplication
 @ComponentScan(basePackages = { "net.dstone.knowledge" })
 public class DstoneKnowledgeApplication {
 
 	/**
+	 * <pre>
 	 * env.properties를 System 프로퍼티로 먼저 세팅한 뒤, conf/application.yml과
 	 * conf/log4j2.xml을 설정 위치로 지정해서 Spring Boot 앱을 실행합니다.
+	 * </pre>
 	 *
 	 * @param args 커맨드라인 인자
 	 */
@@ -57,9 +61,11 @@ public class DstoneKnowledgeApplication {
 	public static boolean IS_SYS_PROPERTIES_SET = false;
 
 	/**
+	 * <pre>
 	 * conf/env.properties(또는 프로파일별 env-{profile}.properties)를 읽어서, 그 안의 값들을
 	 * System 프로퍼티로 세팅합니다. 한 번 세팅되고 나면 다시 호출해도 아무 일도 하지 않습니다
 	 * (IS_SYS_PROPERTIES_SET 플래그로 막습니다).
+	 * </pre>
 	 */
 	@SuppressWarnings("rawtypes")
 	public static void setSysProperties() {

@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
 
 /**
+ * <pre>
  * 이 모듈의 모든 Dao가 상속하는 부모 클래스입니다.
+ * </pre>
  */
 @Repository
 public class BaseDao extends net.dstone.common.biz.BaseDao {

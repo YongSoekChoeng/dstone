@@ -4,7 +4,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 /**
+ * <pre>
  * 예외를 로그나 DB에 남길 글로 바꿔 주는 도구입니다.
+ * </pre>
  */
 public class ErrorText {
 
@@ -19,8 +21,10 @@ public class ErrorText {
 	}
 
 	/**
+	 * <pre>
 	 * "예외종류: 메시지" 한 줄로 줄여 줍니다.
 	 * 메시지가 없는 예외(NullPointerException 등)도 종류는 남아서 무엇이 났는지 알 수 있습니다.
+	 * </pre>
 	 */
 	public static String summaryOf(Throwable t) {
 		String message = t.getMessage();

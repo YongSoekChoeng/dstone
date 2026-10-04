@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.Test;
 
 /**
+ * <pre>
  * 크기가 정해진 캐시가 정해진 크기를 넘지 않고, 오래 안 쓴 것부터 버리는지 확인합니다.
+ * </pre>
  */
 public class BoundedCacheTest {
 

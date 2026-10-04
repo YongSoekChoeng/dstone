@@ -13,7 +13,9 @@ import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.common.exception.ApiException;
 
 /**
+ * <pre>
  * 분석 대상 프로젝트를 등록하고 조회합니다.
+ * </pre>
  */
 @Service
 public class ProjectService extends BaseObject {
@@ -22,10 +24,12 @@ public class ProjectService extends BaseObject {
 	private ProjectDao projectDao;
 
 	/**
+	 * <pre>
 	 * 프로젝트를 등록합니다. 같은 projectId가 이미 있으면 내용을 고칩니다.
 	 *
 	 * 소스는 이 서버가 직접 읽을 수 있는 로컬 폴더여야 합니다(localPath).
 	 * git 저장소에서 받아 오는 기능은 증분 분석(M7) 때 붙입니다.
+	 * </pre>
 	 */
 	public Map<String, Object> saveProject(Map<String, Object> request) {
 		String projectId = text(request, "projectId");

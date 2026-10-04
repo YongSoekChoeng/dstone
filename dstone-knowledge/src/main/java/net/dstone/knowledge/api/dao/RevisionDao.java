@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
+ * <pre>
  * 리비전(analysis_revision)과 리비전별 단계 진행 상태(analysis_revision_pass)를 다루는 Dao입니다.
+ * </pre>
  */
 @Repository("revisionDao")
 public class RevisionDao extends BaseDao {
@@ -17,8 +19,10 @@ public class RevisionDao extends BaseDao {
 	private static final String NS = "net.dstone.knowledge.api.dao.RevisionDao.";
 
 	/**
+	 * <pre>
 	 * 리비전을 지울 때 같이 지워야 하는 테이블들입니다(revision_id 컬럼이 있는 테이블).
 	 * 테이블을 추가하면 여기에도 넣습니다. 맨 뒤의 analysis_revision 이 마지막에 지워져야 합니다(FK).
+	 * </pre>
 	 */
 	private static final String[] REVISION_TABLES = {
 		"rag_chunk", "rag_document"
@@ -98,8 +102,10 @@ public class RevisionDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
 	 * 리비전 하나에 딸린 행을 모두 지웁니다. 반드시 트랜잭션 안에서 부릅니다.
 	 * 임베딩(rag_embedding)은 리비전에 속하지 않아서 남겨 둡니다.
+	 * </pre>
 	 */
 	public void deleteRevisionData(long revisionId) {
 		// analysis_metric 은 revision_id 가 없고 Job ID 로 묶여 있어서, Job 을 지우기 전에 먼저 지운다.

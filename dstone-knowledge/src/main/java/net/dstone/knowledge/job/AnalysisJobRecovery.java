@@ -11,6 +11,7 @@ import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.util.ErrorText;
 
 /**
+ * <pre>
  * 서버가 뜰 때, 지난번에 끝나지 못한 Job을 정리합니다.
  *
  * 분석 도중 서버가 내려가면 Job이 RUNNING인 채로 DB에 남습니다.
@@ -19,6 +20,7 @@ import net.dstone.knowledge.common.util.ErrorText;
  * 그때까지 저장된 결과는 그대로 있으므로, 같은 리비전으로 다시 시작하면 이어서 합니다.
  *
  * 이 서버가 한 대만 뜬다는 전제입니다. 여러 대를 띄우면 다른 서버의 Job까지 정리해 버립니다.
+ * </pre>
  */
 @Component
 public class AnalysisJobRecovery extends BaseObject implements ApplicationListener<ApplicationReadyEvent> {

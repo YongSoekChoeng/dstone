@@ -4,10 +4,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * <pre>
  * Map / List / 문자열 / 숫자 / boolean을 한 줄짜리 JSON 글로 바꿉니다.
  *
  * dstone-common의 ConvertUtil.convertToJson은 사람이 보기 좋게 여러 줄로 풀어 씁니다.
  * 분석 결과는 행마다 JSON 컬럼이 있어서(수십만 행), 공백 없이 짧게 쓰는 이 도구를 따로 둡니다.
+ * </pre>
  */
 public class JsonText {
 

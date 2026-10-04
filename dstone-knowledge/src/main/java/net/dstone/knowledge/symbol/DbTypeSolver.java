@@ -21,6 +21,7 @@ import net.dstone.knowledge.parser.JavaSourceParser;
 import net.dstone.knowledge.scanner.EncodingDetector;
 
 /**
+ * <pre>
  * 프로젝트 안의 타입을 "DB 색인"으로 찾아 주는 타입 해석기입니다.
  *
  * JavaSymbolSolver가 호출 하나를 풀려면 관련된 타입의 선언(AST)이 필요합니다.
@@ -39,6 +40,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  * (TypeSolverTrial이 그렇게 씁니다.)
  *
  * 스레드 하나에서만 써야 합니다. 분석 한 번에 객체 하나를 만들어 쓰고 버립니다.
+ * </pre>
  */
 public class DbTypeSolver implements TypeSolver {
 
@@ -55,8 +57,10 @@ public class DbTypeSolver implements TypeSolver {
 	private final BoundedCache<Long, CompilationUnit> units;
 
 	/**
+	 * <pre>
 	 * 이름 → 그 타입이 있는 파일. 없는 이름도 "없음"으로 적어 둡니다.
 	 * 해석기는 java.lang.String 같은 프로젝트 밖의 이름도 수없이 물어보기 때문에, 없다는 답도 기억해야 DB를 덜 부릅니다.
+	 * </pre>
 	 */
 	private final BoundedCache<String, Map<String, Object>> locations;
 
@@ -121,8 +125,10 @@ public class DbTypeSolver implements TypeSolver {
 	}
 
 	/**
+	 * <pre>
 	 * 파일 하나의 AST를 돌려줍니다. 캐시에 있으면 그것을, 없으면 파싱해서 캐시에 넣고 돌려줍니다.
 	 * 분석하려는 파일 자체도 이 메소드로 얻어야 합니다. 그래야 해석기가 돌려주는 선언과 같은 AST를 보게 됩니다.
+	 * </pre>
 	 *
 	 * @param file {fileId, path, encoding, languageLevel}
 	 * @return 읽거나 파싱하지 못했으면 null

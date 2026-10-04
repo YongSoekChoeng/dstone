@@ -1,7 +1,9 @@
 package net.dstone.knowledge.parser.model;
 
 /**
+ * <pre>
  * 필드 하나(enum 상수 포함). analysis_field 테이블의 한 행이 됩니다.
+ * </pre>
  */
 public class FieldRow {
 

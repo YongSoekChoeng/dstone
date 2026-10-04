@@ -18,7 +18,9 @@ import net.dstone.knowledge.api.service.ProjectService;
 import net.dstone.knowledge.api.service.RevisionService;
 
 /**
+ * <pre>
  * 분석 대상 프로젝트 API입니다. 프로젝트 등록/조회와, 그 프로젝트의 분석 시작/리비전 목록을 다룹니다.
+ * </pre>
  */
 @RestController
 @RequestMapping("/api/projects")
@@ -34,8 +36,10 @@ public class ProjectController {
 	private RevisionService revisionService;
 
 	/**
+	 * <pre>
 	 * 프로젝트 등록(같은 projectId가 있으면 수정).
 	 * 본문: {projectId, localPath, projectName?, rootPackages?, javaVersion?, sourceEncoding?, description?}
+	 * </pre>
 	 */
 	@PostMapping
 	public Map<String, Object> saveProject(@RequestBody Map<String, Object> request) {
@@ -53,8 +57,10 @@ public class ProjectController {
 	}
 
 	/**
+	 * <pre>
 	 * 분석 시작. 바로 202로 돌아오고 분석은 백그라운드에서 돕니다.
 	 * 본문(없어도 됨): {revisionLabel?} - 이미 있는 라벨이면 그 리비전을 이어서 분석합니다.
+	 * </pre>
 	 */
 	@PostMapping("/{projectId}/analyses")
 	public ResponseEntity<Map<String, Object>> startAnalysis(@PathVariable("projectId") String projectId

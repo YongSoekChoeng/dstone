@@ -37,6 +37,7 @@ import net.dstone.knowledge.parser.JavaSourceParser;
 import net.dstone.knowledge.scanner.EncodingDetector;
 
 /**
+ * <pre>
  * DB 색인 기반 타입 해석기(DbTypeSolver)를 실제 프로젝트에 돌려 보는 시험입니다.
  *
  * 확인하려는 것:
@@ -46,6 +47,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *
  * 결과를 DB에 저장하지 않고 통계만 돌려줍니다. 호출 관계를 실제로 저장하는 일은 M2의 RESOLVE 단계가 하고,
  * 그때 이 클래스는 없어집니다. 여기서 확인한 사용법(캐시 끄기, 파일마다 비우기)은 RESOLVE가 그대로 가져갑니다.
+ * </pre>
  */
 @Component
 public class TypeSolverTrial extends BaseObject {

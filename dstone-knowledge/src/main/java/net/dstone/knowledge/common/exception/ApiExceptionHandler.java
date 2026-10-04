@@ -13,7 +13,9 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.common.util.ErrorText;
 
 /**
+ * <pre>
  * 컨트롤러에서 올라온 예외를 {status, message} 모양의 JSON 응답으로 바꿔 줍니다.
+ * </pre>
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends BaseObject {

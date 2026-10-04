@@ -15,6 +15,7 @@ import net.dstone.knowledge.api.dao.FilePassDao;
 import net.dstone.knowledge.common.util.ErrorText;
 
 /**
+ * <pre>
  * "파일을 하나씩 처리하는 단계"가 공통으로 쓰는 실행기입니다. DECLARE, RESOLVE 같은 단계가 씁니다.
  *
  * 하는 일:
@@ -24,6 +25,7 @@ import net.dstone.knowledge.common.util.ErrorText;
  *
  * 그래서 중간에 죽어도 끝난 파일은 끝난 채로 남고, 다시 시작하면 남은 파일만 처리합니다.
  * 메모리에는 한 번에 꺼낸 파일 목록(chunk)과 지금 처리 중인 파일 하나만 올라갑니다.
+ * </pre>
  */
 @Component
 public class FilePassRunner extends BaseObject {

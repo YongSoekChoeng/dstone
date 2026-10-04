@@ -5,16 +5,20 @@ import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 /**
+ * <pre>
  * 파일이 무엇인지(언어와 용도) 가려냅니다.
  *
  * 언어는 확장자로 정합니다. 분석 대상이 아닌 파일(이미지, js, class, jar ...)은 null을 돌려주고 스캔에서 빠집니다.
  * XML은 확장자만으로는 용도를 알 수 없어서 맨 위 요소(root element)를 보고 가립니다.
+ * </pre>
  */
 @Component
 public class FileClassifier {
 
 	/**
+	 * <pre>
 	 * 확장자로 언어를 정합니다.
+	 * </pre>
 	 *
 	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE. 분석 대상이 아니면 null
 	 */
@@ -42,7 +46,9 @@ public class FileClassifier {
 	}
 
 	/**
+	 * <pre>
 	 * 파일의 용도를 정합니다.
+	 * </pre>
 	 *
 	 * @param text 파일 내용. 너무 커서 읽지 않은 파일은 null
 	 */
@@ -117,8 +123,10 @@ public class FileClassifier {
 	}
 
 	/**
+	 * <pre>
 	 * XML의 맨 위 요소 이름을 찾습니다.
 	 * 그 앞에 올 수 있는 XML 선언, 주석, DOCTYPE은 건너뜁니다.
+	 * </pre>
 	 */
 	String rootElementOf(String text) {
 		int pos = 0;

@@ -1,7 +1,9 @@
 package net.dstone.knowledge.parser.model;
 
 /**
+ * <pre>
  * 타입 하나(class / interface / enum / record / annotation / 익명 클래스). analysis_symbol 테이블의 한 행이 됩니다.
+ * </pre>
  */
 public class TypeRow {
 

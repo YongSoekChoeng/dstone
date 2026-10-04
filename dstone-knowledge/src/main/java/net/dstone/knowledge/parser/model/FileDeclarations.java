@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * <pre>
  * 파일 하나에서 찾아낸 선언과 참조를 모아 둔 묶음입니다.
  * DECLARE 단계가 파일 하나를 처리할 때 만들어서 DB에 쓰고 바로 버립니다.
+ * </pre>
  */
 public class FileDeclarations {
 

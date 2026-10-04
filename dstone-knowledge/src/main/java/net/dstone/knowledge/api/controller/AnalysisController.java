@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import net.dstone.knowledge.api.service.AnalysisService;
 
 /**
+ * <pre>
  * 분석 Job API입니다. 시작은 ProjectController(POST /api/projects/{projectId}/analyses)에 있고,
  * 여기서는 시작한 Job의 상태 조회와 취소를 다룹니다.
+ * </pre>
  */
 @RestController
 @RequestMapping("/api/analyses")

@@ -14,7 +14,9 @@ import net.dstone.common.config.ConfigProperty;
 import net.dstone.knowledge.api.dao.SystemDao;
 
 /**
+ * <pre>
  * 모듈이 잘 떠 있는지 확인하는 API입니다.
+ * </pre>
  */
 @RestController
 @RequestMapping("/api/system")
@@ -30,12 +32,14 @@ public class SystemController {
 	private ConfigProperty configProperty;
 
 	/**
+	 * <pre>
 	 * 상태 확인.
 	 *
 	 * 앱만 떠 있고 DB가 안 붙거나 스키마가 덜 만들어진 경우를 구분해서 알려 줍니다.
 	 * - UP: 정상
 	 * - SCHEMA_NOT_READY: DB는 붙었지만 테이블이 모자람(스키마 SQL을 아직 안 돌렸을 때)
 	 * - DB_DOWN: DB 연결 실패
+	 * </pre>
 	 */
 	@GetMapping("/health")
 	public ResponseEntity<Map<String, Object>> health() {

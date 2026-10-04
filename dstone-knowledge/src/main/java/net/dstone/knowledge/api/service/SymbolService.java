@@ -12,7 +12,9 @@ import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.common.exception.ApiException;
 
 /**
+ * <pre>
  * 분석으로 찾아낸 타입(심볼)을 조회합니다.
+ * </pre>
  */
 @Service
 public class SymbolService extends BaseObject {
@@ -23,7 +25,9 @@ public class SymbolService extends BaseObject {
 	private DeclarationDao declarationDao;
 
 	/**
+	 * <pre>
 	 * 타입 목록.
+	 * </pre>
 	 *
 	 * @param kind CLASS / INTERFACE / ENUM / RECORD / ANNOTATION / ANONYMOUS (없으면 전부)
 	 * @param name 전체 이름에 이 글자가 들어간 것만 (없으면 전부)

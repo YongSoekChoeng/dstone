@@ -14,7 +14,9 @@ import org.springframework.stereotype.Component;
 import net.dstone.common.core.BaseObject;
 
 /**
+ * <pre>
  * MyBatis 설정입니다. 매퍼 XML은 resources/sqlmap 아래의 *Dao.xml 파일입니다.
+ * </pre>
  */
 @Component
 public class ConfigMapper extends BaseObject {
@@ -36,11 +38,13 @@ public class ConfigMapper extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 대량 저장용 세션입니다.
 	 *
 	 * 분석은 파일 하나를 처리할 때마다 심볼/참조/관계 행을 수백 건씩 DB에 씁니다.
 	 * 한 건씩 보내면 너무 느려서, 같은 SQL을 모아 한 번에 보내는 BATCH 방식 세션을 따로 둡니다.
 	 * 반드시 트랜잭션 안에서 써야 모아 둔 SQL이 커밋 시점에 함께 나갑니다.
+	 * </pre>
 	 */
 	@Bean(name = "sqlSessionBatch")
 	public SqlSessionTemplate sqlSessionBatch(@Qualifier("sqlSessionFactoryCommon") SqlSessionFactory sqlSessionFactoryCommon) {

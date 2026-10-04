@@ -19,7 +19,9 @@ import net.dstone.knowledge.job.AnalysisJobContext;
 import net.dstone.knowledge.job.AnalysisJobRunner;
 
 /**
+ * <pre>
  * 분석 Job을 시작하고, 상태를 조회하고, 취소합니다.
+ * </pre>
  */
 @Service
 public class AnalysisService extends BaseObject {
@@ -43,6 +45,7 @@ public class AnalysisService extends BaseObject {
 	private ConfigProperty configProperty;
 
 	/**
+	 * <pre>
 	 * 분석을 시작합니다. 바로 돌아오고, 분석은 백그라운드에서 돕니다.
 	 *
 	 * 리비전 라벨:
@@ -52,6 +55,7 @@ public class AnalysisService extends BaseObject {
 	 *
 	 * 한 프로젝트에서 분석은 한 번에 하나만 돕니다. 이미 돌고 있으면 409입니다.
 	 * synchronized인 이유: "돌고 있는 Job이 있나" 확인과 Job 등록 사이에 다른 요청이 끼어들지 못하게 하려는 것입니다.
+	 * </pre>
 	 */
 	public synchronized Map<String, Object> startAnalysis(String projectId, String revisionLabel) {
 		Map<String, Object> project = projectService.getProject(projectId);
@@ -101,8 +105,10 @@ public class AnalysisService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * Job의 상태를 조회합니다.
 	 * Job 자체의 정보에 더해, 리비전의 단계별 진행 상태와 오류 일부를 같이 돌려줍니다.
+	 * </pre>
 	 */
 	public Map<String, Object> getAnalysis(String analysisId) {
 		Map<String, Object> job = analysisJobDao.selectJob(analysisId);
@@ -118,8 +124,10 @@ public class AnalysisService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 분석을 취소합니다. 돌고 있는 단계가 다음 확인 지점에서 멈추므로, 상태가 CANCELLED로 바뀌기까지 조금 걸릴 수 있습니다.
 	 * 그때까지 저장된 결과는 지우지 않습니다.
+	 * </pre>
 	 */
 	public Map<String, Object> cancelAnalysis(String analysisId) {
 		Map<String, Object> job = analysisJobDao.selectJob(analysisId);

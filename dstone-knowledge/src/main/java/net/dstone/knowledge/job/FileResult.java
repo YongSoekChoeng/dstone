@@ -1,7 +1,9 @@
 package net.dstone.knowledge.job;
 
 /**
+ * <pre>
  * 파일 하나를 처리한 결과입니다. FilePassRunner가 이 값을 보고 analysis_file_pass의 상태를 정합니다.
+ * </pre>
  */
 public class FileResult {
 
@@ -21,8 +23,10 @@ public class FileResult {
 	}
 
 	/**
+	 * <pre>
 	 * 끝났지만 알려 둘 것이 있습니다(일부를 저장하지 못한 경우 등).
 	 * 상태는 DONE이고, 내용은 분석 오류로 남습니다.
+	 * </pre>
 	 */
 	public static FileResult doneWithWarning(String errorType, String message) {
 		return new FileResult("DONE", errorType, message);

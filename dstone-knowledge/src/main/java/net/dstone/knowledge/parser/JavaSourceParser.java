@@ -14,6 +14,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.resolution.SymbolResolver;
 
 /**
+ * <pre>
  * Java 소스 한 파일을 AST로 바꿉니다. 어느 문법 수준으로 읽어야 하는지도 여기서 알아냅니다.
  *
  * 문법 수준이 왜 필요한가:
@@ -24,6 +25,7 @@ import com.github.javaparser.resolution.SymbolResolver;
  * 그래서 최신 문법부터 시도하고, 실패하면 수준을 낮춰 다시 읽습니다: 21 → 8 → 1.4
  * 프로젝트에 문법 수준(javaVersion)을 지정해 두었으면 그것을 맨 먼저 시도합니다.
  * 성공한 수준을 파일마다 기록해 둡니다(analysis_file.language_level).
+ * </pre>
  */
 @Component
 public class JavaSourceParser {
@@ -36,7 +38,11 @@ public class JavaSourceParser {
 	/** 파싱 오류 내용이 지나치게 길면 앞쪽 몇 건만 남깁니다. */
 	private static final int MAX_PROBLEMS = 5;
 
-	/** 파싱 결과 */
+	/**
+	 * <pre>
+	 * 파싱 결과
+	 * </pre>
+	 */
 	public static class Result {
 
 		/** 성공했으면 AST, 실패했으면 null */

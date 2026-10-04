@@ -4,10 +4,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
+ * <pre>
  * 크기가 정해진 캐시입니다. 꽉 차면 가장 오래 안 쓴 것부터 버립니다(LRU).
  *
  * 분석은 프로젝트가 아무리 커도 메모리를 일정하게 써야 합니다.
  * 그래서 분석 중에 쓰는 캐시는 모두 이렇게 크기를 정해 둡니다.
+ * </pre>
  */
 public class BoundedCache<K, V> extends LinkedHashMap<K, V> {
 

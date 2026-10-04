@@ -59,6 +59,7 @@ import net.dstone.knowledge.parser.model.ReferenceRow;
 import net.dstone.knowledge.parser.model.TypeRow;
 
 /**
+ * <pre>
  * 파싱한 파일 하나(AST)에서 선언과 참조를 뽑아냅니다. 파일 하나에 객체 하나를 만들어 쓰고 버립니다.
  *
  * 뽑아내는 것:
@@ -78,6 +79,7 @@ import net.dstone.knowledge.parser.model.TypeRow;
  *
  * 시그니처의 파라미터 타입은 소스에 적힌 그대로 씁니다(제네릭만 뺌). 예: findOrders(String), sort(List,Comparator)
  * 전체 이름(java.lang.String)으로 바꾸려면 다른 파일을 봐야 하는데, 그러면 ID가 분석 순서에 따라 달라질 수 있습니다.
+ * </pre>
  */
 public class DeclarationCollector {
 
@@ -169,7 +171,11 @@ public class DeclarationCollector {
 
 	/* ============================== 타입 ============================== */
 
-	/** 타입 하나를 처리하는 동안 들고 다니는 정보 */
+	/**
+	 * <pre>
+	 * 타입 하나를 처리하는 동안 들고 다니는 정보
+	 * </pre>
+	 */
 	static class TypeContext {
 		TypeRow row;
 		String fqn;
@@ -188,7 +194,11 @@ public class DeclarationCollector {
 		List<String[]> recordComponents = new ArrayList<String[]>();
 	}
 
-	/** Lombok이 멤버를 만들 때 필요한 필드 정보 */
+	/**
+	 * <pre>
+	 * Lombok이 멤버를 만들 때 필요한 필드 정보
+	 * </pre>
+	 */
 	static class FieldInfo {
 		String name;
 		String type;
@@ -201,7 +211,11 @@ public class DeclarationCollector {
 		Map<String, String> lombok = new HashMap<String, String>();
 	}
 
-	/** 참조가 들어 있는 쪽 */
+	/**
+	 * <pre>
+	 * 참조가 들어 있는 쪽
+	 * </pre>
+	 */
 	private static class From {
 		final String kind;
 		final String id;
@@ -299,8 +313,10 @@ public class DeclarationCollector {
 	}
 
 	/**
+	 * <pre>
 	 * 익명 클래스. 이름은 컴파일러가 붙이는 방식대로 "바깥타입$번호"로 합니다.
 	 * 무엇을 상속/구현하는지는 적어 두되, 그것이 클래스인지 인터페이스인지는 아직 모릅니다(ANONYMOUS_SUPER).
+	 * </pre>
 	 */
 	private void declareAnonymousType(Node creation, String superTypeName, NodeList<BodyDeclaration<?>> body, TypeContext outer) {
 		int number = ++outer.anonymousCount;
@@ -497,11 +513,13 @@ public class DeclarationCollector {
 	/* ============================== 참조 ============================== */
 
 	/**
+	 * <pre>
 	 * 노드 아래를 훑으면서 참조를 적습니다.
 	 *
 	 * 익명 클래스와 지역 클래스를 만나면 그 안으로 그대로 내려가지 않고, 새 타입으로 따로 처리합니다.
 	 * 그 안의 호출은 바깥 메소드가 아니라 그 클래스의 메소드에서 나가는 것이기 때문입니다.
 	 * (람다는 따로 타입을 만들지 않으므로, 람다 안의 호출은 바깥 메소드에서 나가는 것으로 적힙니다.)
+	 * </pre>
 	 */
 	private void walk(Node node, From from, TypeContext context) {
 		if (node instanceof ObjectCreationExpr) {
@@ -662,8 +680,10 @@ public class DeclarationCollector {
 	}
 
 	/**
+	 * <pre>
 	 * 애노테이션의 전체 이름을 이 파일의 import만 보고 알아냅니다. 알 수 없으면 null입니다.
 	 * (같은 패키지에 있어서 import가 없는 경우 등은 RESOLVE 단계에서 풉니다.)
+	 * </pre>
 	 */
 	private String annotationFqnOf(String written) {
 		int dot = written.indexOf('.');
@@ -703,8 +723,10 @@ public class DeclarationCollector {
 	/* ============================== 만들어 넣는 멤버 (LombokExpander도 씀) ============================== */
 
 	/**
+	 * <pre>
 	 * 소스에는 없지만 컴파일하면 생기는 메소드/생성자를 넣습니다.
 	 * 같은 이름에 파라미터 수가 같은 메소드를 소스에 직접 적어 두었으면 넣지 않습니다(Lombok도 그럴 때는 만들지 않습니다).
+	 * </pre>
 	 *
 	 * @return 넣었으면 true
 	 */

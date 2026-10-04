@@ -3,8 +3,10 @@ package net.dstone.knowledge.job;
 import java.util.Map;
 
 /**
+ * <pre>
  * 분석 Job 하나가 도는 동안 각 단계가 함께 보는 정보입니다.
  * (어느 프로젝트의 어느 리비전을 분석 중인지, 취소 요청이 들어왔는지)
+ * </pre>
  */
 public class AnalysisJobContext {
 

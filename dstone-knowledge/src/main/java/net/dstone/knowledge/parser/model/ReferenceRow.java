@@ -1,7 +1,9 @@
 package net.dstone.knowledge.parser.model;
 
 /**
+ * <pre>
  * 아직 누구를 가리키는지 모르는 참조 하나. analysis_reference 테이블의 한 행이 됩니다. RESOLVE 단계가 풀어서 관계로 옮깁니다.
+ * </pre>
  */
 public class ReferenceRow {
 

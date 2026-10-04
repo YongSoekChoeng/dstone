@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
+ * <pre>
  * 심볼 색인을 조회하는 Dao입니다. 타입 해석기가 "이 이름의 타입이 어디 있나"를 물을 때 씁니다.
+ * </pre>
  */
 @Repository("symbolDao")
 public class SymbolDao extends BaseDao {
@@ -17,7 +19,9 @@ public class SymbolDao extends BaseDao {
 	private static final String NS = "net.dstone.knowledge.api.dao.SymbolDao.";
 
 	/**
+	 * <pre>
 	 * 이 이름의 타입이 있는 파일을 찾습니다. 프로젝트 안에 그런 타입이 없으면 null입니다.
+	 * </pre>
 	 *
 	 * @return {fqn, packageName, fileId, path, encoding, languageLevel}
 	 */

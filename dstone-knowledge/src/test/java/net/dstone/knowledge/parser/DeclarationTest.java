@@ -25,8 +25,10 @@ import net.dstone.knowledge.parser.model.ReferenceRow;
 import net.dstone.knowledge.parser.model.TypeRow;
 
 /**
+ * <pre>
  * DECLARE 단계의 판단 로직(문법 수준 탐지, 선언/참조 수집, Lombok 멤버 만들기)을 확인합니다.
  * DB나 Spring 없이 도는 테스트입니다.
+ * </pre>
  */
 public class DeclarationTest {
 

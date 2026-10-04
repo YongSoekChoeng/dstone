@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
+ * <pre>
  * 파일이 어떤 인코딩으로 저장됐는지 알아냅니다.
  *
  * 오래된 프로젝트는 EUC-KR과 UTF-8이 섞여 있는 경우가 많아서, 프로젝트 전체에 인코딩 하나를 정해 두고
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Component;
  *   5) 프로젝트에 지정해 둔 인코딩(source_encoding)으로 깨짐 없이 읽히면 그것.
  *   6) EUC-KR, 그 다음 MS949(EUC-KR에 없는 글자까지 담는 윈도우용 확장) 순으로 시도.
  *   7) 다 실패하면 ISO-8859-1로 읽는다. 어떤 바이트든 읽히기는 하지만 한글은 깨진다. 이때는 "확신 없음"으로 표시한다.
+ * </pre>
  */
 @Component
 public class EncodingDetector {
@@ -40,7 +42,11 @@ public class EncodingDetector {
 	/** 인코딩 선언은 파일 앞쪽에 있으므로 이만큼만 들여다봅니다. */
 	private static final int HEAD_BYTES = 2048;
 
-	/** 감지 결과 */
+	/**
+	 * <pre>
+	 * 감지 결과
+	 * </pre>
+	 */
 	public static class Result {
 
 		/** 읽을 때 쓸 인코딩 이름 */
@@ -110,8 +116,10 @@ public class EncodingDetector {
 	}
 
 	/**
+	 * <pre>
 	 * 이미 알아낸 인코딩 이름(analysis_file.encoding)으로 파일 내용을 글자로 바꿉니다.
 	 * SCAN 뒤의 단계가 파일을 다시 읽을 때 씁니다. 맨 앞에 BOM이 있으면 떼어 냅니다.
+	 * </pre>
 	 */
 	public String decode(byte[] bytes, String encoding) {
 		int bomLength = 0;

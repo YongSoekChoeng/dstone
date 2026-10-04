@@ -17,7 +17,9 @@ import net.dstone.knowledge.api.service.SymbolService;
 import net.dstone.knowledge.symbol.TypeSolverTrial;
 
 /**
+ * <pre>
  * 리비전 API입니다. 분석 결과를 리비전 단위로 조회하고 지웁니다.
+ * </pre>
  */
 @RestController
 @RequestMapping("/api/revisions")
@@ -67,9 +69,11 @@ public class RevisionController {
 	}
 
 	/**
+	 * <pre>
 	 * (시험용) DB 색인 기반 타입 해석기를 돌려 보고 통계를 돌려줍니다. 결과를 저장하지 않습니다.
 	 * 끝날 때까지 응답이 오지 않으므로(파일 수백 개에 몇 분) maxFiles로 범위를 정해서 씁니다.
 	 * M2에서 RESOLVE 단계가 들어오면 없어집니다.
+	 * </pre>
 	 */
 	@PostMapping("/{revisionId}/trials/type-solver")
 	public Map<String, Object> runTypeSolverTrial(@PathVariable("revisionId") long revisionId

@@ -21,7 +21,9 @@ import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
 
 /**
+ * <pre>
  * 리비전(어느 시점의 소스를 분석한 결과 한 벌)을 조회하고 지웁니다.
+ * </pre>
  */
 @Service
 public class RevisionService extends BaseObject {
@@ -56,8 +58,10 @@ public class RevisionService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 리비전 하나를 조회합니다.
 	 * 단계별 진행 상태, 이 리비전을 돌린 Job들, 스캔한 파일의 요약(종류별/인코딩별/소스 루트별)을 같이 돌려줍니다.
+	 * </pre>
 	 */
 	public Map<String, Object> getRevision(long revisionId) {
 		Map<String, Object> result = new LinkedHashMap<String, Object>(findRevision(revisionId));
@@ -84,7 +88,9 @@ public class RevisionService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 스캔한 파일 목록을 조회합니다.
+	 * </pre>
 	 *
 	 * @param page 1부터 시작
 	 */
@@ -106,8 +112,10 @@ public class RevisionService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
 	 * 리비전과 거기에 딸린 분석 결과를 모두 지웁니다. 되돌릴 수 없습니다.
 	 * 분석이 돌고 있는 리비전은 지울 수 없습니다(먼저 취소해야 합니다).
+	 * </pre>
 	 */
 	public void deleteRevision(final long revisionId) {
 		findRevision(revisionId);
