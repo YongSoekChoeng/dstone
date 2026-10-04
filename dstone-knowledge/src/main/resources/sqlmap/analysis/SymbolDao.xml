@@ -7,6 +7,8 @@
          같은 이름이 여러 소스 루트에 있으면 파일 번호가 작은 것 하나만 돌려준다 -->
     <select id="selectTypeLocation" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT s.fqn AS "fqn"
+             , s.symbol_id AS "symbolId"
+             , s.kind AS "kind"
              , s.package_name AS "packageName"
              , f.file_id AS "fileId"
              , f.path AS "path"
@@ -20,30 +22,92 @@
          LIMIT 1
     </select>
 
-    <!-- 파싱에 성공한 Java 파일 (앞에서부터 몇 개) -->
-    <select id="selectParsedJavaFiles" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        SELECT file_id AS "fileId"
-             , path AS "path"
-             , package_name AS "packageName"
-             , encoding AS "encoding"
-             , language_level AS "languageLevel"
-          FROM analysis_file
-         WHERE revision_id = #{revisionId}
-           AND language = 'JAVA'
-           AND parse_status = 'OK'
-         ORDER BY file_id
-         LIMIT #{limit}
+    <!-- 파일 하나에 선언된 메소드들. 해석기가 찾은 선언(AST 노드)을 "파일 + 줄 + 이름 + 파라미터 수" 로 메소드 ID 에 맞출 때 쓴다.
+         소스에 없는 멤버(만들어 넣은 것)는 AST 노드가 없으므로 뺀다 -->
+    <select id="selectMethodIndexByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT method_id AS "methodId"
+             , name AS "name"
+             , line_start AS "lineStart"
+             , param_count AS "paramCount"
+          FROM analysis_method
+         WHERE file_id = #{fileId}
+           AND NOT is_synthetic
     </select>
 
-    <!-- 이 타입에 이 이름/파라미터 수의 메소드가 선언돼 있는지 (만들어 넣은 멤버 포함) -->
-    <select id="countMethod" parameterType="java.util.Map" resultType="int">
-        SELECT COUNT(*)
+    <!-- 타입 하나에 선언된, 이 이름의 메소드들 (만들어 넣은 멤버 포함). paramCount 가 없으면 이름만 본다 -->
+    <select id="selectMethodsByOwner" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT m.method_id AS "methodId"
+             , m.is_synthetic AS "isSynthetic"
+             , m.return_type AS "returnType"
           FROM analysis_method m
           JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
          WHERE m.revision_id = #{revisionId}
            AND s.fqn = #{ownerFqn}
            AND m.name = #{name}
-           AND m.param_count = #{paramCount}
+        <if test="paramCount != null">AND m.param_count = #{paramCount}</if>
+         ORDER BY m.method_id
+         LIMIT 10
+    </select>
+
+    <select id="selectFieldByOwner" parameterType="java.util.Map" resultType="string">
+        SELECT f.field_id
+          FROM analysis_field f
+          JOIN analysis_symbol s ON s.revision_id = f.revision_id AND s.symbol_id = f.owner_symbol_id
+         WHERE f.revision_id = #{revisionId}
+           AND s.fqn = #{ownerFqn}
+           AND f.name = #{name}
+         ORDER BY f.field_id
+         LIMIT 1
+    </select>
+
+    <!-- 타입 하나에 만들어 넣은 필드(Lombok 의 log 등)의 타입 -->
+    <select id="selectSyntheticFieldType" parameterType="java.util.Map" resultType="string">
+        SELECT f.type
+          FROM analysis_field f
+          JOIN analysis_symbol s ON s.revision_id = f.revision_id AND s.symbol_id = f.owner_symbol_id
+         WHERE f.revision_id = #{revisionId}
+           AND s.fqn = #{ownerFqn}
+           AND f.name = #{name}
+           AND f.is_synthetic
+         LIMIT 1
+    </select>
+
+    <!-- 프로젝트 전체에서 이 이름(과 파라미터 수)의 메소드. 어느 타입의 메소드인지 모를 때 후보를 찾는 데 쓴다.
+         후보가 많으면 짐작할 수 없으므로 limit 까지만 가져와서 "많다" 는 것만 확인한다 -->
+    <select id="selectMethodCandidates" parameterType="java.util.Map" resultType="string">
+        SELECT method_id
+          FROM analysis_method
+         WHERE revision_id = #{revisionId}
+           AND name = #{name}
+           AND NOT is_constructor
+        <if test="paramCount != null">AND param_count = #{paramCount}</if>
+         ORDER BY method_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 단순 이름이 같은 타입들 (익명 클래스 제외) -->
+    <select id="selectTypesBySimpleName" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT symbol_id AS "symbolId", fqn AS "fqn", kind AS "kind"
+          FROM analysis_symbol
+         WHERE revision_id = #{revisionId}
+           AND simple_name = #{simpleName}
+           AND kind &lt;&gt; 'ANONYMOUS'
+         ORDER BY symbol_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 파일 하나에서 나온 참조들 -->
+    <select id="selectReferencesByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT reference_id AS "referenceId"
+             , from_kind AS "fromKind"
+             , from_id AS "fromId"
+             , ref_kind AS "refKind"
+             , name AS "name"
+             , arg_count AS "argCount"
+             , line_start AS "lineStart"
+             , column_start AS "columnStart"
+          FROM analysis_reference
+         WHERE file_id = #{fileId}
     </select>
 
 </mapper>

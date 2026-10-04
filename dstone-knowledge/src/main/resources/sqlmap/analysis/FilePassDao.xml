@@ -34,6 +34,8 @@
              , f.file_type AS "fileType"
              , f.package_name AS "packageName"
              , f.encoding AS "encoding"
+             , f.language_level AS "languageLevel"
+             , f.parse_status AS "parseStatus"
           FROM analysis_file_pass p
           JOIN analysis_file f ON f.file_id = p.file_id
          WHERE p.revision_id = #{revisionId}

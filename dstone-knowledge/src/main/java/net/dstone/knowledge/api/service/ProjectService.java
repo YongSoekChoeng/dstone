@@ -56,6 +56,7 @@ public class ProjectService extends BaseObject {
 		project.put("rootPackages", text(request, "rootPackages"));
 		project.put("javaVersion", text(request, "javaVersion"));
 		project.put("sourceEncoding", text(request, "sourceEncoding"));
+		project.put("classpath", text(request, "classpath"));
 		project.put("description", text(request, "description"));
 		projectDao.upsertProject(project);
 		return projectDao.selectProject(projectId);

@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.RelationDao">
+
+    <!-- ================= 저장 (RESOLVE 단계) ================= -->
+
+    <!-- 이 파일을 근거로 만든 관계를 지운다. 같은 파일을 다시 처리해도 관계가 두 번 들어가지 않게, 쓰기 전에 먼저 지운다 -->
+    <delete id="deleteByFile" parameterType="long">
+        DELETE FROM analysis_relation WHERE file_id = #{fileId}
+    </delete>
+
+    <insert id="insertRelation" parameterType="net.dstone.knowledge.resolver.model.RelationRow">
+        INSERT INTO analysis_relation
+            (revision_id, from_kind, from_id, relation_type, to_kind, to_id, to_external
+            , confidence, resolution_status, properties_json, file_id, line_start)
+        VALUES
+            (#{revisionId}, #{fromKind}, #{fromId}, #{relationType}, #{toKind}, #{toId}, #{toExternal}
+            , #{confidence}, #{resolutionStatus}, CAST(#{propertiesJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <update id="updateReference" parameterType="java.util.Map">
+        UPDATE analysis_reference
+           SET status = #{status}
+             , fail_reason = #{failReason}
+         WHERE reference_id = #{referenceId}
+    </update>
+
+
+    <!-- ================= 집합 연산 (LINK 단계) =================
+         파일을 하나씩 보는 대신, 이미 들어 있는 관계를 SQL 로 엮어서 새 관계를 만든다. -->
+
+    <delete id="deleteLinkRelations" parameterType="long">
+        DELETE FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND relation_type IN ('OVERRIDES', 'CALLS_POSSIBLE_IMPLEMENTATION')
+    </delete>
+
+    <!-- OVERRIDES: 하위 타입의 메소드 → 상위 타입(프로젝트 안)의 같은 메소드.
+         상위 타입은 EXTENDS/IMPLEMENTS 를 끝까지 따라 올라가며 찾는다.
+         순환 상속이 있어도 끝난다: 20단계까지만 올라가고(depth), UNION 이 같은 행을 다시 넣지 않는다.
+         시그니처가 같으면 HIGH. 이름과 파라미터 수만 같으면 MEDIUM 인데, 상위 타입에 시그니처까지 같은 메소드가 따로 있으면 그쪽만 잇는다.
+         (시그니처는 소스에 적힌 그대로라, 같은 타입을 List 와 java.util.List 로 다르게 적으면 글자가 달라진다.) -->
+    <insert id="insertOverrides" parameterType="long">
+        WITH RECURSIVE ancestor (type_id, ancestor_id, depth) AS (
+            SELECT r.from_id, r.to_id, 1
+              FROM analysis_relation r
+             WHERE r.revision_id = #{revisionId}
+               AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
+               AND r.to_id IS NOT NULL
+            UNION
+            SELECT a.type_id, r.to_id, a.depth + 1
+              FROM ancestor a
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.from_id = a.ancestor_id
+               AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
+               AND r.to_id IS NOT NULL
+             WHERE a.depth &lt; 20
+        )
+        INSERT INTO analysis_relation
+            (revision_id, from_kind, from_id, relation_type, to_kind, to_id, confidence, resolution_status)
+        SELECT DISTINCT #{revisionId}, 'METHOD', m.method_id, 'OVERRIDES', 'METHOD', pm.method_id
+             , CASE WHEN m.signature = pm.signature THEN 'HIGH' ELSE 'MEDIUM' END
+             , CASE WHEN m.signature = pm.signature THEN 'RESOLVED' ELSE 'HEURISTIC' END
+          FROM (
+                -- 순환 상속(A extends B, B extends A: 컴파일은 안 되지만 소스에는 있을 수 있다)이면
+                -- 따라 올라가다 자기 자신이 상위 타입으로 나온다. 그 행은 뺀다(메소드가 자기 자신을 재정의한다고 적지 않게).
+                SELECT DISTINCT type_id, ancestor_id FROM ancestor WHERE type_id &lt;&gt; ancestor_id
+               ) a
+          JOIN analysis_method m
+            ON m.revision_id = #{revisionId} AND m.owner_symbol_id = a.type_id
+           AND NOT m.is_constructor AND NOT m.is_static
+          JOIN analysis_method pm
+            ON pm.revision_id = #{revisionId} AND pm.owner_symbol_id = a.ancestor_id
+           AND pm.name = m.name AND pm.param_count = m.param_count
+           AND NOT pm.is_constructor AND NOT pm.is_static
+           AND COALESCE(pm.visibility, '') &lt;&gt; 'private'
+         WHERE m.signature = pm.signature
+            OR NOT EXISTS (
+                SELECT 1 FROM analysis_method x
+                 WHERE x.revision_id = #{revisionId}
+                   AND x.owner_symbol_id = a.ancestor_id
+                   AND x.signature = m.signature)
+    </insert>
+
+    <!-- CALLS_POSSIBLE_IMPLEMENTATION: 인터페이스(또는 상위 타입)의 메소드를 부르는 호출 → 실제로 실행될 수 있는 구현 메소드.
+         orderService.findOrders() 는 소스만 봐서는 OrderService.findOrders 를 부르는 것이지만, 실행될 때는 OrderServiceImpl.findOrders 가 돈다.
+         그 "가능한 구현" 을 호출한 쪽에서 바로 잇는다.
+
+         부른 대상이 몸통 없는 메소드(인터페이스/abstract)일 때만 만든다. 그 경우는 구현이 반드시 다른 곳에 있기 때문이다.
+         몸통이 있는 메소드를 하위 타입이 재정의한 경우까지 넣으면 잡음이 된다. BaseVO.setId() 를 부르는 호출 천여 건이
+         setId() 를 재정의한 하위 클래스 전부로 퍼지는데, 실제로는 대부분 관계없는 클래스다. 그런 경우는 OVERRIDES 를 따라가면 된다. -->
+    <insert id="insertPossibleImplementations" parameterType="long">
+        INSERT INTO analysis_relation
+            (revision_id, from_kind, from_id, relation_type, to_kind, to_id, confidence, resolution_status, properties_json, file_id, line_start)
+        SELECT c.revision_id, c.from_kind, c.from_id, 'CALLS_POSSIBLE_IMPLEMENTATION', 'METHOD', o.from_id
+             , 'MEDIUM'
+             , 'HEURISTIC'
+             , jsonb_build_object('declared', c.to_id)
+             , c.file_id, c.line_start
+          FROM analysis_relation c
+          JOIN analysis_relation o
+            ON o.revision_id = c.revision_id AND o.relation_type = 'OVERRIDES' AND o.to_id = c.to_id
+          JOIN analysis_method target
+            ON target.revision_id = c.revision_id AND target.method_id = c.to_id AND target.is_abstract
+          JOIN analysis_method impl
+            ON impl.revision_id = c.revision_id AND impl.method_id = o.from_id AND NOT impl.is_abstract
+         WHERE c.revision_id = #{revisionId}
+           AND c.relation_type = 'CALLS'
+           AND c.to_id IS NOT NULL
+    </insert>
+
+
+    <!-- ================= 품질 지표 ================= -->
+
+    <delete id="deleteMetrics" parameterType="string">
+        DELETE FROM analysis_metric WHERE analysis_id = #{analysisId}
+    </delete>
+
+    <!-- 참조가 얼마나 풀렸는지를 지표로 남긴다. IGNORED(풀 대상이 아닌 것)는 분모에서 뺀다 -->
+    <insert id="insertMetrics" parameterType="java.util.Map">
+        INSERT INTO analysis_metric (analysis_id, metric_name, metric_value)
+        SELECT #{analysisId}, 'parseSuccessRate'
+             , ROUND(100.0 * COUNT(*) FILTER (WHERE parse_status = 'OK') / NULLIF(COUNT(*) FILTER (WHERE parse_status &lt;&gt; 'SKIPPED'), 0), 2)
+          FROM analysis_file WHERE revision_id = #{revisionId} AND language = 'JAVA'
+        UNION ALL
+        SELECT #{analysisId}, 'callCount', COUNT(*)
+          FROM analysis_reference WHERE revision_id = #{revisionId} AND ref_kind = 'CALL'
+        UNION ALL
+        SELECT #{analysisId}, 'callResolutionRate'
+             , ROUND(100.0 * COUNT(*) FILTER (WHERE status IN ('RESOLVED', 'EXTERNAL')) / NULLIF(COUNT(*), 0), 2)
+          FROM analysis_reference WHERE revision_id = #{revisionId} AND ref_kind = 'CALL'
+        UNION ALL
+        SELECT #{analysisId}, 'callHeuristicRate'
+             , ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'HEURISTIC') / NULLIF(COUNT(*), 0), 2)
+          FROM analysis_reference WHERE revision_id = #{revisionId} AND ref_kind = 'CALL'
+        UNION ALL
+        SELECT #{analysisId}, 'callUnresolvedRate'
+             , ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'UNRESOLVED') / NULLIF(COUNT(*), 0), 2)
+          FROM analysis_reference WHERE revision_id = #{revisionId} AND ref_kind = 'CALL'
+        UNION ALL
+        SELECT #{analysisId}, 'typeResolutionRate'
+             , ROUND(100.0 * COUNT(*) FILTER (WHERE status IN ('RESOLVED', 'EXTERNAL')) / NULLIF(COUNT(*) FILTER (WHERE status &lt;&gt; 'IGNORED'), 0), 2)
+          FROM analysis_reference WHERE revision_id = #{revisionId}
+           AND ref_kind IN ('TYPE_USE', 'EXTENDS', 'IMPLEMENTS', 'THROWS', 'CREATE', 'ANONYMOUS_SUPER')
+        UNION ALL
+        SELECT #{analysisId}, 'relationCount', COUNT(*)
+          FROM analysis_relation WHERE revision_id = #{revisionId}
+    </insert>
+
+    <select id="selectMetricsByRevision" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT m.metric_name AS "name", m.metric_value AS "value", m.analysis_id AS "analysisId"
+          FROM analysis_metric m
+         WHERE m.analysis_id = (
+                SELECT j.analysis_id FROM analysis_job j
+                  JOIN analysis_metric x ON x.analysis_id = j.analysis_id
+                 WHERE j.revision_id = #{revisionId}
+                 ORDER BY j.created_at DESC, j.analysis_id DESC
+                 LIMIT 1)
+         ORDER BY m.metric_name
+    </select>
+
+
+    <!-- ================= 조회 ================= -->
+
+    <select id="selectRelationSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT relation_type AS "relationType"
+             , to_kind AS "toKind"
+             , confidence AS "confidence"
+             , COUNT(*) AS "count"
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+         GROUP BY relation_type, to_kind, confidence
+         ORDER BY relation_type, to_kind, confidence
+    </select>
+
+    <!-- 왜 못 풀었는지, 많은 이유부터.
+         이유의 첫 문장이 "종류" 이고 그 뒤는 건마다 다른 상세 내용이라, 첫 문장으로 묶어서 센다 -->
+    <select id="selectUnresolvedReasons" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT ref_kind AS "refKind"
+             , status AS "status"
+             , split_part(COALESCE(fail_reason, ''), '. ', 1) AS "reason"
+             , COUNT(*) AS "count"
+             , MIN(fail_reason) AS "example"
+          FROM analysis_reference
+         WHERE revision_id = #{revisionId}
+           AND status IN ('UNRESOLVED', 'IGNORED')
+         GROUP BY ref_kind, status, split_part(COALESCE(fail_reason, ''), '. ', 1)
+         ORDER BY COUNT(*) DESC
+         LIMIT 20
+    </select>
+
+    <sql id="methodColumns">
+        m.method_id AS "methodId"
+        , s.fqn AS "ownerFqn"
+        , m.signature AS "signature"
+        , m.return_type AS "returnType"
+        , m.is_abstract AS "isAbstract"
+        , m.is_synthetic AS "isSynthetic"
+        , f.path AS "path"
+        , m.line_start AS "lineStart"
+    </sql>
+
+    <sql id="methodWhere">
+         WHERE m.revision_id = #{revisionId}
+        <if test="owner != null and owner != ''">AND s.fqn LIKE '%' || #{owner} || '%'</if>
+        <if test="name != null and name != ''">AND m.name = #{name}</if>
+    </sql>
+
+    <select id="countMethod" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_method m
+          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+        <include refid="methodWhere"/>
+    </select>
+
+    <select id="selectMethodList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="methodColumns"/>
+          FROM analysis_method m
+          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+          JOIN analysis_file f ON f.file_id = m.file_id
+        <include refid="methodWhere"/>
+         ORDER BY s.fqn, m.signature
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectMethod" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="methodColumns"/>
+          FROM analysis_method m
+          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+          JOIN analysis_file f ON f.file_id = m.file_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.method_id = #{methodId}
+    </select>
+
+    <!-- 순환 호출(재귀, a → b → a)이 있어도 끝난다: 따라가는 깊이가 depth 로 묶여 있고(서비스에서 최대 5),
+         UNION 이 같은 행을 다시 넣지 않아서 행 수가 "관계 수 × depth" 를 넘지 못한다. -->
+    <!-- 이 메소드를 부르는 쪽. depth 만큼 거슬러 올라간다(부르는 쪽의 부르는 쪽 ...).
+         depth 가 같아도 같은 호출이 여러 줄에 있을 수 있어서 줄마다 한 행이다 -->
+    <select id="selectCallers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE walk (depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start) AS (
+            SELECT 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start
+              FROM analysis_relation r
+             WHERE r.revision_id = #{revisionId}
+               AND r.to_id = #{methodId}
+               AND r.relation_type IN
+            <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+            UNION
+            SELECT w.depth + 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start
+              FROM walk w
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.to_id = w.from_id
+               AND r.relation_type IN
+            <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+             WHERE w.depth &lt; #{depth}
+        )
+        SELECT w.depth AS "depth"
+             , w.relation_type AS "relationType"
+             , w.confidence AS "confidence"
+             , w.from_kind AS "fromKind"
+             , w.from_id AS "fromId"
+             , n.fqn AS "from"
+             , w.to_id AS "toId"
+             , f.path AS "path"
+             , w.line_start AS "lineStart"
+          FROM (
+                -- 서로를 부르는 메소드(a → b → a)가 있으면 같은 호출이 깊이를 바꿔 가며 다시 나온다. 가장 얕은 것 하나만 남긴다.
+                SELECT MIN(depth) AS depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start
+                  FROM walk
+                 GROUP BY from_id, from_kind, to_id, relation_type, confidence, file_id, line_start
+               ) w
+          LEFT JOIN kg_node n ON n.revision_id = #{revisionId} AND n.node_id = w.from_id
+          LEFT JOIN analysis_file f ON f.file_id = w.file_id
+         ORDER BY w.depth, n.fqn, w.line_start
+         LIMIT #{limit}
+    </select>
+
+    <!-- 이 메소드가 부르는 쪽. 프로젝트 밖(JDK, 라이브러리)으로 나가는 호출은 거기서 멈춘다 -->
+    <select id="selectCallees" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE walk (depth, from_id, to_kind, to_id, to_external, relation_type, confidence, file_id, line_start) AS (
+            SELECT 1, r.from_id, r.to_kind, r.to_id, r.to_external, r.relation_type, r.confidence, r.file_id, r.line_start
+              FROM analysis_relation r
+             WHERE r.revision_id = #{revisionId}
+               AND r.from_id = #{methodId}
+               AND r.relation_type IN
+            <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+            UNION
+            SELECT w.depth + 1, r.from_id, r.to_kind, r.to_id, r.to_external, r.relation_type, r.confidence, r.file_id, r.line_start
+              FROM walk w
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.from_id = w.to_id
+               AND r.relation_type IN
+            <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+             WHERE w.depth &lt; #{depth}
+        )
+        SELECT w.depth AS "depth"
+             , w.relation_type AS "relationType"
+             , w.confidence AS "confidence"
+             , w.from_id AS "fromId"
+             , w.to_kind AS "toKind"
+             , w.to_id AS "toId"
+             , COALESCE(n.fqn, w.to_external) AS "to"
+             , f.path AS "path"
+             , w.line_start AS "lineStart"
+          FROM (
+                SELECT MIN(depth) AS depth, from_id, to_kind, to_id, to_external, relation_type, confidence, file_id, line_start
+                  FROM walk
+                 GROUP BY from_id, to_kind, to_id, to_external, relation_type, confidence, file_id, line_start
+               ) w
+          LEFT JOIN kg_node n ON n.revision_id = #{revisionId} AND n.node_id = w.to_id
+          LEFT JOIN analysis_file f ON f.file_id = w.file_id
+         <if test="!includeExternal">WHERE w.to_id IS NOT NULL</if>
+         ORDER BY w.depth, w.from_id, w.line_start
+         LIMIT #{limit}
+    </select>
+
+</mapper>

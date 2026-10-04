@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.DataKey;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.resolution.TypeSolver;
@@ -37,12 +38,16 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  * 주의: 이 해석기만으로는 메모리가 묶이지 않습니다. 같이 쓰는 쪽에서 아래 두 가지를 지켜야 합니다.
  * - CombinedTypeSolver는 찾은 타입을 끝없이 캐시한다. 만들 때 캐시를 끈다(NoCache).
  * - JavaParserFacade도 풀어 본 노드를 캐시한다. 파일 하나를 끝낼 때마다 JavaParserFacade.clearInstances()로 비운다.
- * (TypeSolverTrial이 그렇게 씁니다.)
+ * (ResolvePass가 그렇게 씁니다.)
  *
  * 스레드 하나에서만 써야 합니다. 분석 한 번에 객체 하나를 만들어 쓰고 버립니다.
  * </pre>
  */
 public class DbTypeSolver implements TypeSolver {
+
+	/** 파싱한 파일(AST)에 "이것이 몇 번 파일인지"를 적어 두는 꼬리표. 해석기가 찾은 선언이 어느 파일의 것인지 되짚을 때 씁니다. */
+	public static final DataKey<Long> FILE_ID = new DataKey<Long>() {
+	};
 
 	/** "프로젝트 안에 그런 타입 없음"을 캐시에 적어 둘 때 쓰는 표시 */
 	private static final Map<String, Object> NOT_IN_PROJECT = new LinkedHashMap<String, Object>();
@@ -148,6 +153,7 @@ public class DbTypeSolver implements TypeSolver {
 			if (!parsed.isSuccessful()) {
 				return null;
 			}
+			parsed.unit.setData(FILE_ID, fileId);
 			units.put(fileId, parsed.unit);
 			return parsed.unit;
 		} catch (IOException e) {
@@ -155,7 +161,14 @@ public class DbTypeSolver implements TypeSolver {
 		}
 	}
 
-	private Map<String, Object> locationOf(String name) {
+	/**
+	 * <pre>
+	 * 이 이름의 타입이 프로젝트의 어느 파일에 있는지 돌려줍니다. 프로젝트 안에 없으면 null입니다.
+	 * </pre>
+	 *
+	 * @return {fqn, symbolId, kind, packageName, fileId, path, encoding, languageLevel}
+	 */
+	public Map<String, Object> locationOf(String name) {
 		Map<String, Object> cached = locations.get(name);
 		if (cached != null) {
 			return cached == NOT_IN_PROJECT ? null : cached;

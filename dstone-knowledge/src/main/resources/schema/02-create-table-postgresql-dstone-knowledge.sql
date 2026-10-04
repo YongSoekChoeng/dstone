@@ -54,6 +54,13 @@ CREATE TABLE IF NOT EXISTS analysis_project (
     updated_at        TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
 
+-- 클래스패스: 호출이 누구를 가리키는지 풀 때 쓰는 라이브러리 jar 의 위치.
+-- jar 파일이나 jar 가 든 폴더를 쉼표/줄바꿈/경로 구분자(리눅스 ':', 윈도우 ';')로 이어 적는다.
+-- (mvn dependency:build-classpath 의 출력을 그대로 넣어도 된다.)
+-- 프로젝트 폴더 안의 jar(WEB-INF/lib 등)는 적지 않아도 자동으로 찾는다.
+-- 테이블을 이미 만든 DB 에도 컬럼이 생기도록 ALTER 로 추가한다.
+ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS classpath TEXT;
+
 -- 리비전: 한 프로젝트의 어느 시점(커밋 등)
 CREATE TABLE IF NOT EXISTS analysis_revision (
     revision_id         BIGSERIAL     PRIMARY KEY,
@@ -255,7 +262,7 @@ CREATE TABLE IF NOT EXISTS analysis_reference (
     arg_count         INT,
     line_start        INT,
     column_start      INT,                               -- 2차 패스에서 같은 AST 노드를 다시 찾는 키
-    status            VARCHAR(20)   NOT NULL DEFAULT 'PENDING',    -- PENDING/RESOLVED/EXTERNAL/UNRESOLVED
+    status            VARCHAR(20)   NOT NULL DEFAULT 'PENDING',    -- PENDING/RESOLVED/EXTERNAL(프로젝트 밖)/HEURISTIC(짐작)/UNRESOLVED/IGNORED(풀 대상 아님)
     fail_reason       VARCHAR(500)
 );
 CREATE INDEX IF NOT EXISTS idx_analysis_reference_file   ON analysis_reference(file_id, status);

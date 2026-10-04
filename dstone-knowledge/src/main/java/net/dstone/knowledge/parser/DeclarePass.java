@@ -74,42 +74,96 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		final String javaVersion = context.getProjectValue("javaVersion");
 		final String[] rootPackages = rootPackagesOf(context.getProjectValue("rootPackages"));
 
-		filePassRunner.run(context, NAME, "JAVA", new FileHandler() {
+		filePassRunner.run(context, NAME, "JAVA", new FileHandler<Prepared>() {
 			@Override
-			public FileResult handle(Map<String, Object> file) throws Exception {
-				return declareFile(context, root, javaVersion, rootPackages, file);
+			public Prepared prepare(Map<String, Object> file) throws Exception {
+				return parseFile(context, root, javaVersion, rootPackages, file);
+			}
+
+			@Override
+			public FileResult write(Map<String, Object> file, Prepared prepared) throws Exception {
+				return saveFile(context, file, prepared);
+			}
+
+			@Override
+			public void reset() {
+				// 파일 사이에 걸쳐 들고 있는 것이 없다. 파일마다 파서와 수집기를 새로 만든다.
 			}
 		});
 	}
 
-	private FileResult declareFile(AnalysisJobContext context, Path root, String javaVersion, String[] rootPackages, Map<String, Object> file) throws Exception {
+	/**
+	 * <pre>
+	 * 파일 하나를 읽고 파싱한 결과입니다. 아직 DB에는 아무것도 쓰지 않은 상태입니다.
+	 * </pre>
+	 */
+	private static class Prepared {
+		/** 분석 대상이 아니면 그 이유. 대상이면 null */
+		String skipReason;
+		/** 실패했으면 오류 종류(PARSE_ERROR / TOO_DEEP)와 내용. 성공했으면 null */
+		String failType;
+		String failMessage;
+		/** 성공했을 때의 결과 */
+		FileDeclarations declarations;
+		String languageLevel;
+		String packageName;
+		String sourceRoot;
+	}
+
+	/** 준비: 파일을 읽고, 파싱하고, 선언과 참조를 뽑는다. DB에 쓰지 않는다. */
+	private Prepared parseFile(AnalysisJobContext context, Path root, String javaVersion, String[] rootPackages, Map<String, Object> file) throws Exception {
 		long fileId = ((Number) file.get("fileId")).longValue();
 		String path = (String) file.get("path");
+		Prepared prepared = new Prepared();
 
 		// 분석할 루트 패키지를 정해 둔 프로젝트면, 그 밖의 파일은 읽지도 않는다(SCAN이 정규식으로 찾아 둔 패키지로 판단).
 		if (!isUnderRootPackages((String) file.get("packageName"), rootPackages)) {
-			return FileResult.skipped("분석할 루트 패키지 밖입니다.");
+			prepared.skipReason = "분석할 루트 패키지 밖입니다.";
+			return prepared;
 		}
 
 		byte[] bytes = Files.readAllBytes(root.resolve(path));
 		String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+		try {
+			JavaSourceParser.Result parsed = javaSourceParser.parse(text, javaVersion);
+			if (!parsed.isSuccessful()) {
+				prepared.failType = "PARSE_ERROR";
+				prepared.failMessage = parsed.error;
+				return prepared;
+			}
+			// 패키지는 파서가 읽은 값이 정확하다. 소스 루트도 그 값으로 다시 구한다.
+			prepared.packageName = parsed.unit.getPackageDeclaration().isPresent()
+					? parsed.unit.getPackageDeclaration().get().getNameAsString() : "";
+			prepared.sourceRoot = ScanPass.sourceRootOf(path, prepared.packageName);
+			prepared.languageLevel = parsed.languageLevel;
+			// 폴더 구조가 패키지와 맞지 않아 소스 루트를 못 찾은 파일은, 놓인 폴더를 대신 써서 ID가 겹치지 않게 한다.
+			String idScope = prepared.sourceRoot != null ? prepared.sourceRoot : "?" + directoryOf(path);
+			prepared.declarations = new DeclarationCollector(context.getProjectId(), context.getRevisionId(), fileId, idScope).collect(parsed.unit);
+		} catch (StackOverflowError e) {
+			// 식이 지나치게 깊게 중첩된 파일("a" + "b" + ... 를 수천 번 이은 것 등)은 파싱하거나 AST를 따라 내려가다 스택이 넘친다.
+			// 여기서 막아서 "실패했다"는 사실을 파일 행에도 남길 수 있게 한다.
+			prepared.declarations = null;
+			prepared.failType = "TOO_DEEP";
+			prepared.failMessage = "식이 너무 깊게 중첩돼 있어 처리하지 못했습니다(StackOverflowError).";
+		}
+		return prepared;
+	}
 
-		JavaSourceParser.Result parsed = javaSourceParser.parse(text, javaVersion);
-		if (!parsed.isSuccessful()) {
+	/** 저장: 준비한 결과를 DB에 쓴다. 트랜잭션 안이다. */
+	private FileResult saveFile(AnalysisJobContext context, Map<String, Object> file, Prepared prepared) {
+		long fileId = ((Number) file.get("fileId")).longValue();
+		String path = (String) file.get("path");
+
+		if (prepared.skipReason != null) {
+			return FileResult.skipped(prepared.skipReason);
+		}
+		if (prepared.failType != null) {
 			// 전에 성공했던 결과가 남아 있으면 지운다(파일이 바뀐 뒤 다시 돌린 경우).
 			declarationDao.deleteDeclarationsInBatch(fileId);
-			declarationDao.updateFileParsedInBatch(fileId, "FAILED", parsed.error, null, null, null);
-			return FileResult.failed("PARSE_ERROR", parsed.error);
+			declarationDao.updateFileParsedInBatch(fileId, "FAILED", prepared.failMessage, null, null, null);
+			return FileResult.failed(prepared.failType, prepared.failMessage);
 		}
-
-		// 패키지는 파서가 읽은 값이 정확하다. 소스 루트도 그 값으로 다시 구한다.
-		String packageName = parsed.unit.getPackageDeclaration().isPresent()
-				? parsed.unit.getPackageDeclaration().get().getNameAsString() : "";
-		String sourceRoot = ScanPass.sourceRootOf(path, packageName);
-		// 폴더 구조가 패키지와 맞지 않아 소스 루트를 못 찾은 파일은, 놓인 폴더를 대신 써서 ID가 겹치지 않게 한다.
-		String idScope = sourceRoot != null ? sourceRoot : "?" + directoryOf(path);
-
-		FileDeclarations declarations = new DeclarationCollector(context.getProjectId(), context.getRevisionId(), fileId, idScope).collect(parsed.unit);
+		FileDeclarations declarations = prepared.declarations;
 
 		// 같은 소스 루트에 같은 이름의 타입이 다른 파일에도 있으면 ID가 겹친다(복사해 둔 파일, 이름만 바꾼 백업 파일 등).
 		// 컴파일러라면 오류를 내는 상황이라 둘 중 하나만 넣는다. 어느 쪽을 살릴지는 처리 순서가 아니라 파일 이름으로 정한다:
@@ -130,13 +184,13 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 			} else {
 				String message = "같은 소스 루트에 같은 이름의 타입이 이미 있어서 이 파일은 넣지 않았습니다: " + fqn + " (남긴 파일: " + otherPath + ")";
 				declarationDao.deleteDeclarationsInBatch(fileId);
-				declarationDao.updateFileParsedInBatch(fileId, "SKIPPED", message, parsed.languageLevel, packageName, sourceRoot);
+				declarationDao.updateFileParsedInBatch(fileId, "SKIPPED", message, prepared.languageLevel, prepared.packageName, prepared.sourceRoot);
 				return FileResult.failed("DUPLICATE_TYPE", message);
 			}
 		}
 
 		declarationDao.replaceDeclarationsInBatch(fileId, declarations);
-		declarationDao.updateFileParsedInBatch(fileId, "OK", null, parsed.languageLevel, packageName, sourceRoot);
+		declarationDao.updateFileParsedInBatch(fileId, "OK", null, prepared.languageLevel, prepared.packageName, prepared.sourceRoot);
 
 		if (displaced != null) {
 			return FileResult.doneWithWarning("DUPLICATE_TYPE", displaced);

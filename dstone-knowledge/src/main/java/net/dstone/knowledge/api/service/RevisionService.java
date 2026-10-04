@@ -17,6 +17,7 @@ import net.dstone.knowledge.api.dao.AnalysisFileDao;
 import net.dstone.knowledge.api.dao.AnalysisJobDao;
 import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.api.dao.FilePassDao;
+import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
 
@@ -47,6 +48,9 @@ public class RevisionService extends BaseObject {
 
 	@Autowired
 	private FilePassDao filePassDao;
+
+	@Autowired
+	private RelationDao relationDao;
 
 	@Autowired
 	@Qualifier("txTemplateCommon")
@@ -84,6 +88,13 @@ public class RevisionService extends BaseObject {
 		declarations.put("synthetic", declarationDao.selectSyntheticSummary(revisionId));
 		declarations.put("references", declarationDao.selectReferenceSummary(revisionId));
 		result.put("declarations", declarations);
+
+		// RESOLVE / LINK 단계의 결과
+		Map<String, Object> relations = new LinkedHashMap<String, Object>();
+		relations.put("byType", relationDao.selectRelationSummary(revisionId));
+		relations.put("unresolvedReasons", relationDao.selectUnresolvedReasons(revisionId));
+		relations.put("metrics", relationDao.selectMetricsByRevision(revisionId));
+		result.put("relations", relations);
 		return result;
 	}
 
