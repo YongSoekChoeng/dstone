@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.AnalysisJobDao">
+
+    <sql id="jobColumns">
+        j.analysis_id AS "analysisId"
+        , j.project_id AS "projectId"
+        , j.revision_id AS "revisionId"
+        , r.revision_label AS "revisionLabel"
+        , j.job_type AS "jobType"
+        , j.status AS "status"
+        , j.current_pass AS "currentPass"
+        , j.total_files AS "totalFiles"
+        , j.done_files AS "doneFiles"
+        , j.error_message AS "errorMessage"
+        , to_char(j.started_at, 'YYYY-MM-DD HH24:MI:SS') AS "startedAt"
+        , to_char(j.ended_at, 'YYYY-MM-DD HH24:MI:SS') AS "endedAt"
+        , to_char(j.heartbeat_at, 'YYYY-MM-DD HH24:MI:SS') AS "heartbeatAt"
+        , to_char(j.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt"
+    </sql>
+
+    <!-- 오늘 날짜로 시작하는 Job ID 중 가장 큰 일련번호. ID 모양: A + yyyyMMdd + 3자리 이상 번호 -->
+    <select id="selectMaxSeq" parameterType="string" resultType="int">
+        SELECT COALESCE(MAX(CAST(SUBSTRING(analysis_id FROM 10) AS INT)), 0)
+          FROM analysis_job
+         WHERE analysis_id LIKE #{prefix} || '%'
+    </select>
+
+    <insert id="insertJob" parameterType="java.util.Map">
+        INSERT INTO analysis_job (analysis_id, project_id, revision_id, job_type, status)
+        VALUES (#{analysisId}, #{projectId}, #{revisionId}, 'ANALYZE', 'READY')
+    </insert>
+
+    <select id="selectJob" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="jobColumns"/>
+          FROM analysis_job j
+          JOIN analysis_revision r ON r.revision_id = j.revision_id
+         WHERE j.analysis_id = #{analysisId}
+    </select>
+
+    <select id="selectJobListByRevision" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="jobColumns"/>
+          FROM analysis_job j
+          JOIN analysis_revision r ON r.revision_id = j.revision_id
+         WHERE j.revision_id = #{revisionId}
+         ORDER BY j.created_at DESC, j.analysis_id DESC
+    </select>
+
+    <!-- 이 프로젝트에서 아직 안 끝난(대기 중이거나 돌고 있는) Job 수 -->
+    <select id="countActiveJobByProject" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_job
+         WHERE project_id = #{projectId}
+           AND status IN ('READY', 'RUNNING')
+    </select>
+
+    <select id="countActiveJobByRevision" parameterType="long" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_job
+         WHERE revision_id = #{revisionId}
+           AND status IN ('READY', 'RUNNING')
+    </select>
+
+    <update id="updateJobStart" parameterType="string">
+        UPDATE analysis_job
+           SET status = 'RUNNING'
+             , started_at = now()
+             , heartbeat_at = now()
+         WHERE analysis_id = #{analysisId}
+    </update>
+
+    <update id="updateJobPass" parameterType="java.util.Map">
+        UPDATE analysis_job
+           SET current_pass = #{pass}
+             , total_files = 0
+             , done_files = 0
+             , heartbeat_at = now()
+         WHERE analysis_id = #{analysisId}
+    </update>
+
+    <!-- 진행 건수를 고치면서 "살아 있다"는 표시(heartbeat)도 같이 남긴다 -->
+    <update id="updateJobProgress" parameterType="java.util.Map">
+        UPDATE analysis_job
+           SET total_files = #{totalCount}
+             , done_files = #{doneCount}
+             , heartbeat_at = now()
+         WHERE analysis_id = #{analysisId}
+    </update>
+
+    <update id="updateJobEnd" parameterType="java.util.Map">
+        UPDATE analysis_job
+           SET status = #{status}
+             , error_message = #{errorMessage}
+             , ended_at = now()
+         WHERE analysis_id = #{analysisId}
+    </update>
+
+    <!-- 서버가 내려가면서 끊긴 Job 정리 (기동할 때 한 번) -->
+    <update id="markInterruptedJobs" parameterType="string">
+        UPDATE analysis_job
+           SET status = 'FAILED'
+             , error_message = #{errorMessage}
+             , ended_at = now()
+         WHERE status IN ('READY', 'RUNNING')
+    </update>
+
+
+    <!-- ================= 분석 오류 ================= -->
+
+    <insert id="insertError" parameterType="java.util.Map">
+        INSERT INTO analysis_error (analysis_id, revision_id, file_id, pass, error_type, message, detail, line_start)
+        VALUES (#{analysisId}, #{revisionId}, #{fileId, jdbcType=BIGINT}, #{pass}, #{errorType}, #{message}, #{detail}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <select id="countError" parameterType="string" resultType="int">
+        SELECT COUNT(*) FROM analysis_error WHERE analysis_id = #{analysisId}
+    </select>
+
+    <select id="selectErrorList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT error_id AS "errorId"
+             , pass AS "pass"
+             , error_type AS "errorType"
+             , message AS "message"
+             , detail AS "detail"
+             , file_id AS "fileId"
+             , line_start AS "lineStart"
+          FROM analysis_error
+         WHERE analysis_id = #{analysisId}
+         ORDER BY error_id
+         LIMIT #{limit}
+    </select>
+
+</mapper>

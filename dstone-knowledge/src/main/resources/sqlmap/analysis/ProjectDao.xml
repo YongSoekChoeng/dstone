@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.ProjectDao">
+
+    <sql id="projectColumns">
+        project_id AS "projectId"
+        , project_name AS "projectName"
+        , repository AS "repository"
+        , local_path AS "localPath"
+        , branch AS "branch"
+        , root_packages AS "rootPackages"
+        , java_version AS "javaVersion"
+        , source_encoding AS "sourceEncoding"
+        , description AS "description"
+        , to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt"
+        , to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt"
+    </sql>
+
+    <!-- 프로젝트 등록. 같은 project_id 가 이미 있으면 내용을 고친다 -->
+    <insert id="upsertProject" parameterType="java.util.Map">
+        INSERT INTO analysis_project
+            (project_id, project_name, local_path, root_packages, java_version, source_encoding, description)
+        VALUES
+            (#{projectId}, #{projectName}, #{localPath}, #{rootPackages}, #{javaVersion}, #{sourceEncoding}, #{description})
+        ON CONFLICT (project_id) DO UPDATE SET
+            project_name = EXCLUDED.project_name
+            , local_path = EXCLUDED.local_path
+            , root_packages = EXCLUDED.root_packages
+            , java_version = EXCLUDED.java_version
+            , source_encoding = EXCLUDED.source_encoding
+            , description = EXCLUDED.description
+            , updated_at = now()
+    </insert>
+
+    <select id="selectProject" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="projectColumns"/>
+          FROM analysis_project
+         WHERE project_id = #{projectId}
+    </select>
+
+    <select id="selectProjectList" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="projectColumns"/>
+          FROM analysis_project
+         ORDER BY project_id
+    </select>
+
+</mapper>

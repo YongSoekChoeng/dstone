@@ -87,6 +87,21 @@ CREATE TABLE IF NOT EXISTS analysis_job (
 CREATE INDEX IF NOT EXISTS idx_analysis_job_revision ON analysis_job(revision_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_job_status   ON analysis_job(status);
 
+-- 리비전별/단계별 진행 상태. "이 리비전은 SCAN 을 끝냈나?" 를 여기서 본다.
+-- Job 이 죽거나 취소된 뒤 같은 리비전으로 다시 시작하면, DONE 인 단계는 건너뛰고 그 다음부터 이어서 한다.
+-- (파일 하나하나의 진행 상태는 analysis_file_pass 가 따로 맡는다.)
+CREATE TABLE IF NOT EXISTS analysis_revision_pass (
+    revision_id       BIGINT        NOT NULL,
+    pass              VARCHAR(30)   NOT NULL,            -- SCAN/DECLARE/RESOLVE/...
+    status            VARCHAR(20)   NOT NULL DEFAULT 'PENDING',    -- PENDING/RUNNING/DONE/FAILED/CANCELLED
+    analysis_id       VARCHAR(30),                       -- 마지막으로 이 단계를 돌린 Job
+    total_count       INT           NOT NULL DEFAULT 0,  -- 이 단계가 처리할 건수 (모르면 0)
+    done_count        INT           NOT NULL DEFAULT 0,
+    started_at        TIMESTAMPTZ,
+    ended_at          TIMESTAMPTZ,
+    PRIMARY KEY (revision_id, pass)
+);
+
 
 /**********************************************
 2. 파일과 진행 상태

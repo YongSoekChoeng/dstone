@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.RevisionDao">
+
+    <sql id="revisionColumns">
+        revision_id AS "revisionId"
+        , project_id AS "projectId"
+        , revision_label AS "revisionLabel"
+        , status AS "status"
+        , analyzer_version AS "analyzerVersion"
+        , to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt"
+    </sql>
+
+    <select id="selectRevision" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="revisionColumns"/>
+          FROM analysis_revision
+         WHERE revision_id = #{revisionId}
+    </select>
+
+    <select id="selectRevisionByLabel" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="revisionColumns"/>
+          FROM analysis_revision
+         WHERE project_id = #{projectId}
+           AND revision_label = #{revisionLabel}
+    </select>
+
+    <select id="selectRevisionList" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="revisionColumns"/>
+          FROM analysis_revision
+         WHERE project_id = #{projectId}
+         ORDER BY revision_id DESC
+    </select>
+
+    <!-- 새로 만든 revision_id 는 파라미터 Map 의 revisionId 에 담겨 돌아온다 -->
+    <insert id="insertRevision" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="revisionId" keyColumn="revision_id">
+        INSERT INTO analysis_revision (project_id, revision_label, status, analyzer_version)
+        VALUES (#{projectId}, #{revisionLabel}, 'CREATED', #{analyzerVersion})
+    </insert>
+
+    <update id="updateRevisionStatus" parameterType="java.util.Map">
+        UPDATE analysis_revision
+           SET status = #{status}
+         WHERE revision_id = #{revisionId}
+    </update>
+
+    <!-- 서버가 내려가면서 끊긴 리비전 정리 (기동할 때 한 번) -->
+    <update id="markInterruptedRevisions">
+        UPDATE analysis_revision
+           SET status = 'FAILED'
+         WHERE status = 'ANALYZING'
+    </update>
+
+
+    <!-- ================= 리비전별/단계별 진행 상태 ================= -->
+
+    <select id="selectRevisionPassList" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT pass AS "pass"
+             , status AS "status"
+             , analysis_id AS "analysisId"
+             , total_count AS "totalCount"
+             , done_count AS "doneCount"
+             , to_char(started_at, 'YYYY-MM-DD HH24:MI:SS') AS "startedAt"
+             , to_char(ended_at, 'YYYY-MM-DD HH24:MI:SS') AS "endedAt"
+          FROM analysis_revision_pass
+         WHERE revision_id = #{revisionId}
+         ORDER BY started_at, pass
+    </select>
+
+    <select id="selectRevisionPassStatus" parameterType="java.util.Map" resultType="string">
+        SELECT status
+          FROM analysis_revision_pass
+         WHERE revision_id = #{revisionId}
+           AND pass = #{pass}
+    </select>
+
+    <!-- 단계 시작. 전에 돌다 만 기록이 있으면 RUNNING 으로 되돌린다 -->
+    <insert id="startRevisionPass" parameterType="java.util.Map">
+        INSERT INTO analysis_revision_pass (revision_id, pass, status, analysis_id, started_at)
+        VALUES (#{revisionId}, #{pass}, 'RUNNING', #{analysisId}, now())
+        ON CONFLICT (revision_id, pass) DO UPDATE SET
+            status = 'RUNNING'
+            , analysis_id = EXCLUDED.analysis_id
+            , started_at = now()
+            , ended_at = NULL
+    </insert>
+
+    <update id="updateRevisionPassProgress" parameterType="java.util.Map">
+        UPDATE analysis_revision_pass
+           SET total_count = #{totalCount}
+             , done_count = #{doneCount}
+         WHERE revision_id = #{revisionId}
+           AND pass = #{pass}
+    </update>
+
+    <update id="endRevisionPass" parameterType="java.util.Map">
+        UPDATE analysis_revision_pass
+           SET status = #{status}
+             , ended_at = now()
+         WHERE revision_id = #{revisionId}
+           AND pass = #{pass}
+    </update>
+
+    <update id="markInterruptedRevisionPasses">
+        UPDATE analysis_revision_pass
+           SET status = 'FAILED'
+             , ended_at = now()
+         WHERE status = 'RUNNING'
+    </update>
+
+
+    <!-- ================= 리비전 삭제 =================
+         행이 많은 테이블에는 FK 가 없어서, 리비전에 딸린 행을 테이블마다 직접 지운다.
+         rag_embedding 은 지우지 않는다. 키가 (내용 해시, 모델) 이라 리비전에 속하지 않고,
+         남겨 두면 같은 내용을 다시 분석할 때 임베딩을 새로 하지 않아도 된다. -->
+    <delete id="deleteRevisionRows" parameterType="java.util.Map">
+        DELETE FROM ${table} WHERE revision_id = #{revisionId}
+    </delete>
+
+    <delete id="deleteRevisionMetrics" parameterType="long">
+        DELETE FROM analysis_metric
+         WHERE analysis_id IN (SELECT analysis_id FROM analysis_job WHERE revision_id = #{revisionId})
+    </delete>
+
+</mapper>

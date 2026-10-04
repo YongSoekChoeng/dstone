@@ -19,6 +19,7 @@ import net.dstone.common.core.BaseObject;
 @Configuration
 @Import({
 	ConfigDatasource.class
+	, ConfigJob.class
 	, ConfigMapper.class
 	, ConfigProperty.class
 	, ConfigTransaction.class

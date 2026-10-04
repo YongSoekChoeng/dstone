@@ -40,3 +40,16 @@ dstone:
         # 분석기 버전. 분석 결과(analysis_revision/analysis_job)와 RAG 메타데이터에 같이 남긴다.
         # 분석 규칙이 바뀌어 예전 결과와 섞어 보면 안 될 때 올린다.
         analyzer-version: "1.0"
+        # 분석 Job
+        job:
+            # 동시에 도는 분석 Job 수. 넘치면 대기열에서 기다린다.
+            max-concurrent: 2
+        # SCAN 단계 (분석할 파일 목록 만들기)
+        scan:
+            # 훑지 않을 폴더 이름(쉼표 구분). 빌드 결과물이나 버전 관리 폴더처럼 소스가 아닌 곳.
+            # 주의: classes 는 넣지 않는다. 운영 서버에서 받아 온 구버전 웹앱은 WEB-INF/classes 에 소스가 같이 들어 있기도 하다.
+            exclude-dirs: ".git,.svn,.hg,node_modules,target,build,.gradle,.idea,.settings,.metadata"
+            # 이보다 큰 파일은 목록에는 넣되(해시만 계산) 분석하지 않는다(parse_status=SKIPPED). 기본 5MB.
+            max-file-bytes: 5242880
+            # 파일 몇 개마다 DB에 쓰고 커밋할지.
+            commit-size: 200

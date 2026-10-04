@@ -1,0 +1,126 @@
+package net.dstone.knowledge.api.service;
+
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallbackWithoutResult;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import net.dstone.common.core.BaseObject;
+import net.dstone.knowledge.api.dao.AnalysisFileDao;
+import net.dstone.knowledge.api.dao.AnalysisJobDao;
+import net.dstone.knowledge.api.dao.RevisionDao;
+import net.dstone.knowledge.common.exception.ApiException;
+
+/**
+ * 리비전(어느 시점의 소스를 분석한 결과 한 벌)을 조회하고 지웁니다.
+ */
+@Service
+public class RevisionService extends BaseObject {
+
+	private static final int MAX_PAGE_SIZE = 500;
+
+	@Autowired
+	private ProjectService projectService;
+
+	@Autowired
+	private RevisionDao revisionDao;
+
+	@Autowired
+	private AnalysisJobDao analysisJobDao;
+
+	@Autowired
+	private AnalysisFileDao analysisFileDao;
+
+	@Autowired
+	@Qualifier("txTemplateCommon")
+	private TransactionTemplate txTemplateCommon;
+
+	public List<Map<String, Object>> getRevisionList(String projectId) {
+		projectService.getProject(projectId);
+		return revisionDao.selectRevisionList(projectId);
+	}
+
+	/**
+	 * 리비전 하나를 조회합니다.
+	 * 단계별 진행 상태, 이 리비전을 돌린 Job들, 스캔한 파일의 요약(종류별/인코딩별/소스 루트별)을 같이 돌려줍니다.
+	 */
+	public Map<String, Object> getRevision(long revisionId) {
+		Map<String, Object> result = new LinkedHashMap<String, Object>(findRevision(revisionId));
+		result.put("passes", revisionDao.selectRevisionPassList(revisionId));
+		result.put("jobs", analysisJobDao.selectJobListByRevision(revisionId));
+
+		Map<String, Object> files = new LinkedHashMap<String, Object>();
+		files.put("total", analysisFileDao.countFile(condition(revisionId, null, null, null, null)));
+		files.put("byType", analysisFileDao.selectSummaryByType(revisionId));
+		files.put("byEncoding", analysisFileDao.selectSummaryByEncoding(revisionId));
+		files.put("javaSourceRoots", analysisFileDao.selectSummaryBySourceRoot(revisionId));
+		result.put("files", files);
+		return result;
+	}
+
+	/**
+	 * 스캔한 파일 목록을 조회합니다.
+	 *
+	 * @param page 1부터 시작
+	 */
+	public Map<String, Object> getFileList(long revisionId, String language, String fileType, String encoding, String pathLike, int page, int size) {
+		findRevision(revisionId);
+		int pageNo = page < 1 ? 1 : page;
+		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);
+
+		Map<String, Object> condition = condition(revisionId, language, fileType, encoding, pathLike);
+		condition.put("size", pageSize);
+		condition.put("offset", (pageNo - 1) * pageSize);
+
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("total", analysisFileDao.countFile(condition));
+		result.put("page", pageNo);
+		result.put("size", pageSize);
+		result.put("files", analysisFileDao.selectFileList(condition));
+		return result;
+	}
+
+	/**
+	 * 리비전과 거기에 딸린 분석 결과를 모두 지웁니다. 되돌릴 수 없습니다.
+	 * 분석이 돌고 있는 리비전은 지울 수 없습니다(먼저 취소해야 합니다).
+	 */
+	public void deleteRevision(final long revisionId) {
+		findRevision(revisionId);
+		if (analysisJobDao.countActiveJobByRevision(revisionId) > 0) {
+			throw ApiException.conflict("분석이 돌고 있는 리비전은 지울 수 없습니다. 먼저 분석을 취소하세요.");
+		}
+		txTemplateCommon.execute(new TransactionCallbackWithoutResult() {
+			@Override
+			protected void doInTransactionWithoutResult(TransactionStatus status) {
+				revisionDao.deleteRevisionData(revisionId);
+			}
+		});
+		info("리비전 삭제: revisionId=" + revisionId);
+	}
+
+	private Map<String, Object> findRevision(long revisionId) {
+		Map<String, Object> revision = revisionDao.selectRevision(revisionId);
+		if (revision == null) {
+			throw ApiException.notFound("없는 리비전입니다: " + revisionId);
+		}
+		return revision;
+	}
+
+	private Map<String, Object> condition(long revisionId, String language, String fileType, String encoding, String pathLike) {
+		Map<String, Object> condition = new HashMap<String, Object>();
+		condition.put("revisionId", revisionId);
+		condition.put("language", language);
+		condition.put("fileType", fileType);
+		condition.put("encoding", encoding);
+		condition.put("pathLike", pathLike);
+		return condition;
+	}
+
+}

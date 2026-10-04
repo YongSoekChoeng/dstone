@@ -21,7 +21,7 @@ import net.dstone.knowledge.api.dao.SystemDao;
 public class SystemController {
 
 	/** 스키마 SQL(02-create-table-postgresql-dstone-knowledge.sql)이 만드는 테이블 수입니다. 테이블을 추가하면 같이 고칩니다. */
-	private static final int EXPECTED_TABLE_COUNT = 20;
+	private static final int EXPECTED_TABLE_COUNT = 21;
 
 	@Autowired
 	private SystemDao systemDao;
