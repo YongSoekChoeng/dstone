@@ -1,0 +1,436 @@
+# 어제_진행하던_dstone_knowl
+
+> 생성일시: 2026-10-05 06:23
+
+## 질문
+
+어제 진행하던 dstone_knowledge 전체 진행계획 다시 공유해주고 현재 어디까지 진행된건지 알려줘. 그리고 이 모든 것은 /app/dstone/docs/11.dstone-knowledge.md 에 기록해줘.
+
+---
+
+## 답변
+
+먼저 기존 문서와 모듈의 실제 상태를 확인하겠습니다.
+
+---
+
+## 답변
+
+`docs/11.dstone-knowledge.md`의 10절을 전체 계획(10.1), 현재 상태(10.2), 남은 일(10.3)로 나눠 다시 썼습니다. 커밋은 하지 않았습니다.
+
+## 현재 위치
+
+**M0까지 끝났고, M1은 아직 시작하지 않았습니다.** 어제(2026-10-04) 커밋 `a117268`로 모듈 골격이 들어갔고, 분석 코드(`scanner`, `parser`, `symbol` 등)는 아직 하나도 없습니다.
+
+## 전체 계획
+
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| **M0** | 모듈 골격, 스키마, 검증 표본 | 완료 (2026-10-04) |
+| **M1** | SCAN + DECLARE 패스: 인코딩 감지, 문법 수준, 소스 루트 탐지, 타입/메소드/필드/애노테이션, Lombok 생성 멤버, DB 기반 타입 해석기 시험 구현 | 다음 작업 |
+| **M2** | RESOLVE 패스 + 집합 연산: 호출 그래프, confidence, 구현 후보, 품질 지표, 호출자/피호출자 API | 예정 |
+| **M3** | 의미 분석 플러그인: Spring 애노테이션, 일반 Java 진입점(`main`, 서블릿, `web.xml`, `Runnable`), 계층 분류 | 예정 |
+| **M4** | 코드 RAG: FILE/TYPE/METHOD 문서와 청크, 임베딩 대기열, 벡터 검색 (여기까지가 MVP) | 예정 |
+| **M5** | 리소스: MyBatis, 설정, 빌드 파일, Spring XML → iBATIS → Struts, JSP → Java 호출, SQL 테이블 CRUD | 예정 |
+| **M6** | 일반 문서 수집(Tika, tenant), 하이브리드 검색, 영향도 분석, `dstone-ai-engine` Tool 연동 | 예정 |
+| **M7** | 증분 분석, 리비전 비교, 보관 정책 | 예정 |
+| **M8** | 품질·리포트 화면 | 예정 |
+| **M9** | 이관: 기능 대조 후 `dstone-ai-engine` 임베딩과 `dstone-boot` 분석기 제거 | 예정 |
+
+## M0에서 끝낸 것
+
+- **모듈**: `pom.xml`, 루트 pom 등록, `DstoneKnowledgeApplication`, 설정 클래스 4종(`Config`, `ConfigDatasource`, `ConfigMapper`, `ConfigTransaction`), `BaseDao`
+- **스키마**: SQL 두 파일로 테이블 20개와 VIEW 2개 (두 번 실행해도 오류 없음)
+- **API**: `GET /api/system/health` (`UP` / `SCHEMA_NOT_READY` / `DB_DOWN`)
+- **운영**: `bin/startApp.sh`, `stopApp.sh`, `statusApp.sh`, `Jenkinsfile`
+- **검증 표본**: `legacy-app` (EUC-KR, Java 1.4 문법)과 기대 값 `README.md`
+
+## M1 전에 남은 일
+
+로컬 PostgreSQL에 `dstone_knowledge` 롤/DB/테이블을 만들어야 합니다. `sudo`가 필요해서 어제는 임시 클러스터에서만 검증했습니다. 순서는 `docs/software/05.postgresql.md` 6.1절에 있습니다.
+
+지금 실제로 만들어져 있는지는 postgres 비밀번호가 없어 확인하지 못했고, 문서에는 "아직 안 함"으로 적어 두었습니다. 이미 만드셨다면 알려 주세요. 문서를 고치겠습니다. 앱은 현재 중지 상태입니다.
+
+## 문서에 추가한 내용
+
+- **10.1**: 위 계획 표와, 단계별로 어떤 패스가 어떤 테이블을 채우는지 대응표
+- **10.2**: M0 산출물 목록과 확인한 항목
+- **10.3**: M1 선행 작업과 M1 작업 7개
+
+10.3의 M1 작업 7개와 완료 기준은 기존 M1 설명과 `legacy-app` 표본의 특성을 바탕으로 제가 풀어 쓴 것이니, 어제 합의한 범위와 다르면 말씀해 주세요.
+
+---
+
+## 질문
+
+로컬 postgresql 에 dstone_knowledge 생성했어. 그리고 이 프로젝트 진행하는동안 필요한 것 같아서 알려줄께 su의 패스워드는 db2admin 이야. 그리고 데이터베이스 dstone_knowledge 의 패스워드는 db2admin!@ 야.
+
+---
+
+## 답변
+
+롤 비밀번호를 맞췄고 접속도 확인했습니다. 이제 앱을 띄워서 `application.yml`의 `ENC(...)` 값이 이 비밀번호와 맞는지 `/api/system/health`로 확인합니다.
+
+---
+
+## 답변
+
+로컬 DB는 확인됐고, 앱이 저장소 설정 그대로 붙어서 `/api/system/health`가 `UP`(테이블 20개, pgvector 0.8.1)으로 나옵니다. M1을 막는 선행 작업은 이제 없습니다.
+
+## 확인 중에 고친 것
+
+- **롤 비밀번호가 `CHANGE_ME`로 남아 있었습니다.** 알려 주신 `db2admin!@`로는 접속이 안 됐습니다. 롤이 처음에 `CHANGE_ME`로 만들어진 뒤라, 비밀번호를 고친 SQL을 다시 돌려도 "이미 있으면 건너뜀"에 걸린 것으로 보입니다.
+- **`ALTER ROLE`로 알려 주신 비밀번호에 맞췄습니다.** sudo로 postgres에 들어가 변경했고, 이후 `psql` 접속과 앱 기동 모두 정상입니다. 확인 후 앱은 원래대로 중지해 두었습니다.
+
+## 확인이 필요한 것
+
+`schema/01-init-postgresql-dstone-knowledge.sql` 12행에 DB 비밀번호가 평문으로 들어간 채 커밋(`1fa785d`)되어 있습니다. 이 파일은 손대지 않았습니다. 로컬 `main`이 `origin/main`과 같은 상태라 GitHub에도 올라가 있을 가능성이 큽니다.
+
+`CHANGE_ME`로 되돌리고 필요하면 비밀번호도 바꾸는 쪽을 권합니다. 다만 이미 푸시된 이력은 되돌려도 남습니다. 되돌릴지 알려 주세요.
+
+## 문서와 메모리
+
+- **`docs/11.dstone-knowledge.md`**: 10.2에 로컬 DB 준비 완료와 확인 결과를 적고, 10.3의 "M1 전에 할 일"을 없음으로 바꿨습니다.
+- **`docs/software/05.postgresql.md` 6.1절**: 롤이 이미 있으면 비밀번호가 안 바뀐다는 점과 `ALTER ROLE`로 고치는 방법을 추가했습니다.
+- **메모리**: 두 비밀번호는 다음 세션에서도 쓰도록 저장소 밖의 메모리 파일에 저장했습니다. 저장소 파일에는 적지 않았습니다.
+
+문서 변경 두 건은 아직 커밋하지 않았습니다.
+
+---
+
+## 질문
+
+비밀번호 관련해서는 적어도 프로젝트 끝날때까지는 노출되어도 되니까 그냥 두고 필요한 만큼 커밋해줘
+
+---
+
+## 답변
+
+문서 변경 두 건을 `main`에 커밋했습니다(`cc8ba06`). 푸시는 하지 않아서 `origin/main`보다 커밋 1개 앞서 있습니다.
+
+- **커밋 내용**: `docs/11.dstone-knowledge.md`(전체 계획 / 현재 상태 / 남은 일)와 `docs/software/05.postgresql.md` 6.1절(`ALTER ROLE` 안내).
+- **비밀번호**: `01-init-postgresql-dstone-knowledge.sql`의 평문 비밀번호는 말씀대로 그대로 두었습니다. 프로젝트가 끝날 때까지 다시 지적하지 않도록 메모리에도 적어 두었습니다.
+
+이 저장소는 그동안 `main`에 바로 커밋해 왔기에 별도 브랜치는 만들지 않았습니다.
+
+---
+
+## 질문
+
+그럼 다음 진행할 것은 무엇인가?
+
+---
+
+## 답변
+
+다음은 **M1(SCAN + DECLARE 패스)** 입니다. 소스를 읽어 "어떤 타입·메소드·필드가 있는지"를 DB에 채우는 단계이고, 호출 관계를 푸는 일은 M2입니다.
+
+## M1 작업 순서
+
+1. **분석 실행의 뼈대**: 프로젝트 등록 → 리비전 생성 → Job 실행 API와, 파일별·패스별 진행 상태(`analysis_file_pass`)를 기록하는 실행기. 이후 모든 패스가 이 위에 올라갑니다.
+2. **SCAN 패스**: 파일 수집, 인코딩 감지, 체크섬을 `analysis_file`에 저장. `legacy-app`의 EUC-KR 파일이 깨지지 않고 읽히는지가 기준입니다.
+3. **소스 루트와 문법 수준 탐지**: 빌드 파일이 없는 `WEB-INF/src` 구조와, `enum`을 변수 이름으로 쓰는 Java 1.4 문법을 통과시킵니다.
+4. **DECLARE 패스**: 파일 하나를 파싱해 타입/메소드/필드/애노테이션을 저장하고, 호출과 참조는 미해결 상태로 `analysis_reference`에 넣은 뒤 AST를 버립니다.
+5. **Lombok 생성 멤버**: getter/setter 등을 `is_synthetic=true`로 저장합니다.
+6. **DB 기반 타입 해석기 시험 구현**: M2에서 본격적으로 쓰기 전에, 메모리가 프로젝트 크기와 무관하게 유지되는지 먼저 확인합니다.
+7. **검증**: `legacy-app`은 `README.md`의 기대 값과, `dstone-batchadmin`은 손으로 센 값과 대조합니다.
+
+1~2번을 먼저 끝내고 한 번 돌려 본 뒤 3~5번으로 넘어가는 순서를 권합니다. 실행기와 이어 하기 구조가 흔들리면 뒤 패스를 전부 다시 손봐야 하기 때문입니다.
+
+## 시작 전에 정할 것
+
+- **분석 대상 지정 방식**: 로컬 디렉터리 경로만 받을지, git URL과 리비전까지 받아 체크아웃할지. M1은 로컬 경로만 받고 git은 M7(증분 분석)에서 붙이는 쪽을 권합니다.
+- **실행 방식**: REST API로 비동기 Job을 띄울지, CLI도 같이 만들지. REST 하나로 시작하는 쪽을 권합니다.
+
+이 두 가지에 이견이 없으면 권한 대로 1번부터 시작하겠습니다.
+
+---
+
+## 질문
+
+<pasted_content id="23eb">
+<시작 전에 정할 것>
+- 분석 대상 지정 방식: 로컬 디렉터리 경로만 받을지, git URL과 리비전까지 받아 체크아웃할지. M1은 로컬 경로만 받고 git은 M7(증분 분석)에서 붙이는 쪽을 권합니다.
+ ==>> ok.
+- 실행 방식: REST API로 비동기 Job을 띄울지, CLI도 같이 만들지. REST 하나로 시작하는 쪽을 권합니다.
+ ==>> ok.
+   
+그리고 앞으로 진행할 내용에 대해서 샘플소스로 활용할 수 있는 어플리케이션 소스들을 아래의 디렉토리에 올려놨어. 추후 이 소스들을 이용해서 붆석대상으로 활용해도 될 것 같아.
+/app/sampleApps/
+</pasted_content id="23eb">
+
+---
+
+## 답변
+
+두 가지 모두 권한 대로 확정하고 M1의 1~2번(실행 뼈대 + SCAN 패스)부터 시작하겠습니다. 먼저 올려 주신 샘플 소스와 현재 모듈 코드를 살펴봅니다.
+
+---
+
+## 질문
+
+Base directory for this skill: /app/dstone/.claude/skills/java-no-lambdas
+
+# Java는 람다 없이 쓰기
+
+이 저장소의 Java 코드는 람다 식과 메서드 참조를 쓰지 않는다. 모듈을 가리지 않는 상시 규칙이다.
+
+## 왜
+
+사용자가 2026-09-20에 dstone-ai-engine의 람다를 모두 예전 스타일로 바꿔 달라고 했고, 앞으로 만드는 소스에도 계속 적용하라고 했다. 한 번 하고 끝나는 정리가 아니다.
+
+## 이렇게 쓴다
+
+- 함수형 인터페이스(`Comparator`, `Runnable`, `RowMapper`, `CompletableFuture` 콜백 등) → **익명 내부 클래스**
+- Stream 체인 → 가능하면 **일반 for 문**
+
+```java
+// 쓰지 않는다
+list.sort((a, b) -> a.getName().compareTo(b.getName()));
+names.forEach(System.out::println);
+
+// 이렇게 쓴다
+list.sort(new Comparator<Item>() {
+    @Override
+    public int compare(Item a, Item b) {
+        return a.getName().compareTo(b.getName());
+    }
+});
+for (String name : names) {
+    System.out.println(name);
+}
+```
+
+## 기존 코드를 고칠 때
+
+- 손대는 코드에 람다가 있으면, 따로 요청이 없어도 익명 클래스/반복문으로 바꾼다.
+- 깊게 중첩된 Stream 파이프라인처럼 바꾸면 지나치게 장황해지는 경우에는 **말없이 람다를 남겨 두지 말고 사용자에게 물어본다.**
+
+## 끝내기 전 확인
+
+바꾼 Java 파일에 `->` 와 `::` 가 남아 있지 않은지 검색해 본다.
+
+---
+
+## 질문
+
+Base directory for this skill: /app/dstone/.claude/skills/friendly-comments
+
+# 쉽고 친근한 주석 쓰기
+
+주석은 한 번 읽고 바로 이해되어야 한다. 다시 읽어야 뜻이 잡히는 문장은 고쳐 쓴다.
+
+## 오해하지 말 것
+
+**주석을 줄이라는 뜻이 아니다.** 이 코드베이스는 원래 "왜 이렇게 했는지", 결정 배경, 이력을 길게 풀어 쓰는 한글 주석을 쓴다 (dstone-ai-engine의 `ConfigTool`, `CallerContext` 등). 그 관례는 그대로 이어간다. 바꾸는 것은 **말투와 문장**이다.
+
+## 이렇게 쓴다
+
+- 짧고 평범한 문장으로 끊어 쓴다.
+- 딱딱한 한자어나 논문 같은 표현 대신, 구체적이고 직관적인 말을 고른다.
+- "왜"는 그대로 남긴다. 표현만 쉽게 바꾼다.
+
+```java
+// 피한다
+// 조건부 빈 등록에 기인한 의존성 부재 가능성을 고려하여 지연 조회 방식을 채택함.
+
+// 이렇게 쓴다
+// RAG를 꺼 두면 이 빈이 아예 없다.
+// 그래서 꼭 필요할 때만 꺼내 쓴다.
+```
+
+## 왜
+
+사용자가 2026-09-14에 dstone-ai-engine 영향 분석 내용을 검토한 뒤 직접 요청했다.
+
+---
+
+## 답변
+
+공통 예외 처리까지 만들었고, 이제 DAO와 MyBatis 매퍼(프로젝트·리비전·Job·파일)를 작성합니다.
+
+---
+
+## 답변
+
+DAO까지 끝났습니다. 이제 SCAN 패스의 핵심인 인코딩 감지, 파일 분류, 스캔 본체를 작성합니다.
+
+---
+
+## 답변
+
+스캔 본체까지 작성했습니다. 마지막으로 서비스와 REST 컨트롤러를 만들고 빌드합니다.
+
+---
+
+## 답변
+
+빌드가 통과했습니다. 로컬 DB에 새 테이블을 반영하고, 앱을 띄워 `legacy-app`부터 실제로 돌려 봅니다.
+
+---
+
+## 답변
+
+세 표본 모두 정상적으로 스캔됐습니다. 이제 이어 하기(재실행 시 건너뛰기, 취소, 강제 종료 후 복구)를 시험합니다.
+
+---
+
+## 답변
+
+강제 종료 복구까지 모두 통과했습니다. 스캐너의 순수 로직에 단위 테스트를 붙이고 문서를 갱신하겠습니다.
+
+---
+
+## 답변
+
+테스트 4건이 통과했습니다. 이제 문서(`11.dstone-knowledge.md`, `CLAUDE.md`)를 현재 상태에 맞게 고칩니다.
+
+---
+
+## 답변
+
+M1의 1~2번(Job 실행 뼈대와 SCAN 패스)을 끝냈습니다. 세 표본 모두 오류 없이 스캔됐고, 빌드와 단위 테스트 4건이 통과합니다. 커밋은 아직 하지 않았습니다.
+
+## SCAN 결과
+
+| 대상 | 파일 | Java | JSP | MyBatis 매퍼 | 인코딩 | Java 소스 루트 |
+|---|---|---|---|---|---|---|
+| `legacy-app` | 9 | 7 | 1 | 0 | Java 7개 모두 EUC-KR | `WEB-INF/src` |
+| `anybiz_prd` | 1,142 | 489 | 538 | 92 | UTF-8 1,051 / US-ASCII 89 / EUC-KR 2 | `WEB-INF/classes` |
+| `cms4_prd` | 495 | 232 | 200 | 42 | UTF-8 446 / US-ASCII 49 | `WEB-INF/classes` |
+
+- **대조**: `legacy-app`은 README 기대 값(Java 7)과 같고, 올려 주신 두 앱은 `find`로 센 Java·JSP 수와 같습니다.
+- **샘플 앱 구조**: 두 앱은 펼친 WAR라서 소스가 `WEB-INF/classes`에 있습니다. 소스 루트를 폴더 이름이 아니라 `package` 선언으로 거꾸로 찾게 해서 그대로 잡혔습니다.
+
+## 만든 것
+
+- **Job 실행기**: 등록된 단계를 순서대로 돌리고, 그 리비전에서 이미 끝난 단계는 건너뜁니다. 같은 리비전 라벨로 다시 시작하면 이어서 합니다.
+- **SCAN 패스**: 파일 수집, 종류 분류, 파일별 인코딩 감지, SHA-256, 패키지·소스 루트·모듈.
+- **API**: 프로젝트 등록·조회, 분석 시작·상태·취소, 리비전 조회·파일 목록·삭제.
+
+## 이어 하기 시험
+
+`/app` 전체(파일 51,144개, 약 1.1GB)를 시험 대상으로 썼습니다.
+
+- **규모**: 기본 힙으로 43초에 끝났고 오류가 없었습니다.
+- **취소 후 재시작**: 1,000개에서 멈춘 뒤 다시 시작해 51,144개로 끝났습니다.
+- **분석 도중 `kill -9`**: 재기동 때 Job이 `FAILED`로 정리됐고, 다시 시작해 중복 없이 51,144개가 됐습니다.
+
+`/app`에는 `HDMF` 등 다른 소스도 들어 있어 함께 스캔됐습니다. 시험이 끝난 뒤 해당 리비전과 프로젝트는 지웠습니다. 로컬 DB에는 위 세 표본의 `r1` 리비전만 남아 있습니다.
+
+## 계획과 달라진 점
+
+- **테이블 1개 추가**: SCAN처럼 파일 단위가 아닌 단계가 끝났는지 기록할 곳이 없어 `analysis_revision_pass`를 만들었습니다. 테이블이 21개가 됐고 로컬 DB에도 반영했습니다.
+- **소스 루트 탐지를 SCAN에 넣음**: 파싱 없이도 되는 일이라 앞당겼습니다. 문법 수준 탐지는 파서가 필요해 DECLARE와 함께 합니다.
+- **파일별 이어 하기는 다음 단계로**: `analysis_file_pass`를 쓰는 반복 구조는 실제로 쓰는 DECLARE와 같이 만들어야 시험할 수 있어 미뤘습니다.
+- **분석 스레드의 SQL 로그 끔**: 저장 SQL이 수만 건이라 로그를 덮어서, 기존 `SUPPRESS_SQL_LOG` 장치로 껐습니다.
+- **surefire 3.5.2 지정**: 이 저장소에는 테스트가 없었고 Maven 기본값(2.17)은 JUnit 5를 못 돌려서, `dstone-knowledge` pom에만 버전을 적었습니다.
+
+문서는 `docs/11.dstone-knowledge.md`(Job 실행 방식, SCAN, 설정, API, 표본, 현재 상태)와 `CLAUDE.md`를 고쳤습니다. 앱은 중지해 두었습니다.
+
+## 다음
+
+DECLARE 패스입니다. 문법 수준 탐지(Java 1.4의 `enum` 변수 이름), 타입·메소드·필드·애노테이션 저장, 미해결 참조 저장, 파일별 이어 하기 순으로 진행합니다. 지금까지의 변경을 먼저 커밋할지 알려 주시면 그렇게 하고 넘어가겠습니다.
+
+---
+
+## 질문
+
+지금 네가 하는 테스트를 나도 로컬에서 진행 가능해 ?
+
+---
+
+## 답변
+
+네, 가능합니다. WSL(`/app/dstone`)에서는 지금 바로 되고, 준비할 것은 없습니다. jar는 이미 빌드돼 있고 DB에도 스키마가 반영돼 있습니다.
+
+## 1. 단위 테스트 (DB 없이)
+
+```bash
+cd /app/dstone && mvn -pl dstone-knowledge test
+```
+
+`Tests run: 4, Failures: 0`이 나오면 정상입니다.
+
+## 2. 실제 분석 돌려 보기
+
+```bash
+# 기동 (지금은 중지 상태)
+sh /app/dstone/dstone-knowledge/bin/startApp.sh
+curl http://localhost:4081/api/system/health        # "status":"UP" 확인
+
+B=http://localhost:4081/api
+
+# 프로젝트 등록 (세 표본은 이미 등록돼 있어 생략 가능)
+curl -X POST $B/projects -H 'Content-Type: application/json' \
+     -d '{"projectId":"anybiz_prd","localPath":"/app/sampleApps/anybiz_prd"}'
+
+# 분석 시작: 응답의 analysisId, revisionId를 아래에서 씁니다
+curl -X POST $B/projects/anybiz_prd/analyses -H 'Content-Type: application/json' \
+     -d '{"revisionLabel":"r2"}'
+
+# 상태와 결과
+curl $B/analyses/<analysisId>
+curl $B/revisions/<revisionId>
+curl "$B/revisions/<revisionId>/files?language=JAVA&size=20"
+```
+
+- **라벨**: `r1`은 제가 이미 끝까지 돌려서, 같은 라벨로 다시 시작하면 SCAN을 건너뛰고 바로 `DONE`이 됩니다. 처음부터 보려면 `r2`처럼 새 라벨을 쓰시면 됩니다.
+- **삭제**: `curl -X DELETE $B/revisions/<revisionId>`로 리비전을 지울 수 있습니다.
+- **한글 출력**: 응답 뒤에 `| python3 -m json.tool --no-ensure-ascii`를 붙이면 보기 좋게 나옵니다.
+
+## 3. 이어 하기 시험
+
+두 표본은 1초 안에 끝나서 취소나 강제 종료를 끼워 넣기 어렵습니다. 저는 `/app` 전체(약 43초)를 대상으로 했습니다.
+
+```bash
+curl -X POST $B/projects -H 'Content-Type: application/json' -d '{"projectId":"big","localPath":"/app"}'
+curl -X POST $B/projects/big/analyses -H 'Content-Type: application/json' -d '{"revisionLabel":"r1"}'
+
+# (가) 취소 후 이어 하기
+curl -X POST $B/analyses/<analysisId>/cancel
+# (나) 또는 강제 종료 후 재기동: Job이 FAILED로 정리됩니다
+kill -9 $(pgrep -f dstone-knowledge.jar) && sh /app/dstone/dstone-knowledge/bin/startApp.sh
+
+# 같은 라벨로 다시 시작하면 이어서 끝까지 갑니다
+curl -X POST $B/projects/big/analyses -H 'Content-Type: application/json' -d '{"revisionLabel":"r1"}'
+```
+
+## DB에서 직접 보기
+
+```bash
+PGPASSWORD='db2admin!@' psql -h 127.0.0.1 -U dstone_knowledge -d dstone_knowledge
+```
+
+```sql
+SELECT analysis_id, status, current_pass, done_files FROM analysis_job ORDER BY created_at;
+SELECT language, file_type, encoding, count(*) FROM analysis_file WHERE revision_id = 2 GROUP BY 1,2,3 ORDER BY 1,2;
+```
+
+## Windows PC에서 하려면
+
+Windows 쪽 클론(`D:/AppHome/framework/dstone`)에서는 아직 안 됩니다. 이번 변경을 커밋·푸시하지 않아서 그쪽에는 코드가 없습니다. 푸시한 뒤에도 아래 두 가지가 필요합니다.
+
+- **DB**: 기본 프로파일의 `env.properties`가 가리키는 PostgreSQL에 `dstone_knowledge`가 있어야 합니다. 그쪽 설정이 WSL의 PostgreSQL을 보는지는 확인하지 않았습니다.
+- **소스 경로**: `localPath`는 서버가 직접 읽는 경로라서, Windows에서 띄우면 Windows 경로로 등록해야 합니다.
+
+Windows에서도 돌려 보실 계획이면 커밋·푸시부터 하겠습니다.
+
+---
+
+## 질문
+
+응 커밋, 푸시 해줘.
+
+---
+
+## 답변
+
+커밋하고 `origin/main`에 푸시했습니다(`e7cc0d5`). 로컬과 원격이 같은 상태입니다.
+
+- **포함된 것**: `dstone-knowledge`의 Job 실행기·SCAN 패스·API·스키마·테스트 37개 파일과 `docs/11.dstone-knowledge.md`, `CLAUDE.md`.
+- **앞선 문서 커밋**: 아까 만든 `cc8ba06`도 이미 원격에 올라가 있습니다.
+
+Windows 쪽 클론에서 `git pull` 하시면 받을 수 있습니다. 거기서 돌리실 때는 스키마 SQL(`02-create-table-…sql`)을 한 번 다시 실행해야 새 테이블(`analysis_revision_pass`)이 생깁니다. WSL의 DB는 이미 반영돼 있습니다.
+
+다음은 DECLARE 패스입니다.
