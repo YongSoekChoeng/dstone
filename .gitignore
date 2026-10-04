@@ -1,1 +1,3 @@
 LOGS/
+# Windows가 내려받은 파일에 붙이는 부가 정보(파일명에 ":"이 들어가 Windows에서는 체크아웃할 수 없다).
+*:Zone.Identifier
