@@ -322,6 +322,14 @@
            AND model = #{model}
     </update>
 
+    <!-- 어느 청크도 가리키지 않는 임베딩 가운데 만든 지 오래된 것을 지운다(보관 정책).
+         갓 만든 것은 남긴다: 리비전을 지우고 곧바로 다시 분석하는 경우에 다시 쓰려는 것이다 -->
+    <delete id="deleteOrphanEmbeddings" parameterType="int">
+        DELETE FROM rag_embedding e
+         WHERE e.created_at &lt; now() - make_interval(days => #{days})
+           AND NOT EXISTS (SELECT 1 FROM rag_chunk c WHERE c.content_hash = e.content_hash)
+    </delete>
+
     <delete id="deleteEmbedding" parameterType="java.util.Map">
         DELETE FROM rag_embedding
          WHERE content_hash = #{contentHash}

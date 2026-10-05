@@ -7,6 +7,7 @@
         revision_id AS "revisionId"
         , project_id AS "projectId"
         , revision_label AS "revisionLabel"
+        , parent_revision_id AS "parentRevisionId"
         , status AS "status"
         , analyzer_version AS "analyzerVersion"
         , to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt"
@@ -34,9 +35,26 @@
 
     <!-- 새로 만든 revision_id 는 파라미터 Map 의 revisionId 에 담겨 돌아온다 -->
     <insert id="insertRevision" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="revisionId" keyColumn="revision_id">
-        INSERT INTO analysis_revision (project_id, revision_label, status, analyzer_version)
-        VALUES (#{projectId}, #{revisionLabel}, 'CREATED', #{analyzerVersion})
+        INSERT INTO analysis_revision (project_id, revision_label, parent_revision_id, status, analyzer_version)
+        VALUES (#{projectId}, #{revisionLabel}, #{parentRevisionId, jdbcType=BIGINT}, 'CREATED', #{analyzerVersion})
     </insert>
+
+    <select id="selectLatestReadyRevision" parameterType="string" resultType="long">
+        SELECT revision_id
+          FROM analysis_revision
+         WHERE project_id = #{projectId}
+           AND status = 'READY'
+         ORDER BY revision_id DESC
+         LIMIT 1
+    </select>
+
+    <!-- 이 리비전을 기준으로 삼은 증분 분석이 지금 돌고 있는지 -->
+    <select id="countActiveChildRevision" parameterType="long" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_revision c
+          JOIN analysis_job j ON j.revision_id = c.revision_id AND j.status IN ('READY', 'RUNNING')
+         WHERE c.parent_revision_id = #{revisionId}
+    </select>
 
     <update id="updateRevisionStatus" parameterType="java.util.Map">
         UPDATE analysis_revision

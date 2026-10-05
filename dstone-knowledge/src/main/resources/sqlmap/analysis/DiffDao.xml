@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.DiffDao">
+
+    <!-- ================= 리비전 비교 =================
+         두 리비전(기준 base → 대상)에서 달라진 것을 종류(kind)별로 뽑는다.
+         모양은 모두 같다: 양쪽을 "같은 것인지 가리는 열쇠" 로 FULL JOIN 해서
+           기준에만 있으면 REMOVED, 대상에만 있으면 ADDED, 둘 다 있는데 내용이 다르면 CHANGED.
+         타입과 메소드의 ID 는 리비전이 달라도 같은 선언이면 같은 값이라(프로젝트 | 소스 루트 | 종류 | 이름의 해시) 그대로 열쇠로 쓴다.
+         파일 번호와 SQL statement 번호는 리비전마다 새로 매겨지므로 경로와 이름을 열쇠로 쓴다. -->
+    <sql id="diffRows">
+        <choose>
+            <when test="kind == 'FILE'">
+        SELECT CASE WHEN o.path IS NULL THEN 'ADDED' WHEN n.path IS NULL THEN 'REMOVED' ELSE 'CHANGED' END AS "change"
+             , COALESCE(n.path, o.path) AS "name"
+             , COALESCE(n.file_type, o.file_type) AS "detail"
+             , COALESCE(n.path, o.path) AS "path"
+          FROM (SELECT * FROM analysis_file WHERE revision_id = #{revisionId}) n
+          FULL JOIN (SELECT * FROM analysis_file WHERE revision_id = #{baseRevisionId}) o ON o.path = n.path
+         WHERE o.path IS NULL OR n.path IS NULL OR o.checksum &lt;&gt; n.checksum
+            </when>
+            <when test="kind == 'TYPE'">
+        SELECT CASE WHEN o.symbol_id IS NULL THEN 'ADDED' ELSE 'REMOVED' END AS "change"
+             , COALESCE(n.fqn, o.fqn) AS "name"
+             , COALESCE(n.kind, o.kind) AS "detail"
+             , f.path AS "path"
+          FROM (SELECT * FROM analysis_symbol WHERE revision_id = #{revisionId}) n
+          FULL JOIN (SELECT * FROM analysis_symbol WHERE revision_id = #{baseRevisionId}) o ON o.symbol_id = n.symbol_id
+          LEFT JOIN analysis_file f ON f.file_id = COALESCE(n.file_id, o.file_id)
+         WHERE o.symbol_id IS NULL OR n.symbol_id IS NULL
+            </when>
+            <when test="kind == 'METHOD'">
+        <!-- 만들어 넣은 멤버(Lombok 등)는 뺀다. 필드 하나가 바뀌면 getter/setter 가 줄줄이 따라 나와 정작 볼 것을 가린다.
+             둘 다 있는데 반환 타입이나 제한자가 달라진 것은 CHANGED 다. 몸통만 바뀐 것은 여기서 알 수 없다(FILE 의 CHANGED 로 본다) -->
+        SELECT CASE WHEN o.method_id IS NULL THEN 'ADDED' WHEN n.method_id IS NULL THEN 'REMOVED' ELSE 'CHANGED' END AS "change"
+             , COALESCE(ns.fqn, os.fqn) || '#' || COALESCE(n.signature, o.signature) AS "name"
+             , CASE WHEN n.method_id IS NOT NULL AND o.method_id IS NOT NULL
+                    THEN COALESCE(o.return_type, '') || ' → ' || COALESCE(n.return_type, '')
+                    ELSE COALESCE(n.return_type, o.return_type) END AS "detail"
+             , f.path AS "path"
+          FROM (SELECT * FROM analysis_method WHERE revision_id = #{revisionId} AND NOT is_synthetic) n
+          FULL JOIN (SELECT * FROM analysis_method WHERE revision_id = #{baseRevisionId} AND NOT is_synthetic) o ON o.method_id = n.method_id
+          LEFT JOIN analysis_symbol ns ON ns.revision_id = #{revisionId} AND ns.symbol_id = n.owner_symbol_id
+          LEFT JOIN analysis_symbol os ON os.revision_id = #{baseRevisionId} AND os.symbol_id = o.owner_symbol_id
+          LEFT JOIN analysis_file f ON f.file_id = COALESCE(n.file_id, o.file_id)
+         WHERE o.method_id IS NULL OR n.method_id IS NULL
+            OR o.return_type IS DISTINCT FROM n.return_type
+            OR o.visibility IS DISTINCT FROM n.visibility
+            OR o.is_static &lt;&gt; n.is_static
+            OR o.is_abstract &lt;&gt; n.is_abstract
+            </when>
+            <when test="kind == 'ENDPOINT'">
+        SELECT CASE WHEN o.k IS NULL THEN 'ADDED' ELSE 'REMOVED' END AS "change"
+             , COALESCE(n.label, o.label) AS "name"
+             , COALESCE(n.handler, o.handler) AS "detail"
+             , COALESCE(n.file_path, o.file_path) AS "path"
+          FROM (<include refid="endpointKeys"><property name="rev" value="revisionId"/></include>) n
+          FULL JOIN (<include refid="endpointKeys"><property name="rev" value="baseRevisionId"/></include>) o ON o.k = n.k
+         WHERE o.k IS NULL OR n.k IS NULL
+            </when>
+            <when test="kind == 'STATEMENT'">
+        SELECT CASE WHEN o.k IS NULL THEN 'ADDED' WHEN n.k IS NULL THEN 'REMOVED' ELSE 'CHANGED' END AS "change"
+             , COALESCE(n.label, o.label) AS "name"
+             , COALESCE(n.statement_type, o.statement_type) AS "detail"
+             , COALESCE(n.file_path, o.file_path) AS "path"
+          FROM (<include refid="statementKeys"><property name="rev" value="revisionId"/></include>) n
+          FULL JOIN (<include refid="statementKeys"><property name="rev" value="baseRevisionId"/></include>) o ON o.k = n.k
+         WHERE o.k IS NULL OR n.k IS NULL OR o.body_hash &lt;&gt; n.body_hash
+            </when>
+            <when test="kind == 'TABLE_USE'">
+        SELECT CASE WHEN o.k IS NULL THEN 'ADDED' ELSE 'REMOVED' END AS "change"
+             , COALESCE(n.table_name, o.table_name) AS "name"
+             , COALESCE(n.crud, o.crud) || ' ← ' || COALESCE(n.statement, o.statement) AS "detail"
+             , COALESCE(n.file_path, o.file_path) AS "path"
+          FROM (<include refid="tableUseKeys"><property name="rev" value="revisionId"/></include>) n
+          FULL JOIN (<include refid="tableUseKeys"><property name="rev" value="baseRevisionId"/></include>) o ON o.k = n.k
+         WHERE o.k IS NULL OR n.k IS NULL
+            </when>
+            <otherwise>
+        <!-- CALL: 메소드 → 메소드(프로젝트 안) 호출. 같은 호출이 여러 줄에 있어도 한 건으로 본다 -->
+        SELECT CASE WHEN o.from_id IS NULL THEN 'ADDED' ELSE 'REMOVED' END AS "change"
+             , fs.fqn || '#' || fm.signature AS "name"
+             , '→ ' || ts.fqn || '#' || tm.signature AS "detail"
+             , f.path AS "path"
+          FROM (SELECT DISTINCT from_id, to_id FROM analysis_relation WHERE revision_id = #{revisionId} AND relation_type = 'CALLS' AND to_id IS NOT NULL) n
+          FULL JOIN (SELECT DISTINCT from_id, to_id FROM analysis_relation WHERE revision_id = #{baseRevisionId} AND relation_type = 'CALLS' AND to_id IS NOT NULL) o
+            ON o.from_id = n.from_id AND o.to_id = n.to_id
+          <!-- 없어진 메소드의 이름은 기준 리비전에서, 새로 생긴 것은 대상 리비전에서 찾는다 -->
+          JOIN LATERAL (SELECT m.* FROM analysis_method m WHERE m.method_id = COALESCE(n.from_id, o.from_id) AND m.revision_id IN (#{revisionId}, #{baseRevisionId})
+                         ORDER BY m.revision_id DESC LIMIT 1) fm ON TRUE
+          JOIN LATERAL (SELECT m.* FROM analysis_method m WHERE m.method_id = COALESCE(n.to_id, o.to_id) AND m.revision_id IN (#{revisionId}, #{baseRevisionId})
+                         ORDER BY m.revision_id DESC LIMIT 1) tm ON TRUE
+          JOIN analysis_symbol fs ON fs.revision_id = fm.revision_id AND fs.symbol_id = fm.owner_symbol_id
+          JOIN analysis_symbol ts ON ts.revision_id = tm.revision_id AND ts.symbol_id = tm.owner_symbol_id
+          LEFT JOIN analysis_file f ON f.file_id = fm.file_id
+         WHERE o.from_id IS NULL OR n.from_id IS NULL
+            </otherwise>
+        </choose>
+    </sql>
+
+    <!-- 진입점의 열쇠: 종류 + HTTP 메소드 + 주소 + 처리하는 메소드 -->
+    <sql id="endpointKeys">
+        SELECT e.endpoint_type || '|' || COALESCE(e.http_method, '') || '|' || COALESCE(e.path, '') || '|' || COALESCE(e.method_id, e.symbol_id, '') AS k
+             , e.endpoint_type || ' ' || COALESCE(e.http_method || ' ', '') || COALESCE(e.path, '') AS label
+             , COALESCE(s.fqn || '#' || m.signature, s.fqn) AS handler
+             , f.path AS file_path
+          FROM analysis_endpoint e
+          LEFT JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+          LEFT JOIN analysis_symbol s ON s.revision_id = e.revision_id AND s.symbol_id = COALESCE(m.owner_symbol_id, e.symbol_id)
+          LEFT JOIN analysis_file f ON f.file_id = e.file_id
+         WHERE e.revision_id = #{${rev}}
+    </sql>
+
+    <!-- SQL statement 의 열쇠: 파일 경로 + 네임스페이스 + id + 조각인지. 내용이 달라졌는지는 SQL 글의 해시로 본다.
+         조각인지까지 넣는 이유: 실제 매퍼에는 <select id="x"> 와 <sql id="x"> 가 같은 id 를 쓰는 일이 있다.
+         id 만 보면 둘이 서로 짝지어져 바뀌지 않은 것이 "바뀜" 으로 나온다 -->
+    <sql id="statementKeys">
+        SELECT f.path || '|' || COALESCE(mp.namespace, '') || '|' || mp.statement_id || '|' || (mp.statement_type = 'SQL_FRAGMENT') AS k
+             , COALESCE(mp.namespace || '.', '') || mp.statement_id AS label
+             , mp.statement_type
+             , md5(COALESCE(mp.sql_body, '')) AS body_hash
+             , f.path AS file_path
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{${rev}}
+    </sql>
+
+    <!-- 테이블 사용의 열쇠: statement + 테이블 + 읽기/쓰기 종류 -->
+    <sql id="tableUseKeys">
+        SELECT DISTINCT f.path || '|' || COALESCE(mp.namespace, '') || '|' || mp.statement_id || '|' || r.to_external || '|' || COALESCE(r.properties_json->>'crud', '') AS k
+             , r.to_external AS table_name
+             , COALESCE(r.properties_json->>'crud', '') AS crud
+             , COALESCE(mp.namespace || '.', '') || mp.statement_id AS statement
+             , f.path AS file_path
+          FROM analysis_relation r
+          JOIN analysis_mapper mp ON mp.revision_id = r.revision_id AND 'S' || mp.mapper_id = r.from_id
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE r.revision_id = #{${rev}}
+           AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+    </sql>
+
+    <!-- 종류 하나의 달라진 건수: [{change, count}] -->
+    <select id="selectDiffCounts" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT x."change" AS "change", COUNT(*) AS "count"
+          FROM (<include refid="diffRows"/>) x
+         GROUP BY x."change"
+    </select>
+
+    <!-- 종류 하나의 달라진 것 목록: [{change, name, detail, path}] -->
+    <select id="selectDiffRows" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT x.*
+          FROM (<include refid="diffRows"/>) x
+         ORDER BY x."change", x."name", x."detail"
+         LIMIT #{limit}
+    </select>
+
+    <!-- 대상 리비전보다 앞선, 같은 프로젝트의 분석이 끝난 리비전 가운데 가장 최근 것 -->
+    <select id="selectPreviousReadyRevision" parameterType="long" resultType="long">
+        SELECT p.revision_id
+          FROM analysis_revision r
+          JOIN analysis_revision p ON p.project_id = r.project_id AND p.revision_id &lt; r.revision_id AND p.status = 'READY'
+         WHERE r.revision_id = #{revisionId}
+         ORDER BY p.revision_id DESC
+         LIMIT 1
+    </select>
+
+</mapper>

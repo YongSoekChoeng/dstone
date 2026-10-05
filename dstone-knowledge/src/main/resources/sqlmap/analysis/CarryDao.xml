@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.CarryDao">
+
+    <!-- ================= 증분 분석: 바뀌지 않은 파일의 결과를 앞 리비전에서 옮겨 오기 ================= -->
+
+    <update id="clearCarriedFrom" parameterType="long">
+        UPDATE analysis_file
+           SET carried_from_file_id = NULL
+         WHERE revision_id = #{revisionId}
+           AND carried_from_file_id IS NOT NULL
+    </update>
+
+    <!-- 바뀌지 않은 파일에 "앞 리비전의 어느 파일과 같은지" 를 적는다.
+         같다는 것은 경로와 내용(checksum)이 같고, SCAN 이 매긴 분류(언어, 종류, 모듈, 인코딩)도 같다는 뜻이다.
+         분류까지 보는 이유: 내용이 같아도 상위 폴더에 빌드 파일이 생기면 모듈이 달라지는 것처럼, 분류가 달라지면 분석 결과도 달라질 수 있다 -->
+    <update id="markCarriedFiles" parameterType="java.util.Map">
+        UPDATE analysis_file n
+           SET carried_from_file_id = o.file_id
+          FROM analysis_file o
+         WHERE n.revision_id = #{revisionId}
+           AND o.revision_id = #{baseRevisionId}
+           AND o.path = n.path
+           AND o.checksum = n.checksum
+           AND o.language IS NOT DISTINCT FROM n.language
+           AND o.file_type IS NOT DISTINCT FROM n.file_type
+           AND o.module IS NOT DISTINCT FROM n.module
+           AND o.encoding IS NOT DISTINCT FROM n.encoding
+    </update>
+
+    <!-- 앞 리비전에서 그 단계가 "끝남(DONE)" 이었던 파일은 이번에도 끝난 것으로 표시한다. 그러면 그 단계가 이 파일을 건너뛴다.
+         실패했거나 건너뛴 파일은 옮기지 않고 다시 처리한다(다시 해도 금방 끝나고, 실패의 원인이 이번에는 없어졌을 수 있다) -->
+    <insert id="carryFilePasses" parameterType="java.util.Map">
+        INSERT INTO analysis_file_pass (file_id, pass, revision_id, status, error_message, carried)
+        SELECT n.file_id, p.pass, n.revision_id, p.status, p.error_message, TRUE
+          FROM analysis_file n
+          JOIN analysis_file_pass p ON p.file_id = n.carried_from_file_id
+         WHERE n.revision_id = #{revisionId}
+           AND p.status = 'DONE'
+           AND p.pass IN
+            <foreach collection="passes" item="pass" open="(" separator="," close=")">#{pass}</foreach>
+        ON CONFLICT (file_id, pass) DO UPDATE
+           SET status = EXCLUDED.status, error_message = EXCLUDED.error_message, carried = TRUE, updated_at = now()
+    </insert>
+
+    <!-- 테이블의 컬럼 가운데 그대로 복사할 것. 리비전 번호와 파일 번호는 새 값으로 바꿔 넣고, 자동 번호(nextval)는 새로 매겨지게 뺀다.
+         컬럼 이름을 SQL 에 적어 두지 않고 DB 에서 읽는 이유: 테이블에 컬럼을 더했을 때 여기를 고치는 것을 잊으면 그 컬럼만 조용히 빠진다 -->
+    <select id="selectCopyColumns" parameterType="string" resultType="string">
+        SELECT quote_ident(column_name)
+          FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = #{table}
+           AND column_name NOT IN ('revision_id', 'file_id')
+           AND (column_default IS NULL OR column_default NOT LIKE 'nextval%')
+         ORDER BY ordinal_position
+    </select>
+
+    <!-- 옮겨 올 파일에 이미 들어 있는 행을 지운다(이 단계를 다시 돌렸을 때 같은 행이 두 번 들어가지 않게) -->
+    <delete id="deleteCarriedRows" parameterType="java.util.Map">
+        DELETE FROM ${table} t
+         USING analysis_file n, analysis_file_pass p
+         WHERE n.revision_id = #{revisionId}
+           AND n.carried_from_file_id IS NOT NULL
+           AND p.file_id = n.file_id
+           AND p.pass = #{pass}
+           AND p.carried
+           AND t.file_id = n.file_id
+    </delete>
+
+    <!-- 앞 리비전의 행을 새 리비전의 파일로 옮긴다. 대상은 그 단계를 "옮겨 옴(carried)" 으로 표시한 파일이다.
+         ${table} / ${columns} 는 요청에서 온 값이 아니라 코드에 적어 둔 테이블 이름과 DB 에서 읽은 컬럼 이름이다 -->
+    <insert id="copyRows" parameterType="java.util.Map">
+        INSERT INTO ${table} (revision_id, file_id, ${columns})
+        SELECT n.revision_id, n.file_id, ${sourceColumns}
+          FROM analysis_file n
+          JOIN analysis_file_pass p ON p.file_id = n.file_id AND p.pass = #{pass} AND p.carried
+          JOIN ${table} t ON t.file_id = n.carried_from_file_id
+         WHERE n.revision_id = #{revisionId}
+           AND n.carried_from_file_id IS NOT NULL
+        <if test="excludeRelationTypes != null">
+           AND t.relation_type NOT IN
+            <foreach collection="excludeRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+        </if>
+    </insert>
+
+    <!-- 한꺼번에 많은 행을 복사한 뒤에는 통계를 새로 낸다.
+         그러지 않으면 DB 가 "이 리비전의 행은 거의 없다" 고 잘못 알고, 바로 뒤의 LINK 단계가 나쁜 실행 계획을 골라
+         1초면 끝날 SQL 이 2분 넘게 걸린다(실제로 겪었다. 자동 통계 갱신이 돌기 전에 다음 단계가 시작되기 때문이다) -->
+    <update id="analyzeTable" parameterType="java.util.Map">
+        ANALYZE ${table}
+    </update>
+
+    <!-- DECLARE 가 파일 행에 남기는 값(파싱 결과, 문법 수준, 패키지, 소스 루트)도 옮긴다 -->
+    <update id="carryFileParsed" parameterType="long">
+        UPDATE analysis_file n
+           SET parse_status = o.parse_status
+             , parse_error = o.parse_error
+             , language_level = o.language_level
+             , package_name = o.package_name
+             , source_root = o.source_root
+          FROM analysis_file o, analysis_file_pass p
+         WHERE n.revision_id = #{revisionId}
+           AND o.file_id = n.carried_from_file_id
+           AND p.file_id = n.file_id
+           AND p.pass = 'DECLARE'
+           AND p.carried
+    </update>
+
+    <!-- RESOLVE 결과를 옮겨도 되는 파일을 고른다.
+         파일이 바뀌지 않았어도, 그 파일이 가리키던 대상이 바뀌었으면 다시 풀어야 한다. 그래서 두 가지에 걸리는 파일은 뺀다:
+           1) 앞 리비전에서 이 파일의 관계가 "바뀐 파일(고쳐졌거나 없어진 파일)에 선언된 것" 을 가리켰다.
+              시그니처가 바뀌었거나 없어졌을 수 있으므로, 같은 호출이 이제 다른 것을 가리키거나 풀리지 않을 수 있다.
+           2) 앞 리비전에서 확실하게 풀지 못한 참조(밖의 것으로 봤거나, 짐작했거나, 못 풀었거나)의 이름이
+              "새로 생겼거나 고쳐진 파일에 선언된 이름" 과 같다. 이번에는 프로젝트 안에서 풀릴 수 있다.
+         걸리지 않은 파일만 "RESOLVE 끝남" 으로 표시한다. 걸린 파일은 표시가 없으므로 RESOLVE 가 다시 푼다.
+         (파일 번호는 리비전마다 새로 매겨지므로, 파일 번호만으로 어느 리비전의 행인지 가려진다) -->
+    <insert id="carryResolvePasses" parameterType="java.util.Map">
+        WITH touched_file AS (
+            SELECT n.file_id, 'NEW' AS side
+              FROM analysis_file n
+             WHERE n.revision_id = #{revisionId}
+               AND n.carried_from_file_id IS NULL
+            UNION ALL
+            SELECT o.file_id, 'OLD'
+              FROM analysis_file o
+             WHERE o.revision_id = #{baseRevisionId}
+               AND NOT EXISTS (SELECT 1 FROM analysis_file n WHERE n.revision_id = #{revisionId} AND n.carried_from_file_id = o.file_id)
+        ), touched_id AS (
+            SELECT s.symbol_id AS id FROM analysis_symbol s JOIN touched_file t ON t.file_id = s.file_id
+            UNION
+            SELECT m.method_id FROM analysis_method m JOIN touched_file t ON t.file_id = m.file_id
+            UNION
+            SELECT f.field_id FROM analysis_field f JOIN touched_file t ON t.file_id = f.file_id
+        ), touched_name AS (
+            SELECT s.simple_name AS name FROM analysis_symbol s JOIN touched_file t ON t.file_id = s.file_id AND t.side = 'NEW'
+            UNION
+            SELECT m.name FROM analysis_method m JOIN touched_file t ON t.file_id = m.file_id AND t.side = 'NEW'
+            UNION
+            SELECT f.name FROM analysis_field f JOIN touched_file t ON t.file_id = f.file_id AND t.side = 'NEW'
+        ), affected AS (
+            SELECT r.file_id
+              FROM analysis_relation r
+             WHERE r.revision_id = #{baseRevisionId}
+               AND r.file_id IS NOT NULL
+               AND r.to_id IN (SELECT id FROM touched_id)
+            UNION
+            SELECT ref.file_id
+              FROM analysis_reference ref
+             WHERE ref.revision_id = #{baseRevisionId}
+               AND ref.status IN ('EXTERNAL', 'HEURISTIC', 'UNRESOLVED')
+               AND ref.name IN (SELECT name FROM touched_name)
+        )
+        INSERT INTO analysis_file_pass (file_id, pass, revision_id, status, error_message, carried)
+        SELECT n.file_id, 'RESOLVE', n.revision_id, 'DONE', NULL, TRUE
+          FROM analysis_file n
+          JOIN analysis_file_pass p ON p.file_id = n.carried_from_file_id AND p.pass = 'RESOLVE' AND p.status = 'DONE'
+          JOIN analysis_file_pass d ON d.file_id = n.file_id AND d.pass = 'DECLARE' AND d.carried
+         WHERE n.revision_id = #{revisionId}
+           AND n.carried_from_file_id NOT IN (SELECT file_id FROM affected)
+        ON CONFLICT (file_id, pass) DO UPDATE
+           SET status = EXCLUDED.status, error_message = EXCLUDED.error_message, carried = TRUE, updated_at = now()
+    </insert>
+
+    <!-- 다시 풀 파일의 참조는 "아직 안 풂" 으로 되돌린다. 옮겨 온 참조에는 앞 리비전에서 푼 상태가 적혀 있기 때문이다.
+         (RESOLVE 가 파일의 참조를 전부 다시 풀고 상태를 새로 적지만, 도중에 죽었을 때 옛 상태가 남아 있으면 헷갈린다) -->
+    <update id="resetReferencesToResolve" parameterType="long">
+        UPDATE analysis_reference ref
+           SET status = 'PENDING', fail_reason = NULL
+          FROM analysis_file n
+         WHERE n.revision_id = #{revisionId}
+           AND n.carried_from_file_id IS NOT NULL
+           AND ref.file_id = n.file_id
+           AND ref.status &lt;&gt; 'PENDING'
+           AND NOT EXISTS (SELECT 1 FROM analysis_file_pass p WHERE p.file_id = n.file_id AND p.pass = 'RESOLVE' AND p.carried)
+    </update>
+
+    <!-- 증분 분석의 요약: 파일을 얼마나 옮겨 왔고 얼마나 다시 분석했는지 -->
+    <select id="selectCarrySummary" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT (SELECT COUNT(*) FROM analysis_file n WHERE n.revision_id = #{revisionId}) AS "files"
+             , (SELECT COUNT(*) FROM analysis_file n WHERE n.revision_id = #{revisionId} AND n.carried_from_file_id IS NOT NULL) AS "unchangedFiles"
+             , (SELECT COUNT(*) FROM analysis_file n WHERE n.revision_id = #{revisionId} AND n.carried_from_file_id IS NULL
+                   AND EXISTS (SELECT 1 FROM analysis_file o WHERE o.revision_id = #{baseRevisionId} AND o.path = n.path)) AS "changedFiles"
+             , (SELECT COUNT(*) FROM analysis_file n WHERE n.revision_id = #{revisionId} AND n.carried_from_file_id IS NULL
+                   AND NOT EXISTS (SELECT 1 FROM analysis_file o WHERE o.revision_id = #{baseRevisionId} AND o.path = n.path)) AS "addedFiles"
+             , (SELECT COUNT(*) FROM analysis_file o WHERE o.revision_id = #{baseRevisionId}
+                   AND NOT EXISTS (SELECT 1 FROM analysis_file n WHERE n.revision_id = #{revisionId} AND n.path = o.path)) AS "removedFiles"
+    </select>
+
+    <!-- 단계별로, 옮겨 온 파일과 실제로 처리한 파일의 수 -->
+    <select id="selectCarriedPassSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT p.pass AS "pass"
+             , COUNT(*) FILTER (WHERE p.carried) AS "carriedFiles"
+             , COUNT(*) FILTER (WHERE NOT p.carried) AS "analyzedFiles"
+          FROM analysis_file_pass p
+         WHERE p.revision_id = #{revisionId}
+           AND p.pass IN ('DECLARE', 'RESOURCE', 'RESOLVE')
+         GROUP BY p.pass
+         ORDER BY p.pass
+    </select>
+
+</mapper>

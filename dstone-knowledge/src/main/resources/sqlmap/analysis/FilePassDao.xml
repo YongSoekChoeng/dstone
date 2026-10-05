@@ -49,6 +49,7 @@
         UPDATE analysis_file_pass
            SET status = #{status}
              , error_message = #{errorMessage}
+             , carried = FALSE
              , updated_at = now()
          WHERE file_id = #{fileId}
            AND pass = #{pass}

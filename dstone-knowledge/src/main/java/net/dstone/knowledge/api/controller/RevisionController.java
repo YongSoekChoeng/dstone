@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.api.service.CallGraphService;
+import net.dstone.knowledge.api.service.DiffService;
 import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
 import net.dstone.knowledge.api.service.SymbolService;
@@ -37,6 +38,9 @@ public class RevisionController {
 
 	@Autowired
 	private ImpactService impactService;
+
+	@Autowired
+	private DiffService diffService;
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */
 	@GetMapping("/{revisionId}")
@@ -118,6 +122,26 @@ public class RevisionController {
 		result.put("revisionId", revisionId);
 		result.put("deleted", Boolean.TRUE);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 리비전 비교: 기준(앞) 리비전과 견주어 달라진 파일, 타입, 메소드, 진입점, SQL statement, 테이블 사용, 호출을 돌려줍니다.
+	 *   - base: 기준 리비전. 없으면 증분 분석의 기준 리비전, 그것도 없으면 같은 프로젝트의 바로 앞 리비전
+	 *   - kinds: 볼 종류를 쉼표로(FILE,TYPE,METHOD,ENDPOINT,STATEMENT,TABLE_USE,CALL). 없으면 전부
+	 *   - limit: 종류마다 돌려줄 최대 건수(기본 200, 최대 2000). 0이면 건수만
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/diff")
+	public Map<String, Object> getDiff(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "base", required = false) Long base
+			, @RequestParam(name = "kinds", required = false) String kinds
+			, @RequestParam(name = "limit", required = false) Integer limit) {
+		java.util.List<String> kindList = new java.util.ArrayList<String>();
+		if (kinds != null && kinds.trim().length() > 0) {
+			kindList.addAll(java.util.Arrays.asList(kinds.split(",")));
+		}
+		return diffService.getDiff(revisionId, base, kindList, limit);
 	}
 
 	/**

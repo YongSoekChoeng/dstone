@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.AnalysisJobDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
+import net.dstone.knowledge.api.service.RetentionService;
 import net.dstone.knowledge.common.util.ErrorText;
 
 /**
@@ -44,6 +45,9 @@ public class AnalysisJobRunner extends BaseObject {
 
 	@Autowired
 	private RevisionDao revisionDao;
+
+	@Autowired
+	private RetentionService retentionService;
 
 	/** 지금 대기 중이거나 돌고 있는 Job들. 취소 요청을 전달할 때 여기서 찾습니다. */
 	private final Map<String, AnalysisJobContext> activeJobs = new ConcurrentHashMap<String, AnalysisJobContext>();
@@ -132,6 +136,8 @@ public class AnalysisJobRunner extends BaseObject {
 			analysisJobDao.updateJobEnd(analysisId, status, null);
 			revisionDao.updateRevisionStatus(revisionId, "READY");
 			info("분석 끝: analysisId=" + analysisId + ", status=" + status);
+			// 새 리비전이 생겼으니 오래된 리비전을 정리한다. 실패해도 분석 결과에는 영향이 없다.
+			retentionService.applyQuietly(context.getProjectId());
 
 		} catch (JobCancelledException e) {
 			// 취소: 하던 단계는 끝나지 않은 것으로 남긴다. 같은 리비전으로 다시 시작하면 그 단계부터 한다.

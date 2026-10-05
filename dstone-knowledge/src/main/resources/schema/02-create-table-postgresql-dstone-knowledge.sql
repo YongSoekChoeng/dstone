@@ -269,6 +269,12 @@ CREATE TABLE IF NOT EXISTS analysis_reference (
 -- sqlSession.selectList("order.findAll", vo) 의 "order.findAll", new ModelAndView("order/list") 의 "order/list" 처럼
 -- 문자열로 다른 것을 가리키는 호출을 풀 때 쓴다. 테이블을 이미 만든 DB 에도 생기도록 ALTER 로 추가한다.
 ALTER TABLE analysis_reference ADD COLUMN IF NOT EXISTS arg_text VARCHAR(500);
+
+-- 증분 분석: 이 파일의 분석 결과를 앞 리비전의 어느 파일에서 옮겨 왔는지(바뀌지 않은 파일). 새 파일이거나 바뀐 파일이면 NULL.
+-- 앞 리비전이 나중에 지워져도 옮겨 온 결과는 이 리비전의 것으로 온전히 남는다(이 값은 "어디서 왔는지" 의 기록일 뿐이다).
+ALTER TABLE analysis_file ADD COLUMN IF NOT EXISTS carried_from_file_id BIGINT;
+-- 증분 분석: 이 파일의 이 단계를 실제로 돌리지 않고 앞 리비전의 결과를 옮겨 왔는지
+ALTER TABLE analysis_file_pass ADD COLUMN IF NOT EXISTS carried BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_analysis_reference_file   ON analysis_reference(file_id, status);
 CREATE INDEX IF NOT EXISTS idx_analysis_reference_status ON analysis_reference(revision_id, status, ref_kind);
 

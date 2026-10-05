@@ -19,6 +19,7 @@ import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.api.dao.FilePassDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
+import net.dstone.knowledge.api.dao.CarryDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.exception.ApiException;
@@ -38,6 +39,9 @@ public class RevisionService extends BaseObject {
 
 	@Autowired
 	private RevisionDao revisionDao;
+
+	@Autowired
+	private CarryDao carryDao;
 
 	@Autowired
 	private AnalysisJobDao analysisJobDao;
@@ -111,6 +115,16 @@ public class RevisionService extends BaseObject {
 		// RESOURCE 단계가 읽은 것: SQL statement, 설정 값, Spring 빈, 의존성 ...
 		semantic.put("resources", resourceDao.selectResourceSummary(revisionId));
 		result.put("semantic", semantic);
+
+		// 증분 분석이었으면: 기준 리비전에서 얼마나 옮겨 왔고 얼마나 다시 분석했는지
+		Object parent = result.get("parentRevisionId");
+		if (parent != null) {
+			Map<String, Object> incremental = new LinkedHashMap<String, Object>();
+			incremental.put("baseRevisionId", parent);
+			incremental.put("files", carryDao.selectCarrySummary(revisionId, ((Number) parent).longValue()));
+			incremental.put("passes", carryDao.selectCarriedPassSummary(revisionId));
+			result.put("incremental", incremental);
+		}
 		return result;
 	}
 

@@ -59,11 +59,16 @@ public class AnalysisService extends BaseObject {
 	 * - 이미 있는 리비전에서 그 단계와 그 뒤의 단계를 처음부터 다시 돌립니다. 예: DOCUMENT를 주면 문서만 다시 만듭니다.
 	 *   (문서 짓는 규칙이나 의미 분석 규칙을 고친 뒤, 앞 단계를 다시 하지 않고 결과만 새로 만들 때 씁니다.)
 	 *
+	 * 증분 분석(incremental):
+	 * - 새 리비전을 만들 때만 씁니다. 앞 리비전(기준 리비전)과 내용이 같은 파일은 다시 분석하지 않고 결과를 옮겨 옵니다.
+	 *   기준 리비전은 baseRevisionId로 정하고, 주지 않으면 이 프로젝트에서 분석이 끝난 가장 최근 리비전입니다.
+	 * - 기준으로 쓸 리비전이 없거나 분석기 버전이 다르면 전체 분석으로 돕니다(응답의 incremental이 false, 이유는 note).
+	 *
 	 * 한 프로젝트에서 분석은 한 번에 하나만 돕니다. 이미 돌고 있으면 409입니다.
 	 * synchronized인 이유: "돌고 있는 Job이 있나" 확인과 Job 등록 사이에 다른 요청이 끼어들지 못하게 하려는 것입니다.
 	 * </pre>
 	 */
-	public synchronized Map<String, Object> startAnalysis(String projectId, String revisionLabel, String rerunFrom) {
+	public synchronized Map<String, Object> startAnalysis(String projectId, String revisionLabel, String rerunFrom, boolean incremental, Long baseRevisionId) {
 		Map<String, Object> project = projectService.getProject(projectId);
 		String localPath = (String) project.get("localPath");
 		if (localPath == null || !new File(localPath).isDirectory()) {
@@ -82,9 +87,26 @@ public class AnalysisService extends BaseObject {
 
 		boolean resumed;
 		long revisionId;
+		Long parentRevisionId = null;
+		String note = null;
 		Map<String, Object> revision = revisionDao.selectRevisionByLabel(projectId, label);
+		if (revision != null && (incremental || baseRevisionId != null)) {
+			throw ApiException.badRequest("incremental / baseRevisionId는 새 리비전을 만들 때만 쓸 수 있습니다. 이미 있는 리비전입니다: " + label);
+		}
 		if (revision == null) {
-			revisionId = revisionDao.insertRevision(projectId, label, configProperty.getProperty("dstone.knowledge.analyzer-version"));
+			String analyzerVersion = configProperty.getProperty("dstone.knowledge.analyzer-version");
+			if (incremental || baseRevisionId != null) {
+				Map<String, Object> base = findBaseRevision(projectId, baseRevisionId);
+				if (base == null) {
+					note = "기준으로 쓸 분석이 끝난 리비전이 없어 전체 분석으로 돌립니다.";
+				} else if (!String.valueOf(analyzerVersion).equals(String.valueOf(base.get("analyzerVersion")))) {
+					// 분석 규칙이 달라졌으면 옛 결과를 옮겨 오면 안 된다.
+					note = "기준 리비전의 분석기 버전(" + base.get("analyzerVersion") + ")이 지금(" + analyzerVersion + ")과 달라 전체 분석으로 돌립니다.";
+				} else {
+					parentRevisionId = Long.valueOf(((Number) base.get("revisionId")).longValue());
+				}
+			}
+			revisionId = revisionDao.insertRevision(projectId, label, analyzerVersion, parentRevisionId);
 			resumed = false;
 		} else {
 			revisionId = ((Number) revision.get("revisionId")).longValue();
@@ -117,6 +139,13 @@ public class AnalysisService extends BaseObject {
 		result.put("revisionId", revisionId);
 		result.put("revisionLabel", label);
 		result.put("resumed", resumed);
+		if (!resumed) {
+			result.put("incremental", Boolean.valueOf(parentRevisionId != null));
+			result.put("baseRevisionId", parentRevisionId);
+		}
+		if (note != null) {
+			result.put("note", note);
+		}
 		if (!rerunPasses.isEmpty()) {
 			result.put("rerunPasses", rerunPasses);
 		}
@@ -164,6 +193,29 @@ public class AnalysisService extends BaseObject {
 		result.put("analysisId", analysisId);
 		result.put("cancelRequested", Boolean.TRUE);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 증분 분석의 기준 리비전을 찾습니다. 번호를 주면 그 리비전이고(이 프로젝트의 것이고 분석이 끝나 있어야 한다),
+	 * 주지 않으면 이 프로젝트에서 분석이 끝난 가장 최근 리비전입니다.
+	 * </pre>
+	 *
+	 * @return 없으면 null(번호를 주지 않았을 때만. 준 번호가 잘못됐으면 예외)
+	 */
+	private Map<String, Object> findBaseRevision(String projectId, Long baseRevisionId) {
+		if (baseRevisionId == null) {
+			Long latest = revisionDao.selectLatestReadyRevision(projectId);
+			return latest == null ? null : revisionDao.selectRevision(latest.longValue());
+		}
+		Map<String, Object> base = revisionDao.selectRevision(baseRevisionId.longValue());
+		if (base == null || !projectId.equals(base.get("projectId"))) {
+			throw ApiException.badRequest("baseRevisionId가 이 프로젝트의 리비전이 아닙니다: " + baseRevisionId);
+		}
+		if (!"READY".equals(base.get("status"))) {
+			throw ApiException.badRequest("기준 리비전은 분석이 끝난(READY) 것이어야 합니다: " + baseRevisionId + " (status=" + base.get("status") + ")");
+		}
+		return base;
 	}
 
 	/** Job ID를 만듭니다. 모양: A + 날짜(yyyyMMdd) + 그날의 일련번호(3자리, 넘치면 자릿수가 늘어남). 예: A20261005001 */

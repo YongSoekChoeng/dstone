@@ -165,6 +165,14 @@ public class RagDao extends BaseDao {
 		sqlSessionCommon.delete(NS + "deleteEmbedding", keyParam(contentHash, model));
 	}
 
+	/**
+	 * @param days 만든 지 이 날수가 지난 것만 지웁니다
+	 * @return 지운 임베딩 수
+	 */
+	public int deleteOrphanEmbeddings(int days) {
+		return sqlSessionCommon.delete(NS + "deleteOrphanEmbeddings", days);
+	}
+
 	/* ---------- 조회 ---------- */
 
 	public List<Map<String, Object>> selectDocumentSummary(long revisionId) {

@@ -49,13 +49,28 @@ public class RevisionDao extends BaseDao {
 	}
 
 	/** 리비전을 새로 만들고, 만들어진 revision_id를 돌려줍니다. */
-	public long insertRevision(String projectId, String revisionLabel, String analyzerVersion) {
+	/**
+	 * @param parentRevisionId 증분 분석의 기준이 되는 앞 리비전. 전체 분석이면 null
+	 */
+	public long insertRevision(String projectId, String revisionLabel, String analyzerVersion, Long parentRevisionId) {
 		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("parentRevisionId", parentRevisionId);
 		param.put("projectId", projectId);
 		param.put("revisionLabel", revisionLabel);
 		param.put("analyzerVersion", analyzerVersion);
 		sqlSessionCommon.insert(NS + "insertRevision", param);
 		return ((Number) param.get("revisionId")).longValue();
+	}
+
+	/** 프로젝트에서 분석이 끝난 가장 최근 리비전. 없으면 null */
+	public Long selectLatestReadyRevision(String projectId) {
+		return sqlSessionCommon.selectOne(NS + "selectLatestReadyRevision", projectId);
+	}
+
+	/** 이 리비전을 기준으로 삼은 증분 분석 가운데 지금 돌고 있는(대기 포함) 것의 수 */
+	public int countActiveChildRevision(long revisionId) {
+		Integer count = sqlSessionCommon.selectOne(NS + "countActiveChildRevision", revisionId);
+		return count == null ? 0 : count.intValue();
 	}
 
 	public void updateRevisionStatus(long revisionId, String status) {
