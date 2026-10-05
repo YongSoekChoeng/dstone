@@ -13,6 +13,24 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
 		<div id="ai-main">
+			<details class="kn-howto" open>
+				<summary>이렇게 씁니다</summary>
+				<ol>
+					<li>프로젝트와 리비전을 고릅니다(리비전은 분석이 끝난 가장 최근 것이 골라져 있습니다).</li>
+					<li><b>"이것을 고치면 어디가 영향을 받나"</b> → 위 칸(영향도 분석)에 대상을 적고 "분석". 진입점(주소) · 화면 · 메소드 세 표가 나옵니다.</li>
+					<li><b>"이 메소드를 누가 부르나 / 무엇을 부르나"</b> → 아래 칸(호출 관계)에 메소드 이름을 적고 "메소드 찾기" → 나온 줄의 "부르는 쪽" / "불리는 쪽" 단추.
+						"불리는 쪽"에는 실행하는 SQL 과 테이블, 여는 화면까지 나옵니다.</li>
+					<li>테이블 이름을 모르면 아래 칸의 "테이블 찾기"(비워 두고 누르면 전체 목록) → 이름을 누르면 영향도 분석으로 이어집니다.</li>
+				</ol>
+				예시 (누르면 채워집니다. <code>struts-app</code> 기준. 채운 뒤 프로젝트가 <code>struts-app</code> 인지 확인하고 단추를 누르세요):
+				<span class="kn-example" data-fill='{"kn-impact-kind":"table","kn-impact-target":"TB_BOARD"}'>테이블 TB_BOARD 를 고치면</span>
+				<span class="kn-example" data-fill='{"kn-impact-kind":"statement","kn-impact-target":"Board.deleteBoard"}'>SQL Board.deleteBoard 를 고치면</span>
+				<span class="kn-example" data-fill='{"kn-impact-kind":"type","kn-impact-target":"com.sample.board.dao.BoardDAO"}'>클래스 BoardDAO 를 고치면</span>
+				<span class="kn-example" data-fill='{"kn-method-name":"deleteBoard"}'>메소드 deleteBoard 찾기</span>
+				<br>"거리"는 대상에서 몇 단계 떨어졌는지(0 = 대상을 직접 건드리는 메소드), "신뢰도"는 거기까지 이어진 길이 얼마나 확실한지입니다.
+				<span class="kn-conf-LOW">LOW</span> 는 이름만 보고 짐작한 것이라 참고로만 봅니다.
+			</details>
+
 			<section class="ai-panel">
 				<h3>영향도 분석</h3>
 				<p class="ai-hint">"이것을 고치면 어디까지 닿는가"를 봅니다. 대상을 직접 건드리는 메소드에서 부르는 쪽으로 거슬러 올라가며

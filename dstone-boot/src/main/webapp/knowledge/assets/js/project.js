@@ -8,29 +8,10 @@ var DstoneKnowledgeProject = (function () {
 	var projectId = null;
 	var pollTimer = null;
 
-	/** 리비전 요약에서 보여 줄 항목. [응답에서 값을 꺼내는 경로, 제목, 설명] */
-	var SUMMARY_SECTIONS = [
-		["incremental.files", "증분 분석: 파일", "기준 리비전과 견주어 같은 / 바뀐 / 새로 생긴 / 없어진 파일 수"],
-		["incremental.passes", "증분 분석: 단계별", "옮겨 온 파일(carriedFiles)과 실제로 처리한 파일(analyzedFiles)"],
-		["passes", "단계별 진행", null],
-		["relations.metrics", "품질 지표", "호출이 얼마나 풀렸는지 등. LINK 단계가 계산합니다"],
-		["relations.byType", "관계 (종류 · 신뢰도별)", "HIGH는 확실, MEDIUM은 덜 확실, LOW는 이름만 보고 짐작한 것"],
-		["relations.unresolvedReasons", "풀지 못한 참조의 이유", null],
-		["semantic.endpoints", "진입점", null],
-		["semantic.layers", "계층", null],
-		["semantic.resources", "Java 밖의 자원 (SQL, 설정, 빈 ...)", null],
-		["files.byType", "파일 (종류별)", null],
-		["declarations.types", "타입", null],
-		["declarations.members", "멤버", null],
-		["declarations.references", "참조", null],
-		["declarations.filePasses", "파일별 단계 결과", null],
-		["rag.documents", "검색 문서", null],
-		["rag.embedding", "임베딩 진행", "DONE이 돼야 뜻으로 찾는 검색에 나옵니다. PENDING은 대기 중"],
-		["jobs", "Job 이력", null]
-	];
+	var T = DstoneKnowledgeTerms;
 
 	function init() {
-		["kn-health", "kn-project-table", "kn-new-project-id", "kn-new-project-name", "kn-new-project-path", "kn-project-save-btn", "kn-project-message",
+		["kn-health", "kn-project-table", "kn-new-project-id", "kn-new-project-name", "kn-new-project-path", "kn-new-project-classpath", "kn-project-save-btn", "kn-project-message",
 			"kn-analysis-panel", "kn-selected-project", "kn-revision-label", "kn-incremental", "kn-rerun-from", "kn-analysis-start-btn", "kn-analysis-message",
 			"kn-job-box", "kn-job-id", "kn-job-badge", "kn-job-progress", "kn-job-cancel-btn", "kn-job-passes", "kn-job-errors",
 			"kn-revision-table", "kn-retention-keep", "kn-retention-btn", "kn-revision-message",
@@ -79,6 +60,9 @@ var DstoneKnowledgeProject = (function () {
 			projectName: el["kn-new-project-name"].value.trim(),
 			localPath: el["kn-new-project-path"].value.trim()
 		};
+		if (el["kn-new-project-classpath"].value.trim()) {
+			body.classpath = el["kn-new-project-classpath"].value.trim();
+		}
 		K.call("POST", "/api/projects", null, body).then(function (project) {
 			K.message(el["kn-project-message"], "등록했습니다: " + project.projectId);
 			loadProjects();
@@ -99,6 +83,7 @@ var DstoneKnowledgeProject = (function () {
 		el["kn-new-project-id"].value = project.projectId;
 		el["kn-new-project-name"].value = project.projectName || "";
 		el["kn-new-project-path"].value = project.localPath || "";
+		el["kn-new-project-classpath"].value = project.classpath || "";
 		K.message(el["kn-analysis-message"], "");
 		K.message(el["kn-revision-message"], "");
 		loadRevisions();
@@ -168,7 +153,7 @@ var DstoneKnowledgeProject = (function () {
 			+ (job.errorMessage ? " · " + job.errorMessage : "");
 		el["kn-job-cancel-btn"].disabled = !running;
 		K.table(el["kn-job-passes"], [
-			{ key: "pass", label: "단계" },
+			{ key: "pass", label: "단계", html: function (row) { return withMeaning(row.pass, T.PASS[row.pass]); } },
 			{ key: "status", label: "상태", html: function (row) { return K.badge(row.status); } },
 			{ key: "doneCount", label: "처리", num: true },
 			{ key: "totalCount", label: "전체", num: true },
@@ -268,25 +253,136 @@ var DstoneKnowledgeProject = (function () {
 	}
 
 	function renderSummary(summary) {
-		K.cards(el["kn-summary-cards"], [
-			{ label: "파일", value: valueAt(summary, "files.total") },
-			{ label: "타입", value: sumOf(valueAt(summary, "declarations.types")) },
-			{ label: "관계", value: sumOf(valueAt(summary, "relations.byType")) },
-			{ label: "진입점", value: sumOf(valueAt(summary, "semantic.endpoints")) },
-			{ label: "검색 문서", value: sumOf(valueAt(summary, "rag.documents"), "documents") }
-		]);
+		var values = [
+			valueAt(summary, "files.total"),
+			sumOf(valueAt(summary, "declarations.types")),
+			sumOf(valueAt(summary, "relations.byType")),
+			sumOf(valueAt(summary, "semantic.endpoints")),
+			sumOf(valueAt(summary, "rag.documents"), "documents")
+		];
+		// 카드마다 숫자, 이름, 그 숫자가 무엇을 센 것인지
+		el["kn-summary-cards"].innerHTML = T.CARDS.map(function (card, index) {
+			return "<div class=\"kn-card\" title=\"" + K.escapeHtml(card[1]) + "\"><div class=\"kn-card-value\">" + K.escapeHtml(formatNumber(values[index]))
+				+ "</div><div class=\"kn-card-label\">" + K.escapeHtml(card[0]) + "</div><div class=\"kn-card-help\">" + K.escapeHtml(card[1]) + "</div></div>";
+		}).join("");
+
 		el["kn-summary-sections"].innerHTML = "";
-		SUMMARY_SECTIONS.forEach(function (section) {
-			var value = valueAt(summary, section[0]);
+		el["kn-summary-sections"].appendChild(verdictBox(summary));
+		T.SECTIONS.forEach(function (section) {
+			var value = valueAt(summary, section.path);
 			if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
 				return;
 			}
-			var wrap = document.createElement("div");
-			wrap.innerHTML = "<div class=\"kn-section-title\">" + K.escapeHtml(section[1]) + "</div>"
-				+ (section[2] ? "<p class=\"ai-hint\">" + K.escapeHtml(section[2]) + "</p>" : "") + "<div class=\"kn-scroll\"></div>";
-			K.autoTable(wrap.querySelector(".kn-scroll"), value);
-			el["kn-summary-sections"].appendChild(wrap);
+			el["kn-summary-sections"].appendChild(sectionBox(section, value));
 		});
+	}
+
+	/**
+	 * 요약 맨 위의 "한눈에 보기". 숫자를 읽지 않아도 이 리비전을 믿고 써도 되는지 알 수 있게 말로 풀어 준다.
+	 * 기준(95% / 80%)은 대략의 눈금이다. knowledge-terms.js 의 '품질 지표' 설명과 같은 기준을 쓴다.
+	 */
+	function verdictBox(summary) {
+		var lines = [];
+		var metrics = {};
+		(valueAt(summary, "relations.metrics") || []).forEach(function (row) {
+			metrics[row.name] = row.value;
+		});
+		if (metrics.callResolutionRate !== undefined && metrics.callResolutionRate !== null) {
+			var rate = Number(metrics.callResolutionRate);
+			lines.push([rate >= 95 ? "good" : rate >= 80 ? "warn" : "bad",
+				"메소드 호출 " + formatNumber(metrics.callCount) + "건 가운데 " + rate + "% 가 누구를 부르는지 풀렸습니다. "
+				+ (rate >= 95 ? "호출 관계와 영향도 결과를 믿고 써도 됩니다." : rate >= 80 ? "쓸 수는 있지만 빠진 호출이 있을 수 있습니다. 라이브러리(jar) 위치를 확인하세요."
+					: "빠진 호출이 많습니다. 프로젝트 등록 칸에 라이브러리(jar) 위치를 적고 다시 분석하세요.")]);
+		}
+		if (metrics.parseSuccessRate !== undefined && metrics.parseSuccessRate !== null) {
+			var parse = Number(metrics.parseSuccessRate);
+			lines.push([parse >= 100 ? "good" : "warn", parse >= 100 ? "Java 파일을 모두 읽었습니다." : "Java 파일의 " + parse + "% 만 읽었습니다. 읽지 못한 파일의 메소드는 결과에 없습니다."]);
+		}
+		var endpoints = sumOf(valueAt(summary, "semantic.endpoints"));
+		if (typeof endpoints === "number") {
+			lines.push([endpoints > 0 ? "good" : "warn", endpoints > 0 ? "진입점(주소 등) " + formatNumber(endpoints) + "개를 찾았습니다."
+				: "진입점을 하나도 찾지 못했습니다. 영향도 분석의 '진입점' 표가 비어 나옵니다."]);
+		}
+		var sql = 0;
+		(valueAt(summary, "relations.byType") || []).forEach(function (row) {
+			if (row.relationType === "EXECUTES_SQL" && row.confidence !== "UNRESOLVED") {
+				sql += row.count;
+			}
+		});
+		lines.push([sql > 0 ? "good" : "info", sql > 0 ? "메소드와 SQL 이 " + formatNumber(sql) + "건 이어졌습니다. 테이블에서 출발하는 영향도 분석을 할 수 있습니다."
+			: "메소드와 이어진 SQL 이 없습니다(매퍼 XML 을 쓰지 않는 프로그램이면 정상). 테이블에서 출발하는 영향도 분석은 할 수 없습니다."]);
+		var done = 0;
+		var total = 0;
+		(valueAt(summary, "rag.embedding") || []).forEach(function (row) {
+			total += row.chunks;
+			if (row.status === "DONE") {
+				done += row.chunks;
+			}
+		});
+		if (total > 0) {
+			var percent = Math.floor(100 * done / total);
+			lines.push([percent >= 100 ? "good" : "info", percent >= 100 ? "임베딩이 끝났습니다. 뜻으로 찾는 검색을 온전히 쓸 수 있습니다."
+				: "임베딩이 " + percent + "% 진행됐습니다(" + formatNumber(done) + " / " + formatNumber(total) + "). 끝날 때까지 뜻으로 찾는 검색은 일부만 됩니다. 이름으로 찾기 · 호출 관계 · 영향도는 지금도 됩니다."]);
+		}
+		if (summary.status !== "READY") {
+			lines.unshift(["bad", "이 리비전은 분석이 끝나지 않았습니다(상태 " + summary.status + "). 아래 숫자는 도중까지의 결과입니다."]);
+		}
+		var box = document.createElement("div");
+		box.className = "kn-verdict";
+		box.innerHTML = "<div class=\"kn-section-title\" style=\"margin-top:0;\">한눈에 보기</div>" + lines.map(function (line) {
+			var mark = line[0] === "good" ? "✔" : line[0] === "bad" ? "✖" : line[0] === "warn" ? "!" : "·";
+			return "<div class=\"kn-verdict-line kn-verdict-" + line[0] + "\"><span class=\"kn-verdict-mark\">" + mark + "</span>" + K.escapeHtml(line[1]) + "</div>";
+		}).join("");
+		return box;
+	}
+
+	/** 표 하나: 제목, 무엇을 보여 주는지, 표(영문 값 옆에 뜻), 읽는 법 */
+	function sectionBox(section, value) {
+		var wrap = document.createElement("div");
+		var html = "<div class=\"kn-section-title\">" + K.escapeHtml(section.title) + "</div><p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p><div class=\"kn-scroll\"></div>";
+		var help = "";
+		if (section.columns) {
+			help += "<ul>" + section.columns.filter(function (column) { return column[2]; }).map(function (column) {
+				return "<li><b>" + K.escapeHtml(column[1]) + "</b> <code>" + K.escapeHtml(column[0]) + "</code> — " + K.escapeHtml(column[2]) + "</li>";
+			}).join("") + "</ul>";
+		}
+		if (section.read) {
+			help += "<p>" + K.escapeHtml(section.read) + "</p>";
+		}
+		if (help) {
+			html += "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary>" + help + "</details>";
+		}
+		wrap.innerHTML = html;
+		var tableEl = wrap.querySelector(".kn-scroll");
+		if (section.pairs) {
+			var rows = Object.keys(value).map(function (key) {
+				return { name: key, value: value[key] };
+			});
+			K.table(tableEl, [
+				{ key: "name", label: "항목", html: function (row) { return withMeaning(row.name, section.rows[row.name]); } },
+				{ key: "value", label: "값", num: true }
+			], rows);
+			return wrap;
+		}
+		K.table(tableEl, section.columns.map(function (column) {
+			var numeric = value.length > 0 && typeof value[0][column[0]] === "number";
+			return {
+				key: column[0],
+				label: column[1],
+				num: numeric,
+				html: column[3] ? function (row) { return withMeaning(row[column[0]], T.meaningOf(column[3], row[column[0]])); } : null
+			};
+		}), value);
+		return wrap;
+	}
+
+	/** 영문 값 뒤에 한글 뜻을 흐린 글자로 붙인다 */
+	function withMeaning(code, meaning) {
+		return "<span class=\"kn-code\">" + K.escapeHtml(code) + "</span>" + (meaning ? "<span class=\"kn-term\">" + K.escapeHtml(meaning) + "</span>" : "");
+	}
+
+	function formatNumber(value) {
+		return typeof value === "number" ? value.toLocaleString() : (value === null || value === undefined ? "-" : String(value));
 	}
 
 	/** "a.b.c" 경로로 값을 꺼냅니다. 중간에 없으면 null */

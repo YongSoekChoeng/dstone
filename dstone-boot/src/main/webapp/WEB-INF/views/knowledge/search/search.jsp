@@ -13,6 +13,23 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
 		<div id="ai-main">
+			<details class="kn-howto" open>
+				<summary>이렇게 씁니다</summary>
+				<ol>
+					<li>프로젝트를 고릅니다(분석이 끝난 가장 최근 리비전에서 찾습니다).</li>
+					<li>평소 말하듯 적고 "찾기". 클래스 · 메소드 · 테이블 이름이나 주소를 알면 같이 적으세요. 이름이 정확히 맞는 것이 위로 올라옵니다.</li>
+					<li>결과 한 건은 메소드 하나 / SQL 하나 / 화면 하나입니다. 본문 상자를 누르면 전체가 펴집니다.
+						<code>나온 곳 VECTOR+KEYWORD</code> 는 뜻과 이름 양쪽에서 찾혔다는 뜻이라 가장 믿을 만합니다.</li>
+				</ol>
+				예시 (누르면 채워집니다. <code>struts-app</code> 기준):
+				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"게시글을 삭제하는 곳"}'>게시글을 삭제하는 곳</span>
+				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"BoardDAO.deleteBoard"}'>BoardDAO.deleteBoard</span>
+				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"TB_BOARD 를 고치는 SQL"}'>TB_BOARD 를 고치는 SQL</span>
+				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"/board/save.do 요청을 받는 곳"}'>/board/save.do 요청을 받는 곳</span>
+				<br>옵션은 그대로 두어도 됩니다. "종류"를 체크하면 그 종류만(예: SQL 만) 나오고, "올린 문서"를 체크하면 아래에서 올린 문서도 같이 찾습니다.
+				결과가 적으면 임베딩이 아직 진행 중일 수 있습니다(검색 결과 위 줄의 "임베딩 PENDING" 숫자). 그동안은 이름을 넣어 찾으세요.
+			</details>
+
 			<section class="ai-panel">
 				<h3>검색</h3>
 				<p class="ai-hint">분석 결과(메소드, 타입, SQL, 화면)와 올린 문서를 찾습니다. 뜻으로 찾고("주문 취소는 어디서 처리하나"),

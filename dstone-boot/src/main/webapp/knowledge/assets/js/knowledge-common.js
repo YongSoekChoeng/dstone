@@ -10,6 +10,25 @@ var DstoneKnowledge = (function () {
 
 	function init(path) {
 		contextPath = path || "";
+		bindExamples();
+	}
+
+	/**
+	 * 예시 단추(.kn-example)를 누르면 입력 칸에 그 값을 채웁니다.
+	 * 단추의 data-fill 에 {"입력 칸 id": "넣을 값"} 을 JSON 으로 적어 둡니다. 여러 칸을 한 번에 채울 수 있습니다.
+	 */
+	function bindExamples() {
+		Array.prototype.forEach.call(document.querySelectorAll(".kn-example"), function (button) {
+			button.addEventListener("click", function () {
+				var fill = JSON.parse(button.getAttribute("data-fill") || "{}");
+				Object.keys(fill).forEach(function (id) {
+					var target = document.getElementById(id);
+					if (target) {
+						target.value = fill[id];
+					}
+				});
+			});
+		});
 	}
 
 	/**

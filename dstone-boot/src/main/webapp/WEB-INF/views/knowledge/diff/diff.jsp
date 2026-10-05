@@ -13,6 +13,17 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
 		<div id="ai-main">
+			<details class="kn-howto" open>
+				<summary>이렇게 씁니다</summary>
+				<ol>
+					<li>같은 프로젝트를 <b>두 번 이상 분석했을 때</b> 씁니다. 소스가 바뀐 뒤 "프로젝트 · 분석"에서 한 번 더 분석하면(증분 분석을 체크하면 빠릅니다) 리비전이 둘이 됩니다.</li>
+					<li>프로젝트와 (새) 리비전을 고르고 "비교". 기준은 그대로 두면 바로 앞 리비전과 견줍니다.</li>
+					<li>요약 표에서 종류별로 생김 / 없어짐 / 바뀜 건수를 보고, 아래 목록에서 무엇인지 확인합니다.</li>
+				</ol>
+				이런 것을 확인하는 데 씁니다: 이번 변경으로 <b>주소가 새로 열렸는지</b>(진입점 · 생김), <b>테이블을 새로 건드리게 된 SQL</b>이 있는지(테이블 사용 · 생김),
+				<b>없어진 메소드를 아직 부르는 곳</b>은 없는지(호출 · 없어짐). 메소드 이름을 바꾸면 "없어짐 + 생김" 두 줄로 나옵니다.
+			</details>
+
 			<section class="ai-panel">
 				<h3>리비전 비교</h3>
 				<p class="ai-hint">두 리비전 사이에 달라진 것을 분석 결과의 말로 봅니다: 어느 메소드가 생기고 없어졌는지, 어느 주소가 새로 열렸는지,

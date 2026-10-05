@@ -166,3 +166,215 @@
 .kn-change-ADDED { color: #15803d; font-weight: 600; }
 .kn-change-REMOVED { color: #b91c1c; font-weight: 600; }
 .kn-change-CHANGED { color: #b45309; font-weight: 600; }
+
+/* ---------- 사용 안내 ---------- */
+
+/* 각 화면 위쪽의 "이렇게 씁니다" (눌러서 펴는 설명) */
+.kn-howto {
+	border: 1px solid #dbeafe;
+	background: #f8fbff;
+	border-radius: 10px;
+	padding: 10px 14px;
+	margin-bottom: 14px;
+	font-size: 13px;
+	line-height: 1.7;
+	color: #374151;
+}
+
+.kn-howto summary {
+	cursor: pointer;
+	font-weight: 600;
+	color: #1d4ed8;
+}
+
+.kn-howto ol,
+.kn-howto ul {
+	margin: 8px 0 4px;
+	padding-left: 22px;
+}
+
+.kn-howto code,
+.kn-guide code {
+	background: #eef2f7;
+	border-radius: 4px;
+	padding: 1px 5px;
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 12px;
+}
+
+/* 예시를 눌러 입력 칸에 채우는 단추 */
+.kn-example {
+	display: inline-block;
+	border: 1px dashed #93c5fd;
+	background: #fff;
+	color: #1d4ed8;
+	border-radius: 999px;
+	padding: 2px 10px;
+	margin: 2px 4px 2px 0;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+/* 사용 안내 화면 */
+.kn-guide {
+	font-size: 14px;
+	line-height: 1.8;
+	color: #374151;
+}
+
+.kn-guide h4 {
+	margin: 18px 0 6px;
+	font-size: 15px;
+	color: #111827;
+}
+
+.kn-guide ol,
+.kn-guide ul {
+	margin: 6px 0;
+	padding-left: 24px;
+}
+
+.kn-guide table {
+	margin: 8px 0 12px;
+}
+
+.kn-guide .document-list-table td {
+	vertical-align: top;
+}
+
+/* 차례대로 하는 일을 나란히 보여 주는 카드 */
+.kn-steps {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin: 10px 0;
+}
+
+.kn-step {
+	flex: 1;
+	min-width: 200px;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	padding: 12px 14px;
+	text-decoration: none;
+	color: inherit;
+}
+
+a.kn-step:hover {
+	border-color: #2563eb;
+}
+
+.kn-step-no {
+	display: inline-block;
+	width: 22px;
+	height: 22px;
+	line-height: 22px;
+	text-align: center;
+	border-radius: 50%;
+	background: #2563eb;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 700;
+	margin-right: 6px;
+}
+
+.kn-step-title {
+	font-weight: 600;
+	color: #111827;
+}
+
+.kn-step p {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: #4b5563;
+	line-height: 1.6;
+}
+
+.kn-note {
+	border-left: 3px solid #f59e0b;
+	background: #fffbeb;
+	padding: 8px 12px;
+	margin: 8px 0;
+	font-size: 13px;
+}
+
+/* ---------- 리비전 요약의 설명 ---------- */
+
+/* 영문 값 뒤에 붙이는 한글 뜻 */
+.kn-code {
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.kn-term {
+	color: #6b7280;
+	margin-left: 8px;
+	font-size: 12px;
+}
+
+.kn-card-help {
+	font-size: 11px;
+	color: #9ca3af;
+	margin-top: 4px;
+	max-width: 190px;
+	line-height: 1.4;
+}
+
+/* "한눈에 보기": 숫자를 말로 풀어 준 판정 */
+.kn-verdict {
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	padding: 12px 16px;
+	margin-bottom: 8px;
+	background: #fafafa;
+}
+
+.kn-verdict-line {
+	font-size: 13px;
+	line-height: 1.9;
+}
+
+.kn-verdict-mark {
+	display: inline-block;
+	width: 20px;
+	font-weight: 700;
+}
+
+.kn-verdict-good .kn-verdict-mark { color: #15803d; }
+.kn-verdict-warn .kn-verdict-mark { color: #b45309; }
+.kn-verdict-bad .kn-verdict-mark { color: #b91c1c; }
+.kn-verdict-info .kn-verdict-mark { color: #6b7280; }
+.kn-verdict-warn, .kn-verdict-bad { font-weight: 600; }
+
+/* 사용 안내의 그림(글자로 그린 흐름도) */
+.kn-diagram {
+	background: #f9fafb;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	padding: 12px 14px;
+	font-family: "SFMono-Regular", Consolas, "Malgun Gothic", monospace;
+	font-size: 12.5px;
+	line-height: 1.6;
+	white-space: pre;
+	overflow-x: auto;
+	margin: 8px 0 12px;
+}
+
+/* 사용 안내의 차례 */
+.kn-toc a {
+	display: inline-block;
+	margin: 2px 14px 2px 0;
+	color: #2563eb;
+	text-decoration: none;
+	font-size: 13px;
+}
+
+/* 따라 하기의 "이렇게 나옵니다" */
+.kn-expect {
+	border-left: 3px solid #22c55e;
+	background: #f0fdf4;
+	padding: 6px 12px;
+	margin: 6px 0 12px;
+	font-size: 13px;
+}

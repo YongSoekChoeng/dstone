@@ -6,7 +6,10 @@
 }
 
 #ai-page-wrapper {
-	max-width: 960px;
+	/* 표가 많은 화면(Workflow 실행 목록, 코드 분석 결과)이 좁아서 잘리지 않게 화면 폭을 거의 다 쓴다.
+	   아주 넓은 모니터에서는 줄이 너무 길어지지 않게 1600px 에서 멈춘다. */
+	width: 96%;
+	max-width: 1600px;
 	margin: 0 auto;
 	min-height: 100vh;
 	display: flex;
