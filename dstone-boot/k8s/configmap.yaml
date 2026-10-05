@@ -217,6 +217,9 @@ data:
         ai-engine:
           # dstone-ai-engine 연동 주소. 같은 네임스페이스(dstone)의 Service DNS를 가리킨다.
           base-url: http://${AI_ENGINE_HOST}:${AI_ENGINE_PORT}
+        knowledge:
+          # dstone-knowledge 연동 주소. Pod 가 아니라 호스트에서 도는 프로세스라 kind 브리지 게이트웨이(env-k8s.properties)를 가리킨다.
+          base-url: http://${KNOWLEDGE_HOST}:${KNOWLEDGE_PORT}
         naver:
           # 발급받은 클라이언트ID
           client-id: WCdNwqKh3uohtkernz7O

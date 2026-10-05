@@ -219,6 +219,12 @@ interface:
       # dstone-ai-engine 연동 주소. 로컬 실행 시 localhost, kind 클러스터 배포 시엔 같은 네임스페이스(dstone)의
       # Service DNS(dstone-ai-engine)를 가리키도록 env.properties의 AI_ENGINE_HOST 값만 바꾸면 된다.
       base-url: http://${AI_ENGINE_HOST}:${AI_ENGINE_PORT}
+    knowledge:
+      # dstone-knowledge(Java 분석 결과/문서 검색 서버) 연동 주소. "코드 분석(Knowledge)" 화면이 knowledge.service.KnowledgeProxyService 를 거쳐 부른다.
+      # dstone-knowledge 는 Pod 가 아니라 VM 방식 프로세스라, kind 에 배포한 dstone-boot 에서는 호스트 주소(env-k8s.properties)를 가리킨다.
+      base-url: http://${KNOWLEDGE_HOST}:${KNOWLEDGE_PORT}
+      # dstone-knowledge 가 호출자 인증(dstone.knowledge.security.auth.enabled)을 켰을 때만 넣는다. ENC(...) 로 적는다.
+      # api-key: ENC(...)
     naver:
       # 발급받은 클라이언트ID
       client-id: WCdNwqKh3uohtkernz7O

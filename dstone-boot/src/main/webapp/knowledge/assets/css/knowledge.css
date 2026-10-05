@@ -1,0 +1,168 @@
+/* "코드 분석(Knowledge)" 화면에만 쓰는 모양. 바탕은 ai/assets/css/main.css 를 같이 쓴다. */
+
+/* 입력 칸을 한 줄에 나란히 놓는다 */
+.kn-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 10px;
+}
+
+.kn-row label {
+	font-size: 13px;
+	color: #4b5563;
+}
+
+.kn-row input[type="text"],
+.kn-row input[type="number"],
+.kn-row select {
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	padding: 6px 8px;
+	font-size: 13px;
+}
+
+.kn-row input.kn-wide {
+	flex: 1;
+	min-width: 260px;
+}
+
+.kn-row button,
+.kn-btn {
+	border: 1px solid #2563eb;
+	background: #2563eb;
+	color: #fff;
+	border-radius: 6px;
+	padding: 6px 14px;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.kn-row button.kn-plain,
+.kn-btn.kn-plain {
+	border-color: #d1d5db;
+	background: #fff;
+	color: #111827;
+}
+
+.kn-row button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* 처리 결과나 오류를 알리는 한 줄 */
+.kn-message {
+	font-size: 13px;
+	color: #4b5563;
+	margin: 6px 0;
+	min-height: 18px;
+}
+
+.kn-message.kn-error {
+	color: #b91c1c;
+}
+
+/* 표가 길어지면 표 안에서만 스크롤한다 */
+.kn-scroll {
+	max-height: 420px;
+	overflow: auto;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	margin-bottom: 14px;
+}
+
+.kn-scroll .document-list-table th {
+	position: sticky;
+	top: 0;
+	background: #f9fafb;
+}
+
+.kn-num {
+	text-align: right !important;
+	font-variant-numeric: tabular-nums;
+}
+
+.kn-mono {
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 12px;
+	word-break: break-all;
+}
+
+/* 요약 숫자 카드 */
+.kn-cards {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 14px;
+}
+
+.kn-card {
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	padding: 10px 16px;
+	min-width: 110px;
+}
+
+.kn-card .kn-card-value {
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.kn-card .kn-card-label {
+	font-size: 12px;
+	color: #6b7280;
+}
+
+.kn-section-title {
+	font-size: 14px;
+	font-weight: 600;
+	margin: 14px 0 6px;
+}
+
+/* 검색 결과 한 건 */
+.kn-hit {
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	padding: 12px 14px;
+	margin-bottom: 10px;
+}
+
+.kn-hit-title {
+	font-weight: 600;
+	word-break: break-all;
+}
+
+.kn-hit-meta {
+	font-size: 12px;
+	color: #6b7280;
+	margin: 4px 0 8px;
+}
+
+.kn-pre {
+	background: #f9fafb;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	padding: 10px;
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-all;
+	max-height: 220px;
+	overflow: auto;
+	margin: 0;
+}
+
+.kn-pre.kn-open {
+	max-height: none;
+}
+
+/* 신뢰도 */
+.kn-conf-HIGH { color: #15803d; font-weight: 600; }
+.kn-conf-MEDIUM { color: #b45309; font-weight: 600; }
+.kn-conf-LOW { color: #b91c1c; font-weight: 600; }
+
+/* 바뀐 종류 */
+.kn-change-ADDED { color: #15803d; font-weight: 600; }
+.kn-change-REMOVED { color: #b91c1c; font-weight: 600; }
+.kn-change-CHANGED { color: #b45309; font-weight: 600; }
