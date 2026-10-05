@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.RagDao">
+
+    <!-- ================= 문서를 만들 재료 조회 (DOCUMENT 단계의 준비 걸음. 파일 하나 단위) ================= -->
+
+    <select id="selectTypesByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT symbol_id AS "symbolId"
+             , kind AS "kind"
+             , fqn AS "fqn"
+             , simple_name AS "simpleName"
+             , visibility AS "visibility"
+             , is_abstract AS "isAbstract"
+             , layer AS "layer"
+             , layer_confidence AS "layerConfidence"
+             , properties_json->>'synthetic' AS "synthetic"
+             , line_start AS "lineStart"
+             , line_end AS "lineEnd"
+          FROM analysis_symbol
+         WHERE file_id = #{fileId}
+         ORDER BY line_start, fqn
+    </select>
+
+    <select id="selectFieldsByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT owner_symbol_id AS "ownerSymbolId"
+             , name AS "name"
+             , type AS "type"
+             , is_static AS "isStatic"
+             , is_synthetic AS "isSynthetic"
+          FROM analysis_field
+         WHERE file_id = #{fileId}
+         ORDER BY line_start, name
+    </select>
+
+    <select id="selectMethodsByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT method_id AS "methodId"
+             , owner_symbol_id AS "ownerSymbolId"
+             , name AS "name"
+             , signature AS "signature"
+             , return_type AS "returnType"
+             , param_count AS "paramCount"
+             , visibility AS "visibility"
+             , is_static AS "isStatic"
+             , is_abstract AS "isAbstract"
+             , is_constructor AS "isConstructor"
+             , is_synthetic AS "isSynthetic"
+             , synthetic_origin AS "syntheticOrigin"
+             , proxy_related AS "proxyRelated"
+             , line_start AS "lineStart"
+             , line_end AS "lineEnd"
+          FROM analysis_method
+         WHERE file_id = #{fileId}
+         ORDER BY line_start, signature
+    </select>
+
+    <select id="selectAnnotationsByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT target_kind AS "targetKind"
+             , target_id AS "targetId"
+             , annotation_name AS "name"
+             , attributes_json::text AS "attributes"
+          FROM analysis_annotation
+         WHERE file_id = #{fileId}
+           AND target_kind IN ('TYPE', 'METHOD')
+         ORDER BY annotation_id
+    </select>
+
+    <!-- 이 파일의 타입들이 상속/구현/주입받는 것 -->
+    <select id="selectTypeRelationsByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "fromId"
+             , r.relation_type AS "relationType"
+             , COALESCE(s.fqn, r.to_external) AS "target"
+          FROM analysis_relation r
+          LEFT JOIN analysis_symbol s ON s.revision_id = r.revision_id AND s.symbol_id = r.to_id
+         WHERE r.file_id = #{fileId}
+           AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS', 'INJECTS')
+         ORDER BY r.relation_id
+    </select>
+
+    <!-- 이 파일의 메소드들이 부르는 것. 프로젝트 안의 메소드면 "타입#시그니처", 밖이면 이름 그대로 -->
+    <select id="selectCalleesByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT r.from_id AS "fromId"
+             , r.relation_type AS "relationType"
+             , r.confidence AS "confidence"
+             , (r.to_id IS NOT NULL) AS "inProject"
+             , COALESCE(ts.fqn || '#' || tm.signature, r.to_external) AS "target"
+          FROM analysis_relation r
+          LEFT JOIN analysis_method tm ON tm.revision_id = r.revision_id AND tm.method_id = r.to_id
+          LEFT JOIN analysis_symbol ts ON ts.revision_id = tm.revision_id AND ts.symbol_id = tm.owner_symbol_id
+         WHERE r.file_id = #{fileId}
+           AND r.relation_type IN ('CALLS', 'CALLS_POSSIBLE_IMPLEMENTATION')
+    </select>
+
+    <!-- 이 파일의 메소드들을 부르는 쪽. 많이 불리는 메소드(공통 유틸 등)는 부르는 쪽이 수천이라, 메소드마다 limit 건까지만 가져오고 전체 수를 같이 돌려준다 -->
+    <select id="selectCallersByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT t.to_id AS "toId", t.caller AS "caller", t.total AS "total"
+          FROM (
+                SELECT x.to_id, x.caller
+                     , ROW_NUMBER() OVER (PARTITION BY x.to_id ORDER BY x.caller) AS rn
+                     , COUNT(*) OVER (PARTITION BY x.to_id) AS total
+                  FROM (
+                        SELECT DISTINCT r.to_id
+                             , COALESCE(cs.fqn || '#' || cm.signature, fs.fqn || '#' || cf.name, ts.fqn) AS caller
+                          FROM analysis_method m
+                          JOIN analysis_relation r
+                            ON r.revision_id = m.revision_id AND r.to_id = m.method_id
+                           AND r.relation_type IN ('CALLS', 'CALLS_POSSIBLE_IMPLEMENTATION')
+                          LEFT JOIN analysis_method cm ON r.from_kind = 'METHOD' AND cm.revision_id = r.revision_id AND cm.method_id = r.from_id
+                          LEFT JOIN analysis_symbol cs ON cs.revision_id = cm.revision_id AND cs.symbol_id = cm.owner_symbol_id
+                          LEFT JOIN analysis_field cf ON r.from_kind = 'FIELD' AND cf.revision_id = r.revision_id AND cf.field_id = r.from_id
+                          LEFT JOIN analysis_symbol fs ON fs.revision_id = cf.revision_id AND fs.symbol_id = cf.owner_symbol_id
+                          LEFT JOIN analysis_symbol ts ON r.from_kind = 'TYPE' AND ts.revision_id = r.revision_id AND ts.symbol_id = r.from_id
+                         WHERE m.file_id = #{fileId}
+                           AND r.from_id &lt;&gt; r.to_id
+                       ) x
+                 WHERE x.caller IS NOT NULL
+               ) t
+         WHERE t.rn &lt;= #{limit}
+         ORDER BY t.to_id, t.rn
+    </select>
+
+    <!-- 이 파일의 메소드가 처리하는 진입점 -->
+    <select id="selectEndpointsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.method_id AS "methodId"
+             , e.endpoint_type AS "endpointType"
+             , e.http_method AS "httpMethod"
+             , e.path AS "path"
+          FROM analysis_endpoint e
+          JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+         WHERE e.revision_id = #{revisionId}
+           AND m.file_id = #{fileId}
+         ORDER BY e.endpoint_type, e.path
+    </select>
+
+
+    <!-- ================= 문서와 청크 저장 (DOCUMENT 단계의 저장 걸음) ================= -->
+
+    <!-- 같은 파일을 다시 처리해도 문서가 두 번 들어가지 않게, 쓰기 전에 그 파일의 것을 먼저 지운다 -->
+    <delete id="deleteChunksByFile" parameterType="long">
+        DELETE FROM rag_chunk WHERE file_id = #{fileId}
+    </delete>
+
+    <delete id="deleteDocumentsByPath" parameterType="java.util.Map">
+        DELETE FROM rag_document
+         WHERE revision_id = #{revisionId}
+           AND source_path = #{sourcePath}
+           AND source_type = 'CODE'
+    </delete>
+
+    <insert id="insertDocument" parameterType="net.dstone.knowledge.rag.model.DocumentRow">
+        INSERT INTO rag_document
+            (document_id, source_type, project_id, revision_id, doc_type, ref_kind, ref_id, title, source_path, metadata_json, content_hash)
+        VALUES
+            (#{documentId}, 'CODE', #{projectId}, #{revisionId}, #{docType}, #{refKind}, #{refId}, #{title}, #{sourcePath}
+            , CAST(#{metadataJson} AS jsonb), #{contentHash})
+    </insert>
+
+    <!-- 청크는 방금 넣은 문서를 document_id 로 찾아 붙인다(문서의 일련번호를 Java 로 받아 오지 않아도 되게) -->
+    <insert id="insertChunk" parameterType="net.dstone.knowledge.rag.model.ChunkRow">
+        INSERT INTO rag_chunk
+            (doc_seq, revision_id, chunk_no, chunk_type, content, content_hash, char_count, metadata_json, file_id, line_start, line_end)
+        SELECT d.doc_seq, #{revisionId}, #{chunkNo}, #{chunkType}, #{content}, #{contentHash}, #{charCount}
+             , CAST(#{metadataJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER}
+          FROM rag_document d
+         WHERE d.document_id = #{documentId}
+           AND d.revision_id = #{revisionId}
+    </insert>
+
+    <!-- 이 파일의 청크를 임베딩 대기열에 올린다. 키가 (내용 해시, 모델) 이라, 같은 내용이 이미 있으면(다른 리비전에서 임베딩한 것 포함) 아무 일도 하지 않는다 -->
+    <insert id="enqueueEmbeddingsByFile" parameterType="java.util.Map">
+        INSERT INTO rag_embedding (content_hash, model, dimensions, status)
+        SELECT DISTINCT c.content_hash, #{model}, #{dimensions}, 'PENDING'
+          FROM rag_chunk c
+         WHERE c.file_id = #{fileId}
+        ON CONFLICT (content_hash, model) DO NOTHING
+    </insert>
+
+
+    <!-- ================= 임베딩 대기열 (EmbeddingWorker) ================= -->
+
+    <!-- 임베딩할 것을 조금 꺼낸다. 내용은 그 해시를 가진 청크 아무거나 하나에서 가져온다(해시가 같으면 내용도 같다).
+         청크가 하나도 없는 해시(리비전이 지워진 경우)는 content 가 NULL 로 나온다 -->
+    <select id="selectPendingEmbeddings" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.content_hash AS "contentHash"
+             , (SELECT c.content FROM rag_chunk c WHERE c.content_hash = e.content_hash LIMIT 1) AS "content"
+          FROM rag_embedding e
+         WHERE e.status = 'PENDING'
+           AND e.model = #{model}
+         ORDER BY e.created_at, e.content_hash
+         LIMIT #{limit}
+    </select>
+
+    <update id="updateEmbeddingDone" parameterType="java.util.Map">
+        UPDATE rag_embedding
+           SET embedding = CAST(#{vector} AS vector)
+             , status = 'DONE'
+             , last_error = NULL
+             , embedded_at = now()
+         WHERE content_hash = #{contentHash}
+           AND model = #{model}
+    </update>
+
+    <!-- 실패 기록. 세 번 실패하면 더 시도하지 않는다(FAILED) -->
+    <update id="updateEmbeddingFailed" parameterType="java.util.Map">
+        UPDATE rag_embedding
+           SET attempts = attempts + 1
+             , last_error = #{lastError}
+             , status = CASE WHEN attempts + 1 >= 3 THEN 'FAILED' ELSE 'PENDING' END
+         WHERE content_hash = #{contentHash}
+           AND model = #{model}
+    </update>
+
+    <delete id="deleteEmbedding" parameterType="java.util.Map">
+        DELETE FROM rag_embedding
+         WHERE content_hash = #{contentHash}
+           AND model = #{model}
+    </delete>
+
+
+    <!-- ================= 조회 ================= -->
+
+    <select id="selectDocumentSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT d.doc_type AS "docType"
+             , COUNT(DISTINCT d.doc_seq) AS "documents"
+             , COUNT(c.chunk_id) AS "chunks"
+             , COALESCE(SUM(c.char_count), 0) AS "chars"
+          FROM rag_document d
+          LEFT JOIN rag_chunk c ON c.doc_seq = d.doc_seq
+         WHERE d.revision_id = #{revisionId}
+         GROUP BY d.doc_type
+         ORDER BY d.doc_type
+    </select>
+
+    <!-- 이 리비전의 청크가 얼마나 임베딩됐는지. 대기열에 없는 것은 NONE -->
+    <select id="selectEmbeddingProgress" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT COALESCE(e.status, 'NONE') AS "status", COUNT(*) AS "chunks"
+          FROM rag_chunk c
+          LEFT JOIN rag_embedding e ON e.content_hash = c.content_hash AND e.model = #{model}
+         WHERE c.revision_id = #{revisionId}
+         GROUP BY e.status
+         ORDER BY 1
+    </select>
+
+    <!-- 프로젝트에서 분석이 끝난 가장 최근 리비전 -->
+    <select id="selectLatestReadyRevision" parameterType="string" resultType="long">
+        SELECT revision_id
+          FROM analysis_revision
+         WHERE project_id = #{projectId}
+           AND status = 'READY'
+         ORDER BY revision_id DESC
+         LIMIT 1
+    </select>
+
+    <!-- 리비전을 걸러서 찾을 때, 가까운 것 몇 개만 보고 끝내지 않고 조건에 맞는 것이 모일 때까지 계속 찾게 한다(pgvector 0.8 이상).
+         이것이 없으면 다른 리비전의 청크가 가까운 자리를 차지했을 때 결과가 모자라게 나온다. SET LOCAL 이라 트랜잭션 안에서만 먹는다 -->
+    <update id="enableIterativeScan">
+        SET LOCAL hnsw.iterative_scan = relaxed_order
+    </update>
+
+    <!-- 벡터 검색: 질문 벡터와 가까운(코사인 거리) 청크 -->
+    <select id="searchChunks" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT ROUND((1 - (e.embedding &lt;=&gt; CAST(#{vector} AS vector)))::numeric, 4) AS "score"
+             , d.doc_type AS "docType"
+             , d.title AS "title"
+             , d.ref_kind AS "refKind"
+             , d.ref_id AS "refId"
+             , d.source_path AS "path"
+             , c.line_start AS "lineStart"
+             , c.line_end AS "lineEnd"
+             , c.chunk_no AS "chunkNo"
+             , c.metadata_json::text AS "metadata"
+             , c.content AS "content"
+          FROM rag_embedding e
+          JOIN rag_chunk c ON c.content_hash = e.content_hash
+          JOIN rag_document d ON d.doc_seq = c.doc_seq
+         WHERE e.model = #{model}
+           AND e.status = 'DONE'
+           AND c.revision_id = #{revisionId}
+        <if test="docTypes != null and docTypes.size() > 0">
+           AND d.doc_type IN
+            <foreach collection="docTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+        </if>
+        <if test="layer != null and layer != ''">AND c.metadata_json->>'layer' = #{layer}</if>
+         ORDER BY e.embedding &lt;=&gt; CAST(#{vector} AS vector)
+         LIMIT #{topK}
+    </select>
+
+</mapper>

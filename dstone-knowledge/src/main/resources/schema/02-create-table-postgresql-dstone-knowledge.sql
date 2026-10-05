@@ -419,6 +419,8 @@ CREATE INDEX IF NOT EXISTS idx_rag_document_revision ON rag_document(revision_id
 CREATE INDEX IF NOT EXISTS idx_rag_document_ref      ON rag_document(revision_id, ref_id);
 CREATE INDEX IF NOT EXISTS idx_rag_document_tenant   ON rag_document(tenant, source_type);
 CREATE INDEX IF NOT EXISTS idx_rag_document_docid    ON rag_document(document_id);
+-- 파일 하나의 문서를 다시 만들 때(같은 파일을 다시 처리할 때) 그 파일의 문서를 빨리 찾아 지우기 위한 인덱스
+CREATE INDEX IF NOT EXISTS idx_rag_document_path     ON rag_document(revision_id, source_path);
 
 -- 청크: 문서를 의미 단위로 자른 조각. 검색 결과로 돌려주는 단위다
 CREATE TABLE IF NOT EXISTS rag_chunk (
@@ -439,6 +441,7 @@ CREATE TABLE IF NOT EXISTS rag_chunk (
 CREATE INDEX IF NOT EXISTS idx_rag_chunk_doc      ON rag_chunk(doc_seq);
 CREATE INDEX IF NOT EXISTS idx_rag_chunk_hash     ON rag_chunk(content_hash);
 CREATE INDEX IF NOT EXISTS idx_rag_chunk_revision ON rag_chunk(revision_id, chunk_type);
+CREATE INDEX IF NOT EXISTS idx_rag_chunk_file     ON rag_chunk(file_id);
 
 -- 임베딩: 키가 (내용 해시, 모델) 이다.
 -- 같은 내용은 리비전이 달라도, 분석을 다시 돌려도 한 번만 임베딩한다. 임베딩이 제일 오래 걸리는 작업이기 때문이다.
