@@ -98,7 +98,7 @@ mvn clean install
 | [08.dstone-batchadmin.md](08.dstone-batchadmin.md) | 배치 잡 관리(모니터링·스케줄링·원격제어) 웹 애플리케이션 |
 | [09.dstone-ai-engine.md](09.dstone-ai-engine.md) | Spring AI 기반 provider-agnostic AI/MLOps 엔진 — Workflow→Step→Agent→Tool, 휴먼 승인(HITL)/PostgreSQL 영속화 실행, RAG(Embedding 적재와 분리), MCP 클라이언트, API Key 인증·Rate Limit(옵트인) |
 | [10.dstone-saga.md](10.dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
-| [11.dstone-knowledge.md](11.dstone-knowledge.md) | Java 애플리케이션 정적 분석 · Knowledge Graph · RAG 데이터 생성 모듈 (구축 진행 중) |
+| [11.dstone-knowledge.md](11.dstone-knowledge.md) | Java 애플리케이션 정적 분석 · Knowledge Graph · RAG 데이터 생성 모듈 (M0~M8 구축 완료, 이관(M9) 예정. 0절에 그림으로 보는 안내) |
 | [03.build.md](03.build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 
 ### 2.2 개발 환경 / 인프라
