@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.ResourceDao">
+
+    <!-- ================= 저장 (RESOURCE 단계. 파일 하나 단위) ================= -->
+
+    <!-- 같은 파일을 다시 처리해도 행이 두 번 들어가지 않게, 쓰기 전에 그 파일의 것을 먼저 지운다.
+         web.xml 의 항목(SERVLET_MAPPING 등)은 SEMANTIC 단계가 만들고 지우므로 여기서는 건드리지 않는다 -->
+    <delete id="deleteMappersByFile" parameterType="long">
+        DELETE FROM analysis_mapper WHERE file_id = #{fileId}
+    </delete>
+
+    <delete id="deleteConfigsByFile" parameterType="long">
+        DELETE FROM analysis_config WHERE file_id = #{fileId}
+    </delete>
+
+    <delete id="deleteResourcesByFile" parameterType="long">
+        DELETE FROM analysis_resource
+         WHERE file_id = #{fileId}
+           AND resource_type NOT IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER')
+    </delete>
+
+    <insert id="insertMapper" parameterType="java.util.Map">
+        INSERT INTO analysis_mapper
+            (revision_id, mapper_type, namespace, statement_id, statement_type, parameter_type, result_type, sql_body, file_id, line_start, line_end)
+        VALUES
+            (#{revisionId}, #{mapperType}, #{namespace}, #{statementId}, #{statementType}, #{parameterType}, #{resultType}, #{sqlBody}
+            , #{fileId}, #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
+    </insert>
+
+    <insert id="insertConfig" parameterType="java.util.Map">
+        INSERT INTO analysis_config (revision_id, key_path, value, value_type, placeholder, file_id, line_start)
+        VALUES (#{revisionId}, #{keyPath}, #{value}, #{valueType}, #{placeholder}, #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <insert id="insertResource" parameterType="java.util.Map">
+        INSERT INTO analysis_resource (revision_id, resource_type, name, location, value, properties_json, file_id, line_start)
+        VALUES (#{revisionId}, #{resourceType}, #{name}, #{location}, #{value}, CAST(#{propertiesJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+
+    <!-- ================= SQL 과 Java 잇기 (MyBatisPlugin) ================= -->
+
+    <delete id="deleteSqlRelations" parameterType="long">
+        DELETE FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND relation_type IN ('EXECUTES_SQL', 'READS_TABLE', 'WRITES_TABLE')
+    </delete>
+
+    <update id="clearMapperMethods" parameterType="long">
+        UPDATE analysis_mapper SET method_id = NULL WHERE revision_id = #{revisionId} AND method_id IS NOT NULL
+    </update>
+
+    <!-- 모든 statement 와 조각(sql). SQL 본문은 크므로 여기서는 가져오지 않는다 -->
+    <select id="selectMapperKeys" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT mapper_id AS "mapperId"
+             , namespace AS "namespace"
+             , statement_id AS "statementId"
+             , statement_type AS "statementType"
+          FROM analysis_mapper
+         WHERE revision_id = #{revisionId}
+         ORDER BY mapper_id
+    </select>
+
+    <!-- statement 를 mapper_id 순으로 조금씩 꺼낸다(본문 포함) -->
+    <select id="selectMapperPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT mapper_id AS "mapperId"
+             , namespace AS "namespace"
+             , statement_id AS "statementId"
+             , statement_type AS "statementType"
+             , sql_body AS "sqlBody"
+             , file_id AS "fileId"
+             , line_start AS "lineStart"
+          FROM analysis_mapper
+         WHERE revision_id = #{revisionId}
+           AND statement_type &lt;&gt; 'SQL_FRAGMENT'
+           AND mapper_id &gt; #{afterId}
+         ORDER BY mapper_id
+         LIMIT #{limit}
+    </select>
+
+    <select id="selectMapperBody" parameterType="long" resultType="string">
+        SELECT sql_body FROM analysis_mapper WHERE mapper_id = #{mapperId}
+    </select>
+
+    <!-- 인터페이스 방식의 매퍼: 네임스페이스가 인터페이스의 전체 이름이고 statement id 가 메소드 이름이다. 그 메소드가 곧 이 SQL 을 실행한다 -->
+    <insert id="insertInterfaceMapperRelations" parameterType="long">
+        INSERT INTO analysis_relation
+            (revision_id, from_kind, from_id, relation_type, to_kind, to_id, confidence, resolution_status, properties_json, file_id, line_start)
+        SELECT m.revision_id, 'METHOD', jm.method_id, 'EXECUTES_SQL', 'SQL', 'S' || m.mapper_id, 'HIGH', 'RESOLVED'
+             , jsonb_build_object('via', 'MAPPER_INTERFACE'), jm.file_id, jm.line_start
+          FROM analysis_mapper m
+          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.fqn = m.namespace AND s.kind = 'INTERFACE'
+          JOIN analysis_method jm ON jm.revision_id = s.revision_id AND jm.owner_symbol_id = s.symbol_id AND jm.name = m.statement_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.statement_type &lt;&gt; 'SQL_FRAGMENT'
+    </insert>
+
+    <!-- 문자열로 statement 를 부르는 호출들. reference_id 순으로 조금씩 꺼낸다 -->
+    <select id="selectMapperCallPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.reference_id AS "referenceId"
+             , r.from_id AS "fromId"
+             , r.name AS "name"
+             , r.arg_text AS "argText"
+             , r.file_id AS "fileId"
+             , r.line_start AS "lineStart"
+             , m.owner_symbol_id AS "ownerSymbolId"
+          FROM analysis_reference r
+          JOIN analysis_method m ON m.revision_id = r.revision_id AND m.method_id = r.from_id
+         WHERE r.revision_id = #{revisionId}
+           AND r.ref_kind = 'CALL'
+           AND r.from_kind = 'METHOD'
+           AND r.arg_text IS NOT NULL
+           AND r.reference_id &gt; #{afterId}
+           AND r.name IN
+        <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
+         ORDER BY r.reference_id
+         LIMIT #{limit}
+    </select>
+
+    <insert id="insertRelation" parameterType="java.util.Map">
+        INSERT INTO analysis_relation
+            (revision_id, from_kind, from_id, relation_type, to_kind, to_id, to_external
+            , confidence, resolution_status, properties_json, file_id, line_start)
+        VALUES
+            (#{revisionId}, #{fromKind}, #{fromId}, #{relationType}, #{toKind}, #{toId}, #{toExternal}
+            , #{confidence}, #{resolutionStatus}, CAST(#{propertiesJson} AS jsonb), #{fileId, jdbcType=BIGINT}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <!-- statement 와 짝이 되는 Java 메소드를 적어 둔다. 여러 메소드가 부르면 그 가운데 하나(ID 가 가장 작은 것). 전부는 EXECUTES_SQL 관계에 있다 -->
+    <update id="updateMapperMethods" parameterType="long">
+        UPDATE analysis_mapper m
+           SET method_id = x.method_id
+          FROM (SELECT r.to_id, MIN(r.from_id) AS method_id
+                  FROM analysis_relation r
+                 WHERE r.revision_id = #{revisionId}
+                   AND r.relation_type = 'EXECUTES_SQL'
+                   AND r.to_id IS NOT NULL
+                 GROUP BY r.to_id) x
+         WHERE m.revision_id = #{revisionId}
+           AND x.to_id = 'S' || m.mapper_id
+    </update>
+
+
+    <!-- ================= 상수 따라가기 (ConstantEvaluator) ================= -->
+
+    <!-- 타입 자신과 그 상위 타입들(프로젝트 안). 가까운 것부터 -->
+    <select id="selectTypeChain" parameterType="java.util.Map" resultType="string">
+        WITH RECURSIVE chain (symbol_id, depth) AS (
+            SELECT CAST(#{symbolId} AS varchar), 0
+            UNION
+            SELECT r.to_id, c.depth + 1
+              FROM chain c
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId} AND r.from_id = c.symbol_id
+               AND r.relation_type = 'EXTENDS' AND r.to_id IS NOT NULL
+             WHERE c.depth &lt; 20
+        )
+        SELECT symbol_id FROM chain GROUP BY symbol_id ORDER BY MIN(depth)
+    </select>
+
+    <select id="selectFieldInitializer" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT initializer_summary AS "initializer"
+          FROM analysis_field
+         WHERE revision_id = #{revisionId}
+           AND owner_symbol_id = #{symbolId}
+           AND name = #{name}
+         LIMIT 1
+    </select>
+
+    <!-- 파라미터 없는 메소드가 소스의 어디에 있는지 -->
+    <select id="selectGetterLocation" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT f.path AS "path", f.encoding AS "encoding", m.line_start AS "lineStart", m.line_end AS "lineEnd"
+          FROM analysis_method m
+          JOIN analysis_file f ON f.file_id = m.file_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.owner_symbol_id = #{symbolId}
+           AND m.name = #{name}
+           AND m.param_count = 0
+           AND NOT m.is_synthetic
+         LIMIT 1
+    </select>
+
+
+    <!-- ================= 조회 ================= -->
+
+    <select id="selectResourceSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT 'MAPPER:' || mapper_type || ':' || statement_type AS "kind", COUNT(*) AS "count"
+          FROM analysis_mapper WHERE revision_id = #{revisionId} GROUP BY mapper_type, statement_type
+        UNION ALL
+        SELECT 'CONFIG', COUNT(*) FROM analysis_config WHERE revision_id = #{revisionId} HAVING COUNT(*) > 0
+        UNION ALL
+        SELECT 'RESOURCE:' || resource_type, COUNT(*)
+          FROM analysis_resource WHERE revision_id = #{revisionId} GROUP BY resource_type
+        ORDER BY 1
+    </select>
+
+    <!-- 테이블 목록: 테이블마다 읽는 SQL / 쓰는 SQL 이 몇 개인지 -->
+    <select id="selectTableList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.to_external AS "table"
+             , COUNT(*) FILTER (WHERE r.relation_type = 'READS_TABLE') AS "reads"
+             , COUNT(*) FILTER (WHERE r.properties_json->>'crud' = 'C') AS "inserts"
+             , COUNT(*) FILTER (WHERE r.properties_json->>'crud' = 'U') AS "updates"
+             , COUNT(*) FILTER (WHERE r.properties_json->>'crud' = 'D') AS "deletes"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+        <if test="name != null and name != ''">AND r.to_external LIKE '%' || upper(#{name}) || '%'</if>
+         GROUP BY r.to_external
+         ORDER BY COUNT(*) DESC, r.to_external
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 테이블 하나를 건드리는 SQL 과, 그 SQL 을 실행하는 Java 메소드 -->
+    <select id="selectTableUsage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT t.properties_json->>'crud' AS "crud"
+             , t.confidence AS "confidence"
+             , COALESCE(m.namespace || '.', '') || m.statement_id AS "statement"
+             , m.statement_type AS "statementType"
+             , f.path AS "mapperFile"
+             , m.line_start AS "lineStart"
+             , e.from_id AS "methodId"
+             , s.fqn || '#' || jm.signature AS "method"
+          FROM analysis_relation t
+          JOIN analysis_mapper m ON m.revision_id = t.revision_id AND 'S' || m.mapper_id = t.from_id
+          JOIN analysis_file f ON f.file_id = m.file_id
+          LEFT JOIN analysis_relation e
+            ON e.revision_id = t.revision_id AND e.relation_type = 'EXECUTES_SQL' AND e.to_id = t.from_id
+          LEFT JOIN analysis_method jm ON jm.revision_id = e.revision_id AND jm.method_id = e.from_id
+          LEFT JOIN analysis_symbol s ON s.revision_id = jm.revision_id AND s.symbol_id = jm.owner_symbol_id
+         WHERE t.revision_id = #{revisionId}
+           AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND t.to_external = upper(#{table})
+         ORDER BY t.properties_json->>'crud', m.namespace, m.statement_id, s.fqn
+         LIMIT #{limit}
+    </select>
+
+    <sql id="mapperWhere">
+         WHERE m.revision_id = #{revisionId}
+           AND m.statement_type &lt;&gt; 'SQL_FRAGMENT'
+        <if test="namespace != null and namespace != ''">AND m.namespace LIKE '%' || #{namespace} || '%'</if>
+        <if test="statementId != null and statementId != ''">AND m.statement_id LIKE '%' || #{statementId} || '%'</if>
+    </sql>
+
+    <select id="countMapper" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*) FROM analysis_mapper m
+        <include refid="mapperWhere"/>
+    </select>
+
+    <select id="selectMapperList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT m.mapper_id AS "mapperId"
+             , m.mapper_type AS "mapperType"
+             , m.namespace AS "namespace"
+             , m.statement_id AS "statementId"
+             , m.statement_type AS "statementType"
+             , m.parameter_type AS "parameterType"
+             , m.result_type AS "resultType"
+             , f.path AS "file"
+             , m.line_start AS "lineStart"
+             , (SELECT string_agg(DISTINCT t.to_external || '(' || (t.properties_json->>'crud') || ')', ', ')
+                  FROM analysis_relation t
+                 WHERE t.revision_id = m.revision_id AND t.from_id = 'S' || m.mapper_id
+                   AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')) AS "tables"
+             , (SELECT COUNT(*) FROM analysis_relation e
+                 WHERE e.revision_id = m.revision_id AND e.relation_type = 'EXECUTES_SQL' AND e.to_id = 'S' || m.mapper_id) AS "callers"
+          FROM analysis_mapper m
+          JOIN analysis_file f ON f.file_id = m.file_id
+        <include refid="mapperWhere"/>
+         ORDER BY m.namespace, m.statement_id
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectConfigList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT c.key_path AS "key", c.value AS "value", c.value_type AS "valueType", c.placeholder AS "placeholder"
+             , f.path AS "file", c.line_start AS "lineStart"
+          FROM analysis_config c
+          JOIN analysis_file f ON f.file_id = c.file_id
+         WHERE c.revision_id = #{revisionId}
+        <if test="key != null and key != ''">AND c.key_path LIKE '%' || #{key} || '%'</if>
+         ORDER BY f.path, c.config_id
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectResourceList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.resource_type AS "resourceType", r.name AS "name", r.value AS "value", r.properties_json::text AS "properties"
+             , f.path AS "file", r.line_start AS "lineStart"
+          FROM analysis_resource r
+          JOIN analysis_file f ON f.file_id = r.file_id
+         WHERE r.revision_id = #{revisionId}
+        <if test="resourceType != null and resourceType != ''">AND r.resource_type = #{resourceType}</if>
+        <if test="name != null and name != ''">AND r.name LIKE '%' || #{name} || '%'</if>
+         ORDER BY r.resource_type, r.name, r.resource_id
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+</mapper>

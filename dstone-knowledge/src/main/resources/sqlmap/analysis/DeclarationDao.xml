@@ -51,10 +51,10 @@
 
     <insert id="insertReference" parameterType="net.dstone.knowledge.parser.model.ReferenceRow">
         INSERT INTO analysis_reference
-            (revision_id, file_id, from_kind, from_id, ref_kind, name, scope_text, arg_count, line_start, column_start)
+            (revision_id, file_id, from_kind, from_id, ref_kind, name, scope_text, arg_count, arg_text, line_start, column_start)
         VALUES
             (#{revisionId}, #{fileId}, #{fromKind}, #{fromId}, #{refKind}, #{name}, #{scopeText}
-            , #{argCount, jdbcType=INTEGER}, #{lineStart, jdbcType=INTEGER}, #{columnStart, jdbcType=INTEGER})
+            , #{argCount, jdbcType=INTEGER}, #{argText}, #{lineStart, jdbcType=INTEGER}, #{columnStart, jdbcType=INTEGER})
     </insert>
 
     <!-- 이 파일이 선언하려는 타입 가운데, 같은 리비전의 다른 파일이 이미 선언한 것 -->

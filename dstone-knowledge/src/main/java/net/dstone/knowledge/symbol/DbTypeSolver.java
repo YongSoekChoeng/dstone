@@ -19,6 +19,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 
 import net.dstone.knowledge.api.dao.SymbolDao;
 import net.dstone.knowledge.parser.JavaSourceParser;
+import net.dstone.knowledge.parser.JspToJava;
 import net.dstone.knowledge.scanner.EncodingDetector;
 
 /**
@@ -147,6 +148,13 @@ public class DbTypeSolver implements TypeSolver {
 		try {
 			byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
 			String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+			if (JspToJava.isJsp((String) file.get("path"))) {
+				// JSP는 DECLARE 때와 똑같이 Java 소스로 바꿔서 읽는다. 그래야 그때 적어 둔 위치(줄, 칸)와 맞는다.
+				text = JspToJava.convert(text, (String) file.get("path"));
+				if (text == null) {
+					return null;
+				}
+			}
 			parses++;
 			// DECLARE가 성공한 문법 수준으로 바로 읽는다.
 			JavaSourceParser.Result parsed = javaSourceParser.parse(text, (String) file.get("languageLevel"), new JavaSymbolSolver(getRoot()));

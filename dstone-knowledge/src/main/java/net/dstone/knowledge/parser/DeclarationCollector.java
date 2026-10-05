@@ -87,6 +87,7 @@ public class DeclarationCollector {
 	private static final int MAX_TEXT = 1000;
 	private static final int MAX_SIGNATURE = 2000;
 	private static final int MAX_INITIALIZER = 500;
+	private static final int MAX_ARG_TEXT = 500;
 
 	/** Lombok 애노테이션이 들어 있는 패키지. "import lombok.*;"처럼 통째로 가져온 경우에 이름으로 알아보려고 둡니다. */
 	private static final Map<String, String> LOMBOK_PACKAGES = new HashMap<String, String>();
@@ -525,7 +526,8 @@ public class DeclarationCollector {
 		if (node instanceof ObjectCreationExpr) {
 			ObjectCreationExpr creation = (ObjectCreationExpr) node;
 			String typeName = eraseGenerics(creation.getType().asString());
-			addReference(from, "CREATE", typeName, null, Integer.valueOf(creation.getArguments().size()), creation.getType());
+			addReference(from, "CREATE", typeName, null, Integer.valueOf(creation.getArguments().size()), creation.getType())
+					.setArgText(firstArgumentText(creation.getArguments()));
 			if (creation.getScope().isPresent()) {
 				walk(creation.getScope().get(), from, context);
 			}
@@ -562,7 +564,8 @@ public class DeclarationCollector {
 		if (node instanceof MethodCallExpr) {
 			MethodCallExpr call = (MethodCallExpr) node;
 			String scope = call.getScope().isPresent() ? call.getScope().get().toString() : null;
-			addReference(from, "CALL", call.getNameAsString(), scope, Integer.valueOf(call.getArguments().size()), call.getName());
+			addReference(from, "CALL", call.getNameAsString(), scope, Integer.valueOf(call.getArguments().size()), call.getName())
+					.setArgText(firstArgumentText(call.getArguments()));
 		} else if (node instanceof FieldAccessExpr) {
 			FieldAccessExpr access = (FieldAccessExpr) node;
 			addReference(from, "FIELD_ACCESS", access.getNameAsString(), access.getScope().toString(), null, access.getName());
@@ -600,7 +603,7 @@ public class DeclarationCollector {
 	 *             호출과 필드 접근은 식 전체가 아니라 "이름"의 위치를 적습니다. a.get().get()처럼 이어진 호출은
 	 *             식의 시작 위치가 모두 같아서, 이름의 위치라야 RESOLVE 단계가 같은 호출을 다시 찾을 수 있습니다.
 	 */
-	private void addReference(From from, String refKind, String name, String scopeText, Integer argCount, Node node) {
+	private ReferenceRow addReference(From from, String refKind, String name, String scopeText, Integer argCount, Node node) {
 		ReferenceRow row = new ReferenceRow();
 		row.setRevisionId(revisionId);
 		row.setFileId(fileId);
@@ -616,6 +619,28 @@ public class DeclarationCollector {
 			row.setColumnStart(Integer.valueOf(begin.column));
 		}
 		out.getReferences().add(row);
+		return row;
+	}
+
+	/**
+	 * <pre>
+	 * 호출의 첫 인자를 소스에 적힌 그대로 돌려줍니다. 문자열이 들어 있지 않거나 너무 길면 null입니다.
+	 *
+	 * 문자열로 다른 것을 가리키는 호출을 나중에 풀기 위해서입니다.
+	 *   sqlSession.selectList(getOrderMapper() + "findAll", vo)  → 어느 SQL을 실행하는지
+	 *   new ModelAndView("order/list")                            → 어느 화면(JSP)을 여는지
+	 * 모든 호출의 인자를 담으면 양이 너무 많아서, 따옴표가 들어 있는 것만 담습니다.
+	 * </pre>
+	 */
+	private String firstArgumentText(NodeList<Expression> arguments) {
+		if (arguments.isEmpty()) {
+			return null;
+		}
+		String text = arguments.get(0).toString();
+		if (text.indexOf('"') < 0 || text.length() > MAX_ARG_TEXT) {
+			return null;
+		}
+		return text;
 	}
 
 

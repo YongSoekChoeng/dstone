@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE sqlMap PUBLIC "-//iBATIS.com//DTD SQL Map 2.0//EN" "http://www.ibatis.com/dtd/sql-map-2.dtd">
+<sqlMap namespace="Board">
+
+    <typeAlias alias="board" type="com.sample.board.vo.BoardVO"/>
+
+    <sql id="boardColumns">
+        b.BOARD_ID, b.TITLE, b.WRITER_ID, u.USER_NM
+    </sql>
+
+    <select id="selectBoardList" parameterClass="board" resultClass="board">
+        /* 게시글 목록 */
+        SELECT <include refid="boardColumns"/>
+          FROM TB_BOARD b
+          JOIN TB_USER u ON u.USER_ID = b.WRITER_ID
+        <dynamic prepend="WHERE">
+            <isNotEmpty property="title" prepend="AND">b.TITLE LIKE '%' || #title# || '%'</isNotEmpty>
+            <isNotEmpty property="writerId" prepend="AND">b.WRITER_ID = #writerId#</isNotEmpty>
+        </dynamic>
+         ORDER BY b.BOARD_ID DESC
+    </select>
+
+    <select id="countBoard" resultClass="int">
+        SELECT COUNT(*) FROM TB_BOARD
+    </select>
+
+    <insert id="insertBoard" parameterClass="board">
+        INSERT INTO TB_BOARD (BOARD_ID, TITLE, WRITER_ID)
+        VALUES (#boardId#, #title#, #writerId#)
+    </insert>
+
+    <delete id="deleteBoard" parameterClass="string">
+        DELETE FROM TB_BOARD WHERE BOARD_ID = #boardId#
+    </delete>
+
+</sqlMap>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts-config PUBLIC "-//Apache Software Foundation//DTD Struts Configuration 1.3//EN" "http://struts.apache.org/dtds/struts-config_1_3.dtd">
+<struts-config>
+    <form-beans>
+        <form-bean name="boardForm" type="org.apache.struts.action.DynaActionForm"/>
+    </form-beans>
+    <global-forwards>
+        <forward name="error" path="/common/error.jsp"/>
+    </global-forwards>
+    <action-mappings>
+        <!-- 목록: 끝나면 목록 화면으로 -->
+        <action path="/board/list" type="com.sample.board.web.BoardListAction" name="boardForm" scope="request">
+            <forward name="success" path="/board/list.jsp"/>
+        </action>
+        <!-- 저장: 성공하면 목록 주소로 다시 보내고, 실패하면 입력 화면으로 -->
+        <action path="/board/save" type="com.sample.board.web.BoardSaveAction" name="boardForm" scope="request">
+            <forward name="success" path="/board/list.do" redirect="true"/>
+            <forward name="fail" path="/board/edit.jsp"/>
+        </action>
+        <!-- 클래스 없이 화면으로 바로 -->
+        <action path="/board/edit" forward="/board/edit.jsp"/>
+        <!-- 요청 파라미터 cmd 의 값으로 메소드를 고르는 방식(DispatchAction) -->
+        <action path="/board/admin" type="com.sample.board.web.BoardAdminAction" parameter="cmd"/>
+    </action-mappings>
+</struts-config>

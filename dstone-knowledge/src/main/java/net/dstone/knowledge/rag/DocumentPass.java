@@ -3,6 +3,7 @@ package net.dstone.knowledge.rag;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,11 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *   1) 그 파일의 분석 결과(타입, 메소드, 호출 관계, 진입점 ...)를 DB에서 읽는다.
  *   2) 소스를 다시 읽어, 사실과 소스를 엮은 글을 짓는다(CodeDocumentBuilder). 파싱은 하지 않는다. 줄 번호로 잘라 온다.
  *   3) 문서와 청크를 저장하고, 청크의 내용 해시를 임베딩 대기열(rag_embedding, PENDING)에 올린다.
+ *
+ * 만드는 문서:
+ *   Java 파일   → FILE / TYPE / METHOD 문서 (CodeDocumentBuilder)
+ *   SQL 매퍼    → statement마다 MAPPER 문서 (ResourceDocumentBuilder)
+ *   화면(JSP)   → 파일마다 VIEW 문서 (ResourceDocumentBuilder)
  *
  * 임베딩 자체는 여기서 하지 않습니다. 임베딩은 가장 오래 걸리는 일이라(청크 하나에 0.5초쯤) 분석 Job과 떼어 두었습니다.
  * 서버 안의 EmbeddingWorker가 대기열을 알아서 비웁니다. 그래서 이 단계는 금방 끝나고,
@@ -74,6 +80,8 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 		final int dimensions = ragSettings.embeddingDimensions();
 		final int[] counts = new int[2];
 
+		final ResourceDocumentBuilder resourceBuilder = new ResourceDocumentBuilder(context.getProjectId(), context.getRevisionId(), chunkMaxChars);
+
 		filePassRunner.run(context, NAME, "JAVA", new FileHandler<CodeDocumentBuilder.Result>() {
 			@Override
 			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {
@@ -91,6 +99,7 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 				material.callees = ragDao.selectCalleesByFile(fileId);
 				material.callers = ragDao.selectCallersByFile(fileId, MAX_CALLERS);
 				material.endpoints = ragDao.selectEndpointsByFile(context.getRevisionId(), fileId);
+				material.links = ragDao.selectLinksByFile(fileId);
 
 				byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
 				String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
@@ -114,7 +123,62 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 				// 파일 사이에 걸쳐 들고 있는 것이 없다.
 			}
 		});
+
+		// SQL 매퍼: statement 하나가 문서 하나. 매퍼가 아닌 XML은 statement가 없어서 건너뛴다.
+		filePassRunner.run(context, NAME, "XML", new FileHandler<CodeDocumentBuilder.Result>() {
+			@Override
+			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {
+				long fileId = ((Number) file.get("fileId")).longValue();
+				List<Map<String, Object>> statements = ragDao.selectStatementsByFile(fileId);
+				if (statements.isEmpty()) {
+					return null;
+				}
+				return resourceBuilder.buildMapper(file, statements, ragDao.selectStatementTablesByFile(fileId), ragDao.selectStatementExecutorsByFile(fileId));
+			}
+
+			@Override
+			public FileResult write(Map<String, Object> file, CodeDocumentBuilder.Result prepared) throws Exception {
+				if (prepared == null) {
+					return FileResult.skipped("SQL statement가 없는 XML입니다.");
+				}
+				return save(context, file, prepared, model, dimensions, counts);
+			}
+
+			@Override
+			public void reset() {
+			}
+		});
+
+		// 화면(JSP): 파일 하나가 문서 하나. Java 코드가 없는 JSP도 만든다(화면과 주소의 연결은 Java 코드와 상관없다).
+		filePassRunner.run(context, NAME, "JSP", new FileHandler<CodeDocumentBuilder.Result>() {
+			@Override
+			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {
+				long fileId = ((Number) file.get("fileId")).longValue();
+				byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
+				String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+				return resourceBuilder.buildView(file, text, ragDao.selectViewLinksByFile(context.getRevisionId(), fileId));
+			}
+
+			@Override
+			public FileResult write(Map<String, Object> file, CodeDocumentBuilder.Result prepared) throws Exception {
+				return save(context, file, prepared, model, dimensions, counts);
+			}
+
+			@Override
+			public void reset() {
+			}
+		});
+
 		info("DOCUMENT: 문서 " + counts[0] + "건, 청크 " + counts[1] + "건을 만들고 임베딩 대기열에 올렸습니다. model=" + model + ", analysisId=" + context.getAnalysisId());
+	}
+
+	/** 파일 하나의 문서와 청크를 저장하고 임베딩 대기열에 올립니다. */
+	private FileResult save(AnalysisJobContext context, Map<String, Object> file, CodeDocumentBuilder.Result prepared, String model, int dimensions, int[] counts) {
+		long fileId = ((Number) file.get("fileId")).longValue();
+		ragDao.replaceDocumentsInBatch(context.getRevisionId(), fileId, (String) file.get("path"), prepared.documents, prepared.chunks, model, dimensions);
+		counts[0] += prepared.documents.size();
+		counts[1] += prepared.chunks.size();
+		return FileResult.done();
 	}
 
 }

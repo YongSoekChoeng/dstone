@@ -312,7 +312,7 @@
                ) w
           LEFT JOIN kg_node n ON n.revision_id = #{revisionId} AND n.node_id = w.to_id
           LEFT JOIN analysis_file f ON f.file_id = w.file_id
-         <if test="!includeExternal">WHERE w.to_id IS NOT NULL</if>
+         <if test="!includeExternal">WHERE w.to_id IS NOT NULL OR w.to_kind = 'TABLE'</if>
          ORDER BY w.depth, w.from_id, w.line_start
          LIMIT #{limit}
     </select>

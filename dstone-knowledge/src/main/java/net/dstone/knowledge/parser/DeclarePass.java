@@ -74,7 +74,7 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		final String javaVersion = context.getProjectValue("javaVersion");
 		final String[] rootPackages = rootPackagesOf(context.getProjectValue("rootPackages"));
 
-		filePassRunner.run(context, NAME, "JAVA", new FileHandler<Prepared>() {
+		FileHandler<Prepared> handler = new FileHandler<Prepared>() {
 			@Override
 			public Prepared prepare(Map<String, Object> file) throws Exception {
 				return parseFile(context, root, javaVersion, rootPackages, file);
@@ -89,7 +89,10 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 			public void reset() {
 				// 파일 사이에 걸쳐 들고 있는 것이 없다. 파일마다 파서와 수집기를 새로 만든다.
 			}
-		});
+		};
+		filePassRunner.run(context, NAME, "JAVA", handler);
+		// JSP 안의 Java 코드(스크립틀릿)도 같은 방식으로 선언과 참조를 뽑는다(JspToJava).
+		filePassRunner.run(context, NAME, "JSP", handler);
 	}
 
 	/**
@@ -117,13 +120,22 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		Prepared prepared = new Prepared();
 
 		// 분석할 루트 패키지를 정해 둔 프로젝트면, 그 밖의 파일은 읽지도 않는다(SCAN이 정규식으로 찾아 둔 패키지로 판단).
-		if (!isUnderRootPackages((String) file.get("packageName"), rootPackages)) {
+		// JSP는 패키지가 없으므로 이 조건으로 거르지 않는다.
+		if (!JspToJava.isJsp(path) && !isUnderRootPackages((String) file.get("packageName"), rootPackages)) {
 			prepared.skipReason = "분석할 루트 패키지 밖입니다.";
 			return prepared;
 		}
 
 		byte[] bytes = Files.readAllBytes(root.resolve(path));
 		String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+		if (JspToJava.isJsp(path)) {
+			// JSP는 그 안의 Java 코드를 Java 소스로 바꿔서 일반 Java 파일과 같은 길로 보낸다. 줄 번호는 원본 JSP와 같다.
+			text = JspToJava.convert(text, path);
+			if (text == null) {
+				prepared.skipReason = "Java 코드가 없는 JSP입니다.";
+				return prepared;
+			}
+		}
 		try {
 			JavaSourceParser.Result parsed = javaSourceParser.parse(text, javaVersion);
 			if (!parsed.isSuccessful()) {

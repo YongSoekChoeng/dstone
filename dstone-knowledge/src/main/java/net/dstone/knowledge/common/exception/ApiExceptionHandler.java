@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.common.util.ErrorText;
@@ -30,6 +31,12 @@ public class ApiExceptionHandler extends BaseObject {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<Map<String, Object>> handleNotReadable(HttpMessageNotReadableException e) {
 		return response(HttpStatus.BAD_REQUEST, "요청 본문을 읽을 수 없습니다. JSON 형식인지 확인하세요.");
+	}
+
+	/** 없는 주소를 부른 경우. 서버 오류가 아니라 404로 돌려줍니다. */
+	@ExceptionHandler(NoResourceFoundException.class)
+	public ResponseEntity<Map<String, Object>> handleNoResource(NoResourceFoundException e) {
+		return response(HttpStatus.NOT_FOUND, "없는 주소입니다: /" + e.getResourcePath());
 	}
 
 	/** 그 밖의 예외: 원인을 로그에 남기고 500으로 돌려줍니다. */

@@ -105,7 +105,7 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 		info("RESOLVE: jar " + engine[0].jarCount + "개를 클래스패스로 씁니다. analysisId=" + context.getAnalysisId());
 
 		try {
-			filePassRunner.run(context, NAME, "JAVA", new FileHandler<Prepared>() {
+			FileHandler<Prepared> handler = new FileHandler<Prepared>() {
 				@Override
 				public Prepared prepare(Map<String, Object> file) throws Exception {
 					try {
@@ -127,7 +127,10 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 					engine[0] = newEngine(context, root, jars, cacheSize);
 					JavaParserFacade.clearInstances();
 				}
-			});
+			};
+			filePassRunner.run(context, NAME, "JAVA", handler);
+			// JSP 안의 Java 코드가 부르는 것도 같은 방식으로 푼다.
+			filePassRunner.run(context, NAME, "JSP", handler);
 		} finally {
 			JavaParserFacade.clearInstances();
 		}

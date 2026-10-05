@@ -265,6 +265,10 @@ CREATE TABLE IF NOT EXISTS analysis_reference (
     status            VARCHAR(20)   NOT NULL DEFAULT 'PENDING',    -- PENDING/RESOLVED/EXTERNAL(프로젝트 밖)/HEURISTIC(짐작)/UNRESOLVED/IGNORED(풀 대상 아님)
     fail_reason       VARCHAR(500)
 );
+-- 호출의 첫 인자를 소스에 적힌 그대로 담는다(문자열이 들어 있을 때만).
+-- sqlSession.selectList("order.findAll", vo) 의 "order.findAll", new ModelAndView("order/list") 의 "order/list" 처럼
+-- 문자열로 다른 것을 가리키는 호출을 풀 때 쓴다. 테이블을 이미 만든 DB 에도 생기도록 ALTER 로 추가한다.
+ALTER TABLE analysis_reference ADD COLUMN IF NOT EXISTS arg_text VARCHAR(500);
 CREATE INDEX IF NOT EXISTS idx_analysis_reference_file   ON analysis_reference(file_id, status);
 CREATE INDEX IF NOT EXISTS idx_analysis_reference_status ON analysis_reference(revision_id, status, ref_kind);
 
@@ -406,7 +410,7 @@ CREATE TABLE IF NOT EXISTS rag_document (
     tenant            VARCHAR(100),                      -- 호출자별 격리 키. 다른 호출자의 문서가 검색에 섞이지 않게 한다
     project_id        VARCHAR(100),                      -- CODE 일 때만
     revision_id       BIGINT,                            -- CODE 일 때만
-    doc_type          VARCHAR(30)   NOT NULL,            -- FILE/TYPE/METHOD/RELATION/CONFIG/MAPPER/ENDPOINT/SUMMARY/UPLOAD
+    doc_type          VARCHAR(30)   NOT NULL,            -- FILE/TYPE/METHOD(Java) / MAPPER(SQL statement) / VIEW(JSP) / UPLOAD(일반 문서, 예정)
     ref_kind          VARCHAR(20),                       -- 이 문서의 근거가 된 대상 종류 (TYPE/METHOD/FILE ...)
     ref_id            VARCHAR(40),                       -- 그 대상의 ID
     title             VARCHAR(1000),
@@ -471,7 +475,9 @@ CREATE INDEX IF NOT EXISTS idx_rag_embedding_hnsw ON rag_embedding USING hnsw (e
 그래프를 따로 저장하지 않고 analysis_* 를 node/edge 모양으로 보여 준다.
 **********************************************/
 
-CREATE OR REPLACE VIEW kg_node AS
+-- 컬럼의 타입이 바뀌면 CREATE OR REPLACE 가 실패하므로(노드 종류를 더하면서 타입이 넓어졌다) 지우고 다시 만든다.
+DROP VIEW IF EXISTS kg_node;
+CREATE VIEW kg_node AS
     SELECT r.project_id, s.revision_id, s.symbol_id AS node_id, 'TYPE'::varchar AS node_type, s.kind AS sub_type
          , s.simple_name AS name, s.fqn AS fqn, s.properties_json, s.file_id, s.line_start, s.line_end
       FROM analysis_symbol s JOIN analysis_revision r ON r.revision_id = s.revision_id
@@ -487,7 +493,18 @@ CREATE OR REPLACE VIEW kg_node AS
          , f.name, (o.fqn || '#' || f.name)::varchar, '{}'::jsonb, f.file_id, f.line_start, f.line_end
       FROM analysis_field f
       JOIN analysis_revision r ON r.revision_id = f.revision_id
-      JOIN analysis_symbol o ON o.revision_id = f.revision_id AND o.symbol_id = f.owner_symbol_id;
+      JOIN analysis_symbol o ON o.revision_id = f.revision_id AND o.symbol_id = f.owner_symbol_id
+    UNION ALL
+    -- SQL statement (MyBatis/iBATIS 매퍼). 관계에서 가리킬 때 쓰는 ID 는 'S' + mapper_id 다(다른 ID 와 겹치지 않게)
+    SELECT r.project_id, m.revision_id, ('S' || m.mapper_id)::varchar, 'SQL'::varchar, m.statement_type
+         , m.statement_id, (COALESCE(m.namespace || '.', '') || m.statement_id)::varchar, '{}'::jsonb, m.file_id, m.line_start, m.line_end
+      FROM analysis_mapper m JOIN analysis_revision r ON r.revision_id = m.revision_id
+     WHERE m.statement_type <> 'SQL_FRAGMENT'
+    UNION ALL
+    -- 파일. JSP 처럼 파일 자체가 관계의 한쪽이 되는 경우에 쓴다. ID 는 'F' + file_id
+    SELECT r.project_id, f.revision_id, ('F' || f.file_id)::varchar, 'FILE'::varchar, f.language
+         , f.path, f.path, '{}'::jsonb, f.file_id, 1, f.line_count
+      FROM analysis_file f JOIN analysis_revision r ON r.revision_id = f.revision_id;
 
 CREATE OR REPLACE VIEW kg_edge AS
     SELECT r.project_id, e.revision_id, e.relation_id AS edge_id

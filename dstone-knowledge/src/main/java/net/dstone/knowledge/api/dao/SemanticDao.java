@@ -28,6 +28,8 @@ public class SemanticDao extends BaseDao {
 		sqlSessionCommon.delete(NS + "deleteInjects", revisionId);
 		sqlSessionCommon.update(NS + "clearLayers", revisionId);
 		sqlSessionCommon.update(NS + "clearProxyRelated", revisionId);
+		// 화면과 이어진 관계(RENDERS / REQUESTS / INCLUDES)는 플러그인 여럿(Struts, JSP)이 만들기 때문에 여기서 한 번에 지운다.
+		sqlSessionCommon.delete(NS + "deleteViewRelations", revisionId);
 	}
 
 	public int insertSpringHttpEndpoints(long revisionId) {
@@ -106,6 +108,86 @@ public class SemanticDao extends BaseDao {
 
 	public int insertJspEndpoints(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertJspEndpoints", revisionId);
+	}
+
+	/* ---------- Struts ---------- */
+
+	/**
+	 * @return [{urlPattern, servletClass}] - web.xml의 서블릿 매핑
+	 */
+	public List<Map<String, Object>> selectServletMappings(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectServletMappings", revisionId);
+	}
+
+	/**
+	 * @return [{methodId, name, lineStart}] - 이 타입에 직접 적힌 메소드 가운데 이름이 맞는 것
+	 */
+	public List<Map<String, Object>> selectMethodsByName(long revisionId, String symbolId, List<String> names) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("symbolId", symbolId);
+		param.put("names", names);
+		return sqlSessionCommon.selectList(NS + "selectMethodsByName", param);
+	}
+
+	public int updateLayerBySymbol(long revisionId, String symbolId, String layer) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("symbolId", symbolId);
+		param.put("layer", layer);
+		return sqlSessionCommon.update(NS + "updateLayerBySymbol", param);
+	}
+
+	/* ---------- JSP ---------- */
+
+	public int updateJspLayer(long revisionId) {
+		return sqlSessionCommon.update(NS + "updateJspLayer", revisionId);
+	}
+
+	public int updateJspEndpointMethods(long revisionId) {
+		return sqlSessionCommon.update(NS + "updateJspEndpointMethods", revisionId);
+	}
+
+	public int insertRenders(long revisionId) {
+		return sqlSessionCommon.insert(NS + "insertRenders", revisionId);
+	}
+
+	/**
+	 * @return [{path, methodId}] - HTTP와 서블릿 진입점의 주소와 그것을 처리하는 메소드
+	 */
+	public List<Map<String, Object>> selectEndpointHandlers(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectEndpointHandlers", revisionId);
+	}
+
+	/**
+	 * <pre>
+	 * 이 언어의 파일을 file_id 순으로 조금씩 꺼냅니다.
+	 * </pre>
+	 *
+	 * @return [{fileId, path, encoding}]
+	 */
+	public List<Map<String, Object>> selectFilePage(long revisionId, String language, long afterId, int limit) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("language", language);
+		param.put("afterId", afterId);
+		param.put("limit", limit);
+		return sqlSessionCommon.selectList(NS + "selectFilePage", param);
+	}
+
+	/** 이 경로이거나 이 경로로 끝나는 JSP 파일의 ID들(최대 2개. 하나뿐인지 보려는 것) */
+	public List<Long> selectJspByPathEnd(long revisionId, String path) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("path", path);
+		return sqlSessionCommon.selectList(NS + "selectJspByPathEnd", param);
+	}
+
+	/**
+	 * @param relation {revisionId, fromKind, fromId, relationType, toKind, toId, toExternal, confidence, resolutionStatus, propertiesJson, fileId, lineStart}
+	 */
+	public void insertRelation(Map<String, Object> relation) {
+		sqlSessionCommon.insert(NS + "insertRelation", relation);
 	}
 
 	public int updateLayerByAnnotation(long revisionId, String layer, List<String> annotations) {

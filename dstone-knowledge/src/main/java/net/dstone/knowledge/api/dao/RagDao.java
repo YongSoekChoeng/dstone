@@ -71,6 +71,48 @@ public class RagDao extends BaseDao {
 	 * 먼저 이 파일의 문서와 청크를 지우기 때문에, 같은 파일을 다시 처리해도 중복되지 않습니다.
 	 * </pre>
 	 */
+	/**
+	 * @return [{fromId, kind(SQL / VIEW), name, statementType, tables}] - 이 파일의 메소드가 실행하는 SQL과 여는 화면
+	 */
+	public List<Map<String, Object>> selectLinksByFile(long fileId) {
+		return sqlSessionCommon.selectList(NS + "selectLinksByFile", fileId);
+	}
+
+	/* ---------- 매퍼(SQL)와 화면(JSP) 문서의 재료 ---------- */
+
+	/**
+	 * @return 이 매퍼 파일의 statement들(조각 제외)
+	 */
+	public List<Map<String, Object>> selectStatementsByFile(long fileId) {
+		return sqlSessionCommon.selectList(NS + "selectStatementsByFile", fileId);
+	}
+
+	/**
+	 * @return [{fromId("S" + mapperId), table, crud}]
+	 */
+	public List<Map<String, Object>> selectStatementTablesByFile(long fileId) {
+		return sqlSessionCommon.selectList(NS + "selectStatementTablesByFile", fileId);
+	}
+
+	/**
+	 * @return [{toId("S" + mapperId), caller}] - statement를 실행하는 메소드
+	 */
+	public List<Map<String, Object>> selectStatementExecutorsByFile(long fileId) {
+		return sqlSessionCommon.selectList(NS + "selectStatementExecutorsByFile", fileId);
+	}
+
+	/**
+	 * @return [{kind(OPENED_BY / REQUESTS / INCLUDES / INCLUDED_BY / CALLS), text, target}] - 이 JSP와 이어진 것들
+	 */
+	public List<Map<String, Object>> selectViewLinksByFile(long revisionId, long fileId) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("fileId", fileId);
+		// 관계에서 파일을 가리키는 ID
+		param.put("fileNodeId", "F" + fileId);
+		return sqlSessionCommon.selectList(NS + "selectViewLinksByFile", param);
+	}
+
 	public void replaceDocumentsInBatch(long revisionId, long fileId, String sourcePath, List<DocumentRow> documents, List<ChunkRow> chunks
 			, String model, int dimensions) {
 		sqlSessionBatch.delete(NS + "deleteChunksByFile", fileId);

@@ -18,6 +18,7 @@ import net.dstone.knowledge.api.dao.AnalysisJobDao;
 import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.api.dao.FilePassDao;
 import net.dstone.knowledge.api.dao.RelationDao;
+import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.exception.ApiException;
@@ -55,6 +56,9 @@ public class RevisionService extends BaseObject {
 
 	@Autowired
 	private SemanticDao semanticDao;
+
+	@Autowired
+	private ResourceDao resourceDao;
 
 	@Autowired
 	@Qualifier("txTemplateCommon")
@@ -104,6 +108,8 @@ public class RevisionService extends BaseObject {
 		Map<String, Object> semantic = new LinkedHashMap<String, Object>();
 		semantic.put("endpoints", semanticDao.selectEndpointSummary(revisionId));
 		semantic.put("layers", semanticDao.selectLayerSummary(revisionId));
+		// RESOURCE 단계가 읽은 것: SQL statement, 설정 값, Spring 빈, 의존성 ...
+		semantic.put("resources", resourceDao.selectResourceSummary(revisionId));
 		result.put("semantic", semantic);
 		return result;
 	}

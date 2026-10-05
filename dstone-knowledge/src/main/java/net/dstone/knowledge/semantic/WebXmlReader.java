@@ -1,20 +1,17 @@
 package net.dstone.knowledge.semantic;
 
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.xml.sax.EntityResolver;
-import org.xml.sax.InputSource;
+
+import net.dstone.knowledge.common.util.SafeXml;
 
 /**
  * <pre>
@@ -24,7 +21,7 @@ import org.xml.sax.InputSource;
  * 그래서 서블릿의 주소는 여기서 읽어야 알 수 있습니다.
  *
  * 오래된 web.xml(서블릿 2.3 이하)은 맨 위에 DOCTYPE으로 인터넷의 DTD 주소를 적어 둡니다.
- * 그대로 파싱하면 그 주소로 접속하려다 멈추거나 실패하므로, 밖의 것은 아무것도 가져오지 않도록 막아 둡니다.
+ * 밖의 것을 가져오지 않고 읽습니다(SafeXml).
  * </pre>
  */
 public class WebXmlReader {
@@ -56,26 +53,7 @@ public class WebXmlReader {
 	 * @param text web.xml의 내용(이미 올바른 인코딩으로 읽은 글)
 	 */
 	public WebXml read(String text) throws Exception {
-		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		// 이름공간을 따지지 않는다. 버전마다 이름공간이 달라도 요소 이름(servlet, servlet-mapping ...)은 같다.
-		factory.setNamespaceAware(false);
-		factory.setValidating(false);
-		factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-		factory.setXIncludeAware(false);
-		factory.setExpandEntityReferences(false);
-
-		DocumentBuilder builder = factory.newDocumentBuilder();
-		// DOCTYPE에 적힌 밖의 DTD를 달라고 하면 빈 내용을 준다.
-		builder.setEntityResolver(new EntityResolver() {
-			@Override
-			public InputSource resolveEntity(String publicId, String systemId) {
-				return new InputSource(new StringReader(""));
-			}
-		});
-		// 글 맨 앞의 XML 선언에 적힌 encoding은 이미 글자로 바꾼 뒤라 의미가 없다. StringReader로 주면 무시된다.
-		Document document = builder.parse(new InputSource(new StringReader(text)));
+		Document document = SafeXml.parse(text);
 
 		WebXml webXml = new WebXml();
 		List<Element> servlets = elementsOf(document, "servlet");

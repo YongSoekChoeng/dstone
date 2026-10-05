@@ -100,16 +100,18 @@
                      , COUNT(*) OVER (PARTITION BY x.to_id) AS total
                   FROM (
                         SELECT DISTINCT r.to_id
-                             , COALESCE(cs.fqn || '#' || cm.signature, fs.fqn || '#' || cf.name, ts.fqn) AS caller
+                             , COALESCE(cs.fqn || '#' || cm.signature, fs.fqn || '#' || cf.name, ts.fqn, '화면 ' || ff.path) AS caller
                           FROM analysis_method m
                           JOIN analysis_relation r
                             ON r.revision_id = m.revision_id AND r.to_id = m.method_id
-                           AND r.relation_type IN ('CALLS', 'CALLS_POSSIBLE_IMPLEMENTATION')
+                           AND r.relation_type IN ('CALLS', 'CALLS_POSSIBLE_IMPLEMENTATION', 'REQUESTS')
                           LEFT JOIN analysis_method cm ON r.from_kind = 'METHOD' AND cm.revision_id = r.revision_id AND cm.method_id = r.from_id
                           LEFT JOIN analysis_symbol cs ON cs.revision_id = cm.revision_id AND cs.symbol_id = cm.owner_symbol_id
                           LEFT JOIN analysis_field cf ON r.from_kind = 'FIELD' AND cf.revision_id = r.revision_id AND cf.field_id = r.from_id
                           LEFT JOIN analysis_symbol fs ON fs.revision_id = cf.revision_id AND fs.symbol_id = cf.owner_symbol_id
                           LEFT JOIN analysis_symbol ts ON r.from_kind = 'TYPE' AND ts.revision_id = r.revision_id AND ts.symbol_id = r.from_id
+                          -- 이 메소드의 주소를 요청하는 화면(JSP). 파일을 가리키는 ID 는 'F' + file_id 다
+                          LEFT JOIN analysis_file ff ON ff.file_id = CASE WHEN r.from_kind = 'FILE' THEN CAST(substr(r.from_id, 2) AS bigint) END
                          WHERE m.file_id = #{fileId}
                            AND r.from_id &lt;&gt; r.to_id
                        ) x
@@ -120,6 +122,116 @@
     </select>
 
     <!-- 이 파일의 메소드가 처리하는 진입점 -->
+    <!-- 이 파일의 메소드가 실행하는 SQL 과 여는 화면. kind: SQL / VIEW
+         SQL 은 "이름, 종류, 건드리는 테이블" 을, 화면은 JSP 의 경로를 준다 -->
+    <select id="selectLinksByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT r.from_id AS "fromId"
+             , 'SQL' AS "kind"
+             , (COALESCE(mp.namespace || '.', '') || mp.statement_id) AS "name"
+             , mp.statement_type AS "statementType"
+             , (SELECT string_agg(DISTINCT t.to_external || '(' || COALESCE(t.properties_json->>'crud', '?') || ')', ', ')
+                  FROM analysis_relation t
+                 WHERE t.revision_id = r.revision_id AND t.from_id = r.to_id
+                   AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')) AS "tables"
+          FROM analysis_method me
+          JOIN analysis_relation r
+            ON r.revision_id = me.revision_id AND r.from_id = me.method_id AND r.relation_type = 'EXECUTES_SQL' AND r.to_id IS NOT NULL
+          JOIN analysis_mapper mp ON mp.mapper_id = CASE WHEN r.to_kind = 'SQL' THEN CAST(substr(r.to_id, 2) AS bigint) END
+         WHERE me.file_id = #{fileId}
+        UNION ALL
+        SELECT DISTINCT r.from_id, 'VIEW', f.path, NULL, NULL
+          FROM analysis_method me
+          JOIN analysis_relation r
+            ON r.revision_id = me.revision_id AND r.from_id = me.method_id AND r.relation_type = 'RENDERS'
+          JOIN analysis_file f ON f.file_id = CASE WHEN r.to_kind = 'FILE' THEN CAST(substr(r.to_id, 2) AS bigint) END
+         WHERE me.file_id = #{fileId}
+         ORDER BY 1, 2, 3
+    </select>
+
+    <!-- ================= 매퍼(SQL) 문서의 재료 ================= -->
+
+    <!-- 이 매퍼 파일의 statement 들. 조각(sql)은 statement 가 아니라서 뺀다 -->
+    <select id="selectStatementsByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT mapper_id AS "mapperId"
+             , mapper_type AS "mapperType"
+             , namespace AS "namespace"
+             , statement_id AS "statementId"
+             , statement_type AS "statementType"
+             , parameter_type AS "parameterType"
+             , result_type AS "resultType"
+             , sql_body AS "sqlBody"
+             , line_start AS "lineStart"
+             , line_end AS "lineEnd"
+          FROM analysis_mapper
+         WHERE file_id = #{fileId}
+           AND statement_type &lt;&gt; 'SQL_FRAGMENT'
+         ORDER BY mapper_id
+    </select>
+
+    <!-- 이 매퍼 파일의 statement 가 건드리는 테이블. crud: C / R / U / D -->
+    <select id="selectStatementTablesByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT r.from_id AS "fromId"
+             , r.to_external AS "table"
+             , COALESCE(r.properties_json->>'crud', 'R') AS "crud"
+          FROM analysis_relation r
+         WHERE r.file_id = #{fileId}
+           AND r.from_kind = 'SQL'
+           AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+         ORDER BY 1, 2, 3
+    </select>
+
+    <!-- 이 매퍼 파일의 statement 를 실행하는 메소드 -->
+    <select id="selectStatementExecutorsByFile" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT r.to_id AS "toId"
+             , (s.fqn || '#' || me.signature) AS "caller"
+          FROM analysis_mapper mp
+          JOIN analysis_relation r
+            ON r.revision_id = mp.revision_id AND r.to_id = 'S' || mp.mapper_id AND r.relation_type = 'EXECUTES_SQL'
+          JOIN analysis_method me ON me.revision_id = r.revision_id AND me.method_id = r.from_id
+          JOIN analysis_symbol s ON s.revision_id = me.revision_id AND s.symbol_id = me.owner_symbol_id
+         WHERE mp.file_id = #{fileId}
+         ORDER BY 1, 2
+    </select>
+
+    <!-- ================= 화면(JSP) 문서의 재료 ================= -->
+
+    <!-- 이 JSP 와 이어진 것들. kind:
+           OPENED_BY   이 화면을 여는 메소드
+           REQUESTS    이 화면이 요청하는 주소와 그것을 처리하는 메소드 (text = 주소, target = 메소드)
+           INCLUDES    이 화면이 끼워 넣는 JSP
+           INCLUDED_BY 이 화면을 끼워 넣는 JSP
+           CALLS       화면 안의 Java 코드가 부르는 메소드 -->
+    <select id="selectViewLinksByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT 'OPENED_BY' AS "kind", NULL::varchar AS "text", (s.fqn || '#' || me.signature)::varchar AS "target"
+          FROM analysis_relation r
+          JOIN analysis_method me ON me.revision_id = r.revision_id AND me.method_id = r.from_id
+          JOIN analysis_symbol s ON s.revision_id = me.revision_id AND s.symbol_id = me.owner_symbol_id
+         WHERE r.revision_id = #{revisionId} AND r.to_id = #{fileNodeId} AND r.relation_type = 'RENDERS'
+        UNION ALL
+        SELECT DISTINCT 'REQUESTS', (r.properties_json->>'path')::varchar, (s.fqn || '#' || me.signature)::varchar
+          FROM analysis_relation r
+          JOIN analysis_method me ON me.revision_id = r.revision_id AND me.method_id = r.to_id
+          JOIN analysis_symbol s ON s.revision_id = me.revision_id AND s.symbol_id = me.owner_symbol_id
+         WHERE r.revision_id = #{revisionId} AND r.from_id = #{fileNodeId} AND r.relation_type = 'REQUESTS'
+        UNION ALL
+        SELECT DISTINCT 'INCLUDES', NULL::varchar, f.path::varchar
+          FROM analysis_relation r
+          JOIN analysis_file f ON f.file_id = CASE WHEN r.to_kind = 'FILE' THEN CAST(substr(r.to_id, 2) AS bigint) END
+         WHERE r.revision_id = #{revisionId} AND r.from_id = #{fileNodeId} AND r.relation_type = 'INCLUDES'
+        UNION ALL
+        SELECT DISTINCT 'INCLUDED_BY', NULL::varchar, f.path::varchar
+          FROM analysis_relation r
+          JOIN analysis_file f ON f.file_id = CASE WHEN r.from_kind = 'FILE' THEN CAST(substr(r.from_id, 2) AS bigint) END
+         WHERE r.revision_id = #{revisionId} AND r.to_id = #{fileNodeId} AND r.relation_type = 'INCLUDES'
+        UNION ALL
+        SELECT DISTINCT 'CALLS', NULL::varchar, (s.fqn || '#' || me.signature)::varchar
+          FROM analysis_relation r
+          JOIN analysis_method me ON me.revision_id = r.revision_id AND me.method_id = r.to_id
+          JOIN analysis_symbol s ON s.revision_id = me.revision_id AND s.symbol_id = me.owner_symbol_id
+         WHERE r.file_id = #{fileId} AND r.relation_type = 'CALLS' AND r.from_id &lt;&gt; r.to_id
+         ORDER BY 1, 2, 3
+    </select>
+
     <select id="selectEndpointsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT e.method_id AS "methodId"
              , e.endpoint_type AS "endpointType"

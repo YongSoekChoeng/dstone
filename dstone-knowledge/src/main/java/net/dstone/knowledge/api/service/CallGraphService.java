@@ -71,6 +71,8 @@ public class CallGraphService extends BaseObject {
 	public Map<String, Object> getCallers(long revisionId, String methodId, int depth, boolean includePossible) {
 		Map<String, Object> method = findMethod(revisionId, methodId);
 		Map<String, Object> condition = condition(revisionId, methodId, depth, includePossible);
+		// 화면(JSP)이 이 메소드의 주소를 요청하는 것도 "부르는 쪽"이다.
+		relationTypesOf(condition).add("REQUESTS");
 
 		List<Map<String, Object>> callers = relationDao.selectCallers(condition);
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
@@ -93,6 +95,8 @@ public class CallGraphService extends BaseObject {
 		Map<String, Object> method = findMethod(revisionId, methodId);
 		Map<String, Object> condition = condition(revisionId, methodId, depth, includePossible);
 		condition.put("includeExternal", Boolean.valueOf(includeExternal));
+		// 메소드가 실행하는 SQL, 그 SQL이 건드리는 테이블, 메소드가 여는 화면까지 이어서 따라간다.
+		relationTypesOf(condition).addAll(java.util.Arrays.asList("EXECUTES_SQL", "READS_TABLE", "WRITES_TABLE", "RENDERS"));
 
 		List<Map<String, Object>> callees = relationDao.selectCallees(condition);
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
@@ -102,6 +106,11 @@ public class CallGraphService extends BaseObject {
 		result.put("truncated", Boolean.valueOf(callees.size() >= MAX_ROWS));
 		result.put("callees", callees);
 		return result;
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<String> relationTypesOf(Map<String, Object> condition) {
+		return (List<String>) condition.get("relationTypes");
 	}
 
 	private Map<String, Object> findMethod(long revisionId, String methodId) {

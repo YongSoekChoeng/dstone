@@ -27,6 +27,9 @@ public class ReferenceRow {
 
 	private Integer argCount;
 
+	/** 첫 인자를 소스에 적힌 그대로. 문자열이 들어 있을 때만 담는다. 예: getOrderMapper() + "findAll" */
+	private String argText;
+
 	private Integer lineStart;
 
 	private Integer columnStart;
@@ -109,6 +112,14 @@ public class ReferenceRow {
 
 	public void setColumnStart(Integer columnStart) {
 		this.columnStart = columnStart;
+	}
+
+	public String getArgText() {
+		return argText;
+	}
+
+	public void setArgText(String argText) {
+		this.argText = argText;
 	}
 
 }

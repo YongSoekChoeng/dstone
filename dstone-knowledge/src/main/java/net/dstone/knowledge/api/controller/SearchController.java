@@ -32,7 +32,7 @@ public class SearchController {
 	 * 벡터 검색.
 	 * 본문: {query, projectId?, revisionId?, docTypes?, layer?, topK?}
 	 *   - projectId나 revisionId 가운데 하나는 있어야 합니다. projectId만 주면 분석이 끝난 가장 최근 리비전에서 찾습니다.
-	 *   - docTypes: ["METHOD", "TYPE", "FILE"] 가운데 찾을 것. 없으면 전부
+	 *   - docTypes: ["METHOD", "TYPE", "FILE", "MAPPER", "VIEW"] 가운데 찾을 것. 없으면 전부
 	 *   - layer: CONTROLLER / SERVICE / REPOSITORY ... 없으면 전부
 	 *   - topK: 기본 10, 최대 50
 	 * </pre>

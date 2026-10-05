@@ -65,6 +65,8 @@ public class CodeDocumentBuilder {
 		public List<Map<String, Object>> callees = new ArrayList<Map<String, Object>>();
 		public List<Map<String, Object>> callers = new ArrayList<Map<String, Object>>();
 		public List<Map<String, Object>> endpoints = new ArrayList<Map<String, Object>>();
+		/** 메소드가 실행하는 SQL과 여는 화면. 키: fromId, kind(SQL / VIEW), name, statementType, tables */
+		public List<Map<String, Object>> links = new ArrayList<Map<String, Object>>();
 	}
 
 	/**
@@ -106,6 +108,7 @@ public class CodeDocumentBuilder {
 		Map<String, List<Map<String, Object>>> endpointsByMethod = groupBy(material.endpoints, "methodId");
 		Map<String, List<Map<String, Object>>> calleesByMethod = groupBy(material.callees, "fromId");
 		Map<String, List<Map<String, Object>>> callersByMethod = groupBy(material.callers, "toId");
+		Map<String, List<Map<String, Object>>> linksByMethod = groupBy(material.links, "fromId");
 		Map<String, List<Map<String, Object>>> relationsByType = groupBy(material.typeRelations, "fromId");
 		Map<String, List<Map<String, Object>>> fieldsByType = groupBy(material.fields, "ownerSymbolId");
 		Map<String, List<Map<String, Object>>> methodsByType = groupBy(material.methods, "ownerSymbolId");
@@ -130,7 +133,7 @@ public class CodeDocumentBuilder {
 			}
 			String methodId = (String) method.get("methodId");
 			addMethodDocument(result, fileId, path, lines, method, typesById.get((String) method.get("ownerSymbolId")), annotations.get(methodId)
-					, endpointsByMethod.get(methodId), calleesByMethod.get(methodId), callersByMethod.get(methodId));
+					, endpointsByMethod.get(methodId), calleesByMethod.get(methodId), callersByMethod.get(methodId), linksByMethod.get(methodId));
 		}
 		return result;
 	}
@@ -254,7 +257,8 @@ public class CodeDocumentBuilder {
 	/* ============================== 메소드 문서 ============================== */
 
 	private void addMethodDocument(Result result, long fileId, String path, String[] lines, Map<String, Object> method, Map<String, Object> ownerType
-			, List<String> annotations, List<Map<String, Object>> endpoints, List<Map<String, Object>> callees, List<Map<String, Object>> callers) {
+			, List<String> annotations, List<Map<String, Object>> endpoints, List<Map<String, Object>> callees, List<Map<String, Object>> callers
+			, List<Map<String, Object>> links) {
 		String ownerFqn = ownerType == null ? "?" : (String) ownerType.get("fqn");
 		String title = ownerFqn + "#" + method.get("signature");
 		Integer lineStart = intOf(method.get("lineStart"));
@@ -302,6 +306,23 @@ public class CodeDocumentBuilder {
 		line(head, "호출하는 것", join(inProject, ", "));
 		line(head, "실행될 수 있는 구현", join(possible, ", "));
 		line(head, "밖으로 나가는 호출", join(external, ", "));
+
+		// 실행하는 SQL과 여는 화면. "이 기능은 어느 테이블을 고치나", "이 화면은 어디서 여나" 같은 질문에 걸리게 한다.
+		List<String> sqls = new ArrayList<String>();
+		List<String> views = new ArrayList<String>();
+		if (links != null) {
+			for (int i = 0; i < links.size(); i++) {
+				Map<String, Object> link = links.get(i);
+				if ("SQL".equals(link.get("kind"))) {
+					String tables = (String) link.get("tables");
+					addLimited(sqls, link.get("name") + " [" + link.get("statementType") + (tables == null ? "" : ", 테이블 " + tables) + "]", MAX_CALLEES);
+				} else {
+					addLimited(views, (String) link.get("name"), MAX_CALLEES);
+				}
+			}
+		}
+		line(head, "실행하는 SQL", join(sqls, ", "));
+		line(head, "여는 화면", join(views, ", "));
 
 		if (callers != null && !callers.isEmpty()) {
 			List<String> callerTexts = new ArrayList<String>();
@@ -395,7 +416,7 @@ public class CodeDocumentBuilder {
 	 * @param contents 청크로 들어갈 글들(순서대로)
 	 * @param ranges 청크마다의 줄 범위. null이면 모든 청크에 문서의 줄 범위를 쓴다.
 	 */
-	private void addDocument(Result result, String documentId, String docType, String refKind, String refId, String title, String path
+	void addDocument(Result result, String documentId, String docType, String refKind, String refId, String title, String path
 			, Map<String, Object> metadata, long fileId, List<String> contents, List<int[]> ranges, Integer lineStart, Integer lineEnd) {
 		String metadataJson = JsonText.of(metadata);
 		StringBuilder whole = new StringBuilder();
@@ -434,7 +455,7 @@ public class CodeDocumentBuilder {
 	}
 
 	/** 긴 글을 줄 경계에서 나눕니다. */
-	private List<String> splitByLines(String text, int maxChars) {
+	List<String> splitByLines(String text, int maxChars) {
 		List<String> parts = new ArrayList<String>();
 		if (text.length() <= maxChars) {
 			parts.add(text);

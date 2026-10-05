@@ -65,6 +65,13 @@
 			<version>${javaparser.version}</version>
 		</dependency>
 
+		<!-- SQL 분석: MyBatis/iBATIS 매퍼의 SQL에서 테이블과 CRUD를 뽑는다. dstone-boot의 기존 분석기와 같은 버전. -->
+		<dependency>
+			<groupId>com.github.jsqlparser</groupId>
+			<artifactId>jsqlparser</artifactId>
+			<version>4.7</version>
+		</dependency>
+
 		<!-- 임베딩 모델 호출(Spring AI). 이 모듈에서 Spring AI는 "글 → 벡터"로 바꾸는 호출에만 쓴다.
 		     벡터를 저장하고 검색하는 SQL은 MyBatis로 직접 쓴다(PgVectorStore를 쓰지 않는다).
 		     임베딩의 키가 (내용 해시, 모델)이고 그 테이블이 곧 대기열이라, Spring AI가 정해 둔 테이블 구조와 맞지 않기 때문이다.

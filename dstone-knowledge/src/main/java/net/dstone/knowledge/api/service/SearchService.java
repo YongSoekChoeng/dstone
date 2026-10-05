@@ -61,7 +61,7 @@ public class SearchService extends BaseObject {
 	 * 어느 리비전에서 찾을지는 revisionId로 정하고, 주지 않으면 그 프로젝트에서 분석이 끝난 가장 최근 리비전에서 찾습니다.
 	 * </pre>
 	 *
-	 * @param docTypes FILE / TYPE / METHOD 가운데 찾을 것. 비어 있으면 전부
+	 * @param docTypes FILE / TYPE / METHOD / MAPPER(SQL) / VIEW(화면) 가운데 찾을 것. 비어 있으면 전부
 	 * @param layer 이 계층의 것만(CONTROLLER / SERVICE ...). 없으면 전부
 	 * @param topK 돌려줄 최대 건수(기본 10, 최대 50)
 	 */
