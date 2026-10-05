@@ -81,6 +81,11 @@ public final class Constants {
 		public static final class File {
 			public final static String PREFIX = "dstone.ai.tool.file";
 		}
+
+		/** dstone-knowledge(Java 분석 결과/문서 검색 서버)에 물어보는 Tool(tools.knowledge.KnowledgeTool)의 설정 키 접두사입니다. */
+		public static final class Knowledge {
+			public final static String PREFIX = "dstone.ai.tool.knowledge";
+		}
 	}
 
 	/** Workflow를 실행하는 엔진(runtime.workflow.WorkFlowExecutor, api.service.WorkFlowExecutionService)이 사용하는 상수들입니다. */

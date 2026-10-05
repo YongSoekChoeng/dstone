@@ -59,14 +59,18 @@ public class ProjectController {
 	/**
 	 * <pre>
 	 * 분석 시작. 바로 202로 돌아오고 분석은 백그라운드에서 돕니다.
-	 * 본문(없어도 됨): {revisionLabel?} - 이미 있는 라벨이면 그 리비전을 이어서 분석합니다.
+	 * 본문(없어도 됨): {revisionLabel?, rerunFrom?}
+	 *   - revisionLabel: 이미 있는 라벨이면 그 리비전을 이어서 분석합니다.
+	 *   - rerunFrom: 그 리비전에서 이 단계부터 다시 돌립니다(예: DOCUMENT → 문서만 다시 만든다).
 	 * </pre>
 	 */
 	@PostMapping("/{projectId}/analyses")
 	public ResponseEntity<Map<String, Object>> startAnalysis(@PathVariable("projectId") String projectId
 			, @RequestBody(required = false) Map<String, Object> request) {
 		Object label = request == null ? null : request.get("revisionLabel");
-		Map<String, Object> result = analysisService.startAnalysis(projectId, label == null ? null : String.valueOf(label));
+		Object rerunFrom = request == null ? null : request.get("rerunFrom");
+		Map<String, Object> result = analysisService.startAnalysis(projectId, label == null ? null : String.valueOf(label)
+				, rerunFrom == null ? null : String.valueOf(rerunFrom));
 		return new ResponseEntity<Map<String, Object>>(result, HttpStatus.ACCEPTED);
 	}
 

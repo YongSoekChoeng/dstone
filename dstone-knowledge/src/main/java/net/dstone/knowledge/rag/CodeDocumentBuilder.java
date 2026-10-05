@@ -126,9 +126,10 @@ public class CodeDocumentBuilder {
 					, fieldsByType.get(symbolId), methodsByType.get(symbolId), endpointsByMethod);
 		}
 
+		Map<String, List<Map<String, Object>>> fieldsByOwner = groupBy(material.fields, "ownerSymbolId");
 		for (int i = 0; i < material.methods.size(); i++) {
 			Map<String, Object> method = material.methods.get(i);
-			if (Boolean.TRUE.equals(method.get("isSynthetic")) || (skipAccessors && isAccessor(method))) {
+			if (Boolean.TRUE.equals(method.get("isSynthetic")) || (skipAccessors && isAccessor(method, fieldsByOwner.get((String) method.get("ownerSymbolId"))))) {
 				continue;
 			}
 			String methodId = (String) method.get("methodId");
@@ -373,16 +374,43 @@ public class CodeDocumentBuilder {
 				, contents, ranges, lineStart, lineEnd);
 	}
 
-	/** get/set/is로 시작하고 세 줄을 넘지 않는 메소드. 필드 값을 그대로 주고받는 것으로 본다. */
-	private boolean isAccessor(Map<String, Object> method) {
+	/**
+	 * <pre>
+	 * 필드 값을 그대로 주고받는 메소드인지 봅니다. 세 가지가 다 맞아야 합니다.
+	 *   - 이름이 get / set / is로 시작한다
+	 *   - 세 줄을 넘지 않는다
+	 *   - 같은 타입에 그 이름의 필드가 있다 (getName → name)
+	 *
+	 * 필드까지 보는 이유: 이름만 보면 DBUtil.getConnection()처럼 짧지만 일을 하는 메소드까지 빠진다.
+	 * 그런 메소드는 "DB 커넥션을 얻는 코드"로 찾는 대상이라 문서가 있어야 한다.
+	 * </pre>
+	 */
+	private boolean isAccessor(Map<String, Object> method, List<Map<String, Object>> ownerFields) {
 		String name = (String) method.get("name");
 		Integer lineStart = intOf(method.get("lineStart"));
 		Integer lineEnd = intOf(method.get("lineEnd"));
-		if (name == null || lineStart == null || lineEnd == null || Boolean.TRUE.equals(method.get("isConstructor"))) {
+		if (name == null || lineStart == null || lineEnd == null || ownerFields == null || Boolean.TRUE.equals(method.get("isConstructor"))) {
 			return false;
 		}
-		boolean named = (name.startsWith("get") && name.length() > 3) || (name.startsWith("set") && name.length() > 3) || (name.startsWith("is") && name.length() > 2);
-		return named && ((Number) method.get("paramCount")).intValue() <= 1 && lineEnd.intValue() - lineStart.intValue() <= 2;
+		String property;
+		if ((name.startsWith("get") || name.startsWith("set")) && name.length() > 3) {
+			property = name.substring(3);
+		} else if (name.startsWith("is") && name.length() > 2) {
+			property = name.substring(2);
+		} else {
+			return false;
+		}
+		if (((Number) method.get("paramCount")).intValue() > 1 || lineEnd.intValue() - lineStart.intValue() > 2) {
+			return false;
+		}
+		for (int i = 0; i < ownerFields.size(); i++) {
+			String field = (String) ownerFields.get(i).get("name");
+			// isActive()의 필드는 active일 수도, isActive일 수도 있다. 필드 이름의 대소문자 규칙(mb_id, URL)은 프로젝트마다 달라서 가리지 않는다.
+			if (field != null && (field.equalsIgnoreCase(property) || field.equalsIgnoreCase(name))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** 소스를 청크 크기에 맞춰 줄 단위로 나눕니다. [시작 줄, 끝 줄]의 목록(1부터 세는 줄 번호)입니다. */

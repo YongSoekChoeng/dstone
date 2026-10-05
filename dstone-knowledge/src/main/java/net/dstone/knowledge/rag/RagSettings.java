@@ -50,6 +50,21 @@ public class RagSettings {
 		return Math.max(200, intProperty("dstone.knowledge.rag.chunk-max-chars", 1800));
 	}
 
+	/** 올린 문서 하나에서 읽는 최대 글자 수. 넘는 부분은 버린다(끝없이 큰 파일이 서버를 붙잡지 않게) */
+	public int uploadMaxChars() {
+		return Math.max(1000, intProperty("dstone.knowledge.rag.upload.max-chars", 5000000));
+	}
+
+	/** 올린 문서의 청크 경계에서 겹쳐 넣는 문단의 최대 글자 수 */
+	public int uploadOverlapChars() {
+		return Math.max(0, intProperty("dstone.knowledge.rag.upload.overlap-chars", 200));
+	}
+
+	/** 올린 문서의 임베딩 우선순위. 코드(0)보다 커야 먼저 처리된다 */
+	public int uploadEmbeddingPriority() {
+		return intProperty("dstone.knowledge.rag.upload.embedding-priority", 10);
+	}
+
 	private int intProperty(String key, int defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

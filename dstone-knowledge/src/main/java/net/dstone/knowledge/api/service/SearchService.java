@@ -21,11 +21,18 @@ import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.common.util.ErrorText;
 import net.dstone.knowledge.rag.EmbeddingWorker;
+import net.dstone.knowledge.rag.HybridRanker;
 import net.dstone.knowledge.rag.RagSettings;
+import net.dstone.knowledge.rag.SearchKeywords;
 
 /**
  * <pre>
- * 분석 결과를 뜻으로 찾습니다(벡터 검색). "주문 취소는 어디서 처리하나" 같은 질문에 가까운 문서 조각을 돌려줍니다.
+ * 분석 결과와 올린 문서를 찾습니다. "주문 취소는 어디서 처리하나" 같은 질문에 가까운 문서 조각을 돌려줍니다.
+ *
+ * 두 가지 방법을 같이 씁니다(하이브리드 검색).
+ *   - 뜻으로 찾기(벡터): 질문을 임베딩해서 가까운 청크를 찾는다. 글자가 달라도 뜻이 가까우면 나온다.
+ *   - 이름으로 찾기: 질문에 들어 있는 클래스 / 메소드 / SQL / 테이블 이름, 주소가 글자 그대로 있는 청크를 찾는다.
+ * 두 결과를 순위로 합칩니다(HybridRanker). 질문에 이름이 없으면 뜻으로만 찾습니다.
  *
  * 이 모듈은 답을 지어내지 않습니다. 찾은 조각을 그대로 돌려줄 뿐이고, 그것으로 답을 만드는 일은
  * 부르는 쪽(dstone-ai-engine의 Agent)이 합니다.
@@ -35,6 +42,11 @@ import net.dstone.knowledge.rag.RagSettings;
 public class SearchService extends BaseObject {
 
 	private static final int MAX_TOP_K = 50;
+
+	/** 두 검색에서 각각 몇 건을 뽑아 합칠지. 돌려줄 건수보다 넉넉히 뽑아야 한쪽에서만 아래에 있던 것이 올라올 수 있다 */
+	private static final int MIN_CANDIDATES = 30;
+
+	private static final int MAX_CANDIDATES = 150;
 
 	@Autowired
 	private EmbeddingModel embeddingModel;
@@ -58,53 +70,128 @@ public class SearchService extends BaseObject {
 	/**
 	 * <pre>
 	 * 질문과 가까운 청크를 찾습니다.
-	 * 어느 리비전에서 찾을지는 revisionId로 정하고, 주지 않으면 그 프로젝트에서 분석이 끝난 가장 최근 리비전에서 찾습니다.
+	 * 코드는 리비전 하나에서 찾습니다. revisionId를 주지 않으면 그 프로젝트에서 분석이 끝난 가장 최근 리비전입니다.
+	 * 일반 문서는 호출자가 올린 것에서 찾고, projectId를 주면 그 프로젝트에 붙여 올린 것만 봅니다.
 	 * </pre>
-	 *
-	 * @param docTypes FILE / TYPE / METHOD / MAPPER(SQL) / VIEW(화면) 가운데 찾을 것. 비어 있으면 전부
-	 * @param layer 이 계층의 것만(CONTROLLER / SERVICE ...). 없으면 전부
-	 * @param topK 돌려줄 최대 건수(기본 10, 최대 50)
 	 */
-	public Map<String, Object> search(String query, String projectId, Long revisionId, List<String> docTypes, String layer, int topK) {
-		if (query == null || query.trim().length() == 0) {
+	public Map<String, Object> search(SearchQuery request) {
+		if (request.getQuery() == null || request.getQuery().trim().length() == 0) {
 			throw ApiException.badRequest("query(찾을 내용)는 필수입니다.");
 		}
-		final long targetRevisionId = resolveRevision(projectId, revisionId);
-		String model = ragSettings.embeddingModel();
+		String query = request.getQuery().trim();
+		String mode = modeOf(request.getMode());
+		String projectId = request.getProjectId() == null || request.getProjectId().trim().length() == 0 ? null : request.getProjectId().trim();
+		boolean hasTarget = projectId != null || request.getRevisionId() != null;
+		boolean wantCode = wants(request.getSourceTypes(), "CODE", hasTarget);
+		boolean wantDocuments = wants(request.getSourceTypes(), "DOCUMENT", !hasTarget);
+		if (!wantCode && !wantDocuments) {
+			throw ApiException.badRequest("sourceTypes는 CODE나 DOCUMENT여야 합니다: " + request.getSourceTypes());
+		}
 
-		float[] vector;
-		try {
-			vector = embeddingModel.embed(query.trim());
-		} catch (RuntimeException e) {
-			// 임베딩 서버(Ollama)가 내려가 있으면 질문을 벡터로 바꿀 수 없다.
-			throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "임베딩 모델을 부르지 못했습니다. 임베딩 서버가 떠 있는지 확인하세요: " + ErrorText.summaryOf(e));
+		Long revisionId = null;
+		if (wantCode) {
+			revisionId = Long.valueOf(resolveRevision(projectId, request.getRevisionId()));
+		}
+		String model = ragSettings.embeddingModel();
+		int topK = Math.max(1, Math.min(request.getTopK(), MAX_TOP_K));
+
+		List<String> keywords = "VECTOR".equals(mode) ? new ArrayList<String>() : SearchKeywords.extract(query);
+		if ("KEYWORD".equals(mode) && keywords.isEmpty()) {
+			throw ApiException.badRequest("이름으로만 찾으려면(mode=KEYWORD) 질문에 영문 이름이나 주소가 있어야 합니다(3자 이상).");
+		}
+
+		String warning = null;
+		String vectorText = null;
+		if (!"KEYWORD".equals(mode)) {
+			try {
+				vectorText = vectorText(embeddingModel.embed(query));
+			} catch (RuntimeException e) {
+				// 임베딩 서버(Ollama)가 내려가 있으면 질문을 벡터로 바꿀 수 없다. 이름이 있으면 이름으로라도 찾는다.
+				if (keywords.isEmpty()) {
+					throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "임베딩 모델을 부르지 못했습니다. 임베딩 서버가 떠 있는지 확인하세요: " + ErrorText.summaryOf(e));
+				}
+				warning = "임베딩 모델을 부르지 못해 이름으로만 찾았습니다: " + ErrorText.summaryOf(e);
+				mode = "KEYWORD";
+			}
 		}
 
 		final Map<String, Object> condition = new HashMap<String, Object>();
 		condition.put("model", model);
-		condition.put("revisionId", targetRevisionId);
-		condition.put("vector", vectorText(vector));
-		condition.put("topK", Math.max(1, Math.min(topK, MAX_TOP_K)));
-		condition.put("docTypes", docTypes == null ? new ArrayList<String>() : docTypes);
-		condition.put("layer", layer);
+		condition.put("revisionId", revisionId);
+		condition.put("includeDocuments", Boolean.valueOf(wantDocuments));
+		condition.put("tenant", request.getTenant());
+		condition.put("projectId", projectId);
+		condition.put("vector", vectorText);
+		condition.put("docTypes", request.getDocTypes() == null ? new ArrayList<String>() : request.getDocTypes());
+		condition.put("layer", request.getLayer());
+		// 이름이 없으면 합칠 것이 없으니 필요한 만큼만 뽑는다.
+		condition.put("topK", Integer.valueOf(keywords.isEmpty() ? topK : Math.min(MAX_CANDIDATES, Math.max(MIN_CANDIDATES, topK * 3))));
 
-		// 검색 설정(SET LOCAL)이 먹으려면 트랜잭션 안이어야 한다.
-		List<Map<String, Object>> hits = txTemplateCommon.execute(new TransactionCallback<List<Map<String, Object>>>() {
-			@Override
-			public List<Map<String, Object>> doInTransaction(TransactionStatus status) {
-				return ragDao.searchChunks(condition);
+		List<Map<String, Object>> vectorHits = new ArrayList<Map<String, Object>>();
+		if (vectorText != null) {
+			// 검색 설정(SET LOCAL)이 먹으려면 트랜잭션 안이어야 한다.
+			vectorHits = txTemplateCommon.execute(new TransactionCallback<List<Map<String, Object>>>() {
+				@Override
+				public List<Map<String, Object>> doInTransaction(TransactionStatus status) {
+					return ragDao.searchChunks(condition);
+				}
+			});
+		}
+		List<Map<String, Object>> keywordHits = new ArrayList<Map<String, Object>>();
+		if (!keywords.isEmpty()) {
+			List<Map<String, Object>> keywordParams = new ArrayList<Map<String, Object>>();
+			for (int i = 0; i < keywords.size(); i++) {
+				Map<String, Object> keyword = new HashMap<String, Object>();
+				keyword.put("text", keywords.get(i).toLowerCase());
+				keyword.put("pattern", SearchKeywords.wholeWordPattern(keywords.get(i)));
+				keywordParams.add(keyword);
 			}
-		});
+			condition.put("keywords", keywordParams);
+			keywordHits = ragDao.searchChunksByKeyword(condition);
+		}
+		List<Map<String, Object>> hits = HybridRanker.fuse(vectorHits, keywordHits, topK);
 
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
-		result.put("query", query.trim());
-		result.put("revisionId", targetRevisionId);
+		result.put("query", query);
+		result.put("revisionId", revisionId);
+		// 실제로 쓴 방법. 질문에 이름이 없으면 HYBRID로 요청해도 VECTOR가 된다.
+		result.put("mode", keywords.isEmpty() ? "VECTOR" : mode);
+		result.put("keywords", keywords);
 		result.put("model", model);
-		// 임베딩이 아직 덜 끝났으면 결과가 모자랄 수 있다. 얼마나 됐는지 같이 알려 준다.
-		result.put("embedding", ragDao.selectEmbeddingProgress(targetRevisionId, model));
+		if (warning != null) {
+			result.put("warning", warning);
+		}
+		if (revisionId != null) {
+			// 임베딩이 아직 덜 끝났으면 뜻으로 찾는 결과가 모자랄 수 있다. 얼마나 됐는지 같이 알려 준다.
+			result.put("embedding", ragDao.selectEmbeddingProgress(revisionId.longValue(), model));
+		}
 		result.put("count", hits.size());
 		result.put("hits", hits);
 		return result;
+	}
+
+	private String modeOf(String mode) {
+		if (mode == null || mode.trim().length() == 0) {
+			return "HYBRID";
+		}
+		String upper = mode.trim().toUpperCase();
+		if (!"HYBRID".equals(upper) && !"VECTOR".equals(upper) && !"KEYWORD".equals(upper)) {
+			throw ApiException.badRequest("mode는 HYBRID / VECTOR / KEYWORD 가운데 하나여야 합니다: " + mode);
+		}
+		return upper;
+	}
+
+	/** sourceTypes에 그 종류가 있는지. 아무것도 적지 않았으면 기본값을 따른다 */
+	private boolean wants(List<String> sourceTypes, String type, boolean defaultValue) {
+		if (sourceTypes == null || sourceTypes.isEmpty()) {
+			return defaultValue;
+		}
+		for (int i = 0; i < sourceTypes.size(); i++) {
+			if (type.equalsIgnoreCase(sourceTypes.get(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

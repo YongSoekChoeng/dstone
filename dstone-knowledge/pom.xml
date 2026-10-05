@@ -41,6 +41,14 @@
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
+			<!-- dstone-common이 commons-io 2.15.1을 직접 적어 두었는데, Tika가 끌어오는 commons-compress는
+			     commons-io 2.16.0부터 있는 클래스(ChecksumInputStream)를 쓴다. 가까운 쪽이 이기는 Maven 규칙 때문에
+			     그대로 두면 문서를 읽다가 NoClassDefFoundError로 죽는다. 이 모듈에서만 버전을 올린다(dstone-ai-engine과 같은 조치). -->
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>2.20.0</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -79,6 +87,20 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-ollama</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!-- 일반 문서에서 글 뽑기: Tika 하나로 PDF/Word/PowerPoint/Excel/HTML/TXT를 읽는다.
+		     dstone-ai-engine의 문서 수집 기능을 옮겨 오는 것이라 같은 의존성을 쓴다(버전은 Spring AI BOM이 정한다).
+		     이 모듈은 여기서 Tika 클래스만 쓴다(rag.DocumentTextExtractor). -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-tika-document-reader</artifactId>
 			<exclusions>
 				<exclusion>
 					<groupId>org.springframework.boot</groupId>

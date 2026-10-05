@@ -4,6 +4,8 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -53,11 +55,15 @@ public class AnalysisService extends BaseObject {
 	 * - 이미 있는 라벨을 주면 그 리비전을 이어서 분석합니다. 끝난 단계는 건너뜁니다.
 	 *   (죽거나 취소된 분석을 이어 갈 때, 새 단계가 추가된 뒤 나머지만 돌릴 때 씁니다.)
 	 *
+	 * 다시 돌리기(rerunFrom):
+	 * - 이미 있는 리비전에서 그 단계와 그 뒤의 단계를 처음부터 다시 돌립니다. 예: DOCUMENT를 주면 문서만 다시 만듭니다.
+	 *   (문서 짓는 규칙이나 의미 분석 규칙을 고친 뒤, 앞 단계를 다시 하지 않고 결과만 새로 만들 때 씁니다.)
+	 *
 	 * 한 프로젝트에서 분석은 한 번에 하나만 돕니다. 이미 돌고 있으면 409입니다.
 	 * synchronized인 이유: "돌고 있는 Job이 있나" 확인과 Job 등록 사이에 다른 요청이 끼어들지 못하게 하려는 것입니다.
 	 * </pre>
 	 */
-	public synchronized Map<String, Object> startAnalysis(String projectId, String revisionLabel) {
+	public synchronized Map<String, Object> startAnalysis(String projectId, String revisionLabel, String rerunFrom) {
 		Map<String, Object> project = projectService.getProject(projectId);
 		String localPath = (String) project.get("localPath");
 		if (localPath == null || !new File(localPath).isDirectory()) {
@@ -84,6 +90,17 @@ public class AnalysisService extends BaseObject {
 			revisionId = ((Number) revision.get("revisionId")).longValue();
 			resumed = true;
 		}
+		List<String> rerunPasses = new ArrayList<String>();
+		if (rerunFrom != null && rerunFrom.trim().length() > 0) {
+			if (!resumed) {
+				throw ApiException.badRequest("rerunFrom은 이미 분석한 리비전에만 쓸 수 있습니다. revisionLabel로 그 리비전을 지정하세요.");
+			}
+			rerunPasses = analysisJobRunner.passNamesFrom(rerunFrom.trim());
+			if (rerunPasses.isEmpty()) {
+				throw ApiException.badRequest("없는 단계입니다: " + rerunFrom + " (쓸 수 있는 값: " + analysisJobRunner.passNames() + ")");
+			}
+			revisionDao.resetRevisionPasses(revisionId, rerunPasses);
+		}
 
 		String analysisId = nextAnalysisId();
 		analysisJobDao.insertJob(analysisId, projectId, revisionId);
@@ -100,6 +117,9 @@ public class AnalysisService extends BaseObject {
 		result.put("revisionId", revisionId);
 		result.put("revisionLabel", label);
 		result.put("resumed", resumed);
+		if (!rerunPasses.isEmpty()) {
+			result.put("rerunPasses", rerunPasses);
+		}
 		result.put("status", "READY");
 		return result;
 	}

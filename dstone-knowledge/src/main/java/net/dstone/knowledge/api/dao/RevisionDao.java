@@ -97,6 +97,20 @@ public class RevisionDao extends BaseDao {
 		sqlSessionCommon.update(NS + "endRevisionPass", param);
 	}
 
+	/**
+	 * <pre>
+	 * 단계들을 "아직 안 돈 것"으로 되돌립니다. 단계의 진행 상태와, 그 단계의 파일별 진행 상태를 지웁니다.
+	 * 분석 결과 자체는 지우지 않습니다. 단계가 다시 돌면서 자기 결과를 덮어씁니다(모든 단계는 다시 돌려도 되게 만든다).
+	 * </pre>
+	 */
+	public void resetRevisionPasses(long revisionId, List<String> passes) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("passes", passes);
+		sqlSessionCommon.delete(NS + "deleteFilePasses", param);
+		sqlSessionCommon.delete(NS + "deleteRevisionPasses", param);
+	}
+
 	public int markInterruptedRevisionPasses() {
 		return sqlSessionCommon.update(NS + "markInterruptedRevisionPasses");
 	}

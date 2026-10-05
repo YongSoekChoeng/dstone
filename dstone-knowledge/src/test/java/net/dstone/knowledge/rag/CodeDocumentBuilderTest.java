@@ -62,6 +62,7 @@ public class CodeDocumentBuilderTest {
 		material.types.add(row("symbolId", "T1", "kind", "CLASS", "fqn", "shop.order.OrderService", "simpleName", "OrderService"
 				, "layer", "SERVICE", "layerConfidence", "HIGH", "lineStart", 10, "lineEnd", 26));
 		material.fields.add(row("ownerSymbolId", "T1", "name", "orderDao", "type", "OrderDao"));
+		material.fields.add(row("ownerSymbolId", "T1", "name", "name", "type", "String"));
 		material.methods.add(row("methodId", "M1", "ownerSymbolId", "T1", "name", "cancel", "signature", "cancel(String)", "returnType", "boolean"
 				, "paramCount", 1, "isConstructor", false, "isSynthetic", false, "lineStart", 19, "lineEnd", 21));
 		material.methods.add(row("methodId", "M2", "ownerSymbolId", "T1", "name", "getName", "signature", "getName()", "returnType", "String"
@@ -126,6 +127,17 @@ public class CodeDocumentBuilderTest {
 		// 설정을 끄면 접근자도 메소드 문서가 된다.
 		CodeDocumentBuilder.Result kept = new CodeDocumentBuilder("shop", 1L, false, 1800).build(file(), SOURCE, material());
 		assertNotNull(chunkOf(kept, "METHOD:M2"));
+	}
+
+	@Test
+	public void 이름이_get으로_시작해도_그_이름의_필드가_없으면_접근자가_아니다() {
+		// DBUtil.getConnection()처럼 짧지만 일을 하는 메소드. 필드 name을 빼면 getName()은 더는 접근자가 아니다.
+		CodeDocumentBuilder.Material material = material();
+		material.fields.remove(1);
+
+		CodeDocumentBuilder.Result result = new CodeDocumentBuilder("shop", 1L, true, 1800).build(file(), SOURCE, material);
+
+		assertNotNull(chunkOf(result, "METHOD:M2"));
 	}
 
 	@Test

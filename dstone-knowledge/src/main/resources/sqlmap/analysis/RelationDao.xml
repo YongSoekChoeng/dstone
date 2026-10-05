@@ -317,4 +317,157 @@
          LIMIT #{limit}
     </select>
 
+    <!-- ================= 영향도 분석 ================= -->
+
+    <!-- 신뢰도를 숫자로. 경로에서 가장 약한 고리를 고르려면(LEAST) 크기를 비교할 수 있어야 한다 -->
+    <sql id="confRank">(CASE ${column} WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END)</sql>
+
+    <sql id="confName">(CASE ${column} WHEN 3 THEN 'HIGH' WHEN 2 THEN 'MEDIUM' ELSE 'LOW' END)</sql>
+
+    <!-- "이것을 고치면 어디까지 닿는가" 를 거슬러 올라가며 모은다.
+         출발점(깊이 0)은 대상을 직접 건드리는 메소드다:
+           TABLE     그 테이블을 읽거나 쓰는 SQL 을 실행하는 메소드
+           STATEMENT 그 SQL statement 를 실행하는 메소드
+           TYPE      그 타입의 모든 메소드
+           METHOD    그 메소드
+         거기서 부르는 쪽으로(CALLS, 가능한 구현, 화면의 요청) depth 만큼 올라간다.
+         conf 는 출발점에서 여기까지 오는 길에서 가장 약한 관계의 신뢰도다. 길이 여럿이면 가장 믿을 만한 길의 값을 쓴다.
+         순환 호출이 있어도 끝난다: depth 로 묶여 있고 UNION 이 같은 (노드, 깊이, 신뢰도)를 다시 넣지 않는다 -->
+    <sql id="impactWalk">
+        WITH RECURSIVE walk (depth, node_id, node_kind, conf) AS (
+            <choose>
+                <when test="targetKind == 'TABLE'">
+            SELECT 0, e.from_id::varchar, 'METHOD'::varchar
+                 , LEAST(<include refid="confRank"><property name="column" value="e.confidence"/></include>, <include refid="confRank"><property name="column" value="t.confidence"/></include>)
+              FROM analysis_relation t
+              JOIN analysis_relation e ON e.revision_id = t.revision_id AND e.to_id = t.from_id AND e.relation_type = 'EXECUTES_SQL'
+             WHERE t.revision_id = #{revisionId}
+               AND t.to_external = #{target}
+               AND t.relation_type IN
+                    <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+                </when>
+                <when test="targetKind == 'STATEMENT'">
+            SELECT 0, e.from_id::varchar, 'METHOD'::varchar, <include refid="confRank"><property name="column" value="e.confidence"/></include>
+              FROM analysis_relation e
+             WHERE e.revision_id = #{revisionId}
+               AND e.relation_type = 'EXECUTES_SQL'
+               AND e.to_id IN (SELECT 'S' || mp.mapper_id
+                                 FROM analysis_mapper mp
+                                WHERE mp.revision_id = #{revisionId}
+                                  AND (mp.statement_id = #{target} OR mp.namespace || '.' || mp.statement_id = #{target}))
+                </when>
+                <when test="targetKind == 'TYPE'">
+            SELECT 0, m.method_id::varchar, 'METHOD'::varchar, 3
+              FROM analysis_method m
+              JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+             WHERE m.revision_id = #{revisionId}
+               AND s.fqn = #{target}
+                </when>
+                <otherwise>
+            SELECT 0, CAST(#{target} AS varchar), 'METHOD'::varchar, 3
+                </otherwise>
+            </choose>
+            UNION
+            SELECT w.depth + 1, r.from_id::varchar, r.from_kind::varchar
+                 , LEAST(w.conf, <include refid="confRank"><property name="column" value="r.confidence"/></include>)
+              FROM walk w
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.to_id = w.node_id
+               AND r.relation_type IN
+                    <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+             WHERE w.depth &lt; #{depth}
+        ), affected AS (
+            SELECT node_id, node_kind, MIN(depth) AS depth, MAX(conf) AS conf
+              FROM walk
+             GROUP BY node_id, node_kind
+        )
+    </sql>
+
+    <!-- 닿는 메소드. depth 0 이 대상을 직접 건드리는 메소드다 -->
+    <select id="selectImpactMethods" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactWalk"/>
+        SELECT a.depth AS "depth"
+             , <include refid="confName"><property name="column" value="a.conf"/></include> AS "confidence"
+             , m.method_id AS "methodId"
+             , o.fqn || '#' || m.signature AS "method"
+             , o.layer AS "layer"
+             , f.path AS "path"
+             , m.line_start AS "lineStart"
+          FROM affected a
+          JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
+          JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
+          LEFT JOIN analysis_file f ON f.file_id = m.file_id
+         WHERE a.node_kind = 'METHOD'
+         ORDER BY a.depth, o.fqn, m.signature
+         LIMIT #{limit}
+    </select>
+
+    <!-- 닿는 진입점(주소, 스케줄, main ...). 사용자가 이 변경을 겪게 되는 입구다.
+         메소드 없이 타입까지만 이어진 진입점(Struts 의 DispatchAction 처럼 어느 메소드가 불리는지 모르는 것)은
+         그 타입의 메소드가 하나라도 닿으면 넣되, 짐작이므로 LOW 로 표시한다 -->
+    <select id="selectImpactEndpoints" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactWalk"/>
+        SELECT x.*
+          FROM (
+            SELECT e.endpoint_type AS "endpointType"
+                 , e.http_method AS "httpMethod"
+                 , e.path AS "path"
+                 , o.fqn || '#' || m.signature AS "handler"
+                 , m.method_id AS "methodId"
+                 , a.depth AS "depth"
+                 , <include refid="confName"><property name="column" value="a.conf"/></include> AS "confidence"
+                 , 'METHOD' AS "matchedBy"
+              FROM affected a
+              JOIN analysis_endpoint e ON e.revision_id = #{revisionId} AND e.method_id = a.node_id
+              JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+              JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
+             WHERE a.node_kind = 'METHOD'
+            UNION ALL
+            SELECT e.endpoint_type, e.http_method, e.path, o.fqn, NULL, t.depth, 'LOW', 'TYPE'
+              FROM (SELECT m.owner_symbol_id, MIN(a.depth) AS depth
+                      FROM affected a
+                      JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
+                     WHERE a.node_kind = 'METHOD'
+                     GROUP BY m.owner_symbol_id) t
+              JOIN analysis_endpoint e ON e.revision_id = #{revisionId} AND e.symbol_id = t.owner_symbol_id AND e.method_id IS NULL
+              JOIN analysis_symbol o ON o.revision_id = e.revision_id AND o.symbol_id = e.symbol_id
+          ) x
+         ORDER BY x."depth", x."path", x."handler"
+         LIMIT #{limit}
+    </select>
+
+    <!-- 닿는 화면(JSP). 세 가지 길이 있다:
+           REQUESTS 화면이, 닿는 메소드가 처리하는 주소를 요청한다
+           CALLS    화면 안의 Java 코드가 닿는 메소드를 직접 부른다
+           RENDERS  닿는 메소드가 끝나고 이 화면을 연다(이 화면에 보이는 내용이 달라질 수 있다) -->
+    <select id="selectImpactScreens" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactWalk"/>
+        SELECT x.path AS "path"
+             , MIN(x.depth) AS "depth"
+             , <include refid="confName"><property name="column" value="MAX(x.conf)"/></include> AS "confidence"
+             , array_to_string(array_agg(DISTINCT x.via), ',') AS "via"
+          FROM (
+            SELECT 'REQUESTS' AS via, f.path, a.depth, a.conf
+              FROM affected a
+              JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = CAST(substr(a.node_id, 2) AS bigint)
+             WHERE a.node_kind = 'FILE'
+            UNION ALL
+            SELECT 'CALLS', f.path, a.depth, a.conf
+              FROM affected a
+              JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
+              JOIN analysis_file f ON f.file_id = m.file_id AND f.language = 'JSP'
+             WHERE a.node_kind = 'METHOD'
+            UNION ALL
+            SELECT 'RENDERS', f.path, a.depth, LEAST(a.conf, <include refid="confRank"><property name="column" value="r.confidence"/></include>)
+              FROM affected a
+              JOIN analysis_relation r ON r.revision_id = #{revisionId} AND r.from_id = a.node_id AND r.relation_type = 'RENDERS' AND r.to_kind = 'FILE'
+              JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = CAST(substr(r.to_id, 2) AS bigint)
+             WHERE a.node_kind = 'METHOD'
+          ) x
+         GROUP BY x.path
+         ORDER BY MIN(x.depth), x.path
+         LIMIT #{limit}
+    </select>
+
 </mapper>

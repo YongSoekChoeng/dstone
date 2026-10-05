@@ -101,6 +101,21 @@
            AND pass = #{pass}
     </update>
 
+    <!-- "이 단계부터 다시" 할 때: 단계의 진행 상태와 파일별 진행 상태를 지운다 -->
+    <delete id="deleteFilePasses" parameterType="java.util.Map">
+        DELETE FROM analysis_file_pass
+         WHERE revision_id = #{revisionId}
+           AND pass IN
+            <foreach collection="passes" item="pass" open="(" separator="," close=")">#{pass}</foreach>
+    </delete>
+
+    <delete id="deleteRevisionPasses" parameterType="java.util.Map">
+        DELETE FROM analysis_revision_pass
+         WHERE revision_id = #{revisionId}
+           AND pass IN
+            <foreach collection="passes" item="pass" open="(" separator="," close=")">#{pass}</foreach>
+    </delete>
+
     <update id="markInterruptedRevisionPasses">
         UPDATE analysis_revision_pass
            SET status = 'FAILED'

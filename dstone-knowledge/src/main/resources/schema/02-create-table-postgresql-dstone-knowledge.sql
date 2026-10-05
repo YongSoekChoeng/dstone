@@ -462,8 +462,12 @@ CREATE TABLE IF NOT EXISTS rag_embedding (
     embedding         vector(1024),                      -- 임베딩 전에는 NULL
     created_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
     embedded_at       TIMESTAMPTZ,
+    priority          INT           NOT NULL DEFAULT 0,  -- 큰 것부터 임베딩한다. 코드 0, 올린 일반 문서 10
     PRIMARY KEY (content_hash, model)
 );
+-- 우선순위: 사람이 올린 문서 한 건이 큰 프로젝트의 청크 수만 건 뒤에서 몇 시간씩 기다리지 않게 한다.
+-- 테이블을 이미 만든 DB 에도 생기도록 ALTER 로 추가한다.
+ALTER TABLE rag_embedding ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 0;
 -- 대기 중인 것만 빨리 꺼내기 위한 부분 인덱스
 CREATE INDEX IF NOT EXISTS idx_rag_embedding_todo ON rag_embedding(status, created_at) WHERE status <> 'DONE';
 -- 코사인 유사도 검색용 HNSW 인덱스 (NULL 인 행은 인덱스에 들어가지 않는다)

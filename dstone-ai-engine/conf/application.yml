@@ -215,6 +215,15 @@ dstone:
                 api-token: ENC(koeh9W9G8vYjPVBZAeO3GWxg8Uv3PYssUy8aykBFHNMVke4YNjWubBwxGu7xp+hDZbfMwSgwbXj7ZE87Gp1cpQ==)
                 allowed-jobs:
                     - testApp
+            # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)에 물어보는 Tool(tools.knowledge.KnowledgeTool) 설정.
+            # base-url이 비어 있으면 이 Tool은 항상 실패 문구로 끝난다 - 주소를 채우는 것이 곧 "이 Tool을 켠 상태"다.
+            # api-key: dstone-knowledge가 호출자 인증(dstone.knowledge.security.auth.enabled)을 켰을 때만 넣는다. ENC(...)로 적는다.
+            # timeout-seconds: 응답 대기 시간(기본 60). 검색은 질문을 임베딩해야 해서 임베딩 서버가 바쁘면 수 초가 걸린다.
+            knowledge:
+                # 주소는 환경마다 다르다(Pod에서는 localhost가 아니다). env-*.properties의 KNOWLEDGE_HOST / KNOWLEDGE_PORT.
+                base-url: http://${KNOWLEDGE_HOST}:${KNOWLEDGE_PORT}
+                # api-key: ENC(...)
+                timeout-seconds: 60
             # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
             # "잘렸으니 범위를 좁혀 다시 호출하라"는 안내를 붙인다(common.config.ConfigTool, 기본 60000).
             # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 결과 하나가 컨텍스트 한도나 응답 대기 시간을 넘긴다.

@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.api.service.CallGraphService;
+import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
 import net.dstone.knowledge.api.service.SymbolService;
 
@@ -32,6 +34,9 @@ public class RevisionController {
 
 	@Autowired
 	private CallGraphService callGraphService;
+
+	@Autowired
+	private ImpactService impactService;
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */
 	@GetMapping("/{revisionId}")
@@ -113,6 +118,45 @@ public class RevisionController {
 		result.put("revisionId", revisionId);
 		result.put("deleted", Boolean.TRUE);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 영향도 분석: 이것을 고치면 닿는 메소드, 진입점(주소), 화면을 한 번에 돌려줍니다.
+	 * 대상은 넷 가운데 하나만 줍니다.
+	 *   - table: 테이블 이름. access=READ / WRITE로 읽는 쪽이나 쓰는 쪽만 볼 수 있습니다(기본 ALL).
+	 *   - statement: SQL statement 이름(네임스페이스.id 또는 id)
+	 *   - type: 타입 전체 이름. 그 타입의 모든 메소드에서 출발합니다.
+	 *   - methodId: 메소드 ID
+	 * depth: 몇 단계까지 거슬러 올라갈지(기본 5, 최대 10)
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/impact")
+	public Map<String, Object> getImpact(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "table", required = false) String table
+			, @RequestParam(name = "statement", required = false) String statement
+			, @RequestParam(name = "type", required = false) String type
+			, @RequestParam(name = "methodId", required = false) String methodId
+			, @RequestParam(name = "access", required = false) String access
+			, @RequestParam(name = "depth", required = false) Integer depth
+			, @RequestParam(name = "includePossible", defaultValue = "true") boolean includePossible) {
+		String[] kinds = { "TABLE", "STATEMENT", "TYPE", "METHOD" };
+		String[] values = { table, statement, type, methodId };
+		String targetKind = null;
+		String target = null;
+		for (int i = 0; i < values.length; i++) {
+			if (values[i] != null && values[i].trim().length() > 0) {
+				if (targetKind != null) {
+					throw ApiException.badRequest("대상은 table / statement / type / methodId 가운데 하나만 줍니다.");
+				}
+				targetKind = kinds[i];
+				target = values[i];
+			}
+		}
+		if (targetKind == null) {
+			throw ApiException.badRequest("대상이 없습니다. table / statement / type / methodId 가운데 하나를 주세요.");
+		}
+		return impactService.getImpact(revisionId, targetKind, target, access, depth, includePossible);
 	}
 
 }

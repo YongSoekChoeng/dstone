@@ -162,6 +162,34 @@ public class AnalysisJobRunner extends BaseObject {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * 그 단계와 그 뒤에 도는 단계의 이름을 실행 순서대로 돌려줍니다. "이 단계부터 다시" 할 때 무엇을 되돌릴지 정하는 데 씁니다.
+	 * </pre>
+	 *
+	 * @return 없는 단계 이름이면 빈 목록
+	 */
+	public List<String> passNamesFrom(String passName) {
+		List<String> names = new ArrayList<String>();
+		List<AnalysisPass> ordered = orderedPasses();
+		for (int i = 0; i < ordered.size(); i++) {
+			if (!names.isEmpty() || ordered.get(i).name().equalsIgnoreCase(passName)) {
+				names.add(ordered.get(i).name());
+			}
+		}
+		return names;
+	}
+
+	/** 모든 단계의 이름(실행 순서대로) */
+	public List<String> passNames() {
+		List<String> names = new ArrayList<String>();
+		List<AnalysisPass> ordered = orderedPasses();
+		for (int i = 0; i < ordered.size(); i++) {
+			names.add(ordered.get(i).name());
+		}
+		return names;
+	}
+
 	private List<AnalysisPass> orderedPasses() {
 		List<AnalysisPass> ordered = new ArrayList<AnalysisPass>(passes);
 		Collections.sort(ordered, new Comparator<AnalysisPass>() {

@@ -97,4 +97,22 @@ public class RelationDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectCallees", condition);
 	}
 
+	/* ---------- 영향도 분석 ---------- */
+
+	/**
+	 * @param condition {revisionId, targetKind(TABLE / STATEMENT / TYPE / METHOD), target, tableRelationTypes, relationTypes, depth, limit}
+	 * @return 닿는 메소드. depth 0이 대상을 직접 건드리는 메소드
+	 */
+	public List<Map<String, Object>> selectImpactMethods(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactMethods", condition);
+	}
+
+	public List<Map<String, Object>> selectImpactEndpoints(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactEndpoints", condition);
+	}
+
+	public List<Map<String, Object>> selectImpactScreens(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactScreens", condition);
+	}
+
 }

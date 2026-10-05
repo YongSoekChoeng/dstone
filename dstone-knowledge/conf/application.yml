@@ -11,7 +11,7 @@ spring:
     # <자동설정기능>
     # dstone-common이 Spring Security를 클래스패스에 올려 두기 때문에, 따로 빼 주지 않으면
     # 기본 HTTP Basic 인증이 켜진다. 이 모듈은 Spring Security 필터 체인을 쓰지 않는다.
-    # (호출자 인증은 일반 문서 수집 기능을 옮겨 올 때 API 키 필터로 추가할 예정이다.)
+    # 호출자 인증은 헤더 하나만 보는 가벼운 필터(common.security.ApiKeyAuthFilter)로 한다. 아래 dstone.knowledge.security 참고.
     ##########################################################################################
     autoconfigure:
         exclude:
@@ -20,6 +20,11 @@ spring:
             - org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
             - org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration
             - org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
+    servlet:
+        multipart:
+            # 올리는 일반 문서(PDF, Word 등) 한 건의 최대 크기. 기본값(1MB)으로는 웬만한 문서가 다 거절된다.
+            max-file-size: 50MB
+            max-request-size: 55MB
     datasource:
         # 분석 결과/그래프/RAG 청크/임베딩을 모두 담는 단일 스키마(PostgreSQL + pgvector).
         # 롤/DB 생성 절차: src/main/resources/schema/01-init-postgresql-dstone-knowledge.sql, docs/software/05.postgresql.md 참고.
@@ -98,11 +103,22 @@ dstone:
             file-timeout-seconds: 120
         # RAG (분석 결과를 문서와 청크로 만들고 임베딩하기)
         rag:
-            # get/set/is 로 시작하는 한두 줄짜리 메소드(단순 접근자)는 메소드 문서를 따로 만들지 않는다.
+            # 단순 접근자는 메소드 문서를 따로 만들지 않는다. 세 가지가 다 맞는 메소드다:
+            # 이름이 get/set/is 로 시작하고, 세 줄을 넘지 않고, 같은 타입에 그 이름의 필드가 있다(getName → name).
             # 타입 문서의 멤버 목록에는 들어간다. VO 가 많은 프로젝트에서 임베딩 양이 크게 줄어든다.
             skip-accessors: true
             # 청크 하나에 담는 소스의 최대 글자 수. 긴 메소드는 이 크기로 나눈다.
             chunk-max-chars: 1800
+            ##########################################################################################
+            # <올린 일반 문서>  POST /api/documents 로 올린 PDF/Word 등
+            ##########################################################################################
+            upload:
+                # 문서 하나에서 읽는 최대 글자 수. 넘는 부분은 버리고 응답에 truncated 로 알린다.
+                max-chars: 5000000
+                # 청크 경계에서 앞 청크의 마지막 문단을 다음 청크에 다시 넣을 때, 그 문단의 최대 글자 수. 0 이면 겹치지 않는다.
+                overlap-chars: 200
+                # 임베딩 우선순위. 코드(0)보다 커야, 올린 문서가 큰 프로젝트의 대기열 뒤에서 기다리지 않는다.
+                embedding-priority: 10
             embedding:
                 # 임베딩 대기열을 서버가 알아서 비울지. false 면 청크는 만들어지지만 벡터가 생기지 않아 검색되지 않는다.
                 enabled: true
@@ -112,3 +128,19 @@ dstone:
                 dimensions: 1024
                 # 대기열이 비었을 때 다시 확인할 때까지 쉬는 시간(초)
                 idle-seconds: 5
+        ##########################################################################################
+        # <호출자 인증>
+        # enabled: true 면 /api/** 요청에 X-API-Key 헤더가 있어야 한다(/api/system/health 제외).
+        # 키마다 호출자(caller) 이름이 붙고, 올린 일반 문서는 올린 호출자에게만 보인다(tenant 격리).
+        # 꺼 두면 누구나 부를 수 있고, 올린 문서는 호출자 구분 없이 한곳에 모인다.
+        # 코드 분석 결과는 호출자별로 나누지 않는다(키가 있는 호출자는 모든 프로젝트를 본다).
+        # 키 값은 DB 비밀번호와 같이 ENC(...) 로 적는다.
+        ##########################################################################################
+        security:
+            auth:
+                enabled: false
+                # keys:
+                #     - key: ENC(...)
+                #       caller: sample-si-project
+                #     - key: ENC(...)
+                #       caller: another-caller
