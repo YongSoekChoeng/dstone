@@ -30,16 +30,18 @@ public class SymbolService extends BaseObject {
 	 * </pre>
 	 *
 	 * @param kind CLASS / INTERFACE / ENUM / RECORD / ANNOTATION / ANONYMOUS (없으면 전부)
+	 * @param layer CONTROLLER / SERVICE / REPOSITORY / MODEL ... (없으면 전부)
 	 * @param name 전체 이름에 이 글자가 들어간 것만 (없으면 전부)
 	 * @param page 1부터 시작
 	 */
-	public Map<String, Object> getTypeList(long revisionId, String kind, String name, int page, int size) {
+	public Map<String, Object> getTypeList(long revisionId, String kind, String layer, String name, int page, int size) {
 		int pageNo = page < 1 ? 1 : page;
 		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);
 
 		Map<String, Object> condition = new HashMap<String, Object>();
 		condition.put("revisionId", revisionId);
 		condition.put("kind", kind);
+		condition.put("layer", layer);
 		condition.put("name", name);
 		condition.put("size", pageSize);
 		condition.put("offset", (pageNo - 1) * pageSize);

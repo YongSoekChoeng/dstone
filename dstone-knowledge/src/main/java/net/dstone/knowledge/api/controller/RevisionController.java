@@ -51,20 +51,31 @@ public class RevisionController {
 		return revisionService.getFileList(revisionId, language, fileType, encoding, path, page, size);
 	}
 
-	/** 타입 목록. kind는 일치 조건, name은 전체 이름에 포함 조건입니다. */
+	/** 타입 목록. kind와 layer는 일치 조건, name은 전체 이름에 포함 조건입니다. */
 	@GetMapping("/{revisionId}/symbols")
 	public Map<String, Object> getTypeList(@PathVariable("revisionId") long revisionId
 			, @RequestParam(name = "kind", required = false) String kind
+			, @RequestParam(name = "layer", required = false) String layer
 			, @RequestParam(name = "name", required = false) String name
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
-		return symbolService.getTypeList(revisionId, kind, name, page, size);
+		return symbolService.getTypeList(revisionId, kind, layer, name, page, size);
 	}
 
 	/** 타입 하나: 메소드, 필드, 애노테이션, 나가는 참조 */
 	@GetMapping("/{revisionId}/symbols/{symbolId}")
 	public Map<String, Object> getType(@PathVariable("revisionId") long revisionId, @PathVariable("symbolId") String symbolId) {
 		return symbolService.getType(revisionId, symbolId);
+	}
+
+	/** 진입점 목록. type은 일치 조건(HTTP / SERVLET / MAIN / SCHEDULED / LISTENER / THREAD / JSP), path는 주소에 포함 조건입니다. */
+	@GetMapping("/{revisionId}/endpoints")
+	public Map<String, Object> getEndpointList(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "type", required = false) String type
+			, @RequestParam(name = "path", required = false) String path
+			, @RequestParam(name = "page", defaultValue = "1") int page
+			, @RequestParam(name = "size", defaultValue = "50") int size) {
+		return revisionService.getEndpointList(revisionId, type, path, page, size);
 	}
 
 	/** 메소드 찾기. owner는 타입 전체 이름에 포함 조건, name은 메소드 이름 일치 조건입니다. */

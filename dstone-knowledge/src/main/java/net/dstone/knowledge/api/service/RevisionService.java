@@ -19,6 +19,7 @@ import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.api.dao.FilePassDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
+import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.exception.ApiException;
 
 /**
@@ -51,6 +52,9 @@ public class RevisionService extends BaseObject {
 
 	@Autowired
 	private RelationDao relationDao;
+
+	@Autowired
+	private SemanticDao semanticDao;
 
 	@Autowired
 	@Qualifier("txTemplateCommon")
@@ -95,6 +99,12 @@ public class RevisionService extends BaseObject {
 		relations.put("unresolvedReasons", relationDao.selectUnresolvedReasons(revisionId));
 		relations.put("metrics", relationDao.selectMetricsByRevision(revisionId));
 		result.put("relations", relations);
+
+		// SEMANTIC 단계의 결과
+		Map<String, Object> semantic = new LinkedHashMap<String, Object>();
+		semantic.put("endpoints", semanticDao.selectEndpointSummary(revisionId));
+		semantic.put("layers", semanticDao.selectLayerSummary(revisionId));
+		result.put("semantic", semantic);
 		return result;
 	}
 
@@ -119,6 +129,35 @@ public class RevisionService extends BaseObject {
 		result.put("page", pageNo);
 		result.put("size", pageSize);
 		result.put("files", analysisFileDao.selectFileList(condition));
+		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 진입점 목록. 밖에서 이 프로그램으로 들어오는 입구들입니다.
+	 * </pre>
+	 *
+	 * @param endpointType HTTP / SERVLET / MAIN / SCHEDULED / LISTENER / THREAD / JSP (없으면 전부)
+	 * @param path 주소에 이 글자가 들어간 것만 (없으면 전부)
+	 * @param page 1부터 시작
+	 */
+	public Map<String, Object> getEndpointList(long revisionId, String endpointType, String path, int page, int size) {
+		findRevision(revisionId);
+		int pageNo = page < 1 ? 1 : page;
+		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);
+
+		Map<String, Object> condition = new HashMap<String, Object>();
+		condition.put("revisionId", revisionId);
+		condition.put("endpointType", endpointType);
+		condition.put("path", path);
+		condition.put("size", pageSize);
+		condition.put("offset", (pageNo - 1) * pageSize);
+
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("total", semanticDao.countEndpoint(condition));
+		result.put("page", pageNo);
+		result.put("size", pageSize);
+		result.put("endpoints", semanticDao.selectEndpointList(condition));
 		return result;
 	}
 

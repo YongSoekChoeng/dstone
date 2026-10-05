@@ -139,6 +139,7 @@
     <sql id="typeWhere">
          WHERE s.revision_id = #{revisionId}
         <if test="kind != null and kind != ''">AND s.kind = #{kind}</if>
+        <if test="layer != null and layer != ''">AND s.layer = #{layer}</if>
         <if test="name != null and name != ''">AND s.fqn LIKE '%' || #{name} || '%'</if>
     </sql>
 
@@ -158,6 +159,8 @@
         , s.is_abstract AS "isAbstract"
         , s.is_final AS "isFinal"
         , s.is_static AS "isStatic"
+        , s.layer AS "layer"
+        , s.layer_confidence AS "layerConfidence"
         , s.properties_json::text AS "properties"
         , s.file_id AS "fileId"
         , f.path AS "path"
