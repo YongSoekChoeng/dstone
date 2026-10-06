@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.dstone.knowledge.api.dao.GraphDao">
+
+    <!-- 노드 맵은 저장된 관계(analysis_relation)를 읽기만 한다. 따로 저장하는 것은 없다.
+
+         전체 맵은 메소드 하나하나가 아니라 "묶음" 단위로 그린다(메소드는 수만 개라 한 화면에 그릴 수 없다):
+           TYPE    클래스 하나. 안쪽 클래스와 익명 클래스는 가장 바깥 클래스에 합친다. ID = symbol_id
+           JSP     화면 파일 하나. 그 안의 Java 코드(스크립틀릿)도 여기에 합친다.        ID = 'F' + file_id
+           MAPPER  SQL 매퍼 파일 하나. 그 안의 statement 를 모두 합친다.                 ID = 'M' + file_id
+           TABLE   테이블 하나.                                                          ID = 'T:' + 이름 -->
+
+    <!-- 관계의 양쪽 끝(메소드, 필드, 타입, SQL statement, 화면 파일)이 어느 묶음에 속하는지.
+         WITH RECURSIVE 바로 뒤에 붙여 쓴다.
+           root      타입 → 가장 바깥 타입. 깊이를 20 으로 묶어 두어 잘못된 데이터에도 끝난다
+           type_node 타입 → 묶음 ID. 화면(JSP)에서 만든 타입은 그 화면 파일이 묶음이다
+           member    관계의 끝 → 묶음 ID -->
+    <sql id="memberCte">
+        root (symbol_id, root_id, depth) AS (
+            SELECT s.symbol_id, s.symbol_id, 0
+              FROM analysis_symbol s
+             WHERE s.revision_id = #{revisionId}
+               AND s.outer_symbol_id IS NULL
+            UNION ALL
+            SELECT s.symbol_id, r.root_id, r.depth + 1
+              FROM root r
+              JOIN analysis_symbol s ON s.revision_id = #{revisionId} AND s.outer_symbol_id = r.symbol_id
+             WHERE r.depth &lt; 20
+        ), type_node (symbol_id, node_id) AS (
+            -- 바깥 타입을 못 찾은 것(바깥 타입이 분석에서 빠진 경우)은 자기 자신을 묶음으로 삼는다.
+            SELECT s.symbol_id
+                 , (CASE WHEN f.language = 'JSP' THEN 'F' || rs.file_id ELSE rs.symbol_id END)::text
+              FROM analysis_symbol s
+              LEFT JOIN (SELECT symbol_id, MIN(root_id) AS root_id FROM root GROUP BY symbol_id) r ON r.symbol_id = s.symbol_id
+              JOIN analysis_symbol rs ON rs.revision_id = s.revision_id AND rs.symbol_id = COALESCE(r.root_id, s.symbol_id)
+              JOIN analysis_file f ON f.file_id = rs.file_id
+             WHERE s.revision_id = #{revisionId}
+        ), member (member_id, node_id) AS (
+            SELECT t.symbol_id::text, t.node_id FROM type_node t
+            UNION ALL
+            SELECT m.method_id::text, t.node_id
+              FROM analysis_method m
+              JOIN type_node t ON t.symbol_id = m.owner_symbol_id
+             WHERE m.revision_id = #{revisionId}
+            UNION ALL
+            SELECT d.field_id::text, t.node_id
+              FROM analysis_field d
+              JOIN type_node t ON t.symbol_id = d.owner_symbol_id
+             WHERE d.revision_id = #{revisionId}
+            UNION ALL
+            SELECT 'S' || mp.mapper_id, 'M' || mp.file_id
+              FROM analysis_mapper mp
+             WHERE mp.revision_id = #{revisionId}
+            UNION ALL
+            SELECT 'F' || f.file_id, 'F' || f.file_id
+              FROM analysis_file f
+             WHERE f.revision_id = #{revisionId}
+               AND f.language = 'JSP'
+        )
+    </sql>
+
+    <sql id="confRank">(CASE ${column} WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END)</sql>
+
+    <sql id="confName">(CASE ${column} WHEN 3 THEN 'HIGH' WHEN 2 THEN 'MEDIUM' ELSE 'LOW' END)</sql>
+
+    <!-- 파일 경로에서 폴더만. 폴더가 없으면 '(루트)' -->
+    <sql id="folderOf">(CASE WHEN strpos(${column}, '/') > 0 THEN regexp_replace(${column}, '/[^/]*$', '') ELSE '(루트)' END)</sql>
+
+
+    <!-- ================= 전체 맵 ================= -->
+
+    <!-- 전체 맵의 노드. group 은 화면에서 접어 보일 때의 묶음(패키지 / 폴더)이다 -->
+    <select id="selectGraphNodes" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE <include refid="memberCte"/>
+        SELECT x.*
+          FROM (
+            SELECT s.symbol_id::text AS "id"
+                 , 'TYPE' AS "kind"
+                 , s.kind::text AS "subType"
+                 , s.simple_name::text AS "name"
+                 , s.fqn::text AS "fullName"
+                 , COALESCE(NULLIF(s.package_name, ''), '(기본 패키지)')::text AS "group"
+                 , s.layer::text AS "layer"
+                 , f.path::text AS "path"
+                 , (SELECT COUNT(*) FROM analysis_method m
+                     WHERE m.revision_id = s.revision_id AND m.owner_symbol_id = s.symbol_id AND NOT m.is_synthetic)::int AS "size"
+              FROM analysis_symbol s
+              JOIN analysis_file f ON f.file_id = s.file_id
+             WHERE s.revision_id = #{revisionId}
+               AND s.symbol_id IN (SELECT t.node_id FROM type_node t)
+            UNION ALL
+            SELECT 'F' || f.file_id, 'JSP', 'JSP', regexp_replace(f.path, '^.*/', ''), f.path
+                 , <include refid="folderOf"><property name="column" value="f.path"/></include>
+                 , 'VIEW', f.path, COALESCE(f.line_count, 0)
+              FROM analysis_file f
+             WHERE f.revision_id = #{revisionId}
+               AND f.language = 'JSP'
+            UNION ALL
+            -- 이름은 네임스페이스의 마지막 마디(com.shop.OrderDao → OrderDao). 네임스페이스가 없으면 파일 이름
+            SELECT 'M' || f.file_id, 'MAPPER', MIN(mp.mapper_type)
+                 , COALESCE(NULLIF(regexp_replace(MIN(mp.namespace), '^.*\.', ''), ''), regexp_replace(f.path, '^.*/', ''))
+                 , COALESCE(NULLIF(MIN(mp.namespace), ''), f.path)
+                 , <include refid="folderOf"><property name="column" value="f.path"/></include>
+                 , 'MAPPER', f.path, (COUNT(*) FILTER (WHERE mp.statement_type &lt;&gt; 'SQL_FRAGMENT'))::int
+              FROM analysis_mapper mp
+              JOIN analysis_file f ON f.file_id = mp.file_id
+             WHERE mp.revision_id = #{revisionId}
+             GROUP BY f.file_id, f.path
+            UNION ALL
+            SELECT 'T:' || r.to_external, 'TABLE', 'TABLE', r.to_external, r.to_external, '(테이블)', 'TABLE', NULL, COUNT(*)::int
+              FROM analysis_relation r
+             WHERE r.revision_id = #{revisionId}
+               AND r.to_kind = 'TABLE'
+               AND r.to_external IS NOT NULL
+             GROUP BY r.to_external
+          ) x
+         ORDER BY x."kind", x."group", x."name"
+         LIMIT #{limit}
+    </select>
+
+    <!-- 전체 맵의 선. 메소드끼리의 관계를 묶음끼리의 관계로 합친다(count = 합쳐진 관계 수).
+         신뢰도는 합쳐진 것 가운데 가장 확실한 값이다. 같은 묶음 안의 관계(자기 자신으로 가는 선)는 뺀다.
+         프로젝트 밖으로 나가는 관계와 짝을 못 찾은 SQL 이름은 그릴 상대가 없어서 뺀다 -->
+    <select id="selectGraphEdges" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE <include refid="memberCte"/>
+        SELECT e.src AS "from"
+             , e.dst AS "to"
+             , e.relation_type AS "type"
+             , COUNT(*)::int AS "count"
+             , <include refid="confName"><property name="column" value="MAX(e.conf)"/></include> AS "confidence"
+          FROM (
+            SELECT src.node_id AS src
+                 , COALESCE(dst.node_id, 'T:' || r.to_external) AS dst
+                 , r.relation_type
+                 , <include refid="confRank"><property name="column" value="r.confidence"/></include> AS conf
+              FROM analysis_relation r
+              JOIN member src ON src.member_id = r.from_id
+              LEFT JOIN member dst ON dst.member_id = r.to_id
+             WHERE r.revision_id = #{revisionId}
+               AND r.relation_type IN
+            <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+               AND (dst.node_id IS NOT NULL OR (r.to_kind = 'TABLE' AND r.to_external IS NOT NULL))
+          ) e
+         WHERE e.src &lt;&gt; e.dst
+         GROUP BY e.src, e.dst, e.relation_type
+         ORDER BY e.src, e.dst, e.relation_type
+         LIMIT #{limit}
+    </select>
+
+
+    <!-- ================= 노드 하나의 관계 트리 (메소드 단위) ================= -->
+
+    <!-- 고른 노드에서 한쪽 방향으로 따라간다.
+           direction = UP   부르는 쪽으로(화면 → 진입 메소드 → ... → 고른 노드)
+           direction = DOWN 불리는 쪽으로(고른 노드 → ... → SQL → 테이블, 여는 화면)
+         출발점:
+           startByMember = true  묶음(클래스 / 화면 / 매퍼 파일)이다. 그 묶음에 든 메소드, statement 전부에서 출발한다
+           startByMember = false 메소드나 SQL statement 하나다
+           tableName 이 있으면   테이블이다. 그 테이블을 읽거나 쓰는 SQL 에서 출발한다(UP 만 뜻이 있다)
+         첫 걸음(anchorTypes)과 그다음 걸음(stepTypes)의 관계 종류가 다르다. 화면이 끼면 "호출"이 아니라 "화면 이동"이 되기 때문이다:
+           화면에서 내려갈 때만 REQUESTS(화면이 요청하는 주소)를 따라가고, 화면으로 올라갈 때만 RENDERS(이 화면을 여는 메소드)를 따라간다.
+         hideLayers 계층의 메소드로는 가지 않는다(VO 의 getter/setter 호출이 그림을 덮지 않게). 출발점 자신은 숨기지 않는다.
+         순환 호출이 있어도 끝난다: depth 로 묶여 있고 UNION 이 같은 행을 다시 넣지 않는다 -->
+    <select id="selectNeighborEdges" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE <include refid="memberCte"/>
+        , start_node (node_id) AS (
+            <choose>
+                <when test="startByMember">SELECT mb.member_id FROM member mb WHERE mb.node_id = #{startId}</when>
+                <otherwise>SELECT CAST(#{startId} AS text)</otherwise>
+            </choose>
+        ), hidden (member_id) AS (
+            <choose>
+                <when test="hideLayers != null and hideLayers.size() > 0">
+            SELECT m.method_id::text
+              FROM analysis_method m
+              JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
+             WHERE m.revision_id = #{revisionId}
+               AND o.layer IN
+                    <foreach collection="hideLayers" item="layer" open="(" separator="," close=")">#{layer}</foreach>
+               AND m.method_id NOT IN (SELECT sn.node_id FROM start_node sn)
+                </when>
+                <otherwise>SELECT CAST(NULL AS text) WHERE FALSE</otherwise>
+            </choose>
+        ), walk (depth, src, dst, relation_type, conf) AS (
+            SELECT 1, r.from_id::text, COALESCE(r.to_id, 'T:' || r.to_external)::text, r.relation_type::text
+                 , <include refid="confRank"><property name="column" value="r.confidence"/></include>
+              FROM analysis_relation r
+             WHERE r.revision_id = #{revisionId}
+               AND r.relation_type IN
+            <foreach collection="anchorTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+            <choose>
+                <when test="direction == 'UP'">
+                    <choose>
+                        <when test="tableName != null">AND r.to_kind = 'TABLE' AND r.to_external = #{tableName}</when>
+                        <otherwise>AND r.to_id IN (SELECT sn.node_id FROM start_node sn)</otherwise>
+                    </choose>
+               AND NOT EXISTS (SELECT 1 FROM hidden h WHERE h.member_id = r.from_id)
+                </when>
+                <otherwise>
+               AND r.from_id IN (SELECT sn.node_id FROM start_node sn)
+               AND (r.to_id IS NOT NULL OR (r.to_kind = 'TABLE' AND r.to_external IS NOT NULL))
+               AND NOT EXISTS (SELECT 1 FROM hidden h WHERE h.member_id = r.to_id)
+                </otherwise>
+            </choose>
+            UNION
+            SELECT w.depth + 1, r.from_id::text, COALESCE(r.to_id, 'T:' || r.to_external)::text, r.relation_type::text
+                 , <include refid="confRank"><property name="column" value="r.confidence"/></include>
+              FROM walk w
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+            <choose>
+                <when test="direction == 'UP'">AND r.to_id = w.src</when>
+                <otherwise>AND r.from_id = w.dst</otherwise>
+            </choose>
+               AND r.relation_type IN
+            <foreach collection="stepTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+             WHERE w.depth &lt; #{depth}
+            <choose>
+                <when test="direction == 'UP'">
+               AND NOT EXISTS (SELECT 1 FROM hidden h WHERE h.member_id = r.from_id)
+                </when>
+                <otherwise>
+               AND (r.to_id IS NOT NULL OR (r.to_kind = 'TABLE' AND r.to_external IS NOT NULL))
+               AND NOT EXISTS (SELECT 1 FROM hidden h WHERE h.member_id = r.to_id)
+                </otherwise>
+            </choose>
+        )
+        -- 서로를 부르는 메소드가 있으면 같은 선이 깊이를 바꿔 가며 다시 나온다. 가장 얕은 것 하나만 남긴다.
+        SELECT MIN(w.depth) AS "depth"
+             , w.src AS "from"
+             , w.dst AS "to"
+             , w.relation_type AS "type"
+             , <include refid="confName"><property name="column" value="MAX(w.conf)"/></include> AS "confidence"
+          FROM walk w
+         GROUP BY w.src, w.dst, w.relation_type
+         ORDER BY MIN(w.depth), w.src, w.dst
+         LIMIT #{limit}
+    </select>
+
+    <!-- 관계 트리에 나온 노드들의 이름과 위치. 테이블('T:이름')은 여기에 없다(이름이 곧 전부라 서비스가 만든다) -->
+    <select id="selectNodesByIds" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT n.node_id::text AS "id"
+             , n.node_type::text AS "kind"
+             , n.sub_type::text AS "subType"
+             , n.name::text AS "name"
+             , n.fqn::text AS "fullName"
+             , (CASE WHEN n.node_type IN ('METHOD', 'FIELD') THEN o.simple_name END)::text AS "owner"
+             , o.layer::text AS "layer"
+             , f.path::text AS "path"
+             , n.line_start AS "lineStart"
+          FROM kg_node n
+          LEFT JOIN analysis_file f ON f.file_id = n.file_id
+          LEFT JOIN analysis_method m ON m.revision_id = n.revision_id AND m.method_id = n.node_id
+          LEFT JOIN analysis_field d ON d.revision_id = n.revision_id AND d.field_id = n.node_id
+          LEFT JOIN analysis_symbol o
+            ON o.revision_id = n.revision_id
+           AND o.symbol_id = COALESCE(m.owner_symbol_id, d.owner_symbol_id, n.node_id)
+         WHERE n.revision_id = #{revisionId}
+           AND n.node_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+
+    <!-- ================= 노드 하나의 상세 ================= -->
+
+    <!-- 이 타입(안쪽 타입 포함)이나 이 메소드가 처리하는 진입점 -->
+    <select id="selectEndpointsByNode" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.endpoint_type AS "endpointType"
+             , e.http_method AS "httpMethod"
+             , e.path AS "path"
+             , m.method_id AS "methodId"
+             , m.signature AS "signature"
+          FROM analysis_endpoint e
+          LEFT JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+         WHERE e.revision_id = #{revisionId}
+           AND (e.method_id = #{nodeId} OR e.symbol_id = #{nodeId} OR m.owner_symbol_id = #{nodeId})
+         ORDER BY e.path, e.http_method
+         LIMIT #{limit}
+    </select>
+
+    <!-- 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 문서). 조각이 여럿이면 순서대로 잇는다.
+         refKind / docType: TYPE-TYPE(클래스), METHOD-METHOD(메소드), SQL-MAPPER(SQL statement), FILE-VIEW(화면) -->
+    <select id="selectDocumentText" parameterType="java.util.Map" resultType="string">
+        SELECT string_agg(c.content, E'\n' ORDER BY c.chunk_no)
+          FROM rag_document d
+          JOIN rag_chunk c ON c.doc_seq = d.doc_seq
+         WHERE d.revision_id = #{revisionId}
+           AND d.ref_kind = #{refKind}
+           AND d.doc_type = #{docType}
+           AND d.ref_id = #{refId}
+    </select>
+
+    <select id="selectFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT f.file_id AS "fileId"
+             , f.path AS "path"
+             , f.language AS "language"
+             , f.file_type AS "fileType"
+             , f.line_count AS "lineCount"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND f.file_id = #{fileId}
+    </select>
+
+    <!-- 화면(JSP) 안의 Java 코드로 만든 메소드. 화면에 스크립틀릿이 없으면 0건이다 -->
+    <select id="selectMethodsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT m.method_id AS "methodId"
+             , m.signature AS "signature"
+             , m.line_start AS "lineStart"
+             , m.is_synthetic AS "isSynthetic"
+          FROM analysis_method m
+         WHERE m.revision_id = #{revisionId}
+           AND m.file_id = #{fileId}
+         ORDER BY m.line_start, m.signature
+    </select>
+
+    <sql id="statementColumns">
+        'S' || mp.mapper_id AS "id"
+        , COALESCE(mp.namespace || '.', '') || mp.statement_id AS "statement"
+        , mp.statement_type AS "statementType"
+        , mp.mapper_type AS "mapperType"
+        , mp.namespace AS "namespace"
+        , f.path AS "path"
+        , mp.line_start AS "lineStart"
+        , mp.line_end AS "lineEnd"
+        -- 건드리는 테이블. 읽으면 (R), 쓰면 (C/U/D)
+        , (SELECT string_agg(DISTINCT t.to_external || '('
+                    || (CASE WHEN t.relation_type = 'READS_TABLE' THEN 'R' ELSE COALESCE(t.properties_json->>'crud', 'W') END) || ')', ', ')
+             FROM analysis_relation t
+            WHERE t.revision_id = mp.revision_id
+              AND t.from_id = 'S' || mp.mapper_id
+              AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')) AS "tables"
+    </sql>
+
+    <!-- 매퍼 파일 하나에 든 statement. 조각(sql)은 뺀다 -->
+    <select id="selectStatementsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="statementColumns"/>
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.file_id = #{fileId}
+           AND mp.statement_type &lt;&gt; 'SQL_FRAGMENT'
+         ORDER BY mp.line_start, mp.statement_id
+    </select>
+
+    <select id="selectStatement" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="statementColumns"/>
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.mapper_id = #{mapperId}
+    </select>
+
+</mapper>
