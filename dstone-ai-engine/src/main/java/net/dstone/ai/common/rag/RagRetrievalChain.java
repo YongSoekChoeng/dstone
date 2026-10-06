@@ -122,6 +122,9 @@ public class RagRetrievalChain extends BaseService {
 	 * 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다.
 	 * false로 주면 Spring AI ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로 돌아갑니다.
 	 * "컨텍스트 밖의 답변은 절대 허용하면 안 되는" 순수 지식베이스 QA 같은 Agent에 쓰면 됩니다.
+	 *
+	 * 검색 자체가 실패했을 때(dstone-knowledge가 느리거나 내려가 있을 때)도 같은 기준을 따릅니다.
+	 * allowEmptyContext가 true면 경고만 남기고 참고자료 없이 진행하고, false면 호출을 실패시킵니다.
 	 * </pre>
 	 *
 	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
@@ -131,10 +134,22 @@ public class RagRetrievalChain extends BaseService {
 	public Advisor buildAdvisor(final Integer topK, final Double similarityThreshold, Boolean allowEmptyContext) {
 		// 설정이 잘못됐으면 LLM을 부르기 전에 여기서 알린다.
 		this.requireRag();
+		final boolean optional = allowEmptyContext == null ? true : allowEmptyContext.booleanValue();
 		DocumentRetriever retriever = new DocumentRetriever() {
 			@Override
 			public List<Document> retrieve(Query query) {
-				List<RetrievedChunk> chunks = RagRetrievalChain.this.search(query.text(), topK, similarityThreshold);
+				List<RetrievedChunk> chunks;
+				try {
+					chunks = RagRetrievalChain.this.search(query.text(), topK, similarityThreshold);
+				} catch (IllegalStateException e) {
+					if (!optional) {
+						throw e;
+					}
+					// 참고자료가 없어도 답할 수 있는 Agent(allowEmptyContext=true)다. 검색이 실패했다고(dstone-knowledge가 느리거나 내려가 있다고)
+					// Agent 호출과 그 Workflow 전체를 실패시키지 않는다. 참고자료 없이 진행하고, 무슨 일이 있었는지는 로그에 남긴다.
+					RagRetrievalChain.this.warn("RAG 검색에 실패해서 참고자료 없이 진행합니다: " + e.getMessage());
+					chunks = new ArrayList<RetrievedChunk>();
+				}
 				List<Document> documents = new ArrayList<Document>(chunks.size());
 				for (int i = 0; i < chunks.size(); i++) {
 					RetrievedChunk chunk = chunks.get(i);
@@ -145,7 +160,7 @@ public class RagRetrievalChain extends BaseService {
 		};
 		ContextualQueryAugmenter queryAugmenter = ContextualQueryAugmenter.builder()
 			.promptTemplate(CONTEXT_PROMPT_TEMPLATE)
-			.allowEmptyContext(allowEmptyContext == null ? true : allowEmptyContext)
+			.allowEmptyContext(optional)
 			.build();
 		return RetrievalAugmentationAdvisor.builder()
 			.documentRetriever(retriever)

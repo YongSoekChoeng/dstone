@@ -19,6 +19,7 @@ import org.springframework.web.util.DisconnectedClientHelper;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.common.util.ErrorText;
+import net.dstone.knowledge.common.web.RequestClockFilter;
 
 /**
  * <pre>
@@ -70,8 +71,12 @@ public class ApiExceptionHandler extends BaseObject {
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleException(Exception e, HttpServletRequest request) {
 		if (DisconnectedClientHelper.isClientDisconnectedException(e)) {
+			// 몇 초 만에 끊었는지가 원인을 가리는 단서다: 부른 쪽의 대기 시간(dstone-ai-engine 60초, dstone-boot 120초)과 같으면
+			// 시간 초과이고, 훨씬 짧으면 응답이 그쪽의 수신 한도를 넘었거나 부른 프로그램 / 브라우저가 먼저 끝난 것이다.
+			long elapsed = RequestClockFilter.elapsedMillis(request);
 			warn("부른 쪽이 응답을 받기 전에 연결을 끊었습니다: " + request.getMethod() + " " + request.getRequestURI()
-				+ " (부른 쪽의 대기 시간이나 수신 크기 한도를 확인하세요) - " + ErrorText.summaryOf(e));
+				+ " (요청 후 " + (elapsed < 0 ? "?" : String.valueOf(elapsed / 100 / 10.0)) + "초, 부른 쪽 " + request.getRemoteAddr()
+				+ " " + request.getHeader("User-Agent") + ") - " + ErrorText.summaryOf(e));
 			// 응답을 쓸 연결이 없다. null을 돌려주면 Spring이 더 쓰려고 하지 않는다.
 			return null;
 		}

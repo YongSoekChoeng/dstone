@@ -58,6 +58,9 @@ public class EmbeddingWorker extends BaseObject {
 	@Autowired
 	private RagSettings ragSettings;
 
+	@Autowired
+	private EmbeddingGate embeddingGate;
+
 	private volatile boolean running = false;
 
 	private Thread thread;
@@ -139,6 +142,15 @@ public class EmbeddingWorker extends BaseObject {
 					}
 				}
 				if (hashes.isEmpty()) {
+					continue;
+				}
+
+				// 검색이 질문을 임베딩하는 중이면 양보한다. 검색은 사람(또는 Agent)이 기다리고 있고, 이 작업은 급하지 않다.
+				try {
+					embeddingGate.awaitOpen();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					running = false;
 					continue;
 				}
 

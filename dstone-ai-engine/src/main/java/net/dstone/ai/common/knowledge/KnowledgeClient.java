@@ -92,7 +92,13 @@ public class KnowledgeClient extends BaseObject {
 			}).block();
 		} catch (Exception e) {
 			LogUtil.sysout("dstone-ai-engine tool-audit: knowledge " + what + " -> 실패 " + e.getMessage());
-			throw new KnowledgeCallException("실패: dstone-knowledge를 부르지 못했습니다(서버가 떠 있는지, dstone.ai.tool.knowledge.base-url이 맞는지 확인) - " + e.getMessage());
+			if (this.isTimeout(e)) {
+				// 서버는 떠 있는데 응답이 늦은 것이다. "서버가 떠 있는지 확인하라"고 하면 엉뚱한 곳을 보게 된다.
+				throw new KnowledgeCallException("실패: dstone-knowledge가 " + this.timeoutSeconds() + "초 안에 답하지 않았습니다(임베딩 서버가 바쁘면 검색이 늦어집니다. "
+					+ "대기 시간은 dstone.ai.tool.knowledge.timeout-seconds)");
+			}
+			throw new KnowledgeCallException("실패: dstone-knowledge를 부르지 못했습니다(서버가 떠 있는지, dstone.ai.tool.knowledge.base-url이 맞는지 확인) - "
+				+ (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
 		}
 		LogUtil.sysout("dstone-ai-engine tool-audit: knowledge " + what + " -> HTTP " + reply[0]);
 		int status = Integer.parseInt(reply[0]);
@@ -125,9 +131,26 @@ public class KnowledgeClient extends BaseObject {
 		return builder.build().encode().toUri();
 	}
 
-	private WebClient webClient() {
+	/** 예외의 원인을 따라가며 응답 대기 시간 초과인지 봅니다(WebClient는 원래 예외를 한 겹 싸서 던집니다). */
+	private boolean isTimeout(Throwable e) {
+		for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+			if (cause instanceof io.netty.handler.timeout.TimeoutException || cause instanceof java.util.concurrent.TimeoutException) {
+				return true;
+			}
+			if (cause.getCause() == cause) {
+				break;
+			}
+		}
+		return false;
+	}
+
+	private int timeoutSeconds() {
 		String seconds = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".timeout-seconds");
-		return WcUtil.getInstance().getWebClient(StringUtil.isEmpty(seconds) ? 60 : Integer.parseInt(seconds)).mutate().codecs(new Consumer<ClientCodecConfigurer>() {
+		return StringUtil.isEmpty(seconds) ? 60 : Integer.parseInt(seconds);
+	}
+
+	private WebClient webClient() {
+		return WcUtil.getInstance().getWebClient(this.timeoutSeconds()).mutate().codecs(new Consumer<ClientCodecConfigurer>() {
 			@Override
 			public void accept(ClientCodecConfigurer configurer) {
 				configurer.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES);
