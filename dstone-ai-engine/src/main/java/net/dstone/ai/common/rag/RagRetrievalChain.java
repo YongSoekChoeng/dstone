@@ -18,8 +18,6 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
-import net.dstone.ai.api.dto.RagSearchRequest;
-import net.dstone.ai.api.dto.RetrievedChunk;
 import net.dstone.ai.common.knowledge.KnowledgeCallException;
 import net.dstone.ai.common.knowledge.KnowledgeClient;
 import net.dstone.common.biz.BaseService;
@@ -33,10 +31,12 @@ import net.dstone.common.utils.StringUtil;
  * 검색은 이 엔진이 직접 하지 않고 dstone-knowledge에 맡깁니다(POST /api/search, 올린 일반 문서만).
  * dstone-knowledge는 뜻으로 찾기(벡터)와 이름으로 찾기를 같이 합니다. 이 엔진에는 임베딩 모델도 벡터 저장소도 없습니다.
  *
- * 쓰는 곳은 둘이고, 둘 다 search() 하나를 거칩니다. 그래서 "무엇을 검색 대상으로 볼지"(개수, 유사도 기준, caller의 문서만)는
+ * 쓰는 곳은 둘이고, 둘 다 search() 하나를 거칩니다. 그래서 "무엇을 검색 대상으로 볼지"(개수, 유사도 기준)는
  * 이 클래스 안 한 곳에서만 정해집니다.
  *   - buildAdvisor()  Agent의 ragEnabled 경로. 찾은 조각을 질문 뒤에 [참고자료]로 붙여 주는 Advisor를 만든다
- *   - search()        Tool(tools.rag.RagSearchTool)과 검색 미리보기 API(api.controller.RagController)
+ *   - search()        Tool(tools.rag.RagSearchTool)
+ *
+ * 문서를 올리고 지우는 API는 이 엔진에 없습니다. dstone-knowledge에 직접 올립니다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면).
  *
  * 이 클래스 자체는 RAG 설정과 무관하게 항상 등록되고, "지금 RAG를 쓸 수 있는 상태인가"는 검색하는 시점에 판단합니다(requireRag()).
  * </pre>
@@ -109,49 +109,32 @@ public class RagRetrievalChain extends BaseService {
 
 	/**
 	 * <pre>
-	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 
-	 * 이 Advisor가 붙으면 caller가 올린 문서에서만 찾습니다.
-	 *
-	 * topK, similarityThreshold, allowEmptyContext를 전부 기본값(null이면 전역 설정값을 쓰고,
-	 * allowEmptyContext는 true)으로 쓰는 간단한 버전입니다. Agent 정의에 개별 설정이 없을 때는
-	 * buildAdvisor(caller, null, null, null)을 호출하는 것과 완전히 같습니다.
-	 * </pre>
-	 *
-	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
-	 */
-	public Advisor buildAdvisor(String caller) {
-		return this.buildAdvisor(caller, null, null, null);
-	}
-
-	/**
-	 * <pre>
-	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 이 Advisor가 붙으면
-	 * caller가 올린 문서에서만 찾습니다.
+	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다.
+	 * 이 Advisor가 붙으면 질문과 가까운 문서 조각을 찾아 질문 뒤에 [참고자료]로 붙입니다.
 	 *
 	 * topK, similarityThreshold, allowEmptyContext는 전부 null로 두면 전역 기본값
 	 * (dstone.ai.rag.retrieval.* 설정, allowEmptyContext는 true)을 쓰고, 값을 넣으면 이번
-	 * 호출에만(보통은 AgentDefinition.ragTopK / ragSimilarityThreshold / ragAllowEmptyContext에서 넘어온 값) 그 값이 적용됩니다. 
-	 * RAG를 쓰는 Agent가 여러 개 늘어나더라도, 검색 범위나 개수, 그리고 "근거 자료가 없을 때 어떻게 답할지"를 Agent마다 다르게 가져갈 수 있도록 하기 위한 설계입니다.
+	 * 호출에만(보통은 AgentDefinition.ragTopK / ragSimilarityThreshold / ragAllowEmptyContext에서 넘어온 값) 그 값이 적용됩니다.
+	 * RAG를 쓰는 Agent가 여러 개 늘어나더라도, 검색 개수와 "근거 자료가 없을 때 어떻게 답할지"를 Agent마다 다르게 가져갈 수 있도록 하기 위한 설계입니다.
 	 *
-	 * allowEmptyContext가 true(기본값)이면, 검색 결과가 하나도 없거나 RAG 자체가 이 요청과 무관하더라도 
-	 * 질의를 "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킵니다. 
-	 * 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다. 
-	 * false로 주면 Spring AI ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로 돌아갑니다. 
+	 * allowEmptyContext가 true(기본값)이면, 검색 결과가 하나도 없거나 RAG 자체가 이 요청과 무관하더라도
+	 * 질의를 "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킵니다.
+	 * 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다.
+	 * false로 주면 Spring AI ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로 돌아갑니다.
 	 * "컨텍스트 밖의 답변은 절대 허용하면 안 되는" 순수 지식베이스 QA 같은 Agent에 쓰면 됩니다.
 	 * </pre>
 	 *
-	 * @param caller              호출한 앱/서비스를 나타내는 식별자(tenant)
 	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
 	 * @param similarityThreshold 검색 결과 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값을 씁니다)
 	 * @param allowEmptyContext   검색 결과가 없을 때 원래 질의 그대로 진행할지 여부(null이면 true로 취급합니다)
 	 */
-	public Advisor buildAdvisor(final String caller, final Integer topK, final Double similarityThreshold, Boolean allowEmptyContext) {
+	public Advisor buildAdvisor(final Integer topK, final Double similarityThreshold, Boolean allowEmptyContext) {
 		// 설정이 잘못됐으면 LLM을 부르기 전에 여기서 알린다.
 		this.requireRag();
 		DocumentRetriever retriever = new DocumentRetriever() {
 			@Override
 			public List<Document> retrieve(Query query) {
-				List<RetrievedChunk> chunks = RagRetrievalChain.this.search(new RagSearchRequest(query.text(), topK, similarityThreshold, null), caller);
+				List<RetrievedChunk> chunks = RagRetrievalChain.this.search(query.text(), topK, similarityThreshold);
 				List<Document> documents = new ArrayList<Document>(chunks.size());
 				for (int i = 0; i < chunks.size(); i++) {
 					RetrievedChunk chunk = chunks.get(i);
@@ -172,31 +155,31 @@ public class RagRetrievalChain extends BaseService {
 
 	/**
 	 * <pre>
-	 * 올려 둔 문서에서 질문과 가까운 조각을 찾습니다. caller가 있으면 그 caller가 올린 문서에서만 찾고,
-	 * 없으면(인증을 꺼 둔 환경) 전체 문서에서 찾습니다.
+	 * 올려 둔 문서에서 질문과 가까운 조각을 찾습니다.
 	 *
-	 * dstone-knowledge에서 넉넉히 받아 온 뒤 여기서 걸러 냅니다.
-	 *   1. caller의 문서인가 (RagSourceId)
-	 *   2. request.sourceId가 있으면 그 문서인가
-	 *   3. 유사도가 기준 이상인가. 다만 질문에 든 이름(영문 낱말)이 글자 그대로 들어 있어서 찾힌 조각은 유사도와 상관없이 남긴다.
-	 *      이름이 정확히 맞은 것은 뜻이 덜 가까워 보여도 찾던 것일 가능성이 높고, 방금 올려서 아직 임베딩이 안 된 문서는 유사도가 아예 없다.
+	 * 문서는 dstone-knowledge에 올립니다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면, 또는 그 서버의 POST /api/documents).
+	 * 이 엔진을 부르는 앱(caller)별로 문서를 가리지 않습니다. 올린 문서는 이 엔진을 쓰는 모두가 같이 봅니다.
+	 *
+	 * dstone-knowledge에서 넉넉히 받아 온 뒤 유사도가 기준 이상인 것만 남깁니다.
+	 * 다만 질문에 든 이름(영문 낱말)이 글자 그대로 들어 있어서 찾힌 조각은 유사도와 상관없이 남깁니다.
+	 * 이름이 정확히 맞은 것은 뜻이 덜 가까워 보여도 찾던 것일 가능성이 높고, 방금 올려서 아직 임베딩이 안 된 문서는 유사도가 아예 없습니다.
 	 * </pre>
 	 *
-	 * @param request 검색 조건(질의어, topK 등)
-	 * @param caller  호출한 앱/서비스를 나타내는 식별자(tenant)
+	 * @param query               찾을 내용
+	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
+	 * @param similarityThreshold 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값을 씁니다)
 	 */
-	public List<RetrievedChunk> search(RagSearchRequest request, String caller) {
+	public List<RetrievedChunk> search(String query, Integer topK, Double similarityThreshold) {
 		this.requireRag();
-		int topK = request.topK() == null ? this.defaultTopK() : request.topK().intValue();
-		double threshold = request.similarityThreshold() == null ? this.defaultSimilarityThreshold() : request.similarityThreshold().doubleValue();
-		String storedSourceId = StringUtil.isEmpty(request.sourceId()) ? null : RagSourceId.stored(caller, request.sourceId());
+		int limit = topK == null ? this.defaultTopK() : topK.intValue();
+		double threshold = similarityThreshold == null ? this.defaultSimilarityThreshold() : similarityThreshold.doubleValue();
 
 		Map<String, Object> body = new LinkedHashMap<String, Object>();
-		body.put("query", request.query());
+		body.put("query", query);
 		// 올린 일반 문서에서만 찾는다. 코드 분석 결과는 tools.knowledge.KnowledgeTool의 몫이다.
 		body.put("sourceTypes", Arrays.asList("DOCUMENT"));
-		// 걸러 내고도 topK개가 남도록 넉넉히 받는다.
-		body.put("topK", Integer.valueOf(Math.min(MAX_CANDIDATES, Math.max(topK * 4, 20))));
+		// 유사도로 걸러 내고도 limit개가 남도록 넉넉히 받는다.
+		body.put("topK", Integer.valueOf(Math.min(MAX_CANDIDATES, Math.max(limit * 4, 20))));
 
 		JsonNode hits;
 		try {
@@ -206,23 +189,15 @@ public class RagRetrievalChain extends BaseService {
 		}
 
 		List<RetrievedChunk> retrieved = new ArrayList<RetrievedChunk>();
-		for (int i = 0; i < hits.size() && retrieved.size() < topK; i++) {
+		for (int i = 0; i < hits.size() && retrieved.size() < limit; i++) {
 			JsonNode hit = hits.get(i);
-			String storedId = hit.path("documentId").asText(null);
-			if (!RagSourceId.visibleTo(caller, storedId)) {
-				continue;
-			}
-			if (storedSourceId != null && !storedSourceId.equals(storedId)) {
-				continue;
-			}
 			Double score = hit.hasNonNull("score") ? Double.valueOf(hit.get("score").asDouble()) : null;
 			boolean foundByName = hit.path("keywordScore").asInt(0) > 0;
 			if (!foundByName && (score == null || score.doubleValue() < threshold)) {
 				continue;
 			}
 			Map<String, Object> metadata = new LinkedHashMap<String, Object>();
-			this.putIfPresent(metadata, "sourceId", RagSourceId.shown(caller, storedId));
-			this.putIfPresent(metadata, "tenant", RagSourceId.tenantOf(storedId));
+			this.putIfPresent(metadata, "sourceId", hit.path("documentId").asText(null));
 			this.putIfPresent(metadata, "title", hit.path("title").asText(null));
 			this.putIfPresent(metadata, "fileName", hit.path("path").asText(null));
 			if (hit.hasNonNull("chunkNo")) {

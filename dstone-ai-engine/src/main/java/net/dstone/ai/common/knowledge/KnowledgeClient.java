@@ -6,12 +6,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.http.codec.ClientCodecConfigurer;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -32,7 +29,7 @@ import reactor.core.publisher.Mono;
  * dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)의 REST API를 부르는 단 하나의 창구입니다.
  * 이 엔진에서 dstone-knowledge를 쓰는 곳은 둘입니다.
  *   - tools.knowledge.KnowledgeTool            Agent가 코드 분석 결과를 물어보는 Tool
- *   - api.service.EmbedService / common.rag.RagRetrievalChain   문서를 올리고(적재) 검색하는 RAG
+ *   - common.rag.RagRetrievalChain             올려 둔 문서를 검색하는 RAG
  * 둘 다 같은 서버를 같은 방식(주소, API 키, 대기 시간)으로 부르므로 호출 코드를 여기 한 곳에 모았습니다.
  *
  * 설정(dstone.ai.tool.knowledge.*):
@@ -64,10 +61,6 @@ public class KnowledgeClient extends BaseObject {
 		return this.exchange("GET " + path, this.webClient().get().uri(this.uriOf(path, params)));
 	}
 
-	public JsonNode delete(String path, Map<String, String> params) throws KnowledgeCallException {
-		return this.exchange("DELETE " + path, this.webClient().delete().uri(this.uriOf(path, params)));
-	}
-
 	public JsonNode post(String path, Map<String, Object> body) throws KnowledgeCallException {
 		String json;
 		try {
@@ -76,28 +69,6 @@ public class KnowledgeClient extends BaseObject {
 			throw new KnowledgeCallException("실패: 요청을 만들지 못했습니다 - " + e.getMessage());
 		}
 		return this.exchange("POST " + path, this.webClient().post().uri(this.uriOf(path, null)).contentType(MediaType.APPLICATION_JSON).bodyValue(json));
-	}
-
-	/**
-	 * <pre>
-	 * 파일 하나를 multipart/form-data로 올립니다.
-	 * </pre>
-	 *
-	 * @param file 올릴 파일. 파일 이름(getFilename())이 있어야 받는 쪽이 파일 종류를 알 수 있습니다
-	 * @param fields 같이 보낼 값. 비어 있는 값은 보내지 않습니다
-	 */
-	public JsonNode upload(String path, Resource file, Map<String, String> fields) throws KnowledgeCallException {
-		MultipartBodyBuilder builder = new MultipartBodyBuilder();
-		builder.part("file", file);
-		if (fields != null) {
-			for (Map.Entry<String, String> field : fields.entrySet()) {
-				if (!StringUtil.isEmpty(field.getValue())) {
-					builder.part(field.getKey(), field.getValue());
-				}
-			}
-		}
-		return this.exchange("POST " + path
-			, this.webClient().post().uri(this.uriOf(path, null)).contentType(MediaType.MULTIPART_FORM_DATA).body(BodyInserters.fromMultipartData(builder.build())));
 	}
 
 	/** 요청을 보내고 응답 JSON을 읽습니다. 본문이 없는 성공 응답은 빈 객체로 돌려줍니다. */

@@ -44,11 +44,6 @@ spring:
         password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
         hikari:
             maximum-pool-size: 10
-    servlet:
-        multipart:
-            # 문서 임베딩 업로드(/api/ai/embed/documents) 대비 기본 1MB보다 넉넉하게.
-            max-file-size: 20MB
-            max-request-size: 20MB
     ##########################################################################################
     # <자동설정기능>
     # Security/RabbitMQ/Kafka는 아직 미사용 이므로 exclude.
@@ -73,7 +68,7 @@ spring:
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
         # embedding: 이 엔진은 임베딩 모델을 쓰지 않는다(none). RAG의 임베딩과 검색은 dstone-knowledge가 한다
-        # (api.service.EmbedService / common.rag.RagRetrievalChain이 그 서버의 REST API를 부른다).
+        # (common.rag.RagRetrievalChain이 그 서버의 검색 API를 부른다).
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
@@ -201,7 +196,7 @@ dstone:
                 allowed-jobs:
                     - testApp
             # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)를 부르는 설정(common.knowledge.KnowledgeClient).
-            # 두 군데서 쓴다: 코드 분석 결과를 물어보는 Tool(tools.knowledge.KnowledgeTool)과 RAG(문서 올리기 / 검색, 아래 dstone.ai.rag).
+            # 두 군데서 쓴다: 코드 분석 결과를 물어보는 Tool(tools.knowledge.KnowledgeTool)과 RAG(올린 문서 검색, 아래 dstone.ai.rag).
             # base-url이 비어 있으면 그 Tool은 항상 실패 문구로 끝나고 RAG도 쓸 수 없다 - 주소를 채우는 것이 곧 "켠 상태"다.
             # api-key: dstone-knowledge가 호출자 인증(dstone.knowledge.security.auth.enabled)을 켰을 때만 넣는다. ENC(...)로 적는다.
             # timeout-seconds: 응답 대기 시간(기본 60). 검색은 질문을 임베딩해야 해서 임베딩 서버가 바쁘면 수 초가 걸린다.
@@ -231,8 +226,8 @@ dstone:
         
         ##########################################################################################
         # RAG 설정.
-        # 이 값이 true여야 api.service.EmbedService/EmbedController(문서 올리기)와 common.rag.RagRetrievalChain(검색), Agent의 ragEnabled 설정이 실제로 동작한다.
-        # 문서의 저장, 임베딩, 검색은 dstone-knowledge가 한다. 그래서 위의 dstone.ai.tool.knowledge.base-url(그 서버의 주소)이 채워져 있어야 한다.
+        # 이 값이 true여야 common.rag.RagRetrievalChain(검색), Agent의 ragEnabled 설정, searchDocuments Tool이 실제로 동작한다.
+        # 문서의 저장, 임베딩, 검색은 dstone-knowledge가 한다. 문서도 그 서버에 직접 올린다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면). 그래서 위의 dstone.ai.tool.knowledge.base-url(그 서버의 주소)이 채워져 있어야 한다.
         # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 dstone-knowledge 없이도 그대로 기동된다.
         ##########################################################################################
         rag:
