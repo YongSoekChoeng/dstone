@@ -44,6 +44,13 @@
 	padding-bottom: 4px;
 }
 
+/* dstone-boot 첫 화면으로 돌아가는 링크. 이 화면의 메뉴가 아니라 "나가는 문"이라 구분선을 둔다 */
+#ai-nav a.ai-nav-home {
+	padding-right: 16px;
+	border-right: 1px solid #d1d5db;
+	font-weight: 600;
+}
+
 #ai-nav a.current-page-item,
 #ai-nav a:hover {
 	color: #2563eb;
