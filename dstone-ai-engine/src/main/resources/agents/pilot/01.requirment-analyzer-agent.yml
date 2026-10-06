@@ -84,4 +84,4 @@ agent:
         questions: { type: array, items: { type: string }, description: 확인 필요 질문(없으면 빈 배열) }
       required: [file, summary]
   tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile]
-  ragEnabled: false
+  ragEnabled: true

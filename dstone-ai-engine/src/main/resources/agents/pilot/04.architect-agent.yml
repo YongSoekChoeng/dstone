@@ -67,4 +67,4 @@ agent:
         questions: { type: array, items: { type: string }, description: 결정이 필요한 사항(없으면 빈 배열) }
       required: [files, summary]
   tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile]
-  ragEnabled: false
+  ragEnabled: true

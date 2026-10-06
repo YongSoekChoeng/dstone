@@ -97,4 +97,4 @@ agent:
       required: [file, summary]
   tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile]
   subAgents: [pilot-source-investigator-agent]
-  ragEnabled: false
+  ragEnabled: true
