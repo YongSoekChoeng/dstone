@@ -1,9 +1,8 @@
 /**********************************************
 dstone_ai 데이터베이스 안에서 실행할 것 (01-init-postgresql-dstone-ai.sql로 먼저 데이터베이스를 만든다).
 
-RAG용 vector_store 테이블은 더 이상 여기에 없다. 문서의 저장, 임베딩, 검색은 dstone-knowledge가 맡는다
-(dstone-knowledge의 rag_document / rag_chunk / rag_embedding). 예전에 만들어 둔 vector_store 테이블이 남아 있다면
-이 모듈은 더 이상 읽지도 쓰지도 않는다. 안에 든 문서가 필요 없다는 것을 확인한 뒤 직접 지우면 된다(DROP TABLE vector_store).
+RAG용 vector_store 테이블은 더 이상 없다. 문서의 저장, 임베딩, 검색은 dstone-knowledge가 맡는다
+(dstone-knowledge의 rag_document / rag_chunk / rag_embedding).
 **********************************************/
 
 /**********************************************

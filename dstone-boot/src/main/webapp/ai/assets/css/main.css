@@ -238,30 +238,7 @@
 	cursor: default;
 }
 
-/* 문서업로드 화면 */
-
-.document-upload-form {
-	display: flex;
-	gap: 8px;
-	flex-wrap: wrap;
-}
-
-.document-upload-form input[type="text"] {
-	flex: 1;
-	min-width: 160px;
-	padding: 8px 10px;
-	border: 1px solid #d1d5db;
-	border-radius: 8px;
-}
-
-.document-upload-form button {
-	border: none;
-	border-radius: 8px;
-	padding: 8px 16px;
-	background: #2563eb;
-	color: #fff;
-	cursor: pointer;
-}
+/* 목록 표. Workflow 화면과 코드 분석(Knowledge) 화면이 같이 쓴다(문서 업로드 화면에서 쓰던 이름이 남은 것) */
 
 .document-list-table {
 	width: 100%;

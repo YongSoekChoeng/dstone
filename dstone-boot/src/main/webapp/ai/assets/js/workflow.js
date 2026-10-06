@@ -28,7 +28,7 @@ var DstoneAiWorkflow = (function () {
 		},
 		"sample-agent-rag-augmented": {
 			input: "적재된 문서 중에 Spring Batch에 대해 설명해줘.",
-			note: "RAG 문서 관리 화면에서 적재한 문서에 실제로 있는 키워드로 바꿔서 보내세요."
+			note: "코드 분석(Knowledge) > 검색 · 문서 화면에서 올린 문서에 실제로 있는 키워드로 바꿔서 보내세요."
 		},
 		"sample-agent-subagent-delegate": {
 			input: "회원 테이블에서 1번 회원을 찾으려고 해. SELECT * FORM member WHERE id = 1 이렇게 쓰면 되지?",
@@ -78,7 +78,7 @@ var DstoneAiWorkflow = (function () {
 		},
 		"sample-tool-rag-search": {
 			input: "Spring Batch",
-			note: "적재해 둔 문서에 실제로 들어있는 키워드로 바꿔서 보내세요."
+			note: "코드 분석(Knowledge) > 검색 · 문서 화면에서 올린 문서에 실제로 들어있는 키워드로 바꿔서 보내세요."
 		},
 		"testApp-sdlc": {
 			input: "회원 목록 화면에 가입일자 검색 조건을 추가해줘",
