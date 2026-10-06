@@ -59,7 +59,7 @@ data:
 
         <Appenders>
             <Console name="console" target="SYSTEM_OUT">
-                <PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss} %5p [%c] %m%n"/>
+                <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %5p [%c] %m%n"/>
             </Console>
             <RollingFile name="rollingFile" filePermissions="rwxrwxr--">
                 <FileName>${logging.root-path}/${sys:APP_NAME}/execution/execution.log</FileName>
