@@ -1,34 +1,33 @@
 package net.dstone.ai.runtime.workflow.execution;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.common.biz.BaseDao;
 import net.dstone.ai.common.consts.StepType;
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 
 /**
  * <pre>
- * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY, 
- * 이 두 테이블(schema/02-create-table-postgresql- dstone-ai.sql에 정의되어 있습니다)을 JdbcTemplate로 직접 다루는 클래스입니다. 
- * 이 모듈은 MyBatis를 쓰지 않기 때문에, 별도의 sqlmap 파일 없이 이 클래스 하나가 저장과 조회를 전담합니다.
+ * AI_WORKFLOW_EXECUTION과 AI_WORKFLOW_EXECUTION_STEP_HISTORY,
+ * 이 두 테이블(schema/02-create-table-postgresql-dstone-ai.sql에 정의되어 있습니다)의 저장과 조회를 맡는 Dao입니다.
+ * SQL은 MyBatis 매퍼(resources/sqlmap/workflow/WorkFlowExecutionDao.xml)에 있고, 이 클래스는 값을 바꿔서 넘기고 받습니다.
  *
  * context(실행 컨텍스트 트리)는 자바에서는 Map이지만, DB에는 CONTEXT_JSON(JSONB) 컬럼에 문자열로 저장해야 합니다. 
- * 그래서 저장할 때는 Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다. 
- * INSERT/UPDATE 쿼리에서는 PostgreSQL이 일반 문자열을 jsonb 타입으로 자동으로 바꿔주지 않으므로, "?::jsonb"라고 캐스트를 직접 명시해 줍니다.
+ * 그래서 저장할 때는 Jackson으로 JSON 문자열로 바꾸고, 읽어올 때는 다시 Map으로 되돌립니다.
+ * (jsonb로 바꾸는 CAST는 매퍼 XML에 적혀 있습니다.)
  *
  * 최종 결과(WorkFlowExecution.output)는 글자일 수도, 객체나 리스트일 수도 있어서 RESULT_TEXT 컬럼에 항상 JSON 글자로 저장하고, 읽을 때 다시 원래 값으로 되돌립니다
  * (글자 결과는 "..."처럼 따옴표가 붙은 JSON 글자로 저장됩니다).
@@ -59,40 +58,47 @@ import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
  * </pre>
  */
 @Repository
-public class WorkFlowExecutionStore {
+public class WorkFlowExecutionStore extends BaseDao {
 
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
+	private static final String NS = "net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore.";
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/** 새 실행 상태를 한 행으로 저장합니다. @param execution 새로 저장할 실행 상태입니다. */
 	public void insert(WorkFlowExecution execution) {
-		this.jdbcTemplate.update(
-			"INSERT INTO AI_WORKFLOW_EXECUTION ("
-			+ "  EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, CONTEXT_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT "
-			+ ") VALUES ( "
-			+ "  ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ? "
-			+ ")",
-			execution.executionId(), execution.workflowId(), execution.caller(), execution.sessionId(), execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()),
-			this.toResultJson(execution.output()), execution.errorMessage(), Timestamp.from(execution.createdAt()), Timestamp.from(execution.updatedAt()));
+		Map<String, Object> param = this.executionParam(execution);
+		param.put("workflowId", execution.workflowId());
+		param.put("caller", execution.caller());
+		param.put("sessionId", execution.sessionId());
+		param.put("createdAt", Timestamp.from(execution.createdAt()));
+		this.sqlSessionCommon.insert(NS + "insertExecution", param);
 	}
 
 	/** 기존에 저장된 실행 상태를 최신 상태로 덮어씁니다. @param execution 덮어쓸 최신 실행 상태입니다. */
 	public void update(WorkFlowExecution execution) {
-		this.jdbcTemplate.update(
-			"UPDATE AI_WORKFLOW_EXECUTION SET STATUS = ?, CURRENT_STEP_INDEX = ?, CONTEXT_JSON = ?::jsonb, RESULT_TEXT = ?, ERROR_MESSAGE = ?, UPDATED_AT = ? WHERE EXECUTION_ID = ?",
-			execution.status().name(), execution.currentStepIndex(), this.toJson(execution.context()), this.toResultJson(execution.output()), execution.errorMessage(), Timestamp.from(execution.updatedAt()),
-			execution.executionId());
+		this.sqlSessionCommon.update(NS + "updateExecution", this.executionParam(execution));
+	}
+
+	/** insert와 update가 같이 쓰는 값: 실행이 진행되면서 바뀌는 것들입니다. */
+	private Map<String, Object> executionParam(WorkFlowExecution execution) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("executionId", execution.executionId());
+		param.put("status", execution.status().name());
+		param.put("currentStepIndex", Integer.valueOf(execution.currentStepIndex()));
+		param.put("contextJson", this.toJson(execution.context()));
+		param.put("resultText", this.toResultJson(execution.output()));
+		param.put("errorMessage", execution.errorMessage());
+		param.put("updatedAt", Timestamp.from(execution.updatedAt()));
+		return param;
 	}
 
 	/** id로 실행 상태 한 건을 조회합니다. @param executionId 조회할 실행의 id입니다. */
 	public WorkFlowExecution find(String executionId) {
-		List<WorkFlowExecution> found = this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION WHERE EXECUTION_ID = ?", this.executionRowMapper(), executionId);
-		if (found.isEmpty()) {
+		Map<String, Object> row = this.sqlSessionCommon.selectOne(NS + "selectExecution", executionId);
+		if (row == null) {
 			throw new IllegalArgumentException("존재하지 않는 실행입니다: " + executionId);
 		}
-		return found.get(0);
+		return this.mapExecution(row);
 	}
 
 	/**
@@ -106,24 +112,18 @@ public class WorkFlowExecutionStore {
 	 * @param size       한 페이지에 담을 개수입니다.
 	 */
 	public List<WorkFlowExecution> list(String status, String workflowId, String caller, int page, int size) {
-		StringBuilder sql = new StringBuilder("SELECT * FROM AI_WORKFLOW_EXECUTION WHERE 1=1");
-		List<Object> args = new java.util.ArrayList<>();
-		if (StringUtils.hasText(status)) {
-			sql.append(" AND STATUS = ?");
-			args.add(status);
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("status", status);
+		param.put("workflowId", workflowId);
+		param.put("caller", caller);
+		param.put("size", Integer.valueOf(size));
+		param.put("offset", Integer.valueOf(page * size));
+		List<Map<String, Object>> rows = this.sqlSessionCommon.selectList(NS + "selectExecutionList", param);
+		List<WorkFlowExecution> executions = new ArrayList<WorkFlowExecution>(rows.size());
+		for (int i = 0; i < rows.size(); i++) {
+			executions.add(this.mapExecution(rows.get(i)));
 		}
-		if (StringUtils.hasText(workflowId)) {
-			sql.append(" AND WORKFLOW_ID = ?");
-			args.add(workflowId);
-		}
-		if (StringUtils.hasText(caller)) {
-			sql.append(" AND CALLER = ?");
-			args.add(caller);
-		}
-		sql.append(" ORDER BY CREATED_AT DESC LIMIT ? OFFSET ?");
-		args.add(size);
-		args.add(page * size);
-		return this.jdbcTemplate.query(sql.toString(), this.executionRowMapper(), args.toArray());
+		return executions;
 	}
 
 	/**
@@ -133,69 +133,77 @@ public class WorkFlowExecutionStore {
 	 * @param entry       기록할 스텝 실행 결과 한 건입니다.
 	 */
 	public void appendHistory(String executionId, StepHistoryEntry entry) {
-		this.jdbcTemplate.update(
-			"INSERT INTO AI_WORKFLOW_EXECUTION_STEP_HISTORY (EXECUTION_ID, STEP_ID, STEP_TYPE, STEP_REF, SUCCESS, DURATION_MS, OUTPUT_SUMMARY, FAILURE_REASON, EXECUTED_AT) "
-				+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			executionId, entry.stepId(), entry.stepType().name(), entry.ref(), entry.success(), entry.durationMs(), entry.outputSummary(), entry.failureReason(), Timestamp.from(entry.executedAt()));
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("executionId", executionId);
+		param.put("stepId", entry.stepId());
+		param.put("stepType", entry.stepType().name());
+		param.put("stepRef", entry.ref());
+		param.put("success", Boolean.valueOf(entry.success()));
+		param.put("durationMs", Long.valueOf(entry.durationMs()));
+		param.put("outputSummary", entry.outputSummary());
+		param.put("failureReason", entry.failureReason());
+		param.put("executedAt", Timestamp.from(entry.executedAt()));
+		this.sqlSessionCommon.insert(NS + "insertHistory", param);
 	}
 
 	/** 실행 한 건의 스텝 이력을 전부 조회합니다. @param executionId 이력을 조회할 실행의 id입니다. */
 	public List<StepHistoryEntry> findHistory(String executionId) {
-		return this.jdbcTemplate.query("SELECT * FROM AI_WORKFLOW_EXECUTION_STEP_HISTORY WHERE EXECUTION_ID = ? ORDER BY EXECUTED_AT ASC, ID ASC", this.historyRowMapper(), executionId);
-	}
-
-	/** find()와 list()가 함께 쓰는, AI_WORKFLOW_EXECUTION의 한 행을 WorkFlowExecution으로 바꿔주는 매핑기입니다. */
-	private RowMapper<WorkFlowExecution> executionRowMapper() {
-		return new RowMapper<WorkFlowExecution>() {
-			@Override
-			public WorkFlowExecution mapRow(ResultSet rs, int rowNum) throws SQLException {
-				return WorkFlowExecutionStore.this.mapExecution(rs, rowNum);
-			}
-		};
-	}
-
-	/** findHistory()가 쓰는, AI_WORKFLOW_EXECUTION_STEP_HISTORY의 한 행을 StepHistoryEntry로 바꿔주는 매핑기입니다. */
-	private RowMapper<StepHistoryEntry> historyRowMapper() {
-		return new RowMapper<StepHistoryEntry>() {
-			@Override
-			public StepHistoryEntry mapRow(ResultSet rs, int rowNum) throws SQLException {
-				return WorkFlowExecutionStore.this.mapHistoryEntry(rs, rowNum);
-			}
-		};
+		List<Map<String, Object>> rows = this.sqlSessionCommon.selectList(NS + "selectHistoryList", executionId);
+		List<StepHistoryEntry> history = new ArrayList<StepHistoryEntry>(rows.size());
+		for (int i = 0; i < rows.size(); i++) {
+			history.add(this.mapHistoryEntry(rows.get(i)));
+		}
+		return history;
 	}
 
 	/** AI_WORKFLOW_EXECUTION 한 행을 WorkFlowExecution으로 바꿉니다. CONTEXT_JSON 컬럼은 다시 컨텍스트 맵으로 되돌립니다. */
-	private WorkFlowExecution mapExecution(ResultSet rs, int rowNum) throws SQLException {
+	private WorkFlowExecution mapExecution(Map<String, Object> row) {
 		return new WorkFlowExecution(
-			rs.getString("EXECUTION_ID"),
-			rs.getString("WORKFLOW_ID"),
-			rs.getString("CALLER"),
-			rs.getString("SESSION_ID"),
-			WorkFlowExecutionStatus.valueOf(rs.getString("STATUS")),
-			rs.getInt("CURRENT_STEP_INDEX"),
-			this.fromJson(rs.getString("CONTEXT_JSON")),
-			this.fromResultJson(rs.getString("RESULT_TEXT")),
-			rs.getString("ERROR_MESSAGE"),
-			this.toInstant(rs.getTimestamp("CREATED_AT")),
-			this.toInstant(rs.getTimestamp("UPDATED_AT")));
+			this.textOf(row.get("executionId")),
+			this.textOf(row.get("workflowId")),
+			this.textOf(row.get("caller")),
+			this.textOf(row.get("sessionId")),
+			WorkFlowExecutionStatus.valueOf(this.textOf(row.get("status"))),
+			row.get("currentStepIndex") == null ? 0 : ((Number) row.get("currentStepIndex")).intValue(),
+			this.fromJson(this.textOf(row.get("contextJson"))),
+			this.fromResultJson(this.textOf(row.get("resultText"))),
+			this.textOf(row.get("errorMessage")),
+			this.toInstant(row.get("createdAt")),
+			this.toInstant(row.get("updatedAt")));
 	}
 
 	/** AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행을 StepHistoryEntry로 바꿉니다. */
-	private StepHistoryEntry mapHistoryEntry(ResultSet rs, int rowNum) throws SQLException {
+	private StepHistoryEntry mapHistoryEntry(Map<String, Object> row) {
 		return new StepHistoryEntry(
-			rs.getString("STEP_ID"),
-			StepType.valueOf(rs.getString("STEP_TYPE")),
-			rs.getString("STEP_REF"),
-			rs.getBoolean("SUCCESS"),
-			rs.getLong("DURATION_MS"),
-			rs.getString("OUTPUT_SUMMARY"),
-			rs.getString("FAILURE_REASON"),
-			this.toInstant(rs.getTimestamp("EXECUTED_AT")));
+			this.textOf(row.get("stepId")),
+			StepType.valueOf(this.textOf(row.get("stepType"))),
+			this.textOf(row.get("stepRef")),
+			Boolean.TRUE.equals(row.get("success")),
+			row.get("durationMs") == null ? 0L : ((Number) row.get("durationMs")).longValue(),
+			this.textOf(row.get("outputSummary")),
+			this.textOf(row.get("failureReason")),
+			this.toInstant(row.get("executedAt")));
 	}
 
-	/** DB의 Timestamp를 Instant로 바꿉니다. 값이 없으면(null) 그대로 null입니다. */
-	private Instant toInstant(Timestamp timestamp) {
-		return timestamp == null ? null : timestamp.toInstant();
+	private String textOf(Object value) {
+		return value == null ? null : value.toString();
+	}
+
+	/**
+	 * DB에서 읽은 시각을 Instant로 바꿉니다. 값이 없으면(null) 그대로 null입니다.
+	 * Map으로 받으면 드라이버가 주는 타입 그대로 오는데, TIMESTAMPTZ는 java.sql.Timestamp(java.util.Date의 하위 타입)로 옵니다.
+	 */
+	private Instant toInstant(Object value) {
+		if (value == null) {
+			return null;
+		}
+		if (value instanceof Date) {
+			return ((Date) value).toInstant();
+		}
+		if (value instanceof java.time.OffsetDateTime) {
+			return ((java.time.OffsetDateTime) value).toInstant();
+		}
+		throw new IllegalStateException("시각으로 읽을 수 없는 값입니다: " + value.getClass().getName());
 	}
 
 	/** 컨텍스트 맵을 DB에 저장할 수 있도록 JSON 문자열로 바꿉니다. @param context JSON 문자열로 바꿀 컨텍스트 맵입니다. */

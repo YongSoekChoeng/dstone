@@ -3,6 +3,7 @@ package net.dstone.ai.api.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.ai.api.dto.DocumentSourceSummary;
@@ -20,7 +22,7 @@ import net.dstone.ai.common.security.CallerContext;
 import net.dstone.common.biz.BaseController;
 
 /**
- * 문서를 벡터스토어(문서를 숫자 벡터로 바꿔 저장해 두는 검색용 저장소)에 넣고 빼는 관리용 API입니다.
+ * RAG가 검색할 문서를 올리고 지우는 관리용 API(저장과 임베딩은 dstone-knowledge가 합니다)입니다.
  *
  * "문서를 저장하는 일"과 "저장된 문서를 검색해서 답변에 활용하는 일(RAG, 검색-증강 생성)"은 서로 다른
  * 책임이라고 보고, 일부러 클래스를 나눴습니다. 검색 쪽 로직은 common.rag.RagRetrievalChain이 담당하고,
@@ -40,7 +42,7 @@ public class EmbedController extends BaseController {
 	EmbedService embedService;
 
 	/**
-	 * 문서 파일 하나를 받아서 벡터스토어에 적재(임베딩으로 변환해서 저장)합니다.
+	 * 문서 파일 하나를 받아서 올립니다(dstone-knowledge가 조각 내고 임베딩해서 저장합니다).
 	 *
 	 * @param file           적재할 문서 파일입니다.
 	 * @param sourceId       이 문서를 구분할 식별자입니다. 나중에 삭제하거나 목록에서 찾을 때 이 값을 씁니다.
@@ -48,11 +50,16 @@ public class EmbedController extends BaseController {
 	 */
 	@PostMapping("/documents")
 	public IngestResponse ingest(@RequestParam("file") MultipartFile file, @RequestParam("sourceId") String sourceId, HttpServletRequest servletRequest) {
-		return this.embedService.ingest(file.getResource(), sourceId, CallerContext.get(servletRequest));
+		try {
+			return this.embedService.ingest(file.getResource(), sourceId, CallerContext.get(servletRequest));
+		} catch (IllegalArgumentException e) {
+			// 글자를 뽑을 수 없는 파일, 빈 sourceId처럼 올린 쪽이 고쳐야 하는 문제는 400으로 이유를 알려 준다.
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
 	}
 
 	/**
-	 * sourceId로 지정한 문서를 벡터스토어에서 삭제합니다.
+	 * sourceId로 지정한 문서를 삭제합니다.
 	 *
 	 * @param sourceId       삭제할 문서의 식별자입니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
@@ -63,7 +70,7 @@ public class EmbedController extends BaseController {
 	}
 
 	/**
-	 * 지금 vector_store에 어떤 sourceId의 문서들이 적재되어 있는지, 각각 몇 개의 청크(문서를 잘게 나눈 조각)로
+	 * 지금 어떤 sourceId의 문서들이 올라가 있는지, 각각 몇 개의 청크(문서를 잘게 나눈 조각)로
 	 * 저장되어 있는지 목록으로 보여줍니다. 실제로 적재된 내용을 검색해서 확인해 보고 싶다면, 이 API가 아니라
 	 * api.controller.RagController의 POST /api/ai/rag/search를 사용하면 됩니다.
 	 *

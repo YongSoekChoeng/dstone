@@ -495,6 +495,8 @@
                c.chunk_id AS "chunkId"
              , d.source_type AS "sourceType"
              , d.doc_type AS "docType"
+             -- 문서의 ID. 올린 일반 문서는 올릴 때 준 sourceId 다(dstone-ai-engine 의 RAG 가 이것으로 문서를 가려낸다)
+             , d.document_id AS "documentId"
              , d.title AS "title"
              , d.ref_kind AS "refKind"
              , d.ref_id AS "refId"

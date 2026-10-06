@@ -22,11 +22,10 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'dstone_ai')\gexec
 -- \c 이후 이어지는 명령들이 자동으로 그 접속 세션을 이어받는다).
 \c dstone_ai
 
--- pgvector: RAG VectorStore(02-create-table-postgresql-dstone-ai.sql)가 사용하는 vector 타입/HNSW 인덱스.
--- postgresql-18-pgvector 패키지가 미리 설치되어 있어야 한다(docs/software/postgresql.md 7.2절 참고).
+-- pgvector / uuid-ossp: 예전에 이 모듈이 RAG 문서를 직접 저장할 때(vector_store 테이블) 쓰던 확장이다.
+-- 지금은 문서의 저장과 검색을 dstone-knowledge가 맡으므로 이 모듈에는 필요 없다. 이미 만든 DB를 위해 남겨 둔다(있어도 해가 없다).
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- uuid-ossp: vector_store.id의 기본값(uuid_generate_v4())에 필요.
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- hstore: PgVectorStoreAutoConfiguration이 스키마 초기화 시 함께 활성화하는 확장(현재 dstone-ai-engine이

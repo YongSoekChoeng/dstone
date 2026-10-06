@@ -38,7 +38,7 @@ public class RagSearchTool extends BaseObject {
 	 * @param topK        검색 결과로 가져올 최대 개수입니다(생략하면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다).
 	 * @param toolContext Spring AI가 자동으로 넣어주는 호출 컨텍스트입니다(LLM에게 보여주는 파라미터 목록에는 나타나지 않습니다) - 여기서 caller 값을 꺼냅니다.
 	 */
-	@Tool(description = "질의어로 벡터스토어에 적재된 문서를 검색해서 관련 청크 텍스트를 반환한다(LLM을 부르지 않는 순수 검색). RAG가 비활성화돼 있으면 실패 문구를 반환한다.")
+	@Tool(description = "질의어로 올려 둔 문서를 검색해서 관련 청크 텍스트를 반환한다(LLM을 부르지 않는 순수 검색). RAG가 비활성화돼 있으면 실패 문구를 반환한다.")
 	public String searchDocuments(@ToolParam(description = "검색어") String query, @ToolParam(description = "검색 결과 최대 개수(생략 가능)", required = false) Integer topK, ToolContext toolContext) {
 		List<RetrievedChunk> chunks;
 		try {

@@ -1,0 +1,167 @@
+package net.dstone.ai.common.knowledge;
+
+import java.net.URI;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.codec.ClientCodecConfigurer;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import net.dstone.ai.common.consts.Constants;
+import net.dstone.common.config.ConfigProperty;
+import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.LogUtil;
+import net.dstone.common.utils.StringUtil;
+import net.dstone.common.utils.WcUtil;
+import reactor.core.publisher.Mono;
+
+/**
+ * <pre>
+ * dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)의 REST API를 부르는 단 하나의 창구입니다.
+ * 이 엔진에서 dstone-knowledge를 쓰는 곳은 둘입니다.
+ *   - tools.knowledge.KnowledgeTool            Agent가 코드 분석 결과를 물어보는 Tool
+ *   - api.service.EmbedService / common.rag.RagRetrievalChain   문서를 올리고(적재) 검색하는 RAG
+ * 둘 다 같은 서버를 같은 방식(주소, API 키, 대기 시간)으로 부르므로 호출 코드를 여기 한 곳에 모았습니다.
+ *
+ * 설정(dstone.ai.tool.knowledge.*):
+ *   base-url         서버 주소. 비어 있으면 모든 호출이 "주소가 설정되지 않았습니다"로 실패합니다
+ *   api-key          dstone-knowledge가 호출자 인증을 켰을 때만. X-API-Key 헤더로 보냅니다
+ *   timeout-seconds  응답 대기 시간(기본 60)
+ *
+ * 실패(연결 실패, 4xx / 5xx)는 모두 KnowledgeCallException으로 바꿉니다.
+ * dstone-knowledge의 오류 응답은 {status, message} 모양이라 message를 그대로 전합니다(없는 프로젝트, 없는 문서 등).
+ * </pre>
+ */
+@Component
+public class KnowledgeClient extends BaseObject {
+
+	/** 한 번에 받을 수 있는 응답의 최대 크기. WebClient의 기본값(256KB)으로는 검색 결과 수십 건을 받지 못한다 */
+	private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+	private final ObjectMapper objectMapper = new ObjectMapper();
+
+	@Autowired
+	private ConfigProperty configProperty;
+
+	/** dstone-knowledge의 주소가 설정돼 있는지. 비어 있으면 어떤 호출도 할 수 없습니다 */
+	public boolean isConfigured() {
+		return !StringUtil.isEmpty(this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".base-url"));
+	}
+
+	public JsonNode get(String path, Map<String, String> params) throws KnowledgeCallException {
+		return this.exchange("GET " + path, this.webClient().get().uri(this.uriOf(path, params)));
+	}
+
+	public JsonNode delete(String path, Map<String, String> params) throws KnowledgeCallException {
+		return this.exchange("DELETE " + path, this.webClient().delete().uri(this.uriOf(path, params)));
+	}
+
+	public JsonNode post(String path, Map<String, Object> body) throws KnowledgeCallException {
+		String json;
+		try {
+			json = this.objectMapper.writeValueAsString(body);
+		} catch (Exception e) {
+			throw new KnowledgeCallException("실패: 요청을 만들지 못했습니다 - " + e.getMessage());
+		}
+		return this.exchange("POST " + path, this.webClient().post().uri(this.uriOf(path, null)).contentType(MediaType.APPLICATION_JSON).bodyValue(json));
+	}
+
+	/**
+	 * <pre>
+	 * 파일 하나를 multipart/form-data로 올립니다.
+	 * </pre>
+	 *
+	 * @param file 올릴 파일. 파일 이름(getFilename())이 있어야 받는 쪽이 파일 종류를 알 수 있습니다
+	 * @param fields 같이 보낼 값. 비어 있는 값은 보내지 않습니다
+	 */
+	public JsonNode upload(String path, Resource file, Map<String, String> fields) throws KnowledgeCallException {
+		MultipartBodyBuilder builder = new MultipartBodyBuilder();
+		builder.part("file", file);
+		if (fields != null) {
+			for (Map.Entry<String, String> field : fields.entrySet()) {
+				if (!StringUtil.isEmpty(field.getValue())) {
+					builder.part(field.getKey(), field.getValue());
+				}
+			}
+		}
+		return this.exchange("POST " + path
+			, this.webClient().post().uri(this.uriOf(path, null)).contentType(MediaType.MULTIPART_FORM_DATA).body(BodyInserters.fromMultipartData(builder.build())));
+	}
+
+	/** 요청을 보내고 응답 JSON을 읽습니다. 본문이 없는 성공 응답은 빈 객체로 돌려줍니다. */
+	private JsonNode exchange(String what, WebClient.RequestHeadersSpec<?> request) throws KnowledgeCallException {
+		String apiKey = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".api-key");
+		if (!StringUtil.isEmpty(apiKey)) {
+			request = request.header("X-API-Key", apiKey);
+		}
+		String[] reply;
+		try {
+			reply = request.exchangeToMono(new Function<ClientResponse, Mono<String[]>>() {
+				@Override
+				public Mono<String[]> apply(final ClientResponse response) {
+					return response.bodyToMono(String.class).defaultIfEmpty("").map(new Function<String, String[]>() {
+						@Override
+						public String[] apply(String body) {
+							return new String[] { String.valueOf(response.statusCode().value()), body };
+						}
+					});
+				}
+			}).block();
+		} catch (Exception e) {
+			LogUtil.sysout("dstone-ai-engine tool-audit: knowledge " + what + " -> 실패 " + e.getMessage());
+			throw new KnowledgeCallException("실패: dstone-knowledge를 부르지 못했습니다(서버가 떠 있는지, dstone.ai.tool.knowledge.base-url이 맞는지 확인) - " + e.getMessage());
+		}
+		LogUtil.sysout("dstone-ai-engine tool-audit: knowledge " + what + " -> HTTP " + reply[0]);
+		int status = Integer.parseInt(reply[0]);
+		JsonNode body;
+		try {
+			body = StringUtil.isEmpty(reply[1]) ? this.objectMapper.createObjectNode() : this.objectMapper.readTree(reply[1]);
+		} catch (Exception e) {
+			throw new KnowledgeCallException(status, "실패: dstone-knowledge의 응답을 읽지 못했습니다(HTTP " + reply[0] + ")");
+		}
+		if (status < 200 || status >= 300) {
+			throw new KnowledgeCallException(status, "실패: " + (body.hasNonNull("message") ? body.get("message").asText() : "HTTP " + reply[0]));
+		}
+		return body;
+	}
+
+	private URI uriOf(String path, Map<String, String> params) throws KnowledgeCallException {
+		String baseUrl = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".base-url");
+		if (StringUtil.isEmpty(baseUrl)) {
+			throw new KnowledgeCallException("실패: dstone-knowledge 주소가 설정되지 않았습니다(dstone.ai.tool.knowledge.base-url).");
+		}
+		UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl.trim()).path(path);
+		if (params != null) {
+			for (Map.Entry<String, String> param : params.entrySet()) {
+				if (!StringUtil.isEmpty(param.getValue())) {
+					builder.queryParam(param.getKey(), param.getValue().trim());
+				}
+			}
+		}
+		// 한글이나 빈칸이 든 값이 주소에서 깨지지 않게 인코딩한다.
+		return builder.build().encode().toUri();
+	}
+
+	private WebClient webClient() {
+		String seconds = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".timeout-seconds");
+		return WcUtil.getInstance().getWebClient(StringUtil.isEmpty(seconds) ? 60 : Integer.parseInt(seconds)).mutate().codecs(new Consumer<ClientCodecConfigurer>() {
+			@Override
+			public void accept(ClientCodecConfigurer configurer) {
+				configurer.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES);
+			}
+		}).build();
+	}
+
+}

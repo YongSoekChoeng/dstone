@@ -1,28 +1,19 @@
 package net.dstone.ai.tools.knowledge;
 
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.annotation.AiTool;
-import net.dstone.ai.common.consts.Constants;
-import net.dstone.common.config.ConfigProperty;
+import net.dstone.ai.common.knowledge.KnowledgeCallException;
+import net.dstone.ai.common.knowledge.KnowledgeClient;
 import net.dstone.common.core.BaseObject;
-import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
-import net.dstone.common.utils.WcUtil;
-import reactor.core.publisher.Mono;
 
 /**
  * <pre>
@@ -54,10 +45,8 @@ public class KnowledgeTool extends BaseObject {
 	/** 목록 하나에서 돌려주는 최대 줄 수. 넘으면 몇 건이 더 있는지만 알린다 */
 	private static final int MAX_LINES = 60;
 
-	private final ObjectMapper objectMapper = new ObjectMapper();
-
 	@Autowired
-	private ConfigProperty configProperty;
+	private KnowledgeClient knowledgeClient;
 
 	@Tool(description = "dstone-knowledge에 분석해 둔 Java 프로젝트 목록을 돌려준다. 다른 knowledge Tool에 넘길 projectId를 모를 때 먼저 부른다.")
 	public String knowledgeListProjects() {
@@ -310,92 +299,14 @@ public class KnowledgeTool extends BaseObject {
 
 	/* ============================== HTTP 호출 ============================== */
 
+	// 실제 호출은 common.knowledge.KnowledgeClient가 합니다(RAG도 같은 창구를 씁니다).
+
 	private JsonNode get(String path, Map<String, String> params) throws KnowledgeCallException {
-		WebClient.RequestHeadersSpec<?> request = this.webClient().get().uri(this.uriOf(path, params));
-		return this.exchange("GET " + path, request);
+		return this.knowledgeClient.get(path, params);
 	}
 
 	private JsonNode post(String path, Map<String, Object> body) throws KnowledgeCallException {
-		String json;
-		try {
-			json = this.objectMapper.writeValueAsString(body);
-		} catch (Exception e) {
-			throw new KnowledgeCallException("실패: 요청을 만들지 못했습니다 - " + e.getMessage());
-		}
-		WebClient.RequestHeadersSpec<?> request = this.webClient().post().uri(this.uriOf(path, null)).header("Content-Type", "application/json").bodyValue(json);
-		return this.exchange("POST " + path, request);
-	}
-
-	/**
-	 * <pre>
-	 * 요청을 보내고 응답 JSON을 읽습니다. 실패(연결 실패, 4xx/5xx)는 LLM에게 그대로 보여 줄 "실패: ..." 문구를 담은 예외로 바꿉니다.
-	 * dstone-knowledge의 오류 응답은 {status, message} 모양이라 message를 그대로 전합니다(없는 프로젝트, 없는 테이블 등).
-	 * </pre>
-	 */
-	private JsonNode exchange(String what, WebClient.RequestHeadersSpec<?> request) throws KnowledgeCallException {
-		String apiKey = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".api-key");
-		if (!StringUtil.isEmpty(apiKey)) {
-			request = request.header("X-API-Key", apiKey);
-		}
-		String[] reply;
-		try {
-			reply = request.exchangeToMono(new Function<ClientResponse, Mono<String[]>>() {
-				@Override
-				public Mono<String[]> apply(final ClientResponse response) {
-					return response.bodyToMono(String.class).defaultIfEmpty("").map(new Function<String, String[]>() {
-						@Override
-						public String[] apply(String body) {
-							return new String[] { String.valueOf(response.statusCode().value()), body };
-						}
-					});
-				}
-			}).block();
-		} catch (Exception e) {
-			LogUtil.sysout("dstone-ai-engine tool-audit: knowledge " + what + " -> 실패 " + e.getMessage());
-			throw new KnowledgeCallException("실패: dstone-knowledge를 부르지 못했습니다(서버가 떠 있는지, dstone.ai.tool.knowledge.base-url이 맞는지 확인) - " + e.getMessage());
-		}
-		LogUtil.sysout("dstone-ai-engine tool-audit: knowledge " + what + " -> HTTP " + reply[0]);
-		JsonNode body;
-		try {
-			body = this.objectMapper.readTree(reply[1]);
-		} catch (Exception e) {
-			throw new KnowledgeCallException("실패: dstone-knowledge의 응답을 읽지 못했습니다(HTTP " + reply[0] + ")");
-		}
-		if (!reply[0].startsWith("2")) {
-			throw new KnowledgeCallException("실패: " + (body.hasNonNull("message") ? body.get("message").asText() : "HTTP " + reply[0]));
-		}
-		return body;
-	}
-
-	private URI uriOf(String path, Map<String, String> params) throws KnowledgeCallException {
-		String baseUrl = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".base-url");
-		if (StringUtil.isEmpty(baseUrl)) {
-			throw new KnowledgeCallException("실패: dstone-knowledge 주소가 설정되지 않았습니다(dstone.ai.tool.knowledge.base-url).");
-		}
-		UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl.trim()).path(path);
-		if (params != null) {
-			for (Map.Entry<String, String> param : params.entrySet()) {
-				if (!StringUtil.isEmpty(param.getValue())) {
-					builder.queryParam(param.getKey(), param.getValue().trim());
-				}
-			}
-		}
-		// 한글이나 빈칸이 든 값이 주소에서 깨지지 않게 인코딩한다.
-		return builder.build().encode().toUri();
-	}
-
-	private WebClient webClient() {
-		String seconds = this.configProperty.getProperty(Constants.Tool.Knowledge.PREFIX + ".timeout-seconds");
-		return WcUtil.getInstance().getWebClient(StringUtil.isEmpty(seconds) ? 60 : Integer.parseInt(seconds));
-	}
-
-	/** 호출 실패. 메시지가 곧 LLM에게 돌려줄 "실패: ..." 문구다 */
-	private static class KnowledgeCallException extends Exception {
-		private static final long serialVersionUID = 1L;
-
-		KnowledgeCallException(String message) {
-			super(message);
-		}
+		return this.knowledgeClient.post(path, body);
 	}
 
 }

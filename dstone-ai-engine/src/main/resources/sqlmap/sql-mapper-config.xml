@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+
+	<!--Mybatis 설정 -->
+	<settings>
+		<!--  파라미터에 Null 값이 있을 경우 에러가 발생하는 건데 대한 처리 -->
+		<setting name="jdbcTypeForNull" value="VARCHAR"></setting>
+		<!-- 조회 결과를 Map 으로 받을 때 값이 NULL 인 컬럼도 키를 남긴다.
+		     이게 없으면 NULL 인 컬럼이 Map 에서 빠져서, API 응답의 항목이 행마다 달라진다. -->
+		<setting name="callSettersOnNulls" value="true"></setting>
+	</settings>
+
+	<!-- Type Aliases 설정-->
+    <typeAliases>
+
+    </typeAliases>
+
+</configuration>
