@@ -361,6 +361,67 @@
          ORDER BY 1
     </select>
 
+    <!-- ================= 임베딩 대기열 전체의 현황 (화면의 "임베딩 현황") ================= -->
+
+    <!-- 대기열 전체를 상태별로 센다. 리비전과 상관없이 임베딩 한 건(내용 하나)이 한 행이다.
+         chars 는 그 내용의 글자 수. 임베딩에 걸리는 시간은 건수보다 글자 수에 비례해서, 남은 시간을 어림할 때 쓴다.
+         orphans 는 가리키는 청크가 없어진 것(리비전이 지워짐). 임베딩하지 않고 대기열에서 빠진다 -->
+    <select id="selectEmbeddingTotals" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT e.status AS "status"
+             , COUNT(*) AS "items"
+             , COALESCE(SUM(x.chars), 0) AS "chars"
+             , COUNT(*) FILTER (WHERE x.content_hash IS NULL) AS "orphans"
+          FROM rag_embedding e
+          LEFT JOIN (SELECT content_hash, MAX(char_count) AS chars FROM rag_chunk GROUP BY content_hash) x ON x.content_hash = e.content_hash
+         WHERE e.model = #{model}
+         GROUP BY e.status
+         ORDER BY 1
+    </select>
+
+    <!-- 아직 임베딩되지 않은 것을 프로젝트별로. 같은 내용이 여러 리비전에 있어도 프로젝트 안에서는 한 번만 센다.
+         올린 일반 문서는 프로젝트가 없을 수 있다 -->
+    <select id="selectPendingEmbeddingByProject" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT t.project AS "project"
+             , COUNT(*) AS "items"
+             , COALESCE(SUM(t.chars), 0) AS "chars"
+             , MAX(t.priority) AS "priority"
+          FROM (
+            SELECT COALESCE(d.project_id, '(올린 문서)') AS project, e.content_hash, MAX(c.char_count) AS chars, MAX(e.priority) AS priority
+              FROM rag_embedding e
+              JOIN rag_chunk c ON c.content_hash = e.content_hash
+              JOIN rag_document d ON d.doc_seq = c.doc_seq
+             WHERE e.model = #{model}
+               AND e.status = 'PENDING'
+             GROUP BY COALESCE(d.project_id, '(올린 문서)'), e.content_hash
+          ) t
+         GROUP BY t.project
+         ORDER BY MAX(t.priority) DESC, COUNT(*) DESC
+    </select>
+
+    <!-- 최근 N분 동안 끝난 임베딩. seconds 는 그 가운데 가장 먼저 끝난 것부터 지금까지의 시간(속도를 낼 때 나누는 값).
+         서버를 방금 띄웠으면 N분이 다 차지 않았으므로, N분으로 나누면 속도가 실제보다 느리게 나온다 -->
+    <select id="selectRecentEmbedded" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT COUNT(*) AS "items"
+             , COALESCE(SUM(x.chars), 0) AS "chars"
+             , COALESCE(EXTRACT(EPOCH FROM (now() - MIN(e.embedded_at))), 0)::bigint AS "seconds"
+          FROM rag_embedding e
+          LEFT JOIN (SELECT content_hash, MAX(char_count) AS chars FROM rag_chunk GROUP BY content_hash) x ON x.content_hash = e.content_hash
+         WHERE e.model = #{model}
+           AND e.status = 'DONE'
+           AND e.embedded_at > now() - make_interval(mins => #{minutes})
+    </select>
+
+    <!-- 실패한 것(세 번 시도하고 그만둔 것)의 이유. 같은 이유끼리 묶는다 -->
+    <select id="selectFailedEmbeddingReasons" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT left(COALESCE(e.last_error, '(이유 없음)'), 200) AS "reason", COUNT(*) AS "items"
+          FROM rag_embedding e
+         WHERE e.model = #{model}
+           AND e.status = 'FAILED'
+         GROUP BY 1
+         ORDER BY COUNT(*) DESC
+         LIMIT 10
+    </select>
+
     <!-- 프로젝트에서 분석이 끝난 가장 최근 리비전 -->
     <select id="selectLatestReadyRevision" parameterType="string" resultType="long">
         SELECT revision_id

@@ -30,6 +30,19 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			</details>
 
 			<section class="ai-panel">
+				<h3>임베딩 현황 <span id="kn-embed-badge"></span>
+					<button type="button" id="kn-embed-refresh" class="kn-btn kn-plain kn-embed-refresh">지금 다시 보기</button></h3>
+				<p class="ai-hint">뜻으로 찾는 검색에 필요한 임베딩은 분석이 끝난 뒤 서버 안에서 따로 진행됩니다. 여기서는 프로젝트를 통틀어 얼마나 남았는지 봅니다.
+					dstone-knowledge 서버가 떠 있는 동안에만 진행되고, 서버를 내렸다 올려도 남은 것부터 이어서 합니다.
+					예상 남은 시간은 최근 10분의 속도로 어림한 값입니다(검색이 끼어들면 그동안 양보해서 더 걸립니다).</p>
+				<div id="kn-embed-message" class="kn-message"></div>
+				<div id="kn-embed-bar" class="kn-embed-bar" style="display:none;"><div></div></div>
+				<div id="kn-embed-cards" class="kn-cards"></div>
+				<div id="kn-embed-error" class="kn-message kn-error" style="display:none;"></div>
+				<div id="kn-embed-projects"></div>
+			</section>
+
+			<section class="ai-panel">
 				<h3>프로젝트 <span id="kn-health"></span></h3>
 				<p class="ai-hint">dstone-knowledge에 등록한 Java 프로젝트입니다. 프로젝트를 고르면 아래에서 분석을 시작하고 결과를 볼 수 있습니다.
 					소스는 dstone-knowledge 서버가 직접 읽을 수 있는 폴더여야 합니다.</p>
@@ -112,10 +125,12 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-common.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-terms.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/embedding.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/project.js"></script>
 	<script>
 		DstoneKnowledge.init("<%=requestUtil.getStrContextPath()%>");
 		DstoneKnowledgeProject.init();
+		DstoneKnowledgeEmbedding.init();
 	</script>
 </body>
 </html>

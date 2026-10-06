@@ -1,39 +1,16 @@
-#!/bin/sh
-# dstone-knowledge 시작 스크립트 (백그라운드 실행)
+#! /bin/sh
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_HOME="$(dirname "$SCRIPT_DIR")"
-PROFILE="${DSTONE_PROFILE:-wsl}"
-JAVA_OPTS="-Xms512m -Xmx1024m -Dspring.profiles.active=$PROFILE"
-MAIN_CLASS="net.dstone.knowledge.DstoneKnowledgeApplication"
-PID_FILE="$SCRIPT_DIR/application.pid"
-LOG_DIR="$APP_HOME/logs"
-LOG_FILE="$LOG_DIR/dstone-knowledge.out"
+# 어디서 부르든 이 스크립트가 있는 폴더(bin)에서 실행한다. 아래의 상대 경로(../target)와 application.pid 가 여기를 기준으로 한다.
+cd "$(dirname "$0")" || exit 1
 
-JAR_FILE="$APP_HOME/target/dstone-knowledge.jar"
-if [ ! -f "$JAR_FILE" ]; then
-    echo "실행할 jar 파일을 찾을 수 없습니다. 먼저 mvn clean package 를 실행하세요. (${APP_HOME}/target)"
-    exit 1
-fi
+JAVA_OPTS="-Xms512m -Xmx1024m"
+JAR_FILE="../target/dstone-knowledge.jar"
 
-if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-    echo "dstone-knowledge이 이미 실행 중입니다. (PID: $(cat "$PID_FILE"))"
-    exit 1
-fi
+# 프로파일은 기본 wsl. 다른 프로파일로 띄우려면 DSTONE_PROFILE 을 준다(Jenkins 배포는 DSTONE_PROFILE=vm).
+SPRING_PROFILES_ACTIVE=-Dspring.profiles.active=${DSTONE_PROFILE:-wsl}
 
-mkdir -p "$LOG_DIR"
-
-echo "dstone-knowledge을 백그라운드로 시작합니다... ($JAR_FILE)"
-nohup java $JAVA_OPTS -jar "$JAR_FILE" $MAIN_CLASS > "$LOG_FILE" 2>&1 &
-echo $! > "$PID_FILE"
-
-sleep 2
-
-if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-    echo "dstone-knowledge이 시작되었습니다. (PID: $(cat "$PID_FILE"))"
-    echo "로그: $LOG_FILE"
-else
-    echo "dstone-knowledge 시작에 실패했습니다. 로그를 확인하세요: $LOG_FILE"
-    rm -f "$PID_FILE"
-    exit 1
-fi
+# 화면 출력(stdout)은 버린다. 로그는 conf/log4j2.xml 에 적힌 대로만 남는다:
+#   ${APP_HOME}/LOGS/dstone-knowledge/execution/execution.log  (APP_HOME 은 conf/env-*.properties)
+# PID 는 프로그램이 뜨면서 이 폴더의 application.pid 에 적는다(stopApp.sh / statusApp.sh 가 읽는다).
+nohup java ${JAVA_OPTS} ${SPRING_PROFILES_ACTIVE} -jar ${JAR_FILE} net.dstone.knowledge.DstoneKnowledgeApplication > /dev/null 2>&1 &
+# java ${JAVA_OPTS} ${SPRING_PROFILES_ACTIVE} -jar ${JAR_FILE} net.dstone.knowledge.DstoneKnowledgeApplication
