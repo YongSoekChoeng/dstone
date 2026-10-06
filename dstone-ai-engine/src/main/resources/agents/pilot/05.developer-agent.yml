@@ -66,4 +66,6 @@ agent:
         questions: { type: array, items: { type: string }, description: 결정이 필요한 사항과 보류한 태스크의 이유(없으면 빈 배열) }
       required: [files, summary]
   tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileTail, writeFile]
-  ragEnabled: true
+  # knowledge Tool은 주지 않는다. 이 Agent가 소스를 고치는 순간부터 미리 분석해 둔 결과는 낡은 것이 되고,
+  # 무엇을 어떻게 고칠지는 설계서(04-design.md)에 이미 적혀 있다.
+  ragEnabled: false

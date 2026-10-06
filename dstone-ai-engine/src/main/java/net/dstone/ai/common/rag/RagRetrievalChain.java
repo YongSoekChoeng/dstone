@@ -176,8 +176,10 @@ public class RagRetrievalChain extends BaseService {
 	 * 이 엔진을 부르는 앱(caller)별로 문서를 가리지 않습니다. 올린 문서는 이 엔진을 쓰는 모두가 같이 봅니다.
 	 *
 	 * dstone-knowledge에서 넉넉히 받아 온 뒤 유사도가 기준 이상인 것만 남깁니다.
-	 * 다만 질문에 든 이름(영문 낱말)이 글자 그대로 들어 있어서 찾힌 조각은 유사도와 상관없이 남깁니다.
-	 * 이름이 정확히 맞은 것은 뜻이 덜 가까워 보여도 찾던 것일 가능성이 높고, 방금 올려서 아직 임베딩이 안 된 문서는 유사도가 아예 없습니다.
+	 * 예외는 하나입니다: 방금 올려서 아직 임베딩이 안 된 조각은 유사도가 아예 없으므로, 질문에 든 이름(영문 낱말)이 글자 그대로
+	 * 들어 있어서 찾힌 것이면 남깁니다(임베딩이 끝나기 전에도 올린 문서를 이름으로는 찾을 수 있게).
+	 * 임베딩이 끝난 조각에는 이 예외를 두지 않습니다. 경로나 JSON 속의 흔한 낱말(log, error 같은)이 이름으로 잡혀서
+	 * 무관한 조각이 통과하기 때문입니다.
 	 * </pre>
 	 *
 	 * @param query               찾을 내용
@@ -207,8 +209,13 @@ public class RagRetrievalChain extends BaseService {
 		for (int i = 0; i < hits.size() && retrieved.size() < limit; i++) {
 			JsonNode hit = hits.get(i);
 			Double score = hit.hasNonNull("score") ? Double.valueOf(hit.get("score").asDouble()) : null;
-			boolean foundByName = hit.path("keywordScore").asInt(0) > 0;
-			if (!foundByName && (score == null || score.doubleValue() < threshold)) {
+			if (score != null) {
+				// 임베딩이 끝난 조각은 유사도로만 판단한다.
+				if (score.doubleValue() < threshold) {
+					continue;
+				}
+			} else if (hit.path("keywordScore").asInt(0) <= 0) {
+				// 유사도가 없는데 이름으로 찾힌 것도 아니다. 남길 근거가 없다.
 				continue;
 			}
 			Map<String, Object> metadata = new LinkedHashMap<String, Object>();
