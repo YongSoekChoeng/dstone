@@ -123,6 +123,11 @@
 	margin: 0 0 16px;
 }
 
+/* workflow 설명: YAML의 description에 적은 줄바꿈을 그대로 보여 준다(description: | 로 여러 줄을 적은 경우). */
+#workflow-id-desc {
+	white-space: pre-line;
+}
+
 /* 채팅 화면 */
 
 .ai-chat-main {
