@@ -25,7 +25,11 @@
 # 되돌아가는 횟수는 maxIterations가 막습니다(재분석 한 바퀴 = step02, step03, step04 세 번. 재요구분석은 step01까지 네 번).
 workflow:
   id: pilot-workflow
-  description: 어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]  요청서에는 '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
+  description: |
+   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 
+   예)
+   D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+   요청서에는 '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
   maxIterations: 100
   input: string
   output: 
