@@ -15,12 +15,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class FileClassifier {
 
+	/** WebSquare 화면 XML의 맨 위 요소에 적히는 네임스페이스 */
+	private static final String WEBSQUARE_NAMESPACE = "http://www.inswave.com/websquare";
+
 	/**
 	 * <pre>
 	 * 확장자로 언어를 정합니다.
 	 * </pre>
 	 *
-	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE. 분석 대상이 아니면 null
+	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE. 분석 대상이 아니면 null. Nexacro의 .xfdl/.xadl도 XML이다
 	 */
 	public String languageOf(String fileName) {
 		String name = fileName.toLowerCase(Locale.ROOT);
@@ -31,6 +34,10 @@ public class FileClassifier {
 			return "JSP";
 		}
 		if (name.endsWith(".xml")) {
+			return "XML";
+		}
+		if (name.endsWith(".xfdl") || name.endsWith(".xadl")) {
+			// Nexacro / X-Platform의 화면(.xfdl)과 애플리케이션 정의(.xadl). 확장자만 다를 뿐 XML이다.
 			return "XML";
 		}
 		if (name.endsWith(".yml") || name.endsWith(".yaml")) {
@@ -83,6 +90,24 @@ public class FileClassifier {
 		int colon = root.indexOf(':');
 		String name = colon >= 0 ? root.substring(colon + 1) : root;
 
+		if ("html".equals(name)) {
+			// WebSquare 화면은 XHTML 모양의 XML이고, 맨 위 요소에 WebSquare 네임스페이스가 적혀 있다.
+			String head = text.length() > 3000 ? text.substring(0, 3000) : text;
+			return head.indexOf(WEBSQUARE_NAMESPACE) >= 0 ? "WEBSQUARE" : "XML";
+		}
+		if ("FDL".equals(name)) {
+			// Nexacro / X-Platform 화면(.xfdl)
+			return "NEXACRO";
+		}
+		if ("ADL".equals(name)) {
+			// Nexacro / X-Platform 애플리케이션 정의(.xadl). 화면이 아니다.
+			return "NEXACRO_APP";
+		}
+		if ("document".equals(name)) {
+			// SQL을 <document><query id="..."><statement>SQL</statement></query></document> 모양으로 적는 프레임워크(JEF 계열)의 쿼리 파일.
+			// 맨 위 이름이 흔한 낱말이라, 안에 query와 statement가 실제로 있는지까지 본다.
+			return text.indexOf("<statement") >= 0 && text.indexOf(" id=") >= 0 ? "QUERY_XML" : "XML";
+		}
 		if ("mapper".equals(name)) {
 			return "MYBATIS_MAPPER";
 		}

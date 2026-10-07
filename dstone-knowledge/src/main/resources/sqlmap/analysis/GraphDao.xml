@@ -16,6 +16,10 @@
            root      타입 → 가장 바깥 타입. 깊이를 20 으로 묶어 두어 잘못된 데이터에도 끝난다
            type_node 타입 → 묶음 ID. 화면(JSP)에서 만든 타입은 그 화면 파일이 묶음이다
            member    관계의 끝 → 묶음 ID -->
+    <!-- 화면 파일인지. JSP 와 리치클라이언트 화면(WebSquare / Nexacro / X-Platform).
+         노드 종류 이름은 둘 다 'JSP'(= 화면)로 두고, 어느 것인지는 subType(file_type)으로 알린다 -->
+    <sql id="isScreen">(f.language = 'JSP' OR f.file_type IN ('WEBSQUARE', 'NEXACRO'))</sql>
+
     <sql id="memberCte">
         root (symbol_id, root_id, depth) AS (
             SELECT s.symbol_id, s.symbol_id, 0
@@ -56,7 +60,7 @@
             SELECT 'F' || f.file_id, 'F' || f.file_id
               FROM analysis_file f
              WHERE f.revision_id = #{revisionId}
-               AND f.language = 'JSP'
+               AND <include refid="isScreen"/>
         )
     </sql>
 
@@ -90,12 +94,12 @@
              WHERE s.revision_id = #{revisionId}
                AND s.symbol_id IN (SELECT t.node_id FROM type_node t)
             UNION ALL
-            SELECT 'F' || f.file_id, 'JSP', 'JSP', regexp_replace(f.path, '^.*/', ''), f.path
+            SELECT 'F' || f.file_id, 'JSP', COALESCE(f.file_type, 'JSP'), regexp_replace(f.path, '^.*/', ''), f.path
                  , <include refid="folderOf"><property name="column" value="f.path"/></include>
                  , 'VIEW', f.path, COALESCE(f.line_count, 0)
               FROM analysis_file f
              WHERE f.revision_id = #{revisionId}
-               AND f.language = 'JSP'
+               AND <include refid="isScreen"/>
             UNION ALL
             -- 이름은 네임스페이스의 마지막 마디(com.shop.OrderDao → OrderDao). 네임스페이스가 없으면 파일 이름
             SELECT 'M' || f.file_id, 'MAPPER', MIN(mp.mapper_type)

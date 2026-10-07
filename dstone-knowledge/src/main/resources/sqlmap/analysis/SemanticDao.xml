@@ -377,6 +377,67 @@
          LIMIT 2
     </select>
 
+    <!-- ================= 리치클라이언트 화면 (WebSquare / Nexacro / X-Platform) ================= -->
+
+    <select id="selectFilePageByTypes" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT file_id AS "fileId", path AS "path", encoding AS "encoding", file_type AS "fileType"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND file_type IN
+            <foreach collection="fileTypes" item="fileType" open="(" separator="," close=")">#{fileType}</foreach>
+           AND parse_status &lt;&gt; 'SKIPPED'
+           AND file_id &gt; #{afterId}
+         ORDER BY file_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 이름으로 메소드 찾기(프로젝트 전체). 화면이 거래 ID 로 부르는 메소드를 찾는다.
+         Lombok 이 만든 것과 생성자는 뺀다 -->
+    <select id="selectMethodsByNamesInProject" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT name AS "name", method_id AS "methodId"
+          FROM analysis_method
+         WHERE revision_id = #{revisionId}
+           AND name IN
+            <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
+           AND NOT is_synthetic
+           AND NOT is_constructor
+         ORDER BY name, method_id
+    </select>
+
+    <!-- 경로로 리치클라이언트 화면 파일 찾기. 정확히 같거나, 그 경로로 끝나는 것 -->
+    <select id="selectScreenByPathEnd" parameterType="java.util.Map" resultType="long">
+        SELECT file_id
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND file_type IN
+            <foreach collection="fileTypes" item="fileType" open="(" separator="," close=")">#{fileType}</foreach>
+           AND (path = #{path} OR right(path, length(#{path}) + 1) = '/' || #{path})
+         LIMIT 2
+    </select>
+
+    <!-- 거래 ID 로 불리는 메소드를 진입점으로 올린다. 규칙의 메소드 이름 틀(perform{id})에 맞는 공개 메소드가 대상이고,
+         주소 자리(path)에는 거래 ID(이름에서 틀의 앞뒤 글자를 뗀 것)를 둔다.
+         화면에서 실제로 불리는지와 상관없이 올린다. 프레임워크가 ID 만으로 찾아 부르는 메소드라서 불릴 수 있는 것 전부가 입구다 -->
+    <insert id="insertCallRuleEndpoints" parameterType="java.util.Map">
+        INSERT INTO analysis_endpoint
+            (revision_id, endpoint_type, path, symbol_id, method_id, properties_json, file_id, line_start)
+        SELECT m.revision_id, 'TRANSACTION'
+             , substr(m.name, length(#{prefix}) + 1, length(m.name) - length(#{prefix}) - length(#{suffix}))
+             , m.owner_symbol_id, m.method_id
+             , jsonb_build_object('function', #{function}::text, 'rule', #{template}::text)
+             , m.file_id, m.line_start
+          FROM analysis_method m
+         WHERE m.revision_id = #{revisionId}
+           AND NOT m.is_synthetic
+           AND NOT m.is_constructor
+           AND NOT m.is_static
+           AND upper(COALESCE(m.visibility, '')) = 'PUBLIC'
+           AND length(m.name) &gt; length(#{prefix}) + length(#{suffix})
+           AND left(m.name, length(#{prefix})) = #{prefix}
+           AND right(m.name, length(#{suffix})) = #{suffix}
+         ORDER BY m.method_id
+    </insert>
+
     <insert id="insertRelation" parameterType="java.util.Map">
         INSERT INTO analysis_relation
             (revision_id, from_kind, from_id, relation_type, to_kind, to_id, to_external
@@ -417,6 +478,22 @@
                    AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
                    AND r.to_external IN
                 <foreach collection="superTypes" item="name" open="(" separator="," close=")">#{name}</foreach>)
+    </update>
+
+    <!-- 설정에 적은 상위 타입으로: 프로젝트가 쓰는 프레임워크의 약속이다(…을 상속하면 서비스).
+         상위 타입이 프로젝트 밖(jar)에 있으면 to_external 로, 프로젝트 안에 있으면 그 타입의 전체 이름으로 맞춘다 -->
+    <update id="updateLayerByConfiguredSuperType" parameterType="java.util.Map">
+        UPDATE analysis_symbol s
+           SET layer = #{layer}, layer_confidence = 'MEDIUM'
+         WHERE s.revision_id = #{revisionId}
+           AND s.layer IS NULL
+           AND EXISTS (
+                SELECT 1 FROM analysis_relation r
+                  LEFT JOIN analysis_symbol t ON t.revision_id = r.revision_id AND t.symbol_id = r.to_id
+                 WHERE r.revision_id = s.revision_id
+                   AND r.from_id = s.symbol_id
+                   AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
+                   AND COALESCE(r.to_external, t.fqn) = #{superType})
     </update>
 
     <!-- 이름으로: 짐작이다. 익명 클래스와 만들어 넣은 타입(Lombok 빌더)은 뺀다 -->

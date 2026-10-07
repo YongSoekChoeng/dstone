@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ADL version="2.0">
+  <Application id="App" screenid="Desktop_screen">
+    <MainFrame id="mainframe" title="shop"/>
+  </Application>
+</ADL>

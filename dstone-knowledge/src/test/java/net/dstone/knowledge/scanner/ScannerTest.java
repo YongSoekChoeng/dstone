@@ -73,6 +73,18 @@ public class ScannerTest {
 		assertEquals("WEB_XML", fileClassifier.fileTypeOf("XML", "web.xml", prolog + "<web-app>"));
 		assertEquals("BUILD", fileClassifier.fileTypeOf("XML", "pom.xml", null));
 		assertEquals("XML", fileClassifier.fileTypeOf("XML", "data.xml", prolog + "<items/>"));
+
+		// 리치클라이언트 화면: WebSquare는 네임스페이스로, Nexacro / X-Platform은 맨 위 요소로 알아본다.
+		assertEquals("WEBSQUARE", fileClassifier.fileTypeOf("XML", "OrderList.xml"
+				, prolog + "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:w2=\"http://www.inswave.com/websquare\">"));
+		assertEquals("XML", fileClassifier.fileTypeOf("XML", "page.xml", prolog + "<html xmlns=\"http://www.w3.org/1999/xhtml\">"));
+		assertEquals("XML", fileClassifier.languageOf("OrderList.xfdl"));
+		assertEquals("NEXACRO", fileClassifier.fileTypeOf("XML", "OrderList.xfdl", prolog + "<FDL version=\"2.1\">"));
+		assertEquals("NEXACRO_APP", fileClassifier.fileTypeOf("XML", "App.xadl", prolog + "<ADL version=\"2.0\">"));
+
+		// 쿼리 XML: 맨 위가 document 이고 안에 id와 statement가 있다. 그냥 document 인 XML은 아니다.
+		assertEquals("QUERY_XML", fileClassifier.fileTypeOf("XML", "OrderD.xml", prolog + "<document><query id=\"a\"><statement>SELECT 1</statement></query></document>"));
+		assertEquals("XML", fileClassifier.fileTypeOf("XML", "doc.xml", prolog + "<document><title>a</title></document>"));
 	}
 
 	@Test

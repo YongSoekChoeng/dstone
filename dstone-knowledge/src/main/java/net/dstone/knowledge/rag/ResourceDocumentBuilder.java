@@ -85,7 +85,7 @@ public class ResourceDocumentBuilder {
 			StringBuilder sb = new StringBuilder();
 			sb.append("[SQL] ").append(name).append(" (").append(statement.get("statementType")).append(")\n");
 			sb.append("파일: ").append(path).append(rangeText(lineStart, lineEnd)).append('\n');
-			line(sb, "매퍼 종류", "IBATIS".equals(statement.get("mapperType")) ? "iBATIS" : "MyBatis");
+			line(sb, "매퍼 종류", mapperTypeLabel((String) statement.get("mapperType")));
 			line(sb, "파라미터", (String) statement.get("parameterType"));
 			line(sb, "결과", (String) statement.get("resultType"));
 			line(sb, "읽는 테이블", limited(reads));
@@ -148,6 +148,7 @@ public class ResourceDocumentBuilder {
 		StringBuilder sb = new StringBuilder();
 		sb.append("[화면] ").append(path).append('\n');
 		line(sb, "제목", titleOf(text));
+		line(sb, "화면 종류", screenTypeLabel((String) file.get("fileType")));
 		sb.append("줄 수: ").append(lines.length).append('\n');
 		line(sb, "이 화면을 여는 메소드", limited(openedBy));
 		line(sb, "이 화면이 요청하는 주소", limited(requests));
@@ -177,6 +178,32 @@ public class ResourceDocumentBuilder {
 		documents.addDocument(result, documentId, "VIEW", "FILE", "F" + fileId, path, path, metadata, fileId, contents, null
 				, Integer.valueOf(1), Integer.valueOf(lines.length));
 		return result;
+	}
+
+	private String mapperTypeLabel(String mapperType) {
+		if ("IBATIS".equals(mapperType)) {
+			return "iBATIS";
+		}
+		if ("QUERY_XML".equals(mapperType)) {
+			return "쿼리 XML";
+		}
+		return "MyBatis";
+	}
+
+	/** 리치클라이언트 화면 파일인지(analysis_file.file_type). JSP는 언어로 가려지므로 여기에 없다. */
+	public static boolean isRichClientScreen(String fileType) {
+		return "WEBSQUARE".equals(fileType) || "NEXACRO".equals(fileType);
+	}
+
+	/** 화면 종류를 사람이 읽는 이름으로. JSP는 따로 적지 않는다(null). */
+	private String screenTypeLabel(String fileType) {
+		if ("WEBSQUARE".equals(fileType)) {
+			return "WebSquare";
+		}
+		if ("NEXACRO".equals(fileType)) {
+			return "Nexacro / X-Platform";
+		}
+		return null;
 	}
 
 	/** JSP의 title 태그 안의 글. 없거나 실행할 때 정해지는 값이면 null */

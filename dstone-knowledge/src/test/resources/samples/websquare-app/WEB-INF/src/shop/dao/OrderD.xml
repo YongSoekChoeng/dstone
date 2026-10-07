@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 주문 -->
+<document>
+
+	<!-- 주문 목록 -->
+	<query id="selectOrderList" isDynamic="true">
+		<statement>
+			<![CDATA[
+				/* OrderD.xml_001 */
+				SELECT A.ORDER_NO       /* 주문번호 */
+				     , A.ORDER_AMT      /* 주문금액 */
+				     , B.CUST_NM        /* 고객명   */
+				  FROM TB_ORDER A
+				  JOIN TB_CUSTOMER B ON B.CUST_ID = A.CUST_ID
+				 WHERE A.ORDER_DT >= :fromDt
+				#if($status && $status != "ALL")
+				   AND A.STATUS = :status
+				#elseif($catg == "A")
+				   AND A.CATG = 'A'
+				#else
+				   AND A.CATG <> 'A'
+				#end
+			]]>
+		</statement>
+	</query>
+
+	<!-- 주문 삭제 -->
+	<delete id="deleteOrder">
+		<statement>
+			<![CDATA[
+				DELETE FROM TB_ORDER WHERE ORDER_NO = :orderNo
+			]]>
+		</statement>
+	</delete>
+
+</document>

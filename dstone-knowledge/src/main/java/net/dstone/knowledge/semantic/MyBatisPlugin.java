@@ -22,7 +22,7 @@ import net.dstone.knowledge.symbol.BoundedCache;
 
 /**
  * <pre>
- * SQL 매퍼(MyBatis / iBATIS)를 Java와 테이블에 잇습니다. RESOURCE 단계가 매퍼를 다 읽어 둔 뒤에 돕니다.
+ * SQL 매퍼(MyBatis / iBATIS / JEF 계열의 쿼리 XML)를 Java와 테이블에 잇습니다. RESOURCE 단계가 매퍼를 다 읽어 둔 뒤에 돕니다.
  *
  * 만드는 관계:
  *   메소드 ─EXECUTES_SQL→ SQL statement   이 메소드가 이 SQL을 실행한다
@@ -35,6 +35,7 @@ import net.dstone.knowledge.symbol.BoundedCache;
  *   2) 문자열 방식: sqlSession.selectList("네임스페이스.id", ...) 처럼 이름을 문자열로 넘긴다.
  *      문자열이 상수와 메소드를 거쳐 조립되는 경우가 많아서, 상수를 따라가 계산한다(ConstantEvaluator).
  *      계산한 이름의 statement가 없으면 "못 찾음"으로 남긴다(지우지 않는다).
+ *      이름을 메소드에 바로 넘기지 않고 객체에 담는 방식도 여기에 든다: new QueryProperty("파일이름.id") (JEF 계열의 쿼리 XML).
  *
  * 테이블은 statement의 SQL에서 뽑습니다(SqlTableExtractor). include로 가져오는 조각은 여기서 채워 넣습니다.
  * </pre>
@@ -46,6 +47,12 @@ public class MyBatisPlugin implements SemanticPlugin {
 	private static final List<String> MAPPER_CALLS = Arrays.asList(
 			"selectList", "selectOne", "selectMap", "selectCursor", "select", "insert", "update", "delete"
 			, "queryForList", "queryForObject", "queryForMap", "queryForPaginatedList", "queryWithRowHandler");
+
+	/**
+	 * SQL의 이름을 생성자의 첫 인자로 받는 클래스들. 이름을 메소드에 바로 넘기지 않고 객체에 담아 넘기는 프레임워크가 있다.
+	 * 예: JEF 계열의 new QueryProperty("OrderD.selectOrderList") → executeVOQuery(qp, ...)
+	 */
+	private static final List<String> NAME_HOLDERS = Arrays.asList("QueryProperty");
 
 	private static final int PAGE_SIZE = 500;
 
@@ -77,6 +84,10 @@ public class MyBatisPlugin implements SemanticPlugin {
 	private static class Index {
 		/** "네임스페이스.id" → 관계에서 쓰는 ID("S" + mapper_id). 조각(sql)은 들어 있지 않다. */
 		Map<String, String> statements = new HashMap<String, String>();
+		/** 같은 "네임스페이스.id"가 여러 파일에 있을 때만: 이름 → 그 statement들. 하나뿐인 이름은 들어 있지 않다. */
+		Map<String, List<String>> sameName = new HashMap<String, List<String>>();
+		/** statement → 그것이 있는 파일의 경로. 같은 이름 가운데 하나를 고를 때 본다. */
+		Map<String, String> pathOf = new HashMap<String, String>();
 		/** id만으로 찾을 때: id → 그 id를 가진 statement들 */
 		Map<String, List<String>> statementsById = new HashMap<String, List<String>>();
 		/** 조각: "네임스페이스.id" → mapper_id */
@@ -105,7 +116,15 @@ public class MyBatisPlugin implements SemanticPlugin {
 				index.fragments.put(full, mapperId);
 				add(index.fragmentsById, id, mapperId);
 			} else {
-				index.statements.put(full, "S" + mapperId);
+				String previous = index.statements.put(full, "S" + mapperId);
+				if (previous != null) {
+					// 같은 이름이 또 나왔다(같은 파일이 WEB-INF/src 와 WEB-INF/classes 에 둘 다 있는 경우 등). 고를 수 있게 둘 다 적어 둔다.
+					if (!index.sameName.containsKey(full)) {
+						add(index.sameName, full, previous);
+					}
+					add(index.sameName, full, "S" + mapperId);
+				}
+				index.pathOf.put("S" + mapperId, (String) key.get("path"));
 				add(index.statementsById, id, "S" + mapperId);
 			}
 		}
@@ -136,7 +155,7 @@ public class MyBatisPlugin implements SemanticPlugin {
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
-			List<Map<String, Object>> page = resourceDao.selectMapperCallPage(revisionId, MAPPER_CALLS, afterId, PAGE_SIZE);
+			List<Map<String, Object>> page = resourceDao.selectMapperCallPage(revisionId, MAPPER_CALLS, NAME_HOLDERS, afterId, PAGE_SIZE);
 			if (page.isEmpty()) {
 				break;
 			}
@@ -149,7 +168,7 @@ public class MyBatisPlugin implements SemanticPlugin {
 					unknown++;
 					continue;
 				}
-				String statement = index.statements.get(name);
+				String statement = statementOf(name, (String) call.get("sourceRoot"), index);
 				if (statement == null && name.indexOf('.') < 0) {
 					// 네임스페이스 없이 id만 넘기는 방식(iBATIS의 기본). 그 id가 하나뿐일 때만 잇는다.
 					List<String> sameId = index.statementsById.get(name);
@@ -173,6 +192,35 @@ public class MyBatisPlugin implements SemanticPlugin {
 			}
 		}
 		return new int[] { linked, missing, unknown };
+	}
+
+	/**
+	 * <pre>
+	 * 이름으로 statement를 찾습니다.
+	 * 같은 이름이 여러 파일에 있으면, 부르는 Java 파일과 같은 소스 루트에 있는 것을 고릅니다.
+	 * 펼친 WAR에는 같은 SQL 파일이 WEB-INF/src(소스)와 WEB-INF/classes(예전에 빌드된 것)에 둘 다 있고 내용이 다르기도 합니다.
+	 * 분석하는 Java가 src의 것이므로, 짝이 맞는 것은 src의 SQL입니다.
+	 * 소스 루트로 하나를 고를 수 없으면 뒤에 읽은 것으로 합니다.
+	 * </pre>
+	 */
+	private String statementOf(String name, String callerSourceRoot, Index index) {
+		String statement = index.statements.get(name);
+		List<String> candidates = index.sameName.get(name);
+		if (candidates == null || callerSourceRoot == null || callerSourceRoot.length() == 0) {
+			return statement;
+		}
+		String found = null;
+		for (int i = 0; i < candidates.size(); i++) {
+			String path = index.pathOf.get(candidates.get(i));
+			if (path != null && path.startsWith(callerSourceRoot + "/")) {
+				if (found != null) {
+					// 같은 소스 루트 안에도 둘이다. 고를 근거가 없다.
+					return statement;
+				}
+				found = candidates.get(i);
+			}
+		}
+		return found == null ? statement : found;
 	}
 
 	/** SQL의 이름은 영문자/숫자/밑줄/점/하이픈으로만 되어 있다. 공백이나 다른 글자가 있으면 다른 용도의 문자열이다. */

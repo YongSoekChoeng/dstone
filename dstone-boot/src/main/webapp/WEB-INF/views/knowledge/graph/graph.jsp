@@ -36,7 +36,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 			<section class="ai-panel">
 				<h3>노드 맵</h3>
-				<p class="ai-hint">호출 구조를 한눈에 봅니다. 클래스 · 화면(JSP) · SQL 매퍼 · 테이블이 노드이고, 그 사이의 호출 / SQL 실행 / 테이블 사용 / 화면 이동이 선입니다.
+				<p class="ai-hint">호출 구조를 한눈에 봅니다. 클래스 · 화면(JSP · WebSquare · Nexacro) · SQL 매퍼 · 테이블이 노드이고, 그 사이의 호출 / SQL 실행 / 테이블 사용 / 화면 이동이 선입니다.
 					선이 굵을수록 그 사이의 호출이 많습니다.</p>
 				<div class="kn-row">
 					<label for="kn-graph-project">프로젝트</label>

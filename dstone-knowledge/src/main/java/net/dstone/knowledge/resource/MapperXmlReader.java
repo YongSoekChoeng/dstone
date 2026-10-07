@@ -16,6 +16,7 @@ import net.dstone.knowledge.common.util.SafeXml;
 /**
  * <pre>
  * MyBatis 매퍼(mapper)와 iBATIS 매퍼(sqlMap)에서 SQL statement를 읽습니다. 두 가지는 구조가 거의 같아서 한곳에서 읽습니다.
+ * JEF 계열 프레임워크의 쿼리 XML(document / query / statement)도 여기서 읽습니다(readQueryXml).
  *
  * SQL의 주석(-- 로 시작하는 줄 주석과 블록 주석)은 그대로 둡니다. 무엇을 하는 SQL인지 적어 둔 설명인 경우가 많아서 문서로 만들 때 씁니다.
  * (테이블을 뽑을 때는 SqlTableExtractor가 주석을 떼고 봅니다.)
@@ -39,6 +40,15 @@ public class MapperXmlReader {
 	 * @return statement와 조각(sql)의 목록. 키: mapperType, namespace, statementId, statementType, parameterType, resultType, sqlBody, lineStart, lineEnd
 	 */
 	public List<Map<String, Object>> read(String text) throws Exception {
+		return read(text, null);
+	}
+
+	/**
+	 * @param text 매퍼 파일의 내용
+	 * @param fileName 파일 이름(경로 없이). 쿼리 XML은 네임스페이스가 파일 안에 없고 파일 이름이라서 필요하다. 매퍼만 읽을 때는 null이어도 된다
+	 * @return statement와 조각(sql)의 목록. 키는 read(String)과 같다
+	 */
+	public List<Map<String, Object>> read(String text, String fileName) throws Exception {
 		List<Map<String, Object>> statements = new ArrayList<Map<String, Object>>();
 		Document document = SafeXml.parse(text);
 		Element root = document.getDocumentElement();
@@ -46,6 +56,9 @@ public class MapperXmlReader {
 			return statements;
 		}
 		String rootName = root.getNodeName();
+		if ("document".equals(rootName)) {
+			return readQueryXml(text, root, fileName);
+		}
 		boolean ibatis = "sqlMap".equals(rootName);
 		if (!ibatis && !"mapper".equals(rootName)) {
 			return statements;
@@ -93,6 +106,170 @@ public class MapperXmlReader {
 			statements.add(row);
 		}
 		return statements;
+	}
+
+	/**
+	 * <pre>
+	 * 쿼리 XML을 읽습니다. JEF 계열 프레임워크가 SQL을 적어 두는 파일입니다.
+	 *
+	 *   &lt;document&gt;
+	 *     &lt;query id="selectOrderList" isDynamic="true"&gt;
+	 *       &lt;statement&gt;&lt;![CDATA[ SELECT ... WHERE ORDER_NO = :orderNo  #if($status) AND STATUS = :status #end ]]&gt;&lt;/statement&gt;
+	 *     &lt;/query&gt;
+	 *   &lt;/document&gt;
+	 *
+	 * 매퍼와 다른 점:
+	 *   - 네임스페이스가 파일 안에 없다. 파일 이름이 네임스페이스다(OrderD.xml → Java에서 "OrderD.selectOrderList"로 부른다).
+	 *   - 감싸는 태그 이름(query, combo, delete ...)은 SQL의 종류가 아니라 쓰임새다. 종류는 SQL의 첫 단어로 정한다.
+	 *   - 조건에 따라 붙는 부분을 태그가 아니라 Velocity 지시문(#if ... #elseif ... #else ... #end)으로 적는다.
+	 *     매퍼의 조건 태그와 똑같이, 지시문만 떼고 안의 글은 모두 남긴다.
+	 *   - 다른 곳의 조각을 가져오는 include가 없다.
+	 * </pre>
+	 */
+	private List<Map<String, Object>> readQueryXml(String text, Element root, String fileName) {
+		List<Map<String, Object>> statements = new ArrayList<Map<String, Object>>();
+		String namespace = null;
+		if (fileName != null) {
+			String name = fileName.substring(Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\')) + 1);
+			namespace = emptyToNull(name.lastIndexOf('.') > 0 ? name.substring(0, name.lastIndexOf('.')) : name);
+		}
+		int searchFrom = 0;
+		NodeList children = root.getChildNodes();
+		for (int i = 0; i < children.getLength(); i++) {
+			if (children.item(i).getNodeType() != Node.ELEMENT_NODE) {
+				continue;
+			}
+			Element element = (Element) children.item(i);
+			String id = emptyToNull(element.getAttribute("id"));
+			Element statement = firstChild(element, "statement");
+			if (id == null || statement == null) {
+				continue;
+			}
+			StringBuilder sql = new StringBuilder();
+			flatten(statement, sql);
+			String body = tidy(stripVelocity(sql.toString()));
+
+			int[] lines = linesOf(text, id, searchFrom);
+			searchFrom = lines[2];
+
+			Map<String, Object> row = new HashMap<String, Object>();
+			row.put("mapperType", "QUERY_XML");
+			row.put("namespace", namespace);
+			row.put("statementId", id);
+			row.put("statementType", statementTypeOf("statement", withoutLeadingComments(body)));
+			row.put("parameterType", null);
+			row.put("resultType", null);
+			row.put("sqlBody", body);
+			row.put("lineStart", lines[0] == 0 ? null : Integer.valueOf(lines[0]));
+			row.put("lineEnd", lines[1] == 0 ? null : Integer.valueOf(lines[1]));
+			statements.add(row);
+		}
+		return statements;
+	}
+
+	private Element firstChild(Element parent, String tag) {
+		NodeList children = parent.getChildNodes();
+		for (int i = 0; i < children.getLength(); i++) {
+			if (children.item(i).getNodeType() == Node.ELEMENT_NODE && tag.equals(children.item(i).getNodeName())) {
+				return (Element) children.item(i);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * <pre>
+	 * Velocity 지시문을 뗍니다. #if(조건), #elseif(조건), #foreach(...), #set(...) 은 괄호 끝까지, #else 와 #end 는 그 낱말만 뗍니다.
+	 * 안의 SQL은 그대로 남습니다. 조건의 괄호는 겹칠 수 있고 따옴표 안에 괄호가 있을 수도 있어서 글자를 하나씩 따라갑니다.
+	 * </pre>
+	 */
+	String stripVelocity(String sql) {
+		StringBuilder sb = new StringBuilder();
+		int length = sql.length();
+		int pos = 0;
+		while (pos < length) {
+			char c = sql.charAt(pos);
+			if (c != '#') {
+				sb.append(c);
+				pos++;
+				continue;
+			}
+			int wordEnd = pos + 1;
+			while (wordEnd < length && Character.isLetter(sql.charAt(wordEnd))) {
+				wordEnd++;
+			}
+			String word = sql.substring(pos + 1, wordEnd);
+			if ("else".equals(word) || "end".equals(word)) {
+				sb.append(' ');
+				pos = wordEnd;
+			} else if ("if".equals(word) || "elseif".equals(word) || "foreach".equals(word) || "set".equals(word)) {
+				int open = wordEnd;
+				while (open < length && (sql.charAt(open) == ' ' || sql.charAt(open) == '\t')) {
+					open++;
+				}
+				int close = open < length && sql.charAt(open) == '(' ? closingParen(sql, open) : -1;
+				if (close < 0) {
+					// 괄호가 없거나 닫히지 않았다. 지시문이 아닌 것으로 보고 그대로 둔다.
+					sb.append(c);
+					pos++;
+				} else {
+					sb.append(' ');
+					pos = close + 1;
+				}
+			} else {
+				sb.append(c);
+				pos++;
+			}
+		}
+		return sb.toString();
+	}
+
+	/** 여는 괄호와 짝이 맞는 닫는 괄호의 자리. 따옴표 안의 괄호는 세지 않는다. 못 찾으면 -1 */
+	private int closingParen(String text, int open) {
+		int depth = 0;
+		char quote = 0;
+		for (int i = open; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (quote != 0) {
+				if (c == quote) {
+					quote = 0;
+				}
+			} else if (c == '"' || c == '\'') {
+				quote = c;
+			} else if (c == '(') {
+				depth++;
+			} else if (c == ')') {
+				depth--;
+				if (depth == 0) {
+					return i;
+				}
+			} else if (c == '\n' && depth == 0) {
+				return -1;
+			}
+		}
+		return -1;
+	}
+
+	/** SQL 맨 앞의 주석을 뗍니다. 종류(SELECT / INSERT ...)를 첫 단어로 정하려면 주석 뒤의 첫 단어를 봐야 합니다. */
+	private String withoutLeadingComments(String sql) {
+		String rest = sql.trim();
+		while (true) {
+			if (rest.startsWith("/*")) {
+				int end = rest.indexOf("*/");
+				if (end < 0) {
+					return "";
+				}
+				rest = rest.substring(end + 2).trim();
+			} else if (rest.startsWith("--")) {
+				int end = rest.indexOf('\n');
+				if (end < 0) {
+					return "";
+				}
+				rest = rest.substring(end + 1).trim();
+			} else {
+				return rest;
+			}
+		}
 	}
 
 	/**

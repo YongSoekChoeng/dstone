@@ -54,13 +54,15 @@
 
     <!-- 모든 statement 와 조각(sql). SQL 본문은 크므로 여기서는 가져오지 않는다 -->
     <select id="selectMapperKeys" parameterType="long" resultType="java.util.LinkedHashMap">
-        SELECT mapper_id AS "mapperId"
-             , namespace AS "namespace"
-             , statement_id AS "statementId"
-             , statement_type AS "statementType"
-          FROM analysis_mapper
-         WHERE revision_id = #{revisionId}
-         ORDER BY mapper_id
+        SELECT mp.mapper_id AS "mapperId"
+             , mp.namespace AS "namespace"
+             , mp.statement_id AS "statementId"
+             , mp.statement_type AS "statementType"
+             , f.path AS "path"
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+         ORDER BY mp.mapper_id
     </select>
 
     <!-- statement 를 mapper_id 순으로 조금씩 꺼낸다(본문 포함) -->
@@ -97,7 +99,8 @@
            AND m.statement_type &lt;&gt; 'SQL_FRAGMENT'
     </insert>
 
-    <!-- 문자열로 statement 를 부르는 호출들. reference_id 순으로 조금씩 꺼낸다 -->
+    <!-- 문자열로 statement 를 부르는 호출들. reference_id 순으로 조금씩 꺼낸다.
+         두 가지 모양이 있다: 이름을 첫 인자로 받는 메소드 호출(selectList("…")), 이름을 담는 객체를 만드는 곳(new QueryProperty("…")) -->
     <select id="selectMapperCallPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT r.reference_id AS "referenceId"
              , r.from_id AS "fromId"
@@ -106,15 +109,19 @@
              , r.file_id AS "fileId"
              , r.line_start AS "lineStart"
              , m.owner_symbol_id AS "ownerSymbolId"
+             , f.source_root AS "sourceRoot"
           FROM analysis_reference r
           JOIN analysis_method m ON m.revision_id = r.revision_id AND m.method_id = r.from_id
+          LEFT JOIN analysis_file f ON f.file_id = r.file_id
          WHERE r.revision_id = #{revisionId}
-           AND r.ref_kind = 'CALL'
            AND r.from_kind = 'METHOD'
            AND r.arg_text IS NOT NULL
            AND r.reference_id &gt; #{afterId}
-           AND r.name IN
+           AND ((r.ref_kind = 'CALL' AND r.name IN
         <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
+               ) OR (r.ref_kind = 'CREATE' AND r.name IN
+        <foreach collection="holders" item="name" open="(" separator="," close=")">#{name}</foreach>
+               ))
          ORDER BY r.reference_id
          LIMIT #{limit}
     </select>

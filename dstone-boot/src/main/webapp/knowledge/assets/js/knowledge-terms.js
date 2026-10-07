@@ -73,8 +73,8 @@ var DstoneKnowledgeTerms = (function () {
 		READS_TABLE: "SQL 이 테이블을 읽는다 (SELECT)",
 		WRITES_TABLE: "SQL 이 테이블에 쓴다 (INSERT / UPDATE / DELETE)",
 		RENDERS: "메소드가 끝나고 이 화면(JSP)을 연다",
-		REQUESTS: "화면(JSP)이 이 메소드가 처리하는 주소를 요청한다",
-		INCLUDES: "화면이 다른 화면을 끼워 넣는다"
+		REQUESTS: "화면이 이 메소드를 부른다 (JSP · WebSquare · Nexacro 화면이 요청하는 주소나 거래 ID 의 처리 메소드)",
+		INCLUDES: "화면이 다른 화면을 끼워 넣거나 띄운다"
 	};
 
 	var TO_KIND = {
@@ -86,7 +86,7 @@ var DstoneKnowledgeTerms = (function () {
 		EXTERNAL_FIELD: "프로젝트 밖의 필드",
 		SQL: "SQL statement",
 		TABLE: "DB 테이블",
-		FILE: "파일 (JSP 화면)"
+		FILE: "파일 (화면: JSP · WebSquare · Nexacro)"
 	};
 
 	var CONFIDENCE = {
@@ -103,7 +103,8 @@ var DstoneKnowledgeTerms = (function () {
 		SCHEDULED: "스케줄 작업 (@Scheduled)",
 		LISTENER: "메시지 / 이벤트를 받는 메소드",
 		THREAD: "스레드로 도는 코드 (Runnable, Thread, Callable)",
-		JSP: "주소로 바로 열 수 있는 JSP (WEB-INF 밖에 있는 것)"
+		JSP: "주소로 바로 열 수 있는 JSP (WEB-INF 밖에 있는 것)",
+		TRANSACTION: "거래 ID 로 불리는 메소드. 화면이 주소 대신 거래 ID 를 넘겨 부른다 (주소 칸에 거래 ID 가 나온다)"
 	};
 
 	var LAYER = {
@@ -132,8 +133,12 @@ var DstoneKnowledgeTerms = (function () {
 	var FILE_TYPE = {
 		SOURCE: "Java 소스",
 		JSP: "JSP 화면",
+		WEBSQUARE: "WebSquare 화면 (XML)",
+		NEXACRO: "Nexacro / X-Platform 화면 (.xfdl)",
+		NEXACRO_APP: "Nexacro / X-Platform 애플리케이션 정의 (.xadl)",
 		MYBATIS_MAPPER: "MyBatis SQL 매퍼",
 		IBATIS_MAPPER: "iBATIS SQL 매퍼",
+		QUERY_XML: "쿼리 XML (JEF 계열 프레임워크의 document / query / statement)",
 		MYBATIS_CONFIG: "MyBatis 설정",
 		SPRING_XML: "Spring 설정 XML",
 		STRUTS_CONFIG: "Struts 설정",
@@ -158,7 +163,7 @@ var DstoneKnowledgeTerms = (function () {
 		TYPE: "클래스 / 인터페이스 하나",
 		METHOD: "메소드 하나",
 		MAPPER: "SQL statement 하나",
-		VIEW: "화면(JSP) 하나",
+		VIEW: "화면 하나 (JSP · WebSquare · Nexacro)",
 		UPLOAD: "올린 일반 문서"
 	};
 
@@ -219,8 +224,8 @@ var DstoneKnowledgeTerms = (function () {
 		}
 		var parts = String(code).split(":");
 		if (parts[0] === "MAPPER" && parts.length === 3) {
-			var framework = parts[1] === "IBATIS" ? "iBATIS" : "MyBatis";
-			return framework + " 매퍼의 " + (parts[2] === "SQL_FRAGMENT" ? "SQL 조각(<sql>. 다른 SQL 이 끼워 넣어 쓰는 부분)" : parts[2] + " 문");
+			var framework = parts[1] === "IBATIS" ? "iBATIS 매퍼" : (parts[1] === "QUERY_XML" ? "쿼리 XML(JEF 계열)" : "MyBatis 매퍼");
+			return framework + "의 " + (parts[2] === "SQL_FRAGMENT" ? "SQL 조각(<sql>. 다른 SQL 이 끼워 넣어 쓰는 부분)" : parts[2] + " 문");
 		}
 		return "";
 	}

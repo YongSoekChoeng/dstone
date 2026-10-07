@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WebSquare 엔진 설정. 화면이 아니다 -->
+<WebSquare>
+    <welcome-file value="/ui/order/OrderList.xml"/>
+</WebSquare>

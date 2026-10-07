@@ -616,13 +616,16 @@ public class CodeDocumentBuilder {
 		return grouped;
 	}
 
-	/** "POST /order/cancel.do", "main()", "스케줄 0 0 3 * * *" */
+	/** "POST /order/cancel.do", "거래 ID JCST0200M01S", "main()", "스케줄 0 0 3 * * *" */
 	private String endpointText(Map<String, Object> endpoint) {
 		String type = (String) endpoint.get("endpointType");
 		String path = (String) endpoint.get("path");
 		if ("HTTP".equals(type) || "SERVLET".equals(type)) {
 			String httpMethod = (String) endpoint.get("httpMethod");
 			return ("ALL".equals(httpMethod) || httpMethod == null ? "" : httpMethod + " ") + path;
+		}
+		if ("TRANSACTION".equals(type)) {
+			return "거래 ID " + (path == null ? "" : path);
 		}
 		if ("MAIN".equals(type)) {
 			return "프로그램 시작점(main)";
