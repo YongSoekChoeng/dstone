@@ -125,10 +125,16 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 		});
 
 		// SQL 매퍼: statement 하나가 문서 하나. 매퍼가 아닌 XML은 statement가 없어서 건너뛴다.
+		// 리치클라이언트 화면(WebSquare, Nexacro)도 XML이다. 이것은 JSP처럼 파일 하나가 화면 문서 하나다.
 		filePassRunner.run(context, NAME, "XML", new FileHandler<CodeDocumentBuilder.Result>() {
 			@Override
 			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {
 				long fileId = ((Number) file.get("fileId")).longValue();
+				if (ResourceDocumentBuilder.isRichClientScreen((String) file.get("fileType"))) {
+					byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
+					String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+					return resourceBuilder.buildView(file, text, ragDao.selectViewLinksByFile(context.getRevisionId(), fileId));
+				}
 				List<Map<String, Object>> statements = ragDao.selectStatementsByFile(fileId);
 				if (statements.isEmpty()) {
 					return null;
@@ -139,7 +145,7 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 			@Override
 			public FileResult write(Map<String, Object> file, CodeDocumentBuilder.Result prepared) throws Exception {
 				if (prepared == null) {
-					return FileResult.skipped("SQL statement가 없는 XML입니다.");
+					return FileResult.skipped("SQL statement도 화면도 아닌 XML입니다.");
 				}
 				return save(context, file, prepared, model, dimensions, counts);
 			}

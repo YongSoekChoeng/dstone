@@ -141,12 +141,6 @@ public final class Constants {
 		public final static String FAIL_PREFIX = "실패";
 	}
 
-	/** 문서를 벡터스토어에 적재하는 쪽(api.service.EmbedService)과 검색하는 쪽(common.rag.RagRetrievalChain) 둘 다 함께 쓰는, 문서에 붙는 메타데이터 키 이름입니다. */
-	public static final class Rag {
-		public final static String SOURCE_ID_METADATA_KEY = "sourceId";
-		public final static String TENANT_METADATA_KEY = "tenant";
-	}
-
 	/** common.config.ConfigMcp가 MCP 서버(STDIO)를 실제로 띄울 때 쓰는 상수입니다. */
 	public static final class Mcp {
 		/**

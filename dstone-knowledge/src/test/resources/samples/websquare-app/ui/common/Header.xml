@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:w2="http://www.inswave.com/websquare">
+    <head>
+        <w2:type>DEFAULT</w2:type>
+    </head>
+    <body>
+        <w2:textbox id="txtTitle" label="주문 관리"/>
+    </body>
+</html>

@@ -124,7 +124,8 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 		String fileType = (String) file.get("fileType");
 		String language = (String) file.get("language");
 		String path = (String) file.get("path");
-		boolean known = "MYBATIS_MAPPER".equals(fileType) || "IBATIS_MAPPER".equals(fileType) || "SPRING_XML".equals(fileType)
+		boolean mapper = "MYBATIS_MAPPER".equals(fileType) || "IBATIS_MAPPER".equals(fileType) || "QUERY_XML".equals(fileType);
+		boolean known = mapper || "SPRING_XML".equals(fileType)
 				|| "BUILD".equals(fileType) || "CONFIG".equals(fileType);
 		if (!known) {
 			// 용도를 모르는 XML, 로그 설정, web.xml 등
@@ -135,8 +136,9 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 		byte[] bytes = Files.readAllBytes(root.resolve(path));
 		String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
 
-		if ("MYBATIS_MAPPER".equals(fileType) || "IBATIS_MAPPER".equals(fileType)) {
-			prepared.mappers = mapperXmlReader.read(text);
+		if (mapper) {
+			// 쿼리 XML은 파일 이름이 네임스페이스라서 경로를 같이 넘긴다.
+			prepared.mappers = mapperXmlReader.read(text, path);
 		} else if ("SPRING_XML".equals(fileType)) {
 			prepared.resources = resourceReaders.readSpringXml(text);
 		} else if ("BUILD".equals(fileType)) {

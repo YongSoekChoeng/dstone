@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FDL version="2.1">
+  <Form id="OrderDetail" width="600" height="400" titletext="주문 상세">
+    <Script type="xscript5.1"><![CDATA[
+// 저장: 접두어 뒤에 /가 붙은 주소
+this.fnSave = function()
+{
+	this.transaction("save", "svc::/order/save.do", "dsOrder=dsOrder:U", "", "", "fnCallback");
+};
+]]></Script>
+  </Form>
+</FDL>

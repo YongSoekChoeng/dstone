@@ -93,6 +93,25 @@ dstone:
             max-file-bytes: 5242880
             # 파일 몇 개마다 DB에 쓰고 커밋할지.
             commit-size: 200
+        # SEMANTIC 단계 (프레임워크 규칙으로 의미 붙이기)
+        semantic:
+            # 리치클라이언트 화면(WebSquare, Nexacro, X-Platform)
+            screen:
+                # 화면이 주소 대신 "거래 ID"로 서버를 부르는 프로젝트를 위한 규칙. "함수=메소드이름틀" 을 쉼표로 이어 쓴다.
+                # 예) doRequestAjax=perform{id}
+                #     화면의 HiJS.svr.doRequestAjax("JCST0200M01S", ...) 를 performJCST0200M01S 메소드와 잇는다.
+                # 함수 이름은 마지막 마디만 적어도 된다(앞의 HiJS.svr. 은 없어도 맞는다). 첫 인자가 글자로 적힌 호출만 잇는다.
+                # 화면에 그 함수가 없으면 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
+                # 주소(/order/list.do)로 부르는 화면은 규칙 없이도 이어진다.
+                call-rules: "doRequestAjax=perform{id}"
+            # 계층 분류
+            layer:
+                # 자체 프레임워크를 쓰는 프로젝트를 위한 규칙. "상위 타입의 전체 이름=계층" 을 쉼표로 이어 쓴다.
+                # 그 타입을 바로 상속(구현)한 클래스의 계층이 된다(신뢰도 MEDIUM). 애노테이션 등으로 이미 정해진 계층은 바꾸지 않는다.
+                # 계층: CONTROLLER, SERVICE, REPOSITORY, MODEL, VIEW, CONFIG, WEB_FILTER, UTIL, EXCEPTION, BATCH
+                # 아래는 JEF 계열 프레임워크의 규칙이다. AbstractMainService 는 화면의 요청을 처음 받는 클래스라 CONTROLLER 로 둔다.
+                # 그 타입을 쓰지 않는 프로젝트에서는 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
+                super-types: "jef.application.services.AbstractMainService=CONTROLLER, jef.application.services.AbstractSubService=SERVICE, jef.application.dao.jdbc.JdbcDAO=REPOSITORY, jef.application.dao.jdbc.helper.JdbcRowGetter=REPOSITORY, jef.application.entity.BusinessVO=MODEL"
         # RESOLVE 단계 (호출이 누구를 가리키는지 풀기)
         resolve:
             # 메모리에 들고 있을 "파싱한 파일" 수. 호출을 풀 때 다른 타입의 선언이 필요하면 그 파일을 파싱해서 여기에 둔다.
@@ -122,8 +141,12 @@ dstone:
             embedding:
                 # 임베딩 대기열을 서버가 알아서 비울지. false 면 청크는 만들어지지만 벡터가 생기지 않아 검색되지 않는다.
                 enabled: true
-                # 임베딩 모델에 한 번에 보내는 청크 수
-                batch-size: 16
+                # 임베딩 모델에 한 번에 보내는 청크 수.
+                # 임베딩 서버(Ollama)는 요청을 하나씩 차례로 처리하므로, 검색의 "질문 한 줄 임베딩"(0.1초)은 지금 처리 중인 묶음이 끝날 때까지 기다린다.
+                # 그래서 묶음이 크면 검색이 그만큼 느려진다. GPU 없이 CPU로 돌리는 이 환경에서 잰 값(3,500자 청크, bge-m3):
+                #   16건 한 묶음 66.8초, 4건 16.5초 = 건당 약 4초로 같다. 묶어 보내도 빨라지지 않으니 1로 둔다(검색이 길어야 한 건만 기다린다).
+                # GPU가 있는 서버에서는 묶어 보내는 쪽이 빠르다. 그때는 8 ~ 32로 올린다.
+                batch-size: 1
                 # 임베딩 벡터의 차원. rag_embedding.embedding 컬럼의 차원과 같아야 한다.
                 dimensions: 1024
                 # 대기열이 비었을 때 다시 확인할 때까지 쉬는 시간(초)

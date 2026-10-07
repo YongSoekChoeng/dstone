@@ -391,14 +391,14 @@ public class AgentExecutor extends BaseObject {
 		spec = spec.system(EnginePrompt.compose(engineRule, taskPrompt));
 
 		/************************************************************************
-		4. RAG(검색 증강)를 적용합니다. caller의 문서만 검색 대상이 되도록 tenant 필터도 함께 걸립니다.
+		4. RAG(검색 증강)를 적용합니다. dstone-knowledge에 올려 둔 문서에서 질문과 가까운 조각을 찾아 붙입니다.
 			- topK(검색 결과 개수)/similarityThreshold(유사도 기준)/allowEmptyContext(검색 결과가
 			  없을 때 어떻게 할지)는 AgentDefinition에 적힌 ragTopK/ragSimilarityThreshold/
 			  ragAllowEmptyContext 값을 그대로 씁니다. 셋 다 값이 없으면(null) RagRetrievalChain에 정해진
 			  전체 공통 기본값(dstone.ai.rag.retrieval.*, allowEmptyContext는 기본 true)을 씁니다.
 		************************************************************************/
 		if (ragEnabled) {
-			spec = spec.advisors(this.ragRetrievalChain.buildAdvisor(caller, agent.ragTopK(), agent.ragSimilarityThreshold(), agent.ragAllowEmptyContext()));
+			spec = spec.advisors(this.ragRetrievalChain.buildAdvisor(agent.ragTopK(), agent.ragSimilarityThreshold(), agent.ragAllowEmptyContext()));
 		}
 
 		/************************************************************************
@@ -407,16 +407,14 @@ public class AgentExecutor extends BaseObject {
 			  tools가 비어 있으면 붙지 않습니다. caller 화이트리스트 설정이 아예 없으면 그쪽은 전부 통과입니다.
 			- Sub Agent: Agent의 subAgents에 적힌 Agent를 Tool처럼 붙입니다(subAgentCallbacks() 참고).
 			  채팅 요청의 toolsEnabled=false는 Tool만 끄고 Sub Agent는 끄지 않습니다(Sub Agent는 Agent 정의의 일부입니다).
-			- toolContext라는 값에 caller를 함께 실어 보냅니다. 이렇게 하는 이유는, tools.rag.RagSearchTool처럼
-			  "caller(tenant)별로 검색 범위를 좁혀야 하는" Tool이 있을 때, 그 Tool이 ToolContext 파라미터를
-			  통해 caller 값을 받아볼 수 있게 하기 위해서입니다. caller 값이 없더라도(null이더라도) 이
-			  toolContext 맵 자체에는 반드시 키가 하나 채워져 있어야 합니다(값은 빈 문자열로 넣습니다) -
-			  Spring AI의 MethodToolCallback.validateToolContextSupport()가, @Tool 메서드에 ToolContext
-			  파라미터가 선언되어 있는데 toolContext가 null이거나 완전히 빈 Map이면("ToolContext is
+			- toolContext라는 값에 caller를 함께 실어 보냅니다. caller(이 호출을 보낸 앱)를 알아야 하는 Tool이
+			  ToolContext 파라미터로 그 값을 받아볼 수 있게 하기 위해서입니다(지금 그런 Tool은 없지만 길은 열어 둡니다).
+			  caller 값이 없더라도(null이더라도) 이 toolContext 맵 자체에는 반드시 키가 하나 채워져 있어야 합니다
+			  (값은 빈 문자열로 넣습니다) - Spring AI의 MethodToolCallback.validateToolContextSupport()가, @Tool 메서드에
+			  ToolContext 파라미터가 선언되어 있는데 toolContext가 null이거나 완전히 빈 Map이면("ToolContext is
 			  required by the method as an argument"라는) IllegalArgumentException을 던지기 때문입니다.
 			  Map.of()처럼 엔트리가 0개인 Map도 "빈 Map"으로 취급되므로, caller가 null인 경우에도 엔트리를
-			  최소 1개는 넣어 둡니다. 그 값이 빈 문자열이면 RagSearchTool 쪽의 StringUtil.isEmpty() 검사에서
-			  "caller 없음"과 똑같이 처리됩니다.
+			  최소 1개는 넣어 둡니다.
 		************************************************************************/
 		List<ToolCallback> callbacks = new ArrayList<>();
 		if (toolsEnabled) {

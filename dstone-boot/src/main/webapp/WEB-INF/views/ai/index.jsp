@@ -24,7 +24,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div class="ai-card-list">
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/chat/chat">
 						<h3>채팅</h3>
-						<p>dstone-ai-engine과 실시간으로 대화합니다. RAG 검색증강, Tool 호출을 선택적으로 켤 수 있습니다.</p>
+						<p>dstone-ai-engine과 실시간으로 대화합니다. 올린 문서 검색(RAG), Tool 호출을 선택적으로 켤 수 있습니다.</p>
 					</a>
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">
 						<h3>WorkFlow 테스트</h3>
@@ -36,9 +36,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<section class="ai-panel">
 				<h3>관리자</h3>
 				<div class="ai-card-list">
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/admin/document/document">
-						<h3>문서 임베딩 관리</h3>
-						<p>RAG 검색 대상 문서를 업로드/삭제하고, 지금까지 적재한 문서 목록을 확인합니다.</p>
+					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/search/search">
+						<h3>문서 올리기 (코드 분석 &gt; 검색 · 문서)</h3>
+						<p>RAG가 검색할 문서를 올리고 지우는 곳입니다. 문서는 dstone-knowledge에 저장되고, 채팅의 "올린 문서 검색(RAG)"이 거기서 찾습니다.</p>
 					</a>
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/admin/workflow/workflow">
 						<h3>WorkFlow 실행 관리</h3>

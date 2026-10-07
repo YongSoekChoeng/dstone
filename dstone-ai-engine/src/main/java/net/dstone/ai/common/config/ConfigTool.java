@@ -15,6 +15,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
@@ -264,6 +266,12 @@ public class ConfigTool extends BaseObject {
 
 		/** 호출 로그에 남길 인자의 최대 글자 수입니다. */
 		private static final int MAX_LOGGED_ARGUMENT_CHARS = 300;
+		/** Tool 인자(JSON)가 온전한지 읽어 보는 용도입니다. */
+		private static final ObjectMapper ARGUMENT_READER = new ObjectMapper();
+		/** 인자가 끊겨서 왔을 때 LLM에게 돌려주는 안내입니다. */
+		private static final String CUT_OFF_ARGUMENT_MESSAGE = "실패: Tool 인자가 중간에 끊겨서 도착했습니다. 한 번에 쓸 수 있는 분량(출력 토큰 한도)을 넘었습니다. "
+			+ "이 Tool은 실행되지 않았습니다. 같은 길이로 다시 보내지 마세요. 긴 파일 내용은 나눠서 저장하세요: "
+			+ "writeFile로 앞부분(5,000자 이내)을 저장한 뒤 appendFile로 나머지를 5,000자 이내씩 이어 붙입니다.";
 
 		private final ToolCallback delegate;
 		private final int maxResultChars;
@@ -289,12 +297,42 @@ public class ConfigTool extends BaseObject {
 
 		@Override
 		public String call(String toolInput) {
+			if (this.isCutOff(toolInput)) {
+				return this.logged(toolInput, CUT_OFF_ARGUMENT_MESSAGE);
+			}
 			return this.logged(toolInput, this.limit(this.delegate.call(toolInput)));
 		}
 
 		@Override
 		public String call(String toolInput, ToolContext toolContext) {
+			if (this.isCutOff(toolInput)) {
+				return this.logged(toolInput, CUT_OFF_ARGUMENT_MESSAGE);
+			}
 			return this.logged(toolInput, this.limit(this.delegate.call(toolInput, toolContext)));
+		}
+
+		/**
+		 * <pre>
+		 * LLM이 보낸 Tool 인자가 중간에 끊긴 JSON인지 봅니다. 끊겼으면 Tool을 부르지 않고 안내 문구를 돌려줍니다.
+		 *
+		 * 긴 문서를 writeFile의 인자로 한 번에 쓰다가 출력 토큰 한도(max-tokens)에 걸리면, 인자 JSON이 닫히지 않은 채로 옵니다.
+		 * 그대로 두면 Spring AI가 "Conversion from JSON failed"라는 긴 오류 로그만 남기고, LLM은 왜 실패했는지 모른 채
+		 * 같은 길이로 다시 씁니다(실제로 12,000자 문서를 두 번 썼습니다). 이유와 해결 방법을 알려 주면 나눠서 저장합니다.
+		 * 인자가 비어 있는 것은 인자 없는 Tool의 정상 호출이므로 끊긴 것으로 보지 않습니다.
+		 * </pre>
+		 */
+		private boolean isCutOff(String toolInput) {
+			if (toolInput == null || toolInput.isBlank()) {
+				return false;
+			}
+			try {
+				ARGUMENT_READER.readTree(toolInput);
+				return false;
+			} catch (Exception e) {
+				LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 인자 JSON이 끊겨서 도착했습니다(출력 토큰 한도 초과로 보임) - "
+					+ toolInput.length() + "자, " + e.getClass().getSimpleName());
+				return true;
+			}
 		}
 
 		/**

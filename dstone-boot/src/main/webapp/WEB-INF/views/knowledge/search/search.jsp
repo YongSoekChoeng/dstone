@@ -66,7 +66,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<section class="ai-panel">
 				<h3>문서 올리기</h3>
 				<p class="ai-hint">설계서, 운영 매뉴얼 같은 일반 문서(PDF, Word, PowerPoint, Excel, 텍스트)를 올리면 위 검색에서 "올린 문서"로 찾을 수 있습니다.
-					같은 이름으로 다시 올리면 바꿔 넣습니다. 임베딩이 끝나기 전에도 이름으로는 찾힙니다.</p>
+					같은 이름으로 다시 올리면 바꿔 넣습니다. 임베딩이 끝나기 전에도 이름으로는 찾힙니다.
+					AI 채팅의 "올린 문서 검색(RAG)"도 여기서 올린 문서에서 찾습니다.</p>
 				<div class="kn-row">
 					<input type="file" id="kn-doc-file" />
 					<input type="text" id="kn-doc-source-id" placeholder="문서 이름 (비우면 파일 이름)" />

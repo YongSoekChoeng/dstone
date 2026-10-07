@@ -134,7 +134,44 @@ public final class JsonSchemaUtil {
 	 * @param schema 검사할 스키마입니다.
 	 */
 	public static List<String> checkSchema(Map<String, Object> schema) {
-		return messages(META_SCHEMA.validate(toJson(schema), InputFormat.JSON));
+		List<String> messages = new ArrayList<>(messages(META_SCHEMA.validate(toJson(schema), InputFormat.JSON)));
+		collectEmptyKeys(schema, "", messages);
+		return messages;
+	}
+
+	/**
+	 * <pre>
+	 * 스키마 안에서 "값이 없는 키"를 찾아 messages에 담습니다.
+	 *
+	 * YAML에서 { type: string, description: 원인과 변경 대상, 위험 요소 요약 } 처럼 중괄호 안의 설명에 쉼표를 쓰면
+	 * YAML은 쉼표에서 항목을 나눕니다. 그래서 설명은 "원인과 변경 대상"에서 끊기고, 뒷부분은 값이 없는 키가 됩니다.
+	 * JSON Schema는 모르는 키를 그냥 넘기기 때문에 표준 검사로는 잡히지 않고, LLM에게는 잘린 설명이 전달됩니다.
+	 * (default와 const는 값이 null이어도 올바른 스키마라서 넘어갑니다.)
+	 * </pre>
+	 *
+	 * @param node     살펴볼 값입니다(맵이나 리스트가 아니면 아무 일도 하지 않습니다).
+	 * @param path     지금 보고 있는 위치입니다(메시지에 적습니다).
+	 * @param messages 찾은 문제를 담을 리스트입니다.
+	 */
+	private static void collectEmptyKeys(Object node, String path, List<String> messages) {
+		if (node instanceof Map<?, ?> map) {
+			for (Map.Entry<?, ?> entry : map.entrySet()) {
+				String key = String.valueOf(entry.getKey());
+				String childPath = path.isEmpty() ? key : path + "." + key;
+				if (entry.getValue() == null) {
+					if (!"default".equals(key) && !"const".equals(key)) {
+						messages.add("'" + childPath + "'에 값이 없습니다. 중괄호 { } 안에 적은 설명(description)에 쉼표가 있으면 YAML이 쉼표에서 항목을 나눕니다. "
+							+ "설명을 따옴표로 감싸세요(예: description: \"원인, 변경 대상\").");
+					}
+				} else {
+					collectEmptyKeys(entry.getValue(), childPath, messages);
+				}
+			}
+		} else if (node instanceof List<?> list) {
+			for (int i = 0; i < list.size(); i++) {
+				collectEmptyKeys(list.get(i), path + "[" + i + "]", messages);
+			}
+		}
 	}
 
 	/**

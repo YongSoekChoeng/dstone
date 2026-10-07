@@ -3,6 +3,7 @@ package net.dstone.boot.knowledge.service;
 import java.io.File;
 import java.net.URI;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.codec.ClientCodecConfigurer;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -41,6 +43,9 @@ public class KnowledgeProxyService extends net.dstone.boot.common.biz.BaseServic
 	/** 분석 시작처럼 바로 돌아오는 것도 있지만, 검색은 질문을 임베딩하느라 수 초가 걸릴 수 있다 */
 	private static final int READ_TIMEOUT_SECONDS = 120;
 
+	/** 한 번에 받을 수 있는 응답의 최대 크기. 가장 큰 응답은 노드 맵의 전체 맵이다(노드 2만, 선 10만 개 한도에서 20MB쯤) */
+	private static final int MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+
 	@Autowired
 	private ConfigProperty configProperty;
 
@@ -60,7 +65,7 @@ public class KnowledgeProxyService extends net.dstone.boot.common.biz.BaseServic
 		} catch (RejectedCallException e) {
 			return error(e.status, e.getMessage());
 		}
-		WebClient.RequestBodySpec request = this.getWebClient(READ_TIMEOUT_SECONDS).method(httpMethod).uri(uri);
+		WebClient.RequestBodySpec request = this.client().method(httpMethod).uri(uri);
 		withApiKey(request);
 		if (body != null && HttpMethod.POST.equals(httpMethod)) {
 			return exchange(request.contentType(MediaType.APPLICATION_JSON).bodyValue(body));
@@ -98,9 +103,24 @@ public class KnowledgeProxyService extends net.dstone.boot.common.biz.BaseServic
 		} catch (RejectedCallException e) {
 			return error(e.status, e.getMessage());
 		}
-		WebClient.RequestBodySpec request = this.getWebClient(READ_TIMEOUT_SECONDS).post().uri(uri);
+		WebClient.RequestBodySpec request = this.client().post().uri(uri);
 		withApiKey(request);
 		return exchange(request.contentType(MediaType.MULTIPART_FORM_DATA).body(BodyInserters.fromMultipartData(builder.build())));
+	}
+
+	/**
+	 * <pre>
+	 * dstone-knowledge를 부를 때 쓰는 WebClient입니다.
+	 * WebClient는 응답을 256KB까지만 받는 것이 기본값이라, 노드 맵의 전체 맵처럼 큰 응답(수 MB)은 한도를 늘려야 받을 수 있습니다.
+	 * </pre>
+	 */
+	private WebClient client() {
+		return this.getWebClient(READ_TIMEOUT_SECONDS).mutate().codecs(new Consumer<ClientCodecConfigurer>() {
+			@Override
+			public void accept(ClientCodecConfigurer configurer) {
+				configurer.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES);
+			}
+		}).build();
 	}
 
 	/** 요청을 보내고, 상태 코드와 본문을 그대로 돌려줍니다. 서버에 닿지 못하면 502로 이유를 알려 줍니다. */

@@ -186,6 +186,30 @@ public class RagDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectEmbeddingProgress", param);
 	}
 
+	/* ---------- 임베딩 대기열 전체의 현황 ---------- */
+
+	/** @return 상태별 [{status, items, chars, orphans}] */
+	public List<Map<String, Object>> selectEmbeddingTotals(String model) {
+		return sqlSessionCommon.selectList(NS + "selectEmbeddingTotals", model);
+	}
+
+	/** @return 아직 임베딩되지 않은 것을 프로젝트별로 [{project, items, chars, priority}] */
+	public List<Map<String, Object>> selectPendingEmbeddingByProject(String model) {
+		return sqlSessionCommon.selectList(NS + "selectPendingEmbeddingByProject", model);
+	}
+
+	/** @return 최근 minutes분 동안 끝난 것 {items, chars, seconds(가장 먼저 끝난 것부터 지금까지)} */
+	public Map<String, Object> selectRecentEmbedded(String model, int minutes) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("model", model);
+		param.put("minutes", minutes);
+		return sqlSessionCommon.selectOne(NS + "selectRecentEmbedded", param);
+	}
+
+	public List<Map<String, Object>> selectFailedEmbeddingReasons(String model) {
+		return sqlSessionCommon.selectList(NS + "selectFailedEmbeddingReasons", model);
+	}
+
 	/** 프로젝트에서 분석이 끝난 가장 최근 리비전. 없으면 null */
 	public Long selectLatestReadyRevision(String projectId) {
 		return sqlSessionCommon.selectOne(NS + "selectLatestReadyRevision", projectId);

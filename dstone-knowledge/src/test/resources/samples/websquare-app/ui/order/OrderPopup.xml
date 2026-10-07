@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head>
+        <w2:type>DEFAULT</w2:type>
+        <script type="text/javascript"><![CDATA[
+        // 주소 앞에 컨텍스트 경로(/shop)를 글자로 붙여 쓴 경우
+        scwin.onpageload = function() {
+            $p.ajax({ action : "/shop/order/detail.do", mode : "asynchronous" });
+        };
+        ]]></script>
+    </head>
+    <body/>
+</html>

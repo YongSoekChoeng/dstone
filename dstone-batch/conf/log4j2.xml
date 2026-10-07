@@ -10,7 +10,7 @@
     
     <Appenders>
         <Console name="console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss} %5p [%c] %m%n"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %5p [%c] %m%n"/>
             <Filters>
             	<!-- SQL 로그 중 BATCH_ 관련 쿼리 필터링 -->
 	            <RegexFilter regex="(?s).*(TASK_|BATCH_).*" onMatch="DENY" onMismatch="NEUTRAL"/>

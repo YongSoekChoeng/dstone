@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- Workflow 실행 1건(AI_WORKFLOW_EXECUTION)과 그 실행이 지나온 스텝의 기록(AI_WORKFLOW_EXECUTION_STEP_HISTORY).
+     테이블 정의: schema/02-create-table-postgresql-dstone-ai.sql
+     조회 결과는 Map 으로 받는다(컬럼 이름은 따옴표로 감싼 별칭 그대로). enum, JSON, 시각으로 바꾸는 일은
+     runtime.workflow.execution.WorkFlowExecutionStore 가 한다 -->
+<mapper namespace="net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore">
+
+    <sql id="executionColumns">
+        EXECUTION_ID AS "executionId"
+        , WORKFLOW_ID AS "workflowId"
+        , CALLER AS "caller"
+        , SESSION_ID AS "sessionId"
+        , STATUS AS "status"
+        , CURRENT_STEP_INDEX AS "currentStepIndex"
+        , CONTEXT_JSON::text AS "contextJson"
+        , RESULT_TEXT AS "resultText"
+        , ERROR_MESSAGE AS "errorMessage"
+        , CREATED_AT AS "createdAt"
+        , UPDATED_AT AS "updatedAt"
+    </sql>
+
+    <!-- CONTEXT_JSON 은 jsonb 다. PostgreSQL 은 글자를 jsonb 로 알아서 바꿔 주지 않으므로 CAST 를 적어 준다 -->
+    <insert id="insertExecution" parameterType="java.util.Map">
+        INSERT INTO AI_WORKFLOW_EXECUTION
+            (EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, CONTEXT_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT)
+        VALUES
+            (#{executionId}, #{workflowId}, #{caller}, #{sessionId}, #{status}, #{currentStepIndex}, CAST(#{contextJson} AS jsonb), #{resultText}, #{errorMessage}
+            , #{createdAt, jdbcType=TIMESTAMP}, #{updatedAt, jdbcType=TIMESTAMP})
+    </insert>
+
+    <update id="updateExecution" parameterType="java.util.Map">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET STATUS = #{status}
+             , CURRENT_STEP_INDEX = #{currentStepIndex}
+             , CONTEXT_JSON = CAST(#{contextJson} AS jsonb)
+             , RESULT_TEXT = #{resultText}
+             , ERROR_MESSAGE = #{errorMessage}
+             , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
+         WHERE EXECUTION_ID = #{executionId}
+    </update>
+
+    <select id="selectExecution" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="executionColumns"/>
+          FROM AI_WORKFLOW_EXECUTION
+         WHERE EXECUTION_ID = #{executionId}
+    </select>
+
+    <!-- 실행 목록(최신순). status / workflowId / caller 는 값이 있을 때만 조건으로 건다 -->
+    <select id="selectExecutionList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="executionColumns"/>
+          FROM AI_WORKFLOW_EXECUTION
+         WHERE 1 = 1
+        <if test="status != null and status != ''">AND STATUS = #{status}</if>
+        <if test="workflowId != null and workflowId != ''">AND WORKFLOW_ID = #{workflowId}</if>
+        <if test="caller != null and caller != ''">AND CALLER = #{caller}</if>
+         ORDER BY CREATED_AT DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <insert id="insertHistory" parameterType="java.util.Map">
+        INSERT INTO AI_WORKFLOW_EXECUTION_STEP_HISTORY
+            (EXECUTION_ID, STEP_ID, STEP_TYPE, STEP_REF, SUCCESS, DURATION_MS, OUTPUT_SUMMARY, FAILURE_REASON, EXECUTED_AT)
+        VALUES
+            (#{executionId}, #{stepId}, #{stepType}, #{stepRef}, #{success}, #{durationMs}, #{outputSummary}, #{failureReason}, #{executedAt, jdbcType=TIMESTAMP})
+    </insert>
+
+    <!-- 실행 한 건의 스텝 기록 전부(실행한 순서대로) -->
+    <select id="selectHistoryList" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT STEP_ID AS "stepId"
+             , STEP_TYPE AS "stepType"
+             , STEP_REF AS "stepRef"
+             , SUCCESS AS "success"
+             , DURATION_MS AS "durationMs"
+             , OUTPUT_SUMMARY AS "outputSummary"
+             , FAILURE_REASON AS "failureReason"
+             , EXECUTED_AT AS "executedAt"
+          FROM AI_WORKFLOW_EXECUTION_STEP_HISTORY
+         WHERE EXECUTION_ID = #{executionId}
+         ORDER BY EXECUTED_AT ASC, ID ASC
+    </select>
+
+</mapper>

@@ -33,7 +33,7 @@ spring:
             host: ${REDIS_HOST}
             port: ${REDIS_PORT}
             timeout: 10000
-    # RAG: pgvector(PgVectorStoreAutoConfiguration)가 이 DataSource를 그대로 쓴다.
+    # DB: Workflow 실행 이력(AI_WORKFLOW_EXECUTION*)을 담는다. 접근은 MyBatis로 한다(common.config.ConfigMapper, resources/sqlmap/**/*Dao.xml).
     # dstone-boot처럼 여러 datasource가 아니라 하나뿐이라 표준 Spring Boot 단일 datasource
     # 자동설정(spring.datasource.*)을 그대로 쓴다 - 별도 ConfigDatasource 클래스 불필요.
     # 로컬 설치/역할 생성 절차: docs/software/05.postgresql.md 참고.
@@ -44,11 +44,6 @@ spring:
         password: ENC(XIXzzg4U/6LYCwsQagqLSeGJt80UdT1bZcI0Msf0nh8=)
         hikari:
             maximum-pool-size: 10
-    servlet:
-        multipart:
-            # 문서 임베딩 업로드(/api/ai/embed/documents) 대비 기본 1MB보다 넉넉하게.
-            max-file-size: 20MB
-            max-request-size: 20MB
     ##########################################################################################
     # <자동설정기능>
     # Security/RabbitMQ/Kafka는 아직 미사용 이므로 exclude.
@@ -72,16 +67,15 @@ spring:
         # 공유한다 - Agent별로 다른 provider/model을 쓰는 기능은 없다.
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
-        # embedding(RAG): Anthropic은 임베딩 모델을 제공하지 않아 chat과 별개로 정해야 한다
-        # (api.service.EmbedService/common.rag.RagRetrievalChain의 requireVectorStore() 참고). 이 환경엔 OpenAI 키 대신
-        # 로컬 Ollama를 설치해서 쓴다(비용 없음, 문서가 외부로 안 나감) - 설치 절차: docs/software/14.ollama.md.
+        # embedding: 이 엔진은 임베딩 모델을 쓰지 않는다(none). RAG의 임베딩과 검색은 dstone-knowledge가 한다
+        # (common.rag.RagRetrievalChain이 그 서버의 검색 API를 부른다).
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
         # 아직 쓰지 않으므로 전부 명시적으로 꺼둔다.
         model:
             chat: openai # anthropic | openai | ollama
-            embedding: ollama # openai | ollama (anthropic 불가, dstone.ai.rag.enabled=true일 때만 의미 있음)
+            embedding: none # 쓰지 않는다. 임베딩은 dstone-knowledge의 몫이다
             audio:
                 speech: none
                 transcription: none
@@ -135,7 +129,7 @@ spring:
                      # (끄면 답이 틀렸다). 그래서 한도를 넉넉히 준다. pilot-workflow의 리뷰 step이 8192를 추론에 다 쓴 적이 있다.
                      # 값을 올리면 한 번의 호출이 그만큼 길어질 수 있으므로 아래 timeout 안에 끝나는지도 함께 본다
                      # (초당 70토큰쯤이면 16384토큰은 4분 가까이 걸린다).
-                     # 4096 6144 8192 16384
+                     # 4096 6144 8192 16384 32768
                      max-tokens: 16384
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
@@ -147,9 +141,8 @@ spring:
              max-retries: 1
 
         ##########################################################################################
-        # spring.ai.model.embedding=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
-        # (base-url은 spring.ai.ollama.* 하나뿐이라 chat=ollama로 쓰게 되면 이 base-url을 공유한다).
-        # 로컬에 docs/software/14.ollama.md대로 설치 후 bge-m3(다국어/한국어 지원 임베딩 모델, 1024차원) pull 필요.
+        # spring.ai.model.chat=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
+        # 설치 절차: docs/software/14.ollama.md
         ##########################################################################################
         ollama:
             base-url: http://localhost:11434 # ollama 와 통신할 URL            
@@ -163,20 +156,7 @@ spring:
                     model: hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:latest
                     timeout: 300s # 충분하게 5분(300초) 등으로 조절
                     temperature: 0.3  # 💡 모든 Ollama 요청의 토큰 생성 다양성을 제거하여 속도 및 일관성 향상
-            embedding: # spring.ai.model.embedding=ollama 용 설정.
-                model: bge-m3:latest
 
-        ##########################################################################################
-        # RAG VectorStore = pgvector. dimensions는 spring.ai.ollama.embedding.model(bge-m3)의
-        # 실제 출력 차원과 반드시 일치해야 한다 - 모델을 바꾸면 이 값도 같이 바꾸고 테이블을 재생성해야 한다.
-        ##########################################################################################
-        vectorstore:
-            pgvector:
-                initialize-schema: true
-                table-name: vector_store
-                dimensions: 1024
-                index-type: HNSW
-                distance-type: COSINE_DISTANCE
 dstone:
     ai:
         ##########################################################################################
@@ -215,8 +195,9 @@ dstone:
                 api-token: ENC(koeh9W9G8vYjPVBZAeO3GWxg8Uv3PYssUy8aykBFHNMVke4YNjWubBwxGu7xp+hDZbfMwSgwbXj7ZE87Gp1cpQ==)
                 allowed-jobs:
                     - testApp
-            # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)에 물어보는 Tool(tools.knowledge.KnowledgeTool) 설정.
-            # base-url이 비어 있으면 이 Tool은 항상 실패 문구로 끝난다 - 주소를 채우는 것이 곧 "이 Tool을 켠 상태"다.
+            # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)를 부르는 설정(common.knowledge.KnowledgeClient).
+            # 두 군데서 쓴다: 코드 분석 결과를 물어보는 Tool(tools.knowledge.KnowledgeTool)과 RAG(올린 문서 검색, 아래 dstone.ai.rag).
+            # base-url이 비어 있으면 그 Tool은 항상 실패 문구로 끝나고 RAG도 쓸 수 없다 - 주소를 채우는 것이 곧 "켠 상태"다.
             # api-key: dstone-knowledge가 호출자 인증(dstone.knowledge.security.auth.enabled)을 켰을 때만 넣는다. ENC(...)로 적는다.
             # timeout-seconds: 응답 대기 시간(기본 60). 검색은 질문을 임베딩해야 해서 임베딩 서버가 바쁘면 수 초가 걸린다.
             knowledge:
@@ -231,13 +212,17 @@ dstone:
             max-result-chars: 60000
             # 파일 Tool(tools.utils.FileUtil) 설정. 모두 "한 번에 돌려주는 양"을 줄이기 위한 값이다.
             # max-read-chars: readFile/readFileLines/readFileTail이 한 번에 돌려주는 최대 글자 수(기본 30000).
-            # max-list-files: readFileListAll이 한 번에 돌려주는 최대 파일 수(기본 500). 넘으면 잘렸다는 안내를 준다.
+            # list-summary-over: readFileListAll이 찾은 파일이 이 개수를 넘으면 파일 이름 대신 "폴더 경로 (파일 수)"만 준다(기본 100).
+            #               프로젝트 루트를 조회한 Agent가 파일 450개의 경로(4만 자)를 받아서, 그 뒤의 모든 LLM 호출이 그만큼 느려진 적이 있다.
+            #               폴더 구조만 보여 주면 모델이 필요한 폴더를 골라 다시 조회한다.
+            # max-list-files: readFileListAll이 한 번에 돌려주는 최대 파일 수(기본 500). list-summary-over를 이보다 크게 잡았을 때만 의미가 있다.
             # max-search-matches: searchInFiles가 한 번에 돌려주는 최대 건수(기본 100).
             # max-search-file-bytes: searchInFiles가 검색하는 파일의 최대 크기(기본 1MB). 더 큰 파일은 건너뛴다.
             # exclude-dirs: 목록/검색에서 빼는 폴더 이름(콤마 구분). 프로젝트 루트를 조회했을 때 .git 속 파일까지
             #               338KB가 딸려 와서 요청이 700KB로 불어나 실패한 적이 있다.
             file:
                 max-read-chars: 30000
+                list-summary-over: 100
                 max-list-files: 500
                 max-search-matches: 100
                 max-search-file-bytes: 1048576
@@ -245,16 +230,16 @@ dstone:
         
         ##########################################################################################
         # RAG 설정.
-        # 이 값이 true여야 api.service.EmbedService/EmbedController(적재)와 common.rag.RagRetrievalChain(검색), Agent의 ragEnabled 설정이 실제로 동작한다(requireVectorStore() 참고)
-        # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 임베딩 설정 없이도 그대로 기동된다.
-        ########################################################################################## 
+        # 이 값이 true여야 common.rag.RagRetrievalChain(검색), Agent의 ragEnabled 설정, searchDocuments Tool이 실제로 동작한다.
+        # 문서의 저장, 임베딩, 검색은 dstone-knowledge가 한다. 문서도 그 서버에 직접 올린다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면). 그래서 위의 dstone.ai.tool.knowledge.base-url(그 서버의 주소)이 채워져 있어야 한다.
+        # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 dstone-knowledge 없이도 그대로 기동된다.
+        ##########################################################################################
         rag:
             enabled: true
-            ingest:
-                chunk-size: 800 # 청크당 최대 토큰 수
             retrieval:
                 top-k: 5
-                # bge-m3(로컬 임베딩) 기준 실측: 실제로 관련 있는 문서/질의 쌍도 코사인 유사도가
+                # 유사도가 이 값보다 낮은 조각은 버린다(질문에 든 이름이 글자 그대로 들어 있어서 찾힌 조각은 남긴다).
+                # bge-m3(dstone-knowledge가 쓰는 임베딩 모델) 기준 실측: 실제로 관련 있는 문서/질의 쌍도 코사인 유사도가
                 # 0.5를 못 넘는 경우가 흔해서(0.48 등) 0.5로 두면 데이터가 있어도 결과가 통째로 빈다.
                 # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
                 similarity-threshold: 0.35

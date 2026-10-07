@@ -35,7 +35,7 @@ public class RagSettings {
 	}
 
 	public int embeddingBatchSize() {
-		return Math.max(1, intProperty("dstone.knowledge.rag.embedding.batch-size", 16));
+		return Math.max(1, intProperty("dstone.knowledge.rag.embedding.batch-size", 1));
 	}
 
 	public int embeddingIdleSeconds() {

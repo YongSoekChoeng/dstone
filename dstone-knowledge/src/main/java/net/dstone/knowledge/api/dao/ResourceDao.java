@@ -67,10 +67,15 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.insert(NS + "insertInterfaceMapperRelations", revisionId);
 	}
 
-	public List<Map<String, Object>> selectMapperCallPage(long revisionId, List<String> names, long afterId, int limit) {
+	/**
+	 * @param names SQL의 이름을 첫 인자로 받는 메소드 이름들
+	 * @param holders SQL의 이름을 생성자의 첫 인자로 받는 클래스 이름들
+	 */
+	public List<Map<String, Object>> selectMapperCallPage(long revisionId, List<String> names, List<String> holders, long afterId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
 		param.put("names", names);
+		param.put("holders", holders);
 		param.put("afterId", afterId);
 		param.put("limit", limit);
 		return sqlSessionCommon.selectList(NS + "selectMapperCallPage", param);

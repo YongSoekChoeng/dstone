@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FDL version="2.1">
+  <Form id="OrderList" width="1280" height="720" titletext="주문 목록">
+    <Layouts>
+      <Layout>
+        <Grid id="grdOrder" binddataset="dsOrder"/>
+        <Div id="divDetail" url="order::OrderDetail.xfdl"/>
+      </Layout>
+    </Layouts>
+    <Objects>
+      <Dataset id="dsOrder">
+        <ColumnInfo>
+          <Column id="orderNo" type="STRING" size="20"/>
+        </ColumnInfo>
+      </Dataset>
+    </Objects>
+    <Script type="xscript5.1"><![CDATA[
+// 조회: 서비스 접두어가 붙은 주소
+this.fnSearch = function()
+{
+	this.transaction("search", "svc::order/list.do", "", "dsOrder=output", "", "fnCallback");
+};
+
+// 지워 둔 옛 호출: 잇지 않는다
+// this.transaction("old", "svc::order/save.do", "", "", "", "fnCallback");
+]]></Script>
+  </Form>
+</FDL>

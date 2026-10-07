@@ -378,3 +378,238 @@ a.kn-step:hover {
 	margin: 6px 0 12px;
 	font-size: 13px;
 }
+
+/* ---------- 노드 맵 ---------- */
+
+/* 왼쪽에 그림, 오른쪽에 고른 노드의 설명 */
+.kn-graph-body {
+	display: flex;
+	gap: 12px;
+	height: 72vh;
+	min-height: 480px;
+}
+
+.kn-graph-canvas {
+	flex: 1;
+	min-width: 0;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	background: #fff;
+}
+
+.kn-graph-detail {
+	width: 380px;
+	flex-shrink: 0;
+	overflow: auto;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	background: #fff;
+	padding: 12px 14px;
+	font-size: 13px;
+}
+
+/* 계층을 켜고 끄는 색깔 딱지. 노드의 색과 같다 */
+.kn-graph-chip {
+	border: 1.5px solid;
+	border-radius: 999px;
+	padding: 2px 10px 2px 6px;
+	cursor: pointer;
+	color: #111827 !important;
+}
+
+.kn-graph-chip span {
+	color: #6b7280;
+	font-size: 12px;
+}
+
+/* 선의 범례 */
+.kn-graph-line {
+	font-size: 12px;
+	color: #4b5563;
+	margin-right: 6px;
+}
+
+.kn-graph-line i {
+	display: inline-block;
+	width: 26px;
+	border-top: 3px solid;
+	vertical-align: middle;
+	margin-right: 5px;
+}
+
+/* 설명 글 안에서 강조 색을 보여 주는 작은 동그라미 */
+.kn-graph-mark {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	margin-right: 3px;
+}
+
+/* 고른 노드의 설명 */
+.kn-gd-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 15px;
+	word-break: break-all;
+}
+
+.kn-gd-kind {
+	color: #fff;
+	border-radius: 6px;
+	padding: 1px 8px;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.kn-gd-full {
+	color: #4b5563;
+	margin: 6px 0;
+}
+
+.kn-gd-actions {
+	display: flex;
+	gap: 6px;
+	margin: 8px 0;
+}
+
+.kn-gd-facts {
+	border-collapse: collapse;
+	margin: 6px 0;
+}
+
+.kn-gd-facts th {
+	text-align: left;
+	font-weight: 600;
+	color: #6b7280;
+	padding: 2px 10px 2px 0;
+	white-space: nowrap;
+	vertical-align: top;
+}
+
+.kn-gd-facts td {
+	padding: 2px 0;
+}
+
+/* 이어진 노드, 묶음에 든 노드: 누를 수 있는 이름을 나란히 */
+.kn-gd-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 6px;
+	max-height: 160px;
+	overflow: auto;
+}
+
+.kn-gd-list a,
+.kn-gd-rows a {
+	color: #1d4ed8;
+	text-decoration: none;
+}
+
+.kn-gd-list a {
+	border: 1px solid #e5e7eb;
+	border-radius: 6px;
+	padding: 1px 6px;
+	font-size: 12px;
+}
+
+/* 진입점, 메소드, SQL 목록: 한 줄에 하나 */
+.kn-gd-rows {
+	max-height: 220px;
+	overflow: auto;
+	border: 1px solid #f3f4f6;
+	border-radius: 8px;
+	padding: 4px 8px;
+}
+
+.kn-gd-rows > div {
+	word-break: break-all;
+	padding: 3px 0;
+	border-bottom: 1px solid #f3f4f6;
+}
+
+.kn-gd-rows > div:last-child {
+	border-bottom: 0;
+}
+
+.kn-gd-tag {
+	display: inline-block;
+	background: #eef2f7;
+	border-radius: 4px;
+	padding: 0 5px;
+	font-size: 11px;
+	color: #374151;
+}
+
+/* 분석이 만들어 둔 설명 문서. 소스가 들어 있어서 줄바꿈을 그대로 둔다 */
+.kn-gd-doc {
+	background: #f9fafb;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	padding: 8px 10px;
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-all;
+	tab-size: 4;
+	margin: 0;
+}
+
+/* 관계 트리 팝업 */
+.kn-graph-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(17, 24, 39, 0.45);
+	z-index: 1000;
+	align-items: center;
+	justify-content: center;
+}
+
+.kn-graph-modal-box {
+	width: 94vw;
+	height: 90vh;
+	background: #f5f6f8;
+	border-radius: 12px;
+	padding: 14px 16px;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+}
+
+.kn-graph-modal-title {
+	flex: 1;
+	min-width: 200px;
+	word-break: break-all;
+}
+
+.kn-graph-modal-body {
+	flex: 1;
+	height: auto;
+	min-height: 0;
+}
+
+/* ---------- 임베딩 현황 ---------- */
+
+/* 진행률 막대 */
+.kn-embed-bar {
+	height: 10px;
+	background: #e5e7eb;
+	border-radius: 999px;
+	overflow: hidden;
+	margin: 4px 0 14px;
+}
+
+.kn-embed-bar > div {
+	height: 100%;
+	background: #2563eb;
+	border-radius: 999px;
+	transition: width 0.4s;
+}
+
+/* 제목 줄 오른쪽의 "지금 다시 보기" 단추 */
+.kn-embed-refresh {
+	float: right;
+	font-weight: normal;
+}

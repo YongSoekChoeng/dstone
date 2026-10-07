@@ -28,7 +28,7 @@ public class SemanticDao extends BaseDao {
 		sqlSessionCommon.delete(NS + "deleteInjects", revisionId);
 		sqlSessionCommon.update(NS + "clearLayers", revisionId);
 		sqlSessionCommon.update(NS + "clearProxyRelated", revisionId);
-		// 화면과 이어진 관계(RENDERS / REQUESTS / INCLUDES)는 플러그인 여럿(Struts, JSP)이 만들기 때문에 여기서 한 번에 지운다.
+		// 화면과 이어진 관계(RENDERS / REQUESTS / INCLUDES)는 플러그인 여럿(Struts, JSP, 리치클라이언트)이 만들기 때문에 여기서 한 번에 지운다.
 		sqlSessionCommon.delete(NS + "deleteViewRelations", revisionId);
 	}
 
@@ -181,6 +181,71 @@ public class SemanticDao extends BaseDao {
 		param.put("revisionId", revisionId);
 		param.put("path", path);
 		return sqlSessionCommon.selectList(NS + "selectJspByPathEnd", param);
+	}
+
+	/**
+	 * <pre>
+	 * 이 종류(file_type)의 파일을 file_id 순으로 조금씩 꺼냅니다. 리치클라이언트 화면처럼 언어는 XML인데 종류로 가려야 할 때 씁니다.
+	 * </pre>
+	 *
+	 * @return [{fileId, path, encoding, fileType}]
+	 */
+	public List<Map<String, Object>> selectFilePageByTypes(long revisionId, List<String> fileTypes, long afterId, int limit) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("fileTypes", fileTypes);
+		param.put("afterId", afterId);
+		param.put("limit", limit);
+		return sqlSessionCommon.selectList(NS + "selectFilePageByTypes", param);
+	}
+
+	/**
+	 * <pre>
+	 * 프로젝트 전체에서 이 이름들의 메소드를 찾습니다. 화면이 거래 ID로 부르는 메소드를 찾을 때 씁니다.
+	 * </pre>
+	 *
+	 * @return [{name, methodId}]
+	 */
+	public List<Map<String, Object>> selectMethodsByNamesInProject(long revisionId, List<String> names) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("names", names);
+		return sqlSessionCommon.selectList(NS + "selectMethodsByNamesInProject", param);
+	}
+
+	/**
+	 * <pre>
+	 * 거래 ID로 불리는 메소드를 진입점(TRANSACTION)으로 올립니다. 이름이 prefix + 거래 ID + suffix 인 공개 메소드가 대상입니다.
+	 * </pre>
+	 *
+	 * @return 올린 진입점 수
+	 */
+	public int insertCallRuleEndpoints(long revisionId, String function, String template, String prefix, String suffix) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("function", function);
+		param.put("template", template);
+		param.put("prefix", prefix);
+		param.put("suffix", suffix);
+		return sqlSessionCommon.insert(NS + "insertCallRuleEndpoints", param);
+	}
+
+	/** 이 타입을 바로 상속(구현)한 타입 가운데 계층이 아직 없는 것에 계층을 붙입니다(MEDIUM). */
+	public int updateLayerByConfiguredSuperType(long revisionId, String layer, String superType) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("layer", layer);
+		param.put("superType", superType);
+		return sqlSessionCommon.update(NS + "updateLayerByConfiguredSuperType", param);
+	}
+
+	/** 이 경로이거나 이 경로로 끝나는 리치클라이언트 화면 파일의 ID들(최대 2개. 하나뿐인지 보려는 것) */
+	public List<Long> selectScreenByPathEnd(long revisionId, String path, List<String> fileTypes) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("path", path);
+		param.put("fileTypes", fileTypes);
+		return sqlSessionCommon.selectList(NS + "selectScreenByPathEnd", param);
 	}
 
 	/**

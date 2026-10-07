@@ -1,7 +1,10 @@
 package net.dstone.ai.common.rag;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.prompt.PromptTemplate;
@@ -9,45 +12,42 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.Query;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
-import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.filter.Filter;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import net.dstone.ai.api.dto.RagSearchRequest;
-import net.dstone.ai.api.dto.RetrievedChunk;
-import net.dstone.ai.common.consts.Constants;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import net.dstone.ai.common.knowledge.KnowledgeCallException;
+import net.dstone.ai.common.knowledge.KnowledgeClient;
 import net.dstone.common.biz.BaseService;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * "이미 임베딩해 둔 문서를 검색해서 LLM에게 참고 자료로 넘겨주는" 진짜 의미의 RAG
- * (Retrieval-Augmented Generation, 검색 증강 생성) 담당 클래스입니다. 문서를 임베딩으로 만들어
- * 벡터스토어에 넣거나 빼는 작업(api.service.EmbedService가 담당)과는 완전히 분리되어 있습니다 -
- * 이 클래스는 이미 저장되어 있는 임베딩을 "읽기"만 합니다.
+ * RAG의 "검색" 쪽입니다. 올려 둔 문서에서 질문과 가까운 조각을 찾아 줍니다.
  *
- * 검색 체인은 Spring AI의 RAG 모듈(spring-ai-rag)이 제공하는 부품을 그대로 조립해서 씁니다:
- * VectorStoreDocumentRetriever(실제 검색을 담당)와 ContextualQueryAugmenter(검색 결과를 프롬프트에
- * 끼워 넣는 역할)를 RetrievalAugmentationAdvisor 하나로 묶습니다. buildAdvisor()(AGENT step의
- * ragEnabled 경로에서 쓰임)와 search()(TOOL step의 RagSearchTool 경로에서 쓰임) 둘 다 결국 같은
- * VectorStoreDocumentRetriever 생성 로직(buildRetriever())을 거치기 때문에, "무엇을 검색 대상으로
- * 볼지"(topK, 유사도 임계값, tenant 필터)는 이 클래스 안 딱 한 곳에서만 정해집니다.
+ * 검색은 이 엔진이 직접 하지 않고 dstone-knowledge에 맡깁니다(POST /api/search, 올린 일반 문서만).
+ * dstone-knowledge는 뜻으로 찾기(벡터)와 이름으로 찾기를 같이 합니다. 이 엔진에는 임베딩 모델도 벡터 저장소도 없습니다.
  *
- * VectorStore(pgvector) 빈은 dstone.ai.rag.enabled=true이고 spring.ai.model.embedding이 제대로
- * 설정되어 있을 때만 Spring AI가 만들어 줍니다. 즉 설정에 따라 이 빈이 아예 존재하지 않을 수도
- * 있는데, 이 사실을 확인하는 로직은 requireVectorStore() 한 곳에만 모아뒀습니다. 그래서 이
- * RagRetrievalChain 클래스 자체는 RAG 설정 여부와 무관하게 항상 등록되고, "지금 RAG를 실제로
- * 쓸 수 있는 상태인가"는 각 메소드가 실제로 호출되는 시점에만 판단됩니다.
+ * 쓰는 곳은 둘이고, 둘 다 search() 하나를 거칩니다. 그래서 "무엇을 검색 대상으로 볼지"(개수, 유사도 기준)는
+ * 이 클래스 안 한 곳에서만 정해집니다.
+ *   - buildAdvisor()  Agent의 ragEnabled 경로. 찾은 조각을 질문 뒤에 [참고자료]로 붙여 주는 Advisor를 만든다
+ *   - search()        Tool(tools.rag.RagSearchTool)
+ *
+ * 문서를 올리고 지우는 API는 이 엔진에 없습니다. dstone-knowledge에 직접 올립니다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면).
+ *
+ * 이 클래스 자체는 RAG 설정과 무관하게 항상 등록되고, "지금 RAG를 쓸 수 있는 상태인가"는 검색하는 시점에 판단합니다(requireRag()).
  * </pre>
  */
 @Component
 public class RagRetrievalChain extends BaseService {
+
+	private static final String SEARCH_PATH = "/api/search";
+
+	/** dstone-knowledge가 한 번에 돌려주는 최대 건수 */
+	private static final int MAX_CANDIDATES = 50;
 
 	/**
 	 * <pre>
@@ -72,26 +72,23 @@ public class RagRetrievalChain extends BaseService {
 		""");
 
 	@Autowired
-	private ObjectProvider<VectorStore> vectorStoreProvider;
+	private KnowledgeClient knowledgeClient;
 	@Autowired
 	private ConfigProperty configProperty;
 
 	/**
 	 * <pre>
-	 * RAG를 실제로 쓸 수 있는 상태인지 확인하고, 쓸 수 있으면 VectorStore 빈을 돌려줍니다.
-	 * dstone.ai.rag.enabled=true로 켜져 있고 VectorStore 빈이 실제로 떠 있을 때만 통과시키고,
-	 * 둘 중 하나라도 아니면 예외를 던집니다.
+	 * RAG를 실제로 쓸 수 있는 상태인지 확인합니다.
+	 * dstone.ai.rag.enabled=true로 켜져 있고 dstone-knowledge의 주소가 설정돼 있을 때만 통과시키고, 아니면 예외를 던집니다.
 	 * </pre>
 	 */
-	private VectorStore requireVectorStore() {
+	private void requireRag() {
 		if (!Boolean.parseBoolean(this.configProperty.getProperty("dstone.ai.rag.enabled"))) {
 			throw new IllegalStateException("RAG가 비활성화되어 있습니다(dstone.ai.rag.enabled=false 또는 미설정).");
 		}
-		VectorStore vectorStore = this.vectorStoreProvider.getIfAvailable();
-		if (vectorStore == null) {
-			throw new IllegalStateException("dstone.ai.rag.enabled=true인데 VectorStore 빈이 없습니다. spring.ai.model.embedding 설정을 확인하십시오.");
+		if (!this.knowledgeClient.isConfigured()) {
+			throw new IllegalStateException("dstone.ai.rag.enabled=true인데 dstone-knowledge 주소가 없습니다. dstone.ai.tool.knowledge.base-url 설정을 확인하십시오.");
 		}
-		return vectorStore;
 	}
 
 	/** dstone.ai.rag.retrieval.top-k 설정값을 읽어 돌려줍니다. 설정이 없으면 5를 기본값으로 씁니다. */
@@ -112,98 +109,58 @@ public class RagRetrievalChain extends BaseService {
 
 	/**
 	 * <pre>
-	 * caller(=tenant_id)와 sourceId 조건을 하나의 Filter.Expression으로 합쳐 줍니다. 둘 다 없으면
-	 * null을 돌려주는데, 이건 "필터 없이 전체 검색"을 뜻합니다. caller가 없는 경우(예:
-	 * security.auth가 꺼진 배포 환경)는 기존과 똑같이 tenant 필터 없이 동작해야 하므로, "여러
-	 * 앱의 문서를 서로 격리할지 말지"를 판단하는 지점은 이 메소드 하나뿐입니다.
-	 * </pre>
-	 *
-	 * @param caller   호출한 앱/서비스를 나타내는 식별자(tenant)
-	 * @param sourceId 검색 범위를 좁힐 문서의 논리적 식별자
-	 */
-	private Filter.Expression buildFilter(String caller, String sourceId) {
-		FilterExpressionBuilder builder = new FilterExpressionBuilder();
-		Op tenantOp = StringUtil.isEmpty(caller) ? null : builder.eq(Constants.Rag.TENANT_METADATA_KEY, caller);
-		Op sourceOp = StringUtil.isEmpty(sourceId) ? null : builder.eq(Constants.Rag.SOURCE_ID_METADATA_KEY, sourceId);
-		if (tenantOp != null && sourceOp != null) {
-			return builder.and(tenantOp, sourceOp).build();
-		}
-		if (tenantOp != null) {
-			return tenantOp.build();
-		}
-		if (sourceOp != null) {
-			return sourceOp.build();
-		}
-		return null;
-	}
-
-	/**
-	 * <pre>
-	 * "무엇을 검색 대상으로 삼을지"(개수 제한, 유사도 기준, tenant 필터)를 정하는 단 하나의
-	 * 지점입니다. buildAdvisor()와 search() 둘 다 결국 이 메소드를 거쳐서 검색기를 만듭니다.
-	 * </pre>
-	 *
-	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
-	 * @param similarityThreshold 검색 결과 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값을 씁니다)
-	 * @param caller              호출한 앱/서비스를 나타내는 식별자(tenant)
-	 * @param sourceId            검색 범위를 좁힐 문서 식별자(없으면 caller 범위 전체를 검색합니다)
-	 */
-	private VectorStoreDocumentRetriever buildRetriever(Integer topK, Double similarityThreshold, String caller, String sourceId) {
-		VectorStore vectorStore = this.requireVectorStore();
-		VectorStoreDocumentRetriever.Builder builder = VectorStoreDocumentRetriever.builder()
-			.vectorStore(vectorStore)
-			.topK(topK == null ? this.defaultTopK() : topK)
-			.similarityThreshold(similarityThreshold == null ? this.defaultSimilarityThreshold() : similarityThreshold);
-		Filter.Expression filter = this.buildFilter(caller, sourceId);
-		if (filter != null) {
-			builder.filterExpression(filter);
-		}
-		return builder.build();
-	}
-
-	/**
-	 * <pre>
-	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 
-	 * 이 Advisor가 붙으면 caller의 문서만 검색되도록 tenant 필터가 강제로 걸립니다.
-	 *
-	 * topK, similarityThreshold, allowEmptyContext를 전부 기본값(null이면 전역 설정값을 쓰고,
-	 * allowEmptyContext는 true)으로 쓰는 간단한 버전입니다. Agent 정의에 개별 설정이 없을 때는
-	 * buildAdvisor(caller, null, null, null)을 호출하는 것과 완전히 같습니다.
-	 * </pre>
-	 *
-	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
-	 */
-	public Advisor buildAdvisor(String caller) {
-		return this.buildAdvisor(caller, null, null, null);
-	}
-
-	/**
-	 * <pre>
-	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다. 이 Advisor가 붙으면
-	 * caller의 문서만 검색되도록 tenant 필터가 강제로 걸립니다.
+	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다.
+	 * 이 Advisor가 붙으면 질문과 가까운 문서 조각을 찾아 질문 뒤에 [참고자료]로 붙입니다.
 	 *
 	 * topK, similarityThreshold, allowEmptyContext는 전부 null로 두면 전역 기본값
 	 * (dstone.ai.rag.retrieval.* 설정, allowEmptyContext는 true)을 쓰고, 값을 넣으면 이번
-	 * 호출에만(보통은 AgentDefinition.ragTopK / ragSimilarityThreshold / ragAllowEmptyContext에서 넘어온 값) 그 값이 적용됩니다. 
-	 * RAG를 쓰는 Agent가 여러 개 늘어나더라도, 검색 범위나 개수, 그리고 "근거 자료가 없을 때 어떻게 답할지"를 Agent마다 다르게 가져갈 수 있도록 하기 위한 설계입니다.
+	 * 호출에만(보통은 AgentDefinition.ragTopK / ragSimilarityThreshold / ragAllowEmptyContext에서 넘어온 값) 그 값이 적용됩니다.
+	 * RAG를 쓰는 Agent가 여러 개 늘어나더라도, 검색 개수와 "근거 자료가 없을 때 어떻게 답할지"를 Agent마다 다르게 가져갈 수 있도록 하기 위한 설계입니다.
 	 *
-	 * allowEmptyContext가 true(기본값)이면, 검색 결과가 하나도 없거나 RAG 자체가 이 요청과 무관하더라도 
-	 * 질의를 "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킵니다. 
-	 * 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다. 
-	 * false로 주면 Spring AI ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로 돌아갑니다. 
+	 * allowEmptyContext가 true(기본값)이면, 검색 결과가 하나도 없거나 RAG 자체가 이 요청과 무관하더라도
+	 * 질의를 "모른다고 답하라"는 문구로 바꿔치기하지 않고 원래 질의 그대로 진행시킵니다.
+	 * 이 프로젝트의 Agent들처럼 system prompt에 이미 필요한 업무 지식을 갖고 있고 RAG는 그저 보조 수단일 때 어울리는 동작입니다.
+	 * false로 주면 Spring AI ContextualQueryAugmenter의 원래 동작(근거가 없으면 "모른다"고 답하도록 강제하는 동작)으로 돌아갑니다.
 	 * "컨텍스트 밖의 답변은 절대 허용하면 안 되는" 순수 지식베이스 QA 같은 Agent에 쓰면 됩니다.
+	 *
+	 * 검색 자체가 실패했을 때(dstone-knowledge가 느리거나 내려가 있을 때)도 같은 기준을 따릅니다.
+	 * allowEmptyContext가 true면 경고만 남기고 참고자료 없이 진행하고, false면 호출을 실패시킵니다.
 	 * </pre>
 	 *
-	 * @param caller              호출한 앱/서비스를 나타내는 식별자(tenant)
 	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
 	 * @param similarityThreshold 검색 결과 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값을 씁니다)
 	 * @param allowEmptyContext   검색 결과가 없을 때 원래 질의 그대로 진행할지 여부(null이면 true로 취급합니다)
 	 */
-	public Advisor buildAdvisor(String caller, Integer topK, Double similarityThreshold, Boolean allowEmptyContext) {
-		VectorStoreDocumentRetriever retriever = this.buildRetriever(topK, similarityThreshold, caller, null);
+	public Advisor buildAdvisor(final Integer topK, final Double similarityThreshold, Boolean allowEmptyContext) {
+		// 설정이 잘못됐으면 LLM을 부르기 전에 여기서 알린다.
+		this.requireRag();
+		final boolean optional = allowEmptyContext == null ? true : allowEmptyContext.booleanValue();
+		DocumentRetriever retriever = new DocumentRetriever() {
+			@Override
+			public List<Document> retrieve(Query query) {
+				List<RetrievedChunk> chunks;
+				try {
+					chunks = RagRetrievalChain.this.search(query.text(), topK, similarityThreshold);
+				} catch (IllegalStateException e) {
+					if (!optional) {
+						throw e;
+					}
+					// 참고자료가 없어도 답할 수 있는 Agent(allowEmptyContext=true)다. 검색이 실패했다고(dstone-knowledge가 느리거나 내려가 있다고)
+					// Agent 호출과 그 Workflow 전체를 실패시키지 않는다. 참고자료 없이 진행하고, 무슨 일이 있었는지는 로그에 남긴다.
+					RagRetrievalChain.this.warn("RAG 검색에 실패해서 참고자료 없이 진행합니다: " + e.getMessage());
+					chunks = new ArrayList<RetrievedChunk>();
+				}
+				List<Document> documents = new ArrayList<Document>(chunks.size());
+				for (int i = 0; i < chunks.size(); i++) {
+					RetrievedChunk chunk = chunks.get(i);
+					documents.add(Document.builder().text(chunk.text()).metadata(chunk.metadata()).score(chunk.score()).build());
+				}
+				return documents;
+			}
+		};
 		ContextualQueryAugmenter queryAugmenter = ContextualQueryAugmenter.builder()
 			.promptTemplate(CONTEXT_PROMPT_TEMPLATE)
-			.allowEmptyContext(allowEmptyContext == null ? true : allowEmptyContext)
+			.allowEmptyContext(optional)
 			.build();
 		return RetrievalAugmentationAdvisor.builder()
 			.documentRetriever(retriever)
@@ -213,21 +170,71 @@ public class RagRetrievalChain extends BaseService {
 
 	/**
 	 * <pre>
-	 * caller(=tenant_id)의 문서 범위로만 검색을 제한해서 실행합니다. caller가 없으면(예:
-	 * security.auth가 꺼진 환경) 기존과 똑같이 전체 문서를 대상으로 검색합니다.
+	 * 올려 둔 문서에서 질문과 가까운 조각을 찾습니다.
+	 *
+	 * 문서는 dstone-knowledge에 올립니다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면, 또는 그 서버의 POST /api/documents).
+	 * 이 엔진을 부르는 앱(caller)별로 문서를 가리지 않습니다. 올린 문서는 이 엔진을 쓰는 모두가 같이 봅니다.
+	 *
+	 * dstone-knowledge에서 넉넉히 받아 온 뒤 유사도가 기준 이상인 것만 남깁니다.
+	 * 예외는 하나입니다: 방금 올려서 아직 임베딩이 안 된 조각은 유사도가 아예 없으므로, 질문에 든 이름(영문 낱말)이 글자 그대로
+	 * 들어 있어서 찾힌 것이면 남깁니다(임베딩이 끝나기 전에도 올린 문서를 이름으로는 찾을 수 있게).
+	 * 임베딩이 끝난 조각에는 이 예외를 두지 않습니다. 경로나 JSON 속의 흔한 낱말(log, error 같은)이 이름으로 잡혀서
+	 * 무관한 조각이 통과하기 때문입니다.
 	 * </pre>
 	 *
-	 * @param request 검색 조건(질의어, topK 등)
-	 * @param caller  호출한 앱/서비스를 나타내는 식별자(tenant)
+	 * @param query               찾을 내용
+	 * @param topK                검색 결과 최대 개수(null이면 dstone.ai.rag.retrieval.top-k 기본값을 씁니다)
+	 * @param similarityThreshold 유사도 임계값(null이면 dstone.ai.rag.retrieval.similarity-threshold 기본값을 씁니다)
 	 */
-	public List<RetrievedChunk> search(RagSearchRequest request, String caller) {
-		VectorStoreDocumentRetriever retriever = this.buildRetriever(request.topK(), request.similarityThreshold(), caller, request.sourceId());
-		List<Document> documents = retriever.retrieve(new Query(request.query()));
-		List<RetrievedChunk> retrieved = new ArrayList<>(documents.size());
-		for (Document doc : documents) {
-			retrieved.add(new RetrievedChunk(doc.getText(), doc.getMetadata(), doc.getScore()));
+	public List<RetrievedChunk> search(String query, Integer topK, Double similarityThreshold) {
+		this.requireRag();
+		int limit = topK == null ? this.defaultTopK() : topK.intValue();
+		double threshold = similarityThreshold == null ? this.defaultSimilarityThreshold() : similarityThreshold.doubleValue();
+
+		Map<String, Object> body = new LinkedHashMap<String, Object>();
+		body.put("query", query);
+		// 올린 일반 문서에서만 찾는다. 코드 분석 결과는 tools.knowledge.KnowledgeTool의 몫이다.
+		body.put("sourceTypes", Arrays.asList("DOCUMENT"));
+		// 유사도로 걸러 내고도 limit개가 남도록 넉넉히 받는다.
+		body.put("topK", Integer.valueOf(Math.min(MAX_CANDIDATES, Math.max(limit * 4, 20))));
+
+		JsonNode hits;
+		try {
+			hits = this.knowledgeClient.post(SEARCH_PATH, body).path("hits");
+		} catch (KnowledgeCallException e) {
+			throw new IllegalStateException("문서를 검색하지 못했습니다: " + e.reason());
+		}
+
+		List<RetrievedChunk> retrieved = new ArrayList<RetrievedChunk>();
+		for (int i = 0; i < hits.size() && retrieved.size() < limit; i++) {
+			JsonNode hit = hits.get(i);
+			Double score = hit.hasNonNull("score") ? Double.valueOf(hit.get("score").asDouble()) : null;
+			if (score != null) {
+				// 임베딩이 끝난 조각은 유사도로만 판단한다.
+				if (score.doubleValue() < threshold) {
+					continue;
+				}
+			} else if (hit.path("keywordScore").asInt(0) <= 0) {
+				// 유사도가 없는데 이름으로 찾힌 것도 아니다. 남길 근거가 없다.
+				continue;
+			}
+			Map<String, Object> metadata = new LinkedHashMap<String, Object>();
+			this.putIfPresent(metadata, "sourceId", hit.path("documentId").asText(null));
+			this.putIfPresent(metadata, "title", hit.path("title").asText(null));
+			this.putIfPresent(metadata, "fileName", hit.path("path").asText(null));
+			if (hit.hasNonNull("chunkNo")) {
+				metadata.put("chunkNo", Integer.valueOf(hit.get("chunkNo").asInt()));
+			}
+			retrieved.add(new RetrievedChunk(hit.path("content").asText(""), metadata, score));
 		}
 		return retrieved;
+	}
+
+	/** 값이 있을 때만 담습니다(Spring AI의 Document는 metadata에 null 값을 받지 않습니다). */
+	private void putIfPresent(Map<String, Object> metadata, String key, String value) {
+		if (!StringUtil.isEmpty(value)) {
+			metadata.put(key, value);
+		}
 	}
 
 }

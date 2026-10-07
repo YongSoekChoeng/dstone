@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head>
+        <w2:type>DEFAULT</w2:type>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataList id="dltOrderList" baseNode="list" repeatNode="map">
+                    <w2:columnInfo>
+                        <w2:column id="orderNo" name="주문번호" dataType="text"></w2:column>
+                        <w2:column id="orderAmt" name="주문금액" dataType="number"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <!-- 표준 방식: 주소를 적는 submission -->
+            <xf:submission id="sbmList" ref="data:json,dmaSearch" target="data:json,dltOrderList"
+                action="/order/list.do" method="post" mediatype="application/json"/>
+        </xf:model>
+        <script type="text/javascript"><![CDATA[
+        // 조회: 거래 ID로 부른다
+        scwin.fnSearch = function() {
+            ShopJS.svr.doRequestAjax("ORD0100M01S", {
+                data : {"orderVO" : dmaSearch.getJSON()}
+            });
+        };
+
+        // 저장
+        scwin.fnSave = function() {
+            ShopJS.svr.doRequestAjax( 'ORD0100M02U', { data : {} });
+        };
+
+        // 서버에 없는 거래: 사실 그대로 "못 찾음"으로 남아야 한다
+        scwin.fnPrint = function() {
+            ShopJS.svr.doRequestAjax("ORD0100M09S", {});
+        };
+
+        // 거래 ID를 변수로 넘김: 잇지 않는다
+        scwin.fnCommon = function(tranId) {
+            ShopJS.svr.doRequestAjax(tranId, {});
+        };
+
+        // 지워 둔 옛 호출: 잇지 않는다
+        // ShopJS.svr.doRequestAjax("ORD0100M03D", {});
+        /* ShopJS.svr.doRequestAjax("ORD0100M03D", {}); */
+
+        // 상세 팝업
+        scwin.fnPopup = function() {
+            WebSquare.util.openPopup("/shop/ui/order/OrderPopup.xml?mode=view", {});
+        };
+        ]]></script>
+    </head>
+    <body>
+        <w2:wframe id="wfmHeader" src="/shop/ui/common/Header.xml"/>
+        <w2:gridView id="grdOrder" dataList="data:dltOrderList"/>
+    </body>
+</html>

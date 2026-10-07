@@ -72,7 +72,8 @@ pipeline {
         }
         failure {
             echo '====== Deployment Failed ======'
-            sh 'tail -100 ${WORKSPACE_DIR}/logs/*.out || true'
+            // 로그는 conf/log4j2.xml 설정대로 남는다(APP_HOME=/app/dstone, env-vm.properties)
+            sh 'tail -100 /app/dstone/LOGS/dstone-knowledge/execution/execution.log || true'
         }
         always {
             echo '====== Cleanup ======'

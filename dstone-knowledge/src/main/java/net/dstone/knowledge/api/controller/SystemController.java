@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.knowledge.api.dao.SystemDao;
+import net.dstone.knowledge.api.service.EmbeddingStatusService;
 
 /**
  * <pre>
@@ -30,6 +31,9 @@ public class SystemController {
 
 	@Autowired
 	private ConfigProperty configProperty;
+
+	@Autowired
+	private EmbeddingStatusService embeddingStatusService;
 
 	/**
 	 * <pre>
@@ -62,6 +66,17 @@ public class SystemController {
 			body.put("error", String.valueOf(e.getMessage()));
 			return new ResponseEntity<Map<String, Object>>(body, HttpStatus.SERVICE_UNAVAILABLE);
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 임베딩 대기열 전체의 현황: 끝난 것 / 남은 것 / 실패한 것, 최근 처리 속도, 어림한 남은 시간, 작업 스레드의 상태, 프로젝트별 남은 양.
+	 * 리비전 하나의 진행은 GET /api/revisions/{id}/rag 입니다.
+	 * </pre>
+	 */
+	@GetMapping("/embedding")
+	public Map<String, Object> embedding() {
+		return embeddingStatusService.getStatus();
 	}
 
 }

@@ -7,6 +7,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -48,6 +49,10 @@ public class FileUtil {
 	private static final int DEFAULT_MAX_READ_CHARS = 30000;
 	/** 설정이 없을 때 쓰는 파일 목록 개수 상한입니다. */
 	private static final int DEFAULT_MAX_LIST_FILES = 500;
+	/** 설정이 없을 때, 파일이 이 개수를 넘으면 파일 이름 대신 폴더별 개수만 줍니다. */
+	private static final int DEFAULT_LIST_SUMMARY_OVER = 100;
+	/** 폴더별 개수로 줄 때 담는 폴더 수의 상한입니다. */
+	private static final int MAX_SUMMARY_FOLDERS = 150;
 	/** 설정이 없을 때 쓰는 검색 결과 건수 상한입니다. */
 	private static final int DEFAULT_MAX_SEARCH_MATCHES = 100;
 	/** 설정이 없을 때, 이보다 큰 파일은 검색에서 건너뜁니다(1MB). */
@@ -61,7 +66,7 @@ public class FileUtil {
 	private Environment environment;
 
 	@Tool(description = "basePath 디렉토리와 하위디렉토리의 파일목록을 절대경로로 반환한다(files). 사용자가 '파일목록 읽기' 등을 요청할 때 사용한다. "
-		+ ".git, target 같은 폴더는 제외한다. 파일이 많으면 일부만 반환하고 truncated=true와 안내(message)를 준다 - 그때는 더 좁은 하위 폴더를 basePath로 다시 호출한다. "
+		+ ".git, target 같은 폴더는 제외한다. 파일이 많으면 파일 이름 대신 폴더별 파일 수(folders)와 truncated=true, 안내(message)를 준다 - 그때는 필요한 하위 폴더를 basePath로 다시 호출한다. "
 		+ "프로젝트 루트 전체를 조회하지 말고 소스 폴더로 좁혀서 호출하라. 특정 내용이 들어 있는 파일을 찾을 때는 이 Tool 대신 searchInFiles를 사용한다. 같은 경로를 다시 조회하지 마라.")
 	public Map<String, Object> readFileListAll(@ToolParam(description = "조회할 디렉토리의 절대경로") String basePath) {
 		Map<String, Object> result = new LinkedHashMap<>();
@@ -77,6 +82,10 @@ public class FileUtil {
 
 		List<File> all = new ArrayList<>();
 		this.collectFiles(base, this.excludeDirs(), all);
+		// 파일이 많으면 파일 이름을 늘어놓지 않고 폴더별 개수만 줍니다(이유는 summarizeFolders의 설명 참고).
+		if (all.size() > this.intProperty("list-summary-over", DEFAULT_LIST_SUMMARY_OVER)) {
+			return this.summarizeFolders(all);
+		}
 		int max = this.intProperty("max-list-files", DEFAULT_MAX_LIST_FILES);
 		for (File file : all) {
 			if (files.size() >= max) {
@@ -93,6 +102,47 @@ public class FileUtil {
 			result.put("message", "파일이 많아서 전체 " + all.size() + "개 중 " + files.size() + "개만 반환했습니다. "
 				+ "더 좁은 하위 폴더를 basePath로 다시 호출하거나, 찾는 내용이 있으면 searchInFiles를 사용하세요.");
 		}
+		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 파일이 많은 폴더를 조회했을 때, 파일 이름 대신 "폴더 경로 (그 폴더에 바로 들어 있는 파일 수)"만 돌려줍니다.
+	 *
+	 * 프로젝트 루트를 통째로 조회하면 파일 수백 개의 절대경로(4만 자)가 대화에 남아서, 그 뒤의 모든 LLM 호출에
+	 * 다시 실려 갑니다. 실제로 요구사항 분석 Agent가 두 번째 조회에서 루트 목록을 받았고, 남은 17번의 호출이
+	 * 전부 그만큼 느려졌습니다. "루트를 조회하지 마라"고 프롬프트에 적어 두었지만 지켜지지 않았습니다.
+	 * 폴더 구조만 보여 주면 모델은 필요한 폴더를 골라 다시 조회하고, 그때는 파일 이름이 나옵니다.
+	 * </pre>
+	 *
+	 * @param all 조회한 폴더 아래의 모든 파일입니다(이름순).
+	 */
+	private Map<String, Object> summarizeFolders(List<File> all) {
+		Map<String, Integer> counts = new LinkedHashMap<>();
+		for (File file : all) {
+			String folder = this.toPath(file.getParentFile());
+			Integer count = counts.get(folder);
+			counts.put(folder, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+		}
+		List<String> folders = new ArrayList<>();
+		for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+			if (folders.size() >= MAX_SUMMARY_FOLDERS) {
+				break;
+			}
+			folders.add(entry.getKey() + " (" + entry.getValue() + "개)");
+		}
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("files", new ArrayList<String>());
+		result.put("folders", folders);
+		result.put("total", Integer.valueOf(all.size()));
+		result.put("truncated", Boolean.TRUE);
+		String message = "파일이 " + all.size() + "개라서 파일 이름 대신 폴더별 파일 수(folders)만 반환했습니다. "
+			+ "필요한 폴더 하나를 basePath로 다시 호출하면 파일 이름이 나옵니다. 찾는 내용이 있으면 searchInFiles를 사용하세요.";
+		if (counts.size() > folders.size()) {
+			message += " 폴더도 많아서 전체 " + counts.size() + "개 중 " + folders.size() + "개만 담았습니다.";
+		}
+		result.put("message", message);
 		return result;
 	}
 
@@ -169,7 +219,7 @@ public class FileUtil {
 	@Tool(description = "절대경로 fileFullPath의 파일을 읽어서 파일내용을 스트링형식으로 반환한다. 사용자가 '파일 읽기' 등을 요청할 때 사용한다. "
 		+ "파일이 크면 앞부분만 반환하고 잘렸다는 안내를 붙인다. 로그처럼 끝부분이 중요한 큰 파일은 readFileTail을 사용한다. 같은 파일을 다시 읽지 마라.")
 	public String readFile(@ToolParam String fileFullPath) {
-		String contents = net.dstone.common.utils.FileUtil.readFile(fileFullPath);
+		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
 			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
 		}
@@ -201,7 +251,7 @@ public class FileUtil {
 			@ToolParam(description = "읽을 파일의 절대경로(파일명 포함)") String fileFullPath,
 			@ToolParam(required = false, description = "읽기 시작할 줄 번호(1부터). 비워두면 첫 줄부터") Integer startLine,
 			@ToolParam(required = false, description = "마지막으로 읽을 줄 번호(이 줄 포함). 비워두면 끝까지") Integer endLine) {
-		String contents = net.dstone.common.utils.FileUtil.readFile(fileFullPath);
+		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
 			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
 		}
@@ -240,7 +290,7 @@ public class FileUtil {
 
 	@Tool(description = "절대경로 fileFullPath 파일의 끝부분만 읽어서 반환한다. 로그 파일처럼 크고 최근 내용(끝부분)이 중요한 파일을 읽을 때 사용한다.")
 	public String readFileTail(@ToolParam String fileFullPath) {
-		String contents = net.dstone.common.utils.FileUtil.readFile(fileFullPath);
+		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
 			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
 		}
@@ -264,11 +314,57 @@ public class FileUtil {
 		net.dstone.common.utils.FileUtil.writeFile(fileParentPath, fileName, fileContents);
 	}
 	
+	/**
+	 * <pre>
+	 * 파일 끝에 내용을 이어 붙입니다.
+	 *
+	 * 긴 문서를 writeFile 한 번으로 쓰면 모델의 출력 토큰 한도(max-tokens)에 걸려 인자가 중간에 끊깁니다.
+	 * 추론을 하는 모델은 추론에 쓴 분량도 그 한도에 들어가서, 12,000자쯤 되는 문서에서 실제로 끊겼습니다.
+	 * 그래서 앞부분은 writeFile로, 나머지는 이 Tool로 나눠 쓰게 합니다.
+	 * 글자셋은 writeFile과 같습니다(실행 환경의 기본 글자셋).
+	 * </pre>
+	 */
+	@Tool(description = "절대경로 filePath 파일의 끝에 fileContents를 이어 붙인다(파일이 없으면 새로 만든다). 긴 문서를 나눠서 저장할 때 사용한다: "
+		+ "writeFile로 앞부분을 저장한 뒤 이 Tool로 나머지를 순서대로 이어 붙인다. 줄바꿈은 자동으로 넣지 않으므로 fileContents의 첫머리에 필요한 줄바꿈을 직접 넣어라. "
+		+ "저장한 뒤 파일의 전체 글자 수를 알려 준다.")
+	public String appendFile(@ToolParam(description = "이어 붙일 파일의 절대경로(파일명 포함)") String filePath, @ToolParam(description = "이어 붙일 내용") String fileContents) {
+		if (filePath == null || filePath.isBlank()) {
+			return "실패: filePath가 비어 있습니다.";
+		}
+		File file = new File(filePath.trim());
+		try {
+			if (file.getParentFile() != null) {
+				Files.createDirectories(file.getParentFile().toPath());
+			}
+			String contents = fileContents == null ? "" : fileContents;
+			Files.write(file.toPath(), contents.getBytes(Charset.defaultCharset()), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+			String saved = new String(Files.readAllBytes(file.toPath()), Charset.defaultCharset());
+			return "이어 붙였습니다. 지금 파일은 전체 " + saved.length() + "자입니다: " + this.toPath(file);
+		} catch (Exception e) {
+			return "실패: 파일에 이어 붙이지 못했습니다(" + e.getClass().getSimpleName() + ": " + e.getMessage() + "): " + filePath;
+		}
+	}
+
 	@Tool(description = "절대경로 fileFullPath(폴더+파일명)파일이 존재하는지 여부를 boolean 값으로 반환한다. 저장 결과 안내 문구를 돌려준다. 사용자가 '파일 존재' 등을 요청할 때 사용한다.")
 	public boolean isFileExist(@ToolParam(description = "저장할 파일의 절대경로(파일명 포함)") String filePath) {
 		return net.dstone.common.utils.FileUtil.isFileExist(filePath);
 	}
 
+
+	/**
+	 * <pre>
+	 * 파일 내용을 읽습니다. 파일이 없으면 읽으려 하지 않고 바로 null을 돌려줍니다.
+	 *
+	 * 모델은 경로를 짐작해서 열어 보는 일이 잦습니다. 공통 FileUtil은 없는 파일을 열면 오류 내용을 통째로 찍기 때문에,
+	 * 그때마다 로그에 90줄짜리 오류가 남아서 진짜 오류처럼 보였습니다. 없는 파일은 오류가 아니라 "없다"는 답입니다.
+	 * </pre>
+	 */
+	private String readOrNull(String fileFullPath) {
+		if (fileFullPath == null || fileFullPath.isBlank() || !new File(fileFullPath.trim()).isFile()) {
+			return null;
+		}
+		return net.dstone.common.utils.FileUtil.readFile(fileFullPath.trim());
+	}
 
 	/** 경로가 실제로 있는 디렉토리면 File로, 아니면 null로 돌려줍니다. */
 	private File toDirectory(String basePath) {

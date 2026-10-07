@@ -20,6 +20,7 @@ import net.dstone.knowledge.api.dao.RagDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.common.util.ErrorText;
+import net.dstone.knowledge.rag.EmbeddingGate;
 import net.dstone.knowledge.rag.EmbeddingWorker;
 import net.dstone.knowledge.rag.HybridRanker;
 import net.dstone.knowledge.rag.RagSettings;
@@ -64,6 +65,9 @@ public class SearchService extends BaseObject {
 	private EmbeddingWorker embeddingWorker;
 
 	@Autowired
+	private EmbeddingGate embeddingGate;
+
+	@Autowired
 	@Qualifier("txTemplateCommon")
 	private TransactionTemplate txTemplateCommon;
 
@@ -103,6 +107,8 @@ public class SearchService extends BaseObject {
 		String warning = null;
 		String vectorText = null;
 		if (!"KEYWORD".equals(mode)) {
+			// 백그라운드 임베딩이 이 질문보다 먼저 줄을 서지 않게 한다(EmbeddingGate).
+			embeddingGate.searchStarted();
 			try {
 				vectorText = vectorText(embeddingModel.embed(query));
 			} catch (RuntimeException e) {
@@ -112,6 +118,8 @@ public class SearchService extends BaseObject {
 				}
 				warning = "임베딩 모델을 부르지 못해 이름으로만 찾았습니다: " + ErrorText.summaryOf(e);
 				mode = "KEYWORD";
+			} finally {
+				embeddingGate.searchFinished();
 			}
 		}
 

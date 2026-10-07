@@ -312,9 +312,9 @@ CREATE INDEX IF NOT EXISTS idx_analysis_relation_file ON analysis_relation(file_
 CREATE TABLE IF NOT EXISTS analysis_endpoint (
     endpoint_id       BIGSERIAL     PRIMARY KEY,
     revision_id       BIGINT        NOT NULL,
-    endpoint_type     VARCHAR(20)   NOT NULL,            -- HTTP/SERVLET/MAIN/SCHEDULED/LISTENER/JSP/THREAD
+    endpoint_type     VARCHAR(20)   NOT NULL,            -- HTTP/SERVLET/MAIN/SCHEDULED/LISTENER/JSP/THREAD/TRANSACTION
     http_method       VARCHAR(20),
-    path              VARCHAR(1000),                     -- URL 패턴. MAIN 처럼 URL 이 없으면 NULL
+    path              VARCHAR(1000),                     -- URL 패턴. MAIN 처럼 URL 이 없으면 NULL. TRANSACTION 은 거래 ID
     symbol_id         VARCHAR(40),
     method_id         VARCHAR(40),                       -- 이 진입점을 처리하는 메소드
     properties_json   JSONB         NOT NULL DEFAULT '{}',
@@ -343,7 +343,7 @@ CREATE INDEX IF NOT EXISTS idx_analysis_config_file ON analysis_config(file_id);
 CREATE TABLE IF NOT EXISTS analysis_mapper (
     mapper_id         BIGSERIAL     PRIMARY KEY,
     revision_id       BIGINT        NOT NULL,
-    mapper_type       VARCHAR(20)   NOT NULL,            -- MYBATIS/IBATIS
+    mapper_type       VARCHAR(20)   NOT NULL,            -- MYBATIS/IBATIS/QUERY_XML
     namespace         VARCHAR(1000),
     statement_id      VARCHAR(300)  NOT NULL,
     statement_type    VARCHAR(20),                       -- SELECT/INSERT/UPDATE/DELETE

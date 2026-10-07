@@ -46,16 +46,6 @@
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
-			<!-- dstone-common이 commons-io 2.15.1을 직접 명시하는데, RAG(Phase 2)의
-			     spring-ai-tika-document-reader가 끌어오는 commons-compress 1.28.0은
-			     org.apache.commons.io.input.ChecksumInputStream(commons-io 2.16.0에서 추가)을 요구한다.
-			     Maven의 "nearest wins" 규칙상 dstone-common의 직접 의존성이 이겨서 문서 적재 시
-			     NoClassDefFoundError로 죽는다 - 이 모듈에서만 최신 버전으로 올려서 해결한다. -->
-			<dependency>
-				<groupId>commons-io</groupId>
-				<artifactId>commons-io</artifactId>
-				<version>2.20.0</version>
-			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -125,17 +115,9 @@
 			<version>${jackson-jq.version}</version>
 		</dependency>
 
-		<!-- RAG(Phase 2): pgvector 기반 VectorStore. DataSource(spring.datasource.*)와 EmbeddingModel
-		     (spring.ai.model.embedding) 빈이 둘 다 있어야 자동설정된다. DataSource 자체는 dstone-common이
-		     이미 제공하는 HikariCP/postgresql-driver/log4jdbc로 표준 Spring Boot 단일 datasource
-		     자동설정(spring.datasource.*)을 그대로 쓴다(dstone-boot처럼 여러 datasource가 아니라 하나뿐이라
-		     별도 ConfigDatasource 클래스 없이도 충분하다). -->
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
-		</dependency>
-		<!-- RAG 검색 체인(RetrievalAugmentationAdvisor/VectorStoreDocumentRetriever/ContextualQueryAugmenter) -
-		     검색된 문서를 프롬프트에 끼워넣는 ChatClient Advisor를 조립하는 파이프라인이다(common.rag.RagRetrievalChain). -->
+		<!-- RAG: 찾은 문서 조각을 프롬프트에 끼워 넣는 ChatClient Advisor(RetrievalAugmentationAdvisor / ContextualQueryAugmenter)를
+		     조립하는 데 쓴다(common.rag.RagRetrievalChain). 검색 자체는 이 모듈이 하지 않고 dstone-knowledge의 REST API를 부른다.
+		     그래서 벡터 저장소(pgvector), 임베딩 모델, 문서 읽기(Tika) 의존성은 이 모듈에 없다. -->
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-rag</artifactId>
@@ -148,28 +130,10 @@
 			<artifactId>spring-ai-starter-mcp-client</artifactId>
 		</dependency>
 
-		<!-- RAG(Phase 2) 문서 적재: Tika 하나로 PDF/DOCX/PPTX/HTML/TXT 등 대부분의 SI 문서 포맷을 커버한다. -->
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-tika-document-reader</artifactId>
-		</dependency>
-
-		<!-- Lombok -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<scope>provided</scope>
-		</dependency>
-
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-spring-boot-testcontainers</artifactId>
 			<scope>test</scope>
 		</dependency>
 

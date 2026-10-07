@@ -19,8 +19,8 @@ import net.dstone.common.utils.StringUtil;
  * dstone-ai-engine을 시작하는 진입점 클래스입니다.
  *
  * 참고로 Spring Boot 4부터는 JDBC 자동 설정이 별도 모듈(spring-boot-jdbc)로 빠졌습니다. 이
- * 모듈은 RAG(pgvector)용 DataSource가 필요해진 시점부터, dstone-boot가 쓰는 ConfigDatasource
- * 패턴을 그대로 따라서 JDBC starter를 가져다 씁니다.
+ * 모듈은 Workflow 실행 이력을 담을 DataSource가 필요해서 dstone-common이 끌어오는 JDBC starter를 그대로 쓰고,
+ * 그 위에서 MyBatis로 DB에 접근합니다(common.config.ConfigMapper).
  */
 @SpringBootApplication
 @ComponentScan(basePackages = { "net.dstone.ai" })

@@ -1,4 +1,4 @@
--- dstone-ai-engine RAG(Phase 2) 전용 롤/데이터베이스 초기화.
+-- dstone-ai-engine 전용 롤/데이터베이스 초기화. 이 DB에는 Workflow 실행 이력이 들어간다(테이블은 02-create-table-postgresql-dstone-ai.sql).
 -- postgres 슈퍼유저 권한으로 실행해야 한다: sudo -u postgres psql -f 01-init-postgresql-dstone-ai.sql
 -- 상세 배경: docs/software/05.postgresql.md 6절, docs/09.dstone-ai-engine.md 참고.
 
@@ -18,17 +18,5 @@ $$;
 SELECT 'CREATE DATABASE dstone_ai OWNER dstone_ai'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'dstone_ai')\gexec
 
--- 아래부터는 dstone_ai 데이터베이스 안에서 실행되어야 한다(psql -f로 이 파일 전체를 실행하면
--- \c 이후 이어지는 명령들이 자동으로 그 접속 세션을 이어받는다).
-\c dstone_ai
-
--- pgvector: RAG VectorStore(02-create-table-postgresql-dstone-ai.sql)가 사용하는 vector 타입/HNSW 인덱스.
--- postgresql-18-pgvector 패키지가 미리 설치되어 있어야 한다(docs/software/postgresql.md 7.2절 참고).
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- uuid-ossp: vector_store.id의 기본값(uuid_generate_v4())에 필요.
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- hstore: PgVectorStoreAutoConfiguration이 스키마 초기화 시 함께 활성화하는 확장(현재 dstone-ai-engine이
--- 직접 사용하는 곳은 없지만, 실제 운영 중인 인스턴스의 확장 목록과 맞춰 두었다).
-CREATE EXTENSION IF NOT EXISTS hstore;
+-- 확장(vector / uuid-ossp / hstore)은 만들지 않는다. 예전에 이 모듈이 RAG 문서를 직접 저장할 때 쓰던 것인데,
+-- 지금은 문서의 저장과 검색을 dstone-knowledge가 맡는다.
