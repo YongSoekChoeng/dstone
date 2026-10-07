@@ -15,6 +15,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.model.tool.ToolCallLimitExceededException;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -70,6 +71,13 @@ import reactor.core.publisher.Flux;
  * - Tool: Agent의 tools에 적힌 이름 중 caller 화이트리스트도 통과한 것만 LLM에게 보입니다.
  * - Sub Agent: Agent의 subAgents에 적힌 Agent가 Tool처럼 보입니다(SubAgentToolCallback). LLM이 골라 부르면
  *   그 Agent를 이 클래스의 call()로 한 번 더 부릅니다. 깊이는 한 단계뿐입니다(기동할 때 AgentRegistry가 검사합니다).
+ *
+ * ## Tool 호출이 길어질 때
+ * Tool 결과는 대화에 쌓여서 그 뒤의 LLM 호출마다 다시 보내집니다. 그래서 두 가지를 엔진이 직접 챙깁니다.
+ * - 횟수: Agent 호출 한 번에 Tool을 부를 수 있는 횟수를 세고, 다 쓰면 막습니다(ToolCallBudgetCallback).
+ *   Agent의 maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
+ * - 분량: 쌓인 Tool 결과가 dstone.ai.agent.tool.keep-result-chars(기본 200,000자)를 넘으면 오래된 것부터
+ *   앞부분만 남깁니다(ToolResultCompactionAdvisor). 평소의 호출은 이 기준에 닿지 않습니다.
  *
  * LLM을 부르는 방법은 세 가지입니다.
  * - call(): Agent의 output 계약대로 답을 받습니다. 채팅 API와 AGENT step이 씁니다.
@@ -283,10 +291,14 @@ public class AgentExecutor extends BaseObject {
 	 * 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 max-tokens에 들어가서, 추론이 길어지면 답을 한 글자도 쓰지 못하고
 	 * 끝납니다. 이때 그냥 넘어가면 "응답이 비어 있다 / JSON이 아니다"로만 보여서 원인을 알 수 없습니다.
 	 * (실제로 리뷰 Agent가 파일의 줄을 세느라 4096 토큰을 추론에 다 쓰고 빈 답을 돌려준 적이 있습니다.)
+	 *
+	 * 끝난 이유가 toolCallLimitExceeded면 Spring AI가 Tool 호출 한도에서 되풀이를 끊은 것입니다. 이때 답 자리에는
+	 * 모델의 답이 아니라 "Tool call limit exceeded ..."라는 안내 문구가 들어 있습니다. 그대로 돌려주면 그 문구가
+	 * Agent의 답인 것처럼 다음 step으로 넘어가므로, 여기서 실패로 바꿉니다.
 	 * </pre>
 	 *
 	 * @param response LLM 응답입니다.
-	 * @throws AgentContractException 출력 토큰 한도에 걸려 답이 비었을 때
+	 * @throws AgentContractException 출력 토큰 한도에 걸려 답이 비었거나, Tool 호출 한도에 걸려 답을 받지 못했을 때
 	 */
 	private String textOf(ChatResponse response) {
 		if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
@@ -294,6 +306,10 @@ public class AgentExecutor extends BaseObject {
 		}
 		String text = response.getResult().getOutput().getText();
 		String finishReason = response.getResult().getMetadata() == null ? null : response.getResult().getMetadata().getFinishReason();
+		if (ToolCallLimitExceededException.FINISH_REASON.equals(finishReason)) {
+			throw new AgentContractException("LLM이 답을 내지 않고 Tool만 계속 불러서 Tool 호출 한도(spring.ai.tools.limits)에 걸렸습니다: " + text
+				+ " / 같은 조회를 되풀이하지 않도록 Agent의 prompt를 고치거나, 정말 많이 불러야 하는 일이면 한도를 올리십시오.");
+		}
 		if (StringUtil.isEmpty(text) && "LENGTH".equalsIgnoreCase(finishReason)) {
 			String usedTokens = "";
 			if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
@@ -415,15 +431,22 @@ public class AgentExecutor extends BaseObject {
 			  required by the method as an argument"라는) IllegalArgumentException을 던지기 때문입니다.
 			  Map.of()처럼 엔트리가 0개인 Map도 "빈 Map"으로 취급되므로, caller가 null인 경우에도 엔트리를
 			  최소 1개는 넣어 둡니다.
+			- Tool에는 호출 횟수 한도를 씌웁니다(budgeted() 참고).
+			- Tool이나 Sub Agent가 하나라도 붙으면, 쌓인 Tool 결과가 너무 커졌을 때 오래된 것부터 줄이는 Advisor도 함께 붙입니다
+			  (ToolResultCompactionAdvisor. dstone.ai.agent.tool.keep-result-chars가 0이면 붙이지 않습니다).
 		************************************************************************/
 		List<ToolCallback> callbacks = new ArrayList<>();
 		if (toolsEnabled) {
-			callbacks.addAll(this.configTool.toolCallbacks(caller, agent.toolNames()));
+			callbacks.addAll(this.budgeted(agent, this.configTool.toolCallbacks(caller, agent.toolNames())));
 		}
 		callbacks.addAll(this.subAgentCallbacks(agent, caller));
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
 			spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
+			int keepChars = this.intProperty(Constants.Agent.TOOL_KEEP_RESULT_CHARS, Constants.Agent.DEFAULT_TOOL_KEEP_RESULT_CHARS);
+			if (keepChars > 0) {
+				spec = spec.advisors(new ToolResultCompactionAdvisor(agent.id(), keepChars));
+			}
 		}
 
 		/************************************************************************
@@ -433,10 +456,11 @@ public class AgentExecutor extends BaseObject {
 			- 여기서 바꾸는 것은 지금 활성화된 provider(spring.ai.model.chat) 안에서의 모델명뿐입니다.
 			  다른 provider가 쓰는 모델명을 넣으면, 지금 이 호출 시점에 그 provider의 API가 오류를
 			  돌려줍니다(앱이 시작될 때는 이 값이 맞는지 미리 검사해 주지 않습니다).
+			- Agent에 reasoning(추론 세기)이 적혀 있으면 그것도 여기서 함께 실립니다. 적혀 있지 않으면 모델의 기본 동작 그대로입니다.
 			- provider가 openai면 응답 대기 시간(spring.ai.openai.timeout)도 여기서 함께 실립니다.
 			  설정만으로는 적용되지 않아서 호출마다 넣어야 합니다(ConfigChatClient.requestOptions() 설명 참고).
 		************************************************************************/
-		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(model);
+		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(model, agent.reasoningLevel());
 		if (requestOptions != null) {
 			spec = spec.options(requestOptions);
 		}
@@ -460,6 +484,35 @@ public class AgentExecutor extends BaseObject {
 		}
 		
 		return spec;
+	}
+
+	/**
+	 * <pre>
+	 * Tool들에 "이 Agent 호출에서 부를 수 있는 횟수"를 씌워 돌려줍니다(ToolCallBudgetCallback).
+	 * 횟수는 Agent의 maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
+	 * 여기 들어온 Tool들이 횟수 하나를 함께 씁니다(Tool마다 따로 세지 않습니다).
+	 * </pre>
+	 *
+	 * @param agent     호출할 Agent의 정의
+	 * @param callbacks 이 Agent에 붙일 Tool들
+	 */
+	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks) {
+		int maxCalls = agent.maxToolCalls() != null ? agent.maxToolCalls().intValue() : this.intProperty(Constants.Agent.TOOL_MAX_CALLS, Constants.Agent.DEFAULT_TOOL_MAX_CALLS);
+		if (maxCalls <= 0) {
+			maxCalls = Constants.Agent.DEFAULT_TOOL_MAX_CALLS;
+		}
+		AtomicInteger used = new AtomicInteger();
+		List<ToolCallback> result = new ArrayList<>(callbacks.size());
+		for (ToolCallback callback : callbacks) {
+			result.add(new ToolCallBudgetCallback(callback, agent.id(), used, maxCalls));
+		}
+		return result;
+	}
+
+	/** 숫자 설정값을 읽습니다. 설정이 없거나 음수면 기본값을 씁니다(0은 "끔"을 뜻할 수 있어서 그대로 돌려줍니다). */
+	private int intProperty(String key, int defaultValue) {
+		Integer value = this.environment.getProperty(key, Integer.class);
+		return value == null || value.intValue() < 0 ? defaultValue : value.intValue();
 	}
 
 	/**

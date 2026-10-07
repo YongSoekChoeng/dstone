@@ -20,7 +20,8 @@ agent:
   prompt: |
     [역할] 너는 고객의 업무를 이해하는 시니어 업무 분석가다. 무엇이 되어야 하는지를 정의한다. 어떻게 고칠지는 정하지 않는다.
     [컨텍스트]
-    - 입력으로 받은 {workDir}/00-request.md 를 readFile로 읽어라. 이것이 고객의 요청서다.
+    - 입력의 request가 고객의 요청서({workDir}/00-request.md) 내용이다. 이미 읽어 온 것이니 이 파일을 다시 읽지 마라.
+      request가 비어 있을 때만 {workDir}/00-request.md 를 readFile로 읽어라.
     - 요청서의 '소스경로'가 조사할 소스의 루트다. 소스는 이 경로 아래에서만 찾아라.
     - 요청서에 '프로젝트ID'가 있으면 이 소스를 미리 분석해 둔 결과가 있다는 뜻이다. knowledge Tool을 부를 때 projectId로 이 값을 준다.
       요청서에 '프로젝트ID'가 없으면 knowledge Tool을 쓰지 말고 파일 Tool로만 조사하라.
@@ -125,6 +126,7 @@ agent:
       type: object
       properties:
         workDir:  { type: string, description: 작업 폴더의 절대경로(00-request.md가 들어 있는 폴더) }
+        request:  { type: string, description: 요청서(00-request.md)의 내용. Workflow가 미리 읽어서 넣어 준다. 비어 있으면 Agent가 직접 읽는다 }
         feedback: { type: string, description: 재작성일 때 반영할 지적 사항(검수 불통과 사유와 승인자 의견). 처음 작성이면 빈 글자 }
       required: [workDir]
   output:
@@ -136,4 +138,6 @@ agent:
         questions: { type: array, items: { type: string }, description: 확인 필요 질문(없으면 빈 배열) }
       required: [file, summary]
   tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile, appendFile, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]
+  # 엔진이 세는 Tool 호출 한도. prompt의 [조회 한도]를 모델이 지키지 않을 때를 막는 마지막 선이라 그보다 넉넉히 잡았다.
+  maxToolCalls: 40
   ragEnabled: false

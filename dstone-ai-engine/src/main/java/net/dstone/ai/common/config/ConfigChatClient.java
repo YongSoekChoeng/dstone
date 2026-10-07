@@ -10,7 +10,9 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
+import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
@@ -146,17 +149,32 @@ public class ConfigChatClient {
 	 * ChatClient의 기본 옵션(defaultOptions)에 넣지 않는 이유: 호출할 때 옵션을 따로 주면(Agent의 model 지정)
 	 * 기본 옵션이 통째로 바뀌어서 timeout이 사라집니다. 그래서 호출마다 넣습니다.
 	 * 여기서 넣지 않은 값(기본 모델, max-tokens, temperature 등)은 설정 파일의 값이 그대로 쓰입니다.
+	 *
+	 * 추론 세기(Agent의 reasoning)도 여기서 넣습니다. 보내는 방법이 provider마다 달라서 provider별로 옵션을 만듭니다.
+	 *
+	 *   reasoning   openai(OpenRouter 포함)      ollama            anthropic
+	 *   none        reasoning_effort=none       think=false       thinking 끔
+	 *   low         reasoning_effort=low        think=true        thinking 예산 1024 토큰
+	 *   medium      reasoning_effort=medium     think=true        thinking 예산 2048 토큰
+	 *   high        reasoning_effort=high       think=true        thinking 예산 4096 토큰
+	 *
+	 * - ollama는 모델 대부분이 켜기/끄기만 받아서 low/medium/high를 모두 "켜기"로 보냅니다.
+	 * - anthropic의 thinking 예산은 max-tokens보다 작아야 합니다. max-tokens를 4096 이하로 쓰면 high는 오류가 납니다.
+	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(지금까지와 같습니다).
 	 * </pre>
 	 *
-	 * @param model 이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.
+	 * @param model     이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.
+	 * @param reasoning 이번 호출의 추론 세기입니다(none/low/medium/high). 비어 있으면 provider와 모델의 기본 동작을 씁니다.
 	 */
-	public ChatOptions.Builder<?> requestOptions(String model) {
+	public ChatOptions.Builder<?> requestOptions(String model, String reasoning) {
+		String provider = configProperty.getProperty("spring.ai.model.chat");
 		ChatOptions.Builder<?> options = null;
-		if ("openai".equals(configProperty.getProperty("spring.ai.model.chat"))) {
-			String timeout = configProperty.getProperty("spring.ai.openai.timeout");
-			if (!StringUtil.isEmpty(timeout)) {
-				options = OpenAiChatOptions.builder().timeout(DurationStyle.detectAndParse(timeout.trim()));
-			}
+		if ("openai".equals(provider)) {
+			options = this.openAiOptions(reasoning);
+		} else if ("ollama".equals(provider)) {
+			options = this.ollamaOptions(reasoning);
+		} else if ("anthropic".equals(provider)) {
+			options = this.anthropicOptions(reasoning);
 		}
 		if (!StringUtil.isEmpty(model)) {
 			if (options == null) {
@@ -166,5 +184,53 @@ public class ConfigChatClient {
 		}
 		return options;
 	}
-	
+
+	/** openai용 옵션입니다. 응답 대기 시간과 추론 세기를 넣습니다. 넣을 것이 없으면 null입니다. */
+	private ChatOptions.Builder<?> openAiOptions(String reasoning) {
+		String timeout = configProperty.getProperty("spring.ai.openai.timeout");
+		if (StringUtil.isEmpty(timeout) && StringUtil.isEmpty(reasoning)) {
+			return null;
+		}
+		OpenAiChatOptions.Builder options = OpenAiChatOptions.builder();
+		if (!StringUtil.isEmpty(timeout)) {
+			options.timeout(DurationStyle.detectAndParse(timeout.trim()));
+		}
+		if (!StringUtil.isEmpty(reasoning)) {
+			options.reasoningEffort(reasoning);
+		}
+		return options;
+	}
+
+	/** ollama용 옵션입니다. 추론을 켜거나 끕니다. reasoning이 비어 있으면 null입니다. */
+	private ChatOptions.Builder<?> ollamaOptions(String reasoning) {
+		if (StringUtil.isEmpty(reasoning)) {
+			return null;
+		}
+		OllamaChatOptions.Builder options = OllamaChatOptions.builder();
+		if (AgentDefinition.REASONING_NONE.equals(reasoning)) {
+			options.disableThinking();
+		} else {
+			options.enableThinking();
+		}
+		return options;
+	}
+
+	/** anthropic용 옵션입니다. thinking을 끄거나, 세기에 맞는 예산으로 켭니다. reasoning이 비어 있으면 null입니다. */
+	private ChatOptions.Builder<?> anthropicOptions(String reasoning) {
+		if (StringUtil.isEmpty(reasoning)) {
+			return null;
+		}
+		AnthropicChatOptions.Builder options = AnthropicChatOptions.builder();
+		if (AgentDefinition.REASONING_NONE.equals(reasoning)) {
+			options.thinkingDisabled();
+		} else if ("low".equals(reasoning)) {
+			options.thinkingEnabled(1024L);
+		} else if ("medium".equals(reasoning)) {
+			options.thinkingEnabled(2048L);
+		} else {
+			options.thinkingEnabled(4096L);
+		}
+		return options;
+	}
+
 }

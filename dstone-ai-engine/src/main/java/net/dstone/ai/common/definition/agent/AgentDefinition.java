@@ -58,6 +58,24 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  * - 깊이는 한 단계뿐입니다. subAgents에 적힌 Agent는 자기 subAgents를 가질 수 없습니다.
  * - subAgents에 적힌 Agent는 description이 꼭 있어야 합니다(부모 LLM이 이 설명을 보고 맡길지 정합니다).
  * - SUPERVISOR/ROUTER step이 부르는 Agent는 subAgents를 가질 수 없습니다.
+ *
+ * ## 추론 세기(reasoning)
+ * 답을 쓰기 전에 모델이 속으로 따져 보는 정도입니다. 단순한 일(뽑아내기, 분류, 모양 바꾸기)은 꺼 두면 빨라지고,
+ * 추론이 출력 토큰 한도(max-tokens)를 다 써서 답이 비는 일도 줄어듭니다.
+ *
+ *   reasoning: none       # 추론하지 않음
+ *   reasoning: low        # 조금 (medium, high도 쓸 수 있음)
+ *   (적지 않음)            # provider와 모델의 기본 동작 그대로
+ *
+ * "끄기"를 off가 아니라 none으로 적는 이유: YAML은 off를 글자가 아니라 false(참/거짓 값)로 읽습니다.
+ *
+ * 실제로 어떤 값으로 보내는지는 provider마다 다릅니다(common.config.ConfigChatClient.requestOptions() 참고).
+ * 추론을 끌 수 없는 모델은 none을 받지 않을 수 있습니다. 그때는 그 Agent의 첫 호출에서 provider가 오류를 돌려줍니다.
+ *
+ * ## Tool 호출 한도(maxToolCalls)
+ * 이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 횟수입니다. 적지 않으면 엔진 공통값(dstone.ai.agent.tool.max-calls)을 씁니다.
+ * prompt에 "조회는 25번 이내"라고 적어도 모델이 지키지 않을 때가 있어서, 엔진이 세고 막습니다
+ * (runtime.agent.ToolCallBudgetCallback 참고). Sub Agent를 부르는 횟수는 여기에 들어가지 않습니다.
  * </pre>
  *
  * @param id                     (필수)이 Agent를 식별하는 id입니다. 중복될 수 없습니다
@@ -67,6 +85,8 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  * @param description            (옵셔널)이 Agent가 무엇을 하는지 사람이 읽기 위한 설명입니다. 코드 동작에는 아무 영향을 주지 않습니다
  * @param model                  (옵셔널)이 Agent를 호출할 때만 특별히 쓸 모델 이름입니다(자세한 적용 방식은 runtime.agent.AgentExecutor 참고). 
  *                               비워두면(null) 엔진 전체의 기본 모델(spring.ai.{provider}.chat.options.model 설정값)을 그대로 사용합니다.
+ * @param reasoning              (옵셔널)추론 세기입니다. none / low / medium / high 중 하나입니다. 비워두면(null) provider와 모델의 기본 동작을 그대로 씁니다.
+ * @param maxToolCalls           (옵셔널)이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수입니다. 비워두면(null) 엔진 공통값(dstone.ai.agent.tool.max-calls)을 씁니다.
  * @param tools                  (옵셔널)이 Agent가 쓸 수 있는 Tool 이름 목록입니다. 비워두면 Tool을 쓰지 않습니다. ["*"]는 전부 허용입니다.
  * @param subAgents              (옵셔널)이 Agent가 일을 맡길 수 있는 다른 Agent의 id 목록입니다. 비워두면 맡기지 않습니다.
  * @param ragEnabled             (옵셔널)이 Agent가 RAG(적재된 문서를 검색해서 답변에 참고하는 기능)를 쓸 수 있는지 여부입니다. 비워두면 false입니다.
@@ -83,6 +103,8 @@ public record AgentDefinition(
 	, String prompt
 	, String description
 	, String model
+	, String reasoning
+	, Integer maxToolCalls
 	, List<String> tools
 	, List<String> subAgents
 	, boolean ragEnabled
@@ -96,6 +118,20 @@ public record AgentDefinition(
 
 	/** tools에 적어서 "등록된 Tool 전부"를 뜻하는 표시입니다. */
 	public static final String ALL_TOOLS = "*";
+
+	/** reasoning에 적어서 "추론하지 않음"을 뜻하는 값입니다. */
+	public static final String REASONING_NONE = "none";
+
+	/** reasoning에 적을 수 있는 값입니다. */
+	public static final List<String> REASONING_LEVELS = List.of("none", "low", "medium", "high");
+
+	/** reasoning 값을 소문자로 다듬어 돌려줍니다. 적지 않았으면 null입니다. */
+	public String reasoningLevel() {
+		if (this.reasoning == null || this.reasoning.isBlank()) {
+			return null;
+		}
+		return this.reasoning.trim().toLowerCase();
+	}
 
 	/** 이 Agent가 쓸 수 있는 Tool 이름 목록입니다. 비워뒀으면 빈 목록입니다. */
 	public List<String> toolNames() {

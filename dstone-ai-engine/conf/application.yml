@@ -81,6 +81,15 @@ spring:
                 transcription: none
             image: none
             moderation: none
+        # Spring AI가 스스로 거는 Tool 호출 한도(Agent 호출 한 번 기준). 기본값은 Tool 하나당 40번, 전체 150번이고,
+        # 넘으면 LLM 호출을 끊는다(엔진은 그 Agent 호출을 실패로 처리한다 - runtime.agent.AgentExecutor.textOf()).
+        # 이 한도는 Agent마다 다르게 줄 수 없어서 넉넉히 풀어 두고, 실제 한도는 dstone.ai.agent.tool.max-calls와
+        # Agent의 maxToolCalls로 건다. Tool 하나당 한도를 푼 이유: 파일을 많이 만드는 Agent는 writeFile만 40번을 넘길 수 있다.
+        # -1은 "한도 없음"이다.
+        tools:
+            limits:
+                max-calls-per-tool-default: -1
+                max-total-tool-calls: 300
 
         ##########################################################################################
         # spring.ai.model.chat=anthropic 일 때 설정.
@@ -180,9 +189,19 @@ dstone:
         # sub-agent.max-calls: 부모 Agent를 한 번 부르는 동안 Sub Agent(agents/*.yml의 subAgents)를 부를 수 있는 최대 횟수(기본 10).
         #                      Sub Agent 호출 하나가 LLM 호출 한 번이라, 부모가 끝없이 맡기면 시간과 비용이 계속 늘어난다.
         #                      상한을 넘으면 "지금까지의 결과로 답하라"는 안내가 부모 LLM에게 돌아간다.
+        # tool.max-calls: Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수(기본 100). Agent의 maxToolCalls가 있으면 그 값이 이긴다.
+        #                 남은 횟수가 5분의 1 이하가 되면 Tool 결과 끝에 "N번 남았다"는 안내가 붙고, 다 쓰면 Tool을 실행하지 않고
+        #                 "실패: ..."를 돌려준다. 그 뒤에도 3번 넘게 부르면 그 Agent 호출을 실패로 끝낸다(runtime.agent.ToolCallBudgetCallback).
+        # tool.keep-result-chars: Agent를 한 번 부르는 동안 대화에 온전히 들고 다닐 Tool 결과의 글자 수 합(기본 200000, 0이면 줄이지 않음).
+        #                 Tool 결과는 쌓여서 그 뒤의 LLM 호출마다 다시 보내진다. 합이 이 값을 넘으면 오래된 결과부터 앞 300자만 남기고
+        #                 "다시 필요하면 같은 Tool을 다시 부르라"는 안내를 붙인다(runtime.agent.ToolResultCompactor).
+        #                 max-result-chars(아래)는 결과 한 건의 크기를, 이 값은 쌓인 전체의 크기를 막는다.
         agent:
             sub-agent:
                 max-calls: 10
+            tool:
+                max-calls: 100
+                keep-result-chars: 200000
         tool:
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를

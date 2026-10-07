@@ -74,6 +74,7 @@ public class AgentRegistry extends BaseObject {
 			}
 			this.checkSchema(definition, "input", definition.inputSchema());
 			this.checkSchema(definition, "output", definition.outputSchema());
+			this.checkCallOptions(definition);
 		}
 		// tools/subAgents는 다른 Agent를 가리키므로, 전부 읽은 뒤에 검사합니다.
 		List<String> registeredTools = this.configTool.toolNames();
@@ -99,6 +100,26 @@ public class AgentRegistry extends BaseObject {
 		List<String> problems = JsonSchemaUtil.checkSchema(schema);
 		if (!problems.isEmpty()) {
 			throw new IllegalStateException("agent[" + definition.id() + "]의 " + where + ".schema가 올바른 JSON Schema가 아닙니다: " + problems);
+		}
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 reasoning(추론 세기)과 maxToolCalls(Tool 호출 한도)를 검사합니다.
+	 * 오타가 난 값이 조용히 무시되면 "껐는데 왜 느리지"를 한참 찾게 되므로 기동할 때 막습니다.
+	 * </pre>
+	 *
+	 * @param definition 검사할 Agent 정의
+	 */
+	private void checkCallOptions(AgentDefinition definition) {
+		String reasoning = definition.reasoningLevel();
+		if (reasoning != null && !AgentDefinition.REASONING_LEVELS.contains(reasoning)) {
+			// YAML은 off/no를 글자가 아니라 false로 읽습니다. "끄려고 off를 적었는데 false라고 나온다"를 헤매지 않게 알려 줍니다.
+			String hint = "false".equals(reasoning) ? " (YAML은 off를 false로 읽습니다. 추론을 끄려면 none을 적으십시오)" : "";
+			throw new IllegalStateException("agent[" + definition.id() + "]의 reasoning은 " + AgentDefinition.REASONING_LEVELS + " 중 하나여야 합니다: " + definition.reasoning() + hint);
+		}
+		if (definition.maxToolCalls() != null && definition.maxToolCalls().intValue() <= 0) {
+			throw new IllegalStateException("agent[" + definition.id() + "]의 maxToolCalls는 1 이상이어야 합니다(Tool을 쓰지 않으려면 tools를 적지 않습니다): " + definition.maxToolCalls());
 		}
 	}
 

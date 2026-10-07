@@ -216,12 +216,18 @@ public class FileUtil {
 		return result;
 	}
 
+	/**
+	 * 파일을 읽지 못했을 때 돌려주는 문구의 앞부분입니다. "실패"로 시작해야 TOOL step이 실패로 판정합니다
+	 * (runtime.step.ToolStepExecutor). 그렇지 않으면 이 문구가 파일 내용인 것처럼 다음 step으로 넘어갑니다.
+	 */
+	private static final String CANNOT_READ_MESSAGE = "실패: 파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): ";
+
 	@Tool(description = "절대경로 fileFullPath의 파일을 읽어서 파일내용을 스트링형식으로 반환한다. 사용자가 '파일 읽기' 등을 요청할 때 사용한다. "
 		+ "파일이 크면 앞부분만 반환하고 잘렸다는 안내를 붙인다. 로그처럼 끝부분이 중요한 큰 파일은 readFileTail을 사용한다. 같은 파일을 다시 읽지 마라.")
 	public String readFile(@ToolParam String fileFullPath) {
 		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
-			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
+			return CANNOT_READ_MESSAGE + fileFullPath;
 		}
 		int maxChars = this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
 		if (contents.length() <= maxChars) {
@@ -253,7 +259,7 @@ public class FileUtil {
 			@ToolParam(required = false, description = "마지막으로 읽을 줄 번호(이 줄 포함). 비워두면 끝까지") Integer endLine) {
 		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
-			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
+			return CANNOT_READ_MESSAGE + fileFullPath;
 		}
 		String[] lines = contents.split("\r?\n", -1);
 		int totalLines = lines.length;
@@ -292,7 +298,7 @@ public class FileUtil {
 	public String readFileTail(@ToolParam String fileFullPath) {
 		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
-			return "파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): " + fileFullPath;
+			return CANNOT_READ_MESSAGE + fileFullPath;
 		}
 		int maxChars = this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
 		if (contents.length() <= maxChars) {

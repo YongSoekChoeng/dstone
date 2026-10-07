@@ -181,6 +181,14 @@
 				</configuration>
 			</plugin>
 
+			<!-- 단위 테스트(JUnit 5) 실행. dstone-knowledge와 같은 버전으로 맞춘다.
+			     버전을 적지 않으면 Maven 기본값(2.17)이 잡히는데, 그 버전은 JUnit 5 테스트를 돌리지 못한다. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.2</version>
+			</plugin>
+
 			<!-- JAR (스프링부트형식-BOOT-INF포함구조-으로) 패키징을 위한 플러그인 -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

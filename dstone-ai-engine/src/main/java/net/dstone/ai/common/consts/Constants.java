@@ -49,6 +49,21 @@ public final class Constants {
 
 		/** 위 설정이 없을 때 쓰는 값입니다. */
 		public final static int DEFAULT_SUB_AGENT_MAX_CALLS = 10;
+
+		/** Agent 호출 한 번 안에서 Tool을 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.tool.max-calls). Agent의 maxToolCalls가 있으면 그 값이 이깁니다. */
+		public final static String TOOL_MAX_CALLS = "dstone.ai.agent.tool.max-calls";
+
+		/** 위 설정이 없을 때 쓰는 값입니다. */
+		public final static int DEFAULT_TOOL_MAX_CALLS = 100;
+
+		/**
+		 * Agent 호출 한 번 안에서 온전히 들고 다닐 Tool 결과의 글자 수 설정 키입니다(dstone.ai.agent.tool.keep-result-chars).
+		 * 넘으면 오래된 결과부터 앞부분만 남깁니다. 0이면 줄이지 않습니다.
+		 */
+		public final static String TOOL_KEEP_RESULT_CHARS = "dstone.ai.agent.tool.keep-result-chars";
+
+		/** 위 설정이 없을 때 쓰는 값입니다. */
+		public final static int DEFAULT_TOOL_KEEP_RESULT_CHARS = 200000;
 	}
 
 	/** Tool을 caller별로 허용/차단하는 설정 키의 접두사(prefix)들입니다(common.config.ConfigTool과 tools 패키지 아래의 각 Tool이 사용합니다). */
