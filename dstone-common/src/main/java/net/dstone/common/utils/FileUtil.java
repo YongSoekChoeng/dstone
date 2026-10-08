@@ -768,16 +768,20 @@ public class FileUtil {
 	}
 	
 
-	public static boolean makeDir(String filePath) {
+	/**
+	 * <pre>
+	 * 폴더를 만듭니다. 중간 폴더가 없으면 함께 만듭니다. 이미 있으면 그대로 둡니다.
+	 *
+	 * dirPath는 "만들 폴더" 자체입니다(파일 경로가 아닙니다). 이 메서드를 부르는 곳은 모두 폴더 경로를 넘깁니다
+	 * (writeFile(폴더, 파일명, 내용), FileUpUtil의 저장 폴더, AppAnalyzer의 결과 폴더 등).
+	 * 그래서 부모 폴더까지만 만들면 안 됩니다. 그러면 새 폴더에 파일을 쓸 때 "그런 파일이나 디렉터리가 없습니다"로 실패합니다.
+	 * </pre>
+	 */
+	public static boolean makeDir(String dirPath) {
 		boolean flag = false;
 		try {
-			filePath = StringUtil.replace(filePath, "/", System.getProperty("file.separator"));
-	        Path path = Paths.get(filePath);
-
-	        // 상위 디렉터리가 없으면 생성
-	        if (path.getParent() != null) {
-	            Files.createDirectories(path.getParent());
-	        }
+			dirPath = StringUtil.replace(dirPath, "/", System.getProperty("file.separator"));
+			Files.createDirectories(Paths.get(dirPath));
 	        flag = true;
 		} catch (Exception e) {
 			logger.info(e.toString());

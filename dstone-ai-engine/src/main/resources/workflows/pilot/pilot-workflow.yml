@@ -48,8 +48,8 @@ workflow:
   input: string
   output: 
     # 실행된 step의 output을 step id별로 모은다. 각 Agent가 본문은 파일로 저장하고 요약만 돌려주므로 결과가 작다.
-    # newPack은 뺀다. 참고 구현 파일의 내용을 통째로 읽어 둔 것이라 결과에 넣으면 수십만 자가 된다.
-    value: "${ .steps | del(.newPack) | map_values(.output) }"
+    # newPack과 newRead는 뺀다. 파일의 내용을 통째로 읽어 둔 것이라 결과에 넣으면 수십만 자가 된다.
+    value: "${ .steps | del(.newPack, .newRead) | map_values(.output) }"
   
   # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
   steps:
@@ -157,7 +157,8 @@ workflow:
     #   newRef 참고 구현 고르기 → newRefExist/newPack 그 파일들을 한 번만 읽어 두기(LLM 없이)
     #   → newAnalyze 요구사항 + 구성 정의(LLM 1회) → newExist/newCheck 코드로 검증 → newReqDoc/newImpactDoc 문서 만들기
     #   → newApprove 사람의 결정 → newDesign 파일별 설계(파일마다 LLM 1회) → newDesignCheck 코드로 검증 → newDesignDoc
-    #   → newDesignApprove 사람의 결정 → newDevelop 파일별 구현(파일마다 한 번) → newTasksDoc
+    #   → newDesignApprove 사람의 결정 → newCopy/newCreate/newEdit/newAppend 정해진 변경을 코드로 적용(LLM 없이) → newRead 복사한 파일 읽기
+    #   → newDevelop 빼는 것/더하는 것을 줄 번호로 정하기(필요한 새 파일마다 LLM 1회) → newApply 그 변경을 코드로 적용 → newTasksDoc
     #
     # 일반 경로와 다른 점
     # - 참고 구현의 파일은 newPack이 한 번만 읽습니다. 뒤의 Agent는 그 내용을 input으로 받으므로 조회 Tool이 없습니다.
@@ -170,6 +171,10 @@ workflow:
     #   사람이 재분석/재설계를 고르면 그 내용이 Agent의 feedback으로 넘어갑니다.
     #   자동으로 다시 시키지는 않습니다(걸릴 때마다 되돌리면 같은 잘못을 되풀이하는 동안 maxIterations까지 돕니다). 다시 시킬지는 사람이 정합니다.
     # - 리뷰 Agent(SUPERVISOR)가 없습니다. 신규 개발에서는 리뷰가 확인하던 것의 대부분(범위, FR 매핑, 경로가 실제로 있는지)을 위의 검증이 대신합니다.
+    # - 구현에서 정해진 변경은 LLM이 하지 않습니다. 설계가 낸 이름 바꿈 표(renames)는 newCopy(copyFileWithReplace)가,
+    #   변경 전/변경 후(edits)는 newEdit(replaceInFile)와 newAppend(appendFile)가 그대로 적용합니다. LLM(newDevelop)은 새 파일에서
+    #   빼는 것과 더하는 것을 "몇 번째 줄을 어떻게"로 정하기만 하고, 그 변경도 newApply(editFileLines)가 적용합니다.
+    #   예전에는 개발 Agent가 파일 전체를 writeFile 인자로 다시 썼습니다.
     # - 설계와 구현은 forEach로 파일마다 새 대화에서 따로 합니다. 요청이 커지면 호출 수가 늘 뿐 한 호출의 크기는 그대로입니다.
     #   forEach는 동시에 실행되므로 변경 대상에 같은 파일이 두 번 들어 있으면 안 됩니다(newCheck가 잡습니다).
     #
@@ -438,31 +443,119 @@ workflow:
       type: APPROVAL
       approverRole: "PL"
       routes:
-        진행: newDevelop
+        진행: newCopy
         재설계: newDesign
         재분석: newAnalyze
         중단: FAIL
 
-    # 파일별 구현 (설계된 파일마다 새 대화로 한 번씩)
-    #   일부 파일이 실패해도 결과 정리(newTasksDoc)로 넘긴다. 실패한 파일은 04-tasks.md에 '실패'로 적힌다.
+    # 새 파일 만들기 1 (LLM 없이): 본뜰 참고 파일을 복사하면서 설계의 이름 바꿈 표대로 글자를 바꾼다.
+    #   대상 파일이 이미 있으면 그 파일은 실패한다(덮어쓰지 않는다). 일부가 실패해도 다음으로 넘어가고, 결과는 04-tasks.md에 적힌다.
+    - id: newCopy
+      type: TOOL
+      ref: copyFileWithReplace
+      forEach: '${ .steps.newDesign.output | map(select(. != null and .changeType == "신규" and (.referencePath // "") != "")) }'
+      input:
+        sourcePath: "${ $item.referencePath }"
+        targetPath: "${ $item.path }"
+        replacements: "${ $item.renames // [] }"
+      onSuccess: newCreate
+      onFailure: newCreate
+
+    # 새 파일 만들기 1-2 (LLM 없이): 본뜰 파일이 없는 새 파일은 설계가 글자 그대로 적어 준 내용(adds)을 그대로 저장한다.
+    - id: newCreate
+      type: TOOL
+      ref: writeFile
+      forEach: '${ .steps.newDesign.output | map(select(. != null and .changeType == "신규" and (.referencePath // "") == "")) }'
+      input:
+        filePath: "${ $item.path }"
+        fileContents: '${ $item.adds // [] | map(.content // "") | join("\n") }'
+      onSuccess: newEdit
+      onFailure: newEdit
+
+    # 있는 파일 고치기 1 (LLM 없이): 설계의 변경 전을 변경 후로 바꾼다. 변경 전이 파일에 정확히 한 번 있을 때만 바뀐다.
+    - id: newEdit
+      type: TOOL
+      ref: replaceInFile
+      forEach: |
+        ${ [ .steps.newDesign.output[] | select(. != null and .changeType == "수정") | . as $d
+             | ($d.edits // [])[] | select(.append != true) | . as $e
+             | $d | with_entries(select(.key == "path")) | .before = ($e.before // "") | .after = ($e.after // "") ] }
+      input:
+        filePath: "${ $item.path }"
+        oldText: "${ $item.before }"
+        newText: "${ $item.after }"
+      onSuccess: newAppend
+      onFailure: newAppend
+
+    # 있는 파일 고치기 2 (LLM 없이): 파일 끝에 덧붙이는 변경. 덧붙일 내용이 줄바꿈으로 시작하지 않으면 줄바꿈을 앞에 넣는다.
+    - id: newAppend
+      type: TOOL
+      ref: appendFile
+      forEach: |
+        ${ [ .steps.newDesign.output[] | select(. != null and .changeType == "수정") | . as $d
+             | ($d.edits // [])[] | select(.append == true) | . as $e
+             | $d | with_entries(select(.key == "path")) | .after = ($e.after // "") ] }
+      input:
+        filePath: "${ $item.path }"
+        fileContents: '${ $item.after | if startswith("\n") or startswith("\r") then . else "\n" + . end }'
+      onSuccess: newRead
+      onFailure: newRead
+
+    # 새 파일 만들기 2 준비 (LLM 없이): 복사한 새 파일 가운데 빼거나 더할 것이 있는 파일을 줄 번호와 함께 읽어 둔다.
+    #   복사에 실패한 파일(대상이 이미 있었던 파일 등)은 읽지 않는다. 그런 파일은 여기서부터 건드리지 않는다.
+    - id: newRead
+      type: TOOL
+      ref: readFileLines
+      forEach: |
+        ${ ([.steps.newCopy.input // [], .steps.newCopy.output // []] | transpose
+             | map(select(.[1] // "" | tostring | startswith("복사했습니다")) | .[0].targetPath)) as $copied
+           | .steps.newDesign.output | map(select(. != null and .changeType == "신규" and (.referencePath // "") != ""
+               and (((.removes // []) | length) > 0 or ((.adds // []) | length) > 0))
+             | select(.path as $p | ($copied | map(select(. == $p)) | length) > 0)) }
+      input:
+        fileFullPath: "${ $item.path }"
+      onSuccess: newDevelop
+      onFailure: newDevelop
+
+    # 새 파일 만들기 2 (읽어 둔 파일마다 새 대화로 한 번씩. Tool 없이 LLM 1회)
+    #   이름 바꿈은 newCopy가 끝냈다. 여기서는 빼는 것과 더하는 것을 "몇 번째 줄을 어떻게"로 정하기만 한다. 파일은 newApply가 고친다.
+    #   Agent에 Tool을 주고 직접 고치게 했을 때는 같은 호출을 되풀이하거나 몇 분씩 걸렸다(24.newdev-file-developer-agent.yml의 주석).
+    #   일부 파일이 실패해도 다음으로 넘긴다.
     - id: newDevelop
       type: AGENT
       ref: pilot-newdev-file-developer-agent
-      forEach: "${ .steps.newDesign.output | map(select(. != null)) }"
+      forEach: |
+        ${ .steps.newDesign.output as $designs
+           | [ [.steps.newRead.input // [], .steps.newRead.output // []] | transpose | .[]
+               | select(.[1] != null and (.[1] | tostring | startswith("실패") | not)) | . as $r
+               | $designs[] | select(. != null and .path == $r[0].fileFullPath)
+               | {design: ., source: ($r[1] | tostring)} ] }
       input:
-        design: "${ $item }"
-        referenceSource: |
-          ${ ($item.referencePath // "") as $p
-             | [.steps.newPack.input, .steps.newPack.output] | transpose
-             | map(select(.[0].fileFullPath == $p) | .[1] | tostring) | .[0] // "" }
-        currentSource: |
-          ${ ($item.path // "") as $p
-             | [.steps.newPack.input, .steps.newPack.output] | transpose
-             | map(select(.[0].fileFullPath == $p) | .[1] | tostring) | .[0] // "" }
+        design: "${ $item.design }"
+        source: "${ $item.source }"
+      onSuccess: newApply
+      onFailure: newApply
+
+    # 새 파일 만들기 3 (LLM 없이): 위에서 정한 줄 번호 변경을 파일에 적용한다.
+    #   한 파일의 변경은 모두 맞을 때만 한꺼번에 적용된다(줄 번호나 확인 글자가 하나라도 틀리면 그 파일은 복사한 모습 그대로 남는다).
+    #   자동으로 다시 시키지 않는다. 결과는 04-tasks.md에 적히고 사람이 본다.
+    - id: newApply
+      type: TOOL
+      ref: editFileLines
+      forEach: |
+        ${ [ [.steps.newDevelop.input // [], .steps.newDevelop.output // []] | transpose | .[]
+             | select(.[1] != null and ((.[1].edits // []) | length) > 0)
+             | {path: .[0].design.path, edits: .[1].edits} ] }
+      input:
+        filePath: "${ $item.path }"
+        edits: "${ $item.edits }"
       onSuccess: newTasksDoc
       onFailure: newTasksDoc
 
     # 태스크 목록 만들기 (LLM 없이. 파일별 구현 결과를 모은다. 설계 한 건 = 파일 하나 = 태스크 하나)
+    #   상태: 수정 파일은 그 파일의 변경이 모두 적용됐으면 완료. 새 파일은 복사가 실패했으면 실패, 편집 Agent가 불렸으면 그 변경 목록을
+    #   적용한 결과(적용됐으면 완료, 적용됐지만 괄호의 짝이 달라졌거나 변경 목록이 비었으면 확인 필요, 안 됐으면 실패), 불리지 않았으면(이름만 바꾸면 되는 파일,
+    #   내용을 그대로 저장한 파일) 복사/저장만으로 완료다.
     - id: newTasksDoc
       type: TOOL
       ref: writeFile
@@ -470,14 +563,49 @@ workflow:
         filePath: '${ .input + "/04-tasks.md" }'
         fileContents: |
           ${ def c: tostring | gsub("\\|"; "/") | gsub("\r?\n"; " ");
-             ([.steps.newDevelop.input // [], .steps.newDevelop.output // []] | transpose) as $rows
+             (.steps.newDesign.output // [] | map(select(. != null))) as $ds
+             | ( ([.steps.newCopy.input // [], .steps.newCopy.output // []] | transpose | map({key: .[0].targetPath, value: (.[1] | tostring)}))
+                 + ([.steps.newCreate.input // [], .steps.newCreate.output // []] | transpose | map({key: .[0].filePath, value: (.[1] | tostring)}))
+                 | from_entries ) as $copy
+             | ([.steps.newDevelop.input // [], .steps.newDevelop.output // []] | transpose
+                 | map({key: .[0].design.path, value: (.[1] // {failed: true})}) | from_entries) as $dev
+             | ([.steps.newApply.input // [], .steps.newApply.output // []] | transpose
+                 | map({key: .[0].filePath, value: (.[1] // "" | tostring)}) | from_entries) as $apply
+             | ([ ([.steps.newEdit.input // [], .steps.newEdit.output // []] | transpose | .[]),
+                  ([.steps.newAppend.input // [], .steps.newAppend.output // []] | transpose | .[])
+                | .[0] + {result: (.[1] | tostring)} ]) as $edits
+             | ($ds | map(. as $d
+                 | ($edits | map(select(.filePath == $d.path) | .result)) as $er
+                 | ($copy[$d.path] // "") as $cr
+                 | ($dev[$d.path]) as $dv
+                 | ($apply[$d.path] // "") as $ar
+                 | (($d.referencePath // "") != "" and ((($d.removes // []) | length) > 0 or (($d.adds // []) | length) > 0)) as $needEdit
+                 | {path: $d.path, type: ($d.changeType // ""),
+                    status: ( if $d.changeType == "수정" then
+                                ( if ($er | length) == 0 then "변경 없음"
+                                  elif ($er | map(select(startswith("실패"))) | length) > 0 then "실패" else "완료" end )
+                              elif ($cr | startswith("실패")) then "실패"
+                              elif $dv == null then (if $needEdit then "실패" else "완료" end)
+                              elif $dv.failed == true then "실패"
+                              elif (($dv.edits // []) | length) == 0 then "확인 필요"
+                              elif ($ar | startswith("고쳤습니다")) then (if ($ar | contains("주의:")) then "확인 필요" else "완료" end)
+                              else "실패" end ),
+                    summary: ( if $d.changeType == "수정" then ($er | join(" / "))
+                               elif ($cr | startswith("실패")) then ($cr | split("\n") | .[0] // "")
+                               elif $dv == null then (if $needEdit then "복사한 파일을 읽지 못해 빼는 것과 더하는 것을 적용하지 못했습니다" else ($cr | split("\n") | .[0] // "") end)
+                               elif $dv.failed == true then "편집 Agent 호출이 실패했습니다. 파일은 이름만 바꿔 복사한 모습 그대로입니다"
+                               elif (($dv.edits // []) | length) == 0 then (($dv.summary // "") + " (변경 목록이 비어 있어 아무것도 바꾸지 않았습니다)")
+                               elif ($ar | startswith("고쳤습니다")) then (($dv.summary // "") + (if ($ar | contains("주의:")) then " / " + ($ar | split("\n") | map(select(startswith("주의:"))) | join(" ")) else "" end))
+                               else "변경 목록을 적용하지 못했습니다. 파일은 이름만 바꿔 복사한 모습 그대로입니다(이유는 아래 '실패한 호출'). 하려던 변경: " + ($dv.summary // "") end ),
+                    questions: ($dv.questions // [])})) as $rows
              | "# 태스크 목록 (신규 개발)\n\n"
                + "> 파일별 구현 결과를 Workflow가 모아 만든 문서입니다. 컴파일과 실행 검증은 하지 않았습니다. 사람이 확인해야 합니다.\n\n"
                + "| 번호 | 대상 파일 | 유형 | 상태 | 구현 요약 |\n|---|---|---|---|---|\n"
-               + ($rows | to_entries | map("| TASK-" + (.key + 1 | tostring) + " | " + (.value[0].design.path // "" | c) + " | " + (.value[0].design.changeType // "" | c)
-                   + " | " + (.value[1].status // "실패" | c) + " | " + (.value[1].summary // "" | c) + " |") | join("\n")) + "\n\n"
+               + ($rows | to_entries | map("| TASK-" + (.key + 1 | tostring) + " | " + (.value.path | c) + " | " + (.value.type | c)
+                   + " | " + (.value.status | c) + " | " + (.value.summary | c) + " |") | join("\n")) + "\n\n"
                + "## 결정이 필요한 사항과 보류한 이유\n"
-               + ([$rows[] | . as $row | ($row[1].questions // [])[] | "- " + tostring + " (" + ($row[0].design.path | tostring) + ")"] | if length == 0 then "없음" else join("\n") end) + "\n\n"
-               + "## 실패한 호출\n" + (.steps.newDevelop.error // "없음" | tostring) + "\n" }
+               + ([$rows[] | . as $row | $row.questions[] | "- " + tostring + " (" + ($row.path | tostring) + ")"] | if length == 0 then "없음" else join("\n") end) + "\n\n"
+               + "## 실패한 호출\n"
+               + ([.steps.newCopy.error, .steps.newCreate.error, .steps.newEdit.error, .steps.newAppend.error, .steps.newRead.error, .steps.newDevelop.error, .steps.newApply.error] | map(select(. != null and . != "")) | if length == 0 then "없음" else join("\n") end) + "\n" }
       onSuccess: SUCCESS
       onFailure: FAIL

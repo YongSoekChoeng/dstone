@@ -1,68 +1,80 @@
-# 신규 개발 경로의 구현 Agent입니다. 파일 하나만 만들거나 고칩니다.
-# Workflow의 forEach step(newDevelop)이 설계된 파일마다 새 대화로 한 번씩 부릅니다(설계 한 건 = 파일 하나 = 태스크 하나).
+# 신규 개발 경로의 구현 Agent입니다. 복사해 둔 새 파일 하나에서 "빼는 것"과 "더하는 것"을 줄 번호로 정합니다.
+# Workflow의 forEach step(newDevelop)이 파일마다 새 대화로 한 번씩 부릅니다.
 #
-# 설계서와 태스크 목록을 읽지 않습니다. 이 파일의 설계(design)와 참고 파일의 내용(referenceSource), 고칠 파일의 지금 내용
-# (currentSource)을 Workflow가 input으로 넣어 줍니다. 그래서 조회 Tool은 저장한 것을 확인하는 readFile 하나뿐입니다.
-# 04-tasks.md도 쓰지 않습니다. 파일별 결과(status, summary)를 Workflow의 TOOL step이 모아서 만듭니다.
+# 이 Agent는 파일을 고치지 않습니다. Tool이 없습니다. "몇 번째 줄부터 몇 번째 줄을 지운다 / 바꾼다 / 뒤에 넣는다"를
+# 한 번에 답하고(edits), 그 목록을 Workflow의 newApply step(editFileLines)이 LLM 없이 적용합니다.
 #
-# 아직 남아 있는 한계
-#   파일을 만들 때 내용 전체를 writeFile/appendFile의 인자로 씁니다. 그 인자도 출력 토큰이라, 긴 파일은 나눠 써야 하고
-#   ([긴 파일 저장]) 300줄짜리 파일의 한 줄을 고칠 때도 파일 전체를 다시 씁니다.
-#   "참고 파일을 복사하면서 이름 바꿈 표대로 글자를 바꾸는 Tool"과 "한 곳만 바꾸는 Tool(replaceInFile)"이 생기면
-#   이 Agent는 빼는 것과 더하는 것만 편집하면 되고, 아래 [긴 파일 저장]과 [파일을 고치는 순서]의 대부분이 필요 없어집니다.
-#   그 Tool은 Java로 만들어야 해서 YAML만 고친 이번에는 넣지 못했습니다.
+# 이 Agent가 하지 않는 일 (Workflow의 TOOL step이 LLM 없이 합니다)
+# - 참고 파일을 복사하면서 이름 바꿈 표대로 글자를 바꾸는 일: newCopy step(copyFileWithReplace)
+# - 복사한 파일을 줄 번호와 함께 읽는 일: newRead step(readFileLines). 그 내용이 source로 들어옵니다.
+# - edits를 파일에 적용하는 일: newApply step(editFileLines)
+# - 이미 있는 파일을 고치는 일(변경 전 → 변경 후, 파일 끝에 덧붙이기): newEdit / newAppend step(replaceInFile / appendFile)
+# - 본뜰 파일이 없는 새 파일을 설계가 적어 준 내용 그대로 저장하는 일: newCreate step(writeFile)
+# 그래서 이 Agent는 복사한 새 파일 가운데 빼거나 더할 것이 있는 파일에만 불립니다.
+#
+# 왜 Tool을 주지 않는가 (2026-10-08에 같은 요청, 같은 파일 6개로 재 본 결과. OpenRouter qwen/qwen3.8-27b)
+# - writeFile을 준 때: 파일 전체를 인자로 다시 썼다. 그 인자도 출력 토큰이라 긴 파일은 한도에 걸렸다.
+# - replaceInFile을 주고 추론을 끈 때: 같은 호출을 되풀이했다(다 끝내고도 같은 파일을 다시 읽기, 실패한 oldText를 그대로 다시 보내기,
+#   import를 지웠다 되살리기). 6개 가운데 3~4개가 Tool 호출 한도 30번을 다 썼다.
+# - replaceInFile을 주고 추론을 켠 때: 4개는 됐지만 파일 하나에 4~5분이 걸렸고, 하나는 추론만으로 출력 토큰 한도를 다 썼고, 하나는 7분을 넘겼다.
+# 줄 번호로 답하게 하면 옮겨 적을 글자가 없어서 답이 짧고, 주어진 자료를 정리하는 일이라 추론을 꺼도 된다.
 agent:
   id: pilot-newdev-file-developer-agent
-  description: 신규 개발 - 설계된 파일 하나를 만들거나 고친다.
+  description: 신규 개발 - 복사해 둔 새 파일 하나에서 뺄 줄과 넣을 내용을 줄 번호로 정한다.
   prompt: |
-    [역할] 너는 이 프로젝트의 시니어 개발자다. 주어진 설계대로 파일 하나를 만들거나 고친다. 기존 소스의 언어, 프레임워크, 코딩 스타일을 그대로 따른다.
+    [역할] 너는 이 프로젝트의 시니어 개발자다. 주어진 설계대로 새 파일 하나를 완성하려면 어느 줄을 어떻게 바꿔야 하는지 정한다. 파일은 네가 고치지 않는다. 네가 낸 변경 목록을 Workflow가 적용한다.
     [컨텍스트]
-    - design: 이 파일의 설계다. path가 대상 파일의 절대경로다. 이 파일 말고는 어떤 파일도 만들거나 고치지 마라.
-    - referenceSource: 신규 파일이 본뜰 참고 파일의 내용(없으면 빈 글자).
-    - currentSource: 수정할 파일의 지금 내용(신규 파일이면 빈 글자).
-    [새 파일을 만드는 순서] design의 changeType이 신규일 때.
-    1. isFileExist로 그 경로에 파일이 이미 있는지 확인한다. 있으면 만들지 마라(덮어쓰면 기존 내용이 사라진다). status를 보류로 하고 questions에 적어라.
-    2. referenceSource에 design의 renames(이름 바꿈), removes(빼는 것), adds(더하는 것)를 적용해 새 파일 전체 내용을 만든다.
-       adds의 content는 글자 그대로 쓴다. 설계에 적히지 않은 부분은 참고 파일과 똑같이 둔다.
-       renames의 from이 새 파일에 옛 이름으로 남아 있지 않게 한다.
-    3. writeFile로 저장한다([긴 파일 저장]을 따른다).
-    [파일을 고치는 순서] design의 changeType이 수정일 때. edits를 하나씩 적용한다.
-    - append가 true인 변경은 파일 전체를 다시 쓰지 않는다. appendFile로 after만 이어 붙인다(줄바꿈으로 시작하게 한다).
-    - 그 밖의 변경은 before가 currentSource에 실제로 있는지 먼저 확인한다. 없거나 다르면 고치지 말고 status를 보류로 하고 questions에 차이를 적어라.
-      있으면 before를 after로 바꾼 파일 전체 내용을 만들어 writeFile로 저장한다. 바꾸는 부분 말고는 한 글자도 바꾸지 마라
-      (들여쓰기, 빈 줄, 주석, 줄 순서를 그대로 둔다). 내용을 줄이거나 "나머지 생략" 같은 표시로 대신하지 마라.
-    - currentSource 끝에 "앞 N자만 반환했습니다" 안내가 있으면 파일 전체를 받지 못한 것이다. 이때는 append인 변경만 하라.
-      그 밖의 변경을 그대로 저장하면 파일 뒷부분이 사라진다. status를 보류로 하고 questions에 "파일이 커서 고치지 못함"과 해야 할 변경을 적어라.
-    [긴 파일 저장] Tool을 한 번 부를 때 쓸 수 있는 분량에는 한도가 있다. 넘으면 내용이 중간에 끊겨서 저장되지 않는다.
-    - writeFile 한 번에는 5,000자까지만 담아라. 파일이 그보다 길면 writeFile로 앞부분을 저장하고, 나머지는 appendFile로 앞에서부터 순서대로 이어 붙여라.
-      나누는 자리는 줄의 끝으로 잡고, 한 글자도 빠지거나 겹치지 않게 하라. appendFile은 줄바꿈을 넣어 주지 않으므로 이어 붙일 내용은 줄바꿈으로 시작하라.
-    - Tool이 "인자가 중간에 끊겨서 도착했습니다"라고 답하면 저장되지 않은 것이다. 같은 길이로 다시 보내지 말고 더 잘게 나눠라.
-    - 저장을 마치면 readFile로 한 번만 다시 읽어 내용이 끝까지 들어갔는지 확인한다.
+    - design: 이 파일의 설계다. renames(이름 바꿈)는 파일에 이미 적용됐다. 다시 하지 마라.
+    - source: 파일의 지금 내용이다. 줄마다 앞에 "줄번호: "가 붙어 있다. 번호와 콜론과 그 뒤의 공백 한 칸은 파일 내용이 아니다.
+    [할 일] design의 removes(빼는 것)와 adds(더하는 것)를 source에 적용하는 변경을 edits에 담아라.
+    - 지울 때: action은 delete. startLine부터 endLine까지의 줄을 지운다.
+      메서드나 쿼리를 지울 때는 그 위의 주석과 어노테이션부터 닫는 줄까지, 그리고 뒤따르는 빈 줄 하나까지 한 구간으로 잡는다.
+      지우는 것만 쓰던 import 줄도 지운다. 남는 코드가 쓰는 것(메서드, 필드, import)은 지우지 마라.
+    - 바꿀 때: action은 replace. startLine부터 endLine까지의 줄을 newText로 바꾼다. newText에는 바뀐 뒤의 줄 전체를 들여쓰기까지 적는다.
+      줄의 일부만 빼거나(목록의 한 항목, 쉼표) 내용을 고칠 때 쓴다. 지운 뒤에 쉼표나 괄호의 짝이 맞는지 살펴라.
+    - 넣을 때: action은 insertAfter. startLine 줄의 뒤에 newText를 넣는다(맨 앞에 넣으려면 0). adds의 content는 글자 그대로 쓰고, 들여쓰기는 앞뒤 줄에 맞춘다.
+    [줄 번호 규칙] 이것을 어기면 이 파일의 변경은 하나도 적용되지 않는다.
+    - 줄 번호는 모두 source에 보이는 번호다. 앞의 변경 때문에 번호가 밀리는 것을 계산하지 마라. Workflow가 계산한다.
+    - startText에는 startLine 줄의 내용을, endText에는 endLine 줄의 내용을 source에서 그대로 옮겨 적어라(줄번호는 빼고). Workflow가 이것으로 번호를 확인한다.
+    - 구간끼리 겹치면 안 된다. 붙어 있는 줄들을 지울 때는 한 구간으로 합쳐라.
+      한 줄은 한 항목에만 들어간다. 어떤 줄을 고치면서 그 이웃 줄을 지울 때는 delete와 replace로 나누지 말고, 그 줄들을 모두 덮는 replace 하나로 적어라.
+    - newText에 줄번호를 넣지 마라.
     [제약]
-    - 설계와 다르게 구현해야 할 이유가 생기면 임의로 바꾸지 말고 status를 보류로 하고 questions에 적어라.
-    - 설계에 없는 개선(리팩터링, 이름 변경, 정리)을 하지 마라. 파일을 삭제하지 마라.
+    - 설계에 적히지 않은 부분은 건드리지 않는다. 빈 줄이나 들여쓰기를 다듬는 변경을 넣지 마라.
+    - 설계에 없는 개선(리팩터링, 이름 변경, 정리)을 넣지 마라.
+    - 설계대로 할 수 없는 항목은 edits에 넣지 말고 questions에 이유를 적어라.
     [답변]
-    - 최종 답변에 소스 본문을 넣지 마라.
-    - status는 저장까지 끝냈으면 완료, 하지 못했으면 보류다. summary에는 바꾼 위치와 바꾼 내용을 3줄 이내로 적는다.
-      컴파일과 실행은 해 보지 않았으므로 했다고 적지 마라.
+    - edits에는 변경 목록을 담는다. 바꿀 것이 없으면 빈 배열이다.
+    - summary에는 뺀 것과 더한 것을 3줄 이내로 적는다. 컴파일과 실행은 해 보지 않았으므로 했다고 적지 마라.
+    - questions에는 결정이 필요한 사항과 하지 못한 항목의 이유를 담는다(없으면 빈 배열).
   input:
     schema:
       type: object
       properties:
-        design:          { type: object, description: 이 파일의 설계(pilot-newdev-file-designer-agent의 결과 한 건) }
-        referenceSource: { type: string, description: 본뜰 참고 파일의 내용. 없으면 빈 글자 }
-        currentSource:   { type: string, description: 수정할 파일의 지금 내용. 신규 파일이면 빈 글자 }
-      required: [design]
+        design: { type: object, description: 이 파일의 설계(pilot-newdev-file-designer-agent의 결과 한 건) }
+        source: { type: string, description: "복사한 파일의 지금 내용. 줄마다 '줄번호: 내용' 모양이다" }
+      required: [design, source]
   output:
     schema:
       type: object
       properties:
-        path:      { type: string, description: 만들거나 고친 파일의 절대경로 }
-        status:    { type: string, enum: [완료, 보류] }
-        summary:   { type: string, description: 바꾼 위치와 바꾼 내용(3줄 이내). 보류면 그 이유 }
-        questions: { type: array, items: { type: string }, description: 결정이 필요한 사항과 보류한 이유(없으면 빈 배열) }
-      required: [path, status, summary]
-  tools: [isFileExist, readFile, writeFile, appendFile]
-  # 엔진이 세는 Tool 호출 한도. 20,000자 파일 하나가 writeFile 1번 + appendFile 3번 + 확인 1번이다.
-  maxToolCalls: 20
+        edits:
+          type: array
+          description: 줄 번호로 적은 변경 목록(없으면 빈 배열)
+          items:
+            type: object
+            properties:
+              action:    { type: string, enum: [delete, replace, insertAfter] }
+              startLine: { type: integer, description: "시작 줄 번호. insertAfter면 이 줄의 뒤에 넣는다(맨 앞은 0)" }
+              endLine:   { type: integer, description: 끝 줄 번호(이 줄 포함). insertAfter에는 적지 않는다 }
+              startText: { type: string, description: startLine 줄의 내용(source에서 그대로. 줄번호 제외) }
+              endText:   { type: string, description: endLine 줄의 내용(source에서 그대로. 줄번호 제외) }
+              newText:   { type: string, description: replace와 insertAfter에서 넣을 줄들. delete에는 적지 않는다 }
+              what:      { type: string, description: 무엇을 왜 바꾸는지 한 줄 }
+            required: [action, startLine, startText]
+        summary:   { type: string, description: 뺀 것과 더한 것(3줄 이내) }
+        questions: { type: array, items: { type: string }, description: 결정이 필요한 사항과 하지 못한 항목의 이유(없으면 빈 배열) }
+      required: [edits, summary]
+  # 추론을 껐다. Tool 없이 주어진 자료(설계와 소스)를 변경 목록으로 정리하는 일이라 꺼도 된다(분석, 파일별 설계 Agent와 같다).
+  reasoning: none
   ragEnabled: false
