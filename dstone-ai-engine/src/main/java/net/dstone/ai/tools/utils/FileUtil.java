@@ -23,6 +23,7 @@ import org.springframework.core.env.Environment;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
@@ -315,9 +316,15 @@ public class FileUtil {
 
 	@Tool(description = "절대경로 fileFullPath(폴더+파일명)에 fileContents 내용으로 파일을 저장한다. 폴더가 없으면 만들고, 파일이 있으면 덮어쓴다. 저장 결과 안내 문구를 돌려준다. 사용자가 '파일 생성' 등을 요청할 때 사용한다.")
 	public void writeFile(@ToolParam(description = "저장할 파일의 절대경로(파일명 포함)") String filePath, @ToolParam (description = "파일 내용")String fileContents) {
-		String fileParentPath = net.dstone.common.utils.FileUtil.getFilePath(filePath);
-		String fileName = net.dstone.common.utils.FileUtil.getFileName(filePath, true);
-		net.dstone.common.utils.FileUtil.writeFile(fileParentPath, fileName, fileContents);
+		if( !StringUtil.isEmpty(fileContents) ) {
+			List<byte[]> chunks = new ArrayList<byte[]>();
+			String[] lines = net.dstone.common.utils.StringUtil.toStrArray(fileContents, "\n");
+			for(String line : lines) {
+				byte[] lineByteArray = line.getBytes(Charset.defaultCharset());
+				chunks.add(lineByteArray);
+			}
+			net.dstone.common.utils.FileUtil.saveFileInChunks(filePath, chunks);
+		}
 	}
 	
 	/**

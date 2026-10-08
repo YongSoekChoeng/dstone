@@ -18,7 +18,9 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -471,6 +473,73 @@ public class FileUtil {
 			}
 		}
 	}
+	
+	/**
+     * Chunk 리스트 형태의 데이터를 파일로 저장합니다.
+     * 첫 번째 청크는 파일을 새롭게 생성(또는 덮어쓰기)하고,
+     * 이후 청크는 기존 파일에 이어씁니다(Append).
+     *
+     * @param filePath 저장할 파일 경로
+     * @param chunks   저장할 청크(byte 배열) 리스트
+     * @throws IOException 파일 I/O 에러 발생 시
+     */
+    public static void saveFileInChunks(String filePath, List<byte[]> chunks){
+    	try {
+            if (chunks == null || chunks.isEmpty()) {
+                return;
+            }
+
+            Path path = Paths.get(filePath);
+
+            // 상위 디렉터리가 없으면 생성
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+
+            for (int i = 0; i < chunks.size(); i++) {
+                byte[] chunk = chunks.get(i);
+
+                if (i == 0) {
+                    // 첫 번째 Chunk: writeFile 역할 (생성 및 기존 파일 덮어쓰기)
+                    Files.write(path, chunk, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                } else {
+                    // 이후 Chunk: appendFile 역할 (파일 이어쓰기)
+                    Files.write(path, chunk, StandardOpenOption.APPEND);
+                }
+            }
+		} catch (Exception e) {
+			logger.info(e.toString());
+		}
+    }
+
+    /**
+     * 단일 Chunk 단위로 스트리밍 처리할 때 호출하는 메서드입니다.
+     *
+     * @param filePath 저장할 파일 경로
+     * @param chunk    저장할 데이터 청크
+     * @param isFirst  첫 번째 청크 여부 (true면 생성/덮어쓰기, false면 이어쓰기)
+     * @throws IOException 파일 I/O 에러 발생 시
+     */
+    public static void saveChunk(String filePath, byte[] chunk, boolean isFirst){
+    	try {
+            if (chunk == null || chunk.length == 0 ) {
+                return;
+            }
+            Path path = Paths.get(filePath);
+
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+
+            if (isFirst) {
+                Files.write(path, chunk, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            } else {
+                Files.write(path, chunk, StandardOpenOption.APPEND);
+            }
+		} catch (Exception e) {
+			logger.info(e.toString());
+    	}
+    }
 
 
 	public static void copyFile(String source, String target) {
@@ -699,21 +768,17 @@ public class FileUtil {
 	}
 	
 
-	public static boolean makeDir(String s) {
-		
+	public static boolean makeDir(String filePath) {
 		boolean flag = false;
-		s = StringUtil.replace(s, "/", System.getProperty("file.separator"));
-		java.util.StringTokenizer stringtokenizer = new java.util.StringTokenizer(s, System.getProperty("file.separator"));
-		String s3 = "";
 		try {
-			while (stringtokenizer.hasMoreTokens()) {
-				String s2 = stringtokenizer.nextToken();
-				s3 = s3 + "/" + s2;
-				File file = new File(s3);
-				if (!file.exists() || !file.isDirectory()) {
-					file.mkdir();
-				}
-			}
+			filePath = StringUtil.replace(filePath, "/", System.getProperty("file.separator"));
+	        Path path = Paths.get(filePath);
+
+	        // 상위 디렉터리가 없으면 생성
+	        if (path.getParent() != null) {
+	            Files.createDirectories(path.getParent());
+	        }
+	        flag = true;
 		} catch (Exception e) {
 			logger.info(e.toString());
 		}
