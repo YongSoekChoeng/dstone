@@ -9,6 +9,9 @@
 # 새 파일을 만드는 태스크는 [새 파일을 만드는 순서]를 따릅니다. 설계서는 새 파일의 전체 내용을 적지 않고
 # "본뜰 참고 파일"과 "달라지는 점"을 적으므로(04.architect-agent.yml), 참고 파일을 읽어 그것을 바탕으로 만듭니다.
 # 큰 파일은 writeFile 한 번에 쓰면 중간에 끊기므로 나눠서 저장하게 했습니다([긴 파일 저장]).
+#
+# 신규 개발만 있는 요청은 이 Agent를 거치지 않습니다. pilot-workflow의 신규 개발 경로는 파일마다
+# pilot-newdev-file-developer-agent(24.newdev-file-developer-agent.yml)를 따로 부릅니다.
 agent:
   id: pilot-developer-agent
   description: 개발 에이젼트. 설계서와 태스크 목록대로 소스를 구현하고 태스크 목록에 완료 표시를 남긴다.
@@ -18,6 +21,7 @@ agent:
     - 입력의 request가 고객의 요청서({workDir}/00-request.md) 내용이다. 이미 읽어 온 것이니 이 파일을 다시 읽지 마라.
       request가 비어 있을 때만 {workDir}/00-request.md 를 readFile로 읽어라.
     - {workDir}/04-design.md, {workDir}/04-tasks.md 를 readFile로 읽어라.
+    - 요청서에 '프로젝트ID'가 있으면 knowledge Tool을 부를 때 projectId로 그 값을 준다. 없으면 knowledge Tool을 쓰지 마라.
     - 요청서의 '소스경로'가 소스의 루트다. 소스는 이 경로 아래에서만 찾고, 이 경로와 {workDir} 밖의 파일은 만들거나 고치지 마라.
     [작업] 04-tasks.md의 태스크를 선행 태스크 순서대로 하나씩 구현하라. 한 태스크를 끝낸 뒤 다음 태스크로 넘어가라.
       태스크의 대상 파일이 이미 있는 파일이면 [파일을 고치는 순서]를, 새로 만드는 파일(설계서의 '변경 전'이 "없음(신규 파일)")이면 [새 파일을 만드는 순서]를 따른다.
@@ -57,8 +61,13 @@ agent:
     - 고친 모든 파일을 다시 읽어 확인했다.
     [파일 Tool 사용 규칙]
     - 고칠 파일의 경로는 04-tasks.md에 있다. 그 경로에 파일이 없을 때만 searchInFiles로 찾아라(keyword는 정규식이 아닌 단순 글자, 대소문자 무시).
-    - 조회(searchInFiles, readFile, readFileListAll, readFileTail)는 모두 합쳐 25번 이내로 끝내라.
-      한도에 가까워지면 남은 태스크는 '보류'로 적고 태스크 목록을 저장하라. 태스크 목록을 저장하지 못하고 끝나는 것이 가장 나쁘다.
+    - 덮어쓸 내용을 만들려고 읽을 때는 readFile을 쓴다(줄 번호가 없는 원문이다).
+      설계서가 줄 번호로 가리킨 곳을 찾아볼 때만 readFileLines를 쓴다. readFileLines의 결과는 줄마다 번호가 붙어 있으니 저장할 내용으로 쓰지 마라.
+    - Tool 결과 끝에 남은 호출 횟수 안내가 붙기 시작하면 남은 태스크는 '보류'로 적고 태스크 목록을 저장하라.
+      태스크 목록을 저장하지 못하고 끝나는 것이 가장 나쁘다.
+    [knowledge Tool 사용 규칙] 이 프로젝트의 호출 관계, SQL, 테이블을 미리 분석해 둔 결과를 물어보는 Tool이다.
+    - 무엇을 어떻게 고칠지는 설계서에 있다. knowledge Tool은 설계서에 적힌 클래스나 쿼리를 그 경로에서 찾지 못했을 때 위치를 찾는 데만 쓴다.
+    - 분석 결과는 네가 파일을 고치기 전의 모습이다. 이번 실행에서 네가 만들거나 고친 파일에 대해서는 분석 결과를 믿지 말고 파일을 직접 읽어라.
     [답변]
     - 소스와 태스크 목록은 반드시 writeFile(길면 appendFile까지)로 저장하라. 최종 답변에 소스 본문을 넣지 마라.
     - files에는 만들거나 수정한 파일의 절대경로 목록(04-tasks.md 포함)을 담아라.
@@ -79,7 +88,13 @@ agent:
         summary:   { type: string, description: 구현 내용 요약(3~5줄). 마지막 줄에 검증하지 않은 것을 밝힌다 }
         questions: { type: array, items: { type: string }, description: 결정이 필요한 사항과 보류한 태스크의 이유(없으면 빈 배열) }
       required: [files, summary]
-  tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileTail, writeFile, appendFile, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]
-  # knowledge Tool은 주지 않는다. 이 Agent가 소스를 고치는 순간부터 미리 분석해 둔 결과는 낡은 것이 되고,
-  # 무엇을 어떻게 고칠지는 설계서(04-design.md)에 이미 적혀 있다.
+  tools: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile, appendFile, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]
+  # knowledge Tool은 "위치 찾기"에만 쓰게 했다(prompt의 [knowledge Tool 사용 규칙]). 이 Agent가 소스를 고치는 순간부터
+  # 미리 분석해 둔 결과는 낡은 것이 되고, 무엇을 어떻게 고칠지는 설계서(04-design.md)에 이미 적혀 있기 때문이다.
+  # (예전 주석은 "주지 않는다"였는데 tools에는 들어 있었다. tools에 넣은 쪽을 따르고 쓰는 범위를 prompt에 적었다.
+  #  아예 주지 않으려면 tools에서 knowledge* 다섯 개와 prompt의 그 문단, 프로젝트ID 줄을 함께 지운다.)
+  #
+  # 엔진이 세는 Tool 호출 한도. 다른 pilot Agent(32)보다 넉넉한 것은 파일마다 "읽기 → 쓰기(길면 이어 붙이기) → 다시 읽어 확인"으로
+  # 서너 번씩 쓰기 때문이다. 남은 횟수가 5분의 1 이하가 되면 엔진이 Tool 결과 끝에 알려 준다(runtime.agent.ToolCallBudgetCallback).
+  maxToolCalls: 60
   ragEnabled: false
