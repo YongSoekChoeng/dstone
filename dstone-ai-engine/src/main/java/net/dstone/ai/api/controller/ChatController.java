@@ -173,8 +173,9 @@ public class ChatController extends BaseController {
 		if (!StringUtil.isEmpty(request.model())) {
 			return request.model();
 		}
-		if (!StringUtil.isEmpty(agent.model())) {
-			return agent.model();
+		String agentModel = this.agentRegistry.modelOf(agent);
+		if (!StringUtil.isEmpty(agentModel)) {
+			return agentModel;
 		}
 		return this.configProperty.getProperty("spring.ai." + provider + ".chat.options.model");
 	}

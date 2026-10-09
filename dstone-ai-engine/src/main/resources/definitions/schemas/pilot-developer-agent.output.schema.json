@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-developer-agent output",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "만들거나 수정한 파일의 절대경로"
+    },
+    "summary": {
+      "type": "string",
+      "description": "구현 내용 요약(3~5줄). 마지막 줄에 검증하지 않은 것을 밝힌다"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "결정이 필요한 사항과 보류한 태스크의 이유(없으면 빈 배열)"
+    }
+  },
+  "required": [
+    "files",
+    "summary"
+  ]
+}

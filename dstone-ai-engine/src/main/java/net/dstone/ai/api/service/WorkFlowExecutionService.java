@@ -2,6 +2,7 @@ package net.dstone.ai.api.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -55,7 +56,7 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param input        Workflow를 호출할 때 넘겨받은 값입니다(컨텍스트의 input에 들어갑니다).
 	 */
 	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
-		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, input);
+		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input);
 		this.executionStore.insert(execution);
 		return this.workFlowExecutor.run(workflow, execution);
 	}
@@ -70,7 +71,7 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param input        Workflow를 호출할 때 넘겨받은 값입니다(컨텍스트의 input에 들어갑니다).
 	 */
 	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
-		WorkFlowExecution execution = this.newExecution(workflow.id(), sessionId, caller, input);
+		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input);
 		this.executionStore.insert(execution);
 		// 지금은 기본 ForkJoinPool.commonPool()을 그대로 쓰고 있습니다. 전용 스레드풀이나 큐잉,
 		// 동시 실행 개수 제한 같은 건 실제 운영 환경에서 동시에 들어오는 submit이 많아지면 그때 도입할 계획입니다.
@@ -84,41 +85,51 @@ public class WorkFlowExecutionService extends BaseService {
 	}
 
 	/**
+	 * <pre>
 	 * WAITING_APPROVAL(승인 대기) 상태로 멈춰 있는 실행에 사람의 결정을 기록하고, 멈췄던 그
 	 * 스텝부터 다시 이어서 끝까지(또는 다음 승인 대기가 나올 때까지) 동기로 재개합니다.
 	 *
-	 * @param executionId 결정을 내릴 실행의 id입니다.
-	 * 멈춰 있는 APPROVAL step이 선택지 방식(routes)이면 route가 그 이름 중 하나여야 합니다. 아니면 400으로 거절합니다.
+	 * 결정(decision)은 멈춰 있는 APPROVAL step의 routes에 있는 이름 중 하나여야 합니다. 아니면 400으로 거절합니다.
 	 * 틀린 이름을 기록해 두면 다음 step을 찾지 못해 실행 전체가 실패로 끝나 버리기 때문에, 기록하기 전에 막습니다.
+	 * decision을 보내지 않고 approved만 보내면 true는 APPROVED, false는 REJECTED로 봅니다.
+	 * step에 approval.requireCommentOnReject: true를 적었으면 APPROVED가 아닌 결정에는 comment가 있어야 합니다.
+	 * </pre>
 	 *
 	 * @param executionId 결정을 내릴 실행의 id입니다.
-	 * @param approved    승인이면 true, 반려면 false입니다(승인/반려 방식에서만 씁니다).
-	 * @param route       고른 선택지 이름입니다(선택지 방식에서만 씁니다).
+	 * @param decision    고른 결정 이름입니다(없으면 null).
+	 * @param approved    decision이 없을 때만 봅니다. true면 APPROVED, false면 REJECTED입니다(없으면 null).
 	 * @param approver    이 결정을 내린 사람이나 역할입니다.
 	 * @param comment     결정한 이유나 메모입니다.
 	 */
-	public WorkFlowExecution decide(String executionId, boolean approved, String route, String approver, String comment) {
+	public WorkFlowExecution decide(String executionId, String decision, Boolean approved, String approver, String comment) {
 		WorkFlowExecution execution = this.executionStore.find(executionId);
 		if (execution.status() != WorkFlowExecutionStatus.WAITING_APPROVAL) {
 			throw new IllegalStateException("실행[" + executionId + "]은 지금 승인 대기 상태가 아닙니다(현재 상태: " + execution.status() + ").");
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
 		StepDefinition pendingStep = workflow.steps().get(execution.currentStepIndex());
-		String chosenRoute = null;
-		if (pendingStep instanceof ApprovalStepDefinition approval && approval.hasRoutes()) {
-			if (StringUtil.isEmpty(route) || !approval.routes().containsKey(route)) {
-				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 선택지 중 하나를 골라야 합니다. route에 다음 중 하나를 보내십시오: " + approval.routes().keySet()
-					+ (StringUtil.isEmpty(route) ? "" : " (보낸 값: " + route + ")"));
-			}
-			chosenRoute = route;
+		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
+			throw new IllegalStateException("실행[" + executionId + "]이 멈춰 있는 step[" + pendingStep.id() + "]은 APPROVAL step이 아닙니다(실행을 시작한 뒤 Workflow 정의가 바뀌었을 수 있습니다).");
 		}
-		WorkFlowContext.recordApproval(execution.context(), pendingStep.id(), approved, chosenRoute, approver, comment);
+		String chosen = decision;
+		if (StringUtil.isEmpty(chosen) && approved != null) {
+			chosen = approved.booleanValue() ? ApprovalStepDefinition.DECISION_APPROVED : ApprovalStepDefinition.DECISION_REJECTED;
+		}
+		Map<String, String> routes = approval.decisionRoutes();
+		if (StringUtil.isEmpty(chosen) || !routes.containsKey(chosen)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 다음 중 하나를 골라야 합니다. decision에 보내십시오: " + routes.keySet()
+				+ (StringUtil.isEmpty(chosen) ? "" : " (보낸 값: " + chosen + ")"));
+		}
+		if (approval.requiresCommentOnReject() && !ApprovalStepDefinition.DECISION_APPROVED.equals(chosen) && StringUtil.isEmpty(comment)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 " + ApprovalStepDefinition.DECISION_APPROVED + "가 아닌 결정에 의견(comment)이 꼭 있어야 합니다.");
+		}
+		WorkFlowContext.recordApproval(execution.context(), pendingStep.id(), chosen, approver, comment);
 		return this.workFlowExecutor.run(workflow, execution);
 	}
 
 	/**
 	 * 실행이 승인 대기(WAITING_APPROVAL)로 멈춰 있으면, 지금 어떤 결정을 기다리는지 돌려줍니다. 승인 대기가 아니면 null입니다.
-	 * 승인 화면이 이 값을 보고 승인/반려 버튼을 보여 줄지, 선택지 버튼을 보여 줄지 정합니다.
+	 * 승인 화면이 이 값을 보고 고를 수 있는 결정마다 버튼을 하나씩 보여 줍니다.
 	 *
 	 * @param execution 확인할 실행입니다.
 	 */
@@ -131,8 +142,7 @@ public class WorkFlowExecutionService extends BaseService {
 		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
 			return null;
 		}
-		List<String> routes = approval.hasRoutes() ? new ArrayList<>(approval.routes().keySet()) : new ArrayList<>();
-		return new PendingApproval(approval.id(), approval.approverRole(), routes);
+		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact());
 	}
 
 	/**
@@ -191,8 +201,8 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param caller     이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
 	 * @param input      Workflow를 호출할 때 넘겨받은 값입니다.
 	 */
-	private WorkFlowExecution newExecution(String workflowId, String sessionId, String caller, Object input) {
-		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflowId, caller, sessionId, WorkFlowContext.create(input));
+	private WorkFlowExecution newExecution(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
+		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflow.id(), caller, sessionId, WorkFlowContext.create(input, workflow.id(), workflow.version()));
 	}
 
 }

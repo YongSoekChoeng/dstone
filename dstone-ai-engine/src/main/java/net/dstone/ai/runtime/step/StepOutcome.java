@@ -1,16 +1,12 @@
 package net.dstone.ai.runtime.step;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-
-import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
 
 /**
  * <pre>
  * step 하나를 실행한 결과입니다. 각 StepExecutor가 만들어 돌려주고, runtime.workflow.WorkFlowExecutor가
- * 컨텍스트의 steps.{stepId}에 그대로 남깁니다(toRecord()). 그래서 이 record의 input/output/error가 곧
- * 다음 step들이 "${ .steps.id.input }", "${ .steps.id.output }", "${ .steps.id.error }"로 꺼내 쓰는 값입니다. 그 밖의 숨은 값은 없습니다.
+ * 그 step의 output에 적힌 대로 state에 저장합니다(WorkFlowContext.saveOutput()). 이 record의 input/output/error가
+ * step의 output에 적는 input / result / error입니다. 그 밖의 숨은 값은 없습니다.
  *
  * StepExecutor는 success()/failure()/routed()/waitingApproval()로 결과만 만들고, 실제로 넘긴 입력(input)과 걸린 시간(durationMs)은
  * WorkFlowExecutor가 withCall()로 채웁니다. forEach step의 결과는 WorkFlowExecutor가 반복별 결과를 모아 forEach()로 만듭니다.
@@ -21,7 +17,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
  * @param input      이 step이 실제로 받은 입력입니다(표현식을 계산한 뒤의 값. 글자, 맵 등).
  * @param output     이 step이 돌려준 값입니다(Agent output 모양, Tool 응답, 엔진이 정한 모양 등). 없으면 null입니다.
  * @param error      실패 사유입니다. 성공이면 null입니다.
- * @param route      ROUTER step에서 LLM이, routes를 적은 APPROVAL step에서 사람이 고른 경로 이름입니다. 그 밖에는 null입니다(다음 step을 정할 때만 쓰고 컨텍스트에는 output.route로 남습니다).
+ * @param route      ROUTER step에서 LLM이, APPROVAL step에서 사람이 고른 경로 이름입니다. 그 밖에는 null입니다(다음 step을 정할 때 씁니다).
  * @param durationMs 이 step을 처리하는 데 걸린 시간(밀리초)입니다. 실행 이력에 남깁니다.
  */
 public record StepOutcome(
@@ -44,10 +40,10 @@ public record StepOutcome(
 	}
 
 	/**
-	 * 경로를 골랐을 때 씁니다(ROUTER step은 LLM이, routes를 적은 APPROVAL step은 사람이 고릅니다).
+	 * 경로를 골랐을 때 씁니다(ROUTER step은 LLM이, APPROVAL step은 사람이 고릅니다).
 	 * 그 route를 실제로 어느 step으로 이어줄지는 runtime.workflow.WorkFlowExecutor가 그 step의 routes를 보고 정합니다.
 	 *
-	 * @param output 이 step이 돌려준 값입니다(ROUTER는 {route, reason}, APPROVAL은 {route, approver, comment}).
+	 * @param output 이 step이 돌려준 값입니다(ROUTER는 {route, reason}, APPROVAL은 {decision, approver, comment}).
 	 * @param route  고른 경로 이름입니다.
 	 */
 	public static StepOutcome routed(Object output, String route) {
@@ -91,17 +87,6 @@ public record StepOutcome(
 	 */
 	public StepOutcome withCall(Object input, long durationMs) {
 		return new StepOutcome(this.success, this.pending, input, this.output, this.error, this.route, durationMs);
-	}
-
-	/**
-	 * 컨텍스트의 steps.{stepId}에 남길 모양({input, output, error})으로 바꿉니다.
-	 */
-	public Map<String, Object> toRecord() {
-		Map<String, Object> record = new LinkedHashMap<>();
-		record.put(Context.FIELD_INPUT, this.input);
-		record.put(Context.FIELD_OUTPUT, this.output);
-		record.put(Context.FIELD_ERROR, this.error);
-		return record;
 	}
 
 }

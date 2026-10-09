@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-source-investigator-agent output",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "question에 대한 답(5줄 이내)"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "근거 목록(파일 절대경로 | 클래스.메서드 또는 쿼리ID | 줄 번호 | 설명). 찾지 못한 것은 \"미발견 | 찾은 글자 | 찾은 범위\""
+    },
+    "excerpts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "소스 구간 발췌. 항목마다 첫 줄은 \"파일 절대경로:시작줄-끝줄\", 다음 줄부터 readFileLines가 준 줄 번호 붙은 내용 그대로. 구간 하나 40줄 이내, 8개 이내"
+    }
+  },
+  "required": [
+    "summary",
+    "findings"
+  ]
+}

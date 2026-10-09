@@ -12,10 +12,10 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
  * <pre>
- * type: AGENT step(AgentStepDefinition)을 실행합니다. ref에 적힌 Agent를 한 번 부르고, 채워진 input을 넣습니다.
+ * type: AGENT step(AgentStepDefinition)을 실행합니다. agent에 적힌 Agent를 한 번 부르고, 채워진 input을 넣습니다.
  * 받는 값과 돌려주는 값의 모양은 Agent가 정합니다(agents/*.yml 의 input/output).
  *
- *   Agent output         steps.id.output에 남는 값         실패하는 경우
+ *   Agent output         step의 result가 되는 값           실패하는 경우
  *   string(기본)         LLM 답변 원문(글자)               input이 Agent input 모양이 아님
  *   object 등            output 모양대로 읽은 값(맵 등)      위 경우 + LLM이 output 모양을 지키지 않음
  *
@@ -34,7 +34,7 @@ public class AgentStepExecutor {
 
 	/**
 	 * <pre>
-	 * AGENT step 하나를 실행합니다. ref의 Agent를 찾고(caller가 쓸 수 있는 Agent인지도 함께 검사합니다),
+	 * AGENT step 하나를 실행합니다. agent에 적힌 Agent를 찾고(caller가 쓸 수 있는 Agent인지도 함께 검사합니다),
 	 * Agent의 답을 output으로 남깁니다.
 	 *
 	 * 넣은 값이나 LLM의 답이 Agent 계약과 맞지 않으면 실패로 처리합니다(onFailure를 따릅니다).
@@ -46,7 +46,7 @@ public class AgentStepExecutor {
 	 * @param input           표현식을 계산해 채운 input입니다(Agent input 모양).
 	 */
 	public StepOutcome run(WorkFlowExecution execution, AgentStepDefinition step, Object input) {
-		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
+		AgentDefinition agent = this.agentRegistry.resolve(step.agent(), execution.caller());
 		try {
 			
 			return StepOutcome.success(
@@ -58,7 +58,7 @@ public class AgentStepExecutor {
 					, input								// input. Agent에게 넣을 값(Agent input 모양)
 					, null								// ragOverride 이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 					, null								// toolsOverride false면 이번 호출만 Tool 없이 부름(null이면 Agent의 tools 목록 그대로)
-					, null								// modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+					, null								// modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 					, null								// engineRule 엔진 규칙에 덧붙일 문구. AGENT step은 공통 규칙만 씁니다
 				)
 			);

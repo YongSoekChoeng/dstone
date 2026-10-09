@@ -19,7 +19,6 @@
 		<spring-ai.version>2.0.1</spring-ai.version>
 		<!-- Spring AI 2.0.1(spring-ai-client-chat)이 쓰는 버전과 같게 둔다. Spring AI를 올리면 함께 확인한다. -->
 		<json-schema-validator.version>3.0.1</json-schema-validator.version>
-		<jackson-jq.version>1.6.5</jackson-jq.version>
 	</properties>
 
 	<repositories>
@@ -105,14 +104,6 @@
 					<artifactId>jackson-dataformat-yaml</artifactId>
 				</exclusion>
 			</exclusions>
-		</dependency>
-
-		<!-- Workflow YAML의 "${ jq 식 }" 표현식을 해석합니다(common.schema.ExpressionEvaluator).
-		     엔진 코드가 쓰는 Jackson 2(com.fasterxml) JsonNode 위에서 동작하는 1.x 라인을 씁니다. -->
-		<dependency>
-			<groupId>net.thisptr</groupId>
-			<artifactId>jackson-jq</artifactId>
-			<version>${jackson-jq.version}</version>
 		</dependency>
 
 		<!-- RAG: 찾은 문서 조각을 프롬프트에 끼워 넣는 ChatClient Advisor(RetrievalAugmentationAdvisor / ContextualQueryAugmenter)를

@@ -1,0 +1,417 @@
+{
+ "analysis": {
+  "background": "FAQ 메뉴를 새로 만든다",
+  "scope": [
+   {
+    "item": "FAQ 목록",
+    "frs": [
+     "FR-01"
+    ]
+   },
+   {
+    "item": "FAQ | 상세\n보기",
+    "frs": []
+   }
+  ],
+  "requirements": [
+   {
+    "id": "FR-01",
+    "title": "목록 조회",
+    "given": "로그인",
+    "when": "메뉴 클릭",
+    "then": "목록이 보인다"
+   },
+   {
+    "id": "FR-02",
+    "title": "상세",
+    "then": "상세가 보인다"
+   }
+  ],
+  "nonFunctional": [],
+  "outOfScope": [
+   "수정/삭제"
+  ],
+  "layers": [
+   {
+    "layer": "Controller",
+    "referencePath": "/src/board/BoardController.java",
+    "symbol": "BoardController.list",
+    "decision": "신규",
+    "reason": "새 URL"
+   },
+   {
+    "layer": "설정 등록",
+    "decision": "필요 없음"
+   }
+  ],
+  "targets": [
+   {
+    "path": "/src/faq/FaqController.java",
+    "changeType": "신규",
+    "referencePath": "/src/board/BoardController.java",
+    "change": "목록만 남긴다",
+    "frs": [
+     "FR-01"
+    ]
+   },
+   {
+    "path": "/src/sql/create.sql",
+    "changeType": "수정",
+    "referencePath": "",
+    "change": "테이블 추가",
+    "frs": [
+     "FR-09"
+    ]
+   },
+   {
+    "path": "/src/faq/FaqController.java",
+    "changeType": "신규",
+    "referencePath": "/src/board/missing.jsp",
+    "change": "중복",
+    "frs": [
+     "FR-01"
+    ]
+   },
+   {
+    "path": "/src/faq/faq.xml",
+    "changeType": "신규",
+    "change": "새 쿼리",
+    "frs": []
+   },
+   {
+    "path": "/src/menu.sql",
+    "changeType": "수정",
+    "change": "메뉴 등록",
+    "frs": [
+     "FR-01"
+    ]
+   },
+   {
+    "path": "/src/faq/FaqList.jsp",
+    "changeType": "신규",
+    "referencePath": "/src/board/BoardController.java",
+    "change": "화면",
+    "frs": [
+     "FR-01"
+    ]
+   },
+   {
+    "path": "/src/faq/FaqVo.java",
+    "changeType": "신규",
+    "referencePath": "/src/board/BoardController.java",
+    "change": "VO",
+    "frs": [
+     "FR-01"
+    ]
+   },
+   {
+    "path": "/src/faq/FaqDao.java",
+    "changeType": "신규",
+    "referencePath": "/src/board/BoardController.java",
+    "change": "DAO",
+    "frs": [
+     "FR-01"
+    ]
+   }
+  ],
+  "sharedNames": [
+   {
+    "what": "테이블",
+    "name": "TB_FAQ",
+    "from": "TB_BOARD"
+   },
+   {
+    "what": "URL",
+    "name": "/faq/list.do"
+   }
+  ],
+  "impacts": [
+   "메뉴 화면"
+  ],
+  "risks": [],
+  "questions": [
+   "컬럼을 더 둘까요?"
+  ]
+ },
+ "reference": {
+  "sourceRoot": "/src",
+  "featureName": "FAQ",
+  "existing": "없음",
+  "referenceName": "샘플 게시판",
+  "entry": "list.do → BoardController.list",
+  "files": [
+   {
+    "layer": "Controller",
+    "path": "/src/board/BoardController.java"
+   },
+   {
+    "layer": "화면",
+    "path": "/src/board/missing.jsp"
+   },
+   {
+    "layer": "Controller",
+    "path": "/src/board/BoardController.java"
+   },
+   {
+    "layer": "테이블",
+    "path": "/src/sql/create.sql"
+   }
+  ],
+  "questions": [
+   "참고 질문 1"
+  ]
+ },
+ "refExists": [
+  true,
+  false,
+  true,
+  true
+ ],
+ "targetExists": [
+  true,
+  true,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false
+ ],
+ "sources": {
+  "/src/board/BoardController.java": "class BoardController {\r\n  void list() {}\r\n  void update() {}\r\n}\r\n",
+  "/src/sql/create.sql": "CREATE TABLE TB_BOARD (ID INT);\nCREATE TABLE TB_X (ID INT);\n"
+ },
+ "designs": [
+  {
+   "path": "/src/faq/FaqController.java",
+   "changeType": "신규",
+   "referencePath": "/src/board/BoardController.java",
+   "summary": "컨트롤러",
+   "renames": [
+    {
+     "what": "클래스",
+     "from": "BoardController",
+     "to": "FaqController"
+    },
+    {
+     "from": "board",
+     "to": "faq"
+    }
+   ],
+   "removes": [
+    "update 메서드"
+   ],
+   "adds": [
+    {
+     "where": "list 아래",
+     "content": "void faq() {}"
+    }
+   ],
+   "frs": [
+    "FR-01"
+   ],
+   "verify": "목록 호출",
+   "questions": [
+    "권한은?"
+   ]
+  },
+  null,
+  {
+   "path": "/src/sql/create.sql",
+   "changeType": "수정",
+   "summary": "DDL",
+   "edits": [
+    {
+     "location": "TB_BOARD 아래",
+     "before": "CREATE TABLE TB_BOARD (ID INT);",
+     "after": "CREATE TABLE TB_BOARD (ID INT);\nCREATE TABLE TB_FAQ (ID INT);",
+     "reason": "새 테이블"
+    },
+    {
+     "location": "끝",
+     "after": "-- end",
+     "append": true
+    },
+    {
+     "location": "끝2",
+     "after": "\n-- end2",
+     "append": true
+    },
+    {
+     "location": "없는 곳",
+     "before": "CREATE TABLE NOPE",
+     "after": "x"
+    },
+    {
+     "location": "두 번",
+     "before": "CREATE TABLE",
+     "after": "y"
+    },
+    {
+     "location": "빈 것",
+     "before": "",
+     "after": "z"
+    }
+   ],
+   "frs": [
+    "FR-09"
+   ]
+  },
+  {
+   "path": "/src/faq/faq.xml",
+   "changeType": "신규",
+   "referencePath": "",
+   "summary": "쿼리",
+   "adds": [
+    {
+     "where": "전체",
+     "content": "<mapper>"
+    },
+    {
+     "where": "끝",
+     "content": "</mapper>"
+    }
+   ]
+  },
+  {
+   "path": "/src/menu.sql",
+   "changeType": "수정",
+   "summary": "메뉴",
+   "edits": []
+  },
+  {
+   "path": "/src/faq/FaqList.jsp",
+   "changeType": "신규",
+   "referencePath": "/src/board/BoardController.java",
+   "summary": "화면",
+   "renames": [],
+   "adds": [
+    {
+     "where": "a",
+     "content": "b"
+    }
+   ]
+  },
+  {
+   "path": "/src/faq/FaqVo.java",
+   "changeType": "신규",
+   "referencePath": "/src/board/BoardController.java",
+   "summary": "VO"
+  },
+  {
+   "path": "/src/faq/FaqDao.java",
+   "changeType": "신규",
+   "referencePath": "/src/board/BoardController.java",
+   "summary": "DAO",
+   "removes": [
+    "x"
+   ]
+  },
+  {
+   "path": "/src/faq/Empty.java",
+   "changeType": "신규",
+   "summary": "아무것도 없음"
+  }
+ ],
+ "designError": "newDesign[1]: 모양이 틀림",
+ "request": "요청서 내용",
+ "designFeedback": "- 설계를 만들지 못한 파일이 있습니다: newDesign[1]: 모양이 틀림\n- 신규 파일인데 본뜰 참고 파일도 넣을 내용도 없습니다: /src/faq/Empty.java\n- 수정 파일인데 바꿀 곳이 없습니다: /src/menu.sql\n- 변경 전이 지금 파일에 0번 나옵니다(정확히 한 번이어야 합니다): /src/sql/create.sql / 없는 곳\n- 변경 전이 지금 파일에 2번 나옵니다(정확히 한 번이어야 합니다): /src/sql/create.sql / 두 번\n- 파일 끝에 덧붙이는 변경이 아닌데 변경 전이 비어 있습니다: /src/sql/create.sql / 빈 것\n이름을 고쳐라",
+ "copyResults": [
+  "복사했습니다. 파일은 전체 100자입니다: /src/faq/FaqController.java",
+  "실패: 대상 파일이 이미 있어서 복사하지 않았습니다: /src/faq/FaqList.jsp",
+  "복사했습니다. 파일은 전체 5자입니다: /src/faq/FaqVo.java",
+  "복사했습니다. 파일은 전체 7자입니다: /src/faq/FaqDao.java"
+ ],
+ "createResults": [
+  "저장했습니다. 파일은 전체 20자입니다: /src/faq/faq.xml",
+  "저장했습니다. 파일은 전체 0자입니다"
+ ],
+ "editResults": [
+  "고쳤습니다",
+  "실패: oldText를 파일에서 찾지 못했습니다",
+  "실패: oldText가 파일에 2번 나옵니다",
+  "실패: oldText가 비어 있습니다"
+ ],
+ "appendResults": [
+  "이어 붙였습니다",
+  "이어 붙였습니다"
+ ],
+ "developInputs": [
+  {
+   "design": {
+    "path": "/src/faq/FaqController.java",
+    "changeType": "신규",
+    "referencePath": "/src/board/BoardController.java",
+    "summary": "컨트롤러",
+    "renames": [
+     {
+      "what": "클래스",
+      "from": "BoardController",
+      "to": "FaqController"
+     },
+     {
+      "from": "board",
+      "to": "faq"
+     }
+    ],
+    "removes": [
+     "update 메서드"
+    ],
+    "adds": [
+     {
+      "where": "list 아래",
+      "content": "void faq() {}"
+     }
+    ],
+    "frs": [
+     "FR-01"
+    ],
+    "verify": "목록 호출",
+    "questions": [
+     "권한은?"
+    ]
+   },
+   "source": "1: class FaqController {\n2:   void list() {}\n"
+  },
+  {
+   "design": {
+    "path": "/src/faq/FaqDao.java",
+    "changeType": "신규",
+    "referencePath": "/src/board/BoardController.java",
+    "summary": "DAO",
+    "removes": [
+     "x"
+    ]
+   },
+   "source": "1: x"
+  }
+ ],
+ "developResults": [
+  {
+   "edits": [
+    {
+     "action": "delete",
+     "startLine": 3,
+     "startText": "void update"
+    }
+   ],
+   "summary": "update를 뺐다",
+   "questions": [
+    "정말 빼나요?"
+   ]
+  },
+  null
+ ],
+ "applyResults": [
+  "고쳤습니다(1곳). 파일은 4줄에서 3줄이 됐습니다: /src/faq/FaqController.java\n주의: 괄호의 짝이 고치기 전과 달라졌습니다(중괄호)."
+ ],
+ "errors": [
+  "newCopy[1]: 실패: 대상 파일이 이미 있어서",
+  null,
+  "newEdit[1]: 실패",
+  null,
+  null,
+  "newDevelop[1]: 호출 실패",
+  null
+ ]
+}

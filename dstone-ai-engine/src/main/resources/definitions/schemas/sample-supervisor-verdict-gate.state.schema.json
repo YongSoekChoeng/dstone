@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-supervisor-verdict-gate.state",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "draft": {
+      "type": "string",
+      "description": "draft step이 만든 글"
+    },
+    "verdict": {
+      "type": "object",
+      "description": "judge step의 판정",
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

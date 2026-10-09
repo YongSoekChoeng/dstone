@@ -47,6 +47,15 @@ data:
                 # chat:
                 #     options:
                 #         model: claude-sonnet-4-5-20250929
+
+    dstone:
+        ai:
+            # 모델 라우팅. definitions/agents/*.yml의 model.routing에 적은 이름을 실제 모델 이름으로 바꿔 준다.
+            # Agent가 적은 routing 이름이 여기에 없으면 엔진이 켜지지 않는다(conf/application.yml의 같은 항목 참고).
+            # 모델 이름은 이 Pod가 쓰는 provider(위의 anthropic)에서 쓸 수 있는 이름이어야 한다.
+            model:
+                routing:
+                    sample-override: claude-haiku-4-5-20251001
   log4j2.xml: |
     <?xml version="1.0" encoding="UTF-8"?>
     <Configuration>

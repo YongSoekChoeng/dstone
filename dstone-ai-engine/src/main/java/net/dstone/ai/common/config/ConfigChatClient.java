@@ -1,5 +1,6 @@
 package net.dstone.ai.common.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -165,12 +166,14 @@ public class ConfigChatClient {
 	 *
 	 * @param model     이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.
 	 * @param reasoning 이번 호출의 추론 세기입니다(none/low/medium/high). 비어 있으면 provider와 모델의 기본 동작을 씁니다.
+	 * @param temperature 이번 호출의 temperature입니다. 비어 있으면 provider 설정값을 씁니다.
+	 * @param timeoutSeconds 이번 호출이 답을 기다리는 시간(초)입니다. 비어 있으면 provider 설정값을 씁니다. 지금은 provider가 openai일 때만 적용됩니다.
 	 */
-	public ChatOptions.Builder<?> requestOptions(String model, String reasoning) {
+	public ChatOptions.Builder<?> requestOptions(String model, String reasoning, Double temperature, Integer timeoutSeconds) {
 		String provider = configProperty.getProperty("spring.ai.model.chat");
 		ChatOptions.Builder<?> options = null;
 		if ("openai".equals(provider)) {
-			options = this.openAiOptions(reasoning);
+			options = this.openAiOptions(reasoning, timeoutSeconds);
 		} else if ("ollama".equals(provider)) {
 			options = this.ollamaOptions(reasoning);
 		} else if ("anthropic".equals(provider)) {
@@ -182,17 +185,28 @@ public class ConfigChatClient {
 			}
 			options = options.model(model);
 		}
+		if (temperature != null) {
+			if (options == null) {
+				options = ChatOptions.builder();
+			}
+			options = options.temperature(temperature);
+		}
 		return options;
 	}
 
-	/** openai용 옵션입니다. 응답 대기 시간과 추론 세기를 넣습니다. 넣을 것이 없으면 null입니다. */
-	private ChatOptions.Builder<?> openAiOptions(String reasoning) {
+	/**
+	 * openai용 옵션입니다. 응답 대기 시간과 추론 세기를 넣습니다. 넣을 것이 없으면 null입니다.
+	 * 응답 대기 시간은 Agent가 적은 값(execution.timeoutSeconds)이 있으면 그 값을, 없으면 spring.ai.openai.timeout을 씁니다.
+	 */
+	private ChatOptions.Builder<?> openAiOptions(String reasoning, Integer timeoutSeconds) {
 		String timeout = configProperty.getProperty("spring.ai.openai.timeout");
-		if (StringUtil.isEmpty(timeout) && StringUtil.isEmpty(reasoning)) {
+		if (StringUtil.isEmpty(timeout) && timeoutSeconds == null && StringUtil.isEmpty(reasoning)) {
 			return null;
 		}
 		OpenAiChatOptions.Builder options = OpenAiChatOptions.builder();
-		if (!StringUtil.isEmpty(timeout)) {
+		if (timeoutSeconds != null) {
+			options.timeout(Duration.ofSeconds(timeoutSeconds.longValue()));
+		} else if (!StringUtil.isEmpty(timeout)) {
 			options.timeout(DurationStyle.detectAndParse(timeout.trim()));
 		}
 		if (!StringUtil.isEmpty(reasoning)) {

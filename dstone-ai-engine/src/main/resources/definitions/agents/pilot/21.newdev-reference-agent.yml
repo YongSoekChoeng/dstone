@@ -1,0 +1,28 @@
+# 신규 개발 경로의 첫 Agent입니다. "무엇을 본떠 만들지"(참고 구현)를 고르고, 그 기능을 이루는 파일의 경로만 모읍니다.
+#
+# 파일 내용은 읽지 않습니다. 이 Agent가 낸 경로 목록(files)을 Workflow의 TOOL step(newPack)이 LLM 없이 한꺼번에 읽어 두고,
+# 뒤의 Agent들은 그 내용을 input으로 받습니다. 예전에는 요구사항, 영향도, 리뷰, 설계, 개발 Agent가 참고 구현의 같은 파일을
+# 각자 다시 열었습니다(신규 FAQ 요청 한 건에 조회 91번, 20분).
+#
+# prompt에 [조회 한도]를 적지 않았습니다. 횟수는 엔진이 셉니다(execution.maxToolCalls). 한도가 가까워지면 엔진이 Tool 결과 끝에
+# "N번 남았다"고 알려 주고, 다 쓰면 Tool을 실행하지 않습니다.
+agent:
+  id: pilot-newdev-reference-agent
+  version: "1.0.0"
+  description: 신규 개발 - 참고 구현을 고르고 그 파일 경로를 모은다(파일 내용은 읽지 않는다).
+  prompt:
+    system: prompts/pilot-newdev-reference-agent/v1.st
+  input:
+    schema: schemas/pilot-newdev-reference-agent.input.schema.json
+  output:
+    format: JSON
+    schema: schemas/pilot-newdev-reference-agent.output.schema.json
+    validation: STRICT
+  tools:
+    allowed: [knowledgeSearch, knowledgeFindMethods, knowledgeCallees, searchInFiles, readFileListAll, isFileExist]
+  execution:
+    # 엔진이 세는 Tool 호출 한도. 정상이면 6~8번(이미 있는지 1, 참고 구현 2, 등록된 곳 3~5)으로 끝난다.
+    maxToolCalls: 15
+  # model.reasoning을 적지 않았다(모델 기본 동작). 이 Agent는 Tool 결과를 보고 다음에 무엇을 찾을지 정해야 해서 추론이 필요하다.
+  # 재 본 것(2026-10-08, OpenRouter qwen/qwen3.8-27b, testApp의 "FAQ 신규" 요청): 기본 동작은 Tool 7번, 4분 42초에 파일 9개를
+  # 빠짐없이 찾았고, none으로 끄니 같은 조회를 되풀이하다 한도 15번을 다 쓰고 실패했다.

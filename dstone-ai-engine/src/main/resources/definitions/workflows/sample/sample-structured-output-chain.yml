@@ -1,0 +1,48 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 output을 object로 선언한 Agent(sample-structured-extract-agent, output: {sql})의 답을,
+# 뒤이은 TOOL step이 ${state.extracted.sql}로 이름을 콕 집어 가져다 쓰는 흐름을 확인해보기 위한
+# 테스트 전용 Workflow입니다.
+#
+# 동작 흐름
+# 1) extract: 요청의 input(글자)에서 SQL 문 하나를 뽑아냅니다. 답의 모양은 Agent가 정합니다 -
+#    LLM은 {"sql": "..."} 모양의 JSON으로만 답해야 하고, 이 모양을 지키지 않으면 extract가 실패합니다.
+#    extract는 그 답을 state.extracted에 저장합니다(output: {result: state.extracted}).
+# 2) validate: ${state.extracted.sql}을 validateSqlSyntax의 sql 인자로 넘겨 문법을 검사합니다.
+# 3) 성공하면 Workflow의 output(${state.extracted.sql}) - 뽑아내서 검증까지 통과한 SQL - 을 돌려줍니다.
+#    output.schema로 결과가 글자인지도 마지막에 한 번 더 검사합니다.
+#
+# ${state.extracted.sql}이라는 참조가 올바른지(state.extracted에 저장하는 step이 있는지, 그 step이 부르는 Agent의 output에
+# sql이 있는지)는 엔진이 켜질 때 common.registry.WorkFlowRegistry가 미리 검사합니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-structured-output-chain
+#   input     : 이 테이블에서 이름이 김철수인 사람을 찾고 싶어. SELECT * FROM member WHERE name = '김철수' 이렇게 쓰면 되지?
+workflow:
+  id: sample-structured-output-chain
+  version: "1.0.0"
+  description: output을 object로 선언한 Agent의 답을 state에 저장하고, 다음 TOOL step이 그 안의 필드(state.extracted.sql)를 읽는 흐름 확인용 Workflow.
+  input: string
+  settings:
+    maxIterations: 3
+  output:
+    value: "${state.extracted.sql}"
+    schema: string
+  steps:
+
+    - id: extract
+      type: AGENT
+      agent: sample-structured-extract-agent
+      input: "${input}"
+      output:
+        result: "state.extracted"
+      next: validate
+      onFailure: FAIL
+
+    - id: validate
+      type: TOOL
+      tool: validateSqlSyntax
+      input:
+        sql: "${state.extracted.sql}"
+      next: END
+      onFailure: FAIL

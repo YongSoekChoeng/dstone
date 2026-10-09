@@ -26,7 +26,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * 4) 성공/실패 판정: output이 runtime.tool.ToolOutcome 모양({"success":..., "message":...})이면 success 값으로,
  *    글자면 그 글자가 "실패"(Constants.Outcome.FAIL_PREFIX)로 시작하는지로 판정합니다. 그 밖의 모양은 성공입니다.
  *    실패면 ToolOutcome의 message(없으면 응답 글자)를 실패 사유(error)로 남깁니다.
- *    onFailure로 이동한 step은 "${ .steps.id.error }"로 실패 이유를, "${ .steps.id.input.인자명 }"으로 실패한 입력값을 읽을 수 있습니다.
+ *    실패 이유(error)와 실패한 입력값(input.인자명)은 이 step의 output에 저장 위치를 적어 두면 onFailure로 이동한 step이 "${state.이름}"으로 읽을 수 있습니다.
  * </pre>
  */
 @Component
@@ -48,7 +48,7 @@ public class ToolStepExecutor {
 	 */
 	@SuppressWarnings("unchecked")
 	public StepOutcome run(WorkFlowExecution execution, ToolStepDefinition step, Map<String, Object> arguments) {
-		String toolResult = this.toolExecutor.call(execution.caller(), step.ref(), this.toJson(arguments));
+		String toolResult = this.toolExecutor.call(execution.caller(), step.tool(), this.toJson(arguments));
 		Object output = this.parse(toolResult);
 
 		if (output instanceof Map && ((Map<String, Object>) output).get("success") instanceof Boolean success) {

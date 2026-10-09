@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-supervisor-verdict-gate.input",
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "draft step Agent에게 보낼 요청"
+    },
+    "role": {
+      "type": "string",
+      "description": "draft step Agent(sample-role-reply-agent)의 역할"
+    }
+  },
+  "required": [
+    "message",
+    "role"
+  ]
+}

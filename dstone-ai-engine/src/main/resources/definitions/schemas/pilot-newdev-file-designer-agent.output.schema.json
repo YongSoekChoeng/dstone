@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-file-designer-agent output",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "설계한 파일의 절대경로. target의 path를 그대로 적는다"
+    },
+    "changeType": {
+      "type": "string",
+      "enum": [
+        "신규",
+        "수정"
+      ]
+    },
+    "referencePath": {
+      "type": "string",
+      "description": "본뜰 참고 파일의 절대경로. target의 referencePath를 그대로 적는다. 없으면 빈 글자"
+    },
+    "summary": {
+      "type": "string",
+      "description": "이 파일에서 하는 일 한두 줄"
+    },
+    "renames": {
+      "type": "array",
+      "description": "신규 파일 - 참고 파일에서 바뀌는 이름",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "참고 파일에 있는 글자"
+          },
+          "to": {
+            "type": "string",
+            "description": "새 파일에서 쓸 글자"
+          },
+          "what": {
+            "type": "string",
+            "description": "무엇의 이름인지(클래스, 메서드, URL, 쿼리ID, 테이블 등)"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    "removes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "신규 파일 - 참고 파일에서 빼는 것"
+    },
+    "adds": {
+      "type": "array",
+      "description": "신규 파일 - 참고 파일에 없어서 글자 그대로 넣는 내용",
+      "items": {
+        "type": "object",
+        "properties": {
+          "where": {
+            "type": "string",
+            "description": "넣을 자리"
+          },
+          "content": {
+            "type": "string",
+            "description": "넣을 내용(글자 그대로)"
+          }
+        },
+        "required": [
+          "where",
+          "content"
+        ]
+      }
+    },
+    "edits": {
+      "type": "array",
+      "description": "수정 파일 - 바꿀 곳",
+      "items": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "위치(쿼리ID, 클래스.메서드, 무엇의 아래)"
+          },
+          "before": {
+            "type": "string",
+            "description": "지금 파일에서 글자 그대로 옮긴 변경 전. 파일 끝에 덧붙이면 빈 글자"
+          },
+          "after": {
+            "type": "string",
+            "description": "변경 후. 파일 끝에 덧붙이면 덧붙일 내용"
+          },
+          "append": {
+            "type": "boolean",
+            "description": "파일 끝에 덧붙이는 변경이면 true"
+          },
+          "reason": {
+            "type": "string",
+            "description": "이유 한 줄"
+          }
+        },
+        "required": [
+          "location",
+          "after"
+        ]
+      }
+    },
+    "frs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "이 파일의 변경이 해결하는 FR 번호"
+    },
+    "verify": {
+      "type": "string",
+      "description": "이 파일의 변경을 확인하는 방법"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "결정이 필요한 사항(없으면 빈 배열)"
+    }
+  },
+  "required": [
+    "path",
+    "changeType",
+    "summary"
+  ]
+}

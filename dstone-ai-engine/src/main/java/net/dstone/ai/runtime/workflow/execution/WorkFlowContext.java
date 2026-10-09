@@ -1,30 +1,25 @@
 package net.dstone.ai.runtime.workflow.execution;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
+import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
+import net.dstone.ai.common.expression.ContextResolver;
 
 /**
  * <pre>
- * Workflow 실행 1건의 컨텍스트(실행 중 모든 상태를 담은 트리)를 만들고 고치는 도구 모음입니다.
- * 컨텍스트 자체는 평범한 Map이라서 그대로 JSON으로 DB에 저장되고(WorkFlowExecutionStore), 실행 상세
- * 조회 API로도 그대로 보입니다. YAML의 "${ ... }" 표현식은 이 트리를 jq로 읽습니다(common.schema.JqExpEvalUtil).
- * 이름은 YAML에 적는 이름과 맞춰 두었고(workflow.input → .input, step의 input/output → .steps.id.input/output),
- * 엔진이 몰래 채워 넣는 숨은 이름은 없습니다. approvals는 엔진 내부용이라 표현식에는 보이지 않습니다.
+ * Workflow 실행 컨텍스트(WorkFlowExecution.context 맵)를 다루는 도우미입니다. 컨텍스트는 아래 모양의 트리 하나입니다.
  *
- * input:                    ← 요청의 input 그대로(workflow.input 모양). 시작할 때 한 번 채워지고 바뀌지 않음
- *   requirement: "..."
- * steps:                    ← step이 끝날 때마다 자기 id 아래에 결과를 남김(같은 step이 다시 돌면 덮어씀)
- *   analyze:
- *     input:  "계산된 입력"   ← YAML step의 input 표현식을 계산한 값
- *     output: { ... }        ← 부른 Agent/Tool이 돌려준 값(Agent output 모양)
- *     error:  null
- *   validateEach:           ← forEach step은 input/output이 반복별 값의 리스트
- *     input:  [ {...}, {...} ]
- *     output: [ ..., ... ]
- * approvals:                ← APPROVAL step별 사람의 결정(엔진 내부용)
- *   designReview: { approved, approver, comment }
+ *   input:      요청의 input 값 그대로
+ *   state:      step이 output으로 저장한 값들({ 이름: 값 })
+ *   approvals:  { stepId: { decision, approver, comment } }   아직 쓰지 않은 승인 결정(엔진 내부용)
+ *   definition: { id, version }                               이 실행을 시작한 Workflow 정의
+ *
+ * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 output에 적힌 대로 state에 저장하고(saveOutput()),
+ * 뒤의 step은 "${state.이름}"으로 읽습니다(common.expression.ContextResolver).
+ * 이 맵은 실행 상태와 함께 DB에 JSON으로 저장되므로, 승인 대기로 멈췄다가 이어서 실행해도 그대로 남아 있습니다.
  * </pre>
  */
 public final class WorkFlowContext {
@@ -33,72 +28,122 @@ public final class WorkFlowContext {
 	}
 
 	/**
-	 * <pre>
-	 * 새 실행의 컨텍스트를 만듭니다. 요청의 input은 그대로 input 아래에 들어갑니다.
-	 * </pre>
+	 * 새 실행의 컨텍스트를 만듭니다. state는 비어 있습니다.
 	 *
-	 * @param input 실행 요청의 input입니다(workflow.input 모양으로 이미 검사된 값).
+	 * @param input           실행 요청의 input 값
+	 * @param workflowId      실행할 Workflow의 id
+	 * @param workflowVersion 실행할 Workflow 정의의 버전
 	 */
-	public static Map<String, Object> create(Object input) {
+	public static Map<String, Object> create(Object input, String workflowId, String workflowVersion) {
+		Map<String, Object> definition = new LinkedHashMap<>();
+		definition.put("id", workflowId);
+		definition.put("version", workflowVersion);
 		Map<String, Object> context = new LinkedHashMap<>();
 		context.put(Context.INPUT, input);
-		context.put(Context.STEPS, new LinkedHashMap<String, Object>());
+		context.put(Context.STATE, new LinkedHashMap<String, Object>());
+		context.put(Context.DEFINITION, definition);
 		return context;
 	}
 
 	/**
-	 * <pre>
-	 * step 하나의 결과를 steps.{stepId}에 남깁니다.
-	 * </pre>
+	 * 이 실행을 시작한 Workflow 정의의 버전을 돌려줍니다. 기록이 없으면 null입니다.
 	 *
-	 * @param context 실행 컨텍스트입니다(이 맵을 직접 고칩니다).
-	 * @param stepId  결과를 남길 step의 id입니다.
-	 * @param record  남길 결과입니다(runtime.step.StepOutcome.toRecord()로 만든 값).
+	 * @param context 실행 컨텍스트
 	 */
 	@SuppressWarnings("unchecked")
-	public static void recordStep(Map<String, Object> context, String stepId, Map<String, Object> record) {
-		Object steps = context.get(Context.STEPS);
-		if (!(steps instanceof Map)) {
-			steps = new LinkedHashMap<String, Object>();
-			context.put(Context.STEPS, steps);
+	public static String definitionVersion(Map<String, Object> context) {
+		Object definition = context.get(Context.DEFINITION);
+		Object version = definition instanceof Map ? ((Map<String, Object>) definition).get("version") : null;
+		return version == null ? null : version.toString();
+	}
+
+	/**
+	 * 컨텍스트의 state 맵을 돌려줍니다. 없으면 만들어 넣습니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 */
+	@SuppressWarnings("unchecked")
+	public static Map<String, Object> state(Map<String, Object> context) {
+		Object state = context.get(Context.STATE);
+		if (!(state instanceof Map)) {
+			state = new LinkedHashMap<String, Object>();
+			context.put(Context.STATE, state);
 		}
-		((Map<String, Object>) steps).put(stepId, record);
+		return (Map<String, Object>) state;
 	}
 
 	/**
 	 * <pre>
-	 * APPROVAL step에 대해 사람이 내린 결정을 approvals.{stepId}에 기록합니다.
+	 * step 하나가 끝난 뒤, 그 step의 output에 적힌 대로 결과를 state에 저장합니다.
+	 *
+	 *   output:
+	 *     result: state.analysis         돌려준 값 전체
+	 *     result.sql: state.sql          돌려준 값 안의 필드 하나
+	 *     input: state.sentInput         실제로 받은 입력
+	 *     error: state.analysisError     실패 사유(성공이면 null)
+	 *
+	 * 성공이든 실패든 적힌 자리를 모두 새 값으로 덮어씁니다. 그래서 다시 실행된 step의 옛 결과가 남아 있지 않습니다.
+	 * (forEach로 여러 반복이 동시에 도는 동안에는 부르지 않습니다. 모든 반복이 끝난 뒤 한 번 부릅니다.)
 	 * </pre>
 	 *
-	 * @param context  실행 컨텍스트입니다(이 맵을 직접 고칩니다).
-	 * @param stepId   결정을 기록할 APPROVAL step의 id입니다.
-	 * @param approved 승인이면 true, 반려면 false입니다(선택지 방식이면 쓰지 않습니다).
-	 * @param route    선택지 방식(routes)일 때 사람이 고른 이름입니다. 승인/반려 방식이면 null입니다.
-	 * @param approver 결정한 사람이나 역할입니다.
-	 * @param comment  결정한 이유나 메모입니다.
+	 * @param context 실행 컨텍스트
+	 * @param mapping step의 output(무엇 → state.이름). 없으면 아무것도 하지 않습니다.
+	 * @param input   이 step이 실제로 받은 입력
+	 * @param result  이 step이 돌려준 값
+	 * @param error   실패 사유(성공이면 null)
+	 */
+	public static void saveOutput(Map<String, Object> context, Map<String, String> mapping, Object input, Object result, String error) {
+		if (mapping == null || mapping.isEmpty()) {
+			return;
+		}
+		Map<String, Object> record = new LinkedHashMap<>();
+		record.put(Output.INPUT, input);
+		record.put(Output.RESULT, result);
+		record.put(Output.ERROR, error);
+		Map<String, Object> state = state(context);
+		for (Map.Entry<String, String> entry : mapping.entrySet()) {
+			List<String> source = sourcePath(entry.getKey());
+			ContextResolver.write(state, ContextResolver.statePath(entry.getValue()), ContextResolver.read(record, source));
+		}
+	}
+
+	/**
+	 * output의 왼쪽(무엇을 저장할지)을 이름 목록으로 나눕니다. 예: "result.sql" → [result, sql]
+	 *
+	 * @param source output에 적은 이름(result, result.필드, input, input.필드, error)
+	 */
+	public static List<String> sourcePath(String source) {
+		return List.of(source.strip().split("\\."));
+	}
+
+	/**
+	 * 사람이 내린 결정을 승인 수신함에 넣어 둡니다. 이어서 실행되는 APPROVAL step이 꺼내 씁니다.
+	 *
+	 * @param context  실행 컨텍스트
+	 * @param stepId   결정을 기다리던 APPROVAL step의 id
+	 * @param decision 사람이 고른 결정 이름(그 step의 routes에 있는 이름)
+	 * @param approver 결정한 사람
+	 * @param comment  의견
 	 */
 	@SuppressWarnings("unchecked")
-	public static void recordApproval(Map<String, Object> context, String stepId, boolean approved, String route, String approver, String comment) {
+	public static void recordApproval(Map<String, Object> context, String stepId, String decision, String approver, String comment) {
 		Object approvals = context.get(Context.APPROVALS);
 		if (!(approvals instanceof Map)) {
 			approvals = new LinkedHashMap<String, Object>();
 			context.put(Context.APPROVALS, approvals);
 		}
-		Map<String, Object> decision = new LinkedHashMap<>();
-		decision.put("approved", approved);
-		decision.put("route", route);
-		decision.put("approver", approver);
-		decision.put("comment", comment);
-		((Map<String, Object>) approvals).put(stepId, decision);
+		Map<String, Object> record = new LinkedHashMap<>();
+		record.put("decision", decision);
+		record.put("approver", approver);
+		record.put("comment", comment);
+		((Map<String, Object>) approvals).put(stepId, record);
 	}
 
 	/**
-	 * <pre>
-	 * APPROVAL step에 대해 기록된 결정을 돌려줍니다. 아직 결정이 없으면 null입니다.
-	 * </pre>
+	 * 승인 수신함에서 이 step의 결정을 꺼내 봅니다. 아직 없으면 null입니다.
 	 *
-	 * @param context 실행 컨텍스트입니다.
-	 * @param stepId  결정을 찾을 APPROVAL step의 id입니다.
+	 * @param context 실행 컨텍스트
+	 * @param stepId  APPROVAL step의 id
 	 */
 	@SuppressWarnings("unchecked")
 	public static Map<String, Object> approval(Map<String, Object> context, String stepId) {
@@ -111,16 +156,10 @@ public final class WorkFlowContext {
 	}
 
 	/**
-	 * <pre>
-	 * APPROVAL step에 기록된 결정을 지웁니다. 결정을 읽어서 쓴 직후에 부릅니다.
+	 * 다 쓴 결정을 승인 수신함에서 지웁니다. 지워 두어야 같은 APPROVAL step에 다시 왔을 때 사람에게 다시 묻습니다.
 	 *
-	 * 지우는 이유: 결정을 남겨 두면, 흐름이 되돌아와 같은 APPROVAL step에 다시 왔을 때 사람에게 묻지 않고
-	 * 지난번 결정을 그대로 또 씁니다(반려 → 되돌아감 → 또 반려 → ... 로 끝없이 돕니다).
-	 * 지워 두면 다시 올 때마다 새로 묻습니다. 결정 내용은 steps.{stepId}.output에 남으므로 잃는 것은 없습니다.
-	 * </pre>
-	 *
-	 * @param context 실행 컨텍스트입니다(이 맵을 직접 고칩니다).
-	 * @param stepId  결정을 지울 APPROVAL step의 id입니다.
+	 * @param context 실행 컨텍스트
+	 * @param stepId  APPROVAL step의 id
 	 */
 	@SuppressWarnings("unchecked")
 	public static void clearApproval(Map<String, Object> context, String stepId) {

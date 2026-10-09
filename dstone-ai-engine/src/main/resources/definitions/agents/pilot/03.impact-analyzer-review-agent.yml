@@ -1,0 +1,51 @@
+# SUPERVISOR step 전용 Agent입니다. 답의 모양은 엔진이 {pass, reason}으로 정하므로 output을 적지 않습니다.
+# "판정만 하고 대상을 고쳐 쓰지 않는다"는 규칙은 엔진이 SUPERVISOR step에 항상 넣습니다(runtime.prompt.EnginePrompt).
+#
+# 이 Workflow는 불통과 뒤에 사람이 재요구분석(step01) / 재분석(step02) / 재리뷰(step03) 중에서 고릅니다.
+# 그래서 reason의 첫 줄에 "어느 문서를 고쳐야 하는지"를 적게 했습니다. 실제로 겪은 일은 이렇습니다.
+# - 요구사항이 틀렸는데 영향도 분석만 고쳐서 같은 불통과가 반복됐다.
+#   → 요구사항 정의서도 소스와 대조하고, 지적마다 '대상 문서'를 적는다.
+# - 지적이 두 문서에 걸쳐 있는데 첫 줄에는 한 문서만 적었다.
+#   → 첫 줄은 지적 표의 '대상 문서' 칸을 모아서 정한다(두 문서가 다 나오면 "둘 다").
+# - 리뷰할 때마다 새로운 사소한 지적이 나와서 통과하지 못했다.
+#   → 심각도 기준을 정해 두고, '차단'이 없으면 통과시킨다. 앞선 리뷰에 없던 경미한 지적을 새로 꺼내 불통과시키지 않는다.
+# - 줄 번호를 확인하려고 파일의 줄을 1번부터 직접 세다가, 출력 토큰 한도를 추론에 다 써서 판정을 한 글자도 쓰지 못했다.
+#   → 줄 번호는 readFileLines(줄 번호가 붙어서 나온다)로 확인하게 했다.
+# - 조사를 다 마치고도 "이 지적이 차단인가 경미인가"를 여러 번 되짚느라(줄 번호 범위의 끝이 몇 줄 어긋난 것 등)
+#   출력 토큰 한도를 추론에 다 써서 또 판정을 쓰지 못했다.
+#   → [진행 방식]을 두어 판단은 한 번만 하게 하고, 애매한 것을 어느 쪽으로 볼지 정해 두었다.
+# - 신규 개발 요청인데도 두 문서가 가리킨 파일을 전부 다시 열었다(조회 22번). 앞의 두 Agent가 이미 연 파일들이다.
+#   → 확인할 곳을 "변경 내용이 기대고 있는 사실"로 좁히고, 파일 하나는 한 번만 열게 했다.
+#     신규 개발 FR은 원인이 없으므로 원인 대신 "필요한 것이 빠지지 않았는지"를 본다.
+# - 파일을 한 번만 열게 하려고 "넉넉히 읽어라"고 했더니 300줄짜리 스크립트 파일을 통째로 읽었고, 조회는 줄었는데 시간은 더 걸렸다.
+#   → 검수는 문서가 가리킨 줄과 그 앞뒤 10줄만 읽는다.
+# - 파일 경로를 짐작해서 열었다가 없는 파일이었다(다른 폴더에 있었다).
+#   → 문서에 적힌 경로만 열고, 그 경로에 없으면 searchInFiles로 찾는다.
+#
+# 신규 개발만 있는 요청은 이 Agent를 거치지 않습니다(pilot-workflow의 신규 개발 경로는 범위, FR 매핑, 경로 확인을 코드로 합니다).
+# 여기 남아 있는 "신규 개발" 규칙은 오류 수정/기능 변경과 신규 개발이 섞인 요청을 위한 것입니다.
+agent:
+  id: pilot-impact-analyzer-review-agent
+  version: "1.0.0"
+  description: 영향도 분석 리뷰어. 요구사항 정의서와 영향도 분석서를 소스와 대조해 검수하고 통과/불통과를 판정한다.
+  model:
+    # 추론을 줄인다. 이 Agent는 조사를 다 마치고도 "차단인가 경미인가"를 되짚느라 출력 토큰 한도를 추론에 다 써서
+    # 판정을 한 글자도 쓰지 못한 적이 두 번 있다. prompt의 [진행 방식]으로 "길게 생각하지 마라"고 부탁하는 것보다
+    # 추론에 쓰는 양을 직접 줄이는 쪽이 확실하다.
+    # 주의 1: 지금 쓰는 모델(OpenRouter qwen/qwen3.8-27b)은 low/medium이 듣지 않는다(conf/application.yml의 max-tokens 주석).
+    #         이 모델에서는 이 줄이 있어도 달라지는 것이 없고, low를 받아 주는 모델로 바꿨을 때부터 듣는다.
+    # 주의 2: 그렇다고 none으로 끄지 않았다. Tool로 조사하는 Agent의 추론을 끄면 같은 조회를 되풀이했다
+    #         (2026-10-08, pilot-newdev-reference-agent: 기본 동작은 Tool 7번에 끝났고 none은 한도 15번을 다 쓰고 실패).
+    #         이 Agent로 직접 재 본 것은 아니다. [진행 방식]을 지우지 않은 것도 그래서다.
+    reasoning: low
+  prompt:
+    system: prompts/pilot-impact-analyzer-review-agent/v1.st
+  input:
+    schema: schemas/pilot-impact-analyzer-review-agent.input.schema.json
+  tools:
+    allowed: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile, appendFile]
+  execution:
+    # prompt에 [조회 한도]를 적지 않는다. 횟수는 엔진이 센다. 남은 횟수가 5분의 1 이하가 되면 엔진이 Tool 결과 끝에
+    # "N번 남았다, 지금 결과를 저장하라"고 알려 주고, 다 쓰면 Tool을 실행하지 않는다(runtime.agent.ToolCallBudgetCallback).
+    # 예전 prompt의 "조회 25번 이내"에 문서를 저장하는 호출(writeFile, appendFile)을 더한 값이다.
+    maxToolCalls: 32

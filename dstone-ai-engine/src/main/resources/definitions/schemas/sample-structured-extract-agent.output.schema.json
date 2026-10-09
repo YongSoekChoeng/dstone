@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-structured-extract-agent output",
+  "type": "object",
+  "properties": {
+    "sql": {
+      "type": "string",
+      "description": "입력 문장에서 그대로 뽑아낸 SQL 문 하나(없으면 SELECT 1)"
+    }
+  },
+  "required": [
+    "sql"
+  ]
+}

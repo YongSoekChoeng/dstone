@@ -1,8 +1,10 @@
 package net.dstone.ai.common.config;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -12,6 +14,7 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -64,6 +67,9 @@ public class ConfigTool extends BaseObject {
 
 	private ToolCallbackProvider toolCallbackProvider;
 
+	/** Workflow의 TOOL step에서만 부를 수 있는 Tool(@AiTool(stepOnly = true))의 이름들입니다. */
+	private Set<String> stepOnlyToolNames = Set.of();
+
 	/**
 	 * <pre>
 	 * 로컬 @AiTool 빈들과 ConfigMcp가 미리 접속해 둔 MCP 서버 Tool들을 모아서 하나의
@@ -74,9 +80,20 @@ public class ConfigTool extends BaseObject {
 	@PostConstruct
 	public void discover() {
 		Map<String, Object> toolBeans = applicationContext.getBeansWithAnnotation(AiTool.class);
+		// TOOL step 전용 Tool(@AiTool(stepOnly = true))은 따로 모읍니다. LLM에게 보여 주지 않고, 결과 길이 상한도 씌우지 않습니다.
+		List<Object> normalBeans = new ArrayList<>();
+		List<Object> stepOnlyBeans = new ArrayList<>();
+		for (Object bean : toolBeans.values()) {
+			AiTool annotation = AnnotationUtils.findAnnotation(bean.getClass(), AiTool.class);
+			if (annotation != null && annotation.stepOnly()) {
+				stepOnlyBeans.add(bean);
+			} else {
+				normalBeans.add(bean);
+			}
+		}
 		List<ToolCallback> merged = new ArrayList<>();
-		if (!toolBeans.isEmpty()) {
-			merged.addAll(List.of(MethodToolCallbackProvider.builder().toolObjects(toolBeans.values().toArray()).build().getToolCallbacks()));
+		if (!normalBeans.isEmpty()) {
+			merged.addAll(List.of(MethodToolCallbackProvider.builder().toolObjects(normalBeans.toArray()).build().getToolCallbacks()));
 		}
 		merged.addAll(this.configMcp.toolCallbacks());
 
@@ -86,6 +103,16 @@ public class ConfigTool extends BaseObject {
 		for (ToolCallback callback : merged) {
 			limited.add(new LimitedToolCallback(callback, maxResultChars));
 		}
+		// TOOL step 전용 Tool은 상한 없이 등록합니다(호출 로그는 똑같이 남깁니다).
+		Set<String> stepOnlyNames = new HashSet<>();
+		if (!stepOnlyBeans.isEmpty()) {
+			for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(stepOnlyBeans.toArray()).build().getToolCallbacks()) {
+				merged.add(callback);
+				limited.add(new LimitedToolCallback(callback, Integer.MAX_VALUE));
+				stepOnlyNames.add(callback.getToolDefinition().name());
+			}
+		}
+		this.stepOnlyToolNames = stepOnlyNames;
 
 		this.toolCallbackProvider = ToolCallbackProvider.from(limited.toArray(new ToolCallback[0]));
 		if (merged.isEmpty()) {
@@ -128,7 +155,7 @@ public class ConfigTool extends BaseObject {
 	 * <pre>
 	 * Agent 하나에 붙일 Tool을 골라 돌려줍니다. 두 목록을 모두 통과한 Tool만 남습니다.
 	 * - caller 화이트리스트(dstone.ai.tool.allowed-by-caller): 이 앱이 쓸 수 있는 Tool
-	 * - Agent의 tools(agents/*.yml): 이 Agent가 쓰겠다고 적은 Tool
+	 * - Agent의 tools.allowed(agents/*.yml): 이 Agent가 쓰겠다고 적은 Tool
 	 *
 	 * Agent의 tools가 비어 있으면 아무 Tool도 붙지 않습니다. "*" 하나만 적혀 있으면 caller 화이트리스트를
 	 * 통과한 Tool이 전부 붙습니다.
@@ -144,11 +171,24 @@ public class ConfigTool extends BaseObject {
 		}
 		boolean all = toolNames.contains(AgentDefinition.ALL_TOOLS);
 		for (ToolCallback callback : this.toolCallbackProvider(caller).getToolCallbacks()) {
+			// TOOL step 전용 Tool은 LLM에게 보여 주지 않습니다("*"에도 들어가지 않습니다).
+			if (this.isStepOnly(callback.getToolDefinition().name())) {
+				continue;
+			}
 			if (all || toolNames.contains(callback.getToolDefinition().name())) {
 				result.add(callback);
 			}
 		}
 		return result;
+	}
+
+	/**
+	 * 이 이름의 Tool이 Workflow의 TOOL step에서만 부를 수 있는 Tool(@AiTool(stepOnly = true))인지 봅니다.
+	 *
+	 * @param toolName Tool 이름
+	 */
+	public boolean isStepOnly(String toolName) {
+		return this.stepOnlyToolNames.contains(toolName);
 	}
 
 	/**
@@ -258,7 +298,7 @@ public class ConfigTool extends BaseObject {
 	 * "잘렸으니 범위를 좁혀 다시 호출하라"고 알려 주면 모델이 스스로 조회 범위를 줄입니다.
 	 *
 	 * 주의: JSON을 돌려주는 Tool의 결과가 잘리면 더 이상 올바른 JSON이 아닙니다. TOOL step에서는
-	 * 그 결과가 steps.&lt;id&gt;.output에 글자 그대로(text) 들어갑니다. 이런 일이 없도록 큰 결과를
+	 * 그 결과가 글자 그대로(text) step의 result가 됩니다. 이런 일이 없도록 큰 결과를
 	 * 낼 수 있는 Tool은 Tool 안에서 먼저 개수를 제한하는 것이 좋습니다(tools.utils.FileUtil 참고).
 	 * </pre>
 	 */

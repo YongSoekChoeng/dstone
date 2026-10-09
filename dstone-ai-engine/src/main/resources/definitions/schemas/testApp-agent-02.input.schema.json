@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "testApp-agent-02 input",
+  "type": "object",
+  "properties": {
+    "1. 요청 배경/목적 요약": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "2. 현재 상태(As-Is)": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "3. 제안 설계(To-Be)": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "4. 예상 영향 범위": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "5. 확인이 필요한 질문": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "1. 요청 배경/목적 요약",
+    "2. 현재 상태(As-Is)",
+    "3. 제안 설계(To-Be)"
+  ]
+}

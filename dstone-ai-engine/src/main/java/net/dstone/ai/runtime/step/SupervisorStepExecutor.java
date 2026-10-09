@@ -29,7 +29,7 @@ import net.dstone.common.utils.StringUtil;
  * LLM에게는 "판정만 하고 대상을 고쳐 쓰지 말라"는 엔진 규칙(runtime.prompt.EnginePrompt.SUPERVISOR)을 함께 보냅니다.
  * Agent의 prompt가 이 규칙을 빠뜨려도 SUPERVISOR step이면 항상 들어갑니다.
  *
- * 판정 사유는 다음 step이 필요할 때 "${ .steps.id.output.reason }"이나 "${ .steps.id.error }"로 꺼내 씁니다.
+ * 판정 사유는 이 step의 output으로 state에 저장해 두면(예: result: state.review) 다음 step이 "${state.review.reason}"으로 꺼내 씁니다.
  * </pre>
  */
 @Component
@@ -49,7 +49,7 @@ public class SupervisorStepExecutor {
 	 */
 	@SuppressWarnings("unchecked")
 	public StepOutcome run(WorkFlowExecution execution, SupervisorStepDefinition step, Object input) {
-		AgentDefinition agent = this.agentRegistry.resolve(step.ref(), execution.caller());
+		AgentDefinition agent = this.agentRegistry.resolve(step.agent(), execution.caller());
 		Map<String, Object> answer = null;
 		try {
 			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.verdict(), EnginePrompt.SUPERVISOR);

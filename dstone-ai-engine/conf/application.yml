@@ -175,7 +175,7 @@ dstone:
             max-messages: 20 # 세션당 유지할 최대 메시지 수(넘으면 오래된 메시지부터 잘림)
             ttl-seconds: 86400 # Redis에 저장된 세션 히스토리의 만료 시간(1일)
         ##########################################################################################
-        # 프롬프트는 여기 없다 - classpath:agents/*.yml의 각 Agent 항목 안에 prompt로 직접 적혀 있다.
+        # 프롬프트는 여기 없다 - classpath:definitions/prompts/ 아래의 파일이고, 각 Agent(definitions/agents/*.yml)가 prompt.system으로 가리킨다.
         ##########################################################################################
         # Tool 설정. 
         # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
@@ -196,6 +196,13 @@ dstone:
         #                 Tool 결과는 쌓여서 그 뒤의 LLM 호출마다 다시 보내진다. 합이 이 값을 넘으면 오래된 결과부터 앞 300자만 남기고
         #                 "다시 필요하면 같은 Tool을 다시 부르라"는 안내를 붙인다(runtime.agent.ToolResultCompactor).
         #                 max-result-chars(아래)는 결과 한 건의 크기를, 이 값은 쌓인 전체의 크기를 막는다.
+        # 모델 라우팅. agents/*.yml의 model.routing에 적은 이름을 실제 모델 이름으로 바꿔 준다(common.registry.AgentRegistry.modelOf()).
+        # Agent 파일에는 "어떤 일에 쓰는 모델인지"만 적고, 실제 모델 이름은 환경마다 여기서 정한다.
+        # 모델 이름은 지금 켜 둔 provider(spring.ai.model.chat)에서 쓸 수 있는 이름이어야 한다.
+        # Agent가 적은 routing 이름이 여기에 없으면 엔진이 켜지지 않는다(routing: default는 provider 공통 기본 모델이라 적지 않아도 된다).
+        model:
+            routing:
+                sample-override: qwen/qwen-2.5-coder-32b-instruct
         agent:
             sub-agent:
                 max-calls: 10

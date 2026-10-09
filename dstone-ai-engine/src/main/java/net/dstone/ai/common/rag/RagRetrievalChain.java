@@ -33,7 +33,7 @@ import net.dstone.common.utils.StringUtil;
  *
  * 쓰는 곳은 둘이고, 둘 다 search() 하나를 거칩니다. 그래서 "무엇을 검색 대상으로 볼지"(개수, 유사도 기준)는
  * 이 클래스 안 한 곳에서만 정해집니다.
- *   - buildAdvisor()  Agent의 ragEnabled 경로. 찾은 조각을 질문 뒤에 [참고자료]로 붙여 주는 Advisor를 만든다
+ *   - buildAdvisor()  RAG를 쓰는 Agent(context.sources에 retrievedDocuments)의 경로. 찾은 조각을 질문 뒤에 [참고자료]로 붙여 주는 Advisor를 만든다
  *   - search()        Tool(tools.rag.RagSearchTool)
  *
  * 문서를 올리고 지우는 API는 이 엔진에 없습니다. dstone-knowledge에 직접 올립니다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면).
@@ -55,7 +55,7 @@ public class RagRetrievalChain extends BaseService {
 	 *
 	 * Spring AI의 ContextualQueryAugmenter가 기본으로 쓰는 템플릿은 "컨텍스트(참고 자료)에 없는
 	 * 내용이면 모른다고 답하라"고 강제합니다. 이건 순수 지식베이스 QA봇에는 맞는 동작이지만, 이
-	 * 프로젝트에서 ragEnabled를 켠 Agent(예: sql-conversion-agent)는 이미 자기 system prompt
+	 * 프로젝트에서 RAG를 켠 Agent(예: sql-conversion-agent)는 이미 자기 system prompt
 	 * 안에 업무를 수행할 규칙과 전문 지식을 다 갖고 있고, RAG는 그 위에 참고 자료 하나를 더
 	 * 얹어주는 보조 수단일 뿐입니다. 그래서 이 프로젝트에서는 그런 강제 문구 없이 참고자료만
 	 * 덧붙이는 템플릿을 따로 씁니다.
@@ -109,7 +109,7 @@ public class RagRetrievalChain extends BaseService {
 
 	/**
 	 * <pre>
-	 * ragEnabled=true로 설정된 요청에만 붙이는 Advisor를 만들어 줍니다.
+	 * RAG를 쓰도록 설정된 요청에만 붙이는 Advisor를 만들어 줍니다.
 	 * 이 Advisor가 붙으면 질문과 가까운 문서 조각을 찾아 질문 뒤에 [참고자료]로 붙입니다.
 	 *
 	 * topK, similarityThreshold, allowEmptyContext는 전부 null로 두면 전역 기본값

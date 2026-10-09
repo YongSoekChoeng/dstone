@@ -1,0 +1,31 @@
+# 신규 개발 경로에서 요구사항 정의와 구성 정의(무엇을 새로 만들고 무엇을 고칠지)를 한 번의 호출로 끝내는 Agent입니다.
+#
+# Tool이 없습니다. 참고 구현의 파일 내용은 Workflow가 미리 읽어서 input.sources로 넣어 줍니다(newPack step).
+# 그래서 LLM 호출은 한 번입니다. 예전에는 요구사항 Agent와 영향도 Agent가 각각 Tool 루프를 돌며 같은 파일을 열었습니다.
+#
+# 문서를 쓰지 않습니다. 구조화된 데이터(output)만 내고, 01-requirements.md / 02-impact.md는 Workflow의 TOOL step이
+# 그 데이터를 틀에 맞춰 만듭니다. 긴 문서를 writeFile 인자로 쓰면 그것도 출력 토큰이라 한도(max-tokens)에 걸렸습니다.
+# 그래서 이 prompt에는 [긴 문서 저장], [파일 Tool 사용 규칙], [조회 한도]가 없습니다.
+#
+# [완료조건]도 없습니다. "FR마다 변경 대상이 있는가", "수정할 파일이 실제로 있는가" 같은 것은 Workflow가 코드로 확인하고
+# (newExist, newCheck step), 걸린 것만 feedback으로 돌려줍니다.
+#
+# 프롬프트 파일 안에 중괄호를 쓰지 않습니다. 중괄호는 엔진이 input 필드로 채우는 변수 자리라서, input에 없는 이름이면 호출이 실패합니다.
+agent:
+  id: pilot-newdev-analyzer-agent
+  version: "1.0.0"
+  description: 신규 개발 - 요구사항과 구성(층별로 신규/수정/필요 없음, 변경 대상 파일)을 한 번에 정의한다. 문서가 아니라 데이터를 낸다.
+  model:
+    # 추론을 껐다. 재 본 것(2026-10-08, OpenRouter qwen/qwen3.8-27b, testApp의 "FAQ 신규" 요청, 입력 3만 2천 자):
+    # 기본 동작은 응답 제한 5분을 넘겨 실패했고(Error reading response ... timeout), none은 66초에 끝났으며 그 결과는 자동 검증에서
+    # "문제 없음"이었다. 조사는 앞 단계가 끝냈고 여기서는 주어진 내용을 정해진 모양으로 옮기는 일이라 추론 없이도 됐다.
+    # 이 모델은 low/medium이 듣지 않고 none만 듣는다(conf/application.yml의 max-tokens 주석). 다른 모델로 바꾸면 다시 재 본다.
+    reasoning: none
+  prompt:
+    system: prompts/pilot-newdev-analyzer-agent/v1.st
+  input:
+    schema: schemas/pilot-newdev-analyzer-agent.input.schema.json
+  output:
+    format: JSON
+    schema: schemas/pilot-newdev-analyzer-agent.output.schema.json
+    validation: STRICT

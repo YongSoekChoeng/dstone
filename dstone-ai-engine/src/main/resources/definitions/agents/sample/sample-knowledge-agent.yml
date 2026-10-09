@@ -1,0 +1,26 @@
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+#
+# 이 Agent는 dstone-knowledge(Java 프로젝트를 분석해 둔 서버)에 물어보면서 "이 기능은 어디서 처리하나",
+# "이 테이블을 고치면 어디가 영향을 받나" 같은 질문에 답합니다.
+#
+# dstone-knowledge는 사실만 돌려줍니다(어느 메소드가 무엇을 부르는지, 어느 SQL이 어느 테이블을 건드리는지).
+# 그 사실을 엮어 답을 만드는 일을 이 Agent의 LLM이 합니다. 그래서 prompt의 대부분은
+# "어느 Tool을 어떤 순서로 쓰는지"와 "모르는 것을 지어내지 않는 법"입니다.
+#
+# 쓰려면 두 가지가 필요합니다.
+# - conf/application.yml의 dstone.ai.tool.knowledge.base-url에 dstone-knowledge 주소가 있어야 합니다.
+#   (비어 있으면 모든 Tool이 "실패: ..."를 돌려줍니다. 오류가 아니라 꺼져 있는 상태입니다.)
+# - dstone-knowledge에 프로젝트가 등록되고 분석이 끝나 있어야 합니다(docs/11.dstone-knowledge.md 8절).
+#
+# 호출 예 (POST /api/ai/chat):
+#   {"agent": "sample-knowledge-agent", "input": {"projectId": "struts-app", "question": "TB_BOARD 테이블을 고치면 어떤 화면이 영향을 받나?"}}
+agent:
+  id: sample-knowledge-agent
+  version: "1.0.0"
+  description: dstone-knowledge의 분석 결과(호출 관계, SQL, 테이블, 화면)를 조회해서 Java 프로젝트에 대한 질문에 답하는 Agent.
+  prompt:
+    system: prompts/sample-knowledge-agent/v1.st
+  input:
+    schema: schemas/sample-knowledge-agent.input.schema.json
+  tools:
+    allowed: [knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage, knowledgeImpact]

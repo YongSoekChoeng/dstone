@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-file-designer-agent input",
+  "type": "object",
+  "properties": {
+    "request": {
+      "type": "string",
+      "description": "요청서(00-request.md)의 내용"
+    },
+    "requirements": {
+      "type": "array",
+      "description": "기능 요구사항 전체"
+    },
+    "target": {
+      "type": "object",
+      "description": "이번에 설계할 변경 대상 파일 하나"
+    },
+    "plan": {
+      "type": "object",
+      "description": "변경 대상 파일 전체(targets)와 함께 쓰는 이름(sharedNames)"
+    },
+    "referenceSource": {
+      "type": "string",
+      "description": "본뜰 참고 파일의 내용. 없으면 빈 글자"
+    },
+    "currentSource": {
+      "type": "string",
+      "description": "수정할 파일의 지금 내용. 신규 파일이면 빈 글자"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "다시 설계할 때 반영할 지적 사항. 처음이면 빈 글자"
+    }
+  },
+  "required": [
+    "target"
+  ]
+}

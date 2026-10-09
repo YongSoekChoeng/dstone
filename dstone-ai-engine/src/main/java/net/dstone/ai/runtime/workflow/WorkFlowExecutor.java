@@ -3,6 +3,7 @@ package net.dstone.ai.runtime.workflow;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -23,7 +24,7 @@ import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
 import net.dstone.ai.common.exception.ProviderErrorMessage;
 import net.dstone.ai.common.exec.ExecContext;
-import net.dstone.ai.common.schema.JqExpEvalUtil;
+import net.dstone.ai.common.expression.ContextResolver;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.step.AgentStepExecutor;
 import net.dstone.ai.runtime.step.ApprovalStepExecutor;
@@ -41,7 +42,7 @@ import net.dstone.common.core.BaseObject;
  * Workflow를 실제로 진행시키는 핵심 클래스입니다. 
  * WorkFlowDefinition에 정의된 내용을 
  *  1. 순차 실행,
- *  2. 분기(둘 중 하나를 고르는 onSuccess/onFailure, 여러 개 중 하나를 고르는 ROUTER의 routes), 
+ *  2. 분기(둘 중 하나를 고르는 next/onFailure, 여러 개 중 하나를 고르는 ROUTER와 APPROVAL의 routes), 
  *  3. 병렬 실행 (forEach - 같은 step 하나를 리스트 항목 개수만큼 동시에 실행), 
  *  4. 루프(재시도) 
  * 패턴으로 실행합니다.
@@ -50,13 +51,14 @@ import net.dstone.common.core.BaseObject;
  * "지금 몇 번째 step인가 → 다음엔 몇 번째 step으로 가는가"를 계속 따라가는 단순한 상태 기계로 구현했습니다.
  *
  * ## step 사이에 데이터가 오가는 방법
- * 모든 데이터는 실행 컨텍스트(WorkFlowContext) 트리 하나를 거쳐서 오갑니다.
- * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트로 계산합니다. (resolveInput())
- *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다. (common.schema.JqExpEvalUtil)
- * 2) 계산된 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
- * 3) 그 결과를 컨텍스트의 steps.{stepId}에 {input, output, error}로 남깁니다.
- * 그래서 다음 step들은 "${ .steps.id.output.키 }"처럼 누구의 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
- * 표현식을 계산하지 못하면(jq 오류) 그 step은 실패로 처리되고, 사유가 error에 남습니다.
+ * 모든 데이터는 실행 컨텍스트(WorkFlowContext)의 state를 거쳐서 오갑니다.
+ * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트에서 읽어 와 채웁니다. (resolveInput())
+ *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다. (common.expression.ContextResolver)
+ * 2) 채워진 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
+ * 3) 그 결과를 step의 output에 적힌 대로 state에 저장합니다(예: output: {result: state.analysis}).
+ * 그래서 다음 step들은 "${state.analysis.키}"처럼 어떤 값인지 이름으로 콕 집어서 가져다 씁니다(숨은 "직전 결과"는 없습니다).
+ * output에 적지 않은 결과는 저장되지 않으므로 뒤의 step이 읽을 수 없습니다.
+ * 표현식은 값을 읽어 오기만 합니다. 계산이나 조건이 필요한 일은 TOOL step이 부르는 자바 Tool이 합니다.
  *
  * ## 병렬 실행
  * 병렬 실행은 forEach 한 가지 방식으로만 표현합니다. "같은 step을 데이터만 바꿔가며 동시에 반복한다"는 한 가지 모델만 있으므로, 
@@ -65,9 +67,9 @@ import net.dstone.common.core.BaseObject;
  * ## 상태 저장과 다음 step
  * step 하나를 처리할 때마다 WorkFlowExecutionStore로 상태를 바로 저장해 둡니다. 그
  * 래서 APPROVAL step에서 실행이 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 멈춘 step부터 이어서 진행할 수 있습니다.
- * 다음 step은 nextStepId()가 onSuccess/onFailure(또는 ROUTER의 routes)를 보고 정합니다. 
+ * 다음 step은 nextStepId()가 next/onFailure(또는 ROUTER와 APPROVAL의 routes)를 보고 정합니다. 
  * 앞쪽 step을 가리키면 되돌아가는 재시도 루프가 되고, 무한 루프는 maxIterations가 막습니다.
- * "SUCCESS"나 "FAIL" 예약어를 만나면 그 자리에서 Workflow 전체를 끝냅니다.
+ * "END"나 "FAIL" 예약어를 만나면 그 자리에서 Workflow 전체를 끝냅니다.
  */
 @Component
 public class WorkFlowExecutor extends BaseObject {
@@ -84,8 +86,6 @@ public class WorkFlowExecutor extends BaseObject {
 	private ApprovalStepExecutor approvalStepExecutor;
 	@Autowired
 	private WorkFlowExecutionStore executionStore;
-	@Autowired
-	private JqExpEvalUtil jqExpEvalUtil;
 
 	/**
 	 * <pre>
@@ -93,7 +93,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * execution.currentStepIndex()가 가리키는 스텝부터 이어서 실행합니다.
 	 * 처음 시작하는 실행이면 0번(첫 스텝)부터, 승인 대기 상태에서 다시 이어가는 실행이면 멈췄던 바로 그 스텝부터 다시 실행됩니다.
-	 * 실행 도중 SUCCESS, FAIL, WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고 결과를 돌려줍니다.
+	 * 실행 도중 END, FAIL, WAITING_APPROVAL 중 하나에 도달하면 그 상태로 저장하고 결과를 돌려줍니다.
 	 *
 	 * 이 메서드가 호출되는 경우는 두 가지입니다.
 	 * - 새로 실행할 때
@@ -104,7 +104,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 *     같은 실행(같은 executionId, 같은 currentStepIndex)을 가지고 run()이 다시 호출됩니다.
 	 * </pre>
 	 *
-	 * @param workflow  실행할 Workflow의 정의입니다(steps 목록, maxIterations, output 등).
+	 * @param workflow  실행할 Workflow의 정의입니다(steps 목록, settings, output 등).
 	 * @param execution 지금 진행 중인 실행 1건입니다. WorkFlowExecution은 상태가 바뀔 때마다 새 인스턴스를
 	 *                  만드는 불변 객체지만, context 맵만은 같은 Map 인스턴스를 계속 공유해서 여러 스텝의
 	 *                  결과가 한곳에 누적됩니다.
@@ -119,13 +119,20 @@ public class WorkFlowExecutor extends BaseObject {
 			
 			ExecContext.getInstance().put("WorkFlowExecution", currentExecution);
 
+			// 실행을 시작한 뒤에 정의 파일이 바뀌어 배포됐으면(버전이 다르면) 알려 둡니다. 실행은 지금 등록된 정의로 이어 갑니다.
+			String startedVersion = WorkFlowContext.definitionVersion(currentExecution.context());
+			if (startedVersion != null && !startedVersion.equals(workflow.version())) {
+				this.warn("workflow[" + workflow.id() + "] 실행[" + currentExecution.executionId() + "]은 version " + startedVersion + "으로 시작했는데, 지금 등록된 정의는 version "
+					+ workflow.version() + "입니다. 지금 정의로 이어서 실행합니다.");
+			}
+
 			while (true) {
 
 				/****************************************************************************************
 				1) 실행 횟수를 확인합니다. maxIterations를 넘어서면 무한 루프로 보고 FAILED로 끝냅니다.
 				****************************************************************************************/
 				if (++executed > maxIterations) {
-					return this.persistFailed(currentExecution, "최대 실행 횟수(" + maxIterations + ")를 초과했습니다(루프 정지) - onFailure로 되돌아가는 step 구성을 다시 확인하십시오.");
+					return this.persistFailed(currentExecution, "최대 실행 횟수(settings.maxIterations = " + maxIterations + ")를 초과했습니다(루프 정지) - onFailure나 routes로 되돌아가는 step 구성을 다시 확인하십시오.");
 				}
 
 				/****************************************************************************************
@@ -163,13 +170,17 @@ public class WorkFlowExecutor extends BaseObject {
 				}
 
 				/****************************************************************************************
-				5) 이번 step의 결과를 컨텍스트의 steps.{stepId}에 남겨서,
-				   다음 step들이 "${ .steps.id... }"로 가져다 쓸 수 있게 합니다.
+				5) 이번 step의 결과를 그 step의 output에 적힌 대로 state에 저장해서,
+				   다음 step들이 "${state.이름}"으로 가져다 쓸 수 있게 합니다(성공이든 실패든 저장합니다).
 				****************************************************************************************/
-				WorkFlowContext.recordStep(currentExecution.context(), step.id(), outcome.toRecord());
+				try {
+					WorkFlowContext.saveOutput(currentExecution.context(), step.output(), outcome.input(), outcome.output(), outcome.error());
+				} catch (ExpressionException e) {
+					return this.persistFailed(currentExecution, "step[" + step.id() + "]의 output을 state에 저장하지 못했습니다 - " + e.getMessage());
+				}
 
 				/****************************************************************************************
-				6) nextStepId()로 다음에 갈 곳을 정합니다(step id, 또는 SUCCESS/FAIL 예약어).
+				6) nextStepId()로 다음에 갈 곳을 정합니다(step id, 또는 END/FAIL 예약어).
 				   ROUTER가 routes에 없는 경로를 고르면 예외를 던지는데, 여기서 잡아서 FAILED로 남깁니다.
 				****************************************************************************************/
 				String nextId;
@@ -181,19 +192,21 @@ public class WorkFlowExecutor extends BaseObject {
 
 				/****************************************************************************************
 				7) 다음 곳으로 갑니다.
-				   - SUCCESS: Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 계산한 값을 최종 결과로 남깁니다
-				              (output.schema가 있으면 그 모양인지 검사하고, 아니면 FAILED로 끝냅니다).
+				   - END    : Workflow 전체를 성공으로 끝냅니다. workflow.output.value를 계산한 값을 최종 결과로 남깁니다
+				              (output을 적지 않았으면 state 전체. output.schema가 있으면 그 모양인지 검사하고, 아니면 FAILED로 끝냅니다).
 				   - FAIL   : Workflow 전체를 실패로 끝냅니다.
 				   - step id: 그 step으로 이동해서 while 루프를 계속 돕니다(앞쪽 step이면 재시도 루프).
 				****************************************************************************************/
-				if (Constants.WorkFlow.SUCCESS_SENTINEL.equals(nextId)) {
+				if (Constants.WorkFlow.END_SENTINEL.equals(nextId)) {
 					Object result;
 					try {
-						result = this.jqExpEvalUtil.resolve(workflow.output().value(), currentExecution.context(), null);
+						result = workflow.output() == null
+							? new LinkedHashMap<String, Object>(WorkFlowContext.state(currentExecution.context()))
+							: ContextResolver.resolve(workflow.output().value(), currentExecution.context(), null);
 					} catch (ExpressionException e) {
 						return this.persistFailed(currentExecution, "Workflow output을 만들지 못했습니다 - " + e.getMessage());
 					}
-					if (workflow.output().schema() != null) {
+					if (workflow.output() != null && workflow.output().schema() != null) {
 						List<String> problems = JsonSchemaUtil.validate(workflow.output().schema(), result);
 						if (!problems.isEmpty()) {
 							return this.persistFailed(currentExecution, "Workflow output이 output.schema 모양이 아닙니다: " + problems);
@@ -253,9 +266,9 @@ public class WorkFlowExecutor extends BaseObject {
 	 * <pre>
 	 * forEach가 있는 step을 리스트 항목 개수만큼 동시에 실행합니다.
 	 *
-	 * forEach 표현식을 계산한 리스트의 항목마다, 그 항목을 jq 변수($item 또는 $itemVariable)로 넣고 input을 계산해 실행합니다.
+	 * forEach 표현식이 가리키는 리스트의 항목마다, 그 항목을 변수(${item} 또는 itemVariable에 적은 이름)로 넣고 input을 채워 실행합니다.
 	 * 모든 반복이 끝나면 반복 순서대로 실행 이력을 남기고, 반복별 input과 output을 각각 순서대로 리스트로 모읍니다
-	 * (steps.id.input / steps.id.output이 리스트가 됩니다).
+	 * (step의 output에 적는 input / result가 리스트가 됩니다).
 	 * 반복이 하나라도 실패하면 이 step 전체가 실패입니다. 반복할 항목이 하나도 없으면 빈 결과로 성공 처리합니다.
 	 *
 	 * forEach 표현식을 계산하지 못하거나 그 값이 리스트가 아니면, 이 step은 실패로 처리됩니다(onFailure를 따릅니다).
@@ -270,8 +283,8 @@ public class WorkFlowExecutor extends BaseObject {
 		String forEach = StepDefinition.forEachOf(step);
 		Object rawList;
 		try {
-			// 현재까지는 yaml 에서 forEach 의 실행값들만 가져올 목적이므로 는 변수맵핑기능을 제공하지 않음. 그래서 variables 는 null 로 세팅.
-			rawList = this.jqExpEvalUtil.resolve(forEach, execution.context(), null);
+			// forEach 자체에는 반복 변수가 없습니다(변수는 각 반복의 input을 채울 때만 씁니다). 그래서 variables는 null입니다.
+			rawList = ContextResolver.resolve(forEach, execution.context(), null);
 		} catch (ExpressionException e) {
 			return this.failedBeforeRun(execution, step, "forEach - " + e.getMessage());
 		}
@@ -346,7 +359,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * @param step      실행할 step의 정의입니다.
 	 * @param execution 지금 진행 중인 실행입니다.
-	 * @param variables input 표현식에 넣을 jq 변수입니다(forEach 반복이면 {item: 이번 항목}, 아니면 null).
+	 * @param variables input 표현식에 넣을 변수입니다(forEach 반복이면 {item: 이번 항목}, 아니면 null).
 	 */
 	private StepOutcome call(StepDefinition step, WorkFlowExecution execution, Map<String, Object> variables) {
 		long start = System.nanoTime();
@@ -356,14 +369,14 @@ public class WorkFlowExecutor extends BaseObject {
 			resolvedInput = this.resolveInput(step, execution.context(), variables);
 			outcome = this.runStep(execution, step, resolvedInput);
 		} catch (ExpressionException e) {
-			outcome = StepOutcome.failure(null, "input을 계산하지 못했습니다 - " + e.getMessage());
+			outcome = StepOutcome.failure(null, "input을 채우지 못했습니다 - " + e.getMessage());
 		}
 		return outcome.withCall(resolvedInput, (System.nanoTime() - start) / 1_000_000);
 	}
 
 	/**
 	 * <pre>
-	 * step의 input을 컨텍스트로 계산합니다(표현식은 계산하고, 리터럴은 그대로 둡니다).
+	 * step의 input을 컨텍스트로 채웁니다(표현식은 값을 읽어 와 채우고, 리터럴은 그대로 둡니다).
 	 * - AGENT/SUPERVISOR/ROUTER: input(Agent input 모양에 따라 값 하나 또는 맵)을 계산해서 돌려줍니다.
 	 *   input은 필수라서 엔진이 켜질 때 이미 검사되어 있습니다.
 	 * - TOOL: input(맵)을 계산해서 맵으로 돌려줍니다. input이 없으면 빈 맵입니다.
@@ -372,18 +385,18 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * @param step      input을 계산할 step의 정의입니다.
 	 * @param context   실행 컨텍스트입니다.
-	 * @param variables 표현식에 넣을 jq 변수입니다(forEach 반복이 아니면 null).
+	 * @param variables 표현식에 넣을 변수입니다(forEach 반복이 아니면 null).
 	 */
 	private Object resolveInput(StepDefinition step, Map<String, Object> context, Map<String, Object> variables) {
 		switch (step) {
 			case AgentStepDefinition agent:
-				return this.jqExpEvalUtil.resolve(agent.input(), context, variables);
+				return ContextResolver.resolve(agent.input(), context, variables);
 			case SupervisorStepDefinition supervisor:
-				return this.jqExpEvalUtil.resolve(supervisor.input(), context, variables);
+				return ContextResolver.resolve(supervisor.input(), context, variables);
 			case RouterStepDefinition router:
-				return this.jqExpEvalUtil.resolve(router.input(), context, variables);
+				return ContextResolver.resolve(router.input(), context, variables);
 			case ToolStepDefinition tool:
-				return tool.input() == null ? Map.of() : this.jqExpEvalUtil.resolve(tool.input(), context, variables);
+				return tool.input() == null ? Map.of() : ContextResolver.resolve(tool.input(), context, variables);
 			case ApprovalStepDefinition approval:
 				return null;
 		}
@@ -444,10 +457,10 @@ public class WorkFlowExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step 하나가 끝난 뒤 다음에 갈 곳을 정합니다. step id를 돌려주거나, Workflow를 끝낼 때는 "SUCCESS"/"FAIL" 예약어를 돌려줍니다.
-	 * - 성공한 ROUTER, routes를 적은 APPROVAL: 고른 route(ROUTER는 LLM이, APPROVAL은 사람이 고름)를 routes에서 찾습니다.
+	 * step 하나가 끝난 뒤 다음에 갈 곳을 정합니다. step id를 돌려주거나, Workflow를 끝낼 때는 "END"/"FAIL" 예약어를 돌려줍니다.
+	 * - 성공한 ROUTER와 APPROVAL: 고른 route(ROUTER는 LLM이, APPROVAL은 사람이 고름)를 routes에서 찾습니다.
 	 *   routes에 없는 이름이면 예외를 던집니다.
-	 * - 그 밖의 성공: onSuccess에 적은 곳. 비어 있으면 목록상 다음 step, 마지막 step이면 SUCCESS입니다.
+	 * - 그 밖의 성공: next에 적은 곳. 비어 있으면 목록상 다음 step, 마지막 step이면 END입니다.
 	 * - 실패: onFailure에 적은 곳. 비어 있으면 FAIL입니다.
 	 * </pre>
 	 *
@@ -467,17 +480,17 @@ public class WorkFlowExecutor extends BaseObject {
 			}
 			return target;
 		}
-		String onSuccess = StepDefinition.onSuccessOf(step);
-		if (onSuccess != null) {
-			return onSuccess;
+		String next = StepDefinition.nextOf(step);
+		if (next != null) {
+			return next;
 		}
 		String sequentialNextId = this.nextSequentialId(workflow.steps(), step.id());
-		return sequentialNextId == null ? Constants.WorkFlow.SUCCESS_SENTINEL : sequentialNextId;
+		return sequentialNextId == null ? Constants.WorkFlow.END_SENTINEL : sequentialNextId;
 	}
 
 	/**
-	 * Workflow를 FAIL로 끝낼 때 남길 메시지를 만듭니다. 고른 route(ROUTER, routes를 적은 APPROVAL)가 FAIL이거나
-	 * 성공했는데 onSuccess가 FAIL이면 그 step의 output을 글자로 바꾼 값을,
+	 * Workflow를 FAIL로 끝낼 때 남길 메시지를 만듭니다. 고른 route(ROUTER, APPROVAL)가 FAIL이거나
+	 * 성공했는데 next가 FAIL이면 그 step의 output을 글자로 바꾼 값을,
 	 * 실패했는데 onFailure가 없으면 그 사실을 덧붙인 실패 사유를, 그 밖에는 실패 사유를 씁니다.
 	 *
 	 * @param step    방금 끝난 step의 정의입니다.
@@ -488,7 +501,7 @@ public class WorkFlowExecutor extends BaseObject {
 			return "step[" + step.id() + "]에서 고른 route '" + outcome.route() + "'가 FAIL이라 Workflow를 끝냈습니다: " + JsonSchemaUtil.toText(outcome.output());
 		}
 		if (outcome.success()) {
-			return "step[" + step.id() + "]가 onSuccess: FAIL로 Workflow를 끝냈습니다: " + JsonSchemaUtil.toText(outcome.output());
+			return "step[" + step.id() + "]가 next: FAIL로 Workflow를 끝냈습니다: " + JsonSchemaUtil.toText(outcome.output());
 		}
 		if (step.onFailure() == null) {
 			return "step[" + step.id() + "]가 실패했고 onFailure가 지정되지 않았습니다: " + outcome.error();

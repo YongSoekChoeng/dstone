@@ -1,0 +1,47 @@
+# 다른 pilot Agent가 소스 조사를 맡기는 Sub Agent입니다(부모 Agent의 subAgents에 이 id를 적어서 씁니다).
+#
+# 왜 따로 두는가:
+# 소스를 조사하면 파일 검색 결과와 파일 내용이 대화에 계속 쌓입니다. 부모 Agent가 직접 조사하면 그 내용이
+# 부모의 대화에 전부 남아서, 문서를 쓰는 단계까지 매번 다시 보내집니다. 조사를 이 Agent에게 맡기면
+# 읽은 파일 내용은 이 Agent의 대화에만 남고, 부모에게는 아래 output(요약과 근거 목록)만 돌아갑니다.
+#
+# 이 Agent는 빈 대화에서 시작합니다. 부모의 프롬프트나 대화 내용은 보지 못하고 input으로 받은 값만 봅니다.
+# 그래서 input을 object로 선언해서, 부모가 "어디서(sourceRoot)", "무엇을(question)" 조사할지 빠뜨리지 못하게 했습니다.
+# 읽기 전용이라 tools에 writeFile을 적지 않았습니다. 적지 않은 Tool은 이 Agent의 LLM이 볼 수 없습니다.
+#
+# [조회 한도]를 둔 이유: 한 번에 너무 많은 것을 물었을 때 이 Agent가 searchInFiles를 40번 반복하다 한도에 걸려
+# 3분 넘게 쓰고도 답을 내지 못한 적이 있습니다. 그래서 횟수를 정해 두고, 못 찾은 것은 '미발견'으로 적고 끝내게 했습니다.
+# 맡기는 쪽(부모)도 한 번에 한 가지만 묻게 했습니다(02.impact-analyzer-agent.yml).
+#
+# knowledge Tool(knowledgeSearch 등)은 dstone-knowledge가 미리 분석해 둔 호출 관계를 물어보는 Tool입니다. 부모가 projectId를 넘겨줄 때만 씁니다.
+# 파일을 여러 번 뒤져서 따라가던 "화면 → Controller → DAO → 쿼리ID"를 한두 번의 호출로 찾게 하려는 것입니다.
+# 다만 그 결과는 분석한 시점의 것이라, 문서에 적을 줄 번호는 여전히 파일을 열어 확인하게 했습니다.
+#
+# prompt의 [원인 추적 절차]는 pilot Agent들이 함께 쓰는 순서입니다. 로그에 보이는 구문을 "그 쿼리 파일에 있다"고
+# 짐작하지 않고, 공통 조각과 화면에서 넘어온 값, 테이블 정의까지 따라가서 확인하게 하려는 것입니다.
+# 단계마다 "어느 Tool을 먼저 쓰는지"를 적어 두었습니다. Tool 규칙을 절차와 따로 적어 두었을 때는
+# "먼저 searchInFiles로 찾아라"는 문장 하나 때문에 knowledge Tool을 한 번도 쓰지 않고 파일만 뒤진 적이 있습니다.
+#
+# 조사한 구간을 발췌(excerpts)로 함께 돌려줍니다. 요약과 근거 목록만 돌려주던 때는 부모가 문서에 줄 번호를 적으려고
+# 이 Agent가 이미 연 파일을 전부 다시 열었습니다(신규 FAQ 개발 요청에서 화면/Controller/매퍼 파일을 여덟 번씩 읽음).
+# 발췌는 readFileLines가 준 줄 번호 그대로라서, 부모는 그 구간을 다시 열지 않고 문서에 옮겨 적습니다.
+#
+# [구조 조사 절차]를 따로 둔 이유: 오류가 아니라 "기존 기능이 어떻게 생겼나"를 물을 때(신규 개발의 참고 구현 조사)도
+# [원인 추적 절차]밖에 없어서, 원인이 없는 질문에 단서 모으기부터 하느라 조회를 낭비했습니다.
+agent:
+  id: pilot-source-investigator-agent
+  version: "1.0.0"
+  description: 소스 조사 전담. sourceRoot 아래 소스에서 question에 관련된 파일과 근거(파일 경로, 클래스/메서드/쿼리ID, 줄 번호)를 찾아 요약한다. 진입점 찾기, 호출 관계 따라가기, 오류 원인 추적처럼 여러 파일을 뒤져야 하는 조사를 맡긴다.
+  prompt:
+    system: prompts/pilot-source-investigator-agent/v1.st
+  input:
+    schema: schemas/pilot-source-investigator-agent.input.schema.json
+  output:
+    format: JSON
+    schema: schemas/pilot-source-investigator-agent.output.schema.json
+    validation: STRICT
+  tools:
+    allowed: [searchInFiles, readFileListAll, readFile, readFileLines, readFileTail, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]
+  execution:
+    # 엔진이 세는 Tool 호출 한도. prompt의 [조회 한도]를 모델이 지키지 않을 때를 막는 마지막 선이라 그보다 넉넉히 잡았다.
+    maxToolCalls: 25

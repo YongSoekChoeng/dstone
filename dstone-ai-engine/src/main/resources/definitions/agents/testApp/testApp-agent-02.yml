@@ -1,0 +1,8 @@
+agent:
+  id: testApp-agent-02
+  version: "1.0.0"
+  description: 2단계 agent 분석/설계서 리뷰.
+  prompt:
+    system: prompts/testApp-agent-02/v1.st
+  input:
+    schema: schemas/testApp-agent-02.input.schema.json

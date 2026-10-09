@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-developer-agent input",
+  "type": "object",
+  "properties": {
+    "workDir": {
+      "type": "string",
+      "description": "작업 폴더의 절대경로(00-request.md가 들어 있는 폴더)"
+    },
+    "request": {
+      "type": "string",
+      "description": "요청서(00-request.md)의 내용. Workflow가 미리 읽어서 넣어 준다. 비어 있으면 Agent가 직접 읽는다"
+    }
+  },
+  "required": [
+    "workDir"
+  ]
+}

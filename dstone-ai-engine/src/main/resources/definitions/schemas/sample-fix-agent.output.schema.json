@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-fix-agent output",
+  "type": "object",
+  "properties": {
+    "sql": {
+      "type": "string",
+      "description": "문법 오류를 고친 단일 SQL 문"
+    }
+  },
+  "required": [
+    "sql"
+  ]
+}

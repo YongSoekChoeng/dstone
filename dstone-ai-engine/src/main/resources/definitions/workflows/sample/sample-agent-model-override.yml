@@ -1,0 +1,30 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 AGENT step 하나가 model.routing을 적어 둔 Agent(sample-model-override-agent)를
+# 호출해서, Agent별로 모델을 바꿔 쓰는 기능(runtime.agent.AgentExecutor.buildSpec()의 6단계)이
+# Workflow 안에서도 똑같이 잘 적용되는지 확인해보기 위한 테스트 전용 Workflow입니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-agent-model-override
+#   input     : 너는 누구니?
+# 다만 agents/sample/sample-model-override-agent.yml에 적힌 안내대로, conf/application.yml의
+# dstone.ai.model.routing.sample-override에 지금 활성화된 provider(spring.ai.model.chat)에서 쓸 수 있는 모델 이름을 적어 두어야 정상적으로 호출됩니다.
+workflow:
+  id: sample-agent-model-override
+  version: "1.0.0"
+  description: per-Agent model override 확인용 Workflow. conf/application.yml 기본 모델과 다른 모델로 응답한다.
+  input: string
+  settings:
+    maxIterations: 3
+  output:
+    value: "${state.answer}"
+  steps:
+
+    - id: ask
+      type: AGENT
+      agent: sample-model-override-agent
+      input: "${input}"
+      output:
+        result: "state.answer"
+      next: END
+      memory: true

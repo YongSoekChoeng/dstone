@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-reference-agent input",
+  "type": "object",
+  "properties": {
+    "request": {
+      "type": "string",
+      "description": "요청서(00-request.md)의 내용"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "다시 조사할 때 반영할 지적 사항. 처음이면 빈 글자"
+    }
+  },
+  "required": [
+    "request"
+  ]
+}

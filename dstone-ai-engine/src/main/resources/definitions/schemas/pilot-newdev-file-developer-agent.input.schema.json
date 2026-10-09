@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-file-developer-agent input",
+  "type": "object",
+  "properties": {
+    "design": {
+      "type": "object",
+      "description": "이 파일의 설계(pilot-newdev-file-designer-agent의 결과 한 건)"
+    },
+    "source": {
+      "type": "string",
+      "description": "복사한 파일의 지금 내용. 줄마다 '줄번호: 내용' 모양이다"
+    }
+  },
+  "required": [
+    "design",
+    "source"
+  ]
+}

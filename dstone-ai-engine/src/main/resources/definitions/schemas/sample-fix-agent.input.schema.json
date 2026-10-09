@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-fix-agent input",
+  "type": "object",
+  "properties": {
+    "sql": {
+      "type": "string",
+      "description": "검증에 실패한 SQL"
+    },
+    "error": {
+      "type": "string",
+      "description": "검증에 실패한 사유"
+    }
+  },
+  "required": [
+    "sql",
+    "error"
+  ]
+}

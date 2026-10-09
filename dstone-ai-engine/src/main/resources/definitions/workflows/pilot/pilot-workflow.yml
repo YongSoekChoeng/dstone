@@ -1,0 +1,545 @@
+# 어플리케이션 운영관리 Workflow입니다. 요청서(00-request.md)에서 시작해 요구사항 → 영향도 분석 → 리뷰 → 설계 → 구현까지 진행합니다.
+#
+# 경로가 둘입니다. step00이 요청서를 읽으면 classify(ROUTER)가 요청서의 말만 보고 경로를 고릅니다.
+#   일반      오류 수정이나 기능 변경이 하나라도 있는 요청. 아래 "흐름"의 step01~step07을 그대로 탑니다.
+#   신규개발  없는 메뉴/화면/테이블을 새로 만드는 요청. 이 파일 아래쪽의 new* step들을 탑니다("신규 개발 경로" 주석 참고).
+# 분류하지 못하면(classify 실패) 일반 경로로 갑니다. 일반 경로의 Agent들은 신규 개발이 섞인 요청도 다룰 수 있습니다.
+#
+# 흐름 (일반 경로)
+#   step00 요청서 읽기(LLM 없이) → classify 경로 고르기 → step01 요구사항 분석 → step02 영향도 분석 → step03 리뷰(자동 판정) → step04 사람의 결정
+#     step04에서 고르는 것        가는 곳
+#     진행                        step05 (설계)
+#     재요구분석                  step00 → step01 (요구사항 정의서부터 틀렸을 때. 요청서를 다시 읽고, Agent가 지적 사항을 반영해 요구사항을 다시 쓰고, 영향도 분석과 리뷰도 다시 함)
+#     재영향도분석                step02 (Agent가 지적 사항을 반영해 영향도 분석을 다시 함)
+#     재영향도분석리뷰            step03 (01-requirements.md나 02-impact.md를 사람이 직접 고친 뒤, 리뷰만 다시 받음)
+#     중단                        FAIL
+#   step05 설계 → step06 사람의 결정 → step07 구현
+#
+# 어디로 돌아갈지는 step03의 reason 첫 줄을 보고 정합니다. 리뷰 Agent가 "[수정 대상: 요구사항 정의서]"처럼
+# 어느 문서를 고쳐야 하는지 적어 줍니다. 요구사항이 틀렸는데 재영향도분석(step02)만 반복하면 같은 불통과가 계속 나옵니다.
+#
+# step04는 APPROVAL입니다. 갈 곳이 여럿이라 승인/반려 둘로는 나눌 수 없어서, routes에 이름을 적고 사람이 그중 하나를 고르게 했습니다.
+# step03(리뷰)은 통과든 불통과든 step04로 갑니다. 리뷰 결과는 참고 자료이고, 어떻게 할지는 사람이 정합니다(AI의 리뷰와 사람의 승인은 별개입니다).
+#
+# step 사이에 값이 오가는 길
+#   step은 결과를 output에 적은 state 자리에 저장하고, 뒤의 step은 "${state.이름}"으로 읽습니다.
+#   표현식은 값을 읽어 오기만 합니다. 검증하고, 문서를 틀에 맞춰 만들고, 할 일을 나누는 일은 자바 Tool(tools.pilot.PilotNewdevTool)이 합니다.
+#
+# 재분석할 때 지적 사항이 전달되는 길
+#   step01과 step02의 input.feedback이 step03의 불통과 사유(state.review.reason)와 step04에서 사람이 적은 의견
+#   (state.analysisApproval.comment)을 줄바꿈으로 이어서 넘깁니다. 처음 실행할 때는 둘 다 아직 없어서 빈 글자가 됩니다.
+#   그래서 step04에서 "재요구분석"이나 "재영향도분석"을 고를 때는 comment에 무엇을 고쳐야 하는지 적어 주는 것이 좋습니다.
+#
+# step00을 둔 이유
+#   요청서는 모든 Agent가 가장 먼저 읽는 파일입니다. Agent에게 읽으라고 하면 Agent마다 "LLM 호출 → readFile → 다시 LLM 호출"로
+#   LLM 호출이 한 번씩 더 나갑니다. 읽을 파일이 정해져 있으니 TOOL step이 LLM 없이 한 번 읽어 두고(state.request), 그 내용을 각 Agent의
+#   input.request로 넘깁니다. 요청서가 없으면 LLM을 부르기 전에 여기서 바로 실패합니다.
+#   리뷰(step03)에는 넘기지 않습니다. 리뷰는 사람이 고친 문서를 다시 볼 수 있어야 해서 항상 파일에서 직접 읽습니다.
+#   실행 도중에 요청서를 고쳤으면 "재요구분석"을 고르십시오. 그래야 step00이 요청서를 다시 읽습니다
+#   (재영향도분석/재설계는 처음 읽어 둔 요청서를 그대로 씁니다).
+#   이때 classify도 다시 거칩니다. 요청서를 신규 개발만 남게 고쳤다면 신규 개발 경로로 넘어갑니다.
+#
+# 같은 step04에 여러 번 돌아와도 됩니다. 결정은 한 번 쓰고 지우므로 올 때마다 사람에게 다시 묻습니다.
+# 되돌아가는 횟수는 settings.maxIterations가 막습니다(재영향도분석 한 바퀴 = step02, step03, step04 세 번. 재요구분석은 step00, classify, step01까지 여섯 번).
+workflow:
+  id: pilot-workflow
+  version: "1.0.0"
+  description: |
+   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 
+   요청서에는 '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
+   예)
+   D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  input: string
+  settings:
+    checkpoint: true
+    maxIterations: 100
+    onError: STOP
+  output:
+    # 탄 경로에서 나온 결과만 값이 있고, 타지 않은 경로의 것은 null입니다.
+    # 각 Agent가 본문은 파일로 저장하고 요약만 돌려주므로 결과가 작습니다.
+    # 읽어 둔 파일 내용(state.sources)과 Agent에게 넣은 값(state.designInputs, state.developInputs)은 넣지 않습니다. 수십만 자가 됩니다.
+    value:
+      route: "${state.classify.route}"
+      requirements: "${state.requirements}"
+      impact: "${state.impact}"
+      review: "${state.review}"
+      design: "${state.design}"
+      implementation: "${state.implementation}"
+      newdevReference: "${state.reference}"
+      newdevAnalysis: "${state.analysis}"
+      newdevAnalysisCheck: "${state.impactCheck.text}"
+      newdevDesigns: "${state.designs}"
+      newdevDesignCheck: "${state.designCheck.text}"
+      newdevTasks: "${state.tasksFile}"
+  steps:
+
+    # 요청서 읽기 (LLM을 부르지 않는다. 읽은 내용은 뒤의 Agent들이 input.request로 받는다)
+    - id: step00
+      type: TOOL
+      tool: readFile
+      input:
+        fileFullPath: "${input}/00-request.md"
+      output:
+        result: "state.request"
+      next: classify
+      onFailure: FAIL
+
+    # 경로 고르기 (요청서의 말만 보고 고른다. Tool도 추론도 쓰지 않는 짧은 호출 한 번이다)
+    - id: classify
+      type: ROUTER
+      agent: pilot-request-router-agent
+      input: "${state.request}"
+      output:
+        result: "state.classify"
+      routes:
+        신규개발: newRef
+        일반: step01
+      onFailure: step01
+
+    ##########################################################################################
+    # 일반 경로 (오류 수정 / 기능 변경 / 유형이 섞인 요청)
+    ##########################################################################################
+
+    # 요구사항 분석 (재요구분석으로 돌아왔을 때는 feedback에 리뷰 사유와 사람의 의견이 담긴다)
+    - id: step01
+      type: AGENT
+      agent: pilot-requirment-analyzer-agent
+      input:
+        workDir: "${input}"
+        request: "${state.request}"
+        feedback: "${state.review.reason:}\n${state.analysisApproval.comment:}"
+      output:
+        result: "state.requirements"
+      next: step02
+      onFailure: FAIL
+
+    # 영향도 분석 (재영향도분석으로 돌아왔을 때는 feedback에 리뷰 사유와 사람의 의견이 담긴다)
+    - id: step02
+      type: AGENT
+      agent: pilot-impact-analyzer-agent
+      input:
+        workDir: "${input}"
+        request: "${state.request}"
+        feedback: "${state.review.reason:}\n${state.analysisApproval.comment:}"
+      output:
+        result: "state.impact"
+      next: step03
+      onFailure: FAIL
+
+    # 요구사항/영향도 분석문서 리뷰 (통과든 불통과든 사람에게 넘긴다)
+    - id: step03
+      type: SUPERVISOR
+      agent: pilot-impact-analyzer-review-agent
+      input:
+        workDir: "${input}"
+      output:
+        result: "state.review"
+      next: step04
+      onFailure: step04
+
+    # 분석문서를 본 사람이 다음에 할 일을 고른다
+    - id: step04
+      type: APPROVAL
+      approval:
+        artifact: analysis-document
+        approverRole: PL
+      output:
+        result: "state.analysisApproval"
+      routes:
+        진행: step05
+        재요구분석: step00
+        재영향도분석: step02
+        재영향도분석리뷰: step03
+        중단: FAIL
+
+    # 아키텍처 설계
+    - id: step05
+      type: AGENT
+      agent: pilot-architect-agent
+      input:
+        workDir: "${input}"
+        request: "${state.request}"
+      output:
+        result: "state.design"
+      next: step06
+      onFailure: FAIL
+
+    # 설계문서를 본 사람이 다음에 할 일을 고른다
+    - id: step06
+      type: APPROVAL
+      approval:
+        artifact: architecture-document
+        approverRole: PL
+      output:
+        result: "state.designApproval"
+      routes:
+        진행: step07
+        재요구분석: step00
+        재영향도분석: step02
+        재영향도분석리뷰: step03
+        재설계: step05
+        중단: FAIL
+
+    # 구현
+    - id: step07
+      type: AGENT
+      agent: pilot-developer-agent
+      input:
+        workDir: "${input}"
+        request: "${state.request}"
+      output:
+        result: "state.implementation"
+      next: END
+      onFailure: FAIL
+
+    ##########################################################################################
+    # 신규 개발 경로
+    #
+    #   newRef 참고 구현 고르기 → newPack 그 파일들을 한 번만 읽어 두기(LLM 없이)
+    #   → newAnalyze 요구사항 + 구성 정의(LLM 1회) → newCheck 코드로 검증 → newReqDoc/newImpactDoc 문서 만들기
+    #   → newApprove 사람의 결정 → newDesignPrep/newDesign 파일별 설계(파일마다 LLM 1회) → newDesignCheck 코드로 검증 → newDesignDoc
+    #   → newDesignApprove 사람의 결정 → newPlan 적용할 변경 나누기 → newCopy/newCreate/newEdit/newAppend 정해진 변경을 코드로 적용(LLM 없이)
+    #   → newDevelopPrep/newDevelop 빼는 것/더하는 것을 줄 번호로 정하기(필요한 새 파일마다 LLM 1회) → newApplyPrep/newApply 그 변경을 코드로 적용 → newTasksDoc
+    #
+    # 일반 경로와 다른 점
+    # - 참고 구현의 파일은 newPack이 한 번만 읽습니다(state.sources). 뒤의 Agent는 그 내용을 input으로 받으므로 조회 Tool이 없습니다.
+    #   일반 경로에서는 요구사항/영향도/리뷰/설계/개발 Agent가 같은 파일을 각자 다시 열었습니다.
+    # - Agent는 문서(md)를 쓰지 않고 데이터(JSON)만 냅니다. 01-requirements.md, 02-impact.md, 04-design.md, 04-tasks.md는
+    #   TOOL step이 그 데이터를 틀에 끼워 만듭니다(tools.pilot.PilotNewdevTool). 긴 문서를 writeFile 인자로 쓰다가 출력 토큰 한도에 걸리는 일이 없습니다.
+    #   그래서 이 문서들은 사람이 직접 고쳐도 다음 단계에 반영되지 않습니다. 고칠 것은 승인 단계의 의견(comment)에 적습니다.
+    # - "FR마다 변경 대상이 있는가", "수정할 파일이 있는가", "변경 전이 파일에 정확히 한 번 나오는가"는 LLM이 아니라 코드가 확인합니다
+    #   (newCheck, newDesignCheck. 규칙은 tools.pilot.PilotNewdevLogic). 결과는 02-impact-check.md / 04-design-check.md에 남고,
+    #   문서의 '자동 검증 결과'에도 들어가며, 사람이 재분석/재설계를 고르면 그 내용(state.impactCheck.feedback 등)이 Agent의 feedback으로 넘어갑니다.
+    #   자동으로 다시 시키지는 않습니다(걸릴 때마다 되돌리면 같은 잘못을 되풀이하는 동안 maxIterations까지 돕니다). 다시 시킬지는 사람이 정합니다.
+    # - 리뷰 Agent(SUPERVISOR)가 없습니다. 신규 개발에서는 리뷰가 확인하던 것의 대부분(범위, FR 매핑, 경로가 실제로 있는지)을 위의 검증이 대신합니다.
+    # - 구현에서 정해진 변경은 LLM이 하지 않습니다. newPlan이 설계를 네 목록으로 나누고, 이름 바꿈 표(renames)는 newCopy(copyFileWithReplace)가,
+    #   변경 전/변경 후(edits)는 newEdit(replaceInFile)와 newAppend(appendFile)가 그대로 적용합니다. LLM(newDevelop)은 새 파일에서
+    #   빼는 것과 더하는 것을 "몇 번째 줄을 어떻게"로 정하기만 하고, 그 변경도 newApply(editFileLines)가 적용합니다.
+    #   예전에는 개발 Agent가 파일 전체를 writeFile 인자로 다시 썼습니다.
+    # - 설계와 구현은 forEach로 파일마다 새 대화에서 따로 합니다. 요청이 커지면 호출 수가 늘 뿐 한 호출의 크기는 그대로입니다.
+    #   forEach는 동시에 실행되므로 변경 대상에 같은 파일이 두 번 들어 있으면 안 됩니다(newCheck가 잡습니다).
+    # - forEach step의 result는 forEach 목록과 같은 순서의 리스트입니다. 그래서 "무엇을 넣었는지"(예: state.plan.copies)와
+    #   "결과가 무엇인지"(state.copyResults)를 자바 Tool이 순서로 짝지어 봅니다.
+    ##########################################################################################
+
+    # 참고 구현 고르기 (파일 경로만 모은다. 내용은 읽지 않는다)
+    - id: newRef
+      type: AGENT
+      agent: pilot-newdev-reference-agent
+      input:
+        request: "${state.request}"
+        feedback: "${state.newApproval.comment:}"
+      output:
+        result: "state.reference"
+      next: newPack
+      onFailure: FAIL
+
+    # 참고 구현 파일을 한 번만 읽어 둔다 (LLM 없이. 있는 파일만, 같은 경로는 한 번만)
+    #   state.sources = {files: {경로: 내용}, missing: [없는 파일], text: Agent에게 넘길 글자 하나}
+    #   큰 파일은 앞부분만 온다(dstone.ai.tool.file.max-read-chars). 그때는 내용 끝에 잘렸다는 안내가 붙는다.
+    - id: newPack
+      type: TOOL
+      tool: pilotNewdevReadSources
+      input:
+        files: "${state.reference.files}"
+      output:
+        result: "state.sources"
+      next: newAnalyze
+      onFailure: FAIL
+
+    # 요구사항 + 구성 정의 (LLM 1회, Tool 없음. 재분석으로 돌아왔을 때는 feedback에 자동 검증 결과와 사람의 의견이 담긴다)
+    - id: newAnalyze
+      type: AGENT
+      agent: pilot-newdev-analyzer-agent
+      input:
+        request: "${state.request}"
+        reference: "${state.reference}"
+        sources: "${state.sources.text}"
+        feedback: "${state.impactCheck.feedback:}\n${state.newApproval.comment:}\n${state.newDesignApproval.comment:}"
+      output:
+        result: "state.analysis"
+      next: newCheck
+      onFailure: FAIL
+
+    # 코드로 검증 (LLM 없이). 걸린 것을 02-impact-check.md에 적는다. 없으면 "문제 없음" 한 줄이다.
+    #   state.impactCheck = {ok, problems, text, feedback}
+    - id: newCheck
+      type: TOOL
+      tool: pilotNewdevCheckAnalysis
+      input:
+        workDir: "${input}"
+        analysis: "${state.analysis}"
+        reference: "${state.reference}"
+        sources: "${state.sources}"
+      output:
+        result: "state.impactCheck"
+      next: newReqDoc
+      onFailure: FAIL
+
+    # 요구사항 정의서 만들기 (LLM 없이. newAnalyze가 낸 데이터를 틀에 끼운다)
+    - id: newReqDoc
+      type: TOOL
+      tool: pilotNewdevWriteRequirements
+      input:
+        workDir: "${input}"
+        analysis: "${state.analysis}"
+        reference: "${state.reference}"
+      next: newImpactDoc
+      onFailure: FAIL
+
+    # 영향도 분석서 만들기 (LLM 없이. 맨 위에 자동 검증 결과가 들어간다)
+    - id: newImpactDoc
+      type: TOOL
+      tool: pilotNewdevWriteImpact
+      input:
+        workDir: "${input}"
+        analysis: "${state.analysis}"
+        reference: "${state.reference}"
+        checkText: "${state.impactCheck.text}"
+      next: newApprove
+      onFailure: FAIL
+
+    # 요구사항과 구성을 본 사람이 다음에 할 일을 고른다 (재분석/참고구현재조사는 comment에 무엇을 고칠지 적는다)
+    - id: newApprove
+      type: APPROVAL
+      approval:
+        artifact: analysis-document
+        approverRole: PL
+      output:
+        result: "state.newApproval"
+      routes:
+        진행: newDesignPrep
+        재분석: newAnalyze
+        참고구현재조사: newRef
+        중단: FAIL
+
+    # 파일별 설계에 넣을 값 만들기 (LLM 없이. 변경 대상 파일마다 하나씩)
+    #   본뜰 참고 파일의 내용과 고칠 파일의 지금 내용을 읽어 둔 것(state.sources)에서 경로로 찾아 넣는다.
+    #   재설계로 돌아왔을 때는 feedback에 자동 검증 결과와 사람의 의견이 담긴다.
+    - id: newDesignPrep
+      type: TOOL
+      tool: pilotNewdevDesignInputs
+      input:
+        request: "${state.request}"
+        analysis: "${state.analysis}"
+        sources: "${state.sources}"
+        feedback: "${state.designCheck.feedback:}\n${state.newDesignApproval.comment:}"
+      output:
+        result: "state.designInputs"
+      next: newDesign
+      onFailure: FAIL
+
+    # 파일별 설계 (변경 대상 파일마다 새 대화로 LLM 1회, Tool 없음)
+    #   일부 파일의 설계가 실패해도 검증으로 넘긴다. 실패한 파일은 04-design-check.md에 적히고, 사람이 재설계를 고를 수 있다.
+    - id: newDesign
+      type: AGENT
+      agent: pilot-newdev-file-designer-agent
+      forEach: "${state.designInputs}"
+      input: "${item}"
+      output:
+        result: "state.designs"
+        error: "state.designError"
+      next: newDesignCheck
+      onFailure: newDesignCheck
+
+    # 설계를 코드로 검증 (LLM 없이). 걸린 것을 04-design-check.md에 적는다. 없으면 "문제 없음" 한 줄이다.
+    - id: newDesignCheck
+      type: TOOL
+      tool: pilotNewdevCheckDesign
+      input:
+        workDir: "${input}"
+        analysis: "${state.analysis}"
+        designs: "${state.designs}"
+        designError: "${state.designError}"
+        sources: "${state.sources}"
+      output:
+        result: "state.designCheck"
+      next: newDesignDoc
+      onFailure: FAIL
+
+    # 설계서 만들기 (LLM 없이. 파일별 설계를 모아 틀에 끼운다)
+    - id: newDesignDoc
+      type: TOOL
+      tool: pilotNewdevWriteDesign
+      input:
+        workDir: "${input}"
+        designs: "${state.designs}"
+        checkText: "${state.designCheck.text}"
+      next: newDesignApprove
+      onFailure: FAIL
+
+    # 설계를 본 사람이 다음에 할 일을 고른다 (재설계/재분석은 comment에 무엇을 고칠지 적는다)
+    - id: newDesignApprove
+      type: APPROVAL
+      approval:
+        artifact: architecture-document
+        approverRole: PL
+      output:
+        result: "state.newDesignApproval"
+      routes:
+        진행: newPlan
+        재설계: newDesignPrep
+        재분석: newAnalyze
+        중단: FAIL
+
+    # 적용할 변경 나누기 (LLM 없이). state.plan = {copies, creates, edits, appends}
+    #   목록의 항목은 아래 네 step이 부르는 파일 Tool의 인자 모양 그대로다.
+    - id: newPlan
+      type: TOOL
+      tool: pilotNewdevPlanChanges
+      input:
+        designs: "${state.designs}"
+      output:
+        result: "state.plan"
+      next: newCopy
+      onFailure: FAIL
+
+    # 새 파일 만들기 1 (LLM 없이): 본뜰 참고 파일을 복사하면서 설계의 이름 바꿈 표대로 글자를 바꾼다.
+    #   대상 파일이 이미 있으면 그 파일은 실패한다(덮어쓰지 않는다). 일부가 실패해도 다음으로 넘어가고, 결과는 04-tasks.md에 적힌다.
+    - id: newCopy
+      type: TOOL
+      tool: copyFileWithReplace
+      forEach: "${state.plan.copies}"
+      input:
+        sourcePath: "${item.sourcePath}"
+        targetPath: "${item.targetPath}"
+        replacements: "${item.replacements}"
+      output:
+        result: "state.copyResults"
+        error: "state.copyError"
+      next: newCreate
+      onFailure: newCreate
+
+    # 새 파일 만들기 1-2 (LLM 없이): 본뜰 파일이 없는 새 파일은 설계가 글자 그대로 적어 준 내용(adds)을 그대로 저장한다.
+    - id: newCreate
+      type: TOOL
+      tool: writeFile
+      forEach: "${state.plan.creates}"
+      input:
+        filePath: "${item.filePath}"
+        fileContents: "${item.fileContents}"
+      output:
+        result: "state.createResults"
+        error: "state.createError"
+      next: newEdit
+      onFailure: newEdit
+
+    # 있는 파일 고치기 1 (LLM 없이): 설계의 변경 전을 변경 후로 바꾼다. 변경 전이 파일에 정확히 한 번 있을 때만 바뀐다.
+    - id: newEdit
+      type: TOOL
+      tool: replaceInFile
+      forEach: "${state.plan.edits}"
+      input:
+        filePath: "${item.filePath}"
+        oldText: "${item.oldText}"
+        newText: "${item.newText}"
+      output:
+        result: "state.editResults"
+        error: "state.editError"
+      next: newAppend
+      onFailure: newAppend
+
+    # 있는 파일 고치기 2 (LLM 없이): 파일 끝에 덧붙이는 변경.
+    - id: newAppend
+      type: TOOL
+      tool: appendFile
+      forEach: "${state.plan.appends}"
+      input:
+        filePath: "${item.filePath}"
+        fileContents: "${item.fileContents}"
+      output:
+        result: "state.appendResults"
+        error: "state.appendError"
+      next: newDevelopPrep
+      onFailure: newDevelopPrep
+
+    # 새 파일 만들기 2 준비 (LLM 없이): 복사한 새 파일 가운데 빼거나 더할 것이 있는 파일을 줄 번호와 함께 읽어 둔다.
+    #   복사에 실패한 파일(대상이 이미 있었던 파일 등)은 읽지 않는다. 그런 파일은 여기서부터 건드리지 않는다.
+    #   state.developInputs = [{design, source}]
+    - id: newDevelopPrep
+      type: TOOL
+      tool: pilotNewdevDevelopInputs
+      input:
+        designs: "${state.designs}"
+        copies: "${state.plan.copies}"
+        copyResults: "${state.copyResults}"
+      output:
+        result: "state.developInputs"
+      next: newDevelop
+      onFailure: FAIL
+
+    # 새 파일 만들기 2 (읽어 둔 파일마다 새 대화로 한 번씩. Tool 없이 LLM 1회)
+    #   이름 바꿈은 newCopy가 끝냈다. 여기서는 빼는 것과 더하는 것을 "몇 번째 줄을 어떻게"로 정하기만 한다. 파일은 newApply가 고친다.
+    #   Agent에 Tool을 주고 직접 고치게 했을 때는 같은 호출을 되풀이하거나 몇 분씩 걸렸다(24.newdev-file-developer-agent.yml의 주석).
+    #   일부 파일이 실패해도 다음으로 넘긴다.
+    - id: newDevelop
+      type: AGENT
+      agent: pilot-newdev-file-developer-agent
+      forEach: "${state.developInputs}"
+      input:
+        design: "${item.design}"
+        source: "${item.source}"
+      output:
+        result: "state.developResults"
+        error: "state.developError"
+      next: newApplyPrep
+      onFailure: newApplyPrep
+
+    # 새 파일 만들기 3 준비 (LLM 없이): 위에서 정한 줄 번호 변경을 파일마다 적용할 목록으로 만든다.
+    #   편집 Agent 호출이 실패했거나 변경 목록이 빈 파일은 빠진다.
+    - id: newApplyPrep
+      type: TOOL
+      tool: pilotNewdevApplyInputs
+      input:
+        developInputs: "${state.developInputs}"
+        developResults: "${state.developResults}"
+      output:
+        result: "state.applyInputs"
+      next: newApply
+      onFailure: FAIL
+
+    # 새 파일 만들기 3 (LLM 없이): 줄 번호 변경을 파일에 적용한다.
+    #   한 파일의 변경은 모두 맞을 때만 한꺼번에 적용된다(줄 번호나 확인 글자가 하나라도 틀리면 그 파일은 복사한 모습 그대로 남는다).
+    #   자동으로 다시 시키지 않는다. 결과는 04-tasks.md에 적히고 사람이 본다.
+    - id: newApply
+      type: TOOL
+      tool: editFileLines
+      forEach: "${state.applyInputs}"
+      input:
+        filePath: "${item.filePath}"
+        edits: "${item.edits}"
+      output:
+        result: "state.applyResults"
+        error: "state.applyError"
+      next: newTasksDoc
+      onFailure: newTasksDoc
+
+    # 태스크 목록 만들기 (LLM 없이. 파일별 구현 결과를 모은다. 설계 한 건 = 파일 하나 = 태스크 하나)
+    #   상태(완료 / 실패 / 확인 필요 / 변경 없음)를 정하는 규칙은 tools.pilot.PilotNewdevLogic.tasksDoc()에 있다.
+    - id: newTasksDoc
+      type: TOOL
+      tool: pilotNewdevWriteTasks
+      input:
+        workDir: "${input}"
+        designs: "${state.designs}"
+        plan: "${state.plan}"
+        copyResults: "${state.copyResults}"
+        createResults: "${state.createResults}"
+        editResults: "${state.editResults}"
+        appendResults: "${state.appendResults}"
+        developInputs: "${state.developInputs}"
+        developResults: "${state.developResults}"
+        applyInputs: "${state.applyInputs}"
+        applyResults: "${state.applyResults}"
+        errors:
+          - "${state.copyError}"
+          - "${state.createError}"
+          - "${state.editError}"
+          - "${state.appendError}"
+          - "${state.developError}"
+          - "${state.applyError}"
+      output:
+        result: "state.tasksFile"
+      next: END
+      onFailure: FAIL

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-knowledge-agent input",
+  "type": "object",
+  "properties": {
+    "projectId": {
+      "type": "string",
+      "description": "dstone-knowledge에 등록된 프로젝트 ID"
+    },
+    "question": {
+      "type": "string",
+      "description": "프로젝트에 대해 묻고 싶은 것"
+    }
+  },
+  "required": [
+    "projectId",
+    "question"
+  ]
+}

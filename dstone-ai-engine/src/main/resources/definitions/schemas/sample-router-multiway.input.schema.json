@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-router-multiway.input",
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "분류할 고객 문의 원문"
+    },
+    "role": {
+      "type": "string",
+      "description": "종착 step Agent(sample-role-reply-agent)의 역할"
+    }
+  },
+  "required": [
+    "message",
+    "role"
+  ]
+}

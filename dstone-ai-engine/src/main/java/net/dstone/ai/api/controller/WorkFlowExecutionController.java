@@ -72,16 +72,16 @@ public class WorkFlowExecutionController extends BaseController {
 	}
 
 	/**
-	 * WAITING_APPROVAL(승인 대기) 상태인 실행에 대해 사람의 결정(승인/반려, 또는 선택지 하나)을 기록하고, 멈춰 있던 그
+	 * WAITING_APPROVAL(승인 대기) 상태인 실행에 대해 사람의 결정(그 step의 routes 중 하나)을 기록하고, 멈춰 있던 그
 	 * 스텝부터 다시 실행을 이어갑니다. 동기 방식이라서, 이어진 실행이 완전히 끝날 때까지(성공이든
 	 * 실패든) 기다렸다가 최종 상태로 응답합니다.
 	 *
 	 * @param executionId 승인 또는 반려를 결정할 실행의 id입니다.
-	 * @param request     승인 여부(approved) 또는 고른 선택지(route), 결정한 사람(approver), 사유(comment)를 담고 있습니다.
+	 * @param request     고른 결정(decision), 결정한 사람(approver), 사유(comment)를 담고 있습니다.
 	 */
 	@PostMapping("/{executionId}/decision")
 	public WorkFlowExecutionDetail decision(@PathVariable String executionId, @RequestBody WorkFlowDecisionRequest request) {
-		WorkFlowExecution execution = this.workFlowExecutionService.decide(executionId, Boolean.TRUE.equals(request.approved()), request.route(), request.approver(), request.comment());
+		WorkFlowExecution execution = this.workFlowExecutionService.decide(executionId, request.chosen(), request.approved(), request.approver(), request.comment());
 		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution));
 	}
 

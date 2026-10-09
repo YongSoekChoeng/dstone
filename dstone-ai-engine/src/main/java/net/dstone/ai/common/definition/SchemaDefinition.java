@@ -10,22 +10,21 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
 /**
  * <pre>
  * "이 자리에 어떤 모양의 값이 오가는가"를 선언한 것입니다(입출력 계약). YAML 두 곳에서 씁니다.
- * - agents/*.yml 의 agent.input / agent.output: 이 Agent가 받는 값과 돌려주는 값의 모양
+ * - agents/*.yml 의 agent.input: 이 Agent가 받는 값의 모양
  * - workflows/*.yml 의 workflow.input: 이 Workflow를 실행할 때 요청에 담아야 하는 값의 모양
  *
- * schema 아래에는 표준 JSON Schema를 YAML로 그대로 적습니다. 타입만 필요하면 축약형도 됩니다
- * (규칙은 common.schema.JsonSchemaUtil 참고).
+ * schema에는 JSON Schema 파일의 경로를 적습니다(definitions 폴더 기준, schemas/ 아래).
+ * 파일은 common.loader.YamlDefinitionLoader가 읽어서 맵으로 바꿔 넣어 줍니다.
  *
- *   output: string                          # 축약형 = output: {schema: {type: string}}
- *   output:
- *     schema:
- *       type: object
- *       properties:
- *         sql: { type: string, description: 변환된 SQL }
- *         tables: list<string>              # properties 값도 축약형 가능
- *       required: [sql]
+ *   input:
+ *     schema: schemas/requirement-input.schema.json
  *
- * YAML을 읽을 때 축약형은 표준 모양으로 펼쳐지므로, schema()는 항상 표준 JSON Schema 맵입니다.
+ * 타입만 필요한 간단한 경우에는 파일 없이 축약형으로 적어도 됩니다(규칙은 common.schema.JsonSchemaUtil 참고).
+ *
+ *   input: string                           # = {schema: {type: string}}
+ *   input: list&lt;string&gt;
+ *
+ * 축약형은 표준 모양으로 펼쳐지므로, schema()는 항상 표준 JSON Schema 맵입니다.
  * 스키마 자체가 올바른지(예: type 오타)는 엔진이 켜질 때 레지스트리가 검사합니다.
  * </pre>
  *

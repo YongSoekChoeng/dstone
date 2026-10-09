@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-file-developer-agent output",
+  "type": "object",
+  "properties": {
+    "edits": {
+      "type": "array",
+      "description": "줄 번호로 적은 변경 목록(없으면 빈 배열)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "replace",
+              "insertAfter"
+            ]
+          },
+          "startLine": {
+            "type": "integer",
+            "description": "시작 줄 번호. insertAfter면 이 줄의 뒤에 넣는다(맨 앞은 0)"
+          },
+          "endLine": {
+            "type": "integer",
+            "description": "끝 줄 번호(이 줄 포함). insertAfter에는 적지 않는다"
+          },
+          "startText": {
+            "type": "string",
+            "description": "startLine 줄의 내용(source에서 그대로. 줄번호 제외)"
+          },
+          "endText": {
+            "type": "string",
+            "description": "endLine 줄의 내용(source에서 그대로. 줄번호 제외)"
+          },
+          "newText": {
+            "type": "string",
+            "description": "replace와 insertAfter에서 넣을 줄들. delete에는 적지 않는다"
+          },
+          "what": {
+            "type": "string",
+            "description": "무엇을 왜 바꾸는지 한 줄"
+          }
+        },
+        "required": [
+          "action",
+          "startLine",
+          "startText"
+        ]
+      }
+    },
+    "summary": {
+      "type": "string",
+      "description": "뺀 것과 더한 것(3줄 이내)"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "결정이 필요한 사항과 하지 못한 항목의 이유(없으면 빈 배열)"
+    }
+  },
+  "required": [
+    "edits",
+    "summary"
+  ]
+}

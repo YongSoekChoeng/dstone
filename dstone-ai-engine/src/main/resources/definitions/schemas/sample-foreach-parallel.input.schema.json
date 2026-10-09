@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-foreach-parallel.input",
+  "type": "object",
+  "properties": {
+    "sqlList": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "문법을 검사할 SQL 목록"
+    }
+  },
+  "required": [
+    "sqlList"
+  ]
+}

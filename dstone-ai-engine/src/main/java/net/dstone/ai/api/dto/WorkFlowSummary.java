@@ -16,8 +16,9 @@ import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
  * @param id          Workflow를 가리키는 식별자입니다(common.definition.workflow.WorkFlowDefinition.id()).
  * @param description 이 Workflow가 무슨 일을 하는지 설명하는 문구입니다(common.definition.workflow.WorkFlowDefinition.description()).
  * @param input       실행 요청의 input 모양(JSON Schema)입니다(common.definition.workflow.WorkFlowDefinition.inputSchema()).
+ * @param version     이 Workflow 정의의 버전입니다.
  */
-public record WorkFlowSummary(String id, String description, Map<String, Object> input) {
+public record WorkFlowSummary(String id, String description, Map<String, Object> input, String version) {
 
 	/**
 	 * WorkFlowDefinition(Workflow 전체 정의)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
@@ -25,7 +26,7 @@ public record WorkFlowSummary(String id, String description, Map<String, Object>
 	 * @param definition 요약으로 바꿔줄 Workflow 정의입니다.
 	 */
 	public static WorkFlowSummary from(WorkFlowDefinition definition) {
-		return new WorkFlowSummary(definition.id(), definition.description(), definition.inputSchema());
+		return new WorkFlowSummary(definition.id(), definition.description(), definition.inputSchema(), definition.version());
 	}
 
 }

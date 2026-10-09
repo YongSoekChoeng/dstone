@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-analyzer-agent input",
+  "type": "object",
+  "properties": {
+    "request": {
+      "type": "string",
+      "description": "요청서(00-request.md)의 내용"
+    },
+    "reference": {
+      "type": "object",
+      "description": "참고 구현(pilot-newdev-reference-agent의 결과)"
+    },
+    "sources": {
+      "type": "string",
+      "description": "참고 구현 파일들의 내용"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "다시 작성할 때 반영할 지적 사항. 처음이면 빈 글자"
+    }
+  },
+  "required": [
+    "request",
+    "sources"
+  ]
+}

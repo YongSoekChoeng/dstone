@@ -15,7 +15,7 @@ var DstoneAiWorkflow = (function () {
 	var sampleNoteEl;
 
 	// workflowId를 고를 때마다 input에 채워 넣을 기본 샘플값.
-	// 각 Workflow YAML(dstone-ai-engine/src/main/resources/workflows/**) 맨 위 주석의 "Workflow 테스트" 예시와 같은 값이다.
+	// 각 Workflow YAML(dstone-ai-engine/src/main/resources/definitions/workflows/**) 맨 위 주석의 "Workflow 테스트" 예시와 같은 값이다.
 	// input 스키마가 string인 Workflow는 글자, object인 Workflow는 객체로 적는다(객체는 JSON으로 펼쳐서 입력칸에 채운다).
 	// 여기 없는 workflowId를 고르면 input을 비워 둔다.
 	var WORKFLOW_SAMPLES = {
@@ -24,7 +24,7 @@ var DstoneAiWorkflow = (function () {
 		},
 		"sample-agent-model-override": {
 			input: "너는 누구니?",
-			note: "agents/sample/sample-model-override-agent.yml의 model 값이 지금 켜진 provider에 맞아야 호출됩니다."
+			note: "dstone-ai-engine conf/application.yml의 dstone.ai.model.routing.sample-override 값이 지금 켜진 provider의 모델 이름이어야 호출됩니다."
 		},
 		"sample-agent-rag-augmented": {
 			input: "적재된 문서 중에 Spring Batch에 대해 설명해줘.",

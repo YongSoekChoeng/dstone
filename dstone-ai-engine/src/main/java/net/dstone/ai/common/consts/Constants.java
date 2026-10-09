@@ -44,6 +44,9 @@ public final class Constants {
 	/** Agent 호출(runtime.agent.AgentExecutor)이 쓰는 설정 키들입니다. */
 	public static final class Agent {
 
+		/** agents/*.yml의 model.routing 이름을 실제 모델 이름으로 바꿔 주는 설정의 앞부분입니다(dstone.ai.model.routing.{이름}: 모델 이름). */
+		public final static String MODEL_ROUTING_PREFIX = "dstone.ai.model.routing";
+
 		/** 부모 Agent 호출 한 번 안에서 Sub Agent를 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.sub-agent.max-calls). */
 		public final static String SUB_AGENT_MAX_CALLS = "dstone.ai.agent.sub-agent.max-calls";
 
@@ -107,36 +110,55 @@ public final class Constants {
 	public static final class WorkFlow {
 		/** 디폴트 Max Step 실행 횟수 */
 		public final static int DEFAULT_MAX_ITERATIONS = 10;
-		public final static String SUCCESS_SENTINEL = "SUCCESS";
+		/** step의 next/onFailure/routes에 적어서 "여기서 Workflow를 성공으로 끝낸다"를 뜻하는 예약어입니다. */
+		public final static String END_SENTINEL = "END";
+		/** step의 next/onFailure/routes에 적어서 "여기서 Workflow를 실패로 끝낸다"를 뜻하는 예약어입니다. */
 		public final static String FAIL_SENTINEL = "FAIL";
-		/** step의 forEach로 반복 실행할 때(StepDefinition.itemKeyOf 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 jq 변수 이름입니다($item). */
+		/** step의 forEach로 반복 실행할 때(StepDefinition.itemKeyOf 참고), itemVariable을 따로 지정하지 않았다면 각 반복의 항목을 담는 기본 변수 이름입니다(${item}). */
 		public final static String DEFAULT_ITEM_VARIABLE_KEY = "item";
+		/** workflow.settings.onError에 적을 수 있는 값입니다. 지금은 "그 자리에서 실패로 끝낸다" 하나뿐입니다. */
+		public final static String ON_ERROR_STOP = "STOP";
 
 		/**
 		 * <pre>
 		 * Workflow 실행 컨텍스트(runtime.workflow.execution.WorkFlowContext)의 모양을 정하는 이름들입니다.
-		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML의 "${ ... }" 표현식은 이 트리를 jq로 읽습니다.
-		 * 이름은 YAML 키와 같습니다(workflow.input → .input, step의 input/output → .steps.id.input/output). 숨은 이름은 없습니다.
-		 * 
-		 * input:     요청의 input 값 그대로(workflow.input 모양)   ← "${ .input }", "${ .input.필드 }"
-		 * steps:     { stepId: { input, output, error } }          ← "${ .steps.id.output }" 등
-		 * approvals: { stepId: { approved, approver, comment } }   ← 엔진 내부용 승인 결정 수신함(표현식에는 보이지 않음)
+		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML의 "${ ... }" 표현식은 이 트리에서 input과 state를 읽습니다.
+		 *
+		 * input:      요청의 input 값 그대로(workflow.input 모양)         ← "${input}", "${input.필드}"
+		 * state:      step이 output으로 저장한 값들({ 이름: 값 })          ← "${state.이름}", "${state.이름.필드}"
+		 * approvals:  { stepId: { decision, approver, comment } }        ← 엔진 내부용 승인 결정 수신함(표현식에는 보이지 않음)
+		 * definition: { id, version }                                    ← 이 실행을 시작한 Workflow 정의의 버전(표현식에는 보이지 않음)
 		 * </pre>
 		 */
 		public static final class Context {
-			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다(.input). YAML의 workflow.input과 같은 이름입니다. */
+			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다(${input}). YAML의 workflow.input과 같은 이름입니다. */
 			public final static String INPUT = "input";
-			/** 실행된 step들의 결과가 step id별로 쌓이는 루트입니다(.steps.id.xxx). */
-			public final static String STEPS = "steps";
-			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 표현식에서는 보이지 않고 .steps.id.output으로 읽습니다. */
+			/** step들이 output으로 저장한 값이 이름별로 쌓이는 루트입니다(${state.이름}). */
+			public final static String STATE = "state";
+			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 표현식에서는 보이지 않습니다. */
 			public final static String APPROVALS = "approvals";
+			/** 이 실행을 시작한 Workflow 정의의 id와 version을 담아두는 루트입니다. 표현식에서는 보이지 않습니다. */
+			public final static String DEFINITION = "definition";
+		}
 
-			/** step 결과: 이 step이 실제로 받은 입력(YAML step의 input 표현식을 계산한 뒤의 값)입니다. */
-			public final static String FIELD_INPUT = "input";
-			/** step 결과: 이 step이 돌려준 값입니다. 모양은 부른 대상(Agent output, Tool 응답)이나 step 종류가 정합니다. */
-			public final static String FIELD_OUTPUT = "output";
-			/** step 결과: 실패했을 때의 사유입니다(성공이면 null). */
-			public final static String FIELD_ERROR = "error";
+		/**
+		 * <pre>
+		 * step의 output에 적는 "무엇을 저장할지"의 이름들입니다. 값은 저장할 위치(state.이름)입니다.
+		 *
+		 *   output:
+		 *     result: state.analysis           이 step이 돌려준 값 전체
+		 *     result.sql: state.sql            돌려준 값 안의 필드 하나
+		 *     input: state.sentInput           이 step이 실제로 받은 입력(input 표현식을 계산한 뒤의 값)
+		 *     error: state.analysisError       실패 사유(성공이면 null)
+		 * </pre>
+		 */
+		public static final class Output {
+			/** 이 step이 돌려준 값입니다. 모양은 부른 대상(Agent output, Tool 응답)이나 step 종류가 정합니다. */
+			public final static String RESULT = "result";
+			/** 이 step이 실제로 받은 입력입니다. */
+			public final static String INPUT = "input";
+			/** 실패했을 때의 사유입니다(성공이면 null). */
+			public final static String ERROR = "error";
 		}
 	}
 
@@ -177,18 +199,24 @@ public final class Constants {
 	/**
 	 * <pre>
 	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 YAML 파일들을 찾을 때 쓰는
-	 * 위치 패턴입니다. 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서
-	 * workflows/agents/mcp 폴더 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는
-	 * 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
+	 * 위치 패턴입니다. 정의 파일은 모두 resources/definitions 아래에 둡니다(workflows, agents, prompts, schemas, mcp).
+	 * 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서 workflows/agents/mcp 폴더
+	 * 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
 	 * </pre>
 	 */
 	public static final class Definition {
-		public final static String WORKFLOW_LOCATION = "classpath:workflows";
+		/** 정의 파일을 모아 두는 맨 위 폴더입니다(classpath 기준). prompt와 schema 파일 경로는 이 폴더를 기준으로 적습니다. */
+		public final static String ROOT_LOCATION = "classpath:definitions";
+		public final static String WORKFLOW_LOCATION = ROOT_LOCATION + "/workflows";
 		public final static String WORKFLOW_LOCATION_PATTERN = WORKFLOW_LOCATION + "/**/*.yml";
-		public final static String AGENT_LOCATION = "classpath:agents";
+		public final static String AGENT_LOCATION = ROOT_LOCATION + "/agents";
 		public final static String AGENT_LOCATION_PATTERN = AGENT_LOCATION + "/**/*.yml";
-		public final static String MCP_LOCATION = "classpath:mcp";
+		public final static String MCP_LOCATION = ROOT_LOCATION + "/mcp";
 		public final static String MCP_LOCATION_PATTERN = MCP_LOCATION + "/**/*.yml";
+		/** agent.prompt.system에 적는 프롬프트 파일이 있어야 하는 폴더입니다(definitions 기준 상대경로의 첫 이름). */
+		public final static String PROMPT_DIR = "prompts";
+		/** input.schema / output.schema / state.schema에 적는 JSON Schema 파일이 있어야 하는 폴더입니다. */
+		public final static String SCHEMA_DIR = "schemas";
 	}
 
 }

@@ -1,41 +1,44 @@
 package net.dstone.ai.common.definition.workflow.step;
 
+import java.util.Map;
+
 import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/*.yml 의 type: SUPERVISOR step입니다. LLM에게 "통과인가 아닌가, 그리고 왜 그런가"를 판정받습니다.
- * 앞선 step들의 결과가 괜찮은지 감독하고 다시 검토하는 역할에 씁니다(runtime.step.SupervisorStepExecutor).
+ * workflows/*.yml 의 type: SUPERVISOR step입니다. LLM이 앞 step의 결과를 보고 통과/불통과를 판정합니다
+ * (runtime.step.SupervisorStepExecutor).
  *
- * - 통과: 성공이고, output에 {pass: true, reason}을 남깁니다.
- * - 불통과(또는 답의 모양이 깨짐): 실패이고, output에 {pass: false, reason}을, error에 reason을 남깁니다.
- *
- * output 모양은 엔진이 {pass, reason}으로 정해 두었으므로(common.schema.StepOutputSchemas), ref의 Agent는 output을 선언하지 않습니다.
- * input은 AGENT step과 같은 규칙입니다(Agent input 모양에 맞춰 적음).
+ * 답의 모양은 엔진이 {pass, reason}으로 정해 두었습니다. 그래서 부르는 Agent는 output을 선언하지 않습니다.
+ * - 통과(pass: true)면 성공(next), 불통과면 실패(onFailure)입니다. 불통과 사유는 error에도 남습니다.
+ * - 불통과여도 result({pass: false, reason})는 그대로 저장되므로, 되돌아간 step이 사유를 읽을 수 있습니다.
  *
  *   - id: review
  *     type: SUPERVISOR
- *     ref: sample-verdict-judge-agent
- *     input: "${ .steps.convert.output.sql }"
- *     onFailure: convert
+ *     agent: sample-verdict-judge-agent
+ *     input: "${state.draft}"
+ *     output:
+ *       result: "state.review"            # ${state.review.pass}, ${state.review.reason}
+ *     next: publish
+ *     onFailure: rewrite
  * </pre>
  *
  * @param id           (필수)이 step의 이름입니다.
- * @param ref          (필수)부를 Agent의 id입니다.
- * @param input        (필수)Agent에게 넣을 값(판정할 대상)입니다.
- * @param onSuccess    (옵셔널)통과했을 때 갈 step의 id(또는 "SUCCESS")입니다.
- * @param onFailure    (옵셔널)불통과했을 때 갈 step의 id(또는 "FAIL")입니다.
- * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 표현식입니다(예: "${ .input.sqlList }").
- * @param itemVariable (옵셔널)forEach 반복 중 항목을 담을 jq 변수 이름입니다. 비워두면 "item"이고 표현식에서 $item으로 씁니다.
- * @param memory       (옵셔널)true면 이 step이 이전에 자기가 나눈 대화를 기억합니다(대화방 = sessionId:stepId). 비워두면 false입니다.
- *                     재작성 루프처럼 같은 step이 다시 불릴 때 이전 시도를 기억하게 할 때 씁니다. 다른 step의 대화는 섞이지 않습니다.
- *                     forEach와 함께 쓸 수 없습니다(동시에 도는 반복들이 한 대화방에 섞여 쓰이기 때문입니다).
+ * @param agent        (필수)판정을 맡길 Agent의 id입니다.
+ * @param input        (필수)Agent에게 넣을 값입니다(Agent input 모양).
+ * @param output       (옵셔널)이 step의 결과를 state 어디에 저장할지입니다.
+ * @param next         (옵셔널)통과했을 때 갈 step의 id(또는 "END")입니다.
+ * @param onFailure    (옵셔널)불통과일 때 갈 step의 id(또는 "FAIL")입니다.
+ * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 표현식입니다.
+ * @param itemVariable (옵셔널)forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"입니다.
+ * @param memory       (옵셔널)true면 이 step이 자기 대화방에서 이전에 나눈 대화를 기억합니다.
  */
 public record SupervisorStepDefinition(
 	String id
-	, String ref
+	, String agent
 	, Object input
-	, String onSuccess
+	, Map<String, String> output
+	, String next
 	, String onFailure
 	, String forEach
 	, String itemVariable

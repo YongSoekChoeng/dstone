@@ -1,0 +1,35 @@
+# 요구사항에 원인을 잘못 적으면 뒤의 영향도 분석과 리뷰가 모두 그 틀린 전제 위에서 돈다.
+# 실제로 겪은 일을 막으려고 prompt를 이렇게 짰다.
+# - 오류 로그의 SQL에 보이는 구문을 "이 쿼리 파일에 있다"고 추정해서 적었다. 실제로는 공통 페이징 조각이 화면에서 넘어온
+#   정렬 값으로 만들어 붙이는 구문이었고, 리뷰는 소스에서 그 구문을 찾지 못해 계속 불통과시켰다.
+#   → [원인 추적 절차]와 "확인한 것만 사실로 적는다".
+# - 요청서는 메뉴 세 개가 모두 오류라고 했는데 FR을 하나만 만들었다.
+#   → 산출물에 '요청 범위 표'를 두고, 표의 모든 행에 FR 번호가 있어야 완료로 본다.
+# - 요청서에 프로젝트ID가 있는데도 knowledge Tool을 한 번도 쓰지 않고 조회 25번을 모두 파일 검색에 썼다.
+#   knowledge 규칙은 "어디를 봐야 할지 모를 때"라는 조건부였고, 그 아래 Tool 규칙은 "먼저 searchInFiles로"였기 때문이다.
+#   → [원인 추적 절차]의 단계마다 어느 Tool을 먼저 쓰는지 적었다. 진입점과 호출 관계는 knowledge Tool이 먼저다.
+# - 신규 개발 요청(없는 FAQ 메뉴를 새로 만들어 달라)에도 [원인 추적 절차]를 그대로 따랐다. 원인이 없는 요청이라
+#   참고할 기존 기능의 파일을 전부 열어 보는 데 조회 19번을 썼고, 다음 단계(영향도 분석)가 같은 파일을 또 열었다.
+#   → 먼저 요청 유형(오류 수정 / 기능 변경 / 신규 개발)을 정하고, 신규 개발은 [신규 개발 조사 절차]만 따른다.
+#     참고 구현의 파일을 여는 일은 영향도 분석에 맡기고, 여기서는 "무엇을 본떠 만들지"와 진입점만 적는다.
+# - 12,000자 문서를 writeFile 한 번에 쓰다가 출력 토큰 한도에 걸려 인자가 끊겼고, 문서를 처음부터 다시 썼다.
+#   → [긴 문서 저장]: 한 번에 5,000자까지만 쓰고 나머지는 appendFile로 이어 붙인다.
+agent:
+  id: pilot-requirment-analyzer-agent
+  version: "1.0.0"
+  description: 요구사항 분석/정의 에이젼트. 요청서(00-request.md)를 읽고 요구사항 정의서(01-requirements.md)를 만든다.
+  prompt:
+    system: prompts/pilot-requirment-analyzer-agent/v1.st
+  input:
+    schema: schemas/pilot-requirment-analyzer-agent.input.schema.json
+  output:
+    format: JSON
+    schema: schemas/pilot-requirment-analyzer-agent.output.schema.json
+    validation: STRICT
+  tools:
+    allowed: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile, appendFile, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]
+  execution:
+    # prompt에 [조회 한도]를 적지 않는다. 횟수는 엔진이 센다. 남은 횟수가 5분의 1 이하가 되면 엔진이 Tool 결과 끝에
+    # "N번 남았다, 지금 결과를 저장하라"고 알려 주고, 다 쓰면 Tool을 실행하지 않는다(runtime.agent.ToolCallBudgetCallback).
+    # 예전 prompt의 "조회 25번 이내"에 문서를 저장하는 호출(writeFile, appendFile)을 더한 값이다.
+    maxToolCalls: 32

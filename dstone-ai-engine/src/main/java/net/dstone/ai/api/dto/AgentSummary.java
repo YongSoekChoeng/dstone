@@ -18,8 +18,10 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
  * @param output      이 Agent가 돌려주는 값의 모양(JSON Schema)입니다.
  * @param tools       이 Agent가 쓸 수 있는 Tool 이름 목록입니다(["*"]는 전부, 빈 목록은 쓰지 않음).
  * @param subAgents   이 Agent가 일을 맡길 수 있는 다른 Agent의 id 목록입니다.
+ * @param version     이 Agent 정의의 버전입니다.
+ * @param role        사람이 읽는 역할 이름입니다(없으면 null).
  */
-public record AgentSummary(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools, List<String> subAgents) {
+public record AgentSummary(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools, List<String> subAgents, String version, String role) {
 
 	/**
 	 * AgentDefinition(Agent 전체 정의)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
@@ -27,7 +29,7 @@ public record AgentSummary(String id, String description, Map<String, Object> in
 	 * @param definition 요약으로 바꿔줄 Agent 정의입니다.
 	 */
 	public static AgentSummary from(AgentDefinition definition) {
-		return new AgentSummary(definition.id(), definition.description(), definition.inputSchema(), definition.outputSchema(), definition.toolNames(), definition.subAgentIds());
+		return new AgentSummary(definition.id(), definition.description(), definition.inputSchema(), definition.outputSchema(), definition.toolNames(), definition.subAgentIds(), definition.version(), definition.role());
 	}
 
 }

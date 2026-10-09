@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-source-investigator-agent input",
+  "type": "object",
+  "properties": {
+    "sourceRoot": {
+      "type": "string",
+      "description": "조사할 소스의 루트 절대경로"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "이 소스를 미리 분석해 둔 프로젝트의 ID(요청서의 '프로젝트ID'). 없으면 비운다"
+    },
+    "question": {
+      "type": "string",
+      "description": "알아내야 할 것. 찾을 화면명/메뉴명/오류 문구/쿼리ID/클래스명 등 단서를 함께 적는다"
+    }
+  },
+  "required": [
+    "sourceRoot",
+    "question"
+  ]
+}

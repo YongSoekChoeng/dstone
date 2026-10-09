@@ -1,0 +1,61 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# sample-tool-chain-basic.yml과 같은 패턴(TOOL step 2개 연속 실행, LLM 비용 없음)이지만, 여기서
+# 부르는 두 Tool(directory_tree, read_text_file)은 로컬 @AiTool이 아니라 definitions/mcp/sample/
+# sample-filesystem-mcp.yml에 정의된 외부 MCP 서버의 Tool입니다. runtime.tool.ToolExecutor
+# 입장에서는 로컬 Tool을 부를 때와 완전히 같은 경로(caller 화이트리스트 → ToolCallback.call())로
+# 처리되므로, TOOL step도 MCP Tool을 LLM 없이 그대로 직접 호출할 수 있다는 걸 보여주는 것이 이
+# Workflow의 목적입니다.
+#
+# 동작 흐름
+# 1) tree: input으로 받은 디렉토리(${input})의 목록을 directory_tree로 가져옵니다.
+#    directory_tree는 [{"name": "notes.txt", "type": "file"}, ...] 모양의 JSON으로 답하므로,
+#    엔진이 그 JSON(리스트)을 그대로 state.tree에 저장합니다.
+# 2) readNotes: forEach가 "${state.tree}"라서, 찾아낸 항목 개수만큼 read_text_file을 동시에
+#    호출합니다. 각 반복은 자기가 맡은 항목을 entry(itemVariable: entry)로 받고, 글자 사이에 표현식을 끼워 넣어
+#    경로를 만듭니다: "${input}/${entry.name}".
+#    파일이 몇 개든 YAML을 고칠 필요가 없습니다(예시 디렉토리에는 파일만 있다고 가정합니다).
+# 3) 최종 결과는 readNotes가 저장한 state.notes, 즉 파일별 내용의 리스트입니다.
+#
+# MCP 서버가 노출하는 디렉토리(${APP_HOME}/${APP_NAME}/mcp/server-filesystem) 밖의 경로를 넣으면
+# MCP 서버가 거부해서 tree step이 FAIL로 끝납니다. 화이트리스트 밖 접근이 실제로 막히는지 확인하는
+# 셈이므로 정상 동작입니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다(input은 지금 실행 중인
+# conf/env{-profile}.properties의 APP_HOME 값에 맞춰서 넣어야 합니다 - 예를 들어 Windows 로컬이면
+# "D:/AppHome/framework/dstone/dstone-ai-engine/mcp/server-filesystem/sample"을, WSL이면
+# "/app/dstone/dstone-ai-engine/mcp/server-filesystem/sample"을 넣으면 됩니다):
+#   workflowId: sample-mcp-filesystem-list
+#   input     : (지금 환경의 APP_HOME)/dstone-ai-engine/mcp/server-filesystem/sample
+workflow:
+  id: sample-mcp-filesystem-list
+  version: "1.0.0"
+  description: 외부 MCP 서버(filesystem)의 Tool 2개(directory_tree→read_text_file)를 TOOL step에서 LLM 없이 직접 호출하는 확인용 Workflow. 파일이 여러 개면 파일마다 읽는다.
+  input: string
+  settings:
+    maxIterations: 3
+  output:
+    value: "${state.notes}"
+  steps:
+
+    - id: tree
+      type: TOOL
+      tool: directory_tree
+      input:
+        path: "${input}"
+      output:
+        result: "state.tree"
+      next: readNotes
+      onFailure: FAIL
+
+    - id: readNotes
+      type: TOOL
+      tool: read_text_file
+      forEach: "${state.tree}"
+      itemVariable: entry
+      input:
+        path: "${input}/${entry.name}"
+      output:
+        result: "state.notes"
+      next: END
+      onFailure: FAIL

@@ -1,0 +1,17 @@
+# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+#
+# 이 Agent는 SUPERVISOR step 전용 예시입니다. 호출하는 방식 자체는 일반 AGENT step과 같지만,
+# 답의 모양은 엔진이 {pass, reason}으로 정해 두었으므로(common.schema.StepOutputSchemas) 이 Agent는
+# output을 선언하지 않습니다(선언하면 엔진이 켜질 때 막힙니다). 엔진이 그 스키마를 사용자 메시지 끝에
+# 붙여서 LLM이 그 모양의 JSON으로만 답하게 하고, 답을 검사합니다.
+# "판정만 하고 대상을 고쳐 쓰지 않는다", "근거가 부족하면 불통과"라는 규칙은 엔진이 SUPERVISOR step에 항상 넣어 주므로
+# (runtime.prompt.EnginePrompt.SUPERVISOR) 이 prompt에는 "무엇을 기준으로 판정하는지"만 적습니다.
+# 판정 기준은 예시를 들어 구체적으로 적어야 합니다. "안녕이라는 단어를 포함하는지 엄격히 검사"라고만 적었을 때는
+# 모델이 "안녕하세요"를 "안녕이라는 단어는 아니다"로 보고 불통과시킨 적이 있습니다.
+# workflows/sample/sample-supervisor-verdict-gate.yml에서 이 Agent를 가져다 씁니다.
+agent:
+  id: sample-verdict-judge-agent
+  version: "1.0.0"
+  description: SUPERVISOR step 전용 - 주어진 텍스트를 pass/fail + 이유로 판정한다.
+  prompt:
+    system: prompts/sample-verdict-judge-agent/v1.st

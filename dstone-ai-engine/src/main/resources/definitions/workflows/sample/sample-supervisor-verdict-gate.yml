@@ -1,0 +1,51 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 AGENT step 다음에 SUPERVISOR step이 이어지면서, 구조화된 판정({pass, reason})이
+# 실제로 성공/실패를 잘 가르는지 확인해보기 위한 테스트 전용 Workflow입니다(자세한 내용은
+# runtime.step.SupervisorStepExecutor 참고).
+#
+# - draft: 요청의 input(role, message)을 sample-role-reply-agent의 input 맵으로 넘기고 답(string)을 받습니다.
+#   role은 그 Agent 프롬프트의 {role}을 채웁니다(프롬프트 변수는 Agent가 받은 input 필드로 채워짐).
+# - judge: draft의 답(${state.draft})을 sample-verdict-judge-agent에게 넣어 판정받습니다. 그 Agent는
+#   텍스트에 "안녕"이라는 단어가 들어 있는지만 검사합니다 - 들어 있으면 pass=true가 되어 성공으로,
+#   없으면 pass=false가 되어 FAIL로 끝납니다. 판정({pass, reason})은 state.verdict에 저장됩니다.
+# - 성공 시 최종 결과는 draft의 답입니다(output.value).
+# - state.schema를 적어 둔 예시이기도 합니다. state에 어떤 이름들이 저장되는지 한 파일(schemas/...state.schema.json)에서 볼 수 있고,
+#   엔진이 켜질 때 step이 저장하는 자리와 표현식이 읽는 자리가 그 스키마에 있는 이름인지 확인합니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-supervisor-verdict-gate
+#   input     : {"message": "\"안녕하세요\"로 시작하는 인사말을 한 문장 만들어줘.", "role": "친절한 상담원"}
+# message를 "인사말 없이 오늘 날씨만 알려줘"처럼 바꿔보면, judge에서 FAIL로 끝나는 것도 확인할 수 있습니다.
+workflow:
+  id: sample-supervisor-verdict-gate
+  version: "1.0.0"
+  description: AGENT가 만든 텍스트를 SUPERVISOR(pass/reason)가 판정해 성공/실패를 가르는 흐름 확인용 Workflow.
+  input:
+    schema: schemas/sample-supervisor-verdict-gate.input.schema.json
+  state:
+    schema: schemas/sample-supervisor-verdict-gate.state.schema.json
+  settings:
+    maxIterations: 3
+  output:
+    value: "${state.draft}"
+  steps:
+
+    - id: draft
+      type: AGENT
+      agent: sample-role-reply-agent
+      input:
+        role: "${input.role}"
+        message: "${input.message}"
+      output:
+        result: "state.draft"
+      next: judge
+
+    - id: judge
+      type: SUPERVISOR
+      agent: sample-verdict-judge-agent
+      input: "${state.draft}"
+      output:
+        result: "state.verdict"
+      next: END
+      onFailure: FAIL

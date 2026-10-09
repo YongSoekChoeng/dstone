@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-impact-analyzer-review-agent input",
+  "type": "object",
+  "properties": {
+    "workDir": {
+      "type": "string",
+      "description": "작업 폴더의 절대경로(00-request.md가 들어 있는 폴더)"
+    }
+  },
+  "required": [
+    "workDir"
+  ]
+}

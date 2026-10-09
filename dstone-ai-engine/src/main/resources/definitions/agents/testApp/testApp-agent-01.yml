@@ -1,0 +1,10 @@
+agent:
+  id: testApp-agent-01
+  version: "1.0.0"
+  description: 1단계 agent 분석/설계서 작성.
+  prompt:
+    system: prompts/testApp-agent-01/v1.st
+  output:
+    format: JSON
+    schema: schemas/testApp-agent-01.output.schema.json
+    validation: STRICT

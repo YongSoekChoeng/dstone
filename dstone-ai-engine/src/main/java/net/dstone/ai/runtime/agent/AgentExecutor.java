@@ -41,7 +41,7 @@ import reactor.core.publisher.Flux;
 /**
  * <pre>
  * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
- * AgentDefinition에 적힌 prompt(시스템 프롬프트)와 tools(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), ragEnabled(RAG 사용 여부)를 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
+ * AgentDefinition에 적힌 prompt(시스템 프롬프트 파일)와 tools.allowed(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), context(RAG 사용 여부), model, execution을 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
  * 그래서 api.controller.ChatController (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 
  * runtime.step의 AgentStepExecutor/SupervisorStepExecutor/RouterStepExecutor(Workflow 안에서 AGENT/SUPERVISOR/ROUTER step을 실행하는 경우)
  * 모두 결국 이 클래스를 통해서 LLM을 호출합니다.
@@ -125,6 +125,8 @@ public class AgentExecutor extends BaseObject {
 	 * 답은 output이 string이면 글자, object면 맵처럼 Agent output 모양 그대로입니다.
 	 *
 	 * Stream 방식이 아니라서, LLM이 답변을 다 만들 때까지 기다렸다가 완성된 결과를 한 번에 돌려줍니다.
+	 *
+	 * Agent에 execution.onInvalidOutput: RETRY를 적었으면, 답이 계약과 맞지 않을 때 maxAttempts번까지 다시 부릅니다.
 	 * </pre>
 	 * @param agent         호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
@@ -133,14 +135,31 @@ public class AgentExecutor extends BaseObject {
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
-	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구(EnginePrompt.SUB_AGENT 등). 덧붙일 것이 없으면 null
 	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
 	public Object call(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride, engineRule);
-		return this.ask(spec, userMessage, agent.outputSchema());
+		// 답이 계약(output 모양 등)을 지키지 않았을 때만 다시 부릅니다(execution.onInvalidOutput: RETRY, maxAttempts).
+		// 넣는 값이 틀린 것은 다시 불러도 같으므로 위에서 바로 실패하고, 외부 연결 오류 같은 예외는 잡지 않고 그대로 올려보냅니다.
+		int maxAttempts = agent.maxAttempts();
+		AgentContractException last = null;
+		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+			try {
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride, engineRule);
+				return this.ask(spec, userMessage, agent.outputSchema());
+			} catch (AgentContractException e) {
+				last = e;
+				if (attempt < maxAttempts) {
+					this.info("agent[" + agent.id() + "]의 답이 계약과 맞지 않아 다시 부릅니다(" + attempt + "/" + maxAttempts + "): " + e.getMessage());
+				}
+			}
+		}
+		if (maxAttempts > 1) {
+			throw new AgentContractException(maxAttempts + "번 불렀지만 계약에 맞는 답을 받지 못했습니다. 마지막 사유: " + last.getMessage());
+		}
+		throw last;
 	}
 
 	/**
@@ -183,7 +202,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
-	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
 	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
@@ -354,7 +373,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵(promptVariables()로 만든 값)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
-	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 agent.model()을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
+	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
 	 */
 	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
@@ -362,7 +381,7 @@ public class AgentExecutor extends BaseObject {
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
 		boolean toolsEnabled = !Boolean.FALSE.equals(toolsOverride);
-		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : agent.model();
+		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
 		
 		ExecContext.getInstance().put("AgentDefinition", agent);
 		/************************************************************************
@@ -397,13 +416,13 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- 순서는 "엔진 규칙(공통 + engineRule) → 업무 지시(Agent prompt)"입니다(EnginePrompt.compose()).
 			  엔진 규칙은 변수 치환을 거치지 않습니다. 변수는 Agent prompt에서만 채운 뒤 뒤에 이어 붙입니다.
-			- AgentDefinition.prompt()에 적힌 문구가 업무 지시입니다. 만약 그 문구 안에
+			- AgentDefinition.promptText()(prompt.system 파일의 내용)가 업무 지시입니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
 			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
 			  요청의 variables를 더 얹습니다(promptVariables() 참고).
 			- 이번에 처리할 데이터(input)는 사용자 메시지로도 함께 들어갑니다.
 		************************************************************************/
-		String taskPrompt = StringUtil.isEmpty(agent.prompt()) ? "" : new PromptTemplate(agent.prompt()).render(variables == null ? Map.of() : variables);
+		String taskPrompt = StringUtil.isEmpty(agent.promptText()) ? "" : new PromptTemplate(agent.promptText()).render(variables == null ? Map.of() : variables);
 		spec = spec.system(EnginePrompt.compose(engineRule, taskPrompt));
 
 		/************************************************************************
@@ -451,16 +470,17 @@ public class AgentExecutor extends BaseObject {
 
 		/************************************************************************
 		6. 모델(model)을 원하는 것으로 지정합니다.
-			- modelOverride가 있으면 그 값을, 없으면 agent.model()을, 그것도 없으면 spring.ai.{provider}.chat.options.model에
-			  설정된 공통 기본 모델을 그대로 씁니다.
+			- modelOverride가 있으면 그 값을, 없으면 Agent의 model(name 또는 routing으로 찾은 모델. AgentRegistry.modelOf())을,
+			  그것도 없으면 spring.ai.{provider}.chat.options.model에 설정된 공통 기본 모델을 그대로 씁니다.
 			- 여기서 바꾸는 것은 지금 활성화된 provider(spring.ai.model.chat) 안에서의 모델명뿐입니다.
 			  다른 provider가 쓰는 모델명을 넣으면, 지금 이 호출 시점에 그 provider의 API가 오류를
 			  돌려줍니다(앱이 시작될 때는 이 값이 맞는지 미리 검사해 주지 않습니다).
-			- Agent에 reasoning(추론 세기)이 적혀 있으면 그것도 여기서 함께 실립니다. 적혀 있지 않으면 모델의 기본 동작 그대로입니다.
+			- Agent에 model.reasoning(추론 세기), model.temperature, execution.timeoutSeconds가 적혀 있으면 그것도 여기서 함께 실립니다.
+			  적혀 있지 않으면 모델과 provider 설정의 기본 동작 그대로입니다.
 			- provider가 openai면 응답 대기 시간(spring.ai.openai.timeout)도 여기서 함께 실립니다.
 			  설정만으로는 적용되지 않아서 호출마다 넣어야 합니다(ConfigChatClient.requestOptions() 설명 참고).
 		************************************************************************/
-		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(model, agent.reasoningLevel());
+		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(model, agent.reasoningLevel(), agent.temperature(), agent.timeoutSeconds());
 		if (requestOptions != null) {
 			spec = spec.options(requestOptions);
 		}

@@ -15,8 +15,8 @@ import java.util.Map;
  *
  * ragEnabled와 toolsEnabled는 둘 다 비워 두면(null) Agent 정의에 적힌 값을 그대로 씁니다.
  * ragEnabled에 true나 false를 직접 넣으면, 이번 요청 한 번만 Agent 정의값 대신 그 값을 씁니다.
- * toolsEnabled는 Agent의 tools 목록을 이번 요청에서 쓸지 말지만 정합니다. false면 Tool 없이 부르고,
- * true면 Agent의 tools 목록 그대로입니다. true를 넣어도 Agent의 tools에 없는 Tool은 켜지지 않습니다.
+ * toolsEnabled는 Agent의 tools.allowed 목록을 이번 요청에서 쓸지 말지만 정합니다. false면 Tool 없이 부르고,
+ * true면 Agent의 tools.allowed 목록 그대로입니다. true를 넣어도 그 목록에 없는 Tool은 켜지지 않습니다.
  * 예를 들어 dstone-boot의 채팅 화면에서 RAG/Tool 체크박스를 켰다 껐다 할 수 있는 것도 이 기능
  * 덕분입니다 - 같은 Agent를 쓰면서도 요청마다 RAG/Tool 사용 여부를 다르게 줄 수 있습니다.
  *
@@ -37,7 +37,7 @@ import java.util.Map;
  * @param agent        호출할 Agent의 이름입니다. 반드시 있어야 합니다.
  * @param variables    프롬프트의 {변수명} 자리에 채워 넣을 값들입니다.
  * @param ragEnabled   이번 요청에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씁니다(비우면 Agent 정의값을 그대로 사용).
- * @param toolsEnabled false면 이번 요청만 Tool 없이 부릅니다(비우거나 true면 Agent의 tools 목록 그대로).
+ * @param toolsEnabled false면 이번 요청만 Tool 없이 부릅니다(비우거나 true면 Agent의 tools.allowed 목록 그대로).
  * @param model        이번 요청에서만 쓸 모델명을 강제로 지정하고 싶을 때 씁니다(비우면 Agent 정의값 또는 provider 기본값을 사용).
  */
 public record ChatRequest(Object input, String sessionId, String agent, Map<String, Object> variables, Boolean ragEnabled, Boolean toolsEnabled, String model) {

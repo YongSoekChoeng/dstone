@@ -17,7 +17,7 @@ import com.networknt.schema.SpecificationVersion;
 
 /**
  * <pre>
- * YAML에 적은 JSON Schema(agents/*.yml의 input/output, workflows/*.yml의 input/output)를 다루는 도구 모음입니다.
+ * 정의 파일의 JSON Schema(agents/*.yml의 input/output, workflows/*.yml의 input/state/output. 보통 schemas/ 아래 파일)를 다루는 도구 모음입니다.
  * 네 곳에서 같은 규칙을 씁니다.
  * - YAML을 읽을 때: 축약형을 표준 JSON Schema로 펼칩니다(normalize).
  * - 엔진이 켜질 때: 스키마 자체가 올바른 JSON Schema인지(checkSchema), 표현식이 읽는 경로가 스키마에 있는지(checkPath) 검사합니다.
@@ -26,7 +26,7 @@ import com.networknt.schema.SpecificationVersion;
  *
  * ## 축약형
  * 타입만 적으면 되는 자리에서는 타입 이름 하나만 적어도 됩니다. 로더가 표준 모양으로 펼쳐 줍니다.
- *   output: string                  →  output: {schema: {type: string}}
+ *   input: string                   →  input: {schema: {type: string}}
  *   properties: {name: string}      →  properties: {name: {type: string}}
  *   items: integer                  →  items: {type: integer}
  *   list<string>                    →  {type: array, items: {type: string}}
@@ -257,7 +257,7 @@ public final class JsonSchemaUtil {
 	/**
 	 * <pre>
 	 * 스키마를 경로(예: ["analysis", "tables", "0"])대로 따라 내려가 봐서, 그 경로의 값이 있을 수 있는지 검사합니다.
-	 * 엔진이 켜질 때 "${ .steps.analyze.output.analysis.tables[0] }" 같은 표현식이 읽는 경로를 미리 검사하는 데 씁니다.
+	 * 엔진이 켜질 때 "${state.analysis.tables[0]}" 같은 표현식이 읽는 경로를 미리 검사하는 데 씁니다.
 	 * - object: 다음 이름이 properties에 있어야 합니다(properties가 없거나 additionalProperties를 열어 뒀으면 더 보지 않음).
 	 * - array: 다음 이름이 숫자(몇 번째 항목인지, 0부터. 표현식에서는 [0])여야 합니다.
 	 * - string/number/integer/boolean: 그 아래로 더 들어갈 수 없습니다.
@@ -266,7 +266,7 @@ public final class JsonSchemaUtil {
 	 * </pre>
 	 *
 	 * @param schema   시작할 스키마입니다(null이면 판단할 수 없으므로 null).
-	 * @param base     스키마가 가리키는 자리의 이름입니다(오류 문장에 씁니다. 예: "steps.analyze.output").
+	 * @param base     스키마가 가리키는 자리의 이름입니다(오류 문장에 씁니다. 예: "state.analysis").
 	 * @param segments 따라 내려갈 경로입니다.
 	 */
 	public static String checkPath(Map<String, Object> schema, String base, List<String> segments) {
@@ -386,25 +386,16 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * routes를 적은 APPROVAL step의 output 모양입니다: {route: string, approver: string, comment: string}.
-	 * route는 routes 이름 중 하나입니다(enum).
+	 * APPROVAL step의 output 모양입니다: {decision: string, approver: string, comment: string}.
+	 * decision은 routes 이름 중 하나입니다(enum).
 	 *
-	 * @param routes 고를 수 있는 선택지 이름들입니다(APPROVAL step의 routes 키).
+	 * @param routes 고를 수 있는 결정 이름들입니다(APPROVAL step의 routes 키).
 	 */
-	public static Map<String, Object> approvalRoute(Collection<String> routes) {
-		Map<String, Object> route = field(STRING, "사람이 고른 선택지. 다음 중 하나: " + String.join(", ", routes));
-		route.put("enum", new ArrayList<>(routes));
+	public static Map<String, Object> approvalDecision(Collection<String> routes) {
+		Map<String, Object> decision = field(STRING, "사람이 고른 결정. 다음 중 하나: " + String.join(", ", routes));
+		decision.put("enum", new ArrayList<>(routes));
 		Map<String, Object> properties = new LinkedHashMap<>();
-		properties.put("route", route);
-		properties.put("approver", field(STRING, "결정한 사람이나 역할"));
-		properties.put("comment", field(STRING, "결정한 이유나 메모"));
-		return object(properties);
-	}
-
-	/** routes를 적지 않은 APPROVAL step의 output 모양입니다: {approved: boolean, approver: string, comment: string} */
-	public static Map<String, Object> approval() {
-		Map<String, Object> properties = new LinkedHashMap<>();
-		properties.put("approved", field("boolean", "승인이면 true, 반려면 false"));
+		properties.put("decision", decision);
 		properties.put("approver", field(STRING, "결정한 사람이나 역할"));
 		properties.put("comment", field(STRING, "결정한 이유나 메모"));
 		return object(properties);

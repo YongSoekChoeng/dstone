@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-architect-agent output",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "저장한 설계서/태스크 목록의 절대경로"
+    },
+    "summary": {
+      "type": "string",
+      "description": "설계 방향과 태스크 개수 중심 요약(3~5줄)"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "결정이 필요한 사항(없으면 빈 배열)"
+    }
+  },
+  "required": [
+    "files",
+    "summary"
+  ]
+}

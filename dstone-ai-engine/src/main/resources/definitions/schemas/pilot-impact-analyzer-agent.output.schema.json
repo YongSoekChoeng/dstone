@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-impact-analyzer-agent output",
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string",
+      "description": "저장한 영향도 분석서의 절대경로"
+    },
+    "summary": {
+      "type": "string",
+      "description": "원인과 변경 대상, 위험 요소 중심 요약(3~5줄)"
+    }
+  },
+  "required": [
+    "file",
+    "summary"
+  ]
+}

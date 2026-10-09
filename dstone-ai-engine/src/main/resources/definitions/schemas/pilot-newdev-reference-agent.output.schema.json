@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pilot-newdev-reference-agent output",
+  "type": "object",
+  "properties": {
+    "sourceRoot": {
+      "type": "string",
+      "description": "요청서의 소스경로"
+    },
+    "featureName": {
+      "type": "string",
+      "description": "새로 만들 기능의 이름"
+    },
+    "existing": {
+      "type": "string",
+      "description": "같은 기능이 이미 있는지 확인한 결과. 무슨 글자로 어디를 찾았고 무엇이 나왔는지"
+    },
+    "referenceName": {
+      "type": "string",
+      "description": "참고 구현의 기능 이름"
+    },
+    "entry": {
+      "type": "string",
+      "description": "참고 구현의 흐름을 한 줄로: 화면 → URL → Controller.메서드 → 쿼리ID → 테이블"
+    },
+    "files": {
+      "type": "array",
+      "description": "참고 구현을 이루는 파일과 그 기능이 등록된 파일",
+      "items": {
+        "type": "object",
+        "properties": {
+          "layer": {
+            "type": "string",
+            "description": "층. 화면 / Controller / Service / DAO / VO / 쿼리 파일 / 테이블 생성 스크립트 / 메뉴 등록 / 설정 등록 가운데 하나"
+          },
+          "path": {
+            "type": "string",
+            "description": "파일의 절대경로"
+          },
+          "note": {
+            "type": "string",
+            "description": "이 파일에서 참고 구현에 해당하는 것(클래스.메서드, 쿼리ID, 테이블명, 등록 줄의 글자)"
+          }
+        },
+        "required": [
+          "layer",
+          "path"
+        ]
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "사람만 답할 수 있는 질문(없으면 빈 배열)"
+    }
+  },
+  "required": [
+    "sourceRoot",
+    "featureName",
+    "referenceName",
+    "files"
+  ]
+}
