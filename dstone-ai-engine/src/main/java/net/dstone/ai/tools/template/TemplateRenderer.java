@@ -43,6 +43,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *  1. {{이름}} / {{a.b.c}} — 값 넣기. 그 자리에 값을 그대로 넣습니다. 점으로 안쪽 필드를 가리킵니다.
  *    제목: {{title}} / 참고: {{reference.name}} / 담당: {{owner}}
  *    제목: FAQ 메뉴 / 참고: 샘플게시판 / 담당:
+ *    
  *  2. {{#목록}} ... {{/목록}} — 되풀이. 목록의 항목 수만큼 안쪽을 반복합니다. 안에서는 항목의 필드를 이름만으로 씁니다.
  *    {{#targets}}
  *    - {{path}}: {{change}}
@@ -53,9 +54,11 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *    -> 안쪽에서 찾지 못한 이름은 바깥에서 찾습니다. 그래서 {{#frs}}{{.}} ({{path}}){{/frs}}처럼 바깥 항목의 path를 함께 쓸 수 있습니다.
  *    -> {{#targets}}처럼 태그만 있는 줄은 결과에 빈 줄을 남기지 않습니다.
  *    -> 목록 안의 null은 없는 항목으로 보고 건너뜁니다. forEach step에서 실패한 자리가 null로 오기 때문에 넣은 규칙입니다.
+ *    
  *  3. {{#값}} ... {{/값}} — 있을 때만. 2번과 같은 문법인데, 값이 목록이 아니면 "있으면 한 번 보여 준다"로 동작합니다.
  *    {{#title}}제목이 있습니다: {{.}}{{/title}}
  *    -> 없는 값, false, 빈 글자 "", 빈 목록 []이면 안쪽 전체를 건너뜁니다.
+ *    
  *  4. {{^값}} ... {{/값}} — 없을 때만. 3번의 반대입니다. 보통 둘을 짝지어 "있으면 값, 없으면 기본 문구"를 만듭니다.
  *    {{#questions}}
  *    - {{.}}
@@ -65,12 +68,14 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *    {{/questions}}
  *    없음
  *    -> if / else에 해당하는 유일한 방법입니다. 다만 "있다/없다"만 따질 수 있고 "값이 '수정'이면" 같은 비교는 못 합니다.
+ *    
  *  5. {{-index}} — 순번. 되풀이 안에서 몇 번째 항목인지를 1부터 넣습니다.
  *    {{#targets}}
  *    ## {{-index}}. {{path}}
  *    {{/targets}}
  *    ## 1. /src/Faq.java
  *    ## 2. /src/menu.sql
+ *    
  *  6. {{#-first}} / {{^-last}} — 첫 항목일 때만 / 마지막이 아닐 때만 되풀이 안에서만 쓰는 특별한 이름입니다.
  *    쉼표로 잇기 — 마지막 항목 뒤에는 쉼표를 붙이지 않습니다.
  *    {{#frs}}{{.}}{{^-last}}, {{/-last}}{{/frs}}
@@ -83,6 +88,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *    {{/-first}}
  *    | {{from}} | {{to}} |
  *    {{/renames}}
+ *    
  *  7. {{#cell}} ... {{/cell}} — 표의 한 칸에 넣기. Mustache 표준이 아니라 이 엔진이 넣어 둔 도우미입니다. 마크다운 표는 |로 칸을 나누고 한 줄이 한 행이라서, 
  *    값에 |나 줄바꿈이 있으면 표가 깨집니다. 감싼 부분의 |를 /로, 줄바꿈을 빈칸으로 바꿉니다.
  *    | {{path}} | {{#cell}}{{change}}{{/cell}} |
@@ -93,8 +99,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *    - 두 목록을 서로 맞춰 보기 (예: "FR마다 그 FR을 다루는 파일 찾기")
  *    - 목록 전체에 대한 판단 (예: "어느 항목에도 질문이 없으면 '없음'")
  *    
- *    이런 것이 필요하면 틀에 넣기 전에 데이터를 그 모양으로 만들어야 합니다. filterList로 먼저 거르거나, Agent의 output
- *    스키마를 그 모양으로 정하는 식입니다.
+ *  이런 것이 필요하면 틀에 넣기 전에 데이터를 그 모양으로 만들어야 합니다. filterList로 먼저 거르거나, Agent의 output스키마를 그 모양으로 정하는 식입니다.
  * </pre>
  */
 public final class TemplateRenderer {
