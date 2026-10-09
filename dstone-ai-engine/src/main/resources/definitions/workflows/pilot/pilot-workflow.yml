@@ -57,16 +57,42 @@ workflow:
    요청서에는 '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
    예)
    D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  #####################################  
+  #  ● workflow의 settings
+  #    maxIterations: step 실행 횟수 상한
+  #    checkpoint: step마다 상태 저장
+  #      - true만 적을 수 있습니다. 엔진은 step이 끝날 때마다 실행 상태(state 포함)를 항상 DB에 저장하며, 끄는 기능이 없습니다.
+  #      - false를 적으면 기동에 실패합니다.
+  #      - 이 저장 덕분에 APPROVAL에서 멈췄다가 이어서 실행하거나, 서버가 재시작된 뒤 마지막 step부터 이어갈 수 있습니다.
+  #    onError: 시스템 오류 시 동작
+  #      - STOP만 적을 수 있습니다. step 실행 중 시스템 오류(예외)가 나면 실행 전체가 FAILED로 끝납니다.
+  #      - 다른 값(CONTINUE 등)을 적으면 기동에 실패합니다.
+  #      - step 실패 시 다른 곳으로 보내려면 settings가 아니라 그 step의 onFailure를 씁니다. 이것은 Agent 계약 위반(출력 형식 틀림 등)이나 Tool의 실패: 응답 같은 step 실패에 적용됩니다.
+  #####################################    
   settings:
     checkpoint: true
     maxIterations: 100
     onError: STOP
-  # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  #####################################    
+  #  ● workflow의 input
+  #	   * schema 를 표시.
+  #	   * 축약형
+  #    - string : 글자
+  #	   - number : 숫자(소수 포함)
+  #	   - integer : 정수
+  #	   - boolean : true/false
+  #	   - object :  객체(필드 제한 없음)
+  #	   - array : 목록(항목 제한 없음)
+  #	   - list<타입> : 그 타입의 목록
+  #	   * 표준형 - JSON Schema를 그대로 표시.
+  #####################################    
   input: string
+  #####################################    
+  #  ● workflow의 output
+  #	   * value 와 schema 를 표시. value 는 필수, schema 는 생략가능.
+  #    * output 자체를 생략하면 state 자체가 최종결과가 됨.
+  #####################################    
   output:
-    # 탄 경로에서 나온 결과만 값이 있고, 타지 않은 경로의 것은 null입니다.
-    # 각 Agent가 본문은 파일로 저장하고 요약만 돌려주므로 결과가 작습니다.
-    # 읽어 둔 파일 내용(state.sources, state.designTargets, state.developInputs)은 넣지 않습니다. 수십만 자가 됩니다.
     value:
       route: "${state.classify.route}"
       requirements: "${state.requirements}"
