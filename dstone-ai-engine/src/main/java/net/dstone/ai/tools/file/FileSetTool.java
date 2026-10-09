@@ -1,4 +1,4 @@
-package net.dstone.ai.tools.utils;
+package net.dstone.ai.tools.file;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -20,7 +20,7 @@ import net.dstone.ai.common.consts.Constants;
  * 뒤의 Agent들에게 input으로 넘기는 데 씁니다. Agent마다 같은 파일을 Tool로 다시 읽는 일이 없어집니다.
  *
  * stepOnly = true라서 LLM에게는 보이지 않고, 결과 길이 상한도 걸리지 않습니다(파일 내용처럼 큰 값을 그대로 돌려줍니다).
- * 파일 하나를 읽는 일은 readFile Tool(FileUtil)을 그대로 거칩니다. 그래서 읽기 상한(dstone.ai.tool.file.max-read-chars)과
+ * 파일 하나를 읽는 일은 readFile Tool(FileTool)을 그대로 거칩니다. 그래서 읽기 상한(dstone.ai.tool.file.max-read-chars)과
  * 큰 파일에 붙는 "잘렸다"는 안내가 똑같습니다.
  * </pre>
  */
@@ -31,7 +31,7 @@ public class FileSetTool {
 	private static final String PATH_KEY = "path";
 
 	@Autowired
-	private FileUtil fileUtil;
+	private FileTool fileTool;
 
 	/**
 	 * <pre>
@@ -49,14 +49,14 @@ public class FileSetTool {
 		List<String> missing = new ArrayList<>();
 		for (Object item : paths == null ? List.of() : paths) {
 			String path = this.pathOf(item);
-			if (path == null || !this.fileUtil.isFileExist(path)) {
+			if (path == null || !this.fileTool.isFileExist(path)) {
 				missing.add(String.valueOf(path));
 				continue;
 			}
 			if (contents.containsKey(path)) {
 				continue;
 			}
-			String content = this.fileUtil.readFile(path);
+			String content = this.fileTool.readFile(path);
 			if (content == null || content.startsWith(Constants.Outcome.FAIL_PREFIX)) {
 				return this.fail(content == null ? "파일을 읽지 못했습니다: " + path : content);
 			}
@@ -107,10 +107,10 @@ public class FileSetTool {
 
 	/** 파일 내용을 돌려줍니다. 경로가 비었거나 파일이 없거나 읽지 못하면 빈 글자입니다. */
 	private String contentOf(String path, boolean lineNumbers) {
-		if (path.isBlank() || !this.fileUtil.isFileExist(path)) {
+		if (path.isBlank() || !this.fileTool.isFileExist(path)) {
 			return "";
 		}
-		String content = lineNumbers ? this.fileUtil.readFileLines(path, null, null) : this.fileUtil.readFile(path);
+		String content = lineNumbers ? this.fileTool.readFileLines(path, null, null) : this.fileTool.readFile(path);
 		return content == null || content.startsWith(Constants.Outcome.FAIL_PREFIX) ? "" : content;
 	}
 

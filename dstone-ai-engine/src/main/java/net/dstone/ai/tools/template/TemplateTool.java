@@ -14,7 +14,7 @@ import org.springframework.core.io.ResourceLoader;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
-import net.dstone.ai.tools.utils.FileUtil;
+import net.dstone.ai.tools.file.FileTool;
 
 /**
  * <pre>
@@ -49,7 +49,7 @@ public class TemplateTool {
 	private final ResourceLoader resourceLoader = new DefaultResourceLoader(TemplateTool.class.getClassLoader());
 
 	@Autowired
-	private FileUtil fileUtil;
+	private FileTool fileTool;
 
 	/**
 	 * <pre>
@@ -83,7 +83,7 @@ public class TemplateTool {
 		if (filePath == null || filePath.isBlank()) {
 			return rendered;
 		}
-		return this.fileUtil.writeFile(filePath, rendered);
+		return this.fileTool.writeFile(filePath, rendered);
 	}
 
 	/**

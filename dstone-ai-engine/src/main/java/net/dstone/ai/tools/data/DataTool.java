@@ -9,7 +9,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import net.dstone.ai.common.annotation.AiTool;
-import net.dstone.ai.tools.utils.FileUtil;
+import net.dstone.ai.tools.file.FileTool;
 
 /**
  * <pre>
@@ -26,7 +26,7 @@ import net.dstone.ai.tools.utils.FileUtil;
 public class DataTool {
 
 	@Autowired
-	private FileUtil fileUtil;
+	private FileTool fileTool;
 
 	/**
 	 * <pre>
@@ -81,7 +81,7 @@ public class DataTool {
 			return DataLogic.checkResult(DataLogic.check(rules, new DataLogic.FileCheck() {
 				@Override
 				public boolean exists(String path) {
-					return DataTool.this.fileUtil.isFileExist(path);
+					return DataTool.this.fileTool.isFileExist(path);
 				}
 			}));
 		} catch (IllegalArgumentException e) {

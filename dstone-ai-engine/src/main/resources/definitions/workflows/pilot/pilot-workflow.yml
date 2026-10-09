@@ -57,12 +57,12 @@ workflow:
    요청서에는 '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
    예)
    D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
-  # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
-  input: string
   settings:
     checkpoint: true
     maxIterations: 100
     onError: STOP
+  # input: 수정아이디 경로. 예)D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  input: string
   output:
     # 탄 경로에서 나온 결과만 값이 있고, 타지 않은 경로의 것은 null입니다.
     # 각 Agent가 본문은 파일로 저장하고 요약만 돌려주므로 결과가 작습니다.

@@ -299,7 +299,7 @@ public class ConfigTool extends BaseObject {
 	 *
 	 * 주의: JSON을 돌려주는 Tool의 결과가 잘리면 더 이상 올바른 JSON이 아닙니다. TOOL step에서는
 	 * 그 결과가 글자 그대로(text) step의 result가 됩니다. 이런 일이 없도록 큰 결과를
-	 * 낼 수 있는 Tool은 Tool 안에서 먼저 개수를 제한하는 것이 좋습니다(tools.utils.FileUtil 참고).
+	 * 낼 수 있는 Tool은 Tool 안에서 먼저 개수를 제한하는 것이 좋습니다(tools.utils.FileTool 참고).
 	 * </pre>
 	 */
 	private static final class LimitedToolCallback implements ToolCallback {

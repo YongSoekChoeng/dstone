@@ -1,4 +1,4 @@
-package net.dstone.ai.tools.utils;
+package net.dstone.ai.tools.file;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -43,7 +43,7 @@ import net.dstone.ai.common.consts.Constants;
  * </pre>
  */
 @AiTool
-public class FileUtil {
+public class FileTool {
 
 	/** 설정이 없을 때 쓰는 읽기 상한입니다(대략 1만 토큰 안팎). */
 	private static final int DEFAULT_MAX_READ_CHARS = 30000;

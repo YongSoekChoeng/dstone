@@ -16,14 +16,16 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import net.dstone.ai.tools.file.FileTool;
+
 /**
  * <pre>
  * 파일을 쓰고 고치는 Tool(writeFile, replaceInFile, copyFileWithReplace)이 내용을 망가뜨리지 않는지 확인합니다.
  * </pre>
  */
-public class FileUtilTest {
+public class FileToolTest {
 
-	private final FileUtil tool = new FileUtil();
+	private final FileTool tool = new FileTool();
 
 	@TempDir
 	Path dir;

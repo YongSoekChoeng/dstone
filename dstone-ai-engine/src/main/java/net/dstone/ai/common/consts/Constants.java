@@ -95,7 +95,7 @@ public final class Constants {
 			public final static String PREFIX = "dstone.ai.tool.jenkins";
 		}
 
-		/** 파일을 읽고 쓰는 Tool(tools.utils.FileUtil)의 설정 키 접두사입니다. */
+		/** 파일을 읽고 쓰는 Tool(tools.utils.FileTool)의 설정 키 접두사입니다. */
 		public static final class File {
 			public final static String PREFIX = "dstone.ai.tool.file";
 		}

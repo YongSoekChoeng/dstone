@@ -21,9 +21,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.tools.data.DataTool;
+import net.dstone.ai.tools.file.FileSetTool;
+import net.dstone.ai.tools.file.FileTool;
 import net.dstone.ai.tools.template.TemplateTool;
-import net.dstone.ai.tools.utils.FileSetTool;
-import net.dstone.ai.tools.utils.FileUtil;
 
 /**
  * <pre>
@@ -41,16 +41,16 @@ class StepToolsTest {
 
 	@BeforeEach
 	void setUp() {
-		FileUtil fileUtil = new FileUtil();
-		ReflectionTestUtils.setField(fileUtil, "environment", new MockEnvironment());
+		FileTool fileTool = new FileTool();
+		ReflectionTestUtils.setField(fileTool, "environment", new MockEnvironment());
 		FileSetTool fileSetTool = new FileSetTool();
-		ReflectionTestUtils.setField(fileSetTool, "fileUtil", fileUtil);
+		ReflectionTestUtils.setField(fileSetTool, "fileUtil", fileTool);
 		TemplateTool templateTool = new TemplateTool();
-		ReflectionTestUtils.setField(templateTool, "fileUtil", fileUtil);
+		ReflectionTestUtils.setField(templateTool, "fileUtil", fileTool);
 		DataTool dataTool = new DataTool();
-		ReflectionTestUtils.setField(dataTool, "fileUtil", fileUtil);
+		ReflectionTestUtils.setField(dataTool, "fileUtil", fileTool);
 		this.tools = new LinkedHashMap<>();
-		for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(fileUtil, fileSetTool, templateTool, dataTool).build().getToolCallbacks()) {
+		for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(fileTool, fileSetTool, templateTool, dataTool).build().getToolCallbacks()) {
 			this.tools.put(callback.getToolDefinition().name(), callback);
 		}
 	}
