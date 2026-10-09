@@ -1,15 +1,15 @@
 # 신규 개발 경로의 구현 Agent입니다. 복사해 둔 새 파일 하나에서 "빼는 것"과 "더하는 것"을 줄 번호로 정합니다.
-# Workflow의 forEach step(newDevelop)이 파일마다 새 대화로 한 번씩 부릅니다.
+# Workflow의 forEach step(step30)이 파일마다 새 대화로 한 번씩 부릅니다.
 #
 # 이 Agent는 파일을 고치지 않습니다. Tool이 없습니다. "몇 번째 줄부터 몇 번째 줄을 지운다 / 바꾼다 / 뒤에 넣는다"를
-# 한 번에 답하고(edits), 그 목록을 Workflow의 newApply step(editFileLines)이 LLM 없이 적용합니다.
+# 한 번에 답하고(edits), 그 목록을 Workflow의 step31 step(editFileLines)이 LLM 없이 적용합니다.
 #
 # 이 Agent가 하지 않는 일 (Workflow의 TOOL step이 LLM 없이 합니다)
-# - 참고 파일을 복사하면서 이름 바꿈 표대로 글자를 바꾸는 일: newCopy step(copyFileWithReplace)
+# - 참고 파일을 복사하면서 이름 바꿈 표대로 글자를 바꾸는 일: step24 step(copyFileWithReplace)
 # - 복사한 파일을 줄 번호와 함께 읽는 일: newRead step(readFileLines). 그 내용이 source로 들어옵니다.
-# - edits를 파일에 적용하는 일: newApply step(editFileLines)
-# - 이미 있는 파일을 고치는 일(변경 전 → 변경 후, 파일 끝에 덧붙이기): newEdit / newAppend step(replaceInFile / appendFile)
-# - 본뜰 파일이 없는 새 파일을 설계가 적어 준 내용 그대로 저장하는 일: newCreate step(writeFile)
+# - edits를 파일에 적용하는 일: step31 step(editFileLines)
+# - 이미 있는 파일을 고치는 일(변경 전 → 변경 후, 파일 끝에 덧붙이기): step27 / newAppend step(replaceInFile / appendFile)
+# - 본뜰 파일이 없는 새 파일을 설계가 적어 준 내용 그대로 저장하는 일: step26 step(writeFile)
 # 그래서 이 Agent는 복사한 새 파일 가운데 빼거나 더할 것이 있는 파일에만 불립니다.
 #
 # 왜 Tool을 주지 않는가 (2026-10-08에 같은 요청, 같은 파일 6개로 재 본 결과. OpenRouter qwen/qwen3.8-27b)

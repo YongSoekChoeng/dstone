@@ -1,5 +1,5 @@
 # ROUTER step 전용 Agent입니다. 답의 모양은 엔진이 {route, reason}으로 정하므로 output을 적지 않습니다.
-# pilot-workflow의 맨 앞(classify step)에서 요청서를 읽고 어느 경로로 갈지 고릅니다.
+# pilot-workflow의 맨 앞(step01 step)에서 요청서를 읽고 어느 경로로 갈지 고릅니다.
 #
 # 왜 두었나
 #   예전에는 요구사항/영향도/리뷰 Agent의 prompt마다 "요청 유형이 신규 개발이면 이렇게, 오류 수정이면 저렇게"가

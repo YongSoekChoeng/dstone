@@ -1,7 +1,7 @@
 # SUPERVISOR step 전용 Agent입니다. 답의 모양은 엔진이 {pass, reason}으로 정하므로 output을 적지 않습니다.
 # "판정만 하고 대상을 고쳐 쓰지 않는다"는 규칙은 엔진이 SUPERVISOR step에 항상 넣습니다(runtime.prompt.EnginePrompt).
 #
-# 이 Workflow는 불통과 뒤에 사람이 재요구분석(step01) / 재분석(step02) / 재리뷰(step03) 중에서 고릅니다.
+# 이 Workflow는 불통과 뒤에 사람이 재요구분석(step02) / 재분석(step03) / 재리뷰(step04) 중에서 고릅니다.
 # 그래서 reason의 첫 줄에 "어느 문서를 고쳐야 하는지"를 적게 했습니다. 실제로 겪은 일은 이렇습니다.
 # - 요구사항이 틀렸는데 영향도 분석만 고쳐서 같은 불통과가 반복됐다.
 #   → 요구사항 정의서도 소스와 대조하고, 지적마다 '대상 문서'를 적는다.
