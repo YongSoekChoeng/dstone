@@ -1,0 +1,43 @@
+# 영향도 분석서 (신규 개발)
+
+> Agent가 낸 데이터를 Workflow가 틀에 끼워 만든 문서입니다. 이 파일을 고쳐도 다음 단계에 반영되지 않습니다. 고칠 것은 승인 단계에서 '재분석'을 고르고 의견에 적으십시오.
+
+## 자동 검증 결과
+{{#checkText}}{{.}}{{/checkText}}{{^checkText}}검증하지 않음{{/checkText}}
+
+## 참고 구현: {{reference.referenceName}}
+| 층 | 참고 구현의 파일 | 클래스.메서드 / 쿼리ID / 테이블 | 새 기능에 | 이유 |
+|---|---|---|---|---|
+{{#analysis.layers}}
+| {{#cell}}{{layer}}{{/cell}} | {{#cell}}{{referencePath}}{{/cell}} | {{#cell}}{{symbol}}{{/cell}} | {{#cell}}{{decision}}{{/cell}} | {{#cell}}{{reason}}{{/cell}} |
+{{/analysis.layers}}
+
+## 변경 대상
+| 파일 | 유형 | 본뜰 참고 파일 | 변경 내용 | FR |
+|---|---|---|---|---|
+{{#analysis.targets}}
+| {{#cell}}{{path}}{{/cell}} | {{changeType}} | {{#cell}}{{referencePath}}{{/cell}} | {{#cell}}{{change}}{{/cell}} | {{#frs}}{{.}}{{^-last}}, {{/-last}}{{/frs}} |
+{{/analysis.targets}}
+
+## 함께 쓰는 이름
+| 무엇 | 새 이름 | 참고 구현의 이름 |
+|---|---|---|
+{{#analysis.sharedNames}}
+| {{#cell}}{{what}}{{/cell}} | {{#cell}}{{name}}{{/cell}} | {{#cell}}{{from}}{{/cell}} |
+{{/analysis.sharedNames}}
+
+## 영향 받는 기존 기능
+{{#analysis.impacts}}
+- {{.}}
+{{/analysis.impacts}}
+{{^analysis.impacts}}
+없음
+{{/analysis.impacts}}
+
+## 위험 요소와 회귀 테스트 대상
+{{#analysis.risks}}
+- {{.}}
+{{/analysis.risks}}
+{{^analysis.risks}}
+없음
+{{/analysis.risks}}

@@ -1,0 +1,39 @@
+# 구현 결과 (신규 개발)
+
+> 단계별 실행 결과를 Workflow가 모아 만든 문서입니다. 컴파일과 실행 검증은 하지 않았습니다. 사람이 확인해야 합니다.
+> '실패'로 시작하는 줄의 파일은 그 단계가 적용되지 않은 것입니다(그 파일은 앞 단계까지의 모습 그대로 남아 있습니다).
+
+## 1. 새 파일 - 참고 파일을 복사하면서 이름 바꾸기
+| 파일 | 결과 |
+|---|---|
+{{#copied}}
+| {{#cell}}{{input.targetPath}}{{/cell}} | {{#cell}}{{result}}{{/cell}} |
+{{/copied}}
+
+## 2. 새 파일 - 설계에 적힌 내용 그대로 저장
+| 파일 | 결과 |
+|---|---|
+{{#created}}
+| {{#cell}}{{input.filePath}}{{/cell}} | {{#cell}}{{result}}{{/cell}} |
+{{/created}}
+
+## 3. 있는 파일 고치기
+| 파일 | 결과 |
+|---|---|
+{{#edited}}
+| {{#cell}}{{input.filePath}}{{/cell}} | {{#cell}}{{result}}{{/cell}} |
+{{/edited}}
+
+## 4. 복사한 새 파일에서 빼고 더하기
+| 파일 | 무엇을 바꾸려 했는지 | 적용 결과 |
+|---|---|---|
+{{#applied}}
+| {{#cell}}{{input.filePath}}{{/cell}} | {{#cell}}{{#item.success}}{{item.result.summary}}{{/item.success}}{{^item.success}}편집 Agent 호출 실패: {{item.error}}{{/item.success}}{{/cell}} | {{#cell}}{{result}}{{/cell}} |
+{{/applied}}
+
+## 결정이 필요한 사항과 보류한 이유
+{{#applied}}
+{{#item.result.questions}}
+- {{.}} ({{input.filePath}})
+{{/item.result.questions}}
+{{/applied}}

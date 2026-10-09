@@ -106,6 +106,13 @@
 			</exclusions>
 		</dependency>
 
+		<!-- 문서 템플릿(Mustache). TOOL step이 데이터를 틀(definitions/templates/**)에 끼워 문서를 만들 때 쓴다(tools.template.TemplateTool).
+		     반복과 "있으면/없으면"만 되는 문법이라, 틀 파일에 로직이 들어가지 않는다. 버전은 Spring Boot가 관리한다. -->
+		<dependency>
+			<groupId>com.samskivert</groupId>
+			<artifactId>jmustache</artifactId>
+		</dependency>
+
 		<!-- RAG: 찾은 문서 조각을 프롬프트에 끼워 넣는 ChatClient Advisor(RetrievalAugmentationAdvisor / ContextualQueryAugmenter)를
 		     조립하는 데 쓴다(common.rag.RagRetrievalChain). 검색 자체는 이 모듈이 하지 않고 dstone-knowledge의 REST API를 부른다.
 		     그래서 벡터 저장소(pgvector), 임베딩 모델, 문서 읽기(Tika) 의존성은 이 모듈에 없다. -->

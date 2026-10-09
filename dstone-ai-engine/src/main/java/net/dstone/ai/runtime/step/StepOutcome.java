@@ -28,6 +28,7 @@ public record StepOutcome(
 	, String error
 	, String route
 	, long durationMs
+	, List<Object> items
 	) {
 
 	/**
@@ -36,7 +37,7 @@ public record StepOutcome(
 	 * @param output 이 step이 돌려준 값입니다.
 	 */
 	public static StepOutcome success(Object output) {
-		return new StepOutcome(true, false, null, output, null, null, 0L);
+		return new StepOutcome(true, false, null, output, null, null, 0L, null);
 	}
 
 	/**
@@ -47,7 +48,7 @@ public record StepOutcome(
 	 * @param route  고른 경로 이름입니다.
 	 */
 	public static StepOutcome routed(Object output, String route) {
-		return new StepOutcome(true, false, null, output, null, route, 0L);
+		return new StepOutcome(true, false, null, output, null, route, 0L, null);
 	}
 
 	/**
@@ -57,12 +58,12 @@ public record StepOutcome(
 	 * @param error  왜 실패했는지에 대한 설명입니다.
 	 */
 	public static StepOutcome failure(Object output, String error) {
-		return new StepOutcome(false, false, null, output, error, null, 0L);
+		return new StepOutcome(false, false, null, output, error, null, 0L, null);
 	}
 
 	/** 사람의 결정을 기다리는 중일 때 씁니다(ApprovalStepExecutor 전용). */
 	public static StepOutcome waitingApproval() {
-		return new StepOutcome(false, true, null, null, null, null, 0L);
+		return new StepOutcome(false, true, null, null, null, null, 0L, null);
 	}
 
 	/**
@@ -74,9 +75,10 @@ public record StepOutcome(
 	 * @param outputs    반복별로 돌려준 값 목록입니다(실패한 반복은 그 반복이 받은 값 또는 null).
 	 * @param error      실패한 반복들의 사유를 이은 값입니다(모두 성공이면 null).
 	 * @param durationMs 모든 반복이 끝날 때까지 걸린 시간(밀리초)입니다.
+	 * @param items      반복마다 "무엇으로 돌았고 어떻게 됐는지"를 한 건으로 묶은 목록입니다({item, input, result, error, success}).
 	 */
-	public static StepOutcome forEach(boolean success, List<Object> inputs, List<Object> outputs, String error, long durationMs) {
-		return new StepOutcome(success, false, inputs, outputs, error, null, durationMs);
+	public static StepOutcome forEach(boolean success, List<Object> inputs, List<Object> outputs, String error, long durationMs, List<Object> items) {
+		return new StepOutcome(success, false, inputs, outputs, error, null, durationMs, items);
 	}
 
 	/**
@@ -86,7 +88,7 @@ public record StepOutcome(
 	 * @param durationMs 걸린 시간(밀리초)입니다.
 	 */
 	public StepOutcome withCall(Object input, long durationMs) {
-		return new StepOutcome(this.success, this.pending, input, this.output, this.error, this.route, durationMs);
+		return new StepOutcome(this.success, this.pending, input, this.output, this.error, this.route, durationMs, this.items);
 	}
 
 }

@@ -58,7 +58,7 @@ class DefinitionFilesTest {
 		AgentRegistry agentRegistry = (AgentRegistry) registries[0];
 		WorkFlowRegistry workFlowRegistry = (WorkFlowRegistry) registries[1];
 		assertEquals(26, agentRegistry.list(null).size());
-		assertEquals(18, workFlowRegistry.list(null).size());
+		assertEquals(19, workFlowRegistry.list(null).size());
 		for (AgentDefinition agent : agentRegistry.list(null)) {
 			assertNotNull(agent.version(), agent.id());
 			assertFalse(agent.promptText().isBlank(), agent.id());

@@ -91,6 +91,10 @@ public class ToolExecutor extends BaseObject {
 		} catch (JsonProcessingException e) {
 			return null;
 		}
+		// 빈 배열은 MCP content로 보지 않습니다. 로컬 Tool이 돌려준 빈 목록([])이 빈 글자로 바뀌면, 그 값으로 forEach를 도는 step이 "리스트가 아니다"로 실패합니다.
+		if (items.isEmpty()) {
+			return null;
+		}
 		StringBuilder joined = new StringBuilder();
 		for (Object item : items) {
 			if (!(item instanceof Map)) {

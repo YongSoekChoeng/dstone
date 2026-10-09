@@ -81,6 +81,7 @@ public final class WorkFlowContext {
 	 *     result.sql: state.sql          돌려준 값 안의 필드 하나
 	 *     input: state.sentInput         실제로 받은 입력
 	 *     error: state.analysisError     실패 사유(성공이면 null)
+	 *     items: state.copied            forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
 	 *
 	 * 성공이든 실패든 적힌 자리를 모두 새 값으로 덮어씁니다. 그래서 다시 실행된 step의 옛 결과가 남아 있지 않습니다.
 	 * (forEach로 여러 반복이 동시에 도는 동안에는 부르지 않습니다. 모든 반복이 끝난 뒤 한 번 부릅니다.)
@@ -91,8 +92,9 @@ public final class WorkFlowContext {
 	 * @param input   이 step이 실제로 받은 입력
 	 * @param result  이 step이 돌려준 값
 	 * @param error   실패 사유(성공이면 null)
+	 * @param items   forEach step의 반복별 묶음 목록(forEach가 아니면 null)
 	 */
-	public static void saveOutput(Map<String, Object> context, Map<String, String> mapping, Object input, Object result, String error) {
+	public static void saveOutput(Map<String, Object> context, Map<String, String> mapping, Object input, Object result, String error, List<Object> items) {
 		if (mapping == null || mapping.isEmpty()) {
 			return;
 		}
@@ -100,6 +102,7 @@ public final class WorkFlowContext {
 		record.put(Output.INPUT, input);
 		record.put(Output.RESULT, result);
 		record.put(Output.ERROR, error);
+		record.put(Output.ITEMS, items);
 		Map<String, Object> state = state(context);
 		for (Map.Entry<String, String> entry : mapping.entrySet()) {
 			List<String> source = sourcePath(entry.getKey());

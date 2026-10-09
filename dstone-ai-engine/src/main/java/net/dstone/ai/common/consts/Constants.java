@@ -150,6 +150,7 @@ public final class Constants {
 		 *     result.sql: state.sql            돌려준 값 안의 필드 하나
 		 *     input: state.sentInput           이 step이 실제로 받은 입력(input 표현식을 계산한 뒤의 값)
 		 *     error: state.analysisError       실패 사유(성공이면 null)
+		 *     items: state.copied              forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
 		 * </pre>
 		 */
 		public static final class Output {
@@ -159,6 +160,11 @@ public final class Constants {
 			public final static String INPUT = "input";
 			/** 실패했을 때의 사유입니다(성공이면 null). */
 			public final static String ERROR = "error";
+			/**
+			 * forEach step에서만 씁니다. 반복마다 한 건씩, 무엇으로 돌았고 어떻게 됐는지를 묶은 목록입니다:
+			 * [{item: forEach 목록의 그 항목, input: 실제로 받은 입력, result: 돌려준 값, error: 실패 사유, success: 성공 여부}]
+			 */
+			public final static String ITEMS = "items";
 		}
 	}
 
@@ -217,6 +223,8 @@ public final class Constants {
 		public final static String PROMPT_DIR = "prompts";
 		/** input.schema / output.schema / state.schema에 적는 JSON Schema 파일이 있어야 하는 폴더입니다. */
 		public final static String SCHEMA_DIR = "schemas";
+		/** renderTemplate Tool에 적는 문서 틀(Mustache) 파일이 있어야 하는 폴더입니다. */
+		public final static String TEMPLATE_DIR = "templates";
 	}
 
 }

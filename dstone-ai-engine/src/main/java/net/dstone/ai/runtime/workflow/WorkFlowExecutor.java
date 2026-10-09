@@ -174,7 +174,7 @@ public class WorkFlowExecutor extends BaseObject {
 				   다음 step들이 "${state.이름}"으로 가져다 쓸 수 있게 합니다(성공이든 실패든 저장합니다).
 				****************************************************************************************/
 				try {
-					WorkFlowContext.saveOutput(currentExecution.context(), step.output(), outcome.input(), outcome.output(), outcome.error());
+					WorkFlowContext.saveOutput(currentExecution.context(), step.output(), outcome.input(), outcome.output(), outcome.error(), outcome.items());
 				} catch (ExpressionException e) {
 					return this.persistFailed(currentExecution, "step[" + step.id() + "]의 output을 state에 저장하지 못했습니다 - " + e.getMessage());
 				}
@@ -310,6 +310,8 @@ public class WorkFlowExecutor extends BaseObject {
 		List<Object> inputs = new ArrayList<>();
 		List<Object> outputs = new ArrayList<>();
 		List<String> errors = new ArrayList<>();
+		// 반복마다 "무엇으로 돌았고 어떻게 됐는지"를 한 건으로 묶어 둡니다(output의 items로 저장할 수 있습니다).
+		List<Object> records = new ArrayList<>();
 		for (int i = 0; i < futures.size(); i++) {
 			String historyId = step.id() + "[" + i + "]";
 			StepOutcome outcome;
@@ -327,9 +329,16 @@ public class WorkFlowExecutor extends BaseObject {
 			}
 			inputs.add(outcome.input());
 			outputs.add(outcome.output());
+			Map<String, Object> record = new LinkedHashMap<>();
+			record.put("item", items.get(i));
+			record.put("input", outcome.input());
+			record.put("result", outcome.output());
+			record.put("error", outcome.error());
+			record.put("success", outcome.success());
+			records.add(record);
 		}
 		String error = errors.isEmpty() ? null : String.join("\n", errors);
-		return StepOutcome.forEach(allSuccess, inputs, outputs, error, (System.nanoTime() - start) / 1_000_000);
+		return StepOutcome.forEach(allSuccess, inputs, outputs, error, (System.nanoTime() - start) / 1_000_000, records);
 	}
 
 	/**

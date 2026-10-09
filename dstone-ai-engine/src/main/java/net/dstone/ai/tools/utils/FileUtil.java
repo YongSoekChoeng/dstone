@@ -460,6 +460,77 @@ public class FileUtil {
 
 	/**
 	 * <pre>
+	 * 파일 하나의 여러 곳을 한 번에 고칩니다. "이 글자를 저 글자로"(before → after)와 "파일 끝에 덧붙이기"(append)를 섞어 담을 수 있습니다.
+	 *
+	 * - 하나라도 맞지 않으면(before가 없거나 여러 번 나옴) 아무것도 바꾸지 않고 "실패: ..."로 이유를 모두 알려 줍니다.
+	 *   절반만 고쳐진 파일은 무엇이 적용됐는지 알기 어렵기 때문입니다.
+	 * - dryRun이 true면 파일을 건드리지 않고 "고칠 수 있는지"만 답합니다. 사람에게 승인을 받기 전에 미리 확인할 때 씁니다.
+	 * - edits가 비어 있으면 아무것도 하지 않고 성공으로 답합니다(목록을 forEach로 돌 때 고칠 것이 없는 항목이 섞여 있어도 됩니다).
+	 * - 줄바꿈 방식(CRLF/LF)의 차이는 맞춰 주고, 파일의 글자셋은 그대로 지킵니다(replaceInFile과 같습니다).
+	 * - 덧붙이는 내용이 줄바꿈으로 시작하지 않으면 앞에 줄바꿈을 하나 넣습니다.
+	 * </pre>
+	 */
+	@Tool(description = "절대경로 filePath 파일의 여러 곳을 한 번에 고친다. edits의 항목마다 before(파일에 정확히 한 번 나오는 글자)를 after로 바꾸고, append가 true인 항목은 after를 파일 끝에 덧붙인다. "
+		+ "하나라도 맞지 않으면 아무것도 바꾸지 않고 '실패: ...'로 이유를 알려 준다. dryRun이 true면 파일을 바꾸지 않고 고칠 수 있는지만 확인한다.")
+	public String editFileTexts(
+			@ToolParam(description = "고칠 파일의 절대경로(파일명 포함)") String filePath,
+			@ToolParam(required = false, description = "변경 목록. 항목마다 before(바꿀 대상. 파일에 있는 글자 그대로), after(바꾼 뒤의 글자), append(true면 before 없이 after를 파일 끝에 덧붙인다)") List<Map<String, Object>> edits,
+			@ToolParam(required = false, description = "true면 파일을 바꾸지 않고 고칠 수 있는지만 확인한다") Boolean dryRun) {
+		if (edits == null || edits.isEmpty()) {
+			return "바꿀 것이 없습니다: " + filePath;
+		}
+		if (filePath == null || filePath.isBlank()) {
+			return "실패: filePath가 비어 있습니다.";
+		}
+		File file = new File(filePath.trim());
+		if (!file.isFile()) {
+			return CANNOT_READ_MESSAGE + filePath;
+		}
+		synchronized (EDIT_LOCK) {
+			try {
+				byte[] bytes = Files.readAllBytes(file.toPath());
+				Charset charset = charsetOf(bytes);
+				String contents = new String(bytes, charset);
+				boolean crlfFile = contents.contains("\r\n");
+				String changed = contents;
+				List<String> problems = new ArrayList<>();
+				for (int i = 0; i < edits.size(); i++) {
+					Map<String, Object> edit = edits.get(i) == null ? Map.<String, Object>of() : edits.get(i);
+					String after = toLineBreak(textOf(edit.get("after")), crlfFile);
+					if (Boolean.TRUE.equals(edit.get("append"))) {
+						changed = changed + (after.startsWith("\n") || after.startsWith("\r") ? after : (crlfFile ? "\r\n" : "\n") + after);
+						continue;
+					}
+					String before = toLineBreak(textOf(edit.get("before")), crlfFile);
+					if (before.isEmpty()) {
+						problems.add((i + 1) + "번째 변경: before가 비어 있습니다(파일 끝에 덧붙이려면 append를 true로 적습니다).");
+						continue;
+					}
+					int found = countOf(changed, before);
+					if (found != 1) {
+						problems.add((i + 1) + "번째 변경: before가 파일에 " + found + "번 나옵니다(정확히 한 번이어야 합니다). "
+							+ (found == 0 ? nearestText(changed, before) : "앞뒤 줄을 더 포함해 한 곳만 가리키게 하세요."));
+						continue;
+					}
+					int at = changed.indexOf(before);
+					changed = changed.substring(0, at) + after + changed.substring(at + before.length());
+				}
+				if (!problems.isEmpty()) {
+					return "실패: 아무것도 바꾸지 않았습니다: " + this.toPath(file) + "\n" + String.join("\n", problems);
+				}
+				if (Boolean.TRUE.equals(dryRun)) {
+					return "고칠 수 있습니다(" + edits.size() + "곳): " + this.toPath(file);
+				}
+				Files.write(file.toPath(), changed.getBytes(charset), StandardOpenOption.TRUNCATE_EXISTING);
+				return "고쳤습니다(" + edits.size() + "곳). 파일은 전체 " + changed.length() + "자입니다: " + this.toPath(file);
+			} catch (Exception e) {
+				return "실패: 파일을 고치지 못했습니다(" + e.getClass().getSimpleName() + ": " + e.getMessage() + "): " + filePath;
+			}
+		}
+	}
+
+	/**
+	 * <pre>
 	 * 파일을 복사하면서 이름 바꿈 표대로 글자를 바꿉니다.
 	 *
 	 * 기존 기능을 본떠 새 파일을 만들 때, 달라지는 것의 대부분은 이름입니다(클래스, URL, 쿼리ID, 테이블).

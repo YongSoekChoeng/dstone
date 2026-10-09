@@ -1,0 +1,77 @@
+# 설계서 (신규 개발)
+
+> 파일별 설계 데이터를 Workflow가 틀에 끼워 만든 문서입니다. 이 파일을 고쳐도 구현에 반영되지 않습니다. 고칠 것은 승인 단계에서 '재설계'를 고르고 의견에 적으십시오.
+
+## 자동 검증 결과
+{{#checkText}}{{.}}{{/checkText}}{{^checkText}}검증하지 않음{{/checkText}}
+{{#designError}}
+
+설계를 만들지 못한 파일이 있습니다.
+{{.}}
+{{/designError}}
+{{#editCheckError}}
+
+고칠 곳(변경 전)이 지금 파일과 맞지 않는 설계가 있습니다.
+{{.}}
+{{/editCheckError}}
+
+## 결정이 필요한 사항
+{{#designs}}
+{{#questions}}
+- {{.}} ({{path}})
+{{/questions}}
+{{/designs}}
+
+{{#designs}}
+## {{-index}}. {{path}}
+- 변경 유형: {{changeType}}
+- 본뜰 참고 파일: {{#referencePath}}{{.}}{{/referencePath}}{{^referencePath}}없음{{/referencePath}}
+- 해결하는 FR: {{#frs}}{{.}}{{^-last}}, {{/-last}}{{/frs}}
+- 하는 일: {{summary}}
+- 확인 방법: {{verify}}
+{{#renames}}
+{{#-first}}
+
+### 이름 바꿈 (참고 → 신규)
+| 무엇 | 참고 | 신규 |
+|---|---|---|
+{{/-first}}
+| {{#cell}}{{what}}{{/cell}} | {{#cell}}{{from}}{{/cell}} | {{#cell}}{{to}}{{/cell}} |
+{{/renames}}
+{{#removes}}
+{{#-first}}
+
+### 빼는 것
+{{/-first}}
+- {{.}}
+{{/removes}}
+{{#adds}}
+
+### 더하는 것: {{where}}
+```
+{{content}}
+```
+{{/adds}}
+{{#edits}}
+
+### 바꿀 곳: {{location}}{{#append}} (파일 끝에 덧붙임){{/append}}
+{{#reason}}
+이유: {{.}}
+{{/reason}}
+{{^append}}
+
+변경 전
+```
+{{before}}
+```
+{{/append}}
+
+변경 후
+```
+{{after}}
+```
+{{/edits}}
+{{^-last}}
+
+{{/-last}}
+{{/designs}}

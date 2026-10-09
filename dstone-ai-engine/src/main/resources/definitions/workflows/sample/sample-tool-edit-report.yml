@@ -1,0 +1,93 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 "LLM 없이 코드로 정해지는 일"을 범용 Tool만으로 엮는 방법을 보여 주는 테스트 전용 Workflow입니다.
+# 자바를 새로 만들지 않고 YAML과 문서 틀 파일만으로 "확인 → 여러 파일 고치기 → 실패한 것 고르기 → 보고서 만들기"를 합니다.
+#
+#   check      checkData      값을 맞춰 본다(같은 파일이 두 번 들어 있지 않은가, 파일이 있는가). 걸려도 멈추지 않고 보고서에 적는다
+#   apply      editFileTexts  파일마다(forEach) 여러 곳을 한 번에 고친다. 한 파일의 변경은 모두 맞을 때만 적용된다
+#   failed     filterList     실패한 파일의 경로만 고른다
+#   report     renderTemplate 결과를 문서 틀(templates/sample/edit-report.md.mustache)에 끼워 저장한다
+#
+# 눈여겨볼 것
+# - forEach step의 output에 items를 적으면, 반복마다 "무엇으로 돌았고 어떻게 됐는지"가 한 건씩 저장됩니다:
+#     state.applied = [{item: forEach 목록의 그 항목, input: 실제로 넘긴 인자, result: Tool의 답, error: 실패 사유, success: true/false}]
+#   그래서 뒤의 step이 "어느 항목이 실패했는지"를 순서로 짝짓지 않고 바로 알 수 있습니다.
+# - 일부 파일이 실패해도 보고서까지 갑니다(apply의 onFailure가 failed입니다).
+# - 문서의 모양을 바꾸려면 틀 파일만 고치면 됩니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다(파일은 미리 만들어 두십시오):
+#   workflowId: sample-tool-edit-report
+#   input     : {"reportPath": "/tmp/edit-test/report.md",
+#                "changes": [{"path": "/tmp/edit-test/a.txt", "edits": [{"before": "hello", "after": "안녕"}, {"append": true, "after": "끝"}]},
+#                            {"path": "/tmp/edit-test/b.txt", "edits": [{"before": "없는 글자", "after": "x"}]}]}
+workflow:
+  id: sample-tool-edit-report
+  version: "1.0.0"
+  description: 범용 Tool 확인용 테스트 Workflow - 값 확인(checkData) → 파일마다 여러 곳 고치기(editFileTexts forEach) → 실패한 것 고르기(filterList) → 보고서 만들기(renderTemplate). LLM 없음.
+  input:
+    schema: schemas/sample-tool-edit-report.input.schema.json
+  settings:
+    maxIterations: 10
+  output:
+    value:
+      check: "${state.check.text}"
+      failedPaths: "${state.failedPaths}"
+      report: "${state.report}"
+  steps:
+
+    - id: check
+      type: TOOL
+      tool: checkData
+      input:
+        rules:
+          - rule: unique
+            list: "${input.changes}"
+            field: path
+            message: 같은 파일이 두 번 들어 있습니다
+          - rule: filesExist
+            list: "${input.changes}"
+            field: path
+            message: 없는 파일입니다
+      output:
+        result: "state.check"
+      next: apply
+      onFailure: FAIL
+
+    - id: apply
+      type: TOOL
+      tool: editFileTexts
+      forEach: "${input.changes}"
+      input:
+        filePath: "${item.path}"
+        edits: "${item.edits}"
+      output:
+        items: "state.applied"
+      next: failed
+      onFailure: failed
+
+    - id: failed
+      type: TOOL
+      tool: filterList
+      input:
+        list: "${state.applied}"
+        where: { success: false }
+        pick: item.path
+      output:
+        result: "state.failedPaths"
+      next: report
+      onFailure: FAIL
+
+    - id: report
+      type: TOOL
+      tool: renderTemplate
+      input:
+        template: templates/sample/edit-report.md.mustache
+        data:
+          check: "${state.check}"
+          applied: "${state.applied}"
+          failedPaths: "${state.failedPaths}"
+        filePath: "${input.reportPath}"
+      output:
+        result: "state.report"
+      next: END
+      onFailure: FAIL

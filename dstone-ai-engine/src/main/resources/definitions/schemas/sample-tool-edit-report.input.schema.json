@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample-tool-edit-report.input",
+  "type": "object",
+  "properties": {
+    "reportPath": {
+      "type": "string",
+      "description": "결과 보고서를 저장할 파일의 절대경로"
+    },
+    "changes": {
+      "type": "array",
+      "description": "고칠 파일 목록. 파일 하나에 한 건",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "고칠 파일의 절대경로" },
+          "edits": {
+            "type": "array",
+            "description": "그 파일에서 바꿀 곳들",
+            "items": {
+              "type": "object",
+              "properties": {
+                "before": { "type": "string", "description": "바꿀 대상(파일에 정확히 한 번 나오는 글자)" },
+                "after": { "type": "string", "description": "바꾼 뒤의 글자" },
+                "append": { "type": "boolean", "description": "true면 after를 파일 끝에 덧붙인다" }
+              }
+            }
+          }
+        },
+        "required": ["path", "edits"]
+      }
+    }
+  },
+  "required": ["reportPath", "changes"]
+}

@@ -96,7 +96,7 @@ public class WorkFlowRegistry extends BaseObject {
 	private static final Pattern UNRESOLVED_ENV = Pattern.compile("[A-Z0-9_]+");
 
 	/** step의 output 왼쪽에 적을 수 있는 이름들입니다(result.필드처럼 그 아래 필드를 이어 적을 수 있습니다). */
-	private static final List<String> OUTPUT_SOURCES = List.of(Output.RESULT, Output.INPUT, Output.ERROR);
+	private static final List<String> OUTPUT_SOURCES = List.of(Output.RESULT, Output.INPUT, Output.ERROR, Output.ITEMS);
 
 	@Autowired
 	private YamlDefinitionLoader loader;
@@ -543,11 +543,15 @@ public class WorkFlowRegistry extends BaseObject {
 			String sourceText = entry.getKey() == null ? "" : entry.getKey().strip();
 			List<String> source = List.of(sourceText.split("\\."));
 			if (sourceText.isEmpty() || !OUTPUT_SOURCES.contains(source.get(0)) || sourceText.endsWith(".") || sourceText.contains("..")) {
-				throw this.error(definition, step, "output의 '" + entry.getKey() + "'는 저장할 수 없는 이름입니다. result(돌려준 값), result.필드, input(받은 입력), input.필드, error(실패 사유) 중에서 적으십시오."
+				throw this.error(definition, step, "output의 '" + entry.getKey() + "'는 저장할 수 없는 이름입니다. result(돌려준 값), result.필드, input(받은 입력), input.필드, error(실패 사유), items(forEach step의 반복별 묶음) 중에서 적으십시오."
 					+ " 예: output: {result: state.analysis}");
 			}
 			if (Output.ERROR.equals(source.get(0)) && source.size() > 1) {
 				throw this.error(definition, step, "output의 '" + entry.getKey() + "' - error는 글자라서 그 아래 필드를 적을 수 없습니다.");
+			}
+			if (Output.ITEMS.equals(source.get(0)) && (source.size() > 1 || StepDefinition.forEachOf(step) == null)) {
+				throw this.error(definition, step, "output의 '" + entry.getKey() + "' - items는 forEach가 있는 step에서만, 통째로만 저장할 수 있습니다."
+					+ " 반복마다 {item, input, result, error, success}가 한 건씩 담깁니다. 예: output: {items: state.copied}");
 			}
 			List<String> target;
 			try {
@@ -693,6 +697,9 @@ public class WorkFlowRegistry extends BaseObject {
 				}
 			} else if (Output.INPUT.equals(sourceName)) {
 				problem = JsonSchemaUtil.checkPath(this.inputSchemaOf(writer.step()), base, rest);
+			} else if (Output.ITEMS.equals(sourceName)) {
+				// forEach의 반복별 묶음입니다. 항목의 모양은 그때그때 달라서 그 아래 필드는 확인하지 않습니다.
+				problem = null;
 			} else if (!rest.isEmpty()) {
 				problem = base + "는 글자(실패 사유)라서 그 아래로 더 들어갈 수 없습니다.";
 			}

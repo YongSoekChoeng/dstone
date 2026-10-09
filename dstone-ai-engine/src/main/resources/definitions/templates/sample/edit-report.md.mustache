@@ -1,0 +1,19 @@
+# 파일 고치기 결과
+
+## 미리 확인한 결과
+{{check.text}}
+
+## 파일별 결과
+| 번호 | 파일 | 바꿀 곳 수 | 성공 | Tool의 답 |
+|---|---|---|---|---|
+{{#applied}}
+| {{-index}} | {{#cell}}{{item.path}}{{/cell}} | {{#item.edits}}{{#-last}}{{-index}}{{/-last}}{{/item.edits}} | {{#success}}O{{/success}}{{^success}}X{{/success}} | {{#cell}}{{result}}{{/cell}} |
+{{/applied}}
+
+## 고치지 못한 파일
+{{#failedPaths}}
+- {{.}}
+{{/failedPaths}}
+{{^failedPaths}}
+없음
+{{/failedPaths}}
