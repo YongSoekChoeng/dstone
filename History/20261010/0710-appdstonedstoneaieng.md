@@ -59,3 +59,21 @@ id가 추출되지 않았습니다. 파일 형식을 직접 확인하겠습니�
 - **순서 번호 사라짐**: 파일명 앞 번호(00~24)가 없어져 폴더에서 알파벳순으로 보입니다.
 
 커밋은 하지 않았습니다.
+
+---
+
+## 질문
+
+git에 올려줘
+
+---
+
+## 답변
+
+커밋 `1b909d9`로 `main`에 푸시했습니다.
+
+이번 파일명 변경분(pilot agent yml 11개, `pilot-workflow.yml` 주석, `docs/09.dstone-ai-engine.md`, `CLAUDE.md`)만 담았습니다.
+
+작업 전부터 있던 두 가지는 제가 만든 변경이 아니라서 커밋에 넣지 않았습니다. 같이 올리려면 말씀해 주세요.
+- `docs/temp/Agent_Workflow_안정화_방안.docx` 삭제
+- `docs/temp/dstone-workflow-design.md` 신규(미추적)
