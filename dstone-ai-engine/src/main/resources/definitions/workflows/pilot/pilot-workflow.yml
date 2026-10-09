@@ -577,7 +577,7 @@ workflow:
 
     # 새 파일 3 (파일마다 새 대화로 한 번씩. Tool 없이 LLM 1회)
     #   이름 바꿈은 step24가 끝냈다. 여기서는 빼는 것과 더하는 것을 "몇 번째 줄을 어떻게"로 정하기만 한다. 파일은 step31가 고친다.
-    #   Agent에 Tool을 주고 직접 고치게 했을 때는 같은 호출을 되풀이하거나 몇 분씩 걸렸다(24.newdev-file-developer-agent.yml의 주석).
+    #   Agent에 Tool을 주고 직접 고치게 했을 때는 같은 호출을 되풀이하거나 몇 분씩 걸렸다(pilot-newdev-file-developer-agent.yml의 주석).
     - id: step30
       type: AGENT
       agent: pilot-newdev-file-developer-agent
