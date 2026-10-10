@@ -44,11 +44,11 @@ class StepToolsTest {
 		FileTool fileTool = new FileTool();
 		ReflectionTestUtils.setField(fileTool, "environment", new MockEnvironment());
 		FileSetTool fileSetTool = new FileSetTool();
-		ReflectionTestUtils.setField(fileSetTool, "fileUtil", fileTool);
+		ReflectionTestUtils.setField(fileSetTool, "fileTool", fileTool);
 		TemplateTool templateTool = new TemplateTool();
-		ReflectionTestUtils.setField(templateTool, "fileUtil", fileTool);
+		ReflectionTestUtils.setField(templateTool, "fileTool", fileTool);
 		DataTool dataTool = new DataTool();
-		ReflectionTestUtils.setField(dataTool, "fileUtil", fileTool);
+		ReflectionTestUtils.setField(dataTool, "fileTool", fileTool);
 		this.tools = new LinkedHashMap<>();
 		for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(fileTool, fileSetTool, templateTool, dataTool).build().getToolCallbacks()) {
 			this.tools.put(callback.getToolDefinition().name(), callback);
