@@ -174,32 +174,6 @@ dstone:
         session:
             max-messages: 20 # 세션당 유지할 최대 메시지 수(넘으면 오래된 메시지부터 잘림)
             ttl-seconds: 86400 # Redis에 저장된 세션 히스토리의 만료 시간(1일)
-        ##########################################################################################
-        # 프롬프트는 여기 없다 - classpath:definitions/prompts/ 아래의 파일이고, 각 Agent(definitions/agents/*.yml)가 prompt.system으로 가리킨다.
-        ##########################################################################################
-        # Tool 설정. 
-        # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
-        # 설정(dstone.ai.tool.allowed-by-caller)이 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
-        ##########################################################################################      
-        # tool:
-        #     allowed-by-caller:
-        #         - caller: sample-si-project
-        #           tools: getCurrentDateTime,validateSqlSyntax
-        # Agent 호출(runtime.agent.AgentExecutor) 설정.
-        # sub-agent.max-calls: 부모 Agent를 한 번 부르는 동안 Sub Agent(agents/*.yml의 subAgents)를 부를 수 있는 최대 횟수(기본 10).
-        #                      Sub Agent 호출 하나가 LLM 호출 한 번이라, 부모가 끝없이 맡기면 시간과 비용이 계속 늘어난다.
-        #                      상한을 넘으면 "지금까지의 결과로 답하라"는 안내가 부모 LLM에게 돌아간다.
-        # tool.max-calls: Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수(기본 100). Agent의 maxToolCalls가 있으면 그 값이 이긴다.
-        #                 남은 횟수가 5분의 1 이하가 되면 Tool 결과 끝에 "N번 남았다"는 안내가 붙고, 다 쓰면 Tool을 실행하지 않고
-        #                 "실패: ..."를 돌려준다. 그 뒤에도 3번 넘게 부르면 그 Agent 호출을 실패로 끝낸다(runtime.agent.ToolCallBudgetCallback).
-        # tool.keep-result-chars: Agent를 한 번 부르는 동안 대화에 온전히 들고 다닐 Tool 결과의 글자 수 합(기본 200000, 0이면 줄이지 않음).
-        #                 Tool 결과는 쌓여서 그 뒤의 LLM 호출마다 다시 보내진다. 합이 이 값을 넘으면 오래된 결과부터 앞 300자만 남기고
-        #                 "다시 필요하면 같은 Tool을 다시 부르라"는 안내를 붙인다(runtime.agent.ToolResultCompactor).
-        #                 max-result-chars(아래)는 결과 한 건의 크기를, 이 값은 쌓인 전체의 크기를 막는다.
-        # 모델 라우팅. agents/*.yml의 model.routing에 적은 이름을 실제 모델 이름으로 바꿔 준다(common.registry.AgentRegistry.modelOf()).
-        # Agent 파일에는 "어떤 일에 쓰는 모델인지"만 적고, 실제 모델 이름은 환경마다 여기서 정한다.
-        # 모델 이름은 지금 켜 둔 provider(spring.ai.model.chat)에서 쓸 수 있는 이름이어야 한다.
-        # Agent가 적은 routing 이름이 여기에 없으면 엔진이 켜지지 않는다(routing: default는 provider 공통 기본 모델이라 적지 않아도 된다).
         model:
             routing:
                 sample-override: qwen/qwen-2.5-coder-32b-instruct
@@ -216,6 +190,11 @@ dstone:
             tool:
                 max-calls: 100
                 keep-result-chars: 200000
+        ##########################################################################################
+        # Tool 설정. 
+        # Tool 호출은 caller(dstone.ai.security.auth.keys.caller)별로 화이트리스트를 둘 수 있다(common.config.ConfigTool 참고) 
+        # 설정(dstone.ai.tool.allowed-by-caller)이 없는 caller는 등록된 Tool 전체를 그대로 허용한다.
+        ##########################################################################################
         tool:
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를
