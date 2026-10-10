@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,6 +38,15 @@ public class WorkFlowExecutionController extends BaseController {
 	@Autowired
 	WorkFlowExecutionService workFlowExecutionService;
 
+	@Autowired
+	Environment environment;
+
+	/** 상세 응답의 context에서 글자 하나를 몇 자까지 그대로 담을지 정하는 설정 이름입니다. */
+	private static final String MAX_VALUE_CHARS_KEY = "dstone.ai.workflow.detail.max-value-chars";
+
+	/** 위 설정을 적지 않았을 때 쓰는 값입니다. */
+	private static final int DEFAULT_MAX_VALUE_CHARS = 2000;
+
 	/**
 	 * Workflow 실행 목록을 최근에 시작된 순서대로 조회합니다.
 	 *
@@ -63,12 +73,16 @@ public class WorkFlowExecutionController extends BaseController {
 	/**
 	 * 실행 하나의 자세한 정보(입력 변수, 스텝별 실행 이력 등)를 조회합니다.
 	 *
+	 * context 안의 아주 긴 글자(읽어 둔 파일 내용 등)는 앞부분만 담아서 돌려줍니다. 그대로 다 내려주면 응답이
+	 * 수 MB까지 커져서 화면이 받지 못하기 때문입니다. 전체가 필요하면 full=true를 붙여 조회합니다.
+	 *
 	 * @param executionId 상세 정보를 조회할 실행의 id입니다.
+	 * @param full        true면 context를 줄이지 않고 전부 돌려줍니다. 기본값은 false입니다.
 	 */
 	@GetMapping("/{executionId}")
-	public WorkFlowExecutionDetail detail(@PathVariable String executionId) {
+	public WorkFlowExecutionDetail detail(@PathVariable String executionId, @RequestParam(defaultValue = "false") boolean full) {
 		WorkFlowExecution execution = this.workFlowExecutionService.find(executionId);
-		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution));
+		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution), full ? 0 : this.maxValueChars());
 	}
 
 	/**
@@ -82,7 +96,13 @@ public class WorkFlowExecutionController extends BaseController {
 	@PostMapping("/{executionId}/decision")
 	public WorkFlowExecutionDetail decision(@PathVariable String executionId, @RequestBody WorkFlowDecisionRequest request) {
 		WorkFlowExecution execution = this.workFlowExecutionService.decide(executionId, request.chosen(), request.approved(), request.approver(), request.comment());
-		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution));
+		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution), this.maxValueChars());
+	}
+
+	/** 설정에서 글자 수 한도를 읽습니다. 적혀 있지 않으면 기본값을 씁니다(0이면 줄이지 않습니다). */
+	private int maxValueChars() {
+		Integer value = this.environment.getProperty(MAX_VALUE_CHARS_KEY, Integer.class);
+		return value == null ? DEFAULT_MAX_VALUE_CHARS : value.intValue();
 	}
 
 }

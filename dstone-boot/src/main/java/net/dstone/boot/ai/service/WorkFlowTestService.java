@@ -83,7 +83,8 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 
 		try {
-			WorkFlowStatusCallResult callResult = this.getWebClient().get()
+			// 상세 응답(컨텍스트 + 결과)은 커질 수 있어서 큰 응답용 WebClient로 받는다.
+			WorkFlowStatusCallResult callResult = this.getLargeResponseWebClient().get()
 					.uri(baseUrl + "/api/ai/workflow/executions/{executionId}", executionId)
 					.retrieve()
 					.bodyToMono(WorkFlowStatusCallResult.class)

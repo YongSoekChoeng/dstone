@@ -41,7 +41,8 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	/** @param executionId 상세를 조회할 실행 id */
 	public WorkFlowExecutionDetailResult detail(String executionId) {
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
-		return this.getWebClient().get()
+		// 상세 응답에는 실행 컨텍스트가 통째로 들어 있어 커질 수 있다. 기본 한도(256KB)로는 못 받는 경우가 있었다.
+		return this.getLargeResponseWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}", executionId)
 				.retrieve()
 				.bodyToMono(WorkFlowExecutionDetailResult.class)
@@ -59,7 +60,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 		// 선택지 방식 APPROVAL이면 고른 이름을 함께 보낸다(승인/반려 방식이면 null이고, 엔진이 무시한다).
 		body.put("route", request.route());
 
-		return this.getWebClient().post()
+		return this.getLargeResponseWebClient().post()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/decision", request.executionId())
 				.contentType(MediaType.APPLICATION_JSON)
 				.bodyValue(body)

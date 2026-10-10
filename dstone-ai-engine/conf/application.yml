@@ -203,6 +203,13 @@ dstone:
         model:
             routing:
                 sample-override: qwen/qwen-2.5-coder-32b-instruct
+        # 실행 상세 API(GET /api/ai/workflow/executions/{id}) 응답 설정.
+        # detail.max-value-chars: 응답의 context 안에서 글자 하나를 몇 자까지 그대로 담을지(기본 2000, 0이면 줄이지 않음).
+        #                 state에는 읽어 둔 파일 내용처럼 큰 값이 쌓여서, 다 내려주면 응답이 수 MB가 되고 화면이 받지 못한다.
+        #                 넘는 글자는 앞부분만 담고 안내를 붙인다. 전체가 필요하면 조회할 때 ?full=true를 붙인다.
+        workflow:
+            detail:
+                max-value-chars: 2000
         agent:
             sub-agent:
                 max-calls: 10
