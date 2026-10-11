@@ -186,8 +186,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ this.buildParamInfo(joinPoint) +"");
 		}else {
-			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn( this.buildParamInfo(joinPoint)) +"");
 		}
+		log.append("\n");
+		log.append("</input>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -203,8 +205,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ output.toString() +"");
 		}else {
-			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
 		}
+		log.append("\n");
+		log.append("</output>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -254,8 +258,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ this.buildParamInfo(joinPoint) +"");
 		}else {
-			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(this.buildParamInfo(joinPoint)) +"");
 		}
+		log.append("\n");
+		log.append("</input>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -271,8 +277,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ output.toString() +"");
 		}else {
-			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
 		}
+		log.append("\n");
+		log.append("</output>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -307,8 +315,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ this.buildParamInfo(joinPoint) +"");
 		}else {
-			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(this.buildParamInfo(joinPoint)) +"");
 		}
+		log.append("\n");
+		log.append("</input>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -324,8 +334,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ output.toString() +"");
 		}else {
-			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
 		}
+		log.append("\n");
+		log.append("</output>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 
@@ -379,8 +391,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ this.buildParamInfo(joinPoint) +"");
 		}else {
-			log.append(""+ StringUtil.replace(this.buildParamInfo(joinPoint), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(this.buildParamInfo(joinPoint)) +"");
 		}
+		log.append("\n");
+		log.append("</input>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -396,8 +410,10 @@ public class ConfigCallLog extends BaseObject {
 		if(PARAM_MULTI_LINE) {
 			log.append(""+ output.toString() +"");
 		}else {
-			log.append(""+ StringUtil.replace(output.toString(), "\n", "") +"");
+			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
 		}
+		log.append("\n");
+		log.append("</output>");
 		log.append(SAPERATE_LINE);
 		this.info(log.toString());
 		
@@ -438,6 +454,16 @@ public class ConfigCallLog extends BaseObject {
 			}
 		}
 		return identity.toString();
+	}
+	
+	private String removeCarrageReturn(String input) {
+		String output = "";
+		if( input != null ) {
+			output = input;
+			output = StringUtil.replace(output, "\r\n", "");
+			output = StringUtil.replace(output, "\n", "");
+		}
+		return output;
 	}
 
 	/****************************************** 로깅 관련 AOP 설정 종료 ******************************************/
