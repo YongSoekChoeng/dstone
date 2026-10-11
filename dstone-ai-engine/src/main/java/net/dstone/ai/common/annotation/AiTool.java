@@ -30,8 +30,8 @@ public @interface AiTool {
 	 * - Agent의 tools.allowed에 이름을 적을 수 없고, ["*"](전부 허용)에도 들어가지 않습니다.
 	 * - 결과 길이 상한(dstone.ai.tool.max-result-chars)을 씌우지 않습니다. 그 상한은 LLM과의 대화에 큰 결과가 쌓이는 것을
 	 *   막으려는 것인데, TOOL step의 결과는 대화에 쌓이지 않고 state에 저장되기 때문입니다.
-	 * Workflow가 값을 모으고, 검증하고, 문서를 만드는 것처럼 "엔진이 코드로 하는 일"을 담는 Tool에 씁니다
-	 * (예: tools.utils.FileSetTool, tools.template.TemplateTool).
+	 * Workflow가 값을 모으고, 검증하고, 목록을 거르는 것처럼 "엔진이 코드로 하는 일"을 담는 Tool에 씁니다
+	 * (예: tools.file.FileSetTool, tools.data.DataTool).
 	 * </pre>
 	 */
 	boolean stepOnly() default false;

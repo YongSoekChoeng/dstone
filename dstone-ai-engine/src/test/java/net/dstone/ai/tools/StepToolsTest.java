@@ -23,11 +23,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.dstone.ai.tools.data.DataTool;
 import net.dstone.ai.tools.file.FileSetTool;
 import net.dstone.ai.tools.file.FileTool;
-import net.dstone.ai.tools.template.TemplateTool;
 
 /**
  * <pre>
- * 어느 Workflow에서나 TOOL step으로 부르는 범용 Tool(readFiles, readItemFiles, renderTemplate, filterList, checkData, editFileTexts)을, TOOL step이 부르는 것과 같은 길
+ * 어느 Workflow에서나 TOOL step으로 부르는 범용 Tool(readFiles, readItemFiles, filterList, checkData, editFileTexts)을, TOOL step이 부르는 것과 같은 길
  * (인자를 JSON으로 넘기고 답을 글자로 받음)로 불러 봅니다.
  * </pre>
  */
@@ -45,12 +44,10 @@ class StepToolsTest {
 		ReflectionTestUtils.setField(fileTool, "environment", new MockEnvironment());
 		FileSetTool fileSetTool = new FileSetTool();
 		ReflectionTestUtils.setField(fileSetTool, "fileTool", fileTool);
-		TemplateTool templateTool = new TemplateTool();
-		ReflectionTestUtils.setField(templateTool, "fileTool", fileTool);
 		DataTool dataTool = new DataTool();
 		ReflectionTestUtils.setField(dataTool, "fileTool", fileTool);
 		this.tools = new LinkedHashMap<>();
-		for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(fileTool, fileSetTool, templateTool, dataTool).build().getToolCallbacks()) {
+		for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(fileTool, fileSetTool, dataTool).build().getToolCallbacks()) {
 			this.tools.put(callback.getToolDefinition().name(), callback);
 		}
 	}
@@ -80,32 +77,6 @@ class StepToolsTest {
 		assertEquals(Map.of(this.path("Board.java"), "class Board {}", this.path("Faq.java"), "class Faq {}"), sources.get("files"));
 		assertEquals(List.of(this.path("Missing.java")), sources.get("missing"));
 		assertEquals("===== 파일: " + this.path("Board.java") + " =====\nclass Board {}\n\n===== 파일: " + this.path("Faq.java") + " =====\nclass Faq {}", sources.get("text"));
-	}
-
-	@Test
-	void renderTemplate은_틀에_데이터를_끼워_파일로_저장한다() throws Exception {
-		Map<String, Object> analysis = new LinkedHashMap<>();
-		analysis.put("background", "FAQ 메뉴");
-		analysis.put("requirements", List.of(Map.of("id", "FR-01", "title", "목록", "then", "보인다")));
-		Map<String, Object> arguments = new LinkedHashMap<>();
-		arguments.put("template", "templates/pilot/newdev-requirements.md.mustache");
-		arguments.put("data", Map.of("analysis", analysis));
-		arguments.put("filePath", this.path("01-requirements.md"));
-
-		String saved = this.tools.get("renderTemplate").call(this.objectMapper.writeValueAsString(arguments));
-
-		assertTrue(saved.contains("저장했습니다"), saved);
-		String doc = Files.readString(this.workDir.resolve("01-requirements.md"), StandardCharsets.UTF_8);
-		assertTrue(doc.contains("### FR-01 목록\n- Given: -\n- When: -\n- Then: 보인다"), doc);
-		assertTrue(doc.contains("- 같은 기능이 이미 있는지: 미확인"), doc);
-	}
-
-	@Test
-	void renderTemplate은_없는_틀이나_templates_밖의_경로면_실패를_돌려준다() throws Exception {
-		String missing = this.tools.get("renderTemplate").call(this.objectMapper.writeValueAsString(Map.of("template", "templates/none.mustache")));
-		assertTrue(missing.contains("실패: 틀 파일이 없습니다"), missing);
-		String outside = this.tools.get("renderTemplate").call(this.objectMapper.writeValueAsString(Map.of("template", "prompts/../application.yml")));
-		assertTrue(outside.contains("실패: 틀 파일의 경로는 templates/ 로 시작해야 합니다"), outside);
 	}
 
 	@Test

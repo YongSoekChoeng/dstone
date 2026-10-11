@@ -224,8 +224,6 @@ public final class Constants {
 		public final static String PROMPT_DIR = "prompts";
 		/** input.schema / output.schema / state.schema에 적는 JSON Schema 파일이 있어야 하는 폴더입니다. */
 		public final static String SCHEMA_DIR = "schemas";
-		/** renderTemplate Tool에 적는 문서 틀(Mustache) 파일이 있어야 하는 폴더입니다. */
-		public final static String TEMPLATE_DIR = "templates";
 	}
 
 }
