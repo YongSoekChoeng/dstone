@@ -19,24 +19,14 @@ spring:
         allow-bean-definition-overriding: true
     http:
         clients:
-            # 로컬 Ollama(CPU 추론)는 간단한 인사말도 몇 초, 프롬프트가 길거나 Tool 호출이
-            # 붙은 요청(예: capability=oracle-to-postgresql)은 더 오래 걸린다. Spring AI의
-            # OllamaApi가 이 전역 설정으로 만들어지는 RestClient.Builder를 그대로 쓰므로, 여기를
-            # 안 올려두면 "Read timed out"으로 끊긴다(anthropic/openai를 쓸 때는 영향 없음).
             read-timeout: 5m
     data:
-        # session(Phase 1): 대화 히스토리 저장(net.dstone.ai.common.session.RedisChatMemoryRepository).
-        # dstone-boot의 dstone:session(HTTP 세션) 네임스페이스와 겹치지 않게
-        # 키는 dstone:ai:session:{conversationId}로 별도로 둔다.
         redis:
             enabled: true # Redis사용 여부(true/false)
             host: ${REDIS_HOST}
             port: ${REDIS_PORT}
             timeout: 10000
     # DB: Workflow 실행 이력(AI_WORKFLOW_EXECUTION*)을 담는다. 접근은 MyBatis로 한다(common.config.ConfigMapper, resources/sqlmap/**/*Dao.xml).
-    # dstone-boot처럼 여러 datasource가 아니라 하나뿐이라 표준 Spring Boot 단일 datasource
-    # 자동설정(spring.datasource.*)을 그대로 쓴다 - 별도 ConfigDatasource 클래스 불필요.
-    # 로컬 설치/역할 생성 절차: docs/software/05.postgresql.md 참고.
     datasource:
         driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
         url: jdbc:log4jdbc:postgresql://${DB_HOST}:${DB_PORT}/dstone_ai
@@ -46,8 +36,7 @@ spring:
             maximum-pool-size: 10
     ##########################################################################################
     # <자동설정기능>
-    # Security/RabbitMQ/Kafka는 아직 미사용 이므로 exclude.
-    #
+    # Security/RabbitMQ/Kafka는 아직 미사용 이므로 exclude.    #
     # Boot 4에서 Security 자동설정이 org.springframework.boot.autoconfigure.security.* 에서
     # org.springframework.boot.security.autoconfigure.* 로 통째로 옮겨갔다.
     ##########################################################################################
@@ -82,10 +71,8 @@ spring:
             image: none
             moderation: none
         # Spring AI가 스스로 거는 Tool 호출 한도(Agent 호출 한 번 기준). 기본값은 Tool 하나당 40번, 전체 150번이고,
-        # 넘으면 LLM 호출을 끊는다(엔진은 그 Agent 호출을 실패로 처리한다 - runtime.agent.AgentExecutor.textOf()).
-        # 이 한도는 Agent마다 다르게 줄 수 없어서 넉넉히 풀어 두고, 실제 한도는 dstone.ai.agent.tool.max-calls와
-        # Agent의 maxToolCalls로 건다. Tool 하나당 한도를 푼 이유: 파일을 많이 만드는 Agent는 writeFile만 40번을 넘길 수 있다.
-        # -1은 "한도 없음"이다.
+        # max-calls-per-tool-default : Tool 하나당 호출한도. -1은 한도 없음.
+        # max-total-tool-calls : Tool 전체 호출한도.
         tools:
             limits:
                 max-calls-per-tool-default: -1
@@ -95,19 +82,7 @@ spring:
         # spring.ai.model.chat=anthropic 일 때 설정.
         ##########################################################################################
         anthropic:
-            # DB 패스워드와 동일한 컨벤션: Jasypt로 암호화해 ENC(...) 형태로 직접 넣는다(env.properties 경유 안 함).
-            # 로컬에서 생성: cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.EncUtil -Dexec.args="<실제 키>"
-            # (이 명령은 Claude Code가 아니라 별도 터미널에서 직접 실행할 것 — 평문 키가 대화 기록에 남지 않도록)
             api-key: ENC(iTbr7/33NEFc5gCOapVTLZsks5dU96gITu6OUXr2UqAVntTkq5p1nFjlVI/3RVVx/fZzBOAKEdngosd4zialqNUgfEq31RU3u8HUa/VBIaBnFViQCLJBPW8O81lcTpsHsQQPfRbeToKYHAm2BVMWP0cZhkx145+bnmoH7nXsXQE=)
-            # chat.options.model 을 비워두면 Spring AI 기본 모델을 사용한다.
-            # SI 프로젝트별로 다른 모델이 필요하면 아래처럼 override.
-            #
-            # max-tokens: Spring AI의 Anthropic 기본값(500)은 output.schema(응답을 JSON으로
-            # 강제하는 AGENT step)에서는 너무 작다 - 응답이 JSON을 다 못 닫고 잘려서
-            # "Unexpected end-of-input: expected close marker for Object" 파싱 실패로 이어지는 걸
-            # 실제로 겪었다(testApp-sdlc의 analyze step, 5개 항목을 갖춘 분석서를 요구하는 프롬프트).
-            # AgentDefinition에는 max-tokens를 개별 지정하는 필드가 없어(model만 override 가능)
-            # 엔진 전체 공통값을 올려서 대응한다.
             chat:
                  options:
                      model: claude-sonnet-4-5-20250929
@@ -127,25 +102,10 @@ spring:
                      # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash | qwen/qwen3.8-27b
                      model: qwen/qwen3.8-27b
                      temperature: 0.4
-                     # max-tokens: 비워두면 OpenRouter 뒤의 일부 공급자(vLLM 기반, 예: NextBit)가 "남은 컨텍스트 전부"를
-                     # 출력 한도로 잡는다. 그러면 Tool 결과가 쌓여 입력이 커졌을 때 입력+출력이 모델 한도를 넘어서
-                     # "400: Provider returned error"(maximum context length ... requested N output tokens)로 끊긴다.
-                     # 실제로 pilot-workflow가 error.log를 두 번 읽었을 때 이렇게 실패했다. 적당한 상한을 꼭 둔다.
-                     # 반대로 너무 작아도 안 된다. 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 이 한도에 들어가서,
-                     # 추론이 길어지면 답을 한 글자도 쓰지 못하고 끝난다(finishReason=LENGTH, 빈 답).
-                     # qwen/qwen3.8-27b는 추론의 양을 줄일 방법이 없다. OpenRouter의 reasoning.max_tokens / reasoning.effort(low)와
-                     # reasoning-effort를 넣어 봤지만 추론 토큰이 그대로였고, reasoning.effort: none으로 아예 끄는 것만 통했다
-                     # (끄면 답이 틀렸다). 그래서 한도를 넉넉히 준다. pilot-workflow의 리뷰 step이 8192를 추론에 다 쓴 적이 있다.
-                     # 값을 올리면 한 번의 호출이 그만큼 길어질 수 있으므로 아래 timeout 안에 끝나는지도 함께 본다
-                     # (초당 70토큰쯤이면 16384토큰은 4분 가까이 걸린다).
-                     # 4096 6144 8192 16384 32768
                      max-tokens: 16384
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
-             # 60초를 넘기기 쉬운데, 그러면 "OpenAIIoException: Request failed"로 끊기고 같은 요청을 3번 더 보내서
-             # 4분 가까이 지나서야 실패한다. anthropic 설정과 같은 값으로 맞춰 둔다.
-             # 주의: timeout은 Spring AI(2.0.1)가 이 설정만으로는 채팅 호출에 적용하지 않는다(호출마다 60초로 덮어쓴다).
-             # 그래서 엔진이 이 값을 읽어 호출마다 요청 옵션에 직접 넣는다(ConfigChatClient.requestOptions()).
-             # (요청이 너무 커서 생기는 시간 초과는 이 값으로 못 고친다 - 아래 dstone.ai.tool의 크기 상한이 그걸 막는다.)
+             # timeout : LLM호출 타임아웃.
+             # max-retries : LLM호출 실패 시 재시도 횟수.
              timeout: 5m
              max-retries: 1
 
@@ -163,7 +123,7 @@ spring:
                 options:
                     # qwen2.5-coder:7b, llama3.2:latest, bge-m3:latest, hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:latest
                     model: hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:latest
-                    timeout: 300s # 충분하게 5분(300초) 등으로 조절
+                    timeout: 5m 
                     temperature: 0.3  # 💡 모든 Ollama 요청의 토큰 생성 다양성을 제거하여 속도 및 일관성 향상
 
 dstone:
