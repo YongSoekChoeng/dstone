@@ -72,7 +72,7 @@
             <AppenderRef ref="console"/>
             <AppenderRef ref="rollingFile"/>	
 		</Logger>
-		<Logger name="jdbc.sqltiming" level="INFO" additivity="false">
+		<Logger name="jdbc.sqltiming" level="OFF" additivity="false">
             <ThreadContextMapFilter onMatch="DENY" onMismatch="NEUTRAL">
             	<KeyValuePair key="SUPPRESS_SQL_LOG" value="Y"/>
             </ThreadContextMapFilter>
