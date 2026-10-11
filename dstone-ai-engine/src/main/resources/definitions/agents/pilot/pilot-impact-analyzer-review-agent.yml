@@ -41,7 +41,7 @@ agent:
   prompt:
     system: prompts/pilot-impact-analyzer-review-agent/v1.st
   input:
-    schema: schemas/pilot-impact-analyzer-review-agent.input.schema.json
+    schema: schemas/pilot/pilot-impact-analyzer-review-agent.input.schema.json
   tools:
     allowed: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile, appendFile]
   execution:

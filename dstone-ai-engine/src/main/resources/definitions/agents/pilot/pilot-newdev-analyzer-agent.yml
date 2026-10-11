@@ -24,8 +24,8 @@ agent:
   prompt:
     system: prompts/pilot-newdev-analyzer-agent/v1.st
   input:
-    schema: schemas/pilot-newdev-analyzer-agent.input.schema.json
+    schema: schemas/pilot/pilot-newdev-analyzer-agent.input.schema.json
   output:
     format: JSON
-    schema: schemas/pilot-newdev-analyzer-agent.output.schema.json
+    schema: schemas/pilot/pilot-newdev-analyzer-agent.output.schema.json
     validation: STRICT

@@ -156,7 +156,7 @@ public class AgentRegistry extends BaseObject {
 				throw new IllegalStateException(where + "output.format은 " + AgentDefinition.FORMATS + " 중 하나여야 합니다: " + output.format());
 			}
 			if (output.isJson() && output.schema() == null) {
-				throw new IllegalStateException(where + "output.format이 JSON이면 schema가 있어야 합니다. 예: output: {format: JSON, schema: schemas/내결과.schema.json}");
+				throw new IllegalStateException(where + "output.format이 JSON이면 schema가 있어야 합니다. 예: output: {format: JSON, schema: schemas/내묶음/내결과.schema.json}");
 			}
 			if (!output.isJson() && output.schema() != null && !JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(output.schema()))) {
 				throw new IllegalStateException(where + "output.format이 TEXT인데 schema가 글자(string)가 아닙니다. 정해진 모양으로 답을 받으려면 format: JSON으로 적으십시오.");

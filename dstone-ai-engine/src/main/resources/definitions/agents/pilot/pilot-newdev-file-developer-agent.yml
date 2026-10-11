@@ -28,8 +28,8 @@ agent:
   prompt:
     system: prompts/pilot-newdev-file-developer-agent/v1.st
   input:
-    schema: schemas/pilot-newdev-file-developer-agent.input.schema.json
+    schema: schemas/pilot/pilot-newdev-file-developer-agent.input.schema.json
   output:
     format: JSON
-    schema: schemas/pilot-newdev-file-developer-agent.output.schema.json
+    schema: schemas/pilot/pilot-newdev-file-developer-agent.output.schema.json
     validation: STRICT

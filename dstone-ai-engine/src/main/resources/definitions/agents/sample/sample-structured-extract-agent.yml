@@ -16,5 +16,5 @@ agent:
     system: prompts/sample-structured-extract-agent/v1.st
   output:
     format: JSON
-    schema: schemas/sample-structured-extract-agent.output.schema.json
+    schema: schemas/sample/sample-structured-extract-agent.output.schema.json
     validation: STRICT

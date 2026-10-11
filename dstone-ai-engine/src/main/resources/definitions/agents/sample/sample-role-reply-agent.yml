@@ -16,4 +16,4 @@ agent:
   prompt:
     system: prompts/sample-role-reply-agent/v1.st
   input:
-    schema: schemas/sample-role-reply-agent.input.schema.json
+    schema: schemas/sample/sample-role-reply-agent.input.schema.json

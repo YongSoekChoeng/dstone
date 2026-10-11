@@ -21,6 +21,6 @@ agent:
   prompt:
     system: prompts/sample-knowledge-agent/v1.st
   input:
-    schema: schemas/sample-knowledge-agent.input.schema.json
+    schema: schemas/sample/sample-knowledge-agent.input.schema.json
   tools:
     allowed: [knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage, knowledgeImpact]

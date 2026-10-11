@@ -23,9 +23,9 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *     version: "1.0.0"
  *     description: 요구사항 분석부터 구현까지의 AI 개발 Workflow
  *     input:
- *       schema: schemas/pilot-input.schema.json     # 실행 요청의 input 모양(비워두면 글자 하나)
+ *       schema: schemas/pilot/pilot-input.schema.json     # 실행 요청의 input 모양(비워두면 글자 하나)
  *     state:
- *       schema: schemas/workflow-state.schema.json  # (옵셔널) state에 저장되는 값들의 모양
+ *       schema: schemas/pilot/workflow-state.schema.json  # (옵셔널) state에 저장되는 값들의 모양
  *     settings:
  *       checkpoint: true
  *       maxIterations: 20

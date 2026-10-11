@@ -6,5 +6,5 @@ agent:
     system: prompts/testApp-agent-01/v1.st
   output:
     format: JSON
-    schema: schemas/testApp-agent-01.output.schema.json
+    schema: schemas/testApp/testApp-agent-01.output.schema.json
     validation: STRICT

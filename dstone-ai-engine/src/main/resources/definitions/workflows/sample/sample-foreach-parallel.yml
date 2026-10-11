@@ -4,7 +4,7 @@
 # 위한 테스트 전용 Workflow입니다. LLM을 쓰는 AGENT step 없이 TOOL step(validateSqlSyntax) 하나만으로
 # 이루어져 있어서, API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
-# - input: {sqlList: 글자 리스트}를 필수로 선언해 두었습니다(schemas/sample-foreach-parallel.input.schema.json). 요청의 input에 sqlList가 없거나 리스트가
+# - input: {sqlList: 글자 리스트}를 필수로 선언해 두었습니다(schemas/sample/sample-foreach-parallel.input.schema.json). 요청의 input에 sqlList가 없거나 리스트가
 #   아니면 실행하기 전에 400으로 거절됩니다.
 # - validateEach: forEach가 "${input.sqlList}"라서, sqlList 항목 개수만큼 이 step 하나를 한꺼번에
 #   실행합니다(자세한 동작은 runtime.workflow.WorkFlowExecutor.runForEach 참고). 각 실행에서는
@@ -27,7 +27,7 @@ workflow:
   version: "1.0.0"
   description: forEach 동작 확인용 테스트 Workflow - TOOL step 하나를 input.sqlList 항목 수만큼 동시 실행한다.
   input:
-    schema: schemas/sample-foreach-parallel.input.schema.json
+    schema: schemas/sample/sample-foreach-parallel.input.schema.json
   settings:
     maxIterations: 5
   output:

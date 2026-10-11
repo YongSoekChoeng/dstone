@@ -35,10 +35,10 @@ agent:
   prompt:
     system: prompts/pilot-source-investigator-agent/v1.st
   input:
-    schema: schemas/pilot-source-investigator-agent.input.schema.json
+    schema: schemas/pilot/pilot-source-investigator-agent.input.schema.json
   output:
     format: JSON
-    schema: schemas/pilot-source-investigator-agent.output.schema.json
+    schema: schemas/pilot/pilot-source-investigator-agent.output.schema.json
     validation: STRICT
   tools:
     allowed: [searchInFiles, readFileListAll, readFile, readFileLines, readFileTail, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]

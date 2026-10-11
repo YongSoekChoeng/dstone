@@ -33,10 +33,10 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *     prompt:
  *       system: prompts/requirement-analyzer/v1.st   # 프롬프트는 별도 파일
  *     input:
- *       schema: schemas/requirement-input.schema.json
+ *       schema: schemas/pilot/requirement-input.schema.json
  *     output:
  *       format: JSON
- *       schema: schemas/requirement-analysis.schema.json
+ *       schema: schemas/pilot/requirement-analysis.schema.json
  *       validation: STRICT
  *     context:
  *       sources: [workflowInput, retrievedDocuments]

@@ -12,10 +12,10 @@ agent:
   prompt:
     system: prompts/pilot-architect-agent/v1.st
   input:
-    schema: schemas/pilot-architect-agent.input.schema.json
+    schema: schemas/pilot/pilot-architect-agent.input.schema.json
   output:
     format: JSON
-    schema: schemas/pilot-architect-agent.output.schema.json
+    schema: schemas/pilot/pilot-architect-agent.output.schema.json
     validation: STRICT
   tools:
     allowed: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, writeFile, appendFile, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage, knowledgeImpact]

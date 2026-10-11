@@ -5,4 +5,4 @@ agent:
   prompt:
     system: prompts/testApp-agent-02/v1.st
   input:
-    schema: schemas/testApp-agent-02.input.schema.json
+    schema: schemas/testApp/testApp-agent-02.input.schema.json

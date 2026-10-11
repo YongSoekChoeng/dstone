@@ -13,10 +13,10 @@ agent:
   prompt:
     system: prompts/pilot-newdev-reference-agent/v1.st
   input:
-    schema: schemas/pilot-newdev-reference-agent.input.schema.json
+    schema: schemas/pilot/pilot-newdev-reference-agent.input.schema.json
   output:
     format: JSON
-    schema: schemas/pilot-newdev-reference-agent.output.schema.json
+    schema: schemas/pilot/pilot-newdev-reference-agent.output.schema.json
     validation: STRICT
   tools:
     allowed: [knowledgeSearch, knowledgeFindMethods, knowledgeCallees, searchInFiles, readFileListAll, isFileExist]

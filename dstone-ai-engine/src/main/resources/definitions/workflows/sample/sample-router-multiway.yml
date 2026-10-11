@@ -25,7 +25,7 @@ workflow:
   version: "1.0.0"
   description: ROUTER step(billing/technical/other 3갈래)이 실제로 서로 다른 step으로 분기하는지 확인용 Workflow.
   input:
-    schema: schemas/sample-router-multiway.input.schema.json
+    schema: schemas/sample/sample-router-multiway.input.schema.json
   settings:
     maxIterations: 3
   output:

@@ -17,10 +17,10 @@ agent:
   prompt:
     system: prompts/pilot-developer-agent/v1.st
   input:
-    schema: schemas/pilot-developer-agent.input.schema.json
+    schema: schemas/pilot/pilot-developer-agent.input.schema.json
   output:
     format: JSON
-    schema: schemas/pilot-developer-agent.output.schema.json
+    schema: schemas/pilot/pilot-developer-agent.output.schema.json
     validation: STRICT
   tools:
     allowed: [searchInFiles, readFileListAll, isFileExist, readFile, readFileLines, readFileTail, replaceInFile, copyFileWithReplace, writeFile, appendFile, knowledgeSearch, knowledgeFindMethods, knowledgeCallers, knowledgeCallees, knowledgeTableUsage]

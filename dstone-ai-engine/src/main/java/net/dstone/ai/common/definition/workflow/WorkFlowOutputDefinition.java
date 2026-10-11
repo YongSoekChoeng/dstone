@@ -14,7 +14,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *
  *   output:
  *     value: "${state.converted}"         # (필수) 무엇을 돌려줄지. step input과 같은 "${ }" 표현식
- *     schema: schemas/result.schema.json  # (옵셔널) 결과가 이 모양인지 마지막에 한 번 더 검사
+ *     schema: schemas/pilot/result.schema.json  # (옵셔널) 결과가 이 모양인지 마지막에 한 번 더 검사
  *
  * value는 문자열뿐 아니라 맵/리스트로도 적을 수 있습니다. 그러면 여러 값을 모아 새 모양으로 돌려줍니다.
  *   value:

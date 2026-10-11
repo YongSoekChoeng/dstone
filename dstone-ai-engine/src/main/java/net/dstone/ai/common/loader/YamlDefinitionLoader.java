@@ -41,7 +41,7 @@ import net.dstone.common.utils.StringUtil;
  *     workflows/**\/*.yml     Workflow 하나에 파일 하나
  *     agents/**\/*.yml        Agent 하나에 파일 하나
  *     prompts/...             Agent의 시스템 프롬프트(agent.prompt.system이 가리키는 파일)
- *     schemas/...json         입출력 모양(JSON Schema. input.schema / output.schema / state.schema가 가리키는 파일)
+ *     schemas/**\/*.json      입출력 모양(JSON Schema. input.schema / output.schema / state.schema가 가리키는 파일)
  *     mcp/**\/*.yml           MCP 서버 하나에 파일 하나
  *
  * 이렇게 하는 핵심 이유는, 새로 하나를 만들거나 기존 것을 바꿀 때 application.yml과 자바 코드를 건드리지 않고 파일만 추가하거나 고치면 되게 하려는 것입니다.
@@ -395,7 +395,7 @@ public class YamlDefinitionLoader extends BaseObject {
 			return " maxIterations는 settings 아래에 적습니다. 예: settings: {maxIterations: 20}";
 		}
 		if (WorkFlowDefinition.class.equals(owner) && "inputs".equals(key)) {
-			return " inputs는 input으로 바뀌었습니다. 예: input: {schema: schemas/내입력.schema.json}";
+			return " inputs는 input으로 바뀌었습니다. 예: input: {schema: schemas/내묶음/내입력.schema.json}";
 		}
 		if (AgentDefinition.class.equals(owner)) {
 			switch (key) {
@@ -416,7 +416,7 @@ public class YamlDefinitionLoader extends BaseObject {
 			}
 		}
 		if (SchemaDefinition.class.equals(owner)) {
-			return " input 아래에는 schema: 하나만 적습니다. 예: input: {schema: schemas/내입력.schema.json} 또는 input: string";
+			return " input 아래에는 schema: 하나만 적습니다. 예: input: {schema: schemas/내묶음/내입력.schema.json} 또는 input: string";
 		}
 		return "";
 	}
@@ -436,7 +436,7 @@ public class YamlDefinitionLoader extends BaseObject {
 			return "tools는 allowed 목록을 가진 맵입니다. 예: tools: {allowed: [searchInFiles, readFile]}";
 		}
 		if (AgentDefinition.Output.class.equals(block)) {
-			return "output은 맵으로 적습니다. 예: output: {format: JSON, schema: schemas/내결과.schema.json, validation: STRICT} (글자로 답하는 Agent는 output을 적지 않습니다)";
+			return "output은 맵으로 적습니다. 예: output: {format: JSON, schema: schemas/내묶음/내결과.schema.json, validation: STRICT} (글자로 답하는 Agent는 output을 적지 않습니다)";
 		}
 		if (AgentDefinition.Prompt.class.equals(block)) {
 			return "prompt는 파일 경로를 가진 맵입니다. 예: prompt: {system: prompts/내agent/v1.st}";

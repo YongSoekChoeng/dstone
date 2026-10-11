@@ -25,7 +25,7 @@ workflow:
   version: "1.0.0"
   description: 범용 Tool 확인용 테스트 Workflow - 값 확인(checkData) → 파일마다 여러 곳 고치기(editFileTexts forEach) → 실패한 것 고르기(filterList) → 보고서 만들기(renderTemplate). LLM 없음.
   input:
-    schema: schemas/sample-tool-edit-report.input.schema.json
+    schema: schemas/sample/sample-tool-edit-report.input.schema.json
   settings:
     maxIterations: 10
   output:

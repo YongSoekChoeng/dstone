@@ -17,7 +17,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  * 파일은 common.loader.YamlDefinitionLoader가 읽어서 맵으로 바꿔 넣어 줍니다.
  *
  *   input:
- *     schema: schemas/requirement-input.schema.json
+ *     schema: schemas/pilot/requirement-input.schema.json
  *
  * 타입만 필요한 간단한 경우에는 파일 없이 축약형으로 적어도 됩니다(규칙은 common.schema.JsonSchemaUtil 참고).
  *

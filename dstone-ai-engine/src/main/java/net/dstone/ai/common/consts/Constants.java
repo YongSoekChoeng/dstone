@@ -208,6 +208,7 @@ public final class Constants {
 	 * 위치 패턴입니다. 정의 파일은 모두 resources/definitions 아래에 둡니다(workflows, agents, prompts, schemas, mcp).
 	 * 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서 workflows/agents/mcp 폴더
 	 * 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
+	 * schemas도 같은 이름의 서브 디렉토리로 나눠 둡니다(예: agents/pilot ↔ schemas/pilot). 스키마는 YAML에 적힌 경로 그대로 찾습니다.
 	 * </pre>
 	 */
 	public static final class Definition {
