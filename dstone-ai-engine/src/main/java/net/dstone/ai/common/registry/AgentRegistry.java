@@ -16,7 +16,6 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
-import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -36,7 +35,7 @@ import net.dstone.common.utils.StringUtil;
  * 스키마가 틀린 Agent가 있으면 기동 자체를 실패시킵니다.
  *
  * 정해진 값만 받는 항목도 기동할 때 검사합니다(checkCallOptions()). 오타가 조용히 무시되지 않게 하려는 것입니다.
- *   model.routing(설정에 있는 이름인지), model.reasoning, model.temperature, output.format, output.validation,
+ *   model.reasoning, model.temperature, output.format, output.validation,
  *   context.sources, execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls
  *
  * Tool 허용 목록(tools)과 Sub Agent(subAgents)도 기동할 때 검사합니다(checkTools(), checkSubAgents()).
@@ -56,11 +55,6 @@ public class AgentRegistry extends BaseObject {
 	private YamlDefinitionLoader loader;
 	@Autowired
 	private ConfigTool configTool;
-	@Autowired
-	private ConfigProperty configProperty;
-
-	/** model.routing에 적어서 "provider 공통 기본 모델"을 뜻하는 이름입니다. 설정에 따로 적지 않아도 쓸 수 있습니다. */
-	public static final String DEFAULT_ROUTING = "default";
 
 	/** Sub Agent는 LLM에게 Tool로 보이므로, id가 LLM provider의 Tool 이름 규칙(영문/숫자/밑줄/하이픈, 64자 이하)에 맞아야 합니다. */
 	private static final Pattern TOOL_NAME = Pattern.compile("[A-Za-z0-9_-]{1,64}");
@@ -132,14 +126,6 @@ public class AgentRegistry extends BaseObject {
 	private void checkCallOptions(AgentDefinition definition) {
 		String where = "agent[" + definition.id() + "]의 ";
 		// model
-		if (definition.modelRouting() != null && definition.modelName() != null) {
-			throw new IllegalStateException(where + "model에 routing과 name을 함께 적을 수 없습니다. 하나만 적으십시오.");
-		}
-		if (definition.modelRouting() != null && !DEFAULT_ROUTING.equals(definition.modelRouting())
-				&& StringUtil.isEmpty(this.configProperty.getProperty(Constants.Agent.MODEL_ROUTING_PREFIX + "." + definition.modelRouting()))) {
-			throw new IllegalStateException(where + "model.routing '" + definition.modelRouting() + "'가 설정에 없습니다. conf/application.yml의 "
-				+ Constants.Agent.MODEL_ROUTING_PREFIX + "." + definition.modelRouting() + "에 모델 이름을 적으십시오(provider 기본 모델을 쓰려면 routing: " + DEFAULT_ROUTING + ").");
-		}
 		String reasoning = definition.reasoningLevel();
 		if (reasoning != null && !AgentDefinition.REASONING_LEVELS.contains(reasoning)) {
 			// YAML은 off/no를 글자가 아니라 false로 읽습니다. "끄려고 off를 적었는데 false라고 나온다"를 헤매지 않게 알려 줍니다.
@@ -200,22 +186,13 @@ public class AgentRegistry extends BaseObject {
 	 * <pre>
 	 * 이 Agent를 부를 때 쓸 모델 이름을 돌려줍니다.
 	 * - model.name을 적었으면 그 이름
-	 * - model.routing을 적었으면 설정(dstone.ai.model.routing.{이름})에 적힌 모델 이름
-	 * - 둘 다 없거나 routing: default면 null(provider 공통 기본 모델을 씁니다)
+	 * - 없으면 null(provider 공통 기본 모델을 씁니다)
 	 * </pre>
 	 *
 	 * @param definition 모델을 알아볼 Agent 정의
 	 */
 	public String modelOf(AgentDefinition definition) {
-		if (definition.modelName() != null) {
-			return definition.modelName();
-		}
-		String routing = definition.modelRouting();
-		if (routing == null || DEFAULT_ROUTING.equals(routing)) {
-			return null;
-		}
-		String model = this.configProperty.getProperty(Constants.Agent.MODEL_ROUTING_PREFIX + "." + routing);
-		return StringUtil.isEmpty(model) ? null : model.trim();
+		return definition.modelName();
 	}
 
 	/**

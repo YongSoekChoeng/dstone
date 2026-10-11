@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -17,7 +16,6 @@ import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
-import net.dstone.common.config.ConfigProperty;
 
 /**
  * <pre>
@@ -35,13 +33,10 @@ class DefinitionFilesTest {
 		YamlDefinitionLoader loader = new YamlDefinitionLoader();
 		ConfigTool configTool = mock(ConfigTool.class);
 		when(configTool.toolNames()).thenReturn(List.of());
-		ConfigProperty configProperty = mock(ConfigProperty.class);
-		when(configProperty.getProperty(anyString())).thenReturn("test-model");
 
 		AgentRegistry agentRegistry = new AgentRegistry();
 		ReflectionTestUtils.setField(agentRegistry, "loader", loader);
 		ReflectionTestUtils.setField(agentRegistry, "configTool", configTool);
-		ReflectionTestUtils.setField(agentRegistry, "configProperty", configProperty);
 		agentRegistry.load();
 
 		WorkFlowRegistry workFlowRegistry = new WorkFlowRegistry();
@@ -91,7 +86,7 @@ class DefinitionFilesTest {
 		assertEquals("none", agentRegistry.find("pilot-newdev-analyzer-agent").reasoningLevel());
 		assertEquals(32, agentRegistry.find("pilot-impact-analyzer-agent").maxToolCalls());
 		assertTrue(agentRegistry.find("sample-general-chat").allowsAllTools());
-		assertEquals("test-model", agentRegistry.modelOf(agentRegistry.find("sample-model-override-agent")));
+		assertEquals("qwen/qwen-2.5-coder-32b-instruct", agentRegistry.modelOf(agentRegistry.find("sample-model-override-agent")));
 		assertEquals(null, agentRegistry.modelOf(agentRegistry.find("sample-basic-echo-agent")));
 	}
 

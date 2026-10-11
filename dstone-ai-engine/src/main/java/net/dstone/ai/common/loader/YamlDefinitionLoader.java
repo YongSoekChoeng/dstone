@@ -415,6 +415,9 @@ public class YamlDefinitionLoader extends BaseObject {
 					return "";
 			}
 		}
+		if (AgentDefinition.Model.class.equals(owner) && "routing".equals(key)) {
+			return " model.routing은 없어졌습니다. 이 Agent만 다른 모델을 쓰려면 모델 이름을 직접 적습니다. 예: model: {name: 모델이름}";
+		}
 		if (SchemaDefinition.class.equals(owner)) {
 			return " input 아래에는 schema: 하나만 적습니다. 예: input: {schema: schemas/내묶음/내입력.schema.json} 또는 input: string";
 		}
@@ -430,7 +433,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 */
 	private String agentBlockHint(Class<?> block) {
 		if (AgentDefinition.Model.class.equals(block)) {
-			return "model은 맵으로 적습니다. 예: model: {routing: 라우팅이름} 또는 model: {name: 모델이름, temperature: 0.1, reasoning: none}";
+			return "model은 맵으로 적습니다. 예: model: {name: 모델이름, temperature: 0.1, reasoning: none}";
 		}
 		if (AgentDefinition.Tools.class.equals(block)) {
 			return "tools는 allowed 목록을 가진 맵입니다. 예: tools: {allowed: [searchInFiles, readFile]}";

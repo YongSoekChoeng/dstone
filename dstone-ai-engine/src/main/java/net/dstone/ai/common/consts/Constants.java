@@ -44,9 +44,6 @@ public final class Constants {
 	/** Agent 호출(runtime.agent.AgentExecutor)이 쓰는 설정 키들입니다. */
 	public static final class Agent {
 
-		/** agents/*.yml의 model.routing 이름을 실제 모델 이름으로 바꿔 주는 설정의 앞부분입니다(dstone.ai.model.routing.{이름}: 모델 이름). */
-		public final static String MODEL_ROUTING_PREFIX = "dstone.ai.model.routing";
-
 		/** 부모 Agent 호출 한 번 안에서 Sub Agent를 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.sub-agent.max-calls). */
 		public final static String SUB_AGENT_MAX_CALLS = "dstone.ai.agent.sub-agent.max-calls";
 

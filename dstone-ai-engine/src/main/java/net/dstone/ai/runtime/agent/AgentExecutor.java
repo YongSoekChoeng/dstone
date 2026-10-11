@@ -470,7 +470,7 @@ public class AgentExecutor extends BaseObject {
 
 		/************************************************************************
 		6. 모델(model)을 원하는 것으로 지정합니다.
-			- modelOverride가 있으면 그 값을, 없으면 Agent의 model(name 또는 routing으로 찾은 모델. AgentRegistry.modelOf())을,
+			- modelOverride가 있으면 그 값을, 없으면 Agent의 model.name(AgentRegistry.modelOf())을,
 			  그것도 없으면 spring.ai.{provider}.chat.options.model에 설정된 공통 기본 모델을 그대로 씁니다.
 			- 여기서 바꾸는 것은 지금 활성화된 provider(spring.ai.model.chat) 안에서의 모델명뿐입니다.
 			  다른 provider가 쓰는 모델명을 넣으면, 지금 이 호출 시점에 그 provider의 API가 오류를

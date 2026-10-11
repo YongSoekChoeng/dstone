@@ -27,7 +27,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *     role: REQUIREMENT_ANALYST                      # 사람이 읽는 역할 이름(동작에는 영향 없음)
  *     description: 요구사항을 분석하고 구조화된 결과를 생성한다.
  *     model:
- *       routing: requirement-analysis                # 모델 이름 대신 "어떤 일에 쓰는 모델인지"를 적는다(아래 설명)
+ *       name: qwen/qwen3.8-27b                       # (옵셔널) 이 Agent만 다른 모델을 쓸 때. 비우면 provider 공통 기본 모델
  *       temperature: 0.1
  *       reasoning: none
  *     prompt:
@@ -59,9 +59,8 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  * - SUPERVISOR/ROUTER step이 부르는 Agent는 output을 적지 않습니다. 답의 모양을 엔진이 정하기 때문입니다.
  *
  * ## 모델(model)
- * - routing: 모델 이름을 YAML에 직접 적지 않고, 설정 파일(conf/application.yml)의 dstone.ai.model.routing.{이름}에 적어 둔
- *   모델을 씁니다. 운영 환경마다 모델이 달라도 Agent 파일은 그대로 둘 수 있습니다. 설정에 없는 이름이면 엔진이 켜지지 않습니다.
- * - name: 모델 이름을 직접 적습니다(routing과 함께 적을 수 없습니다). 둘 다 없으면 provider 공통 기본 모델을 씁니다.
+ * - name: 이 Agent만 다른 모델을 쓸 때 모델 이름을 적습니다. 적지 않으면 provider 공통 기본 모델을 씁니다.
+ *   지금 켜진 provider(spring.ai.model.chat)에서 쓸 수 있는 이름이어야 합니다.
  * - temperature: 답의 무작위 정도입니다. 적지 않으면 provider 설정값을 씁니다.
  * - reasoning: 답을 쓰기 전에 모델이 속으로 따져 보는 정도입니다(none / low / medium / high). 단순한 일은 꺼 두면 빨라집니다.
  *   "끄기"를 off가 아니라 none으로 적는 이유: YAML은 off를 글자가 아니라 false로 읽습니다.
@@ -158,12 +157,11 @@ public record AgentDefinition(
 	/**
 	 * agent.model 입니다.
 	 *
-	 * @param routing     모델 라우팅 이름입니다. 실제 모델은 설정의 dstone.ai.model.routing.{이름}에서 찾습니다.
-	 * @param name        모델 이름을 직접 적을 때 씁니다(routing과 함께 적을 수 없습니다).
+	 * @param name        이 Agent만 다른 모델을 쓸 때 적는 모델 이름입니다. 없으면 provider 공통 기본 모델을 씁니다.
 	 * @param temperature 답의 무작위 정도입니다.
 	 * @param reasoning   추론 세기입니다(none / low / medium / high).
 	 */
-	public record Model(String routing, String name, Double temperature, String reasoning) {
+	public record Model(String name, Double temperature, String reasoning) {
 	}
 
 	/**
@@ -244,11 +242,6 @@ public record AgentDefinition(
 	/** 시스템 프롬프트 원문입니다(prompt.system 파일의 내용). */
 	public String promptText() {
 		return this.prompt == null ? null : this.prompt.text();
-	}
-
-	/** model.routing 값입니다. 적지 않았으면 null입니다. */
-	public String modelRouting() {
-		return this.model == null || this.model.routing() == null || this.model.routing().isBlank() ? null : this.model.routing().trim();
 	}
 
 	/** model.name 값입니다. 적지 않았으면 null입니다. */
