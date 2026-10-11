@@ -19,7 +19,7 @@ agent:
   version: "1.0.0"
   description: dstone-knowledge의 분석 결과(호출 관계, SQL, 테이블, 화면)를 조회해서 Java 프로젝트에 대한 질문에 답하는 Agent.
   prompt:
-    system: prompts/sample/sample-knowledge-agent/v1.st
+    system: prompts/sample/sample-knowledge-agent.st
   input:
     schema: schemas/sample/sample-knowledge-agent.input.schema.json
   tools:

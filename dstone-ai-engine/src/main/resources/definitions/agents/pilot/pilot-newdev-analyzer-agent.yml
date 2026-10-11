@@ -22,7 +22,7 @@ agent:
     # 이 모델은 low/medium이 듣지 않고 none만 듣는다(conf/application.yml의 max-tokens 주석). 다른 모델로 바꾸면 다시 재 본다.
     reasoning: none
   prompt:
-    system: prompts/pilot/pilot-newdev-analyzer-agent/v1.st
+    system: prompts/pilot/pilot-newdev-analyzer-agent.st
   input:
     schema: schemas/pilot/pilot-newdev-analyzer-agent.input.schema.json
   output:

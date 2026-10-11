@@ -25,7 +25,7 @@ agent:
   version: "1.0.0"
   description: 영향도 분석 에이젼트. 요구사항 정의서를 읽고 원인과 영향받는 코드를 조사해 영향도 분석서(02-impact.md)를 만든다.
   prompt:
-    system: prompts/pilot/pilot-impact-analyzer-agent/v1.st
+    system: prompts/pilot/pilot-impact-analyzer-agent.st
   input:
     schema: schemas/pilot/pilot-impact-analyzer-agent.input.schema.json
   output:

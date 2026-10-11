@@ -18,7 +18,7 @@ agent:
   version: "1.0.0"
   description: RAG(검색-증강) Advisor 적용 확인용 Agent. 먼저 문서를 적재해야 참고자료가 실제로 붙는다.
   prompt:
-    system: prompts/sample/sample-rag-demo-agent/v1.st
+    system: prompts/sample/sample-rag-demo-agent.st
   context:
     sources: [workflowInput, retrievedDocuments]
     retrieval:

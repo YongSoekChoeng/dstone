@@ -39,7 +39,7 @@ agent:
     #         이 Agent로 직접 재 본 것은 아니다. [진행 방식]을 지우지 않은 것도 그래서다.
     reasoning: low
   prompt:
-    system: prompts/pilot/pilot-impact-analyzer-review-agent/v1.st
+    system: prompts/pilot/pilot-impact-analyzer-review-agent.st
   input:
     schema: schemas/pilot/pilot-impact-analyzer-review-agent.input.schema.json
   tools:

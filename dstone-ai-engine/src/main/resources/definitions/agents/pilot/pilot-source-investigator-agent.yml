@@ -33,7 +33,7 @@ agent:
   version: "1.0.0"
   description: 소스 조사 전담. sourceRoot 아래 소스에서 question에 관련된 파일과 근거(파일 경로, 클래스/메서드/쿼리ID, 줄 번호)를 찾아 요약한다. 진입점 찾기, 호출 관계 따라가기, 오류 원인 추적처럼 여러 파일을 뒤져야 하는 조사를 맡긴다.
   prompt:
-    system: prompts/pilot/pilot-source-investigator-agent/v1.st
+    system: prompts/pilot/pilot-source-investigator-agent.st
   input:
     schema: schemas/pilot/pilot-source-investigator-agent.input.schema.json
   output:

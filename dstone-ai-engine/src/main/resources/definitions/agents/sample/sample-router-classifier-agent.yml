@@ -14,4 +14,4 @@ agent:
   version: "1.0.0"
   description: ROUTER step 전용 - 문의를 billing/technical/other 세 갈래 중 하나로 분류한다.
   prompt:
-    system: prompts/sample/sample-router-classifier-agent/v1.st
+    system: prompts/sample/sample-router-classifier-agent.st

@@ -23,6 +23,6 @@ agent:
   version: "1.0.0"
   description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.
   prompt:
-    system: prompts/sample/sample-general-chat/v1.st
+    system: prompts/sample/sample-general-chat.st
   tools:
     allowed: ["*"]

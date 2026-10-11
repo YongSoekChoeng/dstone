@@ -26,7 +26,7 @@ agent:
     # 추론을 껐다. Tool 없이 주어진 자료(설계와 소스)를 변경 목록으로 정리하는 일이라 꺼도 된다(분석, 파일별 설계 Agent와 같다).
     reasoning: none
   prompt:
-    system: prompts/pilot/pilot-newdev-file-developer-agent/v1.st
+    system: prompts/pilot/pilot-newdev-file-developer-agent.st
   input:
     schema: schemas/pilot/pilot-newdev-file-developer-agent.input.schema.json
   output:
