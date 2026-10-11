@@ -1,0 +1,18 @@
+################################################################################################################ 
+# 작업분류 Agent 입니다. 
+#   - 고객의 요청서를 내용을 읽고 신규개발/수정개발 여부를 판단합니다.
+#   - ROUTER 전용 Agent 이므로 output 을 정의하지 않습니다. (엔진이 {route, reason}으로 고정)
+################################################################################################################ 
+agent: 
+  id: sm-decide-job-kind-agent
+  version: "1.0.0"
+  # role: 
+  description: ROUTER step 전용 - 요청서를 읽고 처리 경로(신규개발 / 수정개발)를 고른다.
+  model:
+    # name: 
+    # temperature: 
+    # 이중 하나 선택 : none/low/medium/high
+    reasoning: none 
+  prompt: prompts/sm/sm-decide-job-kind-agent.st
+
+

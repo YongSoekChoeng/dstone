@@ -1,7 +1,10 @@
-# 어플리케이션 운영관리 Workflow입니다. 요청서(00-request.md)에서 시작해 요구사항 → 영향도 분석 → 리뷰 → 설계 → 구현까지 진행합니다.
+################################################################################################################ 
+# 어플리케이션 운영관리 Workflow입니다. 
+# 요청서(00-request.md)에서 시작해 요구사항 → 영향도 분석 → 리뷰 → 설계 → 구현까지 진행합니다.
+################################################################################################################ 
 
 workflow:
-  id: sm
+  id: sm-workflow
   version: "1.0.0"
   description: |
    어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 
@@ -45,7 +48,7 @@ workflow:
   #####################################    
   output:
     value:
-      #route: "${state.classify.route}"
+      route: "${state.classify.route}"
       #requirements: "${state.requirements}"
       #impact: "${state.impact}"
       #review: "${state.review}"
@@ -77,11 +80,10 @@ workflow:
 	  
     - id: step00-02-decideJobKind
       type: AGENT
-      agent: readFile
-      input: 
-        fileFullPath: "${input}/00-request.md"
+      agent: sm-decide-job-kind-agent
+      input: "${state.request}"
       output: 	
-        result: "state.request"
+        result: "state.classify.route"
       next: END
       onFailure: FAIL  
 	
