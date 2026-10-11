@@ -11,7 +11,7 @@ agent:
   version: "1.0.0"
   description: 신규 개발 - 참고 구현을 고르고 그 파일 경로를 모은다(파일 내용은 읽지 않는다).
   prompt:
-    system: prompts/pilot-newdev-reference-agent/v1.st
+    system: prompts/pilot/pilot-newdev-reference-agent/v1.st
   input:
     schema: schemas/pilot/pilot-newdev-reference-agent.input.schema.json
   output:

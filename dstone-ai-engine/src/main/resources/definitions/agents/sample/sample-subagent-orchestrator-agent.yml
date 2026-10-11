@@ -21,7 +21,7 @@ agent:
   version: "1.0.0"
   description: Sub Agent 확인용 - 문장에서 SQL을 뽑고 검증하고 고치는 일을 다른 Agent와 Tool에게 맡겨 처리한다.
   prompt:
-    system: prompts/sample-subagent-orchestrator-agent/v1.st
+    system: prompts/sample/sample-subagent-orchestrator-agent/v1.st
   tools:
     allowed: [validateSqlSyntax]
   subAgents: [sample-structured-extract-agent, sample-fix-agent]

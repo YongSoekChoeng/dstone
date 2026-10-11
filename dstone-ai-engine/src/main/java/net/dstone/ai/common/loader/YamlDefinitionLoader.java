@@ -241,7 +241,7 @@ public class YamlDefinitionLoader extends BaseObject {
 			Map<String, Object> agent = (Map<String, Object>) root.get("agent");
 			Object prompt = agent.get("prompt");
 			if (prompt instanceof String) {
-				throw new IllegalStateException("[agent.prompt] 프롬프트는 YAML에 직접 적지 않고 파일로 둡니다. 예: prompt: {system: prompts/내agent/v1.st}");
+				throw new IllegalStateException("[agent.prompt] 프롬프트는 YAML에 직접 적지 않고 파일로 둡니다. 예: prompt: {system: prompts/내묶음/내agent/v1.st}");
 			}
 			if (prompt instanceof Map) {
 				Map<String, Object> promptMap = (Map<String, Object>) prompt;
@@ -303,7 +303,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * </pre>
 	 *
 	 * @param where 오류 문장에 보여 줄 YAML 경로
-	 * @param path  definitions 폴더 기준 상대경로(예: prompts/requirement-analyzer/v1.st)
+	 * @param path  definitions 폴더 기준 상대경로(예: prompts/pilot/requirement-analyzer/v1.st)
 	 * @param dir   이 파일이 있어야 하는 폴더 이름
 	 */
 	private String readDefinitionFile(String where, String path, String dir) {
@@ -439,7 +439,7 @@ public class YamlDefinitionLoader extends BaseObject {
 			return "output은 맵으로 적습니다. 예: output: {format: JSON, schema: schemas/내묶음/내결과.schema.json, validation: STRICT} (글자로 답하는 Agent는 output을 적지 않습니다)";
 		}
 		if (AgentDefinition.Prompt.class.equals(block)) {
-			return "prompt는 파일 경로를 가진 맵입니다. 예: prompt: {system: prompts/내agent/v1.st}";
+			return "prompt는 파일 경로를 가진 맵입니다. 예: prompt: {system: prompts/내묶음/내agent/v1.st}";
 		}
 		return "이 자리는 맵으로 적습니다(" + block.getSimpleName() + ").";
 	}

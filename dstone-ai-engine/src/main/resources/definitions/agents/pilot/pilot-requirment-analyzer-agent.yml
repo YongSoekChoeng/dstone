@@ -19,7 +19,7 @@ agent:
   version: "1.0.0"
   description: 요구사항 분석/정의 에이젼트. 요청서(00-request.md)를 읽고 요구사항 정의서(01-requirements.md)를 만든다.
   prompt:
-    system: prompts/pilot-requirment-analyzer-agent/v1.st
+    system: prompts/pilot/pilot-requirment-analyzer-agent/v1.st
   input:
     schema: schemas/pilot/pilot-requirment-analyzer-agent.input.schema.json
   output:

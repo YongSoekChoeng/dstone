@@ -31,7 +31,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *       temperature: 0.1
  *       reasoning: none
  *     prompt:
- *       system: prompts/requirement-analyzer/v1.st   # 프롬프트는 별도 파일
+ *       system: prompts/pilot/requirement-analyzer/v1.st   # 프롬프트는 별도 파일
  *     input:
  *       schema: schemas/pilot/requirement-input.schema.json
  *     output:
@@ -169,7 +169,7 @@ public record AgentDefinition(
 	/**
 	 * agent.prompt 입니다.
 	 *
-	 * @param system 시스템 프롬프트 파일의 경로입니다(definitions 폴더 기준. 예: prompts/requirement-analyzer/v1.st).
+	 * @param system 시스템 프롬프트 파일의 경로입니다(definitions 폴더 기준. 예: prompts/pilot/requirement-analyzer/v1.st).
 	 * @param text   그 파일의 내용입니다. YAML에는 적지 않습니다(YamlDefinitionLoader가 파일을 읽어 채웁니다).
 	 */
 	public record Prompt(String system, String text) {

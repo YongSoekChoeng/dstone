@@ -15,7 +15,7 @@ agent:
   version: "1.0.0"
   description: 개발 에이젼트. 설계서와 태스크 목록대로 소스를 구현하고 태스크 목록에 완료 표시를 남긴다.
   prompt:
-    system: prompts/pilot-developer-agent/v1.st
+    system: prompts/pilot/pilot-developer-agent/v1.st
   input:
     schema: schemas/pilot/pilot-developer-agent.input.schema.json
   output:

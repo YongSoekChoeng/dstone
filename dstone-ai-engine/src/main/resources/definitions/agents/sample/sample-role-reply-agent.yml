@@ -14,6 +14,6 @@ agent:
   version: "1.0.0"
   description: input의 role로 역할을 정하고 message에 답한다(prompt 변수를 Agent input 필드로 채우는 예시).
   prompt:
-    system: prompts/sample-role-reply-agent/v1.st
+    system: prompts/sample/sample-role-reply-agent/v1.st
   input:
     schema: schemas/sample/sample-role-reply-agent.input.schema.json

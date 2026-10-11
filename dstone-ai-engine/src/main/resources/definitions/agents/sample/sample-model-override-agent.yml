@@ -21,4 +21,4 @@ agent:
   model:
     routing: sample-override
   prompt:
-    system: prompts/sample-model-override-agent/v1.st
+    system: prompts/sample/sample-model-override-agent/v1.st

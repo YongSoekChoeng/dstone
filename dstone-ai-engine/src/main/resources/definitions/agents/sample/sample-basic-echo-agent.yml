@@ -18,4 +18,4 @@ agent:
   version: "1.0.0"
   description: AGENT step 자체의 기본 동작 확인 전용 - 프롬프트 템플릿 변수도, Tool도 전혀 쓰지 않는다.
   prompt:
-    system: prompts/sample-basic-echo-agent/v1.st
+    system: prompts/sample/sample-basic-echo-agent/v1.st

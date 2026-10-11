@@ -15,4 +15,4 @@ agent:
   model:
     reasoning: none
   prompt:
-    system: prompts/pilot-request-router-agent/v1.st
+    system: prompts/pilot/pilot-request-router-agent/v1.st

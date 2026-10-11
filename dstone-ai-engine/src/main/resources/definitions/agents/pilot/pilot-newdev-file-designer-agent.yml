@@ -18,7 +18,7 @@ agent:
     # 끄고 보니 결과에 망설임을 적거나 다른 파일과 다른 컬럼 이름을 지어내는 일이 있어서, 이름은 plan의 sharedNames를 따르게 했다.
     reasoning: none
   prompt:
-    system: prompts/pilot-newdev-file-designer-agent/v1.st
+    system: prompts/pilot/pilot-newdev-file-designer-agent/v1.st
   input:
     schema: schemas/pilot/pilot-newdev-file-designer-agent.input.schema.json
   output:

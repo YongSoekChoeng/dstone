@@ -85,7 +85,7 @@ public class AgentRegistry extends BaseObject {
 				throw new IllegalStateException("agent[" + definition.id() + "]에 version이 없습니다. 예: version: \"1.0.0\"");
 			}
 			if (StringUtil.isEmpty(definition.promptText())) {
-				throw new IllegalStateException("agent[" + definition.id() + "]에 prompt가 없거나 프롬프트 파일이 비어 있습니다. 예: prompt: {system: prompts/내agent/v1.st}");
+				throw new IllegalStateException("agent[" + definition.id() + "]에 prompt가 없거나 프롬프트 파일이 비어 있습니다. 예: prompt: {system: prompts/내묶음/내agent/v1.st}");
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
 				throw new IllegalStateException("agent id가 중복 등록되었습니다: " + definition.id());

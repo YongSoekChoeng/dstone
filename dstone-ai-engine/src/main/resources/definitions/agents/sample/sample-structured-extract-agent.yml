@@ -13,7 +13,7 @@ agent:
   version: "1.0.0"
   description: 입력 문장에서 SQL 문 하나를 그대로 뽑아 {sql}로 돌려준다(output을 object로 선언한 예시).
   prompt:
-    system: prompts/sample-structured-extract-agent/v1.st
+    system: prompts/sample/sample-structured-extract-agent/v1.st
   output:
     format: JSON
     schema: schemas/sample/sample-structured-extract-agent.output.schema.json

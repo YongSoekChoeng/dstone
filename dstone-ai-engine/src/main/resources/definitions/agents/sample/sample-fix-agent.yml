@@ -17,7 +17,7 @@ agent:
   version: "1.0.0"
   description: onFailure 루프 전용 - 검증에 실패한 SQL과 그 사유를 보고 SQL을 고친다.
   prompt:
-    system: prompts/sample-fix-agent/v1.st
+    system: prompts/sample/sample-fix-agent/v1.st
   input:
     schema: schemas/sample/sample-fix-agent.input.schema.json
   output:

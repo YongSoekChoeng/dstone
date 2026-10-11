@@ -14,4 +14,4 @@ agent:
   version: "1.0.0"
   description: SUPERVISOR step 전용 - 주어진 텍스트를 pass/fail + 이유로 판정한다.
   prompt:
-    system: prompts/sample-verdict-judge-agent/v1.st
+    system: prompts/sample/sample-verdict-judge-agent/v1.st

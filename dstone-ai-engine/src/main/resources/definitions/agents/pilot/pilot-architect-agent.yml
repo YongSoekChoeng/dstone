@@ -10,7 +10,7 @@ agent:
   version: "1.0.0"
   description: 설계 에이젼트. 요구사항과 영향도 분석을 바탕으로 상세 설계서(04-design.md)와 태스크 목록(04-tasks.md)을 만든다.
   prompt:
-    system: prompts/pilot-architect-agent/v1.st
+    system: prompts/pilot/pilot-architect-agent/v1.st
   input:
     schema: schemas/pilot/pilot-architect-agent.input.schema.json
   output:

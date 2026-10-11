@@ -28,6 +28,6 @@ agent:
   version: "1.0.0"
   description: 등록된 로컬 Tool을 LLM이 스스로 골라 호출하는 tool-calling 루프 확인용 Agent.
   prompt:
-    system: prompts/sample-tool-demo-agent/v1.st
+    system: prompts/sample/sample-tool-demo-agent/v1.st
   tools:
     allowed: [getCurrentDateTime, validateSqlSyntax, searchDocuments, httpGet, runShellScript, runPythonScript]
