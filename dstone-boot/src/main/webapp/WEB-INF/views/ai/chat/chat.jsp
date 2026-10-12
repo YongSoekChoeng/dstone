@@ -67,7 +67,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 	<script>
 		DstoneAiChat.init({
 			listUrl: "<%=requestUtil.getStrContextPath()%>/ai/chat/list.do",
-			sendUrl: "<%=requestUtil.getStrContextPath()%>/ai/chat/sendMessage.do"
+			sendUrl: "<%=requestUtil.getStrContextPath()%>/ai/chat/sendMessage.do",
+			// 화면을 열었을 때 골라 둘 Agent (서버가 agent 를 비워 받았을 때 쓰는 기본값과 같다)
+			defaultAgent: "sample-general-chat"
 		});
 	</script>
 </body>
