@@ -12,14 +12,14 @@ agent:
     # name: 
     # temperature: 
     # 이중 하나 선택 : none/low/medium/high
-    reasoning: none 
+    reasoning: low 
   prompt: 
     system: prompts/sm/sm-decide-job-kind-agent.st
   input: 
     schema: {type: string}
-  context:
+  context: # context는 엔진이 LLM 호출 전에 자동으로 한 번 찾아 붙이고
     sources: [retrievedDocuments]
-  tools:
+  tools: # tools는 LLM이 필요하다고 판단할 때만 직접 부름
     allowed: [knowledgeSearch, searchInFiles]
   execution:
     maxAttempts: 2
