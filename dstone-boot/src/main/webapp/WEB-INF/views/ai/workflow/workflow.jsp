@@ -8,19 +8,26 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="../common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
-			<section class="ai-panel">
-				<h3>Workflow 비동기 테스트</h3>
-				<p class="ai-hint">dstone-ai-engine의 GET /api/ai/workflow(목록) + POST
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Workflow Test</h2>
+				<p>dstone-ai-engine의 GET /api/ai/workflow(목록) + POST
 					/api/ai/workflow/{workflowId}/submit + GET /api/ai/workflow/executions/{executionId}
 					비동기 계약을 직접 호출해보는 개발/테스트 화면입니다. [제출]을 누르면
 					executionId를 바로 돌려받고, 이후 2초 간격으로 상태를 자동 조회해 RUNNING → DONE/FAILED/WAITING_APPROVAL 전이를 보여줍니다.
 					승인 대기 실행을 목록으로 보거나 승인/반려하려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/admin/workflow/workflow">관리자 화면</a>을 쓰십시오.</p>
+			</section>
 
+			<section class="ai-panel">
+				<h3>Workflow 제출</h3>
 				<div class="workflow-form">
 					<div class="workflow-field">
 						<label for="workflow-id">workflowId</label>
@@ -75,6 +82,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<tbody id="workflow-history-body"></tbody>
 				</table>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="../common/footer.jsp"></jsp:include>

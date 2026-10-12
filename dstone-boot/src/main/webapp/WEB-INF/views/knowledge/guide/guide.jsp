@@ -9,11 +9,20 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 <jsp:include page="../common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
-		<div id="ai-main" class="kn-guide">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12 kn-guide">
+			<section>
+				<h2 align="center" style="font-weight: bold;">User Guide</h2>
+				<p>코드 분석(Knowledge) 메뉴가 무엇을 하고, 어떻게 쓰는지 처음부터 설명합니다.</p>
+			</section>
+
 
 			<section class="ai-panel kn-toc">
 				<b>차례</b><br>
@@ -339,6 +348,9 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 				</table>
 				<p class="ai-hint">분석이 어떻게 이루어지는지, 무엇을 잇지 못하는지의 자세한 내용은 저장소의 <code>docs/11.dstone-knowledge.md</code> 에 있습니다.</p>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="../common/footer.jsp"></jsp:include>

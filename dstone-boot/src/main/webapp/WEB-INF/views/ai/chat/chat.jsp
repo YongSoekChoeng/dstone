@@ -8,11 +8,21 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="../common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
-		<div id="ai-main" class="ai-chat-main">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Chat</h2>
+				<p>dstone-ai-engine 의 Agent 와 실시간으로 대화합니다. Agent 를 고르고, 필요하면 올린 문서 검색(RAG) · 도구호출(Tool) 을 켠 뒤 메시지를 보냅니다.</p>
+			</section>
+
+			<section class="ai-chat-box">
 			<div id="chat-messages" class="chat-messages"></div>
 
 			<form id="chat-form" class="chat-form">
@@ -34,6 +44,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<button type="submit" id="chat-send" class="chat-send">전송</button>
 				</div>
 			</form>
+			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="../common/footer.jsp"></jsp:include>

@@ -1,78 +1,143 @@
-.ai-body {
-	margin: 0;
-	font-family: -apple-system, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
-	background: #f5f6f8;
-	color: #1f2328;
-}
+/* AI 화면과 코드 분석(Knowledge) 화면이 같이 쓰는 모양.
+   바탕(헤더 바, 본문 틀, 푸터, 글자색)은 분석툴과 똑같이 analyzer/assets/css/main.css 를 쓰고,
+   여기에는 그 테마에 없는 부품(채팅, 카드, Workflow 폼 등)과 테마에 맞추는 보정만 둔다.
+   그래서 head.jsp 에서 analyzer 의 main.css 다음에 이 파일을 읽는다. */
 
-#ai-page-wrapper {
-	/* 표가 많은 화면(Workflow 실행 목록, 코드 분석 결과)이 좁아서 잘리지 않게 화면 폭을 거의 다 쓴다.
-	   아주 넓은 모니터에서는 줄이 너무 길어지지 않게 1600px 에서 멈춘다. */
+/* ---------- 분석툴 테마에 맞추는 보정 ---------- */
+
+/* 표가 많은 화면(Workflow 실행 목록, 코드 분석 결과)이 좁아서 잘리지 않게 화면 폭을 거의 다 쓴다.
+   아주 넓은 모니터에서는 줄이 너무 길어지지 않게 1600px 에서 멈춘다. (분석툴은 1200px 고정) */
+.ai-body .container {
 	width: 96%;
 	max-width: 1600px;
-	margin: 0 auto;
-	min-height: 100vh;
-	display: flex;
-	flex-direction: column;
-	background: #fff;
-	box-shadow: 0 0 24px rgba(0, 0, 0, 0.05);
 }
 
-#ai-header-wrapper {
-	border-bottom: 1px solid #e5e7eb;
-	padding: 16px 24px;
-}
-
-#ai-header {
+/* 메뉴가 분석툴(4개)보다 많아서, 한 줄에 다 안 들어가면 다음 줄로 넘긴다.
+   들어갈 때는 분석툴과 똑같이 왼쪽에 제목, 오른쪽에 메뉴가 놓인다. */
+.ai-body #header {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
+	height: auto;
+	min-height: 86px;
 }
 
-#ai-logo {
-	font-size: 18px;
-	font-weight: 700;
-	color: #111827;
-	text-decoration: none;
+.ai-body #header h1,
+.ai-body #header nav {
+	position: static;
 }
 
-#ai-nav a {
-	margin-left: 16px;
-	color: #4b5563;
-	text-decoration: none;
-	font-size: 14px;
-	padding-bottom: 4px;
+.ai-body #header h1 {
+	white-space: nowrap;
+	margin-right: 20px;
+}
+
+.ai-body #header nav {
+	font-size: 1em;
+	line-height: 60px;
+	margin-left: auto;
+}
+
+.ai-body #header nav a {
+	padding: 0 11px;
+	white-space: nowrap;
 }
 
 /* dstone-boot 첫 화면으로 돌아가는 링크. 이 화면의 메뉴가 아니라 "나가는 문"이라 구분선을 둔다 */
-#ai-nav a.ai-nav-home {
-	padding-right: 16px;
-	border-right: 1px solid #d1d5db;
-	font-weight: 600;
+.ai-body #header nav a.ai-nav-home {
+	border-right: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-#ai-nav a.current-page-item,
-#ai-nav a:hover {
-	color: #2563eb;
-	border-bottom: 2px solid #2563eb;
+/* 분석툴 테마는 좁은 화면(980px 이하)에서 헤더를 숨기고 스크립트로 옆 메뉴를 만든다.
+   여기는 그 스크립트를 쓰지 않으니 헤더를 그대로 보여 준다. */
+@media screen and (max-width: 980px) {
+	.ai-body #page-wrapper {
+		padding-top: 0;
+	}
+
+	.ai-body #header {
+		display: flex;
+	}
 }
 
-#ai-main {
-	flex: 1;
-	padding: 24px;
-	display: flex;
-	flex-direction: column;
-	gap: 24px;
+@media screen and (max-width: 1280px) {
+	.ai-body #header {
+		min-height: 76px;
+	}
 }
 
-.ai-banner h2 {
-	margin: 0 0 8px;
+/* 분석툴 테마는 글자 사이를 1px 좁힌다. 여기는 작은 글씨로 쓴 설명이 많아서 본문만 조금 덜 좁힌다 */
+.ai-body #main {
+	letter-spacing: -0.4px;
 }
 
-.ai-banner p {
-	color: #4b5563;
-	line-height: 1.6;
+/* 분석툴 테마는 굵은 글씨·기울인 글씨·코드 글꼴·목록 번호를 모두 지운다. 설명 글에 필요해서 되살린다. */
+.ai-body b,
+.ai-body strong {
+	font-weight: bold;
 }
+
+.ai-body i,
+.ai-body em {
+	font-style: italic;
+}
+
+.ai-body code,
+.ai-body pre,
+.ai-body textarea {
+	letter-spacing: 0;
+}
+
+.ai-body code,
+.ai-body pre {
+	font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.ai-body ol {
+	list-style: decimal;
+}
+
+/* 본문의 한 구역. 분석툴처럼 상자 없이 청록색 제목으로 구분한다 */
+.ai-panel > h3 {
+	color: #007897;
+	font-size: 1.6em;
+	letter-spacing: -1px;
+	margin-bottom: 0.6em;
+}
+
+/* 단추. 분석툴의 mini_button 과 같은 모양 */
+.ai-body button {
+	background-image: linear-gradient(to bottom, #008dad, #007b9d);
+	display: inline-block;
+	padding: 5px 15px;
+	background-color: #007b9d;
+	border-radius: 10px;
+	color: #fff;
+	font-size: 12px;
+	letter-spacing: -1px;
+	border: solid 1px #006e8b;
+	box-shadow: inset 0px 0px 0px 1px #18a8c8;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.ai-body button:hover {
+	background-image: linear-gradient(to bottom, #1b9fbe, #118eb1);
+	background-color: #118eb1;
+	box-shadow: inset 0px 0px 0px 1px #3ecceb;
+}
+
+.ai-body button:disabled {
+	background-image: none;
+	background-color: #c0c0c0;
+	border-color: #b0b0b0;
+	box-shadow: none;
+	color: #fff;
+	cursor: default;
+}
+
+/* ---------- AI 메인 ---------- */
 
 .ai-card-list {
 	display: grid;
@@ -83,42 +148,36 @@
 .ai-card {
 	display: block;
 	padding: 20px;
-	border: 1px solid #e5e7eb;
-	border-radius: 12px;
+	border: 1px solid #ced0b7;
+	border-radius: 10px;
 	text-decoration: none;
 	color: inherit;
 	transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .ai-card:hover {
-	border-color: #2563eb;
-	box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+	border-color: #007b9d;
+	box-shadow: 0 4px 12px rgba(0, 123, 157, 0.15);
 }
 
 .ai-card h3 {
 	margin: 0 0 8px;
-	color: #111827;
+	color: #007897;
 }
 
 .ai-card p {
 	margin: 0;
-	color: #4b5563;
+	color: #4e4d43;
 	font-size: 14px;
 	line-height: 1.5;
 }
 
 .ai-panel {
-	border: 1px solid #e5e7eb;
-	border-radius: 12px;
-	padding: 20px;
-}
-
-.ai-panel h3 {
-	margin: 0 0 8px;
+	margin: 0 0 60px 0;
 }
 
 .ai-hint {
-	color: #6b7280;
+	color: #878e83;
 	font-size: 13px;
 	margin: 0 0 16px;
 }
@@ -130,9 +189,13 @@
 
 /* 채팅 화면 */
 
-.ai-chat-main {
-	padding: 0;
-	height: calc(100vh - 140px);
+.ai-chat-box {
+	display: flex;
+	flex-direction: column;
+	height: 70vh;
+	min-height: 480px;
+	border: 1px solid #ced0b7;
+	border-radius: 10px;
 }
 
 .chat-messages {
@@ -160,20 +223,22 @@
 	max-width: 70%;
 	padding: 10px 14px;
 	border-radius: 14px;
+	font-size: 15px;
 	line-height: 1.5;
+	letter-spacing: 0;
 	white-space: pre-wrap;
 	word-break: break-word;
 }
 
 .chat-message-user .chat-bubble {
-	background: #2563eb;
+	background: #007b9d;
 	color: #fff;
 	border-bottom-right-radius: 4px;
 }
 
 .chat-message-assistant .chat-bubble {
-	background: #f3f4f6;
-	color: #1f2328;
+	background: #eef1e8;
+	color: #283121;
 	border-bottom-left-radius: 4px;
 }
 
@@ -183,7 +248,7 @@
 }
 
 .chat-form {
-	border-top: 1px solid #e5e7eb;
+	border-top: 1px solid #ced0b7;
 	padding: 16px 24px 24px;
 }
 
@@ -193,18 +258,17 @@
 	gap: 16px;
 	margin-bottom: 8px;
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 }
 
 /* 드롭다운(채팅 Agent, Workflow 선택, 상태 필터 등) - 브라우저 기본 높이가 너무 작아서 조금 키운다 */
 .ai-body select {
-	min-height: 34px;
-	padding: 6px 10px;
-	border: 1px solid #d1d5db;
-	border-radius: 6px;
+	min-height: 28px;
+	padding: 3px 8px;
+	border: solid 1px #006e8b;
 	background-color: #ffffff;
 	font-size: 13px;
-	color: #111827;
+	color: #4e4d43;
 }
 
 .chat-options select {
@@ -212,8 +276,7 @@
 }
 
 .chat-model-input {
-	border: 1px solid #d1d5db;
-	border-radius: 6px;
+	border: solid 1px #006e8b;
 	padding: 3px 8px;
 	font-size: 13px;
 	width: 220px;
@@ -228,56 +291,39 @@
 .chat-input {
 	flex: 1;
 	resize: none;
-	border: 1px solid #d1d5db;
-	border-radius: 10px;
+	border: solid 1px #006e8b;
 	padding: 10px 12px;
 	font-size: 14px;
 	font-family: inherit;
 }
 
-.chat-send {
-	border: none;
-	border-radius: 10px;
-	padding: 0 20px;
-	background: #2563eb;
-	color: #fff;
+.ai-body .chat-send {
+	padding: 0 24px;
 	font-size: 14px;
-	cursor: pointer;
 }
 
-.chat-send:disabled {
-	background: #9ca3af;
-	cursor: default;
-}
-
-/* 목록 표. Workflow 화면과 코드 분석(Knowledge) 화면이 같이 쓴다(문서 업로드 화면에서 쓰던 이름이 남은 것) */
+/* 목록 표. Workflow 화면과 코드 분석(Knowledge) 화면이 같이 쓴다(문서 업로드 화면에서 쓰던 이름이 남은 것).
+   분석툴의 표(border="1")와 같은 모양: 회색 머리줄에 청록색 굵은 글씨, 칸마다 테두리 */
 
 .document-list-table {
 	width: 100%;
 	border-collapse: collapse;
-	font-size: 13px;
+	font-size: 14px;
+	letter-spacing: 0;
 }
 
 .document-list-table th,
 .document-list-table td {
 	text-align: left;
-	padding: 8px 10px;
-	border-bottom: 1px solid #e5e7eb;
+	padding: 5px;
+	border: 1px solid #b5b5b5;
+	line-height: 1.4;
 }
 
-.document-list-table button {
-	border: 1px solid #d1d5db;
-	background: #fff;
-	border-radius: 6px;
-	padding: 4px 10px;
-	cursor: pointer;
-}
-
-#ai-footer-wrapper {
-	padding: 16px 24px;
-	border-top: 1px solid #e5e7eb;
-	color: #9ca3af;
-	font-size: 12px;
+.document-list-table th {
+	color: #008ead;
+	font-weight: bold;
+	background-color: #d1cfcd;
 }
 
 /* Workflow 비동기 테스트 화면 */
@@ -296,21 +342,19 @@
 
 .workflow-field label {
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 }
 
 .workflow-field input[type="text"] {
-	border: 1px solid #d1d5db;
-	border-radius: 8px;
-	padding: 8px 10px;
+	border: solid 1px #006e8b;
+	padding: 6px 8px;
 	font-size: 13px;
 }
 
 .workflow-textarea {
 	min-height: 120px;
 	resize: vertical;
-	border: 1px solid #d1d5db;
-	border-radius: 8px;
+	border: solid 1px #006e8b;
 	padding: 10px 12px;
 	font-size: 13px;
 	font-family: "SFMono-Regular", Consolas, monospace;
@@ -327,24 +371,9 @@
 	margin-top: 12px;
 }
 
-.workflow-actions button {
-	border: none;
-	border-radius: 8px;
-	padding: 8px 20px;
-	background: #2563eb;
-	color: #fff;
-	font-size: 14px;
-	cursor: pointer;
-}
-
-.workflow-actions button:disabled {
-	background: #9ca3af;
-	cursor: default;
-}
-
 .workflow-status {
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 }
 
 .workflow-status-row {
@@ -357,25 +386,12 @@
 
 .workflow-status-label {
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 }
 
 .workflow-job-id {
 	font-family: "SFMono-Regular", Consolas, monospace;
 	font-size: 13px;
-}
-
-.workflow-status-row button {
-	border: 1px solid #d1d5db;
-	background: #fff;
-	border-radius: 6px;
-	padding: 4px 10px;
-	cursor: pointer;
-}
-
-.workflow-status-row button:disabled {
-	color: #9ca3af;
-	cursor: default;
 }
 
 .workflow-badge {
@@ -384,13 +400,13 @@
 	border-radius: 999px;
 	font-size: 12px;
 	font-weight: 600;
-	background: #e5e7eb;
-	color: #4b5563;
+	background: #ced0b7;
+	color: #4e4d43;
 }
 
 .workflow-badge-running {
-	background: #dbeafe;
-	color: #1d4ed8;
+	background: #d5e8ec;
+	color: #007897;
 }
 
 .workflow-badge-done {
@@ -410,13 +426,13 @@
 }
 
 .workflow-badge-cancelled {
-	background: #e5e7eb;
-	color: #6b7280;
+	background: #ced0b7;
+	color: #878e83;
 }
 
 .workflow-history-jobid {
 	font-family: "SFMono-Regular", Consolas, monospace;
-	color: #2563eb;
+	color: #007b9d;
 	text-decoration: none;
 }
 

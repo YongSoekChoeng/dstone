@@ -8,11 +8,20 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="../common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Search &amp; Documents</h2>
+				<p>분석 결과(메소드, 타입, SQL, 화면)와 올린 문서를 뜻과 이름으로 찾고, 일반 문서를 올립니다.</p>
+			</section>
+
 			<details class="kn-howto" open>
 				<summary>이렇게 씁니다</summary>
 				<ol>
@@ -82,6 +91,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				</div>
 				<div id="kn-doc-table" class="kn-scroll"></div>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="../common/footer.jsp"></jsp:include>

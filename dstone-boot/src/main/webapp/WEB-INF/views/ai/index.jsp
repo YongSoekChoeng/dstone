@@ -8,13 +8,29 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
-			<section class="ai-banner">
-				<h2>Dstone AI</h2>
+		<!-- Banner -->
+		<div id="banner-wrapper">
+			<div class="container">
+
+				<div id="banner">
+					<h2>Dstone AI</h2>
+					<span>Chat, Workflow and Agents on dstone-ai-engine ...</span>
+				</div>
+
+			</div>
+		</div>
+
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2>dstone-ai-engine 과 연동되는 AI 기능 모음</h2>
 				<p>dstone-ai-engine과 연동되는 AI 기능 모음입니다. "사용자"는 누구나 기능을 직접 눌러보는 화면이고,
 					"관리자"는 이미 진행 중인 작업(문서 임베딩, Workflow 실행)을 보고 판단·조작하는 화면입니다.</p>
 			</section>
@@ -46,6 +62,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					</a>
 				</div>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="common/footer.jsp"></jsp:include>

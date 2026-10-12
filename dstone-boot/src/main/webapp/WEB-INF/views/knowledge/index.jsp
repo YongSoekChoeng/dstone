@@ -8,11 +8,20 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Project &amp; Analysis</h2>
+				<p>Java 프로젝트를 등록하고 분석을 돌린 뒤, 리비전별 분석 결과와 임베딩 진행 상황을 봅니다.</p>
+			</section>
+
 			<details class="kn-howto">
 				<summary>처음이신가요? 이 화면은 이렇게 씁니다 (눌러서 펴기)</summary>
 				<ol>
@@ -117,6 +126,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div id="kn-summary-cards" class="kn-cards"></div>
 				<div id="kn-summary-sections"></div>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="common/footer.jsp"></jsp:include>

@@ -8,11 +8,20 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="../common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Revision Diff</h2>
+				<p>같은 프로젝트의 두 리비전 사이에 무엇이 더해지고 빠지고 바뀌었는지 봅니다.</p>
+			</section>
+
 			<details class="kn-howto" open>
 				<summary>이렇게 씁니다</summary>
 				<ol>
@@ -45,6 +54,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div id="kn-diff-summary"></div>
 				<div id="kn-diff-result"></div>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="../common/footer.jsp"></jsp:include>
