@@ -29,21 +29,21 @@ workflow:
     onError: STOP
   #####################################    
   #  ● workflow의 input
-  #	   * schema 를 표시.
-  #	   * 축약형
+  #     * schema 를 표시.
+  #     * 축약형
   #    - string : 글자
-  #	   - number : 숫자(소수 포함)
-  #	   - integer : 정수
-  #	   - boolean : true/false
-  #	   - object :  객체(필드 제한 없음)
-  #	   - array : 목록(항목 제한 없음)
-  #	   - list<타입> : 그 타입의 목록
-  #	   * 표준형 - JSON Schema를 그대로 표시.
+  #     - number : 숫자(소수 포함)
+  #     - integer : 정수
+  #     - boolean : true/false
+  #     - object :  객체(필드 제한 없음)
+  #     - array : 목록(항목 제한 없음)
+  #     - list<타입> : 그 타입의 목록
+  #     * 표준형 - JSON Schema를 그대로 표시.
   #####################################    
   input: string
   #####################################    
   #  ● workflow의 output
-  #	   * value 와 schema 를 표시. value 는 필수, schema 는 생략가능.
+  #     * value 와 schema 를 표시. value 는 필수, schema 는 생략가능.
   #    * output 자체를 생략하면 state 자체가 최종결과가 됨.
   #####################################    
   output:
@@ -63,27 +63,27 @@ workflow:
       #newdevTasks: "${state.tasksFile}"
   steps:
 
-	##########################################################################################
-	# step00. 작업구분 (신규 / 수정)
-	##########################################################################################
-	
+  ##########################################################################################
+  # step00. 작업구분 (신규 / 수정)
+  ##########################################################################################
+  
     # 요청서 읽기 (LLM을 부르지 않는다. 읽은 내용은 뒤의 Agent들이 input.request로 받는다)
-    - id: step00-01-readReq
+    - id: step00_01_readReq
       type: TOOL
       tool: readFile
       input: 
         fileFullPath: "${input}/00-request.md"
-      output: 	
+      output:   
         result: "state.request"
-      next: step00-02-decideJobKind
+      next: step00_02_decideJobKind
       onFailure: FAIL
-	  
-    - id: step00-02-decideJobKind
+    
+    - id: step00_02_decideJobKind
       type: AGENT
       agent: sm-decide-job-kind-agent
       input: "${state.request}"
-      output: 	
+      output:   
         result: "state.classify.route"
       next: END
       onFailure: FAIL  
-	
+  

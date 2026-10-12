@@ -7,12 +7,22 @@ agent:
   id: sm-decide-job-kind-agent
   version: "1.0.0"
   # role: 
-  description: ROUTER step 전용 - 요청서를 읽고 처리 경로(신규개발 / 수정개발)를 고른다.
+  description: ROUTER Step 전용 - 요청서를 읽고 처리 경로(신규개발 / 수정개발)를 고른다.
   model:
     # name: 
     # temperature: 
     # 이중 하나 선택 : none/low/medium/high
     reasoning: none 
-  prompt: prompts/sm/sm-decide-job-kind-agent.st
-
+  prompt: 
+    system: prompts/sm/sm-decide-job-kind-agent.st
+  input: 
+    schema: {type: string}
+  context:
+    sources: [retrievedDocuments]
+  tools:
+    allowed: [knowledgeSearch, searchInFiles]
+  execution:
+    maxAttempts: 2
+    timeoutSeconds: 120
+    onInvalidOutput: RETRY
 
