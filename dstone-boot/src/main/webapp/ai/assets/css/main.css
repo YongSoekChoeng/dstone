@@ -377,6 +377,35 @@
 	white-space: pre-line;
 }
 
+/* 채팅 화면의 "무엇을 물을 때 무엇을 켜나" 표 */
+.ai-guide-table {
+	margin-bottom: 12px;
+}
+
+.ai-guide-table td {
+	vertical-align: top;
+	line-height: 1.6;
+}
+
+/* "켤 것"과 "Agent" 칸은 짧으니 줄을 꺾지 않는다 */
+.ai-guide-table td:nth-child(2),
+.ai-guide-table td:nth-child(3) {
+	white-space: nowrap;
+}
+
+.ai-guide-table code {
+	background: #e3e9dc;
+	border-radius: 4px;
+	padding: 1px 5px;
+	font-size: 12px;
+}
+
+.kn-section-title {
+	font-size: 1.2em;
+	color: #283121;
+	margin: 24px 0 8px;
+}
+
 /* 채팅 화면 */
 
 .ai-chat-box {

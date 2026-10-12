@@ -106,11 +106,7 @@
 	color: #878e83;
 }
 
-.kn-section-title {
-	font-size: 1.2em;
-	color: #283121;
-	margin: 24px 0 8px;
-}
+/* .kn-section-title(구역 안의 작은 제목)은 AI 화면도 써서 ai/assets/css/main.css 에 있다 */
 
 /* 검색 결과 한 건 */
 .kn-hit {
