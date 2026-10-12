@@ -137,6 +137,196 @@
 	cursor: default;
 }
 
+/* ---------- 조건 표: 입력 칸을 줄 맞춰 놓는 표 ---------- */
+
+/* 분석툴의 조회 조건 표와 같은 모양. 회색 칸에 이름, 그 옆 칸에 입력.
+   한 줄에 (이름, 입력)을 한 쌍에서 세 쌍까지 놓고, 단추는 표 아래 오른쪽(ai-form-actions)에 둔다. */
+.ai-form {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+	margin-bottom: 10px;
+	letter-spacing: 0;
+}
+
+.ai-form col.ai-form-name {
+	width: 130px;
+}
+
+.ai-form col.ai-form-btncol {
+	width: 130px;
+}
+
+.ai-form th,
+.ai-form td {
+	border: 1px solid #b5b5b5;
+	vertical-align: middle;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.ai-form th {
+	padding: 8px 10px;
+	background-color: #d1cfcd;
+	color: #008ead;
+	font-weight: bold;
+	text-align: center;
+	word-break: keep-all;
+}
+
+.ai-form td {
+	padding: 5px 8px;
+	color: #4e4d43;
+	background: #fff;
+}
+
+/* 표 안의 입력 칸은 칸을 가득 채운다 */
+.ai-form input[type="text"],
+.ai-form input[type="number"],
+.ai-form select,
+.ai-form textarea {
+	display: block;
+	width: 100%;
+	min-height: 30px;
+	padding: 4px 8px;
+	border: solid 1px #006e8b;
+	font-size: 13px;
+	letter-spacing: 0;
+	color: #283121;
+	background-color: #fff;
+}
+
+.ai-form textarea {
+	min-height: 120px;
+}
+
+.ai-form textarea.workflow-textarea-small {
+	min-height: 60px;
+}
+
+.ai-form input[type="file"] {
+	width: 100%;
+	border: 0;
+	padding: 0;
+	font-size: 13px;
+	letter-spacing: 0;
+}
+
+.ai-form input:focus,
+.ai-form select:focus,
+.ai-form textarea:focus,
+.chat-input:focus {
+	outline: 2px solid rgba(0, 142, 173, 0.35);
+	outline-offset: 0;
+}
+
+.ai-form input[readonly],
+.ai-form textarea[readonly] {
+	background-color: #f4f6f0;
+}
+
+/* 체크박스 여러 개를 한 칸에 나란히 */
+.ai-form-checks label {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin: 3px 18px 3px 0;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.ai-form input[type="checkbox"] {
+	margin: 0;
+}
+
+/* 한 칸에 입력과 단추(또는 짧은 글)를 나란히 */
+.ai-form-inline {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ai-form-inline input[type="text"] {
+	flex: 1;
+	min-width: 0;
+}
+
+.ai-form input.ai-form-short {
+	width: 90px;
+}
+
+/* 줄 끝에 단추만 들어가는 칸 */
+.ai-form td.ai-form-btn {
+	text-align: center;
+	padding: 5px 6px;
+}
+
+.ai-form td.ai-form-btn button {
+	width: 100%;
+}
+
+.ai-form td .ai-hint {
+	margin: 6px 0 2px;
+	line-height: 1.5;
+}
+
+.ai-form td .ai-hint:empty {
+	display: none;
+}
+
+.ai-form td .kn-row {
+	margin: 2px 0;
+}
+
+/* 표 아래 오른쪽에 놓는 단추 줄 */
+.ai-form-actions {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 12px;
+}
+
+.ai-form-actions button {
+	min-width: 96px;
+	padding: 7px 18px;
+	font-size: 13px;
+}
+
+.ai-form-buttons {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.ai-form-buttons:empty {
+	display: none;
+}
+
+/* 좁은 화면에서는 한 줄에 한 쌍씩 */
+@media screen and (max-width: 860px) {
+	.ai-form,
+	.ai-form tbody,
+	.ai-form tr,
+	.ai-form th,
+	.ai-form td {
+		display: block;
+		width: 100%;
+	}
+
+	.ai-form colgroup {
+		display: none;
+	}
+
+	.ai-form th {
+		text-align: left;
+	}
+
+	.ai-form th,
+	.ai-form td {
+		margin-top: -1px;
+	}
+}
+
 /* ---------- AI 메인 ---------- */
 
 .ai-card-list {
@@ -252,15 +442,6 @@
 	padding: 16px 24px 24px;
 }
 
-.chat-options {
-	display: flex;
-	align-items: center;
-	gap: 16px;
-	margin-bottom: 8px;
-	font-size: 13px;
-	color: #4e4d43;
-}
-
 /* 드롭다운(채팅 Agent, Workflow 선택, 상태 필터 등) - 브라우저 기본 높이가 너무 작아서 조금 키운다 */
 .ai-body select {
 	min-height: 28px;
@@ -269,18 +450,6 @@
 	background-color: #ffffff;
 	font-size: 13px;
 	color: #4e4d43;
-}
-
-.chat-options select {
-	margin-left: 6px;
-}
-
-.chat-model-input {
-	border: solid 1px #006e8b;
-	padding: 3px 8px;
-	font-size: 13px;
-	width: 220px;
-	margin-left: 6px;
 }
 
 .chat-input-row {
@@ -328,29 +497,6 @@
 
 /* Workflow 비동기 테스트 화면 */
 
-.workflow-form {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-.workflow-field {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.workflow-field label {
-	font-size: 13px;
-	color: #4e4d43;
-}
-
-.workflow-field input[type="text"] {
-	border: solid 1px #006e8b;
-	padding: 6px 8px;
-	font-size: 13px;
-}
-
 .workflow-textarea {
 	min-height: 120px;
 	resize: vertical;
@@ -362,13 +508,6 @@
 
 .workflow-textarea-small {
 	min-height: 60px;
-}
-
-.workflow-actions {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	margin-top: 12px;
 }
 
 .workflow-status {

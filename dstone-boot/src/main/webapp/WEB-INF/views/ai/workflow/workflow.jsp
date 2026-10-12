@@ -28,42 +28,48 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 			<section class="ai-panel">
 				<h3>Workflow 제출</h3>
-				<div class="workflow-form">
-					<div class="workflow-field">
-						<label for="workflow-id">workflowId</label>
-						<select id="workflow-id"></select>
-						<p id="workflow-id-desc" class="ai-hint"></p>
-					</div>
-					<div class="workflow-field">
-						<label for="workflow-session-id">sessionId (선택, 비우면 자동 발급)</label>
-						<input type="text" id="workflow-session-id" placeholder="예: 이전 응답에서 이어가고 싶은 세션 ID" />
-					</div>
-					<div class="workflow-field">
-						<label for="workflow-input">input</label>
-						<p id="workflow-input-schema" class="ai-hint"></p>
-						<textarea id="workflow-input" class="workflow-textarea" placeholder="예: SELECT 1 FROM dual"></textarea>
-						<p id="workflow-sample-note" class="ai-hint"></p>
-					</div>
-				</div>
-
-				<div class="workflow-actions">
-					<button type="button" id="workflow-submit-btn">제출(submit)</button>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="workflow-id">workflowId</label></th>
+						<td><select id="workflow-id"></select>
+							<p id="workflow-id-desc" class="ai-hint"></p></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-session-id">sessionId</label></th>
+						<td><input type="text" id="workflow-session-id" placeholder="(선택) 비우면 자동 발급. 예: 이전 응답에서 이어가고 싶은 세션 ID" /></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-input">input</label></th>
+						<td><p id="workflow-input-schema" class="ai-hint"></p>
+							<textarea id="workflow-input" class="workflow-textarea" placeholder="예: SELECT 1 FROM dual"></textarea>
+							<p id="workflow-sample-note" class="ai-hint"></p></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
 					<span id="workflow-submit-status" class="workflow-status"></span>
+					<button type="button" id="workflow-submit-btn">제출(submit)</button>
 				</div>
 			</section>
 
 			<section class="ai-panel">
 				<h3>실행 상태</h3>
-				<div class="workflow-status-row">
-					<span class="workflow-status-label">executionId</span>
-					<span id="workflow-job-id" class="workflow-job-id">-</span>
-					<span id="workflow-status-badge" class="workflow-badge">-</span>
-					<button type="button" id="workflow-poll-stop-btn" disabled>폴링 중지</button>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th>executionId</th>
+						<td><span id="workflow-job-id" class="workflow-job-id">-</span></td>
+						<th>상태</th>
+						<td><span id="workflow-status-badge" class="workflow-badge">-</span></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-result">result / error</label></th>
+						<td colspan="3"><textarea id="workflow-result" class="workflow-textarea" readonly></textarea></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
+					<button type="button" id="workflow-poll-stop-btn" class="kn-plain" disabled>폴링 중지</button>
 					<button type="button" id="workflow-poll-refresh-btn" disabled>지금 새로고침</button>
-				</div>
-				<div class="workflow-field">
-					<label>result / error</label>
-					<textarea id="workflow-result" class="workflow-textarea" readonly></textarea>
 				</div>
 			</section>
 

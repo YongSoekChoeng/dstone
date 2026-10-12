@@ -47,38 +47,53 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<h3>노드 맵</h3>
 				<p class="ai-hint">호출 구조를 한눈에 봅니다. 클래스 · 화면(JSP · WebSquare · Nexacro) · SQL 매퍼 · 테이블이 노드이고, 그 사이의 호출 / SQL 실행 / 테이블 사용 / 화면 이동이 선입니다.
 					선이 굵을수록 그 사이의 호출이 많습니다.</p>
-				<div class="kn-row">
-					<label for="kn-graph-project">프로젝트</label>
-					<select id="kn-graph-project"></select>
-					<label for="kn-graph-revision">리비전</label>
-					<select id="kn-graph-revision"></select>
-					<button type="button" id="kn-graph-load">다시 불러오기</button>
-					<input type="text" id="kn-graph-find" placeholder="이름으로 찾기 (클래스 / 화면 / 테이블)" style="min-width:230px;" />
-					<button type="button" id="kn-graph-find-btn" class="kn-plain">찾기</button>
-				</div>
-				<div class="kn-row">
-					<label for="kn-graph-unit">보기 단위</label>
-					<select id="kn-graph-unit">
-						<option value="GROUP">묶음 (패키지 · 폴더)</option>
-						<option value="TYPE">클래스</option>
-					</select>
-					<label for="kn-graph-layout">배치</label>
-					<select id="kn-graph-layout">
-						<option value="TIER">계층별 (왼쪽 → 오른쪽)</option>
-						<option value="FREE">자유 (가까운 것끼리)</option>
-					</select>
-					<label for="kn-graph-range">눌렀을 때 강조</label>
-					<select id="kn-graph-range">
-						<option value="ALL">이어진 끝까지</option>
-						<option value="1">바로 옆만</option>
-						<option value="2">두 걸음까지</option>
-					</select>
-					<label><input type="checkbox" id="kn-graph-low" checked /> 짐작한 관계(LOW)도</label>
-					<label><input type="checkbox" id="kn-graph-struct" /> 상속 · 구현 · 주입도</label>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="kn-graph-project">프로젝트</label></th>
+						<td><select id="kn-graph-project"></select></td>
+						<th><label for="kn-graph-revision">리비전</label></th>
+						<td><select id="kn-graph-revision"></select></td>
+						<th><label for="kn-graph-find">이름으로 찾기</label></th>
+						<td><div class="ai-form-inline"><input type="text" id="kn-graph-find" placeholder="클래스 / 화면 / 테이블" />
+							<button type="button" id="kn-graph-find-btn" class="kn-plain">찾기</button></div></td>
+					</tr>
+					<tr>
+						<th><label for="kn-graph-unit">보기 단위</label></th>
+						<td><select id="kn-graph-unit">
+								<option value="GROUP">묶음 (패키지 · 폴더)</option>
+								<option value="TYPE">클래스</option>
+							</select></td>
+						<th><label for="kn-graph-layout">배치</label></th>
+						<td><select id="kn-graph-layout">
+								<option value="TIER">계층별 (왼쪽 → 오른쪽)</option>
+								<option value="FREE">자유 (가까운 것끼리)</option>
+							</select></td>
+						<th><label for="kn-graph-range">눌렀을 때 강조</label></th>
+						<td><select id="kn-graph-range">
+								<option value="ALL">이어진 끝까지</option>
+								<option value="1">바로 옆만</option>
+								<option value="2">두 걸음까지</option>
+							</select></td>
+					</tr>
+					<tr>
+						<th>같이 볼 관계</th>
+						<td colspan="5" class="ai-form-checks"><label><input type="checkbox" id="kn-graph-low" checked /> 짐작한 관계(LOW)도</label>
+							<label><input type="checkbox" id="kn-graph-struct" /> 상속 · 구현 · 주입도</label></td>
+					</tr>
+					<tr>
+						<th>계층</th>
+						<td colspan="5"><div class="kn-row" id="kn-graph-tiers"></div></td>
+					</tr>
+					<tr>
+						<th>선</th>
+						<td colspan="5"><div class="kn-row" id="kn-graph-edges"></div></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
 					<button type="button" id="kn-graph-fit" class="kn-plain">화면에 맞추기</button>
+					<button type="button" id="kn-graph-load">다시 불러오기</button>
 				</div>
-				<div class="kn-row" id="kn-graph-tiers"></div>
-				<div class="kn-row" id="kn-graph-edges"></div>
 				<div id="kn-graph-message" class="kn-message"></div>
 				<div class="kn-graph-body">
 					<div id="kn-graph-canvas" class="kn-graph-canvas"></div>
