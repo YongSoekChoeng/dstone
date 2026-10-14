@@ -41,6 +41,33 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			</details>
 
 			<section class="ai-panel">
+				<h3>호출 관계</h3>
+				<p class="ai-hint">메소드를 이름으로 찾아, 부르는 쪽과 불리는 쪽을 따라갑니다. 불리는 쪽에는 실행하는 SQL, 그 SQL이 건드리는 테이블,
+					여는 화면까지 나옵니다. 테이블 이름을 모르면 아래에서 테이블을 먼저 찾으세요.</p>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-btncol" /></colgroup>
+					<tr>
+						<th><label for="kn-method-name">메소드 이름</label></th>
+						<td><input type="text" id="kn-method-name" placeholder="정확히" /></td>
+						<th><label for="kn-method-owner">타입 이름</label></th>
+						<td><input type="text" id="kn-method-owner" placeholder="(선택) 이름의 일부" /></td>
+						<th><label for="kn-graph-depth">따라갈 깊이</label></th>
+						<td><input type="number" id="kn-graph-depth" min="1" max="5" value="2" /></td>
+						<td class="ai-form-btn"><button type="button" id="kn-method-btn">메소드 찾기</button></td>
+					</tr>
+					<tr>
+						<th><label for="kn-table-name">테이블 이름</label></th>
+						<td colspan="5"><input type="text" id="kn-table-name" placeholder="이름의 일부. 비우면 전체 목록" /></td>
+						<td class="ai-form-btn"><button type="button" id="kn-table-btn" class="kn-plain">테이블 찾기</button></td>
+					</tr>
+				</table>
+				<div id="kn-graph-message" class="kn-message"></div>
+				<div id="kn-method-table" class="kn-scroll"></div>
+				<div id="kn-graph-title" class="kn-section-title"></div>
+				<div id="kn-graph-table"></div>
+			</section>
+					
+			<section class="ai-panel">
 				<h3>영향도 분석</h3>
 				<p class="ai-hint">"이것을 고치면 어디까지 닿는가"를 봅니다. 대상을 직접 건드리는 메소드에서 부르는 쪽으로 거슬러 올라가며
 					닿는 진입점(주소), 화면, 메소드를 모읍니다. 신뢰도는 거기까지 가는 길에서 가장 약한 관계의 값입니다.
@@ -83,33 +110,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div id="kn-impact-result"></div>
 			</section>
 
-			<section class="ai-panel">
-				<h3>호출 관계</h3>
-				<p class="ai-hint">메소드를 이름으로 찾아, 부르는 쪽과 불리는 쪽을 따라갑니다. 불리는 쪽에는 실행하는 SQL, 그 SQL이 건드리는 테이블,
-					여는 화면까지 나옵니다. 테이블 이름을 모르면 아래에서 테이블을 먼저 찾으세요.</p>
-				<table class="ai-form">
-					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-btncol" /></colgroup>
-					<tr>
-						<th><label for="kn-method-name">메소드 이름</label></th>
-						<td><input type="text" id="kn-method-name" placeholder="정확히" /></td>
-						<th><label for="kn-method-owner">타입 이름</label></th>
-						<td><input type="text" id="kn-method-owner" placeholder="(선택) 이름의 일부" /></td>
-						<th><label for="kn-graph-depth">따라갈 깊이</label></th>
-						<td><input type="number" id="kn-graph-depth" min="1" max="5" value="2" /></td>
-						<td class="ai-form-btn"><button type="button" id="kn-method-btn">메소드 찾기</button></td>
-					</tr>
-					<tr>
-						<th><label for="kn-table-name">테이블 이름</label></th>
-						<td colspan="5"><input type="text" id="kn-table-name" placeholder="이름의 일부. 비우면 전체 목록" /></td>
-						<td class="ai-form-btn"><button type="button" id="kn-table-btn" class="kn-plain">테이블 찾기</button></td>
-					</tr>
-				</table>
-				<div id="kn-graph-message" class="kn-message"></div>
-				<div id="kn-method-table" class="kn-scroll"></div>
-				<div id="kn-graph-title" class="kn-section-title"></div>
-				<div id="kn-graph-table"></div>
-			</section>
-					</div>
+					 </div>
 				</div>
 			</div>
 		</div>
