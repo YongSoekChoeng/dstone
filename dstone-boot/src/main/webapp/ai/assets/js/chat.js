@@ -50,6 +50,10 @@ var DstoneAiChat = (function () {
 					option.textContent = agent.id;
 					agentEl.appendChild(option);
 				});
+				// 처음에는 일반 대화용 Agent를 골라 둔다. 목록에 없으면 첫 번째 것이 그대로 골라진다.
+				if (urls.defaultAgent && agentsById[urls.defaultAgent]) {
+					agentEl.value = urls.defaultAgent;
+				}
 				updateAgentDescription();
 			})
 			.catch(function (err) {

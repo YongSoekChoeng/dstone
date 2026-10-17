@@ -8,11 +8,20 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Project &amp; Analysis</h2>
+				<p>Java 프로젝트를 등록하고 분석을 돌린 뒤, 리비전별 분석 결과와 임베딩 진행 상황을 봅니다.</p>
+			</section>
+
 			<details class="kn-howto">
 				<summary>처음이신가요? 이 화면은 이렇게 씁니다 (눌러서 펴기)</summary>
 				<ol>
@@ -49,14 +58,25 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div id="kn-project-table" class="kn-scroll"></div>
 
 				<div class="kn-section-title">프로젝트 등록 / 수정</div>
-				<div class="kn-row">
-					<input type="text" id="kn-new-project-id" placeholder="projectId (영문)" />
-					<input type="text" id="kn-new-project-name" placeholder="이름" />
-					<input type="text" id="kn-new-project-path" class="kn-wide" placeholder="소스 폴더 (서버의 경로. 예: /app/sampleApps/anybiz_prd)" />
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="kn-new-project-id">projectId</label></th>
+						<td><input type="text" id="kn-new-project-id" placeholder="영문" /></td>
+						<th><label for="kn-new-project-name">이름</label></th>
+						<td><input type="text" id="kn-new-project-name" placeholder="화면에 보일 이름" /></td>
+					</tr>
+					<tr>
+						<th><label for="kn-new-project-path">소스 폴더</label></th>
+						<td colspan="3"><input type="text" id="kn-new-project-path" placeholder="서버의 경로. 예: /app/sampleApps/anybiz_prd" /></td>
+					</tr>
+					<tr>
+						<th><label for="kn-new-project-classpath">라이브러리 위치</label></th>
+						<td colspan="3"><input type="text" id="kn-new-project-classpath" placeholder="(선택) jar 가 소스 폴더 밖에 있을 때만. 파일이나 폴더를 쉼표로 구분" /></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
 					<button type="button" id="kn-project-save-btn">등록</button>
-				</div>
-				<div class="kn-row">
-					<input type="text" id="kn-new-project-classpath" class="kn-wide" placeholder="(선택) 라이브러리 jar 의 위치. 소스 폴더 밖에 있을 때만. 파일이나 폴더를 쉼표로 구분" />
 				</div>
 				<p class="ai-hint">같은 projectId 로 다시 등록하면 수정입니다. 소스 폴더 안의 jar 는 알아서 찾으므로, 라이브러리 위치는 jar 가 다른 곳에 있을 때만 적습니다.
 					jar 가 없어도 분석은 되지만 "누가 누구를 부르는지"가 덜 정확해집니다.</p>
@@ -67,20 +87,27 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<h3>분석 <span id="kn-selected-project" class="workflow-job-id"></span></h3>
 				<p class="ai-hint">리비전은 "그 시점의 분석 결과 전체"입니다. 라벨을 비우면 지금 시각으로 새 리비전을 만듭니다.
 					이미 있는 라벨을 적으면 그 리비전을 이어서 분석합니다(끝난 단계는 건너뜁니다).</p>
-				<div class="kn-row">
-					<input type="text" id="kn-revision-label" placeholder="리비전 라벨 (비우면 지금 시각)" />
-					<label><input type="checkbox" id="kn-incremental" /> 증분 분석 (바뀐 파일만 다시 분석)</label>
-					<label for="kn-rerun-from">이 단계부터 다시</label>
-					<select id="kn-rerun-from">
-						<option value="">(쓰지 않음)</option>
-						<option>SCAN</option>
-						<option>DECLARE</option>
-						<option>RESOURCE</option>
-						<option>RESOLVE</option>
-						<option>LINK</option>
-						<option>SEMANTIC</option>
-						<option>DOCUMENT</option>
-					</select>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="kn-revision-label">리비전 라벨</label></th>
+						<td><input type="text" id="kn-revision-label" placeholder="비우면 지금 시각" /></td>
+						<th><label for="kn-rerun-from">이 단계부터 다시</label></th>
+						<td><select id="kn-rerun-from">
+								<option value="">(쓰지 않음)</option>
+								<option>SCAN</option>
+								<option>DECLARE</option>
+								<option>RESOURCE</option>
+								<option>RESOLVE</option>
+								<option>LINK</option>
+								<option>SEMANTIC</option>
+								<option>DOCUMENT</option>
+							</select></td>
+						<th>증분 분석</th>
+						<td class="ai-form-checks"><label><input type="checkbox" id="kn-incremental" /> 바뀐 파일만 다시 분석</label></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
 					<button type="button" id="kn-analysis-start-btn">분석 시작</button>
 				</div>
 				<div id="kn-analysis-message" class="kn-message"></div>
@@ -117,6 +144,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div id="kn-summary-cards" class="kn-cards"></div>
 				<div id="kn-summary-sections"></div>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="common/footer.jsp"></jsp:include>

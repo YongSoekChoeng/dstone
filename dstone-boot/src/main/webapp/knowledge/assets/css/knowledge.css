@@ -1,4 +1,5 @@
-/* "코드 분석(Knowledge)" 화면에만 쓰는 모양. 바탕은 ai/assets/css/main.css 를 같이 쓴다. */
+/* "코드 분석(Knowledge)" 화면에만 쓰는 모양.
+   바탕은 분석툴의 analyzer/assets/css/main.css, 공통 부품은 ai/assets/css/main.css 를 같이 쓴다. */
 
 /* 입력 칸을 한 줄에 나란히 놓는다 */
 .kn-row {
@@ -11,15 +12,14 @@
 
 .kn-row label {
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 }
 
 .kn-row input[type="text"],
 .kn-row input[type="number"],
 .kn-row select {
-	border: 1px solid #d1d5db;
-	border-radius: 6px;
-	padding: 6px 8px;
+	border: solid 1px #006e8b;
+	padding: 4px 8px;
 	font-size: 13px;
 }
 
@@ -28,35 +28,29 @@
 	min-width: 260px;
 }
 
-.kn-row button,
-.kn-btn {
-	border: 1px solid #2563eb;
-	background: #2563eb;
-	color: #fff;
-	border-radius: 6px;
-	padding: 6px 14px;
-	font-size: 13px;
-	cursor: pointer;
+/* 단추의 기본 모양(청록색)은 ai/assets/css/main.css 에 있다. kn-plain 은 덜 중요한 단추(흰 바탕) */
+.ai-body button.kn-plain {
+	background-image: none;
+	background-color: #fff;
+	box-shadow: none;
+	color: #007897;
 }
 
-.kn-row button.kn-plain,
-.kn-btn.kn-plain {
-	border-color: #d1d5db;
-	background: #fff;
-	color: #111827;
+.ai-body button.kn-plain:hover {
+	background-color: #e8f3f5;
 }
 
 .kn-row button:disabled {
-	opacity: 0.5;
 	cursor: default;
 }
 
 /* 처리 결과나 오류를 알리는 한 줄 */
 .kn-message {
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 	margin: 6px 0;
 	min-height: 18px;
+	line-height: 1.5;
 }
 
 .kn-message.kn-error {
@@ -67,15 +61,12 @@
 .kn-scroll {
 	max-height: 420px;
 	overflow: auto;
-	border: 1px solid #e5e7eb;
-	border-radius: 8px;
 	margin-bottom: 14px;
 }
 
 .kn-scroll .document-list-table th {
 	position: sticky;
 	top: 0;
-	background: #f9fafb;
 }
 
 .kn-num {
@@ -98,10 +89,11 @@
 }
 
 .kn-card {
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 10px;
 	padding: 10px 16px;
 	min-width: 110px;
+	line-height: 1.4;
 }
 
 .kn-card .kn-card-value {
@@ -111,18 +103,14 @@
 
 .kn-card .kn-card-label {
 	font-size: 12px;
-	color: #6b7280;
+	color: #878e83;
 }
 
-.kn-section-title {
-	font-size: 14px;
-	font-weight: 600;
-	margin: 14px 0 6px;
-}
+/* .kn-section-title(구역 안의 작은 제목)은 AI 화면도 써서 ai/assets/css/main.css 에 있다 */
 
 /* 검색 결과 한 건 */
 .kn-hit {
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 10px;
 	padding: 12px 14px;
 	margin-bottom: 10px;
@@ -135,13 +123,13 @@
 
 .kn-hit-meta {
 	font-size: 12px;
-	color: #6b7280;
+	color: #878e83;
 	margin: 4px 0 8px;
 }
 
 .kn-pre {
-	background: #f9fafb;
-	border: 1px solid #e5e7eb;
+	background: #f4f6f0;
+	border: 1px solid #ced0b7;
 	border-radius: 8px;
 	padding: 10px;
 	font-family: "SFMono-Regular", Consolas, monospace;
@@ -171,20 +159,20 @@
 
 /* 각 화면 위쪽의 "이렇게 씁니다" (눌러서 펴는 설명) */
 .kn-howto {
-	border: 1px solid #dbeafe;
-	background: #f8fbff;
+	border: 1px solid #d5e8ec;
+	background: #f4f7f0;
 	border-radius: 10px;
 	padding: 10px 14px;
-	margin-bottom: 14px;
+	margin-bottom: 40px;
 	font-size: 13px;
 	line-height: 1.7;
-	color: #374151;
+	color: #4e4d43;
 }
 
 .kn-howto summary {
 	cursor: pointer;
 	font-weight: 600;
-	color: #1d4ed8;
+	color: #007897;
 }
 
 .kn-howto ol,
@@ -193,9 +181,13 @@
 	padding-left: 22px;
 }
 
+.kn-guide ul {
+	list-style: disc;
+}
+
 .kn-howto code,
 .kn-guide code {
-	background: #eef2f7;
+	background: #e3e9dc;
 	border-radius: 4px;
 	padding: 1px 5px;
 	font-family: "SFMono-Regular", Consolas, monospace;
@@ -205,9 +197,9 @@
 /* 예시를 눌러 입력 칸에 채우는 단추 */
 .kn-example {
 	display: inline-block;
-	border: 1px dashed #93c5fd;
+	border: 1px dashed #5d93a2;
 	background: #fff;
-	color: #1d4ed8;
+	color: #007897;
 	border-radius: 999px;
 	padding: 2px 10px;
 	margin: 2px 4px 2px 0;
@@ -219,13 +211,14 @@
 .kn-guide {
 	font-size: 14px;
 	line-height: 1.8;
-	color: #374151;
+	color: #4e4d43;
 }
 
 .kn-guide h4 {
 	margin: 18px 0 6px;
 	font-size: 15px;
-	color: #111827;
+	font-weight: bold;
+	color: #283121;
 }
 
 .kn-guide ol,
@@ -253,7 +246,7 @@
 .kn-step {
 	flex: 1;
 	min-width: 200px;
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 10px;
 	padding: 12px 14px;
 	text-decoration: none;
@@ -261,7 +254,7 @@
 }
 
 a.kn-step:hover {
-	border-color: #2563eb;
+	border-color: #007b9d;
 }
 
 .kn-step-no {
@@ -271,7 +264,7 @@ a.kn-step:hover {
 	line-height: 22px;
 	text-align: center;
 	border-radius: 50%;
-	background: #2563eb;
+	background: #007b9d;
 	color: #fff;
 	font-size: 12px;
 	font-weight: 700;
@@ -280,13 +273,13 @@ a.kn-step:hover {
 
 .kn-step-title {
 	font-weight: 600;
-	color: #111827;
+	color: #283121;
 }
 
 .kn-step p {
 	margin: 6px 0 0;
 	font-size: 13px;
-	color: #4b5563;
+	color: #4e4d43;
 	line-height: 1.6;
 }
 
@@ -308,14 +301,14 @@ a.kn-step:hover {
 }
 
 .kn-term {
-	color: #6b7280;
+	color: #878e83;
 	margin-left: 8px;
 	font-size: 12px;
 }
 
 .kn-card-help {
 	font-size: 11px;
-	color: #9ca3af;
+	color: #a6a88f;
 	margin-top: 4px;
 	max-width: 190px;
 	line-height: 1.4;
@@ -323,11 +316,11 @@ a.kn-step:hover {
 
 /* "한눈에 보기": 숫자를 말로 풀어 준 판정 */
 .kn-verdict {
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 10px;
 	padding: 12px 16px;
 	margin-bottom: 8px;
-	background: #fafafa;
+	background: #f4f6f0;
 }
 
 .kn-verdict-line {
@@ -344,13 +337,13 @@ a.kn-step:hover {
 .kn-verdict-good .kn-verdict-mark { color: #15803d; }
 .kn-verdict-warn .kn-verdict-mark { color: #b45309; }
 .kn-verdict-bad .kn-verdict-mark { color: #b91c1c; }
-.kn-verdict-info .kn-verdict-mark { color: #6b7280; }
+.kn-verdict-info .kn-verdict-mark { color: #878e83; }
 .kn-verdict-warn, .kn-verdict-bad { font-weight: 600; }
 
 /* 사용 안내의 그림(글자로 그린 흐름도) */
 .kn-diagram {
-	background: #f9fafb;
-	border: 1px solid #e5e7eb;
+	background: #f4f6f0;
+	border: 1px solid #ced0b7;
 	border-radius: 8px;
 	padding: 12px 14px;
 	font-family: "SFMono-Regular", Consolas, "Malgun Gothic", monospace;
@@ -365,7 +358,7 @@ a.kn-step:hover {
 .kn-toc a {
 	display: inline-block;
 	margin: 2px 14px 2px 0;
-	color: #2563eb;
+	color: #007b9d;
 	text-decoration: none;
 	font-size: 13px;
 }
@@ -392,7 +385,7 @@ a.kn-step:hover {
 .kn-graph-canvas {
 	flex: 1;
 	min-width: 0;
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 10px;
 	background: #fff;
 }
@@ -401,7 +394,7 @@ a.kn-step:hover {
 	width: 380px;
 	flex-shrink: 0;
 	overflow: auto;
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 10px;
 	background: #fff;
 	padding: 12px 14px;
@@ -414,18 +407,18 @@ a.kn-step:hover {
 	border-radius: 999px;
 	padding: 2px 10px 2px 6px;
 	cursor: pointer;
-	color: #111827 !important;
+	color: #283121 !important;
 }
 
 .kn-graph-chip span {
-	color: #6b7280;
+	color: #878e83;
 	font-size: 12px;
 }
 
 /* 선의 범례 */
 .kn-graph-line {
 	font-size: 12px;
-	color: #4b5563;
+	color: #4e4d43;
 	margin-right: 6px;
 }
 
@@ -464,7 +457,7 @@ a.kn-step:hover {
 }
 
 .kn-gd-full {
-	color: #4b5563;
+	color: #4e4d43;
 	margin: 6px 0;
 }
 
@@ -482,7 +475,7 @@ a.kn-step:hover {
 .kn-gd-facts th {
 	text-align: left;
 	font-weight: 600;
-	color: #6b7280;
+	color: #878e83;
 	padding: 2px 10px 2px 0;
 	white-space: nowrap;
 	vertical-align: top;
@@ -503,12 +496,12 @@ a.kn-step:hover {
 
 .kn-gd-list a,
 .kn-gd-rows a {
-	color: #1d4ed8;
+	color: #007897;
 	text-decoration: none;
 }
 
 .kn-gd-list a {
-	border: 1px solid #e5e7eb;
+	border: 1px solid #ced0b7;
 	border-radius: 6px;
 	padding: 1px 6px;
 	font-size: 12px;
@@ -518,7 +511,7 @@ a.kn-step:hover {
 .kn-gd-rows {
 	max-height: 220px;
 	overflow: auto;
-	border: 1px solid #f3f4f6;
+	border: 1px solid #eef1e8;
 	border-radius: 8px;
 	padding: 4px 8px;
 }
@@ -526,7 +519,7 @@ a.kn-step:hover {
 .kn-gd-rows > div {
 	word-break: break-all;
 	padding: 3px 0;
-	border-bottom: 1px solid #f3f4f6;
+	border-bottom: 1px solid #eef1e8;
 }
 
 .kn-gd-rows > div:last-child {
@@ -535,17 +528,17 @@ a.kn-step:hover {
 
 .kn-gd-tag {
 	display: inline-block;
-	background: #eef2f7;
+	background: #e3e9dc;
 	border-radius: 4px;
 	padding: 0 5px;
 	font-size: 11px;
-	color: #374151;
+	color: #4e4d43;
 }
 
 /* 분석이 만들어 둔 설명 문서. 소스가 들어 있어서 줄바꿈을 그대로 둔다 */
 .kn-gd-doc {
-	background: #f9fafb;
-	border: 1px solid #e5e7eb;
+	background: #f4f6f0;
+	border: 1px solid #ced0b7;
 	border-radius: 8px;
 	padding: 8px 10px;
 	font-family: "SFMono-Regular", Consolas, monospace;
@@ -570,8 +563,8 @@ a.kn-step:hover {
 .kn-graph-modal-box {
 	width: 94vw;
 	height: 90vh;
-	background: #f5f6f8;
-	border-radius: 12px;
+	background: #fff;
+	border-radius: 10px;
 	padding: 14px 16px;
 	display: flex;
 	flex-direction: column;
@@ -595,7 +588,7 @@ a.kn-step:hover {
 /* 진행률 막대 */
 .kn-embed-bar {
 	height: 10px;
-	background: #e5e7eb;
+	background: #ced0b7;
 	border-radius: 999px;
 	overflow: hidden;
 	margin: 4px 0 14px;
@@ -603,7 +596,7 @@ a.kn-step:hover {
 
 .kn-embed-bar > div {
 	height: 100%;
-	background: #2563eb;
+	background: #007b9d;
 	border-radius: 999px;
 	transition: width 0.4s;
 }

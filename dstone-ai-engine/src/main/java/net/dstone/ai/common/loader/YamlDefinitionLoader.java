@@ -110,8 +110,14 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<WorkFlowDefinition> definitions = new ArrayList<>();
 		for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
 			if( !resource.isReadable() ) {continue;}
-			WorkflowFile file = this.readAs(resource, WorkflowFile.class);
-			if (file.workflow() == null) {
+			WorkflowFile file = null;
+			try {
+				file = this.readAs(resource, WorkflowFile.class);
+			} catch (Exception e) {
+				this.error(resource.getFilename() + " 로딩중 예외 발생. 파일내용 확인 필요.");
+				e.printStackTrace();
+			}
+			if (file == null || file.workflow() == null) {
 				throw new IllegalStateException(resource.getFilename() + "에 workflow: 최상위 키가 없습니다.");
 			}
 			definitions.add(file.workflow());

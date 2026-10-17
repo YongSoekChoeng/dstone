@@ -8,11 +8,20 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <jsp:include page="../common/head.jsp"></jsp:include>
 
 <body class="ai-body">
-	<div id="ai-page-wrapper">
+	<div id="page-wrapper">
 
 		<jsp:include page="../common/header.jsp"></jsp:include>
 
-		<div id="ai-main">
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section>
+				<h2 align="center" style="font-weight: bold;">Revision Diff</h2>
+				<p>같은 프로젝트의 두 리비전 사이에 무엇이 더해지고 빠지고 바뀌었는지 봅니다.</p>
+			</section>
+
 			<details class="kn-howto" open>
 				<summary>이렇게 씁니다</summary>
 				<ol>
@@ -29,22 +38,31 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<p class="ai-hint">두 리비전 사이에 달라진 것을 분석 결과의 말로 봅니다: 어느 메소드가 생기고 없어졌는지, 어느 주소가 새로 열렸는지,
 					어느 SQL이 다른 테이블을 건드리게 됐는지, 누가 누구를 새로 부르게 됐는지. 소스의 줄 단위 차이가 아닙니다.
 					메소드의 몸통만 바뀐 것은 "파일 · 바뀜"과, 그 결과로 달라진 호출 · 테이블 사용으로 드러납니다.</p>
-				<div class="kn-row">
-					<label for="kn-diff-project">프로젝트</label>
-					<select id="kn-diff-project"></select>
-					<label for="kn-diff-revision">리비전</label>
-					<select id="kn-diff-revision"></select>
-					<label for="kn-diff-base">기준(앞) 리비전</label>
-					<select id="kn-diff-base"></select>
-					<label for="kn-diff-limit">종류마다</label>
-					<input type="number" id="kn-diff-limit" min="0" max="2000" value="200" style="width:70px;" />
-					<label>건까지</label>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="kn-diff-project">프로젝트</label></th>
+						<td><select id="kn-diff-project"></select></td>
+						<th><label for="kn-diff-revision">리비전</label></th>
+						<td><select id="kn-diff-revision"></select></td>
+						<th><label for="kn-diff-base">기준(앞) 리비전</label></th>
+						<td><select id="kn-diff-base"></select></td>
+					</tr>
+					<tr>
+						<th><label for="kn-diff-limit">보여 줄 건수</label></th>
+						<td colspan="5"><div class="ai-form-inline">종류마다 <input type="number" id="kn-diff-limit" min="0" max="2000" value="200" class="ai-form-short" /> 건까지</div></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
 					<button type="button" id="kn-diff-btn">비교</button>
 				</div>
 				<div id="kn-diff-message" class="kn-message"></div>
 				<div id="kn-diff-summary"></div>
 				<div id="kn-diff-result"></div>
 			</section>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<jsp:include page="../common/footer.jsp"></jsp:include>
