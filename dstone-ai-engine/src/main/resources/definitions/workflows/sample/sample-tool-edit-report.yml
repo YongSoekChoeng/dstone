@@ -9,7 +9,7 @@
 #   report     writeFile      결과를 글자에 끼워 보고서 파일로 저장한다(목록은 JSON 글자 그대로 들어간다)
 #
 # 눈여겨볼 것
-# - forEach step의 output에 items를 적으면, 반복마다 "무엇으로 돌았고 어떻게 됐는지"가 한 건씩 저장됩니다:
+# - forEach step에 saveEach를 적으면, 반복마다 "무엇으로 돌았고 어떻게 됐는지"가 한 건씩 저장됩니다:
 #     state.applied = [{item: forEach 목록의 그 항목, input: 실제로 넘긴 인자, result: Tool의 답, error: 실패 사유, success: true/false}]
 #   그래서 뒤의 step이 "어느 항목이 실패했는지"를 순서로 짝짓지 않고 바로 알 수 있습니다.
 # - 일부 파일이 실패해도 보고서까지 갑니다(apply의 onFailure가 failed입니다).
@@ -21,70 +21,75 @@
 #   input     : {"reportPath": "/tmp/edit-test/report.md",
 #                "changes": [{"path": "/tmp/edit-test/a.txt", "edits": [{"before": "hello", "after": "안녕"}, {"append": true, "after": "끝"}]},
 #                            {"path": "/tmp/edit-test/b.txt", "edits": [{"before": "없는 글자", "after": "x"}]}]}
-workflow:
-  id: sample-tool-edit-report
-  version: "1.0.0"
-  description: 범용 Tool 확인용 테스트 Workflow - 값 확인(checkData) → 파일마다 여러 곳 고치기(editFileTexts forEach) → 실패한 것 고르기(filterList) → 보고서 저장(writeFile). LLM 없음.
-  input:
-    schema: schemas/sample/sample-tool-edit-report.input.schema.json
-  settings:
-    maxIterations: 10
-  output:
-    value:
-      check: "${state.check.text}"
-      failedPaths: "${state.failedPaths}"
-      report: "${state.report}"
-  steps:
+id: sample-tool-edit-report
+version: 1.0.0
+description: 범용 Tool 확인용 테스트 Workflow - 값 확인(checkData) → 파일마다 여러 곳 고치기(editFileTexts forEach) → 실패한 것 고르기(filterList) → 보고서 저장(writeFile). LLM 없음.
+input:
+  reportPath: string, 결과 보고서를 저장할 파일의 절대경로
+  changes(array, 고칠 파일 목록. 파일 하나에 한 건):
+    path: string, 고칠 파일의 절대경로
+    edits(array, 그 파일에서 바꿀 곳들):
+      before?: string, 바꿀 대상(파일에 정확히 한 번 나오는 글자)
+      after?: string, 바꾼 뒤의 글자
+      append?: boolean, true면 after를 파일 끝에 덧붙인다
+settings:
+  maxIterations: 10
+state:
+  check:       check step의 결과
+  applied:     apply step의 반복별 기록
+  failedPaths: failed step의 결과
+  report:      report step의 결과
+return:
+  check: ${state.check.text}
+  failedPaths: ${state.failedPaths}
+  report: ${state.report}
+steps:
 
-    - id: check
-      type: TOOL
-      tool: checkData
-      input:
-        rules:
-          - rule: unique
-            list: "${input.changes}"
-            field: path
-            message: 같은 파일이 두 번 들어 있습니다
-          - rule: filesExist
-            list: "${input.changes}"
-            field: path
-            message: 없는 파일입니다
-      output:
-        result: "state.check"
-      next: apply
-      onFailure: FAIL
+  - id: check
+    type: TOOL
+    tool: checkData
+    with:
+      rules:
+        - rule: unique
+          list: ${input.changes}
+          field: path
+          message: 같은 파일이 두 번 들어 있습니다
+        - rule: filesExist
+          list: ${input.changes}
+          field: path
+          message: 없는 파일입니다
+    save: check
+    next: apply
+    onFailure: FAIL
 
-    - id: apply
-      type: TOOL
-      tool: editFileTexts
-      forEach: "${input.changes}"
-      input:
-        filePath: "${item.path}"
-        edits: "${item.edits}"
-      output:
-        items: "state.applied"
-      next: failed
-      onFailure: failed
+  - id: apply
+    type: TOOL
+    tool: editFileTexts
+    forEach: ${input.changes}
+    with:
+      filePath: ${item.path}
+      edits: ${item.edits}
+    saveEach: applied
+    next: failed
+    onFailure: failed
 
-    - id: failed
-      type: TOOL
-      tool: filterList
-      input:
-        list: "${state.applied}"
-        where: { success: false }
-        pick: item.path
-      output:
-        result: "state.failedPaths"
-      next: report
-      onFailure: FAIL
+  - id: failed
+    type: TOOL
+    tool: filterList
+    with:
+      list: ${state.applied}
+      where: { success: false }
+      pick: item.path
+    save: failedPaths
+    next: report
+    onFailure: FAIL
 
-    - id: report
-      type: TOOL
-      tool: writeFile
-      input:
-        filePath: "${input.reportPath}"
-        fileContents: "# 파일 고치기 결과\n\n## 미리 확인한 결과\n${state.check.text}\n\n## 고치지 못한 파일\n${state.failedPaths}\n\n## 파일별 결과\n${state.applied}"
-      output:
-        result: "state.report"
-      next: END
-      onFailure: FAIL
+  - id: report
+    type: TOOL
+    tool: writeFile
+    with:
+      filePath: ${input.reportPath}
+      fileContents: "# 파일 고치기 결과\n\n## 미리 확인한 결과\n${state.check.text}\n\n## 고치지 못한 파일\n${state.failedPaths}\n\n## 파일별 결과\n${state.applied}"
+    save: report
+    next: END
+    onFailure: FAIL

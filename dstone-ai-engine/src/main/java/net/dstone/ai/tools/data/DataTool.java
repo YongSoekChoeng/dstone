@@ -34,8 +34,8 @@ public class DataTool {
 	 *
 	 * YAML 예: 복사에 성공했고(removes나 adds가 있는) 항목의 item만 고른다
 	 *   tool: filterList
-	 *   input:
-	 *     list: "${state.copied}"
+	 *   with:
+	 *     list: ${state.copied}
 	 *     where: { success: true }
 	 *     anyNotEmpty: [ item.removes, item.adds ]
 	 *     pick: item
@@ -61,14 +61,14 @@ public class DataTool {
 	 *
 	 * YAML 예:
 	 *   tool: checkData
-	 *   input:
+	 *   with:
 	 *     rules:
 	 *       - rule: unique
-	 *         list: "${state.analysis.targets}"
+	 *         list: ${state.analysis.targets}
 	 *         field: path
 	 *         message: 같은 파일이 변경 대상에 두 번 들어 있습니다
 	 *       - rule: filesExist
-	 *         list: "${state.analysis.targets}"
+	 *         list: ${state.analysis.targets}
 	 *         where: { changeType: 수정 }
 	 *         field: path
 	 *         message: 수정이라고 했는데 없는 파일입니다

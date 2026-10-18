@@ -6,18 +6,17 @@ import java.util.Map;
 
 import net.dstone.ai.common.consts.Constants.WorkFlow.Context;
 import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
-import net.dstone.ai.common.expression.ContextResolver;
 
 /**
  * <pre>
  * Workflow 실행 컨텍스트(WorkFlowExecution.context 맵)를 다루는 도우미입니다. 컨텍스트는 아래 모양의 트리 하나입니다.
  *
  *   input:      요청의 input 값 그대로
- *   state:      step이 output으로 저장한 값들({ 이름: 값 })
+ *   state:      step이 save로 저장한 값들({ 이름: 값 })
  *   approvals:  { stepId: { decision, approver, comment } }   아직 쓰지 않은 승인 결정(엔진 내부용)
  *   definition: { id, version }                               이 실행을 시작한 Workflow 정의
  *
- * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 output에 적힌 대로 state에 저장하고(saveOutput()),
+ * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 save에 적힌 이름으로 state에 저장하고(saveOutput()),
  * 뒤의 step은 "${state.이름}"으로 읽습니다(common.expression.ContextResolver).
  * 이 맵은 실행 상태와 함께 DB에 JSON으로 저장되므로, 승인 대기로 멈췄다가 이어서 실행해도 그대로 남아 있습니다.
  * </pre>
@@ -74,21 +73,19 @@ public final class WorkFlowContext {
 
 	/**
 	 * <pre>
-	 * step 하나가 끝난 뒤, 그 step의 output에 적힌 대로 결과를 state에 저장합니다.
+	 * step 하나가 끝난 뒤, 그 step의 save / saveError / saveInput / saveEach에 적힌 이름으로 결과를 state에 저장합니다.
 	 *
-	 *   output:
-	 *     result: state.analysis         돌려준 값 전체
-	 *     result.sql: state.sql          돌려준 값 안의 필드 하나
-	 *     input: state.sentInput         실제로 받은 입력
-	 *     error: state.analysisError     실패 사유(성공이면 null)
-	 *     items: state.copied            forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
+	 *   save: analysis            돌려준 값 전체 → state.analysis
+	 *   saveError: analysisError  실패 사유(성공이면 null)
+	 *   saveInput: sentInput      실제로 받은 입력
+	 *   saveEach: copied          forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
 	 *
-	 * 성공이든 실패든 적힌 자리를 모두 새 값으로 덮어씁니다. 그래서 다시 실행된 step의 옛 결과가 남아 있지 않습니다.
+	 * 성공이든 실패든 적힌 이름을 모두 새 값으로 덮어씁니다. 그래서 다시 실행된 step의 옛 결과가 남아 있지 않습니다.
 	 * (forEach로 여러 반복이 동시에 도는 동안에는 부르지 않습니다. 모든 반복이 끝난 뒤 한 번 부릅니다.)
 	 * </pre>
 	 *
 	 * @param context 실행 컨텍스트
-	 * @param mapping step의 output(무엇 → state.이름). 없으면 아무것도 하지 않습니다.
+	 * @param mapping 무엇(result, error, input, items) → state 이름(StepDefinition.output()). 비었으면 아무것도 하지 않습니다.
 	 * @param input   이 step이 실제로 받은 입력
 	 * @param result  이 step이 돌려준 값
 	 * @param error   실패 사유(성공이면 null)
@@ -105,18 +102,8 @@ public final class WorkFlowContext {
 		record.put(Output.ITEMS, items);
 		Map<String, Object> state = state(context);
 		for (Map.Entry<String, String> entry : mapping.entrySet()) {
-			List<String> source = sourcePath(entry.getKey());
-			ContextResolver.write(state, ContextResolver.statePath(entry.getValue()), ContextResolver.read(record, source));
+			state.put(entry.getValue(), record.get(entry.getKey()));
 		}
-	}
-
-	/**
-	 * output의 왼쪽(무엇을 저장할지)을 이름 목록으로 나눕니다. 예: "result.sql" → [result, sql]
-	 *
-	 * @param source output에 적은 이름(result, result.필드, input, input.필드, error)
-	 */
-	public static List<String> sourcePath(String source) {
-		return List.of(source.strip().split("\\."));
 	}
 
 	/**

@@ -11,7 +11,7 @@ import java.util.Map;
  * 관리합니다.
  *
  * agent는 꼭 있어야 하는 값입니다. common.registry.AgentRegistry에 미리 등록해 둔 Agent(즉
- * resources/agents/*.yml 파일로 만들어 둔 Agent)의 이름을 넣어야 합니다.
+ * resources/definitions/agents/**.md 파일로 만들어 둔 Agent)의 이름을 넣어야 합니다.
  *
  * ragEnabled와 toolsEnabled는 둘 다 비워 두면(null) Agent 정의에 적힌 값을 그대로 씁니다.
  * ragEnabled에 true나 false를 직접 넣으면, 이번 요청 한 번만 Agent 정의값 대신 그 값을 씁니다.
@@ -26,10 +26,10 @@ import java.util.Map;
  * 지금 활성화된 provider(spring.ai.model.chat 설정값) 안에서만 모델을 바꾸는 기능입니다. 만약 다른
  * provider의 모델 이름을 넣으면, 이 요청을 처리하는 시점에 그 provider의 API가 에러를 냅니다.
  *
- * variables는 Agent의 prompt(resources/agents/*.yml 안에 직접 써 있는 프롬프트 원문)에
+ * variables는 Agent의 프롬프트(Agent 파일의 본문)에
  * {변수명} 같은 형태의 토큰이 있을 때, 그 자리를 실제 값으로 채워 넣기 위한 값입니다.
  *
- * input은 그 Agent의 input 계약(agents/*.yml 의 agent.input, 비워두면 string) 모양이어야 합니다.
+ * input은 그 Agent의 input 계약(agents/**.md 의 input, 비워두면 string) 모양이어야 합니다.
  * 모양이 다르면 400으로 거절합니다.
  *
  * @param input        Agent에게 넣을 값입니다(필수. 보통은 사용자가 입력한 글자, Agent input이 object면 객체).

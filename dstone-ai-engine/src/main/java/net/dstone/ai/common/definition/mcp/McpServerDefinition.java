@@ -6,8 +6,8 @@ import net.dstone.ai.common.consts.McpTransport;
 
 /**
  * <pre>
- * 외부 MCP(Model Context Protocol) 서버 하나를 어떻게 연결할지 정의하는 클래스입니다. resources/mcp/*.yml
- * 파일 하나(그 안의 mcpServer: 라는 최상위 키)가 이 클래스의 값으로 채워집니다.
+ * 외부 MCP(Model Context Protocol) 서버 하나를 어떻게 연결할지 정의하는 클래스입니다. resources/definitions/mcp/**.yml
+ * 파일 하나가 이 클래스의 값으로 채워집니다.
  *
  * 엔진이 기동할 때 common.config.ConfigMcp가 이 정의를 보고 실제로 MCP 서버에 접속하고, 그 서버가 제공하는
  * Tool들을 가져와서 common.config.ConfigTool이 관리하는 Tool 목록(ToolCallbackProvider)에 합쳐 넣습니다.

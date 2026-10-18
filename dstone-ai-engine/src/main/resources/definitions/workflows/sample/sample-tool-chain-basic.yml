@@ -7,8 +7,8 @@
 # tools.sample.DateTimeTool) API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
 # validate step은 요청의 input(${input})을 sql 인자로 넘기므로, 이 Workflow를 호출할 때는
-# input 자리에 SQL 문을 넣어야 합니다. now step은 인자가 필요 없어서 input을 생략했습니다(빈 인자 {}로
-# 호출됩니다). 두 step이 결과를 state에 저장하고, 최종 결과는 그 둘을 모은 맵입니다(output.value를 맵으로 적은 예시).
+# input 자리에 SQL 문을 넣어야 합니다. now step은 인자가 필요 없어서 with를 생략했습니다(빈 인자 {}로
+# 호출됩니다). 두 step이 결과를 state에 저장하고, 최종 결과는 그 둘을 모은 맵입니다(return을 맵으로 적은 예시).
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-tool-chain-basic
@@ -16,33 +16,32 @@
 # input을 "SELECT * FROM WRONG SYNTAX ("처럼 문법이 깨진 SQL로 바꿔서 호출해보면, validate에서
 # 바로 FAIL로 끝나는 것도 확인할 수 있습니다(이 Workflow에는 실패했을 때 다시 고쳐보는 재작성
 # 루프가 없습니다 - 그런 루프가 궁금하다면 workflows/sample/sample-loop-retry-until-valid.yml을 참고하세요).
-workflow:
-  id: sample-tool-chain-basic
-  version: "1.0.0"
-  description: TOOL step 2개(validateSqlSyntax→getCurrentDateTime) 연속 실행 확인용 Workflow. LLM 비용 없이 항상 성공한다(SQL이 올바르면).
-  input: string
-  settings:
-    maxIterations: 3
-  output:
-    value:
-      validation: "${state.validation}"
-      checkedAt: "${state.checkedAt}"
-  steps:
+id: sample-tool-chain-basic
+version: 1.0.0
+description: TOOL step 2개(validateSqlSyntax→getCurrentDateTime) 연속 실행 확인용 Workflow. LLM 비용 없이 항상 성공한다(SQL이 올바르면).
+input: string
+settings:
+  maxIterations: 3
+state:
+  validation: validate step의 결과
+  checkedAt:  now step의 결과
+return:
+  validation: ${state.validation}
+  checkedAt: ${state.checkedAt}
+steps:
 
-    - id: validate
-      type: TOOL
-      tool: validateSqlSyntax
-      input:
-        sql: "${input}"
-      output:
-        result: "state.validation"
-      next: now
-      onFailure: FAIL
+  - id: validate
+    type: TOOL
+    tool: validateSqlSyntax
+    with:
+      sql: ${input}
+    save: validation
+    next: now
+    onFailure: FAIL
 
-    - id: now
-      type: TOOL
-      tool: getCurrentDateTime
-      output:
-        result: "state.checkedAt"
-      next: END
-      onFailure: FAIL
+  - id: now
+    type: TOOL
+    tool: getCurrentDateTime
+    save: checkedAt
+    next: END
+    onFailure: FAIL

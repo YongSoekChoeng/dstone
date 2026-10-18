@@ -29,34 +29,33 @@
 #     -> pendingApproval: {"stepId":"choose","approverRole":"team-lead","routes":["완료","다시","중단"]}
 #   POST /api/ai/workflow/executions/{executionId}/decision { "decision": "다시", "approver": "...", "comment": "..." }
 # dstone-boot의 "관리자 > Workflow 실행 관리" 화면에서는 결정 이름마다 버튼이 하나씩 보입니다.
-workflow:
-  id: sample-approval-routes-loop
-  version: "1.0.0"
-  description: 결정 이름을 정해 쓰는 APPROVAL(routes)과 같은 승인 step으로 되돌아오는 흐름 확인용 Workflow. LLM 비용 없음.
-  input: string
-  settings:
-    maxIterations: 10
-  output:
-    value:
-      stampedAt: "${state.stampedAt}"
-      decision: "${state.choice}"
-  steps:
+id: sample-approval-routes-loop
+version: 1.0.0
+description: 결정 이름을 정해 쓰는 APPROVAL(routes)과 같은 승인 step으로 되돌아오는 흐름 확인용 Workflow. LLM 비용 없음.
+input: string
+settings:
+  maxIterations: 10
+state:
+  stampedAt: stamp step의 결과
+  choice:    choose step의 결과
+return:
+  stampedAt: ${state.stampedAt}
+  decision: ${state.choice}
+steps:
 
-    - id: stamp
-      type: TOOL
-      tool: getCurrentDateTime
-      output:
-        result: "state.stampedAt"
-      next: choose
-      onFailure: FAIL
+  - id: stamp
+    type: TOOL
+    tool: getCurrentDateTime
+    save: stampedAt
+    next: choose
+    onFailure: FAIL
 
-    - id: choose
-      type: APPROVAL
-      approval:
-        approverRole: team-lead
-      output:
-        result: "state.choice"
-      routes:
-        완료: END
-        다시: stamp
-        중단: FAIL
+  - id: choose
+    type: APPROVAL
+    approval:
+      approverRole: team-lead
+    save: choice
+    routes:
+      완료: END
+      다시: stamp
+      중단: FAIL

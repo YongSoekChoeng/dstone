@@ -3,96 +3,93 @@
 # 요청서(00-request.md)에서 시작해 요구사항 → 영향도 분석 → 리뷰 → 설계 → 구현까지 진행합니다.
 ################################################################################################################ 
 
-workflow:
-  id: sm-workflow
-  version: "1.0.0"
-  description: |
-   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 
-   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
-   예)
-   D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
-  #####################################  
-  #  ● workflow의 settings
-  #    maxIterations: step 실행 횟수 상한
-  #    checkpoint: step마다 상태 저장
-  #      - true만 적을 수 있습니다. 엔진은 step이 끝날 때마다 실행 상태(state 포함)를 항상 DB에 저장하며, 끄는 기능이 없습니다.
-  #      - false를 적으면 기동에 실패합니다.
-  #      - 이 저장 덕분에 APPROVAL에서 멈췄다가 이어서 실행하거나, 서버가 재시작된 뒤 마지막 step부터 이어갈 수 있습니다.
-  #    onError: 시스템 오류 시 동작
-  #      - STOP만 적을 수 있습니다. step 실행 중 시스템 오류(예외)가 나면 실행 전체가 FAILED로 끝납니다.
-  #      - 다른 값(CONTINUE 등)을 적으면 기동에 실패합니다.
-  #      - step 실패 시 다른 곳으로 보내려면 settings가 아니라 그 step의 onFailure를 씁니다. 이것은 Agent 계약 위반(출력 형식 틀림 등)이나 Tool의 실패: 응답 같은 step 실패에 적용됩니다.
-  #####################################    
-  settings:
-    checkpoint: true
-    maxIterations: 100
-    onError: STOP
-  #####################################    
-  #  ● workflow의 input
-  #     * schema 를 표시.
-  #     * 축약형
-  #    - string : 글자
-  #     - number : 숫자(소수 포함)
-  #     - integer : 정수
-  #     - boolean : true/false
-  #     - object :  객체(필드 제한 없음)
-  #     - array : 목록(항목 제한 없음)
-  #     - list<타입> : 그 타입의 목록
-  #     * 표준형 - JSON Schema를 그대로 표시.
-  #####################################    
-  input: string
-  #####################################    
-  #  ● workflow의 output
-  #     * value 와 schema 를 표시. value 는 필수, schema 는 생략가능.
-  #    * output 자체를 생략하면 state 자체가 최종결과가 됨.
-  #####################################    
-  output:
-    value:
-      route: "${state.classify.route}"
-      #requirements: "${state.requirements}"
-      #impact: "${state.impact}"
-      #review: "${state.review}"
-      #design: "${state.design}"
-      #implementation: "${state.implementation}"
-      #newdevReference: "${state.reference}"
-      #newdevAnalysis: "${state.analysis}"
-      #newdevAnalysisCheck: "${state.impactCheck.text}"
-      #newdevDesigns: "${state.designs}"
-      #newdevDesignCheck: "${state.designCheck.text}"
-      #newdevEditCheck: "${state.editCheckError}"
-      #newdevTasks: "${state.tasksFile}"
-  steps:
+id: sm-workflow
+version: 1.0.0
+description: |
+ 어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 
+ 요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
+ 예)
+ D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+#####################################  
+#  ● workflow의 settings
+#    maxIterations: step 실행 횟수 상한
+#    checkpoint: step마다 상태 저장
+#      - true만 적을 수 있습니다. 엔진은 step이 끝날 때마다 실행 상태(state 포함)를 항상 DB에 저장하며, 끄는 기능이 없습니다.
+#      - false를 적으면 기동에 실패합니다.
+#      - 이 저장 덕분에 APPROVAL에서 멈췄다가 이어서 실행하거나, 서버가 재시작된 뒤 마지막 step부터 이어갈 수 있습니다.
+#    onError: 시스템 오류 시 동작
+#      - STOP만 적을 수 있습니다. step 실행 중 시스템 오류(예외)가 나면 실행 전체가 FAILED로 끝납니다.
+#      - 다른 값(CONTINUE 등)을 적으면 기동에 실패합니다.
+#      - step 실패 시 다른 곳으로 보내려면 settings가 아니라 그 step의 onFailure를 씁니다. 이것은 Agent 계약 위반(출력 형식 틀림 등)이나 Tool의 실패: 응답 같은 step 실패에 적용됩니다.
+#####################################    
+settings:
+  checkpoint: true
+  maxIterations: 100
+  onError: STOP
+#####################################    
+#  ● workflow의 input: 실행 요청의 input 모양(짧은 타입 표기 Picoschema)
+#    - input: string, 설명            글자 하나(쉼표 뒤는 설명)
+#    - 필드를 한 줄에 하나씩 적으면 객체입니다.
+#        input:
+#          workDir: string, 작업 폴더
+#          ids(array, 번호 목록): string
+#    - 타입 이름: string / number / integer / boolean / null / any(무엇이든)
+#    - 이름? 없어도 되는 필드 / 이름(array, 설명) 목록 / 이름(object, 설명) 객체 / 이름(enum, 설명): [A, B] 고를 값
+#####################################    
+input: string
+#####################################    
+#  ● workflow의 state / return
+#    * state: 이 Workflow의 step이 save로 저장하는 이름을 전부 적습니다(이름: 설명).
+#      값의 모양은 적지 않습니다. 저장하는 step의 결과 모양(Agent의 output 등)을 엔진이 알아냅니다.
+#      선언하지 않은 이름에 저장하거나, 선언했는데 아무 step도 저장하지 않으면 엔진이 켜지지 않습니다.
+#    * return: 최종 결과. 생략하면 state 전체가 최종 결과가 됩니다.
+#####################################    
+state:
+  request:  step00_01_readReq step의 결과
+  classify: step00_02_decideJobKind step의 결과
+return:
+  route: ${state.classify.route}
+  #requirements: "${state.requirements}"
+  #impact: "${state.impact}"
+  #review: "${state.review}"
+  #design: "${state.design}"
+  #implementation: "${state.implementation}"
+  #newdevReference: "${state.reference}"
+  #newdevAnalysis: "${state.analysis}"
+  #newdevAnalysisCheck: "${state.impactCheck.text}"
+  #newdevDesigns: "${state.designs}"
+  #newdevDesignCheck: "${state.designCheck.text}"
+  #newdevEditCheck: "${state.editCheckError}"
+  #newdevTasks: "${state.tasksFile}"
+steps:
 
-  ##########################################################################################
-  # step00. 작업구분 (신규 / 일반)
-  ##########################################################################################
+##########################################################################################
+# step00. 작업구분 (신규 / 일반)
+##########################################################################################
+
+  # 요청서 읽기 (LLM을 부르지 않는다. 읽은 내용은 뒤의 Agent들이 input.request로 받는다)
+  - id: step00_01_readReq
+    type: TOOL
+    tool: readFile
+    with: 
+      fileFullPath: ${input}/00-request.md
+    save: request
+    next: step00_02_decideJobKind
+    onFailure: FAIL
   
-    # 요청서 읽기 (LLM을 부르지 않는다. 읽은 내용은 뒤의 Agent들이 input.request로 받는다)
-    - id: step00_01_readReq
-      type: TOOL
-      tool: readFile
-      input: 
-        fileFullPath: "${input}/00-request.md"
-      output:   
-        result: "state.request"
-      next: step00_02_decideJobKind
-      onFailure: FAIL
-    
-    # 작업구분 판단 후 분기
-    - id: step00_02_decideJobKind
-      type: ROUTER
-      agent: sm-decide-job-kind-agent
-      input: "${state.request}"
-      output:   
-        result: "state.classify.route"
-      routes:
-        신규개발: FAIL
-        일반: FAIL
-      onFailure: FAIL  
+  # 작업구분 판단 후 분기
+  - id: step00_02_decideJobKind
+    type: ROUTER
+    agent: sm-decide-job-kind-agent
+    with: ${state.request}
+    save: classify
+    routes:
+      신규개발: FAIL
+      일반: FAIL
+    onFailure: FAIL  
 
-  ##########################################################################################
-  # step01. 일반(순수 신규개발을 제외한 나머지)
-  ##########################################################################################
+##########################################################################################
+# step01. 일반(순수 신규개발을 제외한 나머지)
+##########################################################################################
 
-    # 
-  
+  # 

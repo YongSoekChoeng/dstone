@@ -23,21 +23,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.session.RedisChatMemoryRepository;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정 클래스입니다. 
- * ChatClient는 Spring AI에서 "LLM한테 말을 걸 때 쓰는 창구"라고 생각하면 됩니다.
- * 이 엔진은 provider(dstone.ai.model.chat 설정값 - 예: anthropic, ollama)를 하나만 정해서 쓰는데,
- * 그 provider로 가는 ChatClient를 여기서 딱 한 번 조립해서 스프링 빈으로 등록해 둡니다.
- *
- * PII 가리기, 금지어 검사, 사용량 로깅·쿼터 같은 "거버넌스" 기능은 이 클래스가 직접 처리하지 않습니다. 
- * 대신 이 클래스는 List<Advisor>를 그대로 주입받는 구조로 되어 있습니다. 
- * 그래서 나중에 거버넌스 기능이 필요해지면, 새로운 모듈에서 @Bean으로 Advisor 하나만 추가하면 됩니다
- * (스프링이 등록된 Advisor 빈들을 자동으로 모아서 이 리스트에 넣어주기 때문에, 이 클래스 코드를 고칠 필요가 없습니다). 
- * 지금은 그렇게 추가로 등록된 Advisor 빈이 하나도 없으므로, 이 리스트는 비어 있는 상태로 시작합니다.
+ * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정 클래스.
  * </pre>
  */
 @Configuration
@@ -51,27 +43,22 @@ public class ConfigChatClient {
 	 * <pre>
 	 * 대화 내용을 어디에 저장할지 결정하는 저장소(ChatMemoryRepository)를 준비해 줍니다.
 	 *
-	 * dstone.ai.session.redis.enabled 설정이 true 일 경우 session.RedisChatMemoryRepository 사용
+	 * - spring.data.redis.enabled가 true면 common.session.RedisChatMemoryRepository 빈이 만들어지고, 그것을 씁니다.
+	 * - false면(Redis를 쓰지 않는 환경) InMemoryChatMemoryRepository(자바 메모리에만 저장하는 간단한 저장소)를 새로 만들어 씁니다.
+	 *   이 경우 서버를 재시작하면 대화 내용이 사라지고, 서버가 여러 대면 서로 대화 내용을 나누지 못합니다.
 	 *
-	 * dstone.ai.session.redis.enabled 설정이 false 일 경우(즉 Redis를 안 쓰는 환경이라면) 이 메소드가 대신 
-	 * InMemoryChatMemoryRepository(자바 메모리 위에만 대화 내용을 저장하는 간단한 저장소)를 새로 만들어서 사용
-	 *
-	 * InMemoryChatMemoryRepository를 쓸 경우, 서버를 재시작하면 저장했던 대화 내용이 사라지고, 서버 인스턴스가 여러 대이면 인스턴스끼리 대화 내용을 공유하지 못함.
+	 * Redis 저장소는 ChatMemoryRepository가 아니라 RedisChatMemoryRepository 타입으로 찾습니다.
+	 * ChatMemoryRepository로 찾으면 Redis 빈이 없을 때 지금 만들고 있는 이 빈 자신이 걸려서 순환 참조로 기동에 실패합니다.
 	 * </pre>
+	 *
+	 * @param redisRepository Redis 저장소(spring.data.redis.enabled가 false면 없음)
 	 */
     @Bean
-    ChatMemoryRepository chatMemoryRepository(ObjectProvider<ChatMemoryRepository> repositoryProvider) {
-    	/**************************************************************************
-    	ChatMemoryRepository를 구현한 RedisChatMemoryRepository 가 반환된다.
-    	그러나 spring.data.redis.enabled 가 false 일 경우 RedisChatMemoryRepository 가 
-    	생성이 되어있지 않으므로 repositoryProvider.getIfAvailable()체크를 거친다.
-    	**************************************************************************/
-        ChatMemoryRepository existingRepository = repositoryProvider.getIfAvailable();
+    ChatMemoryRepository chatMemoryRepository(ObjectProvider<RedisChatMemoryRepository> redisRepository) {
+        RedisChatMemoryRepository existingRepository = redisRepository.getIfAvailable();
         if (existingRepository != null) {
-            // 이미 등록된 빈(예: RedisChatMemoryRepository)이 있으면 그것을 그대로 사용합니다.
             return existingRepository;
         } else {
-            // 등록된 빈이 없으면 메모리 기반 저장소를 새로 만들어 사용합니다.
             return new InMemoryChatMemoryRepository();
         }
     }
@@ -80,9 +67,8 @@ public class ConfigChatClient {
 	 * <pre>
 	 * 대화가 아무리 길어져도 최근 메시지 일부만 기억하도록 관리해 주는 대화 메모리를 만듭니다.
 	 *
-	 * dstone.ai.session.max-messages 설정값(기본값 20)만큼 가장 최근 메시지만 남기고, 그보다
-	 * 오래된 메시지는 잊어버립니다. 이렇게 하면 대화가 계속 이어져도 프롬프트가 끝없이 길어지지
-	 * 않습니다.
+	 * dstone.ai.session.max-messages 설정값(기본값 20)만큼 가장 최근 메시지만 남기고, 그보다 오래된 메시지는 잊어버립니다. 
+	 * 이렇게 하면 대화가 계속 이어져도 프롬프트가 끝없이 길어지지 않습니다.
 	 * </pre>
 	 *
 	 * @param chatMemoryRepository 실제로 대화 내용을 저장할 저장소(위 chatMemoryRepository() 메소드가 만든 것)
@@ -99,9 +85,10 @@ public class ConfigChatClient {
 	/**
 	 * <pre>
 	 * 시스템 디폴트 Advisor를 등록하는 메소드.
+	 * net.dstone.ai.common.config.ConfigChatClient.chatClient(Builder, List<Advisor>) 가 호출될 때 자동으로 생성.
 	 *
-	 * 대화 기억 Advisor(MessageChatMemoryAdvisor)는 여기 두지 않습니다. 대화를 기억할지는 호출마다 다르기 때문에
-	 * (채팅 API는 기억, Workflow step은 memory: true일 때만) runtime.agent.AgentExecutor가 필요할 때만 붙입니다.
+	 * 대화 기억 Advisor(MessageChatMemoryAdvisor)는 여기 두지 않습니다. 대화를 기억할지는 호출마다 다르기 때문에 (채팅 API는 기억, Workflow step은 memory: true일 때만) 
+	 * runtime.agent.AgentExecutor가 필요할 때만 붙입니다.
 	 * </pre>
 	 *
 	 * @param advisor    목록(현재는 비어 있음). 스프링에서 List<T> 타입은 단일 Bean과 다르게 빈 List로 주입 하므로 문제 없음.
@@ -110,10 +97,9 @@ public class ConfigChatClient {
 	List<Advisor> defaultAdvisors(List<Advisor> advisors) {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
-		// LLM 로깅하는 Advisor 등록
+		// 1. LLM 로깅하는 Advisor.
 		if(net.dstone.ai.common.config.ConfigCallLog.IS_LLM_LOGGING_YN) {
-			net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor llmLoggerAdvisor = net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor.builder().build();
-			advisorList.add(llmLoggerAdvisor);
+			advisorList.add(new net.dstone.ai.common.advisors.LlmLoggerAdvisor(configProperty, Ordered.HIGHEST_PRECEDENCE));
 		}
 		
 		return advisorList;
@@ -144,7 +130,7 @@ public class ConfigChatClient {
 	 * 이유: Spring AI(2.0.1)의 OpenAiChatModel은 호출할 때마다 "요청 옵션의 timeout"을 꺼내 그 요청의 대기 시간으로 씁니다.
 	 * 그런데 이 값은 설정 파일로 바꿀 길이 없고 기본 60초로 굳어 있습니다. spring.ai.openai.timeout은 HTTP 클라이언트의
 	 * 기본값으로만 들어가고, 요청마다 60초가 그 위를 덮어씁니다. 그래서 설정에 5m을 적어도 60초에 끊깁니다.
-	 * 실제로 느린 모델이 긴 문서를 써 내다가 정확히 60초에 끊겼습니다
+	 * 이렇게 끊기면 오류는 이런 모양으로 남습니다
 	 * ("Error reading response (원인: InterruptedIOException: timeout <- StreamResetException: stream was reset: CANCEL)").
 	 *
 	 * ChatClient의 기본 옵션(defaultOptions)에 넣지 않는 이유: 호출할 때 옵션을 따로 주면(Agent의 model 지정)
@@ -161,7 +147,7 @@ public class ConfigChatClient {
 	 *
 	 * - ollama는 모델 대부분이 켜기/끄기만 받아서 low/medium/high를 모두 "켜기"로 보냅니다.
 	 * - anthropic의 thinking 예산은 max-tokens보다 작아야 합니다. max-tokens를 4096 이하로 쓰면 high는 오류가 납니다.
-	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(지금까지와 같습니다).
+	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(provider와 모델의 기본 동작을 씁니다).
 	 * </pre>
 	 *
 	 * @param model     이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.

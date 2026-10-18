@@ -7,7 +7,7 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/*.yml 의 type: APPROVAL step입니다. 사람이 결정할 때까지 기다립니다(runtime.step.ApprovalStepExecutor).
+ * workflows/**.yml 의 type: APPROVAL step입니다. 사람이 결정할 때까지 기다립니다(runtime.step.ApprovalStepExecutor).
  *
  * AI의 리뷰(SUPERVISOR)와 사람의 승인은 별개입니다. 이 step은 권한이 있는 사람이 직접 고르는 관문입니다.
  *
@@ -23,8 +23,7 @@ import net.dstone.ai.common.consts.StepType;
  *       artifact: analysis-document          # 무엇을 승인하는지(화면에 보여 줄 이름)
  *       approverRole: ANALYSIS_MANAGER
  *       requireCommentOnReject: true
- *     output:
- *       result: "state.analysisApproval"     # {decision, approver, comment}
+ *     save: analysisApproval               # {decision, approver, comment}
  *     routes:
  *       APPROVED: step05
  *       CHANGES_REQUESTED: step02
@@ -33,7 +32,7 @@ import net.dstone.ai.common.consts.StepType;
  * - approval.rejectTo는 routes의 REJECTED를 짧게 적는 방법입니다(둘 다 적었으면 같은 곳이어야 합니다).
  * - requireCommentOnReject: true면 APPROVED가 아닌 결정에는 의견(comment)이 꼭 있어야 합니다.
  * - 되돌아가는 흐름을 만들어도 됩니다. 한 번 쓴 결정은 지우기 때문에, 같은 APPROVAL step에 다시 오면 사람에게 다시 묻습니다.
- *   직전 결정은 output으로 저장한 state에 남아 있어서 다음 step이 "${state.analysisApproval.comment:}"처럼 꺼내 쓸 수 있습니다.
+ *   직전 결정은 save로 저장한 state에 남아 있어서 다음 step이 ${state.analysisApproval.comment:}처럼 꺼내 쓸 수 있습니다.
  * - 고르는 것 자체가 결정이라 이 step에는 실패가 없습니다(onFailure, next를 적지 않습니다).
  * - forEach도 없습니다. 결정은 step id 하나로만 구분되는데, 같은 step을 여러 번 동시에 돌리면
  *   "그중 어느 실행에 대한 결정인지"를 구분할 방법이 없기 때문입니다.
@@ -41,13 +40,13 @@ import net.dstone.ai.common.consts.StepType;
  *
  * @param id       (필수)이 step의 이름입니다. decision API가 이 id로 결정을 기록합니다.
  * @param approval (옵셔널)무엇을 누가 승인하는지입니다.
- * @param output   (옵셔널)결정을 state 어디에 저장할지입니다.
+ * @param save     (옵셔널)결정({decision, approver, comment})을 저장할 state 이름입니다.
  * @param routes   (필수)고를 수 있는 결정 이름 → 이동할 step id(또는 "END"/"FAIL")입니다(approval.rejectTo만 적어도 됩니다).
  */
 public record ApprovalStepDefinition(
 	String id
 	, Approval approval
-	, Map<String, String> output
+	, String save
 	, Map<String, String> routes
 	) implements StepDefinition {
 

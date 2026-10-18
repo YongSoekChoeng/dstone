@@ -23,7 +23,7 @@ import net.dstone.common.utils.StringUtil;
 /**
  * <pre>
  * 모든 Agent 정보를 담아두고, id로 찾아 주는 등록소입니다. 
- * 로딩 순서는 YamlDefinitionLoader가 classpath:agents/*.yml 파일들을 읽어서 AgentDefinition으로 바꾸고, 
+ * 로딩 순서는 YamlDefinitionLoader가 classpath:definitions/agents/**.md 파일들을 읽어서 AgentDefinition으로 바꾸고, 
  * 이 AgentRegistry가 그 AgentDefinition들을 앱이 기동될 때 한 번 모아서 보관하는 식입니다.
  *
  * Agent를 찾아 쓰는 경로는 두 가지입니다. 
@@ -31,11 +31,11 @@ import net.dstone.common.utils.StringUtil;
  * runtime.step의 AgentStepExecutor가 step의 agent 값(AgentStepDefinition.agent 등)으로 찾는 경우입니다. 
  * 어느 경로로 찾든 caller 화이트리스트 검사는 이 클래스 안에서 딱 한 번만 이뤄집니다.
  *
- * 기동할 때 각 Agent의 입출력 계약(input/output의 schema)이 올바른 JSON Schema인지도 검사합니다.
+ * 기동할 때 각 Agent의 입출력 계약(input/output)이 올바른 JSON Schema로 바뀌었는지도 검사합니다.
  * 스키마가 틀린 Agent가 있으면 기동 자체를 실패시킵니다.
  *
  * 정해진 값만 받는 항목도 기동할 때 검사합니다(checkCallOptions()). 오타가 조용히 무시되지 않게 하려는 것입니다.
- *   model.reasoning, model.temperature, output.format, output.validation,
+ *   model.reasoning, model.temperature,
  *   context.sources, execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls
  *
  * Tool 허용 목록(tools)과 Sub Agent(subAgents)도 기동할 때 검사합니다(checkTools(), checkSubAgents()).
@@ -63,7 +63,7 @@ public class AgentRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 앱이 기동될 때 한 번 호출되어, agents/*.yml에 정의된 Agent를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
+	 * 앱이 기동될 때 한 번 호출되어, agents/**.md에 정의된 Agent를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
 	 * id, version, prompt가 비어 있는 Agent가 있거나, 같은 id의 Agent가 둘 이상 있거나, 
 	 * input/output 스키마가 올바른 JSON Schema가 아니면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
 	 * </pre>
@@ -73,13 +73,13 @@ public class AgentRegistry extends BaseObject {
 		Map<String, AgentDefinition> resolved = new HashMap<>();
 		for (AgentDefinition definition : this.loader.loadAgents()) {
 			if (StringUtil.isEmpty(definition.id())) {
-				throw new IllegalStateException("agents/*.yml 항목은 id가 있어야 합니다: " + definition);
+				throw new IllegalStateException("agents/**.md 머리말에는 id가 있어야 합니다: " + definition);
 			}
 			if (StringUtil.isEmpty(definition.version())) {
 				throw new IllegalStateException("agent[" + definition.id() + "]에 version이 없습니다. 예: version: \"1.0.0\"");
 			}
 			if (StringUtil.isEmpty(definition.promptText())) {
-				throw new IllegalStateException("agent[" + definition.id() + "]에 prompt가 없거나 프롬프트 파일이 비어 있습니다. 예: prompt: {system: prompts/내묶음/내agent.st}");
+				throw new IllegalStateException("agent[" + definition.id() + "]의 프롬프트가 비어 있습니다. Agent 파일에서 머리말(--- ... ---) 아래에 프롬프트를 적으십시오.");
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
 				throw new IllegalStateException("agent id가 중복 등록되었습니다: " + definition.id());
@@ -111,13 +111,13 @@ public class AgentRegistry extends BaseObject {
 	private void checkSchema(AgentDefinition definition, String where, Map<String, Object> schema) {
 		List<String> problems = JsonSchemaUtil.checkSchema(schema);
 		if (!problems.isEmpty()) {
-			throw new IllegalStateException("agent[" + definition.id() + "]의 " + where + ".schema가 올바른 JSON Schema가 아닙니다: " + problems);
+			throw new IllegalStateException("agent[" + definition.id() + "]의 " + where + "가 올바른 JSON Schema가 아닙니다: " + problems);
 		}
 	}
 
 	/**
 	 * <pre>
-	 * 정해진 값만 받는 항목(모델, 출력 형식, 실행 정책 등)을 검사합니다.
+	 * 정해진 값만 받는 항목(모델, 참고 자료, 실행 정책)을 검사합니다.
 	 * 오타가 난 값이 조용히 무시되면 "껐는데 왜 느리지"를 한참 찾게 되므로 기동할 때 막습니다.
 	 * </pre>
 	 *
@@ -134,22 +134,6 @@ public class AgentRegistry extends BaseObject {
 		}
 		if (definition.temperature() != null && (definition.temperature().doubleValue() < 0 || definition.temperature().doubleValue() > 2)) {
 			throw new IllegalStateException(where + "model.temperature는 0 이상 2 이하여야 합니다: " + definition.temperature());
-		}
-		// output
-		if (definition.output() != null) {
-			AgentDefinition.Output output = definition.output();
-			if (output.format() != null && !AgentDefinition.FORMATS.contains(output.format())) {
-				throw new IllegalStateException(where + "output.format은 " + AgentDefinition.FORMATS + " 중 하나여야 합니다: " + output.format());
-			}
-			if (output.isJson() && output.schema() == null) {
-				throw new IllegalStateException(where + "output.format이 JSON이면 schema가 있어야 합니다. 예: output: {format: JSON, schema: schemas/내묶음/내결과.schema.json}");
-			}
-			if (!output.isJson() && output.schema() != null && !JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(output.schema()))) {
-				throw new IllegalStateException(where + "output.format이 TEXT인데 schema가 글자(string)가 아닙니다. 정해진 모양으로 답을 받으려면 format: JSON으로 적으십시오.");
-			}
-			if (output.validation() != null && !AgentDefinition.VALIDATIONS.contains(output.validation())) {
-				throw new IllegalStateException(where + "output.validation은 " + AgentDefinition.VALIDATIONS + " 중 하나여야 합니다: " + output.validation());
-			}
 		}
 		// context
 		for (String source : definition.contextSources()) {
@@ -245,7 +229,7 @@ public class AgentRegistry extends BaseObject {
 			String where = "agent[" + definition.id() + "]의 subAgents '" + subAgentId + "'";
 			AgentDefinition subAgent = all.get(subAgentId);
 			if (subAgent == null) {
-				throw new IllegalStateException(where + ": agents/*.yml에 그런 Agent가 없습니다.");
+				throw new IllegalStateException(where + ": agents/**.md에 그런 Agent가 없습니다.");
 			}
 			if (!subAgent.subAgentIds().isEmpty()) {
 				throw new IllegalStateException(where + ": 이 Agent도 subAgents를 가지고 있습니다. Sub Agent는 한 단계만 둘 수 있습니다(부모 → 자식). "

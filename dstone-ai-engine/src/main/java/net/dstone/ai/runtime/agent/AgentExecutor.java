@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
 import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
@@ -41,7 +42,7 @@ import reactor.core.publisher.Flux;
 /**
  * <pre>
  * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
- * AgentDefinition에 적힌 prompt(시스템 프롬프트 파일)와 tools.allowed(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), context(RAG 사용 여부), model, execution을 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
+ * AgentDefinition에 적힌 prompt(Agent 파일 본문)와 tools.allowed(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), context(RAG 사용 여부), model, execution을 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
  * 그래서 api.controller.ChatController (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 
  * runtime.step의 AgentStepExecutor/SupervisorStepExecutor/RouterStepExecutor(Workflow 안에서 AGENT/SUPERVISOR/ROUTER step을 실행하는 경우)
  * 모두 결국 이 클래스를 통해서 LLM을 호출합니다.
@@ -51,7 +52,7 @@ import reactor.core.publisher.Flux;
  * 이 클래스는 호출할 때마다 그 계약을 지킵니다.
  * - 넣는 값: Agent input 스키마로 검사한 뒤, 글자면 그대로, 그 밖의 값(맵 등)이면 JSON 글자로 바꿔 사용자 메시지로 보냅니다.
  * - 받는 값: output이 string이면 LLM 답 원문을 그대로, 그 밖의 타입이면 LLM이 그 모양의 JSON으로 답하게 하고
- *   답을 읽어서 검사한 값을 돌려줍니다(SchemaOutputConverter).
+ *   답을 읽어서 검사한 값을 돌려줍니다(ask()).
  * - 어느 쪽이든 모양이 틀리면 AgentContractException을 던집니다.
  *
  * ## 프롬프트의 {변수}
@@ -59,8 +60,11 @@ import reactor.core.publisher.Flux;
  * input이 object면 그 필드들이 변수가 되고, 채팅 API는 요청의 variables를 더 얹을 수 있습니다(같은 이름이면 variables가 이김).
  * 그래서 Agent 파일은 자기 input 스키마만 보고 prompt를 쓸 수 있습니다.
  *
- *   input:  {schema: {type: object, properties: {role: string, message: string}}}
- *   prompt: 당신은 {role} 역할을 맡은 상담원입니다.
+ *   input:                                      (Agent 파일 머리말)
+ *     role: string
+ *     message: string
+ *   ---
+ *   당신은 {role} 역할을 맡은 상담원입니다.       (Agent 파일 본문)
  *
  * ## 시스템 프롬프트
  * 시스템 프롬프트는 항상 "엔진 규칙 + 업무 지시(Agent prompt)" 순서입니다(runtime.prompt.EnginePrompt).
@@ -75,7 +79,7 @@ import reactor.core.publisher.Flux;
  * ## Tool 호출이 길어질 때
  * Tool 결과는 대화에 쌓여서 그 뒤의 LLM 호출마다 다시 보내집니다. 그래서 두 가지를 엔진이 직접 챙깁니다.
  * - 횟수: Agent 호출 한 번에 Tool을 부를 수 있는 횟수를 세고, 다 쓰면 막습니다(ToolCallBudgetCallback).
- *   Agent의 maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
+ *   Agent의 execution.maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
  * - 분량: 쌓인 Tool 결과가 dstone.ai.agent.tool.keep-result-chars(기본 200,000자)를 넘으면 오래된 것부터
  *   앞부분만 남깁니다(ToolResultCompactionAdvisor). 평소의 호출은 이 기준에 닿지 않습니다.
  *
@@ -309,7 +313,6 @@ public class AgentExecutor extends BaseObject {
 	 * 답이 비어 있는데 끝난 이유가 LENGTH(출력 토큰 한도)면, 그 사실을 알리는 예외를 던집니다.
 	 * 추론(reasoning)을 하는 모델은 추론에 쓴 토큰도 max-tokens에 들어가서, 추론이 길어지면 답을 한 글자도 쓰지 못하고
 	 * 끝납니다. 이때 그냥 넘어가면 "응답이 비어 있다 / JSON이 아니다"로만 보여서 원인을 알 수 없습니다.
-	 * (실제로 리뷰 Agent가 파일의 줄을 세느라 4096 토큰을 추론에 다 쓰고 빈 답을 돌려준 적이 있습니다.)
 	 *
 	 * 끝난 이유가 toolCallLimitExceeded면 Spring AI가 Tool 호출 한도에서 되풀이를 끊은 것입니다. 이때 답 자리에는
 	 * 모델의 답이 아니라 "Tool call limit exceeded ..."라는 안내 문구가 들어 있습니다. 그대로 돌려주면 그 문구가
@@ -416,7 +419,7 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- 순서는 "엔진 규칙(공통 + engineRule) → 업무 지시(Agent prompt)"입니다(EnginePrompt.compose()).
 			  엔진 규칙은 변수 치환을 거치지 않습니다. 변수는 Agent prompt에서만 채운 뒤 뒤에 이어 붙입니다.
-			- AgentDefinition.promptText()(prompt.system 파일의 내용)가 업무 지시입니다. 만약 그 문구 안에
+			- AgentDefinition.promptText()(Agent 파일의 본문)가 업무 지시입니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
 			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
 			  요청의 variables를 더 얹습니다(promptVariables() 참고).
@@ -509,7 +512,7 @@ public class AgentExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * Tool들에 "이 Agent 호출에서 부를 수 있는 횟수"를 씌워 돌려줍니다(ToolCallBudgetCallback).
-	 * 횟수는 Agent의 maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
+	 * 횟수는 Agent의 execution.maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
 	 * 여기 들어온 Tool들이 횟수 하나를 함께 씁니다(Tool마다 따로 세지 않습니다).
 	 * </pre>
 	 *

@@ -73,8 +73,8 @@ public class WorkFlowExecutionService extends BaseService {
 	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
 		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input);
 		this.executionStore.insert(execution);
-		// 지금은 기본 ForkJoinPool.commonPool()을 그대로 쓰고 있습니다. 전용 스레드풀이나 큐잉,
-		// 동시 실행 개수 제한 같은 건 실제 운영 환경에서 동시에 들어오는 submit이 많아지면 그때 도입할 계획입니다.
+		// 기본 ForkJoinPool.commonPool()에서 실행합니다. 전용 스레드풀이나 대기열,
+		// 동시 실행 개수 제한은 두지 않았습니다.
 		CompletableFuture.runAsync(new Runnable() {
 			@Override
 			public void run() {

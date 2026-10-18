@@ -7,7 +7,7 @@ package net.dstone.ai.common.consts;
  * RUNNING → 진행 중(동기 실행 도중이거나 비동기 job이 처리 중). 
  * WAITING_APPROVAL → APPROVAL 스텝에서 멈춰 사람의 결정을 기다리는 중. 
  * DONE/FAILED → 정상/비정상 종료. 
- * CANCELLED → 사람이 명시적으로 취소(현재는 상태값만 정의되어 있고, 취소를 트리거하는 API는 아직 없다 - 실제 필요가 나오면 추가한다).
+ * CANCELLED → 사람이 명시적으로 취소(상태값만 있고, 취소하는 API는 없다).
  * </pre>
  */
 public enum WorkFlowExecutionStatus {
@@ -32,7 +32,7 @@ public enum WorkFlowExecutionStatus {
 	FAILED, 
 	
 	/**
-	 * 사람이 명시적으로 취소(현재는 상태값만 정의되어 있고, 취소를 트리거하는 API는 아직 없음)
+	 * 사람이 명시적으로 취소(상태값만 있고, 취소하는 API는 없음)
 	 */
 	CANCELLED
 }

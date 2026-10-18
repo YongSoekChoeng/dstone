@@ -11,21 +11,20 @@
 # 응답에 현재 시각이 실제로 반영되어 있다면 tool-calling이 제대로 일어난 것입니다. dstone-ai-engine의
 # 로그(log4j2.xml에서 org.springframework.ai 레벨을 DEBUG로 낮추면 더 자세히 볼 수 있습니다)나
 # ConfigCallLog가 남기는 Tools 관련 로그를 보면 어떤 Tool이 호출됐는지도 확인할 수 있습니다.
-workflow:
-  id: sample-agent-tool-calling
-  version: "1.0.0"
-  description: tools를 선언한 Agent의 자율 tool-calling 확인용 Workflow. "지금 몇 시야?" 같은 글자로 호출한다.
-  input: string
-  settings:
-    maxIterations: 3
-  output:
-    value: "${state.answer}"
-  steps:
+id: sample-agent-tool-calling
+version: 1.0.0
+description: tools를 선언한 Agent의 자율 tool-calling 확인용 Workflow. "지금 몇 시야?" 같은 글자로 호출한다.
+input: string
+settings:
+  maxIterations: 3
+state:
+  answer: ask step의 결과
+return: ${state.answer}
+steps:
 
-    - id: ask
-      type: AGENT
-      agent: sample-tool-demo-agent
-      input: "${input}"
-      output:
-        result: "state.answer"
-      next: END
+  - id: ask
+    type: AGENT
+    agent: sample-tool-demo-agent
+    with: ${input}
+    save: answer
+    next: END

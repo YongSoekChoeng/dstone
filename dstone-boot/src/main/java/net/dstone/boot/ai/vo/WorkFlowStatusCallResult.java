@@ -7,7 +7,7 @@ package net.dstone.boot.ai.vo;
  *
  * @param executionId  실행 id
  * @param status       실행 상태(RUNNING/WAITING_APPROVAL/DONE/FAILED/CANCELLED)
- * @param output       실행이 성공했을 때의 결과(workflow.output.value를 채운 값 - 글자 또는 객체)
+ * @param output       실행이 성공했을 때의 결과(Workflow의 return을 채운 값 - 글자 또는 객체)
  * @param errorMessage 실행이 실패했을 때의 사유
  */
 public record WorkFlowStatusCallResult(String executionId, String status, Object output, String errorMessage) {

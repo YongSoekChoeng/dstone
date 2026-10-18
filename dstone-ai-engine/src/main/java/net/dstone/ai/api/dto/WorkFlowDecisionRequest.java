@@ -8,7 +8,7 @@ package net.dstone.ai.api.dto;
  * decision에 멈춰 있는 APPROVAL step의 routes 이름 중 하나를 보냅니다(예: APPROVED, REJECTED, CHANGES_REQUESTED).
  * routes에 없는 이름이면 400입니다. 고를 수 있는 이름은 실행 상세 조회 응답의 pendingApproval.routes에 들어 있습니다.
  *
- * 예전 화면과 맞추려고 두 가지를 더 받습니다.
+ * decision 말고 두 가지 모양도 받습니다(dstone-boot 승인 화면이 보내는 모양).
  * - route: decision과 같은 뜻입니다(decision이 없을 때 씁니다).
  * - approved: decision과 route가 모두 없을 때만 봅니다. true는 APPROVED, false는 REJECTED입니다.
  *
@@ -21,7 +21,7 @@ package net.dstone.ai.api.dto;
  * @param approved decision/route가 없을 때 쓰는 승인 여부입니다(없어도 됩니다).
  * @param approver 이 결정을 내린 사람이나 역할을 적습니다.
  * @param comment  결정한 이유나 메모입니다. step에 requireCommentOnReject를 적었으면 APPROVED가 아닌 결정에 꼭 있어야 합니다.
- * @param route    decision과 같은 뜻입니다(예전 이름).
+ * @param route    decision과 같은 뜻입니다(decision이 없을 때 씁니다).
  */
 public record WorkFlowDecisionRequest(String decision, Boolean approved, String approver, String comment, String route) {
 

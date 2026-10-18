@@ -25,7 +25,7 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
  * @param status          지금 이 실행이 어떤 상태인지입니다.
  * @param currentStepIndex 지금 실행 중이거나 방금 끝낸 스텝이 몇 번째인지입니다(0부터 시작하고, workflow.steps() 기준입니다).
  * @param context         이 실행의 컨텍스트 트리입니다(처음 호출할 때 넘긴 입력값에, 각 스텝이 낸 결과가 계속 누적됩니다).
- * @param output          최종적으로 성공했을 때의 결과(workflow.output.value를 채운 값)입니다. 글자일 수도, 객체나 리스트일 수도 있습니다(아직 안 끝났으면 null입니다).
+ * @param output          최종적으로 성공했을 때의 결과(Workflow의 return을 채운 값)입니다. 글자일 수도, 객체나 리스트일 수도 있습니다(아직 안 끝났으면 null입니다).
  * @param errorMessage    실패했거나 에러가 났을 때의 사유입니다(아직 안 끝났거나 성공했으면 null입니다).
  * @param createdAt       이 실행이 처음 만들어진 시각입니다.
  * @param updatedAt       상태가 마지막으로 바뀐 시각입니다.

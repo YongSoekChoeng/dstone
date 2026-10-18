@@ -5,8 +5,8 @@ import java.util.List;
 /**
  * <pre>
  * step 하나를 실행한 결과입니다. 각 StepExecutor가 만들어 돌려주고, runtime.workflow.WorkFlowExecutor가
- * 그 step의 output에 적힌 대로 state에 저장합니다(WorkFlowContext.saveOutput()). 이 record의 input/output/error가
- * step의 output에 적는 input / result / error입니다. 그 밖의 숨은 값은 없습니다.
+ * 그 step의 save / saveInput / saveError에 적힌 이름으로 state에 저장합니다(WorkFlowContext.saveOutput()). 이 record의 output/input/error가
+ * 저장되는 값 그대로입니다. 그 밖의 숨은 값은 없습니다.
  *
  * StepExecutor는 success()/failure()/routed()/waitingApproval()로 결과만 만들고, 실제로 넘긴 입력(input)과 걸린 시간(durationMs)은
  * WorkFlowExecutor가 withCall()로 채웁니다. forEach step의 결과는 WorkFlowExecutor가 반복별 결과를 모아 forEach()로 만듭니다.

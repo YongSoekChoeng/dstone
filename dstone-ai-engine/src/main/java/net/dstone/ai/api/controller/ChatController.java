@@ -32,7 +32,7 @@ import reactor.core.publisher.Flux;
 /**
  * 이 엔진에서 가장 기본이 되는 채팅 엔드포인트를 제공하는 컨트롤러입니다.
  *
- * POST /api/ai/chat 요청을 받으면, resources/agents/*.yml 파일로 등록해 둔 Agent(챗봇 하나의 설정이라고
+ * POST /api/ai/chat 요청을 받으면, resources/definitions/agents/**.md 파일로 등록해 둔 Agent(챗봇 하나의 설정이라고
  * 생각하면 됩니다) 중 하나를 딱 한 번 호출해서 답을 돌려줍니다. 요청의 input은 그 Agent의 input 계약 모양이어야
  * 하고(아니면 400), 답은 그 Agent의 output 계약 모양 그대로 돌려줍니다(string이면 글자, object면 객체). 만약 여러 단계(step)를 순서대로 이어서
  * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkFlowController를 사용하면 됩니다.

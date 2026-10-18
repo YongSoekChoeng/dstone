@@ -22,7 +22,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * 결과(result)는 {decision, approver, comment}이고 항상 성공입니다. 고른 decision에 적힌 step으로 갑니다(step의 routes).
  *
  * 결정은 한 번 쓰고 지웁니다(WorkFlowContext.clearApproval()). 그래서 흐름이 되돌아와 이 step에 다시 오면
- * 사람에게 다시 묻습니다. 직전 결정은 step의 output으로 저장한 state에 남아 있어, 다음 step이 "${state.이름.comment:}"처럼 꺼내 씁니다.
+ * 사람에게 다시 묻습니다. 직전 결정은 step의 save로 저장한 state에 남아 있어, 다음 step이 ${state.이름.comment:}처럼 꺼내 씁니다.
  * </pre>
  */
 @Component

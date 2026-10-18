@@ -1,7 +1,6 @@
-
 ### 1 MCP 서버 항목
 
-`mcpServer:` 아래에 적는다(`common.definition.mcp.McpServerDefinition`).
+`mcp/**/<server-id>.yml` 파일 맨 위에 감싸는 키 없이 바로 적는다(`common.definition.mcp.McpServerDefinition`).
 
 | 항목 | 필수 | 설명 |
 |---|---|---|
@@ -15,22 +14,19 @@
 접속에 실패한 서버는 로그만 남기고 건너뛴다(엔진 기동은 계속된다). caller별 접근 제어는 서버 단위가 아니라 다른 Tool과
 똑같이 `dstone.ai.tool.allowed-by-caller`(Tool 이름 기준)로 한다.
 
-**MCP 서버**: `definitions/mcp/sample/sample-filesystem-mcp.yml` — 공식 filesystem 레퍼런스 서버를 STDIO로 띄워
+**MCP 서버**: `definitions/mcp/sample/sample-filesystem.yml` — 공식 filesystem 레퍼런스 서버를 STDIO로 띄워
 `${APP_HOME}/${APP_NAME}/mcp/server-filesystem` 하나만 노출한다(`list_directory`/`directory_tree`/`read_text_file`/`write_file`/`edit_file`/`move_file`만 허용).
-
-`
 
 ### 2 MCP 서버 뼈대
 
-**STDIO(로컬 프로세스)**
+**STDIO(로컬 프로세스)** — `definitions/mcp/<폴더>/<server-id>.yml`
 
 ```yaml
-mcpServer:
-  id: <server-id>
-  transport: STDIO
-  command: npx
-  args: ["-y", "<npm 패키지>", "${APP_HOME}/${APP_NAME}/<노출할 경로>"]
-  allowedTools: ["<tool1>", "<tool2>"]   # 비우면 전부
+id: <server-id>
+transport: STDIO
+command: npx
+args: ["-y", "<npm 패키지>", "${APP_HOME}/${APP_NAME}/<노출할 경로>"]
+allowedTools: ["<tool1>", "<tool2>"]   # 비우면 전부
 ```
 
 Windows에서는 `npx`가 실제로는 `npx.cmd`(배치 스크립트)라 `ProcessBuilder`가 바로 실행하지 못한다. 그래서 Windows용
@@ -40,9 +36,8 @@ YAML은 환경마다 고칠 필요가 없다.
 **SSE(원격 서버)**
 
 ```yaml
-mcpServer:
-  id: <server-id>
-  transport: SSE
-  url: http://<host>:<port>
-  allowedTools: []                      # 비우면 전부
+id: <server-id>
+transport: SSE
+url: http://<host>:<port>
+allowedTools: []                      # 비우면 전부
 ```

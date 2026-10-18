@@ -30,7 +30,7 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * resources/mcp/*.yml에 적어둔 MCP 서버들에 하나씩 접속해서, 
+ * resources/definitions/mcp/**.yml에 적어둔 MCP 서버들에 하나씩 접속해서, 
  * 그 서버가 제공하는 Tool을 common.config.ConfigTool의 ToolCallbackProvider에 합류시켜 주는 클래스입니다. 
  * 한번 합류되고 나면 원래부터 있던 로컬 @AiTool Tool과 구분 없이 똑같이 취급됩니다 
  * 

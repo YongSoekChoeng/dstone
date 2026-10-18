@@ -3,112 +3,119 @@ package net.dstone.ai.common.definition.agent;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import net.dstone.ai.common.definition.SchemaDefinition;
-import net.dstone.ai.common.schema.JsonSchemaUtil;
 
 /**
  * <pre>
- * Agent 하나를 표현하는 클래스입니다. Agent란 쉽게 말해 "LLM에게 어떤 역할과 규칙으로 일을 시킬지"를 정의해 둔 설정 묶음입니다.
- * resources/definitions/agents/*.yml 파일 하나하나가 Agent 하나에 해당하며,
- * net.dstone.ai.common.loader.YamlDefinitionLoader 가 그 YAML 파일을 읽어서 이 클래스의 값으로 채워줍니다.
+ * Agent 하나의 정의입니다.
+ * Agent는 "LLM에게 어떤 역할과 규칙으로 일을 시킬지"를 적어 둔 설정 묶음입니다.
  *
- * 이 Agent는 두 가지 경로로 호출될 수 있습니다.
- * 1. 사용자가 api.controller.ChatController를 통해 채팅 요청의 agent 값으로 직접 지정하거나,
- * 2. Workflow 안의 AGENT/SUPERVISOR/ROUTER 타입 step이 agent 값으로 가리키는 경우입니다.
- *    어느 경로로 호출되든, "이 caller(호출 주체)가 이 Agent를 써도 되는지"는 항상 allowedCallers 값으로 똑같이 검사합니다.
+ * ■ 어디서 오나
+ *   resources/definitions/agents/**.md 파일 하나 = Agent 하나입니다.
+ *   common.loader.YamlDefinitionLoader가 파일을 읽어 이 record를 채웁니다.
  *
- * ## 파일 모양
- *   agent:
- *     id: pilot-requirment-analyzer-agent
- *     version: "1.0.0"
- *     role: REQUIREMENT_ANALYST                      # 사람이 읽는 역할 이름(동작에는 영향 없음)
- *     description: 요구사항을 분석하고 구조화된 결과를 생성한다.
- *     model:
- *       name: qwen/qwen3.8-27b                       # (옵셔널) 이 Agent만 다른 모델을 쓸 때. 비우면 provider 공통 기본 모델
- *       temperature: 0.1
- *       reasoning: none
- *     prompt:
- *       system: prompts/pilot/requirement-analyzer.st   # 프롬프트는 별도 파일
- *     input:
- *       schema: schemas/pilot/requirement-input.schema.json
- *     output:
- *       format: JSON
- *       schema: schemas/pilot/requirement-analysis.schema.json
- *       validation: STRICT
- *     context:
- *       sources: [workflowInput, retrievedDocuments]
- *     tools:
- *       allowed: [searchInFiles, readFile]
- *     execution:
- *       maxAttempts: 2
- *       timeoutSeconds: 120
- *       onInvalidOutput: RETRY
+ * ■ 누가 부르나
+ *   1. 채팅 API(api.controller.ChatController) - 요청의 agent 값으로 지정
+ *   2. Workflow의 step - AGENT / SUPERVISOR / ROUTER step의 agent 값으로 지정
+ *   어느 쪽이든 "이 caller가 써도 되는 Agent인가"는 allowedCallers로 똑같이 검사합니다.
  *
- * prompt와 schema에 적는 경로는 resources/definitions 폴더를 기준으로 합니다.
+ * ■ 파일 모양
+ *   맨 위 --- 와 --- 사이(머리말)가 설정이고, 그 아래(본문)가 시스템 프롬프트입니다.
+ *   본문은 LLM에게 그대로 가므로, 사람이 읽을 설명은 머리말에 # 주석으로 적습니다.
  *
- * ## 입출력 계약(input / output)
- * 이 Agent가 무엇을 받고 무엇을 돌려주는지는 Agent가 정합니다. Agent를 부르는 쪽(Workflow step, 채팅 API)은
- * 이 계약에 맞춰 값을 넣고, 돌려받은 값을 그대로 씁니다. 계약은 이 파일 한 곳에만 있습니다.
- * - input을 적지 않으면 글자 하나를 받습니다({type: string}). object 등을 받으려면 schema 파일을 적습니다.
- *   그러면 부르는 쪽이 맵으로 값을 넣고, 엔진이 그 맵을 스키마로 검사한 뒤 JSON 글자로 바꿔 사용자 메시지로 보냅니다.
- * - output을 적지 않으면(또는 format: TEXT) LLM 답 원문이 그대로 결과입니다.
- *   format: JSON이면 LLM이 schema 모양의 JSON으로 답하도록 지시하고 답을 스키마로 검사합니다. 모양이 틀린 답은 실패입니다.
- * - SUPERVISOR/ROUTER step이 부르는 Agent는 output을 적지 않습니다. 답의 모양을 엔진이 정하기 때문입니다.
+ *   ---
+ *   # 요구사항을 분석하는 Agent입니다.          ← 사람이 읽는 설명
+ *   id: my-analyzer-agent                       ← (필수)
+ *   version: 1.0.0                              ← (필수)
+ *   description: 요구사항을 정리한다.
+ *   model:
+ *     reasoning: none
+ *   input:
+ *     request: string, 요청서 내용
+ *   output:
+ *     summary: string, 요약
+ *   tools:
+ *     allowed: [searchInFiles, readFileLines]
+ *   ---
+ *   너는 요구사항 분석가다. {request}를 읽고 ...   ← 시스템 프롬프트(본문)
  *
- * ## 모델(model)
- * - name: 이 Agent만 다른 모델을 쓸 때 모델 이름을 적습니다. 적지 않으면 provider 공통 기본 모델을 씁니다.
- *   지금 켜진 provider(spring.ai.model.chat)에서 쓸 수 있는 이름이어야 합니다.
- * - temperature: 답의 무작위 정도입니다. 적지 않으면 provider 설정값을 씁니다.
- * - reasoning: 답을 쓰기 전에 모델이 속으로 따져 보는 정도입니다(none / low / medium / high). 단순한 일은 꺼 두면 빨라집니다.
- *   "끄기"를 off가 아니라 none으로 적는 이유: YAML은 off를 글자가 아니라 false로 읽습니다.
- *   실제로 어떤 값으로 보내는지는 provider마다 다릅니다(common.config.ConfigChatClient.requestOptions() 참고).
+ *   step 타입별 전체 샘플: agents/sample/steptype/sample-steptype-{agent,supervisor,router}-agent.md
  *
- * ## 참고 자료(context)
- * sources에 retrievedDocuments를 적으면 RAG(올려 둔 문서를 검색해서 답변에 참고하는 기능)를 씁니다.
- * workflowInput은 "부르는 쪽이 넣어 준 input"을 뜻하며 항상 들어가므로 적어도 되고 안 적어도 됩니다.
- * retrieval 아래에 검색 조건(topK, similarityThreshold, allowEmptyContext)을 적을 수 있습니다.
+ * ■ 머리말 항목 한눈에 보기
+ *   id, version      (필수) 이름과 버전. 프롬프트나 계약을 바꾸면 version을 올립니다.
+ *   role             사람이 읽는 역할 이름. 동작에는 영향이 없습니다.
+ *   description      무엇을 하는 Agent인지. Sub Agent로 쓰이면 필수입니다(부모 LLM이 이걸 보고 고릅니다).
+ *   model            name / temperature / reasoning. 비우면 provider 기본값을 씁니다.
+ *   input, output    무엇을 받고 무엇을 돌려주는지(Picoschema). 비우면 둘 다 글자입니다.
+ *   context          RAG(올려 둔 문서 검색)를 쓸지와 검색 조건.
+ *   tools.allowed    LLM에게 보여 줄 Tool 이름. 비우면 Tool을 쓰지 않습니다.
+ *   subAgents        일을 맡길 수 있는 다른 Agent의 id.
+ *   allowedCallers   호출을 허락할 caller(tenant). 비우면 누구나 부를 수 있습니다.
+ *   execution        다시 부르기, 대기 시간, Tool 호출 한도.
+ *   (본문)           시스템 프롬프트. 머리말에 prompt 키로 적지 않습니다.
  *
- * ## Tool 허용 목록(tools.allowed)
- * 이 Agent의 LLM에게 보여 줄 Tool을 이름으로 적습니다. 적지 않은 Tool은 LLM이 아예 볼 수 없습니다.
+ * ■ input / output - 계약은 Agent가 정합니다
+ *   부르는 쪽(step, 채팅 API)은 이 계약에 맞춰 값을 넣고, 돌려받은 값을 그대로 씁니다.
+ *   - input을 비우면 글자 하나를 받습니다.
+ *     필드를 적으면 맵으로 받고, 엔진이 스키마로 검사한 뒤 JSON 글자로 바꿔 user 메시지로 보냅니다.
+ *     프롬프트의 {필드이름}은 이 input의 필드 값으로 채워집니다.
+ *   - output을 비우면(또는 output: string) LLM 답 원문이 결과입니다.
+ *     필드를 적으면 엔진이 "이 모양의 JSON으로 답하라"고 지시하고 답을 검사합니다. 모양이 틀리면 실패입니다.
  *
- *   tools: { allowed: [searchInFiles, readFile] }     # 이 두 개만
- *   tools: { allowed: ["*"] }                         # 등록된 Tool 전부(범용 채팅 Agent용. 다른 이름과 섞어 쓸 수 없음)
- *   (적지 않음)                                        # Tool을 쓰지 않음
+ * ■ step 타입마다 다른 점
+ *   AGENT       제약 없음. output을 적으면 그 모양으로, 안 적으면 글자로 돌려받습니다.
+ *   SUPERVISOR  답 모양을 엔진이 {pass, reason}으로 정합니다 → output, subAgents를 적으면 기동 실패.
+ *               "판정만 하라" 같은 규칙은 엔진이 넣으므로(runtime.prompt.EnginePrompt), 본문에는 판정 기준만 적습니다.
+ *   ROUTER      답 모양을 엔진이 {route, reason}으로 정합니다 → output, subAgents를 적으면 기동 실패.
+ *               route는 step의 routes 이름 중 하나여야 하니, 본문에 각 이름의 뜻을 적어 둡니다.
+ *   onInvalidOutput: RETRY는 AGENT step과 채팅에서만 쓰입니다. SUPERVISOR/ROUTER에는 적용되지 않습니다.
  *
- * 실제로 붙는 Tool은 이 목록과 caller 화이트리스트(dstone.ai.tool.allowed-by-caller)를 둘 다 통과한 것입니다.
+ * ■ model
+ *   - name: 이 Agent만 다른 모델을 쓸 때 적습니다. 지금 켜진 provider(spring.ai.model.chat)의 모델 이름이어야 합니다.
+ *   - temperature: 답의 무작위 정도(0~2).
+ *   - reasoning: 답하기 전에 속으로 따져 보는 정도(none / low / medium / high).
+ *     뽑아내기, 분류처럼 단순한 일은 none으로 끄면 빨라집니다.
+ *     끄는 값이 off가 아니라 none인 이유: YAML은 off를 false로 읽습니다.
+ *     provider마다 실제로 보내는 값은 common.config.ConfigChatClient.requestOptions()를 보세요.
  *
- * ## Sub Agent(subAgents)
- * 이 Agent의 LLM이 일을 맡길 수 있는 다른 Agent의 id 목록입니다. 맡길 Agent 하나가 LLM에게는 Tool 하나로 보입니다
- * (이름 = 그 Agent의 id, 설명 = description, 인자 = input 스키마, 답 = output). 자세한 동작은 runtime.agent.SubAgentToolCallback 참고.
- * - 맡은 Agent는 빈 대화에서 시작합니다. 부모의 프롬프트나 대화 내용은 보지 못하고, 부모가 넘긴 인자만 봅니다.
- * - 깊이는 한 단계뿐입니다. subAgents에 적힌 Agent는 자기 subAgents를 가질 수 없습니다.
- * - subAgents에 적힌 Agent는 description이 꼭 있어야 합니다(부모 LLM이 이 설명을 보고 맡길지 정합니다).
- * - SUPERVISOR/ROUTER step이 부르는 Agent는 subAgents를 가질 수 없습니다.
+ * ■ context (RAG)
+ *   sources에 retrievedDocuments를 넣으면 RAG를 씁니다.
+ *   workflowInput(부르는 쪽이 넣은 input)은 항상 들어가므로 적어도 되고 안 적어도 됩니다.
+ *   retrieval에는 topK, similarityThreshold, allowEmptyContext를 적을 수 있습니다.
  *
- * ## 실행 정책(execution)
- * - maxAttempts / onInvalidOutput: LLM의 답이 output 모양을 지키지 않았을 때 어떻게 할지입니다.
- *   onInvalidOutput: RETRY면 maxAttempts번까지 다시 부르고, FAIL(기본)이면 바로 실패입니다. 외부 연결 오류 같은 것은 다시 부르지 않습니다.
- * - timeoutSeconds: 이 Agent의 LLM 호출 한 번이 답을 기다리는 시간입니다. 적지 않으면 provider 설정값을 씁니다.
- * - maxToolCalls: 이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 횟수입니다. 적지 않으면 엔진 공통값(dstone.ai.agent.tool.max-calls)을 씁니다.
- *   prompt에 "조회는 25번 이내"라고 적어도 모델이 지키지 않을 때가 있어서, 엔진이 세고 막습니다(runtime.agent.ToolCallBudgetCallback 참고).
+ * ■ tools.allowed
+ *   tools: { allowed: [searchInFiles, readFile] }   ← 이 두 개만
+ *   tools: { allowed: ["*"] }                       ← 등록된 Tool 전부(다른 이름과 섞을 수 없음)
+ *   (안 적음)                                       ← Tool 없음
+ *   실제로 붙는 Tool은 이 목록과 caller 화이트리스트(dstone.ai.tool.allowed-by-caller)를 둘 다 통과한 것입니다.
+ *
+ * ■ subAgents
+ *   여기 적은 Agent는 LLM에게 Tool 하나로 보입니다(이름 = id, 설명 = description, 인자 = input 스키마).
+ *   - 맡은 Agent는 빈 대화에서 시작합니다. 부모의 프롬프트와 대화는 못 보고, 넘겨받은 인자만 봅니다.
+ *   - 깊이는 한 단계뿐입니다. 맡은 Agent는 자기 subAgents를 가질 수 없습니다.
+ *   자세한 동작은 runtime.agent.SubAgentToolCallback을 보세요.
+ *
+ * ■ execution
+ *   - onInvalidOutput / maxAttempts: 답이 output 모양을 어겼을 때.
+ *     RETRY면 maxAttempts번까지 다시 부르고, FAIL(기본)이면 바로 실패입니다. 연결 오류는 다시 부르지 않습니다.
+ *   - timeoutSeconds: LLM 호출 한 번의 대기 시간. 비우면 provider 설정값입니다.
+ *   - maxToolCalls: 한 번 부르는 동안 Tool을 부를 수 있는 횟수. 비우면 dstone.ai.agent.tool.max-calls입니다.
+ *     프롬프트에 "25번 이내"라고 적어도 모델이 안 지킬 때가 있어서 엔진이 직접 셉니다(runtime.agent.ToolCallBudgetCallback).
  * </pre>
  *
- * @param id             (필수)이 Agent를 식별하는 id입니다. 중복될 수 없습니다.
- * @param version        (필수)이 Agent 정의의 버전입니다(예: "1.0.0"). 프롬프트나 계약을 바꾸면 올립니다.
- * @param role           (옵셔널)사람이 읽는 역할 이름입니다. 동작에는 영향을 주지 않습니다.
- * @param description    (옵셔널)이 Agent가 무엇을 하는지 사람이 읽기 위한 설명입니다. Sub Agent로 쓰일 때는 부모 LLM이 이 설명을 봅니다.
- * @param model          (옵셔널)모델 고르기와 모델 파라미터입니다.
- * @param prompt         (필수)시스템 프롬프트 파일입니다.
- * @param input          (옵셔널)이 Agent가 받는 값의 모양입니다. 비워두면 {type: string}입니다.
- * @param output         (옵셔널)이 Agent가 돌려주는 값의 모양입니다. 비워두면 글자(TEXT)입니다.
- * @param context        (옵셔널)답할 때 참고할 자료입니다(RAG).
- * @param tools          (옵셔널)이 Agent가 쓸 수 있는 Tool입니다. 비워두면 Tool을 쓰지 않습니다.
- * @param subAgents      (옵셔널)이 Agent가 일을 맡길 수 있는 다른 Agent의 id 목록입니다. 비워두면 맡기지 않습니다.
- * @param allowedCallers (옵셔널)이 Agent를 호출할 수 있도록 허락된 caller(호출 주체, tenant) 목록입니다. 비워두면 누구나 호출할 수 있습니다.
- * @param execution      (옵셔널)다시 부르기, 응답 대기 시간, Tool 호출 한도입니다.
+ * @param id             (필수) Agent 이름입니다. 중복될 수 없습니다.
+ * @param version        (필수) 정의의 버전입니다(예: "1.0.0").
+ * @param role           사람이 읽는 역할 이름입니다. 동작에는 영향이 없습니다.
+ * @param description    무엇을 하는 Agent인지 적은 설명입니다. Sub Agent로 쓰이면 부모 LLM이 이 설명을 봅니다.
+ * @param model          모델 이름과 파라미터입니다.
+ * @param prompt         (필수) 시스템 프롬프트입니다. 로더가 파일 본문을 넣습니다.
+ * @param input          받는 값의 모양입니다. 비우면 글자(string)입니다.
+ * @param output         돌려주는 값의 모양입니다. 비우면 글자(string)입니다.
+ * @param context        답할 때 참고할 자료(RAG)입니다.
+ * @param tools          쓸 수 있는 Tool입니다. 비우면 Tool을 쓰지 않습니다.
+ * @param subAgents      일을 맡길 수 있는 다른 Agent의 id 목록입니다.
+ * @param allowedCallers 호출을 허락할 caller(tenant) 목록입니다. 비우면 누구나 부를 수 있습니다.
+ * @param execution      다시 부르기, 대기 시간, Tool 호출 한도입니다.
  */
 public record AgentDefinition(
 	String id
@@ -116,9 +123,9 @@ public record AgentDefinition(
 	, String role
 	, String description
 	, Model model
-	, Prompt prompt
+	, String prompt
 	, SchemaDefinition input
-	, Output output
+	, SchemaDefinition output
 	, Context context
 	, Tools tools
 	, List<String> subAgents
@@ -134,15 +141,6 @@ public record AgentDefinition(
 
 	/** model.reasoning에 적을 수 있는 값입니다. */
 	public static final List<String> REASONING_LEVELS = List.of("none", "low", "medium", "high");
-
-	/** output.format에 적을 수 있는 값입니다. */
-	public static final String FORMAT_JSON = "JSON";
-	public static final String FORMAT_TEXT = "TEXT";
-	public static final List<String> FORMATS = List.of(FORMAT_JSON, FORMAT_TEXT);
-
-	/** output.validation에 적을 수 있는 값입니다. 지금은 "스키마와 다르면 실패" 하나뿐입니다. */
-	public static final String VALIDATION_STRICT = "STRICT";
-	public static final List<String> VALIDATIONS = List.of(VALIDATION_STRICT);
 
 	/** execution.onInvalidOutput에 적을 수 있는 값입니다. */
 	public static final String ON_INVALID_RETRY = "RETRY";
@@ -162,43 +160,6 @@ public record AgentDefinition(
 	 * @param reasoning   추론 세기입니다(none / low / medium / high).
 	 */
 	public record Model(String name, Double temperature, String reasoning) {
-	}
-
-	/**
-	 * agent.prompt 입니다.
-	 *
-	 * @param system 시스템 프롬프트 파일의 경로입니다(definitions 폴더 기준. 예: prompts/pilot/requirement-analyzer.st).
-	 * @param text   그 파일의 내용입니다. YAML에는 적지 않습니다(YamlDefinitionLoader가 파일을 읽어 채웁니다).
-	 */
-	public record Prompt(String system, String text) {
-	}
-
-	/**
-	 * agent.output 입니다.
-	 *
-	 * @param format     JSON 또는 TEXT입니다. 적지 않으면 schema가 있을 때 JSON, 없을 때 TEXT입니다.
-	 * @param schema     답의 모양입니다(표준 JSON Schema 맵). format이 JSON일 때 필요합니다.
-	 * @param validation 답을 검사하는 방식입니다. 지금은 STRICT뿐입니다.
-	 */
-	public record Output(String format, Map<String, Object> schema, String validation) {
-
-		/**
-		 * YAML의 output 맵을 읽을 때 쓰입니다. schema는 파일에서 읽어 온 맵이거나 축약형(예: schema: string)입니다.
-		 *
-		 * @param format     답의 형식
-		 * @param schema     답의 모양(없으면 null)
-		 * @param validation 검사 방식
-		 */
-		@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
-		public static Output of(@JsonProperty("format") String format, @JsonProperty("schema") Object schema, @JsonProperty("validation") String validation) {
-			return new Output(format == null ? null : format.trim().toUpperCase(), schema == null ? null : JsonSchemaUtil.normalize(schema), validation == null ? null : validation.trim().toUpperCase());
-		}
-
-		/** 답이 JSON인지 봅니다(format을 적지 않았으면 schema가 있을 때 JSON입니다). */
-		public boolean isJson() {
-			return this.format == null ? this.schema != null : FORMAT_JSON.equals(this.format);
-		}
-
 	}
 
 	/**
@@ -239,9 +200,9 @@ public record AgentDefinition(
 	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls) {
 	}
 
-	/** 시스템 프롬프트 원문입니다(prompt.system 파일의 내용). */
+	/** 시스템 프롬프트 원문입니다(파일의 본문). */
 	public String promptText() {
-		return this.prompt == null ? null : this.prompt.text();
+		return this.prompt;
 	}
 
 	/** model.name 값입니다. 적지 않았으면 null입니다. */
@@ -333,12 +294,9 @@ public record AgentDefinition(
 		return (this.input == null ? SchemaDefinition.string() : this.input).schema();
 	}
 
-	/** 이 Agent가 돌려주는 값의 JSON Schema입니다. output을 비워뒀거나 format이 TEXT면 {type: string}입니다. */
+	/** 이 Agent가 돌려주는 값의 JSON Schema입니다. output을 비워뒀으면 {type: string}입니다. */
 	public Map<String, Object> outputSchema() {
-		if (this.output == null || !this.output.isJson() || this.output.schema() == null) {
-			return JsonSchemaUtil.string();
-		}
-		return this.output.schema();
+		return (this.output == null ? SchemaDefinition.string() : this.output).schema();
 	}
 
 }

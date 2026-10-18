@@ -17,7 +17,7 @@ import net.dstone.common.utils.StringUtil;
 /**
  * <pre>
  * MCP 서버 정보를 담아두는 등록소입니다. 
- * 로딩 순서는 YamlDefinitionLoader가 classpath:mcp/*.yml 파일들을 읽어서 McpServerDefinition으로 바꾸고, 
+ * 로딩 순서는 YamlDefinitionLoader가 classpath:definitions/mcp/**.yml 파일들을 읽어서 McpServerDefinition으로 바꾸고, 
  * 이 McpServerRegistry가 앱이 기동될 때 그것들을 한 번 모아서 보관하는 식입니다.
  *
  * WorkFlowRegistry나 AgentRegistry와 달리, 여기에는 "caller별로 이 id를 써도 되는지"를 검사하는 조회 기능이 없습니다. 
@@ -35,7 +35,7 @@ public class McpServerRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 앱이 기동될 때 한 번 호출되어, mcp/*.yml에 정의된 MCP 서버 정보를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
+	 * 앱이 기동될 때 한 번 호출되어, mcp/**.yml에 정의된 MCP 서버 정보를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
 	 * id나 transport가 비어 있는 정의가 있거나, 같은 id가 둘 이상 있으면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
 	 * </pre>
 	 */
@@ -44,7 +44,7 @@ public class McpServerRegistry extends BaseObject {
 		Map<String, McpServerDefinition> resolved = new HashMap<>();
 		for (McpServerDefinition definition : this.loader.loadMcpServers()) {
 			if (StringUtil.isEmpty(definition.id()) || definition.transport() == null) {
-				throw new IllegalStateException("mcp/*.yml 항목은 id와 transport가 모두 있어야 합니다: " + definition);
+				throw new IllegalStateException("mcp/**.yml 파일에는 id와 transport가 모두 있어야 합니다: " + definition);
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
 				throw new IllegalStateException("mcpServer id가 중복 등록되었습니다: " + definition.id());

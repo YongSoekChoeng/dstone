@@ -1,5 +1,7 @@
 package net.dstone.ai.common.consts;
 
+import java.util.List;
+
 /**
  * <pre>
  * dstone-ai-engine 전체에서 함께 쓰는 상수 값들을 한 곳에 모아둔 클래스입니다. 
@@ -50,7 +52,7 @@ public final class Constants {
 		/** 위 설정이 없을 때 쓰는 값입니다. */
 		public final static int DEFAULT_SUB_AGENT_MAX_CALLS = 10;
 
-		/** Agent 호출 한 번 안에서 Tool을 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.tool.max-calls). Agent의 maxToolCalls가 있으면 그 값이 이깁니다. */
+		/** Agent 호출 한 번 안에서 Tool을 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.tool.max-calls). Agent의 execution.maxToolCalls가 있으면 그 값이 이깁니다. */
 		public final static String TOOL_MAX_CALLS = "dstone.ai.agent.tool.max-calls";
 
 		/** 위 설정이 없을 때 쓰는 값입니다. */
@@ -92,7 +94,7 @@ public final class Constants {
 			public final static String PREFIX = "dstone.ai.tool.jenkins";
 		}
 
-		/** 파일을 읽고 쓰는 Tool(tools.utils.FileTool)의 설정 키 접두사입니다. */
+		/** 파일을 읽고 쓰는 Tool(tools.file.FileTool)의 설정 키 접두사입니다. */
 		public static final class File {
 			public final static String PREFIX = "dstone.ai.tool.file";
 		}
@@ -122,7 +124,7 @@ public final class Constants {
 		 * 컨텍스트는 아래 모양의 트리 하나이고, YAML의 "${ ... }" 표현식은 이 트리에서 input과 state를 읽습니다.
 		 *
 		 * input:      요청의 input 값 그대로(workflow.input 모양)         ← "${input}", "${input.필드}"
-		 * state:      step이 output으로 저장한 값들({ 이름: 값 })          ← "${state.이름}", "${state.이름.필드}"
+		 * state:      step이 save로 저장한 값들({ 이름: 값 })          ← "${state.이름}", "${state.이름.필드}"
 		 * approvals:  { stepId: { decision, approver, comment } }        ← 엔진 내부용 승인 결정 수신함(표현식에는 보이지 않음)
 		 * definition: { id, version }                                    ← 이 실행을 시작한 Workflow 정의의 버전(표현식에는 보이지 않음)
 		 * </pre>
@@ -130,7 +132,7 @@ public final class Constants {
 		public static final class Context {
 			/** 사용자가 Workflow를 실행할 때 넘긴 값이 들어가는 루트입니다(${input}). YAML의 workflow.input과 같은 이름입니다. */
 			public final static String INPUT = "input";
-			/** step들이 output으로 저장한 값이 이름별로 쌓이는 루트입니다(${state.이름}). */
+			/** step들이 save로 저장한 값이 이름별로 쌓이는 루트입니다(${state.이름}). */
 			public final static String STATE = "state";
 			/** APPROVAL step별로 사람이 내린 결정을 담아두는 루트입니다. 표현식에서는 보이지 않습니다. */
 			public final static String APPROVALS = "approvals";
@@ -140,14 +142,13 @@ public final class Constants {
 
 		/**
 		 * <pre>
-		 * step의 output에 적는 "무엇을 저장할지"의 이름들입니다. 값은 저장할 위치(state.이름)입니다.
+		 * step이 저장하는 "무엇"의 이름들입니다. StepDefinition.output()이 이 이름 → state 이름 맵을 만듭니다.
 		 *
-		 *   output:
-		 *     result: state.analysis           이 step이 돌려준 값 전체
-		 *     result.sql: state.sql            돌려준 값 안의 필드 하나
-		 *     input: state.sentInput           이 step이 실제로 받은 입력(input 표현식을 계산한 뒤의 값)
-		 *     error: state.analysisError       실패 사유(성공이면 null)
-		 *     items: state.copied              forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
+		 *   YAML 키                이름     저장되는 값
+		 *   save: analysis         result   이 step이 돌려준 값 전체
+		 *   saveInput: sentInput   input    이 step이 실제로 받은 입력(with 표현식을 계산한 뒤의 값)
+		 *   saveError: lastError   error    실패 사유(성공이면 null)
+		 *   saveEach: copied       items    forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
 		 * </pre>
 		 */
 		public static final class Output {
@@ -201,26 +202,29 @@ public final class Constants {
 
 	/**
 	 * <pre>
-	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 YAML 파일들을 찾을 때 쓰는
-	 * 위치 패턴입니다. 정의 파일은 모두 resources/definitions 아래에 둡니다(workflows, agents, prompts, schemas, mcp).
+	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 파일들을 찾을 때 쓰는 위치 패턴입니다.
+	 * 정의 파일은 모두 resources/definitions 아래에 두고, 종류는 폴더로 구분합니다.
+	 *   workflows/**\/*.yml            Workflow 하나에 파일 하나
+	 *   agents/**\/*.md                Agent 하나에 파일 하나(머리말 = 설정, 본문 = 시스템 프롬프트)
+	 *   mcp/**\/*.yml                  MCP 서버 하나에 파일 하나
 	 * 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서 workflows/agents/mcp 폴더
 	 * 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
-	 * prompts와 schemas도 같은 이름의 서브 디렉토리로 나눠 둡니다(예: agents/pilot ↔ prompts/pilot, schemas/pilot). 둘 다 YAML에 적힌 경로 그대로 찾습니다.
 	 * </pre>
 	 */
 	public static final class Definition {
-		/** 정의 파일을 모아 두는 맨 위 폴더입니다(classpath 기준). prompt와 schema 파일 경로는 이 폴더를 기준으로 적습니다. */
+		/** 정의 파일을 모아 두는 맨 위 폴더입니다(classpath 기준). */
 		public final static String ROOT_LOCATION = "classpath:definitions";
 		public final static String WORKFLOW_LOCATION = ROOT_LOCATION + "/workflows";
-		public final static String WORKFLOW_LOCATION_PATTERN = WORKFLOW_LOCATION + "/**/*.yml";
+		public final static String WORKFLOW_SUFFIX = ".yml";
+		public final static String WORKFLOW_LOCATION_PATTERN = WORKFLOW_LOCATION + "/**/*" + WORKFLOW_SUFFIX;
 		public final static String AGENT_LOCATION = ROOT_LOCATION + "/agents";
-		public final static String AGENT_LOCATION_PATTERN = AGENT_LOCATION + "/**/*.yml";
+		public final static String AGENT_SUFFIX = ".md";
+		public final static String AGENT_LOCATION_PATTERN = AGENT_LOCATION + "/**/*" + AGENT_SUFFIX;
 		public final static String MCP_LOCATION = ROOT_LOCATION + "/mcp";
-		public final static String MCP_LOCATION_PATTERN = MCP_LOCATION + "/**/*.yml";
-		/** agent.prompt.system에 적는 프롬프트 파일이 있어야 하는 폴더입니다(definitions 기준 상대경로의 첫 이름). */
-		public final static String PROMPT_DIR = "prompts";
-		/** input.schema / output.schema / state.schema에 적는 JSON Schema 파일이 있어야 하는 폴더입니다. */
-		public final static String SCHEMA_DIR = "schemas";
+		public final static String MCP_SUFFIX = ".yml";
+		public final static String MCP_LOCATION_PATTERN = MCP_LOCATION + "/**/*" + MCP_SUFFIX;
+		/** 정의 파일 폴더 아래에 있으면 안 되는 폴더입니다(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다). 이 안에 파일이 있으면 기동을 멈춥니다. */
+		public final static List<String> OLD_DIRS = List.of("prompts", "schemas");
 	}
 
 }

@@ -17,20 +17,11 @@ import com.networknt.schema.SpecificationVersion;
 
 /**
  * <pre>
- * 정의 파일의 JSON Schema(agents/*.yml의 input/output, workflows/*.yml의 input/state/output. 보통 schemas/ 아래 파일)를 다루는 도구 모음입니다.
- * 네 곳에서 같은 규칙을 씁니다.
- * - YAML을 읽을 때: 축약형을 표준 JSON Schema로 펼칩니다(normalize).
+ * 정의 파일의 입출력 모양(JSON Schema)을 다루는 도구 모음입니다. 정의 파일에는 짧은 표기(Picoschema)로 적고,
+ * 로더가 Picoschema.compile()로 표준 JSON Schema 맵으로 바꿔 둡니다. 이 클래스는 그 맵을 씁니다.
  * - 엔진이 켜질 때: 스키마 자체가 올바른 JSON Schema인지(checkSchema), 표현식이 읽는 경로가 스키마에 있는지(checkPath) 검사합니다.
- * - LLM을 부를 때: 스키마를 그대로 LLM에게 알려줍니다(runtime.agent.SchemaOutputConverter).
- * - 값을 받았을 때: 실제 값이 스키마에 맞는지 확인합니다(validate - Workflow 입력, Agent 입력/출력, Workflow 최종 결과).
- *
- * ## 축약형
- * 타입만 적으면 되는 자리에서는 타입 이름 하나만 적어도 됩니다. 로더가 표준 모양으로 펼쳐 줍니다.
- *   input: string                   →  input: {schema: {type: string}}
- *   properties: {name: string}      →  properties: {name: {type: string}}
- *   items: integer                  →  items: {type: integer}
- *   list<string>                    →  {type: array, items: {type: string}}
- * 축약형은 최상위, properties의 값, items 세 자리에서만 씁니다. 나머지는 표준 JSON Schema 그대로입니다.
+ * - LLM을 부를 때: 스키마를 그대로 LLM에게 알려줍니다(runtime.agent.AgentExecutor).
+ * - 값을 받았을 때: 실제 값이 스키마에 맞는지 확인합니다(validate - Workflow 입력, Agent 입력/출력).
  *
  * 값 검사는 networknt json-schema-validator(Spring AI가 이미 쓰는 라이브러리, JSON Schema 2020-12)로 합니다.
  * </pre>
@@ -47,10 +38,6 @@ public final class JsonSchemaUtil {
 	public static final String OBJECT = "object";
 	public static final String ARRAY = "array";
 
-	private static final String LIST_PREFIX = "list<";
-	private static final String LIST_SUFFIX = ">";
-	private static final List<String> TYPE_NAMES = List.of("string", "number", "integer", "boolean", "object", "array");
-
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 	private static final SchemaRegistry REGISTRY = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
 	private static final Schema META_SCHEMA = REGISTRY.getSchema(SchemaLocation.of(SpecificationVersion.DRAFT_2020_12.getDialectId()));
@@ -64,56 +51,6 @@ public final class JsonSchemaUtil {
 	/** 아무것도 선언하지 않았을 때 쓰는 기본 스키마({type: string})를 새로 만들어 돌려줍니다. */
 	public static Map<String, Object> string() {
 		return typeOnly(STRING);
-	}
-
-	/**
-	 * <pre>
-	 * YAML에 적은 스키마를 표준 JSON Schema 맵으로 펼칩니다(규칙은 클래스 설명의 "축약형" 참고).
-	 * 원본은 건드리지 않고 새 맵을 만들어 돌려줍니다.
-	 * </pre>
-	 *
-	 * @param raw YAML에서 읽은 값입니다(타입 이름 글자 또는 맵).
-	 * @throws IllegalArgumentException 알 수 없는 타입 이름이거나, 글자도 맵도 아닐 때
-	 */
-	@SuppressWarnings("unchecked")
-	public static Map<String, Object> normalize(Object raw) {
-		if (raw instanceof String typeName) {
-			return shorthand(typeName.strip());
-		}
-		if (!(raw instanceof Map)) {
-			throw new IllegalArgumentException("스키마는 타입 이름(예: string) 또는 JSON Schema 맵이어야 합니다: " + raw);
-		}
-		Map<String, Object> schema = new LinkedHashMap<>((Map<String, Object>) raw);
-		Object properties = schema.get(PROPERTIES);
-		if (properties instanceof Map) {
-			Map<String, Object> expanded = new LinkedHashMap<>();
-			for (Map.Entry<String, Object> entry : ((Map<String, Object>) properties).entrySet()) {
-				expanded.put(entry.getKey(), normalize(entry.getValue()));
-			}
-			schema.put(PROPERTIES, expanded);
-		}
-		Object items = schema.get(ITEMS);
-		if (items instanceof String || items instanceof Map) {
-			schema.put(ITEMS, normalize(items));
-		}
-		return schema;
-	}
-
-	/**
-	 * 타입 이름 하나(축약형)를 JSON Schema 맵으로 바꿉니다. list<T>는 T 항목의 array입니다.
-	 *
-	 * @param typeName 타입 이름입니다.
-	 */
-	private static Map<String, Object> shorthand(String typeName) {
-		if (typeName.startsWith(LIST_PREFIX) && typeName.endsWith(LIST_SUFFIX)) {
-			Map<String, Object> schema = typeOnly(ARRAY);
-			schema.put(ITEMS, shorthand(typeName.substring(LIST_PREFIX.length(), typeName.length() - LIST_SUFFIX.length()).strip()));
-			return schema;
-		}
-		if (!TYPE_NAMES.contains(typeName)) {
-			throw new IllegalArgumentException("알 수 없는 타입 이름입니다: " + typeName + " (쓸 수 있는 이름 = " + TYPE_NAMES + ", list<타입>)");
-		}
-		return typeOnly(typeName);
 	}
 
 	/**
@@ -191,7 +128,10 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * 스키마의 최상위 type을 돌려줍니다. type이 없거나 글자 하나가 아니면(예: ["string", "null"]) null입니다.
+	 * <pre>
+	 * 스키마의 최상위 type을 돌려줍니다. type이 없으면(any, enum) null입니다.
+	 * 없어도 되는 필드는 type이 ["string", "null"]처럼 null을 함께 받는 모양이라(Picoschema의 이름?), 그때는 null이 아닌 쪽을 돌려줍니다.
+	 * </pre>
 	 *
 	 * @param schema 볼 스키마입니다(null이면 null).
 	 */
@@ -200,7 +140,17 @@ public final class JsonSchemaUtil {
 			return null;
 		}
 		Object type = schema.get(TYPE);
-		return type instanceof String text ? text : null;
+		if (type instanceof String text) {
+			return text;
+		}
+		if (type instanceof List<?> types && types.size() == 2 && types.contains("null")) {
+			for (Object one : types) {
+				if (!"null".equals(one)) {
+					return String.valueOf(one);
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -242,7 +192,7 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * 리스트 스키마를 만듭니다. forEach step의 output처럼 "항목마다 같은 모양"인 값을 표현할 때 씁니다.
+	 * 리스트 스키마를 만듭니다. forEach step의 결과처럼 "항목마다 같은 모양"인 값을 표현할 때 씁니다.
 	 *
 	 * @param items 항목 하나의 스키마입니다(모르면 null).
 	 */
@@ -363,7 +313,7 @@ public final class JsonSchemaUtil {
 		return messages;
 	}
 
-	/** SUPERVISOR step의 output 모양입니다: {pass: boolean, reason: string} */
+	/** SUPERVISOR step의 결과 모양입니다: {pass: boolean, reason: string} */
 	public static Map<String, Object> verdict() {
 		Map<String, Object> properties = new LinkedHashMap<>();
 		properties.put("pass", field("boolean", "통과면 true, 통과하지 못했으면 false"));
@@ -372,7 +322,7 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * ROUTER step의 output 모양입니다: {route: string, reason: string}. route는 routes 이름 중 하나만 허용합니다(enum).
+	 * ROUTER step의 결과 모양입니다: {route: string, reason: string}. route는 routes 이름 중 하나만 허용합니다(enum).
 	 *
 	 * @param routes 고를 수 있는 경로 이름들입니다(ROUTER step의 routes 키).
 	 */
@@ -386,7 +336,7 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * APPROVAL step의 output 모양입니다: {decision: string, approver: string, comment: string}.
+	 * APPROVAL step의 결과 모양입니다: {decision: string, approver: string, comment: string}.
 	 * decision은 routes 이름 중 하나입니다(enum).
 	 *
 	 * @param routes 고를 수 있는 결정 이름들입니다(APPROVAL step의 routes 키).

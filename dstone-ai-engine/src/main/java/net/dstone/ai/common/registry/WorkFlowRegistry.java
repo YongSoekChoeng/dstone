@@ -54,31 +54,31 @@ import net.dstone.common.utils.StringUtil;
  * 1) 기본 구조(오류)
  *    - id, version, steps가 있는가, Workflow id와 step id가 중복되지 않는가
  *    - step id가 영문/숫자/밑줄로만 되어 있는가, 예약어(END/FAIL)가 아닌가
- *    - input / state / output의 schema가 올바른 JSON Schema인가
+ *    - input이 올바른 JSON Schema로 바뀌었는가, state에 선언한 이름이 쓸 수 있는 모양인가
  *    - settings의 값이 쓸 수 있는 값인가(checkpoint: true, onError: STOP, maxIterations 1 이상)
  * 2) 흐름(오류): next/onFailure/routes가 가리키는 곳이 이 Workflow의 step id이거나 END/FAIL인가
  * 3) step 모양(오류, validateStepShape): 부르는 대상의 계약과 맞는가
  *    - 부르는 대상(agent/tool)이 적혀 있는가, agent가 등록된 Agent인가
- *    - AGENT/SUPERVISOR/ROUTER: input이 있는가, 모양이 Agent input과 맞는가(string이면 값 하나, object면 맵 + 필드 이름)
+ *    - AGENT/SUPERVISOR/ROUTER: with가 있는가, 모양이 Agent input과 맞는가(string이면 값 하나, object면 맵 + 필드 이름)
  *    - SUPERVISOR/ROUTER: 부르는 Agent가 output을 선언하지 않았는가(답의 모양은 엔진이 정함), subAgents를 가지지 않았는가
  *                         (경고) tools.allowed: ["*"]로 Tool을 전부 열어 두지 않았는가
- *    - TOOL: input의 인자 이름이 Tool의 인자 스키마와 맞는가(Tool을 찾지 못하면 경고만 남기고 실행 중에 검사)
+ *    - TOOL: with의 인자 이름이 Tool의 인자 스키마와 맞는가(Tool을 찾지 못하면 경고만 남기고 실행 중에 검사)
  *    - ROUTER/APPROVAL: routes가 최소 1개 있는가(APPROVAL은 approval.rejectTo만 있어도 됨)
  *    - memory: true와 forEach를 함께 쓰지 않았는가, forEach가 값 전체가 표현식 하나인가
- * 4) 저장 위치(validateOutput): step의 output(무엇 → state.이름)에 대해
- *    - (오류) 왼쪽이 result / result.필드 / input / input.필드 / error 중 하나인가
- *    - (오류) 오른쪽이 state.이름 모양인가
- *    - (경고) state.schema를 적었으면 그 이름이 스키마에 있는가, result.필드가 그 step이 돌려주는 모양에 있는가
- * 5) 표현식(validateTemplate): step input, forEach, Workflow output.value 안의 모든 값에 대해
- *    - (오류) 예전 문법({{ }}, "${ .steps.id.output }" 같은 jq 식)이 없는가, 경로 모양이 맞는가
- *    - (오류) 읽는 곳이 input / state / forEach 변수 중 하나인가(변수는 forEach step의 input 안에서만)
- *    - (오류) ${state.이름}을 저장하는 step이 이 Workflow에 있는가
- *    - (오류) 그 값을 저장하는 step이, 흐름상 읽는 step보다 먼저 실행될 수 있는가
- *             (예: 첫 step이 뒤 step의 결과를 읽으면 항상 null이므로 막습니다. 재시도 루프처럼 되돌아오는 흐름이면 허용)
- *    - (경고) 그 뒤의 필드가 스키마에 있는가(${input.필드} → Workflow input, ${state.이름.필드} → state.schema 또는 저장한 step의 결과 모양)
+ * 4) 저장(validateOutput, 오류): step의 save / saveError / saveInput / saveEach에 대해
+ *    - 이름이 state:에 선언되어 있는가(state.이름이 아니라 이름만 적었는가)
+ *    - saveEach는 forEach step에만 있는가
+ *    - state:에 선언한 이름마다 저장하는 step이 하나 이상 있는가
+ * 5) 표현식(validateTemplate, 오류): step with, forEach, Workflow return 안의 모든 값에 대해
+ *    - 쓰지 않는 문법({{ }}, "${ .steps.id.output }" 같은 jq 식)이 없는가, 경로 모양이 맞는가
+ *    - 읽는 곳이 input / state / forEach 변수 중 하나인가(변수는 forEach step의 with 안에서만)
+ *    - ${state.이름}의 이름이 state:에 선언되어 있고, 그 이름에 저장하는 step이 흐름상 읽는 step보다 먼저 실행될 수 있는가
+ *      (예: 첫 step이 뒤 step의 결과를 읽으면 항상 null이므로 막습니다. 재시도 루프처럼 되돌아오는 흐름이면 허용)
+ *    - 그 뒤의 필드가 그 값의 모양에 있는가(${input.필드} → Workflow input, ${state.이름.필드} → 저장한 step의 결과 모양.
+ *      저장하는 step이 여럿이거나 모양을 알 수 없으면(TOOL, any) 확인하지 않습니다)
  *
- *   step 종류        result 스키마
- *   AGENT            부르는 Agent의 output(agents/*.yml, 비워두면 string)
+ *   step 종류        저장되는 결과(save)의 모양
+ *   AGENT            부르는 Agent의 output(agents/**.md, 비워두면 string)
  *   SUPERVISOR       {pass, reason}                (common.schema.JsonSchemaUtil)
  *   ROUTER           {route, reason}
  *   APPROVAL         {decision, approver, comment}
@@ -95,8 +95,8 @@ public class WorkFlowRegistry extends BaseObject {
 	/** 치환되지 않고 남은 ${VAR} 환경변수 모양입니다. 표현식이 아니라 설정 누락이라는 안내를 주기 위해 알아봅니다. */
 	private static final Pattern UNRESOLVED_ENV = Pattern.compile("[A-Z0-9_]+");
 
-	/** step의 output 왼쪽에 적을 수 있는 이름들입니다(result.필드처럼 그 아래 필드를 이어 적을 수 있습니다). */
-	private static final List<String> OUTPUT_SOURCES = List.of(Output.RESULT, Output.INPUT, Output.ERROR, Output.ITEMS);
+	/** state 이름으로 쓸 수 있는 모양입니다(영문/숫자/밑줄). 표현식에서 ${state.이름}으로 읽기 때문입니다. */
+	private static final Pattern STATE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
 	@Autowired
 	private YamlDefinitionLoader loader;
@@ -111,14 +111,14 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step 하나가 state의 한 자리에 값을 저장한다는 사실입니다(step의 output 한 줄).
+	 * step 하나가 state의 한 이름에 값을 저장한다는 사실입니다(step의 save / saveError / saveInput / saveEach 한 줄).
 	 * </pre>
 	 *
 	 * @param step   저장하는 step
-	 * @param source 무엇을 저장하는지(result, result.필드, input, error를 이름 목록으로 나눈 것)
-	 * @param target state 아래 어디에 저장하는지(이름 목록)
+	 * @param source 무엇을 저장하는지(result, error, input, items)
+	 * @param target 저장하는 state 이름
 	 */
-	private record StateWrite(StepDefinition step, List<String> source, List<String> target) {
+	private record StateWrite(StepDefinition step, String source, String target) {
 	}
 
 	/**
@@ -132,7 +132,7 @@ public class WorkFlowRegistry extends BaseObject {
 		Map<String, WorkFlowDefinition> resolved = new HashMap<>();
 		for (WorkFlowDefinition definition : this.loader.loadWorkflows()) {
 			if (StringUtil.isEmpty(definition.id()) || definition.steps() == null || definition.steps().isEmpty()) {
-				throw new IllegalStateException("workflows/*.yml 항목은 id와 steps가 모두 있어야 합니다: " + definition);
+				throw new IllegalStateException("workflows/**.yml 파일에는 id와 steps가 모두 있어야 합니다: " + definition);
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
 				throw new IllegalStateException("workflow id가 중복 등록되었습니다: " + definition.id());
@@ -156,16 +156,10 @@ public class WorkFlowRegistry extends BaseObject {
 		if (StringUtil.isEmpty(definition.version())) {
 			throw this.error(definition, null, "version이 있어야 합니다. 예: version: \"1.0.0\"");
 		}
-		this.checkSchema(definition, "input.schema", definition.inputSchema());
-		if (definition.stateSchema() != null) {
-			this.checkSchema(definition, "state.schema", definition.stateSchema());
-		}
-		if (definition.output() != null) {
-			if (definition.output().value() == null) {
-				throw this.error(definition, null, "output을 적었으면 output.value가 있어야 합니다(최종 결과로 무엇을 돌려줄지). 예: output: {value: \"${state.result}\"} (output을 지우면 state 전체를 돌려줍니다)");
-			}
-			if (definition.output().schema() != null) {
-				this.checkSchema(definition, "output.schema", definition.output().schema());
+		this.checkSchema(definition, "input", definition.inputSchema());
+		for (String name : definition.stateNames().keySet()) {
+			if (!STATE_NAME.matcher(name).matches()) {
+				throw this.error(definition, null, "state의 '" + name + "' - state 이름은 영문, 숫자, 밑줄(_)만 쓸 수 있습니다(표현식에서 ${state.이름}으로 읽습니다).");
 			}
 		}
 		this.checkSettings(definition);
@@ -182,12 +176,13 @@ public class WorkFlowRegistry extends BaseObject {
 		for (StepDefinition step : definition.steps()) {
 			this.validateStepShape(definition, step);
 		}
-		// 4. 저장 위치(step.output)
+		// 4. 저장(step.save...)
 		List<StateWrite> writes = new ArrayList<>();
 		for (StepDefinition step : definition.steps()) {
 			writes.addAll(this.validateOutput(definition, step));
 		}
-		// 5. 표현식(step.input, step.forEach, workflow.output.value)
+		this.checkStateUsed(definition, writes);
+		// 5. 표현식(step.with, step.forEach, workflow.return)
 		for (StepDefinition step : definition.steps()) {
 			String forEach = StepDefinition.forEachOf(step);
 			List<String> itemVariables = new ArrayList<>();
@@ -195,16 +190,16 @@ public class WorkFlowRegistry extends BaseObject {
 				this.validateTemplate(definition, nextSteps, writes, step, "forEach", forEach, itemVariables);
 				itemVariables.add(StepDefinition.itemKeyOf(step));
 			}
-			this.validateTemplate(definition, nextSteps, writes, step, "input", this.inputOf(step), itemVariables);
+			this.validateTemplate(definition, nextSteps, writes, step, "with", this.inputOf(step), itemVariables);
 		}
-		if (definition.output() != null) {
-			this.validateTemplate(definition, nextSteps, writes, null, "output.value", definition.output().value(), List.of());
+		if (definition.returnValue() != null) {
+			this.validateTemplate(definition, nextSteps, writes, null, "return", definition.returnValue(), List.of());
 		}
 	}
 
 	/**
 	 * <pre>
-	 * Workflow의 input/state/output 스키마가 올바른 JSON Schema인지 검사합니다.
+	 * Workflow의 input 스키마가 올바른 JSON Schema인지 검사합니다.
 	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
@@ -214,7 +209,7 @@ public class WorkFlowRegistry extends BaseObject {
 	private void checkSchema(WorkFlowDefinition definition, String where, Map<String, Object> schema) {
 		List<String> problems = JsonSchemaUtil.checkSchema(schema);
 		if (!problems.isEmpty()) {
-			throw this.error(definition, null, where + "가 올바른 JSON Schema가 아닙니다: " + problems);
+			throw this.error(definition, null, where + "가 올바른 JSON Schema로 바뀌지 않았습니다: " + problems);
 		}
 	}
 
@@ -354,7 +349,7 @@ public class WorkFlowRegistry extends BaseObject {
 		String forEach = StepDefinition.forEachOf(step);
 		if (forEach != null) {
 			if (!ContextResolver.isWholeExpression(forEach)) {
-				throw this.error(definition, step, "forEach는 리스트를 가리키는 표현식 하나로 적습니다. 예: forEach: \"${input.sqlList}\"");
+				throw this.error(definition, step, "forEach는 리스트를 가리키는 표현식 하나로 적습니다. 예: forEach: ${input.sqlList}");
 			}
 			if (!STEP_ID.matcher(StepDefinition.itemKeyOf(step)).matches()) {
 				throw this.error(definition, step, "itemVariable은 영문, 숫자, 밑줄(_)만 쓸 수 있습니다(표현식에서 ${" + StepDefinition.itemKeyOf(step) + "}로 읽기 때문입니다).");
@@ -409,34 +404,34 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param definition       검사 중인 Workflow 정의
 	 * @param step             검사할 step
 	 * @param agentId          부를 Agent id
-	 * @param input            step의 input
+	 * @param input            step의 with
 	 * @param engineOwnsOutput 답의 모양을 엔진이 정하는 step(SUPERVISOR/ROUTER)인지 여부
 	 */
 	private void checkAgentCall(WorkFlowDefinition definition, StepDefinition step, String agentId, Object input, boolean engineOwnsOutput) {
 		AgentDefinition agent = this.agentRegistry.find(agentId);
 		if (agent == null) {
-			throw this.error(definition, step, "agents/*.yml에 '" + agentId + "' Agent가 없습니다.");
+			throw this.error(definition, step, "agents/**.md에 '" + agentId + "' Agent가 없습니다.");
 		}
 		if (engineOwnsOutput && agent.declaresOutput()) {
 			throw this.error(definition, step, step.type() + " step이 부르는 agent[" + agentId + "]는 output을 선언하지 않습니다(답의 모양은 엔진이 "
-				+ (step instanceof RouterStepDefinition ? "{route, reason}" : "{pass, reason}") + "으로 정합니다). agents/*.yml에서 output을 지우십시오.");
+				+ (step instanceof RouterStepDefinition ? "{route, reason}" : "{pass, reason}") + "으로 정합니다). 그 Agent 파일에서 output을 지우십시오.");
 		}
 		if (engineOwnsOutput && !agent.subAgentIds().isEmpty()) {
 			throw this.error(definition, step, step.type() + " step이 부르는 agent[" + agentId + "]는 subAgents를 가질 수 없습니다"
-				+ "(판정이나 분류만 하는 Agent는 다른 Agent에게 일을 맡기지 않습니다). AGENT step으로 바꾸거나 agents/*.yml에서 subAgents를 지우십시오.");
+				+ "(판정이나 분류만 하는 Agent는 다른 Agent에게 일을 맡기지 않습니다). AGENT step으로 바꾸거나 그 Agent 파일에서 subAgents를 지우십시오.");
 		}
 		if (engineOwnsOutput && agent.allowsAllTools()) {
 			this.warn(definition, step, step.type() + " step이 부르는 agent[" + agentId + "]가 tools.allowed: [\"*\"]로 등록된 Tool을 전부 쓸 수 있습니다. 판정이나 분류에 필요한 Tool만 이름으로 적는 것이 안전합니다.");
 		}
 		if (input == null) {
-			throw this.error(definition, step, "input이 있어야 합니다(Agent에게 무엇을 넣을지). 예: input: \"${input}\" 또는 input: \"${state.앞에서저장한이름}\"");
+			throw this.error(definition, step, "with가 있어야 합니다(Agent에게 무엇을 넣을지). 예: with: ${input} 또는 with: ${state.앞에서저장한이름}");
 		}
 		this.checkInputShape(definition, step, "agent[" + agentId + "]의 input", agent.inputSchema(), input);
 	}
 
 	/**
 	 * <pre>
-	 * step의 input이 부르는 대상의 input 스키마 모양과 맞는지 봅니다.
+	 * step의 with가 부르는 대상의 input 스키마 모양과 맞는지 봅니다.
 	 * - string: 값 하나(표현식 또는 글자)여야 합니다.
 	 * - object: 맵이어야 하고, properties에 없는 이름을 쓰거나 required 이름을 빠뜨리면 안 됩니다.
 	 * - array: 리스트여야 합니다.
@@ -447,7 +442,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param step       검사할 step
 	 * @param owner      계약의 주인(오류 문장에 씁니다. 예: agent[x]의 input)
 	 * @param schema     부르는 대상의 input 스키마
-	 * @param input      step의 input
+	 * @param input      step의 with
 	 */
 	@SuppressWarnings("unchecked")
 	private void checkInputShape(WorkFlowDefinition definition, StepDefinition step, String owner, Map<String, Object> schema, Object input) {
@@ -456,29 +451,29 @@ public class WorkFlowRegistry extends BaseObject {
 		}
 		String type = JsonSchemaUtil.typeOf(schema);
 		if (JsonSchemaUtil.STRING.equals(type) && !(input instanceof String)) {
-			throw this.error(definition, step, owner + "이 string이라 step의 input은 값 하나로 적어야 합니다. 예: input: \"${input}\"");
+			throw this.error(definition, step, owner + "이 string이라 step의 with는 값 하나로 적어야 합니다. 예: with: ${input}");
 		}
 		if (JsonSchemaUtil.ARRAY.equals(type) && !(input instanceof List)) {
-			throw this.error(definition, step, owner + "이 array라 step의 input은 리스트(또는 리스트를 가리키는 표현식)로 적어야 합니다.");
+			throw this.error(definition, step, owner + "이 array라 step의 with는 리스트(또는 리스트를 가리키는 표현식)로 적어야 합니다.");
 		}
 		if (!JsonSchemaUtil.OBJECT.equals(type)) {
 			return;
 		}
 		if (!(input instanceof Map)) {
-			throw this.error(definition, step, owner + "이 object라 step의 input은 맵으로 적어야 합니다(필드마다 표현식 또는 리터럴). 예: input: {필드: \"${input}\"}");
+			throw this.error(definition, step, owner + "이 object라 step의 with는 맵으로 적어야 합니다(필드마다 표현식 또는 리터럴). 예: with: {필드: \"${input}\"}");
 		}
 		Map<String, Object> fields = (Map<String, Object>) input;
 		Map<String, Object> properties = JsonSchemaUtil.properties(schema);
 		if (properties != null && !JsonSchemaUtil.allowsExtraProperties(schema)) {
 			for (String name : fields.keySet()) {
 				if (!properties.containsKey(name)) {
-					throw this.error(definition, step, "input의 '" + name + "'는 " + owner + "에 없는 이름입니다(쓸 수 있는 이름 = " + properties.keySet() + ").");
+					throw this.error(definition, step, "with의 '" + name + "'는 " + owner + "에 없는 이름입니다(쓸 수 있는 이름 = " + properties.keySet() + ").");
 				}
 			}
 		}
 		for (String name : JsonSchemaUtil.required(schema)) {
 			if (!fields.containsKey(name)) {
-				throw this.error(definition, step, "input에 '" + name + "'가 빠졌습니다(" + owner + "의 필수 이름 = " + JsonSchemaUtil.required(schema) + ").");
+				throw this.error(definition, step, "with에 '" + name + "'가 빠졌습니다(" + owner + "의 필수 이름 = " + JsonSchemaUtil.required(schema) + ").");
 			}
 		}
 	}
@@ -506,7 +501,7 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step의 input을 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 값 하나나 맵, TOOL은 맵이고, APPROVAL은 input이 없어서 null입니다.
+	 * step의 with를 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 값 하나나 맵, TOOL은 맵이고, APPROVAL은 with가 없어서 null입니다.
 	 * </pre>
 	 *
 	 * @param step input을 꺼낼 step
@@ -528,7 +523,7 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step의 output(무엇 → state.이름)을 검사하고, 이 step이 state의 어느 자리에 무엇을 저장하는지 목록으로 돌려줍니다(클래스 설명의 4번).
+	 * step의 save / saveError / saveInput / saveEach를 검사하고, 이 step이 state의 어느 이름에 무엇을 저장하는지 목록으로 돌려줍니다(클래스 설명의 4번).
 	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
@@ -536,58 +531,77 @@ public class WorkFlowRegistry extends BaseObject {
 	 */
 	private List<StateWrite> validateOutput(WorkFlowDefinition definition, StepDefinition step) {
 		List<StateWrite> writes = new ArrayList<>();
-		if (step.output() == null) {
-			return writes;
-		}
 		for (Map.Entry<String, String> entry : step.output().entrySet()) {
-			String sourceText = entry.getKey() == null ? "" : entry.getKey().strip();
-			List<String> source = List.of(sourceText.split("\\."));
-			if (sourceText.isEmpty() || !OUTPUT_SOURCES.contains(source.get(0)) || sourceText.endsWith(".") || sourceText.contains("..")) {
-				throw this.error(definition, step, "output의 '" + entry.getKey() + "'는 저장할 수 없는 이름입니다. result(돌려준 값), result.필드, input(받은 입력), input.필드, error(실패 사유), items(forEach step의 반복별 묶음) 중에서 적으십시오."
-					+ " 예: output: {result: state.analysis}");
+			String key = this.saveKeyOf(entry.getKey());
+			String name = entry.getValue();
+			if (name.startsWith(Context.STATE + ".")) {
+				throw this.error(definition, step, key + ": " + name + " - state.은 붙이지 않고 이름만 적습니다. 예: " + key + ": " + name.substring(Context.STATE.length() + 1));
 			}
-			if (Output.ERROR.equals(source.get(0)) && source.size() > 1) {
-				throw this.error(definition, step, "output의 '" + entry.getKey() + "' - error는 글자라서 그 아래 필드를 적을 수 없습니다.");
+			if (!STATE_NAME.matcher(name).matches()) {
+				throw this.error(definition, step, key + ": " + name + " - state 이름은 영문, 숫자, 밑줄(_)만 쓸 수 있습니다.");
 			}
-			if (Output.ITEMS.equals(source.get(0)) && (source.size() > 1 || StepDefinition.forEachOf(step) == null)) {
-				throw this.error(definition, step, "output의 '" + entry.getKey() + "' - items는 forEach가 있는 step에서만, 통째로만 저장할 수 있습니다."
-					+ " 반복마다 {item, input, result, error, success}가 한 건씩 담깁니다. 예: output: {items: state.copied}");
+			if (!definition.stateNames().containsKey(name)) {
+				throw this.error(definition, step, key + ": " + name + " - state:에 선언하지 않은 이름입니다. Workflow 맨 위 state:에 '" + name + ": 설명'을 적으십시오"
+					+ " (지금 선언된 이름 = " + definition.stateNames().keySet() + ").");
 			}
-			List<String> target;
-			try {
-				target = ContextResolver.statePath(entry.getValue());
-			} catch (ExpressionException e) {
-				throw this.error(definition, step, "output." + entry.getKey() + " - " + e.getMessage());
+			if (Output.ITEMS.equals(entry.getKey()) && StepDefinition.forEachOf(step) == null) {
+				throw this.error(definition, step, "saveEach는 forEach가 있는 step에서만 씁니다(반복마다 {item, input, result, error, success}가 한 건씩 담깁니다).");
 			}
-			String problem = JsonSchemaUtil.checkPath(definition.stateSchema(), Context.STATE, target);
-			if (problem != null) {
-				this.warn(definition, step, "output." + entry.getKey() + ": " + entry.getValue() + " - " + problem + " 이 이름들은 workflow.state.schema가 정합니다.");
-			}
-			Map<String, Object> sourceSchema = Output.RESULT.equals(source.get(0)) ? this.outputSchemaOf(step) : (Output.INPUT.equals(source.get(0)) ? this.inputSchemaOf(step) : null);
-			if (Output.INPUT.equals(source.get(0)) && step instanceof ApprovalStepDefinition) {
-				this.warn(definition, step, "output." + entry.getKey() + " - APPROVAL step에는 input이 없어서 항상 null이 저장됩니다.");
-			}
-			problem = JsonSchemaUtil.checkPath(sourceSchema, source.get(0), source.subList(1, source.size()));
-			if (problem != null) {
-				this.warn(definition, step, "output." + entry.getKey() + " - " + problem);
-			}
-			writes.add(new StateWrite(step, source, target));
+			writes.add(new StateWrite(step, entry.getKey(), name));
 		}
 		return writes;
 	}
 
 	/**
 	 * <pre>
-	 * 템플릿(step.input, step.forEach, workflow.output.value) 하나를 검사합니다(클래스 설명의 5번).
-	 * 1) 글자마다: 예전 문법({{ }})이 없는지 봅니다.
+	 * state:에 선언한 이름마다 저장하는 step이 있는지 봅니다. 아무도 저장하지 않는 이름은 오타이거나 지운 step의 흔적입니다.
+	 * </pre>
+	 *
+	 * @param definition 검사 중인 Workflow 정의
+	 * @param writes     이 Workflow의 step들이 state에 저장하는 이름 전부
+	 */
+	private void checkStateUsed(WorkFlowDefinition definition, List<StateWrite> writes) {
+		Set<String> written = new HashSet<>();
+		for (StateWrite write : writes) {
+			written.add(write.target());
+		}
+		for (String name : definition.stateNames().keySet()) {
+			if (!written.contains(name)) {
+				throw this.error(definition, null, "state의 '" + name + "'에 저장하는 step이 없습니다. 저장할 step에 'save: " + name + "'를 적거나, state:에서 지우십시오.");
+			}
+		}
+	}
+
+	/**
+	 * 저장 매핑의 왼쪽(result, error, input, items)을 YAML 키 이름(save, saveError, saveInput, saveEach)으로 바꿉니다. 오류 문장에 씁니다.
+	 *
+	 * @param source 무엇을 저장하는지
+	 */
+	private String saveKeyOf(String source) {
+		switch (source) {
+			case Output.ERROR:
+				return "saveError";
+			case Output.INPUT:
+				return "saveInput";
+			case Output.ITEMS:
+				return "saveEach";
+			default:
+				return "save";
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 템플릿(step.with, step.forEach, workflow.return) 하나를 검사합니다(클래스 설명의 5번).
+	 * 1) 글자마다: 쓰지 않는 문법({{ }})이 없는지 봅니다.
 	 * 2) 표현식마다: 경로 모양과 읽는 곳을 확인하고(ContextResolver), 읽는 경로를 검사합니다(checkReference).
 	 * </pre>
 	 *
 	 * @param definition     검사 중인 Workflow 정의
 	 * @param nextSteps      step id → 다음에 갈 수 있는 step id들
 	 * @param writes         이 Workflow의 step들이 state에 저장하는 자리 전부
-	 * @param owner          이 템플릿이 들어 있는 step(Workflow output이면 null)
-	 * @param where          이 템플릿의 자리 이름(오류 문장에 씁니다. 예: input, forEach)
+	 * @param owner          이 템플릿이 들어 있는 step(Workflow return이면 null)
+	 * @param where          이 템플릿의 자리 이름(오류 문장에 씁니다. 예: with, forEach)
 	 * @param template       검사할 템플릿
 	 * @param variableNames  이 자리에서 쓸 수 있는 forEach 변수 이름들
 	 */
@@ -595,12 +609,12 @@ public class WorkFlowRegistry extends BaseObject {
 			StepDefinition owner, String where, Object template, List<String> variableNames) {
 		for (String text : this.texts(template)) {
 			if (text.contains("{{")) {
-				throw this.error(definition, owner, where + "의 '" + text + "' - {{ }} 문법은 쓰지 않습니다. 예: \"${state.이름}\", \"${input}\", \"${item}\"");
+				throw this.error(definition, owner, where + "의 '" + text + "' - {{ }} 문법은 쓰지 않습니다. 예: ${state.이름}, ${input}, ${item}");
 			}
 			if (text.contains("${ .") || text.contains("${.") || text.contains("${ $") || text.contains("${$")) {
 				throw this.error(definition, owner, where + "의 '" + this.shorten(text) + "' - jq 표현식은 더 이상 쓰지 않습니다. 표현식은 값을 읽어 오는 경로만 적습니다."
-					+ " 예: \"${input}\", \"${state.이름.필드}\", \"${item.필드}\", 없을 때 기본값은 \"${state.이름:기본값}\"."
-					+ " 앞 step의 결과는 그 step의 output으로 state에 저장한 뒤 읽고(output: {result: state.이름}), 계산이나 조건은 Tool로 만드십시오.");
+					+ " 예: ${input}, ${state.이름.필드}, ${item.필드}, 없을 때 기본값은 ${state.이름:기본값}."
+					+ " 앞 step의 결과는 그 step의 save로 state에 저장한 뒤 읽고(save: 이름), 계산이나 조건은 Tool로 만드십시오.");
 			}
 		}
 		List<ContextResolver.Reference> references;
@@ -615,7 +629,7 @@ public class WorkFlowRegistry extends BaseObject {
 			}
 			String problem = ContextResolver.check(reference, variableNames);
 			if (problem != null) {
-				String hint = variableNames.isEmpty() ? " forEach 변수(${item})는 forEach step의 input 안에서만 씁니다." : "";
+				String hint = variableNames.isEmpty() ? " forEach 변수(${item})는 forEach step의 with 안에서만 씁니다." : "";
 				throw this.error(definition, owner, where + "의 " + problem + hint);
 			}
 			this.checkReference(definition, nextSteps, writes, owner, where, reference);
@@ -624,14 +638,13 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 표현식이 읽는 경로 하나를 검사합니다(클래스 설명의 5번).
-	 * 저장하는 step이 없거나 실행 순서가 맞지 않으면 오류이고, 스키마에 없는 필드는 경고입니다.
+	 * 표현식이 읽는 경로 하나를 검사합니다(클래스 설명의 5번). 문제가 있으면 모두 오류입니다.
 	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
 	 * @param nextSteps  step id → 다음에 갈 수 있는 step id들
-	 * @param writes     이 Workflow의 step들이 state에 저장하는 자리 전부
-	 * @param owner      이 경로를 읽는 step(Workflow output이면 null)
+	 * @param writes     이 Workflow의 step들이 state에 저장하는 이름 전부
+	 * @param owner      이 경로를 읽는 step(Workflow return이면 null)
 	 * @param where      표현식의 자리 이름
 	 * @param reference  검사할 표현식
 	 */
@@ -642,7 +655,7 @@ public class WorkFlowRegistry extends BaseObject {
 		if (Context.INPUT.equals(reference.root())) {
 			String problem = JsonSchemaUtil.checkPath(definition.inputSchema(), Context.INPUT, path);
 			if (problem != null) {
-				this.warn(definition, owner, prefix + problem + " 이 값의 모양은 workflow.input이 정합니다.");
+				throw this.error(definition, owner, prefix + problem + " 이 값의 모양은 Workflow의 input이 정합니다.");
 			}
 			return;
 		}
@@ -650,20 +663,15 @@ public class WorkFlowRegistry extends BaseObject {
 			// forEach 변수(${item...})와 state 전체(${state})는 더 볼 것이 없습니다.
 			return;
 		}
-		// 이 경로에 값을 넣는 step들: 저장 위치가 읽는 경로의 앞부분이거나(state.a를 저장, state.a.b를 읽음), 그 반대(state.a.b를 저장, state.a를 읽음)
+		String name = path.get(0);
+		if (!definition.stateNames().containsKey(name)) {
+			throw this.error(definition, owner, prefix + "'" + name + "'는 state:에 선언하지 않은 이름입니다(선언된 이름 = " + definition.stateNames().keySet() + ").");
+		}
 		List<StateWrite> writers = new ArrayList<>();
 		for (StateWrite write : writes) {
-			if (this.isPrefix(write.target(), path) || this.isPrefix(path, write.target())) {
+			if (write.target().equals(name)) {
 				writers.add(write);
 			}
-		}
-		if (writers.isEmpty()) {
-			Set<String> saved = new java.util.TreeSet<>();
-			for (StateWrite write : writes) {
-				saved.add(Context.STATE + "." + String.join(".", write.target()));
-			}
-			throw this.error(definition, owner, prefix + "이 자리에 값을 저장하는 step이 없습니다. 읽으려는 값을 내는 step의 output에 저장 위치를 적으십시오(예: output: {result: state."
-				+ path.get(0) + "}). 지금 저장되는 자리 = " + saved);
 		}
 		if (owner != null) {
 			boolean reachable = false;
@@ -679,52 +687,35 @@ public class WorkFlowRegistry extends BaseObject {
 					+ "(next/onFailure/routes를 따라 " + writerIds + " → ... → " + owner.id() + "로 오는 길이 없습니다).");
 			}
 		}
-		String problem = JsonSchemaUtil.checkPath(definition.stateSchema(), Context.STATE, path);
-		if (problem != null) {
-			this.warn(definition, owner, prefix + problem + " 이 이름들은 workflow.state.schema가 정합니다.");
+		// 저장하는 step이 하나뿐이면, 그 step이 저장한 값의 모양으로 그 아래 필드를 확인합니다.
+		if (writers.size() != 1) {
 			return;
 		}
-		// 저장하는 step이 하나뿐이고 그 step이 돌려준 값 전체(result)를 저장했으면, 그 모양으로 그 아래 필드를 확인합니다.
-		if (writers.size() == 1 && this.isPrefix(writers.get(0).target(), path) && writers.get(0).source().size() == 1) {
-			StateWrite writer = writers.get(0);
-			List<String> rest = path.subList(writer.target().size(), path.size());
-			String base = Context.STATE + "." + String.join(".", writer.target());
-			String sourceName = writer.source().get(0);
-			if (Output.RESULT.equals(sourceName)) {
+		StateWrite writer = writers.get(0);
+		List<String> rest = path.subList(1, path.size());
+		String base = Context.STATE + "." + name;
+		String problem;
+		switch (writer.source()) {
+			case Output.RESULT:
 				problem = JsonSchemaUtil.checkPath(this.outputSchemaOf(writer.step()), base, rest);
 				if (problem != null && writer.step() instanceof AgentStepDefinition agentStep) {
-					problem = problem + " 이 값의 모양은 agents/*.yml의 agent[" + agentStep.agent() + "].output이 정합니다.";
+					problem = problem + " 이 값의 모양은 agent[" + agentStep.agent() + "]의 output이 정합니다.";
 				}
-			} else if (Output.INPUT.equals(sourceName)) {
+				break;
+			case Output.INPUT:
 				problem = JsonSchemaUtil.checkPath(this.inputSchemaOf(writer.step()), base, rest);
-			} else if (Output.ITEMS.equals(sourceName)) {
-				// forEach의 반복별 묶음입니다. 항목의 모양은 그때그때 달라서 그 아래 필드는 확인하지 않습니다.
+				break;
+			case Output.ERROR:
+				problem = rest.isEmpty() ? null : base + "는 글자(실패 사유)라서 그 아래로 더 들어갈 수 없습니다.";
+				break;
+			default:
+				// forEach의 반복별 묶음(saveEach)입니다. 항목의 모양은 그때그때 달라서 그 아래 필드는 확인하지 않습니다.
 				problem = null;
-			} else if (!rest.isEmpty()) {
-				problem = base + "는 글자(실패 사유)라서 그 아래로 더 들어갈 수 없습니다.";
-			}
-			if (problem != null) {
-				this.warn(definition, owner, prefix + problem + " (step[" + writer.step().id() + "]가 저장한 값)");
-			}
+				break;
 		}
-	}
-
-	/**
-	 * 앞 목록이 뒤 목록의 앞부분과 같은지 봅니다(같아도 true). 예: [a] 는 [a, b]의 앞부분입니다.
-	 *
-	 * @param prefix 앞부분인지 볼 목록
-	 * @param path   전체 목록
-	 */
-	private boolean isPrefix(List<String> prefix, List<String> path) {
-		if (prefix.size() > path.size()) {
-			return false;
+		if (problem != null) {
+			throw this.error(definition, owner, prefix + problem + " (step[" + writer.step().id() + "]가 저장한 값)");
 		}
-		for (int i = 0; i < prefix.size(); i++) {
-			if (!prefix.get(i).equals(path.get(i))) {
-				return false;
-			}
-		}
-		return true;
 	}
 
 	/**
@@ -898,7 +889,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * id로 Workflow를 찾아서 돌려줍니다. 
 	 * 이때 caller가 그 Workflow를 쓸 수 있는지도 함께 확인합니다.
 	 * 등록되지 않은 id이거나, caller가 화이트리스트를 통과하지 못하면 바로 예외를 던집니다.
-	 * <pre>
+	 * </pre>
 	 *
 	 * @param id     조회할 Workflow id
 	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)
