@@ -108,13 +108,21 @@ public class ConfigProperty extends BaseObject{
 
 		private static final Pattern ENC_PATTERN = Pattern.compile("^ENC\\((.*)\\)$");
 
+		/**
+		 * Spring 테스트(@SpringBootTest, @TestPropertySource)가 넣는 PropertySource 이름입니다(TestPropertySourceUtils의 상수와 같은 값).
+		 * Spring Boot 테스트 지원 코드가 이 소스를 MapPropertySource로 꺼내 쓰므로 감싸면 ClassCastException이 납니다.
+		 * 테스트가 직접 적는 값이라 ENC(...)가 들어가지 않으므로 감싸지 않습니다. 운영 실행에는 이 이름의 소스가 없습니다.
+		 */
+		private static final String INLINED_TEST_PROPERTIES = "Inlined Test Properties";
+
 		@Override
 		public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
 			StringEncryptor encryptor = EncUtil.getEncryptor();
 			MutablePropertySources propertySources = environment.getPropertySources();
 			for (org.springframework.core.env.PropertySource<?> propertySource : propertySources) {
 				if (propertySource instanceof EnumerablePropertySource<?> enumerable
-						&& !(propertySource instanceof DecryptingPropertySource)) {
+						&& !(propertySource instanceof DecryptingPropertySource)
+						&& !INLINED_TEST_PROPERTIES.equals(propertySource.getName())) {
 					propertySources.replace(propertySource.getName(), new DecryptingPropertySource(enumerable, encryptor));
 				}
 			}

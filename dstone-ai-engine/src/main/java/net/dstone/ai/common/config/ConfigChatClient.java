@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.session.RedisChatMemoryRepository;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
@@ -42,26 +43,22 @@ public class ConfigChatClient {
 	 * <pre>
 	 * 대화 내용을 어디에 저장할지 결정하는 저장소(ChatMemoryRepository)를 준비해 줍니다.
 	 *
-	 * dstone.ai.session.redis.enabled 설정이 true 일 경우 session.RedisChatMemoryRepository 사용
+	 * - spring.data.redis.enabled가 true면 common.session.RedisChatMemoryRepository 빈이 만들어지고, 그것을 씁니다.
+	 * - false면(Redis를 쓰지 않는 환경) InMemoryChatMemoryRepository(자바 메모리에만 저장하는 간단한 저장소)를 새로 만들어 씁니다.
+	 *   이 경우 서버를 재시작하면 대화 내용이 사라지고, 서버가 여러 대면 서로 대화 내용을 나누지 못합니다.
 	 *
-	 * dstone.ai.session.redis.enabled 설정이 false 일 경우(즉 Redis를 안 쓰는 환경이라면) 이 메소드가 대신 
-	 * InMemoryChatMemoryRepository(자바 메모리 위에만 대화 내용을 저장하는 간단한 저장소)를 새로 만들어서 사용
-	 * InMemoryChatMemoryRepository를 쓸 경우, 서버를 재시작하면 저장했던 대화 내용이 사라지고, 서버 인스턴스가 여러 대이면 인스턴스끼리 대화 내용을 공유하지 못함.
+	 * Redis 저장소는 ChatMemoryRepository가 아니라 RedisChatMemoryRepository 타입으로 찾습니다.
+	 * ChatMemoryRepository로 찾으면 Redis 빈이 없을 때 지금 만들고 있는 이 빈 자신이 걸려서 순환 참조로 기동에 실패합니다.
 	 * </pre>
+	 *
+	 * @param redisRepository Redis 저장소(spring.data.redis.enabled가 false면 없음)
 	 */
     @Bean
-    ChatMemoryRepository chatMemoryRepository(ObjectProvider<ChatMemoryRepository> repositoryProvider) {
-    	/**************************************************************************
-    	ChatMemoryRepository를 구현한 RedisChatMemoryRepository 가 반환된다.
-    	그러나 spring.data.redis.enabled 가 false 일 경우 RedisChatMemoryRepository 가 
-    	생성이 되어있지 않으므로 repositoryProvider.getIfAvailable()체크를 거친다.
-    	**************************************************************************/
-        ChatMemoryRepository existingRepository = repositoryProvider.getIfAvailable();
+    ChatMemoryRepository chatMemoryRepository(ObjectProvider<RedisChatMemoryRepository> redisRepository) {
+        RedisChatMemoryRepository existingRepository = redisRepository.getIfAvailable();
         if (existingRepository != null) {
-            // 이미 등록된 빈(예: RedisChatMemoryRepository)이 있으면 그것을 그대로 사용합니다.
             return existingRepository;
         } else {
-            // 등록된 빈이 없으면 메모리 기반 저장소를 새로 만들어 사용합니다.
             return new InMemoryChatMemoryRepository();
         }
     }
