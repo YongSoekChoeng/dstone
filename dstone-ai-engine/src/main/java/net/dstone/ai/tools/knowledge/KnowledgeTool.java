@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import net.dstone.ai.common.annotation.AiTool;
-import net.dstone.ai.common.knowledge.KnowledgeCallException;
+import net.dstone.ai.common.exception.KnowledgeCallException;
 import net.dstone.ai.common.knowledge.KnowledgeClient;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;

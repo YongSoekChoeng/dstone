@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
-import net.dstone.ai.common.knowledge.KnowledgeCallException;
+import net.dstone.ai.common.exception.KnowledgeCallException;
 import net.dstone.ai.common.knowledge.KnowledgeClient;
 import net.dstone.common.biz.BaseService;
 import net.dstone.common.config.ConfigProperty;

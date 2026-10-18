@@ -1,4 +1,4 @@
-package net.dstone.ai.common.knowledge;
+package net.dstone.ai.common.exception;
 
 /**
  * <pre>
