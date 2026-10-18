@@ -8,7 +8,7 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/**.workflow.yml 의 type: TOOL step입니다. 등록된 Tool(@AiTool로 만든 자바 기능 또는 MCP 서버의 Tool) 하나를
+ * workflows/**.yml 의 type: TOOL step입니다. 등록된 Tool(@AiTool로 만든 자바 기능 또는 MCP 서버의 Tool) 하나를
  * LLM을 거치지 않고 직접 호출합니다. 값을 검증하거나, 목록을 거르거나, 파일을 읽거나, 외부 시스템에서 데이터를 가져오는 것처럼
  * 결과가 코드로 정해지는 작업에 씁니다(runtime.step.ToolStepExecutor).
  *

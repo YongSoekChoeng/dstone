@@ -13,7 +13,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 /**
  * <pre>
  * type: AGENT step(AgentStepDefinition)을 실행합니다. agent에 적힌 Agent를 한 번 부르고, 채워진 input을 넣습니다.
- * 받는 값과 돌려주는 값의 모양은 Agent가 정합니다(agents/**.agent.md 의 input/output).
+ * 받는 값과 돌려주는 값의 모양은 Agent가 정합니다(agents/**.md 의 input/output).
  *
  *   Agent output         step의 result가 되는 값           실패하는 경우
  *   string(기본)         LLM 답변 원문(글자)               input이 Agent input 모양이 아님

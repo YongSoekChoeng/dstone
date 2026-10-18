@@ -7,7 +7,7 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/**.workflow.yml 의 type: APPROVAL step입니다. 사람이 결정할 때까지 기다립니다(runtime.step.ApprovalStepExecutor).
+ * workflows/**.yml 의 type: APPROVAL step입니다. 사람이 결정할 때까지 기다립니다(runtime.step.ApprovalStepExecutor).
  *
  * AI의 리뷰(SUPERVISOR)와 사람의 승인은 별개입니다. 이 step은 권한이 있는 사람이 직접 고르는 관문입니다.
  *

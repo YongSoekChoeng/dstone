@@ -11,7 +11,7 @@ import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statements;
 
 /**
- * SQL을 만들어내는 Agent(예: agents/sample/sample-fix-agent.agent.md)가 최종 답변을 내놓기 전에 스스로 문법을 검증해 보고 틀렸으면 고치는
+ * SQL을 만들어내는 Agent(예: agents/sample/sample-fix-agent.md)가 최종 답변을 내놓기 전에 스스로 문법을 검증해 보고 틀렸으면 고치는
  * 자기수정 루프에 쓰라고 만든 Tool입니다. JSQLParser는 실제 DB 서버에 연결하지 않고 순수하게
  * 문법(그래머)만 파싱하기 때문에(대상 테이블이 진짜로 존재하는지는 모릅니다) 어떤 대상 스키마의
  * 쿼리에도 항상 쓸 수 있지만, 그 대신 PostgreSQL 고유 문법의 세부적인 부분까지는 완벽하게

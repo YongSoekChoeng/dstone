@@ -7,7 +7,7 @@
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
 #   workflowId: sample-agent-model-override
 #   input     : 너는 누구니?
-# 다만 agents/sample/sample-model-override-agent.agent.md의 model.name에 지금 활성화된 provider(spring.ai.model.chat)에서
+# 다만 agents/sample/sample-model-override-agent.md의 model.name에 지금 활성화된 provider(spring.ai.model.chat)에서
 # 쓸 수 있는 모델 이름이 적혀 있어야 정상적으로 호출됩니다.
 id: sample-agent-model-override
 version: 1.0.0

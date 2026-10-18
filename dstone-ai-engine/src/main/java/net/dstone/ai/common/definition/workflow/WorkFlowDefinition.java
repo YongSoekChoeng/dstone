@@ -10,7 +10,7 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 
 /**
  * <pre>
- * Workflow 하나 전체를 표현하는 클래스입니다. resources/definitions/workflows/**.workflow.yml 파일 하나하나가 이 클래스의
+ * Workflow 하나 전체를 표현하는 클래스입니다. resources/definitions/workflows/**.yml 파일 하나하나가 이 클래스의
  * 값으로 채워지며, 이 작업은 net.dstone.ai.common.loader.YamlDefinitionLoader 가 담당합니다.
  * 사용자가 API로 어떤 Workflow를 실행해 달라고 요청하면, api.controller.WorkFlowController가 그
  * Workflow의 id로 이 정의를 찾아서 실제로 실행을 담당하는 runtime.workflow.WorkFlowExecutor에게 넘겨줍니다.

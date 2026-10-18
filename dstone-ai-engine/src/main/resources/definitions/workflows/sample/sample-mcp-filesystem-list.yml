@@ -1,8 +1,8 @@
 # common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
 #
-# sample-tool-chain-basic.workflow.yml과 같은 패턴(TOOL step 2개 연속 실행, LLM 비용 없음)이지만, 여기서
+# sample-tool-chain-basic.yml과 같은 패턴(TOOL step 2개 연속 실행, LLM 비용 없음)이지만, 여기서
 # 부르는 두 Tool(directory_tree, read_text_file)은 로컬 @AiTool이 아니라 definitions/mcp/sample/
-# sample-filesystem.mcp.yml에 정의된 외부 MCP 서버의 Tool입니다. runtime.tool.ToolExecutor
+# sample-filesystem.yml에 정의된 외부 MCP 서버의 Tool입니다. runtime.tool.ToolExecutor
 # 입장에서는 로컬 Tool을 부를 때와 완전히 같은 경로(caller 화이트리스트 → ToolCallback.call())로
 # 처리되므로, TOOL step도 MCP Tool을 LLM 없이 그대로 직접 호출할 수 있다는 걸 보여주는 것이 이
 # Workflow의 목적입니다.

@@ -8,7 +8,7 @@ import net.dstone.ai.common.definition.SchemaDefinition;
 /**
  * <pre>
  * Agent 하나를 표현하는 클래스입니다. Agent란 쉽게 말해 "LLM에게 어떤 역할과 규칙으로 일을 시킬지"를 정의해 둔 설정 묶음입니다.
- * resources/definitions/agents/**.agent.md 파일 하나하나가 Agent 하나에 해당하며,
+ * resources/definitions/agents/**.md 파일 하나하나가 Agent 하나에 해당하며,
  * net.dstone.ai.common.loader.YamlDefinitionLoader 가 그 파일을 읽어서 이 클래스의 값으로 채워줍니다.
  *
  * 이 Agent는 두 가지 경로로 호출될 수 있습니다.

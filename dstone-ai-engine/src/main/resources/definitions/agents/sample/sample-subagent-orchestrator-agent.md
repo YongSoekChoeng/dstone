@@ -3,7 +3,7 @@
 #
 # 이 Agent는 Sub Agent(subAgents) 기능을 보여주는 예시입니다. subAgents에 다른 Agent의 id를 적으면,
 # 이 Agent의 LLM에게 그 Agent가 Tool 하나처럼 보이고, LLM이 필요할 때 스스로 골라 일을 맡깁니다
-# (runtime.agent.SubAgentToolCallback). workflows/sample/sample-agent-subagent-delegate.workflow.yml이 이 Agent를 씁니다.
+# (runtime.agent.SubAgentToolCallback). workflows/sample/sample-agent-subagent-delegate.yml이 이 Agent를 씁니다.
 #
 # 맡는 쪽 Agent는 따로 표시할 것이 없는 평범한 Agent입니다. 여기서는 이미 있는 두 Agent를 그대로 다시 씁니다.
 # - sample-structured-extract-agent: input이 string입니다. Tool 인자는 object여야 하므로 엔진이 {input: 글자}

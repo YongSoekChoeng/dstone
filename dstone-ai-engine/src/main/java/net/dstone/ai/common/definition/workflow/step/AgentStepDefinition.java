@@ -6,10 +6,10 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/**.workflow.yml 의 type: AGENT step입니다. LLM에게 일을 한 번 시킵니다. agent에 적은 Agent를 한 번 부르고,
+ * workflows/**.yml 의 type: AGENT step입니다. LLM에게 일을 한 번 시킵니다. agent에 적은 Agent를 한 번 부르고,
  * 그 답을 save에 적은 state 이름으로 저장합니다(runtime.step.AgentStepExecutor).
  *
- * 무엇을 받고 무엇을 돌려주는지는 Agent가 정합니다(agents/**.agent.md 의 input/output). step은 "무엇을 넣고(with), 답을 어디에 둘지(save)"만 적습니다.
+ * 무엇을 받고 무엇을 돌려주는지는 Agent가 정합니다(agents/**.md 의 input/output). step은 "무엇을 넣고(with), 답을 어디에 둘지(save)"만 적습니다.
  * - Agent input이 string이면 with를 값 하나로 적습니다(표현식 또는 글자).
  * - Agent input이 object면 with를 맵으로 적습니다(필드마다 표현식 또는 리터럴). 엔진이 계산한 맵을 Agent input 스키마로 검사합니다.
  * - 답이 Agent output 모양이 아니면(또는 input이 Agent input 모양이 아니면) 이 step은 실패입니다.

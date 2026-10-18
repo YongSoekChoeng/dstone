@@ -9,7 +9,7 @@
 # - input 전체는 JSON 글자로 바뀌어 사용자 메시지로도 함께 들어가므로, LLM은 message 필드에 답하면 됩니다.
 # - output은 선언하지 않았으므로 string입니다(답변 원문).
 #
-# workflows/sample/sample-router-multiway.workflow.yml의 종착 step들과 sample-supervisor-verdict-gate.workflow.yml의 draft step이 이 Agent를 씁니다.
+# workflows/sample/sample-router-multiway.yml의 종착 step들과 sample-supervisor-verdict-gate.yml의 draft step이 이 Agent를 씁니다.
 id: sample-role-reply-agent
 version: 1.0.0
 description: input의 role로 역할을 정하고 message에 답한다(prompt 변수를 Agent input 필드로 채우는 예시).

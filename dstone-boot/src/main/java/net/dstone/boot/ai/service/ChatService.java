@@ -60,7 +60,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 *
 	 * agent는 화면의 agent 드롭다운 값을 그대로 받는다 - 비어 있으면 기본값(AGENT, sample-general-chat)을
 	 * 쓴다. general-chat Agent의 promptName(sample-system)이 시스템 프롬프트에 {role} 자리표시자를
-	 * 쓰므로(그 Agent의 .agent.md 본문), 그 Agent를 부를 때만 variables로 role을 채워 보낸다 - 안
+	 * 쓰므로(그 Agent의 Agent 파일 본문), 그 Agent를 부를 때만 variables로 role을 채워 보낸다 - 안
 	 * 보내면 PromptTemplate 렌더링이 IllegalStateException("Not all variables were replaced")으로
 	 * 실패한다. 다른 Agent(예: sample-mcp-filesystem-agent)는 이 자리표시자를 쓰지 않으므로 role을
 	 * 보낼 이유가 없다 - 그 Agent가 실제로 쓰는 프롬프트하고 무관한 값을 매번 끼워 보내는 셈이기 때문이다.

@@ -9,8 +9,8 @@
 #   dstone-ai-engine sub-agent: [sample-subagent-orchestrator-agent -> sample-structured-extract-agent] 호출 시작(1/10) - 인자 ...자
 #   dstone-ai-engine sub-agent: [sample-subagent-orchestrator-agent -> sample-structured-extract-agent] 호출 끝 - ...ms, 결과 ...자
 #
-# 같은 일을 step으로 풀어 쓴 Workflow가 sample-structured-output-chain.workflow.yml(뽑기 → 검증)과
-# sample-loop-retry-until-valid.workflow.yml(검증 → 고치기 루프)입니다. 순서가 정해져 있으면 step으로 적는 편이
+# 같은 일을 step으로 풀어 쓴 Workflow가 sample-structured-output-chain.yml(뽑기 → 검증)과
+# sample-loop-retry-until-valid.yml(검증 → 고치기 루프)입니다. 순서가 정해져 있으면 step으로 적는 편이
 # 실행 내역이 남고 비용도 예측하기 쉽습니다. Sub Agent는 "무엇을 몇 번 맡길지"를 LLM이 상황을 보고 정해야 할 때 씁니다.
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:

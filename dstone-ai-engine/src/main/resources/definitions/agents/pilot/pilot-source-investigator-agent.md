@@ -12,7 +12,7 @@
 #
 # [조회 한도]를 둔 이유: 한 번에 너무 많은 것을 물으면 searchInFiles를 되풀이하다 한도에 걸려 답을 내지 못합니다.
 # 그래서 횟수를 정해 두고, 못 찾은 것은 '미발견'으로 적고 끝내게 했습니다.
-# 맡기는 쪽(부모)도 한 번에 한 가지만 묻게 했습니다(pilot-impact-analyzer-agent.agent.md).
+# 맡기는 쪽(부모)도 한 번에 한 가지만 묻게 했습니다(pilot-impact-analyzer-agent.md).
 #
 # knowledge Tool(knowledgeSearch 등)은 dstone-knowledge가 미리 분석해 둔 호출 관계를 물어보는 Tool입니다. 부모가 projectId를 넘겨줄 때만 씁니다.
 # 파일을 여러 번 뒤져서 따라가던 "화면 → Controller → DAO → 쿼리ID"를 한두 번의 호출로 찾게 하려는 것입니다.

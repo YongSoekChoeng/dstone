@@ -37,16 +37,16 @@ import net.dstone.common.utils.StringUtil;
  * Workflow, Agent, McpServer의 정의는 application.yml 안에 넣지 않고, resources/definitions 폴더 아래에 따로 둡니다.
  *
  *   definitions/
- *     workflows/**\/*.workflow.yml   Workflow 하나에 파일 하나
- *     agents/**\/*.agent.md          Agent 하나에 파일 하나. 맨 위 --- 와 --- 사이(머리말)가 설정, 그 아래(본문)가 시스템 프롬프트
- *     mcp/**\/*.mcp.yml              MCP 서버 하나에 파일 하나
+ *     workflows/**\/*.yml            Workflow 하나에 파일 하나
+ *     agents/**\/*.md                Agent 하나에 파일 하나. 맨 위 --- 와 --- 사이(머리말)가 설정, 그 아래(본문)가 시스템 프롬프트
+ *     mcp/**\/*.yml                  MCP 서버 하나에 파일 하나
  *
  * 이렇게 하는 핵심 이유는, 새로 하나를 만들거나 기존 것을 바꿀 때 application.yml과 자바 코드를 건드리지 않고 파일만 추가하거나 고치면 되게 하려는 것입니다.
  * Agent 하나의 계약(input/output)과 프롬프트를 한 파일에 두는 것은, Agent가 무엇을 받고 무엇을 돌려주는지를 파일 하나만 열어 보고 알 수 있게 하려는 것입니다.
  * 입출력 모양은 짧은 타입 표기(Picoschema, common.schema.Picoschema)로 그 자리에 적습니다. 따로 두는 스키마 파일은 없습니다.
  * 이 클래스가 기동 시점에 common.registry.WorkFlowRegistry / AgentRegistry / McpServerRegistry에게 호출되어 이 파일들을 실제로 읽어 들입니다.
  * 경로에 쓰인 "**"는 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, 도메인별로 서브 디렉토리를 나눠서(예: workflows/billing/) 관리해도 됩니다.
- * 파일 맨 위에 workflow: / agent: / mcpServer: 같은 감싸는 키는 없습니다. 무엇의 정의인지는 파일 이름 끝으로 구분합니다.
+ * 파일 맨 위에 workflow: / agent: / mcpServer: 같은 감싸는 키는 없습니다. 무엇의 정의인지는 폴더로 구분합니다.
  *
  * 파일을 읽는 방식은 이렇습니다: 먼저 SnakeYAML로 파싱해서 평범한 Map으로 만들고(Agent는 머리말만), 지원하지 않는 모양(감싸는 키, 따로 둔 스키마 파일 등)을 적지 않았는지 본 다음,
  * Jackson의 ObjectMapper.convertValue()로 그 Map을 definition record에 바인딩합니다.
@@ -80,25 +80,23 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 이름 패턴에 맞지 않는 정의 파일이 있으면 기동을 멈춥니다. 그런 파일은 아예 읽히지 않으므로,
+	 * 읽히지 않을 정의 파일이 있으면 기동을 멈춥니다. 그런 파일은 아예 읽히지 않으므로,
 	 * 그냥 두면 "Agent가 없다"는 엉뚱한 오류만 보게 됩니다.
-	 * - agents/ 아래의 .yml, workflows/ 아래의 .workflow.yml이 아닌 .yml, mcp/ 아래의 .mcp.yml이 아닌 .yml
-	 * - prompts/, schemas/ 폴더 안의 파일(프롬프트는 .agent.md 본문에, 스키마는 그 자리에 Picoschema로 적습니다)
+	 * - agents/ 아래의 .yml(Agent는 .md 한 파일입니다)
+	 * - prompts/, schemas/ 폴더 안의 파일(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다)
 	 * </pre>
 	 */
 	@PostConstruct
 	public void checkOldFiles() {
 		List<String> found = new ArrayList<>();
 		this.collectOld(Constants.Definition.AGENT_LOCATION + "/**/*.yml", null, found);
-		this.collectOld(Constants.Definition.WORKFLOW_LOCATION + "/**/*.yml", Constants.Definition.WORKFLOW_SUFFIX, found);
-		this.collectOld(Constants.Definition.MCP_LOCATION + "/**/*.yml", Constants.Definition.MCP_SUFFIX, found);
 		for (String dir : Constants.Definition.OLD_DIRS) {
 			this.collectOld(Constants.Definition.ROOT_LOCATION + "/" + dir + "/**/*.*", null, found);
 		}
 		if (!found.isEmpty()) {
 			throw new IllegalStateException("예전 형식의 정의 파일이 남아 있습니다: " + found
-				+ ". Agent는 agents/**/이름.agent.md 한 파일(머리말에 설정과 input/output, 본문에 프롬프트), Workflow는 workflows/**/이름.workflow.yml,"
-				+ " MCP 서버는 mcp/**/이름.mcp.yml로 옮기십시오(docs/09.dstone-ai-engine.md 7장 참고).");
+				+ ". Agent는 agents/**/이름.md 한 파일(머리말에 설정과 input/output, 본문에 프롬프트), Workflow는 workflows/**/이름.yml,"
+				+ " MCP 서버는 mcp/**/이름.yml로 옮기십시오(docs/09.dstone-ai-engine.md 7장 참고).");
 		}
 	}
 
@@ -118,7 +116,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		}
 	}
 
-	/** classpath 상의 workflows/**.workflow.yml 파일을 전부 찾아서 읽고, WorkFlowDefinition 목록으로 돌려줍니다. */
+	/** classpath 상의 workflows/**.yml 파일을 전부 찾아서 읽고, WorkFlowDefinition 목록으로 돌려줍니다. */
 	@SuppressWarnings("unchecked")
 	public List<WorkFlowDefinition> loadWorkflows() {
 		List<WorkFlowDefinition> definitions = new ArrayList<>();
@@ -133,7 +131,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		return definitions;
 	}
 
-	/** classpath 상의 agents/**.agent.md 파일을 전부 찾아서 읽고, AgentDefinition 목록으로 돌려줍니다. */
+	/** classpath 상의 agents/**.md 파일을 전부 찾아서 읽고, AgentDefinition 목록으로 돌려줍니다. */
 	public List<AgentDefinition> loadAgents() {
 		List<AgentDefinition> definitions = new ArrayList<>();
 		for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
@@ -146,7 +144,7 @@ public class YamlDefinitionLoader extends BaseObject {
 		return definitions;
 	}
 
-	/** classpath 상의 mcp/**.mcp.yml 파일을 전부 찾아서 읽고, McpServerDefinition 목록으로 돌려줍니다. */
+	/** classpath 상의 mcp/**.yml 파일을 전부 찾아서 읽고, McpServerDefinition 목록으로 돌려줍니다. */
 	public List<McpServerDefinition> loadMcpServers() {
 		List<McpServerDefinition> definitions = new ArrayList<>();
 		for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
@@ -248,7 +246,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * Agent 파일(.agent.md) 하나를 읽습니다. 맨 위 --- 줄과 그다음 --- 줄 사이가 머리말(YAML)이고, 그 아래 전부가 프롬프트입니다.
+	 * Agent 파일(agents/**\/*.md) 하나를 읽습니다. 맨 위 --- 줄과 그다음 --- 줄 사이가 머리말(YAML)이고, 그 아래 전부가 프롬프트입니다.
 	 * 프롬프트는 앞뒤 빈 줄만 떼고 그대로 prompt에 넣습니다(${VAR_NAME}은 채웁니다).
 	 * </pre>
 	 *

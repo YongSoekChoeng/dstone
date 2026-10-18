@@ -12,13 +12,13 @@
 # - 프롬프트 안의 {role} 토큰을 지우면, 채팅 화면이 매번 role 값을 채워서 보내주고 있는데 그 값을
 #   쓸 자리가 없어져 버립니다. 이 Agent는 input이 string이라 {role}을 채울 input 필드가 없으므로, 채팅 API처럼
 #   variables로 role을 넘겨주는 곳에서만 씁니다. Workflow에서 역할을 바꿔 가며 부르고 싶다면 input을 object로
-#   선언한 Agent를 씁니다(예: sample-role-reply-agent.agent.md - prompt 변수는 Agent가 받은 input 필드로 채워짐).
+#   선언한 Agent를 씁니다(예: sample-role-reply-agent.md - prompt 변수는 Agent가 받은 input 필드로 채워짐).
 # - input/output을 선언하지 않았으므로 둘 다 string입니다(글자를 받아 글자로 답함).
 # - tools.allowed: ["*"]도 그대로 두고, context(RAG)는 적지 않아야 합니다. "*"는 등록된 Tool을 전부 쓸 수 있다는 뜻으로,
 #   무엇이든 물어볼 수 있는 범용 채팅 Agent라서 이렇게 열어 두었습니다(caller 화이트리스트는 그대로 적용됩니다).
 #   채팅 화면의 Tool 체크박스(ChatRequest의 toolsEnabled)는 이 목록을 "이번 요청에 쓸지 말지"만 정합니다.
 #   체크를 끄면 Tool 없이 답하고, 켜면 이 목록 그대로입니다. 여기 tools를 지우면 체크를 켜도 Tool이 붙지 않습니다.
-#   업무용 Agent는 "*" 대신 실제로 쓰는 Tool 이름만 적으십시오(예: sample-tool-demo-agent.agent.md).
+#   업무용 Agent는 "*" 대신 실제로 쓰는 Tool 이름만 적으십시오(예: sample-tool-demo-agent.md).
 id: sample-general-chat
 version: 1.0.0
 description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용한다.

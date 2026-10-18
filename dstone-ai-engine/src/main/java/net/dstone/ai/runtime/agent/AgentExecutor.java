@@ -42,7 +42,7 @@ import reactor.core.publisher.Flux;
 /**
  * <pre>
  * Agent 하나를 실제로 호출하는 클래스입니다. 여기서 말하는 "Agent"란 "LLM에게 일을 맡기는 단위"를 뜻합니다.
- * AgentDefinition에 적힌 prompt(.agent.md 본문)와 tools.allowed(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), context(RAG 사용 여부), model, execution을 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
+ * AgentDefinition에 적힌 prompt(Agent 파일 본문)와 tools.allowed(쓸 Tool 목록), subAgents(일을 맡길 Agent 목록), context(RAG 사용 여부), model, execution을 읽어서 Spring AI의 ChatClient 요청을 실제로 조립하는 곳은 이 클래스 하나뿐입니다. 
  * 그래서 api.controller.ChatController (사용자가 채팅창에서 메시지를 한 번 보내는 경우)와 
  * runtime.step의 AgentStepExecutor/SupervisorStepExecutor/RouterStepExecutor(Workflow 안에서 AGENT/SUPERVISOR/ROUTER step을 실행하는 경우)
  * 모두 결국 이 클래스를 통해서 LLM을 호출합니다.
@@ -60,11 +60,11 @@ import reactor.core.publisher.Flux;
  * input이 object면 그 필드들이 변수가 되고, 채팅 API는 요청의 variables를 더 얹을 수 있습니다(같은 이름이면 variables가 이김).
  * 그래서 Agent 파일은 자기 input 스키마만 보고 prompt를 쓸 수 있습니다.
  *
- *   input:                                      (.agent.md 머리말)
+ *   input:                                      (Agent 파일 머리말)
  *     role: string
  *     message: string
  *   ---
- *   당신은 {role} 역할을 맡은 상담원입니다.       (.agent.md 본문)
+ *   당신은 {role} 역할을 맡은 상담원입니다.       (Agent 파일 본문)
  *
  * ## 시스템 프롬프트
  * 시스템 프롬프트는 항상 "엔진 규칙 + 업무 지시(Agent prompt)" 순서입니다(runtime.prompt.EnginePrompt).
@@ -419,7 +419,7 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- 순서는 "엔진 규칙(공통 + engineRule) → 업무 지시(Agent prompt)"입니다(EnginePrompt.compose()).
 			  엔진 규칙은 변수 치환을 거치지 않습니다. 변수는 Agent prompt에서만 채운 뒤 뒤에 이어 붙입니다.
-			- AgentDefinition.promptText()(.agent.md 파일의 본문)가 업무 지시입니다. 만약 그 문구 안에
+			- AgentDefinition.promptText()(Agent 파일의 본문)가 업무 지시입니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
 			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
 			  요청의 variables를 더 얹습니다(promptVariables() 참고).

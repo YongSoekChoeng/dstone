@@ -9,7 +9,7 @@
 # (runtime.prompt.EnginePrompt.SUPERVISOR) 이 prompt에는 "무엇을 기준으로 판정하는지"만 적습니다.
 # 판정 기준은 예시를 들어 구체적으로 적어야 합니다. "안녕이라는 단어를 포함하는지 엄격히 검사"라고만 적으면
 # 모델이 "안녕하세요"를 "안녕이라는 단어는 아니다"로 보고 불통과시키기도 합니다.
-# workflows/sample/sample-supervisor-verdict-gate.workflow.yml에서 이 Agent를 가져다 씁니다.
+# workflows/sample/sample-supervisor-verdict-gate.yml에서 이 Agent를 가져다 씁니다.
 id: sample-verdict-judge-agent
 version: 1.0.0
 description: SUPERVISOR step 전용 - 주어진 텍스트를 pass/fail + 이유로 판정한다.

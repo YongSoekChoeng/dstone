@@ -8,7 +8,7 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/**.workflow.yml 의 type: ROUTER step입니다. LLM이 routes에 적힌 이름 중 하나를 고르고, 그 이름에 적힌 step으로 갑니다
+ * workflows/**.yml 의 type: ROUTER step입니다. LLM이 routes에 적힌 이름 중 하나를 고르고, 그 이름에 적힌 step으로 갑니다
  * (runtime.step.RouterStepExecutor).
  *
  * 답의 모양은 엔진이 {route, reason}으로 정해 두었습니다. 그래서 부르는 Agent는 output을 선언하지 않습니다.

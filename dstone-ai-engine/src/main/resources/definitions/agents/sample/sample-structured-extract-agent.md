@@ -2,7 +2,7 @@
 # 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 id 값입니다.
 #
 # 이 Agent는 output을 object로 선언한 예시입니다.
-# workflows/sample/sample-structured-output-chain.workflow.yml의 extract step이 이 Agent를 부릅니다.
+# workflows/sample/sample-structured-output-chain.yml의 extract step이 이 Agent를 부릅니다.
 # 머리말의 output(필드를 적은 모양) 때문에 엔진이 "이 JSON 모양으로만 답하라"는 지시를 자동으로 붙여주고, LLM의 답을
 # 그 모양으로 읽고 검사합니다. extract step이 그 값을 state.extracted에 저장하고, 그 다음 TOOL step은
 # ${state.extracted.sql}로 이 값을 그대로 가져다 씁니다.

@@ -5,7 +5,7 @@
 # 판단해서 호출할 수 있습니다("tool-calling"이라고 부르는 동작입니다). tools에 적지 않은 Tool
 # (예: writeFile, deleteFile, triggerBuild)은 등록되어 있어도 이 Agent의 LLM에게 보이지 않습니다. 여기서 말하는 Tool은
 # tools 패키지 아래에 있는 자바 코드들이고, common.config.ConfigTool이라는 클래스가 서버가
-# 켜질 때 이 Tool들을 자동으로 찾아서 등록해 둡니다. workflows/sample/sample-agent-tool-calling.workflow.yml이 바로 이
+# 켜질 때 이 Tool들을 자동으로 찾아서 등록해 둡니다. workflows/sample/sample-agent-tool-calling.yml이 바로 이
 # Agent를 사용해서, "LLM이 정말로 알아서 Tool을 골라 호출하는지"를 확인합니다.
 #
 # 아래 prompt 안에는 각 Tool의 이름과 언제 쓰는지를 미리 안내해 두었습니다. 사실 각 Tool의

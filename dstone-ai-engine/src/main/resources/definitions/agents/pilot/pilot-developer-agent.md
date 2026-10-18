@@ -11,7 +11,7 @@
 # 컴파일이나 실행을 해 볼 Tool이 없으므로, 검증하지 못했다는 사실을 summary에 밝히게 했습니다.
 #
 # 신규 개발만 있는 요청은 이 Agent를 거치지 않습니다. pilot-workflow의 신규 개발 경로는 파일마다
-# pilot-newdev-file-developer-agent(pilot-newdev-file-developer-agent.agent.md)를 따로 부릅니다.
+# pilot-newdev-file-developer-agent(pilot-newdev-file-developer-agent.md)를 따로 부릅니다.
 id: pilot-developer-agent
 version: 1.0.0
 description: 개발 에이젼트. 설계서와 태스크 목록대로 소스를 구현하고 태스크 목록에 완료 표시를 남긴다.

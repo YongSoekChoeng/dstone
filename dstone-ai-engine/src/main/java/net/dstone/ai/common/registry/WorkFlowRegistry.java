@@ -42,7 +42,7 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * 모든 Workflow 정보를 담아두고, id로 찾아 주는 등록소입니다. YamlDefinitionLoader가 classpath:definitions/workflows/**.workflow.yml
+ * 모든 Workflow 정보를 담아두고, id로 찾아 주는 등록소입니다. YamlDefinitionLoader가 classpath:definitions/workflows/**.yml
  * 파일들을 읽어서 WorkFlowDefinition으로 바꾸면, 이 WorkFlowRegistry가 앱이 기동될 때 그것들을 한 번 모아서 보관합니다.
  * api.controller.WorkFlowController는 이 레지스트리에서 WorkFlowDefinition을 찾아 runtime.workflow.WorkFlowExecutor에게
  * 넘겨 실행을 시킵니다.
@@ -78,7 +78,7 @@ import net.dstone.common.utils.StringUtil;
  *      저장하는 step이 여럿이거나 모양을 알 수 없으면(TOOL, any) 확인하지 않습니다)
  *
  *   step 종류        저장되는 결과(save)의 모양
- *   AGENT            부르는 Agent의 output(agents/**.agent.md, 비워두면 string)
+ *   AGENT            부르는 Agent의 output(agents/**.md, 비워두면 string)
  *   SUPERVISOR       {pass, reason}                (common.schema.JsonSchemaUtil)
  *   ROUTER           {route, reason}
  *   APPROVAL         {decision, approver, comment}
@@ -123,7 +123,7 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 앱이 기동될 때 한 번 호출되어, workflows/**.workflow.yml에 정의된 Workflow를 전부 읽고 검사한 뒤 id를 키로 하는 맵에 채워 넣습니다.
+	 * 앱이 기동될 때 한 번 호출되어, workflows/**.yml에 정의된 Workflow를 전부 읽고 검사한 뒤 id를 키로 하는 맵에 채워 넣습니다.
 	 * 검사 규칙은 클래스 설명을 참고하세요. 오류가 하나라도 있으면 기동 자체를 실패시킵니다.
 	 * </pre>
 	 */
@@ -132,7 +132,7 @@ public class WorkFlowRegistry extends BaseObject {
 		Map<String, WorkFlowDefinition> resolved = new HashMap<>();
 		for (WorkFlowDefinition definition : this.loader.loadWorkflows()) {
 			if (StringUtil.isEmpty(definition.id()) || definition.steps() == null || definition.steps().isEmpty()) {
-				throw new IllegalStateException("workflows/**.workflow.yml 파일에는 id와 steps가 모두 있어야 합니다: " + definition);
+				throw new IllegalStateException("workflows/**.yml 파일에는 id와 steps가 모두 있어야 합니다: " + definition);
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
 				throw new IllegalStateException("workflow id가 중복 등록되었습니다: " + definition.id());
@@ -410,15 +410,15 @@ public class WorkFlowRegistry extends BaseObject {
 	private void checkAgentCall(WorkFlowDefinition definition, StepDefinition step, String agentId, Object input, boolean engineOwnsOutput) {
 		AgentDefinition agent = this.agentRegistry.find(agentId);
 		if (agent == null) {
-			throw this.error(definition, step, "agents/**.agent.md에 '" + agentId + "' Agent가 없습니다.");
+			throw this.error(definition, step, "agents/**.md에 '" + agentId + "' Agent가 없습니다.");
 		}
 		if (engineOwnsOutput && agent.declaresOutput()) {
 			throw this.error(definition, step, step.type() + " step이 부르는 agent[" + agentId + "]는 output을 선언하지 않습니다(답의 모양은 엔진이 "
-				+ (step instanceof RouterStepDefinition ? "{route, reason}" : "{pass, reason}") + "으로 정합니다). 그 Agent의 .agent.md에서 output을 지우십시오.");
+				+ (step instanceof RouterStepDefinition ? "{route, reason}" : "{pass, reason}") + "으로 정합니다). 그 Agent 파일에서 output을 지우십시오.");
 		}
 		if (engineOwnsOutput && !agent.subAgentIds().isEmpty()) {
 			throw this.error(definition, step, step.type() + " step이 부르는 agent[" + agentId + "]는 subAgents를 가질 수 없습니다"
-				+ "(판정이나 분류만 하는 Agent는 다른 Agent에게 일을 맡기지 않습니다). AGENT step으로 바꾸거나 그 Agent의 .agent.md에서 subAgents를 지우십시오.");
+				+ "(판정이나 분류만 하는 Agent는 다른 Agent에게 일을 맡기지 않습니다). AGENT step으로 바꾸거나 그 Agent 파일에서 subAgents를 지우십시오.");
 		}
 		if (engineOwnsOutput && agent.allowsAllTools()) {
 			this.warn(definition, step, step.type() + " step이 부르는 agent[" + agentId + "]가 tools.allowed: [\"*\"]로 등록된 Tool을 전부 쓸 수 있습니다. 판정이나 분류에 필요한 Tool만 이름으로 적는 것이 안전합니다.");

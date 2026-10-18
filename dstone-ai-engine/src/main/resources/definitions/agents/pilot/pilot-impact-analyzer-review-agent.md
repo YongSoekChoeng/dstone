@@ -30,7 +30,7 @@ model:
   # 주의 1: 지금 쓰는 모델(OpenRouter qwen/qwen3.8-27b)은 low/medium이 듣지 않는다(conf/application.yml의 max-tokens 주석).
   #         이 모델에서는 이 줄이 있어도 달라지는 것이 없고, low를 받아 주는 모델에서만 듣는다.
   # 주의 2: none으로 끄지 않는다. Tool로 조사하는 Agent의 추론을 끄면 같은 조회를 되풀이한다
-  #         (pilot-newdev-reference-agent.agent.md의 주석). 그래서 [진행 방식]도 함께 둔다.
+  #         (pilot-newdev-reference-agent.md의 주석). 그래서 [진행 방식]도 함께 둔다.
   reasoning: low
 input:
   workDir: string, 작업 폴더의 절대경로(00-request.md가 들어 있는 폴더)

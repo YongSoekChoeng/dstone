@@ -2,7 +2,7 @@
 # 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 id 값입니다.
 #
 # 이 Agent는 "실패하면 되돌아가서 다시 시도하는 흐름(onFailure 루프)"을 보여주기 위한 예시입니다.
-# workflows/sample/sample-loop-retry-until-valid.workflow.yml의 fix step이 이 Agent를 씁니다. 먼저 TOOL
+# workflows/sample/sample-loop-retry-until-valid.yml의 fix step이 이 Agent를 씁니다. 먼저 TOOL
 # step(validate, validateSqlSyntax)이 SQL 문법을 검사하고, 실패하면 fix step으로 넘어옵니다.
 #
 # 입출력 계약을 둘 다 object로 선언한 예시이기도 합니다.

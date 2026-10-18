@@ -6,7 +6,7 @@ import net.dstone.ai.common.consts.StepType;
 
 /**
  * <pre>
- * workflows/**.workflow.yml 의 type: SUPERVISOR step입니다. LLM이 앞 step의 결과를 보고 통과/불통과를 판정합니다
+ * workflows/**.yml 의 type: SUPERVISOR step입니다. LLM이 앞 step의 결과를 보고 통과/불통과를 판정합니다
  * (runtime.step.SupervisorStepExecutor).
  *
  * 답의 모양은 엔진이 {pass, reason}으로 정해 두었습니다. 그래서 부르는 Agent는 output을 선언하지 않습니다.

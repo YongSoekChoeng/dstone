@@ -31,7 +31,7 @@ import net.dstone.common.biz.BaseController;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Workflow(resources/definitions/workflows/**.workflow.yml에 정의해 둔, 여러 단계로 이루어진 실행 흐름)를 호출하는
+ * Workflow(resources/definitions/workflows/**.yml에 정의해 둔, 여러 단계로 이루어진 실행 흐름)를 호출하는
  * 엔드포인트를 모아 둔 컨트롤러입니다.
  *
  * api.controller.ChatController가 Agent 하나만 딱 한 번 호출하는 것과 달리, 이 컨트롤러는 여러

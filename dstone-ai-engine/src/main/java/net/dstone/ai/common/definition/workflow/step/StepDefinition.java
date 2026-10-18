@@ -13,7 +13,7 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * workflows/**.workflow.yml 의 steps: 항목 하나입니다. WorkFlowDefinition.steps 목록에 담깁니다.
+ * workflows/**.yml 의 steps: 항목 하나입니다. WorkFlowDefinition.steps 목록에 담깁니다.
  *
  * ## type 값마다 record가 하나씩 있습니다
  * YAML의 type 값을 보고 아래 다섯 record 중 하나로 읽습니다(common.loader.YamlDefinitionLoader).
@@ -36,7 +36,7 @@ import net.dstone.common.utils.StringUtil;
  * 종류마다 있기도 하고 없기도 한 값(부르는 대상, next, forEach, memory)을 꺼내는 일은 아래 static 메서드가 한곳에서 맡습니다.
  *
  * ## 공통 규칙
- * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/**.agent.md 의 input/output)나
+ * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/**.md 의 input/output)나
  *   Tool(인자 스키마)이 정하고, step은 "무엇을 넣을지(with)", "결과를 어디에 둘지(save)", "다음에 어디로 갈지"만 적습니다.
  *
  * - id: 영문, 숫자, 밑줄(_)만 씁니다(예: step01). END/FAIL은 예약어라 id로 쓸 수 없습니다.

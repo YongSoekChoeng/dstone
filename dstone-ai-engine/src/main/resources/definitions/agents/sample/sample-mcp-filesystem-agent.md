@@ -1,9 +1,9 @@
 ---
 # 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 머리말의 id 값이고, 파일 이름도 id와 같게 둡니다.
 #
-# sample-tool-demo-agent.agent.md과 똑같은 tool-calling 패턴이지만, 여기서 LLM이 고르는 Tool
+# sample-tool-demo-agent.md과 똑같은 tool-calling 패턴이지만, 여기서 LLM이 고르는 Tool
 # (list_directory, read_text_file)은 자바로 직접 만든 @AiTool이 아니라 mcp/sample/
-# sample-filesystem.mcp.yml에 정의된 외부 MCP 서버가 제공하는 Tool입니다. common.config.ConfigTool
+# sample-filesystem.yml에 정의된 외부 MCP 서버가 제공하는 Tool입니다. common.config.ConfigTool
 # 입장에서는 둘이 완전히 똑같이 취급되기 때문에, Agent 쪽 설정(tools에 Tool 이름을 적는 것)은 로컬 Tool을
 # 쓸 때와 다를 게 없습니다 - "MCP 서버 Tool도 로컬 Tool과 구분 없이 쓸 수 있다"는 걸 보여주는
 # 것이 이 샘플의 목적입니다.

@@ -8,7 +8,7 @@
 #
 # route 값은 그 step의 routes에 적어둔 이름 중 하나여야 합니다. 엔진이 routes 이름 목록을 스키마(enum)로
 # 알려주고 답도 그 목록으로 검사하지만, 아래 prompt에서 각 이름의 뜻을 설명해 두어야 LLM이 제대로 고릅니다.
-# workflows/sample/sample-router-multiway.workflow.yml에서는 "billing"(결제 문의), "technical"(기술 문의),
+# workflows/sample/sample-router-multiway.yml에서는 "billing"(결제 문의), "technical"(기술 문의),
 # "other"(기타 문의) 세 갈래로 쓰고 있습니다.
 id: sample-router-classifier-agent
 version: 1.0.0

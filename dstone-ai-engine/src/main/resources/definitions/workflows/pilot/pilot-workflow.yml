@@ -26,7 +26,7 @@
 #   표현식은 값을 읽어 오기만 합니다. 파일을 읽어 두고, 검증하고, 목록을 거르는 일은 범용 Tool이 합니다
 #   (readFiles, readItemFiles, checkData, filterList, editFileTexts).
 #   이 Workflow만을 위한 자바 코드는 없습니다. 흐름을 바꾸려면 이 파일을, 문서의 모양을 바꾸려면
-#   문서 Agent의 프롬프트(agents/pilot/pilot-newdev-doc-writer-agent.agent.md의 본문)를 고치면 됩니다.
+#   문서 Agent의 프롬프트(agents/pilot/pilot-newdev-doc-writer-agent.md의 본문)를 고치면 됩니다.
 #
 # 재분석할 때 지적 사항이 전달되는 길
 #   step02와 step03의 input.feedback이 step04의 불통과 사유(state.review.reason)와 step05에서 사람이 적은 의견
@@ -605,7 +605,7 @@ steps:
 
   # 새 파일 3 (파일마다 새 대화로 한 번씩. Tool 없이 LLM 1회)
   #   이름 바꿈은 step24가 끝냈다. 여기서는 빼는 것과 더하는 것을 "몇 번째 줄을 어떻게"로 정하기만 한다. 파일은 step31이 고친다.
-  #   Agent에 Tool을 주지 않는 이유는 pilot-newdev-file-developer-agent.agent.md의 주석에 있다.
+  #   Agent에 Tool을 주지 않는 이유는 pilot-newdev-file-developer-agent.md의 주석에 있다.
   - id: step30
     type: AGENT
     agent: pilot-newdev-file-developer-agent

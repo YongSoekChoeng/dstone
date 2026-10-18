@@ -15,7 +15,7 @@
 #   input     : SELECT 1 FROM dual
 # input을 "SELECT * FROM WRONG SYNTAX ("처럼 문법이 깨진 SQL로 바꿔서 호출해보면, validate에서
 # 바로 FAIL로 끝나는 것도 확인할 수 있습니다(이 Workflow에는 실패했을 때 다시 고쳐보는 재작성
-# 루프가 없습니다 - 그런 루프가 궁금하다면 workflows/sample/sample-loop-retry-until-valid.workflow.yml을 참고하세요).
+# 루프가 없습니다 - 그런 루프가 궁금하다면 workflows/sample/sample-loop-retry-until-valid.yml을 참고하세요).
 id: sample-tool-chain-basic
 version: 1.0.0
 description: TOOL step 2개(validateSqlSyntax→getCurrentDateTime) 연속 실행 확인용 Workflow. LLM 비용 없이 항상 성공한다(SQL이 올바르면).

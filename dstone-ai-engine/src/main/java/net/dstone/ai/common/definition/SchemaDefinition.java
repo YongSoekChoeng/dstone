@@ -10,9 +10,9 @@ import net.dstone.ai.common.schema.Picoschema;
 /**
  * <pre>
  * "이 자리에 어떤 모양의 값이 오가는가"를 선언한 것입니다(입출력 계약). 세 곳에서 씁니다.
- * - agents/**.agent.md 머리말의 input: 이 Agent가 받는 값의 모양
- * - agents/**.agent.md 머리말의 output: 이 Agent가 돌려주는 값의 모양
- * - workflows/**.workflow.yml 의 input: 이 Workflow를 실행할 때 요청에 담아야 하는 값의 모양
+ * - agents/**.md 머리말의 input: 이 Agent가 받는 값의 모양
+ * - agents/**.md 머리말의 output: 이 Agent가 돌려주는 값의 모양
+ * - workflows/**.yml 의 input: 이 Workflow를 실행할 때 요청에 담아야 하는 값의 모양
  *
  * 짧은 타입 표기(Picoschema)로 그 자리에 바로 적습니다(규칙은 common.schema.Picoschema 참고).
  *

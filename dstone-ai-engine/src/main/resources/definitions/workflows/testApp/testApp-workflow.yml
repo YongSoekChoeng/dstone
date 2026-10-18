@@ -2,7 +2,7 @@ id: testApp-workflow
 version: 1.0.0
 description: 테스트용 workflow
 # input: 읽을 문서의 전체 경로입니다.
-#   MCP filesystem 서버(definitions/mcp/sample/sample-filesystem.mcp.yml)가 허용한 폴더
+#   MCP filesystem 서버(definitions/mcp/sample/sample-filesystem.yml)가 허용한 폴더
 #   (${APP_HOME}/${APP_NAME}/mcp/server-filesystem) 안에 있어야 읽을 수 있습니다.
 #   예: D:/AppHome/framework/dstone/dstone-ai-engine/mcp/server-filesystem/testApp/dongyang-plan.md
 input: string

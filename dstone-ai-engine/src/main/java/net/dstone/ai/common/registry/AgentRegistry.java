@@ -23,7 +23,7 @@ import net.dstone.common.utils.StringUtil;
 /**
  * <pre>
  * 모든 Agent 정보를 담아두고, id로 찾아 주는 등록소입니다. 
- * 로딩 순서는 YamlDefinitionLoader가 classpath:definitions/agents/**.agent.md 파일들을 읽어서 AgentDefinition으로 바꾸고, 
+ * 로딩 순서는 YamlDefinitionLoader가 classpath:definitions/agents/**.md 파일들을 읽어서 AgentDefinition으로 바꾸고, 
  * 이 AgentRegistry가 그 AgentDefinition들을 앱이 기동될 때 한 번 모아서 보관하는 식입니다.
  *
  * Agent를 찾아 쓰는 경로는 두 가지입니다. 
@@ -63,7 +63,7 @@ public class AgentRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 앱이 기동될 때 한 번 호출되어, agents/**.agent.md에 정의된 Agent를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
+	 * 앱이 기동될 때 한 번 호출되어, agents/**.md에 정의된 Agent를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
 	 * id, version, prompt가 비어 있는 Agent가 있거나, 같은 id의 Agent가 둘 이상 있거나, 
 	 * input/output 스키마가 올바른 JSON Schema가 아니면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
 	 * </pre>
@@ -73,13 +73,13 @@ public class AgentRegistry extends BaseObject {
 		Map<String, AgentDefinition> resolved = new HashMap<>();
 		for (AgentDefinition definition : this.loader.loadAgents()) {
 			if (StringUtil.isEmpty(definition.id())) {
-				throw new IllegalStateException("agents/**.agent.md 머리말에는 id가 있어야 합니다: " + definition);
+				throw new IllegalStateException("agents/**.md 머리말에는 id가 있어야 합니다: " + definition);
 			}
 			if (StringUtil.isEmpty(definition.version())) {
 				throw new IllegalStateException("agent[" + definition.id() + "]에 version이 없습니다. 예: version: \"1.0.0\"");
 			}
 			if (StringUtil.isEmpty(definition.promptText())) {
-				throw new IllegalStateException("agent[" + definition.id() + "]의 프롬프트가 비어 있습니다. .agent.md 파일에서 머리말(--- ... ---) 아래에 프롬프트를 적으십시오.");
+				throw new IllegalStateException("agent[" + definition.id() + "]의 프롬프트가 비어 있습니다. Agent 파일에서 머리말(--- ... ---) 아래에 프롬프트를 적으십시오.");
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
 				throw new IllegalStateException("agent id가 중복 등록되었습니다: " + definition.id());
@@ -229,7 +229,7 @@ public class AgentRegistry extends BaseObject {
 			String where = "agent[" + definition.id() + "]의 subAgents '" + subAgentId + "'";
 			AgentDefinition subAgent = all.get(subAgentId);
 			if (subAgent == null) {
-				throw new IllegalStateException(where + ": agents/**.agent.md에 그런 Agent가 없습니다.");
+				throw new IllegalStateException(where + ": agents/**.md에 그런 Agent가 없습니다.");
 			}
 			if (!subAgent.subAgentIds().isEmpty()) {
 				throw new IllegalStateException(where + ": 이 Agent도 subAgents를 가지고 있습니다. Sub Agent는 한 단계만 둘 수 있습니다(부모 → 자식). "
