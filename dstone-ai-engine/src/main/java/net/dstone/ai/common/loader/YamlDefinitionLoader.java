@@ -48,7 +48,7 @@ import net.dstone.common.utils.StringUtil;
  * 경로에 쓰인 "**"는 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, 도메인별로 서브 디렉토리를 나눠서(예: workflows/billing/) 관리해도 됩니다.
  * 파일 맨 위에 workflow: / agent: / mcpServer: 같은 감싸는 키는 없습니다. 무엇의 정의인지는 파일 이름 끝으로 구분합니다.
  *
- * 파일을 읽는 방식은 이렇습니다: 먼저 SnakeYAML로 파싱해서 평범한 Map으로 만들고(Agent는 머리말만), 예전 형식이 남아 있지 않은지 본 다음,
+ * 파일을 읽는 방식은 이렇습니다: 먼저 SnakeYAML로 파싱해서 평범한 Map으로 만들고(Agent는 머리말만), 지원하지 않는 모양(감싸는 키, 따로 둔 스키마 파일 등)을 적지 않았는지 본 다음,
  * Jackson의 ObjectMapper.convertValue()로 그 Map을 definition record에 바인딩합니다.
  * record의 필드에 바로 바인딩되는 건 pom.xml에 이미 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
  *
@@ -80,10 +80,10 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 예전 형식의 정의 파일이 남아 있으면 기동을 멈춥니다. 새 이름 패턴에 맞지 않는 파일은 아예 읽히지 않으므로,
+	 * 이름 패턴에 맞지 않는 정의 파일이 있으면 기동을 멈춥니다. 그런 파일은 아예 읽히지 않으므로,
 	 * 그냥 두면 "Agent가 없다"는 엉뚱한 오류만 보게 됩니다.
 	 * - agents/ 아래의 .yml, workflows/ 아래의 .workflow.yml이 아닌 .yml, mcp/ 아래의 .mcp.yml이 아닌 .yml
-	 * - prompts/, schemas/ 폴더 안의 파일(프롬프트는 .agent.md 본문으로, 스키마는 그 자리의 Picoschema로 옮겼습니다)
+	 * - prompts/, schemas/ 폴더 안의 파일(프롬프트는 .agent.md 본문에, 스키마는 그 자리에 Picoschema로 적습니다)
 	 * </pre>
 	 */
 	@PostConstruct
@@ -106,7 +106,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * 패턴에 맞는 파일 중 이름이 keepSuffix로 끝나지 않는 것을 found에 담습니다(keepSuffix가 null이면 전부).
 	 *
 	 * @param pattern    찾을 classpath 패턴
-	 * @param keepSuffix 새 형식의 파일 이름 끝(이것으로 끝나면 건너뜀)
+	 * @param keepSuffix 읽히는 파일의 이름 끝(이것으로 끝나면 건너뜀)
 	 * @param found      찾은 파일을 담을 목록
 	 */
 	private void collectOld(String pattern, String keepSuffix, List<String> found) {
@@ -295,12 +295,12 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 맨 위에 예전처럼 감싸는 키(workflow:, agent:, mcpServer:) 하나만 있으면 안내와 함께 멈춥니다.
+	 * 맨 위에 감싸는 키(workflow:, agent:, mcpServer:) 하나만 있으면 안내와 함께 멈춥니다.
 	 * </pre>
 	 *
 	 * @param resource 오류 문장에 보여 줄 파일
 	 * @param root     파일 전체
-	 * @param wrapper  예전에 쓰던 감싸는 키 이름
+	 * @param wrapper  감싸는 키 이름
 	 */
 	private void checkNoWrapper(Resource resource, Map<String, Object> root, String wrapper) {
 		if (root.size() == 1 && root.get(wrapper) instanceof Map) {
@@ -310,7 +310,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * Agent의 input/output을 예전 모양({schema: 파일}, {format, schema, validation})으로 적었으면 새 모양을 알려줍니다.
+	 * Agent의 input/output을 {schema: 파일}이나 {format, schema, validation} 모양으로 적었으면 타입 표기로 적으라고 알려줍니다.
 	 * </pre>
 	 *
 	 * @param resource 오류 문장에 보여 줄 파일
@@ -327,7 +327,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * Workflow를 예전 모양으로 적은 곳이 있으면 새 모양을 알려줍니다(감싸는 workflow:, output.value, state.schema, input.schema).
+	 * Workflow에 지원하지 않는 모양이 있으면 바른 모양을 알려줍니다(감싸는 workflow:, output.value, state.schema, input.schema).
 	 * </pre>
 	 *
 	 * @param resource 오류 문장에 보여 줄 파일
@@ -375,7 +375,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * - type 값이 없거나 틀림: 쓸 수 있는 type 값을 알려줍니다.
 	 * - 값의 모양이 다름: 예를 들어 TOOL step의 with를 맵이 아니라 문자열로 적은 경우입니다.
 	 * - 값을 만들다 실패함: 예를 들어 타입 표기에 없는 타입 이름(output: strng)을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
-	 * 예전 키(step의 ref/onSuccess, Agent의 reasoning/maxToolCalls/ragEnabled 등)를 적었으면 새 모양도 함께 알려줍니다.
+	 * 쓰지 않는 키나 자리를 옮긴 키(step의 ref/onSuccess, Agent의 reasoning/maxToolCalls/ragEnabled 등)를 적었으면 바른 모양도 함께 알려줍니다.
 	 * </pre>
 	 *
 	 * @param e convertValue()가 던진 예외
@@ -413,7 +413,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 없어졌거나 다른 곳으로 옮겨진 키를 적었으면 새 모양을 알려주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
+	 * 쓰지 않는 키나 다른 자리로 옮긴 키를 적었으면 바른 모양을 알려주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
 	 * </pre>
 	 *
 	 * @param owner 키를 적은 자리의 record 타입
@@ -477,7 +477,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * agent 아래의 묶음(model, prompt, tools 등)을 예전처럼 값 하나로 적었을 때 새 모양을 알려주는 안내 문구를 돌려줍니다.
+	 * Agent 머리말의 묶음(model, tools 등)을 맵이 아니라 값 하나로 적었을 때 바른 모양을 알려주는 안내 문구를 돌려줍니다.
 	 * </pre>
 	 *
 	 * @param block 값이 들어가야 했던 record 타입
@@ -514,7 +514,7 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * Jackson 오류가 가리키는 자리를 YAML 경로 모양(예: workflow.steps[2].routes)으로 만듭니다.
+	 * Jackson 오류가 가리키는 자리를 YAML 경로 모양(예: steps[2].routes)으로 만듭니다.
 	 * </pre>
 	 *
 	 * @param e 자리 정보를 담고 있는 Jackson 오류
@@ -542,7 +542,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * SnakeYAML이 만들어준 Map/List/String 구조를 그대로 따라 내려가면서, 문자열 값 안에 있는
 	 * ${VAR_NAME} 토큰을 전부 찾아 치환합니다. Map과 List는 값만 바꾸면 되므로 구조 자체는
 	 * 그대로 유지하고, 문자열이 아닌 값(숫자, boolean 등)은 건드리지 않고 그대로 돌려줍니다.
-	 * (돌려주는 Map과 List는 새로 만든 것이라, 뒤에서 inlineFiles()가 값을 바꿔 넣을 수 있습니다.)
+	 * (돌려주는 Map과 List는 새로 만든 것이라, 받은 값은 바뀌지 않습니다.)
 	 * </pre>
 	 *
 	 * @param value 치환할 대상입니다(YAML 최상위 Map이거나, 그 안에 중첩된 Map/List/String 등입니다).

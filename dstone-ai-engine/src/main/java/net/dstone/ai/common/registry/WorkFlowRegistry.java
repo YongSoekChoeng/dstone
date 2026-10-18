@@ -70,7 +70,7 @@ import net.dstone.common.utils.StringUtil;
  *    - saveEach는 forEach step에만 있는가
  *    - state:에 선언한 이름마다 저장하는 step이 하나 이상 있는가
  * 5) 표현식(validateTemplate, 오류): step with, forEach, Workflow return 안의 모든 값에 대해
- *    - 예전 문법({{ }}, "${ .steps.id.output }" 같은 jq 식)이 없는가, 경로 모양이 맞는가
+ *    - 쓰지 않는 문법({{ }}, "${ .steps.id.output }" 같은 jq 식)이 없는가, 경로 모양이 맞는가
  *    - 읽는 곳이 input / state / forEach 변수 중 하나인가(변수는 forEach step의 with 안에서만)
  *    - ${state.이름}의 이름이 state:에 선언되어 있고, 그 이름에 저장하는 step이 흐름상 읽는 step보다 먼저 실행될 수 있는가
  *      (예: 첫 step이 뒤 step의 결과를 읽으면 항상 null이므로 막습니다. 재시도 루프처럼 되돌아오는 흐름이면 허용)
@@ -404,7 +404,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param definition       검사 중인 Workflow 정의
 	 * @param step             검사할 step
 	 * @param agentId          부를 Agent id
-	 * @param input            step의 input
+	 * @param input            step의 with
 	 * @param engineOwnsOutput 답의 모양을 엔진이 정하는 step(SUPERVISOR/ROUTER)인지 여부
 	 */
 	private void checkAgentCall(WorkFlowDefinition definition, StepDefinition step, String agentId, Object input, boolean engineOwnsOutput) {
@@ -442,7 +442,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param step       검사할 step
 	 * @param owner      계약의 주인(오류 문장에 씁니다. 예: agent[x]의 input)
 	 * @param schema     부르는 대상의 input 스키마
-	 * @param input      step의 input
+	 * @param input      step의 with
 	 */
 	@SuppressWarnings("unchecked")
 	private void checkInputShape(WorkFlowDefinition definition, StepDefinition step, String owner, Map<String, Object> schema, Object input) {
@@ -501,7 +501,7 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step의 input을 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 값 하나나 맵, TOOL은 맵이고, APPROVAL은 input이 없어서 null입니다.
+	 * step의 with를 돌려줍니다. AGENT/SUPERVISOR/ROUTER는 값 하나나 맵, TOOL은 맵이고, APPROVAL은 with가 없어서 null입니다.
 	 * </pre>
 	 *
 	 * @param step input을 꺼낼 step
@@ -593,7 +593,7 @@ public class WorkFlowRegistry extends BaseObject {
 	/**
 	 * <pre>
 	 * 템플릿(step.with, step.forEach, workflow.return) 하나를 검사합니다(클래스 설명의 5번).
-	 * 1) 글자마다: 예전 문법({{ }})이 없는지 봅니다.
+	 * 1) 글자마다: 쓰지 않는 문법({{ }})이 없는지 봅니다.
 	 * 2) 표현식마다: 경로 모양과 읽는 곳을 확인하고(ContextResolver), 읽는 경로를 검사합니다(checkReference).
 	 * </pre>
 	 *
@@ -889,7 +889,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * id로 Workflow를 찾아서 돌려줍니다. 
 	 * 이때 caller가 그 Workflow를 쓸 수 있는지도 함께 확인합니다.
 	 * 등록되지 않은 id이거나, caller가 화이트리스트를 통과하지 못하면 바로 예외를 던집니다.
-	 * <pre>
+	 * </pre>
 	 *
 	 * @param id     조회할 Workflow id
 	 * @param caller 호출한 앱/서비스를 나타내는 식별자(tenant)

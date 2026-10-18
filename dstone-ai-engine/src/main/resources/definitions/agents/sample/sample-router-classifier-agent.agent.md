@@ -1,9 +1,9 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 머리말의 id 값이고, 파일 이름도 id와 같게 둡니다.
 #
 # 이 Agent는 Workflow의 ROUTER step 전용으로 만들어진 예시입니다. ROUTER step은 "여러 갈래 중
 # 어디로 갈지"를 LLM에게 직접 고르게 하는 step인데, 이 Agent가 바로 그 "고르는 역할"을 맡습니다.
-# 답의 모양은 엔진이 {route, reason}으로 정해 두었으므로(common.schema.StepOutputSchemas), 이 Agent는
+# 답의 모양은 엔진이 {route, reason}으로 정해 두었으므로(common.schema.JsonSchemaUtil.routeDecision()), 이 Agent는
 # output을 선언하지 않습니다(선언하면 엔진이 켜질 때 막힙니다). input은 선언하지 않았으므로 string입니다.
 #
 # route 값은 그 step의 routes에 적어둔 이름 중 하나여야 합니다. 엔진이 routes 이름 목록을 스키마(enum)로

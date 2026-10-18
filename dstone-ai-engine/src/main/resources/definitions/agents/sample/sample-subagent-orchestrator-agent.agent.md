@@ -1,5 +1,5 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 id 값입니다.
 #
 # 이 Agent는 Sub Agent(subAgents) 기능을 보여주는 예시입니다. subAgents에 다른 Agent의 id를 적으면,
 # 이 Agent의 LLM에게 그 Agent가 Tool 하나처럼 보이고, LLM이 필요할 때 스스로 골라 일을 맡깁니다

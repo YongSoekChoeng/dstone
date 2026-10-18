@@ -21,7 +21,7 @@ tools:
 execution:
   # prompt에 [조회 한도]를 적지 않는다. 횟수는 엔진이 센다. 남은 횟수가 5분의 1 이하가 되면 엔진이 Tool 결과 끝에
   # "N번 남았다, 지금 결과를 저장하라"고 알려 주고, 다 쓰면 Tool을 실행하지 않는다(runtime.agent.ToolCallBudgetCallback).
-  # 예전 prompt의 "조회 25번 이내"에 문서를 저장하는 호출(writeFile, appendFile)을 더한 값이다.
+  # 32는 조회 25번 안팎에 문서를 저장하는 호출(writeFile, appendFile)을 더한 값이다.
   maxToolCalls: 32
 ---
 [역할] 너는 이 시스템의 애플리케이션 아키텍트다. 개발자가 그대로 따라 구현할 수 있는 설계서와 태스크 목록을 만든다.

@@ -133,7 +133,7 @@ public class ConfigChatClient {
 	 * 이유: Spring AI(2.0.1)의 OpenAiChatModel은 호출할 때마다 "요청 옵션의 timeout"을 꺼내 그 요청의 대기 시간으로 씁니다.
 	 * 그런데 이 값은 설정 파일로 바꿀 길이 없고 기본 60초로 굳어 있습니다. spring.ai.openai.timeout은 HTTP 클라이언트의
 	 * 기본값으로만 들어가고, 요청마다 60초가 그 위를 덮어씁니다. 그래서 설정에 5m을 적어도 60초에 끊깁니다.
-	 * 실제로 느린 모델이 긴 문서를 써 내다가 정확히 60초에 끊겼습니다
+	 * 이렇게 끊기면 오류는 이런 모양으로 남습니다
 	 * ("Error reading response (원인: InterruptedIOException: timeout <- StreamResetException: stream was reset: CANCEL)").
 	 *
 	 * ChatClient의 기본 옵션(defaultOptions)에 넣지 않는 이유: 호출할 때 옵션을 따로 주면(Agent의 model 지정)
@@ -150,7 +150,7 @@ public class ConfigChatClient {
 	 *
 	 * - ollama는 모델 대부분이 켜기/끄기만 받아서 low/medium/high를 모두 "켜기"로 보냅니다.
 	 * - anthropic의 thinking 예산은 max-tokens보다 작아야 합니다. max-tokens를 4096 이하로 쓰면 high는 오류가 납니다.
-	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(지금까지와 같습니다).
+	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(provider와 모델의 기본 동작을 씁니다).
 	 * </pre>
 	 *
 	 * @param model     이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.

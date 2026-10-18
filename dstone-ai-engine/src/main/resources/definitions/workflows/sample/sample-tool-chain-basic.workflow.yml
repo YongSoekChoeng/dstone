@@ -7,7 +7,7 @@
 # tools.sample.DateTimeTool) API 비용이나 네트워크 연결 없이도 바로 돌려볼 수 있습니다.
 #
 # validate step은 요청의 input(${input})을 sql 인자로 넘기므로, 이 Workflow를 호출할 때는
-# input 자리에 SQL 문을 넣어야 합니다. now step은 인자가 필요 없어서 input을 생략했습니다(빈 인자 {}로
+# input 자리에 SQL 문을 넣어야 합니다. now step은 인자가 필요 없어서 with를 생략했습니다(빈 인자 {}로
 # 호출됩니다). 두 step이 결과를 state에 저장하고, 최종 결과는 그 둘을 모은 맵입니다(return을 맵으로 적은 예시).
 #
 # dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:

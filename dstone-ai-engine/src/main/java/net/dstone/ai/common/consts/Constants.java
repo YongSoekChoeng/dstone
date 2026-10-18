@@ -52,7 +52,7 @@ public final class Constants {
 		/** 위 설정이 없을 때 쓰는 값입니다. */
 		public final static int DEFAULT_SUB_AGENT_MAX_CALLS = 10;
 
-		/** Agent 호출 한 번 안에서 Tool을 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.tool.max-calls). Agent의 maxToolCalls가 있으면 그 값이 이깁니다. */
+		/** Agent 호출 한 번 안에서 Tool을 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.tool.max-calls). Agent의 execution.maxToolCalls가 있으면 그 값이 이깁니다. */
 		public final static String TOOL_MAX_CALLS = "dstone.ai.agent.tool.max-calls";
 
 		/** 위 설정이 없을 때 쓰는 값입니다. */
@@ -94,7 +94,7 @@ public final class Constants {
 			public final static String PREFIX = "dstone.ai.tool.jenkins";
 		}
 
-		/** 파일을 읽고 쓰는 Tool(tools.utils.FileTool)의 설정 키 접두사입니다. */
+		/** 파일을 읽고 쓰는 Tool(tools.file.FileTool)의 설정 키 접두사입니다. */
 		public static final class File {
 			public final static String PREFIX = "dstone.ai.tool.file";
 		}
@@ -142,14 +142,13 @@ public final class Constants {
 
 		/**
 		 * <pre>
-		 * step이 저장하는 "무엇"의 이름들입니다(save = result, saveError = error, saveInput = input, saveEach = items). StepDefinition.output()이 이 이름 → state 이름 맵을 만듭니다.
+		 * step이 저장하는 "무엇"의 이름들입니다. StepDefinition.output()이 이 이름 → state 이름 맵을 만듭니다.
 		 *
-		 *   output:
-		 *     result: state.analysis           이 step이 돌려준 값 전체
-		 *     result.sql: state.sql            돌려준 값 안의 필드 하나
-		 *     input: state.sentInput           이 step이 실제로 받은 입력(input 표현식을 계산한 뒤의 값)
-		 *     error: state.analysisError       실패 사유(성공이면 null)
-		 *     items: state.copied              forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
+		 *   YAML 키                이름     저장되는 값
+		 *   save: analysis         result   이 step이 돌려준 값 전체
+		 *   saveInput: sentInput   input    이 step이 실제로 받은 입력(with 표현식을 계산한 뒤의 값)
+		 *   saveError: lastError   error    실패 사유(성공이면 null)
+		 *   saveEach: copied       items    forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
 		 * </pre>
 		 */
 		public static final class Output {
@@ -224,7 +223,7 @@ public final class Constants {
 		public final static String MCP_LOCATION = ROOT_LOCATION + "/mcp";
 		public final static String MCP_SUFFIX = ".mcp.yml";
 		public final static String MCP_LOCATION_PATTERN = MCP_LOCATION + "/**/*" + MCP_SUFFIX;
-		/** 예전 형식에서 프롬프트와 스키마 파일을 따로 두던 폴더입니다. 남아 있으면 옮기라고 알려 주려고 둡니다. */
+		/** 정의 파일 폴더 아래에 있으면 안 되는 폴더입니다(프롬프트는 .agent.md 본문에, 스키마는 그 자리에 Picoschema로 적습니다). 이 안에 파일이 있으면 기동을 멈춥니다. */
 		public final static List<String> OLD_DIRS = List.of("prompts", "schemas");
 	}
 

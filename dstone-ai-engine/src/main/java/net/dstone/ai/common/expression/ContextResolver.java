@@ -25,18 +25,18 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *
  * ## 쓰는 모양은 두 가지
  * 1) 값 전체가 표현식 하나면, 읽어 온 값을 타입 그대로(글자, 숫자, 객체, 리스트) 넘깁니다.
- *      input: "${state.analysis}"
+ *      with: ${state.analysis}
  * 2) 글자 사이에 섞어 쓰면, 읽어 온 값을 글자로 바꿔 끼워 넣습니다(객체와 리스트는 JSON 글자).
- *      filePath: "${input}/01-requirements.md"
+ *      filePath: ${input}/01-requirements.md
  *      feedback: "${state.review.reason:}\n${state.approval.comment:}"
  *    끼워 넣은 뒤 앞뒤의 공백과 줄바꿈은 뗍니다(위 예에서 둘 다 없으면 빈 글자, 하나만 있으면 그 값만 남습니다).
  *
  * ## 값이 없을 때
  * 없는 값을 가리키면 오류가 아니라 null입니다. 글자 사이에 섞어 쓴 자리에서는 빈 글자가 됩니다.
  * 콜론 뒤에 기본값을 적을 수 있습니다. 값이 없거나 null이면 그 기본값을 씁니다. 기본값 자리에 다른 표현식을 적어도 됩니다.
- *      feedback: "${state.review.comment:}"         없으면 빈 글자
- *      mode: "${input.mode:strict}"                 없으면 strict
- *      sql: "${state.fixed.sql:${input}}"           고친 SQL이 아직 없으면 요청의 input
+ *      feedback: ${state.review.comment:}           없으면 빈 글자
+ *      mode: ${input.mode:strict}                   없으면 strict
+ *      sql: ${state.fixed.sql:${input}}             고친 SQL이 아직 없으면 요청의 input
  *
  * 맵과 리스트는 안쪽 값마다 같은 규칙을 적용합니다. "${"가 없는 값은 적힌 그대로 넘깁니다.
  * </pre>

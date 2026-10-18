@@ -18,7 +18,6 @@ import com.openai.errors.OpenAIServiceException;
  * 공급자가 준 상세가 없을 때는 원인 예외(Caused by)를 대신 붙입니다.
  * "Error reading response", "Request failed" 같은 겉 메시지는 무슨 일이 있었는지 알려 주지 않고,
  * 진짜 이유(시간 초과인지, 연결이 끊겼는지, 본문이 JSON이 아닌지)는 원인 예외에 들어 있기 때문입니다.
- * 실제로 "Error reading response" 한 줄만 남아서, 콘솔의 스택을 보기 전에는 원인을 알 수 없었던 적이 있습니다.
  */
 public final class ProviderErrorMessage {
 

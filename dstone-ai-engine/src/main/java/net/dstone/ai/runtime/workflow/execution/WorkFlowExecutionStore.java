@@ -232,7 +232,7 @@ public class WorkFlowExecutionStore extends BaseDao {
 	}
 
 	/**
-	 * RESULT_TEXT 컬럼의 JSON 글자를 원래 결과 값으로 되돌립니다. JSON이 아니면(결과를 JSON으로 저장하기 전에 쌓인 행) 글자 그대로 씁니다.
+	 * RESULT_TEXT 컬럼의 JSON 글자를 원래 결과 값으로 되돌립니다. JSON이 아니면 글자 그대로 씁니다.
 	 *
 	 * @param json RESULT_TEXT 컬럼 값입니다.
 	 */

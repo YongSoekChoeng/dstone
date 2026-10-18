@@ -11,9 +11,9 @@
 # 1) tree: input으로 받은 디렉토리(${input})의 목록을 directory_tree로 가져옵니다.
 #    directory_tree는 [{"name": "notes.txt", "type": "file"}, ...] 모양의 JSON으로 답하므로,
 #    엔진이 그 JSON(리스트)을 그대로 state.tree에 저장합니다.
-# 2) readNotes: forEach가 "${state.tree}"라서, 찾아낸 항목 개수만큼 read_text_file을 동시에
+# 2) readNotes: forEach가 ${state.tree}라서, 찾아낸 항목 개수만큼 read_text_file을 동시에
 #    호출합니다. 각 반복은 자기가 맡은 항목을 entry(itemVariable: entry)로 받고, 글자 사이에 표현식을 끼워 넣어
-#    경로를 만듭니다: "${input}/${entry.name}".
+#    경로를 만듭니다: ${input}/${entry.name}
 #    파일이 몇 개든 YAML을 고칠 필요가 없습니다(예시 디렉토리에는 파일만 있다고 가정합니다).
 # 3) 최종 결과는 readNotes가 저장한 state.notes, 즉 파일별 내용의 리스트입니다.
 #

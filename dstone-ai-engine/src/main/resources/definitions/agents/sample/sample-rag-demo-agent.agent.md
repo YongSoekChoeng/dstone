@@ -1,5 +1,5 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 머리말의 id 값이고, 파일 이름도 id와 같게 둡니다.
 #
 # 이 Agent는 RAG(검색으로 찾은 문서를 근거로 답하는 기능, context.sources에 retrievedDocuments)가 실제로 동작하는
 # 모습을 보여주기 위한 예시입니다. 동작 원리는 이렇습니다: 이 Agent를 호출하면

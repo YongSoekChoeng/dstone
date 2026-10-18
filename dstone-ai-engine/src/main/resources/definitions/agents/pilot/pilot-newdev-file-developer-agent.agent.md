@@ -3,21 +3,20 @@
 # Workflow의 forEach step(step30)이 파일마다 새 대화로 한 번씩 부릅니다.
 #
 # 이 Agent는 파일을 고치지 않습니다. Tool이 없습니다. "몇 번째 줄부터 몇 번째 줄을 지운다 / 바꾼다 / 뒤에 넣는다"를
-# 한 번에 답하고(edits), 그 목록을 Workflow의 step31 step(editFileLines)이 LLM 없이 적용합니다.
+# 한 번에 답하고(edits), 그 목록을 Workflow의 step31(editFileLines)이 LLM 없이 적용합니다.
 #
 # 이 Agent가 하지 않는 일 (Workflow의 TOOL step이 LLM 없이 합니다)
-# - 참고 파일을 복사하면서 이름 바꿈 표대로 글자를 바꾸는 일: step24 step(copyFileWithReplace)
-# - 복사한 파일을 줄 번호와 함께 읽는 일: newRead step(readFileLines). 그 내용이 source로 들어옵니다.
-# - edits를 파일에 적용하는 일: step31 step(editFileLines)
-# - 이미 있는 파일을 고치는 일(변경 전 → 변경 후, 파일 끝에 덧붙이기): step27 / newAppend step(replaceInFile / appendFile)
-# - 본뜰 파일이 없는 새 파일을 설계가 적어 준 내용 그대로 저장하는 일: step26 step(writeFile)
-# 그래서 이 Agent는 복사한 새 파일 가운데 빼거나 더할 것이 있는 파일에만 불립니다.
+# - 참고 파일을 복사하면서 이름 바꿈 표대로 글자를 바꾸는 일: step24(copyFileWithReplace)
+# - 복사한 파일을 줄 번호와 함께 읽는 일: step29(readItemFiles, lineNumbers). 그 내용이 source로 들어옵니다.
+# - edits를 파일에 적용하는 일: step31(editFileLines)
+# - 이미 있는 파일을 고치는 일(변경 전 → 변경 후, 파일 끝에 덧붙이기): step27(editFileTexts)
+# - 본뜰 파일이 없는 새 파일을 설계가 적어 준 내용 그대로 저장하는 일: step26(writeFile)
+# 그래서 이 Agent는 복사한 새 파일 가운데 빼거나 더할 것이 있는 파일에만 불립니다(step28이 고릅니다).
 #
-# 왜 Tool을 주지 않는가 (2026-10-08에 같은 요청, 같은 파일 6개로 재 본 결과. OpenRouter qwen/qwen3.8-27b)
-# - writeFile을 준 때: 파일 전체를 인자로 다시 썼다. 그 인자도 출력 토큰이라 긴 파일은 한도에 걸렸다.
-# - replaceInFile을 주고 추론을 끈 때: 같은 호출을 되풀이했다(다 끝내고도 같은 파일을 다시 읽기, 실패한 oldText를 그대로 다시 보내기,
-#   import를 지웠다 되살리기). 6개 가운데 3~4개가 Tool 호출 한도 30번을 다 썼다.
-# - replaceInFile을 주고 추론을 켠 때: 4개는 됐지만 파일 하나에 4~5분이 걸렸고, 하나는 추론만으로 출력 토큰 한도를 다 썼고, 하나는 7분을 넘겼다.
+# 왜 Tool을 주지 않는가
+# - writeFile을 주면 파일 전체를 인자로 다시 쓴다. 그 인자도 출력 토큰이라 긴 파일은 한도에 걸린다.
+# - replaceInFile을 주면 같은 호출을 되풀이하기 쉽다(다 끝내고도 같은 파일을 다시 읽기, 실패한 oldText를 그대로 다시 보내기,
+#   import를 지웠다 되살리기). 추론을 켜면 되풀이는 줄지만 파일 하나에 몇 분씩 걸리고, 추론만으로 출력 토큰 한도를 다 쓰기도 한다.
 # 줄 번호로 답하게 하면 옮겨 적을 글자가 없어서 답이 짧고, 주어진 자료를 정리하는 일이라 추론을 꺼도 된다.
 id: pilot-newdev-file-developer-agent
 version: 1.0.0

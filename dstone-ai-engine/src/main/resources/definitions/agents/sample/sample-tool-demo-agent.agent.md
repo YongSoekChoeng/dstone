@@ -1,5 +1,5 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 머리말의 id 값이고, 파일 이름도 id와 같게 둡니다.
 #
 # 이 Agent는 tools에 Tool 이름 여섯 개를 적어 두어서, 그 Tool들 중에서 어떤 걸 쓸지 LLM 스스로
 # 판단해서 호출할 수 있습니다("tool-calling"이라고 부르는 동작입니다). tools에 적지 않은 Tool

@@ -1,6 +1,6 @@
 ### 1 MCP 서버 항목
 
-`mcp/**/<server-id>.mcp.yml` 파일 맨 위에 바로 적는다(`common.definition.mcp.McpServerDefinition`). 감싸는 `mcpServer:` 키는 없다.
+`mcp/**/<server-id>.mcp.yml` 파일 맨 위에 감싸는 키 없이 바로 적는다(`common.definition.mcp.McpServerDefinition`).
 
 | 항목 | 필수 | 설명 |
 |---|---|---|

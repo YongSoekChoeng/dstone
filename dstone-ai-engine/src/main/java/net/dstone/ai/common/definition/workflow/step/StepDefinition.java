@@ -72,7 +72,7 @@ import net.dstone.common.utils.StringUtil;
  *   input만 보고 답합니다. memory: true를 적은 step만 자기 대화방(sessionId:stepId)에서 이전에 자기가 나눈 대화를
  *   기억합니다(재작성 루프 등). 다른 step의 대화는 섞이지 않습니다.
  *
- * - forEach: 이 step을 항목마다 동시에 실행할 리스트를 표현식으로 적습니다(예: "${input.sqlList}").
+ * - forEach: 이 step을 항목마다 동시에 실행할 리스트를 표현식으로 적습니다(예: ${input.sqlList}).
  *   각 반복의 with 안에서 이번 항목은 ${item}(또는 itemVariable에 적은 이름)입니다.
  *
  * YAML이 이 규칙들을 지켰는지는 엔진이 켜질 때 common.registry.WorkFlowRegistry가 모두 검사합니다.

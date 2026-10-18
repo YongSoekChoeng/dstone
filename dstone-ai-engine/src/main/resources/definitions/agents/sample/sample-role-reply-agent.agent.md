@@ -1,9 +1,9 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 id 값입니다.
 #
 # 이 Agent는 "프롬프트의 {변수}는 Agent 자신의 input으로 채운다"는 규칙을 보여주는 예시입니다.
-# - input을 object({role, message})로 선언했습니다. Workflow step은 input을 맵으로 적어서 두 필드를 채웁니다.
-#   예: input: {role: "${input.role}", message: "${input.message}"}
+# - input을 object({role, message})로 선언했습니다. Workflow step은 with를 맵으로 적어서 두 필드를 채웁니다.
+#   예: with: {role: "${input.role}", message: "${input.message}"}   (한 줄 { } 맵 안의 표현식은 따옴표로 감쌉니다)
 # - 프롬프트 파일 안의 {role}은 엔진이 이 Agent가 받은 input의 role 필드로 채웁니다(Spring AI PromptTemplate).
 #   그래서 이 파일만 보면 prompt에 무엇이 들어오는지 알 수 있고, 어느 Workflow에서 부르든 똑같이 동작합니다.
 # - input 전체는 JSON 글자로 바뀌어 사용자 메시지로도 함께 들어가므로, LLM은 message 필드에 답하면 됩니다.

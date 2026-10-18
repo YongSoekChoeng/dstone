@@ -1,5 +1,5 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. 파일 이름이 곧 이 Agent의 id가 됩니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 머리말의 id 값이고, 파일 이름도 id와 같게 둡니다.
 #
 # sample-tool-demo-agent.agent.md과 똑같은 tool-calling 패턴이지만, 여기서 LLM이 고르는 Tool
 # (list_directory, read_text_file)은 자바로 직접 만든 @AiTool이 아니라 mcp/sample/

@@ -1,5 +1,5 @@
 ---
-# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 id 값입니다.
 #
 # 이 Agent는 "특정 Agent 하나에만 다른 LLM 모델을 쓰게 할 수 있다"는 기능(model.name)을 보여주기 위한 예시입니다.
 # 보통은 spring.ai.{provider}.chat.options.model에 설정된 provider 공통 기본 모델을 쓰지만, model.name에 모델 이름을

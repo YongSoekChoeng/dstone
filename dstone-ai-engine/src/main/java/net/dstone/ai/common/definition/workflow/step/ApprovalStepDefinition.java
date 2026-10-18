@@ -32,7 +32,7 @@ import net.dstone.ai.common.consts.StepType;
  * - approval.rejectTo는 routes의 REJECTED를 짧게 적는 방법입니다(둘 다 적었으면 같은 곳이어야 합니다).
  * - requireCommentOnReject: true면 APPROVED가 아닌 결정에는 의견(comment)이 꼭 있어야 합니다.
  * - 되돌아가는 흐름을 만들어도 됩니다. 한 번 쓴 결정은 지우기 때문에, 같은 APPROVAL step에 다시 오면 사람에게 다시 묻습니다.
- *   직전 결정은 save로 저장한 state에 남아 있어서 다음 step이 "${state.analysisApproval.comment:}"처럼 꺼내 쓸 수 있습니다.
+ *   직전 결정은 save로 저장한 state에 남아 있어서 다음 step이 ${state.analysisApproval.comment:}처럼 꺼내 쓸 수 있습니다.
  * - 고르는 것 자체가 결정이라 이 step에는 실패가 없습니다(onFailure, next를 적지 않습니다).
  * - forEach도 없습니다. 결정은 step id 하나로만 구분되는데, 같은 step을 여러 번 동시에 돌리면
  *   "그중 어느 실행에 대한 결정인지"를 구분할 방법이 없기 때문입니다.

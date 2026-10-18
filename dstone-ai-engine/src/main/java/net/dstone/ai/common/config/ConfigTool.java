@@ -45,7 +45,7 @@ import net.dstone.common.utils.LogUtil;
  *
  * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌우고, 호출할 때마다 로그 한 줄(이름, 인자, 결과 길이)을 남깁니다(LimitedToolCallback).
  * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. 
- * Tool마다 따로 막으면 새 Tool이나 MCP Tool에서 같은 사고가 또 나므로, 여기서 마지막 안전망을 하나 둡니다.
+ * Tool마다 따로 막으면 새 Tool이나 MCP Tool에서 빠뜨리기 쉬우므로, 여기서 모든 Tool에 마지막 안전망을 하나 둡니다.
  * </pre>
  */
 @Component
@@ -203,7 +203,7 @@ public class ConfigTool extends BaseObject {
 	 * <pre>
 	 * 이름으로 Tool 하나를 직접 찾아줍니다. 
 	 * runtime.tool.ToolExecutor가 TOOL step을 처리할 때, LLM을 거치지 않고 곧바로 원하는 Tool을 찾기 위해 이 메소드를 씁니다. 
-	 * 찾는 이름의 Tool이 없으면(또는vcaller의 화이트리스트에 없으면) null을 돌려줍니다.
+	 * 찾는 이름의 Tool이 없으면(또는 caller의 화이트리스트에 없으면) null을 돌려줍니다.
 	 * </pre>
 	 *
 	 * @param caller   Tool 화이트리스트를 조회할 호출 주체(tenant)
@@ -293,7 +293,7 @@ public class ConfigTool extends BaseObject {
 	 *
 	 * 주의: JSON을 돌려주는 Tool의 결과가 잘리면 더 이상 올바른 JSON이 아닙니다. TOOL step에서는
 	 * 그 결과가 글자 그대로(text) step의 result가 됩니다. 이런 일이 없도록 큰 결과를
-	 * 낼 수 있는 Tool은 Tool 안에서 먼저 개수를 제한하는 것이 좋습니다(tools.utils.FileTool 참고).
+	 * 낼 수 있는 Tool은 Tool 안에서 먼저 개수를 제한하는 것이 좋습니다(tools.file.FileTool 참고).
 	 * </pre>
 	 */
 	private static final class LimitedToolCallback implements ToolCallback {
@@ -351,7 +351,7 @@ public class ConfigTool extends BaseObject {
 		 *
 		 * 긴 문서를 writeFile의 인자로 한 번에 쓰다가 출력 토큰 한도(max-tokens)에 걸리면, 인자 JSON이 닫히지 않은 채로 옵니다.
 		 * 그대로 두면 Spring AI가 "Conversion from JSON failed"라는 긴 오류 로그만 남기고, LLM은 왜 실패했는지 모른 채
-		 * 같은 길이로 다시 씁니다(실제로 12,000자 문서를 두 번 썼습니다). 이유와 해결 방법을 알려 주면 나눠서 저장합니다.
+		 * 같은 길이로 다시 쓰기 쉽습니다. 이유와 해결 방법을 알려 주면 나눠서 저장합니다.
 		 * 인자가 비어 있는 것은 인자 없는 Tool의 정상 호출이므로 끊긴 것으로 보지 않습니다.
 		 * </pre>
 		 */
@@ -371,7 +371,7 @@ public class ConfigTool extends BaseObject {
 		/**
 		 * Tool을 한 번 부를 때마다 이름, 인자, 결과 길이를 한 줄로 남기고 결과를 그대로 돌려줍니다.
 		 * LLM이 스스로 Tool을 고르는 호출은 다른 곳에 기록이 남지 않습니다. 이 한 줄이 없으면 LLM이 같은 검색을
-		 * 수십 번 되풀이할 때 무엇을 찾고 있었는지 알 수 없습니다(실제로 searchInFiles를 40번 반복하다 실패한 적이 있습니다).
+		 * 수십 번 되풀이할 때 무엇을 찾고 있었는지 알 수 없습니다.
 		 * 인자가 길면(파일 내용을 통째로 넘기는 writeFile 등) 앞부분만 남깁니다.
 		 */
 		private String logged(String toolInput, String result) {

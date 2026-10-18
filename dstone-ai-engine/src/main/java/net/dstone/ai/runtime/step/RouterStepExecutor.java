@@ -18,7 +18,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 /**
  * <pre>
  * type: ROUTER step(RouterStepDefinition)을 실행합니다. LLM에게 "어디로 갈지"를 {route, reason} 모양의 JSON으로
- * 답하게 합니다. 답의 모양은 엔진이 정한 스키마(common.schema.StepOutputSchemas.routeDecision())로 강제하고 검사하며,
+ * 답하게 합니다. 답의 모양은 엔진이 정한 스키마(common.schema.JsonSchemaUtil.routeDecision())로 강제하고 검사하며,
  * route는 routes 이름 중 하나만 허용합니다(스키마의 enum). 그래서 routes에 없는 이름을 고른 답은 모양이 틀린 답으로 봅니다.
  *
  * 고른 경로는 output에 {route, reason}으로 남기고, 그 route로 다음 step을 정하는 일은

@@ -9,7 +9,7 @@ import net.dstone.ai.common.consts.StepType;
 /**
  * <pre>
  * workflows/**.workflow.yml 의 type: TOOL step입니다. 등록된 Tool(@AiTool로 만든 자바 기능 또는 MCP 서버의 Tool) 하나를
- * LLM을 거치지 않고 직접 호출합니다. 값을 검증하거나, 문서를 틀에 맞춰 만들거나, 외부 시스템에서 데이터를 가져오는 것처럼
+ * LLM을 거치지 않고 직접 호출합니다. 값을 검증하거나, 목록을 거르거나, 파일을 읽거나, 외부 시스템에서 데이터를 가져오는 것처럼
  * 결과가 코드로 정해지는 작업에 씁니다(runtime.step.ToolStepExecutor).
  *
  * 표현식은 값을 읽어 오기만 하므로, 계산이나 조건이 필요한 일은 YAML이 아니라 Tool(자바 코드)에 둡니다.
@@ -37,7 +37,7 @@ import net.dstone.ai.common.consts.StepType;
  * @param saveEach     (옵셔널)forEach step만: 반복마다 {item, input, result, error, success} 한 건씩 담은 목록을 저장할 state 이름입니다.
  * @param next         (옵셔널)성공했을 때 갈 step의 id(또는 "END")입니다.
  * @param onFailure    (옵셔널)실패했을 때 갈 step의 id(또는 "FAIL")입니다.
- * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 표현식입니다(예: "${state.tree}").
+ * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 표현식입니다(예: ${state.tree}).
  * @param itemVariable (옵셔널)forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"이고 표현식에서 ${item}으로 씁니다.
  */
 public record ToolStepDefinition(

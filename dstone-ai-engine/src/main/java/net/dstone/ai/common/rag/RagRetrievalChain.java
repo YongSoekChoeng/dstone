@@ -55,7 +55,7 @@ public class RagRetrievalChain extends BaseService {
 	 *
 	 * Spring AI의 ContextualQueryAugmenter가 기본으로 쓰는 템플릿은 "컨텍스트(참고 자료)에 없는
 	 * 내용이면 모른다고 답하라"고 강제합니다. 이건 순수 지식베이스 QA봇에는 맞는 동작이지만, 이
-	 * 프로젝트에서 RAG를 켠 Agent(예: sql-conversion-agent)는 이미 자기 system prompt
+	 * 프로젝트에서 RAG를 켠 Agent는 이미 자기 system prompt
 	 * 안에 업무를 수행할 규칙과 전문 지식을 다 갖고 있고, RAG는 그 위에 참고 자료 하나를 더
 	 * 얹어주는 보조 수단일 뿐입니다. 그래서 이 프로젝트에서는 그런 강제 문구 없이 참고자료만
 	 * 덧붙이는 템플릿을 따로 씁니다.

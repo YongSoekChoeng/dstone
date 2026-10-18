@@ -52,7 +52,7 @@ import net.dstone.common.core.BaseObject;
  *
  * ## step 사이에 데이터가 오가는 방법
  * 모든 데이터는 실행 컨텍스트(WorkFlowContext)의 state를 거쳐서 오갑니다.
- * 1) step을 실행하기 직전에, 그 step의 input에 적힌 "${ ... }" 표현식을 컨텍스트에서 읽어 와 채웁니다. (resolveInput())
+ * 1) step을 실행하기 직전에, 그 step의 with에 적힌 "${ ... }" 표현식을 컨텍스트에서 읽어 와 채웁니다. (resolveInput())
  *    이 일은 step 종류와 상관없이 항상 이 클래스가 하므로, 모든 step이 같은 표현식 규칙을 씁니다. (common.expression.ContextResolver)
  * 2) 채워진 입력을 step 종류에 맞는 StepExecutor에게 넘기고(runStep()), 결과(StepOutcome)를 돌려받습니다.
  * 3) 그 결과를 step의 save에 적힌 이름으로 state에 저장합니다(예: save: analysis).
@@ -65,8 +65,8 @@ import net.dstone.common.core.BaseObject;
  * YAML을 읽는 사람은 병렬에 대해 forEach 하나만 알면 됩니다. 서로 다른 step을 동시에 실행하는 것은 이 모델로 표현할 수 없고, 순차 실행으로 풀어서 써야 합니다.
  *
  * ## 상태 저장과 다음 step
- * step 하나를 처리할 때마다 WorkFlowExecutionStore로 상태를 바로 저장해 둡니다. 그
- * 래서 APPROVAL step에서 실행이 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 멈춘 step부터 이어서 진행할 수 있습니다.
+ * step 하나를 처리할 때마다 WorkFlowExecutionStore로 상태를 바로 저장해 둡니다.
+ * 그래서 APPROVAL step에서 실행이 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 멈춘 step부터 이어서 진행할 수 있습니다.
  * 다음 step은 nextStepId()가 next/onFailure(또는 ROUTER와 APPROVAL의 routes)를 보고 정합니다. 
  * 앞쪽 step을 가리키면 되돌아가는 재시도 루프가 되고, 무한 루프는 maxIterations가 막습니다.
  * "END"나 "FAIL" 예약어를 만나면 그 자리에서 Workflow 전체를 끝냅니다.
@@ -256,7 +256,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * <pre>
 	 * forEach가 있는 step을 리스트 항목 개수만큼 동시에 실행합니다.
 	 *
-	 * forEach 표현식이 가리키는 리스트의 항목마다, 그 항목을 변수(${item} 또는 itemVariable에 적은 이름)로 넣고 input을 채워 실행합니다.
+	 * forEach 표현식이 가리키는 리스트의 항목마다, 그 항목을 변수(${item} 또는 itemVariable에 적은 이름)로 넣고 with를 채워 실행합니다.
 	 * 모든 반복이 끝나면 반복 순서대로 실행 이력을 남기고, 반복별 input과 output을 각각 순서대로 리스트로 모읍니다
 	 * (step의 saveInput / save로 저장하는 값이 리스트가 됩니다).
 	 * 반복이 하나라도 실패하면 이 step 전체가 실패입니다. 반복할 항목이 하나도 없으면 빈 결과로 성공 처리합니다.
@@ -273,7 +273,7 @@ public class WorkFlowExecutor extends BaseObject {
 		String forEach = StepDefinition.forEachOf(step);
 		Object rawList;
 		try {
-			// forEach 자체에는 반복 변수가 없습니다(변수는 각 반복의 input을 채울 때만 씁니다). 그래서 variables는 null입니다.
+			// forEach 자체에는 반복 변수가 없습니다(변수는 각 반복의 with를 채울 때만 씁니다). 그래서 variables는 null입니다.
 			rawList = ContextResolver.resolve(forEach, execution.context(), null);
 		} catch (ExpressionException e) {
 			return this.failedBeforeRun(execution, step, "forEach - " + e.getMessage());
@@ -290,7 +290,7 @@ public class WorkFlowExecutor extends BaseObject {
 			futures.add(CompletableFuture.supplyAsync(new Supplier<StepOutcome>() {
 				@Override
 				public StepOutcome get() {
-					// forEach 의 개별 실행값을 실행시킬 때 비로소 변수값들을 셋팅.
+					// 반복마다 이번 항목을 변수로 넣습니다.
 					return WorkFlowExecutor.this.call(step, execution, variables);
 				}
 			}));
@@ -348,7 +348,7 @@ public class WorkFlowExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * step을 실제로 한 번 실행합니다.
-	 * - input 표현식을 계산하고
+	 * - with 표현식을 계산하고
 	 * - step 종류에 맞는 StepExecutor를 부르고
 	 * - 실제로 넘긴 입력과 걸린 시간을 결과에 채웁니다.
 	 * 표현식을 계산하지 못하면 StepExecutor를 부르지 않고 실패 결과를 돌려줍니다(onFailure를 따릅니다).
@@ -358,7 +358,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 *
 	 * @param step      실행할 step의 정의입니다.
 	 * @param execution 지금 진행 중인 실행입니다.
-	 * @param variables input 표현식에 넣을 변수입니다(forEach 반복이면 {item: 이번 항목}, 아니면 null).
+	 * @param variables with 표현식에 넣을 변수입니다(forEach 반복이면 {item: 이번 항목}, 아니면 null).
 	 */
 	private StepOutcome call(StepDefinition step, WorkFlowExecution execution, Map<String, Object> variables) {
 		long start = System.nanoTime();
@@ -375,14 +375,14 @@ public class WorkFlowExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * step의 input을 컨텍스트로 채웁니다(표현식은 값을 읽어 와 채우고, 리터럴은 그대로 둡니다).
-	 * - AGENT/SUPERVISOR/ROUTER: input(Agent input 모양에 따라 값 하나 또는 맵)을 계산해서 돌려줍니다.
-	 *   input은 필수라서 엔진이 켜질 때 이미 검사되어 있습니다.
-	 * - TOOL: input(맵)을 계산해서 맵으로 돌려줍니다. input이 없으면 빈 맵입니다.
-	 * - APPROVAL: input이 없는 step이라 null입니다.
+	 * step의 with(record 필드 이름은 input)를 컨텍스트로 채웁니다(표현식은 값을 읽어 와 채우고, 리터럴은 그대로 둡니다).
+	 * - AGENT/SUPERVISOR/ROUTER: with(Agent input 모양에 따라 값 하나 또는 맵)을 계산해서 돌려줍니다.
+	 *   with는 필수라서 엔진이 켜질 때 이미 검사되어 있습니다.
+	 * - TOOL: with(맵)를 계산해서 맵으로 돌려줍니다. with가 없으면 빈 맵입니다.
+	 * - APPROVAL: with가 없는 step이라 null입니다.
 	 * </pre>
 	 *
-	 * @param step      input을 계산할 step의 정의입니다.
+	 * @param step      with를 계산할 step의 정의입니다.
 	 * @param context   실행 컨텍스트입니다.
 	 * @param variables 표현식에 넣을 변수입니다(forEach 반복이 아니면 null).
 	 */

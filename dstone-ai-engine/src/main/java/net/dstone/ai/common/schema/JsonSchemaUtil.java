@@ -20,7 +20,7 @@ import com.networknt.schema.SpecificationVersion;
  * 정의 파일의 입출력 모양(JSON Schema)을 다루는 도구 모음입니다. 정의 파일에는 짧은 표기(Picoschema)로 적고,
  * 로더가 Picoschema.compile()로 표준 JSON Schema 맵으로 바꿔 둡니다. 이 클래스는 그 맵을 씁니다.
  * - 엔진이 켜질 때: 스키마 자체가 올바른 JSON Schema인지(checkSchema), 표현식이 읽는 경로가 스키마에 있는지(checkPath) 검사합니다.
- * - LLM을 부를 때: 스키마를 그대로 LLM에게 알려줍니다(runtime.agent.SchemaOutputConverter).
+ * - LLM을 부를 때: 스키마를 그대로 LLM에게 알려줍니다(runtime.agent.AgentExecutor).
  * - 값을 받았을 때: 실제 값이 스키마에 맞는지 확인합니다(validate - Workflow 입력, Agent 입력/출력).
  *
  * 값 검사는 networknt json-schema-validator(Spring AI가 이미 쓰는 라이브러리, JSON Schema 2020-12)로 합니다.
@@ -192,7 +192,7 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * 리스트 스키마를 만듭니다. forEach step의 output처럼 "항목마다 같은 모양"인 값을 표현할 때 씁니다.
+	 * 리스트 스키마를 만듭니다. forEach step의 결과처럼 "항목마다 같은 모양"인 값을 표현할 때 씁니다.
 	 *
 	 * @param items 항목 하나의 스키마입니다(모르면 null).
 	 */
@@ -313,7 +313,7 @@ public final class JsonSchemaUtil {
 		return messages;
 	}
 
-	/** SUPERVISOR step의 output 모양입니다: {pass: boolean, reason: string} */
+	/** SUPERVISOR step의 결과 모양입니다: {pass: boolean, reason: string} */
 	public static Map<String, Object> verdict() {
 		Map<String, Object> properties = new LinkedHashMap<>();
 		properties.put("pass", field("boolean", "통과면 true, 통과하지 못했으면 false"));
@@ -322,7 +322,7 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * ROUTER step의 output 모양입니다: {route: string, reason: string}. route는 routes 이름 중 하나만 허용합니다(enum).
+	 * ROUTER step의 결과 모양입니다: {route: string, reason: string}. route는 routes 이름 중 하나만 허용합니다(enum).
 	 *
 	 * @param routes 고를 수 있는 경로 이름들입니다(ROUTER step의 routes 키).
 	 */
@@ -336,7 +336,7 @@ public final class JsonSchemaUtil {
 	}
 
 	/**
-	 * APPROVAL step의 output 모양입니다: {decision: string, approver: string, comment: string}.
+	 * APPROVAL step의 결과 모양입니다: {decision: string, approver: string, comment: string}.
 	 * decision은 routes 이름 중 하나입니다(enum).
 	 *
 	 * @param routes 고를 수 있는 결정 이름들입니다(APPROVAL step의 routes 키).
