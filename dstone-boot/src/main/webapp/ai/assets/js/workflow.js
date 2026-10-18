@@ -24,7 +24,7 @@ var DstoneAiWorkflow = (function () {
 		},
 		"sample-agent-model-override": {
 			input: "너는 누구니?",
-			note: "dstone-ai-engine의 agents/sample/sample-model-override-agent.yml에 적힌 model.name이 지금 켜진 provider의 모델 이름이어야 호출됩니다."
+			note: "dstone-ai-engine의 agents/sample/sample-model-override-agent.agent.md에 적힌 model.name이 지금 켜진 provider의 모델 이름이어야 호출됩니다."
 		},
 		"sample-agent-rag-augmented": {
 			input: "적재된 문서 중에 Spring Batch에 대해 설명해줘.",
