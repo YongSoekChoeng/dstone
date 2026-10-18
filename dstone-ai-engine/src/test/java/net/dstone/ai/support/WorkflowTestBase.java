@@ -56,7 +56,6 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 		"spring.config.location=file:${APP_CONF_DIR}/application.yml",
 		"logging.config=file:${APP_CONF_DIR}/log4j2.xml",
 		// 아래는 대역(TestEngineConfig)을 쓰기 위해 테스트에서만 바꾸는 값입니다.
-		"spring.ai.model.chat=none",                    // 실제 LLM provider를 켜지 않습니다. ChatModel은 ScriptedChatModel 하나입니다
 		"spring.data.redis.enabled=false",              // ConfigRedis, RedisChatMemoryRepository를 끕니다(대화 기억은 메모리)
 		"spring.data.redis.repositories.enabled=false", // Redis 저장소 자동 설정은 실제 연결을 요구합니다
 		"spring.sql.init.mode=never"                    // DataSource가 대역이라 초기화 스크립트를 돌리지 않습니다
@@ -101,7 +100,10 @@ public abstract class WorkflowTestBase {
 	@Autowired
 	protected WorkFlowExecutionStore workFlowExecutionStore;
 
-	/** LLM 대역입니다. Agent를 부르는 Workflow는 실행 전에 answer(...)로 LLM의 답을 넣어 둡니다. */
+	/**
+	 * LLM 대역입니다. Agent를 부르는 Workflow는 실행 전에 answer(...)로 LLM의 답을 넣어 둡니다.
+	 * conf/application.yml의 dstone.ai.test.llmcall이 true면 실제 LLM을 부르고 answer(...)는 무시됩니다(chatModel.isLlmCall()).
+	 */
 	@Autowired
 	protected ScriptedChatModel chatModel;
 

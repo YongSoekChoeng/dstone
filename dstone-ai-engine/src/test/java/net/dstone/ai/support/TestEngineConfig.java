@@ -3,7 +3,9 @@ package net.dstone.ai.support;
 import javax.sql.DataSource;
 
 import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,6 +21,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  *   DataSource(Mockito)             PostgreSQL 접속        ConfigMapper가 MyBatis 세션을 만들려면 DataSource가 있어야 합니다(쓰이지는 않음)
  *   RedisTemplate(Mockito)          Redis 접속             RateLimitFilter가 주입받습니다(테스트 설정에서 요청 제한은 꺼져 있음)
  *   ScriptedChatModel               LLM provider           Agent를 부르는 step이 테스트가 넣어 둔 답을 받습니다
+ *                                                          (dstone.ai.test.llmcall: true면 실제 provider로 넘깁니다)
  *
  * 그 밖의 빈(정의 파일 로더, 레지스트리의 기동 검증, Tool, MCP 접속, 실행기)은 운영과 똑같이 만들어집니다.
  * </pre>
@@ -46,10 +49,19 @@ public class TestEngineConfig {
 		return Mockito.mock(RedisTemplate.class);
 	}
 
-	/** LLM 대신 미리 넣어 둔 답을 돌려줍니다. */
+	/**
+	 * <pre>
+	 * 엔진이 쓰는 ChatModel입니다. 실제 provider(spring.ai.model.chat)의 ChatModel도 함께 만들어지므로, 이쪽이 쓰이도록 @Primary를 붙입니다.
+	 * dstone.ai.test.llmcall이 false면 미리 넣어 둔 답을, true면 실제 provider의 답을 돌려줍니다.
+	 * </pre>
+	 *
+	 * @param llmCall conf/application.yml의 dstone.ai.test.llmcall
+	 * @param context 실제 provider의 ChatModel을 찾을 컨텍스트
+	 */
 	@Bean
-	public ScriptedChatModel scriptedChatModel() {
-		return new ScriptedChatModel();
+	@Primary
+	public ScriptedChatModel scriptedChatModel(@Value("${dstone.ai.test.llmcall:false}") boolean llmCall, ApplicationContext context) {
+		return new ScriptedChatModel(llmCall, context);
 	}
 
 }
