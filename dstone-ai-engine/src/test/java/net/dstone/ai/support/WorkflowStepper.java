@@ -30,6 +30,12 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  *   흐름이 예상과 다르게 갈라졌을 때(onFailure, routes) 바로 드러납니다.
  * - 중간 step부터 시작하고 싶으면 put(이름, 값)으로 앞 step이 저장했을 state를 넣고 jumpTo(id)로 옮긴 뒤 step(id)를 부릅니다.
  * - APPROVAL step은 step(id)를 부르면 WAITING_APPROVAL로 멈춥니다. decide(결정, 의견)로 결정을 넣으면 그 step을 이어서 실행합니다.
+ *
+ * step 하나만 따로 떼어 확인하기(앞 step 없이)
+ *   WorkflowStepper step1 = this.stepper("sm-workflow", "step00_01_readReq", 그 step에 넣을 값);
+ *   step1.step("step00_01_readReq");          // with를 계산하지 않고 받은 값으로 실행
+ * 넣을 값은 그 step의 with를 계산한 결과와 같은 모양입니다(TOOL은 인자 맵, AGENT류는 Agent input 모양의 값).
+ * step(id, 값)으로 실행 중간의 step 하나에만 값을 넣을 수도 있습니다.
  * </pre>
  */
 public class WorkflowStepper {
@@ -40,6 +46,10 @@ public class WorkflowStepper {
 
 	/** 지금 실행 상태입니다. step을 실행할 때마다 새 값으로 바뀝니다(context 맵은 같은 것을 계속 씁니다). */
 	private WorkFlowExecution execution;
+
+	/** 다음 step(...)에 with 대신 넣을 값이 있는지, 그 값이 무엇인지입니다(stepper(id, stepId, 값)으로 만든 경우). */
+	private boolean hasNextInput;
+	private Object nextInput;
 
 	/**
 	 * 새 실행을 만듭니다. 아직 아무 step도 실행하지 않은 상태(첫 step을 가리킴)입니다.
@@ -68,8 +78,41 @@ public class WorkflowStepper {
 	 * @param stepId 실행할 step의 id
 	 */
 	public WorkflowStepper step(String stepId) {
+		if (this.hasNextInput) {
+			Object input = this.nextInput;
+			this.hasNextInput = false;
+			this.nextInput = null;
+			return this.step(stepId, input);
+		}
 		this.checkTurn(stepId);
 		this.execution = this.executor.run(this.workflow, this.execution, 1);
+		return this;
+	}
+
+	/**
+	 * <pre>
+	 * 지금 차례인 step 하나를, with를 계산하지 않고 input으로 실행하고 멈춥니다.
+	 * input은 그 step의 with를 계산한 결과와 같은 모양이어야 합니다(TOOL은 인자 맵, AGENT류는 Agent input 모양의 값).
+	 * forEach step에는 쓸 수 없습니다.
+	 * </pre>
+	 *
+	 * @param stepId 실행할 step의 id
+	 * @param input  그 step에 넣을 값
+	 */
+	public WorkflowStepper step(String stepId, Object input) {
+		this.checkTurn(stepId);
+		this.execution = this.executor.runStepWith(this.workflow, this.execution, input);
+		return this;
+	}
+
+	/**
+	 * 다음 step(id) 한 번에 with 대신 넣을 값을 정해 둡니다. WorkflowTestBase.stepper(id, stepId, 값)이 씁니다.
+	 *
+	 * @param input 그 step에 넣을 값
+	 */
+	WorkflowStepper nextInput(Object input) {
+		this.hasNextInput = true;
+		this.nextInput = input;
 		return this;
 	}
 

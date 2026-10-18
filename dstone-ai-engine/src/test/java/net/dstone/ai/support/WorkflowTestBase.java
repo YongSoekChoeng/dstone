@@ -147,6 +147,26 @@ public abstract class WorkflowTestBase {
 
 	/**
 	 * <pre>
+	 * step 하나만 따로 떼어 확인할 도구를 만듭니다. 실행은 stepId에서 시작하고, 첫 step(stepId)은 with를 계산하지 않고 stepInput을 받습니다.
+	 * 앞 step을 거치지 않으므로 Workflow input은 비어 있습니다(그 step의 with만 대신 넣기 때문에 필요 없습니다).
+	 *
+	 *   HashMap&lt;String, Object&gt; step1Param = new HashMap&lt;String, Object&gt;();
+	 *   step1Param.put("fileFullPath", ".../00-request.md");        // TOOL step: Tool 인자 이름 → 값
+	 *   WorkflowStepper step1 = this.stepper("sm-workflow", "step00_01_readReq", step1Param);
+	 *   step1.step("step00_01_readReq");
+	 * </pre>
+	 *
+	 * @param workflowId 실행할 Workflow의 id
+	 * @param stepId     실행을 시작할 step의 id
+	 * @param stepInput  그 step에 넣을 값(with를 계산한 결과와 같은 모양)
+	 */
+	protected WorkflowStepper stepper(String workflowId, String stepId, Object stepInput) {
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, null);
+		return new WorkflowStepper(workflow, this.workFlowExecutor, this.workFlowExecutionStore, null).jumpTo(stepId).nextInput(stepInput);
+	}
+
+	/**
+	 * <pre>
 	 * 승인 대기(WAITING_APPROVAL)로 멈춘 실행에 사람의 결정을 넣고 이어서 실행합니다.
 	 * routes에 없는 결정이나, 의견이 꼭 있어야 하는데 없는 결정은 ResponseStatusException(400)을 던집니다.
 	 * </pre>

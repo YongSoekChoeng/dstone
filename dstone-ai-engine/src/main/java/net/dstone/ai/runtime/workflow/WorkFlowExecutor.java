@@ -130,6 +130,41 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param stepLimit 이번 호출에서 실행할 step의 최대 개수입니다(forEach step은 반복 수와 상관없이 1개로 셉니다).
 	 */
 	public WorkFlowExecution run(WorkFlowDefinition workflow, WorkFlowExecution execution, int stepLimit) {
+		return this.run(workflow, execution, stepLimit, NO_INPUT);
+	}
+
+	/**
+	 * <pre>
+	 * 지금 차례인 step 하나를, with를 계산하지 않고 받은 input으로 실행하고 멈춥니다.
+	 * input은 with를 계산한 결과와 같은 모양이어야 합니다(TOOL은 인자 맵, AGENT류는 Agent input 모양의 값).
+	 * 결과 저장(save...)과 다음 step 정하기는 run()과 같습니다.
+	 *
+	 * 테스트가 step 하나만 따로 떼어, 앞 step 없이 원하는 입력으로 확인할 때 씁니다(src/test의 WorkflowStepper). API는 쓰지 않습니다.
+	 * forEach step은 반복마다 입력이 달라서 이 방법으로 실행할 수 없습니다(IllegalArgumentException).
+	 * </pre>
+	 *
+	 * @param workflow  실행할 Workflow의 정의입니다.
+	 * @param execution 지금 진행 중인 실행 1건입니다(currentStepIndex가 실행할 step을 가리킴).
+	 * @param input     그 step에 넣을 값입니다(with 대신).
+	 */
+	public WorkFlowExecution runStepWith(WorkFlowDefinition workflow, WorkFlowExecution execution, Object input) {
+		StepDefinition step = workflow.steps().get(execution.currentStepIndex());
+		if (StepDefinition.forEachOf(step) != null) {
+			throw new IllegalArgumentException("step[" + step.id() + "]은 forEach step이라 입력을 직접 넣어 실행할 수 없습니다.");
+		}
+		return this.run(workflow, execution, 1, input);
+	}
+
+	/** 입력을 따로 받지 않았다는 표시입니다(null도 입력 값이 될 수 있어서 따로 둡니다). */
+	private static final Object NO_INPUT = new Object();
+
+	/**
+	 * run()의 본체입니다.
+	 *
+	 * @param firstInput 첫 step에 with 대신 넣을 값입니다. NO_INPUT이면 with를 계산합니다.
+	 */
+	private WorkFlowExecution run(WorkFlowDefinition workflow, WorkFlowExecution execution, int stepLimit, Object firstInput) {
+		Object inputOverride = firstInput;
 		int maxIterations = workflow.maxIterations() == null ? Constants.WorkFlow.DEFAULT_MAX_ITERATIONS : workflow.maxIterations();
 		int currentIndex = execution.currentStepIndex();
 		WorkFlowExecution currentExecution = execution;
@@ -174,8 +209,9 @@ public class WorkFlowExecutor extends BaseObject {
 					if (StepDefinition.forEachOf(step) != null) {
 						outcome = this.runForEach(step, currentExecution);
 					} else {
-						outcome = this.runOne(step, currentExecution);
+						outcome = this.runOne(step, currentExecution, inputOverride);
 					}
+					inputOverride = NO_INPUT; // 받은 입력은 첫 step에만 씁니다.
 				} catch (Exception e) {
 					// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
 					// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
@@ -269,8 +305,8 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param step      실행할 step의 정의입니다.
 	 * @param execution 지금 진행 중인 실행입니다.
 	 */
-	private StepOutcome runOne(StepDefinition step, WorkFlowExecution execution) {
-		StepOutcome outcome = this.call(step, execution, null);
+	private StepOutcome runOne(StepDefinition step, WorkFlowExecution execution, Object inputOverride) {
+		StepOutcome outcome = this.call(step, execution, null, inputOverride);
 		if (!outcome.pending()) {
 			this.appendHistory(execution, step, step.id(), outcome);
 		}
@@ -316,7 +352,7 @@ public class WorkFlowExecutor extends BaseObject {
 				@Override
 				public StepOutcome get() {
 					// 반복마다 이번 항목을 변수로 넣습니다.
-					return WorkFlowExecutor.this.call(step, execution, variables);
+					return WorkFlowExecutor.this.call(step, execution, variables, NO_INPUT);
 				}
 			}));
 		}
@@ -384,13 +420,14 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param step      실행할 step의 정의입니다.
 	 * @param execution 지금 진행 중인 실행입니다.
 	 * @param variables with 표현식에 넣을 변수입니다(forEach 반복이면 {item: 이번 항목}, 아니면 null).
+	 * @param inputOverride with 대신 넣을 값입니다(runStepWith()). NO_INPUT이면 with를 계산합니다.
 	 */
-	private StepOutcome call(StepDefinition step, WorkFlowExecution execution, Map<String, Object> variables) {
+	private StepOutcome call(StepDefinition step, WorkFlowExecution execution, Map<String, Object> variables, Object inputOverride) {
 		long start = System.nanoTime();
 		Object resolvedInput = null;
 		StepOutcome outcome;
 		try {
-			resolvedInput = this.resolveInput(step, execution.context(), variables);
+			resolvedInput = inputOverride != NO_INPUT ? inputOverride : this.resolveInput(step, execution.context(), variables);
 			outcome = this.runStep(execution, step, resolvedInput);
 		} catch (ExpressionException e) {
 			outcome = StepOutcome.failure(null, "input을 채우지 못했습니다 - " + e.getMessage());
