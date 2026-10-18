@@ -28,16 +28,7 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정 클래스입니다. 
- * ChatClient는 Spring AI에서 "LLM한테 말을 걸 때 쓰는 창구"라고 생각하면 됩니다.
- * 이 엔진은 provider(dstone.ai.model.chat 설정값 - 예: anthropic, ollama)를 하나만 정해서 쓰는데,
- * 그 provider로 가는 ChatClient를 여기서 딱 한 번 조립해서 스프링 빈으로 등록해 둡니다.
- *
- * PII 가리기, 금지어 검사, 사용량 로깅·쿼터 같은 "거버넌스" 기능은 이 클래스가 직접 처리하지 않습니다. 
- * 대신 이 클래스는 List<Advisor>를 그대로 주입받는 구조로 되어 있습니다. 
- * 그래서 나중에 거버넌스 기능이 필요해지면, 새로운 모듈에서 @Bean으로 Advisor 하나만 추가하면 됩니다
- * (스프링이 등록된 Advisor 빈들을 자동으로 모아서 이 리스트에 넣어주기 때문에, 이 클래스 코드를 고칠 필요가 없습니다). 
- * 지금은 그렇게 추가로 등록된 Advisor 빈이 하나도 없으므로, 이 리스트는 비어 있는 상태로 시작합니다.
+ * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정 클래스.
  * </pre>
  */
 @Configuration
@@ -55,7 +46,6 @@ public class ConfigChatClient {
 	 *
 	 * dstone.ai.session.redis.enabled 설정이 false 일 경우(즉 Redis를 안 쓰는 환경이라면) 이 메소드가 대신 
 	 * InMemoryChatMemoryRepository(자바 메모리 위에만 대화 내용을 저장하는 간단한 저장소)를 새로 만들어서 사용
-	 *
 	 * InMemoryChatMemoryRepository를 쓸 경우, 서버를 재시작하면 저장했던 대화 내용이 사라지고, 서버 인스턴스가 여러 대이면 인스턴스끼리 대화 내용을 공유하지 못함.
 	 * </pre>
 	 */
@@ -80,9 +70,8 @@ public class ConfigChatClient {
 	 * <pre>
 	 * 대화가 아무리 길어져도 최근 메시지 일부만 기억하도록 관리해 주는 대화 메모리를 만듭니다.
 	 *
-	 * dstone.ai.session.max-messages 설정값(기본값 20)만큼 가장 최근 메시지만 남기고, 그보다
-	 * 오래된 메시지는 잊어버립니다. 이렇게 하면 대화가 계속 이어져도 프롬프트가 끝없이 길어지지
-	 * 않습니다.
+	 * dstone.ai.session.max-messages 설정값(기본값 20)만큼 가장 최근 메시지만 남기고, 그보다 오래된 메시지는 잊어버립니다. 
+	 * 이렇게 하면 대화가 계속 이어져도 프롬프트가 끝없이 길어지지 않습니다.
 	 * </pre>
 	 *
 	 * @param chatMemoryRepository 실제로 대화 내용을 저장할 저장소(위 chatMemoryRepository() 메소드가 만든 것)
@@ -99,9 +88,10 @@ public class ConfigChatClient {
 	/**
 	 * <pre>
 	 * 시스템 디폴트 Advisor를 등록하는 메소드.
+	 * net.dstone.ai.common.config.ConfigChatClient.chatClient(Builder, List<Advisor>) 가 호출될 때 자동으로 생성.
 	 *
-	 * 대화 기억 Advisor(MessageChatMemoryAdvisor)는 여기 두지 않습니다. 대화를 기억할지는 호출마다 다르기 때문에
-	 * (채팅 API는 기억, Workflow step은 memory: true일 때만) runtime.agent.AgentExecutor가 필요할 때만 붙입니다.
+	 * 대화 기억 Advisor(MessageChatMemoryAdvisor)는 여기 두지 않습니다. 대화를 기억할지는 호출마다 다르기 때문에 (채팅 API는 기억, Workflow step은 memory: true일 때만) 
+	 * runtime.agent.AgentExecutor가 필요할 때만 붙입니다.
 	 * </pre>
 	 *
 	 * @param advisor    목록(현재는 비어 있음). 스프링에서 List<T> 타입은 단일 Bean과 다르게 빈 List로 주입 하므로 문제 없음.
@@ -110,10 +100,9 @@ public class ConfigChatClient {
 	List<Advisor> defaultAdvisors(List<Advisor> advisors) {
 		List<Advisor> advisorList = new ArrayList<>(advisors);
 		
-		// LLM 로깅하는 Advisor 등록
+		// 1. LLM 로깅하는 Advisor.
 		if(net.dstone.ai.common.config.ConfigCallLog.IS_LLM_LOGGING_YN) {
-			net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor llmLoggerAdvisor = net.dstone.ai.common.config.ConfigCallLog.LlmLoggerAdvisor.builder().build();
-			advisorList.add(llmLoggerAdvisor);
+			advisorList.add(new net.dstone.ai.common.advisors.LlmLoggerAdvisor(configProperty, Ordered.HIGHEST_PRECEDENCE));
 		}
 		
 		return advisorList;

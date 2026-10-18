@@ -30,24 +30,22 @@ import net.dstone.common.utils.LogUtil;
 
 /**
  * <pre>
- * 앱이 기동될 때 @AiTool이 붙은 빈들을 모두 찾아서, ConfigMcp가 MCP 서버에서 가져온 Tool까지 한데 합쳐 하나의 Spring AI ToolCallbackProvider로 만들어 주는 클래스입니다. 
+ * 앱이 기동될 때 @AiTool이 붙은 빈들을 모두 찾아서, ConfigMcp가 MCP 서버에서 가져온 Tool까지 한데 합쳐 하나의 Spring AI ToolCallbackProvider로 만들어 주는 클래스.
  * 이렇게 합쳐지고 나면 로컬에서 만든 Tool인지 MCP 서버에서 가져온 Tool인지 더는 구분하지 않고 똑같이 다룹니다.
  *
- * 이 Tool들이 실제로 쓰이는 방식은 두 가지입니다:
- * - type이 AGENT인 step에서는, 어떤 Tool을 언제 호출할지를 Spring AI의 ChatClient가 LLM과 대화를
- *   주고받으면서 알아서 판단하고 호출합니다.
- * - type이 TOOL인 step에서는, runtime.tool.ToolExecutor가 이름으로 Tool을 직접 찾아서 LLM을
- *   거치지 않고 바로 호출합니다.
+ * 이 Tool들이 실제로 쓰이는 방식은 두 가지
+ * - type이 AGENT인 step
+ *   어떤 Tool을 언제 호출할지를 Spring AI의 ChatClient가 LLM과 대화를 주고받으면서 알아서 판단하고 호출합니다.
+ * - type이 TOOL인 step
+ *   runtime.tool.ToolExecutor가 이름으로 Tool을 직접 찾아서 LLM을 거치지 않고 바로 호출합니다.
  *
- * 이 엔진은 여러 앱이 함께 쓰는 공유 서버이기 때문에, caller(호출 주체)별로 Tool 화이트리스트를
- * 둘 수 있습니다. 이렇게 하면 한 앱에게만 허용된 Tool을 다른 앱이 가져다 쓰는 일을 막을 수 있습니다.
- * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로
- * 보고 등록된 Tool을 전부 허용합니다.
+ * 이 엔진은 여러 앱이 함께 쓰는 공유 서버이기 때문에, caller(호출 주체)별로 Tool 화이트리스트를 둘 수 있습니다. 
+ * 이렇게 하면 한 앱에게만 허용된 Tool을 다른 앱이 가져다 쓰는 일을 막을 수 있습니다.
+ * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로 보고 등록된 Tool을 전부 허용합니다.
  *
  * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌우고, 호출할 때마다 로그 한 줄(이름, 인자, 결과 길이)을 남깁니다(LimitedToolCallback).
- * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면
- * 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. Tool마다 따로 막으면 새 Tool이나
- * MCP Tool에서 같은 사고가 또 나므로, 여기서 마지막 안전망을 하나 둡니다.
+ * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. 
+ * Tool마다 따로 막으면 새 Tool이나 MCP Tool에서 같은 사고가 또 나므로, 여기서 마지막 안전망을 하나 둡니다.
  * </pre>
  */
 @Component
@@ -62,7 +60,7 @@ public class ConfigTool extends BaseObject {
 	@Autowired
 	private Environment environment;
 
-	/** 설정이 없을 때 쓰는 Tool 결과 글자 수 상한입니다(대략 2만 토큰 안팎). */
+	/** 설정이 없을 때 쓰는 Tool (한건당)호출 결과 글자 수 상한입니다(대략 2만 토큰 안팎). */
 	private static final int DEFAULT_MAX_RESULT_CHARS = 60000;
 
 	private ToolCallbackProvider toolCallbackProvider;
@@ -80,9 +78,11 @@ public class ConfigTool extends BaseObject {
 	@PostConstruct
 	public void discover() {
 		Map<String, Object> toolBeans = applicationContext.getBeansWithAnnotation(AiTool.class);
-		// TOOL step 전용 Tool(@AiTool(stepOnly = true))은 따로 모읍니다. LLM에게 보여 주지 않고, 결과 길이 상한도 씌우지 않습니다.
-		List<Object> normalBeans = new ArrayList<>();
-		List<Object> stepOnlyBeans = new ArrayList<>();
+
+		List<ToolCallback> merged = new ArrayList<>();	// TOOL 중 stepOnly 를 제외한 일반 Tool + MCP Tool.
+		List<Object> normalBeans = new ArrayList<>();	// TOOL 중 stepOnly 를 제외한 일반 Tool.
+		List<Object> stepOnlyBeans = new ArrayList<>(); // TOOL 중 stepOnly(step 전용). TOOL스텝이 수행하는 Tool.
+		
 		for (Object bean : toolBeans.values()) {
 			AiTool annotation = AnnotationUtils.findAnnotation(bean.getClass(), AiTool.class);
 			if (annotation != null && annotation.stepOnly()) {
@@ -91,7 +91,6 @@ public class ConfigTool extends BaseObject {
 				normalBeans.add(bean);
 			}
 		}
-		List<ToolCallback> merged = new ArrayList<>();
 		if (!normalBeans.isEmpty()) {
 			merged.addAll(List.of(MethodToolCallbackProvider.builder().toolObjects(normalBeans.toArray()).build().getToolCallbacks()));
 		}
@@ -129,9 +128,8 @@ public class ConfigTool extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 이 caller의 Tool 화이트리스트를 통과한 Tool만 골라서 담은 새 ToolCallbackProvider를 만들어
-	 * 돌려줍니다. 화이트리스트 설정(dstone.ai.tool.allowed-by-caller)이 아예 없는 caller라면
-	 * 걸러내지 않고 전체를 그대로 돌려줍니다.
+	 * 이 caller의 Tool 화이트리스트를 통과한 Tool만 골라서 담은 새 ToolCallbackProvider를 만들어 돌려줍니다. 
+	 * 화이트리스트 설정(dstone.ai.tool.allowed-by-caller)이 아예 없는 caller라면 걸러내지 않고 전체를 그대로 돌려줍니다.
 	 * </pre>
 	 *
 	 * @param caller Tool 화이트리스트를 조회할 호출 주체(tenant)
@@ -156,9 +154,7 @@ public class ConfigTool extends BaseObject {
 	 * Agent 하나에 붙일 Tool을 골라 돌려줍니다. 두 목록을 모두 통과한 Tool만 남습니다.
 	 * - caller 화이트리스트(dstone.ai.tool.allowed-by-caller): 이 앱이 쓸 수 있는 Tool
 	 * - Agent의 tools.allowed(agents/*.yml): 이 Agent가 쓰겠다고 적은 Tool
-	 *
-	 * Agent의 tools가 비어 있으면 아무 Tool도 붙지 않습니다. "*" 하나만 적혀 있으면 caller 화이트리스트를
-	 * 통과한 Tool이 전부 붙습니다.
+	 * Agent의 tools가 비어 있으면 아무 Tool도 붙지 않습니다. "*" 하나만 적혀 있으면 caller 화이트리스트를 통과한 Tool이 전부 붙습니다.
 	 * </pre>
 	 *
 	 * @param caller    Tool 화이트리스트를 조회할 호출 주체(tenant)
@@ -205,9 +201,9 @@ public class ConfigTool extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 이름으로 Tool 하나를 직접 찾아줍니다. runtime.tool.ToolExecutor가 TOOL step을 처리할 때, LLM을
-	 * 거치지 않고 곧바로 원하는 Tool을 찾기 위해 이 메소드를 씁니다. 찾는 이름의 Tool이 없으면(또는
-	 * caller의 화이트리스트에 없으면) null을 돌려줍니다.
+	 * 이름으로 Tool 하나를 직접 찾아줍니다. 
+	 * runtime.tool.ToolExecutor가 TOOL step을 처리할 때, LLM을 거치지 않고 곧바로 원하는 Tool을 찾기 위해 이 메소드를 씁니다. 
+	 * 찾는 이름의 Tool이 없으면(또는vcaller의 화이트리스트에 없으면) null을 돌려줍니다.
 	 * </pre>
 	 *
 	 * @param caller   Tool 화이트리스트를 조회할 호출 주체(tenant)
@@ -224,9 +220,8 @@ public class ConfigTool extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 이 caller에게 설정된 Tool 화이트리스트를 찾아서 돌려줍니다. caller가 null이거나, 설정
-	 * 목록 안에 이 caller가 아예 없으면 null을 돌려주는데, 이 null은 "화이트리스트가 없으니
-	 * 전체 허용"이라는 뜻으로 쓰입니다.
+	 * 이 caller에게 설정된 Tool 화이트리스트를 찾아서 돌려줍니다. 
+	 * caller가 null이거나, 설정 목록 안에 이 caller가 아예 없으면 null을 돌려주는데, 이 null은 "화이트리스트가 없으니 전체 허용"이라는 뜻으로 쓰입니다.
 	 * </pre>
 	 *
 	 * @param caller 화이트리스트를 조회할 호출 주체(tenant)
@@ -251,10 +246,9 @@ public class ConfigTool extends BaseObject {
 	 * 설정 파일의 "tools" 값은 YAML List로 쓸 수도 있고, 콤마로 구분한 문자열로 쓸 수도 있습니다.
 	 * 이 메소드는 둘 중 어느 형식으로 오든 똑같이 List<String>으로 바꿔 줍니다.
 	 *
-	 * 한 가지 주의할 점이 있습니다: caller에 화이트리스트 자체는 있는데 tools 값이 비어 있으면
-	 * (YAML의 `[]`), 이건 "허용된 Tool이 0개"라는 뜻이어야 합니다. 그래서 빈 문자열이 들어와도
-	 * 빈 리스트로 처리합니다. 만약 이걸 그냥 무시해 버리면, 화이트리스트가 있는지조차 모르는
-	 * caller와 똑같이 "전체 허용"으로 취급되어 버려서 화이트리스트를 설정한 의미가 없어집니다.
+	 * 한 가지 주의할 점이 있습니다. 
+	 * caller에 화이트리스트 자체는 있는데 agent 설정파일의 tools 값이 비어 있으면(YAML의 []), 이건 허용된 Tool이 없음을 의미합니다.
+	 * 그래서 빈 문자열이 들어와도 빈 리스트로 처리합니다. 만약 이걸 그냥 무시해 버리면, 화이트리스트가 있는지조차 모르는 caller와 똑같이 "전체 허용"으로 취급되어 버려서 화이트리스트를 설정한 의미가 없어집니다.
 	 * </pre>
 	 *
 	 * @param toolsValue 파싱할 tools 설정값(List 또는 콤마로 구분한 문자열)
@@ -369,8 +363,7 @@ public class ConfigTool extends BaseObject {
 				ARGUMENT_READER.readTree(toolInput);
 				return false;
 			} catch (Exception e) {
-				LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 인자 JSON이 끊겨서 도착했습니다(출력 토큰 한도 초과로 보임) - "
-					+ toolInput.length() + "자, " + e.getClass().getSimpleName());
+				LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 인자 JSON이 끊겨서 도착했습니다(출력 토큰 한도 초과로 보임) - " + toolInput.length() + "자, " + e.getClass().getSimpleName());
 				return true;
 			}
 		}
@@ -386,8 +379,7 @@ public class ConfigTool extends BaseObject {
 			if (arguments.length() > MAX_LOGGED_ARGUMENT_CHARS) {
 				arguments = arguments.substring(0, MAX_LOGGED_ARGUMENT_CHARS) + "...(전체 " + toolInput.length() + "자)";
 			}
-			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 호출 - 인자 " + arguments
-				+ " / 결과 " + (result == null ? 0 : result.length()) + "자");
+			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 호출 - 인자 " + arguments + " / 결과 " + (result == null ? 0 : result.length()) + "자");
 			return result;
 		}
 
@@ -396,11 +388,8 @@ public class ConfigTool extends BaseObject {
 			if (result == null || result.length() <= this.maxResultChars) {
 				return result;
 			}
-			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 결과가 커서 잘랐습니다 - 전체 "
-				+ result.length() + "자 중 앞 " + this.maxResultChars + "자만 반환");
-			return result.substring(0, this.maxResultChars)
-				+ "\n\n...(Tool 결과가 너무 커서 전체 " + result.length() + "자 중 앞 " + this.maxResultChars
-				+ "자만 반환했습니다. 조회 범위를 좁혀서 다시 호출하세요.)";
+			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 결과가 커서 잘랐습니다 - 전체 " + result.length() + "자 중 앞 " + this.maxResultChars + "자만 반환");
+			return result.substring(0, this.maxResultChars) + "\n\n...(Tool 결과가 너무 커서 전체 " + result.length() + "자 중 앞 " + this.maxResultChars + "자만 반환했습니다. 조회 범위를 좁혀서 다시 호출하세요.)";
 		}
 	}
 
