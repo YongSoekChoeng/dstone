@@ -17,8 +17,10 @@ import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
+import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 
 /**
  * <pre>
@@ -33,6 +35,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * 실행은 HTTP를 거치지 않고 컨트롤러가 부르는 WorkFlowExecutionService를 바로 부릅니다.
  *   run(id, input)          POST /api/ai/workflow/{id}/execute 와 같습니다(input 검사 → 동기 실행)
  *   decide(실행, 결정, 의견)  POST /api/ai/workflow/executions/{id}/decision 과 같습니다(승인 대기에서 재개)
+ *   stepper(id, input)      step 하나씩 끊어서 실행합니다(WorkflowStepper). 앞 step까지만 확인하고 싶을 때 씁니다
  *
  * 예)
  *   public class MyWorkflowTest extends WorkflowTestBase {
@@ -92,6 +95,12 @@ public abstract class WorkflowTestBase {
 	@Autowired
 	protected ConfigTool configTool;
 
+	@Autowired
+	protected WorkFlowExecutor workFlowExecutor;
+
+	@Autowired
+	protected WorkFlowExecutionStore workFlowExecutionStore;
+
 	/** LLM 대역입니다. Agent를 부르는 Workflow는 실행 전에 answer(...)로 LLM의 답을 넣어 둡니다. */
 	@Autowired
 	protected ScriptedChatModel chatModel;
@@ -119,6 +128,21 @@ public abstract class WorkflowTestBase {
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, null);
 		this.workFlowExecutionService.checkInput(workflow, input);
 		return this.workFlowExecutionService.executeSync(workflow, "test-" + workflowId, null, input);
+	}
+
+	/**
+	 * <pre>
+	 * Workflow를 step 하나씩 끊어서 실행할 도구를 만듭니다. 아직 아무 step도 실행하지 않은 상태입니다.
+	 * input 검사는 run()과 같습니다. 사용법은 WorkflowStepper의 설명을 보십시오.
+	 * </pre>
+	 *
+	 * @param workflowId 실행할 Workflow의 id
+	 * @param input      요청 input
+	 */
+	protected WorkflowStepper stepper(String workflowId, Object input) {
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, null);
+		this.workFlowExecutionService.checkInput(workflow, input);
+		return new WorkflowStepper(workflow, this.workFlowExecutor, this.workFlowExecutionStore, input);
 	}
 
 	/**

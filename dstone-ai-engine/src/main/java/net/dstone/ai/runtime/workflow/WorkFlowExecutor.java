@@ -110,6 +110,26 @@ public class WorkFlowExecutor extends BaseObject {
 	 *                  결과가 한곳에 누적됩니다.
 	 */
 	public WorkFlowExecution run(WorkFlowDefinition workflow, WorkFlowExecution execution) {
+		return this.run(workflow, execution, 0);
+	}
+
+	/**
+	 * <pre>
+	 * run()과 같지만, step을 stepLimit개까지만 실행하고 멈춥니다(0 이하면 제한 없음 = run()과 같음).
+	 *
+	 * 멈출 때는 다음에 실행할 step을 가리키는 RUNNING 상태로 저장하고 돌려줍니다. 그 실행을 다시 이 메서드에 넘기면
+	 * 멈춘 자리에서 이어서 돕니다. 그 전에 END, FAIL, 승인 대기가 나오면 run()처럼 그 상태로 끝납니다.
+	 * 실행 흐름(표현식 계산, state 저장, 다음 step 정하기)은 run()과 똑같은 루프를 탑니다.
+	 *
+	 * 테스트가 Workflow를 step 하나씩 끊어서 확인할 때 씁니다(src/test의 WorkflowStepper). API는 쓰지 않습니다.
+	 * maxIterations는 run()처럼 이 호출 안에서 실행한 step 수로 셉니다.
+	 * </pre>
+	 *
+	 * @param workflow  실행할 Workflow의 정의입니다.
+	 * @param execution 지금 진행 중인 실행 1건입니다.
+	 * @param stepLimit 이번 호출에서 실행할 step의 최대 개수입니다(forEach step은 반복 수와 상관없이 1개로 셉니다).
+	 */
+	public WorkFlowExecution run(WorkFlowDefinition workflow, WorkFlowExecution execution, int stepLimit) {
 		int maxIterations = workflow.maxIterations() == null ? Constants.WorkFlow.DEFAULT_MAX_ITERATIONS : workflow.maxIterations();
 		int currentIndex = execution.currentStepIndex();
 		WorkFlowExecution currentExecution = execution;
@@ -127,6 +147,11 @@ public class WorkFlowExecutor extends BaseObject {
 			}
 
 			while (true) {
+
+				// step 수 제한이 있으면(테스트의 한 step씩 실행), 다 채웠을 때 다음 step을 가리키는 상태로 멈춥니다.
+				if (stepLimit > 0 && executed >= stepLimit) {
+					return currentExecution;
+				}
 
 				/****************************************************************************************
 				1) 실행 횟수를 확인합니다. maxIterations를 넘어서면 무한 루프로 보고 FAILED로 끝냅니다.
