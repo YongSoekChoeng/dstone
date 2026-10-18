@@ -57,7 +57,7 @@ public class WorkFlowTest extends WorkflowTestBase {
 		// 2. step2 테스트
 		stepId = "step00_02_decideJobKind";
 		String step2Param = (String) step1.state("request"); // with: ${state.request}
-		this.chatModel.answer("{\"route\": \"일반\", \"reason\": \"요청서에 '에러가 발생합니다'라고 적혀 있어 기존 기능의 오류 수정이다.\"}");
+		//this.chatModel.answer("{\"route\": \"일반\", \"reason\": \"요청서에 '에러가 발생합니다'라고 적혀 있어 기존 기능의 오류 수정이다.\"}");
 		WorkflowStepper step2 = this.stepper(WORKFLOW_ID, stepId, step2Param);
 		step2.step(stepId);
 		assertThat(step2.stateMap("classify")).containsEntry("route", "일반");
