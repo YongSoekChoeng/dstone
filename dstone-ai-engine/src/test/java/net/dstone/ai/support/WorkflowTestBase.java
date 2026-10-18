@@ -70,7 +70,7 @@ public abstract class WorkflowTestBase {
 		// 테스트는 main()을 거치지 않습니다. 대신 앱과 같은 규칙으로 conf/env{-profile}.properties를 System 프로퍼티로 넣습니다
 		// (정의 파일의 ${APP_HOME}, ${APP_NAME}, MCP_STDIO_COMMAND_PREFIX가 여기서 옵니다).
 		// 프로파일을 지정하지 않았으면 Windows는 local(env.properties), 그 밖은 wsl(env-wsl.properties)로 봅니다.
-		// 다른 프로파일로 돌리려면 mvn test -Dspring.profiles.active=k8s 처럼 지정합니다.
+		// 다른 프로파일로 돌리려면 mvn test -DskipTests=false -Dspring.profiles.active=k8s 처럼 지정합니다.
 		boolean noProfile = isEmpty(System.getenv("spring.profiles.active")) && isEmpty(System.getProperty("spring.profiles.active"));
 		if (noProfile) {
 			boolean windows = System.getProperty("os.name", "").toLowerCase().startsWith("windows");
