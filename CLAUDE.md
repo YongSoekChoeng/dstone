@@ -340,3 +340,20 @@ Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse
 
 Whenever changes are made on resources, Check if docs should be changed too.
 And Rewrite docs if it is necessary.
+
+## Korean Writing Policy
+
+한국어 문장이나 문서를 새로 작성하거나 수정할 때 다음 규칙을 적용한다.
+
+1. `humanizer` Skill의 한국어 작성 지침을 따른다.
+2. 자연스러운 한국어 어순과 조사, 어미를 사용한다.
+3. 영어 기술 문장을 직역한 듯한 번역투를 피한다.
+4. 불필요하게 장황하거나 반복적인 표현을 사용하지 않는다.
+5. 사용자가 읽기 편한 간결하고 명확한 문장을 작성한다.
+6. Java 주석과 JavaDoc은 기술적 정확성과 업무 의미를 보존한다.
+7. 한국어 작성 또는 교정 작업에서 `humanizer` Skill이 관련되면
+   자동으로 호출하여 적용한다.
+8. 코드, SQL, API, 식별자 등 기술 요소는 문체 개선을 이유로 변경하지 않는다.
+
+이 규칙은 Java 주석, JavaDoc, Markdown 문서, README,
+설계서, 오류 메시지 및 사용자에게 보여 주는 한국어 설명에 적용한다.
