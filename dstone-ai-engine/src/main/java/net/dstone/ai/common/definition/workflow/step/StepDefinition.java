@@ -1,17 +1,19 @@
 package net.dstone.ai.common.definition.workflow.step;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
 import net.dstone.ai.common.consts.StepType;
 import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * workflows/*.yml 의 steps: 항목 하나입니다. WorkFlowDefinition.steps 목록에 담깁니다.
+ * workflows/**.workflow.yml 의 steps: 항목 하나입니다. WorkFlowDefinition.steps 목록에 담깁니다.
  *
  * ## type 값마다 record가 하나씩 있습니다
  * YAML의 type 값을 보고 아래 다섯 record 중 하나로 읽습니다(common.loader.YamlDefinitionLoader).
@@ -24,42 +26,42 @@ import net.dstone.common.utils.StringUtil;
  *   TOOL        ToolStepDefinition         Tool 하나를 LLM 없이 직접 호출함       ToolStepExecutor
  *   APPROVAL    ApprovalStepDefinition     사람이 routes 중 하나를 고를 때까지 기다림   ApprovalStepExecutor
  *
- * record에 없는 키를 적으면(예: TOOL step에 routes, APPROVAL step에 input) 엔진이 켜질 때
+ * record에 없는 키를 적으면(예: TOOL step에 routes, APPROVAL step에 with) 엔진이 켜질 때
  * "쓸 수 없는 키"로 바로 막힙니다.
  *
  * ## 이 interface가 하는 일
- * steps 목록에 다섯 종류가 섞여 들어오므로, 그 목록의 공통 타입으로만 씁니다. 모든 종류에 있는 값(id, type, output, onFailure)만
+ * steps 목록에 다섯 종류가 섞여 들어오므로, 그 목록의 공통 타입으로만 씁니다. 모든 종류에 있는 값(id, type, save, onFailure)만
  * 여기에 두고, 나머지는 각 record에서 꺼냅니다. sealed interface라서 다섯 record 말고는 step이 될 수 없고,
  * switch로 step 종류를 나눌 때 빠뜨린 종류가 있으면 컴파일러가 알려줍니다.
  * 종류마다 있기도 하고 없기도 한 값(부르는 대상, next, forEach, memory)을 꺼내는 일은 아래 static 메서드가 한곳에서 맡습니다.
  *
  * ## 공통 규칙
- * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/*.yml 의 input/output)나
- *   Tool(인자 스키마)이 정하고, step은 "무엇을 넣을지(input)", "결과를 어디에 둘지(output)", "다음에 어디로 갈지"만 적습니다.
+ * - 계약은 부르는 대상이 정합니다: 무엇을 받고 무엇을 돌려주는지는 Agent(agents/**.agent.md 의 input/output)나
+ *   Tool(인자 스키마)이 정하고, step은 "무엇을 넣을지(with)", "결과를 어디에 둘지(save)", "다음에 어디로 갈지"만 적습니다.
  *
- * - id: 영문, 숫자, 밑줄(_)만 씁니다(예: validateEach). END/FAIL은 예약어라 id로 쓸 수 없습니다.
+ * - id: 영문, 숫자, 밑줄(_)만 씁니다(예: step01). END/FAIL은 예약어라 id로 쓸 수 없습니다.
  *
- * - input: 이 step에 넣어줄 값입니다. "${ ... }"는 step이 실행되기 직전에 엔진이 읽어 와서 채우고,
+ * - with: 이 step에 넣어줄 값입니다. ${ ... }는 step이 실행되기 직전에 엔진이 읽어 와서 채우고,
  *   그 밖의 값은 적힌 그대로 넘깁니다(규칙은 common.expression.ContextResolver 참고).
  *
- *     "${input}"                        Workflow를 실행할 때 넘긴 값(object면 ${input.필드})
- *     "${state.analysis}"               앞의 step이 state에 저장해 둔 값(object면 ${state.analysis.필드})
- *     "${item}"                         forEach로 반복 중일 때 이번 반복이 맡은 항목
- *     "${state.review.comment:}"        값이 없으면 콜론 뒤의 글자(여기서는 빈 글자)
- *     "${input}/01-requirements.md"     글자 사이에 끼워 넣기
+ *     ${input}                          Workflow를 실행할 때 넘긴 값(object면 ${input.필드})
+ *     ${state.analysis}                 앞의 step이 state에 저장해 둔 값(object면 ${state.analysis.필드})
+ *     ${item}                           forEach로 반복 중일 때 이번 반복이 맡은 항목
+ *     ${state.review.comment:}          값이 없으면 콜론 뒤의 글자(여기서는 빈 글자)
+ *     ${input}/01-requirements.md       글자 사이에 끼워 넣기
  *
- * - output: 이 step의 결과를 state 어디에 저장할지입니다. 저장하지 않은 결과는 다음 step이 읽을 수 없습니다.
+ * - save: 이 step의 결과를 저장할 state 이름입니다. 저장하지 않은 결과는 다음 step이 읽을 수 없습니다.
+ *   이름은 Workflow 맨 위 state:에 선언해 둔 것만 씁니다.
  *
- *     output:
- *       result: "state.analysis"        이 step이 돌려준 값 전체
- *       result.sql: "state.sql"         돌려준 값 안의 필드 하나
- *       input: "state.sentSql"          이 step이 실제로 받은 입력
- *       error: "state.analysisError"    실패 사유(성공이면 null)
+ *     save: analysis                    이 step이 돌려준 값 전체 → ${state.analysis}
+ *     saveError: analysisError          실패 사유(성공이면 null)
+ *     saveInput: sentSql                이 step이 실제로 받은 입력
+ *     saveEach: copied                  forEach step만: 반복마다 {item, input, result, error, success} 한 건씩
  *
- *   result의 모양은 AGENT는 Agent output, TOOL은 Tool 응답(JSON이면 그 값, 아니면 글자)이고, 나머지는 엔진이
+ *   결과의 모양은 AGENT는 Agent output, TOOL은 Tool 응답(JSON이면 그 값, 아니면 글자)이고, 나머지는 엔진이
  *   정해 두었습니다(SUPERVISOR {pass, reason}, ROUTER {route, reason}, APPROVAL {decision, approver, comment}).
- *   forEach step은 input과 result가 반복별 값의 리스트입니다(순서는 forEach 리스트와 같습니다).
- *   step이 끝날 때마다(성공이든 실패든) 적힌 자리를 모두 새 값으로 덮어씁니다.
+ *   forEach step은 결과와 입력이 반복별 값의 리스트입니다(순서는 forEach 리스트와 같습니다).
+ *   step이 끝날 때마다(성공이든 실패든) 적힌 이름을 모두 새 값으로 덮어씁니다.
  *
  * - 다음 step: next와 onFailure를 둘 다 비워두면 성공 시 목록의 다음 step으로, 실패 시 Workflow 전체 실패로 끝납니다.
  *   onFailure에 앞쪽 step의 id를 적으면 재시도 루프가 되고, 무한 반복은 workflow.settings.maxIterations가 막습니다.
@@ -71,7 +73,7 @@ import net.dstone.common.utils.StringUtil;
  *   기억합니다(재작성 루프 등). 다른 step의 대화는 섞이지 않습니다.
  *
  * - forEach: 이 step을 항목마다 동시에 실행할 리스트를 표현식으로 적습니다(예: "${input.sqlList}").
- *   각 반복의 input 안에서 이번 항목은 ${item}(또는 itemVariable에 적은 이름)입니다.
+ *   각 반복의 with 안에서 이번 항목은 ${item}(또는 itemVariable에 적은 이름)입니다.
  *
  * YAML이 이 규칙들을 지켰는지는 엔진이 켜질 때 common.registry.WorkFlowRegistry가 모두 검사합니다.
  * </pre>
@@ -93,8 +95,58 @@ public sealed interface StepDefinition
 	/** 이 step의 종류입니다. YAML의 type 값이며, record마다 정해져 있습니다. */
 	StepType type();
 
-	/** 이 step의 결과를 state 어디에 저장할지입니다(무엇 → state.이름). 비워뒀으면 null입니다. */
-	Map<String, String> output();
+	/**
+	 * <pre>
+	 * save / saveError / saveInput / saveEach에 적은 것을 "무엇 → state 이름" 맵 하나로 모아 돌려줍니다.
+	 * 무엇은 result(돌려준 값), error(실패 사유), input(받은 입력), items(forEach 반복별 묶음)입니다.
+	 * 아무것도 적지 않았으면 빈 맵입니다. 실행기(WorkFlowContext.saveOutput)와 기동 검사가 이 맵 하나만 봅니다.
+	 * </pre>
+	 */
+	default Map<String, String> output() {
+		Map<String, String> mapping = new LinkedHashMap<>();
+		switch (this) {
+			case AgentStepDefinition agent:
+				put(mapping, Output.RESULT, agent.save());
+				put(mapping, Output.ERROR, agent.saveError());
+				put(mapping, Output.INPUT, agent.saveInput());
+				put(mapping, Output.ITEMS, agent.saveEach());
+				break;
+			case SupervisorStepDefinition supervisor:
+				put(mapping, Output.RESULT, supervisor.save());
+				put(mapping, Output.ERROR, supervisor.saveError());
+				put(mapping, Output.INPUT, supervisor.saveInput());
+				put(mapping, Output.ITEMS, supervisor.saveEach());
+				break;
+			case RouterStepDefinition router:
+				put(mapping, Output.RESULT, router.save());
+				put(mapping, Output.ERROR, router.saveError());
+				put(mapping, Output.INPUT, router.saveInput());
+				break;
+			case ToolStepDefinition tool:
+				put(mapping, Output.RESULT, tool.save());
+				put(mapping, Output.ERROR, tool.saveError());
+				put(mapping, Output.INPUT, tool.saveInput());
+				put(mapping, Output.ITEMS, tool.saveEach());
+				break;
+			case ApprovalStepDefinition approval:
+				put(mapping, Output.RESULT, approval.save());
+				break;
+		}
+		return mapping;
+	}
+
+	/**
+	 * 이름을 적었으면 맵에 넣습니다.
+	 *
+	 * @param mapping 모으는 맵
+	 * @param source  무엇을 저장하는지(result, error, input, items)
+	 * @param name    저장할 state 이름(비었으면 넣지 않음)
+	 */
+	private static void put(Map<String, String> mapping, String source, String name) {
+		if (!StringUtil.isEmpty(name)) {
+			mapping.put(source, name.strip());
+		}
+	}
 
 	/** 실패했을 때 다음으로 갈 step의 id(또는 "FAIL" 예약어)입니다. 비워두면 Workflow 전체가 실패로 끝납니다. */
 	String onFailure();

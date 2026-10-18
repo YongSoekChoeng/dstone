@@ -3,17 +3,13 @@ package net.dstone.ai.common.definition.agent;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import net.dstone.ai.common.definition.SchemaDefinition;
-import net.dstone.ai.common.schema.JsonSchemaUtil;
 
 /**
  * <pre>
  * Agent 하나를 표현하는 클래스입니다. Agent란 쉽게 말해 "LLM에게 어떤 역할과 규칙으로 일을 시킬지"를 정의해 둔 설정 묶음입니다.
- * resources/definitions/agents/*.yml 파일 하나하나가 Agent 하나에 해당하며,
- * net.dstone.ai.common.loader.YamlDefinitionLoader 가 그 YAML 파일을 읽어서 이 클래스의 값으로 채워줍니다.
+ * resources/definitions/agents/**.agent.md 파일 하나하나가 Agent 하나에 해당하며,
+ * net.dstone.ai.common.loader.YamlDefinitionLoader 가 그 파일을 읽어서 이 클래스의 값으로 채워줍니다.
  *
  * 이 Agent는 두 가지 경로로 호출될 수 있습니다.
  * 1. 사용자가 api.controller.ChatController를 통해 채팅 요청의 agent 값으로 직접 지정하거나,
@@ -21,41 +17,47 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *    어느 경로로 호출되든, "이 caller(호출 주체)가 이 Agent를 써도 되는지"는 항상 allowedCallers 값으로 똑같이 검사합니다.
  *
  * ## 파일 모양
- *   agent:
- *     id: pilot-requirment-analyzer-agent
- *     version: "1.0.0"
- *     role: REQUIREMENT_ANALYST                      # 사람이 읽는 역할 이름(동작에는 영향 없음)
- *     description: 요구사항을 분석하고 구조화된 결과를 생성한다.
- *     model:
- *       name: qwen/qwen3.8-27b                       # (옵셔널) 이 Agent만 다른 모델을 쓸 때. 비우면 provider 공통 기본 모델
- *       temperature: 0.1
- *       reasoning: none
- *     prompt:
- *       system: prompts/pilot/requirement-analyzer.st   # 프롬프트는 별도 파일
- *     input:
- *       schema: schemas/pilot/requirement-input.schema.json
- *     output:
- *       format: JSON
- *       schema: schemas/pilot/requirement-analysis.schema.json
- *       validation: STRICT
- *     context:
- *       sources: [workflowInput, retrievedDocuments]
- *     tools:
- *       allowed: [searchInFiles, readFile]
- *     execution:
- *       maxAttempts: 2
- *       timeoutSeconds: 120
- *       onInvalidOutput: RETRY
+ * 파일 하나에 Agent 하나입니다. 맨 위 --- 와 --- 사이(머리말)가 설정이고, 그 아래(본문)가 시스템 프롬프트입니다.
+ * 본문은 LLM에게 그대로 가므로, 사람이 읽는 설명은 머리말에 YAML 주석(#)으로 적습니다.
  *
- * prompt와 schema에 적는 경로는 resources/definitions 폴더를 기준으로 합니다.
+ *   ---
+ *   # 요구사항을 분석하는 Agent입니다.
+ *   id: pilot-requirment-analyzer-agent
+ *   version: 1.0.0
+ *   role: REQUIREMENT_ANALYST                      # 사람이 읽는 역할 이름(동작에는 영향 없음)
+ *   description: 요구사항을 분석하고 구조화된 결과를 생성한다.
+ *   model:
+ *     name: qwen/qwen3.8-27b                       # (옵셔널) 이 Agent만 다른 모델을 쓸 때. 비우면 provider 공통 기본 모델
+ *     temperature: 0.1
+ *     reasoning: none
+ *   input:
+ *     workDir: string, 작업 폴더
+ *     request: string, 요청서 내용
+ *     feedback?: string, 다시 할 때 반영할 지적
+ *   output:
+ *     summary: string, 요약
+ *     requirements(array, 기능 요구사항):
+ *       id: string
+ *       title: string
+ *   context:
+ *     sources: [workflowInput, retrievedDocuments]
+ *   tools:
+ *     allowed: [searchInFiles, readFile]
+ *   execution:
+ *     maxAttempts: 2
+ *     timeoutSeconds: 120
+ *     onInvalidOutput: RETRY
+ *   ---
+ *   [역할] 너는 요구사항 분석가다. ...
  *
  * ## 입출력 계약(input / output)
  * 이 Agent가 무엇을 받고 무엇을 돌려주는지는 Agent가 정합니다. Agent를 부르는 쪽(Workflow step, 채팅 API)은
  * 이 계약에 맞춰 값을 넣고, 돌려받은 값을 그대로 씁니다. 계약은 이 파일 한 곳에만 있습니다.
- * - input을 적지 않으면 글자 하나를 받습니다({type: string}). object 등을 받으려면 schema 파일을 적습니다.
- *   그러면 부르는 쪽이 맵으로 값을 넣고, 엔진이 그 맵을 스키마로 검사한 뒤 JSON 글자로 바꿔 사용자 메시지로 보냅니다.
- * - output을 적지 않으면(또는 format: TEXT) LLM 답 원문이 그대로 결과입니다.
- *   format: JSON이면 LLM이 schema 모양의 JSON으로 답하도록 지시하고 답을 스키마로 검사합니다. 모양이 틀린 답은 실패입니다.
+ * 둘 다 짧은 타입 표기(Picoschema, common.schema.Picoschema)로 적습니다.
+ * - input을 적지 않으면 글자 하나를 받습니다(string). 필드를 적으면 부르는 쪽이 맵으로 값을 넣고,
+ *   엔진이 그 맵을 스키마로 검사한 뒤 JSON 글자로 바꿔 사용자 메시지로 보냅니다.
+ * - output을 적지 않으면(또는 output: string) LLM 답 원문이 그대로 결과입니다.
+ *   필드를 적으면 LLM이 그 모양의 JSON으로 답하도록 지시하고 답을 스키마로 검사합니다. 모양이 틀린 답은 실패입니다.
  * - SUPERVISOR/ROUTER step이 부르는 Agent는 output을 적지 않습니다. 답의 모양을 엔진이 정하기 때문입니다.
  *
  * ## 모델(model)
@@ -101,9 +103,9 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  * @param role           (옵셔널)사람이 읽는 역할 이름입니다. 동작에는 영향을 주지 않습니다.
  * @param description    (옵셔널)이 Agent가 무엇을 하는지 사람이 읽기 위한 설명입니다. Sub Agent로 쓰일 때는 부모 LLM이 이 설명을 봅니다.
  * @param model          (옵셔널)모델 고르기와 모델 파라미터입니다.
- * @param prompt         (필수)시스템 프롬프트 파일입니다.
+ * @param prompt         (필수)시스템 프롬프트입니다. 머리말에 적지 않습니다(로더가 파일의 본문을 넣습니다).
  * @param input          (옵셔널)이 Agent가 받는 값의 모양입니다. 비워두면 {type: string}입니다.
- * @param output         (옵셔널)이 Agent가 돌려주는 값의 모양입니다. 비워두면 글자(TEXT)입니다.
+ * @param output         (옵셔널)이 Agent가 돌려주는 값의 모양입니다. 비워두면 글자(string)입니다.
  * @param context        (옵셔널)답할 때 참고할 자료입니다(RAG).
  * @param tools          (옵셔널)이 Agent가 쓸 수 있는 Tool입니다. 비워두면 Tool을 쓰지 않습니다.
  * @param subAgents      (옵셔널)이 Agent가 일을 맡길 수 있는 다른 Agent의 id 목록입니다. 비워두면 맡기지 않습니다.
@@ -116,9 +118,9 @@ public record AgentDefinition(
 	, String role
 	, String description
 	, Model model
-	, Prompt prompt
+	, String prompt
 	, SchemaDefinition input
-	, Output output
+	, SchemaDefinition output
 	, Context context
 	, Tools tools
 	, List<String> subAgents
@@ -134,15 +136,6 @@ public record AgentDefinition(
 
 	/** model.reasoning에 적을 수 있는 값입니다. */
 	public static final List<String> REASONING_LEVELS = List.of("none", "low", "medium", "high");
-
-	/** output.format에 적을 수 있는 값입니다. */
-	public static final String FORMAT_JSON = "JSON";
-	public static final String FORMAT_TEXT = "TEXT";
-	public static final List<String> FORMATS = List.of(FORMAT_JSON, FORMAT_TEXT);
-
-	/** output.validation에 적을 수 있는 값입니다. 지금은 "스키마와 다르면 실패" 하나뿐입니다. */
-	public static final String VALIDATION_STRICT = "STRICT";
-	public static final List<String> VALIDATIONS = List.of(VALIDATION_STRICT);
 
 	/** execution.onInvalidOutput에 적을 수 있는 값입니다. */
 	public static final String ON_INVALID_RETRY = "RETRY";
@@ -162,43 +155,6 @@ public record AgentDefinition(
 	 * @param reasoning   추론 세기입니다(none / low / medium / high).
 	 */
 	public record Model(String name, Double temperature, String reasoning) {
-	}
-
-	/**
-	 * agent.prompt 입니다.
-	 *
-	 * @param system 시스템 프롬프트 파일의 경로입니다(definitions 폴더 기준. 예: prompts/pilot/requirement-analyzer.st).
-	 * @param text   그 파일의 내용입니다. YAML에는 적지 않습니다(YamlDefinitionLoader가 파일을 읽어 채웁니다).
-	 */
-	public record Prompt(String system, String text) {
-	}
-
-	/**
-	 * agent.output 입니다.
-	 *
-	 * @param format     JSON 또는 TEXT입니다. 적지 않으면 schema가 있을 때 JSON, 없을 때 TEXT입니다.
-	 * @param schema     답의 모양입니다(표준 JSON Schema 맵). format이 JSON일 때 필요합니다.
-	 * @param validation 답을 검사하는 방식입니다. 지금은 STRICT뿐입니다.
-	 */
-	public record Output(String format, Map<String, Object> schema, String validation) {
-
-		/**
-		 * YAML의 output 맵을 읽을 때 쓰입니다. schema는 파일에서 읽어 온 맵이거나 축약형(예: schema: string)입니다.
-		 *
-		 * @param format     답의 형식
-		 * @param schema     답의 모양(없으면 null)
-		 * @param validation 검사 방식
-		 */
-		@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
-		public static Output of(@JsonProperty("format") String format, @JsonProperty("schema") Object schema, @JsonProperty("validation") String validation) {
-			return new Output(format == null ? null : format.trim().toUpperCase(), schema == null ? null : JsonSchemaUtil.normalize(schema), validation == null ? null : validation.trim().toUpperCase());
-		}
-
-		/** 답이 JSON인지 봅니다(format을 적지 않았으면 schema가 있을 때 JSON입니다). */
-		public boolean isJson() {
-			return this.format == null ? this.schema != null : FORMAT_JSON.equals(this.format);
-		}
-
 	}
 
 	/**
@@ -239,9 +195,9 @@ public record AgentDefinition(
 	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls) {
 	}
 
-	/** 시스템 프롬프트 원문입니다(prompt.system 파일의 내용). */
+	/** 시스템 프롬프트 원문입니다(파일의 본문). */
 	public String promptText() {
-		return this.prompt == null ? null : this.prompt.text();
+		return this.prompt;
 	}
 
 	/** model.name 값입니다. 적지 않았으면 null입니다. */
@@ -333,12 +289,9 @@ public record AgentDefinition(
 		return (this.input == null ? SchemaDefinition.string() : this.input).schema();
 	}
 
-	/** 이 Agent가 돌려주는 값의 JSON Schema입니다. output을 비워뒀거나 format이 TEXT면 {type: string}입니다. */
+	/** 이 Agent가 돌려주는 값의 JSON Schema입니다. output을 비워뒀으면 {type: string}입니다. */
 	public Map<String, Object> outputSchema() {
-		if (this.output == null || !this.output.isJson() || this.output.schema() == null) {
-			return JsonSchemaUtil.string();
-		}
-		return this.output.schema();
+		return (this.output == null ? SchemaDefinition.string() : this.output).schema();
 	}
 
 }

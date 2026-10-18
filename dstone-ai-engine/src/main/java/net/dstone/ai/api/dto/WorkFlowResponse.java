@@ -10,7 +10,7 @@ package net.dstone.ai.api.dto;
  * POST .../decision을 호출해서 승인 또는 반려하면 됩니다.
  *
  * @param status      DONE(완료) 또는 WAITING_APPROVAL(승인 대기) 중 하나입니다.
- * @param output      Workflow 실행 결과(workflow.output.value를 채운 값)입니다. 글자일 수도, 객체일 수도 있습니다. WAITING_APPROVAL 상태라면 null입니다.
+ * @param output      Workflow 실행 결과(Workflow의 return을 채운 값)입니다. 글자일 수도, 객체일 수도 있습니다. WAITING_APPROVAL 상태라면 null입니다.
  * @param sessionId   대화를 구분하는 세션 ID입니다.
  * @param workflowId  실행된 Workflow의 id입니다.
  * @param executionId 이번 실행을 가리키는 id입니다. 승인 대기 중일 때 후속 조회나 승인 API를 호출할

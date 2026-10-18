@@ -18,7 +18,7 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  * ## 읽을 수 있는 곳
  *   ${input}                    Workflow를 실행할 때 넘긴 값
  *   ${input.requirement}        그 값이 object일 때 그 안의 필드
- *   ${state.analysis}           앞의 step이 output으로 state에 저장해 둔 값
+ *   ${state.analysis}           앞의 step이 save로 state에 저장해 둔 값
  *   ${state.analysis.sql}       그 값 안의 필드
  *   ${state.files[0].path}      리스트의 n번째(0부터)
  *   ${item}  ${item.path}       forEach로 반복 중일 때 이번 항목(itemVariable을 적었으면 그 이름)
@@ -183,34 +183,6 @@ public final class ContextResolver {
 
 	/**
 	 * <pre>
-	 * "state.a.b" 모양으로 적은 저장 위치를 이름 목록으로 바꿉니다(맨 앞의 state는 뺍니다). 예: "state.review.reason" → [review, reason]
-	 * </pre>
-	 *
-	 * @param target step의 output에 적은 저장 위치
-	 * @throws ExpressionException state로 시작하지 않거나 경로 모양이 틀렸을 때
-	 */
-	public static List<String> statePath(String target) {
-		if (target == null || target.isBlank()) {
-			throw new ExpressionException("저장 위치가 비어 있습니다. 예: state.analysis");
-		}
-		String trimmed = target.strip();
-		if (trimmed.contains(PREFIX)) {
-			throw new ExpressionException("'" + target + "' - 저장 위치는 ${ } 없이 적습니다. 예: state.analysis");
-		}
-		List<String> segments = segments(trimmed, target);
-		if (!Context.STATE.equals(segments.get(0)) || segments.size() < 2) {
-			throw new ExpressionException("'" + target + "' - 저장 위치는 state.이름 모양으로 적습니다. 예: state.analysis");
-		}
-		for (String segment : segments) {
-			if (isIndex(segment)) {
-				throw new ExpressionException("'" + target + "' - 저장 위치에는 리스트 번호([n])를 쓸 수 없습니다.");
-			}
-		}
-		return segments.subList(1, segments.size());
-	}
-
-	/**
-	 * <pre>
 	 * 맵에서 이름 목록을 따라 내려간 자리의 값을 돌려줍니다. 가는 길에 값이 없으면 null입니다.
 	 * </pre>
 	 *
@@ -232,30 +204,6 @@ public final class ContextResolver {
 			}
 		}
 		return current;
-	}
-
-	/**
-	 * <pre>
-	 * 맵에서 이름 목록을 따라 내려간 자리에 값을 넣습니다. 가는 길에 맵이 없으면 만듭니다.
-	 * 가는 길에 맵이 아닌 값이 이미 있으면 그 값을 새 맵으로 바꿉니다(뒤에 저장한 것이 이깁니다).
-	 * </pre>
-	 *
-	 * @param root  값을 넣을 맵(state)
-	 * @param path  이름 목록
-	 * @param value 넣을 값
-	 */
-	@SuppressWarnings("unchecked")
-	public static void write(Map<String, Object> root, List<String> path, Object value) {
-		Map<String, Object> current = root;
-		for (int i = 0; i < path.size() - 1; i++) {
-			Object next = current.get(path.get(i));
-			if (!(next instanceof Map)) {
-				next = new LinkedHashMap<String, Object>();
-				current.put(path.get(i), next);
-			}
-			current = (Map<String, Object>) next;
-		}
-		current.put(path.get(path.size() - 1), value);
 	}
 
 	/**

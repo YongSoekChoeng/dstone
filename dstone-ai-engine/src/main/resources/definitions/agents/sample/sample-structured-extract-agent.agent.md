@@ -1,0 +1,19 @@
+---
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
+#
+# 이 Agent는 output을 object로 선언한 예시입니다.
+# workflows/sample/sample-structured-output-chain.workflow.yml의 extract step이 이 Agent를 부릅니다.
+# 머리말의 output(필드를 적은 모양) 때문에 엔진이 "이 JSON 모양으로만 답하라"는 지시를 자동으로 붙여주고, LLM의 답을
+# 그 모양으로 읽고 검사합니다. extract step이 그 값을 state.extracted에 저장하고, 그 다음 TOOL step은
+# "${state.extracted.sql}"로 이 값을 그대로 가져다 씁니다.
+#
+# 응답 모양은 이 파일(Agent)이 정합니다. 이 Agent를 어느 step에서 부르든, 채팅 API로 부르든 답은 항상
+# {sql: ...} 모양입니다. 그래서 이 Agent의 프롬프트는 JSON 모양을 설명하지 않고 "무엇을 뽑아낼지"만 설명합니다.
+id: sample-structured-extract-agent
+version: 1.0.0
+description: 입력 문장에서 SQL 문 하나를 그대로 뽑아 {sql}로 돌려준다(output을 object로 선언한 예시).
+output:
+  sql: string, 입력 문장에서 그대로 뽑아낸 SQL 문 하나(없으면 SELECT 1)
+---
+입력 문장 안에 SQL 문이 섞여 있으면 그 SQL 문 하나를 있는 그대로(수정하지 말고) 뽑아내십시오.
+SQL 문이 없으면 "SELECT 1"을 쓰십시오.

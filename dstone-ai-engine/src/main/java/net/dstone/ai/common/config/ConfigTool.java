@@ -153,7 +153,7 @@ public class ConfigTool extends BaseObject {
 	 * <pre>
 	 * Agent 하나에 붙일 Tool을 골라 돌려줍니다. 두 목록을 모두 통과한 Tool만 남습니다.
 	 * - caller 화이트리스트(dstone.ai.tool.allowed-by-caller): 이 앱이 쓸 수 있는 Tool
-	 * - Agent의 tools.allowed(agents/*.yml): 이 Agent가 쓰겠다고 적은 Tool
+	 * - Agent의 tools.allowed(agents/**.agent.md): 이 Agent가 쓰겠다고 적은 Tool
 	 * Agent의 tools가 비어 있으면 아무 Tool도 붙지 않습니다. "*" 하나만 적혀 있으면 caller 화이트리스트를 통과한 Tool이 전부 붙습니다.
 	 * </pre>
 	 *

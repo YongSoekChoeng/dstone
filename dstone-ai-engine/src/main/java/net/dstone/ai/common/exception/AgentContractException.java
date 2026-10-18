@@ -2,7 +2,7 @@ package net.dstone.ai.common.exception;
 
 /**
  * <pre>
- * Agent의 입출력 계약(agents/*.yml 의 input/output)을 어겼을 때 던지는 예외입니다.
+ * Agent의 입출력 계약(agents/**.agent.md 의 input/output)을 어겼을 때 던지는 예외입니다.
  * - 넣은 값이 Agent input 모양이 아닐 때
  * - LLM의 답이 Agent output(또는 SUPERVISOR/ROUTER가 정한) 모양이 아닐 때
  *

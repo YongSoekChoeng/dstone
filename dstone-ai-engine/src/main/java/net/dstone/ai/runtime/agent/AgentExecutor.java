@@ -60,8 +60,11 @@ import reactor.core.publisher.Flux;
  * input이 object면 그 필드들이 변수가 되고, 채팅 API는 요청의 variables를 더 얹을 수 있습니다(같은 이름이면 variables가 이김).
  * 그래서 Agent 파일은 자기 input 스키마만 보고 prompt를 쓸 수 있습니다.
  *
- *   input:  {schema: {type: object, properties: {role: string, message: string}}}
- *   prompt: 당신은 {role} 역할을 맡은 상담원입니다.
+ *   input:                                      (.agent.md 머리말)
+ *     role: string
+ *     message: string
+ *   ---
+ *   당신은 {role} 역할을 맡은 상담원입니다.       (.agent.md 본문)
  *
  * ## 시스템 프롬프트
  * 시스템 프롬프트는 항상 "엔진 규칙 + 업무 지시(Agent prompt)" 순서입니다(runtime.prompt.EnginePrompt).
@@ -417,7 +420,7 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- 순서는 "엔진 규칙(공통 + engineRule) → 업무 지시(Agent prompt)"입니다(EnginePrompt.compose()).
 			  엔진 규칙은 변수 치환을 거치지 않습니다. 변수는 Agent prompt에서만 채운 뒤 뒤에 이어 붙입니다.
-			- AgentDefinition.promptText()(prompt.system 파일의 내용)가 업무 지시입니다. 만약 그 문구 안에
+			- AgentDefinition.promptText()(.agent.md 파일의 본문)가 업무 지시입니다. 만약 그 문구 안에
 			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
 			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
 			  요청의 variables를 더 얹습니다(promptVariables() 참고).

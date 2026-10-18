@@ -1,0 +1,23 @@
+---
+# 이 파일 하나가 Agent 하나를 정의합니다. Agent의 id는 아래 agent.id 값입니다.
+#
+# 이 Agent는 "특정 Agent 하나에만 다른 LLM 모델을 쓰게 할 수 있다"는 기능(model.name)을 보여주기 위한 예시입니다.
+# 보통은 spring.ai.{provider}.chat.options.model에 설정된 provider 공통 기본 모델을 쓰지만, model.name에 모델 이름을
+# 적어 두면 이 Agent를 호출할 때만 그 모델을 씁니다.
+#
+# 실제로 어떤 모델이 답했는지 눈으로 바로 확인할 수 있도록, 프롬프트에서 "답변 끝에
+# (model=...) 문구를 붙여라"라고 시키고 있습니다. 다만 모델이 자기 자신의 정확한 이름을 모를 수도
+# 있으므로 이 문구를 100% 믿을 수는 없습니다. 확실하게 확인하려면 dstone-ai-engine 서버 로그에 남는 요청/응답
+# 내용을 보거나, api.dto.ChatResponse.model() 값을 확인하면 됩니다.
+#
+# 모델 이름은 지금 활성화되어 있는 provider(spring.ai.model.chat)에서 쓸 수 있는 이름이어야 합니다.
+# provider와 맞지 않는 모델 이름을 넣으면, 서버가 켜질 때는 아무 문제 없이 넘어가지만 실제로 이 Agent를 호출하는 순간에
+# 그 provider의 API가 에러를 냅니다. 아래 이름은 OpenRouter(provider openai)용이므로, 다른 provider를 쓰면 그쪽 모델 이름으로 바꿉니다.
+id: sample-model-override-agent
+version: 1.0.0
+description: per-Agent model override 확인용 Agent. 활성 provider의 기본 모델과 다른 모델을 강제한다.
+model:
+  name: qwen/qwen-2.5-coder-32b-instruct
+---
+당신은 AI 어시스턴트입니다. 질문에 간결히 한국어로 답한 뒤, 마지막 줄에
+"(model=여기에 당신이 아는 자기 모델명을 적으십시오)"를 덧붙이십시오.
