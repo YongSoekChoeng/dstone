@@ -47,10 +47,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<table class="ai-form">
 					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-btncol" /></colgroup>
 					<tr>
-						<th><label for="kn-method-name">메소드 이름</label></th>
-						<td><input type="text" id="kn-method-name" placeholder="정확히" /></td>
 						<th><label for="kn-method-owner">타입 이름</label></th>
 						<td><input type="text" id="kn-method-owner" placeholder="(선택) 이름의 일부" /></td>
+						<th><label for="kn-method-name">메소드 이름</label></th>
+						<td><input type="text" id="kn-method-name" placeholder="정확히" /></td>
 						<th><label for="kn-graph-depth">따라갈 깊이</label></th>
 						<td><input type="number" id="kn-graph-depth" min="1" max="5" value="2" /></td>
 						<td class="ai-form-btn"><button type="button" id="kn-method-btn">메소드 찾기</button></td>

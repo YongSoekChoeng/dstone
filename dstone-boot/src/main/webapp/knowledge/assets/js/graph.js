@@ -513,31 +513,104 @@ var DstoneKnowledgeGraph = (function () {
 		drawMap();
 	}
 
-	/** 이름으로 노드를 찾아 그리로 갑니다. 접힌 묶음 안에 있으면 그 묶음을 펼칩니다. 다시 누르면 다음 것으로 갑니다 */
+	/** "클래스.메소드"로 찾을 때 메소드 목록을 가져와 볼 클래스 수의 한도 */
+	var METHOD_FIND_TYPE_MAX = 20;
+
+	/**
+	 * 이름으로 노드를 찾아 그리로 갑니다. 접힌 묶음 안에 있으면 그 묶음을 펼칩니다. 다시 누르면 다음 것으로 갑니다.
+	 * 맞는 노드가 없고 "클래스.메소드"(또는 "클래스#메소드") 모양이면, 그 클래스로 간 뒤 메소드의 관계 트리를 엽니다.
+	 */
 	function find() {
 		var word = el["kn-graph-find"].value.trim().toLowerCase();
 		if (!map.graph || !word) {
 			return;
 		}
-		if (map.hitWord !== word) {
-			map.hitWord = word;
-			map.hitIndex = 0;
-			map.hits = map.graph.nodes.filter(function (node) {
-				return String(node.name).toLowerCase().indexOf(word) >= 0 || String(node.fullName).toLowerCase().indexOf(word) >= 0;
-			});
-			// 이름이 정확히 같은 것을 앞에 둔다.
-			map.hits.sort(function (a, b) {
-				return (String(b.name).toLowerCase() === word ? 1 : 0) - (String(a.name).toLowerCase() === word ? 1 : 0);
-			});
-		} else {
-			map.hitIndex = (map.hitIndex + 1) % Math.max(map.hits.length, 1);
+		if (map.hitWord === word) {
+			if (map.hits.length > 0) {
+				map.hitIndex = (map.hitIndex + 1) % map.hits.length;
+				showHit(word);
+			}
+			return;
 		}
-		if (map.hits.length === 0) {
+		map.hitWord = word;
+		map.hitIndex = 0;
+		map.hits = nodesNamed(word, null);
+		if (map.hits.length > 0) {
+			showHit(word);
+			return;
+		}
+		var cut = Math.max(word.lastIndexOf("."), word.lastIndexOf("#"));
+		if (cut <= 0 || cut === word.length - 1) {
 			K.message(el["kn-graph-message"], "\"" + word + "\" 이(가) 이름에 들어간 노드가 없습니다.", true);
 			return;
 		}
+		findMethods(word, word.substring(0, cut), word.substring(cut + 1));
+	}
+
+	/** 이름이나 전체 이름에 word 가 들어간 노드. 이름이 정확히 같은 것을 앞에 둡니다. kinds 를 주면 그 종류만 봅니다 */
+	function nodesNamed(word, kinds) {
+		var hits = map.graph.nodes.filter(function (node) {
+			if (kinds && kinds.indexOf(node.kind) < 0) {
+				return false;
+			}
+			return String(node.name).toLowerCase().indexOf(word) >= 0 || String(node.fullName).toLowerCase().indexOf(word) >= 0;
+		});
+		hits.sort(function (a, b) {
+			return (String(b.name).toLowerCase() === word ? 1 : 0) - (String(a.name).toLowerCase() === word ? 1 : 0);
+		});
+		return hits;
+	}
+
+	/** "클래스.메소드" 찾기. 클래스(화면 안의 Java 코드 포함)마다 메소드 목록을 가져와, 이름에 메소드 부분이 들어간 것을 모읍니다 */
+	function findMethods(word, typeWord, methodWord) {
+		var types = nodesNamed(typeWord, ["TYPE", "JSP"]);
+		if (types.length === 0) {
+			K.message(el["kn-graph-message"], "\"" + typeWord + "\" 이(가) 이름에 들어간 클래스가 없습니다.", true);
+			return;
+		}
+		var checked = types.slice(0, METHOD_FIND_TYPE_MAX);
+		K.message(el["kn-graph-message"], "클래스 " + checked.length + "개에서 메소드 \"" + methodWord + "\" 을(를) 찾는 중...");
+		Promise.all(checked.map(function (type) {
+			return K.call("GET", "/api/revisions/" + map.revisionId + "/graph/node", { id: type.id }).then(function (detail) {
+				return { type: type, methods: detail.methods || [] };
+			});
+		})).then(function (results) {
+			// 그사이에 다른 이름을 찾았거나 리비전을 바꿨다.
+			if (map.hitWord !== word) {
+				return;
+			}
+			var exact = [];
+			var partial = [];
+			results.forEach(function (result) {
+				result.methods.forEach(function (method) {
+					var name = String(method.name).toLowerCase();
+					if (name.indexOf(methodWord) >= 0) {
+						(name === methodWord ? exact : partial).push({ node: result.type, method: method, fullName: result.type.fullName + "." + method.signature });
+					}
+				});
+			});
+			// 이름이 정확히 같은 메소드를 앞에 둔다.
+			map.hits = exact.concat(partial);
+			if (map.hits.length === 0) {
+				K.message(el["kn-graph-message"], "\"" + typeWord + "\" 클래스 " + checked.length + "개에 이름에 \"" + methodWord + "\" 이(가) 들어간 메소드가 없습니다."
+					+ (types.length > checked.length ? " 클래스가 " + types.length + "개라 앞의 " + checked.length + "개만 봤습니다. 클래스 이름을 더 길게 적으세요." : ""), true);
+				return;
+			}
+			showHit(word);
+		}).catch(function (err) {
+			K.message(el["kn-graph-message"], err.message, true);
+		});
+	}
+
+	/** 찾은 것 가운데 hitIndex 번째로 갑니다. 메소드면 그 클래스로 간 뒤 메소드의 관계 트리를 엽니다 */
+	function showHit(word) {
 		var hit = map.hits[map.hitIndex];
-		goTo(hit);
+		if (hit.method) {
+			goTo(hit.node);
+			openTree(hit.method.methodId);
+		} else {
+			goTo(hit);
+		}
 		K.message(el["kn-graph-message"], "\"" + word + "\" " + map.hits.length + "건 가운데 " + (map.hitIndex + 1) + "번째: " + hit.fullName
 			+ (map.hits.length > 1 ? " (찾기를 다시 누르면 다음 것)" : ""));
 	}

@@ -39,6 +39,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<span class="kn-example" data-fill='{"kn-graph-find":"BoardDAO"}'>BoardDAO 찾기</span>
 				<span class="kn-example" data-fill='{"kn-graph-find":"TB_BOARD"}'>테이블 TB_BOARD 찾기</span>
 				<span class="kn-example" data-fill='{"kn-graph-find":"list.jsp"}'>화면 list.jsp 찾기</span>
+				<span class="kn-example" data-fill='{"kn-graph-find":"BoardDAO.deleteBoard"}'>메소드 BoardDAO.deleteBoard 찾기</span>
 				<br>모델(VO)은 처음에 꺼져 있습니다. getter / setter 호출이 그림을 덮기 때문입니다. 위의 색깔 딱지를 눌러 계층을 켜고 끕니다.
 				그림에는 분석이 이은 관계만 나옵니다. 리플렉션이나 문자열로 조립한 주소처럼 잇지 못한 호출은 선이 없습니다.
 			</details>
@@ -55,7 +56,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<th><label for="kn-graph-revision">리비전</label></th>
 						<td><select id="kn-graph-revision"></select></td>
 						<th><label for="kn-graph-find">이름으로 찾기</label></th>
-						<td><div class="ai-form-inline"><input type="text" id="kn-graph-find" placeholder="클래스 / 화면 / 테이블" />
+						<td><div class="ai-form-inline"><input type="text" id="kn-graph-find" placeholder="클래스 / 화면 / 테이블 / 클래스.메소드" />
 							<button type="button" id="kn-graph-find-btn" class="kn-plain">찾기</button></div></td>
 					</tr>
 					<tr>
