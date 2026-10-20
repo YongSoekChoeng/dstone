@@ -1,5 +1,6 @@
 /* ==========================================================================
-   Dstone Console — AI 화면과 코드 분석(Knowledge) 화면의 바탕 모양
+   AI 화면(Dstone AI)과 코드 분석 화면(Dstone Knowledge)의 바탕 모양
+   (두 화면은 메뉴가 따로지만 모양은 이 파일 하나를 같이 쓴다)
    --------------------------------------------------------------------------
    색, 글꼴, 간격을 아래 변수(토큰)로만 정하고, 나머지 규칙은 모두 이 변수를 씁니다.
    색을 바꾸려면 :root 의 값만 고치면 됩니다.
@@ -211,7 +212,8 @@ body.ai-body {
 	background: linear-gradient(135deg, #22b8cf 0%, #0e7490 100%);
 	color: #fff;
 	font-weight: 800;
-	font-size: 15px;
+	font-size: 13px;
+	letter-spacing: -0.02em;
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
@@ -281,12 +283,16 @@ body.ai-body {
 	opacity: 0.9;
 }
 
+/* dstone-boot 로 돌아가는 링크. 이 화면 묶음의 메뉴가 아니라 "나가는 문"이라 테두리로 구분한다 */
 .ai-body .cs-nav-home {
-	margin-top: 12px;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
-	border-radius: 0 0 8px 8px;
-	padding-top: 12px;
-	color: var(--cs-side-muted);
+	margin: 0 0 6px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color: #d6dde8;
+	font-size: 13px;
+}
+
+.ai-body .cs-nav-home:hover {
+	border-color: rgba(255, 255, 255, 0.28);
 }
 
 /* 본문 */
@@ -363,8 +369,7 @@ body.ai-body {
 
 	.ai-body .cs-nav-home {
 		margin: 0;
-		border: 0;
-		padding: 7px 10px;
+		padding: 6px 10px;
 	}
 
 	.ai-body #main {

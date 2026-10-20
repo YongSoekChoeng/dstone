@@ -3,7 +3,7 @@
 net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.RequestUtil(request, response);
 %>
 	<head>
-		<title>Dstone AI · Dstone Console</title>
+		<title>Dstone AI</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<%-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, AI 화면의 부품은 ai 의 main.css 에 있다. 코드 분석 화면은 knowledge.css 를 더한다 --%>
