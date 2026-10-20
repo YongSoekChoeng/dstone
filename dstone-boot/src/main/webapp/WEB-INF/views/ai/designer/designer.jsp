@@ -131,6 +131,26 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					</div>
 				</div>
 			</div>
+
+			<%-- Agent 창 위에 뜨는 고르기 창. Tool이나 Sub Agent를 이름·설명으로 찾아 고른다 --%>
+			<div id="wd-pick-dialog" class="wd-dialog wd-pick-dialog" style="display: none;">
+				<div class="wd-dialog-box wd-pick-box">
+					<div class="wd-dialog-head">
+						<h3 id="wd-pick-title"></h3>
+						<button type="button" id="wd-pick-close-btn" class="kn-plain">닫기</button>
+					</div>
+					<div class="wd-pick-bar">
+						<input type="search" id="wd-pick-search" placeholder="이름이나 설명으로 찾기" />
+						<label class="wd-check"><input type="checkbox" id="wd-pick-only-chosen" /> 고른 것만</label>
+						<span id="wd-pick-count" class="ai-hint"></span>
+					</div>
+					<div id="wd-pick-list" class="wd-pick-list"></div>
+					<div class="ai-form-actions">
+						<button type="button" id="wd-pick-cancel-btn" class="kn-plain">취소</button>
+						<button type="button" id="wd-pick-ok-btn">고르기</button>
+					</div>
+				</div>
+			</div>
 				</div>
 			</div>
 					</div>

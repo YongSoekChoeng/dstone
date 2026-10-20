@@ -655,45 +655,165 @@
 	margin-bottom: 10px;
 }
 
-/* 체크 상자 목록(Tool, Sub Agent): 여러 칸으로 나란히, 길면 상자 안에서 스크롤 */
-.wd-check-list {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-	gap: 2px 14px;
-	max-height: 210px;
-	overflow-y: auto;
-	padding: 8px 10px;
+/* 고른 Tool, Sub Agent: 칩으로 나란히, 끝에 [찾아서 추가] */
+.wd-chip-list {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
 	margin: 6px 0 4px;
-	border: 1px solid var(--cs-border);
-	border-radius: var(--cs-radius-sm);
+}
+
+.wd-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 26px;
+	padding: 0 4px 0 10px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: 999px;
 	background: var(--cs-surface-2);
-}
-
-.wd-check-list label.wd-check {
-	margin: 2px 0;
-	white-space: normal;
-	align-items: flex-start;
 	font-size: 12.5px;
-	line-height: 1.45;
-	word-break: break-all;
+	color: var(--cs-text);
 }
 
-.wd-check-list label.wd-check input {
-	margin-top: 1px;
-	flex: none;
+.wd-chip-warn {
+	border-color: var(--cs-warning);
+	background: var(--cs-warning-soft);
 }
 
-.wd-check-list em,
-.wd-check em {
+.ai-body button.wd-chip-x {
+	width: 20px;
+	height: 20px;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--cs-muted);
+	font-size: 14px;
+	line-height: 1;
+}
+
+.ai-body button.wd-chip-x:hover {
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+}
+
+.ai-body button.wd-pick-btn {
+	height: 26px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wd-chip em,
+.wd-check em,
+.wd-pick-row em {
 	font-style: normal;
 	color: var(--cs-faint);
 	font-size: 11.5px;
 	margin-left: 2px;
 }
 
-.wd-check-list label.wd-check-off {
-	color: var(--cs-faint);
+/* 고르기 창: Agent 창 위에 뜬다 */
+.wd-pick-dialog {
+	z-index: 1010;
+}
+
+.wd-pick-box {
+	width: min(720px, 96vw);
+	display: flex;
+	flex-direction: column;
+}
+
+.wd-pick-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	margin-bottom: 10px;
+}
+
+.ai-body .wd-pick-bar input[type="search"] {
+	flex: 1 1 260px;
+}
+
+.wd-pick-bar .ai-hint {
+	margin: 0;
+}
+
+.wd-pick-list {
+	height: min(52vh, 480px);
+	overflow-y: auto;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+}
+
+.wd-pick-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin: 0;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--cs-border);
+	cursor: pointer;
+	font-weight: normal;
+}
+
+.wd-pick-row:hover {
+	background: var(--cs-primary-soft);
+}
+
+.wd-pick-row input {
+	margin-top: 3px;
+	flex: none;
+}
+
+.wd-pick-main {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.wd-pick-name {
+	font-family: var(--cs-mono);
+	font-size: 13px;
+	color: var(--cs-text);
+	word-break: break-all;
+}
+
+.wd-pick-group {
+	font-family: var(--cs-font);
+	font-size: 11px;
+	padding: 0 6px;
+	border-radius: 4px;
+	background: var(--cs-surface-3);
+	color: var(--cs-muted);
+	white-space: nowrap;
+}
+
+.wd-pick-desc {
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--cs-muted);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.wd-pick-off {
 	cursor: not-allowed;
+}
+
+.wd-pick-off .wd-pick-name,
+.wd-pick-off .wd-pick-desc {
+	color: var(--cs-faint);
+}
+
+.wd-pick-empty {
+	padding: 16px;
 }
 
 .ai-body textarea.wd-agent-prompt {

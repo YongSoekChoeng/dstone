@@ -140,6 +140,7 @@ var DstoneAiDesigner = (function () {
 		bindTabs();
 		bindKeyboard();
 		bindAgentDialog();
+		bindPicker();
 
 		window.addEventListener("beforeunload", function (e) {
 			if (dirty) {
@@ -1921,25 +1922,140 @@ var DstoneAiDesigner = (function () {
 		return isNaN(value) ? undefined : value;
 	}
 
-	function checkedValues(container, name) {
-		var values = [];
-		Array.prototype.forEach.call(container.querySelectorAll("input[data-list='" + name + "']:checked"), function (box) {
-			values.push(box.value);
+	/**
+	 * 고른 것만 칩으로 보여 주는 HTML. 칩의 ×로 빼고, [찾아서 추가]로 고르기 창을 엽니다.
+	 * items: 고를 수 있는 전체 목록 [{value, label, title, disabled, note}] - 칩에 설명과 표시를 붙이는 데 씁니다.
+	 */
+	function chipList(name, items, chosen, emptyText, locked) {
+		var html = "<div class=\"wd-chip-list\">";
+		if (chosen.length === 0) {
+			html += "<span class=\"ai-hint\">" + escapeHtml(emptyText) + "</span>";
+		}
+		chosen.forEach(function (value) {
+			var item = null;
+			for (var i = 0; i < items.length; i++) {
+				if (items[i].value === value) {
+					item = items[i];
+				}
+			}
+			var note = item && item.note ? item.note : "";
+			html += "<span class=\"wd-chip" + (note ? " wd-chip-warn" : "") + "\" title=\"" + escapeHtml(item && item.title ? item.title : "") + "\">"
+				+ escapeHtml(value) + (note ? " <em>" + escapeHtml(note) + "</em>" : "")
+				+ "<button type=\"button\" class=\"wd-chip-x\" data-chip-remove=\"" + name + "\" data-value=\"" + escapeHtml(value) + "\" title=\"빼기\">×</button></span>";
 		});
-		return values;
+		html += "<button type=\"button\" class=\"kn-plain wd-pick-btn\" data-pick=\"" + name + "\"" + (locked ? " disabled" : "") + ">+ 찾아서 추가</button>";
+		return html + "</div>";
 	}
 
-	/** 체크 상자 목록의 HTML. items: [{value, label, title, disabled, note}] */
-	function checkList(name, items, chosen) {
-		if (items.length === 0) {
-			return "<p class=\"ai-hint\">고를 것이 없습니다.</p>";
+	/* ====================================================================
+	 * 고르기 창: Tool이나 Sub Agent가 많아져도 이름·설명으로 찾아 고를 수 있게 합니다.
+	 * 창 안에서 고친 것은 [고르기]를 눌러야 Agent에 들어갑니다.
+	 * ==================================================================== */
+
+	var picker = null;
+
+	function bindPicker() {
+		els.pickDialog = document.getElementById("wd-pick-dialog");
+		els.pickTitle = document.getElementById("wd-pick-title");
+		els.pickSearch = document.getElementById("wd-pick-search");
+		els.pickOnlyChosen = document.getElementById("wd-pick-only-chosen");
+		els.pickCount = document.getElementById("wd-pick-count");
+		els.pickList = document.getElementById("wd-pick-list");
+		els.pickSearch.addEventListener("input", renderPickList);
+		els.pickOnlyChosen.addEventListener("change", renderPickList);
+		document.getElementById("wd-pick-close-btn").addEventListener("click", closePicker);
+		document.getElementById("wd-pick-cancel-btn").addEventListener("click", closePicker);
+		document.getElementById("wd-pick-ok-btn").addEventListener("click", function () {
+			var done = picker.onDone;
+			var chosen = picker.chosen.slice();
+			closePicker();
+			done(chosen);
+		});
+		els.pickDialog.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") {
+				// Agent 창까지 닫히지 않게 여기서 멈춘다.
+				e.stopPropagation();
+				closePicker();
+			}
+		});
+		els.pickList.addEventListener("change", function (e) {
+			var box = e.target;
+			if (!box.matches("input[data-pick-value]")) {
+				return;
+			}
+			var value = box.getAttribute("data-pick-value");
+			var at = picker.chosen.indexOf(value);
+			if (box.checked && at < 0) {
+				picker.chosen.push(value);
+			} else if (!box.checked && at >= 0) {
+				picker.chosen.splice(at, 1);
+			}
+			renderPickCount();
+		});
+	}
+
+	/**
+	 * 고르기 창을 엽니다.
+	 * items: [{value, label, title(설명), group(폴더 등), disabled, note}], chosen: 지금 고른 값, onDone(고른 값 목록)
+	 */
+	function openPicker(title, items, chosen, onDone) {
+		picker = { items: items, chosen: chosen.slice(), onDone: onDone };
+		els.pickTitle.textContent = title;
+		els.pickSearch.value = "";
+		els.pickOnlyChosen.checked = false;
+		renderPickList();
+		els.pickDialog.style.display = "flex";
+		els.pickSearch.focus();
+	}
+
+	function closePicker() {
+		els.pickDialog.style.display = "none";
+		picker = null;
+	}
+
+	function renderPickList() {
+		if (!picker) {
+			// 검색 칸에서 Esc를 누르면 창이 닫힌 뒤에 칸 비우기(input)가 한 번 더 온다.
+			return;
 		}
-		return "<div class=\"wd-check-list\">" + items.map(function (item) {
-			var on = chosen.indexOf(item.value) >= 0;
-			return "<label class=\"wd-check" + (item.disabled && !on ? " wd-check-off" : "") + "\" title=\"" + escapeHtml(item.title || "") + "\">"
-				+ "<input type=\"checkbox\" data-list=\"" + name + "\" value=\"" + escapeHtml(item.value) + "\"" + (on ? " checked" : "") + (item.disabled && !on ? " disabled" : "") + " /> "
-				+ "<span>" + escapeHtml(item.label) + (item.note ? " <em>" + escapeHtml(item.note) + "</em>" : "") + "</span></label>";
-		}).join("") + "</div>";
+		var words = els.pickSearch.value.trim().toLowerCase().split(/\s+/).filter(function (w) {
+			return w !== "";
+		});
+		var onlyChosen = els.pickOnlyChosen.checked;
+		var shown = picker.items.filter(function (item) {
+			if (onlyChosen && picker.chosen.indexOf(item.value) < 0) {
+				return false;
+			}
+			// 낱말을 여럿 적으면 모두 들어 있는 것만 남긴다.
+			var text = (item.label + " " + (item.title || "") + " " + (item.group || "")).toLowerCase();
+			return words.every(function (w) {
+				return text.indexOf(w) >= 0;
+			});
+		});
+		if (shown.length === 0) {
+			els.pickList.innerHTML = "<p class=\"ai-hint wd-pick-empty\">" + (picker.items.length === 0 ? "고를 것이 없습니다." : "찾는 것이 없습니다.") + "</p>";
+		} else {
+			els.pickList.innerHTML = shown.map(function (item) {
+				var on = picker.chosen.indexOf(item.value) >= 0;
+				// 이미 고른 것은 지금 고를 수 없는 상태여도 뺄 수 있게 둔다.
+				var off = item.disabled && !on;
+				return "<label class=\"wd-pick-row" + (off ? " wd-pick-off" : "") + "\">"
+					+ "<input type=\"checkbox\" data-pick-value=\"" + escapeHtml(item.value) + "\"" + (on ? " checked" : "") + (off ? " disabled" : "") + " />"
+					+ "<span class=\"wd-pick-main\"><span class=\"wd-pick-name\">" + escapeHtml(item.label)
+					+ (item.group ? " <span class=\"wd-pick-group\">" + escapeHtml(item.group) + "</span>" : "")
+					+ (item.note ? " <em>" + escapeHtml(item.note) + "</em>" : "") + "</span>"
+					+ (item.title ? "<span class=\"wd-pick-desc\">" + escapeHtml(item.title) + "</span>" : "")
+					+ "</span></label>";
+			}).join("");
+		}
+		renderPickCount(shown.length);
+	}
+
+	function renderPickCount(shownCount) {
+		if (shownCount !== undefined) {
+			picker.shownCount = shownCount;
+		}
+		els.pickCount.textContent = "전체 " + picker.items.length + "개 중 " + picker.shownCount + "개 보임 · " + picker.chosen.length + "개 고름";
 	}
 
 	/** 양식을 그립니다. */
@@ -1973,7 +2089,9 @@ var DstoneAiDesigner = (function () {
 				return;
 			}
 			var reason = !agent.description ? "설명 없음" : (agent.subAgents && agent.subAgents.length > 0 ? "자기 Sub Agent가 있음" : "");
-			agentItems.push({ value: agent.id, label: agent.id, title: agent.description || "", disabled: reason !== "", note: reason });
+			// 고르기 창에서 폴더(agents/pilot/... → pilot)로도 찾을 수 있게 한다.
+			var folder = agent.path ? agent.path.replace(/^agents\//, "").replace(/\/?[^\/]*$/, "") : "";
+			agentItems.push({ value: agent.id, label: agent.id, title: agent.description || "", group: folder, disabled: reason !== "", note: reason });
 		});
 		subAgents.forEach(function (id) {
 			if (!findAgent(id)) {
@@ -2015,16 +2133,15 @@ var DstoneAiDesigner = (function () {
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Tool <span class=\"wd-help\">LLM이 스스로 골라 부를 수 있는 Tool</span></h4>"
 			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-all-tools\"" + (allTools ? " checked" : "") + " /> 전부(*) - 등록된 Tool을 모두 씀(TOOL step 전용 Tool은 빠짐)</label>"
-			+ checkList("tools", toolItems, tools)
+			+ (allTools ? "" : chipList("tools", toolItems, tools, "고른 Tool이 없습니다(Tool 없이 답만 함).", false))
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Sub Agent <span class=\"wd-help\">일을 맡길 다른 Agent. LLM에게는 Tool처럼 보입니다(깊이는 한 단계)</span></h4>"
-			+ checkList("subAgents", agentItems, subAgents)
+			+ chipList("subAgents", agentItems, subAgents, "고른 Sub Agent가 없습니다.", false)
 			+ "</section>"
-			+ "<section class=\"wd-agent-sec\"><h4>참고자료</h4>"
-			+ "<div class=\"wd-check-list\">"
-			+ "<label class=\"wd-check\"><input type=\"checkbox\" data-list=\"sources\" value=\"workflowInput\"" + (sources.indexOf("workflowInput") >= 0 ? " checked" : "") + " /> <span>workflowInput <em>Workflow 입력</em></span></label>"
-			+ "<label class=\"wd-check\"><input type=\"checkbox\" data-list=\"sources\" value=\"retrievedDocuments\"" + (sources.indexOf("retrievedDocuments") >= 0 ? " checked" : "") + " /> <span>retrievedDocuments <em>올린 문서 검색(RAG)</em></span></label>"
-			+ "</div>"
+			+ "<section class=\"wd-agent-sec\"><h4>문서 검색(RAG) <span class=\"wd-help\">context.sources</span></h4>"
+			+ "<p class=\"ai-hint\">켜면 부를 때마다 dstone-knowledge에 올린 문서에서 비슷한 내용을 찾아 프롬프트에 붙여 줍니다. 검색어는 이 Agent가 받은 input입니다. "
+			+ "소스 코드는 찾지 않습니다(코드 분석 결과는 knowledge Tool로 봅니다). Agent가 받는 input은 이 설정과 상관없이 늘 전달됩니다.</p>"
+			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-rag\"" + (sources.indexOf("retrievedDocuments") >= 0 ? " checked" : "") + " /> 올린 문서를 찾아 참고하게 함(retrievedDocuments)</label>"
 			+ (sources.indexOf("retrievedDocuments") >= 0
 				? "<div class=\"wd-agent-grid wd-agent-grid-3\">"
 					+ row("topK", "가져올 조각 수", "<input type=\"number\" min=\"1\" data-agent=\"context.retrieval.topK\" value=\"" + escapeHtml(retrieval.topK === undefined ? "" : String(retrieval.topK)) + "\" />")
@@ -2075,27 +2192,52 @@ var DstoneAiDesigner = (function () {
 				agentDoc.body = e.target.value.replace(/\s+$/, "");
 			}, true);
 		});
-		Array.prototype.forEach.call(els.agentForm.querySelectorAll("input[data-list]"), function (box) {
-			box.addEventListener("change", function () {
-				var name = box.getAttribute("data-list");
-				var values = checkedValues(els.agentForm, name);
-				agentChange(function () {
-					if (name === "tools") {
-						setValue(agentDoc.front, "tools.allowed", values.length > 0 ? values : undefined);
-					} else if (name === "subAgents") {
-						setValue(agentDoc.front, "subAgents", values.length > 0 ? values : undefined);
-					} else if (name === "sources") {
-						setValue(agentDoc.front, "context.sources", values.length > 0 ? values : undefined);
-						if (values.indexOf("retrievedDocuments") < 0) {
-							// 엔진은 retrievedDocuments 없이 retrieval을 적으면 막는다.
-							setValue(agentDoc.front, "context.retrieval", undefined);
-						}
-					}
-				}, false);
-				if (name === "sources") {
-					renderAgentForm();
+		// Tool, Sub Agent 목록 바꾸기(칩의 ×, 고르기 창)
+		function setList(name, values) {
+			agentChange(function () {
+				setValue(agentDoc.front, name === "tools" ? "tools.allowed" : "subAgents", values.length > 0 ? values : undefined);
+			}, false);
+			renderAgentForm();
+		}
+		Array.prototype.forEach.call(els.agentForm.querySelectorAll("[data-chip-remove]"), function (button) {
+			button.addEventListener("click", function () {
+				var name = button.getAttribute("data-chip-remove");
+				var value = button.getAttribute("data-value");
+				setList(name, (name === "tools" ? tools : subAgents).filter(function (v) {
+					return v !== value;
+				}));
+			});
+		});
+		Array.prototype.forEach.call(els.agentForm.querySelectorAll("[data-pick]"), function (button) {
+			button.addEventListener("click", function () {
+				var name = button.getAttribute("data-pick");
+				if (name === "tools") {
+					openPicker("Tool 고르기", toolItems, tools, function (values) {
+						setList("tools", values);
+					});
+				} else {
+					openPicker("Sub Agent 고르기", agentItems, subAgents, function (values) {
+						setList("subAgents", values);
+					});
 				}
 			});
+		});
+		document.getElementById("wd-agent-rag").addEventListener("change", function (e) {
+			// 다른 값(예전 파일의 workflowInput)은 그대로 두고 retrievedDocuments만 넣거나 뺀다.
+			var values = sources.filter(function (v) {
+				return v !== "retrievedDocuments";
+			});
+			if (e.target.checked) {
+				values.push("retrievedDocuments");
+			}
+			agentChange(function () {
+				setValue(agentDoc.front, "context.sources", values.length > 0 ? values : undefined);
+				if (!e.target.checked) {
+					// 엔진은 retrievedDocuments 없이 retrieval을 적으면 막는다.
+					setValue(agentDoc.front, "context.retrieval", undefined);
+				}
+			}, false);
+			renderAgentForm();
 		});
 		document.getElementById("wd-agent-all-tools").addEventListener("change", function (e) {
 			var on = e.target.checked;
