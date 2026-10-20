@@ -582,28 +582,36 @@ var DstoneAiDesigner = (function () {
 		afterModelChange();
 	}
 
-	/** 비어 있는 값이면 키를 지우고, 아니면 넣습니다. "a.b" 모양이면 한 단계 아래에 넣습니다. */
+	/**
+	 * 비어 있는 값이면 키를 지우고, 아니면 넣습니다. "a.b.c" 모양이면 그 깊이에 넣고, 없는 묶음은 만듭니다.
+	 * 지운 뒤 비어 버린 묶음(approval: {}, context: {retrieval: {}})은 위로 올라가며 함께 지웁니다.
+	 */
 	function setValue(target, path, value) {
 		var keys = path.split(".");
-		var owner = target;
+		var owners = [target];
 		for (var i = 0; i < keys.length - 1; i++) {
-			if (!owner[keys[i]] || typeof owner[keys[i]] !== "object") {
+			var owner = owners[i];
+			if (!owner[keys[i]] || typeof owner[keys[i]] !== "object" || Array.isArray(owner[keys[i]])) {
 				if (isEmpty(value)) {
 					return;
 				}
 				owner[keys[i]] = {};
 			}
-			owner = owner[keys[i]];
+			owners.push(owner[keys[i]]);
 		}
 		var last = keys[keys.length - 1];
 		if (isEmpty(value)) {
-			delete owner[last];
+			delete owners[keys.length - 1][last];
 		} else {
-			owner[last] = value;
+			owners[keys.length - 1][last] = value;
 		}
-		// 비어 버린 묶음(approval: {})은 지운다.
-		if (keys.length > 1 && Object.keys(owner).length === 0) {
-			delete target[keys[0]];
+		for (var j = keys.length - 2; j >= 0; j--) {
+			var child = owners[j][keys[j]];
+			if (child && typeof child === "object" && !Array.isArray(child) && Object.keys(child).length === 0) {
+				delete owners[j][keys[j]];
+			} else {
+				break;
+			}
 		}
 	}
 
@@ -620,7 +628,8 @@ var DstoneAiDesigner = (function () {
 	}
 
 	function isEmpty(value) {
-		return value === undefined || value === null || value === "" || value === false
+		return value === undefined || value === null || value === ""
+			|| (Array.isArray(value) && value.length === 0)
 			|| (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
 	}
 
@@ -1628,30 +1637,69 @@ var DstoneAiDesigner = (function () {
 
 	/* ====================================================================
 	 * Agent 파일 창
+	 *
+	 * Agent 파일은 맨 위 --- 와 --- 사이가 설정(머리말, YAML), 그 아래가 프롬프트입니다.
+	 * 기준은 늘 [텍스트] 탭의 글자이고, 저장과 검사도 그 글자를 보냅니다.
+	 *   [양식]에서 머리말 항목을 고치면 머리말을 다시 만듭니다(머리말 맨 위 주석만 남깁니다).
+	 *   [양식]에서 프롬프트만 고치면 머리말 글자는 그대로 두고 프롬프트만 바꿉니다.
+	 *   [텍스트]에서 고친 글자는 [양식] 탭으로 돌아갈 때 읽어서 양식에 채웁니다(글자는 그대로 둡니다).
 	 * ==================================================================== */
 
-	var agentDoc = null; // {originalPath}
+	/**
+	 * 열려 있는 Agent 파일.
+	 *   originalPath: 서버의 원래 경로(새로 만든 것이면 null), front: 머리말을 읽은 객체, frontRaw: 머리말 글자 그대로,
+	 *   header: 머리말 맨 위 주석, frontComments: 그 밖의 머리말 주석 줄 수, body: 프롬프트, frontDirty: 양식에서 머리말을 고쳤는지
+	 */
+	var agentDoc = null;
+	/** [텍스트]에서 글자를 고쳤는데 아직 양식에 채우지 않았는지 */
+	var agentTextEdited = false;
+
+	/** 머리말을 다시 만들 때 키를 놓는 순서(Agent 파일들이 쓰는 순서) */
+	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "context", "tools", "subAgents", "allowedCallers", "execution"];
+	var AGENT_SUB_ORDER = {
+		model: ["name", "temperature", "reasoning"],
+		context: ["sources", "retrieval"],
+		retrieval: ["topK", "similarityThreshold", "allowEmptyContext"],
+		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls"]
+	};
 
 	function bindAgentDialog() {
-		document.getElementById("wd-agent-close-btn").addEventListener("click", function () {
-			els.agentDialog.style.display = "none";
-		});
+		els.agentForm = document.getElementById("wd-agent-form");
+		els.agentTextBox = document.getElementById("wd-agent-text-box");
+		els.agentNote = document.getElementById("wd-agent-note");
+		els.agentTitle = document.getElementById("wd-agent-title");
+		els.agentPathHint = document.getElementById("wd-agent-path-hint");
+		document.getElementById("wd-agent-close-btn").addEventListener("click", closeAgent);
 		document.getElementById("wd-agent-check-btn").addEventListener("click", function () {
 			agentRequest("check");
 		});
 		document.getElementById("wd-agent-save-btn").addEventListener("click", function () {
 			agentRequest("save");
 		});
+		Array.prototype.forEach.call(document.querySelectorAll("[data-agent-tab]"), function (tab) {
+			tab.addEventListener("click", function () {
+				showAgentTab(tab.getAttribute("data-agent-tab"));
+			});
+		});
+		els.agentText.addEventListener("input", function () {
+			agentTextEdited = true;
+			agentDoc.dirty = true;
+		});
+		els.agentPath.addEventListener("input", function () {
+			agentDoc.dirty = true;
+			updateAgentPathHint();
+		});
+		els.agentDialog.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") {
+				closeAgent();
+			}
+		});
 	}
 
 	function openAgent(id) {
 		call("GET", "/api/ai/definitions/agents/" + encodeURIComponent(id)).then(function (source) {
-			agentDoc = { originalPath: source.path };
-			els.agentPath.value = source.path;
-			els.agentText.value = source.text;
+			showAgent(source.text, source.path, source.path);
 			agentMessage("", "");
-			els.agentDialog.style.display = "";
-			document.getElementById("wd-agent-save-btn").disabled = !catalog.editable;
 		}).catch(function (e) {
 			showMessage("error", "Agent 파일을 읽지 못했습니다: " + e.message);
 		});
@@ -1659,15 +1707,389 @@ var DstoneAiDesigner = (function () {
 
 	function newAgent() {
 		var folder = currentFolder().replace(/^workflows/, "agents");
-		agentDoc = { originalPath: null };
-		els.agentPath.value = folder + "/new-agent.md";
-		els.agentText.value = "---\nid: new-agent\nversion: 1.0.0\ndescription: 이 Agent가 하는 일\ninput: string\n---\n여기에 시스템 프롬프트를 적습니다.\n";
+		showAgent("---\nid: new-agent\nversion: 1.0.0\ndescription: 이 Agent가 하는 일\ninput: string\n---\n여기에 시스템 프롬프트를 적습니다.\n",
+			folder + "/new-agent.md", null);
 		agentMessage("info", "id와 파일 이름을 바꾸고 저장하십시오. 저장하면 step의 agent 목록에 바로 나옵니다.");
+	}
+
+	function closeAgent() {
+		if (agentDoc && agentDoc.dirty && !window.confirm("저장하지 않은 Agent 변경이 있습니다. 닫을까요?")) {
+			return;
+		}
+		els.agentDialog.style.display = "none";
+	}
+
+	/** Agent 파일 글자로 창을 엽니다. */
+	function showAgent(text, path, originalPath) {
+		agentDoc = { originalPath: originalPath, dirty: false };
+		els.agentPath.value = path;
+		els.agentText.value = text;
+		agentTextEdited = false;
+		var problem = readAgentText(text);
 		els.agentDialog.style.display = "";
 		document.getElementById("wd-agent-save-btn").disabled = !catalog.editable;
+		updateAgentPathHint();
+		if (problem) {
+			showAgentTab("text");
+			agentMessage("error", problem);
+		} else {
+			showAgentTab("form");
+		}
+	}
+
+	/**
+	 * Agent 파일 글자를 머리말 객체와 프롬프트로 나눠 agentDoc에 넣습니다. 틀렸으면 이유를 돌려줍니다(agentDoc은 그대로).
+	 */
+	function readAgentText(text) {
+		var lines = String(text || "").replace(/^﻿/, "").split(/\r?\n/);
+		var start = 0;
+		while (start < lines.length && lines[start].trim() === "") {
+			start++;
+		}
+		if (start >= lines.length || lines[start].trim() !== "---") {
+			return "첫 줄이 --- 여야 합니다(--- 와 --- 사이에 설정, 그 아래에 프롬프트). [텍스트]에서 고치십시오.";
+		}
+		var end = start + 1;
+		while (end < lines.length && lines[end].trim() !== "---") {
+			end++;
+		}
+		if (end >= lines.length) {
+			return "설정을 닫는 --- 줄이 없습니다. [텍스트]에서 고치십시오.";
+		}
+		var frontRaw = lines.slice(start + 1, end).join("\n");
+		var front;
+		try {
+			front = jsyaml.load(frontRaw) || {};
+		} catch (e) {
+			return "설정(--- 사이)을 YAML로 읽지 못했습니다: " + e.message;
+		}
+		if (typeof front !== "object" || Array.isArray(front)) {
+			return "설정(--- 사이)이 키: 값 모양이 아닙니다.";
+		}
+		var split = splitHeader(frontRaw);
+		agentDoc.front = front;
+		agentDoc.frontRaw = frontRaw;
+		agentDoc.header = split.header;
+		agentDoc.frontComments = split.bodyComments;
+		agentDoc.body = lines.slice(end + 1).join("\n").replace(/^\s*\n/, "").replace(/\s+$/, "");
+		agentDoc.frontDirty = false;
+		return null;
+	}
+
+	/** agentDoc으로 파일 글자를 만듭니다. 머리말을 고치지 않았으면 머리말 글자는 원래 그대로 씁니다. */
+	function buildAgentText() {
+		var front;
+		if (agentDoc.frontDirty) {
+			front = (agentDoc.header ? agentDoc.header + "\n" : "")
+				+ jsyaml.dump(orderAgentFront(agentDoc.front), { lineWidth: -1, noRefs: true, quotingType: "\"" }).replace(/\n$/, "");
+		} else {
+			front = agentDoc.frontRaw.replace(/\s+$/, "");
+		}
+		return "---\n" + front + "\n---\n" + agentDoc.body + "\n";
+	}
+
+	/** 머리말 키를 Agent 파일들이 쓰는 순서로 다시 놓습니다(모르는 키는 뒤에 그대로). */
+	function orderAgentFront(front) {
+		return orderKeys(front, AGENT_KEY_ORDER);
+	}
+
+	function orderKeys(source, order) {
+		var result = {};
+		order.forEach(function (key) {
+			if (Object.prototype.hasOwnProperty.call(source, key)) {
+				result[key] = orderChild(key, source[key]);
+			}
+		});
+		Object.keys(source).forEach(function (key) {
+			if (!Object.prototype.hasOwnProperty.call(result, key)) {
+				result[key] = source[key];
+			}
+		});
+		return result;
+	}
+
+	function orderChild(key, value) {
+		if (AGENT_SUB_ORDER[key] && value && typeof value === "object" && !Array.isArray(value)) {
+			return orderKeys(value, AGENT_SUB_ORDER[key]);
+		}
+		return value;
+	}
+
+	function showAgentTab(name) {
+		if (name === "form" && agentTextEdited) {
+			// [텍스트]에서 고친 글자를 양식에 채운다. 읽지 못하면 [텍스트]에 남는다.
+			var problem = readAgentText(els.agentText.value);
+			if (problem) {
+				agentMessage("error", problem);
+				name = "text";
+			} else {
+				agentTextEdited = false;
+				agentMessage("", "");
+			}
+		}
+		Array.prototype.forEach.call(document.querySelectorAll("[data-agent-tab]"), function (tab) {
+			tab.className = "wd-tab" + (tab.getAttribute("data-agent-tab") === name ? " wd-tab-on" : "");
+		});
+		els.agentForm.style.display = name === "form" ? "" : "none";
+		els.agentTextBox.style.display = name === "text" ? "" : "none";
+		if (name === "form") {
+			renderAgentForm();
+		}
+		updateAgentNote();
+	}
+
+	/**
+	 * 양식에서 무엇을 고칩니다. 고친 뒤 [텍스트]의 글자를 다시 만듭니다.
+	 * @param fn 실제로 고치는 함수
+	 * @param bodyOnly 프롬프트만 고쳤으면 true(머리말 글자를 그대로 둡니다)
+	 */
+	function agentChange(fn, bodyOnly) {
+		fn();
+		if (!bodyOnly) {
+			agentDoc.frontDirty = true;
+		}
+		agentDoc.dirty = true;
+		els.agentText.value = buildAgentText();
+		agentTextEdited = false;
+		updateAgentNote();
+	}
+
+	function updateAgentNote() {
+		if (!agentDoc) {
+			return;
+		}
+		els.agentTitle.textContent = agentDoc.front && agentDoc.front.id ? String(agentDoc.front.id) : "";
+		if (agentDoc.frontComments > 0) {
+			els.agentNote.textContent = "설정(--- 사이)에 맨 위 말고도 주석이 " + agentDoc.frontComments + "줄 있습니다. 양식에서 설정을 고치면 그 주석은 사라집니다(프롬프트만 고치거나 [텍스트]에서 고치면 남습니다).";
+		} else {
+			els.agentNote.textContent = "";
+		}
+	}
+
+	function updateAgentPathHint() {
+		var path = els.agentPath.value.trim();
+		if (!agentDoc.originalPath) {
+			els.agentPathHint.textContent = "새 파일로 저장합니다.";
+		} else if (path !== agentDoc.originalPath) {
+			els.agentPathHint.textContent = "저장하면 " + agentDoc.originalPath + " 에서 이 경로로 옮깁니다.";
+		} else {
+			els.agentPathHint.textContent = "";
+		}
+	}
+
+	/** 숫자 칸의 글자를 숫자로 바꿉니다. 비었거나 숫자가 아니면 undefined(그 키를 지웁니다). */
+	function numberOf(text, integer) {
+		var trimmed = String(text || "").trim();
+		if (trimmed === "") {
+			return undefined;
+		}
+		var value = integer ? parseInt(trimmed, 10) : parseFloat(trimmed);
+		return isNaN(value) ? undefined : value;
+	}
+
+	function checkedValues(container, name) {
+		var values = [];
+		Array.prototype.forEach.call(container.querySelectorAll("input[data-list='" + name + "']:checked"), function (box) {
+			values.push(box.value);
+		});
+		return values;
+	}
+
+	/** 체크 상자 목록의 HTML. items: [{value, label, title, disabled, note}] */
+	function checkList(name, items, chosen) {
+		if (items.length === 0) {
+			return "<p class=\"ai-hint\">고를 것이 없습니다.</p>";
+		}
+		return "<div class=\"wd-check-list\">" + items.map(function (item) {
+			var on = chosen.indexOf(item.value) >= 0;
+			return "<label class=\"wd-check" + (item.disabled && !on ? " wd-check-off" : "") + "\" title=\"" + escapeHtml(item.title || "") + "\">"
+				+ "<input type=\"checkbox\" data-list=\"" + name + "\" value=\"" + escapeHtml(item.value) + "\"" + (on ? " checked" : "") + (item.disabled && !on ? " disabled" : "") + " /> "
+				+ "<span>" + escapeHtml(item.label) + (item.note ? " <em>" + escapeHtml(item.note) + "</em>" : "") + "</span></label>";
+		}).join("") + "</div>";
+	}
+
+	/** 양식을 그립니다. */
+	function renderAgentForm() {
+		var f = agentDoc.front;
+		var model = f.model || {};
+		var context = f.context || {};
+		var retrieval = context.retrieval || {};
+		var execution = f.execution || {};
+		var tools = f.tools && Array.isArray(f.tools.allowed) ? f.tools.allowed.map(String) : [];
+		var subAgents = Array.isArray(f.subAgents) ? f.subAgents.map(String) : [];
+		var sources = Array.isArray(context.sources) ? context.sources.map(String) : [];
+		var allTools = tools.indexOf("*") >= 0;
+
+		// Tool 목록: TOOL step 전용 Tool은 Agent에 줄 수 없다(엔진이 막는다). 등록되지 않은 이름도 지우지 않고 보여 준다.
+		var toolItems = [];
+		catalog.tools.forEach(function (tool) {
+			if (!tool.stepOnly) {
+				toolItems.push({ value: tool.name, label: tool.name, title: tool.description || "", disabled: allTools });
+			}
+		});
+		tools.forEach(function (name) {
+			if (name !== "*" && !findTool(name)) {
+				toolItems.push({ value: name, label: name, note: "등록되지 않음" });
+			}
+		});
+		// Sub Agent 목록: 자기 자신은 빼고, 맡을 수 없는 Agent(설명이 없거나 자기 Sub Agent가 있는 것)는 고를 수 없게 둔다.
+		var agentItems = [];
+		catalog.agents.forEach(function (agent) {
+			if (agent.id === f.id) {
+				return;
+			}
+			var reason = !agent.description ? "설명 없음" : (agent.subAgents && agent.subAgents.length > 0 ? "자기 Sub Agent가 있음" : "");
+			agentItems.push({ value: agent.id, label: agent.id, title: agent.description || "", disabled: reason !== "", note: reason });
+		});
+		subAgents.forEach(function (id) {
+			if (!findAgent(id)) {
+				agentItems.push({ value: id, label: id, note: "등록되지 않음" });
+			}
+		});
+
+		var html = ""
+			+ "<div class=\"wd-agent-grid\">"
+			+ "<section class=\"wd-agent-sec\"><h4>기본</h4>"
+			+ row("id", "Workflow step의 agent에 적는 이름", "<input type=\"text\" data-agent=\"id\" value=\"" + escapeHtml(f.id === undefined ? "" : String(f.id)) + "\" />")
+			+ row("version", "예: 1.0.0", "<input type=\"text\" data-agent=\"version\" value=\"" + escapeHtml(f.version === undefined ? "" : String(f.version)) + "\" />")
+			+ row("role", "사람이 읽는 역할 이름(선택)", "<input type=\"text\" data-agent=\"role\" value=\"" + escapeHtml(f.role || "") + "\" />")
+			+ row("description", "하는 일. Sub Agent로 쓰이면 부르는 쪽 LLM이 이 설명을 봅니다", "<textarea data-agent=\"description\" rows=\"2\">" + escapeHtml(f.description || "") + "</textarea>")
+			+ row("allowedCallers", "쉼표로 구분, 비우면 누구나", "<input type=\"text\" data-agent=\"allowedCallers\" value=\"" + escapeHtml((Array.isArray(f.allowedCallers) ? f.allowedCallers : []).join(", ")) + "\" />")
+			+ "</section>"
+			+ "<section class=\"wd-agent-sec\"><h4>모델</h4>"
+			+ row("model.name", "비우면 엔진 기본 모델", "<input type=\"text\" data-agent=\"model.name\" value=\"" + escapeHtml(model.name || "") + "\" />")
+			+ row("model.temperature", "0 ~ 2, 비우면 기본값", "<input type=\"number\" min=\"0\" max=\"2\" step=\"0.1\" data-agent=\"model.temperature\" value=\"" + escapeHtml(model.temperature === undefined ? "" : String(model.temperature)) + "\" />")
+			+ row("model.reasoning", "추론 정도", "<select data-agent=\"model.reasoning\">" + ["", "none", "low", "medium", "high"].map(function (v) {
+				var label = v === "" ? "(모델 기본값)" : v + (v === "none" ? " - 추론 끔" : "");
+				return "<option value=\"" + v + "\"" + (String(model.reasoning === undefined ? "" : model.reasoning) === v ? " selected" : "") + ">" + label + "</option>";
+			}).join("") + "</select>")
+			+ "<h4>실행</h4>"
+			+ row("execution.onInvalidOutput", "답이 output 모양과 다를 때", "<select data-agent=\"execution.onInvalidOutput\">" + [["", "(기본: FAIL)"], ["RETRY", "RETRY - 다시 묻기"], ["FAIL", "FAIL - step 실패"]].map(function (o) {
+				return "<option value=\"" + o[0] + "\"" + (String(execution.onInvalidOutput || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
+			}).join("") + "</select>")
+			+ row("execution.maxAttempts", "RETRY일 때 최대 시도 수", "<input type=\"number\" min=\"1\" data-agent=\"execution.maxAttempts\" value=\"" + escapeHtml(execution.maxAttempts === undefined ? "" : String(execution.maxAttempts)) + "\" />")
+			+ row("execution.timeoutSeconds", "응답 제한 시간(초)", "<input type=\"number\" min=\"1\" data-agent=\"execution.timeoutSeconds\" value=\"" + escapeHtml(execution.timeoutSeconds === undefined ? "" : String(execution.timeoutSeconds)) + "\" />")
+			+ row("execution.maxToolCalls", "한 번 불릴 때 Tool 호출 한도", "<input type=\"number\" min=\"1\" data-agent=\"execution.maxToolCalls\" value=\"" + escapeHtml(execution.maxToolCalls === undefined ? "" : String(execution.maxToolCalls)) + "\" />")
+			+ "</section>"
+			+ "</div>"
+			+ "<section class=\"wd-agent-sec\"><h4>입출력 계약</h4>"
+			+ "<p class=\"ai-hint\">짧은 타입 표기(Picoschema)로 적습니다. 예: <code>string, 설명</code> 또는 한 줄에 필드 하나 <code>path: string, 파일 경로</code>, 선택 필드는 <code>이름?</code>. "
+			+ "output을 비우거나 string이면 글자로 받고, 필드를 적으면 JSON으로 받아 검사합니다. 프롬프트의 <code>{필드}</code> 자리는 input 필드 값으로 채워집니다.</p>"
+			+ "<div class=\"wd-agent-grid\">"
+			+ row("input", "받는 값", "<textarea data-agent=\"input\" rows=\"6\" class=\"wd-code\">" + escapeHtml(valueToText(f.input)) + "</textarea>")
+			+ row("output", "돌려주는 값(SUPERVISOR/ROUTER에 쓸 Agent는 비웁니다)", "<textarea data-agent=\"output\" rows=\"6\" class=\"wd-code\">" + escapeHtml(valueToText(f.output)) + "</textarea>")
+			+ "</div></section>"
+			+ "<section class=\"wd-agent-sec\"><h4>Tool <span class=\"wd-help\">LLM이 스스로 골라 부를 수 있는 Tool</span></h4>"
+			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-all-tools\"" + (allTools ? " checked" : "") + " /> 전부(*) - 등록된 Tool을 모두 씀(TOOL step 전용 Tool은 빠짐)</label>"
+			+ checkList("tools", toolItems, tools)
+			+ "</section>"
+			+ "<section class=\"wd-agent-sec\"><h4>Sub Agent <span class=\"wd-help\">일을 맡길 다른 Agent. LLM에게는 Tool처럼 보입니다(깊이는 한 단계)</span></h4>"
+			+ checkList("subAgents", agentItems, subAgents)
+			+ "</section>"
+			+ "<section class=\"wd-agent-sec\"><h4>참고자료</h4>"
+			+ "<div class=\"wd-check-list\">"
+			+ "<label class=\"wd-check\"><input type=\"checkbox\" data-list=\"sources\" value=\"workflowInput\"" + (sources.indexOf("workflowInput") >= 0 ? " checked" : "") + " /> <span>workflowInput <em>Workflow 입력</em></span></label>"
+			+ "<label class=\"wd-check\"><input type=\"checkbox\" data-list=\"sources\" value=\"retrievedDocuments\"" + (sources.indexOf("retrievedDocuments") >= 0 ? " checked" : "") + " /> <span>retrievedDocuments <em>올린 문서 검색(RAG)</em></span></label>"
+			+ "</div>"
+			+ (sources.indexOf("retrievedDocuments") >= 0
+				? "<div class=\"wd-agent-grid wd-agent-grid-3\">"
+					+ row("topK", "가져올 조각 수", "<input type=\"number\" min=\"1\" data-agent=\"context.retrieval.topK\" value=\"" + escapeHtml(retrieval.topK === undefined ? "" : String(retrieval.topK)) + "\" />")
+					+ row("similarityThreshold", "0 ~ 1, 이보다 덜 비슷하면 버림", "<input type=\"number\" min=\"0\" max=\"1\" step=\"0.05\" data-agent=\"context.retrieval.similarityThreshold\" value=\"" + escapeHtml(retrieval.similarityThreshold === undefined ? "" : String(retrieval.similarityThreshold)) + "\" />")
+					+ row("allowEmptyContext", "", "<label class=\"wd-check\"><input type=\"checkbox\" data-agent=\"context.retrieval.allowEmptyContext\"" + (retrieval.allowEmptyContext !== false ? " checked" : "") + " /> 찾은 문서가 없어도 답함</label>")
+					+ "</div>"
+				: "")
+			+ "</section>"
+			+ "<section class=\"wd-agent-sec\"><h4>프롬프트 <span class=\"wd-help\">시스템 프롬프트(파일의 --- 아래 전부)</span></h4>"
+			+ "<textarea data-agent-body=\"1\" class=\"wd-code wd-agent-prompt\" spellcheck=\"false\">" + escapeHtml(agentDoc.body) + "</textarea>"
+			+ "</section>";
+		els.agentForm.innerHTML = html;
+
+		Array.prototype.forEach.call(els.agentForm.querySelectorAll("[data-agent]"), function (input) {
+			input.addEventListener("change", function () {
+				var key = input.getAttribute("data-agent");
+				var value;
+				try {
+					value = readAgentField(key, input);
+				} catch (e) {
+					agentMessage("error", key + " - " + e.message);
+					return;
+				}
+				agentChange(function () {
+					setValue(agentDoc.front, key, value);
+				}, false);
+				if (key === "id") {
+					renderAgentForm();
+				}
+			});
+		});
+		els.agentForm.querySelector("[data-agent-body]").addEventListener("change", function (e) {
+			agentChange(function () {
+				agentDoc.body = e.target.value.replace(/\s+$/, "");
+			}, true);
+		});
+		Array.prototype.forEach.call(els.agentForm.querySelectorAll("input[data-list]"), function (box) {
+			box.addEventListener("change", function () {
+				var name = box.getAttribute("data-list");
+				var values = checkedValues(els.agentForm, name);
+				agentChange(function () {
+					if (name === "tools") {
+						setValue(agentDoc.front, "tools.allowed", values.length > 0 ? values : undefined);
+					} else if (name === "subAgents") {
+						setValue(agentDoc.front, "subAgents", values.length > 0 ? values : undefined);
+					} else if (name === "sources") {
+						setValue(agentDoc.front, "context.sources", values.length > 0 ? values : undefined);
+						if (values.indexOf("retrievedDocuments") < 0) {
+							// 엔진은 retrievedDocuments 없이 retrieval을 적으면 막는다.
+							setValue(agentDoc.front, "context.retrieval", undefined);
+						}
+					}
+				}, false);
+				if (name === "sources") {
+					renderAgentForm();
+				}
+			});
+		});
+		document.getElementById("wd-agent-all-tools").addEventListener("change", function (e) {
+			var on = e.target.checked;
+			agentChange(function () {
+				setValue(agentDoc.front, "tools.allowed", on ? ["*"] : undefined);
+			}, false);
+			renderAgentForm();
+		});
+	}
+
+	function readAgentField(key, input) {
+		if (input.type === "checkbox") {
+			// allowEmptyContext 의 기본값은 true라서, 켜면 키를 지우고 끄면 false를 적는다.
+			return input.checked ? undefined : false;
+		}
+		if (key === "model.temperature" || key === "context.retrieval.similarityThreshold") {
+			return numberOf(input.value, false);
+		}
+		if (key.indexOf("execution.max") === 0 || key === "execution.timeoutSeconds" || key === "context.retrieval.topK") {
+			return numberOf(input.value, true);
+		}
+		if (key === "allowedCallers") {
+			var list = input.value.split(",").map(function (v) {
+				return v.trim();
+			}).filter(function (v) {
+				return v !== "";
+			});
+			return list.length > 0 ? list : undefined;
+		}
+		if (key === "input" || key === "output") {
+			return textToValue(input.value);
+		}
+		return input.value.trim() === "" ? undefined : input.value.trim();
 	}
 
 	function agentRequest(action) {
+		if (agentTextEdited) {
+			// [텍스트]에서 고친 글자를 그대로 보낸다. 양식에도 채워 둔다(읽지 못해도 보낸다 - 서버가 이유를 알려 준다).
+			if (!readAgentText(els.agentText.value)) {
+				agentTextEdited = false;
+			}
+		}
 		var body = { path: els.agentPath.value.trim(), originalPath: agentDoc ? agentDoc.originalPath : null, text: els.agentText.value };
 		agentMessage("info", action === "save" ? "저장하는 중..." : "검사하는 중...");
 		call("POST", "/api/ai/definitions/agents/" + action, body).then(function (result) {
@@ -1679,7 +2101,9 @@ var DstoneAiDesigner = (function () {
 				agentMessage("ok", "검사를 통과했습니다(이 Agent를 부르는 Workflow까지 함께 검사).");
 				return;
 			}
-			agentDoc = { originalPath: result.path };
+			agentDoc.originalPath = result.path;
+			agentDoc.dirty = false;
+			updateAgentPathHint();
 			agentMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
 			loadCatalog().then(function () {
 				showPanel();
@@ -1769,10 +2193,10 @@ var DstoneAiDesigner = (function () {
 	}
 
 	function bindTabs() {
-		Array.prototype.forEach.call(document.querySelectorAll(".wd-tab"), function (tab) {
+		Array.prototype.forEach.call(document.querySelectorAll(".wd-tab[data-tab]"), function (tab) {
 			tab.addEventListener("click", function () {
 				var name = tab.getAttribute("data-tab");
-				Array.prototype.forEach.call(document.querySelectorAll(".wd-tab"), function (other) {
+				Array.prototype.forEach.call(document.querySelectorAll(".wd-tab[data-tab]"), function (other) {
 					other.className = "wd-tab" + (other === tab ? " wd-tab-on" : "");
 				});
 				els.graphBox.style.display = name === "graph" ? "" : "none";

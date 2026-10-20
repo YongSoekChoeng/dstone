@@ -97,24 +97,40 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				</div>
 			</section>
 
-			<%-- Agent 파일을 고치는 창. step 설정의 [Agent 파일 열기]나 [새 Agent]로 연다 --%>
+			<%-- Agent 파일을 고치는 창. step 설정의 [Agent 파일 열기]나 [새 Agent]로 연다.
+				[양식]은 항목별 입력 칸, [텍스트]는 파일 글자 그대로. 저장하는 것은 늘 [텍스트]의 글자다 --%>
 			<div id="wd-agent-dialog" class="wd-dialog" style="display: none;">
-				<div class="wd-dialog-box">
-					<h3>Agent 파일</h3>
+				<div class="wd-dialog-box wd-agent-box">
+					<div class="wd-dialog-head">
+						<h3>Agent <span id="wd-agent-title" class="workflow-job-id"></span></h3>
+						<button type="button" id="wd-agent-close-btn" class="kn-plain">닫기</button>
+					</div>
 					<table class="ai-form">
 						<colgroup><col class="ai-form-name" /><col /></colgroup>
 						<tr>
 							<th><label for="wd-agent-path">파일 경로</label></th>
-							<td><input type="text" id="wd-agent-path" placeholder="agents/폴더/이름.md" /></td>
+							<td><input type="text" id="wd-agent-path" placeholder="agents/폴더/이름.md" />
+								<p id="wd-agent-path-hint" class="ai-hint"></p></td>
 						</tr>
 					</table>
-					<textarea id="wd-agent-text" class="wd-yaml wd-agent-text" spellcheck="false"></textarea>
+					<div class="wd-tabs">
+						<button type="button" class="wd-tab wd-tab-on" data-agent-tab="form">양식</button>
+						<button type="button" class="wd-tab" data-agent-tab="text">텍스트</button>
+						<span id="wd-agent-note" class="ai-hint"></span>
+					</div>
+					<div id="wd-agent-form" class="wd-agent-form"></div>
+					<div id="wd-agent-text-box" style="display: none;">
+						<p class="ai-hint">파일 글자 그대로입니다(맨 위 --- 와 --- 사이가 설정, 그 아래가 프롬프트). 여기서 고친 글자는 주석까지 그대로 저장되고,
+							[양식] 탭으로 돌아가면 양식에도 채워집니다.</p>
+						<textarea id="wd-agent-text" class="wd-yaml wd-agent-text" spellcheck="false"></textarea>
+					</div>
 					<div id="wd-agent-message" class="wd-message"></div>
 					<div class="ai-form-actions">
-						<button type="button" id="wd-agent-close-btn" class="kn-plain">닫기</button>
-						<button type="button" id="wd-agent-check-btn">검사</button>
+						<button type="button" id="wd-agent-check-btn" class="kn-plain">검사</button>
 						<button type="button" id="wd-agent-save-btn">저장</button>
 					</div>
+				</div>
+			</div>
 				</div>
 			</div>
 					</div>
