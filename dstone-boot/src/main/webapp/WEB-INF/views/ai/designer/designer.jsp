@@ -70,6 +70,14 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<div class="wd-tabs">
 							<button type="button" class="wd-tab wd-tab-on" data-tab="graph">그림</button>
 							<button type="button" class="wd-tab" data-tab="yaml">YAML</button>
+							<label class="wd-line-style">선 모양
+								<select id="wd-line-style">
+									<option value="manhattan">직각 · 노드 피해 가기</option>
+									<option value="orth">직각</option>
+									<option value="smooth">곡선</option>
+									<option value="normal">직선</option>
+								</select>
+							</label>
 							<label class="wd-check wd-hide-fail"><input type="checkbox" id="wd-hide-fail" /> FAIL로 가는 실패 화살표 숨기기</label>
 							<span id="wd-yaml-note" class="ai-hint"></span>
 						</div>

@@ -391,6 +391,21 @@
 	color: #fff;
 }
 
+/* 선 모양 고르기 */
+.wd-tabs label.wd-line-style {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: 12px;
+	font-size: 12.5px;
+	color: var(--cs-text-2);
+}
+
+.ai-body .wd-tabs label.wd-line-style select {
+	height: 30px;
+	font-size: 12.5px;
+}
+
 .wd-tabs label.wd-hide-fail {
 	margin-left: 12px;
 	font-size: 12.5px;

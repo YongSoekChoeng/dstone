@@ -97,6 +97,21 @@ var DstoneAiDesigner = (function () {
 	/** FAIL로 가는 실패 화살표를 숨길지(step이 많으면 그 선들이 그림을 덮습니다) */
 	var hideFailEdges = false;
 
+	/**
+	 * 화살표 모양. router = 길 찾기, connector = 선을 그리는 법(X6 기본 제공).
+	 * 고른 값은 이 브라우저에만 기억한다(정의 파일이나 노드 위치 파일에는 넣지 않는다).
+	 * 포트가 step 아래(나감)와 위(들어옴)에 있으므로, 직각 선은 아래로 나가 위로 들어오게 방향을 정해 준다.
+	 */
+	var LINE_STYLES = {
+		manhattan: { router: { name: "manhattan", args: { padding: 16, startDirections: ["bottom"], endDirections: ["top"] } }, connector: { name: "rounded", args: { radius: 8 } } },
+		orth: { router: { name: "orth", args: { padding: 16 } }, connector: { name: "rounded", args: { radius: 8 } } },
+		smooth: { router: { name: "normal" }, connector: { name: "smooth" } },
+		normal: { router: { name: "normal" }, connector: { name: "normal" } }
+	};
+	var LINE_STYLE_KEY = "dstone.designer.lineStyle";
+	/** 지금 고른 화살표 모양(LINE_STYLES의 키). 기본값은 직각 + 노드 피해 가기 */
+	var lineStyle = "manhattan";
+
 	/* ====================================================================
 	 * 시작
 	 * ==================================================================== */
@@ -931,10 +946,12 @@ var DstoneAiDesigner = (function () {
 				allowPort: true,
 				allowMulti: true,
 				highlight: true,
-				connector: { name: "smooth" },
 				createEdge: function () {
+					var line = LINE_STYLES[lineStyle];
 					return this.createEdge({
 						shape: "edge",
+						router: line.router,
+						connector: line.connector,
 						attrs: { line: { stroke: "#007b9d", strokeWidth: 1.6, targetMarker: { name: "block", width: 10, height: 7 } } }
 					});
 				},
@@ -1085,7 +1102,8 @@ var DstoneAiDesigner = (function () {
 			id: "edge|" + from + "|" + kind + "|" + (route || ""),
 			source: { cell: from, port: "out" },
 			target: { cell: to, port: "in" },
-			connector: { name: "smooth" },
+			router: LINE_STYLES[lineStyle].router,
+			connector: LINE_STYLES[lineStyle].connector,
 			data: { kind: kind, from: from, route: route },
 			attrs: {
 				line: {
@@ -1709,6 +1727,25 @@ var DstoneAiDesigner = (function () {
 		document.getElementById("wd-yaml-apply-btn").addEventListener("click", applyYaml);
 		document.getElementById("wd-hide-fail").addEventListener("change", function (e) {
 			hideFailEdges = e.target.checked;
+			redraw();
+		});
+		var lineSelect = document.getElementById("wd-line-style");
+		try {
+			var saved = window.localStorage.getItem(LINE_STYLE_KEY);
+			if (saved && LINE_STYLES[saved]) {
+				lineStyle = saved;
+			}
+		} catch (e) {
+			// 브라우저 저장소를 쓸 수 없으면(사생활 보호 모드 등) 기본값을 쓴다.
+		}
+		lineSelect.value = lineStyle;
+		lineSelect.addEventListener("change", function () {
+			lineStyle = LINE_STYLES[lineSelect.value] ? lineSelect.value : "manhattan";
+			try {
+				window.localStorage.setItem(LINE_STYLE_KEY, lineStyle);
+			} catch (e) {
+				// 기억하지 못해도 지금 화면에는 반영한다.
+			}
 			redraw();
 		});
 		els.yaml.addEventListener("input", function () {
