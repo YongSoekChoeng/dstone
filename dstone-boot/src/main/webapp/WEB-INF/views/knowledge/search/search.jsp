@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Search &amp; Documents</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>검색 · 문서</h2>
 				<p>분석 결과(메소드, 타입, SQL, 화면)와 올린 문서를 뜻과 이름으로 찾고, 일반 문서를 올립니다.</p>
 			</section>
 

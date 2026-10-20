@@ -1,5 +1,8 @@
-/* "코드 분석(Knowledge)" 화면에만 쓰는 모양.
-   바탕은 분석툴의 analyzer/assets/css/main.css, 공통 부품은 ai/assets/css/main.css 를 같이 쓴다. */
+/* ==========================================================================
+   코드 분석(Knowledge) 화면에만 쓰는 부품 모양
+   --------------------------------------------------------------------------
+   바탕은 ai/assets/css/console.css, 공통 부품은 ai/assets/css/main.css 를 같이 쓰고, 색은 console.css 의 변수를 씁니다.
+   ========================================================================== */
 
 /* 입력 칸을 한 줄에 나란히 놓는다 */
 .kn-row {
@@ -12,15 +15,7 @@
 
 .kn-row label {
 	font-size: 13px;
-	color: #4e4d43;
-}
-
-.kn-row input[type="text"],
-.kn-row input[type="number"],
-.kn-row select {
-	border: solid 1px #006e8b;
-	padding: 4px 8px;
-	font-size: 13px;
+	color: var(--cs-text-2);
 }
 
 .kn-row input.kn-wide {
@@ -28,35 +23,27 @@
 	min-width: 260px;
 }
 
-/* 단추의 기본 모양(청록색)과 덜 중요한 단추(kn-plain, 흰 바탕)는 ai/assets/css/main.css 에 있다 */
-
-.kn-row button:disabled {
-	cursor: default;
-}
-
-/* 처리 결과나 오류를 알리는 한 줄 */
-.kn-message {
-	font-size: 13px;
-	color: #4e4d43;
-	margin: 6px 0;
-	min-height: 18px;
-	line-height: 1.5;
-}
-
-.kn-message.kn-error {
-	color: #b91c1c;
-}
-
 /* 표가 길어지면 표 안에서만 스크롤한다 */
 .kn-scroll {
-	max-height: 420px;
+	max-height: 440px;
 	overflow: auto;
 	margin-bottom: 14px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+}
+
+.kn-scroll .document-list-table {
+	margin: 0;
+	border: 0;
+	border-radius: 0;
+	overflow: visible;
 }
 
 .kn-scroll .document-list-table th {
 	position: sticky;
 	top: 0;
+	z-index: 1;
+	box-shadow: inset 0 -1px 0 var(--cs-border);
 }
 
 .kn-num {
@@ -65,70 +52,93 @@
 }
 
 .kn-mono {
-	font-family: "SFMono-Regular", Consolas, monospace;
+	font-family: var(--cs-mono);
 	font-size: 12px;
 	word-break: break-all;
 }
 
-/* 요약 숫자 카드 */
+/* ---------- 요약 숫자 카드 ---------- */
+
 .kn-cards {
-	display: flex;
-	gap: 12px;
-	flex-wrap: wrap;
-	margin-bottom: 14px;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 10px;
+	margin: 6px 0 16px;
 }
 
 .kn-card {
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
-	padding: 10px 16px;
-	min-width: 110px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	padding: 12px 14px;
 	line-height: 1.4;
 }
 
 .kn-card .kn-card-value {
 	font-size: 22px;
 	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--cs-text);
+	font-variant-numeric: tabular-nums;
 }
 
 .kn-card .kn-card-label {
+	margin-top: 2px;
 	font-size: 12px;
-	color: #878e83;
+	font-weight: 600;
+	color: var(--cs-muted);
 }
 
-/* .kn-section-title(구역 안의 작은 제목)은 AI 화면도 써서 ai/assets/css/main.css 에 있다 */
+.kn-card-help {
+	font-size: 11.5px;
+	color: var(--cs-faint);
+	margin-top: 6px;
+	line-height: 1.45;
+}
 
-/* 검색 결과 한 건 */
+/* ---------- 검색 결과 ---------- */
+
 .kn-hit {
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
-	padding: 12px 14px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	padding: 14px 16px;
 	margin-bottom: 10px;
+	transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.kn-hit:hover {
+	border-color: var(--cs-border-strong);
+	box-shadow: var(--cs-shadow);
 }
 
 .kn-hit-title {
-	font-weight: 600;
+	font-weight: 700;
+	color: var(--cs-text);
 	word-break: break-all;
 }
 
 .kn-hit-meta {
 	font-size: 12px;
-	color: #878e83;
-	margin: 4px 0 8px;
+	color: var(--cs-muted);
+	margin: 4px 0 10px;
 }
 
 .kn-pre {
-	background: #f4f6f0;
-	border: 1px solid #ced0b7;
-	border-radius: 8px;
-	padding: 10px;
-	font-family: "SFMono-Regular", Consolas, monospace;
+	background: #f9fafb;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	padding: 10px 12px;
+	font-family: var(--cs-mono);
 	font-size: 12px;
+	line-height: 1.55;
+	color: var(--cs-text-2);
 	white-space: pre-wrap;
 	word-break: break-all;
 	max-height: 220px;
 	overflow: auto;
 	margin: 0;
+	cursor: pointer;
 }
 
 .kn-pre.kn-open {
@@ -136,89 +146,36 @@
 }
 
 /* 신뢰도 */
-.kn-conf-HIGH { color: #15803d; font-weight: 600; }
-.kn-conf-MEDIUM { color: #b45309; font-weight: 600; }
-.kn-conf-LOW { color: #b91c1c; font-weight: 600; }
+.kn-conf-HIGH { color: var(--cs-success); font-weight: 700; }
+.kn-conf-MEDIUM { color: var(--cs-warning); font-weight: 700; }
+.kn-conf-LOW { color: var(--cs-danger); font-weight: 700; }
 
 /* 바뀐 종류 */
-.kn-change-ADDED { color: #15803d; font-weight: 600; }
-.kn-change-REMOVED { color: #b91c1c; font-weight: 600; }
-.kn-change-CHANGED { color: #b45309; font-weight: 600; }
+.kn-change-ADDED { color: var(--cs-success); font-weight: 700; }
+.kn-change-REMOVED { color: var(--cs-danger); font-weight: 700; }
+.kn-change-CHANGED { color: var(--cs-warning); font-weight: 700; }
 
 /* ---------- 사용 안내 ---------- */
 
-/* 각 화면 위쪽의 "이렇게 씁니다" (눌러서 펴는 설명) */
-.kn-howto {
-	border: 1px solid #d5e8ec;
-	background: #f4f7f0;
-	border-radius: 10px;
-	padding: 10px 14px;
-	margin-bottom: 40px;
-	font-size: 13px;
-	line-height: 1.7;
-	color: #4e4d43;
-}
-
-.kn-howto summary {
-	cursor: pointer;
-	font-weight: 600;
-	color: #007897;
-}
-
 .kn-howto ol,
 .kn-howto ul {
-	margin: 8px 0 4px;
-	padding-left: 22px;
+	margin: 8px 0 6px;
 }
 
-.kn-guide ul {
-	list-style: disc;
-}
-
-.kn-howto code,
-.kn-guide code {
-	background: #e3e9dc;
-	border-radius: 4px;
-	padding: 1px 5px;
-	font-family: "SFMono-Regular", Consolas, monospace;
-	font-size: 12px;
-}
-
-/* 예시를 눌러 입력 칸에 채우는 단추 */
-.kn-example {
-	display: inline-block;
-	border: 1px dashed #5d93a2;
-	background: #fff;
-	color: #007897;
-	border-radius: 999px;
-	padding: 2px 10px;
-	margin: 2px 4px 2px 0;
-	font-size: 12px;
-	cursor: pointer;
-}
-
-/* 사용 안내 화면 */
 .kn-guide {
 	font-size: 14px;
 	line-height: 1.8;
-	color: #4e4d43;
+	color: var(--cs-text-2);
 }
 
 .kn-guide h4 {
-	margin: 18px 0 6px;
+	margin: 22px 0 6px;
 	font-size: 15px;
-	font-weight: bold;
-	color: #283121;
-}
-
-.kn-guide ol,
-.kn-guide ul {
-	margin: 6px 0;
-	padding-left: 24px;
+	color: var(--cs-text);
 }
 
 .kn-guide table {
-	margin: 8px 0 12px;
+	margin: 8px 0 14px;
 }
 
 .kn-guide .document-list-table td {
@@ -227,34 +184,36 @@
 
 /* 차례대로 하는 일을 나란히 보여 주는 카드 */
 .kn-steps {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 	gap: 12px;
-	flex-wrap: wrap;
-	margin: 10px 0;
+	margin: 12px 0;
 }
 
-.kn-step {
-	flex: 1;
-	min-width: 200px;
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
-	padding: 12px 14px;
-	text-decoration: none;
+.ai-body .kn-step {
+	display: block;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	padding: 14px 16px;
 	color: inherit;
+	text-decoration: none;
 }
 
-a.kn-step:hover {
-	border-color: #007b9d;
+.ai-body a.kn-step:hover {
+	border-color: #9fd0dc;
+	box-shadow: 0 6px 18px rgba(14, 116, 144, 0.10);
+	text-decoration: none;
 }
 
 .kn-step-no {
-	display: inline-block;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	width: 22px;
 	height: 22px;
-	line-height: 22px;
-	text-align: center;
 	border-radius: 50%;
-	background: #007b9d;
+	background: var(--cs-primary);
 	color: #fff;
 	font-size: 12px;
 	font-weight: 700;
@@ -262,60 +221,108 @@ a.kn-step:hover {
 }
 
 .kn-step-title {
-	font-weight: 600;
-	color: #283121;
+	font-weight: 700;
+	color: var(--cs-text);
 }
 
 .kn-step p {
-	margin: 6px 0 0;
+	margin: 8px 0 0;
 	font-size: 13px;
-	color: #4e4d43;
-	line-height: 1.6;
+	color: var(--cs-muted);
+	line-height: 1.65;
 }
 
 .kn-note {
+	border: 1px solid #f3dcb3;
 	border-left: 3px solid #f59e0b;
-	background: #fffbeb;
-	padding: 8px 12px;
-	margin: 8px 0;
+	background: var(--cs-warning-soft);
+	border-radius: var(--cs-radius-sm);
+	padding: 9px 12px;
+	margin: 10px 0;
 	font-size: 13px;
+	color: var(--cs-text-2);
+}
+
+/* 따라 하기의 "이렇게 나옵니다" */
+.kn-expect {
+	border: 1px solid #c3e6cf;
+	border-left: 3px solid #22c55e;
+	background: var(--cs-success-soft);
+	border-radius: var(--cs-radius-sm);
+	padding: 8px 12px;
+	margin: 6px 0 12px;
+	font-size: 13px;
+}
+
+/* 사용 안내의 그림(글자로 그린 흐름도) */
+.kn-diagram {
+	background: #f9fafb;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	padding: 12px 14px;
+	font-family: var(--cs-mono), "Malgun Gothic", monospace;
+	font-size: 12.5px;
+	line-height: 1.6;
+	white-space: pre;
+	overflow-x: auto;
+	margin: 8px 0 14px;
+	color: var(--cs-text-2);
+}
+
+/* 사용 안내의 차례 */
+.kn-toc {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.ai-body .kn-toc a {
+	display: inline-flex;
+	align-items: center;
+	height: 28px;
+	padding: 0 12px;
+	border: 1px solid var(--cs-border);
+	border-radius: 999px;
+	background: var(--cs-surface);
+	color: var(--cs-text-2);
+	font-size: 12.5px;
+	text-decoration: none;
+}
+
+.ai-body .kn-toc a:hover {
+	border-color: var(--cs-primary);
+	color: var(--cs-primary);
 }
 
 /* ---------- 리비전 요약의 설명 ---------- */
 
 /* 영문 값 뒤에 붙이는 한글 뜻 */
 .kn-code {
-	font-family: "SFMono-Regular", Consolas, monospace;
+	font-family: var(--cs-mono);
 	font-size: 12px;
 	font-weight: 600;
+	color: var(--cs-text);
 }
 
 .kn-term {
-	color: #878e83;
+	color: var(--cs-muted);
 	margin-left: 8px;
 	font-size: 12px;
 }
 
-.kn-card-help {
-	font-size: 11px;
-	color: #a6a88f;
-	margin-top: 4px;
-	max-width: 190px;
-	line-height: 1.4;
-}
-
 /* "한눈에 보기": 숫자를 말로 풀어 준 판정 */
 .kn-verdict {
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
 	padding: 12px 16px;
-	margin-bottom: 8px;
-	background: #f4f6f0;
+	margin-bottom: 10px;
+	background: var(--cs-surface-2);
 }
 
 .kn-verdict-line {
 	font-size: 13px;
 	line-height: 1.9;
+	color: var(--cs-text-2);
 }
 
 .kn-verdict-mark {
@@ -324,43 +331,11 @@ a.kn-step:hover {
 	font-weight: 700;
 }
 
-.kn-verdict-good .kn-verdict-mark { color: #15803d; }
-.kn-verdict-warn .kn-verdict-mark { color: #b45309; }
-.kn-verdict-bad .kn-verdict-mark { color: #b91c1c; }
-.kn-verdict-info .kn-verdict-mark { color: #878e83; }
-.kn-verdict-warn, .kn-verdict-bad { font-weight: 600; }
-
-/* 사용 안내의 그림(글자로 그린 흐름도) */
-.kn-diagram {
-	background: #f4f6f0;
-	border: 1px solid #ced0b7;
-	border-radius: 8px;
-	padding: 12px 14px;
-	font-family: "SFMono-Regular", Consolas, "Malgun Gothic", monospace;
-	font-size: 12.5px;
-	line-height: 1.6;
-	white-space: pre;
-	overflow-x: auto;
-	margin: 8px 0 12px;
-}
-
-/* 사용 안내의 차례 */
-.kn-toc a {
-	display: inline-block;
-	margin: 2px 14px 2px 0;
-	color: #007b9d;
-	text-decoration: none;
-	font-size: 13px;
-}
-
-/* 따라 하기의 "이렇게 나옵니다" */
-.kn-expect {
-	border-left: 3px solid #22c55e;
-	background: #f0fdf4;
-	padding: 6px 12px;
-	margin: 6px 0 12px;
-	font-size: 13px;
-}
+.kn-verdict-good .kn-verdict-mark { color: var(--cs-success); }
+.kn-verdict-warn .kn-verdict-mark { color: var(--cs-warning); }
+.kn-verdict-bad .kn-verdict-mark { color: var(--cs-danger); }
+.kn-verdict-info .kn-verdict-mark { color: var(--cs-faint); }
+.kn-verdict-warn, .kn-verdict-bad { font-weight: 600; color: var(--cs-text); }
 
 /* ---------- 노드 맵 ---------- */
 
@@ -375,41 +350,48 @@ a.kn-step:hover {
 .kn-graph-canvas {
 	flex: 1;
 	min-width: 0;
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
-	background: #fff;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	background: #fbfcfd;
 }
 
 .kn-graph-detail {
 	width: 380px;
 	flex-shrink: 0;
 	overflow: auto;
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
-	background: #fff;
-	padding: 12px 14px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	background: var(--cs-surface);
+	padding: 14px 16px;
 	font-size: 13px;
 }
 
-/* 계층을 켜고 끄는 색깔 딱지. 노드의 색과 같다 */
-.kn-graph-chip {
+/* 계층을 켜고 끄는 색깔 딱지. 노드의 색과 같다(테두리와 바탕은 스크립트가 정한다) */
+.ai-body .kn-graph-chip {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
 	border: 1.5px solid;
 	border-radius: 999px;
-	padding: 2px 10px 2px 6px;
+	padding: 0 12px 0 8px !important;
+	margin: 2px 8px 2px 0 !important;
 	cursor: pointer;
-	color: #283121 !important;
+	color: var(--cs-text) !important;
+	font-size: 12.5px;
 }
 
 .kn-graph-chip span {
-	color: #878e83;
+	color: var(--cs-muted);
 	font-size: 12px;
 }
 
 /* 선의 범례 */
 .kn-graph-line {
 	font-size: 12px;
-	color: #4e4d43;
-	margin-right: 6px;
+	color: var(--cs-text-2);
+	margin-right: 10px;
+	white-space: nowrap;
 }
 
 .kn-graph-line i {
@@ -427,6 +409,7 @@ a.kn-step:hover {
 	height: 10px;
 	border-radius: 50%;
 	margin-right: 3px;
+	vertical-align: -1px;
 }
 
 /* 고른 노드의 설명 */
@@ -435,44 +418,56 @@ a.kn-step:hover {
 	align-items: center;
 	gap: 8px;
 	font-size: 15px;
+	font-weight: 700;
+	color: var(--cs-text);
 	word-break: break-all;
 }
 
 .kn-gd-kind {
 	color: #fff;
 	border-radius: 6px;
-	padding: 1px 8px;
-	font-size: 12px;
+	padding: 2px 8px;
+	font-size: 11px;
+	font-weight: 700;
 	white-space: nowrap;
 }
 
 .kn-gd-full {
-	color: #4e4d43;
+	color: var(--cs-muted);
 	margin: 6px 0;
+	font-size: 12.5px;
 }
 
 .kn-gd-actions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 6px;
-	margin: 8px 0;
+	margin: 10px 0;
+}
+
+.kn-gd-actions button {
+	height: 28px;
+	padding: 0 10px;
+	font-size: 12px;
 }
 
 .kn-gd-facts {
 	border-collapse: collapse;
-	margin: 6px 0;
+	margin: 8px 0;
 }
 
 .kn-gd-facts th {
 	text-align: left;
 	font-weight: 600;
-	color: #878e83;
-	padding: 2px 10px 2px 0;
+	color: var(--cs-muted);
+	padding: 3px 12px 3px 0;
 	white-space: nowrap;
 	vertical-align: top;
 }
 
 .kn-gd-facts td {
-	padding: 2px 0;
+	padding: 3px 0;
+	color: var(--cs-text-2);
 }
 
 /* 이어진 노드, 묶음에 든 노드: 누를 수 있는 이름을 나란히 */
@@ -484,32 +479,27 @@ a.kn-step:hover {
 	overflow: auto;
 }
 
-.kn-gd-list a,
-.kn-gd-rows a {
-	color: #007897;
-	text-decoration: none;
-}
-
-.kn-gd-list a {
-	border: 1px solid #ced0b7;
+.ai-body .kn-gd-list a {
+	border: 1px solid var(--cs-border);
 	border-radius: 6px;
-	padding: 1px 6px;
+	padding: 1px 7px;
 	font-size: 12px;
+	background: var(--cs-surface-2);
 }
 
 /* 진입점, 메소드, SQL 목록: 한 줄에 하나 */
 .kn-gd-rows {
 	max-height: 220px;
 	overflow: auto;
-	border: 1px solid #eef1e8;
-	border-radius: 8px;
-	padding: 4px 8px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	padding: 4px 10px;
 }
 
 .kn-gd-rows > div {
 	word-break: break-all;
-	padding: 3px 0;
-	border-bottom: 1px solid #eef1e8;
+	padding: 4px 0;
+	border-bottom: 1px solid var(--cs-surface-3);
 }
 
 .kn-gd-rows > div:last-child {
@@ -518,20 +508,21 @@ a.kn-step:hover {
 
 .kn-gd-tag {
 	display: inline-block;
-	background: #e3e9dc;
+	background: var(--cs-surface-3);
 	border-radius: 4px;
-	padding: 0 5px;
+	padding: 0 6px;
 	font-size: 11px;
-	color: #4e4d43;
+	font-weight: 600;
+	color: var(--cs-text-2);
 }
 
 /* 분석이 만들어 둔 설명 문서. 소스가 들어 있어서 줄바꿈을 그대로 둔다 */
 .kn-gd-doc {
-	background: #f4f6f0;
-	border: 1px solid #ced0b7;
-	border-radius: 8px;
+	background: #f9fafb;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
 	padding: 8px 10px;
-	font-family: "SFMono-Regular", Consolas, monospace;
+	font-family: var(--cs-mono);
 	font-size: 12px;
 	line-height: 1.5;
 	white-space: pre-wrap;
@@ -540,30 +531,22 @@ a.kn-step:hover {
 	margin: 0;
 }
 
-/* 관계 트리 팝업 */
-.kn-graph-modal {
-	position: fixed;
-	inset: 0;
-	background: rgba(17, 24, 39, 0.45);
-	z-index: 1000;
-	align-items: center;
-	justify-content: center;
-}
-
+/* 관계 트리 팝업(바깥 어두운 막은 console.css) */
 .kn-graph-modal-box {
 	width: 94vw;
 	height: 90vh;
-	background: #fff;
-	border-radius: 10px;
-	padding: 14px 16px;
+	background: var(--cs-surface);
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-lg);
+	padding: 16px 18px;
 	display: flex;
 	flex-direction: column;
-	box-sizing: border-box;
 }
 
 .kn-graph-modal-title {
 	flex: 1;
 	min-width: 200px;
+	font-weight: 700;
 	word-break: break-all;
 }
 
@@ -577,22 +560,29 @@ a.kn-step:hover {
 
 /* 진행률 막대 */
 .kn-embed-bar {
-	height: 10px;
-	background: #ced0b7;
+	height: 8px;
+	background: var(--cs-surface-3);
 	border-radius: 999px;
 	overflow: hidden;
-	margin: 4px 0 14px;
+	margin: 6px 0 14px;
 }
 
 .kn-embed-bar > div {
 	height: 100%;
-	background: #007b9d;
+	background: linear-gradient(90deg, #22b8cf, var(--cs-primary));
 	border-radius: 999px;
 	transition: width 0.4s;
 }
 
 /* 제목 줄 오른쪽의 "지금 다시 보기" 단추 */
-.kn-embed-refresh {
-	float: right;
-	font-weight: normal;
+.ai-body .kn-embed-refresh {
+	margin-left: auto;
+	height: 28px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* 제목 옆에 붙는 상태 딱지(스크립트가 workflow-badge 를 넣는다) */
+.ai-panel > h3 .workflow-badge {
+	font-size: 11px;
 }

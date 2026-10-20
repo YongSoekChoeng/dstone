@@ -1,31 +1,3 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%
-net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.RequestUtil(request, response);
-String currentLink = requestUtil.getParameter("defaultLink", "");
-String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink=";
-%>
-			<!-- Header -->
-				<div id="header-wrapper">
-					<div class="container">
-						<div class="row">
-							<div class="col-12">
-
-								<header id="header">
-									<h1><a href="<%=linkBase%>knowledge/index" id="logo">Dstone Knowledge</a></h1>
-									<nav id="nav">
-										<%-- dstone-boot 의 첫 화면으로 돌아간다(왼쪽 메뉴의 "main" 과 같은 곳) --%>
-										<a href="<%=requestUtil.getStrContextPath()%>/views/main" class="ai-nav-home">&larr; Dstone 홈</a>
-										<a href="<%=linkBase%>knowledge/index" class="<%=(currentLink.equals("knowledge/index")?"current-page-item":"")%>">프로젝트 · 분석</a>
-										<a href="<%=linkBase%>knowledge/search/search" class="<%=(currentLink.equals("knowledge/search/search")?"current-page-item":"")%>">검색 · 문서</a>
-										<a href="<%=linkBase%>knowledge/impact/impact" class="<%=(currentLink.equals("knowledge/impact/impact")?"current-page-item":"")%>">영향도 · 호출 관계</a>
-										<a href="<%=linkBase%>knowledge/graph/graph" class="<%=(currentLink.equals("knowledge/graph/graph")?"current-page-item":"")%>">노드 맵</a>
-										<a href="<%=linkBase%>knowledge/diff/diff" class="<%=(currentLink.equals("knowledge/diff/diff")?"current-page-item":"")%>">리비전 비교</a>
-										<a href="<%=linkBase%>knowledge/guide/guide" class="<%=(currentLink.equals("knowledge/guide/guide")?"current-page-item":"")%>">사용 안내</a>
-										<a href="<%=linkBase%>ai/index">AI 화면으로</a>
-									</nav>
-								</header>
-
-							</div>
-						</div>
-					</div>
-				</div>
+<%-- 왼쪽 메뉴. AI 화면과 코드 분석 화면이 같은 메뉴를 쓴다 --%>
+<jsp:include page="/WEB-INF/views/console/sidebar.jsp"></jsp:include>

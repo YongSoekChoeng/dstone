@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Workflow 디자이너</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">AI</p>
+				<h2>Workflow 디자이너</h2>
 				<p>dstone-ai-engine의 Workflow 정의(conf/definitions/workflows/**.yml)를 그림으로 보고 고칩니다.
 					왼쪽 상자에서 step을 끌어다 놓고, step 아래쪽 동그라미를 끌어 다른 step에 놓으면 화살표(다음 step)가 생깁니다.
 					step이나 화살표를 누르면 오른쪽에서 설정을 고칠 수 있고, 빈 곳을 누르면 Workflow 전체 설정이 나옵니다.

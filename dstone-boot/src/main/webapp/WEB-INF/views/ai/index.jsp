@@ -12,27 +12,16 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 		<jsp:include page="common/header.jsp"></jsp:include>
 
-		<!-- Banner -->
-		<div id="banner-wrapper">
-			<div class="container">
-
-				<div id="banner">
-					<h2>Dstone AI</h2>
-					<span>Chat, Workflow and Agents on dstone-ai-engine ...</span>
-				</div>
-
-			</div>
-		</div>
-
 		<!-- Main -->
 		<div id="main">
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2>dstone-ai-engine 과 연동되는 AI 기능 모음</h2>
-				<p>dstone-ai-engine과 연동되는 AI 기능 모음입니다. "사용자"는 누구나 기능을 직접 눌러보는 화면이고,
-					"관리자"는 이미 진행 중인 작업(문서 임베딩, Workflow 실행)을 보고 판단·조작하는 화면입니다.</p>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">AI</p>
+				<h2>개요</h2>
+				<p>dstone-ai-engine과 연동되는 AI 기능 모음입니다. "사용자"는 누구나 기능을 직접 눌러 보는 화면이고,
+					"관리자"는 진행 중인 작업(Workflow 실행, 정의)을 보고 판단·조작하는 화면입니다.</p>
 			</section>
 
 			<section class="ai-panel">
@@ -43,7 +32,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<p>dstone-ai-engine과 실시간으로 대화합니다. 올린 문서 검색(RAG), Tool 호출을 선택적으로 켤 수 있습니다.</p>
 					</a>
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">
-						<h3>WorkFlow 테스트</h3>
+						<h3>Workflow 테스트</h3>
 						<p>등록된 Workflow 중 하나를 골라 submit/status 비동기 Workflow 호출을 확인합니다.</p>
 					</a>
 				</div>
@@ -53,11 +42,11 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<h3>관리자</h3>
 				<div class="ai-card-list">
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/search/search">
-						<h3>문서 올리기 (코드 분석 &gt; 검색 · 문서)</h3>
+						<h3>문서 올리기</h3>
 						<p>RAG가 검색할 문서를 올리고 지우는 곳입니다. 문서는 dstone-knowledge에 저장되고, 채팅의 "올린 문서 검색(RAG)"이 거기서 찾습니다.</p>
 					</a>
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/admin/workflow/workflow">
-						<h3>WorkFlow 실행 관리</h3>
+						<h3>Workflow 실행 관리</h3>
 						<p>진행 중인 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다.</p>
 					</a>
 					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/designer/designer">

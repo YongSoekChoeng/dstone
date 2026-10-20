@@ -18,8 +18,9 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12 kn-guide">
-			<section>
-				<h2 align="center" style="font-weight: bold;">User Guide</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>사용 안내</h2>
 				<p>코드 분석(Knowledge) 메뉴가 무엇을 하고, 어떻게 쓰는지 처음부터 설명합니다.</p>
 			</section>
 

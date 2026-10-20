@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Workflow Execution</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">AI</p>
+				<h2>Workflow 실행 관리</h2>
 				<p>이미 시작된 Workflow 실행을 조회하고, 승인 대기(WAITING_APPROVAL) 중인 실행을 승인/반려합니다.
 					임의 workflowId를 직접 실행해보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">Workflow 테스트</a> 화면을 쓰십시오.</p>
 			</section>

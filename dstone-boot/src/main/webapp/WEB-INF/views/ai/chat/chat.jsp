@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Chat</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">AI</p>
+				<h2>채팅</h2>
 				<p>dstone-ai-engine 의 Agent 와 실시간으로 대화합니다. Agent 를 고르고, 필요하면 올린 문서 검색(RAG) · 도구호출(Tool) 을 켠 뒤 메시지를 보냅니다.</p>
 			</section>
 

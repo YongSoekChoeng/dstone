@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Revision Diff</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>리비전 비교</h2>
 				<p>같은 프로젝트의 두 리비전 사이에 무엇이 더해지고 빠지고 바뀌었는지 봅니다.</p>
 			</section>
 

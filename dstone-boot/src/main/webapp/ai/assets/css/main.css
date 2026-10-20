@@ -1,441 +1,123 @@
-/* AI 화면과 코드 분석(Knowledge) 화면이 같이 쓰는 모양.
-   바탕(헤더 바, 본문 틀, 푸터, 글자색)은 분석툴과 똑같이 analyzer/assets/css/main.css 를 쓰고,
-   여기에는 그 테마에 없는 부품(채팅, 카드, Workflow 폼 등)과 테마에 맞추는 보정만 둔다.
-   그래서 head.jsp 에서 analyzer 의 main.css 다음에 이 파일을 읽는다. */
+/* ==========================================================================
+   AI 화면(개요, 채팅, Workflow 테스트/실행 관리/디자이너)의 부품 모양
+   --------------------------------------------------------------------------
+   바탕(색 변수, 왼쪽 메뉴, 구역, 표, 입력 칸, 단추, 상태 딱지)은 console.css 에 있고, 여기서는 그 변수를 씁니다.
+   코드 분석(Knowledge) 화면도 이 파일을 읽습니다(구역 안 작은 제목, 목록 표의 링크 같은 공통 부품 때문).
+   ========================================================================== */
 
-/* ---------- 분석툴 테마에 맞추는 보정 ---------- */
-
-/* 표가 많은 화면(Workflow 실행 목록, 코드 분석 결과)이 좁아서 잘리지 않게 화면 폭을 거의 다 쓴다.
-   아주 넓은 모니터에서는 줄이 너무 길어지지 않게 1600px 에서 멈춘다. (분석툴은 1200px 고정) */
-.ai-body .container {
-	width: 96%;
-	max-width: 1600px;
-}
-
-/* 메뉴가 분석툴(4개)보다 많아서, 한 줄에 다 안 들어가면 다음 줄로 넘긴다.
-   들어갈 때는 분석툴과 똑같이 왼쪽에 제목, 오른쪽에 메뉴가 놓인다. */
-.ai-body #header {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	height: auto;
-	min-height: 86px;
-}
-
-.ai-body #header h1,
-.ai-body #header nav {
-	position: static;
-}
-
-.ai-body #header h1 {
-	white-space: nowrap;
-	margin-right: 20px;
-}
-
-.ai-body #header nav {
-	font-size: 1em;
-	line-height: 60px;
-	margin-left: auto;
-}
-
-.ai-body #header nav a {
-	padding: 0 11px;
-	white-space: nowrap;
-}
-
-/* dstone-boot 첫 화면으로 돌아가는 링크. 이 화면의 메뉴가 아니라 "나가는 문"이라 구분선을 둔다 */
-.ai-body #header nav a.ai-nav-home {
-	border-right: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-/* 분석툴 테마는 좁은 화면(980px 이하)에서 헤더를 숨기고 스크립트로 옆 메뉴를 만든다.
-   여기는 그 스크립트를 쓰지 않으니 헤더를 그대로 보여 준다. */
-@media screen and (max-width: 980px) {
-	.ai-body #page-wrapper {
-		padding-top: 0;
-	}
-
-	.ai-body #header {
-		display: flex;
-	}
-}
-
-@media screen and (max-width: 1280px) {
-	.ai-body #header {
-		min-height: 76px;
-	}
-}
-
-/* 분석툴 테마는 글자 사이를 1px 좁힌다. 여기는 작은 글씨로 쓴 설명이 많아서 본문만 조금 덜 좁힌다 */
-.ai-body #main {
-	letter-spacing: -0.4px;
-}
-
-/* 분석툴 테마는 굵은 글씨·기울인 글씨·코드 글꼴·목록 번호를 모두 지운다. 설명 글에 필요해서 되살린다. */
-.ai-body b,
-.ai-body strong {
-	font-weight: bold;
-}
-
-.ai-body i,
-.ai-body em {
-	font-style: italic;
-}
-
-.ai-body code,
-.ai-body pre,
-.ai-body textarea {
-	letter-spacing: 0;
-}
-
-.ai-body code,
-.ai-body pre {
-	font-family: "SFMono-Regular", Consolas, monospace;
-}
-
-.ai-body ol {
-	list-style: decimal;
-}
-
-/* 본문의 한 구역. 분석툴처럼 상자 없이 청록색 제목으로 구분한다 */
-.ai-panel > h3 {
-	color: #007897;
-	font-size: 1.6em;
-	letter-spacing: -1px;
-	margin-bottom: 0.6em;
-}
-
-/* 단추. 분석툴의 mini_button 과 같은 모양 */
-.ai-body button {
-	background-image: linear-gradient(to bottom, #008dad, #007b9d);
-	display: inline-block;
-	padding: 5px 15px;
-	background-color: #007b9d;
-	border-radius: 10px;
-	color: #fff;
-	font-size: 12px;
-	letter-spacing: -1px;
-	border: solid 1px #006e8b;
-	box-shadow: inset 0px 0px 0px 1px #18a8c8;
-	white-space: nowrap;
-	cursor: pointer;
-}
-
-.ai-body button:hover {
-	background-image: linear-gradient(to bottom, #1b9fbe, #118eb1);
-	background-color: #118eb1;
-	box-shadow: inset 0px 0px 0px 1px #3ecceb;
-}
-
-/* 덜 중요한 단추(흰 바탕). AI 화면과 코드 분석 화면이 같이 쓴다 */
-.ai-body button.kn-plain {
-	background-image: none;
-	background-color: #fff;
-	box-shadow: none;
-	color: #007897;
-}
-
-.ai-body button.kn-plain:hover {
-	background-color: #e8f3f5;
-}
-
-.ai-body button:disabled {
-	background-image: none;
-	background-color: #c0c0c0;
-	border-color: #b0b0b0;
-	box-shadow: none;
-	color: #fff;
-	cursor: default;
-}
-
-/* ---------- 조건 표: 입력 칸을 줄 맞춰 놓는 표 ---------- */
-
-/* 분석툴의 조회 조건 표와 같은 모양. 회색 칸에 이름, 그 옆 칸에 입력.
-   한 줄에 (이름, 입력)을 한 쌍에서 세 쌍까지 놓고, 단추는 표 아래 오른쪽(ai-form-actions)에 둔다. */
-.ai-form {
-	width: 100%;
-	table-layout: fixed;
-	border-collapse: collapse;
-	margin-bottom: 10px;
-	letter-spacing: 0;
-}
-
-.ai-form col.ai-form-name {
-	width: 130px;
-}
-
-.ai-form col.ai-form-btncol {
-	width: 130px;
-}
-
-.ai-form th,
-.ai-form td {
-	border: 1px solid #b5b5b5;
-	vertical-align: middle;
-	font-size: 13px;
-	line-height: 1.4;
-}
-
-.ai-form th {
-	padding: 8px 10px;
-	background-color: #d1cfcd;
-	color: #008ead;
-	font-weight: bold;
-	text-align: center;
-	word-break: keep-all;
-}
-
-.ai-form td {
-	padding: 5px 8px;
-	color: #4e4d43;
-	background: #fff;
-}
-
-/* 표 안의 입력 칸은 칸을 가득 채운다 */
-.ai-form input[type="text"],
-.ai-form input[type="number"],
-.ai-form select,
-.ai-form textarea {
-	display: block;
-	width: 100%;
-	min-height: 30px;
-	padding: 4px 8px;
-	border: solid 1px #006e8b;
-	font-size: 13px;
-	letter-spacing: 0;
-	color: #283121;
-	background-color: #fff;
-}
-
-.ai-form textarea {
-	min-height: 120px;
-}
-
-.ai-form textarea.workflow-textarea-small {
-	min-height: 60px;
-}
-
-.ai-form input[type="file"] {
-	width: 100%;
-	border: 0;
-	padding: 0;
-	font-size: 13px;
-	letter-spacing: 0;
-}
-
-.ai-form input:focus,
-.ai-form select:focus,
-.ai-form textarea:focus,
-.chat-input:focus {
-	outline: 2px solid rgba(0, 142, 173, 0.35);
-	outline-offset: 0;
-}
-
-.ai-form input[readonly],
-.ai-form textarea[readonly] {
-	background-color: #f4f6f0;
-}
-
-/* 체크박스 여러 개를 한 칸에 나란히 */
-.ai-form-checks label {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	margin: 3px 18px 3px 0;
-	white-space: nowrap;
-	cursor: pointer;
-}
-
-.ai-form input[type="checkbox"] {
-	margin: 0;
-}
-
-/* 한 칸에 입력과 단추(또는 짧은 글)를 나란히 */
-.ai-form-inline {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.ai-form-inline input[type="text"] {
-	flex: 1;
-	min-width: 0;
-}
-
-.ai-form input.ai-form-short {
-	width: 90px;
-}
-
-/* 줄 끝에 단추만 들어가는 칸 */
-.ai-form td.ai-form-btn {
-	text-align: center;
-	padding: 5px 6px;
-}
-
-.ai-form td.ai-form-btn button {
-	width: 100%;
-}
-
-.ai-form td .ai-hint {
-	margin: 6px 0 2px;
-	line-height: 1.5;
-}
-
-.ai-form td .ai-hint:empty {
-	display: none;
-}
-
-.ai-form td .kn-row {
-	margin: 2px 0;
-}
-
-/* 표 아래 오른쪽에 놓는 단추 줄 */
-.ai-form-actions {
-	display: flex;
-	justify-content: flex-end;
-	align-items: center;
-	gap: 8px;
-	margin: 0 0 12px;
-}
-
-.ai-form-actions button {
-	min-width: 96px;
-	padding: 7px 18px;
-	font-size: 13px;
-}
-
-.ai-form-buttons {
-	display: inline-flex;
-	gap: 8px;
-}
-
-.ai-form-buttons:empty {
-	display: none;
-}
-
-/* 좁은 화면에서는 한 줄에 한 쌍씩 */
-@media screen and (max-width: 860px) {
-	.ai-form,
-	.ai-form tbody,
-	.ai-form tr,
-	.ai-form th,
-	.ai-form td {
-		display: block;
-		width: 100%;
-	}
-
-	.ai-form colgroup {
-		display: none;
-	}
-
-	.ai-form th {
-		text-align: left;
-	}
-
-	.ai-form th,
-	.ai-form td {
-		margin-top: -1px;
-	}
-}
-
-/* ---------- AI 메인 ---------- */
+/* ---------- 개요(ai/index) ---------- */
 
 .ai-card-list {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-	gap: 16px;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 14px;
+	margin-top: 12px;
 }
 
-.ai-card {
-	display: block;
-	padding: 20px;
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
-	text-decoration: none;
+.ai-body a.ai-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 18px 44px 18px 18px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
 	color: inherit;
-	transition: box-shadow 0.15s ease, border-color 0.15s ease;
+	text-decoration: none;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.ai-card:hover {
-	border-color: #007b9d;
-	box-shadow: 0 4px 12px rgba(0, 123, 157, 0.15);
+.ai-body a.ai-card::after {
+	content: "";
+	position: absolute;
+	right: 18px;
+	top: 22px;
+	width: 8px;
+	height: 8px;
+	border-top: 2px solid var(--cs-faint);
+	border-right: 2px solid var(--cs-faint);
+	transform: rotate(45deg);
+	transition: border-color 0.15s ease, right 0.15s ease;
+}
+
+.ai-body a.ai-card:hover {
+	border-color: #9fd0dc;
+	box-shadow: 0 6px 18px rgba(14, 116, 144, 0.10);
+	text-decoration: none;
+	transform: translateY(-1px);
+}
+
+.ai-body a.ai-card:hover::after {
+	border-color: var(--cs-primary);
+	right: 15px;
 }
 
 .ai-card h3 {
-	margin: 0 0 8px;
-	color: #007897;
+	font-size: 15px;
+	color: var(--cs-text);
 }
 
 .ai-card p {
 	margin: 0;
-	color: #4e4d43;
-	font-size: 14px;
-	line-height: 1.5;
-}
-
-.ai-panel {
-	margin: 0 0 60px 0;
-}
-
-.ai-hint {
-	color: #878e83;
+	color: var(--cs-muted);
 	font-size: 13px;
-	margin: 0 0 16px;
+	line-height: 1.6;
 }
 
-/* workflow 설명: YAML의 description에 적은 줄바꿈을 그대로 보여 준다(description: | 로 여러 줄을 적은 경우). */
+/* workflow 설명: YAML의 description에 적은 줄바꿈을 그대로 보여 준다(description: | 로 여러 줄을 적은 경우) */
 #workflow-id-desc {
 	white-space: pre-line;
 }
 
-/* 채팅 화면의 "무엇을 물을 때 무엇을 켜나" 표 */
-.ai-guide-table {
-	margin-bottom: 12px;
-}
+/* ---------- 채팅 ---------- */
 
+/* "무엇을 물을 때 무엇을 켜나" 표 */
 .ai-guide-table td {
 	vertical-align: top;
-	line-height: 1.6;
+	line-height: 1.65;
 }
 
-/* "켤 것"과 "Agent" 칸은 짧으니 줄을 꺾지 않는다 */
 .ai-guide-table td:nth-child(2),
 .ai-guide-table td:nth-child(3) {
 	white-space: nowrap;
 }
 
 .ai-guide-table code {
-	background: #e3e9dc;
-	border-radius: 4px;
-	padding: 1px 5px;
-	font-size: 12px;
+	white-space: normal;
 }
 
-.kn-section-title {
-	font-size: 1.2em;
-	color: #283121;
-	margin: 24px 0 8px;
+/* Agent 이름은 줄을 꺾지 않는다 */
+.ai-guide-table td:nth-child(3) code {
+	white-space: nowrap;
+	overflow-wrap: normal;
 }
-
-/* 채팅 화면 */
 
 .ai-chat-box {
 	display: flex;
 	flex-direction: column;
-	height: 70vh;
-	min-height: 480px;
-	border: 1px solid #ced0b7;
-	border-radius: 10px;
+	height: 68vh;
+	min-height: 460px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	background: var(--cs-surface-2);
+	overflow: hidden;
 }
 
 .chat-messages {
 	flex: 1;
 	overflow-y: auto;
-	padding: 24px;
+	padding: 22px 24px;
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 14px;
+}
+
+.chat-messages:empty::before {
+	content: "Agent를 고르고 아래에 메시지를 적어 보내십시오.";
+	margin: auto;
+	color: var(--cs-faint);
+	font-size: 13px;
 }
 
 .chat-message {
@@ -451,109 +133,90 @@
 }
 
 .chat-bubble {
-	max-width: 70%;
+	max-width: min(72%, 860px);
 	padding: 10px 14px;
 	border-radius: 14px;
-	font-size: 15px;
-	line-height: 1.5;
+	font-size: 14px;
+	line-height: 1.65;
 	letter-spacing: 0;
 	white-space: pre-wrap;
 	word-break: break-word;
+	box-shadow: var(--cs-shadow-sm);
 }
 
 .chat-message-user .chat-bubble {
-	background: #007b9d;
+	background: var(--cs-primary);
 	color: #fff;
 	border-bottom-right-radius: 4px;
 }
 
 .chat-message-assistant .chat-bubble {
-	background: #eef1e8;
-	color: #283121;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	color: var(--cs-text);
 	border-bottom-left-radius: 4px;
 }
 
 .chat-bubble-pending::after {
-	content: "…";
-	opacity: 0.5;
+	content: "";
+	display: inline-block;
+	width: 18px;
+	height: 6px;
+	margin-left: 4px;
+	vertical-align: middle;
+	background: radial-gradient(circle, var(--cs-faint) 2px, transparent 2.5px) 0 50% / 6px 6px repeat-x;
+	animation: cs-typing 1s steps(3) infinite;
+}
+
+@keyframes cs-typing {
+	from { width: 6px; }
+	to { width: 24px; }
 }
 
 .chat-form {
-	border-top: 1px solid #ced0b7;
-	padding: 16px 24px 24px;
-}
-
-/* 드롭다운(채팅 Agent, Workflow 선택, 상태 필터 등) - 브라우저 기본 높이가 너무 작아서 조금 키운다 */
-.ai-body select {
-	min-height: 28px;
-	padding: 3px 8px;
-	border: solid 1px #006e8b;
-	background-color: #ffffff;
-	font-size: 13px;
-	color: #4e4d43;
+	border-top: 1px solid var(--cs-border);
+	background: var(--cs-surface);
+	padding: 14px 16px;
+	margin: 0;
 }
 
 .chat-input-row {
 	display: flex;
+	align-items: flex-end;
 	gap: 8px;
 }
 
-.chat-input {
+.ai-body textarea.chat-input {
 	flex: 1;
+	min-height: 44px;
+	max-height: 200px;
+	padding: 11px 12px;
 	resize: none;
-	border: solid 1px #006e8b;
-	padding: 10px 12px;
-	font-size: 14px;
-	font-family: inherit;
-}
-
-.ai-body .chat-send {
-	padding: 0 24px;
 	font-size: 14px;
 }
 
-/* 목록 표. Workflow 화면과 코드 분석(Knowledge) 화면이 같이 쓴다(문서 업로드 화면에서 쓰던 이름이 남은 것).
-   분석툴의 표(border="1")와 같은 모양: 회색 머리줄에 청록색 굵은 글씨, 칸마다 테두리 */
-
-.document-list-table {
-	width: 100%;
-	border-collapse: collapse;
+.ai-body button.chat-send {
+	height: 44px;
+	padding: 0 22px;
 	font-size: 14px;
-	letter-spacing: 0;
 }
 
-.document-list-table th,
-.document-list-table td {
-	text-align: left;
-	padding: 5px;
-	border: 1px solid #b5b5b5;
-	line-height: 1.4;
-}
+/* ---------- Workflow 테스트 / 실행 관리 ---------- */
 
-.document-list-table th {
-	color: #008ead;
-	font-weight: bold;
-	background-color: #d1cfcd;
-}
-
-/* Workflow 비동기 테스트 화면 */
-
-.workflow-textarea {
+.ai-body textarea.workflow-textarea {
 	min-height: 120px;
-	resize: vertical;
-	border: solid 1px #006e8b;
-	padding: 10px 12px;
-	font-size: 13px;
-	font-family: "SFMono-Regular", Consolas, monospace;
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	line-height: 1.55;
 }
 
-.workflow-textarea-small {
-	min-height: 60px;
+.ai-body textarea.workflow-textarea-small {
+	min-height: 64px;
 }
 
 .workflow-status {
 	font-size: 13px;
-	color: #4e4d43;
+	color: var(--cs-muted);
 }
 
 .workflow-status-row {
@@ -566,116 +229,117 @@
 
 .workflow-status-label {
 	font-size: 13px;
-	color: #4e4d43;
+	color: var(--cs-muted);
 }
 
 .workflow-job-id {
-	font-family: "SFMono-Regular", Consolas, monospace;
-	font-size: 13px;
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	color: var(--cs-text-2);
+	font-weight: 500;
 }
 
-.workflow-badge {
-	display: inline-block;
-	padding: 2px 10px;
-	border-radius: 999px;
-	font-size: 12px;
-	font-weight: 600;
-	background: #ced0b7;
-	color: #4e4d43;
+.ai-panel > h3 .workflow-job-id:not(:empty) {
+	background: var(--cs-surface-3);
+	border-radius: 4px;
+	padding: 1px 8px;
 }
 
-.workflow-badge-running {
-	background: #d5e8ec;
-	color: #007897;
-}
-
-.workflow-badge-done {
-	background: #dcfce7;
-	color: #15803d;
-}
-
-.workflow-badge-failed,
-.workflow-badge-error {
-	background: #fee2e2;
-	color: #b91c1c;
-}
-
-.workflow-badge-waiting_approval {
-	background: #fef3c7;
-	color: #b45309;
-}
-
-.workflow-badge-cancelled {
-	background: #ced0b7;
-	color: #878e83;
-}
-
-.workflow-history-jobid {
-	font-family: "SFMono-Regular", Consolas, monospace;
-	color: #007b9d;
-	text-decoration: none;
-}
-
-.workflow-history-jobid:hover {
-	text-decoration: underline;
+.ai-body a.workflow-history-jobid {
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	font-weight: 500;
+	color: var(--cs-primary);
 }
 
 /* ---------- Workflow 디자이너(ai/designer/designer.jsp) ---------- */
 
 .wd-wrap {
 	display: flex;
-	gap: 12px;
+	gap: 14px;
 	align-items: stretch;
 }
 
 .wd-palette {
-	flex: 0 0 150px;
-	font-size: 0.85em;
+	flex: 0 0 160px;
+	font-size: 12.5px;
 }
 
 .wd-palette-title {
-	margin: 0 0 6px 0;
-	font-weight: bold;
-	color: #4e4d43;
+	margin: 0 0 8px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--cs-muted);
+}
+
+.wd-palette-title + .wd-legend,
+.wd-palette-item + .wd-palette-title {
+	margin-top: 16px;
 }
 
 .wd-palette-item {
-	border: 1.5px solid #878e83;
+	border: 1px solid var(--cs-border-strong);
+	border-left-width: 4px;
 	border-radius: 8px;
-	padding: 6px 8px;
+	padding: 7px 10px;
 	margin-bottom: 8px;
 	cursor: grab;
 	user-select: none;
-	line-height: 1.3;
-	background: #fff;
+	line-height: 1.35;
+	background: var(--cs-surface);
+	box-shadow: var(--cs-shadow-sm);
+	transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+.wd-palette-item:hover {
+	box-shadow: var(--cs-shadow);
+	transform: translateX(2px);
+}
+
+.wd-palette-item:active {
+	cursor: grabbing;
 }
 
 .wd-palette-item b {
 	display: block;
-	font-size: 1em;
+	font-size: 12px;
+	letter-spacing: 0.02em;
+	color: var(--cs-text);
 }
 
 .wd-palette-item span {
-	color: #878e83;
-	font-size: 0.9em;
+	color: var(--cs-muted);
+	font-size: 12px;
 }
 
 /* step 종류별 색. workflow-designer.js 의 TYPE_COLORS 와 같은 색 */
-.wd-type-AGENT { border-color: #2563eb; background-color: #eff6ff; }
-.wd-type-SUPERVISOR { border-color: #7c3aed; background-color: #f5f3ff; }
-.wd-type-ROUTER { border-color: #d97706; background-color: #fffbeb; }
-.wd-type-TOOL { border-color: #059669; background-color: #ecfdf5; }
-.wd-type-APPROVAL { border-color: #db2777; background-color: #fdf2f8; }
+.wd-type-AGENT { border-color: #2563eb; background-color: #f5f8ff; }
+.wd-type-SUPERVISOR { border-color: #7c3aed; background-color: #f8f5ff; }
+.wd-type-ROUTER { border-color: #d97706; background-color: #fffaf0; }
+.wd-type-TOOL { border-color: #059669; background-color: #f2fbf7; }
+.wd-type-APPROVAL { border-color: #db2777; background-color: #fdf4f9; }
+
+.wd-palette-item.wd-type-AGENT,
+.wd-palette-item.wd-type-SUPERVISOR,
+.wd-palette-item.wd-type-ROUTER,
+.wd-palette-item.wd-type-TOOL,
+.wd-palette-item.wd-type-APPROVAL {
+	border-top-color: var(--cs-border);
+	border-right-color: var(--cs-border);
+	border-bottom-color: var(--cs-border);
+}
 
 .wd-legend {
-	margin: 0 0 4px 0;
-	color: #4e4d43;
-	line-height: 1.4;
+	margin: 0 0 4px;
+	color: var(--cs-text-2);
+	line-height: 1.5;
 }
 
 .wd-legend-line {
 	display: inline-block;
-	width: 26px;
+	width: 24px;
 	height: 0;
 	margin-right: 6px;
 	vertical-align: middle;
@@ -686,9 +350,11 @@
 .wd-legend-route { border-top-color: #d97706; }
 
 .wd-palette-help {
-	margin-top: 10px;
-	color: #878e83;
-	line-height: 1.5;
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid var(--cs-border);
+	color: var(--cs-muted);
+	line-height: 1.7;
 }
 
 .wd-center {
@@ -699,31 +365,49 @@
 .wd-tabs {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	margin-bottom: 6px;
+	gap: 4px;
+	margin-bottom: 8px;
+	flex-wrap: wrap;
 }
 
+/* 그림 / YAML 탭: 붙어 있는 두 칸짜리 전환 단추 */
 .ai-body button.wd-tab {
-	background-image: none;
-	background-color: #fff;
-	color: #007897;
+	height: 30px;
+	background: var(--cs-surface);
+	border-color: var(--cs-border-strong);
+	color: var(--cs-text-2);
 	box-shadow: none;
 }
 
-.ai-body button.wd-tab-on {
-	background-image: linear-gradient(to bottom, #008dad, #007b9d);
+.ai-body button.wd-tab:hover {
+	background: var(--cs-surface-2);
+	color: var(--cs-text);
+}
+
+.ai-body button.wd-tab-on,
+.ai-body button.wd-tab-on:hover {
+	background: var(--cs-text);
+	border-color: var(--cs-text);
 	color: #fff;
+}
+
+.wd-tabs label.wd-hide-fail {
+	margin-left: 12px;
+	font-size: 12.5px;
 }
 
 .wd-tabs .ai-hint {
 	margin: 0 0 0 8px;
+	font-size: 12.5px;
 }
 
 .wd-graph-box {
 	position: relative;
 	height: 72vh;
 	min-height: 480px;
-	border: 1px solid #d1cfcd;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	overflow: hidden;
 }
 
 .wd-canvas {
@@ -733,42 +417,53 @@
 
 .wd-minimap {
 	position: absolute;
-	right: 8px;
-	bottom: 8px;
-	border: 1px solid #d1cfcd;
-	background: #fff;
+	right: 10px;
+	bottom: 10px;
+	border: 1px solid var(--cs-border);
+	border-radius: 8px;
+	background: var(--cs-surface);
+	box-shadow: var(--cs-shadow);
+	overflow: hidden;
 }
 
 .wd-yaml-box .ai-hint {
 	margin-top: 0;
 }
 
-.wd-yaml {
+.ai-body textarea.wd-yaml {
 	width: 100%;
 	height: 66vh;
 	min-height: 440px;
-	font-family: "SFMono-Regular", Consolas, monospace;
-	font-size: 13px;
-	line-height: 1.45;
-	letter-spacing: 0;
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	line-height: 1.55;
 	white-space: pre;
 	tab-size: 2;
-	border: 1px solid #d1cfcd;
-	padding: 8px;
+	background: #fbfcfd;
 }
 
 .wd-props {
 	flex: 0 0 360px;
 	max-height: calc(72vh + 40px);
 	overflow-y: auto;
-	font-size: 0.9em;
-	padding-right: 4px;
+	font-size: 13px;
+	padding: 2px 4px 2px 14px;
+	border-left: 1px solid var(--cs-border);
 }
 
 .wd-props h4 {
-	margin: 0 0 8px 0;
-	color: #007897;
-	font-size: 1.15em;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 10px;
+	font-size: 14px;
+	color: var(--cs-text);
+}
+
+.wd-props h4 ~ h4 {
+	margin-top: 18px;
+	padding-top: 14px;
+	border-top: 1px solid var(--cs-border);
 }
 
 .wd-props h4 + .ai-hint {
@@ -776,20 +471,21 @@
 }
 
 .wd-field {
-	margin-bottom: 10px;
+	margin-bottom: 12px;
 }
 
 .wd-field > label {
 	display: block;
-	font-weight: bold;
-	color: #4e4d43;
-	margin-bottom: 2px;
+	font-weight: 600;
+	color: var(--cs-text-2);
+	margin-bottom: 4px;
+	font-size: 12.5px;
 }
 
 .wd-help {
-	font-weight: normal;
-	color: #878e83;
-	font-size: 0.9em;
+	font-weight: 400;
+	color: var(--cs-faint);
+	font-size: 12px;
 }
 
 .wd-field input[type="text"],
@@ -797,136 +493,121 @@
 .wd-field select,
 .wd-field textarea {
 	width: 100%;
-	box-sizing: border-box;
-	border: 1px solid #d1cfcd;
-	padding: 4px 6px;
-	background: #fff;
-	color: #283121;
-	font-size: 1em;
 }
 
-.wd-field textarea.wd-code {
-	font-family: "SFMono-Regular", Consolas, monospace;
+.ai-body .wd-field textarea {
+	min-height: 64px;
+}
+
+.ai-body .wd-field textarea.wd-code {
+	font-family: var(--cs-mono);
 	font-size: 12px;
-	letter-spacing: 0;
 	white-space: pre;
 }
 
-.wd-field label.wd-check {
-	font-weight: normal;
-}
-
 .wd-desc {
-	margin: 4px 0;
-	color: #4e4d43;
+	margin: 6px 0 4px;
+	color: var(--cs-muted);
+	font-size: 12.5px;
 }
 
 .wd-schema {
-	margin: 4px 0;
-	padding: 6px;
-	background: #f4f6f0;
-	font-size: 11px;
+	margin: 6px 0;
+	padding: 8px 10px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	font-size: 11.5px;
+	line-height: 1.55;
 	white-space: pre-wrap;
-	max-height: 140px;
+	max-height: 150px;
 	overflow-y: auto;
+	color: var(--cs-text-2);
 }
 
 .wd-inline-actions {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
-	margin-top: 6px;
+	margin-top: 8px;
+}
+
+.wd-inline-actions button {
+	height: 28px;
+	padding: 0 10px;
+	font-size: 12px;
 }
 
 .wd-type-chip {
-	display: inline-block;
-	padding: 1px 8px;
-	border: 1.5px solid;
-	border-radius: 10px;
-	font-size: 0.85em;
-	color: #283121;
+	display: inline-flex;
+	align-items: center;
+	height: 22px;
+	padding: 0 8px;
+	border: 1px solid;
+	border-radius: 6px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	color: var(--cs-text);
 }
 
 .wd-edge-list {
-	margin: 0 0 6px 0;
+	margin: 0 0 6px;
 	padding-left: 18px;
-	list-style: disc;
-}
-
-.wd-message {
-	margin-top: 8px;
-	white-space: pre-wrap;
-	word-break: break-all;
-}
-
-.wd-message:empty {
-	display: none;
-}
-
-.wd-message-ok {
-	color: #15803d;
-}
-
-.wd-message-info {
-	color: #4e4d43;
-}
-
-.wd-message-error {
-	color: #b91c1c;
-	background: #fef2f2;
-	border: 1px solid #fecaca;
-	padding: 8px 10px;
-}
-
-.wd-dialog {
-	position: fixed;
-	left: 0;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	background: rgba(0, 0, 0, 0.35);
-	z-index: 1000;
-	display: flex;
-	align-items: center;
-	justify-content: center;
 }
 
 .wd-dialog-box {
-	background: #fff;
-	width: min(960px, 94vw);
+	background: var(--cs-surface);
+	width: min(980px, 96vw);
 	max-height: 92vh;
 	overflow-y: auto;
-	padding: 18px 20px;
-	border-radius: 6px;
+	padding: 20px 22px;
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-lg);
 }
 
 .wd-dialog-box h3 {
-	margin: 0 0 10px 0;
-	color: #007897;
+	margin: 0 0 12px;
+	font-size: 16px;
 }
 
-.wd-agent-text {
+.ai-body textarea.wd-agent-text {
 	height: 55vh;
 	min-height: 300px;
-	margin-top: 8px;
+	margin-top: 4px;
 }
 
 /* 좁은 화면에서는 위아래로 쌓는다 */
-@media screen and (max-width: 1100px) {
+@media screen and (max-width: 1200px) {
 	.wd-wrap {
 		flex-direction: column;
 	}
 
-	.wd-palette,
+	.wd-palette {
+		flex: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.wd-palette-item {
+		margin: 0;
+	}
+
+	.wd-palette-title,
+	.wd-legend,
+	.wd-palette-help {
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+
 	.wd-props {
 		flex: none;
 		max-height: none;
+		border-left: 0;
+		border-top: 1px solid var(--cs-border);
+		padding: 14px 0 0;
 	}
-}
-
-.wd-tabs label.wd-hide-fail {
-	margin-left: 10px;
-	font-size: 0.85em;
-	color: #4e4d43;
-	white-space: nowrap;
 }

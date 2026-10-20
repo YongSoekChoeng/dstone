@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Project &amp; Analysis</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>프로젝트 · 분석</h2>
 				<p>Java 프로젝트를 등록하고 분석을 돌린 뒤, 리비전별 분석 결과와 임베딩 진행 상황을 봅니다.</p>
 			</section>
 

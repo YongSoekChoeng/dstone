@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Node Map</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>노드 맵</h2>
 				<p>화면 → 컨트롤러 → 서비스 → DAO → SQL 매퍼 → 테이블로 이어지는 호출 구조를 그림으로 봅니다.</p>
 			</section>
 

@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Impact &amp; Call Graph</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>영향도 · 호출 관계</h2>
 				<p>테이블 · SQL · 클래스 · 메소드를 고치면 어디까지 영향이 가는지, 누가 누구를 부르는지 봅니다.</p>
 			</section>
 

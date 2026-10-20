@@ -17,8 +17,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
-			<section>
-				<h2 align="center" style="font-weight: bold;">Workflow Test</h2>
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">AI</p>
+				<h2>Workflow 테스트</h2>
 				<p>dstone-ai-engine의 GET /api/ai/workflow(목록) + POST
 					/api/ai/workflow/{workflowId}/submit + GET /api/ai/workflow/executions/{executionId}
 					비동기 계약을 직접 호출해보는 개발/테스트 화면입니다. [제출]을 누르면
