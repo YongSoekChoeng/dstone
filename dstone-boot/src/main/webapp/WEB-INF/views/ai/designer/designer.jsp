@@ -146,6 +146,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/x6.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/dagre.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/js-yaml.min.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/picoschema-editor.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/workflow-designer.js"></script>
 	<script>
 		DstoneAiDesigner.init({

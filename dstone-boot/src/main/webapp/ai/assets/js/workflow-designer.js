@@ -559,6 +559,25 @@ var DstoneAiDesigner = (function () {
 		afterModelChange();
 	}
 
+	/**
+	 * 그림과 설정 칸을 다시 그리지 않고 model만 고칩니다(되돌리기와 글자 다시 만들기는 change()와 같습니다).
+	 * 설정 칸 안의 편집기처럼, 다시 그리면 입력 중인 칸이 사라지는 곳에서 씁니다.
+	 */
+	function quietChange(fn) {
+		if (textEdited && !window.confirm("YAML 탭에서 고친 글자가 아직 그림에 반영되지 않았습니다. 고치면 그 글자는 버립니다. 계속할까요?")) {
+			return;
+		}
+		undoStack.push(JSON.stringify({ model: doc.model, positions: positions }));
+		if (undoStack.length > 50) {
+			undoStack.shift();
+		}
+		fn();
+		els.yaml.value = buildText(doc.header, doc.model);
+		textEdited = false;
+		dirty = true;
+		updateYamlNote();
+	}
+
 	function afterModelChange() {
 		els.yaml.value = buildText(doc.header, doc.model);
 		textEdited = false;
@@ -1062,6 +1081,8 @@ var DstoneAiDesigner = (function () {
 			y: position.y,
 			width: STEP_W,
 			height: STEP_H,
+			// 화살표가 네모 위를 지나도 네모를 누를 수 있게 네모를 화살표보다 위에 그린다.
+			zIndex: 2,
 			data: { kind: "step", type: step.type },
 			attrs: {
 				body: { fill: color.fill, stroke: color.stroke, strokeWidth: isSelectedStep(step.id) ? 3 : 1.5, rx: 8, ry: 8 },
@@ -1087,6 +1108,7 @@ var DstoneAiDesigner = (function () {
 			y: p.y,
 			width: TERM_SIZE,
 			height: TERM_SIZE,
+			zIndex: 2,
 			data: { kind: "terminal" },
 			attrs: {
 				body: { fill: "#fff", stroke: color, strokeWidth: 2 },
@@ -1113,6 +1135,7 @@ var DstoneAiDesigner = (function () {
 			target: { cell: to, port: "in" },
 			router: LINE_STYLES[lineStyle].router,
 			connector: LINE_STYLES[lineStyle].connector,
+			zIndex: 1,
 			data: { kind: kind, from: from, route: route },
 			attrs: {
 				line: {
@@ -1162,7 +1185,7 @@ var DstoneAiDesigner = (function () {
 						missing[missingId] = true;
 						var p = positions[step.id] || { x: 0, y: 0 };
 						cells.push(graph.createNode({
-							id: missingId, shape: "rect", x: p.x + 40, y: p.y + STEP_H + 50, width: 150, height: 40,
+							id: missingId, shape: "rect", x: p.x + 40, y: p.y + STEP_H + 50, width: 150, height: 40, zIndex: 2,
 							data: { kind: "missing" },
 							attrs: {
 								body: { fill: "#fff", stroke: "#b91c1c", strokeDasharray: "4 3", rx: 6, ry: 6 },
@@ -1319,7 +1342,7 @@ var DstoneAiDesigner = (function () {
 			+ row("allowedCallers", "쉼표로 구분, 비우면 누구나", "<input type=\"text\" data-wf=\"allowedCallers\" value=\"" + escapeHtml((m.allowedCallers || []).join(", ")) + "\" />")
 			+ row("settings.maxIterations", "step 실행 횟수 한도", "<input type=\"number\" min=\"1\" data-wf=\"settings.maxIterations\" value=\"" + escapeHtml(settings.maxIterations === undefined ? "" : String(settings.maxIterations)) + "\" />")
 			+ row("settings.checkpoint", "", "<label class=\"wd-check\"><input type=\"checkbox\" data-wf=\"settings.checkpoint\"" + (settings.checkpoint ? " checked" : "") + " /> step마다 상태 저장</label>")
-			+ row("input", "요청 input 모양(Picoschema). 예: string 또는 필드: 타입, 설명", "<textarea data-wf=\"input\" rows=\"4\" class=\"wd-code\">" + escapeHtml(valueToText(m.input)) + "</textarea>")
+			+ row("input", "실행 요청의 input 모양", "<div class=\"pe-host\" id=\"wd-wf-input\"></div>")
 			+ row("state", "저장하는 이름: 설명", "<textarea data-wf=\"state\" rows=\"5\" class=\"wd-code\">" + escapeHtml(valueToText(m.state)) + "</textarea>"
 				+ "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-tidy-state-btn\">step의 save에 맞추기</button></div>")
 			+ row("return", "끝났을 때 돌려줄 값. 비우면 state 전체", "<textarea data-wf=\"return\" rows=\"3\" class=\"wd-code\">" + escapeHtml(valueToText(m["return"])) + "</textarea>")
@@ -1341,6 +1364,17 @@ var DstoneAiDesigner = (function () {
 			});
 		});
 		document.getElementById("wd-tidy-state-btn").addEventListener("click", tidyState);
+		// input 모양은 Picoschema 편집기가 맡는다. 그림과 상관없는 값이라 설정 칸을 다시 그리지 않고 글자만 바꾼다(커서가 사라지지 않게).
+		DstonePicoschemaEditor.create(document.getElementById("wd-wf-input"), m.input, {
+			noneLabel: "적지 않음(기본: 글자 하나)",
+			noneHint: "실행 요청의 input으로 글자 하나(string)를 받습니다.",
+			compact: true,
+			onChange: function (value) {
+				quietChange(function () {
+					setValue(doc.model, "input", value);
+				});
+			}
+		});
 	}
 
 	function readWorkflowField(key, input) {
@@ -1973,12 +2007,12 @@ var DstoneAiDesigner = (function () {
 			+ "</section>"
 			+ "</div>"
 			+ "<section class=\"wd-agent-sec\"><h4>입출력 계약</h4>"
-			+ "<p class=\"ai-hint\">짧은 타입 표기(Picoschema)로 적습니다. 예: <code>string, 설명</code> 또는 한 줄에 필드 하나 <code>path: string, 파일 경로</code>, 선택 필드는 <code>이름?</code>. "
-			+ "output을 비우거나 string이면 글자로 받고, 필드를 적으면 JSON으로 받아 검사합니다. 프롬프트의 <code>{필드}</code> 자리는 input 필드 값으로 채워집니다.</p>"
-			+ "<div class=\"wd-agent-grid\">"
-			+ row("input", "받는 값", "<textarea data-agent=\"input\" rows=\"6\" class=\"wd-code\">" + escapeHtml(valueToText(f.input)) + "</textarea>")
-			+ row("output", "돌려주는 값(SUPERVISOR/ROUTER에 쓸 Agent는 비웁니다)", "<textarea data-agent=\"output\" rows=\"6\" class=\"wd-code\">" + escapeHtml(valueToText(f.output)) + "</textarea>")
-			+ "</div></section>"
+			+ "<p class=\"ai-hint\">무엇을 받고 무엇을 돌려주는지 정합니다. 값 하나(예: 글자)이거나, 이름이 붙은 필드 묶음입니다. "
+			+ "output을 적지 않거나 string 값 하나면 답을 글자로 받고, 필드를 적으면 JSON으로 받아 검사합니다. 프롬프트의 <code>{필드}</code> 자리는 input 필드 값으로 채워집니다. "
+			+ "[직접 입력]을 고르면 짧은 타입 표기(Picoschema)로 바로 적을 수 있습니다.</p>"
+			+ row("input", "받는 값", "<div class=\"pe-host\" data-pico=\"input\"></div>")
+			+ row("output", "돌려주는 값(SUPERVISOR/ROUTER에 쓸 Agent는 적지 않습니다)", "<div class=\"pe-host\" data-pico=\"output\"></div>")
+			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Tool <span class=\"wd-help\">LLM이 스스로 골라 부를 수 있는 Tool</span></h4>"
 			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-all-tools\"" + (allTools ? " checked" : "") + " /> 전부(*) - 등록된 Tool을 모두 씀(TOOL step 전용 Tool은 빠짐)</label>"
 			+ checkList("tools", toolItems, tools)
@@ -2003,6 +2037,20 @@ var DstoneAiDesigner = (function () {
 			+ "<textarea data-agent-body=\"1\" class=\"wd-code wd-agent-prompt\" spellcheck=\"false\">" + escapeHtml(agentDoc.body) + "</textarea>"
 			+ "</section>";
 		els.agentForm.innerHTML = html;
+
+		// 입출력 계약은 Picoschema 편집기(picoschema-editor.js)가 맡는다. 고칠 때마다 머리말의 input/output을 바꾼다.
+		Array.prototype.forEach.call(els.agentForm.querySelectorAll("[data-pico]"), function (host) {
+			var key = host.getAttribute("data-pico");
+			DstonePicoschemaEditor.create(host, f[key], {
+				noneLabel: key === "output" ? "적지 않음(답을 글자로 받음)" : "적지 않음(기본: 글자 하나)",
+				noneHint: key === "output" ? "답을 글자 그대로 받습니다. JSON으로 받으려면 [필드 묶음]을 고르십시오." : "글자 하나(string)를 받습니다.",
+				onChange: function (value) {
+					agentChange(function () {
+						setValue(agentDoc.front, key, value);
+					}, false);
+				}
+			});
+		});
 
 		Array.prototype.forEach.call(els.agentForm.querySelectorAll("[data-agent]"), function (input) {
 			input.addEventListener("change", function () {
