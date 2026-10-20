@@ -1,0 +1,12 @@
+id: test-workflow
+version: 1.0.0
+description: ""
+input: string
+state: {}
+steps:
+
+  - id: step01
+    type: AGENT
+    with: ${input}
+    agent: input-check-agent
+    next: END
