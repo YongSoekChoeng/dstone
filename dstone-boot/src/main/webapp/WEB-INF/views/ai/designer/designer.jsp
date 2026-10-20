@@ -75,7 +75,6 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						</div>
 						<div id="wd-graph-box" class="wd-graph-box">
 							<div id="wd-canvas" class="wd-canvas"></div>
-							<div id="wd-minimap" class="wd-minimap"></div>
 						</div>
 						<div id="wd-yaml-box" class="wd-yaml-box" style="display: none;">
 							<p class="ai-hint">여기서 고친 글자는 [저장] 때 그대로 저장됩니다(주석 포함). 그림에 반영하려면 [그림에 반영]을 누르십시오.

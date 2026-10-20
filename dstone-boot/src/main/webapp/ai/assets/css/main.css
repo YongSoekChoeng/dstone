@@ -415,17 +415,6 @@
 	height: 100%;
 }
 
-.wd-minimap {
-	position: absolute;
-	right: 10px;
-	bottom: 10px;
-	border: 1px solid var(--cs-border);
-	border-radius: 8px;
-	background: var(--cs-surface);
-	box-shadow: var(--cs-shadow);
-	overflow: hidden;
-}
-
 .wd-yaml-box .ai-hint {
 	margin-top: 0;
 }

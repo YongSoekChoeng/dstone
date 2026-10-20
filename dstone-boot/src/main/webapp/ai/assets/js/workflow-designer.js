@@ -109,7 +109,6 @@ var DstoneAiDesigner = (function () {
 		els.status = document.getElementById("wd-status");
 		els.message = document.getElementById("wd-message");
 		els.canvas = document.getElementById("wd-canvas");
-		els.minimap = document.getElementById("wd-minimap");
 		els.props = document.getElementById("wd-props");
 		els.yaml = document.getElementById("wd-yaml");
 		els.yamlNote = document.getElementById("wd-yaml-note");
@@ -907,7 +906,7 @@ var DstoneAiDesigner = (function () {
 	function createGraph() {
 		graph = new X6.Graph({
 			container: els.canvas,
-			// YAML 탭으로 바꾸면 그림 칸이 숨어 크기가 0이 된다. 자동 크기 맞춤은 그때 미니맵 계산을 망가뜨리므로, 보일 때만 직접 맞춘다(fitCanvas).
+			// YAML 탭으로 바꾸면 그림 칸이 숨어 크기가 0이 된다. 자동 크기 맞춤은 그때 크기 계산이 망가지므로, 보일 때만 직접 맞춘다(fitCanvas).
 			autoResize: false,
 			width: els.canvas.clientWidth,
 			height: els.canvas.clientHeight,
@@ -952,7 +951,6 @@ var DstoneAiDesigner = (function () {
 			}
 		});
 		window.addEventListener("resize", fitCanvas);
-		graph.use(new X6.MiniMap({ container: els.minimap, width: 180, height: 120, padding: 10 }));
 
 		dnd = new X6.Dnd({
 			target: graph,
