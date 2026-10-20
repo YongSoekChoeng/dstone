@@ -60,6 +60,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<h3>WorkFlow 실행 관리</h3>
 						<p>진행 중인 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다.</p>
 					</a>
+					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/designer/designer">
+						<h3>Workflow 디자이너</h3>
+						<p>Workflow 정의를 그림으로 보고, step을 끌어다 놓고 화살표로 이어 고칩니다. 저장하면 엔진이 검사한 뒤 바로 반영합니다.</p>
+					</a>
 				</div>
 			</section>
 					</div>

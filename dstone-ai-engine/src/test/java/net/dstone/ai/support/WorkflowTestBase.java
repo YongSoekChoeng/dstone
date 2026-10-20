@@ -26,7 +26,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  * <pre>
  * Workflow 테스트의 부모 클래스입니다. 서버 포트는 열지 않고(webEnvironment = NONE) Spring 컨텍스트만 띄웁니다.
  *
- * 띄우는 순서와 쓰는 파일은 운영과 같습니다. 정의 파일은 src/main/resources/definitions, 설정은 conf/application.yml과
+ * 띄우는 순서와 쓰는 파일은 운영과 같습니다. 정의 파일은 conf/definitions, 설정은 conf/application.yml과
  * conf/log4j2.xml, 환경값은 conf/env{-profile}.properties입니다(테스트용 사본은 없습니다). 레지스트리가 기동 검증을 하고
  * Tool과 MCP 서버를 붙입니다. 바깥 시스템(DB, Redis, LLM)만 TestEngineConfig의 대역으로 바뀌고, 그에 필요한 설정 몇 개만
  * 아래 properties로 덮어씁니다. 로그도 운영 설정대로 ${APP_HOME}/LOGS/dstone-ai-engine/execution/execution.log에 남습니다. 컨텍스트는 테스트 클래스끼리 함께 씁니다

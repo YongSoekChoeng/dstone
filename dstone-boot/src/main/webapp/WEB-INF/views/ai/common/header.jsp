@@ -19,6 +19,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 										<a href="<%=linkBase%>ai/chat/chat" class="<%=(currentLink.equals("ai/chat/chat")?"current-page-item":"")%>">채팅</a>
 										<a href="<%=linkBase%>ai/workflow/workflow" class="<%=(currentLink.equals("ai/workflow/workflow")?"current-page-item":"")%>">Workflow 테스트</a>
 										<a href="<%=linkBase%>ai/admin/workflow/workflow" class="<%=(currentLink.equals("ai/admin/workflow/workflow")?"current-page-item":"")%>">Workflow 실행 관리</a>
+										<a href="<%=linkBase%>ai/designer/designer" class="<%=(currentLink.equals("ai/designer/designer")?"current-page-item":"")%>">Workflow 디자이너</a>
 										<a href="<%=linkBase%>knowledge/index">코드 분석(Knowledge)</a>
 									</nav>
 								</header>

@@ -15,7 +15,7 @@ import net.dstone.ai.support.WorkflowTestBase;
 
 /**
  * <pre>
- * 정의 파일(src/main/resources/definitions) 전체가 기동 검증을 통과하는지 봅니다.
+ * 정의 파일(conf/definitions) 전체가 기동 검증을 통과하는지 봅니다.
  *
  * 검증 자체는 엔진이 켜질 때 레지스트리가 합니다(키 모양, 표현식, state 선언, 흐름, Agent/Tool 계약).
  * 하나라도 틀리면 컨텍스트가 뜨지 않아 이 클래스의 모든 테스트가 실패하고, 로그 마지막 예외에 어느 파일의 어디가 틀렸는지 나옵니다.

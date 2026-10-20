@@ -34,6 +34,7 @@ import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
 import net.dstone.ai.common.expression.ContextResolver;
+import net.dstone.ai.common.loader.DefinitionFile;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.common.core.BaseObject;
@@ -42,8 +43,9 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * 모든 Workflow 정보를 담아두고, id로 찾아 주는 등록소입니다. YamlDefinitionLoader가 classpath:definitions/workflows/**.yml
- * 파일들을 읽어서 WorkFlowDefinition으로 바꾸면, 이 WorkFlowRegistry가 앱이 기동될 때 그것들을 한 번 모아서 보관합니다.
+ * 모든 Workflow 정보를 담아두고, id로 찾아 주는 등록소입니다. YamlDefinitionLoader가 정의 폴더의 workflows/**.yml
+ * 파일들을 읽어서 WorkFlowDefinition으로 바꾸면, 이 WorkFlowRegistry가 앱이 기동될 때 그것들을 모아서 보관합니다.
+ * 기동 뒤에 파일을 고치면 DefinitionReloader가 check()로 검사하고, 전부 통과했을 때만 install()로 바꿔 끼웁니다.
  * api.controller.WorkFlowController는 이 레지스트리에서 WorkFlowDefinition을 찾아 runtime.workflow.WorkFlowExecutor에게
  * 넘겨 실행을 시킵니다.
  *
@@ -107,7 +109,15 @@ public class WorkFlowRegistry extends BaseObject {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	private Map<String, WorkFlowDefinition> byId = Map.of();
+	/** 등록된 Workflow(id → 정의). 다시 읽을 때 통째로 바꿔 끼우므로, 읽는 쪽은 항상 한 시점의 온전한 맵을 봅니다. */
+	private volatile Map<String, WorkFlowDefinition> byId = Map.of();
+	/** 등록된 Workflow가 들어 있는 파일(id → 정의 폴더 기준 경로) */
+	private volatile Map<String, String> pathById = Map.of();
+	/**
+	 * check()가 도는 동안 step의 agent를 찾아볼 Agent 맵입니다. 다시 읽을 때는 아직 등록되지 않은 새 Agent들로 검사해야 해서,
+	 * 등록된 Agent(AgentRegistry) 대신 이것을 봅니다. check()는 synchronized라 한 번에 하나만 씁니다.
+	 */
+	private Map<String, AgentDefinition> checkingAgents = Map.of();
 
 	/**
 	 * <pre>
@@ -123,24 +133,89 @@ public class WorkFlowRegistry extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 앱이 기동될 때 한 번 호출되어, workflows/**.yml에 정의된 Workflow를 전부 읽고 검사한 뒤 id를 키로 하는 맵에 채워 넣습니다.
+	 * 앱이 기동될 때 한 번 호출되어, workflows/**.yml에 정의된 Workflow를 전부 읽고 검사한 뒤 등록합니다.
 	 * 검사 규칙은 클래스 설명을 참고하세요. 오류가 하나라도 있으면 기동 자체를 실패시킵니다.
 	 * </pre>
 	 */
 	@PostConstruct
 	public void load() {
-		Map<String, WorkFlowDefinition> resolved = new HashMap<>();
-		for (WorkFlowDefinition definition : this.loader.loadWorkflows()) {
-			if (StringUtil.isEmpty(definition.id()) || definition.steps() == null || definition.steps().isEmpty()) {
-				throw new IllegalStateException("workflows/**.yml 파일에는 id와 steps가 모두 있어야 합니다: " + definition);
+		List<DefinitionFile<WorkFlowDefinition>> files = this.loader.loadWorkflows();
+		this.install(files, this.check(files, this.agentRegistry.all()));
+	}
+
+	/**
+	 * <pre>
+	 * Workflow들을 검사하고, 통과하면 id → 정의 맵을 돌려줍니다. 등록은 하지 않습니다(install()이 합니다).
+	 * step이 부르는 Agent는 agents에서 찾습니다. 다시 읽기(DefinitionReloader)는 아직 등록하지 않은 새 Agent 맵을 넘깁니다.
+	 * 오류가 있으면 IllegalStateException입니다.
+	 * </pre>
+	 *
+	 * @param files  검사할 Workflow 파일들
+	 * @param agents step의 agent를 찾아볼 Agent 맵(id → 정의)
+	 */
+	public synchronized Map<String, WorkFlowDefinition> check(List<DefinitionFile<WorkFlowDefinition>> files, Map<String, AgentDefinition> agents) {
+		this.checkingAgents = agents;
+		try {
+			Map<String, WorkFlowDefinition> resolved = new HashMap<>();
+			Map<String, String> paths = new HashMap<>();
+			for (DefinitionFile<WorkFlowDefinition> file : files) {
+				WorkFlowDefinition definition = file.definition();
+				if (StringUtil.isEmpty(definition.id()) || definition.steps() == null || definition.steps().isEmpty()) {
+					throw new IllegalStateException(file.path() + " - Workflow 파일에는 id와 steps가 모두 있어야 합니다.");
+				}
+				if (resolved.putIfAbsent(definition.id(), definition) != null) {
+					throw new IllegalStateException("workflow id가 중복 등록되었습니다: " + definition.id() + " (" + paths.get(definition.id()) + ", " + file.path() + ")");
+				}
+				paths.put(definition.id(), file.path());
+				this.validate(definition);
 			}
-			if (resolved.putIfAbsent(definition.id(), definition) != null) {
-				throw new IllegalStateException("workflow id가 중복 등록되었습니다: " + definition.id());
-			}
-			this.validate(definition);
+			return resolved;
+		} finally {
+			this.checkingAgents = Map.of();
 		}
-		this.byId = Map.copyOf(resolved);
+	}
+
+	/**
+	 * <pre>
+	 * check()를 통과한 Workflow들로 등록 내용을 통째로 바꿉니다.
+	 * 이미 돌고 있는 실행은 시작할 때 받은 정의로 계속 돌고, 승인 대기에서 다시 시작하는 실행은 바뀐 정의를 씁니다
+	 * (실행은 시작할 때의 정의에 묶여 있지 않습니다).
+	 * </pre>
+	 *
+	 * @param files   등록할 Workflow 파일들(경로를 기억해 둡니다)
+	 * @param checked check()가 돌려준 맵
+	 */
+	public void install(List<DefinitionFile<WorkFlowDefinition>> files, Map<String, WorkFlowDefinition> checked) {
+		Map<String, String> paths = new HashMap<>();
+		for (DefinitionFile<WorkFlowDefinition> file : files) {
+			paths.put(file.definition().id(), file.path());
+		}
+		this.byId = Map.copyOf(checked);
+		this.pathById = Map.copyOf(paths);
 		LogUtil.sysout("dstone-ai-engine workflow: 등록된 Workflow = " + (this.byId.isEmpty() ? "없음" : this.byId.keySet()));
+	}
+
+	/** 지금 등록된 Workflow 전부(id → 정의)입니다. 바뀌지 않는 맵입니다. */
+	public Map<String, WorkFlowDefinition> all() {
+		return this.byId;
+	}
+
+	/**
+	 * Workflow가 들어 있는 파일의 경로(정의 폴더 기준)입니다. 없는 id면 null입니다.
+	 *
+	 * @param workflowId Workflow id
+	 */
+	public String pathOf(String workflowId) {
+		return this.pathById.get(workflowId);
+	}
+
+	/**
+	 * check() 중에 step의 agent가 가리키는 Agent를 찾습니다. 없으면 null입니다.
+	 *
+	 * @param agentId Agent id
+	 */
+	private AgentDefinition agentOf(String agentId) {
+		return this.checkingAgents.get(agentId);
 	}
 
 	/**
@@ -408,7 +483,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * @param engineOwnsOutput 답의 모양을 엔진이 정하는 step(SUPERVISOR/ROUTER)인지 여부
 	 */
 	private void checkAgentCall(WorkFlowDefinition definition, StepDefinition step, String agentId, Object input, boolean engineOwnsOutput) {
-		AgentDefinition agent = this.agentRegistry.find(agentId);
+		AgentDefinition agent = this.agentOf(agentId);
 		if (agent == null) {
 			throw this.error(definition, step, "agents/**.md에 '" + agentId + "' Agent가 없습니다.");
 		}
@@ -758,7 +833,7 @@ public class WorkFlowRegistry extends BaseObject {
 		Map<String, Object> schema;
 		switch (step) {
 			case AgentStepDefinition agentStep:
-				schema = this.agentRegistry.find(agentStep.agent()).outputSchema();
+				schema = this.agentOf(agentStep.agent()).outputSchema();
 				break;
 			case SupervisorStepDefinition supervisor:
 				schema = JsonSchemaUtil.verdict();
@@ -788,13 +863,13 @@ public class WorkFlowRegistry extends BaseObject {
 		Map<String, Object> schema;
 		switch (step) {
 			case AgentStepDefinition agentStep:
-				schema = this.agentRegistry.find(agentStep.agent()).inputSchema();
+				schema = this.agentOf(agentStep.agent()).inputSchema();
 				break;
 			case SupervisorStepDefinition supervisor:
-				schema = this.agentRegistry.find(supervisor.agent()).inputSchema();
+				schema = this.agentOf(supervisor.agent()).inputSchema();
 				break;
 			case RouterStepDefinition router:
-				schema = this.agentRegistry.find(router.agent()).inputSchema();
+				schema = this.agentOf(router.agent()).inputSchema();
 				break;
 			case ToolStepDefinition tool:
 				schema = this.toolInputSchema(tool.tool());

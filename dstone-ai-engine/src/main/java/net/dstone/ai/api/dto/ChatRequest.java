@@ -11,7 +11,7 @@ import java.util.Map;
  * 관리합니다.
  *
  * agent는 꼭 있어야 하는 값입니다. common.registry.AgentRegistry에 미리 등록해 둔 Agent(즉
- * resources/definitions/agents/**.md 파일로 만들어 둔 Agent)의 이름을 넣어야 합니다.
+ * conf/definitions/agents/**.md 파일로 만들어 둔 Agent)의 이름을 넣어야 합니다.
  *
  * ragEnabled와 toolsEnabled는 둘 다 비워 두면(null) Agent 정의에 적힌 값을 그대로 씁니다.
  * ragEnabled에 true나 false를 직접 넣으면, 이번 요청 한 번만 Agent 정의값 대신 그 값을 씁니다.

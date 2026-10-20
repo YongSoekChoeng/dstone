@@ -128,6 +128,18 @@
 	box-shadow: inset 0px 0px 0px 1px #3ecceb;
 }
 
+/* 덜 중요한 단추(흰 바탕). AI 화면과 코드 분석 화면이 같이 쓴다 */
+.ai-body button.kn-plain {
+	background-image: none;
+	background-color: #fff;
+	box-shadow: none;
+	color: #007897;
+}
+
+.ai-body button.kn-plain:hover {
+	background-color: #e8f3f5;
+}
+
 .ai-body button:disabled {
 	background-image: none;
 	background-color: #c0c0c0;
@@ -606,4 +618,315 @@
 
 .workflow-history-jobid:hover {
 	text-decoration: underline;
+}
+
+/* ---------- Workflow 디자이너(ai/designer/designer.jsp) ---------- */
+
+.wd-wrap {
+	display: flex;
+	gap: 12px;
+	align-items: stretch;
+}
+
+.wd-palette {
+	flex: 0 0 150px;
+	font-size: 0.85em;
+}
+
+.wd-palette-title {
+	margin: 0 0 6px 0;
+	font-weight: bold;
+	color: #4e4d43;
+}
+
+.wd-palette-item {
+	border: 1.5px solid #878e83;
+	border-radius: 8px;
+	padding: 6px 8px;
+	margin-bottom: 8px;
+	cursor: grab;
+	user-select: none;
+	line-height: 1.3;
+	background: #fff;
+}
+
+.wd-palette-item b {
+	display: block;
+	font-size: 1em;
+}
+
+.wd-palette-item span {
+	color: #878e83;
+	font-size: 0.9em;
+}
+
+/* step 종류별 색. workflow-designer.js 의 TYPE_COLORS 와 같은 색 */
+.wd-type-AGENT { border-color: #2563eb; background-color: #eff6ff; }
+.wd-type-SUPERVISOR { border-color: #7c3aed; background-color: #f5f3ff; }
+.wd-type-ROUTER { border-color: #d97706; background-color: #fffbeb; }
+.wd-type-TOOL { border-color: #059669; background-color: #ecfdf5; }
+.wd-type-APPROVAL { border-color: #db2777; background-color: #fdf2f8; }
+
+.wd-legend {
+	margin: 0 0 4px 0;
+	color: #4e4d43;
+	line-height: 1.4;
+}
+
+.wd-legend-line {
+	display: inline-block;
+	width: 26px;
+	height: 0;
+	margin-right: 6px;
+	vertical-align: middle;
+	border-top: 2px solid #4e4d43;
+}
+
+.wd-legend-fail { border-top: 2px dashed #b91c1c; }
+.wd-legend-route { border-top-color: #d97706; }
+
+.wd-palette-help {
+	margin-top: 10px;
+	color: #878e83;
+	line-height: 1.5;
+}
+
+.wd-center {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.wd-tabs {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+}
+
+.ai-body button.wd-tab {
+	background-image: none;
+	background-color: #fff;
+	color: #007897;
+	box-shadow: none;
+}
+
+.ai-body button.wd-tab-on {
+	background-image: linear-gradient(to bottom, #008dad, #007b9d);
+	color: #fff;
+}
+
+.wd-tabs .ai-hint {
+	margin: 0 0 0 8px;
+}
+
+.wd-graph-box {
+	position: relative;
+	height: 72vh;
+	min-height: 480px;
+	border: 1px solid #d1cfcd;
+}
+
+.wd-canvas {
+	width: 100%;
+	height: 100%;
+}
+
+.wd-minimap {
+	position: absolute;
+	right: 8px;
+	bottom: 8px;
+	border: 1px solid #d1cfcd;
+	background: #fff;
+}
+
+.wd-yaml-box .ai-hint {
+	margin-top: 0;
+}
+
+.wd-yaml {
+	width: 100%;
+	height: 66vh;
+	min-height: 440px;
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 13px;
+	line-height: 1.45;
+	letter-spacing: 0;
+	white-space: pre;
+	tab-size: 2;
+	border: 1px solid #d1cfcd;
+	padding: 8px;
+}
+
+.wd-props {
+	flex: 0 0 360px;
+	max-height: calc(72vh + 40px);
+	overflow-y: auto;
+	font-size: 0.9em;
+	padding-right: 4px;
+}
+
+.wd-props h4 {
+	margin: 0 0 8px 0;
+	color: #007897;
+	font-size: 1.15em;
+}
+
+.wd-props h4 + .ai-hint {
+	margin-top: 0;
+}
+
+.wd-field {
+	margin-bottom: 10px;
+}
+
+.wd-field > label {
+	display: block;
+	font-weight: bold;
+	color: #4e4d43;
+	margin-bottom: 2px;
+}
+
+.wd-help {
+	font-weight: normal;
+	color: #878e83;
+	font-size: 0.9em;
+}
+
+.wd-field input[type="text"],
+.wd-field input[type="number"],
+.wd-field select,
+.wd-field textarea {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid #d1cfcd;
+	padding: 4px 6px;
+	background: #fff;
+	color: #283121;
+	font-size: 1em;
+}
+
+.wd-field textarea.wd-code {
+	font-family: "SFMono-Regular", Consolas, monospace;
+	font-size: 12px;
+	letter-spacing: 0;
+	white-space: pre;
+}
+
+.wd-field label.wd-check {
+	font-weight: normal;
+}
+
+.wd-desc {
+	margin: 4px 0;
+	color: #4e4d43;
+}
+
+.wd-schema {
+	margin: 4px 0;
+	padding: 6px;
+	background: #f4f6f0;
+	font-size: 11px;
+	white-space: pre-wrap;
+	max-height: 140px;
+	overflow-y: auto;
+}
+
+.wd-inline-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.wd-type-chip {
+	display: inline-block;
+	padding: 1px 8px;
+	border: 1.5px solid;
+	border-radius: 10px;
+	font-size: 0.85em;
+	color: #283121;
+}
+
+.wd-edge-list {
+	margin: 0 0 6px 0;
+	padding-left: 18px;
+	list-style: disc;
+}
+
+.wd-message {
+	margin-top: 8px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.wd-message:empty {
+	display: none;
+}
+
+.wd-message-ok {
+	color: #15803d;
+}
+
+.wd-message-info {
+	color: #4e4d43;
+}
+
+.wd-message-error {
+	color: #b91c1c;
+	background: #fef2f2;
+	border: 1px solid #fecaca;
+	padding: 8px 10px;
+}
+
+.wd-dialog {
+	position: fixed;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.35);
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.wd-dialog-box {
+	background: #fff;
+	width: min(960px, 94vw);
+	max-height: 92vh;
+	overflow-y: auto;
+	padding: 18px 20px;
+	border-radius: 6px;
+}
+
+.wd-dialog-box h3 {
+	margin: 0 0 10px 0;
+	color: #007897;
+}
+
+.wd-agent-text {
+	height: 55vh;
+	min-height: 300px;
+	margin-top: 8px;
+}
+
+/* 좁은 화면에서는 위아래로 쌓는다 */
+@media screen and (max-width: 1100px) {
+	.wd-wrap {
+		flex-direction: column;
+	}
+
+	.wd-palette,
+	.wd-props {
+		flex: none;
+		max-height: none;
+	}
+}
+
+.wd-tabs label.wd-hide-fail {
+	margin-left: 10px;
+	font-size: 0.85em;
+	color: #4e4d43;
+	white-space: nowrap;
 }

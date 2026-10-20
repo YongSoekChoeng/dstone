@@ -43,6 +43,13 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 													</li>
 												</ul>
 											</div>
+											<div class="col-3 col-6-medium col-12-small">
+												<ul class="link-list">
+													<li>
+														<a href="<%=linkBase%>ai/designer/designer" class="<%=(currentLink.equals("ai/designer/designer")?"current-page-item":"")%>">Workflow 디자이너</a>
+													</li>
+												</ul>
+											</div>
 										</div>
 									</div>
 								</section>

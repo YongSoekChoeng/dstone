@@ -11,7 +11,7 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  * Agent는 "LLM에게 어떤 역할과 규칙으로 일을 시킬지"를 적어 둔 설정 묶음입니다.
  *
  * ■ 어디서 오나
- *   resources/definitions/agents/**.md 파일 하나 = Agent 하나입니다.
+ *   conf/definitions/agents/**.md 파일 하나 = Agent 하나입니다.
  *   common.loader.YamlDefinitionLoader가 파일을 읽어 이 record를 채웁니다.
  *
  * ■ 누가 부르나

@@ -3,13 +3,18 @@ package net.dstone.ai.common.loader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
@@ -34,7 +39,10 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * Workflow, Agent, McpServer의 정의는 application.yml 안에 넣지 않고, resources/definitions 폴더 아래에 따로 둡니다.
+ * Workflow, Agent, McpServer의 정의는 application.yml 안에 넣지 않고, 정의 폴더 아래에 따로 둡니다.
+ * 정의 폴더는 설정 dstone.ai.definition.location으로 정하고, 기본값은 conf/definitions(file:${APP_CONF_DIR}/definitions)입니다.
+ * jar 밖에 두는 이유는 화면(dstone-boot의 Workflow 디자이너)에서 고쳐 저장하고, 엔진을 다시 띄우지 않고 다시 읽기 위해서입니다
+ * (common.registry.DefinitionReloader).
  *
  *   definitions/
  *     workflows/**\/*.yml            Workflow 하나에 파일 하나
@@ -44,7 +52,8 @@ import net.dstone.common.utils.StringUtil;
  * 이렇게 하는 핵심 이유는, 새로 하나를 만들거나 기존 것을 바꿀 때 application.yml과 자바 코드를 건드리지 않고 파일만 추가하거나 고치면 되게 하려는 것입니다.
  * Agent 하나의 계약(input/output)과 프롬프트를 한 파일에 두는 것은, Agent가 무엇을 받고 무엇을 돌려주는지를 파일 하나만 열어 보고 알 수 있게 하려는 것입니다.
  * 입출력 모양은 짧은 타입 표기(Picoschema, common.schema.Picoschema)로 그 자리에 적습니다. 따로 두는 스키마 파일은 없습니다.
- * 이 클래스가 기동 시점에 common.registry.WorkFlowRegistry / AgentRegistry / McpServerRegistry에게 호출되어 이 파일들을 실제로 읽어 들입니다.
+ * 이 클래스가 기동 시점에 common.registry.WorkFlowRegistry / AgentRegistry / McpServerRegistry에게 호출되어 이 파일들을 실제로 읽어 들이고,
+ * 다시 읽을 때는 common.registry.DefinitionReloader가 부릅니다.
  * 경로에 쓰인 "**"는 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, 도메인별로 서브 디렉토리를 나눠서(예: workflows/billing/) 관리해도 됩니다.
  * 파일 맨 위에 workflow: / agent: / mcpServer: 같은 감싸는 키는 없습니다. 무엇의 정의인지는 폴더로 구분합니다.
  *
@@ -74,13 +83,16 @@ public class YamlDefinitionLoader extends BaseObject {
 	/** Agent 파일에서 프롬프트가 들어가는 record 필드 이름입니다. 머리말에는 적지 않습니다. */
 	private static final String PROMPT_KEY = "prompt";
 
+	@Autowired
+	private Environment environment;
+
 	private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
 	private final Yaml yaml = new Yaml();
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/**
 	 * <pre>
-	 * 읽히지 않을 정의 파일이 있으면 기동을 멈춥니다. 그런 파일은 아예 읽히지 않으므로,
+	 * 읽히지 않을 정의 파일이 있으면 기동을 멈춥니다(다시 읽을 때도 같은 검사를 합니다). 그런 파일은 아예 읽히지 않으므로,
 	 * 그냥 두면 "Agent가 없다"는 엉뚱한 오류만 보게 됩니다.
 	 * - agents/ 아래의 .yml(Agent는 .md 한 파일입니다)
 	 * - prompts/, schemas/ 폴더 안의 파일(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다)
@@ -89,9 +101,13 @@ public class YamlDefinitionLoader extends BaseObject {
 	@PostConstruct
 	public void checkOldFiles() {
 		List<String> found = new ArrayList<>();
-		this.collectOld(Constants.Definition.AGENT_LOCATION + "/**/*.yml", null, found);
+		for (Resource resource : this.resolve(Constants.Definition.AGENT_DIR + "/**/*.yml")) {
+			found.add(this.relativePath(resource));
+		}
 		for (String dir : Constants.Definition.OLD_DIRS) {
-			this.collectOld(Constants.Definition.ROOT_LOCATION + "/" + dir + "/**/*.*", null, found);
+			for (Resource resource : this.resolve(dir + "/**/*.*")) {
+				found.add(this.relativePath(resource));
+			}
 		}
 		if (!found.isEmpty()) {
 			throw new IllegalStateException("예전 형식의 정의 파일이 남아 있습니다: " + found
@@ -101,98 +117,161 @@ public class YamlDefinitionLoader extends BaseObject {
 	}
 
 	/**
-	 * 패턴에 맞는 파일 중 이름이 keepSuffix로 끝나지 않는 것을 found에 담습니다(keepSuffix가 null이면 전부).
-	 *
-	 * @param pattern    찾을 classpath 패턴
-	 * @param keepSuffix 읽히는 파일의 이름 끝(이것으로 끝나면 건너뜀)
-	 * @param found      찾은 파일을 담을 목록
+	 * <pre>
+	 * 정의 폴더의 위치입니다(설정 dstone.ai.definition.location). 끝의 / 는 뗍니다.
+	 * 설정이 없으면 conf 폴더 아래의 definitions(file:${APP_CONF_DIR}/definitions)입니다.
+	 * </pre>
 	 */
-	private void collectOld(String pattern, String keepSuffix, List<String> found) {
-		for (Resource resource : this.resolve(pattern)) {
-			String name = resource.getFilename();
-			if (name != null && (keepSuffix == null || !name.endsWith(keepSuffix))) {
-				found.add(this.relativePath(resource, "definitions"));
-			}
+	public String location() {
+		String location = this.environment.getProperty(Constants.Definition.LOCATION_PROPERTY);
+		if (StringUtil.isEmpty(location)) {
+			location = "file:" + System.getProperty("APP_CONF_DIR", "conf") + "/definitions";
 		}
+		location = location.trim().replace('\\', '/');
+		while (location.endsWith("/")) {
+			location = location.substring(0, location.length() - 1);
+		}
+		return location;
 	}
 
-	/** classpath 상의 workflows/**.yml 파일을 전부 찾아서 읽고, WorkFlowDefinition 목록으로 돌려줍니다. */
-	@SuppressWarnings("unchecked")
-	public List<WorkFlowDefinition> loadWorkflows() {
-		List<WorkFlowDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.WORKFLOW_LOCATION_PATTERN)) {
-			if( !resource.isReadable() ) {continue;}
-			Map<String, Object> root = this.readYaml(resource);
-			this.checkOldWorkflowShape(resource, root);
-			WorkFlowDefinition definition = this.bind(resource, root, WorkFlowDefinition.class);
-			definitions.add(definition);
-			LogUtil.sysout("dstone-ai-engine loader: workflow[" + definition.id() + "] <- " + this.relativePath(resource, "definitions"));
+	/**
+	 * <pre>
+	 * 정의 폴더를 디스크 경로로 돌려줍니다. 위치가 file: 이 아니면(예: classpath:) null입니다.
+	 * 파일을 저장할 수 있는지는 이 값이 있는지로 정합니다.
+	 * </pre>
+	 */
+	public Path rootDir() {
+		String location = this.location();
+		if (!location.startsWith("file:")) {
+			return null;
 		}
-		return definitions;
+		return Paths.get(location.substring("file:".length())).toAbsolutePath().normalize();
 	}
 
-	/** classpath 상의 agents/**.md 파일을 전부 찾아서 읽고, AgentDefinition 목록으로 돌려줍니다. */
-	public List<AgentDefinition> loadAgents() {
-		List<AgentDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.AGENT_LOCATION_PATTERN)) {
-			if( !resource.isReadable() ) {continue;}
-			Map<String, Object> root = this.readAgentFile(resource);
-			AgentDefinition definition = this.bind(resource, root, AgentDefinition.class);
-			definitions.add(definition);
-			LogUtil.sysout("dstone-ai-engine loader: agent[" + definition.id() + "] <- " + this.relativePath(resource, "definitions"));
+	/** 정의 폴더 아래 workflows/**.yml 파일을 전부 읽고 WorkFlowDefinition으로 바꿉니다. */
+	public List<DefinitionFile<WorkFlowDefinition>> loadWorkflows() {
+		List<DefinitionFile<WorkFlowDefinition>> definitions = new ArrayList<>();
+		for (DefinitionText file : this.readTexts(Constants.Definition.WORKFLOW_DIR, Constants.Definition.WORKFLOW_SUFFIX)) {
+			definitions.add(new DefinitionFile<>(file.path(), this.parseWorkflow(file)));
 		}
 		return definitions;
 	}
 
-	/** classpath 상의 mcp/**.yml 파일을 전부 찾아서 읽고, McpServerDefinition 목록으로 돌려줍니다. */
+	/** 정의 폴더 아래 agents/**.md 파일을 전부 읽고 AgentDefinition으로 바꿉니다. */
+	public List<DefinitionFile<AgentDefinition>> loadAgents() {
+		List<DefinitionFile<AgentDefinition>> definitions = new ArrayList<>();
+		for (DefinitionText file : this.readTexts(Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX)) {
+			definitions.add(new DefinitionFile<>(file.path(), this.parseAgent(file)));
+		}
+		return definitions;
+	}
+
+	/** 정의 폴더 아래 mcp/**.yml 파일을 전부 읽고 McpServerDefinition 목록으로 돌려줍니다. */
 	public List<McpServerDefinition> loadMcpServers() {
 		List<McpServerDefinition> definitions = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.MCP_LOCATION_PATTERN)) {
-			if( !resource.isReadable() ) {continue;}
-			Map<String, Object> root = this.readYaml(resource);
-			this.checkNoWrapper(resource, root, "mcpServer");
-			McpServerDefinition definition = this.bind(resource, root, McpServerDefinition.class);
+		for (DefinitionText file : this.readTexts(Constants.Definition.MCP_DIR, Constants.Definition.MCP_SUFFIX)) {
+			Map<String, Object> root = this.parseYaml(file.path(), file.text());
+			this.checkNoWrapper(file.path(), root, "mcpServer");
+			McpServerDefinition definition = this.bind(file.path(), root, McpServerDefinition.class);
 			definitions.add(definition);
-			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + definition.id() + "] <- " + this.relativePath(resource, "definitions"));
+			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + definition.id() + "] <- " + file.path());
 		}
 		return definitions;
 	}
 
 	/**
 	 * <pre>
-	 * 주어진 classpath 패턴에 맞는 리소스 파일들을 전부 찾아 돌려줍니다. 패턴의 맨 앞 폴더가 없으면 빈 배열입니다.
+	 * 한 종류(workflows, agents, mcp)의 정의 파일을 전부 글자 그대로 읽습니다. 경로 순으로 돌려줍니다.
+	 * 다시 읽기(common.registry.DefinitionReloader)는 이 목록에 화면이 보낸 글자를 끼워 넣어 검사합니다.
 	 * </pre>
 	 *
-	 * @param locationPattern 리소스를 찾을 classpath 패턴
+	 * @param dir    정의 폴더 아래의 종류 폴더(workflows, agents, mcp)
+	 * @param suffix 파일 이름 꼬리(.yml, .md)
 	 */
-	private Resource[] resolve(String locationPattern) {
+	public List<DefinitionText> readTexts(String dir, String suffix) {
+		List<DefinitionText> texts = new ArrayList<>();
+		for (Resource resource : this.resolve(dir + "/**/*" + suffix)) {
+			if (resource.isReadable()) {
+				texts.add(new DefinitionText(this.relativePath(resource), this.readText(resource)));
+			}
+		}
+		texts.sort(new Comparator<DefinitionText>() {
+			@Override
+			public int compare(DefinitionText a, DefinitionText b) {
+				return a.path().compareTo(b.path());
+			}
+		});
+		return texts;
+	}
+
+	/**
+	 * <pre>
+	 * Workflow 파일 하나의 글자를 WorkFlowDefinition으로 바꿉니다. 틀렸으면 경로와 이유를 담은 IllegalStateException입니다.
+	 * </pre>
+	 *
+	 * @param file 정의 폴더 기준 경로와 파일 내용
+	 */
+	public WorkFlowDefinition parseWorkflow(DefinitionText file) {
+		Map<String, Object> root = this.parseYaml(file.path(), file.text());
+		this.checkOldWorkflowShape(file.path(), root);
+		WorkFlowDefinition definition = this.bind(file.path(), root, WorkFlowDefinition.class);
+		LogUtil.sysout("dstone-ai-engine loader: workflow[" + definition.id() + "] <- " + file.path());
+		return definition;
+	}
+
+	/**
+	 * <pre>
+	 * Agent 파일 하나의 글자를 AgentDefinition으로 바꿉니다. 틀렸으면 경로와 이유를 담은 IllegalStateException입니다.
+	 * </pre>
+	 *
+	 * @param file 정의 폴더 기준 경로와 파일 내용
+	 */
+	public AgentDefinition parseAgent(DefinitionText file) {
+		Map<String, Object> root = this.readAgentFile(file.path(), file.text());
+		AgentDefinition definition = this.bind(file.path(), root, AgentDefinition.class);
+		LogUtil.sysout("dstone-ai-engine loader: agent[" + definition.id() + "] <- " + file.path());
+		return definition;
+	}
+
+	/**
+	 * <pre>
+	 * 정의 폴더 아래에서 패턴에 맞는 파일들을 전부 찾아 돌려줍니다. 종류 폴더가 없으면 빈 배열입니다.
+	 * </pre>
+	 *
+	 * @param relativePattern 정의 폴더 기준 패턴. 예: workflows/**\/*.yml
+	 */
+	private Resource[] resolve(String relativePattern) {
 		Resource[] resources = new Resource[0];
+		String locationPattern = this.location() + "/" + relativePattern;
 		try {
 			String baseDir = locationPattern.substring(0, locationPattern.indexOf("/**"));
 			if( this.resourceResolver.getResource(baseDir).exists() ) {
 				resources = this.resourceResolver.getResources(locationPattern);
 			}
 		} catch (Exception e) {
-			throw new IllegalStateException(locationPattern + " 리소스를 찾는 중 오류가 발생했습니다.", e);
+			throw new IllegalStateException(locationPattern + " 파일을 찾는 중 오류가 발생했습니다.", e);
 		}
 		return resources;
 	}
 
 	/**
 	 * <pre>
-	 * 로그에 남길 경로 문자열을 만들어 줍니다. 로그에 파일 이름만 찍으면, 서브 디렉토리로 나눠서
-	 * 관리하는 경우(이름은 같고 폴더만 다른 경우) 어느 파일을 말하는 건지 구분할 수가 없습니다. 그래서 baseDir 이후의
-	 * 경로까지 포함해서 보여줍니다. 혹시 URL을 읽지 못하는 등 예외가 생기면, 최소한 파일 이름만이라도 남깁니다.
+	 * 정의 폴더 기준의 경로를 만듭니다(예: workflows/sample/sample-chain.yml). 로그와 오류 문장, 화면의 파일 경로에 씁니다.
+	 * 파일 이름만 쓰면 이름은 같고 폴더만 다른 경우 어느 파일인지 구분할 수 없습니다.
+	 * 디스크 파일이 아니면(classpath 안 등) 경로에서 마지막 /definitions/ 뒤를 씁니다.
 	 * </pre>
 	 *
-	 * @param resource 경로를 구할 대상 리소스
-	 * @param baseDir  경로를 보여 주기 시작할 디렉토리 이름(definitions)
+	 * @param resource 경로를 구할 파일
 	 */
-	private String relativePath(Resource resource, String baseDir) {
+	private String relativePath(Resource resource) {
 		try {
+			Path root = this.rootDir();
+			if (root != null && resource.isFile()) {
+				return root.relativize(resource.getFile().toPath().toAbsolutePath().normalize()).toString().replace('\\', '/');
+			}
 			String path = resource.getURL().getPath().replace('\\', '/');
-			int index = path.lastIndexOf("/" + baseDir + "/");
-			return index < 0 ? resource.getFilename() : path.substring(index + 1);
+			int index = path.lastIndexOf("/definitions/");
+			return index < 0 ? resource.getFilename() : path.substring(index + "/definitions/".length());
 		} catch (IOException e) {
 			return resource.getFilename();
 		}
@@ -218,30 +297,21 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * YAML 글자를 Map으로 읽고 ${VAR_NAME}을 채웁니다. 최상위가 맵이 아니면 오류입니다.
 	 * </pre>
 	 *
-	 * @param resource 오류 문장에 보여 줄 파일
+	 * @param where    오류 문장에 보여 줄 파일 경로
 	 * @param text     YAML 글자
 	 */
 	@SuppressWarnings("unchecked")
-	private Map<String, Object> parseYaml(Resource resource, String text) {
+	private Map<String, Object> parseYaml(String where, String text) {
 		Object raw;
 		try {
 			raw = this.yaml.load(text);
 		} catch (RuntimeException e) {
-			throw new IllegalStateException(resource.getDescription() + "가 올바른 YAML이 아닙니다 - " + e.getMessage(), e);
+			throw new IllegalStateException(where + "가 올바른 YAML이 아닙니다 - " + e.getMessage(), e);
 		}
 		if (!(raw instanceof Map)) {
-			throw new IllegalStateException(resource.getDescription() + "의 맨 위가 키: 값 모양이 아닙니다.");
+			throw new IllegalStateException(where + "의 맨 위가 키: 값 모양이 아닙니다.");
 		}
 		return (Map<String, Object>) this.resolvePlaceholders(raw);
-	}
-
-	/**
-	 * YAML 파일 하나를 Map으로 읽습니다.
-	 *
-	 * @param resource 읽을 리소스 파일
-	 */
-	private Map<String, Object> readYaml(Resource resource) {
-		return this.parseYaml(resource, this.readText(resource));
 	}
 
 	/**
@@ -250,10 +320,10 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * 프롬프트는 앞뒤 빈 줄만 떼고 그대로 prompt에 넣습니다(${VAR_NAME}은 채웁니다).
 	 * </pre>
 	 *
-	 * @param resource 읽을 Agent 파일
+	 * @param where 오류 문장에 보여 줄 파일 경로
+	 * @param text  Agent 파일 내용
 	 */
-	private Map<String, Object> readAgentFile(Resource resource) {
-		String text = this.readText(resource);
+	private Map<String, Object> readAgentFile(String where, String text) {
 		if (text.startsWith("\uFEFF")) {
 			text = text.substring(1);
 		}
@@ -263,14 +333,14 @@ public class YamlDefinitionLoader extends BaseObject {
 			start++;
 		}
 		if (start >= lines.length || !FRONT_MATTER_LINE.equals(lines[start].strip())) {
-			throw new IllegalStateException(resource.getDescription() + " - 첫 줄이 --- 여야 합니다(--- 와 --- 사이에 설정, 그 아래에 프롬프트).");
+			throw new IllegalStateException(where + " - 첫 줄이 --- 여야 합니다(--- 와 --- 사이에 설정, 그 아래에 프롬프트).");
 		}
 		int end = start + 1;
 		while (end < lines.length && !FRONT_MATTER_LINE.equals(lines[end].strip())) {
 			end++;
 		}
 		if (end >= lines.length) {
-			throw new IllegalStateException(resource.getDescription() + " - 머리말을 닫는 --- 줄이 없습니다.");
+			throw new IllegalStateException(where + " - 머리말을 닫는 --- 줄이 없습니다.");
 		}
 		StringBuilder header = new StringBuilder();
 		for (int i = start + 1; i < end; i++) {
@@ -280,13 +350,13 @@ public class YamlDefinitionLoader extends BaseObject {
 		for (int i = end + 1; i < lines.length; i++) {
 			body.append(lines[i]).append('\n');
 		}
-		Map<String, Object> root = this.parseYaml(resource, header.toString());
-		this.checkNoWrapper(resource, root, "agent");
+		Map<String, Object> root = this.parseYaml(where, header.toString());
+		this.checkNoWrapper(where, root, "agent");
 		if (root.containsKey(PROMPT_KEY)) {
-			throw new IllegalStateException(resource.getDescription() + " - [prompt] 머리말에는 prompt를 적지 않습니다. 프롬프트는 머리말을 닫는 --- 아래에 그대로 적습니다.");
+			throw new IllegalStateException(where + " - [prompt] 머리말에는 prompt를 적지 않습니다. 프롬프트는 머리말을 닫는 --- 아래에 그대로 적습니다.");
 		}
-		this.checkOldContract(resource, root, "input");
-		this.checkOldContract(resource, root, "output");
+		this.checkOldContract(where, root, "input");
+		this.checkOldContract(where, root, "output");
 		root.put(PROMPT_KEY, this.resolvePlaceholders(body.toString().strip()));
 		return root;
 	}
@@ -296,13 +366,13 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * 맨 위에 감싸는 키(workflow:, agent:, mcpServer:) 하나만 있으면 안내와 함께 멈춥니다.
 	 * </pre>
 	 *
-	 * @param resource 오류 문장에 보여 줄 파일
+	 * @param where    오류 문장에 보여 줄 파일 경로
 	 * @param root     파일 전체
 	 * @param wrapper  감싸는 키 이름
 	 */
-	private void checkNoWrapper(Resource resource, Map<String, Object> root, String wrapper) {
+	private void checkNoWrapper(String where, Map<String, Object> root, String wrapper) {
 		if (root.size() == 1 && root.get(wrapper) instanceof Map) {
-			throw new IllegalStateException(resource.getDescription() + " - 맨 위의 " + wrapper + ": 는 없어졌습니다. 그 아래 내용을 한 단계 내어 맨 위에 적으십시오.");
+			throw new IllegalStateException(where + " - 맨 위의 " + wrapper + ": 는 없어졌습니다. 그 아래 내용을 한 단계 내어 맨 위에 적으십시오.");
 		}
 	}
 
@@ -311,13 +381,13 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * Agent의 input/output을 {schema: 파일}이나 {format, schema, validation} 모양으로 적었으면 타입 표기로 적으라고 알려줍니다.
 	 * </pre>
 	 *
-	 * @param resource 오류 문장에 보여 줄 파일
+	 * @param where    오류 문장에 보여 줄 파일 경로
 	 * @param root     머리말 전체
 	 * @param key      input 또는 output
 	 */
-	private void checkOldContract(Resource resource, Map<String, Object> root, String key) {
+	private void checkOldContract(String where, Map<String, Object> root, String key) {
 		if (root.get(key) instanceof Map<?, ?> contract && (contract.containsKey("schema") || contract.containsKey("format") || contract.containsKey("validation"))) {
-			throw new IllegalStateException(resource.getDescription() + " - [" + key + "] schema/format/validation은 없어졌습니다. 모양을 그 자리에 짧은 타입 표기로 적습니다."
+			throw new IllegalStateException(where + " - [" + key + "] schema/format/validation은 없어졌습니다. 모양을 그 자리에 짧은 타입 표기로 적습니다."
 				+ " 예: " + key + ": string, 설명  또는  필드를 한 줄에 하나씩: " + key + ":\n  path: string, 파일 경로\n  frs(array, FR 번호): string"
 				+ (key.equals("output") ? " (필드를 적으면 JSON으로 받아 검사하고, 적지 않거나 string이면 글자로 받습니다)" : ""));
 		}
@@ -328,12 +398,11 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * Workflow에 지원하지 않는 모양이 있으면 바른 모양을 알려줍니다(감싸는 workflow:, output.value, state.schema, input.schema).
 	 * </pre>
 	 *
-	 * @param resource 오류 문장에 보여 줄 파일
+	 * @param where    오류 문장에 보여 줄 파일 경로
 	 * @param root     파일 전체
 	 */
-	private void checkOldWorkflowShape(Resource resource, Map<String, Object> root) {
-		this.checkNoWrapper(resource, root, "workflow");
-		String where = resource.getDescription();
+	private void checkOldWorkflowShape(String where, Map<String, Object> root) {
+		this.checkNoWrapper(where, root, "workflow");
 		if (root.containsKey("output")) {
 			throw new IllegalStateException(where + " - [output] Workflow의 output은 return으로 바뀌었습니다. 예: return: ${state.result} (output.value에 적던 값을 그대로 적습니다. output.schema 검사는 없어졌습니다)");
 		}
@@ -353,15 +422,15 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * 잘못된 파일을 조용히 건너뛰면 그 Workflow나 Agent가 등록되지 않은 이유를 찾기 어렵기 때문입니다.
 	 * </pre>
 	 *
-	 * @param resource 오류 문장에 보여 줄 파일
+	 * @param where    오류 문장에 보여 줄 파일 경로
 	 * @param root     읽어 둔 파일 내용
 	 * @param type     바인딩할 대상 타입
 	 */
-	private <T> T bind(Resource resource, Map<String, Object> root, Class<T> type) {
+	private <T> T bind(String where, Map<String, Object> root, Class<T> type) {
 		try {
 			return this.objectMapper.convertValue(root, type);
 		} catch (IllegalArgumentException e) {
-			throw new IllegalStateException(resource.getDescription() + "를 읽는 중 오류가 발생했습니다 - " + this.describe(e), e);
+			throw new IllegalStateException(where + "를 읽는 중 오류가 발생했습니다 - " + this.describe(e), e);
 		}
 	}
 

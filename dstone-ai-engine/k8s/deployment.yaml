@@ -22,6 +22,9 @@ spec:
           volumeMounts:
             - name: conf
               mountPath: /app/dstone/dstone-ai-engine/conf
+            # 정의 파일 폴더. conf/ 아래(ConfigMap, 읽기 전용)에 둘 수 없어 따로 붙인다.
+            - name: definitions
+              mountPath: /app/dstone/dstone-ai-engine/definitions
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -38,3 +41,9 @@ spec:
         - name: conf
           configMap:
             name: dstone-ai-engine-conf
+        # 노드(kind라면 kind 노드 컨테이너) 안의 경로다. kind에서 WSL의 /app/dstone/dstone-ai-engine/conf/definitions를 쓰려면
+        # 클러스터를 만들 때 extraMounts로 그 폴더를 노드의 같은 경로에 붙여야 한다(docs/04.cloud-architecture.md 참고).
+        - name: definitions
+          hostPath:
+            path: /app/dstone/dstone-ai-engine/conf/definitions
+            type: Directory

@@ -202,28 +202,31 @@ public final class Constants {
 
 	/**
 	 * <pre>
-	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 파일들을 찾을 때 쓰는 위치 패턴입니다.
-	 * 정의 파일은 모두 resources/definitions 아래에 두고, 종류는 폴더로 구분합니다.
+	 * common.loader.YamlDefinitionLoader가 Workflow/Agent/McpServer 정의 파일들을 찾을 때 쓰는 위치입니다.
+	 * 정의 파일은 모두 정의 폴더(설정 dstone.ai.definition.location, 기본값은 conf/definitions) 아래에 두고, 종류는 폴더로 구분합니다.
 	 *   workflows/**\/*.yml            Workflow 하나에 파일 하나
 	 *   agents/**\/*.md                Agent 하나에 파일 하나(머리말 = 설정, 본문 = 시스템 프롬프트)
 	 *   mcp/**\/*.yml                  MCP 서버 하나에 파일 하나
 	 * 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서 workflows/agents/mcp 폴더
 	 * 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
+	 * 정의 폴더가 jar 밖에 있어서 화면(dstone-boot의 Workflow 디자이너)에서 고쳐 저장할 수 있고, 엔진을 다시 띄우지 않고 다시 읽을 수 있습니다.
+	 * 아래 경로는 모두 정의 폴더 기준의 상대 경로입니다.
 	 * </pre>
 	 */
 	public static final class Definition {
-		/** 정의 파일을 모아 두는 맨 위 폴더입니다(classpath 기준). */
-		public final static String ROOT_LOCATION = "classpath:definitions";
-		public final static String WORKFLOW_LOCATION = ROOT_LOCATION + "/workflows";
+		/** 정의 폴더 위치를 담는 설정 키입니다. 예: file:${APP_CONF_DIR}/definitions */
+		public final static String LOCATION_PROPERTY = "dstone.ai.definition.location";
+		/** 화면에서 정의 파일을 고쳐 저장할 수 있는지 정하는 설정 키입니다(기본값 false). 끄면 조회와 다시 읽기만 됩니다. */
+		public final static String EDIT_ENABLED_PROPERTY = "dstone.ai.definition.edit-enabled";
+		public final static String WORKFLOW_DIR = "workflows";
 		public final static String WORKFLOW_SUFFIX = ".yml";
-		public final static String WORKFLOW_LOCATION_PATTERN = WORKFLOW_LOCATION + "/**/*" + WORKFLOW_SUFFIX;
-		public final static String AGENT_LOCATION = ROOT_LOCATION + "/agents";
+		public final static String AGENT_DIR = "agents";
 		public final static String AGENT_SUFFIX = ".md";
-		public final static String AGENT_LOCATION_PATTERN = AGENT_LOCATION + "/**/*" + AGENT_SUFFIX;
-		public final static String MCP_LOCATION = ROOT_LOCATION + "/mcp";
+		public final static String MCP_DIR = "mcp";
 		public final static String MCP_SUFFIX = ".yml";
-		public final static String MCP_LOCATION_PATTERN = MCP_LOCATION + "/**/*" + MCP_SUFFIX;
-		/** 정의 파일 폴더 아래에 있으면 안 되는 폴더입니다(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다). 이 안에 파일이 있으면 기동을 멈춥니다. */
+		/** Workflow 파일 옆에 두는, 화면의 노드 위치를 담은 파일의 꼬리입니다(예: sample-chain.yml → sample-chain.layout.json). 엔진은 읽지 않습니다. */
+		public final static String LAYOUT_SUFFIX = ".layout.json";
+		/** 정의 폴더 아래에 있으면 안 되는 폴더입니다(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다). 이 안에 파일이 있으면 기동을 멈춥니다. */
 		public final static List<String> OLD_DIRS = List.of("prompts", "schemas");
 	}
 

@@ -28,17 +28,7 @@
 	min-width: 260px;
 }
 
-/* 단추의 기본 모양(청록색)은 ai/assets/css/main.css 에 있다. kn-plain 은 덜 중요한 단추(흰 바탕) */
-.ai-body button.kn-plain {
-	background-image: none;
-	background-color: #fff;
-	box-shadow: none;
-	color: #007897;
-}
-
-.ai-body button.kn-plain:hover {
-	background-color: #e8f3f5;
-}
+/* 단추의 기본 모양(청록색)과 덜 중요한 단추(kn-plain, 흰 바탕)는 ai/assets/css/main.css 에 있다 */
 
 .kn-row button:disabled {
 	cursor: default;

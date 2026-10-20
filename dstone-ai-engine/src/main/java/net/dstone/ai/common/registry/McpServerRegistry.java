@@ -17,7 +17,7 @@ import net.dstone.common.utils.StringUtil;
 /**
  * <pre>
  * MCP 서버 정보를 담아두는 등록소입니다. 
- * 로딩 순서는 YamlDefinitionLoader가 classpath:definitions/mcp/**.yml 파일들을 읽어서 McpServerDefinition으로 바꾸고, 
+ * 로딩 순서는 YamlDefinitionLoader가 정의 폴더(conf/definitions)의 mcp/**.yml 파일들을 읽어서 McpServerDefinition으로 바꾸고, 
  * 이 McpServerRegistry가 앱이 기동될 때 그것들을 한 번 모아서 보관하는 식입니다.
  *
  * WorkFlowRegistry나 AgentRegistry와 달리, 여기에는 "caller별로 이 id를 써도 되는지"를 검사하는 조회 기능이 없습니다. 

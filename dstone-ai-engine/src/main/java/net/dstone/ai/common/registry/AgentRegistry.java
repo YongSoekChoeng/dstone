@@ -14,6 +14,7 @@ import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.loader.DefinitionFile;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.common.core.BaseObject;
@@ -23,8 +24,9 @@ import net.dstone.common.utils.StringUtil;
 /**
  * <pre>
  * 모든 Agent 정보를 담아두고, id로 찾아 주는 등록소입니다. 
- * 로딩 순서는 YamlDefinitionLoader가 classpath:definitions/agents/**.md 파일들을 읽어서 AgentDefinition으로 바꾸고, 
- * 이 AgentRegistry가 그 AgentDefinition들을 앱이 기동될 때 한 번 모아서 보관하는 식입니다.
+ * 로딩 순서는 YamlDefinitionLoader가 정의 폴더의 agents/**.md 파일들을 읽어서 AgentDefinition으로 바꾸고, 
+ * 이 AgentRegistry가 그 AgentDefinition들을 앱이 기동될 때 모아서 보관하는 식입니다.
+ * 기동 뒤에 파일을 고치면 DefinitionReloader가 check()로 검사하고, 전부 통과했을 때만 install()로 바꿔 끼웁니다.
  *
  * Agent를 찾아 쓰는 경로는 두 가지입니다. 
  * api.controller.ChatController가 request.agent() 값으로 직접 찾는 경우와, 
@@ -59,21 +61,40 @@ public class AgentRegistry extends BaseObject {
 	/** Sub Agent는 LLM에게 Tool로 보이므로, id가 LLM provider의 Tool 이름 규칙(영문/숫자/밑줄/하이픈, 64자 이하)에 맞아야 합니다. */
 	private static final Pattern TOOL_NAME = Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
-	private Map<String, AgentDefinition> byId = Map.of();
+	/** 등록된 Agent(id → 정의). 다시 읽을 때 통째로 바꿔 끼우므로, 읽는 쪽은 항상 한 시점의 온전한 맵을 봅니다. */
+	private volatile Map<String, AgentDefinition> byId = Map.of();
+	/** 등록된 Agent가 들어 있는 파일(id → 정의 폴더 기준 경로) */
+	private volatile Map<String, String> pathById = Map.of();
 
 	/**
 	 * <pre>
-	 * 앱이 기동될 때 한 번 호출되어, agents/**.md에 정의된 Agent를 전부 읽어 id를 키로 하는 맵에 채워 넣습니다. 
-	 * id, version, prompt가 비어 있는 Agent가 있거나, 같은 id의 Agent가 둘 이상 있거나, 
-	 * input/output 스키마가 올바른 JSON Schema가 아니면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
+	 * 앱이 기동될 때 한 번 호출되어, agents/**.md에 정의된 Agent를 전부 읽고 검사한 뒤 등록합니다.
+	 * 오류가 하나라도 있으면 기동 자체를 실패시켜서 잘못된 설정이 조용히 넘어가지 않게 합니다.
 	 * </pre>
 	 */
 	@PostConstruct
 	public void load() {
+		List<DefinitionFile<AgentDefinition>> files = this.loader.loadAgents();
+		this.install(files, this.check(files));
+	}
+
+	/**
+	 * <pre>
+	 * Agent들을 검사하고, 통과하면 id → 정의 맵을 돌려줍니다. 등록은 하지 않습니다(install()이 합니다).
+	 * id, version, prompt가 비어 있는 Agent가 있거나, 같은 id의 Agent가 둘 이상 있거나,
+	 * input/output 스키마가 올바른 JSON Schema가 아니면 IllegalStateException입니다.
+	 * 다시 읽기(DefinitionReloader)가 바꿔 끼우기 전에 이것으로 먼저 검사합니다.
+	 * </pre>
+	 *
+	 * @param files 검사할 Agent 파일들
+	 */
+	public Map<String, AgentDefinition> check(List<DefinitionFile<AgentDefinition>> files) {
 		Map<String, AgentDefinition> resolved = new HashMap<>();
-		for (AgentDefinition definition : this.loader.loadAgents()) {
+		Map<String, String> paths = new HashMap<>();
+		for (DefinitionFile<AgentDefinition> file : files) {
+			AgentDefinition definition = file.definition();
 			if (StringUtil.isEmpty(definition.id())) {
-				throw new IllegalStateException("agents/**.md 머리말에는 id가 있어야 합니다: " + definition);
+				throw new IllegalStateException(file.path() + " - 머리말에는 id가 있어야 합니다.");
 			}
 			if (StringUtil.isEmpty(definition.version())) {
 				throw new IllegalStateException("agent[" + definition.id() + "]에 version이 없습니다. 예: version: \"1.0.0\"");
@@ -82,8 +103,9 @@ public class AgentRegistry extends BaseObject {
 				throw new IllegalStateException("agent[" + definition.id() + "]의 프롬프트가 비어 있습니다. Agent 파일에서 머리말(--- ... ---) 아래에 프롬프트를 적으십시오.");
 			}
 			if (resolved.putIfAbsent(definition.id(), definition) != null) {
-				throw new IllegalStateException("agent id가 중복 등록되었습니다: " + definition.id());
+				throw new IllegalStateException("agent id가 중복 등록되었습니다: " + definition.id() + " (" + paths.get(definition.id()) + ", " + file.path() + ")");
 			}
+			paths.put(definition.id(), file.path());
 			this.checkSchema(definition, "input", definition.inputSchema());
 			this.checkSchema(definition, "output", definition.outputSchema());
 			this.checkCallOptions(definition);
@@ -94,8 +116,39 @@ public class AgentRegistry extends BaseObject {
 			this.checkTools(definition, registeredTools);
 			this.checkSubAgents(definition, resolved, registeredTools);
 		}
-		this.byId = Map.copyOf(resolved);
+		return resolved;
+	}
+
+	/**
+	 * <pre>
+	 * check()를 통과한 Agent들로 등록 내용을 통째로 바꿉니다.
+	 * </pre>
+	 *
+	 * @param files   등록할 Agent 파일들(경로를 기억해 둡니다)
+	 * @param checked check()가 돌려준 맵
+	 */
+	public void install(List<DefinitionFile<AgentDefinition>> files, Map<String, AgentDefinition> checked) {
+		Map<String, String> paths = new HashMap<>();
+		for (DefinitionFile<AgentDefinition> file : files) {
+			paths.put(file.definition().id(), file.path());
+		}
+		this.byId = Map.copyOf(checked);
+		this.pathById = Map.copyOf(paths);
 		LogUtil.sysout("dstone-ai-engine agent: 등록된 Agent = " + (this.byId.isEmpty() ? "없음" : this.byId.keySet()));
+	}
+
+	/** 지금 등록된 Agent 전부(id → 정의)입니다. 바뀌지 않는 맵입니다. */
+	public Map<String, AgentDefinition> all() {
+		return this.byId;
+	}
+
+	/**
+	 * Agent가 들어 있는 파일의 경로(정의 폴더 기준)입니다. 없는 id면 null입니다.
+	 *
+	 * @param agentId Agent id
+	 */
+	public String pathOf(String agentId) {
+		return this.pathById.get(agentId);
 	}
 
 	/**
