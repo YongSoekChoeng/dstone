@@ -3,25 +3,24 @@
 # 작업분류 Agent 입니다. 
 #   - 고객의 요청서를 내용을 읽고 신규개발/수정개발 여부를 판단합니다.
 #   - ROUTER 전용 Agent 이므로 output 을 정의하지 않습니다. (엔진이 {route, reason}으로 고정)
-################################################################################################################ 
+################################################################################################################
 id: sm-decide-job-kind-agent
 version: 1.0.0
-# role: 
-description: ROUTER Step 전용 - 요청서를 읽고 처리 경로(신규개발 / 수정개발)를 고른다.
+description: ROUTER Step 전용 - 요청서를 읽고 처리 경로(신규개발 / 일반)를 고른다.
 model:
-  # name: 
-  # temperature: 
-  # 이중 하나 선택 : none/low/medium/high
-  reasoning: low 
+  reasoning: low
 input: string
-context: # context는 엔진이 LLM 호출 전에 자동으로 한 번 찾아 붙이고
-  sources: [retrievedDocuments]
-tools: # tools는 LLM이 필요하다고 판단할 때만 직접 부름
-  allowed: [knowledgeSearch, searchInFiles]
+context:
+  sources:
+    - retrievedDocuments
+tools:
+  allowed:
+    - knowledgeSearch
+    - searchInFiles
 execution:
   maxAttempts: 2
-  timeoutSeconds: 120
   onInvalidOutput: RETRY
+  timeoutSeconds: 120
 ---
 [역할] 
 너는 고객의 요청서를 읽고 처리 경로를 고르는 분류기다. 소스를 조사하지 않는다. 요청서에 적힌 말만 보고 정한다.
@@ -33,5 +32,5 @@ execution:
 [판단 기준]
 - 신규 개발과 오류 수정/기능 변경이 섞여 있으면 일반이다.
 - 어느 쪽인지 판단이 서지 않으면 일반이다(일반 경로는 조사와 리뷰를 더 넓게 한다).
-- route에는 신규개발 / 일반 가운데 하나만 그대로 적어라.
+- route에는 신규개발 / 일반가운데 하나만 그대로 적어라.
 - reason에는 그렇게 고른 근거를 요청서의 말을 옮겨 한 줄로 적어라.
