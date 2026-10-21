@@ -136,7 +136,6 @@ public class SubAgentToolCallback implements ToolCallback {
 				this.subAgent
 				, null					// conversationId. 자식은 매번 새 대화로 시작합니다(부모 대화를 이어받지 않습니다).
 				, this.caller
-				, null					// variables. 채팅 API 전용입니다.
 				, input
 				, null					// ragOverride
 				, null					// toolsOverride

@@ -825,6 +825,493 @@
 	line-height: 1.6;
 }
 
+/* 프롬프트 칸: 가이드 단추, 눌러서 넣는 자리, 실시간 검사 */
+.ai-body button.wd-guide-btn {
+	margin-left: auto;
+	height: 28px;
+	padding: 0 12px;
+	font-size: 12px;
+	color: var(--cs-primary);
+	border-color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+}
+
+.ai-body button.wd-guide-btn::before {
+	content: "?";
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	margin-right: 6px;
+	border-radius: 50%;
+	background: var(--cs-primary);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.wd-slot-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 14px;
+	margin: 0 0 8px;
+}
+
+.wd-slot-label {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--cs-muted);
+}
+
+.wd-slot-group {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+}
+
+.wd-slot-group > em {
+	font-style: normal;
+	font-size: 11.5px;
+	color: var(--cs-faint);
+	margin-right: 2px;
+}
+
+.ai-body button.wd-slot {
+	height: 24px;
+	min-width: 0;
+	padding: 0 8px;
+	border: 1px dashed var(--cs-border-strong);
+	border-radius: 6px;
+	background: var(--cs-surface);
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	color: var(--cs-primary);
+}
+
+.ai-body button.wd-slot:hover:not(:disabled) {
+	border-style: solid;
+	border-color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+}
+
+.ai-body button.wd-slot:disabled {
+	color: var(--cs-faint);
+	cursor: not-allowed;
+}
+
+.wd-prompt-lint:empty {
+	display: none;
+}
+
+.wd-prompt-lint {
+	margin-top: 8px;
+	padding: 8px 12px;
+	border-radius: var(--cs-radius-sm);
+	font-size: 12.5px;
+	line-height: 1.6;
+}
+
+.wd-prompt-lint-ok {
+	background: var(--cs-success-soft);
+	color: var(--cs-success);
+}
+
+.wd-prompt-lint-bad {
+	background: var(--cs-warning-soft);
+	border: 1px solid #f3d19c;
+	color: var(--cs-text-2);
+}
+
+.wd-prompt-lint-bad strong {
+	color: var(--cs-warning);
+	margin-right: 10px;
+}
+
+.ai-body .wd-prompt-lint-bad button {
+	height: 24px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wd-prompt-lint ul {
+	margin: 6px 0 0;
+	padding-left: 18px;
+}
+
+/* 입력·출력 작성 가이드 창 */
+.wd-guide-dialog {
+	z-index: 1020;
+}
+
+.wd-guide-box {
+	width: min(980px, 96vw);
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	padding: 0;
+}
+
+.wd-guide-head {
+	align-items: flex-start;
+	padding: 20px 24px 12px;
+	margin: 0;
+}
+
+.wd-guide-head .cs-eyebrow {
+	margin: 0 0 2px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--cs-primary);
+}
+
+.wd-guide-head h3 {
+	font-size: 19px;
+}
+
+.wd-guide-sub {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--cs-muted);
+}
+
+.wd-guide-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 0 24px 12px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.ai-body .wd-guide-nav button {
+	height: 28px;
+	padding: 0 12px;
+	border: 1px solid var(--cs-border);
+	border-radius: 999px;
+	background: var(--cs-surface-2);
+	font-size: 12.5px;
+	color: var(--cs-text-2);
+}
+
+.ai-body .wd-guide-nav button:hover {
+	border-color: var(--cs-primary);
+	color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+}
+
+.wd-guide-body {
+	overflow-y: auto;
+	padding: 4px 24px 24px;
+	font-size: 13.5px;
+	line-height: 1.7;
+	color: var(--cs-text-2);
+}
+
+.wd-guide-sec {
+	padding: 20px 0 6px;
+	border-top: 1px solid var(--cs-border);
+	scroll-margin-top: 8px;
+}
+
+.wd-guide-sec:first-child {
+	border-top: 0;
+}
+
+.wd-guide-sec h4 {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 12px;
+	font-size: 16px;
+	color: var(--cs-text);
+}
+
+.wd-guide-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: var(--cs-side-bg);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.wd-guide-sec h5 {
+	margin: 0 0 4px;
+	font-size: 13.5px;
+	color: var(--cs-text);
+}
+
+.wd-guide-sec p {
+	margin: 0 0 10px;
+}
+
+.wd-guide-rule {
+	padding: 10px 14px;
+	margin-bottom: 16px;
+	border-left: 4px solid var(--cs-primary);
+	border-radius: 0 var(--cs-radius-sm) var(--cs-radius-sm) 0;
+	background: var(--cs-primary-soft);
+	color: var(--cs-text);
+}
+
+/* 흐름: 단계마다 카드 하나, 사이에 화살표 */
+.wd-flow {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 22px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: none;
+}
+
+.wd-flow li {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 10px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface);
+	box-shadow: var(--cs-shadow-sm);
+}
+
+.wd-flow li + li::before {
+	content: "→";
+	position: absolute;
+	left: -18px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--cs-faint);
+	font-weight: 700;
+}
+
+.wd-flow b {
+	font-size: 12.5px;
+	color: var(--cs-text);
+}
+
+.wd-flow small {
+	font-size: 11.5px;
+	line-height: 1.45;
+	color: var(--cs-muted);
+}
+
+.wd-flow-tag {
+	align-self: flex-start;
+	padding: 0 7px;
+	border-radius: 4px;
+	background: var(--cs-surface-3);
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--cs-muted);
+}
+
+.wd-flow-in {
+	background: var(--cs-info-soft);
+	color: var(--cs-info);
+}
+
+.wd-flow-prompt {
+	background: var(--cs-primary-soft);
+	color: var(--cs-primary);
+}
+
+.wd-flow-out {
+	background: var(--cs-success-soft);
+	color: var(--cs-success);
+}
+
+.wd-guide-cols {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 10px;
+}
+
+.wd-guide-card {
+	padding: 12px 14px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface-2);
+}
+
+.wd-guide-card p {
+	margin: 0;
+	font-size: 13px;
+}
+
+.ai-body pre.wd-guide-code {
+	margin: 0 0 10px;
+	padding: 12px 14px;
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-side-bg);
+	color: #dbe4ef;
+	font-size: 12.5px;
+	line-height: 1.65;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.wd-guide-code .k {
+	color: #7dd3e6;
+}
+
+.wd-guide-code .c {
+	color: #7c8aa0;
+}
+
+.wd-guide-caption {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.wd-guide-caption small {
+	font-weight: normal;
+	font-size: 11.5px;
+	color: var(--cs-faint);
+}
+
+.wd-guide-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 12px;
+	font-size: 13px;
+}
+
+.wd-guide-table th,
+.wd-guide-table td {
+	padding: 7px 10px;
+	border-bottom: 1px solid var(--cs-border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.wd-guide-table th {
+	background: var(--cs-surface-2);
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.wd-guide-table td:first-child {
+	width: 34%;
+	white-space: nowrap;
+}
+
+.wd-guide-notes {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 13px;
+}
+
+.wd-guide-notes li + li {
+	margin-top: 4px;
+}
+
+/* 실수: 왼쪽 나쁜 예, 오른쪽 좋은 예 */
+.wd-guide-pairs {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 12px;
+}
+
+.wd-guide-bad,
+.wd-guide-good {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 12px;
+	border-radius: var(--cs-radius-sm);
+	border-left: 4px solid;
+}
+
+.wd-guide-bad {
+	border-left-color: var(--cs-danger);
+	background: var(--cs-danger-soft);
+}
+
+.wd-guide-good {
+	border-left-color: var(--cs-success);
+	background: var(--cs-success-soft);
+}
+
+.wd-guide-bad > span,
+.wd-guide-good > span {
+	font-size: 11.5px;
+	font-weight: 700;
+}
+
+.wd-guide-bad > span {
+	color: var(--cs-danger);
+}
+
+.wd-guide-bad > span::before {
+	content: "✕ ";
+}
+
+.wd-guide-good > span {
+	color: var(--cs-success);
+}
+
+.wd-guide-good > span::before {
+	content: "✓ ";
+}
+
+.ai-body .wd-guide-bad code,
+.ai-body .wd-guide-good code {
+	align-self: flex-start;
+	background: rgba(255, 255, 255, 0.7);
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.wd-guide-sec .wd-guide-foot {
+	margin-top: 12px;
+	font-size: 12.5px;
+	color: var(--cs-muted);
+}
+
+@media screen and (max-width: 860px) {
+	.wd-flow {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.wd-flow li + li::before {
+		display: none;
+	}
+
+	.wd-guide-cols,
+	.wd-guide-pairs {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.wd-guide-good {
+		margin-bottom: 8px;
+	}
+
+	.wd-guide-table td:first-child {
+		white-space: normal;
+	}
+
+	.wd-guide-head,
+	.wd-guide-nav,
+	.wd-guide-body {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+}
+
 @media screen and (max-width: 860px) {
 	.wd-agent-grid,
 	.wd-agent-grid-3 {

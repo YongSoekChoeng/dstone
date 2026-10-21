@@ -16,4 +16,4 @@ execution:
 너는 IN/OUT 을 체크하는 에이전트다.
 
 [역할]
-input 으로 들어오는 {inputStr}을  {div}를 구분자로 나누어서 스트링배열을 만든 후 {outArr}에 넣어서 반환한다.
+input 으로 들어오는 ${input.inputStr}을  ${input.div}를 구분자로 나누어서 스트링배열을 만든 후 ${output.outArr}에 넣어서 반환한다.

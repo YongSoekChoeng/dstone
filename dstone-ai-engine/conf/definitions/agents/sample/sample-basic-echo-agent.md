@@ -8,7 +8,7 @@
 #
 # 이 Agent를 쓰기 위해 미리 준비할 게 전혀 없다는 점이 특징입니다.
 # - input/output을 선언하지 않았으므로 둘 다 string입니다(글자를 받아 글자로 답함).
-# - 프롬프트 안에 {변수} 같은 템플릿 토큰이 하나도 없어서, 글자 하나만 넣어도 항상 정상적으로 동작합니다.
+# - 프롬프트 안에 ${input.필드} 같은 자리가 하나도 없어서, 글자 하나만 넣어도 항상 정상적으로 동작합니다.
 # - tools를 적지 않았으므로 Tool을 쓰지 않습니다(Tool을 실제로 호출해보는
 #   예시는 agents/sample/sample-tool-demo-agent.md과 workflows/sample/sample-agent-tool-calling.yml에 따로 있습니다).
 #

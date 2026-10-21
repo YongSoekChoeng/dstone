@@ -9,10 +9,9 @@
 # 안에 그대로 박아두고 호출하고 있습니다. 그래서:
 # - id 값을 "sample-general-chat"이 아닌 다른 값으로 바꾸면, 채팅 화면이 이 Agent를
 #   찾지 못해 동작하지 않게 됩니다.
-# - 프롬프트 안의 {role} 토큰을 지우면, 채팅 화면이 매번 role 값을 채워서 보내주고 있는데 그 값을
-#   쓸 자리가 없어져 버립니다. 이 Agent는 input이 string이라 {role}을 채울 input 필드가 없으므로, 채팅 API처럼
-#   variables로 role을 넘겨주는 곳에서만 씁니다. Workflow에서 역할을 바꿔 가며 부르고 싶다면 input을 object로
-#   선언한 Agent를 씁니다(예: sample-role-reply-agent.md - prompt 변수는 Agent가 받은 input 필드로 채워짐).
+# - 역할 문구는 프롬프트에 고정해 두었습니다. 프롬프트가 읽을 수 있는 값은 Agent가 받은 input뿐인데, 이 Agent는
+#   input이 글자 하나(사용자가 친 말)라서 채울 필드가 없습니다. 역할을 바꿔 가며 부르고 싶다면 input을 object로
+#   선언하고 프롬프트에 ${input.role}을 쓰는 Agent를 씁니다(예: sample-role-reply-agent.md).
 # - input/output을 선언하지 않았으므로 둘 다 string입니다(글자를 받아 글자로 답함).
 # - tools.allowed: ["*"]도 그대로 두고, context(RAG)는 적지 않아야 합니다. "*"는 등록된 Tool을 전부 쓸 수 있다는 뜻으로,
 #   무엇이든 물어볼 수 있는 범용 채팅 Agent라서 이렇게 열어 두었습니다(caller 화이트리스트는 그대로 적용됩니다).
@@ -25,5 +24,5 @@ description: 일반 대화용 기본 Agent. dstone-boot 채팅 화면이 사용�
 tools:
   allowed: ["*"]
 ---
-당신은 {role} 역할을 맡은 AI 어시스턴트입니다.
+당신은 친절한 AI 어시스턴트입니다.
 답변은 항상 한국어로, 간결하게 합니다.

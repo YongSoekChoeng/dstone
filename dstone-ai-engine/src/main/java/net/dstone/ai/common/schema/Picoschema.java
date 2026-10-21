@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
  * 정의 파일에 적은 짧은 타입 표기(Picoschema)를 표준 JSON Schema 맵으로 바꿉니다.
  * Agent의 input/output(agents/**.md 머리말)과 Workflow의 input(workflows/**.yml)이 이 표기를 씁니다.
  * 문법은 Google Dotprompt의 Picoschema를 그대로 따릅니다(https://google.github.io/dotprompt/reference/picoschema/).
+ * Dotprompt에서 가져온 것은 이 타입 표기뿐입니다. Agent 파일 형식과 프롬프트 문법(${input.필드})은 이 엔진 고유입니다.
  *
  *   input: string                          글자 하나
  *   input: string, 질문 한 줄               글자 하나 + 설명(쉼표 뒤는 전부 설명)

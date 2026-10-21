@@ -1,7 +1,6 @@
 package net.dstone.ai.runtime.agent;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,7 +13,6 @@ import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.model.tool.ToolCallLimitExceededException;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +27,7 @@ import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.exec.ExecContext;
 import net.dstone.ai.common.rag.RagRetrievalChain;
@@ -55,16 +54,16 @@ import reactor.core.publisher.Flux;
  *   답을 읽어서 검사한 값을 돌려줍니다(ask()).
  * - 어느 쪽이든 모양이 틀리면 AgentContractException을 던집니다.
  *
- * ## 프롬프트의 {변수}
- * Agent prompt 안의 {이름} 자리는 Agent가 받은 input으로 채웁니다(Spring AI PromptTemplate).
- * input이 object면 그 필드들이 변수가 되고, 채팅 API는 요청의 variables를 더 얹을 수 있습니다(같은 이름이면 variables가 이김).
- * 그래서 Agent 파일은 자기 input 스키마만 보고 prompt를 쓸 수 있습니다.
+ * ## 프롬프트의 ${ } 자리
+ * Agent prompt 안의 ${input.필드} 자리는 Agent가 받은 input으로, ${output.필드} 자리는 그 필드 이름으로 채웁니다
+ * (common.expression.PromptText, 문법은 Workflow 표현식과 같음). 프롬프트가 보는 값은 전부 input에서 오므로,
+ * Agent 파일은 자기 input/output 모양만 보고 prompt를 쓸 수 있습니다. 틀린 자리는 기동할 때 AgentRegistry가 막습니다.
  *
- *   input:                                      (Agent 파일 머리말)
+ *   input:                                            (Agent 파일 머리말)
  *     role: string
  *     message: string
  *   ---
- *   당신은 {role} 역할을 맡은 상담원입니다.       (Agent 파일 본문)
+ *   당신은 ${input.role} 역할을 맡은 상담원입니다.       (Agent 파일 본문)
  *
  * ## 시스템 프롬프트
  * 시스템 프롬프트는 항상 "엔진 규칙 + 업무 지시(Agent prompt)" 순서입니다(runtime.prompt.EnginePrompt).
@@ -105,9 +104,6 @@ public class AgentExecutor extends BaseObject {
 	/** 답 전체가 JSON 하나여야 합니다(JSON 뒤에 설명 글자가 더 붙으면 모양이 틀린 답으로 봅니다). */
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
-	/** prompt의 {변수명}으로 쓸 수 있는 이름입니다(영문/숫자/밑줄). */
-	private static final Pattern PROMPT_VARIABLE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-
 	@Autowired
 	private ChatClient chatClient;
 	@Autowired
@@ -135,7 +131,6 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent         호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables     프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
@@ -143,7 +138,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param engineRule    엔진 규칙에 덧붙일 문구(EnginePrompt.SUB_AGENT 등). 덧붙일 것이 없으면 null
 	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
-	public Object call(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
+	public Object call(AgentDefinition agent, String conversationId, String caller, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
 		String userMessage = this.toUserMessage(agent, input);
 		// 답이 계약(output 모양 등)을 지키지 않았을 때만 다시 부릅니다(execution.onInvalidOutput: RETRY, maxAttempts).
 		// 넣는 값이 틀린 것은 다시 불러도 같으므로 위에서 바로 실패하고, 외부 연결 오류 같은 예외는 잡지 않고 그대로 올려보냅니다.
@@ -151,7 +146,7 @@ public class AgentExecutor extends BaseObject {
 		AgentContractException last = null;
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
-				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride, engineRule);
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule);
 				return this.ask(spec, userMessage, agent.outputSchema());
 			} catch (AgentContractException e) {
 				last = e;
@@ -186,7 +181,7 @@ public class AgentExecutor extends BaseObject {
 	 */
 	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, this.promptVariables(input, null), null, null, null, engineRule);
+		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule);
 		return this.ask(spec, userMessage, schema);
 	}
 
@@ -202,19 +197,18 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent         호출할 Agent의 정의
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-	 * @param variables     프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
-	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Map<String, Object> variables, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
+	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride) {
 		if (!JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(agent.outputSchema()))) {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
-		return this.buildSpec(conversationId, caller, agent, this.promptVariables(input, variables), ragOverride, toolsOverride, modelOverride, null).user(userMessage).stream().content();
+		return this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null).user(userMessage).stream().content();
 	}
 
 	/**
@@ -236,34 +230,6 @@ public class AgentExecutor extends BaseObject {
 			throw new AgentContractException("agent[" + agent.id() + "]의 input 모양이 맞지 않습니다: " + problems);
 		}
 		return JsonSchemaUtil.toText(input);
-	}
-
-	/**
-	 * <pre>
-	 * Agent prompt의 {변수명}을 채울 값들을 만듭니다. input이 object면 그 필드들에 variables를 덮어 얹습니다.
-	 * 값이 글자가 아니면(리스트, 맵 등) JSON 글자로 바꿔 넣습니다.
-	 * 변수 이름으로 쓸 수 없는 필드(공백이나 점이 든 이름 등)는 PromptTemplate이 받지 못하므로 뺍니다.
-	 * </pre>
-	 *
-	 * @param input     Agent에게 넣을 값입니다.
-	 * @param variables 더 얹을 값들입니다(채팅 API의 variables, 없으면 null).
-	 */
-	@SuppressWarnings("unchecked")
-	private Map<String, Object> promptVariables(Object input, Map<String, Object> variables) {
-		Map<String, Object> merged = new LinkedHashMap<>();
-		if (input instanceof Map) {
-			merged.putAll((Map<String, Object>) input);
-		}
-		if (variables != null) {
-			merged.putAll(variables);
-		}
-		Map<String, Object> result = new LinkedHashMap<>();
-		for (Map.Entry<String, Object> entry : merged.entrySet()) {
-			if (PROMPT_VARIABLE_NAME.matcher(entry.getKey()).matches()) {
-				result.put(entry.getKey(), JsonSchemaUtil.toText(entry.getValue()));
-			}
-		}
-		return result;
 	}
 
 	/**
@@ -373,13 +339,13 @@ public class AgentExecutor extends BaseObject {
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param agent         호출할 Agent의 정의
-	 * @param variables     프롬프트 안의 {변수명} 자리에 채워 넣을 값들의 맵(promptVariables()로 만든 값)
+	 * @param input         Agent에게 넣을 값(프롬프트의 ${input…} 자리를 채웁니다)
 	 * @param ragOverride   이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Map<String, Object> variables, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
@@ -419,13 +385,12 @@ public class AgentExecutor extends BaseObject {
 		3. 시스템 프롬프트를 적용합니다.
 			- 순서는 "엔진 규칙(공통 + engineRule) → 업무 지시(Agent prompt)"입니다(EnginePrompt.compose()).
 			  엔진 규칙은 변수 치환을 거치지 않습니다. 변수는 Agent prompt에서만 채운 뒤 뒤에 이어 붙입니다.
-			- AgentDefinition.promptText()(Agent 파일의 본문)가 업무 지시입니다. 만약 그 문구 안에
-			  {role} 같은 {변수명} 토큰이 들어 있으면, Spring AI의 PromptTemplate이 variables의 값으로
-			  바꿔치기해 줍니다. variables는 이 Agent가 받은 input(object)의 필드들이고, 채팅 화면은
-			  요청의 variables를 더 얹습니다(promptVariables() 참고).
+			- AgentDefinition.promptText()(Agent 파일의 본문)가 업무 지시입니다. 그 안의 ${input.필드} 자리는
+			  이 Agent가 받은 input 값으로, ${output.필드} 자리는 그 필드 이름으로 채웁니다(PromptText.render()).
+			  없는 값은 빈 글자가 됩니다(${input.필드:기본값}이면 기본값).
 			- 이번에 처리할 데이터(input)는 사용자 메시지로도 함께 들어갑니다.
 		************************************************************************/
-		String taskPrompt = StringUtil.isEmpty(agent.promptText()) ? "" : new PromptTemplate(agent.promptText()).render(variables == null ? Map.of() : variables);
+		String taskPrompt = PromptText.render(agent.promptText(), input, agent.outputSchema());
 		spec = spec.system(EnginePrompt.compose(engineRule, taskPrompt));
 
 		/************************************************************************

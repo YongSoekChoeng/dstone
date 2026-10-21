@@ -54,7 +54,6 @@ public class AgentStepExecutor {
 					agent								// agent. 호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
 					, execution.conversationIdOf(step)	// conversationId. 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 					, execution.caller()				// caller. 이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
-					, null								// variables. 프롬프트의 {변수명}에 input 필드 말고 더 채울 값들(채팅 API 전용, 없으면 null)
 					, input								// input. Agent에게 넣을 값(Agent input 모양)
 					, null								// ragOverride 이번 호출에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씀(null이면 Agent 정의값을 그대로 사용)
 					, null								// toolsOverride false면 이번 호출만 Tool 없이 부름(null이면 Agent의 tools 목록 그대로)

@@ -141,6 +141,7 @@ var DstoneAiDesigner = (function () {
 		bindKeyboard();
 		bindAgentDialog();
 		bindPicker();
+		bindGuide();
 
 		window.addEventListener("beforeunload", function (e) {
 			if (dirty) {
@@ -2148,8 +2149,11 @@ var DstoneAiDesigner = (function () {
 					+ "</div>"
 				: "")
 			+ "</section>"
-			+ "<section class=\"wd-agent-sec\"><h4>프롬프트 <span class=\"wd-help\">시스템 프롬프트(파일의 --- 아래 전부)</span></h4>"
+			+ "<section class=\"wd-agent-sec\"><h4>프롬프트 <span class=\"wd-help\">시스템 프롬프트(파일의 --- 아래 전부)</span>"
+			+ "<button type=\"button\" class=\"kn-plain wd-guide-btn\" data-open-guide=\"1\">입력·출력 작성 가이드</button></h4>"
+			+ "<div class=\"wd-slot-bar\" id=\"wd-prompt-slots\"></div>"
 			+ "<textarea data-agent-body=\"1\" class=\"wd-code wd-agent-prompt\" spellcheck=\"false\">" + escapeHtml(agentDoc.body) + "</textarea>"
+			+ "<div class=\"wd-prompt-lint\" id=\"wd-prompt-lint\"></div>"
 			+ "</section>";
 		els.agentForm.innerHTML = html;
 
@@ -2163,6 +2167,8 @@ var DstoneAiDesigner = (function () {
 					agentChange(function () {
 						setValue(agentDoc.front, key, value);
 					}, false);
+					// 필드가 바뀌면 프롬프트에 넣을 수 있는 자리와 검사 결과도 바뀐다.
+					renderPromptAids();
 				}
 			});
 		});
@@ -2185,11 +2191,16 @@ var DstoneAiDesigner = (function () {
 				}
 			});
 		});
-		els.agentForm.querySelector("[data-agent-body]").addEventListener("change", function (e) {
+		var promptBox = els.agentForm.querySelector("[data-agent-body]");
+		promptBox.addEventListener("change", function (e) {
 			agentChange(function () {
 				agentDoc.body = e.target.value.replace(/\s+$/, "");
 			}, true);
 		});
+		// 치는 동안에도 잘못된 자리를 바로 알려 준다(저장되는 글자는 change 때 바뀐다).
+		promptBox.addEventListener("input", renderPromptLint);
+		els.agentForm.querySelector("[data-open-guide]").addEventListener("click", openGuide);
+		renderPromptAids();
 		// Tool, Sub Agent 목록 바꾸기(칩의 ×, 고르기 창)
 		function setList(name, values) {
 			agentChange(function () {
@@ -2244,6 +2255,239 @@ var DstoneAiDesigner = (function () {
 			}, false);
 			renderAgentForm();
 		});
+	}
+
+	/* ====================================================================
+	 * 프롬프트 도우미: 넣을 수 있는 자리(${input.필드} / ${output.필드}) 단추와 실시간 검사.
+	 * 규칙은 엔진의 common.expression.PromptText와 같고, 최종 판단은 엔진의 [검사]가 한다.
+	 * ==================================================================== */
+
+	/**
+	 * Picoschema 값에서 맨 위 필드 목록을 꺼냅니다. 필드 묶음이 아니면(글자 하나 등) null입니다.
+	 * 결과: [{name, desc, readable}] - readable은 ${input.이름}으로 읽을 수 있는 이름인지(공백 등이 없는지)
+	 */
+	function picoFields(raw) {
+		if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+			return null;
+		}
+		var fields = [];
+		Object.keys(raw).forEach(function (key) {
+			var name = key.trim();
+			var desc = "";
+			// 끝의 (array|object|enum, 설명) 묶음은 이름이 아니라 종류다.
+			var kinded = /^(.+?)\s*(\?)?\s*\((array|object|enum)\s*(?:,(.*))?\)$/.exec(name);
+			if (kinded) {
+				name = kinded[1];
+				desc = (kinded[4] || "").trim();
+			} else {
+				name = name.replace(/\s*\?$/, "");
+				var value = raw[key];
+				if (typeof value === "string" && value.indexOf(",") >= 0) {
+					desc = value.substring(value.indexOf(",") + 1).trim();
+				}
+			}
+			if (name === "(*)") {
+				return;
+			}
+			fields.push({ name: name, desc: desc, readable: /^[\w\-가-힣]+$/.test(name) });
+		});
+		return fields;
+	}
+
+	/** 지금 Agent의 input/output 필드 */
+	function agentSlots() {
+		var f = agentDoc && agentDoc.front ? agentDoc.front : {};
+		return { input: picoFields(f.input), output: picoFields(f.output) || [] };
+	}
+
+	function renderPromptAids() {
+		var bar = document.getElementById("wd-prompt-slots");
+		if (!bar) {
+			return;
+		}
+		var slots = agentSlots();
+		var html = "<span class=\"wd-slot-label\">눌러서 넣기</span>";
+		html += "<span class=\"wd-slot-group\"><em>받는 값</em>";
+		if (slots.input === null) {
+			html += slotButton("${input}", "Agent가 받은 글자 전체");
+		} else if (slots.input.length === 0) {
+			html += "<span class=\"ai-hint\">필드 없음</span>";
+		} else {
+			slots.input.forEach(function (field) {
+				html += slotButton("${input." + field.name + "}", field.desc, !field.readable);
+			});
+		}
+		html += "</span>";
+		if (slots.output.length > 0) {
+			html += "<span class=\"wd-slot-group\"><em>돌려줄 필드</em>";
+			slots.output.forEach(function (field) {
+				html += slotButton("${output." + field.name + "}", "돌려줄 필드 이름(" + field.name + ")으로 바뀝니다. " + field.desc, !field.readable);
+			});
+			html += "</span>";
+		}
+		bar.innerHTML = html;
+		Array.prototype.forEach.call(bar.querySelectorAll("[data-slot]"), function (button) {
+			button.addEventListener("click", function () {
+				insertIntoPrompt(button.getAttribute("data-slot"));
+			});
+		});
+		renderPromptLint();
+	}
+
+	function slotButton(text, title, off) {
+		return "<button type=\"button\" class=\"wd-slot\" data-slot=\"" + escapeHtml(text) + "\""
+			+ (off ? " disabled title=\"이름에 공백이나 괄호가 있어 프롬프트에서 읽을 수 없습니다\"" : " title=\"" + escapeHtml(title || "") + "\"")
+			+ ">" + escapeHtml(text) + "</button>";
+	}
+
+	/** 커서 자리에 글자를 넣고, 바뀐 프롬프트를 파일에도 반영합니다. */
+	function insertIntoPrompt(text) {
+		var box = els.agentForm.querySelector("[data-agent-body]");
+		var start = box.selectionStart;
+		var end = box.selectionEnd;
+		box.setRangeText(text, start, end, "end");
+		box.focus();
+		box.dispatchEvent(new Event("change"));
+		renderPromptLint();
+	}
+
+	/**
+	 * 프롬프트의 문제 목록입니다. 엔진 검사(PromptText.check)와 같은 규칙을 화면에서 미리 봅니다.
+	 * 결과: [{text, fix}] - fix가 있으면 예전 문법 {이름} → 새 문법으로 바꿀 수 있다는 뜻
+	 */
+	function promptProblems(body, slots) {
+		var problems = [];
+		var text = body.split("\\${").join("\u0000{");
+		var inputNames = slots.input === null ? null : slots.input.map(function (f) { return f.name; });
+		var outputNames = slots.output.map(function (f) { return f.name; });
+		var at = text.indexOf("${");
+		while (at >= 0) {
+			var stop = text.slice(at + 2).search(/[:}]/);
+			if (stop < 0) {
+				problems.push({ text: text.substr(at, 20) + "… - ${ 를 닫는 } 가 없습니다." });
+				break;
+			}
+			var path = text.substr(at + 2, stop).trim();
+			var shown = "${" + path + "}";
+			var segments = path.replace(/\[\d+\]/g, "").split(".");
+			var root = segments[0];
+			if (root === "input") {
+				if (segments.length > 1 && inputNames === null) {
+					problems.push({ text: shown + " - input이 글자 하나라 필드가 없습니다. ${input} 으로 읽습니다." });
+				} else if (segments.length > 1 && inputNames.indexOf(segments[1]) < 0) {
+					problems.push({ text: shown + " - input에는 " + (inputNames.length ? inputNames.join(", ") : "필드가") + (inputNames.length ? "만 있습니다." : " 없습니다.") });
+				}
+			} else if (root === "output") {
+				if (outputNames.length === 0) {
+					problems.push({ text: shown + " - output에 필드를 적지 않아서(답을 글자로 받음) 가리킬 필드가 없습니다." });
+				} else if (segments.length !== 2) {
+					problems.push({ text: shown + " - output은 필드 이름 하나까지만 적습니다. 예: ${output." + outputNames[0] + "}" });
+				} else if (outputNames.indexOf(segments[1]) < 0) {
+					problems.push({ text: shown + " - output에는 " + outputNames.join(", ") + "만 있습니다." });
+				}
+			} else if (!/^[A-Z0-9_]+$/.test(root)) {
+				// 대문자 이름은 환경 변수라서 서버가 파일을 읽을 때 바꾼다(여기서는 알 수 없음).
+				problems.push({ text: shown + " - 프롬프트에서는 input과 output만 읽습니다. 다른 값이 필요하면 Workflow step의 with로 input에 넣어 주십시오." });
+			}
+			at = text.indexOf("${", at + 2);
+		}
+		var seen = {};
+		var old = /(^|[^$\\])\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+		var m;
+		while ((m = old.exec(text)) !== null) {
+			var name = m[2];
+			if (seen[name]) {
+				continue;
+			}
+			seen[name] = true;
+			if (inputNames && inputNames.indexOf(name) >= 0) {
+				problems.push({ text: "{" + name + "} - 예전 문법입니다. ${input." + name + "} 로 적습니다.", fix: true });
+			} else if (outputNames.indexOf(name) >= 0) {
+				problems.push({ text: "{" + name + "} - 예전 문법입니다. 돌려줄 필드 이름은 ${output." + name + "} 로 적습니다.", fix: true });
+			}
+		}
+		return problems;
+	}
+
+	function renderPromptLint() {
+		var box = document.getElementById("wd-prompt-lint");
+		var prompt = els.agentForm.querySelector("[data-agent-body]");
+		if (!box || !prompt) {
+			return;
+		}
+		var problems = promptProblems(prompt.value, agentSlots());
+		if (problems.length === 0) {
+			var count = (prompt.value.split("\\${").join("").match(/\$\{/g) || []).length;
+			box.className = "wd-prompt-lint" + (count > 0 ? " wd-prompt-lint-ok" : "");
+			box.textContent = count > 0 ? "넣은 자리 " + count + "개 - 모두 이 Agent의 input/output에 있습니다." : "";
+			return;
+		}
+		var canFix = problems.some(function (p) { return p.fix; });
+		box.className = "wd-prompt-lint wd-prompt-lint-bad";
+		box.innerHTML = "<strong>프롬프트에서 고칠 곳 " + problems.length + "개</strong>"
+			+ (canFix ? "<button type=\"button\" class=\"kn-plain\" id=\"wd-prompt-fix-btn\">예전 문법 {이름} 한 번에 바꾸기</button>" : "")
+			+ "<ul>" + problems.map(function (p) { return "<li>" + escapeHtml(p.text) + "</li>"; }).join("") + "</ul>";
+		if (canFix) {
+			document.getElementById("wd-prompt-fix-btn").addEventListener("click", fixOldSlots);
+		}
+	}
+
+	/** 예전 문법 {필드}를 ${input.필드} / ${output.필드} 로 바꿉니다(이 Agent의 필드 이름과 같은 것만). */
+	function fixOldSlots() {
+		var prompt = els.agentForm.querySelector("[data-agent-body]");
+		var slots = agentSlots();
+		var inputNames = slots.input === null ? [] : slots.input.map(function (f) { return f.name; });
+		var outputNames = slots.output.map(function (f) { return f.name; });
+		prompt.value = prompt.value.replace(/(^|[^$\\])\{([A-Za-z_][A-Za-z0-9_]*)\}/g, function (all, before, name) {
+			if (inputNames.indexOf(name) >= 0) {
+				return before + "${input." + name + "}";
+			}
+			if (outputNames.indexOf(name) >= 0) {
+				return before + "${output." + name + "}";
+			}
+			return all;
+		});
+		prompt.dispatchEvent(new Event("change"));
+		renderPromptLint();
+	}
+
+	/* ====================================================================
+	 * 입력·출력 작성 가이드 창(내용은 designer.jsp의 #wd-guide-dialog)
+	 * ==================================================================== */
+
+	function bindGuide() {
+		els.guideDialog = document.getElementById("wd-guide-dialog");
+		document.getElementById("wd-guide-close-btn").addEventListener("click", closeGuide);
+		els.guideDialog.addEventListener("click", function (e) {
+			// 바깥 어두운 곳을 누르면 닫는다.
+			if (e.target === els.guideDialog) {
+				closeGuide();
+			}
+		});
+		els.guideDialog.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				closeGuide();
+			}
+		});
+		Array.prototype.forEach.call(els.guideDialog.querySelectorAll("[data-guide-go]"), function (link) {
+			link.addEventListener("click", function () {
+				var target = document.getElementById(link.getAttribute("data-guide-go"));
+				if (target) {
+					target.scrollIntoView({ behavior: "smooth", block: "start" });
+				}
+			});
+		});
+	}
+
+	function openGuide() {
+		els.guideDialog.style.display = "flex";
+		els.guideDialog.querySelector(".wd-guide-body").scrollTop = 0;
+		document.getElementById("wd-guide-close-btn").focus();
+	}
+
+	function closeGuide() {
+		els.guideDialog.style.display = "none";
 	}
 
 	function readAgentField(key, input) {

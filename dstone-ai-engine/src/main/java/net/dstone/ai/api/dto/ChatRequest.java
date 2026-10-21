@@ -1,7 +1,5 @@
 package net.dstone.ai.api.dto;
 
-import java.util.Map;
-
 /**
  * POST /api/ai/chat, POST /api/ai/chat/stream 요청에 담을 내용입니다.
  *
@@ -26,19 +24,15 @@ import java.util.Map;
  * 지금 활성화된 provider(spring.ai.model.chat 설정값) 안에서만 모델을 바꾸는 기능입니다. 만약 다른
  * provider의 모델 이름을 넣으면, 이 요청을 처리하는 시점에 그 provider의 API가 에러를 냅니다.
  *
- * variables는 Agent의 프롬프트(Agent 파일의 본문)에
- * {변수명} 같은 형태의 토큰이 있을 때, 그 자리를 실제 값으로 채워 넣기 위한 값입니다.
- *
  * input은 그 Agent의 input 계약(agents/**.md 의 input, 비워두면 string) 모양이어야 합니다.
  * 모양이 다르면 400으로 거절합니다.
  *
  * @param input        Agent에게 넣을 값입니다(필수. 보통은 사용자가 입력한 글자, Agent input이 object면 객체).
  * @param sessionId    대화를 구분하는 세션 ID입니다. 비워 보내면 서버가 새로 발급합니다.
  * @param agent        호출할 Agent의 이름입니다. 반드시 있어야 합니다.
- * @param variables    프롬프트의 {변수명} 자리에 채워 넣을 값들입니다.
  * @param ragEnabled   이번 요청에서만 RAG 사용 여부를 강제로 지정하고 싶을 때 씁니다(비우면 Agent 정의값을 그대로 사용).
  * @param toolsEnabled false면 이번 요청만 Tool 없이 부릅니다(비우거나 true면 Agent의 tools.allowed 목록 그대로).
  * @param model        이번 요청에서만 쓸 모델명을 강제로 지정하고 싶을 때 씁니다(비우면 Agent 정의값 또는 provider 기본값을 사용).
  */
-public record ChatRequest(Object input, String sessionId, String agent, Map<String, Object> variables, Boolean ragEnabled, Boolean toolsEnabled, String model) {
+public record ChatRequest(Object input, String sessionId, String agent, Boolean ragEnabled, Boolean toolsEnabled, String model) {
 }

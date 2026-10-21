@@ -24,7 +24,6 @@ import reactor.core.publisher.Flux;
 public class ChatService extends net.dstone.boot.common.biz.BaseService {
 
 	private static final String AGENT = "sample-general-chat";
-	private static final String AGENT_ROLE = "친절한 AI 어시스턴트";
 
 	@Autowired
 	private ConfigProperty configProperty;
@@ -59,11 +58,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 * 매 요청 명시적으로 실어 보내야 대화가 끊기지 않는다.
 	 *
 	 * agent는 화면의 agent 드롭다운 값을 그대로 받는다 - 비어 있으면 기본값(AGENT, sample-general-chat)을
-	 * 쓴다. general-chat Agent의 promptName(sample-system)이 시스템 프롬프트에 {role} 자리표시자를
-	 * 쓰므로(그 Agent의 Agent 파일 본문), 그 Agent를 부를 때만 variables로 role을 채워 보낸다 - 안
-	 * 보내면 PromptTemplate 렌더링이 IllegalStateException("Not all variables were replaced")으로
-	 * 실패한다. 다른 Agent(예: sample-mcp-filesystem-agent)는 이 자리표시자를 쓰지 않으므로 role을
-	 * 보낼 이유가 없다 - 그 Agent가 실제로 쓰는 프롬프트하고 무관한 값을 매번 끼워 보내는 셈이기 때문이다.
+	 * 쓴다. 프롬프트가 읽는 값은 Agent가 받은 input뿐이라, input 말고 따로 보낼 값은 없다.
 	 *
 	 * model은 화면의 모델 override 입력칸 값을 그대로 흘려보낸다 - 비어 있으면 body에 아예 안 실어서
 	 * dstone-ai-engine이 선택된 Agent 정의값(그마저 없으면 provider 공통 기본값)을 쓰게 둔다.
@@ -78,7 +73,6 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		body.put("sessionId", this.resolveSessionId(servletRequest));
 		body.put("agent", resolvedAgent);
 		body.put("input", input);
-		body.put("variables", AGENT.equals(resolvedAgent) ? Map.of("role", AGENT_ROLE) : Map.of());
 		body.put("ragEnabled", ragEnabled);
 		body.put("toolsEnabled", toolsEnabled);
 		if (!StringUtil.isEmpty(model)) {

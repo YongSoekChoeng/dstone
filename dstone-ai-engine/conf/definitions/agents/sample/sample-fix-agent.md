@@ -8,8 +8,8 @@
 # 입출력 계약을 둘 다 object로 선언한 예시이기도 합니다.
 # - input: {sql, error}. fix step이 with를 맵으로 적어서 "검증에 실패한 SQL"(${state.checkedInput.sql})과
 #   "실패 사유"(${state.validateError})를 채워 넣습니다. 엔진이 이 맵을 아래 input 스키마로 검사한 뒤
-#   JSON 글자로 바꿔 LLM에게 사용자 메시지로 보냅니다. (프롬프트 파일 안에는 중괄호를 쓰지 않습니다 - prompt의
-#   {이름}은 Spring AI PromptTemplate이 변수 자리로 읽기 때문에, JSON 예시를 적으면 기동은 되지만 호출할 때 실패합니다.)
+#   JSON 글자로 바꿔 LLM에게 사용자 메시지로 보냅니다. (프롬프트에서 값을 끼워 넣는 자리는 ${input.필드}뿐이라,
+#   ${ 가 없는 중괄호 { } 는 글자 그대로 갑니다. JSON 예시를 적어도 됩니다.)
 # - output: {sql}. LLM은 이 모양의 JSON으로만 답해야 하고, 고친 SQL은 fix step이 save: fixed로 저장하고 ${state.fixed.sql}로 꺼냅니다.
 #   LLM이 설명이나 코드펜스를 덧붙여도 sql 값만 깔끔하게 다음 step으로 넘어갑니다.
 # 고친 SQL은 다시 validate로 돌아가 검사를 받고, 이 루프가 끝없이 돌지 않도록 Workflow의 maxIterations가 막아줍니다.

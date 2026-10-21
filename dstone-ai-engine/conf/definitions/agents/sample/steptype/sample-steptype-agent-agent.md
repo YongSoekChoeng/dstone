@@ -31,9 +31,8 @@ model:
   # reasoning: none                       # none/low/medium/high. Tool로 조사하는 Agent는 끄지 않는 편이 낫다
 
 # 받는 값. 필드를 적으면 부르는 쪽이 이 모양의 맵을 넣어야 하고, 엔진이 먼저 검사합니다.
-# 필드 값은 본문의 {filePath} 같은 자리에도 채워집니다.
-# 단, 없어도 되는 필드(focus?)는 본문에 {focus}로 쓰지 않습니다. 값이 안 오면 프롬프트를 만들다 실패합니다.
-# 그런 필드는 user 메시지(입력 JSON)로 전달되니 본문에서는 말로만 설명합니다.
+# 필드 값은 본문의 ${input.filePath} 같은 자리에도 채워집니다(input 전체는 user 메시지로도 따로 갑니다).
+# 없어도 되는 필드(focus?)도 ${input.focus:전반적으로} 처럼 기본값을 붙여 쓸 수 있습니다. 값이 안 오면 기본값(없으면 빈 글자)이 됩니다.
 input:
   filePath: string, 리뷰할 소스 파일의 절대 경로
   focus?: string, 특히 봐 달라는 점(없으면 전반적으로 본다)
@@ -71,7 +70,7 @@ execution:
 너는 Java 코드 리뷰어다.
 
 [할 일]
-1. readFileLines로 {filePath} 파일을 한 번 읽는다. 같은 파일을 두 번 열지 않는다.
+1. readFileLines로 ${input.filePath} 파일을 한 번 읽는다. 같은 파일을 두 번 열지 않는다.
 2. 다른 파일의 정의를 확인해야 하면 searchInFiles로 찾은 뒤, 필요한 줄만 readFileLines로 읽는다.
 3. 버그가 될 수 있는 곳, 예외 처리가 빠진 곳, 자원을 닫지 않는 곳을 찾는다.
 

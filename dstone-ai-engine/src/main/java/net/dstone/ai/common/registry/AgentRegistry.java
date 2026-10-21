@@ -14,6 +14,7 @@ import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.loader.DefinitionFile;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
@@ -35,6 +36,8 @@ import net.dstone.common.utils.StringUtil;
  *
  * 기동할 때 각 Agent의 입출력 계약(input/output)이 올바른 JSON Schema로 바뀌었는지도 검사합니다.
  * 스키마가 틀린 Agent가 있으면 기동 자체를 실패시킵니다.
+ *
+ * 프롬프트의 ${input.필드} / ${output.필드} 자리도 기동할 때 검사합니다(checkPrompt(), 규칙은 PromptText).
  *
  * 정해진 값만 받는 항목도 기동할 때 검사합니다(checkCallOptions()). 오타가 조용히 무시되지 않게 하려는 것입니다.
  *   model.reasoning, model.temperature,
@@ -108,6 +111,7 @@ public class AgentRegistry extends BaseObject {
 			paths.put(definition.id(), file.path());
 			this.checkSchema(definition, "input", definition.inputSchema());
 			this.checkSchema(definition, "output", definition.outputSchema());
+			this.checkPrompt(definition);
 			this.checkCallOptions(definition);
 		}
 		// tools/subAgents는 다른 Agent를 가리키므로, 전부 읽은 뒤에 검사합니다.
@@ -165,6 +169,21 @@ public class AgentRegistry extends BaseObject {
 		List<String> problems = JsonSchemaUtil.checkSchema(schema);
 		if (!problems.isEmpty()) {
 			throw new IllegalStateException("agent[" + definition.id() + "]의 " + where + "가 올바른 JSON Schema가 아닙니다: " + problems);
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 프롬프트의 ${ } 자리가 이 Agent의 input/output에 있는 것만 가리키는지 검사합니다.
+	 * 틀린 자리는 부를 때가 아니라 기동(또는 디자이너의 [검사])할 때 알게 하려는 것입니다.
+	 * </pre>
+	 *
+	 * @param definition 검사할 Agent 정의
+	 */
+	private void checkPrompt(AgentDefinition definition) {
+		List<String> problems = PromptText.check(definition.promptText(), definition.inputSchema(), definition.outputSchema());
+		if (!problems.isEmpty()) {
+			throw new IllegalStateException("agent[" + definition.id() + "]의 프롬프트에 잘못된 자리가 있습니다: " + String.join(" / ", problems));
 		}
 	}
 

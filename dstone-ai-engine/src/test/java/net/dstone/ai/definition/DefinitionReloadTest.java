@@ -65,6 +65,18 @@ public class DefinitionReloadTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void Agent_프롬프트의_예전_문법은_검사에서_고칠_방법과_함께_막힌다() {
+		String agentId = "sample-role-reply-agent";
+		String path = this.agentRegistry.pathOf(agentId);
+		String text = this.definitionService.source("agents", agentId).text().replace("${input.role} 역할을", "{role} 역할을");
+
+		DefinitionChangeResult result = this.definitionService.check("agents", new DefinitionChangeRequest(path, path, text, null));
+
+		assertThat(result.ok()).isFalse();
+		assertThat(result.message()).contains("{role}").contains("${input.role}");
+	}
+
+	@Test
 	void 틀린_내용은_이유를_돌려주고_등록된_정의는_그대로다() {
 		WorkFlowDefinition registered = this.workFlowRegistry.all().get(WORKFLOW_ID);
 		String path = this.workFlowRegistry.pathOf(WORKFLOW_ID);

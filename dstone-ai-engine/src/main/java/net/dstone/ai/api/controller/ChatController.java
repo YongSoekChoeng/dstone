@@ -89,7 +89,7 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
-		Object output = this.agentExecutor.call(agent, sessionId, caller, request.variables(), request.input(), request.ragEnabled(), request.toolsEnabled(), request.model(), null);
+		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model(), null);
 		String provider = this.configProperty.getProperty("spring.ai.model.chat");
 		return new ChatResponse(output, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}
@@ -109,7 +109,7 @@ public class ChatController extends BaseController {
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
 		try {
-			return this.agentExecutor.stream(agent, sessionId, caller, request.variables(), request.input(), request.ragEnabled(), request.toolsEnabled(), request.model());
+			return this.agentExecutor.stream(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model());
 		} catch (AgentContractException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}

@@ -132,6 +132,173 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				</div>
 			</div>
 
+			<%-- Agent 창의 [입력·출력 작성 가이드]. 엔진 규칙(common.expression.PromptText, AgentExecutor)과 같아야 한다.
+				JSP가 달러+중괄호를 EL로 읽지 않도록 내용의 달러 기호는 &#36; 로 적는다 --%>
+			<div id="wd-guide-dialog" class="wd-dialog wd-guide-dialog" style="display: none;">
+				<div class="wd-dialog-box wd-guide-box" role="dialog" aria-labelledby="wd-guide-title">
+					<div class="wd-dialog-head wd-guide-head">
+						<div>
+							<p class="cs-eyebrow">Agent 작성</p>
+							<h3 id="wd-guide-title">입력·출력 작성 가이드</h3>
+							<p class="wd-guide-sub">Agent가 무엇을 받고, 프롬프트에서 그 값을 어떻게 쓰고, 무엇을 돌려주는지 정리했습니다.</p>
+						</div>
+						<button type="button" id="wd-guide-close-btn" class="kn-plain">닫기</button>
+					</div>
+					<nav class="wd-guide-nav">
+						<button type="button" data-guide-go="wd-g-flow">한눈에 보기</button>
+						<button type="button" data-guide-go="wd-g-in">받는 값</button>
+						<button type="button" data-guide-go="wd-g-prompt">프롬프트에서 쓰기</button>
+						<button type="button" data-guide-go="wd-g-out">돌려주는 값</button>
+						<button type="button" data-guide-go="wd-g-mistake">자주 하는 실수</button>
+						<button type="button" data-guide-go="wd-g-example">전체 예시</button>
+					</nav>
+					<div class="wd-guide-body">
+
+						<section id="wd-g-flow" class="wd-guide-sec">
+							<h4><span class="wd-guide-num">1</span>한눈에 보기</h4>
+							<div class="wd-guide-rule">프롬프트가 읽을 수 있는 값은 <b>이 Agent가 받은 input뿐</b>입니다. 다른 값이 필요하면 부르는 쪽(Workflow step의 <code>with</code>)이 input에 넣어 줍니다.</div>
+							<ol class="wd-flow">
+								<li><span class="wd-flow-tag">Workflow</span><b>step의 with</b><small>input 모양에 맞춰 값을 넣음</small></li>
+								<li><span class="wd-flow-tag wd-flow-in">input</span><b>모양 검사</b><small>어긋나면 부르기 전에 실패</small></li>
+								<li><span class="wd-flow-tag wd-flow-prompt">프롬프트</span><b>&#36;{input.필드} 채우기</b><small>엔진 규칙 뒤에 붙어 시스템 프롬프트가 됨</small></li>
+								<li><span class="wd-flow-tag">LLM</span><b>답하기</b><small>input 전체는 사용자 메시지로도 감</small></li>
+								<li><span class="wd-flow-tag wd-flow-out">output</span><b>모양 검사</b><small>필드를 적었으면 JSON으로 읽어 검사</small></li>
+								<li><span class="wd-flow-tag">Workflow</span><b>step의 save</b><small>&#36;{state.이름.필드}로 다음 step이 읽음</small></li>
+							</ol>
+						</section>
+
+						<section id="wd-g-in" class="wd-guide-sec">
+							<h4><span class="wd-guide-num">2</span>받는 값 (input)</h4>
+							<div class="wd-guide-cols">
+								<div class="wd-guide-card">
+									<h5>적지 않으면 글자 하나</h5>
+									<p>채팅 화면에서 친 말이나, step의 <code>with: &#36;{state.draft}</code>처럼 넣은 글자를 그대로 받습니다. 프롬프트에서는 <code>&#36;{input}</code>으로 읽습니다.</p>
+								</div>
+								<div class="wd-guide-card">
+									<h5>필드를 적으면 그 모양만 받음</h5>
+									<p>부르는 쪽이 이 모양의 값을 넣어야 합니다. 빠진 필드가 있으면 LLM을 부르기 전에 실패합니다(채팅 API는 400). 이름 뒤 <code>?</code>는 없어도 되는 필드입니다.</p>
+								</div>
+							</div>
+<pre class="wd-guide-code"><span class="c"># Agent 파일 머리말</span>
+input:
+  inputStr: string, 나눌 글자
+  div: string, 구분자
+  note?: string, 덧붙일 말 <span class="c">← ? 는 없어도 됨</span></pre>
+						</section>
+
+						<section id="wd-g-prompt" class="wd-guide-sec">
+							<h4><span class="wd-guide-num">3</span>프롬프트에서 쓰기</h4>
+							<p>값을 끼워 넣는 자리는 Workflow YAML과 같은 <code>&#36;{ }</code> 하나뿐입니다. 계산이나 조건은 쓸 수 없습니다. 프롬프트 칸 위의 단추를 누르면 커서 자리에 바로 들어갑니다.</p>
+							<table class="wd-guide-table">
+								<thead><tr><th>이렇게 쓰면</th><th>이렇게 바뀝니다</th></tr></thead>
+								<tbody>
+									<tr><td><code>&#36;{input}</code></td><td>받은 값 전체. 필드 묶음이면 JSON 글자</td></tr>
+									<tr><td><code>&#36;{input.inputStr}</code></td><td>그 필드의 값</td></tr>
+									<tr><td><code>&#36;{input.note:없음}</code></td><td>값이 없으면 콜론 뒤의 기본값. 기본값을 안 적으면 빈 글자</td></tr>
+									<tr><td><code>&#36;{input.files[0].path}</code></td><td>목록의 n번째(0부터) 항목 안의 필드</td></tr>
+									<tr><td><code>&#36;{output.outArr}</code></td><td>돌려줄 필드의 <b>이름</b> 그대로(<code>outArr</code>). 답은 아직 없으니 "어디에 담을지"를 가리킬 때 씁니다. 이름이 틀리면 검사에서 잡힙니다</td></tr>
+									<tr><td><code>&#36;{APP_HOME}</code></td><td>환경 변수(대문자). 서버가 파일을 읽을 때 바꿉니다</td></tr>
+									<tr><td><code>\&#36;{param}</code></td><td><code>&#36;{param}</code> 글자 그대로(JSP EL, MyBatis 예시 등)</td></tr>
+									<tr><td><code>{"a": 1}</code></td><td>그냥 글자. <code>&#36;</code>가 없는 중괄호는 JSON 예시로 마음껏 써도 됩니다</td></tr>
+								</tbody>
+							</table>
+							<ul class="wd-guide-notes">
+								<li>input 전체는 사용자 메시지로도 따로 전달됩니다. 모든 필드를 프롬프트에 끼워 넣을 필요는 없고, 지시문 속에서 가리킬 값만 넣으면 됩니다.</li>
+								<li>이름에 공백이나 괄호가 있는 필드(예: <code>2. 현재 상태(As-Is)</code>)는 <code>&#36;{input.…}</code>로 읽을 수 없습니다. 사용자 메시지의 JSON에 들어 있으니 말로 가리키십시오.</li>
+								<li>시스템 프롬프트 맨 앞에는 엔진이 정한 공통 규칙이 붙습니다. 프롬프트에는 이 Agent의 일만 적으면 됩니다.</li>
+							</ul>
+						</section>
+
+						<section id="wd-g-out" class="wd-guide-sec">
+							<h4><span class="wd-guide-num">4</span>돌려주는 값 (output)</h4>
+							<div class="wd-guide-cols">
+								<div class="wd-guide-card">
+									<h5>적지 않거나 string이면 글자</h5>
+									<p>LLM의 답을 그대로 돌려줍니다. 긴 문서나 대화 답변에 맞습니다. 채팅의 실시간 답(스트리밍)도 이 경우에만 됩니다.</p>
+								</div>
+								<div class="wd-guide-card">
+									<h5>필드를 적으면 JSON + 검사</h5>
+									<p>엔진이 "이 모양의 JSON으로만 답하라"는 지시를 알아서 붙이고, 답을 JSON으로 읽어 검사합니다. 그래서 프롬프트에 JSON 모양을 다시 설명하지 않습니다. 필드의 뜻은 필드 설명에 적습니다.</p>
+								</div>
+							</div>
+							<ul class="wd-guide-notes">
+								<li>모양이 틀린 답은 실패입니다. <code>execution.onInvalidOutput: RETRY</code>와 <code>maxAttempts</code>를 적으면 그 횟수만큼 다시 묻습니다.</li>
+								<li>SUPERVISOR·ROUTER step에 쓰는 Agent는 output을 적지 않습니다. 결과 모양은 엔진이 정합니다(<code>{pass, reason}</code>, <code>{route, reason}</code>).</li>
+								<li>Workflow에서는 step의 <code>save: 이름</code>으로 결과를 저장하고, 다음 step이 <code>&#36;{state.이름.필드}</code>로 읽습니다.</li>
+							</ul>
+						</section>
+
+						<section id="wd-g-mistake" class="wd-guide-sec">
+							<h4><span class="wd-guide-num">5</span>자주 하는 실수</h4>
+							<div class="wd-guide-pairs">
+								<div class="wd-guide-bad"><span>예전 문법</span><code>{inputStr}을 {div}로 나눈다.</code></div>
+								<div class="wd-guide-good"><span>이렇게</span><code>&#36;{input.inputStr}을 &#36;{input.div}로 나눈다.</code></div>
+
+								<div class="wd-guide-bad"><span>output을 값처럼 씀</span><code>결과를 {outArr}에 넣어라.</code></div>
+								<div class="wd-guide-good"><span>이렇게</span><code>결과를 &#36;{output.outArr}에 넣어라.</code></div>
+
+								<div class="wd-guide-bad"><span>프롬프트에서 state를 읽음</span><code>초안: &#36;{state.draft}</code></div>
+								<div class="wd-guide-good"><span>with로 넘기고 input으로 읽기</span><code>with: {draft: "&#36;{state.draft}"}<br/>초안: &#36;{input.draft}</code></div>
+
+								<div class="wd-guide-bad"><span>JSON 모양을 프롬프트에 설명</span><code>{"outArr": [...]} 모양으로 답하라.</code></div>
+								<div class="wd-guide-good"><span>output 필드로 적기</span><code>outArr(array, 나눈 결과): string</code></div>
+
+								<div class="wd-guide-bad"><span>없어도 되는 필드를 그대로</span><code>특히 볼 점: &#36;{input.focus}</code></div>
+								<div class="wd-guide-good"><span>기본값을 붙이기</span><code>특히 볼 점: &#36;{input.focus:전반적으로}</code></div>
+							</div>
+							<p class="wd-guide-foot">위의 세 가지는 [검사]와 기동 때 막히고, 프롬프트 칸 아래에도 바로 표시됩니다. 예전 문법은 [한 번에 바꾸기]로 고칠 수 있습니다. 아래의 두 가지는 막히지는 않지만 답이 흔들리거나 문장이 어색해지기 쉽습니다.</p>
+						</section>
+
+						<section id="wd-g-example" class="wd-guide-sec">
+							<h4><span class="wd-guide-num">6</span>전체 예시</h4>
+							<div class="wd-guide-cols">
+								<div>
+									<h5 class="wd-guide-caption">Agent 파일 <small>agents/test/split-agent.md</small></h5>
+<pre class="wd-guide-code">---
+id: split-agent
+version: 1.0.0
+description: 글자를 구분자로 나눈다
+input:
+  inputStr: string, 나눌 글자
+  div: string, 구분자
+output:
+  outArr(array, 나눈 결과): string
+execution:
+  onInvalidOutput: RETRY
+  maxAttempts: 3
+---
+주어진 글자 <span class="k">&#36;{input.inputStr}</span> 를
+구분자 <span class="k">&#36;{input.div}</span> 기준으로 나누어
+<span class="k">&#36;{output.outArr}</span>에 담아 돌려준다.
+빈 조각은 버린다.</pre>
+								</div>
+								<div>
+									<h5 class="wd-guide-caption">Workflow step <small>부르는 쪽</small></h5>
+<pre class="wd-guide-code">- id: step01
+  type: AGENT
+  agent: split-agent
+  with:
+    inputStr: <span class="k">&#36;{input.text}</span>
+    div: "|"
+  save: split
+  next: step02
+
+<span class="c"># 다음 step에서</span>
+<span class="k">&#36;{state.split.outArr}</span></pre>
+									<h5 class="wd-guide-caption">LLM이 받는 시스템 프롬프트 <small>input.text가 "바나나|딸기"일 때</small></h5>
+<pre class="wd-guide-code"><span class="c">(엔진 공통 규칙)</span>
+주어진 글자 바나나|딸기 를
+구분자 | 기준으로 나누어
+outArr에 담아 돌려준다.
+빈 조각은 버린다.</pre>
+								</div>
+							</div>
+						</section>
+
+					</div>
+				</div>
+			</div>
+
 			<%-- Agent 창 위에 뜨는 고르기 창. Tool이나 Sub Agent를 이름·설명으로 찾아 고른다 --%>
 			<div id="wd-pick-dialog" class="wd-dialog wd-pick-dialog" style="display: none;">
 				<div class="wd-dialog-box wd-pick-box">
