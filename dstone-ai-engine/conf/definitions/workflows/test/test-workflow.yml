@@ -1,8 +1,8 @@
 id: test-workflow
 version: 1.0.0
 description: ""
-input: string
-state: {}
+state:
+  step01_output: step01 step의 결과
 steps:
 
   - id: step01
@@ -10,3 +10,7 @@ steps:
     with: ${input}
     agent: input-check-agent
     next: END
+    save: step01_output
+input:
+  inputStr: string
+  div: string
