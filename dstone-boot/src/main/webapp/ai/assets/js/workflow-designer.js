@@ -88,6 +88,8 @@ var DstoneAiDesigner = (function () {
 	var positions = {};
 	/** 화살표의 꺾는 점(화살표 키 → [{x, y}]). 키는 edgeKey(from, kind, route). 노드 위치와 함께 이름.layout.json의 edges에 저장합니다 */
 	var edgeVertices = {};
+	/** 화살표가 쓰는 연결점(화살표 키 → {source, target}). 기본(아래 → 위)이 아닐 때만 둡니다. 이름.layout.json의 ports에 저장합니다 */
+	var edgePorts = {};
 	/** 꺾는 점을 끄는 중인지(끌기 한 번에 되돌리기 한 번만 쌓으려고) */
 	var verticesDragging = false;
 	/** 마지막으로 마우스를 누른 자리(꺾는 점을 끌었는지, 그냥 눌렀는지 가리려고) */
@@ -106,7 +108,7 @@ var DstoneAiDesigner = (function () {
 	/**
 	 * 화살표 모양. router = 길 찾기, connector = 선을 그리는 법(X6 기본 제공).
 	 * 고른 값은 이 브라우저에만 기억한다(정의 파일이나 노드 위치 파일에는 넣지 않는다).
-	 * 포트가 step 아래(나감)와 위(들어옴)에 있으므로, 직각 선은 아래로 나가 위로 들어오게 방향을 정해 준다.
+	 * 직각 선(manhattan)이 나가고 들어오는 방향은 화살표마다 연결점 쪽으로 정해 준다(routerOf).
 	 */
 	var LINE_STYLES = {
 		manhattan: { router: { name: "manhattan", args: { padding: 16, startDirections: ["bottom"], endDirections: ["top"] } }, connector: { name: "rounded", args: { radius: 8 } } },
@@ -323,6 +325,7 @@ var DstoneAiDesigner = (function () {
 		}
 		positions = info.layout && info.layout.nodes ? info.layout.nodes : {};
 		edgeVertices = info.layout && info.layout.edges ? info.layout.edges : {};
+		edgePorts = info.layout && info.layout.ports ? info.layout.ports : {};
 		selected = null;
 		undoStack = [];
 		dirty = false;
@@ -373,7 +376,7 @@ var DstoneAiDesigner = (function () {
 		model.id = id.trim();
 		var keep = positions;
 		var text = buildText(doc.header, model);
-		loadDoc(text, { id: null, path: currentFolder() + "/" + model.id + ".yml", originalPath: null, layout: { nodes: clone(keep), edges: clone(edgeVertices) } });
+		loadDoc(text, { id: null, path: currentFolder() + "/" + model.id + ".yml", originalPath: null, layout: { nodes: clone(keep), edges: clone(edgeVertices), ports: clone(edgePorts) } });
 		dirty = true;
 		showMessage("info", "복사본입니다. 저장하면 " + els.path.value + " 파일이 새로 생깁니다.");
 	}
@@ -390,7 +393,7 @@ var DstoneAiDesigner = (function () {
 			text: els.yaml.value
 		};
 		if (withLayout) {
-			body.layout = { nodes: positions, edges: liveEdgeVertices() };
+			body.layout = { nodes: positions, edges: liveEdgeVertices(), ports: liveEdgePorts() };
 		}
 		return body;
 	}
@@ -588,9 +591,9 @@ var DstoneAiDesigner = (function () {
 		updateYamlNote();
 	}
 
-	/** 되돌리기용으로 지금 상태(model, 노드 위치, 꺾는 점)를 글자로 남깁니다. */
+	/** 되돌리기용으로 지금 상태(model, 노드 위치, 꺾는 점, 연결점)를 글자로 남깁니다. */
 	function snapshot() {
-		return JSON.stringify({ model: doc.model, positions: positions, edges: edgeVertices });
+		return JSON.stringify({ model: doc.model, positions: positions, edges: edgeVertices, ports: edgePorts });
 	}
 
 	function afterModelChange() {
@@ -611,6 +614,7 @@ var DstoneAiDesigner = (function () {
 		doc.model = before.model;
 		positions = before.positions;
 		edgeVertices = before.edges || {};
+		edgePorts = before.ports || {};
 		if (selected && selected.type === "step" && !stepById(selected.id)) {
 			selected = null;
 		}
@@ -768,8 +772,11 @@ var DstoneAiDesigner = (function () {
 		return "경로" + n;
 	}
 
-	/** 그림에서 화살표를 이었을 때: 시작이면 첫 step을 바꾸고, 아니면 step 종류에 맞는 자리(next → onFailure, 또는 routes)에 넣습니다. */
-	function connect(from, to) {
+	/**
+	 * 그림에서 화살표를 이었을 때: 시작이면 첫 step을 바꾸고, 아니면 step 종류에 맞는 자리(next → onFailure, 또는 routes)에 넣습니다.
+	 * ports는 끌어 이은 연결점 {source, target}입니다. 새로 생긴 화살표가 그 점을 쓰게 합니다.
+	 */
+	function connect(from, to, ports) {
 		if (from === START_ID) {
 			change(function () {
 				var step = stepById(to);
@@ -779,6 +786,7 @@ var DstoneAiDesigner = (function () {
 				var list = steps();
 				list.splice(list.indexOf(step), 1);
 				list.unshift(step);
+				setEdgePorts(edgeKey(START_ID, "start", null), ports);
 			});
 			return;
 		}
@@ -793,9 +801,7 @@ var DstoneAiDesigner = (function () {
 				source.routes = source.routes || {};
 				source.routes[name] = to;
 				selected = { type: "edge", from: from, kind: "route", route: name };
-				return;
-			}
-			if (!source.next) {
+			} else if (!source.next) {
 				source.next = to;
 				selected = { type: "edge", from: from, kind: "next", route: null };
 			} else if (!source.onFailure) {
@@ -805,6 +811,7 @@ var DstoneAiDesigner = (function () {
 				showMessage("error", from + " step에는 next와 onFailure가 이미 있습니다. 바꿀 화살표를 골라 지운 뒤 다시 이으십시오.");
 				return false;
 			}
+			setEdgePorts(edgeKey(from, selected.kind, selected.route), ports);
 		});
 	}
 
@@ -849,7 +856,7 @@ var DstoneAiDesigner = (function () {
 				positions[newId] = positions[oldId];
 				delete positions[oldId];
 			}
-			Object.keys(edgeVertices).forEach(function (key) {
+			Object.keys(edgeVertices).concat(Object.keys(edgePorts)).forEach(function (key) {
 				if (key.indexOf(oldId + "|") === 0) {
 					moveEdgeVertices(key, newId + key.substring(oldId.length));
 				}
@@ -964,8 +971,34 @@ var DstoneAiDesigner = (function () {
 		out: {
 			position: "bottom",
 			attrs: { circle: { r: 7, magnet: true, stroke: "#007b9d", strokeWidth: 2, fill: "#fff", cursor: "crosshair" } }
+		},
+		// 왼쪽·오른쪽 점은 나가는 화살표도, 들어오는 화살표도 붙일 수 있다.
+		left: {
+			position: "left",
+			attrs: { circle: { r: 5, magnet: true, stroke: "#007b9d", strokeWidth: 1.5, fill: "#fff", cursor: "crosshair" } }
+		},
+		right: {
+			position: "right",
+			attrs: { circle: { r: 5, magnet: true, stroke: "#007b9d", strokeWidth: 1.5, fill: "#fff", cursor: "crosshair" } }
 		}
 	};
+
+	/** 연결점이 노드의 어느 쪽에 있는지(직각 선이 그 쪽으로 나가고 들어오게 할 때 씁니다). */
+	var PORT_SIDES = { "in": "top", out: "bottom", left: "left", right: "right" };
+	/** 나가는 화살표를 붙일 수 있는 점 / 들어오는 화살표를 붙일 수 있는 점 */
+	var SOURCE_PORTS = ["out", "left", "right"];
+	var TARGET_PORTS = ["in", "left", "right"];
+
+	/** 노드에 붙일 연결점 목록입니다. kinds: "in"(위), "out"(아래). 좌/우 점은 늘 붙입니다. */
+	function portItems(kinds) {
+		var items = [];
+		kinds.forEach(function (kind) {
+			items.push({ id: kind, group: kind });
+		});
+		items.push({ id: "left", group: "left" });
+		items.push({ id: "right", group: "right" });
+		return items;
+	}
 
 	function createGraph() {
 		graph = new X6.Graph({
@@ -1006,7 +1039,10 @@ var DstoneAiDesigner = (function () {
 					});
 				},
 				validateConnection: function (args) {
-					if (!args.targetCell || args.sourcePort !== "out") {
+					if (!args.targetCell || SOURCE_PORTS.indexOf(args.sourcePort) < 0) {
+						return false;
+					}
+					if (args.targetPort && TARGET_PORTS.indexOf(args.targetPort) < 0) {
 						return false;
 					}
 					var target = args.targetCell.id;
@@ -1058,9 +1094,10 @@ var DstoneAiDesigner = (function () {
 			}
 			var from = args.edge.getSourceCellId();
 			var to = args.edge.getTargetCellId();
+			var ports = { source: args.edge.getSourcePortId(), target: args.edge.getTargetPortId() };
 			args.edge.remove();
 			if (from && to) {
-				connect(from, to);
+				connect(from, to, ports);
 			}
 		});
 		window.addEventListener("mousedown", function (e) {
@@ -1234,19 +1271,12 @@ var DstoneAiDesigner = (function () {
 				body: { fill: color.fill, stroke: color.stroke, strokeWidth: isSelectedStep(step.id) ? 3 : 1.5, rx: 8, ry: 8 },
 				label: { text: shorten(step.id, 30) + "\n" + shorten(second, 34), fill: "#283121", fontSize: 12 }
 			},
-			ports: { groups: PORT_GROUPS, items: [{ id: "in", group: "in" }, { id: "out", group: "out" }] }
+			ports: { groups: PORT_GROUPS, items: portItems(["in", "out"]) }
 		};
 	}
 
 	function terminalNodeConfig(id, text, color, ports) {
 		var p = positions[id] || { x: 0, y: 0 };
-		var items = [];
-		if (ports.indexOf("in") >= 0) {
-			items.push({ id: "in", group: "in" });
-		}
-		if (ports.indexOf("out") >= 0) {
-			items.push({ id: "out", group: "out" });
-		}
 		return {
 			id: id,
 			shape: "circle",
@@ -1260,7 +1290,7 @@ var DstoneAiDesigner = (function () {
 				body: { fill: "#fff", stroke: color, strokeWidth: 2 },
 				label: { text: text, fill: color, fontSize: 12, fontWeight: "bold" }
 			},
-			ports: { groups: PORT_GROUPS, items: items }
+			ports: { groups: PORT_GROUPS, items: portItems(ports) }
 		};
 	}
 
@@ -1274,13 +1304,16 @@ var DstoneAiDesigner = (function () {
 			label = "불합격";
 		}
 		var selectedNow = isSelectedEdge(from, kind, route);
+		var ports = portsOf(from, kind, route);
+		// 없는 step 상자에는 위 점만 있다.
+		var targetPort = String(to).indexOf("missing:") === 0 ? "in" : ports.target;
 		return {
 			shape: "edge",
 			id: "edge|" + from + "|" + kind + "|" + (route || ""),
-			source: { cell: from, port: "out" },
-			target: { cell: to, port: "in" },
+			source: { cell: from, port: ports.source },
+			target: { cell: to, port: targetPort },
 			vertices: clone(edgeVertices[edgeKey(from, kind, route)] || []),
-			router: LINE_STYLES[lineStyle].router,
+			router: routerOf(ports.source, targetPort),
 			connector: LINE_STYLES[lineStyle].connector,
 			zIndex: 1,
 			data: { kind: kind, from: from, route: route },
@@ -1383,12 +1416,70 @@ var DstoneAiDesigner = (function () {
 		return live;
 	}
 
-	/** 꺾는 점의 주인이 바뀌었을 때(step 이름, 경로 이름) 점을 새 키로 옮깁니다. */
+	/** 꺾는 점(과 연결점)의 주인이 바뀌었을 때(step 이름, 경로 이름) 새 키로 옮깁니다. */
 	function moveEdgeVertices(oldKey, newKey) {
 		if (edgeVertices[oldKey]) {
 			edgeVertices[newKey] = edgeVertices[oldKey];
 			delete edgeVertices[oldKey];
 		}
+		if (edgePorts[oldKey]) {
+			edgePorts[newKey] = edgePorts[oldKey];
+			delete edgePorts[oldKey];
+		}
+	}
+
+	/* ====================================================================
+	 * 화살표의 연결점. 기본은 아래(out) → 위(in)이고, 좌/우 점으로 이었거나 설정 칸에서 바꾼 것만 edgePorts에 둡니다.
+	 * 꺾는 점처럼 그림에만 쓰는 값이라 이름.layout.json의 ports에 저장합니다.
+	 * ==================================================================== */
+
+	/** 화살표가 쓰는 연결점 {source, target}입니다. 적어 둔 것이 없으면 아래 → 위입니다. */
+	function portsOf(from, kind, route) {
+		var saved = edgePorts[edgeKey(from, kind, route)] || {};
+		return {
+			source: SOURCE_PORTS.indexOf(saved.source) >= 0 ? saved.source : "out",
+			target: TARGET_PORTS.indexOf(saved.target) >= 0 ? saved.target : "in"
+		};
+	}
+
+	/** 화살표의 연결점을 적어 둡니다. 기본(아래 → 위)이면 지웁니다. */
+	function setEdgePorts(key, ports) {
+		var source = ports && SOURCE_PORTS.indexOf(ports.source) >= 0 ? ports.source : "out";
+		var target = ports && TARGET_PORTS.indexOf(ports.target) >= 0 ? ports.target : "in";
+		if (source === "out" && target === "in") {
+			delete edgePorts[key];
+		} else {
+			edgePorts[key] = { source: source, target: target };
+		}
+	}
+
+	/** 지금 model에 있는 화살표의 연결점만 돌려줍니다(지운 화살표의 것은 저장하지 않습니다). */
+	function liveEdgePorts() {
+		var live = {};
+		var keep = function (key) {
+			if (edgePorts[key]) {
+				live[key] = edgePorts[key];
+			}
+		};
+		if (steps().length > 0 && steps()[0] && steps()[0].id) {
+			keep(edgeKey(START_ID, "start", null));
+		}
+		steps().forEach(function (step) {
+			outgoing(step).forEach(function (edge) {
+				keep(edgeKey(step.id, edge.kind, edge.route));
+			});
+		});
+		return live;
+	}
+
+	/** 화살표 길 찾기. 직각 선(manhattan)이면 연결점이 있는 쪽으로 나가고 들어오게 방향을 정해 줍니다. */
+	function routerOf(sourcePort, targetPort) {
+		var router = clone(LINE_STYLES[lineStyle].router);
+		if (router.name === "manhattan") {
+			router.args.startDirections = [PORT_SIDES[sourcePort] || "bottom"];
+			router.args.endDirections = [PORT_SIDES[targetPort] || "top"];
+		}
+		return router;
 	}
 
 	/** 위치가 없는 노드에 자리를 줍니다. 위치가 하나도 없으면 전체를 자동 배치합니다. */
@@ -1673,7 +1764,7 @@ var DstoneAiDesigner = (function () {
 			}
 		});
 		html += "<h4>나가는 화살표</h4>" + outgoingList(step)
-			+ "<p class=\"ai-hint\">아래쪽 동그라미를 끌어 다른 step이나 END/FAIL에 놓으면 화살표가 생깁니다.</p>"
+			+ "<p class=\"ai-hint\">아래쪽(또는 왼쪽·오른쪽) 동그라미를 끌어 다른 step이나 END/FAIL에 놓으면 화살표가 생깁니다.</p>"
 			+ "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-delete-step-btn\">이 step 지우기</button></div>"
 			+ stateOptions();
 		els.props.innerHTML = html;
@@ -1847,6 +1938,16 @@ var DstoneAiDesigner = (function () {
 			}
 		}
 		html += row("가는 곳", "", "<select id=\"wd-edge-target\">" + targetOptions(current.target) + "</select>");
+		var ports = portsOf(edge.from, edge.kind, edge.route);
+		var portNames = { out: "아래", "in": "위", left: "왼쪽", right: "오른쪽" };
+		var portSelect = function (id, list, value) {
+			return "<select id=\"" + id + "\">" + list.map(function (port) {
+				return "<option value=\"" + port + "\"" + (port === value ? " selected" : "") + ">" + portNames[port] + "</option>";
+			}).join("") + "</select>";
+		};
+		html += row("연결점", "그림에서 화살표가 붙는 자리입니다. 동작에는 영향이 없습니다.",
+			"나가는 쪽 " + portSelect("wd-edge-source-port", SOURCE_PORTS, ports.source)
+			+ " → 들어가는 쪽 " + portSelect("wd-edge-target-port", TARGET_PORTS, ports.target));
 		var bends = edgeVertices[edgeKey(edge.from, edge.kind, edge.route)] || [];
 		html += "<p class=\"ai-hint wd-bend-help\">꺾는 점: 그림에서 이 화살표의 선 위를 끌면 점이 생기고, 점을 끌면 옮겨지고, 점을 두 번 누르면 지워집니다. 선 모양이 직선·곡선이면 점을 그대로 잇고, 직각이면 점을 지나는 직각 선이 됩니다. 점은 노드 위치와 함께 저장되고 [자동 배치]를 누르면 지워집니다."
 			+ " 지금 " + bends.length + "개" + (bends.length ? " <button type=\"button\" class=\"kn-plain\" id=\"wd-clear-bends-btn\">꺾는 점 모두 지우기</button>" : "") + "</p>";
@@ -1907,6 +2008,7 @@ var DstoneAiDesigner = (function () {
 					// 꺾는 점도 새 이름을 따라간다(갈 곳을 옮긴 경우에는 이 화살표의 점이 그 이름의 점이 된다).
 					if (existing) {
 						delete edgeVertices[edgeKey(step.id, "route", name)];
+						delete edgePorts[edgeKey(step.id, "route", name)];
 					}
 					moveEdgeVertices(edgeKey(step.id, "route", edge.route), edgeKey(step.id, "route", name));
 					selected = { type: "edge", from: step.id, kind: "route", route: name };
@@ -1923,6 +2025,18 @@ var DstoneAiDesigner = (function () {
 				} else {
 					step[edge.kind] = target;
 				}
+			});
+		});
+		Array.prototype.forEach.call(els.props.querySelectorAll("#wd-edge-source-port, #wd-edge-target-port"), function (select) {
+			select.addEventListener("change", function () {
+				undoStack.push(snapshot());
+				setEdgePorts(edgeKey(edge.from, edge.kind, edge.route), {
+					source: document.getElementById("wd-edge-source-port").value,
+					target: document.getElementById("wd-edge-target-port").value
+				});
+				dirty = true;
+				redraw();
+				showPanel();
 			});
 		});
 		document.getElementById("wd-delete-edge-btn").addEventListener("click", deleteSelected);
@@ -3001,8 +3115,9 @@ var DstoneAiDesigner = (function () {
 				return;
 			}
 			autoLayout();
-			// 노드가 모두 움직이므로 손으로 놓은 꺾는 점은 맞지 않게 된다. 지운다.
+			// 노드가 모두 움직이므로 손으로 놓은 꺾는 점은 맞지 않게 된다. 지운다(위에서 아래로 놓으므로 연결점도 아래 → 위로 되돌린다).
 			edgeVertices = {};
+			edgePorts = {};
 			dirty = true;
 			redraw();
 			graph.zoomToFit({ padding: 30, maxScale: 1 });
