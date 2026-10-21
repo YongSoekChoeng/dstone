@@ -86,6 +86,12 @@ var DstoneAiDesigner = (function () {
 	var doc = null;
 	/** 노드 위치(노드 id → {x, y}). Workflow 파일 옆 이름.layout.json에 저장합니다 */
 	var positions = {};
+	/** 화살표의 꺾는 점(화살표 키 → [{x, y}]). 키는 edgeKey(from, kind, route). 노드 위치와 함께 이름.layout.json의 edges에 저장합니다 */
+	var edgeVertices = {};
+	/** 꺾는 점을 끄는 중인지(끌기 한 번에 되돌리기 한 번만 쌓으려고) */
+	var verticesDragging = false;
+	/** 마지막으로 마우스를 누른 자리(꺾는 점을 끌었는지, 그냥 눌렀는지 가리려고) */
+	var lastMouseDown = null;
 	/** 고른 것: null(Workflow 전체) | {type: "step", id} | {type: "edge", from, kind, route} */
 	var selected = null;
 	/** 저장하지 않은 변경이 있는지 */
@@ -316,6 +322,7 @@ var DstoneAiDesigner = (function () {
 			doc.model.steps = [];
 		}
 		positions = info.layout && info.layout.nodes ? info.layout.nodes : {};
+		edgeVertices = info.layout && info.layout.edges ? info.layout.edges : {};
 		selected = null;
 		undoStack = [];
 		dirty = false;
@@ -366,7 +373,7 @@ var DstoneAiDesigner = (function () {
 		model.id = id.trim();
 		var keep = positions;
 		var text = buildText(doc.header, model);
-		loadDoc(text, { id: null, path: currentFolder() + "/" + model.id + ".yml", originalPath: null, layout: { nodes: clone(keep) } });
+		loadDoc(text, { id: null, path: currentFolder() + "/" + model.id + ".yml", originalPath: null, layout: { nodes: clone(keep), edges: clone(edgeVertices) } });
 		dirty = true;
 		showMessage("info", "복사본입니다. 저장하면 " + els.path.value + " 파일이 새로 생깁니다.");
 	}
@@ -383,7 +390,7 @@ var DstoneAiDesigner = (function () {
 			text: els.yaml.value
 		};
 		if (withLayout) {
-			body.layout = { nodes: positions };
+			body.layout = { nodes: positions, edges: liveEdgeVertices() };
 		}
 		return body;
 	}
@@ -549,7 +556,7 @@ var DstoneAiDesigner = (function () {
 			showPanel();
 			return;
 		}
-		var before = JSON.stringify({ model: doc.model, positions: positions });
+		var before = snapshot();
 		var result = fn();
 		if (result === false) {
 			showPanel();
@@ -570,7 +577,7 @@ var DstoneAiDesigner = (function () {
 		if (textEdited && !window.confirm("YAML 탭에서 고친 글자가 아직 그림에 반영되지 않았습니다. 고치면 그 글자는 버립니다. 계속할까요?")) {
 			return;
 		}
-		undoStack.push(JSON.stringify({ model: doc.model, positions: positions }));
+		undoStack.push(snapshot());
 		if (undoStack.length > 50) {
 			undoStack.shift();
 		}
@@ -579,6 +586,11 @@ var DstoneAiDesigner = (function () {
 		textEdited = false;
 		dirty = true;
 		updateYamlNote();
+	}
+
+	/** 되돌리기용으로 지금 상태(model, 노드 위치, 꺾는 점)를 글자로 남깁니다. */
+	function snapshot() {
+		return JSON.stringify({ model: doc.model, positions: positions, edges: edgeVertices });
 	}
 
 	function afterModelChange() {
@@ -598,6 +610,7 @@ var DstoneAiDesigner = (function () {
 		var before = JSON.parse(undoStack.pop());
 		doc.model = before.model;
 		positions = before.positions;
+		edgeVertices = before.edges || {};
 		if (selected && selected.type === "step" && !stepById(selected.id)) {
 			selected = null;
 		}
@@ -836,6 +849,11 @@ var DstoneAiDesigner = (function () {
 				positions[newId] = positions[oldId];
 				delete positions[oldId];
 			}
+			Object.keys(edgeVertices).forEach(function (key) {
+				if (key.indexOf(oldId + "|") === 0) {
+					moveEdgeVertices(key, newId + key.substring(oldId.length));
+				}
+			});
 			selected = { type: "step", id: newId };
 		});
 	}
@@ -963,9 +981,10 @@ var DstoneAiDesigner = (function () {
 			interacting: {
 				edgeMovable: false,
 				arrowheadMovable: false,
-				vertexMovable: false,
-				vertexAddable: false,
-				vertexDeletable: false,
+				// 꺾는 점은 고른 화살표에 붙이는 vertices 도구로만 다룬다(redraw() 참고). 도구가 없는 화살표는 끌어도 점이 생기지 않는다.
+				vertexMovable: true,
+				vertexAddable: true,
+				vertexDeletable: true,
 				edgeLabelMovable: false
 			},
 			connecting: {
@@ -1043,6 +1062,55 @@ var DstoneAiDesigner = (function () {
 			if (from && to) {
 				connect(from, to);
 			}
+		});
+		window.addEventListener("mousedown", function (e) {
+			lastMouseDown = { x: e.clientX, y: e.clientY };
+		}, true);
+		graph.on("edge:change:vertices", function (args) {
+			var data = args.edge.getData() || {};
+			if (!data.kind || !args.options || !args.options.ui) {
+				return;
+			}
+			var key = edgeKey(data.from, data.kind, data.route);
+			if (!verticesDragging) {
+				// 끌기 한 번(마우스를 뗄 때까지)에 되돌리기 하나만 쌓는다.
+				// X6가 mouseup 전달을 막을 때가 있어서 window의 캡처 단계에서 받는다.
+				verticesDragging = true;
+				undoStack.push(snapshot());
+				var before = clone(edgeVertices[key] || []);
+				var down = lastMouseDown;
+				var done = function (e) {
+					window.removeEventListener("mouseup", done, true);
+					verticesDragging = false;
+					var moved = !down || Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) >= 4;
+					if (!moved && (edgeVertices[key] || []).length > before.length) {
+						// 고른 화살표를 그냥 한 번 누른 것뿐이면, 그때 생긴 점과 되돌리기를 거둔다.
+						if (before.length > 0) {
+							edgeVertices[key] = before;
+						} else {
+							delete edgeVertices[key];
+						}
+						undoStack.pop();
+						window.setTimeout(function () {
+							redraw();
+							showPanel();
+						}, 0);
+						return;
+					}
+					// 설정 칸의 "지금 N개"를 새로 쓴다(끄는 동안에는 그림을 다시 그리지 않는다).
+					showPanel();
+				};
+				window.addEventListener("mouseup", done, true);
+			}
+			var points = args.edge.getVertices().map(function (v) {
+				return { x: Math.round(v.x), y: Math.round(v.y) };
+			});
+			if (points.length > 0) {
+				edgeVertices[key] = points;
+			} else {
+				delete edgeVertices[key];
+			}
+			dirty = true;
 		});
 		graph.on("node:moved", function (args) {
 			var p = args.node.getPosition();
@@ -1211,6 +1279,7 @@ var DstoneAiDesigner = (function () {
 			id: "edge|" + from + "|" + kind + "|" + (route || ""),
 			source: { cell: from, port: "out" },
 			target: { cell: to, port: "in" },
+			vertices: clone(edgeVertices[edgeKey(from, kind, route)] || []),
 			router: LINE_STYLES[lineStyle].router,
 			connector: LINE_STYLES[lineStyle].connector,
 			zIndex: 1,
@@ -1278,6 +1347,48 @@ var DstoneAiDesigner = (function () {
 			});
 		});
 		graph.resetCells(cells);
+		// 고른 화살표에는 꺾는 점 도구를 붙인다(선 위를 끌면 점이 생기고, 점을 끌면 옮기고, 두 번 누르면 지운다).
+		if (selected && selected.type === "edge") {
+			var picked = graph.getCellById("edge|" + selected.from + "|" + selected.kind + "|" + (selected.route || ""));
+			if (picked) {
+				picked.addTools([{ name: "vertices", args: { addable: true, removable: true, removeRedundancies: true, attrs: { r: 6, fill: "#fff", stroke: "#007b9d", "stroke-width": 2, cursor: "move" } } }]);
+			}
+		}
+	}
+
+	/* ====================================================================
+	 * 화살표의 꺾는 점. 그림에만 쓰는 값이라 정의 파일이 아니라 노드 위치와 함께 이름.layout.json에 저장합니다.
+	 * ==================================================================== */
+
+	function edgeKey(from, kind, route) {
+		return from + "|" + kind + "|" + (route || "");
+	}
+
+	/** 지금 model에 있는 화살표의 꺾는 점만 돌려줍니다(지운 화살표의 점은 저장하지 않습니다). */
+	function liveEdgeVertices() {
+		var live = {};
+		var keep = function (key) {
+			if (edgeVertices[key] && edgeVertices[key].length > 0) {
+				live[key] = edgeVertices[key];
+			}
+		};
+		if (steps().length > 0 && steps()[0] && steps()[0].id) {
+			keep(edgeKey(START_ID, "start", null));
+		}
+		steps().forEach(function (step) {
+			outgoing(step).forEach(function (edge) {
+				keep(edgeKey(step.id, edge.kind, edge.route));
+			});
+		});
+		return live;
+	}
+
+	/** 꺾는 점의 주인이 바뀌었을 때(step 이름, 경로 이름) 점을 새 키로 옮깁니다. */
+	function moveEdgeVertices(oldKey, newKey) {
+		if (edgeVertices[oldKey]) {
+			edgeVertices[newKey] = edgeVertices[oldKey];
+			delete edgeVertices[oldKey];
+		}
 	}
 
 	/** 위치가 없는 노드에 자리를 줍니다. 위치가 하나도 없으면 전체를 자동 배치합니다. */
@@ -1734,6 +1845,9 @@ var DstoneAiDesigner = (function () {
 			}
 		}
 		html += row("가는 곳", "", "<select id=\"wd-edge-target\">" + targetOptions(current.target) + "</select>");
+		var bends = edgeVertices[edgeKey(edge.from, edge.kind, edge.route)] || [];
+		html += "<p class=\"ai-hint wd-bend-help\">꺾는 점: 그림에서 이 화살표의 선 위를 끌면 점이 생기고, 점을 끌면 옮겨지고, 점을 두 번 누르면 지워집니다. 선 모양이 직선·곡선이면 점을 그대로 잇고, 직각이면 점을 지나는 직각 선이 됩니다. 점은 노드 위치와 함께 저장되고 [자동 배치]를 누르면 지워집니다."
+			+ " 지금 " + bends.length + "개" + (bends.length ? " <button type=\"button\" class=\"kn-plain\" id=\"wd-clear-bends-btn\">꺾는 점 모두 지우기</button>" : "") + "</p>";
 		html += "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-delete-edge-btn\">이 화살표 지우기</button>"
 			+ "<button type=\"button\" class=\"kn-plain\" id=\"wd-back-step-btn\">" + escapeHtml(edge.from) + " step 설정</button></div>";
 		els.props.innerHTML = html;
@@ -1788,6 +1902,11 @@ var DstoneAiDesigner = (function () {
 						}
 					});
 					step.routes = next;
+					// 꺾는 점도 새 이름을 따라간다(갈 곳을 옮긴 경우에는 이 화살표의 점이 그 이름의 점이 된다).
+					if (existing) {
+						delete edgeVertices[edgeKey(step.id, "route", name)];
+					}
+					moveEdgeVertices(edgeKey(step.id, "route", edge.route), edgeKey(step.id, "route", name));
 					selected = { type: "edge", from: step.id, kind: "route", route: name };
 				});
 			});
@@ -1805,6 +1924,16 @@ var DstoneAiDesigner = (function () {
 			});
 		});
 		document.getElementById("wd-delete-edge-btn").addEventListener("click", deleteSelected);
+		var clearBends = document.getElementById("wd-clear-bends-btn");
+		if (clearBends) {
+			clearBends.addEventListener("click", function () {
+				undoStack.push(snapshot());
+				delete edgeVertices[edgeKey(edge.from, edge.kind, edge.route)];
+				dirty = true;
+				redraw();
+				showPanel();
+			});
+		}
 		document.getElementById("wd-back-step-btn").addEventListener("click", function () {
 			selected = { type: "step", id: step.id };
 			redraw();
@@ -2769,6 +2898,8 @@ var DstoneAiDesigner = (function () {
 				return;
 			}
 			autoLayout();
+			// 노드가 모두 움직이므로 손으로 놓은 꺾는 점은 맞지 않게 된다. 지운다.
+			edgeVertices = {};
 			dirty = true;
 			redraw();
 			graph.zoomToFit({ padding: 30, maxScale: 1 });
@@ -2867,7 +2998,7 @@ var DstoneAiDesigner = (function () {
 			showMessage("error", "파일 맨 위가 키: 값 모양이 아닙니다.");
 			return;
 		}
-		undoStack.push(JSON.stringify({ model: doc.model, positions: positions }));
+		undoStack.push(snapshot());
 		var split = splitHeader(text);
 		doc.model = model;
 		if (!Array.isArray(doc.model.steps)) {
