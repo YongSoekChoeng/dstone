@@ -1724,7 +1724,10 @@ var DstoneAiDesigner = (function () {
 			}).join("") + "</select>");
 		if (edge.kind === "route") {
 			var help = step.type === "APPROVAL" ? "승인자가 고르는 결정 이름(예: APPROVED, REJECTED)" : "ROUTER Agent가 고르는 경로 이름";
-			html += row("경로 이름", help, "<input type=\"text\" id=\"wd-edge-route\" value=\"" + escapeHtml(edge.route) + "\" />");
+			var otherNames = Object.keys(step.routes || {}).filter(function (name) { return name !== edge.route; });
+			html += row("경로 이름", help, "<input type=\"text\" id=\"wd-edge-route\" list=\"wd-route-names\" value=\"" + escapeHtml(edge.route) + "\" />"
+				+ "<datalist id=\"wd-route-names\">" + otherNames.map(function (name) { return "<option value=\"" + escapeHtml(name) + "\"></option>"; }).join("") + "</datalist>"
+				+ (otherNames.length ? "<p class=\"ai-hint\">이미 있는 이름(" + escapeHtml(otherNames.join(", ")) + ")을 적으면 그 경로의 갈 곳을 이 화살표의 갈 곳으로 옮깁니다.</p>" : ""));
 			if (step.type === "ROUTER" && routesMissingInPrompt(step).indexOf(edge.route) >= 0) {
 				html += "<p class=\"wd-route-bad\">'" + escapeHtml(edge.route) + "'는 Agent(" + escapeHtml(step.agent || "") + ") 프롬프트에 없는 이름입니다."
 					+ " LLM은 프롬프트에 적힌 경로 이름으로 답하므로, 그 이름으로 바꾸십시오.</p>";
@@ -1761,15 +1764,28 @@ var DstoneAiDesigner = (function () {
 				if (!name || name === edge.route) {
 					return;
 				}
+				// 이미 있는 이름이면, 그 경로의 갈 곳을 이 화살표의 갈 곳으로 옮길지 묻는다.
+				// (ROUTER에 새 step을 이으면 임시 이름 경로1로 생기므로, 예: 일반: END를 일반: 새step으로 바꿀 때 쓴다)
+				var existing = Object.prototype.hasOwnProperty.call(step.routes, name);
+				if (existing && !window.confirm("'" + name + "' 경로는 지금 " + step.routes[name] + "(으)로 갑니다.\n"
+						+ "이 화살표의 갈 곳(" + step.routes[edge.route] + ")으로 바꿀까요?\n(" + step.routes[name] + "(으)로 가던 화살표와 임시 이름 '" + edge.route + "'는 없어집니다)")) {
+					routeInput.value = edge.route;
+					return;
+				}
 				change(function () {
-					if (step.routes[name]) {
-						showMessage("error", "이미 있는 경로 이름입니다: " + name);
-						return false;
-					}
-					// 경로 순서를 지키며 이름만 바꾼다.
 					var next = {};
 					Object.keys(step.routes).forEach(function (key) {
-						next[key === edge.route ? name : key] = step.routes[key];
+						if (existing) {
+							// 기존 이름 자리는 그대로 두고 갈 곳만 바꾸고, 이 화살표의 이름은 지운다.
+							if (key === name) {
+								next[key] = step.routes[edge.route];
+							} else if (key !== edge.route) {
+								next[key] = step.routes[key];
+							}
+						} else {
+							// 경로 순서를 지키며 이름만 바꾼다.
+							next[key === edge.route ? name : key] = step.routes[key];
+						}
 					});
 					step.routes = next;
 					selected = { type: "edge", from: step.id, kind: "route", route: name };
