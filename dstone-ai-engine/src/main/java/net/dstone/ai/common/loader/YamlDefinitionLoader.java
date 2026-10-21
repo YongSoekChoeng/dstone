@@ -26,13 +26,11 @@ import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 
-import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.mcp.McpServerDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
-import net.dstone.ai.common.definition.workflow.step.StepDefinition;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -57,7 +55,7 @@ import net.dstone.common.utils.StringUtil;
  * 경로에 쓰인 "**"는 하위 디렉토리를 몇 단계든 재귀적으로 포함하므로, 도메인별로 서브 디렉토리를 나눠서(예: workflows/billing/) 관리해도 됩니다.
  * 파일 맨 위에 workflow: / agent: / mcpServer: 같은 감싸는 키는 없습니다. 무엇의 정의인지는 폴더로 구분합니다.
  *
- * 파일을 읽는 방식은 이렇습니다: 먼저 SnakeYAML로 파싱해서 평범한 Map으로 만들고(Agent는 머리말만), 지원하지 않는 모양(감싸는 키, 따로 둔 스키마 파일 등)을 적지 않았는지 본 다음,
+ * 파일을 읽는 방식은 이렇습니다: 먼저 SnakeYAML로 파싱해서 평범한 Map으로 만들고(Agent는 머리말만),
  * Jackson의 ObjectMapper.convertValue()로 그 Map을 definition record에 바인딩합니다.
  * record의 필드에 바로 바인딩되는 건 pom.xml에 이미 설정해 둔 컴파일러 -parameters 옵션 덕분이라, 별도의 생성자나 애노테이션이 필요 없습니다.
  *
@@ -89,32 +87,6 @@ public class YamlDefinitionLoader extends BaseObject {
 	private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
 	private final Yaml yaml = new Yaml();
 	private final ObjectMapper objectMapper = new ObjectMapper();
-
-	/**
-	 * <pre>
-	 * 읽히지 않을 정의 파일이 있으면 기동을 멈춥니다(다시 읽을 때도 같은 검사를 합니다). 그런 파일은 아예 읽히지 않으므로,
-	 * 그냥 두면 "Agent가 없다"는 엉뚱한 오류만 보게 됩니다.
-	 * - agents/ 아래의 .yml(Agent는 .md 한 파일입니다)
-	 * - prompts/, schemas/ 폴더 안의 파일(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다)
-	 * </pre>
-	 */
-	@PostConstruct
-	public void checkOldFiles() {
-		List<String> found = new ArrayList<>();
-		for (Resource resource : this.resolve(Constants.Definition.AGENT_DIR + "/**/*.yml")) {
-			found.add(this.relativePath(resource));
-		}
-		for (String dir : Constants.Definition.OLD_DIRS) {
-			for (Resource resource : this.resolve(dir + "/**/*.*")) {
-				found.add(this.relativePath(resource));
-			}
-		}
-		if (!found.isEmpty()) {
-			throw new IllegalStateException("예전 형식의 정의 파일이 남아 있습니다: " + found
-				+ ". Agent는 agents/**/이름.md 한 파일(머리말에 설정과 input/output, 본문에 프롬프트), Workflow는 workflows/**/이름.yml,"
-				+ " MCP 서버는 mcp/**/이름.yml로 옮기십시오(docs/09.dstone-ai-engine.md 7장 참고).");
-		}
-	}
 
 	/**
 	 * <pre>
@@ -171,7 +143,6 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<McpServerDefinition> definitions = new ArrayList<>();
 		for (DefinitionText file : this.readTexts(Constants.Definition.MCP_DIR, Constants.Definition.MCP_SUFFIX)) {
 			Map<String, Object> root = this.parseYaml(file.path(), file.text());
-			this.checkNoWrapper(file.path(), root, "mcpServer");
 			McpServerDefinition definition = this.bind(file.path(), root, McpServerDefinition.class);
 			definitions.add(definition);
 			LogUtil.sysout("dstone-ai-engine loader: mcpServer[" + definition.id() + "] <- " + file.path());
@@ -213,7 +184,6 @@ public class YamlDefinitionLoader extends BaseObject {
 	 */
 	public WorkFlowDefinition parseWorkflow(DefinitionText file) {
 		Map<String, Object> root = this.parseYaml(file.path(), file.text());
-		this.checkOldWorkflowShape(file.path(), root);
 		WorkFlowDefinition definition = this.bind(file.path(), root, WorkFlowDefinition.class);
 		LogUtil.sysout("dstone-ai-engine loader: workflow[" + definition.id() + "] <- " + file.path());
 		return definition;
@@ -351,67 +321,8 @@ public class YamlDefinitionLoader extends BaseObject {
 			body.append(lines[i]).append('\n');
 		}
 		Map<String, Object> root = this.parseYaml(where, header.toString());
-		this.checkNoWrapper(where, root, "agent");
-		if (root.containsKey(PROMPT_KEY)) {
-			throw new IllegalStateException(where + " - [prompt] 머리말에는 prompt를 적지 않습니다. 프롬프트는 머리말을 닫는 --- 아래에 그대로 적습니다.");
-		}
-		this.checkOldContract(where, root, "input");
-		this.checkOldContract(where, root, "output");
 		root.put(PROMPT_KEY, this.resolvePlaceholders(body.toString().strip()));
 		return root;
-	}
-
-	/**
-	 * <pre>
-	 * 맨 위에 감싸는 키(workflow:, agent:, mcpServer:) 하나만 있으면 안내와 함께 멈춥니다.
-	 * </pre>
-	 *
-	 * @param where    오류 문장에 보여 줄 파일 경로
-	 * @param root     파일 전체
-	 * @param wrapper  감싸는 키 이름
-	 */
-	private void checkNoWrapper(String where, Map<String, Object> root, String wrapper) {
-		if (root.size() == 1 && root.get(wrapper) instanceof Map) {
-			throw new IllegalStateException(where + " - 맨 위의 " + wrapper + ": 는 없어졌습니다. 그 아래 내용을 한 단계 내어 맨 위에 적으십시오.");
-		}
-	}
-
-	/**
-	 * <pre>
-	 * Agent의 input/output을 {schema: 파일}이나 {format, schema, validation} 모양으로 적었으면 타입 표기로 적으라고 알려줍니다.
-	 * </pre>
-	 *
-	 * @param where    오류 문장에 보여 줄 파일 경로
-	 * @param root     머리말 전체
-	 * @param key      input 또는 output
-	 */
-	private void checkOldContract(String where, Map<String, Object> root, String key) {
-		if (root.get(key) instanceof Map<?, ?> contract && (contract.containsKey("schema") || contract.containsKey("format") || contract.containsKey("validation"))) {
-			throw new IllegalStateException(where + " - [" + key + "] schema/format/validation은 없어졌습니다. 모양을 그 자리에 짧은 타입 표기로 적습니다."
-				+ " 예: " + key + ": string, 설명  또는  필드를 한 줄에 하나씩: " + key + ":\n  path: string, 파일 경로\n  frs(array, FR 번호): string"
-				+ (key.equals("output") ? " (필드를 적으면 JSON으로 받아 검사하고, 적지 않거나 string이면 글자로 받습니다)" : ""));
-		}
-	}
-
-	/**
-	 * <pre>
-	 * Workflow에 지원하지 않는 모양이 있으면 바른 모양을 알려줍니다(감싸는 workflow:, output.value, state.schema, input.schema).
-	 * </pre>
-	 *
-	 * @param where    오류 문장에 보여 줄 파일 경로
-	 * @param root     파일 전체
-	 */
-	private void checkOldWorkflowShape(String where, Map<String, Object> root) {
-		this.checkNoWrapper(where, root, "workflow");
-		if (root.containsKey("output")) {
-			throw new IllegalStateException(where + " - [output] Workflow의 output은 return으로 바뀌었습니다. 예: return: ${state.result} (output.value에 적던 값을 그대로 적습니다. output.schema 검사는 없어졌습니다)");
-		}
-		if (root.get("state") instanceof Map<?, ?> state && state.containsKey("schema")) {
-			throw new IllegalStateException(where + " - [state.schema] state에는 스키마 대신 이 Workflow가 저장하는 이름을 전부 적습니다. 예: state: {analysis: 분석 결과, review: 검토 결과}");
-		}
-		if (root.get("input") instanceof Map<?, ?> input && input.containsKey("schema")) {
-			throw new IllegalStateException(where + " - [input.schema] input은 그 자리에 짧은 타입 표기로 적습니다. 예: input: string, 작업 폴더  또는  필드를 한 줄에 하나씩: input:\n  workDir: string, 작업 폴더");
-		}
 	}
 
 	/**
@@ -442,7 +353,7 @@ public class YamlDefinitionLoader extends BaseObject {
 	 * - type 값이 없거나 틀림: 쓸 수 있는 type 값을 알려줍니다.
 	 * - 값의 모양이 다름: 예를 들어 TOOL step의 with를 맵이 아니라 문자열로 적은 경우입니다.
 	 * - 값을 만들다 실패함: 예를 들어 타입 표기에 없는 타입 이름(output: strng)을 적은 경우로, 그 오류 메시지를 그대로 씁니다.
-	 * 쓰지 않는 키나 자리를 옮긴 키(step의 ref/onSuccess, Agent의 reasoning/maxToolCalls/ragEnabled 등)를 적었으면 바른 모양도 함께 알려줍니다.
+	 * APPROVAL step에 다른 step처럼 next/onFailure를 적었으면 routes로 적으라고 함께 알려줍니다.
 	 * </pre>
 	 *
 	 * @param e convertValue()가 던진 예외
@@ -455,17 +366,14 @@ public class YamlDefinitionLoader extends BaseObject {
 		if (cause instanceof UnrecognizedPropertyException unknown) {
 			String owner = where.lastIndexOf('.') < 0 ? "" : where.substring(0, where.lastIndexOf('.'));
 			return "[" + where + "] '" + unknown.getPropertyName() + "'는 이 자리(" + unknown.getReferringClass().getSimpleName() + ")에서 쓸 수 없는 키입니다"
-				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ")." + this.movedKeyHint(unknown.getReferringClass(), unknown.getPropertyName());
+				+ " (" + owner + "에서 쓸 수 있는 키 = " + unknown.getKnownPropertyIds() + ")." + this.approvalHint(unknown.getReferringClass(), unknown.getPropertyName());
 		}
 		if (cause instanceof InvalidTypeIdException invalidType) {
 			return "[" + where + "] step의 type이 없거나 올바르지 않습니다(적은 값 = " + invalidType.getTypeId()
 				+ ", 쓸 수 있는 값 = AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL).";
 		}
-		if (cause instanceof MismatchedInputException mismatched && "state".equals(where)) {
+		if (cause instanceof MismatchedInputException && "state".equals(where)) {
 			return "[state] state는 이 Workflow가 저장하는 이름 → 설명 맵입니다. 예: state: {analysis: 분석 결과}";
-		}
-		if (cause instanceof MismatchedInputException mismatched && mismatched.getTargetType() != null && AgentDefinition.class.equals(mismatched.getTargetType().getEnclosingClass())) {
-			return "[" + where + "] 값의 모양이 맞지 않습니다. " + this.agentBlockHint(mismatched.getTargetType());
 		}
 		if (cause instanceof MismatchedInputException mismatched && mismatched.getTargetType() != null) {
 			return "[" + where + "] 값의 모양이 맞지 않습니다(" + this.shapeName(mismatched.getTargetType()) + "이어야 합니다"
@@ -480,83 +388,20 @@ public class YamlDefinitionLoader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 쓰지 않는 키나 다른 자리로 옮긴 키를 적었으면 바른 모양을 알려주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
+	 * APPROVAL step에서 헷갈리기 쉬운 키를 적었으면 바른 모양을 알려주는 안내 문구를 돌려줍니다. 아니면 빈 문자열입니다.
 	 * </pre>
 	 *
 	 * @param owner 키를 적은 자리의 record 타입
 	 * @param key   적은 키 이름
 	 */
-	private String movedKeyHint(Class<?> owner, String key) {
-		boolean isStep = StepDefinition.class.isAssignableFrom(owner);
-		if (isStep && "input".equals(key)) {
-			return " step의 input은 with로 바뀌었습니다. 예: with: ${state.request}";
-		}
-		if (isStep && "output".equals(key)) {
-			return " step의 output은 없어졌습니다. 결과는 save: 이름, 실패 사유는 saveError: 이름, 받은 입력은 saveInput: 이름, forEach 반복별 묶음은 saveEach: 이름으로 적습니다"
-				+ " (이름은 state.을 붙이지 않고, Workflow 맨 위 state:에 선언합니다).";
-		}
-		if (isStep && "ref".equals(key)) {
-			return " ref는 없어졌습니다. 부르는 대상은 AGENT/SUPERVISOR/ROUTER step은 agent: 에, TOOL step은 tool: 에 적습니다.";
-		}
-		if (isStep && "onSuccess".equals(key)) {
-			return " onSuccess는 next로 바뀌었습니다(끝내는 예약어는 SUCCESS가 아니라 END입니다).";
-		}
+	private String approvalHint(Class<?> owner, String key) {
 		if (ApprovalStepDefinition.class.equals(owner) && ("next".equals(key) || "onFailure".equals(key))) {
 			return " APPROVAL step은 routes로 갈 곳을 정합니다. 예: routes: {APPROVED: 다음step, REJECTED: FAIL}";
-		}
-		if (ApprovalStepDefinition.class.equals(owner) && "approverRole".equals(key)) {
-			return " approverRole은 approval 아래에 적습니다. 예: approval: {approverRole: PL}";
 		}
 		if (ApprovalStepDefinition.Approval.class.equals(owner) && ("timeout".equals(key) || "timeoutPolicy".equals(key))) {
 			return " 승인 대기 시간 초과(timeout, timeoutPolicy, TIMEOUT 경로)는 아직 지원하지 않습니다.";
 		}
-		if (WorkFlowDefinition.class.equals(owner) && "maxIterations".equals(key)) {
-			return " maxIterations는 settings 아래에 적습니다. 예: settings: {maxIterations: 20}";
-		}
-		if (WorkFlowDefinition.class.equals(owner) && "inputs".equals(key)) {
-			return " inputs는 input으로 바뀌었습니다. 예: input: string, 작업 폴더";
-		}
-		if (AgentDefinition.class.equals(owner)) {
-			switch (key) {
-				case "reasoning":
-					return " reasoning은 model 아래에 적습니다. 예: model: {reasoning: none}";
-				case "maxToolCalls":
-					return " maxToolCalls는 execution 아래에 적습니다. 예: execution: {maxToolCalls: 32}";
-				case "ragEnabled":
-				case "ragTopK":
-				case "ragSimilarityThreshold":
-				case "ragAllowEmptyContext":
-					return " RAG 설정은 context 아래에 적습니다. 예: context: {sources: [retrievedDocuments], retrieval: {topK: 3, similarityThreshold: 0.3, allowEmptyContext: true}}"
-						+ " (RAG를 쓰지 않으면 context를 적지 않습니다)";
-				case "toolsEnabled":
-					return " toolsEnabled는 없어졌습니다. 쓸 Tool을 이름으로 적습니다. 예: tools: {allowed: [searchInFiles, readFile]}";
-				case "agent":
-					return " 맨 위의 agent: 는 없어졌습니다. 그 아래 내용을 한 단계 내어 머리말에 바로 적으십시오.";
-				default:
-					return "";
-			}
-		}
-		if (AgentDefinition.Model.class.equals(owner) && "routing".equals(key)) {
-			return " model.routing은 없어졌습니다. 이 Agent만 다른 모델을 쓰려면 모델 이름을 직접 적습니다. 예: model: {name: 모델이름}";
-		}
 		return "";
-	}
-
-	/**
-	 * <pre>
-	 * Agent 머리말의 묶음(model, tools 등)을 맵이 아니라 값 하나로 적었을 때 바른 모양을 알려주는 안내 문구를 돌려줍니다.
-	 * </pre>
-	 *
-	 * @param block 값이 들어가야 했던 record 타입
-	 */
-	private String agentBlockHint(Class<?> block) {
-		if (AgentDefinition.Model.class.equals(block)) {
-			return "model은 맵으로 적습니다. 예: model: {name: 모델이름, temperature: 0.1, reasoning: none}";
-		}
-		if (AgentDefinition.Tools.class.equals(block)) {
-			return "tools는 allowed 목록을 가진 맵입니다. 예: tools: {allowed: [searchInFiles, readFile]}";
-		}
-		return "이 자리는 맵으로 적습니다(" + block.getSimpleName() + ").";
 	}
 
 	/**

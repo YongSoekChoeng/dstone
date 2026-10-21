@@ -289,11 +289,6 @@ public class DefinitionService extends BaseObject {
 				throw new RejectedException("경로에 쓸 수 없는 이름이 있습니다('" + segment + "'). 폴더와 파일 이름은 영문, 숫자, 한글, _, -, . 만 씁니다." + hint, false);
 			}
 		}
-		for (String old : Constants.Definition.OLD_DIRS) {
-			if (path.contains("/" + old + "/")) {
-				throw new RejectedException(old + " 폴더에는 정의 파일을 둘 수 없습니다: " + path, false);
-			}
-		}
 	}
 
 	/** 저장이 꺼져 있으면 거절합니다. */

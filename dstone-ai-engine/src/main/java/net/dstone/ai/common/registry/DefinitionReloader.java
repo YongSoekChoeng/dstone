@@ -78,7 +78,6 @@ public class DefinitionReloader extends BaseObject {
 	 * @param write   통과했을 때 파일을 쓰고 등록할지
 	 */
 	public synchronized Result apply(Map<String, String> changes, boolean write) {
-		this.loader.checkOldFiles();
 		List<DefinitionFile<AgentDefinition>> agentFiles = new ArrayList<>();
 		for (DefinitionText text : this.merge(Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX, changes)) {
 			agentFiles.add(new DefinitionFile<>(text.path(), this.loader.parseAgent(text)));

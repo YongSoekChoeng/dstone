@@ -1,7 +1,5 @@
 package net.dstone.ai.common.consts;
 
-import java.util.List;
-
 /**
  * <pre>
  * dstone-ai-engine 전체에서 함께 쓰는 상수 값들을 한 곳에 모아둔 클래스입니다. 
@@ -226,8 +224,6 @@ public final class Constants {
 		public final static String MCP_SUFFIX = ".yml";
 		/** Workflow 파일 옆에 두는, 화면의 노드 위치를 담은 파일의 꼬리입니다(예: sample-chain.yml → sample-chain.layout.json). 엔진은 읽지 않습니다. */
 		public final static String LAYOUT_SUFFIX = ".layout.json";
-		/** 정의 폴더 아래에 있으면 안 되는 폴더입니다(프롬프트는 Agent 파일 본문에, 스키마는 그 자리에 Picoschema로 적습니다). 이 안에 파일이 있으면 기동을 멈춥니다. */
-		public final static List<String> OLD_DIRS = List.of("prompts", "schemas");
 	}
 
 }

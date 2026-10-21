@@ -69,15 +69,6 @@ public final class ContextResolver {
 	}
 
 	/**
-	 * 값에 표현식이 들어 있는지 봅니다(글자이고 "${"가 있으면).
-	 *
-	 * @param value 볼 값
-	 */
-	public static boolean hasExpression(Object value) {
-		return value instanceof String text && text.contains(PREFIX);
-	}
-
-	/**
 	 * 값 전체가 표현식 하나인지 봅니다. 그런 값은 읽어 온 값을 타입 그대로 넘깁니다.
 	 *
 	 * @param value 볼 값

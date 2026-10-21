@@ -72,7 +72,7 @@ import net.dstone.common.utils.StringUtil;
  *    - saveEach는 forEach step에만 있는가
  *    - state:에 선언한 이름마다 저장하는 step이 하나 이상 있는가
  * 5) 표현식(validateTemplate, 오류): step with, forEach, Workflow return 안의 모든 값에 대해
- *    - 쓰지 않는 문법({{ }}, "${ .steps.id.output }" 같은 jq 식)이 없는가, 경로 모양이 맞는가
+ *    - 경로 모양이 맞는가
  *    - 읽는 곳이 input / state / forEach 변수 중 하나인가(변수는 forEach step의 with 안에서만)
  *    - ${state.이름}의 이름이 state:에 선언되어 있고, 그 이름에 저장하는 step이 흐름상 읽는 step보다 먼저 실행될 수 있는가
  *      (예: 첫 step이 뒤 step의 결과를 읽으면 항상 null이므로 막습니다. 재시도 루프처럼 되돌아오는 흐름이면 허용)
@@ -668,8 +668,7 @@ public class WorkFlowRegistry extends BaseObject {
 	/**
 	 * <pre>
 	 * 템플릿(step.with, step.forEach, workflow.return) 하나를 검사합니다(클래스 설명의 5번).
-	 * 1) 글자마다: 쓰지 않는 문법({{ }})이 없는지 봅니다.
-	 * 2) 표현식마다: 경로 모양과 읽는 곳을 확인하고(ContextResolver), 읽는 경로를 검사합니다(checkReference).
+	 * 표현식마다 경로 모양과 읽는 곳을 확인하고(ContextResolver), 읽는 경로를 검사합니다(checkReference).
 	 * </pre>
 	 *
 	 * @param definition     검사 중인 Workflow 정의
@@ -682,16 +681,6 @@ public class WorkFlowRegistry extends BaseObject {
 	 */
 	private void validateTemplate(WorkFlowDefinition definition, Map<String, List<String>> nextSteps, List<StateWrite> writes,
 			StepDefinition owner, String where, Object template, List<String> variableNames) {
-		for (String text : this.texts(template)) {
-			if (text.contains("{{")) {
-				throw this.error(definition, owner, where + "의 '" + text + "' - {{ }} 문법은 쓰지 않습니다. 예: ${state.이름}, ${input}, ${item}");
-			}
-			if (text.contains("${ .") || text.contains("${.") || text.contains("${ $") || text.contains("${$")) {
-				throw this.error(definition, owner, where + "의 '" + this.shorten(text) + "' - jq 표현식은 더 이상 쓰지 않습니다. 표현식은 값을 읽어 오는 경로만 적습니다."
-					+ " 예: ${input}, ${state.이름.필드}, ${item.필드}, 없을 때 기본값은 ${state.이름:기본값}."
-					+ " 앞 step의 결과는 그 step의 save로 state에 저장한 뒤 읽고(save: 이름), 계산이나 조건은 Tool로 만드십시오.");
-			}
-		}
 		List<ContextResolver.Reference> references;
 		try {
 			references = ContextResolver.references(template);
@@ -791,34 +780,6 @@ public class WorkFlowRegistry extends BaseObject {
 		if (problem != null) {
 			throw this.error(definition, owner, prefix + problem + " (step[" + writer.step().id() + "]가 저장한 값)");
 		}
-	}
-
-	/**
-	 * 템플릿(글자/맵/리스트) 안의 글자 값을 모두 돌려줍니다(표현식이든 리터럴이든). 잘못 적은 글자를 찾는 용도입니다.
-	 *
-	 * @param template 글자를 찾을 템플릿
-	 */
-	@SuppressWarnings("unchecked")
-	private List<String> texts(Object template) {
-		List<String> found = new ArrayList<>();
-		if (template instanceof String text) {
-			found.add(text);
-		} else if (template instanceof Map) {
-			for (Object value : ((Map<String, Object>) template).values()) {
-				found.addAll(this.texts(value));
-			}
-		} else if (template instanceof List) {
-			for (Object item : (List<Object>) template) {
-				found.addAll(this.texts(item));
-			}
-		}
-		return found;
-	}
-
-	/** 오류 문장에 넣기에 너무 긴 글자는 앞부분만 남깁니다. */
-	private String shorten(String text) {
-		String oneLine = text.replace('\n', ' ').strip();
-		return oneLine.length() <= 120 ? oneLine : oneLine.substring(0, 120) + "...";
 	}
 
 	/**
