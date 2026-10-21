@@ -12,17 +12,17 @@
       "x" : -130,
       "y" : 560
     },
-    "step00_01_readReq" : {
-      "x" : -210,
-      "y" : -70
-    },
-    "step00_02_decideJobKind" : {
-      "x" : 60,
-      "y" : 40
-    },
     "step02_test_agent" : {
       "x" : 220,
       "y" : 200
+    },
+    "step01_readCustReq" : {
+      "x" : -210,
+      "y" : -70
+    },
+    "step02_decideJobKind" : {
+      "x" : 140,
+      "y" : 0
     }
   }
 }
