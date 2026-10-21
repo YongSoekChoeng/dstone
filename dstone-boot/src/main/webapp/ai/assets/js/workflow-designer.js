@@ -142,6 +142,7 @@ var DstoneAiDesigner = (function () {
 		bindAgentDialog();
 		bindPicker();
 		bindGuide();
+		bindFullscreen();
 
 		window.addEventListener("beforeunload", function (e) {
 			if (dirty) {
@@ -1050,10 +1051,85 @@ var DstoneAiDesigner = (function () {
 		});
 	}
 
-	/** 그림 칸이 보일 때만 그림 크기를 칸에 맞춥니다. */
+	/* ====================================================================
+	 * 전체 화면: 디자이너 작업 영역(#wd-workspace)이 화면 전체를 덮게 합니다.
+	 * 다른 창을 따로 만들지 않고 같은 영역을 키우므로, 그리던 그림과 고치던 설정이 그대로 이어집니다.
+	 * 위쪽 패널의 메시지와 상태 글자는 전체 화면 동안 맨 위 띠로 옮겨 두었다가 끝나면 제자리로 돌려놓습니다.
+	 * ==================================================================== */
+
+	function bindFullscreen() {
+		els.workspace = document.getElementById("wd-workspace");
+		els.fullTitle = document.getElementById("wd-full-title");
+		Array.prototype.forEach.call(document.querySelectorAll("[data-full-toggle]"), function (button) {
+			button.addEventListener("click", function () {
+				setFullscreen(!isFullscreen());
+			});
+		});
+		// 띠의 단추는 위쪽 패널의 같은 단추를 대신 누른다(동작은 한 곳에만 둔다).
+		Array.prototype.forEach.call(els.workspace.querySelectorAll("[data-proxy]"), function (button) {
+			button.addEventListener("click", function () {
+				document.getElementById(button.getAttribute("data-proxy")).click();
+			});
+		});
+		document.addEventListener("keydown", function (e) {
+			if (e.key !== "Escape" || !isFullscreen() || anyDialogOpen()) {
+				return;
+			}
+			var tag = (e.target && e.target.tagName) || "";
+			if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+				return;
+			}
+			setFullscreen(false);
+		});
+	}
+
+	function isFullscreen() {
+		return els.workspace.classList.contains("wd-full");
+	}
+
+	function anyDialogOpen() {
+		return Array.prototype.some.call(document.querySelectorAll(".wd-dialog"), function (dialog) {
+			return dialog.style.display !== "none";
+		});
+	}
+
+	function setFullscreen(on) {
+		if (on === isFullscreen()) {
+			return;
+		}
+		if (on) {
+			// 메시지와 상태 글자를 띠로 옮긴다. 돌려놓을 자리를 기억해 둔다.
+			els.messageHome = { parent: els.message.parentNode, next: els.message.nextSibling };
+			els.statusHome = { parent: els.status.parentNode, next: els.status.nextSibling };
+			document.getElementById("wd-full-message-slot").appendChild(els.message);
+			document.getElementById("wd-full-status-slot").appendChild(els.status);
+			els.fullTitle.textContent = doc && doc.model && doc.model.id ? String(doc.model.id) : "";
+			Array.prototype.forEach.call(els.workspace.querySelectorAll("[data-proxy]"), function (button) {
+				button.disabled = document.getElementById(button.getAttribute("data-proxy")).disabled;
+			});
+		} else {
+			els.messageHome.parent.insertBefore(els.message, els.messageHome.next);
+			els.statusHome.parent.insertBefore(els.status, els.statusHome.next);
+		}
+		els.workspace.classList.toggle("wd-full", on);
+		document.body.classList.toggle("wd-full-on", on);
+		document.getElementById("wd-full-btn").textContent = on ? "전체 화면 끝내기" : "전체 화면";
+		// 칸 크기가 바뀐 뒤에 그림 크기를 맞추고, 그림 전체가 보이게 한다.
+		window.requestAnimationFrame(function () {
+			fitCanvas();
+			if (graph && els.graphBox.style.display !== "none") {
+				graph.zoomToFit({ padding: 30, maxScale: 1 });
+			}
+		});
+	}
+
+	/**
+	 * 그림 칸이 보일 때만 그림 크기를 칸에 맞춥니다.
+	 * 크기는 바깥 상자(#wd-graph-box)에서 잽니다. X6가 #wd-canvas에 픽셀 크기를 직접 적어 두어서, 그것을 재면 처음 크기에서 바뀌지 않습니다.
+	 */
 	function fitCanvas() {
-		var width = els.canvas.clientWidth;
-		var height = els.canvas.clientHeight;
+		var width = els.graphBox.clientWidth;
+		var height = els.graphBox.clientHeight;
 		if (graph && width > 0 && height > 0) {
 			graph.resize(width, height);
 		}

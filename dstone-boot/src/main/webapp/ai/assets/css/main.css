@@ -1319,10 +1319,159 @@
 	}
 }
 
+/* 전체 화면: 디자이너 작업 영역이 화면 전체를 덮는다(창들은 z-index 1000 이상이라 그 위에 뜬다) */
+.ai-body button.wd-full-btn {
+	margin-left: auto;
+	height: 30px;
+	padding: 0 12px;
+	font-size: 12.5px;
+}
+
+.ai-body button.wd-full-btn::before {
+	content: "⤢";
+	margin-right: 6px;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.wd-full-bar {
+	display: none;
+}
+
+/* 전체 화면일 때는 맨 위 띠의 [전체 화면 끝내기]를 쓴다 */
+.wd-full .wd-full-btn {
+	display: none;
+}
+
+body.wd-full-on {
+	overflow: hidden;
+}
+
+.wd-workspace.wd-full {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 12px 18px 14px;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	background: var(--cs-surface);
+}
+
+.wd-full .wd-full-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	padding-bottom: 10px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.wd-full-bar h3 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	font-size: 16px;
+	color: var(--cs-text);
+}
+
+.wd-full-bar .workflow-job-id:not(:empty) {
+	background: var(--cs-surface-3);
+	border-radius: 4px;
+	padding: 1px 8px;
+	font-size: 13px;
+}
+
+.wd-full-message {
+	flex: 1 1 240px;
+	min-width: 0;
+}
+
+.wd-full-message .wd-message {
+	margin: 0;
+	max-height: 64px;
+	overflow-y: auto;
+}
+
+.wd-full-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.ai-body .wd-full-actions button {
+	height: 32px;
+	padding: 0 14px;
+	font-size: 13px;
+}
+
+.ai-body .wd-full-actions button.wd-full-exit {
+	border-color: var(--cs-text-2);
+	color: var(--cs-text);
+}
+
+.wd-full .wd-wrap {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.wd-full .wd-palette {
+	overflow-y: auto;
+}
+
+.wd-full .wd-center {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.wd-full .wd-graph-box {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+.wd-full .wd-yaml-box {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.ai-body .wd-full textarea.wd-yaml {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+.wd-full .wd-props {
+	max-height: none;
+	min-height: 0;
+}
+
 /* 좁은 화면에서는 위아래로 쌓는다 */
 @media screen and (max-width: 1200px) {
 	.wd-wrap {
 		flex-direction: column;
+	}
+
+	.wd-workspace.wd-full {
+		overflow-y: auto;
+	}
+
+	.wd-full .wd-wrap {
+		flex: none;
+	}
+
+	.wd-full .wd-graph-box {
+		flex: none;
+		height: 70vh;
 	}
 
 	.wd-palette {

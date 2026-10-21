@@ -51,7 +51,21 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div id="wd-message" class="wd-message"></div>
 			</section>
 
-			<section class="ai-panel">
+			<%-- 디자이너 작업 영역. [전체 화면]을 누르면 이 영역이 화면 전체를 덮는다(편집 상태는 그대로 이어진다).
+				전체 화면일 때만 맨 위 띠가 보이고, 위쪽 패널의 메시지와 상태 글자를 그 띠로 옮겨 온다 --%>
+			<section id="wd-workspace" class="ai-panel wd-workspace">
+				<div class="wd-full-bar">
+					<h3>Workflow 디자이너 <span id="wd-full-title" class="workflow-job-id"></span></h3>
+					<span id="wd-full-status-slot" class="wd-full-slot"></span>
+					<div id="wd-full-message-slot" class="wd-full-message"></div>
+					<div class="wd-full-actions">
+						<button type="button" class="kn-plain" data-proxy="wd-layout-btn">자동 배치</button>
+						<button type="button" class="kn-plain" data-proxy="wd-undo-btn" title="Ctrl+Z">되돌리기</button>
+						<button type="button" data-proxy="wd-check-btn">검사</button>
+						<button type="button" data-proxy="wd-save-btn">저장</button>
+						<button type="button" class="kn-plain wd-full-exit" data-full-toggle="1" title="Esc">전체 화면 끝내기</button>
+					</div>
+				</div>
 				<div class="wd-wrap">
 					<div class="wd-palette">
 						<p class="wd-palette-title">step 끌어 놓기</p>
@@ -80,6 +94,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							</label>
 							<label class="wd-check wd-hide-fail"><input type="checkbox" id="wd-hide-fail" /> FAIL로 가는 실패 화살표 숨기기</label>
 							<span id="wd-yaml-note" class="ai-hint"></span>
+							<button type="button" id="wd-full-btn" class="kn-plain wd-full-btn" data-full-toggle="1" title="디자이너를 화면 전체로 넓혀서 봅니다">전체 화면</button>
 						</div>
 						<div id="wd-graph-box" class="wd-graph-box">
 							<div id="wd-canvas" class="wd-canvas"></div>
