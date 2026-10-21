@@ -24,7 +24,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * 고른 경로는 output에 {route, reason}으로 남기고, 그 route로 다음 step을 정하는 일은
  * runtime.workflow.WorkFlowExecutor가 이어받습니다.
  *
- * LLM에게는 "경로만 고르고 질문에 답하지 말라"는 엔진 규칙(runtime.prompt.EnginePrompt.ROUTER)을 함께 보냅니다.
+ * LLM에게는 "경로만 고르고 질문에 답하지 말라", "route는 이 이름들 중 하나"라는 엔진 규칙(runtime.prompt.EnginePrompt.router())을 함께 보냅니다.
  *
  * 답을 {route, reason} 모양으로 받지 못하면(또는 input이 Agent input 모양이 아니면) 실패로 처리합니다(onFailure를 따릅니다).
  * 갈 곳을 고르지 못한 채로 계속 진행할 수는 없기 때문입니다.
@@ -50,7 +50,7 @@ public class RouterStepExecutor {
 		AgentDefinition agent = this.agentRegistry.resolve(step.agent(), execution.caller());
 		Map<String, Object> answer = null;
 		try {
-			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.routeDecision(step.routes().keySet()), EnginePrompt.ROUTER);
+			answer = (Map<String, Object>) this.agentExecutor.callForSchema(agent, execution.conversationIdOf(step), execution.caller(), input, JsonSchemaUtil.routeDecision(step.routes().keySet()), EnginePrompt.router(step.routes().keySet()));
 		} catch (AgentContractException e) {
 			// 왜 못 받았는지(답이 비었는지, JSON이 아닌지, 출력 한도에 걸렸는지)는 예외 메시지에 들어 있습니다.
 			return StepOutcome.failure(null, "라우팅 Agent 응답을 {route, reason} 모양으로 받지 못했습니다: " + e.getMessage());

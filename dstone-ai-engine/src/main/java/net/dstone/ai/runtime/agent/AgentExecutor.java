@@ -176,7 +176,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param caller    이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param input     Agent에게 넣을 값(Agent input 모양)
 	 * @param schema    LLM의 답이 따라야 할 JSON Schema
-	 * @param engineRule 엔진 규칙에 덧붙일 문구(EnginePrompt.SUPERVISOR / EnginePrompt.ROUTER). 덧붙일 것이 없으면 null
+	 * @param engineRule 엔진 규칙에 덧붙일 문구(EnginePrompt.SUPERVISOR / EnginePrompt.router()). 덧붙일 것이 없으면 null
 	 * @throws AgentContractException input이나 LLM의 답이 계약과 맞지 않을 때
 	 */
 	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule) {

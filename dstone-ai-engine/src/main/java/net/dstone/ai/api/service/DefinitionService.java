@@ -113,7 +113,7 @@ public class DefinitionService extends BaseObject {
 		List<DefinitionCatalog.AgentItem> agents = new ArrayList<>();
 		for (AgentDefinition definition : this.agentRegistry.all().values()) {
 			agents.add(new DefinitionCatalog.AgentItem(definition.id(), definition.version(), definition.description(), definition.role(), this.agentRegistry.pathOf(definition.id()),
-				definition.inputSchema(), definition.outputSchema(), definition.declaresOutput(), definition.toolNames(), definition.subAgentIds()));
+				definition.inputSchema(), definition.outputSchema(), definition.declaresOutput(), definition.promptText(), definition.toolNames(), definition.subAgentIds()));
 		}
 		agents.sort(new Comparator<DefinitionCatalog.AgentItem>() {
 			@Override

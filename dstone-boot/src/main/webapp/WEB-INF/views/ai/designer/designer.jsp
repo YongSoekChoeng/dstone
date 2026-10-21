@@ -239,6 +239,8 @@ input:
 							<ul class="wd-guide-notes">
 								<li>모양이 틀린 답은 실패입니다. <code>execution.onInvalidOutput: RETRY</code>와 <code>maxAttempts</code>를 적으면 그 횟수만큼 다시 묻습니다.</li>
 								<li>SUPERVISOR·ROUTER step에 쓰는 Agent는 output을 적지 않습니다. 결과 모양은 엔진이 정합니다(<code>{pass, reason}</code>, <code>{route, reason}</code>).</li>
+								<li>ROUTER의 <code>route</code>는 Workflow step의 <code>routes</code> 이름 중 하나로만 받습니다. LLM은 프롬프트에 적힌 경로 이름으로 답하므로, <b>routes 이름이 프롬프트에 그대로 있어야</b> 합니다.
+									다르면(예: 화살표를 이을 때 붙는 임시 이름 <code>경로1</code>을 그대로 둠) [검사]와 기동에서 막힙니다. step 설정의 "답 모양"에 이름마다 ✓/✕가 표시됩니다.</li>
 								<li>Workflow에서는 step의 <code>save: 이름</code>으로 결과를 저장하고, 다음 step이 <code>&#36;{state.이름.필드}</code>로 읽습니다.</li>
 							</ul>
 						</section>

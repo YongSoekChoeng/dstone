@@ -1508,12 +1508,13 @@ var DstoneAiDesigner = (function () {
 			html += "<p class=\"wd-desc\">" + escapeHtml(agent.description || "") + "</p>"
 				+ "<pre class=\"wd-schema\">받는 값\n" + escapeHtml(schemaText(agent.input)) + "</pre>";
 		}
-		if (engineFixed) {
-			html += "<p class=\"ai-hint\">" + step.type + " step에는 output을 선언하지 않은 Agent만 씁니다(답의 모양은 엔진이 정합니다).</p>";
-		}
 		html += "<div class=\"wd-inline-actions\">"
 			+ (agent ? "<button type=\"button\" class=\"kn-plain\" id=\"wd-open-agent-btn\">Agent 파일 열기</button>" : "")
 			+ "<button type=\"button\" class=\"kn-plain\" id=\"wd-new-agent-btn\">새 Agent</button></div>";
+		// SUPERVISOR/ROUTER는 답의 모양을 엔진이 정한다. 부를 Agent 바로 아래에 보여 준다.
+		if (engineFixed) {
+			html += "<div class=\"wd-fixed-sec\">" + fixedOutputBox(step) + "</div>";
+		}
 		return html;
 	}
 
@@ -1634,6 +1635,64 @@ var DstoneAiDesigner = (function () {
 		}
 	}
 
+	/* ====================================================================
+	 * SUPERVISOR / ROUTER: 답의 모양은 엔진이 정한다.
+	 * ROUTER는 LLM 답의 route를 routes 이름으로만 받으므로, 그 이름이 Agent 프롬프트에 그대로 있어야 한다
+	 * (엔진 검사 WorkFlowRegistry.checkRouteNames()와 같은 규칙).
+	 * ==================================================================== */
+
+	/** ROUTER step의 routes 이름 중 Agent 프롬프트에 없는 것들입니다. prompt를 주지 않으면 등록된 Agent의 프롬프트로 봅니다. */
+	function routesMissingInPrompt(step, prompt) {
+		if (prompt === undefined) {
+			var agent = findAgent(step.agent);
+			prompt = agent && agent.prompt ? agent.prompt : null;
+		}
+		if (prompt === null) {
+			return [];
+		}
+		return Object.keys(step.routes || {}).filter(function (name) {
+			return prompt.indexOf(name) < 0;
+		});
+	}
+
+	/** 엔진이 정한 답 모양을 글자로 보여 줍니다. */
+	function fixedOutputText(type, routeNames) {
+		if (type === "SUPERVISOR") {
+			return "{ pass: true | false, reason: 글자 }";
+		}
+		var names = routeNames.length ? routeNames.map(function (n) { return "\"" + n + "\""; }).join(" | ") : "(routes가 아직 없음)";
+		return "{ route: " + names + ", reason: 글자 }";
+	}
+
+	function fixedOutputBox(step) {
+		if (step.type !== "SUPERVISOR" && step.type !== "ROUTER") {
+			return "";
+		}
+		var html = "<h4>답 모양 <span class=\"wd-help\">엔진이 정함 - Agent에 output을 적지 않습니다</span></h4>";
+		if (step.type === "SUPERVISOR") {
+			return html + "<pre class=\"wd-schema wd-fixed-out\">" + escapeHtml(fixedOutputText("SUPERVISOR", [])) + "</pre>"
+				+ "<p class=\"ai-hint\">pass가 true면 next로, false면 onFailure로 갑니다.</p>";
+		}
+		var names = Object.keys(step.routes || {});
+		var missing = routesMissingInPrompt(step);
+		html += "<pre class=\"wd-schema wd-fixed-out\">" + escapeHtml(fixedOutputText("ROUTER", names)) + "</pre>"
+			+ "<p class=\"ai-hint\">LLM은 Agent 프롬프트에 적힌 경로 이름으로 답하고, 엔진은 그 답을 아래 routes 이름 중 하나로만 받습니다. 두 이름이 같아야 합니다.</p>";
+		if (names.length === 0) {
+			return html + "<p class=\"wd-route-bad\">routes가 없습니다. 아래쪽 동그라미를 끌어 갈 곳에 놓으면 경로가 생깁니다.</p>";
+		}
+		html += "<ul class=\"wd-route-list\">" + names.map(function (name) {
+			var bad = missing.indexOf(name) >= 0;
+			return "<li class=\"" + (bad ? "wd-route-bad" : "wd-route-ok") + "\"><span class=\"wd-route-mark\">" + (bad ? "✕" : "✓") + "</span>"
+				+ "<a href=\"javascript:void(0)\" data-edge-select=\"1\" data-kind=\"route\" data-route=\"" + escapeHtml(name) + "\"><b>" + escapeHtml(name) + "</b></a>"
+				+ " → " + escapeHtml(String(step.routes[name]))
+				+ (bad ? " <em>Agent 프롬프트에 없는 이름</em>" : "") + "</li>";
+		}).join("") + "</ul>";
+		if (missing.length > 0) {
+			html += "<p class=\"wd-route-bad\">이대로면 [검사]에서 막히고, 실행하면 \"route가 열거형에 없다\"로 실패합니다. 경로 이름을 눌러 프롬프트의 이름으로 바꾸거나, Agent 프롬프트에 그 이름과 고르는 기준을 적으십시오.</p>";
+		}
+		return html;
+	}
+
 	function outgoingList(step) {
 		var list = outgoing(step);
 		if (list.length === 0) {
@@ -1666,6 +1725,10 @@ var DstoneAiDesigner = (function () {
 		if (edge.kind === "route") {
 			var help = step.type === "APPROVAL" ? "승인자가 고르는 결정 이름(예: APPROVED, REJECTED)" : "ROUTER Agent가 고르는 경로 이름";
 			html += row("경로 이름", help, "<input type=\"text\" id=\"wd-edge-route\" value=\"" + escapeHtml(edge.route) + "\" />");
+			if (step.type === "ROUTER" && routesMissingInPrompt(step).indexOf(edge.route) >= 0) {
+				html += "<p class=\"wd-route-bad\">'" + escapeHtml(edge.route) + "'는 Agent(" + escapeHtml(step.agent || "") + ") 프롬프트에 없는 이름입니다."
+					+ " LLM은 프롬프트에 적힌 경로 이름으로 답하므로, 그 이름으로 바꾸십시오.</p>";
+			}
 		}
 		html += row("가는 곳", "", "<select id=\"wd-edge-target\">" + targetOptions(current.target) + "</select>");
 		html += "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-delete-edge-btn\">이 화살표 지우기</button>"
@@ -2201,10 +2264,10 @@ var DstoneAiDesigner = (function () {
 			+ "</div>"
 			+ "<section class=\"wd-agent-sec\"><h4>입출력 계약</h4>"
 			+ "<p class=\"ai-hint\">무엇을 받고 무엇을 돌려주는지 정합니다. 값 하나(예: 글자)이거나, 이름이 붙은 필드 묶음입니다. "
-			+ "output을 적지 않거나 string 값 하나면 답을 글자로 받고, 필드를 적으면 JSON으로 받아 검사합니다. 프롬프트의 <code>{필드}</code> 자리는 input 필드 값으로 채워집니다. "
+			+ "output을 적지 않거나 string 값 하나면 답을 글자로 받고, 필드를 적으면 JSON으로 받아 검사합니다. 프롬프트에서는 <code>${input.필드}</code>로 받은 값을, <code>${output.필드}</code>로 돌려줄 필드 이름을 씁니다(아래 프롬프트 칸의 [입력·출력 작성 가이드] 참고). "
 			+ "[직접 입력]을 고르면 짧은 타입 표기(Picoschema)로 바로 적을 수 있습니다.</p>"
 			+ row("input", "받는 값", "<div class=\"pe-host\" data-pico=\"input\"></div>")
-			+ row("output", "돌려주는 값(SUPERVISOR/ROUTER에 쓸 Agent는 적지 않습니다)", "<div class=\"pe-host\" data-pico=\"output\"></div>")
+			+ outputRow(f)
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Tool <span class=\"wd-help\">LLM이 스스로 골라 부를 수 있는 Tool</span></h4>"
 			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-all-tools\"" + (allTools ? " checked" : "") + " /> 전부(*) - 등록된 Tool을 모두 씀(TOOL step 전용 Tool은 빠짐)</label>"
@@ -2492,6 +2555,14 @@ var DstoneAiDesigner = (function () {
 			return;
 		}
 		var problems = promptProblems(prompt.value, agentSlots());
+		// 이 Agent를 부르는 ROUTER step의 routes 이름이 프롬프트에 있는지도 본다(엔진 검사 checkRouteNames()와 같은 규칙).
+		engineFixedUses(agentDoc && agentDoc.front ? agentDoc.front.id : null).forEach(function (step) {
+			if (step.type === "ROUTER") {
+				routesMissingInPrompt(step, prompt.value).forEach(function (name) {
+					problems.push({ text: "ROUTER step(" + step.id + ")의 경로 이름 '" + name + "'가 프롬프트에 없습니다. LLM은 프롬프트에 적힌 이름으로 답하므로, 이 이름과 고르는 기준을 적으십시오(또는 Workflow의 routes 이름을 바꾸십시오)." });
+				});
+			}
+		});
 		if (problems.length === 0) {
 			var count = (prompt.value.split("\\${").join("").match(/\$\{/g) || []).length;
 			box.className = "wd-prompt-lint" + (count > 0 ? " wd-prompt-lint-ok" : "");
@@ -2564,6 +2635,40 @@ var DstoneAiDesigner = (function () {
 
 	function closeGuide() {
 		els.guideDialog.style.display = "none";
+	}
+
+	/** 지금 Workflow에서 이 Agent를 부르는 SUPERVISOR/ROUTER step들입니다(답의 모양을 엔진이 정하는 step). */
+	function engineFixedUses(agentId) {
+		if (!doc || !doc.model || !agentId) {
+			return [];
+		}
+		return steps().filter(function (step) {
+			return step.agent === agentId && (step.type === "SUPERVISOR" || step.type === "ROUTER");
+		});
+	}
+
+	/**
+	 * Agent 창의 output 칸입니다. 이 Agent를 SUPERVISOR/ROUTER step이 부르면 output은 엔진이 정하므로 편집 칸 대신 그 모양을 보여 줍니다.
+	 * (이미 output을 적어 두었으면 지울 수 있게 편집 칸도 함께 보여 줍니다.)
+	 */
+	function outputRow(f) {
+		var uses = engineFixedUses(f.id);
+		if (uses.length === 0) {
+			return row("output", "돌려주는 값(SUPERVISOR/ROUTER에 쓸 Agent는 적지 않습니다)", "<div class=\"pe-host\" data-pico=\"output\"></div>");
+		}
+		var html = "<div class=\"wd-fixed-out-box\"><b>output은 엔진이 정합니다</b>"
+			+ "<p>이 Agent는 지금 Workflow의 " + uses.map(function (step) { return step.type + " step(" + escapeHtml(step.id) + ")"; }).join(", ") + "에서 쓰입니다. 답은 늘 이 모양입니다.</p>"
+			+ uses.map(function (step) {
+				return "<pre class=\"wd-schema wd-fixed-out\">" + escapeHtml(step.id + ": " + fixedOutputText(step.type, Object.keys(step.routes || {}))) + "</pre>";
+			}).join("")
+			+ (uses.some(function (step) { return step.type === "ROUTER"; })
+				? "<p>route 이름은 Workflow의 routes에서 정해지고, 프롬프트에 그 이름이 그대로 있어야 LLM이 맞게 답합니다. 프롬프트에서 각 이름을 고르는 기준을 적으십시오.</p>" : "")
+			+ "</div>";
+		if (f.output !== undefined) {
+			html += "<p class=\"wd-route-bad\">그런데 이 Agent에는 output이 적혀 있습니다. 이대로면 [검사]에서 막히니 아래에서 [적지 않음]으로 바꾸십시오.</p>"
+				+ "<div class=\"pe-host\" data-pico=\"output\"></div>";
+		}
+		return row("output", "", html);
 	}
 
 	function readAgentField(key, input) {

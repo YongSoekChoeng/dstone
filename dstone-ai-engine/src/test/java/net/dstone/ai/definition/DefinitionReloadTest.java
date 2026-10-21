@@ -77,6 +77,19 @@ public class DefinitionReloadTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void ROUTER의_경로_이름이_Agent_프롬프트에_없으면_검사에서_막힌다() {
+		String workflowId = "sample-router-multiway";
+		String path = this.workFlowRegistry.pathOf(workflowId);
+		// 디자이너가 화살표를 이을 때 붙이는 임시 이름을 그대로 둔 경우
+		String text = this.definitionService.source("workflows", workflowId).text().replace("      billing:", "      경로1:");
+
+		DefinitionChangeResult result = this.definitionService.check("workflows", new DefinitionChangeRequest(path, path, text, null));
+
+		assertThat(result.ok()).isFalse();
+		assertThat(result.message()).contains("[경로1]").contains("프롬프트에 없습니다");
+	}
+
+	@Test
 	void 틀린_내용은_이유를_돌려주고_등록된_정의는_그대로다() {
 		WorkFlowDefinition registered = this.workFlowRegistry.all().get(WORKFLOW_ID);
 		String path = this.workFlowRegistry.pathOf(WORKFLOW_ID);

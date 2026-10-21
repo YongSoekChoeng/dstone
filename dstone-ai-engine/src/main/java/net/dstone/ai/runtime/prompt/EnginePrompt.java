@@ -1,5 +1,7 @@
 package net.dstone.ai.runtime.prompt;
 
+import java.util.Collection;
+
 import net.dstone.common.utils.StringUtil;
 
 /**
@@ -47,6 +49,15 @@ public final class EnginePrompt {
 	public static final String ROUTER = String.join("\n"
 		, "- 당신의 일은 경로를 하나 고르는 것입니다. 사용자의 질문에 답하거나 작업을 수행하지 않습니다."
 	);
+
+	/**
+	 * ROUTER step에 덧붙이는 규칙입니다. 고를 수 있는 경로 이름(step의 routes 이름)을 함께 밝힙니다.
+	 *
+	 * @param routes 고를 수 있는 경로 이름들
+	 */
+	public static String router(Collection<String> routes) {
+		return ROUTER + "\n- route에는 다음 이름 중 하나만 글자 그대로 적습니다: " + String.join(", ", routes);
+	}
 
 	/** 다른 Agent가 일을 맡겨서 불린 Agent(Sub Agent)에 덧붙이는 규칙입니다. */
 	public static final String SUB_AGENT = String.join("\n"

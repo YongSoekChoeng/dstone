@@ -66,6 +66,7 @@ import net.dstone.common.utils.StringUtil;
  *                         (경고) tools.allowed: ["*"]로 Tool을 전부 열어 두지 않았는가
  *    - TOOL: with의 인자 이름이 Tool의 인자 스키마와 맞는가(Tool을 찾지 못하면 경고만 남기고 실행 중에 검사)
  *    - ROUTER/APPROVAL: routes가 최소 1개 있는가(APPROVAL은 approval.rejectTo만 있어도 됨)
+ *    - ROUTER: routes의 이름이 부르는 Agent의 프롬프트에 모두 적혀 있는가(LLM은 프롬프트의 이름으로 답하고 엔진은 routes 이름만 받음)
  *    - memory: true와 forEach를 함께 쓰지 않았는가, forEach가 값 전체가 표현식 하나인가
  * 4) 저장(validateOutput, 오류): step의 save / saveError / saveInput / saveEach에 대해
  *    - 이름이 state:에 선언되어 있는가(state.이름이 아니라 이름만 적었는가)
@@ -448,6 +449,7 @@ public class WorkFlowRegistry extends BaseObject {
 				if (router.routes() == null || router.routes().isEmpty()) {
 					throw this.error(definition, step, "ROUTER step은 routes를 최소 1개 이상 정의해야 합니다.");
 				}
+				this.checkRouteNames(definition, step, router);
 				break;
 			case ToolStepDefinition tool:
 				Map<String, Object> toolSchema = this.toolInputSchema(tool.tool());
@@ -502,6 +504,33 @@ public class WorkFlowRegistry extends BaseObject {
 			throw this.error(definition, step, "with가 있어야 합니다(Agent에게 무엇을 넣을지). 예: with: ${input} 또는 with: ${state.앞에서저장한이름}");
 		}
 		this.checkInputShape(definition, step, "agent[" + agentId + "]의 input", agent.inputSchema(), input);
+	}
+
+	/**
+	 * <pre>
+	 * ROUTER step의 routes 이름이 부르는 Agent의 프롬프트에 모두 적혀 있는지 봅니다.
+	 * 엔진은 LLM 답의 route를 routes 이름으로 강제하는데, LLM은 프롬프트에 적힌 경로 이름을 보고 고릅니다.
+	 * 둘이 다르면(예: 디자이너가 붙인 임시 이름 경로1을 그대로 둠) 실행할 때마다 "route가 열거형에 없다"로 실패합니다.
+	 * </pre>
+	 *
+	 * @param definition 검사 중인 Workflow 정의
+	 * @param step       검사할 step
+	 * @param router     ROUTER step 정의
+	 */
+	private void checkRouteNames(WorkFlowDefinition definition, StepDefinition step, RouterStepDefinition router) {
+		AgentDefinition agent = this.agentOf(router.agent());
+		String prompt = agent == null || agent.promptText() == null ? "" : agent.promptText();
+		List<String> missing = new ArrayList<>();
+		for (String name : router.routes().keySet()) {
+			if (!prompt.contains(name)) {
+				missing.add(name);
+			}
+		}
+		if (!missing.isEmpty()) {
+			throw this.error(definition, step, "routes의 경로 이름 " + missing + "이 agent[" + router.agent() + "]의 프롬프트에 없습니다."
+				+ " LLM은 프롬프트에 적힌 경로 이름으로 답하고, 엔진은 그 답을 routes 이름(" + router.routes().keySet() + ") 중 하나로만 받습니다."
+				+ " routes 이름을 프롬프트의 경로 이름과 똑같이 맞추거나, 프롬프트에 그 이름과 고르는 기준을 적으십시오.");
+		}
 	}
 
 	/**

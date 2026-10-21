@@ -32,4 +32,5 @@ steps:
     with: ${input}
     agent: sm-decide-job-kind-agent
     routes:
-      경로1: END
+      일반: END
+      신규개발: END
