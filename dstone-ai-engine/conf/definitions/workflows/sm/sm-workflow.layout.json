@@ -5,12 +5,12 @@
       "y" : -170
     },
     "END" : {
-      "x" : 730,
+      "x" : 290,
       "y" : 670
     },
     "FAIL" : {
-      "x" : -220,
-      "y" : 670
+      "x" : -250,
+      "y" : 680
     },
     "step02_test_agent" : {
       "x" : 220,
@@ -23,6 +23,18 @@
     "step02_decideJobKind" : {
       "x" : 140,
       "y" : 0
+    },
+    "step03_getAffectedForNew" : {
+      "x" : 460,
+      "y" : 140
+    },
+    "step03_getAffectedForGen" : {
+      "x" : -120,
+      "y" : 140
+    },
+    "step03" : {
+      "x" : -90,
+      "y" : 140
     }
   },
   "edges" : {
@@ -43,16 +55,13 @@
     "step02_decideJobKind|route|신규개발" : [ {
       "x" : 440,
       "y" : 90
+    }, {
+      "x" : 565,
+      "y" : 90
     } ],
     "step02_decideJobKind|route|일반" : [ {
-      "x" : 40,
+      "x" : 0,
       "y" : 90
-    }, {
-      "x" : -130,
-      "y" : 120
-    }, {
-      "x" : -130,
-      "y" : 440
     } ]
   }
 }
