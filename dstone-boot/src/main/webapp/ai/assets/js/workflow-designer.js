@@ -1342,7 +1342,8 @@ var DstoneAiDesigner = (function () {
 			+ row("description", "", "<textarea data-wf=\"description\" rows=\"2\">" + escapeHtml(m.description || "") + "</textarea>")
 			+ row("allowedCallers", "쉼표로 구분, 비우면 누구나", "<input type=\"text\" data-wf=\"allowedCallers\" value=\"" + escapeHtml((m.allowedCallers || []).join(", ")) + "\" />")
 			+ row("settings.maxIterations", "step 실행 횟수 한도", "<input type=\"number\" min=\"1\" data-wf=\"settings.maxIterations\" value=\"" + escapeHtml(settings.maxIterations === undefined ? "" : String(settings.maxIterations)) + "\" />")
-			+ row("settings.checkpoint", "", "<label class=\"wd-check\"><input type=\"checkbox\" data-wf=\"settings.checkpoint\"" + (settings.checkpoint ? " checked" : "") + " /> step마다 상태 저장</label>")
+			// settings.checkpoint는 엔진이 읽지 않는다(늘 저장, false는 기동 검사에서 막힘). 고칠 것이 없으니 안내만 하고, 파일에 있으면 그대로 둔다.
+			+ "<p class=\"ai-hint\">실행 상태는 step이 끝날 때마다 늘 DB에 저장됩니다(settings.checkpoint와 상관없음).</p>"
 			+ row("input", "실행 요청의 input 모양", "<div class=\"pe-host\" id=\"wd-wf-input\"></div>")
 			+ row("state", "저장하는 이름: 설명", "<textarea data-wf=\"state\" rows=\"5\" class=\"wd-code\">" + escapeHtml(valueToText(m.state)) + "</textarea>"
 				+ "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-tidy-state-btn\">step의 save에 맞추기</button></div>")
@@ -1379,9 +1380,6 @@ var DstoneAiDesigner = (function () {
 	}
 
 	function readWorkflowField(key, input) {
-		if (key === "settings.checkpoint") {
-			return input.checked ? true : undefined;
-		}
 		if (key === "settings.maxIterations") {
 			return input.value === "" ? undefined : parseInt(input.value, 10);
 		}
