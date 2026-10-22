@@ -20,6 +20,7 @@ state:
 steps:
 
   - id: step01_readCustReq
+    name: 고객요청사항판단
     type: TOOL
     tool: readFile
     with:
@@ -29,6 +30,7 @@ steps:
     next: step02_decideJobKind
 
   - id: step02_decideJobKind
+    name: 신규/일반(수정) 판단
     type: ROUTER
     with: ${input}
     agent: sm-decide-job-kind-agent
@@ -37,12 +39,14 @@ steps:
       일반: step03_getAffectedForGen
 
   - id: step03_getAffectedForNew
+    name: 신규처리-영향도파악
     type: AGENT
     with: ${state.custReq}
     save: affected_resources
     agent: sm-architect-agent
 
   - id: step03_getAffectedForGen
+    name: 일반처리-영향도파악
     type: AGENT
     with:
       workDir: ${input}
