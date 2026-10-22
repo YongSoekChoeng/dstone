@@ -38,10 +38,6 @@
     }
   },
   "edges" : {
-    "step01_readCustReq|next|" : [ {
-      "x" : 40,
-      "y" : 20
-    } ],
     "step01_readCustReq|onFailure|" : [ {
       "x" : -170,
       "y" : 20
@@ -51,17 +47,12 @@
     }, {
       "x" : -240,
       "y" : 580
-    } ],
-    "step02_decideJobKind|route|신규개발" : [ {
-      "x" : 440,
-      "y" : 90
-    }, {
-      "x" : 565,
-      "y" : 90
-    } ],
-    "step02_decideJobKind|route|일반" : [ {
-      "x" : 0,
-      "y" : 90
     } ]
+  },
+  "ports" : {
+    "step01_readCustReq|next|" : {
+      "source" : "right",
+      "target" : "in"
+    }
   }
 }
