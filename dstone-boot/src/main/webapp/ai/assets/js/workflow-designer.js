@@ -20,7 +20,7 @@ var DstoneAiDesigner = (function () {
 	var END_ID = "END";
 	var FAIL_ID = "FAIL";
 	var STEP_W = 230;
-	var STEP_H = 58;
+	var STEP_H = 72;
 	var TERM_SIZE = 48;
 	var STEP_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -707,6 +707,28 @@ var DstoneAiDesigner = (function () {
 		});
 	}
 
+	/**
+	 * step 이름(name)을 바꿉니다. YAML에서 id 바로 아래에 오도록 키 순서를 다시 맞춥니다.
+	 * 빈 글자면 name을 지웁니다.
+	 */
+	function setStepName(step, name) {
+		var id = step.id;
+		var rest = {};
+		Object.keys(step).forEach(function (key) {
+			if (key !== "id" && key !== "name") {
+				rest[key] = step[key];
+			}
+			delete step[key];
+		});
+		step.id = id;
+		if (name) {
+			step.name = name;
+		}
+		Object.keys(rest).forEach(function (key) {
+			step[key] = rest[key];
+		});
+	}
+
 	/** step의 바깥으로 나가는 화살표 목록입니다. [{kind, route, target}] */
 	function outgoing(step) {
 		var list = [];
@@ -1269,7 +1291,8 @@ var DstoneAiDesigner = (function () {
 			data: { kind: "step", type: step.type },
 			attrs: {
 				body: { fill: color.fill, stroke: color.stroke, strokeWidth: isSelectedStep(step.id) ? 3 : 1.5, rx: 8, ry: 8 },
-				label: { text: shorten(step.id, 30) + "\n" + shorten(second, 34), fill: "#283121", fontSize: 12 }
+				// 이름(name)이 있으면 맨 윗줄에 이름, 그 아래에 id를 보여 준다.
+				label: { text: (step.name ? shorten(step.name, 22) + "\n" : "") + shorten(step.id, 30) + "\n" + shorten(second, 34), fill: "#283121", fontSize: 12 }
 			},
 			ports: { groups: PORT_GROUPS, items: portItems(["in", "out"]) }
 		};
@@ -1746,7 +1769,8 @@ var DstoneAiDesigner = (function () {
 	function showStepPanel(step) {
 		var fields = STEP_FIELDS[step.type] || [];
 		var html = "<h4><span class=\"wd-type-chip wd-type-" + escapeHtml(step.type) + "\">" + escapeHtml(step.type) + "</span> step</h4>"
-			+ row("id", "영문, 숫자, 밑줄", "<input type=\"text\" id=\"wd-step-id\" value=\"" + escapeHtml(step.id) + "\" />");
+			+ row("id", "영문, 숫자, 밑줄", "<input type=\"text\" id=\"wd-step-id\" value=\"" + escapeHtml(step.id) + "\" />")
+			+ row("name", "사람이 읽는 이름(예: 요구사항 분석). 실행에는 안 씀", "<input type=\"text\" id=\"wd-step-name\" value=\"" + escapeHtml(step.name === undefined || step.name === null ? "" : String(step.name)) + "\" />");
 		fields.forEach(function (key) {
 			var value = getValue(step, key);
 			if (key === "agent") {
@@ -1771,6 +1795,12 @@ var DstoneAiDesigner = (function () {
 
 		document.getElementById("wd-step-id").addEventListener("change", function (e) {
 			renameStep(step.id, e.target.value.trim());
+		});
+		document.getElementById("wd-step-name").addEventListener("change", function (e) {
+			var name = e.target.value.trim();
+			change(function () {
+				setStepName(step, name);
+			});
 		});
 		Array.prototype.forEach.call(els.props.querySelectorAll("[data-step]"), function (input) {
 			input.addEventListener("change", function () {
@@ -2261,7 +2291,7 @@ var DstoneAiDesigner = (function () {
 		els.agentText.value = text;
 		agentTextEdited = false;
 		var problem = readAgentText(text);
-		els.agentDialog.style.display = "";
+		els.agentDialog.style.display = "flex";
 		document.getElementById("wd-agent-save-btn").disabled = !catalog.editable;
 		updateAgentPathHint();
 		if (problem) {

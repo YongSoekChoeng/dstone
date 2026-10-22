@@ -30,7 +30,7 @@ import net.dstone.common.utils.StringUtil;
  * "쓸 수 없는 키"로 바로 막힙니다.
  *
  * ## 이 interface가 하는 일
- * steps 목록에 다섯 종류가 섞여 들어오므로, 그 목록의 공통 타입으로만 씁니다. 모든 종류에 있는 값(id, type, save, onFailure)만
+ * steps 목록에 다섯 종류가 섞여 들어오므로, 그 목록의 공통 타입으로만 씁니다. 모든 종류에 있는 값(id, name, type, save, onFailure)만
  * 여기에 두고, 나머지는 각 record에서 꺼냅니다. sealed interface라서 다섯 record 말고는 step이 될 수 없고,
  * switch로 step 종류를 나눌 때 빠뜨린 종류가 있으면 컴파일러가 알려줍니다.
  * 종류마다 있기도 하고 없기도 한 값(부르는 대상, next, forEach, memory)을 꺼내는 일은 아래 static 메서드가 한곳에서 맡습니다.
@@ -40,6 +40,9 @@ import net.dstone.common.utils.StringUtil;
  *   Tool(인자 스키마)이 정하고, step은 "무엇을 넣을지(with)", "결과를 어디에 둘지(save)", "다음에 어디로 갈지"만 적습니다.
  *
  * - id: 영문, 숫자, 밑줄(_)만 씁니다(예: step01). END/FAIL은 예약어라 id로 쓸 수 없습니다.
+ *
+ * - name: 사람이 읽는 이름입니다(예: 요구사항 분석). 한글·띄어쓰기 모두 됩니다. 디자이너 화면에서 step의 성격을
+ *   한눈에 보이게 할 뿐 실행에는 쓰지 않으므로 비워도 됩니다.
  *
  * - with: 이 step에 넣어줄 값입니다. ${ ... }는 step이 실행되기 직전에 엔진이 읽어 와서 채우고,
  *   그 밖의 값은 적힌 그대로 넘깁니다(규칙은 common.expression.ContextResolver 참고).
@@ -91,6 +94,9 @@ public sealed interface StepDefinition
 
 	/** 이 step을 가리키는 이름입니다. next/onFailure/routes가 이 이름을 씁니다. */
 	String id();
+
+	/** 사람이 읽는 step 이름입니다(예: 요구사항 분석). 디자이너 화면에서 id 아래에 보여 줄 뿐, 실행에는 쓰지 않습니다. 비워도 됩니다. */
+	String name();
 
 	/** 이 step의 종류입니다. YAML의 type 값이며, record마다 정해져 있습니다. */
 	StepType type();

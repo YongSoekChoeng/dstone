@@ -39,12 +39,14 @@ import net.dstone.ai.common.consts.StepType;
  * </pre>
  *
  * @param id       (필수)이 step의 이름입니다. decision API가 이 id로 결정을 기록합니다.
+ * @param name     (옵셔널)사람이 읽는 step 이름입니다(예: 요구사항 분석). 디자이너 화면에 id와 함께 보이고, 실행에는 쓰이지 않습니다.
  * @param approval (옵셔널)무엇을 누가 승인하는지입니다.
  * @param save     (옵셔널)결정({decision, approver, comment})을 저장할 state 이름입니다.
  * @param routes   (필수)고를 수 있는 결정 이름 → 이동할 step id(또는 "END"/"FAIL")입니다(approval.rejectTo만 적어도 됩니다).
  */
 public record ApprovalStepDefinition(
 	String id
+	, String name
 	, Approval approval
 	, String save
 	, Map<String, String> routes

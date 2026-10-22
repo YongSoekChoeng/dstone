@@ -29,6 +29,7 @@ import net.dstone.ai.common.consts.StepType;
  * </pre>
  *
  * @param id           (필수)이 step의 이름입니다.
+ * @param name         (옵셔널)사람이 읽는 step 이름입니다(예: 요구사항 분석). 디자이너 화면에 id와 함께 보이고, 실행에는 쓰이지 않습니다.
  * @param tool         (필수)부를 Tool의 이름입니다(@Tool 메서드 이름 또는 MCP Tool 이름).
  * @param input        (옵셔널)Tool 인자 이름 → 값(표현식 또는 리터럴)입니다. YAML 키는 with입니다. 비워두면 빈 인자입니다.
  * @param save         (옵셔널)이 step이 돌려준 값을 저장할 state 이름입니다(예: analysis → ${state.analysis}).
@@ -42,6 +43,7 @@ import net.dstone.ai.common.consts.StepType;
  */
 public record ToolStepDefinition(
 	String id
+	, String name
 	, String tool
 	, @JsonProperty("with") Map<String, Object> input
 	, String save

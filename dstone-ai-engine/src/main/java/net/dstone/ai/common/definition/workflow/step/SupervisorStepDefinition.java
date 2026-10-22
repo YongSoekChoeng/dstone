@@ -23,6 +23,7 @@ import net.dstone.ai.common.consts.StepType;
  * </pre>
  *
  * @param id           (필수)이 step의 이름입니다.
+ * @param name         (옵셔널)사람이 읽는 step 이름입니다(예: 요구사항 분석). 디자이너 화면에 id와 함께 보이고, 실행에는 쓰이지 않습니다.
  * @param agent        (필수)판정을 맡길 Agent의 id입니다.
  * @param input        (필수)Agent에게 넣을 값입니다. YAML 키는 with입니다(Agent input 모양).
  * @param save         (옵셔널)판정 결과({pass, reason})를 저장할 state 이름입니다.
@@ -37,6 +38,7 @@ import net.dstone.ai.common.consts.StepType;
  */
 public record SupervisorStepDefinition(
 	String id
+	, String name
 	, String agent
 	, @JsonProperty("with") Object input
 	, String save

@@ -15,6 +15,7 @@ import net.dstone.ai.common.consts.StepType;
  * - 답이 Agent output 모양이 아니면(또는 input이 Agent input 모양이 아니면) 이 step은 실패입니다.
  *
  *   - id: step01
+ *     name: 요구사항 분석
  *     type: AGENT
  *     agent: pilot-requirment-analyzer-agent
  *     with:
@@ -24,6 +25,7 @@ import net.dstone.ai.common.consts.StepType;
  * </pre>
  *
  * @param id           (필수)이 step의 이름입니다.
+ * @param name         (옵셔널)사람이 읽는 step 이름입니다(예: 요구사항 분석). 디자이너 화면에 id와 함께 보이고, 실행에는 쓰이지 않습니다.
  * @param agent        (필수)부를 Agent의 id입니다.
  * @param input        (필수)Agent에게 넣을 값입니다. YAML 키는 with입니다(Agent input 모양. 표현식/리터럴, 또는 그것들의 맵).
  * @param save         (옵셔널)이 step이 돌려준 값을 저장할 state 이름입니다(예: analysis → ${state.analysis}).
@@ -38,6 +40,7 @@ import net.dstone.ai.common.consts.StepType;
  */
 public record AgentStepDefinition(
 	String id
+	, String name
 	, String agent
 	, @JsonProperty("with") Object input
 	, String save
