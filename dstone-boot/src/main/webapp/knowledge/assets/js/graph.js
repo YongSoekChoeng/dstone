@@ -733,10 +733,35 @@ var DstoneKnowledgeGraph = (function () {
 			+ "<b>" + K.escapeHtml(name) + "</b></div>";
 	}
 
+	/** 테이블의 컬럼. DB 정의가 아니라, 분석한 SQL에 적힌 컬럼을 모은 것입니다 */
+	function tableColumns(columns, coverage) {
+		var unread = Number(coverage.unread || 0);
+		var statements = Number(coverage.statements || 0);
+		var html = "<div class=\"kn-section-title\">컬럼 · " + columns.length + "개 <span class=\"ai-hint\">(DB 정의가 아니라 SQL에 적힌 컬럼입니다)</span></div>";
+		if (columns.length > 0) {
+			html += "<div class=\"kn-gd-rows\">" + columns.map(function (column) {
+				return "<div><span class=\"kn-mono\">" + K.escapeHtml(column.column) + "</span> <span class=\"ai-hint\">SQL " + K.escapeHtml(column.statementCount)
+					+ "건" + (column.crud ? " · " + K.escapeHtml(column.crud.split("").join("·")) : "") + "</span></div>";
+			}).join("") + "</div>";
+		}
+		if (statements > 0 && unread === statements) {
+			html += "<p class=\"ai-hint\">컬럼 정보가 없습니다. SQL을 파서로 읽지 못했거나, 컬럼을 모으기 전에 분석한 리비전입니다. "
+				+ "뒤의 경우라면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.</p>";
+		} else if (unread > 0) {
+			html += "<p class=\"ai-hint\">SQL " + unread + "건은 파서로 읽지 못해 컬럼을 뽑지 못했습니다. 위 목록에 빠진 컬럼이 있을 수 있습니다.</p>";
+		} else if (columns.length === 0) {
+			html += "<p class=\"ai-hint\">SQL에 이름이 적힌 컬럼이 없습니다(SELECT * 등).</p>";
+		}
+		return html;
+	}
+
 	/** 서버가 준 노드 상세(GET .../graph/node)를 그립니다. 종류마다 들어 있는 항목이 달라서, 있는 것만 그립니다 */
 	function detailBody(detail) {
 		var html = "<div class=\"kn-mono kn-gd-full\">" + K.escapeHtml(detail.fullName) + "</div>";
 		var facts = [];
+		if (detail.kind === "TABLE") {
+			facts.push(["테이블명", "<span class=\"kn-mono\">" + K.escapeHtml(detail.name) + "</span>"]);
+		}
 		if (detail.layer) {
 			facts.push(["계층", K.escapeHtml(detail.layer) + (detail.layerConfidence ? " (" + K.confidence(detail.layerConfidence) + ")" : "")]);
 		}
@@ -760,6 +785,9 @@ var DstoneKnowledgeGraph = (function () {
 			html += "<table class=\"kn-gd-facts\">" + facts.map(function (fact) {
 				return "<tr><th>" + fact[0] + "</th><td>" + fact[1] + "</td></tr>";
 			}).join("") + "</table>";
+		}
+		if (detail.kind === "TABLE") {
+			html += tableColumns(detail.columns || [], detail.columnCoverage || {});
 		}
 
 		if (detail.endpoints && detail.endpoints.length > 0) {

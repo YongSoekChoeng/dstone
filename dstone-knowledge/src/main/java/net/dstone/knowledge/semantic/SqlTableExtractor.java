@@ -1,23 +1,31 @@
 package net.dstone.knowledge.semantic;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.merge.Merge;
+import net.sf.jsqlparser.statement.select.FromItem;
+import net.sf.jsqlparser.statement.select.Join;
+import net.sf.jsqlparser.statement.select.PlainSelect;
+import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.update.Update;
+import net.sf.jsqlparser.statement.update.UpdateSet;
 import net.sf.jsqlparser.util.TablesNamesFinder;
 
 /**
@@ -37,6 +45,9 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
  * 라이브러리가 주는 시간 제한 기능은 쓰지 않습니다. 그 기능은 파싱을 다른 스레드에 맡기고 시간이 지나면 기다리기만 그만둘 뿐,
  * 그 스레드는 계속 돌면서 CPU를 씁니다. 실제로 매퍼 1,900개를 돌렸을 때 그런 스레드가 수십 개 쌓여 서버 전체가 느려졌습니다.
  * 빠른 모드로 못 읽는 SQL은 정규식으로 찾으면 충분합니다.
+ *
+ * 파서로 읽은 SQL에서는 테이블마다 쓰인 컬럼 이름도 모읍니다(ColumnFinder).
+ * 어느 테이블의 컬럼인지 확실할 때만 넣습니다. 정규식으로 찾은 SQL에서는 컬럼을 뽑지 않습니다.
  * </pre>
  */
 public class SqlTableExtractor {
@@ -71,6 +82,13 @@ public class SqlTableExtractor {
 	/** FROM / JOIN / INTO / UPDATE 뒤에 오는 이름 */
 	private static final Pattern TABLE_AFTER_KEYWORD = Pattern.compile("(?i)\\b(FROM|JOIN|INTO|UPDATE)\\s+([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)");
 
+	/** 한 SQL에서 테이블 하나에 모으는 컬럼 수의 한도 */
+	private static final int MAX_COLUMNS = 300;
+
+	/** 컬럼 자리에 오지만 컬럼이 아닌 것들(DB가 주는 값, 예약어) */
+	private static final String NOT_COLUMNS = "|SYSDATE|SYSTIMESTAMP|CURRENT_DATE|CURRENT_TIMESTAMP|CURRENT_TIME|LOCALTIMESTAMP|LOCALTIME"
+			+ "|ROWNUM|ROWID|LEVEL|USER|NULL|TRUE|FALSE|NEXTVAL|CURRVAL|";
+
 	/** 테이블 이름 자리에 올 수 있지만 테이블이 아닌 것들 */
 	private static final String NOT_TABLES = "|SELECT|DUAL|SET|WHERE|LATERAL|TABLE|ONLY|VALUES|X_|";
 
@@ -90,10 +108,18 @@ public class SqlTableExtractor {
 		/** 파서가 아니라 정규식으로 찾았으면 true */
 		public final boolean guessed;
 
+		/** 이 SQL에서 쓰인 이 테이블의 컬럼(대문자, 이름 순). 정규식으로 찾았으면 null(읽지 못함) */
+		public final List<String> columns;
+
 		TableUse(String table, String crud, boolean guessed) {
+			this(table, crud, guessed, null);
+		}
+
+		TableUse(String table, String crud, boolean guessed, List<String> columns) {
 			this.table = table;
 			this.crud = crud;
 			this.guessed = guessed;
+			this.columns = columns;
 		}
 	}
 
@@ -183,11 +209,13 @@ public class SqlTableExtractor {
 		}
 		String targetName = target == null ? null : normalize(target.getFullyQualifiedName());
 
+		ColumnFinder finder = new ColumnFinder();
+		List<String> names = finder.getTableList(statement);
+
 		Map<String, TableUse> uses = new LinkedHashMap<String, TableUse>();
 		if (targetName != null) {
-			uses.put(targetName + "|" + targetCrud, new TableUse(targetName, targetCrud, false));
+			uses.put(targetName + "|" + targetCrud, new TableUse(targetName, targetCrud, false, finder.columnsOf(targetName)));
 		}
-		List<String> names = new TablesNamesFinder().getTableList(statement);
 		boolean targetSeen = false;
 		for (int i = 0; i < names.size(); i++) {
 			String name = normalize(names.get(i));
@@ -199,9 +227,217 @@ public class SqlTableExtractor {
 				targetSeen = true;
 				continue;
 			}
-			uses.put(name + "|R", new TableUse(name, "R", false));
+			uses.put(name + "|R", new TableUse(name, "R", false, finder.columnsOf(name)));
 		}
 		return new ArrayList<TableUse>(uses.values());
+	}
+
+	/**
+	 * <pre>
+	 * 테이블 이름을 모으면서, 어느 테이블의 컬럼인지 확실한 컬럼도 함께 모읍니다.
+	 *
+	 * SELECT / UPDATE / DELETE 마다 "지금 보고 있는 FROM"을 쌓아 두고 컬럼을 그 기준으로 가립니다.
+	 *   A.COL  : 별칭 A가 가리키는 테이블. 안쪽 FROM부터 바깥으로 찾는다(서브쿼리가 바깥 별칭을 쓰는 경우).
+	 *            서브쿼리에 붙인 별칭이거나 어디에도 없는 이름이면 넣지 않는다.
+	 *   COL    : 그 FROM에 테이블이 하나뿐일 때만 그 테이블. 둘 이상이거나 서브쿼리가 끼어 있으면 넣지 않는다.
+	 *   INSERT 의 컬럼 목록, UPDATE 의 SET 왼쪽은 대상 테이블의 컬럼이다.
+	 * SELECT 목록에서 붙인 별칭(AS CNT)은 컬럼이 아니므로 뺍니다.
+	 * </pre>
+	 */
+	private class ColumnFinder extends TablesNamesFinder {
+
+		/** FROM 하나에 있는 이름(별칭 또는 테이블 이름) → 테이블. 서브쿼리 별칭이면 "" */
+		private final List<Map<String, String>> scopes = new ArrayList<Map<String, String>>();
+
+		/** 그 FROM에 테이블이 하나뿐이면 그 테이블, 아니면 null */
+		private final List<String> onlyTables = new ArrayList<String>();
+
+		private final Set<String> selectAliases = new HashSet<String>();
+
+		private final Map<String, Set<String>> columns = new HashMap<String, Set<String>>();
+
+		/** 이 테이블에서 쓰인 컬럼. 하나도 없으면 빈 목록 */
+		List<String> columnsOf(String table) {
+			Set<String> found = columns.get(table);
+			return found == null ? new ArrayList<String>() : new ArrayList<String>(found);
+		}
+
+		@Override
+		public void visit(PlainSelect select) {
+			List<FromItem> items = new ArrayList<FromItem>();
+			items.add(select.getFromItem());
+			addJoins(items, select.getJoins());
+			if (select.getSelectItems() != null) {
+				for (int i = 0; i < select.getSelectItems().size(); i++) {
+					SelectItem<?> item = select.getSelectItems().get(i);
+					// USER_ID AS USER_ID 처럼 컬럼에 같은 이름을 붙인 것은 별칭으로 치지 않는다.
+					if (item.getAlias() != null && !(item.getExpression() instanceof Column
+							&& nameOf(((Column) item.getExpression()).getColumnName()).equals(nameOf(item.getAlias().getName())))) {
+						selectAliases.add(nameOf(item.getAlias().getName()));
+					}
+				}
+			}
+			push(items);
+			try {
+				super.visit(select);
+			} finally {
+				pop();
+			}
+		}
+
+		@Override
+		public void visit(Update update) {
+			List<FromItem> items = new ArrayList<FromItem>();
+			items.add(update.getTable());
+			addJoins(items, update.getStartJoins());
+			items.add(update.getFromItem());
+			addJoins(items, update.getJoins());
+			String target = normalize(update.getTable().getFullyQualifiedName());
+			if (update.getUpdateSets() != null) {
+				for (int i = 0; i < update.getUpdateSets().size(); i++) {
+					UpdateSet set = update.getUpdateSets().get(i);
+					for (int c = 0; set.getColumns() != null && c < set.getColumns().size(); c++) {
+						// SET 왼쪽에 A.COL 처럼 별칭을 붙였어도 대상 테이블의 컬럼이다.
+						add(target, set.getColumns().get(c).getColumnName());
+					}
+				}
+			}
+			push(items);
+			try {
+				super.visit(update);
+			} finally {
+				pop();
+			}
+		}
+
+		@Override
+		public void visit(Delete delete) {
+			List<FromItem> items = new ArrayList<FromItem>();
+			items.add(delete.getTable());
+			addJoins(items, delete.getJoins());
+			push(items);
+			try {
+				super.visit(delete);
+			} finally {
+				pop();
+			}
+		}
+
+		@Override
+		public void visit(Insert insert) {
+			String target = normalize(insert.getTable().getFullyQualifiedName());
+			if (insert.getColumns() != null) {
+				for (int i = 0; i < insert.getColumns().size(); i++) {
+					add(target, insert.getColumns().get(i).getColumnName());
+				}
+			}
+			super.visit(insert);
+		}
+
+		@Override
+		public void visit(Column column) {
+			super.visit(column);
+			Table owner = column.getTable();
+			String qualifier = owner == null || owner.getName() == null ? null : nameOf(owner.getName());
+			if (qualifier == null) {
+				if (onlyTables.isEmpty() || selectAliases.contains(nameOf(column.getColumnName()))) {
+					return;
+				}
+				add(onlyTables.get(onlyTables.size() - 1), column.getColumnName());
+				return;
+			}
+			for (int i = scopes.size() - 1; i >= 0; i--) {
+				String table = scopes.get(i).get(qualifier);
+				if (table != null) {
+					add(table, column.getColumnName());
+					return;
+				}
+			}
+		}
+
+		private void addJoins(List<FromItem> items, List<Join> joins) {
+			for (int i = 0; joins != null && i < joins.size(); i++) {
+				items.add(joins.get(i).getRightItem());
+			}
+		}
+
+		private void push(List<FromItem> items) {
+			Map<String, String> scope = new HashMap<String, String>();
+			int tables = 0;
+			String only = null;
+			boolean others = false;
+			for (int i = 0; i < items.size(); i++) {
+				FromItem item = items.get(i);
+				if (item == null) {
+					continue;
+				}
+				if (item instanceof Table) {
+					Table table = (Table) item;
+					String name = normalize(table.getFullyQualifiedName());
+					if (name == null) {
+						// DUAL 같은 것. 컬럼의 주인이 될 수 없다.
+						continue;
+					}
+					tables++;
+					only = name;
+					scope.put(nameOf(table.getName()), name);
+					scope.put(name, name);
+					if (table.getAlias() != null) {
+						scope.put(nameOf(table.getAlias().getName()), name);
+					}
+				} else {
+					// 서브쿼리 등. 그 별칭으로 적힌 컬럼은 테이블의 것이 아니다.
+					others = true;
+					if (item.getAlias() != null) {
+						scope.put(nameOf(item.getAlias().getName()), "");
+					}
+				}
+			}
+			scopes.add(scope);
+			onlyTables.add(tables == 1 && !others ? only : null);
+		}
+
+		private void pop() {
+			scopes.remove(scopes.size() - 1);
+			onlyTables.remove(onlyTables.size() - 1);
+		}
+
+		private void add(String table, String columnName) {
+			if (table == null || table.length() == 0 || columnName == null) {
+				return;
+			}
+			String name = nameOf(columnName);
+			// X_ 는 ${...} 자리에 넣은 글자다. 무엇이 올지 모른다.
+			if (name.length() == 0 || name.startsWith("X_") || NOT_COLUMNS.indexOf("|" + name + "|") >= 0 || !isIdentifier(name)) {
+				return;
+			}
+			Set<String> found = columns.get(table);
+			if (found == null) {
+				found = new TreeSet<String>();
+				columns.put(table, found);
+			}
+			if (found.size() < MAX_COLUMNS) {
+				found.add(name);
+			}
+		}
+	}
+
+	/** 따옴표를 벗기고 대문자로 맞춘 이름 */
+	private String nameOf(String name) {
+		return name == null ? "" : name.replace("\"", "").replace("`", "").replace("[", "").replace("]", "").trim().toUpperCase(Locale.ROOT);
+	}
+
+	private boolean isIdentifier(String name) {
+		if (!Character.isLetter(name.charAt(0)) && name.charAt(0) != '_') {
+			return false;
+		}
+		for (int i = 1; i < name.length(); i++) {
+			char c = name.charAt(i);
+			if (!Character.isLetterOrDigit(c) && c != '_' && c != '$' && c != '#') {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private int parenDepthOf(String sql) {

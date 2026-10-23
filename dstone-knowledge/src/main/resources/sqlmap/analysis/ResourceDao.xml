@@ -243,6 +243,34 @@
          LIMIT #{limit}
     </select>
 
+    <!-- 테이블의 컬럼: SEMANTIC 이 파서로 읽은 SQL 에서 모아 둔 것(properties_json.columns). DB 정의가 아니라 SQL 에 적힌 컬럼이다 -->
+    <select id="selectTableColumns" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT c.col AS "column"
+             , COUNT(DISTINCT t.from_id) AS "statementCount"
+             , CASE WHEN bool_or(t.properties_json->>'crud' = 'C') THEN 'C' ELSE '' END
+               || CASE WHEN bool_or(t.properties_json->>'crud' = 'R') THEN 'R' ELSE '' END
+               || CASE WHEN bool_or(t.properties_json->>'crud' = 'U') THEN 'U' ELSE '' END
+               || CASE WHEN bool_or(t.properties_json->>'crud' = 'D') THEN 'D' ELSE '' END AS "crud"
+          FROM analysis_relation t
+         CROSS JOIN LATERAL jsonb_array_elements_text(
+               CASE WHEN jsonb_typeof(t.properties_json->'columns') = 'array' THEN t.properties_json->'columns' ELSE '[]'::jsonb END) AS c(col)
+         WHERE t.revision_id = #{revisionId}
+           AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND t.to_external = upper(#{table})
+         GROUP BY c.col
+         ORDER BY c.col
+    </select>
+
+    <!-- 이 테이블을 건드리는 SQL 수와, 그중 컬럼을 읽지 못한 SQL 수(정규식으로 찾았거나 컬럼을 모으기 전에 분석한 것) -->
+    <select id="selectTableColumnCoverage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT COUNT(DISTINCT t.from_id) AS "statements"
+             , COUNT(DISTINCT CASE WHEN t.properties_json->'columns' IS NULL THEN t.from_id END) AS "unread"
+          FROM analysis_relation t
+         WHERE t.revision_id = #{revisionId}
+           AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND t.to_external = upper(#{table})
+    </select>
+
     <sql id="mapperWhere">
          WHERE m.revision_id = #{revisionId}
            AND m.statement_type &lt;&gt; 'SQL_FRAGMENT'

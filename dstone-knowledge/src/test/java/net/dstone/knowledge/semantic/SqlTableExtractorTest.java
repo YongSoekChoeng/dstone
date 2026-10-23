@@ -97,6 +97,59 @@ public class SqlTableExtractorTest {
 		assertEquals("[]", textOf(extractor.extract("  @@include(Common.paging)@@  ", "SELECT")));
 	}
 
+	@Test
+	public void 별칭으로_가리킨_컬럼은_그_테이블의_컬럼이다() {
+		List<SqlTableExtractor.TableUse> uses = extractor.extract(
+				"SELECT o.ORDER_ID, c.NAME AS CUSTOMER_NAME, NVL(o.AMOUNT, 0) FROM TB_ORDER o JOIN TB_CUSTOMER c ON c.ID = o.CUSTOMER_ID"
+				+ " WHERE o.STATUS = #{status} AND CREATED_BY = #{user}", "SELECT");
+
+		// 테이블이 둘인 FROM에서 별칭 없이 적힌 CREATED_BY는 어느 쪽 것인지 몰라서 넣지 않는다.
+		assertEquals("[TB_CUSTOMER:[ID, NAME], TB_ORDER:[AMOUNT, CUSTOMER_ID, ORDER_ID, STATUS]]", columnsOf(uses));
+	}
+
+	@Test
+	public void 테이블이_하나뿐이면_별칭_없는_컬럼도_그_테이블의_것이다() {
+		assertEquals("[TB_MEMBER:[GRADE, MEMBER_ID, REG_DT, USER_ID]]", columnsOf(extractor.extract(
+				"SELECT USER_ID AS USER_ID, GRADE, COUNT(*) AS CNT FROM TB_MEMBER WHERE MEMBER_ID = #{id} AND REG_DT > SYSDATE", "SELECT")));
+	}
+
+	@Test
+	public void 넣기와_고치기의_대상_컬럼과_서브쿼리의_컬럼을_나눠_담는다() {
+		assertEquals("[TB_ORDER:[AMOUNT, ORDER_ID], TB_ORDER_HIST:[AMOUNT, ORDER_ID, REG_DT]]", columnsOf(extractor.extract(
+				"INSERT INTO TB_ORDER_HIST (ORDER_ID, AMOUNT, REG_DT) SELECT ORDER_ID, AMOUNT, SYSDATE FROM TB_ORDER WHERE ORDER_ID = #{orderId}", "INSERT")));
+
+		// 서브쿼리 안의 ID는 그 서브쿼리의 테이블(TB_GRADE), 바깥의 MEMBER_ID는 대상 테이블의 것이다.
+		assertEquals("[TB_GRADE:[GRADE, ID], TB_MEMBER:[GRADE, MEMBER_ID, MEMBER_NO, UPD_DT]]", columnsOf(extractor.extract(
+				"UPDATE TB_MEMBER m SET GRADE = (SELECT MAX(GRADE) FROM TB_GRADE g WHERE g.ID = m.MEMBER_NO), UPD_DT = SYSDATE WHERE MEMBER_ID = #{id}", "UPDATE")));
+	}
+
+	@Test
+	public void 서브쿼리를_FROM에_둔_쪽의_컬럼은_테이블의_것으로_치지_않는다() {
+		assertEquals("[TB_BOARD:[BOARD_ID, TITLE]]", columnsOf(extractor.extract(
+				"SELECT * FROM (SELECT ROWNUM RN, X.* FROM (SELECT BOARD_ID, TITLE FROM TB_BOARD ORDER BY BOARD_ID) X) WHERE RN BETWEEN 1 AND 10", "SELECT")));
+	}
+
+	@Test
+	public void 정규식으로_찾은_SQL은_컬럼을_읽지_않는다() {
+		List<SqlTableExtractor.TableUse> uses = extractor.extract(
+				"UPDATE TB_ORDER SET , STATUS = #{status} , WHERE ORDER_ID = #{id}", "UPDATE");
+		assertTrue(anyGuessed(uses));
+		assertEquals(null, uses.get(0).columns);
+	}
+
+	/** 순서와 상관없이 비교하려고 "테이블:[컬럼]"을 이름순으로 늘어놓습니다. 같은 테이블이 두 번 나오면 한 번만 씁니다. */
+	private String columnsOf(List<SqlTableExtractor.TableUse> uses) {
+		List<String> texts = new ArrayList<String>();
+		for (int i = 0; i < uses.size(); i++) {
+			String text = uses.get(i).table + ":" + uses.get(i).columns;
+			if (!texts.contains(text)) {
+				texts.add(text);
+			}
+		}
+		Collections.sort(texts);
+		return texts.toString();
+	}
+
 	/** 순서와 상관없이 비교하려고 "테이블:종류"를 이름순으로 늘어놓습니다. */
 	private String textOf(List<SqlTableExtractor.TableUse> uses) {
 		List<String> texts = new ArrayList<String>();

@@ -267,6 +267,9 @@ public class MyBatisPlugin implements SemanticPlugin {
 					properties.put("crud", use.crud);
 					if (use.guessed) {
 						properties.put("via", "PATTERN");
+					} else {
+						// 파서로 읽었으면 쓰인 컬럼도 남긴다. 없으면 빈 목록이다(SELECT * 등). 키가 없으면 "컬럼을 못 읽은 SQL"이다.
+						properties.put("columns", use.columns);
 					}
 					resourceDao.insertRelation(relation(revisionId, "SQL", "S" + afterId, "R".equals(use.crud) ? "READS_TABLE" : "WRITES_TABLE"
 							, "TABLE", null, use.table, use.guessed ? "MEDIUM" : "HIGH", use.guessed ? "HEURISTIC" : "RESOLVED"
