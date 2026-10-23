@@ -160,6 +160,20 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectTableColumnCoverage", param);
 	}
 
+	public List<Map<String, Object>> selectDdlDictionary(long revisionId, String table) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("table", table);
+		return sqlSessionCommon.selectList(NS + "selectDdlDictionary", param);
+	}
+
+	public List<Map<String, Object>> selectSqlCommentDictionary(long revisionId, String table) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("table", table);
+		return sqlSessionCommon.selectList(NS + "selectSqlCommentDictionary", param);
+	}
+
 	public int countMapper(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countMapper", condition);
 		return count.intValue();

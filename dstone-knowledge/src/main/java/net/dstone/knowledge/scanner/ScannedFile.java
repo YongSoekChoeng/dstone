@@ -18,7 +18,7 @@ public class ScannedFile {
 	/** Java 파일이 속한 소스 루트(예: src/main/java, WEB-INF/src). 못 찾았으면 null */
 	private String sourceRoot;
 
-	/** JAVA / JSP / XML / YAML / PROPERTIES / GRADLE */
+	/** JAVA / JSP / XML / YAML / PROPERTIES / GRADLE / SQL */
 	private String language;
 
 	/** SOURCE / MYBATIS_MAPPER / SPRING_XML / WEB_XML / CONFIG / BUILD ... */

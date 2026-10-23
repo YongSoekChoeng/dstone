@@ -733,30 +733,61 @@ var DstoneKnowledgeGraph = (function () {
 			+ "<b>" + K.escapeHtml(name) + "</b></div>";
 	}
 
-	/** 테이블의 컬럼. DB 정의가 아니라, 분석한 SQL에 적힌 컬럼을 모은 것입니다 */
-	function tableColumns(columns, coverage) {
+	/** 한글명이 어디서 왔는지: DB 코멘트 → DDL 파일의 COMMENT → SQL 주석 순서로 먼저 있는 것을 쓴다 */
+	var NAME_SOURCE = { DB: "DB", DDL: "DDL", SQL: "SQL 주석" };
+	var NAME_SOURCE_HINT = { DB: "대상 DB의 코멘트", DDL: "프로젝트 안 DDL 파일(.sql)의 COMMENT", SQL: "매퍼 SQL의 주석" };
+
+	function nameSource(source) {
+		return source ? " <span class=\"kn-gd-tag\" title=\"" + K.escapeHtml(NAME_SOURCE_HINT[source] || source) + "\">"
+			+ K.escapeHtml(NAME_SOURCE[source] || source) + "</span>" : "";
+	}
+
+	/** 테이블의 컬럼: 컬럼명, 컬럼 한글명, 타입, SQL에서 쓰인 정도 */
+	function tableColumns(columns, coverage, dictionary) {
 		if (!coverage) {
 			// 컬럼을 주지 않는 예전 dstone-knowledge 다.
 			return "<div class=\"kn-section-title\">컬럼</div><p class=\"ai-hint\">dstone-knowledge 가 컬럼을 주지 않는 예전 버전입니다. 새로 빌드해서 다시 띄워 주세요.</p>";
 		}
 		var unread = Number(coverage.unread || 0);
 		var statements = Number(coverage.statements || 0);
-		var html = "<div class=\"kn-section-title\">컬럼 · " + columns.length + "개 <span class=\"ai-hint\">(DB 정의가 아니라 SQL에 적힌 컬럼입니다)</span></div>";
+		var html = "<div class=\"kn-section-title\">컬럼 · " + columns.length + "개</div>";
 		if (columns.length > 0) {
-			html += "<div class=\"kn-gd-rows\">" + columns.map(function (column) {
-				return "<div><span class=\"kn-mono\">" + K.escapeHtml(column.column) + "</span> <span class=\"ai-hint\">SQL " + K.escapeHtml(column.statementCount)
-					+ "건" + (column.crud ? " · " + K.escapeHtml(column.crud.split("").join("·")) : "") + "</span></div>";
-			}).join("") + "</div>";
+			html += "<table class=\"kn-gd-columns\"><thead><tr><th>컬럼명</th><th>컬럼한글명</th><th>타입</th><th>SQL</th></tr></thead><tbody>"
+				+ columns.map(function (column) {
+					var used = Number(column.statementCount || 0);
+					return "<tr><td class=\"kn-mono\">" + K.escapeHtml(column.column) + "</td>"
+						+ "<td>" + (column.koreanName ? K.escapeHtml(column.koreanName) + nameSource(column.koreanNameSource) : "<span class=\"ai-hint\">-</span>") + "</td>"
+						+ "<td class=\"kn-mono\">" + K.escapeHtml(column.dataType || "") + "</td>"
+						+ "<td class=\"ai-hint\">" + (used > 0 ? used + "건" + (column.crud ? " · " + K.escapeHtml(column.crud.split("").join("·")) : "") : "안 씀") + "</td></tr>";
+				}).join("") + "</tbody></table>";
 		}
+		html += dictionaryNote(dictionary || {});
 		if (statements > 0 && unread === statements) {
-			html += "<p class=\"ai-hint\">컬럼 정보가 없습니다. SQL을 파서로 읽지 못했거나, 컬럼을 모으기 전에 분석한 리비전입니다. "
+			html += "<p class=\"ai-hint\">SQL에서 쓰인 컬럼 정보가 없습니다. SQL을 파서로 읽지 못했거나, 컬럼을 모으기 전에 분석한 리비전입니다. "
 				+ "뒤의 경우라면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.</p>";
 		} else if (unread > 0) {
-			html += "<p class=\"ai-hint\">SQL " + unread + "건은 파서로 읽지 못해 컬럼을 뽑지 못했습니다. 위 목록에 빠진 컬럼이 있을 수 있습니다.</p>";
+			html += "<p class=\"ai-hint\">SQL " + unread + "건은 파서로 읽지 못해 컬럼을 뽑지 못했습니다. 목록에 빠진 컬럼이 있을 수 있습니다.</p>";
 		} else if (columns.length === 0) {
 			html += "<p class=\"ai-hint\">SQL에 이름이 적힌 컬럼이 없습니다(SELECT * 등).</p>";
 		}
 		return html;
+	}
+
+	/** 한글명을 어디서 찾아봤는지 */
+	function dictionaryNote(dictionary) {
+		var parts = [];
+		if (dictionary.db === "OK") {
+			parts.push("DB 코멘트를 읽었습니다");
+		} else if (dictionary.db === "NOT_FOUND") {
+			parts.push("DB에 이 테이블이 없습니다");
+		} else if (dictionary.db === "FAILED") {
+			parts.push("DB 코멘트를 읽지 못했습니다(" + K.escapeHtml(dictionary.dbMessage || "") + ")");
+		} else {
+			parts.push("DB 접속 설정이 없어 DB 코멘트는 보지 않았습니다");
+		}
+		var files = dictionary.ddlFiles || [];
+		parts.push(files.length > 0 ? "DDL: <span class=\"kn-mono\">" + K.escapeHtml(files.join(", ")) + "</span>" : "이 테이블의 DDL 파일은 없습니다");
+		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL → SQL 주석 순서로 찾습니다. " + parts.join(" · ") + ".</p>";
 	}
 
 	/** 서버가 준 노드 상세(GET .../graph/node)를 그립니다. 종류마다 들어 있는 항목이 달라서, 있는 것만 그립니다 */
@@ -764,7 +795,8 @@ var DstoneKnowledgeGraph = (function () {
 		var html = "<div class=\"kn-mono kn-gd-full\">" + K.escapeHtml(detail.fullName) + "</div>";
 		var facts = [];
 		if (detail.kind === "TABLE") {
-			facts.push(["테이블명", "<span class=\"kn-mono\">" + K.escapeHtml(detail.name) + "</span>"]);
+			facts.push(["테이블명", detail.koreanName ? K.escapeHtml(detail.koreanName) + nameSource(detail.koreanNameSource) : "<span class=\"ai-hint\">한글명 없음</span>"]);
+			facts.push(["물리명", "<span class=\"kn-mono\">" + K.escapeHtml(detail.name) + "</span>"]);
 		}
 		if (detail.layer) {
 			facts.push(["계층", K.escapeHtml(detail.layer) + (detail.layerConfidence ? " (" + K.confidence(detail.layerConfidence) + ")" : "")]);
@@ -791,7 +823,7 @@ var DstoneKnowledgeGraph = (function () {
 			}).join("") + "</table>";
 		}
 		if (detail.kind === "TABLE") {
-			html += tableColumns(detail.columns || [], detail.columnCoverage);
+			html += tableColumns(detail.columns || [], detail.columnCoverage, detail.dictionary);
 		}
 
 		if (detail.endpoints && detail.endpoints.length > 0) {

@@ -27,6 +27,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *   .properties / .yml     → analysis_config   (설정 키와 값)
  *   pom.xml / build.gradle → analysis_resource (의존성)
  *   Spring 설정 XML        → analysis_resource (빈 정의, 컴포넌트 스캔 범위)
+ *   DDL(.sql)              → analysis_resource (테이블 / 컬럼과 그 설명. DdlReader)
  *
  * 여기서는 파일 하나를 읽어 그대로 저장하기만 합니다. 다른 것과 잇는 일
  * (이 SQL을 어느 메소드가 실행하나, 이 SQL이 어느 테이블을 건드리나)은 모든 파일을 읽은 뒤 SEMANTIC 단계가 합니다.
@@ -41,7 +42,7 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 	public static final String NAME = "RESOURCE";
 
 	/** 이 단계가 다루는 파일의 언어들 */
-	private static final String[] LANGUAGES = { "XML", "PROPERTIES", "YAML", "GRADLE" };
+	private static final String[] LANGUAGES = { "XML", "PROPERTIES", "YAML", "GRADLE", "SQL" };
 
 	@Autowired
 	private FilePassRunner filePassRunner;
@@ -55,6 +56,8 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 	private final MapperXmlReader mapperXmlReader = new MapperXmlReader();
 
 	private final ResourceReaders resourceReaders = new ResourceReaders();
+
+	private final DdlReader ddlReader = new DdlReader();
 
 	@Override
 	public String name() {
@@ -126,7 +129,7 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 		String path = (String) file.get("path");
 		boolean mapper = "MYBATIS_MAPPER".equals(fileType) || "IBATIS_MAPPER".equals(fileType) || "QUERY_XML".equals(fileType);
 		boolean known = mapper || "SPRING_XML".equals(fileType)
-				|| "BUILD".equals(fileType) || "CONFIG".equals(fileType);
+				|| "BUILD".equals(fileType) || "CONFIG".equals(fileType) || "DDL".equals(fileType);
 		if (!known) {
 			// 용도를 모르는 XML, 로그 설정, web.xml 등
 			prepared.skipReason = "이 단계에서 읽지 않는 종류입니다(" + fileType + ").";
@@ -141,6 +144,8 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 			prepared.mappers = mapperXmlReader.read(text, path);
 		} else if ("SPRING_XML".equals(fileType)) {
 			prepared.resources = resourceReaders.readSpringXml(text);
+		} else if ("DDL".equals(fileType)) {
+			prepared.resources = ddlReader.read(text);
 		} else if ("BUILD".equals(fileType)) {
 			if ("GRADLE".equals(language)) {
 				prepared.resources = resourceReaders.readGradle(text);

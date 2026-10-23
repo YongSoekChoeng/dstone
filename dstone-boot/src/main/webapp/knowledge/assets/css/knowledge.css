@@ -470,6 +470,31 @@
 	color: var(--cs-text-2);
 }
 
+/* 테이블 상세의 컬럼 표: 컬럼명 / 컬럼한글명 / 타입 / SQL */
+.kn-gd-columns {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 4px 0 8px;
+	font-size: 12px;
+}
+
+.kn-gd-columns th {
+	text-align: left;
+	font-weight: 600;
+	color: var(--cs-muted);
+	padding: 4px 6px;
+	border-bottom: 1px solid var(--cs-border);
+	white-space: nowrap;
+}
+
+.kn-gd-columns td {
+	padding: 3px 6px;
+	border-bottom: 1px solid var(--cs-surface-3);
+	color: var(--cs-text-2);
+	vertical-align: top;
+	word-break: break-all;
+}
+
 /* 이어진 노드, 묶음에 든 노드: 누를 수 있는 이름을 나란히 */
 .kn-gd-list {
 	display: flex;

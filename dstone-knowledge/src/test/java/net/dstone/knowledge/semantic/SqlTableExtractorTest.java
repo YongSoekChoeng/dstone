@@ -137,6 +137,51 @@ public class SqlTableExtractorTest {
 		assertEquals(null, uses.get(0).columns);
 	}
 
+	@Test
+	public void SQL_주석에서_테이블과_컬럼의_한글명을_읽는다() {
+		List<SqlTableExtractor.TableUse> uses = extractor.extract(
+				"SELECT tb1.seq             /* 접근유형           BIGINT        */\n"
+				+ "     , tb1.mb_nm           /* 회사명             VARCHAR(100)  */\n"
+				+ "     , tb2.auth_nm,        /* 권한명 */\n"
+				+ "       SUBSTR(tb1.addr1, 1, 10) AS ADDR /* 주소 앞부분 */\n"
+				+ "     , tb1.use_yn          /* use flag */\n"
+				+ "  FROM tbsy_member tb1 /* [SY][시스템] 회원사관리 */\n"
+				+ "  JOIN tbsy_auth tb2 ON tb2.mb_id = tb1.mb_id /* 권한 조인 */\n"
+				+ " WHERE tb1.mb_id = #{mb_id} /* 회원사ID */\n"
+				+ "   AND tb1.use_yn = 'Y' /* 사용하는 것만 */", "SELECT");
+
+		// 별칭을 설명한 주석(AS ADDR), 한글이 없는 주석, 조인 조건과 값 비교(= 'Y')에 단 주석은 넣지 않는다.
+		assertEquals("[TBSY_AUTH:{AUTH_NM=권한명}:null, TBSY_MEMBER:{SEQ=접근유형, MB_NM=회사명, MB_ID=회원사ID}:[SY][시스템] 회원사관리]", commentsOf(uses));
+	}
+
+	@Test
+	public void 고치기의_SET과_넣기의_컬럼_목록에_단_주석도_읽는다() {
+		assertEquals("[TB_ORDER:{STATUS=주문상태, UPD_DT=수정일시}:주문]", commentsOf(extractor.extract(
+				"UPDATE tb_order /* 주문 */\n   SET status = #{status} /* 주문상태 */\n     , upd_dt = SYSDATE /* 수정일시 */\n WHERE order_id = #{id}", "UPDATE")));
+		assertEquals("[TB_ORDER_HIST:{ORDER_ID=주문번호, AMOUNT=금액}:null]", commentsOf(extractor.extract(
+				"INSERT INTO tb_order_hist (\n  order_id /* 주문번호 */\n, amount -- 금액\n) VALUES (#{id}, #{amount})", "INSERT")));
+	}
+
+	@Test
+	public void 테이블이_둘인데_별칭_없이_적은_컬럼의_주석은_주인을_정하지_못하면_버린다() {
+		// CREATED_BY 는 어느 테이블의 것인지 모른다. NAME 은 c 의 것으로 확실하다.
+		assertEquals("[TB_CUSTOMER:{NAME=고객명}:null, TB_ORDER:{}:null]", commentsOf(extractor.extract(
+				"SELECT c.NAME /* 고객명 */, CREATED_BY /* 등록자 */ FROM TB_ORDER o JOIN TB_CUSTOMER c ON c.ID = o.CUSTOMER_ID", "SELECT")));
+	}
+
+	/** "테이블:{컬럼=한글명}:테이블한글명"을 이름순으로 늘어놓습니다. */
+	private String commentsOf(List<SqlTableExtractor.TableUse> uses) {
+		List<String> texts = new ArrayList<String>();
+		for (int i = 0; i < uses.size(); i++) {
+			String text = uses.get(i).table + ":" + uses.get(i).columnComments + ":" + uses.get(i).tableComment;
+			if (!texts.contains(text)) {
+				texts.add(text);
+			}
+		}
+		Collections.sort(texts);
+		return texts.toString();
+	}
+
 	/** 순서와 상관없이 비교하려고 "테이블:[컬럼]"을 이름순으로 늘어놓습니다. 같은 테이블이 두 번 나오면 한 번만 씁니다. */
 	private String columnsOf(List<SqlTableExtractor.TableUse> uses) {
 		List<String> texts = new ArrayList<String>();

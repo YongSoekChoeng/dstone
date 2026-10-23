@@ -48,6 +48,12 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
  *
  * 파서로 읽은 SQL에서는 테이블마다 쓰인 컬럼 이름도 모읍니다(ColumnFinder).
  * 어느 테이블의 컬럼인지 확실할 때만 넣습니다. 정규식으로 찾은 SQL에서는 컬럼을 뽑지 않습니다.
+ *
+ * SQL 주석에 적힌 한글명도 모읍니다(SqlComments). 예:
+ *   SELECT tb1.mb_nm   /* 회사명 VARCHAR(100) *&#47;     → TBSY_MEMBER.MB_NM = 회사명
+ *     FROM tbsy_member tb1 /* 회원사관리 *&#47;          → TBSY_MEMBER = 회원사관리
+ * 한글이 들어 있는 주석만, 그리고 어느 테이블(컬럼)의 것인지 확실할 때만 넣습니다.
+ * "식 AS 별칭 /* 설명 *&#47;" 처럼 별칭을 설명한 주석은 테이블 컬럼의 것이 아니라서 뺍니다.
  * </pre>
  */
 public class SqlTableExtractor {
@@ -111,15 +117,27 @@ public class SqlTableExtractor {
 		/** 이 SQL에서 쓰인 이 테이블의 컬럼(대문자, 이름 순). 정규식으로 찾았으면 null(읽지 못함) */
 		public final List<String> columns;
 
+		/** SQL 주석에 적힌 이 테이블 컬럼의 한글명(컬럼 → 한글명). 없으면 빈 Map */
+		public final Map<String, String> columnComments;
+
+		/** SQL 주석에 적힌 이 테이블의 한글명. 없으면 null */
+		public final String tableComment;
+
 		TableUse(String table, String crud, boolean guessed) {
-			this(table, crud, guessed, null);
+			this(table, crud, guessed, null, new LinkedHashMap<String, String>(), null);
 		}
 
 		TableUse(String table, String crud, boolean guessed, List<String> columns) {
+			this(table, crud, guessed, columns, new LinkedHashMap<String, String>(), null);
+		}
+
+		TableUse(String table, String crud, boolean guessed, List<String> columns, Map<String, String> columnComments, String tableComment) {
 			this.table = table;
 			this.crud = crud;
 			this.guessed = guessed;
 			this.columns = columns;
+			this.columnComments = columnComments;
+			this.tableComment = tableComment;
 		}
 	}
 
@@ -128,6 +146,8 @@ public class SqlTableExtractor {
 	 * @param statementType SELECT / INSERT / UPDATE / DELETE ...
 	 */
 	public List<TableUse> extract(String sql, String statementType) {
+		// 주석은 clean() 이 지우므로 그 전에 읽어 둔다.
+		List<SqlComment> comments = commentsOf(sql);
 		String cleaned = clean(sql);
 		if (cleaned.length() == 0) {
 			return new ArrayList<TableUse>();
@@ -140,14 +160,15 @@ public class SqlTableExtractor {
 		}
 		if (cleaned.length() <= MAX_PARSE_LENGTH && parenDepthOf(cleaned) <= MAX_PAREN_DEPTH) {
 			try {
-				return without(byParser(cleaned), temporaryNames);
+				return without(byParser(cleaned, comments), temporaryNames);
 			} catch (Exception e) {
 				// 문법에 안 맞거나 시간이 넘었다. 정규식으로 찾는다.
 			} catch (StackOverflowError e) {
 				// 지나치게 깊게 중첩된 SQL
 			}
 		}
-		return without(byPattern(cleaned, statementType), temporaryNames);
+		// 정규식으로 찾은 SQL은 별칭이 어느 테이블인지 모르므로 테이블 이름 바로 뒤의 주석(테이블 한글명)만 쓴다.
+		return without(withComments(byPattern(cleaned, statementType), comments, null), temporaryNames);
 	}
 
 	private List<TableUse> without(List<TableUse> uses, Set<String> names) {
@@ -187,7 +208,7 @@ public class SqlTableExtractor {
 		return EMPTY_WHERE.matcher(text).replaceAll("").trim();
 	}
 
-	private List<TableUse> byParser(String sql) throws Exception {
+	private List<TableUse> byParser(String sql, List<SqlComment> comments) throws Exception {
 		// 빠른 모드만 쓰고(복잡한 파싱 끔), 다른 스레드에 맡기지 않고 여기서 바로 읽는다.
 		CCJSqlParser parser = CCJSqlParserUtil.newParser(sql).withAllowComplexParsing(false);
 		Statement statement = parser.Statement();
@@ -229,7 +250,180 @@ public class SqlTableExtractor {
 			}
 			uses.put(name + "|R", new TableUse(name, "R", false, finder.columnsOf(name)));
 		}
-		return new ArrayList<TableUse>(uses.values());
+		return withComments(new ArrayList<TableUse>(uses.values()), comments, finder);
+	}
+
+	/* ============================== SQL 주석의 한글명 ============================== */
+
+	/** 주석: /* … *&#47; 또는 -- … */
+	private static final Pattern COMMENT = Pattern.compile("/\\*(.*?)\\*/|--([^\\n]*)", Pattern.DOTALL);
+
+	/** 주석 앞이 "FROM / JOIN / INTO / UPDATE 테이블 [별칭]" 으로 끝난다 → 테이블의 한글명 */
+	private static final Pattern BEFORE_TABLE_COMMENT = Pattern.compile("(?i)\\b(?:FROM|JOIN|INTO|UPDATE)\\s+([A-Za-z_][\\w$#.]*)(?:\\s+(?:AS\\s+)?([A-Za-z_][\\w$#]*))?\\s*$");
+
+	/** 주석 앞이 "[별칭.]컬럼" 으로 끝나고, 그 앞은 줄의 처음 / 쉼표 / 괄호 / SELECT 다 → 컬럼의 한글명(조회 목록, INSERT 컬럼 목록) */
+	private static final Pattern BEFORE_COLUMN_COMMENT = Pattern.compile("(?i)(?:^|[,(]|\\bSELECT|\\bDISTINCT)\\s*(?:([A-Za-z_][\\w$#]*)\\.)?([A-Za-z_][\\w$#]*)\\s*$");
+
+	/**
+	 * 주석 앞이 "[별칭.]컬럼 = 값" 으로 끝난다 → 컬럼의 한글명(UPDATE 의 SET, WHERE 조건).
+	 * 값은 파라미터와 현재 시각만 본다.
+	 *   "status = '01' /* 접수 *&#47;" 처럼 글자 / 숫자와 비교한 줄의 주석은 컬럼이 아니라 그 값의 뜻을 적은 것이다.
+	 *   "ON a.x = b.x /* 설명 *&#47;" 같은 조인 조건은 어느 쪽 컬럼의 설명인지 모른다.
+	 */
+	private static final Pattern BEFORE_ASSIGN_COMMENT = Pattern.compile("(?i)(?:^|[,(]|\\bSET|\\bAND|\\bOR|\\bWHERE)\\s*(?:([A-Za-z_][\\w$#]*)\\.)?([A-Za-z_][\\w$#]*)\\s*=\\s*"
+			+ "(?:#\\{[^}]*\\}|#[\\w.\\[\\]]+#|\\?|SYSDATE|SYSTIMESTAMP|NOW\\(\\)|CURRENT_TIMESTAMP)\\s*$");
+
+	/** 주석 끝에 붙여 적는 타입: VARCHAR(20), bigint(20), NUMBER(10,2), DATETIME ... */
+	private static final Pattern TRAILING_TYPE = Pattern.compile("(?i)\\s+(?:N?VARCHAR2?|N?CHAR|NUMBER|NUMERIC|DECIMAL|INTEGER|INT|BIGINT|SMALLINT|TINYINT|MEDIUMINT|FLOAT|DOUBLE|REAL"
+			+ "|DATE|DATETIME|TIMESTAMP|TIME|CLOB|NCLOB|BLOB|TEXT|LONGTEXT|MEDIUMTEXT|BOOLEAN|BIT|SERIAL|BIGSERIAL)(?:\\s*\\([^)]*\\))?\\s*$");
+
+	/** 주석 앞에 오면 별칭이 아니라 다음 낱말인 것 */
+	private static final String NOT_ALIASES = "|SET|WHERE|ON|USING|VALUES|SELECT|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|GROUP|ORDER|UNION|WITH|AND|OR|";
+
+	/** 한글명 하나의 최대 길이 */
+	private static final int MAX_COMMENT = 200;
+
+	/**
+	 * <pre>
+	 * SQL 주석 하나와, 그 주석이 무엇을 설명하는지
+	 * </pre>
+	 */
+	private static class SqlComment {
+
+		/** 테이블을 설명하면 그 테이블 이름, 컬럼을 설명하면 null */
+		String table;
+
+		/** 컬럼 앞에 적힌 별칭(tb1.col 의 TB1). 없으면 null */
+		String qualifier;
+
+		String column;
+
+		String text;
+	}
+
+	/** SQL에서 한글이 들어 있는 주석과 그 앞에 적힌 것을 찾습니다. */
+	private List<SqlComment> commentsOf(String sql) {
+		List<SqlComment> found = new ArrayList<SqlComment>();
+		if (sql == null || sql.indexOf("/*") < 0 && sql.indexOf("--") < 0) {
+			return found;
+		}
+		Matcher m = COMMENT.matcher(sql);
+		int previousEnd = 0;
+		while (m.find()) {
+			String text = commentText(m.group(1) != null ? m.group(1) : m.group(2));
+			int lineStart = sql.lastIndexOf('\n', m.start() - 1) + 1;
+			String before = sql.substring(Math.max(lineStart, previousEnd), m.start()).trim();
+			previousEnd = m.end();
+			if (text == null) {
+				continue;
+			}
+			if (before.endsWith(",")) {
+				// "tb1.col, /* 설명 */" 처럼 쉼표 뒤에 단 주석
+				before = before.substring(0, before.length() - 1).trim();
+			}
+			SqlComment comment = new SqlComment();
+			comment.text = text;
+			Matcher table = BEFORE_TABLE_COMMENT.matcher(before);
+			if (table.find() && (table.group(2) == null || NOT_ALIASES.indexOf("|" + table.group(2).toUpperCase(Locale.ROOT) + "|") < 0)) {
+				comment.table = normalize(lastPart(table.group(1)));
+				if (comment.table != null) {
+					found.add(comment);
+				}
+				continue;
+			}
+			Matcher column = BEFORE_COLUMN_COMMENT.matcher(before);
+			if (!column.find()) {
+				column = BEFORE_ASSIGN_COMMENT.matcher(before);
+				if (!column.find()) {
+					continue;
+				}
+			}
+			comment.qualifier = column.group(1) == null ? null : nameOf(column.group(1));
+			comment.column = nameOf(column.group(2));
+			found.add(comment);
+		}
+		return found;
+	}
+
+	/** 주석 글에서 한글명만 남깁니다. 한글이 없으면 null */
+	private String commentText(String raw) {
+		String text = raw.replaceAll("\\s+", " ").trim();
+		// 끝에 붙여 적은 타입을 뗀다(겹쳐 적은 경우도 있어서 두 번까지).
+		for (int i = 0; i < 2; i++) {
+			text = TRAILING_TYPE.matcher(text).replaceAll("").trim();
+		}
+		if (text.endsWith(",")) {
+			text = text.substring(0, text.length() - 1).trim();
+		}
+		if (text.length() == 0 || !hasHangul(text)) {
+			return null;
+		}
+		return text.length() > MAX_COMMENT ? text.substring(0, MAX_COMMENT) : text;
+	}
+
+	private boolean hasHangul(String text) {
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (c >= '\uAC00' && c <= '\uD7A3') {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private String lastPart(String name) {
+		int dot = name.lastIndexOf('.');
+		return dot < 0 ? name : name.substring(dot + 1);
+	}
+
+	/**
+	 * <pre>
+	 * 찾은 주석을 테이블별로 나눠 붙입니다.
+	 * 컬럼 주석의 주인은 이렇게 정합니다(파서로 읽은 경우만. finder 가 null 이면 컬럼 주석은 버린다).
+	 *   별칭이 있으면: 그 별칭이 가리키는 테이블이 하나일 때 그 테이블
+	 *   별칭이 없으면: 이 SQL에서 그 컬럼을 쓴 테이블이 하나일 때 그 테이블
+	 * 같은 것에 주석이 여러 번 달렸으면 처음 것을 씁니다.
+	 * </pre>
+	 */
+	private List<TableUse> withComments(List<TableUse> uses, List<SqlComment> comments, ColumnFinder finder) {
+		if (comments.isEmpty() || uses.isEmpty()) {
+			return uses;
+		}
+		Set<String> tables = new HashSet<String>();
+		for (int i = 0; i < uses.size(); i++) {
+			tables.add(uses.get(i).table);
+		}
+		Map<String, String> tableComments = new HashMap<String, String>();
+		Map<String, Map<String, String>> columnComments = new HashMap<String, Map<String, String>>();
+		for (int i = 0; i < comments.size(); i++) {
+			SqlComment comment = comments.get(i);
+			if (comment.table != null) {
+				if (tables.contains(comment.table) && !tableComments.containsKey(comment.table)) {
+					tableComments.put(comment.table, comment.text);
+				}
+				continue;
+			}
+			String owner = finder == null ? null : finder.ownerOf(comment.qualifier, comment.column);
+			if (owner == null || !tables.contains(owner)) {
+				continue;
+			}
+			Map<String, String> byColumn = columnComments.get(owner);
+			if (byColumn == null) {
+				byColumn = new LinkedHashMap<String, String>();
+				columnComments.put(owner, byColumn);
+			}
+			if (!byColumn.containsKey(comment.column)) {
+				byColumn.put(comment.column, comment.text);
+			}
+		}
+		List<TableUse> result = new ArrayList<TableUse>();
+		for (int i = 0; i < uses.size(); i++) {
+			TableUse use = uses.get(i);
+			Map<String, String> byColumn = columnComments.get(use.table);
+			result.add(new TableUse(use.table, use.crud, use.guessed, use.columns
+					, byColumn == null ? new LinkedHashMap<String, String>() : byColumn, tableComments.get(use.table)));
+		}
+		return result;
 	}
 
 	/**
@@ -255,6 +449,31 @@ public class SqlTableExtractor {
 		private final Set<String> selectAliases = new HashSet<String>();
 
 		private final Map<String, Set<String>> columns = new HashMap<String, Set<String>>();
+
+		/** SQL 전체에서 별칭(또는 테이블 이름) → 그것이 가리킨 테이블들. 주석의 주인을 찾을 때 쓴다 */
+		private final Map<String, Set<String>> aliasTables = new HashMap<String, Set<String>>();
+
+		/**
+		 * 주석이 달린 컬럼의 테이블. 정할 수 없으면 null
+		 *
+		 * @param qualifier 컬럼 앞의 별칭. 없으면 null
+		 */
+		String ownerOf(String qualifier, String column) {
+			if (qualifier != null) {
+				Set<String> found = aliasTables.get(qualifier);
+				return found != null && found.size() == 1 ? found.iterator().next() : null;
+			}
+			String owner = null;
+			for (Map.Entry<String, Set<String>> entry : columns.entrySet()) {
+				if (entry.getValue().contains(column)) {
+					if (owner != null) {
+						return null;
+					}
+					owner = entry.getKey();
+				}
+			}
+			return owner;
+		}
 
 		/** 이 테이블에서 쓰인 컬럼. 하나도 없으면 빈 목록 */
 		List<String> columnsOf(String table) {
@@ -382,8 +601,10 @@ public class SqlTableExtractor {
 					only = name;
 					scope.put(nameOf(table.getName()), name);
 					scope.put(name, name);
+					remember(nameOf(table.getName()), name);
 					if (table.getAlias() != null) {
 						scope.put(nameOf(table.getAlias().getName()), name);
+						remember(nameOf(table.getAlias().getName()), name);
 					}
 				} else {
 					// 서브쿼리 등. 그 별칭으로 적힌 컬럼은 테이블의 것이 아니다.
@@ -395,6 +616,15 @@ public class SqlTableExtractor {
 			}
 			scopes.add(scope);
 			onlyTables.add(tables == 1 && !others ? only : null);
+		}
+
+		private void remember(String alias, String table) {
+			Set<String> found = aliasTables.get(alias);
+			if (found == null) {
+				found = new HashSet<String>();
+				aliasTables.put(alias, found);
+			}
+			found.add(table);
 		}
 
 		private void pop() {

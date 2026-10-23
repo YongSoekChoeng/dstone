@@ -271,6 +271,46 @@
            AND t.to_external = upper(#{table})
     </select>
 
+    <!-- 테이블 / 컬럼 설명: RESOURCE 가 DDL 파일(.sql)에서 읽어 둔 것(DdlReader). 파일 경로 순, 그 안에서는 정의 순 -->
+    <select id="selectDdlDictionary" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.resource_type AS "type"
+             , r.properties_json->>'column' AS "column"
+             , r.value AS "comment"
+             , r.properties_json->>'dataType' AS "dataType"
+             , f.path AS "path"
+             , r.line_start AS "lineStart"
+          FROM analysis_resource r
+          JOIN analysis_file f ON f.file_id = r.file_id
+         WHERE r.revision_id = #{revisionId}
+           AND ((r.resource_type = 'DDL_TABLE' AND r.name = upper(#{table}))
+             OR (r.resource_type = 'DDL_COLUMN' AND r.properties_json->>'table' = upper(#{table})))
+         ORDER BY f.path, r.line_start, (r.properties_json->>'ordinal')::int NULLS LAST, r.resource_id
+    </select>
+
+    <!-- SQL 주석에 적힌 한글명: SEMANTIC 이 테이블 관계에 남겨 둔 것(properties_json.columnComments / tableComment).
+         같은 컬럼에 다른 글이 달렸으면 많이 쓰인 것부터. column 이 NULL 인 행은 테이블의 한글명이다 -->
+    <select id="selectSqlCommentDictionary" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT d.col AS "column", d.comment AS "comment", COUNT(DISTINCT d.from_id) AS "count"
+          FROM (
+                SELECT t.from_id, NULL AS col, t.properties_json->>'tableComment' AS comment
+                  FROM analysis_relation t
+                 WHERE t.revision_id = #{revisionId}
+                   AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+                   AND t.to_external = upper(#{table})
+                   AND t.properties_json->>'tableComment' IS NOT NULL
+                UNION ALL
+                SELECT t.from_id, kv.key, kv.value
+                  FROM analysis_relation t
+                 CROSS JOIN LATERAL jsonb_each_text(
+                       CASE WHEN jsonb_typeof(t.properties_json->'columnComments') = 'object' THEN t.properties_json->'columnComments' ELSE '{}'::jsonb END) AS kv
+                 WHERE t.revision_id = #{revisionId}
+                   AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+                   AND t.to_external = upper(#{table})
+               ) d
+         GROUP BY d.col, d.comment
+         ORDER BY d.col NULLS FIRST, COUNT(DISTINCT d.from_id) DESC, d.comment
+    </select>
+
     <sql id="mapperWhere">
          WHERE m.revision_id = #{revisionId}
            AND m.statement_type &lt;&gt; 'SQL_FRAGMENT'

@@ -271,6 +271,13 @@ public class MyBatisPlugin implements SemanticPlugin {
 						// 파서로 읽었으면 쓰인 컬럼도 남긴다. 없으면 빈 목록이다(SELECT * 등). 키가 없으면 "컬럼을 못 읽은 SQL"이다.
 						properties.put("columns", use.columns);
 					}
+					// SQL 주석에 적힌 한글명. 테이블 상세에서 DB 코멘트, DDL 설명이 없을 때 쓴다.
+					if (!use.columnComments.isEmpty()) {
+						properties.put("columnComments", use.columnComments);
+					}
+					if (use.tableComment != null) {
+						properties.put("tableComment", use.tableComment);
+					}
 					resourceDao.insertRelation(relation(revisionId, "SQL", "S" + afterId, "R".equals(use.crud) ? "READS_TABLE" : "WRITES_TABLE"
 							, "TABLE", null, use.table, use.guessed ? "MEDIUM" : "HIGH", use.guessed ? "HEURISTIC" : "RESOLVED"
 							, properties, statement.get("fileId"), statement.get("lineStart")));

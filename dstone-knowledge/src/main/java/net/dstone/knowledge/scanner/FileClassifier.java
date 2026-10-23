@@ -1,6 +1,7 @@
 package net.dstone.knowledge.scanner;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
@@ -18,12 +19,15 @@ public class FileClassifier {
 	/** WebSquare 화면 XML의 맨 위 요소에 적히는 네임스페이스 */
 	private static final String WEBSQUARE_NAMESPACE = "http://www.inswave.com/websquare";
 
+	/** DDL 파일인지 가리는 문장: CREATE TABLE, COMMENT ON */
+	private static final Pattern DDL_STATEMENT = Pattern.compile("(?i)\\bCREATE\\s+(?:\\w+\\s+){0,3}TABLE\\b|\\bCOMMENT\\s+ON\\s+(?:TABLE|COLUMN)\\b");
+
 	/**
 	 * <pre>
 	 * 확장자로 언어를 정합니다.
 	 * </pre>
 	 *
-	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE. 분석 대상이 아니면 null. Nexacro의 .xfdl/.xadl도 XML이다
+	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE/SQL. 분석 대상이 아니면 null. Nexacro의 .xfdl/.xadl도 XML이다
 	 */
 	public String languageOf(String fileName) {
 		String name = fileName.toLowerCase(Locale.ROOT);
@@ -49,6 +53,10 @@ public class FileClassifier {
 		if (name.endsWith(".gradle") || name.endsWith(".gradle.kts")) {
 			return "GRADLE";
 		}
+		if (name.endsWith(".sql") || name.endsWith(".ddl")) {
+			// DDL 스크립트. 테이블과 컬럼의 설명(COMMENT)을 읽으려고 스캔한다.
+			return "SQL";
+		}
 		return null;
 	}
 
@@ -71,6 +79,10 @@ public class FileClassifier {
 		}
 		if ("GRADLE".equals(language)) {
 			return "BUILD";
+		}
+		if ("SQL".equals(language)) {
+			// 테이블을 만들거나 설명을 다는 문장이 있으면 DDL, 데이터만 넣는 스크립트 등은 SQL_SCRIPT
+			return text != null && DDL_STATEMENT.matcher(text).find() ? "DDL" : "SQL_SCRIPT";
 		}
 		return xmlTypeOf(fileName.toLowerCase(Locale.ROOT), text);
 	}

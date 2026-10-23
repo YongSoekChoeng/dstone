@@ -72,6 +72,9 @@ public class GraphService extends BaseObject {
 	@Autowired
 	private ResourceDao resourceDao;
 
+	@Autowired
+	private TableDictionaryService tableDictionaryService;
+
 	/* ======================= 1. 전체 맵 ======================= */
 
 	/**
@@ -343,8 +346,10 @@ public class GraphService extends BaseObject {
 	 *   JSP    methods(화면 안의 Java 코드), document
 	 *   MAPPER statements(그 파일의 SQL statement)
 	 *   SQL    document
-	 *   TABLE  columns(SQL에 적힌 이 테이블의 컬럼), columnCoverage({statements, unread}: 컬럼을 못 읽은 SQL 수),
-	 *          usage(이 테이블을 건드리는 SQL과 그것을 실행하는 메소드)
+	 *   TABLE  koreanName / koreanNameSource(테이블 한글명과 출처: DB 코멘트 → DDL → SQL 주석),
+	 *          columns(컬럼명, 한글명, 타입, SQL에서 쓰인 정도), columnCoverage({statements, unread}: 컬럼을 못 읽은 SQL 수),
+	 *          dictionary({db, dbMessage, ddlFiles}: 한글명을 찾아본 곳), usage(이 테이블을 건드리는 SQL과 그것을 실행하는 메소드)
+	 *          (TableDictionaryService)
 	 * document는 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 것)입니다. 문서가 없으면 null입니다.
 	 * </pre>
 	 */
@@ -369,8 +374,8 @@ public class GraphService extends BaseObject {
 		} else if ("SQL".equals(kind)) {
 			node.put("document", graphDao.selectDocumentText(revisionId, "SQL", "MAPPER", id.getId()));
 		} else if ("TABLE".equals(kind)) {
-			node.put("columns", resourceDao.selectTableColumns(revisionId, id.getTableName()));
-			node.put("columnCoverage", resourceDao.selectTableColumnCoverage(revisionId, id.getTableName()));
+			String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
+			node.putAll(tableDictionaryService.describe(revisionId, projectId, id.getTableName()));
 			node.put("usage", resourceDao.selectTableUsage(revisionId, id.getTableName(), MAX_DETAIL_ROWS));
 		}
 		return node;
