@@ -735,6 +735,10 @@ var DstoneKnowledgeGraph = (function () {
 
 	/** 테이블의 컬럼. DB 정의가 아니라, 분석한 SQL에 적힌 컬럼을 모은 것입니다 */
 	function tableColumns(columns, coverage) {
+		if (!coverage) {
+			// 컬럼을 주지 않는 예전 dstone-knowledge 다.
+			return "<div class=\"kn-section-title\">컬럼</div><p class=\"ai-hint\">dstone-knowledge 가 컬럼을 주지 않는 예전 버전입니다. 새로 빌드해서 다시 띄워 주세요.</p>";
+		}
 		var unread = Number(coverage.unread || 0);
 		var statements = Number(coverage.statements || 0);
 		var html = "<div class=\"kn-section-title\">컬럼 · " + columns.length + "개 <span class=\"ai-hint\">(DB 정의가 아니라 SQL에 적힌 컬럼입니다)</span></div>";
@@ -787,7 +791,7 @@ var DstoneKnowledgeGraph = (function () {
 			}).join("") + "</table>";
 		}
 		if (detail.kind === "TABLE") {
-			html += tableColumns(detail.columns || [], detail.columnCoverage || {});
+			html += tableColumns(detail.columns || [], detail.columnCoverage);
 		}
 
 		if (detail.endpoints && detail.endpoints.length > 0) {
