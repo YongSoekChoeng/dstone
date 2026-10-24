@@ -348,7 +348,7 @@ public class GraphService extends BaseObject {
 	 *   SQL    document
 	 *   TABLE  koreanName / koreanNameSource(테이블 한글명과 출처: DB 코멘트 → DDL → SQL 주석),
 	 *          columns(컬럼명, 한글명, 타입, SQL에서 쓰인 정도), columnCoverage({statements, unread}: 컬럼을 못 읽은 SQL 수),
-	 *          dictionary({db, dbMessage, ddlFiles}: 한글명을 찾아본 곳), usage(이 테이블을 건드리는 SQL과 그것을 실행하는 메소드)
+	 *          dictionary({db, dbMessage, ddlFiles, file, fileMessage, files}: 한글명을 찾아본 곳), usage(이 테이블을 건드리는 SQL과 그것을 실행하는 메소드)
 	 *          (TableDictionaryService)
 	 * document는 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 것)입니다. 문서가 없으면 null입니다.
 	 * </pre>

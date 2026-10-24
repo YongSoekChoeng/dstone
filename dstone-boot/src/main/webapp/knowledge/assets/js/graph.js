@@ -789,14 +789,15 @@ var DstoneKnowledgeGraph = (function () {
 			+ "<b>" + K.escapeHtml(name) + "</b></div>";
 	}
 
-	/** 한글명이 어디서 왔는지: DB 코멘트 → DDL 의 COMMENT → DDL 의 주석 → SQL 주석 → 소스 순서로 먼저 있는 것을 쓴다 */
-	var NAME_SOURCE = { DB: "DB", DDL: "DDL", DDL_NOTE: "DDL 주석", SQL: "SQL 주석", SOURCE: "소스" };
+	/** 한글명이 어디서 왔는지: DB 코멘트 → DDL 의 COMMENT → DDL 의 주석 → SQL 주석 → 소스 → 사전 파일 순서로 먼저 있는 것을 쓴다 */
+	var NAME_SOURCE = { DB: "DB", DDL: "DDL", DDL_NOTE: "DDL 주석", SQL: "SQL 주석", SOURCE: "소스", DICT: "사전" };
 	var NAME_SOURCE_HINT = {
 		DB: "대상 DB의 코멘트",
 		DDL: "DDL 파일(.sql)의 COMMENT",
 		DDL_NOTE: "DDL 파일(.sql)의 일반 주석",
 		SQL: "매퍼 SQL의 주석",
-		SOURCE: "Java 소스(엔티티, 또는 이름이 같은 VO 필드의 설명). 이름만 같은 필드에서 가져온 것은 다른 테이블의 뜻일 수 있습니다"
+		SOURCE: "Java 소스(엔티티, 또는 이름이 같은 VO 필드의 설명). 이름만 같은 필드에서 가져온 것은 다른 테이블의 뜻일 수 있습니다",
+		DICT: "프로젝트 설정에 등록한 사전 파일(CSV). 사람이 짐작해 붙인 이름이 섞여 있을 수 있습니다"
 	};
 
 	/** 출처 표시. 마우스를 올리면 어디서 가져왔는지(파일:줄, 필드, SQL 건수)가 나온다 */
@@ -854,7 +855,14 @@ var DstoneKnowledgeGraph = (function () {
 		}
 		var files = dictionary.ddlFiles || [];
 		parts.push(files.length > 0 ? "DDL: <span class=\"kn-mono\">" + K.escapeHtml(files.join(", ")) + "</span>" : "이 테이블의 DDL 파일은 없습니다");
-		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL COMMENT → DDL 주석 → SQL 주석 → 소스 순서로 찾습니다. 출처 표시에 마우스를 올리면 가져온 곳이 나옵니다. " + parts.join(" · ") + ".</p>";
+		if (dictionary.file === "OK") {
+			parts.push("사전 파일: <span class=\"kn-mono\">" + K.escapeHtml((dictionary.files || []).join(", ")) + "</span>");
+		} else if (dictionary.file === "FAILED") {
+			parts.push("사전 파일을 다 읽지 못했습니다(" + K.escapeHtml(dictionary.fileMessage || "") + ")");
+		} else if (dictionary.file) {
+			parts.push("등록한 사전 파일은 없습니다");
+		}
+		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL COMMENT → DDL 주석 → SQL 주석 → 소스 → 사전 파일 순서로 찾습니다. 출처 표시에 마우스를 올리면 가져온 곳이 나옵니다. " + parts.join(" · ") + ".</p>";
 	}
 
 	/** 서버가 준 노드 상세(GET .../graph/node)를 그립니다. 종류마다 들어 있는 항목이 달라서, 있는 것만 그립니다 */

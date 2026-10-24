@@ -163,6 +163,35 @@ public class SqlTableExtractorTest {
 	}
 
 	@Test
+	public void FROM을_앞줄에_쓰거나_쉼표로_늘어놓은_테이블의_주석도_읽는다() {
+		// HI-Japan 매퍼에 흔한 모양. 서브쿼리 안의 FROM 목록도 같다. 같은 테이블에 주석이 둘이면 먼저 나온 것을 쓴다.
+		assertEquals("[JC_ACDT_AGMT:{}:클레임_사고계약, JC_BENEFIT:{}:보험금, JC_PLY:{}:클레임_증권]", commentsOf(extractor.extract(
+				"SELECT A.ACDT_MGNT_NO                 AS ACDT_NO     /* 사고번호 */\n"
+				+ "     , NVL((SELECT MAX(S1.PLY_NO)\n"
+				+ "              FROM JC_ACDT_AGMT S1      /* 클레임_사고계약 */\n"
+				+ "                  ,JC_PLY S2            /* 클레임_증권 */\n"
+				+ "             WHERE S1.PLY_NO = S2.PLY_NO), 0) AS PLY_NO /* 증권번호 */\n"
+				+ "  FROM\n"
+				+ "       JC_BENEFIT A       /* 보험금       */\n"
+				+ "      ,JC_ACDT_AGMT B     /* 사고계약     */\n"
+				+ " WHERE A.ACDT_MGNT_NO = B.ACDT_MGNT_NO", "SELECT")));
+	}
+
+	@Test
+	public void 스키마를_붙여_적은_테이블의_주석도_그_테이블의_것이다() {
+		// 테이블 이름은 스키마째 남으므로 주석도 스키마째 짝을 짓는다.
+		assertEquals("[DPHJSDBA.JZ_EMP_INFO:{}:사원정보, TB_ORDER:{}:주문]", commentsOf(extractor.extract(
+				"SELECT o.ORDER_ID\n  FROM TB_ORDER o              /* 주문 */\n     , DPHJSDBA.JZ_EMP_INFO e    /* 사원정보 */\n WHERE o.EMP_NO = e.EMP_NO", "SELECT")));
+	}
+
+	@Test
+	public void 조회_목록의_별칭_주석은_테이블_주석으로_보지_않는다() {
+		// "식 별칭 /* 설명 */" 은 FROM 절이 아니므로 테이블 이름으로 잡히지 않는다.
+		assertEquals("[TB_ORDER:{}:null]", commentsOf(extractor.extract(
+				"SELECT\n       o.ORDER_ID ORDER_NO     /* 주문번호 */\n     , o.AMOUNT AMT          /* 금액 */\n  FROM TB_ORDER o", "SELECT")));
+	}
+
+	@Test
 	public void 테이블이_둘인데_별칭_없이_적은_컬럼의_주석은_주인을_정하지_못하면_버린다() {
 		// CREATED_BY 는 어느 테이블의 것인지 모른다. NAME 은 c 의 것으로 확실하다.
 		assertEquals("[TB_CUSTOMER:{NAME=고객명}:null, TB_ORDER:{}:null]", commentsOf(extractor.extract(

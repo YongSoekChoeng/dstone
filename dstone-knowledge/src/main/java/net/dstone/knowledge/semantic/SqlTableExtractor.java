@@ -53,6 +53,7 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
  * SQL 주석에 적힌 한글명도 모읍니다(SqlComments). 예:
  *   SELECT tb1.mb_nm   /* 회사명 VARCHAR(100) *&#47;     → TBSY_MEMBER.MB_NM = 회사명
  *     FROM tbsy_member tb1 /* 회원사관리 *&#47;          → TBSY_MEMBER = 회원사관리
+ *        , tbsy_auth tb2   /* 권한 *&#47;                → TBSY_AUTH = 권한 (FROM 을 앞줄에 쓰거나 쉼표로 늘어놓은 테이블도)
  * 한글이 들어 있는 주석만, 그리고 어느 테이블(컬럼)의 것인지 확실할 때만 넣습니다.
  * "식 AS 별칭 /* 설명 *&#47;" 처럼 별칭을 설명한 주석은 테이블 컬럼의 것이 아니라서 뺍니다.
  * </pre>
@@ -274,6 +275,15 @@ public class SqlTableExtractor {
 	private static final Pattern BEFORE_ASSIGN_COMMENT = Pattern.compile("(?i)(?:^|[,(]|\\bSET|\\bAND|\\bOR|\\bWHERE)\\s*(?:([A-Za-z_][\\w$#]*)\\.)?([A-Za-z_][\\w$#]*)\\s*=\\s*"
 			+ "(?:#\\{[^}]*\\}|#[\\w.\\[\\]]+#|\\?|SYSDATE|SYSTIMESTAMP|NOW\\(\\)|CURRENT_TIMESTAMP)\\s*$");
 
+	/**
+	 * 주석 앞(같은 줄)이 "[,] 테이블 [별칭]" 으로 끝난다 → FROM / JOIN 절 안이면 테이블의 한글명.
+	 *   FROM
+	 *        JC_BENEFIT A        /* 보험금 *&#47;      ← FROM 을 앞줄에 쓴 경우
+	 *       ,JC_ACDT_AGMT B      /* 사고계약 *&#47;    ← 쉼표로 늘어놓은 두 번째 테이블
+	 * 같은 모양이 조회 목록(SELECT a.col alias)에도 나오므로, 절이 무엇인지는 ClauseTracker 로 확인한다.
+	 */
+	private static final Pattern TABLE_ITEM_COMMENT = Pattern.compile("(?i)(?:^|,)\\s*([A-Za-z_][\\w$#.]*)(?:\\s+(?:AS\\s+)?([A-Za-z_][\\w$#]*))?\\s*$");
+
 	/** 주석 앞에 오면 별칭이 아니라 다음 낱말인 것 */
 	private static final String NOT_ALIASES = "|SET|WHERE|ON|USING|VALUES|SELECT|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|GROUP|ORDER|UNION|WITH|AND|OR|";
 
@@ -303,6 +313,7 @@ public class SqlTableExtractor {
 			return found;
 		}
 		Matcher m = COMMENT.matcher(sql);
+		ClauseTracker clauses = new ClauseTracker(sql);
 		int previousEnd = 0;
 		while (m.find()) {
 			String text = KoreanName.clean(m.group(1) != null ? m.group(1) : m.group(2));
@@ -320,7 +331,16 @@ public class SqlTableExtractor {
 			comment.text = text;
 			Matcher table = BEFORE_TABLE_COMMENT.matcher(before);
 			if (table.find() && (table.group(2) == null || NOT_ALIASES.indexOf("|" + table.group(2).toUpperCase(Locale.ROOT) + "|") < 0)) {
-				comment.table = normalize(lastPart(table.group(1)));
+				comment.table = normalize(table.group(1));
+				if (comment.table != null) {
+					found.add(comment);
+				}
+				continue;
+			}
+			Matcher item = TABLE_ITEM_COMMENT.matcher(before);
+			if (item.find() && (item.group(2) == null || NOT_ALIASES.indexOf("|" + item.group(2).toUpperCase(Locale.ROOT) + "|") < 0)
+					&& clauses.inTableList(m.start())) {
+				comment.table = normalize(item.group(1));
 				if (comment.table != null) {
 					found.add(comment);
 				}
@@ -340,9 +360,74 @@ public class SqlTableExtractor {
 		return found;
 	}
 
-	private String lastPart(String name) {
-		int dot = name.lastIndexOf('.');
-		return dot < 0 ? name : name.substring(dot + 1);
+	/**
+	 * <pre>
+	 * SQL 을 앞에서부터 읽으며, 지금 자리가 어느 절(SELECT / FROM / WHERE ...) 안인지 기억합니다.
+	 * 괄호마다 따로 기억하므로 서브쿼리 안에서는 그 서브쿼리의 절을, 괄호를 닫으면 바깥 절을 봅니다.
+	 * 주석과 '글자' 안의 낱말은 절로 치지 않습니다.
+	 * 주석은 앞에서부터 차례로 묻기 때문에 매번 처음부터 읽지 않고 이어서 읽습니다.
+	 * </pre>
+	 */
+	private static class ClauseTracker {
+
+		/** 절을 바꾸는 낱말 */
+		private static final String CLAUSES = "|SELECT|FROM|JOIN|WHERE|ON|USING|GROUP|ORDER|HAVING|SET|VALUES|INTO|UPDATE|DELETE|INSERT|MERGE"
+				+ "|UNION|INTERSECT|MINUS|EXCEPT|CONNECT|START|WITH|WHEN|THEN|ELSE|";
+
+		/** 이 절 안에 늘어놓은 것은 테이블이다 */
+		private static final String TABLE_CLAUSES = "|FROM|JOIN|INTO|UPDATE|";
+
+		private final String sql;
+		private int position = 0;
+		/** 괄호 단계마다 마지막으로 나온 절. 맨 끝이 지금 단계 */
+		private final List<String> stack = new ArrayList<String>();
+
+		ClauseTracker(String sql) {
+			this.sql = sql;
+			stack.add(null);
+		}
+
+		/** end 자리(주석이 시작하는 곳)가 FROM / JOIN / INTO / UPDATE 절 안인지 */
+		boolean inTableList(int end) {
+			readTo(end);
+			String clause = stack.get(stack.size() - 1);
+			return clause != null && TABLE_CLAUSES.indexOf("|" + clause + "|") >= 0;
+		}
+
+		private void readTo(int end) {
+			while (position < end) {
+				char c = sql.charAt(position);
+				if (c == '/' && position + 1 < sql.length() && sql.charAt(position + 1) == '*') {
+					int close = sql.indexOf("*/", position + 2);
+					position = close < 0 ? sql.length() : close + 2;
+				} else if (c == '-' && position + 1 < sql.length() && sql.charAt(position + 1) == '-') {
+					int newline = sql.indexOf('\n', position);
+					position = newline < 0 ? sql.length() : newline + 1;
+				} else if (c == '\'') {
+					int close = sql.indexOf('\'', position + 1);
+					position = close < 0 ? sql.length() : close + 1;
+				} else if (c == '(') {
+					stack.add(null);
+					position++;
+				} else if (c == ')') {
+					if (stack.size() > 1) {
+						stack.remove(stack.size() - 1);
+					}
+					position++;
+				} else if (Character.isLetter(c) || c == '_') {
+					int start = position;
+					while (position < sql.length() && (Character.isLetterOrDigit(sql.charAt(position)) || "_$#".indexOf(sql.charAt(position)) >= 0)) {
+						position++;
+					}
+					String word = sql.substring(start, position).toUpperCase(Locale.ROOT);
+					if (CLAUSES.indexOf("|" + word + "|") >= 0) {
+						stack.set(stack.size() - 1, word);
+					}
+				} else {
+					position++;
+				}
+			}
+		}
 	}
 
 	/**
