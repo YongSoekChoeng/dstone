@@ -19,6 +19,7 @@ import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.common.util.SqlFormatter;
 
 /**
  * <pre>
@@ -351,7 +352,7 @@ public class GraphService extends BaseObject {
 	 *          dictionary({db, dbMessage, ddlFiles, file, fileMessage, files}: 한글명을 찾아본 곳), usage(이 테이블을 건드리는 SQL과 그것을 실행하는 메소드)
 	 *          (TableDictionaryService)
 	 * document는 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 것)에서 소스·SQL 앞까지입니다. 문서가 없으면 null입니다.
-	 * code는 그 문서의 소스나 SQL 본문({kind: SOURCE | SQL, text})입니다. 화면이 버튼을 눌러 팝업으로 보여 줍니다. 없으면 null입니다.
+	 * code는 그 문서의 소스나 SQL 본문({kind: SOURCE | SQL, text, formatted})입니다. formatted 는 SQL 에만 있고, 들여쓰기를 넣은 SQL 입니다. 화면이 버튼을 눌러 팝업으로 보여 줍니다. 없으면 null입니다.
 	 * </pre>
 	 */
 	public Map<String, Object> getNode(long revisionId, String nodeId) {
@@ -391,6 +392,10 @@ public class GraphService extends BaseObject {
 			code = new LinkedHashMap<String, Object>();
 			code.put("kind", sections.codeKind);
 			code.put("text", sections.code);
+			// SQL 은 줄바꿈과 들여쓰기를 넣은 것도 준다. 팝업은 이것을 먼저 보여 주고, 원문으로 바꿔 볼 수 있다.
+			if ("SQL".equals(sections.codeKind)) {
+				code.put("formatted", SqlFormatter.format(sections.code));
+			}
 		}
 		node.put("code", code);
 	}

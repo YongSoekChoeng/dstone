@@ -67,7 +67,7 @@ var DstoneKnowledgeGraph = (function () {
 			"kn-graph-tiers", "kn-graph-edges", "kn-graph-find", "kn-graph-find-btn", "kn-graph-fit", "kn-graph-message", "kn-graph-canvas", "kn-graph-detail",
 			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-close", "kn-tree-message",
 			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle",
-			"kn-code-modal", "kn-code-title", "kn-code-where", "kn-code-text", "kn-code-copy", "kn-code-close"].forEach(function (id) {
+			"kn-code-modal", "kn-code-title", "kn-code-where", "kn-code-text", "kn-code-raw", "kn-code-copy", "kn-code-close"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 
@@ -110,6 +110,7 @@ var DstoneKnowledgeGraph = (function () {
 		});
 		el["kn-code-close"].addEventListener("click", closeCode);
 		el["kn-code-copy"].addEventListener("click", copyCode);
+		el["kn-code-raw"].addEventListener("click", toggleRawCode);
 		el["kn-code-modal"].addEventListener("click", function (event) {
 			if (event.target === el["kn-code-modal"]) {
 				closeCode();
@@ -939,6 +940,9 @@ var DstoneKnowledgeGraph = (function () {
 
 	var CODE_LABEL = { SOURCE: "소스", SQL: "SQL" };
 
+	/** 팝업에 띄운 본문. SQL 이면 들여쓰기를 넣은 것(formatted)과 원문(text)을 바꿔 볼 수 있다 */
+	var codeView = { code: null, raw: false };
+
 	/** 설명 제목 옆에 붙는 [소스 보기] / [SQL 보기] 버튼. 소스나 SQL 이 없으면 빈 글자 */
 	function codeButton(code) {
 		if (!code || !code.text) {
@@ -969,11 +973,26 @@ var DstoneKnowledgeGraph = (function () {
 			where += (where ? " · " : "") + "빈 줄과 들여쓰기를 뺀 내용입니다";
 		}
 		el["kn-code-where"].textContent = where;
-		el["kn-code-text"].textContent = detail.code.text;
+		codeView.code = detail.code;
+		codeView.raw = false;
+		// SQL 은 들여쓰기를 넣은 것을 먼저 보여 준다. 원문과 다를 때만 바꿔 보기 버튼을 둔다.
+		el["kn-code-raw"].style.display = detail.code.formatted && detail.code.formatted !== detail.code.text ? "" : "none";
+		showCodeText();
+		el["kn-code-modal"].style.display = "flex";
+	}
+
+	function showCodeText() {
+		var code = codeView.code;
+		el["kn-code-text"].textContent = !codeView.raw && code.formatted ? code.formatted : code.text;
 		el["kn-code-text"].scrollTop = 0;
 		el["kn-code-text"].scrollLeft = 0;
+		el["kn-code-raw"].textContent = codeView.raw ? "정리해서 보기" : "원문 보기";
 		el["kn-code-copy"].textContent = "복사";
-		el["kn-code-modal"].style.display = "flex";
+	}
+
+	function toggleRawCode() {
+		codeView.raw = !codeView.raw;
+		showCodeText();
 	}
 
 	function closeCode() {

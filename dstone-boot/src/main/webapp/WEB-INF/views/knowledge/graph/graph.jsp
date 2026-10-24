@@ -144,6 +144,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<div class="kn-code-box">
 			<div class="kn-row">
 				<b id="kn-code-title" class="kn-graph-modal-title"></b>
+				<button type="button" id="kn-code-raw" class="kn-plain" style="display:none;">원문 보기</button>
 				<button type="button" id="kn-code-copy" class="kn-plain">복사</button>
 				<button type="button" id="kn-code-close" class="kn-plain">닫기</button>
 			</div>
