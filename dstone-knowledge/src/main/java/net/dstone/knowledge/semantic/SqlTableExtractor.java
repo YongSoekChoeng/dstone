@@ -12,6 +12,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.dstone.knowledge.common.util.KoreanName;
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
@@ -273,15 +274,9 @@ public class SqlTableExtractor {
 	private static final Pattern BEFORE_ASSIGN_COMMENT = Pattern.compile("(?i)(?:^|[,(]|\\bSET|\\bAND|\\bOR|\\bWHERE)\\s*(?:([A-Za-z_][\\w$#]*)\\.)?([A-Za-z_][\\w$#]*)\\s*=\\s*"
 			+ "(?:#\\{[^}]*\\}|#[\\w.\\[\\]]+#|\\?|SYSDATE|SYSTIMESTAMP|NOW\\(\\)|CURRENT_TIMESTAMP)\\s*$");
 
-	/** 주석 끝에 붙여 적는 타입: VARCHAR(20), bigint(20), NUMBER(10,2), DATETIME ... */
-	private static final Pattern TRAILING_TYPE = Pattern.compile("(?i)\\s+(?:N?VARCHAR2?|N?CHAR|NUMBER|NUMERIC|DECIMAL|INTEGER|INT|BIGINT|SMALLINT|TINYINT|MEDIUMINT|FLOAT|DOUBLE|REAL"
-			+ "|DATE|DATETIME|TIMESTAMP|TIME|CLOB|NCLOB|BLOB|TEXT|LONGTEXT|MEDIUMTEXT|BOOLEAN|BIT|SERIAL|BIGSERIAL)(?:\\s*\\([^)]*\\))?\\s*$");
-
 	/** 주석 앞에 오면 별칭이 아니라 다음 낱말인 것 */
 	private static final String NOT_ALIASES = "|SET|WHERE|ON|USING|VALUES|SELECT|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|GROUP|ORDER|UNION|WITH|AND|OR|";
 
-	/** 한글명 하나의 최대 길이 */
-	private static final int MAX_COMMENT = 200;
 
 	/**
 	 * <pre>
@@ -310,7 +305,7 @@ public class SqlTableExtractor {
 		Matcher m = COMMENT.matcher(sql);
 		int previousEnd = 0;
 		while (m.find()) {
-			String text = commentText(m.group(1) != null ? m.group(1) : m.group(2));
+			String text = KoreanName.clean(m.group(1) != null ? m.group(1) : m.group(2));
 			int lineStart = sql.lastIndexOf('\n', m.start() - 1) + 1;
 			String before = sql.substring(Math.max(lineStart, previousEnd), m.start()).trim();
 			previousEnd = m.end();
@@ -343,32 +338,6 @@ public class SqlTableExtractor {
 			found.add(comment);
 		}
 		return found;
-	}
-
-	/** 주석 글에서 한글명만 남깁니다. 한글이 없으면 null */
-	private String commentText(String raw) {
-		String text = raw.replaceAll("\\s+", " ").trim();
-		// 끝에 붙여 적은 타입을 뗀다(겹쳐 적은 경우도 있어서 두 번까지).
-		for (int i = 0; i < 2; i++) {
-			text = TRAILING_TYPE.matcher(text).replaceAll("").trim();
-		}
-		if (text.endsWith(",")) {
-			text = text.substring(0, text.length() - 1).trim();
-		}
-		if (text.length() == 0 || !hasHangul(text)) {
-			return null;
-		}
-		return text.length() > MAX_COMMENT ? text.substring(0, MAX_COMMENT) : text;
-	}
-
-	private boolean hasHangul(String text) {
-		for (int i = 0; i < text.length(); i++) {
-			char c = text.charAt(i);
-			if (c >= '\uAC00' && c <= '\uD7A3') {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	private String lastPart(String name) {

@@ -174,6 +174,14 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectSqlCommentDictionary", param);
 	}
 
+	public List<Map<String, Object>> selectSourceDictionary(long revisionId, String table, List<String> columns) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("table", table);
+		param.put("columns", columns);
+		return sqlSessionCommon.selectList(NS + "selectSourceDictionary", param);
+	}
+
 	public int countMapper(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countMapper", condition);
 		return count.intValue();

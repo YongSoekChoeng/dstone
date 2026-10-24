@@ -277,6 +277,7 @@
              , r.properties_json->>'column' AS "column"
              , r.value AS "comment"
              , r.properties_json->>'dataType' AS "dataType"
+             , r.properties_json->>'commentKind' AS "commentKind"
              , f.path AS "path"
              , r.line_start AS "lineStart"
           FROM analysis_resource r
@@ -309,6 +310,26 @@
                ) d
          GROUP BY d.col, d.comment
          ORDER BY d.col NULLS FIRST, COUNT(DISTINCT d.from_id) DESC, d.comment
+    </select>
+
+    <!-- 소스에서 찾은 한글명(SourceNamePlugin): 이 테이블의 엔티티 / 엔티티 필드, 그리고 이름이 이 테이블의 컬럼과 같은 필드.
+         엔티티로 이어진 것이 먼저 온다 -->
+    <select id="selectSourceDictionary" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.resource_type AS "type"
+             , r.name AS "name"
+             , r.value AS "comment"
+             , r.properties_json->>'via' AS "via"
+             , COALESCE(r.properties_json->>'field', r.properties_json->>'type') AS "where"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND ((r.resource_type = 'SOURCE_TABLE_NAME' AND r.name = upper(#{table}))
+             OR (r.resource_type = 'SOURCE_NAME' AND r.properties_json->>'table' = upper(#{table}))
+        <if test="columns != null and columns.size() > 0">
+             OR (r.resource_type = 'SOURCE_NAME' AND r.properties_json->>'table' IS NULL
+                 AND r.name IN <foreach collection="columns" item="column" open="(" separator="," close=")">#{column}</foreach>)
+        </if>
+               )
+         ORDER BY CASE WHEN r.properties_json->>'via' = 'NAME' THEN 1 ELSE 0 END, r.file_id, r.line_start
     </select>
 
     <sql id="mapperWhere">

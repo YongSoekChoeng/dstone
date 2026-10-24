@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.dstone.knowledge.common.util.JsonText;
+import net.dstone.knowledge.common.util.KoreanName;
 
 /**
  * <pre>
@@ -24,6 +25,14 @@ import net.dstone.knowledge.common.util.JsonText;
  *   DDL_TABLE  name = 테이블,         value = 설명(없으면 null)
  *   DDL_COLUMN name = 테이블.컬럼,    value = 설명(없으면 null), properties_json = {table, column, dataType, ordinal}
  * COMMENT ON 은 CREATE TABLE 과 다른 파일에 있을 수 있어서, 설명만 있는 행(dataType 없음)으로 따로 남깁니다.
+ *
+ * 정식 COMMENT 가 없으면 일반 주석에 적은 한글명도 읽습니다. 이때 properties_json.commentKind = NOTE 입니다.
+ *   -- [SY] 회원사 마스터              ← CREATE TABLE 바로 윗줄(빈 줄 없이)의 주석, 또는 CREATE TABLE 줄 끝의 주석 → 테이블
+ *   CREATE TABLE tbsy_member (
+ *       mb_id VARCHAR(20) NOT NULL,   -- 회원사ID     ← 컬럼 정의 줄 끝의 주석 → 그 컬럼
+ *       -- 회사명                                      ← 주석만 있는 줄 → 바로 다음 줄의 컬럼
+ *       mb_nm VARCHAR(100)
+ * 한글이 들어 있는 주석만 씁니다(KoreanName).
  * 같은 테이블의 행을 합치는 일은 읽는 쪽(TableDictionaryService)이 합니다.
  *
  * 이름은 따옴표를 벗기고 대문자로 맞추며, 스키마는 뗍니다(SQL 쪽 테이블 이름과 같은 기준).
@@ -72,7 +81,8 @@ public class DdlReader {
 			}
 			Matcher create = CREATE_TABLE.matcher(sql);
 			if (create.find()) {
-				readCreateTable(sql, create, line, rows);
+				String raw = source.substring(range[0], range[1]);
+				readCreateTable(sql, create, line, rows, raw, at - range[0]);
 				continue;
 			}
 			Matcher comment = COMMENT_ON.matcher(sql);
@@ -83,7 +93,11 @@ public class DdlReader {
 		return rows;
 	}
 
-	private void readCreateTable(String sql, Matcher create, int line, List<Map<String, Object>> rows) {
+	/**
+	 * @param raw 주석이 남아 있는 이 문장의 원문(일반 주석의 한글명을 읽는다)
+	 * @param createAt raw 안에서 CREATE 가 시작하는 위치
+	 */
+	private void readCreateTable(String sql, Matcher create, int line, List<Map<String, Object>> rows, String raw, int createAt) {
 		String table = tableName(create.group(1));
 		int open = create.end() - 1;
 		int close = closingParen(sql, open);
@@ -91,7 +105,16 @@ public class DdlReader {
 			return;
 		}
 		Matcher tableComment = TABLE_COMMENT.matcher(sql.substring(close + 1));
-		rows.add(row("DDL_TABLE", table, tableComment.find() ? unquote(tableComment.group(1)) : null, new LinkedHashMap<String, Object>(), line));
+		String tableText = tableComment.find() ? unquote(tableComment.group(1)) : null;
+		Map<String, Object> tableProperties = new LinkedHashMap<String, Object>();
+		if (tableText == null) {
+			tableText = tableNoteOf(raw, createAt);
+			if (tableText != null) {
+				tableProperties.put("commentKind", "NOTE");
+			}
+		}
+		rows.add(row("DDL_TABLE", table, tableText, tableProperties, line));
+		Map<String, String> notes = columnNotesOf(raw, createAt);
 
 		List<String> parts = topLevelParts(sql.substring(open + 1, close));
 		int ordinal = 0;
@@ -112,8 +135,123 @@ public class DdlReader {
 			properties.put("column", column);
 			properties.put("dataType", dataTypeOf(part.substring(words[0].length()).trim()));
 			properties.put("ordinal", ordinal);
-			rows.add(row("DDL_COLUMN", table + "." + column, comment.find() ? unquote(comment.group(1)) : null, properties, line));
+			String text = comment.find() ? unquote(comment.group(1)) : null;
+			if (text == null && notes.get(column) != null) {
+				text = notes.get(column);
+				properties.put("commentKind", "NOTE");
+			}
+			rows.add(row("DDL_COLUMN", table + "." + column, text, properties, line));
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 테이블의 한글명을 일반 주석에서 찾습니다.
+	 * CREATE TABLE 줄 끝의 주석이 먼저이고, 없으면 CREATE TABLE 바로 위에 빈 줄 없이 붙은 주석 줄 가운데 가장 가까운 것을 씁니다.
+	 * 파일 맨 위의 설명처럼 빈 줄로 떨어진 주석은 쓰지 않습니다.
+	 * </pre>
+	 */
+	private String tableNoteOf(String raw, int createAt) {
+		int lineEnd = raw.indexOf('\n', createAt);
+		String createLine = raw.substring(createAt, lineEnd < 0 ? raw.length() : lineEnd);
+		String sameLine = KoreanName.clean(commentOf(createLine));
+		if (sameLine != null) {
+			return sameLine;
+		}
+		String[] above = raw.substring(0, createAt).split("\n", -1);
+		// 마지막 조각은 CREATE 앞의 들여쓰기(빈 글)다.
+		for (int i = above.length - 2; i >= 0; i--) {
+			String text = above[i].trim();
+			if (text.length() == 0) {
+				break;
+			}
+			String comment = commentOf(text);
+			if (comment == null || codeBefore(text).length() > 0) {
+				break;
+			}
+			String note = KoreanName.clean(comment);
+			if (note != null) {
+				return note;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * <pre>
+	 * 컬럼의 한글명을 일반 주석에서 찾습니다(CREATE TABLE 줄 다음부터 한 줄씩).
+	 *   "mb_id VARCHAR(20) NOT NULL, -- 회원사ID" → 그 줄의 컬럼
+	 *   주석만 있는 줄 → 바로 다음 줄의 컬럼(그 줄 끝에 주석이 없을 때)
+	 * </pre>
+	 *
+	 * @return 컬럼(대문자) → 한글명
+	 */
+	private Map<String, String> columnNotesOf(String raw, int createAt) {
+		Map<String, String> notes = new HashMap<String, String>();
+		int lineEnd = raw.indexOf('\n', createAt);
+		if (lineEnd < 0) {
+			return notes;
+		}
+		String[] lines = raw.substring(lineEnd + 1).split("\n");
+		String pending = null;
+		for (int i = 0; i < lines.length; i++) {
+			String text = lines[i];
+			String code = codeBefore(text);
+			String note = KoreanName.clean(commentOf(text));
+			if (code.length() == 0) {
+				// 주석만 있는 줄(또는 빈 줄). 다음 줄의 컬럼에 쓴다.
+				pending = note;
+				continue;
+			}
+			if (code.startsWith(",")) {
+				code = code.substring(1).trim();
+			}
+			String[] words = code.split("[\\s(]+", 2);
+			String column = words.length == 0 ? "" : bareName(words[0]);
+			if (column.length() > 0 && NOT_COLUMNS.indexOf("|" + column + "|") < 0 && !column.startsWith(")")) {
+				String chosen = note != null ? note : pending;
+				if (chosen != null && !notes.containsKey(column)) {
+					notes.put(column, chosen);
+				}
+			}
+			pending = null;
+		}
+		return notes;
+	}
+
+	/** 한 줄에서 주석(-- 또는 /&#42; &#42;/) 안의 글. 따옴표 안의 것은 주석이 아니다. 없으면 null */
+	private String commentOf(String line) {
+		int at = commentStart(line);
+		if (at < 0) {
+			return null;
+		}
+		if (line.startsWith("--", at)) {
+			return line.substring(at + 2);
+		}
+		int end = line.indexOf("*/", at + 2);
+		return line.substring(at + 2, end < 0 ? line.length() : end);
+	}
+
+	/** 한 줄에서 주석 앞의 SQL(앞뒤 공백 제외) */
+	private String codeBefore(String line) {
+		int at = commentStart(line);
+		return (at < 0 ? line : line.substring(0, at)).trim();
+	}
+
+	private int commentStart(String line) {
+		int i = 0;
+		while (i < line.length()) {
+			char c = line.charAt(i);
+			if (c == '\'') {
+				i = skipQuoted(line, i);
+				continue;
+			}
+			if (line.startsWith("--", i) || line.startsWith("/*", i)) {
+				return i;
+			}
+			i++;
+		}
+		return -1;
 	}
 
 	private void readCommentOn(Matcher comment, int line, List<Map<String, Object>> rows) {

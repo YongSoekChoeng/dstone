@@ -733,13 +733,24 @@ var DstoneKnowledgeGraph = (function () {
 			+ "<b>" + K.escapeHtml(name) + "</b></div>";
 	}
 
-	/** 한글명이 어디서 왔는지: DB 코멘트 → DDL 파일의 COMMENT → SQL 주석 순서로 먼저 있는 것을 쓴다 */
-	var NAME_SOURCE = { DB: "DB", DDL: "DDL", SQL: "SQL 주석" };
-	var NAME_SOURCE_HINT = { DB: "대상 DB의 코멘트", DDL: "프로젝트 안 DDL 파일(.sql)의 COMMENT", SQL: "매퍼 SQL의 주석" };
+	/** 한글명이 어디서 왔는지: DB 코멘트 → DDL 의 COMMENT → DDL 의 주석 → SQL 주석 → 소스 순서로 먼저 있는 것을 쓴다 */
+	var NAME_SOURCE = { DB: "DB", DDL: "DDL", DDL_NOTE: "DDL 주석", SQL: "SQL 주석", SOURCE: "소스" };
+	var NAME_SOURCE_HINT = {
+		DB: "대상 DB의 코멘트",
+		DDL: "DDL 파일(.sql)의 COMMENT",
+		DDL_NOTE: "DDL 파일(.sql)의 일반 주석",
+		SQL: "매퍼 SQL의 주석",
+		SOURCE: "Java 소스(엔티티, 또는 이름이 같은 VO 필드의 설명). 이름만 같은 필드에서 가져온 것은 다른 테이블의 뜻일 수 있습니다"
+	};
 
-	function nameSource(source) {
-		return source ? " <span class=\"kn-gd-tag\" title=\"" + K.escapeHtml(NAME_SOURCE_HINT[source] || source) + "\">"
-			+ K.escapeHtml(NAME_SOURCE[source] || source) + "</span>" : "";
+	/** 출처 표시. 마우스를 올리면 어디서 가져왔는지(파일:줄, 필드, SQL 건수)가 나온다 */
+	function nameSource(source, where) {
+		if (!source) {
+			return "";
+		}
+		var title = (NAME_SOURCE_HINT[source] || source) + (where ? " · " + where : "");
+		return " <span class=\"kn-gd-tag" + (source === "SOURCE" ? " kn-gd-tag-guess" : "") + "\" title=\"" + K.escapeHtml(title) + "\">"
+			+ K.escapeHtml(NAME_SOURCE[source] || source) + "</span>";
 	}
 
 	/** 테이블의 컬럼: 컬럼명, 컬럼 한글명, 타입, SQL에서 쓰인 정도 */
@@ -756,7 +767,7 @@ var DstoneKnowledgeGraph = (function () {
 				+ columns.map(function (column) {
 					var used = Number(column.statementCount || 0);
 					return "<tr><td class=\"kn-mono\">" + K.escapeHtml(column.column) + "</td>"
-						+ "<td>" + (column.koreanName ? K.escapeHtml(column.koreanName) + nameSource(column.koreanNameSource) : "<span class=\"ai-hint\">-</span>") + "</td>"
+						+ "<td>" + (column.koreanName ? K.escapeHtml(column.koreanName) + nameSource(column.koreanNameSource, column.koreanNameWhere) : "<span class=\"ai-hint\">-</span>") + "</td>"
 						+ "<td class=\"kn-mono\">" + K.escapeHtml(column.dataType || "") + "</td>"
 						+ "<td class=\"ai-hint\">" + (used > 0 ? used + "건" + (column.crud ? " · " + K.escapeHtml(column.crud.split("").join("·")) : "") : "안 씀") + "</td></tr>";
 				}).join("") + "</tbody></table>";
@@ -787,7 +798,7 @@ var DstoneKnowledgeGraph = (function () {
 		}
 		var files = dictionary.ddlFiles || [];
 		parts.push(files.length > 0 ? "DDL: <span class=\"kn-mono\">" + K.escapeHtml(files.join(", ")) + "</span>" : "이 테이블의 DDL 파일은 없습니다");
-		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL → SQL 주석 순서로 찾습니다. " + parts.join(" · ") + ".</p>";
+		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL COMMENT → DDL 주석 → SQL 주석 → 소스 순서로 찾습니다. 출처 표시에 마우스를 올리면 가져온 곳이 나옵니다. " + parts.join(" · ") + ".</p>";
 	}
 
 	/** 서버가 준 노드 상세(GET .../graph/node)를 그립니다. 종류마다 들어 있는 항목이 달라서, 있는 것만 그립니다 */
@@ -795,7 +806,7 @@ var DstoneKnowledgeGraph = (function () {
 		var html = "<div class=\"kn-mono kn-gd-full\">" + K.escapeHtml(detail.fullName) + "</div>";
 		var facts = [];
 		if (detail.kind === "TABLE") {
-			facts.push(["테이블명", detail.koreanName ? K.escapeHtml(detail.koreanName) + nameSource(detail.koreanNameSource) : "<span class=\"ai-hint\">한글명 없음</span>"]);
+			facts.push(["테이블명", detail.koreanName ? K.escapeHtml(detail.koreanName) + nameSource(detail.koreanNameSource, detail.koreanNameWhere) : "<span class=\"ai-hint\">한글명 없음</span>"]);
 			facts.push(["물리명", "<span class=\"kn-mono\">" + K.escapeHtml(detail.name) + "</span>"]);
 		}
 		if (detail.layer) {

@@ -23,7 +23,7 @@
     <delete id="deleteWebResources" parameterType="long">
         DELETE FROM analysis_resource
          WHERE revision_id = #{revisionId}
-           AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER')
+           AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME')
     </delete>
 
     <delete id="deleteInjects" parameterType="long">
@@ -560,5 +560,111 @@
          ORDER BY e.endpoint_type, e.path, s.fqn, e.endpoint_id
          LIMIT #{size} OFFSET #{offset}
     </select>
+
+    <!-- ================= 소스에서 찾는 테이블 / 컬럼 한글명 (SourceNamePlugin) ================= -->
+
+    <!-- 필드에 붙은 설명 애노테이션의 글: @ApiModelProperty("회사명"), @Schema(description = "회사명"), @Comment("회사명") -->
+    <sql id="fieldDescription">
+        LEFT JOIN LATERAL (
+            SELECT CASE a.annotation_name
+                        WHEN 'Schema' THEN COALESCE(a.attributes_json->>'description', a.attributes_json->>'title')
+                        ELSE a.attributes_json->>'value' END AS text
+              FROM analysis_annotation a
+             WHERE a.revision_id = f.revision_id
+               AND a.target_kind = 'FIELD'
+               AND a.target_id = f.field_id
+               AND a.annotation_name IN ('ApiModelProperty', 'Schema', 'Comment')
+             ORDER BY a.annotation_id
+             LIMIT 1
+        ) an ON TRUE
+    </sql>
+
+    <!-- 필드 이름을 컬럼 이름 모양으로: mbNm → MB_NM, mb_nm → MB_NM -->
+    <sql id="fieldColumnKey">
+        upper(CASE WHEN f.name ~ '[a-z0-9][A-Z]' THEN regexp_replace(f.name, '([a-z0-9])([A-Z])', '\1_\2', 'g') ELSE f.name END)
+    </sql>
+
+    <!-- 이름이 이 리비전의 어떤 컬럼(SQL 에서 쓰인 것, DDL 에 있는 것)과 같은 필드. 어느 테이블의 것인지는 모른다 -->
+    <select id="selectNameCandidateFields" parameterType="long" resultType="java.util.LinkedHashMap">
+        WITH cols AS (
+            SELECT DISTINCT c.col
+              FROM analysis_relation t
+             CROSS JOIN LATERAL jsonb_array_elements_text(
+                   CASE WHEN jsonb_typeof(t.properties_json->'columns') = 'array' THEN t.properties_json->'columns' ELSE '[]'::jsonb END) AS c(col)
+             WHERE t.revision_id = #{revisionId}
+               AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+            UNION
+            SELECT r.properties_json->>'column'
+              FROM analysis_resource r
+             WHERE r.revision_id = #{revisionId}
+               AND r.resource_type = 'DDL_COLUMN'
+        )
+        SELECT f.field_id AS "fieldId", f.name AS "fieldName", s.fqn AS "ownerFqn"
+             , cols.col AS "column", an.text AS "description"
+             , f.file_id AS "fileId", fl.path AS "path", fl.encoding AS "encoding", f.line_start AS "lineStart", f.line_end AS "lineEnd"
+          FROM analysis_field f
+          JOIN cols ON cols.col = <include refid="fieldColumnKey"/>
+          JOIN analysis_symbol s ON s.revision_id = f.revision_id AND s.symbol_id = f.owner_symbol_id
+          JOIN analysis_file fl ON fl.file_id = f.file_id
+          <include refid="fieldDescription"/>
+         WHERE f.revision_id = #{revisionId}
+           AND NOT f.is_static
+           AND NOT f.is_synthetic
+         ORDER BY f.file_id, f.line_start
+    </select>
+
+    <!-- JPA 엔티티: @Table 이 붙은 타입. 테이블 이름과 타입의 설명 애노테이션(@ApiModel, @Schema, @Comment) -->
+    <select id="selectEntityTypes" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT s.symbol_id AS "symbolId", s.fqn AS "fqn"
+             , COALESCE(t.attributes_json->>'name', t.attributes_json->>'value') AS "table"
+             , (SELECT CASE d.annotation_name
+                            WHEN 'Schema' THEN COALESCE(d.attributes_json->>'description', d.attributes_json->>'title')
+                            WHEN 'ApiModel' THEN COALESCE(d.attributes_json->>'description', d.attributes_json->>'value')
+                            ELSE d.attributes_json->>'value' END
+                  FROM analysis_annotation d
+                 WHERE d.revision_id = t.revision_id AND d.target_kind = 'TYPE' AND d.target_id = s.symbol_id
+                   AND d.annotation_name IN ('ApiModel', 'Schema', 'Comment')
+                 ORDER BY d.annotation_id LIMIT 1) AS "description"
+             , s.file_id AS "fileId", fl.path AS "path", fl.encoding AS "encoding", s.line_start AS "lineStart", s.line_start AS "lineEnd"
+          FROM analysis_annotation t
+          JOIN analysis_symbol s ON s.revision_id = t.revision_id AND s.symbol_id = t.target_id
+          JOIN analysis_file fl ON fl.file_id = s.file_id
+         WHERE t.revision_id = #{revisionId}
+           AND t.target_kind = 'TYPE'
+           AND t.annotation_name = 'Table'
+         ORDER BY s.file_id, s.line_start
+    </select>
+
+    <!-- JPA 엔티티의 필드. 컬럼 이름은 @Column(name) 이 있으면 그것, 없으면 필드 이름(부르는 쪽이 정한다). @Transient 는 뺀다 -->
+    <select id="selectEntityFields" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT f.field_id AS "fieldId", f.name AS "fieldName", s.fqn AS "ownerFqn"
+             , COALESCE(t.attributes_json->>'name', t.attributes_json->>'value') AS "table"
+             , (SELECT c.attributes_json->>'name' FROM analysis_annotation c
+                 WHERE c.revision_id = f.revision_id AND c.target_kind = 'FIELD' AND c.target_id = f.field_id
+                   AND c.annotation_name IN ('Column', 'JoinColumn')
+                 ORDER BY c.annotation_id LIMIT 1) AS "columnName"
+             , <include refid="fieldColumnKey"/> AS "column"
+             , an.text AS "description"
+             , f.file_id AS "fileId", fl.path AS "path", fl.encoding AS "encoding", f.line_start AS "lineStart", f.line_end AS "lineEnd"
+          FROM analysis_annotation t
+          JOIN analysis_symbol s ON s.revision_id = t.revision_id AND s.symbol_id = t.target_id
+          JOIN analysis_field f ON f.revision_id = t.revision_id AND f.owner_symbol_id = s.symbol_id
+          JOIN analysis_file fl ON fl.file_id = f.file_id
+          <include refid="fieldDescription"/>
+         WHERE t.revision_id = #{revisionId}
+           AND t.target_kind = 'TYPE'
+           AND t.annotation_name = 'Table'
+           AND NOT f.is_static
+           AND NOT f.is_synthetic
+           AND NOT EXISTS (SELECT 1 FROM analysis_annotation x
+                            WHERE x.revision_id = f.revision_id AND x.target_kind = 'FIELD' AND x.target_id = f.field_id
+                              AND x.annotation_name = 'Transient')
+         ORDER BY f.file_id, f.line_start
+    </select>
+
+    <insert id="insertSourceName" parameterType="java.util.Map">
+        INSERT INTO analysis_resource (revision_id, resource_type, name, location, value, properties_json, file_id, line_start)
+        VALUES (#{revisionId}, #{resourceType}, #{name}, NULL, #{value}, CAST(#{propertiesJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
 
 </mapper>

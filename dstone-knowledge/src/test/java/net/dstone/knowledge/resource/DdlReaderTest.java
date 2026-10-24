@@ -52,6 +52,32 @@ public class DdlReaderTest {
 	}
 
 	@Test
+	public void 정식_COMMENT가_없으면_일반_주석의_한글명을_읽는다() {
+		List<Map<String, Object>> rows = reader.read(
+				"-- testApp 로컬 MySQL 스키마\n"
+				+ "\n"
+				+ "-- [SY] 회원사 마스터\n"
+				+ "CREATE TABLE tbsy_member (\n"
+				+ "    mb_id   VARCHAR(20) NOT NULL,   -- 회원사ID\n"
+				+ "    -- 회사명\n"
+				+ "    mb_nm   VARCHAR(100) NULL,\n"
+				+ "    use_yn  VARCHAR(1) DEFAULT '-' /* 사용여부 */,\n"
+				+ "    memo    VARCHAR(200) COMMENT '메모' -- 주석보다 COMMENT 가 먼저\n"
+				+ "  , seq     BIGINT -- index\n"
+				+ ");\n"
+				+ "CREATE TABLE tb_code ( -- 공통코드\n"
+				+ "    cd VARCHAR(10)\n"
+				+ ");");
+
+		// 파일 맨 위의 설명은 빈 줄로 떨어져 있어서 테이블 한글명이 아니다. 한글이 없는 주석(-- index)도 쓰지 않는다.
+		assertEquals("[DDL_TABLE TBSY_MEMBER=[SY] 회원사 마스터, DDL_COLUMN TBSY_MEMBER.MB_ID=회원사ID, DDL_COLUMN TBSY_MEMBER.MB_NM=회사명"
+				+ ", DDL_COLUMN TBSY_MEMBER.USE_YN=사용여부, DDL_COLUMN TBSY_MEMBER.MEMO=메모, DDL_COLUMN TBSY_MEMBER.SEQ=null"
+				+ ", DDL_TABLE TB_CODE=공통코드, DDL_COLUMN TB_CODE.CD=null]", textOf(rows, false));
+		assertEquals(true, ((String) rows.get(1).get("propertiesJson")).indexOf("\"commentKind\":\"NOTE\"") >= 0);
+		assertEquals(false, ((String) rows.get(4).get("propertiesJson")).indexOf("commentKind") >= 0, "정식 COMMENT 는 NOTE 가 아니다");
+	}
+
+	@Test
 	public void 주석_안의_DDL은_읽지_않는다() {
 		assertEquals("[]", textOf(reader.read("/* CREATE TABLE OLD_T (A INT); */\n-- COMMENT ON TABLE X IS 'y';\n"), false));
 	}

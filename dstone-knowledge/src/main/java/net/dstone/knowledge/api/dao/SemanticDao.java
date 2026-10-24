@@ -299,4 +299,22 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectEndpointList", condition);
 	}
 
+	/* ============ 소스에서 찾는 테이블 / 컬럼 한글명 (SourceNamePlugin) ============ */
+
+	public List<Map<String, Object>> selectNameCandidateFields(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectNameCandidateFields", revisionId);
+	}
+
+	public List<Map<String, Object>> selectEntityTypes(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectEntityTypes", revisionId);
+	}
+
+	public List<Map<String, Object>> selectEntityFields(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectEntityFields", revisionId);
+	}
+
+	public int insertSourceName(Map<String, Object> row) {
+		return sqlSessionCommon.insert(NS + "insertSourceName", row);
+	}
+
 }

@@ -470,6 +470,13 @@
 	color: var(--cs-text-2);
 }
 
+/* 이름만 같은 소스 필드에서 가져온 한글명: 덜 확실하다는 표시 */
+.kn-gd-tag.kn-gd-tag-guess {
+	background: transparent;
+	border: 1px dashed var(--cs-border-strong);
+	color: var(--cs-muted);
+}
+
 /* 테이블 상세의 컬럼 표: 컬럼명 / 컬럼한글명 / 타입 / SQL */
 .kn-gd-columns {
 	width: 100%;
