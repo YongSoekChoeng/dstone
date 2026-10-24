@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.ResourceDao;
+import net.dstone.knowledge.common.util.TableName;
 
 /**
  * <pre>
@@ -48,9 +49,11 @@ public class ResourceService extends BaseObject {
 	 * </pre>
 	 */
 	public Map<String, Object> getTableUsage(long revisionId, String table) {
-		List<Map<String, Object>> usage = resourceDao.selectTableUsage(revisionId, table, 2000);
+		// 스키마를 붙여 물어도(DPHJSDBA.JZ_EMP_INFO) 저장된 이름(JZ_EMP_INFO)으로 찾는다.
+		String name = TableName.bare(table);
+		List<Map<String, Object>> usage = resourceDao.selectTableUsage(revisionId, name, 2000);
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
-		result.put("table", table.toUpperCase());
+		result.put("table", name);
 		result.put("count", usage.size());
 		result.put("usage", usage);
 		return result;

@@ -13,6 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.dstone.knowledge.common.util.KoreanName;
+import net.dstone.knowledge.common.util.TableName;
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
@@ -766,12 +767,12 @@ public class SqlTableExtractor {
 		return new ArrayList<TableUse>(uses.values());
 	}
 
-	/** 따옴표를 벗기고 대문자로 맞춥니다. 테이블이 아닌 것(DUAL 등)은 null */
+	/** 따옴표와 스키마를 떼고 대문자로 맞춥니다(DPHJSDBA.JZ_EMP_INFO → JZ_EMP_INFO). 테이블이 아닌 것(DUAL 등)은 null */
 	private String normalize(String name) {
 		if (name == null) {
 			return null;
 		}
-		String cleaned = name.replace("\"", "").replace("`", "").replace("[", "").replace("]", "").trim().toUpperCase(Locale.ROOT);
+		String cleaned = TableName.bare(name);
 		if (cleaned.length() == 0 || NOT_TABLES.indexOf("|" + cleaned + "|") >= 0 || cleaned.indexOf("X_") >= 0 || cleaned.indexOf('?') >= 0) {
 			return null;
 		}

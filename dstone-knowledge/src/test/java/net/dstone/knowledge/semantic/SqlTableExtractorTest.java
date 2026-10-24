@@ -179,9 +179,23 @@ public class SqlTableExtractorTest {
 
 	@Test
 	public void 스키마를_붙여_적은_테이블의_주석도_그_테이블의_것이다() {
-		// 테이블 이름은 스키마째 남으므로 주석도 스키마째 짝을 짓는다.
-		assertEquals("[DPHJSDBA.JZ_EMP_INFO:{}:사원정보, TB_ORDER:{}:주문]", commentsOf(extractor.extract(
+		// 스키마는 떼고 남긴다. 주석도 스키마를 뗀 이름과 짝을 짓는다.
+		assertEquals("[JZ_EMP_INFO:{}:사원정보, TB_ORDER:{}:주문]", commentsOf(extractor.extract(
 				"SELECT o.ORDER_ID\n  FROM TB_ORDER o              /* 주문 */\n     , DPHJSDBA.JZ_EMP_INFO e    /* 사원정보 */\n WHERE o.EMP_NO = e.EMP_NO", "SELECT")));
+	}
+
+	@Test
+	public void 스키마를_붙인_이름과_안_붙인_이름은_같은_테이블이다() {
+		// DPHJSDBA.JZ_EMP_INFO 와 JZ_EMP_INFO 는 같은 테이블이다. 한 SQL에 둘 다 나와도 하나로 센다.
+		assertEquals("[JZ_DEPT:R, JZ_EMP_INFO:R]", textOf(extractor.extract(
+				"SELECT e.EMP_NO FROM DPHJSDBA.JZ_EMP_INFO e, \"DPHJSDBA\".JZ_DEPT d WHERE e.DEPT_CD = d.DEPT_CD"
+						+ " AND EXISTS (SELECT 1 FROM JZ_EMP_INFO x WHERE x.EMP_NO = e.EMP_NO)", "SELECT")));
+		assertEquals("[JZ_EMP_INFO:U]", textOf(extractor.extract("UPDATE DPHJSDBA.JZ_EMP_INFO SET EMP_NM = #{name} WHERE EMP_NO = #{no}", "UPDATE")));
+		// 컬럼의 주인도 스키마를 뗀 이름이다.
+		assertEquals("[JZ_EMP_INFO:[EMP_NM, EMP_NO]]", columnsOf(extractor.extract(
+				"SELECT DPHJSDBA.JZ_EMP_INFO.EMP_NM FROM DPHJSDBA.JZ_EMP_INFO WHERE EMP_NO = #{no}", "SELECT")));
+		// 정규식으로 찾을 때도 같다.
+		assertEquals("[JZ_EMP_INFO:R]", textOf(extractor.extract("SELECT * FROM DPHJSDBA.JZ_EMP_INFO WHERE (((((((((((((1=1)))))))))))))", "SELECT")));
 	}
 
 	@Test

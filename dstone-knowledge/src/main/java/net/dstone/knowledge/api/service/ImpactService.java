@@ -13,6 +13,7 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.common.util.TableName;
 
 /**
  * <pre>
@@ -60,8 +61,8 @@ public class ImpactService extends BaseObject {
 		}
 		String name = target.trim();
 		if ("TABLE".equals(targetKind)) {
-			// 테이블 이름은 대문자로 맞춰 저장한다(SqlTableExtractor).
-			name = name.toUpperCase();
+			// 테이블 이름은 스키마를 떼고 대문자로 맞춰 저장한다(SqlTableExtractor).
+			name = TableName.bare(name);
 		}
 		int walkDepth = depth == null ? DEFAULT_DEPTH : Math.max(0, Math.min(depth.intValue(), MAX_DEPTH));
 

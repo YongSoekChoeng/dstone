@@ -2,6 +2,8 @@ package net.dstone.knowledge.api.service;
 
 import java.util.regex.Pattern;
 
+import net.dstone.knowledge.common.util.TableName;
+
 /**
  * <pre>
  * 노드 맵에서 쓰는 노드 ID를 읽습니다. ID의 모양만 보고 종류를 압니다.
@@ -66,9 +68,9 @@ public class GraphNodeId {
 		return kind;
 	}
 
-	/** 테이블 이름. 테이블이 아니면 null */
+	/** 테이블 이름(스키마를 뗀 것). 테이블이 아니면 null */
 	public String getTableName() {
-		return TABLE.equals(kind) ? id.substring(TABLE_PREFIX.length()) : null;
+		return TABLE.equals(kind) ? TableName.bare(id.substring(TABLE_PREFIX.length())) : null;
 	}
 
 	/** M / F / S 뒤의 숫자. 숫자가 붙지 않는 종류면 -1 */
