@@ -675,6 +675,13 @@ body.kn-full-on {
 	min-height: 0;
 }
 
+/* 관계 트리 팝업의 상세 칸은 본 화면보다 조금(약 1cm) 넓게 */
+@media screen and (min-width: 861px) {
+	.kn-graph-modal-body > .kn-graph-detail {
+		width: 418px;
+	}
+}
+
 /* ---------- 임베딩 현황 ---------- */
 
 /* 진행률 막대 */

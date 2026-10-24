@@ -811,7 +811,7 @@ var DstoneKnowledgeGraph = (function () {
 	}
 
 	/** 테이블의 컬럼: 컬럼명, 컬럼 한글명, 타입, SQL에서 쓰인 정도 */
-	function tableColumns(columns, coverage, dictionary) {
+	function tableColumns(columns, coverage) {
 		if (!coverage) {
 			// 컬럼을 주지 않는 예전 dstone-knowledge 다.
 			return "<div class=\"kn-section-title\">컬럼</div><p class=\"ai-hint\">dstone-knowledge 가 컬럼을 주지 않는 예전 버전입니다. 새로 빌드해서 다시 띄워 주세요.</p>";
@@ -829,7 +829,7 @@ var DstoneKnowledgeGraph = (function () {
 						+ "<td class=\"ai-hint\">" + (used > 0 ? used + "건" + (column.crud ? " · " + K.escapeHtml(column.crud.split("").join("·")) : "") : "안 씀") + "</td></tr>";
 				}).join("") + "</tbody></table>";
 		}
-		html += dictionaryNote(dictionary || {});
+		html += dictionaryNote();
 		if (statements > 0 && unread === statements) {
 			html += "<p class=\"ai-hint\">SQL에서 쓰인 컬럼 정보가 없습니다. SQL을 파서로 읽지 못했거나, 컬럼을 모으기 전에 분석한 리비전입니다. "
 				+ "뒤의 경우라면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.</p>";
@@ -841,28 +841,9 @@ var DstoneKnowledgeGraph = (function () {
 		return html;
 	}
 
-	/** 한글명을 어디서 찾아봤는지 */
-	function dictionaryNote(dictionary) {
-		var parts = [];
-		if (dictionary.db === "OK") {
-			parts.push("DB 코멘트를 읽었습니다");
-		} else if (dictionary.db === "NOT_FOUND") {
-			parts.push("DB에 이 테이블이 없습니다");
-		} else if (dictionary.db === "FAILED") {
-			parts.push("DB 코멘트를 읽지 못했습니다(" + K.escapeHtml(dictionary.dbMessage || "") + ")");
-		} else {
-			parts.push("DB 접속 설정이 없어 DB 코멘트는 보지 않았습니다");
-		}
-		var files = dictionary.ddlFiles || [];
-		parts.push(files.length > 0 ? "DDL: <span class=\"kn-mono\">" + K.escapeHtml(files.join(", ")) + "</span>" : "이 테이블의 DDL 파일은 없습니다");
-		if (dictionary.file === "OK") {
-			parts.push("사전 파일: <span class=\"kn-mono\">" + K.escapeHtml((dictionary.files || []).join(", ")) + "</span>");
-		} else if (dictionary.file === "FAILED") {
-			parts.push("사전 파일을 다 읽지 못했습니다(" + K.escapeHtml(dictionary.fileMessage || "") + ")");
-		} else if (dictionary.file) {
-			parts.push("등록한 사전 파일은 없습니다");
-		}
-		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL COMMENT → DDL 주석 → SQL 주석 → 소스 → 사전 파일 순서로 찾습니다. 출처 표시에 마우스를 올리면 가져온 곳이 나옵니다. " + parts.join(" · ") + ".</p>";
+	/** 한글명을 찾는 순서 */
+	function dictionaryNote() {
+		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL COMMENT → DDL 주석 → SQL 주석 → 소스 → 사전 파일 순서로 찾습니다.</p>";
 	}
 
 	/** 서버가 준 노드 상세(GET .../graph/node)를 그립니다. 종류마다 들어 있는 항목이 달라서, 있는 것만 그립니다 */
@@ -898,7 +879,7 @@ var DstoneKnowledgeGraph = (function () {
 			}).join("") + "</table>";
 		}
 		if (detail.kind === "TABLE") {
-			html += tableColumns(detail.columns || [], detail.columnCoverage, detail.dictionary);
+			html += tableColumns(detail.columns || [], detail.columnCoverage);
 		}
 
 		if (detail.endpoints && detail.endpoints.length > 0) {
