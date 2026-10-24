@@ -59,13 +59,16 @@ var DstoneKnowledgeGraph = (function () {
 	/** 전체 맵의 상태 */
 	var map = { revisionId: null, graph: null, expanded: {}, view: null, cy: null, selectedId: null, hits: [], hitIndex: 0, loadSeq: 0 };
 
-	/** 관계 트리 팝업의 상태 */
-	var tree = { cy: null, startId: null, nodes: {} };
+	/** 관계 트리 팝업의 상태. hidden 은 끈 계층(팝업을 다시 열어도 유지한다) */
+	var tree = { cy: null, startId: null, nodes: {}, result: null, hidden: {} };
+
+	/** 관계 트리에서 끄고 켤 수 있는 계층. 모델(VO)은 "모델(VO) 호출도"로 서버에서 가려 받는다 */
+	var TREE_TIERS = ["VIEW", "CONTROLLER", "SERVICE", "REPOSITORY", "MAPPER", "TABLE", "ETC"];
 
 	function init() {
 		["kn-graph-project", "kn-graph-revision", "kn-graph-load", "kn-graph-unit", "kn-graph-layout", "kn-graph-range", "kn-graph-low", "kn-graph-struct",
 			"kn-graph-tiers", "kn-graph-edges", "kn-graph-find", "kn-graph-find-btn", "kn-graph-fit", "kn-graph-message", "kn-graph-canvas", "kn-graph-detail",
-			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-close", "kn-tree-message",
+			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-close", "kn-tree-message", "kn-tree-tiers",
 			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle",
 			"kn-code-modal", "kn-code-title", "kn-code-where", "kn-code-text", "kn-code-raw", "kn-code-copy", "kn-code-close"].forEach(function (id) {
 			el[id] = document.getElementById(id);
@@ -1057,30 +1060,116 @@ var DstoneKnowledgeGraph = (function () {
 			id: nodeId, up: el["kn-tree-up"].value, down: el["kn-tree-down"].value, includeModel: el["kn-tree-model"].checked
 		}).then(function (result) {
 			el["kn-tree-title"].textContent = (KIND_LABEL[result.start.kind] || result.start.kind) + " " + result.start.fullName;
-			drawTree(result);
-			K.message(el["kn-tree-message"], result.nodeCount === 0
-				? "이어진 것이 없습니다. 아무도 부르지 않고 아무것도 부르지 않거나, 분석이 잇지 못한 호출일 수 있습니다."
-				: "노드 " + result.nodeCount + "개 · 선 " + result.edgeCount + "개. 가운데(노란 테)가 고른 것, 왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽입니다."
-					+ (result.truncated ? " 너무 많아서 가까운 것부터 일부만 가져왔습니다. 깊이를 줄이거나 더 작은 것(메소드 하나)을 고르세요." : ""), false);
+			result.nodes.forEach(function (node) {
+				node.tier = tierOf(node.layer);
+				node.label = treeLabel(node);
+			});
+			tree.result = result;
+			renderTreeTiers();
+			drawTree();
 		}).catch(function (err) {
 			K.message(el["kn-tree-message"], err.message, true);
 		});
 	}
 
+	/** 관계 트리의 계층 칩(보이기 / 숨기기). 칩 옆 숫자는 이 트리에 있는 그 계층의 노드 수입니다 */
+	function renderTreeTiers() {
+		var counts = {};
+		tree.result.nodes.forEach(function (node) {
+			counts[node.tier] = (counts[node.tier] || 0) + 1;
+		});
+		el["kn-tree-tiers"].innerHTML = TREE_TIERS.map(function (key) {
+			var tier = TIER_BY_KEY[key];
+			return "<label class=\"kn-graph-chip" + (tree.hidden[key] ? " kn-off" : "") + "\" style=\"border-color:" + tier.color + ";background:" + tier.fill + ";\">"
+				+ "<input type=\"checkbox\" data-tree-tier=\"" + key + "\"" + (tree.hidden[key] ? "" : " checked") + " /> " + K.escapeHtml(tier.label)
+				+ " <span>" + (counts[key] || 0) + "</span></label>";
+		}).join("");
+		Array.prototype.forEach.call(el["kn-tree-tiers"].querySelectorAll("input"), function (input) {
+			input.addEventListener("change", function () {
+				var key = input.getAttribute("data-tree-tier");
+				tree.hidden[key] = !input.checked;
+				input.parentNode.classList.toggle("kn-off", !input.checked);
+				clearDetail(el["kn-tree-detail"], "노드를 누르면 여기에 설명이 나옵니다.");
+				drawTree();
+			});
+		});
+	}
+
+	/** 끈 계층이 아니면 보입니다. 고른 노드(가운데)는 늘 보입니다 */
+	function treeVisible(node) {
+		return node.start || !tree.hidden[node.tier];
+	}
+
+	/**
+	 * <pre>
+	 * 보이는 노드끼리의 선을 만듭니다. 숨긴 노드를 거쳐 이어지는 길은 점선(bypass) 하나로 잇습니다.
+	 * 예: 서비스를 끄면 컨트롤러 → (서비스) → DAO 가 컨트롤러 ┄> DAO 가 됩니다.
+	 * 선의 색은 마지막 한 걸음(보이는 노드로 들어가는 선)의 종류를 따릅니다.
+	 * </pre>
+	 */
+	function treeEdges(result) {
+		var outgoing = {};
+		result.edges.forEach(function (edge) {
+			(outgoing[edge.from] = outgoing[edge.from] || []).push(edge);
+		});
+		var edges = [];
+		var seen = {};
+		result.edges.forEach(function (edge) {
+			var from = tree.nodes[edge.from];
+			var to = tree.nodes[edge.to];
+			if (!from || !to || !treeVisible(from)) {
+				return;
+			}
+			if (treeVisible(to)) {
+				edges.push({ from: edge.from, to: edge.to, type: edge.type, low: edge.confidence === "LOW", bypass: false });
+				seen[edge.from + ">" + edge.to] = true;
+				return;
+			}
+			// 숨긴 노드에서부터 보이는 노드가 나올 때까지 따라간다(순환이 있어도 한 번씩만 들른다).
+			var visited = {};
+			var stack = [edge.to];
+			visited[edge.to] = true;
+			while (stack.length > 0) {
+				var id = stack.pop();
+				(outgoing[id] || []).forEach(function (next) {
+					var target = tree.nodes[next.to];
+					if (!target || visited[next.to]) {
+						return;
+					}
+					visited[next.to] = true;
+					if (!treeVisible(target)) {
+						stack.push(next.to);
+						return;
+					}
+					var key = edge.from + ">" + next.to;
+					if (!seen[key] && next.to !== edge.from) {
+						seen[key] = true;
+						edges.push({ from: edge.from, to: next.to, type: next.type, low: false, bypass: true });
+					}
+				});
+			}
+		});
+		return edges;
+	}
+
 	/**
 	 * 관계 트리를 그립니다. 노드의 level 이 가로 자리입니다(0 = 고른 것, 음수 = 부르는 쪽, 양수 = 불리는 쪽).
-	 * 한 level 에 노드가 많으면 여러 열로 나눕니다.
+	 * 한 level 에 노드가 많으면 여러 열로 나눕니다. 끈 계층의 노드는 빼고 자리를 다시 잡습니다.
 	 */
-	function drawTree(result) {
+	function drawTree() {
+		var result = tree.result;
 		var colWidth = 230;
 		var rowHeight = 30;
 		var maxRows = 40;
 		var levels = {};
+		var hiddenCount = 0;
 		tree.nodes = {};
 		result.nodes.forEach(function (node) {
-			node.tier = tierOf(node.layer);
-			node.label = treeLabel(node);
 			tree.nodes[node.id] = node;
+			if (!treeVisible(node)) {
+				hiddenCount++;
+				return;
+			}
 			(levels[node.level] = levels[node.level] || []).push(node);
 		});
 
@@ -1108,12 +1197,13 @@ var DstoneKnowledgeGraph = (function () {
 			});
 			x += cols * colWidth + 40;
 		});
-		result.edges.forEach(function (edge, index) {
+		var edges = treeEdges(result);
+		edges.forEach(function (edge, index) {
 			var cat = CAT_OF_RELATION[edge.type] || "CALL";
 			elements.push({
 				group: "edges",
 				data: { id: "e" + index, source: edge.from, target: edge.to, color: EDGE_CATS[cat].color, w: 1.5 },
-				classes: edge.confidence === "LOW" ? "low" : ""
+				classes: edge.bypass ? "bypass" : (edge.low ? "low" : "")
 			});
 		});
 
@@ -1123,12 +1213,19 @@ var DstoneKnowledgeGraph = (function () {
 		tree.cy = cytoscape({
 			container: el["kn-tree-canvas"],
 			elements: elements,
-			style: styles().concat([{ selector: "node.start", style: { "border-width": 3, "border-color": "#ca8a04", "font-weight": "bold" } }]),
+			style: styles().concat([{ selector: "node.start", style: { "border-width": 3, "border-color": "#ca8a04", "font-weight": "bold" } },
+				{ selector: "edge.bypass", style: { "line-style": "dotted", "width": 2 } }]),
 			layout: { name: "preset" },
 			minZoom: 0.05,
 			maxZoom: 3
 		});
 		tree.cy.fit(undefined, 30);
+		K.message(el["kn-tree-message"], result.nodeCount === 0
+			? "이어진 것이 없습니다. 아무도 부르지 않고 아무것도 부르지 않거나, 분석이 잇지 못한 호출일 수 있습니다."
+			: "노드 " + result.nodeCount + "개 · 선 " + result.edgeCount + "개"
+				+ (hiddenCount > 0 ? "(끈 계층의 노드 " + hiddenCount + "개는 숨김. 숨긴 노드를 건너 이어지는 길은 점선)" : "")
+				+ ". 가운데(노란 테)가 고른 것, 왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽입니다."
+				+ (result.truncated ? " 너무 많아서 가까운 것부터 일부만 가져왔습니다. 깊이를 줄이거나 더 작은 것(메소드 하나)을 고르세요." : ""), false);
 		tree.cy.on("tap", "node", function (event) {
 			highlight(tree.cy, event.target, "ALL");
 			showTreeDetail(tree.nodes[event.target.id()]);

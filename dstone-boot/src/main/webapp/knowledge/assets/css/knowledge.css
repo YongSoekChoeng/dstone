@@ -689,6 +689,23 @@ body.kn-full-on {
 	word-break: normal;
 }
 
+/* 관계 트리 팝업의 계층 보이기 / 숨기기 */
+.kn-tree-tiers {
+	margin-top: 8px;
+}
+
+.kn-tree-tiers-label {
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--cs-text-2);
+	margin-right: 4px;
+}
+
+/* 끈 계층 칩은 흐리게 */
+.kn-graph-chip.kn-off {
+	opacity: 0.45;
+}
+
 /* 관계 트리 팝업(바깥 어두운 막은 console.css) */
 .kn-graph-modal-box {
 	width: 94vw;

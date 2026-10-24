@@ -131,6 +131,11 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<button type="button" id="kn-tree-reload">다시 그리기</button>
 				<button type="button" id="kn-tree-close" class="kn-plain">닫기</button>
 			</div>
+			<%-- 계층 보이기 / 숨기기. 숨긴 계층을 건너 이어지는 길은 점선으로 잇는다 --%>
+			<div class="kn-row kn-tree-tiers">
+				<span class="kn-tree-tiers-label">보일 계층</span>
+				<span id="kn-tree-tiers"></span>
+			</div>
 			<div id="kn-tree-message" class="kn-message"></div>
 			<div class="kn-graph-body kn-graph-modal-body">
 				<div id="kn-tree-canvas" class="kn-graph-canvas"></div>
