@@ -35,6 +35,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						어디까지 강조할지는 "눌렀을 때 강조"에서 고릅니다. 큰 프로젝트는 공통 클래스를 거쳐 거의 전부가 이어지므로 "바로 옆만"으로 시작합니다.</li>
 					<li>오른쪽의 <b>"관계 트리 따로 보기"</b>를 누르면 그 노드에 이어진 길을 <b>메소드 단위</b>로 팝업에 그립니다.
 						전체 맵은 클래스끼리의 관계라 "어느 메소드가 어느 메소드를 부르는지"는 팝업에서 봅니다.</li>
+					<li><b>"전체 화면"</b>을 누르면 노드 맵이 브라우저 화면 전체로 커집니다. 그리던 그림과 고른 노드는 그대로 이어집니다.
+						전체 화면에서는 "조건 숨기기"로 위의 조건표를 접어 그림을 더 넓게 볼 수 있고, <b>Esc</b>나 "전체 화면 끝내기"로 돌아옵니다.</li>
 				</ol>
 				예시 (누르면 채워집니다. <code>struts-app</code> 기준. 채운 뒤 "찾기"를 누르세요):
 				<span class="kn-example" data-fill='{"kn-graph-find":"BoardDAO"}'>BoardDAO 찾기</span>
@@ -45,10 +47,12 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				그림에는 분석이 이은 관계만 나옵니다. 리플렉션이나 문자열로 조립한 주소처럼 잇지 못한 호출은 선이 없습니다.
 			</details>
 
-			<section class="ai-panel">
+			<%-- 전체 화면이면 이 영역(#kn-graph-workspace)이 브라우저 화면 전체를 덮는다(graph.js setFullscreen) --%>
+			<section class="ai-panel kn-graph-workspace" id="kn-graph-workspace">
 				<h3>노드 맵</h3>
 				<p class="ai-hint">호출 구조를 한눈에 봅니다. 클래스 · 화면(JSP · WebSquare · Nexacro) · SQL 매퍼 · 테이블이 노드이고, 그 사이의 호출 / SQL 실행 / 테이블 사용 / 화면 이동이 선입니다.
 					선이 굵을수록 그 사이의 호출이 많습니다.</p>
+				<div class="kn-graph-conditions">
 				<table class="ai-form">
 					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
 					<tr>
@@ -92,7 +96,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<td colspan="5"><div class="kn-row" id="kn-graph-edges"></div></td>
 					</tr>
 				</table>
+				</div>
 				<div class="ai-form-actions">
+					<button type="button" id="kn-graph-cond-toggle" class="kn-plain kn-graph-cond-toggle">조건 숨기기</button>
+					<button type="button" id="kn-graph-full" class="kn-plain kn-graph-full-btn">전체 화면</button>
 					<button type="button" id="kn-graph-fit" class="kn-plain">화면에 맞추기</button>
 					<button type="button" id="kn-graph-load">다시 불러오기</button>
 				</div>

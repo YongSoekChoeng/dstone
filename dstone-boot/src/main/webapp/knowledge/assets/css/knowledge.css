@@ -355,6 +355,93 @@
 	background: #fbfcfd;
 }
 
+/* 전체 화면(graph.js setFullscreen): 노드 맵 영역이 브라우저 화면 전체를 덮는다 */
+.ai-body button.kn-graph-full-btn::before {
+	content: "⤢";
+	margin-right: 6px;
+	font-size: 14px;
+	line-height: 1;
+}
+
+/* 조건 숨기기는 전체 화면에서만 쓴다 */
+.ai-body button.kn-graph-cond-toggle {
+	display: none;
+}
+
+body.kn-full-on {
+	overflow: hidden;
+}
+
+.kn-graph-workspace.kn-full {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 12px 18px 14px;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	background: var(--cs-surface);
+	overflow: hidden;
+}
+
+.kn-graph-workspace.kn-full > p.ai-hint {
+	display: none;
+}
+
+.kn-graph-workspace.kn-full .kn-graph-conditions {
+	flex: 0 0 auto;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+.kn-graph-workspace.kn-full.kn-cond-hidden .kn-graph-conditions {
+	display: none;
+}
+
+.ai-body .kn-graph-workspace.kn-full button.kn-graph-cond-toggle {
+	display: inline-flex;
+}
+
+.kn-graph-workspace.kn-full .kn-graph-body {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+/* 좁은 화면: 오른쪽 상세 칸(380px)이 그림 칸을 밀어내지 않게, 그림 위 · 상세 아래로 쌓는다 */
+@media screen and (max-width: 860px) {
+	.kn-graph-body {
+		flex-direction: column;
+		height: auto;
+		min-height: 0;
+	}
+
+	.kn-graph-body > .kn-graph-canvas {
+		flex: none;
+		height: 60vh;
+		min-height: 320px;
+	}
+
+	.kn-graph-body > .kn-graph-detail {
+		width: auto;
+		max-height: 50vh;
+	}
+
+	.kn-graph-workspace.kn-full .kn-graph-body > .kn-graph-canvas {
+		flex: 1 1 auto;
+		height: auto;
+		min-height: 240px;
+	}
+
+	.kn-graph-workspace.kn-full .kn-graph-body > .kn-graph-detail {
+		flex: none;
+		max-height: 35vh;
+	}
+}
+
 .kn-graph-detail {
 	width: 380px;
 	flex-shrink: 0;

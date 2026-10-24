@@ -66,7 +66,7 @@ var DstoneKnowledgeGraph = (function () {
 		["kn-graph-project", "kn-graph-revision", "kn-graph-load", "kn-graph-unit", "kn-graph-layout", "kn-graph-range", "kn-graph-low", "kn-graph-struct",
 			"kn-graph-tiers", "kn-graph-edges", "kn-graph-find", "kn-graph-find-btn", "kn-graph-fit", "kn-graph-message", "kn-graph-canvas", "kn-graph-detail",
 			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-close", "kn-tree-message",
-			"kn-tree-canvas", "kn-tree-detail"].forEach(function (id) {
+			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 
@@ -90,6 +90,12 @@ var DstoneKnowledgeGraph = (function () {
 				map.cy.fit(undefined, 30);
 			}
 		});
+		el["kn-graph-full"].addEventListener("click", function () {
+			setFullscreen(!isFullscreen());
+		});
+		el["kn-graph-cond-toggle"].addEventListener("click", function () {
+			setConditionsHidden(!el["kn-graph-workspace"].classList.contains("kn-cond-hidden"));
+		});
 		el["kn-graph-find-btn"].addEventListener("click", find);
 		el["kn-graph-find"].addEventListener("keydown", function (event) {
 			if (event.key === "Enter") {
@@ -108,13 +114,63 @@ var DstoneKnowledgeGraph = (function () {
 			}
 		});
 		document.addEventListener("keydown", function (event) {
-			if (event.key === "Escape") {
+			if (event.key !== "Escape") {
+				return;
+			}
+			// 팝업이 열려 있으면 팝업만 닫는다. 전체 화면은 그다음 Esc 에서 끝낸다.
+			if (el["kn-tree-modal"].style.display !== "none") {
 				closeTree();
+				return;
+			}
+			var tag = (event.target && event.target.tagName) || "";
+			if (isFullscreen() && tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
+				setFullscreen(false);
 			}
 		});
 
 		K.loadProjects(el["kn-graph-project"]).then(loadRevisions).then(loadGraph).catch(function (err) {
 			K.message(el["kn-graph-message"], err.message, true);
+		});
+	}
+
+	/* ====================================================================
+	 * 전체 화면: 노드 맵 영역(#kn-graph-workspace)이 브라우저 화면 전체를 덮게 합니다.
+	 * 다른 창을 만들지 않고 같은 영역을 키우므로, 그리던 그림과 고른 노드, 펼친 묶음이 그대로 이어집니다.
+	 * ==================================================================== */
+
+	function isFullscreen() {
+		return el["kn-graph-workspace"].classList.contains("kn-full");
+	}
+
+	function setFullscreen(on) {
+		if (on === isFullscreen()) {
+			return;
+		}
+		el["kn-graph-workspace"].classList.toggle("kn-full", on);
+		document.body.classList.toggle("kn-full-on", on);
+		el["kn-graph-full"].textContent = on ? "전체 화면 끝내기" : "전체 화면";
+		if (!on) {
+			// 접어 둔 조건표는 원래 화면으로 돌아갈 때 다시 편다.
+			setConditionsHidden(false);
+			return;
+		}
+		refitMap();
+	}
+
+	/** 전체 화면에서 위쪽 조건표를 접거나 폅니다. 그림 칸이 그만큼 넓어집니다 */
+	function setConditionsHidden(hidden) {
+		el["kn-graph-workspace"].classList.toggle("kn-cond-hidden", hidden);
+		el["kn-graph-cond-toggle"].textContent = hidden ? "조건 보이기" : "조건 숨기기";
+		refitMap();
+	}
+
+	/** 그림 칸의 크기가 바뀌었다. Cytoscape 는 창 크기만 지켜보므로 칸이 바뀐 것을 직접 알려 주고 그림을 칸에 맞춘다 */
+	function refitMap() {
+		window.requestAnimationFrame(function () {
+			if (map.cy) {
+				map.cy.resize();
+				map.cy.fit(undefined, 30);
+			}
 		});
 	}
 
