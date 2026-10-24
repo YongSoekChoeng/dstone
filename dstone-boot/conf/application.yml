@@ -21,6 +21,7 @@ server:
         session: 
             cookie: 
                 name: JSESSIONID
+            timeout: 120m 
     ssl: 
         enabled: false
         protocol: TLS
