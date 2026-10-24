@@ -350,7 +350,8 @@ public class GraphService extends BaseObject {
 	 *          columns(컬럼명, 한글명, 타입, SQL에서 쓰인 정도), columnCoverage({statements, unread}: 컬럼을 못 읽은 SQL 수),
 	 *          dictionary({db, dbMessage, ddlFiles, file, fileMessage, files}: 한글명을 찾아본 곳), usage(이 테이블을 건드리는 SQL과 그것을 실행하는 메소드)
 	 *          (TableDictionaryService)
-	 * document는 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 것)입니다. 문서가 없으면 null입니다.
+	 * document는 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 것)에서 소스·SQL 앞까지입니다. 문서가 없으면 null입니다.
+	 * code는 그 문서의 소스나 SQL 본문({kind: SOURCE | SQL, text})입니다. 화면이 버튼을 눌러 팝업으로 보여 줍니다. 없으면 null입니다.
 	 * </pre>
 	 */
 	public Map<String, Object> getNode(long revisionId, String nodeId) {
@@ -362,23 +363,36 @@ public class GraphService extends BaseObject {
 		if ("TYPE".equals(kind)) {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
 			node.put("methods", declarationDao.selectMethodListByOwner(revisionId, id.getId()));
-			node.put("document", graphDao.selectDocumentText(revisionId, "TYPE", "TYPE", id.getId()));
+			putDocument(node, revisionId, "TYPE", "TYPE", id.getId());
 		} else if ("METHOD".equals(kind)) {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
-			node.put("document", graphDao.selectDocumentText(revisionId, "METHOD", "METHOD", id.getId()));
+			putDocument(node, revisionId, "METHOD", "METHOD", id.getId());
 		} else if ("JSP".equals(kind)) {
 			node.put("methods", graphDao.selectMethodsByFile(revisionId, id.getNumber()));
-			node.put("document", graphDao.selectDocumentText(revisionId, "FILE", "VIEW", id.getId()));
+			putDocument(node, revisionId, "FILE", "VIEW", id.getId());
 		} else if ("MAPPER".equals(kind)) {
 			node.put("statements", graphDao.selectStatementsByFile(revisionId, id.getNumber()));
 		} else if ("SQL".equals(kind)) {
-			node.put("document", graphDao.selectDocumentText(revisionId, "SQL", "MAPPER", id.getId()));
+			putDocument(node, revisionId, "SQL", "MAPPER", id.getId());
 		} else if ("TABLE".equals(kind)) {
 			String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
 			node.putAll(tableDictionaryService.describe(revisionId, projectId, id.getTableName()));
 			node.put("usage", resourceDao.selectTableUsage(revisionId, id.getTableName(), MAX_DETAIL_ROWS));
 		}
 		return node;
+	}
+
+	/** 설명 문서를 설명(document)과 소스·SQL(code)로 나눠 담습니다 */
+	private void putDocument(Map<String, Object> node, long revisionId, String refKind, String docType, String refId) {
+		DocumentSections sections = DocumentSections.split(graphDao.selectDocumentChunks(revisionId, refKind, docType, refId));
+		node.put("document", sections.description);
+		Map<String, Object> code = null;
+		if (sections.code != null) {
+			code = new LinkedHashMap<String, Object>();
+			code.put("kind", sections.codeKind);
+			code.put("text", sections.code);
+		}
+		node.put("code", code);
 	}
 
 	/**
@@ -451,6 +465,7 @@ public class GraphService extends BaseObject {
 			node.put("returnType", method.get("returnType"));
 			node.put("path", method.get("path"));
 			node.put("lineStart", method.get("lineStart"));
+			node.put("lineEnd", method.get("lineEnd"));
 			return node;
 		}
 		throw notFound(revisionId, id);

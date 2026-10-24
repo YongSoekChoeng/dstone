@@ -62,19 +62,19 @@ public class GraphDao extends BaseDao {
 
 	/**
 	 * <pre>
-	 * 분석이 만들어 둔 설명 문서의 내용. 없으면 null입니다(문서 단계가 아직 안 돌았거나, 문서를 만들지 않는 단순 getter/setter).
+	 * 분석이 만들어 둔 설명 문서의 조각들(조각 순서대로). 없으면 빈 목록입니다(문서 단계가 아직 안 돌았거나, 문서를 만들지 않는 단순 getter/setter).
 	 * </pre>
 	 *
 	 * @param refKind TYPE / METHOD / SQL / FILE
 	 * @param docType TYPE / METHOD / MAPPER / VIEW
 	 */
-	public String selectDocumentText(long revisionId, String refKind, String docType, String refId) {
+	public List<String> selectDocumentChunks(long revisionId, String refKind, String docType, String refId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
 		param.put("refKind", refKind);
 		param.put("docType", docType);
 		param.put("refId", refId);
-		return sqlSessionCommon.selectOne(NS + "selectDocumentText", param);
+		return sqlSessionCommon.selectList(NS + "selectDocumentChunks", param);
 	}
 
 	public Map<String, Object> selectFile(long revisionId, long fileId) {

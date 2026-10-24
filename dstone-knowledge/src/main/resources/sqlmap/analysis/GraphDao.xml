@@ -283,16 +283,17 @@
          LIMIT #{limit}
     </select>
 
-    <!-- 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 문서). 조각이 여럿이면 순서대로 잇는다.
+    <!-- 분석이 만들어 둔 설명 문서(검색에 쓰는 것과 같은 문서)의 조각들. 잇는 일은 DocumentSections 가 한다(조각마다 붙은 "(이어서)" 머리말을 떼야 해서).
          refKind / docType: TYPE-TYPE(클래스), METHOD-METHOD(메소드), SQL-MAPPER(SQL statement), FILE-VIEW(화면) -->
-    <select id="selectDocumentText" parameterType="java.util.Map" resultType="string">
-        SELECT string_agg(c.content, E'\n' ORDER BY c.chunk_no)
+    <select id="selectDocumentChunks" parameterType="java.util.Map" resultType="string">
+        SELECT c.content
           FROM rag_document d
           JOIN rag_chunk c ON c.doc_seq = d.doc_seq
          WHERE d.revision_id = #{revisionId}
            AND d.ref_kind = #{refKind}
            AND d.doc_type = #{docType}
            AND d.ref_id = #{refId}
+         ORDER BY c.chunk_no
     </select>
 
     <select id="selectFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">

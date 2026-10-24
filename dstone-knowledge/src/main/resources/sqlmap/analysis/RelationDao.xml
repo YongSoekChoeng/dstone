@@ -200,6 +200,7 @@
         , m.is_synthetic AS "isSynthetic"
         , f.path AS "path"
         , m.line_start AS "lineStart"
+        , m.line_end AS "lineEnd"
     </sql>
 
     <sql id="methodWhere">

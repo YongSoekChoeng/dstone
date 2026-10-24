@@ -139,6 +139,19 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		</div>
 	</div>
 
+	<%-- 소스 / SQL 팝업: 노드 상세의 [소스 보기] [SQL 보기] 버튼으로 연다. 관계 트리 팝업 위에도 뜬다 --%>
+	<div id="kn-code-modal" class="kn-graph-modal kn-code-modal" style="display:none;">
+		<div class="kn-code-box">
+			<div class="kn-row">
+				<b id="kn-code-title" class="kn-graph-modal-title"></b>
+				<button type="button" id="kn-code-copy" class="kn-plain">복사</button>
+				<button type="button" id="kn-code-close" class="kn-plain">닫기</button>
+			</div>
+			<div id="kn-code-where" class="ai-hint kn-mono kn-code-where"></div>
+			<pre id="kn-code-text" class="kn-gd-doc kn-code-text"></pre>
+		</div>
+	</div>
+
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/cytoscape.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-common.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/graph.js"></script>

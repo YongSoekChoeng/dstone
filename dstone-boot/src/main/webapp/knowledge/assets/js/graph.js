@@ -66,7 +66,8 @@ var DstoneKnowledgeGraph = (function () {
 		["kn-graph-project", "kn-graph-revision", "kn-graph-load", "kn-graph-unit", "kn-graph-layout", "kn-graph-range", "kn-graph-low", "kn-graph-struct",
 			"kn-graph-tiers", "kn-graph-edges", "kn-graph-find", "kn-graph-find-btn", "kn-graph-fit", "kn-graph-message", "kn-graph-canvas", "kn-graph-detail",
 			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-close", "kn-tree-message",
-			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle"].forEach(function (id) {
+			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle",
+			"kn-code-modal", "kn-code-title", "kn-code-where", "kn-code-text", "kn-code-copy", "kn-code-close"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 
@@ -107,6 +108,13 @@ var DstoneKnowledgeGraph = (function () {
 		el["kn-tree-reload"].addEventListener("click", function () {
 			loadTree(tree.startId);
 		});
+		el["kn-code-close"].addEventListener("click", closeCode);
+		el["kn-code-copy"].addEventListener("click", copyCode);
+		el["kn-code-modal"].addEventListener("click", function (event) {
+			if (event.target === el["kn-code-modal"]) {
+				closeCode();
+			}
+		});
 		el["kn-tree-modal"].addEventListener("click", function (event) {
 			// 팝업 바깥(어두운 바탕)을 누르면 닫는다.
 			if (event.target === el["kn-tree-modal"]) {
@@ -117,7 +125,11 @@ var DstoneKnowledgeGraph = (function () {
 			if (event.key !== "Escape") {
 				return;
 			}
-			// 팝업이 열려 있으면 팝업만 닫는다. 전체 화면은 그다음 Esc 에서 끝낸다.
+			// 팝업이 열려 있으면 맨 위 팝업만 닫는다. 전체 화면은 그다음 Esc 에서 끝낸다.
+			if (el["kn-code-modal"].style.display !== "none") {
+				closeCode();
+				return;
+			}
 			if (el["kn-tree-modal"].style.display !== "none") {
 				closeTree();
 				return;
@@ -723,6 +735,7 @@ var DstoneKnowledgeGraph = (function () {
 			container.innerHTML = head(detail.kind, detail.name, node.tier) + actions + detailBody(detail) + linkedHtml;
 			bindMapDetail(container, node);
 			bindTreeLinks(container);
+			bindCodeButton(container, detail);
 		}).catch(function (err) {
 			container.innerHTML = head(node.kind, node.name, node.tier) + "<p class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</p>";
 		});
@@ -913,13 +926,93 @@ var DstoneKnowledgeGraph = (function () {
 					+ K.confidence(use.confidence) + (use.method ? "<div class=\"ai-hint kn-mono\">← " + K.escapeHtml(use.method) + "</div>" : "") + "</div>";
 			}).join("") + "</div>";
 		}
-		if (detail.document) {
-			html += "<div class=\"kn-section-title\">설명 <span class=\"ai-hint\">(분석이 만들어 둔 문서. 검색에 쓰는 것과 같습니다)</span></div><pre class=\"kn-gd-doc\">"
-				+ K.escapeHtml(detail.document) + "</pre>";
+		if (detail.document || detail.code) {
+			html += "<div class=\"kn-section-title\">설명 <span class=\"ai-hint\">(분석이 만들어 둔 문서. 검색에 쓰는 것과 같습니다)</span>" + codeButton(detail.code) + "</div>"
+				+ (detail.document ? "<pre class=\"kn-gd-doc\">" + K.escapeHtml(detail.document) + "</pre>" : "");
 		} else if (detail.kind === "METHOD") {
 			html += "<p class=\"ai-hint\">설명 문서가 없습니다. 단순한 getter / setter 는 문서를 만들지 않습니다.</p>";
 		}
 		return html;
+	}
+
+	/* ======================= 소스 / SQL 팝업 ======================= */
+
+	var CODE_LABEL = { SOURCE: "소스", SQL: "SQL" };
+
+	/** 설명 제목 옆에 붙는 [소스 보기] / [SQL 보기] 버튼. 소스나 SQL 이 없으면 빈 글자 */
+	function codeButton(code) {
+		if (!code || !code.text) {
+			return "";
+		}
+		var lines = code.text.split("\n").length;
+		return "<button type=\"button\" class=\"kn-plain kn-gd-code-btn\" data-code=\"1\" title=\"" + lines + "줄\">"
+			+ K.escapeHtml(CODE_LABEL[code.kind] || "소스") + " 보기</button>";
+	}
+
+	function bindCodeButton(container, detail) {
+		var button = container.querySelector("[data-code]");
+		if (button) {
+			button.addEventListener("click", function () {
+				openCode(detail);
+			});
+		}
+	}
+
+	function openCode(detail) {
+		var label = CODE_LABEL[detail.code.kind] || "소스";
+		var kindLabel = KIND_LABEL[detail.kind] || detail.kind;
+		// SQL 노드면 "SQL · SQL ..." 이 되므로 종류는 한 번만 적는다.
+		el["kn-code-title"].textContent = label + " · " + (kindLabel === label ? "" : kindLabel + " ") + (detail.fullName || detail.name);
+		var where = detail.path ? detail.path + (detail.lineStart ? " (줄 " + detail.lineStart + (detail.lineEnd ? "-" + detail.lineEnd : "") + ")" : "") : "";
+		if (detail.kind === "JSP") {
+			// 화면 문서는 검색용으로 빈 줄과 들여쓰기를 뺀 것이다.
+			where += (where ? " · " : "") + "빈 줄과 들여쓰기를 뺀 내용입니다";
+		}
+		el["kn-code-where"].textContent = where;
+		el["kn-code-text"].textContent = detail.code.text;
+		el["kn-code-text"].scrollTop = 0;
+		el["kn-code-text"].scrollLeft = 0;
+		el["kn-code-copy"].textContent = "복사";
+		el["kn-code-modal"].style.display = "flex";
+	}
+
+	function closeCode() {
+		el["kn-code-modal"].style.display = "none";
+		el["kn-code-text"].textContent = "";
+	}
+
+	/** 클립보드에 복사합니다. http 주소에서는 navigator.clipboard 가 없어서 예전 방식으로 복사합니다 */
+	function copyCode() {
+		var text = el["kn-code-text"].textContent;
+		var done = function () {
+			el["kn-code-copy"].textContent = "복사됨";
+		};
+		if (navigator.clipboard && window.isSecureContext) {
+			navigator.clipboard.writeText(text).then(done).catch(function () {
+				copyByTextarea(text) && done();
+			});
+			return;
+		}
+		if (copyByTextarea(text)) {
+			done();
+		}
+	}
+
+	function copyByTextarea(text) {
+		var area = document.createElement("textarea");
+		area.value = text;
+		area.style.position = "fixed";
+		area.style.top = "-1000px";
+		document.body.appendChild(area);
+		area.select();
+		var ok = false;
+		try {
+			ok = document.execCommand("copy");
+		} catch (e) {
+			ok = false;
+		}
+		document.body.removeChild(area);
+		return ok;
 	}
 
 	/* ======================= 관계 트리 팝업 ======================= */
@@ -1059,6 +1152,7 @@ var DstoneKnowledgeGraph = (function () {
 					+ "\">이 노드를 가운데로 다시 그리기</button></div>")
 				+ detailBody(detail);
 			bindTreeLinks(container);
+			bindCodeButton(container, detail);
 		}).catch(function (err) {
 			container.innerHTML = head(node.kind, node.label, node.tier) + "<p class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</p>";
 		});

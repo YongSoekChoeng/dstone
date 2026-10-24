@@ -650,6 +650,45 @@ body.kn-full-on {
 	margin: 0;
 }
 
+/* 설명 제목 옆의 [소스 보기] [SQL 보기] 버튼 */
+.kn-gd-code-btn {
+	height: 22px;
+	margin-left: 6px;
+	padding: 0 8px;
+	font-size: 11px;
+	vertical-align: middle;
+}
+
+/* 소스 / SQL 팝업. 관계 트리 팝업(1000) 위에 뜬다 */
+.kn-code-modal {
+	z-index: 1100;
+}
+
+.kn-code-box {
+	width: min(1100px, 94vw);
+	max-height: 88vh;
+	background: var(--cs-surface);
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-lg);
+	padding: 16px 18px;
+	display: flex;
+	flex-direction: column;
+}
+
+.kn-code-where {
+	margin: 4px 0 8px;
+	word-break: break-all;
+}
+
+/* 소스는 줄을 접지 않고 옆으로 스크롤한다(들여쓰기가 보이게) */
+.kn-code-text {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	white-space: pre;
+	word-break: normal;
+}
+
 /* 관계 트리 팝업(바깥 어두운 막은 console.css) */
 .kn-graph-modal-box {
 	width: 94vw;
