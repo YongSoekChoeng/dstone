@@ -1,4 +1,5 @@
 #! /bin/sh
+cd ..
 
 ./dstone-boot/bin/startApp.sh
 ./dstone-knowlege/bin/startApp.sh

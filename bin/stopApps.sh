@@ -1,4 +1,5 @@
 #! /bin/sh
+cd ..
 
 ./dstone-boot/bin/stopApp.sh
 ./dstone-knowlege/bin/stopApp.sh
