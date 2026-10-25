@@ -1,22 +1,22 @@
 #! /bin/sh
 
 cd ..
-cd dstone-boot/bin
+cd ./dstone-boot/bin
 ./startApp.sh
 
 cd ../../
-cd dstone-knowlege/bin
+cd ./dstone-knowlege/bin
 ./startApp.sh
 
 cd ../../
-cd dstone-ai-engine/bin
+cd ./dstone-ai-engine/bin
 ./startApp.sh
 
 #cd ../../
-#cd dstone-batch/bin
+#cd ./dstone-batch/bin
 #./startApp.sh
 #
 #cd ../../
-#cd dstone-batchadmin/bin
+#cd ./dstone-batchadmin/bin
 #./startApp.sh
 
