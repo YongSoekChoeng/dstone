@@ -718,6 +718,18 @@ body.kn-full-on {
 	flex-direction: column;
 }
 
+/* 관계 트리 팝업 전체 화면: 바깥 여백을 없애고 팝업 상자가 브라우저 화면을 다 덮는다 */
+.kn-graph-modal.kn-full {
+	padding: 0;
+}
+
+.kn-graph-modal.kn-full .kn-graph-modal-box {
+	width: 100vw;
+	height: 100vh;
+	border-radius: 0;
+	box-shadow: none;
+}
+
 .kn-graph-modal-title {
 	flex: 1;
 	min-width: 200px;

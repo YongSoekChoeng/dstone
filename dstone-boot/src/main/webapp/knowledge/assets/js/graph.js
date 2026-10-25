@@ -68,7 +68,7 @@ var DstoneKnowledgeGraph = (function () {
 	function init() {
 		["kn-graph-project", "kn-graph-revision", "kn-graph-load", "kn-graph-unit", "kn-graph-layout", "kn-graph-range", "kn-graph-low", "kn-graph-struct",
 			"kn-graph-tiers", "kn-graph-edges", "kn-graph-find", "kn-graph-find-btn", "kn-graph-fit", "kn-graph-message", "kn-graph-canvas", "kn-graph-detail",
-			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-close", "kn-tree-message", "kn-tree-tiers",
+			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-full", "kn-tree-close", "kn-tree-message", "kn-tree-tiers",
 			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle",
 			"kn-code-modal", "kn-code-title", "kn-code-where", "kn-code-text", "kn-code-raw", "kn-code-copy", "kn-code-close"].forEach(function (id) {
 			el[id] = document.getElementById(id);
@@ -108,6 +108,9 @@ var DstoneKnowledgeGraph = (function () {
 		});
 
 		el["kn-tree-close"].addEventListener("click", closeTree);
+		el["kn-tree-full"].addEventListener("click", function () {
+			setTreeFullscreen(!isTreeFullscreen());
+		});
 		el["kn-tree-reload"].addEventListener("click", function () {
 			loadTree(tree.startId);
 		});
@@ -135,7 +138,12 @@ var DstoneKnowledgeGraph = (function () {
 				return;
 			}
 			if (el["kn-tree-modal"].style.display !== "none") {
-				closeTree();
+				// 트리 팝업이 전체 화면이면 먼저 원래 크기로 돌리고, 한 번 더 누르면 닫는다.
+				if (isTreeFullscreen()) {
+					setTreeFullscreen(false);
+				} else {
+					closeTree();
+				}
 				return;
 			}
 			var tag = (event.target && event.target.tagName) || "";
@@ -1042,6 +1050,25 @@ var DstoneKnowledgeGraph = (function () {
 	function openTree(nodeId) {
 		el["kn-tree-modal"].style.display = "flex";
 		loadTree(nodeId);
+	}
+
+	/* 관계 트리 팝업도 전체 화면으로 키울 수 있다. 같은 팝업을 키우므로 그린 트리와 고른 노드가 그대로 남는다.
+	 * 다시 열 때도 마지막 크기를 그대로 쓴다(계층 보이기 설정처럼). */
+
+	function isTreeFullscreen() {
+		return el["kn-tree-modal"].classList.contains("kn-full");
+	}
+
+	function setTreeFullscreen(on) {
+		el["kn-tree-modal"].classList.toggle("kn-full", on);
+		el["kn-tree-full"].textContent = on ? "전체 화면 끝내기" : "전체 화면";
+		// Cytoscape 는 창 크기만 지켜보므로 칸이 바뀐 것을 직접 알려 주고 그림을 칸에 맞춘다.
+		window.requestAnimationFrame(function () {
+			if (tree.cy) {
+				tree.cy.resize();
+				tree.cy.fit(undefined, 30);
+			}
+		});
 	}
 
 	function closeTree() {

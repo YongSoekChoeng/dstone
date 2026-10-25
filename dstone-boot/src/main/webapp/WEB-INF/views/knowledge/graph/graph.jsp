@@ -129,6 +129,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<input type="number" id="kn-tree-down" min="0" max="10" value="3" style="width:56px;" />
 				<label><input type="checkbox" id="kn-tree-model" /> 모델(VO) 호출도</label>
 				<button type="button" id="kn-tree-reload">다시 그리기</button>
+				<button type="button" id="kn-tree-full" class="kn-plain">전체 화면</button>
 				<button type="button" id="kn-tree-close" class="kn-plain">닫기</button>
 			</div>
 			<%-- 계층 보이기 / 숨기기. 숨긴 계층을 건너 이어지는 길은 점선으로 잇는다 --%>
