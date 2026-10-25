@@ -138,6 +138,7 @@ public class RichClientPlugin implements SemanticPlugin {
 	 *   - 이 프로젝트의 화면이 그 규칙의 함수를 실제로 쓴다. 설정에는 여러 프로젝트의 규칙이 함께 적혀 있을 수 있어서,
 	 *     쓰지 않는 규칙으로 이름만 비슷한 메소드(performance...)를 입구로 올리면 안 된다.
 	 *   - 메소드 이름 틀에 고정된 글자가 3자 이상 있다(perform{id}). {id}뿐인 틀이면 모든 메소드가 맞아 버린다.
+	 * 여러 규칙이 같은 메소드에 맞아도 진입점은 하나만 넣는다(먼저 맞은 규칙의 것. SQL 이 막는다).
 	 * </pre>
 	 */
 	private int insertEndpoints(long revisionId, Counts counts) {

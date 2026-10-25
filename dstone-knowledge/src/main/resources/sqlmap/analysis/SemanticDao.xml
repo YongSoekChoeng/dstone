@@ -435,6 +435,12 @@
            AND length(m.name) &gt; length(#{prefix}) + length(#{suffix})
            AND left(m.name, length(#{prefix})) = #{prefix}
            AND right(m.name, length(#{suffix})) = #{suffix}
+           -- 규칙 여럿이 같은 틀(perform{id})을 쓰면 같은 메소드가 또 맞는다. 진입점은 메소드마다 하나만 둔다.
+           AND NOT EXISTS (
+                SELECT 1 FROM analysis_endpoint e
+                 WHERE e.revision_id = m.revision_id
+                   AND e.endpoint_type = 'TRANSACTION'
+                   AND e.method_id = m.method_id)
          ORDER BY m.method_id
     </insert>
 
