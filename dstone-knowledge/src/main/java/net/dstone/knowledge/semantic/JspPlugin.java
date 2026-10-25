@@ -100,7 +100,7 @@ public class JspPlugin implements SemanticPlugin {
 		}
 
 		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
-		int files = 0, requests = 0, includes = 0;
+		int files = 0, requests = 0, includes = 0, titled = 0;
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
@@ -121,11 +121,24 @@ public class JspPlugin implements SemanticPlugin {
 					continue;
 				}
 				files++;
+				titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
 				requests += linkRequests(revisionId, fileId, text, handlers);
 				includes += linkIncludes(revisionId, fileId, (String) file.get("path"), text);
 			}
 		}
-		return "JSP " + files + "개. 화면 계층 " + layered + ", 메소드가 여는 화면 " + renders + ", 화면이 요청하는 주소 " + requests + ", 끼워 넣기 " + includes + ".";
+		return "JSP " + files + "개. 화면 계층 " + layered + ", 메소드가 여는 화면 " + renders + ", 화면이 요청하는 주소 " + requests + ", 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
+	}
+
+	/** 화면명(<title>, titletext)을 찾아 남깁니다. 남겼으면 1 */
+	private int saveScreenName(long revisionId, long fileId, String path, String text) {
+		ScreenTitle title = ScreenTitle.of(text);
+		if (title == null) {
+			return 0;
+		}
+		Map<String, Object> properties = new LinkedHashMap<String, Object>();
+		properties.put("via", title.getVia());
+		semanticDao.insertScreenName(revisionId, fileId, path, title.getName(), properties, Integer.valueOf(title.getLine()));
+		return 1;
 	}
 
 	/** JSP 안의 주소 가운데 진입점과 같은 것을 찾아 잇습니다. 같은 메소드는 한 번만 잇습니다. */

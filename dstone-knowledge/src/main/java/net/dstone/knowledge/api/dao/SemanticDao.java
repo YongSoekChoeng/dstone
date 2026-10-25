@@ -7,6 +7,7 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
+import net.dstone.knowledge.common.util.JsonText;
 
 /**
  * <pre>
@@ -190,6 +191,21 @@ public class SemanticDao extends BaseDao {
 	 *
 	 * @return [{fileId, path, encoding, fileType}]
 	 */
+	/** 언어(analysis_file.language)로 고른 파일을 file_id 순서로 한 쪽씩. 메뉴 목록을 찾을 때 씁니다 */
+	public List<Map<String, Object>> selectFilePageByLanguages(long revisionId, List<String> languages, long afterId, int limit) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("languages", languages);
+		param.put("afterId", afterId);
+		param.put("limit", limit);
+		return sqlSessionCommon.selectList(NS + "selectFilePageByLanguages", param);
+	}
+
+	/** 이미 화면명(SCREEN_NAME)이 있는 화면 파일의 file_id */
+	public List<Long> selectScreenNamedFileIds(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectScreenNamedFileIds", revisionId);
+	}
+
 	public List<Map<String, Object>> selectFilePageByTypes(long revisionId, List<String> fileTypes, long afterId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -314,6 +330,26 @@ public class SemanticDao extends BaseDao {
 	}
 
 	public int insertSourceName(Map<String, Object> row) {
+		return sqlSessionCommon.insert(NS + "insertSourceName", row);
+	}
+
+	/**
+	 * <pre>
+	 * 화면 파일 하나의 화면명(SCREEN_NAME)을 남깁니다. name 은 화면 경로(화면 파일 경로, 메뉴에서 왔으면 메뉴에 적힌 경로), value 는 화면명입니다.
+	 * </pre>
+	 *
+	 * @param properties {via: TITLE | TITLETEXT | MENU, ...}
+	 * @param lineStart  화면 파일 안에서 찾았으면 그 줄. 다른 파일(메뉴 목록)에서 찾았으면 null
+	 */
+	public int insertScreenName(long revisionId, long fileId, String path, String screenName, Map<String, Object> properties, Integer lineStart) {
+		Map<String, Object> row = new HashMap<String, Object>();
+		row.put("revisionId", revisionId);
+		row.put("resourceType", "SCREEN_NAME");
+		row.put("name", path);
+		row.put("value", screenName);
+		row.put("propertiesJson", JsonText.of(properties));
+		row.put("fileId", fileId);
+		row.put("lineStart", lineStart);
 		return sqlSessionCommon.insert(NS + "insertSourceName", row);
 	}
 

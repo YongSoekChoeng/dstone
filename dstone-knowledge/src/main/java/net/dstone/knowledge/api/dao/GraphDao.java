@@ -81,6 +81,11 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectFile", fileParam(revisionId, fileId));
 	}
 
+	/** 화면 파일의 화면명(SEMANTIC 이 남긴 SCREEN_NAME). {screenName, via, lineStart, menuFile, menuLine}, 없으면 null */
+	public Map<String, Object> selectScreenName(long revisionId, long fileId) {
+		return sqlSessionCommon.selectOne(NS + "selectScreenName", fileParam(revisionId, fileId));
+	}
+
 	public List<Map<String, Object>> selectMethodsByFile(long revisionId, long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectMethodsByFile", fileParam(revisionId, fileId));
 	}

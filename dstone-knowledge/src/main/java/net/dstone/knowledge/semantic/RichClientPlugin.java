@@ -116,6 +116,7 @@ public class RichClientPlugin implements SemanticPlugin {
 					continue;
 				}
 				counts.files++;
+				counts.titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
 				Set<String> linked = new HashSet<String>();
 				linkPaths(revisionId, fileId, text, handlers, linked, counts);
 				linkCalls(revisionId, fileId, text, rules, linked, counts);
@@ -127,7 +128,20 @@ public class RichClientPlugin implements SemanticPlugin {
 		}
 		int endpoints = insertEndpoints(revisionId, counts);
 		return "리치클라이언트 화면 " + counts.files + "개. 주소로 이은 요청 " + counts.byPath + ", 거래 호출로 이은 요청 " + counts.byCall
-				+ "(메소드 없음 " + counts.missing + ", ID를 글자로 적지 않은 호출 " + counts.unknown + "), 화면 → 화면 " + counts.screens + ", 거래 진입점 " + endpoints + ".";
+				+ "(메소드 없음 " + counts.missing + ", ID를 글자로 적지 않은 호출 " + counts.unknown + "), 화면 → 화면 " + counts.screens + ", 거래 진입점 " + endpoints
+				+ ", 화면명을 찾은 화면 " + counts.titled + ".";
+	}
+
+	/** 화면명(<title>, titletext)을 찾아 남깁니다. 남겼으면 1 */
+	private int saveScreenName(long revisionId, long fileId, String path, String text) {
+		ScreenTitle title = ScreenTitle.of(text);
+		if (title == null) {
+			return 0;
+		}
+		Map<String, Object> properties = new LinkedHashMap<String, Object>();
+		properties.put("via", title.getVia());
+		semanticDao.insertScreenName(revisionId, fileId, path, title.getName(), properties, Integer.valueOf(title.getLine()));
+		return 1;
 	}
 
 	/**
@@ -309,11 +323,16 @@ public class RichClientPlugin implements SemanticPlugin {
 	 * 화면 안에 적힌 경로가 가리키는 화면 파일을 찾습니다.
 	 * 적힌 경로는 웹 주소라서 앞에 컨텍스트 경로나 서비스 접두어가 붙어 있을 수 있습니다(/hi-japan/ui/jc/A.xml, Base::A.xfdl).
 	 * 그래서 "그 경로로 끝나는 화면"을 찾고, 없으면 앞 마디를 하나 떼고 한 번 더 찾습니다.
+	 * 메뉴 목록의 화면 경로를 찾는 ScreenMenuPlugin 도 같이 씁니다(그때는 JSP 도 화면 종류에 넣는다).
 	 * </pre>
 	 *
 	 * @return 화면이 정확히 하나일 때 그 file_id. 없거나 여럿이면 null
 	 */
 	private Long findScreen(long revisionId, String written) {
+		return findScreen(semanticDao, revisionId, written, SCREEN_TYPES);
+	}
+
+	static Long findScreen(SemanticDao semanticDao, long revisionId, String written, List<String> screenTypes) {
 		String path = written;
 		int prefix = path.lastIndexOf("::");
 		if (prefix >= 0) {
@@ -326,7 +345,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			return null;
 		}
 		for (int attempt = 0; attempt < 2; attempt++) {
-			List<Long> found = semanticDao.selectScreenByPathEnd(revisionId, path, SCREEN_TYPES);
+			List<Long> found = semanticDao.selectScreenByPathEnd(revisionId, path, screenTypes);
 			if (found.size() == 1) {
 				return found.get(0);
 			}
@@ -365,6 +384,8 @@ public class RichClientPlugin implements SemanticPlugin {
 		int missing;
 		int unknown;
 		int screens;
+		/** 화면명을 찾은 화면 수 */
+		int titled;
 		/** 이 프로젝트의 화면이 실제로 쓰는 규칙들 */
 		List<ScreenScript.CallRule> usedRules = new ArrayList<ScreenScript.CallRule>();
 	}

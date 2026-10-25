@@ -835,6 +835,23 @@ var DstoneKnowledgeGraph = (function () {
 			+ K.escapeHtml(NAME_SOURCE[source] || source) + "</span>";
 	}
 
+	/** 화면명을 어디서 찾았는지: JSP·WebSquare 는 &lt;title&gt;, Nexacro 는 Form 의 titletext, 둘 다 없으면 메뉴 목록 */
+	var SCREEN_NAME_SOURCE = { TITLE: "title", TITLETEXT: "titletext", MENU: "메뉴" };
+	var SCREEN_NAME_HINT = {
+		TITLE: "화면 파일의 <title>",
+		TITLETEXT: "화면 파일의 titletext",
+		MENU: "소스에 적힌 메뉴 목록의 메뉴 이름(화면 파일에 제목이 없어서 가져온 것)"
+	};
+
+	/** 출처 표시. 마우스를 올리면 찾은 파일과 줄이 나온다 */
+	function screenNameSource(via, where) {
+		if (!via) {
+			return "";
+		}
+		var title = (SCREEN_NAME_HINT[via] || via) + (where ? " · " + where : "");
+		return " <span class=\"kn-gd-tag\" title=\"" + K.escapeHtml(title) + "\">" + K.escapeHtml(SCREEN_NAME_SOURCE[via] || via) + "</span>";
+	}
+
 	/** 테이블의 컬럼: 컬럼명, 컬럼 한글명, 타입, SQL에서 쓰인 정도 */
 	function tableColumns(columns, coverage) {
 		if (!coverage) {
@@ -878,6 +895,10 @@ var DstoneKnowledgeGraph = (function () {
 		if (detail.kind === "TABLE") {
 			facts.push(["테이블명", detail.koreanName ? K.escapeHtml(detail.koreanName) + nameSource(detail.koreanNameSource, detail.koreanNameWhere) : "<span class=\"ai-hint\">한글명 없음</span>"]);
 			facts.push(["물리명", "<span class=\"kn-mono\">" + K.escapeHtml(detail.name) + "</span>"]);
+		}
+		if (detail.kind === "JSP") {
+			facts.push(["화면명", detail.screenName ? K.escapeHtml(detail.screenName) + screenNameSource(detail.screenNameVia, detail.screenNameWhere)
+				: "<span class=\"ai-hint\" title=\"화면 파일에 &lt;title&gt; 이나 titletext 가 없고, 메뉴 목록(menu-rules)에서도 찾지 못했습니다. 이 기능보다 먼저 분석한 리비전이면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.\">화면명 없음</span>"]);
 		}
 		if (detail.layer) {
 			facts.push(["계층", K.escapeHtml(detail.layer) + (detail.layerConfidence ? " (" + K.confidence(detail.layerConfidence) + ")" : "")]);

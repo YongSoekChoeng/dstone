@@ -307,6 +307,21 @@
            AND f.file_id = #{fileId}
     </select>
 
+    <!-- 화면의 화면명. SEMANTIC 이 화면 파일의 title / titletext, 없으면 메뉴 목록에서 찾아 남긴 것이다 -->
+    <select id="selectScreenName" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.value AS "screenName"
+             , r.properties_json->>'via' AS "via"
+             , r.line_start AS "lineStart"
+             , r.properties_json->>'menuFile' AS "menuFile"
+             , r.properties_json->>'menuLine' AS "menuLine"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.file_id = #{fileId}
+           AND r.resource_type = 'SCREEN_NAME'
+         ORDER BY r.resource_id
+         LIMIT 1
+    </select>
+
     <!-- 화면(JSP) 안의 Java 코드로 만든 메소드. 화면에 스크립틀릿이 없으면 0건이다 -->
     <select id="selectMethodsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT m.method_id AS "methodId"

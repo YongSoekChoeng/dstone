@@ -232,9 +232,10 @@ public class ScreenScript {
 	 * http://... 의 //는 주석이 아니므로, // 바로 앞이 :이면 주석으로 보지 않습니다.
 	 *
 	 * 찾은 것마다 앞쪽을 거슬러 훑으면 큰 화면 파일(수 MB)에서 시간이 제곱으로 늘어납니다. 그래서 한 번에 표시해 둡니다.
+	 * 메뉴 목록을 읽는 ScreenMenu 도 같이 씁니다.
 	 * </pre>
 	 */
-	private BitSet commentMask(String text) {
+	BitSet commentMask(String text) {
 		BitSet mask = new BitSet(text.length());
 		int length = text.length();
 		int pos = 0;

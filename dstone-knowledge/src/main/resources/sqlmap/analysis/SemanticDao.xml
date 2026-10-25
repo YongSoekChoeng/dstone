@@ -23,7 +23,7 @@
     <delete id="deleteWebResources" parameterType="long">
         DELETE FROM analysis_resource
          WHERE revision_id = #{revisionId}
-           AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME')
+           AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME', 'SCREEN_NAME')
     </delete>
 
     <delete id="deleteInjects" parameterType="long">
@@ -378,6 +378,27 @@
     </select>
 
     <!-- ================= 리치클라이언트 화면 (WebSquare / Nexacro / X-Platform) ================= -->
+
+    <select id="selectFilePageByLanguages" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT file_id AS "fileId", path AS "path", encoding AS "encoding"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND language IN
+            <foreach collection="languages" item="language" open="(" separator="," close=")">#{language}</foreach>
+           AND parse_status &lt;&gt; 'SKIPPED'
+           AND file_id &gt; #{afterId}
+         ORDER BY file_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 화면 파일 안(title, titletext)에서 이미 화면명을 찾은 화면 -->
+    <select id="selectScreenNamedFileIds" parameterType="long" resultType="long">
+        SELECT DISTINCT file_id
+          FROM analysis_resource
+         WHERE revision_id = #{revisionId}
+           AND resource_type = 'SCREEN_NAME'
+           AND file_id IS NOT NULL
+    </select>
 
     <select id="selectFilePageByTypes" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT file_id AS "fileId", path AS "path", encoding AS "encoding", file_type AS "fileType"

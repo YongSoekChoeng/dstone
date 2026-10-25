@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import net.dstone.knowledge.common.util.HashText;
+import net.dstone.knowledge.semantic.ScreenTitle;
 
 /**
  * <pre>
@@ -206,16 +207,10 @@ public class ResourceDocumentBuilder {
 		return null;
 	}
 
-	/** JSP의 title 태그 안의 글. 없거나 실행할 때 정해지는 값이면 null */
+	/** 화면명(JSP·WebSquare 의 title, Nexacro 의 titletext). 없거나 실행할 때 정해지는 값이면 null */
 	private String titleOf(String text) {
-		String lower = text.toLowerCase(java.util.Locale.ROOT);
-		int open = lower.indexOf("<title>");
-		int close = open < 0 ? -1 : lower.indexOf("</title>", open);
-		if (close < 0) {
-			return null;
-		}
-		String title = text.substring(open + "<title>".length(), close).trim();
-		return title.length() == 0 || title.length() > 200 || title.indexOf('<') >= 0 || title.indexOf("${") >= 0 ? null : title;
+		ScreenTitle title = ScreenTitle.of(text);
+		return title == null ? null : title.getName();
 	}
 
 	/* ============================== 도구 ============================== */

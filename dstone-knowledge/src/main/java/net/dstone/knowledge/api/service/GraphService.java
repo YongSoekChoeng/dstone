@@ -344,7 +344,7 @@ public class GraphService extends BaseObject {
 	 * 노드 하나의 설명입니다. 종류에 따라 들어 있는 항목이 다릅니다.
 	 *   TYPE   endpoints(처리하는 진입점), methods, document
 	 *   METHOD endpoints, document
-	 *   JSP    methods(화면 안의 Java 코드), document
+	 *   JSP    screenName / screenNameVia / screenNameWhere(화면명, 찾은 방법 TITLE / TITLETEXT / MENU, 찾은 파일:줄. 없으면 null), methods(화면 안의 Java 코드), document
 	 *   MAPPER statements(그 파일의 SQL statement)
 	 *   SQL    document
 	 *   TABLE  koreanName / koreanNameSource(테이블 한글명과 출처: DB 코멘트 → DDL → SQL 주석),
@@ -369,6 +369,10 @@ public class GraphService extends BaseObject {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
 			putDocument(node, revisionId, "METHOD", "METHOD", id.getId());
 		} else if ("JSP".equals(kind)) {
+			Map<String, Object> screenName = graphDao.selectScreenName(revisionId, id.getNumber());
+			node.put("screenName", screenName == null ? null : screenName.get("screenName"));
+			node.put("screenNameVia", screenName == null ? null : screenName.get("via"));
+			node.put("screenNameWhere", screenNameWhere(node, screenName));
 			node.put("methods", graphDao.selectMethodsByFile(revisionId, id.getNumber()));
 			putDocument(node, revisionId, "FILE", "VIEW", id.getId());
 		} else if ("MAPPER".equals(kind)) {
@@ -381,6 +385,17 @@ public class GraphService extends BaseObject {
 			node.put("usage", resourceDao.selectTableUsage(revisionId, id.getTableName(), MAX_DETAIL_ROWS));
 		}
 		return node;
+	}
+
+	/** 화면명을 찾은 곳: 화면 파일의 줄, 메뉴에서 왔으면 메뉴 목록 파일:줄. 모르면 null */
+	private String screenNameWhere(Map<String, Object> node, Map<String, Object> screenName) {
+		if (screenName == null) {
+			return null;
+		}
+		if (screenName.get("menuFile") != null) {
+			return screenName.get("menuFile") + (screenName.get("menuLine") != null ? ":" + screenName.get("menuLine") : "");
+		}
+		return screenName.get("lineStart") != null ? node.get("path") + ":" + screenName.get("lineStart") : null;
 	}
 
 	/** 설명 문서를 설명(document)과 소스·SQL(code)로 나눠 담습니다 */
