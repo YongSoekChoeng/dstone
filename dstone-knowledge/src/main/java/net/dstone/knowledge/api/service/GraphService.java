@@ -15,11 +15,14 @@ import org.springframework.stereotype.Service;
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.api.dao.GraphDao;
+import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.common.util.KoreanName;
 import net.dstone.knowledge.common.util.SqlFormatter;
+import net.dstone.knowledge.dictionary.ScreenDictionaryReader;
 
 /**
  * <pre>
@@ -75,6 +78,12 @@ public class GraphService extends BaseObject {
 
 	@Autowired
 	private TableDictionaryService tableDictionaryService;
+
+	@Autowired
+	private ProjectDao projectDao;
+
+	@Autowired
+	private ScreenDictionaryReader screenDictionaryReader;
 
 	/* ======================= 1. 전체 맵 ======================= */
 
@@ -344,7 +353,7 @@ public class GraphService extends BaseObject {
 	 * 노드 하나의 설명입니다. 종류에 따라 들어 있는 항목이 다릅니다.
 	 *   TYPE   endpoints(처리하는 진입점), methods, document
 	 *   METHOD endpoints, document
-	 *   JSP    screenName / screenNameVia / screenNameWhere(화면명, 찾은 방법 TITLE / TITLETEXT / MENU, 찾은 파일:줄. 없으면 null), methods(화면 안의 Java 코드), document
+	 *   JSP    screenName / screenNameVia / screenNameWhere / screenNameOriginal(화면명, 찾은 방법 TITLE / TITLETEXT / MENU / DICT, 찾은 파일:줄, 사전의 한글명을 썼을 때 원래 이름. 없으면 null), methods(화면 안의 Java 코드), document
 	 *   MAPPER statements(그 파일의 SQL statement)
 	 *   SQL    document
 	 *   TABLE  koreanName / koreanNameSource(테이블 한글명과 출처: DB 코멘트 → DDL → SQL 주석),
@@ -369,10 +378,7 @@ public class GraphService extends BaseObject {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
 			putDocument(node, revisionId, "METHOD", "METHOD", id.getId());
 		} else if ("JSP".equals(kind)) {
-			Map<String, Object> screenName = graphDao.selectScreenName(revisionId, id.getNumber());
-			node.put("screenName", screenName == null ? null : screenName.get("screenName"));
-			node.put("screenNameVia", screenName == null ? null : screenName.get("via"));
-			node.put("screenNameWhere", screenNameWhere(node, screenName));
+			putScreenName(node, revisionId, id.getNumber());
 			node.put("methods", graphDao.selectMethodsByFile(revisionId, id.getNumber()));
 			putDocument(node, revisionId, "FILE", "VIEW", id.getId());
 		} else if ("MAPPER".equals(kind)) {
@@ -385,6 +391,37 @@ public class GraphService extends BaseObject {
 			node.put("usage", resourceDao.selectTableUsage(revisionId, id.getTableName(), MAX_DETAIL_ROWS));
 		}
 		return node;
+	}
+
+	/**
+	 * <pre>
+	 * 화면의 화면명을 담습니다.
+	 *   1) 분석이 화면 파일(title, titletext)이나 메뉴 목록에서 찾아 둔 이름(SCREEN_NAME)에 한글이 있으면 그것
+	 *   2) 없거나 한글이 아니면(일본어 메뉴 등) 화면 사전 파일(ScreenDictionaryReader)의 한글명. 이때 1)의 이름은 screenNameOriginal 에 담는다
+	 *   3) 사전에도 없으면 1)의 이름 그대로
+	 * </pre>
+	 */
+	private void putScreenName(Map<String, Object> node, long revisionId, long fileId) {
+		Map<String, Object> found = graphDao.selectScreenName(revisionId, fileId);
+		String name = found == null ? null : (String) found.get("screenName");
+		String via = found == null ? null : (String) found.get("via");
+		String where = screenNameWhere(node, found);
+		String original = null;
+		if (name == null || !KoreanName.hasHangul(name)) {
+			String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
+			Map<String, Object> project = projectDao.selectProject(projectId);
+			String[] korean = screenDictionaryReader.find(projectId, project == null ? null : (String) project.get("localPath"), (String) node.get("path"));
+			if (korean != null) {
+				original = name;
+				name = korean[0];
+				via = "DICT";
+				where = korean[1];
+			}
+		}
+		node.put("screenName", name);
+		node.put("screenNameVia", via);
+		node.put("screenNameWhere", where);
+		node.put("screenNameOriginal", original);
 	}
 
 	/** 화면명을 찾은 곳: 화면 파일의 줄, 메뉴에서 왔으면 메뉴 목록 파일:줄. 모르면 null */

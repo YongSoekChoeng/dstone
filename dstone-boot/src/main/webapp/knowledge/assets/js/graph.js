@@ -835,12 +835,13 @@ var DstoneKnowledgeGraph = (function () {
 			+ K.escapeHtml(NAME_SOURCE[source] || source) + "</span>";
 	}
 
-	/** 화면명을 어디서 찾았는지: JSP·WebSquare 는 &lt;title&gt;, Nexacro 는 Form 의 titletext, 둘 다 없으면 메뉴 목록 */
-	var SCREEN_NAME_SOURCE = { TITLE: "title", TITLETEXT: "titletext", MENU: "메뉴" };
+	/** 화면명을 어디서 찾았는지: JSP·WebSquare 는 &lt;title&gt;, Nexacro 는 Form 의 titletext, 둘 다 없으면 메뉴 목록. 한글이 아니면 화면 사전 */
+	var SCREEN_NAME_SOURCE = { TITLE: "title", TITLETEXT: "titletext", MENU: "메뉴", DICT: "사전" };
 	var SCREEN_NAME_HINT = {
 		TITLE: "화면 파일의 <title>",
 		TITLETEXT: "화면 파일의 titletext",
-		MENU: "소스에 적힌 메뉴 목록의 메뉴 이름(화면 파일에 제목이 없어서 가져온 것)"
+		MENU: "소스에 적힌 메뉴 목록의 메뉴 이름(화면 파일에 제목이 없어서 가져온 것)",
+		DICT: "프로젝트 설정에 등록한 화면 사전 파일(CSV)의 한글명. 화면 제목이나 메뉴 이름에 한글이 없어서 가져온 것"
 	};
 
 	/** 출처 표시. 마우스를 올리면 찾은 파일과 줄이 나온다 */
@@ -898,7 +899,11 @@ var DstoneKnowledgeGraph = (function () {
 		}
 		if (detail.kind === "JSP") {
 			facts.push(["화면명", detail.screenName ? K.escapeHtml(detail.screenName) + screenNameSource(detail.screenNameVia, detail.screenNameWhere)
-				: "<span class=\"ai-hint\" title=\"화면 파일에 &lt;title&gt; 이나 titletext 가 없고, 메뉴 목록(menu-rules)에서도 찾지 못했습니다. 이 기능보다 먼저 분석한 리비전이면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.\">화면명 없음</span>"]);
+				: "<span class=\"ai-hint\" title=\"화면 파일에 &lt;title&gt; 이나 titletext 가 없고, 메뉴 목록(menu-rules)과 화면 사전(screen-file)에서도 찾지 못했습니다. 이 기능보다 먼저 분석한 리비전이면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.\">화면명 없음</span>"]);
+			if (detail.screenNameOriginal) {
+				// 사전의 한글명을 썼을 때, 화면 제목이나 메뉴에 적힌 원래 이름(일본어 등)
+				facts.push(["원어명", K.escapeHtml(detail.screenNameOriginal)]);
+			}
 		}
 		if (detail.layer) {
 			facts.push(["계층", K.escapeHtml(detail.layer) + (detail.layerConfidence ? " (" + K.confidence(detail.layerConfidence) + ")" : "")]);

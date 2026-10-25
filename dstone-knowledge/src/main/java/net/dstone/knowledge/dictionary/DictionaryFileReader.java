@@ -197,8 +197,13 @@ public class DictionaryFileReader extends BaseObject {
 	}
 
 	private List<String> configuredFiles(String projectId) {
+		return configuredFiles(configProperty, PREFIX + projectId);
+	}
+
+	/** 설정 키 하나에 적힌 파일 경로들. 쉼표로 나눈 글자와 YAML 목록을 다 읽는다. ScreenDictionaryReader 도 같이 쓴다 */
+	static List<String> configuredFiles(ConfigProperty configProperty, String key) {
 		List<String> paths = new ArrayList<String>();
-		String value = configProperty.getProperty(PREFIX + projectId);
+		String value = configProperty.getProperty(key);
 		if (value != null) {
 			String[] parts = value.split(",");
 			for (int i = 0; i < parts.length; i++) {
@@ -209,7 +214,7 @@ public class DictionaryFileReader extends BaseObject {
 		}
 		// YAML 목록으로 적은 경우
 		for (int i = 0; i < MAX_FILES; i++) {
-			String item = configProperty.getProperty(PREFIX + projectId + "[" + i + "]");
+			String item = configProperty.getProperty(key + "[" + i + "]");
 			if (item == null) {
 				break;
 			}
@@ -220,7 +225,7 @@ public class DictionaryFileReader extends BaseObject {
 		return paths;
 	}
 
-	private File resolve(String baseDir, String path) {
+	static File resolve(String baseDir, String path) {
 		File file = new File(path);
 		if (file.isAbsolute() || baseDir == null) {
 			return file;
@@ -317,7 +322,7 @@ public class DictionaryFileReader extends BaseObject {
 	}
 
 	/** .tsv 이거나 첫 줄에 쉼표 없이 탭만 있으면 탭으로 나눈다 */
-	private static char delimiterOf(String text, String fileName) {
+	static char delimiterOf(String text, String fileName) {
 		if (fileName.toLowerCase(Locale.ROOT).endsWith(".tsv")) {
 			return '\t';
 		}
@@ -327,7 +332,7 @@ public class DictionaryFileReader extends BaseObject {
 	}
 
 	/** 따옴표로 묶은 칸(안의 쉼표, 줄바꿈, "" 포함)을 읽는 CSV 읽기 */
-	private static List<List<String>> rowsOf(String text, char delimiter) {
+	static List<List<String>> rowsOf(String text, char delimiter) {
 		List<List<String>> rows = new ArrayList<List<String>>();
 		List<String> row = new ArrayList<String>();
 		StringBuilder cell = new StringBuilder();
@@ -374,7 +379,7 @@ public class DictionaryFileReader extends BaseObject {
 	}
 
 	/** 머리글 비교용 열쇠: 끝의 괄호 설명, 띄어쓰기, 밑줄을 떼고 대문자로. "컬럼설명(SQL주석)" → "컬럼설명", "Table Name" → "TABLENAME" */
-	private static String headerKey(String header) {
+	static String headerKey(String header) {
 		String key = header.trim();
 		int paren = key.indexOf('(');
 		if (paren > 0) {
@@ -384,7 +389,7 @@ public class DictionaryFileReader extends BaseObject {
 	}
 
 	/** candidates 를 앞에서부터 찾아 처음 있는 열. skip 에 든 열은 이미 다른 뜻으로 쓴 것이라 건너뛴다 */
-	private static int indexOf(List<String> header, String[] candidates, int... skip) {
+	static int indexOf(List<String> header, String[] candidates, int... skip) {
 		for (int c = 0; c < candidates.length; c++) {
 			String wanted = headerKey(candidates[c]);
 			for (int i = 0; i < header.size(); i++) {
@@ -400,7 +405,7 @@ public class DictionaryFileReader extends BaseObject {
 		return -1;
 	}
 
-	private static String cell(List<String> row, int index) {
+	static String cell(List<String> row, int index) {
 		return index < 0 || index >= row.size() ? null : row.get(index);
 	}
 
