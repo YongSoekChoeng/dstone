@@ -7,7 +7,7 @@ cd "$BASE_DIR/dstone-boot/bin" || exit
 ./stopApp.sh
 
 # 2. dstone-knowlege 실행
-cd "$BASE_DIR/dstone-knowlege/bin" || exit
+cd "$BASE_DIR/dstone-knowledge/bin" || exit
 ./stopApp.sh
 
 # 3. dstone-ai-engine 실행
