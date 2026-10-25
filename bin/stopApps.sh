@@ -1,9 +1,22 @@
 #! /bin/sh
+
 cd ..
+cd dstone-boot/bin
+./stopApp.sh
 
-./dstone-boot/bin/stopApp.sh
-./dstone-knowledge/bin/stopApp.sh
-./dstone-ai-engine/bin/stopApp.sh
+cd ../../
+cd dstone-knowlege/bin
+./stopApp.sh
 
-#./dstone-batch/bin/stopApp.sh
-#./dstone-batchadmin/bin/stopApp.sh
+cd ../../
+cd dstone-ai-engine/bin
+./stopApp.sh
+
+#cd ../../
+#cd dstone-batch/bin
+#./stopApp.sh
+#
+#cd ../../
+#cd dstone-batchadmin/bin
+#./stopApp.sh
+
