@@ -23,6 +23,9 @@ fi
 
 mkdir -p "$LOG_DIR"
 
+# 프로그램도 뜨면서 실행한 폴더에 application.pid 를 쓴다. 그 폴더가 bin 이어야 이 스크립트의 PID 파일과 같은 파일이 된다.
+cd "$SCRIPT_DIR" || exit 1
+
 echo "dstone-batch를 백그라운드로 시작합니다... ($JAR_FILE)"
 nohup java $JAVA_OPTS -jar "$JAR_FILE" $MAIN_CLASS > "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"

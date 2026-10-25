@@ -9,8 +9,20 @@ JAR_FILE="../target/dstone-ai-engine.jar"
 # 프로파일은 기본 wsl. 다른 프로파일로 띄우려면 DSTONE_PROFILE 을 준다(Jenkins 배포는 DSTONE_PROFILE=vm).
 SPRING_PROFILES_ACTIVE=-Dspring.profiles.active=${DSTONE_PROFILE:-wsl}
 
+if [ ! -f "${JAR_FILE}" ]; then
+	echo "dstone-ai-engine: 실행할 jar 파일이 없습니다. 먼저 mvn clean package 를 실행하세요. ($(pwd)/${JAR_FILE})"
+	exit 1
+fi
+
+# 이미 떠 있으면 또 띄우지 않는다. 같은 포트로 하나 더 뜨면 실패하고, 그 전에 같은 DB 를 함께 건드릴 수 있다.
+if [ -f application.pid ] && kill -0 "$(cat application.pid)" 2>/dev/null; then
+	echo "dstone-ai-engine: 이미 실행 중입니다. (PID: $(cat application.pid))"
+	exit 1
+fi
+
 # 화면 출력(stdout)은 버린다. 로그는 conf/log4j2.xml 에 적힌 대로만 남는다:
 #   ${APP_HOME}/LOGS/dstone-ai-engine/execution/execution.log  (APP_HOME 은 conf/env-*.properties)
 # PID 는 프로그램이 뜨면서 이 폴더의 application.pid 에 적는다(stopApp.sh / statusApp.sh 가 읽는다).
 nohup java ${JAVA_OPTS} ${SPRING_PROFILES_ACTIVE} -jar ${JAR_FILE} net.dstone.ai.DstoneAiEngineApplication > /dev/null 2>&1 &
+echo "dstone-ai-engine: 시작했습니다. (PID: $!)"
 # java ${JAVA_OPTS} ${SPRING_PROFILES_ACTIVE} -jar ${JAR_FILE} net.dstone.ai.DstoneAiEngineApplication
