@@ -67,6 +67,20 @@ public class ScreenScriptTest {
 	}
 
 	@Test
+	public void 공통_함수가_여럿이면_규칙마다_찾는다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id},gfnCallService=perform{id}");
+		String text = "HiJS.svr.doRequestAjax(\"JCST0200M01S\", p);\n"
+				+ "comLib.gfnCallService(\"JIAC0000M02I\", param, fnCallback);\n"
+				// 함수를 만드는 곳은 호출이 아니다.
+				+ "comLib.gfnCallService = function(tranId, param, successFn) {};";
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
+
+		assertEquals(2, calls.size());
+		assertEquals("performJCST0200M01S", calls.get(0).getRule().methodNameOf(calls.get(0).getId()));
+		assertEquals("performJIAC0000M02I", calls.get(1).getRule().methodNameOf(calls.get(1).getId()));
+	}
+
+	@Test
 	public void 주소를_찾는다() throws Exception {
 		assertTrue(texts(screenScript.findPaths(read(WEBSQUARE_APP + "ui/order/OrderList.xml"))).contains("/order/list.do"));
 		assertTrue(texts(screenScript.findPaths(read(WEBSQUARE_APP + "ui/order/OrderPopup.xml"))).contains("/shop/order/detail.do"));
