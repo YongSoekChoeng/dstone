@@ -1066,7 +1066,25 @@ var DstoneKnowledgeGraph = (function () {
 	var CODE_LABEL = { SOURCE: "소스", SQL: "SQL" };
 
 	/** 팝업에 띄운 본문. SQL 이면 들여쓰기를 넣은 것(formatted)과 원문(text)을 바꿔 볼 수 있다 */
-	var codeView = { code: null, raw: false };
+	var codeView = { code: null, raw: false, language: null };
+
+	/** 이보다 긴 글은 색을 입히지 않고 그대로 보여 준다(브라우저가 오래 멈추지 않게) */
+	var HIGHLIGHT_MAX_CHARS = 300000;
+
+	/** 파일 확장자 → highlight.js 언어 이름 */
+	var HIGHLIGHT_LANGUAGE_BY_EXT = { java: "java", jsp: "xml", xml: "xml", xfdl: "xml", xadl: "xml", html: "xml", htm: "xml", js: "javascript", sql: "sql" };
+
+	/**
+	 * 소스 팝업에서 색을 입힐 언어. SQL 이면 sql, 소스면 파일 확장자로 고른다. 모르면 null(색 없이 보여 준다).
+	 */
+	function highlightLanguage(detail) {
+		if (detail.code.kind === "SQL") {
+			return "sql";
+		}
+		var path = String(detail.path || "");
+		var ext = path.lastIndexOf(".") >= 0 ? path.substring(path.lastIndexOf(".") + 1).toLowerCase() : "";
+		return HIGHLIGHT_LANGUAGE_BY_EXT[ext] || null;
+	}
 
 	/** 설명 제목 옆에 붙는 [소스 보기] / [SQL 보기] 버튼. 소스나 SQL 이 없으면 빈 글자 */
 	function codeButton(code) {
@@ -1100,6 +1118,7 @@ var DstoneKnowledgeGraph = (function () {
 		el["kn-code-where"].textContent = where;
 		codeView.code = detail.code;
 		codeView.raw = false;
+		codeView.language = highlightLanguage(detail);
 		// SQL 은 들여쓰기를 넣은 것을 먼저 보여 준다. 원문과 다를 때만 바꿔 보기 버튼을 둔다.
 		el["kn-code-raw"].style.display = detail.code.formatted && detail.code.formatted !== detail.code.text ? "" : "none";
 		showCodeText();
@@ -1108,7 +1127,12 @@ var DstoneKnowledgeGraph = (function () {
 
 	function showCodeText() {
 		var code = codeView.code;
-		el["kn-code-text"].textContent = !codeView.raw && code.formatted ? code.formatted : code.text;
+		var text = !codeView.raw && code.formatted ? code.formatted : code.text;
+		el["kn-code-text"].textContent = text;
+		// 구문 강조(highlight.js, knowledge/assets/lib). 글자는 그대로이고 색만 입히므로 복사는 textContent 로 그대로 된다.
+		if (window.hljs && codeView.language && text.length <= HIGHLIGHT_MAX_CHARS) {
+			el["kn-code-text"].innerHTML = window.hljs.highlight(text, { language: codeView.language, ignoreIllegals: true }).value;
+		}
 		el["kn-code-text"].scrollTop = 0;
 		el["kn-code-text"].scrollLeft = 0;
 		el["kn-code-raw"].textContent = codeView.raw ? "정리해서 보기" : "원문 보기";

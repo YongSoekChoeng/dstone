@@ -161,6 +161,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 	</div>
 
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/cytoscape.min.js"></script>
+	<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/highlight-github.min.css" />
+	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/highlight.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-common.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/graph.js"></script>
 	<script>
