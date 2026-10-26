@@ -54,6 +54,12 @@ var DstoneKnowledgeGraph = (function () {
 	/** 자유 배치를 할 수 있는 최대 노드 수 */
 	var FREE_LAYOUT_MAX = 400;
 
+	/**
+	 * 그림을 그리는 해상도 배율. 화면 배율이 1이어도 2배로 그려서 글자와 선을 또렷하게 한다.
+	 * (Cytoscape 기본값은 브라우저 배율 그대로라 125%·150% 같은 배율에서 글자가 흐릿했다)
+	 */
+	var PIXEL_RATIO = Math.max(2, window.devicePixelRatio || 1);
+
 	var DEFAULT_RELATIONS = "CALLS,CALLS_POSSIBLE_IMPLEMENTATION,EXECUTES_SQL,READS_TABLE,WRITES_TABLE,RENDERS,REQUESTS";
 
 	/** 전체 맵의 상태 */
@@ -396,6 +402,7 @@ var DstoneKnowledgeGraph = (function () {
 			layout: free ? { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, idealEdgeLength: 90, nodeRepulsion: 9000, numIter: 300 } : { name: "preset" },
 			minZoom: 0.02,
 			maxZoom: 3,
+			pixelRatio: PIXEL_RATIO,
 			// 노드가 많을 때 끌거나 확대하는 동안은 선을 감춰서 버벅이지 않게 한다.
 			hideEdgesOnViewport: elements.length > 1500,
 			textureOnViewport: elements.length > 1500
@@ -1270,7 +1277,8 @@ var DstoneKnowledgeGraph = (function () {
 				{ selector: "edge.bypass", style: { "line-style": "dotted", "width": 2 } }]),
 			layout: { name: "preset" },
 			minZoom: 0.05,
-			maxZoom: 3
+			maxZoom: 3,
+			pixelRatio: PIXEL_RATIO
 		});
 		tree.cy.fit(undefined, 30);
 		K.message(el["kn-tree-message"], result.nodeCount === 0
