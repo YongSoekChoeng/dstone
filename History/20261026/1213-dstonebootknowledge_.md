@@ -500,3 +500,17 @@ dstone-boot>knowledge 의 graph 에서 우측 상세사항에 [소스 보기]를
 - `dstone-boot`를 다시 빌드하고 띄우면 반영됩니다. 서버(`dstone-knowledge`)는 바꾸지 않았습니다.
 
 커밋은 아직 하지 않았습니다. 올릴까요?
+
+---
+
+## 질문
+
+올려줘.
+
+---
+
+## 답변
+
+커밋 `f2fafa1c`로 `origin/main`에 올렸습니다. 넣은 파일은 7개입니다. highlight.js 파일 3개(스크립트, CSS, 라이선스)와 `graph.jsp`, `graph.js`, 문서 2개입니다.
+
+`dstone-boot`를 다시 빌드하고 띄우면 반영됩니다.
