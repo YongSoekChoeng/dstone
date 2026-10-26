@@ -621,6 +621,18 @@ body.kn-full-on {
 	border-bottom: 1px solid var(--cs-surface-3);
 }
 
+/* 메소드 목록의 기능명(메소드 위 주석의 첫 줄) */
+.kn-gd-method-title {
+	color: var(--cs-text);
+	font-weight: 600;
+}
+
+.kn-gd-method-title::before {
+	content: "· ";
+	color: var(--cs-muted);
+	font-weight: 400;
+}
+
 .kn-gd-rows > div:last-child {
 	border-bottom: 0;
 }

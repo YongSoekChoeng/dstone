@@ -1000,9 +1000,17 @@ var DstoneKnowledgeGraph = (function () {
 			var methods = detail.methods.slice().sort(function (a, b) {
 				return (a.isSynthetic ? 1 : 0) - (b.isSynthetic ? 1 : 0);
 			});
-			html += "<div class=\"kn-section-title\">메소드 · " + methods.length + "개 <span class=\"ai-hint\">(누르면 그 메소드의 관계 트리)</span></div><div class=\"kn-gd-rows\">"
+			// 기능명(title)은 메소드 위 주석의 첫 줄이나 @Description 값이다. 서버가 상세를 열 때 소스에서 읽어 준다.
+			var titled = methods.filter(function (method) {
+				return method.title;
+			}).length;
+			html += "<div class=\"kn-section-title\">메소드 · " + methods.length + "개"
+				+ (titled > 0 ? " · 기능명 " + titled + "개" : "") + " <span class=\"ai-hint\">(누르면 그 메소드의 관계 트리)</span></div>"
+				+ (detail.methodTitleNote ? "<p class=\"ai-hint\">" + K.escapeHtml(detail.methodTitleNote) + "</p>" : "")
+				+ "<div class=\"kn-gd-rows\">"
 				+ methods.slice(0, 200).map(function (method) {
 					return "<div><a href=\"javascript:void(0)\" class=\"kn-mono\" data-tree=\"" + K.escapeHtml(method.methodId) + "\">" + K.escapeHtml(method.signature) + "</a>"
+						+ (method.title ? " <span class=\"kn-gd-method-title\">" + K.escapeHtml(method.title) + "</span>" : "")
 						+ (method.isSynthetic ? " <span class=\"ai-hint\">자동 생성</span>" : "") + "</div>";
 				}).join("") + (methods.length > 200 ? "<div class=\"ai-hint\">… 그 밖에 " + (methods.length - 200) + "개</div>" : "") + "</div>";
 		}

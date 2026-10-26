@@ -1,5 +1,9 @@
 package net.dstone.knowledge.api.service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,9 +24,12 @@ import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.common.util.HashText;
 import net.dstone.knowledge.common.util.KoreanName;
+import net.dstone.knowledge.common.util.MethodTitle;
 import net.dstone.knowledge.common.util.SqlFormatter;
 import net.dstone.knowledge.dictionary.ScreenDictionaryReader;
+import net.dstone.knowledge.scanner.EncodingDetector;
 
 /**
  * <pre>
@@ -84,6 +91,9 @@ public class GraphService extends BaseObject {
 
 	@Autowired
 	private ScreenDictionaryReader screenDictionaryReader;
+
+	@Autowired
+	private EncodingDetector encodingDetector;
 
 	/* ======================= 1. 전체 맵 ======================= */
 
@@ -351,7 +361,7 @@ public class GraphService extends BaseObject {
 	/**
 	 * <pre>
 	 * 노드 하나의 설명입니다. 종류에 따라 들어 있는 항목이 다릅니다.
-	 *   TYPE   endpoints(처리하는 진입점), methods, document
+	 *   TYPE   endpoints(처리하는 진입점), methods(title = 메소드 위 주석의 기능명, 없으면 null), methodTitleNote(기능명을 못 읽은 까닭. 읽었으면 null), document
 	 *   METHOD endpoints, document
 	 *   JSP    screenName / screenNameVia / screenNameWhere / screenNameOriginal(화면명, 찾은 방법 TITLE / TITLETEXT / MENU / DICT, 찾은 파일:줄, 사전의 한글명을 썼을 때 원래 이름. 없으면 null), methods(화면 안의 Java 코드), document
 	 *   MAPPER statements(그 파일의 SQL statement)
@@ -372,7 +382,9 @@ public class GraphService extends BaseObject {
 
 		if ("TYPE".equals(kind)) {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
-			node.put("methods", declarationDao.selectMethodListByOwner(revisionId, id.getId()));
+			List<Map<String, Object>> methods = declarationDao.selectMethodListByOwner(revisionId, id.getId());
+			putMethodTitles(node, methods, revisionId, id.getId());
+			node.put("methods", methods);
 			putDocument(node, revisionId, "TYPE", "TYPE", id.getId());
 		} else if ("METHOD".equals(kind)) {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
@@ -422,6 +434,50 @@ public class GraphService extends BaseObject {
 		node.put("screenNameVia", via);
 		node.put("screenNameWhere", where);
 		node.put("screenNameOriginal", original);
+	}
+
+	/**
+	 * <pre>
+	 * 메소드마다 기능명(title)을 담습니다. 메소드 바로 위 주석의 첫 줄이나 @Description 값입니다(MethodTitle).
+	 * 분석 결과에 저장해 두지 않고 상세를 열 때 소스 파일을 읽습니다. 그래서 예전에 분석한 리비전도 다시 분석하지 않고 바로 나옵니다.
+	 * 분석 뒤에 파일이 바뀌었으면(checksum 이 다르면) 줄 번호가 어긋날 수 있으므로 읽지 않고 methodTitleNote 에 까닭을 적습니다.
+	 * </pre>
+	 */
+	private void putMethodTitles(Map<String, Object> node, List<Map<String, Object>> methods, long revisionId, String symbolId) {
+		String note = null;
+		String[] lines = null;
+		Map<String, Object> file = graphDao.selectSourceFileOfType(revisionId, symbolId);
+		String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
+		Map<String, Object> project = projectDao.selectProject(projectId);
+		String localPath = project == null ? null : (String) project.get("localPath");
+		if (file == null || localPath == null) {
+			note = "소스 파일 위치를 몰라 기능명을 읽지 못했습니다.";
+		} else {
+			try {
+				Path root = Paths.get(localPath).toRealPath();
+				Path source = root.resolve((String) file.get("path")).normalize();
+				if (!source.startsWith(root) || !Files.isRegularFile(source)) {
+					note = "소스 파일이 없어 기능명을 읽지 못했습니다: " + file.get("path");
+				} else {
+					byte[] bytes = Files.readAllBytes(source);
+					if (!HashText.sha256(bytes).equals(file.get("checksum"))) {
+						note = "분석한 뒤에 소스 파일이 바뀌어서 기능명을 읽지 않았습니다(줄 번호가 어긋날 수 있습니다). 새로 분석하면 나옵니다.";
+					} else {
+						lines = encodingDetector.decode(bytes, (String) file.get("encoding")).split("\r?\n", -1);
+					}
+				}
+			} catch (IOException e) {
+				note = "소스 파일을 읽지 못했습니다: " + e.getMessage();
+			}
+		}
+		for (int i = 0; i < methods.size(); i++) {
+			Map<String, Object> method = methods.get(i);
+			Object lineStart = method.get("lineStart");
+			// 소스에 없는 메소드(기본 생성자, Lombok)는 줄이 클래스나 필드의 줄이라 그 위 주석이 메소드 설명이 아니다.
+			boolean synthetic = Boolean.TRUE.equals(method.get("isSynthetic"));
+			method.put("title", lines == null || synthetic || !(lineStart instanceof Number) ? null : MethodTitle.of(lines, Integer.valueOf(((Number) lineStart).intValue())));
+		}
+		node.put("methodTitleNote", note);
 	}
 
 	/** 화면명을 찾은 곳: 화면 파일의 줄, 메뉴에서 왔으면 메뉴 목록 파일:줄. 모르면 null */
