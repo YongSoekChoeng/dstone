@@ -358,7 +358,11 @@ var DstoneKnowledgeGraph = (function () {
 
 	/* ======================= 전체 맵: 그리기 ======================= */
 
-	function drawMap() {
+	/**
+	 * @param focusGroupKey 다 그린 뒤 이 묶음(펼친 것이면 든 노드들, 접은 것이면 묶음 노드)을 화면 가운데에 둔다.
+	 *        없으면 처음 보여 주는 위치(startView). 이벤트에 바로 걸려서 이벤트 객체가 올 수도 있으므로 글자일 때만 쓴다.
+	 */
+	function drawMap(focusGroupKey) {
 		if (!map.graph) {
 			return;
 		}
@@ -404,6 +408,9 @@ var DstoneKnowledgeGraph = (function () {
 			textureOnViewport: elements.length > 1500
 		});
 		var clipped = startView(map.cy);
+		if (typeof focusGroupKey === "string" && focusOn(map.cy, focusGroupKey)) {
+			clipped = false;
+		}
 		map.cy.on("tap", "node", function (event) {
 			if (!event.target.hasClass("tier")) {
 				selectNode(event.target.id());
@@ -514,6 +521,23 @@ var DstoneKnowledgeGraph = (function () {
 		var box = cy.elements().boundingBox();
 		cy.zoom(MIN_START_ZOOM);
 		cy.pan({ x: 30 - box.x1 * MIN_START_ZOOM, y: 30 - box.y1 * MIN_START_ZOOM });
+		return true;
+	}
+
+	/**
+	 * 묶음 하나를 화면 가운데에 둡니다. 펼치거나 접은 뒤에 그 자리를 보여 주려고 씁니다.
+	 * (startView 는 맵의 왼쪽 위부터 보여 주므로, 오른쪽에 있는 묶음을 펼치면 펼친 노드가 화면 밖에 있었다)
+	 * @return 그 묶음의 노드가 맵에 있어서 옮겼으면 true
+	 */
+	function focusOn(cy, groupKey) {
+		var nodes = cy.nodes().filter(function (node) {
+			return node.data("groupKey") === groupKey;
+		});
+		if (nodes.empty()) {
+			return false;
+		}
+		cy.zoom(Math.max(cy.zoom(), MIN_START_ZOOM));
+		cy.center(nodes);
 		return true;
 	}
 
@@ -646,7 +670,7 @@ var DstoneKnowledgeGraph = (function () {
 		// 접혀 있던 묶음을 고른 채로 펼치면 그 노드가 없어진다. 고른 것을 푼다.
 		map.selectedId = null;
 		clearDetail(el["kn-graph-detail"], "노드를 누르면 여기에 설명이 나옵니다.");
-		drawMap();
+		drawMap(groupKey);
 	}
 
 	/** "클래스.메소드"로 찾을 때 메소드 목록을 가져와 볼 클래스 수의 한도 */
@@ -1337,11 +1361,17 @@ var DstoneKnowledgeGraph = (function () {
 			maxZoom: 3
 		});
 		tree.cy.fit(undefined, 30);
+		// 부르는 쪽이 하나도 없으면 깊이를 늘려도 그대로다. 그렇다고 알려 준다.
+		var noCallers = parseInt(el["kn-tree-up"].value, 10) > 0 && !(result.nodes || []).some(function (treeNode) {
+			return treeNode.level < 0;
+		});
 		K.message(el["kn-tree-message"], result.nodeCount === 0
 			? "이어진 것이 없습니다. 아무도 부르지 않고 아무것도 부르지 않거나, 분석이 잇지 못한 호출일 수 있습니다."
 			: "노드 " + result.nodeCount + "개 · 선 " + result.edgeCount + "개"
 				+ (hiddenCount > 0 ? "(끈 계층의 노드 " + hiddenCount + "개는 숨김. 숨긴 노드를 건너 이어지는 길은 점선)" : "")
 				+ ". 가운데(노란 테)가 고른 것, 왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽입니다."
+				+ (noCallers ? " 이것을 부르는 곳은 분석에서 하나도 나오지 않았습니다. 그래서 부르는 쪽 깊이를 늘려도 화면이 나오지 않습니다."
+					+ " 쓰이지 않는 코드이거나, 리플렉션·설정 파일처럼 소스에 이름이 드러나지 않는 방법으로 부를 수 있습니다." : "")
 				+ (result.truncated ? " 너무 많아서 가까운 것부터 일부만 가져왔습니다. 깊이를 줄이거나 더 작은 것(메소드 하나)을 고르세요." : ""), false);
 		tree.cy.on("tap", "node", function (event) {
 			highlight(tree.cy, event.target, "ALL");
