@@ -323,15 +323,14 @@
     </select>
 
     <!-- 화면(JSP) 안의 Java 코드로 만든 메소드. 화면에 스크립틀릿이 없으면 0건이다 -->
-    <!-- 타입이 선언된 소스 파일. 상세를 열 때 메소드 주석(기능명)을 읽으려고 쓴다 -->
-    <select id="selectSourceFileOfType" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+    <!-- 소스 파일 하나. 상세를 열 때 메소드 주석(기능명)을 읽으려고 쓴다 -->
+    <select id="selectSourceFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT f.path AS "path"
              , f.encoding AS "encoding"
              , f.checksum AS "checksum"
-          FROM analysis_symbol s
-          JOIN analysis_file f ON f.file_id = s.file_id
-         WHERE s.revision_id = #{revisionId}
-           AND s.symbol_id = #{symbolId}
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND f.path = #{path}
     </select>
 
     <select id="selectMethodsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">

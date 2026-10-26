@@ -621,6 +621,34 @@ body.kn-full-on {
 	border-bottom: 1px solid var(--cs-surface-3);
 }
 
+/* 관계 트리 상세: 노드 이름 아래에 따로 보여 주는 메소드의 기능명 */
+.kn-gd-func {
+	margin: 2px 0 10px;
+	padding: 8px 10px;
+	border-left: 3px solid var(--cs-primary);
+	background: var(--cs-surface-2);
+	border-radius: var(--cs-radius-sm);
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--cs-text);
+	word-break: break-all;
+}
+
+.kn-gd-func.kn-gd-func-none {
+	border-left-color: var(--cs-border-strong);
+	font-size: 13px;
+	font-weight: 400;
+	color: var(--cs-muted);
+}
+
+.kn-gd-func-label {
+	display: inline-block;
+	margin-right: 8px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--cs-muted);
+}
+
 /* 메소드 목록의 기능명(메소드 위 주석의 첫 줄) */
 .kn-gd-method-title {
 	color: var(--cs-text);

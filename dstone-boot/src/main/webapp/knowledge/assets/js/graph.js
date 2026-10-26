@@ -1381,6 +1381,7 @@ var DstoneKnowledgeGraph = (function () {
 				return;
 			}
 			container.innerHTML = head(detail.kind, node.label, node.tier)
+				+ functionName(detail)
 				+ (node.id === tree.startId ? "" : "<div class=\"kn-gd-actions\"><button type=\"button\" class=\"kn-btn kn-plain\" data-tree=\"" + K.escapeHtml(node.id)
 					+ "\">이 노드를 가운데로 다시 그리기</button></div>")
 				+ detailBody(detail);
@@ -1389,6 +1390,21 @@ var DstoneKnowledgeGraph = (function () {
 		}).catch(function (err) {
 			container.innerHTML = head(node.kind, node.label, node.tier) + "<p class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</p>";
 		});
+	}
+
+	/**
+	 * 메소드의 기능명(메소드 위 주석의 첫 줄이나 @Description)을 노드 이름 바로 아래에 따로 보여 줍니다.
+	 * 메소드가 아니면 빈 글자입니다.
+	 */
+	function functionName(detail) {
+		if (detail.kind !== "METHOD") {
+			return "";
+		}
+		if (detail.title) {
+			return "<div class=\"kn-gd-func\"><span class=\"kn-gd-func-label\">기능명</span>" + K.escapeHtml(detail.title) + "</div>";
+		}
+		return "<div class=\"kn-gd-func kn-gd-func-none\"><span class=\"kn-gd-func-label\">기능명</span>"
+			+ K.escapeHtml(detail.titleNote || "없음 (메소드 위에 설명 주석이 없습니다)") + "</div>";
 	}
 
 	return { init: init };

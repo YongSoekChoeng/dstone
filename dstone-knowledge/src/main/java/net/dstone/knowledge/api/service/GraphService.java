@@ -362,7 +362,7 @@ public class GraphService extends BaseObject {
 	 * <pre>
 	 * 노드 하나의 설명입니다. 종류에 따라 들어 있는 항목이 다릅니다.
 	 *   TYPE   endpoints(처리하는 진입점), methods(title = 메소드 위 주석의 기능명, 없으면 null), methodTitleNote(기능명을 못 읽은 까닭. 읽었으면 null), document
-	 *   METHOD endpoints, document
+	 *   METHOD title(메소드 위 주석의 기능명, 없으면 null), titleNote(기능명을 못 읽은 까닭. 읽었으면 null), endpoints, document
 	 *   JSP    screenName / screenNameVia / screenNameWhere / screenNameOriginal(화면명, 찾은 방법 TITLE / TITLETEXT / MENU / DICT, 찾은 파일:줄, 사전의 한글명을 썼을 때 원래 이름. 없으면 null), methods(화면 안의 Java 코드), document
 	 *   MAPPER statements(그 파일의 SQL statement)
 	 *   SQL    document
@@ -383,10 +383,15 @@ public class GraphService extends BaseObject {
 		if ("TYPE".equals(kind)) {
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
 			List<Map<String, Object>> methods = declarationDao.selectMethodListByOwner(revisionId, id.getId());
-			putMethodTitles(node, methods, revisionId, id.getId());
+			node.put("methodTitleNote", putMethodTitles(methods, revisionId, (String) node.get("path")));
 			node.put("methods", methods);
 			putDocument(node, revisionId, "TYPE", "TYPE", id.getId());
 		} else if ("METHOD".equals(kind)) {
+			// 관계 트리 팝업이 노드 이름 아래에 따로 보여 주는 이 메소드의 기능명
+			List<Map<String, Object>> self = new ArrayList<Map<String, Object>>();
+			self.add(relationDao.selectMethod(revisionId, id.getId()));
+			node.put("titleNote", putMethodTitles(self, revisionId, (String) node.get("path")));
+			node.put("title", self.get(0).get("title"));
 			node.put("endpoints", graphDao.selectEndpointsByNode(revisionId, id.getId(), MAX_DETAIL_ROWS));
 			putDocument(node, revisionId, "METHOD", "METHOD", id.getId());
 		} else if ("JSP".equals(kind)) {
@@ -440,13 +445,16 @@ public class GraphService extends BaseObject {
 	 * <pre>
 	 * 메소드마다 기능명(title)을 담습니다. 메소드 바로 위 주석의 첫 줄이나 @Description 값입니다(MethodTitle).
 	 * 분석 결과에 저장해 두지 않고 상세를 열 때 소스 파일을 읽습니다. 그래서 예전에 분석한 리비전도 다시 분석하지 않고 바로 나옵니다.
-	 * 분석 뒤에 파일이 바뀌었으면(checksum 이 다르면) 줄 번호가 어긋날 수 있으므로 읽지 않고 methodTitleNote 에 까닭을 적습니다.
+	 * 분석 뒤에 파일이 바뀌었으면(checksum 이 다르면) 줄 번호가 어긋날 수 있으므로 읽지 않습니다.
 	 * </pre>
+	 * @param methods 같은 파일의 메소드들(lineStart, isSynthetic). 여기에 title 을 넣는다
+	 * @param path 그 파일의 경로(프로젝트 기준)
+	 * @return 기능명을 못 읽은 까닭. 읽었으면 null
 	 */
-	private void putMethodTitles(Map<String, Object> node, List<Map<String, Object>> methods, long revisionId, String symbolId) {
+	private String putMethodTitles(List<Map<String, Object>> methods, long revisionId, String path) {
 		String note = null;
 		String[] lines = null;
-		Map<String, Object> file = graphDao.selectSourceFileOfType(revisionId, symbolId);
+		Map<String, Object> file = path == null ? null : graphDao.selectSourceFile(revisionId, path);
 		String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
 		Map<String, Object> project = projectDao.selectProject(projectId);
 		String localPath = project == null ? null : (String) project.get("localPath");
@@ -477,7 +485,7 @@ public class GraphService extends BaseObject {
 			boolean synthetic = Boolean.TRUE.equals(method.get("isSynthetic"));
 			method.put("title", lines == null || synthetic || !(lineStart instanceof Number) ? null : MethodTitle.of(lines, Integer.valueOf(((Number) lineStart).intValue())));
 		}
-		node.put("methodTitleNote", note);
+		return note;
 	}
 
 	/** 화면명을 찾은 곳: 화면 파일의 줄, 메뉴에서 왔으면 메뉴 목록 파일:줄. 모르면 null */

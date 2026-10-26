@@ -51,12 +51,12 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectNodesByIds", param);
 	}
 
-	/** 타입이 선언된 소스 파일 {path, encoding, checksum}. 없으면 null */
-	public Map<String, Object> selectSourceFileOfType(long revisionId, String symbolId) {
+	/** 소스 파일 하나 {path, encoding, checksum}. 없으면 null */
+	public Map<String, Object> selectSourceFile(long revisionId, String path) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
-		param.put("symbolId", symbolId);
-		return sqlSessionCommon.selectOne(NS + "selectSourceFileOfType", param);
+		param.put("path", path);
+		return sqlSessionCommon.selectOne(NS + "selectSourceFile", param);
 	}
 
 	/** 이 타입이나 메소드가 처리하는 진입점 */
