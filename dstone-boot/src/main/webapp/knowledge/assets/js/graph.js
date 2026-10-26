@@ -54,6 +54,9 @@ var DstoneKnowledgeGraph = (function () {
 	/** 자유 배치를 할 수 있는 최대 노드 수 */
 	var FREE_LAYOUT_MAX = 400;
 
+	/** 처음 열 때 이보다 작게는 줄이지 않는다. 맵 전체를 칸에 넣으면 글자가 4~5px로 작아져 읽을 수 없었다 */
+	var MIN_START_ZOOM = 0.8;
+
 	var DEFAULT_RELATIONS = "CALLS,CALLS_POSSIBLE_IMPLEMENTATION,EXECUTES_SQL,READS_TABLE,WRITES_TABLE,RENDERS,REQUESTS";
 
 	/** 전체 맵의 상태 */
@@ -188,12 +191,12 @@ var DstoneKnowledgeGraph = (function () {
 		refitMap();
 	}
 
-	/** 그림 칸의 크기가 바뀌었다. Cytoscape 는 창 크기만 지켜보므로 칸이 바뀐 것을 직접 알려 주고 그림을 칸에 맞춘다 */
+	/** 그림 칸의 크기가 바뀌었다. Cytoscape 는 창 크기만 지켜보므로 칸이 바뀐 것을 직접 알려 주고 처음 보여 줄 위치를 다시 잡는다 */
 	function refitMap() {
 		window.requestAnimationFrame(function () {
 			if (map.cy) {
 				map.cy.resize();
-				map.cy.fit(undefined, 30);
+				startView(map.cy);
 			}
 		});
 	}
@@ -400,7 +403,7 @@ var DstoneKnowledgeGraph = (function () {
 			hideEdgesOnViewport: elements.length > 1500,
 			textureOnViewport: elements.length > 1500
 		});
-		map.cy.fit(undefined, 30);
+		var clipped = startView(map.cy);
 		map.cy.on("tap", "node", function (event) {
 			if (!event.target.hasClass("tier")) {
 				selectNode(event.target.id());
@@ -422,6 +425,7 @@ var DstoneKnowledgeGraph = (function () {
 		K.message(el["kn-graph-message"], "노드 " + ids.length + "개 · 선 " + Object.keys(view.edges).length + "개 (분석된 것: 클래스 · 화면 · 매퍼 · 테이블 " + total + "개)"
 			+ (collapsed > 0 ? " · 묶음 " + collapsed + "개가 접혀 있습니다. 묶음을 두 번 누르면 펼쳐집니다." : "")
 			+ (map.graph.truncated ? " · 너무 많아서 일부만 가져왔습니다." : "")
+			+ (clipped ? " · 글자가 보이게 왼쪽 위부터 보여 줍니다. 전체는 [화면에 맞추기]로 보세요." : "")
 			+ (tooManyForFree ? " · 자유 배치는 노드 " + FREE_LAYOUT_MAX + "개까지만 됩니다. 묶음으로 접거나 계층을 꺼서 줄이세요(지금은 계층별로 그렸습니다)." : ""));
 
 		if (map.selectedId && view.nodes[map.selectedId]) {
@@ -468,18 +472,22 @@ var DstoneKnowledgeGraph = (function () {
 		var colWidth = 200;
 		var rowHeight = 30;
 		var tierGap = 110;
-		// 전체가 화면 비율(가로가 조금 긴 모양)에 가깝게 한 열의 줄 수를 정한다.
-		var rows = Math.max(12, Math.ceil(Math.sqrt(nodes.length * colWidth / (rowHeight * 1.8))));
-		var positions = {};
-		var labels = [];
-		var x = 0;
+		var tierLists = [];
 		TIERS.forEach(function (tier) {
 			var list = nodes.filter(function (node) {
 				return node.tier === tier.key;
 			});
-			if (list.length === 0) {
-				return;
+			if (list.length > 0) {
+				tierLists.push({ tier: tier, list: list });
 			}
+		});
+		var rows = bestRows(tierLists, colWidth, rowHeight, tierGap);
+		var positions = {};
+		var labels = [];
+		var x = 0;
+		tierLists.forEach(function (item) {
+			var tier = item.tier;
+			var list = item.list;
 			list.sort(function (a, b) {
 				return a.groupKey === b.groupKey ? a.label.localeCompare(b.label) : a.groupKey.localeCompare(b.groupKey);
 			});
@@ -491,6 +499,54 @@ var DstoneKnowledgeGraph = (function () {
 			x += cols * colWidth + tierGap;
 		});
 		return { positions: positions, labels: labels };
+	}
+
+	/**
+	 * 처음 보여 줄 위치를 정합니다. 칸에 다 들어가면 그대로 맞추고,
+	 * 맞추면 글자가 너무 작아질 때는 MIN_START_ZOOM 배율로 맵의 왼쪽 위(화면 계층 쪽)부터 보여 줍니다.
+	 * @return 맵 일부만 보여 주면 true
+	 */
+	function startView(cy) {
+		cy.fit(undefined, 30);
+		if (cy.zoom() >= MIN_START_ZOOM) {
+			return false;
+		}
+		var box = cy.elements().boundingBox();
+		cy.zoom(MIN_START_ZOOM);
+		cy.pan({ x: 30 - box.x1 * MIN_START_ZOOM, y: 30 - box.y1 * MIN_START_ZOOM });
+		return true;
+	}
+
+	/**
+	 * 한 열에 놓을 줄 수를 고릅니다. 다 그린 맵이 그림 칸 모양(가로 · 세로 비율)과 비슷해야
+	 * "화면에 맞추기"를 했을 때 덜 줄어들고 글자가 크게 보입니다.
+	 * 줄 수를 하나씩 바꿔 보며 맞췄을 때 배율이 가장 큰 값을 씁니다.
+	 * (예전에는 노드 수만 보고 정해서, 계층 사이 간격 때문에 맵이 옆으로 길게 늘어나 글자가 4px쯤으로 작아졌다)
+	 */
+	function bestRows(tierLists, colWidth, rowHeight, tierGap) {
+		var canvas = el["kn-graph-canvas"];
+		var boxWidth = Math.max(canvas.clientWidth, 400) - 60;
+		var boxHeight = Math.max(canvas.clientHeight, 300) - 60;
+		var longest = 1;
+		tierLists.forEach(function (item) {
+			longest = Math.max(longest, item.list.length);
+		});
+		var best = 12;
+		var bestZoom = -1;
+		for (var rows = Math.min(12, longest); rows <= longest; rows++) {
+			var width = -tierGap;
+			tierLists.forEach(function (item) {
+				width += Math.ceil(item.list.length / rows) * colWidth + tierGap;
+			});
+			// 계층 이름 줄(46)과 노드 높이를 더한다
+			var height = (rows - 1) * rowHeight + 46 + 26;
+			var zoom = Math.min(boxWidth / width, boxHeight / height);
+			if (zoom > bestZoom) {
+				bestZoom = zoom;
+				best = rows;
+			}
+		}
+		return best;
 	}
 
 	function styles() {
