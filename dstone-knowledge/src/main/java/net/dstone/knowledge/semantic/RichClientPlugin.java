@@ -36,6 +36,8 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *       거래 호출 화면이 주소 대신 거래 ID로 부를 때 (via = CALL_RULE)
  *                 프로젝트 공통 함수가 "ID → 메소드 이름" 규칙으로 서버를 부르는 방식이다.
  *                 규칙은 설정 dstone.knowledge.semantic.screen.call-rules 에 적는다(ScreenScript.parseRules).
+ *                 폼 필드에 거래 ID를 담아 보내는 화면(&lt;input name='tranId' value='JIMC1000M03S'&gt; 를 만들어 submit)은
+ *                 설정 dstone.knowledge.semantic.screen.field-rules 에 "필드 이름=메소드이름틀" 로 적는다(properties.field).
  *                 그 이름의 메소드가 하나면 HIGH, 여럿이면 어느 것인지 몰라 모두 LOW로 잇는다.
  *                 메소드가 없으면 사실 그대로 UNRESOLVED로 남긴다(이름은 to_external).
  *   진입점 TRANSACTION       거래 ID로 불리는 메소드(이름이 규칙의 틀에 맞는 공개 메소드). 주소 자리에 거래 ID를 둔다
@@ -93,6 +95,8 @@ public class RichClientPlugin implements SemanticPlugin {
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
 		List<ScreenScript.CallRule> rules = ScreenScript.parseRules(configProperty.getProperty("dstone.knowledge.semantic.screen.call-rules"));
+		// 폼 필드에 거래 ID를 담아 보내는 화면도 같은 방식으로 잇는다(출력 화면이 이렇게 많이 부른다).
+		rules.addAll(ScreenScript.parseFieldRules(configProperty.getProperty("dstone.knowledge.semantic.screen.field-rules")));
 		List<ScreenScript.CallRule> openRules = ScreenScript.parseRules(configProperty.getProperty("dstone.knowledge.semantic.screen.open-rules"));
 
 		Map<String, List<String>> handlers = null;
@@ -278,7 +282,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			// path 에는 주소 대신 거래 ID를 둔다. 화면 문서와 조회 화면이 "무엇으로 불렀나"를 이 값으로 보여 준다.
 			properties.put("path", call.getId());
 			properties.put("via", "CALL_RULE");
-			properties.put("function", call.getRule().getFunction());
+			properties.put(call.getRule().isField() ? "field" : "function", call.getRule().getFunction());
 			Integer line = screenScript.lineAt(text, call.getIndex());
 
 			List<String> methods = methodsByName.get(name);

@@ -105,6 +105,12 @@ dstone:
                 # 화면에 그 함수가 없으면 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
                 # 주소(/order/list.do)로 부르는 화면은 규칙 없이도 이어진다.
                 call-rules: "doRequestAjax=perform{id},gfnCallService=perform{id}"
+                # 화면이 폼을 만들어 거래 ID를 필드 값으로 담아 보내는 프로젝트를 위한 규칙. "필드 이름=메소드이름틀" 을 쉼표로 이어 쓴다.
+                # 예) tranId=perform{id}
+                #     화면의 <input type='hidden' name='tranId' value='JIMC1000M03S'/> 를 performJIMC1000M03S 메소드와 잇는다.
+                #     HI-Japan 의 출력 버튼이 이렇게 /reporting_ji.do 로 보내고, 서버(JZCI0102C)가 tranId 로 메소드를 고른다.
+                # value 가 글자로 적힌 필드만 잇는다. 화면에 그 필드가 없으면 아무 일도 하지 않는다.
+                field-rules: "tranId=perform{id}"
                 # 화면이 경로 대신 "화면 ID"로 다른 화면을 여는 프로젝트를 위한 규칙. "함수=화면 경로 틀" 을 쉼표로 이어 쓴다.
                 # 예) fnOpenPage={id}.xml
                 #     화면의 parent.scwin.fnOpenPage("JIMC1000G", ...) 를 JIMC1000G.xml 로 끝나는 화면과 잇는다(화면 → 화면, 노드 맵의 호출화면).

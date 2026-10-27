@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
  *
  * 찾는 것은 세 가지입니다.
  *   1) 주소          /order/list.do 처럼 /로 시작하는 경로, svc::order/list.do 처럼 서비스 접두어가 붙은 경로
- *   2) 거래 호출     HiJS.svr.doRequestAjax("JCST0200M01S", ...) 처럼 주소 대신 거래 ID로 부르는 호출
+ *   2) 거래 호출     HiJS.svr.doRequestAjax("JCST0200M01S", ...) 처럼 주소 대신 거래 ID로 부르는 호출,
+ *                    &lt;input name='tranId' value='JIMC1000M03S'&gt; 처럼 폼 필드에 거래 ID를 담아 보내는 것
  *   3) 다른 화면     src="/app/ui/jc/JCAR0101G.xml" 처럼 따옴표 안에 적힌 다른 화면 파일
  *
  * 주석 안에 있는 것은 뺍니다. 지워 둔 옛 호출이 지금도 불리는 것처럼 보이면 안 되기 때문입니다.
@@ -42,6 +43,10 @@ public class ScreenScript {
 		private final String function;
 		private final String methodTemplate;
 		private final Pattern pattern;
+		/** pattern 에서 ID가 들어 있는 묶음 번호 */
+		private final int idGroup;
+		/** 함수 호출이 아니라 폼 필드(name=…, value=…)를 보는 규칙인지 */
+		private final boolean field;
 
 		public CallRule(String function, String methodTemplate) {
 			this.function = function;
@@ -49,10 +54,34 @@ public class ScreenScript {
 			// 함수 이름 앞에 다른 이름 글자가 붙어 있으면 다른 함수다(xdoRequestAjax). 점은 괜찮다(HiJS.svr.doRequestAjax).
 			// 첫 인자가 따옴표로 싼 글자가 아니면(변수 등) 2번 묶음이 비어 있다.
 			this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])" + Pattern.quote(function) + "\\s*\\(\\s*(?:([\"'])([^\"'\\\\\\r\\n]{1,200})\\1)?");
+			this.idGroup = 2;
+			this.field = false;
 		}
 
+		private CallRule(String fieldName, String methodTemplate, boolean field) {
+			this.function = fieldName;
+			this.methodTemplate = methodTemplate;
+			// <input name='tranId' value='JIMC1000M03S'/> 처럼 name 바로 뒤(태그 안)에 value 가 오는 모양.
+			// 자바스크립트 글자 안에 적힌 폼이라 속성 사이에 쉼표가 끼기도 한다(name='tranId', value='…').
+			// value 가 따옴표로 싼 글자가 아니면(변수를 이어 붙인 것) 3번 묶음이 비어 있다.
+			this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])name\\s*=\\s*([\"'])" + Pattern.quote(fieldName) + "\\1[^<>]{0,40}?(?<![A-Za-z0-9_$])value\\s*=\\s*"
+					+ "(?:([\"'])([^\"'\\\\\\r\\n<>]{1,200})\\2)?");
+			this.idGroup = 3;
+			this.field = field;
+		}
+
+		/** 폼 필드 규칙을 만듭니다. 이 이름의 필드에 적힌 값(거래 ID)으로 메소드 이름을 만듭니다. */
+		public static CallRule field(String fieldName, String methodTemplate) {
+			return new CallRule(fieldName, methodTemplate, true);
+		}
+
+		/** 함수 이름. 폼 필드 규칙이면 필드 이름 */
 		public String getFunction() {
 			return function;
+		}
+
+		public boolean isField() {
+			return field;
 		}
 
 		public String getMethodTemplate() {
@@ -127,6 +156,20 @@ public class ScreenScript {
 	 * </pre>
 	 */
 	public static List<CallRule> parseRules(String configured) {
+		return parse(configured, false);
+	}
+
+	/**
+	 * <pre>
+	 * 폼 필드 규칙 글자를 읽습니다. 모양은 parseRules 와 같고, 함수 자리에 필드 이름을 적습니다.
+	 * 예: "tranId=perform{id}" → 화면이 만드는 폼의 &lt;input name='tranId' value='JIMC1000M03S'&gt; 를 performJIMC1000M03S 와 잇는다.
+	 * </pre>
+	 */
+	public static List<CallRule> parseFieldRules(String configured) {
+		return parse(configured, true);
+	}
+
+	private static List<CallRule> parse(String configured, boolean field) {
 		List<CallRule> rules = new ArrayList<CallRule>();
 		if (configured == null) {
 			return rules;
@@ -143,7 +186,7 @@ public class ScreenScript {
 			if (function.length() == 0 || template.indexOf("{id}") < 0) {
 				continue;
 			}
-			rules.add(new CallRule(function, template));
+			rules.add(field ? CallRule.field(function, template) : new CallRule(function, template));
 		}
 		return rules;
 	}
@@ -156,10 +199,10 @@ public class ScreenScript {
 			CallRule rule = rules.get(i);
 			Matcher m = rule.pattern.matcher(text);
 			while (m.find()) {
-				if (comments.get(m.start()) || isDeclaration(text, m.start())) {
+				if (comments.get(m.start()) || (!rule.isField() && isDeclaration(text, m.start()))) {
 					continue;
 				}
-				calls.add(new Call(rule, m.group(2), m.start()));
+				calls.add(new Call(rule, m.group(rule.idGroup), m.start()));
 			}
 		}
 		return calls;

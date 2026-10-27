@@ -82,6 +82,24 @@ public class ScreenScriptTest {
 	}
 
 	@Test
+	public void 폼_필드_규칙은_필드_값으로_메소드_이름을_만든다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseFieldRules("tranId=perform{id}");
+		String text = "sFormHtml += \"<input type='hidden' name='tranId', value='JIMC1000M03S'/>\";\n"
+				// 값을 변수로 이어 붙이면 ID 가 없다. 짐작하지 않는다.
+				+ "sFormHtml += \"<input type='hidden' name='tranId', value='\" + tranId + \"'/>\";\n"
+				// 주석 안의 것은 뺀다.
+				+ "// sFormHtml += \"<input type='hidden' name='tranId', value='JRAD1010M04S'/>\";\n"
+				// 이름이 다른 필드는 보지 않는다.
+				+ "<input name=\"userId\" value=\"ABC\"/>";
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
+
+		assertEquals(2, calls.size());
+		assertTrue(calls.get(0).getRule().isField());
+		assertEquals("performJIMC1000M03S", calls.get(0).getRule().methodNameOf(calls.get(0).getId()));
+		assertNull(calls.get(1).getId());
+	}
+
+	@Test
 	public void 공통_함수가_여럿이면_규칙마다_찾는다() {
 		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id},gfnCallService=perform{id}");
 		String text = "HiJS.svr.doRequestAjax(\"JCST0200M01S\", p);\n"
