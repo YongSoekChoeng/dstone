@@ -61,8 +61,13 @@ public class ScreenScript {
 
 		/** 거래 ID로 메소드 이름을 만듭니다. 메소드 이름이 될 수 없는 글자가 섞이면 null */
 		public String methodNameOf(String id) {
-			String name = methodTemplate.replace("{id}", id);
+			String name = fill(id);
 			return IDENTIFIER.matcher(name).matches() ? name : null;
+		}
+
+		/** 틀의 {id} 자리에 ID를 넣은 글자. 화면 ID로 화면 경로를 만들 때(open-rules) 씁니다 */
+		public String fill(String id) {
+			return methodTemplate.replace("{id}", id);
 		}
 	}
 

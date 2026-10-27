@@ -67,6 +67,21 @@ public class ScreenScriptTest {
 	}
 
 	@Test
+	public void 화면_열기_규칙은_화면_ID로_화면_경로를_만든다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("fnOpenPage={id}.xml");
+		String text = "parent.scwin.fnOpenPage(\"JIMC1000G\",{\"plyNo\":paramPlyNo});\n"
+				// 화면 ID를 변수로 넘기면 ID 가 없다. 짐작하지 않는다.
+				+ "parent.scwin.fnOpenPage(pageId);\n"
+				// 함수를 만드는 곳은 호출이 아니다.
+				+ "scwin.fnOpenPage = function(pageId, joParam){};";
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
+
+		assertEquals(2, calls.size());
+		assertEquals("JIMC1000G.xml", calls.get(0).getRule().fill(calls.get(0).getId()));
+		assertNull(calls.get(1).getId());
+	}
+
+	@Test
 	public void 공통_함수가_여럿이면_규칙마다_찾는다() {
 		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id},gfnCallService=perform{id}");
 		String text = "HiJS.svr.doRequestAjax(\"JCST0200M01S\", p);\n"

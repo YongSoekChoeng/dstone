@@ -39,7 +39,12 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *                 그 이름의 메소드가 하나면 HIGH, 여럿이면 어느 것인지 몰라 모두 LOW로 잇는다.
  *                 메소드가 없으면 사실 그대로 UNRESOLVED로 남긴다(이름은 to_external).
  *   진입점 TRANSACTION       거래 ID로 불리는 메소드(이름이 규칙의 틀에 맞는 공개 메소드). 주소 자리에 거래 ID를 둔다
- *   화면 ─INCLUDES→ 화면     화면이 다른 화면을 끼워 넣거나 띄운다 (src="/app/ui/a/B.xml" 처럼 따옴표 안에 적힌 화면 파일)
+ *   화면 ─INCLUDES→ 화면     화면이 다른 화면을 끼워 넣거나 띄운다. 찾는 길이 둘이다.
+ *       경로      src="/app/ui/a/B.xml" 처럼 따옴표 안에 적힌 화면 파일
+ *       화면 열기 화면이 경로 대신 화면 ID로 다른 화면을 열 때 (via = OPEN_RULE)
+ *                 규칙은 설정 dstone.knowledge.semantic.screen.open-rules 에 "함수=화면 경로 틀" 로 적는다.
+ *                 예: fnOpenPage={id}.xml → parent.scwin.fnOpenPage("JIMC1000G") 는 JIMC1000G.xml 로 끝나는 화면을 연다.
+ *                 그 경로로 끝나는 화면이 하나일 때만 잇는다
  *
  * 아직 다루지 않는 것:
  * - 거래 ID나 주소를 변수로 넘기는 호출(글자로 적혀 있지 않으면 계산하지 않는다. 짐작해서 잇지 않는다).
@@ -88,6 +93,7 @@ public class RichClientPlugin implements SemanticPlugin {
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
 		List<ScreenScript.CallRule> rules = ScreenScript.parseRules(configProperty.getProperty("dstone.knowledge.semantic.screen.call-rules"));
+		List<ScreenScript.CallRule> openRules = ScreenScript.parseRules(configProperty.getProperty("dstone.knowledge.semantic.screen.open-rules"));
 
 		Map<String, List<String>> handlers = null;
 		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
@@ -120,7 +126,7 @@ public class RichClientPlugin implements SemanticPlugin {
 				Set<String> linked = new HashSet<String>();
 				linkPaths(revisionId, fileId, text, handlers, linked, counts);
 				linkCalls(revisionId, fileId, text, rules, linked, counts);
-				linkScreens(revisionId, fileId, (String) file.get("path"), (String) file.get("fileType"), text, counts);
+				linkScreens(revisionId, fileId, (String) file.get("path"), (String) file.get("fileType"), text, openRules, counts);
 			}
 		}
 		if (counts.files == 0) {
@@ -299,8 +305,12 @@ public class RichClientPlugin implements SemanticPlugin {
 		return call.getId() == null ? null : call.getRule().methodNameOf(call.getId());
 	}
 
-	/** 화면 안에 적힌 다른 화면 파일을 찾아 잇습니다. 가리키는 화면이 하나로 정해질 때만 잇습니다. */
-	private void linkScreens(long revisionId, long fileId, String path, String fileType, String text, Counts counts) {
+	/**
+	 * 화면 안에 적힌 다른 화면 파일과, 화면 ID로 여는 다른 화면(openRules)을 찾아 잇습니다.
+	 * 가리키는 화면이 하나로 정해질 때만 잇고, 자기 자신은 잇지 않습니다.
+	 */
+	private void linkScreens(long revisionId, long fileId, String path, String fileType, String text, List<ScreenScript.CallRule> openRules
+			, Counts counts) {
 		String[] extensions = "NEXACRO".equals(fileType) ? NEXACRO_EXTENSIONS : WEBSQUARE_EXTENSIONS;
 		List<ScreenScript.Hit> refs = screenScript.findScreenRefs(text, extensions);
 		Set<Long> linked = new HashSet<Long>();
@@ -314,6 +324,28 @@ public class RichClientPlugin implements SemanticPlugin {
 			properties.put("path", ref.getText());
 			semanticDao.insertRelation(relation(revisionId, fileId, "INCLUDES", "FILE", "F" + target, null, "HIGH", "RESOLVED"
 					, properties, screenScript.lineAt(text, ref.getIndex())));
+			counts.screens++;
+		}
+		if (openRules.isEmpty()) {
+			return;
+		}
+		List<ScreenScript.Call> opens = screenScript.findCalls(text, openRules);
+		for (int c = 0; c < opens.size(); c++) {
+			ScreenScript.Call open = opens.get(c);
+			if (open.getId() == null) {
+				// 화면 ID를 변수로 넘겼다. 짐작하지 않는다.
+				continue;
+			}
+			Long target = findScreen(revisionId, open.getRule().fill(open.getId()));
+			if (target == null || target.longValue() == fileId || !linked.add(target)) {
+				continue;
+			}
+			Map<String, Object> properties = new LinkedHashMap<String, Object>();
+			properties.put("path", open.getId());
+			properties.put("via", "OPEN_RULE");
+			properties.put("function", open.getRule().getFunction());
+			semanticDao.insertRelation(relation(revisionId, fileId, "INCLUDES", "FILE", "F" + target, null, "HIGH", "RESOLVED"
+					, properties, screenScript.lineAt(text, open.getIndex())));
 			counts.screens++;
 		}
 	}

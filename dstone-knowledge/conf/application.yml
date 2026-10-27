@@ -105,6 +105,13 @@ dstone:
                 # 화면에 그 함수가 없으면 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
                 # 주소(/order/list.do)로 부르는 화면은 규칙 없이도 이어진다.
                 call-rules: "doRequestAjax=perform{id},gfnCallService=perform{id}"
+                # 화면이 경로 대신 "화면 ID"로 다른 화면을 여는 프로젝트를 위한 규칙. "함수=화면 경로 틀" 을 쉼표로 이어 쓴다.
+                # 예) fnOpenPage={id}.xml
+                #     화면의 parent.scwin.fnOpenPage("JIMC1000G", ...) 를 JIMC1000G.xml 로 끝나는 화면과 잇는다(화면 → 화면, 노드 맵의 호출화면).
+                #     HI-Japan 의 fnOpenPage 는 메뉴 목록(ui/main.xml)의 PAGE_ID 로 화면을 찾는데, PAGE_ID 가 화면 파일 이름과 같다.
+                # 첫 인자가 글자로 적힌 호출만 보고, 그 경로로 끝나는 화면이 하나일 때만 잇는다.
+                # 화면에 그 함수가 없으면 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
+                open-rules: "fnOpenPage={id}.xml"
                 # 화면 파일에 <title> 도 titletext 도 없을 때, 소스에 적힌 메뉴 목록에서 화면명을 가져오는 규칙. "화면명 키=화면 경로 키" 를 쉼표로 이어 쓴다.
                 # 예) MENU_NM=SRC_PATH
                 #     {'MENU_NM':'履行期間管理', ... ,'SRC_PATH':'/ui/jc/JCIQ0700G.xml'} 처럼 한 메뉴 항목({ } 또는 XML 태그 하나) 안에 두 키가 함께 있으면
