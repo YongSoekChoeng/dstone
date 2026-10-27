@@ -42,7 +42,7 @@ public class GraphController {
 	 *   - id: 전체 맵의 노드 id, 또는 메소드 ID / SQL statement ID(S123)
 	 *   - up / down: 각 방향으로 몇 단계까지(기본 3, 최대 10, 0이면 그 방향은 보지 않음)
 	 *   - includeModel: VO / DTO의 메소드로 가는 호출도 볼지(기본 false)
-	 *   - includeCallerScreens: 트리에 나온 화면을 부르는(끼워 넣거나 띄우는) 다른 화면도 담을지(기본 false)
+	 *   - includeScreenLinks: 트리에 나온 화면을 부르는 화면과 그 화면이 부르는 화면(끼워 넣거나 띄우는 것)도 담을지(기본 false)
 	 * </pre>
 	 */
 	@GetMapping("/neighborhood")
@@ -52,8 +52,8 @@ public class GraphController {
 			, @RequestParam(name = "down", required = false) Integer down
 			, @RequestParam(name = "includePossible", defaultValue = "true") boolean includePossible
 			, @RequestParam(name = "includeModel", defaultValue = "false") boolean includeModel
-			, @RequestParam(name = "includeCallerScreens", defaultValue = "false") boolean includeCallerScreens) {
-		return graphService.getNeighborhood(revisionId, nodeId, up, down, includePossible, includeModel, includeCallerScreens);
+			, @RequestParam(name = "includeScreenLinks", defaultValue = "false") boolean includeScreenLinks) {
+		return graphService.getNeighborhood(revisionId, nodeId, up, down, includePossible, includeModel, includeScreenLinks);
 	}
 
 	/** 노드 하나의 상세: 위치, 계층, 처리하는 진입점, 메소드 / SQL 목록, 분석이 만들어 둔 설명 문서 */

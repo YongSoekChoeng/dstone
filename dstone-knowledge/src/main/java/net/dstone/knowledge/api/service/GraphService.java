@@ -178,10 +178,11 @@ public class GraphService extends BaseObject {
 	 * @param down 불리는 쪽으로 몇 단계(0이면 보지 않음. 기본 3, 최대 10)
 	 * @param includePossible 인터페이스를 통해 부르는 호출("가능한 구현")도 따라갈지
 	 * @param includeModel VO / DTO(MODEL 계층)의 메소드로 가는 호출도 따라갈지. 끄면 getter / setter 호출이 빠져서 그림이 읽을 만해집니다
-	 * @param includeCallerScreens 트리에 나온 화면을 부르는(끼워 넣거나 띄우는) 다른 화면도 담을지. 그렇게만 들어온 화면은 callerScreen = true 입니다
+	 * @param includeScreenLinks 트리에 나온 화면을 부르는 화면과 그 화면이 부르는 화면(끼워 넣거나 띄우는 것)도 담을지.
+	 *            그렇게만 들어온 화면은 screenLink 가 CALLER(부르는 화면) / CALLEE(불리는 화면) 입니다
 	 */
 	public Map<String, Object> getNeighborhood(long revisionId, String nodeId, Integer up, Integer down, boolean includePossible, boolean includeModel
-			, boolean includeCallerScreens) {
+			, boolean includeScreenLinks) {
 		checkRevision(revisionId);
 		GraphNodeId id = parseId(nodeId);
 		Map<String, Object> start = describe(revisionId, id);
@@ -260,14 +261,21 @@ public class GraphService extends BaseObject {
 		collectEdges(upEdges, "UP", levels, edges, edgeKeys);
 		collectEdges(downEdges, "DOWN", levels, edges, edgeKeys);
 
-		Set<String> callerScreens = new HashSet<String>();
-		if (includeCallerScreens && upDepth > 0) {
+		Map<String, String> screenLinks = new HashMap<String, String>();
+		if (includeScreenLinks && (upDepth > 0 || downDepth > 0)) {
 			if ("JSP".equals(startKind) && !levels.containsKey(id.getId())) {
-				// 아무것도 요청하지 않는 화면이라도 부르는 화면은 있을 수 있다.
+				// 아무것도 요청하지 않는 화면이라도 부르거나 불리는 화면은 있을 수 있다.
 				levels.put(id.getId(), Integer.valueOf(0));
 				startIds.add(id.getId());
 			}
-			truncated = collectCallerScreens(revisionId, upDepth, levels, edges, edgeKeys, callerScreens) || truncated;
+			// 트리에 원래 있던 화면에서만 출발한다. 새로 들어온 화면에서 또 반대쪽으로 가면 화면 이동을 따라가게 되어 앱 전체가 딸려 나온다.
+			List<String> screenIds = screenIdsOf(levels);
+			if (upDepth > 0) {
+				truncated = collectScreenLinks(revisionId, screenIds, upDepth, true, levels, edges, edgeKeys, screenLinks) || truncated;
+			}
+			if (downDepth > 0) {
+				truncated = collectScreenLinks(revisionId, screenIds, downDepth, false, levels, edges, edgeKeys, screenLinks) || truncated;
+			}
 		}
 
 		List<Map<String, Object>> nodes = loadNodes(revisionId, new ArrayList<String>(levels.keySet()));
@@ -276,7 +284,7 @@ public class GraphService extends BaseObject {
 			String key = String.valueOf(node.get("id"));
 			node.put("level", levels.get(key));
 			node.put("start", Boolean.valueOf(startIds.contains(key)));
-			node.put("callerScreen", Boolean.valueOf(callerScreens.contains(key)));
+			node.put("screenLink", screenLinks.get(key));
 		}
 
 		Map<String, Object> depth = new LinkedHashMap<String, Object>();
@@ -320,15 +328,8 @@ public class GraphService extends BaseObject {
 		}
 	}
 
-	/**
-	 * <pre>
-	 * 트리에 나온 화면을 부르는 다른 화면(INCLUDES 를 거꾸로)을 담습니다. 부르는 화면은 불리는 화면의 한 칸 왼쪽에 놓습니다.
-	 * 트리에 없던 화면만 callerScreens 에 넣습니다(화면이 "호출화면" 칩으로 따로 끄고 켭니다).
-	 * </pre>
-	 * @return 너무 많아서 잘랐으면 true
-	 */
-	private boolean collectCallerScreens(long revisionId, int depth, Map<String, Integer> levels, List<Map<String, Object>> edges
-			, Set<String> edgeKeys, Set<String> callerScreens) {
+	/** 자리가 정해진 노드 가운데 화면('F' + 파일 id)만 고릅니다 */
+	private List<String> screenIdsOf(Map<String, Integer> levels) {
 		List<String> screenIds = new ArrayList<String>();
 		Iterator<String> keys = levels.keySet().iterator();
 		while (keys.hasNext()) {
@@ -338,29 +339,47 @@ public class GraphService extends BaseObject {
 				screenIds.add(key);
 			}
 		}
+		return screenIds;
+	}
+
+	/**
+	 * <pre>
+	 * 트리에 나온 화면과 화면 호출(INCLUDES: 끼워 넣기, 팝업, Div url)로 이어진 다른 화면을 담습니다.
+	 *   - up = true : 그 화면을 부르는 화면(INCLUDES 를 거꾸로). 불리는 화면의 한 칸 왼쪽에 놓습니다
+	 *   - up = false: 그 화면이 부르는 화면(INCLUDES 를 그대로). 부르는 화면의 한 칸 오른쪽에 놓습니다
+	 * 트리에 없던 화면만 screenLinks 에 CALLER / CALLEE 로 넣습니다(화면이 "화면호출관계" 칩으로 따로 끄고 켭니다).
+	 * </pre>
+	 * @return 너무 많아서 잘랐으면 true
+	 */
+	private boolean collectScreenLinks(long revisionId, List<String> screenIds, int depth, boolean up, Map<String, Integer> levels
+			, List<Map<String, Object>> edges, Set<String> edgeKeys, Map<String, String> screenLinks) {
 		if (screenIds.isEmpty()) {
 			return false;
 		}
-		List<Map<String, Object>> found = graphDao.selectCallerScreenEdges(revisionId, screenIds, depth, MAX_TREE_EDGES + 1);
+		List<Map<String, Object>> found = up
+				? graphDao.selectCallerScreenEdges(revisionId, screenIds, depth, MAX_TREE_EDGES + 1)
+				: graphDao.selectCalleeScreenEdges(revisionId, screenIds, depth, MAX_TREE_EDGES + 1);
 		boolean truncated = found.size() > MAX_TREE_EDGES;
 		if (truncated) {
 			found = new ArrayList<Map<String, Object>>(found.subList(0, MAX_TREE_EDGES));
 		}
-		// 얕은 것부터 오므로 불리는 화면의 자리는 이미 정해져 있다.
+		// 얕은 것부터 오므로 안쪽 끝(트리에 가까운 화면)의 자리는 이미 정해져 있다.
 		for (int i = 0; i < found.size(); i++) {
 			Map<String, Object> edge = found.get(i);
 			String from = String.valueOf(edge.get("from"));
 			String to = String.valueOf(edge.get("to"));
-			Integer toLevel = levels.get(to);
-			if (toLevel == null) {
+			String inner = up ? to : from;
+			String outer = up ? from : to;
+			Integer innerLevel = levels.get(inner);
+			if (innerLevel == null) {
 				continue;
 			}
-			if (!levels.containsKey(from)) {
-				levels.put(from, Integer.valueOf(toLevel.intValue() - 1));
-				callerScreens.add(from);
+			if (!levels.containsKey(outer)) {
+				levels.put(outer, Integer.valueOf(innerLevel.intValue() + (up ? -1 : 1)));
+				screenLinks.put(outer, up ? "CALLER" : "CALLEE");
 			}
 			if (edgeKeys.add(from + ">" + to + ">INCLUDES")) {
-				edge.put("direction", "UP");
+				edge.put("direction", up ? "UP" : "DOWN");
 				edges.add(edge);
 			}
 		}

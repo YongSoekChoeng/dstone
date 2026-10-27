@@ -29,8 +29,8 @@ var DstoneKnowledgeGraph = (function () {
 		tier.index = index;
 		TIER_BY_KEY[tier.key] = tier;
 	});
-	/** 관계 트리에만 있는 계층: 트리에 나온 화면을 부르는(끼워 넣거나 띄우는) 다른 화면 */
-	TIER_BY_KEY.CALLER = { key: "CALLER", label: "호출화면", color: "#0e7490", fill: "#cffafe", index: -1 };
+	/** 관계 트리에만 있는 계층: 트리에 나온 화면을 부르거나 그 화면이 부르는(끼워 넣거나 띄우는) 다른 화면 */
+	TIER_BY_KEY.SCREEN_LINK = { key: "SCREEN_LINK", label: "화면호출관계", color: "#0e7490", fill: "#cffafe", index: -1 };
 
 	/** 선의 종류. 서버가 주는 관계 이름을 그림에서 쓰는 몇 가지로 모읍니다 */
 	var EDGE_CATS = {
@@ -64,11 +64,11 @@ var DstoneKnowledgeGraph = (function () {
 	/** 전체 맵의 상태 */
 	var map = { revisionId: null, graph: null, expanded: {}, view: null, cy: null, selectedId: null, hits: [], hitIndex: 0, loadSeq: 0 };
 
-	/** 관계 트리 팝업의 상태. hidden 은 끈 계층(팝업을 다시 열어도 유지한다). 호출화면은 처음에 꺼 둔다 */
-	var tree = { cy: null, startId: null, nodes: {}, result: null, hidden: { CALLER: true } };
+	/** 관계 트리 팝업의 상태. hidden 은 끈 계층(팝업을 다시 열어도 유지한다). 화면호출관계는 처음에 꺼 둔다 */
+	var tree = { cy: null, startId: null, nodes: {}, result: null, hidden: { SCREEN_LINK: true } };
 
 	/** 관계 트리에서 끄고 켤 수 있는 계층. 모델(VO)은 "모델(VO) 호출도"로 서버에서 가려 받는다 */
-	var TREE_TIERS = ["CALLER", "VIEW", "CONTROLLER", "SERVICE", "REPOSITORY", "MAPPER", "TABLE", "ETC"];
+	var TREE_TIERS = ["SCREEN_LINK", "VIEW", "CONTROLLER", "SERVICE", "REPOSITORY", "MAPPER", "TABLE", "ETC"];
 
 	function init() {
 		["kn-graph-project", "kn-graph-revision", "kn-graph-load", "kn-graph-unit", "kn-graph-layout", "kn-graph-range", "kn-graph-low", "kn-graph-struct",
@@ -1225,12 +1225,12 @@ var DstoneKnowledgeGraph = (function () {
 		clearDetail(el["kn-tree-detail"], "노드를 누르면 여기에 설명이 나옵니다.");
 		K.call("GET", "/api/revisions/" + map.revisionId + "/graph/neighborhood", {
 			id: nodeId, up: el["kn-tree-up"].value, down: el["kn-tree-down"].value, includeModel: el["kn-tree-model"].checked,
-			// 호출화면은 늘 받아 두고 칩으로만 끄고 켠다. 칩을 켤 때 다시 부르지 않아도 되고, 꺼 둔 채로도 몇 개인지 보인다.
-			includeCallerScreens: true
+			// 화면호출관계는 늘 받아 두고 칩으로만 끄고 켠다. 칩을 켤 때 다시 부르지 않아도 되고, 꺼 둔 채로도 몇 개인지 보인다.
+			includeScreenLinks: true
 		}).then(function (result) {
 			el["kn-tree-title"].textContent = (KIND_LABEL[result.start.kind] || result.start.kind) + " " + result.start.fullName;
 			result.nodes.forEach(function (node) {
-				node.tier = node.callerScreen ? "CALLER" : tierOf(node.layer);
+				node.tier = node.screenLink ? "SCREEN_LINK" : tierOf(node.layer);
 				node.label = treeLabel(node);
 			});
 			tree.result = result;
@@ -1279,7 +1279,7 @@ var DstoneKnowledgeGraph = (function () {
 	function treeEdges(result) {
 		var outgoing = {};
 		result.edges.forEach(function (edge) {
-			if (edge.type === "INCLUDES" && tree.hidden.CALLER) {
+			if (edge.type === "INCLUDES" && tree.hidden.SCREEN_LINK) {
 				return;
 			}
 			(outgoing[edge.from] = outgoing[edge.from] || []).push(edge);
@@ -1289,8 +1289,8 @@ var DstoneKnowledgeGraph = (function () {
 		result.edges.forEach(function (edge) {
 			var from = tree.nodes[edge.from];
 			var to = tree.nodes[edge.to];
-			// 화면끼리 부르는 선(INCLUDES)은 호출화면을 켰을 때만 그린다.
-			if (edge.type === "INCLUDES" && tree.hidden.CALLER) {
+			// 화면끼리 부르는 선(INCLUDES)은 화면호출관계를 켰을 때만 그린다.
+			if (edge.type === "INCLUDES" && tree.hidden.SCREEN_LINK) {
 				return;
 			}
 			if (!from || !to || !treeVisible(from)) {

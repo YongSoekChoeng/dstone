@@ -58,6 +58,20 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectCallerScreenEdges", param);
 	}
 
+	/**
+	 * @param screenIds 화면 노드 id('F' + 파일 id)들
+	 * @param depth 몇 단계 아래까지(부르는 화면이 또 부르는 화면 ...)
+	 * @return 그 화면들이 부르는 화면으로 가는 INCLUDES 선. depth 1이 바로 부르는 화면
+	 */
+	public List<Map<String, Object>> selectCalleeScreenEdges(long revisionId, List<String> screenIds, int depth, int limit) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("screenIds", screenIds);
+		param.put("depth", depth);
+		param.put("limit", limit);
+		return sqlSessionCommon.selectList(NS + "selectCalleeScreenEdges", param);
+	}
+
 	public List<Map<String, Object>> selectNodesByIds(long revisionId, List<String> ids) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

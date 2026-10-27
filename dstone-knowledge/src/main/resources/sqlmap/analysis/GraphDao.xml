@@ -276,6 +276,42 @@
          LIMIT #{limit}
     </select>
 
+    <!-- 관계 트리에 나온 화면들이 부르는 다른 화면(호출받는 화면). INCLUDES(화면 끼워 넣기, 팝업, Div url)를 그대로 따라간다.
+           screenIds 화면 노드 id('F' + 파일 id)들. depth 1 이 그 화면이 바로 부르는 화면이다
+         공통 머리글처럼 많은 화면이 끼워 넣는 화면도 한 줄씩만 나오지만, 깊이가 깊으면 늘어나므로 limit 로 자른다 -->
+    <select id="selectCalleeScreenEdges" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE walk (depth, src, dst) AS (
+            SELECT 1, r.from_id::text, r.to_id::text
+              FROM analysis_relation r
+             WHERE r.revision_id = #{revisionId}
+               AND r.relation_type = 'INCLUDES'
+               AND r.to_kind = 'FILE'
+               AND r.to_id IS NOT NULL
+               AND r.from_id IN
+            <foreach collection="screenIds" item="screenId" open="(" separator="," close=")">#{screenId}</foreach>
+            UNION
+            SELECT w.depth + 1, r.from_id::text, r.to_id::text
+              FROM walk w
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.relation_type = 'INCLUDES'
+               AND r.to_kind = 'FILE'
+               AND r.to_id IS NOT NULL
+               AND r.from_id = w.dst
+             WHERE w.depth &lt; #{depth}
+        )
+        SELECT MIN(w.depth) AS "depth"
+             , w.src AS "from"
+             , w.dst AS "to"
+             , 'INCLUDES' AS "type"
+             , 'HIGH' AS "confidence"
+          FROM walk w
+         WHERE w.src &lt;&gt; w.dst
+         GROUP BY w.src, w.dst
+         ORDER BY MIN(w.depth), w.src, w.dst
+         LIMIT #{limit}
+    </select>
+
     <!-- 관계 트리에 나온 노드들의 이름과 위치. 테이블('T:이름')은 여기에 없다(이름이 곧 전부라 서비스가 만든다) -->
     <select id="selectNodesByIds" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT n.node_id::text AS "id"
