@@ -142,7 +142,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 				String fileName = file.getFileName().toString();
 				String language = fileClassifier.languageOf(fileName);
 				if (language == null) {
-					// 분석 대상이 아닌 파일(이미지, js, class, jar ...)
+					// 분석 대상이 아닌 파일(이미지, class, jar ...)
 					return FileVisitResult.CONTINUE;
 				}
 				String path = relativePath(root, file);

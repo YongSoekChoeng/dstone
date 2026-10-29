@@ -26,25 +26,27 @@ WebSquare 화면은 JSP와 달리 서버가 열어 주지 않고, 화면이 떠�
 | 거래 ID로 불리는 메소드 = 진입점 | `OrderService#performORD0100M01S`, `#performORD0100M02U` | 규칙의 이름 틀(`perform{id}`)에 맞는 공개 메소드 → 진입점 `TRANSACTION`, 주소 자리에 거래 ID |
 | 상위 타입으로 계층 정하기 | `OrderService extends AbstractMainService`, `OrderD extends JdbcDAO` (둘 다 jar 없음, import로 전체 이름만 안다) | 설정 `layer.super-types` → `OrderService` `CONTROLLER`, `OrderD` `REPOSITORY` (`MEDIUM`). 이름 끝말(`…Service`)로 짐작한 `SERVICE`보다 먼저다 |
 | 화면이 다른 화면을 끼워 넣거나 띄움 | `OrderList.xml`: `<w2:wframe src="/shop/ui/common/Header.xml">`, `openPopup("/shop/ui/order/OrderPopup.xml?mode=view")` | `INCLUDES` 2건. 앞의 컨텍스트 경로와 뒤의 `?파라미터`는 떼고 찾는다 |
+| 공통 함수가 여는 화면 | `Header.xml`: `shopLib.searchOrder({})` → `js/shop_lib.js`의 `shopLib.searchOrder`가 `shopLib.openOrderPopup`을 부르고, 그 함수가 `/ui/order/OrderPopup.xml`을 연다 | `Header.xml` → `OrderPopup.xml` `INCLUDES` 1건 (`MEDIUM`, `via = COMMON_SCRIPT`). 함수 안에서 주석으로 지운 옛 화면(`Header.xml`)과 파일 머리 주석의 예시는 보지 않는다. 스크립트 파일은 종류 `SCRIPT`로 목록에만 오른다 |
+| 공통 함수 안의 거래 호출 | 같은 `shopLib.searchOrder` 본문의 `ShopJS.svr.doRequestAjax("ORD0100M01S", …)` | `Header.xml` → `OrderService#performORD0100M01S` `REQUESTS` (`MEDIUM`, `via = COMMON_SCRIPT`, `commonFunction = shopLib.searchOrder`). 줄 번호는 화면에서 그 함수를 부른 줄 |
 
 ## 기대 값
 
 | 항목 | 값 |
 |---|---|
 | Job 상태 | `DONE` (오류 0) |
-| 파일 | 8: Java 3, WebSquare 화면 3, 쿼리 XML 1, 그 밖의 XML 1 |
+| 파일 | 9: Java 3, WebSquare 화면 3, 쿼리 XML 1, 그 밖의 XML 1, 공통 스크립트 1 |
 | 진입점 | `HTTP` 2 (`/order/list.do`, `/order/detail.do`), `TRANSACTION` 2 (`ORD0100M01S`, `ORD0100M02U`) |
 | 계층 | `OrderController` `CONTROLLER`(`HIGH`, 애노테이션), `OrderService` `CONTROLLER`(`MEDIUM`, 상위 타입), `OrderD` `REPOSITORY`(`MEDIUM`, 상위 타입) |
-| `REQUESTS` | 5: `OrderList.xml` → `OrderController#list`(`MEDIUM`), `OrderService#performORD0100M01S`(`HIGH`), `#performORD0100M02U`(`HIGH`), `performORD0100M09S`(`UNRESOLVED`) / `OrderPopup.xml` → `OrderController#detail`(`LOW`) |
-| `INCLUDES` | 2: `OrderList.xml` → `OrderPopup.xml`, `Header.xml` |
+| `REQUESTS` | 6: `OrderList.xml` → `OrderController#list`(`MEDIUM`), `OrderService#performORD0100M01S`(`HIGH`), `#performORD0100M02U`(`HIGH`), `performORD0100M09S`(`UNRESOLVED`) / `OrderPopup.xml` → `OrderController#detail`(`LOW`) / `Header.xml` → `OrderService#performORD0100M01S`(`MEDIUM`, 공통 함수) |
+| `INCLUDES` | 3: `OrderList.xml` → `OrderPopup.xml`, `Header.xml` (`HIGH`) / `Header.xml` → `OrderPopup.xml` (`MEDIUM`, 공통 함수 `shopLib.searchOrder`) |
 | `RENDERS` | 0 (리치클라이언트 화면은 서버가 열지 않는다) |
 | SQL statement (`analysis_mapper`) | 2: `OrderD.selectOrderList`(`SELECT`), `OrderD.deleteOrder`(`DELETE`). `mapper_type = QUERY_XML` |
 | `EXECUTES_SQL` | 3: `OrderD#selectOrderList`, `#deleteOrder`(`HIGH`) / `OrderD.selectGone`(`UNRESOLVED`) |
 | `READS_TABLE` | 2 (`selectOrderList` → `TB_ORDER`, `TB_CUSTOMER`) |
 | `WRITES_TABLE` | 1 (`deleteOrder` → `TB_ORDER` `crud=D`) |
 | 검색 문서 | 20: `METHOD` 9, `TYPE` 3, `FILE` 3, `MAPPER` 2, `VIEW` 3 |
-| 영향 분석 (`table=TB_CUSTOMER`) | 화면 `ui/order/OrderList.xml`(`REQUESTS`), 진입점 `/order/list.do`와 거래 `ORD0100M01S`. 테이블 → SQL → `OrderD` → `OrderService` → 화면 |
-| 영향 분석 (`methodId` = `performORD0100M01S`) | 화면 `ui/order/OrderList.xml`, 진입점 `/order/list.do` |
+| 영향 분석 (`table=TB_CUSTOMER`) | 화면 `ui/order/OrderList.xml`, `ui/common/Header.xml`(`REQUESTS`), 진입점 `/order/list.do`와 거래 `ORD0100M01S`. 테이블 → SQL → `OrderD` → `OrderService` → 화면 |
+| 영향 분석 (`methodId` = `performORD0100M01S`) | 화면 `ui/order/OrderList.xml`, `ui/common/Header.xml`, 진입점 `/order/list.do` |
 | 노드 맵 | 화면 노드 3개(`kind = JSP`, `subType = WEBSQUARE`), 클래스 3개, 매퍼 1개(`subType = QUERY_XML`), 테이블 2개 |
 
 ## 규칙 설정

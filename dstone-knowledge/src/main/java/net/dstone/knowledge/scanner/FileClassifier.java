@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * <pre>
  * 파일이 무엇인지(언어와 용도) 가려냅니다.
  *
- * 언어는 확장자로 정합니다. 분석 대상이 아닌 파일(이미지, js, class, jar ...)은 null을 돌려주고 스캔에서 빠집니다.
+ * 언어는 확장자로 정합니다. 분석 대상이 아닌 파일(이미지, class, jar ...)은 null을 돌려주고 스캔에서 빠집니다.
  * XML은 확장자만으로는 용도를 알 수 없어서 맨 위 요소(root element)를 보고 가립니다.
  * </pre>
  */
@@ -27,7 +27,7 @@ public class FileClassifier {
 	 * 확장자로 언어를 정합니다.
 	 * </pre>
 	 *
-	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE/SQL. 분석 대상이 아니면 null. Nexacro의 .xfdl/.xadl도 XML이다
+	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE/SQL/SCRIPT. 분석 대상이 아니면 null. Nexacro의 .xfdl/.xadl도 XML이다
 	 */
 	public String languageOf(String fileName) {
 		String name = fileName.toLowerCase(Locale.ROOT);
@@ -57,6 +57,11 @@ public class FileClassifier {
 			// DDL 스크립트. 테이블과 컬럼의 설명(COMMENT)을 읽으려고 스캔한다.
 			return "SQL";
 		}
+		if (name.endsWith(".js") || name.endsWith(".xjs")) {
+			// 화면 공통 스크립트(.xjs 는 Nexacro / X-Platform). 공통 함수가 여는 화면을 찾으려고 스캔한다.
+			// 목록에만 올리고, 내용은 SEMANTIC 의 RichClientPlugin 이 읽는다.
+			return "SCRIPT";
+		}
 		return null;
 	}
 
@@ -79,6 +84,9 @@ public class FileClassifier {
 		}
 		if ("GRADLE".equals(language)) {
 			return "BUILD";
+		}
+		if ("SCRIPT".equals(language)) {
+			return "SCRIPT";
 		}
 		if ("SQL".equals(language)) {
 			// 테이블을 만들거나 설명을 다는 문장이 있으면 DDL, 데이터만 넣는 스크립트 등은 SQL_SCRIPT

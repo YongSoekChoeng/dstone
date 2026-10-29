@@ -63,6 +63,10 @@ public class ScannerTest {
 		assertEquals("JSP", fileClassifier.languageOf("list.JSP"));
 		assertEquals("GRADLE", fileClassifier.languageOf("build.gradle.kts"));
 		assertNull(fileClassifier.languageOf("logo.png"));
+		// 화면 공통 스크립트. 공통 함수가 여는 화면을 찾으려고 목록에 올린다.
+		assertEquals("SCRIPT", fileClassifier.languageOf("com_lib.js"));
+		assertEquals("SCRIPT", fileClassifier.languageOf("lib.xjs"));
+		assertEquals("SCRIPT", fileClassifier.fileTypeOf("SCRIPT", "com_lib.js", "var a;"));
 		assertNull(fileClassifier.languageOf("OrderDAO.class"));
 
 		String prolog = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- 주석 <beans> -->\n";

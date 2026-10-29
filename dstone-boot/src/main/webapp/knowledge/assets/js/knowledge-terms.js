@@ -148,6 +148,7 @@ var DstoneKnowledgeTerms = (function () {
 		LOG_CONFIG: "로그 설정",
 		DDL: "DDL 스크립트 (.sql. 테이블 / 컬럼 설명을 읽는다)",
 		SQL_SCRIPT: "그 밖의 SQL 스크립트 (.sql. 읽지 않는다)",
+		SCRIPT: "화면 공통 스크립트 (.js, .xjs. 공통 함수가 여는 화면을 찾는 데만 쓴다)",
 		XML: "그 밖의 XML"
 	};
 
@@ -313,7 +314,7 @@ var DstoneKnowledgeTerms = (function () {
 			path: "files.byType", title: "파일 (종류별)",
 			what: "소스 폴더에서 찾은 파일을 언어와 쓰임새로 나눈 것입니다.",
 			columns: [
-				["language", "언어", "파일의 언어 (JAVA, JSP, XML, PROPERTIES, YAML, SQL …)"],
+				["language", "언어", "파일의 언어 (JAVA, JSP, XML, PROPERTIES, YAML, SQL, SCRIPT …)"],
 				["fileType", "쓰임새", "무슨 파일인지", FILE_TYPE],
 				["fileCount", "파일 수", ""],
 				["lineCount", "줄 수", "그 파일들의 줄 수 합"],

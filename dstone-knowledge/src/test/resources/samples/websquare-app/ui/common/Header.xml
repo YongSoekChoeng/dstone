@@ -2,6 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:w2="http://www.inswave.com/websquare">
     <head>
         <w2:type>DEFAULT</w2:type>
+        <script type="text/javascript"><![CDATA[
+        // 주문 찾기: 공통 함수가 결과에 따라 주문 상세 팝업(OrderPopup.xml)을 연다
+        scwin.btnFind_onclick = function() {
+            shopLib.searchOrder({});
+        };
+        ]]></script>
     </head>
     <body>
         <w2:textbox id="txtTitle" label="주문 관리"/>
