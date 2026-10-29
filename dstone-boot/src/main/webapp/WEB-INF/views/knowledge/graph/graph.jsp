@@ -23,7 +23,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<p>화면 → 컨트롤러 → 서비스 → DAO → SQL 매퍼 → 테이블로 이어지는 호출 구조를 그림으로 봅니다.</p>
 			</section>
 
-			<details class="kn-howto" open>
+			<details class="kn-howto">
 				<summary>이렇게 씁니다</summary>
 				<ol>
 					<li>프로젝트와 리비전을 고르면 <b>전체 맵</b>이 그려집니다. 왼쪽에서 오른쪽으로 화면 → 컨트롤러 → 서비스 → DAO → SQL 매퍼 → 테이블 순서이고,

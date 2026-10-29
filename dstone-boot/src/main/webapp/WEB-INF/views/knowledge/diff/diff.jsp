@@ -23,7 +23,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<p>같은 프로젝트의 두 리비전 사이에 무엇이 더해지고 빠지고 바뀌었는지 봅니다.</p>
 			</section>
 
-			<details class="kn-howto" open>
+			<details class="kn-howto">
 				<summary>이렇게 씁니다</summary>
 				<ol>
 					<li>같은 프로젝트를 <b>두 번 이상 분석했을 때</b> 씁니다. 소스가 바뀐 뒤 "프로젝트 · 분석"에서 한 번 더 분석하면(증분 분석을 체크하면 빠릅니다) 리비전이 둘이 됩니다.</li>

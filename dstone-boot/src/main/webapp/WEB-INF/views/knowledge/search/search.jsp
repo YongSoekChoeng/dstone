@@ -23,7 +23,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<p>분석 결과(메소드, 타입, SQL, 화면)와 올린 문서를 뜻과 이름으로 찾고, 일반 문서를 올립니다.</p>
 			</section>
 
-			<details class="kn-howto" open>
+			<details class="kn-howto">
 				<summary>이렇게 씁니다</summary>
 				<ol>
 					<li>프로젝트를 고릅니다(분석이 끝난 가장 최근 리비전에서 찾습니다).</li>

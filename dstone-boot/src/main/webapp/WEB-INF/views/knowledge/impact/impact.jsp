@@ -23,7 +23,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<p>테이블 · SQL · 클래스 · 메소드를 고치면 어디까지 영향이 가는지, 누가 누구를 부르는지 봅니다.</p>
 			</section>
 
-			<details class="kn-howto" open>
+			<details class="kn-howto">
 				<summary>이렇게 씁니다</summary>
 				<ol>
 					<li>프로젝트와 리비전을 고릅니다(리비전은 분석이 끝난 가장 최근 것이 골라져 있습니다).</li>
