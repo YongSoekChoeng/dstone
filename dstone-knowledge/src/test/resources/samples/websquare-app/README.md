@@ -28,6 +28,7 @@ WebSquare 화면은 JSP와 달리 서버가 열어 주지 않고, 화면이 떠�
 | 화면이 다른 화면을 끼워 넣거나 띄움 | `OrderList.xml`: `<w2:wframe src="/shop/ui/common/Header.xml">`, `openPopup("/shop/ui/order/OrderPopup.xml?mode=view")` | `INCLUDES` 2건. 앞의 컨텍스트 경로와 뒤의 `?파라미터`는 떼고 찾는다 |
 | 공통 함수가 여는 화면 | `Header.xml`: `shopLib.searchOrder({})` → `js/shop_lib.js`의 `shopLib.searchOrder`가 `shopLib.openOrderPopup`을 부르고, 그 함수가 `/ui/order/OrderPopup.xml`을 연다 | `Header.xml` → `OrderPopup.xml` `INCLUDES` 1건 (`MEDIUM`, `via = COMMON_SCRIPT`). 함수 안에서 주석으로 지운 옛 화면(`Header.xml`)과 파일 머리 주석의 예시는 보지 않는다. 스크립트 파일은 종류 `SCRIPT`로 목록에만 오른다 |
 | 공통 함수 안의 거래 호출 | 같은 `shopLib.searchOrder` 본문의 `ShopJS.svr.doRequestAjax("ORD0100M01S", …)` | `Header.xml` → `OrderService#performORD0100M01S` `REQUESTS` (`MEDIUM`, `via = COMMON_SCRIPT`, `commonFunction = shopLib.searchOrder`). 줄 번호는 화면에서 그 함수를 부른 줄 |
+| 공통 함수 안의 주소 | `Header.xml`: `shopLib.printOrder("1")` → 본문의 `$p.ajax({ url : "/order/detail.do" })` | `Header.xml` → `OrderController#detail` `REQUESTS` (`MEDIUM`, `via = COMMON_SCRIPT`) |
 
 ## 기대 값
 
@@ -37,7 +38,7 @@ WebSquare 화면은 JSP와 달리 서버가 열어 주지 않고, 화면이 떠�
 | 파일 | 9: Java 3, WebSquare 화면 3, 쿼리 XML 1, 그 밖의 XML 1, 공통 스크립트 1 |
 | 진입점 | `HTTP` 2 (`/order/list.do`, `/order/detail.do`), `TRANSACTION` 2 (`ORD0100M01S`, `ORD0100M02U`) |
 | 계층 | `OrderController` `CONTROLLER`(`HIGH`, 애노테이션), `OrderService` `CONTROLLER`(`MEDIUM`, 상위 타입), `OrderD` `REPOSITORY`(`MEDIUM`, 상위 타입) |
-| `REQUESTS` | 6: `OrderList.xml` → `OrderController#list`(`MEDIUM`), `OrderService#performORD0100M01S`(`HIGH`), `#performORD0100M02U`(`HIGH`), `performORD0100M09S`(`UNRESOLVED`) / `OrderPopup.xml` → `OrderController#detail`(`LOW`) / `Header.xml` → `OrderService#performORD0100M01S`(`MEDIUM`, 공통 함수) |
+| `REQUESTS` | 7: `OrderList.xml` → `OrderController#list`(`MEDIUM`), `OrderService#performORD0100M01S`(`HIGH`), `#performORD0100M02U`(`HIGH`), `performORD0100M09S`(`UNRESOLVED`) / `OrderPopup.xml` → `OrderController#detail`(`LOW`) / `Header.xml` → `OrderService#performORD0100M01S`, `OrderController#detail`(둘 다 `MEDIUM`, 공통 함수) |
 | `INCLUDES` | 3: `OrderList.xml` → `OrderPopup.xml`, `Header.xml` (`HIGH`) / `Header.xml` → `OrderPopup.xml` (`MEDIUM`, 공통 함수 `shopLib.searchOrder`) |
 | `RENDERS` | 0 (리치클라이언트 화면은 서버가 열지 않는다) |
 | SQL statement (`analysis_mapper`) | 2: `OrderD.selectOrderList`(`SELECT`), `OrderD.deleteOrder`(`DELETE`). `mapper_type = QUERY_XML` |

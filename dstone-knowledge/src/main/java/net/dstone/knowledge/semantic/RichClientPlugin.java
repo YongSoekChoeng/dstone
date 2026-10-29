@@ -33,6 +33,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *   화면 ─REQUESTS→ 메소드   화면이 이 메소드를 부른다. 찾는 길이 둘이다.
  *       주소      화면 안의 /order/list.do, svc::order/list.do 가 진입점 주소와 같을 때 (via = PATH_TEXT, MEDIUM)
  *                 WebSquare의 submission action, $p.ajax 의 주소, Nexacro의 transaction 주소가 여기에 걸린다.
+ *                 화면이 부르는 공통 함수 안에 적힌 주소도 잇는다(via = COMMON_SCRIPT).
  *                 앞에 컨텍스트 경로가 붙은 주소(/myapp/order/list.do)는 첫 마디를 떼고 한 번 더 맞춰 본다 (LOW)
  *       거래 호출 화면이 주소 대신 거래 ID로 부를 때 (via = CALL_RULE)
  *                 프로젝트 공통 함수가 "ID → 메소드 이름" 규칙으로 서버를 부르는 방식이다.
@@ -59,7 +60,6 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *
  * 아직 다루지 않는 것:
  * - 거래 ID나 주소를 변수로 넘기는 호출(글자로 적혀 있지 않으면 계산하지 않는다. 짐작해서 잇지 않는다).
- * - 공통 스크립트 안의 주소(/order/list.do). 공통 스크립트에서는 화면과 거래 ID만 본다.
  * - Nexacro의 서비스 접두어(svc::)가 가리키는 실제 주소(typedefinition). 접두어는 떼고 뒤의 경로만 본다.
  * </pre>
  */
@@ -129,7 +129,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			if (handlers == null) {
 				// 화면이 하나라도 있을 때만 읽는다. 리치클라이언트가 아닌 프로젝트에서는 여기까지 오지 않는다.
 				handlers = loadHandlers(revisionId);
-				commons = loadCommonFunctions(context, root, rules, openRules, counts);
+				commons = loadCommonFunctions(context, root, handlers, rules, openRules, counts);
 			}
 			for (int i = 0; i < page.size(); i++) {
 				Map<String, Object> file = page.get(i);
@@ -147,7 +147,7 @@ public class RichClientPlugin implements SemanticPlugin {
 				counts.titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
 				Set<String> linked = new HashSet<String>();
 				List<CommonUse> uses = commonUsesOf(text, commons);
-				linkPaths(revisionId, fileId, text, handlers, linked, counts);
+				linkPaths(revisionId, fileId, text, handlers, uses, linked, counts);
 				linkCalls(revisionId, fileId, text, rules, uses, linked, counts);
 				Set<Long> screens = linkScreens(revisionId, fileId, (String) file.get("path"), (String) file.get("fileType"), text, openRules, counts);
 				linkCommonScreens(revisionId, fileId, uses, screens, counts);
@@ -159,7 +159,8 @@ public class RichClientPlugin implements SemanticPlugin {
 		int endpoints = insertEndpoints(revisionId, counts);
 		return "리치클라이언트 화면 " + counts.files + "개. 주소로 이은 요청 " + counts.byPath + ", 거래 호출로 이은 요청 " + counts.byCall
 				+ "(메소드 없음 " + counts.missing + ", ID를 글자로 적지 않은 호출 " + counts.unknown + "), 화면 → 화면 " + counts.screens
-				+ "(그 가운데 공통 함수를 거친 것 " + counts.byCommon + "), 공통 함수를 거친 요청 " + counts.byCommonCall
+				+ "(그 가운데 공통 함수를 거친 것 " + counts.byCommon + "), 공통 함수를 거친 요청 거래 " + counts.byCommonCall
+				+ " / 주소 " + counts.byCommonPath
 				+ "(화면을 열거나 서버를 부르는 공통 함수 " + (commons == null ? 0 : commons.size())
 				+ ", 여러 곳에 정의돼 쓰지 않은 이름 " + counts.ambiguous + "), 거래 진입점 " + endpoints
 				+ ", 화면명을 찾은 화면 " + counts.titled + ".";
@@ -220,40 +221,74 @@ public class RichClientPlugin implements SemanticPlugin {
 		return handlers;
 	}
 
-	/** 화면 안의 주소 가운데 진입점과 같은 것을 찾아 잇습니다. 같은 메소드는 한 번만 잇습니다. */
-	private void linkPaths(long revisionId, long fileId, String text, Map<String, List<String>> handlers, Set<String> linked, Counts counts) {
+	/**
+	 * <pre>
+	 * 화면 안의 주소 가운데 진입점과 같은 것을 찾아 잇습니다. 같은 메소드는 한 번만 잇습니다.
+	 * 화면이 부르는 공통 함수 안에 적힌 주소도 같이 봅니다(via = COMMON_SCRIPT, 줄 번호는 화면에서 그 함수를 부른 줄).
+	 * </pre>
+	 */
+	private void linkPaths(long revisionId, long fileId, String text, Map<String, List<String>> handlers, List<CommonUse> uses
+			, Set<String> linked, Counts counts) {
 		if (handlers.isEmpty()) {
 			return;
 		}
 		List<ScreenScript.Hit> hits = screenScript.findPaths(text);
 		for (int h = 0; h < hits.size(); h++) {
 			ScreenScript.Hit hit = hits.get(h);
-			String path = hit.getText();
-			String confidence = "MEDIUM";
-			List<String> methods = handlers.get(path);
-			if (methods == null) {
-				// 컨텍스트 경로를 글자로 붙여 쓴 주소일 수 있다. 첫 마디를 떼고 한 번 더 본다.
-				int second = path.indexOf('/', 1);
-				if (second < 0) {
-					continue;
-				}
-				path = path.substring(second);
-				methods = handlers.get(path);
-				confidence = "LOW";
+			linkPath(revisionId, fileId, hit.getText(), null, null, text, hit.getIndex(), handlers, linked, counts);
+		}
+		for (int u = 0; u < uses.size(); u++) {
+			CommonUse use = uses.get(u);
+			for (String path : use.function.paths) {
+				linkPath(revisionId, fileId, path, use, Integer.valueOf(use.line), text, 0, handlers, linked, counts);
 			}
-			if (methods == null) {
+		}
+	}
+
+	/**
+	 * 주소 하나를 진입점과 맞춰 잇습니다.
+	 *
+	 * @param use  공통 함수 안의 주소면 그 함수. 화면에 적힌 주소면 null
+	 * @param line 줄 번호를 이미 알면 그 값. null 이면 text 의 index 자리로 센다
+	 */
+	private void linkPath(long revisionId, long fileId, String written, CommonUse use, Integer line, String text, int index
+			, Map<String, List<String>> handlers, Set<String> linked, Counts counts) {
+		String path = written;
+		String confidence = "MEDIUM";
+		List<String> methods = handlers.get(path);
+		if (methods == null) {
+			// 컨텍스트 경로를 글자로 붙여 쓴 주소일 수 있다. 첫 마디를 떼고 한 번 더 본다.
+			int second = path.indexOf('/', 1);
+			if (second < 0) {
+				return;
+			}
+			path = path.substring(second);
+			methods = handlers.get(path);
+			confidence = "LOW";
+		}
+		if (methods == null) {
+			return;
+		}
+		for (int i = 0; i < methods.size(); i++) {
+			if (!linked.add(methods.get(i))) {
 				continue;
 			}
-			for (int i = 0; i < methods.size(); i++) {
-				if (!linked.add(methods.get(i))) {
-					continue;
-				}
-				Map<String, Object> properties = new LinkedHashMap<String, Object>();
-				properties.put("path", path);
-				properties.put("via", "PATH_TEXT");
-				semanticDao.insertRelation(relation(revisionId, fileId, "REQUESTS", "METHOD", methods.get(i), null, confidence, "HEURISTIC"
-						, properties, screenScript.lineAt(text, hit.getIndex())));
+			Map<String, Object> properties = new LinkedHashMap<String, Object>();
+			properties.put("path", path);
+			properties.put("via", use == null ? "PATH_TEXT" : "COMMON_SCRIPT");
+			if (use != null) {
+				properties.put("commonFunction", use.name);
+				properties.put("script", use.function.scriptPath);
+			}
+			if (line == null) {
+				line = screenScript.lineAt(text, index);
+			}
+			semanticDao.insertRelation(relation(revisionId, fileId, "REQUESTS", "METHOD", methods.get(i), null, confidence, "HEURISTIC"
+					, properties, line));
+			if (use == null) {
 				counts.byPath++;
+			} else {
+				counts.byCommonPath++;
 			}
 		}
 	}
@@ -355,6 +390,12 @@ public class RichClientPlugin implements SemanticPlugin {
 				}
 			}
 		}
+	}
+
+	/** /myapp/order/list.do → /order/list.do. 마디가 하나뿐이면 그대로 */
+	private String withoutFirstSegment(String path) {
+		int second = path.indexOf('/', 1);
+		return second < 0 ? path : path.substring(second);
 	}
 
 	private String methodNameOf(ScreenScript.Call call) {
@@ -461,9 +502,10 @@ public class RichClientPlugin implements SemanticPlugin {
 
 	/**
 	 * <pre>
-	 * 공통 스크립트(file_type = SCRIPT)를 모두 읽어 "공통 함수 → 여는 화면들, 부르는 거래들"을 만듭니다.
+	 * 공통 스크립트(file_type = SCRIPT)를 모두 읽어 "공통 함수 → 여는 화면들, 부르는 거래와 주소들"을 만듭니다.
 	 *
-	 * 1) 함수마다 본문에 직접 적힌 화면(경로, 화면 열기 규칙)과 거래 호출(거래 호출 규칙. ID가 글자로 적힌 것만)을 찾는다.
+	 * 1) 함수마다 본문에 직접 적힌 화면(경로, 화면 열기 규칙), 거래 호출(거래 호출 규칙. ID가 글자로 적힌 것만),
+	 *    진입점 주소(그대로 또는 첫 마디를 떼면 진입점과 같은 것만 남긴다)를 찾는다.
 	 *    거래 ID를 변수로 받아 넘기는 감싸기 함수(gfnCallService(tranId) 안의 doRequestAjax(tranId))는 세지 않는다.
 	 *    그런 호출은 화면 쪽에서 글자로 적힌 ID로 이미 잡힌다.
 	 * 2) 본문이 다른 공통 함수를 부르면 그 함수의 것도 합친다. 더 늘지 않을 때까지 되풀이한다(서로 부르는 함수도 끝난다).
@@ -471,10 +513,10 @@ public class RichClientPlugin implements SemanticPlugin {
 	 * 스크립트는 화면보다 훨씬 적어서(HI-Japan 34개) 한 번에 메모리에 올린다.
 	 * </pre>
 	 *
-	 * @return 화면을 열거나 거래를 부르는 함수만. 이름은 적힌 그대로(comLib.gfnOpenPopupEmp)
+	 * @return 화면을 열거나 서버를 부르는 함수만. 이름은 적힌 그대로(comLib.gfnOpenPopupEmp)
 	 */
-	private Map<String, CommonFunction> loadCommonFunctions(AnalysisJobContext context, Path root, List<ScreenScript.CallRule> rules
-			, List<ScreenScript.CallRule> openRules, Counts counts) {
+	private Map<String, CommonFunction> loadCommonFunctions(AnalysisJobContext context, Path root, Map<String, List<String>> handlers
+			, List<ScreenScript.CallRule> rules, List<ScreenScript.CallRule> openRules, Counts counts) {
 		long revisionId = context.getRevisionId();
 		Map<String, CommonFunction> functions = new LinkedHashMap<String, CommonFunction>();
 		Set<String> ambiguous = new HashSet<String>();
@@ -534,6 +576,12 @@ public class RichClientPlugin implements SemanticPlugin {
 					}
 				}
 			}
+			List<ScreenScript.Hit> pathHits = screenScript.findPaths(function.body);
+			for (int p = 0; p < pathHits.size(); p++) {
+				if (handlers.containsKey(pathHits.get(p).getText()) || handlers.containsKey(withoutFirstSegment(pathHits.get(p).getText()))) {
+					function.paths.add(pathHits.get(p).getText());
+				}
+			}
 			if (!rules.isEmpty()) {
 				List<ScreenScript.Call> requests = screenScript.findCalls(function.body, rules);
 				for (int q = 0; q < requests.size(); q++) {
@@ -562,6 +610,9 @@ public class RichClientPlugin implements SemanticPlugin {
 					if (function.screens.addAll(callee.screens)) {
 						grew = true;
 					}
+					if (function.paths.addAll(callee.paths)) {
+						grew = true;
+					}
 					int before = function.requests.size();
 					function.requests.putAll(callee.requests);
 					if (function.requests.size() > before) {
@@ -573,7 +624,7 @@ public class RichClientPlugin implements SemanticPlugin {
 
 		Map<String, CommonFunction> useful = new LinkedHashMap<String, CommonFunction>();
 		for (Map.Entry<String, CommonFunction> entry : functions.entrySet()) {
-			if (!entry.getValue().screens.isEmpty() || !entry.getValue().requests.isEmpty()) {
+			if (!entry.getValue().screens.isEmpty() || !entry.getValue().requests.isEmpty() || !entry.getValue().paths.isEmpty()) {
 				useful.put(entry.getKey(), entry.getValue());
 			}
 		}
@@ -646,6 +697,8 @@ public class RichClientPlugin implements SemanticPlugin {
 		final String body;
 		/** 이 함수가 여는 화면들(file_id). 부르는 공통 함수가 여는 것까지 */
 		final Set<Long> screens = new LinkedHashSet<Long>();
+		/** 이 함수 안에 적힌 주소들(/order/list.do). 부르는 공통 함수의 것까지. 진입점과 맞는지는 화면마다 본다 */
+		final Set<String> paths = new LinkedHashSet<String>();
 		/** 이 함수가 거래 ID로 부르는 호출들("함수|ID" → 호출). 부르는 공통 함수의 것까지 */
 		final Map<String, ScreenScript.Call> requests = new LinkedHashMap<String, ScreenScript.Call>();
 		/** 본문에서 부르는 다른 공통 함수 이름들 */
@@ -683,6 +736,8 @@ public class RichClientPlugin implements SemanticPlugin {
 		int byCommon;
 		/** 공통 함수 안의 거래 호출로 이은 요청 */
 		int byCommonCall;
+		/** 공통 함수 안의 주소로 이은 요청 */
+		int byCommonPath;
 		/** 여러 곳에 정의돼 있어 쓰지 않은 공통 함수 이름 수 */
 		int ambiguous;
 		/** 화면명을 찾은 화면 수 */

@@ -7,6 +7,11 @@
         scwin.btnFind_onclick = function() {
             shopLib.searchOrder({});
         };
+
+        // 주문 출력: 공통 함수 안에 주소(/order/detail.do)가 적혀 있다
+        scwin.btnPrint_onclick = function() {
+            shopLib.printOrder("1");
+        };
         ]]></script>
     </head>
     <body>

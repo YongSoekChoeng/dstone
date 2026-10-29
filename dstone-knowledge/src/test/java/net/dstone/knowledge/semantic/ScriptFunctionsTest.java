@@ -38,7 +38,7 @@ public class ScriptFunctionsTest {
 			names.add(functions.get(i).getName());
 		}
 		// 주석 안의 예시, 함수 안의 success: function 은 함수로 보지 않는다.
-		assertEquals("[shopLib.openPopup, shopLib.openOrderPopup, shopLib.searchOrder, formatAmount]", names.toString());
+		assertEquals("[shopLib.openPopup, shopLib.openOrderPopup, shopLib.searchOrder, shopLib.printOrder, formatAmount]", names.toString());
 
 		// 본문은 정규식 글자(/["{]/)와 문자열 안의 중괄호에 속지 않고 제 닫는 중괄호에서 끝난다.
 		String openOrderPopup = functions.get(1).getBody();
