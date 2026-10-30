@@ -3,14 +3,25 @@ version: 1.0.0
 description: ""
 state:
   step01_output: step01 step의 결과
+  step02_output: step02 step의 결과
 steps:
 
   - id: step01
+    name: 테스트
     type: AGENT
     with: ${input}
     agent: input-check-agent
-    next: END
+    next: step02
     save: step01_output
+
+  - id: step02
+    name: 테스트 판정
+    type: SUPERVISOR
+    with: ${state.step01_output.outArr[0]}
+    agent: test-supervisor-agent
+    next: END
+    onFailure: FAIL
+    save: step02_output
 input:
   inputStr: string
   div: string

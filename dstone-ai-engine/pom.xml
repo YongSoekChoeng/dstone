@@ -124,6 +124,13 @@
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-mcp-client</artifactId>
 		</dependency>
+		
+		<!-- Agent Util -->
+		<dependency>
+		    <groupId>org.springaicommunity</groupId>
+		    <artifactId>spring-ai-agent-utils</artifactId>
+		    <version>0.13.0</version>
+		</dependency>		
 
 		<!-- Test -->
 		<dependency>
