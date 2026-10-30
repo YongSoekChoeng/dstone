@@ -1,0 +1,29 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 AGENT step 하나가 백그라운드 Sub Agent를 가진 Agent(sample-subagent-background-agent)를 호출해서,
+# LLM이 여러 일을 한꺼번에 맡겨 놓고 TaskOutput으로 결과를 모으는 동작을 확인해보기 위한 테스트 전용 Workflow입니다.
+# 맡는 쪽(sample-skill-agent)은 Skill도 쓰므로, 두 기능이 함께 도는 것을 볼 수 있습니다.
+#
+# 로그에는 맡긴 일마다 task_id가 붙어 남습니다.
+#   dstone-ai-engine sub-agent: [sample-subagent-background-agent -> sample-skill-agent][task-1] 백그라운드로 맡김(1/10) - 인자 ...자
+#   dstone-ai-engine sub-agent: [sample-subagent-background-agent -> sample-skill-agent][task-1] 호출 끝 - ...ms, 결과 ...자
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-agent-subagent-background
+#   input     : 다음 SQL 세 개를 검토해 줘. 1) SELECT * FORM member 2) SELECT id FROM orders WHERE id = 1 3) UPDATE member SET name = 'a' WHRE id = 2
+id: sample-agent-subagent-background
+version: 1.0.0
+description: 백그라운드 Sub Agent(subAgents.background)로 여러 일을 동시에 맡기고 결과를 모으는 동작 확인용 Workflow. SQL 여러 개가 섞인 문장을 보낸다.
+input: string
+state:
+  answer: step01의 결과
+return: ${state.answer}
+steps:
+
+  - id: step01
+    name: SQL 나눠 맡기기
+    type: AGENT
+    agent: sample-subagent-background-agent
+    with: ${input}
+    save: answer
+    next: END

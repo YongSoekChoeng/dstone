@@ -3,6 +3,9 @@ package net.dstone.ai.runtime.agent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -27,16 +30,20 @@ import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.exec.ExecContext;
 import net.dstone.ai.common.rag.RagRetrievalChain;
 import net.dstone.ai.common.registry.AgentRegistry;
+import net.dstone.ai.common.registry.SkillRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.prompt.EnginePrompt;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
+import jakarta.annotation.PreDestroy;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 /**
  * <pre>
@@ -72,8 +79,12 @@ import reactor.core.publisher.Flux;
  *
  * ## Tool과 Sub Agent
  * - Tool: Agent의 tools에 적힌 이름 중 caller 화이트리스트도 통과한 것만 LLM에게 보입니다.
+ * - Skill: Agent의 skills.allowed에 적힌 Skill이 Skill이라는 Tool 하나로 보입니다(SkillTool). LLM이 부르면 SKILL.md 본문을 받습니다.
+ *   Tool과 같은 호출 횟수를 함께 씁니다.
  * - Sub Agent: Agent의 subAgents에 적힌 Agent가 Tool처럼 보입니다(SubAgentToolCallback). LLM이 골라 부르면
  *   그 Agent를 이 클래스의 call()로 한 번 더 부릅니다. 깊이는 한 단계뿐입니다(기동할 때 AgentRegistry가 검사합니다).
+ *   subAgents.background가 true면 기다리지 않고 맡길 수도 있습니다. 맡긴 일은 부모 호출 한 번 동안만 살아 있고
+ *   (SubAgentTasks), 스레드는 엔진 전체가 함께 쓰는 풀(dstone.ai.agent.sub-agent.background-threads)에서 빌립니다.
  *
  * ## Tool 호출이 길어질 때
  * Tool 결과는 대화에 쌓여서 그 뒤의 LLM 호출마다 다시 보내집니다. 그래서 두 가지를 엔진이 직접 챙깁니다.
@@ -117,7 +128,12 @@ public class AgentExecutor extends BaseObject {
 	@Autowired
 	private AgentRegistry agentRegistry;
 	@Autowired
+	private SkillRegistry skillRegistry;
+	@Autowired
 	private Environment environment;
+
+	/** 백그라운드로 맡긴 Sub Agent 일을 돌리는 스레드 풀입니다. 처음 쓸 때 만듭니다(백그라운드를 쓰는 Agent가 없으면 만들지 않습니다). */
+	private ExecutorService backgroundPool;
 
 	/**
 	 * <pre>
@@ -145,13 +161,18 @@ public class AgentExecutor extends BaseObject {
 		int maxAttempts = agent.maxAttempts();
 		AgentContractException last = null;
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+			SubAgentTasks tasks = this.newTasks(agent);
 			try {
-				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule);
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule, tasks);
 				return this.ask(spec, userMessage, agent.outputSchema());
 			} catch (AgentContractException e) {
 				last = e;
 				if (attempt < maxAttempts) {
 					this.info("agent[" + agent.id() + "]의 답이 계약과 맞지 않아 다시 부릅니다(" + attempt + "/" + maxAttempts + "): " + e.getMessage());
+				}
+			} finally {
+				if (tasks != null) {
+					tasks.close();
 				}
 			}
 		}
@@ -181,8 +202,15 @@ public class AgentExecutor extends BaseObject {
 	 */
 	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule) {
 		String userMessage = this.toUserMessage(agent, input);
-		ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule);
-		return this.ask(spec, userMessage, schema);
+		SubAgentTasks tasks = this.newTasks(agent);
+		try {
+			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule, tasks);
+			return this.ask(spec, userMessage, schema);
+		} finally {
+			if (tasks != null) {
+				tasks.close();
+			}
+		}
 	}
 
 	/**
@@ -208,7 +236,18 @@ public class AgentExecutor extends BaseObject {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
-		return this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null).user(userMessage).stream().content();
+		SubAgentTasks tasks = this.newTasks(agent);
+		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null, tasks).user(userMessage).stream().content();
+		if (tasks == null) {
+			return answer;
+		}
+		// 스트림은 다 흘려보낸 뒤(또는 화면이 끊은 뒤)에 끝나므로, 그때 맡긴 일을 정리합니다.
+		return answer.doFinally(new Consumer<SignalType>() {
+			@Override
+			public void accept(SignalType signal) {
+				tasks.close();
+			}
+		});
 	}
 
 	/**
@@ -344,8 +383,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
+	 * @param tasks         백그라운드로 맡긴 Sub Agent 일을 들고 있을 곳(newTasks()). 백그라운드를 쓰지 않는 Agent면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule, SubAgentTasks tasks) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
@@ -405,11 +445,12 @@ public class AgentExecutor extends BaseObject {
 		}
 
 		/************************************************************************
-		5. Tool과 Sub Agent를 붙입니다.
+		5. Tool, Skill, Sub Agent를 붙입니다.
 			- Tool: Agent의 tools에 적힌 이름 중, caller 화이트리스트(dstone.ai.tool.allowed-by-caller)도 통과한 것만 붙습니다.
 			  tools가 비어 있으면 붙지 않습니다. caller 화이트리스트 설정이 아예 없으면 그쪽은 전부 통과입니다.
+			- Skill: Agent의 skills.allowed에 적힌 Skill을 Skill Tool 하나로 붙입니다(SkillTool).
 			- Sub Agent: Agent의 subAgents에 적힌 Agent를 Tool처럼 붙입니다(subAgentCallbacks() 참고).
-			  채팅 요청의 toolsEnabled=false는 Tool만 끄고 Sub Agent는 끄지 않습니다(Sub Agent는 Agent 정의의 일부입니다).
+			  채팅 요청의 toolsEnabled=false는 Tool만 끄고 Skill과 Sub Agent는 끄지 않습니다(둘 다 Agent 정의의 일부입니다).
 			- toolContext라는 값에 caller를 함께 실어 보냅니다. caller(이 호출을 보낸 앱)를 알아야 하는 Tool이
 			  ToolContext 파라미터로 그 값을 받아볼 수 있게 하기 위해서입니다(지금 그런 Tool은 없지만 길은 열어 둡니다).
 			  caller 값이 없더라도(null이더라도) 이 toolContext 맵 자체에는 반드시 키가 하나 채워져 있어야 합니다
@@ -418,15 +459,20 @@ public class AgentExecutor extends BaseObject {
 			  required by the method as an argument"라는) IllegalArgumentException을 던지기 때문입니다.
 			  Map.of()처럼 엔트리가 0개인 Map도 "빈 Map"으로 취급되므로, caller가 null인 경우에도 엔트리를
 			  최소 1개는 넣어 둡니다.
-			- Tool에는 호출 횟수 한도를 씌웁니다(budgeted() 참고).
+			- Tool과 Skill에는 호출 횟수 한도를 씌웁니다(budgeted() 참고). 둘이 횟수 하나를 함께 씁니다.
 			- Tool이나 Sub Agent가 하나라도 붙으면, 쌓인 Tool 결과가 너무 커졌을 때 오래된 것부터 줄이는 Advisor도 함께 붙입니다
 			  (ToolResultCompactionAdvisor. dstone.ai.agent.tool.keep-result-chars가 0이면 붙이지 않습니다).
 		************************************************************************/
-		List<ToolCallback> callbacks = new ArrayList<>();
+		List<ToolCallback> tools = new ArrayList<>();
 		if (toolsEnabled) {
-			callbacks.addAll(this.budgeted(agent, this.configTool.toolCallbacks(caller, agent.toolNames())));
+			tools.addAll(this.configTool.toolCallbacks(caller, agent.toolNames()));
 		}
-		callbacks.addAll(this.subAgentCallbacks(agent, caller));
+		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent));
+		if (skillTool != null) {
+			tools.add(this.configTool.limited(skillTool));
+		}
+		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools));
+		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks));
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
 			spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
@@ -511,14 +557,17 @@ public class AgentExecutor extends BaseObject {
 	 *   횟수는 이 부모에 붙은 Sub Agent들이 함께 셉니다.
 	 * - Sub Agent의 답도 부모 대화에 쌓이므로 다른 Tool과 같은 결과 크기 상한을 씌웁니다.
 	 *
+	 * - tasks가 있으면(subAgents.background: true) 각 Sub Agent에 run_in_background 인자를 열고, 결과를 받는 TaskOutput Tool을 함께 붙입니다.
+	 *
 	 * 깊이가 한 단계를 넘지 않는지는 여기서 검사하지 않습니다. 기동할 때 AgentRegistry가 "Sub Agent는 subAgents를
 	 * 가질 수 없다"를 이미 검사했으므로, Sub Agent를 부를 때는 붙일 것이 없습니다.
 	 * </pre>
 	 *
 	 * @param agent  부모 Agent의 정의
 	 * @param caller 이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
+	 * @param tasks  백그라운드로 맡긴 일을 들고 있을 곳. 백그라운드를 쓰지 않으면 null
 	 */
-	private List<ToolCallback> subAgentCallbacks(AgentDefinition agent, String caller) {
+	private List<ToolCallback> subAgentCallbacks(AgentDefinition agent, String caller, SubAgentTasks tasks) {
 		List<ToolCallback> callbacks = new ArrayList<>();
 		if (agent.subAgentIds().isEmpty()) {
 			return callbacks;
@@ -531,9 +580,79 @@ public class AgentExecutor extends BaseObject {
 				continue;
 			}
 			AgentDefinition subAgent = this.agentRegistry.find(subAgentId);
-			callbacks.add(this.configTool.limited(new SubAgentToolCallback(this, agent.id(), subAgent, caller, callCount, maxCalls)));
+			callbacks.add(this.configTool.limited(new SubAgentToolCallback(this, agent.id(), subAgent, caller, callCount, maxCalls, tasks)));
+		}
+		if (tasks != null && !callbacks.isEmpty()) {
+			callbacks.add(this.configTool.limited(tasks.outputTool()));
 		}
 		return callbacks;
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 skills.allowed에 적힌 Skill을 등록소에서 찾아 돌려줍니다.
+	 * 다시 읽기 도중처럼 잠깐 없는 이름이 있으면 건너뜁니다(이름이 맞는지는 기동할 때와 다시 읽을 때 검사합니다).
+	 * </pre>
+	 *
+	 * @param agent Agent의 정의
+	 */
+	private List<SkillDefinition> skillsOf(AgentDefinition agent) {
+		List<SkillDefinition> skills = new ArrayList<>();
+		for (String name : agent.skillNames()) {
+			SkillDefinition skill = this.skillRegistry.find(name);
+			if (skill != null) {
+				skills.add(skill);
+			}
+		}
+		return skills;
+	}
+
+	/**
+	 * <pre>
+	 * 부모 호출 한 번 동안 쓸 SubAgentTasks를 만듭니다. Agent가 subAgents.background: true가 아니면 null입니다.
+	 * 만든 쪽(call()/callForSchema()/stream())이 호출이 끝날 때 반드시 close()합니다.
+	 * </pre>
+	 *
+	 * @param agent 부모 Agent의 정의
+	 */
+	private SubAgentTasks newTasks(AgentDefinition agent) {
+		if (!agent.subAgentBackground() || agent.subAgentIds().isEmpty()) {
+			return null;
+		}
+		return new SubAgentTasks(agent.id(), this.backgroundPool());
+	}
+
+	/**
+	 * <pre>
+	 * 백그라운드 Sub Agent용 스레드 풀을 돌려줍니다. 처음 부를 때 만듭니다.
+	 * 스레드 수는 dstone.ai.agent.sub-agent.background-threads(기본 4)이고, 다 차면 새 일은 줄을 섭니다.
+	 * 앱이 내려갈 때 남은 일이 앱 종료를 붙잡지 않게 데몬 스레드로 만듭니다.
+	 * </pre>
+	 */
+	private synchronized ExecutorService backgroundPool() {
+		if (this.backgroundPool == null) {
+			Integer configured = this.environment.getProperty(Constants.Agent.SUB_AGENT_BACKGROUND_THREADS, Integer.class);
+			int threads = configured == null || configured.intValue() <= 0 ? Constants.Agent.DEFAULT_SUB_AGENT_BACKGROUND_THREADS : configured.intValue();
+			AtomicInteger number = new AtomicInteger();
+			this.backgroundPool = Executors.newFixedThreadPool(threads, new ThreadFactory() {
+				@Override
+				public Thread newThread(Runnable runnable) {
+					Thread thread = new Thread(runnable, "sub-agent-" + number.incrementAndGet());
+					thread.setDaemon(true);
+					return thread;
+				}
+			});
+			this.info("백그라운드 Sub Agent 스레드 풀을 만들었습니다(스레드 " + threads + "개).");
+		}
+		return this.backgroundPool;
+	}
+
+	/** 앱이 내려갈 때 백그라운드 Sub Agent 스레드를 정리합니다. */
+	@PreDestroy
+	public synchronized void shutdown() {
+		if (this.backgroundPool != null) {
+			this.backgroundPool.shutdownNow();
+		}
 	}
 
 }

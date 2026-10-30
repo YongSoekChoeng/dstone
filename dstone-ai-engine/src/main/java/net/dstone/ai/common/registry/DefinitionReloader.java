@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.loader.DefinitionFile;
 import net.dstone.ai.common.loader.DefinitionText;
@@ -25,13 +26,14 @@ import net.dstone.common.utils.LogUtil;
 
 /**
  * <pre>
- * 엔진을 다시 띄우지 않고 Agent와 Workflow 정의를 다시 읽습니다.
+ * 엔진을 다시 띄우지 않고 Skill, Agent, Workflow 정의를 다시 읽습니다.
  *
- * 순서는 기동할 때와 같습니다: Agent를 전부 읽어 검사하고, 그 Agent들로 Workflow를 전부 검사합니다.
+ * 순서는 기동할 때와 같습니다: Skill을 전부 읽어 검사하고, 그 Skill들로 Agent를, 그 Agent들로 Workflow를 전부 검사합니다.
  * 바뀐 것만 검사하지 않고 늘 전부 검사합니다. Agent 하나를 고치면 그 Agent를 부르는 Workflow가 틀어질 수 있기 때문입니다.
  *
  * 하나라도 틀리면 아무것도 바꾸지 않고(파일도 쓰지 않고) 오류만 던집니다. 등록된 정의는 그대로입니다.
- * 전부 통과했을 때만 파일을 쓰고 AgentRegistry와 WorkFlowRegistry를 한꺼번에 바꿔 끼웁니다.
+ * 전부 통과했을 때만 파일을 쓰고 SkillRegistry, AgentRegistry, WorkFlowRegistry를 한꺼번에 바꿔 끼웁니다.
+ * Skill 폴더의 참고 파일은 엔진이 읽어 두지 않으므로(Agent가 그때그때 readFile로 읽습니다) 다시 읽을 것이 없습니다.
  *
  * MCP 서버 정의(mcp/**.yml)는 다시 읽지 않습니다. MCP는 기동할 때 외부 프로세스와 연결까지 맺어 두기 때문에,
  * 바꾸려면 엔진을 다시 띄워야 합니다.
@@ -43,6 +45,8 @@ public class DefinitionReloader extends BaseObject {
 	@Autowired
 	private YamlDefinitionLoader loader;
 	@Autowired
+	private SkillRegistry skillRegistry;
+	@Autowired
 	private AgentRegistry agentRegistry;
 	@Autowired
 	private WorkFlowRegistry workFlowRegistry;
@@ -52,8 +56,9 @@ public class DefinitionReloader extends BaseObject {
 	 *
 	 * @param workflows 검사를 통과한 Workflow 수
 	 * @param agents    검사를 통과한 Agent 수
+	 * @param skills    검사를 통과한 Skill 수
 	 */
-	public record Result(int workflows, int agents) {
+	public record Result(int workflows, int agents, int skills) {
 	}
 
 	/**
@@ -78,6 +83,10 @@ public class DefinitionReloader extends BaseObject {
 	 * @param write   통과했을 때 파일을 쓰고 등록할지
 	 */
 	public synchronized Result apply(Map<String, String> changes, boolean write) {
+		List<SkillDefinition> skillFiles = new ArrayList<>();
+		for (DefinitionText text : this.merge(Constants.Definition.SKILL_DIR, Constants.Definition.SKILL_FILE, changes)) {
+			skillFiles.add(this.loader.parseSkill(text));
+		}
 		List<DefinitionFile<AgentDefinition>> agentFiles = new ArrayList<>();
 		for (DefinitionText text : this.merge(Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX, changes)) {
 			agentFiles.add(new DefinitionFile<>(text.path(), this.loader.parseAgent(text)));
@@ -86,16 +95,18 @@ public class DefinitionReloader extends BaseObject {
 		for (DefinitionText text : this.merge(Constants.Definition.WORKFLOW_DIR, Constants.Definition.WORKFLOW_SUFFIX, changes)) {
 			workflowFiles.add(new DefinitionFile<>(text.path(), this.loader.parseWorkflow(text)));
 		}
-		Map<String, AgentDefinition> agents = this.agentRegistry.check(agentFiles);
+		Map<String, SkillDefinition> skills = this.skillRegistry.check(skillFiles);
+		Map<String, AgentDefinition> agents = this.agentRegistry.check(agentFiles, skills);
 		Map<String, WorkFlowDefinition> workflows = this.workFlowRegistry.check(workflowFiles, agents);
 		if (write) {
 			this.writeFiles(changes);
+			this.skillRegistry.install(skills);
 			this.agentRegistry.install(agentFiles, agents);
 			this.workFlowRegistry.install(workflowFiles, workflows);
-			LogUtil.sysout("dstone-ai-engine definition: 다시 읽음 - Agent " + agents.size() + "개, Workflow " + workflows.size() + "개"
+			LogUtil.sysout("dstone-ai-engine definition: 다시 읽음 - Skill " + skills.size() + "개, Agent " + agents.size() + "개, Workflow " + workflows.size() + "개"
 				+ (changes.isEmpty() ? "" : ", 바꾼 파일 " + changes.keySet()));
 		}
-		return new Result(workflows.size(), agents.size());
+		return new Result(workflows.size(), agents.size(), skills.size());
 	}
 
 	/**
@@ -103,8 +114,8 @@ public class DefinitionReloader extends BaseObject {
 	 * 한 종류의 파일을 디스크에서 읽고, 그 종류에 해당하는 changes를 얹은 목록을 돌려줍니다(경로 순).
 	 * </pre>
 	 *
-	 * @param dir     종류 폴더(workflows, agents)
-	 * @param suffix  파일 이름 꼬리(.yml, .md)
+	 * @param dir     종류 폴더(workflows, agents, skills)
+	 * @param suffix  파일 이름 꼬리(.yml, .md, SKILL.md)
 	 * @param changes 정의 폴더 기준 경로 → 새 내용(null이면 지움)
 	 */
 	private List<DefinitionText> merge(String dir, String suffix, Map<String, String> changes) {

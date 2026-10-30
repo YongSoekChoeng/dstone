@@ -26,10 +26,12 @@ import net.dstone.ai.api.dto.DefinitionSource;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.loader.DefinitionText;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.registry.AgentRegistry;
+import net.dstone.ai.common.registry.SkillRegistry;
 import net.dstone.ai.common.registry.DefinitionReloader;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.common.core.BaseObject;
@@ -61,6 +63,8 @@ public class DefinitionService extends BaseObject {
 	private WorkFlowRegistry workFlowRegistry;
 	@Autowired
 	private AgentRegistry agentRegistry;
+	@Autowired
+	private SkillRegistry skillRegistry;
 	@Autowired
 	private ConfigTool configTool;
 
@@ -97,7 +101,7 @@ public class DefinitionService extends BaseObject {
 		return Boolean.TRUE.equals(this.environment.getProperty(Constants.Definition.EDIT_ENABLED_PROPERTY, Boolean.class, Boolean.FALSE)) && this.loader.rootDir() != null;
 	}
 
-	/** 등록된 Workflow, Agent, Tool 목록입니다(디자이너 화면을 처음 열 때 씁니다). */
+	/** 등록된 Workflow, Agent, Tool, Skill 목록입니다(디자이너 화면을 처음 열 때 씁니다). */
 	public DefinitionCatalog catalog() {
 		List<DefinitionCatalog.WorkflowItem> workflows = new ArrayList<>();
 		for (WorkFlowDefinition definition : this.workFlowRegistry.all().values()) {
@@ -113,7 +117,8 @@ public class DefinitionService extends BaseObject {
 		List<DefinitionCatalog.AgentItem> agents = new ArrayList<>();
 		for (AgentDefinition definition : this.agentRegistry.all().values()) {
 			agents.add(new DefinitionCatalog.AgentItem(definition.id(), definition.version(), definition.description(), definition.role(), this.agentRegistry.pathOf(definition.id()),
-				definition.inputSchema(), definition.outputSchema(), definition.declaresOutput(), definition.promptText(), definition.toolNames(), definition.subAgentIds()));
+				definition.inputSchema(), definition.outputSchema(), definition.declaresOutput(), definition.promptText(), definition.toolNames(), definition.skillNames(),
+				definition.subAgentIds(), definition.subAgentBackground()));
 		}
 		agents.sort(new Comparator<DefinitionCatalog.AgentItem>() {
 			@Override
@@ -133,7 +138,11 @@ public class DefinitionService extends BaseObject {
 				return a.name().compareTo(b.name());
 			}
 		});
-		return new DefinitionCatalog(this.loader.location(), this.editable(), workflows, agents, tools);
+		List<DefinitionCatalog.SkillItem> skills = new ArrayList<>();
+		for (SkillDefinition skill : this.skillRegistry.list()) {
+			skills.add(new DefinitionCatalog.SkillItem(skill.name(), skill.description(), skill.path()));
+		}
+		return new DefinitionCatalog(this.loader.location(), this.editable(), workflows, agents, tools, skills);
 	}
 
 	/**

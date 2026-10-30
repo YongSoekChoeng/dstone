@@ -2119,7 +2119,7 @@ var DstoneAiDesigner = (function () {
 	var agentTextEdited = false;
 
 	/** 머리말을 다시 만들 때 키를 놓는 순서(Agent 파일들이 쓰는 순서) */
-	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "context", "tools", "subAgents", "allowedCallers", "execution"];
+	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "context", "tools", "skills", "subAgents", "allowedCallers", "execution"];
 	var AGENT_SUB_ORDER = {
 		model: ["name", "temperature", "reasoning"],
 		context: ["sources", "retrieval"],
@@ -2596,7 +2596,11 @@ var DstoneAiDesigner = (function () {
 		var retrieval = context.retrieval || {};
 		var execution = f.execution || {};
 		var tools = f.tools && Array.isArray(f.tools.allowed) ? f.tools.allowed.map(String) : [];
-		var subAgents = Array.isArray(f.subAgents) ? f.subAgents.map(String) : [];
+		var skills = f.skills && Array.isArray(f.skills.allowed) ? f.skills.allowed.map(String) : [];
+		// subAgents는 목록이거나 {agents: [...], background: true} 모양이다.
+		var subAgentList = Array.isArray(f.subAgents) ? f.subAgents : (f.subAgents && Array.isArray(f.subAgents.agents) ? f.subAgents.agents : []);
+		var subAgents = subAgentList.map(String);
+		var background = !!(f.subAgents && !Array.isArray(f.subAgents) && f.subAgents.background === true);
 		var sources = Array.isArray(context.sources) ? context.sources.map(String) : [];
 		var allTools = tools.indexOf("*") >= 0;
 
@@ -2610,6 +2614,17 @@ var DstoneAiDesigner = (function () {
 		tools.forEach(function (name) {
 			if (name !== "*" && !findTool(name)) {
 				toolItems.push({ value: name, label: name, note: "등록되지 않음" });
+			}
+		});
+		// Skill 목록: 엔진이 등록한 Skill(conf/definitions/skills/**/SKILL.md). 등록되지 않은 이름도 지우지 않고 보여 준다.
+		var skillItems = [];
+		(catalog.skills || []).forEach(function (skill) {
+			var folder = skill.path ? skill.path.replace(/^skills\//, "").replace(/\/[^\/]*\/SKILL\.md$/, "") : "";
+			skillItems.push({ value: skill.name, label: skill.name, title: skill.description || "", group: folder });
+		});
+		skills.forEach(function (name) {
+			if (!(catalog.skills || []).some(function (skill) { return skill.name === name; })) {
+				skillItems.push({ value: name, label: name, note: "등록되지 않음" });
 			}
 		});
 		// Sub Agent 목록: 자기 자신은 빼고, 맡을 수 없는 Agent(설명이 없거나 자기 Sub Agent가 있는 것)는 고를 수 없게 둔다.
@@ -2665,8 +2680,15 @@ var DstoneAiDesigner = (function () {
 			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-all-tools\"" + (allTools ? " checked" : "") + " /> 전부(*) - 등록된 Tool을 모두 씀(TOOL step 전용 Tool은 빠짐)</label>"
 			+ (allTools ? "" : chipList("tools", toolItems, tools, "고른 Tool이 없습니다(Tool 없이 답만 함).", false))
 			+ "</section>"
+			+ "<section class=\"wd-agent-sec\"><h4>Skill <span class=\"wd-help\">필요할 때 꺼내 읽는 작업 안내서(SKILL.md). LLM에게는 Skill이라는 Tool 하나로 보입니다</span></h4>"
+			+ chipList("skills", skillItems, skills, "고른 Skill이 없습니다.", false)
+			+ "<p class=\"ai-hint\">Skill 폴더의 참고 파일까지 읽게 하려면 Tool에 readFile도 고르십시오. Skill 파일은 conf/definitions/skills 아래에서 직접 고치고 [다시 읽기]를 누릅니다.</p>"
+			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Sub Agent <span class=\"wd-help\">일을 맡길 다른 Agent. LLM에게는 Tool처럼 보입니다(깊이는 한 단계)</span></h4>"
 			+ chipList("subAgents", agentItems, subAgents, "고른 Sub Agent가 없습니다.", false)
+			+ (subAgents.length > 0
+				? "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-background\"" + (background ? " checked" : "") + " /> 기다리지 않고 맡길 수 있게 함(background) - 여러 일을 한꺼번에 맡기고 TaskOutput으로 결과를 모읍니다</label>"
+				: "")
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>문서 검색(RAG) <span class=\"wd-help\">context.sources</span></h4>"
 			+ "<p class=\"ai-hint\">켜면 부를 때마다 dstone-knowledge에 올린 문서에서 비슷한 내용을 찾아 프롬프트에 붙여 줍니다. 검색어는 이 Agent가 받은 input입니다. "
@@ -2732,10 +2754,24 @@ var DstoneAiDesigner = (function () {
 		promptBox.addEventListener("input", renderPromptLint);
 		els.agentForm.querySelector("[data-open-guide]").addEventListener("click", openGuide);
 		renderPromptAids();
-		// Tool, Sub Agent 목록 바꾸기(칩의 ×, 고르기 창)
+		// subAgents를 적습니다. background를 켰을 때만 {agents, background} 모양으로, 아니면 목록으로 적습니다.
+		function writeSubAgents(values, on) {
+			if (values.length === 0) {
+				setValue(agentDoc.front, "subAgents", undefined);
+			} else if (on) {
+				setValue(agentDoc.front, "subAgents", { agents: values, background: true });
+			} else {
+				setValue(agentDoc.front, "subAgents", values);
+			}
+		}
+		// Tool, Skill, Sub Agent 목록 바꾸기(칩의 ×, 고르기 창)
 		function setList(name, values) {
 			agentChange(function () {
-				setValue(agentDoc.front, name === "tools" ? "tools.allowed" : "subAgents", values.length > 0 ? values : undefined);
+				if (name === "subAgents") {
+					writeSubAgents(values, background);
+				} else {
+					setValue(agentDoc.front, name === "tools" ? "tools.allowed" : "skills.allowed", values.length > 0 ? values : undefined);
+				}
 			}, false);
 			renderAgentForm();
 		}
@@ -2743,7 +2779,7 @@ var DstoneAiDesigner = (function () {
 			button.addEventListener("click", function () {
 				var name = button.getAttribute("data-chip-remove");
 				var value = button.getAttribute("data-value");
-				setList(name, (name === "tools" ? tools : subAgents).filter(function (v) {
+				setList(name, (name === "tools" ? tools : (name === "skills" ? skills : subAgents)).filter(function (v) {
 					return v !== value;
 				}));
 			});
@@ -2754,6 +2790,10 @@ var DstoneAiDesigner = (function () {
 				if (name === "tools") {
 					openPicker("Tool 고르기", toolItems, tools, function (values) {
 						setList("tools", values);
+					});
+				} else if (name === "skills") {
+					openPicker("Skill 고르기", skillItems, skills, function (values) {
+						setList("skills", values);
 					});
 				} else {
 					openPicker("Sub Agent 고르기", agentItems, subAgents, function (values) {
@@ -2779,6 +2819,16 @@ var DstoneAiDesigner = (function () {
 			}, false);
 			renderAgentForm();
 		});
+		var backgroundBox = document.getElementById("wd-agent-background");
+		if (backgroundBox) {
+			backgroundBox.addEventListener("change", function (e) {
+				var on = e.target.checked;
+				agentChange(function () {
+					writeSubAgents(subAgents, on);
+				}, false);
+				renderAgentForm();
+			});
+		}
 		document.getElementById("wd-agent-all-tools").addEventListener("change", function (e) {
 			var on = e.target.checked;
 			agentChange(function () {

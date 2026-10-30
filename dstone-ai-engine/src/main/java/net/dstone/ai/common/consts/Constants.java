@@ -50,6 +50,15 @@ public final class Constants {
 		/** 위 설정이 없을 때 쓰는 값입니다. */
 		public final static int DEFAULT_SUB_AGENT_MAX_CALLS = 10;
 
+		/**
+		 * Sub Agent를 백그라운드로 돌릴 때(subAgents.background: true) 쓰는 스레드 수 설정 키입니다(dstone.ai.agent.sub-agent.background-threads).
+		 * 엔진 전체가 이 스레드들을 함께 씁니다. 다 차 있으면 새로 맡긴 일은 빈 스레드가 생길 때까지 줄을 서서 기다립니다.
+		 */
+		public final static String SUB_AGENT_BACKGROUND_THREADS = "dstone.ai.agent.sub-agent.background-threads";
+
+		/** 위 설정이 없을 때 쓰는 값입니다. */
+		public final static int DEFAULT_SUB_AGENT_BACKGROUND_THREADS = 4;
+
 		/** Agent 호출 한 번 안에서 Tool을 부를 수 있는 최대 횟수 설정 키입니다(dstone.ai.agent.tool.max-calls). Agent의 execution.maxToolCalls가 있으면 그 값이 이깁니다. */
 		public final static String TOOL_MAX_CALLS = "dstone.ai.agent.tool.max-calls";
 
@@ -222,6 +231,9 @@ public final class Constants {
 		public final static String AGENT_SUFFIX = ".md";
 		public final static String MCP_DIR = "mcp";
 		public final static String MCP_SUFFIX = ".yml";
+		/** Skill 하나는 skills/<폴더>/<Skill 이름>/SKILL.md 파일 하나입니다. 같은 폴더의 다른 파일은 Agent가 readFile로 읽는 참고 자료입니다. */
+		public final static String SKILL_DIR = "skills";
+		public final static String SKILL_FILE = "SKILL.md";
 		/** Workflow 파일 옆에 두는, 화면의 노드 위치를 담은 파일의 꼬리입니다(예: sample-chain.yml → sample-chain.layout.json). 엔진은 읽지 않습니다. */
 		public final static String LAYOUT_SUFFIX = ".layout.json";
 	}

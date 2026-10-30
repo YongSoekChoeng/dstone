@@ -1,7 +1,10 @@
 package net.dstone.ai.common.definition.agent;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
 
 import net.dstone.ai.common.definition.SchemaDefinition;
 
@@ -49,7 +52,8 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   input, output    무엇을 받고 무엇을 돌려주는지(Picoschema). 비우면 둘 다 글자입니다.
  *   context          RAG(올려 둔 문서 검색)를 쓸지와 검색 조건.
  *   tools.allowed    LLM에게 보여 줄 Tool 이름. 비우면 Tool을 쓰지 않습니다.
- *   subAgents        일을 맡길 수 있는 다른 Agent의 id.
+ *   skills.allowed   필요할 때 꺼내 읽을 Skill 이름. 비우면 Skill을 쓰지 않습니다.
+ *   subAgents        일을 맡길 수 있는 다른 Agent의 id. 동시에 맡기려면 {agents: [...], background: true}.
  *   allowedCallers   호출을 허락할 caller(tenant). 비우면 누구나 부를 수 있습니다.
  *   execution        다시 부르기, 대기 시간, Tool 호출 한도.
  *   (본문)           시스템 프롬프트. 머리말에 prompt 키로 적지 않습니다.
@@ -89,11 +93,22 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   (안 적음)                                       ← Tool 없음
  *   실제로 붙는 Tool은 이 목록과 caller 화이트리스트(dstone.ai.tool.allowed-by-caller)를 둘 다 통과한 것입니다.
  *
+ * ■ skills.allowed
+ *   skills: { allowed: [sql-review] }   ← conf/definitions/skills 아래 SKILL.md의 name
+ *   LLM에게는 Skill이라는 Tool 하나가 보이고, 그 설명에 고른 Skill의 이름과 설명이 들어갑니다.
+ *   LLM이 Skill을 부르면 SKILL.md 본문을 Tool 결과로 받아 그대로 따릅니다(runtime.agent.SkillTool).
+ *   Skill 폴더의 참고 파일까지 읽게 하려면 tools.allowed에 readFile도 적어야 합니다.
+ *
  * ■ subAgents
  *   여기 적은 Agent는 LLM에게 Tool 하나로 보입니다(이름 = id, 설명 = description, 인자 = input 스키마).
  *   - 맡은 Agent는 빈 대화에서 시작합니다. 부모의 프롬프트와 대화는 못 보고, 넘겨받은 인자만 봅니다.
  *   - 깊이는 한 단계뿐입니다. 맡은 Agent는 자기 subAgents를 가질 수 없습니다.
- *   자세한 동작은 runtime.agent.SubAgentToolCallback을 보세요.
+ *   두 가지로 적을 수 있습니다.
+ *     subAgents: [a-agent, b-agent]                              ← 맡기면 끝날 때까지 기다립니다
+ *     subAgents: { agents: [a-agent, b-agent], background: true } ← 기다리지 않고 맡길 수도 있습니다
+ *   background: true면 Sub Agent Tool에 run_in_background 인자가 생기고 TaskOutput Tool이 함께 붙습니다.
+ *   LLM은 여러 일을 한꺼번에 맡겨 놓고(task_id를 받음) 나중에 TaskOutput으로 결과를 모읍니다.
+ *   자세한 동작은 runtime.agent.SubAgentToolCallback과 runtime.agent.SubAgentTasks를 보세요.
  *
  * ■ execution
  *   - onInvalidOutput / maxAttempts: 답이 output 모양을 어겼을 때.
@@ -113,7 +128,8 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  * @param output         돌려주는 값의 모양입니다. 비우면 글자(string)입니다.
  * @param context        답할 때 참고할 자료(RAG)입니다.
  * @param tools          쓸 수 있는 Tool입니다. 비우면 Tool을 쓰지 않습니다.
- * @param subAgents      일을 맡길 수 있는 다른 Agent의 id 목록입니다.
+ * @param skills         필요할 때 꺼내 읽을 Skill입니다. 비우면 Skill을 쓰지 않습니다.
+ * @param subAgents      일을 맡길 수 있는 다른 Agent와 맡기는 방식입니다.
  * @param allowedCallers 호출을 허락할 caller(tenant) 목록입니다. 비우면 누구나 부를 수 있습니다.
  * @param execution      다시 부르기, 대기 시간, Tool 호출 한도입니다.
  */
@@ -128,7 +144,8 @@ public record AgentDefinition(
 	, SchemaDefinition output
 	, Context context
 	, Tools tools
-	, List<String> subAgents
+	, Skills skills
+	, SubAgents subAgents
 	, List<String> allowedCallers
 	, Execution execution
 	) {
@@ -190,6 +207,73 @@ public record AgentDefinition(
 	}
 
 	/**
+	 * agent.skills 입니다.
+	 *
+	 * @param allowed 이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다.
+	 */
+	public record Skills(List<String> allowed) {
+	}
+
+	/**
+	 * <pre>
+	 * agent.subAgents 입니다. YAML에는 두 가지 모양으로 적을 수 있습니다.
+	 *   subAgents: [a-agent, b-agent]                               ← 목록만(background는 false)
+	 *   subAgents: { agents: [a-agent, b-agent], background: true }  ← 맵
+	 * </pre>
+	 *
+	 * @param agents     일을 맡길 수 있는 Agent id 목록입니다.
+	 * @param background true면 LLM이 기다리지 않고 맡길 수 있습니다(run_in_background + TaskOutput).
+	 */
+	public record SubAgents(List<String> agents, Boolean background) {
+
+		/** 맵 모양에서 쓸 수 있는 키입니다. */
+		private static final List<String> KEYS = List.of("agents", "background");
+
+		/**
+		 * YAML에 적은 값(목록 또는 맵)을 읽을 때 쓰입니다.
+		 *
+		 * @param raw YAML에 적힌 subAgents 값입니다.
+		 */
+		@JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+		public static SubAgents of(Object raw) {
+			if (raw == null) {
+				return null;
+			}
+			if (raw instanceof List<?> list) {
+				return new SubAgents(toIds(list), Boolean.FALSE);
+			}
+			if (raw instanceof Map<?, ?> map) {
+				for (Object key : map.keySet()) {
+					if (!KEYS.contains(String.valueOf(key))) {
+						throw new IllegalArgumentException("subAgents에 '" + key + "'는 쓸 수 없는 키입니다(쓸 수 있는 키 = " + KEYS + "). 예: subAgents: {agents: [a-agent], background: true}");
+					}
+				}
+				Object agents = map.get("agents");
+				if (agents != null && !(agents instanceof List)) {
+					throw new IllegalArgumentException("subAgents.agents는 Agent id 목록이어야 합니다. 예: agents: [a-agent, b-agent]");
+				}
+				Object background = map.get("background");
+				if (background != null && !(background instanceof Boolean)) {
+					throw new IllegalArgumentException("subAgents.background는 true 또는 false여야 합니다: " + background);
+				}
+				return new SubAgents(agents == null ? List.of() : toIds((List<?>) agents), Boolean.TRUE.equals(background));
+			}
+			throw new IllegalArgumentException("subAgents는 Agent id 목록이나 {agents: [...], background: true} 모양이어야 합니다: " + raw);
+		}
+
+		private static List<String> toIds(List<?> list) {
+			List<String> ids = new ArrayList<>();
+			for (Object item : list) {
+				if (item == null) {
+					throw new IllegalArgumentException("subAgents에 빈 id가 있습니다.");
+				}
+				ids.add(String.valueOf(item));
+			}
+			return ids;
+		}
+	}
+
+	/**
 	 * agent.execution 입니다.
 	 *
 	 * @param maxAttempts     답이 output 모양을 지키지 않았을 때 모두 몇 번까지 부를지입니다(onInvalidOutput: RETRY일 때만 씁니다). 비워두면 1입니다.
@@ -233,9 +317,19 @@ public record AgentDefinition(
 		return this.toolNames().contains(ALL_TOOLS);
 	}
 
+	/** 이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다. 비워뒀으면 빈 목록입니다. */
+	public List<String> skillNames() {
+		return this.skills == null || this.skills.allowed() == null ? List.of() : this.skills.allowed();
+	}
+
 	/** 이 Agent가 일을 맡길 수 있는 Agent id 목록입니다. 비워뒀으면 빈 목록입니다. */
 	public List<String> subAgentIds() {
-		return this.subAgents == null ? List.of() : this.subAgents;
+		return this.subAgents == null || this.subAgents.agents() == null ? List.of() : this.subAgents.agents();
+	}
+
+	/** Sub Agent에게 기다리지 않고 일을 맡길 수 있는지(subAgents.background: true) 봅니다. */
+	public boolean subAgentBackground() {
+		return this.subAgents != null && Boolean.TRUE.equals(this.subAgents.background());
 	}
 
 	/** context.sources에 적은 값들입니다. 비워뒀으면 빈 목록입니다. */

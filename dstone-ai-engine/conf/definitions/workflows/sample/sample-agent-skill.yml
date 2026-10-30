@@ -1,0 +1,29 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 AGENT step 하나가 Skill을 가진 Agent(sample-skill-agent)를 호출해서,
+# LLM이 스스로 Skill(skills/sample/sql-review/SKILL.md)을 불러 읽고 그 안내대로 일하는 동작을 확인해보기 위한 테스트 전용 Workflow입니다.
+#
+# Workflow에서 보면 평범한 AGENT step 하나입니다. Skill을 부르는 일은 step 안에서 LLM이 판단해서 하므로
+# steps에 따로 적지 않습니다. Skill을 불렀는지는 dstone-ai-engine 로그에 남습니다.
+#   dstone-ai-engine skill: agent[sample-skill-agent] -> skill[sql-review] ...자
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출해보면 됩니다:
+#   workflowId: sample-agent-skill
+#   input     : SELECT id, name FORM member WHERE id = 1 이 SQL 좀 봐줘
+# ("FORM"은 "FROM"을 일부러 잘못 쓴 오타입니다 - 검사 실패 → checklist.md 읽기 → 고치기 → 재검사 순서로 진행되는 것을 볼 수 있습니다)
+id: sample-agent-skill
+version: 1.0.0
+description: Skill(skills.allowed)을 가진 Agent가 작업 안내서를 불러 따르는 동작 확인용 Workflow. SQL이 섞인 문장을 보낸다.
+input: string
+state:
+  answer: step01의 결과
+return: ${state.answer}
+steps:
+
+  - id: step01
+    name: SQL 검토
+    type: AGENT
+    agent: sample-skill-agent
+    with: ${input}
+    save: answer
+    next: END

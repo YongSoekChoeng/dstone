@@ -14,10 +14,14 @@ import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.loader.DefinitionFile;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
+import net.dstone.ai.runtime.agent.SkillTool;
+import net.dstone.ai.runtime.agent.SubAgentTasks;
+import net.dstone.ai.runtime.agent.SubAgentToolCallback;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -51,6 +55,13 @@ import net.dstone.common.utils.StringUtil;
  *   Sub Agent가 자기 subAgents를 가짐(깊이는 한 단계뿐)
  *   Sub Agent에 description이 없음
  *   Sub Agent id가 Tool 이름으로 쓸 수 없는 모양이거나, 등록된 Tool 이름과 같음
+ *   subAgents.background: true인데 맡길 Agent가 없음
+ *   Sub Agent의 input에 run_in_background 필드가 있음(백그라운드 인자와 겹침)
+ *
+ * Skill(skills.allowed)도 기동할 때 검사합니다(checkSkills()).
+ *   오류(기동 실패)                                         경고(로그만)
+ *   skills.allowed에 등록되지 않은 Skill 이름을 적음          Skill 폴더에 참고 파일이 있는데 tools.allowed에 readFile이 없음
+ *   엔진이 붙이는 Tool 이름(Skill, TaskOutput)과 같은 이름의 Tool이나 Sub Agent가 있음
  * </pre>
  */
 @Component
@@ -60,6 +71,8 @@ public class AgentRegistry extends BaseObject {
 	private YamlDefinitionLoader loader;
 	@Autowired
 	private ConfigTool configTool;
+	@Autowired
+	private SkillRegistry skillRegistry;
 
 	/** Sub Agent는 LLM에게 Tool로 보이므로, id가 LLM provider의 Tool 이름 규칙(영문/숫자/밑줄/하이픈, 64자 이하)에 맞아야 합니다. */
 	private static final Pattern TOOL_NAME = Pattern.compile("[A-Za-z0-9_-]{1,64}");
@@ -78,7 +91,7 @@ public class AgentRegistry extends BaseObject {
 	@PostConstruct
 	public void load() {
 		List<DefinitionFile<AgentDefinition>> files = this.loader.loadAgents();
-		this.install(files, this.check(files));
+		this.install(files, this.check(files, this.skillRegistry.all()));
 	}
 
 	/**
@@ -89,9 +102,10 @@ public class AgentRegistry extends BaseObject {
 	 * 다시 읽기(DefinitionReloader)가 바꿔 끼우기 전에 이것으로 먼저 검사합니다.
 	 * </pre>
 	 *
-	 * @param files 검사할 Agent 파일들
+	 * @param files  검사할 Agent 파일들
+	 * @param skills skills.allowed가 가리킬 수 있는 Skill(이름 → 정의). 다시 읽을 때는 아직 등록 전인 Skill이 들어옵니다
 	 */
-	public Map<String, AgentDefinition> check(List<DefinitionFile<AgentDefinition>> files) {
+	public Map<String, AgentDefinition> check(List<DefinitionFile<AgentDefinition>> files, Map<String, SkillDefinition> skills) {
 		Map<String, AgentDefinition> resolved = new HashMap<>();
 		Map<String, String> paths = new HashMap<>();
 		for (DefinitionFile<AgentDefinition> file : files) {
@@ -119,6 +133,7 @@ public class AgentRegistry extends BaseObject {
 		for (AgentDefinition definition : resolved.values()) {
 			this.checkTools(definition, registeredTools);
 			this.checkSubAgents(definition, resolved, registeredTools);
+			this.checkSkills(definition, skills, registeredTools);
 		}
 		return resolved;
 	}
@@ -297,6 +312,12 @@ public class AgentRegistry extends BaseObject {
 	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
 	 */
 	private void checkSubAgents(AgentDefinition definition, Map<String, AgentDefinition> all, List<String> registeredTools) {
+		if (definition.subAgentBackground()) {
+			if (definition.subAgentIds().isEmpty()) {
+				throw new IllegalStateException("agent[" + definition.id() + "]의 subAgents.background가 true인데 subAgents.agents가 비어 있습니다. 맡길 Agent를 적거나 background를 지우십시오.");
+			}
+			this.checkEngineToolName(definition, SubAgentTasks.OUTPUT_TOOL_NAME, registeredTools);
+		}
 		for (String subAgentId : definition.subAgentIds()) {
 			String where = "agent[" + definition.id() + "]의 subAgents '" + subAgentId + "'";
 			AgentDefinition subAgent = all.get(subAgentId);
@@ -317,6 +338,10 @@ public class AgentRegistry extends BaseObject {
 			if (registeredTools.contains(subAgentId)) {
 				throw new IllegalStateException(where + ": 같은 이름의 Tool이 이미 등록되어 있습니다. LLM이 둘을 구분할 수 없으니 Agent id를 바꾸십시오.");
 			}
+			if (definition.subAgentBackground() && JsonSchemaUtil.OBJECT.equals(JsonSchemaUtil.typeOf(subAgent.inputSchema()))
+				&& subAgent.inputSchema().get(JsonSchemaUtil.PROPERTIES) instanceof Map<?, ?> properties && properties.containsKey(SubAgentToolCallback.BACKGROUND_FIELD)) {
+				throw new IllegalStateException(where + ": input에 " + SubAgentToolCallback.BACKGROUND_FIELD + " 필드가 있어서, 백그라운드로 맡길 때 쓰는 인자와 겹칩니다. 그 필드 이름을 바꾸십시오.");
+			}
 			// 부모는 쓸 수 있는데 Sub Agent는 쓸 수 없는 caller가 있으면, 그 caller에게는 Sub Agent가 붙지 않습니다. 실수일 수 있어 알려 둡니다.
 			List<String> subCallers = subAgent.allowedCallers();
 			if (subCallers == null || subCallers.isEmpty()) {
@@ -332,6 +357,53 @@ public class AgentRegistry extends BaseObject {
 					LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + ": caller[" + parentCaller + "]는 부모는 쓸 수 있지만 이 Agent는 쓸 수 없습니다. 이 caller에게는 이 Sub Agent가 붙지 않습니다.");
 				}
 			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 skills.allowed(꺼내 읽을 Skill 목록)를 검사합니다. 어떤 검사를 하는지는 클래스 설명의 표를 보십시오.
+	 * </pre>
+	 *
+	 * @param definition      검사할 Agent 정의
+	 * @param skills          등록될 Skill 전체(이름 → 정의)
+	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
+	 */
+	private void checkSkills(AgentDefinition definition, Map<String, SkillDefinition> skills, List<String> registeredTools) {
+		String where = "agent[" + definition.id() + "]의 ";
+		if (!definition.skillNames().isEmpty()) {
+			this.checkEngineToolName(definition, SkillTool.NAME, registeredTools);
+		}
+		boolean needsReadFile = false;
+		for (String name : definition.skillNames()) {
+			SkillDefinition skill = skills.get(name);
+			if (skill == null) {
+				throw new IllegalStateException(where + "skills.allowed에 적은 '" + name + "'는 등록된 Skill이 아닙니다(conf/definitions/skills 아래 SKILL.md의 name). 등록된 Skill = " + skills.keySet());
+			}
+			needsReadFile = needsReadFile || SkillTool.hasReferenceFiles(skill);
+		}
+		if (needsReadFile && !definition.allowsAllTools() && !definition.toolNames().contains(SkillTool.READ_TOOL)) {
+			LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + "Skill 폴더에 참고 파일이 있지만 tools.allowed에 " + SkillTool.READ_TOOL
+				+ "가 없습니다. 이 Agent는 Skill 본문만 읽고 참고 파일은 열지 못합니다.");
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 엔진이 직접 붙이는 Tool(Skill, TaskOutput)의 이름이 등록된 Tool이나 Sub Agent id와 겹치지 않는지 봅니다.
+	 * 겹치면 LLM이 둘을 구분할 수 없습니다.
+	 * </pre>
+	 *
+	 * @param definition      검사할 Agent 정의
+	 * @param toolName        엔진이 붙이는 Tool 이름
+	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
+	 */
+	private void checkEngineToolName(AgentDefinition definition, String toolName, List<String> registeredTools) {
+		if (registeredTools.contains(toolName)) {
+			throw new IllegalStateException("agent[" + definition.id() + "]: 엔진이 붙이는 Tool '" + toolName + "'과 같은 이름의 Tool이 이미 등록되어 있습니다. 그 Tool의 이름을 바꾸십시오.");
+		}
+		if (definition.subAgentIds().contains(toolName)) {
+			throw new IllegalStateException("agent[" + definition.id() + "]: Sub Agent id '" + toolName + "'은 엔진이 붙이는 Tool 이름과 같습니다. Agent id를 바꾸십시오.");
 		}
 	}
 

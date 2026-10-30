@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.mcp.McpServerDefinition;
+import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
 import net.dstone.common.core.BaseObject;
@@ -134,6 +135,15 @@ public class YamlDefinitionLoader extends BaseObject {
 		List<DefinitionFile<AgentDefinition>> definitions = new ArrayList<>();
 		for (DefinitionText file : this.readTexts(Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX)) {
 			definitions.add(new DefinitionFile<>(file.path(), this.parseAgent(file)));
+		}
+		return definitions;
+	}
+
+	/** 정의 폴더 아래 skills 폴더의 SKILL.md 파일을 전부 읽고 SkillDefinition으로 바꿉니다. */
+	public List<SkillDefinition> loadSkills() {
+		List<SkillDefinition> definitions = new ArrayList<>();
+		for (DefinitionText file : this.readTexts(Constants.Definition.SKILL_DIR, Constants.Definition.SKILL_FILE)) {
+			definitions.add(this.parseSkill(file));
 		}
 		return definitions;
 	}
@@ -282,6 +292,30 @@ public class YamlDefinitionLoader extends BaseObject {
 			throw new IllegalStateException(where + "의 맨 위가 키: 값 모양이 아닙니다.");
 		}
 		return (Map<String, Object>) this.resolvePlaceholders(raw);
+	}
+
+	/**
+	 * <pre>
+	 * SKILL.md 하나의 글자를 SkillDefinition으로 바꿉니다. 틀렸으면 경로와 이유를 담은 IllegalStateException입니다.
+	 * 파일 모양은 Agent 파일과 같습니다(--- 머리말 --- 아래 본문). 내용이 맞는지(이름 규칙, 설명 유무)는
+	 * common.registry.SkillRegistry가 검사합니다.
+	 * </pre>
+	 *
+	 * @param file 정의 폴더 기준 경로와 파일 내용
+	 */
+	public SkillDefinition parseSkill(DefinitionText file) {
+		Map<String, Object> root = this.readAgentFile(file.path(), file.text());
+		Object body = root.remove(PROMPT_KEY);
+		SkillDefinition.FrontMatter front = this.bind(file.path(), root, SkillDefinition.FrontMatter.class);
+		String baseDir = null;
+		Path rootDir = this.rootDir();
+		if (rootDir != null) {
+			Path skillFile = rootDir.resolve(file.path()).normalize();
+			baseDir = skillFile.getParent() == null ? null : skillFile.getParent().toString().replace('\\', '/');
+		}
+		SkillDefinition definition = new SkillDefinition(file.path(), baseDir, front, body == null ? "" : body.toString());
+		LogUtil.sysout("dstone-ai-engine loader: skill[" + definition.name() + "] <- " + file.path());
+		return definition;
 	}
 
 	/**
