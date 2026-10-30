@@ -8,6 +8,7 @@ import java.util.Map;
  * @param id          Workflow 식별자
  * @param description Workflow 설명
  * @param input       실행 요청의 input 모양(JSON Schema). 화면이 input을 글자로 보낼지 JSON 객체로 보낼지 정하는 데 쓴다
+ * @param path        정의 파일 경로(예: workflows/sample/sample-foreach-parallel.yml). 드롭다운을 폴더별로 묶는 데 쓴다
  */
-public record WorkFlowSummaryResult(String id, String description, Map<String, Object> input) {
+public record WorkFlowSummaryResult(String id, String description, Map<String, Object> input, String path) {
 }

@@ -81,7 +81,7 @@ public class WorkFlowController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		List<WorkFlowSummary> summaries = new ArrayList<>();
 		for (WorkFlowDefinition definition : this.workFlowRegistry.list(caller)) {
-			summaries.add(WorkFlowSummary.from(definition));
+			summaries.add(WorkFlowSummary.from(definition, this.workFlowRegistry.pathOf(definition.id())));
 		}
 		return summaries;
 	}

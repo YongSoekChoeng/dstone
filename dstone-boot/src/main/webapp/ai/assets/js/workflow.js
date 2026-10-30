@@ -131,21 +131,53 @@ var DstoneAiWorkflow = (function () {
 				return response.json();
 			})
 			.then(function (workflows) {
-				workflowIdEl.innerHTML = "";
 				workflowsById = {};
 				(workflows || []).forEach(function (workflow) {
 					workflowsById[workflow.id] = workflow;
-					var option = document.createElement("option");
-					option.value = workflow.id;
-					option.textContent = workflow.id;
-					workflowIdEl.appendChild(option);
 				});
+				fillWorkflowSelect(workflows || []);
 				updateWorkflowDescription();
 				fillSample();
 			})
 			.catch(function (err) {
 				workflowIdDescEl.textContent = "workflow 목록을 불러오지 못했습니다: " + err.message;
 			});
+	}
+
+	/** Workflow 디자이너처럼 정의 파일의 폴더(workflows/sample 등)별로 묶어 드롭다운을 채운다. */
+	function fillWorkflowSelect(workflows) {
+		var sorted = workflows.slice().sort(function (a, b) {
+			var pathA = a.path || a.id;
+			var pathB = b.path || b.id;
+			return pathA < pathB ? -1 : (pathA > pathB ? 1 : 0);
+		});
+		var groups = {};
+		var order = [];
+		sorted.forEach(function (workflow) {
+			var folder = folderOf(workflow.path);
+			if (!groups[folder]) {
+				groups[folder] = [];
+				order.push(folder);
+			}
+			groups[folder].push(workflow);
+		});
+		var html = "";
+		order.forEach(function (folder) {
+			html += "<optgroup label=\"" + escapeHtml(folder) + "\">";
+			groups[folder].forEach(function (workflow) {
+				html += "<option value=\"" + escapeHtml(workflow.id) + "\">" + escapeHtml(workflow.id) + "</option>";
+			});
+			html += "</optgroup>";
+		});
+		workflowIdEl.innerHTML = html;
+	}
+
+	/** 정의 파일 경로에서 폴더 부분만 뗀다. 경로를 모르면 "(폴더 없음)"으로 묶는다. */
+	function folderOf(path) {
+		if (!path || path.lastIndexOf("/") < 0) {
+			return "(폴더 없음)";
+		}
+		return path.substring(0, path.lastIndexOf("/"));
 	}
 
 	function updateWorkflowDescription() {

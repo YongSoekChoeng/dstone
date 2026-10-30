@@ -17,16 +17,18 @@ import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
  * @param description 이 Workflow가 무슨 일을 하는지 설명하는 문구입니다(common.definition.workflow.WorkFlowDefinition.description()).
  * @param input       실행 요청의 input 모양(JSON Schema)입니다(common.definition.workflow.WorkFlowDefinition.inputSchema()).
  * @param version     이 Workflow 정의의 버전입니다.
+ * @param path        정의 파일 경로입니다(정의 폴더 기준, 예: workflows/sample/sample-foreach-parallel.yml). 화면이 폴더별로 묶어 보여 줄 때 씁니다.
  */
-public record WorkFlowSummary(String id, String description, Map<String, Object> input, String version) {
+public record WorkFlowSummary(String id, String description, Map<String, Object> input, String version, String path) {
 
 	/**
 	 * WorkFlowDefinition(Workflow 전체 정의)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
 	 *
 	 * @param definition 요약으로 바꿔줄 Workflow 정의입니다.
+	 * @param path       그 정의 파일의 경로입니다(common.registry.WorkFlowRegistry.pathOf()).
 	 */
-	public static WorkFlowSummary from(WorkFlowDefinition definition) {
-		return new WorkFlowSummary(definition.id(), definition.description(), definition.inputSchema(), definition.version());
+	public static WorkFlowSummary from(WorkFlowDefinition definition, String path) {
+		return new WorkFlowSummary(definition.id(), definition.description(), definition.inputSchema(), definition.version(), path);
 	}
 
 }

@@ -49,7 +49,7 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 		List<WorkFlowSummaryResult> summaries = new ArrayList<>();
 		if (results != null) {
 			for (WorkFlowSummaryCallResult result : results) {
-				summaries.add(new WorkFlowSummaryResult(result.id(), result.description(), result.input()));
+				summaries.add(new WorkFlowSummaryResult(result.id(), result.description(), result.input(), result.path()));
 			}
 		}
 		return summaries;
