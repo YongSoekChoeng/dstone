@@ -1,58 +1,42 @@
 {
   "nodes" : {
     "__START__" : {
-      "x" : -190,
-      "y" : -170
+      "x" : 157,
+      "y" : 20
     },
     "END" : {
-      "x" : 290,
-      "y" : 670
+      "x" : 391,
+      "y" : 564
     },
     "FAIL" : {
-      "x" : -250,
-      "y" : 680
+      "x" : 62,
+      "y" : 292
     },
     "step02_test_agent" : {
       "x" : 220,
       "y" : 200
     },
     "step01_readCustReq" : {
-      "x" : -210,
-      "y" : -70
+      "x" : 66,
+      "y" : 138
     },
     "step02_decideJobKind" : {
-      "x" : 140,
-      "y" : 0
+      "x" : 160,
+      "y" : 280
     },
     "step03_getAffectedForNew" : {
-      "x" : 460,
-      "y" : 140
+      "x" : 20,
+      "y" : 422
     },
     "step03_getAffectedForGen" : {
-      "x" : -120,
-      "y" : 140
+      "x" : 300,
+      "y" : 422
     },
     "step03" : {
       "x" : -90,
       "y" : 140
     }
   },
-  "edges" : {
-    "step01_readCustReq|onFailure|" : [ {
-      "x" : -170,
-      "y" : 20
-    }, {
-      "x" : -240,
-      "y" : 20
-    }, {
-      "x" : -240,
-      "y" : 580
-    } ]
-  },
-  "ports" : {
-    "step01_readCustReq|next|" : {
-      "source" : "right",
-      "target" : "in"
-    }
-  }
+  "edges" : { },
+  "ports" : { }
 }
