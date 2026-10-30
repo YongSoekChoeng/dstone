@@ -892,6 +892,25 @@ p.wd-route-bad {
 	color: var(--cs-faint);
 }
 
+/* Agent 관리 창: 좁은 화면에서 입력 표가 눌려 잘리지 않게 하고, 창 전체를 스크롤한다 */
+#wd-agents-dialog .wd-dialog-box > * {
+	flex-shrink: 0;
+}
+
+.wd-agents-row {
+	align-items: center;
+}
+
+.wd-agents-row .wd-pick-main {
+	flex: 1 1 auto;
+}
+
+.wd-agents-actions {
+	display: flex;
+	flex: 0 0 auto;
+	gap: 6px;
+}
+
 .wd-pick-empty {
 	padding: 16px;
 }

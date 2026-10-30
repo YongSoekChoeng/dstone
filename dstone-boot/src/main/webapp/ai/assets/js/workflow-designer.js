@@ -148,6 +148,7 @@ var DstoneAiDesigner = (function () {
 		bindTabs();
 		bindKeyboard();
 		bindAgentDialog();
+		bindAgentManager();
 		bindPicker();
 		bindGuide();
 		bindFullscreen();
@@ -2282,6 +2283,9 @@ var DstoneAiDesigner = (function () {
 			return;
 		}
 		els.agentDialog.style.display = "none";
+		if (els.agentsDialog.style.display !== "none") {
+			els.agentsSearch.focus();
+		}
 	}
 
 	/** Agent 파일 글자로 창을 엽니다. */
@@ -3162,6 +3166,7 @@ var DstoneAiDesigner = (function () {
 			agentMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
 			loadCatalog().then(function () {
 				showPanel();
+				renderAgentManager();
 			});
 		}).catch(function (e) {
 			agentMessage("error", e.message);
@@ -3171,6 +3176,160 @@ var DstoneAiDesigner = (function () {
 	function agentMessage(kind, text) {
 		els.agentMessage.className = "wd-message" + (kind ? " wd-message-" + kind : "");
 		els.agentMessage.textContent = text;
+	}
+
+	/* ====================================================================
+	 * Agent 관리 창: Workflow나 step 없이 Agent를 만들고, 고르고, 지운다
+	 * ==================================================================== */
+
+	function bindAgentManager() {
+		els.agentsDialog = document.getElementById("wd-agents-dialog");
+		els.agentsType = document.getElementById("wd-agents-type");
+		els.agentsFolder = document.getElementById("wd-agents-folder");
+		els.agentsId = document.getElementById("wd-agents-id");
+		els.agentsMessage = document.getElementById("wd-agents-message");
+		els.agentsSearch = document.getElementById("wd-agents-search");
+		els.agentsList = document.getElementById("wd-agents-list");
+		document.getElementById("wd-agents-btn").addEventListener("click", openAgentManager);
+		document.getElementById("wd-agents-close-btn").addEventListener("click", closeAgentManager);
+		document.getElementById("wd-agents-new-btn").addEventListener("click", createAgentFromManager);
+		els.agentsSearch.addEventListener("input", renderAgentManager);
+		els.agentsDialog.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				closeAgentManager();
+			}
+		});
+		els.agentsList.addEventListener("click", function (e) {
+			var button = e.target;
+			if (button.getAttribute("data-agent-open")) {
+				openAgent(button.getAttribute("data-agent-open"));
+			} else if (button.getAttribute("data-agent-delete")) {
+				deleteAgent(button.getAttribute("data-agent-delete"));
+			}
+		});
+	}
+
+	function openAgentManager() {
+		if (!catalog) {
+			return;
+		}
+		els.agentsFolder.value = currentFolder().replace(/^workflows/, "agents");
+		els.agentsId.value = "";
+		els.agentsSearch.value = "";
+		agentManagerMessage("", "");
+		document.getElementById("wd-agents-new-btn").disabled = !catalog.editable;
+		els.agentsDialog.style.display = "flex";
+		renderAgentManager();
+		els.agentsId.focus();
+	}
+
+	function closeAgentManager() {
+		els.agentsDialog.style.display = "none";
+	}
+
+	function agentFolderOf(agent) {
+		return agent.path.substring(0, agent.path.lastIndexOf("/"));
+	}
+
+	function renderAgentManager() {
+		if (!els.agentsDialog || els.agentsDialog.style.display === "none") {
+			return;
+		}
+		var folders = [];
+		catalog.agents.forEach(function (agent) {
+			if (folders.indexOf(agentFolderOf(agent)) < 0) {
+				folders.push(agentFolderOf(agent));
+			}
+		});
+		document.getElementById("wd-agents-folders").innerHTML = folders.sort().map(function (folder) {
+			return "<option value=\"" + escapeHtml(folder) + "\"></option>";
+		}).join("");
+
+		// 낱말을 여럿 적으면 모두 들어 있는 것만 남긴다(고르기 창과 같은 방식).
+		var words = els.agentsSearch.value.trim().toLowerCase().split(/\s+/).filter(function (w) {
+			return w !== "";
+		});
+		var shown = catalog.agents.filter(function (agent) {
+			var text = (agent.id + " " + (agent.description || "") + " " + agent.path).toLowerCase();
+			return words.every(function (w) {
+				return text.indexOf(w) >= 0;
+			});
+		});
+		document.getElementById("wd-agents-count").textContent = "전체 " + catalog.agents.length + "개 중 " + shown.length + "개 보임";
+		if (shown.length === 0) {
+			els.agentsList.innerHTML = "<p class=\"ai-hint wd-pick-empty\">" + (catalog.agents.length === 0 ? "아직 Agent가 없습니다." : "찾는 것이 없습니다.") + "</p>";
+			return;
+		}
+		els.agentsList.innerHTML = shown.map(function (agent) {
+			return "<div class=\"wd-pick-row wd-agents-row\">"
+				+ "<span class=\"wd-pick-main\"><span class=\"wd-pick-name\">" + escapeHtml(agent.id)
+				+ " <span class=\"wd-pick-group\">" + escapeHtml(agentFolderOf(agent)) + "</span>"
+				// SUPERVISOR/ROUTER step의 agent 목록에는 output을 적은 Agent가 나오지 않는다.
+				+ (agent.declaresOutput ? " <em>AGENT step 전용(output 있음)</em>" : "") + "</span>"
+				+ (agent.description ? "<span class=\"wd-pick-desc\">" + escapeHtml(agent.description) + "</span>" : "")
+				+ "</span>"
+				+ "<span class=\"wd-agents-actions\">"
+				+ "<button type=\"button\" class=\"kn-plain\" data-agent-open=\"" + escapeHtml(agent.id) + "\">열기</button>"
+				+ "<button type=\"button\" class=\"kn-plain\" data-agent-delete=\"" + escapeHtml(agent.id) + "\"" + (catalog.editable ? "" : " disabled") + ">삭제</button>"
+				+ "</span></div>";
+		}).join("");
+	}
+
+	function createAgentFromManager() {
+		var id = els.agentsId.value.trim();
+		var folder = els.agentsFolder.value.trim().replace(/\/+$/, "");
+		if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+			agentManagerMessage("error", "Agent id는 영문, 숫자, -, _ 로 64자까지 적으십시오.");
+			els.agentsId.focus();
+			return;
+		}
+		if (findAgent(id)) {
+			agentManagerMessage("error", "이미 있는 Agent id입니다: " + id);
+			els.agentsId.focus();
+			return;
+		}
+		if (!/^agents(\/[A-Za-z0-9_-]+)*$/.test(folder)) {
+			agentManagerMessage("error", "폴더는 agents로 시작하고 영문, 숫자, -, _ 로 적으십시오(예: agents/sample).");
+			els.agentsFolder.focus();
+			return;
+		}
+		var type = els.agentsType.value;
+		agentManagerMessage("", "");
+		els.agentsId.value = "";
+		showAgent(agentTemplate({ type: type }, id), folder + "/" + id + ".md", null);
+		agentMessage("info", type === "ROUTER"
+			? "괄호 ( ) 안을 채우고 경로1, 경로2를 실제 경로 이름으로 바꿔 저장하십시오. 이 이름은 나중에 step의 routes 이름과 같아야 합니다."
+			: "괄호 ( ) 안을 이 일에 맞게 채우고 저장하십시오. 저장하면 step의 agent 목록에 바로 나옵니다.");
+	}
+
+	/** Agent 파일을 지웁니다. 어느 Workflow가 아직 쓰고 있으면 엔진 검사에서 막혀 아무것도 지워지지 않습니다. */
+	function deleteAgent(id) {
+		var agent = findAgent(id);
+		if (!agent || !window.confirm(agent.path + " 파일을 지웁니다. 엔진에서도 바로 빠집니다. 지울까요?")) {
+			return;
+		}
+		agentManagerMessage("info", "지우는 중...");
+		call("POST", "/api/ai/definitions/agents/delete", { path: agent.path }).then(function (result) {
+			if (!result.ok) {
+				agentManagerMessage("error", result.message);
+				return;
+			}
+			agentManagerMessage("ok", "지웠습니다: " + result.path);
+			loadCatalog().then(function () {
+				showPanel();
+				renderAgentManager();
+				// 누른 단추가 목록과 함께 사라지므로 포커스를 창 안에 돌려놓는다(그래야 Esc가 듣는다).
+				els.agentsSearch.focus();
+			});
+		}).catch(function (e) {
+			agentManagerMessage("error", e.message);
+		});
+	}
+
+	function agentManagerMessage(kind, text) {
+		els.agentsMessage.className = "wd-message" + (kind ? " wd-message-" + kind : "");
+		els.agentsMessage.textContent = text;
 	}
 
 	/* ====================================================================

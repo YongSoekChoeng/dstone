@@ -41,6 +41,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<span id="wd-status" class="workflow-status"></span>
 					<button type="button" id="wd-new-btn" class="kn-plain">새 Workflow</button>
 					<button type="button" id="wd-copy-btn" class="kn-plain">복사해서 새로</button>
+					<button type="button" id="wd-agents-btn" class="kn-plain" title="Workflow와 상관없이 Agent를 미리 만들고 고칩니다">Agent 관리</button>
 					<button type="button" id="wd-reload-btn" class="kn-plain" title="정의 폴더의 파일을 엔진이 다시 읽습니다(손으로 고친 파일 반영)">엔진 다시 읽기</button>
 					<button type="button" id="wd-layout-btn" class="kn-plain">자동 배치</button>
 					<button type="button" id="wd-undo-btn" class="kn-plain" title="Ctrl+Z">되돌리기</button>
@@ -59,6 +60,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<span id="wd-full-status-slot" class="wd-full-slot"></span>
 					<div id="wd-full-message-slot" class="wd-full-message"></div>
 					<div class="wd-full-actions">
+						<button type="button" class="kn-plain" data-proxy="wd-agents-btn">Agent 관리</button>
 						<button type="button" class="kn-plain" data-proxy="wd-layout-btn">자동 배치</button>
 						<button type="button" class="kn-plain" data-proxy="wd-undo-btn" title="Ctrl+Z">되돌리기</button>
 						<button type="button" data-proxy="wd-check-btn">검사</button>
@@ -112,7 +114,46 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				</div>
 			</section>
 
-			<%-- Agent 파일을 고치는 창. step 설정의 [Agent 파일 열기]나 [새 Agent]로 연다.
+			<%-- Agent 관리 창. Workflow나 step을 고르지 않아도 Agent를 만들고, 고르고, 지운다.
+				Agent 창이 이 창 위에 떠야 하므로 Agent 창보다 앞에 둔다 --%>
+			<div id="wd-agents-dialog" class="wd-dialog" style="display: none;">
+				<div class="wd-dialog-box wd-pick-box">
+					<div class="wd-dialog-head">
+						<h3>Agent 관리</h3>
+						<button type="button" id="wd-agents-close-btn" class="kn-plain">닫기</button>
+					</div>
+					<p class="ai-hint">Workflow를 그리기 전에 필요한 Agent를 만들어 두십시오. 저장한 Agent는 어느 Workflow에서든 step 설정의 agent 목록에서 고를 수 있습니다.</p>
+					<table class="ai-form">
+						<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+						<tr>
+							<th><label for="wd-agents-type">쓸 곳</label></th>
+							<td><select id="wd-agents-type">
+								<option value="AGENT">AGENT step (일을 함)</option>
+								<option value="SUPERVISOR">SUPERVISOR step (통과/불합격 판정)</option>
+								<option value="ROUTER">ROUTER step (여러 길 중 하나)</option>
+							</select></td>
+							<th><label for="wd-agents-folder">폴더</label></th>
+							<td><input type="text" id="wd-agents-folder" list="wd-agents-folders" placeholder="agents/폴더" />
+								<datalist id="wd-agents-folders"></datalist></td>
+						</tr>
+						<tr>
+							<th><label for="wd-agents-id">Agent id</label></th>
+							<td colspan="3"><input type="text" id="wd-agents-id" placeholder="영문, 숫자, -, _ (예: order-summary-agent)" /></td>
+						</tr>
+					</table>
+					<div class="ai-form-actions">
+						<button type="button" id="wd-agents-new-btn">새 Agent 만들기</button>
+					</div>
+					<div id="wd-agents-message" class="wd-message"></div>
+					<div class="wd-pick-bar">
+						<input type="search" id="wd-agents-search" placeholder="이름이나 설명으로 찾기" />
+						<span id="wd-agents-count" class="ai-hint"></span>
+					</div>
+					<div id="wd-agents-list" class="wd-pick-list"></div>
+				</div>
+			</div>
+
+			<%-- Agent 파일을 고치는 창. step 설정의 [Agent 파일 열기]나 [새 Agent], [Agent 관리] 창에서 연다.
 				[양식]은 항목별 입력 칸, [텍스트]는 파일 글자 그대로. 저장하는 것은 늘 [텍스트]의 글자다 --%>
 			<div id="wd-agent-dialog" class="wd-dialog" style="display: none;">
 				<div class="wd-dialog-box wd-agent-box">
