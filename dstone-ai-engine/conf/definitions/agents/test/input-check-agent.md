@@ -9,6 +9,10 @@ input:
   div: string, 토큰으로 나눌 구분자
 output:
   outArr(array, 토큰으로 나뉜 input 스트링): string
+  os: string, os 명
+tools:
+  allowed:
+    - getSystemProperty
 execution:
   maxAttempts: 3
   onInvalidOutput: RETRY
@@ -17,3 +21,4 @@ execution:
 
 [역할]
 input 으로 들어오는 ${input.inputStr}을  ${input.div}를 구분자로 나누어서 스트링배열을 만든 후 ${output.outArr}에 넣어서 반환한다.
+getSystemProperty 를 호출하여 ${output.os}에 현재 OS의 종류를 넣어서 반환한다.
