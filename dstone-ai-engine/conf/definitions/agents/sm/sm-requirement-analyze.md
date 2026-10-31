@@ -14,6 +14,7 @@ model:
   temperature: 0.2
   reasoning: medium
 input: string, 고객의 요구사항표가 위치하는 파일의 Full경로
+output: string, 요구사항분석서 파일 Full경로
 context:
   sources:
     - retrievedDocuments
@@ -44,8 +45,8 @@ ${input} - 고객의 요구사항이 적혀있는 고객요청서경로.
   - Tool : isFileExist
 2. 고객요청서를 읽는다.
   - Tool : readFile
-3. 요청서의 내용을 파악해서 수정사항 과 신규기능 요구사항을 분류 해낸다.
-4. 분류한 내용을 ${input}과 동일한 디렉토리에 01.customer-requirement.md 라는 파일명으로 쓴다.
+3. 요청서의 내용을 파악해서 수정사항 과 신규기능 요구사항을 분석 해낸다.
+4. 분석한 내용을 ${input}과 동일한 디렉토리에 01.customer-requirement.md 라는 파일명으로 쓴다.(고객요구사항분석서)
   - Tool : writeFile
 
 [출력]
@@ -54,3 +55,6 @@ ${input} - 고객의 요구사항이 적혀있는 고객요청서경로.
   - 번호(TASK-01..) | 목적 | 대상 파일 절대경로 | 변경 내용(설계서의 어느 변경인지) | 선행 태스크 | 완료 기준 | 상태(대기)
 3. 과정 설명이나 인사말 없이 결과만 답한다.
 4. 확실하지 않은 것은 "확인 필요"라고 밝힌다.
+
+[반환]
+고객요구사항분석서 Full 파일명
