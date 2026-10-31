@@ -14,43 +14,12 @@ settings:
   maxIterations: 100
   onError: STOP
 input: string, 요청서가 작성된 디렉토리명
-state:
-  custReq: step01_readCustReq step의 결과
-  affected_resources: step03_getAffectedResource step의 결과
+state: {}
 steps:
 
-  - id: step01_readCustReq
-    name: 고객요청사항판단
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/00-request.md
-    save: custReq
-    onFailure: FAIL
-    next: step02_decideJobKind
-
-  - id: step02_decideJobKind
-    name: 신규/일반(수정) 판단
-    type: ROUTER
+  - id: step01
+    name: 고객요청사항 파악
+    type: AGENT
     with: ${input}
-    agent: sm-decide-job-kind-agent
-    routes:
-      신규개발: step03_getAffectedForNew
-      일반: step03_getAffectedForGen
-
-  - id: step03_getAffectedForNew
-    name: 신규처리-영향도파악
-    type: AGENT
-    with: ${state.custReq}
-    save: affected_resources
-    agent: sm-architect-agent
-
-  - id: step03_getAffectedForGen
-    name: 일반처리-영향도파악
-    type: AGENT
-    with:
-      workDir: ${input}
-      request?: ${state.custReq}
-    save: affected_resources
+    agent: sm-requirement-analyze
     next: END
-    agent: sm-architect-agent

@@ -5,36 +5,24 @@
       "y" : 20
     },
     "END" : {
-      "x" : 391,
-      "y" : 564
+      "x" : 620,
+      "y" : 570
     },
     "FAIL" : {
-      "x" : 62,
-      "y" : 292
+      "x" : 100,
+      "y" : 570
     },
     "step02_test_agent" : {
       "x" : 220,
       "y" : 200
     },
-    "step01_readCustReq" : {
-      "x" : 66,
-      "y" : 138
-    },
-    "step02_decideJobKind" : {
-      "x" : 160,
-      "y" : 280
-    },
-    "step03_getAffectedForNew" : {
-      "x" : 20,
-      "y" : 422
-    },
-    "step03_getAffectedForGen" : {
-      "x" : 300,
-      "y" : 422
-    },
     "step03" : {
       "x" : -90,
       "y" : 140
+    },
+    "step01" : {
+      "x" : 170,
+      "y" : 130
     }
   },
   "edges" : { },
