@@ -2,6 +2,7 @@ package net.dstone.ai.api.service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,7 +40,7 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * 정의 파일(Workflow, Agent)을 화면에서 보고 고치기 위한 서비스입니다. api.controller.DefinitionController가 부릅니다.
+ * 정의 파일(Workflow, Agent, Skill)을 화면에서 보고 고치기 위한 서비스입니다. api.controller.DefinitionController가 부릅니다.
  *
  * 검사와 저장은 common.registry.DefinitionReloader에 맡깁니다. 저장은 "전부 검사 → 통과하면 파일 쓰기 → 바꿔 끼우기"라서,
  * 틀린 정의는 파일에도 쓰이지 않고 등록되지도 않습니다.
@@ -71,7 +72,7 @@ public class DefinitionService extends BaseObject {
 	private final ObjectMapper objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
 	/**
-	 * 정의 종류 하나(workflows, agents)의 폴더와 파일 이름 꼬리입니다.
+	 * 정의 종류 하나(workflows, agents, skills)의 폴더와 파일 이름 꼬리입니다.
 	 *
 	 * @param dir    종류 폴더
 	 * @param suffix 파일 이름 꼬리
@@ -150,12 +151,12 @@ public class DefinitionService extends BaseObject {
 	 * 등록된 정의 하나의 파일 내용을 글자 그대로 돌려줍니다. 없는 id면 null입니다.
 	 * </pre>
 	 *
-	 * @param kindName workflows 또는 agents
-	 * @param id       정의 id
+	 * @param kindName workflows, agents, skills 중 하나
+	 * @param id       정의 id(Skill은 이름)
 	 */
 	public DefinitionSource source(String kindName, String id) {
 		Kind kind = this.kindOf(kindName);
-		String path = Constants.Definition.WORKFLOW_DIR.equals(kind.dir()) ? this.workFlowRegistry.pathOf(id) : this.agentRegistry.pathOf(id);
+		String path = this.pathOf(kind, id);
 		if (path == null) {
 			return null;
 		}
@@ -172,7 +173,7 @@ public class DefinitionService extends BaseObject {
 	 * 고친 내용을 저장하지 않고 검사만 합니다. 디스크의 다른 파일들과 함께 전부 검사합니다.
 	 * </pre>
 	 *
-	 * @param kindName workflows 또는 agents
+	 * @param kindName workflows, agents, skills 중 하나
 	 * @param request  경로와 내용
 	 */
 	public DefinitionChangeResult check(String kindName, DefinitionChangeRequest request) {
@@ -192,7 +193,7 @@ public class DefinitionService extends BaseObject {
 	 * 다른 경로로 옮기면 원래 파일은 지웁니다. Workflow는 노드 위치 파일도 함께 쓰거나 옮깁니다.
 	 * </pre>
 	 *
-	 * @param kindName workflows 또는 agents
+	 * @param kindName workflows, agents, skills 중 하나
 	 * @param request  경로, 원래 경로, 내용, 노드 위치
 	 */
 	public synchronized DefinitionChangeResult save(String kindName, DefinitionChangeRequest request) {
@@ -216,7 +217,7 @@ public class DefinitionService extends BaseObject {
 	 * 정의 파일 하나를 지우고 다시 읽습니다. 지우면 다른 정의가 틀어지는 경우(예: Workflow가 부르는 Agent)는 지우지 않습니다.
 	 * </pre>
 	 *
-	 * @param kindName workflows 또는 agents
+	 * @param kindName workflows, agents, skills 중 하나
 	 * @param request  지울 파일 경로
 	 */
 	public synchronized DefinitionChangeResult delete(String kindName, DefinitionChangeRequest request) {
@@ -237,7 +238,11 @@ public class DefinitionService extends BaseObject {
 		if (Constants.Definition.WORKFLOW_DIR.equals(kind.dir())) {
 			this.deleteQuietly(this.fileOf(this.layoutPathOf(request.path())));
 		}
-		return new DefinitionChangeResult(true, "지우고 다시 읽었습니다.", request.path(), result.workflows(), result.agents());
+		String message = "지우고 다시 읽었습니다.";
+		if (Constants.Definition.SKILL_DIR.equals(kind.dir()) && !this.deleteFolderIfEmpty(this.fileOf(request.path()).getParent())) {
+			message += " Skill 폴더의 참고 파일은 지우지 않고 남겨 두었습니다.";
+		}
+		return new DefinitionChangeResult(true, message, request.path(), result.workflows(), result.agents());
 	}
 
 	/** 정의 폴더의 파일을 다시 읽습니다(손으로 고친 파일을 반영할 때). */
@@ -268,6 +273,10 @@ public class DefinitionService extends BaseObject {
 		boolean moved = !StringUtil.isEmpty(request.originalPath()) && !request.originalPath().equals(request.path());
 		if (moved) {
 			this.checkPath(kind, request.originalPath());
+			// Skill 폴더에는 참고 파일이 함께 있다. SKILL.md만 옮기면 참고 파일이 옛 폴더에 남는다.
+			if (Constants.Definition.SKILL_DIR.equals(kind.dir())) {
+				throw new RejectedException("Skill은 다른 경로로 옮길 수 없습니다. 폴더째 옮긴 뒤 [엔진 다시 읽기]를 누르십시오: " + request.originalPath(), false);
+			}
 		}
 		if ((StringUtil.isEmpty(request.originalPath()) || moved) && this.loader.rootDir() != null && Files.exists(this.fileOf(request.path()))) {
 			throw new RejectedException("이미 있는 파일입니다. 다른 경로를 적으십시오: " + request.path(), false);
@@ -289,9 +298,13 @@ public class DefinitionService extends BaseObject {
 	 * @param path 정의 폴더 기준 경로
 	 */
 	private void checkPath(Kind kind, String path) {
-		String hint = " 예: " + kind.dir() + "/sample/이름" + kind.suffix();
-		if (StringUtil.isEmpty(path) || !path.startsWith(kind.dir() + "/") || !path.endsWith(kind.suffix()) || path.endsWith("/" + kind.suffix())) {
-			throw new RejectedException("경로는 " + kind.dir() + "/ 로 시작하고 " + kind.suffix() + "로 끝나야 합니다: " + path + "." + hint, false);
+		boolean skill = Constants.Definition.SKILL_DIR.equals(kind.dir());
+		String hint = " 예: " + kind.dir() + "/sample/이름" + (skill ? "/" : "") + kind.suffix();
+		// Workflow, Agent는 꼬리 앞에 파일 이름이 있어야 하고, Skill은 파일 이름이 SKILL.md이면서 자기 폴더 안에 있어야 한다.
+		boolean nameOk = !StringUtil.isEmpty(path) && (skill ? path.endsWith("/" + kind.suffix()) && path.indexOf('/') < path.lastIndexOf('/')
+			: path.endsWith(kind.suffix()) && !path.endsWith("/" + kind.suffix()));
+		if (!nameOk || !path.startsWith(kind.dir() + "/")) {
+			throw new RejectedException("경로는 " + kind.dir() + "/ 로 시작하고 " + (skill ? "/" : "") + kind.suffix() + "로 끝나야 합니다: " + path + "." + hint, false);
 		}
 		for (String segment : path.split("/", -1)) {
 			if (!PATH_SEGMENT.matcher(segment).matches()) {
@@ -308,7 +321,7 @@ public class DefinitionService extends BaseObject {
 		}
 	}
 
-	/** 종류 이름(workflows, agents)을 폴더와 꼬리로 바꿉니다. 그 밖의 이름은 거절합니다(MCP 정의는 화면에서 고치지 않습니다). */
+	/** 종류 이름(workflows, agents, skills)을 폴더와 꼬리로 바꿉니다. 그 밖의 이름은 거절합니다(MCP 정의는 화면에서 고치지 않습니다). */
 	private Kind kindOf(String kindName) {
 		if (Constants.Definition.WORKFLOW_DIR.equals(kindName)) {
 			return new Kind(Constants.Definition.WORKFLOW_DIR, Constants.Definition.WORKFLOW_SUFFIX);
@@ -316,7 +329,22 @@ public class DefinitionService extends BaseObject {
 		if (Constants.Definition.AGENT_DIR.equals(kindName)) {
 			return new Kind(Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX);
 		}
-		throw new RejectedException("종류는 workflows 또는 agents입니다: " + kindName, false);
+		if (Constants.Definition.SKILL_DIR.equals(kindName)) {
+			return new Kind(Constants.Definition.SKILL_DIR, Constants.Definition.SKILL_FILE);
+		}
+		throw new RejectedException("종류는 workflows, agents, skills 중 하나입니다: " + kindName, false);
+	}
+
+	/** 등록된 정의의 파일 경로입니다. 없는 id면 null입니다. */
+	private String pathOf(Kind kind, String id) {
+		if (Constants.Definition.WORKFLOW_DIR.equals(kind.dir())) {
+			return this.workFlowRegistry.pathOf(id);
+		}
+		if (Constants.Definition.AGENT_DIR.equals(kind.dir())) {
+			return this.agentRegistry.pathOf(id);
+		}
+		SkillDefinition skill = this.skillRegistry.find(id);
+		return skill == null ? null : skill.path();
 	}
 
 	/** 정의 폴더 기준 경로를 디스크 경로로 바꿉니다. */
@@ -382,6 +410,20 @@ public class DefinitionService extends BaseObject {
 		} catch (IOException e) {
 			warn("파일을 지우지 못했습니다: " + file + " - " + e.getMessage());
 		}
+	}
+
+	/** 폴더가 비어 있으면 지웁니다. 비어 있지 않아 남겼으면 false입니다. 폴더를 지우지 못해도 정의 삭제는 실패로 치지 않습니다. */
+	private boolean deleteFolderIfEmpty(Path folder) {
+		try (DirectoryStream<Path> files = Files.newDirectoryStream(folder)) {
+			if (files.iterator().hasNext()) {
+				return false;
+			}
+		} catch (IOException e) {
+			warn("폴더를 읽지 못했습니다: " + folder + " - " + e.getMessage());
+			return true;
+		}
+		this.deleteQuietly(folder);
+		return true;
 	}
 
 	/** Tool 인자 스키마(JSON 글자)를 맵으로 바꿉니다. 읽지 못하면 null입니다. */

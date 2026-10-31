@@ -42,6 +42,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<button type="button" id="wd-new-btn" class="kn-plain">새 Workflow</button>
 					<button type="button" id="wd-copy-btn" class="kn-plain">복사해서 새로</button>
 					<button type="button" id="wd-agents-btn" class="kn-plain" title="Workflow와 상관없이 Agent를 미리 만들고 고칩니다">Agent 관리</button>
+					<button type="button" id="wd-skills-btn" class="kn-plain" title="Agent나 Workflow와 상관없이 Skill을 만들고 고칩니다">Skill 관리</button>
 					<button type="button" id="wd-reload-btn" class="kn-plain" title="정의 폴더의 파일을 엔진이 다시 읽습니다(손으로 고친 파일 반영)">엔진 다시 읽기</button>
 					<button type="button" id="wd-layout-btn" class="kn-plain">자동 배치</button>
 					<button type="button" id="wd-undo-btn" class="kn-plain" title="Ctrl+Z">되돌리기</button>
@@ -61,6 +62,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<div id="wd-full-message-slot" class="wd-full-message"></div>
 					<div class="wd-full-actions">
 						<button type="button" class="kn-plain" data-proxy="wd-agents-btn">Agent 관리</button>
+						<button type="button" class="kn-plain" data-proxy="wd-skills-btn">Skill 관리</button>
 						<button type="button" class="kn-plain" data-proxy="wd-layout-btn">자동 배치</button>
 						<button type="button" class="kn-plain" data-proxy="wd-undo-btn" title="Ctrl+Z">되돌리기</button>
 						<button type="button" data-proxy="wd-check-btn">검사</button>
@@ -150,6 +152,76 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<span id="wd-agents-count" class="ai-hint"></span>
 					</div>
 					<div id="wd-agents-list" class="wd-pick-list"></div>
+				</div>
+			</div>
+
+			<%-- Skill 관리 창. Agent나 Workflow를 고르지 않아도 Skill을 만들고, 고르고, 지운다.
+				Skill 창이 이 창 위에 떠야 하므로 Skill 창보다 앞에 둔다 --%>
+			<div id="wd-skills-dialog" class="wd-dialog" style="display: none;">
+				<div class="wd-dialog-box wd-pick-box">
+					<div class="wd-dialog-head">
+						<h3>Skill 관리</h3>
+						<button type="button" id="wd-skills-close-btn" class="kn-plain">닫기</button>
+					</div>
+					<p class="ai-hint">Skill은 필요할 때 꺼내 읽는 작업 안내서입니다. 저장한 Skill은 어느 Agent에서든 Agent 창의 Skill 목록에서 고를 수 있습니다.</p>
+					<table class="ai-form">
+						<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+						<tr>
+							<th><label for="wd-skills-folder">폴더</label></th>
+							<td><input type="text" id="wd-skills-folder" list="wd-skills-folders" placeholder="skills/폴더" />
+								<datalist id="wd-skills-folders"></datalist></td>
+							<th><label for="wd-skills-name">Skill 이름</label></th>
+							<td><input type="text" id="wd-skills-name" placeholder="영문 소문자, 숫자, - (예: sql-review)" /></td>
+						</tr>
+					</table>
+					<div class="ai-form-actions">
+						<button type="button" id="wd-skills-new-btn">새 Skill 만들기</button>
+					</div>
+					<div id="wd-skills-message" class="wd-message"></div>
+					<div class="wd-pick-bar">
+						<input type="search" id="wd-skills-search" placeholder="이름이나 설명으로 찾기" />
+						<span id="wd-skills-count" class="ai-hint"></span>
+					</div>
+					<div id="wd-skills-list" class="wd-pick-list"></div>
+				</div>
+			</div>
+
+			<%-- Skill 파일(SKILL.md)을 고치는 창. [양식]은 설명과 본문, [텍스트]는 파일 글자 그대로. 저장하는 것은 늘 [텍스트]의 글자다 --%>
+			<div id="wd-skill-dialog" class="wd-dialog" style="display: none;">
+				<div class="wd-dialog-box wd-agent-box">
+					<div class="wd-dialog-head">
+						<h3>Skill <span id="wd-skill-title" class="workflow-job-id"></span></h3>
+						<button type="button" id="wd-skill-close-btn" class="kn-plain">닫기</button>
+					</div>
+					<p class="ai-hint">파일 위치: <code id="wd-skill-path"></code>. 이름은 폴더 이름과 같아야 해서 여기서 바꾸지 않습니다. 참고 파일은 이 폴더에 직접 넣습니다.</p>
+					<div class="wd-tabs">
+						<button type="button" class="wd-tab wd-tab-on" data-skill-tab="form">양식</button>
+						<button type="button" class="wd-tab" data-skill-tab="text">텍스트</button>
+					</div>
+					<div id="wd-skill-form" class="wd-agent-form">
+						<table class="ai-form">
+							<colgroup><col class="ai-form-name" /><col /></colgroup>
+							<tr>
+								<th><label for="wd-skill-description">설명</label></th>
+								<td><textarea id="wd-skill-description" rows="3" maxlength="1024"></textarea>
+									<p class="ai-hint">Agent는 이 설명만 보고 Skill을 부를지 정합니다. 어떤 일을 할 때 쓰는지 구체적으로 적으십시오(1,024자까지).</p></td>
+							</tr>
+							<tr>
+								<th><label for="wd-skill-body">본문</label></th>
+								<td><textarea id="wd-skill-body" class="wd-yaml wd-agent-text" spellcheck="false"></textarea>
+									<p class="ai-hint">Agent가 Skill을 부르면 이 글을 받아 그대로 따릅니다. 반드시 지켜야 하는 절차라면 Skill 대신 Workflow step으로 만드십시오.</p></td>
+							</tr>
+						</table>
+					</div>
+					<div id="wd-skill-text-box" style="display: none;">
+						<p class="ai-hint">파일 글자 그대로입니다(맨 위 --- 와 --- 사이가 설정, 그 아래가 본문). 여기서 고친 글자는 주석까지 그대로 저장됩니다.</p>
+						<textarea id="wd-skill-text" class="wd-yaml wd-agent-text" spellcheck="false"></textarea>
+					</div>
+					<div id="wd-skill-message" class="wd-message"></div>
+					<div class="ai-form-actions">
+						<button type="button" id="wd-skill-check-btn" class="kn-plain">검사</button>
+						<button type="button" id="wd-skill-save-btn">저장</button>
+					</div>
 				</div>
 			</div>
 

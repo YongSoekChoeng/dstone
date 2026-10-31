@@ -27,7 +27,7 @@ import net.dstone.common.biz.BaseController;
  *   POST /api/ai/definitions/{kind}/save        검사 → 통과하면 파일 쓰기 → 바로 등록
  *   POST /api/ai/definitions/{kind}/delete      파일 지우기 → 바로 등록
  *   POST /api/ai/definitions/reload             정의 폴더를 다시 읽기(손으로 고친 파일 반영)
- *   kind = workflows | agents
+ *   kind = workflows | agents | skills
  *
  * 검사에 걸리면 HTTP 200에 ok: false와 이유를 돌려줍니다. 이때 파일과 등록된 정의는 바뀌지 않습니다.
  * 경로가 틀렸으면 400, 저장이 꺼져 있으면(dstone.ai.definition.edit-enabled) 403입니다.
@@ -49,8 +49,8 @@ public class DefinitionController extends BaseController {
 	/**
 	 * 정의 파일 하나의 내용을 글자 그대로 돌려줍니다. 없으면 404입니다.
 	 *
-	 * @param kind workflows 또는 agents
-	 * @param id   정의 id
+	 * @param kind workflows, agents, skills 중 하나
+	 * @param id   정의 id(Skill은 이름)
 	 */
 	@GetMapping("/{kind}/{id}")
 	public ResponseEntity<Object> source(@PathVariable("kind") String kind, @PathVariable("id") String id) {
@@ -68,7 +68,7 @@ public class DefinitionController extends BaseController {
 	/**
 	 * 고친 내용을 저장하지 않고 검사만 합니다.
 	 *
-	 * @param kind    workflows 또는 agents
+	 * @param kind    workflows, agents, skills 중 하나
 	 * @param request 경로, 원래 경로, 내용
 	 */
 	@PostMapping("/{kind}/check")
@@ -83,7 +83,7 @@ public class DefinitionController extends BaseController {
 	/**
 	 * 고친 내용을 검사하고, 통과하면 저장하고 바로 등록합니다.
 	 *
-	 * @param kind    workflows 또는 agents
+	 * @param kind    workflows, agents, skills 중 하나
 	 * @param request 경로, 원래 경로, 내용, 노드 위치
 	 */
 	@PostMapping("/{kind}/save")
@@ -98,7 +98,7 @@ public class DefinitionController extends BaseController {
 	/**
 	 * 정의 파일 하나를 지우고 다시 읽습니다.
 	 *
-	 * @param kind    workflows 또는 agents
+	 * @param kind    workflows, agents, skills 중 하나
 	 * @param request 지울 파일 경로(path)
 	 */
 	@PostMapping("/{kind}/delete")

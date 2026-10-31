@@ -149,6 +149,8 @@ var DstoneAiDesigner = (function () {
 		bindKeyboard();
 		bindAgentDialog();
 		bindAgentManager();
+		bindSkillManager();
+		bindSkillDialog();
 		bindPicker();
 		bindGuide();
 		bindFullscreen();
@@ -2118,6 +2120,8 @@ var DstoneAiDesigner = (function () {
 	var agentDoc = null;
 	/** [텍스트]에서 글자를 고쳤는데 아직 양식에 채우지 않았는지 */
 	var agentTextEdited = false;
+	/** 열려 있는 Skill 파일. path, originalPath(새로 만든 것이면 null), file(머리말과 본문), dirty, textEdited, frontDirty */
+	var skillDoc = null;
 
 	/** 머리말을 다시 만들 때 키를 놓는 순서(Agent 파일들이 쓰는 순서) */
 	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "context", "tools", "skills", "subAgents", "allowedCallers", "execution"];
@@ -2310,39 +2314,54 @@ var DstoneAiDesigner = (function () {
 	 * Agent 파일 글자를 머리말 객체와 프롬프트로 나눠 agentDoc에 넣습니다. 틀렸으면 이유를 돌려줍니다(agentDoc은 그대로).
 	 */
 	function readAgentText(text) {
-		var lines = String(text || "").replace(/^﻿/, "").split(/\r?\n/);
+		var file = readFrontFile(text);
+		if (file.problem) {
+			return file.problem;
+		}
+		agentDoc.front = file.front;
+		agentDoc.frontRaw = file.frontRaw;
+		agentDoc.header = file.header;
+		agentDoc.frontComments = file.frontComments;
+		agentDoc.body = file.body;
+		agentDoc.frontDirty = false;
+		return null;
+	}
+
+	/** "--- 머리말 --- 본문" 모양의 파일 글자(Agent, Skill)를 나눕니다. 틀렸으면 problem에 이유가 들어 있습니다. */
+	function readFrontFile(text) {
+		var lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/);
 		var start = 0;
 		while (start < lines.length && lines[start].trim() === "") {
 			start++;
 		}
 		if (start >= lines.length || lines[start].trim() !== "---") {
-			return "첫 줄이 --- 여야 합니다(--- 와 --- 사이에 설정, 그 아래에 프롬프트). [텍스트]에서 고치십시오.";
+			return { problem: "첫 줄이 --- 여야 합니다(--- 와 --- 사이에 설정, 그 아래에 본문). [텍스트]에서 고치십시오." };
 		}
 		var end = start + 1;
 		while (end < lines.length && lines[end].trim() !== "---") {
 			end++;
 		}
 		if (end >= lines.length) {
-			return "설정을 닫는 --- 줄이 없습니다. [텍스트]에서 고치십시오.";
+			return { problem: "설정을 닫는 --- 줄이 없습니다. [텍스트]에서 고치십시오." };
 		}
 		var frontRaw = lines.slice(start + 1, end).join("\n");
 		var front;
 		try {
 			front = jsyaml.load(frontRaw) || {};
 		} catch (e) {
-			return "설정(--- 사이)을 YAML로 읽지 못했습니다: " + e.message;
+			return { problem: "설정(--- 사이)을 YAML로 읽지 못했습니다: " + e.message };
 		}
 		if (typeof front !== "object" || Array.isArray(front)) {
-			return "설정(--- 사이)이 키: 값 모양이 아닙니다.";
+			return { problem: "설정(--- 사이)이 키: 값 모양이 아닙니다." };
 		}
 		var split = splitHeader(frontRaw);
-		agentDoc.front = front;
-		agentDoc.frontRaw = frontRaw;
-		agentDoc.header = split.header;
-		agentDoc.frontComments = split.bodyComments;
-		agentDoc.body = lines.slice(end + 1).join("\n").replace(/^\s*\n/, "").replace(/\s+$/, "");
-		agentDoc.frontDirty = false;
-		return null;
+		return {
+			front: front,
+			frontRaw: frontRaw,
+			header: split.header,
+			frontComments: split.bodyComments,
+			body: lines.slice(end + 1).join("\n").replace(/^\s*\n/, "").replace(/\s+$/, "")
+		};
 	}
 
 	/** agentDoc으로 파일 글자를 만듭니다. 머리말을 고치지 않았으면 머리말 글자는 원래 그대로 씁니다. */
@@ -2686,7 +2705,7 @@ var DstoneAiDesigner = (function () {
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Skill <span class=\"wd-help\">필요할 때 꺼내 읽는 작업 안내서(SKILL.md). LLM에게는 Skill이라는 Tool 하나로 보입니다</span></h4>"
 			+ chipList("skills", skillItems, skills, "고른 Skill이 없습니다.", false)
-			+ "<p class=\"ai-hint\">Skill 폴더의 참고 파일까지 읽게 하려면 Tool에 readFile도 고르십시오. Skill 파일은 conf/definitions/skills 아래에서 직접 고치고 [다시 읽기]를 누릅니다.</p>"
+			+ "<p class=\"ai-hint\">Skill 폴더의 참고 파일까지 읽게 하려면 Tool에 readFile도 고르십시오. 새 Skill은 위쪽 [Skill 관리]에서 만듭니다.</p>"
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Sub Agent <span class=\"wd-help\">일을 맡길 다른 Agent. LLM에게는 Tool처럼 보입니다(깊이는 한 단계)</span></h4>"
 			+ chipList("subAgents", agentItems, subAgents, "고른 Sub Agent가 없습니다.", false)
@@ -3330,6 +3349,320 @@ var DstoneAiDesigner = (function () {
 	function agentManagerMessage(kind, text) {
 		els.agentsMessage.className = "wd-message" + (kind ? " wd-message-" + kind : "");
 		els.agentsMessage.textContent = text;
+	}
+
+	/* ====================================================================
+	 * Skill 관리 창: Agent나 Workflow 없이 Skill을 만들고, 고르고, 지운다
+	 * ==================================================================== */
+
+	function bindSkillManager() {
+		els.skillsDialog = document.getElementById("wd-skills-dialog");
+		els.skillsFolder = document.getElementById("wd-skills-folder");
+		els.skillsName = document.getElementById("wd-skills-name");
+		els.skillsMessage = document.getElementById("wd-skills-message");
+		els.skillsSearch = document.getElementById("wd-skills-search");
+		els.skillsList = document.getElementById("wd-skills-list");
+		document.getElementById("wd-skills-btn").addEventListener("click", openSkillManager);
+		document.getElementById("wd-skills-close-btn").addEventListener("click", closeSkillManager);
+		document.getElementById("wd-skills-new-btn").addEventListener("click", createSkill);
+		els.skillsSearch.addEventListener("input", renderSkillManager);
+		els.skillsDialog.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				closeSkillManager();
+			}
+		});
+		els.skillsList.addEventListener("click", function (e) {
+			var button = e.target;
+			if (button.getAttribute("data-skill-open")) {
+				openSkill(button.getAttribute("data-skill-open"));
+			} else if (button.getAttribute("data-skill-delete")) {
+				deleteSkill(button.getAttribute("data-skill-delete"));
+			}
+		});
+	}
+
+	function openSkillManager() {
+		if (!catalog) {
+			return;
+		}
+		els.skillsFolder.value = currentFolder().replace(/^workflows/, "skills");
+		els.skillsName.value = "";
+		els.skillsSearch.value = "";
+		skillManagerMessage("", "");
+		document.getElementById("wd-skills-new-btn").disabled = !catalog.editable;
+		els.skillsDialog.style.display = "flex";
+		renderSkillManager();
+		els.skillsName.focus();
+	}
+
+	function closeSkillManager() {
+		els.skillsDialog.style.display = "none";
+	}
+
+	function findSkill(name) {
+		return (catalog.skills || []).filter(function (skill) {
+			return skill.name === name;
+		})[0];
+	}
+
+	/** skills/sample/sql-review/SKILL.md → skills/sample */
+	function skillFolderOf(skill) {
+		return skill.path.replace(/\/[^\/]*\/SKILL\.md$/, "");
+	}
+
+	function skillUsersOf(name) {
+		return catalog.agents.filter(function (agent) {
+			return (agent.skills || []).indexOf(name) >= 0;
+		});
+	}
+
+	function renderSkillManager() {
+		if (!els.skillsDialog || els.skillsDialog.style.display === "none") {
+			return;
+		}
+		var skills = catalog.skills || [];
+		var folders = [];
+		skills.forEach(function (skill) {
+			if (folders.indexOf(skillFolderOf(skill)) < 0) {
+				folders.push(skillFolderOf(skill));
+			}
+		});
+		document.getElementById("wd-skills-folders").innerHTML = folders.sort().map(function (folder) {
+			return "<option value=\"" + escapeHtml(folder) + "\"></option>";
+		}).join("");
+
+		// 낱말을 여럿 적으면 모두 들어 있는 것만 남긴다(고르기 창과 같은 방식).
+		var words = els.skillsSearch.value.trim().toLowerCase().split(/\s+/).filter(function (w) {
+			return w !== "";
+		});
+		var shown = skills.filter(function (skill) {
+			var text = (skill.name + " " + (skill.description || "") + " " + skill.path).toLowerCase();
+			return words.every(function (w) {
+				return text.indexOf(w) >= 0;
+			});
+		});
+		document.getElementById("wd-skills-count").textContent = "전체 " + skills.length + "개 중 " + shown.length + "개 보임";
+		if (shown.length === 0) {
+			els.skillsList.innerHTML = "<p class=\"ai-hint wd-pick-empty\">" + (skills.length === 0 ? "아직 Skill이 없습니다." : "찾는 것이 없습니다.") + "</p>";
+			return;
+		}
+		els.skillsList.innerHTML = shown.map(function (skill) {
+			var users = skillUsersOf(skill.name).length;
+			return "<div class=\"wd-pick-row wd-agents-row\">"
+				+ "<span class=\"wd-pick-main\"><span class=\"wd-pick-name\">" + escapeHtml(skill.name)
+				+ " <span class=\"wd-pick-group\">" + escapeHtml(skillFolderOf(skill)) + "</span>"
+				+ (users > 0 ? " <em>Agent " + users + "개가 씀</em>" : "") + "</span>"
+				+ (skill.description ? "<span class=\"wd-pick-desc\">" + escapeHtml(skill.description) + "</span>" : "")
+				+ "</span>"
+				+ "<span class=\"wd-agents-actions\">"
+				+ "<button type=\"button\" class=\"kn-plain\" data-skill-open=\"" + escapeHtml(skill.name) + "\">열기</button>"
+				+ "<button type=\"button\" class=\"kn-plain\" data-skill-delete=\"" + escapeHtml(skill.name) + "\"" + (catalog.editable ? "" : " disabled") + ">삭제</button>"
+				+ "</span></div>";
+		}).join("");
+	}
+
+	function createSkill() {
+		var name = els.skillsName.value.trim();
+		var folder = els.skillsFolder.value.trim().replace(/\/+$/, "");
+		// 규칙은 엔진의 common.registry.SkillRegistry와 같다.
+		if (name.length > 64 || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
+			skillManagerMessage("error", "Skill 이름은 영문 소문자, 숫자, 하이픈(-)으로 64자까지 적으십시오(예: sql-review).");
+			els.skillsName.focus();
+			return;
+		}
+		if (findSkill(name)) {
+			skillManagerMessage("error", "이미 있는 Skill 이름입니다: " + name);
+			els.skillsName.focus();
+			return;
+		}
+		if (!/^skills(\/[A-Za-z0-9_-]+)*$/.test(folder)) {
+			skillManagerMessage("error", "폴더는 skills로 시작하고 영문, 숫자, -, _ 로 적으십시오(예: skills/sample).");
+			els.skillsFolder.focus();
+			return;
+		}
+		skillManagerMessage("", "");
+		els.skillsName.value = "";
+		var text = "---\nname: " + name + "\ndescription: (어떤 일을 할 때 쓰는 Skill인지 적으십시오)\n---\n"
+			+ "# 작업 순서\n\n1. (이 일을 어떤 순서로 할지 적으십시오)\n\n# 답하는 모양\n\n(결과를 어떤 모양으로 낼지 적으십시오)\n";
+		showSkill(text, folder + "/" + name + "/SKILL.md", null);
+		skillMessage("info", "괄호 ( ) 안을 이 일에 맞게 채우고 저장하십시오. 저장하면 Agent 창의 Skill 목록에 바로 나옵니다.");
+	}
+
+	/** Skill을 지웁니다. 어느 Agent가 아직 쓰고 있으면 엔진 검사에서 막혀 아무것도 지워지지 않습니다. */
+	function deleteSkill(name) {
+		var skill = findSkill(name);
+		if (!skill || !window.confirm(skill.path + " 파일을 지웁니다. 엔진에서도 바로 빠집니다. 지울까요?")) {
+			return;
+		}
+		skillManagerMessage("info", "지우는 중...");
+		call("POST", "/api/ai/definitions/skills/delete", { path: skill.path }).then(function (result) {
+			if (!result.ok) {
+				skillManagerMessage("error", result.message);
+				return;
+			}
+			skillManagerMessage("ok", result.message + " (" + result.path + ")");
+			loadCatalog().then(function () {
+				showPanel();
+				renderSkillManager();
+				// 누른 단추가 목록과 함께 사라지므로 포커스를 창 안에 돌려놓는다(그래야 Esc가 듣는다).
+				els.skillsSearch.focus();
+			});
+		}).catch(function (e) {
+			skillManagerMessage("error", e.message);
+		});
+	}
+
+	function skillManagerMessage(kind, text) {
+		els.skillsMessage.className = "wd-message" + (kind ? " wd-message-" + kind : "");
+		els.skillsMessage.textContent = text;
+	}
+
+	/* ====================================================================
+	 * Skill 창: SKILL.md 하나를 고친다. 저장하는 것은 늘 [텍스트]의 글자다
+	 * ==================================================================== */
+
+	function bindSkillDialog() {
+		els.skillDialog = document.getElementById("wd-skill-dialog");
+		els.skillForm = document.getElementById("wd-skill-form");
+		els.skillTextBox = document.getElementById("wd-skill-text-box");
+		els.skillText = document.getElementById("wd-skill-text");
+		els.skillDescription = document.getElementById("wd-skill-description");
+		els.skillBody = document.getElementById("wd-skill-body");
+		els.skillMessage = document.getElementById("wd-skill-message");
+		document.getElementById("wd-skill-close-btn").addEventListener("click", closeSkill);
+		document.getElementById("wd-skill-check-btn").addEventListener("click", function () {
+			skillRequest("check");
+		});
+		document.getElementById("wd-skill-save-btn").addEventListener("click", function () {
+			skillRequest("save");
+		});
+		Array.prototype.forEach.call(document.querySelectorAll("[data-skill-tab]"), function (tab) {
+			tab.addEventListener("click", function () {
+				showSkillTab(tab.getAttribute("data-skill-tab"));
+			});
+		});
+		els.skillText.addEventListener("input", function () {
+			skillDoc.dirty = true;
+			skillDoc.textEdited = true;
+		});
+		els.skillDescription.addEventListener("input", function () {
+			skillDoc.file.front.description = els.skillDescription.value;
+			skillDoc.frontDirty = true;
+			skillFormEdited();
+		});
+		els.skillBody.addEventListener("input", function () {
+			skillDoc.file.body = els.skillBody.value.replace(/\s+$/, "");
+			skillFormEdited();
+		});
+		els.skillDialog.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				closeSkill();
+			}
+		});
+	}
+
+	function openSkill(name) {
+		call("GET", "/api/ai/definitions/skills/" + encodeURIComponent(name)).then(function (source) {
+			showSkill(source.text, source.path, source.path);
+			skillMessage("", "");
+		}).catch(function (e) {
+			skillManagerMessage("error", "Skill 파일을 읽지 못했습니다: " + e.message);
+		});
+	}
+
+	function closeSkill() {
+		if (skillDoc && skillDoc.dirty && !window.confirm("저장하지 않은 Skill 변경이 있습니다. 닫을까요?")) {
+			return;
+		}
+		els.skillDialog.style.display = "none";
+		if (els.skillsDialog.style.display !== "none") {
+			els.skillsSearch.focus();
+		}
+	}
+
+	function showSkill(text, path, originalPath) {
+		skillDoc = { path: path, originalPath: originalPath, dirty: false, textEdited: false, frontDirty: false, file: null };
+		els.skillText.value = text;
+		document.getElementById("wd-skill-title").textContent = path.replace(/\/SKILL\.md$/, "").replace(/^.*\//, "");
+		document.getElementById("wd-skill-path").textContent = path;
+		document.getElementById("wd-skill-save-btn").disabled = !catalog.editable;
+		els.skillDialog.style.display = "flex";
+		var file = readFrontFile(text);
+		if (file.problem) {
+			showSkillTab("text");
+			skillMessage("error", file.problem);
+		} else {
+			skillDoc.file = file;
+			showSkillTab("form");
+			els.skillDescription.focus();
+		}
+	}
+
+	/** [양식]에서 고친 내용으로 파일 글자를 다시 만듭니다. 설명을 고치지 않았으면 머리말 글자는 주석까지 그대로 둡니다. */
+	function skillFormEdited() {
+		var file = skillDoc.file;
+		var front = skillDoc.frontDirty
+			? (file.header ? file.header + "\n" : "") + jsyaml.dump(file.front, { lineWidth: -1, noRefs: true, quotingType: "\"" }).replace(/\n$/, "")
+			: file.frontRaw.replace(/\s+$/, "");
+		els.skillText.value = "---\n" + front + "\n---\n" + file.body + "\n";
+		skillDoc.dirty = true;
+		skillDoc.textEdited = false;
+	}
+
+	function showSkillTab(name) {
+		if (name === "form" && (skillDoc.textEdited || !skillDoc.file)) {
+			// [텍스트]에서 고친 글자를 양식에 채운다. 읽지 못하면 [텍스트]에 남는다.
+			var file = readFrontFile(els.skillText.value);
+			if (file.problem) {
+				skillMessage("error", file.problem);
+				name = "text";
+			} else {
+				skillDoc.file = file;
+				skillDoc.textEdited = false;
+				skillDoc.frontDirty = false;
+				skillMessage("", "");
+			}
+		}
+		Array.prototype.forEach.call(document.querySelectorAll("[data-skill-tab]"), function (tab) {
+			tab.className = "wd-tab" + (tab.getAttribute("data-skill-tab") === name ? " wd-tab-on" : "");
+		});
+		els.skillForm.style.display = name === "form" ? "" : "none";
+		els.skillTextBox.style.display = name === "text" ? "" : "none";
+		if (name === "form") {
+			els.skillDescription.value = skillDoc.file.front.description == null ? "" : String(skillDoc.file.front.description);
+			els.skillBody.value = skillDoc.file.body;
+		}
+	}
+
+	function skillRequest(action) {
+		var body = { path: skillDoc.path, originalPath: skillDoc.originalPath, text: els.skillText.value };
+		skillMessage("info", action === "save" ? "저장하는 중..." : "검사하는 중...");
+		call("POST", "/api/ai/definitions/skills/" + action, body).then(function (result) {
+			if (!result.ok) {
+				skillMessage("error", result.message);
+				return;
+			}
+			if (action === "check") {
+				skillMessage("ok", "검사를 통과했습니다(이 Skill을 쓰는 Agent와 Workflow까지 함께 검사).");
+				return;
+			}
+			skillDoc.originalPath = result.path;
+			skillDoc.dirty = false;
+			skillMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
+			loadCatalog().then(function () {
+				showPanel();
+				renderSkillManager();
+			});
+		}).catch(function (e) {
+			skillMessage("error", e.message);
+		});
+	}
+
+	function skillMessage(kind, text) {
+		els.skillMessage.className = "wd-message" + (kind ? " wd-message-" + kind : "");
+		els.skillMessage.textContent = text;
 	}
 
 	/* ====================================================================

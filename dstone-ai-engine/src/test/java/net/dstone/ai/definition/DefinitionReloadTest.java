@@ -1,6 +1,7 @@
 package net.dstone.ai.definition;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,6 +52,46 @@ public class DefinitionReloadTest extends WorkflowTestBase {
 
 		assertThat(source.path()).isEqualTo("workflows/sample/sample-tool-chain-basic.yml");
 		assertThat(source.text()).contains("id: " + WORKFLOW_ID).contains("# common.registry.WorkFlowRegistry");
+	}
+
+	@Test
+	void 새_Skill을_검사만_하면_등록되지_않는다() {
+		String text = "---\nname: reload-check\ndescription: 검사용 Skill입니다.\n---\n본문\n";
+		DefinitionChangeRequest request = new DefinitionChangeRequest("skills/sample/reload-check/SKILL.md", null, text, null);
+
+		DefinitionChangeResult result = this.definitionService.check("skills", request);
+
+		assertThat(result.ok()).as(result.message()).isTrue();
+		assertThat(this.definitionService.source("skills", "reload-check")).isNull();
+	}
+
+	@Test
+	void Skill_이름이_폴더와_다르면_검사에서_걸린다() {
+		String text = "---\nname: other-name\ndescription: 검사용 Skill입니다.\n---\n본문\n";
+		DefinitionChangeRequest request = new DefinitionChangeRequest("skills/sample/reload-check/SKILL.md", null, text, null);
+
+		DefinitionChangeResult result = this.definitionService.check("skills", request);
+
+		assertThat(result.ok()).isFalse();
+		assertThat(result.message()).contains("폴더 이름");
+	}
+
+	@Test
+	void Skill_경로와_이동은_거절한다() {
+		String text = "---\nname: reload-check\ndescription: 검사용 Skill입니다.\n---\n본문\n";
+
+		assertThatThrownBy(new org.assertj.core.api.ThrowableAssert.ThrowingCallable() {
+			@Override
+			public void call() {
+				DefinitionReloadTest.this.definitionService.check("skills", new DefinitionChangeRequest("skills/SKILL.md", null, text, null));
+			}
+		}).isInstanceOf(DefinitionService.RejectedException.class);
+		assertThatThrownBy(new org.assertj.core.api.ThrowableAssert.ThrowingCallable() {
+			@Override
+			public void call() {
+				DefinitionReloadTest.this.definitionService.check("skills", new DefinitionChangeRequest("skills/sample/reload-check/SKILL.md", "skills/sample/sql-review/SKILL.md", text, null));
+			}
+		}).isInstanceOf(DefinitionService.RejectedException.class);
 	}
 
 	@Test
