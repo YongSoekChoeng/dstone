@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import net.dstone.ai.api.dto.DefinitionChangeRequest;
 import net.dstone.ai.api.dto.DefinitionChangeResult;
+import net.dstone.ai.api.dto.DefinitionRenameRequest;
+import net.dstone.ai.api.dto.DefinitionRenameResult;
 import net.dstone.ai.api.dto.DefinitionSource;
 import net.dstone.ai.api.service.DefinitionService;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
@@ -166,6 +168,65 @@ public class DefinitionReloadTest extends WorkflowTestBase {
 		assertThat(this.rejectedMessage("workflows", "agents/x.md", null)).isNotNull();
 		assertThat(this.rejectedMessage("mcp", "mcp/x.yml", null)).isNotNull();
 		assertThat(this.rejectedMessage("workflows", "workflows/sample/sample-tool-chain-basic.yml", null)).contains("이미 있는 파일");
+	}
+
+	@Test
+	void Agent_이름_변경을_검사하면_부르는_파일을_알려_주고_아무것도_바꾸지_않는다() {
+		DefinitionRenameResult result = this.definitionService.rename("agents", new DefinitionRenameRequest("sample-skill-agent", "sample-skill-renamed-agent", true));
+
+		assertThat(result.ok()).as(result.message()).isTrue();
+		assertThat(result.path()).isEqualTo("agents/sample/sample-skill-renamed-agent.md");
+		assertThat(result.changed()).contains("workflows/sample/sample-agent-skill.yml", "agents/sample/sample-subagent-background-agent.md");
+		assertThat(this.agentRegistry.all()).containsKey("sample-skill-agent").doesNotContainKey("sample-skill-renamed-agent");
+	}
+
+	@Test
+	void Skill_이름_변경을_검사하면_쓰는_Agent를_알려_주고_옛_이름이_남는_곳도_알려_준다() {
+		DefinitionRenameResult result = this.definitionService.rename("skills", new DefinitionRenameRequest("sql-review", "sql-check", true));
+
+		assertThat(result.ok()).as(result.message()).isTrue();
+		assertThat(result.path()).isEqualTo("skills/sample/sql-check/SKILL.md");
+		assertThat(result.changed()).containsExactly("agents/sample/sample-skill-agent.md");
+		assertThat(result.mentions()).contains("workflows/sample/sample-agent-skill.yml");
+	}
+
+	@Test
+	void Workflow_이름_변경은_자기_파일만_바꾼다() {
+		DefinitionRenameResult result = this.definitionService.rename("workflows", new DefinitionRenameRequest(WORKFLOW_ID, "sample-tool-chain-renamed", true));
+
+		assertThat(result.ok()).as(result.message()).isTrue();
+		assertThat(result.path()).isEqualTo("workflows/sample/sample-tool-chain-renamed.yml");
+		assertThat(result.changed()).isEmpty();
+	}
+
+	@Test
+	void Skill_규칙에_어긋난_새_이름은_검사에서_막힌다() {
+		DefinitionRenameResult result = this.definitionService.rename("skills", new DefinitionRenameRequest("sql-review", "SQL_Review", true));
+
+		assertThat(result.ok()).isFalse();
+		assertThat(result.message()).contains("영문 소문자");
+	}
+
+	@Test
+	void 이미_있는_이름이나_없는_이름으로는_바꾸지_않는다() {
+		assertThatThrownBy(new org.assertj.core.api.ThrowableAssert.ThrowingCallable() {
+			@Override
+			public void call() {
+				DefinitionReloadTest.this.definitionService.rename("agents", new DefinitionRenameRequest("sample-skill-agent", "sample-role-reply-agent", true));
+			}
+		}).isInstanceOf(DefinitionService.RejectedException.class).hasMessageContaining("이미 있는");
+		assertThatThrownBy(new org.assertj.core.api.ThrowableAssert.ThrowingCallable() {
+			@Override
+			public void call() {
+				DefinitionReloadTest.this.definitionService.rename("agents", new DefinitionRenameRequest("no-such-agent", "any-agent", true));
+			}
+		}).isInstanceOf(DefinitionService.RejectedException.class).hasMessageContaining("등록되지 않은");
+		assertThatThrownBy(new org.assertj.core.api.ThrowableAssert.ThrowingCallable() {
+			@Override
+			public void call() {
+				DefinitionReloadTest.this.definitionService.rename("workflows", new DefinitionRenameRequest(WORKFLOW_ID, "../evil", true));
+			}
+		}).isInstanceOf(DefinitionService.RejectedException.class);
 	}
 
 	/** check()가 요청을 거절하면 그 이유를, 거절하지 않으면 null을 돌려줍니다. */

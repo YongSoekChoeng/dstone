@@ -41,6 +41,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<span id="wd-status" class="workflow-status"></span>
 					<button type="button" id="wd-new-btn" class="kn-plain">새 Workflow</button>
 					<button type="button" id="wd-copy-btn" class="kn-plain">복사해서 새로</button>
+					<button type="button" id="wd-rename-btn" class="kn-plain" title="id와 파일 이름을 함께 바꿉니다">이름 변경</button>
 					<button type="button" id="wd-agents-btn" class="kn-plain" title="Workflow와 상관없이 Agent를 미리 만들고 고칩니다">Agent 관리</button>
 					<button type="button" id="wd-skills-btn" class="kn-plain" title="Agent나 Workflow와 상관없이 Skill을 만들고 고칩니다">Skill 관리</button>
 					<button type="button" id="wd-reload-btn" class="kn-plain" title="정의 폴더의 파일을 엔진이 다시 읽습니다(손으로 고친 파일 반영)">엔진 다시 읽기</button>
@@ -193,7 +194,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<h3>Skill <span id="wd-skill-title" class="workflow-job-id"></span></h3>
 						<button type="button" id="wd-skill-close-btn" class="kn-plain">닫기</button>
 					</div>
-					<p class="ai-hint">파일 위치: <code id="wd-skill-path"></code>. 이름은 폴더 이름과 같아야 해서 여기서 바꾸지 않습니다. 참고 파일은 이 폴더에 직접 넣습니다.</p>
+					<p class="ai-hint">파일 위치: <code id="wd-skill-path"></code>. 참고 파일은 이 폴더에 직접 넣습니다.
+						<button type="button" id="wd-skill-rename-btn" class="kn-plain" title="폴더 이름과 이 Skill을 쓰는 Agent의 skills까지 함께 바꿉니다">이름 변경</button></p>
 					<div class="wd-tabs">
 						<button type="button" class="wd-tab wd-tab-on" data-skill-tab="form">양식</button>
 						<button type="button" class="wd-tab" data-skill-tab="text">텍스트</button>

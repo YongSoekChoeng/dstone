@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import net.dstone.ai.api.dto.DefinitionCatalog;
 import net.dstone.ai.api.dto.DefinitionChangeRequest;
 import net.dstone.ai.api.dto.DefinitionChangeResult;
+import net.dstone.ai.api.dto.DefinitionRenameRequest;
 import net.dstone.ai.api.dto.DefinitionSource;
 import net.dstone.ai.api.service.DefinitionService;
 import net.dstone.common.biz.BaseController;
@@ -26,7 +27,8 @@ import net.dstone.common.biz.BaseController;
  *   POST /api/ai/definitions/{kind}/check       저장하지 않고 검사만
  *   POST /api/ai/definitions/{kind}/save        검사 → 통과하면 파일 쓰기 → 바로 등록
  *   POST /api/ai/definitions/{kind}/delete      파일 지우기 → 바로 등록
- *   POST /api/ai/definitions/reload             정의 폴더를 다시 읽기(손으로 고친 파일 반영)
+ *   POST /api/ai/definitions/{kind}/rename      이름 바꾸기(파일과 다른 정의의 참조까지 함께). dryRun이면 검사만
+ *   POST /api/ai/definitions/reload           정의 폴더를 다시 읽기(손으로 고친 파일 반영)
  *   kind = workflows | agents | skills
  *
  * 검사에 걸리면 HTTP 200에 ok: false와 이유를 돌려줍니다. 이때 파일과 등록된 정의는 바뀌지 않습니다.
@@ -105,6 +107,21 @@ public class DefinitionController extends BaseController {
 	public ResponseEntity<Object> delete(@PathVariable("kind") String kind, @RequestBody DefinitionChangeRequest request) {
 		try {
 			return ResponseEntity.ok(this.definitionService.delete(kind, request));
+		} catch (DefinitionService.RejectedException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 이름을 바꿉니다. 파일(Skill은 폴더)과, 그 이름을 부르는 다른 정의의 참조도 함께 바꿉니다.
+	 *
+	 * @param kind    workflows, agents, skills 중 하나
+	 * @param request 지금 이름, 새 이름, 검사만 할지
+	 */
+	@PostMapping("/{kind}/rename")
+	public ResponseEntity<Object> rename(@PathVariable("kind") String kind, @RequestBody DefinitionRenameRequest request) {
+		try {
+			return ResponseEntity.ok(this.definitionService.rename(kind, request));
 		} catch (DefinitionService.RejectedException e) {
 			return this.rejected(e);
 		}

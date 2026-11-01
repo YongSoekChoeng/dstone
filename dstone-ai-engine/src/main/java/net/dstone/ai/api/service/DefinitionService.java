@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -23,9 +25,12 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import net.dstone.ai.api.dto.DefinitionCatalog;
 import net.dstone.ai.api.dto.DefinitionChangeRequest;
 import net.dstone.ai.api.dto.DefinitionChangeResult;
+import net.dstone.ai.api.dto.DefinitionRenameRequest;
+import net.dstone.ai.api.dto.DefinitionRenameResult;
 import net.dstone.ai.api.dto.DefinitionSource;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
@@ -35,6 +40,8 @@ import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.registry.SkillRegistry;
 import net.dstone.ai.common.registry.DefinitionReloader;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 
@@ -54,6 +61,14 @@ public class DefinitionService extends BaseObject {
 	/** 경로의 폴더/파일 이름 한 칸에 쓸 수 있는 글자입니다(영문, 숫자, 한글, 밑줄, 하이픈, 점). 점으로 시작할 수는 없습니다. */
 	private static final Pattern PATH_SEGMENT = Pattern.compile("[A-Za-z0-9가-힣_\\-][A-Za-z0-9가-힣_.\\-]*");
 
+	/** 이름을 바꿀 때 새 이름에 쓸 수 있는 글자입니다(Skill은 SkillRegistry가 소문자 규칙을 한 번 더 봅니다). */
+	private static final Pattern NEW_NAME = Pattern.compile("[A-Za-z0-9_\\-]{1,64}");
+
+	/** 이 시간 안에 움직인 RUNNING 기록만 진짜 실행 중으로 봅니다. */
+	private static final Duration RUNNING_RECENT = Duration.ofHours(1);
+
+	@Autowired
+	private WorkFlowExecutionStore executionStore;
 	@Autowired
 	private Environment environment;
 	@Autowired
@@ -243,6 +258,233 @@ public class DefinitionService extends BaseObject {
 			message += " Skill 폴더의 참고 파일은 지우지 않고 남겨 두었습니다.";
 		}
 		return new DefinitionChangeResult(true, message, request.path(), result.workflows(), result.agents());
+	}
+
+	/**
+	 * <pre>
+	 * 이름을 바꿉니다. 파일 이름(Skill은 폴더 이름)을 새 이름으로 맞추고, 그 이름을 부르는 참조도 함께 바꿉니다.
+	 *   Workflow: 자기 파일 + 노드 위치 파일 (정의 파일 중에 Workflow를 부르는 곳은 없습니다)
+	 *   Agent:    자기 파일 + Workflow step의 agent + 다른 Agent의 subAgents
+	 *   Skill:    자기 폴더(참고 파일까지) + Agent의 skills
+	 * 모두 저장과 같은 전체 검사를 거칩니다. 하나라도 틀리면 아무것도 바꾸지 않습니다.
+	 * </pre>
+	 *
+	 * @param kindName workflows, agents, skills 중 하나
+	 * @param request  지금 이름, 새 이름, 검사만 할지
+	 */
+	public synchronized DefinitionRenameResult rename(String kindName, DefinitionRenameRequest request) {
+		boolean dryRun = Boolean.TRUE.equals(request.dryRun());
+		if (!dryRun) {
+			this.checkEditable();
+		}
+		Kind kind = this.kindOf(kindName);
+		boolean skill = Constants.Definition.SKILL_DIR.equals(kind.dir());
+		String oldName = request.id();
+		String newName = request.newId() == null ? "" : request.newId().trim();
+		String oldPath = StringUtil.isEmpty(oldName) ? null : this.pathOf(kind, oldName);
+		if (oldPath == null) {
+			throw new RejectedException("등록되지 않은 이름입니다: " + oldName, false);
+		}
+		if (!NEW_NAME.matcher(newName).matches()) {
+			throw new RejectedException("새 이름은 영문, 숫자, -, _ 로 64자까지 적으십시오: " + newName, false);
+		}
+		if (newName.equals(oldName)) {
+			throw new RejectedException("지금 이름과 같습니다: " + newName, false);
+		}
+		if (this.pathOf(kind, newName) != null) {
+			throw new RejectedException("이미 있는 이름입니다: " + newName, false);
+		}
+		String newPath = this.renamedPath(kind, oldPath, newName);
+		this.checkPath(kind, newPath);
+		Path taken = skill ? this.fileOf(newPath).getParent() : this.fileOf(newPath);
+		if (Files.exists(taken)) {
+			throw new RejectedException("이미 있는 " + (skill ? "폴더" : "파일") + "입니다: " + this.loader.rootDir().relativize(taken).toString().replace('\\', '/'), false);
+		}
+
+		Map<String, String> changes = new LinkedHashMap<>();
+		List<String> changed = this.renamedReferences(kind, oldName, newName, oldPath, changes);
+		String ownText = this.textOf(kind, oldPath);
+		String renamedText = DefinitionRenamer.renameOwnName(ownText, skill ? "name" : "id", oldName, newName);
+		if (renamedText.equals(ownText)) {
+			return DefinitionRenameResult.fail(oldPath + " 파일에서 이름이 적힌 줄을 찾지 못했습니다. 파일을 직접 고치십시오.");
+		}
+		changes.put(oldPath, null);
+		changes.put(newPath, renamedText);
+		try {
+			this.reloader.apply(changes, !dryRun);
+		} catch (IllegalStateException e) {
+			return DefinitionRenameResult.fail("이름을 바꾸지 않았습니다 - " + e.getMessage());
+		}
+		List<String> warnings = this.runningWarnings(kind, oldName);
+		List<String> mentions = this.mentionsOf(oldName, changes);
+		if (dryRun) {
+			return new DefinitionRenameResult(true, "바꿀 수 있습니다.", newPath, changed, mentions, warnings);
+		}
+		if (Constants.Definition.WORKFLOW_DIR.equals(kind.dir())) {
+			this.moveQuietly(this.fileOf(this.layoutPathOf(oldPath)), this.fileOf(this.layoutPathOf(newPath)));
+		} else if (skill) {
+			try {
+				this.moveFolderRest(this.fileOf(oldPath).getParent(), this.fileOf(newPath).getParent());
+			} catch (IOException e) {
+				// 정의는 이미 새 이름으로 등록됐다. 되돌리지 않고 무엇을 직접 옮겨야 하는지 알려 준다.
+				warnings.add("이름은 바꿨지만 참고 파일을 다 옮기지 못했습니다. " + oldPath.substring(0, oldPath.lastIndexOf('/')) + " 폴더에 남은 파일을 직접 옮기십시오 - " + e.getMessage());
+			}
+		}
+		return new DefinitionRenameResult(true, "이름을 바꾸고 다시 읽었습니다.", newPath, changed, mentions, warnings);
+	}
+
+	/** 이름이 바뀐 뒤의 경로입니다. 폴더는 그대로 두고 파일 이름(Skill은 폴더 이름)만 바꿉니다. */
+	private String renamedPath(Kind kind, String oldPath, String newName) {
+		if (Constants.Definition.SKILL_DIR.equals(kind.dir())) {
+			String skillFolder = oldPath.substring(0, oldPath.lastIndexOf('/'));
+			return skillFolder.substring(0, skillFolder.lastIndexOf('/') + 1) + newName + "/" + kind.suffix();
+		}
+		return oldPath.substring(0, oldPath.lastIndexOf('/') + 1) + newName + kind.suffix();
+	}
+
+	/**
+	 * 옛 이름을 부르는 다른 정의 파일의 참조를 바꿔 changes에 넣고, 그 경로들을 돌려줍니다.
+	 *
+	 * @param kind    이름을 바꾸는 정의의 종류
+	 * @param oldName 옛 이름
+	 * @param newName 새 이름
+	 * @param oldPath 이름을 바꾸는 파일(자기 자신은 빼고 봅니다)
+	 * @param changes 바뀐 파일을 넣을 곳
+	 */
+	private List<String> renamedReferences(Kind kind, String oldName, String newName, String oldPath, Map<String, String> changes) {
+		List<String> changed = new ArrayList<>();
+		if (Constants.Definition.WORKFLOW_DIR.equals(kind.dir())) {
+			return changed;
+		}
+		boolean agent = Constants.Definition.AGENT_DIR.equals(kind.dir());
+		for (DefinitionText text : this.loader.readTexts(Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX)) {
+			String renamed = DefinitionRenamer.renameInFrontBlock(text.text(), agent ? "subAgents" : "skills", oldName, newName);
+			if (!text.path().equals(oldPath) && !renamed.equals(text.text())) {
+				changes.put(text.path(), renamed);
+				changed.add(text.path());
+			}
+		}
+		if (agent) {
+			for (DefinitionText text : this.loader.readTexts(Constants.Definition.WORKFLOW_DIR, Constants.Definition.WORKFLOW_SUFFIX)) {
+				String renamed = DefinitionRenamer.renameStepAgent(text.text(), oldName, newName);
+				if (!renamed.equals(text.text())) {
+					changes.put(text.path(), renamed);
+					changed.add(text.path());
+				}
+			}
+		}
+		return changed;
+	}
+
+	/** 등록된 정의 파일의 글자를 읽습니다. */
+	private String textOf(Kind kind, String path) {
+		for (DefinitionText text : this.loader.readTexts(kind.dir(), kind.suffix())) {
+			if (text.path().equals(path)) {
+				return text.text();
+			}
+		}
+		throw new RejectedException("파일을 읽지 못했습니다: " + path, false);
+	}
+
+	/**
+	 * 이름을 바꾼 뒤에도 옛 이름이 주석이나 본문에 남는 파일들입니다. 뜻을 알 수 없는 글이라 고치지 않고 알려만 줍니다.
+	 *
+	 * @param oldName 옛 이름
+	 * @param changes 이번에 바뀌는 파일들. 쓰기 전에도 후에도 같은 결과가 나오도록 디스크 내용보다 먼저 봅니다
+	 */
+	private List<String> mentionsOf(String oldName, Map<String, String> changes) {
+		List<String> mentions = new ArrayList<>();
+		String[][] kinds = {
+			{Constants.Definition.WORKFLOW_DIR, Constants.Definition.WORKFLOW_SUFFIX},
+			{Constants.Definition.AGENT_DIR, Constants.Definition.AGENT_SUFFIX},
+			{Constants.Definition.SKILL_DIR, Constants.Definition.SKILL_FILE}
+		};
+		for (String[] kind : kinds) {
+			for (DefinitionText text : this.loader.readTexts(kind[0], kind[1])) {
+				if (changes.containsKey(text.path())) {
+					continue;
+				}
+				if (DefinitionRenamer.mentions(text.text(), oldName)) {
+					mentions.add(text.path());
+				}
+			}
+		}
+		for (Map.Entry<String, String> change : changes.entrySet()) {
+			if (change.getValue() != null && DefinitionRenamer.mentions(change.getValue(), oldName)) {
+				mentions.add(change.getKey());
+			}
+		}
+		return mentions;
+	}
+
+	/**
+	 * <pre>
+	 * 진행 중인 실행이 있으면 알릴 말을 만듭니다. 막지는 않습니다. 서버가 죽어 RUNNING으로 남은 기록이 있으면 영영 못 바꾸게 되기 때문입니다.
+	 * 실행 기록을 읽지 못해도 이름 변경은 계속합니다(정의 파일은 DB가 없어도 고칠 수 있습니다).
+	 * </pre>
+	 *
+	 * @param kind    이름을 바꾸는 정의의 종류
+	 * @param oldName 옛 이름
+	 */
+	private List<String> runningWarnings(Kind kind, String oldName) {
+		List<String> warnings = new ArrayList<>();
+		boolean workflow = Constants.Definition.WORKFLOW_DIR.equals(kind.dir());
+		try {
+			// 도는 중인 실행은 메모리에 옛 정의를 들고 있어 다음 step에서 옛 Agent나 Skill을 찾지 못할 수 있다.
+			// 서버가 죽으면 RUNNING 기록이 그대로 남으므로, 최근에 움직인 것만 센다.
+			Instant recent = Instant.now().minus(RUNNING_RECENT);
+			int running = 0;
+			for (WorkFlowExecution execution : this.executionStore.list(WorkFlowExecutionStatus.RUNNING.name(), workflow ? oldName : null, null, 0, 100)) {
+				if (execution.updatedAt() != null && execution.updatedAt().isAfter(recent)) {
+					running++;
+				}
+			}
+			if (running > 0) {
+				warnings.add("최근 1시간 안에 움직인 실행 중인 Workflow가 " + running + "건 있습니다. 옛 이름을 찾지 못해 실패할 수 있습니다.");
+			}
+			if (workflow) {
+				// 승인 뒤 다시 이어 갈 때 Workflow를 id로 찾는다. 이름이 바뀌면 찾지 못한다.
+				int waiting = this.executionStore.list(WorkFlowExecutionStatus.WAITING_APPROVAL.name(), oldName, null, 0, 100).size();
+				if (waiting > 0) {
+					warnings.add("승인을 기다리는 실행이 " + waiting + "건 있습니다. 이름을 바꾸면 이어서 실행할 수 없습니다.");
+				}
+			}
+		} catch (RuntimeException e) {
+			warnings.add("실행 기록을 확인하지 못했습니다: " + e.getMessage());
+		}
+		return warnings;
+	}
+
+	/** 파일을 옮깁니다. 없으면 그냥 넘어갑니다. 노드 위치 파일이라 옮기지 못해도 이름 변경은 실패로 치지 않습니다. */
+	private void moveQuietly(Path from, Path to) {
+		try {
+			if (Files.exists(from)) {
+				Files.move(from, to);
+			}
+		} catch (IOException e) {
+			warn("파일을 옮기지 못했습니다: " + from + " - " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Skill 폴더에 남은 참고 파일을 새 폴더로 옮기고 옛 폴더를 지웁니다(SKILL.md는 이미 옮겨졌습니다).
+	 *
+	 * @param from 옛 폴더
+	 * @param to   새 폴더
+	 */
+	private void moveFolderRest(Path from, Path to) throws IOException {
+		Files.createDirectories(to);
+		try (DirectoryStream<Path> files = Files.newDirectoryStream(from)) {
+			for (Path file : files) {
+				Path target = to.resolve(file.getFileName());
+				if (Files.isDirectory(file)) {
+					this.moveFolderRest(file, target);
+				} else {
+					Files.move(file, target);
+				}
+			}
+		}
+		Files.delete(from);
 	}
 
 	/** 정의 폴더의 파일을 다시 읽습니다(손으로 고친 파일을 반영할 때). */

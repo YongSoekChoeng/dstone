@@ -210,6 +210,7 @@ var DstoneAiDesigner = (function () {
 			fillWorkflowSelect();
 			document.getElementById("wd-save-btn").disabled = !catalog.editable;
 			document.getElementById("wd-delete-btn").disabled = !catalog.editable;
+			document.getElementById("wd-rename-btn").disabled = !catalog.editable;
 			if (!catalog.editable) {
 				showMessage("info", "이 엔진은 정의 파일 저장이 꺼져 있습니다(dstone.ai.definition.edit-enabled). 보기와 검사만 됩니다. 정의 폴더: " + catalog.location);
 			}
@@ -287,7 +288,7 @@ var DstoneAiDesigner = (function () {
 			return;
 		}
 		setStatus("읽는 중...");
-		call("GET", "/api/ai/definitions/workflows/" + encodeURIComponent(id)).then(function (source) {
+		return call("GET", "/api/ai/definitions/workflows/" + encodeURIComponent(id)).then(function (source) {
 			setStatus("");
 			loadDoc(source.text, { id: source.id, path: source.path, originalPath: source.path, layout: source.layout });
 			history.replaceState(null, "", "#" + encodeURIComponent(source.id));
@@ -444,6 +445,7 @@ var DstoneAiDesigner = (function () {
 			doc.id = savedId;
 			doc.originalPath = result.path;
 			dirty = false;
+			showPanel();
 			showMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
 			loadCatalog().then(function () {
 				if (textEdited) {
@@ -489,6 +491,137 @@ var DstoneAiDesigner = (function () {
 			setStatus("");
 			showMessage("error", e.message);
 		});
+	}
+
+	/* ====================================================================
+	 * 이름 바꾸기: 파일과, 그 이름을 부르는 다른 정의의 참조까지 엔진이 함께 바꾼다
+	 * ==================================================================== */
+
+	var RENAME_LABELS = { workflows: "Workflow", agents: "Agent", skills: "Skill" };
+
+	/** 저장하지 않은 내용이 이름 변경과 엇갈리면 이유를 돌려줍니다. 서버 파일이 바뀌는 동안 화면의 옛 글자가 남으면 저장할 때 덮어쓰기 때문입니다. */
+	function renameBlocker(kind) {
+		if (dirty && (kind === "workflows" || kind === "agents")) {
+			return "저장하지 않은 Workflow 변경이 있습니다. 먼저 저장하거나 되돌리십시오.";
+		}
+		if (agentDoc && agentDoc.dirty && els.agentDialog.style.display !== "none" && (kind === "agents" || kind === "skills")) {
+			return "저장하지 않은 Agent 변경이 있습니다. 먼저 저장하십시오.";
+		}
+		if (skillDoc && skillDoc.dirty && els.skillDialog.style.display !== "none" && kind === "skills") {
+			return "저장하지 않은 Skill 변경이 있습니다. 먼저 저장하십시오.";
+		}
+		return null;
+	}
+
+	/**
+	 * 새 이름을 묻고, 무엇이 바뀌는지 엔진에 물어 보여 준 뒤 바꿉니다.
+	 * @param kind workflows, agents, skills
+	 * @param id 지금 이름
+	 * @param say 결과를 보여 줄 함수(종류, 글자)
+	 */
+	function renameDefinition(kind, id, say) {
+		var blocker = renameBlocker(kind);
+		if (blocker) {
+			say("error", blocker);
+			return;
+		}
+		var label = RENAME_LABELS[kind];
+		var hint = kind === "skills" ? "영문 소문자, 숫자, -" : "영문, 숫자, -, _";
+		var input = window.prompt(label + " '" + id + "'의 새 이름을 적으십시오(" + hint + ").", id);
+		if (input === null || input.trim() === "" || input.trim() === id) {
+			return;
+		}
+		var newId = input.trim();
+		var url = "/api/ai/definitions/" + kind + "/rename";
+		say("info", "검사하는 중...");
+		call("POST", url, { id: id, newId: newId, dryRun: true }).then(function (plan) {
+			if (!plan.ok) {
+				say("error", plan.message);
+				return null;
+			}
+			if (!window.confirm(renameSummary(kind, id, newId, plan))) {
+				say("", "");
+				return null;
+			}
+			say("info", "바꾸는 중...");
+			return call("POST", url, { id: id, newId: newId, dryRun: false }).then(function (result) {
+				if (!result.ok) {
+					say("error", result.message);
+					return;
+				}
+				return afterRename(kind, id, newId).then(function () {
+					say(result.warnings.length > 0 ? "error" : "ok", label + " 이름을 " + newId + "(으)로 바꿨습니다: " + result.path
+						+ (result.changed.length > 0 ? " (참조를 고친 파일 " + result.changed.length + "개)" : "")
+						+ (result.mentions.length > 0 ? " 옛 이름이 주석이나 본문에 남은 파일: " + result.mentions.join(", ") : "")
+						+ (result.warnings.length > 0 ? " 확인 필요: " + result.warnings.join(" ") : ""));
+				});
+			});
+		}).catch(function (e) {
+			say("error", e.message);
+		});
+	}
+
+	function renameSummary(kind, id, newId, plan) {
+		var lines = [id + " → " + newId, "", "새 경로: " + plan.path];
+		if (plan.changed.length > 0) {
+			lines.push("", "참조를 함께 고칠 파일 " + plan.changed.length + "개:");
+			lines = lines.concat(plan.changed);
+		}
+		if (plan.mentions.length > 0) {
+			lines.push("", "옛 이름이 주석이나 본문에 남는 파일(직접 고쳐야 합니다):");
+			lines = lines.concat(plan.mentions);
+		}
+		if (plan.warnings.length > 0) {
+			lines.push("", "주의:");
+			lines = lines.concat(plan.warnings);
+		}
+		if (kind !== "skills") {
+			lines.push("", "이 이름으로 부르는 API 호출이나 코드는 자동으로 바뀌지 않습니다.");
+		}
+		lines.push("", "바꿀까요?");
+		return lines.join("\n");
+	}
+
+	/** 이름이 바뀐 뒤 목록을 다시 읽고, 열려 있는 창을 서버의 새 내용으로 다시 엽니다. */
+	function afterRename(kind, id, newId) {
+		var openAgentPath = agentDoc && els.agentDialog.style.display !== "none" ? agentDoc.originalPath : null;
+		var agentRenamed = kind === "agents" && openAgentPath && findAgent(id) && findAgent(id).path === openAgentPath;
+		var skillOpen = kind === "skills" && skillDoc && els.skillDialog.style.display !== "none" && findSkill(id) && findSkill(id).path === skillDoc.originalPath;
+		var workflowUsesAgent = kind === "agents" && doc && steps().some(function (step) {
+			return step.agent === id;
+		});
+		return loadCatalog().then(function () {
+			// 다시 여는 쪽이 안내 칸을 비우므로, 다 열린 뒤에 결과를 보여 주도록 기다린다.
+			var waits = [];
+			if (doc && doc.id && (kind === "workflows" ? doc.id === id : workflowUsesAgent)) {
+				waits.push(openWorkflow(kind === "workflows" ? newId : doc.id));
+			} else {
+				showPanel();
+			}
+			if (agentRenamed) {
+				waits.push(openAgent(newId));
+			} else if (openAgentPath) {
+				catalog.agents.forEach(function (agent) {
+					if (agent.path === openAgentPath) {
+						waits.push(openAgent(agent.id));
+					}
+				});
+			}
+			if (skillOpen) {
+				waits.push(openSkill(newId));
+			}
+			renderAgentManager();
+			renderSkillManager();
+			return Promise.all(waits);
+		});
+	}
+
+	function renameCurrentWorkflow() {
+		if (!doc || !doc.id) {
+			showMessage("info", "아직 저장하지 않은 Workflow입니다. 오른쪽 설정의 id를 고치면 됩니다.");
+			return;
+		}
+		renameDefinition("workflows", doc.id, showMessage);
 	}
 
 	function reloadEngine() {
@@ -1642,7 +1775,9 @@ var DstoneAiDesigner = (function () {
 		var settings = m.settings || {};
 		var html = "<h4>Workflow 설정</h4>"
 			+ "<p class=\"ai-hint\">step이나 화살표를 누르면 그것의 설정이 나옵니다.</p>"
-			+ row("id", "엔진에 등록되는 이름", "<input type=\"text\" data-wf=\"id\" value=\"" + escapeHtml(m.id || "") + "\" />")
+			+ row("id", "엔진에 등록되는 이름", doc.originalPath
+				? "<input type=\"text\" value=\"" + escapeHtml(m.id || "") + "\" readonly /><div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-wf-rename-btn\"" + (catalog.editable ? "" : " disabled") + ">이름 변경</button></div>"
+				: "<input type=\"text\" data-wf=\"id\" value=\"" + escapeHtml(m.id || "") + "\" />")
 			+ row("version", "예: 1.0.0", "<input type=\"text\" data-wf=\"version\" value=\"" + escapeHtml(m.version === undefined ? "" : String(m.version)) + "\" />")
 			+ row("description", "", "<textarea data-wf=\"description\" rows=\"2\">" + escapeHtml(m.description || "") + "</textarea>")
 			+ row("allowedCallers", "쉼표로 구분, 비우면 누구나", "<input type=\"text\" data-wf=\"allowedCallers\" value=\"" + escapeHtml((m.allowedCallers || []).join(", ")) + "\" />")
@@ -1671,6 +1806,9 @@ var DstoneAiDesigner = (function () {
 			});
 		});
 		document.getElementById("wd-tidy-state-btn").addEventListener("click", tidyState);
+		if (document.getElementById("wd-wf-rename-btn")) {
+			document.getElementById("wd-wf-rename-btn").addEventListener("click", renameCurrentWorkflow);
+		}
 		// input 모양은 Picoschema 편집기가 맡는다. 그림과 상관없는 값이라 설정 칸을 다시 그리지 않고 글자만 바꾼다(커서가 사라지지 않게).
 		DstonePicoschemaEditor.create(document.getElementById("wd-wf-input"), m.input, {
 			noneLabel: "적지 않음(기본: 글자 하나)",
@@ -2150,6 +2288,11 @@ var DstoneAiDesigner = (function () {
 				showAgentTab(tab.getAttribute("data-agent-tab"));
 			});
 		});
+		els.agentForm.addEventListener("click", function (e) {
+			if (e.target.id === "wd-agent-rename-btn") {
+				renameDefinition("agents", String(agentDoc.front.id), agentMessage);
+			}
+		});
 		els.agentText.addEventListener("input", function () {
 			agentTextEdited = true;
 			agentDoc.dirty = true;
@@ -2166,7 +2309,7 @@ var DstoneAiDesigner = (function () {
 	}
 
 	function openAgent(id) {
-		call("GET", "/api/ai/definitions/agents/" + encodeURIComponent(id)).then(function (source) {
+		return call("GET", "/api/ai/definitions/agents/" + encodeURIComponent(id)).then(function (source) {
 			showAgent(source.text, source.path, source.path);
 			agentMessage("", "");
 		}).catch(function (e) {
@@ -2670,7 +2813,9 @@ var DstoneAiDesigner = (function () {
 		var html = ""
 			+ "<div class=\"wd-agent-grid\">"
 			+ "<section class=\"wd-agent-sec\"><h4>기본</h4>"
-			+ row("id", "Workflow step의 agent에 적는 이름", "<input type=\"text\" data-agent=\"id\" value=\"" + escapeHtml(f.id === undefined ? "" : String(f.id)) + "\" />")
+			+ row("id", "Workflow step의 agent에 적는 이름", agentDoc.originalPath
+				? "<input type=\"text\" value=\"" + escapeHtml(f.id === undefined ? "" : String(f.id)) + "\" readonly /><div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-agent-rename-btn\"" + (catalog.editable ? "" : " disabled") + ">이름 변경</button></div>"
+				: "<input type=\"text\" data-agent=\"id\" value=\"" + escapeHtml(f.id === undefined ? "" : String(f.id)) + "\" />")
 			+ row("version", "예: 1.0.0", "<input type=\"text\" data-agent=\"version\" value=\"" + escapeHtml(f.version === undefined ? "" : String(f.version)) + "\" />")
 			+ row("role", "사람이 읽는 역할 이름(선택)", "<input type=\"text\" data-agent=\"role\" value=\"" + escapeHtml(f.role || "") + "\" />")
 			+ row("description", "하는 일. Sub Agent로 쓰이면 부르는 쪽 LLM이 이 설명을 봅니다", "<textarea data-agent=\"description\" rows=\"2\">" + escapeHtml(f.description || "") + "</textarea>")
@@ -3182,6 +3327,9 @@ var DstoneAiDesigner = (function () {
 			agentDoc.originalPath = result.path;
 			agentDoc.dirty = false;
 			updateAgentPathHint();
+			if (els.agentForm.style.display !== "none") {
+				renderAgentForm();
+			}
 			agentMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
 			loadCatalog().then(function () {
 				showPanel();
@@ -3225,6 +3373,8 @@ var DstoneAiDesigner = (function () {
 				openAgent(button.getAttribute("data-agent-open"));
 			} else if (button.getAttribute("data-agent-delete")) {
 				deleteAgent(button.getAttribute("data-agent-delete"));
+			} else if (button.getAttribute("data-agent-rename")) {
+				renameDefinition("agents", button.getAttribute("data-agent-rename"), agentManagerMessage);
 			}
 		});
 	}
@@ -3290,6 +3440,7 @@ var DstoneAiDesigner = (function () {
 				+ "</span>"
 				+ "<span class=\"wd-agents-actions\">"
 				+ "<button type=\"button\" class=\"kn-plain\" data-agent-open=\"" + escapeHtml(agent.id) + "\">열기</button>"
+				+ "<button type=\"button\" class=\"kn-plain\" data-agent-rename=\"" + escapeHtml(agent.id) + "\"" + (catalog.editable ? "" : " disabled") + ">이름 변경</button>"
 				+ "<button type=\"button\" class=\"kn-plain\" data-agent-delete=\"" + escapeHtml(agent.id) + "\"" + (catalog.editable ? "" : " disabled") + ">삭제</button>"
 				+ "</span></div>";
 		}).join("");
@@ -3378,6 +3529,8 @@ var DstoneAiDesigner = (function () {
 				openSkill(button.getAttribute("data-skill-open"));
 			} else if (button.getAttribute("data-skill-delete")) {
 				deleteSkill(button.getAttribute("data-skill-delete"));
+			} else if (button.getAttribute("data-skill-rename")) {
+				renameDefinition("skills", button.getAttribute("data-skill-rename"), skillManagerMessage);
 			}
 		});
 	}
@@ -3457,6 +3610,7 @@ var DstoneAiDesigner = (function () {
 				+ "</span>"
 				+ "<span class=\"wd-agents-actions\">"
 				+ "<button type=\"button\" class=\"kn-plain\" data-skill-open=\"" + escapeHtml(skill.name) + "\">열기</button>"
+				+ "<button type=\"button\" class=\"kn-plain\" data-skill-rename=\"" + escapeHtml(skill.name) + "\"" + (catalog.editable ? "" : " disabled") + ">이름 변경</button>"
 				+ "<button type=\"button\" class=\"kn-plain\" data-skill-delete=\"" + escapeHtml(skill.name) + "\"" + (catalog.editable ? "" : " disabled") + ">삭제</button>"
 				+ "</span></div>";
 		}).join("");
@@ -3531,6 +3685,9 @@ var DstoneAiDesigner = (function () {
 		els.skillBody = document.getElementById("wd-skill-body");
 		els.skillMessage = document.getElementById("wd-skill-message");
 		document.getElementById("wd-skill-close-btn").addEventListener("click", closeSkill);
+		document.getElementById("wd-skill-rename-btn").addEventListener("click", function () {
+			renameDefinition("skills", document.getElementById("wd-skill-title").textContent, skillMessage);
+		});
 		document.getElementById("wd-skill-check-btn").addEventListener("click", function () {
 			skillRequest("check");
 		});
@@ -3564,7 +3721,7 @@ var DstoneAiDesigner = (function () {
 	}
 
 	function openSkill(name) {
-		call("GET", "/api/ai/definitions/skills/" + encodeURIComponent(name)).then(function (source) {
+		return call("GET", "/api/ai/definitions/skills/" + encodeURIComponent(name)).then(function (source) {
 			showSkill(source.text, source.path, source.path);
 			skillMessage("", "");
 		}).catch(function (e) {
@@ -3588,6 +3745,8 @@ var DstoneAiDesigner = (function () {
 		document.getElementById("wd-skill-title").textContent = path.replace(/\/SKILL\.md$/, "").replace(/^.*\//, "");
 		document.getElementById("wd-skill-path").textContent = path;
 		document.getElementById("wd-skill-save-btn").disabled = !catalog.editable;
+		document.getElementById("wd-skill-rename-btn").style.display = originalPath ? "" : "none";
+		document.getElementById("wd-skill-rename-btn").disabled = !catalog.editable;
 		els.skillDialog.style.display = "flex";
 		var file = readFrontFile(text);
 		if (file.problem) {
@@ -3650,6 +3809,7 @@ var DstoneAiDesigner = (function () {
 			}
 			skillDoc.originalPath = result.path;
 			skillDoc.dirty = false;
+			document.getElementById("wd-skill-rename-btn").style.display = "";
 			skillMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
 			loadCatalog().then(function () {
 				showPanel();
@@ -3681,6 +3841,7 @@ var DstoneAiDesigner = (function () {
 		});
 		document.getElementById("wd-new-btn").addEventListener("click", newWorkflow);
 		document.getElementById("wd-copy-btn").addEventListener("click", copyWorkflow);
+		document.getElementById("wd-rename-btn").addEventListener("click", renameCurrentWorkflow);
 		document.getElementById("wd-reload-btn").addEventListener("click", reloadEngine);
 		document.getElementById("wd-layout-btn").addEventListener("click", function () {
 			if (!doc) {
