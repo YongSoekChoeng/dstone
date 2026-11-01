@@ -23,5 +23,5 @@ steps:
     type: AGENT
     with: ${input}
     agent: sm-requirement-analyze
-    next: END
     save: customer_requirement
+    next: END
