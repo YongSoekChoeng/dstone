@@ -9,8 +9,8 @@
       "y" : 590
     },
     "FAIL" : {
-      "x" : 100,
-      "y" : 570
+      "x" : 90,
+      "y" : 620
     },
     "step02_test_agent" : {
       "x" : 220,
@@ -23,8 +23,17 @@
     "step01" : {
       "x" : 170,
       "y" : 130
+    },
+    "step02" : {
+      "x" : 380,
+      "y" : 260
     }
   },
   "edges" : { },
-  "ports" : { }
+  "ports" : {
+    "step02|onFailure|" : {
+      "source" : "left",
+      "target" : "in"
+    }
+  }
 }

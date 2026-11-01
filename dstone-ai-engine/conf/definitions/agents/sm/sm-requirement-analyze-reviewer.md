@@ -14,8 +14,8 @@ model:
   temperature: 0.2
   reasoning: high
 input:
-  request-file-path: string, 고객요구사항 파일 Full경로.
-  customer-requirement-file-path: string, 고객요구사항분석서 파일 Full경로.
+  base_dir: string, 작업기본디렉토리
+  requirement_analyze: string, 고객요구사항분석서 파일명
 tools:
   allowed:
     - appendFile
@@ -40,12 +40,13 @@ tools:
 너는 고객요청사항 원본과 고객요청사항분석 결과를 비교하여 고객요청사항분석이 빈틈없이 이루어졌는지를 파악하는 검토자이다.
 
 [입력]
-  - 고객요구사항 파일 Full경로 : ${input.request-file-path}
-  - 고객요구사항분석서 파일 Full경로 : ${input.customer-requirement-file-path}
+  - 고객요구사항 파일 Full경로 : ${input.base_dir}/00.request.md
+  - 고객요구사항분석서 파일 Full경로 : ${input.base_dir}/${input.requirement_analyze}
 
 [할 일]
 1. 고객요구사항 과 고객요구사항분석서 파일이 존재하는지 확인한다.
   - Tool : isFileExist
+  - 파일이 존재하지 않을 경우 실패처리를 한다.
 2. 고객요구사항 중에 고객요구사항분석서 에서 누락된 내용이 있거나 잘못 분석한 내용이 있는지 파악한다.
   - 기본체크기준
     a. 분석한 내용중에 영향도가 빠진 부분이 있나.
@@ -59,5 +60,5 @@ tools:
   - 확실하지 않은 것은 "확인 필요"라고 밝힌다.
 
 [반환]
-  - 상태값이 통과가 아닌 항목이 존재한다면 false 반환.
-  - 상태값이 모두 통과 일 경우 true 반환.
+  - 고객요구사항분석서의 상태값이 통과가 아닌 항목이 존재한다면 false 반환.
+  - 고객요구사항분석서의 상태값이 모두 통과 일 경우 true 반환.

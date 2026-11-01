@@ -14,8 +14,6 @@ settings:
   maxIterations: 100
   onError: STOP
 input: string, 요청서가 작성된 디렉토리명
-state:
-  customer_requirement: step01 step의 결과
 steps:
 
   - id: step01
@@ -23,5 +21,15 @@ steps:
     type: AGENT
     with: ${input}
     agent: sm-requirement-analyze
-    save: customer_requirement
+    next: step02
+    save: base_line
+
+  - id: step02
+    name: 고객요청사항 분석 리뷰
+    type: SUPERVISOR
+    with: ${state.base_line}
+    agent: sm-requirement-analyze-reviewer
     next: END
+    onFailure: FAIL
+state:
+  base_line: step01 step의 결과
