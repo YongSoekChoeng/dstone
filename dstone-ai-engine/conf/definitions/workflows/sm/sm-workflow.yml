@@ -29,7 +29,14 @@ steps:
     type: SUPERVISOR
     with: ${state.base_line}
     agent: sm-requirement-analyze-reviewer-agent
-    next: END
+    next: step03
     onFailure: FAIL
+
+  - id: step03
+    name: 영향도 분석
+    type: AGENT
+    with: ${state.base_line}
+    agent: sm-analyze-impact-agent
+    next: END
 state:
   base_line: step01 step의 결과

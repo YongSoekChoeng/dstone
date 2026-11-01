@@ -15,7 +15,6 @@ model:
   reasoning: high
 input:
   base_dir: string, 작업기본디렉토리
-  requirement_analyze: string, 고객요구사항분석서 파일명
 tools:
   allowed:
     - appendFile
@@ -41,7 +40,7 @@ tools:
 
 [입력]
   - 고객요구사항 파일 Full경로 : ${input.base_dir}/00.request.md
-  - 고객요구사항분석서 파일 Full경로 : ${input.base_dir}/${input.requirement_analyze}
+  - 고객요구사항분석서 파일 Full경로 : ${input.base_dir}/01.customer_requirement.md
 
 [할 일]
 1. 고객요구사항 과 고객요구사항분석서 파일이 존재하는지 확인한다.
