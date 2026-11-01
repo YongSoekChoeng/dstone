@@ -20,7 +20,7 @@ steps:
     name: 고객요청사항 분석
     type: AGENT
     with: ${input}
-    agent: sm-requirement-analyze
+    agent: sm-requirement-analyze-agent
     next: step02
     save: base_line
 
@@ -28,7 +28,7 @@ steps:
     name: 고객요청사항 분석 리뷰
     type: SUPERVISOR
     with: ${state.base_line}
-    agent: sm-requirement-analyze-reviewer
+    agent: sm-requirement-analyze-reviewer-agent
     next: END
     onFailure: FAIL
 state:
