@@ -54,7 +54,23 @@ steps:
     name: 아키텍처 설계
     type: AGENT
     with: ${state.base_line}
-    next: END
     agent: sm-architect-agent
+    next: step06
+
+  - id: step06
+    name: 설계 승인
+    type: APPROVAL
+    approval:
+      approverRole: PL
+    routes:
+      승인: step07
+      아키택처 재설계: step05
+
+  - id: step07
+    name: 개발
+    type: AGENT
+    with: ${state.base_line}
+    agent: sm-developer-agent
+    next: END
 state:
   base_line: step01 step의 결과
