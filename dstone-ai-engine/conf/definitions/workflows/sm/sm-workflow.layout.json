@@ -5,8 +5,8 @@
       "y" : -10
     },
     "END" : {
-      "x" : 570,
-      "y" : 590
+      "x" : 630,
+      "y" : 630
     },
     "FAIL" : {
       "x" : 60,
@@ -21,12 +21,16 @@
       "y" : 190
     },
     "step01" : {
-      "x" : 160,
+      "x" : 170,
       "y" : 20
     },
     "step02" : {
-      "x" : 450,
+      "x" : 460,
       "y" : 60
+    },
+    "step04" : {
+      "x" : 560,
+      "y" : 320
     }
   },
   "edges" : {
@@ -40,12 +44,38 @@
     "step02|onFailure|" : [ {
       "x" : 110,
       "y" : 160
+    } ],
+    "step04|route|고객요청사항 재분석" : [ {
+      "x" : 320,
+      "y" : 310
+    }, {
+      "x" : 320,
+      "y" : 210
+    } ],
+    "step04|route|중지" : [ {
+      "x" : 210,
+      "y" : 380
+    }, {
+      "x" : 210,
+      "y" : 450
     } ]
   },
   "ports" : {
     "step01|next|" : {
       "source" : "right",
       "target" : "left"
+    },
+    "step04|route|고객요청사항 재분석" : {
+      "source" : "left",
+      "target" : "out"
+    },
+    "step04|route|영향도 재분석" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step04|route|중지" : {
+      "source" : "left",
+      "target" : "right"
     }
   }
 }

@@ -37,6 +37,17 @@ steps:
     type: AGENT
     with: ${state.base_line}
     agent: sm-analyze-impact-agent
-    next: END
+    next: step04
+
+  - id: step04
+    name: 영향도 분석 승인
+    type: APPROVAL
+    approval:
+      approverRole: PL
+    routes:
+      고객요청사항 재분석: step01
+      영향도 재분석: step03
+      중지: FAIL
+      승인: END
 state:
   base_line: step01 step의 결과
