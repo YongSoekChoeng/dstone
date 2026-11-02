@@ -44,6 +44,20 @@
     "step02|onFailure|" : [ {
       "x" : 110,
       "y" : 160
+    } ],
+    "step04|route|고객요청사항 재분석" : [ {
+      "x" : 320,
+      "y" : 310
+    }, {
+      "x" : 320,
+      "y" : 210
+    } ],
+    "step04|route|중지" : [ {
+      "x" : 210,
+      "y" : 380
+    }, {
+      "x" : 210,
+      "y" : 450
     } ]
   },
   "ports" : {
@@ -53,7 +67,7 @@
     },
     "step04|route|고객요청사항 재분석" : {
       "source" : "left",
-      "target" : "in"
+      "target" : "out"
     },
     "step04|route|영향도 재분석" : {
       "source" : "right",
