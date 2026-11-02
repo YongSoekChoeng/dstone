@@ -24,12 +24,12 @@ tools:
     - knowledgeListProjects
     - knowledgeSearch
     - knowledgeTableUsage
-    - list_directory
     - readFile
     - replaceInFile
     - searchInFiles
     - searchDocuments
     - writeFile
+    - readFileListAll
 ---
 [역할]
 너는 고객요구사항분석서를 보고 작업을 진행할 때 현행 시스템에 미치는 영향도를 분석하는 분석가이다.

@@ -102,7 +102,7 @@ spring:
                      # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash | qwen/qwen3.8-27b
                      model: qwen/qwen3.8-27b
                      temperature: 0.4
-                     max-tokens: 16384
+                     max-tokens: 30000
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # timeout : LLM호출 타임아웃.
              # max-retries : LLM호출 실패 시 재시도 횟수.
