@@ -525,3 +525,17 @@ GitHub에 올렸지만 `main`이 아니라 새 브랜치 `feature/ai-engine-agen
 ```bash
 git checkout main && git merge --ff-only feature/ai-engine-agent-provider && git push
 ```
+
+---
+
+## 질문
+
+main 에 반영해줘.
+
+---
+
+## 답변
+
+`main`에 반영하고 GitHub에 올렸습니다. 지금 `origin/main`의 최신 커밋은 `26915bf2`이고, Agent별 Provider 커밋 `8ea101cd`이 그 바로 아래에 있습니다.
+
+`26915bf2`는 제가 만든 커밋이 아니라 저장소의 자동 `history:` 커밋이며, 이번 push에 함께 올라갔습니다. 로컬 작업 브랜치도 `main`으로 돌아왔습니다. `feature/ai-engine-agent-provider` 브랜치는 로컬과 GitHub에 그대로 남아 있습니다.
