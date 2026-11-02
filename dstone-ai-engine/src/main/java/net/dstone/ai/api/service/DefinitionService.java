@@ -444,9 +444,10 @@ public class DefinitionService extends BaseObject {
 			}
 			if (workflow) {
 				// 승인 뒤 다시 이어 갈 때 Workflow를 id로 찾는다. 이름이 바뀌면 찾지 못한다.
-				int waiting = this.executionStore.list(WorkFlowExecutionStatus.WAITING_APPROVAL.name(), oldName, null, 0, 100).size();
+				int waiting = this.executionStore.list(WorkFlowExecutionStatus.WAITING_APPROVAL.name(), oldName, null, 0, 100).size()
+					+ this.executionStore.list(WorkFlowExecutionStatus.PAUSED.name(), oldName, null, 0, 100).size();
 				if (waiting > 0) {
-					warnings.add("승인을 기다리는 실행이 " + waiting + "건 있습니다. 이름을 바꾸면 이어서 실행할 수 없습니다.");
+					warnings.add("승인을 기다리거나 일시정지된 실행이 " + waiting + "건 있습니다. 이름을 바꾸면 이어서 실행할 수 없습니다.");
 				}
 			}
 		} catch (RuntimeException e) {

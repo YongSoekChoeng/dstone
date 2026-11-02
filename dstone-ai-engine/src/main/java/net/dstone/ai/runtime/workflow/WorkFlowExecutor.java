@@ -66,7 +66,8 @@ import net.dstone.common.core.BaseObject;
  *
  * ## 상태 저장과 다음 step
  * step 하나를 처리할 때마다 WorkFlowExecutionStore로 상태를 바로 저장해 둡니다.
- * 그래서 APPROVAL step에서 실행이 멈추더라도, 혹은 서버가 중간에 재시작되더라도 마지막으로 멈춘 step부터 이어서 진행할 수 있습니다.
+ * 그래서 APPROVAL step이나 일시정지로 멈추더라도, 혹은 실패하거나 서버가 재시작되어도 멈춘 step부터 이어서 진행할 수 있습니다.
+ * 일시정지는 step 사이에서만 걸립니다. 이미 돌고 있는 step은 끝까지 기다립니다.
  * 다음 step은 nextStepId()가 next/onFailure(또는 ROUTER와 APPROVAL의 routes)를 보고 정합니다. 
  * 앞쪽 step을 가리키면 되돌아가는 재시도 루프가 되고, 무한 루프는 maxIterations가 막습니다.
  * "END"나 "FAIL" 예약어를 만나면 그 자리에서 Workflow 전체를 끝냅니다.
@@ -189,6 +190,17 @@ public class WorkFlowExecutor extends BaseObject {
 				}
 
 				/****************************************************************************************
+				0) 사람이 일시정지를 요청했으면, 다음 step을 시작하지 않고 여기서 멈춥니다.
+				   요청은 전용 컬럼에 있어서 step을 저장할 때 지워지지 않습니다.
+				****************************************************************************************/
+				WorkFlowContext.setCurrentStep(currentExecution.context(), workflow.steps().get(currentIndex).id());
+				if (this.executionStore.isPauseRequested(currentExecution.executionId())) {
+					currentExecution = currentExecution.paused(currentIndex);
+					this.executionStore.update(currentExecution);
+					return currentExecution;
+				}
+
+				/****************************************************************************************
 				1) 실행 횟수를 확인합니다. maxIterations를 넘어서면 무한 루프로 보고 FAILED로 끝냅니다.
 				****************************************************************************************/
 				if (++executed > maxIterations) {
@@ -275,6 +287,8 @@ public class WorkFlowExecutor extends BaseObject {
 					return this.persistFailed(currentExecution, "workflow[" + workflow.id() + "]에 없는 step id로 이동하려 했습니다: " + nextId);
 				}
 				currentIndex = nextIndex;
+				// 다음 step을 시작하기 전에 서버가 죽어도 재개할 자리를 찾도록 함께 저장합니다.
+				WorkFlowContext.setCurrentStep(currentExecution.context(), nextId);
 				currentExecution = currentExecution.advanceTo(currentIndex);
 				this.executionStore.update(currentExecution);
 			}

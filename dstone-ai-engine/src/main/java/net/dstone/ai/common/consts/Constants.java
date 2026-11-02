@@ -145,6 +145,8 @@ public final class Constants {
 			public final static String APPROVALS = "approvals";
 			/** 이 실행을 시작한 Workflow 정의의 id와 version을 담아두는 루트입니다. 표현식에서는 보이지 않습니다. */
 			public final static String DEFINITION = "definition";
+			/** 지금 차례인 step의 id입니다(엔진 내부용). 재개할 자리를 찾을 때 씁니다. */
+			public final static String CURRENT_STEP = "currentStep";
 		}
 
 		/**

@@ -1,10 +1,13 @@
 package net.dstone.ai.api.controller;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.ai.api.dto.WorkFlowDecisionRequest;
 import net.dstone.ai.api.dto.WorkFlowExecutionDetail;
+import net.dstone.ai.api.dto.WorkFlowExecutionPage;
 import net.dstone.ai.api.dto.WorkFlowExecutionSummary;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
@@ -47,6 +52,9 @@ public class WorkFlowExecutionController extends BaseController {
 	/** 위 설정을 적지 않았을 때 쓰는 값입니다. */
 	private static final int DEFAULT_MAX_VALUE_CHARS = 2000;
 
+	/** 목록 한 페이지에 담을 수 있는 최대 건수입니다. */
+	private static final int MAX_PAGE_SIZE = 100;
+
 	/**
 	 * Workflow 실행 목록을 최근에 시작된 순서대로 조회합니다.
 	 *
@@ -54,20 +62,23 @@ public class WorkFlowExecutionController extends BaseController {
 	 * 넣으면 "지금 사람의 승인을 기다리고 있는 실행"만 골라서 볼 수 있습니다.
 	 *
 	 * @param status     이 값으로 상태를 좁혀서 보고 싶을 때 씁니다(WorkFlowExecutionStatus에 정의된 값 중 하나, 비우면 전체).
-	 * @param workflowId 특정 Workflow의 실행만 보고 싶을 때 씁니다(비우면 전체).
+	 * @param workflowId id에 이 글자가 들어 있는 Workflow의 실행만 보고 싶을 때 씁니다(비우면 전체).
 	 * @param caller     특정 호출 주체(caller)의 실행만 보고 싶을 때 씁니다(비우면 전체).
+	 * @param executionId id에 이 글자가 들어 있는 실행만 보고 싶을 때 씁니다(비우면 전체).
 	 * @param page       조회할 페이지 번호입니다. 0부터 시작하며, 기본값은 0입니다.
-	 * @param size       한 페이지에 몇 개씩 보여줄지입니다. 기본값은 20입니다.
+	 * @param size       한 페이지에 몇 개씩 보여줄지입니다. 기본값은 20이고 최대 100입니다.
 	 */
 	@GetMapping
-	public List<WorkFlowExecutionSummary> list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String caller,
-		@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-		List<WorkFlowExecution> executions = this.workFlowExecutionService.list(status, workflowId, caller, page, size);
+	public WorkFlowExecutionPage list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String caller,
+		@RequestParam(required = false) String executionId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+		int safePage = Math.max(page, 0);
+		int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+		List<WorkFlowExecution> executions = this.workFlowExecutionService.search(status, workflowId, executionId, caller, safePage, safeSize);
 		List<WorkFlowExecutionSummary> summaries = new ArrayList<WorkFlowExecutionSummary>();
 		for (WorkFlowExecution execution : executions) {
 			summaries.add(WorkFlowExecutionSummary.from(execution));
 		}
-		return summaries;
+		return new WorkFlowExecutionPage(summaries, this.workFlowExecutionService.count(status, workflowId, executionId, caller), safePage, safeSize);
 	}
 
 	/**
@@ -81,8 +92,7 @@ public class WorkFlowExecutionController extends BaseController {
 	 */
 	@GetMapping("/{executionId}")
 	public WorkFlowExecutionDetail detail(@PathVariable String executionId, @RequestParam(defaultValue = "false") boolean full) {
-		WorkFlowExecution execution = this.workFlowExecutionService.find(executionId);
-		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution), full ? 0 : this.maxValueChars());
+		return this.detailOf(this.workFlowExecutionService.find(executionId), full ? 0 : this.maxValueChars());
 	}
 
 	/**
@@ -96,7 +106,52 @@ public class WorkFlowExecutionController extends BaseController {
 	@PostMapping("/{executionId}/decision")
 	public WorkFlowExecutionDetail decision(@PathVariable String executionId, @RequestBody WorkFlowDecisionRequest request) {
 		WorkFlowExecution execution = this.workFlowExecutionService.decide(executionId, request.chosen(), request.approved(), request.approver(), request.comment());
-		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution), this.maxValueChars());
+		return this.detailOf(execution, this.maxValueChars());
+	}
+
+	/**
+	 * 돌고 있는 실행에 일시정지를 요청합니다. 지금 step이 끝나면 PAUSED로 멈춥니다.
+	 * 실행 중이 아니면 409와 {status, message}를 돌려줍니다.
+	 *
+	 * @param executionId 멈출 실행의 id입니다.
+	 */
+	@PostMapping("/{executionId}/pause")
+	public ResponseEntity<Object> pause(@PathVariable String executionId) {
+		try {
+			return ResponseEntity.ok((Object) this.detailOf(this.workFlowExecutionService.pause(executionId), this.maxValueChars()));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 일시정지했거나 실패한 실행을 멈춘 step부터 이어 갑니다. 끝날 때까지 기다리지 않고 바로 응답합니다.
+	 * 이어 갈 수 없으면 409와 {status, message}를 돌려줍니다.
+	 *
+	 * @param executionId 이어 갈 실행의 id입니다.
+	 */
+	@PostMapping("/{executionId}/resume")
+	public ResponseEntity<Object> resume(@PathVariable String executionId) {
+		try {
+			return ResponseEntity.ok((Object) this.detailOf(this.workFlowExecutionService.resume(executionId), this.maxValueChars()));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/** 거절 사유를 화면이 읽을 수 있게 본문에 담습니다(기본 오류 응답에는 사유가 빠집니다). */
+	private ResponseEntity<Object> rejected(ResponseStatusException e) {
+		Map<String, Object> body = new LinkedHashMap<String, Object>();
+		body.put("status", Integer.valueOf(e.getStatusCode().value()));
+		body.put("message", e.getReason());
+		return ResponseEntity.status(e.getStatusCode()).body((Object) body);
+	}
+
+	/** 실행 상태 하나를 상세 응답으로 만듭니다. */
+	private WorkFlowExecutionDetail detailOf(WorkFlowExecution execution, int maxValueChars) {
+		String executionId = execution.executionId();
+		return WorkFlowExecutionDetail.from(execution, this.workFlowExecutionService.history(executionId), this.workFlowExecutionService.pendingApproval(execution),
+			this.workFlowExecutionService.isPauseRequested(executionId), this.workFlowExecutionService.resumePoint(execution), maxValueChars);
 	}
 
 	/** 설정에서 글자 수 한도를 읽습니다. 적혀 있지 않으면 기본값을 씁니다(0이면 줄이지 않습니다). */

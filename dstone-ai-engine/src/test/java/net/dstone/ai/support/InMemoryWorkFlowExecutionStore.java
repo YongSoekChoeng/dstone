@@ -5,8 +5,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
@@ -31,14 +33,83 @@ public class InMemoryWorkFlowExecutionStore extends WorkFlowExecutionStore {
 	/** executionId → step 실행 이력(쌓인 순서)입니다. */
 	private final Map<String, List<StepHistoryEntry>> histories = new ConcurrentHashMap<String, List<StepHistoryEntry>>();
 
+	/** 일시정지를 요청받은 실행의 id입니다. */
+	private final Set<String> pauseRequests = ConcurrentHashMap.newKeySet();
+
+	@Override
+	public synchronized boolean requestPause(String executionId) {
+		if (this.find(executionId).status() != WorkFlowExecutionStatus.RUNNING) {
+			return false;
+		}
+		this.pauseRequests.add(executionId);
+		return true;
+	}
+
+	@Override
+	public boolean isPauseRequested(String executionId) {
+		return this.pauseRequests.contains(executionId);
+	}
+
+	@Override
+	public synchronized boolean markResumed(WorkFlowExecution execution, int stepIndex) {
+		if (this.find(execution.executionId()).status() != execution.status()) {
+			return false;
+		}
+		this.pauseRequests.remove(execution.executionId());
+		this.executions.put(execution.executionId(), execution.resumed(stepIndex));
+		return true;
+	}
+
+	@Override
+	public synchronized int failInterrupted(String errorMessage) {
+		int count = 0;
+		for (WorkFlowExecution execution : new ArrayList<WorkFlowExecution>(this.executions.values())) {
+			if (execution.status() == WorkFlowExecutionStatus.RUNNING) {
+				this.executions.put(execution.executionId(), execution.failed(errorMessage));
+				this.pauseRequests.remove(execution.executionId());
+				count++;
+			}
+		}
+		return count;
+	}
+
+	@Override
+	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, int page, int size) {
+		List<WorkFlowExecution> matched = this.searchAll(status, workflowId, executionId, caller);
+		int from = Math.min(page * size, matched.size());
+		int to = Math.min(from + size, matched.size());
+		return new ArrayList<WorkFlowExecution>(matched.subList(from, to));
+	}
+
+	@Override
+	public long count(String status, String workflowId, String executionId, String caller) {
+		return this.searchAll(status, workflowId, executionId, caller).size();
+	}
+
+	private List<WorkFlowExecution> searchAll(String status, String workflowId, String executionId, String caller) {
+		List<WorkFlowExecution> matched = new ArrayList<WorkFlowExecution>();
+		for (WorkFlowExecution execution : this.list(status, null, caller, 0, Integer.MAX_VALUE)) {
+			boolean workflowMatches = workflowId == null || execution.workflowId().toLowerCase().contains(workflowId.toLowerCase());
+			boolean executionMatches = executionId == null || execution.executionId().toLowerCase().contains(executionId.toLowerCase());
+			if (workflowMatches && executionMatches) {
+				matched.add(execution);
+			}
+		}
+		return matched;
+	}
+
 	@Override
 	public void insert(WorkFlowExecution execution) {
 		this.executions.put(execution.executionId(), execution);
 	}
 
 	@Override
-	public void update(WorkFlowExecution execution) {
+	public synchronized void update(WorkFlowExecution execution) {
 		this.executions.put(execution.executionId(), execution);
+		// 운영 SQL과 같이, 실행이 멈추거나 끝나면 요청을 지웁니다.
+		if (execution.status() != WorkFlowExecutionStatus.RUNNING) {
+			this.pauseRequests.remove(execution.executionId());
+		}
 	}
 
 	@Override

@@ -109,6 +109,30 @@ public record WorkFlowExecution(
 
 	/**
 	 * <pre>
+	 * 일시정지 요청을 받아 step 사이에서 멈출 때의 상태를 만듭니다.
+	 * </pre>
+	 *
+	 * @param stepIndex 재개하면 실행할 스텝이 몇 번째인지입니다.
+	 * @return status가 PAUSED로 바뀐 새 WorkFlowExecution입니다.
+	 */
+	public WorkFlowExecution paused(int stepIndex) {
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.PAUSED, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now());
+	}
+
+	/**
+	 * <pre>
+	 * 일시정지했거나 실패한 실행을 이어 갈 때의 상태를 만듭니다. 이전 실패 사유는 지웁니다.
+	 * </pre>
+	 *
+	 * @param stepIndex 다시 실행할 스텝이 몇 번째인지입니다.
+	 * @return status가 RUNNING으로 바뀐 새 WorkFlowExecution입니다.
+	 */
+	public WorkFlowExecution resumed(int stepIndex) {
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.context, this.output, null, this.createdAt, Instant.now());
+	}
+
+	/**
+	 * <pre>
 	 * step이 LLM을 부를 때 쓸 대화방 id를 돌려줍니다.
 	 * - memory: true인 step: sessionId:stepId (같은 step이 다시 불리면 이전에 자기가 나눈 대화를 기억합니다)
 	 * - 그 밖의 step: null (대화 기억 없이 input만 보고 답합니다)

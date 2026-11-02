@@ -38,11 +38,12 @@ import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
  *     WORKFLOW_ID         WORKFLOW아이디
  *     CALLER              호출클라이언트
  *     SESSION_ID          세션아이디
- *     STATUS              상태(RUNNING / WAITING_APPROVAL / DONE / FAILED / CANCELLED)
+ *     STATUS              상태(RUNNING / WAITING_APPROVAL / PAUSED / DONE / FAILED / CANCELLED)
  *     CURRENT_STEP_INDEX  현재 STEP 인덱스
  *     CONTEXT_JSON        컨텍스트
  *     RESULT_TEXT         결과텍스트
  *     ERROR_MESSAGE       에러텍스트
+ *     PAUSE_REQUESTED     일시정지 요청 여부
  * 
  * <b>(AI_WORKFLOW_EXECUTION_STEP_HISTORY - WORKFLOW STEP 실행 이력)</b>
  *     ID                실행이력아이디(KEY)
@@ -124,6 +125,88 @@ public class WorkFlowExecutionStore extends BaseDao {
 			executions.add(this.mapExecution(rows.get(i)));
 		}
 		return executions;
+	}
+
+	/**
+	 * 관리 화면의 검색입니다. list()와 달리 workflowId와 executionId는 일부만 적어도 찾습니다.
+	 *
+	 * @param status      이 상태만 봅니다(비우면 전체).
+	 * @param workflowId  id에 이 글자가 들어 있는 Workflow만 봅니다(비우면 전체).
+	 * @param executionId id에 이 글자가 들어 있는 실행만 봅니다(비우면 전체).
+	 * @param caller      이 호출 주체만 봅니다(비우면 전체).
+	 * @param page        0부터 시작하는 페이지 번호입니다.
+	 * @param size        한 페이지에 담을 개수입니다.
+	 */
+	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, int page, int size) {
+		Map<String, Object> param = this.searchParam(status, workflowId, executionId, caller);
+		param.put("size", Integer.valueOf(size));
+		param.put("offset", Integer.valueOf(page * size));
+		List<Map<String, Object>> rows = this.sqlSessionCommon.selectList(NS + "searchExecutionList", param);
+		List<WorkFlowExecution> executions = new ArrayList<WorkFlowExecution>(rows.size());
+		for (int i = 0; i < rows.size(); i++) {
+			executions.add(this.mapExecution(rows.get(i)));
+		}
+		return executions;
+	}
+
+	/** search()와 같은 조건에 맞는 실행이 모두 몇 건인지 돌려줍니다. */
+	public long count(String status, String workflowId, String executionId, String caller) {
+		Long total = this.sqlSessionCommon.selectOne(NS + "countExecutionList", this.searchParam(status, workflowId, executionId, caller));
+		return total == null ? 0L : total.longValue();
+	}
+
+	private Map<String, Object> searchParam(String status, String workflowId, String executionId, String caller) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("status", status);
+		param.put("workflowId", workflowId);
+		param.put("executionId", executionId);
+		param.put("caller", caller);
+		return param;
+	}
+
+	/**
+	 * 돌고 있는 실행에 일시정지를 요청합니다. WorkFlowExecutor가 다음 step을 시작하기 전에 이 요청을 보고 멈춥니다.
+	 *
+	 * @param executionId 멈출 실행의 id입니다.
+	 * @return 요청을 넣었으면 true, 실행이 RUNNING이 아니면 false입니다.
+	 */
+	public boolean requestPause(String executionId) {
+		return this.sqlSessionCommon.update(NS + "requestPause", executionId) > 0;
+	}
+
+	/** 이 실행에 일시정지 요청이 들어와 있는지 돌려줍니다. @param executionId 확인할 실행의 id입니다. */
+	public boolean isPauseRequested(String executionId) {
+		Boolean requested = this.sqlSessionCommon.selectOne(NS + "selectPauseRequested", executionId);
+		return Boolean.TRUE.equals(requested);
+	}
+
+	/**
+	 * 멈춘 실행을 RUNNING으로 바꿉니다. 상태가 fromStatus 그대로일 때만 바꾸므로, 동시에 두 번 재개해도 한 번만 성공합니다.
+	 *
+	 * @param execution  재개할 실행입니다(읽어 온 그대로의 상태).
+	 * @param stepIndex  다시 실행할 스텝이 몇 번째인지입니다.
+	 * @return 바꿨으면 true, 그사이 상태가 달라졌으면 false입니다.
+	 */
+	public boolean markResumed(WorkFlowExecution execution, int stepIndex) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("executionId", execution.executionId());
+		param.put("fromStatus", execution.status().name());
+		param.put("currentStepIndex", Integer.valueOf(stepIndex));
+		param.put("updatedAt", Timestamp.from(Instant.now()));
+		return this.sqlSessionCommon.update(NS + "markResumed", param) > 0;
+	}
+
+	/**
+	 * RUNNING으로 남아 있는 실행을 모두 FAILED로 바꿉니다. 서버가 뜰 때 WorkFlowExecutionRecovery가 부릅니다.
+	 *
+	 * @param errorMessage 남길 실패 사유입니다.
+	 * @return 바꾼 건수입니다.
+	 */
+	public int failInterrupted(String errorMessage) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("errorMessage", errorMessage);
+		param.put("updatedAt", Timestamp.from(Instant.now()));
+		return this.sqlSessionCommon.update(NS + "failInterrupted", param);
 	}
 
 	/**

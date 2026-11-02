@@ -12,11 +12,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.ai.api.dto.PendingApproval;
+import net.dstone.ai.api.dto.ResumePoint;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
@@ -28,10 +30,10 @@ import net.dstone.common.biz.BaseService;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Workflow를 실행하는 세 가지 방법(동기 실행, 비동기 실행, 승인 대기에서 재개)이 모두 거쳐 가는
+ * Workflow를 실행하는 네 가지 방법(동기 실행, 비동기 실행, 승인 대기에서 재개, 일시정지나 실패에서 재개)이 모두 거쳐 가는
  * 단일 진입점입니다.
  *
- * 세 경로 모두 결국은 "실행 상태를 새로 만들거나 기존 것을 불러와서 WorkFlowExecutor에 넘긴다"는
+ * 네 경로 모두 결국은 "실행 상태를 새로 만들거나 기존 것을 불러와서 WorkFlowExecutor에 넘긴다"는
  * 같은 흐름을 탑니다. 그 실행 상태는 WorkFlowExecutionStore(PostgreSQL)에 영구히 저장되기 때문에,
  * 동기 호출이 APPROVAL(승인 대기)에서 멈추든 비동기 job이 아직 처리 중이든 상관없이, 똑같은 방식으로
  * 그 상태를 조회하거나 이어서 재개할 수 있습니다.
@@ -128,6 +130,112 @@ public class WorkFlowExecutionService extends BaseService {
 	}
 
 	/**
+	 * <pre>
+	 * 돌고 있는 실행에 일시정지를 요청합니다. 지금 돌고 있는 step은 끝까지 기다리고, 다음 step을 시작하기 전에 PAUSED로 멈춥니다.
+	 * 그래서 돌려주는 상태는 대개 아직 RUNNING입니다. 멈췄는지는 상세 조회로 확인합니다.
+	 * </pre>
+	 *
+	 * @param executionId 멈출 실행의 id입니다.
+	 * @throws ResponseStatusException 실행이 RUNNING이 아닐 때(409)
+	 */
+	public WorkFlowExecution pause(String executionId) {
+		if (!this.executionStore.requestPause(executionId)) {
+			WorkFlowExecution execution = this.executionStore.find(executionId);
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행 중일 때만 일시정지할 수 있습니다(현재 상태: " + execution.status() + ").");
+		}
+		return this.executionStore.find(executionId);
+	}
+
+	/**
+	 * <pre>
+	 * 일시정지했거나 실패한 실행을 멈춘 step부터 이어 갑니다. 현재 등록된 정의로 돕니다.
+	 * 남은 step이 오래 걸릴 수 있어 끝날 때까지 기다리지 않습니다. 진행 상황은 상세 조회로 확인합니다.
+	 * </pre>
+	 *
+	 * @param executionId 이어 갈 실행의 id입니다.
+	 * @return RUNNING으로 바뀐 실행 상태입니다.
+	 * @throws ResponseStatusException 이어 갈 수 없는 상태이거나 재개할 step을 찾지 못했을 때(409)
+	 */
+	public WorkFlowExecution resume(String executionId) {
+		WorkFlowExecution execution = this.executionStore.find(executionId);
+		ResumePoint point = this.resumePoint(execution);
+		if (point == null) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "일시정지했거나 실패한 실행만 이어 갈 수 있습니다(현재 상태: " + execution.status() + ").");
+		}
+		if (!point.resumable()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, point.problem());
+		}
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
+		if (!this.executionStore.markResumed(execution, point.stepIndex())) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]의 상태가 그사이 바뀌었습니다. 다시 조회하십시오.");
+		}
+		WorkFlowExecution resumed = execution.resumed(point.stepIndex());
+		CompletableFuture.runAsync(new Runnable() {
+			@Override
+			public void run() {
+				WorkFlowExecutionService.this.workFlowExecutor.run(workflow, resumed);
+			}
+		});
+		return resumed;
+	}
+
+	/**
+	 * <pre>
+	 * 실행을 이어 가면 어느 step부터 도는지 알려 줍니다. 일시정지나 실패 상태가 아니면 null입니다.
+	 * step은 순번이 아니라 id로 찾습니다. 멈춘 사이 step을 끼워 넣어도 엉뚱한 step이 돌지 않게 하기 위해서입니다.
+	 * 아래 두 경우는 막지 않고 warnings로 알립니다.
+	 * - 정의 버전이 시작할 때와 다를 때: step id를 다시 매겼다면 같은 id가 다른 일을 할 수 있습니다.
+	 * - 실패한 TOOL이나 forEach step을 다시 돌릴 때: 앞선 시도에서 일부가 이미 끝났을 수 있습니다.
+	 * </pre>
+	 *
+	 * @param execution 확인할 실행입니다.
+	 */
+	public ResumePoint resumePoint(WorkFlowExecution execution) {
+		if (execution.status() != WorkFlowExecutionStatus.PAUSED && execution.status() != WorkFlowExecutionStatus.FAILED) {
+			return null;
+		}
+		WorkFlowDefinition workflow;
+		try {
+			workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
+		} catch (RuntimeException e) {
+			return ResumePoint.blocked("Workflow[" + execution.workflowId() + "] 정의를 찾지 못해 이어 갈 수 없습니다: " + e.getMessage());
+		}
+		List<StepDefinition> steps = workflow.steps();
+		List<String> warnings = new ArrayList<>();
+		String savedStepId = WorkFlowContext.currentStep(execution.context());
+		int index = execution.currentStepIndex();
+		if (savedStepId != null) {
+			index = -1;
+			for (int i = 0; i < steps.size(); i++) {
+				if (steps.get(i).id().equals(savedStepId)) {
+					index = i;
+				}
+			}
+			if (index < 0) {
+				return ResumePoint.blocked("멈췄던 step[" + savedStepId + "]이 지금 정의에 없어 이어 갈 수 없습니다.");
+			}
+		} else if (index < 0 || index >= steps.size()) {
+			return ResumePoint.blocked("멈췄던 " + (index + 1) + "번째 step이 지금 정의에 없어 이어 갈 수 없습니다.");
+		} else {
+			warnings.add("step id 기록이 없는 예전 실행이라 순번으로 찾았습니다. 정의가 바뀌었다면 다른 step일 수 있습니다.");
+		}
+		StepDefinition step = steps.get(index);
+		String startedVersion = WorkFlowContext.definitionVersion(execution.context());
+		if (startedVersion != null && !startedVersion.equals(workflow.version())) {
+			warnings.add("정의 버전이 시작할 때(" + startedVersion + ")와 다릅니다(지금 " + workflow.version() + "). 지금 정의로 이어 가므로, step id를 다시 매겼다면 다른 일을 하는 step일 수 있습니다.");
+		}
+		if (execution.status() == WorkFlowExecutionStatus.FAILED && (step instanceof ToolStepDefinition || StepDefinition.forEachOf(step) != null)) {
+			warnings.add("이 step은 앞선 시도에서 일부가 이미 끝났을 수 있습니다. 파일을 고치는 일이면 다시 실패하거나 같은 일을 두 번 할 수 있습니다.");
+		}
+		return new ResumePoint(step.id(), step.type().name(), index, true, null, warnings);
+	}
+
+	/** 일시정지 요청이 들어와 있는지 돌려줍니다. @param executionId 확인할 실행의 id입니다. */
+	public boolean isPauseRequested(String executionId) {
+		return this.executionStore.isPauseRequested(executionId);
+	}
+
+	/**
 	 * 실행이 승인 대기(WAITING_APPROVAL)로 멈춰 있으면, 지금 어떤 결정을 기다리는지 돌려줍니다. 승인 대기가 아니면 null입니다.
 	 * 승인 화면이 이 값을 보고 고를 수 있는 결정마다 버튼을 하나씩 보여 줍니다.
 	 *
@@ -165,6 +273,25 @@ public class WorkFlowExecutionService extends BaseService {
 	 */
 	public List<WorkFlowExecution> list(String status, String workflowId, String caller, int page, int size) {
 		return this.executionStore.list(status, workflowId, caller, page, size);
+	}
+
+	/**
+	 * 관리 화면의 검색입니다. workflowId와 executionId는 일부만 적어도 찾습니다.
+	 *
+	 * @param status      이 상태만 봅니다(비우면 전체).
+	 * @param workflowId  id에 이 글자가 들어 있는 Workflow만 봅니다(비우면 전체).
+	 * @param executionId id에 이 글자가 들어 있는 실행만 봅니다(비우면 전체).
+	 * @param caller      이 호출 주체만 봅니다(비우면 전체).
+	 * @param page        0부터 시작하는 페이지 번호입니다.
+	 * @param size        한 페이지에 담을 개수입니다.
+	 */
+	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, int page, int size) {
+		return this.executionStore.search(status, workflowId, executionId, caller, page, size);
+	}
+
+	/** search()와 같은 조건에 맞는 실행이 모두 몇 건인지 돌려줍니다. */
+	public long count(String status, String workflowId, String executionId, String caller) {
+		return this.executionStore.count(status, workflowId, executionId, caller);
 	}
 
 	/**

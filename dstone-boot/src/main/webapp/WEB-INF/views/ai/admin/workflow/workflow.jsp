@@ -20,43 +20,66 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<section class="cs-page-head">
 				<p class="cs-eyebrow">AI</p>
 				<h2>Workflow 실행 관리</h2>
-				<p>이미 시작된 Workflow 실행을 조회하고, 승인 대기(WAITING_APPROVAL) 중인 실행을 승인/반려합니다.
+				<p>이미 시작된 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다. 실행 중에 문제가 보이면 일시정지하고, 해결한 뒤 멈춘 step부터 이어 갑니다.
 					임의 workflowId를 직접 실행해보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">Workflow 테스트</a> 화면을 쓰십시오.</p>
 			</section>
 
 			<section class="ai-panel">
 				<h3>조회 조건</h3>
 				<table class="ai-form">
-					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-btncol" /></colgroup>
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
 					<tr>
 						<th><label for="workflow-admin-status-filter">상태</label></th>
 						<td><select id="workflow-admin-status-filter">
 								<option value="">전체</option>
 								<option value="WAITING_APPROVAL">WAITING_APPROVAL</option>
 								<option value="RUNNING">RUNNING</option>
+								<option value="PAUSED">PAUSED</option>
 								<option value="DONE">DONE</option>
 								<option value="FAILED">FAILED</option>
 								<option value="CANCELLED">CANCELLED</option>
 							</select></td>
-						<td class="ai-form-btn"><button type="button" id="workflow-admin-refresh-btn">새로고침</button></td>
+						<th><label for="workflow-admin-workflow-filter">workflowId</label></th>
+						<td><input type="text" id="workflow-admin-workflow-filter" placeholder="일부만 적어도 찾습니다" /></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-admin-execution-filter">executionId</label></th>
+						<td colspan="3"><input type="text" id="workflow-admin-execution-filter" placeholder="일부만 적어도 찾습니다" /></td>
 					</tr>
 				</table>
+				<div class="ai-form-actions">
+					<button type="button" id="workflow-admin-reset-btn" class="kn-plain">초기화</button>
+					<button type="button" id="workflow-admin-refresh-btn">조회</button>
+				</div>
 			</section>
 
 			<section class="ai-panel">
 				<h3>실행 목록</h3>
-				<table id="workflow-admin-list-table" class="document-list-table">
-					<thead>
-						<tr>
-							<th>executionId</th>
-							<th>workflowId</th>
-							<th>상태</th>
-							<th>현재 스텝</th>
-							<th>수정시각</th>
-						</tr>
-					</thead>
-					<tbody id="workflow-admin-list-body"></tbody>
-				</table>
+				<div class="wa-table-scroll">
+					<table id="workflow-admin-list-table" class="document-list-table wa-table">
+						<colgroup>
+							<col />
+							<col style="width:26%" />
+							<col style="width:150px" />
+							<col style="width:84px" />
+							<col style="width:160px" />
+						</colgroup>
+						<thead>
+							<tr>
+								<th>executionId</th>
+								<th>workflowId</th>
+								<th>상태</th>
+								<th class="wa-num">현재 스텝</th>
+								<th>수정시각</th>
+							</tr>
+						</thead>
+						<tbody id="workflow-admin-list-body"></tbody>
+					</table>
+				</div>
+				<div class="wa-pager">
+					<span id="workflow-admin-total" class="wa-pager-total"></span>
+					<div id="workflow-admin-pager" class="wa-pager-buttons"></div>
+				</div>
 			</section>
 
 			<section class="ai-panel" id="workflow-admin-detail-panel" style="display:none;">
@@ -79,21 +102,44 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					</tr>
 				</table>
 
+				<div id="workflow-admin-control" class="wa-control" style="display:none;">
+					<div class="wa-control-text">
+						<div id="workflow-admin-control-message"></div>
+						<ul id="workflow-admin-control-warnings" class="wa-control-warnings"></ul>
+					</div>
+					<div class="wa-control-buttons">
+						<span id="workflow-admin-control-status" class="workflow-status"></span>
+						<button type="button" id="workflow-admin-pause-btn">일시정지</button>
+						<button type="button" id="workflow-admin-resume-btn">재개</button>
+					</div>
+				</div>
+
 				<div class="kn-section-title">스텝 이력</div>
-				<table id="workflow-admin-history-table" class="document-list-table">
-					<thead>
-						<tr>
-							<th>stepId</th>
-							<th>type</th>
-							<th>ref</th>
-							<th>결과</th>
-							<th>소요(ms)</th>
-							<th>내용/사유</th>
-							<th>시각</th>
-						</tr>
-					</thead>
-					<tbody id="workflow-admin-history-body"></tbody>
-				</table>
+				<div class="wa-table-scroll">
+					<table id="workflow-admin-history-table" class="document-list-table wa-table">
+						<colgroup>
+							<col style="width:13%" />
+							<col style="width:100px" />
+							<col style="width:18%" />
+							<col style="width:76px" />
+							<col style="width:84px" />
+							<col />
+							<col style="width:160px" />
+						</colgroup>
+						<thead>
+							<tr>
+								<th>stepId</th>
+								<th>type</th>
+								<th>ref</th>
+								<th>결과</th>
+								<th class="wa-num">소요(ms)</th>
+								<th>내용/사유</th>
+								<th>시각</th>
+							</tr>
+						</thead>
+						<tbody id="workflow-admin-history-body"></tbody>
+					</table>
+				</div>
 
 				<div id="workflow-admin-decision-form" style="display:none;">
 					<div class="kn-section-title">승인/반려 <span id="workflow-admin-decision-step" class="ai-hint"></span></div>
@@ -132,7 +178,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		DstoneAiWorkflowAdmin.init({
 			listUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/list.do",
 			detailUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/detail.do",
-			decisionUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/decision.do"
+			decisionUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/decision.do",
+			pauseUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/pause.do",
+			resumeUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/resume.do"
 		});
 	</script>
 </body>

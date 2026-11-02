@@ -21,7 +21,9 @@ import java.util.Map;
  * @param history          스텝별 실행 이력(오래된 순)
  * @param pendingApproval  승인 대기일 때 기다리는 결정({stepId, approverRole, routes}). routes가 비어 있으면 승인/반려,
  *                         이름이 있으면 그중 하나를 고르는 방식이다. 승인 대기가 아니면 null
+ * @param pauseRequested   일시정지를 요청했고 지금 step이 끝나기를 기다리는 중이면 true
+ * @param resumePoint      일시정지나 실패일 때 이어 가면 어디부터 도는지({stepId, stepType, resumable, problem, warnings}). 그 밖의 상태면 null
  */
 public record WorkFlowExecutionDetailResult(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, String createdAt, String updatedAt,
-	List<WorkFlowStepHistoryResult> history, Map<String, Object> pendingApproval) {
+	List<WorkFlowStepHistoryResult> history, Map<String, Object> pendingApproval, boolean pauseRequested, Map<String, Object> resumePoint) {
 }

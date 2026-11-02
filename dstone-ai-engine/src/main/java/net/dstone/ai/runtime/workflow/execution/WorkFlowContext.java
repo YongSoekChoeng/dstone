@@ -15,6 +15,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
  *   state:      step이 save로 저장한 값들({ 이름: 값 })
  *   approvals:  { stepId: { decision, approver, comment } }   아직 쓰지 않은 승인 결정(엔진 내부용)
  *   definition: { id, version }                               이 실행을 시작한 Workflow 정의
+ *   currentStep: 지금 차례인 step의 id(엔진 내부용). 정의가 바뀌어 순번이 밀려도 재개할 자리를 찾으려고 둡니다.
  *
  * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 save에 적힌 이름으로 state에 저장하고(saveOutput()),
  * 뒤의 step은 "${state.이름}"으로 읽습니다(common.expression.ContextResolver).
@@ -54,6 +55,26 @@ public final class WorkFlowContext {
 		Object definition = context.get(Context.DEFINITION);
 		Object version = definition instanceof Map ? ((Map<String, Object>) definition).get("version") : null;
 		return version == null ? null : version.toString();
+	}
+
+	/**
+	 * 지금 차례인 step의 id를 적어 둡니다. 실행 상태를 저장할 때 함께 저장됩니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 * @param stepId  지금 차례인 step의 id
+	 */
+	public static void setCurrentStep(Map<String, Object> context, String stepId) {
+		context.put(Context.CURRENT_STEP, stepId);
+	}
+
+	/**
+	 * 지금 차례인 step의 id를 돌려줍니다. 이 기록이 생기기 전에 시작한 실행이면 null입니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 */
+	public static String currentStep(Map<String, Object> context) {
+		Object stepId = context.get(Context.CURRENT_STEP);
+		return stepId == null ? null : stepId.toString();
 	}
 
 	/**

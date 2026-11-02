@@ -38,7 +38,45 @@
              , RESULT_TEXT = #{resultText}
              , ERROR_MESSAGE = #{errorMessage}
              , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
+             <!-- 일시정지 요청은 실행이 도는 동안에는 건드리지 않고, 멈추거나 끝나면 지운다 -->
+             , PAUSE_REQUESTED = CASE WHEN #{status} = 'RUNNING' THEN PAUSE_REQUESTED ELSE FALSE END
          WHERE EXECUTION_ID = #{executionId}
+    </update>
+
+    <!-- 돌고 있는 실행에만 일시정지를 요청한다(이미 끝난 실행이면 0건) -->
+    <update id="requestPause" parameterType="string">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET PAUSE_REQUESTED = TRUE
+         WHERE EXECUTION_ID = #{executionId}
+           AND STATUS = 'RUNNING'
+    </update>
+
+    <select id="selectPauseRequested" parameterType="string" resultType="boolean">
+        SELECT PAUSE_REQUESTED
+          FROM AI_WORKFLOW_EXECUTION
+         WHERE EXECUTION_ID = #{executionId}
+    </select>
+
+    <!-- 상태가 그대로일 때만 RUNNING으로 바꾼다. 재개 버튼을 두 번 눌러도 실행은 하나만 돈다 -->
+    <update id="markResumed" parameterType="java.util.Map">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET STATUS = 'RUNNING'
+             , CURRENT_STEP_INDEX = #{currentStepIndex}
+             , ERROR_MESSAGE = NULL
+             , PAUSE_REQUESTED = FALSE
+             , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
+         WHERE EXECUTION_ID = #{executionId}
+           AND STATUS = #{fromStatus}
+    </update>
+
+    <!-- 서버가 뜰 때: 재시작 전에 돌던 실행은 이어 줄 스레드가 없으므로 실패로 바꾼다 -->
+    <update id="failInterrupted" parameterType="java.util.Map">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET STATUS = 'FAILED'
+             , ERROR_MESSAGE = #{errorMessage}
+             , PAUSE_REQUESTED = FALSE
+             , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
+         WHERE STATUS = 'RUNNING'
     </update>
 
     <select id="selectExecution" parameterType="string" resultType="java.util.LinkedHashMap">
@@ -57,6 +95,29 @@
         <if test="caller != null and caller != ''">AND CALLER = #{caller}</if>
          ORDER BY CREATED_AT DESC
          LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 관리 화면의 검색 조건. workflowId / executionId 는 일부만 적어도 찾는다(대소문자 무시) -->
+    <sql id="searchCondition">
+         WHERE 1 = 1
+        <if test="status != null and status != ''">AND STATUS = #{status}</if>
+        <if test="workflowId != null and workflowId != ''">AND POSITION(LOWER(#{workflowId}) IN LOWER(WORKFLOW_ID)) > 0</if>
+        <if test="executionId != null and executionId != ''">AND POSITION(LOWER(#{executionId}) IN LOWER(EXECUTION_ID)) > 0</if>
+        <if test="caller != null and caller != ''">AND CALLER = #{caller}</if>
+    </sql>
+
+    <select id="searchExecutionList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="executionColumns"/>
+          FROM AI_WORKFLOW_EXECUTION
+        <include refid="searchCondition"/>
+         ORDER BY CREATED_AT DESC, EXECUTION_ID
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countExecutionList" parameterType="java.util.Map" resultType="long">
+        SELECT COUNT(*)
+          FROM AI_WORKFLOW_EXECUTION
+        <include refid="searchCondition"/>
     </select>
 
     <insert id="insertHistory" parameterType="java.util.Map">

@@ -29,9 +29,11 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * @param updatedAt        상태가 마지막으로 바뀐 시각입니다.
  * @param history          이 실행에서 각 스텝이 실행된 이력입니다. 오래된 순서대로 담겨 있습니다.
  * @param pendingApproval  승인 대기(WAITING_APPROVAL)일 때, 지금 어떤 결정을 기다리는지입니다(step id, 고를 수 있는 선택지). 승인 대기가 아니면 null입니다.
+ * @param pauseRequested   일시정지를 요청했고 지금 step이 끝나기를 기다리는 중이면 true입니다.
+ * @param resumePoint      일시정지(PAUSED)나 실패(FAILED)일 때, 이어 가면 어느 step부터 도는지입니다. 그 밖의 상태면 null입니다.
  */
 public record WorkFlowExecutionDetail(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, Instant createdAt, Instant updatedAt,
-	List<StepHistoryEntry> history, PendingApproval pendingApproval) {
+	List<StepHistoryEntry> history, PendingApproval pendingApproval, boolean pauseRequested, ResumePoint resumePoint) {
 
 	/**
 	 * WorkFlowExecution(실행 상태)과 스텝별 이력을 받아, 응답으로 내려줄 상세 정보 하나로 합쳐줍니다.
@@ -39,12 +41,14 @@ public record WorkFlowExecutionDetail(String executionId, String workflowId, Str
 	 * @param execution 상세 응답으로 바꿔줄 실행 상태입니다.
 	 * @param history   함께 담을 스텝별 실행 이력입니다.
 	 * @param pendingApproval 승인 대기일 때 기다리는 결정입니다(아니면 null).
+	 * @param pauseRequested 일시정지 요청이 들어와 있는지입니다.
+	 * @param resumePoint 이어 가면 어느 step부터 도는지입니다(이어 갈 상태가 아니면 null).
 	 * @param maxValueChars 컨텍스트 안의 글자 하나를 몇 자까지 그대로 담을지입니다. 0 이하면 줄이지 않고 전부 담습니다.
 	 */
-	public static WorkFlowExecutionDetail from(WorkFlowExecution execution, List<StepHistoryEntry> history, PendingApproval pendingApproval, int maxValueChars) {
+	public static WorkFlowExecutionDetail from(WorkFlowExecution execution, List<StepHistoryEntry> history, PendingApproval pendingApproval, boolean pauseRequested, ResumePoint resumePoint, int maxValueChars) {
 		Map<String, Object> context = ContextShortener.shortenContext(execution.context(), maxValueChars);
 		return new WorkFlowExecutionDetail(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), context, execution.output(), execution.errorMessage(),
-			execution.createdAt(), execution.updatedAt(), history, pendingApproval);
+			execution.createdAt(), execution.updatedAt(), history, pendingApproval, pauseRequested, resumePoint);
 	}
 
 }

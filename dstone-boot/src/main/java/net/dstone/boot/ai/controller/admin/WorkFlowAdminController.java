@@ -1,24 +1,25 @@
 package net.dstone.boot.ai.controller.admin;
 
-import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.boot.ai.service.admin.WorkFlowAdminService;
 import net.dstone.boot.ai.vo.admin.WorkFlowDecisionRequest;
 import net.dstone.boot.ai.vo.admin.WorkFlowExecutionDetailResult;
-import net.dstone.boot.ai.vo.admin.WorkFlowExecutionSummaryResult;
+import net.dstone.boot.ai.vo.admin.WorkFlowExecutionPageResult;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Workflow 실행의 진행상태/내역을 조회하고 승인/반려를 처리하는 관리자 화면이다. 개발자용 "Workflow 테스트"
+ * Workflow 실행의 진행상태/내역을 조회하고 승인/반려와 일시정지/재개를 처리하는 관리자 화면이다. 개발자용 "Workflow 테스트"
  * 화면(WorkFlowTestController, 임의 workflowId로 submit/status만)과 달리, 이미 시작된 실행을 목록에서 찾아
  * 판단·조작하는 운영자용 화면이라 controller.admin 패키지, /ai/admin/workflow/* URL에 둔다.
  */
@@ -29,10 +30,45 @@ public class WorkFlowAdminController extends net.dstone.boot.common.biz.BaseCont
 	@Autowired
 	private WorkFlowAdminService workFlowAdminService;
 
-	/** @param status WAITING_APPROVAL 등으로 좁히고 싶을 때(비우면 전체) */
+	/**
+	 * @param status      WAITING_APPROVAL 등으로 좁히고 싶을 때(비우면 전체)
+	 * @param workflowId  id에 이 글자가 들어 있는 Workflow만(비우면 전체)
+	 * @param executionId id에 이 글자가 들어 있는 실행만(비우면 전체)
+	 * @param page        0부터 시작하는 페이지 번호
+	 * @param size        한 페이지의 건수
+	 */
 	@PostMapping("/list.do")
-	public List<WorkFlowExecutionSummaryResult> list(@RequestParam(required = false) String status) {
-		return this.workFlowAdminService.list(status);
+	public WorkFlowExecutionPageResult list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String executionId,
+			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+		return this.workFlowAdminService.list(status, workflowId, executionId, page, size);
+	}
+
+	/** @param executionId 일시정지를 요청할 실행 id */
+	@PostMapping("/pause.do")
+	public ResponseEntity<Object> pause(@RequestParam String executionId) {
+		try {
+			return ResponseEntity.ok((Object) this.workFlowAdminService.pause(executionId));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/** @param executionId 멈춘 step부터 이어 갈 실행 id */
+	@PostMapping("/resume.do")
+	public ResponseEntity<Object> resume(@RequestParam String executionId) {
+		try {
+			return ResponseEntity.ok((Object) this.workFlowAdminService.resume(executionId));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 엔진이 거절한 상태와 사유({status, message})를 화면에 그대로 전합니다.
+	 * 예외로 던지면 이 앱의 공통 예외 처리가 HTTP 200으로 바꿔 버려 화면이 거절을 알 수 없습니다.
+	 */
+	private ResponseEntity<Object> rejected(WebClientResponseException e) {
+		return ResponseEntity.status(e.getStatusCode()).contentType(MediaType.APPLICATION_JSON).body((Object) e.getResponseBodyAsString());
 	}
 
 	/** @param executionId 상세를 조회할 실행 id */
