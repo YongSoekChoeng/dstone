@@ -125,3 +125,21 @@ Tool 결과는 대화에 쌓여 LLM을 부를 때마다 다시 전송되므로, 
 이렇게 하면 호출은 3~4회로 줄어들 것으로 예상합니다(실측 아님). 대신 파일 경로와 원인 조사는 다음 단계가 맡아야 하므로, `sm-workflow`의 다음 Agent가 이를 조사하도록 되어 있는지 확인해야 합니다.
 
 요구사항 분석에 코드 근거가 꼭 필요하다면 2, 3번은 빼고 1, 4번만 적용하세요. 이때는 프롬프트에 "메뉴별 진입점만 찾고 파일 내용은 읽지 않는다"를 넣고, 한도는 15 정도로 잡는 것을 권합니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b62kxtimn</task-id>
+<tool-use-id>toolu_01LW6APDtsukBrZ3dZjyPvBF</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/0b6da0f9-76ac-4242-b3cc-d1d7911a08f8/tasks/b62kxtimn.output</output-file>
+<status>completed</status>
+<summary>Background command "Show agent definition, advisor ordering and audit logging" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+## 답변
+
+백그라운드로 넘어갔던 첫 조회 명령도 끝났습니다. 필요한 내용은 이후 명령에서 이미 확인했기 때문에 위 답변은 그대로입니다.
