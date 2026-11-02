@@ -29,7 +29,8 @@ import net.dstone.common.utils.StringUtil;
 
 /**
  * <pre>
- * dstone-ai-engine 안의 모든 코드가 LLM을 부를 때 공통으로 쓰는 ChatClient 하나를 만들어주는 설정 클래스.
+ * spring.ai.model.chat의 provider로 LLM을 부르는 공용 ChatClient를 만들어주는 설정 클래스.
+ * Agent가 model.provider로 다른 provider를 고르면 ChatProviders가 그쪽 ChatClient를 만듭니다.
  * </pre>
  */
 @Configuration
@@ -150,13 +151,13 @@ public class ConfigChatClient {
 	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(provider와 모델의 기본 동작을 씁니다).
 	 * </pre>
 	 *
+	 * @param provider  이번 호출이 가는 provider입니다(ChatProviders.resolve()). 옵션은 그 provider에 맞는 종류로 만듭니다.
 	 * @param model     이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.
 	 * @param reasoning 이번 호출의 추론 세기입니다(none/low/medium/high). 비어 있으면 provider와 모델의 기본 동작을 씁니다.
 	 * @param temperature 이번 호출의 temperature입니다. 비어 있으면 provider 설정값을 씁니다.
 	 * @param timeoutSeconds 이번 호출이 답을 기다리는 시간(초)입니다. 비어 있으면 provider 설정값을 씁니다. 지금은 provider가 openai일 때만 적용됩니다.
 	 */
-	public ChatOptions.Builder<?> requestOptions(String model, String reasoning, Double temperature, Integer timeoutSeconds) {
-		String provider = configProperty.getProperty("spring.ai.model.chat");
+	public ChatOptions.Builder<?> requestOptions(String provider, String model, String reasoning, Double temperature, Integer timeoutSeconds) {
 		ChatOptions.Builder<?> options = null;
 		if ("openai".equals(provider)) {
 			options = this.openAiOptions(reasoning, timeoutSeconds);

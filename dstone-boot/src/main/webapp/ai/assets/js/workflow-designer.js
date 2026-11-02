@@ -2255,7 +2255,7 @@ var DstoneAiDesigner = (function () {
 	/** 머리말을 다시 만들 때 키를 놓는 순서(Agent 파일들이 쓰는 순서) */
 	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "context", "tools", "skills", "subAgents", "allowedCallers", "execution"];
 	var AGENT_SUB_ORDER = {
-		model: ["name", "temperature", "reasoning"],
+		model: ["provider", "name", "temperature", "reasoning"],
 		context: ["sources", "retrieval"],
 		retrieval: ["topK", "similarityThreshold", "allowEmptyContext"],
 		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls"]
@@ -2813,7 +2813,10 @@ var DstoneAiDesigner = (function () {
 			+ row("allowedCallers", "쉼표로 구분, 비우면 누구나", "<input type=\"text\" data-agent=\"allowedCallers\" value=\"" + escapeHtml((Array.isArray(f.allowedCallers) ? f.allowedCallers : []).join(", ")) + "\" />")
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>모델</h4>"
-			+ row("model.name", "비우면 엔진 기본 모델", "<input type=\"text\" data-agent=\"model.name\" value=\"" + escapeHtml(model.name || "") + "\" />")
+			+ row("model.provider", "비우면 엔진 기본 provider(spring.ai.model.chat)", "<select data-agent=\"model.provider\">" + ["", "anthropic", "openai", "ollama"].map(function (v) {
+				return "<option value=\"" + v + "\"" + (String(model.provider || "") === v ? " selected" : "") + ">" + (v === "" ? "(엔진 기본값)" : v) + "</option>";
+			}).join("") + "</select>")
+			+ row("model.name", "그 provider의 모델 이름. 비우면 provider 기본 모델", "<input type=\"text\" data-agent=\"model.name\" value=\"" + escapeHtml(model.name || "") + "\" />")
 			+ row("model.temperature", "0 ~ 2, 비우면 기본값", "<input type=\"number\" min=\"0\" max=\"2\" step=\"0.1\" data-agent=\"model.temperature\" value=\"" + escapeHtml(model.temperature === undefined ? "" : String(model.temperature)) + "\" />")
 			+ row("model.reasoning", "추론 정도", "<select data-agent=\"model.reasoning\">" + ["", "none", "low", "medium", "high"].map(function (v) {
 				var label = v === "" ? "(모델 기본값)" : v + (v === "none" ? " - 추론 끔" : "");

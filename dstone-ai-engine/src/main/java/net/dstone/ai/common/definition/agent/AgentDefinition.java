@@ -48,7 +48,7 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   id, version      (필수) 이름과 버전. 프롬프트나 계약을 바꾸면 version을 올립니다.
  *   role             사람이 읽는 역할 이름. 동작에는 영향이 없습니다.
  *   description      무엇을 하는 Agent인지. Sub Agent로 쓰이면 필수입니다(부모 LLM이 이걸 보고 고릅니다).
- *   model            name / temperature / reasoning. 비우면 provider 기본값을 씁니다.
+ *   model            provider / name / temperature / reasoning. 비우면 provider 기본값을 씁니다.
  *   input, output    무엇을 받고 무엇을 돌려주는지(Picoschema). 비우면 둘 다 글자입니다.
  *   context          RAG(올려 둔 문서 검색)를 쓸지와 검색 조건.
  *   tools.allowed    LLM에게 보여 줄 Tool 이름. 비우면 Tool을 쓰지 않습니다.
@@ -75,7 +75,9 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   onInvalidOutput: RETRY는 AGENT step과 채팅에서만 쓰입니다. SUPERVISOR/ROUTER에는 적용되지 않습니다.
  *
  * ■ model
- *   - name: 이 Agent만 다른 모델을 쓸 때 적습니다. 지금 켜진 provider(spring.ai.model.chat)의 모델 이름이어야 합니다.
+ *   - provider: 이 Agent만 다른 provider를 쓸 때 적습니다(anthropic / openai / ollama). 비우면 spring.ai.model.chat입니다.
+ *     접속 정보와 기본 모델은 application.yml의 spring.ai.{provider}에서 읽습니다.
+ *   - name: 이 Agent만 다른 모델을 쓸 때 적습니다. 이 Agent가 쓰는 provider의 모델 이름이어야 합니다.
  *   - temperature: 답의 무작위 정도(0~2).
  *   - reasoning: 답하기 전에 속으로 따져 보는 정도(none / low / medium / high).
  *     뽑아내기, 분류처럼 단순한 일은 none으로 끄면 빨라집니다.
@@ -172,11 +174,12 @@ public record AgentDefinition(
 	/**
 	 * agent.model 입니다.
 	 *
+	 * @param provider    이 Agent만 다른 provider를 쓸 때 적습니다(anthropic / openai / ollama). 없으면 spring.ai.model.chat을 씁니다.
 	 * @param name        이 Agent만 다른 모델을 쓸 때 적는 모델 이름입니다. 없으면 provider 공통 기본 모델을 씁니다.
 	 * @param temperature 답의 무작위 정도입니다.
 	 * @param reasoning   추론 세기입니다(none / low / medium / high).
 	 */
-	public record Model(String name, Double temperature, String reasoning) {
+	public record Model(String provider, String name, Double temperature, String reasoning) {
 	}
 
 	/**
@@ -287,6 +290,11 @@ public record AgentDefinition(
 	/** 시스템 프롬프트 원문입니다(파일의 본문). */
 	public String promptText() {
 		return this.prompt;
+	}
+
+	/** model.provider 값을 소문자로 다듬어 돌려줍니다. 적지 않았으면 null입니다. */
+	public String providerName() {
+		return this.model == null || this.model.provider() == null || this.model.provider().isBlank() ? null : this.model.provider().trim().toLowerCase();
 	}
 
 	/** model.name 값입니다. 적지 않았으면 null입니다. */

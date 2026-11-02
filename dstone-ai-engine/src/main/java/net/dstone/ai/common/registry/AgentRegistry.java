@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import net.dstone.ai.common.config.ChatProviders;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
@@ -44,7 +45,7 @@ import net.dstone.common.utils.StringUtil;
  * 프롬프트의 ${input.필드} / ${output.필드} 자리도 기동할 때 검사합니다(checkPrompt(), 규칙은 PromptText).
  *
  * 정해진 값만 받는 항목도 기동할 때 검사합니다(checkCallOptions()). 오타가 조용히 무시되지 않게 하려는 것입니다.
- *   model.reasoning, model.temperature,
+ *   model.provider, model.reasoning, model.temperature,
  *   context.sources, execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls
  *
  * Tool 허용 목록(tools)과 Sub Agent(subAgents)도 기동할 때 검사합니다(checkTools(), checkSubAgents()).
@@ -71,6 +72,8 @@ public class AgentRegistry extends BaseObject {
 	private YamlDefinitionLoader loader;
 	@Autowired
 	private ConfigTool configTool;
+	@Autowired
+	private ChatProviders chatProviders;
 	@Autowired
 	private SkillRegistry skillRegistry;
 
@@ -213,6 +216,10 @@ public class AgentRegistry extends BaseObject {
 	private void checkCallOptions(AgentDefinition definition) {
 		String where = "agent[" + definition.id() + "]의 ";
 		// model
+		String providerProblem = this.chatProviders.problemOf(definition.providerName());
+		if (providerProblem != null) {
+			throw new IllegalStateException(where + providerProblem);
+		}
 		String reasoning = definition.reasoningLevel();
 		if (reasoning != null && !AgentDefinition.REASONING_LEVELS.contains(reasoning)) {
 			// YAML은 off/no를 글자가 아니라 false로 읽습니다. "끄려고 off를 적었는데 false라고 나온다"를 헤매지 않게 알려 줍니다.

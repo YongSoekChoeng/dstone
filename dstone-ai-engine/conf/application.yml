@@ -52,8 +52,9 @@ spring:
     ai:
         # chat(provider 선택): 아래 3개 provider의 starter가 모두 클래스패스에 있으므로
         # 반드시 하나를 명시해야 한다(값을 지우면 3개 provider가 동시에 활성화되어 기동에 실패한다).
-        # 엔진 전체가 이 값 하나(common.config.ConfigChatClient가 조립하는 단일 ChatClient)를
-        # 공유한다 - Agent별로 다른 provider/model을 쓰는 기능은 없다.
+        # Agent 파일의 model.provider를 비워 둔 Agent가 이 provider를 쓴다.
+        # Agent가 model.provider로 다른 값을 고르면 그 Agent만 아래의 해당 provider 설정으로 호출한다(common.config.ChatProviders).
+        # 고른 provider의 api-key가 비어 있으면 기동이 실패한다(ollama는 키가 없다).
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
         # embedding: 이 엔진은 임베딩 모델을 쓰지 않는다(none). RAG의 임베딩과 검색은 dstone-knowledge가 한다
@@ -79,7 +80,7 @@ spring:
                 max-total-tool-calls: 300
 
         ##########################################################################################
-        # spring.ai.model.chat=anthropic 일 때 설정.
+        # spring.ai.model.chat=anthropic이거나 Agent가 model.provider: anthropic을 고를 때 쓰는 설정.
         ##########################################################################################
         anthropic:
             api-key: ENC(iTbr7/33NEFc5gCOapVTLZsks5dU96gITu6OUXr2UqAVntTkq5p1nFjlVI/3RVVx/fZzBOAKEdngosd4zialqNUgfEq31RU3u8HUa/VBIaBnFViQCLJBPW8O81lcTpsHsQQPfRbeToKYHAm2BVMWP0cZhkx145+bnmoH7nXsXQE=)
@@ -91,7 +92,7 @@ spring:
             timeout: 5m
             max-retries: 1
         ##########################################################################################
-        # spring.ai.model.chat=openai 일 때 설정.
+        # spring.ai.model.chat=openai이거나 Agent가 model.provider: openai를 고를 때 쓰는 설정.
         ##########################################################################################
         openai:
              base-url: https://openrouter.ai/api/v1
@@ -110,7 +111,7 @@ spring:
              max-retries: 1
 
         ##########################################################################################
-        # spring.ai.model.chat=ollama 용 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
+        # spring.ai.model.chat=ollama이거나 Agent가 model.provider: ollama를 고를 때 쓰는 설정.(로컬/사내망 Ollama 서버, API 키 불필요).
         # 설치 절차: docs/software/14.ollama.md
         ##########################################################################################
         ollama:

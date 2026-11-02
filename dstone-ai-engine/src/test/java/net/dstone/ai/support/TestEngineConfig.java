@@ -20,6 +20,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  *   InMemoryWorkFlowExecutionStore  PostgreSQL 실행 기록   WorkFlowExecutor가 step마다 실행 상태를 저장합니다
  *   DataSource(Mockito)             PostgreSQL 접속        ConfigMapper가 MyBatis 세션을 만들려면 DataSource가 있어야 합니다(쓰이지는 않음)
  *   RedisTemplate(Mockito)          Redis 접속             RateLimitFilter가 주입받습니다(테스트 설정에서 요청 제한은 꺼져 있음)
+ *   TestChatProviders               model.provider의 ChatModel  기본이 아닌 provider도 대역을 쓰고, 어떤 provider를 만들었는지 기록합니다
  *   ScriptedChatModel               LLM provider           Agent를 부르는 step이 테스트가 넣어 둔 답을 받습니다
  *                                                          (dstone.ai.test.llmcall: true면 실제 provider로 넘깁니다)
  *
@@ -62,6 +63,17 @@ public class TestEngineConfig {
 	@Primary
 	public ScriptedChatModel scriptedChatModel(@Value("${dstone.ai.test.llmcall:false}") boolean llmCall, ApplicationContext context) {
 		return new ScriptedChatModel(llmCall, context);
+	}
+
+	/**
+	 * Agent의 model.provider로 고른 provider도 대역을 쓰게 합니다. dstone.ai.test.llmcall이 true면 실제 provider를 만듭니다.
+	 *
+	 * @param chatModel 대역 ChatModel
+	 */
+	@Bean
+	@Primary
+	public TestChatProviders testChatProviders(ScriptedChatModel chatModel) {
+		return new TestChatProviders(chatModel);
 	}
 
 }

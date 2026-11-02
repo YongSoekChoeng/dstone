@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
+import net.dstone.ai.common.config.ChatProviders;
 import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
@@ -116,7 +117,7 @@ public class AgentExecutor extends BaseObject {
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
 	@Autowired
-	private ChatClient chatClient;
+	private ChatProviders chatProviders;
 	@Autowired
 	private ChatMemory chatMemory;
 	@Autowired
@@ -348,8 +349,9 @@ public class AgentExecutor extends BaseObject {
 	private Object reshape(AgentDefinition agent, String modelOverride, String answer, Map<String, Object> schema, String jsonSchema, AgentContractException failure) {
 		this.info("agent[" + agent.id() + "]의 답에 계약에 맞는 JSON이 없어 형식 변환을 한 번 부릅니다: " + failure.getMessage());
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
-		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt().system(EnginePrompt.compose(EnginePrompt.RESHAPE, null));
-		ChatOptions.Builder<?> options = this.configChatClient.requestOptions(model, "none", null, agent.timeoutSeconds());
+		String provider = this.chatProviders.resolve(agent.providerName());
+		ChatClient.ChatClientRequestSpec spec = this.chatProviders.clientOf(provider).prompt().system(EnginePrompt.compose(EnginePrompt.RESHAPE, null));
+		ChatOptions.Builder<?> options = this.configChatClient.requestOptions(provider, model, "none", null, agent.timeoutSeconds());
 		if (options != null) {
 			spec = spec.options(options);
 		}
@@ -454,7 +456,8 @@ public class AgentExecutor extends BaseObject {
 		/************************************************************************
 		1. 요청 스펙을 만들기 시작합니다.
 		************************************************************************/
-		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt();
+		String provider = this.chatProviders.resolve(agent.providerName());
+		ChatClient.ChatClientRequestSpec spec = this.chatProviders.clientOf(provider).prompt();
 
 		/************************************************************************
 		2. 대화방 id(conversationId)가 있으면, 그 대화방의 이전 대화를 기억하는 Advisor를 붙입니다.
@@ -544,7 +547,7 @@ public class AgentExecutor extends BaseObject {
 		6. 모델(model)을 원하는 것으로 지정합니다.
 			- modelOverride가 있으면 그 값을, 없으면 Agent의 model.name(AgentRegistry.modelOf())을,
 			  그것도 없으면 spring.ai.{provider}.chat.options.model에 설정된 공통 기본 모델을 그대로 씁니다.
-			- 여기서 바꾸는 것은 지금 활성화된 provider(spring.ai.model.chat) 안에서의 모델명뿐입니다.
+			- 이 모델명은 이 Agent가 쓰는 provider(model.provider, 없으면 spring.ai.model.chat)의 것이어야 합니다.
 			  다른 provider가 쓰는 모델명을 넣으면, 지금 이 호출 시점에 그 provider의 API가 오류를
 			  돌려줍니다(앱이 시작될 때는 이 값이 맞는지 미리 검사해 주지 않습니다).
 			- Agent에 model.reasoning(추론 세기), model.temperature, execution.timeoutSeconds가 적혀 있으면 그것도 여기서 함께 실립니다.
@@ -552,7 +555,7 @@ public class AgentExecutor extends BaseObject {
 			- provider가 openai면 응답 대기 시간(spring.ai.openai.timeout)도 여기서 함께 실립니다.
 			  설정만으로는 적용되지 않아서 호출마다 넣어야 합니다(ConfigChatClient.requestOptions() 설명 참고).
 		************************************************************************/
-		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(model, agent.reasoningLevel(), agent.temperature(), agent.timeoutSeconds());
+		ChatOptions.Builder<?> requestOptions = this.configChatClient.requestOptions(provider, model, agent.reasoningLevel(), agent.temperature(), agent.timeoutSeconds());
 		if (requestOptions != null) {
 			spec = spec.options(requestOptions);
 		}

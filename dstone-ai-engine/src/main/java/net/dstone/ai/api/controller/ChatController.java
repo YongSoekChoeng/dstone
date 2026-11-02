@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.AgentSummary;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
+import net.dstone.ai.common.config.ChatProviders;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
@@ -55,6 +56,8 @@ public class ChatController extends BaseController {
 	@Autowired
 	ConfigProperty configProperty;
 	@Autowired
+	ChatProviders chatProviders;
+	@Autowired
 	AgentRegistry agentRegistry;
 	@Autowired
 	AgentExecutor agentExecutor;
@@ -90,7 +93,7 @@ public class ChatController extends BaseController {
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
 		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model(), null);
-		String provider = this.configProperty.getProperty("spring.ai.model.chat");
+		String provider = this.chatProviders.resolve(agent.providerName());
 		return new ChatResponse(output, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}
 

@@ -1,0 +1,23 @@
+# AGENT step 하나가 model.provider를 적어 둔 Agent(sample-provider-override-agent)를 부릅니다.
+# Agent별 provider 지정이 Workflow 안에서도 적용되는지 확인하는 샘플입니다.
+#
+# dstone-boot의 "Workflow 테스트" 화면에서는 이렇게 호출합니다.
+#   workflowId: sample-agent-provider-override
+#   input     : 지금 몇 시야?
+id: sample-agent-provider-override
+version: 1.0.0
+description: per-Agent provider 확인용 Workflow. 기본 provider와 다른 ollama로 응답한다.
+input: string
+settings:
+  maxIterations: 3
+state:
+  answer: ask step의 결과
+return: ${state.answer}
+steps:
+
+  - id: ask
+    type: AGENT
+    agent: sample-provider-override-agent
+    with: ${input}
+    save: answer
+    next: END
