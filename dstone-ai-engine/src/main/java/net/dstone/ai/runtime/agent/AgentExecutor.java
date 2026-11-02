@@ -164,7 +164,7 @@ public class AgentExecutor extends BaseObject {
 			SubAgentTasks tasks = this.newTasks(agent);
 			try {
 				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule, tasks);
-				return this.ask(spec, userMessage, agent.outputSchema());
+				return this.ask(spec, userMessage, agent.outputSchema(), agent, modelOverride);
 			} catch (AgentContractException e) {
 				last = e;
 				if (attempt < maxAttempts) {
@@ -205,7 +205,7 @@ public class AgentExecutor extends BaseObject {
 		SubAgentTasks tasks = this.newTasks(agent);
 		try {
 			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule, tasks);
-			return this.ask(spec, userMessage, schema);
+			return this.ask(spec, userMessage, schema, agent, null);
 		} finally {
 			if (tasks != null) {
 				tasks.close();
@@ -284,7 +284,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param schema      답이 따라야 할 JSON Schema입니다.
 	 * @throws AgentContractException 답이 스키마에 맞지 않을 때
 	 */
-	private Object ask(ChatClient.ChatClientRequestSpec spec, String userMessage, Map<String, Object> schema) {
+	private Object ask(ChatClient.ChatClientRequestSpec spec, String userMessage, Map<String, Object> schema, AgentDefinition agent, String modelOverride) {
 		if (JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(schema))) {
 			String answer = this.textOf(spec.user(userMessage).call().chatResponse());
 			if (answer == null) {
@@ -307,8 +307,59 @@ public class AgentExecutor extends BaseObject {
 		question.append("The JSON value must strictly follow this JSON Schema:").append("\n");
 		question.append(jsonSchema).append("\n");
 		
-		answer = this.textOf(spec.user(question.toString()).call().chatResponse());
-		return this.convert(answer, schema);
+		ChatResponse response = spec.user(question.toString()).call().chatResponse();
+		answer = this.textOf(response);
+		try {
+			return this.convert(answer, schema);
+		} catch (AgentContractException e) {
+			if (StringUtil.isEmpty(answer) || this.isCutOff(response)) {
+				throw e;
+			}
+			return this.reshape(agent, modelOverride, answer, schema, jsonSchema, e);
+		}
+	}
+
+	/** 출력 토큰 한도에 걸려 답이 중간에 끊겼는가. 끊긴 답을 옮기게 하면 나머지를 지어낼 수 있어서 구분합니다. */
+	private boolean isCutOff(ChatResponse response) {
+		if (response == null || response.getResult() == null || response.getResult().getMetadata() == null) {
+			return false;
+		}
+		return "LENGTH".equalsIgnoreCase(response.getResult().getMetadata().getFinishReason());
+	}
+
+	/**
+	 * <pre>
+	 * 답에 계약에 맞는 JSON이 없을 때, 그 답을 JSON으로 옮기는 호출을 한 번 더 합니다.
+	 *
+	 * Agent를 다시 부르지 않고 답 글자만 넘깁니다. Tool을 붙이지 않으므로 앞서 고친 파일을 또 고치는 일이 없고,
+	 * 판단도 다시 하지 않습니다. 답에 없는 내용은 만들지 말라고 하고, 옮긴 값도 계약 검사를 거칩니다.
+	 * 그래도 안 되면 처음 실패 사유를 그대로 올립니다.
+	 * </pre>
+	 *
+	 * @param agent         답을 낸 Agent입니다.
+	 * @param modelOverride 이번 호출에서만 쓴 모델명입니다. 없으면 null입니다.
+	 * @param answer        Agent의 답입니다.
+	 * @param schema        답이 따라야 할 JSON Schema입니다.
+	 * @param jsonSchema    schema를 글자로 적은 것입니다.
+	 * @param failure       처음 실패 사유입니다.
+	 * @return 계약에 맞는 값입니다.
+	 * @throws AgentContractException 옮기지 못했을 때
+	 */
+	private Object reshape(AgentDefinition agent, String modelOverride, String answer, Map<String, Object> schema, String jsonSchema, AgentContractException failure) {
+		this.info("agent[" + agent.id() + "]의 답에 계약에 맞는 JSON이 없어 형식 변환을 한 번 부릅니다: " + failure.getMessage());
+		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
+		ChatClient.ChatClientRequestSpec spec = this.chatClient.prompt().system(EnginePrompt.compose(EnginePrompt.RESHAPE, null));
+		ChatOptions.Builder<?> options = this.configChatClient.requestOptions(model, "none", null, agent.timeoutSeconds());
+		if (options != null) {
+			spec = spec.options(options);
+		}
+		try {
+			String reshaped = this.textOf(spec.user("[JSON Schema]\n" + jsonSchema + "\n\n[답]\n" + answer).call().chatResponse());
+			return this.convert(reshaped, schema);
+		} catch (RuntimeException e) {
+			this.info("agent[" + agent.id() + "]의 답을 JSON으로 옮기지 못했습니다: " + e.getMessage());
+			throw failure;
+		}
 	}
 
 	/**
@@ -349,6 +400,9 @@ public class AgentExecutor extends BaseObject {
 		return text;
 	}
 
+	/**
+	 * 답을 JSON으로 읽고 계약을 검사합니다. 답 전체가 계약에 맞지 않으면 답 안에서 맞는 JSON을 찾습니다(JsonAnswer).
+	 */
 	private Object convert(String text, Map<String, Object> schema) {
 		String json = text == null ? "" : text.strip();
 		Matcher fence = CODE_FENCE.matcher(json);
@@ -359,6 +413,10 @@ public class AgentExecutor extends BaseObject {
 		try {
 			value = OBJECT_MAPPER.readValue(json, Object.class);
 		} catch (Exception e) {
+			Object found = JsonAnswer.find(text, schema);
+			if (found != null) {
+				return found;
+			}
 			throw new AgentContractException("LLM 응답이 JSON이 아닙니다: " + text);
 		}
 		List<String> problems = JsonSchemaUtil.validate(schema, value);

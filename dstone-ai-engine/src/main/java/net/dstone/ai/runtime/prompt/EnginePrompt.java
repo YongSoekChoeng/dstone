@@ -17,6 +17,7 @@ import net.dstone.common.utils.StringUtil;
  * - COMMON: 모든 호출에 항상 들어갑니다(runtime.agent.AgentExecutor가 넣습니다).
  * - SUPERVISOR / ROUTER / SUB_AGENT: LLM을 부르는 쪽이 자기 문구를 골라 넘깁니다
  *   (SupervisorStepExecutor, RouterStepExecutor, SubAgentToolCallback).
+ * - RESHAPE: Agent의 답을 JSON으로 옮기는 호출에 씁니다(AgentExecutor.reshape()).
  * - AGENT step과 채팅 API는 따로 넘기지 않습니다(COMMON만 들어갑니다).
  * 이 상수들은 그냥 글자입니다. 이 값을 보고 갈라지는 코드는 없습니다.
  *
@@ -63,6 +64,13 @@ public final class EnginePrompt {
 	public static final String SUB_AGENT = String.join("\n"
 		, "- 당신은 다른 Agent가 맡긴 일 하나를 처리합니다. 받은 입력에 없는 사실을 가정하지 않습니다."
 		, "- 당신의 답은 사람이 아니라 일을 맡긴 Agent가 읽습니다. 과정 설명 없이 결과만 답합니다."
+	);
+
+	/** Agent의 답을 JSON으로 옮기는 호출에 덧붙이는 규칙입니다. */
+	public static final String RESHAPE = String.join("\n"
+		, "- 당신의 일은 [답]의 내용을 [JSON Schema] 모양으로 옮기는 것입니다. 답을 다시 판단하거나 고치지 않습니다."
+		, "- [답]에 없는 내용은 만들지 않습니다. 필수 값을 [답]에서 알 수 없으면 NOT_CONVERTIBLE이라고만 답합니다."
+		, "- JSON 하나만 답합니다. 설명과 코드펜스를 붙이지 않습니다."
 	);
 
 	/** 엔진 규칙 구간의 머리말입니다. 뒤에 오는 업무 지시(Agent 파일 본문)보다 이 규칙이 먼저라는 점을 밝힙니다. */
