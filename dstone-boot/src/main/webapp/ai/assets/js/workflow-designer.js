@@ -1124,13 +1124,13 @@ var DstoneAiDesigner = (function () {
 	var PORT_GROUPS = {
 		"in": {
 			position: "top",
-			attrs: { circle: { r: 5, magnet: "passive", stroke: "#8a8f86", strokeWidth: 1, fill: "#fff" } }
+			attrs: { circle: { r: 5, magnet: true, stroke: "#007b9d", strokeWidth: 1.5, fill: "#fff", cursor: "crosshair" } }
 		},
 		out: {
 			position: "bottom",
 			attrs: { circle: { r: 7, magnet: true, stroke: "#007b9d", strokeWidth: 2, fill: "#fff", cursor: "crosshair" } }
 		},
-		// 왼쪽·오른쪽 점은 나가는 화살표도, 들어오는 화살표도 붙일 수 있다.
+		// 네 점 모두 나가는 화살표도, 들어오는 화살표도 붙일 수 있다.
 		left: {
 			position: "left",
 			attrs: { circle: { r: 5, magnet: true, stroke: "#007b9d", strokeWidth: 1.5, fill: "#fff", cursor: "crosshair" } }
@@ -1143,19 +1143,14 @@ var DstoneAiDesigner = (function () {
 
 	/** 연결점이 노드의 어느 쪽에 있는지(직각 선이 그 쪽으로 나가고 들어오게 할 때 씁니다). */
 	var PORT_SIDES = { "in": "top", out: "bottom", left: "left", right: "right" };
-	/** 나가는 화살표를 붙일 수 있는 점 / 들어오는 화살표를 붙일 수 있는 점 */
-	var SOURCE_PORTS = ["out", "left", "right"];
-	var TARGET_PORTS = ["in", "left", "right"];
+	/** 화살표를 붙일 수 있는 점입니다. 나가는 쪽과 들어가는 쪽의 구분이 없습니다. */
+	var PORTS = ["in", "out", "left", "right"];
 
-	/** 노드에 붙일 연결점 목록입니다. kinds: "in"(위), "out"(아래). 좌/우 점은 늘 붙입니다. */
-	function portItems(kinds) {
-		var items = [];
-		kinds.forEach(function (kind) {
-			items.push({ id: kind, group: kind });
+	/** 노드에 붙일 연결점 목록입니다. 어느 노드나 네 점을 모두 가집니다. */
+	function portItems() {
+		return PORTS.map(function (port) {
+			return { id: port, group: port };
 		});
-		items.push({ id: "left", group: "left" });
-		items.push({ id: "right", group: "right" });
-		return items;
 	}
 
 	function createGraph() {
@@ -1197,10 +1192,8 @@ var DstoneAiDesigner = (function () {
 					});
 				},
 				validateConnection: function (args) {
-					if (!args.targetCell || SOURCE_PORTS.indexOf(args.sourcePort) < 0) {
-						return false;
-					}
-					if (args.targetPort && TARGET_PORTS.indexOf(args.targetPort) < 0) {
+					// 막는 것은 흐름상 말이 안 되는 경우뿐이다. 시작으로 들어오거나 END/FAIL에서 나가는 화살표는 없다.
+					if (!args.targetCell || !args.sourceCell || args.sourceCell.id === END_ID || args.sourceCell.id === FAIL_ID) {
 						return false;
 					}
 					var target = args.targetCell.id;
@@ -1430,11 +1423,11 @@ var DstoneAiDesigner = (function () {
 				// 이름(name)이 있으면 맨 윗줄에 이름, 그 아래에 id를 보여 준다.
 				label: { text: (step.name ? shorten(step.name, 22) + "\n" : "") + shorten(step.id, 30) + "\n" + shorten(second, 34), fill: "#283121", fontSize: 12 }
 			},
-			ports: { groups: PORT_GROUPS, items: portItems(["in", "out"]) }
+			ports: { groups: PORT_GROUPS, items: portItems() }
 		};
 	}
 
-	function terminalNodeConfig(id, text, color, ports) {
+	function terminalNodeConfig(id, text, color) {
 		var p = positions[id] || { x: 0, y: 0 };
 		return {
 			id: id,
@@ -1449,7 +1442,7 @@ var DstoneAiDesigner = (function () {
 				body: { fill: "#fff", stroke: color, strokeWidth: 2 },
 				label: { text: text, fill: color, fontSize: 12, fontWeight: "bold" }
 			},
-			ports: { groups: PORT_GROUPS, items: portItems(ports) }
+			ports: { groups: PORT_GROUPS, items: portItems() }
 		};
 	}
 
@@ -1464,15 +1457,13 @@ var DstoneAiDesigner = (function () {
 		}
 		var selectedNow = isSelectedEdge(from, kind, route);
 		var ports = portsOf(from, kind, route);
-		// 없는 step 상자에는 위 점만 있다.
-		var targetPort = String(to).indexOf("missing:") === 0 ? "in" : ports.target;
 		return {
 			shape: "edge",
 			id: "edge|" + from + "|" + kind + "|" + (route || ""),
 			source: { cell: from, port: ports.source },
-			target: { cell: to, port: targetPort },
+			target: { cell: to, port: ports.target },
 			vertices: clone(edgeVertices[edgeKey(from, kind, route)] || []),
-			router: routerOf(ports.source, targetPort),
+			router: routerOf(ports.source, ports.target),
 			connector: LINE_STYLES[lineStyle].connector,
 			zIndex: 1,
 			data: { kind: kind, from: from, route: route },
@@ -1495,9 +1486,9 @@ var DstoneAiDesigner = (function () {
 		}
 		var cells = [];
 		var ids = {};
-		cells.push(graph.createNode(terminalNodeConfig(START_ID, "시작", "#007b9d", ["out"])));
-		cells.push(graph.createNode(terminalNodeConfig(END_ID, "END", "#15803d", ["in"])));
-		cells.push(graph.createNode(terminalNodeConfig(FAIL_ID, "FAIL", "#b91c1c", ["in"])));
+		cells.push(graph.createNode(terminalNodeConfig(START_ID, "시작", "#007b9d")));
+		cells.push(graph.createNode(terminalNodeConfig(END_ID, "END", "#15803d")));
+		cells.push(graph.createNode(terminalNodeConfig(FAIL_ID, "FAIL", "#b91c1c")));
 		steps().forEach(function (step) {
 			if (!step || !step.id || ids[step.id]) {
 				return;
@@ -1530,7 +1521,7 @@ var DstoneAiDesigner = (function () {
 								body: { fill: "#fff", stroke: "#b91c1c", strokeDasharray: "4 3", rx: 6, ry: 6 },
 								label: { text: "없는 step: " + shorten(target, 14), fill: "#b91c1c", fontSize: 11 }
 							},
-							ports: { groups: PORT_GROUPS, items: [{ id: "in", group: "in" }] }
+							ports: { groups: PORT_GROUPS, items: portItems() }
 						}));
 					}
 					target = missingId;
@@ -1588,7 +1579,7 @@ var DstoneAiDesigner = (function () {
 	}
 
 	/* ====================================================================
-	 * 화살표의 연결점. 기본은 아래(out) → 위(in)이고, 좌/우 점으로 이었거나 설정 칸에서 바꾼 것만 edgePorts에 둡니다.
+	 * 화살표의 연결점. 기본은 아래(out) → 위(in)이고, 다른 점으로 이었거나 설정 칸에서 바꾼 것만 edgePorts에 둡니다.
 	 * 꺾는 점처럼 그림에만 쓰는 값이라 이름.layout.json의 ports에 저장합니다.
 	 * ==================================================================== */
 
@@ -1596,15 +1587,15 @@ var DstoneAiDesigner = (function () {
 	function portsOf(from, kind, route) {
 		var saved = edgePorts[edgeKey(from, kind, route)] || {};
 		return {
-			source: SOURCE_PORTS.indexOf(saved.source) >= 0 ? saved.source : "out",
-			target: TARGET_PORTS.indexOf(saved.target) >= 0 ? saved.target : "in"
+			source: PORTS.indexOf(saved.source) >= 0 ? saved.source : "out",
+			target: PORTS.indexOf(saved.target) >= 0 ? saved.target : "in"
 		};
 	}
 
 	/** 화살표의 연결점을 적어 둡니다. 기본(아래 → 위)이면 지웁니다. */
 	function setEdgePorts(key, ports) {
-		var source = ports && SOURCE_PORTS.indexOf(ports.source) >= 0 ? ports.source : "out";
-		var target = ports && TARGET_PORTS.indexOf(ports.target) >= 0 ? ports.target : "in";
+		var source = ports && PORTS.indexOf(ports.source) >= 0 ? ports.source : "out";
+		var target = ports && PORTS.indexOf(ports.target) >= 0 ? ports.target : "in";
 		if (source === "out" && target === "in") {
 			delete edgePorts[key];
 		} else {
@@ -1929,7 +1920,7 @@ var DstoneAiDesigner = (function () {
 			}
 		});
 		html += "<h4>나가는 화살표</h4>" + outgoingList(step)
-			+ "<p class=\"ai-hint\">아래쪽(또는 왼쪽·오른쪽) 동그라미를 끌어 다른 step이나 END/FAIL에 놓으면 화살표가 생깁니다.</p>"
+			+ "<p class=\"ai-hint\">위·아래·왼쪽·오른쪽 동그라미 중 하나를 끌어 다른 step이나 END/FAIL에 놓으면 화살표가 생깁니다.</p>"
 			+ "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-delete-step-btn\">이 step 지우기</button></div>"
 			+ stateOptions();
 		els.props.innerHTML = html;
@@ -2117,8 +2108,8 @@ var DstoneAiDesigner = (function () {
 			}).join("") + "</select>";
 		};
 		html += row("연결점", "그림에서 화살표가 붙는 자리입니다. 동작에는 영향이 없습니다.",
-			"나가는 쪽 " + portSelect("wd-edge-source-port", SOURCE_PORTS, ports.source)
-			+ " → 들어가는 쪽 " + portSelect("wd-edge-target-port", TARGET_PORTS, ports.target));
+			"나가는 쪽 " + portSelect("wd-edge-source-port", PORTS, ports.source)
+			+ " → 들어가는 쪽 " + portSelect("wd-edge-target-port", PORTS, ports.target));
 		var bends = edgeVertices[edgeKey(edge.from, edge.kind, edge.route)] || [];
 		html += "<p class=\"ai-hint wd-bend-help\">꺾는 점: 그림에서 이 화살표의 선 위를 끌면 점이 생기고, 점을 끌면 옮겨지고, 점을 두 번 누르면 지워집니다. 선 모양이 직선·곡선이면 점을 그대로 잇고, 직각이면 점을 지나는 직각 선이 됩니다. 점은 노드 위치와 함께 저장되고 [자동 배치]를 누르면 지워집니다."
 			+ " 지금 " + bends.length + "개" + (bends.length ? " <button type=\"button\" class=\"kn-plain\" id=\"wd-clear-bends-btn\">꺾는 점 모두 지우기</button>" : "") + "</p>";
