@@ -146,6 +146,10 @@
       "source" : "right",
       "target" : "left"
     },
+    "step09|route|중지" : {
+      "source" : "left",
+      "target" : "in"
+    },
     "step10|onFailure|" : {
       "source" : "left",
       "target" : "in"

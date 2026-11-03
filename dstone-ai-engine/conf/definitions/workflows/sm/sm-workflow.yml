@@ -131,6 +131,7 @@ steps:
     routes:
       승인: step10
       아키텍처 재설계: step08
+      중지: FAIL
 
   - id: step10
     name: 상세 설계서 읽기
