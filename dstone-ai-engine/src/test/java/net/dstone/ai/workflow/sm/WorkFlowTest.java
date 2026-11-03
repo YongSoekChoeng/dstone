@@ -1,83 +1,145 @@
 package net.dstone.ai.workflow.sm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.support.ScriptedChatModel;
 import net.dstone.ai.support.WorkflowStepper;
 import net.dstone.ai.support.WorkflowTestBase;
-import net.dstone.common.utils.LogUtil;
 
 /**
  * <pre>
- * sm-workflow(어플리케이션 운영관리) 테스트입니다. step마다 따로 떼어 확인합니다.
+ * sm-workflow(어플리케이션 운영관리) 테스트입니다.
  *
  * 쓰는 법
- * - step 하나에 블록 하나입니다. stepper(WORKFLOW_ID, step id, 그 step에 넣을 값)으로 그 step에서 시작하는 실행을 만들고,
- *   step(id)로 그 step 하나만 실행합니다. 넣을 값은 그 step의 with를 계산한 결과와 같은 모양입니다
- *   (TOOL step은 Tool 인자 이름 → 값의 맵, AGENT/ROUTER/SUPERVISOR step은 Agent input 모양의 값).
- * - 앞 step의 결과가 필요하면 그 결과를 꺼내 다음 step에 넣을 값으로 씁니다(아래 step2가 step1의 state.request를 씀).
- * - 뒤 step을 아직 만들지 않았거나 빼고 싶으면 그 블록을 주석으로 막습니다.
- * - LLM을 부르는 step은 실행 전에 this.chatModel.answer(...)로 LLM의 답을 넣어 둡니다(테스트에서는 실제 LLM을 부르지 않습니다).
+ * - testSmWorkflow는 step 하나에 블록 하나입니다. stepper(WORKFLOW_ID, step id, 그 step에 넣을 값)으로 그 step에서 시작하는 실행을 만들고,
+ *   step(id)로 그 step 하나만 실행합니다. 넣을 값은 그 step의 with를 계산한 결과와 같은 모양입니다.
+ * - 뒤 step을 빼고 싶으면 그 블록을 주석으로 막습니다.
+ * - LLM을 부르는 step은 실행 전에 this.chatModel.answer(...)로 LLM의 답을 넣어 둡니다.
  *
- * 요청서는 testApp의 샘플(workshop/changes/work001[log-error-fix]/00-request.md)을 그대로 읽습니다.
- * 그 폴더는 Windows에서는 D:/AppHome/testApp, 그 밖(WSL)에서는 /app/testApp에 있습니다(TEST_APP_HOME).
+ * 가짜 LLM은 파일을 쓰지 않으므로, Agent가 저장했어야 할 문서를 임시 폴더에 미리 만들어 둡니다.
  * </pre>
  */
 public class WorkFlowTest extends WorkflowTestBase {
 
 	private static final String WORKFLOW_ID = "sm-workflow";
 
-	/** testApp 폴더입니다. 다른 위치에 두었으면 -DTEST_APP_HOME=경로 로 바꿉니다. */
-	private static final String TEST_APP_HOME = System.getProperty("TEST_APP_HOME",
-		System.getProperty("os.name", "").toLowerCase().startsWith("windows") ? "D:/AppHome/testApp" : "/app/testApp");
+	private static final String REQUEST = "## 현업요청\n로그조회 메뉴에서 에러가 납니다.\n\n## 소스경로\nD:/AppHome/testApp\n";
+
+	@TempDir
+	Path workDir;
+
+	/** 작업 폴더에 문서를 만듭니다. */
+	private void writeDoc(String name, String text) throws IOException {
+		Files.write(this.workDir.resolve(name), text.getBytes(StandardCharsets.UTF_8));
+	}
+
+	/** 모든 단계의 문서를 만듭니다. */
+	private void writeAllDocs() throws IOException {
+		this.writeDoc("00.request.md", REQUEST);
+		this.writeDoc("01.customer_requirement.md", "분석서 내용");
+		this.writeDoc("02.impact.md", "영향도 내용");
+		this.writeDoc("03-1.design.md", "설계서 내용");
+		this.writeDoc("03-2.taskitems.md", "태스크 내용");
+	}
+
+	/** 마지막으로 보낸 프롬프트의 글자입니다. */
+	private String lastPrompt() {
+		List<org.springframework.ai.chat.prompt.Prompt> prompts = this.chatModel.prompts();
+		return ScriptedChatModel.textOf(prompts.get(prompts.size() - 1));
+	}
 
 	@Test
-	@SuppressWarnings("unchecked")
-	void testSmWorkflow() {
-		
-		String stepId = "";
+	void testSmWorkflow() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall());
+		this.writeAllDocs();
+		String dir = this.workDir.toString();
 
-		// 1.step1 테스트
-		stepId = "step00_01_readReq";
-		HashMap<String, Object> step1Param = new HashMap<String, Object>();
-		step1Param.put("fileFullPath", TEST_APP_HOME + "/workshop/changes/work001[log-error-fix]/00-request.md");
-		WorkflowStepper step1 = this.stepper(WORKFLOW_ID, stepId, step1Param);
-		step1.step(stepId);
-		assertThat(step1.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		LogUtil.sysout("step1.status()===>>>" + step1.status());
-		if( step1.status().equals(WorkFlowExecutionStatus.FAILED) ) { 
-			LogUtil.sysout("step00_01_readReq" + " 수행 시 실패." );
-			return; 
-		}
+		// 1. step00 고객요청서 읽기
+		WorkflowStepper step00 = this.stepper(WORKFLOW_ID, dir);
+		step00.step("step00");
+		assertThat(step00.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat((String) step00.state("request")).contains("로그조회");
 
-		// 2. step2 테스트
-		stepId = "step00_02_decideJobKind";
-		String step2Param = (String) step1.state("request"); // with: ${state.request}
-		//this.chatModel.answer("{\"route\": \"일반\", \"reason\": \"요청서에 '에러가 발생합니다'라고 적혀 있어 기존 기능의 오류 수정이다.\"}");
-		WorkflowStepper step2 = this.stepper(WORKFLOW_ID, stepId, step2Param);
-		step2.step(stepId);
-		assertThat(step2.stateMap("classify")).containsEntry("route", "일반");
-		LogUtil.sysout("step2.status()===>>>" + step2.status());
-		if( step2.status().equals(WorkFlowExecutionStatus.FAILED) ) { 
-			LogUtil.sysout("step00_02_decideJobKind" + " 수행 시 실패." );
-			return; 
-		}
+		// 2. step01 고객요청사항 분석
+		HashMap<String, Object> step01Param = new HashMap<String, Object>();
+		step01Param.put("base_dir", dir);
+		step01Param.put("request", step00.state("request"));
+		step01Param.put("feedback", "");
+		this.chatModel.answer(dir + "/01.customer_requirement.md");
+		WorkflowStepper step01 = this.stepper(WORKFLOW_ID, "step01", step01Param);
+		step01.step("step01");
+		assertThat(step01.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(step01.currentStepId()).isEqualTo("step02");
+	}
 
-		/*
-		// step3 테스트
-		HashMap<String, Object> step3Param = new HashMap<String, Object>();
-		step3Param.put("...", ...);
-		WorkflowStepper step3 = this.stepper(WORKFLOW_ID, "step01_01_xxx", step3Param);
-		step3.step("step01_01_xxx");
-		assertThat(step3.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+	@Test
+	void 전체_흐름에서_문서는_입력으로_넘어가고_다시_돌릴_때_사유가_전달된다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall());
+		this.writeAllDocs();
 
-		// step4 테스트
-		// step5 테스트
-		*/
+		// 리뷰 불통과 → 사람이 재분석을 고릅니다.
+		this.chatModel.answer("저장함", "{\"pass\": false, \"reason\": \"TASK-01 완료 기준이 모호함\"}");
+		WorkFlowExecution waiting = this.run(WORKFLOW_ID, this.workDir.toString());
+		assertThat(waiting.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
+		assertThat(this.pendingApproval(waiting).stepId()).isEqualTo("step04");
+		// 리뷰 Agent는 문서를 입력으로 받습니다(파일을 읽으려고 LLM을 또 부르지 않습니다).
+		assertThat(this.lastPrompt()).contains("로그조회").contains("분석서 내용");
+
+		// 재분석 때 리뷰 사유와 사람의 의견이 함께 전달되고, 이번에는 통과해서 영향도 승인까지 갑니다.
+		this.chatModel.answer("저장함", "{\"pass\": true, \"reason\": \"문제없음\"}", "저장함");
+		WorkFlowExecution impactWaiting = this.decide(waiting, "고객요청사항 재분석", "메뉴 이름도 적을 것");
+		assertThat(this.pendingApproval(impactWaiting).stepId()).isEqualTo("step06");
+		List<org.springframework.ai.chat.prompt.Prompt> prompts = this.chatModel.prompts();
+		String reanalysis = ScriptedChatModel.textOf(prompts.get(prompts.size() - 3));
+		assertThat(reanalysis).contains("TASK-01 완료 기준이 모호함").contains("메뉴 이름도 적을 것");
+
+		// 영향도 재분석 때 승인 화면의 의견이 전달됩니다.
+		this.chatModel.answer("저장함");
+		WorkFlowExecution impactAgain = this.decide(impactWaiting, "영향도 재분석", "배치도 볼 것");
+		assertThat(this.lastPrompt()).contains("배치도 볼 것");
+
+		// 승인 → 설계 → 승인 → 개발
+		this.chatModel.answer("저장함");
+		WorkFlowExecution designWaiting = this.decide(impactAgain, "승인", null);
+		assertThat(this.pendingApproval(designWaiting).stepId()).isEqualTo("step09");
+		assertThat(this.lastPrompt()).contains("영향도 내용");
+
+		this.chatModel.answer("완료 1건");
+		WorkFlowExecution done = this.decide(designWaiting, "승인", null);
+		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+		assertThat(this.lastPrompt()).contains("설계서 내용").contains("태스크 내용");
+	}
+
+	@Test
+	void 요청서가_없으면_LLM을_부르지_않고_실패한다() {
+		assumeFalse(this.chatModel.isLlmCall());
+		int before = this.chatModel.prompts().size();
+		WorkFlowExecution failed = this.run(WORKFLOW_ID, this.workDir.toString());
+		assertThat(failed.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(this.chatModel.prompts().size()).isEqualTo(before);
+	}
+
+	@Test
+	void 설계_step이_태스크_목록을_저장하지_못하면_개발로_넘어가지_않는다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall());
+		this.writeDoc("03-1.design.md", "설계서 내용");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString());
+		flow.jumpTo("step11");
+		flow.step("step11");
+		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 	}
 
 }

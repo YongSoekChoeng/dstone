@@ -154,8 +154,8 @@ public abstract class WorkflowTestBase {
 	 *
 	 *   HashMap&lt;String, Object&gt; step1Param = new HashMap&lt;String, Object&gt;();
 	 *   step1Param.put("fileFullPath", ".../00-request.md");        // TOOL step: Tool 인자 이름 → 값
-	 *   WorkflowStepper step1 = this.stepper("sm-workflow", "step00_01_readReq", step1Param);
-	 *   step1.step("step00_01_readReq");
+	 *   WorkflowStepper step1 = this.stepper("sm-workflow", "step00", step1Param);
+	 *   step1.step("step00");
 	 * </pre>
 	 *
 	 * @param workflowId 실행할 Workflow의 id

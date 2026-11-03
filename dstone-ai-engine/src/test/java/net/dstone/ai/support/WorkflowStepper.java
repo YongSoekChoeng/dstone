@@ -19,7 +19,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  * Workflow를 step 하나씩 끊어서 실행하는 테스트 도구입니다. WorkflowTestBase.stepper(id, input)로 만듭니다.
  *
  *   WorkflowStepper flow = this.stepper("sm-workflow", 요청서폴더);
- *   flow.step("step00_01_readReq");          // 이 step 하나만 실행하고 멈춤
+ *   flow.step("step00");          // 이 step 하나만 실행하고 멈춤
  *   assertThat(flow.state("request"))...      // 그 step이 save한 값 확인
  *   flow.step("step00_02_decideJobKind");
  *   // flow.step("step01_...");               // 여기를 주석으로 막으면 앞 step까지만 실행
@@ -32,8 +32,8 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  * - APPROVAL step은 step(id)를 부르면 WAITING_APPROVAL로 멈춥니다. decide(결정, 의견)로 결정을 넣으면 그 step을 이어서 실행합니다.
  *
  * step 하나만 따로 떼어 확인하기(앞 step 없이)
- *   WorkflowStepper step1 = this.stepper("sm-workflow", "step00_01_readReq", 그 step에 넣을 값);
- *   step1.step("step00_01_readReq");          // with를 계산하지 않고 받은 값으로 실행
+ *   WorkflowStepper step1 = this.stepper("sm-workflow", "step00", 그 step에 넣을 값);
+ *   step1.step("step00");          // with를 계산하지 않고 받은 값으로 실행
  * 넣을 값은 그 step의 with를 계산한 결과와 같은 모양입니다(TOOL은 인자 맵, AGENT류는 Agent input 모양의 값).
  * step(id, 값)으로 실행 중간의 step 하나에만 값을 넣을 수도 있습니다.
  * </pre>

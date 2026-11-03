@@ -51,6 +51,8 @@ import net.dstone.common.utils.LogUtil;
 @Component
 public class ConfigTool extends BaseObject {
 
+	private static final org.slf4j.Logger TOOL_CALL_LOGGER = org.slf4j.LoggerFactory.getLogger(ConfigTool.class);
+
 	@Autowired
 	private ApplicationContext applicationContext;
 	@Autowired
@@ -379,7 +381,8 @@ public class ConfigTool extends BaseObject {
 			if (arguments.length() > MAX_LOGGED_ARGUMENT_CHARS) {
 				arguments = arguments.substring(0, MAX_LOGGED_ARGUMENT_CHARS) + "...(전체 " + toolInput.length() + "자)";
 			}
-			LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 호출 - 인자 " + arguments + " / 결과 " + (result == null ? 0 : result.length()) + "자");
+			// 기동 스크립트가 stdout을 버리므로 execution.log에 남도록 로거로 씁니다. Agent가 무엇을 되풀이하는지 볼 때 필요합니다.
+			TOOL_CALL_LOGGER.info("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 호출 - 인자 " + arguments + " / 결과 " + (result == null ? 0 : result.length()) + "자");
 			return result;
 		}
 

@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
 import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
 import net.dstone.ai.common.config.ChatProviders;
 import net.dstone.ai.common.config.ConfigChatClient;
@@ -542,6 +543,9 @@ public class AgentExecutor extends BaseObject {
 				spec = spec.advisors(new ToolResultCompactionAdvisor(agent.id(), keepChars));
 			}
 		}
+
+		// LLM 호출 횟수, Tool별 호출 횟수, 토큰을 로그에 남깁니다(Tool이 없어도 붙입니다).
+		spec = spec.advisors(new AgentCallStatsAdvisor(agent.id()));
 
 		/************************************************************************
 		6. 모델(model)을 원하는 것으로 지정합니다.

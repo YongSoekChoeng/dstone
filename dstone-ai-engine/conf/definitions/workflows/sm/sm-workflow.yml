@@ -1,76 +1,173 @@
 ################################################################################################################ 
 # 어플리케이션 운영관리 Workflow입니다. 
-# 요청서(00-request.md)에서 시작해 요구사항 → 영향도 분석 → 리뷰 → 설계 → 구현까지 진행합니다.
+# 요청서(00.request.md)에서 시작해 요구사항 → 리뷰 → 영향도 분석 → 설계 → 구현까지 진행합니다.
+#
+# 문서는 LLM이 아니라 TOOL step이 읽어서 Agent의 입력으로 넘깁니다. 읽으려고 LLM을 한 번 더 부르지 않으려는 것입니다.
+# 파일이 없으면 TOOL step이 실패하므로, 앞 step이 문서를 저장하지 못한 채 다음으로 넘어가지 않습니다.
+#
+# 다시 돌릴 때는 리뷰 사유와 승인 화면에 적은 의견이 Agent의 feedback으로 전달됩니다. 의견을 적어야 같은 결과가 되풀이되지 않습니다.
 ################################################################################################################
 id: sm-workflow
-version: 1.0.0
+version: 1.1.0
 description: |
-  어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00-request.md 파일의 경로를(파일명 제외) 입력하라. 
+  어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
   예)
-  D:/AppHome/testApp/workshop/changes/work001[log-error-fix]
+  D:/AppHome/testApp/workshop/changes/work003
 settings:
   checkpoint: true
   maxIterations: 100
   onError: STOP
-input: string, 요청서가 작성된 디렉토리명
+input: string, 요청서(00.request.md)가 들어 있는 폴더의 절대경로
 steps:
+
+  - id: step00
+    name: 고객요청서 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/00.request.md
+    save: request
+    next: step01
+    onFailure: FAIL
 
   - id: step01
     name: 고객요청사항 분석
     type: AGENT
-    with: ${input}
     agent: sm-requirement-analyze-agent
+    with:
+      base_dir: ${input}
+      request: ${state.request}
+      feedback: |-
+        ${state.review.reason:}
+        ${state.reviewDecision.comment:}
+        ${state.impactApproval.comment:}
     next: step02
-    save: base_line
 
   - id: step02
-    name: 고객요청사항 분석 리뷰
-    type: SUPERVISOR
-    with: ${state.base_line}
-    agent: sm-requirement-analyze-reviewer-agent
+    name: 고객요구사항분석서 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/01.customer_requirement.md
+    save: requirement
     next: step03
     onFailure: FAIL
 
   - id: step03
-    name: 영향도 분석
-    type: AGENT
-    with: ${state.base_line}
-    agent: sm-analyze-impact-agent
-    next: step04
+    name: 고객요청사항 분석 리뷰
+    type: SUPERVISOR
+    agent: sm-requirement-analyze-reviewer-agent
+    with:
+      base_dir: ${input}
+      request: ${state.request}
+      requirement: ${state.requirement}
+    save: review
+    next: step05
+    onFailure: step04
 
   - id: step04
+    name: 리뷰 불통과 처리 결정
+    type: APPROVAL
+    approval:
+      approverRole: PL
+    save: reviewDecision
+    routes:
+      고객요청사항 재분석: step01
+      그대로 진행: step05
+      중지: FAIL
+
+  - id: step05
+    name: 영향도 분석
+    type: AGENT
+    agent: sm-analyze-impact-agent
+    with:
+      base_dir: ${input}
+      request: ${state.request}
+      requirement: ${state.requirement}
+      feedback: ${state.impactApproval.comment:}
+    next: step06
+
+  - id: step06
     name: 영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
+    save: impactApproval
     routes:
       고객요청사항 재분석: step01
-      영향도 재분석: step03
+      영향도 재분석: step05
       중지: FAIL
-      승인: step05
+      승인: step07
 
-  - id: step05
+  - id: step07
+    name: 영향도분석서 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/02.impact.md
+    save: impact
+    next: step08
+    onFailure: FAIL
+
+  - id: step08
     name: 아키텍처 설계
     type: AGENT
-    with: ${state.base_line}
     agent: sm-architect-agent
-    next: step06
+    with:
+      base_dir: ${input}
+      request: ${state.request}
+      requirement: ${state.requirement}
+      impact: ${state.impact}
+      feedback: ${state.designApproval.comment:}
+    next: step09
 
-  - id: step06
+  - id: step09
     name: 설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
+    save: designApproval
     routes:
-      승인: step07
-      아키택처 재설계: step05
+      승인: step10
+      아키텍처 재설계: step08
 
-  - id: step07
+  - id: step10
+    name: 상세 설계서 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/03-1.design.md
+    save: design
+    next: step11
+    onFailure: FAIL
+
+  - id: step11
+    name: 태스크아이템 목록 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/03-2.taskitems.md
+    save: taskitems
+    next: step12
+    onFailure: FAIL
+
+  - id: step12
     name: 개발
     type: AGENT
-    with: ${state.base_line}
     agent: sm-developer-agent
+    with:
+      base_dir: ${input}
+      design: ${state.design}
+      taskitems: ${state.taskitems}
     next: END
 state:
-  base_line: step01 step의 결과
+  request: 고객 요청서 내용
+  requirement: 고객요구사항분석서 내용
+  review: 리뷰 판정 결과
+  reviewDecision: 리뷰 불통과 때 사람이 고른 결과
+  impactApproval: 영향도 분석 승인 결과
+  impact: 영향도분석서 내용
+  designApproval: 설계 승인 결과
+  design: 상세 설계서 내용
+  taskitems: 태스크아이템 목록 내용
