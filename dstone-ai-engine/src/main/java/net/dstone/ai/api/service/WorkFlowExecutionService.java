@@ -405,8 +405,8 @@ public class WorkFlowExecutionService extends BaseService {
 			warnings.add("이 구간의 step이 새로 만든 파일 " + deleteFiles.size() + "개를 지웁니다(파일이 지워진 뒤 빈 폴더도 지웁니다).");
 		}
 		if (!keptFiles.isEmpty()) {
-			warnings.add("이 구간의 step이 고친 파일 " + keptFiles.size() + "개는 원래 있던 파일이라 지우지 않고, 원래대로 돌아가지도 않습니다. "
-				+ "고친 파일을 다시 고치는 step은 원문을 찾지 못해 실패할 수 있습니다.");
+			warnings.add("이 구간의 step이 쓴 파일 " + keptFiles.size() + "개는 지우지 않습니다. 원래 있던 파일을 고친 것이거나, "
+				+ "기록이 오래되어 새로 만든 것인지 알 수 없는 파일입니다. 원래대로 돌아가지도 않으므로, 고친 파일을 다시 고치는 step은 원문을 찾지 못해 실패할 수 있습니다.");
 		}
 
 		String startedVersion = WorkFlowContext.definitionVersion(execution.context());

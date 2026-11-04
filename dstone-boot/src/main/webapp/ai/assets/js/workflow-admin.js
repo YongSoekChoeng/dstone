@@ -621,7 +621,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		});
 
 		fillFileList(rewindFilesEl, point.deleteFiles, "다시 실행하면 지우는 파일(이 구간에서 새로 만든 산출물) ");
-		fillFileList(rewindKeptEl, point.keptFiles, "지우지 않는 파일(원래 있던 파일을 고친 것, 원래대로 돌아가지 않음) ");
+		fillFileList(rewindKeptEl, point.keptFiles, "지우지 않는 파일(원래 있던 파일을 고쳤거나 새로 만들었는지 알 수 없는 것) ");
 
 		var names = point.savedNames || [];
 		rewindClearLabelEl.style.display = names.length > 0 ? "" : "none";
