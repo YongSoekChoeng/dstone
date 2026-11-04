@@ -171,6 +171,7 @@ steps:
       design: ${state.design}
       taskitems: ${state.taskitems}
     next: END
+    onFailure: FAIL
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
