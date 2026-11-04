@@ -936,6 +936,37 @@ label.wd-check {
 	text-align: right;
 }
 
+/*
+ * 스텝 이력 표는 칸 너비를 내용에 맞춥니다.
+ * stepId·type·ref·결과·소요·시각·재실행처럼 짧은 칸은 글자만큼만 차지하고(줄바꿈 없음),
+ * 남는 너비는 '내용/사유' 칸이 다 가져갑니다.
+ */
+.wa-table.wa-history-table {
+	table-layout: auto;
+	min-width: 980px;
+}
+
+.wa-history-table .wa-fit {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.wa-history-table .wa-text-cell {
+	min-width: 240px;
+}
+
+/* 문서 칸은 파일 이름 단추가 두세 개 들어갈 만큼만 잡습니다. 긴 이름은 단추 안에서 말줄임합니다. */
+.wa-history-table .wa-doc-col {
+	width: 200px;
+}
+
+.ai-body .document-list-table.wa-history-table button.wa-doc-chip {
+	display: inline-block;
+	max-width: 200px;
+	white-space: nowrap;
+	text-align: left;
+}
+
 .wa-table tr.wa-selected td {
 	background: var(--cs-info-soft);
 }

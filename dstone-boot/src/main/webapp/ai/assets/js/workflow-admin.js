@@ -223,17 +223,18 @@ var DstoneAiWorkflowAdmin = (function () {
 		(detail.history || []).forEach(function (h, index) {
 			var tr = document.createElement("tr");
 			tr.innerHTML =
-				"<td>" + escapeHtml(h.stepId) + "</td>" +
-				"<td>" + escapeHtml(h.stepType) + "</td>" +
-				"<td>" + escapeHtml(h.ref) + "</td>" +
-				"<td><span class=\"workflow-badge workflow-badge-" + (h.success ? "done" : "failed") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
-				"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : h.durationMs) + "</td>" +
+				"<td class=\"wa-fit\">" + escapeHtml(h.stepId) + "</td>" +
+				"<td class=\"wa-fit\">" + escapeHtml(h.stepType) + "</td>" +
+				"<td class=\"wa-fit\">" + escapeHtml(h.ref) + "</td>" +
+				"<td class=\"wa-fit\"><span class=\"workflow-badge workflow-badge-" + (h.success ? "done" : "failed") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
+				"<td class=\"wa-fit wa-num\">" + (h.durationMs == null ? "-" : h.durationMs) + "</td>" +
 				"<td class=\"wa-text-cell\"></td>" +
 				"<td class=\"wa-doc-cell\"></td>" +
-				"<td>" + escapeHtml(formatTime(h.executedAt)) + "</td>" +
-				"<td class=\"wa-rewind-cell\"></td>";
+				"<td class=\"wa-fit\">" + escapeHtml(formatTime(h.executedAt)) + "</td>" +
+				"<td class=\"wa-fit wa-rewind-cell\"></td>";
 			fillHistoryText(tr.querySelector(".wa-text-cell"), h.success ? h.outputSummary : h.failureReason, !h.success, index);
 			tr.setAttribute("data-step-id", h.stepId || "");
+			tr.setAttribute("data-executed-at", h.executedAt || "");
 			historyBodyEl.appendChild(tr);
 		});
 		renderRewindButtons(detail);
@@ -283,7 +284,8 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	// 이 step이 건드린 파일들. allFiles가 false면 문서(md)만.
-	function filesOfStep(stepId, allFiles) {
+	// since(밀리초)를 주면 그 뒤에 건드린 파일만 고른다. 재실행 전에 다룬 파일은 빠진다.
+	function filesOfStep(stepId, allFiles, since) {
 		var result = [];
 		if (!currentFiles) {
 			return result;
@@ -293,7 +295,7 @@ var DstoneAiWorkflowAdmin = (function () {
 				return;
 			}
 			(file.steps || []).forEach(function (step) {
-				if (step.stepId === stepId && result.indexOf(file) < 0) {
+				if (step.stepId === stepId && touchedSince(step, since) && result.indexOf(file) < 0) {
 					result.push(file);
 				}
 			});
@@ -301,14 +303,23 @@ var DstoneAiWorkflowAdmin = (function () {
 		return result;
 	}
 
-	function actionOf(file, stepId) {
+	function actionOf(file, stepId, since) {
 		var action = "READ";
 		(file.steps || []).forEach(function (step) {
-			if ((stepId == null || step.stepId === stepId) && step.action === "WRITE") {
+			if ((stepId == null || step.stepId === stepId) && touchedSince(step, since) && step.action === "WRITE") {
 				action = "WRITE";
 			}
 		});
 		return action;
+	}
+
+	// 파일 기록의 마지막 접근 시각(lastAt)이 since 이후인지. since가 없으면 모두 통과.
+	function touchedSince(step, since) {
+		if (since == null) {
+			return true;
+		}
+		var lastAt = Date.parse(step.lastAt);
+		return isNaN(lastAt) || lastAt >= since;
 	}
 
 	// forEach step의 이력은 "apply[0]"처럼 순번이 붙는다. 파일 기록은 순번 없이 step id로 남는다.
@@ -317,11 +328,26 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	// 스텝 이력의 '문서' 칸. 같은 step이 여러 번 돌았으면(forEach 반복 포함) 마지막 줄에만 단다(기록은 step별로 합쳐져 있다).
+	// 단, 그 step이 마지막으로 돈 회차에 건드린 파일만 단다. 재실행 때마다 새 폴더에 문서를 만드는 Workflow는
+	// 같은 이름의 문서가 회차 수만큼 쌓이기 때문이다(지난 회차 문서는 아래 'step 문서' 표에 그대로 있다).
 	function renderHistoryDocs() {
 		var rows = historyBodyEl.querySelectorAll("tr[data-step-id]");
 		var lastRowOfStep = {};
+		// step별 마지막 회차의 시작 시각. 이력 시각(executedAt)은 step이 끝난 시각이라,
+		// 바로 앞 줄의 시각을 그 회차의 시작으로 본다(맨 첫 줄이면 제한 없음).
+		var lastRunSince = {};
+		var previousStepId = null;
+		var previousTime = null;
 		Array.prototype.forEach.call(rows, function (tr) {
-			lastRowOfStep[baseStepId(tr.getAttribute("data-step-id"))] = tr;
+			var stepId = baseStepId(tr.getAttribute("data-step-id"));
+			lastRowOfStep[stepId] = tr;
+			// forEach 반복 줄(step[0], step[1] ...)은 이어서 나오므로 한 회차로 묶는다.
+			if (stepId !== previousStepId) {
+				lastRunSince[stepId] = previousTime;
+			}
+			previousStepId = stepId;
+			var time = Date.parse(tr.getAttribute("data-executed-at") || "");
+			previousTime = isNaN(time) ? previousTime : time;
 		});
 		Array.prototype.forEach.call(rows, function (tr) {
 			var cell = tr.querySelector(".wa-doc-cell");
@@ -330,8 +356,9 @@ var DstoneAiWorkflowAdmin = (function () {
 			if (lastRowOfStep[stepId] !== tr) {
 				return;
 			}
-			filesOfStep(stepId, false).forEach(function (file) {
-				cell.appendChild(docChip(file, actionOf(file, stepId)));
+			var since = lastRunSince[stepId];
+			filesOfStep(stepId, false, since).forEach(function (file) {
+				cell.appendChild(docChip(file, actionOf(file, stepId, since)));
 			});
 		});
 	}

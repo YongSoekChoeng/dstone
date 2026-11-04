@@ -140,29 +140,18 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 				<div class="kn-section-title">스텝 이력</div>
 				<div class="wa-table-scroll">
-					<table id="workflow-admin-history-table" class="document-list-table wa-table">
-						<colgroup>
-							<col style="width:13%" />
-							<col style="width:100px" />
-							<col style="width:18%" />
-							<col style="width:76px" />
-							<col style="width:84px" />
-							<col />
-							<col style="width:18%" />
-							<col style="width:160px" />
-							<col style="width:96px" />
-						</colgroup>
+					<table id="workflow-admin-history-table" class="document-list-table wa-table wa-history-table">
 						<thead>
 							<tr>
-								<th>stepId</th>
-								<th>type</th>
-								<th>ref</th>
-								<th>결과</th>
-								<th class="wa-num">소요(ms)</th>
+								<th class="wa-fit">stepId</th>
+								<th class="wa-fit">type</th>
+								<th class="wa-fit">ref</th>
+								<th class="wa-fit">결과</th>
+								<th class="wa-fit wa-num">소요(ms)</th>
 								<th>내용/사유</th>
-								<th>문서</th>
-								<th>시각</th>
-								<th>재실행</th>
+								<th class="wa-doc-col">문서</th>
+								<th class="wa-fit">시각</th>
+								<th class="wa-fit">재실행</th>
 							</tr>
 						</thead>
 						<tbody id="workflow-admin-history-body"></tbody>
