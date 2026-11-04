@@ -400,6 +400,8 @@ public class FileTool {
 	 * - 줄바꿈 방식만 다른 것은 맞춰 줍니다. 모델은 줄바꿈을 LF로 보내는데 Windows에서 만든 소스는 CRLF라서,
 	 *   글자 그대로만 견주면 여러 줄짜리 oldText는 하나도 찾지 못합니다. newText의 줄바꿈도 파일의 방식으로 바꿉니다.
 	 * - 파일의 글자셋을 그대로 지킵니다(UTF-8로 읽히면 UTF-8, 아니면 MS949).
+	 * - 들여쓰기·공백만 다른 것도 맞춰 줍니다. 글자 그대로 못 찾으면 공백을 빼고 줄 단위로 다시 견주고,
+	 *   딱 한 곳만 맞으면 파일의 들여쓰기에 맞춰 바꿉니다(looseMatch). 모델은 탭 개수를 잘 못 맞춥니다.
 	 * - newText를 비우면 그 부분을 지웁니다.
 	 * - 못 찾았을 때는 파일의 그 자리가 실제로 어떻게 생겼는지를 답에 붙입니다(nearestText).
 	 *   "못 찾았다"만 돌려주면 모델이 같은 oldText를 그대로 다시 보내는 일을 되풀이합니다.
@@ -407,7 +409,8 @@ public class FileTool {
 	 * </pre>
 	 */
 	@Tool(description = "절대경로 filePath 파일에서 oldText를 newText로 바꾼다. 이미 있는 파일의 일부를 고칠 때 쓴다(파일 전체를 writeFile로 다시 쓰지 않는다). "
-		+ "oldText는 파일에 정확히 한 번만 나와야 한다. 없거나 여러 번 나오면 아무것도 바꾸지 않고 '실패: ...'로 답한다 - 그때는 앞뒤 줄을 더 포함해 한 곳만 가리키게 하거나, 들여쓰기와 공백이 파일과 같은지 확인한다. "
+		+ "oldText는 파일에 정확히 한 번만 나와야 한다. 없거나 여러 번 나오면 아무것도 바꾸지 않고 '실패: ...'로 답한다 - 그때는 앞뒤 줄을 더 포함해 한 곳만 가리키게 한다. "
+		+ "줄 단위로 적은 oldText는 들여쓰기·공백 개수가 파일과 조금 달라도 글자가 같으면 찾아서 파일의 들여쓰기에 맞춰 바꾼다. "
 		+ "못 찾았을 때는 파일의 그 자리에 실제로 있는 글자를 답에 붙여 주니, 파일을 다시 읽지 말고 그 글자로 oldText를 고쳐 다시 부른다. "
 		+ "줄바꿈 방식(CRLF/LF)의 차이는 자동으로 맞춘다. newText를 빈 글자로 주면 그 부분을 지운다. 줄을 끼워 넣으려면 oldText에 기준이 되는 줄을, newText에 그 줄과 새 줄을 함께 적는다.")
 	public String replaceInFile(
@@ -443,6 +446,16 @@ public class FileTool {
 					found = countOf(contents, from);
 				}
 				if (found == 0) {
+					// 들여쓰기·공백만 다른 것일 수 있습니다. 공백을 빼고 견줘 한 곳만 맞으면 그 자리를 바꿉니다.
+					LooseMatch loose = looseMatch(contents, oldText, newText == null ? "" : newText);
+					if (loose.count == 1) {
+						String changed = contents.substring(0, loose.start) + loose.replacement + contents.substring(loose.end);
+						Files.write(file.toPath(), changed.getBytes(charset), StandardOpenOption.TRUNCATE_EXISTING);
+						return "바꿨습니다(" + loose.line + "번째 줄부터). " + LOOSE_NOTICE + " 파일은 전체 " + changed.length() + "자입니다: " + this.toPath(file);
+					}
+					if (loose.count > 1) {
+						return "실패: 들여쓰기·공백을 빼고 견주면 oldText가 파일에 " + loose.count + "번 나옵니다. 아무것도 바꾸지 않았습니다. 앞뒤 줄을 더 포함해 한 곳만 가리키게 하세요: " + this.toPath(file);
+					}
 					return "실패: oldText를 파일에서 찾지 못했습니다. 아무것도 바꾸지 않았습니다. 같은 oldText로 다시 부르지 마세요. "
 						+ nearestText(contents, oldText) + "\n파일: " + this.toPath(file);
 				}
@@ -467,7 +480,7 @@ public class FileTool {
 	 *   절반만 고쳐진 파일은 무엇이 적용됐는지 알기 어렵기 때문입니다.
 	 * - dryRun이 true면 파일을 건드리지 않고 "고칠 수 있는지"만 답합니다. 사람에게 승인을 받기 전에 미리 확인할 때 씁니다.
 	 * - edits가 비어 있으면 아무것도 하지 않고 성공으로 답합니다(목록을 forEach로 돌 때 고칠 것이 없는 항목이 섞여 있어도 됩니다).
-	 * - 줄바꿈 방식(CRLF/LF)의 차이는 맞춰 주고, 파일의 글자셋은 그대로 지킵니다(replaceInFile과 같습니다).
+	 * - 줄바꿈 방식(CRLF/LF)과 들여쓰기·공백의 차이는 맞춰 주고, 파일의 글자셋은 그대로 지킵니다(replaceInFile과 같습니다).
 	 * - 덧붙이는 내용이 줄바꿈으로 시작하지 않으면 앞에 줄바꿈을 하나 넣습니다.
 	 * </pre>
 	 */
@@ -495,6 +508,7 @@ public class FileTool {
 				boolean crlfFile = contents.contains("\r\n");
 				String changed = contents;
 				List<String> problems = new ArrayList<>();
+				int looseCount = 0;
 				for (int i = 0; i < edits.size(); i++) {
 					Map<String, Object> edit = edits.get(i) == null ? Map.<String, Object>of() : edits.get(i);
 					String after = toLineBreak(textOf(edit.get("after")), crlfFile);
@@ -508,6 +522,19 @@ public class FileTool {
 						continue;
 					}
 					int found = countOf(changed, before);
+					if (found == 0) {
+						// replaceInFile과 같습니다. 들여쓰기·공백만 다르면 공백을 빼고 견줘 한 곳만 맞을 때 그 자리를 바꿉니다.
+						LooseMatch loose = looseMatch(changed, textOf(edit.get("before")), textOf(edit.get("after")));
+						if (loose.count == 1) {
+							changed = changed.substring(0, loose.start) + loose.replacement + changed.substring(loose.end);
+							looseCount++;
+							continue;
+						}
+						if (loose.count > 1) {
+							problems.add((i + 1) + "번째 변경: 들여쓰기·공백을 빼고 견주면 before가 파일에 " + loose.count + "번 나옵니다. 앞뒤 줄을 더 포함해 한 곳만 가리키게 하세요.");
+							continue;
+						}
+					}
 					if (found != 1) {
 						problems.add((i + 1) + "번째 변경: before가 파일에 " + found + "번 나옵니다(정확히 한 번이어야 합니다). "
 							+ (found == 0 ? nearestText(changed, before) : "앞뒤 줄을 더 포함해 한 곳만 가리키게 하세요."));
@@ -519,11 +546,12 @@ public class FileTool {
 				if (!problems.isEmpty()) {
 					return "실패: 아무것도 바꾸지 않았습니다: " + this.toPath(file) + "\n" + String.join("\n", problems);
 				}
+				String looseNote = looseCount == 0 ? "" : " " + looseCount + "곳은 " + LOOSE_NOTICE;
 				if (Boolean.TRUE.equals(dryRun)) {
-					return "고칠 수 있습니다(" + edits.size() + "곳): " + this.toPath(file);
+					return "고칠 수 있습니다(" + edits.size() + "곳)" + (looseNote.isEmpty() ? "" : "." + looseNote) + ": " + this.toPath(file);
 				}
 				Files.write(file.toPath(), changed.getBytes(charset), StandardOpenOption.TRUNCATE_EXISTING);
-				return "고쳤습니다(" + edits.size() + "곳). 파일은 전체 " + changed.length() + "자입니다: " + this.toPath(file);
+				return "고쳤습니다(" + edits.size() + "곳)." + looseNote + " 파일은 전체 " + changed.length() + "자입니다: " + this.toPath(file);
 			} catch (Exception e) {
 				return "실패: 파일을 고치지 못했습니다(" + e.getClass().getSimpleName() + ": " + e.getMessage() + "): " + filePath;
 			}
@@ -951,6 +979,197 @@ public class FileTool {
 		}
 		return "oldText의 첫 줄은 파일의 " + (start + 1) + "번째 줄에 있지만 그 뒤가 파일과 다릅니다. 파일에는 그 줄부터 아래처럼 적혀 있습니다(이 글자를 그대로 써서 oldText를 다시 적으세요).\n"
 			+ "-----\n" + actual + "-----";
+	}
+
+	/** 공백을 빼고 견줘서 바꿨을 때 모델에게 알려 주는 말입니다. */
+	static final String LOOSE_NOTICE = "oldText의 들여쓰기·공백이 파일과 달라서, 공백을 빼고 견줘 찾은 한 곳을 파일의 들여쓰기에 맞춰 바꿨습니다.";
+
+	/** 공백 묶음을 찾는 식입니다. */
+	private static final Pattern SPACES = Pattern.compile("\\s+");
+
+	/**
+	 * <pre>
+	 * looseMatch()의 결과입니다.
+	 * count가 1일 때만 나머지 값이 쓸모 있습니다: contents의 [start, end)를 replacement로 바꾸면 됩니다.
+	 * </pre>
+	 */
+	static final class LooseMatch {
+		/** 공백을 빼고 견줬을 때 맞는 곳의 수입니다. */
+		int count;
+		/** 바꿀 범위의 시작 위치입니다. */
+		int start;
+		/** 바꿀 범위의 끝 위치입니다(이 위치는 포함하지 않습니다). */
+		int end;
+		/** 그 범위에 넣을 글자입니다. 들여쓰기와 줄바꿈은 파일에 맞춰 두었습니다. */
+		String replacement;
+		/** 바꾼 곳의 첫 줄 번호입니다(1부터). */
+		int line;
+	}
+
+	/**
+	 * <pre>
+	 * 들여쓰기와 공백만 다른 oldText를 파일에서 찾습니다. oldText를 글자 그대로 못 찾았을 때만 씁니다.
+	 *
+	 * 왜 필요한가:
+	 * 모델은 탭 3개와 4개, 공백 9칸과 10칸을 잘 구별하지 못합니다. 파일의 실제 글자를 보여 줘도
+	 * 같은 틀린 들여쓰기로 다시 보내다가 Tool 한도를 다 쓴 일이 있습니다(sm-workflow step13, replaceInFile 87번).
+	 * 그래서 들여쓰기는 Tool이 맞춥니다.
+	 *
+	 * 찾는 법:
+	 *   줄 단위로 견줍니다. 각 줄의 앞뒤 공백을 떼고, 줄 안의 공백 묶음은 한 칸으로 줄여서 같으면 같은 줄로 봅니다.
+	 *   oldText의 모든 줄이 파일의 이어진 줄들과 같아야 하고, 그런 곳이 딱 한 곳일 때만 바꿉니다.
+	 *   글자가 하나라도 다르면 맞지 않는 것으로 봅니다(공백만 너그럽게 봅니다).
+	 *
+	 * 바꿀 글자(newText)를 만드는 법:
+	 *   - newText의 줄이 oldText의 어떤 줄과 공백 말고 같으면, 그 줄은 파일의 원래 줄을 그대로 씁니다.
+	 *   - 새로 들어온 줄은 들여쓰기만 바꿉니다. oldText에서 "모델이 쓴 들여쓰기 → 파일의 실제 들여쓰기" 짝을 모아 두고,
+	 *     같은 들여쓰기를 쓴 줄이면 파일 쪽 들여쓰기로 바꿉니다. 짝이 없거나 한 들여쓰기가 두 가지로 갈리면 모델이 쓴 대로 둡니다.
+	 *   - 줄바꿈은 파일의 방식(CRLF/LF)을 따릅니다.
+	 * </pre>
+	 *
+	 * @param contents 파일 내용
+	 * @param oldText  모델이 보낸 바꿀 대상
+	 * @param newText  모델이 보낸 바꾼 뒤의 글자(빈 글자면 지우기)
+	 */
+	static LooseMatch looseMatch(String contents, String oldText, String newText) {
+		LooseMatch result = new LooseMatch();
+		String old = toLineBreak(oldText == null ? "" : oldText, false);
+		String neu = toLineBreak(newText == null ? "" : newText, false);
+		// 끝의 줄바꿈 하나는 "그 줄까지"라는 뜻이라 견줄 때 빼고, newText에서도 같이 뺍니다.
+		if (old.endsWith("\n")) {
+			old = old.substring(0, old.length() - 1);
+			if (neu.endsWith("\n")) {
+				neu = neu.substring(0, neu.length() - 1);
+			}
+		}
+		String[] oldLines = old.split("\n", -1);
+		boolean hasText = false;
+		for (String oldLine : oldLines) {
+			if (!oldLine.trim().isEmpty()) {
+				hasText = true;
+				break;
+			}
+		}
+		if (!hasText) {
+			return result;
+		}
+
+		// 파일을 줄로 나누고, 줄마다 시작 위치와 내용 끝 위치(줄바꿈 앞)를 기억합니다.
+		List<int[]> fileLines = new ArrayList<int[]>();
+		int from = 0;
+		while (true) {
+			int nl = contents.indexOf('\n', from);
+			if (nl < 0) {
+				fileLines.add(new int[] { from, contents.length() });
+				break;
+			}
+			int contentEnd = nl > from && contents.charAt(nl - 1) == '\r' ? nl - 1 : nl;
+			fileLines.add(new int[] { from, contentEnd });
+			from = nl + 1;
+		}
+		String[] fileNorm = new String[fileLines.size()];
+		for (int i = 0; i < fileNorm.length; i++) {
+			fileNorm[i] = normalize(contents.substring(fileLines.get(i)[0], fileLines.get(i)[1]));
+		}
+		String[] oldNorm = new String[oldLines.length];
+		for (int j = 0; j < oldLines.length; j++) {
+			oldNorm[j] = normalize(oldLines[j]);
+		}
+
+		int at = -1;
+		for (int i = 0; i + oldLines.length <= fileNorm.length; i++) {
+			boolean same = true;
+			for (int j = 0; j < oldLines.length; j++) {
+				if (!fileNorm[i + j].equals(oldNorm[j])) {
+					same = false;
+					break;
+				}
+			}
+			if (same) {
+				result.count++;
+				if (at < 0) {
+					at = i;
+				}
+			}
+		}
+		if (result.count != 1) {
+			return result;
+		}
+
+		// 모델이 쓴 들여쓰기 → 파일의 들여쓰기 짝을 모읍니다. 한 들여쓰기가 두 가지로 갈리면 쓰지 않습니다.
+		String[] fileText = new String[oldLines.length];
+		Map<String, String> indents = new LinkedHashMap<String, String>();
+		List<String> conflicts = new ArrayList<String>();
+		for (int j = 0; j < oldLines.length; j++) {
+			int[] range = fileLines.get(at + j);
+			fileText[j] = contents.substring(range[0], range[1]);
+			if (oldLines[j].trim().isEmpty()) {
+				continue;
+			}
+			String modelIndent = indentOf(oldLines[j]);
+			String fileIndent = indentOf(fileText[j]);
+			String known = indents.get(modelIndent);
+			if (known == null) {
+				indents.put(modelIndent, fileIndent);
+			} else if (!known.equals(fileIndent) && !conflicts.contains(modelIndent)) {
+				conflicts.add(modelIndent);
+			}
+		}
+
+		String lineBreak = contents.contains("\r\n") ? "\r\n" : "\n";
+		StringBuilder replacement = new StringBuilder();
+		if (!neu.isEmpty()) {
+			String[] newLines = neu.split("\n", -1);
+			for (int k = 0; k < newLines.length; k++) {
+				if (k > 0) {
+					replacement.append(lineBreak);
+				}
+				replacement.append(reindent(newLines[k], oldNorm, fileText, indents, conflicts));
+			}
+		}
+
+		result.start = fileLines.get(at)[0];
+		result.end = fileLines.get(at + oldLines.length - 1)[1];
+		// 지우기면 남는 빈 줄이 없게 그 줄의 줄바꿈까지 지웁니다.
+		if (neu.isEmpty() && result.end < contents.length()) {
+			result.end = contents.startsWith("\r\n", result.end) ? result.end + 2 : result.end + 1;
+		}
+		result.replacement = replacement.toString();
+		result.line = at + 1;
+		return result;
+	}
+
+	/** newText의 한 줄을 파일에 맞춥니다. looseMatch()의 설명을 보세요. */
+	private static String reindent(String newLine, String[] oldNorm, String[] fileText, Map<String, String> indents, List<String> conflicts) {
+		if (newLine.trim().isEmpty()) {
+			return newLine;
+		}
+		String norm = normalize(newLine);
+		for (int j = 0; j < oldNorm.length; j++) {
+			if (oldNorm[j].equals(norm)) {
+				return fileText[j];
+			}
+		}
+		String modelIndent = indentOf(newLine);
+		String fileIndent = indents.get(modelIndent);
+		if (fileIndent == null || conflicts.contains(modelIndent)) {
+			return newLine;
+		}
+		return fileIndent + newLine.substring(modelIndent.length());
+	}
+
+	/** 줄의 앞뒤 공백을 떼고, 줄 안의 공백 묶음을 한 칸으로 줄입니다. */
+	private static String normalize(String line) {
+		return SPACES.matcher(line.trim()).replaceAll(" ");
+	}
+
+	/** 줄 앞의 들여쓰기(공백과 탭)를 돌려줍니다. */
+	private static String indentOf(String line) {
+		int i = 0;
+		while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+			i++;
+		}
+		return line.substring(0, i);
 	}
 
 	/** 글자가 text 안에 겹치지 않게 몇 번 나오는지 셉니다. */
