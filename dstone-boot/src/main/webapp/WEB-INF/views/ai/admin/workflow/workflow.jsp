@@ -162,7 +162,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 								<th>내용/사유</th>
 								<th>문서</th>
 								<th>시각</th>
-								<th></th>
+								<th>재실행</th>
 							</tr>
 						</thead>
 						<tbody id="workflow-admin-history-body"></tbody>
