@@ -26,6 +26,7 @@ tools:
     - editFileTexts
     - appendFile
     - copyFileWithReplace
+    - searchInFiles
 execution:
   maxToolCalls: 100
 ---
