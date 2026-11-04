@@ -1,5 +1,6 @@
 package net.dstone.ai.api.service;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -243,7 +244,9 @@ public class WorkFlowExecutionService extends BaseService {
 	 *
 	 * clearState가 true면 그 step이 마지막으로 돈 자리부터 뒤에서 저장한 state 이름을 지우고 시작합니다.
 	 * false면 그대로 두는데, 다시 돌 때 경로가 달라지면 예전 값을 읽을 수 있습니다(rewindPoint()의 warnings).
-	 * 어느 쪽이든 그 구간의 아직 쓰지 않은 승인 결정은 지웁니다. step이 고친 파일은 되돌리지 않습니다.
+	 * 어느 쪽이든 그 구간의 아직 쓰지 않은 승인 결정은 지웁니다.
+	 * 그 구간의 step이 새로 만든 파일(산출물)은 실제로 지우고, 비게 된 폴더도 지웁니다(rewindPoint()의 deleteFiles).
+	 * 원래 있던 파일을 고친 것은 지우지도 되돌리지도 않습니다(keptFiles). 그 구간의 step 파일 기록도 지웁니다.
 	 * 실행 기록(step history)은 지우지 않고, 다시 돈 step이 그 뒤에 이어 붙습니다.
 	 * resume()처럼 끝날 때까지 기다리지 않습니다.
 	 * </pre>
@@ -275,10 +278,13 @@ public class WorkFlowExecutionService extends BaseService {
 			WorkFlowContext.clearApproval(context, stepId);
 		}
 		WorkFlowContext.setCurrentStep(context, point.fromStep());
+		List<String> deleted = this.deleteFiles(executionId, point.deleteFiles());
+		this.fileStore.deleteSteps(executionId, point.steps());
 		WorkFlowExecution rewound = execution.rewound(point.stepIndex());
 		this.executionStore.update(rewound);
 		this.info("workflow[" + workflow.id() + "] 실행[" + executionId + "]을 step[" + point.fromStep() + "]으로 되돌려 다시 돌립니다"
-			+ (clearState ? "(지운 state: " + point.savedNames() + ")." : "(state는 그대로 둡니다)."));
+			+ (clearState ? "(지운 state: " + point.savedNames() + ")" : "(state는 그대로 둡니다)")
+			+ " - 지운 파일 " + deleted.size() + "개: " + deleted);
 		CompletableFuture.runAsync(new Runnable() {
 			@Override
 			public void run() {
@@ -378,15 +384,29 @@ public class WorkFlowExecutionService extends BaseService {
 			warnings.add("step " + unknownSteps + "은 지금 정의에 없어, 그 step이 저장한 state 이름은 알 수 없습니다(지우지 못합니다).");
 		}
 
-		// 4) 그 구간의 step이 쓴 파일. 되돌려도 원래대로 돌아가지 않습니다.
-		List<String> writtenFiles = new ArrayList<>();
-		for (WorkFlowFileEntry entry : this.fileStore.list(execution.executionId())) {
-			if (FileAccessRule.WRITE.equals(entry.action()) && rangeSteps.contains(entry.stepId()) && !writtenFiles.contains(entry.path())) {
-				writtenFiles.add(entry.path());
+		// 4) 그 구간의 step이 쓴 파일. 새로 만든 파일은 지우고, 원래 있던 파일을 고친 것은 그대로 둡니다.
+		List<String> deleteFiles = new ArrayList<>();
+		List<String> keptFiles = new ArrayList<>();
+		List<WorkFlowFileEntry> fileEntries = this.fileStore.list(execution.executionId());
+		for (WorkFlowFileEntry entry : fileEntries) {
+			if (!FileAccessRule.WRITE.equals(entry.action()) || !rangeSteps.contains(entry.stepId())) {
+				continue;
+			}
+			if (createdByRun(entry, fileEntries)) {
+				if (!deleteFiles.contains(entry.path())) {
+					deleteFiles.add(entry.path());
+				}
+				keptFiles.remove(entry.path());
+			} else if (!deleteFiles.contains(entry.path()) && !keptFiles.contains(entry.path())) {
+				keptFiles.add(entry.path());
 			}
 		}
-		if (!writtenFiles.isEmpty()) {
-			warnings.add("이 구간의 step이 쓴 파일 " + writtenFiles.size() + "개는 원래대로 돌아가지 않습니다. 고친 파일을 다시 고치는 step은 원문을 찾지 못해 실패할 수 있습니다.");
+		if (!deleteFiles.isEmpty()) {
+			warnings.add("이 구간의 step이 새로 만든 파일 " + deleteFiles.size() + "개를 지웁니다(파일이 지워진 뒤 빈 폴더도 지웁니다).");
+		}
+		if (!keptFiles.isEmpty()) {
+			warnings.add("이 구간의 step이 고친 파일 " + keptFiles.size() + "개는 원래 있던 파일이라 지우지 않고, 원래대로 돌아가지도 않습니다. "
+				+ "고친 파일을 다시 고치는 step은 원문을 찾지 못해 실패할 수 있습니다.");
 		}
 
 		String startedVersion = WorkFlowContext.definitionVersion(execution.context());
@@ -394,7 +414,64 @@ public class WorkFlowExecutionService extends BaseService {
 			warnings.add("정의 버전이 시작할 때(" + startedVersion + ")와 다릅니다(지금 " + workflow.version() + "). 지금 정의로 다시 돕니다.");
 		}
 		StepDefinition step = definitionSteps.get(index);
-		return new RewindPoint(fromStep, step.type().name(), index, true, null, rangeSteps, savedNames, writtenFiles, warnings);
+		return new RewindPoint(fromStep, step.type().name(), index, true, null, rangeSteps, savedNames, deleteFiles, keptFiles, warnings);
+	}
+
+	/**
+	 * <pre>
+	 * 이 실행의 step이 새로 만든 파일의 기록인지 봅니다.
+	 * CREATED 열이 생기기 전의 기록(null)은 만들었는지 알 수 없어서, md 문서이고 이 실행에서 그 파일을 처음 건드린 것이
+	 * 이 쓰기 기록일 때만 만든 것으로 봅니다. 소스 파일이나 먼저 읽은 문서는 원래 있던 파일일 수 있어 지우지 않습니다.
+	 * </pre>
+	 *
+	 * @param entry   확인할 WRITE 기록
+	 * @param entries 이 실행의 파일 기록 전부
+	 */
+	private static boolean createdByRun(WorkFlowFileEntry entry, List<WorkFlowFileEntry> entries) {
+		if (entry.created() != null) {
+			return entry.created().booleanValue();
+		}
+		if (!entry.path().toLowerCase().endsWith(".md")) {
+			return false;
+		}
+		for (WorkFlowFileEntry other : entries) {
+			if (other != entry && other.path().equals(entry.path()) && other.firstAt() != null && entry.firstAt() != null
+				&& other.firstAt().isBefore(entry.firstAt())) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * <pre>
+	 * 재실행할 때 구간의 step이 새로 만든 파일을 지웁니다. 파일을 지운 뒤 비게 된 폴더도 위로 올라가며 지웁니다
+	 * (재실행 때마다 새 폴더를 만드는 Workflow가 빈 폴더를 남기지 않게). 비어 있지 않은 폴더를 만나면 멈춥니다.
+	 * 하나를 못 지워도 나머지는 계속 지우고, 경고 로그만 남깁니다. 지운 파일 목록을 돌려줍니다.
+	 * </pre>
+	 */
+	private List<String> deleteFiles(String executionId, List<String> paths) {
+		List<String> deleted = new ArrayList<>();
+		for (String path : paths) {
+			File file = new File(path);
+			if (!file.isFile()) {
+				continue;
+			}
+			if (!file.delete()) {
+				this.warn("실행[" + executionId + "] 재실행: 파일을 지우지 못했습니다 - " + path);
+				continue;
+			}
+			deleted.add(path);
+			File dir = file.getParentFile();
+			while (dir != null && dir.isDirectory()) {
+				String[] children = dir.list();
+				if (children == null || children.length > 0 || !dir.delete()) {
+					break;
+				}
+				dir = dir.getParentFile();
+			}
+		}
+		return deleted;
 	}
 
 	/** id로 step 정의를 찾습니다. 없으면 null입니다. */

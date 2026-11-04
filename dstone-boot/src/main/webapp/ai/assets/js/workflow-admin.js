@@ -7,7 +7,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 	var controlEl, controlMessageEl, controlWarningsEl, controlStatusEl, pauseBtn, resumeBtn;
 	var docsBodyEl, docsAllEl, docsCountEl;
-	var rewindEl, rewindMessageEl, rewindWarningsEl, rewindFilesEl, rewindClearLabelEl, rewindClearEl, rewindStatusEl, rewindRunBtn;
+	var rewindEl, rewindMessageEl, rewindWarningsEl, rewindFilesEl, rewindKeptEl, rewindClearLabelEl, rewindClearEl, rewindStatusEl, rewindRunBtn;
 	// [여기서 다시]로 고른 step의 미리보기(엔진 GET .../rewind 응답). 패널을 닫으면 비운다.
 	var currentRewind = null;
 
@@ -67,6 +67,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		rewindMessageEl = document.getElementById("workflow-admin-rewind-message");
 		rewindWarningsEl = document.getElementById("workflow-admin-rewind-warnings");
 		rewindFilesEl = document.getElementById("workflow-admin-rewind-files");
+		rewindKeptEl = document.getElementById("workflow-admin-rewind-kept");
 		rewindClearLabelEl = document.getElementById("workflow-admin-rewind-clear-label");
 		rewindClearEl = document.getElementById("workflow-admin-rewind-clear");
 		rewindStatusEl = document.getElementById("workflow-admin-rewind-status");
@@ -586,6 +587,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		rewindMessageEl.textContent = stepId + " step을 확인하는 중입니다...";
 		rewindWarningsEl.innerHTML = "";
 		rewindFilesEl.style.display = "none";
+		rewindKeptEl.style.display = "none";
 		rewindClearLabelEl.style.display = "none";
 		rewindStatusEl.textContent = "";
 		rewindRunBtn.disabled = true;
@@ -618,23 +620,29 @@ var DstoneAiWorkflowAdmin = (function () {
 			rewindWarningsEl.appendChild(li);
 		});
 
-		var files = point.writtenFiles || [];
-		rewindFilesEl.style.display = files.length > 0 ? "" : "none";
-		rewindFilesEl.open = false;
-		rewindFilesEl.querySelector("summary").textContent = "되돌려지지 않는 파일 " + files.length + "개 보기";
-		var fileList = rewindFilesEl.querySelector("ul");
-		fileList.innerHTML = "";
-		files.forEach(function (path) {
-			var li = document.createElement("li");
-			li.textContent = path;
-			fileList.appendChild(li);
-		});
+		fillFileList(rewindFilesEl, point.deleteFiles, "다시 실행하면 지우는 파일(이 구간에서 새로 만든 산출물) ");
+		fillFileList(rewindKeptEl, point.keptFiles, "지우지 않는 파일(원래 있던 파일을 고친 것, 원래대로 돌아가지 않음) ");
 
 		var names = point.savedNames || [];
 		rewindClearLabelEl.style.display = names.length > 0 ? "" : "none";
 		rewindClearEl.checked = false;
 		rewindClearLabelEl.querySelector("span").textContent = "남아 있는 state 값을 지우고 시작 (" + names.join(", ") + ")";
 		rewindRunBtn.disabled = false;
+	}
+
+	// 파일 목록 접기 칸을 채운다. 목록이 비면 칸을 숨긴다.
+	function fillFileList(detailsEl, paths, title) {
+		var files = paths || [];
+		detailsEl.style.display = files.length > 0 ? "" : "none";
+		detailsEl.open = false;
+		detailsEl.querySelector("summary").textContent = title + files.length + "개 보기";
+		var fileList = detailsEl.querySelector("ul");
+		fileList.innerHTML = "";
+		files.forEach(function (path) {
+			var li = document.createElement("li");
+			li.textContent = path;
+			fileList.appendChild(li);
+		});
 	}
 
 	function runRewind() {
@@ -645,8 +653,11 @@ var DstoneAiWorkflowAdmin = (function () {
 		var clear = rewindClearEl.checked && (point.savedNames || []).length > 0;
 		var message = point.fromStep + " step부터 다시 실행할까요?\n\n"
 			+ (clear ? "지울 state 값: " + point.savedNames.join(", ") : "state 값은 지우지 않습니다.");
-		if ((point.writtenFiles || []).length > 0) {
-			message += "\n이 구간에서 쓴 파일 " + point.writtenFiles.length + "개는 되돌려지지 않습니다.";
+		if ((point.deleteFiles || []).length > 0) {
+			message += "\n이 구간에서 새로 만든 파일 " + point.deleteFiles.length + "개를 실제로 지웁니다(되살릴 수 없습니다).";
+		}
+		if ((point.keptFiles || []).length > 0) {
+			message += "\n원래 있던 파일을 고친 " + point.keptFiles.length + "개는 지우지 않고, 원래대로 돌아가지도 않습니다.";
 		}
 		if (!window.confirm(message)) {
 			return;

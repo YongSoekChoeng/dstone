@@ -24,8 +24,9 @@ public class InMemoryWorkFlowFileStore extends WorkFlowFileStore {
 		private int accessCount;
 		private final Instant firstAt;
 		private Instant lastAt;
+		private boolean created;
 
-		private Row(String executionId, String stepId, String path, String action, Instant at) {
+		private Row(String executionId, String stepId, String path, String action, Instant at, boolean created) {
 			this.executionId = executionId;
 			this.stepId = stepId;
 			this.path = path;
@@ -33,22 +34,24 @@ public class InMemoryWorkFlowFileStore extends WorkFlowFileStore {
 			this.accessCount = 1;
 			this.firstAt = at;
 			this.lastAt = at;
+			this.created = created;
 		}
 	}
 
 	private final List<Row> rows = new ArrayList<Row>();
 
 	@Override
-	public synchronized void record(String executionId, String stepId, String path, String action) {
+	public synchronized void record(String executionId, String stepId, String path, String action, boolean created) {
 		Instant now = Instant.now();
 		for (Row row : this.rows) {
 			if (row.executionId.equals(executionId) && row.stepId.equals(stepId) && row.path.equals(path) && row.action.equals(action)) {
 				row.accessCount++;
 				row.lastAt = now;
+				row.created = row.created || created;
 				return;
 			}
 		}
-		this.rows.add(new Row(executionId, stepId, path, action, now));
+		this.rows.add(new Row(executionId, stepId, path, action, now, created));
 	}
 
 	@Override
@@ -56,10 +59,20 @@ public class InMemoryWorkFlowFileStore extends WorkFlowFileStore {
 		List<WorkFlowFileEntry> entries = new ArrayList<WorkFlowFileEntry>();
 		for (Row row : this.rows) {
 			if (row.executionId.equals(executionId)) {
-				entries.add(new WorkFlowFileEntry(row.stepId, row.path, row.action, row.accessCount, row.firstAt, row.lastAt));
+				entries.add(new WorkFlowFileEntry(row.stepId, row.path, row.action, row.accessCount, row.firstAt, row.lastAt, Boolean.valueOf(row.created)));
 			}
 		}
 		return entries;
+	}
+
+	@Override
+	public synchronized void deleteSteps(String executionId, List<String> stepIds) {
+		for (int i = this.rows.size() - 1; i >= 0; i--) {
+			Row row = this.rows.get(i);
+			if (row.executionId.equals(executionId) && stepIds.contains(row.stepId)) {
+				this.rows.remove(i);
+			}
+		}
 	}
 
 	@Override

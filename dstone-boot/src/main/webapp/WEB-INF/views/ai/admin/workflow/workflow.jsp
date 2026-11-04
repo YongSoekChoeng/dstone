@@ -123,7 +123,12 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<div class="wa-control-text">
 						<div id="workflow-admin-rewind-message"></div>
 						<ul id="workflow-admin-rewind-warnings" class="wa-control-warnings"></ul>
+						<%-- 구간의 step이 새로 만든 파일(재실행할 때 지운다)과 원래 있던 파일을 고친 것(그대로 둔다) --%>
 						<details id="workflow-admin-rewind-files" class="wa-rewind-files" style="display:none;">
+							<summary></summary>
+							<ul></ul>
+						</details>
+						<details id="workflow-admin-rewind-kept" class="wa-rewind-files" style="display:none;">
 							<summary></summary>
 							<ul></ul>
 						</details>

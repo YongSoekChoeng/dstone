@@ -351,9 +351,11 @@ public class ConfigTool extends BaseObject {
 			if (this.isCutOff(toolInput)) {
 				return this.logged(toolInput, CUT_OFF_ARGUMENT_MESSAGE);
 			}
+			// 쓰는 Tool이면 부르기 전에 없던 파일을 봐 둡니다. 재실행 때 이 실행이 새로 만든 파일만 지우기 위해서입니다.
+			List<String> missingBefore = this.fileRecorder.missingBefore(this.delegate.getToolDefinition().name(), toolInput, toolContext);
 			String result = this.delegate.call(toolInput, toolContext);
 			// Workflow step에서 부른 파일 Tool이면 어떤 파일을 읽고 썼는지 남깁니다(자르기 전의 답으로 성공 여부를 봅니다).
-			this.fileRecorder.record(this.delegate.getToolDefinition().name(), toolInput, result, toolContext);
+			this.fileRecorder.record(this.delegate.getToolDefinition().name(), toolInput, result, toolContext, missingBefore);
 			return this.logged(toolInput, this.limit(result));
 		}
 

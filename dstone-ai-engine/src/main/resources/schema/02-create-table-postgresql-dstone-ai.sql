@@ -58,6 +58,8 @@ Workflow 실행 중에 step이 읽고 쓴 파일의 목록이다. 파일 Tool(wr
 runtime.workflow.file.WorkFlowFileRecorder가 남긴다. 실행 관리 화면이 step별 문서를 보여 주고 고칠 때 이 목록을 쓴다.
 같은 (실행, step, 경로, 동작)은 한 행으로 합치고 횟수와 마지막 시각만 바꾼다(재분석으로 step이 다시 돌아도 행이 늘지 않는다).
 파일 내용은 저장하지 않는다. 화면이 열 때마다 파일에서 바로 읽는다.
+CREATED는 그 step이 없던 파일을 새로 만들었는지다. 재실행 때 이 실행이 만든 파일만 지우는 데 쓴다
+(원래 있던 소스를 고친 파일은 지우지 않는다).
 **********************************************/
 CREATE TABLE IF NOT EXISTS AI_WORKFLOW_EXECUTION_FILE (
     EXECUTION_ID   VARCHAR(36) NOT NULL REFERENCES AI_WORKFLOW_EXECUTION(EXECUTION_ID),
@@ -67,5 +69,6 @@ CREATE TABLE IF NOT EXISTS AI_WORKFLOW_EXECUTION_FILE (
     ACCESS_COUNT   INT NOT NULL DEFAULT 1,
     FIRST_AT       TIMESTAMPTZ NOT NULL DEFAULT now(),
     LAST_AT        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CREATED        BOOLEAN,                           -- WRITE일 때 이 step이 새로 만든 파일이면 true(이 열이 생기기 전 기록은 NULL)
     PRIMARY KEY (EXECUTION_ID, STEP_ID, FILE_PATH, ACTION)
 );

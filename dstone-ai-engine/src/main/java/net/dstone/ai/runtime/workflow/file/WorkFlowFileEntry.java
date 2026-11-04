@@ -14,6 +14,7 @@ import java.time.Instant;
  * @param accessCount 이 step이 이 파일을 건드린 횟수
  * @param firstAt     처음 건드린 시각
  * @param lastAt      마지막으로 건드린 시각
+ * @param created     WRITE일 때 이 step이 없던 파일을 새로 만들었는지(이 기록이 생기기 전의 행은 null)
  */
-public record WorkFlowFileEntry(String stepId, String path, String action, int accessCount, Instant firstAt, Instant lastAt) {
+public record WorkFlowFileEntry(String stepId, String path, String action, int accessCount, Instant firstAt, Instant lastAt, Boolean created) {
 }

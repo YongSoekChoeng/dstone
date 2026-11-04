@@ -10,6 +10,9 @@ import java.util.List;
  * 되돌리는 구간은 "이 step이 마지막으로 돈 자리부터 실행 기록의 끝까지"입니다.
  * 그 구간의 step이 저장한 state 이름(savedNames)은 지우지 않으면 그대로 남아,
  * 다시 돌 때 경로가 달라지면 예전 값을 읽을 수 있습니다.
+ *
+ * 그 구간의 step이 새로 만든 파일(deleteFiles)은 되돌릴 때 실제로 지웁니다. 원래 있던 파일을 고친 것(keptFiles)은
+ * 지우지도, 원래대로 돌리지도 않습니다.
  * </pre>
  *
  * @param fromStep     다시 시작할 step의 id입니다.
@@ -19,11 +22,12 @@ import java.util.List;
  * @param problem      되돌릴 수 없는 이유입니다(되돌릴 수 있으면 null).
  * @param steps        되돌리는 구간에서 돈 step id들입니다(실행 기록 순서, 중복 없음).
  * @param savedNames   그 구간의 step이 저장해서 지금 state에 남아 있는 이름들입니다. clearState로 지울 수 있습니다.
- * @param writtenFiles 그 구간의 step이 쓴 파일들입니다. 되돌려도 원래대로 돌아가지 않습니다.
+ * @param deleteFiles  그 구간의 step이 새로 만든 파일들입니다. 되돌릴 때 지웁니다.
+ * @param keptFiles    그 구간의 step이 고쳤지만 원래 있던 파일들입니다. 지우지 않고, 원래대로 돌아가지도 않습니다.
  * @param warnings     되돌릴 수는 있지만 사람이 알아야 할 점입니다.
  */
 public record RewindPoint(String fromStep, String stepType, int stepIndex, boolean rewindable, String problem, List<String> steps, List<String> savedNames,
-	List<String> writtenFiles, List<String> warnings) {
+	List<String> deleteFiles, List<String> keptFiles, List<String> warnings) {
 
 	/**
 	 * 되돌릴 수 없을 때의 값을 만듭니다.
@@ -32,7 +36,7 @@ public record RewindPoint(String fromStep, String stepType, int stepIndex, boole
 	 * @param problem  되돌릴 수 없는 이유입니다.
 	 */
 	public static RewindPoint blocked(String fromStep, String problem) {
-		return new RewindPoint(fromStep, null, -1, false, problem, List.of(), List.of(), List.of(), List.of());
+		return new RewindPoint(fromStep, null, -1, false, problem, List.of(), List.of(), List.of(), List.of(), List.of());
 	}
 
 }

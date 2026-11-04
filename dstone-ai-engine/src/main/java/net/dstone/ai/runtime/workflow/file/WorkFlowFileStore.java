@@ -26,6 +26,7 @@ import net.dstone.ai.common.biz.BaseDao;
  *     ACCESS_COUNT   건드린 횟수
  *     FIRST_AT       처음 건드린 시각
  *     LAST_AT        마지막으로 건드린 시각
+ *     CREATED        WRITE일 때 이 step이 새로 만든 파일인지(이 열이 생기기 전 기록은 NULL)
  * </pre>
  */
 @Repository
@@ -40,14 +41,16 @@ public class WorkFlowFileStore extends BaseDao {
 	 * @param stepId      step id
 	 * @param path        파일 경로
 	 * @param action      READ 또는 WRITE
+	 * @param created     WRITE일 때 이 호출 전에는 없던 파일이면 true
 	 */
-	public void record(String executionId, String stepId, String path, String action) {
+	public void record(String executionId, String stepId, String path, String action, boolean created) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("executionId", executionId);
 		param.put("stepId", stepId);
 		param.put("filePath", path);
 		param.put("action", action);
 		param.put("accessedAt", Timestamp.from(Instant.now()));
+		param.put("created", Boolean.valueOf(created));
 		this.sqlSessionCommon.insert(NS + "upsertFile", param);
 	}
 
@@ -62,7 +65,8 @@ public class WorkFlowFileStore extends BaseDao {
 				(String) row.get("action"),
 				row.get("accessCount") == null ? 0 : ((Number) row.get("accessCount")).intValue(),
 				this.toInstant(row.get("firstAt")),
-				this.toInstant(row.get("lastAt"))));
+				this.toInstant(row.get("lastAt")),
+				(Boolean) row.get("created")));
 		}
 		return entries;
 	}
@@ -79,6 +83,22 @@ public class WorkFlowFileStore extends BaseDao {
 		param.put("filePath", path);
 		Long count = this.sqlSessionCommon.selectOne(NS + "countFile", param);
 		return count != null && count.longValue() > 0;
+	}
+
+	/**
+	 * 재실행할 때 되돌리는 구간의 step 기록을 지웁니다. 그 step이 다시 돌면서 새로 남깁니다.
+	 *
+	 * @param executionId 실행 id
+	 * @param stepIds     기록을 지울 step id들(비어 있으면 아무것도 하지 않습니다)
+	 */
+	public void deleteSteps(String executionId, List<String> stepIds) {
+		if (stepIds == null || stepIds.isEmpty()) {
+			return;
+		}
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("executionId", executionId);
+		param.put("stepIds", stepIds);
+		this.sqlSessionCommon.delete(NS + "deleteStepFiles", param);
 	}
 
 	/** DB에서 읽은 시각(TIMESTAMPTZ)을 Instant로 바꿉니다. */

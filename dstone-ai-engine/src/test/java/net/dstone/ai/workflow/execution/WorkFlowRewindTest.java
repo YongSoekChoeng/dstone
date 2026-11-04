@@ -3,7 +3,16 @@ package net.dstone.ai.workflow.execution;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.ai.api.dto.RewindPoint;
@@ -11,6 +20,8 @@ import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.runtime.workflow.file.WorkFlowFileEntry;
+import net.dstone.ai.runtime.workflow.file.WorkFlowFileStore;
 import net.dstone.ai.support.WorkflowTestBase;
 
 /**
@@ -22,6 +33,14 @@ import net.dstone.ai.support.WorkflowTestBase;
 public class WorkFlowRewindTest extends WorkflowTestBase {
 
 	private static final String TOOL_WORKFLOW = "sample-tool-chain-basic";
+	/** 원래 있던 파일을 고치고(apply) 보고서를 새로 만드는(report) Workflow입니다. */
+	private static final String EDIT_REPORT = "sample-tool-edit-report";
+
+	@Autowired
+	private WorkFlowFileStore workFlowFileStore;
+
+	@TempDir
+	Path workDir;
 
 	/** 비동기로 다시 돈 실행이 RUNNING을 벗어날 때까지 기다립니다. */
 	private WorkFlowExecution await(String executionId) throws InterruptedException {
@@ -116,6 +135,49 @@ public class WorkFlowRewindTest extends WorkflowTestBase {
 		assertThat(first.status()).isEqualTo(WorkFlowExecutionStatus.RUNNING);
 
 		assertThat(this.workFlowExecutionService.rewindPoint(first, "validate").problem()).contains("돌고 있는");
+	}
+
+	@Test
+	void 되돌리면_구간의_step이_새로_만든_파일과_빈_폴더를_지우고_고친_파일은_남긴다() throws Exception {
+		File source = this.workDir.resolve("a.txt").toFile();
+		Files.write(source.toPath(), "hello world\n".getBytes(StandardCharsets.UTF_8));
+		File reportDir = this.workDir.resolve("run1/out").toFile();
+		File report = new File(reportDir, "report.md");
+		File report2 = this.workDir.resolve("run2/report.md").toFile();
+
+		WorkFlowExecution done = this.run(EDIT_REPORT, this.json(this.editReportInput(source, report)));
+		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+		assertThat(report).isFile();
+
+		RewindPoint point = this.workFlowExecutionService.rewindPoint(done, "apply");
+		assertThat(point.deleteFiles()).containsExactly(path(report));
+		assertThat(point.keptFiles()).containsExactly(path(source));
+
+		// 다시 돌 때는 다른 곳에 보고서를 쓰게 해서, 지운 파일이 다시 생기지 않게 합니다.
+		this.changeInput(done, this.json(this.editReportInput(source, report2)));
+		this.workFlowExecutionService.rewind(done.executionId(), "apply", false);
+		WorkFlowExecution again = this.await(done.executionId());
+
+		assertThat(again.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+		assertThat(report).doesNotExist();
+		assertThat(this.workDir.resolve("run1").toFile()).doesNotExist();
+		assertThat(source).isFile();
+		assertThat(report2).isFile();
+		// 되돌린 구간의 예전 기록은 지워지고, 다시 돈 step의 기록만 남습니다.
+		List<String> paths = new ArrayList<>();
+		for (WorkFlowFileEntry entry : this.workFlowFileStore.list(done.executionId())) {
+			paths.add(entry.path());
+		}
+		assertThat(paths).contains(path(report2)).doesNotContain(path(report));
+	}
+
+	private String editReportInput(File source, File report) {
+		return "{\"reportPath\": \"" + path(report) + "\", \"changes\": [{\"path\": \"" + path(source)
+			+ "\", \"edits\": [{\"append\": true, \"after\": \"끝\"}]}]}";
+	}
+
+	private static String path(File file) {
+		return file.getAbsolutePath().replace('\\', '/');
 	}
 
 	/** 새 실행을 저장만 하고 돌리지는 않습니다. */
