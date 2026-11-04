@@ -8,6 +8,7 @@ import net.dstone.ai.common.definition.workflow.step.AgentStepDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.runtime.agent.AgentExecutor;
+import net.dstone.ai.runtime.tool.StepRef;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
@@ -59,6 +60,7 @@ public class AgentStepExecutor {
 					, null								// toolsOverride false면 이번 호출만 Tool 없이 부름(null이면 Agent의 tools 목록 그대로)
 					, null								// modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 					, null								// engineRule 엔진 규칙에 덧붙일 문구. AGENT step은 공통 규칙만 씁니다
+					, new StepRef(execution.executionId(), step.id())	// stepRef. 이 step이 읽고 쓴 파일을 기록하는 데 씁니다
 				)
 			);
 		} catch (AgentContractException e) {

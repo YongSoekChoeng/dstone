@@ -16,6 +16,7 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.prompt.EnginePrompt;
+import net.dstone.ai.runtime.tool.StepRef;
 import net.dstone.common.utils.LogUtil;
 
 /**
@@ -72,6 +73,7 @@ public class SubAgentToolCallback implements ToolCallback {
 	private final int maxCalls;
 	private final boolean wrapped;
 	private final SubAgentTasks tasks;
+	private final StepRef stepRef;
 	private final ToolDefinition toolDefinition;
 
 	/**
@@ -82,8 +84,9 @@ public class SubAgentToolCallback implements ToolCallback {
 	 * @param callCount     부모 호출 한 번 안에서 Sub Agent를 부른 횟수입니다. 부모에 붙은 Sub Agent들이 함께 씁니다.
 	 * @param maxCalls      위 횟수의 상한입니다.
 	 * @param tasks         백그라운드로 맡긴 일을 들고 있는 곳입니다. null이면 백그라운드로 맡길 수 없습니다(인자에 run_in_background가 없음).
+	 * @param stepRef       부모를 부른 Workflow 실행과 step입니다. 자식의 Tool 호출도 이 step의 것으로 기록됩니다. Workflow 밖이면 null입니다.
 	 */
-	public SubAgentToolCallback(AgentExecutor agentExecutor, String parentId, AgentDefinition subAgent, String caller, AtomicInteger callCount, int maxCalls, SubAgentTasks tasks) {
+	public SubAgentToolCallback(AgentExecutor agentExecutor, String parentId, AgentDefinition subAgent, String caller, AtomicInteger callCount, int maxCalls, SubAgentTasks tasks, StepRef stepRef) {
 		this.agentExecutor = agentExecutor;
 		this.parentId = parentId;
 		this.subAgent = subAgent;
@@ -92,6 +95,7 @@ public class SubAgentToolCallback implements ToolCallback {
 		this.maxCalls = maxCalls;
 		this.wrapped = !JsonSchemaUtil.OBJECT.equals(JsonSchemaUtil.typeOf(subAgent.inputSchema()));
 		this.tasks = tasks;
+		this.stepRef = stepRef;
 		String description = subAgent.description();
 		if (tasks != null) {
 			description = description + "\n(" + BACKGROUND_FIELD + "=true로 부르면 끝나길 기다리지 않고 task_id를 바로 받습니다. 결과는 " + SubAgentTasks.OUTPUT_TOOL_NAME + "로 받습니다.)";
@@ -212,6 +216,7 @@ public class SubAgentToolCallback implements ToolCallback {
 				, null					// toolsOverride
 				, null					// modelOverride
 				, EnginePrompt.SUB_AGENT
+				, this.stepRef			// 자식의 Tool 호출도 부모 step의 것으로 기록합니다.
 			);
 			String result = JsonSchemaUtil.toText(output);
 			LogUtil.sysout(label + " 호출 끝 - " + (System.currentTimeMillis() - startedAt) + "ms, 결과 " + (result == null ? 0 : result.length()) + "자");

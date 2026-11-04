@@ -1046,6 +1046,334 @@ label.wd-check {
 	gap: 8px;
 }
 
+/* ---------- Workflow 실행 관리: step 문서 ---------- */
+
+/* 스텝 이력의 '문서' 칸에 다는 파일 이름 단추. 작성한 파일은 색을 채우고, 읽기만 한 파일은 테두리만 둡니다. */
+.ai-body .document-list-table button.wa-doc-chip {
+	height: auto;
+	max-width: 100%;
+	margin: 0 4px 4px 0;
+	padding: 3px 8px;
+	border: 1px solid var(--cs-primary);
+	border-radius: 999px;
+	background: var(--cs-surface);
+	color: var(--cs-primary);
+	box-shadow: none;
+	font-size: 12px;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ai-body .document-list-table button.wa-doc-chip-write {
+	background: var(--cs-primary-soft);
+}
+
+.ai-body .document-list-table button.wa-doc-chip:hover {
+	background: var(--cs-primary);
+	color: #fff;
+}
+
+.ai-body .document-list-table button.wa-doc-chip-missing,
+.ai-body .document-list-table button.wa-doc-chip-missing:hover {
+	border-color: var(--cs-border);
+	background: var(--cs-surface-3);
+	color: var(--cs-faint);
+	text-decoration: line-through;
+}
+
+.wa-docs-all {
+	float: right;
+	font-size: 13px;
+	font-weight: 400;
+	color: var(--cs-text-2);
+	cursor: pointer;
+}
+
+.wa-doc-name {
+	font-weight: 600;
+	color: var(--cs-text);
+}
+
+.wa-doc-path-text {
+	font-family: var(--cs-mono);
+	font-size: 11px;
+	color: var(--cs-muted);
+}
+
+/* 팝업 바탕. 화면 전체를 덮고 가운데에 상자를 둡니다. */
+.wa-doc-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 1200;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 38, 0.45);
+}
+
+.wa-doc-modal[hidden],
+.wa-doc-modal [hidden] {
+	display: none !important;
+}
+
+/* 팝업이 떠 있는 동안 뒤쪽 화면이 스크롤되지 않게 합니다. */
+body.wa-doc-open {
+	overflow: hidden;
+}
+
+.wa-doc-box {
+	display: flex;
+	flex-direction: column;
+	width: min(1180px, 96vw);
+	height: min(860px, 92vh);
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-lg);
+	overflow: hidden;
+	animation: wa-doc-in 0.14s ease-out;
+}
+
+@keyframes wa-doc-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wa-doc-box { animation: none; }
+}
+
+.wa-doc-modal.wa-full {
+	padding: 0;
+}
+
+.wa-doc-modal.wa-full .wa-doc-box {
+	width: 100vw;
+	height: 100vh;
+	border-radius: 0;
+}
+
+.wa-doc-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 16px;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.wa-doc-titles {
+	flex: 1 1 280px;
+	min-width: 0;
+}
+
+.wa-doc-title {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--cs-text);
+	overflow-wrap: anywhere;
+}
+
+/* 저장하지 않은 변경이 있으면 제목 앞에 점을 찍습니다. */
+.wa-doc-dirty .wa-doc-title::before {
+	content: "\25CF  ";
+	color: var(--cs-warning);
+}
+
+.wa-doc-path {
+	margin-top: 2px;
+	font-family: var(--cs-mono);
+	font-size: 11px;
+	color: var(--cs-muted);
+	overflow-wrap: anywhere;
+}
+
+.wa-doc-tabs {
+	display: inline-flex;
+	padding: 3px;
+	background: var(--cs-surface-3);
+	border-radius: var(--cs-radius);
+}
+
+.ai-body .wa-doc-tabs button {
+	height: 30px;
+	padding: 0 16px;
+	border: 0;
+	background: transparent;
+	color: var(--cs-text-2);
+	box-shadow: none;
+}
+
+.ai-body .wa-doc-tabs button:hover {
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.ai-body .wa-doc-tabs button.on {
+	background: var(--cs-surface);
+	color: var(--cs-primary);
+	box-shadow: var(--cs-shadow-sm);
+}
+
+.ai-body .wa-doc-tabs button:disabled {
+	background: transparent;
+	color: var(--cs-faint);
+}
+
+.wa-doc-head-buttons {
+	display: flex;
+	gap: 6px;
+}
+
+.wa-doc-notice {
+	padding: 8px 16px;
+	background: var(--cs-surface-2);
+	border-bottom: 1px solid var(--cs-border);
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--cs-text-2);
+}
+
+.wa-doc-notice-warn {
+	color: var(--cs-warning);
+}
+
+.wa-doc-notice-info {
+	color: var(--cs-info);
+}
+
+.wa-doc-body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+}
+
+/* 보기: GitHub처럼 읽기 좋은 폭으로 가운데에 둡니다. */
+.wa-doc-view {
+	flex: 1;
+	min-width: 0;
+	overflow: auto;
+	padding: 28px max(24px, calc((100% - 900px) / 2));
+	scroll-behavior: smooth;
+}
+
+/* 수정: 왼쪽 원문, 오른쪽 미리보기. 좁은 화면에서는 위아래로 놓습니다. */
+.wa-doc-edit {
+	flex: 1;
+	min-width: 0;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+}
+
+.ai-body textarea.wa-doc-text {
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	margin: 0;
+	padding: 16px;
+	border: 0;
+	border-right: 1px solid var(--cs-border);
+	border-radius: 0;
+	background: var(--cs-surface-2);
+	box-shadow: none;
+	resize: none;
+	font-family: var(--cs-mono);
+	font-size: 13px;
+	line-height: 1.6;
+	tab-size: 4;
+}
+
+.ai-body textarea.wa-doc-text:focus {
+	box-shadow: inset 0 0 0 2px var(--cs-primary-ring);
+}
+
+.wa-doc-preview {
+	min-width: 0;
+	overflow: auto;
+	padding: 16px 24px;
+}
+
+/* github-markdown-css 위에 이 화면의 글꼴만 맞춥니다. */
+.wa-doc-modal .markdown-body {
+	font-family: var(--cs-font);
+	font-size: 14px;
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.wa-doc-modal .markdown-body pre,
+.wa-doc-modal .markdown-body code {
+	font-family: var(--cs-mono);
+}
+
+/* highlight.js가 칠한 코드 블록은 GitHub 코드 블록 배경을 그대로 씁니다. */
+.wa-doc-modal .markdown-body pre code.hljs {
+	padding: 0;
+	background: transparent;
+}
+
+.wa-doc-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 10px 16px;
+	border-top: 1px solid var(--cs-border);
+	background: var(--cs-surface-2);
+}
+
+.wa-doc-meta {
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.wa-doc-status {
+	flex: 1;
+	min-width: 160px;
+	text-align: right;
+	font-size: 12px;
+	color: var(--cs-text-2);
+}
+
+.wa-doc-status.wa-doc-status-failed {
+	color: var(--cs-danger);
+	font-weight: 600;
+}
+
+@media (max-width: 760px) {
+	.wa-doc-modal {
+		padding: 0;
+	}
+
+	.wa-doc-box {
+		width: 100vw;
+		height: 100vh;
+		border-radius: 0;
+	}
+
+	.wa-doc-edit {
+		grid-template-columns: 1fr;
+		grid-template-rows: 1fr 1fr;
+	}
+
+	.ai-body textarea.wa-doc-text {
+		border-right: 0;
+		border-bottom: 1px solid var(--cs-border);
+	}
+
+	.wa-doc-view {
+		padding: 16px;
+	}
+
+	.wa-docs-all {
+		float: none;
+		display: block;
+		margin-top: 4px;
+	}
+}
+
 /* ---------- 알림 줄 ---------- */
 
 .kn-message,

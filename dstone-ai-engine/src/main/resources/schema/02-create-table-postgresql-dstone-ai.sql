@@ -50,3 +50,22 @@ CREATE TABLE AI_WORKFLOW_EXECUTION_STEP_HISTORY (
 CREATE INDEX IDX_AI_WORKFLOW_EXECUTION_STEP_HISTORY_EXEC ON AI_WORKFLOW_EXECUTION_STEP_HISTORY(EXECUTION_ID);
   
   
+
+/**********************************************
+AI_WORKFLOW_EXECUTION_FILE
+
+Workflow 실행 중에 step이 읽고 쓴 파일의 목록이다. 파일 Tool(writeFile, readFile 등)이 성공할 때마다
+runtime.workflow.file.WorkFlowFileRecorder가 남긴다. 실행 관리 화면이 step별 문서를 보여 주고 고칠 때 이 목록을 쓴다.
+같은 (실행, step, 경로, 동작)은 한 행으로 합치고 횟수와 마지막 시각만 바꾼다(재분석으로 step이 다시 돌아도 행이 늘지 않는다).
+파일 내용은 저장하지 않는다. 화면이 열 때마다 파일에서 바로 읽는다.
+**********************************************/
+CREATE TABLE IF NOT EXISTS AI_WORKFLOW_EXECUTION_FILE (
+    EXECUTION_ID   VARCHAR(36) NOT NULL REFERENCES AI_WORKFLOW_EXECUTION(EXECUTION_ID),
+    STEP_ID        VARCHAR(100) NOT NULL,
+    FILE_PATH      VARCHAR(1000) NOT NULL,
+    ACTION         VARCHAR(10) NOT NULL,              -- READ / WRITE
+    ACCESS_COUNT   INT NOT NULL DEFAULT 1,
+    FIRST_AT       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    LAST_AT        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (EXECUTION_ID, STEP_ID, FILE_PATH, ACTION)
+);

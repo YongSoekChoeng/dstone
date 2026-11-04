@@ -10,11 +10,12 @@ import org.springframework.stereotype.Service;
 import net.dstone.boot.ai.vo.admin.WorkFlowDecisionRequest;
 import net.dstone.boot.ai.vo.admin.WorkFlowExecutionDetailResult;
 import net.dstone.boot.ai.vo.admin.WorkFlowExecutionPageResult;
+import net.dstone.boot.ai.vo.admin.WorkFlowFileSaveRequest;
 import net.dstone.common.config.ConfigProperty;
 
 /**
  * dstone-ai-engine의 Workflow 실행 조회/승인/일시정지/재개 API(GET /executions, GET /executions/{id}, POST
- * .../decision, .../pause, .../resume)를 그대로 호출하는 관리자 화면 전용 서비스다. 개발자용 WorkFlowTestService(submit/status)와
+ * .../decision, .../pause, .../resume)와 step 문서 조회/저장 API(.../files, .../files/content)를 그대로 호출하는 관리자 화면 전용 서비스다. 개발자용 WorkFlowTestService(submit/status)와
  * 달리, 이미 시작된 실행을 보고 판단·조작하는 쪽이다.
  */
 @Service
@@ -67,6 +68,60 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}", executionId)
 				.retrieve()
 				.bodyToMono(WorkFlowExecutionDetailResult.class)
+				.block();
+	}
+
+	/**
+	 * <pre>
+	 * 실행의 step들이 읽고 쓴 파일 목록을 엔진에서 받아 JSON 글자 그대로 돌려줍니다(GET .../executions/{id}/files).
+	 * 화면이 응답을 그대로 쓰므로 VO로 바꾸지 않습니다. 엔진이 거절하면 WebClientResponseException이 납니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 */
+	public String files(String executionId) {
+		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		// 개발 step은 소스 파일을 많이 읽어서 목록이 길어질 수 있습니다.
+		return this.getLargeResponseWebClient().get()
+				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/files", executionId)
+				.retrieve()
+				.bodyToMono(String.class)
+				.block();
+	}
+
+	/**
+	 * 실행이 건드린 파일 하나의 내용을 엔진에서 받아 JSON 글자 그대로 돌려줍니다(GET .../files/content).
+	 *
+	 * @param executionId 실행 id
+	 * @param path        파일 경로(목록에 나온 값)
+	 */
+	public String fileContent(String executionId, String path) {
+		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		// 문서가 256KB를 넘을 수 있어서 큰 응답용 WebClient를 씁니다(엔진은 2MB까지 보내 줍니다).
+		return this.getLargeResponseWebClient().get()
+				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/files/content?path={path}", executionId, path)
+				.retrieve()
+				.bodyToMono(String.class)
+				.block();
+	}
+
+	/**
+	 * 화면에서 고친 파일을 엔진에 저장합니다(POST .../files/content). 저장한 뒤의 내용을 JSON 글자 그대로 돌려줍니다.
+	 *
+	 * @param request 실행 id, 파일 경로, 새 내용, 열 때 받은 hash
+	 */
+	public String saveFileContent(WorkFlowFileSaveRequest request) {
+		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("path", request.path());
+		body.put("text", request.text());
+		body.put("baseHash", request.baseHash());
+		return this.getLargeResponseWebClient().post()
+				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/files/content", request.executionId())
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(body)
+				.retrieve()
+				.bodyToMono(String.class)
 				.block();
 	}
 

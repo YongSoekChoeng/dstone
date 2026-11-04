@@ -16,6 +16,7 @@ import net.dstone.boot.ai.service.admin.WorkFlowAdminService;
 import net.dstone.boot.ai.vo.admin.WorkFlowDecisionRequest;
 import net.dstone.boot.ai.vo.admin.WorkFlowExecutionDetailResult;
 import net.dstone.boot.ai.vo.admin.WorkFlowExecutionPageResult;
+import net.dstone.boot.ai.vo.admin.WorkFlowFileSaveRequest;
 import net.dstone.common.utils.StringUtil;
 
 /**
@@ -61,6 +62,57 @@ public class WorkFlowAdminController extends net.dstone.boot.common.biz.BaseCont
 		} catch (WebClientResponseException e) {
 			return this.rejected(e);
 		}
+	}
+
+	/**
+	 * 실행의 step들이 읽고 쓴 파일 목록이다. 엔진의 응답을 그대로 넘긴다.
+	 *
+	 * @param executionId 실행 id
+	 */
+	@PostMapping("/files.do")
+	public ResponseEntity<Object> files(@RequestParam String executionId) {
+		try {
+			return this.json(this.workFlowAdminService.files(executionId));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 문서 팝업이 여는 파일 하나의 내용이다. 그 실행이 건드린 파일이 아니면 엔진이 400으로 거절한다.
+	 *
+	 * @param executionId 실행 id
+	 * @param path        파일 경로(목록에 나온 값)
+	 */
+	@PostMapping("/fileContent.do")
+	public ResponseEntity<Object> fileContent(@RequestParam String executionId, @RequestParam String path) {
+		try {
+			return this.json(this.workFlowAdminService.fileContent(executionId, path));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 문서 팝업에서 고친 내용을 저장한다. 저장이 꺼져 있으면 403, 실행 중이거나 연 뒤 파일이 바뀌었으면 409를 그대로 전한다.
+	 *
+	 * @param request 실행 id, 파일 경로, 새 내용, 열 때 받은 hash
+	 */
+	@PostMapping("/saveFile.do")
+	public ResponseEntity<Object> saveFile(@RequestBody WorkFlowFileSaveRequest request) {
+		if (StringUtil.isEmpty(request.executionId()) || StringUtil.isEmpty(request.path())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "executionId와 path는 필수입니다.");
+		}
+		try {
+			return this.json(this.workFlowAdminService.saveFileContent(request));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/** 엔진이 준 JSON 글자를 그대로 200으로 돌려준다. */
+	private ResponseEntity<Object> json(String body) {
+		return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body((Object) body);
 	}
 
 	/**

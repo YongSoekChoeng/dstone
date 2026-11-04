@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
+import net.dstone.ai.runtime.tool.StepRef;
 import net.dstone.ai.runtime.tool.ToolExecutor;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
@@ -48,7 +49,7 @@ public class ToolStepExecutor {
 	 */
 	@SuppressWarnings("unchecked")
 	public StepOutcome run(WorkFlowExecution execution, ToolStepDefinition step, Map<String, Object> arguments) {
-		String toolResult = this.toolExecutor.call(execution.caller(), step.tool(), this.toJson(arguments));
+		String toolResult = this.toolExecutor.call(execution.caller(), new StepRef(execution.executionId(), step.id()), step.tool(), this.toJson(arguments));
 		Object output = this.parse(toolResult);
 
 		if (output instanceof Map && ((Map<String, Object>) output).get("success") instanceof Boolean success) {

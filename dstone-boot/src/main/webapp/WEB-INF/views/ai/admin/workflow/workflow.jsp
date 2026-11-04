@@ -6,6 +6,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 <html>
 
 <jsp:include page="../../common/head.jsp"></jsp:include>
+<%-- step 문서 팝업: Markdown 모양(GitHub 스타일)과 코드 색칠. 라이브러리는 폐쇄망에서도 열리도록 앱 안에 들어 있다 --%>
+<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/github-markdown-light.css" />
+<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/highlight-github.min.css" />
 
 <body class="ai-body">
 	<div id="page-wrapper">
@@ -21,6 +24,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<p class="cs-eyebrow">AI</p>
 				<h2>Workflow 실행 관리</h2>
 				<p>이미 시작된 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다. 실행 중에 문제가 보이면 일시정지하고, 해결한 뒤 멈춘 step부터 이어 갑니다.
+					step이 작성한 md 문서는 스텝 이력의 '문서' 칸이나 아래 'step 문서' 표에서 열어 보고, 승인하기 전에 고칠 수 있습니다.
 					임의 workflowId를 직접 실행해보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">Workflow 테스트</a> 화면을 쓰십시오.</p>
 			</section>
 
@@ -124,6 +128,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							<col style="width:76px" />
 							<col style="width:84px" />
 							<col />
+							<col style="width:18%" />
 							<col style="width:160px" />
 						</colgroup>
 						<thead>
@@ -134,10 +139,37 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 								<th>결과</th>
 								<th class="wa-num">소요(ms)</th>
 								<th>내용/사유</th>
+								<th>문서</th>
 								<th>시각</th>
 							</tr>
 						</thead>
 						<tbody id="workflow-admin-history-body"></tbody>
+					</table>
+				</div>
+
+				<div class="kn-section-title">step 문서
+					<span id="workflow-admin-docs-count" class="ai-hint"></span>
+					<label class="wa-docs-all"><input type="checkbox" id="workflow-admin-docs-all" /> 모든 파일 보기</label>
+				</div>
+				<div class="wa-table-scroll">
+					<table id="workflow-admin-docs-table" class="document-list-table wa-table">
+						<colgroup>
+							<col />
+							<col style="width:22%" />
+							<col style="width:84px" />
+							<col style="width:160px" />
+							<col style="width:96px" />
+						</colgroup>
+						<thead>
+							<tr>
+								<th>파일</th>
+								<th>step</th>
+								<th class="wa-num">크기</th>
+								<th>수정시각</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody id="workflow-admin-docs-body"></tbody>
 					</table>
 				</div>
 
@@ -173,6 +205,44 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 	</div>
 
+	<%-- step 문서 팝업. [보기]는 Markdown을 HTML로, [수정]은 원문과 미리보기를 나란히 보여 준다(workflow-doc-viewer.js) --%>
+	<div id="wa-doc-modal" class="wa-doc-modal" hidden>
+		<div class="wa-doc-box" role="dialog" aria-modal="true" aria-labelledby="wa-doc-title">
+			<div class="wa-doc-head">
+				<div class="wa-doc-titles">
+					<div id="wa-doc-title" class="wa-doc-title"></div>
+					<div id="wa-doc-path" class="wa-doc-path"></div>
+				</div>
+				<div class="wa-doc-tabs" role="tablist">
+					<button type="button" id="wa-doc-tab-view" class="on" role="tab">보기</button>
+					<button type="button" id="wa-doc-tab-edit" role="tab">수정</button>
+				</div>
+				<div class="wa-doc-head-buttons">
+					<button type="button" id="wa-doc-full" class="kn-plain">전체 화면</button>
+					<button type="button" id="wa-doc-close" class="kn-plain">닫기</button>
+				</div>
+			</div>
+			<div id="wa-doc-notice" class="wa-doc-notice" hidden></div>
+			<div class="wa-doc-body">
+				<div id="wa-doc-view" class="wa-doc-view markdown-body"></div>
+				<div id="wa-doc-edit" class="wa-doc-edit" hidden>
+					<textarea id="wa-doc-text" class="wa-doc-text" spellcheck="false" aria-label="문서 원문"></textarea>
+					<div id="wa-doc-preview" class="wa-doc-preview markdown-body" aria-label="미리보기"></div>
+				</div>
+			</div>
+			<div class="wa-doc-foot">
+				<span id="wa-doc-meta" class="wa-doc-meta"></span>
+				<span id="wa-doc-status" class="wa-doc-status"></span>
+				<button type="button" id="wa-doc-reload" class="kn-plain">다시 읽기</button>
+				<button type="button" id="wa-doc-save" hidden>저장 (Ctrl+S)</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/marked.min.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/purify.min.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/highlight.min.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/workflow-doc-viewer.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/workflow-admin.js"></script>
 	<script>
 		DstoneAiWorkflowAdmin.init({
@@ -180,7 +250,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			detailUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/detail.do",
 			decisionUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/decision.do",
 			pauseUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/pause.do",
-			resumeUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/resume.do"
+			resumeUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/resume.do",
+			filesUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/files.do",
+			fileContentUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/fileContent.do",
+			saveFileUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/saveFile.do"
 		});
 	</script>
 </body>

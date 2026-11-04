@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- Workflow 실행 중에 step이 읽고 쓴 파일(AI_WORKFLOW_EXECUTION_FILE).
+     테이블 정의: schema/02-create-table-postgresql-dstone-ai.sql (기존 DB는 04-alter-table-execution-file.sql)
+     runtime.workflow.file.WorkFlowFileStore 가 쓴다 -->
+<mapper namespace="net.dstone.ai.runtime.workflow.file.WorkFlowFileStore">
+
+    <!-- 같은 (실행, step, 경로, 동작)이 이미 있으면 횟수와 마지막 시각만 바꾼다 -->
+    <insert id="upsertFile" parameterType="java.util.Map">
+        INSERT INTO AI_WORKFLOW_EXECUTION_FILE
+            (EXECUTION_ID, STEP_ID, FILE_PATH, ACTION, ACCESS_COUNT, FIRST_AT, LAST_AT)
+        VALUES
+            (#{executionId}, #{stepId}, #{filePath}, #{action}, 1, #{accessedAt, jdbcType=TIMESTAMP}, #{accessedAt, jdbcType=TIMESTAMP})
+        ON CONFLICT (EXECUTION_ID, STEP_ID, FILE_PATH, ACTION)
+        DO UPDATE SET ACCESS_COUNT = AI_WORKFLOW_EXECUTION_FILE.ACCESS_COUNT + 1
+                    , LAST_AT = EXCLUDED.LAST_AT
+    </insert>
+
+    <!-- 실행 한 건이 건드린 파일 전부(처음 건드린 순서대로) -->
+    <select id="selectFileList" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT STEP_ID AS "stepId"
+             , FILE_PATH AS "filePath"
+             , ACTION AS "action"
+             , ACCESS_COUNT AS "accessCount"
+             , FIRST_AT AS "firstAt"
+             , LAST_AT AS "lastAt"
+          FROM AI_WORKFLOW_EXECUTION_FILE
+         WHERE EXECUTION_ID = #{executionId}
+         ORDER BY FIRST_AT ASC, STEP_ID, FILE_PATH, ACTION
+    </select>
+
+    <!-- 이 실행이 이 경로를 건드린 적이 있는지 -->
+    <select id="countFile" parameterType="java.util.Map" resultType="long">
+        SELECT COUNT(*)
+          FROM AI_WORKFLOW_EXECUTION_FILE
+         WHERE EXECUTION_ID = #{executionId}
+           AND FILE_PATH = #{filePath}
+    </select>
+
+</mapper>

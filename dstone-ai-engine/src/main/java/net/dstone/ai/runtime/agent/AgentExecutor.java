@@ -41,6 +41,7 @@ import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.registry.SkillRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.prompt.EnginePrompt;
+import net.dstone.ai.runtime.tool.StepRef;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import jakarta.annotation.PreDestroy;
@@ -154,9 +155,10 @@ public class AgentExecutor extends BaseObject {
 	 * @param toolsOverride false면 이번 호출만 Tool 없이 부름(null이나 true면 Agent의 tools 목록 그대로)
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구(EnginePrompt.SUB_AGENT 등). 덧붙일 것이 없으면 null
+	 * @param stepRef       이 호출을 보낸 Workflow 실행과 step. Tool 호출까지 따라가서 파일 기록에 쓰입니다. Workflow 밖이면 null
 	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
-	public Object call(AgentDefinition agent, String conversationId, String caller, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule) {
+	public Object call(AgentDefinition agent, String conversationId, String caller, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule, StepRef stepRef) {
 		String userMessage = this.toUserMessage(agent, input);
 		// 답이 계약(output 모양 등)을 지키지 않았을 때만 다시 부릅니다(execution.onInvalidOutput: RETRY, maxAttempts).
 		// 넣는 값이 틀린 것은 다시 불러도 같으므로 위에서 바로 실패하고, 외부 연결 오류 같은 예외는 잡지 않고 그대로 올려보냅니다.
@@ -165,7 +167,7 @@ public class AgentExecutor extends BaseObject {
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			SubAgentTasks tasks = this.newTasks(agent);
 			try {
-				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule, tasks);
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule, tasks, stepRef);
 				return this.ask(spec, userMessage, agent.outputSchema(), agent, modelOverride);
 			} catch (AgentContractException e) {
 				last = e;
@@ -200,13 +202,14 @@ public class AgentExecutor extends BaseObject {
 	 * @param input     Agent에게 넣을 값(Agent input 모양)
 	 * @param schema    LLM의 답이 따라야 할 JSON Schema
 	 * @param engineRule 엔진 규칙에 덧붙일 문구(EnginePrompt.SUPERVISOR / EnginePrompt.router()). 덧붙일 것이 없으면 null
+	 * @param stepRef   이 호출을 보낸 Workflow 실행과 step(파일 기록용). Workflow 밖이면 null
 	 * @throws AgentContractException input이나 LLM의 답이 계약과 맞지 않을 때
 	 */
-	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule) {
+	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule, StepRef stepRef) {
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
 		try {
-			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule, tasks);
+			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule, tasks, stepRef);
 			return this.ask(spec, userMessage, schema, agent, null);
 		} finally {
 			if (tasks != null) {
@@ -239,7 +242,7 @@ public class AgentExecutor extends BaseObject {
 		}
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
-		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null, tasks).user(userMessage).stream().content();
+		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null, tasks, null).user(userMessage).stream().content();
 		if (tasks == null) {
 			return answer;
 		}
@@ -445,8 +448,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
 	 * @param tasks         백그라운드로 맡긴 Sub Agent 일을 들고 있을 곳(newTasks()). 백그라운드를 쓰지 않는 Agent면 null
+	 * @param stepRef       이 호출을 보낸 Workflow 실행과 step. ToolContext에 실어 Tool까지 넘깁니다. Workflow 밖이면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule, SubAgentTasks tasks) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
@@ -513,7 +517,9 @@ public class AgentExecutor extends BaseObject {
 			- Skill: Agent의 skills.allowed에 적힌 Skill을 Skill Tool 하나로 붙입니다(SkillTool).
 			- Sub Agent: Agent의 subAgents에 적힌 Agent를 Tool처럼 붙입니다(subAgentCallbacks() 참고).
 			  채팅 요청의 toolsEnabled=false는 Tool만 끄고 Skill과 Sub Agent는 끄지 않습니다(둘 다 Agent 정의의 일부입니다).
-			- toolContext라는 값에 caller를 함께 실어 보냅니다. caller(이 호출을 보낸 앱)를 알아야 하는 Tool이
+			- toolContext라는 값에 caller와, Workflow step에서 부른 것이면 실행 id·step id(StepRef)를 함께 실어 보냅니다.
+			  실행 id·step id는 파일 Tool이 어떤 파일을 읽고 썼는지 step별로 기록하는 데 씁니다(WorkFlowFileRecorder).
+			  caller는 caller(이 호출을 보낸 앱)를 알아야 하는 Tool이
 			  ToolContext 파라미터로 그 값을 받아볼 수 있게 하기 위해서입니다(지금 그런 Tool은 없지만 길은 열어 둡니다).
 			  caller 값이 없더라도(null이더라도) 이 toolContext 맵 자체에는 반드시 키가 하나 채워져 있어야 합니다
 			  (값은 빈 문자열로 넣습니다) - Spring AI의 MethodToolCallback.validateToolContextSupport()가, @Tool 메서드에
@@ -534,10 +540,10 @@ public class AgentExecutor extends BaseObject {
 			tools.add(this.configTool.limited(skillTool));
 		}
 		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools));
-		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks));
+		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks, stepRef));
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
-			spec = spec.toolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
+			spec = spec.toolContext(StepRef.toolContextOf(caller, stepRef));
 			int keepChars = this.intProperty(Constants.Agent.TOOL_KEEP_RESULT_CHARS, Constants.Agent.DEFAULT_TOOL_KEEP_RESULT_CHARS);
 			if (keepChars > 0) {
 				spec = spec.advisors(new ToolResultCompactionAdvisor(agent.id(), keepChars));
@@ -631,8 +637,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent  부모 Agent의 정의
 	 * @param caller 이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param tasks  백그라운드로 맡긴 일을 들고 있을 곳. 백그라운드를 쓰지 않으면 null
+	 * @param stepRef 부모를 부른 Workflow 실행과 step. 자식도 같은 값으로 부릅니다. Workflow 밖이면 null
 	 */
-	private List<ToolCallback> subAgentCallbacks(AgentDefinition agent, String caller, SubAgentTasks tasks) {
+	private List<ToolCallback> subAgentCallbacks(AgentDefinition agent, String caller, SubAgentTasks tasks, StepRef stepRef) {
 		List<ToolCallback> callbacks = new ArrayList<>();
 		if (agent.subAgentIds().isEmpty()) {
 			return callbacks;
@@ -645,7 +652,7 @@ public class AgentExecutor extends BaseObject {
 				continue;
 			}
 			AgentDefinition subAgent = this.agentRegistry.find(subAgentId);
-			callbacks.add(this.configTool.limited(new SubAgentToolCallback(this, agent.id(), subAgent, caller, callCount, maxCalls, tasks)));
+			callbacks.add(this.configTool.limited(new SubAgentToolCallback(this, agent.id(), subAgent, caller, callCount, maxCalls, tasks, stepRef)));
 		}
 		if (tasks != null && !callbacks.isEmpty()) {
 			callbacks.add(this.configTool.limited(tasks.outputTool()));

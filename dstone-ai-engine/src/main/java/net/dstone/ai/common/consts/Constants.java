@@ -81,6 +81,17 @@ public final class Constants {
 		/** caller별로 어떤 Tool을 쓸 수 있는지 정하는 화이트리스트 설정 키입니다(dstone.ai.tool.allowed-by-caller, common.config.ConfigTool이 사용합니다). */
 		public final static String POLICY_PREFIX = "dstone.ai.tool";
 
+		/**
+		 * <pre>
+		 * Tool에 넘기는 ToolContext에 "어느 Workflow 실행의 어느 step이 부른 것인지"를 싣는 키입니다(runtime.tool.StepRef).
+		 * 파일 Tool이 어떤 파일을 읽고 썼는지 step별로 기록할 때 씁니다(runtime.workflow.file.WorkFlowFileRecorder).
+		 * 채팅 API처럼 Workflow 밖에서 부르면 이 키가 없습니다.
+		 * </pre>
+		 */
+		public final static String CONTEXT_EXECUTION_ID = "net.dstone.ai.workflow.executionId";
+		/** 위와 같은 용도로 step id를 싣는 키입니다. */
+		public final static String CONTEXT_STEP_ID = "net.dstone.ai.workflow.stepId";
+
 		/** 셸 스크립트를 실행하는 Tool(tools.shell.ShellExecTool)의 설정 키 접두사입니다. */
 		public static final class Shell {
 			public final static String PREFIX = "dstone.ai.tool.shell";

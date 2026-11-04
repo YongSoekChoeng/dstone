@@ -92,7 +92,7 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
-		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model(), null);
+		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model(), null, null);
 		String provider = this.chatProviders.resolve(agent.providerName());
 		return new ChatResponse(output, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}

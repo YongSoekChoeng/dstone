@@ -24,6 +24,7 @@ import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.runtime.workflow.file.WorkFlowFileRecorder;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
@@ -44,6 +45,7 @@ import net.dstone.common.utils.LogUtil;
  * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로 보고 등록된 Tool을 전부 허용합니다.
  *
  * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌우고, 호출할 때마다 로그 한 줄(이름, 인자, 결과 길이)을 남깁니다(LimitedToolCallback).
+ * Workflow step에서 부른 파일 Tool이면 어떤 파일을 읽고 썼는지도 여기서 기록합니다(WorkFlowFileRecorder).
  * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. 
  * Tool마다 따로 막으면 새 Tool이나 MCP Tool에서 빠뜨리기 쉬우므로, 여기서 모든 Tool에 마지막 안전망을 하나 둡니다.
  * </pre>
@@ -61,6 +63,8 @@ public class ConfigTool extends BaseObject {
 	private ConfigMcp configMcp;
 	@Autowired
 	private Environment environment;
+	@Autowired
+	private WorkFlowFileRecorder fileRecorder;
 
 	/** 설정이 없을 때 쓰는 Tool (한건당)호출 결과 글자 수 상한입니다(대략 2만 토큰 안팎). */
 	private static final int DEFAULT_MAX_RESULT_CHARS = 60000;
@@ -102,14 +106,14 @@ public class ConfigTool extends BaseObject {
 		int maxResultChars = this.maxResultChars();
 		List<ToolCallback> limited = new ArrayList<>(merged.size());
 		for (ToolCallback callback : merged) {
-			limited.add(new LimitedToolCallback(callback, maxResultChars));
+			limited.add(new LimitedToolCallback(callback, maxResultChars, this.fileRecorder));
 		}
 		// TOOL step 전용 Tool은 상한 없이 등록합니다(호출 로그는 똑같이 남깁니다).
 		Set<String> stepOnlyNames = new HashSet<>();
 		if (!stepOnlyBeans.isEmpty()) {
 			for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(stepOnlyBeans.toArray()).build().getToolCallbacks()) {
 				merged.add(callback);
-				limited.add(new LimitedToolCallback(callback, Integer.MAX_VALUE));
+				limited.add(new LimitedToolCallback(callback, Integer.MAX_VALUE, this.fileRecorder));
 				stepOnlyNames.add(callback.getToolDefinition().name());
 			}
 		}
@@ -198,7 +202,7 @@ public class ConfigTool extends BaseObject {
 	 * @param callback 상한을 씌울 ToolCallback
 	 */
 	public ToolCallback limited(ToolCallback callback) {
-		return new LimitedToolCallback(callback, this.maxResultChars());
+		return new LimitedToolCallback(callback, this.maxResultChars(), this.fileRecorder);
 	}
 
 	/**
@@ -311,14 +315,17 @@ public class ConfigTool extends BaseObject {
 
 		private final ToolCallback delegate;
 		private final int maxResultChars;
+		private final WorkFlowFileRecorder fileRecorder;
 
 		/**
 		 * @param delegate       실제 Tool 호출을 맡는 원래 ToolCallback입니다.
 		 * @param maxResultChars 결과로 돌려줄 최대 글자 수입니다.
+		 * @param fileRecorder   Workflow step이 읽고 쓴 파일을 기록하는 곳입니다.
 		 */
-		private LimitedToolCallback(ToolCallback delegate, int maxResultChars) {
+		private LimitedToolCallback(ToolCallback delegate, int maxResultChars, WorkFlowFileRecorder fileRecorder) {
 			this.delegate = delegate;
 			this.maxResultChars = maxResultChars;
+			this.fileRecorder = fileRecorder;
 		}
 
 		@Override
@@ -344,7 +351,10 @@ public class ConfigTool extends BaseObject {
 			if (this.isCutOff(toolInput)) {
 				return this.logged(toolInput, CUT_OFF_ARGUMENT_MESSAGE);
 			}
-			return this.logged(toolInput, this.limit(this.delegate.call(toolInput, toolContext)));
+			String result = this.delegate.call(toolInput, toolContext);
+			// Workflow step에서 부른 파일 Tool이면 어떤 파일을 읽고 썼는지 남깁니다(자르기 전의 답으로 성공 여부를 봅니다).
+			this.fileRecorder.record(this.delegate.getToolDefinition().name(), toolInput, result, toolContext);
+			return this.logged(toolInput, this.limit(result));
 		}
 
 		/**

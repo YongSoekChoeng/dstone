@@ -55,6 +55,10 @@ data:
             definition:
                 location: file:/app/dstone/dstone-ai-engine/definitions
                 edit-enabled: false
+            # 실행 관리 화면에서 step 문서를 고치는 기능. Pod에서는 보기만 허용한다.
+            workflow:
+                file:
+                    edit-enabled: false
 
   log4j2.xml: |
     <?xml version="1.0" encoding="UTF-8"?>

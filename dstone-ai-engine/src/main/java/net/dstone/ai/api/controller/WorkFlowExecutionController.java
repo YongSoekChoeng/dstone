@@ -21,7 +21,9 @@ import net.dstone.ai.api.dto.WorkFlowDecisionRequest;
 import net.dstone.ai.api.dto.WorkFlowExecutionDetail;
 import net.dstone.ai.api.dto.WorkFlowExecutionPage;
 import net.dstone.ai.api.dto.WorkFlowExecutionSummary;
+import net.dstone.ai.api.dto.WorkFlowFileSaveRequest;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
+import net.dstone.ai.api.service.WorkFlowFileService;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.biz.BaseController;
 
@@ -42,6 +44,9 @@ public class WorkFlowExecutionController extends BaseController {
 
 	@Autowired
 	WorkFlowExecutionService workFlowExecutionService;
+
+	@Autowired
+	WorkFlowFileService workFlowFileService;
 
 	@Autowired
 	Environment environment;
@@ -134,6 +139,54 @@ public class WorkFlowExecutionController extends BaseController {
 	public ResponseEntity<Object> resume(@PathVariable String executionId) {
 		try {
 			return ResponseEntity.ok((Object) this.detailOf(this.workFlowExecutionService.resume(executionId), this.maxValueChars()));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 실행 하나의 step들이 읽고 쓴 파일 목록을 돌려줍니다. 실행 관리 화면이 step마다 문서 버튼을 그릴 때 씁니다.
+	 * 파일 Tool이 성공할 때마다 남긴 기록(AI_WORKFLOW_EXECUTION_FILE)을 파일별로 묶은 것입니다.
+	 *
+	 * @param executionId 실행 id
+	 */
+	@GetMapping("/{executionId}/files")
+	public ResponseEntity<Object> files(@PathVariable String executionId) {
+		try {
+			return ResponseEntity.ok((Object) this.workFlowFileService.list(executionId));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 실행이 건드린 파일 하나의 내용을 돌려줍니다. 그 실행의 step이 읽거나 쓴 파일만 열 수 있습니다(아니면 400).
+	 *
+	 * @param executionId 실행 id
+	 * @param path        파일 경로(목록에 나온 값)
+	 */
+	@GetMapping("/{executionId}/files/content")
+	public ResponseEntity<Object> fileContent(@PathVariable String executionId, @RequestParam String path) {
+		try {
+			return ResponseEntity.ok((Object) this.workFlowFileService.read(executionId, path));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 실행 관리 화면에서 고친 파일을 저장합니다.
+	 * 저장 기능이 꺼져 있으면 403, 실행 중이거나 화면이 연 뒤 파일이 바뀌었으면 409, 저장할 수 없는 확장자면 409입니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 * @param request     경로, 새 내용, 열 때 받은 hash
+	 */
+	@PostMapping("/{executionId}/files/content")
+	public ResponseEntity<Object> saveFileContent(@PathVariable String executionId, @RequestBody WorkFlowFileSaveRequest request) {
+		try {
+			return ResponseEntity.ok((Object) this.workFlowFileService.save(executionId, request.path(), request.text(), request.baseHash()));
 		} catch (ResponseStatusException e) {
 			return this.rejected(e);
 		}

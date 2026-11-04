@@ -12,7 +12,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.config.ConfigTool;
-import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.core.BaseObject;
 
 /**
@@ -34,17 +33,18 @@ public class ToolExecutor extends BaseObject {
 	 * Tool 하나를 이름으로 찾아서 직접 호출하고, 그 결과를 문자열로 돌려줍니다.
 	 *
 	 * @param caller    이 호출을 요청한 주체(tenant)를 식별하는 값입니다.
+	 * @param stepRef   이 호출을 보낸 Workflow 실행과 step입니다(파일 기록용). Workflow 밖이면 null입니다.
 	 * @param toolName  호출할 Tool의 이름입니다.
 	 * @param jsonInput Tool에 넘길 인자를 담은 JSON 문자열입니다.
 	 */
-	public String call(String caller, String toolName, String jsonInput) {
+	public String call(String caller, StepRef stepRef, String toolName, String jsonInput) {
 		// caller 별 ToolCallback 을 구한다.
 		ToolCallback callback = this.configTool.findByName(caller, toolName);
 		if (callback == null) {
 			throw new IllegalStateException("caller[" + caller + "]가 쓸 수 있는 Tool 중 '" + toolName + "'가 없습니다(화이트리스트 또는 이름을 확인하십시오).");
 		}
-		// caller 별 ToolContext 를 구한다.
-		ToolContext toolContext = new ToolContext(Map.of(Constants.Security.Caller.ADVISOR_CONTEXT_KEY, caller == null ? "" : caller));
+		// caller와 실행 id·step id를 ToolContext에 싣는다.
+		ToolContext toolContext = new ToolContext(StepRef.toolContextOf(caller, stepRef));
 		String rawResult = callback.call(jsonInput, toolContext);
 		return this.unwrap(rawResult);
 	}

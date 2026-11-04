@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
+import net.dstone.ai.runtime.workflow.file.WorkFlowFileStore;
 
 /**
  * <pre>
@@ -18,6 +19,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
  *
  *   빈                              대신하는 것            왜 필요한가
  *   InMemoryWorkFlowExecutionStore  PostgreSQL 실행 기록   WorkFlowExecutor가 step마다 실행 상태를 저장합니다
+ *   InMemoryWorkFlowFileStore       PostgreSQL 파일 기록   파일 Tool이 step별로 읽고 쓴 파일을 기록합니다
  *   DataSource(Mockito)             PostgreSQL 접속        ConfigMapper가 MyBatis 세션을 만들려면 DataSource가 있어야 합니다(쓰이지는 않음)
  *   RedisTemplate(Mockito)          Redis 접속             RateLimitFilter가 주입받습니다(테스트 설정에서 요청 제한은 꺼져 있음)
  *   TestChatProviders               model.provider의 ChatModel  기본이 아닌 provider도 대역을 쓰고, 어떤 provider를 만들었는지 기록합니다
@@ -35,6 +37,13 @@ public class TestEngineConfig {
 	@Primary
 	public WorkFlowExecutionStore inMemoryWorkFlowExecutionStore() {
 		return new InMemoryWorkFlowExecutionStore();
+	}
+
+	/** DB 대신 메모리에 "step이 읽고 쓴 파일" 기록을 둡니다. */
+	@Bean
+	@Primary
+	public WorkFlowFileStore inMemoryWorkFlowFileStore() {
+		return new InMemoryWorkFlowFileStore();
 	}
 
 	/** MyBatis 세션을 만들 때만 필요한 DataSource입니다. 실제로 접속하는 일은 없습니다. */

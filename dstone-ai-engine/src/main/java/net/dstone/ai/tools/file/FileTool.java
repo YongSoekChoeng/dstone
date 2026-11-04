@@ -382,8 +382,11 @@ public class FileTool {
 		}
 	}
 
-	/** 파일을 읽고 고쳐서 다시 쓰는 Tool들이 같은 파일을 동시에 건드리지 않게 하는 잠금입니다(forEach step은 동시에 실행됩니다). */
-	private static final Object EDIT_LOCK = new Object();
+	/**
+	 * 파일을 읽고 고쳐서 다시 쓰는 Tool들이 같은 파일을 동시에 건드리지 않게 하는 잠금입니다(forEach step은 동시에 실행됩니다).
+	 * 실행 관리 화면에서 문서를 고쳐 저장할 때(api.service.WorkFlowFileService)도 이 잠금을 함께 씁니다.
+	 */
+	public static final Object EDIT_LOCK = new Object();
 
 	/**
 	 * <pre>
@@ -965,7 +968,7 @@ public class FileTool {
 	}
 
 	/** 줄바꿈을 한 가지 방식으로 맞춥니다. crlf가 true면 모두 CRLF로, 아니면 모두 LF로 바꿉니다. */
-	static String toLineBreak(String text, boolean crlf) {
+	public static String toLineBreak(String text, boolean crlf) {
 		String lf = text.replace("\r\n", "\n");
 		return crlf ? lf.replace("\n", "\r\n") : lf;
 	}
@@ -1058,7 +1061,7 @@ public class FileTool {
 	}
 
 	/** 파일의 글자셋을 고릅니다. UTF-8로 깨지지 않고 읽히면 UTF-8, 아니면 MS949(오래된 국내 프로젝트의 EUC-KR 소스)입니다. */
-	static Charset charsetOf(byte[] bytes) {
+	public static Charset charsetOf(byte[] bytes) {
 		try {
 			StandardCharsets.UTF_8.newDecoder()
 				.onMalformedInput(CodingErrorAction.REPORT)
