@@ -22,143 +22,152 @@ input: string, 요청서(00.request.md)가 들어 있는 폴더의 절대경로
 steps:
 
   - id: step00
+    name: 사전작업
+    type: AGENT
+    with: ${input}
+    agent: sm-ready-agent
+    save: ready
+    next: step01
+    onFailure: FAIL
+
+  - id: step01
     name: 고객요청서 읽기
     type: TOOL
     tool: readFile
     with:
       fileFullPath: ${input}/00.request.md
     save: request
-    next: step01
+    next: step02
     onFailure: FAIL
 
-  - id: step01
+  - id: step02
     name: 고객요청사항 분석
     type: AGENT
     agent: sm-requirement-analyze-agent
     with:
-      base_dir: ${input}
+      base_dir: ${state.ready.base_dir}
       request: ${state.request}
       feedback: |-
         ${state.review.reason:}
         ${state.reviewDecision.comment:}
         ${state.impactApproval.comment:}
-    next: step02
+    next: step03
 
-  - id: step02
+  - id: step03
     name: 고객요구사항분석서 읽기
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${input}/01.customer_requirement.md
+      fileFullPath: ${state.ready.base_dir}/01.customer_requirement.md
     save: requirement
-    next: step03
+    next: step04
     onFailure: FAIL
 
-  - id: step03
+  - id: step04
     name: 고객요청사항 분석 리뷰
     type: SUPERVISOR
     agent: sm-requirement-analyze-reviewer-agent
     with:
-      base_dir: ${input}
+      base_dir: ${state.ready.base_dir}
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
-    next: step05
-    onFailure: step04
+    next: step06
+    onFailure: step05
 
-  - id: step04
+  - id: step05
     name: 리뷰 불통과 처리 결정
     type: APPROVAL
     approval:
       approverRole: PL
     save: reviewDecision
     routes:
-      고객요청사항 재분석: step01
-      그대로 진행: step05
+      고객요청사항 재분석: step02
+      그대로 진행: step06
       중지: FAIL
 
-  - id: step05
+  - id: step06
     name: 영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
     with:
-      base_dir: ${input}
+      base_dir: ${state.ready.base_dir}
       request: ${state.request}
       requirement: ${state.requirement}
       feedback: ${state.impactApproval.comment:}
-    next: step06
+    next: step07
 
-  - id: step06
+  - id: step07
     name: 영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: impactApproval
     routes:
-      고객요청사항 재분석: step01
-      영향도 재분석: step05
+      고객요청사항 재분석: step02
+      영향도 재분석: step06
       중지: FAIL
-      승인: step07
+      승인: step08
 
-  - id: step07
+  - id: step08
     name: 영향도분석서 읽기
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${input}/02.impact.md
+      fileFullPath: ${state.ready.base_dir}/02.impact.md
     save: impact
-    next: step08
+    next: step09
     onFailure: FAIL
 
-  - id: step08
+  - id: step09
     name: 아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
     with:
-      base_dir: ${input}
+      base_dir: ${state.ready.base_dir}
       request: ${state.request}
       requirement: ${state.requirement}
       impact: ${state.impact}
       feedback: ${state.designApproval.comment:}
-    next: step09
+    next: step10
 
-  - id: step09
+  - id: step10
     name: 설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: designApproval
     routes:
-      승인: step10
-      아키텍처 재설계: step08
+      승인: step11
+      아키텍처 재설계: step09
       중지: FAIL
 
-  - id: step10
+  - id: step11
     name: 상세 설계서 읽기
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${input}/03-1.design.md
+      fileFullPath: ${state.ready.base_dir}/03-1.design.md
     save: design
-    next: step11
-    onFailure: FAIL
-
-  - id: step11
-    name: 태스크아이템 목록 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/03-2.taskitems.md
-    save: taskitems
     next: step12
     onFailure: FAIL
 
   - id: step12
+    name: 태스크아이템 목록 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${state.ready.base_dir}/03-2.taskitems.md
+    save: taskitems
+    next: step13
+    onFailure: FAIL
+
+  - id: step13
     name: 개발
     type: AGENT
     agent: sm-developer-agent
     with:
-      base_dir: ${input}
+      base_dir: ${state.ready.base_dir}
       design: ${state.design}
       taskitems: ${state.taskitems}
     next: END
@@ -172,3 +181,4 @@ state:
   designApproval: 설계 승인 결과
   design: 상세 설계서 내용
   taskitems: 태스크아이템 목록 내용
+  ready: 기본정보

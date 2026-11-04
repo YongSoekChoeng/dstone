@@ -19,4 +19,9 @@ public class DateTimeTool {
 		return LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 	}
 
+	@Tool(description = "현재 날짜와 시간을 원하는 포맷으로 반환한다, '현재 날짜/시간', '날짜포맷' 등을 물어볼 때 사용한다.")
+	public String getToDate(String format) {
+		return net.dstone.common.utils.DateUtil.getToDate(format);
+	}
+
 }
