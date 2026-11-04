@@ -82,8 +82,8 @@ steps:
       approverRole: PL
     save: reviewDecision
     routes:
-      고객요청사항 재분석: step02
       그대로 진행: step06
+      고객요청사항 재분석: step02
       중지: FAIL
 
   - id: step06
@@ -104,10 +104,10 @@ steps:
       approverRole: PL
     save: impactApproval
     routes:
+      승인: step08
       고객요청사항 재분석: step02
       영향도 재분석: step06
       중지: FAIL
-      승인: step08
 
   - id: step08
     name: 영향도분석서 읽기
@@ -139,6 +139,7 @@ steps:
     save: designApproval
     routes:
       승인: step11
+      영향도 재분석: step06
       아키텍처 재설계: step09
       중지: FAIL
 
@@ -170,8 +171,21 @@ steps:
       base_dir: ${state.ready.base_dir}
       design: ${state.design}
       taskitems: ${state.taskitems}
-    next: END
+    next: step14
     onFailure: FAIL
+
+  - id: step14
+    name: 개발 승인
+    type: APPROVAL
+    approval:
+      approverRole: PL
+    save: developApproval
+    routes:
+      승인: END
+      고객요청사항 재분석: step02
+      영향도 재분석: step06
+      재개발: step13
+      실패: FAIL
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
@@ -183,3 +197,4 @@ state:
   design: 상세 설계서 내용
   taskitems: 태스크아이템 목록 내용
   ready: 기본정보
+  developApproval: step14 step의 결과

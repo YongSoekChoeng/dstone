@@ -6,15 +6,15 @@
     },
     "END" : {
       "x" : 860,
-      "y" : 1520
+      "y" : 1590
     },
     "FAIL" : {
       "x" : 30,
-      "y" : 1530
+      "y" : 1590
     },
     "step13" : {
       "x" : 640,
-      "y" : 1380
+      "y" : 1330
     },
     "step12" : {
       "x" : 170,
@@ -67,6 +67,10 @@
     "step00" : {
       "x" : 380,
       "y" : -120
+    },
+    "step14" : {
+      "x" : 170,
+      "y" : 1420
     }
   },
   "edges" : {
@@ -86,19 +90,47 @@
       "y" : 490
     } ],
     "step07|route|고객요청사항 재분석" : [ {
-      "x" : 490,
-      "y" : 290
+      "x" : 940,
+      "y" : 360
     }, {
-      "x" : 490,
-      "y" : 190
+      "x" : 940,
+      "y" : 210
     } ],
     "step07|route|영향도 재분석" : [ {
-      "x" : 540,
+      "x" : 610,
       "y" : 610
+    }, {
+      "x" : 790,
+      "y" : 590
+    } ],
+    "step10|route|영향도 재분석" : [ {
+      "x" : 1010,
+      "y" : 760
     } ],
     "step10|route|아키텍처 재설계" : [ {
-      "x" : 540,
-      "y" : 970
+      "x" : 600,
+      "y" : 980
+    }, {
+      "x" : 890,
+      "y" : 980
+    } ],
+    "step14|route|고객요청사항 재분석" : [ {
+      "x" : 1100,
+      "y" : 1160
+    }, {
+      "x" : 1100,
+      "y" : 1030
+    } ],
+    "step14|route|영향도 재분석" : [ {
+      "x" : 1150,
+      "y" : 1100
+    } ],
+    "step14|route|재개발" : [ {
+      "x" : 780,
+      "y" : 1420
+    }, {
+      "x" : 1050,
+      "y" : 1420
     } ]
   },
   "ports" : {
@@ -134,9 +166,13 @@
       "source" : "right",
       "target" : "in"
     },
+    "step07|route|고객요청사항 재분석" : {
+      "source" : "right",
+      "target" : "right"
+    },
     "step07|route|영향도 재분석" : {
       "source" : "right",
-      "target" : "left"
+      "target" : "right"
     },
     "step07|route|중지" : {
       "source" : "left",
@@ -150,9 +186,13 @@
       "source" : "left",
       "target" : "in"
     },
+    "step10|route|영향도 재분석" : {
+      "source" : "right",
+      "target" : "right"
+    },
     "step10|route|아키텍처 재설계" : {
       "source" : "right",
-      "target" : "left"
+      "target" : "right"
     },
     "step10|route|중지" : {
       "source" : "left",
@@ -162,11 +202,31 @@
       "source" : "left",
       "target" : "in"
     },
+    "step12|next|" : {
+      "source" : "right",
+      "target" : "in"
+    },
     "step12|onFailure|" : {
       "source" : "left",
       "target" : "in"
     },
     "step13|onFailure|" : {
+      "source" : "left",
+      "target" : "in"
+    },
+    "step14|route|고객요청사항 재분석" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step14|route|영향도 재분석" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step14|route|재개발" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step14|route|실패" : {
       "source" : "left",
       "target" : "in"
     }
