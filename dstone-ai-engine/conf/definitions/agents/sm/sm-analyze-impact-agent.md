@@ -12,7 +12,7 @@ version: 1.1.0
 description: 고객요구사항분석서의 태스크가 현행 시스템에 미치는 영향도를 분석한다.
 model:
   temperature: 0.2
-  reasoning: medium
+  reasoning: high
 input:
   base_dir: string, 작업 폴더의 절대경로
   request: string, 고객 요청서(00.request.md)의 내용. 프로젝트ID와 소스경로가 들어 있다
