@@ -387,9 +387,12 @@ var DstoneAiWorkflowAdmin = (function () {
 			return;
 		}
 		var all = docsAllEl.checked;
-		var files = (currentFiles.files || []).filter(function (file) { return all || isDocument(file); });
+		var picked = (currentFiles.files || []).filter(function (file) { return all || isDocument(file); });
+		var files = latestOnly(picked);
 		var total = (currentFiles.files || []).length;
+		var hidden = picked.length - files.length;
 		docsCountEl.textContent = files.length + "개" + (all ? "" : " (전체 파일 " + total + "개)")
+			+ (hidden > 0 ? " · 지난 회차 문서 " + hidden + "개 숨김" : "")
 			+ (currentFiles.readOnlyReason ? " · " + currentFiles.readOnlyReason : "");
 		if (files.length === 0) {
 			docsBodyEl.innerHTML = "<tr><td colspan=\"5\">" + (total === 0
@@ -427,6 +430,49 @@ var DstoneAiWorkflowAdmin = (function () {
 			tr.querySelector(".wa-doc-open-cell").appendChild(openBtn);
 			docsBodyEl.appendChild(tr);
 		});
+	}
+
+	/*
+	 * 같은 문서가 여러 번 나오면 가장 최근 것 하나만 남긴다.
+	 * 재실행 때마다 새 폴더에 문서를 만드는 Workflow는 '01.요구사항.md'가 회차 수만큼 쌓이기 때문이다.
+	 * 같은 문서 = 파일 이름이 같고, 그 파일을 다룬 step도 같은 것(폴더만 다르다).
+	 * 가장 최근 = step이 마지막으로 건드린 시각(lastAt)이 가장 늦은 것. 자리는 처음 나온 자리를 지킨다.
+	 */
+	function latestOnly(files) {
+		var result = [];
+		var indexOfKey = {};
+		files.forEach(function (file) {
+			var key = sameDocKey(file);
+			if (!Object.prototype.hasOwnProperty.call(indexOfKey, key)) {
+				indexOfKey[key] = result.length;
+				result.push(file);
+			} else if (lastTouched(file) > lastTouched(result[indexOfKey[key]])) {
+				result[indexOfKey[key]] = file;
+			}
+		});
+		return result;
+	}
+
+	function sameDocKey(file) {
+		var stepIds = [];
+		(file.steps || []).forEach(function (step) {
+			if (stepIds.indexOf(step.stepId) < 0) {
+				stepIds.push(step.stepId);
+			}
+		});
+		stepIds.sort();
+		return file.name + "|" + stepIds.join(",");
+	}
+
+	function lastTouched(file) {
+		var latest = 0;
+		(file.steps || []).forEach(function (step) {
+			var time = Date.parse(step.lastAt);
+			if (!isNaN(time) && time > latest) {
+				latest = time;
+			}
+		});
+		return latest;
 	}
 
 	function markSelectedRow() {
