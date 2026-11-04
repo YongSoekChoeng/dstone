@@ -27,6 +27,12 @@ tools:
     - readFileListAll
     - writeFile
     - appendFile
+    - knowledgeCallees
+    - knowledgeCallers
+    - knowledgeFindMethods
+    - knowledgeImpact
+    - knowledgeSearch
+    - knowledgeTableUsage
 execution:
   maxToolCalls: 50
 ---
@@ -40,9 +46,10 @@ feedback에 내용이 있으면 다시 설계하는 것이다. 지적된 부분�
 [할 일]
 1. 아래 내용을 지켜 상세 설계와 구현 태스크아이템 목록을 작성한다.
   - 요청서의 '소스경로'가 소스의 루트다. 소스는 이 경로 아래에서만 찾는다.
+  - 참고할 기존 기능이 있을 경우 파일을 읽어서 구조를 파악한다.
+  - 기존 기능을 파악할 때 고객요청서에 '프로젝트ID'가 있으면 knowledge계열 Tool부터 쓰고, 프로젝트ID로 그 값을 준다. 답이 부족하거나 "실패:"이면 파일 Tool로 찾는다.
   - 내용을 태스크로 나눈다. 한 태스크는 한 가지 목적만 가진다.
   - 같은 파일을 두 번 열지 않는다.
-   - 참고할 기존 기능이 있을 경우 파일을 읽어서 구조를 파악한다.
   1-1. 수정사항인 경우
     - 영향도분석서의 수정사항 항목에 있는 파일을 readFileLines로 한 번 열어 현재 내용을 확인한다.
     - 변경마다 '변경 전'(지금 소스의 해당 부분)과 '변경 후'(바꾼 모습)를 정한다. 기존 소스의 이름 규칙, 들여쓰기, 주석 방식을 따른다.
