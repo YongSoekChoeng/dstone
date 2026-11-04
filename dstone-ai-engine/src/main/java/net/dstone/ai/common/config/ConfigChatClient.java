@@ -15,7 +15,9 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.convert.DurationStyle;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +26,7 @@ import org.springframework.core.Ordered;
 
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.session.RedisChatMemoryRepository;
+import net.dstone.ai.runtime.agent.UnknownToolGuard;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 
@@ -120,6 +123,29 @@ public class ConfigChatClient {
 	@Bean
 	ChatClient chatClient(ChatClient.Builder builder, List<Advisor> defaultAdvisors) {
 		return builder.defaultAdvisors(defaultAdvisors.toArray(new Advisor[0])).build();
+	}
+
+	/**
+	 * <pre>
+	 * Spring AI 자동 설정이 만든 ToolCallingManager 빈을 UnknownToolGuard로 감쌉니다.
+	 * LLM이 받지 않은 Tool 이름으로 부르면 예외로 실행 전체가 죽는 대신 "그런 Tool은 없다"는 답이 돌아갑니다.
+	 *
+	 * 자동 설정의 빈을 새로 만들지 않고 감싸기만 하므로 spring.ai.tools.limits 같은 설정은 그대로 적용됩니다.
+	 * 기본 ChatClient와 ChatProviders가 만드는 다른 provider의 ChatClient 모두 이 빈을 쓰므로 함께 적용됩니다.
+	 * BeanPostProcessor는 다른 빈보다 먼저 만들어져야 해서 static 메소드로 둡니다.
+	 * </pre>
+	 */
+	@Bean
+	static BeanPostProcessor unknownToolGuardPostProcessor() {
+		return new BeanPostProcessor() {
+			@Override
+			public Object postProcessAfterInitialization(Object bean, String beanName) {
+				if (bean instanceof ToolCallingManager && !(bean instanceof UnknownToolGuard)) {
+					return new UnknownToolGuard((ToolCallingManager) bean);
+				}
+				return bean;
+			}
+		};
 	}
 
 	/**
