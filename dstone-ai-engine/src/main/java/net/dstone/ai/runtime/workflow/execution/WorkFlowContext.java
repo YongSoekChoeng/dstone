@@ -128,6 +128,19 @@ public final class WorkFlowContext {
 	}
 
 	/**
+	 * state에서 이름들을 지웁니다. 지난 step으로 되돌릴 때, 그 뒤에서 저장한 값을 없애려고 씁니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 * @param names   지울 state 이름들
+	 */
+	public static void removeState(Map<String, Object> context, List<String> names) {
+		Map<String, Object> state = state(context);
+		for (String name : names) {
+			state.remove(name);
+		}
+	}
+
+	/**
 	 * 사람이 내린 결정을 승인 수신함에 넣어 둡니다. 이어서 실행되는 APPROVAL step이 꺼내 씁니다.
 	 *
 	 * @param context  실행 컨텍스트

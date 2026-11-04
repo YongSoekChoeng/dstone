@@ -51,6 +51,45 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 		return this.control(executionId, "resume");
 	}
 
+	/**
+	 * <pre>
+	 * 실행을 fromStep으로 되돌리면 무엇이 어떻게 되는지 엔진에서 받아 JSON 글자 그대로 돌려줍니다(GET .../rewind).
+	 * 화면이 응답을 그대로 쓰므로 VO로 바꾸지 않습니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 * @param fromStep    다시 시작할 step id
+	 */
+	public String rewindPoint(String executionId, String fromStep) {
+		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		return this.getWebClient().get()
+				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/rewind?fromStep={fromStep}", executionId, fromStep)
+				.retrieve()
+				.bodyToMono(String.class)
+				.block();
+	}
+
+	/**
+	 * 실행을 fromStep으로 되돌려 다시 돌립니다(POST .../rewind).
+	 *
+	 * @param executionId 실행 id
+	 * @param fromStep    다시 시작할 step id
+	 * @param clearState  true면 그 step부터 뒤에서 저장한 state 값을 지우고 시작합니다
+	 */
+	public WorkFlowExecutionDetailResult rewind(String executionId, String fromStep, boolean clearState) {
+		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("fromStep", fromStep);
+		body.put("clearState", Boolean.valueOf(clearState));
+		return this.getLargeResponseWebClient().post()
+				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/rewind", executionId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(body)
+				.retrieve()
+				.bodyToMono(WorkFlowExecutionDetailResult.class)
+				.block();
+	}
+
 	private WorkFlowExecutionDetailResult control(String executionId, String action) {
 		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
 		return this.getLargeResponseWebClient().post()

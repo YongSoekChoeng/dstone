@@ -65,6 +65,37 @@ public class WorkFlowAdminController extends net.dstone.boot.common.biz.BaseCont
 	}
 
 	/**
+	 * 실행을 지난 step으로 되돌리면 무엇이 어떻게 되는지 미리 본다(지울 state, 쓴 파일, 경고). 엔진의 응답을 그대로 넘긴다.
+	 *
+	 * @param executionId 실행 id
+	 * @param fromStep    다시 시작할 step id
+	 */
+	@PostMapping("/rewindPoint.do")
+	public ResponseEntity<Object> rewindPoint(@RequestParam String executionId, @RequestParam String fromStep) {
+		try {
+			return this.json(this.workFlowAdminService.rewindPoint(executionId, fromStep));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 실행을 지난 step으로 되돌려 다시 돌린다. 되돌릴 수 없으면 엔진의 409를 그대로 전한다.
+	 *
+	 * @param executionId 실행 id
+	 * @param fromStep    다시 시작할 step id
+	 * @param clearState  true면 그 step부터 뒤에서 저장한 state 값을 지운다
+	 */
+	@PostMapping("/rewind.do")
+	public ResponseEntity<Object> rewind(@RequestParam String executionId, @RequestParam String fromStep, @RequestParam(defaultValue = "false") boolean clearState) {
+		try {
+			return ResponseEntity.ok((Object) this.workFlowAdminService.rewind(executionId, fromStep, clearState));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
 	 * 실행의 step들이 읽고 쓴 파일 목록이다. 엔진의 응답을 그대로 넘긴다.
 	 *
 	 * @param executionId 실행 id

@@ -1046,6 +1046,49 @@ label.wd-check {
 	gap: 8px;
 }
 
+/* ---------- Workflow 실행 관리: 지난 step부터 다시 ---------- */
+
+/* [여기서 다시]를 누르면 나오는 확인 패널. 일시정지/재개 패널과 같은 모양에 왼쪽 줄로 구분합니다. */
+.wa-rewind {
+	border-left: 3px solid var(--cs-warning);
+}
+
+.wa-rewind-files {
+	margin-top: 6px;
+}
+
+.wa-rewind-files summary {
+	cursor: pointer;
+	color: var(--cs-text-2);
+}
+
+.wa-rewind-files ul {
+	margin: 4px 0 0;
+	padding-left: 18px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+}
+
+.wa-rewind-clear {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	margin-top: 8px;
+	color: var(--cs-text);
+	font-weight: 600;
+}
+
+.wa-rewind-clear input {
+	margin-top: 2px;
+}
+
+.ai-body .document-list-table button.wa-rewind-btn {
+	height: auto;
+	padding: 3px 8px;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
 /* ---------- Workflow 실행 관리: step 문서 ---------- */
 
 /* 스텝 이력의 '문서' 칸에 다는 파일 이름 단추. 작성한 파일은 색을 채우고, 읽기만 한 파일은 테두리만 둡니다. */

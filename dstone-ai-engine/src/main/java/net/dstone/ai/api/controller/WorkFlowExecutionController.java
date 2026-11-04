@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import net.dstone.ai.api.dto.RewindPoint;
 import net.dstone.ai.api.dto.WorkFlowDecisionRequest;
+import net.dstone.ai.api.dto.WorkFlowRewindRequest;
 import net.dstone.ai.api.dto.WorkFlowExecutionDetail;
 import net.dstone.ai.api.dto.WorkFlowExecutionPage;
 import net.dstone.ai.api.dto.WorkFlowExecutionSummary;
@@ -139,6 +141,40 @@ public class WorkFlowExecutionController extends BaseController {
 	public ResponseEntity<Object> resume(@PathVariable String executionId) {
 		try {
 			return ResponseEntity.ok((Object) this.detailOf(this.workFlowExecutionService.resume(executionId), this.maxValueChars()));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 실행을 fromStep으로 되돌리면 무엇이 어떻게 되는지 미리 봅니다. 실제로 바꾸지는 않습니다.
+	 * 되돌릴 수 없어도 200이고, rewindable: false와 problem에 이유가 담깁니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 * @param fromStep    다시 시작할 step의 id(실행 기록에 있는 step)
+	 */
+	@GetMapping("/{executionId}/rewind")
+	public RewindPoint rewindPoint(@PathVariable String executionId, @RequestParam String fromStep) {
+		return this.workFlowExecutionService.rewindPoint(this.workFlowExecutionService.find(executionId), fromStep);
+	}
+
+	/**
+	 * <pre>
+	 * 실행을 지난 step으로 되돌려 그 step부터 다시 돌립니다. 끝날 때까지 기다리지 않고 바로 응답합니다.
+	 * clearState: true면 그 step부터 뒤에서 저장한 state 값을 지우고 시작합니다.
+	 * 되돌릴 수 없으면 409, fromStep이 비었으면 400과 {status, message}를 돌려줍니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 * @param request     {fromStep, clearState}
+	 */
+	@PostMapping("/{executionId}/rewind")
+	public ResponseEntity<Object> rewind(@PathVariable String executionId, @RequestBody WorkFlowRewindRequest request) {
+		try {
+			WorkFlowExecution execution = this.workFlowExecutionService.rewind(executionId, request.fromStep(), request.clear());
+			return ResponseEntity.ok((Object) this.detailOf(execution, this.maxValueChars()));
 		} catch (ResponseStatusException e) {
 			return this.rejected(e);
 		}

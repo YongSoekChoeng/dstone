@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.ai.api.dto.PendingApproval;
 import net.dstone.ai.api.dto.ResumePoint;
+import net.dstone.ai.api.dto.RewindPoint;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
@@ -26,6 +27,9 @@ import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
+import net.dstone.ai.runtime.workflow.file.FileAccessRule;
+import net.dstone.ai.runtime.workflow.file.WorkFlowFileEntry;
+import net.dstone.ai.runtime.workflow.file.WorkFlowFileStore;
 import net.dstone.common.biz.BaseService;
 import net.dstone.common.utils.StringUtil;
 
@@ -47,6 +51,8 @@ public class WorkFlowExecutionService extends BaseService {
 	private WorkFlowExecutionStore executionStore;
 	@Autowired
 	private WorkFlowRegistry workFlowRegistry;
+	@Autowired
+	private WorkFlowFileStore fileStore;
 
 	/**
 	 * 새 실행을 만들고, 끝날 때까지(또는 승인 대기 상태가 될 때까지) 동기로 쭉 돌린 뒤 최종 상태를
@@ -228,6 +234,186 @@ public class WorkFlowExecutionService extends BaseService {
 			warnings.add("이 step은 앞선 시도에서 일부가 이미 끝났을 수 있습니다. 파일을 고치는 일이면 다시 실패하거나 같은 일을 두 번 할 수 있습니다.");
 		}
 		return new ResumePoint(step.id(), step.type().name(), index, true, null, warnings);
+	}
+
+	/**
+	 * <pre>
+	 * 실행을 지난 step으로 되돌려 그 step부터 다시 돌립니다. 현재 등록된 정의로 돕니다.
+	 * 실행 기록에 있는 step만 고를 수 있고, 돌고 있는 실행은 되돌릴 수 없습니다.
+	 *
+	 * clearState가 true면 그 step이 마지막으로 돈 자리부터 뒤에서 저장한 state 이름을 지우고 시작합니다.
+	 * false면 그대로 두는데, 다시 돌 때 경로가 달라지면 예전 값을 읽을 수 있습니다(rewindPoint()의 warnings).
+	 * 어느 쪽이든 그 구간의 아직 쓰지 않은 승인 결정은 지웁니다. step이 고친 파일은 되돌리지 않습니다.
+	 * 실행 기록(step history)은 지우지 않고, 다시 돈 step이 그 뒤에 이어 붙습니다.
+	 * resume()처럼 끝날 때까지 기다리지 않습니다.
+	 * </pre>
+	 *
+	 * @param executionId 되돌릴 실행의 id입니다.
+	 * @param fromStep    다시 시작할 step의 id입니다.
+	 * @param clearState  true면 그 구간에서 저장한 state 값을 지웁니다.
+	 * @return RUNNING으로 바뀐 실행 상태입니다.
+	 * @throws ResponseStatusException 되돌릴 수 없을 때(409), fromStep이 비었을 때(400)
+	 */
+	public WorkFlowExecution rewind(String executionId, String fromStep, boolean clearState) {
+		if (StringUtil.isEmpty(fromStep)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "다시 시작할 step(fromStep)을 보내십시오.");
+		}
+		WorkFlowExecution execution = this.executionStore.find(executionId);
+		RewindPoint point = this.rewindPoint(execution, fromStep);
+		if (!point.rewindable()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, point.problem());
+		}
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
+		if (!this.executionStore.markResumed(execution, point.stepIndex())) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]의 상태가 그사이 바뀌었습니다. 다시 조회하십시오.");
+		}
+		Map<String, Object> context = execution.context();
+		if (clearState) {
+			WorkFlowContext.removeState(context, point.savedNames());
+		}
+		for (String stepId : point.steps()) {
+			WorkFlowContext.clearApproval(context, stepId);
+		}
+		WorkFlowContext.setCurrentStep(context, point.fromStep());
+		WorkFlowExecution rewound = execution.rewound(point.stepIndex());
+		this.executionStore.update(rewound);
+		this.info("workflow[" + workflow.id() + "] 실행[" + executionId + "]을 step[" + point.fromStep() + "]으로 되돌려 다시 돌립니다"
+			+ (clearState ? "(지운 state: " + point.savedNames() + ")." : "(state는 그대로 둡니다)."));
+		CompletableFuture.runAsync(new Runnable() {
+			@Override
+			public void run() {
+				WorkFlowExecutionService.this.workFlowExecutor.run(workflow, rewound);
+			}
+		});
+		return rewound;
+	}
+
+	/**
+	 * <pre>
+	 * 실행을 fromStep으로 되돌리면 무엇이 어떻게 되는지 알려 줍니다. 실제로 바꾸지는 않습니다.
+	 *
+	 * 되돌리는 구간은 fromStep이 실행 기록에서 마지막으로 돈 자리부터 기록 끝까지입니다.
+	 * (forEach step은 "step17[0]", "step17[1]"처럼 여러 줄이라, 마지막으로 이어진 줄 묶음의 첫 줄부터입니다.)
+	 * 막는 경우: 실행 중, 기록에 없는 step, 지금 정의에 없는 step.
+	 * 알리는 경우: 그 구간에서 저장한 state가 남아 있음, 그 구간의 step이 쓴 파일, 정의 버전이 다름,
+	 *             구간의 step 중 지금 정의에 없는 것(그 step이 저장한 이름은 알 수 없음).
+	 * </pre>
+	 *
+	 * @param execution 확인할 실행입니다.
+	 * @param fromStep  다시 시작할 step의 id입니다.
+	 */
+	public RewindPoint rewindPoint(WorkFlowExecution execution, String fromStep) {
+		if (execution.status() == WorkFlowExecutionStatus.RUNNING) {
+			return RewindPoint.blocked(fromStep, "돌고 있는 실행은 되돌릴 수 없습니다. 먼저 일시정지하십시오.");
+		}
+		WorkFlowDefinition workflow;
+		try {
+			workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
+		} catch (RuntimeException e) {
+			return RewindPoint.blocked(fromStep, "Workflow[" + execution.workflowId() + "] 정의를 찾지 못해 되돌릴 수 없습니다: " + e.getMessage());
+		}
+
+		// 1) 실행 기록에서 fromStep이 마지막으로 돈 자리를 찾습니다.
+		List<StepHistoryEntry> history = this.executionStore.findHistory(execution.executionId());
+		int start = -1;
+		for (int i = history.size() - 1; i >= 0; i--) {
+			if (fromStep.equals(baseStepId(history.get(i).stepId()))) {
+				start = i;
+				break;
+			}
+		}
+		if (start < 0) {
+			return RewindPoint.blocked(fromStep, "step[" + fromStep + "]은 이 실행의 기록에 없습니다. 이미 돈 step만 고를 수 있습니다.");
+		}
+		while (start > 0 && fromStep.equals(baseStepId(history.get(start - 1).stepId()))) {
+			start--;
+		}
+
+		// 2) 지금 정의에서 그 step을 찾습니다.
+		List<StepDefinition> definitionSteps = workflow.steps();
+		int index = -1;
+		for (int i = 0; i < definitionSteps.size(); i++) {
+			if (definitionSteps.get(i).id().equals(fromStep)) {
+				index = i;
+			}
+		}
+		if (index < 0) {
+			return RewindPoint.blocked(fromStep, "step[" + fromStep + "]이 지금 정의에 없어 되돌릴 수 없습니다.");
+		}
+
+		// 3) 그 자리부터 기록 끝까지 돈 step들과, 그 step들이 저장해 지금 state에 남아 있는 이름을 모읍니다.
+		List<String> warnings = new ArrayList<>();
+		List<String> rangeSteps = new ArrayList<>();
+		for (int i = start; i < history.size(); i++) {
+			String stepId = baseStepId(history.get(i).stepId());
+			if (!rangeSteps.contains(stepId)) {
+				rangeSteps.add(stepId);
+			}
+		}
+		// WAITING_APPROVAL이면 기다리는 APPROVAL step은 아직 기록이 없지만, 구간에 들어갑니다.
+		String currentStepId = WorkFlowContext.currentStep(execution.context());
+		if (currentStepId != null && execution.status() == WorkFlowExecutionStatus.WAITING_APPROVAL && !rangeSteps.contains(currentStepId)) {
+			rangeSteps.add(currentStepId);
+		}
+		Map<String, Object> state = WorkFlowContext.state(execution.context());
+		List<String> savedNames = new ArrayList<>();
+		List<String> unknownSteps = new ArrayList<>();
+		for (String stepId : rangeSteps) {
+			StepDefinition step = this.stepOf(definitionSteps, stepId);
+			if (step == null) {
+				unknownSteps.add(stepId);
+				continue;
+			}
+			for (String name : step.output().values()) {
+				if (state.containsKey(name) && !savedNames.contains(name)) {
+					savedNames.add(name);
+				}
+			}
+		}
+		if (!savedNames.isEmpty()) {
+			warnings.add("step[" + fromStep + "]부터 뒤에서 저장한 값이 state에 남아 있습니다: " + String.join(", ", savedNames)
+				+ ". 지우지 않으면 다시 돌 때 경로가 달라질 경우 예전 값을 읽을 수 있습니다.");
+		}
+		if (!unknownSteps.isEmpty()) {
+			warnings.add("step " + unknownSteps + "은 지금 정의에 없어, 그 step이 저장한 state 이름은 알 수 없습니다(지우지 못합니다).");
+		}
+
+		// 4) 그 구간의 step이 쓴 파일. 되돌려도 원래대로 돌아가지 않습니다.
+		List<String> writtenFiles = new ArrayList<>();
+		for (WorkFlowFileEntry entry : this.fileStore.list(execution.executionId())) {
+			if (FileAccessRule.WRITE.equals(entry.action()) && rangeSteps.contains(entry.stepId()) && !writtenFiles.contains(entry.path())) {
+				writtenFiles.add(entry.path());
+			}
+		}
+		if (!writtenFiles.isEmpty()) {
+			warnings.add("이 구간의 step이 쓴 파일 " + writtenFiles.size() + "개는 원래대로 돌아가지 않습니다. 고친 파일을 다시 고치는 step은 원문을 찾지 못해 실패할 수 있습니다.");
+		}
+
+		String startedVersion = WorkFlowContext.definitionVersion(execution.context());
+		if (startedVersion != null && !startedVersion.equals(workflow.version())) {
+			warnings.add("정의 버전이 시작할 때(" + startedVersion + ")와 다릅니다(지금 " + workflow.version() + "). 지금 정의로 다시 돕니다.");
+		}
+		StepDefinition step = definitionSteps.get(index);
+		return new RewindPoint(fromStep, step.type().name(), index, true, null, rangeSteps, savedNames, writtenFiles, warnings);
+	}
+
+	/** id로 step 정의를 찾습니다. 없으면 null입니다. */
+	private StepDefinition stepOf(List<StepDefinition> steps, String stepId) {
+		for (StepDefinition step : steps) {
+			if (step.id().equals(stepId)) {
+				return step;
+			}
+		}
+		return null;
+	}
+
+	/** forEach step의 기록은 "step17[0]"처럼 순번이 붙습니다. 순번을 떼어 step id만 돌려줍니다. */
+	private static String baseStepId(String historyStepId) {
+		if (historyStepId == null) {
+			return "";
+		}
+		int bracket = historyStepId.lastIndexOf('[');
+		return bracket > 0 && historyStepId.endsWith("]") ? historyStepId.substring(0, bracket) : historyStepId;
 	}
 
 	/** 일시정지 요청이 들어와 있는지 돌려줍니다. @param executionId 확인할 실행의 id입니다. */

@@ -118,6 +118,26 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					</div>
 				</div>
 
+				<%-- 스텝 이력의 [여기서 다시]를 누르면 나온다. 무엇이 남고 무엇을 지울지 보여 주고 확인을 받는다 --%>
+				<div id="workflow-admin-rewind" class="wa-control wa-rewind" style="display:none;">
+					<div class="wa-control-text">
+						<div id="workflow-admin-rewind-message"></div>
+						<ul id="workflow-admin-rewind-warnings" class="wa-control-warnings"></ul>
+						<details id="workflow-admin-rewind-files" class="wa-rewind-files" style="display:none;">
+							<summary></summary>
+							<ul></ul>
+						</details>
+						<label id="workflow-admin-rewind-clear-label" class="wa-rewind-clear" style="display:none;">
+							<input type="checkbox" id="workflow-admin-rewind-clear" /> <span></span>
+						</label>
+					</div>
+					<div class="wa-control-buttons">
+						<span id="workflow-admin-rewind-status" class="workflow-status"></span>
+						<button type="button" id="workflow-admin-rewind-run-btn">다시 실행</button>
+						<button type="button" id="workflow-admin-rewind-cancel-btn" class="kn-plain">취소</button>
+					</div>
+				</div>
+
 				<div class="kn-section-title">스텝 이력</div>
 				<div class="wa-table-scroll">
 					<table id="workflow-admin-history-table" class="document-list-table wa-table">
@@ -130,6 +150,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							<col />
 							<col style="width:18%" />
 							<col style="width:160px" />
+							<col style="width:96px" />
 						</colgroup>
 						<thead>
 							<tr>
@@ -141,6 +162,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 								<th>내용/사유</th>
 								<th>문서</th>
 								<th>시각</th>
+								<th></th>
 							</tr>
 						</thead>
 						<tbody id="workflow-admin-history-body"></tbody>
@@ -251,6 +273,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			decisionUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/decision.do",
 			pauseUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/pause.do",
 			resumeUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/resume.do",
+			rewindPointUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/rewindPoint.do",
+			rewindUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/rewind.do",
 			filesUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/files.do",
 			fileContentUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/fileContent.do",
 			saveFileUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/saveFile.do"

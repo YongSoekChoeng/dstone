@@ -7,6 +7,9 @@ var DstoneAiWorkflowAdmin = (function () {
 
 	var controlEl, controlMessageEl, controlWarningsEl, controlStatusEl, pauseBtn, resumeBtn;
 	var docsBodyEl, docsAllEl, docsCountEl;
+	var rewindEl, rewindMessageEl, rewindWarningsEl, rewindFilesEl, rewindClearLabelEl, rewindClearEl, rewindStatusEl, rewindRunBtn;
+	// [여기서 다시]로 고른 step의 미리보기(엔진 GET .../rewind 응답). 패널을 닫으면 비운다.
+	var currentRewind = null;
 
 	var PAGE_SIZE = 10;
 	var POLL_MILLIS = 3000;
@@ -59,6 +62,17 @@ var DstoneAiWorkflowAdmin = (function () {
 		docsAllEl = document.getElementById("workflow-admin-docs-all");
 		docsCountEl = document.getElementById("workflow-admin-docs-count");
 		docsAllEl.addEventListener("change", renderDocs);
+
+		rewindEl = document.getElementById("workflow-admin-rewind");
+		rewindMessageEl = document.getElementById("workflow-admin-rewind-message");
+		rewindWarningsEl = document.getElementById("workflow-admin-rewind-warnings");
+		rewindFilesEl = document.getElementById("workflow-admin-rewind-files");
+		rewindClearLabelEl = document.getElementById("workflow-admin-rewind-clear-label");
+		rewindClearEl = document.getElementById("workflow-admin-rewind-clear");
+		rewindStatusEl = document.getElementById("workflow-admin-rewind-status");
+		rewindRunBtn = document.getElementById("workflow-admin-rewind-run-btn");
+		rewindRunBtn.addEventListener("click", runRewind);
+		document.getElementById("workflow-admin-rewind-cancel-btn").addEventListener("click", closeRewind);
 
 		// step 문서 팝업. 저장하면 목록(크기, 수정 시각)을 다시 읽는다.
 		DstoneAiDocViewer.init({
@@ -182,6 +196,10 @@ var DstoneAiWorkflowAdmin = (function () {
 			openHistory = {};
 			controlStatusEl.textContent = "";
 			currentFiles = null;
+			closeRewind();
+		}
+		if (detail.status === "RUNNING") {
+			closeRewind();
 		}
 		activeExecutionId = detail.executionId;
 		currentDetail = detail;
@@ -212,11 +230,13 @@ var DstoneAiWorkflowAdmin = (function () {
 				"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : h.durationMs) + "</td>" +
 				"<td class=\"wa-text-cell\"></td>" +
 				"<td class=\"wa-doc-cell\"></td>" +
-				"<td>" + escapeHtml(formatTime(h.executedAt)) + "</td>";
+				"<td>" + escapeHtml(formatTime(h.executedAt)) + "</td>" +
+				"<td class=\"wa-rewind-cell\"></td>";
 			fillHistoryText(tr.querySelector(".wa-text-cell"), h.success ? h.outputSummary : h.failureReason, !h.success, index);
 			tr.setAttribute("data-step-id", h.stepId || "");
 			historyBodyEl.appendChild(tr);
 		});
+		renderRewindButtons(detail);
 		renderHistoryDocs();
 		renderDocs();
 		loadFiles(detail.executionId);
@@ -463,6 +483,142 @@ var DstoneAiWorkflowAdmin = (function () {
 			var li = document.createElement("li");
 			li.textContent = warning;
 			controlWarningsEl.appendChild(li);
+		});
+	}
+
+	// 스텝 이력의 [여기서 다시] 버튼. step마다 마지막으로 돈 줄에 하나만 단다(forEach 반복 줄은 묶어서 하나).
+	// 돌고 있는 실행은 되돌릴 수 없어 버튼을 잠근다.
+	function renderRewindButtons(detail) {
+		var rows = historyBodyEl.querySelectorAll("tr[data-step-id]");
+		var lastRowOfStep = {};
+		Array.prototype.forEach.call(rows, function (tr) {
+			lastRowOfStep[baseStepId(tr.getAttribute("data-step-id"))] = tr;
+		});
+		Object.keys(lastRowOfStep).forEach(function (stepId) {
+			if (!stepId) {
+				return;
+			}
+			var button = document.createElement("button");
+			button.type = "button";
+			button.className = "kn-plain wa-rewind-btn";
+			button.textContent = "여기서 다시";
+			button.title = stepId + " step부터 다시 실행합니다";
+			button.disabled = detail.status === "RUNNING";
+			button.addEventListener("click", function () { openRewind(stepId); });
+			lastRowOfStep[stepId].querySelector(".wa-rewind-cell").appendChild(button);
+		});
+	}
+
+	// 고른 step으로 되돌리면 무엇이 남고 무엇을 지울 수 있는지 엔진에 물어 패널에 보여 준다.
+	function openRewind(stepId) {
+		var executionId = activeExecutionId;
+		var params = new URLSearchParams();
+		params.set("executionId", executionId);
+		params.set("fromStep", stepId);
+		rewindEl.style.display = "";
+		rewindMessageEl.textContent = stepId + " step을 확인하는 중입니다...";
+		rewindWarningsEl.innerHTML = "";
+		rewindFilesEl.style.display = "none";
+		rewindClearLabelEl.style.display = "none";
+		rewindStatusEl.textContent = "";
+		rewindRunBtn.disabled = true;
+		currentRewind = null;
+		fetchJson(urls.rewindPointUrl + "?" + params.toString())
+			.then(function (point) {
+				if (executionId !== activeExecutionId) {
+					return;
+				}
+				renderRewind(point);
+			})
+			.catch(function (err) {
+				rewindMessageEl.textContent = "확인하지 못했습니다: " + err.message;
+			});
+		rewindEl.scrollIntoView({ block: "nearest" });
+	}
+
+	function renderRewind(point) {
+		currentRewind = point;
+		rewindWarningsEl.innerHTML = "";
+		if (!point.rewindable) {
+			rewindMessageEl.textContent = point.problem;
+			rewindRunBtn.disabled = true;
+			return;
+		}
+		rewindMessageEl.textContent = point.fromStep + " (" + point.stepType + ") step부터 다시 실행합니다. 되돌리는 구간: " + (point.steps || []).join(" → ");
+		(point.warnings || []).forEach(function (warning) {
+			var li = document.createElement("li");
+			li.textContent = warning;
+			rewindWarningsEl.appendChild(li);
+		});
+
+		var files = point.writtenFiles || [];
+		rewindFilesEl.style.display = files.length > 0 ? "" : "none";
+		rewindFilesEl.open = false;
+		rewindFilesEl.querySelector("summary").textContent = "되돌려지지 않는 파일 " + files.length + "개 보기";
+		var fileList = rewindFilesEl.querySelector("ul");
+		fileList.innerHTML = "";
+		files.forEach(function (path) {
+			var li = document.createElement("li");
+			li.textContent = path;
+			fileList.appendChild(li);
+		});
+
+		var names = point.savedNames || [];
+		rewindClearLabelEl.style.display = names.length > 0 ? "" : "none";
+		rewindClearEl.checked = false;
+		rewindClearLabelEl.querySelector("span").textContent = "남아 있는 state 값을 지우고 시작 (" + names.join(", ") + ")";
+		rewindRunBtn.disabled = false;
+	}
+
+	function runRewind() {
+		var point = currentRewind;
+		if (!point || !point.rewindable) {
+			return;
+		}
+		var clear = rewindClearEl.checked && (point.savedNames || []).length > 0;
+		var message = point.fromStep + " step부터 다시 실행할까요?\n\n"
+			+ (clear ? "지울 state 값: " + point.savedNames.join(", ") : "state 값은 지우지 않습니다.");
+		if ((point.writtenFiles || []).length > 0) {
+			message += "\n이 구간에서 쓴 파일 " + point.writtenFiles.length + "개는 되돌려지지 않습니다.";
+		}
+		if (!window.confirm(message)) {
+			return;
+		}
+		var params = new URLSearchParams();
+		params.set("executionId", activeExecutionId);
+		params.set("fromStep", point.fromStep);
+		params.set("clearState", clear ? "true" : "false");
+		rewindStatusEl.textContent = "요청 중입니다...";
+		rewindRunBtn.disabled = true;
+		fetchJson(urls.rewindUrl + "?" + params.toString())
+			.then(function (detail) {
+				closeRewind();
+				renderDetail(detail);
+				loadList(currentPage);
+			})
+			.catch(function (err) {
+				rewindStatusEl.textContent = "처리 실패: " + err.message;
+				rewindRunBtn.disabled = false;
+			});
+	}
+
+	function closeRewind() {
+		currentRewind = null;
+		if (rewindEl) {
+			rewindEl.style.display = "none";
+			rewindStatusEl.textContent = "";
+		}
+	}
+
+	// POST로 부르고, 실패 응답이면 본문의 message로 오류를 낸다.
+	function fetchJson(url) {
+		return fetch(url, { method: "POST" }).then(function (response) {
+			return response.json().then(function (body) {
+				if (!response.ok) {
+					throw new Error(body.message || ("서버 오류(" + response.status + ")"));
+				}
+				return body;
+			});
 		});
 	}
 

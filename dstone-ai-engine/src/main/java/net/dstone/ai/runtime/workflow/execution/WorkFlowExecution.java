@@ -133,6 +133,18 @@ public record WorkFlowExecution(
 
 	/**
 	 * <pre>
+	 * 지난 step으로 되돌려 다시 돌릴 때의 상태를 만듭니다. 끝난 실행이었다면 그 결과도 지웁니다.
+	 * </pre>
+	 *
+	 * @param stepIndex 다시 시작할 스텝이 몇 번째인지입니다.
+	 * @return status가 RUNNING이고 결과와 실패 사유가 비워진 새 WorkFlowExecution입니다.
+	 */
+	public WorkFlowExecution rewound(int stepIndex) {
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.context, null, null, this.createdAt, Instant.now());
+	}
+
+	/**
+	 * <pre>
 	 * step이 LLM을 부를 때 쓸 대화방 id를 돌려줍니다.
 	 * - memory: true인 step: sessionId:stepId (같은 step이 다시 불리면 이전에 자기가 나눈 대화를 기억합니다)
 	 * - 그 밖의 step: null (대화 기억 없이 input만 보고 답합니다)
