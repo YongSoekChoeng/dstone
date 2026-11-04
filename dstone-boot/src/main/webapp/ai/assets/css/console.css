@@ -1126,8 +1126,8 @@ body.wa-doc-open {
 .wa-doc-box {
 	display: flex;
 	flex-direction: column;
-	width: min(1180px, 96vw);
-	height: min(860px, 92vh);
+	width: min(1560px, 96vw);
+	height: min(900px, 92vh);
 	background: var(--cs-surface);
 	border: 1px solid var(--cs-border);
 	border-radius: var(--cs-radius-lg);
@@ -1250,12 +1250,12 @@ body.wa-doc-open {
 	display: flex;
 }
 
-/* 보기: GitHub처럼 읽기 좋은 폭으로 가운데에 둡니다. */
+/* 보기: 팝업 폭을 거의 다 씁니다. 분석서는 넓은 표가 많아서, 폭을 좁게 묶으면 표가 읽기 어렵습니다. */
 .wa-doc-view {
 	flex: 1;
 	min-width: 0;
 	overflow: auto;
-	padding: 28px max(24px, calc((100% - 900px) / 2));
+	padding: 28px 2.5%;
 	scroll-behavior: smooth;
 }
 
@@ -1306,6 +1306,25 @@ body.wa-doc-open {
 .wa-doc-modal .markdown-body pre,
 .wa-doc-modal .markdown-body code {
 	font-family: var(--cs-mono);
+}
+
+/*
+ * 표는 본문 폭을 꽉 채웁니다(github-markdown-css는 글자 길이만큼만 넓혀서 표가 좁게 보입니다).
+ * 칸이 많아 폭을 넘는 표는 그 표만 가로로 스크롤합니다.
+ */
+.wa-doc-modal .markdown-body table {
+	display: table;
+	width: 100%;
+	max-width: none;
+}
+
+.wa-doc-modal .markdown-body .wa-doc-table-wrap {
+	overflow-x: auto;
+	margin-bottom: 16px;
+}
+
+.wa-doc-modal .markdown-body .wa-doc-table-wrap > table {
+	margin-bottom: 0;
 }
 
 /* highlight.js가 칠한 코드 블록은 GitHub 코드 블록 배경을 그대로 씁니다. */

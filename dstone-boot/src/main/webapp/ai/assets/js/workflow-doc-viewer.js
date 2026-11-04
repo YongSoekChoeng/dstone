@@ -348,6 +348,7 @@ var DstoneAiDocViewer = (function () {
 		var extension = extensionOf(path);
 		if (extension === "md" || extension === "markdown") {
 			target.innerHTML = markdownToHtml(text);
+			wrapTables(target);
 			highlightBlocks(target);
 		} else {
 			target.innerHTML = "";
@@ -371,6 +372,16 @@ var DstoneAiDocViewer = (function () {
 		var html = marked.parse(text || "", { gfm: true, breaks: false });
 		// LLM이 쓴 문서라 script나 이벤트 속성이 섞일 수 있다. 화면에 넣기 전에 반드시 걸러낸다.
 		return window.DOMPurify ? DOMPurify.sanitize(html) : escapeHtml(text);
+	}
+
+	// 표를 감싸서, 칸이 많아 본문 폭을 넘는 표는 그 표만 가로로 스크롤되게 한다(본문 전체가 밀리지 않는다).
+	function wrapTables(target) {
+		Array.prototype.forEach.call(target.querySelectorAll("table"), function (table) {
+			var wrap = document.createElement("div");
+			wrap.className = "wa-doc-table-wrap";
+			table.parentNode.insertBefore(wrap, table);
+			wrap.appendChild(table);
+		});
 	}
 
 	// 코드 블록에 색을 칠한다. 아주 큰 블록은 브라우저가 멈추지 않게 건너뛴다.
