@@ -108,3 +108,19 @@ sm `WorkFlowTest`의 실패 3건은 제 변경을 뺀 상태에서도 똑같이 
 - 실제 LLM으로 `sm-workflow`를 다시 돌려 보지는 않았습니다.
 
 Windows 쪽 인스턴스에 반영하려면 git으로 받아서 다시 빌드하고 재기동해야 합니다. 커밋은 아직 하지 않았습니다.
+
+---
+
+## 질문
+
+올려줘.
+
+---
+
+## 답변
+
+커밋해서 `origin/main`에 올렸습니다. 커밋은 `64d45dc7`이고, 지금 로컬과 원격이 같은 상태입니다.
+
+이번 수정 파일 4개만 넣었습니다. 엔진 클래스 `UnknownToolGuard`, 그 클래스를 등록하는 `ConfigChatClient` 수정, 테스트, `docs/09.dstone-ai-engine.md`입니다.
+
+Windows 쪽 인스턴스에 반영하려면 그쪽 클론에서 받은 뒤 `dstone-ai-engine`을 다시 빌드하고 재기동해야 합니다.
