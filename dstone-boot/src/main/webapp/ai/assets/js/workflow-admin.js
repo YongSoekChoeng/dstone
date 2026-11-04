@@ -433,16 +433,21 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	/*
-	 * 같은 문서가 여러 번 나오면 가장 최근 것 하나만 남긴다.
+	 * 같은 문서(md)가 여러 번 나오면 가장 최근 것 하나만 남긴다.
 	 * 재실행 때마다 새 폴더에 문서를 만드는 Workflow는 '01.요구사항.md'가 회차 수만큼 쌓이기 때문이다.
-	 * 같은 문서 = 파일 이름이 같고, 그 파일을 다룬 step도 같은 것(폴더만 다르다).
+	 * 같은 문서 = 파일 이름이 같은 md 문서(폴더는 달라도 된다).
+	 * md가 아닌 파일(소스 등)은 이름이 같아도 다른 파일인 경우가 많아 지우지 않고 모두 보여 준다.
 	 * 가장 최근 = step이 마지막으로 건드린 시각(lastAt)이 가장 늦은 것. 자리는 처음 나온 자리를 지킨다.
 	 */
 	function latestOnly(files) {
 		var result = [];
 		var indexOfKey = {};
 		files.forEach(function (file) {
-			var key = sameDocKey(file);
+			if (!isDocument(file)) {
+				result.push(file);
+				return;
+			}
+			var key = file.name;
 			if (!Object.prototype.hasOwnProperty.call(indexOfKey, key)) {
 				indexOfKey[key] = result.length;
 				result.push(file);
@@ -451,17 +456,6 @@ var DstoneAiWorkflowAdmin = (function () {
 			}
 		});
 		return result;
-	}
-
-	function sameDocKey(file) {
-		var stepIds = [];
-		(file.steps || []).forEach(function (step) {
-			if (stepIds.indexOf(step.stepId) < 0) {
-				stepIds.push(step.stepId);
-			}
-		});
-		stepIds.sort();
-		return file.name + "|" + stepIds.join(",");
 	}
 
 	function lastTouched(file) {
