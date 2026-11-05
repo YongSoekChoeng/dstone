@@ -37,6 +37,7 @@ import net.dstone.ai.common.consts.Constants;
  * - 목록(readFileListAll): 소스와 상관없는 폴더(.git, target 등)는 빼고, 개수 상한까지만 줍니다.
  * - 검색(searchInFiles): 키워드가 들어 있는 "파일:줄번호: 그 줄"만, 건수 상한까지만 줍니다.
  * - 읽기(readFile/readFileLines/readFileTail): 앞부분 또는 끝부분만 글자 수 상한까지 줍니다.
+ *   readFileLines를 범위 없이 부르면 줄 수 상한(기본 300줄)까지만 줍니다.
  * 잘렸을 때는 결과에 그 사실과 "어떻게 좁히면 되는지"를 적어 모델이 다음 행동을 정할 수 있게 합니다.
  * </pre>
  */
@@ -45,6 +46,8 @@ public class FileTool {
 
 	/** 설정이 없을 때 쓰는 읽기 상한입니다(대략 1만 토큰 안팎). */
 	private static final int DEFAULT_MAX_READ_CHARS = 30000;
+	/** 설정이 없을 때, readFileLines를 범위 없이 부르면 이 줄 수까지만 줍니다. */
+	private static final int DEFAULT_MAX_LINES_WITHOUT_RANGE = 300;
 	/** 설정이 없을 때 쓰는 파일 목록 개수 상한입니다. */
 	private static final int DEFAULT_MAX_LIST_FILES = 500;
 	/** 설정이 없을 때, 파일이 이 개수를 넘으면 파일 이름 대신 폴더별 개수만 줍니다. */
@@ -249,12 +252,67 @@ public class FileTool {
 	 * </pre>
 	 */
 	@Tool(description = "절대경로 fileFullPath의 파일을 '줄번호: 그 줄 내용' 형식으로 읽어서 반환한다. 어느 줄에 무엇이 있는지(줄 번호) 확인하거나 문서에 줄 번호를 적을 때 사용한다. "
-		+ "줄을 직접 세지 말고 이 Tool의 줄 번호를 그대로 써라. startLine/endLine으로 필요한 구간만 읽을 수 있다(searchInFiles가 알려 준 줄 번호의 앞뒤를 볼 때 좋다). "
+		+ "줄을 직접 세지 말고 이 Tool의 줄 번호를 그대로 써라. startLine/endLine으로 필요한 구간만 읽어라(searchInFiles가 알려 준 줄 번호의 앞뒤를 볼 때 좋다). "
+		+ "startLine과 endLine을 둘 다 비우면 파일이 길 때 앞부분만 반환한다. "
 		+ "구간이 크면 앞부분만 반환하고 어디까지 반환했는지 안내를 붙인다. 이 결과는 줄 번호가 붙어 있으므로 writeFile의 내용으로 그대로 쓰면 안 된다.")
 	public String readFileLines(
 			@ToolParam(description = "읽을 파일의 절대경로(파일명 포함)") String fileFullPath,
 			@ToolParam(required = false, description = "읽기 시작할 줄 번호(1부터). 비워두면 첫 줄부터") Integer startLine,
 			@ToolParam(required = false, description = "마지막으로 읽을 줄 번호(이 줄 포함). 비워두면 끝까지") Integer endLine) {
+		// 범위를 하나도 주지 않으면 앞부분만 줍니다(이유는 readLinesWithoutRange의 설명 참고).
+		if (startLine == null && endLine == null) {
+			return this.readLinesWithoutRange(fileFullPath);
+		}
+		return this.readNumberedLines(fileFullPath, startLine, endLine);
+	}
+
+	/**
+	 * <pre>
+	 * readFileLines를 범위 없이 불렀을 때의 처리입니다.
+	 * 파일이 max-lines-without-range(기본 300줄)보다 길면 그만큼만 주고, 범위를 정해 다시 부르라고 안내합니다.
+	 *
+	 * 왜 막는가:
+	 * 프롬프트에 "필요한 범위만 읽는다"고 적어도, 실제 실행(sm-workflow, 2026-11-05)에서는 readFileLines 200번 중
+	 * 146번이 범위 없이 불렸고 읽은 글자의 88%가 거기서 나왔습니다. 읽은 내용은 그 뒤의 LLM 호출마다 다시 실려 가므로
+	 * 큰 파일 하나가 그 Agent 호출 전체를 느리게 만듭니다.
+	 * 짧은 파일은 통째로 읽어도 되므로 줄 수로만 막습니다.
+	 * </pre>
+	 */
+	private String readLinesWithoutRange(String fileFullPath) {
+		int maxLines = this.intProperty("max-lines-without-range", DEFAULT_MAX_LINES_WITHOUT_RANGE);
+		String contents = this.readOrNull(fileFullPath);
+		if (contents == null) {
+			return this.readNumberedLines(fileFullPath, null, null);
+		}
+		int totalLines = countLines(contents);
+		if (totalLines <= maxLines) {
+			return this.readNumberedLines(fileFullPath, null, null);
+		}
+		String head = this.readNumberedLines(fileFullPath, Integer.valueOf(1), Integer.valueOf(maxLines));
+		return head + "\n(안내: startLine과 endLine 없이 불러서 앞 " + maxLines + "줄만 반환했습니다. 파일은 전체 " + totalLines + "줄입니다. "
+			+ "searchInFiles로 필요한 위치를 찾은 뒤 startLine/endLine으로 그 구간만 읽으세요. 이어서 보려면 startLine=" + (maxLines + 1) + "로 다시 호출하세요.)";
+	}
+
+	/** 줄바꿈으로 끝나는 마지막 빈 조각은 세지 않은 줄 수입니다(readNumberedLines와 같은 방식). */
+	private static int countLines(String contents) {
+		String[] lines = contents.split("\r?\n", -1);
+		int totalLines = lines.length;
+		if (totalLines > 0 && lines[totalLines - 1].isEmpty()) {
+			totalLines--;
+		}
+		return totalLines;
+	}
+
+	/**
+	 * <pre>
+	 * 파일을 "줄번호: 그 줄 내용" 모양으로 읽습니다. 범위가 없어도 줄 수로 자르지 않습니다(글자 수 상한만 있습니다).
+	 * readItemFiles처럼 LLM이 아니라 엔진이 파일을 읽어 넘기는 Tool은 이 메서드를 씁니다.
+	 * </pre>
+	 *
+	 * @param startLine 읽기 시작할 줄 번호(1부터). null이면 첫 줄부터
+	 * @param endLine   마지막으로 읽을 줄 번호(이 줄 포함). null이면 끝까지
+	 */
+	public String readNumberedLines(String fileFullPath, Integer startLine, Integer endLine) {
 		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
 			return CANNOT_READ_MESSAGE + fileFullPath;
@@ -891,7 +949,7 @@ public class FileTool {
 	}
 
 	/** 줄 번호로 온 값을 숫자로 바꿉니다. JSON에서 온 값이라 숫자일 수도, 글자("12")일 수도 있습니다. 숫자가 아니면 null입니다. */
-	static Integer lineNumberOf(Object value) {
+	public static Integer lineNumberOf(Object value) {
 		if (value == null) {
 			return null;
 		}

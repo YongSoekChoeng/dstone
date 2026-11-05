@@ -6,9 +6,13 @@
 # 파일이 없으면 TOOL step이 실패하므로, 앞 step이 문서를 저장하지 못한 채 다음으로 넘어가지 않습니다.
 #
 # 다시 돌릴 때는 리뷰 사유와 승인 화면에 적은 의견이 Agent의 feedback으로 전달됩니다. 의견을 적어야 같은 결과가 되풀이되지 않습니다.
+#
+# 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣고,
+# 뒤의 step은 ${input}/${state.now}로 씁니다. 날짜 하나를 얻으려고 LLM을 부르지 않으려는 것입니다
+# (Agent로 할 때는 같은 Tool을 12번 되풀이한 적이 있습니다).
 ################################################################################################################
 id: sm-workflow
-version: 1.2.0
+version: 1.3.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -23,10 +27,11 @@ steps:
 
   - id: step00
     name: 사전작업
-    type: AGENT
-    with: ${input}
-    agent: sm-ready-agent
-    save: ready
+    type: TOOL
+    tool: getToDate
+    with:
+      format: yyyyMMdd-HHmm
+    save: now
     next: step01
     onFailure: FAIL
 
@@ -45,7 +50,7 @@ steps:
     type: AGENT
     agent: sm-requirement-analyze-agent
     with:
-      base_dir: ${state.ready.base_dir}
+      base_dir: ${input}/${state.now}
       request: ${state.request}
       feedback: |-
         ${state.review.reason:}
@@ -59,7 +64,7 @@ steps:
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${state.ready.base_dir}/01.customer_requirement.md
+      fileFullPath: ${input}/${state.now}/01.customer_requirement.md
     save: requirement
     next: step04
     onFailure: FAIL
@@ -69,7 +74,7 @@ steps:
     type: SUPERVISOR
     agent: sm-requirement-analyze-reviewer-agent
     with:
-      base_dir: ${state.ready.base_dir}
+      base_dir: ${input}/${state.now}
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
@@ -92,7 +97,7 @@ steps:
     type: AGENT
     agent: sm-analyze-impact-agent
     with:
-      base_dir: ${state.ready.base_dir}
+      base_dir: ${input}/${state.now}
       request: ${state.request}
       requirement: ${state.requirement}
       feedback: |-
@@ -118,7 +123,7 @@ steps:
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${state.ready.base_dir}/02.impact.md
+      fileFullPath: ${input}/${state.now}/02.impact.md
     save: impact
     next: step09
     onFailure: FAIL
@@ -128,7 +133,7 @@ steps:
     type: AGENT
     agent: sm-architect-agent
     with:
-      base_dir: ${state.ready.base_dir}
+      base_dir: ${input}/${state.now}
       request: ${state.request}
       requirement: ${state.requirement}
       impact: ${state.impact}
@@ -153,7 +158,7 @@ steps:
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${state.ready.base_dir}/03-1.design.md
+      fileFullPath: ${input}/${state.now}/03-1.design.md
     save: design
     next: step12
     onFailure: FAIL
@@ -163,7 +168,7 @@ steps:
     type: TOOL
     tool: readFile
     with:
-      fileFullPath: ${state.ready.base_dir}/03-2.taskitems.md
+      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
     save: taskitems
     next: step13
     onFailure: FAIL
@@ -173,7 +178,7 @@ steps:
     type: AGENT
     agent: sm-developer-agent
     with:
-      base_dir: ${state.ready.base_dir}
+      base_dir: ${input}/${state.now}
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
@@ -203,7 +208,7 @@ state:
   designApproval: 설계 승인 결과
   design: 상세 설계서 내용
   taskitems: 태스크아이템 목록 내용
-  ready: 기본정보
+  now: 작업을 시작한 시각(yyyyMMdd-HHmm). 작업 폴더 이름으로 쓴다
   developApproval: step14 step의 결과
   impactPath: step09 step의 결과
   architectPath: step09 step의 결과

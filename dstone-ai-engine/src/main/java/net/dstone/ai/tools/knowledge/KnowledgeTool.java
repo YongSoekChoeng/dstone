@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -39,14 +40,20 @@ import net.dstone.common.utils.StringUtil;
 @AiTool
 public class KnowledgeTool extends BaseObject {
 
-	/** 검색 결과 한 건의 본문을 이 글자 수까지만 돌려준다. 결과는 대화에 쌓여 매번 다시 보내지므로 짧게 유지한다 */
-	private static final int MAX_CONTENT_CHARS = 1500;
+	/**
+	 * 설정(dstone.ai.tool.knowledge.max-content-chars)이 없을 때, 검색 결과 한 건의 본문을 이 글자 수까지만 돌려준다.
+	 * 결과는 대화에 쌓여 매번 다시 보내지므로 짧게 유지한다
+	 */
+	private static final int DEFAULT_MAX_CONTENT_CHARS = 1500;
 
 	/** 목록 하나에서 돌려주는 최대 줄 수. 넘으면 몇 건이 더 있는지만 알린다 */
 	private static final int MAX_LINES = 60;
 
 	@Autowired
 	private KnowledgeClient knowledgeClient;
+
+	@Autowired
+	private Environment environment;
 
 	@Tool(description = "dstone-knowledge에 분석해 둔 Java 프로젝트 목록을 돌려준다. 다른 knowledge Tool에 넘길 projectId를 모를 때 먼저 부른다.")
 	public String knowledgeListProjects() {
@@ -109,7 +116,8 @@ public class KnowledgeTool extends BaseObject {
 				}
 				sb.append('\n');
 				String content = text(hit, "content");
-				sb.append(content.length() > MAX_CONTENT_CHARS ? content.substring(0, MAX_CONTENT_CHARS) + "\n...(생략)" : content).append("\n\n");
+				int maxChars = this.maxContentChars();
+				sb.append(content.length() > maxChars ? content.substring(0, maxChars) + "\n...(생략)" : content).append("\n\n");
 			}
 			return sb.toString();
 		} catch (KnowledgeCallException e) {
@@ -307,6 +315,12 @@ public class KnowledgeTool extends BaseObject {
 
 	private JsonNode post(String path, Map<String, Object> body) throws KnowledgeCallException {
 		return this.knowledgeClient.post(path, body);
+	}
+
+	/** 검색 결과 한 건의 본문 글자 수 상한입니다. 설정이 없거나 1보다 작으면 기본값입니다. */
+	private int maxContentChars() {
+		Integer value = this.environment.getProperty("dstone.ai.tool.knowledge.max-content-chars", Integer.class);
+		return value == null || value.intValue() < 1 ? DEFAULT_MAX_CONTENT_CHARS : value.intValue();
 	}
 
 }

@@ -95,6 +95,7 @@ import reactor.core.publisher.SignalType;
  * Tool 결과는 대화에 쌓여서 그 뒤의 LLM 호출마다 다시 보내집니다. 그래서 두 가지를 엔진이 직접 챙깁니다.
  * - 횟수: Agent 호출 한 번에 Tool을 부를 수 있는 횟수를 세고, 다 쓰면 막습니다(ToolCallBudgetCallback).
  *   Agent의 execution.maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
+ * - 다시 읽기: 이번 호출에서 이미 읽은 파일 범위를 또 읽으면 Tool을 실행하지 않고 안내만 돌려줍니다(RereadGuardCallback).
  * - 분량: 쌓인 Tool 결과가 dstone.ai.agent.tool.keep-result-chars(기본 200,000자)를 넘으면 오래된 것부터
  *   앞부분만 남깁니다(ToolResultCompactionAdvisor). 평소의 호출은 이 기준에 닿지 않습니다.
  *
@@ -538,6 +539,8 @@ public class AgentExecutor extends BaseObject {
 			  Map.of()처럼 엔트리가 0개인 Map도 "빈 Map"으로 취급되므로, caller가 null인 경우에도 엔트리를
 			  최소 1개는 넣어 둡니다.
 			- Tool과 Skill에는 호출 횟수 한도를 씌웁니다(budgeted() 참고). 둘이 횟수 하나를 함께 씁니다.
+			- 이번 호출에서 이미 읽은 파일 범위를 또 읽으면 Tool을 실행하지 않고 안내만 돌려줍니다(RereadGuardCallback.
+			  dstone.ai.agent.tool.reread-guard가 false면 끕니다).
 			- Tool이나 Sub Agent가 하나라도 붙으면, 쌓인 Tool 결과가 너무 커졌을 때 오래된 것부터 줄이는 Advisor도 함께 붙입니다
 			  (ToolResultCompactionAdvisor. dstone.ai.agent.tool.keep-result-chars가 0이면 붙이지 않습니다).
 		************************************************************************/
@@ -549,14 +552,16 @@ public class AgentExecutor extends BaseObject {
 		if (skillTool != null) {
 			tools.add(this.configTool.limited(skillTool));
 		}
-		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools));
+		// 이 호출에서 이미 읽은 파일 범위를 적어 둘 장부입니다. 같은 범위를 또 읽으면 Tool을 실행하지 않습니다(RereadGuardCallback).
+		ReadHistory readHistory = this.environment.getProperty(Constants.Agent.TOOL_REREAD_GUARD, Boolean.class, Boolean.TRUE).booleanValue() ? new ReadHistory() : null;
+		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools, readHistory));
 		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks, stepRef));
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
 			spec = spec.toolContext(StepRef.toolContextOf(caller, stepRef));
 			int keepChars = this.intProperty(Constants.Agent.TOOL_KEEP_RESULT_CHARS, Constants.Agent.DEFAULT_TOOL_KEEP_RESULT_CHARS);
 			if (keepChars > 0) {
-				spec = spec.advisors(new ToolResultCompactionAdvisor(agent.id(), keepChars));
+				spec = spec.advisors(new ToolResultCompactionAdvisor(agent.id(), keepChars, readHistory));
 			}
 		}
 
@@ -647,8 +652,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent          호출할 Agent의 정의
 	 * @param callbacks      이 Agent에 붙일 Tool들
 	 * @param succeededTools 성공한 Tool 이름을 적어 둘 곳. 필요 없으면 null
+	 * @param readHistory    이 호출에서 읽은 파일 범위 장부. 주면 같은 범위를 다시 읽지 못하게 막습니다(RereadGuardCallback). 끄면 null
 	 */
-	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools) {
+	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools, ReadHistory readHistory) {
 		int maxCalls = agent.maxToolCalls() != null ? agent.maxToolCalls().intValue() : this.intProperty(Constants.Agent.TOOL_MAX_CALLS, Constants.Agent.DEFAULT_TOOL_MAX_CALLS);
 		if (maxCalls <= 0) {
 			maxCalls = Constants.Agent.DEFAULT_TOOL_MAX_CALLS;
@@ -656,7 +662,9 @@ public class AgentExecutor extends BaseObject {
 		AtomicInteger used = new AtomicInteger();
 		List<ToolCallback> result = new ArrayList<>(callbacks.size());
 		for (ToolCallback callback : callbacks) {
-			result.add(new ToolCallBudgetCallback(callback, agent.id(), used, maxCalls, succeededTools));
+			// 다시 읽기 막기는 횟수 세기보다 안쪽에 둡니다. 막은 호출도 한 번으로 셉니다.
+			ToolCallback inner = readHistory == null ? callback : new RereadGuardCallback(callback, readHistory, agent.id());
+			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools));
 		}
 		return result;
 	}

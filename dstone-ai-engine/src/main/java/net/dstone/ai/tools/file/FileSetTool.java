@@ -110,7 +110,7 @@ public class FileSetTool {
 		if (path.isBlank() || !this.fileTool.isFileExist(path)) {
 			return "";
 		}
-		String content = lineNumbers ? this.fileTool.readFileLines(path, null, null) : this.fileTool.readFile(path);
+		String content = lineNumbers ? this.fileTool.readNumberedLines(path, null, null) : this.fileTool.readFile(path);
 		return content == null || content.startsWith(Constants.Outcome.FAIL_PREFIX) ? "" : content;
 	}
 

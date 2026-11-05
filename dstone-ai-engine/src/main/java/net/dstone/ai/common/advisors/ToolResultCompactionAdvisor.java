@@ -13,6 +13,7 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import net.dstone.ai.runtime.agent.ReadHistory;
 import net.dstone.common.utils.LogUtil;
 import reactor.core.publisher.Flux;
 
@@ -42,14 +43,25 @@ public class ToolResultCompactionAdvisor  implements CallAdvisor, StreamAdvisor 
 
 	private final String agentId;
 	private final int keepChars;
+	private final ReadHistory readHistory;
 
 	/**
 	 * @param agentId   이 호출의 Agent id입니다(로그용).
 	 * @param keepChars 온전히 남겨 둘 Tool 결과의 글자 수 합입니다(dstone.ai.agent.tool.keep-result-chars).
 	 */
 	public ToolResultCompactionAdvisor(String agentId, int keepChars) {
+		this(agentId, keepChars, null);
+	}
+
+	/**
+	 * @param agentId     이 호출의 Agent id입니다(로그용).
+	 * @param keepChars   온전히 남겨 둘 Tool 결과의 글자 수 합입니다(dstone.ai.agent.tool.keep-result-chars).
+	 * @param readHistory 이 호출에서 읽은 파일 범위 장부입니다. 결과를 줄이면 비웁니다(줄인 내용은 다시 읽게 해야 하므로). 없으면 null
+	 */
+	public ToolResultCompactionAdvisor(String agentId, int keepChars, ReadHistory readHistory) {
 		this.agentId = agentId;
 		this.keepChars = keepChars;
+		this.readHistory = readHistory;
 	}
 
 	@Override
@@ -79,6 +91,10 @@ public class ToolResultCompactionAdvisor  implements CallAdvisor, StreamAdvisor 
 		List<Message> compacted = ToolResultCompactor.compact(messages, this.keepChars);
 		if (compacted == messages) {
 			return chatClientRequest;
+		}
+		// 앞에서 읽은 파일 내용이 잘려 나갔을 수 있으니, 이제부터는 같은 범위도 다시 읽게 합니다.
+		if (this.readHistory != null) {
+			this.readHistory.clear();
 		}
 		LogUtil.sysout("dstone-ai-engine tool: agent[" + this.agentId + "]의 대화에 쌓인 Tool 결과가 " + ToolResultCompactor.toolResultChars(messages)
 			+ "자라서 오래된 것부터 줄였습니다 - 줄인 뒤 " + ToolResultCompactor.toolResultChars(compacted) + "자(기준 " + this.keepChars + "자)");

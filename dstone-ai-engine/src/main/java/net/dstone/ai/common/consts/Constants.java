@@ -73,6 +73,12 @@ public final class Constants {
 
 		/** 위 설정이 없을 때 쓰는 값입니다. */
 		public final static int DEFAULT_TOOL_KEEP_RESULT_CHARS = 200000;
+
+		/**
+		 * Agent 호출 한 번 안에서 이미 읽은 파일 범위를 다시 읽지 못하게 막을지 정하는 설정 키입니다(dstone.ai.agent.tool.reread-guard, 기본 true).
+		 * 막으면 Tool을 실행하지 않고 "앞의 결과를 보라"는 안내를 돌려줍니다(runtime.agent.RereadGuardCallback).
+		 */
+		public final static String TOOL_REREAD_GUARD = "dstone.ai.agent.tool.reread-guard";
 	}
 
 	/** Tool을 caller별로 허용/차단하는 설정 키의 접두사(prefix)들입니다(common.config.ConfigTool과 tools 패키지 아래의 각 Tool이 사용합니다). */
