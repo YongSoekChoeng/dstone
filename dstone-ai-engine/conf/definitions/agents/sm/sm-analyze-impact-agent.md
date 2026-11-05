@@ -18,6 +18,7 @@ input:
   request: string, 고객 요청서(00.request.md)의 내용. 프로젝트ID와 소스경로가 들어 있다
   requirement: string, 고객요구사항분석서(01.customer_requirement.md)의 내용
   feedback?: string, 다시 분석할 때 받은 지적 사항. 처음 실행하면 비어 있다
+output: string
 tools:
   allowed:
     - knowledgeCallees
@@ -58,5 +59,5 @@ feedback에 내용이 있으면 다시 분석하는 것이다. 지적된 부분�
   - 확실하지 않은 것은 "확인 필요"라고 적는다.
   - 5,000자가 넘으면 writeFile로 앞부분을 저장하고 나머지는 appendFile로 잇는다.
 
-[답]
-저장한 파일 경로만 답한다.
+[반환]
+저장한 파일 경로와 결정 필요 사항만 답한다.

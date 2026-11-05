@@ -99,6 +99,7 @@ steps:
         ${state.impactApproval.comment:}
         ${state.developApproval.comment:}
     next: step07
+    save: impactPath
 
   - id: step07
     name: 영향도 분석 승인
@@ -133,6 +134,7 @@ steps:
       impact: ${state.impact}
       feedback: ${state.designApproval.comment:}
     next: step10
+    save: architectPath
 
   - id: step10
     name: 설계 승인
@@ -203,3 +205,5 @@ state:
   taskitems: 태스크아이템 목록 내용
   ready: 기본정보
   developApproval: step14 step의 결과
+  impactPath: step09 step의 결과
+  architectPath: step09 step의 결과
