@@ -17,7 +17,7 @@ description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
   예)
-  D:/AppHome/testApp/workshop/changes/work003
+  D:/WorkShop/00.SM/work004
 settings:
   checkpoint: true
   maxIterations: 100

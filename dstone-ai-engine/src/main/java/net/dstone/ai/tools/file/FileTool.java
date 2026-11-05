@@ -148,22 +148,27 @@ public class FileTool {
 	}
 
 	@Tool(description = "basePath 디렉토리와 하위디렉토리의 파일 내용에서 keyword가 들어 있는 줄을 찾아 '파일절대경로:줄번호: 그 줄 내용' 목록으로 반환한다(matches). "
+		+ "basePath에 파일 경로를 주면 그 파일 하나에서만 찾는다(fileNamePattern은 보지 않는다). "
 		+ "어떤 소스가 특정 컬럼명/테이블명/클래스명/메서드명/URL/문구를 쓰는지 찾을 때 사용한다. 파일을 하나씩 열어 보기 전에 먼저 이 Tool로 후보를 찾아라. "
 		+ "keyword는 정규식이 아니라 단순 문자열이며 대소문자를 구분하지 않는다. 결과가 많으면 일부만 반환하고 truncated=true와 안내(message)를 준다 - "
 		+ "그때는 keyword를 더 구체적으로 하거나 fileNamePattern/basePath로 범위를 좁혀 다시 호출한다.")
 	public Map<String, Object> searchInFiles(
-			@ToolParam(description = "검색을 시작할 디렉토리의 절대경로") String basePath,
+			@ToolParam(description = "검색을 시작할 디렉토리의 절대경로. 파일 하나에서만 찾으려면 그 파일의 절대경로") String basePath,
 			@ToolParam(description = "찾을 문자열(정규식 아님, 대소문자 구분 안 함)") String keyword,
 			@ToolParam(required = false, description = "검색할 파일명 패턴. 콤마로 여러 개 지정 가능. 예) *.java,*.xml  비워두면 모든 파일") String fileNamePattern) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		List<String> matches = new ArrayList<>();
 		result.put("matches", matches);
 
-		File base = this.toDirectory(basePath);
-		if (base == null) {
+		// basePath가 파일이면 그 파일 하나에서만 찾습니다. 모델이 "이 파일에서 찾아라"는 뜻으로 파일 경로를 줄 때가 많아서,
+		// 폴더만 받으면 "찾을 수 없다"는 답을 받고 폴더로 다시 부르느라 LLM 호출이 한 번 더 듭니다.
+		File singleFile = basePath == null || basePath.isBlank() ? null : new File(basePath.trim());
+		boolean fileOnly = singleFile != null && singleFile.isFile();
+		File base = fileOnly ? null : this.toDirectory(basePath);
+		if (!fileOnly && base == null) {
 			result.put("totalMatches", Integer.valueOf(0));
 			result.put("truncated", Boolean.FALSE);
-			result.put("message", "디렉토리를 찾을 수 없습니다: " + basePath);
+			result.put("message", "디렉토리나 파일을 찾을 수 없습니다: " + basePath);
 			return result;
 		}
 		if (keyword == null || keyword.isBlank()) {
@@ -174,8 +179,14 @@ public class FileTool {
 		}
 
 		List<File> all = new ArrayList<>();
-		this.collectFiles(base, this.excludeDirs(), all);
-		List<Pattern> namePatterns = this.toNamePatterns(fileNamePattern);
+		List<Pattern> namePatterns;
+		if (fileOnly) {
+			all.add(singleFile);
+			namePatterns = this.toNamePatterns(null);
+		} else {
+			this.collectFiles(base, this.excludeDirs(), all);
+			namePatterns = this.toNamePatterns(fileNamePattern);
+		}
 		int maxMatches = this.intProperty("max-search-matches", DEFAULT_MAX_SEARCH_MATCHES);
 		int maxFileBytes = this.intProperty("max-search-file-bytes", DEFAULT_MAX_SEARCH_FILE_BYTES);
 		String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
