@@ -392,7 +392,7 @@ public class FileTool {
 	 * </pre>
 	 */
 	@Tool(description = "절대경로 filePath(폴더+파일명)에 fileContents 내용으로 파일을 저장한다. 폴더가 없으면 만들고, 파일이 있으면 덮어쓴다. 저장 결과 안내 문구를 돌려준다. "
-		+ "이미 있는 파일의 일부만 고칠 때는 이 Tool로 전체를 다시 쓰지 말고 replaceInFile을 사용한다.")
+		+ "이미 있는 파일의 일부만 고칠 때는 이 Tool로 전체를 다시 쓰지 말고 replaceInFile이나 editFileTexts를 사용한다.")
 	public String writeFile(@ToolParam(description = "저장할 파일의 절대경로(파일명 포함)") String filePath, @ToolParam (description = "파일 내용")String fileContents) {
 		if (filePath == null || filePath.isBlank()) {
 			return "실패: filePath가 비어 있습니다.";

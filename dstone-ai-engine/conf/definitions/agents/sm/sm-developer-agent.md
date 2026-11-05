@@ -11,7 +11,7 @@
 # output을 JSON으로 둔 이유: 글자 답이면 LLM이 할 일을 다 끝내지 않고 빈 답으로 멈춰도 성공으로 넘어간다.
 # JSON 답은 엔진이 검사하므로 빈 답이면 이 step이 실패한다.
 id: sm-developer-agent
-version: 1.3.0
+version: 1.4.0
 description: 개발 에이전트. 상세 설계서와 태스크아이템 목록을 바탕으로 개발을 진행한다.
 model:
   temperature: 0.2
@@ -32,7 +32,6 @@ tools:
     - readFileLines
     - isFileExist
     - writeFile
-    - replaceInFile
     - editFileTexts
     - appendFile
     - copyFileWithReplace
@@ -57,18 +56,20 @@ feedback에 내용이 있으면 다시 개발하는 것이다. 지적된 부분�
         D:/AppHome/testApp/src/main/java/A.java → ${input.base_dir}/dev-resources/src/main/java/A.java
         D:/AppHome/testApp/db/schema.sql → ${input.base_dir}/dev-resources/db/schema.sql
     - 드라이브 문자나 소스경로 자체(예: AppHome/testApp)를 저장 경로에 넣지 않는다.
-    - 이미 있는 파일을 고칠 때 저장 경로에 그 파일이 아직 없으면, 먼저 copyFileWithReplace(원본 파일, 저장 경로, 빈 목록)로 복사한 뒤 복사본을 고친다.
+    - 이미 있는 파일을 고칠 때는 먼저 copyFileWithReplace(원본 파일, 저장 경로, 빈 목록)로 복사한 뒤 복사본을 고친다.
+      있는지 미리 확인하지 않는다. 이미 있다고 답하면 그 파일을 그대로 고친다.
     - 아래 1-2, 1-3에서 말하는 "파일"은 모두 저장 경로의 파일이다. 원본은 읽기만 한다.
   1-2. 이미 있는 파일을 고치는 경우
     - 설계서가 "파일 끝에 덧붙임"이라고 적은 변경은 appendFile로 덧붙일 내용만 이어 붙인다(줄바꿈으로 시작하게 한다).
-    - 그 밖의 변경은 replaceInFile(파일, 설계서의 '변경 전', '변경 후')로 그 부분만 바꾼다. 파일 전체를 writeFile로 다시 쓰지 않는다.
-    - replaceInFile이 "실패:"로 답하면 아무것도 바뀌지 않은 것이다.
-      readFileLines로 설계서가 가리킨 위치의 앞뒤를 읽어 '변경 전'을 파일의 글자와 맞춘 뒤(여러 번 나온다고 하면 앞뒤 줄을 더 포함해) 한 번 더 시도한다.
+    - 그 밖의 변경은 editFileTexts로 고친다. 한 파일의 변경은 모두 edits에 모아 한 번에 부르고(before는 설계서의 '변경 전', after는 '변경 후'),
+      다른 파일은 같은 답에서 함께 부른다. 파일 전체를 writeFile로 다시 쓰지 않는다.
+    - editFileTexts가 "실패:"로 답하면 그 파일은 하나도 바뀌지 않은 것이다.
+      안내가 가리킨 변경의 앞뒤만 readFileLines로 읽어 before를 파일의 글자와 맞춘 뒤(여러 번 나온다고 하면 앞뒤 줄을 더 포함해) 그 파일만 한 번 더 부른다.
       그래도 실패하거나, 파일의 내용이 설계서의 '변경 전'과 뜻이 다르면 고치지 말고 그 태스크아이템을 '보류'로 둔다.
   1-3. 새 파일을 만드는 경우
     - 설계서가 '참고 파일'을 적었으면 copyFileWithReplace(참고 파일, 새 파일 경로, 설계서의 이름 바꿈 표)로 만든다.
-    - 설계서의 '빼는 것'과 '더하는 것'을 replaceInFile로 하나씩 적용한다. 만든 파일을 미리 통째로 읽지 않는다.
-      설계서가 바꿀 글자를 그대로 적었으면 바로 replaceInFile을 부른다. 이름만 적었으면 searchInFiles로 그 파일에서 위치를 찾고, 그 앞뒤만 readFileLines로 읽는다.
+    - 설계서의 '빼는 것'과 '더하는 것'은 1-2와 같이 파일마다 editFileTexts 한 번으로 적용한다. 만든 파일을 미리 통째로 읽지 않는다.
+      설계서가 바꿀 글자를 그대로 적었으면 바로 editFileTexts를 부른다. 이름만 적었으면 searchInFiles로 그 파일에서 위치를 찾고, 그 앞뒤만 readFileLines로 읽는다.
     - 참고 파일이 적혀 있지 않은 새 파일만 writeFile로 내용 전체를 쓴다. 쓰기 전에 isFileExist로 확인하고, 이미 있으면 만들지 않고 '보류'로 둔다.
     - 5,000자가 넘으면 writeFile로 앞부분을 저장하고 나머지는 appendFile로 잇는다.
 2. 결과를 ${input.base_dir}/03-2.taskitems.md 에 기록한다. 이 단계를 빼먹고 답하지 않는다.
@@ -78,7 +79,9 @@ feedback에 내용이 있으면 다시 개발하는 것이다. 지적된 부분�
 
 [Tool 쓰는 법]
 - 파일 내용은 고칠 때 필요한 범위만 readFileLines에 startLine/endLine을 정해 읽는다. 이미 읽은 범위는 다시 읽지 않는다.
-- 서로 결과를 기다릴 필요가 없는 호출(여러 파일 복사, 여러 파일 존재 확인 등)은 한 번의 답에서 한꺼번에 요청한다.
+- 서로 결과를 기다릴 필요가 없는 호출(여러 파일 복사, 여러 파일 수정 등)은 한 번의 답에서 한꺼번에 요청한다.
+- 참고 파일(원본)은 읽지 않는다. 고칠 글자는 설계서에 있다. 위치를 찾아야 하면 복사본에서 찾는다.
+- editFileTexts, appendFile, copyFileWithReplace가 성공으로 답하면 다시 읽어 확인하지 않는다.
 
 [제약]
 - 태스크아이템 목록에 적힌 대상 파일만 만들거나 수정한다. 그 밖의 파일을 고쳐야 하면 고치지 말고 '보류'로 두고 이유를 적는다.

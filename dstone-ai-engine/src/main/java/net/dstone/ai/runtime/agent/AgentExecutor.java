@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
+import net.dstone.ai.common.advisors.ReasoningStripAdvisor;
 import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
 import net.dstone.ai.common.config.ChatProviders;
 import net.dstone.ai.common.config.ConfigChatClient;
@@ -543,6 +544,8 @@ public class AgentExecutor extends BaseObject {
 			  dstone.ai.agent.tool.reread-guard가 false면 끕니다).
 			- Tool이나 Sub Agent가 하나라도 붙으면, 쌓인 Tool 결과가 너무 커졌을 때 오래된 것부터 줄이는 Advisor도 함께 붙입니다
 			  (ToolResultCompactionAdvisor. dstone.ai.agent.tool.keep-result-chars가 0이면 붙이지 않습니다).
+			- 앞 라운드 답에 붙은 추론 글(reasoning)은 다음 라운드에 다시 보내지 않습니다
+			  (ReasoningStripAdvisor. dstone.ai.agent.keep-reasoning이 true면 붙이지 않습니다).
 		************************************************************************/
 		List<ToolCallback> tools = new ArrayList<>();
 		if (toolsEnabled) {
@@ -563,6 +566,11 @@ public class AgentExecutor extends BaseObject {
 			if (keepChars > 0) {
 				spec = spec.advisors(new ToolResultCompactionAdvisor(agent.id(), keepChars, readHistory));
 			}
+		}
+
+		// 앞 라운드 답에 붙은 추론 글은 다음 라운드에 다시 보내지 않습니다(ReasoningStripAdvisor). 대화 기억에서 온 앞 답에도 적용됩니다.
+		if (!this.environment.getProperty(Constants.Agent.KEEP_REASONING, Boolean.class, Boolean.FALSE).booleanValue()) {
+			spec = spec.advisors(new ReasoningStripAdvisor(agent.id()));
 		}
 
 		// LLM 호출 횟수, Tool별 호출 횟수, 토큰을 로그에 남깁니다(Tool이 없어도 붙입니다).

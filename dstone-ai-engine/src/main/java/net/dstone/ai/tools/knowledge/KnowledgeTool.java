@@ -46,6 +46,12 @@ public class KnowledgeTool extends BaseObject {
 	 */
 	private static final int DEFAULT_MAX_CONTENT_CHARS = 1500;
 
+	/** 설정(dstone.ai.tool.knowledge.max-top-k)이 없을 때, knowledgeSearch가 돌려주는 결과의 최대 개수 */
+	private static final int DEFAULT_MAX_TOP_K = 10;
+
+	/** knowledgeSearch에서 topK를 주지 않았을 때의 결과 개수 */
+	private static final int DEFAULT_TOP_K = 5;
+
 	/** 목록 하나에서 돌려주는 최대 줄 수. 넘으면 몇 건이 더 있는지만 알린다 */
 	private static final int MAX_LINES = 60;
 
@@ -83,11 +89,14 @@ public class KnowledgeTool extends BaseObject {
 	public String knowledgeSearch(@ToolParam(description = "프로젝트 ID") String projectId, @ToolParam(description = "찾을 내용. 자연어 질문이나 이름") String query,
 		@ToolParam(description = "찾을 종류를 쉼표로 구분: METHOD, TYPE, FILE, MAPPER(SQL), VIEW(화면), UPLOAD(올린 문서). 생략하면 전부", required = false) String docTypes,
 		@ToolParam(description = "올린 일반 문서(설계서 등)도 같이 찾을지. 기본 false", required = false) Boolean includeDocuments,
-		@ToolParam(description = "결과 최대 개수(기본 5, 최대 10)", required = false) Integer topK) {
+		@ToolParam(description = "결과 최대 개수(기본 5). 서버에 정한 상한을 넘으면 상한까지만 준다", required = false) Integer topK) {
 		Map<String, Object> body = new LinkedHashMap<String, Object>();
 		body.put("query", query);
 		body.put("projectId", projectId);
-		body.put("topK", Integer.valueOf(topK == null ? 5 : Math.max(1, Math.min(topK.intValue(), 10))));
+		// 결과는 대화에 쌓여 뒤의 모든 라운드에 다시 실리므로, LLM이 많이 달라고 해도 설정한 상한까지만 줍니다.
+		int maxTopK = this.maxTopK();
+		int wanted = topK == null ? DEFAULT_TOP_K : topK.intValue();
+		body.put("topK", Integer.valueOf(Math.max(1, Math.min(wanted, maxTopK))));
 		if (!StringUtil.isEmpty(docTypes)) {
 			body.put("docTypes", java.util.Arrays.asList(docTypes.toUpperCase().replace(" ", "").split(",")));
 		}
@@ -315,6 +324,12 @@ public class KnowledgeTool extends BaseObject {
 
 	private JsonNode post(String path, Map<String, Object> body) throws KnowledgeCallException {
 		return this.knowledgeClient.post(path, body);
+	}
+
+	/** knowledgeSearch 결과 개수의 상한입니다. 설정이 없거나 1보다 작으면 기본값입니다. */
+	private int maxTopK() {
+		Integer value = this.environment.getProperty("dstone.ai.tool.knowledge.max-top-k", Integer.class);
+		return value == null || value.intValue() < 1 ? DEFAULT_MAX_TOP_K : value.intValue();
 	}
 
 	/** 검색 결과 한 건의 본문 글자 수 상한입니다. 설정이 없거나 1보다 작으면 기본값입니다. */

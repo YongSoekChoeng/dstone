@@ -79,6 +79,12 @@ public final class Constants {
 		 * 막으면 Tool을 실행하지 않고 "앞의 결과를 보라"는 안내를 돌려줍니다(runtime.agent.RereadGuardCallback).
 		 */
 		public final static String TOOL_REREAD_GUARD = "dstone.ai.agent.tool.reread-guard";
+
+		/**
+		 * 앞 라운드 답에 붙은 추론 글(reasoning)을 다음 LLM 호출에 다시 보낼지 정하는 설정 키입니다(dstone.ai.agent.keep-reasoning, 기본 false).
+		 * false면 보내기 직전에 뺍니다(common.advisors.ReasoningStripAdvisor).
+		 */
+		public final static String KEEP_REASONING = "dstone.ai.agent.keep-reasoning";
 	}
 
 	/** Tool을 caller별로 허용/차단하는 설정 키의 접두사(prefix)들입니다(common.config.ConfigTool과 tools 패키지 아래의 각 Tool이 사용합니다). */

@@ -180,8 +180,11 @@ dstone:
         # tool.reread-guard: true면 Agent 호출 한 번 안에서 이미 읽은 파일 범위(readFileLines/readFile)를 또 읽을 때
         #           Tool을 실행하지 않고 "앞의 결과를 보라"는 안내만 준다. 같은 내용이 대화에 두 번 쌓이지 않게 하려는 것이다.
         #           파일이 바뀌었거나 일부만 겹치거나, 오래된 결과를 줄인 뒤에는 그대로 읽는다(runtime.agent.RereadGuardCallback).
+        # keep-reasoning: false면 앞 라운드 답에 붙은 추론 글을 다음 라운드에 다시 보내지 않는다(OpenAI 호환 provider만 해당).
+        #           Tool 루프가 길수록 앞의 추론 글이 매 라운드 쌓여 입력 토큰이 크게 는다(common.advisors.ReasoningStripAdvisor).
         ##########################################################################################
         agent:
+            keep-reasoning: false
             sub-agent:
                 max-calls: 10
                 background-threads: 4
@@ -218,6 +221,9 @@ dstone:
                 timeout-seconds: 60
                 # knowledgeSearch 결과 한 건의 본문 글자 수 상한(기본 1500). 한 번에 10건까지 오므로 1500이면 16,000자가 넘었다(2026-11-05).
                 max-content-chars: 800
+                # knowledgeSearch 결과 개수 상한(기본 10). LLM이 topK를 더 크게 줘도 이만큼만 준다.
+                # sm-workflow 영향도 step에서 topK 10으로 두 번 찾은 18,000자가 뒤의 18라운드에 계속 실렸다(2026-11-05).
+                max-top-k: 5
             # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
             # "잘렸으니 범위를 좁혀 다시 호출하라"는 안내를 붙인다(common.config.ConfigTool, 기본 60000).
             # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 결과 하나가 컨텍스트 한도나 응답 대기 시간을 넘긴다.
