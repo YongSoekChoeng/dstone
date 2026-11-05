@@ -3,6 +3,8 @@ package net.dstone.ai.runtime.agent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -146,6 +148,7 @@ public class AgentExecutor extends BaseObject {
 	 * Stream 방식이 아니라서, LLM이 답변을 다 만들 때까지 기다렸다가 완성된 결과를 한 번에 돌려줍니다.
 	 *
 	 * Agent에 execution.onInvalidOutput: RETRY를 적었으면, 답이 계약과 맞지 않을 때 maxAttempts번까지 다시 부릅니다.
+	 * execution.requiredTools(꼭 성공해야 하는 Tool)를 하나라도 성공하지 못하고 끝난 것도 계약 위반입니다.
 	 * </pre>
 	 * @param agent         호출할 Agent의 정의(프롬프트, 입출력 계약, Tool/RAG 사용 여부 등)
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
@@ -166,9 +169,12 @@ public class AgentExecutor extends BaseObject {
 		AgentContractException last = null;
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			SubAgentTasks tasks = this.newTasks(agent);
+			Set<String> succeededTools = ConcurrentHashMap.newKeySet();
 			try {
-				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule, tasks, stepRef);
-				return this.ask(spec, userMessage, agent.outputSchema(), agent, modelOverride);
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, engineRule, tasks, stepRef, succeededTools);
+				Object answer = this.ask(spec, userMessage, agent.outputSchema(), agent, modelOverride);
+				this.checkRequiredTools(agent, toolsOverride, succeededTools, answer);
+				return answer;
 			} catch (AgentContractException e) {
 				last = e;
 				if (attempt < maxAttempts) {
@@ -208,9 +214,12 @@ public class AgentExecutor extends BaseObject {
 	public Object callForSchema(AgentDefinition agent, String conversationId, String caller, Object input, Map<String, Object> schema, String engineRule, StepRef stepRef) {
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
+		Set<String> succeededTools = ConcurrentHashMap.newKeySet();
 		try {
-			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule, tasks, stepRef);
-			return this.ask(spec, userMessage, schema, agent, null);
+			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, null, engineRule, tasks, stepRef, succeededTools);
+			Object answer = this.ask(spec, userMessage, schema, agent, null);
+			this.checkRequiredTools(agent, null, succeededTools, answer);
+			return answer;
 		} finally {
 			if (tasks != null) {
 				tasks.close();
@@ -242,7 +251,7 @@ public class AgentExecutor extends BaseObject {
 		}
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
-		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null, tasks, null).user(userMessage).stream().content();
+		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, ragOverride, toolsOverride, modelOverride, null, tasks, null, null).user(userMessage).stream().content();
 		if (tasks == null) {
 			return answer;
 		}
@@ -449,8 +458,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
 	 * @param tasks         백그라운드로 맡긴 Sub Agent 일을 들고 있을 곳(newTasks()). 백그라운드를 쓰지 않는 Agent면 null
 	 * @param stepRef       이 호출을 보낸 Workflow 실행과 step. ToolContext에 실어 Tool까지 넘깁니다. Workflow 밖이면 null
+	 * @param succeededTools 성공한 Tool 이름을 적어 둘 곳(execution.requiredTools 확인용). 확인하지 않으면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, Boolean ragOverride, Boolean toolsOverride, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef, Set<String> succeededTools) {
 
 		boolean ragEnabled = ragOverride != null ? ragOverride : agent.ragEnabled();
 		// toolsOverride는 "Agent의 tools 목록을 이번에 쓸지 말지"만 정합니다. false일 때만 끕니다.
@@ -539,7 +549,7 @@ public class AgentExecutor extends BaseObject {
 		if (skillTool != null) {
 			tools.add(this.configTool.limited(skillTool));
 		}
-		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools));
+		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools));
 		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks, stepRef));
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
@@ -593,15 +603,52 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
+	 * execution.requiredTools(꼭 성공해야 하는 Tool)를 이번 호출에서 모두 성공했는지 확인합니다.
+	 * 모델이 "이제 산출물을 작성합니다"라고 말만 하고 writeFile 없이 끝내도 답 자체는 멀쩡한 글자라서,
+	 * 이 확인이 없으면 저장되지 않은 결과가 성공으로 넘어갑니다(sm-workflow step09에서 실제로 있었던 일입니다).
+	 * 빠진 Tool이 있으면 계약 위반(AgentContractException)입니다. onInvalidOutput: RETRY면 call()이 다시 부릅니다.
+	 * 채팅에서 toolsEnabled=false로 Tool을 끈 호출은 부를 수 없으니 확인하지 않습니다.
+	 * </pre>
+	 *
+	 * @param agent          호출한 Agent의 정의
+	 * @param toolsOverride  채팅의 toolsEnabled 값. false면 확인하지 않습니다
+	 * @param succeededTools 이번 호출에서 성공한 Tool 이름
+	 * @param answer         받은 답(오류 메시지에 앞부분을 보여 줍니다)
+	 * @throws AgentContractException 꼭 성공해야 하는 Tool 중 성공하지 않은 것이 있을 때
+	 */
+	private void checkRequiredTools(AgentDefinition agent, Boolean toolsOverride, Set<String> succeededTools, Object answer) {
+		if (Boolean.FALSE.equals(toolsOverride)) {
+			return;
+		}
+		List<String> missing = new ArrayList<>();
+		for (String toolName : agent.requiredTools()) {
+			if (!succeededTools.contains(toolName)) {
+				missing.add(toolName);
+			}
+		}
+		if (missing.isEmpty()) {
+			return;
+		}
+		String text = answer == null ? "" : JsonSchemaUtil.toText(answer).strip();
+		if (text.length() > 200) {
+			text = text.substring(0, 200) + "...";
+		}
+		throw new AgentContractException("agent[" + agent.id() + "]가 꼭 성공해야 하는 Tool " + missing + "를 성공하지 못한 채 답을 끝냈습니다"
+			+ "(결과를 저장하지 않고 끝났을 수 있습니다. execution.requiredTools). 답 앞부분: " + text);
+	}
+
+	/**
+	 * <pre>
 	 * Tool들에 "이 Agent 호출에서 부를 수 있는 횟수"를 씌워 돌려줍니다(ToolCallBudgetCallback).
 	 * 횟수는 Agent의 execution.maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
 	 * 여기 들어온 Tool들이 횟수 하나를 함께 씁니다(Tool마다 따로 세지 않습니다).
 	 * </pre>
 	 *
-	 * @param agent     호출할 Agent의 정의
-	 * @param callbacks 이 Agent에 붙일 Tool들
+	 * @param agent          호출할 Agent의 정의
+	 * @param callbacks      이 Agent에 붙일 Tool들
+	 * @param succeededTools 성공한 Tool 이름을 적어 둘 곳. 필요 없으면 null
 	 */
-	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks) {
+	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools) {
 		int maxCalls = agent.maxToolCalls() != null ? agent.maxToolCalls().intValue() : this.intProperty(Constants.Agent.TOOL_MAX_CALLS, Constants.Agent.DEFAULT_TOOL_MAX_CALLS);
 		if (maxCalls <= 0) {
 			maxCalls = Constants.Agent.DEFAULT_TOOL_MAX_CALLS;
@@ -609,7 +656,7 @@ public class AgentExecutor extends BaseObject {
 		AtomicInteger used = new AtomicInteger();
 		List<ToolCallback> result = new ArrayList<>(callbacks.size());
 		for (ToolCallback callback : callbacks) {
-			result.add(new ToolCallBudgetCallback(callback, agent.id(), used, maxCalls));
+			result.add(new ToolCallBudgetCallback(callback, agent.id(), used, maxCalls, succeededTools));
 		}
 		return result;
 	}

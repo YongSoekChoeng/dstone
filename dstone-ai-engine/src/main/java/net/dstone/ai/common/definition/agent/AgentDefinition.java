@@ -118,6 +118,9 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   - timeoutSeconds: LLM 호출 한 번의 대기 시간. 비우면 provider 설정값입니다.
  *   - maxToolCalls: 한 번 부르는 동안 Tool을 부를 수 있는 횟수. 비우면 dstone.ai.agent.tool.max-calls입니다.
  *     프롬프트에 "25번 이내"라고 적어도 모델이 안 지킬 때가 있어서 엔진이 직접 셉니다(runtime.agent.ToolCallBudgetCallback).
+ *   - requiredTools: 한 번 부르는 동안 꼭 성공해야 하는 Tool 이름. 예: [writeFile]
+ *     하나라도 부르지 않고(또는 "실패: ..."만 받고) 답을 끝내면 계약 위반이라서, RETRY면 다시 부르고 아니면 실패입니다.
+ *     "이제 산출물을 작성합니다"라고 말만 하고 저장 없이 끝나는 경우를 잡으려고 둡니다. tools.allowed에 있는 이름만 적을 수 있습니다.
  * </pre>
  *
  * @param id             (필수) Agent 이름입니다. 중복될 수 없습니다.
@@ -283,8 +286,9 @@ public record AgentDefinition(
 	 * @param timeoutSeconds  LLM 호출 한 번이 답을 기다리는 시간(초)입니다. 비워두면 provider 설정값을 씁니다.
 	 * @param onInvalidOutput 답이 output 모양을 지키지 않았을 때의 동작입니다(RETRY / FAIL). 비워두면 FAIL입니다.
 	 * @param maxToolCalls    이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수입니다. 비워두면 엔진 공통값을 씁니다.
+	 * @param requiredTools   이 Agent를 한 번 부르는 동안 꼭 한 번 이상 성공해야 하는 Tool 이름입니다. 비워두면 검사하지 않습니다.
 	 */
-	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls) {
+	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls, List<String> requiredTools) {
 	}
 
 	/** 시스템 프롬프트 원문입니다(파일의 본문). */
@@ -368,6 +372,11 @@ public record AgentDefinition(
 	/** 이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수입니다. 적지 않았으면 null입니다. */
 	public Integer maxToolCalls() {
 		return this.execution == null ? null : this.execution.maxToolCalls();
+	}
+
+	/** 한 번 부르는 동안 꼭 성공해야 하는 Tool 이름입니다(execution.requiredTools). 적지 않았으면 빈 목록입니다. */
+	public List<String> requiredTools() {
+		return this.execution == null || this.execution.requiredTools() == null ? List.of() : this.execution.requiredTools();
 	}
 
 	/** LLM 호출 한 번이 답을 기다리는 시간(초)입니다. 적지 않았으면 null입니다. */

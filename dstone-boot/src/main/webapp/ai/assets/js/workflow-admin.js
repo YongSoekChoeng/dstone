@@ -361,7 +361,48 @@ var DstoneAiWorkflowAdmin = (function () {
 			filesOfStep(stepId, false, since).forEach(function (file) {
 				cell.appendChild(docChip(file, actionOf(file, stepId, since)));
 			});
+			var earlier = docsWrittenOnlyBefore(stepId, since);
+			if (earlier.length > 0) {
+				cell.appendChild(noNewDocWarning(earlier));
+			}
 		});
+	}
+
+	// 이 step이 앞 회차에서는 문서를 썼는데, 마지막 회차(since 이후)에는 한 문서도 쓰지 않았으면 앞 회차 문서들을 돌려준다.
+	// Agent가 "이제 작성합니다"라고 말만 하고 끝나면 화면에는 지난 회차 문서가 그대로 남아 있어서,
+	// 승인하는 사람이 새 문서로 착각하기 쉽다. 그것을 알리려는 것이다.
+	function docsWrittenOnlyBefore(stepId, since) {
+		if (!currentFiles || since == null) {
+			return [];
+		}
+		var before = [];
+		var wroteNow = false;
+		(currentFiles.files || []).forEach(function (file) {
+			if (!isDocument(file)) {
+				return;
+			}
+			(file.steps || []).forEach(function (step) {
+				if (step.stepId !== stepId || step.action !== "WRITE") {
+					return;
+				}
+				if (touchedSince(step, since)) {
+					wroteNow = true;
+				} else if (before.indexOf(file) < 0) {
+					before.push(file);
+				}
+			});
+		});
+		return wroteNow ? [] : before;
+	}
+
+	function noNewDocWarning(earlier) {
+		var box = document.createElement("div");
+		box.className = "wa-doc-warning";
+		box.textContent = "⚠ 이번 회차에 작성한 문서가 없습니다. 지난 회차 문서 " + earlier.length + "개가 그대로 남아 있습니다.";
+		box.title = "지난 회차에 작성한 문서(이번 회차에는 바뀌지 않음):\n" + earlier.map(function (file) {
+			return file.path;
+		}).join("\n");
+		return box;
 	}
 
 	function docChip(file, action) {

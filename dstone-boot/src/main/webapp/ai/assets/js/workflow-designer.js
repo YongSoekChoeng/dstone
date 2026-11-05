@@ -2258,7 +2258,7 @@ var DstoneAiDesigner = (function () {
 		model: ["provider", "name", "temperature", "reasoning"],
 		context: ["sources", "retrieval"],
 		retrieval: ["topK", "similarityThreshold", "allowEmptyContext"],
-		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls"]
+		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls", "requiredTools"]
 	};
 
 	function bindAgentDialog() {
@@ -2829,6 +2829,7 @@ var DstoneAiDesigner = (function () {
 			+ row("execution.maxAttempts", "RETRY일 때 최대 시도 수", "<input type=\"number\" min=\"1\" data-agent=\"execution.maxAttempts\" value=\"" + escapeHtml(execution.maxAttempts === undefined ? "" : String(execution.maxAttempts)) + "\" />")
 			+ row("execution.timeoutSeconds", "응답 제한 시간(초)", "<input type=\"number\" min=\"1\" data-agent=\"execution.timeoutSeconds\" value=\"" + escapeHtml(execution.timeoutSeconds === undefined ? "" : String(execution.timeoutSeconds)) + "\" />")
 			+ row("execution.maxToolCalls", "한 번 불릴 때 Tool 호출 한도", "<input type=\"number\" min=\"1\" data-agent=\"execution.maxToolCalls\" value=\"" + escapeHtml(execution.maxToolCalls === undefined ? "" : String(execution.maxToolCalls)) + "\" />")
+			+ row("execution.requiredTools", "꼭 성공해야 하는 Tool(쉼표로 구분). 예: writeFile - 부르지 않고 끝나면 실패", "<input type=\"text\" data-agent=\"execution.requiredTools\" value=\"" + escapeHtml((Array.isArray(execution.requiredTools) ? execution.requiredTools : []).join(", ")) + "\" />")
 			+ "</section>"
 			+ "</div>"
 			+ "<section class=\"wd-agent-sec\"><h4>입출력 계약</h4>"
@@ -3286,7 +3287,7 @@ var DstoneAiDesigner = (function () {
 		if (key.indexOf("execution.max") === 0 || key === "execution.timeoutSeconds" || key === "context.retrieval.topK") {
 			return numberOf(input.value, true);
 		}
-		if (key === "allowedCallers") {
+		if (key === "allowedCallers" || key === "execution.requiredTools") {
 			var list = input.value.split(",").map(function (v) {
 				return v.trim();
 			}).filter(function (v) {

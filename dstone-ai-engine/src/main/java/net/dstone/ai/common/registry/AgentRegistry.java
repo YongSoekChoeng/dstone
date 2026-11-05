@@ -46,12 +46,13 @@ import net.dstone.common.utils.StringUtil;
  *
  * 정해진 값만 받는 항목도 기동할 때 검사합니다(checkCallOptions()). 오타가 조용히 무시되지 않게 하려는 것입니다.
  *   model.provider, model.reasoning, model.temperature,
- *   context.sources, execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls
+ *   context.sources, execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls / requiredTools
  *
  * Tool 허용 목록(tools)과 Sub Agent(subAgents)도 기동할 때 검사합니다(checkTools(), checkSubAgents()).
  *   오류(기동 실패)                                         경고(로그만)
  *   tools.allowed에 "*"와 다른 이름을 함께 적음               tools.allowed에 등록되지 않은 Tool 이름이 있음(MCP 서버가 꺼져 있을 수 있음)
  *   tools.allowed에 TOOL step 전용 Tool을 적음
+ *   execution.requiredTools의 이름이 tools.allowed에 없음
  *   subAgents의 id가 없는 Agent임                            부모를 쓸 수 있는 caller가 Sub Agent는 쓸 수 없음
  *   Sub Agent가 자기 subAgents를 가짐(깊이는 한 단계뿐)
  *   Sub Agent에 description이 없음
@@ -135,6 +136,7 @@ public class AgentRegistry extends BaseObject {
 		List<String> registeredTools = this.configTool.toolNames();
 		for (AgentDefinition definition : resolved.values()) {
 			this.checkTools(definition, registeredTools);
+			this.checkRequiredTools(definition, registeredTools);
 			this.checkSubAgents(definition, resolved, registeredTools);
 			this.checkSkills(definition, skills, registeredTools);
 		}
@@ -300,6 +302,39 @@ public class AgentRegistry extends BaseObject {
 			if (!registeredTools.contains(toolName)) {
 				LogUtil.sysout("dstone-ai-engine agent: [경고] agent[" + definition.id() + "]의 tools.allowed에 적은 '" + toolName
 					+ "'는 지금 등록된 Tool이 아닙니다(이름이 틀렸거나 MCP 서버가 아직 안 떴을 수 있습니다). 이 Tool은 붙지 않습니다. 등록된 Tool = " + registeredTools);
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * execution.requiredTools(한 번 부를 때 꼭 성공해야 하는 Tool)를 검사합니다.
+	 * - LLM이 볼 수 없는 Tool은 부를 수도 없으므로, tools.allowed에 있는 이름만 적을 수 있습니다.
+	 *   tools.allowed가 "*"이면 등록된 Tool 이름이어야 합니다(TOOL step 전용 Tool은 안 됩니다).
+	 * - 같은 이름을 두 번 적으면 막습니다(오타로 다른 이름을 빠뜨린 것일 수 있습니다).
+	 * </pre>
+	 *
+	 * @param definition      검사할 Agent 정의
+	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
+	 */
+	private void checkRequiredTools(AgentDefinition definition, List<String> registeredTools) {
+		List<String> required = definition.requiredTools();
+		String where = "agent[" + definition.id() + "]의 execution.requiredTools";
+		List<String> seen = new ArrayList<>();
+		for (String toolName : required) {
+			if (toolName == null || toolName.isBlank()) {
+				throw new IllegalStateException(where + "에 빈 이름이 있습니다: " + required);
+			}
+			if (seen.contains(toolName)) {
+				throw new IllegalStateException(where + "에 '" + toolName + "'를 두 번 적었습니다: " + required);
+			}
+			seen.add(toolName);
+			if (definition.allowsAllTools()) {
+				if (!registeredTools.contains(toolName) || this.configTool.isStepOnly(toolName)) {
+					throw new IllegalStateException(where + "의 '" + toolName + "'는 LLM에게 줄 수 있는 등록된 Tool이 아닙니다.");
+				}
+			} else if (!definition.toolNames().contains(toolName)) {
+				throw new IllegalStateException(where + "의 '" + toolName + "'가 tools.allowed에 없습니다. LLM이 볼 수 없는 Tool은 부를 수 없으니 tools.allowed에도 적으십시오. tools.allowed = " + definition.toolNames());
 			}
 		}
 	}

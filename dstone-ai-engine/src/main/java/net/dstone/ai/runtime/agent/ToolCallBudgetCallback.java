@@ -1,5 +1,6 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.ai.chat.model.ToolContext;
@@ -33,6 +34,9 @@ import net.dstone.common.utils.LogUtil;
  *
  * 이 클래스는 Spring 빈이 아닙니다. Agent를 부를 때마다 AgentExecutor가 새로 만듭니다(횟수가 호출마다 따로이기 때문입니다).
  * 같은 Agent 호출에 붙는 Tool들은 used 하나를 함께 씁니다. Sub Agent 호출은 세지 않습니다(그쪽은 자기 한도가 따로 있습니다).
+ *
+ * 성공한 Tool 이름도 함께 적어 둡니다(succeeded). Agent의 execution.requiredTools(꼭 성공해야 하는 Tool)를
+ * 답을 받은 뒤에 AgentExecutor가 이 기록으로 확인합니다. 결과가 "실패:"로 시작하면 성공으로 치지 않습니다.
  * </pre>
  */
 public class ToolCallBudgetCallback implements ToolCallback {
@@ -44,6 +48,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	private final String agentId;
 	private final AtomicInteger used;
 	private final int maxCalls;
+	private final Set<String> succeeded;
 
 	/**
 	 * @param delegate 실제 Tool 호출을 맡는 원래 ToolCallback입니다.
@@ -52,10 +57,22 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	 * @param maxCalls 부를 수 있는 최대 횟수입니다.
 	 */
 	public ToolCallBudgetCallback(ToolCallback delegate, String agentId, AtomicInteger used, int maxCalls) {
+		this(delegate, agentId, used, maxCalls, null);
+	}
+
+	/**
+	 * @param delegate  실제 Tool 호출을 맡는 원래 ToolCallback입니다.
+	 * @param agentId   이 Tool을 쓰는 Agent의 id입니다(로그용).
+	 * @param used      지금까지 부른 횟수입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다.
+	 * @param maxCalls  부를 수 있는 최대 횟수입니다.
+	 * @param succeeded 성공한 Tool 이름을 적어 둘 곳입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다. 필요 없으면 null
+	 */
+	public ToolCallBudgetCallback(ToolCallback delegate, String agentId, AtomicInteger used, int maxCalls, Set<String> succeeded) {
 		this.delegate = delegate;
 		this.agentId = agentId;
 		this.used = used;
 		this.maxCalls = maxCalls;
+		this.succeeded = succeeded;
 	}
 
 	@Override
@@ -74,7 +91,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (count > this.maxCalls) {
 			return this.refused(count);
 		}
-		return this.withNotice(this.delegate.call(toolInput), count);
+		return this.withNotice(this.recorded(this.delegate.call(toolInput)), count);
 	}
 
 	@Override
@@ -83,7 +100,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (count > this.maxCalls) {
 			return this.refused(count);
 		}
-		return this.withNotice(this.delegate.call(toolInput, toolContext), count);
+		return this.withNotice(this.recorded(this.delegate.call(toolInput, toolContext)), count);
 	}
 
 	/**
@@ -100,6 +117,14 @@ public class ToolCallBudgetCallback implements ToolCallback {
 			+ this.delegate.getToolDefinition().name() + "]를 실행하지 않았습니다(" + count + "번째 호출).");
 		return "실패: 이번 작업에서 쓸 수 있는 Tool 호출 횟수(" + this.maxCalls + "번)를 다 썼습니다. 이 Tool은 실행되지 않았습니다. "
 			+ "Tool을 더 부르지 마십시오. 지금까지 알아낸 것으로 답을 마무리하고, 확인하지 못한 것은 확인하지 못했다고 적으십시오.";
+	}
+
+	/** 결과가 "실패:"로 시작하지 않으면 이 Tool을 성공한 것으로 적어 둡니다. 결과는 그대로 돌려줍니다. */
+	private String recorded(String result) {
+		if (this.succeeded != null && (result == null || !result.stripLeading().startsWith("실패:"))) {
+			this.succeeded.add(this.delegate.getToolDefinition().name());
+		}
+		return result;
 	}
 
 	/** 남은 횟수가 얼마 없으면 결과 끝에 안내를 붙입니다. */

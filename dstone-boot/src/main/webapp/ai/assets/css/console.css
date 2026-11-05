@@ -1156,6 +1156,19 @@ label.wd-check {
 	text-decoration: line-through;
 }
 
+/* 마지막 회차에 문서를 하나도 쓰지 않은 step에 붙이는 경고. 지난 회차 문서를 새 문서로 착각하지 않게 합니다. */
+.wa-doc-warning {
+	margin: 2px 0 4px;
+	padding: 4px 8px;
+	border: 1px solid var(--cs-warning);
+	border-radius: var(--cs-radius-sm, 6px);
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+	font-size: 12px;
+	font-weight: 600;
+	white-space: normal;
+}
+
 .wa-docs-all {
 	float: right;
 	font-size: 13px;
