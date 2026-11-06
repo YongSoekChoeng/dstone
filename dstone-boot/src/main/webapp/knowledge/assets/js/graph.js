@@ -1055,7 +1055,7 @@ var DstoneKnowledgeGraph = (function () {
 			}).join("") + "</div>";
 		}
 		if (detail.document || detail.code) {
-			html += "<div class=\"kn-section-title\">설명 <span class=\"ai-hint\">(분석이 만들어 둔 문서. 검색에 쓰는 것과 같습니다)</span>" + codeButton(detail.code) + "</div>"
+			html += "<div class=\"kn-section-title\">설명 <span class=\"ai-hint\">(분석이 만들어 둔 문서. 검색에 쓰는 것과 같습니다)</span>" + codeButton(detail) + "</div>"
 				+ (detail.document ? "<pre class=\"kn-gd-doc\">" + K.escapeHtml(detail.document) + "</pre>" : "");
 		} else if (detail.kind === "METHOD") {
 			html += "<p class=\"ai-hint\">설명 문서가 없습니다. 단순한 getter / setter 는 문서를 만들지 않습니다.</p>";
@@ -1088,14 +1088,24 @@ var DstoneKnowledgeGraph = (function () {
 		return HIGHLIGHT_LANGUAGE_BY_EXT[ext] || null;
 	}
 
-	/** 설명 제목 옆에 붙는 [소스 보기] / [SQL 보기] 버튼. 소스나 SQL 이 없으면 빈 글자 */
-	function codeButton(code) {
+	/** 화면 노드의 [소스 보기] 버튼에 마우스를 올리면 나오는 안내 */
+	var SCREEN_CODE_DISABLED = "화면 문서는 검색용으로 앞부분만 담아 두어서 전체 소스를 보여 줄 수 없습니다";
+
+	/**
+	 * 설명 제목 옆에 붙는 [소스 보기] / [SQL 보기] 버튼. 소스나 SQL 이 없으면 빈 글자.
+	 * 화면(JSP·WebSquare·Nexacro)은 버튼을 꺼 둔다. 문서에 앞부분만 들어 있어서, 띄우면 전체 소스로 오해하기 쉽다.
+	 */
+	function codeButton(detail) {
+		var code = detail.code;
 		if (!code || !code.text) {
 			return "";
 		}
+		var label = K.escapeHtml(CODE_LABEL[code.kind] || "소스") + " 보기";
+		if (detail.kind === "JSP") {
+			return "<button type=\"button\" class=\"kn-plain kn-gd-code-btn\" disabled title=\"" + K.escapeHtml(SCREEN_CODE_DISABLED) + "\">" + label + "</button>";
+		}
 		var lines = code.text.split("\n").length;
-		return "<button type=\"button\" class=\"kn-plain kn-gd-code-btn\" data-code=\"1\" title=\"" + lines + "줄\">"
-			+ K.escapeHtml(CODE_LABEL[code.kind] || "소스") + " 보기</button>";
+		return "<button type=\"button\" class=\"kn-plain kn-gd-code-btn\" data-code=\"1\" title=\"" + lines + "줄\">" + label + "</button>";
 	}
 
 	function bindCodeButton(container, detail) {
@@ -1113,10 +1123,6 @@ var DstoneKnowledgeGraph = (function () {
 		// SQL 노드면 "SQL · SQL ..." 이 되므로 종류는 한 번만 적는다.
 		el["kn-code-title"].textContent = label + " · " + (kindLabel === label ? "" : kindLabel + " ") + (detail.fullName || detail.name);
 		var where = detail.path ? detail.path + (detail.lineStart ? " (줄 " + detail.lineStart + (detail.lineEnd ? "-" + detail.lineEnd : "") + ")" : "") : "";
-		if (detail.kind === "JSP") {
-			// 화면 문서는 검색용으로 빈 줄과 들여쓰기를 뺀 것이다.
-			where += (where ? " · " : "") + "빈 줄과 들여쓰기를 뺀 내용입니다";
-		}
 		el["kn-code-where"].textContent = where;
 		codeView.code = detail.code;
 		codeView.raw = false;
