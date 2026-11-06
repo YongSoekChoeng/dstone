@@ -269,7 +269,8 @@ var DstoneAiWorkflow = (function () {
 
 		activeExecutionId = executionId;
 		executionIdEl.textContent = executionId;
-		setBadge("RUNNING");
+		// 엔진은 새 실행을 대기열에 넣고 시작한다(동시 실행 수가 다 찼으면 차례를 기다린다).
+		setBadge("QUEUED");
 		resultEl.value = "";
 		pollStopBtn.disabled = false;
 		pollRefreshBtn.disabled = false;
@@ -333,7 +334,7 @@ var DstoneAiWorkflow = (function () {
 			"<td>" + escapeHtml(new Date().toLocaleTimeString()) + "</td>" +
 			"<td>" + escapeHtml(workflowId) + "</td>" +
 			"<td><a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + escapeHtml(executionId) + "</a></td>" +
-			"<td class=\"workflow-history-status\">RUNNING</td>";
+			"<td class=\"workflow-history-status\">QUEUED</td>";
 		tr.querySelector(".workflow-history-jobid").addEventListener("click", function () {
 			trackExisting(executionId);
 		});

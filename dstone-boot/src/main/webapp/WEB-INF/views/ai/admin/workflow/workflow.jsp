@@ -1,6 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%
 net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.RequestUtil(request, response);
+// 로그인 사용자. 승인/반려한 사람은 이 값으로 남는다(엔진에도 이 사용자를 헤더로 넘긴다 - ai.service.AiEngineUser).
+String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser();
 %>
 <!DOCTYPE HTML>
 <html>
@@ -25,6 +27,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<h2>Workflow 실행 관리</h2>
 				<p>이미 시작된 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다. 실행 중에 문제가 보이면 일시정지하고, 해결한 뒤 멈춘 step부터 이어 갑니다.
 					step이 작성한 md 문서는 스텝 이력의 '문서' 칸이나 아래 'step 문서' 표에서 열어 보고, 승인하기 전에 고칠 수 있습니다.
+					엔진이 동시에 돌리는 실행 수에는 한도가 있어서, 사람이 많으면 새 실행은 QUEUED(대기)로 차례를 기다립니다.
+					일시정지·재개·되감기·문서 저장은 실행을 시작한 사람과 관리자만 할 수 있습니다.
 					임의 workflowId를 직접 실행해보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">Workflow 테스트</a> 화면을 쓰십시오.</p>
 			</section>
 
@@ -37,6 +41,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<td><select id="workflow-admin-status-filter">
 								<option value="">전체</option>
 								<option value="WAITING_APPROVAL">WAITING_APPROVAL</option>
+								<option value="QUEUED">QUEUED</option>
 								<option value="RUNNING">RUNNING</option>
 								<option value="PAUSED">PAUSED</option>
 								<option value="DONE">DONE</option>
@@ -48,7 +53,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					</tr>
 					<tr>
 						<th><label for="workflow-admin-execution-filter">executionId</label></th>
-						<td colspan="3"><input type="text" id="workflow-admin-execution-filter" placeholder="일부만 적어도 찾습니다" /></td>
+						<td><input type="text" id="workflow-admin-execution-filter" placeholder="일부만 적어도 찾습니다" /></td>
+						<th><label for="workflow-admin-mine-filter">시작한 사람</label></th>
+						<td><label class="wa-check"><input type="checkbox" id="workflow-admin-mine-filter" checked /> 내 실행만</label></td>
 					</tr>
 				</table>
 				<div class="ai-form-actions">
@@ -63,7 +70,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<table id="workflow-admin-list-table" class="document-list-table wa-table">
 						<colgroup>
 							<col />
-							<col style="width:26%" />
+							<col style="width:22%" />
+							<col style="width:110px" />
 							<col style="width:150px" />
 							<col style="width:84px" />
 							<col style="width:160px" />
@@ -72,6 +80,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							<tr>
 								<th>executionId</th>
 								<th>workflowId</th>
+								<th>시작한 사람</th>
 								<th>상태</th>
 								<th class="wa-num">현재 스텝</th>
 								<th>수정시각</th>
@@ -95,6 +104,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<td><span id="workflow-admin-detail-id" class="workflow-job-id">-</span></td>
 						<th>상태</th>
 						<td><span id="workflow-admin-detail-badge" class="workflow-badge">-</span></td>
+					</tr>
+					<tr>
+						<th>시작한 사람</th>
+						<td colspan="3"><span id="workflow-admin-detail-requester">-</span></td>
 					</tr>
 					<tr>
 						<th><label for="workflow-admin-detail-result">결과 / 실패사유</label></th>
@@ -195,7 +208,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<colgroup><col class="ai-form-name" /><col /></colgroup>
 						<tr>
 							<th><label for="workflow-admin-approver">approver</label></th>
-							<td><input type="text" id="workflow-admin-approver" placeholder="결정하는 사람/역할" /></td>
+							<%-- 로그인했으면 결정한 사람은 로그인 사용자로 남는다(바꿀 수 없다). 로그인하지 않은 환경에서만 직접 적는다 --%>
+							<td><input type="text" id="workflow-admin-approver" placeholder="결정하는 사람/역할" value="<%=org.springframework.web.util.HtmlUtils.htmlEscape(loginUser)%>" <%=loginUser.isEmpty() ? "" : "readonly"%> /></td>
 						</tr>
 						<tr>
 							<th><label for="workflow-admin-comment">comment</label></th>

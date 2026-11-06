@@ -15,6 +15,7 @@ import net.dstone.ai.DstoneAiEngineApplication;
 import net.dstone.ai.api.dto.PendingApproval;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.common.config.ConfigTool;
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
@@ -170,6 +171,7 @@ public abstract class WorkflowTestBase {
 	/**
 	 * <pre>
 	 * 승인 대기(WAITING_APPROVAL)로 멈춘 실행에 사람의 결정을 넣고 이어서 실행합니다.
+	 * 엔진은 결정을 받으면 대기열에 넣고 바로 돌려주므로(QUEUED), 끝나거나 다시 멈출 때까지 기다린 상태를 돌려줍니다.
 	 * routes에 없는 결정이나, 의견이 꼭 있어야 하는데 없는 결정은 ResponseStatusException(400)을 던집니다.
 	 * </pre>
 	 *
@@ -178,7 +180,32 @@ public abstract class WorkflowTestBase {
 	 * @param comment   의견(없으면 null)
 	 */
 	protected WorkFlowExecution decide(WorkFlowExecution execution, String decision, String comment) {
-		return this.workFlowExecutionService.decide(execution.executionId(), decision, null, "tester", comment);
+		WorkFlowExecution queued = this.workFlowExecutionService.decide(execution.executionId(), decision, null, "tester", comment);
+		return this.awaitFinished(queued.executionId());
+	}
+
+	/**
+	 * <pre>
+	 * 대기열(QUEUED)이나 실행 중(RUNNING)을 벗어날 때까지 기다린 실행 상태를 돌려줍니다. 30초가 넘으면 실패입니다.
+	 * 승인·재개·되감기처럼 엔진이 실행 풀에 맡기고 바로 돌아오는 일을 확인할 때 씁니다.
+	 * </pre>
+	 *
+	 * @param executionId 기다릴 실행의 id
+	 */
+	protected WorkFlowExecution awaitFinished(String executionId) {
+		for (int i = 0; i < 300; i++) {
+			WorkFlowExecution execution = this.workFlowExecutionStore.find(executionId);
+			if (execution.status() != WorkFlowExecutionStatus.RUNNING && execution.status() != WorkFlowExecutionStatus.QUEUED) {
+				return execution;
+			}
+			try {
+				Thread.sleep(100L);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new AssertionError("기다리다 중단되었습니다: " + executionId);
+			}
+		}
+		throw new AssertionError("실행이 30초 안에 끝나지 않았습니다: " + executionId);
 	}
 
 	/** 승인 대기 중인 실행이 지금 어떤 결정을 기다리는지 돌려줍니다. 승인 대기가 아니면 null입니다. */

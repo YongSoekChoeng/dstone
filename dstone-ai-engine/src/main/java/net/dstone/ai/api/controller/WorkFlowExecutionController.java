@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import net.dstone.ai.api.dto.RewindPoint;
 import net.dstone.ai.api.dto.WorkFlowDecisionRequest;
 import net.dstone.ai.api.dto.WorkFlowRewindRequest;
@@ -26,6 +28,7 @@ import net.dstone.ai.api.dto.WorkFlowExecutionSummary;
 import net.dstone.ai.api.dto.WorkFlowFileSaveRequest;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.api.service.WorkFlowFileService;
+import net.dstone.ai.common.security.RequesterContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.biz.BaseController;
 
@@ -72,20 +75,21 @@ public class WorkFlowExecutionController extends BaseController {
 	 * @param workflowId id에 이 글자가 들어 있는 Workflow의 실행만 보고 싶을 때 씁니다(비우면 전체).
 	 * @param caller     특정 호출 주체(caller)의 실행만 보고 싶을 때 씁니다(비우면 전체).
 	 * @param executionId id에 이 글자가 들어 있는 실행만 보고 싶을 때 씁니다(비우면 전체).
+	 * @param requestedBy 이 사용자가 시작한 실행만 보고 싶을 때 씁니다(비우면 전체. 화면의 "내 실행만").
 	 * @param page       조회할 페이지 번호입니다. 0부터 시작하며, 기본값은 0입니다.
 	 * @param size       한 페이지에 몇 개씩 보여줄지입니다. 기본값은 20이고 최대 100입니다.
 	 */
 	@GetMapping
 	public WorkFlowExecutionPage list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String caller,
-		@RequestParam(required = false) String executionId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+		@RequestParam(required = false) String executionId, @RequestParam(required = false) String requestedBy, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
 		int safePage = Math.max(page, 0);
 		int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-		List<WorkFlowExecution> executions = this.workFlowExecutionService.search(status, workflowId, executionId, caller, safePage, safeSize);
+		List<WorkFlowExecution> executions = this.workFlowExecutionService.search(status, workflowId, executionId, caller, requestedBy, safePage, safeSize);
 		List<WorkFlowExecutionSummary> summaries = new ArrayList<WorkFlowExecutionSummary>();
 		for (WorkFlowExecution execution : executions) {
 			summaries.add(WorkFlowExecutionSummary.from(execution));
 		}
-		return new WorkFlowExecutionPage(summaries, this.workFlowExecutionService.count(status, workflowId, executionId, caller), safePage, safeSize);
+		return new WorkFlowExecutionPage(summaries, this.workFlowExecutionService.count(status, workflowId, executionId, caller, requestedBy), safePage, safeSize);
 	}
 
 	/**
@@ -104,27 +108,37 @@ public class WorkFlowExecutionController extends BaseController {
 
 	/**
 	 * WAITING_APPROVAL(승인 대기) 상태인 실행에 대해 사람의 결정(그 step의 routes 중 하나)을 기록하고, 멈춰 있던 그
-	 * 스텝부터 다시 실행을 이어갑니다. 동기 방식이라서, 이어진 실행이 완전히 끝날 때까지(성공이든
-	 * 실패든) 기다렸다가 최종 상태로 응답합니다.
+	 * 스텝부터 다시 실행을 이어가도록 대기열에 넣습니다. 끝날 때까지 기다리지 않고 QUEUED 상태로 바로 응답합니다.
+	 * 이미 다른 사람이 결정했으면 409, 대기열이 꽉 찼으면 503, 결정 값이 틀렸으면 400과 {status, message}를 돌려줍니다.
+	 * X-Dstone-User 헤더가 있으면 결정한 사람은 요청 본문의 approver 대신 그 사용자로 남깁니다.
 	 *
-	 * @param executionId 승인 또는 반려를 결정할 실행의 id입니다.
-	 * @param request     고른 결정(decision), 결정한 사람(approver), 사유(comment)를 담고 있습니다.
+	 * @param executionId    승인 또는 반려를 결정할 실행의 id입니다.
+	 * @param request        고른 결정(decision), 결정한 사람(approver), 사유(comment)를 담고 있습니다.
+	 * @param servletRequest 결정한 사용자를 읽을 HTTP 요청입니다.
 	 */
 	@PostMapping("/{executionId}/decision")
-	public WorkFlowExecutionDetail decision(@PathVariable String executionId, @RequestBody WorkFlowDecisionRequest request) {
-		WorkFlowExecution execution = this.workFlowExecutionService.decide(executionId, request.chosen(), request.approved(), request.approver(), request.comment());
-		return this.detailOf(execution, this.maxValueChars());
+	public ResponseEntity<Object> decision(@PathVariable String executionId, @RequestBody WorkFlowDecisionRequest request, HttpServletRequest servletRequest) {
+		String user = RequesterContext.userOf(servletRequest);
+		String approver = user != null ? user : request.approver();
+		try {
+			WorkFlowExecution execution = this.workFlowExecutionService.decide(executionId, request.chosen(), request.approved(), approver, request.comment());
+			return ResponseEntity.ok((Object) this.detailOf(execution, this.maxValueChars()));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
 	}
 
 	/**
-	 * 돌고 있는 실행에 일시정지를 요청합니다. 지금 step이 끝나면 PAUSED로 멈춥니다.
-	 * 실행 중이 아니면 409와 {status, message}를 돌려줍니다.
+	 * 돌고 있는 실행에 일시정지를 요청합니다. 지금 step이 끝나면 PAUSED로 멈춥니다. 대기 중(QUEUED)이면 바로 멈춥니다.
+	 * 실행 중이나 대기 중이 아니면 409, 남의 실행이면 403과 {status, message}를 돌려줍니다(RequesterContext.checkOwner()).
 	 *
-	 * @param executionId 멈출 실행의 id입니다.
+	 * @param executionId    멈출 실행의 id입니다.
+	 * @param servletRequest 요청한 사용자를 읽을 HTTP 요청입니다.
 	 */
 	@PostMapping("/{executionId}/pause")
-	public ResponseEntity<Object> pause(@PathVariable String executionId) {
+	public ResponseEntity<Object> pause(@PathVariable String executionId, HttpServletRequest servletRequest) {
 		try {
+			RequesterContext.checkOwner(servletRequest, this.workFlowExecutionService.find(executionId));
 			return ResponseEntity.ok((Object) this.detailOf(this.workFlowExecutionService.pause(executionId), this.maxValueChars()));
 		} catch (ResponseStatusException e) {
 			return this.rejected(e);
@@ -132,14 +146,16 @@ public class WorkFlowExecutionController extends BaseController {
 	}
 
 	/**
-	 * 일시정지했거나 실패한 실행을 멈춘 step부터 이어 갑니다. 끝날 때까지 기다리지 않고 바로 응답합니다.
-	 * 이어 갈 수 없으면 409와 {status, message}를 돌려줍니다.
+	 * 일시정지했거나 실패한 실행을 멈춘 step부터 이어 갑니다. 끝날 때까지 기다리지 않고 바로 응답합니다(QUEUED).
+	 * 이어 갈 수 없으면 409, 남의 실행이면 403, 대기열이 꽉 찼으면 503과 {status, message}를 돌려줍니다.
 	 *
 	 * @param executionId 이어 갈 실행의 id입니다.
+	 * @param servletRequest 요청한 사용자를 읽을 HTTP 요청입니다(남의 실행이면 403).
 	 */
 	@PostMapping("/{executionId}/resume")
-	public ResponseEntity<Object> resume(@PathVariable String executionId) {
+	public ResponseEntity<Object> resume(@PathVariable String executionId, HttpServletRequest servletRequest) {
 		try {
+			RequesterContext.checkOwner(servletRequest, this.workFlowExecutionService.find(executionId));
 			return ResponseEntity.ok((Object) this.detailOf(this.workFlowExecutionService.resume(executionId), this.maxValueChars()));
 		} catch (ResponseStatusException e) {
 			return this.rejected(e);
@@ -169,10 +185,12 @@ public class WorkFlowExecutionController extends BaseController {
 	 *
 	 * @param executionId 실행 id
 	 * @param request     {fromStep, clearState}
+	 * @param servletRequest 요청한 사용자를 읽을 HTTP 요청입니다(남의 실행이면 403).
 	 */
 	@PostMapping("/{executionId}/rewind")
-	public ResponseEntity<Object> rewind(@PathVariable String executionId, @RequestBody WorkFlowRewindRequest request) {
+	public ResponseEntity<Object> rewind(@PathVariable String executionId, @RequestBody WorkFlowRewindRequest request, HttpServletRequest servletRequest) {
 		try {
+			RequesterContext.checkOwner(servletRequest, this.workFlowExecutionService.find(executionId));
 			WorkFlowExecution execution = this.workFlowExecutionService.rewind(executionId, request.fromStep(), request.clear());
 			return ResponseEntity.ok((Object) this.detailOf(execution, this.maxValueChars()));
 		} catch (ResponseStatusException e) {
@@ -218,10 +236,12 @@ public class WorkFlowExecutionController extends BaseController {
 	 *
 	 * @param executionId 실행 id
 	 * @param request     경로, 새 내용, 열 때 받은 hash
+	 * @param servletRequest 요청한 사용자를 읽을 HTTP 요청입니다(남의 실행이면 403).
 	 */
 	@PostMapping("/{executionId}/files/content")
-	public ResponseEntity<Object> saveFileContent(@PathVariable String executionId, @RequestBody WorkFlowFileSaveRequest request) {
+	public ResponseEntity<Object> saveFileContent(@PathVariable String executionId, @RequestBody WorkFlowFileSaveRequest request, HttpServletRequest servletRequest) {
 		try {
+			RequesterContext.checkOwner(servletRequest, this.workFlowExecutionService.find(executionId));
 			return ResponseEntity.ok((Object) this.workFlowFileService.save(executionId, request.path(), request.text(), request.baseHash()));
 		} catch (ResponseStatusException e) {
 			return this.rejected(e);

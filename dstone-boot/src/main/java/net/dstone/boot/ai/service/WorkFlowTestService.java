@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import net.dstone.boot.ai.vo.WorkFlowStatusCallResult;
 import net.dstone.boot.ai.vo.WorkFlowStatusResult;
@@ -35,6 +36,10 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 
 	@Autowired
 	private ConfigProperty configProperty;
+
+	/** 실행을 시작한 사람으로 남도록 로그인 사용자 헤더를 붙입니다(실행 관리 화면의 "내 실행만"). */
+	@Autowired
+	private AiEngineUser aiEngineUser;
 
 	/** 등록된 Workflow의 id+description 목록을 조회한다("Workflow 테스트" 화면의 workflowId 드롭다운용). */
 	public List<WorkFlowSummaryResult> listWorkflows() {
@@ -67,12 +72,16 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 			WorkFlowSubmitCallResult callResult = this.getWebClient().post()
 					.uri(baseUrl + "/api/ai/workflow/" + request.workflowId() + "/submit")
 					.contentType(MediaType.APPLICATION_JSON)
+					.headers(this.aiEngineUser.headers())
 					.bodyValue(body)
 					.retrieve()
 					.bodyToMono(WorkFlowSubmitCallResult.class)
 					.block();
 
 			return new WorkFlowSubmitResult(callResult != null ? callResult.executionId() : null, null);
+		} catch (WebClientResponseException e) {
+			// 엔진이 거절한 사유(예: 실행 대기열이 꽉 차서 503)를 그대로 보여 줍니다.
+			return new WorkFlowSubmitResult(null, e.getStatusCode().value() + " - " + e.getResponseBodyAsString());
 		} catch (Exception e) {
 			return new WorkFlowSubmitResult(null, e.getMessage());
 		}

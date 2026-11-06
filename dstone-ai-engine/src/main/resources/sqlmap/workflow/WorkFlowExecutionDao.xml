@@ -19,15 +19,32 @@
         , ERROR_MESSAGE AS "errorMessage"
         , CREATED_AT AS "createdAt"
         , UPDATED_AT AS "updatedAt"
+        , REQUESTED_BY AS "requestedBy"
+    </sql>
+
+    <!-- 목록 화면용. 큰 CONTEXT_JSON / RESULT_TEXT 는 읽지 않는다(목록에는 필요 없고, 여러 사람이 자주 새로 고치면 부담이 크다) -->
+    <sql id="executionSummaryColumns">
+        EXECUTION_ID AS "executionId"
+        , WORKFLOW_ID AS "workflowId"
+        , CALLER AS "caller"
+        , SESSION_ID AS "sessionId"
+        , STATUS AS "status"
+        , CURRENT_STEP_INDEX AS "currentStepIndex"
+        , ERROR_MESSAGE AS "errorMessage"
+        , CREATED_AT AS "createdAt"
+        , UPDATED_AT AS "updatedAt"
+        , REQUESTED_BY AS "requestedBy"
     </sql>
 
     <!-- CONTEXT_JSON 은 jsonb 다. PostgreSQL 은 글자를 jsonb 로 알아서 바꿔 주지 않으므로 CAST 를 적어 준다 -->
     <insert id="insertExecution" parameterType="java.util.Map">
         INSERT INTO AI_WORKFLOW_EXECUTION
-            (EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, CONTEXT_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT)
+            (EXECUTION_ID, WORKFLOW_ID, CALLER, SESSION_ID, STATUS, CURRENT_STEP_INDEX, CONTEXT_JSON, RESULT_TEXT, ERROR_MESSAGE, CREATED_AT, UPDATED_AT
+            , REQUESTED_BY, OWNER_INSTANCE, HEARTBEAT_AT)
         VALUES
             (#{executionId}, #{workflowId}, #{caller}, #{sessionId}, #{status}, #{currentStepIndex}, CAST(#{contextJson} AS jsonb), #{resultText}, #{errorMessage}
-            , #{createdAt, jdbcType=TIMESTAMP}, #{updatedAt, jdbcType=TIMESTAMP})
+            , #{createdAt, jdbcType=TIMESTAMP}, #{updatedAt, jdbcType=TIMESTAMP}
+            , #{requestedBy}, #{ownerInstance}, now())
     </insert>
 
     <update id="updateExecution" parameterType="java.util.Map">
@@ -41,6 +58,34 @@
              <!-- 일시정지 요청은 실행이 도는 동안에는 건드리지 않고, 멈추거나 끝나면 지운다 -->
              , PAUSE_REQUESTED = CASE WHEN #{status} = 'RUNNING' THEN PAUSE_REQUESTED ELSE FALSE END
          WHERE EXECUTION_ID = #{executionId}
+    </update>
+
+    <!-- 대기열이 꽉 차서 받지 못한 새 실행을 지운다. 아직 아무 step도 돌지 않아 이력이나 파일 기록이 없다 -->
+    <delete id="deleteQueued" parameterType="string">
+        DELETE FROM AI_WORKFLOW_EXECUTION
+         WHERE EXECUTION_ID = #{executionId}
+           AND STATUS = 'QUEUED'
+    </delete>
+
+    <!-- 대기열에서 기다리던 실행이 슬롯을 받았을 때. QUEUED 그대로일 때만 RUNNING으로 바꾼다(그사이 일시정지했으면 0건이라 돌리지 않는다) -->
+    <update id="markStarted" parameterType="java.util.Map">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET STATUS = 'RUNNING'
+             , OWNER_INSTANCE = #{ownerInstance}
+             , HEARTBEAT_AT = now()
+             , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
+         WHERE EXECUTION_ID = #{executionId}
+           AND STATUS = 'QUEUED'
+    </update>
+
+    <!-- 아직 대기열에 있는 실행은 일시정지 요청을 남기지 않고 바로 PAUSED로 바꾼다 -->
+    <update id="pauseQueued" parameterType="java.util.Map">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET STATUS = 'PAUSED'
+             , PAUSE_REQUESTED = FALSE
+             , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
+         WHERE EXECUTION_ID = #{executionId}
+           AND STATUS = 'QUEUED'
     </update>
 
     <!-- 돌고 있는 실행에만 일시정지를 요청한다(이미 끝난 실행이면 0건) -->
@@ -57,26 +102,40 @@
          WHERE EXECUTION_ID = #{executionId}
     </select>
 
-    <!-- 상태가 그대로일 때만 RUNNING으로 바꾼다. 재개 버튼을 두 번 눌러도 실행은 하나만 돈다 -->
-    <update id="markResumed" parameterType="java.util.Map">
+    <!-- 멈춰 있던 실행(승인 대기/일시정지/실패/완료)을 다시 돌리려고 대기열에 넣는다.
+         상태가 그대로일 때만 바꾼다. 재개·승인 버튼을 두 번 누르거나 두 사람이 동시에 눌러도 실행은 하나만 돈다 -->
+    <update id="markQueued" parameterType="java.util.Map">
         UPDATE AI_WORKFLOW_EXECUTION
-           SET STATUS = 'RUNNING'
+           SET STATUS = 'QUEUED'
              , CURRENT_STEP_INDEX = #{currentStepIndex}
              , ERROR_MESSAGE = NULL
              , PAUSE_REQUESTED = FALSE
+             , OWNER_INSTANCE = #{ownerInstance}
+             , HEARTBEAT_AT = now()
              , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
          WHERE EXECUTION_ID = #{executionId}
            AND STATUS = #{fromStatus}
     </update>
 
-    <!-- 서버가 뜰 때: 재시작 전에 돌던 실행은 이어 줄 스레드가 없으므로 실패로 바꾼다 -->
-    <update id="failInterrupted" parameterType="java.util.Map">
+    <!-- 이 인스턴스가 맡은 실행(도는 중이거나 대기열에 있는 것)에 "아직 살아 있다"고 적는다 -->
+    <update id="heartbeat" parameterType="string">
+        UPDATE AI_WORKFLOW_EXECUTION
+           SET HEARTBEAT_AT = now()
+         WHERE OWNER_INSTANCE = #{ownerInstance}
+           AND STATUS IN ('RUNNING', 'QUEUED')
+    </update>
+
+    <!-- 맡은 인스턴스가 사라진 실행을 실패로 바꾼다. heartbeat가 staleSeconds초 넘게 끊긴 것만 고르므로,
+         엔진을 여러 대 띄워도 살아 있는 다른 인스턴스의 실행은 건드리지 않는다.
+         HEARTBEAT_AT이 비어 있는 것은 이 컬럼이 생기기 전에 시작한 실행이다 -->
+    <update id="failOrphans" parameterType="java.util.Map">
         UPDATE AI_WORKFLOW_EXECUTION
            SET STATUS = 'FAILED'
              , ERROR_MESSAGE = #{errorMessage}
              , PAUSE_REQUESTED = FALSE
-             , UPDATED_AT = #{updatedAt, jdbcType=TIMESTAMP}
-         WHERE STATUS = 'RUNNING'
+             , UPDATED_AT = now()
+         WHERE STATUS IN ('RUNNING', 'QUEUED')
+           AND (HEARTBEAT_AT IS NULL OR HEARTBEAT_AT &lt; now() - make_interval(secs => #{staleSeconds}))
     </update>
 
     <select id="selectExecution" parameterType="string" resultType="java.util.LinkedHashMap">
@@ -87,7 +146,7 @@
 
     <!-- 실행 목록(최신순). status / workflowId / caller 는 값이 있을 때만 조건으로 건다 -->
     <select id="selectExecutionList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        SELECT <include refid="executionColumns"/>
+        SELECT <include refid="executionSummaryColumns"/>
           FROM AI_WORKFLOW_EXECUTION
          WHERE 1 = 1
         <if test="status != null and status != ''">AND STATUS = #{status}</if>
@@ -104,10 +163,11 @@
         <if test="workflowId != null and workflowId != ''">AND POSITION(LOWER(#{workflowId}) IN LOWER(WORKFLOW_ID)) > 0</if>
         <if test="executionId != null and executionId != ''">AND POSITION(LOWER(#{executionId}) IN LOWER(EXECUTION_ID)) > 0</if>
         <if test="caller != null and caller != ''">AND CALLER = #{caller}</if>
+        <if test="requestedBy != null and requestedBy != ''">AND REQUESTED_BY = #{requestedBy}</if>
     </sql>
 
     <select id="searchExecutionList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        SELECT <include refid="executionColumns"/>
+        SELECT <include refid="executionSummaryColumns"/>
           FROM AI_WORKFLOW_EXECUTION
         <include refid="searchCondition"/>
          ORDER BY CREATED_AT DESC, EXECUTION_ID

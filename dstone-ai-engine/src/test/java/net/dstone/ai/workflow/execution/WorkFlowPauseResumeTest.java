@@ -18,11 +18,12 @@ import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionRecovery;
+import net.dstone.ai.support.InMemoryWorkFlowExecutionStore;
 import net.dstone.ai.support.WorkflowTestBase;
 
 /**
  * <pre>
- * 일시정지, 재개, 실패 지점부터 재실행, 재시작 복구, 목록 검색을 확인합니다.
+ * 일시정지, 재개, 실패 지점부터 재실행, heartbeat 정리, 대기열(QUEUED), 목록 검색을 확인합니다.
  * step 사이에 요청을 끼워 넣으려고 WorkFlowExecutor.run(workflow, execution, 1)로 한 step씩 돌립니다.
  * </pre>
  */
@@ -42,16 +43,9 @@ public class WorkFlowPauseResumeTest extends WorkflowTestBase {
 		return execution;
 	}
 
-	/** 비동기로 이어 간 실행이 RUNNING을 벗어날 때까지 기다립니다. */
+	/** 비동기로 이어 간 실행이 QUEUED/RUNNING을 벗어날 때까지 기다립니다. */
 	private WorkFlowExecution await(String executionId) throws InterruptedException {
-		for (int i = 0; i < 300; i++) {
-			WorkFlowExecution execution = this.workFlowExecutionStore.find(executionId);
-			if (execution.status() != WorkFlowExecutionStatus.RUNNING) {
-				return execution;
-			}
-			Thread.sleep(100L);
-		}
-		throw new AssertionError("실행이 30초 안에 끝나지 않았습니다: " + executionId);
+		return this.awaitFinished(executionId);
 	}
 
 	@Test
@@ -149,21 +143,58 @@ public class WorkFlowPauseResumeTest extends WorkflowTestBase {
 	void 상태가_그사이_바뀌면_재개는_한_번만_성공한다() {
 		WorkFlowExecution failed = this.run(TOOL_WORKFLOW, "SELEC 1 FROM dual");
 
-		assertThat(this.workFlowExecutionStore.markResumed(failed, 0)).isTrue();
-		assertThat(this.workFlowExecutionStore.markResumed(failed, 0)).isFalse();
+		assertThat(this.workFlowExecutionStore.markQueued(failed, 0)).isTrue();
+		assertThat(this.workFlowExecutionStore.markQueued(failed, 0)).isFalse();
 		this.workFlowExecutionStore.update(failed);
 	}
 
 	@Test
-	void 재시작_복구는_RUNNING으로_남은_실행을_FAILED로_바꾸고_다시_실행할_수_있게_한다() {
+	void heartbeat가_살아_있는_실행은_두고_끊긴_실행만_FAILED로_바꾼다() {
+		WorkFlowExecution alive = this.newExecution(TOOL_WORKFLOW, "SELECT 1 FROM dual");
 		WorkFlowExecution stuck = this.newExecution(TOOL_WORKFLOW, "SELECT 1 FROM dual");
+		// stuck을 맡은 엔진이 3분 전에 사라졌다고 칩니다.
+		((InMemoryWorkFlowExecutionStore) this.workFlowExecutionStore).ageHeartbeat(stuck.executionId(), 180L);
 
-		this.recovery.recover();
+		this.recovery.sweep(120);
 
+		assertThat(this.workFlowExecutionStore.find(alive.executionId()).status()).isEqualTo(WorkFlowExecutionStatus.RUNNING);
 		WorkFlowExecution failed = this.workFlowExecutionStore.find(stuck.executionId());
 		assertThat(failed.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(failed.errorMessage()).contains("재시작");
+		assertThat(failed.errorMessage()).contains("중단");
 		assertThat(this.workFlowExecutionService.resumePoint(failed).resumable()).isTrue();
+		// 다음 테스트에 남지 않게 정리합니다.
+		this.workFlowExecutionStore.update(alive.failed("테스트 정리"));
+	}
+
+	@Test
+	void 대기열의_실행은_일시정지하면_바로_멈추고_차례가_와도_돌지_않는다() {
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(TOOL_WORKFLOW, null);
+		Map<String, Object> context = WorkFlowContext.create("SELECT 1 FROM dual", TOOL_WORKFLOW, workflow.version());
+		WorkFlowContext.setCurrentStep(context, workflow.steps().get(0).id());
+		WorkFlowExecution queued = WorkFlowExecution.queue(UUID.randomUUID().toString(), TOOL_WORKFLOW, null, "test-queued", context, "dev1");
+		this.workFlowExecutionStore.insert(queued);
+
+		WorkFlowExecution paused = this.workFlowExecutionService.pause(queued.executionId());
+
+		assertThat(paused.status()).isEqualTo(WorkFlowExecutionStatus.PAUSED);
+		// 차례가 왔을 때 하는 확인(markStarted)이 실패하므로 돌지 않습니다.
+		assertThat(this.workFlowExecutionStore.markStarted(queued.executionId())).isFalse();
+		ResumePoint point = this.workFlowExecutionService.resumePoint(paused);
+		assertThat(point.stepId()).isEqualTo(workflow.steps().get(0).id());
+		assertThat(point.warnings()).isEmpty();
+	}
+
+	@Test
+	void 비동기_실행은_QUEUED로_시작해_끝나고_시작한_사람을_남긴다() throws Exception {
+		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(TOOL_WORKFLOW, null);
+
+		String executionId = this.workFlowExecutionService.submitAsync(workflow, "test-async", null, "SELECT 1 FROM dual", "dev1");
+		WorkFlowExecution done = this.await(executionId);
+
+		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+		assertThat(done.requestedBy()).isEqualTo("dev1");
+		assertThat(this.workFlowExecutionService.search(null, null, executionId, null, "dev1", 0, 10)).extracting("executionId").containsExactly(executionId);
+		assertThat(this.workFlowExecutionService.search(null, null, executionId, null, "dev2", 0, 10)).isEmpty();
 	}
 
 	@Test
@@ -171,12 +202,12 @@ public class WorkFlowPauseResumeTest extends WorkflowTestBase {
 		WorkFlowExecution first = this.run(TOOL_WORKFLOW, "SELECT 1 FROM dual");
 		this.run(TOOL_WORKFLOW, "SELECT 2 FROM dual");
 
-		List<WorkFlowExecution> found = this.workFlowExecutionService.search(null, null, first.executionId().substring(0, 13).toUpperCase(), null, 0, 10);
+		List<WorkFlowExecution> found = this.workFlowExecutionService.search(null, null, first.executionId().substring(0, 13).toUpperCase(), null, null, 0, 10);
 		assertThat(found).extracting("executionId").contains(first.executionId());
 
-		long total = this.workFlowExecutionService.count(null, "tool-chain", null, null);
+		long total = this.workFlowExecutionService.count(null, "tool-chain", null, null, null);
 		assertThat(total).isGreaterThanOrEqualTo(2L);
-		assertThat(this.workFlowExecutionService.search(null, "tool-chain", null, null, 0, 1)).hasSize(1);
+		assertThat(this.workFlowExecutionService.search(null, "tool-chain", null, null, null, 0, 1)).hasSize(1);
 	}
 
 }

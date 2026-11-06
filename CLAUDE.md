@@ -181,7 +181,7 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 - 새 DB 코드는 MyBatis: `resources/sqlmap/` 아래 `*Dao.xml` + `common.biz.BaseDao` 상속.
 - 정의 파일 검증은 부팅 시 수행된다. 정의 개수를 테스트에서 단정하지 않는다.
 - 테스트: `mvn test -DskipTests=false` (pom에서 기본 skip). 실제 LLM은 `-Ddstone.ai.test.llmcall=true`. 테스트는 main의 `conf/definitions`와 `conf/application.yml`을 그대로 쓴다 (테스트 전용 정의 파일 없음).
-- 같은 DB를 쓰는 테스트 사본은 `-Ddstone.ai.workflow.recovery.enabled=false`로 띄운다.
+- Workflow 실행은 `WorkFlowThreadPools`의 풀에서 `QUEUED`→`RUNNING`으로 돈다. 상태 전이는 조건부 UPDATE(`markQueued`/`markStarted`)로만 하고, 고아 실행 정리는 heartbeat 기준이라 같은 DB에 시험 사본을 띄워도 된다(`ai-engine-features.md` "Concurrent use").
 - 실행 중인 `target/*.jar|war`를 그 자리에서 다시 빌드하지 않는다. 사본을 다른 포트로 띄워 시험한다.
 
 필요할 때 읽을 문서 (`.claude/docs/`):

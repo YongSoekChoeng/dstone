@@ -86,6 +86,8 @@ public class WorkFlowExecutor extends BaseObject {
 	@Autowired
 	private ApprovalStepExecutor approvalStepExecutor;
 	@Autowired
+	private WorkFlowThreadPools threadPools;
+	@Autowired
 	private WorkFlowExecutionStore executionStore;
 
 	/**
@@ -368,7 +370,7 @@ public class WorkFlowExecutor extends BaseObject {
 					// 반복마다 이번 항목을 변수로 넣습니다.
 					return WorkFlowExecutor.this.call(step, execution, variables, NO_INPUT);
 				}
-			}));
+			}, this.threadPools.forEachExecutor())); // 공용 풀이 아니라 forEach 전용 풀에서 돕니다(WorkFlowThreadPools).
 		}
 
 		boolean allSuccess = true;

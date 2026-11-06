@@ -1,11 +1,14 @@
 package net.dstone.ai.api.controller;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +28,7 @@ import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.security.CallerContext;
+import net.dstone.ai.common.security.RequesterContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseController;
@@ -100,7 +104,7 @@ public class WorkFlowController extends BaseController {
 		this.checkInput(workflow, request);
 		String sessionId = this.resolveSessionId(request);
 
-		WorkFlowExecution result = this.workFlowExecutionService.executeSync(workflow, sessionId, caller, request.input());
+		WorkFlowExecution result = this.workFlowExecutionService.executeSync(workflow, sessionId, caller, request.input(), RequesterContext.userOf(servletRequest));
 		if (result.status() == WorkFlowExecutionStatus.FAILED) {
 			// /execute는 결과를 바로 받는 동기 호출이므로, 실패했다면 그 자리에서 바로 알려줘야 합니다.
 			// 이 API를 호출하는 쪽(dstone-boot 등)은 "실패하면 예외가 날아온다"고 가정하고 코드를
@@ -113,19 +117,29 @@ public class WorkFlowController extends BaseController {
 	/**
 	 * Workflow 하나의 실행을 시작만 시켜 놓고, 결과를 기다리지 않고 바로 응답합니다(비동기 호출).
 	 * 실행 결과가 궁금하면 나중에 status() 메서드(GET /status/{executionId})로 확인하면 됩니다.
+	 * 실행은 QUEUED로 시작해서 실행 슬롯이 비면 RUNNING이 됩니다. 대기열까지 꽉 찼으면 503으로 거절합니다.
+	 * X-Dstone-User 헤더가 있으면 그 사용자를 실행을 시작한 사람으로 남깁니다(RequesterContext).
 	 *
 	 * @param workflowId     실행할 Workflow의 id입니다.
 	 * @param request        Workflow에 넘길 입력값(input, Workflow input 모양)과 세션 ID를 담고 있습니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
 	@PostMapping("/{workflowId}/submit")
-	public WorkFlowSubmitResponse submit(@PathVariable String workflowId, @RequestBody WorkFlowRequest request, HttpServletRequest servletRequest) {
+	public ResponseEntity<Object> submit(@PathVariable String workflowId, @RequestBody WorkFlowRequest request, HttpServletRequest servletRequest) {
 		String caller = CallerContext.get(servletRequest);
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(workflowId, caller);
 		this.checkInput(workflow, request);
 		String sessionId = this.resolveSessionId(request);
-		String executionId = this.workFlowExecutionService.submitAsync(workflow, sessionId, caller, request.input());
-		return new WorkFlowSubmitResponse(executionId);
+		try {
+			String executionId = this.workFlowExecutionService.submitAsync(workflow, sessionId, caller, request.input(), RequesterContext.userOf(servletRequest));
+			return ResponseEntity.ok((Object) new WorkFlowSubmitResponse(executionId));
+		} catch (ResponseStatusException e) {
+			// 대기열이 꽉 찬 503 등. 기본 오류 응답에는 사유가 빠지므로 {status, message}로 직접 돌려줍니다.
+			Map<String, Object> body = new LinkedHashMap<String, Object>();
+			body.put("status", Integer.valueOf(e.getStatusCode().value()));
+			body.put("message", e.getReason());
+			return ResponseEntity.status(e.getStatusCode()).body((Object) body);
+		}
 	}
 
 	/**

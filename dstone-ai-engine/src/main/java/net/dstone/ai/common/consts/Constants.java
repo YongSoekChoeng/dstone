@@ -33,6 +33,14 @@ public final class Constants {
 			/** ChatClient의 Advisor 체인 안에서 caller 값을 읽을 때 쓰는 키입니다. 값을 저장하는 위치만 REQUEST_ATTRIBUTE와 다를 뿐, 담고 있는 값은 똑같습니다. */
 			public final static String ADVISOR_CONTEXT_KEY = REQUEST_ATTRIBUTE;
 		}
+
+		/** 화면을 쓰는 사람(사용자)을 dstone-boot가 알려 줄 때 쓰는 헤더입니다(common.security.RequesterContext가 읽습니다). */
+		public static final class Requester {
+			/** 로그인 사용자 id(URL 인코딩). */
+			public final static String USER_HEADER = "X-Dstone-User";
+			/** 그 사용자가 관리자면 "true". 관리자는 다른 사람의 실행도 조작할 수 있습니다. */
+			public final static String ADMIN_HEADER = "X-Dstone-User-Admin";
+		}
 	}
 
 	/** 대화 이력을 Redis에 저장할 때 쓰는 키 이름과 관련된 상수입니다(common.session.RedisChatMemoryRepository이 사용합니다). */

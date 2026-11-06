@@ -886,6 +886,11 @@ label.wd-check {
 	color: var(--cs-info);
 }
 
+.workflow-badge-queued {
+	background: var(--cs-surface-3);
+	color: var(--cs-info);
+}
+
 .workflow-badge-done {
 	background: var(--cs-success-soft);
 	color: var(--cs-success);
@@ -1019,6 +1024,14 @@ label.wd-check {
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
+}
+
+/* 조회 조건의 "내 실행만" 체크박스 */
+.wa-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
 }
 
 .wa-pager-total {

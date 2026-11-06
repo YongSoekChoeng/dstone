@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -38,12 +39,15 @@ import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
  *     WORKFLOW_ID         WORKFLOW아이디
  *     CALLER              호출클라이언트
  *     SESSION_ID          세션아이디
- *     STATUS              상태(RUNNING / WAITING_APPROVAL / PAUSED / DONE / FAILED / CANCELLED)
+ *     STATUS              상태(QUEUED / RUNNING / WAITING_APPROVAL / PAUSED / DONE / FAILED / CANCELLED)
  *     CURRENT_STEP_INDEX  현재 STEP 인덱스
  *     CONTEXT_JSON        컨텍스트
  *     RESULT_TEXT         결과텍스트
  *     ERROR_MESSAGE       에러텍스트
  *     PAUSE_REQUESTED     일시정지 요청 여부
+ *     REQUESTED_BY        실행을 시작한 사용자(dstone-boot 로그인 id)
+ *     OWNER_INSTANCE      실행을 맡은 엔진 인스턴스(EngineInstance)
+ *     HEARTBEAT_AT        맡은 인스턴스가 살아 있다고 마지막으로 알린 시각
  * 
  * <b>(AI_WORKFLOW_EXECUTION_STEP_HISTORY - WORKFLOW STEP 실행 이력)</b>
  *     ID                실행이력아이디(KEY)
@@ -65,13 +69,18 @@ public class WorkFlowExecutionStore extends BaseDao {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	/** 새 실행 상태를 한 행으로 저장합니다. @param execution 새로 저장할 실행 상태입니다. */
+	@Autowired
+	private EngineInstance engineInstance;
+
+	/** 새 실행 상태를 한 행으로 저장합니다. 이 인스턴스가 맡은 실행으로 적습니다. @param execution 새로 저장할 실행 상태입니다. */
 	public void insert(WorkFlowExecution execution) {
 		Map<String, Object> param = this.executionParam(execution);
 		param.put("workflowId", execution.workflowId());
 		param.put("caller", execution.caller());
 		param.put("sessionId", execution.sessionId());
 		param.put("createdAt", Timestamp.from(execution.createdAt()));
+		param.put("requestedBy", execution.requestedBy());
+		param.put("ownerInstance", this.engineInstance.id());
 		this.sqlSessionCommon.insert(NS + "insertExecution", param);
 	}
 
@@ -104,7 +113,7 @@ public class WorkFlowExecutionStore extends BaseDao {
 
 	/**
 	 * 실행 목록을 최신순으로 조회합니다. status, workflowId, caller는 값이 있을 때만 필터로 적용되고,
-	 * 셋 다 비어 있으면 전체를 돌려줍니다.
+	 * 셋 다 비어 있으면 전체를 돌려줍니다. 건수를 세거나 목록을 보여 줄 때만 쓰므로 컨텍스트와 결과는 읽지 않습니다.
 	 *
 	 * @param status     WAITING_APPROVAL처럼 특정 상태로만 좁혀서 보고 싶을 때 씁니다(비우면 전체를 봅니다).
 	 * @param workflowId 특정 Workflow의 실행만 보고 싶을 때 씁니다(비우면 전체를 봅니다).
@@ -134,11 +143,12 @@ public class WorkFlowExecutionStore extends BaseDao {
 	 * @param workflowId  id에 이 글자가 들어 있는 Workflow만 봅니다(비우면 전체).
 	 * @param executionId id에 이 글자가 들어 있는 실행만 봅니다(비우면 전체).
 	 * @param caller      이 호출 주체만 봅니다(비우면 전체).
+	 * @param requestedBy 이 사용자가 시작한 실행만 봅니다(비우면 전체).
 	 * @param page        0부터 시작하는 페이지 번호입니다.
 	 * @param size        한 페이지에 담을 개수입니다.
 	 */
-	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, int page, int size) {
-		Map<String, Object> param = this.searchParam(status, workflowId, executionId, caller);
+	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, String requestedBy, int page, int size) {
+		Map<String, Object> param = this.searchParam(status, workflowId, executionId, caller, requestedBy);
 		param.put("size", Integer.valueOf(size));
 		param.put("offset", Integer.valueOf(page * size));
 		List<Map<String, Object>> rows = this.sqlSessionCommon.selectList(NS + "searchExecutionList", param);
@@ -150,17 +160,18 @@ public class WorkFlowExecutionStore extends BaseDao {
 	}
 
 	/** search()와 같은 조건에 맞는 실행이 모두 몇 건인지 돌려줍니다. */
-	public long count(String status, String workflowId, String executionId, String caller) {
-		Long total = this.sqlSessionCommon.selectOne(NS + "countExecutionList", this.searchParam(status, workflowId, executionId, caller));
+	public long count(String status, String workflowId, String executionId, String caller, String requestedBy) {
+		Long total = this.sqlSessionCommon.selectOne(NS + "countExecutionList", this.searchParam(status, workflowId, executionId, caller, requestedBy));
 		return total == null ? 0L : total.longValue();
 	}
 
-	private Map<String, Object> searchParam(String status, String workflowId, String executionId, String caller) {
+	private Map<String, Object> searchParam(String status, String workflowId, String executionId, String caller, String requestedBy) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("status", status);
 		param.put("workflowId", workflowId);
 		param.put("executionId", executionId);
 		param.put("caller", caller);
+		param.put("requestedBy", requestedBy);
 		return param;
 	}
 
@@ -181,32 +192,85 @@ public class WorkFlowExecutionStore extends BaseDao {
 	}
 
 	/**
-	 * 멈춘 실행을 RUNNING으로 바꿉니다. 상태가 fromStatus 그대로일 때만 바꾸므로, 동시에 두 번 재개해도 한 번만 성공합니다.
+	 * <pre>
+	 * 멈춰 있던 실행(승인 대기, 일시정지, 실패, 완료)을 다시 돌리려고 QUEUED로 바꾸고, 이 인스턴스가 맡은 실행으로 적습니다.
+	 * 상태가 읽어 온 그대로일 때만 바꾸므로, 재개나 승인을 동시에 두 번 눌러도 한 번만 성공합니다.
+	 * </pre>
 	 *
-	 * @param execution  재개할 실행입니다(읽어 온 그대로의 상태).
+	 * @param execution  다시 돌릴 실행입니다(읽어 온 그대로의 상태).
 	 * @param stepIndex  다시 실행할 스텝이 몇 번째인지입니다.
 	 * @return 바꿨으면 true, 그사이 상태가 달라졌으면 false입니다.
 	 */
-	public boolean markResumed(WorkFlowExecution execution, int stepIndex) {
+	public boolean markQueued(WorkFlowExecution execution, int stepIndex) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("executionId", execution.executionId());
 		param.put("fromStatus", execution.status().name());
 		param.put("currentStepIndex", Integer.valueOf(stepIndex));
+		param.put("ownerInstance", this.engineInstance.id());
 		param.put("updatedAt", Timestamp.from(Instant.now()));
-		return this.sqlSessionCommon.update(NS + "markResumed", param) > 0;
+		return this.sqlSessionCommon.update(NS + "markQueued", param) > 0;
 	}
 
 	/**
-	 * RUNNING으로 남아 있는 실행을 모두 FAILED로 바꿉니다. 서버가 뜰 때 WorkFlowExecutionRecovery가 부릅니다.
+	 * 대기열에서 기다리던 실행이 슬롯을 받았을 때 RUNNING으로 바꿉니다. QUEUED 그대로일 때만 바꿉니다.
+	 *
+	 * @param executionId 돌기 시작할 실행의 id입니다.
+	 * @return 바꿨으면 true, 그사이 일시정지 등으로 상태가 달라졌으면 false입니다(이때는 돌리지 않습니다).
+	 */
+	public boolean markStarted(String executionId) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("executionId", executionId);
+		param.put("ownerInstance", this.engineInstance.id());
+		param.put("updatedAt", Timestamp.from(Instant.now()));
+		return this.sqlSessionCommon.update(NS + "markStarted", param) > 0;
+	}
+
+	/**
+	 * 대기열이 꽉 차서 받지 못한 새 실행을 지웁니다. QUEUED일 때만 지웁니다.
+	 *
+	 * @param executionId 지울 실행의 id입니다.
+	 */
+	public void deleteQueued(String executionId) {
+		this.sqlSessionCommon.delete(NS + "deleteQueued", executionId);
+	}
+
+	/**
+	 * 아직 대기열에 있는 실행을 바로 PAUSED로 바꿉니다.
+	 *
+	 * @param executionId 멈출 실행의 id입니다.
+	 * @return 바꿨으면 true, QUEUED가 아니었으면 false입니다.
+	 */
+	public boolean pauseQueued(String executionId) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("executionId", executionId);
+		param.put("updatedAt", Timestamp.from(Instant.now()));
+		return this.sqlSessionCommon.update(NS + "pauseQueued", param) > 0;
+	}
+
+	/**
+	 * 이 인스턴스가 맡은 실행(도는 중이거나 대기열에 있는 것)에 "아직 살아 있다"고 적습니다. WorkFlowExecutionRecovery가 주기적으로 부릅니다.
+	 *
+	 * @return 갱신한 건수입니다.
+	 */
+	public int heartbeat() {
+		return this.sqlSessionCommon.update(NS + "heartbeat", this.engineInstance.id());
+	}
+
+	/**
+	 * <pre>
+	 * 맡은 인스턴스가 사라진 실행(heartbeat가 staleSeconds초 넘게 끊긴 RUNNING/QUEUED)을 FAILED로 바꿉니다.
+	 * 서버가 뜰 때와 그 뒤 주기적으로 WorkFlowExecutionRecovery가 부릅니다.
+	 * </pre>
 	 *
 	 * @param errorMessage 남길 실패 사유입니다.
+	 * @param staleSeconds heartbeat가 이 초만큼 끊기면 맡은 인스턴스가 사라졌다고 봅니다.
 	 * @return 바꾼 건수입니다.
 	 */
-	public int failInterrupted(String errorMessage) {
+	public int failOrphans(String errorMessage, int staleSeconds) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("errorMessage", errorMessage);
-		param.put("updatedAt", Timestamp.from(Instant.now()));
-		return this.sqlSessionCommon.update(NS + "failInterrupted", param);
+		param.put("staleSeconds", Integer.valueOf(staleSeconds));
+		return this.sqlSessionCommon.update(NS + "failOrphans", param);
 	}
 
 	/**
@@ -239,7 +303,10 @@ public class WorkFlowExecutionStore extends BaseDao {
 		return history;
 	}
 
-	/** AI_WORKFLOW_EXECUTION 한 행을 WorkFlowExecution으로 바꿉니다. CONTEXT_JSON 컬럼은 다시 컨텍스트 맵으로 되돌립니다. */
+	/**
+	 * AI_WORKFLOW_EXECUTION 한 행을 WorkFlowExecution으로 바꿉니다. CONTEXT_JSON 컬럼은 다시 컨텍스트 맵으로 되돌립니다.
+	 * 목록 조회는 CONTEXT_JSON과 RESULT_TEXT를 읽지 않으므로, 그때는 빈 컨텍스트와 null 결과가 들어갑니다.
+	 */
 	private WorkFlowExecution mapExecution(Map<String, Object> row) {
 		return new WorkFlowExecution(
 			this.textOf(row.get("executionId")),
@@ -252,7 +319,8 @@ public class WorkFlowExecutionStore extends BaseDao {
 			this.fromResultJson(this.textOf(row.get("resultText"))),
 			this.textOf(row.get("errorMessage")),
 			this.toInstant(row.get("createdAt")),
-			this.toInstant(row.get("updatedAt")));
+			this.toInstant(row.get("updatedAt")),
+			this.textOf(row.get("requestedBy")));
 	}
 
 	/** AI_WORKFLOW_EXECUTION_STEP_HISTORY 한 행을 StepHistoryEntry로 바꿉니다. */

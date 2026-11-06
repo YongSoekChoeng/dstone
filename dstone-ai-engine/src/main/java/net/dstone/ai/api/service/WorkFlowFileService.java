@@ -42,7 +42,7 @@ import net.dstone.ai.tools.file.FileTool;
  * 저장은 다음을 모두 만족할 때만 됩니다.
  * - dstone.ai.workflow.file.edit-enabled가 true(운영 서버에서는 false 권장)
  * - 확장자가 dstone.ai.workflow.file.editable-extensions에 있음(기본 md. 소스 파일은 넣지 않습니다)
- * - 실행이 RUNNING이 아님(Agent가 같은 파일을 쓰고 있을 수 있습니다)
+ * - 실행이 RUNNING이나 QUEUED가 아님(Agent가 같은 파일을 쓰고 있거나 곧 쓸 수 있습니다)
  * - 화면이 열었을 때의 hash와 지금 파일의 hash가 같음(그사이 Agent가 다시 썼으면 덮어쓰지 않습니다)
  *
  * 저장할 때 원래 파일의 글자셋(UTF-8/MS949)과 줄바꿈(CRLF/LF)을 그대로 지킵니다. 뒤 step의 Agent가
@@ -224,8 +224,8 @@ public class WorkFlowFileService {
 		if (!this.editEnabled()) {
 			return "파일 저장 기능이 꺼져 있습니다(" + EDIT_ENABLED_PROPERTY + ").";
 		}
-		if (execution.status() == WorkFlowExecutionStatus.RUNNING) {
-			return "실행 중에는 고칠 수 없습니다. Agent가 같은 파일을 쓰고 있을 수 있습니다. 승인 대기이거나 일시정지했을 때 고치십시오.";
+		if (execution.status() == WorkFlowExecutionStatus.RUNNING || execution.status() == WorkFlowExecutionStatus.QUEUED) {
+			return "실행 중이거나 차례를 기다리는 중에는 고칠 수 없습니다. Agent가 같은 파일을 쓰고 있을 수 있습니다. 승인 대기이거나 일시정지했을 때 고치십시오.";
 		}
 		return null;
 	}

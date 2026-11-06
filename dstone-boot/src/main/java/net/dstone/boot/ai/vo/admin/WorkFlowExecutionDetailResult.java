@@ -25,5 +25,5 @@ import java.util.Map;
  * @param resumePoint      일시정지나 실패일 때 이어 가면 어디부터 도는지({stepId, stepType, resumable, problem, warnings}). 그 밖의 상태면 null
  */
 public record WorkFlowExecutionDetailResult(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, String createdAt, String updatedAt,
-	List<WorkFlowStepHistoryResult> history, Map<String, Object> pendingApproval, boolean pauseRequested, Map<String, Object> resumePoint) {
+	List<WorkFlowStepHistoryResult> history, Map<String, Object> pendingApproval, boolean pauseRequested, Map<String, Object> resumePoint, String requestedBy) {
 }

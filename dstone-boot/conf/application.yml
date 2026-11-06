@@ -220,6 +220,9 @@ interface:
       # dstone-ai-engine 연동 주소. 로컬 실행 시 localhost, kind 클러스터 배포 시엔 같은 네임스페이스(dstone)의
       # Service DNS(dstone-ai-engine)를 가리키도록 env.properties의 AI_ENGINE_HOST 값만 바꾸면 된다.
       base-url: http://${AI_ENGINE_HOST}:${AI_ENGINE_PORT}
+      # 이 역할(ROLE_ID) 중 하나라도 가진 사용자는 Workflow 실행 관리 화면에서 다른 사람의 실행도 조작(일시정지/재개/되감기/문서 저장)할 수 있다.
+      # 쉼표로 구분한다. "ROLE_" 접두어는 붙여도 되고 안 붙여도 된다. 그 밖의 사용자는 자기가 시작한 실행만 조작할 수 있다.
+      admin-roles: ADMIN
     knowledge:
       # dstone-knowledge(Java 분석 결과/문서 검색 서버) 연동 주소. "코드 분석(Knowledge)" 화면이 knowledge.service.KnowledgeProxyService 를 거쳐 부른다.
       # dstone-knowledge 는 Pod 가 아니라 VM 방식 프로세스라, kind 에 배포한 dstone-boot 에서는 호스트 주소(env-k8s.properties)를 가리킨다.

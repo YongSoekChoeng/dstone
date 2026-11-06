@@ -51,10 +51,30 @@ public class SampleApprovalPauseResumeTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void 같은_승인_대기에_두_번_결정하면_한_번만_받고_나중_것은_409로_거절한다() {
+		final WorkFlowExecution waiting = this.run(WORKFLOW_ID, "승인 테스트");
+
+		this.workFlowExecutionService.decide(waiting.executionId(), "APPROVED", null, "dev1", null);
+		ResponseStatusException second = assertThrows(ResponseStatusException.class, new Executable() {
+			@Override
+			public void execute() {
+				SampleApprovalPauseResumeTest.this.workFlowExecutionService.decide(waiting.executionId(), "APPROVED", null, "dev2", null);
+			}
+		});
+
+		assertThat(second.getStatusCode().value()).isEqualTo(409);
+		WorkFlowExecution done = this.awaitFinished(waiting.executionId());
+		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+		assertThat(this.stepIds(done)).doesNotHaveDuplicates();
+	}
+
+	@Test
 	void 예전_화면처럼_approved만_보내도_결정으로_받는다() {
 		WorkFlowExecution waiting = this.run(WORKFLOW_ID, "승인 테스트");
 
-		WorkFlowExecution done = this.workFlowExecutionService.decide(waiting.executionId(), null, Boolean.TRUE, "tester", null);
+		WorkFlowExecution queued = this.workFlowExecutionService.decide(waiting.executionId(), null, Boolean.TRUE, "tester", null);
+		assertThat(queued.status()).isEqualTo(WorkFlowExecutionStatus.QUEUED);
+		WorkFlowExecution done = this.awaitFinished(waiting.executionId());
 		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
 	}
 

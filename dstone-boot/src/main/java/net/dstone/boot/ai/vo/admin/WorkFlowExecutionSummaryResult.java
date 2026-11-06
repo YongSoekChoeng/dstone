@@ -13,5 +13,5 @@ package net.dstone.boot.ai.vo.admin;
  * @param createdAt        생성 시각
  * @param updatedAt        마지막 상태 변경 시각
  */
-public record WorkFlowExecutionSummaryResult(String executionId, String workflowId, String caller, String status, int currentStepIndex, String createdAt, String updatedAt) {
+public record WorkFlowExecutionSummaryResult(String executionId, String workflowId, String caller, String status, int currentStepIndex, String createdAt, String updatedAt, String requestedBy) {
 }

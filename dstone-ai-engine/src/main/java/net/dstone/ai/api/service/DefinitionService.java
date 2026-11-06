@@ -434,13 +434,16 @@ public class DefinitionService extends BaseObject {
 			// 서버가 죽으면 RUNNING 기록이 그대로 남으므로, 최근에 움직인 것만 센다.
 			Instant recent = Instant.now().minus(RUNNING_RECENT);
 			int running = 0;
-			for (WorkFlowExecution execution : this.executionStore.list(WorkFlowExecutionStatus.RUNNING.name(), workflow ? oldName : null, null, 0, 100)) {
+			List<WorkFlowExecution> active = new ArrayList<>(this.executionStore.list(WorkFlowExecutionStatus.RUNNING.name(), workflow ? oldName : null, null, 0, 100));
+			// 대기열에서 차례를 기다리는 실행도 곧 옛 정의로 돕니다.
+			active.addAll(this.executionStore.list(WorkFlowExecutionStatus.QUEUED.name(), workflow ? oldName : null, null, 0, 100));
+			for (WorkFlowExecution execution : active) {
 				if (execution.updatedAt() != null && execution.updatedAt().isAfter(recent)) {
 					running++;
 				}
 			}
 			if (running > 0) {
-				warnings.add("최근 1시간 안에 움직인 실행 중인 Workflow가 " + running + "건 있습니다. 옛 이름을 찾지 못해 실패할 수 있습니다.");
+				warnings.add("최근 1시간 안에 움직인 실행 중(대기 포함)인 Workflow가 " + running + "건 있습니다. 옛 이름을 찾지 못해 실패할 수 있습니다.");
 			}
 			if (workflow) {
 				// 승인 뒤 다시 이어 갈 때 Workflow를 id로 찾는다. 이름이 바뀌면 찾지 못한다.

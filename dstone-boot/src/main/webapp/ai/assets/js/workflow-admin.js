@@ -1,8 +1,8 @@
 var DstoneAiWorkflowAdmin = (function () {
 
 	var urls = {};
-	var statusFilterEl, workflowFilterEl, executionFilterEl, refreshBtn, resetBtn, listBodyEl, totalEl, pagerEl;
-	var detailPanelEl, detailIdEl, detailBadgeEl, detailResultEl, detailContextEl, historyBodyEl;
+	var statusFilterEl, workflowFilterEl, executionFilterEl, mineFilterEl, refreshBtn, resetBtn, listBodyEl, totalEl, pagerEl;
+	var detailPanelEl, detailIdEl, detailBadgeEl, detailRequesterEl, detailResultEl, detailContextEl, historyBodyEl;
 	var decisionFormEl, approverEl, commentEl, approveBtn, rejectBtn, decisionStatusEl, decisionStepEl, routeButtonsEl;
 
 	var controlEl, controlMessageEl, controlWarningsEl, controlStatusEl, pauseBtn, resumeBtn;
@@ -31,6 +31,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		statusFilterEl = document.getElementById("workflow-admin-status-filter");
 		workflowFilterEl = document.getElementById("workflow-admin-workflow-filter");
 		executionFilterEl = document.getElementById("workflow-admin-execution-filter");
+		mineFilterEl = document.getElementById("workflow-admin-mine-filter");
 		refreshBtn = document.getElementById("workflow-admin-refresh-btn");
 		resetBtn = document.getElementById("workflow-admin-reset-btn");
 		totalEl = document.getElementById("workflow-admin-total");
@@ -46,6 +47,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		detailPanelEl = document.getElementById("workflow-admin-detail-panel");
 		detailIdEl = document.getElementById("workflow-admin-detail-id");
 		detailBadgeEl = document.getElementById("workflow-admin-detail-badge");
+		detailRequesterEl = document.getElementById("workflow-admin-detail-requester");
 		detailResultEl = document.getElementById("workflow-admin-detail-result");
 		detailContextEl = document.getElementById("workflow-admin-detail-context");
 		historyBodyEl = document.getElementById("workflow-admin-history-body");
@@ -91,9 +93,11 @@ var DstoneAiWorkflowAdmin = (function () {
 			statusFilterEl.value = "";
 			workflowFilterEl.value = "";
 			executionFilterEl.value = "";
+			mineFilterEl.checked = true;
 			loadList(0);
 		});
 		statusFilterEl.addEventListener("change", function () { loadList(0); });
+		mineFilterEl.addEventListener("change", function () { loadList(0); });
 		[workflowFilterEl, executionFilterEl].forEach(function (input) {
 			input.addEventListener("keydown", function (event) {
 				if (event.key === "Enter") {
@@ -114,6 +118,8 @@ var DstoneAiWorkflowAdmin = (function () {
 		params.set("status", statusFilterEl.value);
 		params.set("workflowId", workflowFilterEl.value.trim());
 		params.set("executionId", executionFilterEl.value.trim());
+		// 여러 사람이 함께 쓰므로 기본은 내가 시작한 실행만 본다.
+		params.set("mine", mineFilterEl.checked ? "true" : "false");
 		params.set("page", page);
 		params.set("size", PAGE_SIZE);
 		fetch(urls.listUrl + "?" + params.toString(), { method: "POST" })
@@ -144,6 +150,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			tr.innerHTML =
 				"<td><a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + escapeHtml(row.executionId) + "</a></td>" +
 				"<td>" + escapeHtml(row.workflowId) + "</td>" +
+				"<td>" + escapeHtml(row.requestedBy || "-") + "</td>" +
 				"<td><span class=\"workflow-badge workflow-badge-" + escapeHtml((row.status || "unknown").toLowerCase()) + "\">" + escapeHtml(row.status) + "</span></td>" +
 				"<td class=\"wa-num\">" + row.currentStepIndex + "</td>" +
 				"<td>" + escapeHtml(formatTime(row.updatedAt)) + "</td>";
@@ -153,7 +160,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			listBodyEl.appendChild(tr);
 		});
 		if (!executions || executions.length === 0) {
-			listBodyEl.innerHTML = "<tr><td colspan=\"5\">조건에 맞는 실행이 없습니다.</td></tr>";
+			listBodyEl.innerHTML = "<tr><td colspan=\"6\">조건에 맞는 실행이 없습니다.</td></tr>";
 		}
 	}
 
@@ -199,7 +206,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			currentFiles = null;
 			closeRewind();
 		}
-		if (detail.status === "RUNNING") {
+		if (isActive(detail.status)) {
 			closeRewind();
 		}
 		activeExecutionId = detail.executionId;
@@ -210,6 +217,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		schedulePoll(detail);
 
 		detailIdEl.textContent = detail.executionId;
+		detailRequesterEl.textContent = detail.requestedBy || "-";
 		detailBadgeEl.textContent = detail.status;
 		detailBadgeEl.className = "workflow-badge workflow-badge-" + (detail.status || "unknown").toLowerCase();
 		// output은 Workflow에 따라 글자일 수도, 객체일 수도 있다 - 객체면 보기 좋게 JSON으로 펼친다.
@@ -565,7 +573,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 실행 상태에 따라 일시정지/재개 버튼과 안내를 보여 준다.
 	function renderControl(detail) {
 		var point = detail.resumePoint;
-		var running = detail.status === "RUNNING";
+		var running = isActive(detail.status);
 		controlEl.style.display = running || point ? "" : "none";
 		pauseBtn.style.display = running ? "" : "none";
 		pauseBtn.disabled = !!detail.pauseRequested;
@@ -574,6 +582,10 @@ var DstoneAiWorkflowAdmin = (function () {
 		resumeBtn.textContent = detail.status === "FAILED" ? "실패 지점부터 다시 실행" : "재개";
 		controlWarningsEl.innerHTML = "";
 
+		if (detail.status === "QUEUED") {
+			controlMessageEl.textContent = "실행 차례를 기다리는 중입니다(엔진의 동시 실행 수가 다 찼습니다). 일시정지하면 차례가 와도 돌지 않습니다.";
+			return;
+		}
 		if (running) {
 			controlMessageEl.textContent = detail.pauseRequested
 				? "일시정지를 요청했습니다. 지금 돌고 있는 step이 끝나면 멈춥니다."
@@ -612,7 +624,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			button.className = "kn-plain wa-rewind-btn";
 			button.textContent = "여기서 다시";
 			button.title = stepId + " step부터 다시 실행합니다";
-			button.disabled = detail.status === "RUNNING";
+			button.disabled = isActive(detail.status);
 			button.addEventListener("click", function () { openRewind(stepId); });
 			lastRowOfStep[stepId].querySelector(".wa-rewind-cell").appendChild(button);
 		});
@@ -787,7 +799,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			clearTimeout(pollTimer);
 			pollTimer = null;
 		}
-		if (detail.status !== "RUNNING") {
+		if (!isActive(detail.status)) {
 			return;
 		}
 		pollTimer = setTimeout(function () {
@@ -805,12 +817,23 @@ var DstoneAiWorkflowAdmin = (function () {
 						return;
 					}
 					renderDetail(latest);
-					if (latest.status !== "RUNNING") {
+					if (!isActive(latest.status) || latest.status !== currentListStatus(executionId)) {
 						loadList(currentPage);
 					}
 				})
 				.catch(function () { schedulePoll(detail); });
 		}, POLL_MILLIS);
+	}
+
+	// 아직 끝나지 않고 엔진이 돌리고 있거나(RUNNING) 차례를 기다리는(QUEUED) 상태인지.
+	function isActive(status) {
+		return status === "RUNNING" || status === "QUEUED";
+	}
+
+	// 목록에 지금 보이는 그 실행의 상태(QUEUED → RUNNING처럼 바뀌면 목록도 새로 읽으려고 본다).
+	function currentListStatus(executionId) {
+		var tr = listBodyEl.querySelector("tr[data-execution-id=\"" + executionId + "\"] .workflow-badge");
+		return tr ? tr.textContent : null;
 	}
 
 	// 2026-11-02T04:55:03.123Z → 이 PC 시각의 2026-11-02 13:55:03
@@ -877,18 +900,23 @@ var DstoneAiWorkflowAdmin = (function () {
 			})
 		})
 			.then(function (response) {
-				if (!response.ok) {
-					throw new Error("서버 오류(" + response.status + ")");
-				}
-				return response.json();
+				return response.json().then(function (body) {
+					if (!response.ok) {
+						// 409: 다른 사람이 먼저 결정함, 503: 실행 대기열이 꽉 참 등. 엔진이 준 사유를 보여 준다.
+						throw new Error(body.message || ("서버 오류(" + response.status + ")"));
+					}
+					return body;
+				});
 			})
 			.then(function (detail) {
-				decisionStatusEl.textContent = "처리 완료 (" + detail.status + ")";
+				// 엔진은 결정을 받으면 이어서 돌릴 실행을 대기열에 넣고 바로 돌려준다(QUEUED). 진행은 자동 갱신으로 본다.
+				decisionStatusEl.textContent = "결정을 전달했습니다. 이어서 실행합니다 (" + detail.status + ")";
 				renderDetail(detail);
 				loadList(currentPage);
 			})
 			.catch(function (err) {
 				decisionStatusEl.textContent = "처리 실패: " + err.message;
+				loadDetail(activeExecutionId);
 			});
 	}
 

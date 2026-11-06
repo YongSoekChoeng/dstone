@@ -31,9 +31,10 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * @param pendingApproval  승인 대기(WAITING_APPROVAL)일 때, 지금 어떤 결정을 기다리는지입니다(step id, 고를 수 있는 선택지). 승인 대기가 아니면 null입니다.
  * @param pauseRequested   일시정지를 요청했고 지금 step이 끝나기를 기다리는 중이면 true입니다.
  * @param resumePoint      일시정지(PAUSED)나 실패(FAILED)일 때, 이어 가면 어느 step부터 도는지입니다. 그 밖의 상태면 null입니다.
+ * @param requestedBy      이 실행을 시작한 사용자(dstone-boot 로그인 id)입니다. API로 직접 시작했으면 null입니다.
  */
 public record WorkFlowExecutionDetail(String executionId, String workflowId, String caller, String status, int currentStepIndex, Map<String, Object> context, Object output, String errorMessage, Instant createdAt, Instant updatedAt,
-	List<StepHistoryEntry> history, PendingApproval pendingApproval, boolean pauseRequested, ResumePoint resumePoint) {
+	List<StepHistoryEntry> history, PendingApproval pendingApproval, boolean pauseRequested, ResumePoint resumePoint, String requestedBy) {
 
 	/**
 	 * WorkFlowExecution(실행 상태)과 스텝별 이력을 받아, 응답으로 내려줄 상세 정보 하나로 합쳐줍니다.
@@ -48,7 +49,7 @@ public record WorkFlowExecutionDetail(String executionId, String workflowId, Str
 	public static WorkFlowExecutionDetail from(WorkFlowExecution execution, List<StepHistoryEntry> history, PendingApproval pendingApproval, boolean pauseRequested, ResumePoint resumePoint, int maxValueChars) {
 		Map<String, Object> context = ContextShortener.shortenContext(execution.context(), maxValueChars);
 		return new WorkFlowExecutionDetail(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), context, execution.output(), execution.errorMessage(),
-			execution.createdAt(), execution.updatedAt(), history, pendingApproval, pauseRequested, resumePoint);
+			execution.createdAt(), execution.updatedAt(), history, pendingApproval, pauseRequested, resumePoint, execution.requestedBy());
 	}
 
 }

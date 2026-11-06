@@ -42,16 +42,9 @@ public class WorkFlowRewindTest extends WorkflowTestBase {
 	@TempDir
 	Path workDir;
 
-	/** 비동기로 다시 돈 실행이 RUNNING을 벗어날 때까지 기다립니다. */
+	/** 비동기로 다시 돈 실행이 QUEUED/RUNNING을 벗어날 때까지 기다립니다. */
 	private WorkFlowExecution await(String executionId) throws InterruptedException {
-		for (int i = 0; i < 300; i++) {
-			WorkFlowExecution execution = this.workFlowExecutionStore.find(executionId);
-			if (execution.status() != WorkFlowExecutionStatus.RUNNING) {
-				return execution;
-			}
-			Thread.sleep(100L);
-		}
-		throw new AssertionError("실행이 30초 안에 끝나지 않았습니다: " + executionId);
+		return this.awaitFinished(executionId);
 	}
 
 	/** 저장된 실행의 input을 바꿔 둡니다. 다시 돌 때 경로가 달라지게 하려고 씁니다. */
@@ -79,7 +72,7 @@ public class WorkFlowRewindTest extends WorkflowTestBase {
 		assertThat(this.workFlowExecutionService.rewindPoint(done, "now").savedNames()).containsExactly("checkedAt");
 
 		WorkFlowExecution rewound = this.workFlowExecutionService.rewind(done.executionId(), "now", false);
-		assertThat(rewound.status()).isEqualTo(WorkFlowExecutionStatus.RUNNING);
+		assertThat(rewound.status()).isEqualTo(WorkFlowExecutionStatus.QUEUED);
 		assertThat(rewound.output()).isNull();
 		WorkFlowExecution again = this.await(done.executionId());
 

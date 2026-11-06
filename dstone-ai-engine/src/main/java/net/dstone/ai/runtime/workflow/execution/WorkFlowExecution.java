@@ -13,7 +13,7 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
  *
  * context는 이 실행의 모든 상태(사용자 입력, step별 결과, 승인 결정)를 담은 트리이고,
  * 스텝이 실행될 때마다 값이 계속 채워지는 살아있는 Map입니다(모양은 WorkFlowContext 참고). 
- * 상태가 바뀔 때마다(advanceTo/done/failed/waitingApproval 메서드를 호출할 때마다) 새로운 WorkFlowExecution 인스턴스를 만들어서 돌려주지만, 
+ * 상태가 바뀔 때마다(queued/started/advanceTo/done/failed/waitingApproval 메서드를 호출할 때마다) 새로운 WorkFlowExecution 인스턴스를 만들어서 돌려주지만, 
  * context만큼은 항상 같은 Map 인스턴스를 그대로 넘겨서 여러 인스턴스가 그 참조를 공유합니다(WorkFlowExecutor가 각 스텝의 결과를 이 Map에 계속 누적해서 넣기 때문입니다).
  * </pre>
  *
@@ -29,6 +29,7 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
  * @param errorMessage    실패했거나 에러가 났을 때의 사유입니다(아직 안 끝났거나 성공했으면 null입니다).
  * @param createdAt       이 실행이 처음 만들어진 시각입니다.
  * @param updatedAt       상태가 마지막으로 바뀐 시각입니다.
+ * @param requestedBy     이 실행을 시작한 사용자입니다(dstone-boot 로그인 id). API를 직접 부른 실행이면 null입니다.
  */
 public record WorkFlowExecution(
 	String executionId,
@@ -41,7 +42,8 @@ public record WorkFlowExecution(
 	Object output,
 	String errorMessage,
 	Instant createdAt,
-	Instant updatedAt) {
+	Instant updatedAt,
+	String requestedBy) {
 
 	/**
 	 * <pre>
@@ -56,7 +58,47 @@ public record WorkFlowExecution(
 	 */
 	public static WorkFlowExecution start(String executionId, String workflowId, String caller, String sessionId, Map<String, Object> context) {
 		Instant now = Instant.now();
-		return new WorkFlowExecution(executionId, workflowId, caller, sessionId, WorkFlowExecutionStatus.RUNNING, 0, context, null, null, now, now);
+		return new WorkFlowExecution(executionId, workflowId, caller, sessionId, WorkFlowExecutionStatus.RUNNING, 0, context, null, null, now, now, null);
+	}
+
+	/**
+	 * <pre>
+	 * 대기열에 넣을 새 실행을 만듭니다. status는 QUEUED이고, 실행 슬롯을 받으면 started()로 RUNNING이 됩니다.
+	 * </pre>
+	 *
+	 * @param executionId 이 실행을 위해 새로 발급한 id입니다.
+	 * @param workflowId  실행할 Workflow의 id입니다.
+	 * @param caller      이 실행을 호출한 주체를 식별하는 값입니다(tenant).
+	 * @param sessionId   대화 세션을 식별하는 값입니다.
+	 * @param context     새로 만든 컨텍스트입니다.
+	 * @param requestedBy 실행을 시작한 사용자입니다(없으면 null).
+	 */
+	public static WorkFlowExecution queue(String executionId, String workflowId, String caller, String sessionId, Map<String, Object> context, String requestedBy) {
+		Instant now = Instant.now();
+		return new WorkFlowExecution(executionId, workflowId, caller, sessionId, WorkFlowExecutionStatus.QUEUED, 0, context, null, null, now, now, requestedBy);
+	}
+
+	/**
+	 * <pre>
+	 * 대기열에서 실행 슬롯을 받아 실제로 돌기 시작할 때의 상태를 만듭니다.
+	 * </pre>
+	 *
+	 * @return status가 RUNNING으로 바뀐 새 WorkFlowExecution입니다.
+	 */
+	public WorkFlowExecution started() {
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, this.currentStepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now(), this.requestedBy);
+	}
+
+	/**
+	 * <pre>
+	 * 멈춰 있던 실행(승인 대기, 일시정지, 실패)을 다시 돌리려고 대기열에 넣을 때의 상태를 만듭니다. 이전 실패 사유는 지웁니다.
+	 * </pre>
+	 *
+	 * @param stepIndex 다시 실행할 스텝이 몇 번째인지입니다.
+	 * @return status가 QUEUED로 바뀐 새 WorkFlowExecution입니다.
+	 */
+	public WorkFlowExecution queued(int stepIndex) {
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.QUEUED, stepIndex, this.context, this.output, null, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**
@@ -68,7 +110,7 @@ public record WorkFlowExecution(
 	 * @return currentStepIndex만 갱신된, 여전히 RUNNING 상태인 새 WorkFlowExecution입니다.
 	 */
 	public WorkFlowExecution advanceTo(int stepIndex) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now());
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**
@@ -80,7 +122,7 @@ public record WorkFlowExecution(
 	 * @return status가 DONE으로 바뀐 새 WorkFlowExecution입니다.
 	 */
 	public WorkFlowExecution done(Object output) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.DONE, this.currentStepIndex, this.context, output, null, this.createdAt, Instant.now());
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.DONE, this.currentStepIndex, this.context, output, null, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**
@@ -92,7 +134,7 @@ public record WorkFlowExecution(
 	 * @return status가 FAILED로 바뀐 새 WorkFlowExecution입니다.
 	 */
 	public WorkFlowExecution failed(String errorMessage) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.FAILED, this.currentStepIndex, this.context, this.output, errorMessage, this.createdAt, Instant.now());
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.FAILED, this.currentStepIndex, this.context, this.output, errorMessage, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**
@@ -104,7 +146,7 @@ public record WorkFlowExecution(
 	 * @return status가 WAITING_APPROVAL로 바뀐 새 WorkFlowExecution입니다.
 	 */
 	public WorkFlowExecution waitingApproval(int stepIndex) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.WAITING_APPROVAL, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now());
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.WAITING_APPROVAL, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**
@@ -116,19 +158,7 @@ public record WorkFlowExecution(
 	 * @return status가 PAUSED로 바뀐 새 WorkFlowExecution입니다.
 	 */
 	public WorkFlowExecution paused(int stepIndex) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.PAUSED, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now());
-	}
-
-	/**
-	 * <pre>
-	 * 일시정지했거나 실패한 실행을 이어 갈 때의 상태를 만듭니다. 이전 실패 사유는 지웁니다.
-	 * </pre>
-	 *
-	 * @param stepIndex 다시 실행할 스텝이 몇 번째인지입니다.
-	 * @return status가 RUNNING으로 바뀐 새 WorkFlowExecution입니다.
-	 */
-	public WorkFlowExecution resumed(int stepIndex) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.context, this.output, null, this.createdAt, Instant.now());
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.PAUSED, stepIndex, this.context, this.output, this.errorMessage, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**
@@ -137,10 +167,10 @@ public record WorkFlowExecution(
 	 * </pre>
 	 *
 	 * @param stepIndex 다시 시작할 스텝이 몇 번째인지입니다.
-	 * @return status가 RUNNING이고 결과와 실패 사유가 비워진 새 WorkFlowExecution입니다.
+	 * @return status가 QUEUED(대기열에 들어감)이고 결과와 실패 사유가 비워진 새 WorkFlowExecution입니다.
 	 */
 	public WorkFlowExecution rewound(int stepIndex) {
-		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.RUNNING, stepIndex, this.context, null, null, this.createdAt, Instant.now());
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.QUEUED, stepIndex, this.context, null, null, this.createdAt, Instant.now(), this.requestedBy);
 	}
 
 	/**

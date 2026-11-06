@@ -20,7 +20,9 @@ import net.dstone.boot.ai.vo.admin.WorkFlowFileSaveRequest;
 import net.dstone.common.utils.StringUtil;
 
 /**
- * Workflow 실행의 진행상태/내역을 조회하고 승인/반려와 일시정지/재개를 처리하는 관리자 화면이다. 개발자용 "Workflow 테스트"
+ * Workflow 실행의 진행상태/내역을 조회하고 승인/반려와 일시정지/재개를 처리하는 관리자 화면이다.
+ * 엔진 호출마다 로그인 사용자를 헤더로 넘긴다(ai.service.AiEngineUser). 엔진은 실행을 시작한 사람과 관리자만
+ * 일시정지/재개/되감기/문서 저장을 허용하고(403), 결정한 사람은 로그인 사용자로 남긴다. 개발자용 "Workflow 테스트"
  * 화면(WorkFlowTestController, 임의 workflowId로 submit/status만)과 달리, 이미 시작된 실행을 목록에서 찾아
  * 판단·조작하는 운영자용 화면이라 controller.admin 패키지, /ai/admin/workflow/* URL에 둔다.
  */
@@ -35,13 +37,14 @@ public class WorkFlowAdminController extends net.dstone.boot.common.biz.BaseCont
 	 * @param status      WAITING_APPROVAL 등으로 좁히고 싶을 때(비우면 전체)
 	 * @param workflowId  id에 이 글자가 들어 있는 Workflow만(비우면 전체)
 	 * @param executionId id에 이 글자가 들어 있는 실행만(비우면 전체)
+	 * @param mine        true면 로그인 사용자가 시작한 실행만
 	 * @param page        0부터 시작하는 페이지 번호
 	 * @param size        한 페이지의 건수
 	 */
 	@PostMapping("/list.do")
 	public WorkFlowExecutionPageResult list(@RequestParam(required = false) String status, @RequestParam(required = false) String workflowId, @RequestParam(required = false) String executionId,
-			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-		return this.workFlowAdminService.list(status, workflowId, executionId, page, size);
+			@RequestParam(defaultValue = "false") boolean mine, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+		return this.workFlowAdminService.list(status, workflowId, executionId, mine, page, size);
 	}
 
 	/** @param executionId 일시정지를 요청할 실행 id */
@@ -163,13 +166,22 @@ public class WorkFlowAdminController extends net.dstone.boot.common.biz.BaseCont
 		return this.workFlowAdminService.detail(executionId);
 	}
 
-	/** @param request 결정을 내릴 실행 id와 승인 여부/결정자/사유 */
+	/**
+	 * 승인 대기 중인 실행에 결정을 보냅니다. 엔진은 이어서 돌릴 실행을 대기열에 넣고 바로 응답합니다(QUEUED).
+	 * 다른 사람이 먼저 결정했으면(409) 등 엔진이 거절한 사유를 그대로 전합니다.
+	 *
+	 * @param request 결정을 내릴 실행 id와 승인 여부/결정자/사유
+	 */
 	@PostMapping("/decision.do")
-	public WorkFlowExecutionDetailResult decision(@RequestBody WorkFlowDecisionRequest request) {
+	public ResponseEntity<Object> decision(@RequestBody WorkFlowDecisionRequest request) {
 		if (StringUtil.isEmpty(request.executionId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "executionId는 필수입니다.");
 		}
-		return this.workFlowAdminService.decide(request);
+		try {
+			return ResponseEntity.ok((Object) this.workFlowAdminService.decide(request));
+		} catch (WebClientResponseException e) {
+			return this.rejected(e);
+		}
 	}
 
 }

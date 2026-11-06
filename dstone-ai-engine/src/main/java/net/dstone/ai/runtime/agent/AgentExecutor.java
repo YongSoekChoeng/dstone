@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
+import net.dstone.ai.common.advisors.LlmCallGateAdvisor;
 import net.dstone.ai.common.advisors.ReasoningStripAdvisor;
 import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
 import net.dstone.ai.common.config.ChatProviders;
@@ -124,6 +125,8 @@ public class AgentExecutor extends BaseObject {
 
 	@Autowired
 	private ChatProviders chatProviders;
+	@Autowired
+	private LlmCallGate llmCallGate;
 	@Autowired
 	private ChatMemory chatMemory;
 	@Autowired
@@ -366,6 +369,7 @@ public class AgentExecutor extends BaseObject {
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
 		String provider = this.chatProviders.resolve(agent.providerName());
 		ChatClient.ChatClientRequestSpec spec = this.chatProviders.clientOf(provider).prompt().system(EnginePrompt.compose(EnginePrompt.RESHAPE, null));
+		spec = this.gated(spec, provider, agent.id());
 		ChatOptions.Builder<?> options = this.configChatClient.requestOptions(provider, model, "none", null, agent.timeoutSeconds());
 		if (options != null) {
 			spec = spec.options(options);
@@ -576,6 +580,9 @@ public class AgentExecutor extends BaseObject {
 		// LLM 호출 횟수, Tool별 호출 횟수, 토큰을 로그에 남깁니다(Tool이 없어도 붙입니다).
 		spec = spec.advisors(new AgentCallStatsAdvisor(agent.id()));
 
+		// LLM 요청 한 번마다 provider별 동시 요청 수를 묶고, 429를 받으면 쉬었다가 다시 보냅니다(LlmCallGate).
+		spec = this.gated(spec, provider, agent.id());
+
 		/************************************************************************
 		6. 모델(model)을 원하는 것으로 지정합니다.
 			- modelOverride가 있으면 그 값을, 없으면 Agent의 model.name(AgentRegistry.modelOf())을,
@@ -612,6 +619,22 @@ public class AgentExecutor extends BaseObject {
 		}
 		
 		return spec;
+	}
+
+	/**
+	 * <pre>
+	 * 요청에 LlmCallGateAdvisor를 붙입니다. dstone.ai.llm.gate.enabled가 false면 그대로 돌려줍니다.
+	 * </pre>
+	 *
+	 * @param spec     요청 스펙
+	 * @param provider 이번 호출이 쓰는 provider 이름
+	 * @param agentId  로그에 남길 Agent id
+	 */
+	private ChatClient.ChatClientRequestSpec gated(ChatClient.ChatClientRequestSpec spec, String provider, String agentId) {
+		if (!this.llmCallGate.enabled()) {
+			return spec;
+		}
+		return spec.advisors(new LlmCallGateAdvisor(this.llmCallGate, provider, agentId));
 	}
 
 	/**

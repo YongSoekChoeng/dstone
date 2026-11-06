@@ -1,5 +1,6 @@
 package net.dstone.ai.support;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -36,6 +37,9 @@ public class InMemoryWorkFlowExecutionStore extends WorkFlowExecutionStore {
 	/** 일시정지를 요청받은 실행의 id입니다. */
 	private final Set<String> pauseRequests = ConcurrentHashMap.newKeySet();
 
+	/** executionId → 맡은 인스턴스가 마지막으로 살아 있다고 알린 시각(운영의 HEARTBEAT_AT)입니다. */
+	private final Map<String, Instant> heartbeats = new ConcurrentHashMap<String, Instant>();
+
 	@Override
 	public synchronized boolean requestPause(String executionId) {
 		if (this.find(executionId).status() != WorkFlowExecutionStatus.RUNNING) {
@@ -51,20 +55,65 @@ public class InMemoryWorkFlowExecutionStore extends WorkFlowExecutionStore {
 	}
 
 	@Override
-	public synchronized boolean markResumed(WorkFlowExecution execution, int stepIndex) {
+	public synchronized boolean markQueued(WorkFlowExecution execution, int stepIndex) {
 		if (this.find(execution.executionId()).status() != execution.status()) {
 			return false;
 		}
 		this.pauseRequests.remove(execution.executionId());
-		this.executions.put(execution.executionId(), execution.resumed(stepIndex));
+		this.executions.put(execution.executionId(), execution.queued(stepIndex));
+		this.heartbeats.put(execution.executionId(), Instant.now());
 		return true;
 	}
 
 	@Override
-	public synchronized int failInterrupted(String errorMessage) {
+	public synchronized boolean markStarted(String executionId) {
+		WorkFlowExecution execution = this.find(executionId);
+		if (execution.status() != WorkFlowExecutionStatus.QUEUED) {
+			return false;
+		}
+		this.executions.put(executionId, execution.started());
+		this.heartbeats.put(executionId, Instant.now());
+		return true;
+	}
+
+	@Override
+	public synchronized void deleteQueued(String executionId) {
+		if (this.executions.containsKey(executionId) && this.find(executionId).status() == WorkFlowExecutionStatus.QUEUED) {
+			this.executions.remove(executionId);
+			this.heartbeats.remove(executionId);
+		}
+	}
+
+	@Override
+	public synchronized boolean pauseQueued(String executionId) {
+		WorkFlowExecution execution = this.find(executionId);
+		if (execution.status() != WorkFlowExecutionStatus.QUEUED) {
+			return false;
+		}
+		this.executions.put(executionId, execution.paused(execution.currentStepIndex()));
+		this.pauseRequests.remove(executionId);
+		return true;
+	}
+
+	@Override
+	public synchronized int heartbeat() {
+		int count = 0;
+		for (WorkFlowExecution execution : this.executions.values()) {
+			if (this.active(execution)) {
+				this.heartbeats.put(execution.executionId(), Instant.now());
+				count++;
+			}
+		}
+		return count;
+	}
+
+	@Override
+	public synchronized int failOrphans(String errorMessage, int staleSeconds) {
+		Instant limit = Instant.now().minusSeconds(staleSeconds);
 		int count = 0;
 		for (WorkFlowExecution execution : new ArrayList<WorkFlowExecution>(this.executions.values())) {
-			if (execution.status() == WorkFlowExecutionStatus.RUNNING) {
+			Instant beat = this.heartbeats.get(execution.executionId());
+			if (this.active(execution) && (beat == null || beat.isBefore(limit))) {
 				this.executions.put(execution.executionId(), execution.failed(errorMessage));
 				this.pauseRequests.remove(execution.executionId());
 				count++;
@@ -73,25 +122,40 @@ public class InMemoryWorkFlowExecutionStore extends WorkFlowExecutionStore {
 		return count;
 	}
 
+	/**
+	 * 테스트에서 "맡은 엔진이 사라진" 상황을 만듭니다. 그 실행의 heartbeat를 seconds초 전으로 돌립니다.
+	 *
+	 * @param executionId 실행 id
+	 * @param seconds     몇 초 전으로 돌릴지
+	 */
+	public void ageHeartbeat(String executionId, long seconds) {
+		this.heartbeats.put(executionId, Instant.now().minusSeconds(seconds));
+	}
+
+	private boolean active(WorkFlowExecution execution) {
+		return execution.status() == WorkFlowExecutionStatus.RUNNING || execution.status() == WorkFlowExecutionStatus.QUEUED;
+	}
+
 	@Override
-	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, int page, int size) {
-		List<WorkFlowExecution> matched = this.searchAll(status, workflowId, executionId, caller);
+	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, String requestedBy, int page, int size) {
+		List<WorkFlowExecution> matched = this.searchAll(status, workflowId, executionId, caller, requestedBy);
 		int from = Math.min(page * size, matched.size());
 		int to = Math.min(from + size, matched.size());
 		return new ArrayList<WorkFlowExecution>(matched.subList(from, to));
 	}
 
 	@Override
-	public long count(String status, String workflowId, String executionId, String caller) {
-		return this.searchAll(status, workflowId, executionId, caller).size();
+	public long count(String status, String workflowId, String executionId, String caller, String requestedBy) {
+		return this.searchAll(status, workflowId, executionId, caller, requestedBy).size();
 	}
 
-	private List<WorkFlowExecution> searchAll(String status, String workflowId, String executionId, String caller) {
+	private List<WorkFlowExecution> searchAll(String status, String workflowId, String executionId, String caller, String requestedBy) {
 		List<WorkFlowExecution> matched = new ArrayList<WorkFlowExecution>();
 		for (WorkFlowExecution execution : this.list(status, null, caller, 0, Integer.MAX_VALUE)) {
 			boolean workflowMatches = workflowId == null || execution.workflowId().toLowerCase().contains(workflowId.toLowerCase());
 			boolean executionMatches = executionId == null || execution.executionId().toLowerCase().contains(executionId.toLowerCase());
-			if (workflowMatches && executionMatches) {
+			boolean requesterMatches = requestedBy == null || requestedBy.isEmpty() || requestedBy.equals(execution.requestedBy());
+			if (workflowMatches && executionMatches && requesterMatches) {
 				matched.add(execution);
 			}
 		}
@@ -101,6 +165,7 @@ public class InMemoryWorkFlowExecutionStore extends WorkFlowExecutionStore {
 	@Override
 	public void insert(WorkFlowExecution execution) {
 		this.executions.put(execution.executionId(), execution);
+		this.heartbeats.put(execution.executionId(), Instant.now());
 	}
 
 	@Override

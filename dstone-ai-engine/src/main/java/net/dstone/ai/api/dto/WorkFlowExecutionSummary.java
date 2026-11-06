@@ -18,8 +18,9 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * @param currentStepIndex 지금 실행 중이거나 방금 끝난 스텝이 몇 번째 순서인지를 나타냅니다.
  * @param createdAt        이 실행이 처음 생성된 시각입니다.
  * @param updatedAt        상태가 마지막으로 바뀐 시각입니다.
+ * @param requestedBy      이 실행을 시작한 사용자(dstone-boot 로그인 id)입니다. API로 직접 시작했으면 null입니다.
  */
-public record WorkFlowExecutionSummary(String executionId, String workflowId, String caller, String status, int currentStepIndex, Instant createdAt, Instant updatedAt) {
+public record WorkFlowExecutionSummary(String executionId, String workflowId, String caller, String status, int currentStepIndex, Instant createdAt, Instant updatedAt, String requestedBy) {
 
 	/**
 	 * WorkFlowExecution(실행 상태)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
@@ -27,7 +28,7 @@ public record WorkFlowExecutionSummary(String executionId, String workflowId, St
 	 * @param execution 요약으로 바꿔줄 실행 상태입니다.
 	 */
 	public static WorkFlowExecutionSummary from(WorkFlowExecution execution) {
-		return new WorkFlowExecutionSummary(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), execution.createdAt(), execution.updatedAt());
+		return new WorkFlowExecutionSummary(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), execution.createdAt(), execution.updatedAt(), execution.requestedBy());
 	}
 
 }

@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,6 +27,7 @@ import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.workflow.WorkFlowExecutor;
+import net.dstone.ai.runtime.workflow.WorkFlowThreadPools;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
@@ -42,6 +46,13 @@ import net.dstone.common.utils.StringUtil;
  * 같은 흐름을 탑니다. 그 실행 상태는 WorkFlowExecutionStore(PostgreSQL)에 영구히 저장되기 때문에,
  * 동기 호출이 APPROVAL(승인 대기)에서 멈추든 비동기 job이 아직 처리 중이든 상관없이, 똑같은 방식으로
  * 그 상태를 조회하거나 이어서 재개할 수 있습니다.
+ *
+ * 모든 경로는 실행을 바로 돌리지 않고 QUEUED로 저장한 뒤 WorkFlowThreadPools의 실행 풀에 맡깁니다.
+ * 동시에 도는 실행 수가 정해져 있어서, 여러 사람이 한꺼번에 돌려도 서버가 감당할 만큼만 돌고 나머지는 차례를 기다립니다.
+ * 대기열까지 꽉 차면 새 실행은 503(SERVICE_UNAVAILABLE)으로 거절합니다.
+ *
+ * 승인/재개/되감기는 "상태가 읽어 온 그대로일 때만 QUEUED로 바꾸는" UPDATE(markQueued)로 시작합니다.
+ * 같은 실행에 버튼을 두 번 누르거나 두 사람이 동시에 눌러도 한 번만 성공하고, 나머지는 409로 거절됩니다.
  */
 @Service
 public class WorkFlowExecutionService extends BaseService {
@@ -54,10 +65,12 @@ public class WorkFlowExecutionService extends BaseService {
 	private WorkFlowRegistry workFlowRegistry;
 	@Autowired
 	private WorkFlowFileStore fileStore;
+	@Autowired
+	private WorkFlowThreadPools threadPools;
 
 	/**
-	 * 새 실행을 만들고, 끝날 때까지(또는 승인 대기 상태가 될 때까지) 동기로 쭉 돌린 뒤 최종 상태를
-	 * 돌려줍니다.
+	 * 새 실행을 만들고, 끝날 때까지(또는 승인 대기 상태가 될 때까지) 기다린 뒤 최종 상태를 돌려줍니다.
+	 * 실행 자체는 실행 풀에서 돌기 때문에, 슬롯이 없으면 차례가 올 때까지 기다립니다.
 	 *
 	 * @param workflow     실행할 Workflow의 정의입니다.
 	 * @param sessionId    대화를 구분하는 세션 식별자입니다.
@@ -65,9 +78,31 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param input        Workflow를 호출할 때 넘겨받은 값입니다(컨텍스트의 input에 들어갑니다).
 	 */
 	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
-		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input);
+		return this.executeSync(workflow, sessionId, caller, input, null);
+	}
+
+	/**
+	 * executeSync()와 같고, 실행을 시작한 사용자를 함께 남깁니다.
+	 *
+	 * @param requestedBy 실행을 시작한 사용자입니다(없으면 null).
+	 */
+	public WorkFlowExecution executeSync(WorkFlowDefinition workflow, String sessionId, String caller, Object input, String requestedBy) {
+		this.checkRoom();
+		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input, requestedBy);
 		this.executionStore.insert(execution);
-		return this.workFlowExecutor.run(workflow, execution);
+		Future<WorkFlowExecution> future = this.enqueue(workflow, execution, true);
+		try {
+			return future.get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("실행[" + execution.executionId() + "]을 기다리다 중단되었습니다.", e);
+		} catch (ExecutionException e) {
+			Throwable cause = e.getCause() == null ? e : e.getCause();
+			if (cause instanceof RuntimeException runtime) {
+				throw runtime;
+			}
+			throw new IllegalStateException(cause.getMessage(), cause);
+		}
 	}
 
 	/**
@@ -80,23 +115,91 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param input        Workflow를 호출할 때 넘겨받은 값입니다(컨텍스트의 input에 들어갑니다).
 	 */
 	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
-		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input);
+		return this.submitAsync(workflow, sessionId, caller, input, null);
+	}
+
+	/**
+	 * submitAsync()와 같고, 실행을 시작한 사용자를 함께 남깁니다.
+	 *
+	 * @param requestedBy 실행을 시작한 사용자입니다(없으면 null).
+	 */
+	public String submitAsync(WorkFlowDefinition workflow, String sessionId, String caller, Object input, String requestedBy) {
+		this.checkRoom();
+		WorkFlowExecution execution = this.newExecution(workflow, sessionId, caller, input, requestedBy);
 		this.executionStore.insert(execution);
-		// 기본 ForkJoinPool.commonPool()에서 실행합니다. 전용 스레드풀이나 대기열,
-		// 동시 실행 개수 제한은 두지 않았습니다.
-		CompletableFuture.runAsync(new Runnable() {
-			@Override
-			public void run() {
-				WorkFlowExecutionService.this.workFlowExecutor.run(workflow, execution);
-			}
-		});
+		this.enqueue(workflow, execution, true);
 		return execution.executionId();
+	}
+
+	/** 대기열이 꽉 찼으면 실행을 DB에 넣기 전에 503으로 거절합니다. */
+	private void checkRoom() {
+		if (!this.threadPools.hasRoom()) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, this.fullMessage());
+		}
+	}
+
+	private String fullMessage() {
+		return "실행 대기열이 꽉 찼습니다(동시 실행 " + this.threadPools.maxRunning() + "개, 대기 " + this.threadPools.maxQueued() + "개). 잠시 뒤 다시 시도하십시오.";
+	}
+
+	/**
+	 * <pre>
+	 * QUEUED로 저장해 둔 실행을 실행 풀에 맡깁니다.
+	 * 슬롯을 받으면 DB의 상태가 아직 QUEUED인지 확인하고(markStarted) RUNNING으로 바꾼 뒤 돌립니다.
+	 * 기다리는 사이 일시정지했으면 돌리지 않고 그 상태를 돌려줍니다.
+	 * 실행 도중 예상하지 못한 예외가 나면 FAILED로 남깁니다(그냥 두면 heartbeat가 계속 살아 있어 RUNNING으로 남습니다).
+	 * 대기열이 그사이 꽉 찼으면 503을 던집니다. 새 실행이면 저장한 행을 지우고(아무 일도 하지 않았으므로),
+	 * 멈춰 있던 실행을 다시 돌리려던 것이면 FAILED로 남겨 실행 관리 화면에서 다시 시도할 수 있게 합니다.
+	 * </pre>
+	 *
+	 * @param workflow 돌릴 Workflow의 정의
+	 * @param queued   QUEUED로 저장한 실행
+	 * @param isNew    방금 만든 새 실행이면 true
+	 */
+	private Future<WorkFlowExecution> enqueue(final WorkFlowDefinition workflow, final WorkFlowExecution queued, boolean isNew) {
+		try {
+			return this.threadPools.submit(new Callable<WorkFlowExecution>() {
+				@Override
+				public WorkFlowExecution call() {
+					return WorkFlowExecutionService.this.runQueued(workflow, queued);
+				}
+			});
+		} catch (RejectedExecutionException e) {
+			String message = this.fullMessage();
+			if (isNew) {
+				this.executionStore.deleteQueued(queued.executionId());
+			} else {
+				this.executionStore.update(queued.failed(message));
+			}
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, message);
+		}
+	}
+
+	/** 실행 풀의 스레드에서 도는 부분입니다(enqueue() 설명 참고). */
+	private WorkFlowExecution runQueued(WorkFlowDefinition workflow, WorkFlowExecution queued) {
+		if (!this.executionStore.markStarted(queued.executionId())) {
+			this.info("실행[" + queued.executionId() + "]은 대기하는 사이 상태가 바뀌어(일시정지 등) 돌리지 않습니다.");
+			return this.executionStore.find(queued.executionId());
+		}
+		WorkFlowExecution started = queued.started();
+		try {
+			return this.workFlowExecutor.run(workflow, started);
+		} catch (RuntimeException e) {
+			this.error("실행[" + queued.executionId() + "] 도중 예상하지 못한 오류가 났습니다: " + e.getMessage());
+			WorkFlowExecution failed = started.failed("실행 도중 예상하지 못한 오류가 났습니다 - " + e.getMessage());
+			this.executionStore.update(failed);
+			return failed;
+		}
 	}
 
 	/**
 	 * <pre>
 	 * WAITING_APPROVAL(승인 대기) 상태로 멈춰 있는 실행에 사람의 결정을 기록하고, 멈췄던 그
-	 * 스텝부터 다시 이어서 끝까지(또는 다음 승인 대기가 나올 때까지) 동기로 재개합니다.
+	 * 스텝부터 다시 이어 가도록 대기열에 넣습니다. 끝날 때까지 기다리지 않고 QUEUED 상태를 바로 돌려줍니다
+	 * (예전에는 다음 승인 대기나 끝까지 요청 스레드에서 돌려서 몇 분씩 응답이 없었습니다). 진행 상황은 상세 조회로 확인합니다.
+	 *
+	 * 상태가 WAITING_APPROVAL 그대로일 때만 결정을 받습니다(markQueued). 두 사람이 동시에 결정하거나 버튼을 두 번 눌러도
+	 * 실행은 한 번만 이어지고, 늦은 쪽은 409로 거절됩니다.
 	 *
 	 * 결정(decision)은 멈춰 있는 APPROVAL step의 routes에 있는 이름 중 하나여야 합니다. 아니면 400으로 거절합니다.
 	 * 틀린 이름을 기록해 두면 다음 step을 찾지 못해 실행 전체가 실패로 끝나 버리기 때문에, 기록하기 전에 막습니다.
@@ -113,12 +216,12 @@ public class WorkFlowExecutionService extends BaseService {
 	public WorkFlowExecution decide(String executionId, String decision, Boolean approved, String approver, String comment) {
 		WorkFlowExecution execution = this.executionStore.find(executionId);
 		if (execution.status() != WorkFlowExecutionStatus.WAITING_APPROVAL) {
-			throw new IllegalStateException("실행[" + executionId + "]은 지금 승인 대기 상태가 아닙니다(현재 상태: " + execution.status() + ").");
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]은 지금 승인 대기 상태가 아닙니다(현재 상태: " + execution.status() + "). 다른 사람이 먼저 결정했을 수 있습니다.");
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
 		StepDefinition pendingStep = workflow.steps().get(execution.currentStepIndex());
 		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
-			throw new IllegalStateException("실행[" + executionId + "]이 멈춰 있는 step[" + pendingStep.id() + "]은 APPROVAL step이 아닙니다(실행을 시작한 뒤 Workflow 정의가 바뀌었을 수 있습니다).");
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]이 멈춰 있는 step[" + pendingStep.id() + "]은 APPROVAL step이 아닙니다(실행을 시작한 뒤 Workflow 정의가 바뀌었을 수 있습니다).");
 		}
 		String chosen = decision;
 		if (StringUtil.isEmpty(chosen) && approved != null) {
@@ -132,23 +235,32 @@ public class WorkFlowExecutionService extends BaseService {
 		if (approval.requiresCommentOnReject() && !ApprovalStepDefinition.DECISION_APPROVED.equals(chosen) && StringUtil.isEmpty(comment)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 " + ApprovalStepDefinition.DECISION_APPROVED + "가 아닌 결정에 의견(comment)이 꼭 있어야 합니다.");
 		}
+		this.checkRoom();
+		if (!this.executionStore.markQueued(execution, execution.currentStepIndex())) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]의 상태가 그사이 바뀌었습니다. 다른 사람이 먼저 결정했을 수 있습니다. 다시 조회하십시오.");
+		}
 		WorkFlowContext.recordApproval(execution.context(), pendingStep.id(), chosen, approver, comment);
-		return this.workFlowExecutor.run(workflow, execution);
+		WorkFlowExecution queued = execution.queued(execution.currentStepIndex());
+		// 결정을 컨텍스트에 남긴 채로 저장해 둡니다. 차례를 기다리는 사이 서버가 내려가도 결정은 남습니다.
+		this.executionStore.update(queued);
+		this.enqueue(workflow, queued, false);
+		return queued;
 	}
 
 	/**
 	 * <pre>
 	 * 돌고 있는 실행에 일시정지를 요청합니다. 지금 돌고 있는 step은 끝까지 기다리고, 다음 step을 시작하기 전에 PAUSED로 멈춥니다.
 	 * 그래서 돌려주는 상태는 대개 아직 RUNNING입니다. 멈췄는지는 상세 조회로 확인합니다.
+	 * 아직 대기열에서 차례를 기다리는 실행(QUEUED)은 바로 PAUSED가 되고, 차례가 와도 돌지 않습니다.
 	 * </pre>
 	 *
 	 * @param executionId 멈출 실행의 id입니다.
-	 * @throws ResponseStatusException 실행이 RUNNING이 아닐 때(409)
+	 * @throws ResponseStatusException 실행이 RUNNING이나 QUEUED가 아닐 때(409)
 	 */
 	public WorkFlowExecution pause(String executionId) {
-		if (!this.executionStore.requestPause(executionId)) {
+		if (!this.executionStore.pauseQueued(executionId) && !this.executionStore.requestPause(executionId)) {
 			WorkFlowExecution execution = this.executionStore.find(executionId);
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행 중일 때만 일시정지할 수 있습니다(현재 상태: " + execution.status() + ").");
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행 중이거나 대기 중일 때만 일시정지할 수 있습니다(현재 상태: " + execution.status() + ").");
 		}
 		return this.executionStore.find(executionId);
 	}
@@ -160,7 +272,7 @@ public class WorkFlowExecutionService extends BaseService {
 	 * </pre>
 	 *
 	 * @param executionId 이어 갈 실행의 id입니다.
-	 * @return RUNNING으로 바뀐 실행 상태입니다.
+	 * @return QUEUED(대기열에 들어감)로 바뀐 실행 상태입니다.
 	 * @throws ResponseStatusException 이어 갈 수 없는 상태이거나 재개할 step을 찾지 못했을 때(409)
 	 */
 	public WorkFlowExecution resume(String executionId) {
@@ -173,17 +285,13 @@ public class WorkFlowExecutionService extends BaseService {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, point.problem());
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
-		if (!this.executionStore.markResumed(execution, point.stepIndex())) {
+		this.checkRoom();
+		if (!this.executionStore.markQueued(execution, point.stepIndex())) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]의 상태가 그사이 바뀌었습니다. 다시 조회하십시오.");
 		}
-		WorkFlowExecution resumed = execution.resumed(point.stepIndex());
-		CompletableFuture.runAsync(new Runnable() {
-			@Override
-			public void run() {
-				WorkFlowExecutionService.this.workFlowExecutor.run(workflow, resumed);
-			}
-		});
-		return resumed;
+		WorkFlowExecution queued = execution.queued(point.stepIndex());
+		this.enqueue(workflow, queued, false);
+		return queued;
 	}
 
 	/**
@@ -254,7 +362,7 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param executionId 되돌릴 실행의 id입니다.
 	 * @param fromStep    다시 시작할 step의 id입니다.
 	 * @param clearState  true면 그 구간에서 저장한 state 값을 지웁니다.
-	 * @return RUNNING으로 바뀐 실행 상태입니다.
+	 * @return QUEUED(대기열에 들어감)로 바뀐 실행 상태입니다.
 	 * @throws ResponseStatusException 되돌릴 수 없을 때(409), fromStep이 비었을 때(400)
 	 */
 	public WorkFlowExecution rewind(String executionId, String fromStep, boolean clearState) {
@@ -267,7 +375,8 @@ public class WorkFlowExecutionService extends BaseService {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, point.problem());
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
-		if (!this.executionStore.markResumed(execution, point.stepIndex())) {
+		this.checkRoom();
+		if (!this.executionStore.markQueued(execution, point.stepIndex())) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]의 상태가 그사이 바뀌었습니다. 다시 조회하십시오.");
 		}
 		Map<String, Object> context = execution.context();
@@ -285,12 +394,7 @@ public class WorkFlowExecutionService extends BaseService {
 		this.info("workflow[" + workflow.id() + "] 실행[" + executionId + "]을 step[" + point.fromStep() + "]으로 되돌려 다시 돌립니다"
 			+ (clearState ? "(지운 state: " + point.savedNames() + ")" : "(state는 그대로 둡니다)")
 			+ " - 지운 파일 " + deleted.size() + "개: " + deleted);
-		CompletableFuture.runAsync(new Runnable() {
-			@Override
-			public void run() {
-				WorkFlowExecutionService.this.workFlowExecutor.run(workflow, rewound);
-			}
-		});
+		this.enqueue(workflow, rewound, false);
 		return rewound;
 	}
 
@@ -300,7 +404,7 @@ public class WorkFlowExecutionService extends BaseService {
 	 *
 	 * 되돌리는 구간은 fromStep이 실행 기록에서 마지막으로 돈 자리부터 기록 끝까지입니다.
 	 * (forEach step은 "step17[0]", "step17[1]"처럼 여러 줄이라, 마지막으로 이어진 줄 묶음의 첫 줄부터입니다.)
-	 * 막는 경우: 실행 중, 기록에 없는 step, 지금 정의에 없는 step.
+	 * 막는 경우: 실행 중이거나 대기 중, 기록에 없는 step, 지금 정의에 없는 step.
 	 * 알리는 경우: 그 구간에서 저장한 state가 남아 있음, 그 구간의 step이 쓴 파일, 정의 버전이 다름,
 	 *             구간의 step 중 지금 정의에 없는 것(그 step이 저장한 이름은 알 수 없음).
 	 * </pre>
@@ -309,8 +413,8 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param fromStep  다시 시작할 step의 id입니다.
 	 */
 	public RewindPoint rewindPoint(WorkFlowExecution execution, String fromStep) {
-		if (execution.status() == WorkFlowExecutionStatus.RUNNING) {
-			return RewindPoint.blocked(fromStep, "돌고 있는 실행은 되돌릴 수 없습니다. 먼저 일시정지하십시오.");
+		if (execution.status() == WorkFlowExecutionStatus.RUNNING || execution.status() == WorkFlowExecutionStatus.QUEUED) {
+			return RewindPoint.blocked(fromStep, "돌고 있는 실행이나 차례를 기다리는 실행은 되돌릴 수 없습니다. 먼저 일시정지하십시오.");
 		}
 		WorkFlowDefinition workflow;
 		try {
@@ -545,16 +649,17 @@ public class WorkFlowExecutionService extends BaseService {
 	 * @param workflowId  id에 이 글자가 들어 있는 Workflow만 봅니다(비우면 전체).
 	 * @param executionId id에 이 글자가 들어 있는 실행만 봅니다(비우면 전체).
 	 * @param caller      이 호출 주체만 봅니다(비우면 전체).
+	 * @param requestedBy 이 사용자가 시작한 실행만 봅니다(비우면 전체).
 	 * @param page        0부터 시작하는 페이지 번호입니다.
 	 * @param size        한 페이지에 담을 개수입니다.
 	 */
-	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, int page, int size) {
-		return this.executionStore.search(status, workflowId, executionId, caller, page, size);
+	public List<WorkFlowExecution> search(String status, String workflowId, String executionId, String caller, String requestedBy, int page, int size) {
+		return this.executionStore.search(status, workflowId, executionId, caller, requestedBy, page, size);
 	}
 
 	/** search()와 같은 조건에 맞는 실행이 모두 몇 건인지 돌려줍니다. */
-	public long count(String status, String workflowId, String executionId, String caller) {
-		return this.executionStore.count(status, workflowId, executionId, caller);
+	public long count(String status, String workflowId, String executionId, String caller, String requestedBy) {
+		return this.executionStore.count(status, workflowId, executionId, caller, requestedBy);
 	}
 
 	/**
@@ -584,15 +689,21 @@ public class WorkFlowExecutionService extends BaseService {
 	}
 
 	/**
-	 * 새 실행 상태를 만듭니다. 요청의 input으로 새 컨텍스트를 만들어 담습니다(WorkFlowContext.create() 참고).
+	 * 대기열에 넣을 새 실행 상태(QUEUED)를 만듭니다. 요청의 input으로 새 컨텍스트를 만들어 담습니다(WorkFlowContext.create() 참고).
+	 * 첫 step id도 미리 적어 둡니다. 차례를 기다리다 일시정지한 실행을 재개할 때 어디서 시작할지 id로 찾게 하려는 것입니다.
 	 *
-	 * @param workflowId 이 새 실행이 속할 Workflow의 id입니다.
-	 * @param sessionId  대화를 구분하는 세션 식별자입니다.
-	 * @param caller     이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
-	 * @param input      Workflow를 호출할 때 넘겨받은 값입니다.
+	 * @param workflow    이 새 실행이 속할 Workflow의 정의입니다.
+	 * @param sessionId   대화를 구분하는 세션 식별자입니다.
+	 * @param caller      이 Workflow를 호출한 주체를 가리키는 식별자(tenant)입니다.
+	 * @param input       Workflow를 호출할 때 넘겨받은 값입니다.
+	 * @param requestedBy 실행을 시작한 사용자입니다(없으면 null).
 	 */
-	private WorkFlowExecution newExecution(WorkFlowDefinition workflow, String sessionId, String caller, Object input) {
-		return WorkFlowExecution.start(UUID.randomUUID().toString(), workflow.id(), caller, sessionId, WorkFlowContext.create(input, workflow.id(), workflow.version()));
+	private WorkFlowExecution newExecution(WorkFlowDefinition workflow, String sessionId, String caller, Object input, String requestedBy) {
+		Map<String, Object> context = WorkFlowContext.create(input, workflow.id(), workflow.version());
+		if (!workflow.steps().isEmpty()) {
+			WorkFlowContext.setCurrentStep(context, workflow.steps().get(0).id());
+		}
+		return WorkFlowExecution.queue(UUID.randomUUID().toString(), workflow.id(), caller, sessionId, context, requestedBy);
 	}
 
 }

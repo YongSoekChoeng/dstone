@@ -4,6 +4,7 @@ package net.dstone.ai.common.consts;
  * <pre>
  * 하나의 Workflow 실행(runtime.workflow.execution.WorkFlowExecution)이 지금 어느 단계에 있는지 나타낸다.
  *
+ * QUEUED → 실행 슬롯이 빌 때까지 대기열에서 기다리는 중(runtime.workflow.WorkFlowThreadPools).
  * RUNNING → 진행 중(동기 실행 도중이거나 비동기 job이 처리 중). 
  * WAITING_APPROVAL → APPROVAL 스텝에서 멈춰 사람의 결정을 기다리는 중. 
  * PAUSED → 사람이 일시정지를 요청해서 step 사이에서 멈춘 상태. 재개하면 멈춘 step부터 이어 간다. 
@@ -12,6 +13,11 @@ package net.dstone.ai.common.consts;
  * </pre>
  */
 public enum WorkFlowExecutionStatus {
+	/**
+	 * 실행 슬롯이 빌 때까지 대기열에서 기다리는 중. 슬롯을 받으면 RUNNING이 된다.
+	 */
+	QUEUED,
+
 	/**
 	 * 진행 중(동기 실행 도중이거나 비동기 job이 처리 중)
 	 */
