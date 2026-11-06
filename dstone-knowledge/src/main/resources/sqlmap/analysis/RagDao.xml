@@ -201,6 +201,17 @@
            INCLUDES    이 화면이 끼워 넣는 JSP
            INCLUDED_BY 이 화면을 끼워 넣는 JSP
            CALLS       화면 안의 Java 코드가 부르는 메소드 -->
+    <!-- 화면의 화면명들: 사전의 한글명(DICT_SCREEN_NAME)이 먼저, 그다음 화면 파일이나 메뉴에서 찾은 이름(SCREEN_NAME). SEMANTIC 이 남긴 것이다 -->
+    <select id="selectScreenNamesByFile" parameterType="java.util.Map" resultType="string">
+        SELECT r.value
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.file_id = #{fileId}
+           AND r.resource_type IN ('DICT_SCREEN_NAME', 'SCREEN_NAME')
+           AND r.value IS NOT NULL
+         ORDER BY CASE WHEN r.resource_type = 'DICT_SCREEN_NAME' THEN 0 ELSE 1 END, r.resource_id
+    </select>
+
     <select id="selectViewLinksByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT DISTINCT 'OPENED_BY' AS "kind", NULL::varchar AS "text", (s.fqn || '#' || me.signature)::varchar AS "target"
           FROM analysis_relation r

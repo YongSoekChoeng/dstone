@@ -1,6 +1,7 @@
 package net.dstone.knowledge.api.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -12,10 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.dstone.common.core.BaseObject;
-import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.dictionary.DbCommentReader;
-import net.dstone.knowledge.dictionary.DictionaryFileReader;
+import net.dstone.knowledge.common.util.TableName;
 
 /**
  * <pre>
@@ -28,7 +28,10 @@ import net.dstone.knowledge.dictionary.DictionaryFileReader;
  *   4. SQL       매퍼 SQL 의 주석. 한 컬럼에 다른 글이 달렸으면 가장 많이 쓰인 것 (SEMANTIC 단계, SqlTableExtractor)
  *   5. SOURCE    Java 소스: JPA 엔티티(@Table / @Column)가 먼저, 다음은 이름이 컬럼과 같은 필드(VO 등)의 설명.
  *                이름만 같은 필드는 어느 테이블의 것인지 모르므로, 가장 많은 필드가 쓴 글을 고른다 (SEMANTIC 단계, SourceNamePlugin)
- *   6. DICT      프로젝트 설정에 등록한 사전 파일(CSV). 사람이 짐작해서 붙인 이름이 섞여 있을 수 있어 맨 뒤에 둔다(DictionaryFileReader)
+ *   6. DICT      프로젝트 설정에 등록한 사전 파일(CSV). 사람이 짐작해서 붙인 이름이 섞여 있을 수 있어 맨 뒤에 둔다
+ *                (SEMANTIC 단계에서 TableDictionaryPlugin 이 옮겨 둔 것)
+ *
+ * DB 코멘트만 상세를 열 때 대상 DB 에서 읽습니다. 리비전이 아니라 지금 돌고 있는 DB 의 것이기 때문입니다. 나머지는 모두 분석 결과에서 읽습니다.
  *
  * 컬럼 목록은 DB / DDL / SQL 을 합친 것입니다. 순서는 DB 에 정의된 순서, 없으면 DDL 에 적힌 순서이고,
  * 정의에 없이 SQL 에만 나온 컬럼은 그 뒤에 이름 순으로 붙입니다. 소스와 사전 파일은 한글명만 채우고 컬럼을 늘리지 않습니다.
@@ -44,17 +47,15 @@ public class TableDictionaryService extends BaseObject {
 	public static final String SOURCE_CODE = "SOURCE";
 	public static final String SOURCE_DICT = "DICT";
 
+	/** 사전 파일 상태: 사전을 저장하기 전에 분석한 리비전이라 모른다 */
+	public static final String NOT_STORED = "NOT_STORED";
+
 	@Autowired
 	private ResourceDao resourceDao;
 
 	@Autowired
 	private DbCommentReader dbCommentReader;
 
-	@Autowired
-	private DictionaryFileReader dictionaryFileReader;
-
-	@Autowired
-	private ProjectDao projectDao;
 
 	/**
 	 * @return {koreanName, koreanNameSource, koreanNameWhere,
@@ -177,26 +178,35 @@ public class TableDictionaryService extends BaseObject {
 			name(column, best, SOURCE_CODE, where);
 		}
 
-		// 6. 사전 파일. 상대 경로는 프로젝트의 소스 폴더 기준이다.
-		Map<String, Object> project = projectDao.selectProject(projectId);
-		DictionaryFileReader.Result file = dictionaryFileReader.read(projectId, project == null ? null : (String) project.get("localPath"), table);
-		if (file.tableName != null) {
-			name(tableName, file.tableName.text, SOURCE_DICT, file.tableName.where);
-		}
-		for (Map.Entry<String, DictionaryFileReader.Name> entry : file.columns.entrySet()) {
-			Map<String, Object> column = columns.get(entry.getKey());
-			if (column != null) {
-				name(column, entry.getValue().text, SOURCE_DICT, entry.getValue().where);
+		// 6. 사전 파일. 분석할 때 옮겨 둔 행을 읽는다(파일에 적힌 순서).
+		List<Map<String, Object>> dictNames = resourceDao.selectDictionaryNames(revisionId, TableName.bare(table));
+		for (int i = 0; i < dictNames.size(); i++) {
+			Map<String, Object> row = dictNames.get(i);
+			if ("DICT_TABLE_NAME".equals(row.get("type"))) {
+				name(tableName, (String) row.get("comment"), SOURCE_DICT, (String) row.get("where"));
+				continue;
 			}
+			Map<String, Object> column = columns.get(row.get("column"));
+			if (column != null) {
+				name(column, (String) row.get("comment"), SOURCE_DICT, (String) row.get("where"));
+			}
+		}
+		Map<String, Object> fileStatus = resourceDao.selectSemanticStatus(revisionId, "TABLE_DICTIONARY");
+		String fileState = fileStatus == null ? NOT_STORED : (String) fileStatus.get("status");
+		String fileMessage = fileStatus == null ? "사전 파일을 저장하기 전에 분석한 리비전입니다. SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다."
+				: (String) fileStatus.get("message");
+		List<String> dictFiles = new ArrayList<String>();
+		if (fileStatus != null && fileStatus.get("files") != null && ((String) fileStatus.get("files")).length() > 0) {
+			dictFiles.addAll(Arrays.asList(((String) fileStatus.get("files")).split("\n")));
 		}
 
 		Map<String, Object> dictionary = new LinkedHashMap<String, Object>();
 		dictionary.put("db", db.status);
 		dictionary.put("dbMessage", db.message);
 		dictionary.put("ddlFiles", new ArrayList<String>(ddlFiles));
-		dictionary.put("file", file.status);
-		dictionary.put("fileMessage", file.message);
-		dictionary.put("files", file.files);
+		dictionary.put("file", fileState);
+		dictionary.put("fileMessage", fileMessage);
+		dictionary.put("files", dictFiles);
 
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("koreanName", tableName.get("koreanName"));

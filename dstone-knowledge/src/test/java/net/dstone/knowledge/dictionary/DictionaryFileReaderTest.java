@@ -69,4 +69,14 @@ public class DictionaryFileReaderTest {
 		assertEquals(text, DictionaryFileReader.decode(("\uFEFF" + text).getBytes(StandardCharsets.UTF_8)));
 	}
 
+	@Test
+	public void 사전_여러_개를_합치면_앞_파일의_것이_먼저다() {
+		DictionaryFileReader.Loaded loaded = new DictionaryFileReader.Loaded(DictionaryFileReader.OK, null, new java.util.ArrayList<String>());
+		DictionaryFileReader.merge(loaded, DictionaryFileReader.parse("테이블ID,테이블한글명,컬럼ID,컬럼한글명\nTB_A,주문,ORD_NO,주문번호\n", "a.csv"));
+		DictionaryFileReader.merge(loaded, DictionaryFileReader.parse("테이블ID,테이블한글명,컬럼ID,컬럼한글명\nTB_A,주문서,ORD_NO,주문 번호\nTB_A,주문서,ORD_DT,주문일\n", "b.csv"));
+		assertEquals("주문", loaded.tables.get("TB_A").text);
+		assertEquals("주문번호", loaded.columns.get("TB_A").get("ORD_NO").text);
+		assertEquals("b.csv:3", loaded.columns.get("TB_A").get("ORD_DT").where);
+	}
+
 }

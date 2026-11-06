@@ -199,4 +199,25 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectResourceList", condition);
 	}
 
+	/**
+	 * <pre>
+	 * SEMANTIC 플러그인이 남긴 상태 {status, message, files(줄바꿈으로 이은 것)}. 그 플러그인이 생기기 전에 분석한 리비전이면 null 입니다.
+	 * </pre>
+	 * @param name METHOD_TITLE / SCREEN_DICTIONARY / TABLE_DICTIONARY
+	 */
+	public Map<String, Object> selectSemanticStatus(long revisionId, String name) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("name", name);
+		return sqlSessionCommon.selectOne(NS + "selectSemanticStatus", param);
+	}
+
+	/** 테이블 사전 파일에서 옮겨 둔 한글명 [{type: DICT_TABLE_NAME | DICT_COLUMN_NAME, column, comment, where}] */
+	public List<Map<String, Object>> selectDictionaryNames(long revisionId, String table) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("table", table);
+		return sqlSessionCommon.selectList(NS + "selectDictionaryNames", param);
+	}
+
 }

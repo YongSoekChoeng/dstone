@@ -115,7 +115,7 @@ public class ResourceDocumentBuilder {
 	/* ============================== 화면(JSP) ============================== */
 
 	/**
-	 * @param file analysis_file 한 행. 키: fileId, path
+	 * @param file analysis_file 한 행. 키: fileId, path, screenNames(SEMANTIC 이 찾아 둔 화면명들. 사전의 한글명이 먼저. 없어도 된다)
 	 * @param text JSP의 내용(올바른 인코딩으로 읽은 글)
 	 * @param links 이 JSP와 이어진 것들. 키: kind(OPENED_BY / REQUESTS / INCLUDES / INCLUDED_BY / CALLS), text, target
 	 */
@@ -148,7 +148,9 @@ public class ResourceDocumentBuilder {
 
 		StringBuilder sb = new StringBuilder();
 		sb.append("[화면] ").append(path).append('\n');
-		line(sb, "제목", titleOf(text));
+		String title = titleOf(text);
+		line(sb, "제목", title);
+		line(sb, "화면명", screenNames(file, title));
 		line(sb, "화면 종류", screenTypeLabel((String) file.get("fileType")));
 		sb.append("줄 수: ").append(lines.length).append('\n');
 		line(sb, "이 화면을 여는 메소드", limited(openedBy));
@@ -205,6 +207,27 @@ public class ResourceDocumentBuilder {
 			return "Nexacro / X-Platform";
 		}
 		return null;
+	}
+
+	/**
+	 * 분석이 찾아 둔 화면명(사전의 한글명, 메뉴 이름)을 " / " 로 잇는다. 제목과 같은 것은 뺀다. 남는 것이 없으면 null.
+	 * "보험료 입출금 처리 화면" 처럼 사람이 부르는 이름으로 물어도 화면이 검색되게 하려고 넣는다.
+	 */
+	@SuppressWarnings("unchecked")
+	private String screenNames(Map<String, Object> file, String title) {
+		Object value = file.get("screenNames");
+		if (!(value instanceof List)) {
+			return null;
+		}
+		List<String> names = new ArrayList<String>();
+		List<Object> found = (List<Object>) value;
+		for (int i = 0; i < found.size(); i++) {
+			String name = found.get(i) == null ? null : String.valueOf(found.get(i)).trim();
+			if (name != null && name.length() > 0 && !name.equals(title)) {
+				addOnce(names, name);
+			}
+		}
+		return names.isEmpty() ? null : String.join(" / ", names);
 	}
 
 	/** 화면명(JSP·WebSquare 의 title, Nexacro 의 titletext). 없거나 실행할 때 정해지는 값이면 null */

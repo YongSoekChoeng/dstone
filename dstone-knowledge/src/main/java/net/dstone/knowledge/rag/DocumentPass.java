@@ -133,7 +133,8 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 				if (ResourceDocumentBuilder.isRichClientScreen((String) file.get("fileType"))) {
 					byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
 					String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
-					return resourceBuilder.buildView(file, text, ragDao.selectViewLinksByFile(context.getRevisionId(), fileId));
+					file.put("screenNames", ragDao.selectScreenNamesByFile(context.getRevisionId(), fileId));
+				return resourceBuilder.buildView(file, text, ragDao.selectViewLinksByFile(context.getRevisionId(), fileId));
 				}
 				List<Map<String, Object>> statements = ragDao.selectStatementsByFile(fileId);
 				if (statements.isEmpty()) {
@@ -162,6 +163,7 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 				long fileId = ((Number) file.get("fileId")).longValue();
 				byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
 				String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+				file.put("screenNames", ragDao.selectScreenNamesByFile(context.getRevisionId(), fileId));
 				return resourceBuilder.buildView(file, text, ragDao.selectViewLinksByFile(context.getRevisionId(), fileId));
 			}
 

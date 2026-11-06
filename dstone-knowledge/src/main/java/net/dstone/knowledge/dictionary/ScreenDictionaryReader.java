@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -21,7 +20,7 @@ import net.dstone.knowledge.common.util.KoreanName;
  * <pre>
  * 프로젝트 담당자가 따로 정리해 둔 화면 목록 파일(CSV)에서 화면 한글명을 읽습니다.
  *
- * 화면 파일의 제목이나 메뉴 이름이 한글이 아닐 때(예: 일본어 메뉴) 화면 상세에 한글 화면명을 보여 주려고 씁니다(GraphService).
+ * 화면 파일의 제목이나 메뉴 이름이 한글이 아닐 때(예: 일본어 메뉴) 화면 상세에 한글 화면명을 보여 주려고 씁니다.
  * 있어도 되고 없어도 되는 기능이라, 설정이 없으면 아무 파일도 읽지 않습니다.
  *
  * 설정(conf/application.yml, 프로젝트 ID 마다):
@@ -36,7 +35,8 @@ import net.dstone.knowledge.common.util.KoreanName;
  * 화면은 파일 경로로 먼저 찾고(한쪽 경로가 다른 쪽 경로로 끝나면 같은 화면), 없으면 화면 ID = 화면 파일 이름(확장자 뺀 것)으로 찾습니다.
  * 한글이 없는 한글명은 건너뜁니다. 같은 화면이 여러 번 나오면 먼저 나온 것을 씁니다.
  *
- * 분석 결과(DB)에 저장하지 않고, 화면 상세를 열 때 읽습니다. 파일은 고친 시각과 크기가 같으면 다시 읽지 않습니다.
+ * 분석할 때(SEMANTIC 단계, ScreenDictionaryPlugin) 한 번 읽어 화면마다 찾은 한글명을 analysis_resource 에 남깁니다.
+ * 화면 상세는 그 행만 읽습니다. 그래서 어느 인스턴스에서 열어도 같고, 사전을 고쳤으면 SEMANTIC 부터 다시 분석해야 바뀝니다.
  * </pre>
  */
 @Component
@@ -50,9 +50,6 @@ public class ScreenDictionaryReader extends BaseObject {
 
 	@Autowired
 	private ConfigProperty configProperty;
-
-	/** 파일 경로 → 읽어 둔 사전 */
-	private final Map<String, Cached> cache = new ConcurrentHashMap<String, Cached>();
 
 	/**
 	 * <pre>
@@ -71,45 +68,83 @@ public class ScreenDictionaryReader extends BaseObject {
 		String problem;
 	}
 
-	private static class Cached {
-		final long modified;
-		final long size;
-		final Dictionary dictionary;
+	/**
+	 * <pre>
+	 * 한 프로젝트에 설정된 화면 사전 파일들을 모두 읽은 것
+	 * </pre>
+	 */
+	public static class Loaded {
 
-		Cached(long modified, long size, Dictionary dictionary) {
-			this.modified = modified;
-			this.size = size;
-			this.dictionary = dictionary;
+		/** NOT_CONFIGURED / OK / FAILED(쓰지 못한 파일이 있다. 읽은 파일의 것은 그래도 들어 있다) */
+		public final String status;
+
+		/** 쓰지 못한 파일과 그 까닭. 없으면 null */
+		public final String message;
+
+		/** 설정된 파일들(설정에 적은 그대로) */
+		public final List<String> files;
+
+		/** 읽은 사전들. 설정에 적은 순서다 */
+		final List<Dictionary> dictionaries;
+
+		Loaded(String status, String message, List<String> files, List<Dictionary> dictionaries) {
+			this.status = status;
+			this.message = message;
+			this.files = files;
+			this.dictionaries = dictionaries;
 		}
 	}
 
 	/**
 	 * <pre>
-	 * 화면 하나의 한글명을 찾습니다. 설정이 없거나 사전에 없으면 null 입니다.
+	 * 프로젝트에 설정된 화면 사전 파일을 모두 읽습니다. 설정이 없으면 아무 파일도 읽지 않고 NOT_CONFIGURED 입니다.
 	 * </pre>
 	 *
 	 * @param projectId 분석 프로젝트 ID. 설정 키를 찾는 데 쓴다
 	 * @param baseDir 상대 경로의 기준 폴더(프로젝트의 localPath). null 이면 현재 폴더
+	 */
+	public Loaded load(String projectId, String baseDir) {
+		List<String> paths = DictionaryFileReader.configuredFiles(configProperty, PREFIX + projectId);
+		List<Dictionary> dictionaries = new ArrayList<Dictionary>();
+		if (paths.isEmpty()) {
+			return new Loaded(DictionaryFileReader.NOT_CONFIGURED, null, paths, dictionaries);
+		}
+		List<String> problems = new ArrayList<String>();
+		for (int i = 0; i < paths.size(); i++) {
+			try {
+				File file = DictionaryFileReader.resolve(baseDir, paths.get(i));
+				if (!file.isFile()) {
+					throw new IllegalArgumentException("파일이 없습니다: " + file.getPath());
+				}
+				Dictionary dictionary = parse(DictionaryFileReader.decode(Files.readAllBytes(file.toPath())), file.getName());
+				if (dictionary.problem != null) {
+					problems.add(paths.get(i) + ": " + dictionary.problem);
+					continue;
+				}
+				dictionaries.add(dictionary);
+			} catch (Exception e) {
+				warn("화면 사전 파일을 읽지 못했습니다. projectId=" + projectId + ", file=" + paths.get(i) + ", 까닭=" + ErrorText.summaryOf(e));
+				problems.add(paths.get(i) + ": " + ErrorText.summaryOf(e));
+			}
+		}
+		return new Loaded(problems.isEmpty() ? DictionaryFileReader.OK : DictionaryFileReader.FAILED
+				, problems.isEmpty() ? null : String.join(" / ", problems), paths, dictionaries);
+	}
+
+	/**
+	 * <pre>
+	 * 화면 하나의 한글명을 찾습니다. 파일 경로로 먼저 찾고, 어느 사전에도 없으면 화면 ID 로 찾습니다.
+	 * </pre>
+	 *
 	 * @param screenPath 분석 결과의 화면 파일 경로. 예: ui/jc/JCIQ0700G.xml
 	 * @return {한글명, 적힌 곳(파일이름:줄)}. 없으면 null
 	 */
-	public String[] find(String projectId, String baseDir, String screenPath) {
-		List<String> paths = DictionaryFileReader.configuredFiles(configProperty, PREFIX + projectId);
+	public static String[] find(Loaded loaded, String screenPath) {
 		String path = normalize(screenPath);
 		String id = idOf(path);
 		String[] byId = null;
-		for (int i = 0; i < paths.size(); i++) {
-			Dictionary dictionary;
-			try {
-				dictionary = load(DictionaryFileReader.resolve(baseDir, paths.get(i)));
-			} catch (Exception e) {
-				warn("화면 사전 파일을 읽지 못했습니다. projectId=" + projectId + ", file=" + paths.get(i) + ", 까닭=" + ErrorText.summaryOf(e));
-				continue;
-			}
-			if (dictionary.problem != null) {
-				warn("화면 사전 파일을 쓸 수 없습니다. projectId=" + projectId + ", file=" + paths.get(i) + ", 까닭=" + dictionary.problem);
-				continue;
-			}
+		for (int i = 0; i < loaded.dictionaries.size(); i++) {
+			Dictionary dictionary = loaded.dictionaries.get(i);
 			String[] found = findByPath(dictionary, path);
 			if (found != null) {
 				return found;
@@ -121,7 +156,7 @@ public class ScreenDictionaryReader extends BaseObject {
 		return byId;
 	}
 
-	private String[] findByPath(Dictionary dictionary, String path) {
+	private static String[] findByPath(Dictionary dictionary, String path) {
 		for (int i = 0; i < dictionary.byPath.size(); i++) {
 			String[] entry = dictionary.byPath.get(i);
 			if (samePath(entry[0], path)) {
@@ -139,22 +174,6 @@ public class ScreenDictionaryReader extends BaseObject {
 		String x = a.toLowerCase(Locale.ROOT);
 		String y = b.toLowerCase(Locale.ROOT);
 		return x.equals(y) || x.endsWith("/" + y) || y.endsWith("/" + x);
-	}
-
-	private Dictionary load(File file) throws Exception {
-		if (!file.isFile()) {
-			throw new IllegalArgumentException("파일이 없습니다: " + file.getPath());
-		}
-		String key = file.getCanonicalPath();
-		long modified = file.lastModified();
-		long size = file.length();
-		Cached cached = cache.get(key);
-		if (cached != null && cached.modified == modified && cached.size == size) {
-			return cached.dictionary;
-		}
-		Dictionary dictionary = parse(DictionaryFileReader.decode(Files.readAllBytes(file.toPath())), file.getName());
-		cache.put(key, new Cached(modified, size, dictionary));
-		return dictionary;
 	}
 
 	/**

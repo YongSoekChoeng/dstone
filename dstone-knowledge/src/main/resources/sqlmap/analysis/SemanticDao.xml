@@ -23,7 +23,8 @@
     <delete id="deleteWebResources" parameterType="long">
         DELETE FROM analysis_resource
          WHERE revision_id = #{revisionId}
-           AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME', 'SCREEN_NAME')
+           AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME', 'SCREEN_NAME'
+                               , 'METHOD_TITLE', 'METHOD_TITLE_SKIP', 'DICT_SCREEN_NAME', 'DICT_TABLE_NAME', 'DICT_COLUMN_NAME', 'SEMANTIC_STATUS')
     </delete>
 
     <delete id="deleteInjects" parameterType="long">
@@ -205,8 +206,8 @@
         INSERT INTO analysis_resource
             (revision_id, resource_type, name, location, value, properties_json, file_id, line_start)
         VALUES
-            (#{revisionId}, #{resourceType}, #{name}, #{location}, #{value}
-            , CAST(#{propertiesJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER})
+            (#{revisionId}, #{resourceType}, #{name, jdbcType=VARCHAR}, #{location, jdbcType=VARCHAR}, #{value, jdbcType=VARCHAR}
+            , CAST(#{propertiesJson} AS jsonb), #{fileId, jdbcType=BIGINT}, #{lineStart, jdbcType=INTEGER})
     </insert>
 
 
@@ -693,5 +694,31 @@
         INSERT INTO analysis_resource (revision_id, resource_type, name, location, value, properties_json, file_id, line_start)
         VALUES (#{revisionId}, #{resourceType}, #{name}, NULL, #{value}, CAST(#{propertiesJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER})
     </insert>
+
+    <!-- ================= 메소드 기능명 / 사전 (MethodTitlePlugin, ScreenDictionaryPlugin, TableDictionaryPlugin) ================= -->
+
+    <!-- 소스에 적힌 메소드가 있는 파일. 기능명을 읽으려고 파일 하나씩 연다 -->
+    <select id="selectMethodFilePage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT f.file_id AS "fileId", f.path AS "path", f.encoding AS "encoding", f.checksum AS "checksum"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND f.file_id &gt; #{afterId}
+           AND EXISTS (SELECT 1 FROM analysis_method m
+                        WHERE m.revision_id = #{revisionId} AND m.file_id = f.file_id
+                          AND NOT m.is_synthetic AND m.line_start IS NOT NULL)
+         ORDER BY f.file_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 파일 하나의 메소드와 시작 줄. 자동으로 생긴 메소드(기본 생성자, Lombok)는 그 줄 위 주석이 메소드 설명이 아니라서 뺀다 -->
+    <select id="selectMethodLinesByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT m.method_id AS "methodId", m.line_start AS "lineStart"
+          FROM analysis_method m
+         WHERE m.revision_id = #{revisionId}
+           AND m.file_id = #{fileId}
+           AND NOT m.is_synthetic
+           AND m.line_start IS NOT NULL
+         ORDER BY m.line_start, m.method_id
+    </select>
 
 </mapper>

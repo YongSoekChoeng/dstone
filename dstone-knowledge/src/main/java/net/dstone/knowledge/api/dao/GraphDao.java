@@ -79,14 +79,6 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectNodesByIds", param);
 	}
 
-	/** 소스 파일 하나 {path, encoding, checksum}. 없으면 null */
-	public Map<String, Object> selectSourceFile(long revisionId, String path) {
-		Map<String, Object> param = new HashMap<String, Object>();
-		param.put("revisionId", revisionId);
-		param.put("path", path);
-		return sqlSessionCommon.selectOne(NS + "selectSourceFile", param);
-	}
-
 	/** 이 타입이나 메소드가 처리하는 진입점 */
 	public List<Map<String, Object>> selectEndpointsByNode(long revisionId, String nodeId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
@@ -120,6 +112,27 @@ public class GraphDao extends BaseDao {
 	/** 화면 파일의 화면명(SEMANTIC 이 남긴 SCREEN_NAME). {screenName, via, lineStart, menuFile, menuLine}, 없으면 null */
 	public Map<String, Object> selectScreenName(long revisionId, long fileId) {
 		return sqlSessionCommon.selectOne(NS + "selectScreenName", fileParam(revisionId, fileId));
+	}
+
+	/** 화면 사전 파일에서 찾은 화면 한글명 {screenName, where}. 없으면 null */
+	public Map<String, Object> selectDictScreenName(long revisionId, long fileId) {
+		return sqlSessionCommon.selectOne(NS + "selectDictScreenName", fileParam(revisionId, fileId));
+	}
+
+	/** 메소드들의 기능명 [{methodId, title}]. 기능명이 없는 메소드는 빠진다 */
+	public List<Map<String, Object>> selectMethodTitles(long revisionId, List<String> methodIds) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("methodIds", methodIds);
+		return sqlSessionCommon.selectList(NS + "selectMethodTitles", param);
+	}
+
+	/** 분석할 때 이 파일의 기능명을 읽지 못한 까닭. 읽었으면 null */
+	public String selectMethodTitleSkip(long revisionId, String path) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("path", path);
+		return sqlSessionCommon.selectOne(NS + "selectMethodTitleSkip", param);
 	}
 
 	public List<Map<String, Object>> selectMethodsByFile(long revisionId, long fileId) {

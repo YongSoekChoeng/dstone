@@ -392,17 +392,41 @@
          LIMIT 1
     </select>
 
-    <!-- 화면(JSP) 안의 Java 코드로 만든 메소드. 화면에 스크립틀릿이 없으면 0건이다 -->
-    <!-- 소스 파일 하나. 상세를 열 때 메소드 주석(기능명)을 읽으려고 쓴다 -->
-    <select id="selectSourceFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        SELECT f.path AS "path"
-             , f.encoding AS "encoding"
-             , f.checksum AS "checksum"
-          FROM analysis_file f
-         WHERE f.revision_id = #{revisionId}
-           AND f.path = #{path}
+    <!-- 화면 사전 파일(CSV)에서 찾은 화면 한글명(ScreenDictionaryPlugin) -->
+    <select id="selectDictScreenName" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.value AS "screenName"
+             , r.properties_json->>'where' AS "where"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.file_id = #{fileId}
+           AND r.resource_type = 'DICT_SCREEN_NAME'
+         ORDER BY r.resource_id
+         LIMIT 1
     </select>
 
+    <!-- 메소드들의 기능명(MethodTitlePlugin) -->
+    <select id="selectMethodTitles" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.name AS "methodId"
+             , r.value AS "title"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.resource_type = 'METHOD_TITLE'
+           AND r.name IN
+            <foreach collection="methodIds" item="methodId" open="(" separator="," close=")">#{methodId}</foreach>
+    </select>
+
+    <!-- 기능명을 읽지 못한 파일과 그 까닭(MethodTitlePlugin). 없으면 null -->
+    <select id="selectMethodTitleSkip" parameterType="java.util.Map" resultType="string">
+        SELECT r.value
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.resource_type = 'METHOD_TITLE_SKIP'
+           AND r.name = #{path}
+         ORDER BY r.resource_id
+         LIMIT 1
+    </select>
+
+    <!-- 화면(JSP) 안의 Java 코드로 만든 메소드. 화면에 스크립틀릿이 없으면 0건이다 -->
     <select id="selectMethodsByFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT m.method_id AS "methodId"
              , m.signature AS "signature"

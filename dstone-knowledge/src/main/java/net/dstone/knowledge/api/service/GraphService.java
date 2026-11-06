@@ -1,9 +1,5 @@
 package net.dstone.knowledge.api.service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,17 +16,12 @@ import org.springframework.stereotype.Service;
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.DeclarationDao;
 import net.dstone.knowledge.api.dao.GraphDao;
-import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
-import net.dstone.knowledge.common.util.HashText;
 import net.dstone.knowledge.common.util.KoreanName;
-import net.dstone.knowledge.common.util.MethodTitle;
 import net.dstone.knowledge.common.util.SqlFormatter;
-import net.dstone.knowledge.dictionary.ScreenDictionaryReader;
-import net.dstone.knowledge.scanner.EncodingDetector;
 
 /**
  * <pre>
@@ -87,14 +78,6 @@ public class GraphService extends BaseObject {
 	@Autowired
 	private TableDictionaryService tableDictionaryService;
 
-	@Autowired
-	private ProjectDao projectDao;
-
-	@Autowired
-	private ScreenDictionaryReader screenDictionaryReader;
-
-	@Autowired
-	private EncodingDetector encodingDetector;
 
 	/* ======================= 1. 전체 맵 ======================= */
 
@@ -492,9 +475,9 @@ public class GraphService extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 화면의 화면명을 담습니다.
+	 * 화면의 화면명을 담습니다. 모두 분석할 때(SEMANTIC) 남긴 행을 읽습니다.
 	 *   1) 분석이 화면 파일(title, titletext)이나 메뉴 목록에서 찾아 둔 이름(SCREEN_NAME)에 한글이 있으면 그것
-	 *   2) 없거나 한글이 아니면(일본어 메뉴 등) 화면 사전 파일(ScreenDictionaryReader)의 한글명. 이때 1)의 이름은 screenNameOriginal 에 담는다
+	 *   2) 없거나 한글이 아니면(일본어 메뉴 등) 화면 사전 파일에서 찾아 둔 한글명(DICT_SCREEN_NAME). 이때 1)의 이름은 screenNameOriginal 에 담는다
 	 *   3) 사전에도 없으면 1)의 이름 그대로
 	 * </pre>
 	 */
@@ -505,14 +488,12 @@ public class GraphService extends BaseObject {
 		String where = screenNameWhere(node, found);
 		String original = null;
 		if (name == null || !KoreanName.hasHangul(name)) {
-			String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
-			Map<String, Object> project = projectDao.selectProject(projectId);
-			String[] korean = screenDictionaryReader.find(projectId, project == null ? null : (String) project.get("localPath"), (String) node.get("path"));
+			Map<String, Object> korean = graphDao.selectDictScreenName(revisionId, fileId);
 			if (korean != null) {
 				original = name;
-				name = korean[0];
+				name = (String) korean.get("screenName");
 				via = "DICT";
-				where = korean[1];
+				where = (String) korean.get("where");
 			}
 		}
 		node.put("screenName", name);
@@ -523,49 +504,36 @@ public class GraphService extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 메소드마다 기능명(title)을 담습니다. 메소드 바로 위 주석의 첫 줄이나 @Description 값입니다(MethodTitle).
-	 * 분석 결과에 저장해 두지 않고 상세를 열 때 소스 파일을 읽습니다. 그래서 예전에 분석한 리비전도 다시 분석하지 않고 바로 나옵니다.
-	 * 분석 뒤에 파일이 바뀌었으면(checksum 이 다르면) 줄 번호가 어긋날 수 있으므로 읽지 않습니다.
+	 * 메소드마다 기능명(title)을 담습니다. 메소드 바로 위 주석의 첫 줄이나 @Description 값으로, 분석할 때(SEMANTIC, MethodTitlePlugin) 남긴 것입니다.
 	 * </pre>
-	 * @param methods 같은 파일의 메소드들(lineStart, isSynthetic). 여기에 title 을 넣는다
+	 * @param methods 같은 파일의 메소드들(methodId, isSynthetic). 여기에 title 을 넣는다
 	 * @param path 그 파일의 경로(프로젝트 기준)
 	 * @return 기능명을 못 읽은 까닭. 읽었으면 null
 	 */
 	private String putMethodTitles(List<Map<String, Object>> methods, long revisionId, String path) {
-		String note = null;
-		String[] lines = null;
-		Map<String, Object> file = path == null ? null : graphDao.selectSourceFile(revisionId, path);
-		String projectId = String.valueOf(revisionDao.selectRevision(revisionId).get("projectId"));
-		Map<String, Object> project = projectDao.selectProject(projectId);
-		String localPath = project == null ? null : (String) project.get("localPath");
-		if (file == null || localPath == null) {
-			note = "소스 파일 위치를 몰라 기능명을 읽지 못했습니다.";
-		} else {
-			try {
-				Path root = Paths.get(localPath).toRealPath();
-				Path source = root.resolve((String) file.get("path")).normalize();
-				if (!source.startsWith(root) || !Files.isRegularFile(source)) {
-					note = "소스 파일이 없어 기능명을 읽지 못했습니다: " + file.get("path");
-				} else {
-					byte[] bytes = Files.readAllBytes(source);
-					if (!HashText.sha256(bytes).equals(file.get("checksum"))) {
-						note = "분석한 뒤에 소스 파일이 바뀌어서 기능명을 읽지 않았습니다(줄 번호가 어긋날 수 있습니다). 새로 분석하면 나옵니다.";
-					} else {
-						lines = encodingDetector.decode(bytes, (String) file.get("encoding")).split("\r?\n", -1);
-					}
-				}
-			} catch (IOException e) {
-				note = "소스 파일을 읽지 못했습니다: " + e.getMessage();
+		List<String> ids = new ArrayList<String>();
+		for (int i = 0; i < methods.size(); i++) {
+			// 소스에 없는 메소드(기본 생성자, Lombok)는 기능명이 없다.
+			if (!Boolean.TRUE.equals(methods.get(i).get("isSynthetic")) && methods.get(i).get("methodId") != null) {
+				ids.add(String.valueOf(methods.get(i).get("methodId")));
+			}
+		}
+		Map<String, String> titles = new HashMap<String, String>();
+		if (!ids.isEmpty()) {
+			List<Map<String, Object>> rows = graphDao.selectMethodTitles(revisionId, ids);
+			for (int i = 0; i < rows.size(); i++) {
+				titles.put((String) rows.get(i).get("methodId"), (String) rows.get(i).get("title"));
 			}
 		}
 		for (int i = 0; i < methods.size(); i++) {
 			Map<String, Object> method = methods.get(i);
-			Object lineStart = method.get("lineStart");
-			// 소스에 없는 메소드(기본 생성자, Lombok)는 줄이 클래스나 필드의 줄이라 그 위 주석이 메소드 설명이 아니다.
 			boolean synthetic = Boolean.TRUE.equals(method.get("isSynthetic"));
-			method.put("title", lines == null || synthetic || !(lineStart instanceof Number) ? null : MethodTitle.of(lines, Integer.valueOf(((Number) lineStart).intValue())));
+			method.put("title", synthetic ? null : titles.get(String.valueOf(method.get("methodId"))));
 		}
-		return note;
+		if (resourceDao.selectSemanticStatus(revisionId, "METHOD_TITLE") == null) {
+			return "기능명을 저장하기 전에 분석한 리비전입니다. SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.";
+		}
+		return path == null ? null : graphDao.selectMethodTitleSkip(revisionId, path);
 	}
 
 	/** 화면명을 찾은 곳: 화면 파일의 줄, 메뉴에서 왔으면 메뉴 목록 파일:줄. 모르면 null */

@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +45,8 @@ import net.dstone.knowledge.common.util.KoreanName;
  * 이름이 영문 식별자가 아닌 행, 한글이 없는 한글명은 건너뜁니다. 같은 것이 여러 번 나오면 먼저 나온 것을 씁니다.
  * 글자 코드는 UTF-8(BOM 있어도 됨)로 읽고, 안 맞으면 MS949 로 읽습니다.
  *
- * 분석 결과(DB)에 저장하지 않고, 화면에서 테이블 상세를 열 때 읽습니다. 파일은 고친 시각과 크기가 같으면 다시 읽지 않습니다.
+ * 분석할 때(SEMANTIC 단계, TableDictionaryPlugin) 한 번 읽어 analysis_resource 에 남깁니다. 테이블 상세는 그 행만 읽습니다.
+ * 그래서 어느 인스턴스에서 열어도 같고, 사전을 고쳤으면 SEMANTIC 부터 다시 분석해야 바뀝니다.
  * </pre>
  */
 @Component
@@ -71,9 +71,6 @@ public class DictionaryFileReader extends BaseObject {
 
 	@Autowired
 	private ConfigProperty configProperty;
-
-	/** 파일 경로 → 읽어 둔 사전 */
-	private final Map<String, Cached> cache = new ConcurrentHashMap<String, Cached>();
 
 	/**
 	 * <pre>
@@ -111,89 +108,90 @@ public class DictionaryFileReader extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 테이블 하나에 대해 사전 파일들에서 찾은 것
+	 * 한 프로젝트에 설정된 사전 파일들을 모두 읽어 합친 것. 같은 테이블 / 컬럼이 여러 파일에 있으면 설정에 먼저 적은 파일의 것을 쓴다.
 	 * </pre>
 	 */
-	public static class Result {
+	public static class Loaded {
 
-		/** NOT_CONFIGURED / OK / FAILED(읽지 못한 파일이 있다. 읽은 파일의 것은 그래도 들어 있다) */
+		/** NOT_CONFIGURED / OK / FAILED(쓰지 못한 파일이 있다. 읽은 파일의 것은 그래도 들어 있다) */
 		public final String status;
 
-		/** 읽지 못한 파일과 그 까닭 */
+		/** 쓰지 못한 파일과 그 까닭. 없으면 null */
 		public final String message;
 
 		/** 설정된 파일들(설정에 적은 그대로) */
 		public final List<String> files;
 
-		/** 테이블 한글명. 없으면 null */
-		public final Name tableName;
+		/** 테이블(대문자) → 한글명 */
+		public final Map<String, Name> tables = new LinkedHashMap<String, Name>();
 
-		/** 컬럼 → 한글명 */
-		public final Map<String, Name> columns;
+		/** 테이블 → 컬럼 → 한글명 */
+		public final Map<String, Map<String, Name>> columns = new LinkedHashMap<String, Map<String, Name>>();
 
-		Result(String status, String message, List<String> files, Name tableName, Map<String, Name> columns) {
+		Loaded(String status, String message, List<String> files) {
 			this.status = status;
 			this.message = message;
 			this.files = files;
-			this.tableName = tableName;
-			this.columns = columns;
-		}
-	}
-
-	private static class Cached {
-		final long modified;
-		final long size;
-		final Dictionary dictionary;
-
-		Cached(long modified, long size, Dictionary dictionary) {
-			this.modified = modified;
-			this.size = size;
-			this.dictionary = dictionary;
 		}
 	}
 
 	/**
+	 * <pre>
+	 * 프로젝트에 설정된 사전 파일을 모두 읽어 합칩니다. 설정이 없으면 아무 파일도 읽지 않고 NOT_CONFIGURED 입니다.
+	 * </pre>
+	 *
 	 * @param projectId 분석 프로젝트 ID. 설정 키를 찾는 데 쓴다
 	 * @param baseDir 상대 경로의 기준 폴더(프로젝트의 localPath). null 이면 현재 폴더
-	 * @param table 테이블 이름(대문자). 스키마가 붙어 있으면(DPHJSDBA.JZ_CMNS_DET) 사전에서는 스키마를 떼고 찾는다
 	 */
-	public Result read(String projectId, String baseDir, String table) {
-		int dot = table.lastIndexOf('.');
-		if (dot >= 0) {
-			table = table.substring(dot + 1);
-		}
+	public Loaded load(String projectId, String baseDir) {
 		List<String> paths = configuredFiles(projectId);
 		if (paths.isEmpty()) {
-			return new Result(NOT_CONFIGURED, null, paths, null, new LinkedHashMap<String, Name>());
+			return new Loaded(NOT_CONFIGURED, null, paths);
 		}
-		Name tableName = null;
-		Map<String, Name> columns = new LinkedHashMap<String, Name>();
 		List<String> problems = new ArrayList<String>();
+		List<Dictionary> dictionaries = new ArrayList<Dictionary>();
 		for (int i = 0; i < paths.size(); i++) {
-			Dictionary dictionary;
 			try {
-				dictionary = load(resolve(baseDir, paths.get(i)));
+				File file = resolve(baseDir, paths.get(i));
+				if (!file.isFile()) {
+					throw new IllegalArgumentException("파일이 없습니다: " + file.getPath());
+				}
+				Dictionary dictionary = parse(decode(Files.readAllBytes(file.toPath())), file.getName());
+				if (dictionary.problem != null) {
+					problems.add(paths.get(i) + ": " + dictionary.problem);
+				}
+				dictionaries.add(dictionary);
 			} catch (Exception e) {
 				warn("사전 파일을 읽지 못했습니다. projectId=" + projectId + ", file=" + paths.get(i) + ", 까닭=" + ErrorText.summaryOf(e));
 				problems.add(paths.get(i) + ": " + ErrorText.summaryOf(e));
-				continue;
 			}
-			if (dictionary.problem != null) {
-				problems.add(paths.get(i) + ": " + dictionary.problem);
+		}
+		Loaded loaded = new Loaded(problems.isEmpty() ? OK : FAILED, problems.isEmpty() ? null : String.join(" / ", problems), paths);
+		for (int i = 0; i < dictionaries.size(); i++) {
+			merge(loaded, dictionaries.get(i));
+		}
+		return loaded;
+	}
+
+	/** 앞 파일에 없던 것만 더한다 */
+	static void merge(Loaded loaded, Dictionary dictionary) {
+		for (Map.Entry<String, Name> entry : dictionary.tables.entrySet()) {
+			if (!loaded.tables.containsKey(entry.getKey())) {
+				loaded.tables.put(entry.getKey(), entry.getValue());
 			}
-			if (tableName == null) {
-				tableName = dictionary.tables.get(table);
+		}
+		for (Map.Entry<String, Map<String, Name>> table : dictionary.columns.entrySet()) {
+			Map<String, Name> target = loaded.columns.get(table.getKey());
+			if (target == null) {
+				target = new LinkedHashMap<String, Name>();
+				loaded.columns.put(table.getKey(), target);
 			}
-			Map<String, Name> found = dictionary.columns.get(table);
-			if (found != null) {
-				for (Map.Entry<String, Name> entry : found.entrySet()) {
-					if (!columns.containsKey(entry.getKey())) {
-						columns.put(entry.getKey(), entry.getValue());
-					}
+			for (Map.Entry<String, Name> column : table.getValue().entrySet()) {
+				if (!target.containsKey(column.getKey())) {
+					target.put(column.getKey(), column.getValue());
 				}
 			}
 		}
-		return new Result(problems.isEmpty() ? OK : FAILED, problems.isEmpty() ? null : String.join(" / ", problems), paths, tableName, columns);
 	}
 
 	private List<String> configuredFiles(String projectId) {
@@ -231,22 +229,6 @@ public class DictionaryFileReader extends BaseObject {
 			return file;
 		}
 		return new File(baseDir, path);
-	}
-
-	private Dictionary load(File file) throws Exception {
-		if (!file.isFile()) {
-			throw new IllegalArgumentException("파일이 없습니다: " + file.getPath());
-		}
-		String key = file.getCanonicalPath();
-		long modified = file.lastModified();
-		long size = file.length();
-		Cached cached = cache.get(key);
-		if (cached != null && cached.modified == modified && cached.size == size) {
-			return cached.dictionary;
-		}
-		Dictionary dictionary = parse(decode(Files.readAllBytes(file.toPath())), file.getName());
-		cache.put(key, new Cached(modified, size, dictionary));
-		return dictionary;
 	}
 
 	/** UTF-8 로 읽고, 맞지 않는 글자가 있으면 MS949 로 읽습니다. */

@@ -353,4 +353,42 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.insert(NS + "insertSourceName", row);
 	}
 
+	/** 소스에 적힌 메소드가 있는 파일. fileId 순서로 afterId 다음부터 limit 개 */
+	public List<Map<String, Object>> selectMethodFilePage(long revisionId, long afterId, int limit) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("afterId", afterId);
+		param.put("limit", limit);
+		return sqlSessionCommon.selectList(NS + "selectMethodFilePage", param);
+	}
+
+	/** 파일 하나의 메소드(자동 생성 제외)와 시작 줄 */
+	public List<Map<String, Object>> selectMethodLinesByFile(long revisionId, long fileId) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("fileId", fileId);
+		return sqlSessionCommon.selectList(NS + "selectMethodLinesByFile", param);
+	}
+
+	/**
+	 * <pre>
+	 * SEMANTIC 이 만든 analysis_resource 행 하나를 남깁니다(기능명, 사전에서 찾은 이름, 플러그인 상태).
+	 * </pre>
+	 *
+	 * @param fileId 어느 파일의 것인지. 소스 파일과 상관없는 것(테이블 사전, 상태)은 null
+	 */
+	public void insertSemanticResource(long revisionId, String resourceType, Long fileId, String name, String location, String value
+			, Map<String, Object> properties, Integer lineStart) {
+		Map<String, Object> row = new HashMap<String, Object>();
+		row.put("revisionId", revisionId);
+		row.put("resourceType", resourceType);
+		row.put("name", name);
+		row.put("location", location);
+		row.put("value", value);
+		row.put("propertiesJson", JsonText.of(properties == null ? new HashMap<String, Object>() : properties));
+		row.put("fileId", fileId);
+		row.put("lineStart", lineStart);
+		sqlSessionCommon.insert(NS + "insertResource", row);
+	}
+
 }

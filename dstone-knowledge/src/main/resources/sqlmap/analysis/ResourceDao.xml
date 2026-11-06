@@ -382,12 +382,40 @@
         SELECT r.resource_type AS "resourceType", r.name AS "name", r.value AS "value", r.properties_json::text AS "properties"
              , f.path AS "file", r.line_start AS "lineStart"
           FROM analysis_resource r
-          JOIN analysis_file f ON f.file_id = r.file_id
+          LEFT JOIN analysis_file f ON f.file_id = r.file_id
          WHERE r.revision_id = #{revisionId}
         <if test="resourceType != null and resourceType != ''">AND r.resource_type = #{resourceType}</if>
         <if test="name != null and name != ''">AND r.name LIKE '%' || #{name} || '%'</if>
          ORDER BY r.resource_type, r.name, r.resource_id
          LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- SEMANTIC 플러그인이 남긴 상태(SEMANTIC_STATUS). 없으면 그 플러그인이 생기기 전에 분석한 리비전이다.
+         files 는 설정에 적은 사전 파일들을 줄바꿈으로 이은 것이다 -->
+    <select id="selectSemanticStatus" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.value AS "status"
+             , r.properties_json->>'message' AS "message"
+             , CASE WHEN jsonb_typeof(r.properties_json->'files') = 'array'
+                    THEN array_to_string(ARRAY(SELECT jsonb_array_elements_text(r.properties_json->'files')), E'\n') END AS "files"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.resource_type = 'SEMANTIC_STATUS'
+           AND r.name = #{name}
+         ORDER BY r.resource_id
+         LIMIT 1
+    </select>
+
+    <!-- 테이블 사전 파일(CSV)에서 옮겨 둔 테이블 / 컬럼 한글명(TableDictionaryPlugin) -->
+    <select id="selectDictionaryNames" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.resource_type AS "type"
+             , r.location AS "column"
+             , r.value AS "comment"
+             , r.properties_json->>'where' AS "where"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.resource_type IN ('DICT_TABLE_NAME', 'DICT_COLUMN_NAME')
+           AND r.name = upper(#{table})
+         ORDER BY r.resource_id
     </select>
 
 </mapper>

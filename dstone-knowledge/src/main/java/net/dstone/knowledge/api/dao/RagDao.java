@@ -104,6 +104,14 @@ public class RagDao extends BaseDao {
 	/**
 	 * @return [{kind(OPENED_BY / REQUESTS / INCLUDES / INCLUDED_BY / CALLS), text, target}] - 이 JSP와 이어진 것들
 	 */
+	/** 화면의 화면명들. 사전의 한글명이 먼저 온다 */
+	public List<String> selectScreenNamesByFile(long revisionId, long fileId) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("fileId", fileId);
+		return sqlSessionCommon.selectList(NS + "selectScreenNamesByFile", param);
+	}
+
 	public List<Map<String, Object>> selectViewLinksByFile(long revisionId, long fileId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

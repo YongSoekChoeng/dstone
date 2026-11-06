@@ -1026,7 +1026,7 @@ var DstoneKnowledgeGraph = (function () {
 			var methods = detail.methods.slice().sort(function (a, b) {
 				return (a.isSynthetic ? 1 : 0) - (b.isSynthetic ? 1 : 0);
 			});
-			// 기능명(title)은 메소드 위 주석의 첫 줄이나 @Description 값이다. 서버가 상세를 열 때 소스에서 읽어 준다.
+			// 기능명(title)은 메소드 위 주석의 첫 줄이나 @Description 값이다. 분석할 때(SEMANTIC) 저장해 둔 것을 서버가 준다.
 			var titled = methods.filter(function (method) {
 				return method.title;
 			}).length;

@@ -119,6 +119,19 @@ public class ResourceDocumentBuilderTest {
 		assertEquals(Integer.valueOf(1), result.chunks.get(0).getLineStart());
 	}
 
+	@Test
+	public void 화면_문서에_분석이_찾은_화면명을_넣는다() {
+		Map<String, Object> file = file(9L, "ui/ja/JABA1010G.xml");
+		List<String> names = new ArrayList<String>();
+		names.add("보험료 입출금 처리");
+		names.add("入出金処理");
+		names.add("入出金処理");
+		file.put("screenNames", names);
+		CodeDocumentBuilder.Result result = builder.buildView(file, "<html><body></body></html>", new ArrayList<Map<String, Object>>());
+		String text = contentOf(result, result.documents.get(0).getDocumentId());
+		assertTrue(text.contains("화면명: 보험료 입출금 처리 / 入出金処理\n"));
+	}
+
 	private String contentOf(CodeDocumentBuilder.Result result, String documentId) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < result.chunks.size(); i++) {

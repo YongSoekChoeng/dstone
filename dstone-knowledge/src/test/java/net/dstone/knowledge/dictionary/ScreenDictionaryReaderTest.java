@@ -45,4 +45,15 @@ public class ScreenDictionaryReaderTest {
 		assertEquals("ui/jc/A.xml", ScreenDictionaryReader.normalize("\\ui\\jc\\A.xml"));
 		assertEquals("JCIQ0700G", ScreenDictionaryReader.idOf("ui/jc/JCIQ0700G.xml"));
 	}
+
+	@Test
+	public void 경로로_먼저_찾고_없으면_화면_ID_로_찾는다() {
+		java.util.List<ScreenDictionaryReader.Dictionary> dictionaries = new java.util.ArrayList<ScreenDictionaryReader.Dictionary>();
+		dictionaries.add(ScreenDictionaryReader.parse("화면ID,화면명(한글),파일\nJABA1010G,보험료 입출금 처리,was/ui/ja/JABA1010G.xml\nJABA1020P,미수보험료 조회 팝업,\n", "a.csv"));
+		ScreenDictionaryReader.Loaded loaded = new ScreenDictionaryReader.Loaded(DictionaryFileReader.OK, null, new java.util.ArrayList<String>(), dictionaries);
+		assertEquals("보험료 입출금 처리", ScreenDictionaryReader.find(loaded, "ui/ja/JABA1010G.xml")[0]);
+		assertEquals("a.csv:3", ScreenDictionaryReader.find(loaded, "ui/ja/JABA1020P.xml")[1]);
+		assertNull(ScreenDictionaryReader.find(loaded, "ui/ja/JABA9999G.xml"));
+	}
+
 }

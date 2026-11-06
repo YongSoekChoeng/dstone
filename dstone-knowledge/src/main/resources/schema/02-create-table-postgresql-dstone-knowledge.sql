@@ -368,11 +368,13 @@ CREATE TABLE IF NOT EXISTS analysis_resource (
     location          VARCHAR(1000),                     -- 파일 안의 위치 (XPath 비슷한 경로)
     value             TEXT,
     properties_json   JSONB         NOT NULL DEFAULT '{}',
-    file_id           BIGINT        NOT NULL,
+    file_id           BIGINT,                            -- 어느 파일에서 나왔는지. 소스 파일이 아닌 곳(테이블 사전 CSV 등)에서 온 행은 NULL
     line_start        INT
 );
 CREATE INDEX IF NOT EXISTS idx_analysis_resource_type ON analysis_resource(revision_id, resource_type, name);
 CREATE INDEX IF NOT EXISTS idx_analysis_resource_file ON analysis_resource(file_id);
+-- 테이블 사전(DICT_TABLE_NAME / DICT_COLUMN_NAME)은 프로젝트 소스 밖의 CSV 에서 오므로 파일이 없다. 이미 만든 DB 에도 적용되도록 ALTER 로 푼다.
+ALTER TABLE analysis_resource ALTER COLUMN file_id DROP NOT NULL;
 
 
 /**********************************************
