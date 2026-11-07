@@ -2,6 +2,7 @@ package net.dstone.knowledge.semantic;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -23,6 +24,12 @@ import java.util.regex.Pattern;
  *   function gfnX(...) { ... }            함수 안의 지역 함수(success, callback ...)까지 공통 함수로 보면 잡음이다
  * 객체 글자 안의 이름(success: function ...)은 보지 않습니다. 어느 객체의 것인지 알 수 없습니다.
  *
+ * prototype 에 붙인 함수는 화면(그 prototype 의 인스턴스)에서 this. 로 부르므로 이름을 this.함수 로 바꿔 둡니다.
+ *   var pForm = nexacro.Form.prototype;            파일 맨 바깥에서 만든 prototype 별칭만 본다
+ *   pForm.gfn_comnMultiComboLoad = function(...)   → this.gfn_comnMultiComboLoad (화면: this.gfn_comnMultiComboLoad(...))
+ *   nexacro.Form.prototype.gfnX = function(...)    → this.gfnX
+ * 함수 안에서 만든 별칭(라이브러리가 즉시 실행 함수 안에서 쓰는 _pGrid 같은 것)은 보지 않습니다. 화면이 부를 함수가 아니라 잡음입니다.
+ *
  * 문자열, 주석, 정규식 글자 안의 중괄호는 세지 않습니다. 본문의 끝을 찾지 못한 함수는 버립니다(짐작하지 않는다).
  * </pre>
  */
@@ -36,6 +43,10 @@ public class ScriptFunctions {
 
 	/** comLib.gfnX = function(  /  var gfnX = function name( */
 	private static final Pattern ASSIGNED = Pattern.compile("(?<![A-Za-z0-9_$.])(" + CHAIN + ")\\s*=\\s*function\\b\\s*(?:" + NAME + ")?\\s*\\(");
+
+	/** var pForm = nexacro.Form.prototype;  (끝에 ; 가 없어도 줄이 끝나면 된다. Array.prototype.slice 같은 것은 아니다) */
+	private static final Pattern PROTOTYPE_ALIAS = Pattern.compile("(?<![A-Za-z0-9_$.])(?:var|let|const)\\s+(" + NAME + ")\\s*=\\s*" + CHAIN
+			+ "\\.prototype[ \\t]*(?:;|\\r?\\n|$)");
 
 	/** function gfnX( */
 	private static final Pattern DECLARED = Pattern.compile("(?<![A-Za-z0-9_$.])function\\s+(" + NAME + ")\\s*\\(");
@@ -59,7 +70,7 @@ public class ScriptFunctions {
 			this.body = body;
 		}
 
-		/** 적힌 그대로의 이름. 예: comLib.gfnOpenPopupEmp, gfnX */
+		/** 적힌 그대로의 이름. 예: comLib.gfnOpenPopupEmp, gfnX. prototype 에 붙인 함수는 화면에서 부르는 이름(this.gfnX)이다 */
 		public String getName() {
 			return name;
 		}
@@ -107,6 +118,7 @@ public class ScriptFunctions {
 
 		// 나온 순서로 세워 두고, 앞에서부터 중괄호 깊이를 한 번만 센다.
 		sortByIndex(found, names);
+		Set<String> aliases = prototypeAliases(text, skip);
 		List<Function> functions = new ArrayList<Function>();
 		int depth = 0;
 		int cursor = 0;
@@ -124,9 +136,44 @@ public class ScriptFunctions {
 			if (close < 0) {
 				continue;
 			}
-			functions.add(new Function(name, at[0], text.substring(open, close)));
+			functions.add(new Function(instanceName(name, aliases), at[0], text.substring(open, close)));
 		}
 		return functions;
+	}
+
+	/** 파일 맨 바깥(중괄호 밖)에서 prototype 을 가리키게 만든 별칭들. 예: var pForm = nexacro.Form.prototype; → pForm */
+	private Set<String> prototypeAliases(String text, BitSet skip) {
+		Set<String> aliases = new HashSet<String>();
+		Matcher m = PROTOTYPE_ALIAS.matcher(text);
+		int depth = 0;
+		int cursor = 0;
+		while (m.find()) {
+			depth += braceDelta(text, skip, cursor, m.start());
+			cursor = m.start();
+			if (depth == 0 && !skip.get(m.start())) {
+				aliases.add(m.group(1));
+			}
+		}
+		return aliases;
+	}
+
+	/**
+	 * <pre>
+	 * prototype 에 붙인 함수면 화면에서 부르는 이름(this.함수)으로 바꿉니다. 아니면 적힌 그대로 돌려줍니다.
+	 *   pForm.gfnX (pForm 이 별칭)        → this.gfnX
+	 *   nexacro.Form.prototype.gfnX       → this.gfnX
+	 * </pre>
+	 */
+	private String instanceName(String name, Set<String> aliases) {
+		int dot = name.lastIndexOf('.');
+		if (dot < 0) {
+			return name;
+		}
+		String owner = name.substring(0, dot);
+		if (aliases.contains(owner) || owner.endsWith(".prototype")) {
+			return "this" + name.substring(dot);
+		}
+		return name;
 	}
 
 	/**

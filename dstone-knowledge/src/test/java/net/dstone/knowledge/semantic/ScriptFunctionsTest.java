@@ -111,6 +111,53 @@ public class ScriptFunctionsTest {
 	}
 
 	@Test
+	public void prototype_에_붙인_함수는_this_로_부르는_이름이다() {
+		// Nexacro 공통 라이브러리 모양(hen 프로젝트의 Transaction.js)
+		String lib = "var pForm = nexacro.Form.prototype;\n"
+				+ "pForm.gfn_comnMultiComboLoad = function(strDS, strLgcd) {\n"
+				+ "  var strUrl = \"/hsy/sc/selectCommInitList.do\";\n"
+				+ "  this.gfn_Transaction(strDS, strUrl);\n"
+				+ "};\n"
+				+ "pForm.gfn_Transaction = function(svc, url) { this.transaction(svc, url); };\n"
+				+ "nexacro.Form.prototype.gfn_direct = function() { };\n"
+				+ "comLib.gfnX = function() { };\n"
+				+ "(function() {\n"
+				+ "  var _pGrid = nexacro.Grid.prototype;\n"
+				+ "  _pGrid.gfn_inner = function() { };\n"
+				+ "})();\n"
+				+ "var args = Array.prototype.slice.call(arguments);\n"
+				+ "args.gfn_notAlias = function() { };\n";
+		List<ScriptFunctions.Function> functions = scriptFunctions.findFunctions(lib);
+		List<String> names = new ArrayList<String>();
+		for (int i = 0; i < functions.size(); i++) {
+			names.add(functions.get(i).getName());
+		}
+		// 함수 안에서 만든 별칭(_pGrid)과 prototype 이 아닌 것(args)은 적힌 그대로 둔다.
+		assertEquals("[this.gfn_comnMultiComboLoad, this.gfn_Transaction, this.gfn_direct, comLib.gfnX, _pGrid.gfn_inner, args.gfn_notAlias]"
+				, names.toString());
+		assertTrue(functions.get(0).getBody().indexOf("/hsy/sc/selectCommInitList.do") > 0);
+
+		// 화면의 this.gfn_xxx( 호출과 맞고, 공통 함수끼리의 호출도 맞는다.
+		Set<String> defined = new HashSet<String>(names);
+		String screen = "this.fn_onload = function() {\n"
+				+ "  this.gfn_comnMultiComboLoad(\"dsCombo\", \"A01\");\n"
+				+ "  this.parent.gfn_Transaction(\"x\", \"y\");\n"
+				+ "};";
+		List<ScriptFunctions.Call> calls = scriptFunctions.findCalls(screen, defined, screenScript.commentMask(screen));
+		assertEquals(1, calls.size());
+		assertEquals("this.gfn_comnMultiComboLoad", calls.get(0).getName());
+		assertEquals(2, screenScript.lineAt(screen, calls.get(0).getIndex()));
+
+		String body = functions.get(0).getBody();
+		calls = scriptFunctions.findCalls(body, defined, scriptFunctions.nonCode(body));
+		assertEquals(1, calls.size());
+		assertEquals("this.gfn_Transaction", calls.get(0).getName());
+
+		// 화면이 같은 이름을 스스로 만들면 그 화면에서는 공통 함수가 아니다.
+		assertTrue(scriptFunctions.definesItself("this.gfn_comnMultiComboLoad = function() {}", "this.gfn_comnMultiComboLoad"));
+	}
+
+	@Test
 	public void 화면이_스스로_만든_함수는_공통_함수가_아니다() {
 		assertTrue(scriptFunctions.definesItself("comLib.gfnX = function(a) {}", "comLib.gfnX"));
 		assertTrue(scriptFunctions.definesItself("function gfnY(a) {}", "gfnY"));
