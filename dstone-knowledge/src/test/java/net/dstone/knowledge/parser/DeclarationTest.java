@@ -313,4 +313,32 @@ public class DeclarationTest {
 		return null;
 	}
 
+	@Test
+	public void 둘째_인자부터의_따옴표_글자는_자리를_맞춰_JSON_배열로_남긴다() {
+		String source = "package p;\n"
+				+ "public class A {\n"
+				+ "  void m(Dao dao, Object param, String id) {\n"
+				+ "    dao.execute(param, \"Order.list\");\n"
+				+ "    dao.query(\"first\", id, NS + \"third\");\n"
+				+ "    dao.plain(\"only\", id);\n"
+				+ "  }\n"
+				+ "}\n";
+		FileDeclarations declarations = collect(source, 1L);
+		Map<String, ReferenceRow> calls = new HashMap<String, ReferenceRow>();
+		for (ReferenceRow reference : declarations.getReferences()) {
+			if ("CALL".equals(reference.getRefKind())) {
+				calls.put(reference.getName(), reference);
+			}
+		}
+		// 첫 인자에 따옴표가 없으면 arg_text 는 비고, 둘째 인자가 args_json 의 1번 자리에 들어간다.
+		assertNull(calls.get("execute").getArgText());
+		assertEquals("[null,\"\\\"Order.list\\\"\"]", calls.get("execute").getArgsJson());
+		// 첫 인자는 arg_text 에 있고, args_json 에는 둘째 인자부터. 따옴표 없는 인자(id)는 null 로 자리만 맞춘다.
+		assertEquals("\"first\"", calls.get("query").getArgText());
+		assertEquals("[null,null,\"NS + \\\"third\\\"\"]", calls.get("query").getArgsJson());
+		// 둘째 인자부터 따옴표 글자가 없으면 args_json 은 비어 있다(양을 줄이려는 것).
+		assertEquals("\"only\"", calls.get("plain").getArgText());
+		assertNull(calls.get("plain").getArgsJson());
+	}
+
 }

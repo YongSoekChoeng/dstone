@@ -3,7 +3,6 @@ package net.dstone.knowledge.semantic;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,7 +27,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *   web.xml의 servlet / servlet-mapping → SERVLET 진입점. 주소마다, 처리 메소드(doGet, doPost ...)마다 한 건.
  *   web.xml의 filter / listener         → analysis_resource에 기록(FILTER_MAPPING, LISTENER)
  *   @WebServlet                         → SERVLET 진입점(서블릿 3.0 이후의 방식)
- *   HttpServlet을 상속한 클래스         → 계층 CONTROLLER(MEDIUM)
+ *   HttpServlet을 상속한 클래스의 계층(CONTROLLER)은 규칙 파일 conf/rules/servlet.yml 에 있고 ConfiguredLayerPlugin 이 정한다.
  *
  * 서블릿 클래스가 프로젝트 밖에 있어도(Spring의 DispatcherServlet 등) 진입점으로 남깁니다.
  * "*.do로 끝나는 요청은 Spring이 받는다" 같은 사실이 거기서 나오기 때문입니다. 이때 처리 메소드는 비어 있습니다.
@@ -92,11 +91,9 @@ public class ServletPlugin extends BaseObject implements SemanticPlugin {
 		}
 
 		endpoints += semanticDao.insertWebServletEndpoints(revisionId);
-		int layered = semanticDao.updateLayerBySuperType(revisionId, "CONTROLLER"
-				, Arrays.asList("javax.servlet.http.HttpServlet", "jakarta.servlet.http.HttpServlet", "javax.servlet.GenericServlet", "jakarta.servlet.GenericServlet"));
-		layered += semanticDao.updateLayerBySuperType(revisionId, "WEB_FILTER", Arrays.asList("javax.servlet.Filter", "jakarta.servlet.Filter"));
+		// HttpServlet / Filter 를 상속한 클래스의 계층은 규칙 파일(conf/rules/servlet.yml, layers.superTypes)로 ConfiguredLayerPlugin 이 정한다.
 
-		return "web.xml " + files.size() + "개, 서블릿 진입점 " + endpoints + ", 필터/리스너 " + resources + ", 계층 " + layered + ".";
+		return "web.xml " + files.size() + "개, 서블릿 진입점 " + endpoints + ", 필터/리스너 " + resources + ".";
 	}
 
 	private int addServletEndpoints(long revisionId, long fileId, WebXmlReader.WebXml webXml) {

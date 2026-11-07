@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
 import net.dstone.knowledge.common.util.JsonText;
+import net.dstone.knowledge.semantic.rule.RuleSet;
 
 /**
  * <pre>
@@ -33,24 +34,81 @@ public class SemanticDao extends BaseDao {
 		sqlSessionCommon.delete(NS + "deleteViewRelations", revisionId);
 	}
 
-	public int insertSpringHttpEndpoints(long revisionId) {
-		return sqlSessionCommon.insert(NS + "insertSpringHttpEndpoints", revisionId);
+	/* ---------- 규칙 파일(conf/rules)로 만드는 것 ---------- */
+
+	/** HTTP 진입점 규칙(endpoints.http) 하나로 진입점을 만듭니다. */
+	public int insertHttpEndpoints(long revisionId, RuleSet.HttpMappingRule rule) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("classAnnotations", rule.classAnnotations);
+		param.put("pathAttributes", rule.pathAttributes);
+		param.put("methodAnnotations", rule.methodAnnotations);
+		return sqlSessionCommon.insert(NS + "insertHttpEndpoints", param);
 	}
 
-	public int insertScheduledEndpoints(long revisionId) {
-		return sqlSessionCommon.insert(NS + "insertScheduledEndpoints", revisionId);
+	/** 애노테이션 진입점 규칙(endpoints.annotations) 하나로 진입점을 만듭니다. 예: @Scheduled → SCHEDULED */
+	public int insertAnnotatedEndpoints(long revisionId, RuleSet.AnnotatedEndpointRule rule) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("endpointType", rule.endpointType);
+		param.put("annotations", rule.annotations);
+		param.put("pathAttributes", rule.pathAttributes);
+		return sqlSessionCommon.insert(NS + "insertAnnotatedEndpoints", param);
 	}
 
-	public int insertListenerEndpoints(long revisionId) {
-		return sqlSessionCommon.insert(NS + "insertListenerEndpoints", revisionId);
+	/** 상위 타입 진입점 규칙(endpoints.superTypes) 하나로 진입점을 만듭니다. 예: Runnable 의 run() → THREAD */
+	public int insertSuperTypeEndpoints(long revisionId, RuleSet.SuperTypeEndpointRule rule) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("endpointType", rule.endpointType);
+		param.put("superTypes", rule.superTypes);
+		param.put("methods", rule.methods);
+		param.put("methodPattern", rule.methodPattern);
+		param.put("paramCount", rule.paramCount);
+		return sqlSessionCommon.insert(NS + "insertSuperTypeEndpoints", param);
 	}
 
-	public int insertInjects(long revisionId) {
-		return sqlSessionCommon.insert(NS + "insertInjects", revisionId);
+	public int insertInjects(long revisionId, List<String> annotations) {
+		if (annotations.isEmpty()) {
+			return 0;
+		}
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("annotations", annotations);
+		return sqlSessionCommon.insert(NS + "insertInjects", param);
 	}
 
-	public int markProxyRelated(long revisionId) {
-		return sqlSessionCommon.update(NS + "markProxyRelated", revisionId);
+	public int markProxyRelated(long revisionId, List<String> annotations) {
+		if (annotations.isEmpty()) {
+			return 0;
+		}
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("annotations", annotations);
+		return sqlSessionCommon.update(NS + "markProxyRelated", param);
+	}
+
+	/** 호출 인자 규칙(target: VIEW) 하나로 메소드 → 화면(RENDERS) 관계를 만듭니다. */
+	public int insertViewArgumentRelations(long revisionId, RuleSet.CallArgumentRule rule) {
+		return sqlSessionCommon.insert(NS + "insertViewArgumentRelations", callArgumentParams(revisionId, rule));
+	}
+
+	/**
+	 * <pre>
+	 * 호출 인자 규칙을 SQL 파라미터로 바꿉니다. SemanticDao.xml 의 ruleReferenceFilter / ruleArgText / receiverTypesCte 조각이 이 키를 씁니다.
+	 * </pre>
+	 */
+	public static Map<String, Object> callArgumentParams(long revisionId, RuleSet.CallArgumentRule rule) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("methods", rule.methods);
+		param.put("constructors", rule.constructors);
+		param.put("argIndex", Integer.valueOf(rule.argIndex));
+		param.put("receiverTypes", rule.receiverTypes);
+		param.put("prefix", rule.prefix);
+		param.put("suffix", rule.suffix);
+		param.put("exclude", rule.exclude);
+		return param;
 	}
 
 	public int insertWebServletEndpoints(long revisionId) {
@@ -103,10 +161,6 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.insert(NS + "insertMainEndpoints", revisionId);
 	}
 
-	public int insertThreadEndpoints(long revisionId) {
-		return sqlSessionCommon.insert(NS + "insertThreadEndpoints", revisionId);
-	}
-
 	public int insertJspEndpoints(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertJspEndpoints", revisionId);
 	}
@@ -147,10 +201,6 @@ public class SemanticDao extends BaseDao {
 
 	public int updateJspEndpointMethods(long revisionId) {
 		return sqlSessionCommon.update(NS + "updateJspEndpointMethods", revisionId);
-	}
-
-	public int insertRenders(long revisionId) {
-		return sqlSessionCommon.insert(NS + "insertRenders", revisionId);
 	}
 
 	/**
@@ -277,14 +327,6 @@ public class SemanticDao extends BaseDao {
 		param.put("layer", layer);
 		param.put("annotations", annotations);
 		return sqlSessionCommon.update(NS + "updateLayerByAnnotation", param);
-	}
-
-	public int updateLayerBySuperType(long revisionId, String layer, List<String> superTypes) {
-		Map<String, Object> param = new HashMap<String, Object>();
-		param.put("revisionId", revisionId);
-		param.put("layer", layer);
-		param.put("superTypes", superTypes);
-		return sqlSessionCommon.update(NS + "updateLayerBySuperType", param);
 	}
 
 	/**

@@ -1,19 +1,22 @@
 package net.dstone.knowledge.semantic;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.job.AnalysisJobContext;
+import net.dstone.knowledge.semantic.rule.RuleSet;
 
 /**
  * <pre>
  * 프레임워크 없이도 있는 진입점을 알아냅니다. 어떤 Java 프로그램에나 해당합니다.
  *
  *   public static void main(String[])            → MAIN 진입점
- *   Runnable / Thread / TimerTask 의 run()       → THREAD 진입점
- *   Callable 의 call()                           → THREAD 진입점
  *   주소로 바로 열 수 있는 JSP(WEB-INF 밖)       → JSP 진입점
+ *   규칙 파일의 상위 타입 진입점(endpoints.superTypes)
+ *     예: Runnable / Thread / TimerTask 의 run(), Callable 의 call() → THREAD 진입점(conf/rules/java.yml)
  *
  * 스레드 진입점은 "누가 직접 부르지 않는데도 실행되는 메소드"라서 알아 둘 필요가 있습니다.
  * 호출 그래프만 보면 run()을 부르는 곳이 없어 죽은 코드처럼 보이기 때문입니다.
@@ -44,9 +47,13 @@ public class PlainJavaPlugin implements SemanticPlugin {
 	public String run(AnalysisJobContext context) {
 		long revisionId = context.getRevisionId();
 		int mains = semanticDao.insertMainEndpoints(revisionId);
-		int threads = semanticDao.insertThreadEndpoints(revisionId);
 		int jsps = semanticDao.insertJspEndpoints(revisionId);
-		return "main " + mains + ", 스레드 " + threads + ", JSP " + jsps + ".";
+		int bySuperType = 0;
+		List<RuleSet.SuperTypeEndpointRule> rules = context.getSemanticRules().getSuperTypeEndpoints();
+		for (int i = 0; i < rules.size(); i++) {
+			bySuperType += semanticDao.insertSuperTypeEndpoints(revisionId, rules.get(i));
+		}
+		return "main " + mains + ", JSP " + jsps + ", 상위 타입 진입점(스레드 등) " + bySuperType + ".";
 	}
 
 }

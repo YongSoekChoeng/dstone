@@ -70,8 +70,9 @@ spring:
 dstone:
     knowledge:
         # 분석기 버전. 분석 결과(analysis_revision/analysis_job)와 RAG 메타데이터에 같이 남긴다.
-        # 분석 규칙이 바뀌어 예전 결과와 섞어 보면 안 될 때 올린다.
-        analyzer-version: "1.0"
+        # 분석 규칙이 바뀌어 예전 결과와 섞어 보면 안 될 때 올린다. 버전이 다른 리비전은 증분 분석의 기준으로 쓰지 않는다.
+        # 1.1: DECLARE 가 둘째 인자부터의 글자도 남긴다(analysis_reference.args_json, 규칙 파일의 argIndex).
+        analyzer-version: "1.1"
         # 분석 Job
         job:
             # 동시에 도는 분석 Job 수. 넘치면 대기열에서 기다린다.
@@ -95,43 +96,14 @@ dstone:
             commit-size: 200
         # SEMANTIC 단계 (프레임워크 규칙으로 의미 붙이기)
         semantic:
-            # 리치클라이언트 화면(WebSquare, Nexacro, X-Platform)
-            screen:
-                # 화면이 주소 대신 "거래 ID"로 서버를 부르는 프로젝트를 위한 규칙. "함수=메소드이름틀" 을 쉼표로 이어 쓴다.
-                # 예) doRequestAjax=perform{id}
-                #     화면의 HiJS.svr.doRequestAjax("JCST0200M01S", ...) 를 performJCST0200M01S 메소드와 잇는다.
-                #     gfnCallService=perform{id} 는 comLib.gfnCallService("JIAC0000M02I", ...) 를 performJIAC0000M02I 와 잇는다(HI-Japan 의 다른 공통 함수).
-                # 함수 이름은 마지막 마디만 적어도 된다(앞의 HiJS.svr. 은 없어도 맞는다). 첫 인자가 글자로 적힌 호출만 잇는다.
-                # 화면에 그 함수가 없으면 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
-                # 주소(/order/list.do)로 부르는 화면은 규칙 없이도 이어진다.
-                call-rules: "doRequestAjax=perform{id},gfnCallService=perform{id}"
-                # 화면이 폼을 만들어 거래 ID를 필드 값으로 담아 보내는 프로젝트를 위한 규칙. "필드 이름=메소드이름틀" 을 쉼표로 이어 쓴다.
-                # 예) tranId=perform{id}
-                #     화면의 <input type='hidden' name='tranId' value='JIMC1000M03S'/> 를 performJIMC1000M03S 메소드와 잇는다.
-                #     HI-Japan 의 출력 버튼이 이렇게 /reporting_ji.do 로 보내고, 서버(JZCI0102C)가 tranId 로 메소드를 고른다.
-                # value 가 글자로 적힌 필드만 잇는다. 화면에 그 필드가 없으면 아무 일도 하지 않는다.
-                field-rules: "tranId=perform{id}"
-                # 화면이 경로 대신 "화면 ID"로 다른 화면을 여는 프로젝트를 위한 규칙. "함수=화면 경로 틀" 을 쉼표로 이어 쓴다.
-                # 예) fnOpenPage={id}.xml
-                #     화면의 parent.scwin.fnOpenPage("JIMC1000G", ...) 를 JIMC1000G.xml 로 끝나는 화면과 잇는다(화면 → 화면, 노드 맵의 호출화면).
-                #     HI-Japan 의 fnOpenPage 는 메뉴 목록(ui/main.xml)의 PAGE_ID 로 화면을 찾는데, PAGE_ID 가 화면 파일 이름과 같다.
-                # 첫 인자가 글자로 적힌 호출만 보고, 그 경로로 끝나는 화면이 하나일 때만 잇는다.
-                # 화면에 그 함수가 없으면 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
-                open-rules: "fnOpenPage={id}.xml"
-                # 화면 파일에 <title> 도 titletext 도 없을 때, 소스에 적힌 메뉴 목록에서 화면명을 가져오는 규칙. "화면명 키=화면 경로 키" 를 쉼표로 이어 쓴다.
-                # 예) MENU_NM=SRC_PATH
-                #     {'MENU_NM':'履行期間管理', ... ,'SRC_PATH':'/ui/jc/JCIQ0700G.xml'} 처럼 한 메뉴 항목({ } 또는 XML 태그 하나) 안에 두 키가 함께 있으면
-                #     그 경로의 화면에 그 메뉴 이름을 화면명으로 붙인다(HI-Japan 은 ui/main.xml 에 이렇게 적혀 있다).
-                # JSP 와 XML 파일을 본다. 그 키가 없는 프로젝트에서는 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
-                menu-rules: "MENU_NM=SRC_PATH"
-            # 계층 분류
-            layer:
-                # 자체 프레임워크를 쓰는 프로젝트를 위한 규칙. "상위 타입의 전체 이름=계층" 을 쉼표로 이어 쓴다.
-                # 그 타입을 바로 상속(구현)한 클래스의 계층이 된다(신뢰도 MEDIUM). 애노테이션 등으로 이미 정해진 계층은 바꾸지 않는다.
-                # 계층: CONTROLLER, SERVICE, REPOSITORY, MODEL, VIEW, CONFIG, WEB_FILTER, UTIL, EXCEPTION, BATCH
-                # 아래는 JEF 계열 프레임워크의 규칙이다. AbstractMainService 는 화면의 요청을 처음 받는 클래스라 CONTROLLER 로 둔다.
-                # 그 타입을 쓰지 않는 프로젝트에서는 아무 일도 하지 않으므로, 여러 프로젝트의 규칙을 함께 적어 두어도 된다.
-                super-types: "jef.application.services.AbstractMainService=CONTROLLER, jef.application.services.AbstractSubService=SERVICE, jef.application.dao.jdbc.JdbcDAO=REPOSITORY, jef.application.dao.jdbc.helper.JdbcRowGetter=REPOSITORY, jef.application.entity.BusinessVO=MODEL"
+            # 프레임워크마다 다른 관례(어떤 애노테이션이 진입점인지, 어떤 메소드가 SQL 이름을 받는지, 어떤 상위 타입이면 서비스인지,
+            # 화면이 거래 ID 로 서버를 부르는 함수 ...)는 규칙 파일에 적는다. 파일 하나가 규칙 묶음 하나다.
+            # 적는 법은 그 폴더의 README.md. 서버가 뜰 때 모두 검사하고(틀리면 뜨지 않는다), 분석할 때마다 다시 읽는다.
+            # 규칙 파일을 고쳤으면 서버를 다시 띄우지 않고 rerunFrom=SEMANTIC 으로 다시 돌리면 된다.
+            # 비워 두면 설정 폴더(APP_CONF_DIR) 아래 rules 폴더를 쓴다.
+            # (예전의 screen.call-rules / field-rules / open-rules / menu-rules, layer.super-types 키는 conf/rules/hi-japan.yml, jef.yml 로 옮겼다.
+            #  이 키를 다시 적으면 읽기는 하지만 경고를 남긴다.)
+            rules-dir:
         # RESOLVE 단계 (호출이 누구를 가리키는지 풀기)
         resolve:
             # 메모리에 들고 있을 "파싱한 파일" 수. 호출을 풀 때 다른 타입의 선언이 필요하면 그 파일을 파싱해서 여기에 둔다.

@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS analysis_project (
 -- 테이블을 이미 만든 DB 에도 컬럼이 생기도록 ALTER 로 추가한다.
 ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS classpath TEXT;
 
+-- 이 프로젝트에 더 쓸 의미 분석 규칙 묶음(conf/rules/*.yml 의 이름, 쉼표로 이어 적는다).
+-- autoApply: true 인 묶음은 적지 않아도 모든 프로젝트에 쓰고, autoApply: false 인 묶음은 여기에 적었을 때만 쓴다. NULL 이면 autoApply 묶음만.
+ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS rule_sets TEXT;
+
 -- 리비전: 한 프로젝트의 어느 시점(커밋 등)
 CREATE TABLE IF NOT EXISTS analysis_revision (
     revision_id         BIGSERIAL     PRIMARY KEY,
@@ -269,6 +273,10 @@ CREATE TABLE IF NOT EXISTS analysis_reference (
 -- sqlSession.selectList("order.findAll", vo) 의 "order.findAll", new ModelAndView("order/list") 의 "order/list" 처럼
 -- 문자열로 다른 것을 가리키는 호출을 풀 때 쓴다. 테이블을 이미 만든 DB 에도 생기도록 ALTER 로 추가한다.
 ALTER TABLE analysis_reference ADD COLUMN IF NOT EXISTS arg_text VARCHAR(500);
+-- 둘째 인자부터 따옴표 글자가 든 인자를 적힌 그대로 담은 JSON 배열(자리를 맞추려고 첫 칸과 따옴표 없는 인자는 null).
+-- 예: dao.execute(param, "Order.list") → [null, "\"Order.list\""]
+-- 규칙 파일(conf/rules)의 호출 인자 규칙에서 argIndex 를 1 이상으로 적었을 때 읽는다. 둘째 인자부터 따옴표 글자가 없으면 NULL.
+ALTER TABLE analysis_reference ADD COLUMN IF NOT EXISTS args_json JSONB;
 
 -- 증분 분석: 이 파일의 분석 결과를 앞 리비전의 어느 파일에서 옮겨 왔는지(바뀌지 않은 파일). 새 파일이거나 바뀐 파일이면 NULL.
 -- 앞 리비전이 나중에 지워져도 옮겨 온 결과는 이 리비전의 것으로 온전히 남는다(이 값은 "어디서 왔는지" 의 기록일 뿐이다).

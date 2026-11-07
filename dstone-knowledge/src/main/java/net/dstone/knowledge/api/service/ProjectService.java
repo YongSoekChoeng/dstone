@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.semantic.rule.RuleException;
+import net.dstone.knowledge.semantic.rule.SemanticRuleRegistry;
 
 /**
  * <pre>
@@ -23,11 +25,15 @@ public class ProjectService extends BaseObject {
 	@Autowired
 	private ProjectDao projectDao;
 
+	@Autowired
+	private SemanticRuleRegistry ruleRegistry;
+
 	/**
 	 * <pre>
 	 * 프로젝트를 등록합니다. 같은 projectId가 이미 있으면 내용을 고칩니다.
 	 *
 	 * 소스는 이 서버가 직접 읽을 수 있는 로컬 폴더여야 합니다(localPath).
+	 * ruleSets 에는 이 프로젝트에 더 쓸 규칙 묶음(conf/rules 의 autoApply: false 인 것) 이름을 적습니다.
 	 * git 저장소에서 받아 오는 기능은 증분 분석(M7) 때 붙입니다.
 	 * </pre>
 	 */
@@ -57,6 +63,7 @@ public class ProjectService extends BaseObject {
 		project.put("javaVersion", text(request, "javaVersion"));
 		project.put("sourceEncoding", text(request, "sourceEncoding"));
 		project.put("classpath", text(request, "classpath"));
+		project.put("ruleSets", ruleSets(request == null ? null : request.get("ruleSets")));
 		project.put("description", text(request, "description"));
 		projectDao.upsertProject(project);
 		return projectDao.selectProject(projectId);
@@ -73,6 +80,34 @@ public class ProjectService extends BaseObject {
 			throw ApiException.notFound("등록되지 않은 프로젝트입니다: " + projectId);
 		}
 		return project;
+	}
+
+	/**
+	 * <pre>
+	 * 프로젝트에 더 쓸 규칙 묶음 이름을 확인하고 "a,b" 모양으로 돌려줍니다. 비었으면 null.
+	 * "a, b" 글자로 받아도, ["a", "b"] 목록으로 받아도 됩니다. conf/rules 에 없는 이름이면 400 입니다.
+	 * </pre>
+	 */
+	private String ruleSets(Object value) {
+		Object text = value instanceof List ? join((List<?>) value) : value;
+		List<String> names = SemanticRuleRegistry.ruleSetNames(text);
+		if (names.isEmpty()) {
+			return null;
+		}
+		try {
+			ruleRegistry.checkRuleSetNames(join(names));
+		} catch (RuleException e) {
+			throw ApiException.badRequest(e.getMessage());
+		}
+		return join(names);
+	}
+
+	private String join(List<?> values) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < values.size(); i++) {
+			sb.append(i == 0 ? "" : ",").append(String.valueOf(values.get(i)).trim());
+		}
+		return sb.toString();
 	}
 
 	/** 요청 값 하나를 문자열로 꺼냅니다. 없거나 비어 있으면 null */

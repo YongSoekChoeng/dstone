@@ -14,6 +14,73 @@
     </sql>
 
 
+    <!-- ================= 호출 인자 규칙 (callArguments) 이 함께 쓰는 조각 =================
+         analysis_reference 를 r, 그 호출이 들어 있는 메소드(analysis_method)를 caller 로 부르는 쿼리에서 쓴다.
+         파라미터: revisionId, methods[], constructors[], argIndex, receiverTypes[] -->
+
+    <!-- 규칙이 보는 인자의 글자. 첫 인자는 arg_text, 둘째 인자부터는 args_json 에 있다(따옴표 글자가 든 인자만 남아 있다) -->
+    <sql id="ruleArgText"><choose><when test="argIndex == 0">r.arg_text</when><otherwise>(r.args_json ->> #{argIndex}::int)</otherwise></choose></sql>
+
+    <!-- receiverTypes 에 적은 타입과, 프로젝트 안에서 그 타입을 상속(구현)한 타입들(여러 단계). WITH 바로 뒤에 붙여 쓴다.
+         receiverTypes 가 없으면 빈 목록이다. UNION 이 같은 행을 버리므로 상속이 돌고 돌아도 끝난다 -->
+    <sql id="receiverTypesCte">
+        RECURSIVE recv(symbol_id) AS (
+        <choose>
+            <when test="receiverTypes != null and receiverTypes.size() > 0">
+                SELECT s.symbol_id FROM analysis_symbol s
+                 WHERE s.revision_id = #{revisionId}
+                   AND s.fqn IN <foreach collection="receiverTypes" item="t" open="(" separator="," close=")">#{t}</foreach>
+                UNION
+                SELECT x.from_id FROM analysis_relation x
+                 WHERE x.revision_id = #{revisionId}
+                   AND x.relation_type IN ('EXTENDS', 'IMPLEMENTS')
+                   AND x.to_external IN <foreach collection="receiverTypes" item="t" open="(" separator="," close=")">#{t}</foreach>
+                UNION
+                SELECT x.from_id FROM analysis_relation x
+                  JOIN recv ON x.to_id = recv.symbol_id
+                 WHERE x.revision_id = #{revisionId}
+                   AND x.relation_type IN ('EXTENDS', 'IMPLEMENTS')
+            </when>
+            <otherwise>SELECT NULL::varchar WHERE FALSE</otherwise>
+        </choose>
+        )
+    </sql>
+
+    <!-- 규칙에 맞는 호출만 남긴다: 이름이 맞는 메소드 호출(methods)이나 생성자 호출(constructors).
+         receiverTypes 가 있으면 메소드 호출의 대상 타입도 본다. 아래 가운데 하나면 맞다.
+           1) RESOLVE 가 푼 같은 줄의 같은 이름 호출(CALLS)이 그 타입(또는 하위 타입)의 메소드를 가리킨다
+           2) 프로젝트 밖 메소드로 풀렸고 그 이름이 "타입.메소드" 로 시작한다
+           3) 대상 없이 부른 호출(this / super 포함)이고, 부르는 클래스가 그 타입이거나 그 하위 타입이다(상속받은 메소드를 부른 것) -->
+    <sql id="ruleReferenceFilter">
+        AND (
+        <trim prefixOverrides="OR">
+            <if test="methods != null and methods.size() > 0">
+                OR (r.ref_kind = 'CALL'
+                    AND r.name IN <foreach collection="methods" item="name" open="(" separator="," close=")">#{name}</foreach>
+                    <if test="receiverTypes != null and receiverTypes.size() > 0">
+                    AND (EXISTS (
+                            SELECT 1 FROM analysis_relation c
+                              LEFT JOIN analysis_method tm ON tm.revision_id = c.revision_id AND tm.method_id = c.to_id
+                             WHERE c.revision_id = r.revision_id AND c.from_id = r.from_id
+                               AND c.file_id = r.file_id AND c.line_start = r.line_start
+                               AND c.relation_type = 'CALLS'
+                               AND ((tm.name = r.name AND tm.owner_symbol_id IN (SELECT symbol_id FROM recv))
+                                <foreach collection="receiverTypes" item="t">
+                                    OR c.to_external = #{t} || '.' || r.name OR c.to_external LIKE #{t} || '.' || r.name || '(%'
+                                </foreach>))
+                         OR ((r.scope_text IS NULL OR r.scope_text IN ('this', 'super'))
+                             AND caller.owner_symbol_id IN (SELECT symbol_id FROM recv)))
+                    </if>)
+            </if>
+            <if test="constructors != null and constructors.size() > 0">
+                OR (r.ref_kind = 'CREATE'
+                    AND r.name IN <foreach collection="constructors" item="name" open="(" separator="," close=")">#{name}</foreach>)
+            </if>
+        </trim>
+        )
+    </sql>
+
+
     <!-- ================= 지우기 (SEMANTIC 단계는 매번 처음부터 다시 만든다) ================= -->
 
     <delete id="deleteEndpoints" parameterType="long">
@@ -24,7 +91,8 @@
         DELETE FROM analysis_resource
          WHERE revision_id = #{revisionId}
            AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME', 'SCREEN_NAME'
-                               , 'METHOD_TITLE', 'METHOD_TITLE_SKIP', 'DICT_SCREEN_NAME', 'DICT_TABLE_NAME', 'DICT_COLUMN_NAME', 'SEMANTIC_STATUS')
+                               , 'METHOD_TITLE', 'METHOD_TITLE_SKIP', 'DICT_SCREEN_NAME', 'DICT_TABLE_NAME', 'DICT_COLUMN_NAME', 'SEMANTIC_STATUS'
+                               , 'RULE_SET')
     </delete>
 
     <delete id="deleteInjects" parameterType="long">
@@ -42,19 +110,27 @@
     </update>
 
 
-    <!-- ================= Spring ================= -->
+    <!-- ================= 애노테이션 규칙 (Spring 등) ================= -->
 
-    <!-- HTTP 진입점: @RequestMapping / @GetMapping ... 이 붙은 메소드.
-         주소는 클래스에 붙은 @RequestMapping 의 주소와 메소드에 붙은 주소를 이어 붙인다.
-         주소나 HTTP 메소드를 여러 개 적었으면 조합마다 한 행씩 만든다. -->
-    <insert id="insertSpringHttpEndpoints" parameterType="long">
-        WITH mapping AS (
-            SELECT a.target_kind, a.target_id, a.annotation_name, a.file_id, a.line_start
-                 , COALESCE(a.attributes_json->'value', a.attributes_json->'path') AS paths
-                 , a.attributes_json->'method' AS methods
+    <!-- HTTP 진입점: 규칙 파일(endpoints.http)에 적은 애노테이션이 붙은 메소드. 예: @RequestMapping / @GetMapping ...
+         주소는 클래스에 붙은 애노테이션(classAnnotations)의 주소와 메소드에 붙은 주소를 이어 붙인다.
+         주소나 HTTP 메소드를 여러 개 적었으면 조합마다 한 행씩 만든다.
+         HTTP 메소드는 규칙에 정해져 있거나(httpMethod: GET) 애노테이션 속성에서 읽는다(methodAttribute: method, 비었으면 ALL).
+         파라미터: revisionId, classAnnotations[], pathAttributes[], methodAnnotations[{annotation, httpMethod, methodAttribute}] -->
+    <insert id="insertHttpEndpoints" parameterType="java.util.Map">
+        WITH rule(annotation_name, http_method, method_attribute) AS (
+            VALUES
+            <foreach collection="methodAnnotations" item="m" separator=",">(#{m.annotation, jdbcType=VARCHAR}::text, #{m.httpMethod, jdbcType=VARCHAR}::text, #{m.methodAttribute, jdbcType=VARCHAR}::text)</foreach>
+        ), mapping AS (
+            SELECT a.target_kind, a.target_id, a.annotation_name, a.file_id, a.line_start, a.attributes_json
+                 , COALESCE(<foreach collection="pathAttributes" item="key" separator=", ">a.attributes_json->#{key}::text</foreach>) AS paths
               FROM analysis_annotation a
              WHERE a.revision_id = #{revisionId}
-               AND a.annotation_name IN ('RequestMapping', 'GetMapping', 'PostMapping', 'PutMapping', 'DeleteMapping', 'PatchMapping')
+               AND (a.annotation_name IN (SELECT annotation_name FROM rule)
+                <if test="classAnnotations != null and classAnnotations.size() > 0">
+                    OR (a.target_kind = 'TYPE' AND a.annotation_name IN
+                    <foreach collection="classAnnotations" item="name" open="(" separator="," close=")">#{name}</foreach>)
+                </if>)
         )
         INSERT INTO analysis_endpoint
             (revision_id, endpoint_type, http_method, path, symbol_id, method_id, properties_json, file_id, line_start)
@@ -64,47 +140,43 @@
              , jsonb_build_object('annotation', mm.annotation_name)
              , mm.file_id, mm.line_start
           FROM mapping mm
+          JOIN rule rl ON rl.annotation_name = mm.annotation_name
           JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = mm.target_id
           LEFT JOIN mapping cm
-            ON cm.target_kind = 'TYPE' AND cm.target_id = m.owner_symbol_id AND cm.annotation_name = 'RequestMapping'
+            ON cm.target_kind = 'TYPE' AND cm.target_id = m.owner_symbol_id
+           AND cm.annotation_name IN
+            <choose>
+                <when test="classAnnotations != null and classAnnotations.size() > 0">
+                    <foreach collection="classAnnotations" item="name" open="(" separator="," close=")">#{name}</foreach>
+                </when>
+                <otherwise>(NULL)</otherwise>
+            </choose>
          CROSS JOIN LATERAL <include refid="jsonTexts"><property name="v" value="cm.paths"/></include> AS cp(path)
          CROSS JOIN LATERAL <include refid="jsonTexts"><property name="v" value="mm.paths"/></include> AS mp(path)
          CROSS JOIN LATERAL (
-                SELECT CASE mm.annotation_name
-                            WHEN 'GetMapping' THEN 'GET' WHEN 'PostMapping' THEN 'POST' WHEN 'PutMapping' THEN 'PUT'
-                            WHEN 'DeleteMapping' THEN 'DELETE' ELSE 'PATCH' END AS name
-                 WHERE mm.annotation_name &lt;&gt; 'RequestMapping'
+                SELECT rl.http_method AS name
+                 WHERE rl.http_method IS NOT NULL
                 UNION ALL
                 -- @RequestMapping(method = RequestMethod.GET) 의 GET. 적지 않았으면 모든 메소드를 받는다(ALL).
                 SELECT COALESCE(NULLIF(regexp_replace(e.text, '^.*\.', ''), ''), 'ALL')
-                  FROM <include refid="jsonTexts"><property name="v" value="mm.methods"/></include> AS e(text)
-                 WHERE mm.annotation_name = 'RequestMapping'
+                  FROM <include refid="jsonTexts"><property name="v" value="mm.attributes_json->rl.method_attribute"/></include> AS e(text)
+                 WHERE rl.http_method IS NULL
                ) hm
          CROSS JOIN LATERAL (SELECT regexp_replace('/' || cp.path || '/' || mp.path, '/+', '/', 'g') AS path) joined
          WHERE mm.target_kind = 'METHOD'
     </insert>
 
-    <!-- 정해진 시각에 도는 메소드: @Scheduled -->
-    <insert id="insertScheduledEndpoints" parameterType="long">
+    <!-- 애노테이션이 붙은 메소드를 진입점으로: 규칙 파일(endpoints.annotations). 예: @Scheduled → SCHEDULED, @KafkaListener → LISTENER
+         path 에는 규칙에 적은 속성(pathAttributes) 가운데 처음으로 값이 있는 것을 넣는다(예: cron, topics).
+         파라미터: revisionId, endpointType, annotations[], pathAttributes[] -->
+    <insert id="insertAnnotatedEndpoints" parameterType="java.util.Map">
         INSERT INTO analysis_endpoint
             (revision_id, endpoint_type, path, symbol_id, method_id, properties_json, file_id, line_start)
-        SELECT #{revisionId}, 'SCHEDULED'
-             , COALESCE(a.attributes_json->>'cron', a.attributes_json->>'fixedRate', a.attributes_json->>'fixedDelay'
-                      , a.attributes_json->>'fixedRateString', a.attributes_json->>'fixedDelayString')
-             , m.owner_symbol_id, m.method_id, a.attributes_json, a.file_id, a.line_start
-          FROM analysis_annotation a
-          JOIN analysis_method m ON m.revision_id = a.revision_id AND m.method_id = a.target_id
-         WHERE a.revision_id = #{revisionId}
-           AND a.target_kind = 'METHOD'
-           AND a.annotation_name = 'Scheduled'
-    </insert>
-
-    <!-- 메시지나 이벤트를 받는 메소드: @KafkaListener, @RabbitListener ... -->
-    <insert id="insertListenerEndpoints" parameterType="long">
-        INSERT INTO analysis_endpoint
-            (revision_id, endpoint_type, path, symbol_id, method_id, properties_json, file_id, line_start)
-        SELECT #{revisionId}, 'LISTENER'
-             , COALESCE(a.attributes_json->>'topics', a.attributes_json->>'queues', a.attributes_json->>'destination', a.attributes_json->>'value')
+        SELECT #{revisionId}, #{endpointType}
+             , <choose>
+                   <when test="pathAttributes != null and pathAttributes.size() > 0">COALESCE(<foreach collection="pathAttributes" item="key" separator=", ">a.attributes_json->>#{key}::text</foreach>)</when>
+                   <otherwise>NULL</otherwise>
+               </choose>
              , m.owner_symbol_id, m.method_id
              , jsonb_build_object('annotation', a.annotation_name) || a.attributes_json
              , a.file_id, a.line_start
@@ -112,13 +184,14 @@
           JOIN analysis_method m ON m.revision_id = a.revision_id AND m.method_id = a.target_id
          WHERE a.revision_id = #{revisionId}
            AND a.target_kind = 'METHOD'
-           AND a.annotation_name IN ('KafkaListener', 'RabbitListener', 'JmsListener', 'SqsListener', 'StreamListener', 'EventListener', 'TransactionalEventListener')
+           AND a.annotation_name IN
+            <foreach collection="annotations" item="name" open="(" separator="," close=")">#{name}</foreach>
     </insert>
 
-    <!-- 주입(INJECTS): @Autowired 등이 붙은 필드를 가진 타입 → 그 필드의 타입.
+    <!-- 주입(INJECTS): 규칙 파일(injects.annotations)의 애노테이션(@Autowired 등)이 붙은 필드를 가진 타입 → 그 필드의 타입.
          필드의 타입은 RESOLVE 가 만든 USES_TYPE 관계에서 가져온다.
          List<Foo> 처럼 타입이 여럿 걸린 필드는 맨 앞의 것(바깥 타입) 하나만 쓴다. -->
-    <insert id="insertInjects" parameterType="long">
+    <insert id="insertInjects" parameterType="java.util.Map">
         INSERT INTO analysis_relation
             (revision_id, from_kind, from_id, relation_type, to_kind, to_id, to_external
             , confidence, resolution_status, properties_json, file_id, line_start)
@@ -133,13 +206,14 @@
             ON r.revision_id = a.revision_id AND r.from_id = f.field_id AND r.relation_type = 'USES_TYPE'
          WHERE a.revision_id = #{revisionId}
            AND a.target_kind = 'FIELD'
-           AND a.annotation_name IN ('Autowired', 'Inject', 'Resource')
+           AND a.annotation_name IN
+            <foreach collection="annotations" item="name" open="(" separator="," close=")">#{name}</foreach>
          ORDER BY f.field_id, r.relation_id
     </insert>
 
-    <!-- Spring 이 프록시로 감싸는 메소드 표시: @Transactional 등이 메소드나 그 클래스에 붙은 경우.
+    <!-- 프록시로 감싸는 메소드 표시: 규칙 파일(proxies.annotations)의 애노테이션(@Transactional 등)이 메소드나 그 클래스에 붙은 경우.
          이런 메소드는 실제로 불릴 때 프록시가 끼어든다(같은 클래스 안에서 부르면 끼어들지 않는다) -->
-    <update id="markProxyRelated" parameterType="long">
+    <update id="markProxyRelated" parameterType="java.util.Map">
         UPDATE analysis_method m
            SET proxy_related = TRUE
          WHERE m.revision_id = #{revisionId}
@@ -147,7 +221,8 @@
            AND EXISTS (
                 SELECT 1 FROM analysis_annotation a
                  WHERE a.revision_id = m.revision_id
-                   AND a.annotation_name IN ('Transactional', 'Async', 'Cacheable', 'CacheEvict', 'CachePut', 'Retryable', 'PreAuthorize', 'Secured')
+                   AND a.annotation_name IN
+                <foreach collection="annotations" item="name" open="(" separator="," close=")">#{name}</foreach>
                    AND ((a.target_kind = 'METHOD' AND a.target_id = m.method_id)
                      OR (a.target_kind = 'TYPE' AND a.target_id = m.owner_symbol_id)))
     </update>
@@ -226,24 +301,40 @@
            AND m.signature IN ('main(String[])', 'main(String...)', 'main(java.lang.String[])', 'main(java.lang.String...)')
     </insert>
 
-    <!-- 다른 스레드에서 도는 메소드: Runnable / Thread / TimerTask 의 run(), Callable 의 call().
-         new Thread(new Runnable() { ... }) 처럼 익명 클래스로 적은 것도 잡힌다. 람다로 적은 것은 잡히지 않는다 -->
-    <insert id="insertThreadEndpoints" parameterType="long">
+    <!-- 상위 타입으로 정해지는 진입점: 규칙 파일(endpoints.superTypes). 예: Runnable / Thread / TimerTask 의 run(), Callable 의 call() → THREAD
+         바로 위의 상위 타입(extends / implements 에 적힌 것)만 본다. 상위 타입은 프로젝트 밖(to_external)이어도, 안(전체 이름)이어도 된다.
+         new Thread(new Runnable() { ... }) 처럼 익명 클래스로 적은 것도 잡힌다. 람다로 적은 것은 잡히지 않는다.
+         같은 종류의 진입점이 이미 있는 메소드는 다시 넣지 않는다.
+         파라미터: revisionId, endpointType, superTypes[], methods[] 또는 methodPattern, paramCount(없으면 보지 않음) -->
+    <insert id="insertSuperTypeEndpoints" parameterType="java.util.Map">
         INSERT INTO analysis_endpoint
             (revision_id, endpoint_type, symbol_id, method_id, properties_json, file_id, line_start)
         SELECT DISTINCT ON (m.method_id)
-               #{revisionId}, 'THREAD', m.owner_symbol_id, m.method_id
-             , jsonb_build_object('super', r.to_external)
+               #{revisionId}, #{endpointType}, m.owner_symbol_id, m.method_id
+             , jsonb_build_object('super', COALESCE(r.to_external, t.fqn))
              , m.file_id, m.line_start
           FROM analysis_relation r
+          LEFT JOIN analysis_symbol t ON t.revision_id = r.revision_id AND t.symbol_id = r.to_id
           JOIN analysis_method m
             ON m.revision_id = r.revision_id AND m.owner_symbol_id = r.from_id
-           AND m.param_count = 0 AND NOT m.is_synthetic
-           AND ((m.name = 'run' AND r.to_external IN ('java.lang.Runnable', 'java.lang.Thread', 'java.util.TimerTask'))
-             OR (m.name = 'call' AND r.to_external = 'java.util.concurrent.Callable'))
+           AND NOT m.is_synthetic AND NOT m.is_constructor
          WHERE r.revision_id = #{revisionId}
            AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
-         ORDER BY m.method_id
+           AND COALESCE(r.to_external, t.fqn) IN
+            <foreach collection="superTypes" item="name" open="(" separator="," close=")">#{name}</foreach>
+           <choose>
+               <when test="methods != null and methods.size() > 0">
+                   AND m.name IN <foreach collection="methods" item="name" open="(" separator="," close=")">#{name}</foreach>
+               </when>
+               <otherwise>AND m.name ~ #{methodPattern}</otherwise>
+           </choose>
+           <if test="paramCount != null">AND m.param_count = #{paramCount}</if>
+           AND NOT EXISTS (
+                SELECT 1 FROM analysis_endpoint e
+                 WHERE e.revision_id = m.revision_id
+                   AND e.endpoint_type = #{endpointType}
+                   AND e.method_id = m.method_id)
+         ORDER BY m.method_id, r.relation_id
     </insert>
 
     <!-- 주소로 바로 열 수 있는 JSP. WEB-INF 아래의 JSP 는 밖에서 바로 열 수 없으므로 뺀다.
@@ -325,24 +416,36 @@
            AND m.name = '_jspService'
     </update>
 
-    <!-- RENDERS: 메소드가 여는 화면. new ModelAndView("order/list") 나 setViewName("order/list") 의 이름으로 JSP 파일을 찾는다.
-         뷰 이름 뒤에 .jsp 를 붙인 경로로 끝나는 JSP 가 정확히 하나일 때만 잇는다(뷰 리졸버의 prefix 가 무엇이든 맞도록 "끝이 같은지" 로 본다).
-         redirect: / forward: 로 시작하는 것은 화면이 아니라 다른 주소로 보내는 것이라 뺀다 -->
-    <insert id="insertRenders" parameterType="long">
+    <!-- RENDERS: 메소드가 여는 화면. 규칙 파일의 호출 인자 규칙(callArguments, target: VIEW)에 맞는 호출의 글자로 JSP 파일을 찾는다.
+         예: new ModelAndView("order/list") 나 setViewName("order/list") → 틀 {value}.jsp 를 채운 order/list.jsp
+         틀을 채운 경로로 끝나는 JSP 가 정확히 하나일 때만 잇는다(뷰 리졸버의 prefix 가 무엇이든 맞도록 "끝이 같은지" 로 본다).
+         인자는 따옴표 글자 하나여야 한다(상수나 + 는 보지 않는다). 앞의 / 는 뗀다. exclude 에 맞는 값(redirect: 등)은 버린다.
+         파라미터: revisionId, methods[], constructors[], argIndex, receiverTypes[], prefix, suffix, exclude -->
+    <insert id="insertViewArgumentRelations" parameterType="java.util.Map">
+        WITH <include refid="receiverTypesCte"/>
         INSERT INTO analysis_relation
             (revision_id, from_kind, from_id, relation_type, to_kind, to_id, confidence, resolution_status, properties_json, file_id, line_start)
         SELECT r.revision_id, 'METHOD', r.from_id, 'RENDERS', 'FILE', 'F' || MIN(f.file_id), 'HIGH', 'RESOLVED'
              , jsonb_build_object('view', v.name), r.file_id, r.line_start
           FROM analysis_reference r
-         CROSS JOIN LATERAL (SELECT regexp_replace(trim(both '"' from r.arg_text), '^/+', '') AS name) v
+          JOIN analysis_method caller ON caller.revision_id = r.revision_id AND caller.method_id = r.from_id
+         CROSS JOIN LATERAL (SELECT <include refid="ruleArgText"/> AS text) arg
+         CROSS JOIN LATERAL (SELECT regexp_replace(trim(both '"' from arg.text), '^/+', '') AS name) v
           JOIN analysis_file f
             ON f.revision_id = r.revision_id AND f.language = 'JSP'
-           AND (f.path = v.name || '.jsp' OR right(f.path, length(v.name) + 5) = '/' || v.name || '.jsp')
+           AND (f.path = #{prefix} || v.name || #{suffix} OR right(f.path, length(#{prefix} || v.name || #{suffix}) + 1) = '/' || #{prefix} || v.name || #{suffix})
          WHERE r.revision_id = #{revisionId}
            AND r.from_kind = 'METHOD'
-           AND ((r.ref_kind = 'CREATE' AND r.name = 'ModelAndView') OR (r.ref_kind = 'CALL' AND r.name = 'setViewName'))
-           AND r.arg_text ~ '^"[^"]+"$'
-           AND r.arg_text !~ '^"(redirect|forward):'
+           <include refid="ruleReferenceFilter"/>
+           AND arg.text IS NOT NULL
+           AND arg.text ~ '^"[^"]+"$'
+           <if test="exclude != null">AND trim(both '"' from arg.text) !~ #{exclude}</if>
+           -- 규칙 여럿이 같은 호출에 맞으면 한 번만 잇는다.
+           AND NOT EXISTS (
+                SELECT 1 FROM analysis_relation x
+                 WHERE x.revision_id = r.revision_id AND x.relation_type = 'RENDERS'
+                   AND x.from_id = r.from_id AND x.file_id = r.file_id AND x.line_start = r.line_start
+                   AND x.properties_json->>'view' = v.name)
          GROUP BY r.revision_id, r.reference_id, r.from_id, v.name, r.file_id, r.line_start
         HAVING COUNT(*) = 1
     </insert>
@@ -491,21 +594,6 @@
                    AND a.target_id = s.symbol_id
                    AND a.annotation_name IN
                 <foreach collection="annotations" item="name" open="(" separator="," close=")">#{name}</foreach>)
-    </update>
-
-    <!-- 무엇을 상속/구현하는지로: HttpServlet 을 상속하면 요청을 받는 클래스다 -->
-    <update id="updateLayerBySuperType" parameterType="java.util.Map">
-        UPDATE analysis_symbol s
-           SET layer = #{layer}, layer_confidence = 'MEDIUM'
-         WHERE s.revision_id = #{revisionId}
-           AND s.layer IS NULL
-           AND EXISTS (
-                SELECT 1 FROM analysis_relation r
-                 WHERE r.revision_id = s.revision_id
-                   AND r.from_id = s.symbol_id
-                   AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
-                   AND r.to_external IN
-                <foreach collection="superTypes" item="name" open="(" separator="," close=")">#{name}</foreach>)
     </update>
 
     <!-- 설정에 적은 상위 타입으로: 프로젝트가 쓰는 프레임워크의 약속이다(…을 상속하면 서비스).

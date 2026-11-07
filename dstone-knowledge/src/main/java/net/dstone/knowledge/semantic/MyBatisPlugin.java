@@ -3,11 +3,13 @@ package net.dstone.knowledge.semantic;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -18,6 +20,7 @@ import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.job.AnalysisJobContext;
 import net.dstone.knowledge.resource.MapperXmlReader;
 import net.dstone.knowledge.scanner.EncodingDetector;
+import net.dstone.knowledge.semantic.rule.RuleSet;
 import net.dstone.knowledge.symbol.BoundedCache;
 
 /**
@@ -33,26 +36,18 @@ import net.dstone.knowledge.symbol.BoundedCache;
  * 메소드와 SQL을 잇는 방법은 두 가지입니다.
  *   1) 인터페이스 방식: 매퍼의 namespace가 인터페이스의 전체 이름이고 statement id가 메소드 이름이다. 이름이 같으면 짝이다.
  *   2) 문자열 방식: sqlSession.selectList("네임스페이스.id", ...) 처럼 이름을 문자열로 넘긴다.
+ *      어떤 메소드(생성자)의 몇 번째 인자가 SQL 이름인지는 규칙 파일의 callArguments(target: SQL)에 있다.
+ *      기본은 MyBatis 의 SqlSession, iBATIS 의 SqlMapClient(conf/rules/mybatis.yml)이고, 자체 프레임워크는 규칙을 더한다.
+ *      예: JEF 계열의 new QueryProperty("파일이름.id") → executeVOQuery(qp, ...) (conf/rules/jef.yml)
  *      문자열이 상수와 메소드를 거쳐 조립되는 경우가 많아서, 상수를 따라가 계산한다(ConstantEvaluator).
+ *      규칙의 template 이 있으면 계산한 값에 앞뒤 글자를 붙인다(예: "Order.{value}").
  *      계산한 이름의 statement가 없으면 "못 찾음"으로 남긴다(지우지 않는다).
- *      이름을 메소드에 바로 넘기지 않고 객체에 담는 방식도 여기에 든다: new QueryProperty("파일이름.id") (JEF 계열의 쿼리 XML).
  *
  * 테이블은 statement의 SQL에서 뽑습니다(SqlTableExtractor). include로 가져오는 조각은 여기서 채워 넣습니다.
  * </pre>
  */
 @Component
 public class MyBatisPlugin implements SemanticPlugin {
-
-	/** SQL의 이름을 첫 인자로 받는 메소드들(MyBatis의 SqlSession, iBATIS의 SqlMapClient) */
-	private static final List<String> MAPPER_CALLS = Arrays.asList(
-			"selectList", "selectOne", "selectMap", "selectCursor", "select", "insert", "update", "delete"
-			, "queryForList", "queryForObject", "queryForMap", "queryForPaginatedList", "queryWithRowHandler");
-
-	/**
-	 * SQL의 이름을 생성자의 첫 인자로 받는 클래스들. 이름을 메소드에 바로 넘기지 않고 객체에 담아 넘기는 프레임워크가 있다.
-	 * 예: JEF 계열의 new QueryProperty("OrderD.selectOrderList") → executeVOQuery(qp, ...)
-	 */
-	private static final List<String> NAME_HOLDERS = Arrays.asList("QueryProperty");
 
 	private static final int PAGE_SIZE = 500;
 
@@ -151,21 +146,39 @@ public class MyBatisPlugin implements SemanticPlugin {
 		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
 		ConstantEvaluator evaluator = new ConstantEvaluator(revisionId, root, resourceDao, symbolDao, encodingDetector);
 
-		int linked = 0, missing = 0, unknown = 0;
+		int[] counts = new int[3];
+		// 규칙 여럿이 같은 호출에 맞아도 한 번만 잇는다.
+		Set<Long> done = new HashSet<Long>();
+		List<RuleSet.CallArgumentRule> rules = context.getSemanticRules().getSqlArguments();
+		for (int r = 0; r < rules.size(); r++) {
+			linkCalls(context, index, evaluator, rules.get(r), done, counts);
+		}
+		return counts;
+	}
+
+	/** 규칙 하나에 맞는 호출을 잇습니다. counts 는 [이은 수, 이름은 알았지만 statement를 못 찾은 수, 이름을 계산하지 못한 수] */
+	private void linkCalls(AnalysisJobContext context, Index index, ConstantEvaluator evaluator, RuleSet.CallArgumentRule rule
+			, Set<Long> done, int[] counts) throws Exception {
+		long revisionId = context.getRevisionId();
+		Pattern exclude = rule.exclude == null ? null : Pattern.compile(rule.exclude);
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
-			List<Map<String, Object>> page = resourceDao.selectMapperCallPage(revisionId, MAPPER_CALLS, NAME_HOLDERS, afterId, PAGE_SIZE);
+			List<Map<String, Object>> page = resourceDao.selectMapperCallPage(revisionId, rule, afterId, PAGE_SIZE);
 			if (page.isEmpty()) {
 				break;
 			}
 			for (int i = 0; i < page.size(); i++) {
 				Map<String, Object> call = page.get(i);
 				afterId = ((Number) call.get("referenceId")).longValue();
-				String name = evaluator.evaluate((String) call.get("argText"), (String) call.get("ownerSymbolId"));
-				if (name == null || !looksLikeStatementName(name)) {
+				if (!done.add(Long.valueOf(afterId))) {
+					continue;
+				}
+				String value = evaluator.evaluate((String) call.get("argText"), (String) call.get("ownerSymbolId"));
+				String name = value == null ? null : rule.prefix + value + rule.suffix;
+				if (name == null || !looksLikeStatementName(name) || (exclude != null && exclude.matcher(value).find())) {
 					// 상수를 끝까지 따라가지 못했거나, 이름이 같을 뿐 SQL 호출이 아니다(list.insert(...), map.update(...) 등).
-					unknown++;
+					counts[2]++;
 					continue;
 				}
 				String statement = statementOf(name, (String) call.get("sourceRoot"), index);
@@ -180,18 +193,17 @@ public class MyBatisPlugin implements SemanticPlugin {
 				if (statement != null) {
 					resourceDao.insertRelation(relation(revisionId, "METHOD", (String) call.get("fromId"), "EXECUTES_SQL", "SQL", statement, null
 							, "HIGH", "RESOLVED", properties, call.get("fileId"), call.get("lineStart")));
-					linked++;
+					counts[0]++;
 				} else if (name.indexOf('.') > 0) {
 					// 이름은 SQL의 이름처럼 생겼는데 그런 statement가 없다. 매퍼 파일이 분석 대상에 없거나 이름이 틀렸다. 사실 그대로 남긴다.
 					resourceDao.insertRelation(relation(revisionId, "METHOD", (String) call.get("fromId"), "EXECUTES_SQL", "SQL", null, name
 							, "UNRESOLVED", "UNRESOLVED", properties, call.get("fileId"), call.get("lineStart")));
-					missing++;
+					counts[1]++;
 				} else {
-					unknown++;
+					counts[2]++;
 				}
 			}
 		}
-		return new int[] { linked, missing, unknown };
 	}
 
 	/**

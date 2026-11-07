@@ -20,6 +20,7 @@ import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.job.AnalysisJobContext;
 import net.dstone.knowledge.scanner.EncodingDetector;
+import net.dstone.knowledge.semantic.rule.RuleSet;
 
 /**
  * <pre>
@@ -27,6 +28,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *
  * 만드는 관계:
  *   메소드 ─RENDERS→ JSP    컨트롤러의 메소드가 이 화면을 연다 (new ModelAndView("order/list"), setViewName(...))
+ *                           어떤 호출의 몇 번째 인자가 화면 이름인지는 규칙 파일의 callArguments(target: VIEW)에 있다(conf/rules/spring.yml)
  *   JSP ─REQUESTS→ 메소드   이 화면이 이 메소드의 주소를 요청한다 (form action, AJAX url, 링크)
  *   JSP ─INCLUDES→ JSP      이 화면이 다른 JSP를 끼워 넣는다 (jsp:include, include 지시자)
  * 이것이 있어야 "이 화면에서 저장을 누르면 어디로 가나", "이 메소드는 어느 화면에서 불리나"를 따라갈 수 있습니다.
@@ -84,7 +86,11 @@ public class JspPlugin implements SemanticPlugin {
 
 		int layered = semanticDao.updateJspLayer(revisionId);
 		semanticDao.updateJspEndpointMethods(revisionId);
-		int renders = semanticDao.insertRenders(revisionId);
+		int renders = 0;
+		List<RuleSet.CallArgumentRule> viewRules = context.getSemanticRules().getViewArguments();
+		for (int i = 0; i < viewRules.size(); i++) {
+			renders += semanticDao.insertViewArgumentRelations(revisionId, viewRules.get(i));
+		}
 
 		// 주소 → 그 주소를 처리하는 메소드들. 진입점 수만큼만 메모리에 올라간다.
 		Map<String, List<String>> handlers = new HashMap<String, List<String>>();

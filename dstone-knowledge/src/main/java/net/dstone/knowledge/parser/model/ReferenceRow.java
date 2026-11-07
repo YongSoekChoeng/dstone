@@ -30,6 +30,9 @@ public class ReferenceRow {
 	/** 첫 인자를 소스에 적힌 그대로. 문자열이 들어 있을 때만 담는다. 예: getOrderMapper() + "findAll" */
 	private String argText;
 
+	/** 둘째 인자부터, 따옴표가 든 것만 적힌 그대로 담은 JSON 배열. 자리를 맞추려고 첫 칸과 따옴표 없는 인자는 null. 담을 것이 없으면 null */
+	private String argsJson;
+
 	private Integer lineStart;
 
 	private Integer columnStart;
@@ -120,6 +123,14 @@ public class ReferenceRow {
 
 	public void setArgText(String argText) {
 		this.argText = argText;
+	}
+
+	public String getArgsJson() {
+		return argsJson;
+	}
+
+	public void setArgsJson(String argsJson) {
+		this.argsJson = argsJson;
 	}
 
 }

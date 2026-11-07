@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 의미 분석 규칙(conf/rules) 화면용: 리비전에 쓴 규칙 묶음, 규칙 시험 적용(전후 비교), 규칙 후보 찾기 -->
+<mapper namespace="net.dstone.knowledge.api.dao.RuleDao">
+
+    <!-- 리비전을 분석할 때 쓴 규칙 묶음(SemanticPass 가 남긴 RULE_SET 행). 적용 순서대로 -->
+    <select id="selectAppliedRuleSets" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT name AS "name", location AS "source", value AS "hash", properties_json::text AS "propertiesJson"
+          FROM analysis_resource
+         WHERE revision_id = #{revisionId}
+           AND resource_type = 'RULE_SET'
+         ORDER BY resource_id
+    </select>
+
+
+    <!-- ================= 규칙 시험 적용: SEMANTIC 이 만드는 것을 한 줄씩 "사실" 로 편다 =================
+         kind     ENDPOINT / LAYER / RELATION / PROXY
+         category 진입점 종류, 계층, 관계 종류(신뢰도) 처럼 묶어 셀 단위
+         key      같은 사실인지 견주는 값(행 ID 는 매번 바뀌므로 쓰지 않는다)
+         label    사람이 읽는 설명 -->
+    <sql id="semanticFacts">
+        SELECT 'ENDPOINT'::text AS kind, e.endpoint_type::text AS category
+             , concat_ws('|', e.endpoint_type, e.http_method, e.path, e.method_id, e.symbol_id, e.file_id) AS key
+             , concat_ws(' ', e.endpoint_type, e.http_method, e.path, '→', COALESCE(ms.fqn || '#' || m.signature, s.fqn, f.path)) AS label
+          FROM analysis_endpoint e
+          LEFT JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+          LEFT JOIN analysis_symbol ms ON ms.revision_id = m.revision_id AND ms.symbol_id = m.owner_symbol_id
+          LEFT JOIN analysis_symbol s ON s.revision_id = e.revision_id AND s.symbol_id = e.symbol_id
+          LEFT JOIN analysis_file f ON f.file_id = e.file_id
+         WHERE e.revision_id = #{revisionId}
+        UNION ALL
+        SELECT 'LAYER', s.layer || '(' || s.layer_confidence || ')'
+             , concat_ws('|', s.symbol_id, s.layer, s.layer_confidence)
+             , s.fqn || ' = ' || s.layer || '(' || s.layer_confidence || ')'
+          FROM analysis_symbol s
+         WHERE s.revision_id = #{revisionId}
+           AND s.layer IS NOT NULL
+        UNION ALL
+        SELECT 'PROXY', 'PROXY_RELATED', m.method_id, ms.fqn || '#' || m.signature
+          FROM analysis_method m
+          JOIN analysis_symbol ms ON ms.revision_id = m.revision_id AND ms.symbol_id = m.owner_symbol_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.proxy_related
+        UNION ALL
+        SELECT 'RELATION', r.relation_type || '(' || r.confidence || ')'
+             , concat_ws('|', r.from_id, r.relation_type, r.to_id, r.to_external, r.confidence, r.file_id, r.line_start)
+             , COALESCE(fm.label, r.from_id) || ' ─' || r.relation_type || '→ ' || COALESCE(tm.label, r.to_external, r.to_id)
+          FROM analysis_relation r
+          LEFT JOIN LATERAL (<include refid="nodeLabel"><property name="k" value="r.from_kind"/><property name="i" value="r.from_id"/></include>) fm ON TRUE
+          LEFT JOIN LATERAL (<include refid="nodeLabel"><property name="k" value="r.to_kind"/><property name="i" value="r.to_id"/></include>) tm ON TRUE
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type IN ('INJECTS', 'RENDERS', 'REQUESTS', 'INCLUDES', 'EXECUTES_SQL', 'READS_TABLE', 'WRITES_TABLE')
+    </sql>
+
+    <!-- 관계 한쪽 끝의 이름: 메소드는 타입#시그니처, 타입은 전체 이름, 파일은 경로, SQL 은 네임스페이스.id -->
+    <sql id="nodeLabel">
+        SELECT CASE ${k}
+                    WHEN 'METHOD' THEN (SELECT s.fqn || '#' || m.signature FROM analysis_method m
+                                          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+                                         WHERE m.revision_id = #{revisionId} AND m.method_id = ${i})
+                    WHEN 'TYPE' THEN (SELECT s.fqn FROM analysis_symbol s WHERE s.revision_id = #{revisionId} AND s.symbol_id = ${i})
+                    WHEN 'FILE' THEN (SELECT f.path FROM analysis_file f WHERE f.file_id = substr(${i}, 2)::bigint)
+                    WHEN 'SQL' THEN (SELECT COALESCE(mp.namespace || '.', '') || mp.statement_id FROM analysis_mapper mp WHERE mp.mapper_id = substr(${i}, 2)::bigint)
+               END AS label
+         WHERE ${i} IS NOT NULL
+    </sql>
+
+    <!-- 지금의 결과를 임시 테이블에 담아 둔다. 트랜잭션이 끝나면(되돌리면) 사라진다 -->
+    <update id="createBeforeFacts" parameterType="long">
+        CREATE TEMP TABLE trial_before ON COMMIT DROP AS
+        <include refid="semanticFacts"/>
+    </update>
+
+    <update id="createAfterFacts" parameterType="long">
+        CREATE TEMP TABLE trial_after ON COMMIT DROP AS
+        <include refid="semanticFacts"/>
+    </update>
+
+    <!-- 묶음(kind, category)마다 전, 후, 새로 생긴 수, 없어진 수 -->
+    <select id="selectTrialSummary" resultType="java.util.LinkedHashMap">
+        WITH added AS (SELECT kind, category, key FROM trial_after EXCEPT ALL SELECT kind, category, key FROM trial_before)
+           , removed AS (SELECT kind, category, key FROM trial_before EXCEPT ALL SELECT kind, category, key FROM trial_after)
+           , cats AS (SELECT kind, category FROM trial_before UNION SELECT kind, category FROM trial_after)
+        SELECT c.kind AS "kind", c.category AS "category"
+             , (SELECT COUNT(*) FROM trial_before b WHERE b.kind = c.kind AND b.category = c.category) AS "before"
+             , (SELECT COUNT(*) FROM trial_after a WHERE a.kind = c.kind AND a.category = c.category) AS "after"
+             , (SELECT COUNT(*) FROM added a WHERE a.kind = c.kind AND a.category = c.category) AS "added"
+             , (SELECT COUNT(*) FROM removed r WHERE r.kind = c.kind AND r.category = c.category) AS "removed"
+          FROM cats c
+         ORDER BY c.kind, c.category
+    </select>
+
+    <!-- 새로 생긴 것 / 없어진 것의 보기. side: ADDED | REMOVED -->
+    <select id="selectTrialSamples" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT x.kind AS "kind", x.category AS "category", x.label AS "label"
+          FROM (
+            <choose>
+                <when test="side == 'ADDED'">
+                    SELECT a.kind, a.category, a.key, a.label FROM trial_after a
+                     WHERE NOT EXISTS (SELECT 1 FROM trial_before b WHERE b.kind = a.kind AND b.key = a.key)
+                </when>
+                <otherwise>
+                    SELECT b.kind, b.category, b.key, b.label FROM trial_before b
+                     WHERE NOT EXISTS (SELECT 1 FROM trial_after a WHERE a.kind = b.kind AND a.key = b.key)
+                </otherwise>
+            </choose>
+               ) x
+         ORDER BY x.kind, x.category, x.label
+         LIMIT #{limit}
+    </select>
+
+
+    <!-- ================= 규칙 후보 찾기 ================= -->
+
+    <!-- 호출 인자 후보: 따옴표 글자 하나를 인자로 받는 호출 가운데, 그 글자가 이 프로젝트의 SQL 이름이나 JSP 화면 이름과 같은 것.
+         "이 메소드의 n번째 인자는 SQL 이름이다" 라는 관례가 숨어 있다는 신호다. 규칙이 이미 보는 (종류, 이름, 자리)는 뺀다.
+         파라미터: revisionId, covered[{kind, name, argIndex}], limit -->
+    <select id="selectCallArgumentCandidates" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH covered(ref_kind, name, arg_index) AS (
+            <choose>
+                <when test="covered != null and covered.size() > 0">
+                    VALUES <foreach collection="covered" item="c" separator=",">(#{c.kind}::text, #{c.name}::text, #{c.argIndex}::int)</foreach>
+                </when>
+                <otherwise>SELECT NULL::text, NULL::text, NULL::int WHERE FALSE</otherwise>
+            </choose>
+        ), arg AS (
+            SELECT r.ref_kind, r.name, 0 AS arg_index, r.arg_text AS text, r.from_id, r.file_id, r.line_start
+              FROM analysis_reference r
+             WHERE r.revision_id = #{revisionId} AND r.from_kind = 'METHOD' AND r.ref_kind IN ('CALL', 'CREATE')
+               AND r.arg_text IS NOT NULL
+            UNION ALL
+            SELECT r.ref_kind, r.name, (e.ord - 1)::int, e.text, r.from_id, r.file_id, r.line_start
+              FROM analysis_reference r
+             CROSS JOIN LATERAL jsonb_array_elements_text(r.args_json) WITH ORDINALITY AS e(text, ord)
+             WHERE r.revision_id = #{revisionId} AND r.from_kind = 'METHOD' AND r.ref_kind IN ('CALL', 'CREATE')
+               AND r.args_json IS NOT NULL
+               AND e.text IS NOT NULL
+        ), lit AS MATERIALIZED (
+            SELECT a.ref_kind, a.name, a.arg_index, a.from_id, a.file_id, a.line_start
+                 , regexp_replace(trim(both '"' from a.text), '^/+', '') AS value
+              FROM arg a
+             WHERE a.text ~ '^"[A-Za-z0-9_./-]{1,200}"$'
+               AND NOT EXISTS (SELECT 1 FROM covered c WHERE c.ref_kind = a.ref_kind AND c.name = a.name AND c.arg_index = a.arg_index)
+        ), stmt AS MATERIALIZED (
+            -- "네임스페이스.id" 와, 프로젝트에 하나뿐인 id(iBATIS 처럼 id 만 넘기는 방식. MyBatisPlugin 도 이때만 잇는다)
+            SELECT COALESCE(namespace || '.', '') || statement_id AS name
+              FROM analysis_mapper WHERE revision_id = #{revisionId} AND statement_type &lt;&gt; 'SQL_FRAGMENT'
+            UNION
+            SELECT statement_id
+              FROM analysis_mapper WHERE revision_id = #{revisionId} AND statement_type &lt;&gt; 'SQL_FRAGMENT'
+             GROUP BY statement_id
+            HAVING COUNT(*) = 1
+        ), view_hit AS MATERIALIZED (
+            -- 글자에 .jsp 를 붙인 경로로 끝나는 JSP 가 있는 값. 파일 이름으로 먼저 맞춘 뒤(해시 조인) 경로 끝을 본다
+            SELECT DISTINCT v.value
+              FROM (SELECT DISTINCT value FROM lit) v
+              JOIN analysis_file f
+                ON f.revision_id = #{revisionId} AND f.language = 'JSP'
+               AND regexp_replace(f.path, '^.*/', '') = regexp_replace(v.value, '^.*/', '') || '.jsp'
+             WHERE f.path = v.value || '.jsp' OR right(f.path, length(v.value) + 5) = '/' || v.value || '.jsp'
+        ), scored AS (
+            SELECT l.*, (s.name IS NOT NULL) AS is_sql, (vh.value IS NOT NULL) AS is_view
+              FROM lit l
+              LEFT JOIN stmt s ON s.name = l.value
+              LEFT JOIN view_hit vh ON vh.value = l.value
+        ), grouped AS (
+            -- 맞는 것이 2건 이상이고, 글자로 넘긴 호출의 30% 이상이 맞아야 후보로 본다.
+            -- equals("orderList") 처럼 우연히 이름이 같은 글자를 쓰는 호출을 거르려는 것이다.
+            SELECT ref_kind, name, arg_index
+                 , COUNT(*) AS calls
+                 , COUNT(*) FILTER (WHERE is_sql) AS sql_matches
+                 , COUNT(*) FILTER (WHERE is_view) AS view_matches
+                 , (array_agg(DISTINCT value) FILTER (WHERE is_sql OR is_view))[1:3] AS samples
+              FROM scored
+             GROUP BY ref_kind, name, arg_index
+            HAVING GREATEST(COUNT(*) FILTER (WHERE is_sql), COUNT(*) FILTER (WHERE is_view)) &gt;= 2
+               AND GREATEST(COUNT(*) FILTER (WHERE is_sql), COUNT(*) FILTER (WHERE is_view)) * 10 &gt;= COUNT(*) * 3
+        )
+        SELECT g.ref_kind AS "kind", g.name AS "name", g.arg_index AS "argIndex", g.calls AS "calls"
+             , g.sql_matches AS "sqlMatches", g.view_matches AS "viewMatches", array_to_string(g.samples, ', ') AS "samples"
+             , rt.type AS "receiverType", rt.n AS "receiverTypeCalls"
+          FROM grouped g
+          LEFT JOIN LATERAL (
+                -- 그 호출이 RESOLVE 에서 가장 많이 풀린 대상 타입. receiverTypes 를 적을 때 참고한다
+                SELECT COALESCE(ts.fqn, regexp_replace(c.to_external, '\.[^.(]+(\(.*)?$', '')) AS type, COUNT(*) AS n
+                  FROM lit l
+                  JOIN analysis_relation c
+                    ON c.revision_id = #{revisionId} AND c.relation_type = 'CALLS'
+                   AND c.from_id = l.from_id AND c.file_id = l.file_id AND c.line_start = l.line_start
+                  LEFT JOIN analysis_method tm ON tm.revision_id = c.revision_id AND tm.method_id = c.to_id
+                  LEFT JOIN analysis_symbol ts ON ts.revision_id = tm.revision_id AND ts.symbol_id = tm.owner_symbol_id
+                 WHERE g.ref_kind = 'CALL' AND l.ref_kind = g.ref_kind AND l.name = g.name AND l.arg_index = g.arg_index
+                   AND (tm.name = l.name OR c.to_external LIKE '%.' || l.name || '(%' OR c.to_external LIKE '%.' || l.name)
+                 GROUP BY 1
+                 ORDER BY 2 DESC
+                 LIMIT 1) rt ON TRUE
+         -- JDK 의 메소드(String.equals 등)는 관례가 아니다
+         WHERE rt.type IS NULL OR rt.type NOT LIKE 'java.%'
+         ORDER BY GREATEST(g.sql_matches, g.view_matches) DESC, g.ref_kind, g.name, g.arg_index
+         LIMIT #{limit}
+    </select>
+
+    <!-- 애노테이션 후보: 규칙이 모르는 애노테이션 가운데 많이 붙은 것. 계층이 없는 타입이나 진입점이 아닌 메소드에 붙었으면 눈여겨본다.
+         파라미터: revisionId, known[], ignored[], limit -->
+    <select id="selectAnnotationCandidates" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT a.annotation_name AS "annotation", a.target_kind AS "targetKind", MIN(a.annotation_fqn) AS "fqn"
+             , COUNT(*) AS "count"
+             , COUNT(*) FILTER (WHERE (a.target_kind = 'TYPE' AND (s.layer IS NULL OR s.layer_confidence = 'LOW'))
+                                   OR (a.target_kind = 'METHOD' AND NOT EXISTS (
+                                        SELECT 1 FROM analysis_endpoint e WHERE e.revision_id = a.revision_id AND e.method_id = a.target_id))) AS "unexplained"
+          FROM analysis_annotation a
+          LEFT JOIN analysis_symbol s ON a.target_kind = 'TYPE' AND s.revision_id = a.revision_id AND s.symbol_id = a.target_id
+         WHERE a.revision_id = #{revisionId}
+           AND a.target_kind IN ('TYPE', 'METHOD')
+           <if test="known != null and known.size() > 0">
+           AND a.annotation_name NOT IN <foreach collection="known" item="n" open="(" separator="," close=")">#{n}</foreach>
+           </if>
+           AND a.annotation_name NOT IN <foreach collection="ignored" item="n" open="(" separator="," close=")">#{n}</foreach>
+         GROUP BY a.annotation_name, a.target_kind
+        HAVING COUNT(*) &gt;= 2
+         ORDER BY 5 DESC, 4 DESC, 1
+         LIMIT #{limit}
+    </select>
+
+    <!-- 상위 타입 후보: 규칙이 모르는 상위 타입 가운데, 그것을 바로 상속(구현)한 타입이 여럿이고 그 타입들의 계층이 비었거나 LOW 인 것.
+         자체 프레임워크의 "이것을 상속하면 서비스" 같은 약속이 숨어 있다는 신호다. java. 로 시작하는 타입은 뺀다.
+         파라미터: revisionId, known[], limit -->
+    <select id="selectSuperTypeCandidates" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT COALESCE(r.to_external, t.fqn) AS "superType"
+             , (r.to_external IS NULL) AS "inProject"
+             , COUNT(DISTINCT r.from_id) AS "types"
+             , COUNT(DISTINCT r.from_id) FILTER (WHERE s.layer IS NULL OR s.layer_confidence = 'LOW') AS "unlayered"
+             , array_to_string((array_agg(DISTINCT s.simple_name))[1:3], ', ') AS "samples"
+          FROM analysis_relation r
+          JOIN analysis_symbol s ON s.revision_id = r.revision_id AND s.symbol_id = r.from_id AND s.kind &lt;&gt; 'ANONYMOUS'
+          LEFT JOIN analysis_symbol t ON t.revision_id = r.revision_id AND t.symbol_id = r.to_id
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type IN ('EXTENDS', 'IMPLEMENTS')
+           AND COALESCE(r.to_external, t.fqn) IS NOT NULL
+           AND COALESCE(r.to_external, t.fqn) NOT LIKE 'java.%'
+           <if test="known != null and known.size() > 0">
+           AND COALESCE(r.to_external, t.fqn) NOT IN <foreach collection="known" item="n" open="(" separator="," close=")">#{n}</foreach>
+           </if>
+         GROUP BY 1, 2
+        HAVING COUNT(DISTINCT r.from_id) &gt;= 3
+           AND COUNT(DISTINCT r.from_id) FILTER (WHERE s.layer IS NULL OR s.layer_confidence = 'LOW') &gt; 0
+         ORDER BY 4 DESC, 3 DESC, 1
+         LIMIT #{limit}
+    </select>
+
+    <!-- 후보 화면의 요약: 아직 풀리지 않은 것들의 수 -->
+    <select id="selectCandidateSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT (SELECT COUNT(*) FROM analysis_symbol s
+                 WHERE s.revision_id = #{revisionId} AND s.kind &lt;&gt; 'ANONYMOUS' AND s.properties_json->>'synthetic' IS NULL) AS "types"
+             , (SELECT COUNT(*) FROM analysis_symbol s
+                 WHERE s.revision_id = #{revisionId} AND s.kind &lt;&gt; 'ANONYMOUS' AND s.properties_json->>'synthetic' IS NULL
+                   AND s.layer IS NULL) AS "typesWithoutLayer"
+             , (SELECT COUNT(*) FROM analysis_symbol s
+                 WHERE s.revision_id = #{revisionId} AND s.layer_confidence = 'LOW') AS "typesWithLowLayer"
+             , (SELECT COUNT(*) FROM analysis_endpoint e WHERE e.revision_id = #{revisionId}) AS "endpoints"
+             , (SELECT COUNT(*) FROM analysis_relation r
+                 WHERE r.revision_id = #{revisionId} AND r.relation_type = 'EXECUTES_SQL' AND r.resolution_status = 'RESOLVED') AS "sqlCalls"
+             , (SELECT COUNT(*) FROM analysis_relation r
+                 WHERE r.revision_id = #{revisionId} AND r.relation_type = 'EXECUTES_SQL' AND r.resolution_status = 'UNRESOLVED') AS "sqlCallsNotFound"
+             , (SELECT COUNT(*) FROM analysis_mapper m
+                 WHERE m.revision_id = #{revisionId} AND m.statement_type &lt;&gt; 'SQL_FRAGMENT' AND m.method_id IS NULL) AS "statementsWithoutCaller"
+    </select>
+
+</mapper>

@@ -2,6 +2,8 @@ package net.dstone.knowledge.job;
 
 import java.util.Map;
 
+import net.dstone.knowledge.semantic.rule.SemanticRules;
+
 /**
  * <pre>
  * 분석 Job 하나가 도는 동안 각 단계가 함께 보는 정보입니다.
@@ -19,6 +21,9 @@ public class AnalysisJobContext {
 
 	/** 다른 스레드(취소 API)가 바꾸고 분석 스레드가 읽기 때문에 volatile입니다. */
 	private volatile boolean cancelRequested = false;
+
+	/** SEMANTIC 단계가 시작할 때 읽은 의미 분석 규칙(conf/rules). 그 전에는 null */
+	private SemanticRules semanticRules;
 
 	public AnalysisJobContext(String analysisId, String projectId, long revisionId, Map<String, Object> project) {
 		this.analysisId = analysisId;
@@ -47,6 +52,18 @@ public class AnalysisJobContext {
 		}
 		String text = String.valueOf(value).trim();
 		return text.length() == 0 ? null : text;
+	}
+
+	/** SEMANTIC 단계의 플러그인이 쓰는 규칙. SemanticPass 가 시작할 때 채웁니다 */
+	public SemanticRules getSemanticRules() {
+		if (semanticRules == null) {
+			throw new IllegalStateException("의미 분석 규칙이 아직 없습니다. SemanticPass 를 거쳐 플러그인을 불러야 합니다.");
+		}
+		return semanticRules;
+	}
+
+	public void setSemanticRules(SemanticRules semanticRules) {
+		this.semanticRules = semanticRules;
 	}
 
 	public void requestCancel() {

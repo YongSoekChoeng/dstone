@@ -1,0 +1,21 @@
+# 다른 규칙이 정하지 못한 것을 마지막에 채우는 넓은 규칙. order 가 커서 맨 뒤에 적용된다.
+name: fallback
+description: "@Component 계층과 클래스 이름 끝말로 짐작하는 계층(LOW)"
+order: 900
+
+layers:
+  # @Component 는 뜻이 넓어서 다른 애노테이션 규칙이 모두 끝난 뒤에 본다.
+  annotations:
+    - { layer: COMPONENT, annotations: [Component] }
+  # 클래스 이름(단순 이름) → 계층(LOW). PostgreSQL 정규식. 위에서부터 먼저 맞는 것으로 정한다.
+  names:
+    - { layer: CONTROLLER, pattern: '(Controller|Action|Servlet)$' }
+    - { layer: SERVICE, pattern: '(Service|ServiceImpl|Manager|ManagerImpl|Facade|FacadeImpl|Biz|BizImpl)$' }
+    - { layer: REPOSITORY, pattern: '(DAO|Dao|DAOImpl|DaoImpl|Repository|RepositoryImpl|Mapper)$' }
+    - { layer: MODEL, pattern: '(VO|Vo|DTO|Dto|Entity|Bean|Model|Form)$' }
+    - { layer: CONFIG, pattern: '(Config|Configuration)$' }
+    - { layer: WEB_FILTER, pattern: '(Filter|Interceptor)$' }
+    - { layer: UTIL, pattern: '(Util|Utils|Utility|Helper)$' }
+    - { layer: EXCEPTION, pattern: '(Exception|Error)$' }
+    # 배치는 끝말이 제각각이라(OrderBatchMain, DailyJob) 이름 어디에든 Batch 가 있으면 본다.
+    - { layer: BATCH, pattern: '(Batch|Job$|Scheduler$|Tasklet$)' }

@@ -57,6 +57,7 @@ import net.dstone.knowledge.parser.model.FileDeclarations;
 import net.dstone.knowledge.parser.model.MethodRow;
 import net.dstone.knowledge.parser.model.ReferenceRow;
 import net.dstone.knowledge.parser.model.TypeRow;
+import net.dstone.knowledge.semantic.rule.RuleSetParser;
 
 /**
  * <pre>
@@ -526,8 +527,8 @@ public class DeclarationCollector {
 		if (node instanceof ObjectCreationExpr) {
 			ObjectCreationExpr creation = (ObjectCreationExpr) node;
 			String typeName = eraseGenerics(creation.getType().asString());
-			addReference(from, "CREATE", typeName, null, Integer.valueOf(creation.getArguments().size()), creation.getType())
-					.setArgText(firstArgumentText(creation.getArguments()));
+			setArguments(addReference(from, "CREATE", typeName, null, Integer.valueOf(creation.getArguments().size()), creation.getType())
+					, creation.getArguments());
 			if (creation.getScope().isPresent()) {
 				walk(creation.getScope().get(), from, context);
 			}
@@ -564,8 +565,8 @@ public class DeclarationCollector {
 		if (node instanceof MethodCallExpr) {
 			MethodCallExpr call = (MethodCallExpr) node;
 			String scope = call.getScope().isPresent() ? call.getScope().get().toString() : null;
-			addReference(from, "CALL", call.getNameAsString(), scope, Integer.valueOf(call.getArguments().size()), call.getName())
-					.setArgText(firstArgumentText(call.getArguments()));
+			setArguments(addReference(from, "CALL", call.getNameAsString(), scope, Integer.valueOf(call.getArguments().size()), call.getName())
+					, call.getArguments());
 		} else if (node instanceof FieldAccessExpr) {
 			FieldAccessExpr access = (FieldAccessExpr) node;
 			addReference(from, "FIELD_ACCESS", access.getNameAsString(), access.getScope().toString(), null, access.getName());
@@ -633,14 +634,44 @@ public class DeclarationCollector {
 	 * </pre>
 	 */
 	private String firstArgumentText(NodeList<Expression> arguments) {
-		if (arguments.isEmpty()) {
-			return null;
-		}
-		String text = arguments.get(0).toString();
+		return arguments.isEmpty() ? null : argumentText(arguments.get(0));
+	}
+
+	/** 인자 하나를 소스에 적힌 그대로. 따옴표가 없거나 너무 길면 null */
+	private String argumentText(Expression argument) {
+		String text = argument.toString();
 		if (text.indexOf('"') < 0 || text.length() > MAX_ARG_TEXT) {
 			return null;
 		}
 		return text;
+	}
+
+	/**
+	 * <pre>
+	 * 둘째 인자부터를 JSON 배열로 돌려줍니다. 자리를 맞추려고 첫 칸(첫 인자, arg_text 에 따로 있음)과
+	 * 따옴표가 없는 인자는 null 로 둡니다. 둘째 인자부터 따옴표 든 것이 하나도 없으면 null 입니다.
+	 * 예: dao.execute(param, "Order.list") → [null, "\"Order.list\""]
+	 * 규칙 파일의 호출 인자 규칙에서 argIndex 를 1 이상으로 적은 경우에 씁니다(SQL 이름이 둘째 인자로 가는 프레임워크).
+	 * MAX_ARG_INDEX 번째 인자까지만 봅니다.
+	 * </pre>
+	 */
+	private String laterArgumentsJson(NodeList<Expression> arguments) {
+		int size = Math.min(arguments.size(), RuleSetParser.MAX_ARG_INDEX + 1);
+		List<String> texts = new ArrayList<String>();
+		boolean any = false;
+		texts.add(null);
+		for (int i = 1; i < size; i++) {
+			String text = argumentText(arguments.get(i));
+			any = any || text != null;
+			texts.add(text);
+		}
+		return any ? JsonText.of(texts) : null;
+	}
+
+	/** 참조에 인자 글자를 담습니다(첫 인자는 argText, 나머지는 argsJson). */
+	private void setArguments(ReferenceRow reference, NodeList<Expression> arguments) {
+		reference.setArgText(firstArgumentText(arguments));
+		reference.setArgsJson(laterArgumentsJson(arguments));
 	}
 
 

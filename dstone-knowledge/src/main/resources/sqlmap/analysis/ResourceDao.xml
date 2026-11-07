@@ -99,29 +99,28 @@
            AND m.statement_type &lt;&gt; 'SQL_FRAGMENT'
     </insert>
 
-    <!-- 문자열로 statement 를 부르는 호출들. reference_id 순으로 조금씩 꺼낸다.
-         두 가지 모양이 있다: 이름을 첫 인자로 받는 메소드 호출(selectList("…")), 이름을 담는 객체를 만드는 곳(new QueryProperty("…")) -->
+    <!-- 문자열로 statement 를 부르는 호출들: 규칙 파일의 호출 인자 규칙(callArguments, target: SQL) 하나에 맞는 것. reference_id 순으로 조금씩 꺼낸다.
+         두 가지 모양이 있다: 이름을 인자로 받는 메소드 호출(selectList("…")), 이름을 담는 객체를 만드는 곳(new QueryProperty("…")).
+         argText 는 규칙이 보는 자리(argIndex)의 인자 글자다. 조건 조각은 SemanticDao.xml 에 있다 -->
     <select id="selectMapperCallPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH <include refid="net.dstone.knowledge.api.dao.SemanticDao.receiverTypesCte"/>
         SELECT r.reference_id AS "referenceId"
              , r.from_id AS "fromId"
              , r.name AS "name"
-             , r.arg_text AS "argText"
+             , arg.text AS "argText"
              , r.file_id AS "fileId"
              , r.line_start AS "lineStart"
-             , m.owner_symbol_id AS "ownerSymbolId"
+             , caller.owner_symbol_id AS "ownerSymbolId"
              , f.source_root AS "sourceRoot"
           FROM analysis_reference r
-          JOIN analysis_method m ON m.revision_id = r.revision_id AND m.method_id = r.from_id
+          JOIN analysis_method caller ON caller.revision_id = r.revision_id AND caller.method_id = r.from_id
           LEFT JOIN analysis_file f ON f.file_id = r.file_id
+         CROSS JOIN LATERAL (SELECT <include refid="net.dstone.knowledge.api.dao.SemanticDao.ruleArgText"/> AS text) arg
          WHERE r.revision_id = #{revisionId}
            AND r.from_kind = 'METHOD'
-           AND r.arg_text IS NOT NULL
+           AND arg.text IS NOT NULL
            AND r.reference_id &gt; #{afterId}
-           AND ((r.ref_kind = 'CALL' AND r.name IN
-        <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
-               ) OR (r.ref_kind = 'CREATE' AND r.name IN
-        <foreach collection="holders" item="name" open="(" separator="," close=")">#{name}</foreach>
-               ))
+           <include refid="net.dstone.knowledge.api.dao.SemanticDao.ruleReferenceFilter"/>
          ORDER BY r.reference_id
          LIMIT #{limit}
     </select>

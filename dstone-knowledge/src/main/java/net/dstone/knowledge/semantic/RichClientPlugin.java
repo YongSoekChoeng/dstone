@@ -16,7 +16,6 @@ import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import net.dstone.common.config.ConfigProperty;
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.job.AnalysisJobContext;
@@ -37,9 +36,9 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *                 앞에 컨텍스트 경로가 붙은 주소(/myapp/order/list.do)는 첫 마디를 떼고 한 번 더 맞춰 본다 (LOW)
  *       거래 호출 화면이 주소 대신 거래 ID로 부를 때 (via = CALL_RULE)
  *                 프로젝트 공통 함수가 "ID → 메소드 이름" 규칙으로 서버를 부르는 방식이다.
- *                 규칙은 설정 dstone.knowledge.semantic.screen.call-rules 에 적는다(ScreenScript.parseRules).
+ *                 규칙은 규칙 파일의 screens.calls 에 적는다(예: conf/rules/hi-japan.yml).
  *                 폼 필드에 거래 ID를 담아 보내는 화면(&lt;input name='tranId' value='JIMC1000M03S'&gt; 를 만들어 submit)은
- *                 설정 dstone.knowledge.semantic.screen.field-rules 에 "필드 이름=메소드이름틀" 로 적는다(properties.field).
+ *                 규칙 파일의 screens.fields 에 필드 이름과 메소드 이름 틀로 적는다(properties.field).
  *                 그 이름의 메소드가 하나면 HIGH, 여럿이면 어느 것인지 몰라 모두 LOW로 잇는다.
  *                 화면이 부르는 공통 함수(아래 "공통 함수") 안에 글자로 적힌 거래 호출도 잇는다(via = COMMON_SCRIPT).
  *                 예: comLib.gfnOneResultSearchAgnt(p) → com_lib.js 의 doRequestAjax("JMAT0116M01L") → performJMAT0116M01L.
@@ -49,7 +48,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *   화면 ─INCLUDES→ 화면     화면이 다른 화면을 끼워 넣거나 띄운다. 찾는 길이 셋이다.
  *       경로      src="/app/ui/a/B.xml" 처럼 따옴표 안에 적힌 화면 파일
  *       화면 열기 화면이 경로 대신 화면 ID로 다른 화면을 열 때 (via = OPEN_RULE)
- *                 규칙은 설정 dstone.knowledge.semantic.screen.open-rules 에 "함수=화면 경로 틀" 로 적는다.
+ *                 규칙은 규칙 파일의 screens.opens 에 함수와 화면 경로 틀로 적는다.
  *                 예: fnOpenPage={id}.xml → parent.scwin.fnOpenPage("JIMC1000G") 는 JIMC1000G.xml 로 끝나는 화면을 연다.
  *                 그 경로로 끝나는 화면이 하나일 때만 잇는다
  *       공통 함수 화면이 공통 스크립트(.js, .xjs)의 함수를 부르고, 그 함수가 다른 화면을 열 때 (via = COMMON_SCRIPT, MEDIUM)
@@ -89,8 +88,6 @@ public class RichClientPlugin implements SemanticPlugin {
 	@Autowired
 	private EncodingDetector encodingDetector;
 
-	@Autowired
-	private ConfigProperty configProperty;
 
 	private final ScreenScript screenScript = new ScreenScript();
 
@@ -110,10 +107,9 @@ public class RichClientPlugin implements SemanticPlugin {
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
-		List<ScreenScript.CallRule> rules = ScreenScript.parseRules(configProperty.getProperty("dstone.knowledge.semantic.screen.call-rules"));
-		// 폼 필드에 거래 ID를 담아 보내는 화면도 같은 방식으로 잇는다(출력 화면이 이렇게 많이 부른다).
-		rules.addAll(ScreenScript.parseFieldRules(configProperty.getProperty("dstone.knowledge.semantic.screen.field-rules")));
-		List<ScreenScript.CallRule> openRules = ScreenScript.parseRules(configProperty.getProperty("dstone.knowledge.semantic.screen.open-rules"));
+		// 규칙 파일의 screens.calls 다음에 screens.fields(폼 필드에 거래 ID를 담아 보내는 화면. 출력 화면이 이렇게 많이 부른다).
+		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>(context.getSemanticRules().getScreenCalls());
+		List<ScreenScript.CallRule> openRules = new ArrayList<ScreenScript.CallRule>(context.getSemanticRules().getScreenOpens());
 
 		Map<String, List<String>> handlers = null;
 		Map<String, CommonFunction> commons = null;
