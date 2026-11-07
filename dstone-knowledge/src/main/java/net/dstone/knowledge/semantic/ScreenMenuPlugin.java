@@ -25,7 +25,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  * 거기서 화면명이 생긴 화면은 건드리지 않습니다(화면 파일에 적힌 것이 먼저다).
  *
  * 메뉴 목록은 프로젝트마다 적는 곳과 키 이름이 달라서 설정으로 받습니다.
- *   규칙 파일의 screens.menus: - { nameKey: MENU_NM, pathKey: SRC_PATH }   (화면명 키, 화면 경로 키. 예: conf/rules/hi-japan.yml)
+ *   규칙 파일의 screens.menus: - { nameKey: MENU_NM, pathKey: SRC_PATH }   (화면명 키, 화면 경로 키. 예: conf/rules/hi-japan/frontend.yml)
  * JSP와 XML 파일 가운데 경로 키가 글자로 들어 있는 것만 읽어 메뉴 항목을 찾습니다(ScreenMenu).
  * 메뉴의 화면 경로는 "그 경로로 끝나는 화면"으로 찾고, 화면이 하나로 정해질 때만 씁니다(RichClientPlugin.findScreen).
  * 한 화면이 메뉴 여러 곳에 있으면 파일 순서로 먼저 나온 이름을 씁니다.

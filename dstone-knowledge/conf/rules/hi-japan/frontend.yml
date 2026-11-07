@@ -1,5 +1,6 @@
-# HI-Japan(WebSquare 화면)의 관례. 화면에 이 함수나 필드가 없으면 아무 일도 하지 않는다.
-name: hi-japan
+# HI-Japan 화면(WebSquare)의 관례. 화면에 이 함수나 필드가 없으면 아무 일도 하지 않는다.
+# 프로젝트에 따른 규칙이라 hi-japan 폴더에 둔다. 묶음 이름은 폴더를 포함한 경로다.
+name: hi-japan/frontend
 description: 화면이 거래 ID 로 서버를 부르는 공통 함수, 출력 폼 필드, 화면 ID 로 여는 함수, 메뉴 목록
 order: 500
 

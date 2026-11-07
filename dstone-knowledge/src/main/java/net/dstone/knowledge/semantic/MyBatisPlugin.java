@@ -38,7 +38,7 @@ import net.dstone.knowledge.symbol.BoundedCache;
  *   2) 문자열 방식: sqlSession.selectList("네임스페이스.id", ...) 처럼 이름을 문자열로 넘긴다.
  *      어떤 메소드(생성자)의 몇 번째 인자가 SQL 이름인지는 규칙 파일의 callArguments(target: SQL)에 있다.
  *      기본은 MyBatis 의 SqlSession, iBATIS 의 SqlMapClient(conf/rules/mybatis.yml)이고, 자체 프레임워크는 규칙을 더한다.
- *      예: JEF 계열의 new QueryProperty("파일이름.id") → executeVOQuery(qp, ...) (conf/rules/jef.yml)
+ *      예: JEF 계열의 new QueryProperty("파일이름.id") → executeVOQuery(qp, ...) (conf/rules/hi-japan/backend.yml)
  *      문자열이 상수와 메소드를 거쳐 조립되는 경우가 많아서, 상수를 따라가 계산한다(ConstantEvaluator).
  *      규칙의 template 이 있으면 계산한 값에 앞뒤 글자를 붙인다(예: "Order.{value}").
  *      계산한 이름의 statement가 없으면 "못 찾음"으로 남긴다(지우지 않는다).

@@ -42,14 +42,14 @@ public class RuleSetParser {
 	/** 타입의 전체 이름 */
 	private static final Pattern QUALIFIED = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*");
 	private static final Pattern HTTP_METHOD = Pattern.compile("[A-Z]{3,10}");
-	/** 묶음 이름: 파일 이름으로 쓸 수 있는 글자 */
-	private static final Pattern SET_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,59}");
+	/** 묶음 이름: 규칙 폴더 안의 경로(확장자 뺀 것). 프로젝트에 따른 규칙은 하위 폴더에 둔다(예: hi-japan/frontend) */
+	private static final Pattern SET_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,59}(/[A-Za-z0-9][A-Za-z0-9_.-]{0,59}){0,3}");
 	/** 인자 위치의 한도. DECLARE 가 남기는 인자 수도 이만큼이다 */
 	public static final int MAX_ARG_INDEX = 9;
 
 	/**
 	 * @param text     파일 내용
-	 * @param fileName 파일 이름(메시지와 묶음 이름 확인에 쓴다). 예: spring.yml
+	 * @param fileName 규칙 폴더 안의 경로(메시지와 묶음 이름 확인에 쓴다). 예: spring.yml, hi-japan/frontend.yml
 	 */
 	public RuleSet parse(String text, String fileName) {
 		Object root;
@@ -66,10 +66,10 @@ public class RuleSetParser {
 		String baseName = fileName.replaceFirst("\\.ya?ml$", "");
 		b.name = r.optString(top, "", "name", baseName);
 		if (!SET_NAME.matcher(b.name).matches()) {
-			throw r.error("name", "묶음 이름은 영문자, 숫자, - _ . 로 60자 이내여야 합니다: " + b.name);
+			throw r.error("name", "묶음 이름은 영문자, 숫자, - _ . 로 된 마디를 / 로 이은 것이어야 합니다(마디마다 60자, 폴더 3단계까지): " + b.name);
 		}
 		if (!b.name.equals(baseName)) {
-			throw r.error("name", "묶음 이름(" + b.name + ")은 파일 이름(" + baseName + ")과 같아야 합니다. 프로젝트의 ruleSets 에 적는 이름이라 헷갈리지 않게 맞춥니다.");
+			throw r.error("name", "묶음 이름(" + b.name + ")은 규칙 폴더 안의 경로(" + baseName + ")와 같아야 합니다. 프로젝트의 ruleSets 에 적는 이름이라 헷갈리지 않게 맞춥니다.");
 		}
 		b.description = r.optString(top, "", "description", null);
 		b.order = r.optInt(top, "", "order", 500);

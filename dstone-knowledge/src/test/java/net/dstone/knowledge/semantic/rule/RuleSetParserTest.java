@@ -173,14 +173,16 @@ public class RuleSetParserTest {
 	@Test
 	public void conf_rules_폴더의_규칙_파일은_모두_올바르고_함께_쓸_수_있다() throws Exception {
 		File dir = new File("conf/rules");
-		File[] files = dir.listFiles();
-		assertTrue(files != null && files.length > 0, "conf/rules 가 없습니다: " + dir.getAbsolutePath());
+		assertTrue(dir.isDirectory(), "conf/rules 가 없습니다: " + dir.getAbsolutePath());
 		List<RuleSet> sets = new ArrayList<RuleSet>();
-		for (int i = 0; i < files.length; i++) {
-			if (files[i].getName().endsWith(".yml")) {
-				sets.add(parse(new String(Files.readAllBytes(files[i].toPath()), StandardCharsets.UTF_8), files[i].getName()));
-			}
+		readAll(dir, "", sets);
+		List<String> names = new ArrayList<String>();
+		for (int i = 0; i < sets.size(); i++) {
+			names.add(sets.get(i).name);
 		}
+		// 프로젝트에 따른 규칙은 하위 폴더에 있고, 묶음 이름은 폴더를 포함한 경로다.
+		assertTrue(names.contains("hi-japan/frontend"), String.valueOf(names));
+		assertTrue(names.contains("hi-japan/backend"), String.valueOf(names));
 		// 합칠 때 겹치는 진입점 애노테이션이 없어야 한다.
 		SemanticRules rules = new SemanticRules(sets);
 		// 기본 규칙이 그대로 옮겨졌는지 대표 값만 본다(정확한 전후 비교는 실제 리비전으로 했다).
@@ -189,6 +191,31 @@ public class RuleSetParserTest {
 		assertFalse(rules.getSqlArguments().isEmpty());
 		assertFalse(rules.getViewArguments().isEmpty());
 		assertFalse(rules.getLayerNames().isEmpty());
+	}
+
+	/** 폴더 아래의 *.yml 을 규칙 폴더 안의 경로를 이름으로 읽는다(SemanticRuleRegistry 와 같은 방식) */
+	private void readAll(File dir, String prefix, List<RuleSet> sets) throws Exception {
+		File[] files = dir.listFiles();
+		for (int i = 0; i < files.length; i++) {
+			if (files[i].isDirectory()) {
+				readAll(files[i], prefix + files[i].getName() + "/", sets);
+			} else if (files[i].getName().endsWith(".yml")) {
+				sets.add(parse(new String(Files.readAllBytes(files[i].toPath()), StandardCharsets.UTF_8), prefix + files[i].getName()));
+			}
+		}
+	}
+
+	@Test
+	public void 하위_폴더의_묶음은_경로가_이름이고_폴더_이름으로_고를_수_있다() {
+		// name 을 적지 않으면 경로가 이름이다. 적었으면 경로와 같아야 한다.
+		assertEquals("hi-japan/frontend", parse("order: 500\n", "hi-japan/frontend.yml").name);
+		assertEquals("hi-japan/frontend", parse("name: hi-japan/frontend\n", "hi-japan/frontend.yml").name);
+		assertEquals("name", parseFails("name: frontend\n", "hi-japan/frontend.yml").getPath());
+		// ruleSets 에 폴더 이름을 적으면 그 아래 묶음을 모두 고른다. 이름 앞부분만 같은 다른 폴더는 고르지 않는다.
+		assertTrue(SemanticRuleRegistry.refersTo("hi-japan", "hi-japan/frontend"));
+		assertTrue(SemanticRuleRegistry.refersTo("hi-japan/backend", "hi-japan/backend"));
+		assertFalse(SemanticRuleRegistry.refersTo("hi-japan", "hi-japan-batch/backend"));
+		assertFalse(SemanticRuleRegistry.refersTo("hi-japan/front", "hi-japan/frontend"));
 	}
 
 }

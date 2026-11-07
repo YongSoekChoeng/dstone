@@ -17,7 +17,7 @@ import net.dstone.knowledge.semantic.rule.RuleSet;
  * 자체 프레임워크를 쓰는 프로젝트는 대개 "이 클래스를 상속하면 서비스, 저것을 상속하면 DAO"라는 약속이 있습니다.
  * 그 약속을 규칙 파일에 적어 두면 여기서 계층을 붙입니다.
  *
- *   예(conf/rules/jef.yml):
+ *   예(conf/rules/hi-japan/backend.yml):
  *     layers:
  *       superTypes:
  *         - { layer: SERVICE,    types: [jef.application.services.AbstractSubService] }

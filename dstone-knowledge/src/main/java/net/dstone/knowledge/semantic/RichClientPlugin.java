@@ -36,7 +36,7 @@ import net.dstone.knowledge.scanner.EncodingDetector;
  *                 앞에 컨텍스트 경로가 붙은 주소(/myapp/order/list.do)는 첫 마디를 떼고 한 번 더 맞춰 본다 (LOW)
  *       거래 호출 화면이 주소 대신 거래 ID로 부를 때 (via = CALL_RULE)
  *                 프로젝트 공통 함수가 "ID → 메소드 이름" 규칙으로 서버를 부르는 방식이다.
- *                 규칙은 규칙 파일의 screens.calls 에 적는다(예: conf/rules/hi-japan.yml).
+ *                 규칙은 규칙 파일의 screens.calls 에 적는다(예: conf/rules/hi-japan/frontend.yml).
  *                 폼 필드에 거래 ID를 담아 보내는 화면(&lt;input name='tranId' value='JIMC1000M03S'&gt; 를 만들어 submit)은
  *                 규칙 파일의 screens.fields 에 필드 이름과 메소드 이름 틀로 적는다(properties.field).
  *                 그 이름의 메소드가 하나면 HIGH, 여럿이면 어느 것인지 몰라 모두 LOW로 잇는다.

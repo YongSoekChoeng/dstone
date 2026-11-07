@@ -30,9 +30,14 @@ import net.dstone.knowledge.semantic.ScreenScript;
  * - 분석할 때마다(SEMANTIC 단계 시작) 파일을 다시 읽습니다. 그래서 규칙 파일을 고친 뒤 서버를 다시 띄우지 않고
  *   rerunFrom=SEMANTIC 으로 다시 돌리면 바로 반영됩니다. 이때 잘못 적혀 있으면 그 분석이 실패합니다.
  *
+ * 폴더 모양:
+ *   공통 관례(java, spring, mybatis ...)는 규칙 폴더 바로 아래에, 특정 프로젝트의 관례는 프로젝트 이름의 하위 폴더에 둡니다.
+ *   묶음 이름은 규칙 폴더 안의 경로(확장자 뺀 것)입니다. 예: conf/rules/hi-japan/frontend.yml → hi-japan/frontend
+ *
  * 어느 묶음을 쓰나:
  *   autoApply: true 인 묶음은 모든 프로젝트에 씁니다(기본). 해당하는 코드가 없는 프로젝트에서는 아무 일도 하지 않습니다.
  *   autoApply: false 인 묶음은 프로젝트의 ruleSets(쉼표로 이은 묶음 이름)에 적었을 때만 씁니다.
+ *   ruleSets 에 폴더 이름(예: hi-japan)을 적으면 그 폴더 아래의 묶음을 모두 고른 것입니다.
  *
  * 옛 설정 키(application.yml 의 dstone.knowledge.semantic.screen.* / layer.super-types)가 남아 있으면
  * "application-yml" 이라는 묶음으로 바꿔 맨 뒤에 붙입니다. 새로 적을 때는 규칙 파일에 적습니다.
@@ -93,34 +98,57 @@ public class SemanticRuleRegistry extends BaseObject {
 	 */
 	public List<RuleSet> loadAll() {
 		File dir = rulesDir();
-		File[] files = dir.listFiles();
-		if (files == null) {
+		if (!dir.isDirectory()) {
 			throw new RuleException(dir.getPath(), "", "규칙 파일 폴더가 없습니다. 기본 규칙(java, spring, mybatis ...)도 이 폴더에 있어서, 없으면 진입점과 계층을 하나도 찾지 못합니다.");
 		}
-		Arrays.sort(files);
+		List<String> paths = new ArrayList<String>();
+		collect(dir, "", paths, 0);
+		Collections.sort(paths);
 		List<RuleSet> sets = new ArrayList<RuleSet>();
 		List<String> names = new ArrayList<String>();
-		for (int i = 0; i < files.length; i++) {
-			String fileName = files[i].getName();
-			String lower = fileName.toLowerCase(Locale.ROOT);
-			if (!files[i].isFile() || !(lower.endsWith(".yml") || lower.endsWith(".yaml"))) {
-				continue;
-			}
+		for (int i = 0; i < paths.size(); i++) {
+			String path = paths.get(i);
 			String text;
 			try {
-				text = new String(Files.readAllBytes(files[i].toPath()), StandardCharsets.UTF_8);
+				text = new String(Files.readAllBytes(new File(dir, path).toPath()), StandardCharsets.UTF_8);
 			} catch (IOException e) {
-				throw new RuleException(fileName, "", "파일을 읽지 못했습니다: " + e.getMessage());
+				throw new RuleException(path, "", "파일을 읽지 못했습니다: " + e.getMessage());
 			}
-			RuleSet set = parser.parse(text, fileName);
+			RuleSet set = parser.parse(text, path);
 			if (names.contains(set.name)) {
-				throw new RuleException(fileName, "", "같은 이름의 규칙 묶음이 또 있습니다: " + set.name);
+				throw new RuleException(path, "", "같은 이름의 규칙 묶음이 또 있습니다(.yml 과 .yaml 이 함께 있는지 보세요): " + set.name);
 			}
 			names.add(set.name);
 			sets.add(set);
 		}
 		sort(sets);
 		return sets;
+	}
+
+	/**
+	 * <pre>
+	 * 폴더 아래의 규칙 파일(*.yml, *.yaml)을 규칙 폴더 안의 경로("hi-japan/frontend.yml")로 모읍니다.
+	 * 하위 폴더는 3단계까지 봅니다(묶음 이름 규칙과 같다). README.md 같은 다른 파일은 건너뜁니다.
+	 * </pre>
+	 */
+	private void collect(File dir, String prefix, List<String> paths, int depth) {
+		File[] files = dir.listFiles();
+		if (files == null) {
+			return;
+		}
+		for (int i = 0; i < files.length; i++) {
+			String name = files[i].getName();
+			if (files[i].isDirectory()) {
+				if (depth < 3 && !name.startsWith(".")) {
+					collect(files[i], prefix + name + "/", paths, depth + 1);
+				}
+				continue;
+			}
+			String lower = name.toLowerCase(Locale.ROOT);
+			if (lower.endsWith(".yml") || lower.endsWith(".yaml")) {
+				paths.add(prefix + name);
+			}
+		}
 	}
 
 	/** 글로 받은 규칙 묶음 하나를 읽습니다(시험 적용 API). 이름은 묶음 안의 name 이 있어야 합니다. */
@@ -162,8 +190,11 @@ public class SemanticRuleRegistry extends BaseObject {
 		for (int i = 0; i < all.size(); i++) {
 			known.add(all.get(i).name);
 		}
+		if (trial != null) {
+			known.add(trial.name);
+		}
 		for (int i = 0; i < wanted.size(); i++) {
-			if (!known.contains(wanted.get(i)) && (trial == null || !trial.name.equals(wanted.get(i)))) {
+			if (!matchesAny(wanted.get(i), known)) {
 				throw new RuleException(String.valueOf(project.get("projectId")), "ruleSets"
 						, "규칙 묶음 " + wanted.get(i) + " 이(가) " + rulesDir().getPath() + " 에 없습니다. 있는 묶음: " + known);
 			}
@@ -174,7 +205,7 @@ public class SemanticRuleRegistry extends BaseObject {
 			if (trial != null && trial.name.equals(set.name)) {
 				continue;
 			}
-			if (set.autoApply || wanted.contains(set.name)) {
+			if (set.autoApply || isWanted(set.name, wanted)) {
 				chosen.add(set);
 			}
 		}
@@ -189,7 +220,7 @@ public class SemanticRuleRegistry extends BaseObject {
 		return new SemanticRules(chosen);
 	}
 
-	/** 프로젝트의 ruleSets 값이 폴더에 있는 묶음인지 확인합니다(프로젝트를 등록할 때). 틀리면 RuleException */
+	/** 프로젝트의 ruleSets 값이 폴더에 있는 묶음(또는 묶음이 든 하위 폴더)인지 확인합니다(프로젝트를 등록할 때). 틀리면 RuleException */
 	public void checkRuleSetNames(Object ruleSets) {
 		List<String> wanted = ruleSetNames(ruleSets);
 		if (wanted.isEmpty()) {
@@ -201,10 +232,33 @@ public class SemanticRuleRegistry extends BaseObject {
 			known.add(all.get(i).name);
 		}
 		for (int i = 0; i < wanted.size(); i++) {
-			if (!known.contains(wanted.get(i))) {
+			if (!matchesAny(wanted.get(i), known)) {
 				throw new RuleException("ruleSets", "", "규칙 묶음 " + wanted.get(i) + " 이(가) 없습니다. 있는 묶음: " + known);
 			}
 		}
+	}
+
+	/** ruleSets 에 적은 이름 하나가 이 묶음을 가리키는지. 묶음 이름 그대로이거나, 묶음이 들어 있는 폴더 이름이면 맞다 */
+	static boolean refersTo(String wanted, String setName) {
+		return setName.equals(wanted) || setName.startsWith(wanted + "/");
+	}
+
+	private boolean isWanted(String setName, List<String> wanted) {
+		for (int i = 0; i < wanted.size(); i++) {
+			if (refersTo(wanted.get(i), setName)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean matchesAny(String wanted, List<String> names) {
+		for (int i = 0; i < names.size(); i++) {
+			if (refersTo(wanted, names.get(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** "a, b" → [a, b] */

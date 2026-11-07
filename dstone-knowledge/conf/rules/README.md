@@ -4,7 +4,8 @@
 
 새 환경의 프로젝트를 분석하다 처음 보는 관례를 만나면 Java 코드를 고치지 않고 여기에 규칙 파일을 더한다.
 
-- 파일 하나가 **규칙 묶음** 하나다. 파일 이름(확장자 뺀 것)이 묶음 이름이다.
+- 파일 하나가 **규칙 묶음** 하나다. 이 폴더 안의 경로(확장자 뺀 것)가 묶음 이름이다(`spring.yml` → `spring`, `hi-japan/frontend.yml` → `hi-japan/frontend`).
+- **공통 관례**(Java, 서블릿, Spring, MyBatis)는 이 폴더 바로 아래에, **특정 프로젝트의 관례**는 프로젝트 이름의 하위 폴더에 둔다. 하위 폴더는 3단계까지 읽는다.
 - 서버가 뜰 때 모든 파일을 검사한다. 모르는 키나 없는 계층 이름, 틀린 정규식이 있으면 **서버가 뜨지 않고** 어느 파일의 어느 자리인지 알려 준다.
 - 분석할 때마다 파일을 다시 읽는다. 규칙을 고친 뒤에는 서버를 다시 띄울 필요 없이 `rerunFrom: "SEMANTIC"`으로 다시 돌리면 된다.
 - 리비전마다 어떤 묶음을 썼는지 해시와 함께 남는다(`GET /api/revisions/{id}/rules`).
@@ -17,8 +18,8 @@
 | `servlet.yml` | 150 | `HttpServlet` → CONTROLLER, `Filter` → WEB_FILTER |
 | `spring.yml` | 200 | `@RequestMapping` 계열 HTTP 진입점, `@Scheduled`, 리스너, 주입, 프록시, 스테레오타입 계층, `ModelAndView` 화면 |
 | `mybatis.yml` | 300 | SQL 이름을 첫 인자로 받는 `SqlSession`/`SqlMapClient` 메소드 |
-| `jef.yml` | 500 | JEF 계열 상위 타입 계층, `new QueryProperty("…")` SQL 이름 |
-| `hi-japan.yml` | 500 | HI-Japan 화면의 거래 ID 호출 함수, 출력 폼 필드, 화면 열기 함수, 메뉴 목록 |
+| `hi-japan/backend.yml` | 500 | JEF 계열 상위 타입 계층, `new QueryProperty("…")` SQL 이름 |
+| `hi-japan/frontend.yml` | 500 | HI-Japan 화면의 거래 ID 호출 함수, 출력 폼 필드, 화면 열기 함수, 메뉴 목록 |
 | `fallback.yml` | 900 | `@Component` 계층, 클래스 이름 끝말로 짐작하는 계층(LOW) |
 
 코드에 남아 있는 것은 언어나 표준 형식 자체의 규칙이다. `main()`, JSP 진입점, `web.xml`, `struts-config.xml`, 매퍼 인터페이스 방식(namespace = 인터페이스 이름), 호출 해석(RESOLVE), SQL 파싱이 그렇다.
@@ -27,10 +28,12 @@
 
 - `autoApply: true`(기본)인 묶음은 모든 프로젝트에 쓴다. 해당하는 코드가 없는 프로젝트에서는 아무 일도 하지 않으므로 여러 프로젝트의 규칙을 함께 두어도 된다.
 - `autoApply: false`인 묶음은 프로젝트를 등록할 때 `ruleSets`에 이름을 적은 경우에만 쓴다. 메소드 이름이 흔해서 다른 프로젝트에 잘못 걸릴 수 있는 규칙은 이렇게 둔다.
+- `ruleSets`에는 묶음 이름(`hi-japan/frontend`)이나 폴더 이름(`hi-japan`)을 적는다. 폴더 이름이면 그 아래 묶음을 모두 고른 것이다.
+- `hi-japan/` 아래 두 묶음은 지금 `autoApply: true`다. 이 관례를 쓰지 않는 프로젝트에서는 아무 일도 하지 않고, `websquare-app` 표본도 같은 규칙을 쓰기 때문이다. HI-Japan에만 쓰게 하려면 두 파일을 `autoApply: false`로 바꾸고 HI-Japan 프로젝트(와 표본)에 `"ruleSets": "hi-japan"`을 적는다.
 
 ```json
 POST /api/projects
-{ "projectId": "order-system", "localPath": "/src/order", "ruleSets": "order-fw" }
+{ "projectId": "order-system", "localPath": "/src/order", "ruleSets": "order-system" }
 ```
 
 - 묶음은 `order`가 작은 것부터 적용한다(같으면 이름 순). 계층은 "먼저 정한 것을 뒤에서 바꾸지 않는다"라서 순서가 결과를 바꿀 수 있다. 뜻이 넓은 규칙은 order를 크게 둔다.
@@ -38,7 +41,7 @@ POST /api/projects
 ## 파일 모양
 
 ```yaml
-name: order-fw          # 파일 이름과 같아야 한다. 생략하면 파일 이름
+name: order-system/backend   # 이 폴더 안의 경로(conf/rules/order-system/backend.yml)와 같아야 한다. 생략하면 경로
 description: 주문 시스템 자체 프레임워크
 order: 500              # 기본 500
 autoApply: false        # 기본 true
@@ -109,12 +112,12 @@ screens:                # 리치클라이언트 화면(WebSquare, Nexacro)
    - `annotations`: 규칙이 모르는 애노테이션 가운데 많이 붙은 것. `unexplained`는 계층 없는 타입이나 진입점 아닌 메소드에 붙은 수다.
    - `superTypes`: 규칙이 모르는 상위 타입 가운데 계층이 비었거나 LOW인 하위 타입이 많은 것
    - 후보마다 붙여 넣을 규칙 조각(`suggestion`)이 있다. 계층과 진입점 종류는 짐작이니 꼭 고친다.
-2. **시험 적용**: `POST /api/revisions/{id}/rules/trial`, 본문 `{"ruleSet": "name: order-fw\n..."}`
+2. **시험 적용**: `POST /api/revisions/{id}/rules/trial`, 본문 `{"ruleSet": "name: order-system/backend\n..."}`
    - SEMANTIC을 한 트랜잭션 안에서 실제로 돌려 보고 전후 차이(묶음별 수, 새로 생긴 것과 없어진 것의 보기)를 알려 준 뒤 모두 되돌린다. DB에는 아무것도 남지 않는다.
    - 같은 이름의 파일이 있으면 그 파일 대신 쓴다. 본문 없이 부르면 지금 파일 그대로 돌려, 규칙 파일을 고친 뒤 무엇이 바뀌는지 본다.
-3. **저장**: 이 폴더에 `<name>.yml`로 저장한다.
+3. **저장**: 이 폴더에 `<name>.yml`로 저장한다. 프로젝트에 따른 규칙이면 `<프로젝트>/<이름>.yml`(묶음 이름 `<프로젝트>/<이름>`).
 4. **반영**: `POST /api/projects/{id}/analyses` `{"revisionLabel": "...", "rerunFrom": "SEMANTIC"}`
 
 ## 옛 설정 키
 
-예전에는 `application.yml`의 `dstone.knowledge.semantic.screen.call-rules` / `field-rules` / `open-rules` / `menu-rules`와 `dstone.knowledge.semantic.layer.super-types`에 규칙을 적었다. 지금 값은 `hi-japan.yml`, `jef.yml`로 옮겼다. 이 키가 남아 있으면 `application-yml`이라는 묶음으로 맨 뒤에 붙여 쓰고 경고를 남긴다.
+예전에는 `application.yml`의 `dstone.knowledge.semantic.screen.call-rules` / `field-rules` / `open-rules` / `menu-rules`와 `dstone.knowledge.semantic.layer.super-types`에 규칙을 적었다. 지금 값은 `hi-japan/frontend.yml`, `hi-japan/backend.yml`로 옮겼다. 이 키가 남아 있으면 `application-yml`이라는 묶음으로 맨 뒤에 붙여 쓰고 경고를 남긴다.

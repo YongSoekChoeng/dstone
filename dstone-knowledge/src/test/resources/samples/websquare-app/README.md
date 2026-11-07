@@ -24,7 +24,7 @@ WebSquare 화면은 JSP와 달리 서버가 열어 주지 않고, 화면이 떠�
 | 쿼리 파일에 없는 이름 | `new QueryProperty("OrderD.selectGone")` | `UNRESOLVED`로 남긴다 |
 | 이름을 변수로 넘김 | `new QueryProperty(queryName)` | 잇지 않는다 |
 | 거래 ID로 불리는 메소드 = 진입점 | `OrderService#performORD0100M01S`, `#performORD0100M02U` | 규칙의 이름 틀(`perform{id}`)에 맞는 공개 메소드 → 진입점 `TRANSACTION`, 주소 자리에 거래 ID |
-| 상위 타입으로 계층 정하기 | `OrderService extends AbstractMainService`, `OrderD extends JdbcDAO` (둘 다 jar 없음, import로 전체 이름만 안다) | 규칙 `conf/rules/jef.yml`의 `layers.superTypes` → `OrderService` `CONTROLLER`, `OrderD` `REPOSITORY` (`MEDIUM`). 이름 끝말(`…Service`)로 짐작한 `SERVICE`보다 먼저다 |
+| 상위 타입으로 계층 정하기 | `OrderService extends AbstractMainService`, `OrderD extends JdbcDAO` (둘 다 jar 없음, import로 전체 이름만 안다) | 규칙 `conf/rules/hi-japan/backend.yml`의 `layers.superTypes` → `OrderService` `CONTROLLER`, `OrderD` `REPOSITORY` (`MEDIUM`). 이름 끝말(`…Service`)로 짐작한 `SERVICE`보다 먼저다 |
 | 화면이 다른 화면을 끼워 넣거나 띄움 | `OrderList.xml`: `<w2:wframe src="/shop/ui/common/Header.xml">`, `openPopup("/shop/ui/order/OrderPopup.xml?mode=view")` | `INCLUDES` 2건. 앞의 컨텍스트 경로와 뒤의 `?파라미터`는 떼고 찾는다 |
 | 공통 함수가 여는 화면 | `Header.xml`: `shopLib.searchOrder({})` → `js/shop_lib.js`의 `shopLib.searchOrder`가 `shopLib.openOrderPopup`을 부르고, 그 함수가 `/ui/order/OrderPopup.xml`을 연다 | `Header.xml` → `OrderPopup.xml` `INCLUDES` 1건 (`MEDIUM`, `via = COMMON_SCRIPT`). 함수 안에서 주석으로 지운 옛 화면(`Header.xml`)과 파일 머리 주석의 예시는 보지 않는다. 스크립트 파일은 종류 `SCRIPT`로 목록에만 오른다 |
 | 공통 함수 안의 거래 호출 | 같은 `shopLib.searchOrder` 본문의 `ShopJS.svr.doRequestAjax("ORD0100M01S", …)` | `Header.xml` → `OrderService#performORD0100M01S` `REQUESTS` (`MEDIUM`, `via = COMMON_SCRIPT`, `commonFunction = shopLib.searchOrder`). 줄 번호는 화면에서 그 함수를 부른 줄 |
@@ -52,7 +52,7 @@ WebSquare 화면은 JSP와 달리 서버가 열어 주지 않고, 화면이 떠�
 
 ## 규칙 설정
 
-거래 ID 규칙은 규칙 파일 `conf/rules/hi-japan.yml`의 `screens.calls`에 있다(`{ function: doRequestAjax, method: "perform{id}" }`).
+거래 ID 규칙은 규칙 파일 `conf/rules/hi-japan/frontend.yml`의 `screens.calls`에 있다(`{ function: doRequestAjax, method: "perform{id}" }`).
 이 표본과 `HI-Japan`은 같은 규칙을 쓴다. 주소로 부르는 화면은 규칙 없이도 이어진다.
 
-계층 규칙과 `QueryProperty` SQL 이름 규칙은 `conf/rules/jef.yml`에 있다(`layers.superTypes`, `callArguments`). 적는 법은 `conf/rules/README.md`.
+계층 규칙과 `QueryProperty` SQL 이름 규칙은 `conf/rules/hi-japan/backend.yml`에 있다(`layers.superTypes`, `callArguments`). 적는 법은 `conf/rules/README.md`.

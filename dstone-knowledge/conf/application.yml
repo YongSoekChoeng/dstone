@@ -101,7 +101,7 @@ dstone:
             # 적는 법은 그 폴더의 README.md. 서버가 뜰 때 모두 검사하고(틀리면 뜨지 않는다), 분석할 때마다 다시 읽는다.
             # 규칙 파일을 고쳤으면 서버를 다시 띄우지 않고 rerunFrom=SEMANTIC 으로 다시 돌리면 된다.
             # 비워 두면 설정 폴더(APP_CONF_DIR) 아래 rules 폴더를 쓴다.
-            # (예전의 screen.call-rules / field-rules / open-rules / menu-rules, layer.super-types 키는 conf/rules/hi-japan.yml, jef.yml 로 옮겼다.
+            # (예전의 screen.call-rules / field-rules / open-rules / menu-rules, layer.super-types 키는 conf/rules/hi-japan/frontend.yml, hi-japan/backend.yml 로 옮겼다.
             #  이 키를 다시 적으면 읽기는 하지만 경고를 남긴다.)
             rules-dir:
         # RESOLVE 단계 (호출이 누구를 가리키는지 풀기)
