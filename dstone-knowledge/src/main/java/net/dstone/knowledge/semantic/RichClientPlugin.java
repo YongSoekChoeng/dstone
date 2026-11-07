@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -153,13 +154,75 @@ public class RichClientPlugin implements SemanticPlugin {
 			return "리치클라이언트 화면 없음.";
 		}
 		int endpoints = insertEndpoints(revisionId, counts);
+		int hinted = saveRuleStatus(revisionId, counts, rules, openRules);
 		return "리치클라이언트 화면 " + counts.files + "개. 주소로 이은 요청 " + counts.byPath + ", 거래 호출로 이은 요청 " + counts.byCall
 				+ "(메소드 없음 " + counts.missing + ", ID를 글자로 적지 않은 호출 " + counts.unknown + "), 화면 → 화면 " + counts.screens
 				+ "(그 가운데 공통 함수를 거친 것 " + counts.byCommon + "), 공통 함수를 거친 요청 거래 " + counts.byCommonCall
 				+ " / 주소 " + counts.byCommonPath
 				+ "(화면을 열거나 서버를 부르는 공통 함수 " + (commons == null ? 0 : commons.size())
 				+ ", 여러 곳에 정의돼 쓰지 않은 이름 " + counts.ambiguous + "), 거래 진입점 " + endpoints
-				+ ", 화면명을 찾은 화면 " + counts.titled + ".";
+				+ ", 화면명을 찾은 화면 " + counts.titled
+				+ (hinted > 0 ? ". ID가 다른 자리에 있는 것 같은 규칙 " + hinted + "개(규칙 후보 API 참고)" : "") + ".";
+	}
+
+	/**
+	 * <pre>
+	 * 규칙이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출을 함수별로 남깁니다(SEMANTIC_STATUS, name = SCREEN_RULES).
+	 * 그런 호출의 다른 자리에 따옴표 글자가 있었으면 자리마다 셉니다(literalAt). 다른 규칙이 이미 보는 자리는 뺍니다.
+	 *   예: fnOpenPage(param, "JIMC1000G") 가 12건이면 {kind: OPEN, function: fnOpenPage, argIndex: 0, calls: 12, literalAt: {"1": 12}}
+	 * 규칙 후보 API(GET /api/revisions/{id}/rules/candidates 의 screenRules)가 이것으로 argIndex 규칙을 제안합니다.
+	 * </pre>
+	 *
+	 * @return 다른 자리에 글자가 있었던 규칙 수
+	 */
+	private int saveRuleStatus(long revisionId, Counts counts, List<ScreenScript.CallRule> rules, List<ScreenScript.CallRule> openRules) {
+		List<Map<String, Object>> entries = new ArrayList<Map<String, Object>>();
+		int hinted = 0;
+		for (Map.Entry<String, NotLiteral> e : counts.notLiteral.entrySet()) {
+			NotLiteral n = e.getValue();
+			List<ScreenScript.CallRule> sameKind = "OPEN".equals(n.kind) ? openRules : rules;
+			Map<String, Integer> literalAt = new LinkedHashMap<String, Integer>();
+			for (Map.Entry<Integer, Integer> at : n.literalAt.entrySet()) {
+				if (!covered(sameKind, n.rule.getFunction(), at.getKey().intValue())) {
+					literalAt.put(String.valueOf(at.getKey()), at.getValue());
+				}
+			}
+			Map<String, Object> entry = new LinkedHashMap<String, Object>();
+			entry.put("kind", n.kind);
+			entry.put("function", n.rule.getFunction());
+			entry.put("template", n.rule.getMethodTemplate());
+			entry.put("argIndex", Integer.valueOf(n.rule.getArgIndex()));
+			entry.put("calls", Integer.valueOf(n.calls));
+			entry.put("literalAt", literalAt);
+			entries.add(entry);
+			if (!literalAt.isEmpty()) {
+				hinted++;
+			}
+		}
+		Map<String, Object> properties = new LinkedHashMap<String, Object>();
+		properties.put("notLiteral", entries);
+		semanticDao.insertSemanticResource(revisionId, "SEMANTIC_STATUS", null, "SCREEN_RULES", null, "OK", properties, null);
+		return hinted;
+	}
+
+	/** 같은 함수의 그 자리를 보는 규칙이 이미 있는지 */
+	private boolean covered(List<ScreenScript.CallRule> rules, String function, int argIndex) {
+		for (int i = 0; i < rules.size(); i++) {
+			ScreenScript.CallRule rule = rules.get(i);
+			if (!rule.isField() && rule.getFunction().equals(function) && rule.getArgIndex() == argIndex) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** 규칙 하나(종류, 함수, 자리)에서 ID를 글자로 적지 않아 건너뛴 호출의 집계 */
+	private static class NotLiteral {
+		String kind;
+		ScreenScript.CallRule rule;
+		int calls;
+		/** 다른 자리 → 그 자리에 따옴표 글자가 있었던 호출 수 */
+		Map<Integer, Integer> literalAt = new TreeMap<Integer, Integer>();
 	}
 
 	/** 화면명(<title>, titletext)을 찾아 남깁니다. 남겼으면 1 */
@@ -346,6 +409,9 @@ public class RichClientPlugin implements SemanticPlugin {
 			if (name == null) {
 				// ID를 변수로 넘겼거나, 메소드 이름이 될 수 없는 글자다. 짐작하지 않는다.
 				counts.unknown++;
+				if (call.getId() == null && !call.getRule().isField()) {
+					counts.notLiteral("CALL", call);
+				}
 				continue;
 			}
 			if (!counts.usedRules.contains(call.getRule())) {
@@ -429,6 +495,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			ScreenScript.Call open = opens.get(c);
 			if (open.getId() == null) {
 				// 화면 ID를 변수로 넘겼다. 짐작하지 않는다.
+				counts.notLiteral("OPEN", open);
 				continue;
 			}
 			Long target = findScreen(revisionId, open.getRule().fill(open.getId()));
@@ -740,6 +807,26 @@ public class RichClientPlugin implements SemanticPlugin {
 		int titled;
 		/** 이 프로젝트의 화면이 실제로 쓰는 규칙들 */
 		List<ScreenScript.CallRule> usedRules = new ArrayList<ScreenScript.CallRule>();
+		/** 규칙(종류|함수|틀|자리)마다 ID를 글자로 적지 않아 건너뛴 호출 */
+		Map<String, NotLiteral> notLiteral = new LinkedHashMap<String, NotLiteral>();
+
+		void notLiteral(String kind, ScreenScript.Call call) {
+			ScreenScript.CallRule rule = call.getRule();
+			String key = kind + "|" + rule.getFunction() + "|" + rule.getMethodTemplate() + "|" + rule.getArgIndex();
+			NotLiteral n = notLiteral.get(key);
+			if (n == null) {
+				n = new NotLiteral();
+				n.kind = kind;
+				n.rule = rule;
+				notLiteral.put(key, n);
+			}
+			n.calls++;
+			List<Integer> positions = call.otherLiteralPositions();
+			for (int i = 0; i < positions.size(); i++) {
+				Integer count = n.literalAt.get(positions.get(i));
+				n.literalAt.put(positions.get(i), Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+			}
+		}
 	}
 
 }

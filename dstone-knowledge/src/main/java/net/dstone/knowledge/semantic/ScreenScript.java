@@ -33,9 +33,11 @@ public class ScreenScript {
 
 	/**
 	 * <pre>
-	 * 거래 호출 규칙 하나. "이 함수의 첫 인자(거래 ID)로 이 이름의 메소드가 불린다"는 뜻입니다.
+	 * 거래 호출 규칙 하나. "이 함수의 n번째 인자(거래 ID)로 이 이름의 메소드가 불린다"는 뜻입니다.
 	 * 예: 함수 doRequestAjax, 메소드 이름 틀 perform{id}
 	 *     → doRequestAjax("JCST0200M01S") 는 performJCST0200M01S 메소드를 부른다.
+	 * 기본은 첫 인자입니다. argIndex 를 주면 그 자리의 인자를 봅니다(0부터 센다).
+	 *     예: argIndex 1 → fnOpenPage(param, "JIMC1000G") 의 "JIMC1000G"
 	 * </pre>
 	 */
 	public static class CallRule {
@@ -47,14 +49,31 @@ public class ScreenScript {
 		private final int idGroup;
 		/** 함수 호출이 아니라 폼 필드(name=…, value=…)를 보는 규칙인지 */
 		private final boolean field;
+		/** 몇 번째 인자가 ID 인지(0부터). 폼 필드 규칙은 늘 0 */
+		private final int argIndex;
 
 		public CallRule(String function, String methodTemplate) {
+			this(function, methodTemplate, 0);
+		}
+
+		/**
+		 * @param argIndex ID 가 들어 있는 인자의 자리(0부터). 0 이면 첫 인자
+		 */
+		public CallRule(String function, String methodTemplate, int argIndex) {
 			this.function = function;
 			this.methodTemplate = methodTemplate;
-			// 함수 이름 앞에 다른 이름 글자가 붙어 있으면 다른 함수다(xdoRequestAjax). 점은 괜찮다(HiJS.svr.doRequestAjax).
-			// 첫 인자가 따옴표로 싼 글자가 아니면(변수 등) 2번 묶음이 비어 있다.
-			this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])" + Pattern.quote(function) + "\\s*\\(\\s*(?:([\"'])([^\"'\\\\\\r\\n]{1,200})\\1)?");
-			this.idGroup = 2;
+			this.argIndex = argIndex;
+			if (argIndex == 0) {
+				// 함수 이름 앞에 다른 이름 글자가 붙어 있으면 다른 함수다(xdoRequestAjax). 점은 괜찮다(HiJS.svr.doRequestAjax).
+				// 첫 인자가 따옴표로 싼 글자가 아니면(변수 등) 2번 묶음이 비어 있다.
+				this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])" + Pattern.quote(function) + "\\s*\\(\\s*(?:([\"'])([^\"'\\\\\\r\\n]{1,200})\\1)?");
+				this.idGroup = 2;
+			} else {
+				// 둘째 인자부터는 정규식으로 자리를 셀 수 없다(인자 안에 쉼표, 괄호, 문자열이 들어간다). 여는 괄호까지만 찾고
+				// 인자는 findCalls 가 괄호 짝을 맞춰 나눈다.
+				this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])" + Pattern.quote(function) + "\\s*\\(");
+				this.idGroup = -1;
+			}
 			this.field = false;
 		}
 
@@ -68,6 +87,7 @@ public class ScreenScript {
 					+ "(?:([\"'])([^\"'\\\\\\r\\n<>]{1,200})\\2)?");
 			this.idGroup = 3;
 			this.field = field;
+			this.argIndex = 0;
 		}
 
 		/** 폼 필드 규칙을 만듭니다. 이 이름의 필드에 적힌 값(거래 ID)으로 메소드 이름을 만듭니다. */
@@ -88,6 +108,11 @@ public class ScreenScript {
 			return methodTemplate;
 		}
 
+		/** ID 가 들어 있는 인자의 자리(0부터) */
+		public int getArgIndex() {
+			return argIndex;
+		}
+
 		/** 거래 ID로 메소드 이름을 만듭니다. 메소드 이름이 될 수 없는 글자가 섞이면 null */
 		public String methodNameOf(String id) {
 			String name = fill(id);
@@ -106,11 +131,32 @@ public class ScreenScript {
 		private final CallRule rule;
 		private final String id;
 		private final int index;
+		/** 자리마다 따옴표 글자 하나인 인자의 값(아니면 null). 인자를 나눠 보지 않았으면 null */
+		private final List<String> literals;
 
-		Call(CallRule rule, String id, int index) {
+		Call(CallRule rule, String id, int index, List<String> literals) {
 			this.rule = rule;
 			this.id = id;
 			this.index = index;
+			this.literals = literals;
+		}
+
+		/**
+		 * <pre>
+		 * 규칙이 보는 자리 말고 다른 자리에 따옴표 글자가 있는 인자의 자리들.
+		 * ID 를 글자로 적지 않은 호출에서, ID 가 사실은 다른 자리에 있는지 가늠할 때 씁니다(규칙 후보).
+		 * </pre>
+		 */
+		public List<Integer> otherLiteralPositions() {
+			List<Integer> positions = new ArrayList<Integer>();
+			if (literals != null) {
+				for (int i = 0; i < literals.size(); i++) {
+					if (i != rule.getArgIndex() && literals.get(i) != null) {
+						positions.add(Integer.valueOf(i));
+					}
+				}
+			}
+			return positions;
 		}
 
 		public CallRule getRule() {
@@ -202,7 +248,21 @@ public class ScreenScript {
 				if (comments.get(m.start()) || (!rule.isField() && isDeclaration(text, m.start()))) {
 					continue;
 				}
-				calls.add(new Call(rule, m.group(rule.idGroup), m.start()));
+				if (rule.isField()) {
+					calls.add(new Call(rule, m.group(rule.idGroup), m.start(), null));
+					continue;
+				}
+				String id = rule.idGroup > 0 ? m.group(rule.idGroup) : null;
+				List<String> literals = null;
+				if (id == null) {
+					// 첫 인자 규칙에서 첫 인자가 글자가 아니거나, 둘째 인자부터를 보는 규칙이다. 괄호 짝을 맞춰 인자를 나눈다.
+					int open = text.lastIndexOf('(', m.end() - 1);
+					literals = literalArguments(text, open + 1, comments);
+					if (literals != null && rule.idGroup < 0 && rule.getArgIndex() < literals.size()) {
+						id = literals.get(rule.getArgIndex());
+					}
+				}
+				calls.add(new Call(rule, id, m.start(), literals));
 			}
 		}
 		return calls;
@@ -315,6 +375,80 @@ public class ScreenScript {
 	private int closeOf(String text, int from, String close) {
 		int found = text.indexOf(close, from);
 		return found < 0 ? text.length() : found + close.length();
+	}
+
+	/** 인자를 나눌 때 볼 글자 수의 한도. 괄호 짝이 맞지 않는 글에서 끝까지 훑지 않게 한다 */
+	private static final int MAX_ARGUMENT_CHARS = 5000;
+
+	/** 나누어 볼 인자 수의 한도. 규칙의 argIndex 한도(9)와 맞춘다 */
+	private static final int MAX_ARGUMENTS = 10;
+
+	/** 인자 하나가 따옴표 글자 하나인지. 2번 묶음이 그 값이다 */
+	private static final Pattern LITERAL = Pattern.compile("([\"'])([^\"'\\\\\\r\\n]{1,200})\\1");
+
+	/**
+	 * <pre>
+	 * 여는 괄호 바로 뒤(from)부터 짝이 맞는 닫는 괄호까지를 인자로 나누고, 인자마다 따옴표 글자 하나면 그 값을, 아니면 null 을 돌려줍니다.
+	 *   fnOpenPage(param, "JIMC1000G", {mode: "a, b"}) → [null, JIMC1000G, null]
+	 * 인자 안의 문자열, 중첩된 괄호({…}, […], f(a, b)), 주석 속의 쉼표는 나누는 곳으로 보지 않습니다.
+	 * 괄호 짝이 맞지 않거나 너무 길면 null 입니다(짐작하지 않는다). 앞의 MAX_ARGUMENTS 개만 봅니다.
+	 * </pre>
+	 */
+	public List<String> literalArguments(String text, int from, BitSet comments) {
+		List<String> literals = new ArrayList<String>();
+		StringBuilder current = new StringBuilder();
+		int depth = 0;
+		char quote = 0;
+		int limit = Math.min(text.length(), from + MAX_ARGUMENT_CHARS);
+		for (int i = from; i < limit; i++) {
+			char c = text.charAt(i);
+			if (quote != 0) {
+				current.append(c);
+				if (c == '\\' && i + 1 < limit) {
+					current.append(text.charAt(++i));
+				} else if (c == quote) {
+					quote = 0;
+				}
+				continue;
+			}
+			if (comments.get(i)) {
+				continue;
+			}
+			if (c == '"' || c == '\'' || c == '`') {
+				quote = c;
+				current.append(c);
+				continue;
+			}
+			if (c == '(' || c == '[' || c == '{') {
+				depth++;
+			} else if (c == ')' || c == ']' || c == '}') {
+				if (depth == 0) {
+					if (c != ')') {
+						return null;
+					}
+					if (literals.size() > 0 || current.toString().trim().length() > 0) {
+						literals.add(literalOf(current.toString()));
+					}
+					return literals;
+				}
+				depth--;
+			} else if (c == ',' && depth == 0) {
+				literals.add(literalOf(current.toString()));
+				current.setLength(0);
+				if (literals.size() >= MAX_ARGUMENTS) {
+					return literals;
+				}
+				continue;
+			}
+			current.append(c);
+		}
+		return null;
+	}
+
+	/** 인자가 따옴표 글자 하나면 그 값, 아니면 null */
+	private String literalOf(String argument) {
+		Matcher m = LITERAL.matcher(argument.trim());
+		return m.matches() ? m.group(2) : null;
 	}
 
 	/** 호출이 아니라 함수를 만드는 곳인지. 예: function doRequestAjax(tranId) { */

@@ -94,6 +94,11 @@ public class RuleDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectSuperTypeCandidates", param);
 	}
 
+	/** @return [{kind: CALL|OPEN, function, template, argIndex, calls, literalAt, literalCalls}] - 다른 자리에 글자가 있던 화면 규칙 */
+	public List<Map<String, Object>> selectScreenRuleCandidates(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectScreenRuleCandidates", revisionId);
+	}
+
 	/** @return {types, typesWithoutLayer, typesWithLowLayer, endpoints, sqlCalls, sqlCallsNotFound, statementsWithoutCaller} */
 	public Map<String, Object> selectCandidateSummary(long revisionId) {
 		return sqlSessionCommon.selectOne(NS + "selectCandidateSummary", revisionId);

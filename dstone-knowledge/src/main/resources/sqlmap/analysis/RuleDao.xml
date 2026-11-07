@@ -249,6 +249,24 @@
          LIMIT #{limit}
     </select>
 
+    <!-- 화면 규칙이 건너뛴 호출(RichClientPlugin 이 남긴 SEMANTIC_STATUS / SCREEN_RULES 행) 가운데, 다른 자리에 따옴표 글자가 있던 것.
+         규칙마다 글자가 가장 많이 있던 자리 하나(literalAt)와 그 호출 수(literalCalls). 화면이 없거나 그런 호출이 없으면 빈 목록 -->
+    <select id="selectScreenRuleCandidates" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT e->>'kind' AS "kind", e->>'function' AS "function", e->>'template' AS "template"
+             , (e->>'argIndex')::int AS "argIndex", (e->>'calls')::int AS "calls"
+             , best.k::int AS "literalAt", best.v::int AS "literalCalls"
+          FROM analysis_resource r
+         CROSS JOIN LATERAL jsonb_array_elements(r.properties_json->'notLiteral') AS e
+         CROSS JOIN LATERAL (
+                SELECT key AS k, value AS v FROM jsonb_each_text(e->'literalAt')
+                 ORDER BY value::int DESC, key::int
+                 LIMIT 1) best
+         WHERE r.revision_id = #{revisionId}
+           AND r.resource_type = 'SEMANTIC_STATUS'
+           AND r.name = 'SCREEN_RULES'
+         ORDER BY best.v::int DESC, 2
+    </select>
+
     <!-- 후보 화면의 요약: 아직 풀리지 않은 것들의 수 -->
     <select id="selectCandidateSummary" parameterType="long" resultType="java.util.LinkedHashMap">
         SELECT (SELECT COUNT(*) FROM analysis_symbol s

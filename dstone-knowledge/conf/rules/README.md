@@ -85,6 +85,7 @@ callArguments:          # 호출의 n번째 인자로 넘긴 글자 → SQL 또�
 
 screens:                # 리치클라이언트 화면(WebSquare, Nexacro)
   calls:  [{ function: doRequestAjax, method: "perform{id}" }]   # 화면 함수의 첫 인자(거래 ID) → 메소드
+                                                                # argIndex: 1 처럼 적으면 그 자리의 인자를 본다(calls, opens)
   fields: [{ field: tranId, method: "perform{id}" }]            # 폼 필드 값(거래 ID) → 메소드
   opens:  [{ function: fnOpenPage, screen: "{id}.xml" }]        # 화면 ID → 화면 파일
   menus:  [{ nameKey: MENU_NM, pathKey: SRC_PATH }]             # 메뉴 목록 → 화면명
@@ -95,6 +96,22 @@ screens:                # 리치클라이언트 화면(WebSquare, Nexacro)
 - 애노테이션은 `@` 없이 단순 이름으로 적는다(`Service`). 상위 타입과 `receiverTypes`는 전체 이름으로 적는다.
 - 목록 자리에 값을 하나만 적어도 된다(`annotations: Service`).
 - `{`로 시작하는 값과 `@`로 시작하는 값은 따옴표로 감싼다(YAML 문법).
+
+### 화면 규칙의 인자 자리(`argIndex`)
+
+`screens.calls`와 `screens.opens`는 기본으로 함수의 첫 인자를 본다. ID가 다른 자리에 있으면 `argIndex`를 적는다(0부터).
+
+```yaml
+screens:
+  opens:
+    - { function: fnOpenPage, screen: "{id}.xml" }                # fnOpenPage("JIMC1000G", …)
+    - { function: fnOpenPage, screen: "{id}.xml", argIndex: 1 }   # fnOpenPage(param, "JIMC1000G", …)
+```
+
+- 같은 함수에 자리가 다른 규칙을 함께 둘 수 있다. 한 호출에 둘 다 맞으면 둘 다 보지만, 틀을 채운 경로로 끝나는 화면이 하나일 때(거래면 그 이름의 메소드가 있을 때)만 잇는다.
+- 짝이 맞는 닫는 괄호까지 인자를 나눈다. 인자 안의 문자열, 중첩된 괄호(`{mode: "a, b"}`, `f(x, y)`), 주석 속 쉼표는 나누는 곳으로 보지 않는다. 그 자리의 인자가 따옴표 글자 하나일 때만 ID로 쓴다. 괄호 짝이 맞지 않으면 잇지 않는다.
+- "아무 자리나 화면 이름이면 잇는다"는 없다. 자리가 호출마다 다르면 자리마다 규칙을 적는다.
+- 규칙이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출은 SEMANTIC이 함수별로 센다. 그 호출의 다른 자리에 따옴표 글자가 있었으면 후보 API의 `screenRules`가 `argIndex` 규칙을 제안한다.
 
 ### 호출 인자 규칙이 잇는 기준
 
@@ -111,6 +128,7 @@ screens:                # 리치클라이언트 화면(WebSquare, Nexacro)
    - `callArguments`: 따옴표 글자를 인자로 받는 호출 가운데 그 글자가 이 프로젝트의 SQL 이름이나 JSP 화면 이름과 같은 것. 몇 번째 인자인지, RESOLVE가 가장 많이 푼 대상 타입도 함께 나온다.
    - `annotations`: 규칙이 모르는 애노테이션 가운데 많이 붙은 것. `unexplained`는 계층 없는 타입이나 진입점 아닌 메소드에 붙은 수다.
    - `superTypes`: 규칙이 모르는 상위 타입 가운데 계층이 비었거나 LOW인 하위 타입이 많은 것
+   - `screenRules`: 화면 규칙이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출 가운데, 다른 자리에 따옴표 글자가 있던 것(예: `fnOpenPage(param, "JIMC1000G")` → `argIndex: 1`)
    - 후보마다 붙여 넣을 규칙 조각(`suggestion`)이 있다. 계층과 진입점 종류는 짐작이니 꼭 고친다.
 2. **시험 적용**: `POST /api/revisions/{id}/rules/trial`, 본문 `{"ruleSet": "name: order-system/backend\n..."}`
    - SEMANTIC을 한 트랜잭션 안에서 실제로 돌려 보고 전후 차이(묶음별 수, 새로 생긴 것과 없어진 것의 보기)를 알려 준 뒤 모두 되돌린다. DB에는 아무것도 남지 않는다.

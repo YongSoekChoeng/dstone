@@ -223,6 +223,9 @@ public class RuleService extends BaseObject {
 	 *   callArguments  따옴표 글자를 인자로 받는 호출 가운데, 그 글자가 이 프로젝트의 SQL 이름이나 JSP 화면 이름과 같은 것
 	 *   annotations    규칙이 모르는 애노테이션 가운데 많이 붙은 것(unexplained: 계층 없는 타입, 진입점 아닌 메소드에 붙은 수)
 	 *   superTypes     규칙이 모르는 상위 타입 가운데, 계층이 없거나 LOW 인 하위 타입이 많은 것
+	 *   screenRules    화면 규칙(screens.calls / opens)이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출 가운데,
+	 *                  다른 자리에 따옴표 글자가 있던 것. 예: fnOpenPage(param, "JIMC1000G") → argIndex: 1 규칙 제안
+	 *                  (SEMANTIC 이 남긴 집계를 읽으므로, 이 기능 전에 분석한 리비전은 SEMANTIC 을 다시 돌려야 나온다)
 	 * 후보마다 규칙 파일에 붙여 넣을 조각(suggestion)을 함께 줍니다. 계층이나 진입점 종류는 짐작이라 꼭 고쳐서 시험해 보세요.
 	 * </pre>
 	 */
@@ -250,17 +253,32 @@ public class RuleService extends BaseObject {
 			superTypes.get(i).put("suggestion", superTypeSuggestion(superTypes.get(i), rules));
 		}
 
+		List<Map<String, Object>> screenRules = screenRuleCandidates(revisionId);
+
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("revisionId", Long.valueOf(revisionId));
 		result.put("projectId", revision.get("projectId"));
 		result.put("ruleSets", names(rules.getSets()));
 		result.put("summary", ruleDao.selectCandidateSummary(revisionId));
+		result.put("screenRules", screenRules);
 		result.put("callArguments", calls);
 		result.put("annotations", annotations);
 		result.put("superTypes", superTypes);
 		result.put("howTo", "suggestion 을 규칙 묶음(name 포함)으로 엮어 POST /api/revisions/" + revisionId
 				+ "/rules/trial 로 시험한 뒤, " + ruleRegistry.rulesDir().getPath() + " 에 저장하고 rerunFrom=SEMANTIC 으로 다시 돌리세요.");
 		return result;
+	}
+
+	/** SEMANTIC 이 남긴 화면 규칙 집계에서, 다른 자리에 글자가 있던 것에 규칙 조각을 붙입니다. 글자가 가장 많던 자리를 제안합니다. */
+	private List<Map<String, Object>> screenRuleCandidates(long revisionId) {
+		List<Map<String, Object>> candidates = ruleDao.selectScreenRuleCandidates(revisionId);
+		for (int i = 0; i < candidates.size(); i++) {
+			Map<String, Object> c = candidates.get(i);
+			boolean open = "OPEN".equals(c.get("kind"));
+			c.put("suggestion", "screens:\n  " + (open ? "opens" : "calls") + ":\n    - { function: " + c.get("function")
+					+ ", " + (open ? "screen" : "method") + ": \"" + c.get("template") + "\", argIndex: " + c.get("literalAt") + " }\n");
+		}
+		return candidates;
 	}
 
 	/* ============================== 도우미 ============================== */

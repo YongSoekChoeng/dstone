@@ -170,6 +170,42 @@ public class ScreenScriptTest {
 		return texts;
 	}
 
+	@Test
+	public void 둘째_인자부터를_보는_규칙은_괄호_짝을_맞춰_인자를_나눈다() {
+		String text = "scwin.a = function() {\n"
+				+ "  parent.scwin.fnOpenPage(param, \"JIMC1000G\", {mode: \"a, b\"});\n"            // 둘째 인자
+				+ "  fnOpenPage(f(x, \"y\"), 'JIMC2000G');\n"                                    // 첫 인자 안의 쉼표와 문자열
+				+ "  fnOpenPage(param /* , \"JIMC9999G\" */, \"JIMC3000G\");\n"                  // 주석 속 쉼표
+				+ "  fnOpenPage(param, pageId);\n"                                                 // 변수
+				+ "  fnOpenPage(\"JIMC4000G\");\n"                                                // 둘째 인자가 없다
+				+ "  // fnOpenPage(param, \"JIMC5000G\");\n"                                       // 주석 안의 호출
+				+ "};";
+		ScreenScript.CallRule second = new ScreenScript.CallRule("fnOpenPage", "{id}.xml", 1);
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, java.util.Arrays.asList(second));
+		assertEquals(5, calls.size());
+		assertEquals("JIMC1000G", calls.get(0).getId());
+		assertEquals("JIMC2000G", calls.get(1).getId());
+		assertEquals("JIMC3000G", calls.get(2).getId());
+		assertNull(calls.get(3).getId());
+		assertNull(calls.get(4).getId());
+		// 첫 인자 규칙의 결과는 그대로다. 첫 인자가 글자가 아닌 호출은 다른 자리의 글자를 알려 준다(규칙 후보).
+		ScreenScript.CallRule first = new ScreenScript.CallRule("fnOpenPage", "{id}.xml");
+		List<ScreenScript.Call> byFirst = screenScript.findCalls(text, java.util.Arrays.asList(first));
+		assertEquals(5, byFirst.size());
+		assertNull(byFirst.get(0).getId());
+		assertEquals(java.util.Arrays.asList(Integer.valueOf(1)), byFirst.get(0).otherLiteralPositions());
+		assertEquals("JIMC4000G", byFirst.get(4).getId());
+		assertTrue(byFirst.get(3).otherLiteralPositions().isEmpty());
+	}
+
+	@Test
+	public void 괄호_짝이_맞지_않으면_인자를_짐작하지_않는다() {
+		String text = "fnOpenPage(param, \"JIMC1000G\"";
+		assertNull(screenScript.literalArguments(text, text.indexOf('(') + 1, screenScript.commentMask(text)));
+		String empty = "fnOpenPage()";
+		assertTrue(screenScript.literalArguments(empty, empty.indexOf('(') + 1, screenScript.commentMask(empty)).isEmpty());
+	}
+
 	private String read(String path) throws Exception {
 		return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
 	}

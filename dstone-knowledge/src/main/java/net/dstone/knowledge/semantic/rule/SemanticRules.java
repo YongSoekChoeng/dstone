@@ -114,7 +114,7 @@ public class SemanticRules {
 	private void addScreenRules(List<ScreenScript.CallRule> target, List<ScreenScript.CallRule> rules, Set<String> keys, String kind) {
 		for (int i = 0; i < rules.size(); i++) {
 			ScreenScript.CallRule rule = rules.get(i);
-			if (keys.add(kind + "|" + rule.getFunction() + "|" + rule.getMethodTemplate())) {
+			if (keys.add(kind + "|" + rule.getFunction() + "|" + rule.getMethodTemplate() + "|" + rule.getArgIndex())) {
 				target.add(rule);
 			}
 		}

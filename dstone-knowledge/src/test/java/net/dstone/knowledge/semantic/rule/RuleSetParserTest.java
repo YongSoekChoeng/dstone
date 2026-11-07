@@ -106,6 +106,8 @@ public class RuleSetParserTest {
 		assertEquals("^redirect:", view.exclude);
 
 		assertEquals("callTx", set.screenCalls.get(0).getFunction());
+		assertEquals(0, set.screenCalls.get(0).getArgIndex());
+		assertEquals(1, parse("screens:\n  opens: [{ function: openPage, screen: '{id}.xml', argIndex: 1 }]\n", "x.yml").screenOpens.get(0).getArgIndex());
 		assertTrue(set.screenFields.get(0).isField());
 		assertEquals("JIMC1000G.xml", set.screenOpens.get(0).fill("JIMC1000G"));
 		assertEquals("SRC_PATH", set.screenMenus.get(0).getPathKey());

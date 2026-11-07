@@ -208,10 +208,7 @@ public class RuleSetParser {
 			if (methods.isEmpty() && constructors.isEmpty()) {
 				throw r.error(path, "methods(메소드 이름)나 constructors(생성자 타입 이름)를 하나 이상 적어야 합니다.");
 			}
-			int argIndex = r.optInt(item, path, "argIndex", 0);
-			if (argIndex < 0 || argIndex > MAX_ARG_INDEX) {
-				throw r.error(path + ".argIndex", "0 부터 " + MAX_ARG_INDEX + " 사이여야 합니다: " + argIndex);
-			}
+			int argIndex = r.argIndex(item, path);
 			List<String> receiverTypes = r.qualifiedNamesOptional(item, path, "receiverTypes");
 			if (!receiverTypes.isEmpty() && methods.isEmpty()) {
 				throw r.error(path + ".receiverTypes", "receiverTypes 는 메소드 호출(methods)에만 씁니다. 생성자는 타입 이름 자체가 대상입니다.");
@@ -242,8 +239,8 @@ public class RuleSetParser {
 		for (int i = 0; i < calls.size(); i++) {
 			String path = "screens.calls[" + i + "]";
 			Map<String, Object> item = r.map(calls.get(i), path);
-			r.keys(item, path, "function", "method");
-			b.screenCalls.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "method")));
+			r.keys(item, path, "function", "method", "argIndex");
+			b.screenCalls.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "method"), r.argIndex(item, path)));
 		}
 		List<Object> fields = r.list(screens.get("fields"), "screens.fields");
 		for (int i = 0; i < fields.size(); i++) {
@@ -256,8 +253,8 @@ public class RuleSetParser {
 		for (int i = 0; i < opens.size(); i++) {
 			String path = "screens.opens[" + i + "]";
 			Map<String, Object> item = r.map(opens.get(i), path);
-			r.keys(item, path, "function", "screen");
-			b.screenOpens.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "screen")));
+			r.keys(item, path, "function", "screen", "argIndex");
+			b.screenOpens.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "screen"), r.argIndex(item, path)));
 		}
 		List<Object> menus = r.list(screens.get("menus"), "screens.menus");
 		for (int i = 0; i < menus.size(); i++) {
@@ -439,6 +436,15 @@ public class RuleSetParser {
 				throw error(path + ".endpointType", "영문 대문자와 _ 로 20자 이내여야 합니다: " + type);
 			}
 			return type;
+		}
+
+		/** 몇 번째 인자인지(0부터, 기본 0). 0 ~ MAX_ARG_INDEX */
+		int argIndex(Map<String, Object> map, String path) {
+			int argIndex = optInt(map, path, "argIndex", 0);
+			if (argIndex < 0 || argIndex > MAX_ARG_INDEX) {
+				throw error(path + ".argIndex", "0 부터 " + MAX_ARG_INDEX + " 사이여야 합니다: " + argIndex);
+			}
+			return argIndex;
 		}
 
 		/** {id} 가 들어 있는 틀 */
