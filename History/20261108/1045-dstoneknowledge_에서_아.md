@@ -1512,3 +1512,20 @@ Revision 90 (created 10:25) was created by someone else on the 4081 instance res
 - 그 사이에 만들어진 dstone-boot 리비전 90(10:25)도 건드리지 않았습니다.
 
 이번 변경까지 반영하려면 pull → `mvn clean package` → `bin/startApp.sh` → dstone-boot에 `rerunFrom: SEMANTIC` 순서로 진행하면 됩니다. 제가 진행할까요?
+
+---
+
+## 질문
+
+올려줘.
+
+---
+
+## 답변
+
+새로 올릴 것은 없습니다. 이번 변경 커밋 `e45c8fa8`(JSP가 `<script src>`로 불러오는 스크립트의 주소도 `REQUESTS`로 잇기)은 이미 GitHub `origin/main`에 들어가 있고, 방금 다시 확인했습니다.
+
+- 로컬 `main`과 `origin/main`은 같은 상태입니다. 아직 푸시하지 않은 커밋은 없습니다.
+- 커밋하지 않은 파일은 `docs/temp/knowledge분석프로세스.md` 하나뿐입니다. `docs/temp`는 커밋하지 않는 폴더라서 그대로 두었습니다.
+
+4081 인스턴스는 지금도 꺼져 있습니다. 재빌드·재기동과 dstone-boot 재분석이 필요하면 말씀해 주세요.
