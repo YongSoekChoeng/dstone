@@ -80,12 +80,18 @@ public class SymbolDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectSyntheticFieldType", param);
 	}
 
-	/** 프로젝트 전체에서 이 이름(과 파라미터 수)의 메소드 ID들. limit개까지만 가져옵니다. */
-	public List<String> selectMethodCandidates(long revisionId, String name, Integer paramCount, int limit) {
+	/**
+	 * <pre>
+	 * 프로젝트 전체에서 이 이름(과 파라미터 수)의 메소드 ID들. limit개까지만 가져옵니다.
+	 * private 메소드는 부르는 쪽과 같은 파일(callerFileId)에 있는 것만 넣습니다.
+	 * </pre>
+	 */
+	public List<String> selectMethodCandidates(long revisionId, String name, Integer paramCount, long callerFileId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
 		param.put("name", name);
 		param.put("paramCount", paramCount);
+		param.put("callerFileId", Long.valueOf(callerFileId));
 		param.put("limit", limit);
 		return sqlSessionCommon.selectList(NS + "selectMethodCandidates", param);
 	}

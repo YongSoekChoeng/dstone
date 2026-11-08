@@ -81,6 +81,8 @@
            AND name = #{name}
            AND NOT is_constructor
         <if test="paramCount != null">AND param_count = #{paramCount}</if>
+           -- 다른 파일의 private 메소드는 부를 수 없다
+           AND (visibility IS DISTINCT FROM 'private' OR file_id = #{callerFileId})
          ORDER BY method_id
          LIMIT #{limit}
     </select>

@@ -483,13 +483,17 @@ public class ReferenceResolver {
 	 * <pre>
 	 * 어느 타입의 메소드인지 전혀 모를 때, 프로젝트 전체에서 이름(과 인자 수)이 같은 메소드를 찾습니다.
 	 * 후보가 몇 개 안 될 때만 잇고(LOW), 많으면 짐작하지 않습니다. get, toString 같은 흔한 이름은 여기서 걸러집니다.
+	 * 다른 파일의 private 메소드는 부를 수 없으므로 후보에서 뺍니다.
 	 * </pre>
 	 */
 	private void guessByName(FileContext context, Map<String, Object> reference, String relationType, String name, Integer argCount, String failure) {
-		String key = name + "/" + argCount;
+		// private 메소드는 같은 파일(같은 최상위 타입) 안에서만 부를 수 있다. 다른 파일의 private 메소드는 후보가 아니다.
+		// (EncUtil 의 decrypt 호출이 sso_application.jsp 안의 private decrypt 와 이어지던 것)
+		// 그래서 후보는 파일마다 다르고, 캐시 키에도 파일을 넣는다.
+		String key = name + "/" + argCount + "/" + context.fileId;
 		List<String> found = candidates.get(key);
 		if (found == null) {
-			found = symbolDao.selectMethodCandidates(revisionId, name, argCount, MAX_CANDIDATES + 1);
+			found = symbolDao.selectMethodCandidates(revisionId, name, argCount, context.fileId, MAX_CANDIDATES + 1);
 			candidates.put(key, found);
 		}
 		if (found.isEmpty()) {
@@ -945,7 +949,54 @@ public class ReferenceResolver {
 			if (dbSolver.isProjectType(inOwnerPackage)) {
 				return inOwnerPackage;
 			}
+			// 프로젝트 밖의 타입을 돌려주는 메소드: EncUtil.getEncryptor() 가 돌려주는 org.jasypt...StandardPBEStringEncryptor.
+			// jar 가 없어도 그 메소드가 있는 파일의 import 로 전체 이름을 알 수 있다.
+			// 여기서 null 을 돌려주면 부르는 쪽은 대상 타입을 몰라 프로젝트 전체에서 이름으로 짐작하게 된다(엉뚱한 decrypt 와 잇는다).
+			return externalTypeOf(ownerLocation, returnType);
+		}
+		return null;
+	}
+
+	/**
+	 * <pre>
+	 * 소스에 적힌 타입 이름(written)을, 그 이름이 적힌 파일(location)의 import 로 전체 이름으로 바꿉니다.
+	 * 프로젝트 밖의 타입만 다룹니다(프로젝트 안의 타입은 부르는 쪽에서 먼저 맞춰 본다).
+	 *   StandardPBEStringEncryptor + import org.jasypt.encryption.pbe.StandardPBEStringEncryptor → 그 전체 이름
+	 *   org.jasypt.X (이미 전체 이름)                                                            → 그대로
+	 *   String (import 없음, java.lang 에 있음)                                                    → java.lang.String
+	 * 기본형(int, void), 배열, 알 수 없는 이름이면 null 입니다. 짐작하지 않습니다.
+	 * </pre>
+	 */
+	private String externalTypeOf(Map<String, Object> location, String written) {
+		if (written == null || written.length() == 0 || written.indexOf('[') >= 0 || !Character.isJavaIdentifierStart(written.charAt(0))) {
 			return null;
+		}
+		int dot = written.indexOf('.');
+		String first = dot < 0 ? written : written.substring(0, dot);
+		String rest = dot < 0 ? "" : written.substring(dot);
+		if (dot >= 0 && Character.isLowerCase(first.charAt(0))) {
+			return written;
+		}
+		if (!Character.isUpperCase(first.charAt(0))) {
+			// 소문자로 시작하는 한 마디 이름은 기본형(int, boolean)이거나 타입 파라미터가 아닌 무언가다.
+			return null;
+		}
+		CompilationUnit unit = location == null ? null : dbSolver.unitOf(location);
+		if (unit != null) {
+			for (int i = 0; i < unit.getImports().size(); i++) {
+				ImportDeclaration declaration = unit.getImports().get(i);
+				if (declaration.isStatic() || declaration.isAsterisk()) {
+					continue;
+				}
+				String imported = declaration.getNameAsString();
+				if (imported.endsWith("." + first)) {
+					return imported + rest;
+				}
+			}
+		}
+		String javaLang = "java.lang." + written;
+		if (dot < 0 && isKnownType(javaLang)) {
+			return javaLang;
 		}
 		return null;
 	}
