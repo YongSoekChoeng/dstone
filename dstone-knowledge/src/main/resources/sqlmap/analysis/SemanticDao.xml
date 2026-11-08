@@ -162,7 +162,10 @@
                   FROM <include refid="jsonTexts"><property name="v" value="mm.attributes_json->rl.method_attribute"/></include> AS e(text)
                  WHERE rl.http_method IS NULL
                ) hm
-         CROSS JOIN LATERAL (SELECT regexp_replace('/' || cp.path || '/' || mp.path, '/+', '/', 'g') AS path) joined
+         -- 클래스 주소가 /* 로 끝나면 그 /* 를 떼고 잇는다. Spring 이 주소를 합치는 규칙과 같다.
+         -- @RequestMapping("/sample/user/*") + @RequestMapping("/listUser.do") → /sample/user/listUser.do (/sample/user/*/listUser.do 가 아니다)
+         -- /** 로 끝나면 Spring 도 그대로 잇는다(/a/** + /b → /a/**/b).
+         CROSS JOIN LATERAL (SELECT regexp_replace('/' || regexp_replace(cp.path, '/\*$', '') || '/' || mp.path, '/+', '/', 'g') AS path) joined
          WHERE mm.target_kind = 'METHOD'
     </insert>
 
