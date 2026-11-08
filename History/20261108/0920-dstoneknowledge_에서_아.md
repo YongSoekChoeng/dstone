@@ -1082,3 +1082,18 @@ Cleanup is done. Next I'll update the RESOLVE description in the docs.
 3. hen을 **새 리비전으로** 분석합니다.
 
 hen에 `classpath`(Maven 의존성 jar 목록)까지 등록하면, 지금 이름으로 짐작한 관계 214개 가운데 대부분이 해석기로 확실하게 풀립니다.
+
+---
+
+## 질문
+
+올렸어?
+
+---
+
+## 답변
+
+네, 올렸습니다. 커밋 `1cdb04e4`(외부 타입을 돌려주는 호출 뒤의 메소드를 이름으로 짐작하지 않음)는 GitHub `origin/main`에 들어가 있고, 방금 다시 확인했습니다.
+
+- 로컬 `main`과 `origin/main`은 같은 상태입니다. 아직 푸시하지 않은 커밋은 없습니다.
+- 커밋하지 않은 파일은 `docs/temp/knowledge분석프로세스.md` 하나뿐입니다. `docs/temp`는 커밋하지 않는 폴더라 그대로 두었습니다.
