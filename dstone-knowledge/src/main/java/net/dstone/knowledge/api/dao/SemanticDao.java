@@ -227,6 +227,20 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/** 이 경로이거나 이 경로로 끝나는 JSP 파일의 ID들(최대 2개. 하나뿐인지 보려는 것) */
+	/**
+	 * <pre>
+	 * 이 경로로 끝나는 스크립트 파일(file_type = SCRIPT). 둘 이상이면 2개까지만 돌려줍니다.
+	 * </pre>
+	 *
+	 * @return [{fileId, path, encoding}]
+	 */
+	public List<Map<String, Object>> selectScriptByPathEnd(long revisionId, String path) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("path", path);
+		return sqlSessionCommon.selectList(NS + "selectScriptByPathEnd", param);
+	}
+
 	public List<Long> selectJspByPathEnd(long revisionId, String path) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

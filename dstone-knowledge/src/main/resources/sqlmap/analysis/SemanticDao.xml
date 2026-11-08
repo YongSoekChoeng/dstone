@@ -484,6 +484,18 @@
          LIMIT 2
     </select>
 
+    <!-- 화면이 <script src> 로 불러오는 스크립트 파일. 그 경로로 끝나는 파일을 찾는다(앞의 컨텍스트 경로, 웹 루트 폴더는 몰라도 된다).
+         둘 이상이면 어느 것인지 모르므로 부르는 쪽이 버린다 -->
+    <select id="selectScriptByPathEnd" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT file_id AS "fileId", path AS "path", encoding AS "encoding"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND file_type = 'SCRIPT'
+           AND (path = #{path} OR right(path, length(#{path}) + 1) = '/' || #{path})
+         ORDER BY file_id
+         LIMIT 2
+    </select>
+
     <!-- ================= 리치클라이언트 화면 (WebSquare / Nexacro / X-Platform) ================= -->
 
     <select id="selectFilePageByLanguages" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">

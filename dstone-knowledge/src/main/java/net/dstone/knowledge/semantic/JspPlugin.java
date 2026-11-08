@@ -30,6 +30,7 @@ import net.dstone.knowledge.semantic.rule.RuleSet;
  *   메소드 ─RENDERS→ JSP    컨트롤러의 메소드가 이 화면을 연다 (new ModelAndView("order/list"), setViewName(...))
  *                           어떤 호출의 몇 번째 인자가 화면 이름인지는 규칙 파일의 callArguments(target: VIEW)에 있다(conf/rules/spring.yml)
  *   JSP ─REQUESTS→ 메소드   이 화면이 이 메소드의 주소를 요청한다 (form action, AJAX url, 링크)
+ *                           화면이 &lt;script src&gt; 로 불러오는 프로젝트 안의 .js 에 적힌 주소도 잇는다(via = SCRIPT_SRC, ScriptSources)
  *   JSP ─INCLUDES→ JSP      이 화면이 다른 JSP를 끼워 넣는다 (jsp:include, include 지시자)
  * 이것이 있어야 "이 화면에서 저장을 누르면 어디로 가나", "이 메소드는 어느 화면에서 불리나"를 따라갈 수 있습니다.
  *
@@ -45,6 +46,7 @@ import net.dstone.knowledge.semantic.rule.RuleSet;
  *
  * 아직 다루지 않는 것:
  * - 주소를 JavaScript에서 조립하는 경우('/order/' + type + '.do').
+ * - 불러온 스크립트가 또 다른 스크립트를 불러오는 경우(import, 동적 로딩). 화면에 적힌 &lt;script src&gt; 한 단계만 본다.
  * - 컨텍스트 경로를 글자로 붙여 쓴 경우(/myapp/order/list.do).
  * - return "order/list" 처럼 메소드가 뷰 이름을 문자열로 돌려주는 방식, Tiles 정의 이름.
  *
@@ -67,6 +69,10 @@ public class JspPlugin implements SemanticPlugin {
 
 	@Autowired
 	private EncodingDetector encodingDetector;
+
+	private final ScriptSources scriptSources = new ScriptSources();
+
+	private final ScreenScript screenScript = new ScreenScript();
 
 	@Override
 	public String name() {
@@ -106,7 +112,9 @@ public class JspPlugin implements SemanticPlugin {
 		}
 
 		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
-		int files = 0, requests = 0, includes = 0, titled = 0;
+		// 스크립트 경로 → 그 스크립트에 적힌 진입점 주소. 여러 화면이 같은 공통 스크립트를 불러오므로 한 번만 읽는다.
+		Map<String, ScriptPaths> scripts = new HashMap<String, ScriptPaths>();
+		int files = 0, requests = 0, includes = 0, titled = 0, byScript = 0;
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
@@ -128,11 +136,13 @@ public class JspPlugin implements SemanticPlugin {
 				}
 				files++;
 				titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
-				requests += linkRequests(revisionId, fileId, text, handlers);
+				Set<String> linked = new HashSet<String>();
+				requests += linkRequests(revisionId, fileId, text, handlers, linked);
+				byScript += linkScriptRequests(revisionId, fileId, text, handlers, linked, root, scripts);
 				includes += linkIncludes(revisionId, fileId, (String) file.get("path"), text);
 			}
 		}
-		return "JSP " + files + "개. 화면 계층 " + layered + ", 메소드가 여는 화면 " + renders + ", 화면이 요청하는 주소 " + requests + ", 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
+		return "JSP " + files + "개. 화면 계층 " + layered + ", 메소드가 여는 화면 " + renders + ", 화면이 요청하는 주소 " + requests + "(불러온 스크립트에 적힌 것 " + byScript + "), 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
 	}
 
 	/** 화면명(<title>, titletext)을 찾아 남깁니다. 남겼으면 1 */
@@ -147,13 +157,12 @@ public class JspPlugin implements SemanticPlugin {
 		return 1;
 	}
 
-	/** JSP 안의 주소 가운데 진입점과 같은 것을 찾아 잇습니다. 같은 메소드는 한 번만 잇습니다. */
-	private int linkRequests(long revisionId, long fileId, String text, Map<String, List<String>> handlers) {
+	/** JSP 안의 주소 가운데 진입점과 같은 것을 찾아 잇습니다. 같은 메소드는 한 번만 잇습니다(linked). */
+	private int linkRequests(long revisionId, long fileId, String text, Map<String, List<String>> handlers, Set<String> linked) {
 		if (handlers.isEmpty()) {
 			return 0;
 		}
 		int count = 0;
-		Set<String> linked = new HashSet<String>();
 		Matcher m = PATH.matcher(text);
 		while (m.find()) {
 			List<String> methods = handlers.get(m.group());
@@ -173,6 +182,87 @@ public class JspPlugin implements SemanticPlugin {
 			}
 		}
 		return count;
+	}
+
+	/** 스크립트 파일 하나와 거기에 적힌 진입점 주소들 */
+	private static class ScriptPaths {
+		/** 스크립트의 프로젝트 안 경로. 찾지 못했거나 여럿이면 null */
+		String scriptPath;
+		/** 진입점과 같은 주소. 나온 순서대로, 같은 것은 한 번 */
+		List<String> paths = new ArrayList<String>();
+	}
+
+	/**
+	 * <pre>
+	 * 화면이 &lt;script src&gt; 로 불러오는 스크립트에 적힌 주소 가운데 진입점과 같은 것을 잇습니다(via = SCRIPT_SRC).
+	 * 스크립트는 "그 경로로 끝나는 SCRIPT 파일"이 하나일 때만 씁니다. 줄 번호는 화면에서 그 스크립트를 불러온 줄입니다.
+	 * 불러온 스크립트에 주소가 적혀 있다는 것만 보고 잇는 것이라 MEDIUM 입니다(화면이 그 함수를 실제로 부르는지는 모른다).
+	 * 같은 메소드를 화면 글자에서 이미 이었으면(PATH_TEXT) 다시 잇지 않습니다.
+	 * </pre>
+	 */
+	private int linkScriptRequests(long revisionId, long fileId, String text, Map<String, List<String>> handlers, Set<String> linked
+			, Path root, Map<String, ScriptPaths> scripts) {
+		if (handlers.isEmpty()) {
+			return 0;
+		}
+		int count = 0;
+		List<ScriptSources.Source> sources = scriptSources.find(text);
+		for (int s = 0; s < sources.size(); s++) {
+			ScriptSources.Source source = sources.get(s);
+			ScriptPaths script = scriptPathsOf(revisionId, source.getPath(), handlers, root, scripts);
+			if (script.scriptPath == null) {
+				continue;
+			}
+			for (int p = 0; p < script.paths.size(); p++) {
+				String path = script.paths.get(p);
+				List<String> methods = handlers.get(path);
+				for (int i = 0; i < methods.size(); i++) {
+					if (!linked.add(methods.get(i))) {
+						continue;
+					}
+					Map<String, Object> properties = new LinkedHashMap<String, Object>();
+					properties.put("path", path);
+					properties.put("via", "SCRIPT_SRC");
+					properties.put("script", script.scriptPath);
+					semanticDao.insertRelation(relation(revisionId, "FILE", "F" + fileId, "REQUESTS", "METHOD", methods.get(i), "MEDIUM", "HEURISTIC"
+							, properties, fileId, lineAt(text, source.getIndex())));
+					count++;
+				}
+			}
+		}
+		return count;
+	}
+
+	/** 스크립트를 찾아 읽고, 적힌 주소 가운데 진입점과 같은 것을 모읍니다. 한 번 본 스크립트는 다시 읽지 않습니다. */
+	private ScriptPaths scriptPathsOf(long revisionId, String path, Map<String, List<String>> handlers, Path root, Map<String, ScriptPaths> scripts) {
+		ScriptPaths cached = scripts.get(path);
+		if (cached != null) {
+			return cached;
+		}
+		ScriptPaths script = new ScriptPaths();
+		scripts.put(path, script);
+		List<Map<String, Object>> found = semanticDao.selectScriptByPathEnd(revisionId, path);
+		if (found.size() != 1) {
+			return script;
+		}
+		String scriptPath = (String) found.get(0).get("path");
+		String text;
+		try {
+			byte[] bytes = Files.readAllBytes(root.resolve(scriptPath));
+			text = encodingDetector.decode(bytes, (String) found.get(0).get("encoding"));
+		} catch (Exception e) {
+			return script;
+		}
+		script.scriptPath = scriptPath;
+		// 주석 안의 주소는 뺀다(지워 둔 옛 호출).
+		List<ScreenScript.Hit> hits = screenScript.findPaths(text);
+		for (int i = 0; i < hits.size(); i++) {
+			String hit = hits.get(i).getText();
+			if (handlers.containsKey(hit) && !script.paths.contains(hit)) {
+				script.paths.add(hit);
+			}
+		}
+		return script;
 	}
 
 	/** 끼워 넣는 JSP를 찾아 잇습니다. 경로가 가리키는 JSP가 하나로 정해질 때만 잇습니다. */
