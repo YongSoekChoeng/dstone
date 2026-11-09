@@ -268,12 +268,16 @@ var DstoneKnowledgeProject = (function () {
 
 		el["kn-summary-sections"].innerHTML = "";
 		el["kn-summary-sections"].appendChild(verdictBox(summary));
+		el["kn-summary-sections"].appendChild(unresolvedButtons(summary));
 		T.SECTIONS.forEach(function (section) {
 			var value = valueAt(summary, section.path);
 			if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
 				return;
 			}
 			el["kn-summary-sections"].appendChild(sectionBox(section, value));
+			if (section.path === "relations.unresolvedReasons") {
+				el["kn-summary-sections"].appendChild(unresolvedButtons(summary));
+			}
 		});
 	}
 
@@ -333,6 +337,29 @@ var DstoneKnowledgeProject = (function () {
 			var mark = line[0] === "good" ? "✔" : line[0] === "bad" ? "✖" : line[0] === "warn" ? "!" : "·";
 			return "<div class=\"kn-verdict-line kn-verdict-" + line[0] + "\"><span class=\"kn-verdict-mark\">" + mark + "</span>" + K.escapeHtml(line[1]) + "</div>";
 		}).join("");
+		return box;
+	}
+
+	/**
+	 * "풀지 못한 참조 살펴보기" 단추. 못 푼 것(UNRESOLVED)과 짐작으로 이은 것(HEURISTIC)을 따로 연다.
+	 * 누르면 아래 패널에 원인 · 파일별 묶음과 한 건씩의 목록(파일 · 줄 번호)이 나온다.
+	 */
+	function unresolvedButtons(summary) {
+		var metrics = {};
+		(valueAt(summary, "relations.metrics") || []).forEach(function (row) {
+			metrics[row.name] = row.value;
+		});
+		var box = document.createElement("div");
+		box.className = "kn-row";
+		box.innerHTML = "<button type=\"button\" class=\"kn-plain\" data-status=\"UNRESOLVED\">풀지 못한 참조 살펴보기"
+			+ (metrics.callUnresolvedRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callUnresolvedRate)) + "%)" : "") + "</button>"
+			+ "<button type=\"button\" class=\"kn-plain\" data-status=\"HEURISTIC\">짐작으로 이은 참조 살펴보기"
+			+ (metrics.callHeuristicRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callHeuristicRate)) + "%)" : "") + "</button>";
+		Array.prototype.forEach.call(box.querySelectorAll("button"), function (button) {
+			button.addEventListener("click", function () {
+				DstoneKnowledgeUnresolved.open({ revisionId: summary.revisionId, revisionLabel: summary.revisionLabel }, button.getAttribute("data-status"));
+			});
+		});
 		return box;
 	}
 

@@ -820,3 +820,37 @@ body.kn-full-on {
 .ai-panel > h3 .workflow-badge {
 	font-size: 11px;
 }
+
+/* ---------- 풀지 못한 참조 살펴보기 ---------- */
+/* 원인별 · 파일별 · 이름별 표를 나란히 둔다. 좁은 화면에서는 아래로 내려간다 */
+.kn-unresolved-groups {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: 12px;
+}
+
+.kn-unresolved-groups .kn-scroll {
+	max-height: 320px;
+}
+
+/* 누를 수 있는 줄 */
+.kn-unresolved-groups tbody tr[data-index] {
+	cursor: pointer;
+}
+
+.kn-unresolved-groups tbody tr[data-index]:hover {
+	background: var(--cs-surface-2);
+}
+
+/* 지금 걸린 조건. 누르면 그 조건이 풀린다 */
+.kn-unresolved-filter {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.ai-body button.kn-unresolved-chip {
+	font-size: 12px;
+	padding: 2px 10px;
+}

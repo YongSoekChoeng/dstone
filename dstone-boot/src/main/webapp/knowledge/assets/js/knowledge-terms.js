@@ -280,7 +280,8 @@ var DstoneKnowledgeTerms = (function () {
 				["example", "예", "그 가운데 하나"]
 			],
 			read: "상태가 IGNORED 인 줄은 문제가 아닙니다(배열의 length 처럼 관계로 만들 것이 아닌 것). 볼 것은 UNRESOLVED 입니다. "
-				+ "\"프로젝트에 같은 이름의 메소드가 없습니다\"가 많으면 라이브러리(jar)가 빠진 것이고, \"프로젝트 밖의 상위 타입에서 물려받은 메소드로 보입니다\"는 프레임워크 클래스를 물려받아 쓰는 메소드라 jar 가 있으면 풀립니다."
+				+ "\"프로젝트에 같은 이름의 메소드가 없습니다\"가 많으면 라이브러리(jar)가 빠진 것이고, \"프로젝트 밖의 상위 타입에서 물려받은 메소드로 보입니다\"는 프레임워크 클래스를 물려받아 쓰는 메소드라 jar 가 있으면 풀립니다. "
+				+ "어느 파일의 어느 줄인지, 무엇을 못 찾았는지는 아래 \"풀지 못한 참조 살펴보기\" 버튼으로 봅니다."
 		},
 		{
 			path: "semantic.endpoints", title: "진입점",
@@ -485,6 +486,8 @@ var DstoneKnowledgeTerms = (function () {
 		CARDS: CARDS,
 		PASS: PASS,
 		CONFIDENCE: CONFIDENCE,
+		REF_KIND: REF_KIND,
+		REFERENCE_STATUS: REFERENCE_STATUS,
 		meaningOf: meaningOf
 	};
 })();

@@ -343,7 +343,9 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 						<tr><td>부르는 쪽이 하나도 안 나온다</td>
 							<td>진입점이라서 정말 부르는 곳이 없거나, 리플렉션 · 문자열로 만든 주소처럼 분석이 잇지 못하는 방식으로 불리는 것입니다.</td></tr>
 						<tr><td>결과에 LOW 가 많다 / 풀지 못한 참조가 많다</td>
-							<td>분석 대상의 라이브러리(jar)를 찾지 못해서일 수 있습니다. 소스 폴더 안에 jar 가 없으면 "프로젝트 · 분석" 화면의 등록 칸에 라이브러리 jar 의 위치를 적고 다시 등록한 뒤, 새로 분석합니다.</td></tr>
+							<td>분석 대상의 라이브러리(jar)를 찾지 못해서일 수 있습니다. 리비전 요약의 <b>"풀지 못한 참조 살펴보기"</b>를 누르면 무엇을 못 찾았는지(원인별), 어느 파일에 몰렸는지(파일별)와 파일 · 줄 번호가 나옵니다.
+								<code>Model</code> · <code>logger</code> · <code>HttpEntity</code> 처럼 같은 기호가 많이 나오면 그 타입이 든 jar 가 빠진 것입니다.
+								소스 폴더 안에 jar 가 없으면(Maven 프로젝트라면 <code>mvn dependency:build-classpath</code> 의 출력) "프로젝트 · 분석" 화면의 등록 칸에 jar 위치를 적고 다시 등록한 뒤, 새로 분석합니다(증분 분석이 아니라 전체 분석).</td></tr>
 						<tr><td>리비전 비교에서 "비교할 앞 리비전이 없습니다"</td>
 							<td>그 프로젝트를 한 번만 분석한 것입니다. 소스가 바뀐 뒤 한 번 더 분석하면 비교할 수 있습니다.</td></tr>
 					</tbody>

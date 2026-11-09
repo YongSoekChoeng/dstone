@@ -183,6 +183,76 @@ public class RevisionService extends BaseObject {
 
 	/**
 	 * <pre>
+	 * 풀지 못한 참조를 묶어서 셉니다. 분석률을 높이려면 어디부터 볼지 정할 때 씁니다.
+	 *   - byCause: 못 찾은 기호별 (예: Model 378건 → spring jar 가 빠졌다)
+	 *   - byFile:  못 푼 참조가 몰린 파일별
+	 *   - byName:  부르려던 이름별 (짐작으로 이은 HEURISTIC 은 이유가 비어 있어 이쪽이 더 쓸모 있다)
+	 * 조건(cause/causeKey/name/fileId/path)을 주면 그 안에서 다시 묶습니다.
+	 * causeKey 는 byCause 가 함께 돌려주는 원인의 md5 입니다. 원인 글자를 주소에 그대로 싣기 어려울 때 씁니다.
+	 * </pre>
+	 *
+	 * @param status UNRESOLVED(기본) / HEURISTIC / IGNORED
+	 * @param refKind CALL / FIELD_ACCESS / TYPE_USE ... 비우면 모든 종류
+	 */
+	public Map<String, Object> getUnresolvedGroups(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path, int limit) {
+		findRevision(revisionId);
+		Map<String, Object> condition = unresolvedCondition(revisionId, status, refKind, cause, causeKey, name, fileId, path);
+		condition.put("limit", limit < 1 ? 30 : Math.min(limit, MAX_PAGE_SIZE));
+
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("status", condition.get("status"));
+		result.put("refKind", refKind);
+		result.put("total", relationDao.countUnresolved(condition));
+		result.put("byCause", relationDao.selectUnresolvedByCause(condition));
+		result.put("byFile", relationDao.selectUnresolvedByFile(condition));
+		result.put("byName", relationDao.selectUnresolvedByName(condition));
+		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 풀지 못한 참조를 한 건씩 봅니다. 파일 경로와 줄 번호 순서입니다.
+	 * 조건은 getUnresolvedGroups와 같습니다.
+	 * </pre>
+	 *
+	 * @param page 1부터 시작
+	 */
+	public Map<String, Object> getUnresolvedList(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path, int page, int size) {
+		findRevision(revisionId);
+		int pageNo = page < 1 ? 1 : page;
+		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);
+
+		Map<String, Object> condition = unresolvedCondition(revisionId, status, refKind, cause, causeKey, name, fileId, path);
+		condition.put("size", pageSize);
+		condition.put("offset", (pageNo - 1) * pageSize);
+
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("total", relationDao.countUnresolved(condition));
+		result.put("page", pageNo);
+		result.put("size", pageSize);
+		result.put("references", relationDao.selectUnresolvedList(condition));
+		return result;
+	}
+
+	private Map<String, Object> unresolvedCondition(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path) {
+		String statusValue = status == null || status.trim().isEmpty() ? "UNRESOLVED" : status.trim().toUpperCase();
+		if (!"UNRESOLVED".equals(statusValue) && !"HEURISTIC".equals(statusValue) && !"IGNORED".equals(statusValue)) {
+			throw ApiException.badRequest("status 는 UNRESOLVED / HEURISTIC / IGNORED 가운데 하나입니다: " + status);
+		}
+		Map<String, Object> condition = new HashMap<String, Object>();
+		condition.put("revisionId", revisionId);
+		condition.put("status", statusValue);
+		condition.put("refKind", refKind == null ? null : refKind.trim().toUpperCase());
+		condition.put("cause", cause);
+		condition.put("causeKey", causeKey);
+		condition.put("name", name);
+		condition.put("fileId", fileId);
+		condition.put("path", path);
+		return condition;
+	}
+
+	/**
+	 * <pre>
 	 * 리비전과 거기에 딸린 분석 결과를 모두 지웁니다. 되돌릴 수 없습니다.
 	 * 분석이 돌고 있는 리비전은 지울 수 없습니다(먼저 취소해야 합니다).
 	 * </pre>

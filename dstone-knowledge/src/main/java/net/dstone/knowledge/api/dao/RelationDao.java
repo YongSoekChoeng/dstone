@@ -73,6 +73,37 @@ public class RelationDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectUnresolvedReasons", revisionId);
 	}
 
+	/**
+	 * <pre>
+	 * 풀지 못한 참조를 원인(못 찾은 기호)별로 셉니다.
+	 * </pre>
+	 *
+	 * @param condition revisionId, status, refKind?, cause?, name?, fileId?, path?, limit
+	 */
+	public List<Map<String, Object>> selectUnresolvedByCause(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectUnresolvedByCause", condition);
+	}
+
+	/** 풀지 못한 참조를 파일별로 셉니다. 조건은 selectUnresolvedByCause와 같습니다. */
+	public List<Map<String, Object>> selectUnresolvedByFile(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectUnresolvedByFile", condition);
+	}
+
+	/** 풀지 못한 참조를 부르려던 이름별로 셉니다. 조건은 selectUnresolvedByCause와 같습니다. */
+	public List<Map<String, Object>> selectUnresolvedByName(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectUnresolvedByName", condition);
+	}
+
+	public int countUnresolved(Map<String, Object> condition) {
+		Integer count = sqlSessionCommon.selectOne(NS + "countUnresolved", condition);
+		return count.intValue();
+	}
+
+	/** 풀지 못한 참조 한 건씩. 조건에 size, offset이 더 필요합니다. */
+	public List<Map<String, Object>> selectUnresolvedList(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectUnresolvedList", condition);
+	}
+
 	public int countMethod(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countMethod", condition);
 		return count.intValue();

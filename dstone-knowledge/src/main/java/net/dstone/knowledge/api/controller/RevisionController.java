@@ -87,6 +87,41 @@ public class RevisionController {
 		return revisionService.getEndpointList(revisionId, type, path, page, size);
 	}
 
+	/**
+	 * <pre>
+	 * 풀지 못한 참조를 원인(못 찾은 기호) · 파일 · 이름별로 묶어 셉니다.
+	 * status는 UNRESOLVED(기본) / HEURISTIC / IGNORED, refKind는 비우면 모든 종류입니다.
+	 * cause · causeKey(원인의 md5) · name · fileId는 일치 조건, path는 포함 조건입니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/unresolved/groups")
+	public Map<String, Object> getUnresolvedGroups(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "status", required = false) String status
+			, @RequestParam(name = "refKind", required = false) String refKind
+			, @RequestParam(name = "cause", required = false) String cause
+			, @RequestParam(name = "causeKey", required = false) String causeKey
+			, @RequestParam(name = "name", required = false) String name
+			, @RequestParam(name = "fileId", required = false) Long fileId
+			, @RequestParam(name = "path", required = false) String path
+			, @RequestParam(name = "limit", defaultValue = "30") int limit) {
+		return revisionService.getUnresolvedGroups(revisionId, status, refKind, cause, causeKey, name, fileId, path, limit);
+	}
+
+	/** 풀지 못한 참조 한 건씩(파일 · 줄 · 호출식 · 이유). 조건은 /unresolved/groups와 같습니다. */
+	@GetMapping("/{revisionId}/unresolved")
+	public Map<String, Object> getUnresolvedList(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "status", required = false) String status
+			, @RequestParam(name = "refKind", required = false) String refKind
+			, @RequestParam(name = "cause", required = false) String cause
+			, @RequestParam(name = "causeKey", required = false) String causeKey
+			, @RequestParam(name = "name", required = false) String name
+			, @RequestParam(name = "fileId", required = false) Long fileId
+			, @RequestParam(name = "path", required = false) String path
+			, @RequestParam(name = "page", defaultValue = "1") int page
+			, @RequestParam(name = "size", defaultValue = "50") int size) {
+		return revisionService.getUnresolvedList(revisionId, status, refKind, cause, causeKey, name, fileId, path, page, size);
+	}
+
 	/** 메소드 찾기. owner는 타입 전체 이름에 포함 조건, name은 메소드 이름 일치 조건입니다. */
 	@GetMapping("/{revisionId}/methods")
 	public Map<String, Object> getMethodList(@PathVariable("revisionId") long revisionId
