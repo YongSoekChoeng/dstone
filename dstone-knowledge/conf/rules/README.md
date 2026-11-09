@@ -17,6 +17,7 @@
 | `java.yml` | 100 | `Runnable`/`Thread`/`TimerTask`의 `run()`, `Callable`의 `call()` → THREAD 진입점 |
 | `servlet.yml` | 150 | `HttpServlet` → CONTROLLER, `Filter` → WEB_FILTER |
 | `spring.yml` | 200 | `@RequestMapping` 계열 HTTP 진입점, `@Scheduled`, 리스너, 주입, 프록시, 스테레오타입 계층, `ModelAndView` 화면 |
+| `jpa.yml` | 250 | JPA 엔티티 → 테이블, `@Query` · `@NamedQuery`, Spring Data 저장소의 메소드 이름 쿼리, `createQuery`(JPQL) · `createNamedQuery` |
 | `mybatis.yml` | 300 | SQL 이름을 첫 인자로 받는 `SqlSession`/`SqlMapClient` 메소드 |
 | `hi-japan/backend.yml` | 500 | JEF 계열 상위 타입 계층, `new QueryProperty("…")` SQL 이름 |
 | `hi-japan/frontend.yml` | 500 | HI-Japan 화면의 거래 ID 호출 함수, 출력 폼 필드, 화면 열기 함수, 메뉴 목록 |
@@ -101,6 +102,17 @@ screens:                # 리치클라이언트 화면(WebSquare, Nexacro)
   fields: [{ field: tranId, method: "perform{id}" }]            # 폼 필드 값(거래 ID) → 메소드
   opens:  [{ function: fnOpenPage, screen: "{id}.xml" }]        # 화면 ID → 화면 파일
   menus:  [{ nameKey: MENU_NM, pathKey: SRC_PATH }]             # 메뉴 목록 → 화면명
+
+jpa:                    # JPA. 엔티티 → 테이블을 알아내 JPQL 의 엔티티 이름을 테이블로 바꾼다
+  entities: [Entity]                  # 엔티티 애노테이션. name 속성이 엔티티 이름(없으면 클래스 이름)
+  tables: [Table]                     # 테이블 이름 애노테이션(name 속성)
+  naming: SNAKE_CASE                  # 테이블 애노테이션이 없을 때: SNAKE_CASE(OrderItem → ORDER_ITEM) | AS_IS(ORDERITEM)
+  queries:                            # 메소드에 붙은 쿼리. nativeAttribute 가 true 면 SQL, 아니면 JPQL
+    - { annotation: Query, attribute: value, nativeAttribute: nativeQuery }
+  namedQueries:                       # 엔티티에 붙은 이름 있는 쿼리. container 안의 것도 읽는다. native: true 면 SQL
+    - { annotation: NamedQuery, nameAttribute: name, attribute: query, container: NamedQueries }
+  repositories: [JpaRepository]       # 이 타입을 상속한 인터페이스 = 저장소. findByX 는 엔티티 테이블을 읽는다(delete… 는 지운다)
+  jpqlCalls: [createQuery]            # 이 메소드에 넘긴 Java 문자열은 JPQL 로 읽는다
 ```
 
 - 계층: `CONTROLLER, SERVICE, REPOSITORY, MODEL, VIEW, CONFIG, WEB_FILTER, UTIL, EXCEPTION, BATCH, COMPONENT, ASPECT`
@@ -153,6 +165,14 @@ ORD003,cancelOrder
 - 대응표가 있는 `calls` 규칙은 **대응표의 ID 하나하나를 `TRANSACTION` 진입점**으로 올린다(메소드가 하나로 정해질 때만). 프레임워크가 그 표를 보고 메소드를 부르기 때문이다.
 - 대응표 파일은 규칙 폴더 밖을 가리킬 수 없다. 대응표를 고치면 묶음의 해시도 바뀌어 `GET /api/revisions/{id}/rules`에서 `CHANGED`로 보인다.
 - `idCase`처럼 정규식 없이 바꾸는 것만 적어도 된다. 대응표가 없는 규칙에서 점이 든 값(`order.list`)은 메소드 이름으로 보지 않는다.
+
+### 규칙 없이 코드가 하는 것: Java 문자열 SQL, 주소 상수, 상위 클래스의 주소
+
+아래 셋은 언어(Java)와 Spring 자체의 규칙이라 규칙 파일이 없다(2026-11-09).
+
+- **Java 문자열 SQL**: 메소드 안에서 `"SELECT …" + …`, `sql += …`, `sb.append(…)`, 같은 클래스의 상수로 만든 글이 SQL처럼 생겼으면 SQL statement(`mapper_type = JAVA`)가 되고 테이블과 이어진다. 그 글이 `jpa.jpqlCalls`의 메소드(`createQuery`)로 넘어가면 JPQL로 읽는다. 모르는 값은 `?`로 둔다.
+- **주소 상수**: `@RequestMapping(Urls.ORDER)`, `@GetMapping(BASE + "/list")`는 상수를 따라가 계산한다. 못 하면(static import, 다른 jar의 상수) 진입점의 `properties_json.unresolvedPath`에 남는다.
+- **상위 클래스 · 인터페이스의 주소**: 클래스에 주소가 없으면 상위 타입의 클래스 주소를 쓰고, 상위 타입의 주소 메소드는 그것을 물려받은 컨트롤러의 진입점이 된다. 컨트롤러인지는 `layers.annotations`가 정한 `CONTROLLER` 계층이나 주소 애노테이션으로 본다. 그래서 사내 컨트롤러 애노테이션을 쓰면 `layers.annotations`에 적어 두어야 물려받는다.
 
 ### 호출 인자 규칙이 잇는 기준
 

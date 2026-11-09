@@ -28,7 +28,7 @@ import net.dstone.knowledge.job.AnalysisPass;
  *           자원을 옮긴다          처리한다          되는 파일을 골라 옮긴다   푼다
  *
  * 여기서 옮기는 것은 "파일 하나만 보면 정해지는 결과"입니다.
- *   - DECLARE의 결과: 타입, 메소드, 필드, 애노테이션, 참조
+ *   - DECLARE의 결과: 타입, 메소드, 필드, 애노테이션, 참조, Java 문자열 SQL
  *   - RESOURCE의 결과: SQL statement, 설정 값, 그 밖의 자원
  * 옮긴 파일은 그 단계가 "끝남"으로 표시되므로 DECLARE와 RESOURCE가 건너뜁니다.
  * 다른 파일에 따라 달라지는 결과(풀린 관계)는 바뀐 파일의 선언이 들어온 뒤에 CARRY_RESOLVE가 따로 판단합니다.
@@ -42,8 +42,9 @@ public class CarryPass extends BaseObject implements AnalysisPass {
 
 	public static final String NAME = "CARRY";
 
-	/** DECLARE가 파일마다 쓰는 테이블 */
-	private static final String[] DECLARE_TABLES = { "analysis_symbol", "analysis_method", "analysis_field", "analysis_annotation", "analysis_reference" };
+	/** DECLARE가 파일마다 쓰는 테이블. analysis_mapper 는 Java 문자열 SQL(mapper_type JAVA) 때문이다(Java 파일에는 RESOURCE 단계가 없다) */
+	private static final String[] DECLARE_TABLES = { "analysis_symbol", "analysis_method", "analysis_field", "analysis_annotation", "analysis_reference"
+			, "analysis_mapper" };
 
 	/** RESOURCE가 파일마다 쓰는 테이블 */
 	private static final String[] RESOURCE_TABLES = { "analysis_mapper", "analysis_config", "analysis_resource" };

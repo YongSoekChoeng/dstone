@@ -351,7 +351,7 @@ CREATE INDEX IF NOT EXISTS idx_analysis_config_file ON analysis_config(file_id);
 CREATE TABLE IF NOT EXISTS analysis_mapper (
     mapper_id         BIGSERIAL     PRIMARY KEY,
     revision_id       BIGINT        NOT NULL,
-    mapper_type       VARCHAR(20)   NOT NULL,            -- MYBATIS/IBATIS/QUERY_XML
+    mapper_type       VARCHAR(20)   NOT NULL,            -- MYBATIS/IBATIS/QUERY_XML/JAVA(Java 문자열 SQL)/JPA
     namespace         VARCHAR(1000),
     statement_id      VARCHAR(300)  NOT NULL,
     statement_type    VARCHAR(20),                       -- SELECT/INSERT/UPDATE/DELETE
@@ -366,6 +366,9 @@ CREATE TABLE IF NOT EXISTS analysis_mapper (
 CREATE INDEX IF NOT EXISTS idx_analysis_mapper_stmt   ON analysis_mapper(revision_id, namespace, statement_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_mapper_method ON analysis_mapper(revision_id, method_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_mapper_file   ON analysis_mapper(file_id);
+-- Java 소스에 문자열로 적은 SQL(mapper_type JAVA, DECLARE 단계)과 JPA 쿼리(mapper_type JPA, SEMANTIC 단계)도 이 테이블에 넣는다.
+-- 그 행의 덧붙임 정보: 어느 메소드 · 상수의 것인지, 무엇에 넘겼는지, JPQL 인지 등. 이미 만든 DB 에도 생기도록 ALTER 로 추가한다.
+ALTER TABLE analysis_mapper ADD COLUMN IF NOT EXISTS properties_json JSONB NOT NULL DEFAULT '{}';
 
 -- 그 밖의 리소스 항목: XML 의 element/attribute, Spring XML 의 bean 정의, web.xml 의 서블릿 매핑 등
 CREATE TABLE IF NOT EXISTS analysis_resource (

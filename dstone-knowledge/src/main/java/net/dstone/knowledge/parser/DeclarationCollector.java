@@ -194,6 +194,16 @@ public class DeclarationCollector {
 		Map<String, String> lombok = new LinkedHashMap<String, String>();
 		/** record의 구성 요소(이름, 타입) */
 		List<String[]> recordComponents = new ArrayList<String[]>();
+		/** 바깥 타입(중첩 · 익명 · 지역 클래스일 때). Java 문자열 SQL 의 상수를 바깥에서도 찾는다 */
+		TypeContext outer;
+		/** 소스에 적힌 이름(익명 클래스는 null) */
+		String simpleName;
+		/** final 필드의 초기값 식. Java 문자열 SQL 을 계산할 때 쓴다 */
+		Map<String, Expression> constants = new LinkedHashMap<String, Expression>();
+		/** SQL 상수 → 그 상수를 그대로 넘긴 메소드들 */
+		Map<String, List<String>> constantUsers = new LinkedHashMap<String, List<String>>();
+		/** 이 타입에서 SQL 이름으로 쓴 메소드 이름 → 몇 번 썼는지(같은 메소드에 SQL 이 여럿이면 이름#2 …) */
+		Map<String, Integer> sqlNames = new HashMap<String, Integer>();
 	}
 
 	/**
@@ -259,6 +269,9 @@ public class DeclarationCollector {
 		context.row = row;
 		context.fqn = fqn;
 		context.isInterface = isInterface || "ANNOTATION".equals(kind);
+		context.outer = outer;
+		context.simpleName = type.getNameAsString();
+		collectConstants(type.getMembers(), context);
 		From fromType = new From("TYPE", row.getSymbolId());
 
 		declareAnnotations(type.getAnnotations(), "TYPE", row.getSymbolId(), null, context.lombok);
@@ -281,6 +294,7 @@ public class DeclarationCollector {
 		for (int i = 0; i < members.size(); i++) {
 			declareMember(members.get(i), context);
 		}
+		addConstantSql(context);
 
 		// 여기부터는 소스에 없지만 컴파일하면 생기는 멤버들
 		if ("RECORD".equals(kind)) {
@@ -330,10 +344,13 @@ public class DeclarationCollector {
 		TypeContext context = new TypeContext();
 		context.row = row;
 		context.fqn = row.getFqn();
+		context.outer = outer;
+		collectConstants(body, context);
 		addReference(new From("TYPE", row.getSymbolId()), "ANONYMOUS_SUPER", superTypeName, null, null, creation);
 		for (int i = 0; i < body.size(); i++) {
 			declareMember(body.get(i), context);
 		}
+		addConstantSql(context);
 	}
 
 	/** enum 상수는 그 enum 타입의 public static final 필드로 넣습니다(컴파일하면 실제로 그렇게 됩니다). */
@@ -422,6 +439,7 @@ public class DeclarationCollector {
 			if (addMethod(context, row)) {
 				declareAnnotations(constructor.getAnnotations(), "METHOD", row.getMethodId(), null, null);
 				walk(constructor.getBody(), new From("METHOD", row.getMethodId()), context);
+				collectSql(context, row, constructor.getBody());
 			}
 		} else if (member instanceof InitializerDeclaration) {
 			// 초기화 블록(static { ... } 포함)은 메소드가 아니라서, 그 안의 참조는 타입에서 나가는 것으로 적는다.
@@ -508,7 +526,135 @@ public class DeclarationCollector {
 		}
 		if (body != null) {
 			walk(body, from, context);
+			collectSql(context, row, body);
 		}
+	}
+
+
+	/* ============================== Java 문자열 SQL ============================== */
+
+	/** 타입의 final 필드(인터페이스 필드 포함) 가운데 초기값이 있는 것을 상수로 모아 둡니다. */
+	private void collectConstants(NodeList<BodyDeclaration<?>> members, TypeContext context) {
+		for (int i = 0; i < members.size(); i++) {
+			if (!(members.get(i) instanceof FieldDeclaration)) {
+				continue;
+			}
+			FieldDeclaration declaration = (FieldDeclaration) members.get(i);
+			if (!declaration.hasModifier(Modifier.Keyword.FINAL) && !context.isInterface) {
+				continue;
+			}
+			NodeList<VariableDeclarator> variables = declaration.getVariables();
+			for (int v = 0; v < variables.size(); v++) {
+				if (variables.get(v).getInitializer().isPresent()) {
+					context.constants.put(variables.get(v).getNameAsString(), variables.get(v).getInitializer().get());
+				}
+			}
+		}
+	}
+
+	/** 이 타입과 바깥 타입들에서 상수를 찾는 곳 */
+	private JavaSqlCollector.Constants constantsOf(final TypeContext context) {
+		return new JavaSqlCollector.Constants() {
+			@Override
+			public Expression initializerOf(String name) {
+				TypeContext owner = constantOwner(context, name);
+				return owner == null ? null : owner.constants.get(name);
+			}
+
+			@Override
+			public boolean isOwnTypeName(String name) {
+				for (TypeContext c = context; c != null; c = c.outer) {
+					if (name.equals(c.simpleName)) {
+						return true;
+					}
+				}
+				return false;
+			}
+		};
+	}
+
+	/** 이 이름의 상수를 가진 타입(가까운 것부터). 없으면 null */
+	private TypeContext constantOwner(TypeContext context, String name) {
+		for (TypeContext c = context; c != null; c = c.outer) {
+			if (c.constants.containsKey(name)) {
+				return c;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * <pre>
+	 * 메소드 본문에서 Java 문자열 SQL 을 찾아 SQL statement 행(analysis_mapper, mapper_type JAVA)으로 남깁니다.
+	 * 상수를 그대로 넘긴 것은 새 행을 만들지 않고, 그 상수의 행에 "이 메소드가 썼다"고 적습니다(addConstantSql).
+	 * </pre>
+	 */
+	private void collectSql(TypeContext context, MethodRow method, Node body) {
+		List<JavaSqlCollector.Found> found = new JavaSqlCollector(constantsOf(context)).collect(body);
+		for (int i = 0; i < found.size(); i++) {
+			JavaSqlCollector.Found sql = found.get(i);
+			if (sql.constant != null) {
+				TypeContext owner = constantOwner(context, sql.constant);
+				if (owner != null) {
+					List<String> users = owner.constantUsers.get(sql.constant);
+					if (users == null) {
+						users = new ArrayList<String>();
+						owner.constantUsers.put(sql.constant, users);
+					}
+					if (!users.contains(method.getMethodId())) {
+						users.add(method.getMethodId());
+					}
+					continue;
+				}
+			}
+			Map<String, Object> properties = new LinkedHashMap<String, Object>();
+			properties.put("methodId", method.getMethodId());
+			if (sql.call != null) {
+				properties.put("call", sql.call);
+			}
+			if (sql.dynamic) {
+				properties.put("dynamic", Boolean.TRUE);
+			}
+			Integer count = context.sqlNames.get(method.getName());
+			int n = count == null ? 1 : count.intValue() + 1;
+			context.sqlNames.put(method.getName(), Integer.valueOf(n));
+			addSqlRow(context, n == 1 ? method.getName() : method.getName() + "#" + n, sql, properties);
+		}
+	}
+
+	/** SQL 을 담은 상수(final 필드)마다 행을 하나씩 만듭니다. 다른 클래스에서 쓰는 곳은 SEMANTIC 단계가 필드 접근으로 잇는다 */
+	private void addConstantSql(TypeContext context) {
+		for (Map.Entry<String, Expression> entry : context.constants.entrySet()) {
+			JavaSqlCollector.Found sql = new JavaSqlCollector(constantsOf(context)).constantValue(entry.getKey());
+			if (sql == null || !JavaSqlCollector.looksLikeSql(sql.text)) {
+				continue;
+			}
+			Map<String, Object> properties = new LinkedHashMap<String, Object>();
+			properties.put("fieldId", idOf("F", context.fqn + "#" + entry.getKey()));
+			List<String> users = context.constantUsers.get(entry.getKey());
+			if (users != null) {
+				properties.put("methods", users);
+			}
+			if (sql.dynamic) {
+				properties.put("dynamic", Boolean.TRUE);
+			}
+			Integer line = sql.line == null ? lineOf(entry.getValue()) : sql.line;
+			addSqlRow(context, entry.getKey(), new JavaSqlCollector.Found(sql.text, line, null, sql.dynamic, null), properties);
+		}
+	}
+
+	private void addSqlRow(TypeContext context, String name, JavaSqlCollector.Found sql, Map<String, Object> properties) {
+		Map<String, Object> row = new HashMap<String, Object>();
+		row.put("revisionId", revisionId);
+		row.put("mapperType", "JAVA");
+		row.put("namespace", cut(context.fqn, MAX_TEXT));
+		row.put("statementId", cut(name, MAX_NAME));
+		row.put("statementType", JavaSqlCollector.statementTypeOf(sql.text));
+		row.put("sqlBody", sql.text);
+		row.put("fileId", fileId);
+		row.put("lineStart", sql.line);
+		row.put("propertiesJson", JsonText.of(properties));
+		out.getSqlStatements().add(row);
 	}
 
 

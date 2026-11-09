@@ -78,6 +78,36 @@
          LIMIT #{limit}
     </select>
 
+    <!-- 주소를 상수로 적었는데 값을 계산하지 못한 HTTP 진입점(static import, 다른 jar 의 상수 …). 같은 식끼리 묶어 많은 것부터 -->
+    <select id="selectUnresolvedPaths" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.properties_json->>'unresolvedPath' AS "name", COUNT(*) AS "count", MIN(f.path || ':' || COALESCE(e.line_start, 0)) AS "example"
+          FROM analysis_endpoint e
+          JOIN analysis_file f ON f.file_id = e.file_id
+         WHERE e.revision_id = #{revisionId}
+           AND e.properties_json->>'unresolvedPath' IS NOT NULL
+         GROUP BY e.properties_json->>'unresolvedPath'
+         ORDER BY COUNT(*) DESC, 1
+         LIMIT #{limit}
+    </select>
+
+    <select id="countUnresolvedPaths" parameterType="long" resultType="int">
+        SELECT COUNT(*) FROM analysis_endpoint WHERE revision_id = #{revisionId} AND properties_json->>'unresolvedPath' IS NOT NULL
+    </select>
+
+    <!-- Java 소스 안의 SQL(JAVA, JPA) 가운데 테이블을 하나도 찾지 못한 것. 테이블 이름 자리가 변수이거나 엔티티를 모르는 경우다 -->
+    <select id="selectJavaSqlWithoutTable" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT mp.mapper_type AS "type", COALESCE(mp.namespace || '.', '') || mp.statement_id AS "name", f.path AS "file", mp.line_start AS "line"
+             , left(mp.sql_body, 120) AS "note"
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.mapper_type IN ('JAVA', 'JPA')
+           AND NOT EXISTS (SELECT 1 FROM analysis_relation r WHERE r.revision_id = mp.revision_id AND r.from_id = 'S' || mp.mapper_id
+                              AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE'))
+         ORDER BY f.path, mp.line_start
+         LIMIT #{limit}
+    </select>
+
     <!-- 종류를 모르는 XML(매퍼, Spring, web.xml, 화면 ... 이 아닌 것). 같은 파일 이름끼리 묶어 많은 것부터.
          프로젝트 자체 프레임워크의 설정 파일이면 endpoints.xml 규칙으로 진입점을 만들 수 있다 -->
     <select id="selectUnknownXml" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">

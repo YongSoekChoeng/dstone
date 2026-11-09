@@ -50,6 +50,20 @@ public class RuleSet {
 	public final List<ScreenScript.CallRule> screenFields;
 	public final List<ScreenScript.CallRule> screenOpens;
 	public final List<ScreenMenu.Rule> screenMenus;
+	/** JPA: 엔티티 애노테이션(name 속성 = 엔티티 이름) */
+	public final List<String> jpaEntities;
+	/** JPA: 테이블 이름 애노테이션(name 속성) */
+	public final List<String> jpaTables;
+	/** JPA: 테이블 애노테이션이 없을 때 이름 짓는 법(SNAKE_CASE / AS_IS). 적지 않았으면 null */
+	public final String jpaNaming;
+	/** JPA: 메소드에 붙은 쿼리 애노테이션(@Query) */
+	public final List<JpaQueryRule> jpaQueries;
+	/** JPA: 엔티티에 붙은 이름 있는 쿼리(@NamedQuery) */
+	public final List<JpaQueryRule> jpaNamedQueries;
+	/** JPA: 이 타입을 상속한 인터페이스는 Spring Data 저장소다(메소드 이름으로 쿼리를 만든다) */
+	public final List<String> jpaRepositories;
+	/** JPA: 이 메소드에 넘긴 Java 문자열은 SQL 이 아니라 JPQL 이다(createQuery) */
+	public final List<String> jpqlCalls;
 
 	RuleSet(Builder b) {
 		this.name = b.name;
@@ -72,6 +86,13 @@ public class RuleSet {
 		this.screenFields = Collections.unmodifiableList(b.screenFields);
 		this.screenOpens = Collections.unmodifiableList(b.screenOpens);
 		this.screenMenus = Collections.unmodifiableList(b.screenMenus);
+		this.jpaEntities = Collections.unmodifiableList(b.jpaEntities);
+		this.jpaTables = Collections.unmodifiableList(b.jpaTables);
+		this.jpaNaming = b.jpaNaming;
+		this.jpaQueries = Collections.unmodifiableList(b.jpaQueries);
+		this.jpaNamedQueries = Collections.unmodifiableList(b.jpaNamedQueries);
+		this.jpaRepositories = Collections.unmodifiableList(b.jpaRepositories);
+		this.jpqlCalls = Collections.unmodifiableList(b.jpqlCalls);
 	}
 
 	/** 이 묶음에 든 규칙 수. 리비전 기록과 화면에 보여 줄 때 쓴다 */
@@ -79,7 +100,9 @@ public class RuleSet {
 		return httpMappings.size() + annotatedEndpoints.size() + superTypeEndpoints.size() + xmlEndpoints.size()
 				+ (injectAnnotations.isEmpty() ? 0 : 1) + (proxyAnnotations.isEmpty() ? 0 : 1)
 				+ layerAnnotations.size() + layerSuperTypes.size() + layerNames.size() + callArguments.size()
-				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size();
+				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size()
+				+ (jpaEntities.isEmpty() ? 0 : 1) + jpaQueries.size() + jpaNamedQueries.size() + (jpaRepositories.isEmpty() ? 0 : 1)
+				+ (jpqlCalls.isEmpty() ? 0 : 1);
 	}
 
 	/** RuleSet 을 만드는 동안만 쓰는 그릇. RuleSetParser 와 옛 설정을 읽는 곳에서 씁니다 */
@@ -104,6 +127,13 @@ public class RuleSet {
 		List<ScreenScript.CallRule> screenFields = new ArrayList<ScreenScript.CallRule>();
 		List<ScreenScript.CallRule> screenOpens = new ArrayList<ScreenScript.CallRule>();
 		List<ScreenMenu.Rule> screenMenus = new ArrayList<ScreenMenu.Rule>();
+		List<String> jpaEntities = new ArrayList<String>();
+		List<String> jpaTables = new ArrayList<String>();
+		String jpaNaming;
+		List<JpaQueryRule> jpaQueries = new ArrayList<JpaQueryRule>();
+		List<JpaQueryRule> jpaNamedQueries = new ArrayList<JpaQueryRule>();
+		List<String> jpaRepositories = new ArrayList<String>();
+		List<String> jpqlCalls = new ArrayList<String>();
 
 		RuleSet build() {
 			return new RuleSet(this);
@@ -294,6 +324,37 @@ public class RuleSet {
 			this.prefix = prefix;
 			this.suffix = suffix;
 			this.exclude = exclude;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * JPA 쿼리 애노테이션 규칙(jpa.queries / jpa.namedQueries).
+	 *   jpa.queries      메소드에 붙는다. 예: @Query("select o from Order o") / @Query(value = "...", nativeQuery = true)
+	 *   jpa.namedQueries 엔티티에 붙고 이름이 있다. 예: @NamedQuery(name = "Order.findAll", query = "...")
+	 *                    여럿을 묶는 애노테이션(container, 예: @NamedQueries({...}))의 안쪽도 읽는다.
+	 * </pre>
+	 */
+	public static class JpaQueryRule {
+		public final String annotation;
+		/** 쿼리 글이 든 속성 */
+		public final String attribute;
+		/** 이 속성이 true 면 JPQL 이 아니라 SQL 이다(nativeQuery). 없으면 null */
+		public final String nativeAttribute;
+		/** 언제나 SQL 인 애노테이션(@NamedNativeQuery) */
+		public final boolean nativeQuery;
+		/** 이름이 든 속성(namedQueries). queries 는 null */
+		public final String nameAttribute;
+		/** 이 애노테이션 여럿을 묶는 애노테이션. 없으면 null */
+		public final String container;
+
+		public JpaQueryRule(String annotation, String attribute, String nativeAttribute, boolean nativeQuery, String nameAttribute, String container) {
+			this.annotation = annotation;
+			this.attribute = attribute;
+			this.nativeAttribute = nativeAttribute;
+			this.nativeQuery = nativeQuery;
+			this.nameAttribute = nameAttribute;
+			this.container = container;
 		}
 	}
 

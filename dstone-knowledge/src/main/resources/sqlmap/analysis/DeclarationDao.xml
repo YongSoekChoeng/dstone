@@ -10,6 +10,19 @@
         DELETE FROM ${table} WHERE file_id = #{fileId}
     </delete>
 
+    <!-- Java 문자열 SQL(JavaSqlCollector). SQL 매퍼와 같은 테이블에 mapper_type JAVA 로 넣어서, 테이블 관계 · 메소드 문서 · 영향도가 그대로 이어지게 한다 -->
+    <delete id="deleteJavaSqlByFile" parameterType="long">
+        DELETE FROM analysis_mapper WHERE file_id = #{fileId} AND mapper_type = 'JAVA'
+    </delete>
+
+    <insert id="insertJavaSql" parameterType="java.util.Map">
+        INSERT INTO analysis_mapper
+            (revision_id, mapper_type, namespace, statement_id, statement_type, sql_body, properties_json, file_id, line_start)
+        VALUES
+            (#{revisionId}, #{mapperType}, #{namespace}, #{statementId}, #{statementType}, #{sqlBody}, CAST(#{propertiesJson} AS jsonb)
+            , #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
     <insert id="insertType" parameterType="net.dstone.knowledge.parser.model.TypeRow">
         INSERT INTO analysis_symbol
             (revision_id, symbol_id, kind, fqn, simple_name, package_name, outer_symbol_id, visibility

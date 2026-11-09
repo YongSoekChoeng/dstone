@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.DiagnosticDao;
+import net.dstone.knowledge.api.dao.JavaSqlDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
@@ -78,6 +79,9 @@ public class DiagnosticService extends BaseObject {
 	private DiagnosticDao diagnosticDao;
 
 	@Autowired
+	private JavaSqlDao javaSqlDao;
+
+	@Autowired
 	private SemanticRuleRegistry ruleRegistry;
 
 	/**
@@ -101,9 +105,11 @@ public class DiagnosticService extends BaseObject {
 		checkParse(checks, metrics);
 		checkUnsupportedFiles(checks, (String) project.get("localPath"));
 		checkEndpoints(checks, revisionId);
+		checkUnresolvedPaths(checks, revisionId);
 		checkScreens(checks, revisionId);
 		checkUnresolvedTargets(checks, revisionId);
 		checkUnknownXml(checks, revisionId);
+		checkJavaSql(checks, revisionId);
 		checkLayers(checks, revisionId);
 		checkRules(checks, revisionId, projectId);
 
@@ -286,6 +292,33 @@ public class DiagnosticService extends BaseObject {
 							+ " 이름 앞뒤에 프레임워크가 글자를 붙이면 callArguments 규칙의 template 을 고칩니다(RULE)."
 					, diagnosticDao.selectUnresolvedTargets(revisionId, "EXECUTES_SQL", SAMPLES)));
 		}
+	}
+
+	private void checkUnresolvedPaths(List<Map<String, Object>> checks, long revisionId) {
+		int count = diagnosticDao.countUnresolvedPaths(revisionId);
+		if (count == 0) {
+			return;
+		}
+		checks.add(check("unresolvedPaths", "값을 모르는 주소 상수", "warn", "SOURCE", Integer.valueOf(count), null
+				, "HTTP 진입점 " + count + "개는 주소를 상수로 적었는데 그 값을 계산하지 못해, 상수 이름이 주소에 그대로 들어 있습니다."
+						+ " 상수가 분석 대상 밖(다른 jar · 모듈)에 있으면 그 소스를 더합니다(SOURCE). static import 한 상수는 아직 따라가지 못합니다(DEVELOP)."
+				, diagnosticDao.selectUnresolvedPaths(revisionId, SAMPLES)));
+	}
+
+	/** Java 문자열 SQL 과 JPA 쿼리. 있으면 알려 주고, 테이블을 찾지 못한 것을 보여 준다 */
+	private void checkJavaSql(List<Map<String, Object>> checks, long revisionId) {
+		Map<String, Object> summary = javaSqlDao.selectSummary(revisionId);
+		int java = toInt(summary.get("java")).intValue();
+		int jpa = toInt(summary.get("jpa")).intValue();
+		if (java + jpa == 0) {
+			return;
+		}
+		int noTable = toInt(summary.get("javaNoTable")).intValue() + toInt(summary.get("jpaNoTable")).intValue();
+		checks.add(check("javaSql", "Java 소스 안의 SQL", noTable == 0 ? "good" : "info", "NONE", Integer.valueOf(java + jpa), null
+				, "Java 문자열 SQL " + java + "개(모르는 부분이 든 것 " + toInt(summary.get("javaDynamic")) + "), JPA 쿼리 " + jpa + "개를 SQL 매퍼처럼 메소드 · 테이블과 이었습니다."
+						+ (noTable == 0 ? "" : " " + noTable + "개는 테이블을 찾지 못했습니다. 테이블 이름을 변수로 넘기거나(규칙으로 풀 수 없음),"
+								+ " JPQL 의 엔티티가 분석 대상에 없거나(SOURCE), 엔티티 · 테이블 애노테이션 이름이 jpa 규칙과 다릅니다(RULE).")
+				, diagnosticDao.selectJavaSqlWithoutTable(revisionId, SAMPLES)));
 	}
 
 	private void checkUnknownXml(List<Map<String, Object>> checks, long revisionId) {

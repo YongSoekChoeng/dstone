@@ -169,6 +169,56 @@
          WHERE mm.target_kind = 'METHOD'
     </insert>
 
+    <!-- ===== HTTP 진입점을 Java 로 만들 때(HttpEndpointBuilder) 읽는 것 ===== -->
+
+    <!-- 규칙의 애노테이션(메소드의 것과 클래스의 것). 메소드에 붙은 것이면 그 메소드의 이름 · 파라미터 수 · 타입을 함께 -->
+    <select id="selectHttpMappingAnnotations" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT a.target_kind AS "targetKind"
+             , a.target_id AS "targetId"
+             , a.annotation_name AS "annotationName"
+             , a.attributes_json::text AS "attributesJson"
+             , a.file_id AS "fileId"
+             , a.line_start AS "lineStart"
+             , m.owner_symbol_id AS "ownerSymbolId"
+             , m.name AS "methodName"
+             , m.param_count AS "paramCount"
+          FROM analysis_annotation a
+          LEFT JOIN analysis_method m
+            ON a.target_kind = 'METHOD' AND m.revision_id = a.revision_id AND m.method_id = a.target_id
+         WHERE a.revision_id = #{revisionId}
+           AND a.target_kind IN ('TYPE', 'METHOD')
+           AND a.annotation_name IN <foreach collection="names" item="n" open="(" separator="," close=")">#{n}</foreach>
+         ORDER BY a.annotation_id
+    </select>
+
+    <!-- 프로젝트 안 타입끼리의 상속(EXTENDS: 상위 클래스 · 상위 인터페이스, IMPLEMENTS: 구현한 인터페이스) -->
+    <select id="selectTypeEdges" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT from_id AS "fromId", to_id AS "toId", relation_type AS "relationType"
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND relation_type IN ('EXTENDS', 'IMPLEMENTS')
+           AND from_kind = 'TYPE'
+           AND to_id IS NOT NULL
+         ORDER BY relation_id
+    </select>
+
+    <select id="selectTypeFlags" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT symbol_id AS "symbolId", fqn AS "fqn", kind AS "kind", is_abstract AS "isAbstract", layer AS "layer"
+          FROM analysis_symbol
+         WHERE revision_id = #{revisionId}
+           AND symbol_id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <select id="selectMethodsOfTypes" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT method_id AS "methodId", owner_symbol_id AS "ownerSymbolId", name AS "name", param_count AS "paramCount"
+          FROM analysis_method
+         WHERE revision_id = #{revisionId}
+           AND NOT is_static
+           AND NOT is_constructor
+           AND owner_symbol_id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+         ORDER BY method_id
+    </select>
+
     <!-- 애노테이션이 붙은 메소드를 진입점으로: 규칙 파일(endpoints.annotations). 예: @Scheduled → SCHEDULED, @KafkaListener → LISTENER
          path 에는 규칙에 적은 속성(pathAttributes) 가운데 처음으로 값이 있는 것을 넣는다(예: cron, topics).
          파라미터: revisionId, endpointType, annotations[], pathAttributes[] -->

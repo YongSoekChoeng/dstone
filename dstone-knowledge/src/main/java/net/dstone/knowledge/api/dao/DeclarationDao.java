@@ -47,6 +47,9 @@ public class DeclarationDao extends BaseDao {
 		for (int i = 0; i < declarations.getReferences().size(); i++) {
 			sqlSessionBatch.insert(NS + "insertReference", declarations.getReferences().get(i));
 		}
+		for (int i = 0; i < declarations.getSqlStatements().size(); i++) {
+			sqlSessionBatch.insert(NS + "insertJavaSql", declarations.getSqlStatements().get(i));
+		}
 	}
 
 	/**
@@ -72,6 +75,8 @@ public class DeclarationDao extends BaseDao {
 			param.put("fileId", fileId);
 			sqlSessionBatch.delete(NS + "deleteByFile", param);
 		}
+		// Java 문자열 SQL 은 매퍼(RESOURCE 단계)와 같은 테이블에 있어서 이 파일의 JAVA 행만 지운다.
+		sqlSessionBatch.delete(NS + "deleteJavaSqlByFile", Long.valueOf(fileId));
 	}
 
 	/**

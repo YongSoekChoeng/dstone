@@ -28,7 +28,7 @@ import net.dstone.knowledge.symbol.BoundedCache;
  *   "글"                        → 그대로
  *   a + b                       → 이어 붙임
  *   이름, this.이름             → 자기 타입이나 상위 타입의 필드의 초기값
- *   타입.이름                   → 그 타입의 필드의 초기값
+ *   타입.이름                   → 그 타입의 필드의 초기값(바깥.중첩.이름 처럼 중첩 타입이어도 된다)
  *   이름(), this.이름()         → 자기 타입이나 상위 타입의 파라미터 없는 메소드가 return 하는 식
  *   타입.이름()                 → 그 타입의 파라미터 없는 메소드가 return 하는 식
  *
@@ -43,8 +43,9 @@ public class ConstantEvaluator {
 	/** 서로를 가리키는 상수에 걸려 끝없이 도는 것을 막습니다. */
 	private static final int MAX_DEPTH = 6;
 
-	private static final Pattern GETTER = Pattern.compile("^(?:(this|super|[A-Z]\\w*)\\.)?([A-Za-z_]\\w*)\\(\\)$");
-	private static final Pattern FIELD = Pattern.compile("^(?:(this|[A-Z]\\w*)\\.)?([A-Za-z_]\\w*)$");
+	/** 앞에 붙는 타입은 중첩 타입일 수 있다(ApiPaths.Order.LIST). 찾을 때는 마지막 마디(Order)로 찾는다 */
+	private static final Pattern GETTER = Pattern.compile("^(?:(this|super|[A-Z]\\w*(?:\\.[A-Z]\\w*)*)\\.)?([A-Za-z_]\\w*)\\(\\)$");
+	private static final Pattern FIELD = Pattern.compile("^(?:(this|[A-Z]\\w*(?:\\.[A-Z]\\w*)*)\\.)?([A-Za-z_]\\w*)$");
 	private static final Pattern RETURN = Pattern.compile("\\breturn\\s+([^;]+);");
 
 	/** "모른다"는 답도 기억해 두기 위한 표시 */
@@ -119,7 +120,7 @@ public class ConstantEvaluator {
 			return ownerSymbolId;
 		}
 		// 타입 이름을 적은 경우: 프로젝트 안에 그 이름의 타입이 하나뿐일 때만 믿는다.
-		List<Map<String, Object>> types = symbolDao.selectTypesBySimpleName(revisionId, qualifier, 2);
+		List<Map<String, Object>> types = symbolDao.selectTypesBySimpleName(revisionId, qualifier.substring(qualifier.lastIndexOf('.') + 1), 2);
 		return types.size() == 1 ? (String) types.get(0).get("symbolId") : null;
 	}
 

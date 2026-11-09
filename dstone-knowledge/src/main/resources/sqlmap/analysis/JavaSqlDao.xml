@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- Java 소스 안의 SQL: Java 문자열 SQL(mapper_type JAVA, DECLARE 가 만든다)과 JPA 쿼리(mapper_type JPA, JpaPlugin 이 만든다) -->
+<mapper namespace="net.dstone.knowledge.api.dao.JavaSqlDao">
+
+    <delete id="deleteJpaStatements" parameterType="java.util.Map">
+        DELETE FROM analysis_mapper WHERE revision_id = #{revisionId} AND mapper_type = 'JPA'
+    </delete>
+
+    <insert id="insertJpaStatement" parameterType="java.util.Map">
+        INSERT INTO analysis_mapper
+            (revision_id, mapper_type, namespace, statement_id, statement_type, sql_body, properties_json, file_id, line_start)
+        VALUES
+            (#{revisionId}, 'JPA', #{namespace}, #{statementId}, #{statementType}, #{sqlBody}, CAST(#{propertiesJson} AS jsonb)
+            , #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <!-- 이름이 맞는 애노테이션. 메소드에 붙은 것이면 그 메소드와 타입을, 타입에 붙은 것이면 그 타입을 함께 -->
+    <select id="selectAnnotations" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT a.annotation_name AS "annotationName"
+             , a.target_id AS "targetId"
+             , a.attributes_json::text AS "attributesJson"
+             , a.file_id AS "fileId"
+             , a.line_start AS "lineStart"
+             , s.symbol_id AS "ownerSymbolId"
+             , s.fqn AS "ownerFqn"
+             , s.simple_name AS "simpleName"
+             , m.name AS "methodName"
+          FROM analysis_annotation a
+          LEFT JOIN analysis_method m
+            ON a.target_kind = 'METHOD' AND m.revision_id = a.revision_id AND m.method_id = a.target_id
+          JOIN analysis_symbol s
+            ON s.revision_id = a.revision_id AND s.symbol_id = CASE WHEN a.target_kind = 'METHOD' THEN m.owner_symbol_id ELSE a.target_id END
+         WHERE a.revision_id = #{revisionId}
+           AND a.target_kind = #{targetKind}
+           AND a.annotation_name IN <foreach collection="names" item="n" open="(" separator="," close=")">#{n}</foreach>
+         ORDER BY a.annotation_id
+    </select>
+
+    <select id="selectExtends" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT from_id AS "fromId", to_id AS "toId"
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND relation_type = 'EXTENDS'
+           AND from_kind = 'TYPE'
+           AND to_id IS NOT NULL
+         ORDER BY relation_id
+    </select>
+
+    <select id="selectFieldType" parameterType="java.util.Map" resultType="string">
+        SELECT type FROM analysis_field
+         WHERE revision_id = #{revisionId} AND owner_symbol_id = #{ownerSymbolId} AND name = #{name}
+         LIMIT 1
+    </select>
+
+    <!-- 저장소 인터페이스: 적힌 상위 타입의 단순 이름이 baseTypes 에 있는 인터페이스, 그리고 그것을 (여러 단계로) 상속한 인터페이스.
+         jar 가 없어도 찾을 수 있게 RESOLVE 결과가 아니라 소스에 적힌 이름(analysis_reference)으로 본다 -->
+    <select id="selectRepositories" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH RECURSIVE repo(symbol_id) AS (
+            SELECT DISTINCT r.from_id
+              FROM analysis_reference r
+             WHERE r.revision_id = #{revisionId}
+               AND r.ref_kind = 'EXTENDS'
+               AND r.from_kind = 'TYPE'
+               AND regexp_replace(r.name, '^.*\.', '') IN <foreach collection="baseTypes" item="t" open="(" separator="," close=")">#{t}</foreach>
+            UNION
+            SELECT x.from_id
+              FROM analysis_relation x
+              JOIN repo ON x.to_id = repo.symbol_id
+             WHERE x.revision_id = #{revisionId}
+               AND x.relation_type = 'EXTENDS'
+        )
+        SELECT s.symbol_id AS "symbolId", s.fqn AS "fqn"
+          FROM repo
+          JOIN analysis_symbol s ON s.revision_id = #{revisionId} AND s.symbol_id = repo.symbol_id
+         WHERE s.kind = 'INTERFACE'
+         ORDER BY s.fqn
+    </select>
+
+    <!-- 타입 선언의 타입 인자: 타입에서 나가는 USES_TYPE(타입 수준에서 타입을 쓰는 곳은 상속의 타입 인자뿐이다) -->
+    <select id="selectTypeArguments" parameterType="java.util.Map" resultType="string">
+        SELECT to_id
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND from_id = #{symbolId}
+           AND relation_type = 'USES_TYPE'
+           AND to_id IS NOT NULL
+         ORDER BY line_start, relation_id
+    </select>
+
+    <select id="selectDeclaredMethods" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT method_id AS "methodId", name AS "name", file_id AS "fileId", line_start AS "lineStart"
+          FROM analysis_method
+         WHERE revision_id = #{revisionId}
+           AND owner_symbol_id = #{symbolId}
+           AND NOT is_synthetic
+           AND NOT is_static
+           AND NOT is_constructor
+         ORDER BY line_start, method_id
+    </select>
+
+    <!-- JAVA / JPA statement 를 mapper_id 순으로 조금씩. 덧붙임 정보(properties_json)는 쓰는 것만 꺼낸다. methods 는 쉼표로 이은 메소드 ID -->
+    <select id="selectStatementPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT mapper_id AS "mapperId"
+             , mapper_type AS "mapperType"
+             , statement_type AS "statementType"
+             , sql_body AS "sqlBody"
+             , file_id AS "fileId"
+             , line_start AS "lineStart"
+             , properties_json->>'methodId' AS "methodId"
+             , (SELECT string_agg(x, ',') FROM jsonb_array_elements_text(
+                    CASE WHEN jsonb_typeof(properties_json->'methods') = 'array' THEN properties_json->'methods' ELSE '[]'::jsonb END) x) AS "methods"
+             , properties_json->>'fieldId' AS "fieldId"
+             , properties_json->>'call' AS "call"
+             , properties_json->>'language' AS "language"
+             , properties_json->>'entity' AS "entity"
+          FROM analysis_mapper
+         WHERE revision_id = #{revisionId}
+           AND mapper_type IN ('JAVA', 'JPA')
+           AND mapper_id &gt; #{afterId}
+         ORDER BY mapper_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- SQL 상수를 읽는 메소드: RESOLVE 가 만든 필드 접근(ACCESSES_FIELD). 다른 클래스에서 OrderSql.LIST 처럼 쓴 곳이다 -->
+    <select id="selectFieldReaders" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT ON (from_id) from_id AS "methodId", file_id AS "fileId", line_start AS "lineStart"
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND to_id = #{fieldId}
+           AND relation_type = 'ACCESSES_FIELD'
+           AND from_kind = 'METHOD'
+         ORDER BY from_id, relation_id
+    </select>
+
+    <select id="selectSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT COUNT(*) FILTER (WHERE mp.mapper_type = 'JAVA') AS "java"
+             , COUNT(*) FILTER (WHERE mp.mapper_type = 'JAVA' AND mp.properties_json->>'dynamic' IS NOT NULL) AS "javaDynamic"
+             , COUNT(*) FILTER (WHERE mp.mapper_type = 'JAVA' AND NOT EXISTS (
+                    SELECT 1 FROM analysis_relation r WHERE r.revision_id = mp.revision_id AND r.from_id = 'S' || mp.mapper_id
+                       AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE'))) AS "javaNoTable"
+             , COUNT(*) FILTER (WHERE mp.mapper_type = 'JPA') AS "jpa"
+             , COUNT(*) FILTER (WHERE mp.mapper_type = 'JPA' AND NOT EXISTS (
+                    SELECT 1 FROM analysis_relation r WHERE r.revision_id = mp.revision_id AND r.from_id = 'S' || mp.mapper_id
+                       AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE'))) AS "jpaNoTable"
+          FROM analysis_mapper mp
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.mapper_type IN ('JAVA', 'JPA')
+    </select>
+
+</mapper>

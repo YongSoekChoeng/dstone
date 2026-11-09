@@ -54,6 +54,21 @@ public class DiagnosticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectEndpointsWithoutMethod", param(revisionId, limit));
 	}
 
+	/** @return [{name(계산하지 못한 식), count, example(파일:줄)}] */
+	public List<Map<String, Object>> selectUnresolvedPaths(long revisionId, int limit) {
+		return sqlSessionCommon.selectList(NS + "selectUnresolvedPaths", param(revisionId, limit));
+	}
+
+	public int countUnresolvedPaths(long revisionId) {
+		Integer count = sqlSessionCommon.selectOne(NS + "countUnresolvedPaths", revisionId);
+		return count.intValue();
+	}
+
+	/** @return [{type, name, file, line, note(SQL 앞부분)}] */
+	public List<Map<String, Object>> selectJavaSqlWithoutTable(long revisionId, int limit) {
+		return sqlSessionCommon.selectList(NS + "selectJavaSqlWithoutTable", param(revisionId, limit));
+	}
+
 	/** @return [{name, count, example}] */
 	public List<Map<String, Object>> selectUnknownXml(long revisionId, int limit) {
 		return sqlSessionCommon.selectList(NS + "selectUnknownXml", param(revisionId, limit));

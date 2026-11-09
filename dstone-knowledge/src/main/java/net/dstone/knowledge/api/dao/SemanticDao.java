@@ -46,6 +46,39 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.insert(NS + "insertHttpEndpoints", param);
 	}
 
+	/**
+	 * HTTP 진입점 규칙의 애노테이션(HttpEndpointBuilder).
+	 *
+	 * @return [{targetKind, targetId, annotationName, attributesJson, fileId, lineStart, ownerSymbolId, methodName, paramCount}]
+	 */
+	public List<Map<String, Object>> selectHttpMappingAnnotations(long revisionId, List<String> names) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("names", names);
+		return sqlSessionCommon.selectList(NS + "selectHttpMappingAnnotations", param);
+	}
+
+	/** @return [{fromId, toId, relationType}] 프로젝트 안 타입끼리의 EXTENDS / IMPLEMENTS */
+	public List<Map<String, Object>> selectTypeEdges(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectTypeEdges", revisionId);
+	}
+
+	/** @return [{symbolId, fqn, kind, isAbstract, layer}] */
+	public List<Map<String, Object>> selectTypeFlags(long revisionId, List<String> ids) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("ids", ids);
+		return sqlSessionCommon.selectList(NS + "selectTypeFlags", param);
+	}
+
+	/** @return [{methodId, ownerSymbolId, name, paramCount}] 타입들의 인스턴스 메소드 */
+	public List<Map<String, Object>> selectMethodsOfTypes(long revisionId, List<String> ids) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("ids", ids);
+		return sqlSessionCommon.selectList(NS + "selectMethodsOfTypes", param);
+	}
+
 	/** 애노테이션 진입점 규칙(endpoints.annotations) 하나로 진입점을 만듭니다. 예: @Scheduled → SCHEDULED */
 	public int insertAnnotatedEndpoints(long revisionId, RuleSet.AnnotatedEndpointRule rule) {
 		Map<String, Object> param = new HashMap<String, Object>();

@@ -82,7 +82,7 @@ public class RuleSetParser {
 		}
 		Reader r = new Reader(fileName);
 		Map<String, Object> top = r.map(root, "");
-		r.keys(top, "", "name", "description", "order", "autoApply", "endpoints", "injects", "proxies", "layers", "callArguments", "screens");
+		r.keys(top, "", "name", "description", "order", "autoApply", "endpoints", "injects", "proxies", "layers", "callArguments", "screens", "jpa");
 
 		RuleSet.Builder b = new RuleSet.Builder();
 		String baseName = fileName.replaceFirst("\\.ya?ml$", "");
@@ -114,6 +114,7 @@ public class RuleSetParser {
 		}
 		readLayers(r, top.get("layers"), b);
 		readCallArguments(r, top.get("callArguments"), b);
+		readJpa(r, top.get("jpa"), b);
 		StringBuilder mapTexts = new StringBuilder();
 		readScreens(r, top.get("screens"), b, mapTexts);
 		if (mapTexts.length() > 0) {
@@ -224,6 +225,58 @@ public class RuleSetParser {
 			}
 			b.xmlEndpoints.add(new RuleSet.XmlEndpointRule(endpointType, files, element, pathAttribute, classAttribute, methodAttribute, httpMethod
 					, template.substring(0, at), template.substring(at + "{value}".length())));
+		}
+	}
+
+	/**
+	 * <pre>
+	 * jpa:
+	 *   entities: [Entity]          tables: [Table]          naming: SNAKE_CASE
+	 *   queries:      - { annotation: Query, attribute: value, nativeAttribute: nativeQuery }
+	 *   namedQueries: - { annotation: NamedQuery, nameAttribute: name, attribute: query, container: NamedQueries, native: false }
+	 *   repositories: [JpaRepository, CrudRepository ...]
+	 *   jpqlCalls: [createQuery]
+	 * </pre>
+	 */
+	private void readJpa(Reader r, Object node, RuleSet.Builder b) {
+		if (node == null) {
+			return;
+		}
+		Map<String, Object> jpa = r.map(node, "jpa");
+		r.keys(jpa, "jpa", "entities", "tables", "naming", "queries", "namedQueries", "repositories", "jpqlCalls");
+		b.jpaEntities.addAll(r.identifiers(jpa, "jpa", "entities", false));
+		b.jpaTables.addAll(r.identifiers(jpa, "jpa", "tables", false));
+		String naming = r.optString(jpa, "jpa", "naming", null);
+		if (naming != null) {
+			naming = naming.toUpperCase(Locale.ROOT);
+			if (!"SNAKE_CASE".equals(naming) && !"AS_IS".equals(naming)) {
+				throw r.error("jpa.naming", "SNAKE_CASE 또는 AS_IS 여야 합니다: " + naming);
+			}
+			b.jpaNaming = naming;
+		}
+		readJpaQueries(r, jpa.get("queries"), "jpa.queries", false, b.jpaQueries);
+		readJpaQueries(r, jpa.get("namedQueries"), "jpa.namedQueries", true, b.jpaNamedQueries);
+		b.jpaRepositories.addAll(r.identifiers(jpa, "jpa", "repositories", false));
+		b.jpqlCalls.addAll(r.identifiers(jpa, "jpa", "jpqlCalls", false));
+	}
+
+	private void readJpaQueries(Reader r, Object node, String name, boolean named, List<RuleSet.JpaQueryRule> target) {
+		List<Object> rules = r.list(node, name);
+		for (int i = 0; i < rules.size(); i++) {
+			String path = name + "[" + i + "]";
+			Map<String, Object> item = r.map(rules.get(i), path);
+			if (named) {
+				r.keys(item, path, "annotation", "attribute", "nameAttribute", "container", "native");
+			} else {
+				r.keys(item, path, "annotation", "attribute", "nativeAttribute");
+			}
+			String annotation = r.identifier(item, path, "annotation");
+			String attribute = item.get("attribute") == null ? "value" : r.identifier(item, path, "attribute");
+			String nativeAttribute = item.get("nativeAttribute") == null ? null : r.identifier(item, path, "nativeAttribute");
+			String nameAttribute = named ? (item.get("nameAttribute") == null ? "name" : r.identifier(item, path, "nameAttribute")) : null;
+			String container = item.get("container") == null ? null : r.identifier(item, path, "container");
+			boolean nativeQuery = r.optBool(item, path, "native", false);
+			target.add(new RuleSet.JpaQueryRule(annotation, attribute, nativeAttribute, nativeQuery, nameAttribute, container));
 		}
 	}
 

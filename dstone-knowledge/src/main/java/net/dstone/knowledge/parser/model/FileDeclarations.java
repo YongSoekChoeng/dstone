@@ -2,6 +2,7 @@ package net.dstone.knowledge.parser.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * <pre>
@@ -19,6 +20,8 @@ public class FileDeclarations {
 	private final List<FieldRow> fields = new ArrayList<FieldRow>();
 	private final List<AnnotationRow> annotations = new ArrayList<AnnotationRow>();
 	private final List<ReferenceRow> references = new ArrayList<ReferenceRow>();
+	/** Java 문자열로 적은 SQL(analysis_mapper 의 mapper_type JAVA 행). 키는 ResourceDao 의 insertMapper 와 같고 propertiesJson 이 더 있다 */
+	private final List<Map<String, Object>> sqlStatements = new ArrayList<Map<String, Object>>();
 
 	/** 저장하지 못하고 버린 것들의 설명(같은 ID가 겹친 경우 등). 분석 오류로 남깁니다. */
 	private final List<String> warnings = new ArrayList<String>();
@@ -49,6 +52,10 @@ public class FileDeclarations {
 
 	public List<ReferenceRow> getReferences() {
 		return references;
+	}
+
+	public List<Map<String, Object>> getSqlStatements() {
+		return sqlStatements;
 	}
 
 	public List<String> getWarnings() {

@@ -193,6 +193,30 @@ public class RuleSetParserTest {
 		assertFalse(rules.getSqlArguments().isEmpty());
 		assertFalse(rules.getViewArguments().isEmpty());
 		assertFalse(rules.getLayerNames().isEmpty());
+		// JPA 규칙(jpa.yml)
+		assertTrue(rules.getJpaEntities().contains("Entity"));
+		assertEquals("SNAKE_CASE", rules.getJpaNaming());
+		assertTrue(rules.getJpqlCalls().contains("createQuery"));
+		assertEquals(2, rules.getJpaNamedQueries().size());
+	}
+
+	@Test
+	public void JPA_규칙을_읽고_틀린_값을_막는다() {
+		RuleSet set = parse("jpa:\n"
+				+ "  entities: [Entity, MyEntity]\n"
+				+ "  naming: as_is\n"
+				+ "  queries:\n"
+				+ "    - { annotation: Query, nativeAttribute: nativeQuery }\n"
+				+ "  namedQueries:\n"
+				+ "    - { annotation: NamedNativeQuery, attribute: query, container: NamedNativeQueries, native: true }\n"
+				+ "  jpqlCalls: createQuery\n", "x.yml");
+		assertEquals("AS_IS", set.jpaNaming);
+		assertEquals("value", set.jpaQueries.get(0).attribute);
+		assertEquals("name", set.jpaNamedQueries.get(0).nameAttribute);
+		assertTrue(set.jpaNamedQueries.get(0).nativeQuery);
+		assertEquals(4, set.ruleCount());
+		assertTrue(parseFails("jpa:\n  naming: CAMEL\n", "x.yml").getMessage().contains("jpa.naming"));
+		assertTrue(parseFails("jpa:\n  queries:\n    - { annotation: Query, container: Q }\n", "x.yml").getMessage().contains("container"));
 	}
 
 	/** 폴더 아래의 *.yml 을 규칙 폴더 안의 경로를 이름으로 읽는다(SemanticRuleRegistry 와 같은 방식) */

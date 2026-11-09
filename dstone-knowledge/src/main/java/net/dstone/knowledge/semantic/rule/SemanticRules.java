@@ -48,6 +48,13 @@ public class SemanticRules {
 	private final List<ScreenScript.CallRule> screenCalls = new ArrayList<ScreenScript.CallRule>();
 	private final List<ScreenScript.CallRule> screenOpens = new ArrayList<ScreenScript.CallRule>();
 	private final List<ScreenMenu.Rule> screenMenus = new ArrayList<ScreenMenu.Rule>();
+	private final Set<String> jpaEntities = new LinkedHashSet<String>();
+	private final Set<String> jpaTables = new LinkedHashSet<String>();
+	private String jpaNaming;
+	private final List<RuleSet.JpaQueryRule> jpaQueries = new ArrayList<RuleSet.JpaQueryRule>();
+	private final List<RuleSet.JpaQueryRule> jpaNamedQueries = new ArrayList<RuleSet.JpaQueryRule>();
+	private final Set<String> jpaRepositories = new LinkedHashSet<String>();
+	private final Set<String> jpqlCalls = new LinkedHashSet<String>();
 
 	/**
 	 * @param sets 이미 order 순서로 늘어놓은 규칙 묶음
@@ -91,6 +98,16 @@ public class SemanticRules {
 					viewArguments.add(rule);
 				}
 			}
+			jpaEntities.addAll(set.jpaEntities);
+			jpaTables.addAll(set.jpaTables);
+			if (jpaNaming == null) {
+				// 먼저 적용되는(order 가 작은) 묶음의 것을 쓴다.
+				jpaNaming = set.jpaNaming;
+			}
+			jpaQueries.addAll(set.jpaQueries);
+			jpaNamedQueries.addAll(set.jpaNamedQueries);
+			jpaRepositories.addAll(set.jpaRepositories);
+			jpqlCalls.addAll(set.jpqlCalls);
 			addScreenRules(screenCalls, set.screenCalls, screenKeys, "call");
 			addScreenRules(fields, set.screenFields, screenKeys, "field");
 			addScreenRules(screenOpens, set.screenOpens, screenKeys, "open");
@@ -182,6 +199,35 @@ public class SemanticRules {
 
 	public List<ScreenScript.CallRule> getScreenOpens() {
 		return screenOpens;
+	}
+
+	public List<String> getJpaEntities() {
+		return new ArrayList<String>(jpaEntities);
+	}
+
+	public List<String> getJpaTables() {
+		return new ArrayList<String>(jpaTables);
+	}
+
+	/** @return SNAKE_CASE(적지 않았으면) 또는 AS_IS */
+	public String getJpaNaming() {
+		return jpaNaming == null ? "SNAKE_CASE" : jpaNaming;
+	}
+
+	public List<RuleSet.JpaQueryRule> getJpaQueries() {
+		return Collections.unmodifiableList(jpaQueries);
+	}
+
+	public List<RuleSet.JpaQueryRule> getJpaNamedQueries() {
+		return Collections.unmodifiableList(jpaNamedQueries);
+	}
+
+	public List<String> getJpaRepositories() {
+		return new ArrayList<String>(jpaRepositories);
+	}
+
+	public List<String> getJpqlCalls() {
+		return new ArrayList<String>(jpqlCalls);
 	}
 
 	public List<ScreenMenu.Rule> getScreenMenus() {
