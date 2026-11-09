@@ -261,6 +261,16 @@
          ORDER BY path
     </select>
 
+    <!-- 언어별 파일 목록(XML 진입점 규칙이 경로 정규식으로 다시 고른다) -->
+    <select id="selectFilesByLanguage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT file_id AS "fileId", path AS "path", encoding AS "encoding"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND language = #{language}
+           AND parse_status &lt;&gt; 'SKIPPED'
+         ORDER BY path
+    </select>
+
     <!-- 서블릿 클래스에 직접 적힌 요청 처리 메소드 -->
     <select id="selectServletHandlers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT method_id AS "methodId", name AS "name", line_start AS "lineStart"
@@ -533,15 +543,17 @@
 
     <!-- 이름으로 메소드 찾기(프로젝트 전체). 화면이 거래 ID 로 부르는 메소드를 찾는다.
          Lombok 이 만든 것과 생성자는 뺀다 -->
+    <!-- ownerFqn: 대응표(idMap)가 "클래스.메소드"를 돌려줄 때 클래스로 좁히는 데 쓴다 -->
     <select id="selectMethodsByNamesInProject" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        SELECT name AS "name", method_id AS "methodId"
-          FROM analysis_method
-         WHERE revision_id = #{revisionId}
-           AND name IN
+        SELECT m.name AS "name", m.method_id AS "methodId", s.fqn AS "ownerFqn"
+          FROM analysis_method m
+          LEFT JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.name IN
             <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
-           AND NOT is_synthetic
-           AND NOT is_constructor
-         ORDER BY name, method_id
+           AND NOT m.is_synthetic
+           AND NOT m.is_constructor
+         ORDER BY m.name, m.method_id
     </select>
 
     <!-- 경로로 리치클라이언트 화면 파일 찾기. 정확히 같거나, 그 경로로 끝나는 것 -->
@@ -582,6 +594,22 @@
                    AND e.endpoint_type = 'TRANSACTION'
                    AND e.method_id = m.method_id)
          ORDER BY m.method_id
+    </insert>
+
+    <!-- 대응표(idMap)로 정한 거래 진입점 하나. 대응표의 ID 가 주소 자리(path)에 들어간다. 메소드마다 하나만 둔다 -->
+    <insert id="insertTransactionEndpoint" parameterType="java.util.Map">
+        INSERT INTO analysis_endpoint
+            (revision_id, endpoint_type, path, symbol_id, method_id, properties_json, file_id, line_start)
+        SELECT m.revision_id, 'TRANSACTION', #{path}, m.owner_symbol_id, m.method_id
+             , CAST(#{propertiesJson} AS jsonb), m.file_id, m.line_start
+          FROM analysis_method m
+         WHERE m.revision_id = #{revisionId}
+           AND m.method_id = #{methodId}
+           AND NOT EXISTS (
+                SELECT 1 FROM analysis_endpoint e
+                 WHERE e.revision_id = m.revision_id
+                   AND e.endpoint_type = 'TRANSACTION'
+                   AND e.method_id = m.method_id)
     </insert>
 
     <insert id="insertRelation" parameterType="java.util.Map">

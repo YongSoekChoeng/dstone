@@ -22,18 +22,20 @@
 | `hi-japan/frontend.yml` | 500 | HI-Japan 화면의 거래 ID 호출 함수, 출력 폼 필드, 화면 열기 함수, 메뉴 목록 |
 | `fallback.yml` | 900 | `@Component` 계층, 클래스 이름 끝말로 짐작하는 계층(LOW) |
 
+`hi-japan/` 두 묶음은 프로젝트 `HI-Japan` 폴더라 그 프로젝트에 저절로 쓰인다. 같은 프레임워크를 쓰는 `HI-Japan-batch`와 표본 `websquare-app`은 `ruleSets: hi-japan`으로 빌려 쓴다.
+
 코드에 남아 있는 것은 언어나 표준 형식 자체의 규칙이다. `main()`, JSP 진입점, `web.xml`, `struts-config.xml`, 매퍼 인터페이스 방식(namespace = 인터페이스 이름), 호출 해석(RESOLVE), SQL 파싱이 그렇다.
 
 ## 어느 묶음을 쓰나
 
-- `autoApply: true`(기본)인 묶음은 모든 프로젝트에 쓴다. 해당하는 코드가 없는 프로젝트에서는 아무 일도 하지 않으므로 여러 프로젝트의 규칙을 함께 두어도 된다.
-- `autoApply: false`인 묶음은 프로젝트를 등록할 때 `ruleSets`에 이름을 적은 경우에만 쓴다. 메소드 이름이 흔해서 다른 프로젝트에 잘못 걸릴 수 있는 규칙은 이렇게 둔다.
-- `ruleSets`에는 묶음 이름(`hi-japan/frontend`)이나 폴더 이름(`hi-japan`)을 적는다. 폴더 이름이면 그 아래 묶음을 모두 고른 것이다.
-- `hi-japan/` 아래 두 묶음은 지금 `autoApply: true`다. 이 관례를 쓰지 않는 프로젝트에서는 아무 일도 하지 않고, `websquare-app` 표본도 같은 규칙을 쓰기 때문이다. HI-Japan에만 쓰게 하려면 두 파일을 `autoApply: false`로 바꾸고 HI-Japan 프로젝트(와 표본)에 `"ruleSets": "hi-japan"`을 적는다.
+- **공통 묶음**(이 폴더 바로 아래)은 모든 프로젝트에 쓴다(`autoApply` 기본 `true`). 해당하는 코드가 없는 프로젝트에서는 아무 일도 하지 않는다.
+- **프로젝트 폴더**: `conf/rules/{프로젝트ID}/` 아래 묶음은 그 프로젝트에만 저절로 쓴다. 폴더 이름과 프로젝트 ID는 대소문자를 가리지 않고 맞춘다(`hi-japan/` → 프로젝트 `HI-Japan`). `ruleSets`에 적을 필요가 없다.
+- 하위 폴더의 묶음은 `autoApply` 기본이 `false`다. 그래서 A 프로젝트의 규칙이 B 프로젝트 분석에 끼어들지 않는다. 일부러 모든 프로젝트에 쓰려면 `autoApply: true`를 적는다.
+- **다른 프로젝트의 규칙을 빌려 쓰기**: 프로젝트를 등록할 때 `ruleSets`에 묶음 이름(`hi-japan/backend`)이나 폴더 이름(`hi-japan`)을 적는다. 같은 프레임워크를 쓰는 배치 프로젝트(`HI-Japan-batch`)나 표본(`websquare-app`)이 이렇게 쓴다.
 
 ```json
 POST /api/projects
-{ "projectId": "order-system", "localPath": "/src/order", "ruleSets": "order-system" }
+{ "projectId": "HI-Japan-batch", "localPath": "/app/HI-Japan/batch", "ruleSets": "hi-japan" }
 ```
 
 - 묶음은 `order`가 작은 것부터 적용한다(같으면 이름 순). 계층은 "먼저 정한 것을 뒤에서 바꾸지 않는다"라서 순서가 결과를 바꿀 수 있다. 뜻이 넓은 규칙은 order를 크게 둔다.
@@ -60,6 +62,15 @@ endpoints:
       superTypes: [java.lang.Runnable]
       methods: [run]                  # 또는 methodPattern: '^perform'
       paramCount: 0                   # 생략하면 보지 않는다
+  xml:                  # 프로젝트 자체의 설정 XML 에 적힌 진입점(주소 · 거래 ID → 클래스 · 메소드)
+    - endpointType: TRANSACTION
+      files: 'config/service-.*\.xml$'  # 파일 경로(프로젝트 안의 경로) Java 정규식. find 로 본다
+      element: service                # 요소 이름(네임스페이스 앞붙이 없이)
+      pathAttribute: id               # 주소(거래 ID)가 적힌 속성
+      classAttribute: class           # 처리 클래스(전체 이름 또는 단순 이름). 그 요소에 없으면 바깥 요소에서 찾는다
+      methodAttribute: method         # 처리 메소드 이름. 생략하면 클래스만 남는다
+      pathTemplate: "{value}"         # 주소 앞뒤에 붙일 글자. 예: "{value}.do"
+      httpMethod: POST                # endpointType 이 HTTP 일 때. 생략하면 ALL
 
 injects:                # 이 애노테이션이 붙은 필드 → INJECTS 관계
   annotations: [Autowired]
@@ -86,6 +97,7 @@ callArguments:          # 호출의 n번째 인자로 넘긴 글자 → SQL 또�
 screens:                # 리치클라이언트 화면(WebSquare, Nexacro)
   calls:  [{ function: doRequestAjax, method: "perform{id}" }]   # 화면 함수의 첫 인자(거래 ID) → 메소드
                                                                 # argIndex: 1 처럼 적으면 그 자리의 인자를 본다(calls, opens)
+                                                                # calls / fields / opens 는 ID 다듬기(아래 절)를 받는다
   fields: [{ field: tranId, method: "perform{id}" }]            # 폼 필드 값(거래 ID) → 메소드
   opens:  [{ function: fnOpenPage, screen: "{id}.xml" }]        # 화면 ID → 화면 파일
   menus:  [{ nameKey: MENU_NM, pathKey: SRC_PATH }]             # 메뉴 목록 → 화면명
@@ -113,6 +125,35 @@ screens:
 - "아무 자리나 화면 이름이면 잇는다"는 없다. 자리가 호출마다 다르면 자리마다 규칙을 적는다.
 - 규칙이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출은 SEMANTIC이 함수별로 센다. 그 호출의 다른 자리에 따옴표 글자가 있었으면 후보 API의 `screenRules`가 `argIndex` 규칙을 제안한다.
 
+### 화면 규칙의 ID 다듬기 (`idPattern`, `idReplace`, `idCase`, `idMap`)
+
+거래 ID가 메소드 이름이나 화면 파일 이름과 글자 그대로 같지 않을 때 쓴다. `screens.calls`, `fields`, `opens`에 적는다. 적힌 순서와 상관없이 아래 순서로 다듬은 뒤 틀(`{id}`)에 넣는다.
+
+1. `idPattern` / `idReplace`: ID 전체가 정규식에 맞아야 한다. 맞으면 `idReplace`(`$1`, `$2` …)로 바꾼다. 맞지 않는 ID는 이 규칙으로 잇지 않는다.
+2. `idCase`: `UPPER` / `LOWER` / `UPPER_FIRST` / `LOWER_FIRST`.
+3. `idMap`: 대응표 파일(이 폴더 안의 경로)에서 찾아 그 값으로 바꾼다. 표에 없는 ID는 잇지 않는다.
+
+```yaml
+screens:
+  calls:
+    # callService("SVC_ORDER_LIST") → svcOrderList 메소드
+    - { function: callService, method: "{id}", idPattern: '^SVC_(.*)$', idReplace: 'svc_$1', idCase: LOWER }
+    # 거래 ID → 클래스.메소드 대응표. 한 줄에 "ID,값"(= 이나 탭도 된다). # 은 주석
+    - { function: callTx, method: "{id}", idMap: order-system/tx-map.csv }
+```
+
+```text
+# conf/rules/order-system/tx-map.csv
+ORD001,OrderController.list
+ORD002,com.order.web.OrderController.save
+ORD003,cancelOrder
+```
+
+- 대응표의 값이 `클래스.메소드`면 그 클래스(전체 이름이 같거나 그 이름으로 끝나는 것)의 메소드에만 잇는다. 메소드 이름만 적으면 그 이름의 메소드가 하나일 때 `HIGH`다.
+- 대응표가 있는 `calls` 규칙은 **대응표의 ID 하나하나를 `TRANSACTION` 진입점**으로 올린다(메소드가 하나로 정해질 때만). 프레임워크가 그 표를 보고 메소드를 부르기 때문이다.
+- 대응표 파일은 규칙 폴더 밖을 가리킬 수 없다. 대응표를 고치면 묶음의 해시도 바뀌어 `GET /api/revisions/{id}/rules`에서 `CHANGED`로 보인다.
+- `idCase`처럼 정규식 없이 바꾸는 것만 적어도 된다. 대응표가 없는 규칙에서 점이 든 값(`order.list`)은 메소드 이름으로 보지 않는다.
+
 ### 호출 인자 규칙이 잇는 기준
 
 이름은 **계산할 수 있을 때만** 잇는다. 짐작으로 이은 선은 영향도 분석을 틀리게 만들기 때문이다.
@@ -133,8 +174,10 @@ screens:
 2. **시험 적용**: `POST /api/revisions/{id}/rules/trial`, 본문 `{"ruleSet": "name: order-system/backend\n..."}`
    - SEMANTIC을 한 트랜잭션 안에서 실제로 돌려 보고 전후 차이(묶음별 수, 새로 생긴 것과 없어진 것의 보기)를 알려 준 뒤 모두 되돌린다. DB에는 아무것도 남지 않는다.
    - 같은 이름의 파일이 있으면 그 파일 대신 쓴다. 본문 없이 부르면 지금 파일 그대로 돌려, 규칙 파일을 고친 뒤 무엇이 바뀌는지 본다.
-3. **저장**: 이 폴더에 `<name>.yml`로 저장한다. 프로젝트에 따른 규칙이면 `<프로젝트>/<이름>.yml`(묶음 이름 `<프로젝트>/<이름>`).
+3. **저장**: 이 폴더에 `<name>.yml`로 저장한다. 프로젝트에 따른 규칙이면 `<프로젝트ID>/<이름>.yml`(묶음 이름 `<프로젝트ID>/<이름>`). 그 프로젝트에 저절로 쓰인다.
 4. **반영**: `POST /api/projects/{id}/analyses` `{"revisionLabel": "...", "rerunFrom": "SEMANTIC"}`
+
+처음 분석한 뒤 무엇부터 할지는 **적용 진단**(`GET /api/revisions/{id}/diagnostics`, 화면에서는 리비전 요약의 "적용 진단")이 알려 준다. 항목마다 규칙 파일로 풀지(`RULE`), jar 위치(`CLASSPATH`) · 프로젝트 설정(`SETTING`) · 소스 보충(`SOURCE`)으로 풀지, 분석기 개발이 필요한지(`DEVELOP`)가 붙어 있다. 규칙으로 되는 것과 안 되는 것의 경계는 `docs/11.dstone-knowledge.md`의 "지원 범위"에 있다.
 
 ## 옛 설정 키
 

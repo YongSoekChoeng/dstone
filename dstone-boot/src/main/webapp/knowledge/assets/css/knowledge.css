@@ -854,3 +854,29 @@ body.kn-full-on {
 	font-size: 12px;
 	padding: 2px 10px;
 }
+
+/* ---------- 적용 진단 ---------- */
+.kn-diag .kn-verdict-line {
+	line-height: 1.7;
+	margin-top: 4px;
+}
+
+/* 해결 방법 꼬리표. 규칙으로 되는 것과 개발이 필요한 것을 색으로 가른다 */
+.kn-diag-solution {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 600;
+	padding: 1px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--cs-border);
+	color: var(--cs-text-2);
+	background: var(--cs-surface);
+}
+
+.kn-diag-RULE { color: var(--cs-success); border-color: var(--cs-success); }
+.kn-diag-CLASSPATH, .kn-diag-SETTING, .kn-diag-SOURCE { color: var(--cs-warning); border-color: var(--cs-warning); }
+.kn-diag-DEVELOP { color: var(--cs-danger); border-color: var(--cs-danger); }
+
+.kn-diag-samples {
+	margin: 2px 0 6px 20px;
+}

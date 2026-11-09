@@ -52,7 +52,7 @@ WebSquare 화면은 JSP와 달리 서버가 열어 주지 않고, 화면이 떠�
 
 ## 규칙 설정
 
-거래 ID 규칙은 규칙 파일 `conf/rules/hi-japan/frontend.yml`의 `screens.calls`에 있다(`{ function: doRequestAjax, method: "perform{id}" }`).
+거래 ID 규칙은 규칙 파일 `conf/rules/hi-japan/frontend.yml`의 `screens.calls`에 있다. 이 표본은 프로젝트 등록 때 `"ruleSets": "hi-japan"`을 적어 그 규칙을 빌려 쓴다(`{ function: doRequestAjax, method: "perform{id}" }`).
 이 표본과 `HI-Japan`은 같은 규칙을 쓴다. 주소로 부르는 화면은 규칙 없이도 이어진다.
 
 계층 규칙과 `QueryProperty` SQL 이름 규칙은 `conf/rules/hi-japan/backend.yml`에 있다(`layers.superTypes`, `callArguments`). 적는 법은 `conf/rules/README.md`.

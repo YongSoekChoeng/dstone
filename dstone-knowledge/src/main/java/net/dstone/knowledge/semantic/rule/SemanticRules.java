@@ -18,6 +18,7 @@ import net.dstone.knowledge.semantic.ScreenScript;
  * SEMANTIC 단계가 시작할 때 한 번 만들어 AnalysisJobContext 에 실어 두고, 플러그인들이 여기서 자기 몫의 규칙을 꺼내 씁니다.
  *   SpringPlugin       HTTP 진입점, 애노테이션 진입점, 주입, 프록시, 애노테이션 계층
  *   PlainJavaPlugin    상위 타입 진입점
+ *   XmlEndpointPlugin  설정 XML 에 적힌 진입점
  *   MyBatisPlugin      호출 인자 규칙(SQL)
  *   JspPlugin          호출 인자 규칙(VIEW)
  *   RichClientPlugin   화면 호출 / 필드 / 열기 규칙
@@ -36,6 +37,7 @@ public class SemanticRules {
 	private final List<RuleSet.HttpMappingRule> httpMappings = new ArrayList<RuleSet.HttpMappingRule>();
 	private final List<RuleSet.AnnotatedEndpointRule> annotatedEndpoints = new ArrayList<RuleSet.AnnotatedEndpointRule>();
 	private final List<RuleSet.SuperTypeEndpointRule> superTypeEndpoints = new ArrayList<RuleSet.SuperTypeEndpointRule>();
+	private final List<RuleSet.XmlEndpointRule> xmlEndpoints = new ArrayList<RuleSet.XmlEndpointRule>();
 	private final Set<String> injectAnnotations = new LinkedHashSet<String>();
 	private final Set<String> proxyAnnotations = new LinkedHashSet<String>();
 	private final List<RuleSet.LayerAnnotationRule> layerAnnotations = new ArrayList<RuleSet.LayerAnnotationRule>();
@@ -75,6 +77,7 @@ public class SemanticRules {
 				annotatedEndpoints.add(rule);
 			}
 			superTypeEndpoints.addAll(set.superTypeEndpoints);
+			xmlEndpoints.addAll(set.xmlEndpoints);
 			injectAnnotations.addAll(set.injectAnnotations);
 			proxyAnnotations.addAll(set.proxyAnnotations);
 			layerAnnotations.addAll(set.layerAnnotations);
@@ -114,7 +117,7 @@ public class SemanticRules {
 	private void addScreenRules(List<ScreenScript.CallRule> target, List<ScreenScript.CallRule> rules, Set<String> keys, String kind) {
 		for (int i = 0; i < rules.size(); i++) {
 			ScreenScript.CallRule rule = rules.get(i);
-			if (keys.add(kind + "|" + rule.getFunction() + "|" + rule.getMethodTemplate() + "|" + rule.getArgIndex())) {
+			if (keys.add(kind + "|" + rule.getFunction() + "|" + rule.getMethodTemplate() + "|" + rule.getArgIndex() + "|" + rule.getTransform().describe())) {
 				target.add(rule);
 			}
 		}
@@ -131,6 +134,11 @@ public class SemanticRules {
 
 	public List<RuleSet.AnnotatedEndpointRule> getAnnotatedEndpoints() {
 		return annotatedEndpoints;
+	}
+
+	/** 설정 XML 에 적힌 진입점 규칙(XmlEndpointPlugin) */
+	public List<RuleSet.XmlEndpointRule> getXmlEndpoints() {
+		return xmlEndpoints;
 	}
 
 	public List<RuleSet.SuperTypeEndpointRule> getSuperTypeEndpoints() {

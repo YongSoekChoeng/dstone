@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.api.service.CallGraphService;
+import net.dstone.knowledge.api.service.DiagnosticService;
 import net.dstone.knowledge.api.service.DiffService;
 import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
@@ -41,6 +42,9 @@ public class RevisionController {
 
 	@Autowired
 	private DiffService diffService;
+
+	@Autowired
+	private DiagnosticService diagnosticService;
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */
 	@GetMapping("/{revisionId}")
@@ -85,6 +89,17 @@ public class RevisionController {
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
 		return revisionService.getEndpointList(revisionId, type, path, page, size);
+	}
+
+	/**
+	 * <pre>
+	 * 적용 진단: 어디가 안 이어졌는지와, 그것을 규칙(RULE) · jar(CLASSPATH) · 설정(SETTING) · 소스 보충(SOURCE) · 개발(DEVELOP)
+	 * 가운데 무엇으로 풀지를 항목별로 돌려줍니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/diagnostics")
+	public Map<String, Object> getDiagnostics(@PathVariable("revisionId") long revisionId) {
+		return diagnosticService.diagnose(revisionId);
 	}
 
 	/**

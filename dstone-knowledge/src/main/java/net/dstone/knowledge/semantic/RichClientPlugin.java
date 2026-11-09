@@ -252,6 +252,10 @@ public class RichClientPlugin implements SemanticPlugin {
 		int endpoints = 0;
 		for (int i = 0; i < counts.usedRules.size(); i++) {
 			ScreenScript.CallRule rule = counts.usedRules.get(i);
+			if (rule.getTransform().getMap() != null) {
+				endpoints += insertMapEndpoints(revisionId, rule);
+				continue;
+			}
 			String template = rule.getMethodTemplate();
 			int at = template.indexOf("{id}");
 			String prefix = template.substring(0, at);
@@ -262,6 +266,40 @@ public class RichClientPlugin implements SemanticPlugin {
 			endpoints += semanticDao.insertCallRuleEndpoints(revisionId, rule.getFunction(), template, prefix, suffix);
 		}
 		return endpoints;
+	}
+
+	/**
+	 * <pre>
+	 * 대응표(idMap)가 있는 규칙: 대응표에 적힌 ID 하나하나가 거래 진입점이다. 프레임워크가 그 표를 보고 메소드를 부르기 때문이다.
+	 * ID 의 메소드가 하나로 정해질 때만 올린다(같은 이름이 여럿이면 어느 것인지 모른다).
+	 * 주소 자리(path)에는 대응표의 ID(다듬은 ID)를 둔다.
+	 * </pre>
+	 */
+	private int insertMapEndpoints(long revisionId, ScreenScript.CallRule rule) {
+		Map<String, String> map = rule.getTransform().getMap();
+		List<String> ids = new ArrayList<String>();
+		List<String> names = new ArrayList<String>();
+		for (Map.Entry<String, String> entry : map.entrySet()) {
+			String name = rule.getMethodTemplate().replace("{id}", entry.getValue());
+			if (ScreenScript.isMethodName(name)) {
+				ids.add(entry.getKey());
+				names.add(name);
+			}
+		}
+		MethodIndex index = MethodIndex.load(semanticDao, revisionId, names);
+		Map<String, Object> properties = new LinkedHashMap<String, Object>();
+		properties.put("function", rule.getFunction());
+		properties.put("rule", rule.getMethodTemplate());
+		properties.put("idMap", rule.getTransform().getMapSource());
+		String json = JsonText.of(properties);
+		int inserted = 0;
+		for (int i = 0; i < ids.size(); i++) {
+			List<String> methods = index.find(names.get(i));
+			if (methods != null && methods.size() == 1) {
+				inserted += semanticDao.insertTransactionEndpoint(revisionId, methods.get(0), ids.get(i), json);
+			}
+		}
+		return inserted;
 	}
 
 	/** 주소 → 그 주소를 처리하는 메소드들. 진입점 수만큼만 메모리에 올라간다. */
@@ -384,23 +422,11 @@ public class RichClientPlugin implements SemanticPlugin {
 		List<String> names = new ArrayList<String>();
 		for (int i = 0; i < calls.size(); i++) {
 			String name = methodNameOf(calls.get(i));
-			if (name != null && !names.contains(name)) {
+			if (name != null) {
 				names.add(name);
 			}
 		}
-		Map<String, List<String>> methodsByName = new HashMap<String, List<String>>();
-		if (!names.isEmpty()) {
-			List<Map<String, Object>> rows = semanticDao.selectMethodsByNamesInProject(revisionId, names);
-			for (int i = 0; i < rows.size(); i++) {
-				String name = (String) rows.get(i).get("name");
-				List<String> list = methodsByName.get(name);
-				if (list == null) {
-					list = new ArrayList<String>();
-					methodsByName.put(name, list);
-				}
-				list.add((String) rows.get(i).get("methodId"));
-			}
-		}
+		MethodIndex methodsByName = MethodIndex.load(semanticDao, revisionId, names);
 
 		Set<String> missingNames = new HashSet<String>();
 		for (int c = 0; c < calls.size(); c++) {
@@ -429,7 +455,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			}
 			Integer line = use == null ? screenScript.lineAt(text, call.getIndex()) : use.line;
 
-			List<String> methods = methodsByName.get(name);
+			List<String> methods = methodsByName.find(name);
 			if (methods == null || methods.size() > MAX_CANDIDATES) {
 				if (missingNames.add(name)) {
 					semanticDao.insertRelation(relation(revisionId, fileId, "REQUESTS", "METHOD", null, name, "UNRESOLVED", "UNRESOLVED", properties, line));
@@ -709,6 +735,10 @@ public class RichClientPlugin implements SemanticPlugin {
 	}
 
 	static Long findScreen(SemanticDao semanticDao, long revisionId, String written, List<String> screenTypes) {
+		if (written == null) {
+			// 화면 ID 가 열기 규칙의 다듬는 규칙(idPattern / idMap)에 맞지 않았다
+			return null;
+		}
 		String path = written;
 		int prefix = path.lastIndexOf("::");
 		if (prefix >= 0) {
@@ -826,6 +856,72 @@ public class RichClientPlugin implements SemanticPlugin {
 				Integer count = n.literalAt.get(positions.get(i));
 				n.literalAt.put(positions.get(i), Integer.valueOf(count == null ? 1 : count.intValue() + 1));
 			}
+		}
+	}
+
+
+	/**
+	 * <pre>
+	 * 화면 규칙이 만든 메소드 이름 → 프로젝트 안의 메소드들.
+	 * 이름은 메소드 이름(list)이거나, 대응표(idMap)가 돌려준 클래스.메소드(OrderController.list, com.x.OrderController.list)다.
+	 * 클래스가 붙어 있으면 그 클래스(전체 이름이 같거나 그 이름으로 끝나는 것)의 메소드만 남긴다.
+	 * </pre>
+	 */
+	static class MethodIndex {
+
+		/** 메소드 이름 → [methodId, ownerFqn] 들 */
+		private final Map<String, List<String[]>> byName = new HashMap<String, List<String[]>>();
+
+		static MethodIndex load(SemanticDao semanticDao, long revisionId, List<String> names) {
+			MethodIndex index = new MethodIndex();
+			List<String> methodNames = new ArrayList<String>();
+			for (int i = 0; i < names.size(); i++) {
+				String method = methodPart(names.get(i));
+				if (!methodNames.contains(method)) {
+					methodNames.add(method);
+				}
+			}
+			if (methodNames.isEmpty()) {
+				return index;
+			}
+			List<Map<String, Object>> rows = semanticDao.selectMethodsByNamesInProject(revisionId, methodNames);
+			for (int i = 0; i < rows.size(); i++) {
+				String name = (String) rows.get(i).get("name");
+				List<String[]> list = index.byName.get(name);
+				if (list == null) {
+					list = new ArrayList<String[]>();
+					index.byName.put(name, list);
+				}
+				list.add(new String[] { (String) rows.get(i).get("methodId"), (String) rows.get(i).get("ownerFqn") });
+			}
+			return index;
+		}
+
+		/** 이 이름에 맞는 메소드들. 하나도 없으면 null */
+		List<String> find(String name) {
+			List<String[]> list = byName.get(methodPart(name));
+			if (list == null) {
+				return null;
+			}
+			String owner = ownerPart(name);
+			List<String> methods = new ArrayList<String>();
+			for (int i = 0; i < list.size(); i++) {
+				String fqn = list.get(i)[1];
+				if (owner == null || (fqn != null && (fqn.equals(owner) || fqn.endsWith("." + owner)))) {
+					methods.add(list.get(i)[0]);
+				}
+			}
+			return methods.isEmpty() ? null : methods;
+		}
+
+		static String methodPart(String name) {
+			int dot = name.lastIndexOf('.');
+			return dot < 0 ? name : name.substring(dot + 1);
+		}
+
+		static String ownerPart(String name) {
+			int dot = name.lastIndexOf('.');
+			return dot < 0 ? null : name.substring(0, dot);
 		}
 	}
 

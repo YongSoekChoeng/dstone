@@ -35,9 +35,13 @@ import net.dstone.knowledge.semantic.ScreenScript;
  *   묶음 이름은 규칙 폴더 안의 경로(확장자 뺀 것)입니다. 예: conf/rules/hi-japan/frontend.yml → hi-japan/frontend
  *
  * 어느 묶음을 쓰나:
- *   autoApply: true 인 묶음은 모든 프로젝트에 씁니다(기본). 해당하는 코드가 없는 프로젝트에서는 아무 일도 하지 않습니다.
- *   autoApply: false 인 묶음은 프로젝트의 ruleSets(쉼표로 이은 묶음 이름)에 적었을 때만 씁니다.
+ *   autoApply: true 인 묶음은 모든 프로젝트에 씁니다. 해당하는 코드가 없는 프로젝트에서는 아무 일도 하지 않습니다.
+ *     적지 않으면 바로 아래 묶음은 true, 하위 폴더의 묶음은 false 입니다.
+ *   프로젝트 폴더: 묶음 이름의 첫 마디가 프로젝트 ID 와 같으면(대소문자 무시) 그 프로젝트에 저절로 씁니다.
+ *     예: conf/rules/order-system/backend.yml 은 프로젝트 order-system 에 쓴다. ruleSets 에 적지 않아도 된다.
+ *   그 밖의 autoApply: false 묶음은 프로젝트의 ruleSets(쉼표로 이은 묶음 이름)에 적었을 때만 씁니다.
  *   ruleSets 에 폴더 이름(예: hi-japan)을 적으면 그 폴더 아래의 묶음을 모두 고른 것입니다.
+ *     다른 프로젝트의 규칙을 빌려 쓸 때(예: 같은 프레임워크를 쓰는 배치 프로젝트) 이렇게 적습니다.
  *
  * 옛 설정 키(application.yml 의 dstone.knowledge.semantic.screen.* / layer.super-types)가 남아 있으면
  * "application-yml" 이라는 묶음으로 바꿔 맨 뒤에 붙입니다. 새로 적을 때는 규칙 파일에 적습니다.
@@ -58,7 +62,10 @@ public class SemanticRuleRegistry extends BaseObject {
 	@Autowired
 	private ConfigProperty configProperty;
 
-	private final RuleSetParser parser = new RuleSetParser();
+	/** 대응표 파일(idMap)을 규칙 폴더에서 찾으므로 쓸 때마다 그 폴더로 만든다 */
+	private RuleSetParser parser() {
+		return new RuleSetParser(rulesDir());
+	}
 
 	/** 서버가 뜰 때 규칙 파일을 모두 검사합니다. 하나라도 틀리면 서버를 띄우지 않습니다. */
 	@PostConstruct
@@ -114,7 +121,7 @@ public class SemanticRuleRegistry extends BaseObject {
 			} catch (IOException e) {
 				throw new RuleException(path, "", "파일을 읽지 못했습니다: " + e.getMessage());
 			}
-			RuleSet set = parser.parse(text, path);
+			RuleSet set = parser().parse(text, path);
 			if (names.contains(set.name)) {
 				throw new RuleException(path, "", "같은 이름의 규칙 묶음이 또 있습니다(.yml 과 .yaml 이 함께 있는지 보세요): " + set.name);
 			}
@@ -165,7 +172,7 @@ public class SemanticRuleRegistry extends BaseObject {
 		if (name == null || String.valueOf(name).trim().length() == 0) {
 			throw new RuleException("(요청)", "name", "시험할 규칙 묶음에는 name 을 적어야 합니다. 같은 이름의 파일이 있으면 그 파일 대신 씁니다.");
 		}
-		return parser.parse(text, String.valueOf(name).trim() + ".yml");
+		return parser().parse(text, String.valueOf(name).trim() + ".yml");
 	}
 
 	/**
@@ -199,13 +206,14 @@ public class SemanticRuleRegistry extends BaseObject {
 						, "규칙 묶음 " + wanted.get(i) + " 이(가) " + rulesDir().getPath() + " 에 없습니다. 있는 묶음: " + known);
 			}
 		}
+		String projectId = project == null || project.get("projectId") == null ? null : String.valueOf(project.get("projectId"));
 		List<RuleSet> chosen = new ArrayList<RuleSet>();
 		for (int i = 0; i < all.size(); i++) {
 			RuleSet set = all.get(i);
 			if (trial != null && trial.name.equals(set.name)) {
 				continue;
 			}
-			if (set.autoApply || isWanted(set.name, wanted)) {
+			if (set.autoApply || isWanted(set.name, wanted) || ownedBy(set.name, projectId)) {
 				chosen.add(set);
 			}
 		}
@@ -236,6 +244,17 @@ public class SemanticRuleRegistry extends BaseObject {
 				throw new RuleException("ruleSets", "", "규칙 묶음 " + wanted.get(i) + " 이(가) 없습니다. 있는 묶음: " + known);
 			}
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 이 묶음이 이 프로젝트의 폴더에 있는지. 묶음 이름의 첫 마디가 프로젝트 ID 와 같으면(대소문자 무시) 그 프로젝트의 것이다.
+	 * 예: hi-japan/frontend 는 프로젝트 HI-Japan 의 것. 바로 아래 묶음(spring)은 어느 프로젝트의 것도 아니다.
+	 * </pre>
+	 */
+	static boolean ownedBy(String setName, String projectId) {
+		int slash = setName.indexOf('/');
+		return projectId != null && slash > 0 && setName.substring(0, slash).equalsIgnoreCase(projectId.trim());
 	}
 
 	/** ruleSets 에 적은 이름 하나가 이 묶음을 가리키는지. 묶음 이름 그대로이거나, 묶음이 들어 있는 폴더 이름이면 맞다 */

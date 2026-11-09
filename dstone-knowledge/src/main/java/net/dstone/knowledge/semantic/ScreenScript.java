@@ -30,6 +30,13 @@ public class ScreenScript {
 
 	/** 자바 메소드 이름으로 쓸 수 있는 글자인지 */
 	private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
+	/** 클래스.메소드(대응표가 돌려줄 수 있는 모양). 앞부분은 단순 이름이나 전체 이름 */
+	private static final Pattern OWNER_METHOD = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+");
+
+	/** 메소드 이름(list)이거나 클래스.메소드(OrderController.list) 모양인지 */
+	public static boolean isMethodName(String name) {
+		return name != null && (IDENTIFIER.matcher(name).matches() || OWNER_METHOD.matcher(name).matches());
+	}
 
 	/**
 	 * <pre>
@@ -51,6 +58,8 @@ public class ScreenScript {
 		private final boolean field;
 		/** 몇 번째 인자가 ID 인지(0부터). 폼 필드 규칙은 늘 0 */
 		private final int argIndex;
+		/** ID 를 틀에 넣기 전에 다듬는 방법(idPattern / idCase / idMap). 없으면 IdTransform.NONE */
+		private final IdTransform transform;
 
 		public CallRule(String function, String methodTemplate) {
 			this(function, methodTemplate, 0);
@@ -60,9 +69,17 @@ public class ScreenScript {
 		 * @param argIndex ID 가 들어 있는 인자의 자리(0부터). 0 이면 첫 인자
 		 */
 		public CallRule(String function, String methodTemplate, int argIndex) {
+			this(function, methodTemplate, argIndex, IdTransform.NONE);
+		}
+
+		/**
+		 * @param transform ID 를 틀에 넣기 전에 다듬는 방법. null 이면 그대로 쓴다
+		 */
+		public CallRule(String function, String methodTemplate, int argIndex, IdTransform transform) {
 			this.function = function;
 			this.methodTemplate = methodTemplate;
 			this.argIndex = argIndex;
+			this.transform = transform == null ? IdTransform.NONE : transform;
 			if (argIndex == 0) {
 				// 함수 이름 앞에 다른 이름 글자가 붙어 있으면 다른 함수다(xdoRequestAjax). 점은 괜찮다(HiJS.svr.doRequestAjax).
 				// 첫 인자가 따옴표로 싼 글자가 아니면(변수 등) 2번 묶음이 비어 있다.
@@ -77,9 +94,10 @@ public class ScreenScript {
 			this.field = false;
 		}
 
-		private CallRule(String fieldName, String methodTemplate, boolean field) {
+		private CallRule(String fieldName, String methodTemplate, boolean field, IdTransform transform) {
 			this.function = fieldName;
 			this.methodTemplate = methodTemplate;
+			this.transform = transform == null ? IdTransform.NONE : transform;
 			// <input name='tranId' value='JIMC1000M03S'/> 처럼 name 바로 뒤(태그 안)에 value 가 오는 모양.
 			// 자바스크립트 글자 안에 적힌 폼이라 속성 사이에 쉼표가 끼기도 한다(name='tranId', value='…').
 			// value 가 따옴표로 싼 글자가 아니면(변수를 이어 붙인 것) 3번 묶음이 비어 있다.
@@ -92,7 +110,12 @@ public class ScreenScript {
 
 		/** 폼 필드 규칙을 만듭니다. 이 이름의 필드에 적힌 값(거래 ID)으로 메소드 이름을 만듭니다. */
 		public static CallRule field(String fieldName, String methodTemplate) {
-			return new CallRule(fieldName, methodTemplate, true);
+			return new CallRule(fieldName, methodTemplate, true, IdTransform.NONE);
+		}
+
+		/** 폼 필드 규칙. ID 를 다듬는 방법이 있을 때 */
+		public static CallRule field(String fieldName, String methodTemplate, IdTransform transform) {
+			return new CallRule(fieldName, methodTemplate, true, transform);
 		}
 
 		/** 함수 이름. 폼 필드 규칙이면 필드 이름 */
@@ -113,15 +136,30 @@ public class ScreenScript {
 			return argIndex;
 		}
 
-		/** 거래 ID로 메소드 이름을 만듭니다. 메소드 이름이 될 수 없는 글자가 섞이면 null */
-		public String methodNameOf(String id) {
-			String name = fill(id);
-			return IDENTIFIER.matcher(name).matches() ? name : null;
+		public IdTransform getTransform() {
+			return transform;
 		}
 
-		/** 틀의 {id} 자리에 ID를 넣은 글자. 화면 ID로 화면 경로를 만들 때(open-rules) 씁니다 */
+		/**
+		 * 거래 ID로 메소드 이름을 만듭니다. 메소드 이름이 될 수 없는 글자가 섞였거나, ID 를 다듬는 규칙에 맞지 않으면 null.
+		 * 대응표(idMap)가 "클래스.메소드"를 돌려주면 그 모양(OrderController.list) 그대로 돌려줍니다.
+		 * 대응표가 없는 규칙에서 점이 든 ID(order.list)는 메소드 이름이 아니다(짐작하지 않는다).
+		 */
+		public String methodNameOf(String id) {
+			String name = fill(id);
+			if (name == null) {
+				return null;
+			}
+			if (IDENTIFIER.matcher(name).matches()) {
+				return name;
+			}
+			return transform.getMap() != null && OWNER_METHOD.matcher(name).matches() ? name : null;
+		}
+
+		/** 틀의 {id} 자리에 (다듬은) ID를 넣은 글자. 화면 ID로 화면 경로를 만들 때(open-rules) 씁니다. 다듬는 규칙에 맞지 않으면 null */
 		public String fill(String id) {
-			return methodTemplate.replace("{id}", id);
+			String value = transform.apply(id);
+			return value == null ? null : methodTemplate.replace("{id}", value);
 		}
 	}
 

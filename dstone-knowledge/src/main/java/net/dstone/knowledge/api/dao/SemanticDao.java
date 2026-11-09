@@ -129,6 +129,14 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectFilesByType", param);
 	}
 
+	/** 언어(XML, JAVA …)별 파일 목록. [{fileId, path, encoding}] */
+	public List<Map<String, Object>> selectFilesByLanguage(long revisionId, String language) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("language", language);
+		return sqlSessionCommon.selectList(NS + "selectFilesByLanguage", param);
+	}
+
 	/**
 	 * <pre>
 	 * 서블릿 클래스에 직접 적힌 요청 처리 메소드(doGet, doPost ...).
@@ -284,7 +292,7 @@ public class SemanticDao extends BaseDao {
 	 * 프로젝트 전체에서 이 이름들의 메소드를 찾습니다. 화면이 거래 ID로 부르는 메소드를 찾을 때 씁니다.
 	 * </pre>
 	 *
-	 * @return [{name, methodId}]
+	 * @return [{name, methodId, ownerFqn}]
 	 */
 	public List<Map<String, Object>> selectMethodsByNamesInProject(long revisionId, List<String> names) {
 		Map<String, Object> param = new HashMap<String, Object>();
@@ -308,6 +316,22 @@ public class SemanticDao extends BaseDao {
 		param.put("prefix", prefix);
 		param.put("suffix", suffix);
 		return sqlSessionCommon.insert(NS + "insertCallRuleEndpoints", param);
+	}
+
+	/**
+	 * <pre>
+	 * 대응표(idMap)로 정한 거래 진입점 하나를 넣습니다. 그 메소드에 거래 진입점이 이미 있으면 넣지 않습니다.
+	 * </pre>
+	 *
+	 * @return 넣은 수(0 또는 1)
+	 */
+	public int insertTransactionEndpoint(long revisionId, String methodId, String path, String propertiesJson) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("methodId", methodId);
+		param.put("path", path);
+		param.put("propertiesJson", propertiesJson);
+		return sqlSessionCommon.insert(NS + "insertTransactionEndpoint", param);
 	}
 
 	/** 이 타입을 바로 상속(구현)한 타입 가운데 계층이 아직 없는 것에 계층을 붙입니다(MEDIUM). */

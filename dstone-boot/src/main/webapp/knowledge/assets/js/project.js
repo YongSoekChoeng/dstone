@@ -241,10 +241,13 @@ var DstoneKnowledgeProject = (function () {
 		Promise.all([
 			K.call("GET", "/api/revisions/" + revision.revisionId),
 			// RAG 상태는 따로 조회한다. 실패해도 나머지 요약은 보여 준다.
-			K.call("GET", "/api/revisions/" + revision.revisionId + "/rag").catch(function () { return null; })
+			K.call("GET", "/api/revisions/" + revision.revisionId + "/rag").catch(function () { return null; }),
+			// 적용 진단도 따로. 실패하면 진단 상자만 빠진다.
+			K.call("GET", "/api/revisions/" + revision.revisionId + "/diagnostics").catch(function () { return null; })
 		]).then(function (results) {
 			var summary = results[0];
 			summary.rag = results[1];
+			summary.diagnostics = results[2];
 			renderSummary(summary);
 			el["kn-summary-panel"].scrollIntoView({ behavior: "smooth" });
 		}).catch(function (err) {
@@ -269,6 +272,9 @@ var DstoneKnowledgeProject = (function () {
 		el["kn-summary-sections"].innerHTML = "";
 		el["kn-summary-sections"].appendChild(verdictBox(summary));
 		el["kn-summary-sections"].appendChild(unresolvedButtons(summary));
+		if (summary.diagnostics) {
+			el["kn-summary-sections"].appendChild(diagnosticsBox(summary.diagnostics));
+		}
 		T.SECTIONS.forEach(function (section) {
 			var value = valueAt(summary, section.path);
 			if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
@@ -359,6 +365,53 @@ var DstoneKnowledgeProject = (function () {
 			button.addEventListener("click", function () {
 				DstoneKnowledgeUnresolved.open({ revisionId: summary.revisionId, revisionLabel: summary.revisionLabel }, button.getAttribute("data-status"));
 			});
+		});
+		return box;
+	}
+
+	/** 진단 항목의 해결 방법 → 화면에 보일 말 */
+	var SOLUTION = {
+		RULE: "규칙 파일로 해결",
+		CLASSPATH: "jar 위치 등록",
+		SETTING: "프로젝트 설정",
+		SOURCE: "소스 보충",
+		DEVELOP: "분석기 개발 필요",
+		NONE: ""
+	};
+
+	/**
+	 * "적용 진단" 상자. 어디가 안 이어졌는지와, 그것을 무엇으로 풀지(규칙 / jar / 설정 / 소스 / 개발)를 항목마다 보여 준다.
+	 * 새 프로젝트를 처음 분석한 뒤 "규칙만으로 되는지, 개발이 필요한지"를 바로 가리려는 것이다.
+	 */
+	function diagnosticsBox(diagnostics) {
+		var box = document.createElement("div");
+		box.className = "kn-verdict kn-diag";
+		var summary = diagnostics.summary || {};
+		var head = Object.keys(summary).map(function (key) {
+			return "<span class=\"kn-diag-solution kn-diag-" + K.escapeHtml(key) + "\">" + K.escapeHtml(SOLUTION[key] || key) + " " + summary[key] + "</span>";
+		}).join(" ");
+		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">적용 진단</div>"
+			+ "<p class=\"ai-hint\">살펴볼 항목을 해결 방법별로 나눴습니다. <b>규칙 파일로 해결</b>은 conf/rules/" + K.escapeHtml(diagnostics.projectId)
+			+ "/ 에 규칙을 적고 SEMANTIC 부터 다시 분석하면 되고, <b>분석기 개발 필요</b>는 지금 지원하는 범위 밖입니다.</p>"
+			+ (head ? "<div class=\"kn-row\">" + head + "</div>" : "<p class=\"ai-hint\">살펴볼 항목이 없습니다.</p>");
+		(diagnostics.checks || []).forEach(function (check) {
+			var mark = check.level === "good" ? "✔" : check.level === "bad" ? "✖" : check.level === "warn" ? "!" : "·";
+			var count = check.count === null || check.count === undefined ? "" : " (" + formatNumber(check.count)
+				+ (check.total === null || check.total === undefined ? "" : " / " + formatNumber(check.total)) + ")";
+			var solution = SOLUTION[check.solution] ? " <span class=\"kn-diag-solution kn-diag-" + K.escapeHtml(check.solution) + "\">" + K.escapeHtml(SOLUTION[check.solution]) + "</span>" : "";
+			html += "<div class=\"kn-verdict-line kn-verdict-" + K.escapeHtml(check.level) + "\"><span class=\"kn-verdict-mark\">" + mark + "</span><b>"
+				+ K.escapeHtml(check.title) + "</b>" + K.escapeHtml(count) + solution + " — " + K.escapeHtml(check.message) + "</div>";
+			if (check.samples && check.samples.length > 0) {
+				html += "<details class=\"kn-howto kn-diag-samples\"><summary>보기 " + check.samples.length + "건</summary><div class=\"kn-scroll\" data-key=\""
+					+ K.escapeHtml(check.key) + "\"></div></details>";
+			}
+		});
+		box.innerHTML = html;
+		(diagnostics.checks || []).forEach(function (check) {
+			var target = box.querySelector(".kn-scroll[data-key=\"" + check.key + "\"]");
+			if (target) {
+				K.autoTable(target, check.samples);
+			}
 		});
 		return box;
 	}

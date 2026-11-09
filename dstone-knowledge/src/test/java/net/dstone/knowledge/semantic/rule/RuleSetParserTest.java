@@ -202,7 +202,9 @@ public class RuleSetParserTest {
 			if (files[i].isDirectory()) {
 				readAll(files[i], prefix + files[i].getName() + "/", sets);
 			} else if (files[i].getName().endsWith(".yml")) {
-				sets.add(parse(new String(Files.readAllBytes(files[i].toPath()), StandardCharsets.UTF_8), prefix + files[i].getName()));
+				// 대응표(idMap)를 쓰는 규칙이 있을 수 있어서 규칙 폴더를 아는 파서로 읽는다.
+				sets.add(new RuleSetParser(new File("conf/rules")).parse(new String(Files.readAllBytes(files[i].toPath()), StandardCharsets.UTF_8)
+						, prefix + files[i].getName()));
 			}
 		}
 	}
@@ -218,6 +220,80 @@ public class RuleSetParserTest {
 		assertTrue(SemanticRuleRegistry.refersTo("hi-japan/backend", "hi-japan/backend"));
 		assertFalse(SemanticRuleRegistry.refersTo("hi-japan", "hi-japan-batch/backend"));
 		assertFalse(SemanticRuleRegistry.refersTo("hi-japan/front", "hi-japan/frontend"));
+	}
+
+
+	@Test
+	public void 하위_폴더의_묶음은_기본으로_그_폴더의_프로젝트에만_쓴다() {
+		// 바로 아래 묶음은 모든 프로젝트에, 하위 폴더 묶음은 기본으로 쓰지 않는다. 적으면 적은 대로.
+		assertTrue(parse("order: 200\n", "spring.yml").autoApply);
+		assertFalse(parse("order: 500\n", "order-system/backend.yml").autoApply);
+		assertTrue(parse("autoApply: true\n", "order-system/backend.yml").autoApply);
+		assertFalse(parse("autoApply: false\n", "spring.yml").autoApply);
+		// 첫 마디가 프로젝트 ID 와 같으면(대소문자 무시) 그 프로젝트의 묶음이다.
+		assertTrue(SemanticRuleRegistry.ownedBy("hi-japan/frontend", "HI-Japan"));
+		assertTrue(SemanticRuleRegistry.ownedBy("order-system/sub/backend", "order-system"));
+		assertFalse(SemanticRuleRegistry.ownedBy("hi-japan/frontend", "HI-Japan-batch"));
+		assertFalse(SemanticRuleRegistry.ownedBy("spring", "spring"));
+		assertFalse(SemanticRuleRegistry.ownedBy("hi-japan/frontend", null));
+	}
+
+	@Test
+	public void 화면_규칙의_ID_다듬기를_읽고_잘못_적으면_막는다() throws Exception {
+		RuleSet set = parse("screens:\n"
+				+ "  calls:\n"
+				+ "    - { function: callTx, method: '{id}', idPattern: '^TX_([A-Z]+)_([A-Z]+)$', idReplace: '$1$2', idCase: lower_first }\n", "a.yml");
+		assertEquals("oRDLIST", set.screenCalls.get(0).methodNameOf("TX_ORD_LIST"));
+		assertNull(set.screenCalls.get(0).methodNameOf("ORD_LIST"));
+		assertEquals("screens.calls[0].idReplace", parseFails("screens:\n  calls:\n    - { function: f, method: '{id}', idReplace: '$1' }\n", "a.yml").getPath());
+		assertEquals("screens.calls[0].idReplace", parseFails("screens:\n  calls:\n    - { function: f, method: '{id}', idPattern: '^(a)$', idReplace: '$2' }\n", "a.yml").getPath());
+		assertEquals("screens.calls[0].idCase", parseFails("screens:\n  calls:\n    - { function: f, method: '{id}', idCase: TITLE }\n", "a.yml").getPath());
+		// 규칙 폴더를 모르는 파서는 대응표를 읽을 수 없다.
+		assertEquals("screens.opens[0].idMap", parseFails("screens:\n  opens:\n    - { function: f, screen: '{id}.xfdl', idMap: m.csv }\n", "a.yml").getPath());
+
+		// 규칙 폴더 안의 대응표를 읽는다. 폴더 밖은 막는다. 대응표 내용도 해시에 들어간다.
+		File dir = Files.createTempDirectory("rules").toFile();
+		File map = new File(dir, "tx.csv");
+		Files.write(map.toPath(), "# 거래 ID,클래스.메소드\nORD001,OrderController.list\nORD002 = save\n".getBytes(StandardCharsets.UTF_8));
+		RuleSetParser withDir = new RuleSetParser(dir);
+		String text = "screens:\n  calls:\n    - { function: callTx, method: '{id}', idMap: tx.csv }\n";
+		RuleSet mapped = withDir.parse(text, "a.yml");
+		assertEquals("OrderController.list", mapped.screenCalls.get(0).methodNameOf("ORD001"));
+		assertEquals("save", mapped.screenCalls.get(0).methodNameOf("ORD002"));
+		assertNull(mapped.screenCalls.get(0).methodNameOf("ORD003"));
+		String before = mapped.hash;
+		Files.write(map.toPath(), "ORD001,OrderController.find\n".getBytes(StandardCharsets.UTF_8));
+		assertFalse(before.equals(withDir.parse(text, "a.yml").hash));
+		final RuleSetParser outside = withDir;
+		RuleException escape = assertThrows(RuleException.class, new Executable() {
+			@Override
+			public void execute() {
+				outside.parse("screens:\n  calls:\n    - { function: f, method: '{id}', idMap: ../x.csv }\n", "a.yml");
+			}
+		});
+		assertEquals("screens.calls[0].idMap", escape.getPath());
+	}
+
+	@Test
+	public void 설정_XML_진입점_규칙을_읽는다() {
+		RuleSet set = parse("endpoints:\n"
+				+ "  xml:\n"
+				+ "    - { endpointType: TRANSACTION, files: 'service-config\\.xml$', element: service, pathAttribute: id,"
+				+ " classAttribute: class, methodAttribute: method }\n"
+				+ "    - { endpointType: HTTP, files: 'routes\\.xml$', element: route, pathAttribute: url, pathTemplate: '{value}.do' }\n", "a.yml");
+		assertEquals(2, set.xmlEndpoints.size());
+		RuleSet.XmlEndpointRule first = set.xmlEndpoints.get(0);
+		assertEquals("service", first.element);
+		assertEquals("class", first.classAttribute);
+		assertNull(first.httpMethod);
+		RuleSet.XmlEndpointRule second = set.xmlEndpoints.get(1);
+		assertEquals("ALL", second.httpMethod);
+		assertEquals(".do", second.suffix);
+		assertNull(second.methodAttribute);
+		assertEquals(2, new SemanticRules(Arrays.asList(set)).getXmlEndpoints().size());
+		assertEquals("endpoints.xml[0].files", parseFails("endpoints:\n  xml:\n    - { endpointType: TX, files: '(', element: a, pathAttribute: b }\n", "a.yml").getPath());
+		assertEquals("endpoints.xml[0].element", parseFails("endpoints:\n  xml:\n    - { endpointType: TX, files: 'a', element: 'x:y', pathAttribute: b }\n", "a.yml").getPath());
+		assertEquals("endpoints.xml[0].pathTemplate", parseFails("endpoints:\n  xml:\n    - { endpointType: TX, files: 'a', element: a, pathAttribute: b, pathTemplate: '.do' }\n", "a.yml").getPath());
 	}
 
 }

@@ -26,7 +26,10 @@ public class RuleSet {
 	public final String description;
 	/** 작은 값이 먼저 적용된다. "먼저 정한 계층은 뒤에서 바꾸지 않는다" 라서 순서가 결과를 바꿀 수 있다 */
 	public final int order;
-	/** true 면 모든 프로젝트에 적용한다. false 면 프로젝트의 ruleSets 에 이름을 적었을 때만 적용한다 */
+	/**
+	 * true 면 모든 프로젝트에 적용한다. false 면 프로젝트 폴더(첫 마디 = 프로젝트 ID)의 묶음이거나
+	 * 프로젝트의 ruleSets 에 이름을 적었을 때만 적용한다. 적지 않으면 바로 아래 묶음은 true, 하위 폴더 묶음은 false
+	 */
 	public final boolean autoApply;
 	/** 읽은 파일 이름. 설정(application.yml)에서 온 옛 규칙이면 "application.yml" */
 	public final String source;
@@ -36,6 +39,7 @@ public class RuleSet {
 	public final List<HttpMappingRule> httpMappings;
 	public final List<AnnotatedEndpointRule> annotatedEndpoints;
 	public final List<SuperTypeEndpointRule> superTypeEndpoints;
+	public final List<XmlEndpointRule> xmlEndpoints;
 	public final List<String> injectAnnotations;
 	public final List<String> proxyAnnotations;
 	public final List<LayerAnnotationRule> layerAnnotations;
@@ -57,6 +61,7 @@ public class RuleSet {
 		this.httpMappings = Collections.unmodifiableList(b.httpMappings);
 		this.annotatedEndpoints = Collections.unmodifiableList(b.annotatedEndpoints);
 		this.superTypeEndpoints = Collections.unmodifiableList(b.superTypeEndpoints);
+		this.xmlEndpoints = Collections.unmodifiableList(b.xmlEndpoints);
 		this.injectAnnotations = Collections.unmodifiableList(b.injectAnnotations);
 		this.proxyAnnotations = Collections.unmodifiableList(b.proxyAnnotations);
 		this.layerAnnotations = Collections.unmodifiableList(b.layerAnnotations);
@@ -71,7 +76,7 @@ public class RuleSet {
 
 	/** 이 묶음에 든 규칙 수. 리비전 기록과 화면에 보여 줄 때 쓴다 */
 	public int ruleCount() {
-		return httpMappings.size() + annotatedEndpoints.size() + superTypeEndpoints.size()
+		return httpMappings.size() + annotatedEndpoints.size() + superTypeEndpoints.size() + xmlEndpoints.size()
 				+ (injectAnnotations.isEmpty() ? 0 : 1) + (proxyAnnotations.isEmpty() ? 0 : 1)
 				+ layerAnnotations.size() + layerSuperTypes.size() + layerNames.size() + callArguments.size()
 				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size();
@@ -88,6 +93,7 @@ public class RuleSet {
 		List<HttpMappingRule> httpMappings = new ArrayList<HttpMappingRule>();
 		List<AnnotatedEndpointRule> annotatedEndpoints = new ArrayList<AnnotatedEndpointRule>();
 		List<SuperTypeEndpointRule> superTypeEndpoints = new ArrayList<SuperTypeEndpointRule>();
+		List<XmlEndpointRule> xmlEndpoints = new ArrayList<XmlEndpointRule>();
 		List<String> injectAnnotations = new ArrayList<String>();
 		List<String> proxyAnnotations = new ArrayList<String>();
 		List<LayerAnnotationRule> layerAnnotations = new ArrayList<LayerAnnotationRule>();
@@ -172,6 +178,46 @@ public class RuleSet {
 			this.methods = Collections.unmodifiableList(new ArrayList<String>(methods));
 			this.methodPattern = methodPattern;
 			this.paramCount = paramCount;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 설정 XML 에 적힌 진입점 규칙. 주소(또는 거래 ID)와 처리 클래스 · 메소드를 애노테이션이 아니라
+	 * 프로젝트 자체의 설정 파일에 적는 프레임워크를 위한 것입니다.
+	 * 예: &lt;service id="ORD001" class="com.x.OrderService" method="list"/&gt;
+	 *     → files: 'service-config\.xml$', element: service, pathAttribute: id, classAttribute: class, methodAttribute: method
+	 * classAttribute / methodAttribute 는 그 요소에 없으면 바깥 요소에서 찾습니다(&lt;controller class="…"&gt;&lt;action …/&gt;).
+	 * </pre>
+	 */
+	public static class XmlEndpointRule {
+		public final String endpointType;
+		/** 파일 경로(프로젝트 안의 경로)에 대한 Java 정규식. find 로 본다 */
+		public final String files;
+		/** 요소 이름(네임스페이스 앞붙이 없이) */
+		public final String element;
+		public final String pathAttribute;
+		/** 처리 클래스(전체 이름 또는 단순 이름)가 적힌 속성. 없으면 null */
+		public final String classAttribute;
+		/** 처리 메소드 이름이 적힌 속성. 없으면 null(클래스만 남는다) */
+		public final String methodAttribute;
+		/** HTTP 진입점이면 HTTP 메소드(GET …, 모르면 ALL). 다른 종류면 null */
+		public final String httpMethod;
+		/** 주소 값 앞뒤에 붙일 글자. 틀 "{value}.do" 면 "", ".do" */
+		public final String prefix;
+		public final String suffix;
+
+		public XmlEndpointRule(String endpointType, String files, String element, String pathAttribute, String classAttribute, String methodAttribute
+				, String httpMethod, String prefix, String suffix) {
+			this.endpointType = endpointType;
+			this.files = files;
+			this.element = element;
+			this.pathAttribute = pathAttribute;
+			this.classAttribute = classAttribute;
+			this.methodAttribute = methodAttribute;
+			this.httpMethod = httpMethod;
+			this.prefix = prefix;
+			this.suffix = suffix;
 		}
 	}
 

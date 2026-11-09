@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 적용 진단: 새 프로젝트를 처음 분석한 뒤 "어디가 안 이어졌고, 규칙으로 풀 일인지 개발할 일인지" 를 가리는 데 쓰는 숫자와 보기 -->
+<mapper namespace="net.dstone.knowledge.api.dao.DiagnosticDao">
+
+    <!-- 화면(JSP, WebSquare, Nexacro) 수와, 서버를 하나도 부르지 않는(REQUESTS 가 없는) 화면 수 -->
+    <select id="selectScreenSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT COUNT(*) AS "total"
+             , COUNT(*) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM analysis_relation r
+                     WHERE r.revision_id = f.revision_id AND r.relation_type = 'REQUESTS'
+                       AND r.from_kind = 'FILE' AND r.from_id = 'F' || f.file_id)) AS "noRequest"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+    </select>
+
+    <select id="selectScreensWithoutRequest" parameterType="java.util.Map" resultType="string">
+        SELECT f.path
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+           AND NOT EXISTS (
+                SELECT 1 FROM analysis_relation r
+                 WHERE r.revision_id = f.revision_id AND r.relation_type = 'REQUESTS'
+                   AND r.from_kind = 'FILE' AND r.from_id = 'F' || f.file_id)
+         ORDER BY f.path
+         LIMIT #{limit}
+    </select>
+
+    <!-- 규칙으로 이름(거래 ID → 메소드 이름, SQL 이름)까지는 알았는데 그 대상이 프로젝트에 없는 것. 이름별로 많은 것부터 -->
+    <select id="selectUnresolvedTargets" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT to_external AS "name", COUNT(*) AS "count"
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND relation_type = #{relationType}
+           AND to_id IS NULL
+           AND to_external IS NOT NULL
+         GROUP BY to_external
+         ORDER BY COUNT(*) DESC, to_external
+         LIMIT #{limit}
+    </select>
+
+    <select id="countUnresolvedTargets" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_relation
+         WHERE revision_id = #{revisionId}
+           AND relation_type = #{relationType}
+           AND to_id IS NULL
+           AND to_external IS NOT NULL
+    </select>
+
+    <!-- 진입점 종류별 수와, 처리 메소드를 정하지 못한 수 -->
+    <select id="selectEndpointSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT endpoint_type AS "endpointType"
+             , COUNT(*) AS "count"
+             , COUNT(*) FILTER (WHERE method_id IS NULL) AS "noMethod"
+             , COUNT(*) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM analysis_relation r
+                     WHERE r.revision_id = e.revision_id AND r.relation_type = 'REQUESTS' AND r.to_id = e.method_id)) AS "notRequested"
+          FROM analysis_endpoint e
+         WHERE e.revision_id = #{revisionId}
+         GROUP BY endpoint_type
+         ORDER BY COUNT(*) DESC
+    </select>
+
+    <!-- 처리 메소드를 정하지 못한 진입점의 보기 -->
+    <select id="selectEndpointsWithoutMethod" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.endpoint_type AS "endpointType", e.path AS "path", f.path AS "file", e.line_start AS "line"
+             , COALESCE(e.properties_json->>'unresolvedClass', e.properties_json->>'unresolvedMethod', e.properties_json->>'actionClass') AS "note"
+          FROM analysis_endpoint e
+          JOIN analysis_file f ON f.file_id = e.file_id
+         WHERE e.revision_id = #{revisionId}
+           AND e.method_id IS NULL
+           AND e.endpoint_type NOT IN ('JSP', 'SERVLET')
+         ORDER BY f.path, e.line_start
+         LIMIT #{limit}
+    </select>
+
+    <!-- 종류를 모르는 XML(매퍼, Spring, web.xml, 화면 ... 이 아닌 것). 같은 파일 이름끼리 묶어 많은 것부터.
+         프로젝트 자체 프레임워크의 설정 파일이면 endpoints.xml 규칙으로 진입점을 만들 수 있다 -->
+    <select id="selectUnknownXml" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT regexp_replace(path, '^.*/', '') AS "name", COUNT(*) AS "count", MIN(path) AS "example"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND file_type = 'XML'
+         GROUP BY regexp_replace(path, '^.*/', '')
+         ORDER BY COUNT(*) DESC, 1
+         LIMIT #{limit}
+    </select>
+
+    <select id="countUnknownXml" parameterType="long" resultType="int">
+        SELECT COUNT(*) FROM analysis_file WHERE revision_id = #{revisionId} AND file_type = 'XML'
+    </select>
+
+    <!-- 계층을 정하지 못한 클래스. 패키지별로 많은 것부터 -->
+    <select id="selectClassLayerSummary" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT COUNT(*) AS "total"
+             , COUNT(*) FILTER (WHERE layer IS NULL) AS "noLayer"
+             , COUNT(*) FILTER (WHERE layer_confidence = 'LOW') AS "low"
+          FROM analysis_symbol
+         WHERE revision_id = #{revisionId}
+           AND kind = 'CLASS'
+    </select>
+
+    <select id="selectNoLayerPackages" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT COALESCE(package_name, '(기본 패키지)') AS "name", COUNT(*) AS "count", MIN(simple_name) AS "example"
+          FROM analysis_symbol
+         WHERE revision_id = #{revisionId}
+           AND kind = 'CLASS'
+           AND layer IS NULL
+         GROUP BY package_name
+         ORDER BY COUNT(*) DESC, 1
+         LIMIT #{limit}
+    </select>
+
+    <!-- 리비전에 쓴 규칙 묶음 이름(적용 순서) -->
+    <select id="selectAppliedRuleSetNames" parameterType="long" resultType="string">
+        SELECT name
+          FROM analysis_resource
+         WHERE revision_id = #{revisionId}
+           AND resource_type = 'RULE_SET'
+         ORDER BY resource_id
+    </select>
+
+</mapper>

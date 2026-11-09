@@ -1,5 +1,9 @@
 package net.dstone.knowledge.semantic.rule;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -15,6 +19,7 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import net.dstone.knowledge.common.util.HashText;
+import net.dstone.knowledge.semantic.IdTransform;
 import net.dstone.knowledge.semantic.ScreenMenu;
 import net.dstone.knowledge.semantic.ScreenScript;
 
@@ -47,6 +52,23 @@ public class RuleSetParser {
 	/** 인자 위치의 한도. DECLARE 가 남기는 인자 수도 이만큼이다 */
 	public static final int MAX_ARG_INDEX = 9;
 
+	/** 화면 규칙의 ID 를 다듬는 키(IdTransform) */
+	private static final String[] ID_KEYS = { "idPattern", "idReplace", "idCase", "idMap" };
+
+	/** 대응표 파일(idMap)을 찾는 폴더. 보통 규칙 폴더. null 이면 idMap 을 쓸 수 없다(단위 테스트처럼 글만 읽을 때) */
+	private final File baseDir;
+
+	public RuleSetParser() {
+		this(null);
+	}
+
+	/**
+	 * @param baseDir 대응표 파일(idMap)을 찾는 폴더(규칙 폴더). 파일은 이 폴더 안에 있어야 한다
+	 */
+	public RuleSetParser(File baseDir) {
+		this.baseDir = baseDir;
+	}
+
 	/**
 	 * @param text     파일 내용
 	 * @param fileName 규칙 폴더 안의 경로(메시지와 묶음 이름 확인에 쓴다). 예: spring.yml, hi-japan/frontend.yml
@@ -73,7 +95,9 @@ public class RuleSetParser {
 		}
 		b.description = r.optString(top, "", "description", null);
 		b.order = r.optInt(top, "", "order", 500);
-		b.autoApply = r.optBool(top, "", "autoApply", true);
+		// 바로 아래의 공통 묶음(spring, mybatis ...)은 모든 프로젝트에 쓴다. 하위 폴더의 묶음은 그 프로젝트의 것이라
+		// 기본으로는 다른 프로젝트에 쓰지 않는다(폴더 이름 = 프로젝트 ID 면 그 프로젝트에 저절로 쓴다. SemanticRuleRegistry).
+		b.autoApply = r.optBool(top, "", "autoApply", b.name.indexOf('/') < 0);
 		b.source = fileName;
 		b.hash = HashText.sha256(text).substring(0, 12);
 
@@ -90,7 +114,12 @@ public class RuleSetParser {
 		}
 		readLayers(r, top.get("layers"), b);
 		readCallArguments(r, top.get("callArguments"), b);
-		readScreens(r, top.get("screens"), b);
+		StringBuilder mapTexts = new StringBuilder();
+		readScreens(r, top.get("screens"), b, mapTexts);
+		if (mapTexts.length() > 0) {
+			// 대응표를 고쳐도 "규칙이 바뀌었다"를 알 수 있게 해시에 대응표 내용도 넣는다.
+			b.hash = HashText.sha256(text + "\n" + mapTexts).substring(0, 12);
+		}
 		return b.build();
 	}
 
@@ -99,7 +128,7 @@ public class RuleSetParser {
 			return;
 		}
 		Map<String, Object> endpoints = r.map(node, "endpoints");
-		r.keys(endpoints, "endpoints", "http", "annotations", "superTypes");
+		r.keys(endpoints, "endpoints", "http", "annotations", "superTypes", "xml");
 
 		List<Object> https = r.list(endpoints.get("http"), "endpoints.http");
 		for (int i = 0; i < https.size(); i++) {
@@ -142,6 +171,8 @@ public class RuleSetParser {
 					, r.identifiers(item, path, "annotations", true), r.identifiers(item, path, "pathAttributes", false)));
 		}
 
+		readXmlEndpoints(r, endpoints.get("xml"), b);
+
 		List<Object> superTypes = r.list(endpoints.get("superTypes"), "endpoints.superTypes");
 		for (int i = 0; i < superTypes.size(); i++) {
 			String path = "endpoints.superTypes[" + i + "]";
@@ -159,6 +190,49 @@ public class RuleSetParser {
 			b.superTypeEndpoints.add(new RuleSet.SuperTypeEndpointRule(r.endpointType(item, path), r.qualifiedNames(item, path, "superTypes")
 					, methods, methodPattern, paramCount));
 		}
+	}
+
+	/** XML 요소 · 속성 이름: 영문자로 시작, 영문자 · 숫자 · _ . - */
+	private static final Pattern XML_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_.-]*");
+
+	private void readXmlEndpoints(Reader r, Object node, RuleSet.Builder b) {
+		List<Object> rules = r.list(node, "endpoints.xml");
+		for (int i = 0; i < rules.size(); i++) {
+			String path = "endpoints.xml[" + i + "]";
+			Map<String, Object> item = r.map(rules.get(i), path);
+			r.keys(item, path, "endpointType", "files", "element", "pathAttribute", "classAttribute", "methodAttribute", "httpMethod", "pathTemplate");
+			String files = r.string(item, path, "files");
+			r.regex(files, path + ".files");
+			String element = xmlName(r, item, path, "element", true);
+			String pathAttribute = xmlName(r, item, path, "pathAttribute", true);
+			String classAttribute = xmlName(r, item, path, "classAttribute", false);
+			String methodAttribute = xmlName(r, item, path, "methodAttribute", false);
+			String endpointType = r.endpointType(item, path);
+			String httpMethod = r.optString(item, path, "httpMethod", null);
+			if (httpMethod != null) {
+				httpMethod = httpMethod.toUpperCase(Locale.ROOT);
+				if (!HTTP_METHOD.matcher(httpMethod).matches()) {
+					throw r.error(path + ".httpMethod", "GET, POST, ALL 처럼 영문 대문자여야 합니다: " + httpMethod);
+				}
+			} else if ("HTTP".equals(endpointType)) {
+				httpMethod = "ALL";
+			}
+			String template = r.optString(item, path, "pathTemplate", "{value}");
+			int at = template.indexOf("{value}");
+			if (at < 0 || template.indexOf("{value}", at + 1) >= 0) {
+				throw r.error(path + ".pathTemplate", "{value} 를 한 번 적어야 합니다: " + template);
+			}
+			b.xmlEndpoints.add(new RuleSet.XmlEndpointRule(endpointType, files, element, pathAttribute, classAttribute, methodAttribute, httpMethod
+					, template.substring(0, at), template.substring(at + "{value}".length())));
+		}
+	}
+
+	private String xmlName(Reader r, Map<String, Object> item, String path, String key, boolean required) {
+		String value = required ? r.string(item, path, key) : r.optString(item, path, key, null);
+		if (value != null && !XML_NAME.matcher(value).matches()) {
+			throw r.error(path + "." + key, "XML 이름(영문자로 시작, 영문자 · 숫자 · _ . -)이어야 합니다. 네임스페이스 앞붙이는 빼고 적습니다: " + value);
+		}
+		return value;
 	}
 
 	private void readLayers(Reader r, Object node, RuleSet.Builder b) {
@@ -228,7 +302,82 @@ public class RuleSetParser {
 		}
 	}
 
-	private void readScreens(Reader r, Object node, RuleSet.Builder b) {
+	/**
+	 * <pre>
+	 * 화면 규칙 하나의 ID 다듬기(idPattern / idReplace / idCase / idMap)를 읽습니다. 하나도 없으면 IdTransform.NONE.
+	 * idMap 은 규칙 폴더 안의 파일 경로입니다. 읽은 내용은 mapTexts 에 붙여 묶음의 해시에 넣습니다.
+	 * </pre>
+	 */
+	private IdTransform readIdTransform(Reader r, Map<String, Object> item, String path, StringBuilder mapTexts) {
+		String pattern = r.optString(item, path, "idPattern", null);
+		String replace = r.optString(item, path, "idReplace", null);
+		String idCase = r.optString(item, path, "idCase", null);
+		String mapPath = r.optString(item, path, "idMap", null);
+		if (pattern == null && replace == null && idCase == null && mapPath == null) {
+			return IdTransform.NONE;
+		}
+		if (pattern != null) {
+			r.regex(pattern, path + ".idPattern");
+		}
+		if (replace != null && pattern == null) {
+			throw r.error(path + ".idReplace", "idReplace 는 idPattern 과 함께 적습니다($1 처럼 idPattern 의 묶음을 씁니다).");
+		}
+		if (replace != null) {
+			int groups = Pattern.compile(pattern).matcher("").groupCount();
+			if (groups < maxGroupRef(replace)) {
+				throw r.error(path + ".idReplace", "idPattern 의 묶음 수(" + groups + ")보다 큰 번호를 씁니다: " + replace);
+			}
+		}
+		if (idCase != null) {
+			idCase = idCase.toUpperCase(Locale.ROOT);
+			if (!IdTransform.CASES.contains(idCase)) {
+				throw r.error(path + ".idCase", "쓸 수 있는 값이 아닙니다: " + idCase + " (쓸 수 있는 값: " + IdTransform.CASES + ")");
+			}
+		}
+		Map<String, String> map = null;
+		if (mapPath != null) {
+			if (baseDir == null) {
+				throw r.error(path + ".idMap", "규칙 폴더 밖에서 읽는 규칙에는 idMap 을 쓸 수 없습니다.");
+			}
+			File file = new File(baseDir, mapPath);
+			String text;
+			try {
+				File canonicalBase = baseDir.getCanonicalFile();
+				File canonical = file.getCanonicalFile();
+				if (!canonical.getPath().startsWith(canonicalBase.getPath() + File.separator)) {
+					throw r.error(path + ".idMap", "대응표 파일은 규칙 폴더(" + baseDir.getPath() + ") 안에 있어야 합니다: " + mapPath);
+				}
+				if (!canonical.isFile()) {
+					throw r.error(path + ".idMap", "대응표 파일이 없습니다: " + file.getPath());
+				}
+				text = new String(Files.readAllBytes(canonical.toPath()), StandardCharsets.UTF_8);
+			} catch (IOException e) {
+				throw r.error(path + ".idMap", "대응표 파일을 읽지 못했습니다: " + e.getMessage());
+			}
+			List<Integer> errors = new ArrayList<Integer>();
+			map = IdTransform.parseMap(text, errors);
+			if (!errors.isEmpty()) {
+				throw r.error(path + ".idMap", mapPath + " 의 " + errors + " 번째 줄에 \"ID,값\" 이 없습니다.");
+			}
+			if (map.isEmpty()) {
+				throw r.error(path + ".idMap", "대응표가 비어 있습니다: " + mapPath);
+			}
+			mapTexts.append(mapPath).append('\n').append(text).append('\n');
+		}
+		return new IdTransform(pattern, replace, idCase, map, mapPath);
+	}
+
+	/** 바꿀 글자 안의 $n 가운데 가장 큰 n */
+	private static int maxGroupRef(String replace) {
+		int max = 0;
+		java.util.regex.Matcher m = Pattern.compile("\\$(\\d)").matcher(replace);
+		while (m.find()) {
+			max = Math.max(max, Integer.parseInt(m.group(1)));
+		}
+		return max;
+	}
+
+	private void readScreens(Reader r, Object node, RuleSet.Builder b, StringBuilder mapTexts) {
 		if (node == null) {
 			return;
 		}
@@ -239,22 +388,25 @@ public class RuleSetParser {
 		for (int i = 0; i < calls.size(); i++) {
 			String path = "screens.calls[" + i + "]";
 			Map<String, Object> item = r.map(calls.get(i), path);
-			r.keys(item, path, "function", "method", "argIndex");
-			b.screenCalls.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "method"), r.argIndex(item, path)));
+			r.keys(item, path, with(ID_KEYS, "function", "method", "argIndex"));
+			b.screenCalls.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "method"), r.argIndex(item, path)
+					, readIdTransform(r, item, path, mapTexts)));
 		}
 		List<Object> fields = r.list(screens.get("fields"), "screens.fields");
 		for (int i = 0; i < fields.size(); i++) {
 			String path = "screens.fields[" + i + "]";
 			Map<String, Object> item = r.map(fields.get(i), path);
-			r.keys(item, path, "field", "method");
-			b.screenFields.add(ScreenScript.CallRule.field(r.identifier(item, path, "field"), r.idTemplate(item, path, "method")));
+			r.keys(item, path, with(ID_KEYS, "field", "method"));
+			b.screenFields.add(ScreenScript.CallRule.field(r.identifier(item, path, "field"), r.idTemplate(item, path, "method")
+					, readIdTransform(r, item, path, mapTexts)));
 		}
 		List<Object> opens = r.list(screens.get("opens"), "screens.opens");
 		for (int i = 0; i < opens.size(); i++) {
 			String path = "screens.opens[" + i + "]";
 			Map<String, Object> item = r.map(opens.get(i), path);
-			r.keys(item, path, "function", "screen", "argIndex");
-			b.screenOpens.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "screen"), r.argIndex(item, path)));
+			r.keys(item, path, with(ID_KEYS, "function", "screen", "argIndex"));
+			b.screenOpens.add(new ScreenScript.CallRule(r.identifier(item, path, "function"), r.idTemplate(item, path, "screen"), r.argIndex(item, path)
+					, readIdTransform(r, item, path, mapTexts)));
 		}
 		List<Object> menus = r.list(screens.get("menus"), "screens.menus");
 		for (int i = 0; i < menus.size(); i++) {
@@ -263,6 +415,14 @@ public class RuleSetParser {
 			r.keys(item, path, "nameKey", "pathKey");
 			b.screenMenus.add(new ScreenMenu.Rule(r.identifier(item, path, "nameKey"), r.identifier(item, path, "pathKey")));
 		}
+	}
+
+	/** 쓸 수 있는 키 목록에 공통 키를 더합니다 */
+	private static String[] with(String[] common, String... keys) {
+		String[] all = new String[keys.length + common.length];
+		System.arraycopy(keys, 0, all, 0, keys.length);
+		System.arraycopy(common, 0, all, keys.length, common.length);
+		return all;
 	}
 
 	private static String firstLine(String text) {
