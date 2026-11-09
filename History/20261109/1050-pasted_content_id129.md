@@ -273,3 +273,19 @@ Docs edits (API table, screen table, guide).
 ## 답변
 
 RESOURCE 단계를 진행하고 있습니다. 계속 기다립니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b1t4dwdsx</task-id>
+<summary>Monitor event: "hen 재분석(A20261109001) 단계 진행"</summary>
+<event>RUNNING | SCAN:DONE CARRY:DONE DECLARE:DONE RESOURCE:DONE CARRY_RESOLVE:DONE RESOLVE:RUNNING</event>
+</task-notification>
+
+---
+
+## 답변
+
+RESOLVE 단계(호출 해석)에 들어갔습니다.
