@@ -7,6 +7,7 @@ dstone_knowledge 데이터베이스 안에서 앱 계정으로 실행할 것
 
 이 모듈도 다른 dstone 모듈처럼 스키마를 코드가 자동으로 만들지 않는다. 배포 전에 이 파일을 한 번 실행한다.
 모든 문장이 IF NOT EXISTS / OR REPLACE 라서 여러 번 실행해도 된다.
+테이블·컬럼 코멘트는 맨 끝 9절에 있다. 컬럼을 새로 추가하면 9절에도 코멘트를 적는다.
 
 ## 테이블을 나누는 기준
 
@@ -534,3 +535,366 @@ CREATE OR REPLACE VIEW kg_edge AS
          , e.from_id AS from_node_id, e.relation_type AS edge_type, e.to_id AS to_node_id, e.to_external
          , e.confidence, e.resolution_status, e.properties_json, e.file_id, e.line_start, e.line_end
       FROM analysis_relation e JOIN analysis_revision r ON r.revision_id = e.revision_id;
+
+
+/**********************************************
+9. 테이블 · 컬럼 코멘트
+COMMENT ON 은 덮어쓰기라 여러 번 실행해도 된다. kg_node 는 위에서 다시 만들므로 이 절이 맨 끝에 있어야 한다.
+테이블이나 컬럼을 새로 추가하면 여기에도 코멘트를 함께 적는다.
+**********************************************/
+
+/**********************************************
+9-1. 코멘트: 프로젝트 / 리비전 / 분석 Job
+**********************************************/
+
+COMMENT ON TABLE  analysis_project                   IS '분석 대상 프로젝트';
+COMMENT ON COLUMN analysis_project.project_id        IS '프로젝트 ID. 사용자가 정하는 키 (예: order-system)';
+COMMENT ON COLUMN analysis_project.project_name      IS '프로젝트 이름';
+COMMENT ON COLUMN analysis_project.repository        IS 'git 저장소 URL (없으면 NULL)';
+COMMENT ON COLUMN analysis_project.local_path        IS '소스가 있는 로컬 경로';
+COMMENT ON COLUMN analysis_project.branch            IS '브랜치';
+COMMENT ON COLUMN analysis_project.root_packages     IS '분석할 루트 패키지 (쉼표 구분). 이 밖의 코드는 분석하지 않는다';
+COMMENT ON COLUMN analysis_project.java_version      IS '소스 문법 수준 (예: 1.4, 8, 21). NULL 이면 자동';
+COMMENT ON COLUMN analysis_project.source_encoding   IS '소스 인코딩 (예: EUC-KR). NULL 이면 파일마다 자동 감지';
+COMMENT ON COLUMN analysis_project.description       IS '설명';
+COMMENT ON COLUMN analysis_project.created_at        IS '등록 시각';
+COMMENT ON COLUMN analysis_project.updated_at        IS '마지막 수정 시각';
+COMMENT ON COLUMN analysis_project.classpath         IS '호출 해석에 쓸 라이브러리 jar 또는 jar 폴더 목록 (쉼표/줄바꿈/경로 구분자). 프로젝트 폴더 안의 jar 는 자동으로 찾는다';
+COMMENT ON COLUMN analysis_project.rule_sets         IS '더 쓸 의미 분석 규칙 묶음 이름 (conf/rules/*.yml, 쉼표 구분). NULL 이면 autoApply 묶음만';
+
+COMMENT ON TABLE  analysis_revision                  IS '리비전: 한 프로젝트의 어느 시점 소스 전체를 분석한 결과 한 벌';
+COMMENT ON COLUMN analysis_revision.revision_id      IS '리비전 ID (일련번호)';
+COMMENT ON COLUMN analysis_revision.project_id       IS '프로젝트 ID';
+COMMENT ON COLUMN analysis_revision.revision_label   IS '커밋 해시나 사용자가 붙인 이름. 프로젝트 안에서 유일';
+COMMENT ON COLUMN analysis_revision.branch           IS '브랜치';
+COMMENT ON COLUMN analysis_revision.parent_revision_id IS '증분 분석의 기준이 된 리비전 (전체 분석이면 NULL)';
+COMMENT ON COLUMN analysis_revision.status           IS '상태: CREATED/ANALYZING/READY/FAILED';
+COMMENT ON COLUMN analysis_revision.analyzer_version IS '분석한 분석기 버전. 다르면 증분 분석을 하지 않고 전체 분석한다';
+COMMENT ON COLUMN analysis_revision.created_at       IS '생성 시각';
+
+COMMENT ON TABLE  analysis_job                       IS '분석 Job: 리비전 하나를 분석하는 실행 1건';
+COMMENT ON COLUMN analysis_job.analysis_id           IS '분석 ID (예: A20261004001)';
+COMMENT ON COLUMN analysis_job.project_id            IS '프로젝트 ID';
+COMMENT ON COLUMN analysis_job.revision_id           IS '분석하는 리비전';
+COMMENT ON COLUMN analysis_job.job_type              IS 'Job 종류: ANALYZE/RAG_BUILD';
+COMMENT ON COLUMN analysis_job.status                IS '상태: READY/RUNNING/DONE/DONE_WITH_WARNING/FAILED/CANCELLED';
+COMMENT ON COLUMN analysis_job.current_pass          IS '지금 돌고 있는 단계 (SCAN/DECLARE/RESOLVE/...)';
+COMMENT ON COLUMN analysis_job.options_json          IS '실행 옵션 (JSON)';
+COMMENT ON COLUMN analysis_job.total_files           IS '처리할 파일 수';
+COMMENT ON COLUMN analysis_job.done_files            IS '처리한 파일 수';
+COMMENT ON COLUMN analysis_job.error_message         IS '실패했을 때의 오류 메시지';
+COMMENT ON COLUMN analysis_job.started_at            IS '시작 시각';
+COMMENT ON COLUMN analysis_job.ended_at              IS '종료 시각';
+COMMENT ON COLUMN analysis_job.heartbeat_at          IS '살아 있다는 표시. 오래 안 바뀌면 죽은 Job 으로 본다';
+COMMENT ON COLUMN analysis_job.created_at            IS '요청 시각';
+
+COMMENT ON TABLE  analysis_revision_pass             IS '리비전별·단계별 진행 상태. 다시 시작하면 DONE 인 단계는 건너뛴다';
+COMMENT ON COLUMN analysis_revision_pass.revision_id IS '리비전 ID';
+COMMENT ON COLUMN analysis_revision_pass.pass        IS '단계: SCAN/CARRY/DECLARE/RESOURCE/CARRY_RESOLVE/RESOLVE/LINK/SEMANTIC/DOCUMENT';
+COMMENT ON COLUMN analysis_revision_pass.status      IS '상태: PENDING/RUNNING/DONE/FAILED/CANCELLED';
+COMMENT ON COLUMN analysis_revision_pass.analysis_id IS '마지막으로 이 단계를 돌린 Job';
+COMMENT ON COLUMN analysis_revision_pass.total_count IS '이 단계가 처리할 건수 (모르면 0)';
+COMMENT ON COLUMN analysis_revision_pass.done_count  IS '처리한 건수';
+COMMENT ON COLUMN analysis_revision_pass.started_at  IS '시작 시각';
+COMMENT ON COLUMN analysis_revision_pass.ended_at    IS '종료 시각';
+
+
+/**********************************************
+9-2. 코멘트: 파일과 진행 상태
+**********************************************/
+
+COMMENT ON TABLE  analysis_file                      IS '스캔한 파일 (Java/XML/YAML/Properties/JSP/빌드 파일 등)';
+COMMENT ON COLUMN analysis_file.file_id              IS '파일 ID (일련번호, 리비전마다 새로 매긴다)';
+COMMENT ON COLUMN analysis_file.revision_id          IS '리비전 ID';
+COMMENT ON COLUMN analysis_file.module               IS '멀티모듈일 때 모듈 이름';
+COMMENT ON COLUMN analysis_file.path                 IS '프로젝트 루트 기준 상대 경로';
+COMMENT ON COLUMN analysis_file.source_root          IS '이 파일이 속한 소스 루트 (예: src/main/java, WEB-INF/src)';
+COMMENT ON COLUMN analysis_file.language             IS '언어: JAVA/XML/YAML/PROPERTIES/JSP/SQL/SCRIPT';
+COMMENT ON COLUMN analysis_file.file_type            IS '파일 용도: SOURCE/MYBATIS_MAPPER/IBATIS_MAPPER/SPRING_XML/WEB_XML/CONFIG/BUILD/JSP/WEBSQUARE/NEXACRO/...';
+COMMENT ON COLUMN analysis_file.package_name         IS 'Java 패키지 이름';
+COMMENT ON COLUMN analysis_file.encoding             IS '실제로 읽을 때 쓴 인코딩';
+COMMENT ON COLUMN analysis_file.language_level       IS '실제로 파싱에 성공한 Java 문법 수준';
+COMMENT ON COLUMN analysis_file.checksum             IS '파일 내용의 SHA-256. 증분 분석 때 바뀐 파일을 찾는 기준';
+COMMENT ON COLUMN analysis_file.size_bytes           IS '파일 크기 (바이트)';
+COMMENT ON COLUMN analysis_file.line_count           IS '줄 수';
+COMMENT ON COLUMN analysis_file.parse_status         IS '파싱 상태: PENDING/OK/FAILED/SKIPPED';
+COMMENT ON COLUMN analysis_file.parse_error          IS '파싱 실패 사유';
+COMMENT ON COLUMN analysis_file.created_at           IS '등록 시각';
+COMMENT ON COLUMN analysis_file.carried_from_file_id IS '증분 분석: 결과를 옮겨 온 앞 리비전의 파일 ID. 새 파일이거나 바뀐 파일이면 NULL';
+
+COMMENT ON TABLE  analysis_file_pass                 IS '파일별·단계별 진행 상태. 아직 안 한 파일을 여기서 꺼낸다';
+COMMENT ON COLUMN analysis_file_pass.file_id         IS '파일 ID';
+COMMENT ON COLUMN analysis_file_pass.pass            IS '단계: DECLARE/RESOURCE/RESOLVE/DOCUMENT ...';
+COMMENT ON COLUMN analysis_file_pass.revision_id     IS '리비전 ID';
+COMMENT ON COLUMN analysis_file_pass.status          IS '상태: PENDING/DONE/FAILED/SKIPPED';
+COMMENT ON COLUMN analysis_file_pass.error_message   IS '실패했을 때의 오류 메시지';
+COMMENT ON COLUMN analysis_file_pass.updated_at      IS '마지막 상태 변경 시각';
+COMMENT ON COLUMN analysis_file_pass.carried         IS '증분 분석: 이 단계를 돌리지 않고 앞 리비전의 결과를 옮겨 왔는지';
+
+
+/**********************************************
+9-3. 코멘트: 심볼 (타입 / 메소드 / 필드 / 애노테이션)
+**********************************************/
+
+COMMENT ON TABLE  analysis_symbol                    IS '타입: class / interface / enum / record / annotation / 익명 클래스';
+COMMENT ON COLUMN analysis_symbol.revision_id        IS '리비전 ID';
+COMMENT ON COLUMN analysis_symbol.symbol_id          IS '타입 ID. 리비전과 상관없이 같은 타입이면 같은 값 (해시)';
+COMMENT ON COLUMN analysis_symbol.kind               IS '종류: CLASS/INTERFACE/ENUM/RECORD/ANNOTATION/ANONYMOUS';
+COMMENT ON COLUMN analysis_symbol.fqn                IS '패키지를 포함한 전체 이름';
+COMMENT ON COLUMN analysis_symbol.simple_name        IS '단순 이름';
+COMMENT ON COLUMN analysis_symbol.package_name       IS '패키지 이름';
+COMMENT ON COLUMN analysis_symbol.outer_symbol_id    IS '중첩 타입이면 바깥 타입의 ID';
+COMMENT ON COLUMN analysis_symbol.visibility         IS '접근 제한자: public/protected/package/private';
+COMMENT ON COLUMN analysis_symbol.is_abstract        IS 'abstract 여부';
+COMMENT ON COLUMN analysis_symbol.is_final           IS 'final 여부';
+COMMENT ON COLUMN analysis_symbol.is_static          IS 'static 여부 (중첩 타입)';
+COMMENT ON COLUMN analysis_symbol.layer              IS '계층: CONTROLLER/SERVICE/REPOSITORY/MODEL/CONFIG/... (의미 분석이 채운다)';
+COMMENT ON COLUMN analysis_symbol.layer_confidence   IS '계층 판단의 확실성: 애노테이션·규칙이면 HIGH, 이름으로 짐작했으면 LOW';
+COMMENT ON COLUMN analysis_symbol.properties_json    IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN analysis_symbol.file_id            IS '선언된 파일 ID';
+COMMENT ON COLUMN analysis_symbol.line_start         IS '시작 줄';
+COMMENT ON COLUMN analysis_symbol.line_end           IS '끝 줄';
+
+COMMENT ON TABLE  analysis_method                    IS '메소드 / 생성자';
+COMMENT ON COLUMN analysis_method.revision_id        IS '리비전 ID';
+COMMENT ON COLUMN analysis_method.method_id          IS '메소드 ID. 리비전과 상관없이 같은 메소드면 같은 값 (해시)';
+COMMENT ON COLUMN analysis_method.owner_symbol_id    IS '이 메소드를 가진 타입의 ID';
+COMMENT ON COLUMN analysis_method.name               IS '메소드 이름';
+COMMENT ON COLUMN analysis_method.signature          IS '이름(파라미터 타입들). 예: cancelOrder(java.lang.Long)';
+COMMENT ON COLUMN analysis_method.return_type        IS '반환 타입';
+COMMENT ON COLUMN analysis_method.param_count        IS '파라미터 개수';
+COMMENT ON COLUMN analysis_method.parameters_json    IS '파라미터 목록 [{name, type}]';
+COMMENT ON COLUMN analysis_method.visibility         IS '접근 제한자';
+COMMENT ON COLUMN analysis_method.is_static          IS 'static 여부';
+COMMENT ON COLUMN analysis_method.is_abstract        IS 'abstract 여부 (인터페이스 메소드 포함)';
+COMMENT ON COLUMN analysis_method.is_constructor     IS '생성자 여부';
+COMMENT ON COLUMN analysis_method.is_synthetic       IS '소스에는 없지만 컴파일하면 생기는 멤버인지 (Lombok getter, 기본 생성자 등)';
+COMMENT ON COLUMN analysis_method.synthetic_origin   IS '만들어진 근거: LOMBOK_GETTER/LOMBOK_DATA/DEFAULT_CONSTRUCTOR/RECORD_ACCESSOR/...';
+COMMENT ON COLUMN analysis_method.proxy_related      IS 'Spring 프록시가 끼어들 수 있는 메소드인지 (@Transactional 등)';
+COMMENT ON COLUMN analysis_method.properties_json    IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN analysis_method.file_id            IS '선언된 파일 ID';
+COMMENT ON COLUMN analysis_method.line_start         IS '시작 줄 (합성 멤버는 근거가 된 필드·애노테이션의 줄)';
+COMMENT ON COLUMN analysis_method.line_end           IS '끝 줄';
+
+COMMENT ON TABLE  analysis_field                     IS '필드';
+COMMENT ON COLUMN analysis_field.revision_id         IS '리비전 ID';
+COMMENT ON COLUMN analysis_field.field_id            IS '필드 ID. 리비전과 상관없이 같은 필드면 같은 값 (해시)';
+COMMENT ON COLUMN analysis_field.owner_symbol_id     IS '이 필드를 가진 타입의 ID';
+COMMENT ON COLUMN analysis_field.name                IS '필드 이름';
+COMMENT ON COLUMN analysis_field.type                IS '필드 타입';
+COMMENT ON COLUMN analysis_field.visibility          IS '접근 제한자';
+COMMENT ON COLUMN analysis_field.is_static           IS 'static 여부';
+COMMENT ON COLUMN analysis_field.is_final            IS 'final 여부';
+COMMENT ON COLUMN analysis_field.is_synthetic        IS '소스에 없이 생기는 필드인지 (예: Lombok @Slf4j 의 log)';
+COMMENT ON COLUMN analysis_field.synthetic_origin    IS '만들어진 근거';
+COMMENT ON COLUMN analysis_field.initializer_summary IS '초기값 요약 (상수 추적용)';
+COMMENT ON COLUMN analysis_field.file_id             IS '선언된 파일 ID';
+COMMENT ON COLUMN analysis_field.line_start          IS '시작 줄';
+COMMENT ON COLUMN analysis_field.line_end            IS '끝 줄';
+
+COMMENT ON TABLE  analysis_annotation                IS '애노테이션이 붙은 자리 (어디에, 무엇이, 어떤 속성으로)';
+COMMENT ON COLUMN analysis_annotation.annotation_id  IS '애노테이션 행 ID (일련번호)';
+COMMENT ON COLUMN analysis_annotation.revision_id    IS '리비전 ID';
+COMMENT ON COLUMN analysis_annotation.target_kind    IS '붙은 대상 종류: TYPE/METHOD/FIELD/PARAMETER';
+COMMENT ON COLUMN analysis_annotation.target_id      IS '붙은 대상의 ID (symbol_id / method_id / field_id)';
+COMMENT ON COLUMN analysis_annotation.annotation_name IS '단순 이름 (예: Transactional)';
+COMMENT ON COLUMN analysis_annotation.annotation_fqn IS '풀렸으면 전체 이름';
+COMMENT ON COLUMN analysis_annotation.attributes_json IS '속성 값 (JSON)';
+COMMENT ON COLUMN analysis_annotation.file_id        IS '파일 ID';
+COMMENT ON COLUMN analysis_annotation.line_start     IS '줄';
+
+
+/**********************************************
+9-4. 코멘트: 참조(아직 안 풀린 것)와 관계(풀린 것)
+**********************************************/
+
+COMMENT ON TABLE  analysis_reference                 IS 'DECLARE 가 모아 둔 참조. 이름만 알고 대상은 모른다. RESOLVE 가 풀어서 analysis_relation 으로 옮긴다';
+COMMENT ON COLUMN analysis_reference.reference_id    IS '참조 ID (일련번호)';
+COMMENT ON COLUMN analysis_reference.revision_id     IS '리비전 ID';
+COMMENT ON COLUMN analysis_reference.file_id         IS '파일 ID';
+COMMENT ON COLUMN analysis_reference.from_kind       IS '참조가 들어 있는 쪽의 종류: TYPE/METHOD/FIELD';
+COMMENT ON COLUMN analysis_reference.from_id         IS '참조가 들어 있는 쪽의 ID';
+COMMENT ON COLUMN analysis_reference.ref_kind        IS '참조 종류: CALL/CREATE/FIELD_ACCESS/TYPE_USE/THROWS/EXTENDS/IMPLEMENTS/ANONYMOUS_SUPER/METHOD_REF';
+COMMENT ON COLUMN analysis_reference.name            IS '메소드/타입/필드 이름';
+COMMENT ON COLUMN analysis_reference.scope_text      IS '호출 대상 식 (예: orderService, this.dao)';
+COMMENT ON COLUMN analysis_reference.arg_count       IS '인자 개수';
+COMMENT ON COLUMN analysis_reference.line_start      IS '줄';
+COMMENT ON COLUMN analysis_reference.column_start    IS '칸. RESOLVE 에서 같은 AST 노드를 다시 찾는 키';
+COMMENT ON COLUMN analysis_reference.status          IS '상태: PENDING/RESOLVED/EXTERNAL(프로젝트 밖)/HEURISTIC(짐작)/UNRESOLVED/IGNORED(풀 대상 아님)';
+COMMENT ON COLUMN analysis_reference.fail_reason     IS '풀지 못한 이유';
+COMMENT ON COLUMN analysis_reference.arg_text        IS '첫 인자를 소스에 적힌 그대로 (문자열이 들어 있을 때만). 예: "order.findAll"';
+COMMENT ON COLUMN analysis_reference.args_json       IS '둘째 인자부터 따옴표 글자가 든 인자를 적힌 그대로 담은 JSON 배열 (첫 칸과 따옴표 없는 인자는 null)';
+
+COMMENT ON TABLE  analysis_relation                  IS '관계: 그래프의 간선. 모든 관계 종류가 이 한 테이블에 들어간다';
+COMMENT ON COLUMN analysis_relation.relation_id      IS '관계 ID (일련번호)';
+COMMENT ON COLUMN analysis_relation.revision_id      IS '리비전 ID';
+COMMENT ON COLUMN analysis_relation.from_kind        IS '출발 대상 종류: TYPE/METHOD/FIELD/SQL/FILE';
+COMMENT ON COLUMN analysis_relation.from_id          IS '출발 대상 ID (SQL 은 S+mapper_id, 파일은 F+file_id)';
+COMMENT ON COLUMN analysis_relation.relation_type    IS '관계 종류: CALLS/EXTENDS/IMPLEMENTS/OVERRIDES/INJECTS/EXECUTES_SQL/READS_TABLE/WRITES_TABLE/REQUESTS/RENDERS/...';
+COMMENT ON COLUMN analysis_relation.to_kind          IS '도착 대상 종류: TYPE/METHOD/FIELD/SQL/FILE/TABLE, 프로젝트 밖이면 EXTERNAL_TYPE/EXTERNAL_METHOD/EXTERNAL_FIELD';
+COMMENT ON COLUMN analysis_relation.to_id            IS '프로젝트 안의 도착 대상 ID. 밖이면 NULL';
+COMMENT ON COLUMN analysis_relation.to_external      IS '프로젝트 밖 대상이나 테이블의 이름 (예: java.util.List.add(E))';
+COMMENT ON COLUMN analysis_relation.confidence       IS '확실성: HIGH/MEDIUM/LOW/UNRESOLVED';
+COMMENT ON COLUMN analysis_relation.resolution_status IS '해석 상태: RESOLVED/HEURISTIC/UNRESOLVED/DYNAMIC(리플렉션 등)';
+COMMENT ON COLUMN analysis_relation.properties_json  IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN analysis_relation.file_id          IS '근거가 된 파일 ID. SQL 로 계산한 관계는 NULL 일 수 있다';
+COMMENT ON COLUMN analysis_relation.line_start       IS '근거가 된 시작 줄';
+COMMENT ON COLUMN analysis_relation.line_end         IS '근거가 된 끝 줄';
+
+
+/**********************************************
+9-5. 코멘트: 의미 분석 결과 (진입점 / 설정 / 매퍼 / 그 밖의 리소스)
+**********************************************/
+
+COMMENT ON TABLE  analysis_endpoint                  IS '진입점: 밖에서 이 프로그램으로 들어오는 입구 (HTTP 뿐 아니라 main, 스케줄 등도)';
+COMMENT ON COLUMN analysis_endpoint.endpoint_id      IS '진입점 ID (일련번호)';
+COMMENT ON COLUMN analysis_endpoint.revision_id      IS '리비전 ID';
+COMMENT ON COLUMN analysis_endpoint.endpoint_type    IS '종류: HTTP/SERVLET/MAIN/SCHEDULED/LISTENER/JSP/THREAD/TRANSACTION';
+COMMENT ON COLUMN analysis_endpoint.http_method      IS 'HTTP 메소드 (GET/POST/...)';
+COMMENT ON COLUMN analysis_endpoint.path             IS 'URL 패턴. TRANSACTION 은 거래 ID. URL 이 없으면 NULL';
+COMMENT ON COLUMN analysis_endpoint.symbol_id        IS '처리하는 타입의 ID';
+COMMENT ON COLUMN analysis_endpoint.method_id        IS '처리하는 메소드의 ID';
+COMMENT ON COLUMN analysis_endpoint.properties_json  IS '덧붙임 정보 (JSON. 예: inheritedFrom, unresolvedPath)';
+COMMENT ON COLUMN analysis_endpoint.file_id          IS '파일 ID';
+COMMENT ON COLUMN analysis_endpoint.line_start       IS '줄';
+
+COMMENT ON TABLE  analysis_config                    IS '설정 값: application.yml / *.properties 의 키 하나하나';
+COMMENT ON COLUMN analysis_config.config_id          IS '설정 행 ID (일련번호)';
+COMMENT ON COLUMN analysis_config.revision_id        IS '리비전 ID';
+COMMENT ON COLUMN analysis_config.key_path           IS '키 (예: spring.datasource.url)';
+COMMENT ON COLUMN analysis_config.value              IS '값. 비밀값은 **** 로 가린다';
+COMMENT ON COLUMN analysis_config.value_type         IS '값 종류: STRING/NUMBER/BOOLEAN/NULL/MASKED(가린 비밀값)';
+COMMENT ON COLUMN analysis_config.placeholder        IS '값 안에 들어 있는 동적 변수 참조 (예: ${DB_HOST})';
+COMMENT ON COLUMN analysis_config.file_id            IS '파일 ID';
+COMMENT ON COLUMN analysis_config.line_start         IS '줄';
+
+COMMENT ON TABLE  analysis_mapper                    IS 'SQL statement 하나하나: MyBatis/iBATIS/Query XML, Java 문자열 SQL, JPA 쿼리';
+COMMENT ON COLUMN analysis_mapper.mapper_id          IS 'statement ID (일련번호). 그래프에서는 S+mapper_id';
+COMMENT ON COLUMN analysis_mapper.revision_id        IS '리비전 ID';
+COMMENT ON COLUMN analysis_mapper.mapper_type        IS '출처: MYBATIS/IBATIS/QUERY_XML/JAVA(Java 문자열 SQL)/JPA';
+COMMENT ON COLUMN analysis_mapper.namespace          IS '네임스페이스';
+COMMENT ON COLUMN analysis_mapper.statement_id       IS 'statement 이름';
+COMMENT ON COLUMN analysis_mapper.statement_type     IS 'SQL 종류: SELECT/INSERT/UPDATE/DELETE/OTHER/SQL_FRAGMENT';
+COMMENT ON COLUMN analysis_mapper.parameter_type     IS '파라미터 타입';
+COMMENT ON COLUMN analysis_mapper.result_type        IS '결과 타입';
+COMMENT ON COLUMN analysis_mapper.sql_body           IS 'SQL 본문';
+COMMENT ON COLUMN analysis_mapper.method_id          IS '짝이 되는 Java 메소드 ID (찾았으면)';
+COMMENT ON COLUMN analysis_mapper.file_id            IS '파일 ID';
+COMMENT ON COLUMN analysis_mapper.line_start         IS '시작 줄';
+COMMENT ON COLUMN analysis_mapper.line_end           IS '끝 줄';
+COMMENT ON COLUMN analysis_mapper.properties_json    IS '덧붙임 정보 (JSON). JAVA·JPA 행의 소속 메소드·상수, 넘긴 호출, JPQL 여부 등';
+
+COMMENT ON TABLE  analysis_resource                  IS '그 밖의 리소스 항목: Spring bean, 서블릿 매핑, 의존 라이브러리, 테이블 사전, DDL 등';
+COMMENT ON COLUMN analysis_resource.resource_id      IS '리소스 ID (일련번호)';
+COMMENT ON COLUMN analysis_resource.revision_id      IS '리비전 ID';
+COMMENT ON COLUMN analysis_resource.resource_type    IS '종류: SPRING_BEAN/SERVLET_MAPPING/FILTER_MAPPING/DEPENDENCY/DDL_TABLE/DDL_COLUMN/DICT_TABLE_NAME/SCREEN_NAME/RULE_SET/...';
+COMMENT ON COLUMN analysis_resource.name             IS '이름';
+COMMENT ON COLUMN analysis_resource.location         IS '파일 안의 위치 (XPath 비슷한 경로)';
+COMMENT ON COLUMN analysis_resource.value            IS '값';
+COMMENT ON COLUMN analysis_resource.properties_json  IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN analysis_resource.file_id          IS '파일 ID. 소스 밖(테이블 사전 CSV 등)에서 온 행은 NULL';
+COMMENT ON COLUMN analysis_resource.line_start       IS '줄';
+
+
+/**********************************************
+9-6. 코멘트: 품질 (오류 / 지표)
+**********************************************/
+
+COMMENT ON TABLE  analysis_error                     IS '분석 중 생긴 오류. 실패한 파일과 못 푼 심볼을 숨기지 않고 남긴다';
+COMMENT ON COLUMN analysis_error.error_id            IS '오류 ID (일련번호)';
+COMMENT ON COLUMN analysis_error.analysis_id         IS '분석 Job ID';
+COMMENT ON COLUMN analysis_error.revision_id         IS '리비전 ID';
+COMMENT ON COLUMN analysis_error.file_id             IS '파일 ID (파일과 상관없으면 NULL)';
+COMMENT ON COLUMN analysis_error.pass                IS '오류가 난 단계';
+COMMENT ON COLUMN analysis_error.error_type          IS '종류: PARSE_ERROR/ENCODING/CLASSPATH/RESOLVE_TIMEOUT/TOO_DEEP/...';
+COMMENT ON COLUMN analysis_error.message             IS '오류 메시지';
+COMMENT ON COLUMN analysis_error.detail              IS '자세한 내용 (스택 등)';
+COMMENT ON COLUMN analysis_error.line_start          IS '줄';
+COMMENT ON COLUMN analysis_error.created_at          IS '발생 시각';
+
+COMMENT ON TABLE  analysis_metric                    IS '분석 품질 지표';
+COMMENT ON COLUMN analysis_metric.analysis_id        IS '분석 Job ID';
+COMMENT ON COLUMN analysis_metric.metric_name        IS '지표 이름: parseSuccessRate/typeResolutionRate/callResolutionRate/callHeuristicRate/callUnresolvedRate/callCount/relationCount';
+COMMENT ON COLUMN analysis_metric.metric_value       IS '지표 값';
+COMMENT ON COLUMN analysis_metric.created_at         IS '기록 시각';
+
+
+/**********************************************
+9-7. 코멘트: RAG (문서 / 청크 / 임베딩)
+**********************************************/
+
+COMMENT ON TABLE  rag_document                       IS 'RAG 논리 문서: 분석 결과에서 만든 것(CODE)과 사용자가 올린 일반 문서(DOCUMENT)';
+COMMENT ON COLUMN rag_document.doc_seq               IS '문서 일련번호';
+COMMENT ON COLUMN rag_document.document_id           IS '문서 ID. 같은 대상이면 리비전이 달라도 같은 값';
+COMMENT ON COLUMN rag_document.source_type           IS '출처: CODE(분석 결과에서 생성) / DOCUMENT(업로드한 일반 문서)';
+COMMENT ON COLUMN rag_document.tenant                IS '호출자별 격리 키. 다른 호출자의 문서가 검색에 섞이지 않게 한다';
+COMMENT ON COLUMN rag_document.project_id            IS '프로젝트 ID (CODE 일 때만)';
+COMMENT ON COLUMN rag_document.revision_id           IS '리비전 ID (CODE 일 때만)';
+COMMENT ON COLUMN rag_document.doc_type              IS '문서 종류: FILE/TYPE/METHOD/MAPPER/VIEW/UPLOAD';
+COMMENT ON COLUMN rag_document.ref_kind              IS '근거가 된 대상 종류 (TYPE/METHOD/FILE/SQL/DOCUMENT)';
+COMMENT ON COLUMN rag_document.ref_id                IS '근거가 된 대상 ID';
+COMMENT ON COLUMN rag_document.title                 IS '제목';
+COMMENT ON COLUMN rag_document.source_path           IS '원본 경로';
+COMMENT ON COLUMN rag_document.metadata_json         IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN rag_document.content_hash          IS '문서 내용의 해시';
+COMMENT ON COLUMN rag_document.created_at            IS '생성 시각';
+
+COMMENT ON TABLE  rag_chunk                          IS 'RAG 청크: 문서를 의미 단위로 자른 조각. 검색 결과로 돌려주는 단위';
+COMMENT ON COLUMN rag_chunk.chunk_id                 IS '청크 ID (일련번호)';
+COMMENT ON COLUMN rag_chunk.doc_seq                  IS '소속 문서 일련번호 (rag_document.doc_seq)';
+COMMENT ON COLUMN rag_chunk.revision_id              IS '리비전 ID (코드 청크일 때)';
+COMMENT ON COLUMN rag_chunk.tenant                   IS '호출자별 격리 키';
+COMMENT ON COLUMN rag_chunk.chunk_no                 IS '문서 안에서의 순번';
+COMMENT ON COLUMN rag_chunk.chunk_type               IS '청크 종류: FILE/TYPE/METHOD/MAPPER/VIEW/UPLOAD';
+COMMENT ON COLUMN rag_chunk.content                  IS '청크 본문';
+COMMENT ON COLUMN rag_chunk.content_hash             IS '본문의 SHA-256. 임베딩을 찾는 키';
+COMMENT ON COLUMN rag_chunk.char_count               IS '글자 수';
+COMMENT ON COLUMN rag_chunk.metadata_json            IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN rag_chunk.file_id                  IS '원본 파일 ID';
+COMMENT ON COLUMN rag_chunk.line_start               IS '원본 시작 줄';
+COMMENT ON COLUMN rag_chunk.line_end                 IS '원본 끝 줄';
+
+COMMENT ON TABLE  rag_embedding                      IS 'RAG 임베딩. 키는 (내용 해시, 모델). 같은 내용은 한 번만 임베딩한다. status=PENDING 인 행이 곧 대기열';
+COMMENT ON COLUMN rag_embedding.content_hash         IS '청크 본문의 SHA-256 (rag_chunk.content_hash)';
+COMMENT ON COLUMN rag_embedding.model                IS '임베딩 모델 (예: bge-m3:latest)';
+COMMENT ON COLUMN rag_embedding.dimensions           IS '벡터 차원';
+COMMENT ON COLUMN rag_embedding.status               IS '상태: PENDING/DONE/FAILED';
+COMMENT ON COLUMN rag_embedding.attempts             IS '시도 횟수';
+COMMENT ON COLUMN rag_embedding.last_error           IS '마지막 실패 사유';
+COMMENT ON COLUMN rag_embedding.embedding            IS '임베딩 벡터 (임베딩 전에는 NULL)';
+COMMENT ON COLUMN rag_embedding.created_at           IS '대기열에 들어온 시각';
+COMMENT ON COLUMN rag_embedding.embedded_at          IS '임베딩한 시각';
+COMMENT ON COLUMN rag_embedding.priority             IS '우선순위. 큰 것부터 임베딩한다 (코드 0, 올린 일반 문서 10)';
+
+
+/**********************************************
+9-8. 코멘트: Knowledge Graph VIEW
+**********************************************/
+
+COMMENT ON VIEW   kg_node                            IS '그래프 노드 VIEW: 타입/메소드/필드/SQL/파일을 노드 모양으로 보여 준다';
+COMMENT ON COLUMN kg_node.project_id                 IS '프로젝트 ID';
+COMMENT ON COLUMN kg_node.revision_id                IS '리비전 ID';
+COMMENT ON COLUMN kg_node.node_id                    IS '노드 ID (SQL 은 S+mapper_id, 파일은 F+file_id)';
+COMMENT ON COLUMN kg_node.node_type                  IS '노드 종류: TYPE/METHOD/FIELD/SQL/FILE';
+COMMENT ON COLUMN kg_node.sub_type                   IS '세부 종류: 타입의 kind, METHOD/CONSTRUCTOR, SQL 종류, 파일 언어';
+COMMENT ON COLUMN kg_node.name                       IS '이름';
+COMMENT ON COLUMN kg_node.fqn                        IS '전체 이름 (메소드는 타입fqn#시그니처)';
+COMMENT ON COLUMN kg_node.properties_json            IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN kg_node.file_id                    IS '파일 ID';
+COMMENT ON COLUMN kg_node.line_start                 IS '시작 줄';
+COMMENT ON COLUMN kg_node.line_end                   IS '끝 줄';
+
+COMMENT ON VIEW   kg_edge                            IS '그래프 간선 VIEW: analysis_relation 에 프로젝트 ID 를 붙여 보여 준다';
+COMMENT ON COLUMN kg_edge.project_id                 IS '프로젝트 ID';
+COMMENT ON COLUMN kg_edge.revision_id                IS '리비전 ID';
+COMMENT ON COLUMN kg_edge.edge_id                    IS '간선 ID (analysis_relation.relation_id)';
+COMMENT ON COLUMN kg_edge.from_node_id               IS '출발 노드 ID';
+COMMENT ON COLUMN kg_edge.edge_type                  IS '간선 종류 (relation_type)';
+COMMENT ON COLUMN kg_edge.to_node_id                 IS '도착 노드 ID. 프로젝트 밖이면 NULL';
+COMMENT ON COLUMN kg_edge.to_external                IS '프로젝트 밖 대상이나 테이블의 이름';
+COMMENT ON COLUMN kg_edge.confidence                 IS '확실성: HIGH/MEDIUM/LOW/UNRESOLVED';
+COMMENT ON COLUMN kg_edge.resolution_status          IS '해석 상태';
+COMMENT ON COLUMN kg_edge.properties_json            IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN kg_edge.file_id                    IS '근거가 된 파일 ID';
+COMMENT ON COLUMN kg_edge.line_start                 IS '근거가 된 시작 줄';
+COMMENT ON COLUMN kg_edge.line_end                   IS '근거가 된 끝 줄';
