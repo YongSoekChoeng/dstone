@@ -1,0 +1,231 @@
+package net.dstone.knowledge.analysis.pass01.scan;
+
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+import org.springframework.stereotype.Component;
+
+/**
+ * <pre>
+ * 파일이 무엇인지(언어와 용도) 가려냅니다.
+ *
+ * 언어는 확장자로 정합니다. 분석 대상이 아닌 파일(이미지, class, jar ...)은 null을 돌려주고 스캔에서 빠집니다.
+ * XML은 확장자만으로는 용도를 알 수 없어서 맨 위 요소(root element)를 보고 가립니다.
+ * </pre>
+ */
+@Component
+public class FileClassifier {
+
+	/** WebSquare 화면 XML의 맨 위 요소에 적히는 네임스페이스 */
+	private static final String WEBSQUARE_NAMESPACE = "http://www.inswave.com/websquare";
+
+	/** DDL 파일인지 가리는 문장: CREATE TABLE, COMMENT ON */
+	private static final Pattern DDL_STATEMENT = Pattern.compile("(?i)\\bCREATE\\s+(?:\\w+\\s+){0,3}TABLE\\b|\\bCOMMENT\\s+ON\\s+(?:TABLE|COLUMN)\\b");
+
+	/**
+	 * <pre>
+	 * 확장자로 언어를 정합니다.
+	 * </pre>
+	 *
+	 * @return JAVA/JSP/XML/YAML/PROPERTIES/GRADLE/SQL/SCRIPT. 분석 대상이 아니면 null. Nexacro의 .xfdl/.xadl도 XML이다
+	 */
+	public String languageOf(String fileName) {
+		String name = fileName.toLowerCase(Locale.ROOT);
+		if (name.endsWith(".java")) {
+			return "JAVA";
+		}
+		if (name.endsWith(".jsp") || name.endsWith(".jspf") || name.endsWith(".jspx") || name.endsWith(".tag")) {
+			return "JSP";
+		}
+		if (name.endsWith(".xml")) {
+			return "XML";
+		}
+		if (name.endsWith(".xfdl") || name.endsWith(".xadl")) {
+			// Nexacro / X-Platform의 화면(.xfdl)과 애플리케이션 정의(.xadl). 확장자만 다를 뿐 XML이다.
+			return "XML";
+		}
+		if (name.endsWith(".yml") || name.endsWith(".yaml")) {
+			return "YAML";
+		}
+		if (name.endsWith(".properties")) {
+			return "PROPERTIES";
+		}
+		if (name.endsWith(".gradle") || name.endsWith(".gradle.kts")) {
+			return "GRADLE";
+		}
+		if (name.endsWith(".sql") || name.endsWith(".ddl")) {
+			// DDL 스크립트. 테이블과 컬럼의 설명(COMMENT)을 읽으려고 스캔한다.
+			return "SQL";
+		}
+		if (name.endsWith(".js") || name.endsWith(".xjs")) {
+			// 화면 공통 스크립트(.xjs 는 Nexacro / X-Platform). 공통 함수가 여는 화면을 찾으려고 스캔한다.
+			// 목록에만 올리고, 내용은 SEMANTIC 의 RichClientPlugin 이 읽는다.
+			return "SCRIPT";
+		}
+		return null;
+	}
+
+	/**
+	 * <pre>
+	 * 파일의 용도를 정합니다.
+	 * </pre>
+	 *
+	 * @param text 파일 내용. 너무 커서 읽지 않은 파일은 null
+	 */
+	public String fileTypeOf(String language, String fileName, String text) {
+		if ("JAVA".equals(language)) {
+			return "SOURCE";
+		}
+		if ("JSP".equals(language)) {
+			return "JSP";
+		}
+		if ("YAML".equals(language) || "PROPERTIES".equals(language)) {
+			return "CONFIG";
+		}
+		if ("GRADLE".equals(language)) {
+			return "BUILD";
+		}
+		if ("SCRIPT".equals(language)) {
+			return "SCRIPT";
+		}
+		if ("SQL".equals(language)) {
+			// 테이블을 만들거나 설명을 다는 문장이 있으면 DDL, 데이터만 넣는 스크립트 등은 SQL_SCRIPT
+			return text != null && DDL_STATEMENT.matcher(text).find() ? "DDL" : "SQL_SCRIPT";
+		}
+		return xmlTypeOf(fileName.toLowerCase(Locale.ROOT), text);
+	}
+
+	private String xmlTypeOf(String lowerName, String text) {
+		if ("pom.xml".equals(lowerName)) {
+			return "BUILD";
+		}
+		if (text == null) {
+			return "XML";
+		}
+		String root = rootElementOf(text);
+		if (root == null) {
+			return "XML";
+		}
+		// beans:beans 처럼 접두어가 붙은 경우 뒤쪽 이름만 본다.
+		int colon = root.indexOf(':');
+		String name = colon >= 0 ? root.substring(colon + 1) : root;
+
+		if ("html".equals(name)) {
+			// WebSquare 화면은 XHTML 모양의 XML이고, 맨 위 요소에 WebSquare 네임스페이스가 적혀 있다.
+			String head = text.length() > 3000 ? text.substring(0, 3000) : text;
+			return head.indexOf(WEBSQUARE_NAMESPACE) >= 0 ? "WEBSQUARE" : "XML";
+		}
+		if ("FDL".equals(name)) {
+			// Nexacro / X-Platform 화면(.xfdl)
+			return "NEXACRO";
+		}
+		if ("ADL".equals(name)) {
+			// Nexacro / X-Platform 애플리케이션 정의(.xadl). 화면이 아니다.
+			return "NEXACRO_APP";
+		}
+		if ("document".equals(name)) {
+			// SQL을 <document><query id="..."><statement>SQL</statement></query></document> 모양으로 적는 프레임워크(JEF 계열)의 쿼리 파일.
+			// 맨 위 이름이 흔한 낱말이라, 안에 query와 statement가 실제로 있는지까지 본다.
+			return text.indexOf("<statement") >= 0 && text.indexOf(" id=") >= 0 ? "QUERY_XML" : "XML";
+		}
+		if ("mapper".equals(name)) {
+			return "MYBATIS_MAPPER";
+		}
+		if ("sqlMap".equals(name)) {
+			return "IBATIS_MAPPER";
+		}
+		if ("sqlMapConfig".equals(name)) {
+			return "IBATIS_CONFIG";
+		}
+		if ("beans".equals(name)) {
+			return "SPRING_XML";
+		}
+		if ("web-app".equals(name) || "web-fragment".equals(name)) {
+			return "WEB_XML";
+		}
+		if ("struts-config".equals(name) || "struts".equals(name)) {
+			return "STRUTS_CONFIG";
+		}
+		if ("tiles-definitions".equals(name)) {
+			return "TILES";
+		}
+		if ("project".equals(name)) {
+			// pom.xml 이 아닌데 맨 위가 project 면 Ant 빌드 파일이거나, 이름을 바꿔 둔 pom 이다.
+			return "BUILD";
+		}
+		if ("configuration".equals(name) || "Configuration".equals(name)) {
+			// 맨 위 이름이 같은 설정 파일이 여럿이라, 앞부분에 적힌 단서로 한 번 더 가린다.
+			String head = text.length() > 1000 ? text.substring(0, 1000) : text;
+			if (head.indexOf("mybatis") >= 0) {
+				return "MYBATIS_CONFIG";
+			}
+			return "LOG_CONFIG";
+		}
+		if (name.startsWith("log4j")) {
+			return "LOG_CONFIG";
+		}
+		return "XML";
+	}
+
+	/**
+	 * <pre>
+	 * XML의 맨 위 요소 이름을 찾습니다.
+	 * 그 앞에 올 수 있는 XML 선언, 주석, DOCTYPE은 건너뜁니다.
+	 * </pre>
+	 */
+	String rootElementOf(String text) {
+		int pos = 0;
+		int length = text.length();
+		while (pos < length) {
+			int lt = text.indexOf('<', pos);
+			if (lt < 0 || lt + 1 >= length) {
+				return null;
+			}
+			if (text.startsWith("<?", lt)) {
+				int end = text.indexOf("?>", lt);
+				if (end < 0) {
+					return null;
+				}
+				pos = end + 2;
+			} else if (text.startsWith("<!--", lt)) {
+				int end = text.indexOf("-->", lt);
+				if (end < 0) {
+					return null;
+				}
+				pos = end + 3;
+			} else if (text.startsWith("<!", lt)) {
+				// DOCTYPE. 안에 [ ... ] 로 내부 선언이 들어 있으면 그 닫는 괄호 뒤의 '>' 까지가 끝이다.
+				int end = text.indexOf('>', lt);
+				int bracket = text.indexOf('[', lt);
+				if (bracket >= 0 && end >= 0 && bracket < end) {
+					int close = text.indexOf("]", bracket);
+					if (close < 0) {
+						return null;
+					}
+					end = text.indexOf('>', close);
+				}
+				if (end < 0) {
+					return null;
+				}
+				pos = end + 1;
+			} else {
+				int nameStart = lt + 1;
+				int nameEnd = nameStart;
+				while (nameEnd < length) {
+					char c = text.charAt(nameEnd);
+					if (Character.isLetterOrDigit(c) || c == '_' || c == '-' || c == '.' || c == ':') {
+						nameEnd++;
+					} else {
+						break;
+					}
+				}
+				if (nameEnd == nameStart) {
+					return null;
+				}
+				return text.substring(nameStart, nameEnd);
+			}
+		}
+		return null;
+	}
+
+}

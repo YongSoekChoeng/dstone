@@ -25,7 +25,7 @@ import net.dstone.knowledge.api.dao.JavaSqlDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
-import net.dstone.knowledge.semantic.rule.SemanticRuleRegistry;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
 
 /**
  * <pre>

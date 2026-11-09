@@ -6,7 +6,7 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
-import net.dstone.knowledge.scanner.ScannedFile;
+import net.dstone.knowledge.analysis.pass01.scan.ScannedFile;
 
 /**
  * <pre>

@@ -7,7 +7,7 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
-import net.dstone.knowledge.resolver.model.RelationRow;
+import net.dstone.knowledge.analysis.pass06.resolve.model.RelationRow;
 
 /**
  * <pre>

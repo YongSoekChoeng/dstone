@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
 import net.dstone.knowledge.common.util.JsonText;
-import net.dstone.knowledge.semantic.rule.RuleSet;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
 
 /**
  * <pre>

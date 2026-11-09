@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.common.exception.ApiException;
-import net.dstone.knowledge.semantic.rule.RuleException;
-import net.dstone.knowledge.semantic.rule.SemanticRuleRegistry;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleException;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
 
 /**
  * <pre>

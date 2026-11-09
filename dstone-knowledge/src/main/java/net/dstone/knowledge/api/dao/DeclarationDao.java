@@ -7,7 +7,7 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
-import net.dstone.knowledge.parser.model.FileDeclarations;
+import net.dstone.knowledge.analysis.pass03.declare.model.FileDeclarations;
 
 /**
  * <pre>

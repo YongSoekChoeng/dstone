@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.ResourceDao;
-import net.dstone.knowledge.dictionary.DbCommentReader;
+import net.dstone.knowledge.analysis.pass08.semantic.dictionary.DbCommentReader;
 import net.dstone.knowledge.common.util.TableName;
 
 /**

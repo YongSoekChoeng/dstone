@@ -203,6 +203,7 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro 화면 포함)을 분석 모델로 만든 뒤 Knowledge Graph와 RAG 청크로 투영한다. 현재 상태와 마일스톤은 `docs/11.dstone-knowledge.md`.
 
 반드시 지킬 규칙:
+- **패키지**: 분석 코드는 `analysis.passNN.<단계>`(번호 = 실행 순서, 실제 순서는 Pass의 `order()` — 단계를 끼워 넣으면 둘을 같이 맞춘다), 단계 공용 도구는 `analysis.common`, 실행 틀은 `analysis.job`. 임베딩·검색은 `rag`.
 - **DB 기반 파이프라인.** 프로젝트 전체를 메모리에 올리지 않는다. Pass는 파일 하나씩 처리하고 행을 쓴 뒤 AST를 버린다.
 - 새 Pass = 새 `AnalysisPass` bean. 재실행에 멱등이어야 하고 루프 안에서 `context.checkCancelled()`를 부른다. 파일 단위 Pass는 무거운 작업을 `prepare`(DB 쓰기·트랜잭션 없음)에, DB 쓰기를 `write`에 둔다.
 - `sqlSessionBatch` 트랜잭션 안에서 `sqlSessionCommon`을 쓰지 않는다.

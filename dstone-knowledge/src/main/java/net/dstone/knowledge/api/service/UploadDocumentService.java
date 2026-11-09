@@ -24,7 +24,7 @@ import net.dstone.knowledge.common.util.HashText;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.rag.DocumentTextExtractor;
 import net.dstone.knowledge.rag.RagSettings;
-import net.dstone.knowledge.rag.TextChunker;
+import net.dstone.knowledge.analysis.pass09.document.TextChunker;
 
 /**
  * <pre>

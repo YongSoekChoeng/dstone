@@ -1,0 +1,213 @@
+package net.dstone.knowledge.analysis.pass08.semantic.screen;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+/**
+ * <pre>
+ * 리치클라이언트 화면에서 "서버를 부르는 곳"을 찾는 로직을 확인합니다.
+ * DB나 Spring 없이 도는 테스트입니다. 표본은 samples/websquare-app, samples/nexacro-app 입니다.
+ * </pre>
+ */
+public class ScreenScriptTest {
+
+	private static final String WEBSQUARE_APP = "src/test/resources/samples/websquare-app/";
+	private static final String NEXACRO_APP = "src/test/resources/samples/nexacro-app/";
+
+	private final ScreenScript screenScript = new ScreenScript();
+
+	@Test
+	public void 규칙_글자를_읽는다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseRules(" doRequestAjax=perform{id} , gfnTran = {id}Service ,잘못된것, noId=perform ");
+		assertEquals(2, rules.size());
+		assertEquals("doRequestAjax", rules.get(0).getFunction());
+		assertEquals("performORD0100M01S", rules.get(0).methodNameOf("ORD0100M01S"));
+		assertEquals("ORD0100M01SService", rules.get(1).methodNameOf("ORD0100M01S"));
+		// 메소드 이름이 될 수 없는 글자가 섞이면 잇지 않는다.
+		assertNull(rules.get(0).methodNameOf("order.list"));
+		assertTrue(ScreenScript.parseRules(null).isEmpty());
+	}
+
+	@Test
+	public void 거래_호출을_찾고_주석과_변수는_가려낸다() throws Exception {
+		String text = read(WEBSQUARE_APP + "ui/order/OrderList.xml");
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, ScreenScript.parseRules("doRequestAjax=perform{id}"));
+
+		List<String> ids = new ArrayList<String>();
+		int unknown = 0;
+		for (int i = 0; i < calls.size(); i++) {
+			if (calls.get(i).getId() == null) {
+				unknown++;
+			} else {
+				ids.add(calls.get(i).getId());
+			}
+		}
+		// 주석 안의 ORD0100M03D 는 없어야 한다. 변수로 넘긴 호출은 ID 없이 한 건.
+		assertEquals("[ORD0100M01S, ORD0100M02U, ORD0100M09S]", ids.toString());
+		assertEquals(1, unknown);
+		assertEquals(23, screenScript.lineAt(text, calls.get(0).getIndex()));
+	}
+
+	@Test
+	public void 함수를_만드는_곳과_이름이_다른_함수는_호출이_아니다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id}");
+		assertTrue(screenScript.findCalls("function doRequestAjax(tranId) {}", rules).isEmpty());
+		assertTrue(screenScript.findCalls("xdoRequestAjax(\"A1\")", rules).isEmpty());
+		assertEquals(1, screenScript.findCalls("a = 1; doRequestAjax(\"A1\")", rules).size());
+	}
+
+	@Test
+	public void 화면_열기_규칙은_화면_ID로_화면_경로를_만든다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("fnOpenPage={id}.xml");
+		String text = "parent.scwin.fnOpenPage(\"JIMC1000G\",{\"plyNo\":paramPlyNo});\n"
+				// 화면 ID를 변수로 넘기면 ID 가 없다. 짐작하지 않는다.
+				+ "parent.scwin.fnOpenPage(pageId);\n"
+				// 함수를 만드는 곳은 호출이 아니다.
+				+ "scwin.fnOpenPage = function(pageId, joParam){};";
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
+
+		assertEquals(2, calls.size());
+		assertEquals("JIMC1000G.xml", calls.get(0).getRule().fill(calls.get(0).getId()));
+		assertNull(calls.get(1).getId());
+	}
+
+	@Test
+	public void 폼_필드_규칙은_필드_값으로_메소드_이름을_만든다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseFieldRules("tranId=perform{id}");
+		String text = "sFormHtml += \"<input type='hidden' name='tranId', value='JIMC1000M03S'/>\";\n"
+				// 값을 변수로 이어 붙이면 ID 가 없다. 짐작하지 않는다.
+				+ "sFormHtml += \"<input type='hidden' name='tranId', value='\" + tranId + \"'/>\";\n"
+				// 주석 안의 것은 뺀다.
+				+ "// sFormHtml += \"<input type='hidden' name='tranId', value='JRAD1010M04S'/>\";\n"
+				// 이름이 다른 필드는 보지 않는다.
+				+ "<input name=\"userId\" value=\"ABC\"/>";
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
+
+		assertEquals(2, calls.size());
+		assertTrue(calls.get(0).getRule().isField());
+		assertEquals("performJIMC1000M03S", calls.get(0).getRule().methodNameOf(calls.get(0).getId()));
+		assertNull(calls.get(1).getId());
+	}
+
+	@Test
+	public void 공통_함수가_여럿이면_규칙마다_찾는다() {
+		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id},gfnCallService=perform{id}");
+		String text = "HiJS.svr.doRequestAjax(\"JCST0200M01S\", p);\n"
+				+ "comLib.gfnCallService(\"JIAC0000M02I\", param, fnCallback);\n"
+				// 함수를 만드는 곳은 호출이 아니다.
+				+ "comLib.gfnCallService = function(tranId, param, successFn) {};";
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
+
+		assertEquals(2, calls.size());
+		assertEquals("performJCST0200M01S", calls.get(0).getRule().methodNameOf(calls.get(0).getId()));
+		assertEquals("performJIAC0000M02I", calls.get(1).getRule().methodNameOf(calls.get(1).getId()));
+	}
+
+	@Test
+	public void 주소를_찾는다() throws Exception {
+		assertTrue(texts(screenScript.findPaths(read(WEBSQUARE_APP + "ui/order/OrderList.xml"))).contains("/order/list.do"));
+		assertTrue(texts(screenScript.findPaths(read(WEBSQUARE_APP + "ui/order/OrderPopup.xml"))).contains("/shop/order/detail.do"));
+
+		// Nexacro: 서비스 접두어를 떼고 앞에 /를 붙인다. 주석 안의 save.do 는 없어야 한다.
+		List<String> list = texts(screenScript.findPaths(read(NEXACRO_APP + "nxui/order/OrderList.xfdl")));
+		assertTrue(list.contains("/order/list.do"));
+		assertFalse(list.contains("/order/save.do"));
+		assertTrue(texts(screenScript.findPaths(read(NEXACRO_APP + "nxui/order/OrderDetail.xfdl"))).contains("/order/save.do"));
+	}
+
+	@Test
+	public void 다른_화면을_가리키는_경로를_찾는다() throws Exception {
+		List<String> refs = texts(screenScript.findScreenRefs(read(WEBSQUARE_APP + "ui/order/OrderList.xml"), new String[] { ".xml" }));
+		// ?mode=view 는 떼고 돌려준다.
+		assertEquals("[/shop/ui/order/OrderPopup.xml, /shop/ui/common/Header.xml]", refs.toString());
+
+		refs = texts(screenScript.findScreenRefs(read(NEXACRO_APP + "nxui/order/OrderList.xfdl"), new String[] { ".xfdl" }));
+		assertEquals("[order::OrderDetail.xfdl]", refs.toString());
+	}
+
+	@Test
+	public void 주석인지_가려낸다() {
+		assertTrue(screenScript.inComment("a(); // b();", 8));
+		assertFalse(screenScript.inComment("a(); // b();\nc();", 13));
+		assertTrue(screenScript.inComment("/* a(); */ b(); /* c();", 19));
+		assertFalse(screenScript.inComment("/* a(); */ b();", 11));
+		assertTrue(screenScript.inComment("<!-- <a/> -->\n<!-- <b/>", 19));
+		// http:// 의 //는 주석이 아니다.
+		assertFalse(screenScript.inComment("url = \"http://host/a.do\"; b();", 26));
+	}
+
+	@Test
+	public void 큰_화면_파일도_금방_끝난다() {
+		// 실제 프로젝트에 2MB가 넘는 화면이 있었다. 찾은 것마다 앞쪽을 거슬러 훑으면 몇 분이 걸린다.
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < 150000; i++) {
+			sb.append("<w2:column id=\"c").append(i).append("\" src=\"/a/b").append(i).append(".do\"/>\n");
+		}
+		final String text = sb.toString();
+		org.junit.jupiter.api.Assertions.assertTimeout(java.time.Duration.ofSeconds(10), new org.junit.jupiter.api.function.Executable() {
+			@Override
+			public void execute() {
+				assertEquals(150000, screenScript.findPaths(text).size());
+			}
+		});
+	}
+
+	private List<String> texts(List<ScreenScript.Hit> hits) {
+		List<String> texts = new ArrayList<String>();
+		for (int i = 0; i < hits.size(); i++) {
+			texts.add(hits.get(i).getText());
+		}
+		return texts;
+	}
+
+	@Test
+	public void 둘째_인자부터를_보는_규칙은_괄호_짝을_맞춰_인자를_나눈다() {
+		String text = "scwin.a = function() {\n"
+				+ "  parent.scwin.fnOpenPage(param, \"JIMC1000G\", {mode: \"a, b\"});\n"            // 둘째 인자
+				+ "  fnOpenPage(f(x, \"y\"), 'JIMC2000G');\n"                                    // 첫 인자 안의 쉼표와 문자열
+				+ "  fnOpenPage(param /* , \"JIMC9999G\" */, \"JIMC3000G\");\n"                  // 주석 속 쉼표
+				+ "  fnOpenPage(param, pageId);\n"                                                 // 변수
+				+ "  fnOpenPage(\"JIMC4000G\");\n"                                                // 둘째 인자가 없다
+				+ "  // fnOpenPage(param, \"JIMC5000G\");\n"                                       // 주석 안의 호출
+				+ "};";
+		ScreenScript.CallRule second = new ScreenScript.CallRule("fnOpenPage", "{id}.xml", 1);
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, java.util.Arrays.asList(second));
+		assertEquals(5, calls.size());
+		assertEquals("JIMC1000G", calls.get(0).getId());
+		assertEquals("JIMC2000G", calls.get(1).getId());
+		assertEquals("JIMC3000G", calls.get(2).getId());
+		assertNull(calls.get(3).getId());
+		assertNull(calls.get(4).getId());
+		// 첫 인자 규칙의 결과는 그대로다. 첫 인자가 글자가 아닌 호출은 다른 자리의 글자를 알려 준다(규칙 후보).
+		ScreenScript.CallRule first = new ScreenScript.CallRule("fnOpenPage", "{id}.xml");
+		List<ScreenScript.Call> byFirst = screenScript.findCalls(text, java.util.Arrays.asList(first));
+		assertEquals(5, byFirst.size());
+		assertNull(byFirst.get(0).getId());
+		assertEquals(java.util.Arrays.asList(Integer.valueOf(1)), byFirst.get(0).otherLiteralPositions());
+		assertEquals("JIMC4000G", byFirst.get(4).getId());
+		assertTrue(byFirst.get(3).otherLiteralPositions().isEmpty());
+	}
+
+	@Test
+	public void 괄호_짝이_맞지_않으면_인자를_짐작하지_않는다() {
+		String text = "fnOpenPage(param, \"JIMC1000G\"";
+		assertNull(screenScript.literalArguments(text, text.indexOf('(') + 1, screenScript.commentMask(text)));
+		String empty = "fnOpenPage()";
+		assertTrue(screenScript.literalArguments(empty, empty.indexOf('(') + 1, screenScript.commentMask(empty)).isEmpty());
+	}
+
+	private String read(String path) throws Exception {
+		return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
+	}
+
+}

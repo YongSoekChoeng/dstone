@@ -23,7 +23,7 @@
             , #{fileId}, #{lineStart, jdbcType=INTEGER})
     </insert>
 
-    <insert id="insertType" parameterType="net.dstone.knowledge.parser.model.TypeRow">
+    <insert id="insertType" parameterType="net.dstone.knowledge.analysis.pass03.declare.model.TypeRow">
         INSERT INTO analysis_symbol
             (revision_id, symbol_id, kind, fqn, simple_name, package_name, outer_symbol_id, visibility
             , is_abstract, is_final, is_static, properties_json, file_id, line_start, line_end)
@@ -33,7 +33,7 @@
             , #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
     </insert>
 
-    <insert id="insertMethod" parameterType="net.dstone.knowledge.parser.model.MethodRow">
+    <insert id="insertMethod" parameterType="net.dstone.knowledge.analysis.pass03.declare.model.MethodRow">
         INSERT INTO analysis_method
             (revision_id, method_id, owner_symbol_id, name, signature, return_type, param_count, parameters_json
             , visibility, is_static, is_abstract, is_constructor, is_synthetic, synthetic_origin, properties_json
@@ -44,7 +44,7 @@
             , #{fileId}, #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
     </insert>
 
-    <insert id="insertField" parameterType="net.dstone.knowledge.parser.model.FieldRow">
+    <insert id="insertField" parameterType="net.dstone.knowledge.analysis.pass03.declare.model.FieldRow">
         INSERT INTO analysis_field
             (revision_id, field_id, owner_symbol_id, name, type, visibility, is_static, is_final
             , is_synthetic, synthetic_origin, initializer_summary, file_id, line_start, line_end)
@@ -54,7 +54,7 @@
             , #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
     </insert>
 
-    <insert id="insertAnnotation" parameterType="net.dstone.knowledge.parser.model.AnnotationRow">
+    <insert id="insertAnnotation" parameterType="net.dstone.knowledge.analysis.pass03.declare.model.AnnotationRow">
         INSERT INTO analysis_annotation
             (revision_id, target_kind, target_id, annotation_name, annotation_fqn, attributes_json, file_id, line_start)
         VALUES
@@ -62,7 +62,7 @@
             , #{fileId}, #{lineStart, jdbcType=INTEGER})
     </insert>
 
-    <insert id="insertReference" parameterType="net.dstone.knowledge.parser.model.ReferenceRow">
+    <insert id="insertReference" parameterType="net.dstone.knowledge.analysis.pass03.declare.model.ReferenceRow">
         INSERT INTO analysis_reference
             (revision_id, file_id, from_kind, from_id, ref_kind, name, scope_text, arg_count, arg_text, args_json, line_start, column_start)
         VALUES

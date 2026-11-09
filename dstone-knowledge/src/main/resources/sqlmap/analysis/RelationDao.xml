@@ -10,7 +10,7 @@
         DELETE FROM analysis_relation WHERE file_id = #{fileId}
     </delete>
 
-    <insert id="insertRelation" parameterType="net.dstone.knowledge.resolver.model.RelationRow">
+    <insert id="insertRelation" parameterType="net.dstone.knowledge.analysis.pass06.resolve.model.RelationRow">
         INSERT INTO analysis_relation
             (revision_id, from_kind, from_id, relation_type, to_kind, to_id, to_external
             , confidence, resolution_status, properties_json, file_id, line_start)

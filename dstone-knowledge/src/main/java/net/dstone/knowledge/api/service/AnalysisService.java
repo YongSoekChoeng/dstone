@@ -17,8 +17,8 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.AnalysisJobDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
-import net.dstone.knowledge.job.AnalysisJobContext;
-import net.dstone.knowledge.job.AnalysisJobRunner;
+import net.dstone.knowledge.analysis.job.AnalysisJobContext;
+import net.dstone.knowledge.analysis.job.AnalysisJobRunner;
 
 /**
  * <pre>

@@ -22,13 +22,13 @@ import net.dstone.knowledge.api.dao.AnalysisJobDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.api.dao.RuleDao;
 import net.dstone.knowledge.common.exception.ApiException;
-import net.dstone.knowledge.job.AnalysisJobContext;
-import net.dstone.knowledge.job.AnalysisJobRunner;
-import net.dstone.knowledge.semantic.SemanticPass;
-import net.dstone.knowledge.semantic.rule.RuleException;
-import net.dstone.knowledge.semantic.rule.RuleSet;
-import net.dstone.knowledge.semantic.rule.SemanticRuleRegistry;
-import net.dstone.knowledge.semantic.rule.SemanticRules;
+import net.dstone.knowledge.analysis.job.AnalysisJobContext;
+import net.dstone.knowledge.analysis.job.AnalysisJobRunner;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticPass;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleException;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRules;
 
 /**
  * <pre>

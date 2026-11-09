@@ -189,7 +189,7 @@ public class EmbeddingWorker extends BaseObject {
 	}
 
 	/** 벡터를 pgvector가 읽는 모양의 글로 바꿉니다. 예: [0.12,-0.03,...] */
-	static String vectorText(float[] vector) {
+	public static String vectorText(float[] vector) {
 		StringBuilder sb = new StringBuilder(vector.length * 10);
 		sb.append('[');
 		for (int i = 0; i < vector.length; i++) {
