@@ -257,3 +257,19 @@ Docs edits (API table, screen table, guide).
 ## 답변
 
 재분석(리비전 #96)이 끝나면 결과를 비교해 알려 드리겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b1t4dwdsx</task-id>
+<summary>Monitor event: "hen 재분석(A20261109001) 단계 진행"</summary>
+<event>RUNNING | SCAN:DONE CARRY:DONE DECLARE:DONE RESOURCE:RUNNING</event>
+</task-notification>
+
+---
+
+## 답변
+
+RESOURCE 단계를 진행하고 있습니다. 계속 기다립니다.
