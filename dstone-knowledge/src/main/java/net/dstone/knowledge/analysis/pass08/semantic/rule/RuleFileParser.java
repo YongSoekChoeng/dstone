@@ -44,29 +44,35 @@ public class RuleFileParser {
 
 	/** 계층으로 쓸 수 있는 이름 */
 	public static final List<String> LAYERS = Collections.unmodifiableList(Arrays.asList(
-			"CONTROLLER", "SERVICE", "REPOSITORY", "MODEL", "VIEW", "CONFIG", "WEB_FILTER", "UTIL", "EXCEPTION", "BATCH", "COMPONENT", "ASPECT"));
+		"CONTROLLER", "SERVICE", "REPOSITORY"
+		, "MODEL", "VIEW"
+		, "CONFIG", "WEB_FILTER"
+		, "UTIL", "EXCEPTION"
+		, "BATCH", "COMPONENT", "ASPECT"
+	));
 
 	/** 인자 자리의 한도(0부터). DECLARE 가 남기는 인자 수도 이만큼이다 */
 	public static final int MAX_ARG_INDEX = 9;
 
 	/** 진입점 종류: 영문 대문자와 밑줄, 20자 이내(analysis_endpoint.endpoint_type) */
 	private static final Pattern ENDPOINT_TYPE = Pattern.compile("[A-Z][A-Z0-9_]{1,19}");
+
+	/** HTTP 메소드 */
 	private static final List<String> HTTP_VERBS = Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
 	private static final Pattern HTTP_METHOD = Pattern.compile("[A-Z]{3,10}");
 
-	private static final List<String> TOP_KEYS = Arrays.asList("description", "layer", "entry", "inject", "proxy", "sql", "view", "screen", "jpa");
-	/** 옛 형식의 키 → 새 형식에서 어디에 적나 */
-	private static final String[][] OLD_KEYS = {
-		{ "name", "name 은 없어졌습니다. 규칙 이름은 파일 경로입니다(common/spring.yml → common/spring)." },
-		{ "order", "order 는 없어졌습니다. 우선순위는 폴더가 정합니다: projects/{프로젝트ID}/ > common/ > guess/." },
-		{ "autoApply", "autoApply 는 없어졌습니다. common/ 과 guess/ 는 모든 프로젝트에, projects/{프로젝트ID}/ 는 그 프로젝트에만 씁니다." },
-		{ "endpoints", "endpoints 는 entry 로 바뀌었습니다. 예: entry: { SCHEDULED: \"@Scheduled(cron = KEY)\" }" },
-		{ "layers", "layers 는 layer 로 바뀌었습니다. 예: layer: { SERVICE: [\"@Service\", extends com.fw.BaseService, name *Service] }" },
-		{ "callArguments", "callArguments 는 sql / view 로 바뀌었습니다. 예: sql: [ _.selectList(SQL) ], view: [ new ModelAndView(VIEW) ]" },
-		{ "screens", "screens 는 screen 으로 바뀌었습니다. 예: screen: [ { call: doRequestAjax(ID), to: perform{ID} } ]" },
-		{ "injects", "injects 는 inject 로 바뀌었습니다. 예: inject: [\"@Autowired\"]" },
-		{ "proxies", "proxies 는 proxy 로 바뀌었습니다. 예: proxy: [\"@Transactional\"]" },
-	};
+	/** Rule Key값들 */
+	private static final List<String> TOP_KEYS = Arrays.asList(
+		"description"
+		, "layer"
+		, "entry"
+		, "inject"
+		, "proxy"
+		, "sql"
+		, "view"
+		, "screen"
+		, "jpa"
+	);
 
 	/** 대응표 파일(id.map)을 찾는 바탕 폴더(규칙 폴더). null 이면 대응표를 쓸 수 없다(글만 읽는 단위 테스트) */
 	private final File rulesDir;
@@ -140,11 +146,6 @@ public class RuleFileParser {
 	}
 
 	private String unknownTopKey(String key) {
-		for (int i = 0; i < OLD_KEYS.length; i++) {
-			if (OLD_KEYS[i][0].equals(key)) {
-				return "옛 형식의 키입니다. " + OLD_KEYS[i][1];
-			}
-		}
 		return "모르는 키입니다: " + key + " (쓸 수 있는 키: " + TOP_KEYS + ")";
 	}
 
