@@ -207,7 +207,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro �
 - **DB 기반 파이프라인.** 프로젝트 전체를 메모리에 올리지 않는다. Pass는 파일 하나씩 처리하고 행을 쓴 뒤 AST를 버린다.
 - 새 Pass = 새 `AnalysisPass` bean. 재실행에 멱등이어야 하고 루프 안에서 `context.checkCancelled()`를 부른다. 파일 단위 Pass는 무거운 작업을 `prepare`(DB 쓰기·트랜잭션 없음)에, DB 쓰기를 `write`에 둔다.
 - `sqlSessionBatch` 트랜잭션 안에서 `sqlSessionCommon`을 쓰지 않는다.
-- 프레임워크 관례(애노테이션, SQL 이름을 받는 메소드, 상위 타입, 화면 함수)는 먼저 규칙 파일 `conf/rules/*.yml`에 적는다(`conf/rules/README.md`). 한 프로젝트만의 관례는 `conf/rules/{프로젝트ID}/`에 둔다(그 프로젝트에만 저절로 적용). 규칙으로 안 되는 것만 새 `SemanticPlugin` bean으로 만들고, Java를 다시 파싱하지 말고 `analysis_*` 테이블에서 SQL로 도출한다. 지원 범위는 `docs/11` 4.7.6절.
+- 프레임워크 관례(애노테이션, SQL 이름을 받는 메소드, 상위 타입, 화면 함수)는 먼저 규칙 파일에 **코드 모양 그대로** 적는다(`conf/rules/README.md`, `docs/11-2`). 폴더가 우선순위다: `projects/{프로젝트ID}/` > `common/` > `guess/`. 규칙 파일의 절(`layer:` `entry:` `sql:` …)마다 처리기가 하나다(`LayerResolver`, `EntryFinder`, `SqlLinker` …). 규칙으로 안 되는 것만 새 `SemanticStep` bean을 만들어 `SemanticPass.steps()`에 넣고, Java를 다시 파싱하지 말고 `analysis_*` 테이블에서 SQL로 도출한다. 규칙으로 만든 결과에는 `ruleAt`(파일:줄)을 남긴다. 지원 범위는 `docs/11` 4.7.6절.
 - 이름(statement, 거래 ID, 화면 경로)은 **계산하고 추측하지 않는다.** 따옴표 리터럴만 인정한다.
 - 비밀값은 저장하지 않는다(`****`). XML은 모두 `common.util.SafeXml`로 읽는다. JSQLParser는 fast mode, 호출 스레드에서만.
 - `analysis_*`만 원본이다. `kg_*`는 VIEW, `rag_*`는 언제든 재생성. 임베딩 키는 `(content_hash, model)`이며 모델명·차원은 `RagSettings`로 읽는다.

@@ -391,7 +391,7 @@ var DstoneKnowledgeProject = (function () {
 			return "<span class=\"kn-diag-solution kn-diag-" + K.escapeHtml(key) + "\">" + K.escapeHtml(SOLUTION[key] || key) + " " + summary[key] + "</span>";
 		}).join(" ");
 		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">적용 진단</div>"
-			+ "<p class=\"ai-hint\">살펴볼 항목을 해결 방법별로 나눴습니다. <b>규칙 파일로 해결</b>은 conf/rules/" + K.escapeHtml(diagnostics.projectId)
+			+ "<p class=\"ai-hint\">살펴볼 항목을 해결 방법별로 나눴습니다. <b>규칙 파일로 해결</b>은 conf/rules/projects/" + K.escapeHtml(String(diagnostics.projectId || "").toLowerCase())
 			+ "/ 에 규칙을 적고 SEMANTIC 부터 다시 분석하면 되고, <b>분석기 개발 필요</b>는 지금 지원하는 범위 밖입니다.</p>"
 			+ (head ? "<div class=\"kn-row\">" + head + "</div>" : "<p class=\"ai-hint\">살펴볼 항목이 없습니다.</p>");
 		(diagnostics.checks || []).forEach(function (check) {

@@ -10,10 +10,10 @@ import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
  * <pre>
- * Java 소스 안의 SQL(Java 문자열 SQL, JPA 쿼리)을 다루는 Dao 입니다. JpaPlugin 과 JavaSqlPlugin 이 씁니다.
+ * Java 소스 안의 SQL(Java 문자열 SQL, JPA 쿼리)을 다루는 Dao 입니다. JpaQueryReader 와 JavaSqlLinker 가 씁니다.
  * 둘 다 SQL 매퍼와 같은 테이블(analysis_mapper)에 mapper_type JAVA / JPA 로 들어 있습니다.
  *   JAVA  DECLARE 단계가 파일마다 만든다(JavaSqlCollector). SEMANTIC 은 읽기만 한다.
- *   JPA   SEMANTIC 단계(JpaPlugin)가 애노테이션에서 만든다. SEMANTIC 을 다시 돌리면 지우고 다시 만든다.
+ *   JPA   SEMANTIC 단계(JpaQueryReader)가 애노테이션에서 만든다. SEMANTIC 을 다시 돌리면 지우고 다시 만든다.
  * </pre>
  */
 @Repository("javaSqlDao")

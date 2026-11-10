@@ -1,8 +1,5 @@
 package net.dstone.knowledge.analysis.pass08.semantic;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,28 +16,48 @@ import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.util.ErrorText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.job.AnalysisPass;
+import net.dstone.knowledge.analysis.pass08.semantic.dictionary.MethodTitlePlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.dictionary.ScreenDictionaryPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.dictionary.SourceNamePlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.dictionary.TableDictionaryPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.entry.EntryFinder;
+import net.dstone.knowledge.analysis.pass08.semantic.entry.ServletEntries;
+import net.dstone.knowledge.analysis.pass08.semantic.entry.StrutsEntries;
+import net.dstone.knowledge.analysis.pass08.semantic.layer.LayerResolver;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.ProjectRules;
 import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleException;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFile;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFiles;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.JspLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenMenuReader;
+import net.dstone.knowledge.analysis.pass08.semantic.sql.JavaSqlLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.sql.JpaQueryReader;
+import net.dstone.knowledge.analysis.pass08.semantic.sql.MapperLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.sql.SqlLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.view.ViewLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.wiring.WiringMarker;
 
 /**
  * <pre>
- * SEMANTIC 단계: 등록된 의미 분석 플러그인을 순서대로 돌려서 진입점과 계층을 알아냅니다.
+ * SEMANTIC 단계: 처리기를 정해진 순서로 돌려서 진입점, 계층, SQL · 화면과의 관계를 알아냅니다.
  *
- * 만드는 것:
- *   진입점(analysis_endpoint)   밖에서 이 프로그램으로 들어오는 입구. HTTP 주소, 서블릿, main(), 스케줄, 리스너, 스레드, JSP
- *   계층(analysis_symbol.layer) CONTROLLER / SERVICE / REPOSITORY / MODEL ...
- *   주입(INJECTS 관계)          @Autowired 필드
+ * 프레임워크마다 다른 관례(어떤 애노테이션이 진입점인지 등)는 규칙 파일(conf/rules)에 있습니다.
+ * 규칙 파일의 절마다 처리기가 하나씩 있습니다.
  *
- * Java 파일을 다시 파싱하지 않습니다. DECLARE가 넣어 둔 애노테이션과 RESOLVE가 만든 관계를 SQL로 엮습니다.
- * 파일을 읽는 것은 web.xml뿐입니다. 그래서 큰 프로젝트에서도 금방 끝나고 메모리를 쓰지 않습니다.
+ *   규칙 파일의 절     처리기
+ *   layer:            LayerResolver
+ *   entry:            EntryFinder
+ *   inject: proxy:    WiringMarker
+ *   jpa:              JpaQueryReader, JavaSqlLinker
+ *   sql:              SqlLinker
+ *   view:             ViewLinker
+ *   screen:           ScreenLinker, ScreenMenuReader
+ *
+ * Java 파일을 다시 파싱하지 않습니다. DECLARE 가 넣어 둔 애노테이션과 RESOLVE 가 만든 관계를 SQL 로 엮습니다.
  *
  * 전체를 한 트랜잭션으로 돌립니다. 시작할 때 전에 만든 것을 지우고 새로 만들기 때문에, 다시 돌려도 결과가 같고
- * 도중에 실패하면 지운 것까지 되돌아갑니다.
- *
- * 프레임워크마다 다른 관례(어떤 애노테이션이 진입점인지 등)는 규칙 파일(conf/rules/*.yml)에 있습니다.
- * 시작할 때 규칙 파일을 다시 읽어 컨텍스트에 실어 두고(SemanticRuleRegistry), 어떤 묶음을 썼는지를
+ * 도중에 실패하면 지운 것까지 되돌아갑니다. 시작할 때 규칙 폴더를 다시 읽고(RuleFiles), 어떤 파일을 썼는지를
  * analysis_resource 에 RULE_SET 행으로 남깁니다. 규칙 파일을 고친 뒤에는 rerunFrom=SEMANTIC 으로 다시 돌리면 됩니다.
  * </pre>
  */
@@ -49,19 +66,56 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 
 	public static final String NAME = "SEMANTIC";
 
-	/** 등록된 모든 플러그인. Spring이 SemanticPlugin 구현 빈을 모아서 넣어 줍니다. */
-	@Autowired
-	private List<SemanticPlugin> plugins;
+	@Autowired private ServletEntries servletEntries;
+	@Autowired private StrutsEntries strutsEntries;
+	@Autowired private LayerResolver layerResolver;
+	@Autowired private EntryFinder entryFinder;
+	@Autowired private WiringMarker wiringMarker;
+	@Autowired private JpaQueryReader jpaQueryReader;
+	@Autowired private MapperLinker mapperLinker;
+	@Autowired private SqlLinker sqlLinker;
+	@Autowired private JavaSqlLinker javaSqlLinker;
+	@Autowired private ViewLinker viewLinker;
+	@Autowired private JspLinker jspLinker;
+	@Autowired private ScreenLinker screenLinker;
+	@Autowired private ScreenMenuReader screenMenuReader;
+	@Autowired private SourceNamePlugin sourceNamePlugin;
+	@Autowired private MethodTitlePlugin methodTitlePlugin;
+	@Autowired private ScreenDictionaryPlugin screenDictionaryPlugin;
+	@Autowired private TableDictionaryPlugin tableDictionaryPlugin;
 
 	@Autowired
 	private SemanticDao semanticDao;
 
 	@Autowired
-	private SemanticRuleRegistry ruleRegistry;
+	private RuleFiles ruleFiles;
 
 	@Autowired
 	@Qualifier("txTemplateCommon")
 	private TransactionTemplate txTemplateCommon;
+
+	/**
+	 * <pre>
+	 * 처리기를 도는 순서. 순서가 결과를 바꾸는 곳이 있어서 까닭을 함께 적습니다.
+	 * </pre>
+	 */
+	private SemanticStep[] steps() {
+		return new SemanticStep[] {
+			// 1) 규칙 없이 표준 설정 파일에서 읽는 입구. struts-config 의 Action 은 여기서 CONTROLLER 가 된다(규칙보다 확실하다).
+			servletEntries, strutsEntries,
+			// 2) 계층. 진입점보다 먼저다: 상위 클래스의 주소를 물려받는 컨트롤러를 계층으로 알아본다.
+			layerResolver,
+			// 3) 입구와 주입 · 프록시.
+			entryFinder, wiringMarker,
+			// 4) SQL. JPA statement 를 먼저 만들고, MapperLinker 가 SQL 관계를 지운 뒤 다시 만든다.
+			//    SqlLinker 가 이름 있는 JPA 쿼리(createNamedQuery)까지 잇고, JavaSqlLinker 가 Java 문자열 SQL · JPA 를 테이블과 잇는다.
+			jpaQueryReader, mapperLinker, sqlLinker, javaSqlLinker,
+			// 5) 화면. 진입점이 다 만들어진 뒤라야 화면이 요청하는 주소를 진입점과 맞춰 볼 수 있다.
+			viewLinker, jspLinker, screenLinker, screenMenuReader,
+			// 6) 이름 사전. SQL 에서 쓰인 컬럼과 화면 제목이 다 모인 뒤에 돈다.
+			sourceNamePlugin, methodTitlePlugin, screenDictionaryPlugin, tableDictionaryPlugin
+		};
+	}
 
 	@Override
 	public String name() {
@@ -75,77 +129,61 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
-		SemanticRules rules;
+		ProjectRules rules;
 		try {
-			rules = ruleRegistry.rulesFor(projectOf(context));
+			rules = ruleFiles.rulesFor(context.getProjectId(), context.getProjectValue("ruleSets"), null);
 		} catch (RuleException e) {
 			throw new IllegalStateException("의미 분석 규칙을 읽지 못했습니다. " + e.getMessage(), e);
 		}
-		context.setSemanticRules(rules);
+		context.setProjectRules(rules);
 
 		txTemplateCommon.execute(new TransactionCallbackWithoutResult() {
 			@Override
 			protected void doInTransactionWithoutResult(TransactionStatus status) {
-				runPlugins(context);
+				runSteps(context);
 			}
 		});
 	}
 
 	/**
 	 * <pre>
-	 * 이미 열린 트랜잭션 안에서, 전에 만든 결과를 지우고 플러그인을 모두 돌립니다.
-	 * 규칙은 context.getSemanticRules() 에 미리 실어 두어야 합니다.
-	 * 규칙 시험 적용(RuleTrialService)이 트랜잭션을 열고 이것을 부른 뒤 되돌립니다.
+	 * 이미 열린 트랜잭션 안에서, 전에 만든 결과를 지우고 처리기를 모두 돌립니다.
+	 * 규칙은 context.getProjectRules() 에 미리 실어 두어야 합니다.
+	 * 규칙 시험 적용(RuleService.trial)이 트랜잭션을 열고 이것을 부른 뒤 되돌립니다.
 	 * </pre>
 	 */
-	public void runPlugins(AnalysisJobContext context) {
-		final List<SemanticPlugin> ordered = new ArrayList<SemanticPlugin>(plugins);
-		Collections.sort(ordered, new Comparator<SemanticPlugin>() {
-			@Override
-			public int compare(SemanticPlugin a, SemanticPlugin b) {
-				return Integer.compare(a.order(), b.order());
-			}
-		});
-
+	public void runSteps(AnalysisJobContext context) {
 		semanticDao.clear(context.getRevisionId());
-		recordRuleSets(context);
-		for (int i = 0; i < ordered.size(); i++) {
-			SemanticPlugin plugin = ordered.get(i);
+		recordRuleFiles(context);
+		SemanticStep[] steps = steps();
+		for (int i = 0; i < steps.length; i++) {
+			SemanticStep step = steps[i];
 			context.checkCancelled();
 			try {
-				String summary = plugin.run(context);
-				info("SEMANTIC[" + plugin.name() + "]: " + summary + " analysisId=" + context.getAnalysisId());
+				String summary = step.run(context);
+				info("SEMANTIC[" + step.name() + "]: " + summary + " analysisId=" + context.getAnalysisId());
 			} catch (RuntimeException e) {
 				throw e;
 			} catch (Exception e) {
-				// 트랜잭션을 취소시키려면 RuntimeException이어야 한다.
-				throw new IllegalStateException("의미 분석 플러그인 " + plugin.name() + " 실패: " + ErrorText.summaryOf(e), e);
+				// 트랜잭션을 취소시키려면 RuntimeException 이어야 한다.
+				throw new IllegalStateException("의미 분석 처리기 " + step.name() + " 실패: " + ErrorText.summaryOf(e), e);
 			}
 		}
 	}
 
-	/** 어떤 규칙 묶음으로 분석했는지 남깁니다. 규칙 파일이 바뀌었는지 나중에 해시로 견줘 볼 수 있습니다. */
-	private void recordRuleSets(AnalysisJobContext context) {
-		List<RuleSet> sets = context.getSemanticRules().getSets();
-		for (int i = 0; i < sets.size(); i++) {
-			RuleSet set = sets.get(i);
+	/** 어떤 규칙 파일로 분석했는지 남깁니다. 규칙 파일이 바뀌었는지 나중에 해시로 견줘 볼 수 있습니다. */
+	private void recordRuleFiles(AnalysisJobContext context) {
+		List<RuleFile> files = context.getProjectRules().getFiles();
+		for (int i = 0; i < files.size(); i++) {
+			RuleFile file = files.get(i);
 			Map<String, Object> properties = new LinkedHashMap<String, Object>();
-			properties.put("order", Integer.valueOf(set.order));
-			properties.put("autoApply", Boolean.valueOf(set.autoApply));
-			properties.put("rules", Integer.valueOf(set.ruleCount()));
-			if (set.description != null) {
-				properties.put("description", set.description);
+			properties.put("tier", file.tier.name());
+			properties.put("rules", Integer.valueOf(file.ruleCount()));
+			if (file.description != null) {
+				properties.put("description", file.description);
 			}
-			semanticDao.insertSemanticResource(context.getRevisionId(), "RULE_SET", null, set.name, set.source, set.hash, properties, null);
+			semanticDao.insertSemanticResource(context.getRevisionId(), "RULE_SET", null, file.name, file.path, file.getHash(), properties, null);
 		}
-	}
-
-	/** 컨텍스트에서 규칙 묶음 선택에 필요한 프로젝트 값만 꺼냅니다. */
-	private Map<String, Object> projectOf(AnalysisJobContext context) {
-		Map<String, Object> project = new LinkedHashMap<String, Object>();
-		project.put("projectId", context.getProjectId());
-		project.put("ruleSets", context.getProjectValue("ruleSets"));
-		return project;
 	}
 
 }

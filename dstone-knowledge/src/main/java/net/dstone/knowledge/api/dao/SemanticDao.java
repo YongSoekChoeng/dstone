@@ -1,5 +1,6 @@
 package net.dstone.knowledge.api.dao;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
 import net.dstone.knowledge.common.util.JsonText;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.Rule;
 
 /**
  * <pre>
@@ -34,16 +35,25 @@ public class SemanticDao extends BaseDao {
 		sqlSessionCommon.delete(NS + "deleteViewRelations", revisionId);
 	}
 
-	/* ---------- 규칙 파일(conf/rules)로 만드는 것 ---------- */
+	/* ---------- 규칙 파일(conf/rules)로 만드는 것. 결과마다 규칙의 자리(ruleAt)를 남긴다 ---------- */
 
-	/** HTTP 진입점 규칙(endpoints.http) 하나로 진입점을 만듭니다. */
-	public int insertHttpEndpoints(long revisionId, RuleSet.HttpMappingRule rule) {
+	/**
+	 * <pre>
+	 * 계층 규칙 하나로 아직 계층이 없는 타입에 계층을 붙입니다. 이미 정해진 계층은 바꾸지 않습니다.
+	 * 어느 규칙 때문인지 analysis_symbol.properties_json 에 남깁니다(layerRuleAt: 파일:줄, layerBy: 적힌 모양).
+	 * </pre>
+	 */
+	public int updateLayerByRule(long revisionId, Rule.Layer rule) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
-		param.put("classAnnotations", rule.classAnnotations);
-		param.put("pathAttributes", rule.pathAttributes);
-		param.put("methodAnnotations", rule.methodAnnotations);
-		return sqlSessionCommon.insert(NS + "insertHttpEndpoints", param);
+		param.put("layer", rule.layer);
+		param.put("confidence", rule.confidence());
+		param.put("by", rule.by);
+		param.put("value", rule.value);
+		param.put("nameRegex", rule.nameRegex);
+		param.put("ruleAt", rule.at());
+		param.put("layerBy", rule.text);
+		return sqlSessionCommon.update(NS + "updateLayerByRule", param);
 	}
 
 	/**
@@ -63,7 +73,7 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectTypeEdges", revisionId);
 	}
 
-	/** @return [{symbolId, fqn, kind, isAbstract, layer}] */
+	/** @return [{symbolId, fqn, kind, isAbstract, layer, layerBy}] */
 	public List<Map<String, Object>> selectTypeFlags(long revisionId, List<String> ids) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -79,38 +89,62 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectMethodsOfTypes", param);
 	}
 
-	/** 애노테이션 진입점 규칙(endpoints.annotations) 하나로 진입점을 만듭니다. 예: @Scheduled → SCHEDULED */
-	public int insertAnnotatedEndpoints(long revisionId, RuleSet.AnnotatedEndpointRule rule) {
+	/** 애노테이션 진입점 규칙 하나로 진입점을 만듭니다. 예: "@Scheduled(cron = KEY)" → SCHEDULED */
+	public int insertAnnotationEntries(long revisionId, Rule.AnnotationEntry rule) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
 		param.put("endpointType", rule.endpointType);
-		param.put("annotations", rule.annotations);
+		param.put("annotation", rule.annotation);
 		param.put("pathAttributes", rule.pathAttributes);
-		return sqlSessionCommon.insert(NS + "insertAnnotatedEndpoints", param);
+		param.put("ruleAt", rule.at());
+		return sqlSessionCommon.insert(NS + "insertAnnotationEntries", param);
 	}
 
-	/** 상위 타입 진입점 규칙(endpoints.superTypes) 하나로 진입점을 만듭니다. 예: Runnable 의 run() → THREAD */
-	public int insertSuperTypeEndpoints(long revisionId, RuleSet.SuperTypeEndpointRule rule) {
+	/**
+	 * <pre>
+	 * 상위 타입 진입점 규칙 여럿(진입점 종류, 메소드, 인자 수가 같은 것)으로 진입점을 만듭니다.
+	 * 예: java.lang.Runnable#run(), java.lang.Thread#run() → THREAD
+	 * 한 메소드에 여럿이 맞으면 상속 관계가 먼저 적힌 것 하나만 넣습니다.
+	 * </pre>
+	 */
+	public int insertExtendsEntries(long revisionId, List<Rule.ExtendsEntry> rules) {
+		Rule.ExtendsEntry first = rules.get(0);
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
-		param.put("endpointType", rule.endpointType);
-		param.put("superTypes", rule.superTypes);
-		param.put("methods", rule.methods);
-		param.put("methodPattern", rule.methodPattern);
-		param.put("paramCount", rule.paramCount);
-		return sqlSessionCommon.insert(NS + "insertSuperTypeEndpoints", param);
+		param.put("endpointType", first.endpointType);
+		List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+		for (int i = 0; i < rules.size(); i++) {
+			Map<String, Object> row = new HashMap<String, Object>();
+			row.put("superType", rules.get(i).superType);
+			row.put("ruleAt", rules.get(i).at());
+			rows.add(row);
+		}
+		param.put("rules", rows);
+		param.put("methodName", first.methodName);
+		param.put("methodRegex", first.methodRegex);
+		param.put("paramCount", first.paramCount);
+		return sqlSessionCommon.insert(NS + "insertExtendsEntries", param);
 	}
 
-	public int insertInjects(long revisionId, List<String> annotations) {
-		if (annotations.isEmpty()) {
+	/** 주입 애노테이션이 붙은 필드 → INJECTS 관계 */
+	public int insertInjects(long revisionId, List<Rule.Mark> rules) {
+		if (rules.isEmpty()) {
 			return 0;
 		}
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
-		param.put("annotations", annotations);
+		List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+		for (int i = 0; i < rules.size(); i++) {
+			Map<String, Object> row = new HashMap<String, Object>();
+			row.put("annotation", rules.get(i).annotation);
+			row.put("ruleAt", rules.get(i).at());
+			rows.add(row);
+		}
+		param.put("rules", rows);
 		return sqlSessionCommon.insert(NS + "insertInjects", param);
 	}
 
+	/** 프록시 애노테이션이 메소드나 그 클래스에 붙은 메소드 → proxy_related */
 	public int markProxyRelated(long revisionId, List<String> annotations) {
 		if (annotations.isEmpty()) {
 			return 0;
@@ -121,27 +155,42 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.update(NS + "markProxyRelated", param);
 	}
 
-	/** 호출 인자 규칙(target: VIEW) 하나로 메소드 → 화면(RENDERS) 관계를 만듭니다. */
-	public int insertViewArgumentRelations(long revisionId, RuleSet.CallArgumentRule rule) {
-		return sqlSessionCommon.insert(NS + "insertViewArgumentRelations", callArgumentParams(revisionId, rule));
+	/** view: 규칙 하나로 메소드 → 화면(RENDERS) 관계를 만듭니다. */
+	public int insertViewArgumentRelations(long revisionId, Rule.CallArgument rule) {
+		Map<String, Object> param = callArgumentParams(revisionId, single(rule.method), single(rule.constructor), rule.argIndex, single(rule.receiverType));
+		param.put("prefix", rule.prefix);
+		param.put("suffix", rule.suffix);
+		param.put("exclude", rule.skip);
+		param.put("ruleAt", rule.at());
+		return sqlSessionCommon.insert(NS + "insertViewArgumentRelations", param);
 	}
 
 	/**
 	 * <pre>
 	 * 호출 인자 규칙을 SQL 파라미터로 바꿉니다. SemanticDao.xml 의 ruleReferenceFilter / ruleArgText / receiverTypesCte 조각이 이 키를 씁니다.
 	 * </pre>
+	 *
+	 * @param methods       이 이름의 메소드 호출
+	 * @param constructors  이 이름의 생성자 호출
+	 * @param receiverTypes 호출 대상 타입(하위 타입 포함). 비어 있으면 보지 않는다
 	 */
-	public static Map<String, Object> callArgumentParams(long revisionId, RuleSet.CallArgumentRule rule) {
+	public static Map<String, Object> callArgumentParams(long revisionId, List<String> methods, List<String> constructors, int argIndex
+			, List<String> receiverTypes) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
-		param.put("methods", rule.methods);
-		param.put("constructors", rule.constructors);
-		param.put("argIndex", Integer.valueOf(rule.argIndex));
-		param.put("receiverTypes", rule.receiverTypes);
-		param.put("prefix", rule.prefix);
-		param.put("suffix", rule.suffix);
-		param.put("exclude", rule.exclude);
+		param.put("methods", methods);
+		param.put("constructors", constructors);
+		param.put("argIndex", Integer.valueOf(argIndex));
+		param.put("receiverTypes", receiverTypes);
 		return param;
+	}
+
+	private static List<String> single(String value) {
+		List<String> list = new ArrayList<String>();
+		if (value != null) {
+			list.add(value);
+		}
+		return list;
 	}
 
 	public int insertWebServletEndpoints(long revisionId) {
@@ -226,11 +275,17 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectMethodsByName", param);
 	}
 
-	public int updateLayerBySymbol(long revisionId, String symbolId, String layer) {
+	/**
+	 * 설정 파일(struts-config.xml 등)이 "이 클래스가 요청을 처리한다"고 알려 준 타입의 계층을 정합니다(HIGH). 이미 정해졌으면 바꾸지 않습니다.
+	 *
+	 * @param layerBy 근거. 예: struts-config.xml
+	 */
+	public int updateLayerBySymbol(long revisionId, String symbolId, String layer, String layerBy) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
 		param.put("symbolId", symbolId);
 		param.put("layer", layer);
+		param.put("layerBy", layerBy);
 		return sqlSessionCommon.update(NS + "updateLayerBySymbol", param);
 	}
 
@@ -341,8 +396,9 @@ public class SemanticDao extends BaseDao {
 	 *
 	 * @return 올린 진입점 수
 	 */
-	public int insertCallRuleEndpoints(long revisionId, String function, String template, String prefix, String suffix) {
+	public int insertCallRuleEndpoints(long revisionId, String function, String template, String prefix, String suffix, String ruleAt) {
 		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("ruleAt", ruleAt);
 		param.put("revisionId", revisionId);
 		param.put("function", function);
 		param.put("template", template);
@@ -353,7 +409,7 @@ public class SemanticDao extends BaseDao {
 
 	/**
 	 * <pre>
-	 * 대응표(idMap)로 정한 거래 진입점 하나를 넣습니다. 그 메소드에 거래 진입점이 이미 있으면 넣지 않습니다.
+	 * 대응표(규칙의 id: { map })로 정한 거래 진입점 하나를 넣습니다. 그 메소드에 거래 진입점이 이미 있으면 넣지 않습니다.
 	 * </pre>
 	 *
 	 * @return 넣은 수(0 또는 1)
@@ -365,15 +421,6 @@ public class SemanticDao extends BaseDao {
 		param.put("path", path);
 		param.put("propertiesJson", propertiesJson);
 		return sqlSessionCommon.insert(NS + "insertTransactionEndpoint", param);
-	}
-
-	/** 이 타입을 바로 상속(구현)한 타입 가운데 계층이 아직 없는 것에 계층을 붙입니다(MEDIUM). */
-	public int updateLayerByConfiguredSuperType(long revisionId, String layer, String superType) {
-		Map<String, Object> param = new HashMap<String, Object>();
-		param.put("revisionId", revisionId);
-		param.put("layer", layer);
-		param.put("superType", superType);
-		return sqlSessionCommon.update(NS + "updateLayerByConfiguredSuperType", param);
 	}
 
 	/** 이 경로이거나 이 경로로 끝나는 리치클라이언트 화면 파일의 ID들(최대 2개. 하나뿐인지 보려는 것) */
@@ -390,25 +437,6 @@ public class SemanticDao extends BaseDao {
 	 */
 	public void insertRelation(Map<String, Object> relation) {
 		sqlSessionCommon.insert(NS + "insertRelation", relation);
-	}
-
-	public int updateLayerByAnnotation(long revisionId, String layer, List<String> annotations) {
-		Map<String, Object> param = new HashMap<String, Object>();
-		param.put("revisionId", revisionId);
-		param.put("layer", layer);
-		param.put("annotations", annotations);
-		return sqlSessionCommon.update(NS + "updateLayerByAnnotation", param);
-	}
-
-	/**
-	 * @param pattern 단순 이름에 맞춰 볼 정규식(PostgreSQL 문법)
-	 */
-	public int updateLayerByName(long revisionId, String layer, String pattern) {
-		Map<String, Object> param = new HashMap<String, Object>();
-		param.put("revisionId", revisionId);
-		param.put("layer", layer);
-		param.put("pattern", pattern);
-		return sqlSessionCommon.update(NS + "updateLayerByName", param);
 	}
 
 	public List<Map<String, Object>> selectEndpointSummary(long revisionId) {

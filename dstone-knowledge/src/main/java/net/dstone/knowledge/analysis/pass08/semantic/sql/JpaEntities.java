@@ -10,7 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.dstone.knowledge.api.dao.JavaSqlDao;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.ProjectRules;
 import net.dstone.knowledge.analysis.pass08.semantic.AnnotationValues;
 
 /**
@@ -75,9 +75,9 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		this.dao = dao;
 	}
 
-	public static JpaEntities load(long revisionId, SemanticRules rules, JavaSqlDao dao) {
+	public static JpaEntities load(long revisionId, ProjectRules rules, JavaSqlDao dao) {
 		JpaEntities entities = new JpaEntities(revisionId, dao);
-		List<String> entityAnnotations = rules.getJpaEntities();
+		List<String> entityAnnotations = rules.jpaEntities();
 		if (entityAnnotations.isEmpty()) {
 			return entities;
 		}
@@ -98,7 +98,7 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		if (entities.bySymbol.isEmpty()) {
 			return entities;
 		}
-		List<String> tableAnnotations = rules.getJpaTables();
+		List<String> tableAnnotations = rules.jpaTables();
 		if (!tableAnnotations.isEmpty()) {
 			List<Map<String, Object>> tables = dao.selectAnnotations(revisionId, "TYPE", tableAnnotations);
 			for (int i = 0; i < tables.size(); i++) {
@@ -124,7 +124,7 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		for (int i = 0; i < edges.size(); i++) {
 			entities.parents.put((String) edges.get(i).get("fromId"), (String) edges.get(i).get("toId"));
 		}
-		boolean snake = !"AS_IS".equals(rules.getJpaNaming());
+		boolean snake = !"AS_IS".equals(rules.jpaNaming());
 		for (Entity entity : entities.bySymbol.values()) {
 			if (entity.table != null) {
 				continue;

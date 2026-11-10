@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<!-- Java 소스 안의 SQL: Java 문자열 SQL(mapper_type JAVA, DECLARE 가 만든다)과 JPA 쿼리(mapper_type JPA, JpaPlugin 이 만든다) -->
+<!-- Java 소스 안의 SQL: Java 문자열 SQL(mapper_type JAVA, DECLARE 가 만든다)과 JPA 쿼리(mapper_type JPA, JpaQueryReader 가 만든다) -->
 <mapper namespace="net.dstone.knowledge.api.dao.JavaSqlDao">
 
     <delete id="deleteJpaStatements" parameterType="java.util.Map">

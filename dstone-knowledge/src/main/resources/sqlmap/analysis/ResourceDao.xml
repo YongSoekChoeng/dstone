@@ -40,7 +40,7 @@
     </insert>
 
 
-    <!-- ================= SQL 과 Java 잇기 (MyBatisPlugin) ================= -->
+    <!-- ================= SQL 과 Java 잇기 (MapperLinker) ================= -->
 
     <delete id="deleteSqlRelations" parameterType="long">
         DELETE FROM analysis_relation
@@ -67,7 +67,7 @@
          ORDER BY mp.mapper_id
     </select>
 
-    <!-- statement 를 mapper_id 순으로 조금씩 꺼낸다(본문 포함). Java 소스 안의 SQL(JAVA, JPA)은 JavaSqlPlugin 이 테이블을 뽑는다 -->
+    <!-- statement 를 mapper_id 순으로 조금씩 꺼낸다(본문 포함). Java 소스 안의 SQL(JAVA, JPA)은 JavaSqlLinker 가 테이블을 뽑는다 -->
     <select id="selectMapperPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT mapper_id AS "mapperId"
              , namespace AS "namespace"
@@ -103,7 +103,7 @@
            AND m.mapper_type NOT IN ('JAVA', 'JPA')
     </insert>
 
-    <!-- 문자열로 statement 를 부르는 호출들: 규칙 파일의 호출 인자 규칙(callArguments, target: SQL) 하나에 맞는 것. reference_id 순으로 조금씩 꺼낸다.
+    <!-- 문자열로 statement 를 부르는 호출들: 규칙 파일의 sql 규칙(같은 자리 · 대상 타입 · 틀을 쓰는 것끼리 묶은 것)에 맞는 것. reference_id 순으로 조금씩 꺼낸다.
          두 가지 모양이 있다: 이름을 인자로 받는 메소드 호출(selectList("…")), 이름을 담는 객체를 만드는 곳(new QueryProperty("…")).
          argText 는 규칙이 보는 자리(argIndex)의 인자 글자다. 조건 조각은 SemanticDao.xml 에 있다 -->
     <select id="selectMapperCallPage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
@@ -111,6 +111,7 @@
         SELECT r.reference_id AS "referenceId"
              , r.from_id AS "fromId"
              , r.name AS "name"
+             , r.ref_kind AS "refKind"
              , arg.text AS "argText"
              , r.file_id AS "fileId"
              , r.line_start AS "lineStart"

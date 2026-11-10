@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -25,7 +25,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class ScreenDictionaryPlugin implements SemanticPlugin {
+public class ScreenDictionaryPlugin implements SemanticStep {
 
 	/** 화면 종류(analysis_file.file_type) */
 	private static final List<String> SCREEN_TYPES = Arrays.asList("JSP", "WEBSQUARE", "NEXACRO");
@@ -41,12 +41,6 @@ public class ScreenDictionaryPlugin implements SemanticPlugin {
 	@Override
 	public String name() {
 		return "screenDictionary";
-	}
-
-	@Override
-	public int order() {
-		// 화면명(JSP 500, 리치클라이언트 510, 메뉴 520)과 상관없이 사전에 있는 것은 모두 남긴다. 어느 것을 보여 줄지는 읽는 쪽이 정한다.
-		return 970;
 	}
 
 	@Override

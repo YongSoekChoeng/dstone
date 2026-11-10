@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,7 +12,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.Rule;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFileParser;
 import net.dstone.knowledge.analysis.pass08.semantic.AnnotationValues;
 
 /**
@@ -27,15 +28,15 @@ import net.dstone.knowledge.analysis.pass08.semantic.AnnotationValues;
  */
 public class HttpEndpointBuilderTest {
 
-	private RuleSet.HttpMappingRule springRule() {
-		List<RuleSet.HttpMethodAnnotation> methods = new ArrayList<RuleSet.HttpMethodAnnotation>();
-		methods.add(new RuleSet.HttpMethodAnnotation("RequestMapping", null, "method"));
-		methods.add(new RuleSet.HttpMethodAnnotation("GetMapping", "GET", null));
-		methods.add(new RuleSet.HttpMethodAnnotation("PostMapping", "POST", null));
-		List<String> paths = new ArrayList<String>();
-		paths.add("value");
-		paths.add("path");
-		return new RuleSet.HttpMappingRule(Collections.singletonList("RequestMapping"), paths, methods);
+	/** 규칙 파일(common/spring.yml)과 같은 모양의 HTTP 규칙 */
+	private Rule.HttpEntry springRule() {
+		String yaml = "entry:\n"
+				+ "  HTTP:\n"
+				+ "    class: \"@RequestMapping(value|path = URL)\"\n"
+				+ "    ANY: \"@RequestMapping(value|path = URL, method = VERB)\"\n"
+				+ "    GET: \"@GetMapping(value|path = URL)\"\n"
+				+ "    POST: \"@PostMapping(value|path = URL)\"\n";
+		return new RuleFileParser().parse(yaml, "common/spring.yml").httpEntries.get(0);
 	}
 
 	private Map<String, Object> row(String kind, String target, String annotation, String json, String owner, String method, int params) {

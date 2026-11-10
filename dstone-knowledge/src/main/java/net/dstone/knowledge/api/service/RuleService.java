@@ -25,22 +25,23 @@ import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.job.AnalysisJobRunner;
 import net.dstone.knowledge.analysis.pass08.semantic.SemanticPass;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.ProjectRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.Rule;
 import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleException;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFile;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFiles;
 
 /**
  * <pre>
- * 의미 분석 규칙(conf/rules/*.yml)을 다루는 API 의 업무 로직입니다.
+ * 의미 분석 규칙(conf/rules)을 다루는 API 의 업무 로직입니다.
  *
- *   규칙 묶음 목록        폴더에 있는 규칙 묶음과 그 해시
- *   리비전의 규칙         그 리비전을 분석할 때 쓴 묶음과 지금 파일의 비교(바뀌었으면 SEMANTIC 부터 다시 돌려야 반영된다)
- *   시험 적용(trial)      규칙 묶음 글을 받아 SEMANTIC 을 한 트랜잭션 안에서 돌려 보고, 전후 차이를 알려 준 뒤 되돌린다
+ *   규칙 파일 목록        폴더에 있는 규칙 파일과 그 해시
+ *   리비전의 규칙         그 리비전을 분석할 때 쓴 파일과 지금 파일의 비교(바뀌었으면 SEMANTIC 부터 다시 돌려야 반영된다)
+ *   시험 적용(trial)      규칙 파일 글을 받아 SEMANTIC 을 한 트랜잭션 안에서 돌려 보고, 전후 차이를 알려 준 뒤 되돌린다
  *   후보 찾기             규칙이 아직 모르는 관례의 흔적(SQL 이름 같은 글자를 받는 호출, 많이 붙은 애노테이션, 많이 상속한 상위 타입)
  *
  * 새 환경의 프로젝트를 분석할 때의 순서:
- *   1) 후보를 본다 → 2) 제안된 규칙 조각을 고쳐 시험 적용으로 결과를 본다 → 3) conf/rules 에 파일로 저장한다
+ *   1) 후보를 본다 → 2) 제안된 규칙 조각을 고쳐 시험 적용으로 결과를 본다 → 3) conf/rules/projects/{프로젝트ID}/ 에 파일로 저장한다
  *   → 4) rerunFrom=SEMANTIC 으로 다시 돌린다
  * </pre>
  */
@@ -58,7 +59,7 @@ public class RuleService extends BaseObject {
 	private static final int MAX_SAMPLES = 200;
 
 	@Autowired
-	private SemanticRuleRegistry ruleRegistry;
+	private RuleFiles ruleFiles;
 
 	@Autowired
 	private SemanticPass semanticPass;
@@ -82,22 +83,22 @@ public class RuleService extends BaseObject {
 	@Qualifier("txTemplateCommon")
 	private TransactionTemplate txTemplateCommon;
 
-	/** 폴더에 있는 규칙 묶음 목록(order 순서) */
+	/** 폴더에 있는 규칙 파일 목록(우선순위 순서: projects → common → guess) */
 	public Map<String, Object> getRuleSets() {
-		List<RuleSet> sets = loadAll();
+		List<RuleFile> sets = loadAll();
 		List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
 		for (int i = 0; i < sets.size(); i++) {
 			list.add(describe(sets.get(i)));
 		}
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
-		result.put("rulesDir", ruleRegistry.rulesDir().getPath());
+		result.put("rulesDir", ruleFiles.rulesDir().getPath());
 		result.put("ruleSets", list);
 		return result;
 	}
 
 	/**
 	 * <pre>
-	 * 리비전을 분석할 때 쓴 규칙 묶음과, 지금 이 프로젝트에 쓰일 묶음을 견줍니다.
+	 * 리비전을 분석할 때 쓴 규칙 파일과, 지금 이 프로젝트에 쓰일 파일을 견줍니다.
 	 * status: SAME(같음) / CHANGED(파일 내용이 바뀜) / REMOVED(지금은 쓰지 않음) / ADDED(지금은 쓰는데 그때는 없었음)
 	 * 하나라도 SAME 이 아니면 upToDate 가 false 이고, SEMANTIC 부터 다시 돌려야 지금 규칙이 반영됩니다.
 	 * </pre>
@@ -106,7 +107,7 @@ public class RuleService extends BaseObject {
 		Map<String, Object> revision = revisionOf(revisionId);
 		Map<String, Object> project = projectService.getProject((String) revision.get("projectId"));
 		List<Map<String, Object>> applied = ruleDao.selectAppliedRuleSets(revisionId);
-		List<RuleSet> current = rulesFor(project, null).getSets();
+		List<RuleFile> current = rulesFor(project, null).getFiles();
 
 		List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
 		Set<String> seen = new LinkedHashSet<String>();
@@ -115,25 +116,25 @@ public class RuleService extends BaseObject {
 			Map<String, Object> a = applied.get(i);
 			String name = (String) a.get("name");
 			seen.add(name);
-			RuleSet now = find(current, name);
+			RuleFile now = find(current, name);
 			Map<String, Object> row = new LinkedHashMap<String, Object>();
 			row.put("name", name);
 			row.put("source", a.get("source"));
 			row.put("appliedHash", a.get("hash"));
-			row.put("currentHash", now == null ? null : now.hash);
-			String status = now == null ? "REMOVED" : now.hash.equals(a.get("hash")) ? "SAME" : "CHANGED";
+			row.put("currentHash", now == null ? null : now.getHash());
+			String status = now == null ? "REMOVED" : now.getHash().equals(a.get("hash")) ? "SAME" : "CHANGED";
 			row.put("status", status);
 			upToDate = upToDate && "SAME".equals(status);
 			rows.add(row);
 		}
 		for (int i = 0; i < current.size(); i++) {
-			RuleSet now = current.get(i);
+			RuleFile now = current.get(i);
 			if (!seen.contains(now.name)) {
 				Map<String, Object> row = new LinkedHashMap<String, Object>();
 				row.put("name", now.name);
-				row.put("source", now.source);
+				row.put("source", now.path);
 				row.put("appliedHash", null);
-				row.put("currentHash", now.hash);
+				row.put("currentHash", now.getHash());
 				row.put("status", "ADDED");
 				upToDate = false;
 				rows.add(row);
@@ -159,13 +160,13 @@ public class RuleService extends BaseObject {
 	 * 규칙을 시험 적용합니다. SEMANTIC 단계를 한 트랜잭션 안에서 실제로 돌려 보고, 전후를 견준 뒤 모두 되돌립니다.
 	 * DB 에 남는 것은 없습니다. 큰 프로젝트는 SEMANTIC 한 번만큼(수십 초~몇 분) 걸립니다.
 	 *
-	 * ruleSetText 가 있으면 그 묶음을 더해 봅니다(같은 이름의 파일이 있으면 그 대신). 없으면 지금 파일 그대로 돌려,
-	 * "규칙 파일을 고쳤는데 다시 돌리면 무엇이 바뀌나" 를 봅니다.
+	 * ruleText 가 있으면 그 글을 path(규칙 폴더 안의 경로) 에 있는 파일처럼 더해 봅니다. 그 경로의 파일이 있으면 그 대신 씁니다.
+	 * 없으면 지금 파일 그대로 돌려, "규칙 파일을 고쳤는데 다시 돌리면 무엇이 바뀌나" 를 봅니다.
 	 *
 	 * 그 프로젝트에 분석이 돌고 있으면 409 입니다. 서버 전체에서 한 번에 하나만 돕니다(synchronized).
 	 * </pre>
 	 */
-	public synchronized Map<String, Object> trial(long revisionId, String ruleSetText, int sampleLimit) {
+	public synchronized Map<String, Object> trial(long revisionId, String path, String ruleText, int sampleLimit) {
 		long started = System.currentTimeMillis();
 		Map<String, Object> revision = revisionOf(revisionId);
 		String projectId = (String) revision.get("projectId");
@@ -175,17 +176,21 @@ public class RuleService extends BaseObject {
 			throw ApiException.conflict("이 프로젝트는 분석이 돌고 있습니다. 끝난 뒤에 시험하세요: " + projectId);
 		}
 
-		RuleSet trialSet = null;
-		if (ruleSetText != null && ruleSetText.trim().length() > 0) {
+		RuleFile trialFile = null;
+		if (ruleText != null && ruleText.trim().length() > 0) {
+			if (path == null || path.trim().length() == 0) {
+				throw ApiException.badRequest("시험할 규칙 파일의 경로(path)를 적어야 합니다. 예: \"projects/" + projectId.toLowerCase() + "/backend.yml\"."
+						+ " 그 경로의 파일이 있으면 시험하는 동안 그 대신 씁니다.");
+			}
 			try {
-				trialSet = ruleRegistry.parse(ruleSetText);
+				trialFile = ruleFiles.parse(ruleText, path);
 			} catch (RuleException e) {
 				throw ApiException.badRequest(e.getMessage());
 			}
 		}
-		final SemanticRules rules = rulesFor(project, trialSet);
+		final ProjectRules rules = rulesFor(project, trialFile);
 		final AnalysisJobContext context = new AnalysisJobContext("TRIAL", projectId, revisionId, project);
-		context.setSemanticRules(rules);
+		context.setProjectRules(rules);
 		final long id = revisionId;
 		final int limit = Math.max(1, Math.min(sampleLimit, MAX_SAMPLES));
 
@@ -195,7 +200,7 @@ public class RuleService extends BaseObject {
 				// 무엇이 있어도 마지막에 되돌린다. 시험 적용은 아무것도 남기지 않는다.
 				status.setRollbackOnly();
 				ruleDao.createBeforeFacts(id);
-				semanticPass.runPlugins(context);
+				semanticPass.runSteps(context);
 				ruleDao.createAfterFacts(id);
 				Map<String, Object> body = new LinkedHashMap<String, Object>();
 				body.put("summary", changedOnly(ruleDao.selectTrialSummary()));
@@ -208,11 +213,11 @@ public class RuleService extends BaseObject {
 		Map<String, Object> response = new LinkedHashMap<String, Object>();
 		response.put("revisionId", Long.valueOf(revisionId));
 		response.put("projectId", projectId);
-		response.put("trialRuleSet", trialSet == null ? null : trialSet.name);
-		response.put("ruleSets", names(rules.getSets()));
+		response.put("trialRuleSet", trialFile == null ? null : trialFile.name);
+		response.put("ruleSets", names(rules.getFiles()));
 		response.putAll(result);
 		response.put("elapsedMs", Long.valueOf(System.currentTimeMillis() - started));
-		response.put("note", "시험 결과는 저장하지 않았습니다. 반영하려면 규칙 파일을 " + ruleRegistry.rulesDir().getPath()
+		response.put("note", "시험 결과는 저장하지 않았습니다. 반영하려면 규칙 파일을 " + ruleFiles.rulesDir().getPath()
 				+ " 에 저장하고 rerunFrom=SEMANTIC 으로 다시 돌리세요.");
 		return response;
 	}
@@ -220,11 +225,11 @@ public class RuleService extends BaseObject {
 	/**
 	 * <pre>
 	 * 규칙 후보를 찾습니다. 지금 이 프로젝트에 쓰이는 규칙이 이미 보는 것은 뺍니다.
-	 *   callArguments  따옴표 글자를 인자로 받는 호출 가운데, 그 글자가 이 프로젝트의 SQL 이름이나 JSP 화면 이름과 같은 것
+	 *   callArguments  따옴표 글자를 인자로 받는 호출 가운데, 그 글자가 이 프로젝트의 SQL 이름이나 JSP 화면 이름과 같은 것(sql: / view: 규칙)
 	 *   annotations    규칙이 모르는 애노테이션 가운데 많이 붙은 것(unexplained: 계층 없는 타입, 진입점 아닌 메소드에 붙은 수)
 	 *   superTypes     규칙이 모르는 상위 타입 가운데, 계층이 없거나 LOW 인 하위 타입이 많은 것
-	 *   screenRules    화면 규칙(screens.calls / opens)이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출 가운데,
-	 *                  다른 자리에 따옴표 글자가 있던 것. 예: fnOpenPage(param, "JIMC1000G") → argIndex: 1 규칙 제안
+	 *   screenRules    화면 규칙(screen: 의 call / open)이 보는 자리의 인자가 글자가 아니어서 건너뛴 호출 가운데,
+	 *                  다른 자리에 따옴표 글자가 있던 것. 예: fnOpenPage(param, "JIMC1000G") → open: fnOpenPage(_, ID) 규칙 제안
 	 *                  (SEMANTIC 이 남긴 집계를 읽으므로, 이 기능 전에 분석한 리비전은 SEMANTIC 을 다시 돌려야 나온다)
 	 * 후보마다 규칙 파일에 붙여 넣을 조각(suggestion)을 함께 줍니다. 계층이나 진입점 종류는 짐작이라 꼭 고쳐서 시험해 보세요.
 	 * </pre>
@@ -232,12 +237,12 @@ public class RuleService extends BaseObject {
 	public Map<String, Object> getCandidates(long revisionId, int limit) {
 		Map<String, Object> revision = revisionOf(revisionId);
 		Map<String, Object> project = projectService.getProject((String) revision.get("projectId"));
-		SemanticRules rules = rulesFor(project, null);
+		ProjectRules rules = rulesFor(project, null);
 		int size = Math.max(1, Math.min(limit, 100));
 
 		List<Map<String, Object>> covered = new ArrayList<Map<String, Object>>();
-		addCovered(covered, rules.getSqlArguments());
-		addCovered(covered, rules.getViewArguments());
+		addCovered(covered, rules.sqlCalls());
+		addCovered(covered, rules.viewCalls());
 		List<Map<String, Object>> calls = ruleDao.selectCallArgumentCandidates(revisionId, covered, size);
 		for (int i = 0; i < calls.size(); i++) {
 			calls.get(i).put("suggestion", callArgumentSuggestion(calls.get(i)));
@@ -254,18 +259,20 @@ public class RuleService extends BaseObject {
 		}
 
 		List<Map<String, Object>> screenRules = screenRuleCandidates(revisionId);
+		String file = "conf/rules/projects/" + String.valueOf(revision.get("projectId")).toLowerCase() + "/";
 
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("revisionId", Long.valueOf(revisionId));
 		result.put("projectId", revision.get("projectId"));
-		result.put("ruleSets", names(rules.getSets()));
+		result.put("ruleSets", names(rules.getFiles()));
 		result.put("summary", ruleDao.selectCandidateSummary(revisionId));
 		result.put("screenRules", screenRules);
 		result.put("callArguments", calls);
 		result.put("annotations", annotations);
 		result.put("superTypes", superTypes);
-		result.put("howTo", "suggestion 을 규칙 묶음(name 포함)으로 엮어 POST /api/revisions/" + revisionId
-				+ "/rules/trial 로 시험한 뒤, " + ruleRegistry.rulesDir().getPath() + " 에 저장하고 rerunFrom=SEMANTIC 으로 다시 돌리세요.");
+		result.put("howTo", "suggestion 을 규칙 파일 하나로 엮어 POST /api/revisions/" + revisionId
+				+ "/rules/trial 에 {\"path\": \"projects/" + String.valueOf(revision.get("projectId")).toLowerCase() + "/backend.yml\", \"rules\": \"...\"} 로 시험한 뒤, "
+				+ file + " 에 저장하고 rerunFrom=SEMANTIC 으로 다시 돌리세요.");
 		return result;
 	}
 
@@ -275,25 +282,34 @@ public class RuleService extends BaseObject {
 		for (int i = 0; i < candidates.size(); i++) {
 			Map<String, Object> c = candidates.get(i);
 			boolean open = "OPEN".equals(c.get("kind"));
-			c.put("suggestion", "screens:\n  " + (open ? "opens" : "calls") + ":\n    - { function: " + c.get("function")
-					+ ", " + (open ? "screen" : "method") + ": \"" + c.get("template") + "\", argIndex: " + c.get("literalAt") + " }\n");
+			c.put("suggestion", "screen:\n  - " + (open ? "open: " : "call: ") + c.get("function") + "(" + argumentsWithIdAt(((Number) c.get("literalAt")).intValue())
+					+ ")\n    to: \"" + String.valueOf(c.get("template")).replace("{id}", "{ID}") + "\"\n");
 		}
 		return candidates;
 	}
 
 	/* ============================== 도우미 ============================== */
 
-	private List<RuleSet> loadAll() {
+	/** ID 가 n번째 인자인 호출의 인자 모양. 2 → "_, _, ID" */
+	private static String argumentsWithIdAt(int index) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < index; i++) {
+			sb.append("_, ");
+		}
+		return sb.append("ID").toString();
+	}
+
+	private List<RuleFile> loadAll() {
 		try {
-			return ruleRegistry.loadAll();
+			return ruleFiles.loadAll();
 		} catch (RuleException e) {
 			throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "규칙 파일이 잘못 적혀 있습니다. " + e.getMessage());
 		}
 	}
 
-	private SemanticRules rulesFor(Map<String, Object> project, RuleSet trial) {
+	private ProjectRules rulesFor(Map<String, Object> project, RuleFile trial) {
 		try {
-			return ruleRegistry.rulesFor(project, trial);
+			return ruleFiles.rulesFor((String) project.get("projectId"), project.get("ruleSets"), trial);
 		} catch (RuleException e) {
 			throw ApiException.badRequest(e.getMessage());
 		}
@@ -323,19 +339,19 @@ public class RuleService extends BaseObject {
 		}
 	}
 
-	private Map<String, Object> describe(RuleSet set) {
+	private Map<String, Object> describe(RuleFile file) {
 		Map<String, Object> row = new LinkedHashMap<String, Object>();
-		row.put("name", set.name);
-		row.put("description", set.description);
-		row.put("order", Integer.valueOf(set.order));
-		row.put("autoApply", Boolean.valueOf(set.autoApply));
-		row.put("source", set.source);
-		row.put("hash", set.hash);
-		row.put("rules", Integer.valueOf(set.ruleCount()));
+		row.put("name", file.name);
+		row.put("description", file.description);
+		row.put("tier", file.tier.name());
+		row.put("project", file.projectFolder);
+		row.put("source", file.path);
+		row.put("hash", file.getHash());
+		row.put("rules", Integer.valueOf(file.ruleCount()));
 		return row;
 	}
 
-	private RuleSet find(List<RuleSet> sets, String name) {
+	private RuleFile find(List<RuleFile> sets, String name) {
 		for (int i = 0; i < sets.size(); i++) {
 			if (sets.get(i).name.equals(name)) {
 				return sets.get(i);
@@ -344,7 +360,7 @@ public class RuleService extends BaseObject {
 		return null;
 	}
 
-	private List<String> names(List<RuleSet> sets) {
+	private List<String> names(List<RuleFile> sets) {
 		List<String> names = new ArrayList<String>();
 		for (int i = 0; i < sets.size(); i++) {
 			names.add(sets.get(i).name);
@@ -352,7 +368,7 @@ public class RuleService extends BaseObject {
 		return names;
 	}
 
-	/** 전후가 같은 줄은 빼고 바뀐 묶음만 남깁니다. 아무것도 안 바뀌었으면 빈 목록입니다. */
+	/** 전후가 같은 줄은 빼고 바뀐 것만 남깁니다. 아무것도 안 바뀌었으면 빈 목록입니다. */
 	private List<Map<String, Object>> changedOnly(List<Map<String, Object>> summary) {
 		List<Map<String, Object>> changed = new ArrayList<Map<String, Object>>();
 		for (int i = 0; i < summary.size(); i++) {
@@ -364,15 +380,10 @@ public class RuleService extends BaseObject {
 		return changed;
 	}
 
-	private void addCovered(List<Map<String, Object>> covered, List<RuleSet.CallArgumentRule> rules) {
+	private void addCovered(List<Map<String, Object>> covered, List<Rule.CallArgument> rules) {
 		for (int i = 0; i < rules.size(); i++) {
-			RuleSet.CallArgumentRule rule = rules.get(i);
-			for (int m = 0; m < rule.methods.size(); m++) {
-				covered.add(coveredRow("CALL", rule.methods.get(m), rule.argIndex));
-			}
-			for (int c = 0; c < rule.constructors.size(); c++) {
-				covered.add(coveredRow("CREATE", rule.constructors.get(c), rule.argIndex));
-			}
+			Rule.CallArgument rule = rules.get(i);
+			covered.add(coveredRow(rule.refKind(), rule.callName(), rule.argIndex));
 		}
 	}
 
@@ -384,77 +395,88 @@ public class RuleService extends BaseObject {
 		return row;
 	}
 
-	private List<String> knownAnnotations(SemanticRules rules) {
+	private List<String> knownAnnotations(ProjectRules rules) {
 		Set<String> known = new LinkedHashSet<String>();
-		List<RuleSet.HttpMappingRule> http = rules.getHttpMappings();
+		List<Rule.HttpEntry> http = rules.httpEntries();
 		for (int i = 0; i < http.size(); i++) {
-			known.addAll(http.get(i).classAnnotations);
-			for (int j = 0; j < http.get(i).methodAnnotations.size(); j++) {
-				known.add(http.get(i).methodAnnotations.get(j).annotation);
+			known.addAll(http.get(i).annotationNames());
+		}
+		for (int i = 0; i < rules.annotationEntries().size(); i++) {
+			known.add(rules.annotationEntries().get(i).annotation);
+		}
+		List<Rule.Layer> layers = rules.layers();
+		for (int i = 0; i < layers.size(); i++) {
+			if (Rule.Layer.BY_ANNOTATION.equals(layers.get(i).by)) {
+				known.add(layers.get(i).value);
 			}
 		}
-		for (int i = 0; i < rules.getAnnotatedEndpoints().size(); i++) {
-			known.addAll(rules.getAnnotatedEndpoints().get(i).annotations);
+		for (int i = 0; i < rules.injects().size(); i++) {
+			known.add(rules.injects().get(i).annotation);
 		}
-		for (int i = 0; i < rules.getLayerAnnotations().size(); i++) {
-			known.addAll(rules.getLayerAnnotations().get(i).annotations);
+		for (int i = 0; i < rules.proxies().size(); i++) {
+			known.add(rules.proxies().get(i).annotation);
 		}
-		known.addAll(rules.getInjectAnnotations());
-		known.addAll(rules.getProxyAnnotations());
 		return new ArrayList<String>(known);
 	}
 
-	private List<String> knownSuperTypes(SemanticRules rules) {
+	private List<String> knownSuperTypes(ProjectRules rules) {
 		Set<String> known = new LinkedHashSet<String>();
-		for (int i = 0; i < rules.getLayerSuperTypes().size(); i++) {
-			known.addAll(rules.getLayerSuperTypes().get(i).types);
+		List<Rule.Layer> layers = rules.layers();
+		for (int i = 0; i < layers.size(); i++) {
+			if (Rule.Layer.BY_EXTENDS.equals(layers.get(i).by)) {
+				known.add(layers.get(i).value);
+			}
 		}
-		for (int i = 0; i < rules.getSuperTypeEndpoints().size(); i++) {
-			known.addAll(rules.getSuperTypeEndpoints().get(i).superTypes);
+		for (int i = 0; i < rules.extendsEntries().size(); i++) {
+			known.add(rules.extendsEntries().get(i).superType);
 		}
 		return new ArrayList<String>(known);
 	}
 
+	/** 후보 호출 하나를 sql: / view: 규칙 한 줄로 */
 	private String callArgumentSuggestion(Map<String, Object> c) {
 		boolean sql = ((Number) c.get("sqlMatches")).longValue() >= ((Number) c.get("viewMatches")).longValue();
-		StringBuilder sb = new StringBuilder();
-		sb.append("callArguments:\n");
-		sb.append("  - target: ").append(sql ? "SQL" : "VIEW").append('\n');
-		sb.append("    ").append("CREATE".equals(c.get("kind")) ? "constructors" : "methods").append(": [").append(c.get("name")).append("]\n");
+		String slot = sql ? "SQL" : "VIEW";
 		int argIndex = ((Number) c.get("argIndex")).intValue();
-		if (argIndex != 0) {
-			sb.append("    argIndex: ").append(argIndex).append('\n');
+		StringBuilder args = new StringBuilder();
+		for (int i = 0; i < argIndex; i++) {
+			args.append("_, ");
 		}
-		if ("CALL".equals(c.get("kind")) && c.get("receiverType") != null) {
-			sb.append("    receiverTypes: [").append(c.get("receiverType")).append("]   # 이름이 흔한 메소드면 대상 타입으로 좁힌다\n");
+		args.append(slot);
+		String call;
+		if ("CREATE".equals(c.get("kind"))) {
+			call = "new " + c.get("name") + "(" + args + ")";
+		} else if (c.get("receiverType") != null) {
+			call = c.get("receiverType") + "#" + c.get("name") + "(" + args + ")";
+		} else {
+			call = "_." + c.get("name") + "(" + args + ")";
 		}
-		return sb.toString();
+		return (sql ? "sql" : "view") + ":\n  - " + call
+				+ ("CALL".equals(c.get("kind")) && c.get("receiverType") != null ? "   # 이름이 흔한 메소드라 대상 타입으로 좁혔다. 아무 객체면 _." + c.get("name") + "(...)" : "")
+				+ "\n";
 	}
 
-	private String annotationSuggestion(Map<String, Object> a, SemanticRules rules) {
+	private String annotationSuggestion(Map<String, Object> a, ProjectRules rules) {
 		String name = (String) a.get("annotation");
 		if ("TYPE".equals(a.get("targetKind"))) {
-			return "layers:\n  annotations:\n    - { layer: " + guessLayer(name, rules) + ", annotations: [" + name + "] }\n";
+			return "layer:\n  " + guessLayer(name, rules) + ": \"@" + name + "\"\n";
 		}
-		return "endpoints:\n  annotations:\n    - endpointType: HANDLER   # 진입점 종류를 정해 적는다(영문 대문자)\n      annotations: [" + name + "]\n";
+		return "entry:\n  HANDLER: \"@" + name + "\"   # 진입점 종류(HANDLER)를 정해 적는다(영문 대문자)\n";
 	}
 
-	private String superTypeSuggestion(Map<String, Object> s, SemanticRules rules) {
+	private String superTypeSuggestion(Map<String, Object> s, ProjectRules rules) {
 		String superType = (String) s.get("superType");
 		String simple = superType.substring(superType.lastIndexOf('.') + 1);
-		return "layers:\n  superTypes:\n    - { layer: " + guessLayer(simple, rules) + ", types: [" + superType + "] }\n";
+		return "layer:\n  " + guessLayer(simple, rules) + ": extends " + superType + "\n";
 	}
 
-	/** 이름 규칙(layers.names)으로 계층을 짐작합니다. 맞는 것이 없으면 고를 자리를 남깁니다(그대로 쓰면 검사에서 걸린다). */
-	private String guessLayer(String name, SemanticRules rules) {
-		List<RuleSet.LayerNameRule> names = rules.getLayerNames();
-		for (int i = 0; i < names.size(); i++) {
-			try {
-				if (Pattern.compile(names.get(i).pattern).matcher(name).find()) {
-					return names.get(i).layer;
-				}
-			} catch (RuntimeException e) {
-				// PostgreSQL 에만 맞는 정규식이면 짐작하지 않는다.
+	/** 이름 규칙(layer 의 name ...)으로 계층을 짐작합니다. 맞는 것이 없으면 고를 자리를 남깁니다(그대로 쓰면 검사에서 걸린다). */
+	private String guessLayer(String name, ProjectRules rules) {
+		List<Rule.Layer> layers = rules.layers();
+		for (int i = 0; i < layers.size(); i++) {
+			Rule.Layer rule = layers.get(i);
+			if (Rule.Layer.BY_NAME.equals(rule.by) && Pattern.compile(rule.nameRegex).matcher(name).matches()) {
+				return rule.layer;
 			}
 		}
 		return "<계층을 고르세요>";

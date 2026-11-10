@@ -143,7 +143,7 @@
              WHERE a.text ~ '^"[A-Za-z0-9_./-]{1,200}"$'
                AND NOT EXISTS (SELECT 1 FROM covered c WHERE c.ref_kind = a.ref_kind AND c.name = a.name AND c.arg_index = a.arg_index)
         ), stmt AS MATERIALIZED (
-            -- "네임스페이스.id" 와, 프로젝트에 하나뿐인 id(iBATIS 처럼 id 만 넘기는 방식. MyBatisPlugin 도 이때만 잇는다)
+            -- "네임스페이스.id" 와, 프로젝트에 하나뿐인 id(iBATIS 처럼 id 만 넘기는 방식. MapperLinker 도 이때만 잇는다)
             SELECT COALESCE(namespace || '.', '') || statement_id AS name
               FROM analysis_mapper WHERE revision_id = #{revisionId} AND statement_type &lt;&gt; 'SQL_FRAGMENT'
             UNION
@@ -249,7 +249,7 @@
          LIMIT #{limit}
     </select>
 
-    <!-- 화면 규칙이 건너뛴 호출(RichClientPlugin 이 남긴 SEMANTIC_STATUS / SCREEN_RULES 행) 가운데, 다른 자리에 따옴표 글자가 있던 것.
+    <!-- 화면 규칙이 건너뛴 호출(ScreenLinker 가 남긴 SEMANTIC_STATUS / SCREEN_RULES 행) 가운데, 다른 자리에 따옴표 글자가 있던 것.
          규칙마다 글자가 가장 많이 있던 자리 하나(literalAt)와 그 호출 수(literalCalls). 화면이 없거나 그런 호출이 없으면 빈 목록 -->
     <select id="selectScreenRuleCandidates" parameterType="long" resultType="java.util.LinkedHashMap">
         SELECT e->>'kind' AS "kind", e->>'function' AS "function", e->>'template' AS "template"

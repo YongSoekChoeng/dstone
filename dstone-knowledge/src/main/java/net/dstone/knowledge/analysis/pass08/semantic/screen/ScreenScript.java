@@ -58,8 +58,10 @@ public class ScreenScript {
 		private final boolean field;
 		/** 몇 번째 인자가 ID 인지(0부터). 폼 필드 규칙은 늘 0 */
 		private final int argIndex;
-		/** ID 를 틀에 넣기 전에 다듬는 방법(idPattern / idCase / idMap). 없으면 IdTransform.NONE */
+		/** ID 를 틀에 넣기 전에 다듬는 방법(id: match / replace / case / map). 없으면 IdTransform.NONE */
 		private final IdTransform transform;
+		/** 이 규칙이 적힌 자리(규칙 파일:줄). 결과의 ruleAt 에 남긴다. 모르면 null */
+		private final String at;
 
 		public CallRule(String function, String methodTemplate) {
 			this(function, methodTemplate, 0);
@@ -76,7 +78,15 @@ public class ScreenScript {
 		 * @param transform ID 를 틀에 넣기 전에 다듬는 방법. null 이면 그대로 쓴다
 		 */
 		public CallRule(String function, String methodTemplate, int argIndex, IdTransform transform) {
+			this(function, methodTemplate, argIndex, transform, null);
+		}
+
+		/**
+		 * @param at 이 규칙이 적힌 자리(규칙 파일:줄). 모르면 null
+		 */
+		public CallRule(String function, String methodTemplate, int argIndex, IdTransform transform, String at) {
 			this.function = function;
+			this.at = at;
 			this.methodTemplate = methodTemplate;
 			this.argIndex = argIndex;
 			this.transform = transform == null ? IdTransform.NONE : transform;
@@ -94,8 +104,9 @@ public class ScreenScript {
 			this.field = false;
 		}
 
-		private CallRule(String fieldName, String methodTemplate, boolean field, IdTransform transform) {
+		private CallRule(String fieldName, String methodTemplate, boolean field, IdTransform transform, String at) {
 			this.function = fieldName;
+			this.at = at;
 			this.methodTemplate = methodTemplate;
 			this.transform = transform == null ? IdTransform.NONE : transform;
 			// <input name='tranId' value='JIMC1000M03S'/> 처럼 name 바로 뒤(태그 안)에 value 가 오는 모양.
@@ -110,12 +121,22 @@ public class ScreenScript {
 
 		/** 폼 필드 규칙을 만듭니다. 이 이름의 필드에 적힌 값(거래 ID)으로 메소드 이름을 만듭니다. */
 		public static CallRule field(String fieldName, String methodTemplate) {
-			return new CallRule(fieldName, methodTemplate, true, IdTransform.NONE);
+			return new CallRule(fieldName, methodTemplate, true, IdTransform.NONE, null);
 		}
 
 		/** 폼 필드 규칙. ID 를 다듬는 방법이 있을 때 */
 		public static CallRule field(String fieldName, String methodTemplate, IdTransform transform) {
-			return new CallRule(fieldName, methodTemplate, true, transform);
+			return new CallRule(fieldName, methodTemplate, true, transform, null);
+		}
+
+		/** 폼 필드 규칙. 규칙이 적힌 자리(at)를 함께 */
+		public static CallRule field(String fieldName, String methodTemplate, IdTransform transform, String at) {
+			return new CallRule(fieldName, methodTemplate, true, transform, at);
+		}
+
+		/** 이 규칙이 적힌 자리(규칙 파일:줄). 모르면 null */
+		public String getAt() {
+			return at;
 		}
 
 		/** 함수 이름. 폼 필드 규칙이면 필드 이름 */
@@ -142,7 +163,7 @@ public class ScreenScript {
 
 		/**
 		 * 거래 ID로 메소드 이름을 만듭니다. 메소드 이름이 될 수 없는 글자가 섞였거나, ID 를 다듬는 규칙에 맞지 않으면 null.
-		 * 대응표(idMap)가 "클래스.메소드"를 돌려주면 그 모양(OrderController.list) 그대로 돌려줍니다.
+		 * 대응표(id: { map })가 "클래스.메소드"를 돌려주면 그 모양(OrderController.list) 그대로 돌려줍니다.
 		 * 대응표가 없는 규칙에서 점이 든 ID(order.list)는 메소드 이름이 아니다(짐작하지 않는다).
 		 */
 		public String methodNameOf(String id) {

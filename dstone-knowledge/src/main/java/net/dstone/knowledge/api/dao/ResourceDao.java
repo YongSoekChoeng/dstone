@@ -7,7 +7,6 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 import net.dstone.knowledge.common.biz.BaseDao;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
 
 /**
  * <pre>
@@ -70,13 +69,17 @@ public class ResourceDao extends BaseDao {
 
 	/**
 	 * <pre>
-	 * 호출 인자 규칙(target: SQL) 하나에 맞는 호출을 reference_id 순서로 조금씩 꺼냅니다.
+	 * sql: 규칙(자리 · 대상 타입이 같은 것끼리 묶은 것)에 맞는 호출을 reference_id 순서로 조금씩 꺼냅니다.
 	 * </pre>
 	 *
-	 * @return [{referenceId, fromId, name, argText, fileId, lineStart, ownerSymbolId, sourceRoot}] - argText 는 규칙이 보는 자리의 인자 글자
+	 * @param methods       이 이름의 메소드 호출
+	 * @param constructors  이 이름의 생성자 호출
+	 * @param receiverTypes 호출 대상 타입(하위 타입 포함). 비어 있으면 보지 않는다
+	 * @return [{referenceId, fromId, name, refKind, argText, fileId, lineStart, ownerSymbolId, sourceRoot}] - argText 는 규칙이 보는 자리의 인자 글자
 	 */
-	public List<Map<String, Object>> selectMapperCallPage(long revisionId, RuleSet.CallArgumentRule rule, long afterId, int limit) {
-		Map<String, Object> param = SemanticDao.callArgumentParams(revisionId, rule);
+	public List<Map<String, Object>> selectMapperCallPage(long revisionId, List<String> methods, List<String> constructors, int argIndex
+			, List<String> receiverTypes, long afterId, int limit) {
+		Map<String, Object> param = SemanticDao.callArgumentParams(revisionId, methods, constructors, argIndex, receiverTypes);
 		param.put("afterId", afterId);
 		param.put("limit", limit);
 		return sqlSessionCommon.selectList(NS + "selectMapperCallPage", param);

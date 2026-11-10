@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,7 +29,7 @@ import net.dstone.knowledge.common.util.SafeXml;
  *       &lt;/action&gt;
  *   &lt;/package&gt;
  *
- * 여기서는 파일에 적힌 것만 읽습니다. 실제 주소(뒤에 .do가 붙는지 등)와 Java 메소드를 찾는 일은 StrutsPlugin이 합니다.
+ * 여기서는 파일에 적힌 것만 읽습니다. 실제 주소(뒤에 .do가 붙는지 등)와 Java 메소드를 찾는 일은 StrutsEntries가 합니다.
  * </pre>
  */
 public class StrutsConfigReader {

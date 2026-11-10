@@ -21,7 +21,7 @@ import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -38,9 +38,9 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  *                 앞에 컨텍스트 경로가 붙은 주소(/myapp/order/list.do)는 첫 마디를 떼고 한 번 더 맞춰 본다 (LOW)
  *       거래 호출 화면이 주소 대신 거래 ID로 부를 때 (via = CALL_RULE)
  *                 프로젝트 공통 함수가 "ID → 메소드 이름" 규칙으로 서버를 부르는 방식이다.
- *                 규칙은 규칙 파일의 screens.calls 에 적는다(예: conf/rules/hi-japan/frontend.yml).
+ *                 규칙은 규칙 파일의 screen: 에 { call: 함수(ID), to: "perform{ID}" } 로 적는다(예: conf/rules/projects/hi-japan/frontend.yml).
  *                 폼 필드에 거래 ID를 담아 보내는 화면(&lt;input name='tranId' value='JIMC1000M03S'&gt; 를 만들어 submit)은
- *                 규칙 파일의 screens.fields 에 필드 이름과 메소드 이름 틀로 적는다(properties.field).
+ *                 규칙 파일의 screen: 에 { field: 필드이름, to: "perform{ID}" } 로 적는다(properties.field).
  *                 그 이름의 메소드가 하나면 HIGH, 여럿이면 어느 것인지 몰라 모두 LOW로 잇는다.
  *                 화면이 부르는 공통 함수(아래 "공통 함수") 안에 글자로 적힌 거래 호출도 잇는다(via = COMMON_SCRIPT).
  *                 예: comLib.gfnOneResultSearchAgnt(p) → com_lib.js 의 doRequestAjax("JMAT0116M01L") → performJMAT0116M01L.
@@ -50,7 +50,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  *   화면 ─INCLUDES→ 화면     화면이 다른 화면을 끼워 넣거나 띄운다. 찾는 길이 셋이다.
  *       경로      src="/app/ui/a/B.xml" 처럼 따옴표 안에 적힌 화면 파일
  *       화면 열기 화면이 경로 대신 화면 ID로 다른 화면을 열 때 (via = OPEN_RULE)
- *                 규칙은 규칙 파일의 screens.opens 에 함수와 화면 경로 틀로 적는다.
+ *                 규칙은 규칙 파일의 screen: 에 { open: 함수(ID), to: "{ID}.xml" } 로 적는다.
  *                 예: fnOpenPage={id}.xml → parent.scwin.fnOpenPage("JIMC1000G") 는 JIMC1000G.xml 로 끝나는 화면을 연다.
  *                 그 경로로 끝나는 화면이 하나일 때만 잇는다
  *       공통 함수 화면이 공통 스크립트(.js, .xjs)의 함수를 부르고, 그 함수가 다른 화면을 열 때 (via = COMMON_SCRIPT, MEDIUM)
@@ -65,7 +65,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class RichClientPlugin implements SemanticPlugin {
+public class ScreenLinker implements SemanticStep {
 
 	/** 리치클라이언트 화면의 파일 종류(analysis_file.file_type) */
 	private static final List<String> SCREEN_TYPES = Arrays.asList("WEBSQUARE", "NEXACRO");
@@ -97,21 +97,15 @@ public class RichClientPlugin implements SemanticPlugin {
 
 	@Override
 	public String name() {
-		return "richClient";
-	}
-
-	@Override
-	public int order() {
-		// 진입점(Spring, 서블릿, Struts)이 다 만들어진 뒤에 돌아야 한다. JSP 다음이다.
-		return 510;
+		return "screen";
 	}
 
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
-		// 규칙 파일의 screens.calls 다음에 screens.fields(폼 필드에 거래 ID를 담아 보내는 화면. 출력 화면이 이렇게 많이 부른다).
-		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>(context.getSemanticRules().getScreenCalls());
-		List<ScreenScript.CallRule> openRules = new ArrayList<ScreenScript.CallRule>(context.getSemanticRules().getScreenOpens());
+		// 규칙 파일 screen: 의 call 규칙 다음에 field 규칙(폼 필드에 거래 ID를 담아 보내는 화면. 출력 화면이 이렇게 많이 부른다).
+		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>(context.getProjectRules().screenCalls());
+		List<ScreenScript.CallRule> openRules = new ArrayList<ScreenScript.CallRule>(context.getProjectRules().screenOpens());
 
 		Map<String, List<String>> handlers = null;
 		Map<String, CommonFunction> commons = null;
@@ -264,14 +258,14 @@ public class RichClientPlugin implements SemanticPlugin {
 			if (prefix.length() + suffix.length() < 3 || suffix.indexOf("{id}") >= 0) {
 				continue;
 			}
-			endpoints += semanticDao.insertCallRuleEndpoints(revisionId, rule.getFunction(), template, prefix, suffix);
+			endpoints += semanticDao.insertCallRuleEndpoints(revisionId, rule.getFunction(), template, prefix, suffix, rule.getAt());
 		}
 		return endpoints;
 	}
 
 	/**
 	 * <pre>
-	 * 대응표(idMap)가 있는 규칙: 대응표에 적힌 ID 하나하나가 거래 진입점이다. 프레임워크가 그 표를 보고 메소드를 부르기 때문이다.
+	 * 대응표(id: { map })가 있는 규칙: 대응표에 적힌 ID 하나하나가 거래 진입점이다. 프레임워크가 그 표를 보고 메소드를 부르기 때문이다.
 	 * ID 의 메소드가 하나로 정해질 때만 올린다(같은 이름이 여럿이면 어느 것인지 모른다).
 	 * 주소 자리(path)에는 대응표의 ID(다듬은 ID)를 둔다.
 	 * </pre>
@@ -292,6 +286,7 @@ public class RichClientPlugin implements SemanticPlugin {
 		properties.put("function", rule.getFunction());
 		properties.put("rule", rule.getMethodTemplate());
 		properties.put("idMap", rule.getTransform().getMapSource());
+		properties.put("ruleAt", rule.getAt());
 		String json = JsonText.of(properties);
 		int inserted = 0;
 		for (int i = 0; i < ids.size(); i++) {
@@ -450,6 +445,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			properties.put("path", call.getId());
 			properties.put("via", use == null ? "CALL_RULE" : "COMMON_SCRIPT");
 			properties.put(call.getRule().isField() ? "field" : "function", call.getRule().getFunction());
+			properties.put("ruleAt", call.getRule().getAt());
 			if (use != null) {
 				properties.put("commonFunction", use.name);
 				properties.put("script", use.function.scriptPath);
@@ -533,6 +529,7 @@ public class RichClientPlugin implements SemanticPlugin {
 			properties.put("path", open.getId());
 			properties.put("via", "OPEN_RULE");
 			properties.put("function", open.getRule().getFunction());
+			properties.put("ruleAt", open.getRule().getAt());
 			semanticDao.insertRelation(relation(revisionId, fileId, "INCLUDES", "FILE", "F" + target, null, "HIGH", "RESOLVED"
 					, properties, screenScript.lineAt(text, open.getIndex())));
 			counts.screens++;
@@ -726,7 +723,7 @@ public class RichClientPlugin implements SemanticPlugin {
 	 * 화면 안에 적힌 경로가 가리키는 화면 파일을 찾습니다.
 	 * 적힌 경로는 웹 주소라서 앞에 컨텍스트 경로나 서비스 접두어가 붙어 있을 수 있습니다(/hi-japan/ui/jc/A.xml, Base::A.xfdl).
 	 * 그래서 "그 경로로 끝나는 화면"을 찾고, 없으면 앞 마디를 하나 떼고 한 번 더 찾습니다.
-	 * 메뉴 목록의 화면 경로를 찾는 ScreenMenuPlugin 도 같이 씁니다(그때는 JSP 도 화면 종류에 넣는다).
+	 * 메뉴 목록의 화면 경로를 찾는 ScreenMenuReader 도 같이 씁니다(그때는 JSP 도 화면 종류에 넣는다).
 	 * </pre>
 	 *
 	 * @return 화면이 정확히 하나일 때 그 file_id. 없거나 여럿이면 null
@@ -737,7 +734,7 @@ public class RichClientPlugin implements SemanticPlugin {
 
 	static Long findScreen(SemanticDao semanticDao, long revisionId, String written, List<String> screenTypes) {
 		if (written == null) {
-			// 화면 ID 가 열기 규칙의 다듬는 규칙(idPattern / idMap)에 맞지 않았다
+			// 화면 ID 가 열기 규칙의 다듬는 규칙(id: match / map)에 맞지 않았다
 			return null;
 		}
 		String path = written;
@@ -864,7 +861,7 @@ public class RichClientPlugin implements SemanticPlugin {
 	/**
 	 * <pre>
 	 * 화면 규칙이 만든 메소드 이름 → 프로젝트 안의 메소드들.
-	 * 이름은 메소드 이름(list)이거나, 대응표(idMap)가 돌려준 클래스.메소드(OrderController.list, com.x.OrderController.list)다.
+	 * 이름은 메소드 이름(list)이거나, 대응표(id: { map })가 돌려준 클래스.메소드(OrderController.list, com.x.OrderController.list)다.
 	 * 클래스가 붙어 있으면 그 클래스(전체 이름이 같거나 그 이름으로 끝나는 것)의 메소드만 남긴다.
 	 * </pre>
 	 */

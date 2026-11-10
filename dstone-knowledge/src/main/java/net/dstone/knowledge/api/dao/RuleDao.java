@@ -11,7 +11,7 @@ import net.dstone.knowledge.common.biz.BaseDao;
 /**
  * <pre>
  * 의미 분석 규칙(conf/rules) 화면용 Dao입니다.
- *   - 리비전을 분석할 때 쓴 규칙 묶음(analysis_resource 의 RULE_SET 행)
+ *   - 리비전을 분석할 때 쓴 규칙 파일(analysis_resource 의 RULE_SET 행)
  *   - 규칙 시험 적용: SEMANTIC 이 만드는 것을 임시 테이블에 담아 전후를 견준다(트랜잭션을 되돌리면 사라진다)
  *   - 규칙 후보 찾기: 규칙이 아직 모르는 관례의 흔적
  * </pre>

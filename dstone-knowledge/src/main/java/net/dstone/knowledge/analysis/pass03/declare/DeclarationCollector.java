@@ -57,7 +57,7 @@ import net.dstone.knowledge.analysis.pass03.declare.model.FileDeclarations;
 import net.dstone.knowledge.analysis.pass03.declare.model.MethodRow;
 import net.dstone.knowledge.analysis.pass03.declare.model.ReferenceRow;
 import net.dstone.knowledge.analysis.pass03.declare.model.TypeRow;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSetParser;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFileParser;
 
 /**
  * <pre>
@@ -802,7 +802,7 @@ public class DeclarationCollector {
 	 * </pre>
 	 */
 	private String laterArgumentsJson(NodeList<Expression> arguments) {
-		int size = Math.min(arguments.size(), RuleSetParser.MAX_ARG_INDEX + 1);
+		int size = Math.min(arguments.size(), RuleFileParser.MAX_ARG_INDEX + 1);
 		List<String> texts = new ArrayList<String>();
 		boolean any = false;
 		texts.add(null);

@@ -25,13 +25,13 @@ import net.dstone.knowledge.api.dao.JavaSqlDao;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFiles;
 
 /**
  * <pre>
  * 적용 진단. 새 프로젝트를 처음 분석한 뒤 "어디가 안 이어졌는지" 와 "그것을 무엇으로 풀지" 를 한 번에 보여 줍니다.
  * 항목마다 해결 방법(solution)을 붙입니다.
- *   RULE      규칙 파일(conf/rules/{프로젝트ID}/*.yml)로 풀 수 있다. Java 를 고치지 않는다
+ *   RULE      규칙 파일(conf/rules/projects/{프로젝트ID}/*.yml)로 풀 수 있다. Java 를 고치지 않는다
  *   CLASSPATH 라이브러리(jar) 위치를 프로젝트에 적고 다시 분석한다
  *   SETTING   프로젝트 설정(Java 버전, 인코딩 …)을 고친다
  *   SOURCE    분석 대상 소스가 빠졌다(공통 모듈, 매퍼 XML …). 소스를 더한다
@@ -82,7 +82,7 @@ public class DiagnosticService extends BaseObject {
 	private JavaSqlDao javaSqlDao;
 
 	@Autowired
-	private SemanticRuleRegistry ruleRegistry;
+	private RuleFiles ruleFiles;
 
 	/**
 	 * @return {revisionId, projectId, summary: {RULE: n, ...}, checks: [{key, title, level, solution, count, total, message, samples}]}
@@ -243,12 +243,12 @@ public class DiagnosticService extends BaseObject {
 		}
 		checks.add(check("endpoints", "진입점", total > 0 ? "good" : "bad", total > 0 ? "NONE" : "RULE", Integer.valueOf(total), null
 				, total > 0 ? "진입점(주소 · 거래 · 스케줄 …) " + total + "개를 찾았습니다."
-						: "진입점을 하나도 찾지 못했습니다. 주소를 애노테이션으로 적는 프레임워크면 endpoints.http / annotations 규칙, 설정 XML 에 적는 프레임워크면 endpoints.xml 규칙을 더합니다."
+						: "진입점을 하나도 찾지 못했습니다. 주소를 애노테이션으로 적는 프레임워크면 entry 규칙(HTTP: { GET: \"@GetX(value = URL)\" } 이나 \"@X(KEY)\"), 설정 XML 에 적는 프레임워크면 entry 의 { file, xml } 규칙을 더합니다."
 				, byType));
 		if (noMethod > 0) {
 			checks.add(check("endpointsWithoutMethod", "처리 메소드를 모르는 진입점", "warn", "RULE", Integer.valueOf(noMethod), Integer.valueOf(total)
 					, "진입점 " + noMethod + "개는 처리하는 메소드를 정하지 못했습니다. 설정에 적힌 클래스가 프로젝트에 없거나(SOURCE), 메소드를 요청 파라미터로 고르는 방식(Struts DispatchAction 등, DEVELOP)입니다."
-							+ " endpoints.xml 규칙이면 classAttribute / methodAttribute 를 확인합니다."
+							+ " 설정 XML 규칙이면 xml 의 CLASS / METHOD 자리를 확인합니다."
 					, diagnosticDao.selectEndpointsWithoutMethod(revisionId, SAMPLES)));
 		}
 	}
@@ -272,7 +272,7 @@ public class DiagnosticService extends BaseObject {
 				, Integer.valueOf(noRequest), Integer.valueOf(total)
 				, noRequest == 0 ? "모든 화면이 서버의 무엇인가를 부릅니다."
 						: "화면 " + total + "개 가운데 " + noRequest + "개는 서버의 무엇도 부르지 않는 것으로 나왔습니다. 팝업 · 조각 화면이면 정상입니다."
-								+ " 공통 함수에 거래 ID 를 넘겨 서버를 부르는 프로젝트면 screens.calls 규칙(필요하면 idPattern / idCase / idMap)을 더합니다."
+								+ " 공통 함수에 거래 ID 를 넘겨 서버를 부르는 프로젝트면 screen 의 { call: 함수(ID), to: \"perform{ID}\" } 규칙(필요하면 id: match / case / map)을 더합니다."
 								+ " 규칙 후보 API(/rules/candidates)의 screenRules 도 봅니다."
 				, samples));
 	}
@@ -282,14 +282,14 @@ public class DiagnosticService extends BaseObject {
 		if (requests > 0) {
 			checks.add(check("unresolvedRequests", "화면이 부르는데 메소드가 없는 거래", "warn", "RULE", Integer.valueOf(requests), null
 					, "화면 규칙으로 메소드 이름을 만들었는데 그런 메소드가 프로젝트에 없습니다. 거래 ID 와 메소드 이름의 관계가 틀에 그대로 들어맞지 않으면"
-							+ " idPattern / idReplace / idCase 로 다듬거나, 대응표(idMap)를 씁니다. 서버 소스가 다른 저장소에 있으면 SOURCE 입니다."
+							+ " 규칙의 id: { match, replace, case } 로 다듬거나, 대응표(id: { map })를 씁니다. 서버 소스가 다른 저장소에 있으면 SOURCE 입니다."
 					, diagnosticDao.selectUnresolvedTargets(revisionId, "REQUESTS", SAMPLES)));
 		}
 		int sql = diagnosticDao.countUnresolvedTargets(revisionId, "EXECUTES_SQL");
 		if (sql > 0) {
 			checks.add(check("unresolvedSql", "이름은 아는데 없는 SQL", "warn", "SOURCE", Integer.valueOf(sql), null
 					, "코드가 부르는 SQL 이름의 statement 가 매퍼에 없습니다. 매퍼 XML 이 분석 대상 폴더 밖에 있으면 소스를 더하고(SOURCE),"
-							+ " 이름 앞뒤에 프레임워크가 글자를 붙이면 callArguments 규칙의 template 을 고칩니다(RULE)."
+							+ " 이름 앞뒤에 프레임워크가 글자를 붙이면 sql 규칙에 name: '앞{SQL}뒤' 를 적습니다(RULE)."
 					, diagnosticDao.selectUnresolvedTargets(revisionId, "EXECUTES_SQL", SAMPLES)));
 		}
 	}
@@ -328,7 +328,7 @@ public class DiagnosticService extends BaseObject {
 		}
 		checks.add(check("unknownXml", "종류를 모르는 XML", "info", "RULE", Integer.valueOf(count), null
 				, "매퍼 · Spring · web.xml · 화면이 아닌 XML 이 " + count + "개 있습니다. 대부분 문제가 아닙니다."
-						+ " 이 가운데 주소(거래 ID)와 처리 클래스 · 메소드를 적은 자체 프레임워크의 설정 파일이 있으면 endpoints.xml 규칙으로 진입점을 만듭니다."
+						+ " 이 가운데 주소(거래 ID)와 처리 클래스 · 메소드를 적은 자체 프레임워크의 설정 파일이 있으면 entry 의 { file, xml } 규칙으로 진입점을 만듭니다."
 				, diagnosticDao.selectUnknownXml(revisionId, SAMPLES)));
 	}
 
@@ -344,14 +344,14 @@ public class DiagnosticService extends BaseObject {
 		checks.add(check("layers", "계층을 모르는 클래스", noLayer == 0 ? "good" : many ? "warn" : "info", noLayer == 0 ? "NONE" : "RULE"
 				, Integer.valueOf(noLayer), Integer.valueOf(total)
 				, "클래스 " + total + "개 가운데 " + noLayer + "개는 계층(Controller / Service …)을 정하지 못했고, " + low + "개는 이름 끝말로 짐작했습니다(LOW)."
-						+ (noLayer == 0 ? "" : " 자체 프레임워크의 상위 타입이나 애노테이션이 있으면 layers.superTypes / layers.annotations 규칙을 더합니다. 유틸 · VO 처럼 계층이 없는 것이 맞는 클래스도 있습니다.")
+						+ (noLayer == 0 ? "" : " 자체 프레임워크의 상위 타입이나 애노테이션이 있으면 layer 규칙(extends 상위타입, \"@애노테이션\")을 더합니다. 유틸 · VO 처럼 계층이 없는 것이 맞는 클래스도 있습니다.")
 				, diagnosticDao.selectNoLayerPackages(revisionId, SAMPLES)));
 	}
 
 	private void checkRules(List<Map<String, Object>> checks, long revisionId, String projectId) {
 		List<String> applied = diagnosticDao.selectAppliedRuleSetNames(revisionId);
 		boolean projectFolder = false;
-		File[] dirs = ruleRegistry.rulesDir().listFiles();
+		File[] dirs = new File(ruleFiles.rulesDir(), "projects").listFiles();
 		for (int i = 0; dirs != null && i < dirs.length; i++) {
 			if (dirs[i].isDirectory() && dirs[i].getName().equalsIgnoreCase(projectId)) {
 				projectFolder = true;
@@ -364,8 +364,8 @@ public class DiagnosticService extends BaseObject {
 			samples.add(sample);
 		}
 		checks.add(check("rules", "적용한 규칙", "info", "NONE", Integer.valueOf(applied.size()), null
-				, (projectFolder ? "이 프로젝트 전용 규칙 폴더(conf/rules/" + projectId + "/)가 있습니다."
-						: "이 프로젝트 전용 규칙 폴더가 없습니다. 이 프로젝트에만 쓸 관례는 conf/rules/" + projectId + "/ 아래에 적습니다(ruleSets 에 적지 않아도 저절로 쓴다).")
+				, (projectFolder ? "이 프로젝트 전용 규칙 폴더(conf/rules/projects/" + projectId.toLowerCase() + "/)가 있습니다."
+						: "이 프로젝트 전용 규칙 폴더가 없습니다. 이 프로젝트에만 쓸 관례는 conf/rules/projects/" + projectId.toLowerCase() + "/ 아래에 적습니다(ruleSets 에 적지 않아도 저절로 쓴다).")
 						+ " 규칙을 고친 뒤에는 SEMANTIC 부터 다시 분석합니다."
 				, samples));
 	}

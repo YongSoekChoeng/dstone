@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

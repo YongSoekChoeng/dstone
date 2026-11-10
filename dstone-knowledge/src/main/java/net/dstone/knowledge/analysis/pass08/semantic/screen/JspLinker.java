@@ -20,24 +20,21 @@ import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
  * 화면(JSP)을 Java 쪽과 잇습니다.
  *
- * 만드는 관계:
- *   메소드 ─RENDERS→ JSP    컨트롤러의 메소드가 이 화면을 연다 (new ModelAndView("order/list"), setViewName(...))
- *                           어떤 호출의 몇 번째 인자가 화면 이름인지는 규칙 파일의 callArguments(target: VIEW)에 있다(conf/rules/spring.yml)
+ * 만드는 관계(규칙 파일 없이 JSP 글자만 보고 만든다):
  *   JSP ─REQUESTS→ 메소드   이 화면이 이 메소드의 주소를 요청한다 (form action, AJAX url, 링크)
  *                           화면이 &lt;script src&gt; 로 불러오는 프로젝트 안의 .js 에 적힌 주소도 잇는다(via = SCRIPT_SRC, ScriptSources)
  *   JSP ─INCLUDES→ JSP      이 화면이 다른 JSP를 끼워 넣는다 (jsp:include, include 지시자)
  * 이것이 있어야 "이 화면에서 저장을 누르면 어디로 가나", "이 메소드는 어느 화면에서 불리나"를 따라갈 수 있습니다.
  *
  * JSP 안의 Java 코드(스크립틀릿)가 부르는 것은 여기서 하지 않습니다. JSP를 Java로 바꿔서(JspToJava)
- * 일반 Java 파일과 같은 길(DECLARE, RESOLVE)로 이미 풀려 있습니다. 여기서는 그 타입에 화면 계층(VIEW)을 붙이고
- * JSP 진입점에 실행 메소드를 달아 주기만 합니다.
+ * 일반 Java 파일과 같은 길(DECLARE, RESOLVE)로 이미 풀려 있습니다. 여기서는 JSP 진입점에 실행 메소드를 달아 주기만 합니다.
+ * 메소드가 이 화면을 여는 관계(RENDERS, 규칙 파일의 view:)는 ViewLinker 가 만듭니다.
  *
  * "요청하는 주소"를 찾는 방법:
  * JSP에서 주소가 적히는 모양은 제각각입니다(action="...", url: '...', location.href = ..., ${ctx}/..., c:url ...).
@@ -51,11 +48,11 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * - 컨텍스트 경로를 글자로 붙여 쓴 경우(/myapp/order/list.do).
  * - return "order/list" 처럼 메소드가 뷰 이름을 문자열로 돌려주는 방식, Tiles 정의 이름.
  *
- * Struts의 화면 이동(forward / result)은 StrutsPlugin이 같은 RENDERS 관계로 넣습니다.
+ * Struts의 화면 이동(forward / result)은 StrutsEntries 가 RENDERS 관계로 넣습니다.
  * </pre>
  */
 @Component
-public class JspPlugin implements SemanticPlugin {
+public class JspLinker implements SemanticStep {
 
 	/** /로 시작하는 경로처럼 생긴 글자. 예: /order/list.do, /api/auth/me */
 	private static final Pattern PATH = Pattern.compile("/[A-Za-z0-9_\\-]+(?:/[A-Za-z0-9_\\-]+)*(?:\\.[A-Za-z0-9]+)?");
@@ -81,23 +78,13 @@ public class JspPlugin implements SemanticPlugin {
 	}
 
 	@Override
-	public int order() {
-		// 진입점(Spring, 서블릿, JSP)이 다 만들어진 뒤에 돌아야 한다.
-		return 500;
-	}
-
-	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
 		// 화면과 이어진 관계는 SEMANTIC 단계가 시작할 때 이미 지워져 있다(SemanticDao.clear).
 
-		int layered = semanticDao.updateJspLayer(revisionId);
+		// JSP 진입점(EntryFinder 가 만든 것)에 그 JSP 의 실행 메소드를 붙인다. 화면 계층(VIEW)은 LayerResolver 가,
+		// 메소드가 여는 화면(RENDERS, 규칙 파일의 view:)은 ViewLinker 가 먼저 만들어 둔다.
 		semanticDao.updateJspEndpointMethods(revisionId);
-		int renders = 0;
-		List<RuleSet.CallArgumentRule> viewRules = context.getSemanticRules().getViewArguments();
-		for (int i = 0; i < viewRules.size(); i++) {
-			renders += semanticDao.insertViewArgumentRelations(revisionId, viewRules.get(i));
-		}
 
 		// 주소 → 그 주소를 처리하는 메소드들. 진입점 수만큼만 메모리에 올라간다.
 		Map<String, List<String>> handlers = new HashMap<String, List<String>>();
@@ -143,7 +130,7 @@ public class JspPlugin implements SemanticPlugin {
 				includes += linkIncludes(revisionId, fileId, (String) file.get("path"), text);
 			}
 		}
-		return "JSP " + files + "개. 화면 계층 " + layered + ", 메소드가 여는 화면 " + renders + ", 화면이 요청하는 주소 " + requests + "(불러온 스크립트에 적힌 것 " + byScript + "), 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
+		return "JSP " + files + "개. 화면이 요청하는 주소 " + requests + "(불러온 스크립트에 적힌 것 " + byScript + "), 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
 	}
 
 	/** 화면명(<title>, titletext)을 찾아 남깁니다. 남겼으면 1 */

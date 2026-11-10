@@ -25,7 +25,7 @@ import net.dstone.knowledge.common.util.SafeXml;
  * 다른 곳의 조각을 가져오는 부분(include)이 섞여 있기 때문입니다. 여기서는 그것을 "글 한 줄"로 펴 둡니다.
  *   - 조건 태그는 벗기고 안의 글을 모두 남긴다. 실제로는 그중 일부만 실행되지만, 어떤 테이블을 건드리는지 보는 데는 전부 있는 편이 낫다.
  *   - where / set 태그는 WHERE / SET 글자로 바꾼다. trim, foreach, dynamic의 prefix / open / prepend도 글자로 붙인다.
- *   - include는 "@@include(이름)@@" 표시로 남긴다. 다른 파일의 조각일 수 있어서, 모든 매퍼를 읽은 뒤에 채운다(MyBatisPlugin).
+ *   - include는 "@@include(이름)@@" 표시로 남긴다. 다른 파일의 조각일 수 있어서, 모든 매퍼를 읽은 뒤에 채운다(MapperLinker).
  *   - selectKey(키를 미리 뽑는 딸린 SQL)는 뺀다.
  * </pre>
  */

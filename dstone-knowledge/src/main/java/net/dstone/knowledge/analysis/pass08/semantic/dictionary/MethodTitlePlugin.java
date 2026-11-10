@@ -16,7 +16,7 @@ import net.dstone.knowledge.common.util.HashText;
 import net.dstone.knowledge.common.util.MethodTitle;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -33,7 +33,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class MethodTitlePlugin implements SemanticPlugin {
+public class MethodTitlePlugin implements SemanticStep {
 
 	private static final int PAGE_SIZE = 200;
 
@@ -46,12 +46,6 @@ public class MethodTitlePlugin implements SemanticPlugin {
 	@Override
 	public String name() {
 		return "methodTitle";
-	}
-
-	@Override
-	public int order() {
-		// 다른 플러그인의 결과를 쓰지 않는다. 사전 플러그인들과 같이 뒤쪽에 둔다.
-		return 960;
 	}
 
 	@Override

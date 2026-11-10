@@ -15,7 +15,7 @@ import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.SqlTableExtractor;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -27,8 +27,8 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  *         - 메소드 안의 SQL                → 그 메소드가 실행한다(via JAVA_STRING)
  *         - SQL 을 담은 상수(final 필드)    → 그 상수를 그대로 넘긴 같은 클래스의 메소드(DECLARE 가 적어 둠, JAVA_STRING)와
  *                                          다른 클래스에서 OrderSql.LIST 처럼 읽은 메소드(필드 접근, JAVA_CONSTANT, MEDIUM)
- *         - createQuery 처럼 규칙(jpa.jpqlCalls)의 메소드에 넘긴 글은 JPQL 로 읽는다
- *   JPA   JpaPlugin 이 만든 @Query · @NamedQuery · 메소드 이름 쿼리
+ *         - createQuery 처럼 규칙(jpa.jpql)의 메소드에 넘긴 글은 JPQL 로 읽는다
+ *   JPA   JpaQueryReader 가 만든 @Query · @NamedQuery · 메소드 이름 쿼리
  *
  * 테이블:
  *   SQL      SqlTableExtractor(SQL 매퍼와 같다). 모르는 부분(?)이 테이블 자리에 있으면 그 테이블은 찾지 못한다.
@@ -36,11 +36,11 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  *            테이블 이름을 @Table 로 적었으면 HIGH, 관례(naming)로 지었으면 MEDIUM · HEURISTIC 이다.
  *   DERIVED  저장소의 엔티티 테이블을 읽는다(delete… 는 지운다).
  *
- * MyBatisPlugin(400)이 SQL 관계를 지우고 다시 만든 뒤에 돌아야 하므로 order 가 410 입니다.
+ * MapperLinker 가 SQL 관계를 지우고 다시 만들고 SqlLinker 가 호출을 이은 뒤에 돕니다(SemanticPass 의 순서 목록).
  * </pre>
  */
 @Component
-public class JavaSqlPlugin implements SemanticPlugin {
+public class JavaSqlLinker implements SemanticStep {
 
 	private static final int PAGE_SIZE = 500;
 
@@ -60,15 +60,10 @@ public class JavaSqlPlugin implements SemanticPlugin {
 	}
 
 	@Override
-	public int order() {
-		return 410;
-	}
-
-	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
-		JpaEntities entities = JpaEntities.load(revisionId, context.getSemanticRules(), javaSqlDao);
-		Set<String> jpqlCalls = new LinkedHashSet<String>(context.getSemanticRules().getJpqlCalls());
+		JpaEntities entities = JpaEntities.load(revisionId, context.getProjectRules(), javaSqlDao);
+		Set<String> jpqlCalls = new LinkedHashSet<String>(context.getProjectRules().jpqlMethods());
 
 		int statements = 0, executes = 0, tables = 0, noTable = 0;
 		Set<String> unknownEntities = new LinkedHashSet<String>();

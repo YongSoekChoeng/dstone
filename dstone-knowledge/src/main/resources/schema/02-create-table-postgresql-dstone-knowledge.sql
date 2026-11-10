@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS analysis_project (
 -- 테이블을 이미 만든 DB 에도 컬럼이 생기도록 ALTER 로 추가한다.
 ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS classpath TEXT;
 
--- 이 프로젝트에 더 쓸 의미 분석 규칙 묶음(conf/rules/*.yml 의 이름, 쉼표로 이어 적는다).
--- autoApply: true 인 묶음은 적지 않아도 모든 프로젝트에 쓰고, autoApply: false 인 묶음은 여기에 적었을 때만 쓴다. NULL 이면 autoApply 묶음만.
+-- 빌려 쓸 다른 프로젝트의 의미 분석 규칙(conf/rules/projects 아래 폴더 이름 hi-japan 이나 파일 hi-japan/backend, 쉼표로 이어 적는다).
+-- common/ 과 guess/ 의 규칙, 그리고 이 프로젝트 폴더(conf/rules/projects/{프로젝트ID})의 규칙은 적지 않아도 쓴다.
 ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS rule_sets TEXT;
 
 -- 리비전: 한 프로젝트의 어느 시점(커밋 등)
@@ -560,7 +560,7 @@ COMMENT ON COLUMN analysis_project.description       IS '설명';
 COMMENT ON COLUMN analysis_project.created_at        IS '등록 시각';
 COMMENT ON COLUMN analysis_project.updated_at        IS '마지막 수정 시각';
 COMMENT ON COLUMN analysis_project.classpath         IS '호출 해석에 쓸 라이브러리 jar 또는 jar 폴더 목록 (쉼표/줄바꿈/경로 구분자). 프로젝트 폴더 안의 jar 는 자동으로 찾는다';
-COMMENT ON COLUMN analysis_project.rule_sets         IS '더 쓸 의미 분석 규칙 묶음 이름 (conf/rules/*.yml, 쉼표 구분). NULL 이면 autoApply 묶음만';
+COMMENT ON COLUMN analysis_project.rule_sets         IS '빌려 쓸 다른 프로젝트의 의미 분석 규칙 (conf/rules/projects 아래 폴더 또는 폴더/파일 이름, 쉼표 구분)';
 
 COMMENT ON TABLE  analysis_revision                  IS '리비전: 한 프로젝트의 어느 시점 소스 전체를 분석한 결과 한 벌';
 COMMENT ON COLUMN analysis_revision.revision_id      IS '리비전 ID (일련번호)';

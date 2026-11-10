@@ -11,15 +11,15 @@ import java.util.regex.Pattern;
 
 /**
  * <pre>
- * 화면 규칙(screens.calls / fields / opens)이 화면에서 찾은 ID 를 틀({id})에 넣기 전에 다듬는 방법입니다.
+ * 화면 규칙(screen: 의 call / field / open)이 화면에서 찾은 ID 를 틀({ID})에 넣기 전에 다듬는 방법입니다(규칙의 id: 키).
  * ID 가 메소드 이름이나 화면 파일 이름과 글자 그대로 같지 않은 프로젝트를 위한 것입니다.
  *
  * 순서:
- *   1) idPattern / idReplace  ID 전체가 정규식에 맞아야 하고, 맞으면 바꿀 글자($1, $2 …)로 바꾼다.
+ *   1) match / replace  ID 전체가 정규식에 맞아야 하고, 맞으면 바꿀 글자($1, $2 …)로 바꾼다.
  *                              맞지 않는 ID 는 이 규칙의 것이 아니라고 보고 잇지 않는다(짐작하지 않는다).
- *                              예: 'ORD_LIST01' → idPattern '^([A-Z]+)_([A-Z]+)\d+$', idReplace '$1$2'
- *   2) idCase                 UPPER / LOWER / UPPER_FIRST / LOWER_FIRST
- *   3) idMap                  대응표(ID → 값)에서 찾아 그 값으로 바꾼다. 표에 없는 ID 는 잇지 않는다.
+ *                              예: 'ORD_LIST01' → match '^([A-Z]+)_([A-Z]+)\d+$', replace '$1$2'
+ *   2) case                 UPPER / LOWER / UPPER_FIRST / LOWER_FIRST
+ *   3) map                  대응표(ID → 값)에서 찾아 그 값으로 바꾼다. 표에 없는 ID 는 잇지 않는다.
  *                              값은 메소드 이름(list), 클래스.메소드(OrderController.list), 화면 경로 무엇이든 된다.
  *
  * 아무것도 적지 않으면 ID 를 그대로 쓴다(NONE).

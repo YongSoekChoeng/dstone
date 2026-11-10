@@ -1,30 +1,19 @@
 package net.dstone.knowledge.analysis.pass08.semantic.sql;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import net.dstone.knowledge.api.dao.ResourceDao;
-import net.dstone.knowledge.api.dao.SymbolDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.pass04.resource.MapperXmlReader;
-import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
-import net.dstone.knowledge.analysis.common.BoundedCache;
 import net.dstone.knowledge.analysis.common.SqlTableExtractor;
-import net.dstone.knowledge.analysis.pass08.semantic.ConstantEvaluator;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -39,18 +28,15 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * 메소드와 SQL을 잇는 방법은 두 가지입니다.
  *   1) 인터페이스 방식: 매퍼의 namespace가 인터페이스의 전체 이름이고 statement id가 메소드 이름이다. 이름이 같으면 짝이다.
  *   2) 문자열 방식: sqlSession.selectList("네임스페이스.id", ...) 처럼 이름을 문자열로 넘긴다.
- *      어떤 메소드(생성자)의 몇 번째 인자가 SQL 이름인지는 규칙 파일의 callArguments(target: SQL)에 있다.
- *      기본은 MyBatis 의 SqlSession, iBATIS 의 SqlMapClient(conf/rules/mybatis.yml)이고, 자체 프레임워크는 규칙을 더한다.
- *      예: JEF 계열의 new QueryProperty("파일이름.id") → executeVOQuery(qp, ...) (conf/rules/hi-japan/backend.yml)
- *      문자열이 상수와 메소드를 거쳐 조립되는 경우가 많아서, 상수를 따라가 계산한다(ConstantEvaluator).
- *      규칙의 template 이 있으면 계산한 값에 앞뒤 글자를 붙인다(예: "Order.{value}").
- *      계산한 이름의 statement가 없으면 "못 찾음"으로 남긴다(지우지 않는다).
+ *      어떤 호출의 몇 번째 인자가 SQL 이름인지는 규칙 파일의 sql: 절에 있어서, 그 일은 SqlLinker 가 한다.
+ *
+ * 이 처리기는 규칙이 필요 없는 1) 과 테이블 관계만 만듭니다.
  *
  * 테이블은 statement의 SQL에서 뽑습니다(SqlTableExtractor). include로 가져오는 조각은 여기서 채워 넣습니다.
  * </pre>
  */
 @Component
-public class MyBatisPlugin implements SemanticPlugin {
+public class MapperLinker implements SemanticStep {
 
 	private static final int PAGE_SIZE = 500;
 
@@ -60,39 +46,11 @@ public class MyBatisPlugin implements SemanticPlugin {
 	@Autowired
 	private ResourceDao resourceDao;
 
-	@Autowired
-	private SymbolDao symbolDao;
-
-	@Autowired
-	private EncodingDetector encodingDetector;
-
 	private final SqlTableExtractor tableExtractor = new SqlTableExtractor();
 
 	@Override
 	public String name() {
-		return "mybatis";
-	}
-
-	@Override
-	public int order() {
-		return 400;
-	}
-
-	/** 한 번 도는 동안 들고 다니는 것 */
-	private static class Index {
-		/** "네임스페이스.id" → 관계에서 쓰는 ID("S" + mapper_id). 조각(sql)은 들어 있지 않다. */
-		Map<String, String> statements = new HashMap<String, String>();
-		/** 같은 "네임스페이스.id"가 여러 파일에 있을 때만: 이름 → 그 statement들. 하나뿐인 이름은 들어 있지 않다. */
-		Map<String, List<String>> sameName = new HashMap<String, List<String>>();
-		/** statement → 그것이 있는 파일의 경로. 같은 이름 가운데 하나를 고를 때 본다. */
-		Map<String, String> pathOf = new HashMap<String, String>();
-		/** id만으로 찾을 때: id → 그 id를 가진 statement들 */
-		Map<String, List<String>> statementsById = new HashMap<String, List<String>>();
-		/** 조각: "네임스페이스.id" → mapper_id */
-		Map<String, Long> fragments = new HashMap<String, Long>();
-		Map<String, List<Long>> fragmentsById = new HashMap<String, List<Long>>();
-		/** 조각의 본문. 여러 statement가 같은 조각을 가져오므로 기억해 둔다. */
-		BoundedCache<Long, String> fragmentBodies = new BoundedCache<Long, String>(2000);
+		return "mapper";
 	}
 
 	@Override
@@ -100,156 +58,15 @@ public class MyBatisPlugin implements SemanticPlugin {
 		long revisionId = context.getRevisionId();
 		resourceDao.clearSqlRelations(revisionId);
 
-		Index index = new Index();
-		List<Map<String, Object>> keys = resourceDao.selectMapperKeys(revisionId);
-		if (keys.isEmpty()) {
+		StatementIndex index = StatementIndex.load(resourceDao, revisionId);
+		if (index.isEmpty()) {
 			return "SQL 매퍼가 없습니다.";
 		}
-		for (int i = 0; i < keys.size(); i++) {
-			Map<String, Object> key = keys.get(i);
-			Long mapperId = Long.valueOf(((Number) key.get("mapperId")).longValue());
-			String id = (String) key.get("statementId");
-			String full = key.get("namespace") == null ? id : key.get("namespace") + "." + id;
-			if ("SQL_FRAGMENT".equals(key.get("statementType"))) {
-				index.fragments.put(full, mapperId);
-				add(index.fragmentsById, id, mapperId);
-			} else {
-				String previous = index.statements.put(full, "S" + mapperId);
-				if (previous != null) {
-					// 같은 이름이 또 나왔다(같은 파일이 WEB-INF/src 와 WEB-INF/classes 에 둘 다 있는 경우 등). 고를 수 있게 둘 다 적어 둔다.
-					if (!index.sameName.containsKey(full)) {
-						add(index.sameName, full, previous);
-					}
-					add(index.sameName, full, "S" + mapperId);
-				}
-				index.pathOf.put("S" + mapperId, (String) key.get("path"));
-				add(index.statementsById, id, "S" + mapperId);
-			}
-		}
-
 		int byInterface = resourceDao.insertInterfaceMapperRelations(revisionId);
-		int[] calls = linkCalls(context, index);
 		int[] tables = extractTables(context, index);
-		resourceDao.updateMapperMethods(revisionId);
 
-		return "statement " + index.statements.size() + ", 조각 " + index.fragments.size() + ". 메소드와 이음: 인터페이스 방식 " + byInterface
-				+ ", 문자열 방식 " + calls[0] + "(이름은 알았지만 statement를 못 찾음 " + calls[1] + ", 이름을 계산하지 못함 " + calls[2] + ")"
+		return "statement " + index.statements.size() + ", 조각 " + index.fragments.size() + ". 인터페이스 방식으로 이은 메소드 " + byInterface
 				+ ". 테이블 관계 " + tables[0] + "(파서 " + tables[1] + ", 정규식 " + tables[2] + ").";
-	}
-
-	/**
-	 * <pre>
-	 * 문자열로 statement를 부르는 호출을 잇습니다.
-	 * </pre>
-	 *
-	 * @return [이은 수, 이름은 알았지만 statement를 못 찾은 수, 이름을 계산하지 못한 수]
-	 */
-	private int[] linkCalls(AnalysisJobContext context, Index index) throws Exception {
-		long revisionId = context.getRevisionId();
-		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
-		ConstantEvaluator evaluator = new ConstantEvaluator(revisionId, root, resourceDao, symbolDao, encodingDetector);
-
-		int[] counts = new int[3];
-		// 규칙 여럿이 같은 호출에 맞아도 한 번만 잇는다.
-		Set<Long> done = new HashSet<Long>();
-		List<RuleSet.CallArgumentRule> rules = context.getSemanticRules().getSqlArguments();
-		for (int r = 0; r < rules.size(); r++) {
-			linkCalls(context, index, evaluator, rules.get(r), done, counts);
-		}
-		return counts;
-	}
-
-	/** 규칙 하나에 맞는 호출을 잇습니다. counts 는 [이은 수, 이름은 알았지만 statement를 못 찾은 수, 이름을 계산하지 못한 수] */
-	private void linkCalls(AnalysisJobContext context, Index index, ConstantEvaluator evaluator, RuleSet.CallArgumentRule rule
-			, Set<Long> done, int[] counts) throws Exception {
-		long revisionId = context.getRevisionId();
-		Pattern exclude = rule.exclude == null ? null : Pattern.compile(rule.exclude);
-		long afterId = 0;
-		while (true) {
-			context.checkCancelled();
-			List<Map<String, Object>> page = resourceDao.selectMapperCallPage(revisionId, rule, afterId, PAGE_SIZE);
-			if (page.isEmpty()) {
-				break;
-			}
-			for (int i = 0; i < page.size(); i++) {
-				Map<String, Object> call = page.get(i);
-				afterId = ((Number) call.get("referenceId")).longValue();
-				if (!done.add(Long.valueOf(afterId))) {
-					continue;
-				}
-				String value = evaluator.evaluate((String) call.get("argText"), (String) call.get("ownerSymbolId"));
-				String name = value == null ? null : rule.prefix + value + rule.suffix;
-				if (name == null || !looksLikeStatementName(name) || (exclude != null && exclude.matcher(value).find())) {
-					// 상수를 끝까지 따라가지 못했거나, 이름이 같을 뿐 SQL 호출이 아니다(list.insert(...), map.update(...) 등).
-					counts[2]++;
-					continue;
-				}
-				String statement = statementOf(name, (String) call.get("sourceRoot"), index);
-				if (statement == null && name.indexOf('.') < 0) {
-					// 네임스페이스 없이 id만 넘기는 방식(iBATIS의 기본). 그 id가 하나뿐일 때만 잇는다.
-					List<String> sameId = index.statementsById.get(name);
-					statement = sameId != null && sameId.size() == 1 ? sameId.get(0) : null;
-				}
-				Map<String, Object> properties = new LinkedHashMap<String, Object>();
-				properties.put("via", "STATEMENT_NAME");
-				properties.put("statement", name);
-				if (statement != null) {
-					resourceDao.insertRelation(relation(revisionId, "METHOD", (String) call.get("fromId"), "EXECUTES_SQL", "SQL", statement, null
-							, "HIGH", "RESOLVED", properties, call.get("fileId"), call.get("lineStart")));
-					counts[0]++;
-				} else if (name.indexOf('.') > 0) {
-					// 이름은 SQL의 이름처럼 생겼는데 그런 statement가 없다. 매퍼 파일이 분석 대상에 없거나 이름이 틀렸다. 사실 그대로 남긴다.
-					resourceDao.insertRelation(relation(revisionId, "METHOD", (String) call.get("fromId"), "EXECUTES_SQL", "SQL", null, name
-							, "UNRESOLVED", "UNRESOLVED", properties, call.get("fileId"), call.get("lineStart")));
-					counts[1]++;
-				} else {
-					counts[2]++;
-				}
-			}
-		}
-	}
-
-	/**
-	 * <pre>
-	 * 이름으로 statement를 찾습니다.
-	 * 같은 이름이 여러 파일에 있으면, 부르는 Java 파일과 같은 소스 루트에 있는 것을 고릅니다.
-	 * 펼친 WAR에는 같은 SQL 파일이 WEB-INF/src(소스)와 WEB-INF/classes(예전에 빌드된 것)에 둘 다 있고 내용이 다르기도 합니다.
-	 * 분석하는 Java가 src의 것이므로, 짝이 맞는 것은 src의 SQL입니다.
-	 * 소스 루트로 하나를 고를 수 없으면 뒤에 읽은 것으로 합니다.
-	 * </pre>
-	 */
-	private String statementOf(String name, String callerSourceRoot, Index index) {
-		String statement = index.statements.get(name);
-		List<String> candidates = index.sameName.get(name);
-		if (candidates == null || callerSourceRoot == null || callerSourceRoot.length() == 0) {
-			return statement;
-		}
-		String found = null;
-		for (int i = 0; i < candidates.size(); i++) {
-			String path = index.pathOf.get(candidates.get(i));
-			if (path != null && path.startsWith(callerSourceRoot + "/")) {
-				if (found != null) {
-					// 같은 소스 루트 안에도 둘이다. 고를 근거가 없다.
-					return statement;
-				}
-				found = candidates.get(i);
-			}
-		}
-		return found == null ? statement : found;
-	}
-
-	/** SQL의 이름은 영문자/숫자/밑줄/점/하이픈으로만 되어 있다. 공백이나 다른 글자가 있으면 다른 용도의 문자열이다. */
-	private boolean looksLikeStatementName(String name) {
-		if (name.length() == 0 || name.length() > 300) {
-			return false;
-		}
-		for (int i = 0; i < name.length(); i++) {
-			char c = name.charAt(i);
-			if (!Character.isLetterOrDigit(c) && c != '_' && c != '.' && c != '-') {
-				return false;
-			}
-		}
-		return true;
 	}
 
 	/**
@@ -259,7 +76,7 @@ public class MyBatisPlugin implements SemanticPlugin {
 	 *
 	 * @return [테이블 관계 수, 파서로 읽은 statement 수, 정규식으로 읽은 statement 수]
 	 */
-	private int[] extractTables(AnalysisJobContext context, Index index) {
+	private int[] extractTables(AnalysisJobContext context, StatementIndex index) {
 		long revisionId = context.getRevisionId();
 		int relations = 0, parsed = 0, guessed = 0;
 		long afterId = 0;
@@ -311,7 +128,7 @@ public class MyBatisPlugin implements SemanticPlugin {
 	}
 
 	/** SQL 안의 include 표시를 그 조각의 본문으로 바꿉니다. 조각 안의 include도 이어서 채웁니다. */
-	private String expandIncludes(String sql, String namespace, Index index, int depth) {
+	private String expandIncludes(String sql, String namespace, StatementIndex index, int depth) {
 		if (sql == null || sql.indexOf(MapperXmlReader.INCLUDE_OPEN) < 0 || depth > MAX_INCLUDE_DEPTH) {
 			return sql;
 		}
@@ -346,7 +163,7 @@ public class MyBatisPlugin implements SemanticPlugin {
 	}
 
 	/** include의 refid가 가리키는 조각을 찾습니다: 적힌 그대로 → 같은 네임스페이스 → id가 하나뿐인 것 */
-	private Long fragmentOf(String refid, String namespace, Index index) {
+	private Long fragmentOf(String refid, String namespace, StatementIndex index) {
 		Long found = index.fragments.get(refid);
 		if (found == null && namespace != null) {
 			found = index.fragments.get(namespace + "." + refid);
@@ -374,15 +191,6 @@ public class MyBatisPlugin implements SemanticPlugin {
 		relation.put("fileId", fileId == null ? null : Long.valueOf(((Number) fileId).longValue()));
 		relation.put("lineStart", lineStart == null ? null : Integer.valueOf(((Number) lineStart).intValue()));
 		return relation;
-	}
-
-	private <T> void add(Map<String, List<T>> map, String key, T value) {
-		List<T> list = map.get(key);
-		if (list == null) {
-			list = new ArrayList<T>();
-			map.put(key, list);
-		}
-		list.add(value);
 	}
 
 }

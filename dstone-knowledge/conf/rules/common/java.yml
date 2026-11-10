@@ -1,0 +1,12 @@
+# 순수 Java 의 관례. 프레임워크와 상관없이 모든 프로젝트에 해당한다.
+# (public static void main 은 언어 규칙이라 코드에 있다)
+description: 다른 스레드에서 도는 메소드(Runnable, Thread, TimerTask, Callable)
+
+entry:
+  # 이 타입을 바로 구현(상속)한 클래스의 메소드는 다른 스레드에서 불린다.
+  # 호출 그래프만 보면 run() 을 부르는 곳이 없어 죽은 코드처럼 보이므로 입구로 알아 둔다.
+  THREAD:
+    - java.lang.Runnable#run()
+    - java.lang.Thread#run()
+    - java.util.TimerTask#run()
+    - java.util.concurrent.Callable#call()

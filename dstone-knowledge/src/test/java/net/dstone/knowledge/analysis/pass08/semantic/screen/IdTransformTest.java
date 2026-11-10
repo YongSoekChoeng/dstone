@@ -50,9 +50,9 @@ public class IdTransformTest {
 		assertEquals("pop/ord01.xfdl", open.fill("ORD01"));
 		assertTrue(ScreenScript.isMethodName("com.x.OrderController.list"));
 		assertTrue(!ScreenScript.isMethodName("order/list"));
-		assertEquals("Order", RichClientPlugin.MethodIndex.ownerPart("Order.list"));
-		assertEquals("list", RichClientPlugin.MethodIndex.methodPart("Order.list"));
-		assertNull(RichClientPlugin.MethodIndex.ownerPart("list"));
+		assertEquals("Order", ScreenLinker.MethodIndex.ownerPart("Order.list"));
+		assertEquals("list", ScreenLinker.MethodIndex.methodPart("Order.list"));
+		assertNull(ScreenLinker.MethodIndex.ownerPart("list"));
 	}
 
 }

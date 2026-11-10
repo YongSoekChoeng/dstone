@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +22,7 @@ import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.job.AnalysisJobReporter;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -50,7 +50,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class StrutsPlugin implements SemanticPlugin {
+public class StrutsEntries implements SemanticStep {
 
 	private static final String PASS = "SEMANTIC";
 
@@ -71,12 +71,6 @@ public class StrutsPlugin implements SemanticPlugin {
 	@Override
 	public String name() {
 		return "struts";
-	}
-
-	@Override
-	public int order() {
-		// web.xml의 서블릿 매핑을 읽어 둔 ServletPlugin(200) 뒤, 화면이 요청하는 주소를 진입점과 맞춰 보는 JspPlugin(500) 앞.
-		return 250;
 	}
 
 	@Override
@@ -143,7 +137,7 @@ public class StrutsPlugin implements SemanticPlugin {
 		Map<String, Object> location = action.className == null ? null : symbolDao.selectTypeLocation(revisionId, action.className);
 		if (location != null) {
 			symbolId = (String) location.get("symbolId");
-			layered = semanticDao.updateLayerBySymbol(revisionId, symbolId, "CONTROLLER");
+			layered = semanticDao.updateLayerBySymbol(revisionId, symbolId, "CONTROLLER", "struts-config");
 			List<String> names = config.struts2
 					? Arrays.asList(action.method == null ? "execute" : action.method)
 					: Arrays.asList("execute", "perform");

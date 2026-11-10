@@ -2,7 +2,7 @@ package net.dstone.knowledge.analysis.job;
 
 import java.util.Map;
 
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.ProjectRules;
 
 /**
  * <pre>
@@ -23,7 +23,7 @@ public class AnalysisJobContext {
 	private volatile boolean cancelRequested = false;
 
 	/** SEMANTIC 단계가 시작할 때 읽은 의미 분석 규칙(conf/rules). 그 전에는 null */
-	private SemanticRules semanticRules;
+	private ProjectRules projectRules;
 
 	public AnalysisJobContext(String analysisId, String projectId, long revisionId, Map<String, Object> project) {
 		this.analysisId = analysisId;
@@ -54,16 +54,16 @@ public class AnalysisJobContext {
 		return text.length() == 0 ? null : text;
 	}
 
-	/** SEMANTIC 단계의 플러그인이 쓰는 규칙. SemanticPass 가 시작할 때 채웁니다 */
-	public SemanticRules getSemanticRules() {
-		if (semanticRules == null) {
-			throw new IllegalStateException("의미 분석 규칙이 아직 없습니다. SemanticPass 를 거쳐 플러그인을 불러야 합니다.");
+	/** SEMANTIC 단계의 처리기가 쓰는 이 프로젝트의 규칙(conf/rules). SemanticPass 가 시작할 때 채웁니다 */
+	public ProjectRules getProjectRules() {
+		if (projectRules == null) {
+			throw new IllegalStateException("의미 분석 규칙이 아직 없습니다. SemanticPass 를 거쳐 처리기를 불러야 합니다.");
 		}
-		return semanticRules;
+		return projectRules;
 	}
 
-	public void setSemanticRules(SemanticRules semanticRules) {
-		this.semanticRules = semanticRules;
+	public void setProjectRules(ProjectRules projectRules) {
+		this.projectRules = projectRules;
 	}
 
 	public void requestCancel() {

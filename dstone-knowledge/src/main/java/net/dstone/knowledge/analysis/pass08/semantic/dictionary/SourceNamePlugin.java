@@ -17,7 +17,7 @@ import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.common.util.KoreanName;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -30,7 +30,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  *        필드(@Column(name) 이 있으면 그 이름)의 설명 → SOURCE_NAME (name = 컬럼, properties.table = TB_ORDER, via = ENTITY)
  *   2. 이름이 컬럼과 같은 필드(VO 등): mb_nm / mbNm → MB_NM. 어느 테이블의 것인지는 모른다.
  *        → SOURCE_NAME (name = 컬럼, properties.table = null, via = NAME)
- *      "이 리비전의 어떤 컬럼" 은 SQL 에서 쓰인 컬럼과 DDL 에 있는 컬럼입니다. 그래서 MyBatisPlugin(400) 뒤에 돕니다.
+ *      "이 리비전의 어떤 컬럼" 은 SQL 에서 쓰인 컬럼과 DDL 에 있는 컬럼입니다. 그래서 MapperLinker 뒤에 돕니다.
  *
  * 설명은 이 순서로 찾습니다.
  *   애노테이션: @ApiModelProperty("회사명"), @Schema(description = "회사명"), @Comment("회사명") (클래스는 @ApiModel / @Schema / @Comment)
@@ -43,7 +43,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class SourceNamePlugin extends BaseObject implements SemanticPlugin {
+public class SourceNamePlugin extends BaseObject implements SemanticStep {
 
 	/** 들고 있을 파일 수. 행이 파일 순서로 오므로 몇 개면 충분하다 */
 	private static final int MAX_CACHED_FILES = 16;
@@ -60,12 +60,6 @@ public class SourceNamePlugin extends BaseObject implements SemanticPlugin {
 	@Override
 	public String name() {
 		return "SOURCE_NAME";
-	}
-
-	@Override
-	public int order() {
-		// SQL 에서 쓰인 컬럼(MyBatisPlugin 400)이 있어야 이름을 맞춰 볼 수 있다.
-		return 950;
 	}
 
 	@Override

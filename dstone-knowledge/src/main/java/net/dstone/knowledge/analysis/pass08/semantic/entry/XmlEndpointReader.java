@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,12 +11,12 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import net.dstone.knowledge.common.util.SafeXml;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.Rule;
 
 /**
  * <pre>
- * 설정 XML 한 파일에서 규칙(endpoints.xml)이 말하는 요소를 찾아 "주소 · 클래스 · 메소드"를 꺼냅니다.
- * DB 도 Spring 도 쓰지 않는 순수한 클래스라 단위 테스트로 확인합니다. DB 에 넣는 일은 XmlEndpointPlugin 이 합니다.
+ * 설정 XML 한 파일에서 규칙(entry 의 { file, xml })이 말하는 요소를 찾아 "주소 · 클래스 · 메소드"를 꺼냅니다.
+ * DB 도 Spring 도 쓰지 않는 순수한 클래스라 단위 테스트로 확인합니다. DB 에 넣는 일은 EntryFinder 가 합니다.
  *
  * - 요소 이름은 네임스페이스 앞붙이를 떼고 맞춥니다(&lt;svc:service&gt; 도 service).
  * - 클래스 · 메소드 속성은 그 요소에 없으면 바깥 요소에서 찾습니다(&lt;controller class="…"&gt;&lt;action id="…" method="…"/&gt;).
@@ -49,7 +49,7 @@ public class XmlEndpointReader {
 	 * @param text XML 의 내용(올바른 인코딩으로 읽은 글)
 	 * @throws Exception XML 이 아니거나 깨졌을 때
 	 */
-	public List<Entry> read(String text, RuleSet.XmlEndpointRule rule) throws Exception {
+	public List<Entry> read(String text, Rule.XmlEntry rule) throws Exception {
 		Document document = SafeXml.parse(text);
 		List<Integer> lines = openTagLines(text, rule.element);
 		List<Entry> entries = new ArrayList<Entry>();

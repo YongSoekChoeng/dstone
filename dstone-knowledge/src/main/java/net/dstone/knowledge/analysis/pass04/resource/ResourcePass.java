@@ -32,7 +32,7 @@ import net.dstone.knowledge.analysis.common.EncodingDetector;
  * 여기서는 파일 하나를 읽어 그대로 저장하기만 합니다. 다른 것과 잇는 일
  * (이 SQL을 어느 메소드가 실행하나, 이 SQL이 어느 테이블을 건드리나)은 모든 파일을 읽은 뒤 SEMANTIC 단계가 합니다.
  *
- * web.xml은 여기서 읽지 않습니다. 서블릿 진입점을 만드는 SEMANTIC 단계의 ServletPlugin이 읽습니다.
+ * web.xml은 여기서 읽지 않습니다. 서블릿 진입점을 만드는 SEMANTIC 단계의 ServletEntries가 읽습니다.
  * 못 읽는 파일(XML이 깨진 경우 등)은 그 파일만 실패로 남기고 계속합니다.
  * </pre>
  */

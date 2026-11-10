@@ -59,7 +59,7 @@ public class FileClassifier {
 		}
 		if (name.endsWith(".js") || name.endsWith(".xjs")) {
 			// 화면 공통 스크립트(.xjs 는 Nexacro / X-Platform). 공통 함수가 여는 화면을 찾으려고 스캔한다.
-			// 목록에만 올리고, 내용은 SEMANTIC 의 RichClientPlugin 이 읽는다.
+			// 목록에만 올리고, 내용은 SEMANTIC 의 ScreenLinker 가 읽는다.
 			return "SCRIPT";
 		}
 		return null;

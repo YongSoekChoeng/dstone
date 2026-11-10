@@ -1,0 +1,25 @@
+# JPA(Hibernate)와 Spring Data JPA 의 관례. 엔티티 → 테이블을 알아낸 뒤 JPQL 의 엔티티 이름을 테이블로 바꾼다.
+description: JPA 엔티티와 테이블, @Query · @NamedQuery, Spring Data 저장소 메소드, EntityManager 의 createQuery · createNamedQuery
+
+jpa:
+  # 이 애노테이션이 붙은 클래스가 엔티티다. 엔티티 이름은 name 속성, 없으면 클래스 이름.
+  entity: "@Entity"
+  # 테이블 이름(name 속성). 없으면 naming 으로 짓는다.
+  table: "@Table"
+  # @Table 이 없을 때: SNAKE_CASE(Spring Boot 기본, OrderItem → ORDER_ITEM) 또는 AS_IS(Hibernate 기본, ORDERITEM)
+  naming: SNAKE_CASE
+  # 메소드에 붙은 쿼리. NATIVE 자리가 true 면 SQL, 아니면 JPQL
+  query: "@Query(value = JPQL, nativeQuery = NATIVE)"
+  # 엔티티에 붙은 이름 있는 쿼리. in 뒤의 애노테이션(@NamedQueries({...})) 안의 것도 읽는다. SQL 자리면 언제나 SQL
+  namedQuery:
+    - "@NamedQuery(name = NAME, query = JPQL) in @NamedQueries"
+    - "@NamedNativeQuery(name = NAME, query = SQL) in @NamedNativeQueries"
+  # 이 타입을 상속한 인터페이스는 Spring Data 저장소다. findByName 처럼 이름으로 만드는 쿼리는 그 엔티티의 테이블을 읽는다(delete… 는 지운다).
+  repository: [Repository, CrudRepository, ListCrudRepository, PagingAndSortingRepository, ListPagingAndSortingRepository, JpaRepository]
+  # 이 메소드에 넘긴 Java 문자열은 JPQL 이다(createNativeQuery 에 넘긴 것은 SQL 그대로).
+  jpql: _.createQuery(JPQL)
+
+sql:
+  # em.createNamedQuery("Order.findAll") → 그 이름의 @NamedQuery 와 EXECUTES_SQL
+  - _.createNamedQuery(SQL)
+  - _.getNamedQuery(SQL)

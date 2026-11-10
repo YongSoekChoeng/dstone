@@ -12,7 +12,7 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.ProjectDao;
 import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleException;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRuleRegistry;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFiles;
 
 /**
  * <pre>
@@ -26,14 +26,14 @@ public class ProjectService extends BaseObject {
 	private ProjectDao projectDao;
 
 	@Autowired
-	private SemanticRuleRegistry ruleRegistry;
+	private RuleFiles ruleFiles;
 
 	/**
 	 * <pre>
 	 * 프로젝트를 등록합니다. 같은 projectId가 이미 있으면 내용을 고칩니다.
 	 *
 	 * 소스는 이 서버가 직접 읽을 수 있는 로컬 폴더여야 합니다(localPath).
-	 * ruleSets 에는 이 프로젝트에 더 쓸 규칙 묶음(conf/rules 의 autoApply: false 인 것) 이름을 적습니다.
+	 * ruleSets 에는 빌려 쓸 다른 프로젝트의 규칙(conf/rules/projects 아래 폴더 이름 hi-japan, 또는 파일 hi-japan/backend)을 적습니다.
 	 * git 저장소에서 받아 오는 기능은 증분 분석(M7) 때 붙입니다.
 	 * </pre>
 	 */
@@ -84,18 +84,18 @@ public class ProjectService extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 프로젝트에 더 쓸 규칙 묶음 이름을 확인하고 "a,b" 모양으로 돌려줍니다. 비었으면 null.
-	 * "a, b" 글자로 받아도, ["a", "b"] 목록으로 받아도 됩니다. conf/rules 에 없는 이름이면 400 입니다.
+	 * 빌려 쓸 다른 프로젝트의 규칙 이름을 확인하고 "a,b" 모양으로 돌려줍니다. 비었으면 null.
+	 * "a, b" 글자로 받아도, ["a", "b"] 목록으로 받아도 됩니다. conf/rules/projects 에 없는 이름이면 400 입니다.
 	 * </pre>
 	 */
 	private String ruleSets(Object value) {
 		Object text = value instanceof List ? join((List<?>) value) : value;
-		List<String> names = SemanticRuleRegistry.ruleSetNames(text);
+		List<String> names = RuleFiles.borrowNames(text);
 		if (names.isEmpty()) {
 			return null;
 		}
 		try {
-			ruleRegistry.checkRuleSetNames(join(names));
+			ruleFiles.checkBorrowNames(join(names));
 		} catch (RuleException e) {
 			throw ApiException.badRequest(e.getMessage());
 		}

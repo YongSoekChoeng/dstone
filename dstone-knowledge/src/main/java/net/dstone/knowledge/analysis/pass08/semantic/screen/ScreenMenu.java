@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 /**
  * <pre>
  * 파일 안에 적힌 메뉴 목록에서 "화면명 + 화면 경로" 쌍을 찾습니다.
- * 화면 파일에 &lt;title&gt; 도 titletext 도 없을 때 화면명을 채우는 데 씁니다(ScreenMenuPlugin).
+ * 화면 파일에 &lt;title&gt; 도 titletext 도 없을 때 화면명을 채우는 데 씁니다(ScreenMenuReader).
  * 파일 하나의 글자만 보므로 그대로 단위 테스트할 수 있습니다.
  *
  * 규칙은 "화면명 키=화면 경로 키" 입니다. 예: MENU_NM=SRC_PATH
@@ -35,7 +35,15 @@ public class ScreenMenu {
 		private final Pattern namePattern;
 		private final Pattern pathPattern;
 
+		/** 이 규칙이 적힌 자리(규칙 파일:줄). 모르면 null */
+		private final String at;
+
 		public Rule(String nameKey, String pathKey) {
+			this(nameKey, pathKey, null);
+		}
+
+		public Rule(String nameKey, String pathKey, String at) {
+			this.at = at;
 			this.nameKey = nameKey;
 			this.pathKey = pathKey;
 			this.namePattern = pairPattern(nameKey);
@@ -48,6 +56,10 @@ public class ScreenMenu {
 
 		public String getPathKey() {
 			return pathKey;
+		}
+
+		public String getAt() {
+			return at;
 		}
 
 		/** 키: '값' / "키": "값" / 키="값" 모양. 3번 묶음이 값이다. 키 앞에 이름 글자가 붙어 있으면 다른 키다(SUB_MENU_NM) */
@@ -66,11 +78,18 @@ public class ScreenMenu {
 		private final String name;
 		private final String path;
 		private final int line;
+		/** 이 항목을 찾은 규칙의 자리(규칙 파일:줄). 모르면 null */
+		private final String ruleAt;
 
-		Entry(String name, String path, int line) {
+		Entry(String name, String path, int line, String ruleAt) {
 			this.name = name;
 			this.path = path;
 			this.line = line;
+			this.ruleAt = ruleAt;
+		}
+
+		public String getRuleAt() {
+			return ruleAt;
 		}
 
 		/** 화면명 */
@@ -157,7 +176,7 @@ public class ScreenMenu {
 					found = ScreenTitle.clean(name.group(3));
 				}
 				if (found != null) {
-					entries.add(new Entry(found, written, screenScript.lineAt(text, path.start())));
+					entries.add(new Entry(found, written, screenScript.lineAt(text, path.start()), rule.getAt()));
 				}
 			}
 		}

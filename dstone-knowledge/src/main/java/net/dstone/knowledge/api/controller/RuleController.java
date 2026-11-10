@@ -15,12 +15,13 @@ import net.dstone.knowledge.api.service.RuleService;
 
 /**
  * <pre>
- * 의미 분석 규칙(conf/rules/*.yml) API입니다.
+ * 의미 분석 규칙(conf/rules) API입니다.
  *
- *   GET  /api/rules                                   폴더에 있는 규칙 묶음
+ *   GET  /api/rules                                   폴더에 있는 규칙 파일
  *   GET  /api/revisions/{revisionId}/rules            그 리비전에 쓴 규칙과 지금 규칙의 비교
  *   POST /api/revisions/{revisionId}/rules/trial      규칙 시험 적용(전후 차이만 알려 주고 저장하지 않음)
- *        본문: {"ruleSet": "규칙 묶음 YAML 글"}  (없으면 지금 파일 그대로 돌려 본다)
+ *        본문: {"path": "projects/hen/backend.yml", "rules": "규칙 파일 YAML 글"}
+ *              (path 의 파일이 있으면 그 대신 쓴다. 본문이 없으면 지금 파일 그대로 돌려 본다)
  *   GET  /api/revisions/{revisionId}/rules/candidates 규칙이 아직 모르는 관례의 후보
  * </pre>
  */
@@ -45,8 +46,9 @@ public class RuleController {
 	public Map<String, Object> trial(@PathVariable("revisionId") long revisionId
 			, @RequestBody(required = false) Map<String, Object> body
 			, @RequestParam(name = "samples", defaultValue = "30") int samples) {
-		Object text = body == null ? null : body.get("ruleSet");
-		return ruleService.trial(revisionId, text == null ? null : String.valueOf(text), samples);
+		Object path = body == null ? null : body.get("path");
+		Object text = body == null ? null : body.get("rules");
+		return ruleService.trial(revisionId, path == null ? null : String.valueOf(path), text == null ? null : String.valueOf(text), samples);
 	}
 
 	@GetMapping("/revisions/{revisionId}/rules/candidates")

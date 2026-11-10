@@ -1,0 +1,18 @@
+# 다른 규칙이 정하지 못한 것을 마지막에 채우는 넓은 규칙. guess 폴더라 가장 약하다.
+# (프로젝트 규칙, 공통 규칙이 이미 정한 계층은 바꾸지 않는다)
+description: "@Component 계층과 클래스 이름 끝말로 짐작하는 계층(LOW)"
+
+layer:
+  # @Component 는 뜻이 넓어서 다른 규칙이 모두 끝난 뒤에 본다.
+  COMPONENT: "@Component"
+  # 클래스 단순 이름(* 는 아무 글자). 위에서부터 먼저 맞는 것으로 정한다.
+  CONTROLLER: [name *Controller, name *Action, name *Servlet]
+  SERVICE: [name *Service, name *ServiceImpl, name *Manager, name *ManagerImpl, name *Facade, name *FacadeImpl, name *Biz, name *BizImpl]
+  REPOSITORY: [name *DAO, name *Dao, name *DAOImpl, name *DaoImpl, name *Repository, name *RepositoryImpl, name *Mapper]
+  MODEL: [name *VO, name *Vo, name *DTO, name *Dto, name *Entity, name *Bean, name *Model, name *Form]
+  CONFIG: [name *Config, name *Configuration]
+  WEB_FILTER: [name *Filter, name *Interceptor]
+  UTIL: [name *Util, name *Utils, name *Utility, name *Helper]
+  EXCEPTION: [name *Exception, name *Error]
+  # 배치는 끝말이 제각각이라(OrderBatchMain, DailyJob) 이름 어디에든 Batch 가 있으면 본다.
+  BATCH: [name *Batch*, name *Job, name *Scheduler, name *Tasklet]

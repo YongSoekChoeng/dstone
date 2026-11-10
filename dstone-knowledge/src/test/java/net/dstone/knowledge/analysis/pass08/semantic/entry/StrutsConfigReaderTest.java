@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -87,19 +87,19 @@ public class StrutsConfigReaderTest {
 
 	@Test
 	public void 서블릿에_걸어_둔_주소_모양을_설정의_path에_입힌다() {
-		assertEquals("/order/list.do", StrutsPlugin.applyPattern("*.do", "/order/list"));
-		assertEquals("/do/order/list", StrutsPlugin.applyPattern("/do/*", "/order/list"));
-		assertEquals("/order/list", StrutsPlugin.applyPattern("/", "/order/list"));
+		assertEquals("/order/list.do", StrutsEntries.applyPattern("*.do", "/order/list"));
+		assertEquals("/do/order/list", StrutsEntries.applyPattern("/do/*", "/order/list"));
+		assertEquals("/order/list", StrutsEntries.applyPattern("/", "/order/list"));
 	}
 
 	@Test
 	public void 화면_경로는_JSP일_때만_파일을_찾는_경로로_바꾼다() {
-		assertEquals("order/list.jsp", StrutsPlugin.jspPathOf("/order/list.jsp"));
-		assertEquals("order/list.jsp", StrutsPlugin.jspPathOf("/order/list.jsp?mode=1"));
+		assertEquals("order/list.jsp", StrutsEntries.jspPathOf("/order/list.jsp"));
+		assertEquals("order/list.jsp", StrutsEntries.jspPathOf("/order/list.jsp?mode=1"));
 		// 다른 주소로 보내는 것, Tiles 정의 이름, 실행할 때 정해지는 경로는 JSP 파일이 아니다.
-		assertNull(StrutsPlugin.jspPathOf("/order/list.do"));
-		assertNull(StrutsPlugin.jspPathOf("order.list"));
-		assertNull(StrutsPlugin.jspPathOf("/order/${view}.jsp"));
+		assertNull(StrutsEntries.jspPathOf("/order/list.do"));
+		assertNull(StrutsEntries.jspPathOf("order.list"));
+		assertNull(StrutsEntries.jspPathOf("/order/${view}.jsp"));
 	}
 
 }

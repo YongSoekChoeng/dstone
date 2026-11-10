@@ -16,19 +16,19 @@ import org.springframework.stereotype.Component;
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
  * 화면 파일에서 화면명을 찾지 못한 화면에, 메뉴 목록에 적힌 메뉴 이름을 화면명으로 채웁니다.
  *
- * 화면 파일의 &lt;title&gt; / titletext 는 JspPlugin(500)과 RichClientPlugin(510)이 먼저 찾습니다. 이 플러그인은 그 뒤에 돌고,
+ * 화면 파일의 &lt;title&gt; / titletext 는 JspLinker와 ScreenLinker가 먼저 찾습니다. 이 플러그인은 그 뒤에 돌고,
  * 거기서 화면명이 생긴 화면은 건드리지 않습니다(화면 파일에 적힌 것이 먼저다).
  *
  * 메뉴 목록은 프로젝트마다 적는 곳과 키 이름이 달라서 설정으로 받습니다.
- *   규칙 파일의 screens.menus: - { nameKey: MENU_NM, pathKey: SRC_PATH }   (화면명 키, 화면 경로 키. 예: conf/rules/hi-japan/frontend.yml)
+ *   규칙 파일의 screen: - { menu: { name: MENU_NM, path: SRC_PATH } }   (화면명 키, 화면 경로 키. 예: conf/rules/projects/hi-japan/frontend.yml)
  * JSP와 XML 파일 가운데 경로 키가 글자로 들어 있는 것만 읽어 메뉴 항목을 찾습니다(ScreenMenu).
- * 메뉴의 화면 경로는 "그 경로로 끝나는 화면"으로 찾고, 화면이 하나로 정해질 때만 씁니다(RichClientPlugin.findScreen).
+ * 메뉴의 화면 경로는 "그 경로로 끝나는 화면"으로 찾고, 화면이 하나로 정해질 때만 씁니다(ScreenLinker.findScreen).
  * 한 화면이 메뉴 여러 곳에 있으면 파일 순서로 먼저 나온 이름을 씁니다.
  *
  * 남기는 것: analysis_resource SCREEN_NAME (properties_json = {via: MENU, menuFile, menuLine, menuPath}, line_start 는 없음)
@@ -37,7 +37,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class ScreenMenuPlugin implements SemanticPlugin {
+public class ScreenMenuReader implements SemanticStep {
 
 	/** 메뉴의 화면 경로가 가리킬 수 있는 화면 종류(analysis_file.file_type) */
 	private static final List<String> SCREEN_TYPES = Arrays.asList("JSP", "WEBSQUARE", "NEXACRO");
@@ -62,14 +62,8 @@ public class ScreenMenuPlugin implements SemanticPlugin {
 	}
 
 	@Override
-	public int order() {
-		// 화면 파일 안의 화면명(JSP 500, 리치클라이언트 510)이 먼저 남아 있어야 빈 화면만 채울 수 있다.
-		return 520;
-	}
-
-	@Override
 	public String run(AnalysisJobContext context) throws Exception {
-		List<ScreenMenu.Rule> rules = context.getSemanticRules().getScreenMenus();
+		List<ScreenMenu.Rule> rules = context.getProjectRules().screenMenus();
 		if (rules.isEmpty()) {
 			return "메뉴 규칙 없음.";
 		}
@@ -104,7 +98,7 @@ public class ScreenMenuPlugin implements SemanticPlugin {
 				for (int e = 0; e < found.size(); e++) {
 					ScreenMenu.Entry entry = found.get(e);
 					entries++;
-					Long screen = RichClientPlugin.findScreen(semanticDao, revisionId, entry.getPath(), SCREEN_TYPES);
+					Long screen = ScreenLinker.findScreen(semanticDao, revisionId, entry.getPath(), SCREEN_TYPES);
 					if (screen == null) {
 						notFound++;
 						continue;
@@ -117,6 +111,7 @@ public class ScreenMenuPlugin implements SemanticPlugin {
 					properties.put("menuFile", file.get("path"));
 					properties.put("menuLine", Integer.valueOf(entry.getLine()));
 					properties.put("menuPath", entry.getPath());
+					properties.put("ruleAt", entry.getRuleAt());
 					semanticDao.insertScreenName(revisionId, screen.longValue(), entry.getPath(), entry.getName(), properties, null);
 					filled++;
 				}

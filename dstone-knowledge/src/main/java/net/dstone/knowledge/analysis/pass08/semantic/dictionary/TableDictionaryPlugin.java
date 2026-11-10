@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.knowledge.api.dao.SemanticDao;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -25,7 +25,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class TableDictionaryPlugin implements SemanticPlugin {
+public class TableDictionaryPlugin implements SemanticStep {
 
 	@Autowired
 	private SemanticDao semanticDao;
@@ -36,11 +36,6 @@ public class TableDictionaryPlugin implements SemanticPlugin {
 	@Override
 	public String name() {
 		return "tableDictionary";
-	}
-
-	@Override
-	public int order() {
-		return 980;
 	}
 
 	@Override

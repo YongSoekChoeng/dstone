@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * 화면이 다른 화면을 직접 열지 않고 공통 함수에 맡기는 프로젝트가 있습니다.
  *   화면       comLib.gfnOpenPopupEmp(joParam);
  *   com_lib.js comLib.gfnOpenPopupEmp = function(joParam) { comLib.openPopup("JZCO0102P", "/ui/jz/JZCO0102P.xml", options); };
- * 화면 글자만 봐서는 JZCO0102P 를 여는 줄 알 수 없으므로, 공통 함수의 본문을 읽어 둡니다(RichClientPlugin 이 씁니다).
+ * 화면 글자만 봐서는 JZCO0102P 를 여는 줄 알 수 없으므로, 공통 함수의 본문을 읽어 둡니다(ScreenLinker 가 씁니다).
  *
  * 함수로 보는 정의는 세 가지 모양입니다.
  *   comLib.gfnX = function(...) { ... }   이름에 점이 있으면 어느 깊이에 있어도 본다

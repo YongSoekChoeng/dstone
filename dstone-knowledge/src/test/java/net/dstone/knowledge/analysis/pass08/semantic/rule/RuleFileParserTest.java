@@ -16,308 +16,302 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenScript;
+
 /**
  * <pre>
- * 규칙 파일(conf/rules/*.yml)을 읽는 RuleSetParser 와, 묶음을 합치는 SemanticRules 를 확인합니다.
+ * 규칙 파일을 읽는 RuleFileParser 와, 파일들을 합쳐 우선순위를 정하는 ProjectRules, 파일을 고르는 RuleFiles 를 확인합니다.
  * DB 나 Spring 없이 돕니다. 실제 conf/rules 폴더의 파일도 모두 읽어 봅니다(잘못 적으면 서버가 뜨지 않으므로).
  * </pre>
  */
-public class RuleSetParserTest {
+public class RuleFileParserTest {
 
-	private final RuleSetParser parser = new RuleSetParser();
+	private final RuleFileParser parser = new RuleFileParser();
 
-	private RuleSet parse(String text, String fileName) {
-		return parser.parse(text, fileName);
+	private RuleFile parse(String text, String path) {
+		return parser.parse(text, path);
 	}
 
-	private RuleException parseFails(final String text, final String fileName) {
+	private RuleException parseFails(final String text, final String path) {
 		return assertThrows(RuleException.class, new Executable() {
 			@Override
 			public void execute() {
-				parser.parse(text, fileName);
+				parser.parse(text, path);
 			}
 		});
 	}
 
 	@Test
-	public void 규칙_파일을_읽으면_키마다_규칙이_된다() {
-		String text = "name: sample\n"
-				+ "order: 400\n"
-				+ "autoApply: false\n"
-				+ "endpoints:\n"
-				+ "  http:\n"
-				+ "    - classAnnotations: [MyMapping]\n"
-				+ "      pathAttributes: [value]\n"
-				+ "      methodAnnotations:\n"
-				+ "        - { annotation: MyMapping, methodAttribute: method }\n"
-				+ "        - { annotation: MyGet, httpMethod: GET }\n"
-				+ "  annotations:\n"
-				+ "    - { endpointType: batch_job, annotations: [MyJob], pathAttributes: [name] }\n"
-				+ "  superTypes:\n"
-				+ "    - { endpointType: TRANSACTION, superTypes: [com.fw.BaseHandler], methodPattern: '^handle' }\n"
-				+ "layers:\n"
-				+ "  annotations:\n"
-				+ "    - { layer: service, annotations: MyService }\n"
-				+ "  superTypes:\n"
-				+ "    - { layer: REPOSITORY, types: [com.fw.BaseDao] }\n"
-				+ "  names:\n"
-				+ "    - { layer: CONTROLLER, pattern: 'M$' }\n"
-				+ "callArguments:\n"
-				+ "  - target: sql\n"
-				+ "    methods: [execute]\n"
-				+ "    argIndex: 1\n"
-				+ "    receiverTypes: [com.fw.BaseDao]\n"
-				+ "    template: 'Order.{value}'\n"
-				+ "  - target: VIEW\n"
-				+ "    methods: [forward]\n"
-				+ "    exclude: '^redirect:'\n"
-				+ "screens:\n"
-				+ "  calls: [{ function: callTx, method: 'do{id}' }]\n"
-				+ "  fields: [{ field: txId, method: 'do{id}' }]\n"
-				+ "  opens: [{ function: openPage, screen: '{id}.xml' }]\n"
-				+ "  menus: [{ nameKey: MENU_NM, pathKey: SRC_PATH }]\n";
-		RuleSet set = parse(text, "sample.yml");
+	public void 코드_모양으로_적은_규칙이_절마다_규칙이_된다() {
+		String text = "description: 주문 시스템\n"
+				+ "layer:\n"
+				+ "  SERVICE: [\"@MyService\", extends com.fw.BaseService, name *Biz]\n"
+				+ "entry:\n"
+				+ "  HTTP:\n"
+				+ "    class: \"@MyMapping(value = URL)\"\n"
+				+ "    ANY: \"@MyMapping(value = URL, method = VERB)\"\n"
+				+ "    GET: \"@MyGet(value|path = URL)\"\n"
+				+ "  BATCH_JOB: \"@MyJob(name = KEY)\"\n"
+				+ "  TRANSACTION: com.fw.BaseHandler#handle*(...)\n"
+				+ "inject: \"@MyInject\"\n"
+				+ "proxy: [\"@MyTx\"]\n"
+				+ "sql:\n"
+				+ "  - com.fw.BaseDao#execute(_, SQL)\n"
+				+ "  - { call: new Query(SQL), name: 'Order.{SQL}' }\n"
+				+ "view:\n"
+				+ "  - { call: _.forward(VIEW), skip: '^redirect:' }\n"
+				+ "screen:\n"
+				+ "  - { call: 'lib.callTx(_, ID)', to: 'do{ID}' }\n"
+				+ "  - { field: txId, to: 'do{ID}' }\n"
+				+ "  - { open: openPage(ID), to: '{ID}.xml' }\n"
+				+ "  - { menu: { name: MENU_NM, path: SRC_PATH } }\n";
+		RuleFile file = parse(text, "projects/order-system/backend.yml");
 
-		assertEquals("sample", set.name);
-		assertEquals(400, set.order);
-		assertFalse(set.autoApply);
-		assertEquals(12, set.hash.length());
-		assertEquals(Arrays.asList("MyMapping"), set.httpMappings.get(0).classAnnotations);
-		assertEquals("GET", set.httpMappings.get(0).methodAnnotations.get(1).httpMethod);
-		assertEquals("method", set.httpMappings.get(0).methodAnnotations.get(0).methodAttribute);
-		// 진입점 종류와 계층은 대문자로 맞춘다. 목록 대신 하나만 적어도 된다(annotations: MyService).
-		assertEquals("BATCH_JOB", set.annotatedEndpoints.get(0).endpointType);
-		assertEquals("SERVICE", set.layerAnnotations.get(0).layer);
-		assertEquals(Arrays.asList("MyService"), set.layerAnnotations.get(0).annotations);
-		assertEquals("^handle", set.superTypeEndpoints.get(0).methodPattern);
-		assertTrue(set.superTypeEndpoints.get(0).methods.isEmpty());
-		assertNull(set.superTypeEndpoints.get(0).paramCount);
+		assertEquals("projects/order-system/backend", file.name);
+		assertEquals(Tier.PROJECT, file.tier);
+		assertEquals("order-system", file.projectFolder);
+		assertEquals("주문 시스템", file.description);
+		assertEquals(12, file.getHash().length());
 
-		RuleSet.CallArgumentRule sql = set.callArguments.get(0);
-		assertEquals("SQL", sql.target);
-		assertEquals(1, sql.argIndex);
-		assertEquals("Order.", sql.prefix);
-		assertEquals("", sql.suffix);
-		assertEquals(Arrays.asList("com.fw.BaseDao"), sql.receiverTypes);
-		// 화면 규칙의 틀을 적지 않으면 {value}.jsp 다.
-		RuleSet.CallArgumentRule view = set.callArguments.get(1);
-		assertEquals("", view.prefix);
-		assertEquals(".jsp", view.suffix);
-		assertEquals("^redirect:", view.exclude);
+		assertEquals(3, file.layers.size());
+		assertEquals(Rule.Layer.BY_ANNOTATION, file.layers.get(0).by);
+		assertEquals("MyService", file.layers.get(0).value);
+		assertEquals("HIGH", file.layers.get(0).confidence());
+		assertEquals("com.fw.BaseService", file.layers.get(1).value);
+		assertEquals("MEDIUM", file.layers.get(1).confidence());
+		assertEquals("^.*Biz$", file.layers.get(2).nameRegex);
+		assertEquals("projects/order-system/backend.yml:3", file.layers.get(0).at());
 
-		assertEquals("callTx", set.screenCalls.get(0).getFunction());
-		assertEquals(0, set.screenCalls.get(0).getArgIndex());
-		assertEquals(1, parse("screens:\n  opens: [{ function: openPage, screen: '{id}.xml', argIndex: 1 }]\n", "x.yml").screenOpens.get(0).getArgIndex());
-		assertTrue(set.screenFields.get(0).isField());
-		assertEquals("JIMC1000G.xml", set.screenOpens.get(0).fill("JIMC1000G"));
-		assertEquals("SRC_PATH", set.screenMenus.get(0).getPathKey());
-		assertEquals(12, set.ruleCount());
+		Rule.HttpEntry http = file.httpEntries.get(0);
+		assertEquals(Arrays.asList("value"), http.classAnnotation("MyMapping").pathAttributes);
+		assertEquals("method", http.methodAnnotation("MyMapping").verbAttribute);
+		assertEquals("GET", http.methodAnnotation("MyGet").httpMethod);
+		assertEquals(Arrays.asList("value", "path"), http.methodAnnotation("MyGet").pathAttributes);
+
+		assertEquals("BATCH_JOB", file.annotationEntries.get(0).endpointType);
+		assertEquals(Arrays.asList("name"), file.annotationEntries.get(0).pathAttributes);
+		Rule.ExtendsEntry handler = file.extendsEntries.get(0);
+		assertEquals("com.fw.BaseHandler", handler.superType);
+		assertNull(handler.methodName);
+		assertEquals("^handle.*$", handler.methodRegex);
+		assertNull(handler.paramCount);
+
+		assertEquals("MyInject", file.injects.get(0).annotation);
+		assertEquals("MyTx", file.proxies.get(0).annotation);
+
+		Rule.CallArgument execute = file.sqlCalls.get(0);
+		assertEquals("execute", execute.method);
+		assertEquals("com.fw.BaseDao", execute.receiverType);
+		assertEquals(1, execute.argIndex);
+		Rule.CallArgument query = file.sqlCalls.get(1);
+		assertEquals("Query", query.constructor);
+		assertEquals("Order.", query.prefix);
+		assertEquals("", query.suffix);
+		Rule.CallArgument forward = file.viewCalls.get(0);
+		assertEquals(".jsp", forward.suffix);
+		assertEquals("^redirect:", forward.skip);
+
+		// 화면 함수는 마지막 이름으로 찾는다. ID 자리가 argIndex 가 된다
+		ScreenScript.CallRule call = file.screenCalls.get(0);
+		assertEquals("callTx", call.getFunction());
+		assertEquals(1, call.getArgIndex());
+		assertEquals("do{id}", call.getMethodTemplate());
+		assertTrue(call.getAt().startsWith("projects/order-system/backend.yml:"));
+		assertTrue(file.screenFields.get(0).isField());
+		assertEquals("{id}.xml", file.screenOpens.get(0).getMethodTemplate());
+		assertEquals("MENU_NM", file.screenMenus.get(0).getNameKey());
 	}
 
 	@Test
-	public void 모르는_키는_오타로_보고_자리를_알려_준다() {
-		RuleException e = parseFails("callArguments:\n  - target: SQL\n    method: [execute]\n", "x.yml");
-		assertEquals("callArguments[0].method", e.getPath());
-		assertTrue(e.getMessage().contains("모르는 키"), e.getMessage());
+	public void 상위_타입_진입점의_괄호는_인자_수다() {
+		RuleFile file = parse("entry:\n  THREAD:\n    - java.lang.Runnable#run()\n    - com.x.Worker#work(_, _)\n", "common/java.yml");
+		assertEquals(Integer.valueOf(0), file.extendsEntries.get(0).paramCount);
+		assertEquals("run", file.extendsEntries.get(0).methodName);
+		assertEquals(Integer.valueOf(2), file.extendsEntries.get(1).paramCount);
+		// [ ] 안에 쉼표가 든 호출을 적으면 YAML 이 쉼표에서 나눈다. 고치는 법을 알려 준다
+		assertTrue(parseFails("sql: [com.x.Dao#run(_, SQL)]\n", "common/x.yml").getMessage().contains("괄호가 닫히지 않았습니다"));
 	}
 
 	@Test
-	public void 잘못된_값은_서버를_띄우기_전에_막는다() {
-		// 없는 계층
-		assertEquals("layers.annotations[0].layer", parseFails("layers:\n  annotations:\n    - { layer: SERVCE, annotations: [S] }\n", "x.yml").getPath());
-		// 틀린 정규식
-		assertEquals("layers.names[0].pattern", parseFails("layers:\n  names:\n    - { layer: SERVICE, pattern: '(Service' }\n", "x.yml").getPath());
-		// {value} 가 없는 틀
-		assertEquals("callArguments[0].template", parseFails("callArguments:\n  - { target: SQL, methods: [q], template: 'Order.' }\n", "x.yml").getPath());
-		// argIndex 범위
-		assertEquals("callArguments[0].argIndex", parseFails("callArguments:\n  - { target: SQL, methods: [q], argIndex: 10 }\n", "x.yml").getPath());
-		// 생성자에는 receiverTypes 를 쓰지 않는다
-		assertEquals("callArguments[0].receiverTypes", parseFails("callArguments:\n  - { target: SQL, constructors: [Q], receiverTypes: [a.B] }\n", "x.yml").getPath());
-		// httpMethod 와 methodAttribute 는 하나만
-		parseFails("endpoints:\n  http:\n    - methodAnnotations: [{ annotation: A, httpMethod: GET, methodAttribute: m }]\n      pathAttributes: [value]\n", "x.yml");
-		// {id} 가 없는 화면 규칙
-		parseFails("screens:\n  calls: [{ function: f, method: perform }]\n", "x.yml");
-		// 애노테이션에 @ 를 붙였다
-		parseFails("injects:\n  annotations: ['@Autowired']\n", "x.yml");
-		// 묶음 이름은 파일 이름과 같아야 한다
-		assertEquals("name", parseFails("name: other\n", "x.yml").getPath());
-		// YAML 문법 오류
-		parseFails("layers: [\n", "x.yml");
+	public void 잘못_적으면_파일과_줄_번호와_예를_알려_준다() {
+		RuleException e = parseFails("layer:\n  SERVCE: \"@Service\"\n", "common/x.yml");
+		assertEquals(2, e.getLine());
+		assertTrue(e.getMessage().contains("common/x.yml 2번째 줄"), e.getMessage());
+		assertTrue(e.getMessage().contains("SERVCE"), e.getMessage());
+
+		// 모양이 틀린 것
+		assertTrue(parseFails("layer:\n  SERVICE: Service\n", "common/x.yml").getMessage().contains("세 가지 모양"));
+		assertTrue(parseFails("layer:\n  SERVICE: extends Service\n", "common/x.yml").getMessage().contains("전체 이름"));
+		assertTrue(parseFails("sql: [ selectList(SQL) ]\n", "common/x.yml").getMessage().contains("_.이름"));
+		assertTrue(parseFails("sql: [ _.selectList(x) ]\n", "common/x.yml").getMessage().contains("자리"));
+		assertTrue(parseFails("sql: [ _.selectList(_) ]\n", "common/x.yml").getMessage().contains("SQL 자리를 적어야"));
+		assertTrue(parseFails("entry:\n  SCHEDULED: \"@Scheduled(cron = URL)\"\n", "common/x.yml").getMessage().contains("KEY"));
+		assertTrue(parseFails("entry:\n  HTTP: { GET: \"@GetMapping\" }\n", "common/x.yml").getMessage().contains("URL 자리"));
+		assertTrue(parseFails("entry:\n  JOB: { class: \"@X(value = URL)\" }\n", "common/x.yml").getMessage().contains("HTTP 아래"));
+		assertTrue(parseFails("layer:\n  SERVICE: \"@org.fw.Service\"\n", "common/x.yml").getMessage().contains("단순 이름"));
+		assertTrue(parseFails("screen:\n  - { call: callTx(ID), to: 'do' }\n", "common/x.yml").getMessage().contains("{ID}"));
+		assertTrue(parseFails("view:\n  - { call: _.forward(VIEW), skip: '[' }\n", "common/x.yml").getMessage().contains("정규식"));
+		// @ 로 시작하는 값을 따옴표 없이 적으면 YAML 이 틀린다. 고치는 법을 알려 준다
+		assertTrue(parseFails("layer:\n  SERVICE: @Service\n", "common/x.yml").getMessage().contains("따옴표"));
+		// 모르는 키
+		assertTrue(parseFails("lyer:\n  SERVICE: \"@Service\"\n", "common/x.yml").getMessage().contains("모르는 키"));
 	}
 
 	@Test
-	public void 두_묶음이_같은_애노테이션으로_진입점을_만들면_합칠_때_막는다() {
-		final RuleSet a = parse("endpoints:\n  annotations:\n    - { endpointType: SCHEDULED, annotations: [Scheduled] }\n", "a.yml");
-		final RuleSet b = parse("endpoints:\n  annotations:\n    - { endpointType: SCHEDULED, annotations: [Scheduled] }\n", "b.yml");
+	public void 옛_형식의_키는_새_형식을_알려_준다() {
+		assertTrue(parseFails("order: 500\n", "common/x.yml").getMessage().contains("폴더가 정합니다"));
+		assertTrue(parseFails("callArguments: []\n", "common/x.yml").getMessage().contains("sql / view"));
+		assertTrue(parseFails("layers: {}\n", "common/x.yml").getMessage().contains("layer 로"));
+	}
+
+	@Test
+	public void 폴더가_우선순위를_정하고_다른_자리의_파일은_막는다() {
+		assertEquals(Tier.COMMON, parse("", "common/spring.yml").tier);
+		assertEquals(Tier.GUESS, parse("", "guess/default.yml").tier);
+		assertEquals(Tier.PROJECT, parse("", "projects/hi-japan/backend.yml").tier);
+		assertTrue(parseFails("", "spring.yml").getMessage().contains("common/, guess/, projects/"));
+		assertTrue(parseFails("", "projects/backend.yml").getMessage().contains("common/, guess/, projects/"));
+		assertTrue(parseFails("", "other/spring.yml").getMessage().contains("common/, guess/, projects/"));
+	}
+
+	@Test
+	public void 계층은_프로젝트_공통_짐작_순서이고_같은_단계에서는_애노테이션_상속_이름_순서다() {
+		RuleFile guess = parse("layer:\n  COMPONENT: \"@Component\"\n  SERVICE: name *Biz\n", "guess/default.yml");
+		RuleFile common = parse("layer:\n  CONTROLLER: [name *Act, extends javax.servlet.http.HttpServlet, \"@Controller\"]\n", "common/spring.yml");
+		RuleFile project = parse("layer:\n  CONTROLLER: extends com.acme.BaseAction\n", "projects/acme/backend.yml");
+		List<RuleFile> files = new ArrayList<RuleFile>(Arrays.asList(guess, common, project));
+		List<Rule.Layer> layers = new ProjectRules(files).layers();
+		List<String> order = new ArrayList<String>();
+		for (int i = 0; i < layers.size(); i++) {
+			order.add(layers.get(i).text);
+		}
+		assertEquals(Arrays.asList("extends com.acme.BaseAction", "@Controller", "extends javax.servlet.http.HttpServlet", "name *Act"
+				, "@Component", "name *Biz"), order);
+	}
+
+	@Test
+	public void 같은_애노테이션으로_진입점을_두_번_만들면_두_자리를_알려_준다() {
+		final RuleFile a = parse("entry:\n  SCHEDULED: \"@Scheduled(cron = KEY)\"\n", "common/spring.yml");
+		final RuleFile b = parse("entry:\n  SCHEDULED: \"@Scheduled\"\n", "projects/x/backend.yml");
+		RuleException e = assertThrows(RuleException.class, new Executable() {
+			@Override
+			public void execute() {
+				new ProjectRules(Arrays.asList(a, b));
+			}
+		});
+		assertTrue(e.getMessage().contains("common/spring.yml"), e.getMessage());
+		assertTrue(e.getMessage().contains("projects/x/backend.yml"), e.getMessage());
+	}
+
+	@Test
+	public void 합칠_때_겹치는_목록은_하나만_남기고_화면_필드_규칙은_호출_규칙_뒤에_둔다() {
+		RuleFile a = parse("inject: [\"@Autowired\"]\nscreen:\n  - { field: tranId, to: 'perform{ID}' }\n", "projects/a/frontend.yml");
+		RuleFile b = parse("inject: [\"@Autowired\", \"@Inject\"]\nscreen:\n  - { call: doRequest(ID), to: 'perform{ID}' }\n", "common/screen.yml");
+		ProjectRules rules = new ProjectRules(Arrays.asList(a, b));
+		assertEquals(2, rules.injects().size());
+		assertEquals("projects/a/frontend.yml:1", rules.injects().get(0).at());
+		List<ScreenScript.CallRule> calls = rules.screenCalls();
+		assertFalse(calls.get(0).isField());
+		assertTrue(calls.get(1).isField());
+	}
+
+	@Test
+	public void 프로젝트_규칙은_그_프로젝트와_빌려_쓰는_프로젝트에만_쓴다() {
+		RuleFile hiJapan = parse("", "projects/hi-japan/backend.yml");
+		RuleFile common = parse("", "common/spring.yml");
+		List<String> none = new ArrayList<String>();
+		assertTrue(RuleFiles.applies(common, "hen", none));
+		assertTrue(RuleFiles.applies(hiJapan, "HI-Japan", none));
+		assertFalse(RuleFiles.applies(hiJapan, "hen", none));
+		assertTrue(RuleFiles.applies(hiJapan, "HI-Japan-batch", RuleFiles.borrowNames("hi-japan")));
+		assertTrue(RuleFiles.applies(hiJapan, "websquare-app", RuleFiles.borrowNames("projects/hi-japan/backend.yml")));
+		assertFalse(RuleFiles.applies(hiJapan, "x", RuleFiles.borrowNames("hi-japan/frontend")));
+	}
+
+	@Test
+	public void JPA_규칙을_읽는다() {
+		String text = "jpa:\n"
+				+ "  entity: \"@Entity\"\n"
+				+ "  table: \"@Table\"\n"
+				+ "  naming: as_is\n"
+				+ "  query: \"@Query(value = JPQL, nativeQuery = NATIVE)\"\n"
+				+ "  namedQuery:\n"
+				+ "    - \"@NamedQuery(name = NAME, query = JPQL) in @NamedQueries\"\n"
+				+ "    - \"@NamedNativeQuery(name = NAME, query = SQL)\"\n"
+				+ "  repository: [JpaRepository]\n"
+				+ "  jpql: _.createQuery(JPQL)\n";
+		RuleFile file = parse(text, "common/jpa.yml");
+		assertEquals("AS_IS", file.jpaNaming);
+		assertEquals("nativeQuery", file.jpaQueries.get(0).nativeAttribute);
+		assertEquals("value", file.jpaQueries.get(0).attribute);
+		assertFalse(file.jpaQueries.get(0).nativeQuery);
+		assertEquals("NamedQueries", file.jpaNamedQueries.get(0).container);
+		assertEquals("name", file.jpaNamedQueries.get(0).nameAttribute);
+		assertTrue(file.jpaNamedQueries.get(1).nativeQuery);
+		assertEquals(Arrays.asList("createQuery"), file.jpqlMethods);
+		assertTrue(parseFails("jpa:\n  naming: CAMEL\n", "common/jpa.yml").getMessage().contains("SNAKE_CASE"));
+		assertTrue(parseFails("jpa:\n  query: \"@Query(value = JPQL, x = SQL)\"\n", "common/jpa.yml").getMessage().contains("하나로"));
+	}
+
+	@Test
+	public void 설정_XML_진입점과_ID_대응표를_읽는다() throws Exception {
+		File dir = Files.createTempDirectory("rules").toFile();
+		File folder = new File(dir, "projects/order");
+		folder.mkdirs();
+		Files.write(new File(folder, "tx-map.csv").toPath(), "ORD001,OrderController.list\n".getBytes(StandardCharsets.UTF_8));
+		RuleFileParser withDir = new RuleFileParser(dir);
+		String text = "entry:\n"
+				+ "  TRANSACTION:\n"
+				+ "    - file: 'config/service-.*\\.xml$'\n"
+				+ "      xml: '<service id=\"KEY\" class=\"CLASS\" method=\"METHOD\"/>'\n"
+				+ "      path: '{KEY}.do'\n"
+				+ "screen:\n"
+				+ "  - { call: callTx(ID), to: '{ID}', id: { map: tx-map.csv } }\n";
+		RuleFile file = withDir.parse(text, "projects/order/backend.yml");
+		Rule.XmlEntry xml = file.xmlEntries.get(0);
+		assertEquals("service", xml.element);
+		assertEquals("id", xml.pathAttribute);
+		assertEquals("class", xml.classAttribute);
+		assertEquals(".do", xml.suffix);
+		assertNull(xml.httpMethod);
+		// 대응표는 규칙 파일이 있는 폴더를 기준으로 찾는다
+		assertEquals("projects/order/tx-map.csv", file.screenCalls.get(0).getTransform().getMapSource());
+		assertEquals("OrderController.list", file.screenCalls.get(0).methodNameOf("ORD001"));
+		// 규칙 폴더 밖은 가리킬 수 없다
+		String escape = "screen:\n  - { call: callTx(ID), to: '{ID}', id: { map: ../../../x.csv } }\n";
+		final RuleFileParser p = withDir;
+		final String t = escape;
 		assertThrows(RuleException.class, new Executable() {
 			@Override
 			public void execute() {
-				new SemanticRules(Arrays.asList(a, b));
+				p.parse(t, "projects/order/backend.yml");
 			}
 		});
-	}
-
-	@Test
-	public void 합칠_때_목록_규칙은_겹치는_것을_하나만_남기고_화면_필드_규칙은_호출_규칙_뒤에_둔다() {
-		RuleSet a = parse("injects:\n  annotations: [Autowired, Inject]\n"
-				+ "screens:\n  fields: [{ field: tranId, method: 'perform{id}' }]\n  calls: [{ function: f1, method: 'perform{id}' }]\n", "a.yml");
-		RuleSet b = parse("injects:\n  annotations: [Inject, Resource]\n"
-				+ "screens:\n  calls: [{ function: f1, method: 'perform{id}' }, { function: f2, method: 'perform{id}' }]\n", "b.yml");
-		SemanticRules rules = new SemanticRules(Arrays.asList(a, b));
-		assertEquals(Arrays.asList("Autowired", "Inject", "Resource"), rules.getInjectAnnotations());
-		List<String> functions = new ArrayList<String>();
-		for (int i = 0; i < rules.getScreenCalls().size(); i++) {
-			functions.add(rules.getScreenCalls().get(i).getFunction());
-		}
-		assertEquals(Arrays.asList("f1", "f2", "tranId"), functions);
 	}
 
 	@Test
 	public void conf_rules_폴더의_규칙_파일은_모두_올바르고_함께_쓸_수_있다() throws Exception {
 		File dir = new File("conf/rules");
 		assertTrue(dir.isDirectory(), "conf/rules 가 없습니다: " + dir.getAbsolutePath());
-		List<RuleSet> sets = new ArrayList<RuleSet>();
-		readAll(dir, "", sets);
-		List<String> names = new ArrayList<String>();
-		for (int i = 0; i < sets.size(); i++) {
-			names.add(sets.get(i).name);
-		}
-		// 프로젝트에 따른 규칙은 하위 폴더에 있고, 묶음 이름은 폴더를 포함한 경로다.
-		assertTrue(names.contains("hi-japan/frontend"), String.valueOf(names));
-		assertTrue(names.contains("hi-japan/backend"), String.valueOf(names));
-		// 합칠 때 겹치는 진입점 애노테이션이 없어야 한다.
-		SemanticRules rules = new SemanticRules(sets);
-		// 기본 규칙이 그대로 옮겨졌는지 대표 값만 본다(정확한 전후 비교는 실제 리비전으로 했다).
-		assertTrue(rules.getInjectAnnotations().contains("Autowired"));
-		assertEquals(1, rules.getHttpMappings().size());
-		assertFalse(rules.getSqlArguments().isEmpty());
-		assertFalse(rules.getViewArguments().isEmpty());
-		assertFalse(rules.getLayerNames().isEmpty());
-		// JPA 규칙(jpa.yml)
-		assertTrue(rules.getJpaEntities().contains("Entity"));
-		assertEquals("SNAKE_CASE", rules.getJpaNaming());
-		assertTrue(rules.getJpqlCalls().contains("createQuery"));
-		assertEquals(2, rules.getJpaNamedQueries().size());
+		List<RuleFile> files = new ArrayList<RuleFile>();
+		collect(dir, dir, files);
+		assertTrue(files.size() >= 7, "규칙 파일이 너무 적습니다: " + files.size());
+		ProjectRules rules = new ProjectRules(files);
+		assertFalse(rules.layers().isEmpty());
+		assertFalse(rules.httpEntries().isEmpty());
+		assertFalse(rules.sqlCalls().isEmpty());
 	}
 
-	@Test
-	public void JPA_규칙을_읽고_틀린_값을_막는다() {
-		RuleSet set = parse("jpa:\n"
-				+ "  entities: [Entity, MyEntity]\n"
-				+ "  naming: as_is\n"
-				+ "  queries:\n"
-				+ "    - { annotation: Query, nativeAttribute: nativeQuery }\n"
-				+ "  namedQueries:\n"
-				+ "    - { annotation: NamedNativeQuery, attribute: query, container: NamedNativeQueries, native: true }\n"
-				+ "  jpqlCalls: createQuery\n", "x.yml");
-		assertEquals("AS_IS", set.jpaNaming);
-		assertEquals("value", set.jpaQueries.get(0).attribute);
-		assertEquals("name", set.jpaNamedQueries.get(0).nameAttribute);
-		assertTrue(set.jpaNamedQueries.get(0).nativeQuery);
-		assertEquals(4, set.ruleCount());
-		assertTrue(parseFails("jpa:\n  naming: CAMEL\n", "x.yml").getMessage().contains("jpa.naming"));
-		assertTrue(parseFails("jpa:\n  queries:\n    - { annotation: Query, container: Q }\n", "x.yml").getMessage().contains("container"));
-	}
-
-	/** 폴더 아래의 *.yml 을 규칙 폴더 안의 경로를 이름으로 읽는다(SemanticRuleRegistry 와 같은 방식) */
-	private void readAll(File dir, String prefix, List<RuleSet> sets) throws Exception {
-		File[] files = dir.listFiles();
-		for (int i = 0; i < files.length; i++) {
-			if (files[i].isDirectory()) {
-				readAll(files[i], prefix + files[i].getName() + "/", sets);
-			} else if (files[i].getName().endsWith(".yml")) {
-				// 대응표(idMap)를 쓰는 규칙이 있을 수 있어서 규칙 폴더를 아는 파서로 읽는다.
-				sets.add(new RuleSetParser(new File("conf/rules")).parse(new String(Files.readAllBytes(files[i].toPath()), StandardCharsets.UTF_8)
-						, prefix + files[i].getName()));
+	private void collect(File root, File dir, List<RuleFile> files) throws Exception {
+		File[] children = dir.listFiles();
+		for (int i = 0; children != null && i < children.length; i++) {
+			if (children[i].isDirectory()) {
+				collect(root, children[i], files);
+			} else if (children[i].getName().endsWith(".yml")) {
+				String path = root.toPath().relativize(children[i].toPath()).toString().replace('\\', '/');
+				files.add(new RuleFileParser(root).parse(new String(Files.readAllBytes(children[i].toPath()), StandardCharsets.UTF_8), path));
 			}
 		}
-	}
-
-	@Test
-	public void 하위_폴더의_묶음은_경로가_이름이고_폴더_이름으로_고를_수_있다() {
-		// name 을 적지 않으면 경로가 이름이다. 적었으면 경로와 같아야 한다.
-		assertEquals("hi-japan/frontend", parse("order: 500\n", "hi-japan/frontend.yml").name);
-		assertEquals("hi-japan/frontend", parse("name: hi-japan/frontend\n", "hi-japan/frontend.yml").name);
-		assertEquals("name", parseFails("name: frontend\n", "hi-japan/frontend.yml").getPath());
-		// ruleSets 에 폴더 이름을 적으면 그 아래 묶음을 모두 고른다. 이름 앞부분만 같은 다른 폴더는 고르지 않는다.
-		assertTrue(SemanticRuleRegistry.refersTo("hi-japan", "hi-japan/frontend"));
-		assertTrue(SemanticRuleRegistry.refersTo("hi-japan/backend", "hi-japan/backend"));
-		assertFalse(SemanticRuleRegistry.refersTo("hi-japan", "hi-japan-batch/backend"));
-		assertFalse(SemanticRuleRegistry.refersTo("hi-japan/front", "hi-japan/frontend"));
-	}
-
-
-	@Test
-	public void 하위_폴더의_묶음은_기본으로_그_폴더의_프로젝트에만_쓴다() {
-		// 바로 아래 묶음은 모든 프로젝트에, 하위 폴더 묶음은 기본으로 쓰지 않는다. 적으면 적은 대로.
-		assertTrue(parse("order: 200\n", "spring.yml").autoApply);
-		assertFalse(parse("order: 500\n", "order-system/backend.yml").autoApply);
-		assertTrue(parse("autoApply: true\n", "order-system/backend.yml").autoApply);
-		assertFalse(parse("autoApply: false\n", "spring.yml").autoApply);
-		// 첫 마디가 프로젝트 ID 와 같으면(대소문자 무시) 그 프로젝트의 묶음이다.
-		assertTrue(SemanticRuleRegistry.ownedBy("hi-japan/frontend", "HI-Japan"));
-		assertTrue(SemanticRuleRegistry.ownedBy("order-system/sub/backend", "order-system"));
-		assertFalse(SemanticRuleRegistry.ownedBy("hi-japan/frontend", "HI-Japan-batch"));
-		assertFalse(SemanticRuleRegistry.ownedBy("spring", "spring"));
-		assertFalse(SemanticRuleRegistry.ownedBy("hi-japan/frontend", null));
-	}
-
-	@Test
-	public void 화면_규칙의_ID_다듬기를_읽고_잘못_적으면_막는다() throws Exception {
-		RuleSet set = parse("screens:\n"
-				+ "  calls:\n"
-				+ "    - { function: callTx, method: '{id}', idPattern: '^TX_([A-Z]+)_([A-Z]+)$', idReplace: '$1$2', idCase: lower_first }\n", "a.yml");
-		assertEquals("oRDLIST", set.screenCalls.get(0).methodNameOf("TX_ORD_LIST"));
-		assertNull(set.screenCalls.get(0).methodNameOf("ORD_LIST"));
-		assertEquals("screens.calls[0].idReplace", parseFails("screens:\n  calls:\n    - { function: f, method: '{id}', idReplace: '$1' }\n", "a.yml").getPath());
-		assertEquals("screens.calls[0].idReplace", parseFails("screens:\n  calls:\n    - { function: f, method: '{id}', idPattern: '^(a)$', idReplace: '$2' }\n", "a.yml").getPath());
-		assertEquals("screens.calls[0].idCase", parseFails("screens:\n  calls:\n    - { function: f, method: '{id}', idCase: TITLE }\n", "a.yml").getPath());
-		// 규칙 폴더를 모르는 파서는 대응표를 읽을 수 없다.
-		assertEquals("screens.opens[0].idMap", parseFails("screens:\n  opens:\n    - { function: f, screen: '{id}.xfdl', idMap: m.csv }\n", "a.yml").getPath());
-
-		// 규칙 폴더 안의 대응표를 읽는다. 폴더 밖은 막는다. 대응표 내용도 해시에 들어간다.
-		File dir = Files.createTempDirectory("rules").toFile();
-		File map = new File(dir, "tx.csv");
-		Files.write(map.toPath(), "# 거래 ID,클래스.메소드\nORD001,OrderController.list\nORD002 = save\n".getBytes(StandardCharsets.UTF_8));
-		RuleSetParser withDir = new RuleSetParser(dir);
-		String text = "screens:\n  calls:\n    - { function: callTx, method: '{id}', idMap: tx.csv }\n";
-		RuleSet mapped = withDir.parse(text, "a.yml");
-		assertEquals("OrderController.list", mapped.screenCalls.get(0).methodNameOf("ORD001"));
-		assertEquals("save", mapped.screenCalls.get(0).methodNameOf("ORD002"));
-		assertNull(mapped.screenCalls.get(0).methodNameOf("ORD003"));
-		String before = mapped.hash;
-		Files.write(map.toPath(), "ORD001,OrderController.find\n".getBytes(StandardCharsets.UTF_8));
-		assertFalse(before.equals(withDir.parse(text, "a.yml").hash));
-		final RuleSetParser outside = withDir;
-		RuleException escape = assertThrows(RuleException.class, new Executable() {
-			@Override
-			public void execute() {
-				outside.parse("screens:\n  calls:\n    - { function: f, method: '{id}', idMap: ../x.csv }\n", "a.yml");
-			}
-		});
-		assertEquals("screens.calls[0].idMap", escape.getPath());
-	}
-
-	@Test
-	public void 설정_XML_진입점_규칙을_읽는다() {
-		RuleSet set = parse("endpoints:\n"
-				+ "  xml:\n"
-				+ "    - { endpointType: TRANSACTION, files: 'service-config\\.xml$', element: service, pathAttribute: id,"
-				+ " classAttribute: class, methodAttribute: method }\n"
-				+ "    - { endpointType: HTTP, files: 'routes\\.xml$', element: route, pathAttribute: url, pathTemplate: '{value}.do' }\n", "a.yml");
-		assertEquals(2, set.xmlEndpoints.size());
-		RuleSet.XmlEndpointRule first = set.xmlEndpoints.get(0);
-		assertEquals("service", first.element);
-		assertEquals("class", first.classAttribute);
-		assertNull(first.httpMethod);
-		RuleSet.XmlEndpointRule second = set.xmlEndpoints.get(1);
-		assertEquals("ALL", second.httpMethod);
-		assertEquals(".do", second.suffix);
-		assertNull(second.methodAttribute);
-		assertEquals(2, new SemanticRules(Arrays.asList(set)).getXmlEndpoints().size());
-		assertEquals("endpoints.xml[0].files", parseFails("endpoints:\n  xml:\n    - { endpointType: TX, files: '(', element: a, pathAttribute: b }\n", "a.yml").getPath());
-		assertEquals("endpoints.xml[0].element", parseFails("endpoints:\n  xml:\n    - { endpointType: TX, files: 'a', element: 'x:y', pathAttribute: b }\n", "a.yml").getPath());
-		assertEquals("endpoints.xml[0].pathTemplate", parseFails("endpoints:\n  xml:\n    - { endpointType: TX, files: 'a', element: a, pathAttribute: b, pathTemplate: '.do' }\n", "a.yml").getPath());
 	}
 
 }

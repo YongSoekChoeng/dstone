@@ -1,0 +1,26 @@
+# HI-Japan 화면(WebSquare)의 관례. 화면에 이 함수나 필드가 없으면 아무 일도 하지 않는다.
+description: 화면이 거래 ID 로 서버를 부르는 공통 함수, 출력 폼 필드, 화면 ID 로 여는 함수, 메뉴 목록
+
+screen:
+  # 화면이 주소 대신 거래 ID 로 서버를 부른다. ID 자리가 따옴표 글자인 호출만 잇는다.
+  # HiJS.svr.doRequestAjax("JCST0200M01S", ...) → performJCST0200M01S 메소드
+  # comLib.gfnCallService("JIAC0000M02I", ...)  → performJIAC0000M02I 메소드
+  # 함수 이름 앞의 마디(HiJS.svr.)는 적지 않아도 맞는다.
+  - call: doRequestAjax(ID)
+    to: perform{ID}
+  - call: gfnCallService(ID)
+    to: perform{ID}
+
+  # 화면이 폼을 만들어 거래 ID 를 필드 값으로 보낸다(출력 버튼 → /reporting_ji.do, 서버 JZCI0102C 가 tranId 로 메소드를 고른다).
+  # <input type='hidden' name='tranId' value='JIMC1000M03S'/> → performJIMC1000M03S
+  - field: tranId
+    to: perform{ID}
+
+  # 화면 ID 로 다른 화면을 연다. 그 경로로 끝나는 화면이 하나일 때만 잇는다.
+  # parent.scwin.fnOpenPage("JIMC1000G", ...) → JIMC1000G.xml
+  - open: fnOpenPage(ID)
+    to: "{ID}.xml"
+
+  # 화면 파일에 제목이 없을 때 메뉴 목록에서 화면명을 가져온다.
+  # {'MENU_NM':'履行期間管理', ... ,'SRC_PATH':'/ui/jc/JCIQ0700G.xml'} (ui/main.xml)
+  - menu: { name: MENU_NM, path: SRC_PATH }

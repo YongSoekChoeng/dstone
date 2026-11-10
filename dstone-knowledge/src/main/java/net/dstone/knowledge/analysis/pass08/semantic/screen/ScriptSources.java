@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /**
  * <pre>
  * 화면(JSP) 글자에서 &lt;script src="..."&gt; 로 불러오는 스크립트 파일의 경로를 찾습니다.
- * 파일 하나의 글자만 봅니다. DB는 보지 않으므로 그대로 단위 테스트할 수 있습니다(JspPlugin 이 씁니다).
+ * 파일 하나의 글자만 봅니다. DB는 보지 않으므로 그대로 단위 테스트할 수 있습니다(JspLinker 가 씁니다).
  *
  * 화면이 서버 주소를 JSP 에 적지 않고 불러온 .js 파일에 적는 경우가 있습니다.
  *   impact.jsp           &lt;script src="&lt;%=ctx%&gt;/knowledge/assets/js/knowledge-common.js"&gt;

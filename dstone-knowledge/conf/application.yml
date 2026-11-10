@@ -98,12 +98,12 @@ dstone:
         # SEMANTIC 단계 (프레임워크 규칙으로 의미 붙이기)
         semantic:
             # 프레임워크마다 다른 관례(어떤 애노테이션이 진입점인지, 어떤 메소드가 SQL 이름을 받는지, 어떤 상위 타입이면 서비스인지,
-            # 화면이 거래 ID 로 서버를 부르는 함수 ...)는 규칙 파일에 적는다. 파일 하나가 규칙 묶음 하나다.
-            # 적는 법은 그 폴더의 README.md. 서버가 뜰 때 모두 검사하고(틀리면 뜨지 않는다), 분석할 때마다 다시 읽는다.
+            # 화면이 거래 ID 로 서버를 부르는 함수 ...)는 규칙 파일에 코드 모양 그대로 적는다(예: layer: { SERVICE: "@Service" }).
+            # 폴더가 우선순위다: projects/{프로젝트ID}/ > common/ > guess/. 적는 법은 그 폴더의 README.md.
+            # 서버가 뜰 때 모두 검사하고(틀리면 파일과 줄 번호를 알려 주며 뜨지 않는다), 분석할 때마다 다시 읽는다.
             # 규칙 파일을 고쳤으면 서버를 다시 띄우지 않고 rerunFrom=SEMANTIC 으로 다시 돌리면 된다.
             # 비워 두면 설정 폴더(APP_CONF_DIR) 아래 rules 폴더를 쓴다.
-            # (예전의 screen.call-rules / field-rules / open-rules / menu-rules, layer.super-types 키는 conf/rules/hi-japan/frontend.yml, hi-japan/backend.yml 로 옮겼다.
-            #  이 키를 다시 적으면 읽기는 하지만 경고를 남긴다.)
+            # (예전의 screen.call-rules / layer.super-types 키는 더 이상 읽지 않는다. conf/rules/projects/hi-japan/ 로 옮겼다.)
             rules-dir:
         # RESOLVE 단계 (호출이 누구를 가리키는지 풀기)
         resolve:

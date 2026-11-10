@@ -1,0 +1,46 @@
+# Spring 의 관례. 애노테이션은 단순 이름으로 맞춘다(와일드카드 import 면 전체 이름을 알 수 없어서).
+description: Spring MVC 주소, 스케줄, 리스너, 주입, 프록시, 스테레오타입 계층, ModelAndView 화면
+
+layer:
+  # @Component 는 뜻이 넓어서 짐작 규칙(guess/default.yml)에 있다.
+  CONTROLLER: ["@Controller", "@RestController", "@ControllerAdvice", "@RestControllerAdvice"]
+  SERVICE: "@Service"
+  REPOSITORY: ["@Repository", "@Mapper"]
+  CONFIG: ["@Configuration", "@SpringBootApplication", "@ConfigurationProperties"]
+  MODEL: ["@Entity", "@Embeddable", "@MappedSuperclass", "@Document"]
+  ASPECT: "@Aspect"
+
+entry:
+  # 클래스의 @RequestMapping("/order") + 메소드의 @GetMapping("/list") → GET /order/list
+  HTTP:
+    class: "@RequestMapping(value|path = URL)"
+    ANY: "@RequestMapping(value|path = URL, method = VERB)"   # method = RequestMethod.GET. 적지 않았으면 ALL
+    GET: "@GetMapping(value|path = URL)"
+    POST: "@PostMapping(value|path = URL)"
+    PUT: "@PutMapping(value|path = URL)"
+    DELETE: "@DeleteMapping(value|path = URL)"
+    PATCH: "@PatchMapping(value|path = URL)"
+  # 정해진 시각에 도는 메소드. 진입점 주소 자리(path)에는 주기를 넣는다.
+  SCHEDULED: "@Scheduled(cron|fixedRate|fixedDelay|fixedRateString|fixedDelayString = KEY)"
+  # 메시지나 이벤트를 받는 메소드. 주소 자리에는 토픽이나 큐 이름을 넣는다.
+  LISTENER:
+    - "@KafkaListener(topics|queues|destination|value = KEY)"
+    - "@RabbitListener(topics|queues|destination|value = KEY)"
+    - "@JmsListener(topics|queues|destination|value = KEY)"
+    - "@SqsListener(topics|queues|destination|value = KEY)"
+    - "@StreamListener(topics|queues|destination|value = KEY)"
+    - "@EventListener(topics|queues|destination|value = KEY)"
+    - "@TransactionalEventListener(topics|queues|destination|value = KEY)"
+
+# 이 애노테이션이 붙은 필드 → INJECTS 관계(필드를 가진 타입 → 필드의 타입)
+inject: ["@Autowired", "@Inject", "@Resource"]
+
+# 이 애노테이션이 메소드나 그 클래스에 붙으면 프록시가 끼어드는 메소드로 표시한다(proxy_related)
+proxy: ["@Transactional", "@Async", "@Cacheable", "@CacheEvict", "@CachePut", "@Retryable", "@PreAuthorize", "@Secured"]
+
+view:
+  # new ModelAndView("order/list") / setViewName("order/list") → order/list.jsp 로 끝나는 JSP 가 하나뿐이면 RENDERS
+  # redirect: / forward: 는 화면이 아니라 다른 주소로 보내는 것이라 뺀다.
+  - call: [new ModelAndView(VIEW), _.setViewName(VIEW)]
+    file: "{VIEW}.jsp"
+    skip: '^(redirect|forward):'

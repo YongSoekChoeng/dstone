@@ -29,31 +29,31 @@ import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.pass03.declare.JavaSqlCollector;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.SemanticRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.ProjectRules;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.Rule;
 import net.dstone.knowledge.analysis.pass08.semantic.AnnotationValues;
 import net.dstone.knowledge.analysis.pass08.semantic.ConstantEvaluator;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
- * JPA 의 쿼리를 SQL statement 로 만듭니다(analysis_mapper, mapper_type JPA). 무엇이 JPA 의 관례인지는 규칙 파일(conf/rules/jpa.yml)에 있습니다.
+ * JPA 의 쿼리를 SQL statement 로 만듭니다(analysis_mapper, mapper_type JPA). 무엇이 JPA 의 관례인지는 규칙 파일(conf/rules/common/jpa.yml)의 jpa: 절에 있습니다.
  *
  *   @Query("select o from Order o where ...")             그 메소드의 statement(JPQL). nativeQuery = true 면 SQL
  *   @NamedQuery(name = "Order.findAll", query = "...")     이름 있는 statement. em.createNamedQuery("Order.findAll") 은
- *                                                          MyBatisPlugin 이 규칙(callArguments)으로 잇고,
+ *                                                          SqlLinker 가 규칙(sql: _.createNamedQuery(SQL))으로 잇고,
  *                                                          저장소의 같은 이름 메소드(OrderRepository.findAll)는 여기서 잇는다
  *   interface OrderRepository extends JpaRepository&lt;Order, Long&gt;
  *       List&lt;Order&gt; findByStatus(String s);              메소드 이름으로 만드는 쿼리(DERIVED). SQL 글은 없고, 엔티티의 테이블을 읽는다
  *                                                          (delete… / remove… 는 지운다)
  *
- * 테이블과 메소드는 여기서 잇지 않습니다. MyBatisPlugin(400)이 SQL 관계를 지우고 다시 만들기 때문에, 그 뒤에 도는 JavaSqlPlugin(410)이
+ * 테이블과 메소드는 여기서 잇지 않습니다. MapperLinker 가 SQL 관계를 지우고 다시 만들기 때문에, 그 뒤에 도는 JavaSqlLinker 가
  * Java 문자열 SQL 과 함께 잇습니다. 여기서는 statement 만 만들고, 이을 메소드를 properties_json 에 적어 둡니다.
  * 쿼리 글을 상수와 이어 붙여 적었으면 상수를 따라가 계산합니다(ConstantEvaluator). 계산하지 못하면 만들지 않습니다.
  * </pre>
  */
 @Component
-public class JpaPlugin implements SemanticPlugin {
+public class JpaQueryReader implements SemanticStep {
 
 	/** Spring Data 가 메소드 이름으로 쿼리를 만드는 모양: findByName, countByStatus, deleteByIdIn ... */
 	private static final Pattern DERIVED = Pattern.compile("^(find|read|get|query|search|stream|count|exists|delete|remove)[A-Za-z0-9_]*?By[A-Z_][A-Za-z0-9_]*$");
@@ -76,17 +76,11 @@ public class JpaPlugin implements SemanticPlugin {
 	}
 
 	@Override
-	public int order() {
-		// SQL 매퍼를 잇는 MyBatisPlugin(400) 앞: createNamedQuery("이름") 을 그 플러그인이 이름으로 찾을 수 있게 statement 를 먼저 만든다.
-		return 390;
-	}
-
-	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
 		javaSqlDao.deleteJpaStatements(revisionId);
-		SemanticRules rules = context.getSemanticRules();
-		if (rules.getJpaEntities().isEmpty() && rules.getJpaQueries().isEmpty() && rules.getJpaNamedQueries().isEmpty()) {
+		ProjectRules rules = context.getProjectRules();
+		if (rules.jpaEntities().isEmpty() && rules.jpaQueries().isEmpty() && rules.jpaNamedQueries().isEmpty()) {
 			return "JPA 규칙이 없습니다.";
 		}
 		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
@@ -105,12 +99,12 @@ public class JpaPlugin implements SemanticPlugin {
 	}
 
 	/** @Query 같은 메소드 쿼리. @return 쿼리 애노테이션이 붙은 메소드 ID 들 */
-	private Set<String> addQueries(AnalysisJobContext context, SemanticRules rules, ConstantEvaluator evaluator, int[] counts) {
+	private Set<String> addQueries(AnalysisJobContext context, ProjectRules rules, ConstantEvaluator evaluator, int[] counts) {
 		long revisionId = context.getRevisionId();
 		Set<String> methods = new HashSet<String>();
-		List<RuleSet.JpaQueryRule> queryRules = rules.getJpaQueries();
+		List<Rule.JpaQuery> queryRules = rules.jpaQueries();
 		for (int r = 0; r < queryRules.size(); r++) {
-			RuleSet.JpaQueryRule rule = queryRules.get(r);
+			Rule.JpaQuery rule = queryRules.get(r);
 			List<Map<String, Object>> rows = javaSqlDao.selectAnnotations(revisionId, "METHOD", single(rule.annotation));
 			for (int i = 0; i < rows.size(); i++) {
 				context.checkCancelled();
@@ -129,6 +123,7 @@ public class JpaPlugin implements SemanticPlugin {
 				properties.put("language", nativeQuery ? "SQL" : "JPQL");
 				properties.put("annotation", rule.annotation);
 				properties.put("methodId", methodId);
+				properties.put("ruleAt", rule.at());
 				insert(statement(revisionId, (String) row.get("ownerFqn"), (String) row.get("methodName"), text, properties, row));
 				counts[0]++;
 			}
@@ -137,13 +132,13 @@ public class JpaPlugin implements SemanticPlugin {
 	}
 
 	/** @NamedQuery 같은 이름 있는 쿼리. 이름 → 넣을 행(저장소 메소드를 다 이은 뒤에 넣는다) */
-	private Map<String, Map<String, Object>> namedQueries(AnalysisJobContext context, SemanticRules rules, JpaEntities entities
+	private Map<String, Map<String, Object>> namedQueries(AnalysisJobContext context, ProjectRules rules, JpaEntities entities
 			, ConstantEvaluator evaluator, int[] counts) {
 		long revisionId = context.getRevisionId();
 		Map<String, Map<String, Object>> named = new LinkedHashMap<String, Map<String, Object>>();
-		List<RuleSet.JpaQueryRule> namedRules = rules.getJpaNamedQueries();
+		List<Rule.JpaQuery> namedRules = rules.jpaNamedQueries();
 		for (int r = 0; r < namedRules.size(); r++) {
-			RuleSet.JpaQueryRule rule = namedRules.get(r);
+			Rule.JpaQuery rule = namedRules.get(r);
 			List<Map<String, Object>> rows = javaSqlDao.selectAnnotations(revisionId, "TYPE", single(rule.annotation));
 			for (int i = 0; i < rows.size(); i++) {
 				Map<String, Object> attributes = AnnotationValues.parse((String) rows.get(i).get("attributesJson"));
@@ -171,7 +166,7 @@ public class JpaPlugin implements SemanticPlugin {
 		return named;
 	}
 
-	private void addNamed(Map<String, Map<String, Object>> named, RuleSet.JpaQueryRule rule, JpaEntities.Entity entity, String name, String text
+	private void addNamed(Map<String, Map<String, Object>> named, Rule.JpaQuery rule, JpaEntities.Entity entity, String name, String text
 			, Map<String, Object> row, long revisionId, int[] counts) {
 		if (name == null || text == null) {
 			counts[3]++;
@@ -180,6 +175,7 @@ public class JpaPlugin implements SemanticPlugin {
 		Map<String, Object> properties = new LinkedHashMap<String, Object>();
 		properties.put("language", rule.nativeQuery ? "SQL" : "JPQL");
 		properties.put("annotation", rule.annotation);
+		properties.put("ruleAt", rule.at());
 		if (entity != null) {
 			properties.put("entity", entity.name);
 		}
@@ -189,7 +185,7 @@ public class JpaPlugin implements SemanticPlugin {
 	}
 
 	/** "@NamedQuery(name = \"X\", query = \"...\")" 에서 [이름, 쿼리]. 이 규칙의 애노테이션이 아니면 null */
-	private String[] innerAnnotation(String text, RuleSet.JpaQueryRule rule, String owner, ConstantEvaluator evaluator) {
+	private String[] innerAnnotation(String text, Rule.JpaQuery rule, String owner, ConstantEvaluator evaluator) {
 		AnnotationExpr annotation;
 		try {
 			annotation = StaticJavaParser.parseAnnotation(text);
@@ -233,10 +229,10 @@ public class JpaPlugin implements SemanticPlugin {
 	 * 저장소의 엔티티는 상속에 적은 타입 인자 가운데 엔티티인 것(JpaRepository&lt;Order, Long&gt; 의 Order)이다. 모르면 건너뛴다.
 	 * </pre>
 	 */
-	private void addRepositoryMethods(AnalysisJobContext context, SemanticRules rules, JpaEntities entities, Map<String, Map<String, Object>> named
+	private void addRepositoryMethods(AnalysisJobContext context, ProjectRules rules, JpaEntities entities, Map<String, Map<String, Object>> named
 			, Set<String> queryMethods, int[] counts) {
 		long revisionId = context.getRevisionId();
-		List<String> baseTypes = rules.getJpaRepositories();
+		List<String> baseTypes = rules.jpaRepositories();
 		if (baseTypes.isEmpty() || entities.isEmpty()) {
 			return;
 		}

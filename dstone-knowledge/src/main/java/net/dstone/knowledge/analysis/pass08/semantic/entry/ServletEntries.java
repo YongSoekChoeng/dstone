@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,7 +19,7 @@ import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.job.AnalysisJobReporter;
 import net.dstone.knowledge.analysis.common.EncodingDetector;
-import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
+import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
 /**
  * <pre>
@@ -28,7 +28,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  *   web.xml의 servlet / servlet-mapping → SERVLET 진입점. 주소마다, 처리 메소드(doGet, doPost ...)마다 한 건.
  *   web.xml의 filter / listener         → analysis_resource에 기록(FILTER_MAPPING, LISTENER)
  *   @WebServlet                         → SERVLET 진입점(서블릿 3.0 이후의 방식)
- *   HttpServlet을 상속한 클래스의 계층(CONTROLLER)은 규칙 파일 conf/rules/servlet.yml 에 있고 ConfiguredLayerPlugin 이 정한다.
+ *   HttpServlet을 상속한 클래스의 계층(CONTROLLER)은 규칙 파일 conf/rules/common/servlet.yml 에 있고 LayerResolver 가 정한다.
  *
  * 서블릿 클래스가 프로젝트 밖에 있어도(Spring의 DispatcherServlet 등) 진입점으로 남깁니다.
  * "*.do로 끝나는 요청은 Spring이 받는다" 같은 사실이 거기서 나오기 때문입니다. 이때 처리 메소드는 비어 있습니다.
@@ -39,7 +39,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticPlugin;
  * </pre>
  */
 @Component
-public class ServletPlugin extends BaseObject implements SemanticPlugin {
+public class ServletEntries extends BaseObject implements SemanticStep {
 
 	private static final String PASS = "SEMANTIC";
 
@@ -60,11 +60,6 @@ public class ServletPlugin extends BaseObject implements SemanticPlugin {
 	@Override
 	public String name() {
 		return "servlet";
-	}
-
-	@Override
-	public int order() {
-		return 200;
 	}
 
 	@Override
@@ -92,7 +87,6 @@ public class ServletPlugin extends BaseObject implements SemanticPlugin {
 		}
 
 		endpoints += semanticDao.insertWebServletEndpoints(revisionId);
-		// HttpServlet / Filter 를 상속한 클래스의 계층은 규칙 파일(conf/rules/servlet.yml, layers.superTypes)로 ConfiguredLayerPlugin 이 정한다.
 
 		return "web.xml " + files.size() + "개, 서블릿 진입점 " + endpoints + ", 필터/리스너 " + resources + ".";
 	}

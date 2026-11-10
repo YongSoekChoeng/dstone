@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass08.semantic.web;
+package net.dstone.knowledge.analysis.pass08.semantic.entry;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,12 +10,12 @@ import java.util.Map;
 import java.util.Set;
 
 import net.dstone.knowledge.common.util.JsonText;
-import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleSet;
+import net.dstone.knowledge.analysis.pass08.semantic.rule.Rule;
 import net.dstone.knowledge.analysis.pass08.semantic.AnnotationValues;
 
 /**
  * <pre>
- * HTTP 진입점 규칙(endpoints.http) 하나로 진입점 행을 만듭니다. DB 를 읽고 쓰는 일은 SpringPlugin 이 하고, 여기서는 읽어 온 것으로 계산만 합니다.
+ * HTTP 진입점 규칙(entry: HTTP) 하나로 진입점 행을 만듭니다. DB 를 읽고 쓰는 일은 EntryFinder 가 하고, 여기서는 읽어 온 것으로 계산만 합니다.
  * 그래서 상속 관계를 흉내 낸 값으로 단위 테스트할 수 있습니다.
  *
  * 주소 = 클래스의 주소 + 메소드의 주소 (클래스 주소가 /* 로 끝나면 /* 를 떼고 잇는다. Spring 과 같다)
@@ -160,13 +160,13 @@ public class HttpEndpointBuilder {
 		}
 	}
 
-	private final RuleSet.HttpMappingRule rule;
+	private final Rule.HttpEntry rule;
 	private final TypeGraph graph;
 	private final Map<String, TypeInfo> types;
 	private final Map<String, List<MethodInfo>> methodsByType;
 	private final PathEvaluator evaluator;
 
-	private final Map<String, RuleSet.HttpMethodAnnotation> methodRules = new HashMap<String, RuleSet.HttpMethodAnnotation>();
+	private final Map<String, Rule.HttpAnnotation> methodRules = new HashMap<String, Rule.HttpAnnotation>();
 	private final Map<String, List<Mapping>> classMappings = new HashMap<String, List<Mapping>>();
 	private final Map<String, List<Mapping>> methodMappingsByType = new LinkedHashMap<String, List<Mapping>>();
 	/** 주소 애노테이션이 붙은 메소드 ID */
@@ -177,7 +177,7 @@ public class HttpEndpointBuilder {
 	private int unresolved;
 	private int inherited;
 
-	public HttpEndpointBuilder(RuleSet.HttpMappingRule rule, TypeGraph graph, Map<String, TypeInfo> types, Map<String, List<MethodInfo>> methodsByType
+	public HttpEndpointBuilder(Rule.HttpEntry rule, TypeGraph graph, Map<String, TypeInfo> types, Map<String, List<MethodInfo>> methodsByType
 			, PathEvaluator evaluator) {
 		this.rule = rule;
 		this.graph = graph;
@@ -189,18 +189,8 @@ public class HttpEndpointBuilder {
 		}
 	}
 
-	/** 이 규칙이 보는 애노테이션 이름(메소드의 것 + 클래스의 것) */
-	public static List<String> annotationNames(RuleSet.HttpMappingRule rule) {
-		Set<String> names = new LinkedHashSet<String>();
-		for (int i = 0; i < rule.methodAnnotations.size(); i++) {
-			names.add(rule.methodAnnotations.get(i).annotation);
-		}
-		names.addAll(rule.classAnnotations);
-		return new ArrayList<String>(names);
-	}
-
 	/** 주소 애노테이션이 붙은 메소드를 가진 타입들(상속을 따라 하위 타입을 찾을 출발점) */
-	public static Set<String> mappedOwners(RuleSet.HttpMappingRule rule, List<Map<String, Object>> rows) {
+	public static Set<String> mappedOwners(List<Map<String, Object>> rows) {
 		Set<String> owners = new LinkedHashSet<String>();
 		for (int i = 0; i < rows.size(); i++) {
 			Map<String, Object> row = rows.get(i);
@@ -220,7 +210,7 @@ public class HttpEndpointBuilder {
 	public List<Map<String, Object>> build(List<Map<String, Object>> rows) {
 		for (int i = 0; i < rows.size(); i++) {
 			Mapping mapping = new Mapping(rows.get(i));
-			if ("TYPE".equals(mapping.row.get("targetKind")) && rule.classAnnotations.contains(mapping.annotation())) {
+			if ("TYPE".equals(mapping.row.get("targetKind")) && rule.classAnnotation(mapping.annotation()) != null) {
 				TypeGraph.listOf(classMappings, mapping.typeId).add(mapping);
 			} else if ("METHOD".equals(mapping.row.get("targetKind")) && mapping.methodName() != null && methodRules.containsKey(mapping.annotation())) {
 				TypeGraph.listOf(methodMappingsByType, mapping.typeId).add(mapping);
@@ -389,6 +379,7 @@ public class HttpEndpointBuilder {
 
 		Map<String, Object> properties = new LinkedHashMap<String, Object>();
 		properties.put("annotation", mapping.annotation());
+		properties.put("ruleAt", methodRules.get(mapping.annotation()).at());
 		if (inheritedFrom != null) {
 			properties.put("inheritedFrom", inheritedFrom);
 		}
@@ -414,12 +405,14 @@ public class HttpEndpointBuilder {
 		}
 	}
 
-	/** 규칙의 주소 속성(pathAttributes) 가운데 처음으로 적힌 것의 값들. 없거나 비었으면 [""] */
+	/** 규칙의 URL 자리 속성 가운데 처음으로 적힌 것의 값들. 없거나 비었으면 [""] */
 	private List<String> paths(Mapping mapping, List<String> unresolvedPaths) {
+		Rule.HttpAnnotation annotation = "TYPE".equals(mapping.row.get("targetKind"))
+				? rule.classAnnotation(mapping.annotation()) : methodRules.get(mapping.annotation());
 		List<String> values = new ArrayList<String>();
-		for (int i = 0; i < rule.pathAttributes.size(); i++) {
-			if (mapping.attributes.get(rule.pathAttributes.get(i)) != null) {
-				values = AnnotationValues.strings(mapping.attributes, rule.pathAttributes.get(i));
+		for (int i = 0; i < annotation.pathAttributes.size(); i++) {
+			if (mapping.attributes.get(annotation.pathAttributes.get(i)) != null) {
+				values = AnnotationValues.strings(mapping.attributes, annotation.pathAttributes.get(i));
 				break;
 			}
 		}
@@ -446,14 +439,14 @@ public class HttpEndpointBuilder {
 
 	/** 규칙에 정한 HTTP 메소드, 아니면 속성(method = RequestMethod.GET)의 값. 없으면 ALL */
 	private List<String> httpMethods(Mapping mapping) {
-		RuleSet.HttpMethodAnnotation methodRule = methodRules.get(mapping.annotation());
+		Rule.HttpAnnotation methodRule = methodRules.get(mapping.annotation());
 		List<String> methods = new ArrayList<String>();
 		if (methodRule.httpMethod != null) {
 			methods.add(methodRule.httpMethod);
 			return methods;
 		}
-		List<String> values = methodRule.methodAttribute == null ? new ArrayList<String>()
-				: AnnotationValues.strings(mapping.attributes, methodRule.methodAttribute);
+		List<String> values = methodRule.verbAttribute == null ? new ArrayList<String>()
+				: AnnotationValues.strings(mapping.attributes, methodRule.verbAttribute);
 		if (values.isEmpty()) {
 			values.add("");
 		}
