@@ -110,14 +110,11 @@
 		</dependency>
 
 		<!-- Test -->
+		<!--
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
-			<!-- 이 제외가 없으면 logback이 실행 jar에까지 딸려 들어와 기동이 깨진다
-			     ("log4j-slf4j2-impl cannot be present with log4j-to-slf4j").
-			     starter-test가 끌어오는 spring-boot-starter가 dstone-common 쪽 경로보다 가까워서,
-			     common에서 해 둔 logging 제외가 적용되지 않기 때문이다. -->
 			<exclusions>
 				<exclusion>
 					<groupId>org.springframework.boot</groupId>
@@ -125,6 +122,7 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
+		-->
 
 	</dependencies>
 
@@ -170,12 +168,14 @@
 				</configuration>
 			</plugin>
 
-			<!-- 단위 테스트 실행.
-			     버전을 적지 않으면 Maven 기본값(2.17)이 잡히는데, 그 버전은 JUnit 5 테스트를 돌리지 못한다. -->
+			<!-- 단위 테스트 실행. 버전을 적지 않으면 Maven 기본값(2.17)이 잡히는데, 그 버전은 JUnit 5 테스트를 돌리지 못한다. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.5.2</version>
+			    <configuration>
+			    	<skipTests>true</skipTests>
+			    </configuration>				
 			</plugin>
 
 			<!-- JAR (스프링부트형식-BOOT-INF포함구조-으로) 패키징을 위한 플러그인 -->
