@@ -16,7 +16,7 @@ screen:
   - { call: doRequestAjax(ID), to: "perform{ID}" }  # 화면의 doRequestAjax("A01") → performA01 메소드
 ```
 
-자세한 설명과 예제는 `docs/11-2.dstone-knowledge-Rules.md`에 있다.
+자세한 설명과 예제는 `docs/11.dstone-knowledge.md 4.7절`에 있다.
 
 ## 폴더 = 우선순위
 
