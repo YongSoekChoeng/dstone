@@ -1,0 +1,628 @@
+# dstoneknowledge_에서_S
+
+> 생성일시: 2026-11-11 14:12
+
+## 질문
+
+dstone-knowledge 에서 
+SCAN 단계에서는 jsp 파일은 건너뛰나?
+
+---
+
+## 답변
+
+아니요, SCAN 단계는 JSP를 건너뛰지 않고 스캔 대상에 넣습니다.
+
+**JSP로 분류되는 확장자** (`pass01/scan/FileClassifier.java:37`)
+- `.jsp`, `.jspf`, `.jspx`, `.tag`는 `language = "JSP"`, `fileType = "JSP"`로 분류됩니다.
+
+**SCAN이 JSP 파일에 하는 일** (`ScanPass.java:178` `scanFile`)
+- 파일을 읽어 체크섬, 인코딩, 줄 수를 구합니다.
+- `analysis_file`에 `parseStatus = "PENDING"`으로 한 행을 씁니다.
+- 내용은 파싱하지 않습니다. JSP 내용은 뒤 단계에서 읽습니다.
+
+**JSP라도 SCAN에서 빠지거나 분석에서 제외되는 경우는 두 가지입니다.**
+1. **제외 폴더 아래에 있을 때**: `dstone.knowledge.scan.exclude-dirs`에 지정된 폴더(`target`, `build`, `node_modules` 등) 안의 파일은 아예 훑지 않습니다.
+2. **5MB를 넘을 때**: `max-file-bytes`(기본 5MB)보다 크면 행은 남지만 `parseStatus = "SKIPPED"`가 되어 분석에서 빠집니다.
+
+참고로 `conf/application.yml:93`의 `exclude-dirs`에 `/test/`가 들어 있는데, 이 값은 동작하지 않습니다. `ScanPass.preVisitDirectory`는 폴더 이름 하나(`dir.getFileName()`)만 비교하므로 슬래시가 들어간 값과는 일치할 수 없습니다. 그래서 지금은 `test` 폴더도 스캔됩니다. 원래 `test` 폴더를 빼려던 설정이라면 고쳐야 합니다. 원하시면 수정하겠습니다.
+
+---
+
+## 질문
+
+DeclarePass 에서는 java, jsp 만 처리한다고 했는데 해당 파일타입을 필터링하는 부분은 어디에 있나?
+
+---
+
+## 답변
+
+Now trace into FilePassRunner and the SQL.
+
+---
+
+## 답변
+
+필터링은 SQL에서 합니다. Java 코드에서 확장자를 거르는 부분은 없고, 언어 값을 넘겨 받은 `INSERT` 문의 `WHERE` 절이 대상을 고릅니다.
+
+**1. `DeclarePass`가 언어를 지정해 두 번 실행합니다** (`src/main/java/net/dstone/knowledge/analysis/pass03/declare/DeclarePass.java:93`)
+```java
+filePassRunner.run(context, NAME, "JAVA", handler);
+filePassRunner.run(context, NAME, "JSP", handler);
+```
+
+**2. `FilePassRunner.run()`이 그 언어 값을 `seedFilePass`에 넘깁니다** (`src/main/java/net/dstone/knowledge/analysis/job/FilePassRunner.java:70`)
+```java
+filePassDao.seedFilePass(revisionId, pass, language);
+```
+
+**3. 실제 필터링은 이 `INSERT`의 `WHERE`가 합니다** (`src/main/resources/sqlmap/analysis/FilePassDao.xml:9`)
+```sql
+INSERT INTO analysis_file_pass (file_id, pass, revision_id, status)
+SELECT file_id, #{pass}, revision_id
+     , CASE WHEN parse_status = 'SKIPPED' THEN 'SKIPPED' ELSE 'PENDING' END
+  FROM analysis_file
+ WHERE revision_id = #{revisionId}
+   AND language = #{language}     -- 여기서 걸러짐
+ON CONFLICT (file_id, pass) DO NOTHING
+```
+`language`가 `JAVA` 또는 `JSP`인 파일만 `analysis_file_pass`에 이 단계의 작업 행으로 들어갑니다. 이 값은 SCAN 단계에서 `FileClassifier.languageOf()`가 정해 둔 것입니다.
+
+**4. 처리할 파일은 이 작업 행에서 꺼냅니다** (`selectPendingFiles`, 같은 XML 28행)
+`analysis_file_pass`에서 `pass = 'DECLARE'`이고 `status = 'PENDING'`인 행만 읽습니다. 3번에서 행이 만들어지지 않은 XML, YAML 같은 파일은 이 단계에서 아예 보이지 않습니다.
+
+`parseFile()` 안에서도 대상을 한 번 더 거릅니다 (`DeclarePass.java:124`).
+- Java 파일 중 패키지가 `rootPackages` 밖에 있으면 건너뜁니다. JSP는 패키지가 없으므로 이 조건을 적용하지 않습니다.
+- JSP는 `JspToJava.convert()`로 Java 소스로 바꾼 뒤 Java와 같은 방식으로 파싱합니다. Java 코드가 없는 JSP는 `"Java 코드가 없는 JSP입니다."`라는 사유로 SKIPPED 처리됩니다.
+
+---
+
+## 질문
+
+dstone-knowledge 에서 
+analysis_reference.ref_kind 의 종류(범례)와 각 종류에 대한 설명을 해줘.
+
+---
+
+## 답변
+
+Now let me see where each kind is produced.
+
+---
+
+## 답변
+
+`analysis_reference.ref_kind` 값은 9가지입니다. 스키마 주석(`src/main/resources/schema/02-create-table-postgresql-dstone-knowledge.sql:264`)과 이 값을 만드는 코드가 일치합니다.
+
+이 테이블에는 DECLARE 단계가 소스에서 **이름만 보고 적어 둔 참조**가 들어갑니다. 이 시점에는 그 이름이 실제로 무엇을 가리키는지 아직 모릅니다. 값은 `DeclarationCollector`가 넣고, RESOLVE 단계의 `ReferenceResolver`가 이를 풀어 `analysis_relation`의 관계로 바꿉니다.
+
+| ref_kind | 기록 대상 (코드 예) | `name`에 들어가는 값 | `from_kind` | RESOLVE 후 관계 |
+|---|---|---|---|---|
+| `CALL` | 메소드 호출 `orderService.save(vo)`<br>생성자 안의 `this(...)`, `super(...)` | 메소드 이름 `save`<br>`this(...)`/`super(...)`는 `<init>` | METHOD (필드 초기화식이면 FIELD) | `CALLS` |
+| `CREATE` | 객체 생성 `new OrderVo(a, b)` | 타입 이름 `OrderVo` (제네릭 제거) | METHOD / FIELD | `CREATES` (타입)와 `CALLS` (생성자) |
+| `FIELD_ACCESS` | 필드 접근 `this.dao`, `Const.MAX` | 필드 이름 `dao`, `MAX` | METHOD / FIELD | `ACCESSES_FIELD` |
+| `TYPE_USE` | 파라미터·반환·변수·제네릭 인자에 쓴 타입 `List<OrderVo> list` | 타입 이름 (`List`, `OrderVo`) | METHOD / FIELD | `USES_TYPE` |
+| `THROWS` | 메소드 선언의 `throws BizException` | 예외 타입 이름 | METHOD | `THROWS` |
+| `EXTENDS` | 클래스 선언의 `extends BaseDao` | 상위 클래스 이름 | TYPE | `EXTENDS` |
+| `IMPLEMENTS` | `implements OrderService` (class, enum, record) | 인터페이스 이름 | TYPE | `IMPLEMENTS` |
+| `ANONYMOUS_SUPER` | 익명 클래스의 상위 타입 `new Runnable() { ... }`<br>몸통이 따로 있는 enum 상수 | 상위 타입 이름 `Runnable` | TYPE (익명 클래스 `바깥타입$번호`) | 클래스면 `EXTENDS`, 인터페이스면 `IMPLEMENTS` |
+| `METHOD_REF` | 메소드 참조 `OrderVo::getId` | 메소드 이름 `getId` | METHOD / FIELD | `CALLS` (이름으로만 추정) |
+
+**종류별로 알아 둘 점**
+
+- **`CALL`**
+  - 호출 대상이 되는 식(`orderService`, `this.dao`)은 `scope_text`에, 인자 개수는 `arg_count`에 들어갑니다.
+  - 첫 인자가 문자열 리터럴이면 `arg_text`에, 둘째 인자부터의 문자열 리터럴은 `args_json`에 적힌 그대로 담깁니다.
+  - `sqlSession.selectList("order.findAll")`이나 `new ModelAndView("order/list")`처럼 문자열로 SQL이나 화면을 가리키는 호출을 SEMANTIC 단계의 규칙(`conf/rules`)이 이 값으로 연결합니다. `CREATE`도 같은 방식입니다.
+- **`TYPE_USE`**
+  - 한 멤버 안에서 같은 타입을 여러 번 써도 한 번만 기록합니다. 행 수를 줄이려는 처리입니다 (`DeclarationCollector.java:704`).
+- **`ANONYMOUS_SUPER`**
+  - DECLARE 시점에는 `new X() {}`의 `X`가 클래스인지 인터페이스인지 알 수 없어서 따로 둔 종류입니다.
+  - RESOLVE가 이를 판별해 `EXTENDS`나 `IMPLEMENTS`로 연결합니다. 프로젝트 밖 타입이라 판별할 수 없으면 `EXTENDS`로 두고 `kindUnknown: true`를 붙입니다 (`ReferenceResolver.java:617`).
+- **`METHOD_REF`**
+  - `Foo::bar`는 해석기로 정확히 풀기 어렵습니다. 그래서 이름으로만 후보를 찾고 `HEURISTIC`으로 남깁니다 (`ReferenceResolver.java:237`).
+- **람다**
+  - 람다는 별도 타입으로 만들지 않습니다. 람다 안의 호출은 바깥 메소드에서 나간 `CALL`로 기록됩니다.
+- **JSP**
+  - JSP의 스크립틀릿은 `JspToJava`가 Java 소스로 바꿔 같은 방식으로 수집합니다. 그래서 JSP 전용 `ref_kind`는 없습니다.
+
+**함께 보면 좋은 `status` 컬럼** (같은 테이블)
+
+| status | 의미 |
+|---|---|
+| `PENDING` | 아직 RESOLVE 전 |
+| `RESOLVED` | 프로젝트 안의 대상을 정확히 찾음 |
+| `EXTERNAL` | 프로젝트 밖(JDK, 라이브러리)의 대상 |
+| `HEURISTIC` | 이름 등으로 추정해 연결함 |
+| `UNRESOLVED` | 찾지 못함. 사유는 `fail_reason`에 있음 |
+| `IGNORED` | 풀 대상이 아님 |
+
+---
+
+## 질문
+
+<pasted_content id="b7aa">
+/docs/11.dstone-knowledge.md 에 아래의 작업을 해줘.
+
+<작업대상 단락>
+2-3. DECLARE — 무엇이 선언돼 있나
+
+<작업 내용>
+상기 내용을 요약해서 테이블 단락의 아래쪽에 붙여줘.
+</pasted_content id="b7aa">
+
+---
+
+## 질문
+
+Base directory for this skill: /app/dstone/.claude/skills/humanizer
+
+# humanizer: 한국어 AI 작문 패턴 감지 및 교정기
+
+## 소개
+
+당신은 AI가 생성한 텍스트의 특징적인 패턴을 감지하고 교정하는 한국어 글쓰기 분석 전문가입니다. 당신의 전문성은 과학적 언어학 연구, 특히 KatFishNet 논문(ArXiv 2503.00032v4)에 기반하고 있으며, 이 논문은 인간이 작성한 텍스트와 LLM이 생성한 한국어 텍스트 사이의 측정 가능한 차이를 식별했습니다.
+
+**중요한 컨텍스트**:
+- 이 스킬은 **한국어 텍스트에만** 집중하며, 영어 번역이나 다른 언어는 다루지 않습니다
+- 검출 패턴은 높은 정확도(쉼표 패턴: 94.88% AUC, 품사 다양성: 82.99% AUC, 띄어쓰기: 79.51% AUC)를 가진 **실증적 언어학 분석**에 기반합니다
+- 당신의 목표는 원래의 의미와 의도를 보존하면서 텍스트를 **자연스럽게 인간이 작성한 것처럼** 만드는 것입니다
+- 우선순위에 따라 구성된 6개 카테고리의 40가지 고유 패턴을 분석하며, 각 패턴은 S1/S2/S3 심각도로 분류됩니다
+
+## 작업 설명
+
+실행될 때 다음을 수행합니다:
+
+1. **한국어 텍스트 읽기** - 사용자가 제공한 텍스트(인자, 대화 컨텍스트, 또는 파일)
+2. **텍스트 분석** - 아래에 설명된 40가지 검출 패턴에 대해 분석
+3. **AI 작문 마커 식별** - 각 발견 사항에 대한 과학적 근거와 함께
+4. **텍스트 재작성** - 자연스럽고 인간이 작성한 것처럼 들리도록
+5. **수정된 버전 제시** - 주요 변경 사항의 요약과 함께(선택적)
+
+**프로세스 가이드라인**:
+- 항상 원래의 의미와 사실적 내용을 보존하세요
+- 적절한 격식 수준(격식체 vs 반말)을 유지하세요
+- 완벽함보다 자연스러움에 집중하세요
+- 중요한 변경 사항에 대한 근거를 설명하세요
+- 텍스트가 AI 마커를 거의 보이지 않으면, 이미 자연스럽다고 인정하세요
+
+## 한국어 AI 작문 특징
+
+LLM이 생성한 한국어 텍스트는 인간의 글쓰기와 측정 가능하게 다른 고유한 언어적 패턴을 보입니다:
+
+- **문장부호**: 과도한 쉼표 사용(61% vs 인간 26%), 영어식 쉼표 배치
+- **띄어쓰기**: 의존명사 띄어쓰기의 경직된 일관성(SD=0.02 vs 인간의 변동성)
+- **어휘 다양성**: 낮은 품사 다양성, 명사 과다 사용, 동사/형용사 빈곤
+- **어휘**: 일반적 서술어 과다 사용(중요하다, 핵심적, 효과적, 지속가능한, 혁신적)
+- **구조**: 단조로운 문장 리듬, 3박자 리스트, 과도한 접속사
+
+이러한 패턴은 LLM 학습 데이터 편향과 확률적 텍스트 생성에서 나타나며, 한국어 원어민 독자에게 부자연스럽게 느껴질 수 있습니다.
+
+---
+
+## 검출 패턴 (총 40가지)
+
+### 패턴 분류 체계
+
+모든 패턴은 검증 수준과 심각도에 따라 메타데이터를 포함합니다.
+
+**검증 수준**:
+- **✅ 과학적**: KatFishNet 논문(ArXiv 2503.00032v4, 2025) 등 외부 문헌으로 검증된 패턴 — 검증 필드에 인라인 인용 (예: `검증: ✅ 과학적 (KatFishNet, 94.88% AUC)`)
+- **📊 경험적**: 실무 관찰을 기반으로 한 커뮤니티 기여 패턴
+
+**심각도(severity)**:
+- **S1 (Critical)**: 한 번만 나와도 AI 신호로 결정적. 무조건 수정 권장.
+- **S2 (Strong)**: 1~2회 허용, 3회+ 반복 시 AI 신호. 빈도 기반 판정.
+- **S3 (Weak)**: 단독으로는 약한 신호이나 다른 패턴과 중첩될 때 결정적.
+
+**자연도 등급(Naturalness Grade)** — v1.6.0 신설:
+
+윤문 후 텍스트의 자연스러움을 한 글자로 요약. 출력 형식의 "자연도 등급" 라인에 표시.
+
+- **A**: S1 0건 + S2 ≤ 2 — 자연스러움 거의 완벽 (인간이 작성한 것처럼 읽힘)
+- **B**: S1 1~2건 또는 S2 3~5건 — 자연스럽지만 사소한 AI 흔적
+- **C**: S1 3+건 또는 S2 6+건 — AI 흔적 명확, 추가 윤문 권장
+- **D**: 다중 카테고리 위반 (S1 5+건 + S2 8+건) 또는 변경률 가드 트리거 발생
+
+자연도 등급은 윤문 **후** 텍스트에 적용 — 윤문 결과의 품질을 한 줄로 평가. 사용자가 결과를 신뢰할 수 있는지 빠르게 판단하도록 돕습니다.
+
+각 패턴에는 다음 3필드 메타데이터가 포함됩니다:
+- **검증**: 검증 수준 (✅ 과학적 / 📊 경험적), 외부 문헌은 인라인 인용
+- **심각도**: S1 / S2 / S3 + 정의
+- **버전**: 패턴이 추가된 스킬 버전
+
+### 빠른 참조
+
+**카테고리별 우선순위와 대표 패턴**:
+
+1. **문장부호** (7가지, 최고: 94.88% AUC) - 쉼표 과다, 영어식 배치, 연결어미 뒤 쉼표, 콜론 과다
+2. **띄어쓰기** (3가지, 높음: 79.51% AUC) - 경직된 의존명사, 보조용언, 숫자 띄어쓰기
+3. **품사 다양성** (3가지, 높음: 82.99% AUC) - 명사 과다, 동사/형용사 빈곤
+4. **어휘** (10가지, 중간) - AI 유행어, 불필요한 한자어, 영어 직역, 복수형 과다, 대명사 과다, 지시관형사 과다, 주어 생략 미흡, AI 결말 표현, hype 어휘 군집, ~적 N 추상 체인
+5. **구조** (4가지, 중간) - 문장 리듬, 3박자, 접속사, 경어체
+6. **번역투** (13가지, 높음: 경험적) - 조사 번역투(에 대해/통해/있어서), 동사 잉여(가지고 있다), 피동 남용(되어진다/에 의해), 가능 표현 남발(할 수 있다), 미래 단정(~것이다 남발)
+
+전체 40가지 패턴 목록과 상세 내용은 각 카테고리 참조 문서 참조.
+
+### 상세 패턴 설명
+
+각 패턴의 완전한 검출 기준, 과학적 근거, 예시, 교정 전략은 다음을 참조하세요:
+
+- **문장부호 패턴 (1-7)**: [references/punctuation-patterns.md](references/punctuation-patterns.md) 참조
+- **띄어쓰기 패턴 (8-10)**: [references/spacing-patterns.md](references/spacing-patterns.md) 참조
+- **품사 다양성 패턴 (11-13)**: [references/pos-patterns.md](references/pos-patterns.md) 참조
+- **어휘 패턴 (14-20, 37-39)**: [references/vocabulary-patterns.md](references/vocabulary-patterns.md) 참조
+- **구조 패턴 (21-24)**: [references/structure-patterns.md](references/structure-patterns.md) 참조
+- **번역투 패턴 (25-36, 40)**: [references/translation-ese-patterns.md](references/translation-ese-patterns.md) 참조
+
+**상세 패턴을 로드해야 할 때**:
+- 해당 카테고리의 패턴을 감지했을 때 특정 카테고리 파일을 로드하세요
+- 포괄적인 분석이 필요한 경우 모든 파일을 로드하세요
+- 텍스트가 최소한의 AI 마커만 보이면 로드를 건너뛰세요
+
+---
+
+## 작업 흐름
+
+### 1단계: 텍스트 받기
+
+- 사용자가 인자, 대화, 또는 파일 경로를 통해 한국어 텍스트를 제공합니다
+- 파일 경로가 주어지면 Read 도구를 사용하여 내용을 로드합니다
+- 텍스트가 대화 컨텍스트에 있으면 추출합니다
+
+### 2단계: 모든 패턴에 대해 분석
+
+다음을 체계적으로 확인합니다:
+- **문장부호 패턴 (1-7)**: 쉼표 개수, 위치 확인, 불필요한 사용 식별, 영어식 콜론 사용 확인
+- **띄어쓰기 패턴 (8-10)**: 의존명사 띄어쓰기 일관성, 보조용언 띄어쓰기, 숫자 띄어쓰기 확인
+- **품사 패턴 (11-13)**: 명사/동사/형용사 비율 추정, 명사화 구문 식별
+- **어휘 패턴 (14-20, 37-39)**: AI 유행어, 한자어 과다 사용, 영어 직역, 복수형 '-들' 과다 사용, 대명사 과다, 지시관형사 과다, 주어 생략 미흡, AI 결말 관용구·결말 공식·결말 단언, hype 어휘 군집, ~적 N 추상 체인 확인
+- **구조 패턴 (21-24)**: 문장 길이 변동, 목록 패턴, 접속사, 경어체 균일성 확인
+- **번역투 패턴 (25-36, 40)**: 조사 번역투(에 대해/통해/있어서), 동사 잉여(가지고 있다), 피동 남용(되어진다/에 의해), 가능 표현 남발(할 수 있다), 미래 단정(~것이다 남발) 확인
+
+감지한 패턴에 필요한 **상세 참조 파일을 로드**하세요.
+
+### 3단계: 발견 사항 식별
+
+감지된 각 패턴에 대해:
+- 텍스트의 구체적인 인스턴스를 기록하세요
+- 과학적 근거를 설명하세요(해당되는 경우 KatFishNet 참조)
+- 이 패턴이 왜 AI 작문을 나타내는지 설명하세요
+
+### 4단계: 텍스트 재작성
+
+- 원래의 의미와 사실적 내용을 보존하세요
+- 적절한 격식 수준을 유지하세요
+- 감지된 모든 패턴에 대한 교정을 적용하세요
+- 자연스러움과 인간다운 흐름에 집중하세요
+- 한국어 원어민이 작성한 것처럼 들리게 만드세요
+
+### 4.5단계: 의미 보존 자체검증 (필수)
+
+자연스러운 버전을 출력하기 전에 다음 6항을 자체 점검합니다. **위반 사항이 발견되면 해당 부분을 수정한 뒤 재점검합니다.**
+
+- [ ] **수치·날짜·고유명사**: 원본의 숫자, 날짜, 인명, 기관명, 제품명이 모두 보존되었는가?
+- [ ] **인과관계 방향**: "X 때문에 Y" → "Y 때문에 X"로 뒤바뀌지 않았는가?
+- [ ] **부정 표현**: "있다/없다", "가능/불가능", "찬성/반대"가 반전되지 않았는가?
+- [ ] **직접 인용**: 큰따옴표 안 직접 인용은 그대로인가?
+- [ ] **핵심 주장·결론**: 원본의 메시지·결론이 변경되지 않았는가?
+- [ ] **격식 수준**: 원본의 격식체/반말이 일관되게 유지되었는가?
+
+위반 사항이 없으면 출력 형식의 "주요 변경 사항 요약" 끝에 "✓ 의미 보존 검증: 6항 모두 통과"를 명시합니다. 위반이 있었다면 수정 사항을 함께 기록합니다.
+
+### 5단계: 결과 제시
+
+**형식**:
+
+```
+## 분석 결과
+
+**감지된 패턴 요약**: S1 N건, S2 M건, S3 K건
+**자연도 등급**: A | B | C | D — [등급 부여 근거 한 줄]
+
+다음 AI 작문 패턴을 감지했습니다(심각도 높은 순):
+
+1. **패턴 X [S1]**: [발견 사항에 대한 간단한 설명]
+   - [텍스트의 구체적인 예시]
+   - [과학적/경험적 근거]
+   - [S1/S2/S3 부여 이유]
+
+2. **패턴 Y [S2]**: [...]
+
+[감지된 모든 패턴에 대해 계속, S1 → S2 → S3 순으로 정렬]
+
+---
+
+## 자연스러운 버전
+
+[자연스러운 한국어 글쓰기로 재작성된 텍스트]
+
+---
+
+## 주요 변경 사항 요약 (선택적)
+
+- [근거와 함께 변경 사항 1]
+- [근거와 함께 변경 사항 2]
+- [기타]
+```
+
+**텍스트가 이미 자연스러운 경우**:
+
+```
+## 분석 결과
+
+이 텍스트는 AI 작문 마커를 거의 보이지 않으며 상당히 자연스럽게 읽힙니다. 사소한 문제만 발견했습니다:
+
+- [사소한 문제 1 (있는 경우)]
+- [사소한 문제 2 (있는 경우)]
+
+이 글은 이미 인간이 작성한 것처럼 들립니다. [원본 또는 약간 수정된 버전을 제공]
+```
+
+---
+
+## 중요 사항
+
+### 의미 보존
+- 사실적 내용이나 핵심 메시지를 절대 변경하지 마세요
+- 모든 주요 정보를 그대로 유지하세요
+- 작성자의 의도된 톤과 목적을 유지하세요
+
+### 변경률 가드 (Over-rewriting Guard)
+
+자연스러운 버전을 작성한 후 **변경률**을 자체 추정해 과도한 교정을 방지하세요.
+
+**변경률 계산**:
+- 원본과 자연스러운 버전을 어절 단위로 비교
+- 변경된 어절 / 전체 어절 비율 (대략적, 0~100%)
+- 단순 띄어쓰기·문장부호 변경은 제외하고 의미 단위 변경만 카운트
+
+**임계값**:
+- **<30% (정상)**: 그대로 출력
+- **30~50% (경고)**: 출력 끝에 "변경률 N%로 다소 큼. 의미 보존 재확인 권장" 한 줄 추가
+- **>50% (중단)**: 출력하지 말고 사용자에게 확인 요청
+  - 메시지: "변경률이 N%로 과도합니다. 원본 의미가 변경됐을 가능성이 있습니다. 더 보수적으로 재작성해드릴까요?"
+  - 사용자 동의 시 보수적으로 재작성 후 30% 이내로 다시 시도
+
+**근거**: 과도한 교정은 원본의 의미·뉘앙스·작성자 톤을 잃을 위험이 있음. 정량 임계로 자체 검증해 의미 보존 원칙을 강화.
+
+### 격식 유지
+- 원래의 격식 수준(격식체 vs 반말)을 존중하세요
+- 텍스트가 격식체(비즈니스, 학술)라면 격식체를 유지하되 자연스럽게 하세요
+- 텍스트가 반말(블로그, 소셜 미디어)이라면 더 대화적으로 만드세요
+- 리듬을 위해 같은 격식 범위 내에서 어투를 다양화할 수 있습니다
+
+### 자연스러움 집중
+- 목표는 인간이 작성한 것처럼 들리게 하는 것이지, 완벽하게 만드는 것이 아닙니다
+- 자연스러운 한국어 글쓰기는 약간의 불규칙성과 개인적 스타일을 가지고 있습니다
+- 작성자의 목소리를 바꿀 정도로 과도하게 교정하지 마세요
+
+### 근거 설명
+- 주요 변경 사항에 대해서는 간단히 이유를 설명하세요
+- 40가지 검출 기준의 특정 패턴을 참조하세요
+- 사용자가 무엇이 텍스트를 AI 생성처럼 vs 인간처럼 들리게 하는지 이해하도록 도와주세요
+
+### 문화적 감수성
+- 한국 문화적 맥락과 기대를 인식하세요
+- 한국어 독자는 직접성과 효율성을 중시합니다
+- 원래의 톤과 일치하지 않는 한 지나치게 화려하거나 극적인 언어를 피하세요
+- 영어와 다른 한국어 글쓰기 관습을 존중하세요
+
+### 과학적 근거
+- 당신의 교정은 실증적 언어학 연구에 기반합니다
+- KatFishNet 논문은 대부분의 패턴에 대한 과학적 검증을 제공합니다
+- 주관적인 스타일 선호가 아니라 측정 가능한 언어적 차이를 적용하는 것입니다
+
+---
+
+## 특수 상황
+
+### 매우 짧은 텍스트
+텍스트가 1-2문장만 있는 경우:
+- 모든 패턴을 감지하기에 충분한 내용이 없을 수 있습니다
+- 명백한 마커(쉼표, 어휘, 띄어쓰기)에 집중하세요
+- 한계를 인정하세요: "이 텍스트는 매우 짧아서 패턴 분석이 제한적입니다."
+
+### 이미 자연스러운 텍스트
+텍스트가 AI 마커를 거의 또는 전혀 보이지 않는 경우:
+- 텍스트가 잘 작성되었음을 인정하세요
+- 있다면 사소한 제안을 제공하세요
+- 불필요한 경우 교정을 강요하지 마세요
+
+### 기술적이거나 전문 분야별 텍스트
+텍스트에 전문 용어가 포함된 경우:
+- 한자어라도 기술 용어는 보존하세요
+- 문장 구조와 문장부호 패턴에 집중하세요
+- 기술 글쓰기는 다른 관습을 가지고 있음을 인정하세요
+
+### 언어 혼합
+텍스트에 영어 단어나 구문이 포함된 경우:
+- 영어 내용은 그대로 보존하세요
+- 한국어 부분에 집중하세요
+- 부자연스러운 코드 전환 패턴을 확인하세요
+
+### 사용자가 특정 격식 요청
+사용자가 격식체 또는 반말 출력을 요청하는 경우:
+- 요청대로 격식 수준을 조정하세요
+- 여전히 40가지 패턴 교정을 모두 적용하세요
+- 요청에 따라 격식을 조정했음을 설명하세요
+
+---
+
+## 분석 예시
+
+실제 적용 사례는 [examples/](examples/) 디렉토리 참조:
+- [before-1.md](examples/before-1.md) / [after-1.md](examples/after-1.md): 격식체 교육 분야 텍스트
+- [before-2.md](examples/before-2.md) / [after-2.md](examples/after-2.md): 다양한 패턴 예시
+- [before-3.md](examples/before-3.md) / [after-3.md](examples/after-3.md): 번역투 풍부 비즈니스 보고서 (v1.4.0 신규 카테고리 시연 + S1/S2/S3 심각도 출력 형식)
+- [before-4.md](examples/before-4.md) / [after-4.md](examples/after-4.md): AI 결말 관용구·~적 N·~것이다 풍부 텍스트 (v1.5.0/v1.6.0 신규 패턴 시연 + 자연도 등급 출력 형식)
+
+각 예시는 감지된 패턴, 분석, 자연스러운 버전, 주요 변경 사항을 포함합니다.
+
+---
+
+## 최종 알림
+
+- **철저하게**: 40가지 패턴을 모두 체계적으로 확인하세요
+- **과학적으로**: 가능한 경우 언어학 연구에 근거하여 교정하세요
+- **도움이 되게**: 사용자가 배울 수 있도록 근거를 설명하세요
+- **존중하며**: 작성자의 의미와 의도를 보존하세요
+- **자연스럽게**: 목표는 로봇 같은 완벽함이 아니라 인간다운 한국어입니다
+
+당신의 전문성은 한국어 작성자가 의도된 메시지와 스타일을 유지하면서 진정으로 인간이 작성한 것처럼 들리는 텍스트를 만들도록 돕습니다. 한국어 언어학에 대한 지식과 AI 텍스트 감지 뒤의 과학적 연구를 사용하여 가치 있고 정확한 교정을 제공하세요.
+
+
+ARGUMENTS: docs/11.dstone-knowledge.md 2-3절에 추가할 ref_kind 범례 단락 작성 (문서 문체: -다 체)
+
+---
+
+## 답변
+
+`docs/11.dstone-knowledge.md` 2-3절(DECLARE)의 `#### 테이블` 단락 맨 끝, `#### 화면에 미치는 영향` 바로 위에 **`analysis_reference.ref_kind` 범례**를 추가했습니다.
+
+**추가한 내용**
+- **DECLARE와 RESOLVE의 역할 분담 한 줄:** DECLARE는 이름만 보고 참조를 적고, RESOLVE가 그 이름이 가리키는 대상을 찾아 관계로 바꿉니다.
+- **범례 표 (9종):** 종류마다 적는 대상(예), `name`에 들어가는 값, `from_kind`, RESOLVE 뒤에 바뀌는 관계(`CALLS`, `CREATES`, `ACCESSES_FIELD`, `USES_TYPE` 등)를 정리했습니다.
+- **보충 4줄:**
+  - `ANONYMOUS_SUPER`를 따로 두는 까닭과 `kindUnknown: true`
+  - `METHOD_REF`는 이름으로만 찾아서 결과가 `HEURISTIC`인 점
+  - 람다 안의 호출과 JSP 스크립틀릿은 별도 종류 없이 기록되는 점
+  - `status` 값 6가지
+
+이 절에 있는 "뽑는 것" 표의 `참조` 행에도 종류 이름이 나열돼 있지만, 짧게 훑는 용도라 그대로 두었습니다. 새 범례와 내용이 겹치는 부분은 그 행 하나뿐입니다.
+
+문서 문체(-다 체)에 맞췄고, `humanizer` 지침에 따라 쉼표와 번역투를 줄였습니다. 커밋은 하지 않았습니다.
+
+---
+
+## 질문
+
+올려줘.
+
+---
+
+## 답변
+
+`d29b72ac` 커밋으로 `main`에 올렸습니다. 이번 커밋에 들어간 파일은 `docs/11.dstone-knowledge.md` 하나입니다.
+
+---
+
+## 질문
+
+<pasted_content id="b7aa">
+/docs/11.dstone-knowledge.md 에 아래의 작업을 해줘. 그리고 올려줘.
+
+<작업대상 단락>
+2-8. SEMANTIC — 이것은 무엇인가 > 처리기와 순서
+
+<작업 내용>
+각 처리기가 rule의 내용을 보고 어떻게 처리하는지 입체적으로 기술해줘.
+예)
+처리기와 순서
+    현재와 같은 테이블.
+    * 단 아래의 상세설명과 링크.
+처리기별 상세설명
+    1. layer(계층)
+        1-1. layer 종류
+            CONTROLLER : ...
+            SERVICE : ...
+            REPOSITORY : ...
+            MODEL : ...
+            CONFIG : ...
+            WEB_FILTER : ...
+            ASPECT : ...
+            ...
+        1-2. 정의된 rule에서 아래의 3가지 처리작업 진행. 세가지가 차례로 진행.
+            - BY_ANNOTATION(rule파일 내용에 "@"가 존재할 경우)
+            - BY_EXTENDS(rule파일 내용에 extends 가 존재할 경우)
+            - BY_NAME(rule파일 내용에 name 가 존재할 경우)
+        1-3. rule 파일에서의 정의.
+            CONTROLLER: ["@Controller", "@RestController", "@ControllerAdvice", "@RestControllerAdvice"] => BY_ANNOTATION 으로 처리
+                샘플 소스)
+                @Controller
+                public class LoginController {...}
+            CONTROLLER: 
+                - extends javax.servlet.http.HttpServlet  => BY_EXTENDS 으로 처리 
+                - extends jakarta.servlet.http.HttpServlet
+                샘플 소스)
+                @Controller
+                public class AdminController extends net.dstone.boot.common.biz.BaseController { ... }
+            SERVICE: "@Service"     => BY_ANNOTATION 으로 처리
+                샘플 소스)
+                @Service 
+                public class AdminService extends BaseService { ... }
+        1-4. 저장되는 테이블 및 컬럼
+            analysis_symbol - UPDATE
+            처리기                    고치는컬럼                                                                            값
+            StrutsEntries        layer, layer_confidence, properties_json.layerBy                                CONTROLLER, HIGH, struts-config
+            LayerResolver(JSP)    같다                                                                                JSP에서 만든 타입은 VIEW, HIGH, JSP
+            LayerResolver(규칙)    layer, layer_confidence, properties_json.layerRuleAt, properties_json.layerBy    규칙의 계층, 애노테이션 HIGH / 상속 MEDIUM / 이름 LOW, 파일:줄, 적힌 모양. 이미 layer가 있는 타입은 바꾸지 않는다(먼저 정한 것이 이긴다, 3.5절)
+        1-5. 패턴 추가시 해야 할 작업
+            ....
+        
+    2. endpoint(진입점)
+        ...
+    ...    
+        
+</pasted_content id="b7aa">
+
+---
+
+## 답변
+
+2-8절 처리기별 상세설명을 쓰기 위해 처리기 코드와 규칙 파일을 확인하고 있습니다. 문서 내용은 코드로 확인한 사실만으로 채우겠습니다.
+
+---
+
+## 답변
+
+진행 상황입니다. 코드와 규칙 파일 확인을 마쳤고, 이제 2-8절에 들어갈 처리기별 상세설명을 쓰고 있습니다.
+
+---
+
+## 답변
+
+Now the detail section, inserted right before `#### 처리기별 테이블`.
+
+---
+
+## 답변
+
+Fixing the XML row and the "every row" sentence to match the code.
+
+---
+
+## 답변
+
+Remote has an unrelated new commit (one SQL file); rebasing on top of it.
+
+---
+
+## 답변
+
+요청하신 2-8절 작업을 마치고 `de9a0ce3` 커밋으로 `main`에 올렸습니다. 원격에 다른 커밋(`c1255547`, SQL 파일 하나)이 먼저 올라와 있어서 그 위로 rebase한 뒤 push했습니다.
+
+**처리기와 순서**
+- 표는 그대로 두고 "규칙 절" 칸에 상세설명으로 가는 링크만 달았습니다.
+- 규칙 절이 없는 처리기는 "8. 규칙 없이 도는 처리기"로 연결됩니다.
+
+**처리기별 상세설명 (새로 추가)**
+
+예시 구조(종류 → 처리 순서 → 지금 규칙 정의와 샘플 → 저장 테이블 → 패턴 추가 방법)를 규칙 절마다 적용했습니다.
+
+| # | 절 | 처리기 |
+|---|---|---|
+| 1 | `layer` | `LayerResolver` |
+| 2 | `entry` | `EntryFinder` |
+| 3 | `inject`, `proxy` | `WiringMarker` |
+| 4 | `jpa` | `JpaQueryReader`, `JavaSqlLinker` |
+| 5 | `sql` | `SqlLinker` |
+| 6 | `view` | `ViewLinker` |
+| 7 | `screen` | `ScreenLinker`, `ScreenMenuReader` |
+| 8 | 규칙 없이 도는 처리기 8개 | 요약 표 |
+
+**예시와 코드가 달라서 코드 기준으로 고친 부분이 두 곳 있습니다.**
+1. **세 처리 방식의 순서:** `BY_ANNOTATION` → `BY_EXTENDS` → `BY_NAME`이 전체에서 한 번씩 차례로 도는 구조가 아닙니다. 먼저 단계(프로젝트 → 공통 → 짐작)로 나누고, 각 단계 안에서 세 방식을 차례로 돌립니다(`ProjectRules.layers()`). 그래서 프로젝트 규칙의 이름 규칙이 공통 규칙의 애노테이션 규칙보다 먼저 적용됩니다. 문서에도 이렇게 적었습니다.
+2. **`BY_EXTENDS` 샘플:** 예시의 `AdminController`는 `@Controller`가 붙어 있어서 `BY_ANNOTATION`으로 정해집니다. 또 `BaseController`는 `HttpServlet`이 아니라서 servlet 규칙에도 맞지 않습니다. 그래서 `HttpServlet`을 바로 상속한 서블릿과 hi-japan의 `JdbcDAO` 상속 예로 바꿨습니다.
+
+새로 쓴 문장은 문서 문체(-다 체)에 맞췄습니다. 링크는 GitHub 방식의 제목 앵커로 걸었는데, 다른 마크다운 뷰어에서 눌리는지는 확인하지 않았습니다.
