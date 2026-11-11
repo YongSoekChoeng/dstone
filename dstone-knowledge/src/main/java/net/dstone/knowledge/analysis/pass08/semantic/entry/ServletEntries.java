@@ -62,6 +62,7 @@ public class ServletEntries extends BaseObject implements SemanticStep {
 		return "servlet";
 	}
 
+
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
