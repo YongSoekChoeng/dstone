@@ -101,19 +101,58 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 	 */
 	private SemanticStep[] steps() {
 		return new SemanticStep[] {
+			
+			/****************************************************************************************************************************
+			
+			<SEMANTIC 스텝 처리 순서 및 성격>
+			----------------------------------------------------------------------------------------------------------------------------
+			| #   | 처리기                   | rule            | 하는 일                                                                   |
+			| --- | ---------------------- | -------------------------------------------------------------------------------------------
+			| 1   | ServletEntries         |                 | web.xml의 서블릿·필터·리스너, @WebServlet. (규칙 없이 확실한 입구)
+			| 2   | StrutsEntries          |                 | struts-config.xml·struts.xml의 액션 → 입구, 액션 클래스 계층, 이동할 JSP. 액션 클래스를 규칙보다 먼저 CONTROLLER로 정한다.
+			| 3   | LayerResolver          | layer           | 클래스의 계층. 입구보다 먼저. 상위 클래스의 주소를 물려받는 컨트롤러를 알아보려고 
+			| 4   | EntryFinder            | entry           | 애노테이션·상속·설정 XML로 입구, main(), 바로 열리는 JSP. 화면 연결보다 먼저(화면 글자와 견줄 주소가 있어야 한다)
+			| 5   | WiringMarker           | inject, proxy   | 주입 관계, 프록시가 끼는 메소드.
+			| 6   | JpaQueryReader         | jpa             | JPA 쿼리를 statement로. MapperLinker보다 먼저(이름 있는 쿼리를 이름으로 찾게)
+			| 7   | MapperLinker           |                 | SQL 관계를 모두 지우고, 매퍼 인터페이스 방식 연결과 매퍼 SQL → 테이블.
+			| 8   | SqlLinker              | sql             | 호출 인자로 SQL 이름을 계산해 메소드 → statement. MapperLinker 다음.
+			| 9   | JavaSqlLinker          | jpa > jpql      | Java 문자열 SQL·JPA를 메소드·테이블에. SqlLinker 다음.
+			| 10  | ViewLinker             | view            | 메소드 → JSP(RENDERS). 화면 연결은 입구가 다 만들어진 뒤 
+			| 11  | JspLinker              |                 | JSP → 메소드(REQUESTS), JSP → JSP(INCLUDES), JSP 화면명.
+			| 12  | ScreenLinker           | screen          | WebSquare·Nexacro 화면 → 메소드·화면, 거래 입구, 화면명.
+			| 13  | ScreenMenuReader       | screen > menu   | 메뉴 목록에서 화면명. 화면 파일의 제목이 먼저
+			| 14  | SourceNamePlugin       |                 | Java 소스에서 테이블·컬럼 한글명. SQL에 쓰인 컬럼이 다 모인 뒤
+			| 15  | MethodTitlePlugin      |                 | 메소드 기능명.
+			| 16  | ScreenDictionaryPlugin |                 | 화면 사전 CSV의 한글명.
+			| 17  | TableDictionaryPlugin  |                 | 테이블·컬럼 사전 CSV.
+			----------------------------------------------------------------------------------------------------------------------------
+			
+			****************************************************************************************************************************/
+			
 			// 1) 규칙 없이 표준 설정 파일에서 읽는 입구. struts-config 의 Action 은 여기서 CONTROLLER 가 된다(규칙보다 확실하다).
-			servletEntries, strutsEntries,
+			servletEntries,
+			strutsEntries,
 			// 2) 계층. 진입점보다 먼저다: 상위 클래스의 주소를 물려받는 컨트롤러를 계층으로 알아본다.
 			layerResolver,
 			// 3) 입구와 주입 · 프록시.
-			entryFinder, wiringMarker,
+			entryFinder, 
+			wiringMarker,
 			// 4) SQL. JPA statement 를 먼저 만들고, MapperLinker 가 SQL 관계를 지운 뒤 다시 만든다.
 			//    SqlLinker 가 이름 있는 JPA 쿼리(createNamedQuery)까지 잇고, JavaSqlLinker 가 Java 문자열 SQL · JPA 를 테이블과 잇는다.
-			jpaQueryReader, mapperLinker, sqlLinker, javaSqlLinker,
+			jpaQueryReader, 
+			mapperLinker, 
+			sqlLinker, 
+			javaSqlLinker,
 			// 5) 화면. 진입점이 다 만들어진 뒤라야 화면이 요청하는 주소를 진입점과 맞춰 볼 수 있다.
-			viewLinker, jspLinker, screenLinker, screenMenuReader,
+			viewLinker, 
+			jspLinker, 
+			screenLinker, 
+			screenMenuReader,
 			// 6) 이름 사전. SQL 에서 쓰인 컬럼과 화면 제목이 다 모인 뒤에 돈다.
-			sourceNamePlugin, methodTitlePlugin, screenDictionaryPlugin, tableDictionaryPlugin
+			sourceNamePlugin, 
+			methodTitlePlugin, 
+			screenDictionaryPlugin, 
+			tableDictionaryPlugin
 		};
 	}
 
