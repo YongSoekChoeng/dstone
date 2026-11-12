@@ -197,6 +197,8 @@ public class RagRetrievalChain extends BaseService {
 		body.put("sourceTypes", Arrays.asList("DOCUMENT"));
 		// 유사도로 걸러 내고도 limit개가 남도록 넉넉히 받는다.
 		body.put("topK", Integer.valueOf(Math.min(MAX_CANDIDATES, Math.max(limit * 4, 20))));
+		// dstone-knowledge도 유사도로 거르므로, 이 엔진의 기준값을 같이 보내 서버 기준에 먼저 잘리지 않게 한다.
+		body.put("minScore", Double.valueOf(threshold));
 
 		JsonNode hits;
 		try {

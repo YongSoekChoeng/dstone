@@ -69,6 +69,11 @@ var DstoneKnowledgeSearch = (function () {
 			if (result.embedding) {
 				text += " · 임베딩 " + result.embedding.map(function (row) { return row.status + " " + row.chunks; }).join(" / ");
 			}
+			// 뜻으로 찾은 것이 모두 기준보다 멀면 결과가 0건이다. 엉뚱한 결과 대신 왜 없는지 알려 준다.
+			if (result.count === 0 && result.belowMinScore > 0) {
+				text = "질문과 가까운 내용이 없습니다(가장 가까운 것의 유사도 " + result.bestBelowMinScore
+					+ ", 기준 코드 " + result.minScore.code + " / 문서 " + result.minScore.document + ") · " + text;
+			}
 			K.message(el["kn-search-message"], (result.warning ? result.warning + " · " : "") + text, !!result.warning);
 			renderHits(result.hits || []);
 		}).catch(function (err) {

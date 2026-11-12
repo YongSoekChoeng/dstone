@@ -33,13 +33,14 @@ public class SearchController {
 	/**
 	 * <pre>
 	 * 검색. 뜻으로 찾기(벡터)와 이름으로 찾기를 같이 합니다.
-	 * 본문: {query, projectId?, revisionId?, sourceTypes?, docTypes?, layer?, mode?, topK?}
+	 * 본문: {query, projectId?, revisionId?, sourceTypes?, docTypes?, layer?, mode?, topK?, minScore?}
 	 *   - 코드에서 찾으려면 projectId나 revisionId 가운데 하나가 있어야 합니다. projectId만 주면 분석이 끝난 가장 최근 리비전에서 찾습니다.
 	 *   - sourceTypes: ["CODE", "DOCUMENT"] 가운데 찾을 곳. 없으면 프로젝트를 줬을 때 CODE, 안 줬을 때 DOCUMENT(올린 일반 문서)
 	 *   - docTypes: ["METHOD", "TYPE", "FILE", "MAPPER", "VIEW", "UPLOAD"] 가운데 찾을 것. 없으면 전부
 	 *   - layer: CONTROLLER / SERVICE / REPOSITORY ... 없으면 전부
 	 *   - mode: HYBRID(기본) / VECTOR(뜻만) / KEYWORD(이름만)
 	 *   - topK: 기본 10, 최대 50
+	 *   - minScore: 뜻으로 찾은 결과를 남길 최소 유사도(0~1). 없으면 설정값(dstone.knowledge.rag.search.min-score.*), 0이면 거르지 않음
 	 * </pre>
 	 */
 	@PostMapping("/search")
@@ -57,6 +58,7 @@ public class SearchController {
 		if (request.get("topK") != null) {
 			query.setTopK((int) longOf(request.get("topK"), "topK").longValue());
 		}
+		query.setMinScore(doubleOf(request.get("minScore"), "minScore"));
 		return searchService.search(query);
 	}
 
@@ -76,6 +78,17 @@ public class SearchController {
 		}
 		try {
 			return Long.valueOf(String.valueOf(value).trim());
+		} catch (NumberFormatException e) {
+			throw ApiException.badRequest(name + "는 숫자여야 합니다: " + value);
+		}
+	}
+
+	private Double doubleOf(Object value, String name) {
+		if (value == null || String.valueOf(value).trim().length() == 0) {
+			return null;
+		}
+		try {
+			return Double.valueOf(String.valueOf(value).trim());
 		} catch (NumberFormatException e) {
 			throw ApiException.badRequest(name + "는 숫자여야 합니다: " + value);
 		}

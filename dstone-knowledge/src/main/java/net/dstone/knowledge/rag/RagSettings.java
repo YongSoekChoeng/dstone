@@ -65,6 +65,33 @@ public class RagSettings {
 		return intProperty("dstone.knowledge.rag.upload.embedding-priority", 10);
 	}
 
+	/**
+	 * <pre>
+	 * 뜻으로 찾기(벡터)에서 코드 청크를 남길 최소 유사도. 이보다 낮으면 질문과 상관없는 것으로 보고 버린다.
+	 * 값은 임베딩 모델마다 다르다. bge-m3 실측: 상관없는 질문은 0.47 이하, 맞는 질문의 1등은 0.5 이상.
+	 * </pre>
+	 */
+	public double searchMinScoreCode() {
+		return doubleProperty("dstone.knowledge.rag.search.min-score.code", 0.5);
+	}
+
+	/**
+	 * <pre>
+	 * 같은 기준의 올린 문서용 값. 문서(사람이 쓴 글)는 맞는 것도 유사도가 코드보다 낮게 나와서 따로 둔다.
+	 * </pre>
+	 */
+	public double searchMinScoreDocument() {
+		return doubleProperty("dstone.knowledge.rag.search.min-score.document", 0.35);
+	}
+
+	private double doubleProperty(String key, double defaultValue) {
+		String configured = configProperty.getProperty(key);
+		if (configured == null || configured.trim().length() == 0) {
+			return defaultValue;
+		}
+		return Double.parseDouble(configured.trim());
+	}
+
 	private int intProperty(String key, int defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

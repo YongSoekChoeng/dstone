@@ -31,6 +31,9 @@ public class SearchQuery {
 
 	private int topK = 10;
 
+	/** 뜻으로 찾은 결과를 남길 최소 유사도. null이면 설정값(코드/올린 문서 따로), 0이면 거르지 않는다 */
+	private Double minScore;
+
 	/** 호출자. 일반 문서는 이 호출자가 올린 것만 보인다. 인증을 꺼 두면 null */
 	private String tenant;
 
@@ -96,6 +99,14 @@ public class SearchQuery {
 
 	public void setTopK(int topK) {
 		this.topK = topK;
+	}
+
+	public Double getMinScore() {
+		return minScore;
+	}
+
+	public void setMinScore(Double minScore) {
+		this.minScore = minScore;
 	}
 
 	public String getTenant() {

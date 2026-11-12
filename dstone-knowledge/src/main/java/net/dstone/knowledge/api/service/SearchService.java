@@ -35,6 +35,10 @@ import net.dstone.knowledge.rag.SearchKeywords;
  *   - 이름으로 찾기: 질문에 들어 있는 클래스 / 메소드 / SQL / 테이블 이름, 주소가 글자 그대로 있는 청크를 찾는다.
  * 두 결과를 순위로 합칩니다(HybridRanker). 질문에 이름이 없으면 뜻으로만 찾습니다.
  *
+ * 뜻으로 찾기는 아무 질문에나 "가장 가까운 것"을 돌려주므로, 유사도가 기준(minScore)보다 낮은 것은 버립니다.
+ * 그래서 "대한민국 수도가 어디야?"처럼 코드와 상관없는 질문에는 결과가 없습니다.
+ * 이름으로 찾은 결과는 이름이 글자 그대로 맞은 것이라 이 기준으로 거르지 않습니다.
+ *
  * 이 모듈은 답을 지어내지 않습니다. 찾은 조각을 그대로 돌려줄 뿐이고, 그것으로 답을 만드는 일은
  * 부르는 쪽(dstone-ai-engine의 Agent)이 합니다.
  * </pre>
@@ -98,6 +102,12 @@ public class SearchService extends BaseObject {
 		}
 		String model = ragSettings.embeddingModel();
 		int topK = Math.max(1, Math.min(request.getTopK(), MAX_TOP_K));
+		Double requestedMinScore = request.getMinScore();
+		if (requestedMinScore != null && (requestedMinScore.doubleValue() < 0 || requestedMinScore.doubleValue() > 1)) {
+			throw ApiException.badRequest("minScore는 0에서 1 사이여야 합니다: " + requestedMinScore);
+		}
+		double minScoreCode = requestedMinScore == null ? ragSettings.searchMinScoreCode() : requestedMinScore.doubleValue();
+		double minScoreDocument = requestedMinScore == null ? ragSettings.searchMinScoreDocument() : requestedMinScore.doubleValue();
 
 		List<String> keywords = "VECTOR".equals(mode) ? new ArrayList<String>() : SearchKeywords.extract(query);
 		if ("KEYWORD".equals(mode) && keywords.isEmpty()) {
@@ -145,6 +155,24 @@ public class SearchService extends BaseObject {
 				}
 			});
 		}
+		// 기준보다 먼 것은 버린다. 버린 것 가운데 가장 가까웠던 값은 화면에서 "왜 없는지" 보여 줄 때 쓴다.
+		List<Map<String, Object>> keptVectorHits = new ArrayList<Map<String, Object>>();
+		int belowMinScore = 0;
+		Double bestBelowMinScore = null;
+		for (int i = 0; i < vectorHits.size(); i++) {
+			Map<String, Object> hit = vectorHits.get(i);
+			double score = ((Number) hit.get("score")).doubleValue();
+			double minScore = "DOCUMENT".equals(hit.get("sourceType")) ? minScoreDocument : minScoreCode;
+			if (score >= minScore) {
+				keptVectorHits.add(hit);
+			} else {
+				belowMinScore++;
+				if (bestBelowMinScore == null || score > bestBelowMinScore.doubleValue()) {
+					bestBelowMinScore = Double.valueOf(score);
+				}
+			}
+		}
+		vectorHits = keptVectorHits;
 		List<Map<String, Object>> keywordHits = new ArrayList<Map<String, Object>>();
 		if (!keywords.isEmpty()) {
 			List<Map<String, Object>> keywordParams = new ArrayList<Map<String, Object>>();
@@ -169,6 +197,13 @@ public class SearchService extends BaseObject {
 		if (warning != null) {
 			result.put("warning", warning);
 		}
+		Map<String, Object> minScore = new LinkedHashMap<String, Object>();
+		minScore.put("code", Double.valueOf(minScoreCode));
+		minScore.put("document", Double.valueOf(minScoreDocument));
+		result.put("minScore", minScore);
+		// 뜻으로 찾았지만 유사도가 기준보다 낮아 버린 건수와, 그중 가장 높았던 유사도
+		result.put("belowMinScore", Integer.valueOf(belowMinScore));
+		result.put("bestBelowMinScore", bestBelowMinScore);
 		if (revisionId != null) {
 			// 임베딩이 아직 덜 끝났으면 뜻으로 찾는 결과가 모자랄 수 있다. 얼마나 됐는지 같이 알려 준다.
 			result.put("embedding", ragDao.selectEmbeddingProgress(revisionId.longValue(), model));

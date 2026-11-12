@@ -38,6 +38,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"/board/save.do 요청을 받는 곳"}'>/board/save.do 요청을 받는 곳</span>
 				<br>옵션은 그대로 두어도 됩니다. "종류"를 체크하면 그 종류만(예: SQL 만) 나오고, "올린 문서"를 체크하면 아래에서 올린 문서도 같이 찾습니다.
 				결과가 적으면 임베딩이 아직 진행 중일 수 있습니다(검색 결과 위 줄의 "임베딩 PENDING" 숫자). 그동안은 이름을 넣어 찾으세요.
+				뜻으로 찾은 결과는 유사도가 기준(코드 0.5, 올린 문서 0.35)보다 낮으면 버립니다. 그래서 프로젝트와 상관없는 질문에는 결과가 나오지 않습니다.
 			</details>
 
 			<section class="ai-panel">
