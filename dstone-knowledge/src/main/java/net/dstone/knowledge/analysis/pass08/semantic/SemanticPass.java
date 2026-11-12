@@ -226,156 +226,189 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 		|     |                        |               |     SemanticDao.insertRelation() - 메소드 → JSP (RENDERS)           
 		|     |                        |               |                         <입력> analysis_relation <입력>                             
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 3   | LayerResolver          | layer         | LayerResolver.run()                                                                     * 클래스의 계층. EntryFinder보다 먼저 돈다.
-		|     |                        |               |   SemanticDao.updateJspLayer() - JSP에서 만든 타입은 규칙과 상관없이 VIEW                          상위 클래스의 주소를 물려받는 컨트롤러를 알아보려면 계층이 있어야 한다.
+		| 3   | LayerResolver          | layer         | LayerResolver.run()                                                                     * 클래스의 계층. EntryFinder보다 먼저 돈다. 상위 클래스의 주소를 물려받는 컨트롤러를 알아보려면 계층이 있어야 한다.
+		|     |                        |               |   SemanticDao.updateJspLayer() - JSP에서 만든 타입은 규칙과 상관없이 VIEW                          
+		|     |                        |               |                         <수정> analysis_symbol(layer, layer_confidence, properties_json) <수정>    
 		|     |                        |               |   ProjectRules.layers() - 규칙 목록 (프로젝트 > 공통 > 짐작)
-		|     |                        |               |   SemanticDao.updateLayerByRule() - 규칙마다 UPDATE 한 번
-		|     |                        |               |       (@애노테이션 / 상위 타입 / 이름 정규식. layer IS NULL만 → 앞선 규칙이 이긴다)
+		|     |                        |               |   SemanticDao.updateLayerByRule() - 규칙마다 UPDATE 한 번. (@애노테이션 / 상위 타입 / 이름 정규식. layer IS NULL만 → 앞선 규칙이 이긴다)
+		|     |                        |               |                         <수정> analysis_symbol(layer, layer_confidence, properties_json) <수정>    
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 4   | EntryFinder            | entry         | EntryFinder.run()                                                              | 애노테이션·상속·설정 XML로 입구, main(), 바로 열리는 JSP.
-		|     |                        |               |   EntryFinder.insertHttpEntries() - entry의 http 규칙                           | 화면 연결보다 먼저 돈다(화면 글자와 견줄 주소가 있어야 한다).
-		|     |                        |               |     SemanticDao.selectHttpMappingAnnotations() - @RequestMapping 등             |
-		|     |                        |               |     EntryFinder.typeGraph() → selectTypeEdges()·selectTypeFlags() - 상속 그래프     |
-		|     |                        |               |     SemanticDao.selectTypeFlags()·selectMethodsOfTypes() - 관련 타입·메소드         |
-		|     |                        |               |     HttpEndpointBuilder.build() - 클래스+메소드 주소 합치기, 상위 타입에서 물려받기,        |
-		|     |                        |               |       ConstantEvaluator.evaluate()로 상수로 적은 주소 계산                           |
-		|     |                        |               |     SemanticDao.insertEndpoint() - HTTP 입구                                     |
-		|     |                        |               |   SemanticDao.insertAnnotationEntries() - 애노테이션 입구 (스케줄, 리스너 등)          |
-		|     |                        |               |   EntryFinder.insertXmlEntries() - entry의 xml 규칙                             |
-		|     |                        |               |     SemanticDao.selectFilesByLanguage("XML") + 규칙의 파일 패턴                     |
-		|     |                        |               |     XmlEndpointReader.read() - 규칙의 요소·속성에서 주소·클래스·메소드                    |
-		|     |                        |               |     addXmlEntry() → findType() → selectMethodsByName() → insertXmlEndpoint()    |
-		|     |                        |               |   SemanticDao.insertMainEndpoints() - main()                                   |
-		|     |                        |               |   SemanticDao.insertJspEndpoints() - 바로 열리는 JSP                              |
-		|     |                        |               |   EntryFinder.insertExtendsEntries() → SemanticDao.insertExtendsEntries()      |
-		|     |                        |               |       - 상위 타입 입구 (Thread.run 등), 메소드 조건이 같은 규칙끼리 묶어 SQL 한 번        |
+		| 4   | EntryFinder            | entry         | EntryFinder.run()                                                                      * 애노테이션·상속·설정 XML로 입구, main(), 바로 열리는 JSP.
+		|     |                        |               |   EntryFinder.insertHttpEntries() - entry의 http 규칙                                      화면 연결보다 먼저 돈다(화면 글자와 견줄 주소가 있어야 한다).  
+		|     |                        |               |     SemanticDao.selectHttpMappingAnnotations() - @RequestMapping 등
+		|     |                        |               |     EntryFinder.typeGraph() → selectTypeEdges()·selectTypeFlags() - 상속 그래프
+		|     |                        |               |     SemanticDao.selectTypeFlags()·selectMethodsOfTypes() - 관련 타입·메소드
+		|     |                        |               |     HttpEndpointBuilder.build() - 클래스+메소드 주소 합치기, 상위 타입에서 물려받기,
+		|     |                        |               |       ConstantEvaluator.evaluate()로 상수로 적은 주소 계산
+		|     |                        |               |     SemanticDao.insertEndpoint() - HTTP 입구         
+		|     |                        |               |                         <입력> analysis_endpoint <입력>       
+		|     |                        |               |   SemanticDao.insertAnnotationEntries() - 애노테이션 입구 (스케줄, 리스너 등)
+		|     |                        |               |                         <입력> analysis_endpoint <입력>     
+		|     |                        |               |   EntryFinder.insertXmlEntries() - entry의 xml 규칙
+		|     |                        |               |     SemanticDao.selectFilesByLanguage("XML") + 규칙의 파일 패턴
+		|     |                        |               |     XmlEndpointReader.read() - 규칙의 요소·속성에서 주소·클래스·메소드
+		|     |                        |               |     addXmlEntry() → findType() → selectMethodsByName() → insertXmlEndpoint()
+		|     |                        |               |                         <입력> analysis_endpoint <입력>     
+		|     |                        |               |   SemanticDao.insertMainEndpoints() - main()
+		|     |                        |               |                         <입력> analysis_endpoint <입력>     
+		|     |                        |               |   SemanticDao.insertJspEndpoints() - 바로 열리는 JSP
+		|     |                        |               |                         <입력> analysis_endpoint <입력>     
+		|     |                        |               |   EntryFinder.insertExtendsEntries() → SemanticDao.insertExtendsEntries() 
+		|     |                        |               |       - 상위 타입 입구 (Thread.run 등), 메소드 조건이 같은 규칙끼리 묶어 SQL 한 번 
+		|     |                        |               |                         <입력> analysis_endpoint <입력>     
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 5   | WiringMarker           | inject, proxy | WiringMarker.run()                                                             | 주입 관계, 프록시가 끼는 메소드.
-		|     |                        |               |   SemanticDao.insertInjects() - 규칙 애노테이션이 붙은 필드의 타입 → INJECTS            |
-		|     |                        |               |   SemanticDao.markProxyRelated() - 메소드나 그 클래스에 규칙 애노테이션                  |
-		|     |                        |               |                                    (@Transactional 등) → proxy_related = TRUE  |
+		| 5   | WiringMarker           | inject, proxy | WiringMarker.run()                                                                    * 주입 관계, 프록시가 끼는 메소드.
+		|     |                        |               |   SemanticDao.insertInjects() - 규칙 애노테이션이 붙은 필드의 타입 → INJECTS
+		|     |                        |               |                         <입력> analysis_relation <입력>     
+		|     |                        |               |   SemanticDao.markProxyRelated() - 메소드나 그 클래스에 규칙 애노테이션. (@Transactional 등) → proxy_related = TRUE 
+		|     |                        |               |                         <수정> analysis_method(proxy_related) <수정>    
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 6   | JpaQueryReader         | jpa           | JpaQueryReader.run()                                                           | JPA 쿼리를 statement로.
-		|     |                        |               |   JavaSqlDao.deleteJpaStatements() - 지난번 JPA statement 삭제 (규칙 없으면 여기서 끝) | MapperLinker보다 먼저 돈다(이름 있는 쿼리를 이름으로 찾게).
-		|     |                        |               |   JpaEntities.load() - 엔티티 → 테이블                                           |
-		|     |                        |               |   JpaQueryReader.addQueries() - 메소드의 @Query                                  |
-		|     |                        |               |     JavaSqlDao.selectAnnotations("METHOD") → AnnotationValues.parse()          |
-		|     |                        |               |     queryText() - 리터럴, 텍스트 블록, 상수(ConstantEvaluator)                        |
-		|     |                        |               |     insert() → JavaSqlDao.insertJpaStatement()                                 |
-		|     |                        |               |   JpaQueryReader.namedQueries() - 타입의 @NamedQuery, 묶음(@NamedQueries)은       |
-		|     |                        |               |                                   innerAnnotation()으로 풀어서                    |
-		|     |                        |               |   JpaQueryReader.addRepositoryMethods() - 저장소 인터페이스 메소드                    |
-		|     |                        |               |     JavaSqlDao.selectRepositories() → repositoryEntity() (타입 인자로 엔티티)        |
-		|     |                        |               |     JavaSqlDao.selectDeclaredMethods()                                         |
-		|     |                        |               |       - 엔티티.메소드 이름 쿼리가 있으면 addMethod()로 그 쿼리에 메소드를 붙인다            |
-		|     |                        |               |       - findBy·countBy… 모양이면 DERIVED statement insert                        |
-		|     |                        |               |   이름 있는 쿼리 insert() - 메소드 목록까지 채운 뒤 마지막에 넣는다                        |
+		| 6   | JpaQueryReader         | jpa           | JpaQueryReader.run()                                                                  * JPA 쿼리를 statement로. MapperLinker보다 먼저 돈다(이름 있는 쿼리를 이름으로 찾게).
+		|     |                        |               |   JavaSqlDao.deleteJpaStatements() - 지난번 JPA statement 삭제 (규칙 없으면 여기서 끝) 
+		|     |                        |               |                         <삭제> analysis_mapper <삭제>    
+		|     |                        |               |   JpaEntities.load() - 엔티티 → 테이블
+		|     |                        |               |   JpaQueryReader.addQueries() - 메소드의 @Query
+		|     |                        |               |     JavaSqlDao.selectAnnotations("METHOD") → AnnotationValues.parse()
+		|     |                        |               |     queryText() - 리터럴, 텍스트 블록, 상수(ConstantEvaluator)
+		|     |                        |               |     insert() → JavaSqlDao.insertJpaStatement()
+		|     |                        |               |   JpaQueryReader.namedQueries() - 타입의 @NamedQuery, 묶음(@NamedQueries)은 innerAnnotation()으로 풀어서
+		|     |                        |               |   JpaQueryReader.addRepositoryMethods() - 저장소 인터페이스 메소드
+		|     |                        |               |     JavaSqlDao.selectRepositories() → repositoryEntity() (타입 인자로 엔티티)
+		|     |                        |               |     JavaSqlDao.selectDeclaredMethods() 
+		|     |                        |               |       - 엔티티.메소드 이름 쿼리가 있으면 addMethod()로 그 쿼리에 메소드를 붙인다
+		|     |                        |               |       - findBy·countBy… 모양이면 DERIVED statement insert
+		|     |                        |               |   JpaQueryReader.insert() - 메소드 목록까지 채운 뒤 마지막에 넣는다
+		|     |                        |               |                         <입력> analysis_mapper <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 7   | MapperLinker           |               | MapperLinker.run()                                                             | SQL 관계를 모두 지우고, 매퍼 인터페이스 방식 연결과 매퍼 SQL → 테이블.
-		|     |                        |               |   ResourceDao.clearSqlRelations() - EXECUTES_SQL·READS_TABLE·WRITES_TABLE 삭제  |
-		|     |                        |               |   StatementIndex.load() - statement·조각 색인 (없으면 끝)                         |
-		|     |                        |               |   ResourceDao.insertInterfaceMapperRelations() - 매퍼 인터페이스 메소드 →              |
-		|     |                        |               |                                                  같은 이름 statement (EXECUTES_SQL) |
-		|     |                        |               |   MapperLinker.extractTables()                                                 |
-		|     |                        |               |     ResourceDao.selectMapperPage() - 500건씩                                     |
-		|     |                        |               |     expandIncludes() - <include refid> 풀기 (fragmentOf(), selectMapperBody())   |
-		|     |                        |               |     SqlTableExtractor.extract() - 테이블·CRUD·컬럼 (파서, 실패하면 정규식)              |
-		|     |                        |               |     ResourceDao.insertRelation() - SQL → 테이블 (READS_TABLE / WRITES_TABLE)      |
+		| 7   | MapperLinker           |               | MapperLinker.run()                                                                   * SQL 관계를 모두 지우고, 매퍼 인터페이스 방식 연결과 매퍼 SQL → 테이블.
+		|     |                        |               |   ResourceDao.clearSqlRelations() - EXECUTES_SQL·READS_TABLE·WRITES_TABLE 삭제
+		|     |                        |               |                         <삭제> analysis_relation <삭제>    
+		|     |                        |               |                         <수정> analysis_mapper(method_id = NULL) <수정>
+		|     |                        |               |   StatementIndex.load() - statement·조각 색인 (없으면 끝)
+		|     |                        |               |   ResourceDao.insertInterfaceMapperRelations() - 매퍼 인터페이스 메소드 → 같은 이름 statement (EXECUTES_SQL)
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |   MapperLinker.extractTables()
+		|     |                        |               |     ResourceDao.selectMapperPage() - 500건씩
+		|     |                        |               |     expandIncludes() - <include refid> 풀기 (fragmentOf(), selectMapperBody())
+		|     |                        |               |     SqlTableExtractor.extract() - 테이블·CRUD·컬럼 (파서, 실패하면 정규식)
+		|     |                        |               |     ResourceDao.insertRelation() - SQL → 테이블 (READS_TABLE / WRITES_TABLE)
+		|     |                        |               |                         <입력> analysis_relation <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 8   | SqlLinker              | sql           | SqlLinker.run()                                                                | 호출 인자로 SQL 이름을 계산해 메소드 → statement.
-		|     |                        |               |   StatementIndex.load() - 없으면 끝                                               | MapperLinker 다음에 돈다.
-		|     |                        |               |   SqlLinker.groups() - 수신 타입·인자 위치·prefix·suffix가 같은 규칙끼리 묶는다          |
-		|     |                        |               |   SqlLinker.linkCalls() - 묶음마다                                              |
-		|     |                        |               |     ResourceDao.selectMapperCallPage() - 그 메소드 호출 500건씩                     |
-		|     |                        |               |     ConstantEvaluator.evaluate() - 인자를 문자열로 계산, prefix + 값 + suffix         |
-		|     |                        |               |     looksLikeStatementName()·skip 패턴 - SQL 이름이 아니면 버린다                   |
-		|     |                        |               |     StatementIndex.statementOf() - 없으면 id만으로 찾되 하나뿐일 때만                    |
-		|     |                        |               |     ResourceDao.insertRelation() - 메소드 → SQL (EXECUTES_SQL),                  |
-		|     |                        |               |                                    statement가 없으면 UNRESOLVED로 남긴다            |
-		|     |                        |               |   ResourceDao.updateMapperMethods() - statement에 대표 메소드 기록                   |
+		| 8   | SqlLinker              | sql           | SqlLinker.run()                                                                     * 호출 인자로 SQL 이름을 계산해 메소드 → statement. MapperLinker 다음에 돈다.
+		|     |                        |               |   StatementIndex.load() - 없으면 끝  
+		|     |                        |               |   SqlLinker.groups() - 수신 타입·인자 위치·prefix·suffix가 같은 규칙끼리 묶는다 
+		|     |                        |               |   SqlLinker.linkCalls() - 묶음마다
+		|     |                        |               |     ResourceDao.selectMapperCallPage() - 그 메소드 호출 500건씩
+		|     |                        |               |     ConstantEvaluator.evaluate() - 인자를 문자열로 계산, prefix + 값 + suffix
+		|     |                        |               |     looksLikeStatementName()·skip 패턴 - SQL 이름이 아니면 버린다
+		|     |                        |               |     StatementIndex.statementOf() - 없으면 id만으로 찾되 하나뿐일 때만
+		|     |                        |               |     ResourceDao.insertRelation() - 메소드 → SQL (EXECUTES_SQL), statement가 없으면 UNRESOLVED로 남긴다
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |   ResourceDao.updateMapperMethods() - statement에 대표 메소드 기록
+		|     |                        |               |                         <수정> analysis_mapper(method_id) <수정>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 9   | JavaSqlLinker          | jpa > jpql    | JavaSqlLinker.run()                                                            | Java 문자열 SQL·JPA를 메소드·테이블에 잇는다.
-		|     |                        |               |   JpaEntities.load(), ProjectRules.jpqlMethods()                               | SqlLinker 다음에 돈다.
-		|     |                        |               |   JavaSqlDao.selectStatementPage() - Java 문자열 SQL + JPA statement 500건씩      |
-		|     |                        |               |   JavaSqlLinker.languageOf() - JPA는 저장된 언어, 문자열은 jpql 규칙 메소드면 JPQL       |
-		|     |                        |               |   JavaSqlLinker.linkTables() - SQL → 테이블                                     |
-		|     |                        |               |     DERIVED: 엔티티의 테이블 / JPQL: JpqlTableExtractor.extract() /               |
-		|     |                        |               |     SQL: SqlTableExtractor.extract() → ResourceDao.insertRelation()            |
-		|     |                        |               |   JavaSqlLinker.linkMethods() - 메소드 → SQL (EXECUTES_SQL)                      |
-		|     |                        |               |     SQL을 쓴 메소드, 이름 있는 쿼리를 쓰는 메소드,                                       |
-		|     |                        |               |     SQL 상수 필드를 읽는 메소드 (JavaSqlDao.selectFieldReaders(), MEDIUM)             |
-		|     |                        |               |   ResourceDao.updateMapperMethods()                                            |
+		| 9   | JavaSqlLinker          | jpa > jpql    | JavaSqlLinker.run()                                                                  * Java 문자열 SQL·JPA를 메소드·테이블에 잇는다. SqlLinker 다음에 돈다.
+		|     |                        |               |   JpaEntities.load(), ProjectRules.jpqlMethods()
+		|     |                        |               |   JavaSqlDao.selectStatementPage() - Java 문자열 SQL + JPA statement 500건씩
+		|     |                        |               |   JavaSqlLinker.languageOf() - JPA는 저장된 언어, 문자열은 jpql 규칙 메소드면 JPQL
+		|     |                        |               |   JavaSqlLinker.linkTables() - SQL → 테이블
+		|     |                        |               |     DERIVED: 엔티티의 테이블 / JPQL: JpqlTableExtractor.extract() / SQL: SqlTableExtractor.extract()
+		|     |                        |               |     → ResourceDao.insertRelation()
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |   JavaSqlLinker.linkMethods() - 메소드 → SQL (EXECUTES_SQL)
+		|     |                        |               |     SQL을 쓴 메소드, 이름 있는 쿼리를 쓰는 메소드,
+		|     |                        |               |     SQL 상수 필드를 읽는 메소드 (JavaSqlDao.selectFieldReaders(), MEDIUM)
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |   ResourceDao.updateMapperMethods()
+		|     |                        |               |                         <수정> analysis_mapper(method_id) <수정>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 10  | ViewLinker             | view          | ViewLinker.run()                                                               | 메소드 → JSP (RENDERS).
-		|     |                        |               |   ProjectRules.viewCalls() - 규칙마다                                            | 화면 연결은 입구가 다 만들어진 뒤에 한다.
-		|     |                        |               |   SemanticDao.insertViewArgumentRelations() - 호출 인자가 따옴표 리터럴이고           |
-		|     |                        |               |       prefix+이름+suffix로 JSP가 하나만 맞으면 RENDERS (SQL 한 번)                  |
+		| 10  | ViewLinker             | view          | ViewLinker.run()                                                                   * 메소드 → JSP (RENDERS). 화면 연결은 입구가 다 만들어진 뒤에 한다.
+		|     |                        |               |   ProjectRules.viewCalls() - 규칙마다
+		|     |                        |               |   SemanticDao.insertViewArgumentRelations() - 호출 인자가 따옴표 리터럴이고 prefix+이름+suffix로 JSP가 하나만 맞으면 RENDERS (SQL 한 번)
+		|     |                        |               |                         <입력> analysis_relation <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 11  | JspLinker              |               | JspLinker.run()                                                                | JSP → 메소드 (REQUESTS), JSP → JSP (INCLUDES), JSP 화면명.
-		|     |                        |               |   SemanticDao.updateJspEndpointMethods() - JSP 입구에 _jspService 메소드 채우기     |
-		|     |                        |               |   SemanticDao.selectEndpointHandlers() - 주소 → 메소드 표                          |
-		|     |                        |               |   SemanticDao.selectFilePage("JSP") - 200건씩, 파일마다                           |
-		|     |                        |               |     saveScreenName() - ScreenTitle.of() → SemanticDao.insertScreenName()       |
-		|     |                        |               |     linkRequests() - 본문의 경로 글자가 입구 주소와 같으면 REQUESTS (MEDIUM)              |
-		|     |                        |               |     linkScriptRequests() - ScriptSources.find()로 <script src>를 찾고            |
-		|     |                        |               |       scriptPathsOf() (selectScriptByPathEnd(), ScreenScript.findPaths())       |
-		|     |                        |               |       → 그 .js에 적힌 주소로 REQUESTS                                              |
-		|     |                        |               |     linkIncludes() - jsp:include, @include → selectJspByPathEnd() → INCLUDES   |
+		| 11  | JspLinker              |               | JspLinker.run()                                                                    * JSP → 메소드 (REQUESTS), JSP → JSP (INCLUDES), JSP 화면명.
+		|     |                        |               |   SemanticDao.updateJspEndpointMethods() - JSP 입구에 _jspService 메소드 채우기
+		|     |                        |               |                         <수정> analysis_endpoint(symbol_id, method_id) <수정>
+		|     |                        |               |   SemanticDao.selectEndpointHandlers() - 주소 → 메소드 표
+		|     |                        |               |   SemanticDao.selectFilePage("JSP") - 200건씩, 파일마다
+		|     |                        |               |     saveScreenName() - ScreenTitle.of() → SemanticDao.insertScreenName()
+		|     |                        |               |                         <입력> analysis_resource <입력>
+		|     |                        |               |     linkRequests() - 본문의 경로 글자가 입구 주소와 같으면 REQUESTS (MEDIUM)
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |     linkScriptRequests() - ScriptSources.find()로 <script src>를 찾고
+		|     |                        |               |       scriptPathsOf() (selectScriptByPathEnd(), ScreenScript.findPaths())
+		|     |                        |               |       → 그 .js에 적힌 주소로 REQUESTS
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |     linkIncludes() - jsp:include, @include → selectJspByPathEnd() → INCLUDES
+		|     |                        |               |                         <입력> analysis_relation <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 12  | ScreenLinker           | screen        | ScreenLinker.run()                                                             | WebSquare·Nexacro 화면 → 메소드·화면, 거래 입구, 화면명.
-		|     |                        |               |   ProjectRules.screenCalls()·screenOpens() - 거래 호출 규칙, 화면 열기 규칙            |
-		|     |                        |               |   SemanticDao.selectFilePageByTypes(WEBSQUARE, NEXACRO) - 200건씩                 |
-		|     |                        |               |   (첫 페이지에서 한 번) loadHandlers() - 주소 → 메소드 표                             |
-		|     |                        |               |                       loadCommonFunctions() - 공통 스크립트에서 화면을 열거나            |
-		|     |                        |               |                         서버를 부르는 함수 (ScriptFunctions.findFunctions())         |
-		|     |                        |               |   파일마다                                                                       |
-		|     |                        |               |     saveScreenName() - ScreenTitle.of() → insertScreenName()                   |
-		|     |                        |               |     commonUsesOf() - 이 화면이 부르는 공통 함수                                       |
-		|     |                        |               |     linkPaths() - ScreenScript.findPaths() → 입구 주소와 같으면 REQUESTS             |
-		|     |                        |               |     linkCalls() - ScreenScript.findCalls(rules) → methodNameOf() (IdTransform)  |
-		|     |                        |               |       → MethodIndex.load() → REQUESTS (메소드가 없으면 UNRESOLVED)                |
-		|     |                        |               |     linkScreens() - findScreenRefs() + findCalls(openRules) → findScreen()     |
-		|     |                        |               |       → 화면 → 화면 INCLUDES                                                     |
-		|     |                        |               |     linkCommonScreens() - 공통 함수가 여는 화면 → INCLUDES (MEDIUM)                  |
-		|     |                        |               |   ScreenLinker.insertEndpoints() - 실제로 쓰인 규칙마다 거래 입구                      |
-		|     |                        |               |     SemanticDao.insertCallRuleEndpoints() / insertMapEndpoints()               |
-		|     |                        |               |       (ID 표 규칙 → MethodIndex → insertTransactionEndpoint())                   |
-		|     |                        |               |   ScreenLinker.saveRuleStatus() - ID를 글자로 적지 않은 호출 통계                      |
-		|     |                        |               |       → insertSemanticResource(SEMANTIC_STATUS, SCREEN_RULES)                  |
+		| 12  | ScreenLinker           | screen        | ScreenLinker.run()                                                                 * WebSquare·Nexacro 화면 → 메소드·화면, 거래 입구, 화면명.
+		|     |                        |               |   ProjectRules.screenCalls()·screenOpens() - 거래 호출 규칙, 화면 열기 규칙
+		|     |                        |               |   SemanticDao.selectFilePageByTypes(WEBSQUARE, NEXACRO) - 200건씩
+		|     |                        |               |     (첫 페이지에서 한 번)
+		|     |                        |               |     loadHandlers() - 주소 → 메소드 표
+		|     |                        |               |     loadCommonFunctions() - 공통 스크립트에서 화면을 열거나 서버를 부르는 함수 (ScriptFunctions.findFunctions())
+		|     |                        |               |     (파일마다)
+		|     |                        |               |     saveScreenName() - ScreenTitle.of() → insertScreenName()
+		|     |                        |               |                         <입력> analysis_resource <입력>
+		|     |                        |               |     commonUsesOf() - 이 화면이 부르는 공통 함수
+		|     |                        |               |     linkPaths() - ScreenScript.findPaths() → 입구 주소와 같으면 REQUESTS
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |     linkCalls() - ScreenScript.findCalls(rules) → methodNameOf() (IdTransform)
+		|     |                        |               |       → MethodIndex.load() → REQUESTS (메소드가 없으면 UNRESOLVED)
+		|     |                        |               |                         <입력> analysis_resource <입력>
+		|     |                        |               |     linkScreens() - findScreenRefs() + findCalls(openRules) → findScreen() → 화면 → 화면 INCLUDES
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |     linkCommonScreens() - 공통 함수가 여는 화면 → INCLUDES (MEDIUM)
+		|     |                        |               |                         <입력> analysis_relation <입력>
+		|     |                        |               |   ScreenLinker.insertEndpoints() - 실제로 쓰인 규칙마다 거래 입구
+		|     |                        |               |     SemanticDao.insertCallRuleEndpoints() / insertMapEndpoints()(ID 표 규칙 → MethodIndex → insertTransactionEndpoint())
+		|     |                        |               |                         <입력> analysis_endpoint <입력>
+		|     |                        |               |   ScreenLinker.saveRuleStatus() - ID를 글자로 적지 않은 호출 통계 → insertSemanticResource(SEMANTIC_STATUS, SCREEN_RULES)
+		|     |                        |               |                         <입력> analysis_resource <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 13  | ScreenMenuReader       | screen > menu | ScreenMenuReader.run()                                                         | 메뉴 목록에서 화면명.
-		|     |                        |               |   ProjectRules.screenMenus() - 없으면 끝                                         | 화면 파일의 제목이 먼저다.
-		|     |                        |               |   SemanticDao.selectScreenNamedFileIds() - 이미 화면명이 있는 화면 (11·12번이 넣음)      |
-		|     |                        |               |   SemanticDao.selectFilePageByLanguages(JSP, XML) - 200건씩                       |
-		|     |                        |               |     ScreenMenu.findEntries() - 메뉴 항목 (경로, 이름)                               |
-		|     |                        |               |     ScreenLinker.findScreen() - 경로로 화면 파일 찾기                                |
-		|     |                        |               |     SemanticDao.insertScreenName() - 화면명이 아직 없는 화면만 (via MENU)              |
+		| 13  | ScreenMenuReader       | screen > menu | ScreenMenuReader.run()                                                            * 메뉴 목록에서 화면명. 화면 파일의 제목이 먼저다.
+		|     |                        |               |   ProjectRules.screenMenus() - 없으면 끝
+		|     |                        |               |   SemanticDao.selectScreenNamedFileIds() - 이미 화면명이 있는 화면 (11·12번이 넣음)
+		|     |                        |               |   SemanticDao.selectFilePageByLanguages(JSP, XML) - 200건씩
+		|     |                        |               |     ScreenMenu.findEntries() - 메뉴 항목 (경로, 이름)
+		|     |                        |               |     ScreenLinker.findScreen() - 경로로 화면 파일 찾기
+		|     |                        |               |     SemanticDao.insertScreenName() - 화면명이 아직 없는 화면만 (via MENU)
+		|     |                        |               |                         <입력> analysis_resource <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 14  | SourceNamePlugin       |               | SourceNamePlugin.run()                                                         | Java 소스에서 테이블·컬럼 한글명.
-		|     |                        |               |   SemanticDao.selectEntityTypes() → describe() → SOURCE_TABLE_NAME             | SQL에 쓰인 컬럼이 다 모인 뒤에 돈다.
-		|     |                        |               |   SemanticDao.selectEntityFields() → describe() → SOURCE_NAME (ENTITY)         |
-		|     |                        |               |   SemanticDao.selectNameCandidateFields() - SQL·DDL 컬럼과 이름이 같은 필드           |
-		|     |                        |               |     → describe() → SOURCE_NAME (NAME)                                          |
-		|     |                        |               |   describe() - JavaDoc 설명 → 줄 끝 주석 → 바로 위 주석 순으로 찾는다                  |
+		| 14  | SourceNamePlugin       |               | SourceNamePlugin.run()                                                            * Java 소스에서 테이블·컬럼 한글명. SQL에 쓰인 컬럼이 다 모인 뒤에 돈다.
+		|     |                        |               |   SemanticDao.selectEntityTypes() → describe() → SOURCE_TABLE_NAME
+		|     |                        |               |   SemanticDao.selectEntityFields() → describe() → SOURCE_NAME (ENTITY)
+		|     |                        |               |   SemanticDao.selectNameCandidateFields() - SQL·DDL 컬럼과 이름이 같은 필드
+		|     |                        |               |     → describe() → SOURCE_NAME (NAME)
+		|     |                        |               |   describe() - JavaDoc 설명 → 줄 끝 주석 → 바로 위 주석 순으로 찾는다
+		|     |                        |               |   SourceNamePlugin.insert() 
+		|     |                        |               |                         <입력> analysis_resource <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 15  | MethodTitlePlugin      |               | MethodTitlePlugin.run()                                                        | 메소드 기능명.
-		|     |                        |               |   SemanticDao.selectMethodFilePage() - 메소드가 있는 파일 200건씩                    |
-		|     |                        |               |     readLines() - 체크섬이 다르거나 못 읽으면 METHOD_TITLE_SKIP                       |
-		|     |                        |               |     SemanticDao.selectMethodLinesByFile() → MethodTitle.of(lines, lineStart)    |
-		|     |                        |               |     insertSemanticResource(METHOD_TITLE)                                       |
-		|     |                        |               |   insertSemanticResource(SEMANTIC_STATUS, METHOD_TITLE) - 건수 기록               |
+		| 15  | MethodTitlePlugin      |               | MethodTitlePlugin.run()                                                           * 메소드 기능명.
+		|     |                        |               |   SemanticDao.selectMethodFilePage() - 메소드가 있는 파일 200건씩
+		|     |                        |               |     readLines() - 체크섬이 다르거나 못 읽으면 METHOD_TITLE_SKIP
+		|     |                        |               |     SemanticDao.selectMethodLinesByFile() → MethodTitle.of(lines, lineStart)
+		|     |                        |               |     insertSemanticResource(METHOD_TITLE)
+		|     |                        |               |   insertSemanticResource(SEMANTIC_STATUS, METHOD_TITLE) - 건수 기록
+		|     |                        |               |                         <입력> analysis_resource <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 16  | ScreenDictionaryPlugin | (설정)          | ScreenDictionaryPlugin.run()                                                   | 화면 사전 CSV의 한글명.
-		|     |                        |               |   ScreenDictionaryReader.load() - 설정된 화면 사전 CSV (없으면 NOT_CONFIGURED)       |
-		|     |                        |               |   SemanticDao.selectFilePageByTypes(JSP, WEBSQUARE, NEXACRO) - 200건씩            |
-		|     |                        |               |     ScreenDictionaryReader.find() → insertSemanticResource(DICT_SCREEN_NAME)   |
-		|     |                        |               |   insertSemanticResource(SEMANTIC_STATUS, SCREEN_DICTIONARY)                   |
+		| 16  | ScreenDictionaryPlugin | (설정)          | ScreenDictionaryPlugin.run()                                                      * 화면 사전 CSV의 한글명.
+		|     |                        |               |   ScreenDictionaryReader.load() - 설정된 화면 사전 CSV (없으면 NOT_CONFIGURED)
+		|     |                        |               |   SemanticDao.selectFilePageByTypes(JSP, WEBSQUARE, NEXACRO) - 200건씩
+		|     |                        |               |     ScreenDictionaryReader.find() → insertSemanticResource(DICT_SCREEN_NAME)
+		|     |                        |               |   insertSemanticResource(SEMANTIC_STATUS, SCREEN_DICTIONARY)
+		|     |                        |               |                         <입력> analysis_resource <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 17  | TableDictionaryPlugin  | (설정)          | TableDictionaryPlugin.run()                                                    | 테이블·컬럼 사전 CSV.
-		|     |                        |               |   DictionaryFileReader.load() - 설정된 테이블·컬럼 사전 CSV                          |
-		|     |                        |               |   insertSemanticResource(DICT_TABLE_NAME) - 테이블마다                            |
-		|     |                        |               |   insertSemanticResource(DICT_COLUMN_NAME) - 컬럼마다                             |
-		|     |                        |               |   insertSemanticResource(SEMANTIC_STATUS, TABLE_DICTIONARY)                    |
+		| 17  | TableDictionaryPlugin  | (설정)          | TableDictionaryPlugin.run()                                                      * 테이블·컬럼 사전 CSV.
+		|     |                        |               |   DictionaryFileReader.load() - 설정된 테이블·컬럼 사전 CSV
+		|     |                        |               |   insertSemanticResource(DICT_TABLE_NAME) - 테이블마다
+		|     |                        |               |                         <입력> analysis_resource <입력>
+		|     |                        |               |   insertSemanticResource(DICT_COLUMN_NAME) - 컬럼마다
+		|     |                        |               |                         <입력> analysis_resource <입력>
+		|     |                        |               |   insertSemanticResource(SEMANTIC_STATUS, TABLE_DICTIONARY)
+		|     |                        |               |                         <입력> analysis_resource <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 				 
 		**************************************************************************************************************************************/
