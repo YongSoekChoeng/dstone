@@ -1,7 +1,13 @@
 package net.dstone.ai.tools.knowledge;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -9,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.exception.KnowledgeCallException;
@@ -30,6 +37,7 @@ import net.dstone.common.utils.StringUtil;
  *   knowledgeCallees        이 메소드가 부르는 쪽(SQL, 테이블, 화면까지)
  *   knowledgeTableUsage     테이블을 건드리는 SQL과 메소드
  *   knowledgeImpact         이것을 고치면 닿는 진입점, 화면, 메소드
+ *   knowledgeDatasources    애플리케이션이 쓰는 DB 접속 설정(설정 파일, Spring XML 빈). 실제 조회는 tools.db.DbQueryTool이 한다
  *
  * 켜고 끄는 설정은 따로 없습니다. dstone.ai.tool.knowledge.base-url이 비어 있으면(기본값) 어떤 호출도 실패 문구로 끝납니다.
  * 모든 Tool은 프로젝트 ID를 받고, 그 프로젝트에서 분석이 끝난 가장 최근 리비전을 씁니다.
@@ -60,6 +68,9 @@ public class KnowledgeTool extends BaseObject {
 
 	@Autowired
 	private Environment environment;
+
+	/** 빈 속성(properties_json 글)을 읽을 때 쓴다 */
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@Tool(description = "dstone-knowledge에 분석해 둔 Java 프로젝트 목록을 돌려준다. 다른 knowledge Tool에 넘길 projectId를 모를 때 먼저 부른다.")
 	public String knowledgeListProjects() {
@@ -251,6 +262,265 @@ public class KnowledgeTool extends BaseObject {
 		}
 	}
 
+	@Tool(description = "분석한 애플리케이션이 쓰는 DB(데이터소스) 설정을 찾아 돌려준다: 설정 파일(application.yml, *.properties)의 JDBC 주소, 계정, 드라이버, JNDI 이름과 "
+		+ "Spring XML의 DataSource 빈. 값마다 정의된 파일과 줄이 붙고, ${...} 변수는 같은 프로젝트 설정에서 찾아 풀어 본다. 비밀번호는 분석 결과에 없다(****). "
+		+ "그 DB를 실제로 조회하려면 dbListConnections에서 같은 JDBC 주소의 별칭을 찾는다.")
+	public String knowledgeDatasources(@ToolParam(description = "프로젝트 ID") String projectId) {
+		try {
+			long revision = this.latestRevision(projectId);
+			StringBuilder sb = new StringBuilder();
+			int found = this.appendDatasourceConfigs(revision, sb);
+			found += this.appendDatasourceBeans(revision, sb);
+			if (found == 0) {
+				return "데이터소스 설정을 찾지 못했습니다. Java 코드(@Bean)에서 만든 데이터소스나 WAS 쪽 설정(server.xml, JNDI 리소스)은 분석 결과에 없습니다.";
+			}
+			sb.append("\n참고: 비밀번호는 분석 결과에 남기지 않습니다(****). 같은 이름의 설정이 여러 파일에 있으면 프로파일(application-{프로파일}.yml)이나 환경마다 다른 값입니다.\n");
+			sb.append("이 DB를 조회하려면 dbListConnections에서 같은 JDBC 주소의 별칭을 찾고, 없으면 관리자에게 dstone.ai.tool.db.connections 등록을 요청합니다.\n");
+			return sb.toString();
+		} catch (KnowledgeCallException e) {
+			return e.getMessage();
+		}
+	}
+
+	/** 데이터소스 설정 키의 마지막 마디(소문자, - _ 없앰). 이것만 보여 준다(풀 크기 같은 튜닝 값은 뺀다) */
+	private static final Set<String> DATASOURCE_KEYS = new LinkedHashSet<String>(java.util.Arrays.asList(
+		"url", "jdbcurl", "username", "user", "password", "driverclassname", "driverclass", "driver", "drivername", "jndiname", "jndi", "type", "schema", "catalog"));
+
+	/** 한 번에 가져오는 설정 / 빈의 수(dstone-knowledge의 상한) */
+	private static final int PAGE_SIZE = 500;
+
+	/** 변수(${...})를 풀려고 부르는 최대 횟수 */
+	private static final int MAX_RESOLVE = 20;
+
+	/**
+	 * <pre>
+	 * 설정 파일의 데이터소스 설정. 파일과 접두사(spring.datasource 등)로 묶어서 쓴다.
+	 * 찾는 방법: 키에 datasource / dataSource / DataSource / jdbc가 들어간 것, 값에 jdbc:가 들어간 것.
+	 * 값으로만 찾은 것(db.url = jdbc:...)은 같은 접두사의 형제(db.username ...)를 한 번 더 가져온다.
+	 * </pre>
+	 */
+	private int appendDatasourceConfigs(long revision, StringBuilder sb) throws KnowledgeCallException {
+		String path = "/api/revisions/" + revision + "/configs";
+		Map<String, JsonNode> rows = new LinkedHashMap<String, JsonNode>();
+		String[] keyWords = { "datasource", "dataSource", "DataSource", "jdbc" };
+		for (int i = 0; i < keyWords.length; i++) {
+			this.collectConfigs(path, "key", keyWords[i], rows);
+		}
+		Map<String, JsonNode> byValue = new LinkedHashMap<String, JsonNode>();
+		this.collectConfigs(path, "value", "jdbc:", byValue);
+
+		// 그룹: 파일 + 접두사
+		Map<String, List<JsonNode>> groups = new LinkedHashMap<String, List<JsonNode>>();
+		Iterator<JsonNode> it = rows.values().iterator();
+		while (it.hasNext()) {
+			JsonNode row = it.next();
+			if (isDatasourceKey(text(row, "key")) || containsJdbc(text(row, "value"))) {
+				addToGroup(groups, row);
+			}
+		}
+		// 값으로만 찾은 주소는 형제 키를 더 가져온다
+		Iterator<JsonNode> values = byValue.values().iterator();
+		while (values.hasNext()) {
+			JsonNode row = values.next();
+			if (!containsJdbc(text(row, "value")) || rows.containsKey(rowId(row))) {
+				continue;
+			}
+			String prefix = prefixOf(text(row, "key"));
+			if (prefix.length() == 0 || groups.containsKey(text(row, "file") + "\n" + prefix)) {
+				addToGroup(groups, row);
+				continue;
+			}
+			Map<String, JsonNode> siblings = new LinkedHashMap<String, JsonNode>();
+			this.collectConfigs(path, "key", prefix + ".", siblings);
+			Iterator<JsonNode> sit = siblings.values().iterator();
+			while (sit.hasNext()) {
+				JsonNode sibling = sit.next();
+				String key = text(sibling, "key");
+				if (text(sibling, "file").equals(text(row, "file")) && prefix.equals(prefixOf(key)) && (isDatasourceKey(key) || containsJdbc(text(sibling, "value")))) {
+					addToGroup(groups, sibling);
+				}
+			}
+			addToGroup(groups, row);
+		}
+		if (groups.isEmpty()) {
+			return 0;
+		}
+		sb.append("[설정 파일] (키 = 값, 줄)\n");
+		int resolveCalls = 0;
+		Iterator<Map.Entry<String, List<JsonNode>>> git = groups.entrySet().iterator();
+		while (git.hasNext()) {
+			Map.Entry<String, List<JsonNode>> group = git.next();
+			List<JsonNode> members = group.getValue();
+			sb.append("- ").append(text(members.get(0), "file")).append("  ").append(prefixOf(text(members.get(0), "key"))).append('\n');
+			for (int i = 0; i < members.size(); i++) {
+				JsonNode row = members.get(i);
+				sb.append("    ").append(text(row, "key")).append(" = ").append(text(row, "value"));
+				if (!StringUtil.isEmpty(text(row, "lineStart"))) {
+					sb.append("  (").append(text(row, "lineStart")).append("줄)");
+				}
+				String placeholder = text(row, "placeholder");
+				if (!StringUtil.isEmpty(placeholder) && resolveCalls < MAX_RESOLVE) {
+					resolveCalls++;
+					sb.append(this.resolvePlaceholder(path, placeholder));
+				}
+				sb.append('\n');
+			}
+		}
+		return groups.size();
+	}
+
+	/**
+	 * <pre>
+	 * Spring XML의 DataSource 빈. 클래스 이름에 DataSource가 들어간 빈(트랜잭션 매니저 등 받아 쓰는 쪽은 뺀다)과 JNDI로 찾는 빈(JndiObjectFactoryBean).
+	 * 속성 가운데 접속에 관한 것(url, username, driverClassName, jndiName ...)만 보여 준다.
+	 * </pre>
+	 */
+	private int appendDatasourceBeans(long revision, StringBuilder sb) throws KnowledgeCallException {
+		String path = "/api/revisions/" + revision + "/resources";
+		Map<String, JsonNode> beans = new LinkedHashMap<String, JsonNode>();
+		String[] classWords = { "DataSource", "JndiObjectFactoryBean" };
+		for (int w = 0; w < classWords.length; w++) {
+			Map<String, String> params = new LinkedHashMap<String, String>();
+			params.put("type", "SPRING_BEAN");
+			params.put("value", classWords[w]);
+			params.put("size", String.valueOf(PAGE_SIZE));
+			JsonNode list = this.get(path, params).path("resources");
+			for (int i = 0; i < list.size(); i++) {
+				JsonNode bean = list.get(i);
+				// 예전 dstone-knowledge는 value 조건을 모르므로 여기서도 거른다
+				if (isDatasourceClass(text(bean, "value"))) {
+					beans.put(text(bean, "file") + "\n" + text(bean, "name") + "\n" + text(bean, "lineStart"), bean);
+				}
+			}
+		}
+		if (beans.isEmpty()) {
+			return 0;
+		}
+		sb.append(sb.length() > 0 ? "\n" : "").append("[Spring XML 빈] (빈 이름 = 클래스, 파일)\n");
+		String configPath = path.replace("/resources", "/configs");
+		int resolveCalls = 0;
+		Iterator<JsonNode> it = beans.values().iterator();
+		while (it.hasNext()) {
+			JsonNode bean = it.next();
+			sb.append("- ").append(text(bean, "name")).append(" = ").append(text(bean, "value")).append("  (").append(text(bean, "file"));
+			if (!StringUtil.isEmpty(text(bean, "lineStart"))) {
+				sb.append(':').append(text(bean, "lineStart"));
+			}
+			sb.append(")\n");
+			JsonNode extra = this.parseJson(text(bean, "properties"));
+			if (extra.hasNonNull("parent")) {
+				sb.append("    parent = ").append(extra.get("parent").asText()).append('\n');
+			}
+			JsonNode properties = extra.path("properties");
+			Iterator<Map.Entry<String, JsonNode>> pit = properties.properties().iterator();
+			while (pit.hasNext()) {
+				Map.Entry<String, JsonNode> property = pit.next();
+				String value = property.getValue().asText();
+				if (!isDatasourceKey(property.getKey()) && !containsJdbc(value)) {
+					continue;
+				}
+				sb.append("    ").append(property.getKey()).append(" = ").append(value);
+				int open = value.indexOf("${");
+				int close = value.indexOf('}', open + 2);
+				if (open >= 0 && close > open && resolveCalls < MAX_RESOLVE) {
+					resolveCalls++;
+					sb.append(this.resolvePlaceholder(configPath, value.substring(open + 2, close)));
+				}
+				sb.append('\n');
+			}
+		}
+		return beans.size();
+	}
+
+	/** ${이름:기본값}의 이름을 같은 프로젝트의 설정에서 찾는다. 돌려주는 글은 줄 끝에 붙인다 */
+	private String resolvePlaceholder(String configPath, String placeholder) throws KnowledgeCallException {
+		String name = placeholder;
+		String defaultValue = null;
+		int colon = placeholder.indexOf(':');
+		if (colon > 0) {
+			name = placeholder.substring(0, colon);
+			defaultValue = placeholder.substring(colon + 1);
+		}
+		Map<String, JsonNode> found = new LinkedHashMap<String, JsonNode>();
+		this.collectConfigs(configPath, "key", name, found);
+		List<String> values = new ArrayList<String>();
+		Iterator<JsonNode> it = found.values().iterator();
+		while (it.hasNext()) {
+			JsonNode row = it.next();
+			if (name.equals(text(row, "key"))) {
+				values.add(text(row, "value") + " (" + text(row, "file") + ")");
+			}
+		}
+		if (values.isEmpty()) {
+			return defaultValue == null ? "  → ${" + name + "}: 프로젝트 설정에 없음(환경 변수나 실행 옵션으로 주는 값)" : "  → ${" + name + "}: 프로젝트 설정에 없음, 기본값 " + defaultValue;
+		}
+		return "  → ${" + name + "} = " + String.join(" / ", values);
+	}
+
+	/** 설정 목록을 한 쪽(최대 500건) 가져와 rows에 더한다. 키: 파일 + 줄 + 키 */
+	private void collectConfigs(String path, String paramName, String paramValue, Map<String, JsonNode> rows) throws KnowledgeCallException {
+		Map<String, String> params = new LinkedHashMap<String, String>();
+		params.put(paramName, paramValue);
+		params.put("size", String.valueOf(PAGE_SIZE));
+		JsonNode configs = this.get(path, params).path("configs");
+		for (int i = 0; i < configs.size(); i++) {
+			JsonNode row = configs.get(i);
+			rows.put(rowId(row), row);
+		}
+	}
+
+	private static void addToGroup(Map<String, List<JsonNode>> groups, JsonNode row) {
+		String groupKey = text0(row, "file") + "\n" + prefixOf(text0(row, "key"));
+		List<JsonNode> members = groups.get(groupKey);
+		if (members == null) {
+			members = new ArrayList<JsonNode>();
+			groups.put(groupKey, members);
+		}
+		for (int i = 0; i < members.size(); i++) {
+			if (rowId(members.get(i)).equals(rowId(row))) {
+				return;
+			}
+		}
+		members.add(row);
+	}
+
+	private static String rowId(JsonNode row) {
+		return text0(row, "file") + "\n" + text0(row, "lineStart") + "\n" + text0(row, "key");
+	}
+
+	/** spring.datasource.url → spring.datasource */
+	private static String prefixOf(String key) {
+		int dot = key.lastIndexOf('.');
+		return dot < 0 ? "" : key.substring(0, dot);
+	}
+
+	/** 키의 마지막 마디가 접속에 관한 것인지(url, username, driver-class-name ...) */
+	private static boolean isDatasourceKey(String key) {
+		int dot = key.lastIndexOf('.');
+		String last = (dot < 0 ? key : key.substring(dot + 1)).toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
+		return DATASOURCE_KEYS.contains(last);
+	}
+
+	/** DataSource 빈의 클래스인지. DataSourceTransactionManager처럼 데이터소스를 받아 쓰는 쪽은 뺀다 */
+	private static boolean isDatasourceClass(String className) {
+		if (className.contains("JndiObjectFactoryBean")) {
+			return true;
+		}
+		return className.contains("DataSource") && !className.contains("TransactionManager") && !className.contains("Initializer");
+	}
+
+	private static boolean containsJdbc(String value) {
+		return value != null && value.toLowerCase(Locale.ROOT).contains("jdbc:");
+	}
+
+	private JsonNode parseJson(String json) {
+		try {
+			return StringUtil.isEmpty(json) ? this.objectMapper.createObjectNode() : this.objectMapper.readTree(json);
+		} catch (Exception e) {
+			return this.objectMapper.createObjectNode();
+		}
+	}
+
 	/** 부르는 쪽 / 불리는 쪽 조회. 두 Tool의 모양이 같아서 한곳에서 한다 */
 	private String callGraph(String projectId, String methodId, Integer depth, String direction) {
 		try {
@@ -310,6 +580,10 @@ public class KnowledgeTool extends BaseObject {
 	}
 
 	private String text(JsonNode node, String field) {
+		return text0(node, field);
+	}
+
+	private static String text0(JsonNode node, String field) {
 		JsonNode value = node.get(field);
 		return value == null || value.isNull() ? "" : value.asText();
 	}

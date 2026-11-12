@@ -258,6 +258,27 @@ dstone:
                 # knowledgeSearch 결과 개수 상한(기본 10). LLM이 topK를 더 크게 줘도 이만큼만 준다.
                 # sm-workflow 영향도 step에서 topK 10으로 두 번 찾은 18,000자가 뒤의 18라운드에 계속 실렸다(2026-11-05).
                 max-top-k: 5
+            # 등록해 둔 DB를 조회하는 Tool(tools.db.DbQueryTool: dbListConnections / dbListTables / dbDescribeTable / dbQuery) 설정.
+            # connections가 비어 있으면(기본값) 모든 호출이 실패 문구로 끝난다 - 별칭을 등록하는 것이 곧 "켠 상태"다.
+            # LLM은 별칭만 넘기고 주소와 계정은 모른다. 비밀번호는 ENC(...)로 적고, 계정은 읽기 권한만 있는 것을 쓴다.
+            # 어떤 DB를 등록할지는 KnowledgeTool.knowledgeDatasources(분석한 애플리케이션의 데이터소스 설정)로 찾는다.
+            # 조회만 한다: 실행 전에 SELECT 한 문장인지 검사하고, 읽기 전용 연결로 실행한 뒤 항상 롤백한다.
+            # max-rows: dbQuery가 돌려주는 최대 행 수(기본 100). 결과는 대화에 쌓이므로 작게 둔다.
+            # max-cell-chars: 칸 하나의 최대 글자 수(기본 200).
+            # query-timeout-seconds: 쿼리 대기 시간(기본 30).
+            # mask-columns: 이 정규식에 맞는 이름의 컬럼은 값 대신 ****를 준다(기본: password, token, ssn, card_no 등).
+            # Pod(k8s)에서 돌 때는 DB 주소가 Pod에서 닿아야 한다(localhost가 아니다. KNOWLEDGE_HOST처럼 172.18.0.1 등).
+            db:
+                max-rows: 100
+                max-cell-chars: 200
+                query-timeout-seconds: 30
+                # connections:
+                #     sample-app:
+                #         url: jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB
+                #         username: readonly_user
+                #         password: ENC(...)
+                #         schema: sampleDB
+                #         description: dstone-boot 샘플 DB
             # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
             # "잘렸으니 범위를 좁혀 다시 호출하라"는 안내를 붙인다(common.config.ConfigTool, 기본 60000).
             # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 결과 하나가 컨텍스트 한도나 응답 대기 시간을 넘긴다.
