@@ -166,10 +166,12 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 		return 500;
 	}
 
+
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		ProjectRules rules;
 		try {
+			// conf/rules 아래의 파일셋을 읽어옴.
 			rules = ruleFiles.rulesFor(context.getProjectId(), context.getProjectValue("ruleSets"), null);
 		} catch (RuleException e) {
 			throw new IllegalStateException("의미 분석 규칙을 읽지 못했습니다. " + e.getMessage(), e);
@@ -178,49 +180,57 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 		
 		/**************************************************************************************************************************************
 		
+		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		| #   | 처리기                   | rule          | 처리순서                                                                       			 | 하는 일
+		| --- | ---------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------
+		| 0   | SemanticPass           |               | SemanticPass.run() - 규칙 폴더를 읽어 context에 싣고 트랜잭션을 하나 연다                            * 처리기 실행 틀. 전체가 한 트랜잭션이라 실패하면 지운 것까지 되돌아간다.
+		|     | (framework)            |               |   RuleFiles.rulesFor() - projects/{ID} > common > guess 순으로 규칙을 읽는다 
+		|     |                        |               |   SemanticPass.runSteps()  
+		|     |                        |               |     SemanticDao.clear()
+		|     |                        |               |                         <삭제> analysis_endpoint, analysis_resource, analysis_relation <삭제>
+		|     |                        |               |                         <수정> analysis_symbol(layer, layer_confidence, properties_json) 초기화 <수정>
+		|     |                        |               |                         <수정> analysis_method(proxy_related) 초기화 <수정>                
+		|     |                        |               |     SemanticPass.recordRuleFiles() - 쓰는 규칙 파일마다 RULE_SET 행(파일 해시)                   
+		|     |                        |               |                         <입력> analysis_resource <입력>                                        
+		|     |                        |               |     SemanticPass.steps() - 아래 1~17을 차례로 run()                                  
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| #   | 처리기                   | rule          | 처리순서                                                                       | 하는 일
-		| --- | ---------------------- | ------------- | ------------------------------------------------------------------------------ | -----------------------------------------------
-		| 0   | SemanticPass           | (규칙 읽기)     | SemanticPass.run() - 규칙 폴더를 읽어 context에 싣고 트랜잭션을 하나 연다                       | 처리기 실행 틀. 전체가 한 트랜잭션이라 실패하면 지운 것까지 되돌아간다.
-		|     | (framework)            |               |   RuleFiles.rulesFor() - projects/{ID} > common > guess 순으로 규칙을 읽는다            |
-		|     |                        |               |   SemanticPass.runSteps()                                                      |
-		|     |                        |               |     SemanticDao.clear() - 이 리비전의 endpoint, SEMANTIC이 만든 resource·relation 삭제, |
-		|     |                        |               |                           layer·proxy_related 초기화                             |
-		|     |                        |               |     SemanticPass.recordRuleFiles() - 쓰는 규칙 파일마다 RULE_SET 행(파일 해시)            |
-		|     |                        |               |     SemanticPass.steps() - 아래 1~17을 차례로 run()                                  |
+		| 1   | ServletEntries         |               | ServletEntries.run()                                                                     * web.xml의 서블릿·필터·리스너, @WebServlet. 규칙 없이도 확실한 입구.
+		|     |                        |               |   SemanticDao.selectFilesByType("WEB_XML") - web.xml 목록 
+		|     |                        |               |   WebXmlReader.read() - 서블릿·매핑·필터·리스너 읽기 (실패하면 reporter.error() 후 다음 파일) 
+		|     |                        |               |   ServletEntries.addServletEndpoints() - <servlet-mapping>마다                   
+		|     |                        |               |     addResource() → SemanticDao.insertResource() - SERVLET_MAPPING   
+		|     |                        |               |                         <입력> analysis_resource <입력>          
+		|     |                        |               |     SymbolDao.selectTypeLocation() - 서블릿 클래스 찾기 (없으면 external, 메소드 없는 입구) 
+		|     |                        |               |     SemanticDao.selectServletHandlers() - doGet·doPost·service 찾기             
+		|     |                        |               |     addEndpoint() → SemanticDao.insertEndpoint() - SERVLET 입구. (doGet → GET, service → ALL, 메소드 없으면 타입만)                 
+		|     |                        |               |                         <입력> analysis_endpoint <입력>                 
+		|     |                        |               |   ServletEntries.addResources() → insertResource() - FILTER_MAPPING, LISTENER  
+		|     |                        |               |                         <입력> analysis_resource <입력>          
+		|     |                        |               |   SemanticDao.insertWebServletEndpoints() - @WebServlet 입구 (SQL 한 번)               
+		|     |                        |               |                         <입력> analysis_endpoint <입력>                       
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 1   | ServletEntries         |               | ServletEntries.run()                                                           | web.xml의 서블릿·필터·리스너, @WebServlet. 규칙 없이도 확실한 입구.
-		|     |                        |               |   SemanticDao.selectFilesByType("WEB_XML") - web.xml 목록                        |
-		|     |                        |               |   WebXmlReader.read() - 서블릿·매핑·필터·리스너 읽기 (실패하면 reporter.error() 후 다음 파일)  |
-		|     |                        |               |   ServletEntries.addServletEndpoints() - <servlet-mapping>마다                    |
-		|     |                        |               |     addResource() → SemanticDao.insertResource() - SERVLET_MAPPING              |
-		|     |                        |               |     SymbolDao.selectTypeLocation() - 서블릿 클래스 찾기 (없으면 external, 메소드 없는 입구)   |
-		|     |                        |               |     SemanticDao.selectServletHandlers() - doGet·doPost·service 찾기               |
-		|     |                        |               |     addEndpoint() → SemanticDao.insertEndpoint() - SERVLET 입구                  |
-		|     |                        |               |                     (doGet → GET, service → ALL, 메소드 없으면 타입만)               |
-		|     |                        |               |   ServletEntries.addResources() → insertResource() - FILTER_MAPPING, LISTENER   |
-		|     |                        |               |   SemanticDao.insertWebServletEndpoints() - @WebServlet 입구 (SQL 한 번)          |
+		| 2   | StrutsEntries          |               | StrutsEntries.run()                                                                     * struts-config.xml·struts.xml의 액션 → 입구, 액션 클래스 계층, 이동할 JSP.
+		|     |                        |               |   SemanticDao.selectFilesByType("STRUTS_CONFIG") - 없으면 바로 끝                             액션 클래스를 규칙보다 먼저 CONTROLLER로 정한다.
+		|     |                        |               |   StrutsEntries.strutsUrlPatterns() → SemanticDao.selectServletMappings() 
+		|     |                        |               |       - 1번이 넣은 ActionServlet의 url-pattern (없으면 *.do)
+		|     |                        |               |   StrutsConfigReader.read() - 액션·forward 읽기
+		|     |                        |               |   StrutsEntries.addAction() - 액션마다 
+		|     |                        |               |     applyPattern() / struts2Extension() - 주소 만들기 (Struts1: url-pattern, Struts2: .action 또는 설정된 확장자)
+		|     |                        |               |     SymbolDao.selectTypeLocation() - 액션 클래스                          
+		|     |                        |               |     SemanticDao.updateLayerBySymbol(.., "CONTROLLER") - 계층 지정      
+		|     |                        |               |                         <수정> analysis_symbol(layer, layer_confidence, properties_json) <수정>                       
+		|     |                        |               |     SemanticDao.selectMethodsByName() - execute·perform (Struts2는 method 속성)
+		|     |                        |               |     addEndpoint() → SemanticDao.insertEndpoint() - HTTP 입구           
+		|     |                        |               |                         <입력> analysis_endpoint <입력>                 
+		|     |                        |               |     jspPathOf() → SemanticDao.selectJspByPathEnd() - forward JSP가 하나일 때만 
+		|     |                        |               |     SemanticDao.insertRelation() - 메소드 → JSP (RENDERS)           
+		|     |                        |               |                         <입력> analysis_relation <입력>                             
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 2   | StrutsEntries          |               | StrutsEntries.run()                                                            | struts-config.xml·struts.xml의 액션 → 입구, 액션 클래스 계층, 이동할 JSP.
-		|     |                        |               |   SemanticDao.selectFilesByType("STRUTS_CONFIG") - 없으면 바로 끝                 | 액션 클래스를 규칙보다 먼저 CONTROLLER로 정한다.
-		|     |                        |               |   StrutsEntries.strutsUrlPatterns() → SemanticDao.selectServletMappings()      |
-		|     |                        |               |       - 1번이 넣은 ActionServlet의 url-pattern (없으면 *.do)                      |
-		|     |                        |               |   StrutsConfigReader.read() - 액션·forward 읽기                                  |
-		|     |                        |               |   StrutsEntries.addAction() - 액션마다                                          |
-		|     |                        |               |     applyPattern() / struts2Extension() - 주소 만들기 (Struts1: url-pattern,      |
-		|     |                        |               |                                           Struts2: .action 또는 설정된 확장자)       |
-		|     |                        |               |     SymbolDao.selectTypeLocation() - 액션 클래스                                  |
-		|     |                        |               |     SemanticDao.updateLayerBySymbol(.., "CONTROLLER") - 계층 지정                 |
-		|     |                        |               |     SemanticDao.selectMethodsByName() - execute·perform (Struts2는 method 속성)   |
-		|     |                        |               |     addEndpoint() → SemanticDao.insertEndpoint() - HTTP 입구                     |
-		|     |                        |               |     jspPathOf() → SemanticDao.selectJspByPathEnd() - forward JSP가 하나일 때만       |
-		|     |                        |               |     SemanticDao.insertRelation() - 메소드 → JSP (RENDERS)                         |
-		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		| 3   | LayerResolver          | layer         | LayerResolver.run()                                                            | 클래스의 계층. 입구보다 먼저 돈다.
-		|     |                        |               |   SemanticDao.updateJspLayer() - JSP에서 만든 타입은 규칙과 상관없이 VIEW               | 상위 클래스의 주소를 물려받는 컨트롤러를 알아보려면 계층이 있어야 한다.
-		|     |                        |               |   ProjectRules.layers() - 규칙 목록 (프로젝트 > 공통 > 짐작)                         |
-		|     |                        |               |   SemanticDao.updateLayerByRule() - 규칙마다 UPDATE 한 번                          |
-		|     |                        |               |       (@애노테이션 / 상위 타입 / 이름 정규식. layer IS NULL만 → 앞선 규칙이 이긴다)       |
+		| 3   | LayerResolver          | layer         | LayerResolver.run()                                                                     * 클래스의 계층. EntryFinder보다 먼저 돈다.
+		|     |                        |               |   SemanticDao.updateJspLayer() - JSP에서 만든 타입은 규칙과 상관없이 VIEW                          상위 클래스의 주소를 물려받는 컨트롤러를 알아보려면 계층이 있어야 한다.
+		|     |                        |               |   ProjectRules.layers() - 규칙 목록 (프로젝트 > 공통 > 짐작)
+		|     |                        |               |   SemanticDao.updateLayerByRule() - 규칙마다 UPDATE 한 번
+		|     |                        |               |       (@애노테이션 / 상위 타입 / 이름 정규식. layer IS NULL만 → 앞선 규칙이 이긴다)
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 		| 4   | EntryFinder            | entry         | EntryFinder.run()                                                              | 애노테이션·상속·설정 XML로 입구, main(), 바로 열리는 JSP.
 		|     |                        |               |   EntryFinder.insertHttpEntries() - entry의 http 규칙                           | 화면 연결보다 먼저 돈다(화면 글자와 견줄 주소가 있어야 한다).
