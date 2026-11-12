@@ -72,6 +72,72 @@ public class ResourceReaders {
 
 	/**
 	 * <pre>
+	 * Java의 XML 프로퍼티 파일(java.util.Properties.loadFromXML 형식)의 키와 값.
+	 *   <properties>
+	 *     <entry key="Globals.Url">jdbc:mysql://...</entry>
+	 *   </properties>
+	 * 주석(<!-- -->) 안의 entry는 읽지 않습니다. 값은 적힌 그대로 둡니다(loadFromXML도 앞뒤 공백을 자르지 않는다).
+	 * </pre>
+	 *
+	 * @return 키: keyPath, value, valueType, placeholder, lineStart
+	 */
+	public List<Map<String, Object>> readXmlProperties(String text) throws Exception {
+		List<Map<String, Object>> configs = new ArrayList<Map<String, Object>>();
+		Document document = SafeXml.parse(text);
+		String masked = maskXmlComments(text);
+		NodeList entries = document.getElementsByTagName("entry");
+		for (int i = 0; i < entries.getLength(); i++) {
+			Element entry = (Element) entries.item(i);
+			String key = entry.getAttribute("key");
+			if (key == null || key.length() == 0) {
+				continue;
+			}
+			configs.add(config(key, entry.getTextContent(), "STRING", lineOfXmlKey(masked, key)));
+		}
+		return configs;
+	}
+
+	/** XML 주석을 같은 길이의 공백으로 바꾼다(줄바꿈은 남긴다). 주석 안의 같은 키에 줄 번호가 잡히지 않게 한다 */
+	private String maskXmlComments(String text) {
+		StringBuilder sb = new StringBuilder(text);
+		int from = 0;
+		while (true) {
+			int open = text.indexOf("<!--", from);
+			if (open < 0) {
+				break;
+			}
+			int close = text.indexOf("-->", open + 4);
+			int end = close < 0 ? text.length() : close + 3;
+			for (int i = open; i < end; i++) {
+				if (sb.charAt(i) != '\n' && sb.charAt(i) != '\r') {
+					sb.setCharAt(i, ' ');
+				}
+			}
+			from = end;
+		}
+		return sb.toString();
+	}
+
+	/** key="이름" 또는 key='이름'이 처음 나오는 줄. 못 찾으면 null */
+	private Integer lineOfXmlKey(String text, String key) {
+		int at = text.indexOf("key=\"" + key + "\"");
+		if (at < 0) {
+			at = text.indexOf("key='" + key + "'");
+		}
+		if (at < 0) {
+			return null;
+		}
+		int line = 1;
+		for (int i = 0; i < at; i++) {
+			if (text.charAt(i) == '\n') {
+				line++;
+			}
+		}
+		return Integer.valueOf(line);
+	}
+
+	/**
+	 * <pre>
 	 * YAML 파일의 값들. 중첩된 키는 점으로 이어 붙입니다(spring.datasource.url). 목록은 [0], [1]을 붙입니다.
 	 * 한 파일에 문서가 여러 개(---)면 모두 읽습니다.
 	 * </pre>

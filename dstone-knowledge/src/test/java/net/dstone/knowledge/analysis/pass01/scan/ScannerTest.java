@@ -78,6 +78,8 @@ public class ScannerTest {
 		assertEquals("WEB_XML", fileClassifier.fileTypeOf("XML", "web.xml", prolog + "<web-app>"));
 		assertEquals("BUILD", fileClassifier.fileTypeOf("XML", "pom.xml", null));
 		assertEquals("XML", fileClassifier.fileTypeOf("XML", "data.xml", prolog + "<items/>"));
+		assertEquals("CONFIG", fileClassifier.fileTypeOf("XML", "globals.xml", prolog + "<properties><entry key=\"a\">b</entry></properties>"));
+		assertEquals("XML", fileClassifier.fileTypeOf("XML", "props.xml", prolog + "<properties><item/></properties>"));
 
 		// 리치클라이언트 화면: WebSquare는 네임스페이스로, Nexacro / X-Platform은 맨 위 요소로 알아본다.
 		assertEquals("WEBSQUARE", fileClassifier.fileTypeOf("XML", "OrderList.xml"

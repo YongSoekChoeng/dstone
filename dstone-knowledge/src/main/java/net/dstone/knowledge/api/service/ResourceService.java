@@ -78,9 +78,10 @@ public class ResourceService extends BaseObject {
 	/**
 	 * @param key 키에 이 글자가 들어간 것만
 	 */
-	public Map<String, Object> getConfigList(long revisionId, String key, int page, int size) {
+	public Map<String, Object> getConfigList(long revisionId, String key, String value, int page, int size) {
 		Map<String, Object> condition = paging(revisionId, page, size);
 		condition.put("key", key);
+		condition.put("value", value);
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("page", condition.get("page"));
 		result.put("size", condition.get("size"));
@@ -91,11 +92,13 @@ public class ResourceService extends BaseObject {
 	/**
 	 * @param resourceType SPRING_BEAN / COMPONENT_SCAN / DEPENDENCY / SERVLET_MAPPING / FILTER_MAPPING / LISTENER ...
 	 * @param name 이름에 이 글자가 들어간 것만
+	 * @param value 값(빈이면 클래스 이름)에 이 글자가 들어간 것만. 대소문자는 가리지 않는다
 	 */
-	public Map<String, Object> getResourceList(long revisionId, String resourceType, String name, int page, int size) {
+	public Map<String, Object> getResourceList(long revisionId, String resourceType, String name, String value, int page, int size) {
 		Map<String, Object> condition = paging(revisionId, page, size);
 		condition.put("resourceType", resourceType);
 		condition.put("name", name);
+		condition.put("value", value);
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("page", condition.get("page"));
 		result.put("size", condition.get("size"));

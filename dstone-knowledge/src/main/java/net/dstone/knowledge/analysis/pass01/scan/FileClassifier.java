@@ -140,6 +140,11 @@ public class FileClassifier {
 		if ("beans".equals(name)) {
 			return "SPRING_XML";
 		}
+		if ("properties".equals(name)) {
+			// Java의 XML 프로퍼티 파일(<properties><entry key="...">값</entry>). eGovFrame의 globals.xml처럼 DB 접속 정보가 여기 있기도 하다.
+			// 맨 위 이름이 흔한 낱말이라, entry가 실제로 있는지까지 본다.
+			return text.indexOf("<entry") >= 0 ? "CONFIG" : "XML";
+		}
 		if ("web-app".equals(name) || "web-fragment".equals(name)) {
 			return "WEB_XML";
 		}

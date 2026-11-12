@@ -48,23 +48,25 @@ public class ResourceController {
 		return resourceService.getMapperList(revisionId, namespace, statementId, page, size);
 	}
 
-	/** 설정 값 목록. key는 포함 조건입니다. 비밀번호처럼 보이는 값은 ****로 나옵니다. */
+	/** 설정 값 목록. key는 포함 조건, value는 대소문자를 가리지 않는 포함 조건입니다. 비밀번호처럼 보이는 값은 ****로 나옵니다. */
 	@GetMapping("/configs")
 	public Map<String, Object> getConfigList(@PathVariable("revisionId") long revisionId
 			, @RequestParam(name = "key", required = false) String key
+			, @RequestParam(name = "value", required = false) String value
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
-		return resourceService.getConfigList(revisionId, key, page, size);
+		return resourceService.getConfigList(revisionId, key, value, page, size);
 	}
 
-	/** 그 밖의 항목. type은 일치 조건(SPRING_BEAN / DEPENDENCY / SERVLET_MAPPING ...), name은 포함 조건입니다. */
+	/** 그 밖의 항목. type은 일치 조건(SPRING_BEAN / DEPENDENCY / SERVLET_MAPPING ...), name은 포함 조건, value는 대소문자를 가리지 않는 포함 조건입니다. */
 	@GetMapping("/resources")
 	public Map<String, Object> getResourceList(@PathVariable("revisionId") long revisionId
 			, @RequestParam(name = "type", required = false) String type
 			, @RequestParam(name = "name", required = false) String name
+			, @RequestParam(name = "value", required = false) String value
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
-		return resourceService.getResourceList(revisionId, type, name, page, size);
+		return resourceService.getResourceList(revisionId, type, name, value, page, size);
 	}
 
 }

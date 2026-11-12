@@ -156,6 +156,9 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 			}
 		} else if ("YAML".equals(language)) {
 			prepared.configs = resourceReaders.readYaml(text);
+		} else if ("XML".equals(language)) {
+			// XML 프로퍼티 파일(<properties><entry key>)
+			prepared.configs = resourceReaders.readXmlProperties(text);
 		} else {
 			prepared.configs = resourceReaders.readProperties(text);
 		}

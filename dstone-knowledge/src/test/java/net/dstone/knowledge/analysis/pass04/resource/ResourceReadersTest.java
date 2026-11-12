@@ -43,6 +43,28 @@ public class ResourceReadersTest {
 	}
 
 	@Test
+	public void XML_프로퍼티_파일의_entry를_읽고_주석_안은_건너뛴다() throws Exception {
+		String text = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+				+ "<!DOCTYPE properties SYSTEM \"http://java.sun.com/dtd/properties.dtd\" >\n"
+				+ "<properties>\n"
+				+ "\t<comment>설명</comment>\n"
+				+ "\t<!-- <entry key=\"Globals.Url\">jdbc:old</entry> -->\n"
+				+ "\t<entry key=\"Globals.Url\">jdbc:mysql://localhost:3306/app?a=1&amp;b=2</entry>\n"
+				+ "\t<entry key=\"Globals.Password\">s3cret</entry>\n"
+				+ "\t<entry key=\"Globals.Db\">${DB_NAME}</entry>\n"
+				+ "</properties>\n";
+		List<Map<String, Object>> configs = readers.readXmlProperties(text);
+
+		assertEquals(3, configs.size());
+		Map<String, Object> url = find(configs, "keyPath", "Globals.Url");
+		assertEquals("jdbc:mysql://localhost:3306/app?a=1&b=2", url.get("value"));
+		// 주석 안의 같은 키가 아니라 실제 entry의 줄
+		assertEquals(Integer.valueOf(6), url.get("lineStart"));
+		assertEquals("****", find(configs, "keyPath", "Globals.Password").get("value"));
+		assertEquals("DB_NAME", find(configs, "keyPath", "Globals.Db").get("placeholder"));
+	}
+
+	@Test
 	public void YAML의_중첩된_키는_점으로_잇고_목록은_번호를_붙인다() {
 		String text = "spring:\n"
 				+ "  datasource:\n"
