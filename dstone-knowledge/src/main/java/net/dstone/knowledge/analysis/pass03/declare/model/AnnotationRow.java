@@ -7,6 +7,7 @@ package net.dstone.knowledge.analysis.pass03.declare.model;
  */
 public class AnnotationRow {
 
+	/** 리비전 ID */
 	private long revisionId;
 
 	/** TYPE / METHOD / FIELD / PARAMETER */
@@ -24,8 +25,10 @@ public class AnnotationRow {
 	/** 속성(JSON). PARAMETER면 $parameter 키에 파라미터 이름이 들어간다 */
 	private String attributesJson;
 
+	/** 선언된 파일 ID */
 	private long fileId;
 
+	/** 애노테이션이 있는 줄 */
 	private Integer lineStart;
 
 	public long getRevisionId() {

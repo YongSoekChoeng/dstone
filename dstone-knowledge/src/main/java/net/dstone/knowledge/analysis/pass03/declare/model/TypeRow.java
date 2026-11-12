@@ -7,6 +7,7 @@ package net.dstone.knowledge.analysis.pass03.declare.model;
  */
 public class TypeRow {
 
+	/** 리비전 ID */
 	private long revisionId;
 
 	/** 리비전과 무관한 안정 ID */
@@ -18,8 +19,10 @@ public class TypeRow {
 	/** 패키지를 포함한 전체 이름. 중첩 타입은 Outer.Inner, 익명 클래스는 Outer$1 */
 	private String fqn;
 
+	/** 단순 이름 */
 	private String simpleName;
 
+	/** 패키지 이름. 기본 패키지면 빈 문자열 */
 	private String packageName;
 
 	/** 중첩/익명/지역 타입이면 바깥 타입의 ID */
@@ -28,19 +31,25 @@ public class TypeRow {
 	/** public / protected / private / package */
 	private String visibility;
 
+	/** abstract 여부 */
 	private boolean isAbstract;
 
+	/** final 여부 */
 	private boolean isFinal;
 
+	/** static 여부(중첩 타입) */
 	private boolean isStatic;
 
 	/** 덧붙이는 정보(JSON). 예: 지역 클래스 여부, Lombok이 만든 타입 여부 */
 	private String propertiesJson;
 
+	/** 선언된 파일 ID */
 	private long fileId;
 
+	/** 시작 줄 */
 	private Integer lineStart;
 
+	/** 끝 줄 */
 	private Integer lineEnd;
 
 	public long getRevisionId() {

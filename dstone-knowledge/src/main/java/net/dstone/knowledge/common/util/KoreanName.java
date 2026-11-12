@@ -23,10 +23,15 @@ public final class KoreanName {
 	/** 한글명 하나의 최대 길이 */
 	private static final int MAX_LENGTH = 200;
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private KoreanName() {
 	}
 
 	/**
+	 * <pre>
+	 * 주석 글에서 한글명으로 쓸 부분만 다듬어 꺼냅니다.
+	 * </pre>
+	 *
 	 * @param raw 주석 안의 글(주석 기호 /&#42; &#42;/ -- // 는 뗀 것)
 	 * @return 한글명. 한글이 없으면 null
 	 */
@@ -54,6 +59,7 @@ public final class KoreanName {
 		return text.length() > MAX_LENGTH ? text.substring(0, MAX_LENGTH) : text;
 	}
 
+	/** 한글(가~힣)이 한 글자라도 있는지 */
 	public static boolean hasHangul(String text) {
 		for (int i = 0; i < text.length(); i++) {
 			char c = text.charAt(i);

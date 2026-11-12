@@ -63,11 +63,16 @@ public class ScreenScript {
 		/** 이 규칙이 적힌 자리(규칙 파일:줄). 결과의 ruleAt 에 남긴다. 모르면 null */
 		private final String at;
 
+		/** 첫 번째 인자에 ID 가 있는 함수 규칙(규칙 파일 위치 없이, 단위 테스트용) */
 		public CallRule(String function, String methodTemplate) {
 			this(function, methodTemplate, 0);
 		}
 
 		/**
+		 * <pre>
+		 * ID가 argIndex 번째 인자에 있는 함수 규칙
+		 * </pre>
+		 *
 		 * @param argIndex ID 가 들어 있는 인자의 자리(0부터). 0 이면 첫 인자
 		 */
 		public CallRule(String function, String methodTemplate, int argIndex) {
@@ -75,6 +80,10 @@ public class ScreenScript {
 		}
 
 		/**
+		 * <pre>
+		 * ID를 다듬어 쓰는 함수 규칙
+		 * </pre>
+		 *
 		 * @param transform ID 를 틀에 넣기 전에 다듬는 방법. null 이면 그대로 쓴다
 		 */
 		public CallRule(String function, String methodTemplate, int argIndex, IdTransform transform) {
@@ -82,6 +91,10 @@ public class ScreenScript {
 		}
 
 		/**
+		 * <pre>
+		 * 규칙 파일에서 읽은 함수 규칙(적힌 자리 포함)
+		 * </pre>
+		 *
 		 * @param at 이 규칙이 적힌 자리(규칙 파일:줄). 모르면 null
 		 */
 		public CallRule(String function, String methodTemplate, int argIndex, IdTransform transform, String at) {
@@ -104,6 +117,7 @@ public class ScreenScript {
 			this.field = false;
 		}
 
+		/** 폼 필드 규칙: &lt;input name="fieldName" value="ID"&gt; 모양에서 value 를 ID 로 읽습니다. */
 		private CallRule(String fieldName, String methodTemplate, boolean field, IdTransform transform, String at) {
 			this.function = fieldName;
 			this.at = at;
@@ -162,9 +176,11 @@ public class ScreenScript {
 		}
 
 		/**
+		 * <pre>
 		 * 거래 ID로 메소드 이름을 만듭니다. 메소드 이름이 될 수 없는 글자가 섞였거나, ID 를 다듬는 규칙에 맞지 않으면 null.
 		 * 대응표(id: { map })가 "클래스.메소드"를 돌려주면 그 모양(OrderController.list) 그대로 돌려줍니다.
 		 * 대응표가 없는 규칙에서 점이 든 ID(order.list)는 메소드 이름이 아니다(짐작하지 않는다).
+		 * </pre>
 		 */
 		public String methodNameOf(String id) {
 			String name = fill(id);
@@ -274,6 +290,7 @@ public class ScreenScript {
 		return parse(configured, true);
 	}
 
+	/** "함수=메소드틀, 함수=메소드틀" 모양의 설정 글을 규칙 목록으로 읽습니다. 틀에 {id} 가 없는 항목은 버립니다. */
 	private static List<CallRule> parse(String configured, boolean field) {
 		List<CallRule> rules = new ArrayList<CallRule>();
 		if (configured == null) {
@@ -461,6 +478,7 @@ public class ScreenScript {
 		int limit = Math.min(text.length(), from + MAX_ARGUMENT_CHARS);
 		for (int i = from; i < limit; i++) {
 			char c = text.charAt(i);
+			// 문자열 안: 닫는 따옴표가 나올 때까지 그대로 담는다(\ 다음 글자는 건너뛴다)
 			if (quote != 0) {
 				current.append(c);
 				if (c == '\\' && i + 1 < limit) {
@@ -478,6 +496,7 @@ public class ScreenScript {
 				current.append(c);
 				continue;
 			}
+			// 괄호 깊이를 센다. 깊이 0 에서 ')' 를 만나면 인자 목록의 끝이다.
 			if (c == '(' || c == '[' || c == '{') {
 				depth++;
 			} else if (c == ')' || c == ']' || c == '}') {
@@ -492,6 +511,7 @@ public class ScreenScript {
 				}
 				depth--;
 			} else if (c == ',' && depth == 0) {
+				// 맨 바깥 쉼표: 인자 하나 끝
 				literals.add(literalOf(current.toString()));
 				current.setLength(0);
 				if (literals.size() >= MAX_ARGUMENTS) {

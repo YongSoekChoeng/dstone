@@ -68,6 +68,7 @@ public class DeclarationDao extends BaseDao {
 		return sqlSessionBatch.selectList(NS + "selectTypesDeclaredElsewhere", param);
 	}
 
+	/** 이 파일에서 나온 행을 지운다. 같은 파일을 다시 처리해도 행이 두 번 들어가지 않게, 쓰기 전에 먼저 지운다 */
 	public void deleteDeclarationsInBatch(long fileId) {
 		for (int i = 0; i < DECLARATION_TABLES.length; i++) {
 			Map<String, Object> param = new HashMap<String, Object>();
@@ -98,55 +99,68 @@ public class DeclarationDao extends BaseDao {
 		sqlSessionBatch.update(NS + "updateFileParsed", param);
 	}
 
+	/** 종류별 타입 수 */
 	public List<Map<String, Object>> selectTypeSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectTypeSummary", revisionId);
 	}
 
+	/** 메소드/필드/애노테이션 수. 소스에 적힌 것과 만들어 넣은 것(synthetic)을 나눠서 센다 */
 	public Map<String, Object> selectMemberSummary(long revisionId) {
 		return sqlSessionCommon.selectOne(NS + "selectMemberSummary", revisionId);
 	}
 
+	/** 만들어 넣은 멤버를 근거(LOMBOK_GETTER …)별로 센 것 */
 	public List<Map<String, Object>> selectSyntheticSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectSyntheticSummary", revisionId);
 	}
 
+	/** 종류·상태별 참조 수 */
 	public List<Map<String, Object>> selectReferenceSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectReferenceSummary", revisionId);
 	}
 
+	/** 파싱에 성공한 문법 수준별 Java 파일 수 */
 	public List<Map<String, Object>> selectParseSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectParseSummary", revisionId);
 	}
 
+	/** 타입 수(목록과 같은 조건) */
 	public int countType(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countType", condition);
 		return count.intValue();
 	}
 
+	/** 타입 목록(페이지) */
 	public List<Map<String, Object>> selectTypeList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectTypeList", condition);
 	}
 
+	/** 타입 하나. 없으면 null */
 	public Map<String, Object> selectType(long revisionId, String symbolId) {
 		return sqlSessionCommon.selectOne(NS + "selectType", ownerParam(revisionId, symbolId));
 	}
 
+	/** 타입 하나의 메소드 목록 */
 	public List<Map<String, Object>> selectMethodListByOwner(long revisionId, String symbolId) {
 		return sqlSessionCommon.selectList(NS + "selectMethodListByOwner", ownerParam(revisionId, symbolId));
 	}
 
+	/** 타입 하나의 필드 목록 */
 	public List<Map<String, Object>> selectFieldListByOwner(long revisionId, String symbolId) {
 		return sqlSessionCommon.selectList(NS + "selectFieldListByOwner", ownerParam(revisionId, symbolId));
 	}
 
+	/** 타입 하나와 그 멤버들에 붙은 애노테이션 */
 	public List<Map<String, Object>> selectAnnotationListByType(long revisionId, String symbolId) {
 		return sqlSessionCommon.selectList(NS + "selectAnnotationListByType", ownerParam(revisionId, symbolId));
 	}
 
+	/** 타입 하나와 그 멤버들에서 나가는 참조 (아직 안 풀린 것 포함) */
 	public List<Map<String, Object>> selectReferenceListByType(long revisionId, String symbolId) {
 		return sqlSessionCommon.selectList(NS + "selectReferenceListByType", ownerParam(revisionId, symbolId));
 	}
 
+	/** 리비전 + 타입 조회 조건 */
 	private Map<String, Object> ownerParam(long revisionId, String symbolId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

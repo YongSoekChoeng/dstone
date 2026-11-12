@@ -70,17 +70,31 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 	/** "엔티티이름.속성" → 가리키는 엔티티 이름(없으면 "") */
 	private final Map<String, String> attributes = new HashMap<String, String>();
 
+	/** load() 로만 만듭니다. */
 	private JpaEntities(long revisionId, JavaSqlDao dao) {
 		this.revisionId = revisionId;
 		this.dao = dao;
 	}
 
+	/**
+	 * <pre>
+	 * 이 리비전의 JPA 엔티티를 모두 읽습니다.
+	 *
+	 * 흐름:
+	 *   1) 규칙의 엔티티 애노테이션(&#64;Entity 등)이 붙은 타입을 찾아 엔티티 이름(name 속성, 없으면 클래스 이름)을 정한다.
+	 *   2) 테이블 애노테이션(&#64;Table)의 name 을 읽는다.
+	 *   3) 상속 전략(&#64;Inheritance)과 상위 타입 관계를 읽어 둔다.
+	 *   4) 아직 테이블이 없는 엔티티: 상위 엔티티와 테이블 하나를 같이 쓰면(SINGLE_TABLE) 그 테이블,
+	 *      아니면 이름 관례(SNAKE_CASE 등)로 짓는다.
+	 * </pre>
+	 */
 	public static JpaEntities load(long revisionId, ProjectRules rules, JavaSqlDao dao) {
 		JpaEntities entities = new JpaEntities(revisionId, dao);
 		List<String> entityAnnotations = rules.jpaEntities();
 		if (entityAnnotations.isEmpty()) {
 			return entities;
 		}
+		// 1) 엔티티
 		List<Map<String, Object>> rows = dao.selectAnnotations(revisionId, "TYPE", entityAnnotations);
 		for (int i = 0; i < rows.size(); i++) {
 			Map<String, Object> row = rows.get(i);
@@ -98,6 +112,7 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		if (entities.bySymbol.isEmpty()) {
 			return entities;
 		}
+		// 2) @Table
 		List<String> tableAnnotations = rules.jpaTables();
 		if (!tableAnnotations.isEmpty()) {
 			List<Map<String, Object>> tables = dao.selectAnnotations(revisionId, "TYPE", tableAnnotations);
@@ -110,6 +125,7 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 				}
 			}
 		}
+		// 3) 상속 전략과 상위 타입
 		List<String> inheritance = new ArrayList<String>();
 		inheritance.add(INHERITANCE);
 		List<Map<String, Object>> strategies = dao.selectAnnotations(revisionId, "TYPE", inheritance);
@@ -124,6 +140,7 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		for (int i = 0; i < edges.size(); i++) {
 			entities.parents.put((String) edges.get(i).get("fromId"), (String) edges.get(i).get("toId"));
 		}
+		// 4) 남은 엔티티의 테이블 이름
 		boolean snake = !"AS_IS".equals(rules.jpaNaming());
 		for (Entity entity : entities.bySymbol.values()) {
 			if (entity.table != null) {
@@ -162,6 +179,7 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		return bySymbol.isEmpty();
 	}
 
+	/** 읽은 엔티티 수 */
 	public int size() {
 		return bySymbol.size();
 	}
@@ -182,16 +200,24 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 		return entity;
 	}
 
+	/** 이 타입이 엔티티면 그 엔티티. 아니면 null */
 	public Entity entityOfSymbol(String symbolId) {
 		return bySymbol.get(symbolId);
 	}
 
+	/** 엔티티 이름(또는 클래스 이름)의 테이블 이름. 엔티티가 아니면 null */
 	@Override
 	public String tableOf(String name) {
 		Entity entity = entity(name);
 		return entity == null ? null : entity.table;
 	}
 
+	/**
+	 * <pre>
+	 * 엔티티의 속성(필드)이 가리키는 다른 엔티티 이름. 예: Order.customer → Customer
+	 * JOIN o.customer c 처럼 연관을 따라갈 때 씁니다. 엔티티 타입이 아니면 null
+	 * </pre>
+	 */
 	@Override
 	public String entityOfAttribute(String entityName, String attribute) {
 		Entity entity = entity(entityName);
@@ -231,8 +257,10 @@ public class JpaEntities implements JpqlTableExtractor.Model {
 	}
 
 	/**
+	 * <pre>
 	 * OrderItem → Order_Item(대문자로 바꾸기 전). Spring Boot 의 CamelCaseToUnderscoresNamingStrategy 와 같은 규칙:
 	 * 앞이 소문자 · 숫자이고, 자신이 대문자이고, 뒤가 소문자 · 숫자일 때만 _ 를 넣는다(URLMap → URLMap, orderID → orderID).
+	 * </pre>
 	 */
 	static String snakeCase(String name) {
 		StringBuilder sb = new StringBuilder(name);

@@ -98,6 +98,17 @@ public class AnalysisJobRunner extends BaseObject {
 		return true;
 	}
 
+	/**
+	 * <pre>
+	 * Job 하나를 처음부터 끝까지 돌립니다(작업 스레드에서).
+	 *
+	 * 흐름:
+	 *   1) Job을 RUNNING, 리비전을 ANALYZING으로 바꾼다.
+	 *   2) 단계를 order() 순서로 돈다. 이미 DONE인 단계는 건너뛴다.
+	 *   3) 다 끝나면 오류 건수를 보고 DONE / DONE_WITH_WARNING으로 끝내고, 오래된 리비전을 정리한다.
+	 *   - 취소되면 CANCELLED, 그 밖의 예외면 FAILED로 끝낸다.
+	 * </pre>
+	 */
 	private void runJob(AnalysisJobContext context) {
 		String analysisId = context.getAnalysisId();
 		long revisionId = context.getRevisionId();
@@ -106,10 +117,12 @@ public class AnalysisJobRunner extends BaseObject {
 			// 대기하는 동안 취소된 경우
 			context.checkCancelled();
 
+			// 1) 시작 표시
 			analysisJobDao.updateJobStart(analysisId);
 			revisionDao.updateRevisionStatus(revisionId, "ANALYZING");
 			info("분석 시작: analysisId=" + analysisId + ", projectId=" + context.getProjectId() + ", revisionId=" + revisionId);
 
+			// 2) 단계를 순서대로 실행
 			List<AnalysisPass> ordered = orderedPasses();
 			for (int i = 0; i < ordered.size(); i++) {
 				AnalysisPass pass = ordered.get(i);
@@ -132,6 +145,7 @@ public class AnalysisJobRunner extends BaseObject {
 				info("단계 끝: " + pass.name() + ", analysisId=" + analysisId + ", " + (System.currentTimeMillis() - startedAt) + "ms");
 			}
 
+			// 3) 마무리. 오류가 한 건이라도 있었으면 경고 상태로 끝낸다.
 			String status = analysisJobDao.countError(analysisId) > 0 ? "DONE_WITH_WARNING" : "DONE";
 			analysisJobDao.updateJobEnd(analysisId, status, null);
 			revisionDao.updateRevisionStatus(revisionId, "READY");
@@ -196,6 +210,7 @@ public class AnalysisJobRunner extends BaseObject {
 		return names;
 	}
 
+	/** 등록된 단계를 order() 오름차순으로 정렬한 사본 */
 	private List<AnalysisPass> orderedPasses() {
 		List<AnalysisPass> ordered = new ArrayList<AnalysisPass>(passes);
 		Collections.sort(ordered, new Comparator<AnalysisPass>() {

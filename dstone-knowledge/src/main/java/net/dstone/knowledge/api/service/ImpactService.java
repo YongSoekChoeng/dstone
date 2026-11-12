@@ -49,6 +49,10 @@ public class ImpactService extends BaseObject {
 	private RevisionDao revisionDao;
 
 	/**
+	 * <pre>
+	 * 대상(테이블, SQL, 타입, 메소드)을 바꾸면 영향을 받는 메소드와 진입점을 호출 관계를 거슬러 올라가며 찾습니다.
+	 * </pre>
+	 *
 	 * @param targetKind TABLE / STATEMENT / TYPE / METHOD
 	 * @param target 테이블 이름 / statement 이름(네임스페이스.id 또는 id) / 타입 전체 이름 / 메소드 ID
 	 * @param access 대상이 테이블일 때만: ALL(기본) / READ(읽는 SQL만) / WRITE(쓰는 SQL만)
@@ -59,6 +63,7 @@ public class ImpactService extends BaseObject {
 		if (revisionDao.selectRevision(revisionId) == null) {
 			throw ApiException.notFound("없는 리비전입니다: " + revisionId);
 		}
+		// 1) 대상 이름과 깊이 다듬기
 		String name = target.trim();
 		if ("TABLE".equals(targetKind)) {
 			// 테이블 이름은 스키마를 떼고 대문자로 맞춰 저장한다(SqlTableExtractor).
@@ -66,6 +71,7 @@ public class ImpactService extends BaseObject {
 		}
 		int walkDepth = depth == null ? DEFAULT_DEPTH : Math.max(0, Math.min(depth.intValue(), MAX_DEPTH));
 
+		// 2) 거슬러 올라갈 관계: 호출, 화면의 요청, (켜면) 가능한 구현
 		List<String> relationTypes = new ArrayList<String>();
 		relationTypes.add("CALLS");
 		// 화면(JSP)이 그 메소드의 주소를 요청하는 것도 "부르는 쪽"이다.
@@ -83,6 +89,7 @@ public class ImpactService extends BaseObject {
 		condition.put("depth", Integer.valueOf(walkDepth));
 		condition.put("limit", Integer.valueOf(MAX_ROWS));
 
+		// 3) 닿는 메소드 → 그 메소드의 진입점과 화면
 		List<Map<String, Object>> methods = relationDao.selectImpactMethods(condition);
 		if (methods.isEmpty()) {
 			throw ApiException.notFound(notFoundMessage(targetKind, name));
@@ -90,6 +97,7 @@ public class ImpactService extends BaseObject {
 		List<Map<String, Object>> endpoints = relationDao.selectImpactEndpoints(condition);
 		List<Map<String, Object>> screens = relationDao.selectImpactScreens(condition);
 
+		// 4) 요약과 응답
 		int startMethods = 0;
 		for (int i = 0; i < methods.size(); i++) {
 			if (((Number) methods.get(i).get("depth")).intValue() == 0) {
@@ -126,6 +134,7 @@ public class ImpactService extends BaseObject {
 		return result;
 	}
 
+	/** access(ALL / READ / WRITE)에 맞는 테이블 관계 종류. 그 밖의 값이면 400 */
 	private List<String> tableRelationTypes(String access) {
 		List<String> types = new ArrayList<String>();
 		String upper = access == null || access.trim().length() == 0 ? "ALL" : access.trim().toUpperCase();
@@ -141,6 +150,7 @@ public class ImpactService extends BaseObject {
 		return types;
 	}
 
+	/** 영향 받는 메소드가 없을 때의 안내(대상 종류마다 목록을 볼 수 있는 곳을 함께 알려 줌) */
 	private String notFoundMessage(String targetKind, String name) {
 		if ("TABLE".equals(targetKind)) {
 			return "그 테이블을 건드리는 SQL을 실행하는 메소드가 없습니다: " + name + " (테이블 목록: /tables)";

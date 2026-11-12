@@ -88,6 +88,7 @@ public class DbCommentReader extends BaseObject {
 		}
 	}
 
+	/** 캐시에 넣어 둔 조회 결과와 그 만료 시각 */
 	private static class Cached {
 		final long expiresAt;
 		final Result result;
@@ -99,6 +100,10 @@ public class DbCommentReader extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * 대상 DB에서 테이블 하나의 코멘트와 컬럼을 읽습니다(접속 설정이 있을 때만, 결과는 잠시 캐시).
+	 * </pre>
+	 *
 	 * @param projectId 분석 프로젝트 ID. 설정 키를 찾는 데 쓴다
 	 * @param table 테이블 이름(대문자)
 	 */
@@ -128,6 +133,17 @@ public class DbCommentReader extends BaseObject {
 		return result;
 	}
 
+	/**
+	 * <pre>
+	 * 대상 DB에 직접 붙어 테이블 하나의 코멘트와 컬럼(이름, 코멘트, 타입, 순서)을 읽습니다.
+	 *
+	 * 흐름:
+	 *   1) 설정의 계정으로 읽기 전용 연결을 연다(시간 제한 옵션 포함).
+	 *   2) 스키마: 설정 값 → 없으면 연결의 기본 스키마
+	 *   3) DB가 이름을 저장하는 대소문자부터 테이블을 찾고, 찾으면 컬럼 메타데이터를 읽는다.
+	 *   4) 어느 쪽으로도 없으면 NOT_FOUND
+	 * </pre>
+	 */
 	private Result load(String url, String projectId, String table) throws SQLException {
 		Properties properties = new Properties();
 		String username = configured(projectId, "username");
@@ -212,6 +228,7 @@ public class DbCommentReader extends BaseObject {
 		}
 	}
 
+	/** 연결의 기본 스키마. 드라이버가 알려 주지 않으면 null(모든 스키마에서 찾는다) */
 	private String schemaOf(Connection connection) {
 		try {
 			return connection.getSchema();
@@ -239,10 +256,12 @@ public class DbCommentReader extends BaseObject {
 		return type;
 	}
 
+	/** 이 프로젝트의 DB 접속 설정 값 하나(비었으면 null) */
 	private String configured(String projectId, String name) {
 		return blankToNull(configProperty.getProperty(PREFIX + projectId + "." + name));
 	}
 
+	/** 앞뒤 공백을 떼고, 비었으면 null */
 	private String blankToNull(String value) {
 		return value == null || value.trim().length() == 0 ? null : value.trim();
 	}

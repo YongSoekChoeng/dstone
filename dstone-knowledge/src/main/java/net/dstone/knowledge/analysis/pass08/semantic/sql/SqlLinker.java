@@ -112,7 +112,17 @@ public class SqlLinker implements SemanticStep {
 		return new ArrayList<Group>(byKey.values());
 	}
 
-	/** 규칙 묶음 하나에 맞는 호출을 잇습니다. counts 는 [이은 수, 이름은 알았지만 statement를 못 찾은 수, 이름을 계산하지 못한 수] */
+	/**
+	 * <pre>
+	 * 규칙 묶음 하나에 맞는 호출을 잇습니다. counts 는 [이은 수, 이름은 알았지만 statement를 못 찾은 수, 이름을 계산하지 못한 수]
+	 *
+	 * 흐름(규칙에 맞는 호출을 PAGE_SIZE 개씩 읽으며):
+	 *   1) 이름이 든 인자를 ConstantEvaluator 로 계산하고 규칙의 앞뒤 글을 붙여 SQL 이름을 만든다.
+	 *      계산을 못 했거나 SQL 이름 모양이 아니거나 skip 에 걸리면 센 뒤 넘어간다.
+	 *   2) 그 이름의 statement 를 찾는다. 네임스페이스 없는 id 면 그 id 가 하나뿐일 때만.
+	 *   3) 찾았으면 HIGH 관계, "a.b" 모양인데 없으면 UNRESOLVED 관계(사실 그대로 남김)
+	 * </pre>
+	 */
 	private void linkCalls(AnalysisJobContext context, StatementIndex index, ConstantEvaluator evaluator, Group group
 			, Set<Long> done, int[] counts) throws Exception {
 		long revisionId = context.getRevisionId();
@@ -136,6 +146,7 @@ public class SqlLinker implements SemanticStep {
 				if (!done.add(Long.valueOf(afterId))) {
 					continue;
 				}
+				// 1) SQL 이름 계산
 				String value = evaluator.evaluate((String) call.get("argText"), (String) call.get("ownerSymbolId"));
 				String name = value == null ? null : rule.prefix + value + rule.suffix;
 				if (name == null || !looksLikeStatementName(name) || (skip != null && skip.matcher(value).find())) {
@@ -143,6 +154,7 @@ public class SqlLinker implements SemanticStep {
 					counts[2]++;
 					continue;
 				}
+				// 2) statement 찾기
 				String statement = index.statementOf(name, (String) call.get("sourceRoot"));
 				if (statement == null && name.indexOf('.') < 0) {
 					// 네임스페이스 없이 id만 넘기는 방식(iBATIS의 기본). 그 id가 하나뿐일 때만 잇는다.
@@ -153,6 +165,7 @@ public class SqlLinker implements SemanticStep {
 				properties.put("via", "STATEMENT_NAME");
 				properties.put("statement", name);
 				properties.put("ruleAt", group.ruleAt.get(call.get("refKind") + "|" + call.get("name")));
+				// 3) 관계 남기기
 				if (statement != null) {
 					resourceDao.insertRelation(relation(revisionId, (String) call.get("fromId"), statement, null, "HIGH", "RESOLVED", properties
 							, call.get("fileId"), call.get("lineStart")));
@@ -183,6 +196,7 @@ public class SqlLinker implements SemanticStep {
 		return true;
 	}
 
+	/** 메소드 → SQL statement 의 EXECUTES_SQL 관계 한 행을 만듭니다. */
 	private Map<String, Object> relation(long revisionId, String fromId, String toId, String toExternal, String confidence, String resolutionStatus
 			, Map<String, Object> properties, Object fileId, Object lineStart) {
 		Map<String, Object> relation = new HashMap<String, Object>();

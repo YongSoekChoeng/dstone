@@ -66,6 +66,10 @@ public class JavaSourceParser {
 	}
 
 	/**
+	 * <pre>
+	 * 소스를 파싱합니다. 심볼 해석기 없이(DECLARE 단계용).
+	 * </pre>
+	 *
 	 * @param text 소스 내용
 	 * @param projectJavaVersion 프로젝트에 지정해 둔 문법 수준(예: 1.4, 8, 17). 없으면 null
 	 */
@@ -74,9 +78,19 @@ public class JavaSourceParser {
 	}
 
 	/**
+	 * <pre>
+	 * 소스를 파싱합니다.
+	 *
+	 * 흐름:
+	 *   1) 시도할 문법 수준 목록을 만든다: 프로젝트 지정 수준 → 21 → 8 → 1.4 (겹치면 한 번만)
+	 *   2) 차례로 파싱해 보고, 처음 성공한 수준의 결과를 돌려준다.
+	 *   3) 모두 실패하면 첫 시도의 오류를 돌려준다.
+	 * </pre>
+	 *
 	 * @param symbolResolver 파싱한 AST에 붙여 둘 심볼 해석기. 호출이 누구를 가리키는지 풀 때(RESOLVE) 필요합니다. 없으면 null
 	 */
 	public Result parse(String text, String projectJavaVersion, SymbolResolver symbolResolver) {
+		// 1) 시도할 문법 수준 목록
 		List<LanguageLevel> levels = new ArrayList<LanguageLevel>();
 		LanguageLevel preferred = levelOf(projectJavaVersion);
 		if (preferred != null) {
@@ -88,6 +102,7 @@ public class JavaSourceParser {
 			}
 		}
 
+		// 2) 차례로 시도
 		String firstError = null;
 		for (int i = 0; i < levels.size(); i++) {
 			LanguageLevel level = levels.get(i);
@@ -136,6 +151,7 @@ public class JavaSourceParser {
 		return level.name().substring("JAVA_".length()).replace('_', '.');
 	}
 
+	/** 파싱 오류 목록을 사람이 읽을 글로. 앞쪽 MAX_PROBLEMS건만 적고 나머지는 "외 n건" */
 	private String describe(List<Problem> problems) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < problems.size() && i < MAX_PROBLEMS; i++) {

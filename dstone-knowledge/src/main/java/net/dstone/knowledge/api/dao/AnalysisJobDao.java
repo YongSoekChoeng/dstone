@@ -24,6 +24,7 @@ public class AnalysisJobDao extends BaseDao {
 		return max == null ? 0 : max.intValue();
 	}
 
+	/** 새 Job(READY) */
 	public void insertJob(String analysisId, String projectId, long revisionId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("analysisId", analysisId);
@@ -32,10 +33,12 @@ public class AnalysisJobDao extends BaseDao {
 		sqlSessionCommon.insert(NS + "insertJob", param);
 	}
 
+	/** Job 하나. 없으면 null */
 	public Map<String, Object> selectJob(String analysisId) {
 		return sqlSessionCommon.selectOne(NS + "selectJob", analysisId);
 	}
 
+	/** 리비전의 Job 목록 */
 	public List<Map<String, Object>> selectJobListByRevision(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectJobListByRevision", revisionId);
 	}
@@ -46,15 +49,18 @@ public class AnalysisJobDao extends BaseDao {
 		return count.intValue();
 	}
 
+	/** 이 리비전으로 대기 중이거나 돌고 있는 Job 수 */
 	public int countActiveJobByRevision(long revisionId) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countActiveJobByRevision", revisionId);
 		return count.intValue();
 	}
 
+	/** Job 시작: RUNNING 과 시작 시각 */
 	public void updateJobStart(String analysisId) {
 		sqlSessionCommon.update(NS + "updateJobStart", analysisId);
 	}
 
+	/** Job 이 지금 돌고 있는 단계 */
 	public void updateJobPass(String analysisId, String pass) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("analysisId", analysisId);
@@ -62,6 +68,7 @@ public class AnalysisJobDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateJobPass", param);
 	}
 
+	/** 진행 건수를 고치면서 "살아 있다"는 표시(heartbeat)도 같이 남긴다 */
 	public void updateJobProgress(String analysisId, int totalCount, int doneCount) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("analysisId", analysisId);
@@ -70,6 +77,7 @@ public class AnalysisJobDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateJobProgress", param);
 	}
 
+	/** Job 끝: 상태와 오류 메시지, 끝난 시각 */
 	public void updateJobEnd(String analysisId, String status, String errorMessage) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("analysisId", analysisId);
@@ -78,19 +86,23 @@ public class AnalysisJobDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateJobEnd", param);
 	}
 
+	/** 서버가 내려가면서 끊긴 Job 정리 (기동할 때 한 번) */
 	public int markInterruptedJobs(String errorMessage) {
 		return sqlSessionCommon.update(NS + "markInterruptedJobs", errorMessage);
 	}
 
+	/** 분석 오류 한 건 */
 	public void insertError(Map<String, Object> error) {
 		sqlSessionCommon.insert(NS + "insertError", error);
 	}
 
+	/** Job 의 분석 오류 수 */
 	public int countError(String analysisId) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countError", analysisId);
 		return count.intValue();
 	}
 
+	/** Job 의 분석 오류 목록(limit 건까지) */
 	public List<Map<String, Object>> selectErrorList(String analysisId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("analysisId", analysisId);

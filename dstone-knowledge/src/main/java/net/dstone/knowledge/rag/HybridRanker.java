@@ -29,16 +29,19 @@ import java.util.Map;
  */
 public final class HybridRanker {
 
+	/** 순위 점수 = 1 / (RANK_CONSTANT + 순위). 60은 RRF(순위 합치기)에서 흔히 쓰는 값으로, 1등과 2등의 차이를 너무 크게 만들지 않는다 */
 	private static final double RANK_CONSTANT = 60.0;
 
 	/** 이름 점수가 이 값 이상이면 "제목에 이름이 한 낱말로 맞았다"는 뜻이다(RagDao.xml의 searchChunksByKeyword) */
 	private static final int EXACT_NAME_SCORE = 3;
 
+	/** 이름이 정확히 맞은 이름 검색 결과는 점수를 이만큼 곱한다(클래스·메소드 이름으로 찾은 질문을 앞으로) */
 	private static final double EXACT_NAME_WEIGHT = 2.0;
 
 	/** 결과의 각 행에서 청크를 가리는 키 */
 	public static final String KEY = "chunkId";
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private HybridRanker() {
 	}
 
@@ -58,6 +61,7 @@ public final class HybridRanker {
 		Map<String, Map<String, Object>> rows = new LinkedHashMap<String, Map<String, Object>>();
 		Map<String, List<String>> matched = new LinkedHashMap<String, List<String>>();
 
+		// 1) 벡터 검색 결과: 순위로 점수를 준다
 		for (int i = 0; i < vectorHits.size(); i++) {
 			Map<String, Object> hit = vectorHits.get(i);
 			String key = String.valueOf(hit.get(KEY));
@@ -67,6 +71,7 @@ public final class HybridRanker {
 			from.add("VECTOR");
 			matched.put(key, from);
 		}
+		// 2) 이름 검색 결과: 순위로 점수를 주고, 양쪽에 다 나온 청크는 점수를 더한다
 		for (int i = 0; i < keywordHits.size(); i++) {
 			Map<String, Object> hit = keywordHits.get(i);
 			String key = String.valueOf(hit.get(KEY));
@@ -84,6 +89,7 @@ public final class HybridRanker {
 			matched.get(key).add("KEYWORD");
 		}
 
+		// 3) 합친 점수 순으로 세워 topK 건만
 		List<String> keys = new ArrayList<String>(rows.keySet());
 		// 점수가 같으면 먼저 들어온 것(벡터 쪽, 그 안에서는 가까운 순)이 앞에 남는다. Collections.sort 는 순서를 지키는 정렬이다.
 		Collections.sort(keys, new Comparator<String>() {

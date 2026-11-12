@@ -36,6 +36,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	@Autowired
 	private ConfigProperty configProperty;
 
+	/** 검사하지 않는 경우: 인증을 꺼 두었거나, /api/ 가 아닌 주소이거나, 상태 확인(/api/system/health) */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		boolean enabled = Boolean.parseBoolean(configProperty.getProperty(PREFIX + ".enabled"));
@@ -43,6 +44,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 		return !enabled || !uri.startsWith("/api/") || uri.startsWith("/api/system/health");
 	}
 
+	/** X-API-Key 헤더를 설정의 키 목록과 견줍니다. 맞으면 그 키의 호출자 이름을 CallerContext 에 두고 넘기고, 없거나 틀리면 401 로 막습니다. */
 	@SuppressWarnings("rawtypes")
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {

@@ -42,15 +42,22 @@ public class ResourceDao extends BaseDao {
 
 	/* ---------- SQL과 Java 잇기 (SEMANTIC 단계. 일반 세션) ---------- */
 
+	/** SQL 관계(EXECUTES_SQL, READS_TABLE, WRITES_TABLE)와 statement 의 짝 메소드 표시를 지웁니다. MapperLinker 가 다시 만들기 전에 부릅니다. */
 	public void clearSqlRelations(long revisionId) {
 		sqlSessionCommon.delete(NS + "deleteSqlRelations", revisionId);
 		sqlSessionCommon.update(NS + "clearMapperMethods", revisionId);
 	}
 
+	/**
+	 * <pre>
+	 * 모든 statement 와 조각(sql). SQL 본문은 크므로 여기서는 가져오지 않는다. Java 문자열 SQL(JAVA)은 이름으로 부르는 것이 아니라서 뺀다. JPA 의 이름 있는 쿼리는 createNamedQuery("이름") 으로 찾도록 넣는다
+	 * </pre>
+	 */
 	public List<Map<String, Object>> selectMapperKeys(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectMapperKeys", revisionId);
 	}
 
+	/** statement 를 mapper_id 순으로 조금씩 꺼낸다(본문 포함). Java 소스 안의 SQL(JAVA, JPA)은 JavaSqlLinker 가 테이블을 뽑는다 */
 	public List<Map<String, Object>> selectMapperPage(long revisionId, long afterId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -59,10 +66,12 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectMapperPage", param);
 	}
 
+	/** statement 하나의 SQL 본문 */
 	public String selectMapperBody(long mapperId) {
 		return sqlSessionCommon.selectOne(NS + "selectMapperBody", mapperId);
 	}
 
+	/** 인터페이스 방식의 매퍼: 네임스페이스가 인터페이스의 전체 이름이고 statement id 가 메소드 이름이다. 그 메소드가 곧 이 SQL 을 실행한다 */
 	public int insertInterfaceMapperRelations(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertInterfaceMapperRelations", revisionId);
 	}
@@ -86,12 +95,17 @@ public class ResourceDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 관계 한 행을 넣습니다.
+	 * </pre>
+	 *
 	 * @param relation {revisionId, fromKind, fromId, relationType, toKind, toId, toExternal, confidence, resolutionStatus, propertiesJson, fileId, lineStart}
 	 */
 	public void insertRelation(Map<String, Object> relation) {
 		sqlSessionCommon.insert(NS + "insertRelation", relation);
 	}
 
+	/** statement 와 짝이 되는 Java 메소드를 적어 둔다. 여러 메소드가 부르면 그 가운데 하나(ID 가 가장 작은 것). 전부는 EXECUTES_SQL 관계에 있다 */
 	public void updateMapperMethods(long revisionId) {
 		sqlSessionCommon.update(NS + "updateMapperMethods", revisionId);
 	}
@@ -122,6 +136,10 @@ public class ResourceDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 타입 하나에 직접 적힌, 이 이름의 파라미터 없는 메소드의 위치(합성 메소드 제외). 상수를 return 하는 식을 읽을 때 씁니다.
+	 * </pre>
+	 *
 	 * @return {path, encoding, lineStart, lineEnd}. 그런 메소드가 없으면 null
 	 */
 	public Map<String, Object> selectGetterLocation(long revisionId, String symbolId, String name) {
@@ -134,14 +152,17 @@ public class ResourceDao extends BaseDao {
 
 	/* ---------- 조회 ---------- */
 
+	/** 종류별 자원 수 */
 	public List<Map<String, Object>> selectResourceSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectResourceSummary", revisionId);
 	}
 
+	/** 테이블 목록: 테이블마다 읽는 SQL / 쓰는 SQL 이 몇 개인지 */
 	public List<Map<String, Object>> selectTableList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectTableList", condition);
 	}
 
+	/** 테이블 하나를 건드리는 SQL 과, 그 SQL 을 실행하는 Java 메소드 */
 	public List<Map<String, Object>> selectTableUsage(long revisionId, String table, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -150,6 +171,7 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectTableUsage", param);
 	}
 
+	/** 테이블의 컬럼: SEMANTIC 이 파서로 읽은 SQL 에서 모아 둔 것(properties_json.columns). DB 정의가 아니라 SQL 에 적힌 컬럼이다 */
 	public List<Map<String, Object>> selectTableColumns(long revisionId, String table) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -157,6 +179,7 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectTableColumns", param);
 	}
 
+	/** 이 테이블을 건드리는 SQL 수와, 그중 컬럼을 읽지 못한 SQL 수(정규식으로 찾았거나 컬럼을 모으기 전에 분석한 것) */
 	public Map<String, Object> selectTableColumnCoverage(long revisionId, String table) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -164,6 +187,7 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectTableColumnCoverage", param);
 	}
 
+	/** 테이블 / 컬럼 설명: RESOURCE 가 DDL 파일(.sql)에서 읽어 둔 것(DdlReader). 파일 경로 순, 그 안에서는 정의 순 */
 	public List<Map<String, Object>> selectDdlDictionary(long revisionId, String table) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -171,6 +195,11 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectDdlDictionary", param);
 	}
 
+	/**
+	 * <pre>
+	 * SQL 주석에 적힌 한글명: SEMANTIC 이 테이블 관계에 남겨 둔 것(properties_json.columnComments / tableComment). 같은 컬럼에 다른 글이 달렸으면 많이 쓰인 것부터. column 이 NULL 인 행은 테이블의 한글명이다
+	 * </pre>
+	 */
 	public List<Map<String, Object>> selectSqlCommentDictionary(long revisionId, String table) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -178,6 +207,7 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectSqlCommentDictionary", param);
 	}
 
+	/** 소스에서 찾은 한글명(SourceNamePlugin): 이 테이블의 엔티티 / 엔티티 필드, 그리고 이름이 이 테이블의 컬럼과 같은 필드. 엔티티로 이어진 것이 먼저 온다 */
 	public List<Map<String, Object>> selectSourceDictionary(long revisionId, String table, List<String> columns) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -186,19 +216,23 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectSourceDictionary", param);
 	}
 
+	/** SQL statement 수(목록과 같은 조건) */
 	public int countMapper(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countMapper", condition);
 		return count.intValue();
 	}
 
+	/** SQL statement 목록(페이지) */
 	public List<Map<String, Object>> selectMapperList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectMapperList", condition);
 	}
 
+	/** 설정 값 목록(페이지) */
 	public List<Map<String, Object>> selectConfigList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectConfigList", condition);
 	}
 
+	/** 그 밖의 자원 목록(페이지) */
 	public List<Map<String, Object>> selectResourceList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectResourceList", condition);
 	}

@@ -36,6 +36,10 @@ public class DocumentTextExtractor {
 	}
 
 	/**
+	 * <pre>
+	 * 올린 파일(PDF, Word, 한글 등)에서 글만 뽑습니다(Apache Tika).
+	 * </pre>
+	 *
 	 * @param fileName 파일 이름. 종류를 알아내는 단서로 쓴다
 	 * @param maxChars 읽을 최대 글자 수
 	 * @throws IOException 파일을 읽지 못했을 때

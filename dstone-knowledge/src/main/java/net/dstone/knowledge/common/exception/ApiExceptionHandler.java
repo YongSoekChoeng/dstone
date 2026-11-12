@@ -84,6 +84,7 @@ public class ApiExceptionHandler extends BaseObject {
 		return response(HttpStatus.INTERNAL_SERVER_ERROR, String.valueOf(e.getMessage()));
 	}
 
+	/** 오류 응답 본문: {"status": 코드, "message": 내용} */
 	private ResponseEntity<Map<String, Object>> response(HttpStatus status, String message) {
 		Map<String, Object> body = new LinkedHashMap<String, Object>();
 		body.put("status", status.value());

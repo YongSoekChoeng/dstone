@@ -108,15 +108,28 @@ public class ScriptFunctions {
 		}
 	}
 
-	/** 스크립트 파일의 함수 정의를 파일에 나온 순서대로 찾습니다. */
+	/**
+	 * <pre>
+	 * 스크립트 파일의 함수 정의를 파일에 나온 순서대로 찾습니다.
+	 *
+	 * 흐름:
+	 *   1) 주석·문자열·정규식 글자 자리를 표시해 둔다(그 안의 것은 보지 않는다).
+	 *   2) "이름 = function(" 과 "function 이름(" 을 모두 찾아 나온 순서로 세운다.
+	 *   3) 앞에서부터 중괄호 깊이를 세어 가며, 점 없는 이름이 함수 안에 있으면(지역 함수) 버린다.
+	 *   4) 괄호 뒤의 { ... } 를 본문으로 잘라 낸다. 닫는 괄호를 못 찾으면 버린다.
+	 *   5) prototype 에 붙인 함수는 이름을 this.함수 로 바꾼다.
+	 * </pre>
+	 */
 	public List<Function> findFunctions(String text) {
+		// 1) 코드가 아닌 자리
 		BitSet skip = nonCode(text);
+		// 2) 정의 모으기
 		List<int[]> found = new ArrayList<int[]>();
 		List<String> names = new ArrayList<String>();
 		collect(text, skip, ASSIGNED, found, names);
 		collect(text, skip, DECLARED, found, names);
 
-		// 나온 순서로 세워 두고, 앞에서부터 중괄호 깊이를 한 번만 센다.
+		// 3) 나온 순서로 세워 두고, 앞에서부터 중괄호 깊이를 한 번만 센다.
 		sortByIndex(found, names);
 		Set<String> aliases = prototypeAliases(text, skip);
 		List<Function> functions = new ArrayList<Function>();
@@ -131,6 +144,7 @@ public class ScriptFunctions {
 				// 점 없는 이름이 함수 안에 있다. 지역 함수다.
 				continue;
 			}
+			// 4) 본문 { ... } 잘라 내기 → 5) 이름 정리
 			int open = codeIndexOf(text, skip, '{', closeOf(text, skip, at[1], '(', ')'));
 			int close = open < 0 ? -1 : closeOf(text, skip, open, '{', '}');
 			if (close < 0) {
@@ -236,6 +250,7 @@ public class ScriptFunctions {
 		return text.substring(from, index).trim().endsWith("function");
 	}
 
+	/** 이 모양으로 선언된 함수를 찾아 [이름 시작, 여는 괄호 자리]와 이름을 모읍니다. 주석·글자 안(skip)에 있는 것은 뺍니다. */
 	private void collect(String text, BitSet skip, Pattern pattern, List<int[]> found, List<String> names) {
 		Matcher m = pattern.matcher(text);
 		while (m.find()) {

@@ -35,7 +35,9 @@ import java.util.regex.Pattern;
  */
 public class JspToJava {
 
+	/** &lt;%@ page import="java.util.*, com.a.B" %&gt; 의 import 값 */
 	private static final Pattern IMPORT = Pattern.compile("import\\s*=\\s*\"([^\"]*)\"");
+	/** &lt;jsp:useBean ... /&gt; 태그 하나 */
 	private static final Pattern USE_BEAN = Pattern.compile("<jsp:useBean\\b([^>]*?)/?>");
 	private static final Pattern ATTRIBUTE_ID = Pattern.compile("\\bid\\s*=\\s*\"([^\"]+)\"");
 	private static final Pattern ATTRIBUTE_CLASS = Pattern.compile("\\b(?:class|type)\\s*=\\s*\"([^\"]+)\"");
@@ -43,6 +45,7 @@ public class JspToJava {
 	/** 폴더나 파일 이름으로 쓸 수 없는 Java 예약어들(흔한 것만). 뒤에 _를 붙여 피한다. */
 	private static final String KEYWORDS = "|new|default|import|package|class|interface|public|private|static|final|int|long|for|if|else|do|while|switch|case|return|void|this|super|null|true|false|try|catch|throw|enum|abstract|native|goto|const|char|byte|short|float|double|boolean|";
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private JspToJava() {
 	}
 
@@ -53,6 +56,16 @@ public class JspToJava {
 	}
 
 	/**
+	 * <pre>
+	 * JSP를 Java 소스로 바꿉니다.
+	 *
+	 * 흐름:
+	 *   1) useBean 태그를 변수 선언 스크립틀릿으로 바꿔 둔다.
+	 *   2) "&lt;%"를 차례로 찾아가며 종류(주석 / 지시자 / 선언 / 식 / 코드)에 따라 나눠 담는다.
+	 *      그 사이의 HTML은 줄바꿈만 남긴다.
+	 *   3) Java 코드가 하나라도 있었으면 import + 클래스 + _jspService(본문) + 선언을 이어 붙여 돌려준다.
+	 * </pre>
+	 *
 	 * @param jsp JSP의 내용
 	 * @param path 프로젝트 루트 기준 경로. 클래스 이름을 만드는 데 씁니다.
 	 * @return 바꾼 Java 소스. Java 코드가 없는 JSP면 null
@@ -100,11 +113,13 @@ public class JspToJava {
 				}
 				appendNewlines(body, text, open, end);
 			} else if (kind == '!') {
+				// 선언(<%! %>). 클래스 멤버라서 따로 모았다가 맨 뒤에 붙인다.
 				String code = text.substring(open + 3, end);
 				hasJava = hasJava || code.trim().length() > 0;
 				declarations.append(code).append('\n');
 				appendNewlines(body, text, open, end);
 			} else if (kind == '=') {
+				// 식(<%= %>). 화면에 찍는 값이므로 out.print(식); 으로 바꾼다.
 				String code = text.substring(open + 3, end);
 				if (code.trim().length() > 0) {
 					hasJava = true;
@@ -113,6 +128,7 @@ public class JspToJava {
 					appendNewlines(body, text, open, end);
 				}
 			} else {
+				// 코드(<% %>). 몸통에 그대로 넣는다.
 				String code = text.substring(open + 2, end);
 				hasJava = hasJava || code.trim().length() > 0;
 				body.append(code).append(' ');
@@ -123,6 +139,7 @@ public class JspToJava {
 			return null;
 		}
 
+		// 조립: package + import + 클래스 { _jspService(기본 객체들) { 몸통 } 선언들 }
 		StringBuilder java = new StringBuilder();
 		String packageName = packageOf(path);
 		java.append("package ").append(packageName).append("; ");

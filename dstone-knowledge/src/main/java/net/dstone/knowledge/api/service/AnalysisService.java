@@ -69,6 +69,7 @@ public class AnalysisService extends BaseObject {
 	 * </pre>
 	 */
 	public synchronized Map<String, Object> startAnalysis(String projectId, String revisionLabel, String rerunFrom, boolean incremental, Long baseRevisionId) {
+		// 1) 확인: 소스 폴더가 있는지, 이미 돌고 있는 분석이 없는지
 		Map<String, Object> project = projectService.getProject(projectId);
 		String localPath = (String) project.get("localPath");
 		if (localPath == null || !new File(localPath).isDirectory()) {
@@ -78,6 +79,7 @@ public class AnalysisService extends BaseObject {
 			throw ApiException.conflict("이 프로젝트는 이미 분석이 돌고 있습니다: " + projectId);
 		}
 
+		// 2) 리비전 라벨. 안 주면 지금 시각
 		String label = revisionLabel == null || revisionLabel.trim().length() == 0
 				? new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date())
 				: revisionLabel.trim();
@@ -85,6 +87,7 @@ public class AnalysisService extends BaseObject {
 			throw ApiException.badRequest("revisionLabel은 200자 이내여야 합니다.");
 		}
 
+		// 3) 같은 라벨의 리비전이 있으면 이어서(resumed), 없으면 새로 만든다. 증분이면 기준 리비전을 정한다.
 		boolean resumed;
 		long revisionId;
 		Long parentRevisionId = null;
@@ -112,6 +115,7 @@ public class AnalysisService extends BaseObject {
 			revisionId = ((Number) revision.get("revisionId")).longValue();
 			resumed = true;
 		}
+		// 4) rerunFrom: 그 단계부터 "끝남" 표시를 지워 다시 돌게 한다
 		List<String> rerunPasses = new ArrayList<String>();
 		if (rerunFrom != null && rerunFrom.trim().length() > 0) {
 			if (!resumed) {
@@ -124,6 +128,7 @@ public class AnalysisService extends BaseObject {
 			revisionDao.resetRevisionPasses(revisionId, rerunPasses);
 		}
 
+		// 5) Job 을 등록하고 실행 대기열에 넣는다(실제 분석은 백그라운드)
 		String analysisId = nextAnalysisId();
 		analysisJobDao.insertJob(analysisId, projectId, revisionId);
 		try {
@@ -133,6 +138,7 @@ public class AnalysisService extends BaseObject {
 			throw new ApiException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "대기 중인 분석이 너무 많습니다. 잠시 뒤에 다시 시도하세요.");
 		}
 
+		// 6) 응답
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("analysisId", analysisId);
 		result.put("projectId", projectId);

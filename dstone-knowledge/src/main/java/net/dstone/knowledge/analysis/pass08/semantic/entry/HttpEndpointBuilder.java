@@ -26,7 +26,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.AnnotationValues;
  *   2) 클래스에 주소가 없으면 상위 클래스 · 인터페이스의 클래스 주소를 씁니다(Spring 이 찾는 차례: 자기 → 인터페이스 → 상위 클래스).
  *   3) 상위 클래스 · 인터페이스의 메소드에 붙은 주소는 그것을 물려받은 컨트롤러의 진입점이 됩니다.
  *        abstract class BaseCrudController { @GetMapping("/list") list() }
- *        @RestController @RequestMapping("/order") class OrderController extends BaseCrudController
+ *        &#64;RestController @RequestMapping("/order") class OrderController extends BaseCrudController
  *        → GET /order/list, 처리 클래스 OrderController, 처리 메소드 list(재정의했으면 재정의한 메소드)
  *      물려받는 클래스: abstract 가 아닌 클래스이면서 클래스 주소나 주소 붙은 메소드가 있거나, 애노테이션으로 정한 계층이 CONTROLLER.
  *      하위 클래스가 같은 메소드를 다시 정의하면서 자기 주소를 붙였으면 물려받지 않습니다(자기 것이 진입점).
@@ -48,6 +48,7 @@ public class HttpEndpointBuilder {
 		public final boolean concreteClass;
 		public final boolean controller;
 
+		/** @param concreteClass abstract 가 아닌 클래스인지(진입점은 실제로 객체가 만들어지는 클래스에만 생긴다) */
 		public TypeInfo(String symbolId, String fqn, boolean concreteClass, boolean controller) {
 			this.symbolId = symbolId;
 			this.fqn = fqn;
@@ -62,6 +63,7 @@ public class HttpEndpointBuilder {
 		public final String name;
 		public final int paramCount;
 
+		/** @param paramCount 파라미터 수. 상위 타입의 메소드와 같은 메소드인지 맞춰 볼 때 쓴다 */
 		public MethodInfo(String methodId, String name, int paramCount) {
 			this.methodId = methodId;
 			this.name = name;
@@ -77,6 +79,10 @@ public class HttpEndpointBuilder {
 		final Set<String> interfaceTypes = new HashSet<String>();
 
 		/**
+		 * <pre>
+		 * 상속 관계 하나를 그래프에 더합니다.
+		 * </pre>
+		 *
 		 * @param relationType EXTENDS / IMPLEMENTS
 		 * @param childIsInterface 하위 타입이 인터페이스면 true(인터페이스의 EXTENDS 는 상위 인터페이스다)
 		 */
@@ -120,6 +126,7 @@ public class HttpEndpointBuilder {
 			return parents;
 		}
 
+		/** map 에서 key 의 목록을 꺼냅니다. 없으면 빈 목록을 만들어 넣고 돌려줍니다. */
 		private static <T> List<T> listOf(Map<String, List<T>> map, String key) {
 			List<T> list = map.get(key);
 			if (list == null) {
@@ -143,18 +150,22 @@ public class HttpEndpointBuilder {
 			this.typeId = "TYPE".equals(row.get("targetKind")) ? (String) row.get("targetId") : (String) row.get("ownerSymbolId");
 		}
 
+		/** 애노테이션이 붙은 메소드의 ID */
 		String methodId() {
 			return (String) row.get("targetId");
 		}
 
+		/** 그 메소드의 이름 */
 		String methodName() {
 			return (String) row.get("methodName");
 		}
 
+		/** 그 메소드의 파라미터 수(모르면 -1) */
 		int paramCount() {
 			return row.get("paramCount") == null ? -1 : ((Number) row.get("paramCount")).intValue();
 		}
 
+		/** 애노테이션 이름. 예: GetMapping */
 		String annotation() {
 			return (String) row.get("annotationName");
 		}
@@ -177,6 +188,7 @@ public class HttpEndpointBuilder {
 	private int unresolved;
 	private int inherited;
 
+	/** @param evaluator 주소를 상수로 적었을 때 값을 계산하는 것 */
 	public HttpEndpointBuilder(Rule.HttpEntry rule, TypeGraph graph, Map<String, TypeInfo> types, Map<String, List<MethodInfo>> methodsByType
 			, PathEvaluator evaluator) {
 		this.rule = rule;
@@ -204,6 +216,10 @@ public class HttpEndpointBuilder {
 	}
 
 	/**
+	 * <pre>
+	 * 규칙 하나의 매핑 애노테이션으로 진입점을 만듭니다(클래스 주소 × 메소드 주소, 상위 타입에서 물려받은 매핑 포함).
+	 * </pre>
+	 *
 	 * @param rows 이 규칙의 애노테이션(SemanticDao.selectHttpMappingAnnotations, annotation_id 순)
 	 * @return 진입점 행들. 키: httpMethod, path, symbolId, methodId, propertiesJson, fileId, lineStart
 	 */
@@ -284,8 +300,10 @@ public class HttpEndpointBuilder {
 	}
 
 	/**
+	 * <pre>
 	 * 하위 클래스 heir 에서 owner 의 주소 메소드를 실제로 처리하는 메소드.
 	 * heir 에서 owner 쪽으로 올라가며 같은 이름 · 같은 파라미터 수의 메소드를 찾는다(가장 가까운 재정의).
+	 * </pre>
 	 *
 	 * @return 처리 메소드 ID. 재정의한 메소드에 자기 주소가 붙어 있으면 null(물려받지 않는다)
 	 */
@@ -332,6 +350,7 @@ public class HttpEndpointBuilder {
 		return between;
 	}
 
+	/** 그 타입에 직접 선언된, 이름과 파라미터 수가 같은 메소드. 없으면 null */
 	private MethodInfo declared(String type, String name, int paramCount) {
 		List<MethodInfo> methods = methodsByType.get(type);
 		if (methods == null) {
@@ -364,6 +383,14 @@ public class HttpEndpointBuilder {
 		return new ArrayList<Mapping>();
 	}
 
+	/**
+	 * <pre>
+	 * 진입점을 만들어 endpoints 에 담습니다. 주소는 "클래스 주소 × 메소드 주소", 방식은 애노테이션에서 정한 것 전부를 조합합니다.
+	 * 상수를 계산하지 못한 주소가 있으면 그 식을 unresolvedPath 로 남깁니다.
+	 * </pre>
+	 *
+	 * @param inheritedFrom 상위 타입에서 물려받은 매핑이면 그 상위 타입. 아니면 null
+	 */
 	private void add(List<Map<String, Object>> endpoints, String handlerType, String handlerMethod, Mapping mapping, String inheritedFrom) {
 		List<String> unresolvedPaths = new ArrayList<String>();
 		List<String> classPaths = new ArrayList<String>();

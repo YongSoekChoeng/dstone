@@ -68,6 +68,7 @@ public class TableDictionaryPlugin implements SemanticStep {
 		return "사전의 테이블 한글명 " + tables + "건, 컬럼 한글명 " + columns + "건." + (loaded.message == null ? "" : " 쓰지 못한 파일: " + loaded.message);
 	}
 
+	/** 덧붙임 정보: 이 이름을 사전 파일 어디에서 읽었는지 */
 	private Map<String, Object> whereOf(DictionaryFileReader.Name name) {
 		Map<String, Object> properties = new LinkedHashMap<String, Object>();
 		properties.put("where", name.where);

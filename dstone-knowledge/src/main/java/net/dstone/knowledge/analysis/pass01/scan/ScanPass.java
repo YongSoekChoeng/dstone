@@ -88,8 +88,19 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		return 100;
 	}
 
+	/**
+	 * <pre>
+	 * 흐름:
+	 *   1) 프로젝트 소스 폴더(localPath)를 확인하고 설정 값을 읽는다.
+	 *   2) 폴더를 깊이 우선으로 걸어간다.
+	 *      - 폴더에 들어갈 때: 제외 폴더면 통째로 건너뛰고, 빌드 파일이 있으면 "모듈"로 기억한다.
+	 *      - 파일을 만날 때: 분석 대상이면 scanFile()로 정보를 만들어 buffer에 담는다.
+	 *   3) buffer가 commitSize개가 되면 flush()로 DB에 쓰고 비운다. 끝나면 남은 것을 한 번 더 쓴다.
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
+		// 1) 소스 폴더와 설정 값
 		String localPath = context.getProjectValue("localPath");
 		if (localPath == null) {
 			throw new IllegalStateException("프로젝트에 소스 경로(localPath)가 없습니다.");
@@ -111,8 +122,10 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		// 지금 들어와 있는 폴더가 속한 모듈. 폴더에 들어갈 때 쌓고 나올 때 뺀다(모듈이 없으면 "").
 		final Deque<String> moduleStack = new ArrayDeque<String>();
 
+		// 2) 폴더 걷기
 		Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
 
+			/** 폴더에 들어갈 때: 제외 폴더인지, 새 모듈의 시작인지 본다. */
 			@Override
 			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
 				boolean isRoot = dir.equals(root);
@@ -129,12 +142,14 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 				return FileVisitResult.CONTINUE;
 			}
 
+			/** 폴더에서 나올 때: 들어갈 때 쌓은 모듈을 뺀다. */
 			@Override
 			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
 				moduleStack.pop();
 				return FileVisitResult.CONTINUE;
 			}
 
+			/** 파일을 만날 때: 분석 대상이면 정보를 만들어 모아 두고, 많이 모이면 DB에 쓴다. */
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 				if (!attrs.isRegularFile()) {
@@ -170,11 +185,18 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 			}
 		});
 
+		// 3) 마지막으로 남은 것까지 저장
 		flush(context, buffer, savedCount);
 		info("SCAN: 파일 " + savedCount[0] + "개, root=" + root);
 	}
 
-	/** 파일 하나를 읽어 analysis_file 한 행에 들어갈 내용을 만듭니다. */
+	/**
+	 * <pre>
+	 * 파일 하나를 읽어 analysis_file 한 행에 들어갈 내용을 만듭니다.
+	 *
+	 * 순서: 크기 확인(너무 크면 해시만 내고 SKIPPED) → 해시 → 인코딩 판별 → 글자로 풀기 → 줄 수·용도 → (Java면) 패키지·소스 루트
+	 * </pre>
+	 */
 	private ScannedFile scanFile(AnalysisJobContext context, Path file, String path, String fileName, String language
 			, long size, long maxFileBytes, String projectEncoding) throws IOException {
 		ScannedFile scanned = new ScannedFile();
@@ -288,6 +310,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		return null;
 	}
 
+	/** 줄 수를 셉니다. 줄바꿈 개수 + (마지막 줄이 줄바꿈 없이 끝나면 1) */
 	private int lineCountOf(String text) {
 		if (text.length() == 0) {
 			return 0;
@@ -305,12 +328,14 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		return lines;
 	}
 
+	/** 메모리에 읽어 둔 내용의 SHA-256(16진수 문자열) */
 	private String sha256Of(byte[] bytes) throws IOException {
 		MessageDigest digest = newSha256();
 		digest.update(bytes);
 		return hex(digest.digest());
 	}
 
+	/** 큰 파일의 SHA-256. 메모리에 다 올리지 않고 64KB씩 흘려 읽으며 계산합니다. */
 	private String sha256Of(Path file) throws IOException {
 		MessageDigest digest = newSha256();
 		byte[] chunk = new byte[64 * 1024];
@@ -323,6 +348,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		return hex(digest.digest());
 	}
 
+	/** SHA-256 계산기를 새로 만듭니다. */
 	private MessageDigest newSha256() throws IOException {
 		try {
 			return MessageDigest.getInstance("SHA-256");
@@ -331,6 +357,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		}
 	}
 
+	/** 바이트 배열 → 소문자 16진수 문자열 */
 	private String hex(byte[] bytes) {
 		StringBuilder sb = new StringBuilder(bytes.length * 2);
 		for (int i = 0; i < bytes.length; i++) {
@@ -357,6 +384,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		return dirs;
 	}
 
+	/** 설정 값을 long으로 읽습니다. 비어 있으면 기본값 */
 	private long longProperty(String key, long defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

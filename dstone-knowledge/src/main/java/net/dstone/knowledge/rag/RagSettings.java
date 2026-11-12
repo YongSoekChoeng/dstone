@@ -30,22 +30,27 @@ public class RagSettings {
 		return intProperty("dstone.knowledge.rag.embedding.dimensions", 1024);
 	}
 
+	/** 임베딩 작업을 돌릴지(기본 true) */
 	public boolean embeddingEnabled() {
 		return !"false".equalsIgnoreCase(configProperty.getProperty("dstone.knowledge.rag.embedding.enabled"));
 	}
 
+	/** 한 번에 임베딩 서버로 보낼 청크 수(기본 1) */
 	public int embeddingBatchSize() {
 		return Math.max(1, intProperty("dstone.knowledge.rag.embedding.batch-size", 1));
 	}
 
+	/** 할 일이 없을 때 쉬는 초(기본 5) */
 	public int embeddingIdleSeconds() {
 		return Math.max(1, intProperty("dstone.knowledge.rag.embedding.idle-seconds", 5));
 	}
 
+	/** 단순 getter/setter 는 메소드 문서를 만들지 않을지(기본 true) */
 	public boolean skipAccessors() {
 		return !"false".equalsIgnoreCase(configProperty.getProperty("dstone.knowledge.rag.skip-accessors"));
 	}
 
+	/** 청크 하나의 최대 글자 수(기본 1800, 최소 200) */
 	public int chunkMaxChars() {
 		return Math.max(200, intProperty("dstone.knowledge.rag.chunk-max-chars", 1800));
 	}
@@ -84,6 +89,7 @@ public class RagSettings {
 		return doubleProperty("dstone.knowledge.rag.search.min-score.document", 0.35);
 	}
 
+	/** 설정 값을 실수로 읽습니다. 비어 있으면 기본값 */
 	private double doubleProperty(String key, double defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {
@@ -92,6 +98,7 @@ public class RagSettings {
 		return Double.parseDouble(configured.trim());
 	}
 
+	/** 설정 값을 정수로 읽습니다. 비어 있으면 기본값 */
 	private int intProperty(String key, int defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

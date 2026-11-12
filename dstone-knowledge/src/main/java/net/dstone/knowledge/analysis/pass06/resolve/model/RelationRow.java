@@ -7,11 +7,13 @@ package net.dstone.knowledge.analysis.pass06.resolve.model;
  */
 public class RelationRow {
 
+	/** 리비전 ID */
 	private long revisionId;
 
 	/** 관계가 시작하는 쪽의 종류: TYPE / METHOD / FIELD */
 	private String fromKind;
 
+	/** 출발 대상 ID */
 	private String fromId;
 
 	/** CALLS / CREATES / ACCESSES_FIELD / USES_TYPE / EXTENDS / IMPLEMENTS / THROWS ... */
@@ -38,6 +40,7 @@ public class RelationRow {
 	/** 근거가 된 소스 파일 */
 	private long fileId;
 
+	/** 근거가 된 줄 */
 	private Integer lineStart;
 
 	public long getRevisionId() {

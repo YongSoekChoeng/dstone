@@ -113,6 +113,10 @@ public class CarryDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 다시 풀어야 하는 파일의 참조를 PENDING 으로 되돌립니다.
+	 * </pre>
+	 *
 	 * @return 다시 풀 파일의 참조 가운데 상태를 되돌린 수
 	 */
 	public int resetReferencesToResolve(long revisionId) {
@@ -120,6 +124,10 @@ public class CarryDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 증분 분석 요약: 같은 / 바뀐 / 새 / 없어진 파일 수
+	 * </pre>
+	 *
 	 * @return {files, unchangedFiles, changedFiles, addedFiles, removedFiles}
 	 */
 	public Map<String, Object> selectCarrySummary(long revisionId, long baseRevisionId) {
@@ -127,12 +135,17 @@ public class CarryDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 단계마다 옮겨 온 파일 수와 실제로 처리한 파일 수
+	 * </pre>
+	 *
 	 * @return [{pass, carriedFiles, analyzedFiles}]
 	 */
 	public List<Map<String, Object>> selectCarriedPassSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectCarriedPassSummary", revisionId);
 	}
 
+	/** 리비전 + 기준 리비전 조회 조건 */
 	private Map<String, Object> param(long revisionId, long baseRevisionId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

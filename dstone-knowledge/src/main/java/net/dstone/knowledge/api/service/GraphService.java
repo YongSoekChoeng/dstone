@@ -82,12 +82,22 @@ public class GraphService extends BaseObject {
 	/* ======================= 1. 전체 맵 ======================= */
 
 	/**
+	 * <pre>
+	 * 리비전 전체의 노드 맵(노드와 선)을 돌려줍니다.
+	 *
+	 * 흐름:
+	 *   1) 노드와, 고른 종류의 선을 읽는다. 너무 많으면 MAX_NODES / MAX_EDGES 에서 자르고 truncated 로 알린다.
+	 *   2) 노드를 종류별로 센다.
+	 *   3) 잘려서 한쪽 끝이 없는 선은 뺀다(그릴 수 없다).
+	 * </pre>
+	 *
 	 * @param relations 그릴 관계를 쉼표로. 없으면 호출 흐름(CALLS, EXECUTES_SQL, READS_TABLE, WRITES_TABLE, RENDERS, REQUESTS ...)
 	 */
 	public Map<String, Object> getGraph(long revisionId, String relations) {
 		checkRevision(revisionId);
 		List<String> relationTypes = mapRelations(relations);
 
+		// 1) 노드와 선(한 건 더 읽어서 잘렸는지 안다)
 		List<Map<String, Object>> nodes = graphDao.selectGraphNodes(revisionId, MAX_NODES + 1);
 		List<Map<String, Object>> edges = graphDao.selectGraphEdges(revisionId, relationTypes, MAX_EDGES + 1);
 		boolean truncated = nodes.size() > MAX_NODES || edges.size() > MAX_EDGES;
@@ -98,7 +108,7 @@ public class GraphService extends BaseObject {
 			edges = new ArrayList<Map<String, Object>>(edges.subList(0, MAX_EDGES));
 		}
 
-		// 노드가 잘렸으면 한쪽 끝이 없는 선이 생긴다. 그릴 수 없으므로 뺀다.
+		// 2) 종류별 개수, 3) 노드가 잘렸으면 한쪽 끝이 없는 선이 생긴다. 그릴 수 없으므로 뺀다.
 		Set<String> nodeIds = new HashSet<String>();
 		Map<String, Integer> kindCounts = new LinkedHashMap<String, Integer>();
 		for (int i = 0; i < nodes.size(); i++) {
@@ -127,6 +137,7 @@ public class GraphService extends BaseObject {
 		return result;
 	}
 
+	/** 전체 맵에 그릴 관계 종류. 쉼표로 받은 이름을 대문자로 읽고, 비었으면 기본 목록 */
 	private List<String> mapRelations(String relations) {
 		if (relations == null || relations.trim().length() == 0) {
 			return DEFAULT_MAP_RELATIONS;
@@ -369,6 +380,7 @@ public class GraphService extends BaseObject {
 		return truncated;
 	}
 
+	/** 노드 ID 목록의 노드 정보. 테이블 노드는 DB에 행이 없어 이름으로 바로 만들고, 나머지는 DB에서 읽습니다. */
 	private List<Map<String, Object>> loadNodes(long revisionId, List<String> ids) {
 		List<Map<String, Object>> nodes = new ArrayList<Map<String, Object>>();
 		List<String> stored = new ArrayList<String>();
@@ -399,6 +411,7 @@ public class GraphService extends BaseObject {
 		return nodes;
 	}
 
+	/** 테이블 노드(ID 뒤쪽이 테이블 이름) */
 	private Map<String, Object> tableNode(String id) {
 		String name = id.substring(GraphNodeId.TABLE_PREFIX.length());
 		Map<String, Object> node = new LinkedHashMap<String, Object>();
@@ -411,10 +424,12 @@ public class GraphService extends BaseObject {
 		return node;
 	}
 
+	/** 조회 깊이. 없으면 기본값, 0~MAX_DEPTH 로 맞춥니다. */
 	private int depthOf(Integer depth) {
 		return depth == null ? DEFAULT_DEPTH : Math.max(0, Math.min(depth.intValue(), MAX_DEPTH));
 	}
 
+	/** 숫자면 int 로, 아니면 0 */
 	private int intOf(Object value) {
 		return value instanceof Number ? ((Number) value).intValue() : 0;
 	}
@@ -575,6 +590,7 @@ public class GraphService extends BaseObject {
 		Map<String, Object> node = new LinkedHashMap<String, Object>();
 		node.put("id", id.getId());
 
+		// ID 모양으로 종류가 정해지는 것: 테이블(T:이름), SQL statement(S번호), 파일(F번호)·매퍼(M번호)
 		if (GraphNodeId.TABLE.equals(id.getKind())) {
 			node.putAll(tableNode(id.getId()));
 			return node;
@@ -640,6 +656,7 @@ public class GraphService extends BaseObject {
 		throw notFound(revisionId, id);
 	}
 
+	/** 노드 ID 를 읽습니다. 모양이 틀리면 400 */
 	private GraphNodeId parseId(String nodeId) {
 		GraphNodeId id = GraphNodeId.parse(nodeId);
 		if (id == null) {
@@ -648,10 +665,12 @@ public class GraphService extends BaseObject {
 		return id;
 	}
 
+	/** "없는 노드" 404 오류 */
 	private ApiException notFound(long revisionId, GraphNodeId id) {
 		return ApiException.notFound("없는 노드입니다: revisionId=" + revisionId + ", id=" + id.getId());
 	}
 
+	/** 없는 리비전이면 404 */
 	private void checkRevision(long revisionId) {
 		if (revisionDao.selectRevision(revisionId) == null) {
 			throw ApiException.notFound("없는 리비전입니다: " + revisionId);

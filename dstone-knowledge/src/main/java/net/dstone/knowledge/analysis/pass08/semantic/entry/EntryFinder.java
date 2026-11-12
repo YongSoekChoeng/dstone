@@ -106,7 +106,17 @@ public class EntryFinder implements SemanticStep {
 	/* ============================== HTTP ============================== */
 
 	/**
+	 * <pre>
 	 * HTTP 진입점 규칙마다 애노테이션과 상속 관계를 읽어 진입점을 만듭니다.
+	 *
+	 * 흐름(규칙 하나마다):
+	 *   1) 규칙에 적힌 주소 애노테이션이 붙은 곳을 DB에서 읽는다. 없으면 다음 규칙.
+	 *   2) 타입 상속 그래프를 한 번 만들어 두고, 애노테이션이 붙은 타입과 그 하위 타입을 모두 모은다
+	 *      (상위 클래스의 주소를 물려받는 컨트롤러가 있어서).
+	 *   3) 그 타입들의 성질(구체 클래스인지, 컨트롤러인지)과 메소드 목록을 1000개씩 끊어 읽는다.
+	 *   4) HttpEndpointBuilder 로 "클래스 주소 + 메소드 주소"를 조합해 진입점을 만들어 넣는다.
+	 *      주소를 상수로 적었으면 ConstantEvaluator 로 계산한다.
+	 * </pre>
 	 *
 	 * @return [진입점 수, 물려받은 것, 상수를 계산한 주소, 계산하지 못한 주소]
 	 */
@@ -129,10 +139,12 @@ public class EntryFinder implements SemanticStep {
 		for (int r = 0; r < httpRules.size(); r++) {
 			context.checkCancelled();
 			Rule.HttpEntry rule = httpRules.get(r);
+			// 1) 이 규칙의 애노테이션이 붙은 곳
 			List<Map<String, Object>> rows = semanticDao.selectHttpMappingAnnotations(revisionId, rule.annotationNames());
 			if (rows.isEmpty()) {
 				continue;
 			}
+			// 2) 상속 그래프(처음 한 번만)와 관련 타입 모으기
 			if (graph == null) {
 				graph = typeGraph(revisionId, interfaces);
 			}
@@ -140,6 +152,7 @@ public class EntryFinder implements SemanticStep {
 			List<String> ids = new ArrayList<String>(involved);
 			Map<String, HttpEndpointBuilder.TypeInfo> types = new HashMap<String, HttpEndpointBuilder.TypeInfo>();
 			Map<String, List<HttpEndpointBuilder.MethodInfo>> methods = new HashMap<String, List<HttpEndpointBuilder.MethodInfo>>();
+			// 3) 타입 성질과 메소드 목록(IN 절이 너무 길어지지 않게 1000개씩)
 			for (int from = 0; from < ids.size(); from += 1000) {
 				List<String> chunk = ids.subList(from, Math.min(ids.size(), from + 1000));
 				List<Map<String, Object>> flags = semanticDao.selectTypeFlags(revisionId, chunk);
@@ -161,6 +174,7 @@ public class EntryFinder implements SemanticStep {
 					list.add(new HttpEndpointBuilder.MethodInfo((String) m.get("methodId"), (String) m.get("name"), ((Number) m.get("paramCount")).intValue()));
 				}
 			}
+			// 4) 주소 조합 → 진입점 저장
 			HttpEndpointBuilder builder = new HttpEndpointBuilder(rule, graph, types, methods, evaluator);
 			List<Map<String, Object>> endpoints = builder.build(rows);
 			for (int i = 0; i < endpoints.size(); i++) {
@@ -322,6 +336,7 @@ public class EntryFinder implements SemanticStep {
 		return types.size() == 1 ? (String) types.get(0).get("symbolId") : null;
 	}
 
+	/** 설정 XML 규칙으로 찾은 진입점 한 행을 넣습니다. 종류와 방식은 규칙에 적힌 것을 씁니다. */
 	private void insertXmlEndpoint(long revisionId, long fileId, Rule.XmlEntry rule, XmlEndpointReader.Entry entry, String symbolId, String methodId
 			, Map<String, Object> properties) {
 		Map<String, Object> endpoint = new HashMap<String, Object>();

@@ -35,6 +35,7 @@ public class EmbeddingGate {
 		searching.incrementAndGet();
 	}
 
+	/** 검색이 질문 임베딩을 끝냈을 때 부릅니다. 끝난 시각을 남겨, 임베딩 작업이 잠깐 더 기다렸다가 다시 돌게 합니다. */
 	public void searchFinished() {
 		lastSearchAt = System.currentTimeMillis();
 		searching.decrementAndGet();

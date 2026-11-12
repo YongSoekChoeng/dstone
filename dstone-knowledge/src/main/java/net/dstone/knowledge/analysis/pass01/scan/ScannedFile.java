@@ -7,6 +7,7 @@ package net.dstone.knowledge.analysis.pass01.scan;
  */
 public class ScannedFile {
 
+	/** 리비전 ID */
 	private long revisionId;
 
 	/** 멀티모듈일 때 이 파일이 속한 모듈의 경로. 모듈이 따로 없으면 null */
@@ -24,6 +25,7 @@ public class ScannedFile {
 	/** SOURCE / MYBATIS_MAPPER / SPRING_XML / WEB_XML / CONFIG / BUILD ... */
 	private String fileType;
 
+	/** Java 패키지 이름(Java 파일만) */
 	private String packageName;
 
 	/** 실제로 읽을 때 쓴 인코딩 */
@@ -32,13 +34,16 @@ public class ScannedFile {
 	/** 파일 내용의 SHA-256 */
 	private String checksum;
 
+	/** 파일 크기(바이트) */
 	private long sizeBytes;
 
+	/** 줄 수 */
 	private Integer lineCount;
 
 	/** PENDING(아직 파싱 전) / SKIPPED(너무 커서 읽지 않음) */
 	private String parseStatus;
 
+	/** 파싱 실패 사유 */
 	private String parseError;
 
 	public long getRevisionId() {

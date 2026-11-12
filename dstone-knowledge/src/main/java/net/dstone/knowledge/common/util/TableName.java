@@ -14,10 +14,15 @@ import java.util.Locale;
  */
 public final class TableName {
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private TableName() {
 	}
 
 	/**
+	 * <pre>
+	 * 테이블 이름을 비교용 모양으로 맞춥니다(스키마 떼고, 따옴표 벗기고, 대문자).
+	 * </pre>
+	 *
 	 * @param written SQL이나 요청에 적힌 이름(스키마.테이블 또는 테이블)
 	 * @return 스키마를 뗀 대문자 테이블 이름. 비어 있으면 빈 글자
 	 */

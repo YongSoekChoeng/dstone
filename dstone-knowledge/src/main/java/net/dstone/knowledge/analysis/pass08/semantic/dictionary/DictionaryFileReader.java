@@ -194,6 +194,7 @@ public class DictionaryFileReader extends BaseObject {
 		}
 	}
 
+	/** 이 프로젝트에 설정해 둔 사전 파일 목록 */
 	private List<String> configuredFiles(String projectId) {
 		return configuredFiles(configProperty, PREFIX + projectId);
 	}
@@ -223,6 +224,7 @@ public class DictionaryFileReader extends BaseObject {
 		return paths;
 	}
 
+	/** 상대 경로면 baseDir 기준으로, 절대 경로면 그대로 */
 	static File resolve(String baseDir, String path) {
 		File file = new File(path);
 		if (file.isAbsolute() || baseDir == null) {
@@ -246,7 +248,14 @@ public class DictionaryFileReader extends BaseObject {
 	/**
 	 * <pre>
 	 * 사전 파일의 글을 읽습니다.
+	 *
+	 * 흐름:
+	 *   1) 구분자(쉼표 / 탭)를 정하고 CSV 로 읽는다.
+	 *   2) 첫 줄(머리글)에서 테이블 / 컬럼 / 테이블 한글명 / 컬럼 한글명 열을 이름으로 찾는다.
+	 *      테이블 열과 한글명 열 하나는 꼭 있어야 한다. 없으면 problem 에 이유를 남기고 끝.
+	 *   3) 둘째 줄부터 테이블 한글명, 컬럼 한글명을 담는다. 같은 것이 또 나오면 먼저 나온 것을 쓴다.
 	 * </pre>
+	 *
 	 * @param text 파일 내용
 	 * @param fileName 한글명이 어디서 왔는지 적을 때 쓰는 파일 이름
 	 */
@@ -264,6 +273,7 @@ public class DictionaryFileReader extends BaseObject {
 		for (int i = 0; i < rows.get(0).size(); i++) {
 			header.add(headerKey(rows.get(0).get(i)));
 		}
+		// 2) 머리글에서 열 찾기
 		int table = indexOf(header, TABLE_HEADERS, -1);
 		int column = indexOf(header, COLUMN_HEADERS, table);
 		int tableName = indexOf(header, TABLE_NAME_HEADERS, table);
@@ -275,6 +285,7 @@ public class DictionaryFileReader extends BaseObject {
 			dictionary.problem = "머리글에서 테이블 열과 한글명 열을 찾지 못했습니다";
 			return dictionary;
 		}
+		// 3) 데이터 줄
 		for (int r = 1; r < rows.size(); r++) {
 			List<String> row = rows.get(r);
 			String tableId = identifierOf(cell(row, table));
@@ -387,6 +398,7 @@ public class DictionaryFileReader extends BaseObject {
 		return -1;
 	}
 
+	/** 행의 index 번째 칸. 칸이 없으면 null */
 	static String cell(List<String> row, int index) {
 		return index < 0 || index >= row.size() ? null : row.get(index);
 	}

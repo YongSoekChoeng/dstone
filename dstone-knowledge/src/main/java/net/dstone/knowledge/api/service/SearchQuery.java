@@ -13,8 +13,10 @@ public class SearchQuery {
 	/** 찾을 내용(질문) */
 	private String query;
 
+	/** 찾을 프로젝트. 일반 문서만 찾을 때는 비워도 된다 */
 	private String projectId;
 
+	/** 찾을 리비전. 없으면 그 프로젝트의 최신 READY 리비전 */
 	private Long revisionId;
 
 	/** 어디에서 찾을지: CODE(분석 결과) / DOCUMENT(올린 일반 문서). 비어 있으면 프로젝트를 줬을 때 CODE, 안 줬을 때 DOCUMENT */
@@ -29,6 +31,7 @@ public class SearchQuery {
 	/** HYBRID(기본. 뜻 + 이름) / VECTOR(뜻만) / KEYWORD(이름만) */
 	private String mode;
 
+	/** 돌려줄 최대 건수 */
 	private int topK = 10;
 
 	/** 뜻으로 찾은 결과를 남길 최소 유사도. null이면 설정값(코드/올린 문서 따로), 0이면 거르지 않는다 */

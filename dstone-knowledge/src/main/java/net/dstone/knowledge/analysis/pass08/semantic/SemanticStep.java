@@ -24,6 +24,10 @@ public interface SemanticStep {
 	String name();
 
 	/**
+	 * <pre>
+	 * 이 처리기의 일을 합니다. SemanticPass 의 트랜잭션 안에서 불립니다.
+	 * </pre>
+	 *
 	 * @return 무엇을 얼마나 만들었는지 한 줄 요약(로그용)
 	 */
 	String run(AnalysisJobContext context) throws Exception;

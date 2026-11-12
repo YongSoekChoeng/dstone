@@ -68,10 +68,12 @@ public class SearchController {
 		return searchService.getStatus(revisionId);
 	}
 
+	/** null 이 아니면 글로 */
 	private String textOf(Object value) {
 		return value == null ? null : String.valueOf(value);
 	}
 
+	/** 숫자로 읽습니다. null 이면 null, 숫자가 아니면 400 */
 	private Long longOf(Object value, String name) {
 		if (value == null) {
 			return null;
@@ -83,6 +85,7 @@ public class SearchController {
 		}
 	}
 
+	/** 실수로 읽습니다. 비었으면 null, 숫자가 아니면 400 */
 	private Double doubleOf(Object value, String name) {
 		if (value == null || String.valueOf(value).trim().length() == 0) {
 			return null;
@@ -94,6 +97,7 @@ public class SearchController {
 		}
 	}
 
+	/** 목록이면 각 값을 글로, 값 하나면 그것 하나짜리 목록으로 */
 	private List<String> stringsOf(Object value) {
 		List<String> strings = new ArrayList<String>();
 		if (value instanceof List) {

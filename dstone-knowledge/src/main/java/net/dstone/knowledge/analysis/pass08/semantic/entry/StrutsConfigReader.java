@@ -73,6 +73,7 @@ public class StrutsConfigReader {
 		public final Map<String, String> forwards = new LinkedHashMap<String, String>();
 	}
 
+	/** struts 설정 파일 하나를 읽습니다. 맨 위 요소가 struts 면 Struts 2, struts-config 면 Struts 1 입니다. */
 	public StrutsConfig read(String text) throws Exception {
 		StrutsConfig config = new StrutsConfig();
 		Document document = SafeXml.parse(text);
@@ -89,6 +90,7 @@ public class StrutsConfigReader {
 		return config;
 	}
 
+	/** Struts 1: &lt;action path type parameter&gt; 와 그 안의 &lt;forward name path&gt; */
 	private void readStruts1(Element root, StrutsConfig config) {
 		NodeList actions = root.getElementsByTagName("action");
 		for (int i = 0; i < actions.getLength(); i++) {
@@ -117,6 +119,7 @@ public class StrutsConfigReader {
 		}
 	}
 
+	/** Struts 2: &lt;constant&gt;, &lt;package namespace&gt; 안의 &lt;action name class method&gt; 와 &lt;result&gt;. 주소는 namespace + "/" + name */
 	private void readStruts2(Element root, StrutsConfig config) {
 		List<Element> constants = childrenOf(root, "constant");
 		for (int i = 0; i < constants.size(); i++) {
@@ -167,11 +170,13 @@ public class StrutsConfigReader {
 		return found;
 	}
 
+	/** 속성 값(앞뒤 공백 제거). 없거나 비었으면 null */
 	private String attribute(Element element, String name) {
 		String value = element.getAttribute(name);
 		return value == null || value.trim().length() == 0 ? null : value.trim();
 	}
 
+	/** name 이 null 이면 fallback */
 	private String nameOr(String name, String fallback) {
 		return name == null ? fallback : name;
 	}

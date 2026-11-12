@@ -21,6 +21,7 @@ import net.dstone.common.core.BaseObject;
 @Component
 public class ConfigMapper extends BaseObject {
 
+	/** MyBatis 세션 팩토리. sqlmap/sql-mapper-config.xml 설정과 sqlmap 아래의 모든 *Dao.xml 매퍼를 읽습니다. */
 	@Bean(name = "sqlSessionFactoryCommon")
 	public SqlSessionFactory sqlSessionFactoryCommon(@Qualifier("dataSourceCommon") DataSource dataSourceCommon) throws Exception {
 		PathMatchingResourcePatternResolver pmrpr = new PathMatchingResourcePatternResolver();

@@ -11,6 +11,7 @@ import java.security.NoSuchAlgorithmException;
  */
 public class HashText {
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private HashText() {
 	}
 

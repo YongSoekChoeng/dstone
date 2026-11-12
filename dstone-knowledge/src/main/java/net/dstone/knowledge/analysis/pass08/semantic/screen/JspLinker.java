@@ -306,6 +306,7 @@ public class JspLinker implements SemanticStep {
 		return sb.toString();
 	}
 
+	/** 글자 위치 → 줄 번호(1부터) */
 	private Integer lineAt(String text, int index) {
 		int line = 1;
 		for (int i = 0; i < index; i++) {
@@ -316,6 +317,7 @@ public class JspLinker implements SemanticStep {
 		return Integer.valueOf(line);
 	}
 
+	/** analysis_relation 한 행을 Map 으로 만듭니다(DAO 에 넘길 모양). */
 	private Map<String, Object> relation(long revisionId, String fromKind, String fromId, String relationType, String toKind, String toId
 			, String confidence, String resolutionStatus, Map<String, Object> properties, long fileId, Integer lineStart) {
 		Map<String, Object> relation = new HashMap<String, Object>();

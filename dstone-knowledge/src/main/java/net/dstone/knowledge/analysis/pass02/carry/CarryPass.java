@@ -77,16 +77,22 @@ public class CarryPass extends BaseObject implements AnalysisPass {
 		if (baseRevisionId == null) {
 			return;
 		}
+		// counts: [0] 같은 파일 수, [1] 옮겨 온 단계 진행 행 수, [2] 복사한 결과 행 수 (익명 클래스 안에서 바꾸려고 배열)
 		final int[] counts = new int[3];
 		txTemplateCommon.execute(new TransactionCallbackWithoutResult() {
 			@Override
 			protected void doInTransactionWithoutResult(TransactionStatus status) {
+				// 1) 경로와 내용 해시(그리고 언어·용도·모듈·인코딩)가 같은 파일을 찾아 "앞 리비전의 어느 파일에서 옮겨 왔는지" 표시한다.
 				counts[0] = carryDao.markCarriedFiles(revisionId, baseRevisionId.longValue());
+				// 2) 그 파일들의 DECLARE / RESOURCE 진행 상태를 끝남으로 옮긴다. 그래서 두 단계가 이 파일을 건너뛴다.
 				counts[1] = carryDao.carryFilePasses(revisionId, Arrays.asList("DECLARE", "RESOURCE"));
+				// 3) DECLARE 결과 테이블의 행을 복사한다.
 				for (int i = 0; i < DECLARE_TABLES.length; i++) {
 					counts[2] += carryDao.copyRows(revisionId, DECLARE_TABLES[i], "DECLARE", null);
 				}
+				// 4) 파싱 결과(상태, 문법 수준, 패키지, 소스 루트)도 앞 리비전 값으로 맞춘다.
 				carryDao.carryFileParsed(revisionId);
+				// 5) RESOURCE 결과 테이블의 행을 복사한다.
 				for (int i = 0; i < RESOURCE_TABLES.length; i++) {
 					counts[2] += carryDao.copyRows(revisionId, RESOURCE_TABLES[i], "RESOURCE", null);
 				}

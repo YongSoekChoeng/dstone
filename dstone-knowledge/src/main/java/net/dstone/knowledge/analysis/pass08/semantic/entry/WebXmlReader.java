@@ -50,6 +50,10 @@ public class WebXmlReader {
 	}
 
 	/**
+	 * <pre>
+	 * web.xml 을 읽어 서블릿·필터·리스너를 모읍니다.
+	 * </pre>
+	 *
 	 * @param text web.xml의 내용(이미 올바른 인코딩으로 읽은 글)
 	 */
 	public WebXml read(String text) throws Exception {
@@ -109,6 +113,7 @@ public class WebXmlReader {
 		}
 	}
 
+	/** 문서 전체에서 이 이름의 요소들 */
 	private List<Element> elementsOf(Document document, String tagName) {
 		List<Element> elements = new ArrayList<Element>();
 		NodeList nodes = document.getElementsByTagName(tagName);
@@ -118,6 +123,7 @@ public class WebXmlReader {
 		return elements;
 	}
 
+	/** 이 이름의 첫 자식 요소의 글. 없으면 null */
 	private String childText(Element parent, String tagName) {
 		List<String> texts = childTexts(parent, tagName);
 		return texts.isEmpty() ? null : texts.get(0);

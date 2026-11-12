@@ -26,7 +26,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
  *
  * 두 가지를 봅니다.
  *   1. JPA 엔티티(@Table 이 붙은 클래스): 테이블이 정해져 있다.
- *        @Table(name = "TB_ORDER") 클래스의 설명    → SOURCE_TABLE_NAME (name = TB_ORDER)
+ *        &#64;Table(name = "TB_ORDER") 클래스의 설명    → SOURCE_TABLE_NAME (name = TB_ORDER)
  *        필드(@Column(name) 이 있으면 그 이름)의 설명 → SOURCE_NAME (name = 컬럼, properties.table = TB_ORDER, via = ENTITY)
  *   2. 이름이 컬럼과 같은 필드(VO 등): mb_nm / mbNm → MB_NM. 어느 테이블의 것인지는 모른다.
  *        → SOURCE_NAME (name = 컬럼, properties.table = null, via = NAME)
@@ -62,6 +62,16 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 		return "SOURCE_NAME";
 	}
 
+	/**
+	 * <pre>
+	 * Java 소스의 설명(애노테이션 또는 주석)에서 테이블·컬럼 한글명을 읽습니다. 세 갈래로 읽습니다.
+	 *   1) 엔티티 클래스의 설명      → 그 테이블의 한글명
+	 *   2) 엔티티 필드의 설명        → 그 컬럼의 한글명(@Column 의 이름, 없으면 필드 이름을 컬럼으로)
+	 *   3) SQL·DDL 에 나온 컬럼과 이름이 같은 필드(VO 등. orderNo ↔ ORDER_NO)의 설명 → 그 컬럼의 한글명(테이블은 모름)
+	 * </pre>
+	 *
+	 * @return 로그와 상태 화면에 보일 한 줄 요약
+	 */
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
@@ -69,6 +79,7 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 		SourceLines lines = new SourceLines(root);
 		int tables = 0, entityColumns = 0, namedColumns = 0;
 
+		// 1) 엔티티 → 테이블 한글명
 		List<Map<String, Object>> types = semanticDao.selectEntityTypes(revisionId);
 		for (int i = 0; i < types.size(); i++) {
 			context.checkCancelled();
@@ -83,6 +94,7 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 			}
 		}
 
+		// 2) 엔티티 필드 → 컬럼 한글명
 		List<Map<String, Object>> entityFields = semanticDao.selectEntityFields(revisionId);
 		for (int i = 0; i < entityFields.size(); i++) {
 			context.checkCancelled();
@@ -97,6 +109,7 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 			}
 		}
 
+		// 3) SQL·DDL 컬럼과 이름이 같은 필드 → 컬럼 한글명
 		List<Map<String, Object>> fields = semanticDao.selectNameCandidateFields(revisionId);
 		for (int i = 0; i < fields.size(); i++) {
 			context.checkCancelled();
@@ -173,6 +186,7 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 		return null;
 	}
 
+	/** 한글명을 읽은 필드의 덧붙임 정보: 테이블, "클래스.필드", 어떻게 이었는지(via) */
 	private Map<String, Object> fieldProperties(Map<String, Object> field, String table, String via) {
 		Map<String, Object> properties = new LinkedHashMap<String, Object>();
 		properties.put("table", table);
@@ -181,6 +195,7 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 		return properties;
 	}
 
+	/** 소스에서 읽은 한글명 한 행(SOURCE_TABLE_NAME / SOURCE_COLUMN_NAME …)을 넣습니다. 위치는 at(파일, 줄)에서 가져옵니다. */
 	private void insert(long revisionId, String type, String name, String value, Map<String, Object> properties, Map<String, Object> at) {
 		Map<String, Object> row = new LinkedHashMap<String, Object>();
 		row.put("revisionId", revisionId);
@@ -207,10 +222,12 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 		return name.length() == 0 || name.length() > 300 ? null : name;
 	}
 
+	/** com.a.OrderVO → OrderVO */
 	private String shortName(String fqn) {
 		return fqn == null ? "" : fqn.substring(fqn.lastIndexOf('.') + 1);
 	}
 
+	/** 숫자면 int 로, 아니면 0 */
 	private int intOf(Object value) {
 		return value instanceof Number ? ((Number) value).intValue() : 0;
 	}
@@ -237,6 +254,7 @@ public class SourceNamePlugin extends BaseObject implements SemanticStep {
 			this.root = root;
 		}
 
+		/** 파일을 줄 단위로 읽습니다(캐시). 못 읽으면 null 을 기억해 두고 돌려줍니다. */
 		String[] of(String path, String encoding) {
 			if (path == null) {
 				return null;

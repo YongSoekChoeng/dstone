@@ -39,8 +39,8 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
  * <pre>
  * JPA 의 쿼리를 SQL statement 로 만듭니다(analysis_mapper, mapper_type JPA). 무엇이 JPA 의 관례인지는 규칙 파일(conf/rules/common/jpa.yml)의 jpa: 절에 있습니다.
  *
- *   @Query("select o from Order o where ...")             그 메소드의 statement(JPQL). nativeQuery = true 면 SQL
- *   @NamedQuery(name = "Order.findAll", query = "...")     이름 있는 statement. em.createNamedQuery("Order.findAll") 은
+ *   &#64;Query("select o from Order o where ...")             그 메소드의 statement(JPQL). nativeQuery = true 면 SQL
+ *   &#64;NamedQuery(name = "Order.findAll", query = "...")     이름 있는 statement. em.createNamedQuery("Order.findAll") 은
  *                                                          SqlLinker 가 규칙(sql: _.createNamedQuery(SQL))으로 잇고,
  *                                                          저장소의 같은 이름 메소드(OrderRepository.findAll)는 여기서 잇는다
  *   interface OrderRepository extends JpaRepository&lt;Order, Long&gt;
@@ -166,6 +166,7 @@ public class JpaQueryReader implements SemanticStep {
 		return named;
 	}
 
+	/** 이름 있는 쿼리 하나를 statement 로 모아 둡니다(이름이 같으면 뒤의 것이 덮는다). 이름이나 글을 못 읽었으면 세기만 합니다. */
 	private void addNamed(Map<String, Map<String, Object>> named, Rule.JpaQuery rule, JpaEntities.Entity entity, String name, String text
 			, Map<String, Object> row, long revisionId, int[] counts) {
 		if (name == null || text == null) {
@@ -210,6 +211,7 @@ public class JpaQueryReader implements SemanticStep {
 		return new String[] { name, query };
 	}
 
+	/** 애노테이션 속성 값을 글로 만듭니다. 문자열이면 그대로, 상수 식이면 ConstantEvaluator 로 계산(못 하면 null) */
 	private String expressionText(Expression value, String owner, ConstantEvaluator evaluator) {
 		if (value instanceof StringLiteralExpr) {
 			return ((StringLiteralExpr) value).asString();
@@ -223,7 +225,7 @@ public class JpaQueryReader implements SemanticStep {
 	/**
 	 * <pre>
 	 * Spring Data 저장소의 메소드.
-	 *   @Query 가 붙었으면 이미 만들었다(건너뛴다).
+	 *   &#64;Query 가 붙었으면 이미 만들었다(건너뛴다).
 	 *   "엔티티이름.메소드이름" 의 이름 있는 쿼리가 있으면 그것을 쓴다(Spring Data 의 규칙).
 	 *   이름이 findBy… 꼴이면 메소드 이름 쿼리(DERIVED)를 만든다.
 	 * 저장소의 엔티티는 상속에 적은 타입 인자 가운데 엔티티인 것(JpaRepository&lt;Order, Long&gt; 의 Order)이다. 모르면 건너뛴다.
@@ -249,15 +251,18 @@ public class JpaQueryReader implements SemanticStep {
 				Map<String, Object> method = methods.get(m);
 				String methodId = (String) method.get("methodId");
 				String name = (String) method.get("name");
+				// @Query 로 이미 만든 메소드
 				if (queryMethods.contains(methodId)) {
 					continue;
 				}
+				// "엔티티.메소드" 이름 있는 쿼리가 있으면 그 쿼리를 이 메소드가 쓴다고 적는다
 				Map<String, Object> namedRow = named.get(entity.name + "." + name);
 				if (namedRow != null) {
 					addMethod(namedRow, methodId);
 					counts[2]++;
 					continue;
 				}
+				// findBy… / deleteBy… 같은 메소드 이름 쿼리면 글 없는 statement(DERIVED)를 만든다
 				if (!DERIVED.matcher(name).matches()) {
 					continue;
 				}
@@ -281,6 +286,7 @@ public class JpaQueryReader implements SemanticStep {
 		}
 	}
 
+	/** 리포지토리가 다루는 엔티티: extends JpaRepository&lt;Order, Long&gt; 의 타입 인자 가운데 엔티티인 것. 없으면 null */
 	private JpaEntities.Entity repositoryEntity(long revisionId, String symbolId, JpaEntities entities) {
 		List<String> arguments = javaSqlDao.selectTypeArguments(revisionId, symbolId);
 		for (int i = 0; i < arguments.size(); i++) {
@@ -292,6 +298,7 @@ public class JpaQueryReader implements SemanticStep {
 		return null;
 	}
 
+	/** statement 를 쓰는 메소드 목록에 이 메소드를 더합니다(겹치지 않게). */
 	@SuppressWarnings("unchecked")
 	private void addMethod(Map<String, Object> row, String methodId) {
 		Map<String, Object> properties = (Map<String, Object>) row.get("properties");
@@ -302,7 +309,9 @@ public class JpaQueryReader implements SemanticStep {
 	}
 
 	/**
+	 * <pre>
 	 * 애노테이션 속성의 쿼리 글. 따옴표로 적은 글은 그대로, 식("a" + "b", 상수)이면 계산한다. 못 하면 null
+	 * </pre>
 	 */
 	private String queryText(List<String> values, String ownerSymbolId, ConstantEvaluator evaluator) {
 		if (values.isEmpty()) {
@@ -324,6 +333,7 @@ public class JpaQueryReader implements SemanticStep {
 		return value;
 	}
 
+	/** JPA statement 한 행(analysis_mapper, mapper_type JPA)을 만듭니다. 위치는 at(파일, 줄)에서 가져옵니다. */
 	private Map<String, Object> statement(long revisionId, String namespace, String statementId, String text, Map<String, Object> properties
 			, Map<String, Object> at) {
 		Map<String, Object> row = new HashMap<String, Object>();
@@ -338,6 +348,7 @@ public class JpaQueryReader implements SemanticStep {
 		return row;
 	}
 
+	/** 덧붙임 정보를 JSON 으로 바꿔 저장합니다. */
 	@SuppressWarnings("unchecked")
 	private void insert(Map<String, Object> row) {
 		if (row.get("properties") != null) {
@@ -346,12 +357,14 @@ public class JpaQueryReader implements SemanticStep {
 		javaSqlDao.insertJpaStatement(row);
 	}
 
+	/** 값 하나짜리 목록 */
 	private static List<String> single(String name) {
 		List<String> list = new ArrayList<String>();
 		list.add(name);
 		return list;
 	}
 
+	/** 첫 값. 비었으면 null */
 	private static String first(List<String> values) {
 		return values.isEmpty() ? null : values.get(0);
 	}

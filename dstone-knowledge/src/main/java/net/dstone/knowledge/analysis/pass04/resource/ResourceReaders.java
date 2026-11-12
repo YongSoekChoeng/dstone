@@ -152,6 +152,7 @@ public class ResourceReaders {
 		return configs;
 	}
 
+	/** YAML 트리를 펴서 "a.b.c = 값" 모양의 설정 행으로 만듭니다. 목록은 a.b[0] 처럼 번호를 붙입니다. */
 	@SuppressWarnings("unchecked")
 	private void flattenYaml(String prefix, Object value, List<Map<String, Object>> configs) {
 		if (value instanceof Map) {
@@ -170,6 +171,12 @@ public class ResourceReaders {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * analysis_config 한 행을 만듭니다.
+	 * 비밀값으로 보이는 키(password, secret …)는 값을 저장하지 않고 **** 로 가립니다. ${...} 자리 표시가 있으면 그 이름을 따로 적습니다.
+	 * </pre>
+	 */
 	private Map<String, Object> config(String key, String value, String valueType, Integer line) {
 		Map<String, Object> row = new HashMap<String, Object>();
 		row.put("keyPath", key.length() > 1000 ? key.substring(0, 1000) : key);
@@ -264,6 +271,7 @@ public class ResourceReaders {
 			Element element = (Element) beans.item(i);
 			String tag = localName(element.getNodeName());
 			if ("bean".equals(tag)) {
+				// <bean id class> : 이름(id 없으면 name), 클래스, <property> 값들
 				String className = emptyToNull(element.getAttribute("class"));
 				String id = emptyToNull(element.getAttribute("id"));
 				if (id == null) {
@@ -301,6 +309,7 @@ public class ResourceReaders {
 
 	/* ============================== 도구 ============================== */
 
+	/** analysis_resource 한 행을 만듭니다. */
 	private Map<String, Object> resource(String type, String name, String value, Map<String, Object> properties) {
 		Map<String, Object> row = new HashMap<String, Object>();
 		row.put("resourceType", type);
@@ -318,6 +327,7 @@ public class ResourceReaders {
 		return colon < 0 ? nodeName : nodeName.substring(colon + 1);
 	}
 
+	/** 위쪽 어딘가에 이 이름의 요소가 있는지. 예: &lt;dependencyManagement&gt; 안의 &lt;dependency&gt; 를 가려낼 때 */
 	private boolean hasAncestor(Node node, String tagName) {
 		Node current = node.getParentNode();
 		while (current != null) {
@@ -329,6 +339,7 @@ public class ResourceReaders {
 		return false;
 	}
 
+	/** 이 이름을 가진 첫 자식 요소의 글. 없거나 비었으면 null */
 	private String childText(Element parent, String tagName) {
 		NodeList children = parent.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++) {
@@ -341,6 +352,7 @@ public class ResourceReaders {
 		return null;
 	}
 
+	/** 앞뒤 공백을 떼고, 비었으면 null */
 	private String emptyToNull(String value) {
 		return value == null || value.trim().length() == 0 ? null : value.trim();
 	}

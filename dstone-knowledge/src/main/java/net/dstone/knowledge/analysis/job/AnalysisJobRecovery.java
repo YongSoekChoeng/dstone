@@ -31,6 +31,7 @@ public class AnalysisJobRecovery extends BaseObject implements ApplicationListen
 	@Autowired
 	private RevisionDao revisionDao;
 
+	/** 서버가 다 뜬 뒤 한 번: 끊긴 Job·단계·리비전을 FAILED 로 정리합니다. */
 	@Override
 	public void onApplicationEvent(ApplicationReadyEvent event) {
 		try {

@@ -59,6 +59,15 @@ public class FilePassRunner extends BaseObject {
 	private TransactionTemplate txTemplateCommon;
 
 	/**
+	 * <pre>
+	 * 이 단계가 맡은 파일을 모두 처리합니다.
+	 *
+	 * 흐름:
+	 *   1) 파일마다 진행 상태 행을 깔고(이미 있으면 그대로), 전체/완료 건수를 기록한다.
+	 *   2) PENDING 파일을 CHUNK_SIZE개씩 꺼내 handleFile()로 하나씩 처리한다.
+	 *   3) 묶음 하나가 끝날 때마다 진행 건수를 기록한다. 꺼낼 파일이 없으면 끝.
+	 * </pre>
+	 *
 	 * @param pass 단계 이름
 	 * @param language 이 단계가 처리할 파일의 언어(예: JAVA)
 	 */
@@ -67,6 +76,7 @@ public class FilePassRunner extends BaseObject {
 		long hardTimeoutMillis = intProperty("dstone.knowledge.job.file-hard-timeout-seconds", 600) * 1000L;
 		int maxStuckFiles = intProperty("dstone.knowledge.job.max-stuck-files", 3);
 
+		// 1) 진행 상태 행 깔기. 다시 시작한 경우라면 끝난 파일 수가 0이 아닐 수 있다.
 		filePassDao.seedFilePass(revisionId, pass, language);
 		int total = filePassDao.countFilePass(revisionId, pass, null);
 		int done = total - filePassDao.countFilePass(revisionId, pass, "PENDING");
@@ -74,6 +84,7 @@ public class FilePassRunner extends BaseObject {
 
 		FileWatchdog watchdog = new FileWatchdog("analysis-file-" + context.getAnalysisId());
 		try {
+			// 2) 남은 파일을 묶음 단위로 꺼내 처리한다. 처리한 파일은 PENDING이 아니게 되므로 다음 조회에 안 나온다.
 			while (true) {
 				context.checkCancelled();
 				List<Map<String, Object>> files = filePassDao.selectPendingFiles(revisionId, pass, CHUNK_SIZE);
@@ -90,6 +101,7 @@ public class FilePassRunner extends BaseObject {
 								+ "개). 해당 파일은 FAILED로 남겼으므로 다시 시작하면 그 다음 파일부터 이어서 합니다. 버려진 스레드를 정리하려면 서버를 다시 띄워야 합니다.");
 					}
 				}
+				// 3) 묶음 하나 끝. 진행 건수(겸 heartbeat)를 남긴다.
 				reporter.progress(context, pass, total, done);
 			}
 		} finally {
@@ -97,6 +109,12 @@ public class FilePassRunner extends BaseObject {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * 파일 하나를 준비(prepare) → 저장(write) 순서로 처리합니다.
+	 * 어느 걸음에서 실패하든 이 파일만 FAILED로 남기고 돌아옵니다. 취소만은 그대로 위로 던집니다.
+	 * </pre>
+	 */
 	private <T> void handleFile(AnalysisJobContext context, final String pass, final Map<String, Object> file, final FileHandler<T> handler
 			, FileWatchdog watchdog, long hardTimeoutMillis) throws Exception {
 		final long fileId = ((Number) file.get("fileId")).longValue();
@@ -159,6 +177,7 @@ public class FilePassRunner extends BaseObject {
 			fail(context, pass, fileId, "INTERNAL", path + ": " + ErrorText.summaryOf(e), ErrorText.summaryOf(e), ErrorText.stackTraceOf(e));
 			return;
 		}
+		// 3) 저장은 됐지만 경고/실패 내용이 있으면 분석 오류로 남긴다(트랜잭션 밖에서).
 		if (result.getErrorType() != null) {
 			reporter.error(context, pass, Long.valueOf(fileId), result.getErrorType(), path, result.getMessage());
 		}
@@ -170,6 +189,7 @@ public class FilePassRunner extends BaseObject {
 		reporter.error(context, pass, Long.valueOf(fileId), errorType, message, detail == null ? passMessage : detail);
 	}
 
+	/** 설정 값을 정수로 읽습니다. 비어 있으면 기본값 */
 	private int intProperty(String key, int defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

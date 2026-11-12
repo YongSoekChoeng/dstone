@@ -73,6 +73,7 @@ public class DstoneKnowledgeApplication {
 			IS_SYS_PROPERTIES_SET = true;
 			StringBuffer msg = new StringBuffer();
 			try {
+				// 1) 프로파일 정하기: 환경 변수 → JVM 프로퍼티 → 기본 local. local 이면 env.properties, 아니면 env-{프로파일}.properties
 				String profile = "local";
 				if (!StringUtil.isEmpty(System.getenv("spring.profiles.active"))) {
 					profile = System.getenv("spring.profiles.active").trim().toLowerCase();
@@ -86,6 +87,7 @@ public class DstoneKnowledgeApplication {
 				}
 				String envFile = "env" + profile + ".properties";
 				msg.append("/******************************* " + envFile + " System변수로 세팅 하기위한 조치 시작 *********************************/").append("\n");
+				// 2) 클래스패스에서 그 파일을 찾아, 키마다 System 프로퍼티로 넣는다(application.yml 의 ${...} 가 이 값을 읽는다)
 				java.net.URL resource = DstoneKnowledgeApplication.class.getClassLoader().getResource(envFile);
 				if (resource != null) {
 					try (InputStream input = resource.openStream()) {

@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
  */
 public class FileWatchdog {
 
+	/** 작업 스레드 이름. 스레드 덤프에서 어느 분석의 스레드인지 알아보는 데 쓴다 */
 	private final String threadName;
 
 	/** 일을 돌리는 작업 스레드(하나). 시간을 넘기면 버리고 새로 만듭니다. */
@@ -42,6 +43,7 @@ public class FileWatchdog {
 	/** 시간을 넘겨 버린 작업 스레드 수 */
 	private int abandonedCount = 0;
 
+	/** @param threadName 작업 스레드 이름 */
 	public FileWatchdog(String threadName) {
 		this.threadName = threadName;
 		this.executor = newExecutor();
@@ -67,6 +69,7 @@ public class FileWatchdog {
 			executor = newExecutor();
 			throw e;
 		} catch (ExecutionException e) {
+			// 작업 스레드에서 난 예외는 ExecutionException에 싸여 온다. 껍질을 벗겨 원래 예외로 던진다.
 			Throwable cause = e.getCause();
 			if (cause instanceof Error) {
 				throw (Error) cause;
@@ -87,6 +90,7 @@ public class FileWatchdog {
 		executor.shutdownNow();
 	}
 
+	/** 작업 스레드 하나짜리 실행기를 새로 만듭니다. */
 	private ExecutorService newExecutor() {
 		return Executors.newSingleThreadExecutor(new ThreadFactory() {
 			@Override

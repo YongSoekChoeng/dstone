@@ -13,15 +13,18 @@ import java.util.Map;
  */
 public class JsonText {
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private JsonText() {
 	}
 
+	/** Map / List / 문자열 / 숫자 / true·false / null 을 JSON 글로 바꿉니다. */
 	public static String of(Object value) {
 		StringBuilder sb = new StringBuilder();
 		write(sb, value);
 		return sb.toString();
 	}
 
+	/** 값 하나를 종류에 맞게 씁니다(Map 과 List 는 안으로 들어가며 다시 부름). */
 	@SuppressWarnings("unchecked")
 	private static void write(StringBuilder sb, Object value) {
 		if (value == null) {
@@ -56,6 +59,7 @@ public class JsonText {
 		}
 	}
 
+	/** 문자열을 따옴표로 감싸 씁니다. 따옴표, 역슬래시, 줄바꿈, 제어 문자는 이스케이프합니다. */
 	private static void writeString(StringBuilder sb, String text) {
 		sb.append('"');
 		for (int i = 0; i < text.length(); i++) {

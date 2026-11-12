@@ -25,10 +25,15 @@ public final class MethodTitle {
 	/** 기능명으로 보여 줄 최대 글자 수 */
 	private static final int MAX_LENGTH = 60;
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private MethodTitle() {
 	}
 
 	/**
+	 * <pre>
+	 * 메소드 위의 주석에서 기능명(첫 줄 설명)을 뽑습니다.
+	 * </pre>
+	 *
 	 * @param lines 소스 파일의 줄들
 	 * @param lineStart 메소드 선언이 시작하는 줄(1부터, 애노테이션이 있으면 그 줄)
 	 * @return 기능명. 주석이 없거나 쓸 만한 글이 없으면 null
@@ -75,6 +80,7 @@ public final class MethodTitle {
 		if (lines == null || lineStart == null || lineStart.intValue() < 2 || lineStart.intValue() > lines.length + 1) {
 			return result;
 		}
+		// 1) 선언 바로 위에서 빈 줄을 건너뛰고 올라간다(lines 는 0부터, lineStart 는 1부터)
 		int i = lineStart.intValue() - 2;
 		while (i >= 0 && lines[i].trim().length() == 0) {
 			i--;
@@ -82,6 +88,7 @@ public final class MethodTitle {
 		if (i < 0) {
 			return result;
 		}
+		// 2) 그 줄이 블록 주석의 끝이면 여는 줄까지, // 주석이면 // 줄이 이어지는 데까지 모은다. 주석이 아니면 없음
 		List<String> raw = new ArrayList<String>();
 		String last = lines[i].trim();
 		if (last.endsWith("*/")) {
@@ -102,6 +109,7 @@ public final class MethodTitle {
 		} else {
 			return result;
 		}
+		// 3) 주석 기호와 HTML 태그를 떼고 빈 줄은 뺀다
 		for (int c = 0; c < raw.size(); c++) {
 			String text = raw.get(c).replace("/**", "").replace("/*", "").replace("*/", "").trim();
 			while (text.startsWith("*") || text.startsWith("/")) {
@@ -148,6 +156,7 @@ public final class MethodTitle {
 		return text.matches("(public|private|protected|package|import|return|static|final)\\b.*");
 	}
 
+	/** 글자(문자)가 하나라도 있는지. 기호만 있는 줄(===== 등)을 거를 때 씁니다. */
 	private static boolean hasLetter(String text) {
 		for (int i = 0; i < text.length(); i++) {
 			if (Character.isLetter(text.charAt(i))) {
@@ -157,6 +166,7 @@ public final class MethodTitle {
 		return false;
 	}
 
+	/** 한글(가~힣)이 한 글자라도 있는지 */
 	private static boolean hasHangul(String text) {
 		for (int i = 0; i < text.length(); i++) {
 			char ch = text.charAt(i);

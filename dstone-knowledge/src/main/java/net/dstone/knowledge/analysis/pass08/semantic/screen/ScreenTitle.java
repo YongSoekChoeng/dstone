@@ -34,6 +34,7 @@ public class ScreenTitle {
 	private final String via;
 	private final int line;
 
+	/** @param via 어디서 읽었는지: TITLE(&lt;title&gt; 요소) / TITLETEXT(Nexacro Form 의 titletext) */
 	private ScreenTitle(String name, String via, int line) {
 		this.name = name;
 		this.via = via;
@@ -108,6 +109,7 @@ public class ScreenTitle {
 				.replace("&nbsp;", " ").replace("&amp;", "&");
 	}
 
+	/** 주석을 같은 길이의 빈칸으로 바꿉니다(줄바꿈은 남겨 줄 번호가 그대로다). */
 	private static String blankComments(String text) {
 		Matcher comment = COMMENT.matcher(text);
 		if (!comment.find()) {
@@ -124,6 +126,7 @@ public class ScreenTitle {
 		return sb.toString();
 	}
 
+	/** 글자 위치 → 줄 번호(1부터) */
 	private static int lineOf(String text, int offset) {
 		int line = 1;
 		for (int i = 0; i < offset; i++) {

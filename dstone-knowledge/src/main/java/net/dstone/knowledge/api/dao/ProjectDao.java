@@ -22,10 +22,12 @@ public class ProjectDao extends BaseDao {
 		sqlSessionCommon.insert(NS + "upsertProject", project);
 	}
 
+	/** 프로젝트 하나. 없으면 null */
 	public Map<String, Object> selectProject(String projectId) {
 		return sqlSessionCommon.selectOne(NS + "selectProject", projectId);
 	}
 
+	/** 프로젝트 목록 */
 	public List<Map<String, Object>> selectProjectList() {
 		return sqlSessionCommon.selectList(NS + "selectProjectList");
 	}

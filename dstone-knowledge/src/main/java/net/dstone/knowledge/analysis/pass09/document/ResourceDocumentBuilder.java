@@ -36,6 +36,7 @@ public class ResourceDocumentBuilder {
 	/** 문서와 청크를 만들어 담는 일은 CodeDocumentBuilder의 것을 그대로 씁니다. */
 	private final CodeDocumentBuilder documents;
 
+	/** @param chunkMaxChars 청크 하나의 최대 글자 수 */
 	public ResourceDocumentBuilder(String projectId, long revisionId, int chunkMaxChars) {
 		this.projectId = projectId;
 		this.chunkMaxChars = chunkMaxChars;
@@ -45,6 +46,11 @@ public class ResourceDocumentBuilder {
 	/* ============================== SQL 매퍼 ============================== */
 
 	/**
+	 * <pre>
+	 * SQL 매퍼 파일 하나의 문서들을 만듭니다. statement 하나가 문서(MAPPER) 하나입니다.
+	 * 문서에는 SQL 이름과 종류, 건드리는 테이블(CRUD), 실행하는 메소드, SQL 본문이 들어갑니다.
+	 * </pre>
+	 *
 	 * @param file analysis_file 한 행. 키: fileId, path
 	 * @param statements 이 파일의 statement들. 키: mapperId, mapperType, namespace, statementId, statementType, parameterType, resultType, sqlBody, lineStart, lineEnd
 	 * @param tables statement가 건드리는 테이블. 키: fromId("S" + mapperId), table, crud(C / R / U / D)
@@ -115,6 +121,11 @@ public class ResourceDocumentBuilder {
 	/* ============================== 화면(JSP) ============================== */
 
 	/**
+	 * <pre>
+	 * 화면 파일(JSP, WebSquare, Nexacro) 하나의 문서(VIEW)를 만듭니다.
+	 * 문서에는 화면명, 이 화면을 여는 메소드, 이 화면이 부르는 주소·메소드, 끼워 넣는 화면, 화면 소스가 들어갑니다.
+	 * </pre>
+	 *
 	 * @param file analysis_file 한 행. 키: fileId, path, screenNames(SEMANTIC 이 찾아 둔 화면명들. 사전의 한글명이 먼저. 없어도 된다)
 	 * @param text JSP의 내용(올바른 인코딩으로 읽은 글)
 	 * @param links 이 JSP와 이어진 것들. 키: kind(OPENED_BY / REQUESTS / INCLUDES / INCLUDED_BY / CALLS), text, target
@@ -183,6 +194,7 @@ public class ResourceDocumentBuilder {
 		return result;
 	}
 
+	/** 매퍼 종류를 문서에 쓸 말로: IBATIS → iBATIS, QUERY_XML → 쿼리 XML, 그 밖 → MyBatis */
 	private String mapperTypeLabel(String mapperType) {
 		if ("IBATIS".equals(mapperType)) {
 			return "iBATIS";
@@ -210,8 +222,10 @@ public class ResourceDocumentBuilder {
 	}
 
 	/**
+	 * <pre>
 	 * 분석이 찾아 둔 화면명(사전의 한글명, 메뉴 이름)을 " / " 로 잇는다. 제목과 같은 것은 뺀다. 남는 것이 없으면 null.
 	 * "보험료 입출금 처리 화면" 처럼 사람이 부르는 이름으로 물어도 화면이 검색되게 하려고 넣는다.
+	 * </pre>
 	 */
 	@SuppressWarnings("unchecked")
 	private String screenNames(Map<String, Object> file, String title) {
@@ -238,6 +252,7 @@ public class ResourceDocumentBuilder {
 
 	/* ============================== 도구 ============================== */
 
+	/** CRUD 글자를 문서에 쓸 말로: C → 넣기, U → 고치기, D → 지우기 */
 	private String crudLabel(String crud) {
 		if ("C".equals(crud)) {
 			return "넣기";
@@ -263,6 +278,7 @@ public class ResourceDocumentBuilder {
 		return sb.toString();
 	}
 
+	/** null 이 아니고 아직 없는 값이면 더합니다. */
 	private void addOnce(List<String> list, String value) {
 		if (value != null && !list.contains(value)) {
 			list.add(value);
@@ -280,6 +296,7 @@ public class ResourceDocumentBuilder {
 		return dot < 0 ? name : name.substring(dot + 1);
 	}
 
+	/** " (줄 10-20)" 모양. 시작 줄을 모르면 빈 글 */
 	private String rangeText(Integer lineStart, Integer lineEnd) {
 		if (lineStart == null) {
 			return "";
@@ -294,6 +311,7 @@ public class ResourceDocumentBuilder {
 		}
 	}
 
+	/** 행들을 key 값으로 묶습니다. */
 	private Map<String, List<Map<String, Object>>> groupBy(List<Map<String, Object>> rows, String key) {
 		Map<String, List<Map<String, Object>>> grouped = new HashMap<String, List<Map<String, Object>>>();
 		for (int i = 0; i < rows.size(); i++) {
@@ -308,6 +326,7 @@ public class ResourceDocumentBuilder {
 		return grouped;
 	}
 
+	/** 숫자 → Integer. null 이면 null */
 	private Integer intOf(Object value) {
 		return value == null ? null : Integer.valueOf(((Number) value).intValue());
 	}

@@ -41,6 +41,10 @@ public class IdTransform {
 	private final String mapSource;
 
 	/**
+	 * <pre>
+	 * ID를 메소드·화면 이름에 넣기 전에 다듬는 방법(정규식 바꾸기 → 대소문자 → 대응표)
+	 * </pre>
+	 *
 	 * @param pattern   ID 전체가 맞아야 하는 정규식. 없으면 null
 	 * @param replace   맞은 ID 를 바꿀 글자($1 …). 없으면 ID 를 그대로 둔다
 	 * @param idCase    CASES 가운데 하나. 없으면 null
@@ -114,6 +118,7 @@ public class IdTransform {
 		return sb.toString();
 	}
 
+	/** 대소문자를 바꿉니다: UPPER / LOWER / UPPER_FIRST(첫 글자만 대문자) / LOWER_FIRST(첫 글자만 소문자). 그 밖이면 그대로 */
 	static String changeCase(String value, String idCase) {
 		if (idCase == null || value.length() == 0) {
 			return value;
@@ -171,6 +176,7 @@ public class IdTransform {
 		return map;
 	}
 
+	/** 대응표 한 줄에서 처음 나오는 구분자(쉼표, =, 탭)의 위치. 없으면 -1 */
 	private static int firstSeparator(String line) {
 		int best = -1;
 		char[] separators = { ',', '=', '\t' };
@@ -183,6 +189,7 @@ public class IdTransform {
 		return best;
 	}
 
+	/** 양끝이 같은 따옴표(" 또는 ')로 싸여 있으면 벗깁니다. */
 	private static String unquote(String text) {
 		if (text.length() >= 2 && (text.charAt(0) == '"' || text.charAt(0) == '\'') && text.charAt(text.length() - 1) == text.charAt(0)) {
 			return text.substring(1, text.length() - 1).trim();

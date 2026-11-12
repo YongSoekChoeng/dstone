@@ -56,10 +56,12 @@ public class LinkPass extends BaseObject implements AnalysisPass {
 		txTemplateCommon.execute(new TransactionCallbackWithoutResult() {
 			@Override
 			protected void doInTransactionWithoutResult(TransactionStatus status) {
+				// 1) 지난번에 이 단계가 만든 관계를 지운다(다시 돌려도 같은 결과가 나오게).
 				relationDao.deleteLinkRelations(revisionId);
 				// 순서가 중요하다. "가능한 구현"은 OVERRIDES를 보고 만든다.
 				counts[0] = relationDao.insertOverrides(revisionId);
 				counts[1] = relationDao.insertPossibleImplementations(revisionId);
+				// 2) 품질 지표(호출이 얼마나 풀렸는지 등)를 새로 계산한다.
 				relationDao.replaceMetrics(context.getAnalysisId(), revisionId);
 			}
 		});

@@ -83,6 +83,7 @@ public class ProjectController {
 		return new ResponseEntity<Map<String, Object>>(result, HttpStatus.ACCEPTED);
 	}
 
+	/** 이 프로젝트의 리비전 목록 */
 	@GetMapping("/{projectId}/revisions")
 	public List<Map<String, Object>> getRevisionList(@PathVariable("projectId") String projectId) {
 		return revisionService.getRevisionList(projectId);
@@ -104,6 +105,7 @@ public class ProjectController {
 		return retentionService.apply(projectId, keep);
 	}
 
+	/** 요청 본문의 baseRevisionId(증분 분석의 기준 리비전). 없으면 null(전체 분석), 숫자가 아니면 400 */
 	private Long baseRevisionOf(Map<String, Object> request) {
 		Object value = request == null ? null : request.get("baseRevisionId");
 		if (value == null || String.valueOf(value).trim().length() == 0) {

@@ -15,14 +15,20 @@ public final class CallerContext {
 
 	private static final String REQUEST_ATTRIBUTE = "dstone.knowledge.caller";
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private CallerContext() {
 	}
 
+	/** 이 요청의 호출자를 요청 속성에 담아 둡니다(ApiKeyAuthFilter 가 부른다). */
 	public static void set(HttpServletRequest request, String caller) {
 		request.setAttribute(REQUEST_ATTRIBUTE, caller);
 	}
 
 	/**
+	 * <pre>
+	 * 이 요청의 호출자(ApiKeyAuthFilter 가 담아 둔 값)
+	 * </pre>
+	 *
 	 * @return 호출자 이름. 인증을 꺼 두었으면 null
 	 */
 	public static String get(HttpServletRequest request) {

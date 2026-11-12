@@ -36,6 +36,10 @@ public class MapperXmlReader {
 	public static final String INCLUDE_CLOSE = ")@@";
 
 	/**
+	 * <pre>
+	 * 매퍼 파일을 읽습니다(파일 이름 없이. 쿼리 XML은 읽지 못한다).
+	 * </pre>
+	 *
 	 * @param text 매퍼 파일의 내용
 	 * @return statement와 조각(sql)의 목록. 키: mapperType, namespace, statementId, statementType, parameterType, resultType, sqlBody, lineStart, lineEnd
 	 */
@@ -44,12 +48,22 @@ public class MapperXmlReader {
 	}
 
 	/**
+	 * <pre>
+	 * 매퍼 파일 하나를 읽어 statement 목록을 만듭니다.
+	 *
+	 * 흐름:
+	 *   1) XML을 안전하게 파싱하고 맨 위 요소를 본다. document 면 쿼리 XML로 넘기고, mapper / sqlMap 이 아니면 빈 목록.
+	 *   2) 맨 위 요소의 자식 중 id가 있는 select / insert / update / delete / statement / procedure / sql 만 고른다.
+	 *   3) 동적 태그(if, foreach …)를 펴서 SQL 글 하나로 만들고, 원본에서 id를 찾아 줄 번호를 구한다.
+	 * </pre>
+	 *
 	 * @param text 매퍼 파일의 내용
 	 * @param fileName 파일 이름(경로 없이). 쿼리 XML은 네임스페이스가 파일 안에 없고 파일 이름이라서 필요하다. 매퍼만 읽을 때는 null이어도 된다
 	 * @return statement와 조각(sql)의 목록. 키는 read(String)과 같다
 	 */
 	public List<Map<String, Object>> read(String text, String fileName) throws Exception {
 		List<Map<String, Object>> statements = new ArrayList<Map<String, Object>>();
+		// 1) 파싱하고 맨 위 요소로 종류 가리기
 		Document document = SafeXml.parse(text);
 		Element root = document.getDocumentElement();
 		if (root == null) {
@@ -65,6 +79,7 @@ public class MapperXmlReader {
 		}
 		String namespace = emptyToNull(root.getAttribute("namespace"));
 
+		// 2) statement 고르기
 		// 줄 번호: DOM은 줄 번호를 알려 주지 않아서, 원본 글에서 id="..." 가 나오는 자리를 차례로 찾는다.
 		int searchFrom = 0;
 		NodeList children = root.getChildNodes();
@@ -86,6 +101,7 @@ public class MapperXmlReader {
 				continue;
 			}
 
+			// 3) SQL 글과 줄 번호
 			StringBuilder sql = new StringBuilder();
 			flatten(element, sql);
 			String body = tidy(sql.toString());
@@ -167,6 +183,7 @@ public class MapperXmlReader {
 		return statements;
 	}
 
+	/** 이 이름을 가진 첫 번째 자식 요소. 없으면 null */
 	private Element firstChild(Element parent, String tag) {
 		NodeList children = parent.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++) {
@@ -371,6 +388,7 @@ public class MapperXmlReader {
 		return new int[] { startLine, endLine, at + 1 };
 	}
 
+	/** 원본 글에서 id="..." 또는 id='...' 가 처음 나오는 위치. 줄 번호를 구할 때 씁니다(DOM은 줄 번호를 주지 않는다). */
 	private int indexOfId(String text, String id, int from) {
 		int doubleQuoted = text.indexOf("id=\"" + id + "\"", from);
 		int singleQuoted = text.indexOf("id='" + id + "'", from);
@@ -383,6 +401,7 @@ public class MapperXmlReader {
 		return Math.min(doubleQuoted, singleQuoted);
 	}
 
+	/** 글자 위치 → 줄 번호(1부터) */
 	private int lineAt(String text, int index) {
 		int line = 1;
 		for (int i = 0; i < index && i < text.length(); i++) {
@@ -393,11 +412,13 @@ public class MapperXmlReader {
 		return line;
 	}
 
+	/** names 중 처음으로 있는 속성의 값. 없거나 비었으면 null */
 	private String firstAttribute(Element element, String... names) {
 		String value = firstAttributeOrEmpty(element, names);
 		return value.length() == 0 ? null : value;
 	}
 
+	/** names 중 처음으로 있는 속성의 값. 없으면 빈 문자열 */
 	private String firstAttributeOrEmpty(Element element, String... names) {
 		for (int i = 0; i < names.length; i++) {
 			if (element.hasAttribute(names[i])) {
@@ -407,6 +428,7 @@ public class MapperXmlReader {
 		return "";
 	}
 
+	/** 앞뒤 공백을 떼고, 비었으면 null */
 	private String emptyToNull(String value) {
 		return value == null || value.trim().length() == 0 ? null : value.trim();
 	}

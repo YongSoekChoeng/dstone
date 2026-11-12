@@ -66,6 +66,12 @@ public class UploadDocumentService extends BaseObject {
 	 * 문서 하나를 올립니다.
 	 * 글을 한 글자도 뽑지 못하면(스캔한 PDF, 빈 파일) 400이고, 같은 이름으로 이미 올린 문서가 있어도 그대로 둡니다.
 	 * 잘못 올린 파일 때문에 멀쩡하던 문서가 사라지면 안 되기 때문입니다.
+	 *
+	 * 흐름:
+	 *   1) 파일에서 글을 뽑는다(Tika). 글이 없으면 400.
+	 *   2) 청크로 나눈다. JSONL 은 한 줄이 한 청크, 그 밖은 문단 단위로.
+	 *   3) 문서 행과 청크 행을 만든다. 청크 첫 줄에 "어느 문서의 몇 번째 조각"인지 적는다.
+	 *   4) 같은 이름의 옛 문서를 지우고 새것을 넣는 일을 한 트랜잭션으로 한다. 청크는 임베딩 대기열에 오른다.
 	 * </pre>
 	 *
 	 * @param fileName 올린 파일의 이름
@@ -167,6 +173,10 @@ public class UploadDocumentService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * 호출자가 올린 문서 목록(페이지)
+	 * </pre>
+	 *
 	 * @param projectId 이 프로젝트에 붙인 문서만. 없으면 호출자의 문서 전부
 	 */
 	public Map<String, Object> getDocumentList(String tenant, String projectId, int page, int size) {
@@ -211,6 +221,7 @@ public class UploadDocumentService extends BaseObject {
 		return result;
 	}
 
+	/** 문서 주인을 가리키는 조건(호출자 + 원본 ID) */
 	private Map<String, Object> ownerOf(String tenant, String sourceId) {
 		Map<String, Object> owner = new HashMap<String, Object>();
 		owner.put("tenant", tenant);
@@ -218,6 +229,7 @@ public class UploadDocumentService extends BaseObject {
 		return owner;
 	}
 
+	/** 비었으면 기본값, 아니면 앞뒤 공백을 뗀 값 */
 	private String textOr(String value, String defaultValue) {
 		return value == null || value.trim().length() == 0 ? defaultValue : value.trim();
 	}

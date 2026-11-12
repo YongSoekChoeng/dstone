@@ -48,6 +48,10 @@ public class DiffService extends BaseObject {
 	private RevisionDao revisionDao;
 
 	/**
+	 * <pre>
+	 * 두 리비전 사이에 무엇이 생기고 없어지고 바뀌었는지 종류별로 견줍니다.
+	 * </pre>
+	 *
 	 * @param baseRevisionId 기준(앞) 리비전. 없으면 증분 분석의 기준 리비전, 그것도 없으면 같은 프로젝트의 바로 앞 리비전
 	 * @param kinds 볼 종류. 비어 있으면 전부
 	 * @param limit 종류마다 돌려줄 최대 건수(기본 200, 최대 2000). 건수(summary)는 언제나 전체를 센다
@@ -57,6 +61,7 @@ public class DiffService extends BaseObject {
 		if (revision == null) {
 			throw ApiException.notFound("없는 리비전입니다: " + revisionId);
 		}
+		// 1) 기준 리비전 정하고 확인(같은 프로젝트, 자기 자신이 아님)
 		long baseId = resolveBase(revision, revisionId, baseRevisionId);
 		Map<String, Object> base = revisionDao.selectRevision(baseId);
 		if (base == null) {
@@ -71,6 +76,7 @@ public class DiffService extends BaseObject {
 		int rowLimit = limit == null ? DEFAULT_LIMIT : Math.max(0, Math.min(limit.intValue(), MAX_LIMIT));
 		List<String> targetKinds = kindsOf(kinds);
 
+		// 2) 종류마다 건수(전체)와 바뀐 것 목록(limit 건까지)
 		Map<String, Object> summary = new LinkedHashMap<String, Object>();
 		Map<String, Object> changes = new LinkedHashMap<String, Object>();
 		boolean truncated = false;
@@ -108,6 +114,7 @@ public class DiffService extends BaseObject {
 		return result;
 	}
 
+	/** 비교할 기준 리비전: 준 값 → 증분 분석의 기준 리비전 → 바로 앞의 READY 리비전 순서로 정합니다. */
 	private long resolveBase(Map<String, Object> revision, long revisionId, Long baseRevisionId) {
 		if (baseRevisionId != null) {
 			return baseRevisionId.longValue();
@@ -123,6 +130,7 @@ public class DiffService extends BaseObject {
 		return previous.longValue();
 	}
 
+	/** 비교할 종류. 비었으면 전부, 모르는 종류면 400 */
 	private List<String> kindsOf(List<String> kinds) {
 		List<String> result = new ArrayList<String>();
 		if (kinds == null || kinds.isEmpty()) {
@@ -147,6 +155,7 @@ public class DiffService extends BaseObject {
 		return result;
 	}
 
+	/** 응답에 넣을 리비전 요약(ID, 라벨, 상태, 만든 시각) */
 	private Map<String, Object> brief(Map<String, Object> revision) {
 		Map<String, Object> brief = new LinkedHashMap<String, Object>();
 		brief.put("revisionId", revision.get("revisionId"));

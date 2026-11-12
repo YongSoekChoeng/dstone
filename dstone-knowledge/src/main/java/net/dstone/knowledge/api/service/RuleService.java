@@ -104,6 +104,7 @@ public class RuleService extends BaseObject {
 	 * </pre>
 	 */
 	public Map<String, Object> getRevisionRules(long revisionId) {
+		// 1) 그때 쓴 규칙(RULE_SET 행)과 지금 쓸 규칙
 		Map<String, Object> revision = revisionOf(revisionId);
 		Map<String, Object> project = projectService.getProject((String) revision.get("projectId"));
 		List<Map<String, Object>> applied = ruleDao.selectAppliedRuleSets(revisionId);
@@ -111,6 +112,7 @@ public class RuleService extends BaseObject {
 
 		List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
 		Set<String> seen = new LinkedHashSet<String>();
+		// 2) 그때 쓴 파일마다: 지금도 있고 해시가 같은지
 		boolean upToDate = !applied.isEmpty();
 		for (int i = 0; i < applied.size(); i++) {
 			Map<String, Object> a = applied.get(i);
@@ -127,6 +129,7 @@ public class RuleService extends BaseObject {
 			upToDate = upToDate && "SAME".equals(status);
 			rows.add(row);
 		}
+		// 3) 지금은 쓰는데 그때는 없던 파일
 		for (int i = 0; i < current.size(); i++) {
 			RuleFile now = current.get(i);
 			if (!seen.contains(now.name)) {
@@ -167,6 +170,7 @@ public class RuleService extends BaseObject {
 	 * </pre>
 	 */
 	public synchronized Map<String, Object> trial(long revisionId, String path, String ruleText, int sampleLimit) {
+		// 1) 확인: 리비전이 SEMANTIC 을 돌릴 수 있는 상태이고, 그 프로젝트에 분석이 돌고 있지 않은지
 		long started = System.currentTimeMillis();
 		Map<String, Object> revision = revisionOf(revisionId);
 		String projectId = (String) revision.get("projectId");
@@ -176,6 +180,7 @@ public class RuleService extends BaseObject {
 			throw ApiException.conflict("이 프로젝트는 분석이 돌고 있습니다. 끝난 뒤에 시험하세요: " + projectId);
 		}
 
+		// 2) 시험할 규칙 글을 읽어, 그 프로젝트의 규칙에 끼워 넣는다
 		RuleFile trialFile = null;
 		if (ruleText != null && ruleText.trim().length() > 0) {
 			if (path == null || path.trim().length() == 0) {
@@ -199,6 +204,7 @@ public class RuleService extends BaseObject {
 			public Map<String, Object> doInTransaction(TransactionStatus status) {
 				// 무엇이 있어도 마지막에 되돌린다. 시험 적용은 아무것도 남기지 않는다.
 				status.setRollbackOnly();
+				// 3) 전의 결과를 떠 두고 → SEMANTIC 을 돌리고 → 후의 결과를 떠서 → 차이를 센다
 				ruleDao.createBeforeFacts(id);
 				semanticPass.runSteps(context);
 				ruleDao.createAfterFacts(id);
@@ -210,6 +216,7 @@ public class RuleService extends BaseObject {
 			}
 		});
 
+		// 4) 응답(트랜잭션은 이미 되돌려졌다)
 		Map<String, Object> response = new LinkedHashMap<String, Object>();
 		response.put("revisionId", Long.valueOf(revisionId));
 		response.put("projectId", projectId);
@@ -299,6 +306,7 @@ public class RuleService extends BaseObject {
 		return sb.append("ID").toString();
 	}
 
+	/** 규칙 폴더의 모든 파일. 잘못 적힌 파일이 있으면 500 */
 	private List<RuleFile> loadAll() {
 		try {
 			return ruleFiles.loadAll();
@@ -307,6 +315,7 @@ public class RuleService extends BaseObject {
 		}
 	}
 
+	/** 이 프로젝트에 쓰일 규칙. trial 을 주면 같은 이름의 파일 대신(없으면 더해서) 그것을 씁니다. 잘못 적혔으면 400 */
 	private ProjectRules rulesFor(Map<String, Object> project, RuleFile trial) {
 		try {
 			return ruleFiles.rulesFor((String) project.get("projectId"), project.get("ruleSets"), trial);
@@ -315,6 +324,7 @@ public class RuleService extends BaseObject {
 		}
 	}
 
+	/** 리비전 한 건. 없으면 404 */
 	private Map<String, Object> revisionOf(long revisionId) {
 		Map<String, Object> revision = revisionDao.selectRevision(revisionId);
 		if (revision == null) {
@@ -339,6 +349,7 @@ public class RuleService extends BaseObject {
 		}
 	}
 
+	/** 규칙 파일 목록에 보일 한 줄(이름, 설명, 단계, 프로젝트, 경로, 해시, 규칙 수) */
 	private Map<String, Object> describe(RuleFile file) {
 		Map<String, Object> row = new LinkedHashMap<String, Object>();
 		row.put("name", file.name);
@@ -351,6 +362,7 @@ public class RuleService extends BaseObject {
 		return row;
 	}
 
+	/** 이름이 같은 규칙 파일. 없으면 null */
 	private RuleFile find(List<RuleFile> sets, String name) {
 		for (int i = 0; i < sets.size(); i++) {
 			if (sets.get(i).name.equals(name)) {
@@ -360,6 +372,7 @@ public class RuleService extends BaseObject {
 		return null;
 	}
 
+	/** 규칙 파일 이름 목록 */
 	private List<String> names(List<RuleFile> sets) {
 		List<String> names = new ArrayList<String>();
 		for (int i = 0; i < sets.size(); i++) {
@@ -380,6 +393,7 @@ public class RuleService extends BaseObject {
 		return changed;
 	}
 
+	/** 이미 규칙에 있는 호출(종류, 이름, 인자 자리)을 covered 에 더합니다. 후보에서 빼는 데 씁니다. */
 	private void addCovered(List<Map<String, Object>> covered, List<Rule.CallArgument> rules) {
 		for (int i = 0; i < rules.size(); i++) {
 			Rule.CallArgument rule = rules.get(i);
@@ -387,6 +401,7 @@ public class RuleService extends BaseObject {
 		}
 	}
 
+	/** covered 한 행 */
 	private Map<String, Object> coveredRow(String kind, String name, int argIndex) {
 		Map<String, Object> row = new LinkedHashMap<String, Object>();
 		row.put("kind", kind);
@@ -395,6 +410,7 @@ public class RuleService extends BaseObject {
 		return row;
 	}
 
+	/** 규칙에 이미 적힌 애노테이션 이름들(진입점, 계층 …). 후보에서 뺍니다. */
 	private List<String> knownAnnotations(ProjectRules rules) {
 		Set<String> known = new LinkedHashSet<String>();
 		List<Rule.HttpEntry> http = rules.httpEntries();
@@ -419,6 +435,7 @@ public class RuleService extends BaseObject {
 		return new ArrayList<String>(known);
 	}
 
+	/** 규칙에 이미 적힌 상위 타입들(계층, 진입점). 후보에서 뺍니다. */
 	private List<String> knownSuperTypes(ProjectRules rules) {
 		Set<String> known = new LinkedHashSet<String>();
 		List<Rule.Layer> layers = rules.layers();
@@ -456,6 +473,7 @@ public class RuleService extends BaseObject {
 				+ "\n";
 	}
 
+	/** 후보 애노테이션에 대한 규칙 예시 글. 타입에 붙으면 layer:, 메소드에 붙으면 entry: 로 제안합니다. */
 	private String annotationSuggestion(Map<String, Object> a, ProjectRules rules) {
 		String name = (String) a.get("annotation");
 		if ("TYPE".equals(a.get("targetKind"))) {
@@ -464,6 +482,7 @@ public class RuleService extends BaseObject {
 		return "entry:\n  HANDLER: \"@" + name + "\"   # 진입점 종류(HANDLER)를 정해 적는다(영문 대문자)\n";
 	}
 
+	/** 후보 상위 타입에 대한 layer: 규칙 예시 글 */
 	private String superTypeSuggestion(Map<String, Object> s, ProjectRules rules) {
 		String superType = (String) s.get("superType");
 		String simple = superType.substring(superType.lastIndexOf('.') + 1);

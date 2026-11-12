@@ -58,6 +58,10 @@ public class TableDictionaryService extends BaseObject {
 
 
 	/**
+	 * <pre>
+	 * 테이블 하나의 상세: 한글명(어디서 읽었는지 포함), 컬럼마다 한글명·타입·쓰는 SQL 수·CRUD, 한글명을 찾을 수 있는 곳(DB 코멘트, DDL, 사전 파일)의 상태
+	 * </pre>
+	 *
 	 * @return {koreanName, koreanNameSource, koreanNameWhere,
 	 *          columns: [{column, koreanName, koreanNameSource, koreanNameWhere, dataType, statementCount, crud}],
 	 *          columnCoverage: {statements, unread}, dictionary: {db, dbMessage, ddlFiles, file, fileMessage, files}}
@@ -218,6 +222,7 @@ public class TableDictionaryService extends BaseObject {
 		return result;
 	}
 
+	/** 컬럼 표에서 이 컬럼의 행을 꺼냅니다. 없으면 빈 행을 만들어 넣고 돌려줍니다. */
 	private Map<String, Object> columnOf(Map<String, Map<String, Object>> columns, String name) {
 		Map<String, Object> column = columns.get(name);
 		if (column == null) {

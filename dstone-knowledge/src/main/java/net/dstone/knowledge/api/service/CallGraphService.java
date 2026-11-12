@@ -108,11 +108,13 @@ public class CallGraphService extends BaseObject {
 		return result;
 	}
 
+	/** 조회 조건에 담아 둔 따라갈 관계 종류 */
 	@SuppressWarnings("unchecked")
 	private List<String> relationTypesOf(Map<String, Object> condition) {
 		return (List<String>) condition.get("relationTypes");
 	}
 
+	/** 메소드 한 건. 없으면 404 */
 	private Map<String, Object> findMethod(long revisionId, String methodId) {
 		Map<String, Object> method = relationDao.selectMethod(revisionId, methodId);
 		if (method == null) {
@@ -121,6 +123,7 @@ public class CallGraphService extends BaseObject {
 		return method;
 	}
 
+	/** 호출 그래프 조회 조건. CALLS 를 따라가고, includePossible 이면 "가능한 구현" 관계도 따라갑니다. 깊이는 1~MAX_DEPTH */
 	private Map<String, Object> condition(long revisionId, String methodId, int depth, boolean includePossible) {
 		List<String> relationTypes = new ArrayList<String>();
 		relationTypes.add("CALLS");

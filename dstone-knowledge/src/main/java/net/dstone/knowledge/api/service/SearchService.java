@@ -80,9 +80,18 @@ public class SearchService extends BaseObject {
 	 * 질문과 가까운 청크를 찾습니다.
 	 * 코드는 리비전 하나에서 찾습니다. revisionId를 주지 않으면 그 프로젝트에서 분석이 끝난 가장 최근 리비전입니다.
 	 * 일반 문서는 호출자가 올린 것에서 찾고, projectId를 주면 그 프로젝트에 붙여 올린 것만 봅니다.
+	 *
+	 * 흐름:
+	 *   1) 요청 확인: 어디서 찾을지(CODE / DOCUMENT), 리비전, 건수, 최소 유사도
+	 *   2) 질문에서 이름(영문 식별자, 주소)을 뽑는다(VECTOR 모드면 뽑지 않음).
+	 *   3) 질문을 임베딩한다. 임베딩 서버가 죽었으면 이름이 있을 때만 이름 검색으로 바꾼다.
+	 *   4) 뜻으로 찾기(벡터) → 최소 유사도보다 낮은 것은 버린다.
+	 *   5) 이름으로 찾기(키워드)
+	 *   6) 두 결과를 순위로 합쳐(HybridRanker) topK 건을 돌려준다. 임베딩 진행률도 함께 알려 준다.
 	 * </pre>
 	 */
 	public Map<String, Object> search(SearchQuery request) {
+		// 1) 요청 확인
 		if (request.getQuery() == null || request.getQuery().trim().length() == 0) {
 			throw ApiException.badRequest("query(찾을 내용)는 필수입니다.");
 		}
@@ -109,11 +118,13 @@ public class SearchService extends BaseObject {
 		double minScoreCode = requestedMinScore == null ? ragSettings.searchMinScoreCode() : requestedMinScore.doubleValue();
 		double minScoreDocument = requestedMinScore == null ? ragSettings.searchMinScoreDocument() : requestedMinScore.doubleValue();
 
+		// 2) 질문 속 이름
 		List<String> keywords = "VECTOR".equals(mode) ? new ArrayList<String>() : SearchKeywords.extract(query);
 		if ("KEYWORD".equals(mode) && keywords.isEmpty()) {
 			throw ApiException.badRequest("이름으로만 찾으려면(mode=KEYWORD) 질문에 영문 이름이나 주소가 있어야 합니다(3자 이상).");
 		}
 
+		// 3) 질문 임베딩
 		String warning = null;
 		String vectorText = null;
 		if (!"KEYWORD".equals(mode)) {
@@ -145,6 +156,7 @@ public class SearchService extends BaseObject {
 		// 이름이 없으면 합칠 것이 없으니 필요한 만큼만 뽑는다.
 		condition.put("topK", Integer.valueOf(keywords.isEmpty() ? topK : Math.min(MAX_CANDIDATES, Math.max(MIN_CANDIDATES, topK * 3))));
 
+		// 4) 뜻으로 찾기
 		List<Map<String, Object>> vectorHits = new ArrayList<Map<String, Object>>();
 		if (vectorText != null) {
 			// 검색 설정(SET LOCAL)이 먹으려면 트랜잭션 안이어야 한다.
@@ -173,6 +185,7 @@ public class SearchService extends BaseObject {
 			}
 		}
 		vectorHits = keptVectorHits;
+		// 5) 이름으로 찾기
 		List<Map<String, Object>> keywordHits = new ArrayList<Map<String, Object>>();
 		if (!keywords.isEmpty()) {
 			List<Map<String, Object>> keywordParams = new ArrayList<Map<String, Object>>();
@@ -185,6 +198,7 @@ public class SearchService extends BaseObject {
 			condition.put("keywords", keywordParams);
 			keywordHits = ragDao.searchChunksByKeyword(condition);
 		}
+		// 6) 합치기와 응답
 		List<Map<String, Object>> hits = HybridRanker.fuse(vectorHits, keywordHits, topK);
 
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
@@ -213,6 +227,7 @@ public class SearchService extends BaseObject {
 		return result;
 	}
 
+	/** 검색 방식. 비었으면 HYBRID, HYBRID / VECTOR / KEYWORD 가 아니면 400 */
 	private String modeOf(String mode) {
 		if (mode == null || mode.trim().length() == 0) {
 			return "HYBRID";
@@ -261,6 +276,7 @@ public class SearchService extends BaseObject {
 		return result;
 	}
 
+	/** 검색할 리비전: 준 리비전(없으면 404) → 없으면 프로젝트의 최신 READY 리비전 */
 	private long resolveRevision(String projectId, Long revisionId) {
 		if (revisionId != null) {
 			if (revisionDao.selectRevision(revisionId.longValue()) == null) {
@@ -278,6 +294,7 @@ public class SearchService extends BaseObject {
 		return latest.longValue();
 	}
 
+	/** 벡터를 pgvector 가 읽는 글로: [0.1,0.2,...] */
 	private String vectorText(float[] vector) {
 		StringBuilder sb = new StringBuilder(vector.length * 10);
 		sb.append('[');

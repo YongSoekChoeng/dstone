@@ -27,6 +27,7 @@ public final class SearchKeywords {
 	/** 이름을 너무 많이 넣으면 SQL만 무거워진다 */
 	private static final int MAX_KEYWORDS = 8;
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private SearchKeywords() {
 	}
 
@@ -101,6 +102,7 @@ public final class SearchKeywords {
 		}
 	}
 
+	/** 너무 짧거나 영문자가 없거나 이미 있는(대소문자 무시) 낱말이 아니면 더합니다. MAX_KEYWORDS 개까지 */
 	private static void add(String word, List<String> keywords) {
 		if (word.length() < MIN_LENGTH || keywords.size() >= MAX_KEYWORDS || !hasLetter(word)) {
 			return;
@@ -126,6 +128,7 @@ public final class SearchKeywords {
 		return run.substring(start, end);
 	}
 
+	/** 영문자가 하나라도 있는지 */
 	private static boolean hasLetter(String word) {
 		for (int i = 0; i < word.length(); i++) {
 			char ch = word.charAt(i);

@@ -51,6 +51,7 @@ public class JpqlTableExtractor {
 		}
 	}
 
+	/** JPQL 하나에서 찾은 결과: 엔티티 사용(어느 테이블을 읽고 쓰는지)과, 엔티티로 찾지 못한 이름 */
 	public static class Result {
 		public final List<Use> uses = new ArrayList<Use>();
 		/** 엔티티로 찾지 못한 이름 */
@@ -93,6 +94,17 @@ public class JpqlTableExtractor {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * JPQL 하나에서 엔티티를 찾아 테이블과 CRUD로 바꿉니다.
+	 *
+	 * 흐름:
+	 *   1) 따옴표 글('...')을 비워 그 안의 낱말에 속지 않게 한다.
+	 *   2) UPDATE / DELETE 의 대상 엔티티를 찾는다(쓰기).
+	 *   3) FROM / JOIN 뒤의 엔티티와 별칭을 모두 찾는다(읽기). 별칭.속성 으로 이어지는 연관 엔티티도 따라간다.
+	 *   4) 엔티티 이름 → 테이블 이름으로 바꾼다. 모르는 이름은 unknown 에 담는다.
+	 * </pre>
+	 */
 	public Result extract(String jpql, Model model) {
 		Result result = new Result();
 		if (jpql == null) {

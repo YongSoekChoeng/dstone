@@ -27,7 +27,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
  *
  *   web.xml의 servlet / servlet-mapping → SERVLET 진입점. 주소마다, 처리 메소드(doGet, doPost ...)마다 한 건.
  *   web.xml의 filter / listener         → analysis_resource에 기록(FILTER_MAPPING, LISTENER)
- *   @WebServlet                         → SERVLET 진입점(서블릿 3.0 이후의 방식)
+ *   &#64;WebServlet                         → SERVLET 진입점(서블릿 3.0 이후의 방식)
  *   HttpServlet을 상속한 클래스의 계층(CONTROLLER)은 규칙 파일 conf/rules/common/servlet.yml 에 있고 LayerResolver 가 정한다.
  *
  * 서블릿 클래스가 프로젝트 밖에 있어도(Spring의 DispatcherServlet 등) 진입점으로 남깁니다.
@@ -92,6 +92,17 @@ public class ServletEntries extends BaseObject implements SemanticStep {
 		return "web.xml " + files.size() + "개, 서블릿 진입점 " + endpoints + ", 필터/리스너 " + resources + ".";
 	}
 
+	/**
+	 * <pre>
+	 * servlet-mapping 마다 SERVLET 진입점을 만듭니다.
+	 *
+	 *   - 서블릿 클래스가 프로젝트 밖이면(DispatcherServlet 등) 주소만 있는 진입점(external)
+	 *   - 클래스에 doGet/doPost 등이 직접 있으면 그 메소드마다 진입점
+	 *   - 없으면(상위 클래스에서 물려받음) 클래스만 가리키는 진입점
+	 * </pre>
+	 *
+	 * @return 만든 진입점 수
+	 */
 	private int addServletEndpoints(long revisionId, long fileId, WebXmlReader.WebXml webXml) {
 		int count = 0;
 		for (int i = 0; i < webXml.servletMappings.size(); i++) {
@@ -135,6 +146,7 @@ public class ServletEntries extends BaseObject implements SemanticStep {
 		return count;
 	}
 
+	/** 필터 매핑과 리스너를 analysis_resource 에 남깁니다(진입점은 아니다). */
 	private int addResources(long revisionId, long fileId, WebXmlReader.WebXml webXml) {
 		int count = 0;
 		for (int i = 0; i < webXml.filterMappings.size(); i++) {
@@ -149,6 +161,7 @@ public class ServletEntries extends BaseObject implements SemanticStep {
 		return count;
 	}
 
+	/** SERVLET 진입점 한 행을 넣습니다. */
 	private void addEndpoint(long revisionId, long fileId, String httpMethod, String path, String symbolId, String methodId
 			, Map<String, Object> properties, Integer lineStart) {
 		Map<String, Object> endpoint = new HashMap<String, Object>();
@@ -165,6 +178,10 @@ public class ServletEntries extends BaseObject implements SemanticStep {
 	}
 
 	/**
+	 * <pre>
+	 * web.xml 에서 읽은 것을 analysis_resource 한 행으로 남깁니다.
+	 * </pre>
+	 *
 	 * @param value 주소 패턴. 리스너처럼 주소가 없으면 null
 	 */
 	private void addResource(long revisionId, long fileId, String resourceType, String name, String value, String className) {

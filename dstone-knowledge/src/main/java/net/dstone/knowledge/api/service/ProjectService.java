@@ -102,6 +102,7 @@ public class ProjectService extends BaseObject {
 		return join(names);
 	}
 
+	/** 쉼표로 이어 붙입니다(앞뒤 공백 제거). */
 	private String join(List<?> values) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < values.size(); i++) {

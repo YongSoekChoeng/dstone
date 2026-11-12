@@ -33,23 +33,28 @@ public class AnalysisFileDao extends BaseDao {
 		sqlSessionBatch.flushStatements();
 	}
 
+	/** 파일 수(목록과 같은 조건) */
 	public int countFile(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countFile", condition);
 		return count.intValue();
 	}
 
+	/** 파일 목록(페이지) */
 	public List<Map<String, Object>> selectFileList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectFileList", condition);
 	}
 
+	/** 종류별 파일 수와 줄 수 */
 	public List<Map<String, Object>> selectSummaryByType(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectSummaryByType", revisionId);
 	}
 
+	/** 인코딩별 파일 수 */
 	public List<Map<String, Object>> selectSummaryByEncoding(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectSummaryByEncoding", revisionId);
 	}
 
+	/** Java 소스 루트별 파일 수. 소스 루트를 못 찾은 파일은 '(못 찾음)' 으로 묶인다 */
 	public List<Map<String, Object>> selectSummaryBySourceRoot(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectSummaryBySourceRoot", revisionId);
 	}

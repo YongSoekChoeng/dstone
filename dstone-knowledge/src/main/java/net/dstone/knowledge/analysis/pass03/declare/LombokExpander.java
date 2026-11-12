@@ -13,9 +13,7 @@ import net.dstone.knowledge.analysis.pass03.declare.DeclarationCollector.TypeCon
  * Lombok 애노테이션이 컴파일할 때 만들어 내는 멤버를, 소스를 고치지 않고 심볼로만 만들어 넣습니다.
  *
  * 왜 필요한가:
- * </pre>
- *
- * @Getter가 붙은 클래스에는 소스에 getName()이 없습니다. 그대로 두면 다른 클래스의 vo.getName() 호출이
+ * 클래스에 &#64;Getter가 붙어 있으면 소스에 getName()이 없습니다. 그대로 두면 다른 클래스의 vo.getName() 호출이
  * "없는 메소드를 부른다"가 되어 호출 관계가 끊깁니다. 그래서 컴파일하면 생길 멤버를 미리 넣어 둡니다
  * (is_synthetic = true, synthetic_origin = LOMBOK_...). 줄 번호는 근거가 된 필드나 애노테이션의 줄입니다.
  *
@@ -23,13 +21,14 @@ import net.dstone.knowledge.analysis.pass03.declare.DeclarationCollector.TypeCon
  * 그래서 분석 대상 소스의 애노테이션을 "읽기만" 합니다. 이 모듈이 Lombok 라이브러리를 쓰는 것은 아닙니다.
  *
  * 다루는 애노테이션:
- *   @Getter / @Setter (타입, 필드), @Data, @Value,
- *   @NoArgsConstructor / @AllArgsConstructor / @RequiredArgsConstructor,
- *   @Builder, @ToString, @EqualsAndHashCode,
- *   로그 필드: @Slf4j, @XSlf4j, @Log4j, @Log4j2, @Log, @CommonsLog, @JBossLog
+ *   - &#64;Getter / &#64;Setter (타입, 필드), &#64;Data, &#64;Value,
+ *   - &#64;NoArgsConstructor / &#64;AllArgsConstructor / &#64;RequiredArgsConstructor,
+ *   - &#64;Builder, &#64;ToString, &#64;EqualsAndHashCode,
+ *   - 로그 필드: &#64;Slf4j, &#64;XSlf4j, &#64;Log4j, &#64;Log4j2, &#64;Log, &#64;CommonsLog, &#64;JBossLog
  *
- * 다루지 않는 것(필요해지면 추가): @SuperBuilder, @With, @Delegate, @Accessors(fluent/chain), @Builder를 메소드에 붙인 경우.
+ * 다루지 않는 것(필요해지면 추가): &#64;SuperBuilder, &#64;With, &#64;Delegate, &#64;Accessors(fluent/chain), &#64;Builder를 메소드에 붙인 경우.
  * 소스에 같은 이름/같은 파라미터 수의 메소드를 직접 적어 두었으면 Lombok처럼 만들지 않습니다.
+ * </pre>
  */
 class LombokExpander {
 
@@ -45,6 +44,7 @@ class LombokExpander {
 		LOGGER_TYPES.put("JBossLog", "org.jboss.logging.Logger");
 	}
 
+	/** 만든 멤버를 실제로 넣어 주는 곳 */
 	private final DeclarationCollector collector;
 
 	LombokExpander(DeclarationCollector collector) {
@@ -52,6 +52,13 @@ class LombokExpander {
 	}
 
 	/**
+	 * <pre>
+	 * 이 타입의 Lombok 애노테이션을 보고, 컴파일하면 생길 멤버를 넣습니다.
+	 *
+	 * 넣는 순서: 로그 필드 → 필드마다 getter/setter → 생성자 → toString/equals/hashCode → 빌더
+	 * Lombok을 하나도 안 쓰는 타입이면 바로 돌아갑니다.
+	 * </pre>
+	 *
 	 * @param typeLine 타입 선언이 시작하는 줄. 타입에 붙은 애노테이션이 만드는 멤버의 위치로 씁니다.
 	 */
 	void expand(TypeContext context, Integer typeLine) {
@@ -171,10 +178,12 @@ class LombokExpander {
 		}
 	}
 
+	/** @Data 에서 왔으면 LOMBOK_DATA, @Value 에서 왔으면 LOMBOK_VALUE */
 	private String originOf(boolean data) {
 		return data ? "LOMBOK_DATA" : "LOMBOK_VALUE";
 	}
 
+	/** 이 필드들을 차례로 받는 생성자를 넣습니다. 접근 수준이 none(AccessLevel.NONE)이면 만들지 않습니다. */
 	private void addConstructor(TypeContext context, List<FieldInfo> fields, String access, String origin, Integer line) {
 		if ("none".equals(access)) {
 			return;
@@ -251,6 +260,7 @@ class LombokExpander {
 		return fieldName;
 	}
 
+	/** 첫 글자만 대문자로: name → Name */
 	private String capitalize(String name) {
 		if (name.length() == 0) {
 			return name;

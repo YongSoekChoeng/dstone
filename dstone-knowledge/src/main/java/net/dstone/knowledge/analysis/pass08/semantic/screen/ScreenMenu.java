@@ -38,10 +38,19 @@ public class ScreenMenu {
 		/** 이 규칙이 적힌 자리(규칙 파일:줄). 모르면 null */
 		private final String at;
 
+		/** 규칙 파일 위치 없이 만듭니다(단위 테스트용). */
 		public Rule(String nameKey, String pathKey) {
 			this(nameKey, pathKey, null);
 		}
 
+		/**
+		 * <pre>
+		 * </pre>
+		 *
+		 * @param nameKey 메뉴 목록에서 화면명이 든 열(키) 이름. 예: MENU_NM
+		 * @param pathKey 화면 파일 경로가 든 열(키) 이름. 예: SRC_PATH
+		 * @param at 규칙이 적힌 곳("파일:줄")
+		 */
 		public Rule(String nameKey, String pathKey, String at) {
 			this.at = at;
 			this.nameKey = nameKey;

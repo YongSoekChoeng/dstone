@@ -30,6 +30,7 @@ class StatementIndex {
 	/** 조각의 본문. 여러 statement가 같은 조각을 가져오므로 기억해 둔다. */
 	final BoundedCache<Long, String> fragmentBodies = new BoundedCache<Long, String>(2000);
 
+	/** load() 로만 만듭니다. */
 	private StatementIndex() {
 	}
 
@@ -94,6 +95,7 @@ class StatementIndex {
 		return found == null ? statement : found;
 	}
 
+	/** map 의 key 목록에 value 를 더합니다(목록이 없으면 만든다). */
 	private static <T> void add(Map<String, List<T>> map, String key, T value) {
 		List<T> list = map.get(key);
 		if (list == null) {

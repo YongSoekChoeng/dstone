@@ -14,6 +14,10 @@ public class RuleException extends RuntimeException {
 	private final int line;
 
 	/**
+	 * <pre>
+	 * 규칙 파일이 잘못 적혔을 때의 오류. 메시지 앞에 "파일:줄"이 붙습니다.
+	 * </pre>
+	 *
 	 * @param fileName 규칙 폴더 안의 경로. 예: common/spring.yml
 	 * @param line     줄 번호(1부터). 줄을 모르면 0
 	 */

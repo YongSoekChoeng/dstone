@@ -72,6 +72,15 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 		return 600;
 	}
 
+	/**
+	 * <pre>
+	 * 분석 결과로 검색용 문서와 청크를 만들어 임베딩 대기열에 올립니다. 파일 종류마다 한 번씩 돕니다.
+	 *   1) JAVA: 파일·타입·메소드 문서(CodeDocumentBuilder). 파싱하지 못한 파일은 건너뛴다.
+	 *   2) XML : 매퍼면 statement 하나가 문서 하나, 리치클라이언트 화면이면 파일 하나가 화면 문서 하나
+	 *   3) JSP : 파일 하나가 화면 문서 하나
+	 * 각각 "준비 = 재료를 DB에서 읽고 문서를 만든다, 저장 = 이 파일의 문서를 바꿔 쓴다"로 파일 단위 실행기에 넘깁니다.
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		final Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
@@ -83,6 +92,9 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 
 		final ResourceDocumentBuilder resourceBuilder = new ResourceDocumentBuilder(context.getProjectId(), context.getRevisionId(), chunkMaxChars);
 
+		// counts: [0] 만든 문서 수, [1] 만든 청크 수
+
+		// 1) Java 파일
 		filePassRunner.run(context, NAME, "JAVA", new FileHandler<CodeDocumentBuilder.Result>() {
 			@Override
 			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {
@@ -91,6 +103,7 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 					return null;
 				}
 				long fileId = ((Number) file.get("fileId")).longValue();
+				// 문서 재료: 이 파일의 선언, 관계, 진입점을 DB에서 모은다
 				CodeDocumentBuilder.Material material = new CodeDocumentBuilder.Material();
 				material.types = ragDao.selectTypesByFile(fileId);
 				material.fields = ragDao.selectFieldsByFile(fileId);
@@ -125,7 +138,7 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 			}
 		});
 
-		// SQL 매퍼: statement 하나가 문서 하나. 매퍼가 아닌 XML은 statement가 없어서 건너뛴다.
+		// 2) SQL 매퍼: statement 하나가 문서 하나. 매퍼가 아닌 XML은 statement가 없어서 건너뛴다.
 		// 리치클라이언트 화면(WebSquare, Nexacro)도 XML이다. 이것은 JSP처럼 파일 하나가 화면 문서 하나다.
 		filePassRunner.run(context, NAME, "XML", new FileHandler<CodeDocumentBuilder.Result>() {
 			@Override
@@ -157,7 +170,7 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 			}
 		});
 
-		// 화면(JSP): 파일 하나가 문서 하나. Java 코드가 없는 JSP도 만든다(화면과 주소의 연결은 Java 코드와 상관없다).
+		// 3) 화면(JSP): 파일 하나가 문서 하나. Java 코드가 없는 JSP도 만든다(화면과 주소의 연결은 Java 코드와 상관없다).
 		filePassRunner.run(context, NAME, "JSP", new FileHandler<CodeDocumentBuilder.Result>() {
 			@Override
 			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {

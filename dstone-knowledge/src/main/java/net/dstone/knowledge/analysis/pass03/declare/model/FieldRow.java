@@ -7,34 +7,46 @@ package net.dstone.knowledge.analysis.pass03.declare.model;
  */
 public class FieldRow {
 
+	/** 리비전 ID */
 	private long revisionId;
 
+	/** 필드 ID. 같은 필드면 리비전이 달라도 같은 값(해시) */
 	private String fieldId;
 
+	/** 이 필드를 가진 타입의 ID */
 	private String ownerSymbolId;
 
+	/** 필드 이름 */
 	private String name;
 
 	/** 소스에 적힌 그대로의 타입 */
 	private String type;
 
+	/** 접근 제한자: public / protected / package / private */
 	private String visibility;
 
+	/** static 여부 */
 	private boolean isStatic;
 
+	/** final 여부 */
 	private boolean isFinal;
 
+	/** 소스에는 없지만 컴파일하면 생기는 필드인지. 예: Lombok @Slf4j 의 log */
 	private boolean isSynthetic;
 
+	/** 합성 필드를 만든 근거. 예: LOMBOK_LOG */
 	private String syntheticOrigin;
 
 	/** 초기값을 적은 식(길면 자른다). 상수 값을 따라갈 때 쓴다 */
 	private String initializerSummary;
 
+	/** 선언된 파일 ID */
 	private long fileId;
 
+	/** 시작 줄 */
 	private Integer lineStart;
 
+	/** 끝 줄 */
 	private Integer lineEnd;
 
 	public long getRevisionId() {

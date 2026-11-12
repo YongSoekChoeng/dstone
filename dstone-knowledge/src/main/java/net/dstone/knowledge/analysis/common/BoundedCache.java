@@ -15,17 +15,20 @@ public class BoundedCache<K, V> extends LinkedHashMap<K, V> {
 
 	private static final long serialVersionUID = 1L;
 
+	/** 최대로 담을 개수 */
 	private final int maxSize;
 
 	/** 꽉 차서 버린 횟수 */
 	private long evictions = 0;
 
+	/** @param maxSize 최대로 담을 개수. 넘으면 가장 오래 안 쓴 것부터 버린다 */
 	public BoundedCache(int maxSize) {
 		// 세 번째 값 true: 넣은 순서가 아니라 "쓴 순서"로 줄을 세운다. 그래야 오래 안 쓴 것이 맨 앞에 온다.
 		super(16, 0.75f, true);
 		this.maxSize = maxSize;
 	}
 
+	/** 새 값을 넣은 직후 LinkedHashMap이 부릅니다. true를 돌려주면 가장 오래 안 쓴 것 하나를 버립니다. */
 	@Override
 	protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
 		if (size() > maxSize) {

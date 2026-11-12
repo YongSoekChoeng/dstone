@@ -18,10 +18,15 @@ import java.util.List;
  */
 public final class TextChunker {
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private TextChunker() {
 	}
 
 	/**
+	 * <pre>
+	 * 글을 문단 단위로 maxChars 이하의 청크로 나눕니다.
+	 * </pre>
+	 *
 	 * @param text 문서에서 뽑은 글
 	 * @param maxChars 청크 하나의 최대 글자 수
 	 * @param overlapChars 앞 청크의 마지막 문단을 다음 청크에 다시 넣을 때, 그 문단의 최대 글자 수. 0이면 겹치지 않는다
@@ -139,6 +144,7 @@ public final class TextChunker {
 		return sb.toString().trim();
 	}
 
+	/** 줄 끝의 공백만 지웁니다(앞의 들여쓰기는 남긴다). */
 	private static String stripEnd(String line) {
 		int end = line.length();
 		while (end > 0 && Character.isWhitespace(line.charAt(end - 1))) {

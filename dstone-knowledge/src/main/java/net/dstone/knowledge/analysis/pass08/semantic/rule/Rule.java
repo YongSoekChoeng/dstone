@@ -32,6 +32,7 @@ public abstract class Rule {
 	/** 파일에 적힌 모양 그대로. 예: "@Service", "extends jef.application.dao.jdbc.JdbcDAO" */
 	public final String text;
 
+	/** 모든 규칙의 공통 부분: 어느 파일 몇 번째 줄에서 왔는지, 소스에 적힌 원문 */
 	protected Rule(Origin origin, String text) {
 		this.file = origin.file;
 		this.line = origin.line;
@@ -55,17 +56,20 @@ public abstract class Rule {
 		public final int line;
 		public final Tier tier;
 
+		/** @param tier 규칙 폴더의 단계(PROJECT / COMMON / GUESS) */
 		public Origin(String file, int line, Tier tier) {
 			this.file = file;
 			this.line = line;
 			this.tier = tier;
 		}
 
+		/** "파일:줄" 모양 */
 		public String at() {
 			return file + ":" + line;
 		}
 	}
 
+	/** 바꿀 수 없는 사본 목록 */
 	static List<String> copy(List<String> values) {
 		return Collections.unmodifiableList(new ArrayList<String>(values));
 	}
@@ -93,6 +97,7 @@ public abstract class Rule {
 		/** by 가 NAME 일 때 글롭을 바꾼 PostgreSQL 정규식(~). 아니면 null */
 		public final String nameRegex;
 
+		/** @param by 무엇으로 알아보는지: 애노테이션 / 상속 / 이름 */
 		public Layer(Origin origin, String text, String layer, String by, String value, String nameRegex) {
 			super(origin, text);
 			this.layer = layer;
@@ -124,20 +129,24 @@ public abstract class Rule {
 		/** 메소드에 붙어 주소를 정하는 애노테이션들 */
 		public final List<HttpAnnotation> methodAnnotations;
 
+		/** @param classAnnotations 클래스에 붙어 주소의 앞부분을 정하는 애노테이션들 */
 		public HttpEntry(Origin origin, String text, List<HttpAnnotation> classAnnotations, List<HttpAnnotation> methodAnnotations) {
 			super(origin, text);
 			this.classAnnotations = Collections.unmodifiableList(new ArrayList<HttpAnnotation>(classAnnotations));
 			this.methodAnnotations = Collections.unmodifiableList(new ArrayList<HttpAnnotation>(methodAnnotations));
 		}
 
+		/** 클래스 쪽 애노테이션 규칙 가운데 이 이름인 것. 없으면 null */
 		public HttpAnnotation classAnnotation(String name) {
 			return find(classAnnotations, name);
 		}
 
+		/** 메소드 쪽 애노테이션 규칙 가운데 이 이름인 것. 없으면 null */
 		public HttpAnnotation methodAnnotation(String name) {
 			return find(methodAnnotations, name);
 		}
 
+		/** 목록에서 애노테이션 이름이 같은 첫 규칙. 없으면 null */
 		private static HttpAnnotation find(List<HttpAnnotation> list, String name) {
 			for (int i = 0; i < list.size(); i++) {
 				if (list.get(i).annotation.equals(name)) {
@@ -174,6 +183,7 @@ public abstract class Rule {
 		/** HTTP 메소드가 적힌 속성(VERB 자리). 비어 있으면 ALL. 없으면 null */
 		public final String verbAttribute;
 
+		/** @param pathAttributes 주소를 읽을 속성들(앞의 것부터) */
 		public HttpAnnotation(Origin origin, String text, String annotation, List<String> pathAttributes, String httpMethod, String verbAttribute) {
 			super(origin, text);
 			this.annotation = annotation;
@@ -190,6 +200,7 @@ public abstract class Rule {
 		/** 진입점의 path 자리에 넣을 속성(KEY 자리). 앞에 있는 것부터 본다. 없으면 path 는 비어 있다 */
 		public final List<String> pathAttributes;
 
+		/** @param endpointType 만들 진입점의 종류 */
 		public AnnotationEntry(Origin origin, String text, String endpointType, String annotation, List<String> pathAttributes) {
 			super(origin, text);
 			this.endpointType = endpointType;
@@ -210,6 +221,7 @@ public abstract class Rule {
 		/** 인자 수. "(...)" 로 적어 보지 않으면 null */
 		public final Integer paramCount;
 
+		/** @param methodRegex 메소드 이름에 글롭을 썼으면 그것을 바꾼 정규식. 아니면 null */
 		public ExtendsEntry(Origin origin, String text, String endpointType, String superType, String methodName, String methodRegex, Integer paramCount) {
 			super(origin, text);
 			this.endpointType = endpointType;
@@ -245,6 +257,7 @@ public abstract class Rule {
 		public final String prefix;
 		public final String suffix;
 
+		/** @param files 읽을 설정 파일의 경로 글롭 */
 		public XmlEntry(Origin origin, String text, String endpointType, String files, String element, String pathAttribute, String classAttribute
 				, String methodAttribute, String httpMethod, String prefix, String suffix) {
 			super(origin, text);
@@ -266,6 +279,7 @@ public abstract class Rule {
 	public static class Mark extends Rule {
 		public final String annotation;
 
+		/** @param annotation 표시를 붙일 애노테이션 이름 */
 		public Mark(Origin origin, String text, String annotation) {
 			super(origin, text);
 			this.annotation = annotation;
@@ -302,6 +316,7 @@ public abstract class Rule {
 		/** 이 정규식에 맞는 값은 버린다. 없으면 null */
 		public final String skip;
 
+		/** @param argIndex 이름(SQL ID, 화면 경로)이 들어 있는 인자 자리(0부터) */
 		public CallArgument(Origin origin, String text, String target, String method, String constructor, String receiverType, int argIndex
 				, String prefix, String suffix, String skip) {
 			super(origin, text);
@@ -349,6 +364,7 @@ public abstract class Rule {
 		/** "in @NamedQueries" 의 묶는 애노테이션. 없으면 null */
 		public final String container;
 
+		/** @param attribute 쿼리 글이 들어 있는 속성 */
 		public JpaQuery(Origin origin, String text, String annotation, String attribute, String nativeAttribute, boolean nativeQuery
 				, String nameAttribute, String container) {
 			super(origin, text);

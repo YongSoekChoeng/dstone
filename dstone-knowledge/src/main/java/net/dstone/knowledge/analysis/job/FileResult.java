@@ -7,10 +7,14 @@ package net.dstone.knowledge.analysis.job;
  */
 public class FileResult {
 
+	/** DONE / FAILED / SKIPPED 중 하나 */
 	private final String status;
+	/** 분석 오류로 남길 종류. 남길 것이 없으면 null */
 	private final String errorType;
+	/** 오류 내용이나 건너뛴 이유 */
 	private final String message;
 
+	/** done() / failed() 같은 정적 메소드로만 만듭니다. */
 	private FileResult(String status, String errorType, String message) {
 		this.status = status;
 		this.errorType = errorType;

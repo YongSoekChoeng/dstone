@@ -15,10 +15,15 @@ public class FileDeclarations {
 	/** 파서가 읽은 패키지 이름. 기본 패키지면 빈 문자열 */
 	private String packageName = "";
 
+	/** 타입(클래스·인터페이스·enum …) → analysis_symbol */
 	private final List<TypeRow> types = new ArrayList<TypeRow>();
+	/** 메소드·생성자 → analysis_method */
 	private final List<MethodRow> methods = new ArrayList<MethodRow>();
+	/** 필드 → analysis_field */
 	private final List<FieldRow> fields = new ArrayList<FieldRow>();
+	/** 애노테이션 → analysis_annotation */
 	private final List<AnnotationRow> annotations = new ArrayList<AnnotationRow>();
+	/** 아직 풀지 않은 참조(호출·생성·타입 사용 …) → analysis_reference. RESOLVE 단계가 푼다 */
 	private final List<ReferenceRow> references = new ArrayList<ReferenceRow>();
 	/** Java 문자열로 적은 SQL(analysis_mapper 의 mapper_type JAVA 행). 키는 ResourceDao 의 insertMapper 와 같고 propertiesJson 이 더 있다 */
 	private final List<Map<String, Object>> sqlStatements = new ArrayList<Map<String, Object>>();

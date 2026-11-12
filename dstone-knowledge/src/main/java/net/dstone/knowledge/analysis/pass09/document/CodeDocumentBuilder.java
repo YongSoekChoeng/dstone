@@ -80,6 +80,10 @@ public class CodeDocumentBuilder {
 	}
 
 	/**
+	 * <pre>
+	 * 파일 하나의 문서를 만드는 빌더
+	 * </pre>
+	 *
 	 * @param skipAccessors 단순 접근자의 메소드 문서를 만들지 않을지
 	 * @param chunkMaxChars 청크 하나에 담는 소스의 최대 글자 수
 	 */
@@ -91,6 +95,16 @@ public class CodeDocumentBuilder {
 	}
 
 	/**
+	 * <pre>
+	 * Java 파일 하나의 문서들을 만듭니다.
+	 *
+	 * 흐름:
+	 *   1) 재료(타입, 필드, 메소드, 애노테이션, 관계, 진입점)를 대상 ID별로 묶어 둔다.
+	 *   2) 파일 문서 하나
+	 *   3) 타입 문서: 익명 클래스와 만들어 넣은 타입(Lombok 빌더)은 뺀다.
+	 *   4) 메소드 문서: 만들어 넣은 메소드와, 설정에 따라 단순 getter/setter 는 뺀다.
+	 * </pre>
+	 *
 	 * @param file analysis_file 한 행. 키: fileId, path, module, packageName, languageLevel
 	 * @param text 파일 내용(올바른 인코딩으로 읽은 글)
 	 */
@@ -100,6 +114,7 @@ public class CodeDocumentBuilder {
 		String[] lines = text.split("\r?\n", -1);
 		Result result = new Result();
 
+		// 1) 재료 묶기
 		Map<String, Map<String, Object>> typesById = new HashMap<String, Map<String, Object>>();
 		for (int i = 0; i < material.types.size(); i++) {
 			typesById.put((String) material.types.get(i).get("symbolId"), material.types.get(i));
@@ -113,8 +128,10 @@ public class CodeDocumentBuilder {
 		Map<String, List<Map<String, Object>>> fieldsByType = groupBy(material.fields, "ownerSymbolId");
 		Map<String, List<Map<String, Object>>> methodsByType = groupBy(material.methods, "ownerSymbolId");
 
+		// 2) 파일 문서
 		addFileDocument(result, fileId, path, file, lines, material.types);
 
+		// 3) 타입 문서
 		for (int i = 0; i < material.types.size(); i++) {
 			Map<String, Object> type = material.types.get(i);
 			// 익명 클래스와 만들어 넣은 타입(Lombok 빌더)은 타입 문서를 만들지 않는다. 설명할 선언이 소스에 없다.
@@ -126,6 +143,7 @@ public class CodeDocumentBuilder {
 					, fieldsByType.get(symbolId), methodsByType.get(symbolId), endpointsByMethod);
 		}
 
+		// 4) 메소드 문서
 		Map<String, List<Map<String, Object>>> fieldsByOwner = groupBy(material.fields, "ownerSymbolId");
 		for (int i = 0; i < material.methods.size(); i++) {
 			Map<String, Object> method = material.methods.get(i);
@@ -142,6 +160,7 @@ public class CodeDocumentBuilder {
 
 	/* ============================== 파일 문서 ============================== */
 
+	/** 파일 문서(FILE) 하나: 경로, 패키지, 모듈, 줄 수, 이 파일에 선언된 타입 목록 */
 	private void addFileDocument(Result result, long fileId, String path, Map<String, Object> file, String[] lines, List<Map<String, Object>> types) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("[파일] ").append(path).append('\n');
@@ -179,6 +198,7 @@ public class CodeDocumentBuilder {
 
 	/* ============================== 타입 문서 ============================== */
 
+	/** 타입 문서(TYPE) 하나: 이름과 종류, 계층, 위치, 소스의 설명, 상속·구현, 애노테이션, 필드, 메소드(진입점이면 그 주소) */
 	private void addTypeDocument(Result result, long fileId, String path, String[] lines, Map<String, Object> type, List<String> annotations
 			, List<Map<String, Object>> relations, List<Map<String, Object>> fields, List<Map<String, Object>> methods
 			, Map<String, List<Map<String, Object>>> endpointsByMethod) {
@@ -257,6 +277,15 @@ public class CodeDocumentBuilder {
 
 	/* ============================== 메소드 문서 ============================== */
 
+	/**
+	 * <pre>
+	 * 메소드 문서(METHOD) 하나를 만듭니다.
+	 *
+	 * 머리말(분석으로 알아낸 사실: 시그니처, 반환, 진입점 주소, 부르는 것 / 불리는 것, SQL·화면 관계)과
+	 * 소스 본문을 합쳐 청크로 나눕니다. 본문이 길면 줄 단위로 나누고, 첫 조각에만 머리말 전체를,
+	 * 뒤 조각에는 "어느 메소드의 몇 번째 조각인지"만 붙입니다.
+	 * </pre>
+	 */
 	private void addMethodDocument(Result result, long fileId, String path, String[] lines, Map<String, Object> method, Map<String, Object> ownerType
 			, List<String> annotations, List<Map<String, Object>> endpoints, List<Map<String, Object>> callees, List<Map<String, Object>> callers
 			, List<Map<String, Object>> links) {
@@ -441,6 +470,10 @@ public class CodeDocumentBuilder {
 	/* ============================== 문서와 청크 만들기 ============================== */
 
 	/**
+	 * <pre>
+	 * 문서 하나와 그 청크들을 결과에 담습니다.
+	 * </pre>
+	 *
 	 * @param contents 청크로 들어갈 글들(순서대로)
 	 * @param ranges 청크마다의 줄 범위. null이면 모든 청크에 문서의 줄 범위를 쓴다.
 	 */
@@ -602,6 +635,7 @@ public class CodeDocumentBuilder {
 		return grouped;
 	}
 
+	/** 행들을 key 값으로 묶습니다. */
 	private Map<String, List<Map<String, Object>>> groupBy(List<Map<String, Object>> rows, String key) {
 		Map<String, List<Map<String, Object>>> grouped = new HashMap<String, List<Map<String, Object>>>();
 		for (int i = 0; i < rows.size(); i++) {
@@ -653,6 +687,7 @@ public class CodeDocumentBuilder {
 		return (dot < 0 ? owner : owner.substring(dot + 1)) + (hash < 0 ? "" : name.substring(hash));
 	}
 
+	/** 타입 종류를 문서에 쓸 말로: INTERFACE → 인터페이스 … */
 	private String kindLabel(String kind) {
 		if ("INTERFACE".equals(kind)) {
 			return "인터페이스";
@@ -669,6 +704,7 @@ public class CodeDocumentBuilder {
 		return "클래스";
 	}
 
+	/** 계층 글. 이름으로 짐작한 계층이면 "(이름으로 추정)"을 붙입니다. 계층이 없으면 null */
 	private String layerText(Map<String, Object> type) {
 		if (type.get("layer") == null) {
 			return null;
@@ -677,10 +713,12 @@ public class CodeDocumentBuilder {
 		return type.get("layer") + ("LOW".equals(type.get("layerConfidence")) ? " (이름으로 추정)" : "");
 	}
 
+	/** 타입 목록 뒤에 붙일 ", 계층". 계층이 없으면 빈 글 */
 	private String layerSuffix(Map<String, Object> type) {
 		return type.get("layer") == null ? "" : ", " + type.get("layer");
 	}
 
+	/** " (줄 10-20)" 모양. 시작 줄을 모르면 빈 글 */
 	private String rangeText(Integer lineStart, Integer lineEnd) {
 		if (lineStart == null) {
 			return "";
@@ -695,12 +733,14 @@ public class CodeDocumentBuilder {
 		}
 	}
 
+	/** 목록이 max 개보다 적고 아직 없는 값이면 더합니다. */
 	private void addLimited(List<String> list, String value, int max) {
 		if (list.size() < max && !list.contains(value)) {
 			list.add(value);
 		}
 	}
 
+	/** separator 로 이어 붙입니다. */
 	private String join(List<String> values, String separator) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < values.size(); i++) {
@@ -712,6 +752,7 @@ public class CodeDocumentBuilder {
 		return sb.toString();
 	}
 
+	/** 숫자 → Integer. null 이면 null */
 	private Integer intOf(Object value) {
 		return value == null ? null : Integer.valueOf(((Number) value).intValue());
 	}

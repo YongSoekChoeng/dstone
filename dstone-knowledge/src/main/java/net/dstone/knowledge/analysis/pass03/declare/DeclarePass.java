@@ -68,6 +68,11 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		return 200;
 	}
 
+	/**
+	 * <pre>
+	 * 파일 단위 실행기(FilePassRunner)에 "준비 = parseFile, 저장 = saveFile"을 넘겨 JAVA 파일, 그다음 JSP 파일을 처리합니다.
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		final Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
@@ -106,14 +111,23 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		/** 실패했으면 오류 종류(PARSE_ERROR / TOO_DEEP)와 내용. 성공했으면 null */
 		String failType;
 		String failMessage;
-		/** 성공했을 때의 결과 */
+		/** 성공했을 때의 결과: 뽑아낸 선언과 참조 */
 		FileDeclarations declarations;
+		/** 파싱에 성공한 Java 문법 수준 */
 		String languageLevel;
+		/** 파서가 읽은 패키지 이름 */
 		String packageName;
+		/** 패키지로 다시 구한 소스 루트. 폴더 구조가 패키지와 안 맞으면 null */
 		String sourceRoot;
 	}
 
-	/** 준비: 파일을 읽고, 파싱하고, 선언과 참조를 뽑는다. DB에 쓰지 않는다. */
+	/**
+	 * <pre>
+	 * 준비: 파일을 읽고, 파싱하고, 선언과 참조를 뽑는다. DB에 쓰지 않는다.
+	 *
+	 * 흐름: 루트 패키지 밖이면 건너뜀 → 읽기(JSP면 Java로 바꾸기) → 파싱 → 패키지·소스 루트 확정 → 선언·참조 뽑기
+	 * </pre>
+	 */
 	private Prepared parseFile(AnalysisJobContext context, Path root, String javaVersion, String[] rootPackages, Map<String, Object> file) throws Exception {
 		long fileId = ((Number) file.get("fileId")).longValue();
 		String path = (String) file.get("path");
@@ -161,11 +175,21 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		return prepared;
 	}
 
-	/** 저장: 준비한 결과를 DB에 쓴다. 트랜잭션 안이다. */
+	/**
+	 * <pre>
+	 * 저장: 준비한 결과를 DB에 쓴다. 트랜잭션 안이다.
+	 *
+	 * 흐름:
+	 *   1) 건너뛸 파일이면 SKIPPED, 파싱 실패면 남은 옛 결과를 지우고 FAILED.
+	 *   2) 같은 타입이 다른 파일에 이미 있으면 진짜(파일 이름 = 클래스 이름)만 남긴다.
+	 *   3) 이 파일의 선언을 통째로 바꿔 쓰고 파일 행을 OK로 표시한다.
+	 * </pre>
+	 */
 	private FileResult saveFile(AnalysisJobContext context, Map<String, Object> file, Prepared prepared) {
 		long fileId = ((Number) file.get("fileId")).longValue();
 		String path = (String) file.get("path");
 
+		// 1) 건너뛰기 / 실패
 		if (prepared.skipReason != null) {
 			return FileResult.skipped(prepared.skipReason);
 		}
@@ -177,6 +201,7 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		}
 		FileDeclarations declarations = prepared.declarations;
 
+		// 2) 겹치는 타입 정리
 		// 같은 소스 루트에 같은 이름의 타입이 다른 파일에도 있으면 ID가 겹친다(복사해 둔 파일, 이름만 바꾼 백업 파일 등).
 		// 컴파일러라면 오류를 내는 상황이라 둘 중 하나만 넣는다. 어느 쪽을 살릴지는 처리 순서가 아니라 파일 이름으로 정한다:
 		// 파일 이름이 클래스 이름과 같은 쪽(Order.java 안의 Order)이 진짜고, 아닌 쪽(Order_1.java 안의 Order)이 복사본이다.
@@ -201,6 +226,7 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 			}
 		}
 
+		// 3) 저장. 지우고 다시 넣으므로 같은 파일을 두 번 돌려도 행이 겹치지 않는다.
 		declarationDao.replaceDeclarationsInBatch(fileId, declarations);
 		declarationDao.updateFileParsedInBatch(fileId, "OK", null, prepared.languageLevel, prepared.packageName, prepared.sourceRoot);
 
@@ -213,6 +239,7 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		return FileResult.done();
 	}
 
+	/** 이 파일의 타입 중, 같은 ID로 다른 파일에 이미 들어가 있는 것을 찾습니다(fqn, path, fileId). */
 	private List<Map<String, Object>> findTypesDeclaredElsewhere(long revisionId, long fileId, FileDeclarations declarations) {
 		List<String> symbolIds = new ArrayList<String>();
 		for (int i = 0; i < declarations.getTypes().size(); i++) {
@@ -231,6 +258,7 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		return fileName.equals(simpleName + ".java");
 	}
 
+	/** 쉼표로 적은 루트 패키지 설정을 배열로. 설정이 없으면 빈 배열(= 전부 분석) */
 	private String[] rootPackagesOf(String configured) {
 		if (configured == null) {
 			return new String[0];
@@ -242,6 +270,7 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		return packages;
 	}
 
+	/** 패키지가 루트 패키지 중 하나이거나 그 아래인지. 루트 패키지를 안 정했으면 언제나 true */
 	private boolean isUnderRootPackages(String packageName, String[] rootPackages) {
 		if (rootPackages.length == 0) {
 			return true;
@@ -256,11 +285,13 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 		return false;
 	}
 
+	/** 경로에서 파일 이름을 뗀 폴더 부분 */
 	private String directoryOf(String path) {
 		int slash = path.lastIndexOf('/');
 		return slash < 0 ? "" : path.substring(0, slash);
 	}
 
+	/** 줄바꿈으로 이어 붙입니다. */
 	private String join(List<String> lines) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < lines.size(); i++) {

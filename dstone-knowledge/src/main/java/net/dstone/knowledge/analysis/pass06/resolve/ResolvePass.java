@@ -84,8 +84,18 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 		return 300;
 	}
 
+	/**
+	 * <pre>
+	 * 흐름:
+	 *   1) 설정 값(캐시 크기, 파일당 제한 시간)과 대상 프로젝트의 jar 목록을 준비한다.
+	 *   2) 해석 도구 한 벌(Engine)을 만든다.
+	 *   3) 파일 단위 실행기에 "준비 = resolveFile, 저장 = saveFile"을 넘겨 JAVA, 그다음 JSP 파일을 푼다.
+	 *   4) 타입 해석기의 통계를 로그로 남긴다.
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
+		// 1) 설정과 jar 목록
 		final Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
 		final int cacheSize = intProperty("dstone.knowledge.resolve.unit-cache-size", 100);
 		final long fileTimeoutMillis = intProperty("dstone.knowledge.resolve.file-timeout-seconds", 120) * 1000L;
@@ -98,10 +108,11 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 			}
 		};
 
-		// 해석 도구 한 벌. 파일 처리가 끝나지 않아 작업 스레드를 버리면 통째로 새로 만든다(그래서 배열에 담아 바꿔 끼운다).
+		// 2) 해석 도구 한 벌. 파일 처리가 끝나지 않아 작업 스레드를 버리면 통째로 새로 만든다(그래서 배열에 담아 바꿔 끼운다).
 		final Engine[] engine = new Engine[] { newEngine(context, root, jars, cacheSize) };
 		info("RESOLVE: jar " + engine[0].jarCount + "개를 클래스패스로 씁니다. analysisId=" + context.getAnalysisId());
 
+		// 3) 파일마다 풀기
 		try {
 			FileHandler<Prepared> handler = new FileHandler<Prepared>() {
 				@Override
@@ -132,6 +143,7 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 		} finally {
 			JavaParserFacade.clearInstances();
 		}
+		// 4) 통계
 		DbTypeSolver dbSolver = engine[0].dbSolver;
 		info("RESOLVE: 타입 조회 " + dbSolver.getLookups() + "회(DB " + dbSolver.getDbQueries() + "회), 파싱 " + dbSolver.getParses() + "회, 캐시에서 버림 "
 				+ dbSolver.getUnitEvictions() + "회. analysisId=" + context.getAnalysisId());
@@ -144,11 +156,15 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 	 * </pre>
 	 */
 	private static class Engine {
+		/** 프로젝트 안의 타입을 DB 색인으로 찾는 해석기(파싱한 파일을 크기를 정해 캐시한다) */
 		DbTypeSolver dbSolver;
+		/** 참조 하나하나를 관계로 푸는 것 */
 		ReferenceResolver resolver;
+		/** 클래스패스로 쓴 jar 수 */
 		int jarCount;
 	}
 
+	/** 해석 도구 한 벌을 새로 만듭니다. 타입은 프로젝트(DB) → JDK → jar 순서로 찾습니다. */
 	private Engine newEngine(AnalysisJobContext context, Path root, List<Path> jars, int cacheSize) {
 		Engine engine = new Engine();
 		engine.dbSolver = new DbTypeSolver(symbolDao, javaSourceParser, encodingDetector, context.getRevisionId(), root, cacheSize, 50000);
@@ -182,6 +198,7 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 		String skipReason;
 		/** 실패했으면 그 내용 */
 		String failMessage;
+		/** 푼 결과: 새 관계들과 참조마다 바꿀 상태 */
 		ReferenceResolver.Outcome outcome;
 	}
 
@@ -238,6 +255,7 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 
 		private static final String[] JDK_PACKAGES = { "java.", "javax.", "jdk.", "org.w3c.dom.", "org.xml.sax.", "org.ietf.jgss." };
 
+		/** JDK 패키지의 클래스면 true(이 프로그램의 클래스에서 찾아도 된다) */
 		@Override
 		public boolean test(String className) {
 			for (int i = 0; i < JDK_PACKAGES.length; i++) {
@@ -249,6 +267,7 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 		}
 	}
 
+	/** 설정 값을 정수로 읽습니다. 비어 있으면 기본값 */
 	private int intProperty(String key, int defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

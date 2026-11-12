@@ -64,6 +64,7 @@ public class AnalysisJobReporter extends BaseObject {
 		analysisJobDao.insertError(error);
 	}
 
+	/** MAX_DETAIL_LENGTH보다 길면 잘라 끝에 "(잘림)"을 붙입니다. */
 	private String cut(String text) {
 		if (text == null || text.length() <= MAX_DETAIL_LENGTH) {
 			return text;

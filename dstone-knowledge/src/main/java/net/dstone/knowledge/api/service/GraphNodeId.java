@@ -23,22 +23,32 @@ public class GraphNodeId {
 	public static final String SQL = "SQL";
 	public static final String SYMBOL = "SYMBOL";
 
+	/** 테이블 노드 ID 의 앞붙이. 예: T:TB_ORDER */
 	public static final String TABLE_PREFIX = "T:";
 
+	/** 번호로 된 노드 ID: M(매퍼 파일) / F(파일) / S(SQL statement) + 번호 */
 	private static final Pattern NUMBERED = Pattern.compile("[MFS][0-9]{1,18}");
 
+	/** 타입·메소드 노드 ID: SHA-1 40자리 */
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{40}");
 
+	/** 받은 ID 그대로 */
 	private final String id;
 
+	/** TABLE / MAPPER / FILE / SQL / SYMBOL(타입 또는 메소드) */
 	private final String kind;
 
+	/** parse() 로만 만듭니다. */
 	private GraphNodeId(String id, String kind) {
 		this.id = id;
 		this.kind = kind;
 	}
 
 	/**
+	 * <pre>
+	 * 노드 ID 글을 읽어 종류를 정합니다: T:이름(테이블) / M·F·S+번호 / SHA-1 40자리(타입·메소드)
+	 * </pre>
+	 *
 	 * @return 읽은 ID. 모양이 맞지 않으면 null
 	 */
 	public static GraphNodeId parse(String text) {

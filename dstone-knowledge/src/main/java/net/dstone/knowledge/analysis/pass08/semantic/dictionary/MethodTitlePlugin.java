@@ -48,6 +48,18 @@ public class MethodTitlePlugin implements SemanticStep {
 		return "methodTitle";
 	}
 
+	/**
+	 * <pre>
+	 * 메소드 바로 위의 주석에서 기능명(첫 줄 설명)을 읽어 METHOD_TITLE 로 남깁니다.
+	 *
+	 * 흐름(메소드가 있는 파일을 PAGE_SIZE 개씩):
+	 *   1) 소스를 다시 읽는다. 못 읽었거나 분석 뒤에 바뀌었으면 METHOD_TITLE_SKIP 으로 이유를 남기고 넘어간다.
+	 *   2) 그 파일의 메소드마다 시작 줄 위의 주석에서 기능명을 뽑는다(MethodTitle).
+	 *   3) 끝나면 처리 건수를 SEMANTIC_STATUS 로 남긴다.
+	 * </pre>
+	 *
+	 * @return 로그와 상태 화면에 보일 한 줄 요약
+	 */
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
@@ -66,6 +78,7 @@ public class MethodTitlePlugin implements SemanticStep {
 				afterId = fileId;
 				String path = (String) file.get("path");
 				files++;
+				// 1) 소스 다시 읽기
 				String[] lines;
 				try {
 					lines = readLines(root, file);
@@ -82,6 +95,7 @@ public class MethodTitlePlugin implements SemanticStep {
 					skipped++;
 					continue;
 				}
+				// 2) 메소드마다 기능명
 				List<Map<String, Object>> methods = semanticDao.selectMethodLinesByFile(revisionId, fileId);
 				for (int m = 0; m < methods.size(); m++) {
 					Map<String, Object> method = methods.get(m);
@@ -95,6 +109,7 @@ public class MethodTitlePlugin implements SemanticStep {
 				}
 			}
 		}
+		// 3) 처리 건수
 		Map<String, Object> properties = new LinkedHashMap<String, Object>();
 		properties.put("fileCount", Integer.valueOf(files));
 		properties.put("titled", Integer.valueOf(titled));
@@ -104,7 +119,9 @@ public class MethodTitlePlugin implements SemanticStep {
 	}
 
 	/**
+	 * <pre>
 	 * 소스 파일의 줄들. 파일이 SCAN 때와 달라졌으면 null
+	 * </pre>
 	 */
 	private String[] readLines(Path root, Map<String, Object> file) throws Exception {
 		Path source = root.resolve((String) file.get("path")).normalize();

@@ -22,10 +22,15 @@ import org.xml.sax.helpers.DefaultHandler;
  */
 public class SafeXml {
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private SafeXml() {
 	}
 
 	/**
+	 * <pre>
+	 * XML을 안전하게 파싱합니다(외부 엔티티·DTD를 읽지 않는다).
+	 * </pre>
+	 *
 	 * @param text XML의 내용(이미 올바른 인코딩으로 읽은 글)
 	 */
 	public static Document parse(String text) throws Exception {

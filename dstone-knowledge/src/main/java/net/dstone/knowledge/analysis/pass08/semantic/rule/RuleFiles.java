@@ -230,6 +230,7 @@ public class RuleFiles extends BaseObject {
 		return relative.equalsIgnoreCase(borrowed) || relative.toLowerCase(Locale.ROOT).startsWith(borrowed.toLowerCase(Locale.ROOT) + "/");
 	}
 
+	/** 빌려 쓰겠다고 적은 이름(borrowed)이 이 파일들 중 하나를 가리키는지 */
 	private static boolean refersToAny(String borrowed, List<RuleFile> files) {
 		for (int i = 0; i < files.size(); i++) {
 			if (refersTo(borrowed, files.get(i))) {
@@ -239,6 +240,7 @@ public class RuleFiles extends BaseObject {
 		return false;
 	}
 
+	/** 읽은 규칙 파일 가운데 projects/ 아래 것들의 프로젝트 폴더 이름(겹치지 않게) */
 	private static List<String> projectNames(List<RuleFile> files) {
 		List<String> names = new ArrayList<String>();
 		for (int i = 0; i < files.size(); i++) {
@@ -269,6 +271,7 @@ public class RuleFiles extends BaseObject {
 		return names;
 	}
 
+	/** null이 아니고 공백이 아닌 글자가 있는지 */
 	private static boolean hasText(String value) {
 		return value != null && value.trim().length() > 0;
 	}

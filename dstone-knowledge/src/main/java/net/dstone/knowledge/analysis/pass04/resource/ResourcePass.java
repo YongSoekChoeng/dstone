@@ -53,10 +53,13 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 	@Autowired
 	private EncodingDetector encodingDetector;
 
+	/** MyBatis / iBATIS 매퍼와 쿼리 XML을 읽는 도구 */
 	private final MapperXmlReader mapperXmlReader = new MapperXmlReader();
 
+	/** 설정 파일, 빌드 파일, Spring XML을 읽는 도구 */
 	private final ResourceReaders resourceReaders = new ResourceReaders();
 
+	/** DDL 스크립트를 읽는 도구 */
 	private final DdlReader ddlReader = new DdlReader();
 
 	@Override
@@ -77,15 +80,21 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 	 * </pre>
 	 */
 	private static class Prepared {
+		/** 이 단계에서 읽지 않는 파일이면 그 이유. 읽었으면 null */
 		String skipReason;
+		/** analysis_mapper 에 넣을 행(SQL statement) */
 		List<Map<String, Object>> mappers = new ArrayList<Map<String, Object>>();
+		/** analysis_config 에 넣을 행(설정 키와 값) */
 		List<Map<String, Object>> configs = new ArrayList<Map<String, Object>>();
+		/** analysis_resource 에 넣을 행(의존성, 빈, 테이블 …) */
 		List<Map<String, Object>> resources = new ArrayList<Map<String, Object>>();
 	}
 
+	/** 파일 단위 실행기에 "준비 = read, 저장 = 이 파일의 행을 바꿔 쓰기"를 넘겨 XML, 설정, 빌드, DDL 파일을 처리합니다. */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		final Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
+		// counts: [0] SQL statement 수, [1] 설정 값 수, [2] 그 밖의 항목 수
 		final int[] counts = new int[3];
 		FileHandler<Prepared> handler = new FileHandler<Prepared>() {
 			@Override
@@ -122,6 +131,14 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 		info("RESOURCE: SQL statement/조각 " + counts[0] + "건, 설정 값 " + counts[1] + "건, 그 밖의 항목 " + counts[2] + "건. analysisId=" + context.getAnalysisId());
 	}
 
+	/**
+	 * <pre>
+	 * 준비: 파일 용도(fileType)를 보고 알맞은 읽기 도구에 넘깁니다. DB에 쓰지 않습니다.
+	 *
+	 * 매퍼·쿼리 XML → MapperXmlReader / Spring XML → readSpringXml / DDL → DdlReader
+	 * pom.xml·build.gradle → readPom·readGradle / yml → readYaml / XML 프로퍼티 → readXmlProperties / .properties → readProperties
+	 * </pre>
+	 */
 	private Prepared read(Path root, Map<String, Object> file) throws Exception {
 		Prepared prepared = new Prepared();
 		String fileType = (String) file.get("fileType");
@@ -165,6 +182,7 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 		return prepared;
 	}
 
+	/** 읽기 도구가 만든 행마다 리비전 ID와 파일 ID를 채웁니다. */
 	private void fill(List<Map<String, Object>> rows, long revisionId, long fileId) {
 		for (int i = 0; i < rows.size(); i++) {
 			rows.get(i).put("revisionId", revisionId);

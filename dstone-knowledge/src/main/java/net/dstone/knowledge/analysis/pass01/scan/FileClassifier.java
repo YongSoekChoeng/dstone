@@ -95,6 +95,14 @@ public class FileClassifier {
 		return xmlTypeOf(fileName.toLowerCase(Locale.ROOT), text);
 	}
 
+	/**
+	 * <pre>
+	 * XML 파일의 용도를 맨 위 요소 이름으로 가립니다.
+	 * 예: &lt;mapper&gt; → MYBATIS_MAPPER, &lt;beans&gt; → SPRING_XML, &lt;web-app&gt; → WEB_XML
+	 * 이름이 흔한 낱말이라 헷갈릴 수 있는 것(html, document, properties, configuration)은 내용을 조금 더 본다.
+	 * 아무것에도 안 걸리면 그냥 XML입니다.
+	 * </pre>
+	 */
 	private String xmlTypeOf(String lowerName, String text) {
 		if ("pom.xml".equals(lowerName)) {
 			return "BUILD";
@@ -187,12 +195,14 @@ public class FileClassifier {
 				return null;
 			}
 			if (text.startsWith("<?", lt)) {
+				// <?xml ... ?> 선언이나 처리 지시문. 건너뛴다.
 				int end = text.indexOf("?>", lt);
 				if (end < 0) {
 					return null;
 				}
 				pos = end + 2;
 			} else if (text.startsWith("<!--", lt)) {
+				// 주석. 건너뛴다.
 				int end = text.indexOf("-->", lt);
 				if (end < 0) {
 					return null;
@@ -214,6 +224,7 @@ public class FileClassifier {
 				}
 				pos = end + 1;
 			} else {
+				// 처음 만난 진짜 요소. '<' 바로 뒤부터 이름에 쓸 수 있는 글자가 이어지는 곳까지가 이름이다.
 				int nameStart = lt + 1;
 				int nameEnd = nameStart;
 				while (nameEnd < length) {

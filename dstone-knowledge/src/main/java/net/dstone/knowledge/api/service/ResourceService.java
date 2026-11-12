@@ -60,6 +60,10 @@ public class ResourceService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * SQL statement 목록(페이지)
+	 * </pre>
+	 *
 	 * @param namespace 네임스페이스에 이 글자가 들어간 것만
 	 * @param statementId statement id에 이 글자가 들어간 것만
 	 */
@@ -76,6 +80,10 @@ public class ResourceService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * 설정 값 목록(페이지)
+	 * </pre>
+	 *
 	 * @param key 키에 이 글자가 들어간 것만
 	 */
 	public Map<String, Object> getConfigList(long revisionId, String key, String value, int page, int size) {
@@ -90,6 +98,10 @@ public class ResourceService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * 그 밖의 자원(빈, 의존성, 서블릿 매핑 …) 목록(페이지)
+	 * </pre>
+	 *
 	 * @param resourceType SPRING_BEAN / COMPONENT_SCAN / DEPENDENCY / SERVLET_MAPPING / FILTER_MAPPING / LISTENER ...
 	 * @param name 이름에 이 글자가 들어간 것만
 	 * @param value 값(빈이면 클래스 이름)에 이 글자가 들어간 것만. 대소문자는 가리지 않는다
@@ -106,6 +118,7 @@ public class ResourceService extends BaseObject {
 		return result;
 	}
 
+	/** 페이지 조회 조건. 페이지는 1부터, 크기는 기본 50·최대 MAX_PAGE_SIZE */
 	private Map<String, Object> paging(long revisionId, int page, int size) {
 		int pageNo = page < 1 ? 1 : page;
 		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);

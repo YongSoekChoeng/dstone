@@ -57,7 +57,9 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
 	 * HTTP 진입점 규칙의 애노테이션(HttpEndpointBuilder).
+	 * </pre>
 	 *
 	 * @return [{targetKind, targetId, annotationName, attributesJson, fileId, lineStart, ownerSymbolId, methodName, paramCount}]
 	 */
@@ -185,6 +187,7 @@ public class SemanticDao extends BaseDao {
 		return param;
 	}
 
+	/** 값 하나짜리 목록(null 이면 빈 목록) */
 	private static List<String> single(String value) {
 		List<String> list = new ArrayList<String>();
 		if (value != null) {
@@ -193,6 +196,7 @@ public class SemanticDao extends BaseDao {
 		return list;
 	}
 
+	/** @WebServlet 이 붙은 서블릿의 진입점. 주소마다, 처리 메소드(doGet ...)마다 한 행 */
 	public int insertWebServletEndpoints(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertWebServletEndpoints", revisionId);
 	}
@@ -234,6 +238,10 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 진입점 한 행을 넣습니다.
+	 * </pre>
+	 *
 	 * @param endpoint {revisionId, endpointType, httpMethod, path, symbolId, methodId, propertiesJson, fileId, lineStart}
 	 */
 	public void insertEndpoint(Map<String, Object> endpoint) {
@@ -241,16 +249,22 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * analysis_resource 한 행을 넣습니다.
+	 * </pre>
+	 *
 	 * @param resource {revisionId, resourceType, name, location, value, propertiesJson, fileId, lineStart}
 	 */
 	public void insertResource(Map<String, Object> resource) {
 		sqlSessionCommon.insert(NS + "insertResource", resource);
 	}
 
+	/** main(): public static void main(String[] args) */
 	public int insertMainEndpoints(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertMainEndpoints", revisionId);
 	}
 
+	/** 주소로 바로 열 수 있는 JSP. WEB-INF 아래의 JSP 는 밖에서 바로 열 수 없으므로 뺀다. 주소는 웹 루트(webapp, WebContent ...) 아래의 경로다 */
 	public int insertJspEndpoints(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertJspEndpoints", revisionId);
 	}
@@ -258,6 +272,10 @@ public class SemanticDao extends BaseDao {
 	/* ---------- Struts ---------- */
 
 	/**
+	 * <pre>
+	 * web.xml 의 서블릿 매핑(주소 모양과 서블릿 클래스)
+	 * </pre>
+	 *
 	 * @return [{urlPattern, servletClass}] - web.xml의 서블릿 매핑
 	 */
 	public List<Map<String, Object>> selectServletMappings(long revisionId) {
@@ -265,6 +283,10 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 타입 하나에 직접 적힌 메소드 가운데 이름이 맞는 것
+	 * </pre>
+	 *
 	 * @return [{methodId, name, lineStart}] - 이 타입에 직접 적힌 메소드 가운데 이름이 맞는 것
 	 */
 	public List<Map<String, Object>> selectMethodsByName(long revisionId, String symbolId, List<String> names) {
@@ -276,7 +298,9 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
 	 * 설정 파일(struts-config.xml 등)이 "이 클래스가 요청을 처리한다"고 알려 준 타입의 계층을 정합니다(HIGH). 이미 정해졌으면 바꾸지 않습니다.
+	 * </pre>
 	 *
 	 * @param layerBy 근거. 예: struts-config.xml
 	 */
@@ -291,15 +315,21 @@ public class SemanticDao extends BaseDao {
 
 	/* ---------- JSP ---------- */
 
+	/** JSP 에서 만든 타입(JspToJava 가 바꾼 것)은 화면 계층이다 */
 	public int updateJspLayer(long revisionId) {
 		return sqlSessionCommon.update(NS + "updateJspLayer", revisionId);
 	}
 
+	/** JSP 진입점에 그 JSP 의 실행 메소드(_jspService)를 붙인다. 그래야 "이 화면이 무엇을 부르나" 를 진입점에서 따라갈 수 있다 */
 	public int updateJspEndpointMethods(long revisionId) {
 		return sqlSessionCommon.update(NS + "updateJspEndpointMethods", revisionId);
 	}
 
 	/**
+	 * <pre>
+	 * 진입점 주소와 그것을 처리하는 메소드(화면 → 메소드 연결에 쓴다)
+	 * </pre>
+	 *
 	 * @return [{path, methodId}] - HTTP와 서블릿 진입점의 주소와 그것을 처리하는 메소드
 	 */
 	public List<Map<String, Object>> selectEndpointHandlers(long revisionId) {
@@ -337,6 +367,7 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectScriptByPathEnd", param);
 	}
 
+	/** 경로로 JSP 파일 찾기. 정확히 같거나, 그 경로로 끝나는 것 */
 	public List<Long> selectJspByPathEnd(long revisionId, String path) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -366,6 +397,7 @@ public class SemanticDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectScreenNamedFileIds", revisionId);
 	}
 
+	/** 이 용도들의 파일을 file_id 순으로 조금씩 꺼냅니다. */
 	public List<Map<String, Object>> selectFilePageByTypes(long revisionId, List<String> fileTypes, long afterId, int limit) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -433,43 +465,55 @@ public class SemanticDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 관계 한 행을 넣습니다.
+	 * </pre>
+	 *
 	 * @param relation {revisionId, fromKind, fromId, relationType, toKind, toId, toExternal, confidence, resolutionStatus, propertiesJson, fileId, lineStart}
 	 */
 	public void insertRelation(Map<String, Object> relation) {
 		sqlSessionCommon.insert(NS + "insertRelation", relation);
 	}
 
+	/** 종류별 진입점 수 */
 	public List<Map<String, Object>> selectEndpointSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectEndpointSummary", revisionId);
 	}
 
+	/** 계층별 타입 수 */
 	public List<Map<String, Object>> selectLayerSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectLayerSummary", revisionId);
 	}
 
+	/** 진입점 수(목록과 같은 조건) */
 	public int countEndpoint(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countEndpoint", condition);
 		return count.intValue();
 	}
 
+	/** 진입점 목록(페이지) */
 	public List<Map<String, Object>> selectEndpointList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectEndpointList", condition);
 	}
 
 	/* ============ 소스에서 찾는 테이블 / 컬럼 한글명 (SourceNamePlugin) ============ */
 
+	/** 이름이 이 리비전의 어떤 컬럼(SQL 에서 쓰인 것, DDL 에 있는 것)과 같은 필드. 어느 테이블의 것인지는 모른다 */
 	public List<Map<String, Object>> selectNameCandidateFields(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectNameCandidateFields", revisionId);
 	}
 
+	/** JPA 엔티티: @Table 이 붙은 타입. 테이블 이름과 타입의 설명 애노테이션(@ApiModel, @Schema, @Comment) */
 	public List<Map<String, Object>> selectEntityTypes(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectEntityTypes", revisionId);
 	}
 
+	/** JPA 엔티티의 필드. 컬럼 이름은 @Column(name) 이 있으면 그것, 없으면 필드 이름(부르는 쪽이 정한다). @Transient 는 뺀다 */
 	public List<Map<String, Object>> selectEntityFields(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectEntityFields", revisionId);
 	}
 
+	/** 소스에서 읽은 한글명 한 행(SourceNamePlugin) */
 	public int insertSourceName(Map<String, Object> row) {
 		return sqlSessionCommon.insert(NS + "insertSourceName", row);
 	}

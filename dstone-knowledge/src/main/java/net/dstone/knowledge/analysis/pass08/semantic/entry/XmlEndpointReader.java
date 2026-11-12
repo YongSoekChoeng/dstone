@@ -46,6 +46,14 @@ public class XmlEndpointReader {
 	}
 
 	/**
+	 * <pre>
+	 * 설정 XML 하나에서 규칙에 적힌 요소를 모두 찾아 진입점 후보로 만듭니다.
+	 *
+	 *   - 줄 번호: DOM 은 줄을 주지 않으므로 원본 글에서 같은 이름의 여는 태그를 차례로 세어 맞춘다.
+	 *   - 주소: 규칙의 KEY 속성 값에 접두어·접미어를 붙인다. ${...} 처럼 실행할 때 정해지는 값은 건너뛴다.
+	 *   - 클래스·메소드: 그 요소나 가장 가까운 바깥 요소의 속성에서 읽는다.
+	 * </pre>
+	 *
 	 * @param text XML 의 내용(올바른 인코딩으로 읽은 글)
 	 * @throws Exception XML 이 아니거나 깨졌을 때
 	 */
@@ -87,6 +95,7 @@ public class XmlEndpointReader {
 		return null;
 	}
 
+	/** 접두어를 뗀 요소 이름: beans:bean → bean */
 	static String localName(String nodeName) {
 		int colon = nodeName.indexOf(':');
 		return colon < 0 ? nodeName : nodeName.substring(colon + 1);

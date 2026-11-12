@@ -130,6 +130,7 @@ public class EmbeddingStatusService extends BaseObject {
 		return recentItems > 0 && embeddingWorker.getLastError() == null ? "WORKING" : "WAITING";
 	}
 
+	/** 숫자면 long 으로, 아니면 0 */
 	private long longOf(Object value) {
 		return value instanceof Number ? ((Number) value).longValue() : 0L;
 	}

@@ -85,6 +85,10 @@ public class DiagnosticService extends BaseObject {
 	private RuleFiles ruleFiles;
 
 	/**
+	 * <pre>
+	 * 리비전 하나의 분석 품질을 점검해, 무엇이 부족하고 어떻게 고치는지(solution) 목록으로 돌려줍니다.
+	 * </pre>
+	 *
 	 * @return {revisionId, projectId, summary: {RULE: n, ...}, checks: [{key, title, level, solution, count, total, message, samples}]}
 	 */
 	public Map<String, Object> diagnose(long revisionId) {
@@ -95,12 +99,14 @@ public class DiagnosticService extends BaseObject {
 		String projectId = (String) revision.get("projectId");
 		Map<String, Object> project = projectService.getProject(projectId);
 
+		// 1) LINK 단계가 계산해 둔 품질 지표를 읽는다
 		List<Map<String, Object>> checks = new ArrayList<Map<String, Object>>();
 		Map<String, Object> metrics = new LinkedHashMap<String, Object>();
 		List<Map<String, Object>> metricRows = relationDao.selectMetricsByRevision(revisionId);
 		for (int i = 0; i < metricRows.size(); i++) {
 			metrics.put((String) metricRows.get(i).get("name"), metricRows.get(i).get("value"));
 		}
+		// 2) 항목별 점검. 각 점검이 checks 에 결과를 더한다
 		checkCalls(checks, metrics);
 		checkParse(checks, metrics);
 		checkUnsupportedFiles(checks, (String) project.get("localPath"));
@@ -113,6 +119,7 @@ public class DiagnosticService extends BaseObject {
 		checkLayers(checks, revisionId);
 		checkRules(checks, revisionId, projectId);
 
+		// 3) warn / bad 인 점검을 고치는 길(solution)별로 센다
 		Map<String, Object> summary = new TreeMap<String, Object>();
 		for (int i = 0; i < checks.size(); i++) {
 			Map<String, Object> check = checks.get(i);
@@ -131,6 +138,7 @@ public class DiagnosticService extends BaseObject {
 		return result;
 	}
 
+	/** 점검: 메소드 호출이 얼마나 풀렸는지(95% 이상 good, 80% 이상 warn, 그 아래 bad) */
 	private void checkCalls(List<Map<String, Object>> checks, Map<String, Object> metrics) {
 		Number rate = (Number) metrics.get("callResolutionRate");
 		if (rate == null) {
@@ -145,6 +153,7 @@ public class DiagnosticService extends BaseObject {
 				, null));
 	}
 
+	/** 점검: Java 파일을 모두 파싱했는지 */
 	private void checkParse(List<Map<String, Object>> checks, Map<String, Object> metrics) {
 		Number rate = (Number) metrics.get("parseSuccessRate");
 		if (rate == null) {
@@ -223,6 +232,7 @@ public class DiagnosticService extends BaseObject {
 				, samples));
 	}
 
+	/** 점검: 진입점이 종류별로 몇 개이고, 처리 메소드를 못 찾은 진입점이 있는지 */
 	private void checkEndpoints(List<Map<String, Object>> checks, long revisionId) {
 		List<Map<String, Object>> rows = diagnosticDao.selectEndpointSummary(revisionId);
 		int total = 0;
@@ -253,6 +263,7 @@ public class DiagnosticService extends BaseObject {
 		}
 	}
 
+	/** 점검: 서버를 부르지 않는 화면이 얼마나 되는지(40% 넘으면 화면 규칙을 의심) */
 	private void checkScreens(List<Map<String, Object>> checks, long revisionId) {
 		Map<String, Object> screens = diagnosticDao.selectScreenSummary(revisionId);
 		int total = toInt(screens.get("total")).intValue();
@@ -277,6 +288,7 @@ public class DiagnosticService extends BaseObject {
 				, samples));
 	}
 
+	/** 점검: 이름은 만들었는데 대상이 없는 거래 호출(REQUESTS)과 SQL 호출(EXECUTES_SQL) */
 	private void checkUnresolvedTargets(List<Map<String, Object>> checks, long revisionId) {
 		int requests = diagnosticDao.countUnresolvedTargets(revisionId, "REQUESTS");
 		if (requests > 0) {
@@ -294,6 +306,7 @@ public class DiagnosticService extends BaseObject {
 		}
 	}
 
+	/** 점검: 상수로 적었는데 값을 계산하지 못한 HTTP 주소 */
 	private void checkUnresolvedPaths(List<Map<String, Object>> checks, long revisionId) {
 		int count = diagnosticDao.countUnresolvedPaths(revisionId);
 		if (count == 0) {
@@ -321,6 +334,7 @@ public class DiagnosticService extends BaseObject {
 				, diagnosticDao.selectJavaSqlWithoutTable(revisionId, SAMPLES)));
 	}
 
+	/** 점검: 종류를 모르는 XML(자체 프레임워크 설정 파일일 수 있다) */
 	private void checkUnknownXml(List<Map<String, Object>> checks, long revisionId) {
 		int count = diagnosticDao.countUnknownXml(revisionId);
 		if (count == 0) {
@@ -332,6 +346,7 @@ public class DiagnosticService extends BaseObject {
 				, diagnosticDao.selectUnknownXml(revisionId, SAMPLES)));
 	}
 
+	/** 점검: 계층을 모르는 클래스와 이름으로 짐작한 클래스가 얼마나 되는지 */
 	private void checkLayers(List<Map<String, Object>> checks, long revisionId) {
 		Map<String, Object> layers = diagnosticDao.selectClassLayerSummary(revisionId);
 		int total = toInt(layers.get("total")).intValue();
@@ -348,6 +363,7 @@ public class DiagnosticService extends BaseObject {
 				, diagnosticDao.selectNoLayerPackages(revisionId, SAMPLES)));
 	}
 
+	/** 점검: 어떤 규칙 파일을 썼는지, 이 프로젝트 전용 규칙 폴더(projects/{ID})가 있는지 */
 	private void checkRules(List<Map<String, Object>> checks, long revisionId, String projectId) {
 		List<String> applied = diagnosticDao.selectAppliedRuleSetNames(revisionId);
 		boolean projectFolder = false;
@@ -370,6 +386,15 @@ public class DiagnosticService extends BaseObject {
 				, samples));
 	}
 
+	/**
+	 * <pre>
+	 * 점검 결과 한 건을 만듭니다.
+	 * </pre>
+	 *
+	 * @param level good / info / warn / bad
+	 * @param solution 고치는 길: NONE / CLASSPATH / SETTING / RULE / SOURCE / DEVELOP
+	 * @param samples 예시 몇 건(없으면 null)
+	 */
 	private Map<String, Object> check(String key, String title, String level, String solution, Integer count, Integer total, String message
 			, List<Map<String, Object>> samples) {
 		Map<String, Object> check = new LinkedHashMap<String, Object>();
@@ -384,6 +409,7 @@ public class DiagnosticService extends BaseObject {
 		return check;
 	}
 
+	/** 숫자 → Integer. null 이면 null */
 	private static Integer toInt(Object value) {
 		return value == null ? null : Integer.valueOf(((Number) value).intValue());
 	}

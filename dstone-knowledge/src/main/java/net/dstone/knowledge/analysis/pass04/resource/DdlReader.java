@@ -60,6 +60,10 @@ public class DdlReader {
 	private static final int MAX_COMMENT = 1000;
 
 	/**
+	 * <pre>
+	 * DDL 스크립트에서 테이블·컬럼과 그 설명(COMMENT)을 읽습니다.
+	 * </pre>
+	 *
 	 * @param text DDL 파일의 내용
 	 * @return analysis_resource 에 넣을 행들(revisionId / fileId 는 부르는 쪽이 채운다)
 	 */
@@ -94,16 +98,28 @@ public class DdlReader {
 	}
 
 	/**
+	 * <pre>
+	 * CREATE TABLE 문장 하나에서 테이블 행 하나와 컬럼 행들을 만듭니다.
+	 *
+	 * 흐름:
+	 *   1) 테이블 이름과 ( ... ) 범위를 찾는다.
+	 *   2) 테이블 설명: 닫는 괄호 뒤의 COMMENT='...'(MySQL) → 없으면 주변의 일반 주석(-- 주문)
+	 *   3) 괄호 안을 쉼표로 나눠(괄호 안 쉼표는 빼고) 컬럼마다 이름·타입·순서·설명을 적는다.
+	 *      PRIMARY KEY, CONSTRAINT 같은 줄은 컬럼이 아니라서 건너뛴다.
+	 * </pre>
+	 *
 	 * @param raw 주석이 남아 있는 이 문장의 원문(일반 주석의 한글명을 읽는다)
 	 * @param createAt raw 안에서 CREATE 가 시작하는 위치
 	 */
 	private void readCreateTable(String sql, Matcher create, int line, List<Map<String, Object>> rows, String raw, int createAt) {
+		// 1) 테이블 이름과 괄호 범위
 		String table = tableName(create.group(1));
 		int open = create.end() - 1;
 		int close = closingParen(sql, open);
 		if (table == null || close < 0) {
 			return;
 		}
+		// 2) 테이블 설명
 		Matcher tableComment = TABLE_COMMENT.matcher(sql.substring(close + 1));
 		String tableText = tableComment.find() ? unquote(tableComment.group(1)) : null;
 		Map<String, Object> tableProperties = new LinkedHashMap<String, Object>();
@@ -116,6 +132,7 @@ public class DdlReader {
 		rows.add(row("DDL_TABLE", table, tableText, tableProperties, line));
 		Map<String, String> notes = columnNotesOf(raw, createAt);
 
+		// 3) 컬럼
 		List<String> parts = topLevelParts(sql.substring(open + 1, close));
 		int ordinal = 0;
 		for (int i = 0; i < parts.size(); i++) {
@@ -238,6 +255,7 @@ public class DdlReader {
 		return (at < 0 ? line : line.substring(0, at)).trim();
 	}
 
+	/** 줄에서 SQL 주석(-- 나 /*)이 시작하는 위치. 작은따옴표 안의 글은 건너뜁니다. 없으면 -1 */
 	private int commentStart(String line) {
 		int i = 0;
 		while (i < line.length()) {
@@ -254,6 +272,7 @@ public class DdlReader {
 		return -1;
 	}
 
+	/** COMMENT ON TABLE / COMMENT ON COLUMN 문장 하나를 테이블·컬럼 설명 행으로 만듭니다. */
 	private void readCommentOn(Matcher comment, int line, List<Map<String, Object>> rows) {
 		String target = comment.group(2);
 		String text = unquote(comment.group(3));
@@ -361,6 +380,7 @@ public class DdlReader {
 		return ranges;
 	}
 
+	/** at 위치가 들어 있는 줄이 token 하나만으로 이뤄졌는지(앞뒤 공백 제외). 예: 한 줄에 "/" 만 있는 Oracle 문장 끝 표시 */
 	private boolean lineIsOnly(String text, int at, String token) {
 		int lineStart = text.lastIndexOf('\n', at - 1) + 1;
 		int lineEnd = text.indexOf('\n', at);
@@ -470,10 +490,12 @@ public class DdlReader {
 		return name.length() == 0 || name.length() > 300 ? null : name;
 	}
 
+	/** 따옴표·백틱·대괄호를 벗기고 대문자로: "tb_order" → TB_ORDER */
 	private String bareName(String name) {
 		return name.replace("\"", "").replace("`", "").replace("[", "").replace("]", "").trim().toUpperCase(Locale.ROOT);
 	}
 
+	/** 설명 글의 '' 를 ' 로 되돌리고 다듬습니다. 비었으면 null, 너무 길면 자릅니다. */
 	private String unquote(String text) {
 		String value = text.replace("''", "'").trim();
 		if (value.length() == 0) {
@@ -482,6 +504,7 @@ public class DdlReader {
 		return value.length() > MAX_COMMENT ? value.substring(0, MAX_COMMENT) : value;
 	}
 
+	/** analysis_resource 한 행을 만듭니다. */
 	private Map<String, Object> row(String type, String name, String value, Map<String, Object> properties, int line) {
 		Map<String, Object> row = new HashMap<String, Object>();
 		row.put("resourceType", type);

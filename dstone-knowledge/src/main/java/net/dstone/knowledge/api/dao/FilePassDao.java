@@ -26,6 +26,10 @@ public class FilePassDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 이 단계의 파일 진행 행 수
+	 * </pre>
+	 *
 	 * @param status 이 상태인 것만 셉니다. null이면 전부 셉니다.
 	 */
 	public int countFilePass(long revisionId, String pass, String status) {
@@ -35,6 +39,7 @@ public class FilePassDao extends BaseDao {
 		return count.intValue();
 	}
 
+	/** 아직 안 한 파일을 몇 개 꺼낸다 */
 	public List<Map<String, Object>> selectPendingFiles(long revisionId, String pass, int limit) {
 		Map<String, Object> param = param(revisionId, pass);
 		param.put("limit", limit);
@@ -51,10 +56,12 @@ public class FilePassDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateFilePass", statusParam(fileId, pass, status, errorMessage));
 	}
 
+	/** 단계별 파일 처리 결과 (리비전 조회 화면용) */
 	public List<Map<String, Object>> selectFilePassSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectFilePassSummary", revisionId);
 	}
 
+	/** 리비전 + 단계 조회 조건 */
 	private Map<String, Object> param(long revisionId, String pass) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -62,6 +69,7 @@ public class FilePassDao extends BaseDao {
 		return param;
 	}
 
+	/** 파일 하나의 단계 상태를 바꿀 값 */
 	private Map<String, Object> statusParam(long fileId, String pass, String status, String errorMessage) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("fileId", fileId);

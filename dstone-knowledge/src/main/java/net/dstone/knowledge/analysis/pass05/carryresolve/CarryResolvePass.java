@@ -74,12 +74,17 @@ public class CarryResolvePass extends BaseObject implements AnalysisPass {
 		if (baseRevisionId == null) {
 			return;
 		}
+		// counts: [0] 관계를 옮긴 파일 수, [1] 옮긴 관계 수, [2] 다시 풀 참조 수
 		final int[] counts = new int[3];
 		txTemplateCommon.execute(new TransactionCallbackWithoutResult() {
 			@Override
 			protected void doInTransactionWithoutResult(TransactionStatus status) {
+				// 1) 옮겨도 되는 파일(클래스 설명의 두 조건에 안 걸리는 파일)을 골라 "RESOLVE 끝남"으로 표시한다.
 				counts[0] = carryDao.carryResolvePasses(revisionId, baseRevisionId.longValue());
+				// 2) 그 파일들의 RESOLVE 관계를 앞 리비전에서 복사한다(LINK / SEMANTIC 관계는 빼고).
 				counts[1] = carryDao.copyRows(revisionId, "analysis_relation", "RESOLVE", NOT_FROM_RESOLVE);
+				// 3) 내용은 같지만 관계를 다시 풀어야 하는 파일은, CARRY 가 복사해 온 참조에 앞 리비전의 상태가 남아 있다.
+				//    헷갈리지 않게 PENDING 으로 되돌린다.
 				counts[2] = carryDao.resetReferencesToResolve(revisionId);
 			}
 		});

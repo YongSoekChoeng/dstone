@@ -34,6 +34,7 @@ import java.util.Locale;
  */
 public final class SqlFormatter {
 
+	/** 들여쓰기 한 단계의 칸 수 */
 	private static final int INDENT = 4;
 
 	/** 이것보다 긴 SQL은 정리하지 않는다 */
@@ -55,8 +56,10 @@ public final class SqlFormatter {
 	/** 앞뒤로 한 칸씩 띄우는 비교 연산자 */
 	private static final String COMPARISONS = "|=|<>|!=|^=|>=|<=|<|>|";
 
+	/** 토큰 종류: 공백 / 블록 주석 / 줄 주석 / 문자열 / 파라미터(#{..} 등) / 단어 / ( / ) / , / ; / 연산자 */
 	private enum Type { SPACE, BLOCK_COMMENT, LINE_COMMENT, STRING, PARAM, WORD, OPEN, CLOSE, COMMA, SEMI, OP }
 
+	/** SQL 을 나눈 조각 하나. 글자는 원문 그대로 들고 있습니다. */
 	private static class Token {
 		final Type type;
 		final String text;
@@ -69,10 +72,12 @@ public final class SqlFormatter {
 			this.text = text;
 		}
 
+		/** 대문자로(절 이름 비교용) */
 		String upper() {
 			return text.toUpperCase(Locale.ROOT);
 		}
 
+		/** 이 단어인지(대소문자 무시) */
 		boolean is(String word) {
 			return type == Type.WORD && text.equalsIgnoreCase(word);
 		}
@@ -86,10 +91,15 @@ public final class SqlFormatter {
 		final int base;
 		/** 이 괄호를 연 줄의 칸. 닫는 괄호가 여기에 선다 */
 		final int openIndent;
+		/** 지금 쓰고 있는 절 이름(SELECT, FROM …). 절 밖이면 null */
 		String clause;
+		/** 절 이름만 쓰고 아직 내용을 안 썼는지(첫 내용 앞에서 줄을 바꾼다) */
 		boolean pendingContent;
+		/** JOIN 의 ON 조건 안인지(AND/OR 를 더 깊이 들여 쓴다) */
 		boolean inOn;
+		/** BETWEEN 을 만났고 짝이 되는 AND 를 아직 못 만났는지(그 AND 는 줄을 바꾸지 않는다) */
 		boolean betweenPending;
+		/** 열려 있는 CASE 들이 시작한 칸(안쪽이 뒤) */
 		final List<Integer> cases = new ArrayList<Integer>();
 
 		Frame(String kind, int base, int openIndent) {
@@ -99,8 +109,11 @@ public final class SqlFormatter {
 		}
 	}
 
+	/** 나눈 토큰 전체 */
 	private final List<Token> tokens;
+	/** 정리한 결과 */
 	private final StringBuilder out = new StringBuilder();
+	/** 괄호 단계 스택. 맨 아래는 문장 전체 */
 	private final List<Frame> frames = new ArrayList<Frame>();
 	/** 지금 줄의 들여쓰기와, 그 줄에 아직 아무것도 안 썼는지 */
 	private int lineIndent = 0;
@@ -109,13 +122,20 @@ public final class SqlFormatter {
 	private boolean mustBreak = false;
 	/** 방금 쓴 것이 줄 앞 쉼표(", ")라서 다음 글자를 붙여 써야 하는지 */
 	private boolean glueNext = false;
+	/** 바로 앞에 쓴 토큰 */
 	private Token previous;
 
+	/** format() 으로만 씁니다. */
 	private SqlFormatter(List<Token> tokens) {
 		this.tokens = tokens;
 	}
 
 	/**
+	 * <pre>
+	 * SQL 을 정리합니다. 토큰으로 나눈 뒤(tokenize) 앞에서부터 하나씩 규칙대로 씁니다(run → handle).
+	 * 비었거나 너무 길거나, 정리 중 문제가 생기거나, 결과의 글자가 원문과 다르면 원문을 그대로 돌려줍니다.
+	 * </pre>
+	 *
 	 * @param sql 매퍼에 적힌 SQL
 	 * @return 정리한 SQL. 정리할 수 없으면 원문 그대로
 	 */
@@ -135,6 +155,12 @@ public final class SqlFormatter {
 
 	/* ============================== 글자 나누기 ============================== */
 
+	/**
+	 * <pre>
+	 * SQL 을 토큰으로 나눕니다. 공백은 토큰으로 만들지 않고, 다음 토큰에 "앞에 공백/줄바꿈이 있었다"로 적어 둡니다.
+	 * 주석, 문자열, 파라미터(#{..} ${..} #x# $x$ @@include(..)@@)는 통째로 토큰 하나입니다.
+	 * </pre>
+	 */
 	private static List<Token> tokenize(String sql) {
 		List<Token> result = new ArrayList<Token>();
 		int length = sql.length();
@@ -210,6 +236,7 @@ public final class SqlFormatter {
 		return result;
 	}
 
+	/** 따옴표 글이 끝난 바로 뒤 위치. '' 처럼 두 번 겹친 따옴표는 글 안의 따옴표다. 닫히지 않으면 끝까지 */
 	private static int quotedEnd(String sql, int start, char quote) {
 		int i = start + 1;
 		while (i < sql.length()) {
@@ -243,14 +270,17 @@ public final class SqlFormatter {
 		return -1;
 	}
 
+	/** 이름의 첫 글자가 될 수 있는지 */
 	private static boolean isIdentifierStart(char c) {
 		return Character.isLetter(c) || c == '_';
 	}
 
+	/** 단어에 들어가는 글자인지(영문·숫자·_·점) */
 	private static boolean isWordChar(char c) {
 		return Character.isLetterOrDigit(c) || c == '_' || c == '.';
 	}
 
+	/** 공백을 모두 뺀 글. 정리 전후를 견줄 때 씁니다. */
 	private static String withoutSpaces(String text) {
 		StringBuilder sb = new StringBuilder(text.length());
 		for (int i = 0; i < text.length(); i++) {
@@ -263,6 +293,7 @@ public final class SqlFormatter {
 
 	/* ============================== 쓰기 ============================== */
 
+	/** 토큰을 처음부터 끝까지 handle() 로 씁니다. */
 	private String run() {
 		frames.add(new Frame("QUERY", 0, 0));
 		int i = 0;
@@ -272,6 +303,7 @@ public final class SqlFormatter {
 		return trimEnd(out.toString());
 	}
 
+	/** 지금 괄호 단계 */
 	private Frame frame() {
 		return frames.get(frames.size() - 1);
 	}
@@ -282,10 +314,12 @@ public final class SqlFormatter {
 		Frame frame = frame();
 		boolean query = "QUERY".equals(frame.kind);
 
+		// 1) 주석
 		if (token.type == Type.BLOCK_COMMENT || token.type == Type.LINE_COMMENT) {
 			comment(token, frame);
 			return i + 1;
 		}
+		// 2) 절 이름(SELECT, FROM …)이나 JOIN 이면 줄을 바꿔 쓴다
 		if (query && token.type == Type.WORD && frame.cases.isEmpty()) {
 			int next = clause(i, frame);
 			if (next > i) {
@@ -296,6 +330,7 @@ public final class SqlFormatter {
 				return next;
 			}
 		}
+		// 3) 괄호
 		if (token.type == Type.OPEN) {
 			open(i, frame);
 			return i + 1;
@@ -305,6 +340,7 @@ public final class SqlFormatter {
 			return i + 1;
 		}
 
+		// 4) 절의 첫 내용이면 줄을 바꾸고, 쉼표 · 세미콜론 · AND/OR · CASE 를 규칙대로 쓴다
 		startContent(frame);
 		if (token.type == Type.COMMA) {
 			if ((query && frame.cases.isEmpty()) || "LIST".equals(frame.kind)) {
@@ -452,6 +488,7 @@ public final class SqlFormatter {
 		return tokens.get(index).upper();
 	}
 
+	/** i 부터 count 개의 단어를 한 칸씩 띄워 씁니다(절 이름처럼 여러 단어로 된 것). */
 	private int writeWords(int i, int count) {
 		for (int k = 0; k < count; k++) {
 			Token token = tokens.get(i + k);
@@ -461,6 +498,7 @@ public final class SqlFormatter {
 		return i + count;
 	}
 
+	/** 여는 괄호. 안이 서브쿼리면 QUERY, INSERT 컬럼·VALUES 목록이면 LIST, 그 밖은 INLINE(한 줄) 단계를 엽니다. */
 	private void open(int i, Frame frame) {
 		Token next = nextSignificant(i);
 		boolean subquery = next != null && (next.is("SELECT") || next.is("WITH"));
@@ -486,6 +524,7 @@ public final class SqlFormatter {
 		glueNext = true;
 	}
 
+	/** 닫는 괄호. 단계를 닫고, 한 줄 괄호가 아니면 여는 괄호가 있던 줄의 칸에 맞춰 씁니다. */
 	private void close(Token token) {
 		if (frames.size() == 1) {
 			write(")", false);
@@ -500,6 +539,7 @@ public final class SqlFormatter {
 		previous = token;
 	}
 
+	/** 주석. 원문에서 줄 앞에 있었으면 새 줄에, 줄 끝에 있었으면 그대로 줄 끝에 씁니다. 줄 주석 뒤에는 반드시 줄을 바꿉니다. */
 	private void comment(Token token, Frame frame) {
 		if (token.newlineBefore || mustBreak) {
 			int indent = frame.pendingContent ? contentIndent(frame) : (lineEmpty ? lineIndent : Math.max(lineIndent, contentIndent(frame)));
@@ -523,6 +563,7 @@ public final class SqlFormatter {
 		}
 	}
 
+	/** 지금 단계에서 내용이 서는 칸 */
 	private int contentIndent(Frame frame) {
 		if ("LIST".equals(frame.kind)) {
 			return frame.base;
@@ -533,6 +574,7 @@ public final class SqlFormatter {
 		return frame.clause == null ? frame.base : frame.base + INDENT;
 	}
 
+	/** i 뒤의, 주석이 아닌 첫 토큰. 없으면 null */
 	private Token nextSignificant(int i) {
 		for (int k = i + 1; k < tokens.size(); k++) {
 			Type type = tokens.get(k).type;
@@ -543,6 +585,7 @@ public final class SqlFormatter {
 		return null;
 	}
 
+	/** 이 토큰 앞에 한 칸 띄울지. 비교 연산자 앞뒤는 늘 띄우고, 그 밖은 원문에 공백이 있었으면 띄웁니다. */
 	private boolean needSpace(Token token) {
 		if (lineEmpty || glueNext) {
 			return false;
@@ -556,6 +599,7 @@ public final class SqlFormatter {
 		return token.spaceBefore;
 	}
 
+	/** 지금 줄에 글을 씁니다(필요하면 앞에 한 칸). */
 	private void write(String text, boolean space) {
 		if (mustBreak && !lineEmpty) {
 			newline(lineIndent);
@@ -569,6 +613,7 @@ public final class SqlFormatter {
 		glueNext = false;
 	}
 
+	/** 줄을 바꾸고 indent 칸 들여 씁니다. 아직 빈 줄이면 줄은 그대로 두고 들여쓰기만 다시 맞춥니다. */
 	private void newline(int indent) {
 		mustBreak = false;
 		glueNext = false;
@@ -587,6 +632,7 @@ public final class SqlFormatter {
 		lineEmpty = true;
 	}
 
+	/** 지금 줄 끝의 공백을 지웁니다. */
 	private void trimLineEnd() {
 		int end = out.length();
 		while (end > 0 && out.charAt(end - 1) == ' ') {
@@ -595,6 +641,7 @@ public final class SqlFormatter {
 		out.setLength(end);
 	}
 
+	/** 맨 앞의 빈 줄과 맨 뒤의 공백을 지웁니다. */
 	private static String trimEnd(String text) {
 		int end = text.length();
 		while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) {

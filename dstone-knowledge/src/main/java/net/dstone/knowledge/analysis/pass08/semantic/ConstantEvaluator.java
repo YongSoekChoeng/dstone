@@ -61,6 +61,7 @@ public class ConstantEvaluator {
 	private final BoundedCache<String, String> values = new BoundedCache<String, String>(20000);
 	private final BoundedCache<String, String[]> files = new BoundedCache<String, String[]>(20);
 
+	/** @param root 프로젝트 소스 폴더. 메소드가 return 하는 식을 소스에서 읽을 때 씁니다. */
 	public ConstantEvaluator(long revisionId, Path root, ResourceDao resourceDao, SymbolDao symbolDao, EncodingDetector encodingDetector) {
 		this.revisionId = revisionId;
 		this.root = root;
@@ -70,6 +71,10 @@ public class ConstantEvaluator {
 	}
 
 	/**
+	 * <pre>
+	 * 식이 어떤 문자열이 되는지 계산합니다(클래스 설명의 "따라가는 것").
+	 * </pre>
+	 *
 	 * @param expression 소스에 적힌 식
 	 * @param ownerSymbolId 그 식이 적힌 타입의 심볼 ID
 	 * @return 계산한 문자열. 알 수 없으면 null
@@ -78,6 +83,7 @@ public class ConstantEvaluator {
 		return evaluate(expression, ownerSymbolId, 0);
 	}
 
+	/** 식 하나를 계산합니다. + 로 나눈 조각을 하나씩 계산해 잇고, 한 조각이라도 모르면 null입니다. */
 	private String evaluate(String expression, String ownerSymbolId, int depth) {
 		if (expression == null || depth > MAX_DEPTH) {
 			return null;
@@ -94,6 +100,7 @@ public class ConstantEvaluator {
 		return sb.toString();
 	}
 
+	/** + 로 나눈 조각 하나를 계산합니다: "글" / (식) / 이름() 모양의 메소드 / 이름 모양의 필드. 그 밖은 null */
 	private String evaluateTerm(String term, String ownerSymbolId, int depth) {
 		if (term.length() >= 2 && term.charAt(0) == '"' && term.charAt(term.length() - 1) == '"' && term.indexOf('"', 1) == term.length() - 1) {
 			return unescape(term.substring(1, term.length() - 1));
@@ -153,6 +160,7 @@ public class ConstantEvaluator {
 		return value;
 	}
 
+	/** 타입과 그 상위 타입들의 ID(가까운 것부터). 캐시 → 없으면 DB */
 	private List<String> chainOf(String symbolId) {
 		List<String> chain = chains.get(symbolId);
 		if (chain == null) {
@@ -184,6 +192,7 @@ public class ConstantEvaluator {
 		return m.find() ? null : expression;
 	}
 
+	/** 소스 파일을 줄 단위로 읽습니다(캐시). 못 읽으면 null */
 	private String[] linesOf(String path, String encoding) {
 		String[] lines = files.get(path);
 		if (lines == null) {
@@ -233,6 +242,7 @@ public class ConstantEvaluator {
 		return terms;
 	}
 
+	/** Java 문자열의 \n, \t, \" 같은 이스케이프를 실제 글자로 바꿉니다. */
 	private String unescape(String text) {
 		if (text.indexOf('\\') < 0) {
 			return text;

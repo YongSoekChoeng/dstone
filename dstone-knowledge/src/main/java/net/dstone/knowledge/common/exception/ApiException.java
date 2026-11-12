@@ -16,6 +16,7 @@ public class ApiException extends RuntimeException {
 
 	private final HttpStatus status;
 
+	/** @param status 응답할 HTTP 상태 */
 	public ApiException(HttpStatus status, String message) {
 		super(message);
 		this.status = status;
@@ -25,14 +26,17 @@ public class ApiException extends RuntimeException {
 		return status;
 	}
 
+	/** 400: 요청 값이 잘못됨 */
 	public static ApiException badRequest(String message) {
 		return new ApiException(HttpStatus.BAD_REQUEST, message);
 	}
 
+	/** 404: 찾는 것이 없음 */
 	public static ApiException notFound(String message) {
 		return new ApiException(HttpStatus.NOT_FOUND, message);
 	}
 
+	/** 409: 지금 상태로는 할 수 없음(이미 분석 중 등) */
 	public static ApiException conflict(String message) {
 		return new ApiException(HttpStatus.CONFLICT, message);
 	}

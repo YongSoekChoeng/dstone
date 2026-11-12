@@ -84,6 +84,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFileParser;
  */
 public class DeclarationCollector {
 
+	// 컬럼 길이에 맞춰 자르는 기준. 이름 / 긴 글 / 시그니처 / 초기값 요약 / 인자 글
 	private static final int MAX_NAME = 300;
 	private static final int MAX_TEXT = 1000;
 	private static final int MAX_SIGNATURE = 2000;
@@ -107,6 +108,7 @@ public class DeclarationCollector {
 		LOMBOK_PACKAGES.put("JBossLog", "lombok.extern.jbosslog");
 	}
 
+	/** ID에 넣는 프로젝트 ID */
 	private final String projectId;
 	private final long revisionId;
 	private final long fileId;
@@ -114,7 +116,9 @@ public class DeclarationCollector {
 	/** ID에 넣는 소스 루트 */
 	private final String idScope;
 
+	/** 결과를 모으는 곳. collect()가 이것을 돌려준다 */
 	private final FileDeclarations out = new FileDeclarations();
+	/** Lombok 애노테이션을 보고 getter/setter 등을 만들어 넣는 도우미 */
 	private final LombokExpander lombokExpander = new LombokExpander(this);
 
 	/** import com.a.Foo; → Foo = com.a.Foo */
@@ -129,9 +133,14 @@ public class DeclarationCollector {
 	/** 같은 멤버 안에서 같은 타입을 여러 번 쓰면 한 번만 적으려고 둡니다. */
 	private final Set<String> typeUseKeys = new HashSet<String>();
 
+	/** 이 파일의 패키지. 기본 패키지면 빈 문자열 */
 	private String packageName = "";
 
 	/**
+	 * <pre>
+	 * 파일 하나를 처리할 수집기를 만듭니다.
+	 * </pre>
+	 *
 	 * @param idScope ID에 넣을 소스 루트(예: src/main/java, WEB-INF/src)
 	 */
 	public DeclarationCollector(String projectId, long revisionId, long fileId, String idScope) {
@@ -141,12 +150,23 @@ public class DeclarationCollector {
 		this.idScope = idScope == null ? "" : idScope;
 	}
 
+	/**
+	 * <pre>
+	 * 파일 하나의 선언과 참조를 모두 뽑아 돌려줍니다.
+	 *
+	 * 흐름:
+	 *   1) 패키지 이름을 읽는다.
+	 *   2) import를 정리해 둔다(애노테이션 전체 이름을 알아낼 때 쓴다). static import는 빼고.
+	 *   3) 맨 위 타입마다 declareType()을 부른다. 중첩 타입·멤버·참조는 그 안에서 차례로 내려가며 처리한다.
+	 * </pre>
+	 */
 	public FileDeclarations collect(CompilationUnit unit) {
 		if (unit.getPackageDeclaration().isPresent()) {
 			packageName = unit.getPackageDeclaration().get().getNameAsString();
 		}
 		out.setPackageName(packageName);
 
+		// 2) import 정리
 		NodeList<ImportDeclaration> imports = unit.getImports();
 		for (int i = 0; i < imports.size(); i++) {
 			ImportDeclaration declaration = imports.get(i);
@@ -161,6 +181,7 @@ public class DeclarationCollector {
 			}
 		}
 
+		// 3) 맨 위 타입부터 내려가기
 		NodeList<TypeDeclaration<?>> types = unit.getTypes();
 		for (int i = 0; i < types.size(); i++) {
 			TypeDeclaration<?> type = types.get(i);
@@ -179,8 +200,10 @@ public class DeclarationCollector {
 	 * </pre>
 	 */
 	static class TypeContext {
+		/** 이 타입의 행 */
 		TypeRow row;
 		String fqn;
+		/** 인터페이스(또는 애노테이션 타입)인지. 멤버의 기본 접근 제한자가 달라진다 */
 		boolean isInterface;
 		/** 이 타입 안에서 지금까지 나온 익명 클래스 수 / 지역 클래스 수. 이름(Outer$1)을 붙일 때 씁니다. */
 		int anonymousCount;
@@ -189,6 +212,7 @@ public class DeclarationCollector {
 		int explicitConstructors;
 		/** 소스에 적힌 메소드의 "이름/파라미터 수". 만들어 넣을 멤버가 이미 있는지 볼 때 씁니다. */
 		Set<String> methodKeys = new HashSet<String>();
+		/** 소스에 적힌 필드들. Lombok이 getter/setter를 만들 때 본다 */
 		List<FieldInfo> fields = new ArrayList<FieldInfo>();
 		/** 타입에 붙은 Lombok 애노테이션. 단순 이름 → 속성을 적은 글 */
 		Map<String, String> lombok = new LinkedHashMap<String, String>();
@@ -229,7 +253,9 @@ public class DeclarationCollector {
 	 * </pre>
 	 */
 	private static class From {
+		/** TYPE / METHOD / FIELD */
 		final String kind;
+		/** 그 대상의 ID */
 		final String id;
 
 		From(String kind, String id) {
@@ -238,6 +264,18 @@ public class DeclarationCollector {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * 타입 하나(클래스·인터페이스·enum·record·애노테이션)를 처리합니다. 중첩 타입이면 다시 이 메소드로 들어옵니다.
+	 *
+	 * 흐름:
+	 *   1) 종류를 가리고 타입 행을 만든다(접근 제한자, abstract/final/static).
+	 *   2) 상수(final 필드 초기값)를 먼저 모아 둔다. 메소드 안의 Java 문자열 SQL을 계산할 때 쓴다.
+	 *   3) 애노테이션, 상속/구현, (enum 상수 / record 구성 요소)를 적는다.
+	 *   4) 멤버를 하나씩 처리한다. 그다음 SQL 상수 행을 만든다.
+	 *   5) 소스에는 없지만 컴파일하면 생기는 멤버를 넣는다: record 접근자, Lombok 멤버, 기본 생성자.
+	 * </pre>
+	 */
 	private void declareType(TypeDeclaration<?> type, TypeContext outer, String fqn, boolean local) {
 		String kind = "CLASS";
 		boolean isInterface = false;
@@ -252,6 +290,7 @@ public class DeclarationCollector {
 			kind = "ANNOTATION";
 		}
 
+		// 1) 타입 행
 		TypeRow row = newTypeRow(kind, fqn, type.getNameAsString(), outer, type);
 		row.setVisibility(visibilityOf(type, outer != null && outer.isInterface));
 		row.setIsAbstract(type.hasModifier(Modifier.Keyword.ABSTRACT) || isInterface || "ANNOTATION".equals(kind));
@@ -265,6 +304,7 @@ public class DeclarationCollector {
 			return;
 		}
 
+		// 2) 이 타입을 처리하는 동안 들고 다닐 정보, 그리고 상수 모으기
 		TypeContext context = new TypeContext();
 		context.row = row;
 		context.fqn = fqn;
@@ -274,6 +314,7 @@ public class DeclarationCollector {
 		collectConstants(type.getMembers(), context);
 		From fromType = new From("TYPE", row.getSymbolId());
 
+		// 3) 애노테이션과 상속/구현
 		declareAnnotations(type.getAnnotations(), "TYPE", row.getSymbolId(), null, context.lombok);
 
 		if (type instanceof ClassOrInterfaceDeclaration) {
@@ -290,6 +331,7 @@ public class DeclarationCollector {
 			declareRecordComponents(declaration, context);
 		}
 
+		// 4) 멤버
 		NodeList<BodyDeclaration<?>> members = type.getMembers();
 		for (int i = 0; i < members.size(); i++) {
 			declareMember(members.get(i), context);
@@ -310,6 +352,7 @@ public class DeclarationCollector {
 		}
 	}
 
+	/** fromIndex 뒤에 이 타입의 생성자가 새로 들어왔는지 봅니다. Lombok이 생성자를 만들었는지 확인할 때 씁니다. */
 	private boolean hasConstructorAfter(int fromIndex, String ownerSymbolId) {
 		List<MethodRow> methods = out.getMethods();
 		for (int i = fromIndex; i < methods.size(); i++) {
@@ -320,6 +363,7 @@ public class DeclarationCollector {
 		return false;
 	}
 
+	/** extends / implements 에 적힌 타입을 참조로 적습니다. 제네릭 인자(List&lt;OrderVO&gt;의 OrderVO)도 타입 사용으로 적습니다. */
 	private void addSuperTypes(NodeList<ClassOrInterfaceType> superTypes, String refKind, From from) {
 		for (int i = 0; i < superTypes.size(); i++) {
 			ClassOrInterfaceType superType = superTypes.get(i);
@@ -410,6 +454,7 @@ public class DeclarationCollector {
 
 	/* ============================== 멤버 ============================== */
 
+	/** 멤버 하나를 종류에 따라 나눠 처리합니다: 필드 / 메소드 / 생성자 / record 짧은 생성자 / 초기화 블록 / 애노테이션 요소 / 중첩 타입 */
 	private void declareMember(BodyDeclaration<?> member, TypeContext context) {
 		if (member instanceof FieldDeclaration) {
 			declareFields((FieldDeclaration) member, context);
@@ -458,6 +503,12 @@ public class DeclarationCollector {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * 필드 선언 하나를 처리합니다. "int a, b;"처럼 한 줄에 여럿이면 변수마다 필드 행을 하나씩 만듭니다.
+	 * 그리고 Lombok이 쓸 필드 정보(FieldInfo)를 모으고, 타입과 초기값 안의 참조를 적습니다.
+	 * </pre>
+	 */
 	private void declareFields(FieldDeclaration declaration, TypeContext context) {
 		NodeList<VariableDeclarator> variables = declaration.getVariables();
 		for (int i = 0; i < variables.size(); i++) {
@@ -643,6 +694,12 @@ public class DeclarationCollector {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * 찾은 Java 문자열 SQL을 analysis_mapper 한 행(mapper_type JAVA)으로 만들어 결과에 담습니다.
+	 * namespace는 타입 전체 이름, statementId는 메소드나 상수 이름입니다.
+	 * </pre>
+	 */
 	private void addSqlRow(TypeContext context, String name, JavaSqlCollector.Found sql, Map<String, Object> properties) {
 		Map<String, Object> row = new HashMap<String, Object>();
 		row.put("revisionId", revisionId);
@@ -708,12 +765,15 @@ public class DeclarationCollector {
 			return;
 		}
 
+		// 여기부터는 노드 자체가 참조인지 보고 적은 뒤, 자식 노드로 계속 내려간다.
 		if (node instanceof MethodCallExpr) {
+			// 메소드 호출: a.b(x). 이름, 대상 식(a), 인자 수, 따옴표 든 인자를 적는다.
 			MethodCallExpr call = (MethodCallExpr) node;
 			String scope = call.getScope().isPresent() ? call.getScope().get().toString() : null;
 			setArguments(addReference(from, "CALL", call.getNameAsString(), scope, Integer.valueOf(call.getArguments().size()), call.getName())
 					, call.getArguments());
 		} else if (node instanceof FieldAccessExpr) {
+			// 필드 접근: a.b
 			FieldAccessExpr access = (FieldAccessExpr) node;
 			addReference(from, "FIELD_ACCESS", access.getNameAsString(), access.getScope().toString(), null, access.getName());
 		} else if (node instanceof MethodReferenceExpr) {
@@ -746,6 +806,10 @@ public class DeclarationCollector {
 	}
 
 	/**
+	 * <pre>
+	 * 참조 행 하나를 만들어 결과에 담고 돌려줍니다(인자 글자를 이어서 채울 수 있게).
+	 * </pre>
+	 *
 	 * @param node 위치(줄, 칸)를 가져올 노드.
 	 *             호출과 필드 접근은 식 전체가 아니라 "이름"의 위치를 적습니다. a.get().get()처럼 이어진 호출은
 	 *             식의 시작 위치가 모두 같아서, 이름의 위치라야 RESOLVE 단계가 같은 호출을 다시 찾을 수 있습니다.
@@ -824,6 +888,11 @@ public class DeclarationCollector {
 	/* ============================== 애노테이션 ============================== */
 
 	/**
+	 * <pre>
+	 * 애노테이션마다 행을 하나씩 만듭니다. 속성 값은 JSON으로 담습니다(예: {"value":"/order"}).
+	 * 파라미터에 붙은 것은 "$parameter"에 파라미터 이름을 같이 적습니다.
+	 * </pre>
+	 *
 	 * @param parameterName PARAMETER에 붙은 것이면 그 파라미터 이름. 아니면 null
 	 * @param lombokSink Lombok 애노테이션이면 여기에 (이름 → 속성을 적은 글)로 담아 줍니다. 필요 없으면 null
 	 */
@@ -911,6 +980,7 @@ public class DeclarationCollector {
 		return Character.isLowerCase(first.charAt(0)) ? written : null;
 	}
 
+	/** 이 이름의 애노테이션이 붙어 있는지 봅니다. @NonNull 과 @lombok.NonNull 을 모두 알아봅니다. */
 	private boolean hasAnnotation(NodeList<AnnotationExpr> annotations, String simpleName) {
 		for (int i = 0; i < annotations.size(); i++) {
 			String written = annotations.get(i).getNameAsString();
@@ -949,6 +1019,7 @@ public class DeclarationCollector {
 		return addMethod(context, row);
 	}
 
+	/** 소스에는 없지만 컴파일하면 생기는 필드를 넣습니다(예: Lombok @Slf4j 의 log). 같은 이름의 필드가 이미 있으면 넣지 않습니다. */
 	boolean addSyntheticField(TypeContext context, String name, String type, String origin, Integer line) {
 		for (int i = 0; i < context.fields.size(); i++) {
 			if (context.fields.get(i).name.equals(name)) {
@@ -986,6 +1057,7 @@ public class DeclarationCollector {
 
 	/* ============================== 행 만들기 ============================== */
 
+	/** 타입 행의 공통 부분(ID, 이름, 패키지, 바깥 타입, 위치)을 채워 만듭니다. 아직 결과에 넣지는 않습니다. */
 	private TypeRow newTypeRow(String kind, String fqn, String simpleName, TypeContext outer, Node node) {
 		TypeRow row = new TypeRow();
 		row.setRevisionId(revisionId);
@@ -1004,6 +1076,7 @@ public class DeclarationCollector {
 		return row;
 	}
 
+	/** 메소드 행의 공통 부분(ID, 시그니처, 파라미터, 위치)을 채워 만듭니다. 아직 결과에 넣지는 않습니다. */
 	private MethodRow newMethodRow(TypeContext context, String name, String[] parameterTypes, String[] parameterNames, String returnType, Node node) {
 		StringBuilder signature = new StringBuilder(name).append('(');
 		List<Map<String, Object>> parameters = new ArrayList<Map<String, Object>>();
@@ -1037,6 +1110,7 @@ public class DeclarationCollector {
 		return row;
 	}
 
+	/** 필드 행의 공통 부분(ID, 이름, 타입, 위치)을 채워 만듭니다. 아직 결과에 넣지는 않습니다. */
 	private FieldRow newFieldRow(TypeContext context, String name, String type, Node node) {
 		FieldRow row = new FieldRow();
 		row.setRevisionId(revisionId);
@@ -1052,6 +1126,7 @@ public class DeclarationCollector {
 		return row;
 	}
 
+	/** 타입 행을 결과에 넣습니다. 같은 ID가 이미 있으면 넣지 않고 경고만 남깁니다. */
 	private boolean addType(TypeRow row) {
 		if (!usedIds.add(row.getSymbolId())) {
 			out.getWarnings().add("같은 이름의 타입이 한 파일에 두 번 나와서 뒤의 것은 저장하지 않았습니다: " + row.getFqn());
@@ -1061,6 +1136,7 @@ public class DeclarationCollector {
 		return true;
 	}
 
+	/** 메소드 행을 결과에 넣습니다. 같은 ID가 이미 있으면 넣지 않고 경고만 남깁니다. */
 	private boolean addMethod(TypeContext context, MethodRow row) {
 		if (!usedIds.add(row.getMethodId())) {
 			out.getWarnings().add("같은 시그니처의 메소드가 두 번 나와서 뒤의 것은 저장하지 않았습니다: " + context.fqn + "#" + row.getSignature());
@@ -1071,6 +1147,7 @@ public class DeclarationCollector {
 		return true;
 	}
 
+	/** 필드 행을 결과에 넣습니다. 같은 ID가 이미 있으면 넣지 않고 경고만 남깁니다. */
 	private boolean addField(FieldRow row) {
 		if (!usedIds.add(row.getFieldId())) {
 			out.getWarnings().add("같은 이름의 필드가 두 번 나와서 뒤의 것은 저장하지 않았습니다: " + row.getName());
@@ -1083,10 +1160,12 @@ public class DeclarationCollector {
 
 	/* ============================== 작은 도구들 ============================== */
 
+	/** ID를 만듭니다: SHA-1(프로젝트 | 소스 루트 | 종류(T/M/F) | 이름). 클래스 설명의 "ID 만드는 규칙" 참고 */
 	private String idOf(String kind, String name) {
 		return sha1(projectId + "|" + idScope + "|" + kind + "|" + name);
 	}
 
+	/** 글자의 SHA-1을 16진수 문자열(40자)로 */
 	private String sha1(String text) {
 		try {
 			byte[] digest = MessageDigest.getInstance("SHA-1").digest(text.getBytes(StandardCharsets.UTF_8));
@@ -1137,14 +1216,17 @@ public class DeclarationCollector {
 		return sb.toString();
 	}
 
+	/** 노드가 시작하는 줄. 위치 정보가 없으면 null */
 	private Integer lineOf(Node node) {
 		return node.getBegin().isPresent() ? Integer.valueOf(node.getBegin().get().line) : null;
 	}
 
+	/** 노드가 끝나는 줄. 위치 정보가 없으면 null */
 	private Integer endLineOf(Node node) {
 		return node.getEnd().isPresent() ? Integer.valueOf(node.getEnd().get().line) : null;
 	}
 
+	/** max 글자보다 길면 앞부분만 남깁니다. */
 	private String cut(String text, int max) {
 		if (text == null || text.length() <= max) {
 			return text;

@@ -36,6 +36,7 @@ public final class DocumentSections {
 	/** 소스나 SQL 본문. 없으면 null */
 	public final String code;
 
+	/** split() 으로만 만듭니다. */
 	private DocumentSections(String description, String codeKind, String code) {
 		this.description = description;
 		this.codeKind = codeKind;
@@ -43,6 +44,10 @@ public final class DocumentSections {
 	}
 
 	/**
+	 * <pre>
+	 * 문서의 청크들을 이어 붙여 설명(머리말)과 코드로 나눕니다.
+	 * </pre>
+	 *
 	 * @param chunks 문서 조각(chunk_no 순서). 비어 있으면 문서가 없는 것이다
 	 */
 	public static DocumentSections split(List<String> chunks) {
@@ -102,6 +107,7 @@ public final class DocumentSections {
 		return lines;
 	}
 
+	/** 끝의 공백을 지웁니다. */
 	private static String trimEnd(String text) {
 		int end = text.length();
 		while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) {

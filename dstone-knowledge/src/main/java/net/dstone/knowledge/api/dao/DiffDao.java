@@ -19,6 +19,10 @@ public class DiffDao extends BaseDao {
 	private static final String NS = "net.dstone.knowledge.api.dao.DiffDao.";
 
 	/**
+	 * <pre>
+	 * 종류 하나의 생김 / 없어짐 / 바뀜 건수
+	 * </pre>
+	 *
 	 * @param kind FILE / TYPE / METHOD / ENDPOINT / STATEMENT / TABLE_USE / CALL
 	 * @return [{change(ADDED / REMOVED / CHANGED), count}]
 	 */
@@ -27,6 +31,10 @@ public class DiffDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 종류 하나의 바뀐 것 목록(limit 건까지)
+	 * </pre>
+	 *
 	 * @return [{change, name, detail, path}] - 바뀐 종류, 이름 순
 	 */
 	public List<Map<String, Object>> selectDiffRows(long revisionId, long baseRevisionId, String kind, int limit) {
@@ -40,6 +48,7 @@ public class DiffDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectPreviousReadyRevision", revisionId);
 	}
 
+	/** 비교 조회 조건(리비전, 기준 리비전, 종류) */
 	private Map<String, Object> param(long revisionId, long baseRevisionId, String kind) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

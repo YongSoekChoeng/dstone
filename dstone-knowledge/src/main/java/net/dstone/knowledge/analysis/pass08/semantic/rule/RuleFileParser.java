@@ -77,11 +77,16 @@ public class RuleFileParser {
 	/** 대응표 파일(id.map)을 찾는 바탕 폴더(규칙 폴더). null 이면 대응표를 쓸 수 없다(글만 읽는 단위 테스트) */
 	private final File rulesDir;
 
+	/** 대응표 파일을 쓰지 않는 파서(단위 테스트용) */
 	public RuleFileParser() {
 		this(null);
 	}
 
 	/**
+	 * <pre>
+	 * 대응표 파일을 이 규칙 폴더에서 찾는 파서
+	 * </pre>
+	 *
 	 * @param rulesDir 규칙 폴더. 대응표 파일은 이 폴더 안에 있어야 한다
 	 */
 	public RuleFileParser(File rulesDir) {
@@ -91,13 +96,22 @@ public class RuleFileParser {
 	/**
 	 * <pre>
 	 * 규칙 파일 하나를 읽습니다.
+	 *
+	 * 흐름:
+	 *   1) 경로로 파일 이름·단계(projects / common / guess)·프로젝트 폴더를 정한다.
+	 *   2) YAML을 노드 트리로 읽는다(줄 번호를 남기려고 객체가 아닌 노드로 읽는다).
+	 *   3) description 을 먼저 읽고, 맨 위 키(layer / entry / inject / proxy / sql / view / screen / jpa)마다 읽는 메소드로 넘긴다.
+	 *      모르는 키면 쓸 수 있는 키를 알려 주며 오류를 낸다.
+	 *   4) 파일 내용(+ 대응표)의 해시를 남긴다. 규칙이 바뀌었는지 알아볼 때 쓴다.
 	 * </pre>
 	 *
 	 * @param text 파일 내용
 	 * @param path 규칙 폴더 안의 경로(/ 로 구분). 예: common/spring.yml, projects/hi-japan/backend.yml
 	 */
 	public RuleFile parse(String text, String path) {
+		// 1) 위치 → 이름과 단계
 		Location location = locate(path);
+		// 2) YAML 노드 트리
 		Node root;
 		try {
 			root = new Yaml(new SafeConstructor(new LoaderOptions())).compose(new StringReader(text));
@@ -115,6 +129,7 @@ public class RuleFileParser {
 				description = r.scalar(top.get(i).getValueNode(), "description");
 			}
 		}
+		// 3) 맨 위 키마다 읽기
 		RuleFile file = new RuleFile(location.name, path, location.tier, location.projectFolder, description);
 		for (int i = 0; i < top.size(); i++) {
 			NodeTuple tuple = top.get(i);
@@ -140,11 +155,12 @@ public class RuleFileParser {
 				throw r.error(tuple.getKeyNode(), unknownTopKey(key));
 			}
 		}
-		// 대응표를 고쳐도 "규칙이 바뀌었다"를 알 수 있게 해시에 대응표 내용도 넣는다.
+		// 4) 대응표를 고쳐도 "규칙이 바뀌었다"를 알 수 있게 해시에 대응표 내용도 넣는다.
 		file.hash = HashText.sha256(mapTexts.length() == 0 ? text : text + "\n" + mapTexts).substring(0, 12);
 		return file;
 	}
 
+	/** 모르는 맨 위 키에 대한 오류 메시지(쓸 수 있는 키 목록을 함께 보여 준다) */
 	private String unknownTopKey(String key) {
 		return "모르는 키입니다: " + key + " (쓸 수 있는 키: " + TOP_KEYS + ")";
 	}
@@ -285,6 +301,13 @@ public class RuleFileParser {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * entry: 의 HTTP 항목 하나를 읽습니다.
+	 * 키는 class(클래스에 붙는 주소 애노테이션) / GET·POST… (그 방식의 메소드 애노테이션) / ANY(방식을 VERB 자리에서 읽음)입니다.
+	 * 각 애노테이션에는 주소가 들어 있는 속성을 URL 자리로 적어야 합니다. 예: GET: "@GetMapping(value|path = URL)"
+	 * </pre>
+	 */
 	private Rule.HttpEntry readHttpEntry(Reader r, Node node, List<NodeTuple> keys) {
 		List<Rule.HttpAnnotation> classAnnotations = new ArrayList<Rule.HttpAnnotation>();
 		List<Rule.HttpAnnotation> methodAnnotations = new ArrayList<Rule.HttpAnnotation>();
@@ -319,6 +342,12 @@ public class RuleFileParser {
 		return new Rule.HttpEntry(r.origin(node), "HTTP", classAnnotations, methodAnnotations);
 	}
 
+	/**
+	 * <pre>
+	 * entry: 의 설정 XML 항목 하나를 읽습니다(키: file, xml, path, verb).
+	 * xml 에 적은 요소 모양에서 KEY(주소·거래 ID), CLASS, METHOD 자리를 찾고, path 의 {KEY} 앞뒤를 접두어·접미어로 나눠 둡니다.
+	 * </pre>
+	 */
 	private Rule.XmlEntry readXmlEntry(Reader r, Node node, List<NodeTuple> keys, String type) {
 		r.allowOnly(keys, "file", "xml", "path", "verb");
 		String files = r.requiredScalar(keys, node, "file");
@@ -353,6 +382,7 @@ public class RuleFileParser {
 
 	/* ============================== inject: / proxy: ============================== */
 
+	/** inject: / proxy: 처럼 애노테이션 이름만 나열한 목록을 읽습니다. */
 	private void readMarks(Reader r, Node node, List<Rule.Mark> target, String where) {
 		List<Node> items = r.items(node, where);
 		for (int i = 0; i < items.size(); i++) {
@@ -360,6 +390,7 @@ public class RuleFileParser {
 		}
 	}
 
+	/** 애노테이션 하나("@Autowired")를 읽어 표시 규칙으로 만듭니다. 괄호 안 자리는 쓸 수 없습니다. */
 	private Rule.Mark readMark(Reader r, Node item, String where) {
 		String text = r.scalar(item, where);
 		try {
@@ -666,6 +697,13 @@ public class RuleFileParser {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * jpa: 의 query / namedQuery 목록을 읽습니다.
+	 * 쿼리 글이 든 속성을 JPQL 이나 SQL 자리 하나로 적어야 하고, namedQuery 는 이름이 든 속성을 NAME 자리로 적어야 합니다.
+	 * "@NamedQuery(...) in @NamedQueries" 처럼 in 뒤에 감싸는 애노테이션을 적을 수 있습니다.
+	 * </pre>
+	 */
 	private void readJpaQueries(Reader r, Node node, boolean named, List<Rule.JpaQuery> target) {
 		String where = named ? "jpa.namedQuery" : "jpa.query";
 		List<Node> items = r.items(node, where);
@@ -702,6 +740,7 @@ public class RuleFileParser {
 
 	/* ============================== 도우미 ============================== */
 
+	/** 여러 줄 메시지의 첫 줄만(null 이면 빈 문자열) */
 	private static String firstLine(String text) {
 		if (text == null) {
 			return "";
@@ -725,10 +764,12 @@ public class RuleFileParser {
 			this.tier = tier;
 		}
 
+		/** 이 노드의 줄 번호를 붙인 규칙 오류를 만듭니다. */
 		RuleException error(Node node, String message) {
 			return new RuleException(fileName, node == null ? 0 : node.getStartMark().getLine() + 1, message);
 		}
 
+		/** 이 노드가 있는 파일과 줄(규칙의 출처) */
 		Rule.Origin origin(Node node) {
 			return new Rule.Origin(fileName, node.getStartMark().getLine() + 1, tier);
 		}
@@ -750,6 +791,7 @@ public class RuleFileParser {
 			return tuples;
 		}
 
+		/** 키를 글자로 읽습니다. 글자가 아니면 오류 */
 		String key(NodeTuple tuple) {
 			Node key = tuple.getKeyNode();
 			if (!(key instanceof ScalarNode)) {
@@ -769,6 +811,7 @@ public class RuleFileParser {
 			return Collections.singletonList(node);
 		}
 
+		/** 값을 글자 하나로 읽습니다. 목록·표이거나 비어 있으면 오류 */
 		String scalar(Node node, String where) {
 			if (!(node instanceof ScalarNode)) {
 				throw error(node, where + " 은(는) 글자 하나여야 합니다.");
@@ -780,10 +823,12 @@ public class RuleFileParser {
 			return value;
 		}
 
+		/** 이 키가 적혀 있는지 */
 		boolean has(List<NodeTuple> tuples, String key) {
 			return valueNode(tuples, key) != null;
 		}
 
+		/** 이 키의 값 노드. 없으면 null */
 		Node valueNode(List<NodeTuple> tuples, String key) {
 			for (int i = 0; i < tuples.size(); i++) {
 				if (key.equals(key(tuples.get(i)))) {
@@ -793,6 +838,7 @@ public class RuleFileParser {
 			return null;
 		}
 
+		/** allowed 밖의 키가 있으면 쓸 수 있는 키를 알려 주며 오류를 냅니다. */
 		void allowOnly(List<NodeTuple> tuples, String... allowed) {
 			List<String> known = Arrays.asList(allowed);
 			for (int i = 0; i < tuples.size(); i++) {
@@ -803,6 +849,7 @@ public class RuleFileParser {
 			}
 		}
 
+		/** 꼭 있어야 하는 키의 글자 값. 없으면 오류 */
 		String requiredScalar(List<NodeTuple> tuples, Node parent, String key) {
 			Node node = valueNode(tuples, key);
 			if (node == null) {
@@ -811,11 +858,13 @@ public class RuleFileParser {
 			return scalar(node, key);
 		}
 
+		/** 있어도 되고 없어도 되는 키의 글자 값. 없으면 기본값 */
 		String optionalScalar(List<NodeTuple> tuples, String key, String defaultValue) {
 			Node node = valueNode(tuples, key);
 			return node == null ? defaultValue : scalar(node, key);
 		}
 
+		/** 꼭 있어야 하고, Java 이름 모양(영문자, 숫자, _, $)이어야 하는 키의 값 */
 		String identifier(List<NodeTuple> tuples, Node parent, String key) {
 			String value = requiredScalar(tuples, parent, key);
 			if (!CodePattern.isIdentifier(value)) {
@@ -824,6 +873,7 @@ public class RuleFileParser {
 			return value;
 		}
 
+		/** 정규식으로 쓸 수 있는 글인지 미리 확인합니다. 틀리면 이 노드의 줄과 함께 오류 */
 		void regex(String pattern, Node node) {
 			try {
 				Pattern.compile(pattern);

@@ -78,8 +78,10 @@ public class SqlTableExtractor {
 	private static final Pattern CTE_NAME = Pattern.compile("(?i)(?:\\bWITH\\s+(?:RECURSIVE\\s+)?|,\\s*)([A-Za-z_][\\w$]*)\\s*(?:\\([^()]*\\))?\\s+AS\\s*\\(");
 
 	/**
+	 * <pre>
 	 * 조건 조각을 전부 이어 붙이면 생기는 군더더기: WHERE AND ..., WHERE OR ..., ( AND ..., AND AND ...
 	 * 매퍼는 실행할 때 이것을 떼어 주지만(where 태그, prepend), 펴 놓은 글에는 그대로 남아 파서가 읽지 못한다.
+	 * </pre>
 	 */
 	private static final Pattern DANGLING_CONDITION = Pattern.compile("(?i)(\\bWHERE|\\(|\\bAND|\\bOR)\\s+(?:AND|OR)\\b");
 
@@ -145,6 +147,16 @@ public class SqlTableExtractor {
 	}
 
 	/**
+	 * <pre>
+	 * SQL 하나가 읽고 쓰는 테이블을 돌려줍니다.
+	 *
+	 * 흐름:
+	 *   1) 주석의 한글명을 먼저 읽어 둔다(다듬기에서 주석이 지워지므로).
+	 *   2) SQL 을 다듬고, WITH 절의 임시 이름을 모아 둔다(진짜 테이블이 아니다).
+	 *   3) 너무 길거나 괄호가 너무 깊지 않으면 파서로 읽는다.
+	 *   4) 파서가 못 읽으면 정규식으로 찾는다(guessed).
+	 * </pre>
+	 *
 	 * @param sql 매퍼에서 편 SQL(include는 이미 채워진 것)
 	 * @param statementType SELECT / INSERT / UPDATE / DELETE ...
 	 */
@@ -174,6 +186,7 @@ public class SqlTableExtractor {
 		return without(withComments(byPattern(cleaned, statementType), comments, null), temporaryNames);
 	}
 
+	/** names(WITH 절의 임시 이름 등 진짜 테이블이 아닌 것)에 든 테이블을 뺀 목록 */
 	private List<TableUse> without(List<TableUse> uses, Set<String> names) {
 		if (names.isEmpty()) {
 			return uses;
@@ -211,6 +224,17 @@ public class SqlTableExtractor {
 		return EMPTY_WHERE.matcher(text).replaceAll("").trim();
 	}
 
+	/**
+	 * <pre>
+	 * JSQLParser 로 읽어 테이블과 CRUD, 쓰인 컬럼, 주석의 한글명을 모읍니다. 못 읽으면 예외를 던집니다(그러면 byPattern 으로 간다).
+	 *
+	 * 흐름:
+	 *   1) 빠른 모드로만 파싱한다.
+	 *   2) INSERT / UPDATE / DELETE 면 쓰는 대상 테이블과 그 종류(C/U/D)를 정한다.
+	 *   3) 문장 안의 모든 테이블 이름을 모아, 대상이 아닌 것은 읽기(R)로 둔다.
+	 *   4) ColumnFinder 로 테이블마다 컬럼을, SqlComments 로 한글명을 붙인다.
+	 * </pre>
+	 */
 	private List<TableUse> byParser(String sql, List<SqlComment> comments) throws Exception {
 		// 빠른 모드만 쓰고(복잡한 파싱 끔), 다른 스레드에 맡기지 않고 여기서 바로 읽는다.
 		CCJSqlParser parser = CCJSqlParserUtil.newParser(sql).withAllowComplexParsing(false);
@@ -268,20 +292,24 @@ public class SqlTableExtractor {
 	private static final Pattern BEFORE_COLUMN_COMMENT = Pattern.compile("(?i)(?:^|[,(]|\\bSELECT|\\bDISTINCT)\\s*(?:([A-Za-z_][\\w$#]*)\\.)?([A-Za-z_][\\w$#]*)\\s*$");
 
 	/**
+	 * <pre>
 	 * 주석 앞이 "[별칭.]컬럼 = 값" 으로 끝난다 → 컬럼의 한글명(UPDATE 의 SET, WHERE 조건).
 	 * 값은 파라미터와 현재 시각만 본다.
 	 *   "status = '01' /* 접수 *&#47;" 처럼 글자 / 숫자와 비교한 줄의 주석은 컬럼이 아니라 그 값의 뜻을 적은 것이다.
 	 *   "ON a.x = b.x /* 설명 *&#47;" 같은 조인 조건은 어느 쪽 컬럼의 설명인지 모른다.
+	 * </pre>
 	 */
 	private static final Pattern BEFORE_ASSIGN_COMMENT = Pattern.compile("(?i)(?:^|[,(]|\\bSET|\\bAND|\\bOR|\\bWHERE)\\s*(?:([A-Za-z_][\\w$#]*)\\.)?([A-Za-z_][\\w$#]*)\\s*=\\s*"
 			+ "(?:#\\{[^}]*\\}|#[\\w.\\[\\]]+#|\\?|SYSDATE|SYSTIMESTAMP|NOW\\(\\)|CURRENT_TIMESTAMP)\\s*$");
 
 	/**
+	 * <pre>
 	 * 주석 앞(같은 줄)이 "[,] 테이블 [별칭]" 으로 끝난다 → FROM / JOIN 절 안이면 테이블의 한글명.
 	 *   FROM
 	 *        JC_BENEFIT A        /* 보험금 *&#47;      ← FROM 을 앞줄에 쓴 경우
 	 *       ,JC_ACDT_AGMT B      /* 사고계약 *&#47;    ← 쉼표로 늘어놓은 두 번째 테이블
 	 * 같은 모양이 조회 목록(SELECT a.col alias)에도 나오므로, 절이 무엇인지는 ClauseTracker 로 확인한다.
+	 * </pre>
 	 */
 	private static final Pattern TABLE_ITEM_COMMENT = Pattern.compile("(?i)(?:^|,)\\s*([A-Za-z_][\\w$#.]*)(?:\\s+(?:AS\\s+)?([A-Za-z_][\\w$#]*))?\\s*$");
 
@@ -395,6 +423,7 @@ public class SqlTableExtractor {
 			return clause != null && TABLE_CLAUSES.indexOf("|" + clause + "|") >= 0;
 		}
 
+		/** end 위치까지 글자를 읽어 나가며 괄호 깊이를 맞춥니다. 주석과 따옴표 글 안의 괄호는 세지 않습니다. */
 		private void readTo(int end) {
 			while (position < end) {
 				char c = sql.charAt(position);
@@ -509,7 +538,9 @@ public class SqlTableExtractor {
 		private final Map<String, Set<String>> aliasTables = new HashMap<String, Set<String>>();
 
 		/**
+		 * <pre>
 		 * 주석이 달린 컬럼의 테이블. 정할 수 없으면 null
+		 * </pre>
 		 *
 		 * @param qualifier 컬럼 앞의 별칭. 없으면 null
 		 */
@@ -536,6 +567,7 @@ public class SqlTableExtractor {
 			return found == null ? new ArrayList<String>() : new ArrayList<String>(found);
 		}
 
+		/** SELECT: FROM·JOIN 의 테이블로 범위를 열고, SELECT 목록의 별칭을 기억한 뒤(별칭은 컬럼이 아니다) 안으로 내려갑니다. */
 		@Override
 		public void visit(PlainSelect select) {
 			List<FromItem> items = new ArrayList<FromItem>();
@@ -559,6 +591,7 @@ public class SqlTableExtractor {
 			}
 		}
 
+		/** UPDATE: SET 왼쪽의 컬럼은 대상 테이블의 컬럼입니다. 그 밖은 FROM·JOIN 범위 안에서 찾습니다. */
 		@Override
 		public void visit(Update update) {
 			List<FromItem> items = new ArrayList<FromItem>();
@@ -584,6 +617,7 @@ public class SqlTableExtractor {
 			}
 		}
 
+		/** DELETE: 대상과 JOIN 테이블로 범위를 열고 내려갑니다. */
 		@Override
 		public void visit(Delete delete) {
 			List<FromItem> items = new ArrayList<FromItem>();
@@ -597,6 +631,7 @@ public class SqlTableExtractor {
 			}
 		}
 
+		/** INSERT: 컬럼 목록은 대상 테이블의 컬럼입니다. VALUES / SELECT 부분은 그대로 내려갑니다. */
 		@Override
 		public void visit(Insert insert) {
 			String target = normalize(insert.getTable().getFullyQualifiedName());
@@ -608,6 +643,13 @@ public class SqlTableExtractor {
 			super.visit(insert);
 		}
 
+		/**
+		 * <pre>
+		 * 컬럼 하나의 주인 테이블을 찾습니다.
+		 *   - 앞에 별칭이 붙었으면(a.col) 안쪽 범위부터 그 별칭이 가리키는 테이블
+		 *   - 안 붙었으면 그 범위에 테이블이 하나뿐일 때만 그 테이블(SELECT 별칭이면 뺀다)
+		 * </pre>
+		 */
 		@Override
 		public void visit(Column column) {
 			super.visit(column);
@@ -629,12 +671,14 @@ public class SqlTableExtractor {
 			}
 		}
 
+		/** JOIN 오른쪽의 테이블(또는 서브쿼리)을 items 에 더합니다. */
 		private void addJoins(List<FromItem> items, List<Join> joins) {
 			for (int i = 0; joins != null && i < joins.size(); i++) {
 				items.add(joins.get(i).getRightItem());
 			}
 		}
 
+		/** 새 범위(SELECT 하나)를 엽니다. 별칭 → 테이블 표를 만들고, 테이블이 딱 하나면 "별칭 없는 컬럼의 주인"으로 기억합니다. */
 		private void push(List<FromItem> items) {
 			Map<String, String> scope = new HashMap<String, String>();
 			int tables = 0;
@@ -673,6 +717,7 @@ public class SqlTableExtractor {
 			onlyTables.add(tables == 1 && !others ? only : null);
 		}
 
+		/** 별칭이 가리키는 테이블을 기억합니다(같은 별칭이 여러 테이블에 쓰일 수 있어 집합으로). */
 		private void remember(String alias, String table) {
 			Set<String> found = aliasTables.get(alias);
 			if (found == null) {
@@ -682,11 +727,13 @@ public class SqlTableExtractor {
 			found.add(table);
 		}
 
+		/** 범위 하나를 닫습니다. */
 		private void pop() {
 			scopes.remove(scopes.size() - 1);
 			onlyTables.remove(onlyTables.size() - 1);
 		}
 
+		/** 테이블의 컬럼으로 이름 하나를 더합니다. 키워드·${} 자리·이름이 아닌 것은 빼고, 테이블마다 MAX_COLUMNS 개까지만 */
 		private void add(String table, String columnName) {
 			if (table == null || table.length() == 0 || columnName == null) {
 				return;
@@ -725,6 +772,7 @@ public class SqlTableExtractor {
 		return true;
 	}
 
+	/** 괄호가 가장 깊이 겹친 정도. 너무 깊은 SQL 은 파서에 넘기지 않을 때 씁니다. */
 	private int parenDepthOf(String sql) {
 		int depth = 0;
 		int max = 0;
@@ -740,6 +788,12 @@ public class SqlTableExtractor {
 		return max;
 	}
 
+	/**
+	 * <pre>
+	 * 파서가 못 읽은 SQL: FROM / JOIN / INTO / UPDATE 뒤의 이름을 정규식으로 찾습니다(guessed 표시, 컬럼은 뽑지 않음).
+	 * 처음 나온 INTO / UPDATE / (DELETE) FROM 뒤의 이름이 쓰는 대상이고, 나머지는 읽기입니다.
+	 * </pre>
+	 */
 	private List<TableUse> byPattern(String sql, String statementType) {
 		Map<String, TableUse> uses = new LinkedHashMap<String, TableUse>();
 		Matcher m = TABLE_AFTER_KEYWORD.matcher(sql);

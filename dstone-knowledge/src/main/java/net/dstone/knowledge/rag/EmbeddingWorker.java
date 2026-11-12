@@ -71,6 +71,7 @@ public class EmbeddingWorker extends BaseObject {
 	/** 마지막 실패의 내용. 정상으로 돌아오면 null */
 	private volatile String lastError = null;
 
+	/** 서버가 다 뜨면 임베딩 작업 스레드를 하나 띄웁니다(설정으로 꺼 두었으면 띄우지 않음). */
 	@EventListener
 	public void onReady(ApplicationReadyEvent event) {
 		if (!ragSettings.embeddingEnabled()) {
@@ -90,6 +91,7 @@ public class EmbeddingWorker extends BaseObject {
 		info("임베딩 작업을 시작했습니다. model=" + ragSettings.embeddingModel() + ", batch=" + ragSettings.embeddingBatchSize());
 	}
 
+	/** 서버를 내릴 때 작업 스레드에 멈추라고 알립니다. */
 	@EventListener
 	public void onClosed(ContextClosedEvent event) {
 		running = false;
@@ -110,6 +112,18 @@ public class EmbeddingWorker extends BaseObject {
 		return running;
 	}
 
+	/**
+	 * <pre>
+	 * 임베딩 작업 스레드의 본체. 멈추라고 할 때까지 되풀이합니다.
+	 *
+	 * 한 바퀴:
+	 *   1) 대기열에서 임베딩할 청크 내용을 batchSize 개 꺼낸다(연속으로 실패했으면 한 건씩). 없으면 잠깐 쉰다.
+	 *   2) 내용이 사라진 것(리비전이 지워짐)은 대기열에서 뺀다.
+	 *   3) 검색이 질문을 임베딩하는 중이면 끝날 때까지 기다린다(검색 먼저).
+	 *   4) 임베딩 서버에 보낸다. 실패하면 쉬었다가 다시. 한 건씩 보내도 실패하면 그 건의 실패 횟수를 올린다.
+	 *   5) 받은 벡터를 저장한다.
+	 * </pre>
+	 */
 	private void loop() {
 		// 임베딩할 내용을 읽는 SQL이 로그를 덮지 않게 한다.
 		ThreadContext.put("SUPPRESS_SQL_LOG", "Y");
@@ -120,6 +134,7 @@ public class EmbeddingWorker extends BaseObject {
 		while (running) {
 			try {
 				// 한꺼번에 보낸 것이 계속 실패하면 한 건씩 꺼내서 보낸다.
+				// 1) 대기열에서 꺼내기
 				boolean single = batchFailures >= BATCH_FAILURES_BEFORE_SINGLE;
 				List<Map<String, Object>> pending = ragDao.selectPendingEmbeddings(model, single ? 1 : batchSize);
 				if (pending.isEmpty()) {
@@ -128,6 +143,7 @@ public class EmbeddingWorker extends BaseObject {
 					continue;
 				}
 
+				// 2) 내용이 사라진 것은 빼기
 				List<String> hashes = new ArrayList<String>();
 				List<String> contents = new ArrayList<String>();
 				for (int i = 0; i < pending.size(); i++) {
@@ -145,7 +161,7 @@ public class EmbeddingWorker extends BaseObject {
 					continue;
 				}
 
-				// 검색이 질문을 임베딩하는 중이면 양보한다. 검색은 사람(또는 Agent)이 기다리고 있고, 이 작업은 급하지 않다.
+				// 3) 검색이 질문을 임베딩하는 중이면 양보한다. 검색은 사람(또는 Agent)이 기다리고 있고, 이 작업은 급하지 않다.
 				try {
 					embeddingGate.awaitOpen();
 				} catch (InterruptedException e) {
@@ -154,6 +170,7 @@ public class EmbeddingWorker extends BaseObject {
 					continue;
 				}
 
+				// 4) 임베딩
 				List<float[]> vectors;
 				try {
 					vectors = embeddingModel.embed(contents);
@@ -171,6 +188,7 @@ public class EmbeddingWorker extends BaseObject {
 					continue;
 				}
 
+				// 5) 저장
 				for (int i = 0; i < hashes.size(); i++) {
 					ragDao.updateEmbeddingDone(hashes.get(i), model, vectorText(vectors.get(i)));
 				}
@@ -202,6 +220,7 @@ public class EmbeddingWorker extends BaseObject {
 		return sb.toString();
 	}
 
+	/** seconds 초 쉽니다. 중간에 깨우면(서버 종료) 반복을 끝내도록 표시합니다. */
 	private void sleep(int seconds) {
 		try {
 			Thread.sleep(seconds * 1000L);
@@ -212,6 +231,7 @@ public class EmbeddingWorker extends BaseObject {
 		}
 	}
 
+	/** 오류 글이 너무 길면 자릅니다. */
 	private String cut(String text) {
 		return text == null || text.length() <= MAX_ERROR_LENGTH ? text : text.substring(0, MAX_ERROR_LENGTH);
 	}

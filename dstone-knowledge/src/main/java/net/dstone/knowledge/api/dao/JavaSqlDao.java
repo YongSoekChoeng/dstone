@@ -21,6 +21,7 @@ public class JavaSqlDao extends BaseDao {
 
 	private static final String NS = "net.dstone.knowledge.api.dao.JavaSqlDao.";
 
+	/** JPA statement(mapper_type JPA)를 지웁니다. JpaQueryReader 가 다시 만들기 전에 부릅니다. */
 	public void deleteJpaStatements(long revisionId) {
 		sqlSessionCommon.delete(NS + "deleteJpaStatements", revisionId);
 	}
@@ -31,6 +32,10 @@ public class JavaSqlDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 이 이름들의 애노테이션이 붙은 곳(타입 또는 메소드)
+	 * </pre>
+	 *
 	 * @param targetKind TYPE / METHOD
 	 * @return [{annotationName, targetId, attributesJson, fileId, lineStart, ownerSymbolId, ownerFqn, simpleName, methodName}]
 	 *         METHOD 면 ownerSymbolId · ownerFqn 은 메소드의 타입, methodName 은 메소드 이름. TYPE 이면 ownerSymbolId = targetId
@@ -56,6 +61,10 @@ public class JavaSqlDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * JPA 저장소 인터페이스 찾기
+	 * </pre>
+	 *
 	 * @param baseTypes 상속하면 저장소가 되는 타입의 단순 이름(JpaRepository ...)
 	 * @return [{symbolId, fqn}] 그 타입을 (여러 단계를 거쳐서라도) 상속한 프로젝트의 인터페이스
 	 */
@@ -99,6 +108,7 @@ public class JavaSqlDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectSummary", revisionId);
 	}
 
+	/** 리비전 조회 조건 */
 	private Map<String, Object> param(long revisionId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

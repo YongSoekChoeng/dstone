@@ -33,6 +33,12 @@ public class ProjectRules {
 
 	private final List<RuleFile> files;
 
+	/**
+	 * <pre>
+	 * 규칙 파일들을 우선순위(projects &gt; common &gt; guess, 같은 단계면 파일 이름) 순서로 정렬해 들고 있습니다.
+	 * 같은 진입점 규칙이 두 파일에 있으면 진입점이 두 번 생기므로 여기서 바로 오류를 냅니다.
+	 * </pre>
+	 */
 	public ProjectRules(List<RuleFile> files) {
 		List<RuleFile> sorted = new ArrayList<RuleFile>(files);
 		Collections.sort(sorted, new Comparator<RuleFile>() {
@@ -82,10 +88,12 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** 계층 규칙을 고르는 순서: 애노테이션(0) → 상속(1) → 이름(2) */
 	private static int kindOrder(String by) {
 		return Rule.Layer.BY_ANNOTATION.equals(by) ? 0 : Rule.Layer.BY_EXTENDS.equals(by) ? 1 : 2;
 	}
 
+	/** entry: http 규칙 전부(우선순위 순서) */
 	public List<Rule.HttpEntry> httpEntries() {
 		List<Rule.HttpEntry> all = new ArrayList<Rule.HttpEntry>();
 		for (int i = 0; i < files.size(); i++) {
@@ -94,6 +102,7 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** entry: annotation 규칙 전부(우선순위 순서) */
 	public List<Rule.AnnotationEntry> annotationEntries() {
 		List<Rule.AnnotationEntry> all = new ArrayList<Rule.AnnotationEntry>();
 		for (int i = 0; i < files.size(); i++) {
@@ -102,6 +111,7 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** entry: extends 규칙 전부(우선순위 순서) */
 	public List<Rule.ExtendsEntry> extendsEntries() {
 		List<Rule.ExtendsEntry> all = new ArrayList<Rule.ExtendsEntry>();
 		for (int i = 0; i < files.size(); i++) {
@@ -110,6 +120,7 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** entry: xml 규칙 전부(우선순위 순서) */
 	public List<Rule.XmlEntry> xmlEntries() {
 		List<Rule.XmlEntry> all = new ArrayList<Rule.XmlEntry>();
 		for (int i = 0; i < files.size(); i++) {
@@ -136,6 +147,7 @@ public class ProjectRules {
 		return distinctMarks(all);
 	}
 
+	/** sql: 규칙(SQL 이름을 인자로 받는 호출) 전부 */
 	public List<Rule.CallArgument> sqlCalls() {
 		List<Rule.CallArgument> all = new ArrayList<Rule.CallArgument>();
 		for (int i = 0; i < files.size(); i++) {
@@ -144,6 +156,7 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** view: 규칙(화면 경로를 인자로 받는 호출) 전부 */
 	public List<Rule.CallArgument> viewCalls() {
 		List<Rule.CallArgument> all = new ArrayList<Rule.CallArgument>();
 		for (int i = 0; i < files.size(); i++) {
@@ -218,6 +231,7 @@ public class ProjectRules {
 		return "SNAKE_CASE";
 	}
 
+	/** jpa: 메소드에 붙는 쿼리 애노테이션 규칙 전부(예: &#64;Query) */
 	public List<Rule.JpaQuery> jpaQueries() {
 		List<Rule.JpaQuery> all = new ArrayList<Rule.JpaQuery>();
 		for (int i = 0; i < files.size(); i++) {
@@ -226,6 +240,7 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** jpa: 이름 있는 쿼리 애노테이션 규칙 전부(예: &#64;NamedQuery) */
 	public List<Rule.JpaQuery> jpaNamedQueries() {
 		List<Rule.JpaQuery> all = new ArrayList<Rule.JpaQuery>();
 		for (int i = 0; i < files.size(); i++) {
@@ -234,6 +249,7 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** jpa: 리포지토리 상위 타입 이름들(겹치지 않게) */
 	public List<String> jpaRepositories() {
 		Set<String> all = new LinkedHashSet<String>();
 		for (int i = 0; i < files.size(); i++) {
@@ -242,6 +258,7 @@ public class ProjectRules {
 		return new ArrayList<String>(all);
 	}
 
+	/** jpa: JPQL 글을 받는 메소드 이름들(겹치지 않게) */
 	public List<String> jpqlMethods() {
 		Set<String> all = new LinkedHashSet<String>();
 		for (int i = 0; i < files.size(); i++) {
@@ -252,6 +269,7 @@ public class ProjectRules {
 
 	/* ============================== 도우미 ============================== */
 
+	/** 화면 호출 규칙을 target 에 더합니다. 내용이 똑같은 규칙(함수, 메소드 틀, 인자 자리, 변환이 모두 같은 것)은 한 번만 */
 	private void addScreenRules(List<ScreenScript.CallRule> target, List<ScreenScript.CallRule> rules, Set<String> keys, String kind) {
 		for (int i = 0; i < rules.size(); i++) {
 			ScreenScript.CallRule rule = rules.get(i);
@@ -261,6 +279,7 @@ public class ProjectRules {
 		}
 	}
 
+	/** 애노테이션 이름이 같은 표시 규칙은 먼저 나온 것(우선순위가 높은 것) 하나만 남깁니다. */
 	private static List<Rule.Mark> distinctMarks(List<Rule.Mark> marks) {
 		Set<String> seen = new LinkedHashSet<String>();
 		List<Rule.Mark> distinct = new ArrayList<Rule.Mark>();
@@ -272,6 +291,7 @@ public class ProjectRules {
 		return distinct;
 	}
 
+	/** 표시 규칙들의 애노테이션 이름 목록 */
 	private static List<String> names(List<Rule.Mark> marks) {
 		List<String> names = new ArrayList<String>();
 		for (int i = 0; i < marks.size(); i++) {
@@ -297,6 +317,7 @@ public class ProjectRules {
 		}
 	}
 
+	/** key 를 이 규칙 몫으로 등록합니다. 이미 다른 규칙이 가져갔으면 어디에 있는지 알려 주며 오류를 냅니다. */
 	private void claim(Map<String, Rule> owner, String key, Rule rule) {
 		Rule previous = owner.put(key, rule);
 		if (previous != null) {

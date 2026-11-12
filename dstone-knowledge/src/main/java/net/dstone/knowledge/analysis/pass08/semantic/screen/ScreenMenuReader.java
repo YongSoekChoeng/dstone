@@ -61,6 +61,18 @@ public class ScreenMenuReader implements SemanticStep {
 		return "screenMenu";
 	}
 
+	/**
+	 * <pre>
+	 * 메뉴 목록 파일에서 "메뉴 이름 ↔ 화면 경로" 짝을 찾아, 아직 화면명이 없는 화면에 메뉴 이름을 채웁니다.
+	 *
+	 * 흐름:
+	 *   1) 규칙(screen: 의 menu)이 없으면 바로 끝.
+	 *   2) 이미 화면명이 있는 화면을 기억해 둔다(화면 파일의 제목이 메뉴 이름보다 먼저다).
+	 *   3) 후보 파일을 하나씩 읽어 규칙에 맞는 메뉴 항목을 찾고, 경로로 화면 파일을 찾아 이름을 넣는다.
+	 * </pre>
+	 *
+	 * @return 로그와 상태 화면에 보일 한 줄 요약
+	 */
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		List<ScreenMenu.Rule> rules = context.getProjectRules().screenMenus();
@@ -90,6 +102,7 @@ public class ScreenMenuReader implements SemanticStep {
 					// 파일 하나를 못 읽었다고 전체를 멈추지 않는다.
 					continue;
 				}
+				// 3) 메뉴 항목 → 화면 파일 → 화면명
 				List<ScreenMenu.Entry> found = screenMenu.findEntries(text, rules);
 				if (found.isEmpty()) {
 					continue;

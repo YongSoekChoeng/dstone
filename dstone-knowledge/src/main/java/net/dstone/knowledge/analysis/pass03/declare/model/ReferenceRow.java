@@ -7,13 +7,16 @@ package net.dstone.knowledge.analysis.pass03.declare.model;
  */
 public class ReferenceRow {
 
+	/** 리비전 ID */
 	private long revisionId;
 
+	/** 참조가 들어 있는 파일 ID */
 	private long fileId;
 
 	/** 참조가 들어 있는 쪽의 종류: TYPE / METHOD / FIELD */
 	private String fromKind;
 
+	/** 참조가 들어 있는 쪽의 ID */
 	private String fromId;
 
 	/** CALL / CREATE / FIELD_ACCESS / TYPE_USE / THROWS / EXTENDS / IMPLEMENTS / ANONYMOUS_SUPER */
@@ -25,6 +28,7 @@ public class ReferenceRow {
 	/** 호출 대상 식. 예: orderService, this.dao */
 	private String scopeText;
 
+	/** 인자 개수. CALL / CREATE 일 때만 */
 	private Integer argCount;
 
 	/** 첫 인자를 소스에 적힌 그대로. 문자열이 들어 있을 때만 담는다. 예: getOrderMapper() + "findAll" */
@@ -33,8 +37,10 @@ public class ReferenceRow {
 	/** 둘째 인자부터, 따옴표가 든 것만 적힌 그대로 담은 JSON 배열. 자리를 맞추려고 첫 칸과 따옴표 없는 인자는 null. 담을 것이 없으면 null */
 	private String argsJson;
 
+	/** 줄 */
 	private Integer lineStart;
 
+	/** 칸. RESOLVE 단계가 같은 AST 노드를 다시 찾는 열쇠다 */
 	private Integer columnStart;
 
 	public long getRevisionId() {

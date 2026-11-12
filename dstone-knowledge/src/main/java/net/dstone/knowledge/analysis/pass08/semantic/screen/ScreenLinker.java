@@ -100,10 +100,25 @@ public class ScreenLinker implements SemanticStep {
 		return "screen";
 	}
 
+	/**
+	 * <pre>
+	 * WebSquare / Nexacro 화면 파일을 하나씩 읽어 서버 메소드, 다른 화면과 잇습니다.
+	 *
+	 * 흐름:
+	 *   1) 규칙 파일 screen: 의 호출 규칙(call / field)과 열기 규칙(open)을 꺼낸다.
+	 *   2) 화면이 하나라도 있으면, 주소 → 메소드 색인과 공통 스크립트의 함수를 한 번만 읽어 둔다.
+	 *   3) 화면 파일마다:
+	 *      화면명 저장 → 이 화면이 쓰는 공통 함수 찾기 → 주소로 잇기(linkPaths) → 거래 ID로 잇기(linkCalls)
+	 *      → 다른 화면과 잇기(linkScreens) → 공통 함수가 여는 화면 잇기(linkCommonScreens)
+	 *   4) 거래 진입점을 만들고, ID 자리를 잘못 적은 듯한 규칙을 상태로 남긴다.
+	 * </pre>
+	 *
+	 * @return 로그와 상태 화면에 보일 한 줄 요약
+	 */
 	@Override
 	public String run(AnalysisJobContext context) throws Exception {
 		long revisionId = context.getRevisionId();
-		// 규칙 파일 screen: 의 call 규칙 다음에 field 규칙(폼 필드에 거래 ID를 담아 보내는 화면. 출력 화면이 이렇게 많이 부른다).
+		// 1) 규칙 파일 screen: 의 call 규칙 다음에 field 규칙(폼 필드에 거래 ID를 담아 보내는 화면. 출력 화면이 이렇게 많이 부른다).
 		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>(context.getProjectRules().screenCalls());
 		List<ScreenScript.CallRule> openRules = new ArrayList<ScreenScript.CallRule>(context.getProjectRules().screenOpens());
 
@@ -119,7 +134,7 @@ public class ScreenLinker implements SemanticStep {
 				break;
 			}
 			if (handlers == null) {
-				// 화면이 하나라도 있을 때만 읽는다. 리치클라이언트가 아닌 프로젝트에서는 여기까지 오지 않는다.
+				// 2) 화면이 하나라도 있을 때만 읽는다. 리치클라이언트가 아닌 프로젝트에서는 여기까지 오지 않는다.
 				handlers = loadHandlers(revisionId);
 				commons = loadCommonFunctions(context, root, handlers, rules, openRules, counts);
 			}
@@ -135,6 +150,7 @@ public class ScreenLinker implements SemanticStep {
 					// 파일 하나를 못 읽었다고 전체를 멈추지 않는다.
 					continue;
 				}
+				// 3) 화면 하나 처리
 				counts.files++;
 				counts.titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
 				Set<String> linked = new HashSet<String>();
@@ -148,6 +164,7 @@ public class ScreenLinker implements SemanticStep {
 		if (counts.files == 0) {
 			return "리치클라이언트 화면 없음.";
 		}
+		// 4) 거래 진입점과 규칙 상태
 		int endpoints = insertEndpoints(revisionId, counts);
 		int hinted = saveRuleStatus(revisionId, counts, rules, openRules);
 		return "리치클라이언트 화면 " + counts.files + "개. 주소로 이은 요청 " + counts.byPath + ", 거래 호출로 이은 요청 " + counts.byCall
@@ -339,7 +356,9 @@ public class ScreenLinker implements SemanticStep {
 	}
 
 	/**
+	 * <pre>
 	 * 주소 하나를 진입점과 맞춰 잇습니다.
+	 * </pre>
 	 *
 	 * @param use  공통 함수 안의 주소면 그 함수. 화면에 적힌 주소면 null
 	 * @param line 줄 번호를 이미 알면 그 값. null 이면 text 의 index 자리로 센다
@@ -398,6 +417,7 @@ public class ScreenLinker implements SemanticStep {
 		if (rules.isEmpty()) {
 			return;
 		}
+		// 1) 이 화면에서 직접 부른 거래 호출 + 이 화면이 쓰는 공통 함수 안의 거래 호출
 		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules);
 		// 같은 자리의 공통 함수(없으면 null). calls 와 순서가 같다
 		List<CommonUse> through = new ArrayList<CommonUse>();
@@ -414,7 +434,7 @@ public class ScreenLinker implements SemanticStep {
 		if (calls.isEmpty()) {
 			return;
 		}
-		// 이 화면이 부르는 메소드 이름을 모아 한 번에 찾는다.
+		// 2) 이 화면이 부르는 메소드 이름을 모아 한 번에 찾는다.
 		List<String> names = new ArrayList<String>();
 		for (int i = 0; i < calls.size(); i++) {
 			String name = methodNameOf(calls.get(i));
@@ -424,6 +444,7 @@ public class ScreenLinker implements SemanticStep {
 		}
 		MethodIndex methodsByName = MethodIndex.load(semanticDao, revisionId, names);
 
+		// 3) 호출마다 관계를 남긴다: 메소드 하나면 HIGH(공통 함수를 거쳤으면 MEDIUM), 여럿이면 LOW, 없거나 너무 많으면 UNRESOLVED
 		Set<String> missingNames = new HashSet<String>();
 		for (int c = 0; c < calls.size(); c++) {
 			ScreenScript.Call call = calls.get(c);
@@ -483,13 +504,16 @@ public class ScreenLinker implements SemanticStep {
 		return second < 0 ? path : path.substring(second);
 	}
 
+	/** 호출에서 읽은 ID 를 규칙의 메소드 틀에 넣은 서버 메소드 이름. ID 를 못 읽었으면 null */
 	private String methodNameOf(ScreenScript.Call call) {
 		return call.getId() == null ? null : call.getRule().methodNameOf(call.getId());
 	}
 
 	/**
+	 * <pre>
 	 * 화면 안에 적힌 다른 화면 파일과, 화면 ID로 여는 다른 화면(openRules)을 찾아 잇습니다.
 	 * 가리키는 화면이 하나로 정해질 때만 잇고, 자기 자신은 잇지 않습니다.
+	 * </pre>
 	 *
 	 * @return 이은 화면들(file_id). 공통 함수로 한 번 더 잇지 않으려고 돌려준다
 	 */
@@ -732,6 +756,13 @@ public class ScreenLinker implements SemanticStep {
 		return findScreen(semanticDao, revisionId, written, SCREEN_TYPES);
 	}
 
+	/**
+	 * <pre>
+	 * 화면 함수에 적힌 경로로 화면 파일을 찾습니다. 경로 끝이 같은 화면이 딱 하나일 때만 그 파일 ID를 돌려줍니다.
+	 * "앱::경로" 의 앞부분과 맨 앞의 / ./ 는 떼고 찾습니다. .. 이 든 경로는 찾지 않습니다.
+	 * 하나도 없으면 맨 앞 폴더 하나를 떼고 한 번 더 찾습니다(앱 이름 폴더가 경로에 붙어 있는 경우).
+	 * </pre>
+	 */
 	static Long findScreen(SemanticDao semanticDao, long revisionId, String written, List<String> screenTypes) {
 		if (written == null) {
 			// 화면 ID 가 열기 규칙의 다듬는 규칙(id: match / map)에 맞지 않았다
@@ -762,6 +793,7 @@ public class ScreenLinker implements SemanticStep {
 		return null;
 	}
 
+	/** 화면 파일에서 나가는 관계 한 행을 Map 으로 만듭니다(DAO 에 넘길 모양). */
 	private Map<String, Object> relation(long revisionId, long fileId, String relationType, String toKind, String toId, String toExternal
 			, String confidence, String resolutionStatus, Map<String, Object> properties, Integer lineStart) {
 		Map<String, Object> relation = new HashMap<String, Object>();
@@ -838,6 +870,12 @@ public class ScreenLinker implements SemanticStep {
 		/** 규칙(종류|함수|틀|자리)마다 ID를 글자로 적지 않아 건너뛴 호출 */
 		Map<String, NotLiteral> notLiteral = new LinkedHashMap<String, NotLiteral>();
 
+		/**
+		 * <pre>
+		 * ID 자리에 따옴표 글이 아닌 것(변수 등)이 온 호출을 규칙별로 셉니다.
+		 * 그때 다른 인자 자리에 따옴표 글이 몇 번 왔는지도 세어, "인자 자리를 잘못 적은 것 같다"는 안내에 씁니다.
+		 * </pre>
+		 */
 		void notLiteral(String kind, ScreenScript.Call call) {
 			ScreenScript.CallRule rule = call.getRule();
 			String key = kind + "|" + rule.getFunction() + "|" + rule.getMethodTemplate() + "|" + rule.getArgIndex();
@@ -870,6 +908,7 @@ public class ScreenLinker implements SemanticStep {
 		/** 메소드 이름 → [methodId, ownerFqn] 들 */
 		private final Map<String, List<String[]>> byName = new HashMap<String, List<String[]>>();
 
+		/** 화면이 부르는 서버 메소드 이름들("타입.메소드" 또는 "메소드")을 한 번에 찾아 메소드 이름 → [메소드 ID, 타입 전체 이름] 목록 색인을 만듭니다. */
 		static MethodIndex load(SemanticDao semanticDao, long revisionId, List<String> names) {
 			MethodIndex index = new MethodIndex();
 			List<String> methodNames = new ArrayList<String>();
@@ -912,11 +951,13 @@ public class ScreenLinker implements SemanticStep {
 			return methods.isEmpty() ? null : methods;
 		}
 
+		/** "Owner.method" → "method" */
 		static String methodPart(String name) {
 			int dot = name.lastIndexOf('.');
 			return dot < 0 ? name : name.substring(dot + 1);
 		}
 
+		/** "Owner.method" → "Owner". 점이 없으면 null */
 		static String ownerPart(String name) {
 			int dot = name.lastIndexOf('.');
 			return dot < 0 ? null : name.substring(0, dot);

@@ -71,6 +71,10 @@ public class RetentionService extends BaseObject {
 	}
 
 	/**
+	 * <pre>
+	 * 프로젝트의 리비전을 최근 keep 개만 남기고 지웁니다. 분석이 돌고 있거나, 돌고 있는 증분 분석이 기준으로 쓰는 리비전은 건너뜁니다.
+	 * </pre>
+	 *
 	 * @param keep 남길 리비전 수. null이면 설정 값(dstone.knowledge.retention.max-revisions)
 	 * @return {keep, deletedRevisions: [{revisionId, revisionLabel}], skippedRevisions: [{revisionId, reason}], deletedEmbeddings}
 	 */
@@ -135,6 +139,7 @@ public class RetentionService extends BaseObject {
 		return null;
 	}
 
+	/** 설정 값을 정수로 읽습니다. 비어 있으면 기본값 */
 	private int intProperty(String key, int defaultValue) {
 		String configured = configProperty.getProperty(key);
 		if (configured == null || configured.trim().length() == 0) {

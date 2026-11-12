@@ -106,13 +106,23 @@ public class JavaSqlLinker implements SemanticStep {
 		return call != null && jpqlCalls.contains(call) ? "JPQL" : "SQL";
 	}
 
-	/** @return 만든 테이블 관계 수 */
+	/**
+	 * <pre>
+	 * statement 하나를 테이블과 잇습니다. 글의 종류에 따라 읽는 방법이 다릅니다.
+	 *   DERIVED  findByName 처럼 메소드 이름으로 만든 쿼리: 리포지토리의 엔티티 테이블 하나(삭제면 D, 아니면 R)
+	 *   JPQL     엔티티 이름을 테이블로 바꿔서(JpqlTableExtractor)
+	 *   SQL      SQL 을 파싱해서(SqlTableExtractor). 파싱이 안 되면 정규식으로 짐작한 것(MEDIUM)
+	 * </pre>
+	 *
+	 * @return 만든 테이블 관계 수
+	 */
 	private int linkTables(long revisionId, Map<String, Object> statement, String language, JpaEntities entities, Set<String> unknownEntities) {
 		String from = "S" + statement.get("mapperId");
 		Object fileId = statement.get("fileId");
 		Object line = statement.get("lineStart");
 		String sql = (String) statement.get("sqlBody");
 		int count = 0;
+		// 메소드 이름 쿼리: 리포지토리의 엔티티 테이블
 		if ("DERIVED".equals(language)) {
 			JpaEntities.Entity entity = entities.entity((String) statement.get("entity"));
 			if (entity == null) {
@@ -126,6 +136,7 @@ public class JavaSqlLinker implements SemanticStep {
 		if (sql == null) {
 			return 0;
 		}
+		// JPQL: 엔티티 → 테이블
 		if ("JPQL".equals(language)) {
 			JpqlTableExtractor.Result result = jpqlExtractor.extract(sql, entities);
 			unknownEntities.addAll(result.unknown);
@@ -138,6 +149,7 @@ public class JavaSqlLinker implements SemanticStep {
 			}
 			return count;
 		}
+		// SQL: 테이블마다 CRUD, 쓴 컬럼, SQL 주석에 적힌 한글명을 덧붙여 남긴다.
 		List<SqlTableExtractor.TableUse> uses = tableExtractor.extract(sql, (String) statement.get("statementType"));
 		for (int i = 0; i < uses.size(); i++) {
 			SqlTableExtractor.TableUse use = uses.get(i);
@@ -161,6 +173,12 @@ public class JavaSqlLinker implements SemanticStep {
 		return count;
 	}
 
+	/**
+	 * <pre>
+	 * SQL statement → 테이블 관계 한 행(R 이면 READS_TABLE, 그 밖은 WRITES_TABLE).
+	 * 테이블 이름을 @Table 에서 읽었으면 HIGH, 이름 관례로 지었으면 MEDIUM 입니다.
+	 * </pre>
+	 */
 	private Map<String, Object> tableRelation(long revisionId, String from, String table, String crud, String via, String entity, boolean explicit
 			, Object fileId, Object line) {
 		Map<String, Object> properties = new LinkedHashMap<String, Object>();
@@ -220,6 +238,7 @@ public class JavaSqlLinker implements SemanticStep {
 		return executors.size();
 	}
 
+	/** analysis_relation 한 행을 Map 으로 만듭니다(DAO 에 넘길 모양). */
 	private Map<String, Object> relation(long revisionId, String fromKind, String fromId, String relationType, String toKind, String toId, String toExternal
 			, String confidence, String resolutionStatus, Map<String, Object> properties, Object fileId, Object lineStart) {
 		Map<String, Object> relation = new HashMap<String, Object>();

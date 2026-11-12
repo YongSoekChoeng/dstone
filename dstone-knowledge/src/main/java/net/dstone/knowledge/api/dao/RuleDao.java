@@ -44,6 +44,10 @@ public class RuleDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 규칙 시험 적용 전후로 생기거나 없어진 결과의 예시
+	 * </pre>
+	 *
 	 * @param side ADDED(새로 생긴 것) | REMOVED(없어진 것)
 	 * @return [{kind, category, label}]
 	 */
@@ -57,6 +61,10 @@ public class RuleDao extends BaseDao {
 	/* ---------- 규칙 후보 ---------- */
 
 	/**
+	 * <pre>
+	 * sql: / view: 규칙 후보: 따옴표 글을 인자로 받는데 규칙이 아직 안 보는 호출
+	 * </pre>
+	 *
 	 * @param covered 규칙이 이미 보는 호출 [{kind: CALL|CREATE, name, argIndex}]
 	 * @return [{kind, name, argIndex, calls, sqlMatches, viewMatches, samples, receiverType, receiverTypeCalls}]
 	 */
@@ -69,6 +77,10 @@ public class RuleDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * layer: / entry: 규칙 후보: 자주 쓰이는데 규칙이 모르는 애노테이션
+	 * </pre>
+	 *
 	 * @param known   규칙이 이미 아는 애노테이션
 	 * @param ignored 뜻이 없어 후보로 보지 않을 애노테이션(@Override, Lombok 등)
 	 * @return [{annotation, targetKind, fqn, count, unexplained}]
@@ -83,6 +95,10 @@ public class RuleDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * layer: 규칙 후보: 여러 클래스가 물려받는데 규칙이 모르는 상위 타입
+	 * </pre>
+	 *
 	 * @param known 규칙이 이미 아는 상위 타입
 	 * @return [{superType, inProject, types, unlayered, samples}]
 	 */

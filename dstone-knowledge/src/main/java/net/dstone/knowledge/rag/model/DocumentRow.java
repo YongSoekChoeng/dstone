@@ -10,8 +10,10 @@ public class DocumentRow {
 	/** 같은 대상이면 리비전이 달라도 같은 값. 예: METHOD:메소드ID */
 	private String documentId;
 
+	/** 프로젝트 ID */
 	private String projectId;
 
+	/** 리비전 ID */
 	private long revisionId;
 
 	/** FILE / TYPE / METHOD */
@@ -23,11 +25,13 @@ public class DocumentRow {
 	/** 그 대상의 ID(파일은 파일 번호) */
 	private String refId;
 
+	/** 제목. 검색 결과 목록에 보인다 */
 	private String title;
 
 	/** 원본 파일의 경로(프로젝트 루트 기준) */
 	private String sourcePath;
 
+	/** 덧붙임 정보(JSON) */
 	private String metadataJson;
 
 	/** 문서 전체 내용의 SHA-256 */

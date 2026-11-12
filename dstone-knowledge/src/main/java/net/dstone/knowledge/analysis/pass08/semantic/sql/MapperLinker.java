@@ -72,6 +72,11 @@ public class MapperLinker implements SemanticStep {
 	/**
 	 * <pre>
 	 * statement마다 SQL에서 테이블을 뽑아 관계로 넣습니다.
+	 *
+	 * 흐름(statement 를 mapperId 순서로 PAGE_SIZE 개씩 읽으며):
+	 *   1) &lt;include refid&gt; 로 끼워 넣는 SQL 조각을 펼쳐 SQL 글을 완성한다.
+	 *   2) 테이블과 CRUD, 쓰인 컬럼을 뽑는다(파서 → 안 되면 정규식).
+	 *   3) 테이블마다 READS_TABLE / WRITES_TABLE 관계를 넣는다. 정규식으로 짐작한 것은 MEDIUM.
 	 * </pre>
 	 *
 	 * @return [테이블 관계 수, 파서로 읽은 statement 수, 정규식으로 읽은 statement 수]
@@ -89,8 +94,10 @@ public class MapperLinker implements SemanticStep {
 			for (int i = 0; i < page.size(); i++) {
 				Map<String, Object> statement = page.get(i);
 				afterId = ((Number) statement.get("mapperId")).longValue();
+				// 1) 조각 펼치기 → 2) 테이블 뽑기
 				String sql = expandIncludes((String) statement.get("sqlBody"), (String) statement.get("namespace"), index, 0);
 				List<SqlTableExtractor.TableUse> uses = tableExtractor.extract(sql, (String) statement.get("statementType"));
+				// 3) 테이블마다 관계
 				boolean anyGuessed = false;
 				for (int t = 0; t < uses.size(); t++) {
 					SqlTableExtractor.TableUse use = uses.get(t);
@@ -175,6 +182,7 @@ public class MapperLinker implements SemanticStep {
 		return found;
 	}
 
+	/** analysis_relation 한 행을 Map 으로 만듭니다(DAO 에 넘길 모양). */
 	private Map<String, Object> relation(long revisionId, String fromKind, String fromId, String relationType, String toKind, String toId, String toExternal
 			, String confidence, String resolutionStatus, Map<String, Object> properties, Object fileId, Object lineStart) {
 		Map<String, Object> relation = new HashMap<String, Object>();

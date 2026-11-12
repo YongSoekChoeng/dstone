@@ -234,6 +234,7 @@ public class RevisionService extends BaseObject {
 		return result;
 	}
 
+	/** 풀지 못한 참조 조회 조건. status 는 UNRESOLVED(기본) / HEURISTIC / IGNORED 가운데 하나, 그 밖이면 400 */
 	private Map<String, Object> unresolvedCondition(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path) {
 		String statusValue = status == null || status.trim().isEmpty() ? "UNRESOLVED" : status.trim().toUpperCase();
 		if (!"UNRESOLVED".equals(statusValue) && !"HEURISTIC".equals(statusValue) && !"IGNORED".equals(statusValue)) {
@@ -271,6 +272,7 @@ public class RevisionService extends BaseObject {
 		info("리비전 삭제: revisionId=" + revisionId);
 	}
 
+	/** 리비전 한 건. 없으면 404 */
 	private Map<String, Object> findRevision(long revisionId) {
 		Map<String, Object> revision = revisionDao.selectRevision(revisionId);
 		if (revision == null) {
@@ -279,6 +281,7 @@ public class RevisionService extends BaseObject {
 		return revision;
 	}
 
+	/** 파일 목록 조회 조건(비운 값은 거르지 않음) */
 	private Map<String, Object> condition(long revisionId, String language, String fileType, String encoding, String pathLike) {
 		Map<String, Object> condition = new HashMap<String, Object>();
 		condition.put("revisionId", revisionId);

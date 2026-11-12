@@ -37,6 +37,10 @@ public class GraphDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 노드 주변 그래프: 고른 노드에서 위(부르는 쪽) 또는 아래(불리는 쪽)로 따라간 선들
+	 * </pre>
+	 *
 	 * @param condition {revisionId, direction(UP / DOWN), startId, startByMember, tableName, anchorTypes, stepTypes, hideLayers, depth, limit}
 	 * @return 고른 노드에서 한쪽 방향으로 따라간 선. depth 1이 고른 노드에 바로 붙은 선
 	 */
@@ -45,6 +49,10 @@ public class GraphDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 이 화면들을 끼워 넣거나 띄우는 화면 쪽 선들
+	 * </pre>
+	 *
 	 * @param screenIds 화면 노드 id('F' + 파일 id)들
 	 * @param depth 몇 단계 위까지(부르는 화면을 부르는 화면 ...)
 	 * @return 그 화면들을 부르는 화면에서 오는 INCLUDES 선. depth 1이 바로 부르는 화면
@@ -59,6 +67,10 @@ public class GraphDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 이 화면들이 끼워 넣거나 띄우는 화면 쪽 선들
+	 * </pre>
+	 *
 	 * @param screenIds 화면 노드 id('F' + 파일 id)들
 	 * @param depth 몇 단계 아래까지(부르는 화면이 또 부르는 화면 ...)
 	 * @return 그 화면들이 부르는 화면으로 가는 INCLUDES 선. depth 1이 바로 부르는 화면
@@ -72,6 +84,7 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectCalleeScreenEdges", param);
 	}
 
+	/** 관계 트리에 나온 노드들의 이름과 위치. 테이블('T:이름')은 여기에 없다(이름이 곧 전부라 서비스가 만든다) */
 	public List<Map<String, Object>> selectNodesByIds(long revisionId, List<String> ids) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -105,6 +118,7 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectDocumentChunks", param);
 	}
 
+	/** 파일 하나(노드 상세용). 없으면 null */
 	public Map<String, Object> selectFile(long revisionId, long fileId) {
 		return sqlSessionCommon.selectOne(NS + "selectFile", fileParam(revisionId, fileId));
 	}
@@ -135,14 +149,17 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectMethodTitleSkip", param);
 	}
 
+	/** 화면(JSP) 안의 Java 코드로 만든 메소드. 화면에 스크립틀릿이 없으면 0건이다 */
 	public List<Map<String, Object>> selectMethodsByFile(long revisionId, long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectMethodsByFile", fileParam(revisionId, fileId));
 	}
 
+	/** 매퍼 파일 하나에 든 statement. 조각(sql)은 뺀다 */
 	public List<Map<String, Object>> selectStatementsByFile(long revisionId, long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectStatementsByFile", fileParam(revisionId, fileId));
 	}
 
+	/** SQL statement 하나(노드 상세용). 없으면 null */
 	public Map<String, Object> selectStatement(long revisionId, long mapperId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -150,6 +167,7 @@ public class GraphDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectStatement", param);
 	}
 
+	/** 파일 하나를 가리키는 조회 조건 */
 	private Map<String, Object> fileParam(long revisionId, long fileId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

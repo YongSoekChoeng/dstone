@@ -156,6 +156,7 @@ public class ScreenDictionaryReader extends BaseObject {
 		return byId;
 	}
 
+	/** 경로로 사전 항목을 찾습니다. 찾으면 [화면명, 그 항목의 출처], 없으면 null */
 	private static String[] findByPath(Dictionary dictionary, String path) {
 		for (int i = 0; i < dictionary.byPath.size(); i++) {
 			String[] entry = dictionary.byPath.get(i);
@@ -179,7 +180,13 @@ public class ScreenDictionaryReader extends BaseObject {
 	/**
 	 * <pre>
 	 * 화면 사전 파일의 글을 읽습니다.
+	 *
+	 * 흐름:
+	 *   1) CSV 로 읽고, 머리글에서 화면명 / 화면 파일 경로 / 화면 ID 열을 찾는다.
+	 *      화면명 열과, 경로나 ID 열 하나는 꼭 있어야 한다. 없으면 problem 에 이유를 남기고 끝.
+	 *   2) 둘째 줄부터 경로 → 화면명(byPath), 화면 ID(대문자) → 화면명(byId)을 담는다.
 	 * </pre>
+	 *
 	 * @param text 파일 내용
 	 * @param fileName 한글명이 어디서 왔는지 적을 때 쓰는 파일 이름
 	 */
@@ -204,6 +211,7 @@ public class ScreenDictionaryReader extends BaseObject {
 			dictionary.problem = "머리글에서 화면명 열과 화면 파일(또는 화면 ID) 열을 찾지 못했습니다";
 			return dictionary;
 		}
+		// 2) 데이터 줄
 		for (int r = 1; r < rows.size(); r++) {
 			List<String> row = rows.get(r);
 			String koreanName = KoreanName.clean(DictionaryFileReader.cell(row, name));

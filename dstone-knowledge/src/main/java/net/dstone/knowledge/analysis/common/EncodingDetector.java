@@ -58,6 +58,7 @@ public class EncodingDetector {
 		/** false면 어떤 인코딩으로도 깨끗하게 읽히지 않아 ISO-8859-1로 대신 읽은 것입니다. */
 		public final boolean confident;
 
+		/** @param confident 깨짐 없이 읽혔는지 */
 		public Result(String encoding, int bomLength, boolean confident) {
 			this.encoding = encoding;
 			this.bomLength = bomLength;
@@ -66,6 +67,10 @@ public class EncodingDetector {
 	}
 
 	/**
+	 * <pre>
+	 * 파일의 인코딩을 알아냅니다. 순서는 클래스 설명의 1)~7)과 같습니다.
+	 * </pre>
+	 *
 	 * @param bytes 파일 내용 전체
 	 * @param language 파일 종류(JAVA/JSP/XML ...). 파일 안에 적힌 인코딩을 찾을 때 씁니다.
 	 * @param projectEncoding 프로젝트에 지정해 둔 인코딩. 없으면 null
@@ -131,6 +136,7 @@ public class EncodingDetector {
 		return decode(bytes, new Result(encoding == null ? "ISO-8859-1" : encoding, bomLength, true));
 	}
 
+	/** 파일 맨 앞 바이트가 head와 같은지(BOM 확인용) */
 	private boolean startsWith(byte[] bytes, int... head) {
 		if (bytes.length < head.length) {
 			return false;
@@ -143,6 +149,7 @@ public class EncodingDetector {
 		return true;
 	}
 
+	/** 모든 바이트가 0~127(영문·숫자·기호)인지. Java의 byte는 부호가 있어서 128 이상은 음수로 보인다 */
 	private boolean isAscii(byte[] bytes) {
 		for (int i = 0; i < bytes.length; i++) {
 			if (bytes[i] < 0) {
@@ -152,6 +159,7 @@ public class EncodingDetector {
 		return true;
 	}
 
+	/** 이름으로 받은 인코딩으로 깨짐 없이 읽히는지. 이 JVM이 모르는 인코딩이면 false */
 	private boolean canDecode(byte[] bytes, String charsetName) {
 		try {
 			if (!Charset.isSupported(charsetName)) {

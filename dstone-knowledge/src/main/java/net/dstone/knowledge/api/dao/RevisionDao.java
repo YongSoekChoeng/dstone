@@ -33,10 +33,12 @@ public class RevisionDao extends BaseDao {
 		, "analysis_revision_pass", "analysis_job", "analysis_revision"
 	};
 
+	/** 리비전 하나. 없으면 null */
 	public Map<String, Object> selectRevision(long revisionId) {
 		return sqlSessionCommon.selectOne(NS + "selectRevision", revisionId);
 	}
 
+	/** 프로젝트에서 라벨이 같은 리비전. 없으면 null */
 	public Map<String, Object> selectRevisionByLabel(String projectId, String revisionLabel) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("projectId", projectId);
@@ -44,12 +46,17 @@ public class RevisionDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectRevisionByLabel", param);
 	}
 
+	/** 프로젝트의 리비전 목록 */
 	public List<Map<String, Object>> selectRevisionList(String projectId) {
 		return sqlSessionCommon.selectList(NS + "selectRevisionList", projectId);
 	}
 
 	/** 리비전을 새로 만들고, 만들어진 revision_id를 돌려줍니다. */
 	/**
+	 * <pre>
+	 * 새 리비전을 만들고 그 ID를 돌려줍니다.
+	 * </pre>
+	 *
 	 * @param parentRevisionId 증분 분석의 기준이 되는 앞 리비전. 전체 분석이면 null
 	 */
 	public long insertRevision(String projectId, String revisionLabel, String analyzerVersion, Long parentRevisionId) {
@@ -73,6 +80,7 @@ public class RevisionDao extends BaseDao {
 		return count == null ? 0 : count.intValue();
 	}
 
+	/** 리비전 상태(CREATED / ANALYZING / READY / FAILED) */
 	public void updateRevisionStatus(long revisionId, String status) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -80,10 +88,12 @@ public class RevisionDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateRevisionStatus", param);
 	}
 
+	/** 서버가 내려가면서 끊긴 리비전 정리 (기동할 때 한 번) */
 	public int markInterruptedRevisions() {
 		return sqlSessionCommon.update(NS + "markInterruptedRevisions");
 	}
 
+	/** 리비전의 단계별 진행 상태 */
 	public List<Map<String, Object>> selectRevisionPassList(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectRevisionPassList", revisionId);
 	}
@@ -93,12 +103,14 @@ public class RevisionDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectRevisionPassStatus", passParam(revisionId, pass));
 	}
 
+	/** 단계 시작. 전에 돌다 만 기록이 있으면 RUNNING 으로 되돌린다 */
 	public void startRevisionPass(long revisionId, String pass, String analysisId) {
 		Map<String, Object> param = passParam(revisionId, pass);
 		param.put("analysisId", analysisId);
 		sqlSessionCommon.insert(NS + "startRevisionPass", param);
 	}
 
+	/** 단계의 진행 건수 */
 	public void updateRevisionPassProgress(long revisionId, String pass, int totalCount, int doneCount) {
 		Map<String, Object> param = passParam(revisionId, pass);
 		param.put("totalCount", totalCount);
@@ -106,6 +118,7 @@ public class RevisionDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateRevisionPassProgress", param);
 	}
 
+	/** 단계 끝: 상태(DONE / FAILED / CANCELLED)와 끝난 시각 */
 	public void endRevisionPass(long revisionId, String pass, String status) {
 		Map<String, Object> param = passParam(revisionId, pass);
 		param.put("status", status);
@@ -126,6 +139,7 @@ public class RevisionDao extends BaseDao {
 		sqlSessionCommon.delete(NS + "deleteRevisionPasses", param);
 	}
 
+	/** 서버가 내려가며 RUNNING 으로 남은 단계 진행을 FAILED 로 정리합니다(기동할 때 한 번). */
 	public int markInterruptedRevisionPasses() {
 		return sqlSessionCommon.update(NS + "markInterruptedRevisionPasses");
 	}
@@ -147,6 +161,7 @@ public class RevisionDao extends BaseDao {
 		}
 	}
 
+	/** 리비전 + 단계 조회 조건 */
 	private Map<String, Object> passParam(long revisionId, String pass) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);

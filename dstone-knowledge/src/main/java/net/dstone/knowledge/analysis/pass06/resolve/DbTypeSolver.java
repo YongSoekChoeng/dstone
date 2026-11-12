@@ -78,6 +78,10 @@ public class DbTypeSolver implements TypeSolver {
 	private long parses = 0;
 
 	/**
+	 * <pre>
+	 * 리비전 하나의 프로젝트 타입을 찾는 해석기를 만듭니다.
+	 * </pre>
+	 *
 	 * @param root 프로젝트 소스의 루트 폴더
 	 * @param maxUnits 메모리에 들고 있을 파싱한 파일 수
 	 * @param maxLocations 기억해 둘 "이름 → 파일" 수
@@ -103,6 +107,13 @@ public class DbTypeSolver implements TypeSolver {
 		this.parent = parent;
 	}
 
+	/**
+	 * <pre>
+	 * 전체 이름으로 타입을 찾습니다(JavaSymbolSolver가 부릅니다).
+	 * DB 색인에서 그 타입이 있는 파일을 찾고 → 그 파일의 AST를 꺼내(캐시에 없으면 파싱) → AST에서 그 타입 선언을 찾습니다.
+	 * 어느 걸음에서든 못 찾으면 "못 풂"을 돌려주고, 그러면 다음 해석기(JDK, jar)가 시도합니다.
+	 * </pre>
+	 */
 	@Override
 	public SymbolReference<ResolvedReferenceTypeDeclaration> tryToSolveType(String name) {
 		lookups++;
@@ -121,6 +132,7 @@ public class DbTypeSolver implements TypeSolver {
 		return SymbolReference.solved(JavaParserFacade.get(getRoot()).getTypeDeclaration(declaration));
 	}
 
+	/** Java 모듈 시스템을 쓰지 않으므로 모듈 이름은 무시하고 이름만으로 찾습니다. */
 	@Override
 	public SymbolReference<ResolvedReferenceTypeDeclaration> tryToSolveTypeInModule(String qualifiedModuleName, String simpleTypeName) {
 		return tryToSolveType(simpleTypeName);

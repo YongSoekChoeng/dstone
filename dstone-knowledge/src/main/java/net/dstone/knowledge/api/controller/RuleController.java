@@ -37,11 +37,13 @@ public class RuleController {
 		return ruleService.getRuleSets();
 	}
 
+	/** 이 리비전을 분석할 때 쓴 규칙 파일과 지금의 규칙 파일을 견준 결과(바뀌었으면 SEMANTIC 부터 다시 돌려야 한다) */
 	@GetMapping("/revisions/{revisionId}/rules")
 	public Map<String, Object> getRevisionRules(@PathVariable("revisionId") long revisionId) {
 		return ruleService.getRevisionRules(revisionId);
 	}
 
+	/** 규칙 글을 저장하지 않고 이 리비전에 시험 삼아 적용해 봅니다. 본문: {path: 규칙 폴더 안 경로, rules: 규칙 글} */
 	@PostMapping("/revisions/{revisionId}/rules/trial")
 	public Map<String, Object> trial(@PathVariable("revisionId") long revisionId
 			, @RequestBody(required = false) Map<String, Object> body

@@ -7,10 +7,13 @@ package net.dstone.knowledge.analysis.pass03.declare.model;
  */
 public class MethodRow {
 
+	/** 리비전 ID */
 	private long revisionId;
 
+	/** 메소드 ID. 같은 메소드면 리비전이 달라도 같은 값(해시) */
 	private String methodId;
 
+	/** 이 메소드를 가진 타입의 ID */
 	private String ownerSymbolId;
 
 	/** 메소드 이름. 생성자는 <init> */
@@ -22,17 +25,22 @@ public class MethodRow {
 	/** 소스에 적힌 그대로의 반환 타입. 생성자는 null */
 	private String returnType;
 
+	/** 파라미터 개수. 호출을 풀 때 오버로드를 가르는 데 쓴다 */
 	private int paramCount;
 
 	/** [{name, type}] */
 	private String parametersJson;
 
+	/** 접근 제한자: public / protected / package / private */
 	private String visibility;
 
+	/** static 여부 */
 	private boolean isStatic;
 
+	/** abstract 여부(인터페이스의 본문 없는 메소드 포함) */
 	private boolean isAbstract;
 
+	/** 생성자 여부 */
 	private boolean isConstructor;
 
 	/** 소스에는 없지만 컴파일하면 생기는 멤버(Lombok getter, 기본 생성자 등) */
@@ -41,12 +49,16 @@ public class MethodRow {
 	/** 예: LOMBOK_GETTER, DEFAULT_CONSTRUCTOR */
 	private String syntheticOrigin;
 
+	/** 덧붙임 정보(JSON) */
 	private String propertiesJson;
 
+	/** 선언된 파일 ID */
 	private long fileId;
 
+	/** 시작 줄. 합성 메소드는 근거가 된 필드·애노테이션의 줄 */
 	private Integer lineStart;
 
+	/** 끝 줄 */
 	private Integer lineEnd;
 
 	public long getRevisionId() {

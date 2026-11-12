@@ -108,9 +108,20 @@ public class StrutsEntries implements SemanticStep {
 	}
 
 	/**
+	 * <pre>
+	 * 액션 하나를 진입점과 화면 관계로 만듭니다.
+	 *
+	 * 흐름:
+	 *   1) 주소를 만든다. Struts 2 는 path + 확장자(.action), Struts 1 은 web.xml 의 주소 모양(*.do 등)마다 하나씩.
+	 *   2) 액션 클래스를 찾아 CONTROLLER 로 정하고, 처리 메소드(execute / perform / method 속성)를 찾는다.
+	 *   3) 주소 × 처리 메소드마다 진입점을 넣는다. 메소드를 못 찾았으면 클래스만 가리키는 진입점.
+	 *   4) forward / result 에 적힌 JSP 가 하나로 정해지면 처리 메소드 → JSP 의 RENDERS 관계를 넣는다.
+	 * </pre>
+	 *
 	 * @return [만든 진입점 수, 계층을 정한 타입 수, 화면 관계 수]
 	 */
 	private int[] addAction(long revisionId, long fileId, StrutsConfigReader.StrutsConfig config, StrutsConfigReader.Action action, List<String> urlPatterns) {
+		// 1) 주소
 		List<String> urls = new ArrayList<String>();
 		if (config.struts2) {
 			urls.add(action.path + struts2Extension(config));
@@ -130,7 +141,7 @@ public class StrutsEntries implements SemanticStep {
 			properties.put("forwards", action.forwards);
 		}
 
-		// 처리하는 타입과 메소드
+		// 2) 처리하는 타입과 메소드
 		String symbolId = null;
 		List<Map<String, Object>> handlers = new ArrayList<Map<String, Object>>();
 		int layered = 0;
@@ -150,6 +161,7 @@ public class StrutsEntries implements SemanticStep {
 			properties.put("external", Boolean.TRUE);
 		}
 
+		// 3) 진입점
 		int endpoints = 0;
 		for (int u = 0; u < urls.size(); u++) {
 			if (handlers.isEmpty()) {
@@ -164,7 +176,7 @@ public class StrutsEntries implements SemanticStep {
 			}
 		}
 
-		// 끝나고 가는 화면. 경로가 가리키는 JSP가 하나로 정해질 때만 잇는다.
+		// 4) 끝나고 가는 화면. 경로가 가리키는 JSP가 하나로 정해질 때만 잇는다.
 		int renders = 0;
 		for (int h = 0; h < handlers.size(); h++) {
 			Iterator<Map.Entry<String, String>> forwards = action.forwards.entrySet().iterator();
@@ -251,6 +263,7 @@ public class StrutsEntries implements SemanticStep {
 		return path.length() == 0 ? null : path;
 	}
 
+	/** Struts 액션 하나를 HTTP 진입점(방식 ALL)으로 넣습니다. */
 	private void addEndpoint(long revisionId, long fileId, String path, String symbolId, String methodId, Map<String, Object> properties, Integer lineStart) {
 		Map<String, Object> endpoint = new HashMap<String, Object>();
 		endpoint.put("revisionId", revisionId);
@@ -265,6 +278,7 @@ public class StrutsEntries implements SemanticStep {
 		semanticDao.insertEndpoint(endpoint);
 	}
 
+	/** 액션 메소드 → 이동할 JSP 의 RENDERS 관계 한 행(설정 파일에 적힌 사실이라 HIGH) */
 	private Map<String, Object> relation(long revisionId, String methodId, String fileNodeId, Map<String, Object> properties, long fileId) {
 		Map<String, Object> relation = new HashMap<String, Object>();
 		relation.put("revisionId", revisionId);

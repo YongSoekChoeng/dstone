@@ -23,11 +23,13 @@ import net.dstone.common.core.BaseObject;
 @Component
 public class ConfigTransaction extends BaseObject {
 
+	/** dstone_knowledge DB의 트랜잭션 관리자 */
 	@Bean(name = "txManagerCommon")
 	public DataSourceTransactionManager txManagerCommon(@Qualifier("dataSourceCommon") DataSource dataSourceCommon) {
 		return new DataSourceTransactionManager(dataSourceCommon);
 	}
 
+	/** 코드로 트랜잭션 범위를 정할 때 쓰는 틀(분석 단계가 파일 하나씩 커밋할 때 등) */
 	@Bean(name = "txTemplateCommon")
 	public TransactionTemplate txTemplateCommon(@Qualifier("txManagerCommon") DataSourceTransactionManager txManagerCommon) {
 		return new TransactionTemplate(txManagerCommon);

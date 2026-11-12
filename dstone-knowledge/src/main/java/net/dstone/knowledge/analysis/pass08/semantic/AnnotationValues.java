@@ -18,9 +18,16 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  */
 public class AnnotationValues {
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private AnnotationValues() {
 	}
 
+	/**
+	 * <pre>
+	 * analysis_annotation.attributes_json 을 Map으로 읽습니다. 비었거나 읽을 수 없으면 빈 Map
+	 * (JSON은 YAML의 한 형태라서 이미 쓰고 있는 SnakeYAML로 읽습니다.)
+	 * </pre>
+	 */
 	@SuppressWarnings("unchecked")
 	public static Map<String, Object> parse(String json) {
 		if (json == null || json.length() == 0) {

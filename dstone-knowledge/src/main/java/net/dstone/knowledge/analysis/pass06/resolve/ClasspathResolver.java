@@ -40,6 +40,10 @@ public class ClasspathResolver extends BaseObject {
 	private static final int MAX_JARS = 1000;
 
 	/**
+	 * <pre>
+	 * 대상 프로젝트의 라이브러리 jar 를 찾습니다(프로젝트 폴더 안의 jar + 설정한 클래스패스).
+	 * </pre>
+	 *
 	 * @param root 프로젝트 소스의 루트 폴더
 	 * @param classpath 프로젝트에 적어 둔 클래스패스. 없으면 null
 	 */

@@ -22,31 +22,41 @@ public class RagDao extends BaseDao {
 
 	/* ---------- 문서를 만들 재료 조회 (준비 걸음, 일반 세션) ---------- */
 
+	/** 이 파일의 타입(문서 재료) */
 	public List<Map<String, Object>> selectTypesByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectTypesByFile", fileId);
 	}
 
+	/** 이 파일의 필드(문서 재료) */
 	public List<Map<String, Object>> selectFieldsByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectFieldsByFile", fileId);
 	}
 
+	/** 이 파일의 메소드(문서 재료) */
 	public List<Map<String, Object>> selectMethodsByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectMethodsByFile", fileId);
 	}
 
+	/** 이 파일의 애노테이션(문서 재료) */
 	public List<Map<String, Object>> selectAnnotationsByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectAnnotationsByFile", fileId);
 	}
 
+	/** 이 파일의 타입들이 상속/구현/주입받는 것 */
 	public List<Map<String, Object>> selectTypeRelationsByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectTypeRelationsByFile", fileId);
 	}
 
+	/** 이 파일의 메소드들이 부르는 것. 프로젝트 안의 메소드면 "타입#시그니처", 밖이면 이름 그대로 */
 	public List<Map<String, Object>> selectCalleesByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectCalleesByFile", fileId);
 	}
 
 	/**
+	 * <pre>
+	 * 이 파일의 메소드마다 "부르는 쪽" 메소드들(메소드 문서 재료)
+	 * </pre>
+	 *
 	 * @param limit 메소드 하나당 가져올 "부르는 쪽"의 최대 수. 전체 수는 각 행의 total에 들어 있습니다.
 	 */
 	public List<Map<String, Object>> selectCallersByFile(long fileId, int limit) {
@@ -56,6 +66,7 @@ public class RagDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectCallersByFile", param);
 	}
 
+	/** 이 파일의 메소드가 처리하는 진입점(문서 재료) */
 	public List<Map<String, Object>> selectEndpointsByFile(long revisionId, long fileId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -72,6 +83,10 @@ public class RagDao extends BaseDao {
 	 * </pre>
 	 */
 	/**
+	 * <pre>
+	 * 이 파일의 메소드가 실행하는 SQL과 여는 화면(메소드 문서 재료)
+	 * </pre>
+	 *
 	 * @return [{fromId, kind(SQL / VIEW), name, statementType, tables}] - 이 파일의 메소드가 실행하는 SQL과 여는 화면
 	 */
 	public List<Map<String, Object>> selectLinksByFile(long fileId) {
@@ -81,6 +96,10 @@ public class RagDao extends BaseDao {
 	/* ---------- 매퍼(SQL)와 화면(JSP) 문서의 재료 ---------- */
 
 	/**
+	 * <pre>
+	 * 매퍼 파일의 statement 들(매퍼 문서 재료)
+	 * </pre>
+	 *
 	 * @return 이 매퍼 파일의 statement들(조각 제외)
 	 */
 	public List<Map<String, Object>> selectStatementsByFile(long fileId) {
@@ -88,6 +107,10 @@ public class RagDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 매퍼 파일의 statement 마다 건드리는 테이블
+	 * </pre>
+	 *
 	 * @return [{fromId("S" + mapperId), table, crud}]
 	 */
 	public List<Map<String, Object>> selectStatementTablesByFile(long fileId) {
@@ -95,15 +118,16 @@ public class RagDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 매퍼 파일의 statement 마다 실행하는 메소드
+	 * </pre>
+	 *
 	 * @return [{toId("S" + mapperId), caller}] - statement를 실행하는 메소드
 	 */
 	public List<Map<String, Object>> selectStatementExecutorsByFile(long fileId) {
 		return sqlSessionCommon.selectList(NS + "selectStatementExecutorsByFile", fileId);
 	}
 
-	/**
-	 * @return [{kind(OPENED_BY / REQUESTS / INCLUDES / INCLUDED_BY / CALLS), text, target}] - 이 JSP와 이어진 것들
-	 */
 	/** 화면의 화면명들. 사전의 한글명이 먼저 온다 */
 	public List<String> selectScreenNamesByFile(long revisionId, long fileId) {
 		Map<String, Object> param = new HashMap<String, Object>();
@@ -112,6 +136,13 @@ public class RagDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectScreenNamesByFile", param);
 	}
 
+	/**
+	 * <pre>
+	 * 화면 문서에 넣을, 이 화면과 이어진 것들
+	 * </pre>
+	 *
+	 * @return [{kind(OPENED_BY / REQUESTS / INCLUDES / INCLUDED_BY / CALLS), text, target}] - 이 화면과 이어진 것들
+	 */
 	public List<Map<String, Object>> selectViewLinksByFile(long revisionId, long fileId) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -121,6 +152,7 @@ public class RagDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectViewLinksByFile", param);
 	}
 
+	/** 같은 파일을 다시 처리해도 문서가 두 번 들어가지 않게, 쓰기 전에 그 파일의 것을 먼저 지운다 */
 	public void replaceDocumentsInBatch(long revisionId, long fileId, String sourcePath, List<DocumentRow> documents, List<ChunkRow> chunks
 			, String model, int dimensions) {
 		sqlSessionBatch.delete(NS + "deleteChunksByFile", fileId);
@@ -145,6 +177,10 @@ public class RagDao extends BaseDao {
 	/* ---------- 임베딩 대기열 ---------- */
 
 	/**
+	 * <pre>
+	 * 임베딩을 기다리는 청크 내용을 limit 건 꺼냅니다.
+	 * </pre>
+	 *
 	 * @return [{contentHash, content}] - 그 해시의 청크가 더는 없으면 content가 null
 	 */
 	public List<Map<String, Object>> selectPendingEmbeddings(String model, int limit) {
@@ -155,6 +191,10 @@ public class RagDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 임베딩 결과(벡터)를 저장하고 DONE 으로 표시합니다.
+	 * </pre>
+	 *
 	 * @param vector pgvector가 읽는 모양의 글. 예: [0.12,-0.03,...]
 	 */
 	public void updateEmbeddingDone(String contentHash, String model, String vector) {
@@ -163,17 +203,23 @@ public class RagDao extends BaseDao {
 		sqlSessionCommon.update(NS + "updateEmbeddingDone", param);
 	}
 
+	/** 실패 기록. 세 번 실패하면 더 시도하지 않는다(FAILED) */
 	public void updateEmbeddingFailed(String contentHash, String model, String lastError) {
 		Map<String, Object> param = keyParam(contentHash, model);
 		param.put("lastError", lastError);
 		sqlSessionCommon.update(NS + "updateEmbeddingFailed", param);
 	}
 
+	/** 임베딩 대기열·결과에서 한 건을 지웁니다(그 내용의 청크가 더는 없을 때). */
 	public void deleteEmbedding(String contentHash, String model) {
 		sqlSessionCommon.delete(NS + "deleteEmbedding", keyParam(contentHash, model));
 	}
 
 	/**
+	 * <pre>
+	 * 어느 청크도 쓰지 않는 오래된 임베딩을 지웁니다.
+	 * </pre>
+	 *
 	 * @param days 만든 지 이 날수가 지난 것만 지웁니다
 	 * @return 지운 임베딩 수
 	 */
@@ -183,10 +229,12 @@ public class RagDao extends BaseDao {
 
 	/* ---------- 조회 ---------- */
 
+	/** 리비전의 문서 종류별 문서·청크 수 */
 	public List<Map<String, Object>> selectDocumentSummary(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectDocumentSummary", revisionId);
 	}
 
+	/** 이 리비전의 청크가 얼마나 임베딩됐는지. 대기열에 없는 것은 NONE */
 	public List<Map<String, Object>> selectEmbeddingProgress(long revisionId, String model) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("revisionId", revisionId);
@@ -214,6 +262,7 @@ public class RagDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectRecentEmbedded", param);
 	}
 
+	/** 실패한 것(세 번 시도하고 그만둔 것)의 이유. 같은 이유끼리 묶는다 */
 	public List<Map<String, Object>> selectFailedEmbeddingReasons(String model) {
 		return sqlSessionCommon.selectList(NS + "selectFailedEmbeddingReasons", model);
 	}
@@ -249,6 +298,10 @@ public class RagDao extends BaseDao {
 	/* ---------- 올린 일반 문서 ---------- */
 
 	/**
+	 * <pre>
+	 * 올린 문서의 일련번호 찾기
+	 * </pre>
+	 *
 	 * @param owner {tenant?, sourceId}
 	 * @return 그 호출자가 그 이름으로 올린 문서의 일련번호. 없으면 null
 	 */
@@ -292,6 +345,10 @@ public class RagDao extends BaseDao {
 	}
 
 	/**
+	 * <pre>
+	 * 올린 문서 수(목록 조건과 같은 조건으로)
+	 * </pre>
+	 *
 	 * @param condition {tenant?, projectId?, sourceId?, model, size, offset}
 	 */
 	public int countUploadDocuments(Map<String, Object> condition) {
@@ -299,10 +356,12 @@ public class RagDao extends BaseDao {
 		return count == null ? 0 : count.intValue();
 	}
 
+	/** 올린 문서 목록. 청크 수와 그중 임베딩이 끝난 수를 같이 준다(끝나야 뜻으로 찾힌다) */
 	public List<Map<String, Object>> selectUploadDocuments(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectUploadDocuments", condition);
 	}
 
+	/** 임베딩 하나를 가리키는 열쇠(내용 해시 + 모델) */
 	private Map<String, Object> keyParam(String contentHash, String model) {
 		Map<String, Object> param = new HashMap<String, Object>();
 		param.put("contentHash", contentHash);

@@ -44,6 +44,7 @@ public final class CodePattern {
 	private static final Pattern XML_ELEMENT = Pattern.compile("<\\s*([^\\s/>]+)((?:\\s+[^\\s=]+\\s*=\\s*\"[^\"]*\")*)\\s*/?\\s*>");
 	private static final Pattern XML_ATTRIBUTE = Pattern.compile("([^\\s=]+)\\s*=\\s*\"([^\"]*)\"");
 
+	/** 정적 메소드만 쓰는 도구 클래스라 객체를 만들지 않습니다. */
 	private CodePattern() {
 	}
 
@@ -180,6 +181,19 @@ public final class CodePattern {
 		SCRIPT_FUNCTION
 	}
 
+	/**
+	 * <pre>
+	 * 규칙 파일에 적은 호출 모양 한 줄을 읽습니다. 모양이 틀리면 고칠 방법을 알려 주는 오류를 냅니다.
+	 *
+	 * 읽는 순서:
+	 *   1) 앞붙이를 가린다: new 타입(...) / 타입#이름(...) / _.이름(...) / 이름(...)
+	 *   - 어느 모양을 쓸 수 있는지는 kind 에 따라 다르다(CallKind 설명 참고).
+	 *   2) 이름을 확인한다(TYPE_METHOD 는 * ? 글롭 허용).
+	 *   3) 괄호 안 인자를 쉼표로 나눈다: _ 는 "아무거나", ... 는 "나머지 인자는 보지 않음", 그 밖은 자리 이름(SQL, ID …).
+	 * </pre>
+	 *
+	 * @param allowedSlots 이 절에서 쓸 수 있는 자리 이름들. 예: sql 절은 [SQL]
+	 */
 	public static Call call(String text, CallKind kind, Collection<String> allowedSlots) {
 		String t = text.trim();
 		Matcher m = CALL.matcher(t);
@@ -259,6 +273,7 @@ public final class CodePattern {
 		return new Call(constructor, receiverType, anyReceiver, name, args, anyArgs);
 	}
 
+	/** 오류 메시지에 붙일, 그 종류의 올바른 예 */
 	private static String example(CallKind kind) {
 		switch (kind) {
 		case TYPE_METHOD:
@@ -359,6 +374,7 @@ public final class CodePattern {
 
 	/* ============================== 도우미 ============================== */
 
+	/** 자리 이름이 대문자 모양이고 이 절에서 쓸 수 있는 것인지 확인합니다. */
 	private static void checkSlot(String slot, Collection<String> allowedSlots, String text) {
 		if (!PLACEHOLDER.matcher(slot).matches() || !allowedSlots.contains(slot)) {
 			throw new IllegalArgumentException("여기서 쓸 수 있는 자리는 " + allowedSlots + " 입니다. 적힌 것: " + slot + " (" + text + ")");

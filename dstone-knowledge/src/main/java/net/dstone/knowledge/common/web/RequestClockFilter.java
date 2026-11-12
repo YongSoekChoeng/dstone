@@ -26,6 +26,7 @@ public class RequestClockFilter extends OncePerRequestFilter {
 
 	private static final String STARTED_AT = RequestClockFilter.class.getName() + ".startedAt";
 
+	/** 요청이 들어온 시각을 요청 속성에 적어 둡니다. 응답에 걸린 시간을 계산할 때 씁니다. */
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 		request.setAttribute(STARTED_AT, Long.valueOf(System.currentTimeMillis()));
@@ -33,6 +34,10 @@ public class RequestClockFilter extends OncePerRequestFilter {
 	}
 
 	/**
+	 * <pre>
+	 * 요청이 들어온 뒤 지난 시간
+	 * </pre>
+	 *
 	 * @return 이 요청이 들어온 뒤 지난 시간(밀리초). 알 수 없으면 -1
 	 */
 	public static long elapsedMillis(HttpServletRequest request) {

@@ -10,6 +10,7 @@ public class ChunkRow {
 	/** 어느 문서의 조각인지 */
 	private String documentId;
 
+	/** 리비전 ID */
 	private long revisionId;
 
 	/** 문서 안에서의 순서(0부터) */
@@ -24,16 +25,19 @@ public class ChunkRow {
 	/** content의 SHA-256. 임베딩을 찾는 키 */
 	private String contentHash;
 
+	/** 본문 글자 수 */
 	private int charCount;
 
 	/** 검색을 거를 때 쓰는 정보(전체 이름, 계층 등) */
 	private String metadataJson;
 
+	/** 원본 파일 ID. 검색 결과에서 소스로 되짚어 갈 때 쓴다 */
 	private long fileId;
 
 	/** 원본 파일에서 이 조각이 시작하는 줄 */
 	private Integer lineStart;
 
+	/** 원본 끝 줄 */
 	private Integer lineEnd;
 
 	public String getDocumentId() {

@@ -12,8 +12,11 @@ import net.dstone.knowledge.analysis.pass08.semantic.rule.ProjectRules;
  */
 public class AnalysisJobContext {
 
+	/** 이번 분석 Job의 ID (analysis_job.analysis_id) */
 	private final String analysisId;
+	/** 분석 중인 프로젝트 ID */
 	private final String projectId;
+	/** 이번 분석 결과가 쌓이는 리비전. 모든 analysis_* 행이 이 값으로 묶인다 */
 	private final long revisionId;
 
 	/** analysis_project 한 행. 키는 localPath, sourceEncoding, javaVersion, rootPackages 등 */
@@ -25,6 +28,7 @@ public class AnalysisJobContext {
 	/** SEMANTIC 단계가 시작할 때 읽은 의미 분석 규칙(conf/rules). 그 전에는 null */
 	private ProjectRules projectRules;
 
+	/** @param project analysis_project 한 행(소스 경로, 인코딩, Java 버전 …) */
 	public AnalysisJobContext(String analysisId, String projectId, long revisionId, Map<String, Object> project) {
 		this.analysisId = analysisId;
 		this.projectId = projectId;
@@ -66,6 +70,7 @@ public class AnalysisJobContext {
 		this.projectRules = projectRules;
 	}
 
+	/** 취소 API가 부릅니다. 플래그만 세우고, 실제로 멈추는 것은 단계가 checkCancelled()를 부를 때입니다. */
 	public void requestCancel() {
 		this.cancelRequested = true;
 	}

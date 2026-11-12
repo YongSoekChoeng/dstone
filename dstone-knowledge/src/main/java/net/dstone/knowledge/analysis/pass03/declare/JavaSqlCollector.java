@@ -67,8 +67,10 @@ public class JavaSqlCollector {
 	/** 상수가 상수를 가리킬 때 따라가는 깊이(식 안의 + 나 괄호는 세지 않는다) */
 	private static final int MAX_DEPTH = 6;
 
+	/** 모르는 값 자리에 넣는 글 */
 	private static final String PLACEHOLDER = "?";
 
+	// SQL 처럼 생긴 글인지 가리는 정규식들. 맨 앞의 공백과 여는 괄호는 LEADING 으로 먼저 떼고 본다.
 	private static final Pattern LEADING = Pattern.compile("^[\\s(]*");
 	private static final Pattern SELECT = Pattern.compile("(?is)^select\\s+(.+?)\\s+from\\s+\\S");
 	private static final Pattern INSERT = Pattern.compile("(?is)^insert\\s+into\\s+[\\w$#.\"`\\[\\]]+\\s*(\\(|values\\b|select\\b|with\\b|\\?)");
@@ -104,13 +106,16 @@ public class JavaSqlCollector {
 	/** 만들어 가는 글 */
 	static class Text {
 		final StringBuilder sb = new StringBuilder();
+		/** 모르는 부분(?)이 들어 있다 */
 		boolean dynamic;
 		/** 문자열 조각이 하나라도 있다 */
 		boolean literal;
+		/** 첫 문자열 조각의 줄 */
 		Integer line;
 		/** 상수 하나를 그대로 담은 것이면 그 이름. 덧붙이면 null 이 된다 */
 		String constant;
 
+		/** 뒤에 다른 글을 잇습니다. 이으면 더는 "상수 하나 그대로"가 아니므로 constant 를 지웁니다 */
 		Text append(Text other) {
 			if (sb.length() + other.sb.length() <= MAX_SQL) {
 				sb.append(other.sb);
@@ -124,6 +129,7 @@ public class JavaSqlCollector {
 			return this;
 		}
 
+		/** 사본. 지역 변수의 글을 다른 식에서 읽을 때, 원본이 바뀌지 않게 씁니다 */
 		Text copy() {
 			Text t = new Text();
 			t.sb.append(sb);
@@ -134,6 +140,7 @@ public class JavaSqlCollector {
 			return t;
 		}
 
+		/** 모르는 값 하나: "?" 이고 dynamic 이다 */
 		static Text placeholder() {
 			Text t = new Text();
 			t.sb.append(PLACEHOLDER);
@@ -141,6 +148,7 @@ public class JavaSqlCollector {
 			return t;
 		}
 
+		/** 소스에 적힌 문자열 조각 하나. 그 줄을 SQL 이 시작하는 줄로 기억한다 */
 		static Text literal(String value, Node node) {
 			Text t = new Text();
 			t.sb.append(value);
@@ -163,6 +171,7 @@ public class JavaSqlCollector {
 		boolean isOwnTypeName(String name);
 	}
 
+	/** 상수 값을 찾는 곳(DeclarationCollector 가 넘겨준다) */
 	private final Constants constants;
 
 	/** 지금 메소드의 지역 변수 → 지금까지 만든 글 */
@@ -171,15 +180,25 @@ public class JavaSqlCollector {
 	private Set<String> readLocals;
 	/** append 사슬에서 이미 처리한 호출 */
 	private Set<MethodCallExpr> handledAppends;
+	/** 지금 메소드에서 찾은 SQL */
 	private List<Found> found;
+	/** 이미 낸 SQL 글. 같은 글을 두 번 내지 않으려고 */
 	private Set<String> seen;
 
+	/** @param constants 이 타입(과 바깥 타입)의 상수를 찾는 곳 */
 	public JavaSqlCollector(Constants constants) {
 		this.constants = constants;
 	}
 
 	/**
+	 * <pre>
 	 * 메소드 · 생성자 본문 하나에서 SQL 을 찾습니다.
+	 *
+	 * 흐름:
+	 *   1) 메소드마다 쓰는 상태(지역 변수의 글, 읽힌 변수, 찾은 SQL)를 비운다.
+	 *   2) 본문을 훑으며(visit) SQL 이 나타나는 곳에서 낸다.
+	 *   3) 끝까지 아무 데도 쓰이지 않은 SQL 지역 변수도 낸다.
+	 * </pre>
 	 */
 	public List<Found> collect(Node body) {
 		locals = new LinkedHashMap<String, Text>();
@@ -198,7 +217,9 @@ public class JavaSqlCollector {
 	}
 
 	/**
+	 * <pre>
 	 * 상수 하나의 값을 계산합니다. 문자열이 아니거나 모르는 부분이 있으면 그대로 ? 가 들어갑니다.
+	 * </pre>
 	 *
 	 * @return 문자열 조각이 하나도 없으면 null
 	 */
@@ -215,6 +236,18 @@ public class JavaSqlCollector {
 
 	/* ============================== 훑기 ============================== */
 
+	/**
+	 * <pre>
+	 * 본문을 위에서부터 훑습니다. 노드 종류마다 하는 일:
+	 *   new X(sql)                 인자 중 SQL 을 낸다(call = X). StringBuilder 생성은 빼고.
+	 *   String sql = "...";        지역 변수의 글로 기억한다.
+	 *   sql = "..." / sql += "..." 지역 변수의 글을 바꾸거나 덧붙인다.
+	 *   sb.append("...")           지역 변수의 글에 덧붙인다(사슬 전체를 한 번에).
+	 *   foo(sql)                   인자 중 SQL 을 낸다(call = foo).
+	 *   return sql;                SQL 이면 낸다(call = "return").
+	 * 그리고 자식 노드로 내려갑니다. 지역 클래스는 따로 처리되므로 들어가지 않습니다.
+	 * </pre>
+	 */
 	private void visit(Node node) {
 		if (node instanceof LocalClassDeclarationStmt || node instanceof LocalRecordDeclarationStmt) {
 			return;
@@ -293,6 +326,7 @@ public class JavaSqlCollector {
 		}
 	}
 
+	/** SQL 처럼 생겼고 이 메소드에서 처음 나온 글이면 결과에 담습니다. */
 	private void emit(Text text, String call) {
 		String sql = clean(text.sb.toString());
 		if (!looksLikeSql(sql) || !seen.add(sql)) {
@@ -303,6 +337,19 @@ public class JavaSqlCollector {
 
 	/* ============================== 식 → 글 ============================== */
 
+	/**
+	 * <pre>
+	 * 식 하나를 글로 계산합니다. 모르는 부분은 ? 로 둡니다.
+	 *   "abc"              그대로
+	 *   a + b              양쪽을 계산해 잇는다
+	 *   sql (지역 변수)    지금까지 만든 글
+	 *   X, this.X, 이클래스.X  같은 클래스의 상수 값
+	 *   sb.toString(), sb.append(..) 사슬   StringBuilder 의 글
+	 *   그 밖(파라미터, 메소드 호출 결과 …)  ?
+	 * </pre>
+	 *
+	 * @param depth 상수를 따라 들어간 깊이. MAX_DEPTH 를 넘으면 ? 로 끊는다(서로를 가리키는 상수에서 끝없이 돌지 않게)
+	 */
 	private Text textOf(Expression e, int depth) {
 		if (depth > MAX_DEPTH) {
 			return Text.placeholder();
@@ -425,13 +472,17 @@ public class JavaSqlCollector {
 		}
 	}
 
+	/** append(x) 의 인자 x 를 글로. 인자가 하나가 아니면 ? */
 	private Text appendArgument(MethodCallExpr call, int depth) {
 		// append(char[], int, int) 같은 것은 모른다.
 		return call.getArguments().size() == 1 ? textOf(call.getArguments().get(0), depth) : Text.placeholder();
 	}
 
 	/**
+	 * <pre>
 	 * 이 호출이 지역 변수에 덧붙이는 append 사슬의 바깥쪽 끝이면 그 변수 이름. 아니면 null
+	 * 예: sb.append("a").append("b"); 에서 .append("b") 호출이면 "sb"
+	 * </pre>
 	 */
 	private String appendTarget(MethodCallExpr call) {
 		if (!"append".equals(call.getNameAsString())) {
@@ -462,6 +513,7 @@ public class JavaSqlCollector {
 		return ((NameExpr) root).getNameAsString();
 	}
 
+	/** 이 이름의 상수(final 필드) 값을 글로 계산합니다. 상수가 없거나 문자열 조각이 하나도 없으면 null */
 	private Text constantText(String name, int depth) {
 		if (depth > MAX_DEPTH) {
 			return null;
@@ -490,6 +542,7 @@ public class JavaSqlCollector {
 		return null;
 	}
 
+	/** SQL 글을 담을 수 있는 지역 변수인지: String, CharSequence, StringBuilder, StringBuffer, 또는 그런 값으로 시작하는 var */
 	private boolean isTextType(VariableDeclarator variable) {
 		String type = simpleName(variable.getType().asString());
 		if ("String".equals(type) || "CharSequence".equals(type) || isBuilderType(type)) {
@@ -504,10 +557,12 @@ public class JavaSqlCollector {
 		return false;
 	}
 
+	/** StringBuilder / StringBuffer 인지 */
 	private static boolean isBuilderType(String simpleName) {
 		return "StringBuilder".equals(simpleName) || "StringBuffer".equals(simpleName);
 	}
 
+	/** java.lang.String → String */
 	private static String simpleName(String type) {
 		int dot = type.lastIndexOf('.');
 		return dot < 0 ? type : type.substring(dot + 1);
@@ -540,7 +595,10 @@ public class JavaSqlCollector {
 	}
 
 	/**
+	 * <pre>
 	 * SELECT 와 FROM 사이가 SQL 의 목록처럼 생겼는지. "an item" 처럼 기호 없는 두 낱말 이상이면 사람의 글로 본다.
+	 * 기호(, * . ( ? 따옴표 :)가 있거나, 한 낱말이거나, "컬럼 as 별칭" 모양이면 SQL 이다.
+	 * </pre>
 	 */
 	private static boolean isSelectList(String list) {
 		String l = SELECT_MODIFIER.matcher(list.trim()).replaceFirst("");

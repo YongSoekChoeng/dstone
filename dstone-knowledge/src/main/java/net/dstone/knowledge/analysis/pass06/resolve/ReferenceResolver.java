@@ -83,11 +83,15 @@ public class ReferenceResolver {
 	/** 프로젝트 전체에서 이름으로 찾을 때, 후보가 이보다 많으면 짐작하지 않습니다. */
 	private static final int MAX_CANDIDATES = 5;
 
+	/** 못 푼 이유 글의 최대 길이 */
 	private static final int MAX_REASON = 500;
+	/** 프로젝트 밖 대상 이름의 최대 길이 */
 	private static final int MAX_EXTERNAL = 2000;
 
 	private final long revisionId;
+	/** 프로젝트 안의 타입을 찾는 해석기. 타입 위치(파일, symbolId)를 물을 때도 쓴다 */
 	private final DbTypeSolver dbSolver;
+	/** 프로젝트 + JDK + jar 를 엮은 해석기. JavaSymbolSolver 에 넘긴다 */
 	private final TypeSolver typeSolver;
 	private final SymbolDao symbolDao;
 
@@ -113,6 +117,7 @@ public class ReferenceResolver {
 	 */
 	public static class Outcome {
 
+		/** 새로 만든 관계들 */
 		public final List<RelationRow> relations = new ArrayList<RelationRow>();
 
 		/** [{referenceId, status, failReason}] */
@@ -123,6 +128,10 @@ public class ReferenceResolver {
 	}
 
 	/**
+	 * <pre>
+	 * 리비전 하나의 참조를 풀 해석기를 만듭니다.
+	 * </pre>
+	 *
 	 * @param typeSolver 프로젝트(dbSolver) + JDK + jar를 엮은 해석기
 	 */
 	public ReferenceResolver(long revisionId, DbTypeSolver dbSolver, TypeSolver typeSolver, SymbolDao symbolDao) {
@@ -142,18 +151,31 @@ public class ReferenceResolver {
 	 */
 	private static class FileContext {
 		long fileId;
+		/** 이 파일의 패키지 */
 		String packageName = "";
 		/** import com.a.Foo; → Foo = com.a.Foo */
 		Map<String, String> imports = new HashMap<String, String>();
 		/** "종류|줄|칸" → 참조. 풀 때마다 꺼내서, 끝나고 남은 것이 "노드를 못 찾은 참조"다. */
 		Map<String, Map<String, Object>> pending = new LinkedHashMap<String, Map<String, Object>>();
+		/** 이 파일의 결과 */
 		Outcome outcome = new Outcome();
 		/** 이 시각(밀리초)을 넘기면 남은 참조는 풀지 않는다. */
 		long deadlineAt;
+		/** 참조 하나를 풀 때마다 부를 확인 지점 */
 		Checkpoint checkpoint;
 	}
 
 	/**
+	 * <pre>
+	 * 파일 하나의 참조를 모두 풉니다.
+	 *
+	 * 흐름:
+	 *   1) 패키지와 import를 읽어 둔다.
+	 *   2) 참조를 "종류|줄|칸" 열쇠로 pending 에 넣는다.
+	 *   3) AST를 훑으며(walk) 같은 위치의 노드를 만나면 꺼내서 푼다.
+	 *   4) 끝까지 꺼내지 못한 참조는 "시간 초과" 또는 "노드를 못 찾음"으로 남긴다.
+	 * </pre>
+	 *
 	 * @param unit 이 파일의 AST. 반드시 dbSolver.unitOf(...)로 얻은 것이어야 합니다.
 	 * @param references 이 파일의 참조(SymbolDao.selectReferencesByFile)
 	 * @param timeoutMillis 이 파일에 쓸 수 있는 시간. 넘기면 남은 참조는 풀지 않고 "시간 초과"로 남깁니다.
@@ -174,13 +196,16 @@ public class ReferenceResolver {
 				context.imports.put(name.substring(name.lastIndexOf('.') + 1), name);
 			}
 		}
+		// 2) 위치로 찾을 수 있게 참조를 넣어 둔다
 		for (int i = 0; i < references.size(); i++) {
 			Map<String, Object> reference = references.get(i);
 			context.pending.put(reference.get("refKind") + "|" + reference.get("lineStart") + "|" + reference.get("columnStart"), reference);
 		}
 
+		// 3) 훑으며 풀기
 		walk(unit, context);
 
+		// 4) 남은 참조 정리
 		boolean timedOut = System.currentTimeMillis() > context.deadlineAt;
 		for (Map<String, Object> reference : context.pending.values()) {
 			if (timedOut) {
@@ -194,6 +219,20 @@ public class ReferenceResolver {
 		return context.outcome;
 	}
 
+	/**
+	 * <pre>
+	 * AST를 위에서부터 훑으며, 노드 위치에 적힌 참조가 있으면 꺼내 종류에 맞게 풉니다.
+	 *
+	 * 노드 → 푸는 메소드
+	 * 메소드 호출 a.b()          → resolveCall
+	 * this(...) / super(...)    → resolveConstructorInvocation
+	 * new Foo()                 → resolveCreation (익명 클래스면 상위 타입도 resolveType)
+	 * 몸통 있는 enum 상수       → resolveEnumBody
+	 * a.b (필드 접근)           → resolveFieldAccess
+	 * Foo::bar                  → guessByName (이름으로만)
+	 * 타입 이름                 → resolveType (사용 / 상속 / 구현 / throws)
+	 * </pre>
+	 */
 	private void walk(Node node, FileContext context) {
 		if (System.currentTimeMillis() > context.deadlineAt) {
 			// 시간을 넘겼다. 더 내려가지 않는다. 아직 풀지 않은 참조는 resolveFile이 "시간 초과"로 남긴다.
@@ -282,6 +321,17 @@ public class ReferenceResolver {
 
 	/* ============================== 호출 ============================== */
 
+	/**
+	 * <pre>
+	 * 메소드 호출 하나를 풉니다(클래스 설명의 1) → 2) → 3) 순서).
+	 *
+	 *   1) 해석기로 푼다. 풀리면 HIGH로 끝.
+	 *   2) 대상 식의 타입(없으면 감싸는 타입)을 알아내 그 타입과 상위 타입에서 이름·인자 수로 찾는다.
+	 *   - 타입이 프로젝트 밖이면 "밖의 메소드"로 남긴다.
+	 *   - 타입이 프로젝트 안인데 메소드가 없으면, 밖의 상위 타입에서 물려받은 것으로 보고 짐작하지 않는다.
+	 *   3) 타입조차 모르면 프로젝트 전체에서 이름으로 짐작한다(guessByName).
+	 * </pre>
+	 */
 	private void resolveCall(FileContext context, Map<String, Object> reference, MethodCallExpr call) {
 		String failure;
 		try {
@@ -417,6 +467,7 @@ public class ReferenceResolver {
 		return methodIndexOf(fileId).get(node.getBegin().get().line + "|" + methodName + "|" + declaration.getNumberOfParams());
 	}
 
+	/** 파일 하나의 메소드 색인("줄|이름|파라미터 수" → 메소드 ID). 처음 물을 때 DB에서 읽어 캐시에 둡니다. */
 	private Map<String, String> methodIndexOf(Long fileId) {
 		Map<String, String> index = methodIndexes.get(fileId);
 		if (index == null) {
@@ -468,6 +519,7 @@ public class ReferenceResolver {
 		return false;
 	}
 
+	/** 그 타입에 직접 선언된, 이름과 파라미터 수가 같은 메소드들(캐시 → 없으면 DB) */
 	private List<Map<String, Object>> methodsOf(String ownerFqn, String name, Integer paramCount) {
 		String key = ownerFqn + "#" + name + "/" + paramCount;
 		List<Map<String, Object>> methods = ownerMethods.get(key);
@@ -515,6 +567,7 @@ public class ReferenceResolver {
 
 	/* ============================== 객체 생성 ============================== */
 
+	/** new Foo(...) 하나를 풉니다. 타입(CREATES)과 생성자 호출(CALLS) 두 관계를 만듭니다. */
 	private void resolveCreation(FileContext context, Map<String, Object> reference, ObjectCreationExpr creation) {
 		// new Foo(...) 는 두 가지 관계가 된다: Foo 타입을 만든다(CREATES), Foo의 생성자를 부른다(CALLS).
 		resolveType(context, reference, creation.getType(), "CREATES");
@@ -662,6 +715,7 @@ public class ReferenceResolver {
 		return null;
 	}
 
+	/** 단순 이름이 같은 프로젝트 안의 타입들(최대 2개만 읽는다. 하나인지 여럿인지만 알면 되므로). 캐시 → 없으면 DB */
 	private List<Map<String, Object>> typesBySimpleName(String written) {
 		String simpleName = written.substring(written.lastIndexOf('.') + 1);
 		List<Map<String, Object>> types = simpleNames.get(simpleName);
@@ -691,6 +745,16 @@ public class ReferenceResolver {
 
 	/* ============================== 필드 접근 ============================== */
 
+	/**
+	 * <pre>
+	 * a.b 모양의 필드 접근 하나를 풉니다.
+	 *
+	 *   1) 해석기로 푼다 → 그 필드를 가진 타입에서 필드를 찾는다(HIGH).
+	 *   2) 못 풀면, 사실은 타입 이름(java.util.Collections, Map.Entry)이거나 패키지 이름의 일부인지 본다.
+	 *   3) 그것도 아니면 대상 식의 타입을 알아내 그 타입의 필드로 찾는다(MEDIUM).
+	 *   4) 그래도 안 되면 못 푼 것으로 남긴다(배열의 length 는 무시).
+	 * </pre>
+	 */
 	private void resolveFieldAccess(FileContext context, Map<String, Object> reference, FieldAccessExpr access) {
 		String name = access.getNameAsString();
 		String failure;
@@ -749,6 +813,12 @@ public class ReferenceResolver {
 		update(context, reference, "UNRESOLVED", "필드 접근을 풀지 못했습니다. " + failure);
 	}
 
+	/**
+	 * <pre>
+	 * 그 타입(과 프로젝트 안의 상위 타입)에서 이름이 같은 필드를 찾아 ACCESSES_FIELD 관계로 적습니다.
+	 * 타입이 프로젝트 밖이면 "밖의 필드"로 적습니다.
+	 * </pre>
+	 */
 	private void emitField(FileContext context, Map<String, Object> reference, String owner, String name, String confidence, String status, String properties) {
 		if (!dbSolver.isProjectType(owner)) {
 			addRelation(context, reference, "ACCESSES_FIELD", "EXTERNAL_FIELD", null, owner + "." + name, confidence, status, properties);
@@ -769,6 +839,7 @@ public class ReferenceResolver {
 		update(context, reference, "UNRESOLVED", "타입에서 그 이름의 필드를 찾지 못했습니다. " + owner + "#" + name);
 	}
 
+	/** 그 타입에 직접 선언된 필드의 ID. 없으면 null(캐시 → 없으면 DB) */
 	private String fieldIdOf(String ownerFqn, String name) {
 		String key = ownerFqn + "#" + name;
 		String fieldId = fields.get(key);
@@ -1070,6 +1141,7 @@ public class ReferenceResolver {
 		return null;
 	}
 
+	/** 선언된 변수들 가운데 이 이름의 타입(제네릭 뺌). 클래스 타입이 아니면(int, var …) null */
 	private String typeOfVariable(List<VariableDeclarator> variables, String name) {
 		for (int i = 0; i < variables.size(); i++) {
 			if (variables.get(i).getNameAsString().equals(name)) {
@@ -1081,6 +1153,7 @@ public class ReferenceResolver {
 		return null;
 	}
 
+	/** 제네릭과 공백을 뺍니다. 예: Map&lt;String, List&lt;OrderVO&gt;&gt; → Map */
 	private String eraseGenerics(String type) {
 		StringBuilder sb = new StringBuilder(type.length());
 		int depth = 0;
@@ -1139,6 +1212,7 @@ public class ReferenceResolver {
 		return new ArrayList<String>(ancestors);
 	}
 
+	/** 이 해석기 조합으로 노드를 푸는 JavaSymbolSolver 창구 */
 	private JavaParserFacade facade() {
 		return JavaParserFacade.get(typeSolver);
 	}
@@ -1146,6 +1220,7 @@ public class ReferenceResolver {
 
 	/* ============================== 결과 적기 ============================== */
 
+	/** 관계 한 건을 결과에 담습니다. 출발점과 줄은 참조에서 가져옵니다. */
 	private void addRelation(FileContext context, Map<String, Object> reference, String relationType, String toKind, String toId, String toExternal
 			, String confidence, String resolutionStatus, String propertiesJson) {
 		RelationRow row = new RelationRow();
@@ -1165,6 +1240,7 @@ public class ReferenceResolver {
 		context.outcome.relations.add(row);
 	}
 
+	/** 참조의 새 상태(RESOLVED / HEURISTIC / EXTERNAL / UNRESOLVED / IGNORED)와 못 푼 이유를 결과에 담습니다. */
 	private void update(FileContext context, Map<String, Object> reference, String status, String failReason) {
 		Map<String, Object> update = new HashMap<String, Object>();
 		update.put("referenceId", reference.get("referenceId"));
@@ -1173,6 +1249,7 @@ public class ReferenceResolver {
 		context.outcome.referenceUpdates.add(update);
 	}
 
+	/** 관계를 어떻게 찾았는지 적는 덧붙임 JSON. 예: {"via":"OWNER_TYPE"} */
 	private String via(String how) {
 		return "{\"via\":\"" + how + "\"}";
 	}
@@ -1187,6 +1264,7 @@ public class ReferenceResolver {
 		return e.getClass().getSimpleName() + ": " + (newline < 0 ? message : message.substring(0, newline));
 	}
 
+	/** max 글자보다 길면 앞부분만 남깁니다. */
 	private String cut(String text, int max) {
 		if (text == null || text.length() <= max) {
 			return text;
