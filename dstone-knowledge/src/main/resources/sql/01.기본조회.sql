@@ -1,7 +1,7 @@
 
 
 select 
-	--distinct resource_type 
+	--distinct relation_type 
 	*
 from 
 	/************************************************************************************
@@ -27,10 +27,9 @@ from
 	                                                      analysis_method(수정)
 	                                                      analysis_resource(추가입력)	
 	************************************************************************************/
-	public.analysis_endpoint 
+	public.analysis_relation 
 where 1=1
-	and revision_id = 116
-	--and from_id = 'e877bffc99c843d5fc8e712ebeb6cd813c8644fd'
+	and revision_id = 117
 	
 	/* *****************************************************
 	and from_id = 'e877bffc99c843d5fc8e712ebeb6cd813c8644fd'
