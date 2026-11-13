@@ -669,7 +669,7 @@ var DstoneKnowledgeImpact = (function () {
 
 	/**
 	 * 맨 위 한 줄 결론. 숫자를 문장으로 바꿔 "그래서 무엇을 하면 되나"가 바로 보이게 한다.
-	 *   - 대상 메소드가 그 자체로 입구면 그렇다고 먼저 알린다(영향이 자기 거래 · 화면에서 끝나는 까닭)
+	 *   - 대상 메소드가 그 자체로 진입점이면 그렇다고 먼저 알린다(영향이 자기 거래 · 화면에서 끝나는 까닭)
 	 *   - 영향받는 화면 · 진입점 수, 그 관계가 얼마나 확실한지, 건드리는 테이블, 놓쳤을 수 있는 곳
 	 */
 	function leadHtml(result, groups) {
@@ -686,12 +686,12 @@ var DstoneKnowledgeImpact = (function () {
 			if (own.length > 0) {
 				// 이 메소드를 부르는 Java 메소드가 하나도 없을 때만 "영향이 여기서 끝난다"고 말한다
 				var calledByJava = (result.methods || []).some(function (row) { return row.depth > 0; });
-				lines.push("이 메소드는 " + own.map(function (path) { return "<b class=\"kn-mono\">" + K.escapeHtml(path) + "</b>"; }).join(", ")
-					+ "의 입구입니다." + (calledByJava ? "" : " 이 메소드를 부르는 Java 코드가 없어서 영향은 이 입구와 이 입구를 부르는 화면에서 끝납니다."));
+				lines.push("이 메소드는 진입점(" + own.map(function (path) { return "<b class=\"kn-mono\">" + K.escapeHtml(path) + "</b>"; }).join(", ")
+					+ ")입니다." + (calledByJava ? "" : " 이 메소드를 부르는 Java 코드가 없어서 영향은 이 진입점과 이 진입점을 부르는 화면에서 끝납니다."));
 			}
 		}
 		if (endpoints.length + screens.length === 0) {
-			lines.push("고쳐도 사용자가 들어오는 입구(진입점 · 화면)에 닿지 않습니다. 부르는 곳이 없거나, 분석이 잇지 못한 호출일 수 있습니다(아래 \"믿을 만한가\" 참고).");
+			lines.push("고쳐도 사용자가 들어오는 진입점이나 화면에 닿지 않습니다. 부르는 곳이 없거나, 분석이 잇지 못한 호출일 수 있습니다(아래 \"믿을 만한가\" 참고).");
 		} else {
 			lines.push("고치면 화면 <b>" + screens.length + "</b>개, 진입점 <b>" + endpoints.length + "</b>개가 영향을 받습니다"
 				+ (groups.length > 1 ? " (업무 묶음 " + groups.length + "개)" : "") + ". " + confidenceText(endpoints.concat(screens)));

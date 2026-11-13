@@ -174,7 +174,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 							앞의 것과 비교할 수 있습니다. 화면에서는 <code>#29 r1 (READY)</code> 처럼 번호와 라벨로 보입니다.</td></tr>
 						<tr><td><b>증분 분석</b></td><td>앞 리비전과 내용이 같은 파일은 다시 분석하지 않고 결과를 옮겨 오는 방식. 결과는 전체 분석과 같고 시간만 줄어듭니다.
 							두 번째 분석부터 체크하면 됩니다.</td></tr>
-						<tr><td><b>진입점</b></td><td>바깥에서 프로그램으로 들어오는 입구. 웹 주소(<code>/board/list.do</code>), 스케줄 작업, <code>main</code> 메소드, JSP 등.</td></tr>
+						<tr><td><b>진입점</b></td><td>바깥에서 프로그램으로 들어오는 곳. 웹 주소(<code>/board/list.do</code>), 스케줄 작업, <code>main</code> 메소드, JSP 등.</td></tr>
 						<tr><td><b>신뢰도</b></td><td>"A 가 B 를 부른다" 같은 관계를 얼마나 확실하게 알아냈는지.
 							<span class="kn-conf-HIGH">HIGH</span> 는 확실, <span class="kn-conf-MEDIUM">MEDIUM</span> 은 대체로 맞음(타입은 알고 메소드를 이름으로 고른 경우 등),
 							<span class="kn-conf-LOW">LOW</span> 는 이름만 보고 짐작한 것이라 <b>참고로만</b> 봅니다.</td></tr>
