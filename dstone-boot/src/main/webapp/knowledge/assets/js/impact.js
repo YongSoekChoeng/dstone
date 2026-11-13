@@ -266,19 +266,40 @@ var DstoneKnowledgeImpact = (function () {
 				+ (rows.length !== relations.length ? " (관계 " + relations.length + ")" : "")
 				+ (result.truncated ? " (일부만 보임)" : "");
 			el["kn-graph-table"].innerHTML = "<div class=\"kn-scroll\"></div>";
-			K.table(el["kn-graph-table"].querySelector(".kn-scroll"), [
+			var columns = [
 				{ key: "depth", label: "거리", num: true },
-				{ key: "relationType", label: "관계" },
-				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-				callers
-					? { key: "from", label: "부르는 쪽", mono: true, html: function (row) { return callerCell(row); } }
-					: { key: "to", label: "불리는 쪽", mono: true },
-				{ key: "path", label: "적힌 파일", mono: true },
-				{ key: "lineStart", label: "줄", num: true }
-			], rows, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
+				{ key: "relationType", label: "관계", html: function (row) { return relationLabel(row.relationType); } },
+				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } }
+			];
+			if (callers) {
+				// 부르는 쪽: 짧은 이름(+ 화면명)과, 그것이 어디에 적혀 있는지(근거) 두 칸
+				columns.push({ key: "from", label: "부르는 쪽", html: function (row) { return callerCell(row); } });
+				columns.push({ key: "path", label: "근거 (파일:줄)", html: function (row) { return evidenceCell(row); } });
+			} else {
+				columns.push({ key: "to", label: "불리는 쪽", mono: true });
+				columns.push({ key: "path", label: "적힌 파일", mono: true });
+				columns.push({ key: "lineStart", label: "줄", num: true });
+			}
+			K.table(el["kn-graph-table"].querySelector(".kn-scroll"), columns, rows
+				, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
 		}).catch(function (err) {
 			K.message(el["kn-graph-message"], err.message, true);
 		});
+	}
+
+	/** 관계 종류 → 화면 글자. 원래 이름은 마우스를 올리면 보인다. */
+	var RELATION_LABELS = {
+		CALLS: "호출",
+		REQUESTS: "화면 요청",
+		CALLS_POSSIBLE_IMPLEMENTATION: "구현체 호출(추정)",
+		EXECUTES_SQL: "SQL 실행",
+		READS_TABLE: "테이블 읽기",
+		WRITES_TABLE: "테이블 쓰기",
+		RENDERS: "화면 열기"
+	};
+
+	function relationLabel(type) {
+		return "<span class=\"kn-nowrap\" title=\"" + K.escapeHtml(type) + "\">" + K.escapeHtml(RELATION_LABELS[type] || type) + "</span>";
 	}
 
 	/**
@@ -305,21 +326,70 @@ var DstoneKnowledgeImpact = (function () {
 		return rows;
 	}
 
-	/** 부르는 쪽 칸. 합친 행이면 이름 옆에 "주소 N개"(호출이면 "대상 N개")를 붙이고, 누르면 무엇으로 이어졌는지 펼친다. */
+	/** 경로의 마지막 이름: src/main/webapp/WEB-INF/sitemesh/layout.jsp → layout.jsp */
+	function fileName(path) {
+		path = path || "";
+		return path.substring(path.lastIndexOf("/") + 1);
+	}
+
+	/**
+	 * 부르는 쪽 칸.
+	 *   메소드: CommonCodeController#getCommonCode(…)   (전체 이름은 마우스를 올리면)
+	 *   화면:   layout.jsp · 화면명                     (전체 경로는 마우스를 올리면)
+	 * 합친 행이면 아래에 "genexon.js를 불러와 주소 5개 요청"을 붙이고, 누르면 주소마다 어디로 이어졌는지 펼친다.
+	 */
 	function callerCell(row) {
-		var name = K.escapeHtml(row.from || row.fromId || "");
+		var screen = row.fromKind === "FILE";
+		var full = row.from || row.fromId || "";
+		var html = "<span class=\"kn-mono kn-caller-name\" title=\"" + K.escapeHtml(full) + "\">" + K.escapeHtml(screen ? fileName(full) : shortMethod(full)) + "</span>";
+		if (screen && row.screenName) {
+			html += " <span class=\"kn-caller-note\">" + K.escapeHtml(row.screenName) + "</span>";
+		}
 		var targets = row.targets || [];
 		if (targets.length < 2) {
-			return name;
+			return html;
 		}
 		var requests = row.relationType === "REQUESTS";
-		var allScript = targets.every(function (target) { return target.via === "SCRIPT_SRC"; });
+		var script = sameScript(targets);
+		var summary = requests
+			? (script ? fileName(script) + "를 불러와 주소 " + targets.length + "개 요청" : "주소 " + targets.length + "개 요청")
+			: "대상 " + targets.length + "개";
 		var items = targets.map(function (target) {
 			var method = shortMethod(target.to || target.toId || "");
-			return "<li>" + K.escapeHtml(requests && target.requestPath ? target.requestPath + " → " + method : method) + "</li>";
+			var text = requests && target.requestPath ? target.requestPath + " → " + method : method;
+			var where = target.script ? fileName(target.script) + (target.scriptLine ? ":" + target.scriptLine : "") : "";
+			return "<li><span class=\"kn-mono\">" + K.escapeHtml(text) + "</span>"
+				+ (where ? " <span class=\"kn-caller-note\" title=\"" + K.escapeHtml(target.script) + "\">" + K.escapeHtml(where) + "</span>" : "") + "</li>";
 		}).join("");
-		return name + "<details class=\"kn-targets\"><summary>" + (requests ? "주소 " : "대상 ") + targets.length + "개"
-			+ (allScript ? " (불러온 스크립트)" : "") + "</summary><ul>" + items + "</ul></details>";
+		return html + "<details class=\"kn-targets\"><summary>" + K.escapeHtml(summary) + "</summary><ul>" + items + "</ul></details>";
+	}
+
+	/**
+	 * 근거 칸: 이 관계가 적힌 파일과 줄. 화면이 불러온 스크립트에 적힌 주소면 그 스크립트(주소가 하나면 줄까지)를 잇대어 쓴다.
+	 *   CommonCodeController.java:38
+	 *   commoncode.jsp:141
+	 *   layout.jsp:26 → genexon.js        (주소 여러 개: 줄은 펼친 목록에)
+	 *   layout.jsp:30 → session.js:17     (주소 하나)
+	 */
+	function evidenceCell(row) {
+		var text = fileName(row.path) + (row.lineStart ? ":" + row.lineStart : "");
+		var targets = row.targets || [row];
+		var script = row.relationType === "REQUESTS" ? sameScript(targets) : null;
+		if (script) {
+			text += " → " + fileName(script) + (targets.length === 1 && targets[0].scriptLine ? ":" + targets[0].scriptLine : "");
+		}
+		return "<span class=\"kn-mono kn-nowrap\" title=\"" + K.escapeHtml((row.path || "") + (script ? " → " + script : "")) + "\">" + K.escapeHtml(text) + "</span>";
+	}
+
+	/** 모두 같은 스크립트를 거쳐 이어졌으면 그 스크립트 경로, 아니면 null */
+	function sameScript(targets) {
+		var script = targets.length > 0 ? targets[0].script : null;
+		for (var i = 1; i < targets.length && script; i++) {
+			if (targets[i].script !== script) {
+				script = null;
+			}
+		}
+		return script || null;
 	}
 
 	/** kr.co.gnx.CommonCodeController#getCommonCode(HttpServletRequest,...) → CommonCodeController#getCommonCode(…) */

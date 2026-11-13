@@ -329,15 +329,15 @@
     <!-- 이 메소드를 부르는 쪽. depth 만큼 거슬러 올라간다(부르는 쪽의 부르는 쪽 ...).
          depth 가 같아도 같은 호출이 여러 줄에 있을 수 있어서 줄마다 한 행이다 -->
     <select id="selectCallers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        WITH RECURSIVE walk (depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, via, request_path) AS (
-            SELECT 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json ->> 'via', r.properties_json ->> 'path'
+        WITH RECURSIVE walk (depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, props) AS (
+            SELECT 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json
               FROM analysis_relation r
              WHERE r.revision_id = #{revisionId}
                AND r.to_id = #{methodId}
                AND r.relation_type IN
             <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
             UNION
-            SELECT w.depth + 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json ->> 'via', r.properties_json ->> 'path'
+            SELECT w.depth + 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json
               FROM walk w
               JOIN analysis_relation r
                 ON r.revision_id = #{revisionId}
@@ -354,15 +354,30 @@
              , n.fqn AS "from"
              , w.to_id AS "toId"
              , t.fqn AS "to"
-             , w.via AS "via"
-             , w.request_path AS "requestPath"
+             -- 화면 → 메소드(REQUESTS)의 근거: 화면 글자(PATH_TEXT)인지 불러온 스크립트(SCRIPT_SRC)인지, 요청 주소, 주소가 적힌 스크립트와 그 줄
+             , w.props ->> 'via' AS "via"
+             , w.props ->> 'path' AS "requestPath"
+             , w.props ->> 'script' AS "script"
+             , (w.props ->> 'scriptLine')::int AS "scriptLine"
+             -- 부르는 쪽이 화면이면 화면명. 한글 화면명(SCREEN_NAME)이 먼저, 없으면 화면 사전(DICT_SCREEN_NAME), 그것도 없으면 찾은 이름 그대로
+             , CASE WHEN w.from_kind = 'FILE' THEN
+                    COALESCE((SELECT r.value FROM analysis_resource r
+                               WHERE r.revision_id = #{revisionId} AND r.file_id = w.file_id AND r.resource_type = 'SCREEN_NAME' AND r.value ~ '[가-힣]'
+                               ORDER BY r.resource_id LIMIT 1)
+                           , (SELECT r.value FROM analysis_resource r
+                               WHERE r.revision_id = #{revisionId} AND r.file_id = w.file_id AND r.resource_type = 'DICT_SCREEN_NAME'
+                               ORDER BY r.resource_id LIMIT 1)
+                           , (SELECT r.value FROM analysis_resource r
+                               WHERE r.revision_id = #{revisionId} AND r.file_id = w.file_id AND r.resource_type = 'SCREEN_NAME'
+                               ORDER BY r.resource_id LIMIT 1))
+               END AS "screenName"
              , f.path AS "path"
              , w.line_start AS "lineStart"
           FROM (
                 -- 서로를 부르는 메소드(a → b → a)가 있으면 같은 호출이 깊이를 바꿔 가며 다시 나온다. 가장 얕은 것 하나만 남긴다.
-                SELECT MIN(depth) AS depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, via, request_path
+                SELECT MIN(depth) AS depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, props
                   FROM walk
-                 GROUP BY from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, via, request_path
+                 GROUP BY from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, props
                ) w
           LEFT JOIN kg_node n ON n.revision_id = #{revisionId} AND n.node_id = w.from_id
           -- 이 단계에서 불리는 쪽. 화면 한 줄이 여러 주소를 요청하면 이 열과 요청 주소로 줄이 구분된다.

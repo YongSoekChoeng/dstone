@@ -178,11 +178,14 @@ public class JspLinker implements SemanticStep {
 		String scriptPath;
 		/** 진입점과 같은 주소. 나온 순서대로, 같은 것은 한 번 */
 		List<String> paths = new ArrayList<String>();
+		/** paths 와 같은 순서로, 그 주소가 스크립트에서 처음 나온 줄 */
+		List<Integer> lines = new ArrayList<Integer>();
 	}
 
 	/**
 	 * <pre>
 	 * 화면이 &lt;script src&gt; 로 불러오는 스크립트에 적힌 주소 가운데 진입점과 같은 것을 잇습니다(via = SCRIPT_SRC).
+ * properties_json 에 스크립트 경로(script)와 그 안에서 주소가 처음 나온 줄(scriptLine)을 남깁니다.
 	 * 스크립트는 "그 경로로 끝나는 SCRIPT 파일"이 하나일 때만 씁니다. 줄 번호는 화면에서 그 스크립트를 불러온 줄입니다.
 	 * 불러온 스크립트에 주소가 적혀 있다는 것만 보고 잇는 것이라 MEDIUM 입니다(화면이 그 함수를 실제로 부르는지는 모른다).
 	 * 같은 메소드를 화면 글자에서 이미 이었으면(PATH_TEXT) 다시 잇지 않습니다.
@@ -212,6 +215,8 @@ public class JspLinker implements SemanticStep {
 					properties.put("path", path);
 					properties.put("via", "SCRIPT_SRC");
 					properties.put("script", script.scriptPath);
+					// 주소가 실제로 적힌 곳(스크립트 안의 줄). 화면은 "layout.jsp:26 → genexon.js:112" 처럼 근거를 보여 준다.
+					properties.put("scriptLine", script.lines.get(p));
 					semanticDao.insertRelation(relation(revisionId, "FILE", "F" + fileId, "REQUESTS", "METHOD", methods.get(i), "MEDIUM", "HEURISTIC"
 							, properties, fileId, lineAt(text, source.getIndex())));
 					count++;
@@ -248,6 +253,7 @@ public class JspLinker implements SemanticStep {
 			String hit = hits.get(i).getText();
 			if (handlers.containsKey(hit) && !script.paths.contains(hit)) {
 				script.paths.add(hit);
+				script.lines.add(lineAt(text, hits.get(i).getIndex()));
 			}
 		}
 		return script;
