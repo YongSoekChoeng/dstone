@@ -880,3 +880,10 @@ body.kn-full-on {
 .kn-diag-samples {
 	margin: 2px 0 6px 20px;
 }
+
+/* 영향도 · 호출 관계: 같은 줄을 합친 행의 "주소 N개" 펼쳐 보기 */
+.kn-targets { margin-top: 2px; }
+.kn-targets summary { cursor: pointer; color: var(--cs-primary); font-size: 12px; width: max-content; }
+.kn-targets summary:hover { color: var(--cs-primary-hover); }
+.kn-targets ul { margin: 4px 0 2px; padding-left: 18px; color: var(--cs-muted); font-size: 12px; }
+.kn-targets li { white-space: nowrap; }
