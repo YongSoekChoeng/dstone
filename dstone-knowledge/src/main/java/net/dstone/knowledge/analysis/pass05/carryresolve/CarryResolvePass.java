@@ -43,7 +43,7 @@ public class CarryResolvePass extends BaseObject implements AnalysisPass {
 	public static final String NAME = "CARRY_RESOLVE";
 
 	/** LINK와 SEMANTIC이 만드는 관계. RESOLVE의 결과가 아니라서 옮기지 않는다 */
-	private static final List<String> NOT_FROM_RESOLVE = Arrays.asList("OVERRIDES", "CALLS_POSSIBLE_IMPLEMENTATION", "INJECTS", "EXECUTES_SQL", "READS_TABLE"
+	private static final List<String> NOT_FROM_RESOLVE = Arrays.asList("OVERRIDES", "CALLS_POSSIBLE_IMPLEMENTATION", "ENCLOSES_ANONYMOUS", "INJECTS", "EXECUTES_SQL", "READS_TABLE"
 			, "WRITES_TABLE", "RENDERS", "REQUESTS", "INCLUDES");
 
 	@Autowired

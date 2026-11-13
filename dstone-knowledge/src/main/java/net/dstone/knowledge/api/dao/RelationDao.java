@@ -38,7 +38,7 @@ public class RelationDao extends BaseDao {
 		}
 	}
 
-	/** LINK 단계가 만든 관계(OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION)를 지웁니다. */
+	/** LINK 단계가 만든 관계(OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION, ENCLOSES_ANONYMOUS)를 지웁니다. */
 	public int deleteLinkRelations(long revisionId) {
 		return sqlSessionCommon.delete(NS + "deleteLinkRelations", revisionId);
 	}
@@ -59,6 +59,17 @@ public class RelationDao extends BaseDao {
 	 */
 	public int insertPossibleImplementations(long revisionId) {
 		return sqlSessionCommon.insert(NS + "insertPossibleImplementations", revisionId);
+	}
+
+	/**
+	 * <pre>
+	 * ENCLOSES_ANONYMOUS: 바깥 메소드 → 그 안에서 만든 익명 클래스의 메소드.
+	 * new Runnable() { run() { runJob(); } } 안의 runJob 호출은 익명 클래스의 run 이 주인이라,
+	 * 이 선이 있어야 바깥 메소드에서 runJob 까지 따라갈 수 있습니다.
+	 * </pre>
+	 */
+	public int insertEnclosesAnonymous(long revisionId) {
+		return sqlSessionCommon.insert(NS + "insertEnclosesAnonymous", revisionId);
 	}
 
 	/** 이 Job의 품질 지표를 다시 계산해서 넣습니다. */

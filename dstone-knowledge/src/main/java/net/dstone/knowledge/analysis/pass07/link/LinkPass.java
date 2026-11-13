@@ -18,6 +18,7 @@ import net.dstone.knowledge.analysis.job.AnalysisPass;
  *
  *   OVERRIDES                      하위 타입의 메소드 → 상위 타입의 같은 메소드
  *   CALLS_POSSIBLE_IMPLEMENTATION  몸통 없는 메소드(인터페이스/abstract)를 부르는 호출 → 실제로 실행될 수 있는 구현 메소드
+ *   ENCLOSES_ANONYMOUS             바깥 메소드 → 그 안에서 만든 익명 클래스(new Runnable() { ... })의 메소드
  *
  * 예: OrderServlet이 orderService.findOrders()를 부르면 RESOLVE는 "OrderService.findOrders를 부른다"까지만 압니다.
  * 여기서 OrderServiceImpl.findOrders가 그것을 구현한다는 것을 엮어, OrderServlet → OrderServiceImpl.findOrders를 "가능한 구현"으로 잇습니다.
@@ -54,15 +55,15 @@ public class LinkPass extends BaseObject implements AnalysisPass {
 	 * 단계: ⑦ LINK
 	 *   1) 테이블(CRUD): 
 	 *		analysis_symbol / analysis_method R
-	 *		analysis_relation D·C (OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION)
+	 *		analysis_relation D·C (OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION, ENCLOSES_ANONYMOUS)
 	 *		analysis_metric D·C
-	 *   2) 기능: 파싱 없이 SQL만으로 재정의 관계와 인터페이스→구현 관계를 잇고, 품질 지표를 계산합니다.
+	 *   2) 기능: 파싱 없이 SQL만으로 재정의 관계, 인터페이스→구현 관계, 바깥 메소드→익명 클래스 관계를 잇고, 품질 지표를 계산합니다.
 	 * </pre>
 	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		final long revisionId = context.getRevisionId();
-		final int[] counts = new int[2];
+		final int[] counts = new int[3];
 		txTemplateCommon.execute(new TransactionCallbackWithoutResult() {
 			@Override
 			protected void doInTransactionWithoutResult(TransactionStatus status) {
@@ -71,11 +72,12 @@ public class LinkPass extends BaseObject implements AnalysisPass {
 				// 순서가 중요하다. "가능한 구현"은 OVERRIDES를 보고 만든다.
 				counts[0] = relationDao.insertOverrides(revisionId);
 				counts[1] = relationDao.insertPossibleImplementations(revisionId);
+				counts[2] = relationDao.insertEnclosesAnonymous(revisionId);
 				// 2) 품질 지표(호출이 얼마나 풀렸는지 등)를 새로 계산한다.
 				relationDao.replaceMetrics(context.getAnalysisId(), revisionId);
 			}
 		});
-		info("LINK: OVERRIDES " + counts[0] + "건, CALLS_POSSIBLE_IMPLEMENTATION " + counts[1] + "건. analysisId=" + context.getAnalysisId());
+		info("LINK: OVERRIDES " + counts[0] + "건, CALLS_POSSIBLE_IMPLEMENTATION " + counts[1] + "건, ENCLOSES_ANONYMOUS " + counts[2] + "건. analysisId=" + context.getAnalysisId());
 	}
 
 }

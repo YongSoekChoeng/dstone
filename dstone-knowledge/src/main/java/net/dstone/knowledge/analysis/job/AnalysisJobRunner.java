@@ -186,7 +186,7 @@ public class AnalysisJobRunner extends BaseObject {
 				  단계: ⑦ LINK
 				  테이블(CRUD):
 					analysis_symbol / analysis_method R
-					analysis_relation D·C (OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION)
+					analysis_relation D·C (OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION, ENCLOSES_ANONYMOUS)
 					analysis_metric D·C
 				  기능: 파싱 없이 SQL만으로 재정의 관계와 인터페이스→구현 관계를 잇고, 품질 지표를 계산합니다.
 				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

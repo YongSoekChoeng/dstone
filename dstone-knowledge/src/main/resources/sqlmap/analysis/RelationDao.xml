@@ -33,7 +33,7 @@
     <delete id="deleteLinkRelations" parameterType="long">
         DELETE FROM analysis_relation
          WHERE revision_id = #{revisionId}
-           AND relation_type IN ('OVERRIDES', 'CALLS_POSSIBLE_IMPLEMENTATION')
+           AND relation_type IN ('OVERRIDES', 'CALLS_POSSIBLE_IMPLEMENTATION', 'ENCLOSES_ANONYMOUS')
     </delete>
 
     <!-- OVERRIDES: 하위 타입의 메소드 → 상위 타입(프로젝트 안)의 같은 메소드.
@@ -109,6 +109,39 @@
          WHERE c.revision_id = #{revisionId}
            AND c.relation_type = 'CALLS'
            AND c.to_id IS NOT NULL
+    </insert>
+
+    <!-- ENCLOSES_ANONYMOUS: 바깥 메소드 → 그 안에서 만든 익명 클래스의 메소드.
+           submit() { executor.execute(new Runnable() { public void run() { runJob(); } }); }
+         이면 submit → $1#run 을 잇는다. runJob 을 부르는 것은 $1#run 이라, 이 선이 없으면 submit 에서 runJob 까지 따라갈 수 없다.
+         (람다는 따로 메소드가 없어서 안의 호출이 처음부터 바깥 메소드의 것이다. 익명 클래스만 이 선이 필요하다.)
+
+         바깥 메소드: 익명 클래스의 바깥 타입(outer_symbol_id)에 속하고, 같은 파일에서 익명 클래스의 줄 범위를 감싸는 메소드.
+         익명 클래스 안의 익명 클래스는 바깥 익명 클래스의 메소드에 이어진다. 감싸는 메소드가 없으면(필드 초기값, enum 상수 몸통) 잇지 않는다.
+         줄 범위로 찾으므로 한 줄에 메소드를 여러 개 적은 경우처럼 애매하면 가장 안쪽(늦게 시작하는) 메소드 하나만 고른다. -->
+    <insert id="insertEnclosesAnonymous" parameterType="long">
+        INSERT INTO analysis_relation
+            (revision_id, from_kind, from_id, relation_type, to_kind, to_id, confidence, resolution_status, file_id, line_start)
+        SELECT a.revision_id, 'METHOD', em.method_id, 'ENCLOSES_ANONYMOUS', 'METHOD', am.method_id
+             , 'HIGH', 'RESOLVED', a.file_id, a.line_start
+          FROM analysis_symbol a
+          JOIN LATERAL (
+                SELECT m.method_id
+                  FROM analysis_method m
+                 WHERE m.revision_id = a.revision_id
+                   AND m.file_id = a.file_id
+                   AND m.owner_symbol_id = a.outer_symbol_id
+                   AND m.line_start &lt;= a.line_start
+                   AND m.line_end &gt;= a.line_end
+                 ORDER BY m.line_start DESC, m.method_id
+                 LIMIT 1
+               ) em ON TRUE
+          JOIN analysis_method am
+            ON am.revision_id = a.revision_id AND am.owner_symbol_id = a.symbol_id
+           AND NOT am.is_constructor AND NOT am.is_synthetic
+         WHERE a.revision_id = #{revisionId}
+           AND a.kind = 'ANONYMOUS'
+           AND a.outer_symbol_id IS NOT NULL
     </insert>
 
 

@@ -52,6 +52,12 @@ public class GraphService extends BaseObject {
 	/** 상세에 싣는 목록(진입점, 테이블을 쓰는 SQL)의 최대 행 수 */
 	private static final int MAX_DETAIL_ROWS = 500;
 
+	/** 바깥 메소드 → 그 안에서 만든 익명 클래스의 메소드(LINK 단계가 만든다). 관계 트리는 이 선을 따라가되 익명 클래스 메소드는 건너뛰고 그린다 */
+	private static final String ENCLOSES_ANONYMOUS = "ENCLOSES_ANONYMOUS";
+
+	/** 익명 클래스 안의 익명 클래스를 따라 올라가는 최대 단계. 잘못된 데이터에도 끝나게 묶어 둔다 */
+	private static final int MAX_ANONYMOUS_NESTING = 20;
+
 	/** 전체 맵에 그릴 수 있는 관계 */
 	private static final List<String> MAP_RELATIONS = Arrays.asList("CALLS", "CALLS_POSSIBLE_IMPLEMENTATION", "EXECUTES_SQL", "READS_TABLE", "WRITES_TABLE"
 			, "RENDERS", "REQUESTS", "INCLUDES", "EXTENDS", "IMPLEMENTS", "INJECTS");
@@ -199,6 +205,8 @@ public class GraphService extends BaseObject {
 			calls.add("CALLS_POSSIBLE_IMPLEMENTATION");
 		}
 		calls.addAll(Arrays.asList("EXECUTES_SQL", "READS_TABLE", "WRITES_TABLE"));
+		// new Runnable() { run() { runJob(); } } 안의 호출은 익명 클래스의 run 이 주인이다. 바깥 메소드에서 거기까지 건너가는 선.
+		calls.add(ENCLOSES_ANONYMOUS);
 
 		boolean truncated = false;
 		List<Map<String, Object>> upEdges = new ArrayList<Map<String, Object>>();
@@ -212,7 +220,7 @@ public class GraphService extends BaseObject {
 			condition.put("depth", Integer.valueOf(upDepth));
 			condition.put("stepTypes", step);
 			condition.put("anchorTypes", anchor);
-			upEdges = graphDao.selectNeighborEdges(condition);
+			upEdges = skipAnonymous(graphDao.selectNeighborEdges(condition), id.getId());
 			if (upEdges.size() > MAX_TREE_EDGES) {
 				truncated = true;
 				upEdges = new ArrayList<Map<String, Object>>(upEdges.subList(0, MAX_TREE_EDGES));
@@ -230,7 +238,7 @@ public class GraphService extends BaseObject {
 			condition.put("depth", Integer.valueOf(downDepth));
 			condition.put("stepTypes", step);
 			condition.put("anchorTypes", anchor);
-			downEdges = graphDao.selectNeighborEdges(condition);
+			downEdges = skipAnonymous(graphDao.selectNeighborEdges(condition), id.getId());
 			if (downEdges.size() > MAX_TREE_EDGES) {
 				truncated = true;
 				downEdges = new ArrayList<Map<String, Object>>(downEdges.subList(0, MAX_TREE_EDGES));
@@ -294,6 +302,84 @@ public class GraphService extends BaseObject {
 		result.put("nodes", nodes);
 		result.put("edges", edges);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 관계 트리에서 익명 클래스의 메소드를 건너뜁니다.
+	 *   submit → $1#run (ENCLOSES_ANONYMOUS),  $1#run → runJob (CALLS)
+	 * 를 submit → runJob (CALLS) 하나로 바꿉니다. 바뀐 선에는 viaAnonymous = true 를 붙입니다.
+	 * 익명 클래스 안의 익명 클래스면 가장 바깥의 보통 메소드까지 올라갑니다.
+	 * 고른 노드가 익명 클래스의 메소드 자신이면 그 메소드는 건너뛰지 않습니다(고른 노드가 그림에서 사라지면 안 되니까).
+	 * 선의 depth 는 SQL 에서 ENCLOSES_ANONYMOUS 를 0 칸으로 세어 두었으므로 그대로 씁니다.
+	 * 결과가 같은 선(from, to, type)은 가장 얕은 것 하나만 남깁니다.
+	 * </pre>
+	 * @param found selectNeighborEdges 결과(깊이 순으로 정렬돼 있다)
+	 * @param pickedId 고른 노드 ID
+	 */
+	private List<Map<String, Object>> skipAnonymous(List<Map<String, Object>> found, String pickedId) {
+		// 익명 클래스의 메소드 → 그것을 감싸는 바깥 메소드들
+		Map<String, List<String>> enclosing = new HashMap<String, List<String>>();
+		for (int i = 0; i < found.size(); i++) {
+			Map<String, Object> edge = found.get(i);
+			if (!ENCLOSES_ANONYMOUS.equals(edge.get("type"))) {
+				continue;
+			}
+			String anonymous = String.valueOf(edge.get("to"));
+			if (anonymous.equals(pickedId)) {
+				continue;
+			}
+			List<String> outers = enclosing.get(anonymous);
+			if (outers == null) {
+				outers = new ArrayList<String>();
+				enclosing.put(anonymous, outers);
+			}
+			outers.add(String.valueOf(edge.get("from")));
+		}
+		if (enclosing.isEmpty()) {
+			return found;
+		}
+		List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+		Set<String> keys = new HashSet<String>();
+		for (int i = 0; i < found.size(); i++) {
+			Map<String, Object> edge = found.get(i);
+			String to = String.valueOf(edge.get("to"));
+			if (ENCLOSES_ANONYMOUS.equals(edge.get("type")) && enclosing.containsKey(to)) {
+				// 건너뛸 익명 클래스 메소드로 들어가는 선. 그 메소드에서 나가는 선이 바깥 메소드에서 나가는 선이 된다.
+				continue;
+			}
+			String from = String.valueOf(edge.get("from"));
+			Set<String> sources = new HashSet<String>();
+			outermost(from, enclosing, 0, sources);
+			Iterator<String> it = sources.iterator();
+			while (it.hasNext()) {
+				String source = it.next();
+				if (!keys.add(source + ">" + to + ">" + edge.get("type"))) {
+					continue;
+				}
+				if (source.equals(from)) {
+					result.add(edge);
+				} else {
+					Map<String, Object> moved = new LinkedHashMap<String, Object>(edge);
+					moved.put("from", source);
+					moved.put("viaAnonymous", Boolean.TRUE);
+					result.add(moved);
+				}
+			}
+		}
+		return result;
+	}
+
+	/** 익명 클래스의 메소드면 그것을 감싸는 바깥 메소드를 따라 올라가, 익명 클래스가 아닌 메소드를 모읍니다 */
+	private void outermost(String memberId, Map<String, List<String>> enclosing, int nesting, Set<String> sources) {
+		List<String> outers = enclosing.get(memberId);
+		if (outers == null || nesting >= MAX_ANONYMOUS_NESTING) {
+			sources.add(memberId);
+			return;
+		}
+		for (int i = 0; i < outers.size(); i++) {
+			outermost(outers.get(i), enclosing, nesting + 1, sources);
+		}
 	}
 
 	/**
