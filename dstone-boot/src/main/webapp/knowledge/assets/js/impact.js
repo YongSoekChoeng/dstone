@@ -37,7 +37,7 @@ var DstoneKnowledgeImpact = (function () {
 
 	/** 탭 아래 한 줄 설명 */
 	var TAB_HINTS = {
-		impact: "이 대상을 고치면 어디까지 닿는지 봅니다. 대상을 직접 건드리는 메소드에서 부르는 쪽으로 거슬러 올라가며 닿는 진입점(주소) · 화면 · 메소드를 모읍니다.",
+		impact: "이 대상을 고치면 무엇을 다시 확인해야 하는지 한 장으로 요약합니다(영향받는 화면 · 진입점, 건드리는 테이블, 결과를 얼마나 믿어도 되는지). 호출 경로는 부르는 쪽 / 불리는 쪽 탭에서 봅니다.",
 		callers: "이 메소드를 누가 부르는지 거슬러 올라갑니다. 화면(JSP)이 주소로 요청하는 것도 함께 나옵니다.",
 		callees: "이 메소드가 무엇을 부르는지 따라 내려갑니다. 실행하는 SQL, 그 SQL이 건드리는 테이블까지 나옵니다."
 	};
@@ -54,7 +54,13 @@ var DstoneKnowledgeImpact = (function () {
 		RENDERS: "화면 열기"
 	};
 
-	/** 영향도 요약의 첫 카드. 무엇을 "직접 건드리는" 메소드인지 대상에 맞춰 적는다. */
+	/** 진입점 종류 → 화면 글자 */
+	var ENDPOINT_LABELS = { TRANSACTION: "거래 ID", HTTP: "주소", SCHEDULED: "스케줄", MAIN: "main", THREAD: "스레드", LISTENER: "리스너", SERVLET: "서블릿", JSP: "JSP 주소" };
+
+	/** 업무 묶음 이름으로 쓰기엔 너무 흔한 패키지 이름. 이런 이름이면 한 칸 위 패키지를 쓴다 */
+	var COMMON_PACKAGES = ["service", "services", "controller", "controllers", "action", "actions", "web", "impl", "biz", "dao", "api", "rest", "handler", "handlers"];
+
+	/** 닿는 메소드 설명의 첫머리. 무엇을 "직접 건드리는" 메소드인지 대상에 맞춰 적는다. */
 	var START_LABELS = { table: "이 테이블을 쓰는 메소드", statement: "이 SQL을 쓰는 메소드", type: "이 타입의 메소드", method: "대상 메소드" };
 
 	/** 지금 대상 {kind, value, label, notes[]}. value 는 API 에 넘기는 값(메소드 ID, 테이블 이름, SQL 이름, 타입 전체 이름) */
@@ -653,56 +659,293 @@ var DstoneKnowledgeImpact = (function () {
 			}
 		}
 		K.message(panel.message, result.truncated ? "결과가 많아 일부만 보입니다. 깊이를 줄이거나 대상을 좁혀 보세요." : "");
+		var groups = impactGroups(result);
+		panel.content.innerHTML = "<div class=\"kn-lead\">" + leadHtml(result, groups) + "</div>";
+		renderAffected(panel.content, result, groups);
+		renderTouches(panel.content, result);
+		renderTrust(panel.content, result);
+		renderReachedMethods(panel.content, result);
+	}
+
+	/**
+	 * 맨 위 한 줄 결론. 숫자를 문장으로 바꿔 "그래서 무엇을 하면 되나"가 바로 보이게 한다.
+	 *   - 대상 메소드가 그 자체로 입구면 그렇다고 먼저 알린다(영향이 자기 거래 · 화면에서 끝나는 까닭)
+	 *   - 영향받는 화면 · 진입점 수, 그 관계가 얼마나 확실한지, 건드리는 테이블, 놓쳤을 수 있는 곳
+	 */
+	function leadHtml(result, groups) {
+		var endpoints = result.endpoints || [];
+		var screens = result.screens || [];
+		var lines = [];
+		if (target.kind === "method") {
+			var own = [];
+			endpoints.forEach(function (row) {
+				if (row.methodId === target.value && row.depth === 0 && own.indexOf(row.path) < 0) {
+					own.push(row.path);
+				}
+			});
+			if (own.length > 0) {
+				// 이 메소드를 부르는 Java 메소드가 하나도 없을 때만 "영향이 여기서 끝난다"고 말한다
+				var calledByJava = (result.methods || []).some(function (row) { return row.depth > 0; });
+				lines.push("이 메소드는 " + own.map(function (path) { return "<b class=\"kn-mono\">" + K.escapeHtml(path) + "</b>"; }).join(", ")
+					+ "의 입구입니다." + (calledByJava ? "" : " 이 메소드를 부르는 Java 코드가 없어서 영향은 이 입구와 이 입구를 부르는 화면에서 끝납니다."));
+			}
+		}
+		if (endpoints.length + screens.length === 0) {
+			lines.push("고쳐도 사용자가 들어오는 입구(진입점 · 화면)에 닿지 않습니다. 부르는 곳이 없거나, 분석이 잇지 못한 호출일 수 있습니다(아래 \"믿을 만한가\" 참고).");
+		} else {
+			lines.push("고치면 화면 <b>" + screens.length + "</b>개, 진입점 <b>" + endpoints.length + "</b>개가 영향을 받습니다"
+				+ (groups.length > 1 ? " (업무 묶음 " + groups.length + "개)" : "") + ". " + confidenceText(endpoints.concat(screens)));
+		}
+		var touches = result.touches || [];
+		if (target.kind === "table" && touches.length > 0) {
+			lines.push("이 테이블을 읽는 SQL <b>" + touches[0].reads.length + "</b>개, 쓰는 SQL <b>" + touches[0].writes.length + "</b>개가 있습니다.");
+		} else if (touches.length > 0) {
+			var writing = touches.filter(function (touch) { return touch.writes.length > 0; }).length;
+			lines.push("테이블 <b>" + touches.length + "</b>개를 건드립니다"
+				+ (writing === 0 ? "(모두 읽기만)." : "(쓰기 " + writing + "개 · 읽기만 " + (touches.length - writing) + "개)."));
+		}
+		var missed = gapCount(result, "missedCallers") + gapCount(result, "unresolvedInside");
+		if (missed > 0) {
+			lines.push("<span class=\"kn-lead-warn\">분석이 놓쳤을 수 있는 곳이 " + missed + "건 있습니다. 아래 \"믿을 만한가\"를 확인하세요.</span>");
+		}
+		return lines.map(function (line) { return "<p>" + line + "</p>"; }).join("");
+	}
+
+	/** 신뢰도 건수를 한 문장으로: 모두 HIGH 면 짧게 */
+	function confidenceText(rows) {
+		var counts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+		rows.forEach(function (row) {
+			counts[row.confidence] = (counts[row.confidence] || 0) + 1;
+		});
+		if (counts.MEDIUM === 0 && counts.LOW === 0) {
+			return "모두 확실한 관계(HIGH)로 이어졌습니다.";
+		}
+		return "확실(HIGH) " + counts.HIGH + " · 보통(MEDIUM) " + counts.MEDIUM + " · 짐작(LOW) " + counts.LOW + ".";
+	}
+
+	function gapCount(result, key) {
+		var gap = (result.gaps || {})[key];
+		return gap ? gap.count : 0;
+	}
+
+	/**
+	 * 영향받는 곳을 업무 묶음으로 나눈다. 행 하나 = 진입점 하나 + 그 진입점을 부르거나 그 진입점이 여는 화면들.
+	 * 어느 진입점과도 짝이 없는 화면은 그 화면의 폴더 이름으로 따로 묶는다.
+	 * 반환: [{name, rows: [{screens: [path], endpoint, confidence}]}] (이름 순)
+	 */
+	function impactGroups(result) {
+		var byName = {};
+		var paired = {};
+		function add(name, row) {
+			if (!byName[name]) {
+				byName[name] = { name: name, rows: [], screens: {}, endpoints: 0 };
+			}
+			byName[name].rows.push(row);
+			row.screens.forEach(function (path) {
+				byName[name].screens[path] = true;
+			});
+			if (row.endpoint) {
+				byName[name].endpoints++;
+			}
+		}
+		(result.endpoints || []).forEach(function (endpoint) {
+			var screens = [];
+			(endpoint.screens || []).forEach(function (screen) {
+				if (screens.indexOf(screen.path) < 0) {
+					screens.push(screen.path);
+				}
+				paired[screen.path] = true;
+			});
+			add(businessName(endpoint.handler), { screens: screens, endpoint: endpoint, confidence: endpoint.confidence });
+		});
+		(result.screens || []).forEach(function (screen) {
+			if (!paired[screen.path]) {
+				add("화면 " + parentDir(screen.path), { screens: [screen.path], endpoint: null, confidence: screen.confidence, via: screen.via });
+			}
+		});
+		return Object.keys(byName).sort().map(function (name) {
+			var group = byName[name];
+			group.screenCount = Object.keys(group.screens).length;
+			return group;
+		});
+	}
+
+	/**
+	 * 처리하는 메소드의 패키지로 업무 묶음 이름을 정한다. hi.ja.closing.service.JADC1021M#… → closing
+	 * service, controller 처럼 어느 업무에나 있는 이름이면 한 칸 위 이름을 쓴다.
+	 */
+	function businessName(handler) {
+		var owner = (handler || "").split("#")[0];
+		var parts = owner.substring(0, Math.max(0, owner.lastIndexOf("."))).split(".");
+		var i = parts.length - 1;
+		while (i > 0 && COMMON_PACKAGES.indexOf(parts[i].toLowerCase()) >= 0) {
+			i--;
+		}
+		return parts[i] || "(패키지 없음)";
+	}
+
+	/** 영향받는 곳: 다시 테스트할 목록 */
+	function renderAffected(container, result, groups) {
+		var total = (result.endpoints || []).length + (result.screens || []).length;
+		var wrap = sectionWrap(container, "영향받는 곳", groups.length + "묶음",
+			"다시 테스트할 목록입니다. 화면과 그 화면이 부르는 진입점(거래 ID · 주소)을 한 줄로 묶고, 처리하는 클래스의 패키지로 업무를 나눴습니다.");
+		if (total === 0) {
+			wrap.insertAdjacentHTML("beforeend", "<p class=\"ai-hint\">닿는 진입점과 화면이 없습니다.</p>");
+			return;
+		}
+		// 진입점 종류별 건수: 거래 ID 30 · 스케줄 2
+		var kinds = {};
+		(result.endpoints || []).forEach(function (row) {
+			var label = ENDPOINT_LABELS[row.endpointType] || row.endpointType;
+			kinds[label] = (kinds[label] || 0) + 1;
+		});
+		var kindText = Object.keys(kinds).map(function (label) { return label + " " + kinds[label]; }).join(" · ");
+		if (kindText) {
+			wrap.insertAdjacentHTML("beforeend", "<div class=\"kn-target-cond\"><span>진입점 종류: " + K.escapeHtml(kindText) + "</span></div>");
+		}
+		var open = groups.length <= 3;
+		groups.forEach(function (group) {
+			var details = document.createElement("details");
+			details.className = "kn-group";
+			details.open = open;
+			details.innerHTML = "<summary><b>" + K.escapeHtml(group.name) + "</b> <span class=\"kn-caller-note\">화면 " + group.screenCount
+				+ " · 진입점 " + group.endpoints + "</span></summary><div class=\"kn-scroll\"></div>";
+			K.table(details.querySelector(".kn-scroll"), [
+				{ key: "screens", label: "화면", html: function (row) {
+					if (row.screens.length === 0) {
+						return "<span class=\"kn-caller-note\">(이어진 화면 없음)</span>";
+					}
+					return row.screens.map(function (path) {
+						return "<span class=\"kn-mono kn-caller-name\" title=\"" + K.escapeHtml(path) + "\">" + K.escapeHtml(fileName(path)) + "</span>";
+					}).join("<br>") + (row.via ? " <span class=\"kn-caller-note\">" + K.escapeHtml(row.via.split(",").map(relationLabel).join(", ")) + "</span>" : "");
+				} },
+				{ key: "endpoint", label: "진입점", html: function (row) {
+					var e = row.endpoint;
+					if (!e) {
+						return "";
+					}
+					return "<span class=\"kn-mono\">" + K.escapeHtml((e.httpMethod && e.httpMethod !== "ALL" ? e.httpMethod + " " : "") + (e.path || "")) + "</span>"
+						+ " <span class=\"kn-caller-note\">" + K.escapeHtml(ENDPOINT_LABELS[e.endpointType] || e.endpointType || "") + "</span>";
+				} },
+				{ key: "handler", label: "처리하는 메소드", html: function (row) { return row.endpoint ? methodLink(row.endpoint.methodId, row.endpoint.handler) : ""; } },
+				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } }
+			], group.rows);
+			wrap.appendChild(details);
+		});
+	}
+
+	/** 건드리는 데이터: 테이블마다 읽는 SQL · 쓰는 SQL */
+	function renderTouches(container, result) {
+		var touches = result.touches || [];
+		var hints = {
+			method: "이 메소드에서 끝까지 따라 내려가며 실행하는 SQL이 읽고 쓰는 테이블입니다. 쓰기가 있으면 데이터까지 확인하세요.",
+			type: "이 타입의 메소드들에서 끝까지 따라 내려가며 실행하는 SQL이 읽고 쓰는 테이블입니다. 쓰기가 있으면 데이터까지 확인하세요.",
+			statement: "이 SQL이 읽고 쓰는 테이블입니다.",
+			table: "이 테이블을 읽고 쓰는 SQL입니다."
+		};
+		var wrap = sectionWrap(container, "건드리는 데이터", "테이블 " + touches.length + "개", hints[target.kind] || "");
+		var scroll = document.createElement("div");
+		scroll.className = "kn-scroll";
+		wrap.appendChild(scroll);
+		K.table(scroll, [
+			{ key: "table", label: "테이블", html: function (row) { return pickLink({ kind: "table", value: row.table, label: row.table }, row.table); } },
+			{ key: "reads", label: "읽기", num: true, html: function (row) { return row.reads.length || ""; } },
+			{ key: "writes", label: "쓰기", num: true, html: function (row) { return row.writes.length ? "<b class=\"kn-write\">" + row.writes.length + "</b>" : ""; } },
+			{ key: "statements", label: "SQL", html: function (row) {
+				var items = row.writes.map(function (name) { return statementItem(name, "쓰기"); })
+					.concat(row.reads.map(function (name) { return statementItem(name, "읽기"); }));
+				return "<details class=\"kn-targets\"><summary>SQL " + items.length + "개</summary><ul>" + items.join("") + "</ul></details>";
+			} }
+		], touches, target.kind === "table" ? "이 테이블을 건드리는 SQL이 없습니다." : "실행하는 SQL에서 이어진 테이블이 없습니다.");
+	}
+
+	function statementItem(name, access) {
+		return "<li>" + pickLink({ kind: "statement", value: name, label: name }, name) + " <span class=\"kn-caller-note\">" + access + "</span></li>";
+	}
+
+	/** 믿을 만한가: 신뢰도, 잘림, 조건, 분석이 놓쳤을 수 있는 곳 */
+	function renderTrust(container, result) {
+		var t = result.target || {};
+		var wrap = sectionWrap(container, "믿을 만한가", "", "\"영향 없음\"이 정말 없는 것인지, 분석이 잇지 못한 것인지 가려 봅니다.");
 		var conditions = ["거슬러 올라간 깊이 " + result.depth, result.includePossible ? "인터페이스 경유 호출 포함" : "인터페이스 경유 호출 제외"];
 		if (t.kind === "TABLE") {
 			conditions.unshift({ ALL: "읽기 + 쓰기", READ: "읽기만", WRITE: "쓰기만" }[t.access] || t.access);
 		}
-		var html = "<div class=\"kn-cards\"></div>"
-			+ "<div class=\"kn-target-cond\">" + conditions.map(function (text) { return "<span>" + K.escapeHtml(text) + "</span>"; }).join("") + "</div>";
-		panel.content.innerHTML = html;
-		K.cards(panel.content.querySelector(".kn-cards"), [
-			{ label: START_LABELS[target.kind] || "직접 건드리는 메소드", value: result.summary.startMethods },
-			{ label: "닿는 메소드", value: result.summary.methods },
-			{ label: "진입점", value: result.summary.endpoints },
-			{ label: "화면", value: result.summary.screens }
-		]);
+		var rows = (result.endpoints || []).concat(result.screens || []);
+		var html = "<div class=\"kn-target-cond\">" + conditions.map(function (text) { return "<span>" + K.escapeHtml(text) + "</span>"; }).join("") + "</div><ul class=\"kn-trust\">";
+		if (rows.length > 0) {
+			html += "<li>진입점 · 화면의 신뢰도: " + confidenceText(rows) + " <span class=\"kn-caller-note\">짐작(LOW)은 이름만 보고 이은 관계가 낀 것입니다.</span></li>";
+		}
+		var reachedTop = (result.methods || []).some(function (row) { return row.depth === result.depth; });
+		if (result.truncated) {
+			html += "<li class=\"kn-lead-warn\">결과가 많아 일부만 담았습니다.</li>";
+		} else if (reachedTop) {
+			html += "<li class=\"kn-lead-warn\">깊이 " + result.depth + "까지 올라가서도 부르는 쪽이 이어졌습니다. 깊이를 늘리면 더 나올 수 있습니다.</li>";
+		} else {
+			html += "<li>깊이 제한 안에서 끝까지 올라갔습니다.</li>";
+		}
+		html += gapItem(result, "missedCallers", "놓쳤을 수 있는 부르는 쪽",
+			"닿은 메소드와 이름 · 인자 수가 같은데 분석이 풀지 못한 호출입니다. 실제로 이 메소드를 부르는 것이면 영향 범위가 더 넓습니다.");
+		if ((result.gaps || {}).unresolvedInside) {
+			html += gapItem(result, "unresolvedInside", "놓쳤을 수 있는 건드리는 데이터",
+				"따라 내려간 코드 안에서 풀지 못한 호출(SQL이 이어지지 않은 메소드 안의 것만)과, 이름은 있는데 매퍼에서 찾지 못한 SQL입니다.");
+		}
+		wrap.insertAdjacentHTML("beforeend", html + "</ul>");
+	}
 
-		section(panel.content, "진입점", "사용자가 이 변경을 겪게 되는 입구입니다.", [
-			{ key: "depth", label: "거리", num: true },
-			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-			{ key: "path", label: "주소", html: function (row) {
-				return "<span class=\"kn-mono\">" + K.escapeHtml((row.httpMethod && row.httpMethod !== "ALL" ? row.httpMethod + " " : "") + (row.path || "")) + "</span>"
-					+ (row.endpointType && row.endpointType !== "HTTP" ? " <span class=\"kn-caller-note\">" + K.escapeHtml(row.endpointType) + "</span>" : "");
-			} },
-			{ key: "handler", label: "처리하는 메소드", html: function (row) { return methodLink(row.methodId, row.handler); } }
-		], result.endpoints, "닿는 진입점이 없습니다.");
-		section(panel.content, "화면", "이 변경을 겪는 화면입니다. 이어진 방식: 화면 요청(화면이 주소를 요청) · 화면 열기(메소드가 화면을 연다) · 호출(화면 안의 코드가 직접 부른다).", [
-			{ key: "depth", label: "거리", num: true },
-			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-			{ key: "path", label: "화면", html: function (row) {
-				return "<span class=\"kn-mono kn-caller-name\" title=\"" + K.escapeHtml(row.path) + "\">" + K.escapeHtml(fileName(row.path)) + "</span>"
-					+ " <span class=\"kn-caller-note\">" + K.escapeHtml(parentDir(row.path)) + "</span>";
-			} },
-			{ key: "via", label: "이어진 방식", html: function (row) {
-				return (row.via || "").split(",").filter(function (via) { return via; }).map(relationLabel).join(", ");
-			} }
-		], result.screens, "닿는 화면이 없습니다.");
-		section(panel.content, "메소드", "거리 0은 대상을 직접 건드리는 메소드입니다. 이름을 누르면 그 메소드가 새 대상이 됩니다.", [
+	function gapItem(result, key, title, hint) {
+		var gap = (result.gaps || {})[key] || { count: 0, samples: [] };
+		if (gap.count === 0) {
+			return "<li>" + K.escapeHtml(title) + ": 없음</li>";
+		}
+		var items = gap.samples.map(function (row) {
+			var what = row.kind === "SQL"
+				? "SQL " + row.name + " (매퍼에 없음)"
+				: (row.scopeText ? row.scopeText + "." : "") + row.name + "(…)";
+			return "<li><span class=\"kn-mono\">" + K.escapeHtml(what) + "</span> " + whereText(row.path, row.lineStart) + "</li>";
+		});
+		return "<li class=\"kn-lead-warn\">" + K.escapeHtml(title) + " " + gap.count + "건 <span class=\"kn-caller-note\">" + K.escapeHtml(hint) + "</span>"
+			+ "<details class=\"kn-targets\"><summary>" + (gap.count > gap.samples.length ? "처음 " + gap.samples.length + "건 보기" : "목록 보기") + "</summary><ul>"
+			+ items.join("") + "</ul></details></li>";
+	}
+
+	/** 닿는 메소드는 한 줄로 줄이고 목록은 접어 둔다. 경로는 부르는 쪽 탭이 맡는다 */
+	function renderReachedMethods(container, result) {
+		var methods = result.methods || [];
+		var layers = (result.summary || {}).methodsByLayer || {};
+		var start = methods.filter(function (row) { return row.depth === 0; }).length;
+		var wrap = sectionWrap(container, "닿는 메소드", methods.length + "개",
+			(START_LABELS[target.kind] || "직접 건드리는 메소드") + " " + start + "개에서 부르는 쪽으로 올라가며 닿은 메소드입니다. 이름을 누르면 그 메소드가 새 대상이 됩니다.");
+		var layerText = Object.keys(layers).map(function (layer) { return layer + " " + layers[layer]; }).join(" · ");
+		var html = "<div class=\"kn-target-cond\">" + (layerText ? "<span>계층별 " + K.escapeHtml(layerText) + "</span>" : "") + "</div>";
+		if (tabEnabled("callers")) {
+			html += "<p><button type=\"button\" class=\"kn-to-callers\">부르는 쪽 탭에서 경로 보기</button></p>";
+		}
+		html += "<details class=\"kn-group\"><summary>목록 펼치기</summary><div class=\"kn-scroll\"></div></details>";
+		wrap.insertAdjacentHTML("beforeend", html);
+		K.table(wrap.querySelector(".kn-group .kn-scroll"), [
 			{ key: "depth", label: "거리", num: true },
 			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
 			{ key: "layer", label: "계층" },
 			{ key: "method", label: "메소드", html: function (row) { return methodLink(row.methodId, row.method); } },
 			{ key: "path", label: "위치", html: function (row) { return whereText(row.path, row.lineStart); } }
-		], result.methods, "닿는 메소드가 없습니다.");
+		], methods, "닿는 메소드가 없습니다.");
+		var button = wrap.querySelector(".kn-to-callers");
+		if (button) {
+			button.addEventListener("click", function () {
+				showTab("callers", true);
+			});
+		}
 	}
 
-	function section(container, title, hint, columns, rows, emptyText) {
+	/** 제목 · 건수 · 한 줄 설명이 달린 빈 구역을 만들어 붙이고 돌려준다 */
+	function sectionWrap(container, title, count, hint) {
 		var wrap = document.createElement("div");
 		wrap.className = "kn-result-section";
-		wrap.innerHTML = "<div class=\"kn-section-title\">" + K.escapeHtml(title) + " <span class=\"kn-section-count\">" + (rows || []).length + "건</span></div>"
-			+ "<p class=\"kn-section-hint\">" + K.escapeHtml(hint) + "</p><div class=\"kn-scroll\"></div>";
-		K.table(wrap.querySelector(".kn-scroll"), columns, rows, emptyText);
+		wrap.innerHTML = "<div class=\"kn-section-title\">" + K.escapeHtml(title) + (count ? " <span class=\"kn-section-count\">" + K.escapeHtml(count) + "</span>" : "") + "</div>"
+			+ (hint ? "<p class=\"kn-section-hint\">" + K.escapeHtml(hint) + "</p>" : "");
 		container.appendChild(wrap);
+		return wrap;
 	}
 
 	/* ---------------- 부르는 쪽 / 불리는 쪽 탭 ---------------- */

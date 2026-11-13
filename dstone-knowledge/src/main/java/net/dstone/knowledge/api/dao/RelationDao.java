@@ -199,4 +199,45 @@ public class RelationDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectImpactScreens", condition);
 	}
 
+	/**
+	 * <pre>
+	 * 닿는 메소드와 화면의 짝(methodId, path, via). 화면이 그 메소드의 주소를 요청하거나(REQUESTS) 그 메소드가 화면을 엽니다(RENDERS).
+	 * 영향도 요약에서 화면과 거래를 한 줄로 묶을 때 씁니다.
+	 * </pre>
+	 */
+	public List<Map<String, Object>> selectImpactScreenLinks(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactScreenLinks", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 건드리는 데이터(table, access, statement). 메소드 · 타입이면 끝까지 따라 내려가며 실행하는 SQL 의 테이블입니다.
+	 * </pre>
+	 * @param condition 영향도 조건 + downRelationTypes(따라 내려갈 관계)
+	 */
+	public List<Map<String, Object>> selectImpactTouches(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactTouches", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 놓쳤을 수 있는 부르는 쪽: 닿은 메소드와 이름 · 인자 수가 같은데 풀지 못한 호출. 행마다 total(전체 건수)이 붙습니다.
+	 * </pre>
+	 * @param condition 영향도 조건 + sampleLimit
+	 */
+	public List<Map<String, Object>> selectImpactMissedCallers(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactMissedCallers", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 놓쳤을 수 있는 건드리는 데이터: 따라 내려간 메소드 안의 풀지 못한 호출(CALL)과 매퍼를 못 찾은 SQL 실행(SQL).
+	 * 행마다 total(전체 건수)이 붙습니다.
+	 * </pre>
+	 * @param condition 영향도 조건 + downRelationTypes, sampleLimit
+	 */
+	public List<Map<String, Object>> selectImpactUnresolvedInside(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactUnresolvedInside", condition);
+	}
+
 }

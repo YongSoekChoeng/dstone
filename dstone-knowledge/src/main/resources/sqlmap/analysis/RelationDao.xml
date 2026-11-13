@@ -683,4 +683,143 @@
          LIMIT #{limit}
     </select>
 
+    <!-- 화면과 메소드의 짝. 영향도 요약에서 "이 화면 → 이 거래"를 한 줄로 묶는 데 쓴다.
+           REQUESTS 화면이 그 메소드의 주소(거래 ID)를 요청한다
+           RENDERS  그 메소드가 끝나고 이 화면을 연다 -->
+    <select id="selectImpactScreenLinks" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactWalk"/>
+        SELECT DISTINCT x.method_id AS "methodId", f.path AS "path", x.via AS "via"
+          FROM (
+            SELECT r.to_id AS method_id, CAST(substr(r.from_id, 2) AS bigint) AS file_id, 'REQUESTS' AS via
+              FROM affected a
+              JOIN analysis_relation r ON r.revision_id = #{revisionId} AND r.to_id = a.node_id AND r.relation_type = 'REQUESTS' AND r.from_kind = 'FILE'
+             WHERE a.node_kind = 'METHOD'
+            UNION ALL
+            SELECT r.from_id, CAST(substr(r.to_id, 2) AS bigint), 'RENDERS'
+              FROM affected a
+              JOIN analysis_relation r ON r.revision_id = #{revisionId} AND r.from_id = a.node_id AND r.relation_type = 'RENDERS' AND r.to_kind = 'FILE'
+             WHERE a.node_kind = 'METHOD'
+          ) x
+          JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = x.file_id
+         ORDER BY f.path
+         LIMIT #{limit}
+    </select>
+
+    <!-- 대상(메소드 · 타입)에서 부르는 쪽 방향으로 끝까지 따라 내려간 메소드들. 깊이 제한 없이 한 번씩만 담는다(UNION) -->
+    <sql id="impactDown">
+        WITH RECURSIVE down (node_id) AS (
+            <choose>
+                <when test="targetKind == 'TYPE'">
+            SELECT m.method_id::varchar
+              FROM analysis_method m
+              JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+             WHERE m.revision_id = #{revisionId}
+               AND s.fqn = #{target}
+                </when>
+                <otherwise>
+            SELECT CAST(#{target} AS varchar)
+                </otherwise>
+            </choose>
+            UNION
+            SELECT r.to_id::varchar
+              FROM down d
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.from_id = d.node_id
+               AND r.to_kind = 'METHOD'
+               AND r.relation_type IN
+                    <foreach collection="downRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+        )
+    </sql>
+
+    <!-- 건드리는 데이터: 테이블 하나에 SQL 하나씩, 읽기(READS_TABLE)인지 쓰기(WRITES_TABLE)인지.
+           TABLE     그 테이블을 건드리는 SQL (access 조건을 따른다)
+           STATEMENT 그 SQL 이 건드리는 테이블
+           TYPE / METHOD 끝까지 따라 내려가며 실행하는 SQL 이 건드리는 테이블 -->
+    <select id="selectImpactTouches" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <if test="targetKind == 'TYPE' or targetKind == 'METHOD'">
+            <include refid="impactDown"/>
+        </if>
+        SELECT DISTINCT t.to_external AS "table"
+             , t.relation_type AS "access"
+             , COALESCE(NULLIF(mp.namespace, '') || '.', '') || mp.statement_id AS "statement"
+          FROM analysis_relation t
+          JOIN analysis_mapper mp ON mp.revision_id = t.revision_id AND mp.mapper_id = CAST(substr(t.from_id, 2) AS bigint)
+         WHERE t.revision_id = #{revisionId}
+           AND t.to_external IS NOT NULL
+        <choose>
+            <when test="targetKind == 'TABLE'">
+           AND t.to_external = #{target}
+           AND t.relation_type IN
+                <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+            </when>
+            <when test="targetKind == 'STATEMENT'">
+           AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND (mp.statement_id = #{target} OR mp.namespace || '.' || mp.statement_id = #{target})
+            </when>
+            <otherwise>
+           AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND t.from_id IN (SELECT e.to_id
+                               FROM down d
+                               JOIN analysis_relation e ON e.revision_id = #{revisionId} AND e.from_id = d.node_id AND e.relation_type = 'EXECUTES_SQL'
+                              WHERE e.to_id IS NOT NULL)
+            </otherwise>
+        </choose>
+         ORDER BY 1, 3, 2
+         LIMIT #{limit}
+    </select>
+
+    <!-- 놓쳤을 수 있는 부르는 쪽: 닿은 메소드와 이름 · 인자 수가 같은데 분석이 풀지 못한 호출.
+         이 호출이 실제로 닿은 메소드를 부르는 것이라면 영향 범위가 더 넓다. total 은 LIMIT 앞의 전체 건수 -->
+    <select id="selectImpactMissedCallers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactWalk"/>
+        SELECT n.name AS "name"
+             , r.arg_count AS "argCount"
+             , r.scope_text AS "scopeText"
+             , f.path AS "path"
+             , r.line_start AS "lineStart"
+             , COUNT(*) OVER () AS "total"
+          FROM (SELECT DISTINCT m.name, m.param_count
+                  FROM affected a
+                  JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
+                 WHERE a.node_kind = 'METHOD'
+                   AND NOT m.is_constructor) n
+          JOIN analysis_reference r
+            ON r.revision_id = #{revisionId}
+           AND r.status = 'UNRESOLVED'
+           AND r.ref_kind = 'CALL'
+           AND r.name = n.name
+           AND r.arg_count = n.param_count
+          JOIN analysis_file f ON f.file_id = r.file_id
+         ORDER BY f.path, r.line_start
+         LIMIT #{sampleLimit}
+    </select>
+
+    <!-- 놓쳤을 수 있는 건드리는 데이터: 따라 내려간 메소드 안에서
+           CALL 분석이 풀지 못한 호출(그 뒤에 SQL 이 있을 수 있다).
+                SQL 이 이미 이어진 메소드 안의 것은 뺀다. DAO 가 프레임워크 메소드(this.executeVOQuery 등)를
+                부르는데 jar 가 없어 못 푼 것이 대부분이고, SQL 은 규칙으로 이미 이어졌기 때문이다
+           SQL  이름은 적혀 있는데 매퍼에서 그 SQL 을 찾지 못한 실행 -->
+    <select id="selectImpactUnresolvedInside" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactDown"/>
+        SELECT x.*, COUNT(*) OVER () AS "total"
+          FROM (
+            SELECT 'CALL' AS "kind", r.name AS "name", r.scope_text AS "scopeText", f.path AS "path", r.line_start AS "lineStart"
+              FROM down d
+              JOIN analysis_reference r ON r.revision_id = #{revisionId} AND r.from_id = d.node_id AND r.from_kind = 'METHOD'
+                                       AND r.status = 'UNRESOLVED' AND r.ref_kind = 'CALL'
+              JOIN analysis_file f ON f.file_id = r.file_id
+             WHERE NOT EXISTS (SELECT 1 FROM analysis_relation e
+                                WHERE e.revision_id = #{revisionId} AND e.from_id = d.node_id AND e.relation_type = 'EXECUTES_SQL')
+            UNION ALL
+            SELECT 'SQL', e.to_external, NULL, f.path, e.line_start
+              FROM down d
+              JOIN analysis_relation e ON e.revision_id = #{revisionId} AND e.from_id = d.node_id
+                                      AND e.relation_type = 'EXECUTES_SQL' AND e.to_id IS NULL
+              LEFT JOIN analysis_file f ON f.file_id = e.file_id
+          ) x
+         ORDER BY x."path", x."lineStart"
+         LIMIT #{sampleLimit}
+    </select>
+
 </mapper>

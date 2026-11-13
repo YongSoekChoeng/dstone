@@ -138,10 +138,11 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					<li>"① 대상 찾기"에서 종류를 "테이블"로 바꾸고 <code>TB_BOARD</code> 를 적은 뒤 "찾기".
 						이름이 똑같은 테이블이 바로 골라지고, 아래 "② 결과"에 영향도 탭이 열립니다.</li>
 				</ol>
-				<div class="kn-expect">이렇게 나옵니다: 직접 건드리는 메소드 4 · 닿는 메소드 7 · 진입점 3 · 화면 3.<br>
-					진입점 표: <code>/board/list.do</code> 와 <code>/board/save.do</code> 는 신뢰도 <span class="kn-conf-HIGH">HIGH</span>,
-					<code>/board/admin.do</code> 는 <span class="kn-conf-LOW">LOW</span> (이 주소는 요청 값에 따라 실행되는 메소드가 달라져서 클래스까지만 알아냈다는 뜻).<br>
-					화면 표: <code>board/edit.jsp</code>, <code>board/list.jsp</code>, <code>common/header.jsp</code>.<br>
+				<div class="kn-expect">이렇게 나옵니다: 맨 위 결론에 "고치면 화면 3개, 진입점 3개가 영향을 받습니다"(닿는 메소드는 7개, 그중 테이블을 직접 쓰는 메소드 4개).<br>
+					영향받는 곳: <code>/board/list.do</code> 와 <code>/board/save.do</code> 는 신뢰도 <span class="kn-conf-HIGH">HIGH</span>,
+					<code>/board/admin.do</code> 는 <span class="kn-conf-LOW">LOW</span> (이 주소는 요청 값에 따라 실행되는 메소드가 달라져서 클래스까지만 알아냈다는 뜻).
+					화면은 <code>board/edit.jsp</code>, <code>board/list.jsp</code>, <code>common/header.jsp</code> 이고, 그 화면이 부르는 주소와 같은 줄에 묶입니다.<br>
+					건드리는 데이터: <code>TB_BOARD</code> 를 읽는 SQL 과 쓰는 SQL 의 수와 이름.<br>
 					<b>읽는 법:</b> "TB_BOARD 의 구조를 바꾸면 이 세 주소와 세 화면을 확인해야 한다."</div>
 
 				<h4>따라 하기 ④ 메소드 하나를 앞뒤로 따라간다 (같은 화면)</h4>
@@ -246,8 +247,9 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 								<tr><td>메소드</td><td>methodId — 직접 적지 말고 아래 "메소드 찾기"의 "영향도" 단추를 누릅니다</td><td></td></tr>
 							</tbody>
 						</table>
-						결과는 세 표입니다. <b>진입점</b>(이 변경을 사용자가 겪게 되는 주소), <b>화면</b>(그 주소를 부르거나 그 결과를 보여 주는 JSP),
-						<b>메소드</b>(중간에 거치는 메소드 전부). "거리"는 대상에서 몇 단계 떨어졌는지이고, 0 은 대상을 직접 건드리는 메소드입니다.
+						결과는 "무엇을 다시 확인하나"를 한 장으로 요약합니다. 맨 위 한 줄 결론, <b>영향받는 곳</b>(화면과 그 화면이 부르는 진입점을 한 줄로 묶어 업무별로 나눈 테스트 목록),
+						<b>건드리는 데이터</b>(테이블마다 읽는 SQL · 쓰는 SQL), <b>믿을 만한가</b>(신뢰도, 깊이 제한, 분석이 놓쳤을 수 있는 호출) 순서입니다.
+						중간에 거치는 메소드는 건수만 보여 주고 목록은 접어 둡니다. 경로는 "부르는 쪽" 탭에서 봅니다.
 						테이블이면 "쓰기만"을 골라 그 테이블을 <b>고치는</b> 기능만 볼 수 있습니다.</li>
 					<li><b>호출 관계</b> — 메소드 이름을 적고 "메소드 찾기" → 나온 줄에서
 						<ul>

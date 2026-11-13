@@ -1058,6 +1058,29 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 .kn-section-count { margin-left: 4px; font-weight: 500; color: var(--cs-muted); }
 .kn-section-hint { margin: 2px 0 8px; font-size: 12.5px; color: var(--cs-faint); }
 
+/* 영향도 요약: 맨 위 한 줄 결론 */
+.kn-lead {
+	padding: 12px 14px;
+	border: 1px solid var(--cs-border);
+	border-left: 3px solid var(--cs-primary);
+	border-radius: var(--cs-radius);
+	background: var(--cs-surface-2);
+	font-size: 14px;
+	color: var(--cs-text);
+}
+.kn-lead p { margin: 0; }
+.kn-lead p + p { margin-top: 4px; }
+.kn-lead-warn { color: var(--cs-warning); }
+.kn-lead-warn .kn-caller-note { color: var(--cs-faint); }
+
+/* 영향도 요약: 업무 묶음(접고 펼침), 쓰기 건수, 믿을 만한가 목록 */
+.kn-group { margin-top: 8px; }
+.kn-group > summary { cursor: pointer; padding: 4px 0; font-size: 13.5px; }
+.kn-group > summary:hover { color: var(--cs-primary); }
+.kn-write { color: var(--cs-danger); }
+.kn-trust { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
+.kn-trust li + li { margin-top: 4px; }
+
 @media screen and (max-width: 860px) {
 	.kn-tabbar { align-items: stretch; }
 	.kn-tabs { width: 100%; overflow-x: auto; }

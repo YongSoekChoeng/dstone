@@ -2,6 +2,7 @@ package net.dstone.knowledge.api.service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,9 @@ public class ImpactService extends BaseObject {
 
 	/** 종류별로 돌려주는 최대 행 수 */
 	private static final int MAX_ROWS = 2000;
+
+	/** "놓쳤을 수 있는 것"의 예시로 돌려주는 최대 행 수(건수는 전체를 센다) */
+	private static final int GAP_SAMPLES = 20;
 
 	@Autowired
 	private RelationDao relationDao;
@@ -102,6 +106,24 @@ public class ImpactService extends BaseObject {
 		}
 		List<Map<String, Object>> endpoints = relationDao.selectImpactEndpoints(condition);
 		List<Map<String, Object>> screens = relationDao.selectImpactScreens(condition);
+		// 진입점마다 그 진입점을 요청하거나 그 진입점이 여는 화면을 붙인다(요약에서 "화면 → 거래"를 한 줄로)
+		attachScreens(endpoints, relationDao.selectImpactScreenLinks(condition));
+
+		// 5) 건드리는 데이터와 "놓쳤을 수 있는 것"
+		List<String> downRelationTypes = new ArrayList<String>();
+		downRelationTypes.add("CALLS");
+		if (includePossible) {
+			downRelationTypes.add("CALLS_POSSIBLE_IMPLEMENTATION");
+		}
+		downRelationTypes.add("ENCLOSES_ANONYMOUS");
+		condition.put("downRelationTypes", downRelationTypes);
+		condition.put("sampleLimit", Integer.valueOf(GAP_SAMPLES));
+		List<Map<String, Object>> touches = groupTouches(relationDao.selectImpactTouches(condition));
+		Map<String, Object> gaps = new LinkedHashMap<String, Object>();
+		putGap(gaps, "missedCallers", relationDao.selectImpactMissedCallers(condition));
+		if ("METHOD".equals(targetKind) || "TYPE".equals(targetKind)) {
+			putGap(gaps, "unresolvedInside", relationDao.selectImpactUnresolvedInside(condition));
+		}
 
 		// 4) 요약과 응답
 		int startMethods = 0;
@@ -138,7 +160,94 @@ public class ImpactService extends BaseObject {
 		result.put("endpoints", endpoints);
 		result.put("screens", screens);
 		result.put("methods", methods);
+		result.put("touches", touches);
+		result.put("gaps", gaps);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 진입점 행마다 screens: [{path, via}] 를 붙입니다. 진입점을 처리하는 메소드를 요청하는 화면(REQUESTS)과
+	 * 그 메소드가 여는 화면(RENDERS)입니다. 메소드 없이 타입에만 붙은 진입점은 빈 목록입니다.
+	 * </pre>
+	 */
+	private void attachScreens(List<Map<String, Object>> endpoints, List<Map<String, Object>> links) {
+		Map<String, List<Map<String, Object>>> byMethod = new HashMap<String, List<Map<String, Object>>>();
+		for (int i = 0; i < links.size(); i++) {
+			Map<String, Object> link = links.get(i);
+			String methodId = String.valueOf(link.get("methodId"));
+			List<Map<String, Object>> list = byMethod.get(methodId);
+			if (list == null) {
+				list = new ArrayList<Map<String, Object>>();
+				byMethod.put(methodId, list);
+			}
+			Map<String, Object> screen = new LinkedHashMap<String, Object>();
+			screen.put("path", link.get("path"));
+			screen.put("via", link.get("via"));
+			list.add(screen);
+		}
+		for (int i = 0; i < endpoints.size(); i++) {
+			Map<String, Object> endpoint = endpoints.get(i);
+			List<Map<String, Object>> list = endpoint.get("methodId") == null ? null : byMethod.get(String.valueOf(endpoint.get("methodId")));
+			endpoint.put("screens", list == null ? new ArrayList<Map<String, Object>>() : list);
+		}
+	}
+
+	/**
+	 * <pre>
+	 * (table, access, statement) 행을 테이블 하나에 한 행으로 모읍니다: {table, reads: [SQL 이름], writes: [SQL 이름]}.
+	 * 쓰는 테이블이 먼저, 그다음 이름 순입니다.
+	 * </pre>
+	 */
+	private List<Map<String, Object>> groupTouches(List<Map<String, Object>> rows) {
+		Map<String, Map<String, Object>> byTable = new LinkedHashMap<String, Map<String, Object>>();
+		for (int i = 0; i < rows.size(); i++) {
+			Map<String, Object> row = rows.get(i);
+			String table = String.valueOf(row.get("table"));
+			Map<String, Object> touch = byTable.get(table);
+			if (touch == null) {
+				touch = new LinkedHashMap<String, Object>();
+				touch.put("table", table);
+				touch.put("reads", new ArrayList<String>());
+				touch.put("writes", new ArrayList<String>());
+				byTable.put(table, touch);
+			}
+			@SuppressWarnings("unchecked")
+			List<String> list = (List<String>) touch.get("WRITES_TABLE".equals(row.get("access")) ? "writes" : "reads");
+			String statement = String.valueOf(row.get("statement"));
+			if (!list.contains(statement)) {
+				list.add(statement);
+			}
+		}
+		List<Map<String, Object>> writing = new ArrayList<Map<String, Object>>();
+		List<Map<String, Object>> readingOnly = new ArrayList<Map<String, Object>>();
+		Iterator<Map<String, Object>> it = byTable.values().iterator();
+		while (it.hasNext()) {
+			Map<String, Object> touch = it.next();
+			if (((List<?>) touch.get("writes")).isEmpty()) {
+				readingOnly.add(touch);
+			} else {
+				writing.add(touch);
+			}
+		}
+		writing.addAll(readingOnly);
+		return writing;
+	}
+
+	/** gaps 에 {count, samples} 를 넣습니다. 행마다 붙어 온 total 이 전체 건수입니다 */
+	private void putGap(Map<String, Object> gaps, String key, List<Map<String, Object>> rows) {
+		int total = 0;
+		for (int i = 0; i < rows.size(); i++) {
+			Map<String, Object> row = rows.get(i);
+			Object value = row.remove("total");
+			if (value instanceof Number) {
+				total = ((Number) value).intValue();
+			}
+		}
+		Map<String, Object> gap = new LinkedHashMap<String, Object>();
+		gap.put("count", Integer.valueOf(total));
+		gap.put("samples", rows);
+		gaps.put(key, gap);
 	}
 
 	/** access(ALL / READ / WRITE)에 맞는 테이블 관계 종류. 그 밖의 값이면 400 */
