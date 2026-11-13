@@ -61,6 +61,7 @@ var DstoneKnowledgeTerms = (function () {
 	var RELATION_TYPE = {
 		CALLS: "메소드가 메소드를 부른다",
 		CALLS_POSSIBLE_IMPLEMENTATION: "인터페이스의 메소드를 불렀을 때 실제로 실행될 수 있는 구현 메소드",
+		ENCLOSES_ANONYMOUS: "바깥 메소드가 그 안에서 만든 익명 클래스(new Runnable() { … })의 메소드를 품는다",
 		CREATES: "객체를 만든다 (new)",
 		EXTENDS: "상속한다",
 		IMPLEMENTS: "구현한다",

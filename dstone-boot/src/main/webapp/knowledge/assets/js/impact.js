@@ -47,6 +47,7 @@ var DstoneKnowledgeImpact = (function () {
 		CALLS: "호출",
 		REQUESTS: "화면 요청",
 		CALLS_POSSIBLE_IMPLEMENTATION: "구현체 호출(추정)",
+		ENCLOSES_ANONYMOUS: "익명 클래스",
 		EXECUTES_SQL: "SQL 실행",
 		READS_TABLE: "테이블 읽기",
 		WRITES_TABLE: "테이블 쓰기",
@@ -725,7 +726,7 @@ var DstoneKnowledgeImpact = (function () {
 		panel.content.innerHTML = "<div class=\"kn-scroll\"></div>";
 		var columns = [
 			{ key: "depth", label: "거리", num: true },
-			{ key: "relationType", label: "관계", html: function (row) { return relationLabel(row.relationType); } },
+			{ key: "relationType", label: "관계", html: function (row) { return relationLabel(row.relationType) + anonymousNote(row); } },
 			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } }
 		];
 		if (callers) {
@@ -737,6 +738,13 @@ var DstoneKnowledgeImpact = (function () {
 		columns.push({ key: "path", label: "근거 (파일:줄)", html: function (row) { return evidenceCell(row); } });
 		K.table(panel.content.firstChild, columns, rows
 			, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
+	}
+
+	/** 익명 클래스(new Runnable() { … }) 안에서 부른 호출을 바깥 메소드의 호출로 바꿔 보여 준 행이면 그렇다고 붙인다. */
+	function anonymousNote(row) {
+		return row.viaAnonymous
+			? " <span class=\"kn-caller-note kn-nowrap\" title=\"익명 클래스 안에서 부른 것을 바깥 메소드에서 부른 것으로 보여 줍니다\">익명 클래스 안</span>"
+			: "";
 	}
 
 	function relationLabel(type) {

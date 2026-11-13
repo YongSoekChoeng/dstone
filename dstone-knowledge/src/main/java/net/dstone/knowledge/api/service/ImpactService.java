@@ -75,7 +75,7 @@ public class ImpactService extends BaseObject {
 		}
 		int walkDepth = depth == null ? DEFAULT_DEPTH : Math.max(0, Math.min(depth.intValue(), MAX_DEPTH));
 
-		// 2) 거슬러 올라갈 관계: 호출, 화면의 요청, (켜면) 가능한 구현
+		// 2) 거슬러 올라갈 관계: 호출, 화면의 요청, (켜면) 가능한 구현, 익명 클래스를 감싸는 바깥 메소드
 		List<String> relationTypes = new ArrayList<String>();
 		relationTypes.add("CALLS");
 		// 화면(JSP)이 그 메소드의 주소를 요청하는 것도 "부르는 쪽"이다.
@@ -83,6 +83,8 @@ public class ImpactService extends BaseObject {
 		if (includePossible) {
 			relationTypes.add("CALLS_POSSIBLE_IMPLEMENTATION");
 		}
+		// new Runnable() { run() { 대상(); } } 처럼 익명 클래스 안에서 부르면, 익명 클래스 메소드를 감싸는 바깥 메소드로 올라간다.
+		relationTypes.add("ENCLOSES_ANONYMOUS");
 
 		Map<String, Object> condition = new HashMap<String, Object>();
 		condition.put("revisionId", revisionId);

@@ -363,6 +363,8 @@
          depth 가 같아도 같은 호출이 여러 줄에 있을 수 있어서 줄마다 한 행이다 -->
     <select id="selectCallers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         WITH RECURSIVE walk (depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, props) AS (
+            <!-- ENCLOSES_ANONYMOUS(바깥 메소드 → 익명 클래스의 메소드)는 0 칸으로 센다. 서비스가 익명 클래스 메소드를 건너뛰고
+                 바깥 메소드에서 바로 잇기 때문이다(CallGraphService.skipAnonymous). 조회한 메소드 자신으로 가는 것만 1 칸이다 -->
             SELECT 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json
               FROM analysis_relation r
              WHERE r.revision_id = #{revisionId}
@@ -370,7 +372,8 @@
                AND r.relation_type IN
             <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
             UNION
-            SELECT w.depth + 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json
+            SELECT w.depth + (CASE WHEN r.relation_type = 'ENCLOSES_ANONYMOUS' AND r.to_id &lt;&gt; #{methodId} THEN 0 ELSE 1 END)
+                 , r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json
               FROM walk w
               JOIN analysis_relation r
                 ON r.revision_id = #{revisionId}
@@ -423,14 +426,17 @@
     <!-- 이 메소드가 부르는 쪽. 프로젝트 밖(JDK, 라이브러리)으로 나가는 호출은 거기서 멈춘다 -->
     <select id="selectCallees" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         WITH RECURSIVE walk (depth, from_id, to_kind, to_id, to_external, relation_type, confidence, file_id, line_start) AS (
-            SELECT 1, r.from_id, r.to_kind, r.to_id, r.to_external, r.relation_type, r.confidence, r.file_id, r.line_start
+            <!-- ENCLOSES_ANONYMOUS 는 0 칸이다(selectCallers 와 같은 까닭) -->
+            SELECT (CASE WHEN r.relation_type = 'ENCLOSES_ANONYMOUS' THEN 0 ELSE 1 END)
+                 , r.from_id, r.to_kind, r.to_id, r.to_external, r.relation_type, r.confidence, r.file_id, r.line_start
               FROM analysis_relation r
              WHERE r.revision_id = #{revisionId}
                AND r.from_id = #{methodId}
                AND r.relation_type IN
             <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
             UNION
-            SELECT w.depth + 1, r.from_id, r.to_kind, r.to_id, r.to_external, r.relation_type, r.confidence, r.file_id, r.line_start
+            SELECT w.depth + (CASE WHEN r.relation_type = 'ENCLOSES_ANONYMOUS' THEN 0 ELSE 1 END)
+                 , r.from_id, r.to_kind, r.to_id, r.to_external, r.relation_type, r.confidence, r.file_id, r.line_start
               FROM walk w
               JOIN analysis_relation r
                 ON r.revision_id = #{revisionId}
@@ -568,7 +574,10 @@
                 </otherwise>
             </choose>
             UNION
-            SELECT w.depth + 1, r.from_id::varchar, r.from_kind::varchar
+            -- ENCLOSES_ANONYMOUS(바깥 메소드 → 익명 클래스의 메소드)는 0 칸이다. 익명 클래스 메소드 대신 바깥 메소드를 같은 거리로 본다.
+            -- 대상이 익명 클래스 메소드 자신이면 그 바깥 메소드는 부르는 쪽이므로 1 칸이다.
+            SELECT w.depth + (CASE WHEN r.relation_type = 'ENCLOSES_ANONYMOUS' AND r.to_id &lt;&gt; #{target} THEN 0 ELSE 1 END)
+                 , r.from_id::varchar, r.from_kind::varchar
                  , LEAST(w.conf, <include refid="confRank"><property name="column" value="r.confidence"/></include>)
               FROM walk w
               JOIN analysis_relation r
@@ -599,6 +608,10 @@
           JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
           LEFT JOIN analysis_file f ON f.file_id = m.file_id
          WHERE a.node_kind = 'METHOD'
+           -- 익명 클래스의 메소드는 건너뛴다. 그 대신 그것을 감싸는 바깥 메소드가 같은 거리로 나온다. 대상 자신은 남긴다
+           AND (a.node_id = #{target}
+                OR NOT EXISTS (SELECT 1 FROM analysis_relation x
+                                WHERE x.revision_id = #{revisionId} AND x.relation_type = 'ENCLOSES_ANONYMOUS' AND x.to_id = a.node_id))
          ORDER BY a.depth, o.fqn, m.signature
          LIMIT #{limit}
     </select>
