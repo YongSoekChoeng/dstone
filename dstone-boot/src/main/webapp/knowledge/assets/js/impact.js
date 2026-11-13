@@ -1,38 +1,162 @@
 /**
  * "영향도 · 호출 관계" 화면.
+ *
+ * 흐름은 하나입니다.
+ *   맨 위   프로젝트 · 리비전 (화면 전체에 적용)
+ *   ①      대상 찾기: 종류(메소드 / 테이블 / SQL / 타입) + 이름 → 후보 목록 → 하나를 고른다
+ *   ②      결과: 고른 대상 머리글 + 지나온 대상 + 탭 셋(영향도 / 부르는 쪽 / 불리는 쪽)
+ * 결과 표에 나온 이름(밑줄)을 누르면 그것이 새 대상이 됩니다. 지금 상태는 주소창(#...)에 남아서
+ * 새로 고침, 뒤로 가기, 링크 전달이 됩니다.
  */
 var DstoneKnowledgeImpact = (function () {
 
 	var K = DstoneKnowledge;
 	var el = {};
-	/** 호출 관계에서 [영향도]로 고른 메소드. 대상 칸에는 읽을 수 있는 이름을 보이고, 실제로는 이 ID로 분석한다. */
-	var picked = null;
 
-	/** 대상 종류(API 값) → 화면 글자 */
-	var KIND_LABELS = { TABLE: "테이블", STATEMENT: "SQL", TYPE: "타입", METHOD: "메소드" };
+	/** 대상 종류 → 화면 글자 */
+	var KIND_LABELS = { method: "메소드", table: "테이블", statement: "SQL", type: "타입" };
+	/** 대상 종류 → 영향도 API 의 인자 이름 */
+	var IMPACT_PARAMS = { method: "methodId", table: "table", statement: "statement", type: "type" };
+	/** 영향도 응답의 target.kind → 화면에서 쓰는 종류 */
+	var API_KINDS = { METHOD: "method", TABLE: "table", STATEMENT: "statement", TYPE: "type" };
+
+	/** 찾기 칸의 안내 글자 */
+	var PLACEHOLDERS = {
+		method: "메소드 이름(정확히). 타입으로 좁히려면 BoardDAO#deleteBoard",
+		table: "테이블 이름의 일부. 비우면 많이 쓰이는 순서로 전체",
+		statement: "SQL 이름의 일부. 네임스페이스까지면 Board.deleteBoard",
+		type: "타입 이름의 일부(패키지 포함 가능)"
+	};
+
+	/** 탭마다 깊이 기본값과 범위. 영향도는 서버 최대 10, 호출 관계는 5 */
+	var DEPTHS = {
+		impact: { value: 5, min: 0, max: 10 },
+		callers: { value: 2, min: 1, max: 5 },
+		callees: { value: 2, min: 1, max: 5 }
+	};
+
+	/** 탭 아래 한 줄 설명 */
+	var TAB_HINTS = {
+		impact: "이 대상을 고치면 어디까지 닿는지 봅니다. 대상을 직접 건드리는 메소드에서 부르는 쪽으로 거슬러 올라가며 닿는 진입점(주소) · 화면 · 메소드를 모읍니다.",
+		callers: "이 메소드를 누가 부르는지 거슬러 올라갑니다. 화면(JSP)이 주소로 요청하는 것도 함께 나옵니다.",
+		callees: "이 메소드가 무엇을 부르는지 따라 내려갑니다. 실행하는 SQL, 그 SQL이 건드리는 테이블까지 나옵니다."
+	};
+
+	/** 관계 종류 → 화면 글자. 원래 이름은 마우스를 올리면 보인다. */
+	var RELATION_LABELS = {
+		CALLS: "호출",
+		REQUESTS: "화면 요청",
+		CALLS_POSSIBLE_IMPLEMENTATION: "구현체 호출(추정)",
+		EXECUTES_SQL: "SQL 실행",
+		READS_TABLE: "테이블 읽기",
+		WRITES_TABLE: "테이블 쓰기",
+		RENDERS: "화면 열기"
+	};
+
+	/** 영향도 요약의 첫 카드. 무엇을 "직접 건드리는" 메소드인지 대상에 맞춰 적는다. */
+	var START_LABELS = { table: "이 테이블을 쓰는 메소드", statement: "이 SQL을 쓰는 메소드", type: "이 타입의 메소드", method: "대상 메소드" };
+
+	/** 지금 대상 {kind, value, label, notes[]}. value 는 API 에 넘기는 값(메소드 ID, 테이블 이름, SQL 이름, 타입 전체 이름) */
+	var target = null;
+	/** 지나온 대상(오래된 것이 앞) */
+	var trail = [];
+	/** 지금 탭 */
+	var tab = "impact";
+	/** 탭마다 마지막으로 불러온 조건. 같으면 다시 부르지 않는다 */
+	var loaded = {};
+	/** 탭마다 요청 번호. 늦게 온 옛 응답은 버린다 */
+	var requestNo = { impact: 0, callers: 0, callees: 0 };
+	/** 탭마다 결과 칸 {message, content} */
+	var panels = {};
 
 	function init() {
-		["kn-impact-project", "kn-impact-revision", "kn-impact-kind", "kn-impact-target", "kn-impact-access", "kn-impact-depth", "kn-impact-btn",
-			"kn-impact-message", "kn-impact-head", "kn-impact-cards", "kn-impact-result", "kn-method-name", "kn-method-owner", "kn-method-btn", "kn-table-name", "kn-table-btn",
-			"kn-graph-depth", "kn-graph-message", "kn-method-table", "kn-graph-title", "kn-graph-table"].forEach(function (id) {
+		["kn-impact-project", "kn-impact-revision", "kn-find-kind", "kn-find-name", "kn-find-btn", "kn-find-message", "kn-find-table",
+			"kn-result-panel", "kn-target-head", "kn-trail", "kn-impact-access", "kn-access-wrap", "kn-depth", "kn-tab-hint", "kn-tab-body"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
-		el["kn-impact-project"].addEventListener("change", loadRevisions);
-		el["kn-impact-btn"].addEventListener("click", function () {
-			var kind = el["kn-impact-kind"].value;
-			var text = el["kn-impact-target"].value.trim();
-			// 고른 메소드의 이름을 그대로 두고 다시 누르면 그 메소드로. 칸을 고쳤으면 적힌 글자(메소드 ID)로 찾는다.
-			if (kind === "methodId" && picked && text === picked.label) {
-				runImpact(kind, picked.methodId, picked.label);
-			} else {
-				runImpact(kind, text);
+		el.tabs = document.querySelectorAll(".kn-tab");
+
+		// 탭마다 결과 칸을 하나씩 만들어 둔다. 탭을 오가도 이미 불러온 결과는 그대로 남는다.
+		["impact", "callers", "callees"].forEach(function (name) {
+			var wrap = document.createElement("div");
+			wrap.className = "kn-tab-panel";
+			wrap.setAttribute("role", "tabpanel");
+			wrap.hidden = true;
+			wrap.innerHTML = "<div class=\"kn-message\"></div><div class=\"kn-tab-content\"></div>";
+			el["kn-tab-body"].appendChild(wrap);
+			panels[name] = { wrap: wrap, message: wrap.firstChild, content: wrap.lastChild };
+		});
+
+		el["kn-find-kind"].addEventListener("change", updatePlaceholder);
+		el["kn-find-btn"].addEventListener("click", findTargets);
+		el["kn-find-name"].addEventListener("keydown", function (event) {
+			if (event.key === "Enter") {
+				findTargets();
 			}
 		});
-		el["kn-method-btn"].addEventListener("click", findMethods);
-		el["kn-table-btn"].addEventListener("click", findTables);
+		Array.prototype.forEach.call(el.tabs, function (button) {
+			button.addEventListener("click", function () {
+				if (!button.disabled) {
+					showTab(button.getAttribute("data-tab"), true);
+				}
+			});
+		});
+		el["kn-depth"].addEventListener("change", function () {
+			var range = DEPTHS[tab];
+			var value = parseInt(el["kn-depth"].value, 10);
+			range.value = isNaN(value) ? range.value : Math.max(range.min, Math.min(range.max, value));
+			el["kn-depth"].value = range.value;
+			showTab(tab, false);
+		});
+		el["kn-impact-access"].addEventListener("change", function () {
+			showTab(tab, false);
+		});
+		el["kn-impact-project"].addEventListener("change", function () {
+			loadRevisions().then(function () {
+				clearTarget();
+				writeHash(false);
+			});
+		});
+		el["kn-impact-revision"].addEventListener("change", function () {
+			clearFound();
+			if (target) {
+				loaded = {};
+				showTab(tab, false);
+			}
+			writeHash(false);
+		});
+		// 결과 표와 후보 목록의 밑줄 친 이름: 누르면 그것이 새 대상
+		document.addEventListener("click", function (event) {
+			var link = event.target.closest ? event.target.closest("a.kn-retarget[data-kind]") : null;
+			if (link) {
+				event.preventDefault();
+				pickTarget({ kind: link.getAttribute("data-kind"), value: link.getAttribute("data-value"), label: link.getAttribute("data-label") });
+			}
+		});
+		el["kn-trail"].addEventListener("click", function (event) {
+			var button = event.target.closest ? event.target.closest("button[data-trail]") : null;
+			if (button) {
+				var index = parseInt(button.getAttribute("data-trail"), 10);
+				var back = trail[index];
+				trail = trail.slice(0, index);
+				setTarget(back, { push: true, scroll: true, keepTrail: true });
+			}
+		});
+		window.addEventListener("popstate", function () {
+			restoreHash();
+		});
 
-		K.loadProjects(el["kn-impact-project"]).then(loadRevisions).catch(function (err) {
-			K.message(el["kn-impact-message"], err.message, true);
+		updatePlaceholder();
+		K.loadProjects(el["kn-impact-project"]).then(function () {
+			var state = readHash();
+			selectOption(el["kn-impact-project"], state.p);
+			return loadRevisions().then(function () {
+				selectOption(el["kn-impact-revision"], state.r);
+				applyState(state);
+				writeHash(false);
+			});
+		}).catch(function (err) {
+			K.message(el["kn-find-message"], err.message, true);
 		});
 	}
 
@@ -48,81 +172,416 @@ var DstoneKnowledgeImpact = (function () {
 		return "/api/revisions/" + revisionId;
 	}
 
-	/* ---------------- 영향도 ---------------- */
+	function updatePlaceholder() {
+		el["kn-find-name"].placeholder = PLACEHOLDERS[el["kn-find-kind"].value];
+	}
 
-	/**
-	 * 영향도를 분석합니다. label 은 메소드를 고른 경우에만 줍니다(대상 칸에 메소드 ID 대신 보일 이름).
-	 * jump 가 true 면 결과가 나온 뒤 결과 머리글로 옮겨 갑니다(위쪽 호출 관계에서 실행한 경우).
-	 */
-	function runImpact(kind, target, label, jump) {
-		var query = { access: el["kn-impact-access"].value, depth: el["kn-impact-depth"].value };
-		query[kind] = target;
-		picked = kind === "methodId" && label ? { methodId: target, label: label } : null;
-		el["kn-impact-kind"].value = kind;
-		el["kn-impact-target"].value = picked ? label : target;
-		el["kn-impact-head"].innerHTML = "";
-		el["kn-impact-cards"].innerHTML = "";
-		el["kn-impact-result"].innerHTML = "";
-		K.message(el["kn-impact-message"], "분석 중...");
-		Promise.resolve().then(function () {
-			return K.call("GET", revisionPath() + "/impact", query);
-		}).then(function (result) {
-			K.message(el["kn-impact-message"], result.truncated ? "결과가 많아 일부만 보입니다. 깊이를 줄이거나 대상을 좁혀 보세요." : "");
-			el["kn-impact-head"].innerHTML = targetHead(result);
-			K.cards(el["kn-impact-cards"], [
-				{ label: START_LABELS[result.target.kind] || "직접 건드리는 메소드", value: result.summary.startMethods },
-				{ label: "닿는 메소드", value: result.summary.methods },
-				{ label: "진입점", value: result.summary.endpoints },
-				{ label: "화면", value: result.summary.screens }
-			]);
-			section(el["kn-impact-result"], "진입점 (사용자가 이 변경을 겪게 되는 입구)", [
-				{ key: "depth", label: "거리", num: true },
-				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-				{ key: "endpointType", label: "종류" },
-				{ key: "httpMethod", label: "HTTP" },
-				{ key: "path", label: "주소", mono: true },
-				{ key: "handler", label: "처리하는 메소드", mono: true }
-			], result.endpoints);
-			section(el["kn-impact-result"], "화면 (REQUESTS: 화면이 그 주소를 요청 / RENDERS: 메소드가 이 화면을 연다 / CALLS: 화면의 코드가 직접 부른다)", [
-				{ key: "depth", label: "거리", num: true },
-				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-				{ key: "path", label: "화면", mono: true },
-				{ key: "via", label: "이어진 방식" }
-			], result.screens);
-			section(el["kn-impact-result"], "메소드 (거리 0 = 대상을 직접 건드린다)", [
-				{ key: "depth", label: "거리", num: true },
-				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-				{ key: "layer", label: "계층" },
-				{ key: "method", label: "메소드", mono: true },
-				{ key: "path", label: "파일", mono: true },
-				{ key: "lineStart", label: "줄", num: true }
-			], result.methods);
-			if (jump) {
-				showResult();
+	/* ---------------- 주소창(#...)에 지금 상태 남기기 ---------------- */
+
+	/** #p=프로젝트&r=리비전&k=종류&v=값&l=보이는 이름&t=탭 */
+	function readHash() {
+		var state = {};
+		location.hash.replace(/^#/, "").split("&").forEach(function (pair) {
+			var at = pair.indexOf("=");
+			if (at > 0) {
+				state[pair.substring(0, at)] = decodeURIComponent(pair.substring(at + 1));
 			}
-		}).catch(function (err) {
-			K.message(el["kn-impact-message"], err.message, true);
-			if (jump) {
-				showResult();
+		});
+		return state;
+	}
+
+	/** push 가 true 면 새 기록(뒤로 가기로 돌아올 수 있게), 아니면 지금 기록을 바꾼다 */
+	function writeHash(push) {
+		var state = { p: el["kn-impact-project"].value, r: el["kn-impact-revision"].value };
+		if (target) {
+			state.k = target.kind;
+			state.v = target.value;
+			state.l = target.label;
+			state.t = tab;
+		}
+		var hash = "#" + Object.keys(state).filter(function (key) {
+			return state[key];
+		}).map(function (key) {
+			return key + "=" + encodeURIComponent(state[key]);
+		}).join("&");
+		if (hash === location.hash) {
+			return;
+		}
+		if (push) {
+			history.pushState(null, "", hash);
+		} else {
+			history.replaceState(null, "", hash);
+		}
+	}
+
+	/** 뒤로 가기 / 앞으로 가기 */
+	function restoreHash() {
+		var state = readHash();
+		var ready = Promise.resolve();
+		if (state.p && state.p !== el["kn-impact-project"].value) {
+			selectOption(el["kn-impact-project"], state.p);
+			ready = loadRevisions();
+		}
+		ready.then(function () {
+			if (state.r && state.r !== el["kn-impact-revision"].value) {
+				selectOption(el["kn-impact-revision"], state.r);
+				loaded = {};
+			}
+			// 지나온 대상의 마지막으로 돌아온 것이면 그 칸을 지운다
+			if (trail.length > 0 && state.k && sameTarget(trail[trail.length - 1], { kind: state.k, value: state.v })) {
+				trail.pop();
+			}
+			applyState(state);
+		});
+	}
+
+	function applyState(state) {
+		if (state.k && state.v && KIND_LABELS[state.k]) {
+			setTarget({ kind: state.k, value: state.v, label: state.l || state.v }, { push: false, tab: state.t, keepTrail: true });
+		} else {
+			clearTarget();
+		}
+	}
+
+	function selectOption(select, value) {
+		if (!value) {
+			return;
+		}
+		Array.prototype.forEach.call(select.options, function (option) {
+			if (option.value === value) {
+				select.value = value;
 			}
 		});
 	}
 
-	/** 요약 카드의 첫 칸. 무엇을 "직접 건드리는" 메소드인지 대상에 맞춰 적는다. */
-	var START_LABELS = { TABLE: "이 테이블을 쓰는 메소드", STATEMENT: "이 SQL을 쓰는 메소드", TYPE: "이 타입의 메소드", METHOD: "대상 메소드" };
+	/* ---------------- ① 대상 찾기 ---------------- */
+
+	function clearFound() {
+		K.message(el["kn-find-message"], "");
+		el["kn-find-table"].innerHTML = "";
+	}
+
+	/** 종류에 맞는 API 로 후보를 찾는다. 하나뿐이면 바로 고른다. */
+	function findTargets() {
+		var kind = el["kn-find-kind"].value;
+		var text = el["kn-find-name"].value.trim();
+		clearFound();
+		K.message(el["kn-find-message"], "찾는 중...");
+		Promise.resolve().then(function () {
+			return FINDERS[kind](text);
+		}).then(function (found) {
+			var rows = found.rows;
+			var total = found.total !== undefined ? found.total : rows.length;
+			K.table(el["kn-find-table"], found.columns, rows, "찾는 것이 없습니다. 이름을 줄이거나 종류를 바꿔 보세요.");
+			var listed = "후보 " + total + "건" + (total > rows.length ? " (앞쪽 " + rows.length + "건만 보임)" : "");
+			if (rows.length === 1) {
+				K.message(el["kn-find-message"], "한 건이라 바로 골랐습니다.");
+				pickTarget(found.toTarget(rows[0]));
+				return;
+			}
+			// 이름을 정확히 적었으면(TBCM_COMMON_CODE) 비슷한 이름(TBCM_COMMON_CODE_DTL)이 같이 나와도 그것을 바로 고른다
+			var exact = rows.filter(function (row) {
+				return found.exact(row, text);
+			});
+			if (exact.length === 1) {
+				K.message(el["kn-find-message"], "이름이 똑같은 것을 바로 골랐습니다. " + listed + ". 다른 것은 이름을 누르면 고릅니다.");
+				pickTarget(found.toTarget(exact[0]));
+				return;
+			}
+			K.message(el["kn-find-message"], rows.length === 0 ? "" : listed + ". 이름을 누르면 대상으로 고릅니다.");
+		}).catch(function (err) {
+			K.message(el["kn-find-message"], err.message, true);
+		});
+	}
+
+	/** 종류별 찾기. {columns, rows, total?, toTarget(row)} 를 돌려준다. 첫 칸은 대상으로 고르는 링크다. */
+	var FINDERS = {
+		method: function (text) {
+			// "BoardDAO#deleteBoard" 나 "deleteBoard(…)" 처럼 적어도 찾는다
+			var hash = text.indexOf("#");
+			var owner = hash >= 0 ? text.substring(0, hash).trim() : "";
+			var name = (hash >= 0 ? text.substring(hash + 1) : text).replace(/\(.*$/, "").trim();
+			if (!name) {
+				throw new Error("메소드 이름을 적으세요. 이름은 정확히 같아야 합니다.");
+			}
+			return K.call("GET", revisionPath() + "/methods", { name: name, owner: owner, size: 100 }).then(function (result) {
+				var toTarget = function (row) {
+					return { kind: "method", value: row.methodId, label: shortMethod(row.ownerFqn + "#" + row.signature) };
+				};
+				return {
+					total: result.total,
+					rows: result.methods || [],
+					toTarget: toTarget,
+					// 타입까지 적었고(BoardDAO#deleteBoard) 그 타입이 하나뿐이면
+					exact: function (row) { return !!owner && (row.ownerFqn === owner || endsWith(row.ownerFqn, "." + owner)); },
+					columns: [
+						{ key: "signature", label: "메소드", html: function (row) { return pickLink(toTarget(row), row.ownerFqn + "#" + row.signature); } },
+						{ key: "ownerFqn", label: "타입 (전체 이름)", mono: true },
+						{ key: "path", label: "위치", html: function (row) { return whereText(row.path, row.lineStart); } }
+					]
+				};
+			});
+		},
+		table: function (text) {
+			return K.call("GET", revisionPath() + "/tables", { name: text, size: 100 }).then(function (result) {
+				var toTarget = function (row) {
+					return { kind: "table", value: row.table, label: row.table };
+				};
+				return {
+					rows: result.tables || [],
+					toTarget: toTarget,
+					exact: function (row, typed) { return sameName(row.table, typed); },
+					columns: [
+						{ key: "table", label: "테이블", html: function (row) { return pickLink(toTarget(row)); } },
+						{ key: "reads", label: "읽는 SQL", num: true },
+						{ key: "inserts", label: "넣는 SQL", num: true },
+						{ key: "updates", label: "고치는 SQL", num: true },
+						{ key: "deletes", label: "지우는 SQL", num: true }
+					]
+				};
+			});
+		},
+		statement: function (text) {
+			// "Board.deleteBoard" 는 네임스페이스와 id 로 나눠 찾는다
+			var dot = text.lastIndexOf(".");
+			var query = { namespace: dot > 0 ? text.substring(0, dot) : "", id: dot > 0 ? text.substring(dot + 1) : text, size: 100 };
+			return K.call("GET", revisionPath() + "/mappers", query).then(function (result) {
+				var toTarget = function (row) {
+					var name = (row.namespace ? row.namespace + "." : "") + row.statementId;
+					return { kind: "statement", value: name, label: name };
+				};
+				return {
+					total: result.total,
+					rows: result.statements || [],
+					toTarget: toTarget,
+					exact: function (row, typed) { return sameName(toTarget(row).value, typed); },
+					columns: [
+						{ key: "statementId", label: "SQL", html: function (row) { return pickLink(toTarget(row)); } },
+						{ key: "statementType", label: "종류" },
+						{ key: "tables", label: "테이블 (R 읽기 · C 넣기 · U 고치기 · D 지우기)", mono: true },
+						{ key: "callers", label: "실행하는 메소드", num: true },
+						{ key: "file", label: "위치", html: function (row) { return whereText(row.file, row.lineStart); } }
+					]
+				};
+			});
+		},
+		type: function (text) {
+			return K.call("GET", revisionPath() + "/symbols", { name: text, size: 100 }).then(function (result) {
+				var toTarget = function (row) {
+					return { kind: "type", value: row.fqn, label: row.simpleName || row.fqn };
+				};
+				return {
+					total: result.total,
+					rows: result.types || [],
+					toTarget: toTarget,
+					exact: function (row, typed) { return sameName(row.fqn, typed) || sameName(row.simpleName, typed); },
+					columns: [
+						{ key: "simpleName", label: "타입", html: function (row) { return pickLink(toTarget(row), row.fqn); } },
+						{ key: "kind", label: "종류" },
+						{ key: "layer", label: "계층" },
+						{ key: "packageName", label: "패키지", mono: true },
+						{ key: "path", label: "위치", html: function (row) { return whereText(row.path, row.lineStart); } }
+					]
+				};
+			});
+		}
+	};
+
+	/** 대소문자를 가리지 않고 같은 이름인지 */
+	function sameName(a, b) {
+		return !!a && !!b && String(a).toUpperCase() === String(b).toUpperCase();
+	}
+
+	function endsWith(text, tail) {
+		return !!text && text.length >= tail.length && text.substring(text.length - tail.length) === tail;
+	}
+
+	/* ---------------- ② 대상과 탭 ---------------- */
+
+	function sameTarget(a, b) {
+		return !!a && !!b && a.kind === b.kind && a.value === b.value;
+	}
+
+	/** 후보 목록이나 결과 표에서 고른 대상. 지금 대상은 지나온 대상에 남긴다. */
+	function pickTarget(next) {
+		if (sameTarget(next, target)) {
+			flashHead();
+			return;
+		}
+		setTarget(next, { push: true, scroll: true });
+	}
 
 	/**
-	 * 결과 맨 위의 "대상" 머리글. 무엇을 고치면 생기는 영향인지 한눈에 보이게 한다.
-	 *   [종류]  큰 이름
-	 *           설명(전체 이름 · 파일:줄 · 계층 · 한글명 ...)
-	 *           조건(리비전 · 깊이 · 인터페이스 경유 호출 포함 여부)
+	 * 대상을 바꾼다.
+	 * options.push: 주소창에 새 기록을 남길지 / options.tab: 열 탭 / options.scroll: 결과로 옮겨 갈지
+	 * options.keepTrail: 지나온 대상을 그대로 둘지(주소창에서 되살릴 때)
 	 */
-	function targetHead(result) {
-		var t = result.target || {};
-		var title = t.name;
+	function setTarget(next, options) {
+		options = options || {};
+		if (!options.keepTrail && target && !sameTarget(target, next)) {
+			// 이미 지나온 대상으로 다시 가면 거기까지 잘라 같은 이름이 두 번 남지 않게 한다
+			var at = -1;
+			trail.forEach(function (item, index) {
+				if (sameTarget(item, next)) {
+					at = index;
+				}
+			});
+			trail = at >= 0 ? trail.slice(0, at) : trail.concat([target]);
+		}
+		target = { kind: next.kind, value: next.value, label: next.label || next.value, notes: next.notes || [] };
+		loaded = {};
+		["impact", "callers", "callees"].forEach(function (name) {
+			panels[name].content.innerHTML = "";
+			K.message(panels[name].message, "");
+			setCount(name, null);
+		});
+		el["kn-result-panel"].hidden = false;
+		renderHead();
+		renderTrail();
+		var wanted = options.tab || tab;
+		showTab(tabEnabled(wanted) ? wanted : "impact", false);
+		writeHash(options.push);
+		if (options.scroll) {
+			flashHead(true);
+		}
+	}
+
+	function clearTarget() {
+		target = null;
+		trail = [];
+		loaded = {};
+		el["kn-result-panel"].hidden = true;
+		clearFound();
+	}
+
+	/** 호출 관계 탭은 메소드일 때만 */
+	function tabEnabled(name) {
+		return name === "impact" || (target && target.kind === "method");
+	}
+
+	/**
+	 * 탭을 보이고, 조건이 바뀌었으면 결과를 다시 불러온다.
+	 * byUser 가 true 면 탭을 눌러 바꾼 것이라 주소창 기록을 바꾼다.
+	 */
+	function showTab(name, byUser) {
+		tab = name;
+		Array.prototype.forEach.call(el.tabs, function (button) {
+			var me = button.getAttribute("data-tab");
+			var enabled = tabEnabled(me);
+			button.disabled = !enabled;
+			button.title = enabled ? "" : "메소드를 대상으로 골랐을 때만 볼 수 있습니다.";
+			button.setAttribute("aria-selected", me === name ? "true" : "false");
+			button.classList.toggle("kn-tab-on", me === name);
+			panels[me].wrap.hidden = me !== name;
+		});
+		var range = DEPTHS[name];
+		el["kn-depth"].min = range.min;
+		el["kn-depth"].max = range.max;
+		el["kn-depth"].value = range.value;
+		el["kn-access-wrap"].hidden = !(name === "impact" && target && target.kind === "table");
+		el["kn-tab-hint"].textContent = TAB_HINTS[name];
+		if (byUser) {
+			writeHash(false);
+		}
+		if (target) {
+			loadTab(name);
+		}
+	}
+
+	function loadTab(name) {
+		var access = name === "impact" && target.kind === "table" ? el["kn-impact-access"].value : "";
+		var key = [el["kn-impact-revision"].value, target.kind, target.value, DEPTHS[name].value, access].join("|");
+		if (loaded[name] === key) {
+			return;
+		}
+		loaded[name] = key;
+		var panel = panels[name];
+		var no = ++requestNo[name];
+		var current = target;
+		panel.content.innerHTML = "";
+		setCount(name, null);
+		K.message(panel.message, "불러오는 중...");
+		Promise.resolve().then(function () {
+			if (name === "impact") {
+				var query = { depth: DEPTHS.impact.value };
+				query[IMPACT_PARAMS[current.kind]] = current.value;
+				if (access) {
+					query.access = access;
+				}
+				return K.call("GET", revisionPath() + "/impact", query);
+			}
+			return K.call("GET", revisionPath() + "/methods/" + encodeURIComponent(current.value) + "/" + name, { depth: DEPTHS[name].value });
+		}).then(function (result) {
+			if (no !== requestNo[name] || current !== target) {
+				return;
+			}
+			if (name === "impact") {
+				renderImpact(panel, result);
+			} else {
+				renderCalls(panel, result, name === "callers");
+			}
+		}).catch(function (err) {
+			if (no === requestNo[name]) {
+				loaded[name] = null;
+				K.message(panel.message, err.message, true);
+			}
+		});
+	}
+
+	function setCount(name, count) {
+		Array.prototype.forEach.call(el.tabs, function (button) {
+			if (button.getAttribute("data-tab") === name) {
+				button.querySelector(".kn-tab-count").textContent = count === null || count === undefined ? "" : String(count);
+			}
+		});
+	}
+
+	/**
+	 * 대상 머리글. 세 탭이 모두 이 대상에 대한 결과라는 것을 한눈에 보이게 한다.
+	 *   [종류]  큰 이름  을(를) 고치면
+	 *           설명(기능명 · 전체 이름 · 파일:줄 · 계층 · 한글명 ...)
+	 */
+	function renderHead() {
+		var notes = target.notes || [];
+		el["kn-target-head"].innerHTML = "<div class=\"kn-target-head\" tabindex=\"-1\">"
+			+ "<span class=\"kn-target-kind\">" + K.escapeHtml(KIND_LABELS[target.kind]) + "</span>"
+			+ "<div class=\"kn-target-body\"><div class=\"kn-target-name\">" + K.escapeHtml(target.label)
+			+ " <span class=\"kn-target-suffix\">을(를) 고치면</span></div>"
+			+ (notes.length ? "<div class=\"kn-target-note\">" + K.escapeHtml(notes.join(" · ")) + "</div>" : "")
+			+ "</div></div>";
+	}
+
+	/** 지나온 대상: 누르면 그 대상으로 돌아간다 */
+	function renderTrail() {
+		if (trail.length === 0) {
+			el["kn-trail"].innerHTML = "";
+			return;
+		}
+		el["kn-trail"].innerHTML = "<span class=\"kn-trail-label\">지나온 대상</span>" + trail.map(function (item, index) {
+			return "<button type=\"button\" class=\"kn-trail-item\" data-trail=\"" + index + "\" title=\"" + K.escapeHtml(KIND_LABELS[item.kind] + " " + item.value) + "\">"
+				+ "<span class=\"kn-trail-kind\">" + K.escapeHtml(KIND_LABELS[item.kind]) + "</span> " + K.escapeHtml(item.label) + "</button>";
+		}).join("<span class=\"kn-trail-sep\">›</span>") + "<span class=\"kn-trail-sep\">›</span><span class=\"kn-trail-now\">" + K.escapeHtml(target.label) + "</span>";
+	}
+
+	/** 결과로 옮겨 가 머리글을 잠깐 강조한다 */
+	function flashHead(scroll) {
+		var head = el["kn-target-head"].querySelector(".kn-target-head");
+		if (!head) {
+			return;
+		}
+		if (scroll !== false) {
+			head.scrollIntoView({ behavior: "smooth", block: "start" });
+		}
+		head.classList.add("kn-flash");
+		setTimeout(function () {
+			head.classList.remove("kn-flash");
+		}, 1600);
+	}
+
+	/** 영향도 응답의 target 으로 머리글 설명을 채운다(처음 고를 때는 이름만 알기 때문) */
+	function notesFromImpact(t) {
 		var notes = [];
 		if (t.kind === "METHOD") {
-			title = t.ownerFqn ? shortMethod(t.ownerFqn + "#" + t.signature) : t.name;
 			if (t.title) {
 				notes.push(t.title);
 			}
@@ -130,10 +589,8 @@ var DstoneKnowledgeImpact = (function () {
 				notes.push(t.ownerFqn);
 			}
 		} else if (t.kind === "TYPE") {
-			title = t.simpleName || t.name;
 			notes.push(t.name);
 		} else if (t.kind === "STATEMENT") {
-			title = t.statement || t.name;
 			if (t.statementType) {
 				notes.push(t.statementType);
 			}
@@ -144,159 +601,143 @@ var DstoneKnowledgeImpact = (function () {
 			if (t.koreanName) {
 				notes.push(t.koreanName);
 			}
-			notes.push({ ALL: "읽기 + 쓰기", READ: "읽기만", WRITE: "쓰기만" }[t.access] || t.access);
 			if (t.statements !== undefined) {
 				notes.push("건드리는 SQL " + t.statements + "개");
 			}
 		}
 		if (t.path) {
-			notes.push(t.path + (t.lineStart ? ":" + t.lineStart : ""));
+			notes.push(fileName(t.path) + (t.lineStart ? ":" + t.lineStart : ""));
 		}
 		if (t.layer) {
 			notes.push(t.layer);
 		}
-		var revision = el["kn-impact-revision"].options[el["kn-impact-revision"].selectedIndex];
-		var conditions = [
-			"리비전 " + (revision ? revision.text : result.revisionId),
-			"거슬러 올라간 깊이 " + result.depth,
-			result.includePossible ? "인터페이스 경유 호출 포함" : "인터페이스 경유 호출 제외"
-		];
-		return "<div class=\"kn-target-head\" tabindex=\"-1\">"
-			+ "<span class=\"kn-target-kind\">" + K.escapeHtml(KIND_LABELS[t.kind] || t.kind) + "</span>"
-			+ "<div class=\"kn-target-body\"><div class=\"kn-target-name\">" + K.escapeHtml(title) + " <span class=\"kn-target-suffix\">을(를) 고치면</span></div>"
-			+ (notes.length ? "<div class=\"kn-target-note\">" + K.escapeHtml(notes.join(" · ")) + "</div>" : "")
-			+ "<div class=\"kn-target-cond\">" + conditions.map(function (text) { return "<span>" + K.escapeHtml(text) + "</span>"; }).join("") + "</div>"
-			+ "</div></div>";
+		return notes;
 	}
 
-	/** 위쪽(호출 관계)에서 영향도를 실행했을 때 결과 머리글로 옮겨 가 잠깐 강조한다 */
-	function showResult() {
-		var head = el["kn-impact-head"].querySelector(".kn-target-head");
-		var target = head || el["kn-impact-message"];
-		target.scrollIntoView({ behavior: "smooth", block: "start" });
-		if (head) {
-			head.classList.add("kn-flash");
-			setTimeout(function () {
-				head.classList.remove("kn-flash");
-			}, 1600);
+	/** 메소드 대상의 머리글 이름과 설명. 주소창에서 되살렸을 때 이름이 ID 로만 남은 경우를 고친다. */
+	function updateMethodHead(ownerFqn, signature, title, path, lineStart, layer) {
+		if (!ownerFqn || !signature) {
+			return;
 		}
+		target.label = shortMethod(ownerFqn + "#" + signature);
+		var notes = [];
+		if (title) {
+			notes.push(title);
+		}
+		notes.push(ownerFqn);
+		if (path) {
+			notes.push(fileName(path) + (lineStart ? ":" + lineStart : ""));
+		}
+		if (layer) {
+			notes.push(layer);
+		}
+		if (target.notes.length <= notes.length) {
+			target.notes = notes;
+		}
+		renderHead();
+		renderTrail();
+		writeHash(false);
 	}
 
-	function section(container, title, columns, rows) {
+	/* ---------------- 영향도 탭 ---------------- */
+
+	function renderImpact(panel, result) {
+		var t = result.target || {};
+		if (API_KINDS[t.kind] === target.kind) {
+			target.notes = notesFromImpact(t);
+			if (t.kind === "METHOD") {
+				updateMethodHead(t.ownerFqn, t.signature, t.title, t.path, t.lineStart, t.layer);
+			} else {
+				renderHead();
+			}
+		}
+		K.message(panel.message, result.truncated ? "결과가 많아 일부만 보입니다. 깊이를 줄이거나 대상을 좁혀 보세요." : "");
+		var conditions = ["거슬러 올라간 깊이 " + result.depth, result.includePossible ? "인터페이스 경유 호출 포함" : "인터페이스 경유 호출 제외"];
+		if (t.kind === "TABLE") {
+			conditions.unshift({ ALL: "읽기 + 쓰기", READ: "읽기만", WRITE: "쓰기만" }[t.access] || t.access);
+		}
+		var html = "<div class=\"kn-cards\"></div>"
+			+ "<div class=\"kn-target-cond\">" + conditions.map(function (text) { return "<span>" + K.escapeHtml(text) + "</span>"; }).join("") + "</div>";
+		panel.content.innerHTML = html;
+		K.cards(panel.content.querySelector(".kn-cards"), [
+			{ label: START_LABELS[target.kind] || "직접 건드리는 메소드", value: result.summary.startMethods },
+			{ label: "닿는 메소드", value: result.summary.methods },
+			{ label: "진입점", value: result.summary.endpoints },
+			{ label: "화면", value: result.summary.screens }
+		]);
+
+		section(panel.content, "진입점", "사용자가 이 변경을 겪게 되는 입구입니다.", [
+			{ key: "depth", label: "거리", num: true },
+			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
+			{ key: "path", label: "주소", html: function (row) {
+				return "<span class=\"kn-mono\">" + K.escapeHtml((row.httpMethod && row.httpMethod !== "ALL" ? row.httpMethod + " " : "") + (row.path || "")) + "</span>"
+					+ (row.endpointType && row.endpointType !== "HTTP" ? " <span class=\"kn-caller-note\">" + K.escapeHtml(row.endpointType) + "</span>" : "");
+			} },
+			{ key: "handler", label: "처리하는 메소드", html: function (row) { return methodLink(row.methodId, row.handler); } }
+		], result.endpoints, "닿는 진입점이 없습니다.");
+		section(panel.content, "화면", "이 변경을 겪는 화면입니다. 이어진 방식: 화면 요청(화면이 주소를 요청) · 화면 열기(메소드가 화면을 연다) · 호출(화면 안의 코드가 직접 부른다).", [
+			{ key: "depth", label: "거리", num: true },
+			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
+			{ key: "path", label: "화면", html: function (row) {
+				return "<span class=\"kn-mono kn-caller-name\" title=\"" + K.escapeHtml(row.path) + "\">" + K.escapeHtml(fileName(row.path)) + "</span>"
+					+ " <span class=\"kn-caller-note\">" + K.escapeHtml(parentDir(row.path)) + "</span>";
+			} },
+			{ key: "via", label: "이어진 방식", html: function (row) {
+				return (row.via || "").split(",").filter(function (via) { return via; }).map(relationLabel).join(", ");
+			} }
+		], result.screens, "닿는 화면이 없습니다.");
+		section(panel.content, "메소드", "거리 0은 대상을 직접 건드리는 메소드입니다. 이름을 누르면 그 메소드가 새 대상이 됩니다.", [
+			{ key: "depth", label: "거리", num: true },
+			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
+			{ key: "layer", label: "계층" },
+			{ key: "method", label: "메소드", html: function (row) { return methodLink(row.methodId, row.method); } },
+			{ key: "path", label: "위치", html: function (row) { return whereText(row.path, row.lineStart); } }
+		], result.methods, "닿는 메소드가 없습니다.");
+	}
+
+	function section(container, title, hint, columns, rows, emptyText) {
 		var wrap = document.createElement("div");
-		wrap.innerHTML = "<div class=\"kn-section-title\">" + K.escapeHtml(title) + " · " + (rows || []).length + "건</div><div class=\"kn-scroll\"></div>";
-		K.table(wrap.querySelector(".kn-scroll"), columns, rows);
+		wrap.className = "kn-result-section";
+		wrap.innerHTML = "<div class=\"kn-section-title\">" + K.escapeHtml(title) + " <span class=\"kn-section-count\">" + (rows || []).length + "건</span></div>"
+			+ "<p class=\"kn-section-hint\">" + K.escapeHtml(hint) + "</p><div class=\"kn-scroll\"></div>";
+		K.table(wrap.querySelector(".kn-scroll"), columns, rows, emptyText);
 		container.appendChild(wrap);
 	}
 
-	/* ---------------- 호출 관계 ---------------- */
+	/* ---------------- 부르는 쪽 / 불리는 쪽 탭 ---------------- */
 
-	function findMethods() {
-		el["kn-graph-title"].textContent = "";
-		el["kn-graph-table"].innerHTML = "";
-		Promise.resolve().then(function () {
-			return K.call("GET", revisionPath() + "/methods", { name: el["kn-method-name"].value.trim(), owner: el["kn-method-owner"].value.trim(), size: 100 });
-		}).then(function (result) {
-			var methods = result.methods || [];
-			K.message(el["kn-graph-message"], "메소드 " + result.total + "건" + (result.total > methods.length ? " (앞쪽 " + methods.length + "건만 보임)" : ""));
-			K.table(el["kn-method-table"], [
-				{ key: "ownerFqn", label: "타입", mono: true },
-				{ key: "signature", label: "메소드", mono: true },
-				{ key: "path", label: "파일", mono: true },
-				{ key: "lineStart", label: "줄", num: true },
-				{ key: "action", label: "", html: function () {
-					return "<button type=\"button\" data-act=\"callers\">부르는 쪽</button> <button type=\"button\" data-act=\"callees\">불리는 쪽</button>"
-						+ " <button type=\"button\" data-act=\"impact\">영향도</button>";
-				} }
-			], methods, "그 이름의 메소드가 없습니다.");
-			eachRow(el["kn-method-table"], function (tr, index) {
-				var method = methods[index];
-				Array.prototype.forEach.call(tr.querySelectorAll("button"), function (button) {
-					button.addEventListener("click", function () {
-						var act = button.getAttribute("data-act");
-						if (act === "impact") {
-							runImpact("methodId", method.methodId, shortMethod(method.ownerFqn + "#" + method.signature), true);
-						} else {
-							loadGraph(method, act);
-						}
-					});
-				});
-			});
-		}).catch(function (err) {
-			K.message(el["kn-graph-message"], err.message, true);
-		});
+	function renderCalls(panel, result, callers) {
+		var method = result.method || {};
+		updateMethodHead(method.ownerFqn, method.signature, null, method.path, method.lineStart, null);
+		var relations = result[callers ? "callers" : "callees"] || [];
+		// 부르는 쪽은 같은 줄을 한 행으로 합친다(공통 스크립트를 불러오는 화면 한 줄이 주소 여러 개로 이어지는 경우).
+		var rows = callers ? groupSameLine(relations) : relations;
+		setCount(callers ? "callers" : "callees", rows.length);
+		// 건수는 탭에 보이므로, 같은 줄을 합쳤거나 잘렸을 때만 알린다
+		var notes = [];
+		if (rows.length !== relations.length) {
+			notes.push("관계 " + relations.length + "개를 같은 줄끼리 " + rows.length + "행으로 합쳤습니다. \"주소 N개\"를 누르면 펼칩니다.");
+		}
+		if (result.truncated) {
+			notes.push("결과가 많아 일부만 보입니다. 깊이를 줄여 보세요.");
+		}
+		K.message(panel.message, notes.join(" "));
+		panel.content.innerHTML = "<div class=\"kn-scroll\"></div>";
+		var columns = [
+			{ key: "depth", label: "거리", num: true },
+			{ key: "relationType", label: "관계", html: function (row) { return relationLabel(row.relationType); } },
+			{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } }
+		];
+		if (callers) {
+			// 부르는 쪽: 짧은 이름(+ 화면명)과, 그것이 어디에 적혀 있는지(근거) 두 칸
+			columns.push({ key: "from", label: "부르는 쪽", html: function (row) { return callerCell(row); } });
+		} else {
+			columns.push({ key: "to", label: "불리는 쪽", html: function (row) { return calleeCell(row); } });
+		}
+		columns.push({ key: "path", label: "근거 (파일:줄)", html: function (row) { return evidenceCell(row); } });
+		K.table(panel.content.firstChild, columns, rows
+			, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
 	}
-
-	function findTables() {
-		el["kn-graph-title"].textContent = "";
-		el["kn-graph-table"].innerHTML = "";
-		Promise.resolve().then(function () {
-			return K.call("GET", revisionPath() + "/tables", { name: el["kn-table-name"].value.trim(), size: 100 });
-		}).then(function (result) {
-			// 응답에서 목록이 든 키를 찾는다(행의 배열인 첫 번째 값).
-			var tables = [];
-			Object.keys(result).forEach(function (key) {
-				if (tables.length === 0 && Array.isArray(result[key])) {
-					tables = result[key];
-				}
-			});
-			K.message(el["kn-graph-message"], "테이블 " + (result.total !== undefined ? result.total : tables.length) + "건. 이름을 누르면 영향도를 분석합니다.");
-			K.autoTable(el["kn-method-table"], tables);
-			eachRow(el["kn-method-table"], function (tr, index) {
-				var name = tables[index].table || tables[index].name || tables[index].tableName;
-				var cell = tr.querySelector("td");
-				cell.innerHTML = "<a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + K.escapeHtml(cell.textContent) + "</a>";
-				cell.querySelector("a").addEventListener("click", function () {
-					runImpact("table", name, null, true);
-				});
-			});
-		}).catch(function (err) {
-			K.message(el["kn-graph-message"], err.message, true);
-		});
-	}
-
-	/** direction: callers(부르는 쪽) / callees(불리는 쪽) */
-	function loadGraph(method, direction) {
-		var callers = direction === "callers";
-		K.call("GET", revisionPath() + "/methods/" + method.methodId + "/" + direction, { depth: el["kn-graph-depth"].value }).then(function (result) {
-			var relations = result[direction] || [];
-			// 부르는 쪽은 같은 줄을 한 행으로 합친다(공통 스크립트를 불러오는 화면 한 줄이 주소 여러 개로 이어지는 경우).
-			var rows = callers ? groupSameLine(relations) : relations;
-			el["kn-graph-title"].textContent = method.ownerFqn + "#" + method.signature + (callers ? " 을(를) 부르는 쪽" : " 이(가) 부르는 쪽") + " · " + rows.length + "건"
-				+ (rows.length !== relations.length ? " (관계 " + relations.length + ")" : "")
-				+ (result.truncated ? " (일부만 보임)" : "");
-			el["kn-graph-table"].innerHTML = "<div class=\"kn-scroll\"></div>";
-			var columns = [
-				{ key: "depth", label: "거리", num: true },
-				{ key: "relationType", label: "관계", html: function (row) { return relationLabel(row.relationType); } },
-				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } }
-			];
-			if (callers) {
-				// 부르는 쪽: 짧은 이름(+ 화면명)과, 그것이 어디에 적혀 있는지(근거) 두 칸
-				columns.push({ key: "from", label: "부르는 쪽", html: function (row) { return callerCell(row); } });
-				columns.push({ key: "path", label: "근거 (파일:줄)", html: function (row) { return evidenceCell(row); } });
-			} else {
-				columns.push({ key: "to", label: "불리는 쪽", mono: true });
-				columns.push({ key: "path", label: "적힌 파일", mono: true });
-				columns.push({ key: "lineStart", label: "줄", num: true });
-			}
-			K.table(el["kn-graph-table"].querySelector(".kn-scroll"), columns, rows
-				, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
-		}).catch(function (err) {
-			K.message(el["kn-graph-message"], err.message, true);
-		});
-	}
-
-	/** 관계 종류 → 화면 글자. 원래 이름은 마우스를 올리면 보인다. */
-	var RELATION_LABELS = {
-		CALLS: "호출",
-		REQUESTS: "화면 요청",
-		CALLS_POSSIBLE_IMPLEMENTATION: "구현체 호출(추정)",
-		EXECUTES_SQL: "SQL 실행",
-		READS_TABLE: "테이블 읽기",
-		WRITES_TABLE: "테이블 쓰기",
-		RENDERS: "화면 열기"
-	};
 
 	function relationLabel(type) {
 		return "<span class=\"kn-nowrap\" title=\"" + K.escapeHtml(type) + "\">" + K.escapeHtml(RELATION_LABELS[type] || type) + "</span>";
@@ -326,22 +767,18 @@ var DstoneKnowledgeImpact = (function () {
 		return rows;
 	}
 
-	/** 경로의 마지막 이름: src/main/webapp/WEB-INF/sitemesh/layout.jsp → layout.jsp */
-	function fileName(path) {
-		path = path || "";
-		return path.substring(path.lastIndexOf("/") + 1);
-	}
-
 	/**
 	 * 부르는 쪽 칸.
-	 *   메소드: CommonCodeController#getCommonCode(…)   (전체 이름은 마우스를 올리면)
+	 *   메소드: CommonCodeController#getCommonCode(…)   (누르면 새 대상, 전체 이름은 마우스를 올리면)
 	 *   화면:   layout.jsp · 화면명                     (전체 경로는 마우스를 올리면)
 	 * 합친 행이면 아래에 "genexon.js를 불러와 주소 5개 요청"을 붙이고, 누르면 주소마다 어디로 이어졌는지 펼친다.
 	 */
 	function callerCell(row) {
 		var screen = row.fromKind === "FILE";
 		var full = row.from || row.fromId || "";
-		var html = "<span class=\"kn-mono kn-caller-name\" title=\"" + K.escapeHtml(full) + "\">" + K.escapeHtml(screen ? fileName(full) : shortMethod(full)) + "</span>";
+		var html = screen
+			? "<span class=\"kn-mono kn-caller-name\" title=\"" + K.escapeHtml(full) + "\">" + K.escapeHtml(fileName(full)) + "</span>"
+			: methodLink(row.fromId, full);
 		if (screen && row.screenName) {
 			html += " <span class=\"kn-caller-note\">" + K.escapeHtml(row.screenName) + "</span>";
 		}
@@ -354,14 +791,29 @@ var DstoneKnowledgeImpact = (function () {
 		var summary = requests
 			? (script ? fileName(script) + "를 불러와 주소 " + targets.length + "개 요청" : "주소 " + targets.length + "개 요청")
 			: "대상 " + targets.length + "개";
-		var items = targets.map(function (target) {
-			var method = shortMethod(target.to || target.toId || "");
-			var text = requests && target.requestPath ? target.requestPath + " → " + method : method;
-			var where = target.script ? fileName(target.script) + (target.scriptLine ? ":" + target.scriptLine : "") : "";
-			return "<li><span class=\"kn-mono\">" + K.escapeHtml(text) + "</span>"
-				+ (where ? " <span class=\"kn-caller-note\" title=\"" + K.escapeHtml(target.script) + "\">" + K.escapeHtml(where) + "</span>" : "") + "</li>";
+		var items = targets.map(function (item) {
+			var to = methodLink(item.toId, item.to || item.toId || "");
+			var text = requests && item.requestPath ? "<span class=\"kn-mono\">" + K.escapeHtml(item.requestPath) + "</span> → " + to : to;
+			var where = item.script ? fileName(item.script) + (item.scriptLine ? ":" + item.scriptLine : "") : "";
+			return "<li>" + text
+				+ (where ? " <span class=\"kn-caller-note\" title=\"" + K.escapeHtml(item.script) + "\">" + K.escapeHtml(where) + "</span>" : "") + "</li>";
 		}).join("");
 		return html + "<details class=\"kn-targets\"><summary>" + K.escapeHtml(summary) + "</summary><ul>" + items + "</ul></details>";
+	}
+
+	/** 불리는 쪽 칸: 메소드 · SQL · 테이블은 누르면 새 대상이 된다 */
+	function calleeCell(row) {
+		var to = row.to || row.toId || "";
+		if (row.toKind === "METHOD") {
+			return methodLink(row.toId, to);
+		}
+		if (row.relationType === "EXECUTES_SQL" || row.toKind === "SQL") {
+			return pickLink({ kind: "statement", value: to, label: to });
+		}
+		if (row.relationType === "READS_TABLE" || row.relationType === "WRITES_TABLE") {
+			return pickLink({ kind: "table", value: to, label: to });
+		}
+		return "<span class=\"kn-mono\">" + K.escapeHtml(to) + "</span>";
 	}
 
 	/**
@@ -392,6 +844,47 @@ var DstoneKnowledgeImpact = (function () {
 		return script || null;
 	}
 
+	/* ---------------- 표시 도우미 ---------------- */
+
+	/** 누르면 그 대상으로 바뀌는 이름. 지금 대상이면 링크 대신 굵은 글자. title 은 마우스를 올리면 보일 전체 이름 */
+	function pickLink(next, title) {
+		var tip = K.escapeHtml(title || next.value);
+		if (target && sameTarget(next, target)) {
+			return "<b class=\"kn-mono kn-caller-name\" title=\"" + tip + "\">" + K.escapeHtml(next.label) + "</b>";
+		}
+		return "<a href=\"javascript:void(0)\" class=\"kn-retarget kn-mono\" data-kind=\"" + next.kind + "\" data-value=\"" + K.escapeHtml(next.value)
+			+ "\" data-label=\"" + K.escapeHtml(next.label) + "\" title=\"" + tip + " — 누르면 이것을 대상으로\">" + K.escapeHtml(next.label) + "</a>";
+	}
+
+	/** 메소드 이름 링크. ID 를 모르면 글자만 */
+	function methodLink(methodId, fqn) {
+		fqn = fqn || "";
+		if (!methodId) {
+			return "<span class=\"kn-mono\" title=\"" + K.escapeHtml(fqn) + "\">" + K.escapeHtml(shortMethod(fqn)) + "</span>";
+		}
+		return pickLink({ kind: "method", value: methodId, label: shortMethod(fqn) }, fqn);
+	}
+
+	/** 파일:줄 (전체 경로는 마우스를 올리면) */
+	function whereText(path, line) {
+		if (!path) {
+			return "";
+		}
+		return "<span class=\"kn-mono kn-nowrap\" title=\"" + K.escapeHtml(path) + "\">" + K.escapeHtml(fileName(path) + (line ? ":" + line : "")) + "</span>";
+	}
+
+	/** 경로의 마지막 이름: src/main/webapp/WEB-INF/sitemesh/layout.jsp → layout.jsp */
+	function fileName(path) {
+		path = path || "";
+		return path.substring(path.lastIndexOf("/") + 1);
+	}
+
+	/** 화면 경로의 바로 위 폴더: .../WEB-INF/views/board/list.jsp → board/ (이름이 같은 화면을 가려 보게) */
+	function parentDir(path) {
+		var parts = (path || "").split("/");
+		return parts.length > 1 ? parts[parts.length - 2] + "/" : "";
+	}
+
 	/** kr.co.gnx.CommonCodeController#getCommonCode(HttpServletRequest,...) → CommonCodeController#getCommonCode(…) */
 	function shortMethod(fqn) {
 		var hash = fqn.indexOf("#");
@@ -402,12 +895,6 @@ var DstoneKnowledgeImpact = (function () {
 		var name = fqn.substring(hash + 1);
 		var paren = name.indexOf("(");
 		return owner.substring(owner.lastIndexOf(".") + 1) + "#" + (paren < 0 ? name : name.substring(0, paren) + (name.charAt(paren + 1) === ")" ? "()" : "(…)"));
-	}
-
-	function eachRow(container, callback) {
-		Array.prototype.forEach.call(container.querySelectorAll("tbody tr[data-index]"), function (tr) {
-			callback(tr, parseInt(tr.getAttribute("data-index"), 10));
-		});
 	}
 
 	return { init: init };

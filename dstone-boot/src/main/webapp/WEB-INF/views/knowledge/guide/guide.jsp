@@ -134,8 +134,9 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 
 				<h4>따라 하기 ③ 테이블을 고치면 어디가 영향을 받는지 본다 <a href="<%=linkBase%>knowledge/impact/impact">(영향도 · 호출 관계 화면 열기)</a></h4>
 				<ol>
-					<li>프로젝트에서 <code>struts-app</code> 을 고릅니다(리비전은 알아서 골라집니다).</li>
-					<li>대상은 "테이블" 그대로 두고 <code>TB_BOARD</code> 를 적은 뒤 "분석".</li>
+					<li>맨 위 프로젝트에서 <code>struts-app</code> 을 고릅니다(리비전은 알아서 골라집니다).</li>
+					<li>"① 대상 찾기"에서 종류를 "테이블"로 바꾸고 <code>TB_BOARD</code> 를 적은 뒤 "찾기".
+						이름이 똑같은 테이블이 바로 골라지고, 아래 "② 결과"에 영향도 탭이 열립니다.</li>
 				</ol>
 				<div class="kn-expect">이렇게 나옵니다: 직접 건드리는 메소드 4 · 닿는 메소드 7 · 진입점 3 · 화면 3.<br>
 					진입점 표: <code>/board/list.do</code> 와 <code>/board/save.do</code> 는 신뢰도 <span class="kn-conf-HIGH">HIGH</span>,
@@ -143,12 +144,15 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					화면 표: <code>board/edit.jsp</code>, <code>board/list.jsp</code>, <code>common/header.jsp</code>.<br>
 					<b>읽는 법:</b> "TB_BOARD 의 구조를 바꾸면 이 세 주소와 세 화면을 확인해야 한다."</div>
 
-				<h4>따라 하기 ④ 메소드 하나를 앞뒤로 따라간다 (같은 화면의 아래 칸)</h4>
+				<h4>따라 하기 ④ 메소드 하나를 앞뒤로 따라간다 (같은 화면)</h4>
 				<ol>
-					<li>"메소드 이름"에 <code>deleteBoard</code> 를 적고 "메소드 찾기".</li>
-					<li>나온 줄에서 "불리는 쪽"을 누릅니다. 그다음 "부르는 쪽"도 눌러 봅니다.</li>
+					<li>"① 대상 찾기"에서 종류를 "메소드"로 두고 <code>BoardDAO#deleteBoard</code> 를 적은 뒤 "찾기".
+						(<code>deleteBoard</code> 만 적으면 같은 이름의 후보가 모두 나옵니다. 그중 BoardDAO 의 것을 누르면 됩니다.)</li>
+					<li>"② 결과"에서 "불리는 쪽" 탭을 누릅니다. 그다음 "부르는 쪽" 탭도 눌러 봅니다.</li>
+					<li>불리는 쪽 표의 <code>Board.deleteBoard</code> 를 누르면 그 SQL 이 새 대상이 되어 영향도가 나옵니다.
+						"지나온 대상"의 메소드 이름을 누르면 돌아옵니다.</li>
 				</ol>
-				<div class="kn-expect">이렇게 나옵니다: 불리는 쪽 — 거리 1 <code>EXECUTES_SQL</code> → <code>Board.deleteBoard</code>, 거리 2 <code>WRITES_TABLE</code> → <code>TB_BOARD</code>.
+				<div class="kn-expect">이렇게 나옵니다: 불리는 쪽 — 거리 1 "SQL 실행" → <code>Board.deleteBoard</code>, 거리 2 "테이블 쓰기" → <code>TB_BOARD</code>.
 					("이 메소드는 Board.deleteBoard 라는 SQL 을 실행하고, 그 SQL 은 TB_BOARD 에 쓴다.")<br>
 					부르는 쪽 — <code>BoardAdminAction#delete(…)</code>. ("관리자 액션의 delete 가 이 메소드를 부른다.")</div>
 
