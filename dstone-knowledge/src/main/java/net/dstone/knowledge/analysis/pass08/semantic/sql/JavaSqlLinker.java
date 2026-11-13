@@ -1,6 +1,7 @@
 package net.dstone.knowledge.analysis.pass08.semantic.sql;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import net.dstone.knowledge.api.dao.JavaSqlDao;
 import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.common.util.JsonText;
+import net.dstone.knowledge.common.util.TableName;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.common.SqlTableExtractor;
 import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
@@ -67,6 +69,12 @@ public class JavaSqlLinker implements SemanticStep {
 
 		int statements = 0, executes = 0, tables = 0, noTable = 0;
 		Set<String> unknownEntities = new LinkedHashSet<String>();
+		// CREATE TEMP TABLE 로 만드는 임시 테이블. 업무 테이블이 아니라서 관계로 넣지 않는다(MapperLinker 와 같다).
+		Set<String> tempTables = new HashSet<String>();
+		List<String> written = resourceDao.selectTempTableNames(revisionId);
+		for (int i = 0; i < written.size(); i++) {
+			tempTables.add(TableName.bare(written.get(i)));
+		}
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
@@ -79,7 +87,7 @@ public class JavaSqlLinker implements SemanticStep {
 				afterId = ((Number) statement.get("mapperId")).longValue();
 				statements++;
 				String language = languageOf(statement, jpqlCalls);
-				int added = linkTables(revisionId, statement, language, entities, unknownEntities);
+				int added = linkTables(revisionId, statement, language, entities, unknownEntities, tempTables);
 				tables += added;
 				if (added == 0) {
 					noTable++;
@@ -111,12 +119,14 @@ public class JavaSqlLinker implements SemanticStep {
 	 * statement 하나를 테이블과 잇습니다. 글의 종류에 따라 읽는 방법이 다릅니다.
 	 *   DERIVED  findByName 처럼 메소드 이름으로 만든 쿼리: 리포지토리의 엔티티 테이블 하나(삭제면 D, 아니면 R)
 	 *   JPQL     엔티티 이름을 테이블로 바꿔서(JpqlTableExtractor)
-	 *   SQL      SQL 을 파싱해서(SqlTableExtractor). 파싱이 안 되면 정규식으로 짐작한 것(MEDIUM)
+	 *   SQL      SQL 을 파싱해서(SqlTableExtractor). JSQLParser → Druid → 정규식. 정규식으로 짐작한 것은 MEDIUM
+	 *            DB 시스템 카탈로그와 임시 테이블(tempTables)은 넣지 않는다.
 	 * </pre>
 	 *
 	 * @return 만든 테이블 관계 수
 	 */
-	private int linkTables(long revisionId, Map<String, Object> statement, String language, JpaEntities entities, Set<String> unknownEntities) {
+	private int linkTables(long revisionId, Map<String, Object> statement, String language, JpaEntities entities, Set<String> unknownEntities
+			, Set<String> tempTables) {
 		String from = "S" + statement.get("mapperId");
 		Object fileId = statement.get("fileId");
 		Object line = statement.get("lineStart");
@@ -153,10 +163,14 @@ public class JavaSqlLinker implements SemanticStep {
 		List<SqlTableExtractor.TableUse> uses = tableExtractor.extract(sql, (String) statement.get("statementType"));
 		for (int i = 0; i < uses.size(); i++) {
 			SqlTableExtractor.TableUse use = uses.get(i);
+			if (use.system || tempTables.contains(use.table)) {
+				continue;
+			}
 			Map<String, Object> properties = new LinkedHashMap<String, Object>();
 			properties.put("crud", use.crud);
-			if (use.guessed) {
-				properties.put("via", "PATTERN");
+			if (!SqlTableExtractor.VIA_PARSER.equals(use.via)) {
+				// PATTERN(정규식) / DRUID. 둘 다 컬럼은 읽지 않는다.
+				properties.put("via", use.via);
 			} else {
 				properties.put("columns", use.columns);
 			}

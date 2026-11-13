@@ -73,7 +73,9 @@ dstone:
         # 분석 규칙이 바뀌어 예전 결과와 섞어 보면 안 될 때 올린다. 버전이 다른 리비전은 증분 분석의 기준으로 쓰지 않는다.
         # 1.1: DECLARE 가 둘째 인자부터의 글자도 남긴다(analysis_reference.args_json, 규칙 파일의 argIndex).
         # 1.2: DECLARE 가 Java 문자열 SQL 을 남긴다(analysis_mapper 의 mapper_type JAVA).
-        analyzer-version: "1.3"
+        # 1.3: 메소드 참조(::) 해석, REQUESTS 의 scriptLine.
+        # 1.4: RESOURCE 가 choose 가지마다 편 SQL 을 남긴다(analysis_mapper.properties_json.chooseVariants). 예전 리비전에서 복사하면 빠진다.
+        analyzer-version: "1.4"
         # 분석 Job
         job:
             # 동시에 도는 분석 Job 수. 넘치면 대기열에서 기다린다.

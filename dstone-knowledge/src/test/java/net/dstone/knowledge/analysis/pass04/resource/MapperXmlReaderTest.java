@@ -175,4 +175,30 @@ public class MapperXmlReaderTest {
 		assertEquals("DELETE", statements.get(2).get("statementType"));
 	}
 
+	@Test
+	public void choose_가지가_둘_이상이면_가지마다_편_SQL도_남긴다() throws Exception {
+		String xml = "<mapper namespace=\"Rule\">\n"
+				+ "  <select id=\"selectCandidates\">\n"
+				+ "    WITH covered(name) AS (\n"
+				+ "      <choose>\n"
+				+ "        <when test=\"list != null\">VALUES <foreach collection=\"list\" item=\"c\" separator=\",\">(#{c})</foreach></when>\n"
+				+ "        <otherwise>SELECT NULL WHERE FALSE</otherwise>\n"
+				+ "      </choose>\n"
+				+ "    ) SELECT * FROM TB_RULE r WHERE r.name NOT IN (SELECT name FROM covered)\n"
+				+ "  </select>\n"
+				+ "  <select id=\"selectPlain\">SELECT * FROM TB_RULE <if test=\"x\">WHERE X = #{x}</if></select>\n"
+				+ "</mapper>\n";
+		List<Map<String, Object>> rows = reader.read(xml);
+
+		// sql_body 는 그대로 모든 가지를 이은 글이다.
+		assertTrue(((String) rows.get(0).get("sqlBody")).contains("VALUES (#{c})\nSELECT NULL WHERE FALSE"));
+		String properties = (String) rows.get(0).get("propertiesJson");
+		assertTrue(properties.startsWith("{\"chooseVariants\":["), properties);
+		assertTrue(properties.contains("WITH covered(name) AS (\\nVALUES (#{c})\\n) SELECT"), properties);
+		assertTrue(properties.contains("WITH covered(name) AS (\\nSELECT NULL WHERE FALSE\\n) SELECT"), properties);
+
+		// choose 가 없으면 남기지 않는다.
+		assertNull(rows.get(1).get("propertiesJson"));
+	}
+
 }

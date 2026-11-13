@@ -23,9 +23,10 @@
 
     <insert id="insertMapper" parameterType="java.util.Map">
         INSERT INTO analysis_mapper
-            (revision_id, mapper_type, namespace, statement_id, statement_type, parameter_type, result_type, sql_body, file_id, line_start, line_end)
+            (revision_id, mapper_type, namespace, statement_id, statement_type, parameter_type, result_type, sql_body, properties_json, file_id, line_start, line_end)
         VALUES
             (#{revisionId}, #{mapperType}, #{namespace}, #{statementId}, #{statementType}, #{parameterType}, #{resultType}, #{sqlBody}
+            , COALESCE(CAST(#{propertiesJson, jdbcType=VARCHAR} AS jsonb), '{}'::jsonb)
             , #{fileId}, #{lineStart, jdbcType=INTEGER}, #{lineEnd, jdbcType=INTEGER})
     </insert>
 
@@ -74,6 +75,7 @@
              , statement_id AS "statementId"
              , statement_type AS "statementType"
              , sql_body AS "sqlBody"
+             , (properties_json->'chooseVariants') IS NOT NULL AS "hasVariants"
              , file_id AS "fileId"
              , line_start AS "lineStart"
           FROM analysis_mapper
@@ -85,8 +87,32 @@
          LIMIT #{limit}
     </select>
 
-    <select id="selectMapperBody" parameterType="long" resultType="string">
-        SELECT sql_body FROM analysis_mapper WHERE mapper_id = #{mapperId}
+    <!-- 조각 하나의 본문과, choose 가지마다 편 본문이 있는지 -->
+    <select id="selectMapperBody" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT sql_body AS "sqlBody"
+             , (properties_json->'chooseVariants') IS NOT NULL AS "hasVariants"
+          FROM analysis_mapper
+         WHERE mapper_id = #{mapperId}
+    </select>
+
+    <!-- choose 가지마다 편 본문(MapperXmlReader 가 properties_json.chooseVariants 에 둔 것). 가지 순서대로 -->
+    <select id="selectChooseVariants" parameterType="long" resultType="string">
+        SELECT v.text
+          FROM analysis_mapper mp
+         CROSS JOIN LATERAL jsonb_array_elements_text(mp.properties_json->'chooseVariants') WITH ORDINALITY AS v(text, ord)
+         WHERE mp.mapper_id = #{mapperId}
+         ORDER BY v.ord
+    </select>
+
+    <!-- 이 리비전의 SQL이 CREATE TEMP TABLE 로 만드는 임시 테이블의 이름(적힌 그대로. 스키마 · 따옴표는 Java 에서 뗀다).
+         다른 statement 가 그 이름을 읽어도 업무 테이블이 아니므로 테이블 관계로 넣지 않는다 -->
+    <select id="selectTempTableNames" parameterType="long" resultType="string">
+        SELECT DISTINCT t.m[1]
+          FROM analysis_mapper mp
+         CROSS JOIN LATERAL regexp_matches(mp.sql_body
+                 , 'create\s+(?:global\s+|local\s+)?temp(?:orary)?\s+table\s+(?:if\s+not\s+exists\s+)?([A-Za-z_"][A-Za-z0-9_$."]*)', 'gi') AS t(m)
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.sql_body ILIKE '%temp%'
     </select>
 
     <!-- 인터페이스 방식의 매퍼: 네임스페이스가 인터페이스의 전체 이름이고 statement id 가 메소드 이름이다. 그 메소드가 곧 이 SQL 을 실행한다 -->

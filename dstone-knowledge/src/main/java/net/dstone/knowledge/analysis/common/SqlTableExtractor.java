@@ -12,6 +12,12 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.alibaba.druid.DbType;
+import com.alibaba.druid.sql.SQLUtils;
+import com.alibaba.druid.sql.ast.SQLStatement;
+import com.alibaba.druid.sql.visitor.SchemaStatVisitor;
+import com.alibaba.druid.stat.TableStat;
+
 import net.dstone.knowledge.common.util.KoreanName;
 import net.dstone.knowledge.common.util.TableName;
 import net.sf.jsqlparser.parser.CCJSqlParser;
@@ -35,7 +41,11 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
  * SQL 하나가 어느 테이블을 읽고 쓰는지 알아냅니다.
  *
  * 먼저 SQL 파서(JSQLParser)로 읽습니다. 정확합니다.
- * 파서가 못 읽으면 FROM / JOIN / INTO / UPDATE 뒤의 이름을 정규식으로 찾습니다. 덜 정확하지만 대부분 맞습니다.
+ * JSQLParser 가 못 읽으면 Druid 파서로 다시 읽습니다. 테이블과 CRUD 만 받습니다(컬럼은 뽑지 않는다).
+ * 둘 다 못 읽으면 FROM / JOIN / INTO / UPDATE 뒤의 이름을 정규식으로 찾습니다. 덜 정확하지만 대부분 맞습니다.
+ *   정규식은 함수 괄호 안의 FROM(trim(both ' ' from x), extract(year from d)), IS DISTINCT FROM, FROM 함수(...) 를 건너뜁니다.
+ *
+ * DB의 시스템 카탈로그(information_schema.tables, pg_class, ALL_TABLES 등)는 system 표시를 붙여 돌려줍니다. 업무 테이블이 아닙니다.
  *
  * 파서가 못 읽는 경우가 드물지 않습니다. 매퍼의 SQL은 조건에 따라 붙는 조각을 전부 이어 붙인 글이라
  * 문법에 안 맞을 수 있고(가장 흔한 WHERE AND ... 는 미리 다듬지만, 값 목록이나 컬럼 목록이 조건에 따라 달라지면 못 다듬는다),
@@ -46,7 +56,7 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
  * JSQLParser는 빠른 모드로 못 읽으면 "복잡한 파싱" 모드로 다시 시도하는데, 그 모드는 어떤 SQL에서 끝없이 오래 걸립니다.
  * 라이브러리가 주는 시간 제한 기능은 쓰지 않습니다. 그 기능은 파싱을 다른 스레드에 맡기고 시간이 지나면 기다리기만 그만둘 뿐,
  * 그 스레드는 계속 돌면서 CPU를 씁니다. 실제로 매퍼 1,900개를 돌렸을 때 그런 스레드가 수십 개 쌓여 서버 전체가 느려졌습니다.
- * 빠른 모드로 못 읽는 SQL은 정규식으로 찾으면 충분합니다.
+ * 빠른 모드로 못 읽는 SQL은 Druid 와 정규식으로 찾으면 충분합니다.
  *
  * 파서로 읽은 SQL에서는 테이블마다 쓰인 컬럼 이름도 모읍니다(ColumnFinder).
  * 어느 테이블의 컬럼인지 확실할 때만 넣습니다. 정규식으로 찾은 SQL에서는 컬럼을 뽑지 않습니다.
@@ -74,8 +84,44 @@ public class SqlTableExtractor {
 	private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
 	private static final Pattern LINE_COMMENT = Pattern.compile("--[^\\n]*");
 
-	/** WITH 이름 AS ( ... ) 의 이름. SQL 안에서만 쓰는 임시 이름이라 테이블이 아니다. */
-	private static final Pattern CTE_NAME = Pattern.compile("(?i)(?:\\bWITH\\s+(?:RECURSIVE\\s+)?|,\\s*)([A-Za-z_][\\w$]*)\\s*(?:\\([^()]*\\))?\\s+AS\\s*\\(");
+	/**
+	 * <pre>
+	 * WITH 이름 AS ( ... ) 의 이름. SQL 안에서만 쓰는 임시 이름이라 테이블이 아니다.
+	 * PostgreSQL 의 "이름 AS MATERIALIZED (" / "이름 AS NOT MATERIALIZED (" 도 받는다.
+	 * </pre>
+	 */
+	private static final Pattern CTE_NAME = Pattern.compile("(?i)(?:\\bWITH\\s+(?:RECURSIVE\\s+)?|,\\s*)([A-Za-z_][\\w$]*)\\s*(?:\\([^()]*\\))?\\s+AS\\s*(?:NOT\\s+)?(?:MATERIALIZED\\s*)?\\(");
+
+	/** 바로 앞이 DISTINCT 다: "a IS [NOT] DISTINCT FROM b" 의 FROM 은 비교다 */
+	private static final Pattern DISTINCT_BEFORE = Pattern.compile("(?i)\\bDISTINCT\\s*$");
+
+	/** 이름 바로 뒤에 여는 괄호가 온다: FROM unnest( ... ) 처럼 함수를 부른 것 */
+	private static final Pattern FUNCTION_CALL_AFTER = Pattern.compile("\\s*\\(");
+
+	/** 괄호 안이 서브쿼리로 시작한다 */
+	private static final Pattern SUBQUERY_START = Pattern.compile("(?i)\\s*(?:SELECT|WITH)\\b");
+
+	/** 괄호 앞에 와도 함수 이름이 아닌 키워드 */
+	private static final String NOT_FUNCTIONS = "|IN|EXISTS|FROM|JOIN|AS|ON|AND|OR|NOT|VALUES|ANY|ALL|SOME|LATERAL|USING|WHERE|SELECT|INTO"
+			+ "|SET|UNION|EXCEPT|INTERSECT|MINUS|THEN|ELSE|WHEN|CASE|BY|HAVING|OVER|MATERIALIZED|RECURSIVE|TABLE|";
+
+	/** 시스템 카탈로그의 스키마 */
+	private static final String SYSTEM_SCHEMAS = "|INFORMATION_SCHEMA|PG_CATALOG|SYS|SYSIBM|SYSCAT|MYSQL|PERFORMANCE_SCHEMA|";
+
+	/** 스키마 없이 써도 시스템 카탈로그인 이름(PostgreSQL 의 pg_catalog 와 Oracle 의 사전) */
+	private static final String SYSTEM_TABLES = "|PG_CLASS|PG_NAMESPACE|PG_ATTRIBUTE|PG_ATTRDEF|PG_TYPE|PG_PROC|PG_EXTENSION|PG_DATABASE"
+			+ "|PG_TABLES|PG_VIEWS|PG_MATVIEWS|PG_INDEXES|PG_INDEX|PG_CONSTRAINT|PG_DESCRIPTION|PG_TRIGGER|PG_SEQUENCES|PG_SEQUENCE"
+			+ "|PG_ROLES|PG_USER|PG_AUTHID|PG_SETTINGS|PG_LOCKS|PG_STAT_ACTIVITY|PG_STAT_USER_TABLES|PG_STAT_ALL_TABLES|PG_STAT_STATEMENTS"
+			+ "|PG_STATIO_USER_TABLES|PG_TABLESPACE|PG_DEPEND|PG_INHERITS|PG_ENUM|PG_TIMEZONE_NAMES"
+			+ "|DICTIONARY|DICT|";
+
+	/** Oracle 사전 뷰에서 ALL_ / USER_ / DBA_ 뒤에 오는 이름 */
+	private static final String ORACLE_DICTIONARY = "|TABLES|TAB_COLUMNS|TAB_COLS|TAB_COMMENTS|COL_COMMENTS|OBJECTS|SEQUENCES|INDEXES|IND_COLUMNS"
+			+ "|CONSTRAINTS|CONS_COLUMNS|VIEWS|SOURCE|SYNONYMS|USERS|PROCEDURES|ARGUMENTS|TRIGGERS|TAB_PRIVS|ROLE_PRIVS|SYS_PRIVS"
+			+ "|DEPENDENCIES|TAB_PARTITIONS|MVIEWS|DB_LINKS|JOBS|SCHEDULER_JOBS|SEGMENTS|EXTENTS|TABLESPACES|ERRORS|TYPES|LOBS|";
+
+	/** Druid 로 읽어 볼 DB 문법. 앞의 것부터 시도한다 */
+	private static final DbType[] DRUID_DIALECTS = new DbType[] { DbType.oracle, DbType.postgresql, DbType.mysql };
 
 	/**
 	 * <pre>
@@ -116,10 +162,16 @@ public class SqlTableExtractor {
 		/** C(넣기) / R(읽기) / U(고치기) / D(지우기) */
 		public final String crud;
 
-		/** 파서가 아니라 정규식으로 찾았으면 true */
+		/** 무엇으로 찾았나: VIA_PARSER(JSQLParser) / VIA_DRUID(Druid 파서) / VIA_PATTERN(정규식) */
+		public final String via;
+
+		/** 정규식으로 찾았으면 true(덜 확실하다) */
 		public final boolean guessed;
 
-		/** 이 SQL에서 쓰인 이 테이블의 컬럼(대문자, 이름 순). 정규식으로 찾았으면 null(읽지 못함) */
+		/** DB가 가진 시스템 카탈로그(information_schema.tables, pg_class, ALL_TABLES 등)면 true. 업무 테이블이 아니다 */
+		public final boolean system;
+
+		/** 이 SQL에서 쓰인 이 테이블의 컬럼(대문자, 이름 순). 컬럼을 읽지 못했으면 null(정규식, Druid) */
 		public final List<String> columns;
 
 		/** SQL 주석에 적힌 이 테이블 컬럼의 한글명(컬럼 → 한글명). 없으면 빈 Map */
@@ -128,23 +180,30 @@ public class SqlTableExtractor {
 		/** SQL 주석에 적힌 이 테이블의 한글명. 없으면 null */
 		public final String tableComment;
 
-		TableUse(String table, String crud, boolean guessed) {
-			this(table, crud, guessed, null, new LinkedHashMap<String, String>(), null);
+		TableUse(String table, String crud, String via, boolean system, List<String> columns) {
+			this(table, crud, via, system, columns, new LinkedHashMap<String, String>(), null);
 		}
 
-		TableUse(String table, String crud, boolean guessed, List<String> columns) {
-			this(table, crud, guessed, columns, new LinkedHashMap<String, String>(), null);
-		}
-
-		TableUse(String table, String crud, boolean guessed, List<String> columns, Map<String, String> columnComments, String tableComment) {
+		TableUse(String table, String crud, String via, boolean system, List<String> columns, Map<String, String> columnComments, String tableComment) {
 			this.table = table;
 			this.crud = crud;
-			this.guessed = guessed;
+			this.via = via;
+			this.guessed = VIA_PATTERN.equals(via);
+			this.system = system;
 			this.columns = columns;
 			this.columnComments = columnComments;
 			this.tableComment = tableComment;
 		}
 	}
+
+	/** 찾은 방법: JSQLParser 로 읽었다 */
+	public static final String VIA_PARSER = "PARSER";
+
+	/** 찾은 방법: JSQLParser 는 못 읽고 Druid 파서로 읽었다. 테이블과 CRUD 는 확실하지만 컬럼은 뽑지 않는다 */
+	public static final String VIA_DRUID = "DRUID";
+
+	/** 찾은 방법: 두 파서 모두 못 읽어 정규식으로 찾았다 */
+	public static final String VIA_PATTERN = "PATTERN";
 
 	/**
 	 * <pre>
@@ -154,7 +213,8 @@ public class SqlTableExtractor {
 	 *   1) 주석의 한글명을 먼저 읽어 둔다(다듬기에서 주석이 지워지므로).
 	 *   2) SQL 을 다듬고, WITH 절의 임시 이름을 모아 둔다(진짜 테이블이 아니다).
 	 *   3) 너무 길거나 괄호가 너무 깊지 않으면 파서로 읽는다.
-	 *   4) 파서가 못 읽으면 정규식으로 찾는다(guessed).
+	 *   4) 파서가 못 읽으면 Druid 로 읽는다(테이블과 CRUD 만).
+	 *   5) 그래도 못 읽으면 정규식으로 찾는다(guessed).
 	 * </pre>
 	 *
 	 * @param sql 매퍼에서 편 SQL(include는 이미 채워진 것)
@@ -177,13 +237,127 @@ public class SqlTableExtractor {
 			try {
 				return without(byParser(cleaned, comments), temporaryNames);
 			} catch (Exception e) {
-				// 문법에 안 맞거나 시간이 넘었다. 정규식으로 찾는다.
+				// 문법에 안 맞는다. Druid 로 다시 읽어 본다.
 			} catch (StackOverflowError e) {
 				// 지나치게 깊게 중첩된 SQL
+			}
+			List<TableUse> byDruid = byDruid(cleaned);
+			if (byDruid != null) {
+				// Druid 로 읽은 SQL도 별칭의 주인을 따로 모으지 않으므로 테이블 한글명만 쓴다.
+				return without(withComments(byDruid, comments, null), temporaryNames);
 			}
 		}
 		// 정규식으로 찾은 SQL은 별칭이 어느 테이블인지 모르므로 테이블 이름 바로 뒤의 주석(테이블 한글명)만 쓴다.
 		return without(withComments(byPattern(cleaned, statementType), comments, null), temporaryNames);
+	}
+
+	/**
+	 * <pre>
+	 * 같은 statement 를 &lt;choose&gt; 가지마다 따로 편 SQL 여러 개에서 테이블을 뽑아 합칩니다.
+	 *
+	 * 매퍼는 &lt;choose&gt; 의 가지 중 하나만 실행하지만, 펴 놓은 SQL 하나에는 모든 가지가 이어 붙어 있어서
+	 * "VALUES (...) SELECT NULL WHERE FALSE" 처럼 문법에 안 맞는 글이 되기 쉽습니다. 그러면 어떤 파서도 읽지 못합니다.
+	 * 가지마다 편 SQL은 각각 문법에 맞으므로 파서로 읽힐 가능성이 큽니다.
+	 *
+	 * 합치는 방법: 같은 (테이블, CRUD)는 하나로. 더 확실한 방법으로 찾은 쪽을 남기고(파서 &gt; Druid &gt; 정규식), 컬럼과 한글명은 모은다.
+	 * </pre>
+	 *
+	 * @param sqls 가지마다 편 SQL(include 는 이미 채운 것). 하나뿐이면 extract(sql, statementType) 과 같다
+	 */
+	public List<TableUse> extractAll(List<String> sqls, String statementType) {
+		Map<String, TableUse> merged = new LinkedHashMap<String, TableUse>();
+		for (int s = 0; s < sqls.size(); s++) {
+			List<TableUse> uses = extract(sqls.get(s), statementType);
+			for (int i = 0; i < uses.size(); i++) {
+				TableUse use = uses.get(i);
+				String key = use.table + "|" + use.crud;
+				TableUse before = merged.get(key);
+				merged.put(key, before == null ? use : merge(before, use));
+			}
+		}
+		return new ArrayList<TableUse>(merged.values());
+	}
+
+	/** 같은 (테이블, CRUD)를 두 가지에서 찾았을 때 하나로 합칩니다. */
+	private TableUse merge(TableUse a, TableUse b) {
+		TableUse better = rankOf(b.via) > rankOf(a.via) ? b : a;
+		List<String> columns = better.columns;
+		if (a.columns != null && b.columns != null) {
+			Set<String> union = new TreeSet<String>(a.columns);
+			union.addAll(b.columns);
+			columns = new ArrayList<String>(union);
+		}
+		Map<String, String> columnComments = new LinkedHashMap<String, String>(a.columnComments);
+		for (Map.Entry<String, String> entry : b.columnComments.entrySet()) {
+			if (!columnComments.containsKey(entry.getKey())) {
+				columnComments.put(entry.getKey(), entry.getValue());
+			}
+		}
+		return new TableUse(a.table, a.crud, better.via, a.system || b.system, columns, columnComments
+				, a.tableComment != null ? a.tableComment : b.tableComment);
+	}
+
+	/** 찾은 방법의 확실한 정도. 클수록 확실하다 */
+	private int rankOf(String via) {
+		if (VIA_PARSER.equals(via)) {
+			return 3;
+		}
+		return VIA_DRUID.equals(via) ? 2 : 1;
+	}
+
+	/**
+	 * <pre>
+	 * JSQLParser 가 못 읽은 SQL을 Druid 파서로 읽어 테이블과 CRUD 를 뽑습니다. 못 읽으면 null(그러면 정규식으로 간다).
+	 *
+	 * Druid 는 DB 문법마다 파서가 따로 있습니다. 어느 DB의 SQL인지 모르므로 Oracle → PostgreSQL → MySQL 순으로 읽어 보고, 처음 읽힌 것을 씁니다.
+	 * 이 스레드에서 바로 읽습니다(다른 스레드에 맡기지 않는다).
+	 * 컬럼은 뽑지 않습니다. 별칭이 어느 테이블인지 가리는 일을 ColumnFinder 만큼 확인하지 않았기 때문입니다.
+	 *
+	 * CRUD 는 Druid 가 센 횟수로 정합니다. 넣기 → C, 고치기 / MERGE → U, 지우기 → D, 읽기 → R.
+	 * 한 테이블을 넣으면서 읽기도 하면 둘 다 남깁니다(INSERT INTO t SELECT ... FROM t).
+	 * </pre>
+	 */
+	private List<TableUse> byDruid(String sql) {
+		for (int d = 0; d < DRUID_DIALECTS.length; d++) {
+			try {
+				List<SQLStatement> statements = SQLUtils.parseStatements(sql, DRUID_DIALECTS[d]);
+				if (statements.isEmpty()) {
+					return null;
+				}
+				Map<String, TableUse> uses = new LinkedHashMap<String, TableUse>();
+				for (int s = 0; s < statements.size(); s++) {
+					SchemaStatVisitor visitor = SQLUtils.createSchemaStatVisitor(DRUID_DIALECTS[d]);
+					statements.get(s).accept(visitor);
+					for (Map.Entry<TableStat.Name, TableStat> entry : visitor.getTables().entrySet()) {
+						String written = entry.getKey().getName();
+						String name = normalize(written);
+						if (name == null) {
+							continue;
+						}
+						boolean system = isSystemObject(written);
+						TableStat stat = entry.getValue();
+						if (stat.getInsertCount() > 0) {
+							uses.put(name + "|C", new TableUse(name, "C", VIA_DRUID, system, null));
+						}
+						if (stat.getUpdateCount() > 0 || stat.getMergeCount() > 0) {
+							uses.put(name + "|U", new TableUse(name, "U", VIA_DRUID, system, null));
+						}
+						if (stat.getDeleteCount() > 0) {
+							uses.put(name + "|D", new TableUse(name, "D", VIA_DRUID, system, null));
+						}
+						if (stat.getSelectCount() > 0) {
+							uses.put(name + "|R", new TableUse(name, "R", VIA_DRUID, system, null));
+						}
+					}
+				}
+				return new ArrayList<TableUse>(uses.values());
+			} catch (Exception e) {
+				// 이 문법으로는 못 읽는다. 다음 문법으로.
+			} catch (StackOverflowError e) {
+				return null;
+			}
+		}
+		return null;
 	}
 
 	/** names(WITH 절의 임시 이름 등 진짜 테이블이 아닌 것)에 든 테이블을 뺀 목록 */
@@ -262,7 +436,8 @@ public class SqlTableExtractor {
 
 		Map<String, TableUse> uses = new LinkedHashMap<String, TableUse>();
 		if (targetName != null) {
-			uses.put(targetName + "|" + targetCrud, new TableUse(targetName, targetCrud, false, finder.columnsOf(targetName)));
+			uses.put(targetName + "|" + targetCrud, new TableUse(targetName, targetCrud, VIA_PARSER, isSystemObject(target.getFullyQualifiedName())
+					, finder.columnsOf(targetName)));
 		}
 		boolean targetSeen = false;
 		for (int i = 0; i < names.size(); i++) {
@@ -275,7 +450,7 @@ public class SqlTableExtractor {
 				targetSeen = true;
 				continue;
 			}
-			uses.put(name + "|R", new TableUse(name, "R", false, finder.columnsOf(name)));
+			uses.put(name + "|R", new TableUse(name, "R", VIA_PARSER, isSystemObject(names.get(i)), finder.columnsOf(name)));
 		}
 		return withComments(new ArrayList<TableUse>(uses.values()), comments, finder);
 	}
@@ -504,7 +679,7 @@ public class SqlTableExtractor {
 		for (int i = 0; i < uses.size(); i++) {
 			TableUse use = uses.get(i);
 			Map<String, String> byColumn = columnComments.get(use.table);
-			result.add(new TableUse(use.table, use.crud, use.guessed, use.columns
+			result.add(new TableUse(use.table, use.crud, use.via, use.system, use.columns
 					, byColumn == null ? new LinkedHashMap<String, String>() : byColumn, tableComments.get(use.table)));
 		}
 		return result;
@@ -796,10 +971,22 @@ public class SqlTableExtractor {
 	 */
 	private List<TableUse> byPattern(String sql, String statementType) {
 		Map<String, TableUse> uses = new LinkedHashMap<String, TableUse>();
+		boolean[] inFunction = functionArgumentsOf(sql);
 		Matcher m = TABLE_AFTER_KEYWORD.matcher(sql);
 		boolean targetFound = false;
 		while (m.find()) {
 			String keyword = m.group(1).toUpperCase(Locale.ROOT);
+			boolean fromOrJoin = "FROM".equals(keyword) || "JOIN".equals(keyword);
+			// 테이블 앞의 FROM 이 아닌 것들은 건너뛴다.
+			//   함수 괄호 안의 FROM: trim(both '"' from a.text), extract(year from d), substring(s from 2)
+			//   비교의 FROM: a.x IS DISTINCT FROM b.x
+			//   FROM 함수(...): FROM unnest(...), FROM generate_series(...) 은 테이블이 아니다(INTO t(...) 는 컬럼 목록이라 뺀다)
+			if ("FROM".equals(keyword) && (inFunction[m.start()] || DISTINCT_BEFORE.matcher(sql.substring(Math.max(0, m.start() - 20), m.start())).find())) {
+				continue;
+			}
+			if (fromOrJoin && FUNCTION_CALL_AFTER.matcher(sql).region(m.end(), sql.length()).lookingAt()) {
+				continue;
+			}
 			String name = normalize(m.group(2));
 			if (name == null) {
 				continue;
@@ -816,9 +1003,88 @@ public class SqlTableExtractor {
 				}
 				targetFound = !"R".equals(crud);
 			}
-			uses.put(name + "|" + crud, new TableUse(name, crud, true));
+			uses.put(name + "|" + crud, new TableUse(name, crud, VIA_PATTERN, isSystemObject(m.group(2)), null));
 		}
 		return new ArrayList<TableUse>(uses.values());
+	}
+
+	/**
+	 * <pre>
+	 * 글자마다 "함수 괄호 안인가"를 표시합니다. byPattern 이 함수 인자 속의 FROM 을 테이블로 잡지 않게 할 때 씁니다.
+	 *
+	 * 괄호 바로 앞에 이름이 붙어 있으면 함수 괄호로 봅니다: trim( / extract( / substring(
+	 * 다만 괄호 안이 SELECT / WITH 로 시작하면 서브쿼리이고, IN / EXISTS 같은 키워드 뒤의 괄호도 함수가 아닙니다.
+	 * 따옴표 안의 괄호는 세지 않습니다.
+	 * </pre>
+	 */
+	private boolean[] functionArgumentsOf(String sql) {
+		boolean[] inFunction = new boolean[sql.length() + 1];
+		List<Boolean> stack = new ArrayList<Boolean>();
+		boolean quoted = false;
+		for (int i = 0; i < sql.length(); i++) {
+			char c = sql.charAt(i);
+			if (c == '\'') {
+				quoted = !quoted;
+			} else if (!quoted && c == '(') {
+				stack.add(Boolean.valueOf(isFunctionParen(sql, i)));
+			} else if (!quoted && c == ')' && !stack.isEmpty()) {
+				stack.remove(stack.size() - 1);
+			}
+			inFunction[i] = !stack.isEmpty() && stack.get(stack.size() - 1).booleanValue();
+		}
+		return inFunction;
+	}
+
+	/** open 자리의 여는 괄호가 함수 호출의 괄호인지: 앞에 이름이 붙어 있고, 그 이름이 키워드가 아니고, 안이 서브쿼리가 아닐 때 */
+	private boolean isFunctionParen(String sql, int open) {
+		if (SUBQUERY_START.matcher(sql).region(open + 1, sql.length()).lookingAt()) {
+			return false;
+		}
+		int end = open;
+		while (end > 0 && sql.charAt(end - 1) == ' ') {
+			end--;
+		}
+		int start = end;
+		while (start > 0 && (Character.isLetterOrDigit(sql.charAt(start - 1)) || sql.charAt(start - 1) == '_' || sql.charAt(start - 1) == '$')) {
+			start--;
+		}
+		if (start == end) {
+			return false;
+		}
+		String word = sql.substring(start, end).toUpperCase(Locale.ROOT);
+		return NOT_FUNCTIONS.indexOf("|" + word + "|") < 0;
+	}
+
+	/**
+	 * <pre>
+	 * DB가 가진 시스템 카탈로그인지 봅니다. 업무 테이블이 아니라서 테이블 관계로 넣지 않습니다.
+	 *
+	 *   스키마가 붙은 것: information_schema.* / pg_catalog.* / sys.* / mysql.* / performance_schema.* / sysibm.* / syscat.*
+	 *   이름만으로: PostgreSQL 카탈로그(pg_class, pg_extension ...), Oracle 사전 뷰(ALL_TABLES, USER_TAB_COLUMNS ...), V$ / GV$ 뷰
+	 * PG_ / USER_ 로 시작한다고 모두 빼지는 않습니다. PG_PAYMENT(결제대행), USER_INFO 같은 업무 테이블이 흔해서, 알려진 이름만 봅니다.
+	 * </pre>
+	 */
+	static boolean isSystemObject(String written) {
+		if (written == null) {
+			return false;
+		}
+		String name = written.replace("\"", "").replace("`", "").replace("[", "").replace("]", "").trim().toUpperCase(Locale.ROOT);
+		int dot = name.lastIndexOf('.');
+		String bare = dot < 0 ? name : name.substring(dot + 1);
+		if (dot > 0) {
+			String schema = name.substring(0, dot);
+			schema = schema.substring(schema.lastIndexOf('.') + 1);
+			if (SYSTEM_SCHEMAS.indexOf("|" + schema + "|") >= 0) {
+				return true;
+			}
+		}
+		if (bare.startsWith("V$") || bare.startsWith("GV$")) {
+			return true;
+		}
+		if (bare.startsWith("ALL_") || bare.startsWith("USER_") || bare.startsWith("DBA_")) {
+			return ORACLE_DICTIONARY.indexOf("|" + bare.substring(bare.indexOf('_') + 1) + "|") >= 0;
+		}
+		return SYSTEM_TABLES.indexOf("|" + bare + "|") >= 0;
 	}
 
 	/** 따옴표와 스키마를 떼고 대문자로 맞춥니다(DPHJSDBA.JZ_EMP_INFO → JZ_EMP_INFO). 테이블이 아닌 것(DUAL 등)은 null */

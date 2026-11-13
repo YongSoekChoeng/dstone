@@ -80,6 +80,14 @@
 			<version>4.7</version>
 		</dependency>
 
+		<!-- SQL 분석의 두 번째 단계: JSQLParser 가 못 읽은 SQL을 Druid 의 SQL 파서로 다시 읽는다(테이블과 CRUD 만).
+		     Druid 의 커넥션 풀은 쓰지 않는다(이 모듈의 DataSource 는 HikariCP). 자동 설정이 없는 본체 jar 만 넣는다. -->
+		<dependency>
+			<groupId>com.alibaba</groupId>
+			<artifactId>druid</artifactId>
+			<version>1.2.27</version>
+		</dependency>
+
 		<!-- 임베딩 모델 호출(Spring AI). 이 모듈에서 Spring AI는 "글 → 벡터"로 바꾸는 호출에만 쓴다.
 		     벡터를 저장하고 검색하는 SQL은 MyBatis로 직접 쓴다(PgVectorStore를 쓰지 않는다).
 		     임베딩의 키가 (내용 해시, 모델)이고 그 테이블이 곧 대기열이라, Spring AI가 정해 둔 테이블 구조와 맞지 않기 때문이다.

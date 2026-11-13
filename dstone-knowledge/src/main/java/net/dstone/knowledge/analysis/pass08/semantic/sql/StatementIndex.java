@@ -27,8 +27,8 @@ class StatementIndex {
 	/** 조각: "네임스페이스.id" → mapper_id */
 	final Map<String, Long> fragments = new HashMap<String, Long>();
 	final Map<String, List<Long>> fragmentsById = new HashMap<String, List<Long>>();
-	/** 조각의 본문. 여러 statement가 같은 조각을 가져오므로 기억해 둔다. */
-	final BoundedCache<Long, String> fragmentBodies = new BoundedCache<Long, String>(2000);
+	/** 조각의 본문. 여러 statement가 같은 조각을 가져오므로 기억해 둔다. [0] 은 모든 가지를 이은 본문, [1] 부터는 choose 가지마다 편 본문 */
+	final BoundedCache<Long, List<String>> fragmentBodies = new BoundedCache<Long, List<String>>(2000);
 
 	/** load() 로만 만듭니다. */
 	private StatementIndex() {

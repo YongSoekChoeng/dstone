@@ -66,9 +66,19 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectMapperPage", param);
 	}
 
-	/** statement 하나의 SQL 본문 */
-	public String selectMapperBody(long mapperId) {
+	/** 조각 하나의 SQL 본문. 키: sqlBody, hasVariants(choose 가지마다 편 본문이 있으면 true). 없는 조각이면 null */
+	public Map<String, Object> selectMapperBody(long mapperId) {
 		return sqlSessionCommon.selectOne(NS + "selectMapperBody", mapperId);
+	}
+
+	/** choose 가지마다 편 SQL 본문(가지 순서대로). 없으면 빈 목록 */
+	public List<String> selectChooseVariants(long mapperId) {
+		return sqlSessionCommon.selectList(NS + "selectChooseVariants", mapperId);
+	}
+
+	/** 이 리비전의 SQL이 CREATE TEMP TABLE 로 만드는 임시 테이블의 이름(적힌 그대로) */
+	public List<String> selectTempTableNames(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectTempTableNames", revisionId);
 	}
 
 	/** 인터페이스 방식의 매퍼: 네임스페이스가 인터페이스의 전체 이름이고 statement id 가 메소드 이름이다. 그 메소드가 곧 이 SQL 을 실행한다 */

@@ -11,6 +11,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.common.util.SafeXml;
 
 /**
@@ -27,6 +28,11 @@ import net.dstone.knowledge.common.util.SafeXml;
  *   - where / set 태그는 WHERE / SET 글자로 바꾼다. trim, foreach, dynamic의 prefix / open / prepend도 글자로 붙인다.
  *   - include는 "@@include(이름)@@" 표시로 남긴다. 다른 파일의 조각일 수 있어서, 모든 매퍼를 읽은 뒤에 채운다(MapperLinker).
  *   - selectKey(키를 미리 뽑는 딸린 SQL)는 뺀다.
+ *
+ * &lt;choose&gt; 는 가지 중 하나만 실행되는데, 모든 가지를 이어 붙이면 문법에 안 맞는 SQL이 되기 쉽습니다.
+ * 그래서 가지가 둘 이상인 choose 가 있으면 "가지마다 편 SQL"도 따로 만들어 properties_json.chooseVariants 에 둡니다.
+ *   k 번째 SQL은 모든 choose 에서 k 번째 가지(가지가 그보다 적으면 마지막 가지)를 고른 것입니다. 최대 MAX_CHOOSE_VARIANTS 개.
+ *   sql_body(보여 주고 문서로 만드는 글)는 그대로 모든 가지를 이은 것입니다. chooseVariants 는 테이블을 뽑을 때만 씁니다(MapperLinker).
  * </pre>
  */
 public class MapperXmlReader {
@@ -34,6 +40,15 @@ public class MapperXmlReader {
 	/** include 자리에 남겨 두는 표시의 앞뒤 */
 	public static final String INCLUDE_OPEN = "@@include(";
 	public static final String INCLUDE_CLOSE = ")@@";
+
+	/** properties_json 에서 가지마다 편 SQL을 담는 키 */
+	public static final String CHOOSE_VARIANTS = "chooseVariants";
+
+	/** 가지마다 편 SQL을 만드는 최대 개수 */
+	private static final int MAX_CHOOSE_VARIANTS = 8;
+
+	/** flatten 의 branch 값: choose 의 모든 가지를 잇는다 */
+	private static final int ALL_BRANCHES = -1;
 
 	/**
 	 * <pre>
@@ -103,13 +118,26 @@ public class MapperXmlReader {
 
 			// 3) SQL 글과 줄 번호
 			StringBuilder sql = new StringBuilder();
-			flatten(element, sql);
+			flatten(element, sql, ALL_BRANCHES);
 			String body = tidy(sql.toString());
 
 			int[] lines = linesOf(text, id, searchFrom);
 			searchFrom = lines[2];
 
 			Map<String, Object> row = new HashMap<String, Object>();
+			// 가지가 둘 이상인 choose 가 있으면 가지마다 편 SQL도 남긴다.
+			int branches = Math.min(maxChooseBranches(element), MAX_CHOOSE_VARIANTS);
+			if (branches > 1) {
+				List<String> variants = new ArrayList<String>();
+				for (int k = 0; k < branches; k++) {
+					StringBuilder variant = new StringBuilder();
+					flatten(element, variant, k);
+					variants.add(tidy(variant.toString()));
+				}
+				Map<String, Object> properties = new HashMap<String, Object>();
+				properties.put(CHOOSE_VARIANTS, variants);
+				row.put("propertiesJson", JsonText.of(properties));
+			}
 			row.put("mapperType", ibatis ? "IBATIS" : "MYBATIS");
 			row.put("namespace", namespace);
 			row.put("statementId", id);
@@ -162,7 +190,7 @@ public class MapperXmlReader {
 				continue;
 			}
 			StringBuilder sql = new StringBuilder();
-			flatten(statement, sql);
+			flatten(statement, sql, ALL_BRANCHES);
 			String body = tidy(stripVelocity(sql.toString()));
 
 			int[] lines = linesOf(text, id, searchFrom);
@@ -307,8 +335,14 @@ public class MapperXmlReader {
 		return sb.toString();
 	}
 
-	/** 요소 안의 SQL을 글 하나로 폅니다. */
-	private void flatten(Node node, StringBuilder out) {
+	/**
+	 * <pre>
+	 * 요소 안의 SQL을 글 하나로 폅니다.
+	 * </pre>
+	 *
+	 * @param branch choose 에서 고를 가지 번호(0부터, 가지가 적으면 마지막 가지). ALL_BRANCHES 면 모든 가지를 잇는다
+	 */
+	private void flatten(Node node, StringBuilder out, int branch) {
 		NodeList children = node.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++) {
 			Node child = children.item(i);
@@ -328,18 +362,49 @@ public class MapperXmlReader {
 				continue;
 			} else if ("where".equals(tag)) {
 				out.append(" WHERE ");
-				flatten(element, out);
+				flatten(element, out, branch);
 			} else if ("set".equals(tag)) {
 				out.append(" SET ");
-				flatten(element, out);
+				flatten(element, out, branch);
+			} else if ("choose".equals(tag) && branch != ALL_BRANCHES) {
+				// 가지(when / otherwise) 하나만 편다.
+				List<Element> arms = chooseArms(element);
+				if (!arms.isEmpty()) {
+					out.append(' ');
+					flatten(arms.get(Math.min(branch, arms.size() - 1)), out, branch);
+					out.append(' ');
+				}
 			} else {
 				// if, choose/when/otherwise, foreach, trim, bind, dynamic, isNotEmpty, iterate ...
 				// 앞뒤에 붙이라고 적어 둔 글자(prefix, open, prepend)가 있으면 붙인다.
 				out.append(' ').append(firstAttributeOrEmpty(element, "prefix", "open", "prepend")).append(' ');
-				flatten(element, out);
+				flatten(element, out, branch);
 				out.append(' ').append(firstAttributeOrEmpty(element, "suffix", "close")).append(' ');
 			}
 		}
+	}
+
+	/** choose 의 가지(when, otherwise)를 적힌 순서대로 */
+	private List<Element> chooseArms(Element choose) {
+		List<Element> arms = new ArrayList<Element>();
+		NodeList children = choose.getChildNodes();
+		for (int i = 0; i < children.getLength(); i++) {
+			Node child = children.item(i);
+			if (child.getNodeType() == Node.ELEMENT_NODE && ("when".equals(child.getNodeName()) || "otherwise".equals(child.getNodeName()))) {
+				arms.add((Element) child);
+			}
+		}
+		return arms;
+	}
+
+	/** 요소 안(include 로 가져오는 조각은 빼고)의 choose 가운데 가지가 가장 많은 것의 가지 수. choose 가 없으면 0 */
+	private int maxChooseBranches(Element element) {
+		int max = 0;
+		NodeList chooses = element.getElementsByTagName("choose");
+		for (int i = 0; i < chooses.getLength(); i++) {
+			max = Math.max(max, chooseArms((Element) chooses.item(i)).size());
+		}
+		return max;
 	}
 
 	/** select / insert ... 태그는 그대로, statement / procedure 태그는 SQL의 첫 단어로 정합니다. */

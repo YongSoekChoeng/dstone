@@ -238,6 +238,60 @@ public class SqlTableExtractorTest {
 		return texts.toString();
 	}
 
+	@Test
+	public void 정규식은_함수_괄호_안의_FROM과_DISTINCT_FROM과_MATERIALIZED_WITH_이름을_테이블로_잡지_않는다() {
+		// 끝의 "( (" 때문에 두 파서 모두 못 읽어 정규식으로 간다.
+		List<SqlTableExtractor.TableUse> uses = extractor.extract(
+				"WITH lit AS MATERIALIZED (SELECT trim(both '\"' from a.text) AS v, extract(year from a.reg_dt) AS y FROM TB_ARG a)"
+				+ " SELECT l.v FROM lit l JOIN TB_STMT s ON s.name IS DISTINCT FROM l.v CROSS JOIN generate_series(1, 3) g"
+				+ " WHERE s.kind IS NOT DISTINCT FROM l.y AND EXISTS (SELECT 1 FROM TB_VIEW v WHERE v.x = l.v) ( (", "SELECT");
+
+		assertEquals("[TB_ARG:R, TB_STMT:R, TB_VIEW:R]", textOf(uses));
+		assertTrue(anyGuessed(uses));
+	}
+
+	@Test
+	public void DB의_시스템_카탈로그는_system으로_표시한다() {
+		List<SqlTableExtractor.TableUse> uses = extractor.extract(
+				"SELECT t.table_name FROM information_schema.tables t JOIN pg_extension e ON e.extname = t.table_name", "SELECT");
+		assertEquals("[PG_EXTENSION:R, TABLES:R]", textOf(uses));
+		assertTrue(uses.get(0).system && uses.get(1).system);
+
+		// 알려진 사전 이름만 본다. PG_ / USER_ 로 시작하는 업무 테이블은 시스템이 아니다.
+		assertTrue(SqlTableExtractor.isSystemObject("ALL_TAB_COLUMNS"));
+		assertTrue(SqlTableExtractor.isSystemObject("sys.dba_objects"));
+		assertTrue(SqlTableExtractor.isSystemObject("V$SESSION"));
+		assertTrue(!SqlTableExtractor.isSystemObject("PG_PAYMENT"));
+		assertTrue(!SqlTableExtractor.isSystemObject("USER_INFO"));
+		assertTrue(!SqlTableExtractor.isSystemObject("SCOTT.TB_ORDER"));
+	}
+
+	@Test
+	public void JSQLParser가_못_읽는_SQL은_Druid로_읽고_컬럼은_뽑지_않는다() {
+		// JSQLParser 4.7 은 EXCEPT ALL 을 읽지 못한다.
+		List<SqlTableExtractor.TableUse> uses = extractor.extract(
+				"SELECT kind, category FROM TB_AFTER EXCEPT ALL SELECT kind, category FROM TB_BEFORE", "SELECT");
+
+		assertEquals("[TB_AFTER:R, TB_BEFORE:R]", textOf(uses));
+		for (int i = 0; i < uses.size(); i++) {
+			assertEquals(SqlTableExtractor.VIA_DRUID, uses.get(i).via);
+			assertTrue(!uses.get(i).guessed);
+			assertTrue(uses.get(i).columns == null);
+		}
+	}
+
+	@Test
+	public void choose_가지마다_편_SQL은_각각_읽어_합친다() {
+		// 두 가지를 이어 붙이면 "VALUES (?) SELECT ..." 가 되어 어느 파서도 못 읽는다.
+		List<String> sqls = new ArrayList<String>();
+		sqls.add("INSERT INTO TB_A (X) VALUES (#{x})");
+		sqls.add("INSERT INTO TB_A (X) SELECT X FROM TB_B WHERE Y = #{y}");
+		List<SqlTableExtractor.TableUse> uses = extractor.extractAll(sqls, "INSERT");
+
+		assertEquals("[TB_A:C, TB_B:R]", textOf(uses));
+		assertTrue(!anyGuessed(uses));
+	}
+
 	/** 순서와 상관없이 비교하려고 "테이블:종류"를 이름순으로 늘어놓습니다. */
 	private String textOf(List<SqlTableExtractor.TableUse> uses) {
 		List<String> texts = new ArrayList<String>();
