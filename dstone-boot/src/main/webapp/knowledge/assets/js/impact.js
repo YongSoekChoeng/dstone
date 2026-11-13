@@ -170,13 +170,41 @@ var DstoneKnowledgeImpact = (function () {
 				{ key: "depth", label: "거리", num: true },
 				{ key: "relationType", label: "관계" },
 				{ key: "confidence", label: "신뢰도", html: function (row) { return K.confidence(row.confidence); } },
-				{ key: callers ? "from" : "to", label: callers ? "부르는 쪽" : "불리는 쪽", mono: true },
+				{ key: callers ? "from" : "to", label: callers ? "부르는 쪽" : "불리는 쪽", mono: true }
+			].concat(callers ? [
+				// 부르는 쪽이 이 단계에서 무엇을 부르나. 화면 한 줄(공통 스크립트 등)이 주소 여러 개를 요청하면 이 열로 줄이 구분된다.
+				{ key: "to", label: "→ 거쳐 가는 곳", mono: true, html: function (row) { return callTarget(row, method); } }
+			] : []).concat([
 				{ key: "path", label: "적힌 파일", mono: true },
 				{ key: "lineStart", label: "줄", num: true }
-			], rows, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
+			]), rows, callers ? "부르는 쪽이 없습니다(진입점이거나, 분석이 잇지 못한 호출일 수 있습니다)." : "부르는 것이 없습니다.");
 		}).catch(function (err) {
 			K.message(el["kn-graph-message"], err.message, true);
 		});
+	}
+
+	/**
+	 * "→ 거쳐 가는 곳" 칸. 고른 메소드를 바로 부르면 "이 메소드", 아니면 그 단계에서 불리는 메소드(클래스#이름)이고,
+	 * 화면이 주소를 요청한 것(REQUESTS)이면 그 주소를 붙인다. 불러온 스크립트에 적힌 주소면 그렇다고 적는다.
+	 */
+	function callTarget(row, method) {
+		var text = row.toId === method.methodId ? "이 메소드" : shortMethod(row.to || row.toId || "");
+		if (row.requestPath) {
+			text += " · " + row.requestPath + (row.via === "SCRIPT_SRC" ? " (불러온 스크립트)" : "");
+		}
+		return K.escapeHtml(text);
+	}
+
+	/** kr.co.gnx.CommonCodeController#getCommonCode(HttpServletRequest,...) → CommonCodeController#getCommonCode() */
+	function shortMethod(fqn) {
+		var hash = fqn.indexOf("#");
+		if (hash < 0) {
+			return fqn;
+		}
+		var owner = fqn.substring(0, hash);
+		var name = fqn.substring(hash + 1);
+		var paren = name.indexOf("(");
+		return owner.substring(owner.lastIndexOf(".") + 1) + "#" + (paren < 0 ? name : name.substring(0, paren) + (name.charAt(paren + 1) === ")" ? "()" : "(…)"));
 	}
 
 	function eachRow(container, callback) {

@@ -329,15 +329,15 @@
     <!-- 이 메소드를 부르는 쪽. depth 만큼 거슬러 올라간다(부르는 쪽의 부르는 쪽 ...).
          depth 가 같아도 같은 호출이 여러 줄에 있을 수 있어서 줄마다 한 행이다 -->
     <select id="selectCallers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        WITH RECURSIVE walk (depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start) AS (
-            SELECT 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start
+        WITH RECURSIVE walk (depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, via, request_path) AS (
+            SELECT 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json ->> 'via', r.properties_json ->> 'path'
               FROM analysis_relation r
              WHERE r.revision_id = #{revisionId}
                AND r.to_id = #{methodId}
                AND r.relation_type IN
             <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
             UNION
-            SELECT w.depth + 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start
+            SELECT w.depth + 1, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.file_id, r.line_start, r.properties_json ->> 'via', r.properties_json ->> 'path'
               FROM walk w
               JOIN analysis_relation r
                 ON r.revision_id = #{revisionId}
@@ -353,17 +353,22 @@
              , w.from_id AS "fromId"
              , n.fqn AS "from"
              , w.to_id AS "toId"
+             , t.fqn AS "to"
+             , w.via AS "via"
+             , w.request_path AS "requestPath"
              , f.path AS "path"
              , w.line_start AS "lineStart"
           FROM (
                 -- 서로를 부르는 메소드(a → b → a)가 있으면 같은 호출이 깊이를 바꿔 가며 다시 나온다. 가장 얕은 것 하나만 남긴다.
-                SELECT MIN(depth) AS depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start
+                SELECT MIN(depth) AS depth, from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, via, request_path
                   FROM walk
-                 GROUP BY from_id, from_kind, to_id, relation_type, confidence, file_id, line_start
+                 GROUP BY from_id, from_kind, to_id, relation_type, confidence, file_id, line_start, via, request_path
                ) w
           LEFT JOIN kg_node n ON n.revision_id = #{revisionId} AND n.node_id = w.from_id
+          -- 이 단계에서 불리는 쪽. 화면 한 줄이 여러 주소를 요청하면 이 열과 요청 주소로 줄이 구분된다.
+          LEFT JOIN kg_node t ON t.revision_id = #{revisionId} AND t.node_id = w.to_id
           LEFT JOIN analysis_file f ON f.file_id = w.file_id
-         ORDER BY w.depth, n.fqn, w.line_start
+         ORDER BY w.depth, n.fqn, w.line_start, t.fqn
          LIMIT #{limit}
     </select>
 
