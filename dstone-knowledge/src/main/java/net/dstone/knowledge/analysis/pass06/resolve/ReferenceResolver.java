@@ -12,6 +12,7 @@ import com.github.javaparser.Position;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.Node;
+import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.EnumConstantDeclaration;
 import com.github.javaparser.ast.body.EnumDeclaration;
@@ -229,7 +230,7 @@ public class ReferenceResolver {
 	 * new Foo()                 → resolveCreation (익명 클래스면 상위 타입도 resolveType)
 	 * 몸통 있는 enum 상수       → resolveEnumBody
 	 * a.b (필드 접근)           → resolveFieldAccess
-	 * Foo::bar                  → guessByName (이름으로만)
+	 * Foo::bar                  → resolveMethodRef
 	 * 타입 이름                 → resolveType (사용 / 상속 / 구현 / throws)
 	 * </pre>
 	 */
@@ -274,8 +275,7 @@ public class ReferenceResolver {
 		} else if (node instanceof MethodReferenceExpr) {
 			Map<String, Object> reference = take(context, "METHOD_REF", node);
 			if (reference != null) {
-				// Foo::bar 는 해석기가 잘 풀지 못한다. 이름으로만 후보를 찾는다.
-				guessByName(context, reference, "CALLS", (String) reference.get("name"), null, "메소드 참조(::)는 이름으로만 찾습니다.");
+				resolveMethodRef(context, reference, (MethodReferenceExpr) node);
 			}
 		} else if (node instanceof ClassOrInterfaceType) {
 			ClassOrInterfaceType type = (ClassOrInterfaceType) node;
@@ -380,6 +380,119 @@ public class ReferenceResolver {
 			return;
 		}
 		guessByName(context, reference, "CALLS", name, argCount, failure);
+	}
+
+	/**
+	 * <pre>
+	 * 메소드 참조(Foo::bar, this::bar, list::add, Foo::new) 하나를 풉니다.
+	 * 메소드 호출(resolveCall)과 같은 순서로 풀되, 인자 수는 모르므로 이름만 봅니다.
+	 *
+	 * 순서:
+	 *   1) 해석기로 풀어 본다.
+	 *   2) 못 풀면 :: 앞의 타입을 알아낸다(Claims → import 로 io.jsonwebtoken.Claims).
+	 *      프로젝트 밖 타입이면 EXTERNAL_METHOD 로, 안 타입이면 그 타입(과 상위 타입)의 같은 이름 메소드로 잇는다.
+	 *   3) 타입도 모를 때만 프로젝트 전체에서 이름으로 짐작한다.
+	 * Foo::new 는 Foo 의 생성자(&lt;init&gt;)를 부르는 것으로 보고, int[]::new 같은 배열 생성은 풀지 않는다(IGNORED).
+	 * </pre>
+	 */
+	private void resolveMethodRef(FileContext context, Map<String, Object> reference, MethodReferenceExpr methodRef) {
+		boolean constructor = "new".equals(methodRef.getIdentifier());
+		String name = constructor ? "<init>" : methodRef.getIdentifier();
+		Expression scope = methodRef.getScope();
+
+		// 배열 생성(int[]::new, String[]::new)은 부르는 메소드가 없다.
+		if (constructor && scope.isTypeExpr() && scope.asTypeExpr().getType().isArrayType()) {
+			update(context, reference, "IGNORED", "배열 생성(타입[]::new)은 메소드 호출이 아닙니다.");
+			return;
+		}
+
+		// 1) 해석기
+		String failure;
+		if (constructor) {
+			// 해석기는 생성자 참조를 풀지 못한다. 바로 타입으로 찾는다.
+			failure = "생성자 참조(::new)는 타입으로 찾습니다.";
+		} else {
+			try {
+				ResolvedMethodDeclaration solved = methodRef.resolve();
+				emitCallable(context, reference, "CALLS", solved, name, solved.getNumberOfParams());
+				return;
+			} catch (StackOverflowError e) {
+				failure = "해석기 오류: StackOverflowError";
+			} catch (RuntimeException e) {
+				failure = "해석기 오류: " + summaryOf(e);
+			}
+		}
+
+		// 2) :: 앞의 타입
+		String owner = typeOfExpression(context, scope);
+		if (owner == null && scope.isThisExpr() && !scope.asThisExpr().getTypeName().isPresent() && !insideAnonymousClass(methodRef)) {
+			// this::foo 는 이 코드를 감싼 타입의 메소드다. (익명 클래스 안이면 this 가 익명 클래스라서 짚지 않는다.)
+			List<String> enclosing = enclosingTypesOf(methodRef);
+			if (!enclosing.isEmpty()) {
+				owner = enclosing.get(0);
+			}
+		}
+		if (owner != null) {
+			if (!dbSolver.isProjectType(owner)) {
+				// 프로젝트 밖 타입: 어느 오버로드인지는 모르므로 타입과 이름만 남긴다.
+				addRelation(context, reference, "CALLS", "EXTERNAL_METHOD", null, owner + "." + name, "MEDIUM", "HEURISTIC", via("SCOPE_TYPE"));
+				update(context, reference, "EXTERNAL", null);
+				return;
+			}
+			if (constructor) {
+				// 생성자는 물려받지 않으므로 그 타입 자신의 것만 본다.
+				if (emitOwnMethods(context, reference, owner, name)) {
+					return;
+				}
+				update(context, reference, "UNRESOLVED", "타입 " + owner + " 에서 생성자를 찾지 못했습니다. " + failure);
+				return;
+			}
+			if (emitDeclaredMembers(context, reference, "CALLS", owner, name, null)) {
+				return;
+			}
+			// resolveCall 과 같은 이유로, 프로젝트 전체에서 짐작하지 않는다.
+			update(context, reference, "UNRESOLVED", "프로젝트 밖의 상위 타입에서 물려받은 메소드로 보입니다. 타입 " + owner + " 과 그 상위 타입(프로젝트 안)에는 없습니다. " + failure);
+			return;
+		}
+
+		// 3) 타입을 모른다. 이름으로만 짐작한다.
+		if (constructor) {
+			update(context, reference, "UNRESOLVED", "생성자 참조(::new)의 타입을 알아내지 못했습니다.");
+			return;
+		}
+		guessByName(context, reference, "CALLS", name, null, "메소드 참조(::)의 대상 타입을 알아내지 못해 이름으로만 찾았습니다. " + failure);
+	}
+
+	/** 가장 가까운 타입 선언보다 익명 클래스 몸통이 먼저 나오면 true 입니다. */
+	private boolean insideAnonymousClass(Node node) {
+		Node current = node;
+		while (current.getParentNode().isPresent()) {
+			Node parent = current.getParentNode().get();
+			if (parent instanceof TypeDeclaration) {
+				return false;
+			}
+			if (parent instanceof ObjectCreationExpr && ((ObjectCreationExpr) parent).getAnonymousClassBody().isPresent()
+					&& current instanceof BodyDeclaration) {
+				return true;
+			}
+			current = parent;
+		}
+		return false;
+	}
+
+	/** 그 타입에 직접 선언된 같은 이름 메소드(생성자 포함)로 잇습니다. 하나도 없으면 false 입니다. */
+	private boolean emitOwnMethods(FileContext context, Map<String, Object> reference, String ownerFqn, String name) {
+		List<Map<String, Object>> methods = methodsOf(ownerFqn, name, null);
+		if (methods.isEmpty()) {
+			return false;
+		}
+		for (int i = 0; i < methods.size(); i++) {
+			String confidence = methods.size() > 1 ? "LOW" : "HIGH";
+			addRelation(context, reference, "CALLS", "METHOD", (String) methods.get(i).get("methodId"), null, confidence
+					, methods.size() > 1 ? "HEURISTIC" : "RESOLVED", via("OWNER_TYPE"));
+		}
+		update(context, reference, methods.size() > 1 ? "HEURISTIC" : "RESOLVED", null);
+		return true;
 	}
 
 	/** this(...) / super(...) */
