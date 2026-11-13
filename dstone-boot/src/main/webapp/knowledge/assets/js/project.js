@@ -300,7 +300,7 @@ var DstoneKnowledgeProject = (function () {
 		if (metrics.callResolutionRate !== undefined && metrics.callResolutionRate !== null) {
 			var rate = Number(metrics.callResolutionRate);
 			lines.push([rate >= 95 ? "good" : rate >= 80 ? "warn" : "bad",
-				"메소드 호출 " + formatNumber(metrics.callCount) + "건 가운데 " + rate + "% 가 누구를 부르는지 풀렸습니다. "
+				"메소드 호출 " + formatNumber(metrics.callCount) + "건 가운데 **" + rate + "%** 가 누구를 부르는지 풀렸습니다. "
 				+ (rate >= 95 ? "호출 관계와 영향도 결과를 믿고 써도 됩니다." : rate >= 80 ? "쓸 수는 있지만 빠진 호출이 있을 수 있습니다. 라이브러리(jar) 위치를 확인하세요."
 					: "빠진 호출이 많습니다. 프로젝트 등록 칸에 라이브러리(jar) 위치를 적고 다시 분석하세요.")]);
 		}
@@ -341,7 +341,9 @@ var DstoneKnowledgeProject = (function () {
 		box.className = "kn-verdict";
 		box.innerHTML = "<div class=\"kn-section-title\" style=\"margin-top:0;\">한눈에 보기</div>" + lines.map(function (line) {
 			var mark = line[0] === "good" ? "✔" : line[0] === "bad" ? "✖" : line[0] === "warn" ? "!" : "·";
-			return "<div class=\"kn-verdict-line kn-verdict-" + line[0] + "\"><span class=\"kn-verdict-mark\">" + mark + "</span>" + K.escapeHtml(line[1]) + "</div>";
+			// 글은 먼저 이스케이프하고, **로 감싼 부분만 굵게 바꾼다.
+			var text = K.escapeHtml(line[1]).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+			return "<div class=\"kn-verdict-line kn-verdict-" + line[0] + "\"><span class=\"kn-verdict-mark\">" + mark + "</span>" + text + "</div>";
 		}).join("");
 		return box;
 	}
