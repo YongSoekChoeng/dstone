@@ -150,6 +150,16 @@ public class RelationDao extends BaseDao {
 
 	/**
 	 * <pre>
+	 * 영향도 분석 대상의 설명(종류마다 다름). 없으면 null 입니다.
+	 * </pre>
+	 * @param condition revisionId, targetKind, target, tableRelationTypes
+	 */
+	public Map<String, Object> selectImpactTarget(Map<String, Object> condition) {
+		return sqlSessionCommon.selectOne(NS + "selectImpactTarget", condition);
+	}
+
+	/**
+	 * <pre>
 	 * 영향 분석: 대상에서 출발해 호출 관계를 거슬러 올라가며 닿는 메소드들
 	 * </pre>
 	 *

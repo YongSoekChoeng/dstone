@@ -419,6 +419,63 @@
 
     <sql id="confName">(CASE ${column} WHEN 3 THEN 'HIGH' WHEN 2 THEN 'MEDIUM' ELSE 'LOW' END)</sql>
 
+    <!-- 영향도 분석의 대상을 사람이 알아볼 수 있게 설명한다(화면 맨 위 "대상" 머리글).
+         TABLE 은 이름 말고 따로 읽을 것이 없어서 건드리는 statement 수만 센다. 한글명은 서비스가 TableDictionaryService 로 붙인다.
+         STATEMENT 는 이름이 같은 statement 가 여럿일 수 있어서 matches 로 수를 함께 준다(자리는 첫 번째 것). -->
+    <select id="selectImpactTarget" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <choose>
+            <when test="targetKind == 'METHOD'">
+        SELECT s.fqn AS "ownerFqn"
+             , m.signature AS "signature"
+             , s.layer AS "layer"
+             , f.path AS "path"
+             , m.line_start AS "lineStart"
+             , (SELECT r.value FROM analysis_resource r
+                 WHERE r.revision_id = m.revision_id AND r.resource_type = 'METHOD_TITLE' AND r.name = m.method_id
+                 ORDER BY r.resource_id LIMIT 1) AS "title"
+          FROM analysis_method m
+          JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+          JOIN analysis_file f ON f.file_id = m.file_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.method_id = #{target}
+            </when>
+            <when test="targetKind == 'TYPE'">
+        SELECT s.simple_name AS "simpleName"
+             , s.kind AS "typeKind"
+             , s.layer AS "layer"
+             , f.path AS "path"
+             , s.line_start AS "lineStart"
+          FROM analysis_symbol s
+          JOIN analysis_file f ON f.file_id = s.file_id
+         WHERE s.revision_id = #{revisionId}
+           AND s.fqn = #{target}
+         ORDER BY s.file_id
+         LIMIT 1
+            </when>
+            <when test="targetKind == 'STATEMENT'">
+        SELECT COALESCE(NULLIF(mp.namespace, '') || '.', '') || mp.statement_id AS "statement"
+             , mp.statement_type AS "statementType"
+             , f.path AS "path"
+             , mp.line_start AS "lineStart"
+             , COUNT(*) OVER () AS "matches"
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+           AND (mp.statement_id = #{target} OR mp.namespace || '.' || mp.statement_id = #{target})
+         ORDER BY f.path, mp.line_start
+         LIMIT 1
+            </when>
+            <otherwise>
+        SELECT COUNT(DISTINCT t.from_id) AS "statements"
+          FROM analysis_relation t
+         WHERE t.revision_id = #{revisionId}
+           AND t.to_external = #{target}
+           AND t.relation_type IN
+                <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+            </otherwise>
+        </choose>
+    </select>
+
     <!-- "이것을 고치면 어디까지 닿는가" 를 거슬러 올라가며 모은다.
          출발점(깊이 0)은 대상을 직접 건드리는 메소드다:
            TABLE     그 테이블을 읽거나 쓰는 SQL 을 실행하는 메소드

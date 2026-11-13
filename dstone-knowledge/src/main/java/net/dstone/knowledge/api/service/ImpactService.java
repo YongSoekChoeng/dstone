@@ -48,6 +48,9 @@ public class ImpactService extends BaseObject {
 	@Autowired
 	private RevisionDao revisionDao;
 
+	@Autowired
+	private TableDictionaryService tableDictionaryService;
+
 	/**
 	 * <pre>
 	 * 대상(테이블, SQL, 타입, 메소드)을 바꾸면 영향을 받는 메소드와 진입점을 호출 관계를 거슬러 올라가며 찾습니다.
@@ -60,7 +63,8 @@ public class ImpactService extends BaseObject {
 	 * @param includePossible 인터페이스를 통해 부르는 호출("가능한 구현")도 따라갈지. 영향을 빠뜨리지 않으려면 켠다
 	 */
 	public Map<String, Object> getImpact(long revisionId, String targetKind, String target, String access, Integer depth, boolean includePossible) {
-		if (revisionDao.selectRevision(revisionId) == null) {
+		Map<String, Object> revision = revisionDao.selectRevision(revisionId);
+		if (revision == null) {
 			throw ApiException.notFound("없는 리비전입니다: " + revisionId);
 		}
 		// 1) 대상 이름과 깊이 다듬기
@@ -111,6 +115,7 @@ public class ImpactService extends BaseObject {
 		if ("TABLE".equals(targetKind)) {
 			targetInfo.put("access", access == null ? "ALL" : access.toUpperCase());
 		}
+		putTargetDetail(targetInfo, condition, String.valueOf(revision.get("projectId")));
 
 		Map<String, Object> summary = new LinkedHashMap<String, Object>();
 		// 대상을 직접 건드리는 메소드 수
@@ -151,6 +156,34 @@ public class ImpactService extends BaseObject {
 	}
 
 	/** 영향 받는 메소드가 없을 때의 안내(대상 종류마다 목록을 볼 수 있는 곳을 함께 알려 줌) */
+	/**
+	 * <pre>
+	 * 화면이 "무엇에 대한 영향도인지" 보여 줄 수 있게 대상의 설명을 붙입니다. 종류마다 붙는 항목이 다릅니다.
+	 *   METHOD    ownerFqn, signature, layer, path, lineStart, title(메소드 위 주석의 기능명)
+	 *   TYPE      simpleName, typeKind, layer, path, lineStart
+	 *   STATEMENT statement(네임스페이스.id), statementType, path, lineStart, matches(이름이 같은 statement 수)
+	 *   TABLE     statements(건드리는 statement 수), koreanName / koreanNameSource(테이블 한글명과 출처)
+	 * 설명을 못 읽어도 영향도 결과는 그대로 돌려줍니다.
+	 * </pre>
+	 */
+	private void putTargetDetail(Map<String, Object> targetInfo, Map<String, Object> condition, String projectId) {
+		Map<String, Object> detail = relationDao.selectImpactTarget(condition);
+		if (detail != null) {
+			targetInfo.putAll(detail);
+		}
+		if ("TABLE".equals(condition.get("targetKind"))) {
+			try {
+				Map<String, Object> dictionary = tableDictionaryService.describe(((Long) condition.get("revisionId")).longValue(), projectId
+						, (String) condition.get("target"));
+				targetInfo.put("koreanName", dictionary.get("koreanName"));
+				targetInfo.put("koreanNameSource", dictionary.get("koreanNameSource"));
+			} catch (RuntimeException e) {
+				// 한글명은 덤이다. 못 찾아도(대상 DB에 못 붙는 등) 영향도는 보여 준다.
+				warn("테이블 한글명을 읽지 못했습니다: " + condition.get("target") + " - " + e.getMessage());
+			}
+		}
+	}
+
 	private String notFoundMessage(String targetKind, String name) {
 		if ("TABLE".equals(targetKind)) {
 			return "그 테이블을 건드리는 SQL을 실행하는 메소드가 없습니다: " + name + " (테이블 목록: /tables)";

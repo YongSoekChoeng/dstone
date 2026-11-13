@@ -5,16 +5,28 @@ var DstoneKnowledgeImpact = (function () {
 
 	var K = DstoneKnowledge;
 	var el = {};
+	/** 호출 관계에서 [영향도]로 고른 메소드. 대상 칸에는 읽을 수 있는 이름을 보이고, 실제로는 이 ID로 분석한다. */
+	var picked = null;
+
+	/** 대상 종류(API 값) → 화면 글자 */
+	var KIND_LABELS = { TABLE: "테이블", STATEMENT: "SQL", TYPE: "타입", METHOD: "메소드" };
 
 	function init() {
 		["kn-impact-project", "kn-impact-revision", "kn-impact-kind", "kn-impact-target", "kn-impact-access", "kn-impact-depth", "kn-impact-btn",
-			"kn-impact-message", "kn-impact-cards", "kn-impact-result", "kn-method-name", "kn-method-owner", "kn-method-btn", "kn-table-name", "kn-table-btn",
+			"kn-impact-message", "kn-impact-head", "kn-impact-cards", "kn-impact-result", "kn-method-name", "kn-method-owner", "kn-method-btn", "kn-table-name", "kn-table-btn",
 			"kn-graph-depth", "kn-graph-message", "kn-method-table", "kn-graph-title", "kn-graph-table"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 		el["kn-impact-project"].addEventListener("change", loadRevisions);
 		el["kn-impact-btn"].addEventListener("click", function () {
-			runImpact(el["kn-impact-kind"].value, el["kn-impact-target"].value.trim());
+			var kind = el["kn-impact-kind"].value;
+			var text = el["kn-impact-target"].value.trim();
+			// 고른 메소드의 이름을 그대로 두고 다시 누르면 그 메소드로. 칸을 고쳤으면 적힌 글자(메소드 ID)로 찾는다.
+			if (kind === "methodId" && picked && text === picked.label) {
+				runImpact(kind, picked.methodId, picked.label);
+			} else {
+				runImpact(kind, text);
+			}
 		});
 		el["kn-method-btn"].addEventListener("click", findMethods);
 		el["kn-table-btn"].addEventListener("click", findTables);
@@ -38,20 +50,27 @@ var DstoneKnowledgeImpact = (function () {
 
 	/* ---------------- 영향도 ---------------- */
 
-	function runImpact(kind, target) {
+	/**
+	 * 영향도를 분석합니다. label 은 메소드를 고른 경우에만 줍니다(대상 칸에 메소드 ID 대신 보일 이름).
+	 * jump 가 true 면 결과가 나온 뒤 결과 머리글로 옮겨 갑니다(위쪽 호출 관계에서 실행한 경우).
+	 */
+	function runImpact(kind, target, label, jump) {
 		var query = { access: el["kn-impact-access"].value, depth: el["kn-impact-depth"].value };
 		query[kind] = target;
+		picked = kind === "methodId" && label ? { methodId: target, label: label } : null;
 		el["kn-impact-kind"].value = kind;
-		el["kn-impact-target"].value = target;
+		el["kn-impact-target"].value = picked ? label : target;
+		el["kn-impact-head"].innerHTML = "";
 		el["kn-impact-cards"].innerHTML = "";
 		el["kn-impact-result"].innerHTML = "";
 		K.message(el["kn-impact-message"], "분석 중...");
 		Promise.resolve().then(function () {
 			return K.call("GET", revisionPath() + "/impact", query);
 		}).then(function (result) {
-			K.message(el["kn-impact-message"], "대상: " + result.target.kind + " " + result.target.name + (result.truncated ? " · 결과가 많아 일부만 보입니다" : ""));
+			K.message(el["kn-impact-message"], result.truncated ? "결과가 많아 일부만 보입니다. 깊이를 줄이거나 대상을 좁혀 보세요." : "");
+			el["kn-impact-head"].innerHTML = targetHead(result);
 			K.cards(el["kn-impact-cards"], [
-				{ label: "직접 건드리는 메소드", value: result.summary.startMethods },
+				{ label: START_LABELS[result.target.kind] || "직접 건드리는 메소드", value: result.summary.startMethods },
 				{ label: "닿는 메소드", value: result.summary.methods },
 				{ label: "진입점", value: result.summary.endpoints },
 				{ label: "화면", value: result.summary.screens }
@@ -78,9 +97,89 @@ var DstoneKnowledgeImpact = (function () {
 				{ key: "path", label: "파일", mono: true },
 				{ key: "lineStart", label: "줄", num: true }
 			], result.methods);
+			if (jump) {
+				showResult();
+			}
 		}).catch(function (err) {
 			K.message(el["kn-impact-message"], err.message, true);
+			if (jump) {
+				showResult();
+			}
 		});
+	}
+
+	/** 요약 카드의 첫 칸. 무엇을 "직접 건드리는" 메소드인지 대상에 맞춰 적는다. */
+	var START_LABELS = { TABLE: "이 테이블을 쓰는 메소드", STATEMENT: "이 SQL을 쓰는 메소드", TYPE: "이 타입의 메소드", METHOD: "대상 메소드" };
+
+	/**
+	 * 결과 맨 위의 "대상" 머리글. 무엇을 고치면 생기는 영향인지 한눈에 보이게 한다.
+	 *   [종류]  큰 이름
+	 *           설명(전체 이름 · 파일:줄 · 계층 · 한글명 ...)
+	 *           조건(리비전 · 깊이 · 인터페이스 경유 호출 포함 여부)
+	 */
+	function targetHead(result) {
+		var t = result.target || {};
+		var title = t.name;
+		var notes = [];
+		if (t.kind === "METHOD") {
+			title = t.ownerFqn ? shortMethod(t.ownerFqn + "#" + t.signature) : t.name;
+			if (t.title) {
+				notes.push(t.title);
+			}
+			if (t.ownerFqn) {
+				notes.push(t.ownerFqn);
+			}
+		} else if (t.kind === "TYPE") {
+			title = t.simpleName || t.name;
+			notes.push(t.name);
+		} else if (t.kind === "STATEMENT") {
+			title = t.statement || t.name;
+			if (t.statementType) {
+				notes.push(t.statementType);
+			}
+			if (t.matches > 1) {
+				notes.push("이름이 같은 statement " + t.matches + "개를 함께 봤습니다");
+			}
+		} else if (t.kind === "TABLE") {
+			if (t.koreanName) {
+				notes.push(t.koreanName);
+			}
+			notes.push({ ALL: "읽기 + 쓰기", READ: "읽기만", WRITE: "쓰기만" }[t.access] || t.access);
+			if (t.statements !== undefined) {
+				notes.push("건드리는 SQL " + t.statements + "개");
+			}
+		}
+		if (t.path) {
+			notes.push(t.path + (t.lineStart ? ":" + t.lineStart : ""));
+		}
+		if (t.layer) {
+			notes.push(t.layer);
+		}
+		var revision = el["kn-impact-revision"].options[el["kn-impact-revision"].selectedIndex];
+		var conditions = [
+			"리비전 " + (revision ? revision.text : result.revisionId),
+			"거슬러 올라간 깊이 " + result.depth,
+			result.includePossible ? "인터페이스 경유 호출 포함" : "인터페이스 경유 호출 제외"
+		];
+		return "<div class=\"kn-target-head\" tabindex=\"-1\">"
+			+ "<span class=\"kn-target-kind\">" + K.escapeHtml(KIND_LABELS[t.kind] || t.kind) + "</span>"
+			+ "<div class=\"kn-target-body\"><div class=\"kn-target-name\">" + K.escapeHtml(title) + " <span class=\"kn-target-suffix\">을(를) 고치면</span></div>"
+			+ (notes.length ? "<div class=\"kn-target-note\">" + K.escapeHtml(notes.join(" · ")) + "</div>" : "")
+			+ "<div class=\"kn-target-cond\">" + conditions.map(function (text) { return "<span>" + K.escapeHtml(text) + "</span>"; }).join("") + "</div>"
+			+ "</div></div>";
+	}
+
+	/** 위쪽(호출 관계)에서 영향도를 실행했을 때 결과 머리글로 옮겨 가 잠깐 강조한다 */
+	function showResult() {
+		var head = el["kn-impact-head"].querySelector(".kn-target-head");
+		var target = head || el["kn-impact-message"];
+		target.scrollIntoView({ behavior: "smooth", block: "start" });
+		if (head) {
+			head.classList.add("kn-flash");
+			setTimeout(function () {
+				head.classList.remove("kn-flash");
+			}, 1600);
+		}
 	}
 
 	function section(container, title, columns, rows) {
@@ -116,8 +215,7 @@ var DstoneKnowledgeImpact = (function () {
 					button.addEventListener("click", function () {
 						var act = button.getAttribute("data-act");
 						if (act === "impact") {
-							runImpact("methodId", method.methodId);
-							el["kn-impact-message"].scrollIntoView({ behavior: "smooth" });
+							runImpact("methodId", method.methodId, shortMethod(method.ownerFqn + "#" + method.signature), true);
 						} else {
 							loadGraph(method, act);
 						}
@@ -149,8 +247,7 @@ var DstoneKnowledgeImpact = (function () {
 				var cell = tr.querySelector("td");
 				cell.innerHTML = "<a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + K.escapeHtml(cell.textContent) + "</a>";
 				cell.querySelector("a").addEventListener("click", function () {
-					runImpact("table", name);
-					el["kn-impact-message"].scrollIntoView({ behavior: "smooth" });
+					runImpact("table", name, null, true);
 				});
 			});
 		}).catch(function (err) {

@@ -85,12 +85,12 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 								<option value="table">테이블</option>
 								<option value="statement">SQL statement</option>
 								<option value="type">타입 (전체 이름)</option>
-								<option value="methodId">메소드 (methodId)</option>
+								<option value="methodId">메소드</option>
 							</select></td>
 					</tr>
 					<tr>
 						<th><label for="kn-impact-target">대상</label></th>
-						<td colspan="5"><input type="text" id="kn-impact-target" placeholder="예: TB_ORDER / Order.selectList / com.shop.OrderService" /></td>
+						<td colspan="5"><input type="text" id="kn-impact-target" placeholder="예: TB_ORDER / Order.selectList / com.shop.OrderService (메소드는 위 호출 관계에서 [영향도]를 누릅니다)" /></td>
 					</tr>
 					<tr>
 						<th><label for="kn-impact-access">테이블일 때</label></th>
@@ -107,6 +107,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<button type="button" id="kn-impact-btn">분석</button>
 				</div>
 				<div id="kn-impact-message" class="kn-message"></div>
+				<div id="kn-impact-head"></div>
 				<div id="kn-impact-cards" class="kn-cards"></div>
 				<div id="kn-impact-result"></div>
 			</section>
