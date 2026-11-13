@@ -90,7 +90,18 @@ public class ResourcePass extends BaseObject implements AnalysisPass {
 		List<Map<String, Object>> resources = new ArrayList<Map<String, Object>>();
 	}
 
-	/** 파일 단위 실행기에 "준비 = read, 저장 = 이 파일의 행을 바꿔 쓰기"를 넘겨 XML, 설정, 빌드, DDL 파일을 처리합니다. */
+	/** 
+	 * <pre>
+	 * 단계: ④ RESOURCE
+	 *   1) 테이블(CRUD):  
+	 *		analysis_file R
+	 *		analysis_mapper D·C (MYBATIS, IBATIS, QUERY_XML)
+	 *		analysis_config D·C
+	 *		analysis_resource D·C (빈, 의존성, DDL)
+	 *   2) 기능: Java가 아닌 파일을 읽습니다. 대상은 MyBatis/iBATIS 매퍼 XML의 SQL, properties·YAML 설정, 빌드 파일 의존성, DDL입니다.
+	 *      파일 단위 실행기에 "준비 = read, 저장 = 이 파일의 행을 바꿔 쓰기"를 넘겨 XML, 설정, 빌드, DDL 파일을 처리합니다. 
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		final Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();

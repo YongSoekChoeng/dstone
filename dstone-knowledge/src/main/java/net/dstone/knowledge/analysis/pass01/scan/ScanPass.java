@@ -90,12 +90,16 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 
 	/**
 	 * <pre>
-	 * 흐름:
-	 *   1) 프로젝트 소스 폴더(localPath)를 확인하고 설정 값을 읽는다.
-	 *   2) 폴더를 깊이 우선으로 걸어간다.
-	 *      - 폴더에 들어갈 때: 제외 폴더면 통째로 건너뛰고, 빌드 파일이 있으면 "모듈"로 기억한다.
-	 *      - 파일을 만날 때: 분석 대상이면 scanFile()로 정보를 만들어 buffer에 담는다.
-	 *   3) buffer가 commitSize개가 되면 flush()로 DB에 쓰고 비운다. 끝나면 남은 것을 한 번 더 쓴다.
+	 * 단계: ① SCAN
+	 *   1) 테이블(CRUD):  
+	 *		analysis_file C
+	 *   2) 기능: 소스 폴더의 파일을 모두 훑어 목록을 만들고 종류(Java, JSP, XML, properties 등)를 나눕니다. 이후 모든 단계가 이 목록을 기준으로 돕니다.
+	 *   3) 흐름
+	 *   	3-1) 프로젝트 소스 폴더(localPath)를 확인하고 설정 값을 읽는다.
+	 *   	3-2) 폴더를 깊이 우선으로 걸어간다.
+	 *      	- 폴더에 들어갈 때: 제외 폴더면 통째로 건너뛰고, 빌드 파일이 있으면 "모듈"로 기억한다.
+	 *      	- 파일을 만날 때: 분석 대상이면 scanFile()로 정보를 만들어 buffer에 담는다.
+	 *   	3-3) buffer가 commitSize개가 되면 flush()로 DB에 쓰고 비운다. 끝나면 남은 것을 한 번 더 쓴다.
 	 * </pre>
 	 */
 	@Override

@@ -74,11 +74,16 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 
 	/**
 	 * <pre>
-	 * 분석 결과로 검색용 문서와 청크를 만들어 임베딩 대기열에 올립니다. 파일 종류마다 한 번씩 돕니다.
-	 *   1) JAVA: 파일·타입·메소드 문서(CodeDocumentBuilder). 파싱하지 못한 파일은 건너뛴다.
-	 *   2) XML : 매퍼면 statement 하나가 문서 하나, 리치클라이언트 화면이면 파일 하나가 화면 문서 하나
-	 *   3) JSP : 파일 하나가 화면 문서 하나
-	 * 각각 "준비 = 재료를 DB에서 읽고 문서를 만든다, 저장 = 이 파일의 문서를 바꿔 쓴다"로 파일 단위 실행기에 넘깁니다.
+	 * 단계: ⑨ DOCUMENT
+	 *   1) 테이블(CRUD):  
+	 *		analysis_* 전반 R (+ 소스의 해당 줄)
+	 *		rag_document, rag_chunk D·C
+	 *		rag_embedding C (새 content_hash만, 대기열)
+	 *   2) 기능: 분석 결과를 파일 단위 설명 문서로 풀어 쓰고 청크로 자릅니다. 임베딩 대기열에도 올리며, 실제 임베딩 계산은 Job과 별도로 도는 EmbeddingWorker가 맡습니다.
+	 *   3) 흐름: 분석 결과로 검색용 문서와 청크를 만들어 임베딩 대기열에 올립니다. 파일 종류마다 한 번씩 돕니다.
+	 *   	3-1) JAVA: 파일·타입·메소드 문서(CodeDocumentBuilder). 파싱하지 못한 파일은 건너뛴다.
+	 *   	3-2) XML : 매퍼면 statement 하나가 문서 하나, 리치클라이언트 화면이면 파일 하나가 화면 문서 하나
+	 *   	3-3) JSP : 파일 하나가 화면 문서 하나 각각 "준비 = 재료를 DB에서 읽고 문서를 만든다, 저장 = 이 파일의 문서를 바꿔 쓴다"로 파일 단위 실행기에 넘깁니다.
 	 * </pre>
 	 */
 	@Override

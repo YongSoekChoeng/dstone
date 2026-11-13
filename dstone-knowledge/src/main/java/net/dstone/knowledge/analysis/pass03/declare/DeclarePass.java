@@ -70,7 +70,14 @@ public class DeclarePass extends BaseObject implements AnalysisPass {
 
 	/**
 	 * <pre>
-	 * 파일 단위 실행기(FilePassRunner)에 "준비 = parseFile, 저장 = saveFile"을 넘겨 JAVA 파일, 그다음 JSP 파일을 처리합니다.
+	 * 단계: ③ DECLARE
+	 *   1) 테이블(CRUD):  
+	 *		analysis_file R/U (parse_status, package_name 등)
+	 *		analysis_symbol / analysis_method / analysis_field / analysis_annotation D·C
+	 *		analysis_reference D·C
+	 *		analysis_mapper D·C (JAVA: Java 문자열 SQL)
+	 *   2) 기능: Java 파일과 JSP 안의 Java를 한 파일씩 파싱해서 클래스, 메소드, 필드, 애노테이션을 기록합니다. 호출이나 타입 참조는 대상을 풀지 않고 이름만 적어 둡니다.
+	 *      파일 단위 실행기(FilePassRunner)에 "준비 = parseFile, 저장 = saveFile"을 넘겨 JAVA 파일, 그다음 JSP 파일을 처리합니다.
 	 * </pre>
 	 */
 	@Override

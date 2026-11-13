@@ -138,6 +138,79 @@ public class AnalysisJobRunner extends BaseObject {
 				revisionDao.startRevisionPass(revisionId, pass.name(), analysisId);
 				long startedAt = System.currentTimeMillis();
 
+				/**************************************************************************************************************************************
+				
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ① SCAN
+				  테이블(CRUD): 
+					analysis_file C
+				  기능: 소스 폴더의 파일을 모두 훑어 목록을 만들고 종류(Java, JSP, XML, properties 등)를 나눕니다. 이후 모든 단계가 이 목록을 기준으로 돕니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ② CARRY(증분 분석만)
+				  테이블(CRUD): 
+					analysis_revision R
+					analysis_file U (carried_from_file_id, 파싱 결과)
+					analysis_symbol / analysis_method / analysis_field / analysis_annotation / analysis_reference 복사
+					analysis_mapper / analysis_config / analysis_resource 복사
+				  기능: 앞 리비전과 비교해 바뀌지 않은 파일의 선언과 자원 행을 그대로 옮겨 옵니다. 이 파일들은 다시 파싱하지 않습니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ③ DECLARE
+				  테이블(CRUD): 
+					analysis_file R/U (parse_status, package_name 등)
+					analysis_symbol / analysis_method / analysis_field / analysis_annotation D·C
+					analysis_reference D·C
+					analysis_mapper D·C (JAVA: Java 문자열 SQL)
+				  기능: Java 파일과 JSP 안의 Java를 한 파일씩 파싱해서 클래스, 메소드, 필드, 애노테이션을 기록합니다. 호출이나 타입 참조는 대상을 풀지 않고 이름만 적어 둡니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ④ RESOURCE
+				  테이블(CRUD): 
+					analysis_file R
+					analysis_mapper D·C (MYBATIS, IBATIS, QUERY_XML)
+					analysis_config D·C
+					analysis_resource D·C (빈, 의존성, DDL)
+				  기능: Java가 아닌 파일을 읽습니다. 대상은 MyBatis/iBATIS 매퍼 XML의 SQL, properties·YAML 설정, 빌드 파일 의존성, DDL입니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ⑤ CARRY_RESOLVE(증분 분석만)
+				  테이블(CRUD): 
+					analysis_relation 복사
+					analysis_reference U (status → PENDING)
+				  기능: 앞 리비전에서 풀어 둔 관계 가운데 옮겨도 안전한 것만 복사합니다. 바뀐 파일의 영향을 받는 참조는 다시 풀도록 PENDING으로 되돌립니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ⑥ RESOLVE
+				  테이블(CRUD): 
+					analysis_symbol / analysis_method / analysis_field / analysis_reference R
+					analysis_reference U (status, fail_reason)
+					analysis_relation D·C (CALLS 등 7종)
+				  기능: Java 파일을 다시 파싱하고 DB의 선언 정보를 조회해서 ③에서 이름만 적어 둔 참조의 실제 대상을 찾습니다. 그 결과가 "누가 누구를 부르나" 관계가 됩니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ⑦ LINK
+				  테이블(CRUD):
+					analysis_symbol / analysis_method R
+					analysis_relation D·C (OVERRIDES, CALLS_POSSIBLE_IMPLEMENTATION)
+					analysis_metric D·C
+				  기능: 파싱 없이 SQL만으로 재정의 관계와 인터페이스→구현 관계를 잇고, 품질 지표를 계산합니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ⑧ SEMANTIC
+				  테이블(CRUD): 
+					analysis_* 전반 R (+ 규칙 파일 conf/rules, web.xml, Struts 설정)
+					analysis_symbol U (layer, layer_confidence, properties_json)
+					analysis_method U (proxy_related)
+					analysis_endpoint D·C/U (method_id)
+					analysis_relation D·C (INJECTS, EXECUTES_SQL, READS_TABLE, WRITES_TABLE, RENDERS, REQUESTS, INCLUDES)
+					analysis_mapper D·C (JPA), U (method_id)
+					analysis_resource D·C (매핑, 화면명, 기능명, 이름 사전, 규칙 기록)
+				  기능: 규칙과 처리기(LayerResolver, EntryFinder, SqlLinker 등)로 의미를 붙입니다. 계층을 정하고, 진입점(URL·서블릿·JSP·거래)을 찾고, 주입 관계와 SQL·테이블·화면 연결을 만듭니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+				  단계: ⑨ DOCUMENT
+				  테이블(CRUD): 
+					analysis_* 전반 R (+ 소스의 해당 줄)
+					rag_document, rag_chunk D·C
+					rag_embedding C (새 content_hash만, 대기열)
+				  기능: 분석 결과를 파일 단위 설명 문서로 풀어 쓰고 청크로 자릅니다. 임베딩 대기열에도 올리며, 실제 임베딩 계산은 Job과 별도로 도는 EmbeddingWorker가 맡습니다.
+				  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+					 
+				**************************************************************************************************************************************/
+				
 				pass.run(context);
 
 				revisionDao.endRevisionPass(revisionId, pass.name(), "DONE");

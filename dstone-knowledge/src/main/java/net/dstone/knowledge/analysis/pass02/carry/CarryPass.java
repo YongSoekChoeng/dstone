@@ -70,6 +70,17 @@ public class CarryPass extends BaseObject implements AnalysisPass {
 		return 150;
 	}
 
+	/**
+	 * <pre>
+	 * 단계: ② CARRY(증분 분석만)
+	 *   1) 테이블(CRUD):  
+	 *		analysis_revision R
+	 *		analysis_file U (carried_from_file_id, 파싱 결과)
+	 *		analysis_symbol / analysis_method / analysis_field / analysis_annotation / analysis_reference 복사
+	 *		analysis_mapper / analysis_config / analysis_resource 복사
+	 *   2) 기능: 앞 리비전과 비교해 바뀌지 않은 파일의 선언과 자원 행을 그대로 옮겨 옵니다. 이 파일들은 다시 파싱하지 않습니다.
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		final long revisionId = context.getRevisionId();

@@ -167,6 +167,20 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 	}
 
 
+	/**
+	 * <pre>
+	 * 단계: ⑧ SEMANTIC
+	 *   1) 테이블(CRUD):  
+	 *		analysis_* 전반 R (+ 규칙 파일 conf/rules, web.xml, Struts 설정)
+	 *		analysis_symbol U (layer, layer_confidence, properties_json)
+	 *		analysis_method U (proxy_related)
+	 *		analysis_endpoint D·C/U (method_id)
+	 *		analysis_relation D·C (INJECTS, EXECUTES_SQL, READS_TABLE, WRITES_TABLE, RENDERS, REQUESTS, INCLUDES)
+	 *		analysis_mapper D·C (JPA), U (method_id)
+	 *		analysis_resource D·C (매핑, 화면명, 기능명, 이름 사전, 규칙 기록)
+	 *   2) 기능: 규칙과 처리기(LayerResolver, EntryFinder, SqlLinker 등)로 의미를 붙입니다. 계층을 정하고, 진입점(URL·서블릿·JSP·거래)을 찾고, 주입 관계와 SQL·테이블·화면 연결을 만듭니다.
+	 * </pre>
+	 */
 	@Override
 	public void run(final AnalysisJobContext context) throws Exception {
 		ProjectRules rules;

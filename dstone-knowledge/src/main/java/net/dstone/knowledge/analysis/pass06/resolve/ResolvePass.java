@@ -86,11 +86,17 @@ public class ResolvePass extends BaseObject implements AnalysisPass {
 
 	/**
 	 * <pre>
-	 * 흐름:
-	 *   1) 설정 값(캐시 크기, 파일당 제한 시간)과 대상 프로젝트의 jar 목록을 준비한다.
-	 *   2) 해석 도구 한 벌(Engine)을 만든다.
-	 *   3) 파일 단위 실행기에 "준비 = resolveFile, 저장 = saveFile"을 넘겨 JAVA, 그다음 JSP 파일을 푼다.
-	 *   4) 타입 해석기의 통계를 로그로 남긴다.
+	 * 단계: ⑥ RESOLVE
+	 *   1) 테이블(CRUD):  
+	 *		analysis_symbol / analysis_method / analysis_field / analysis_reference R
+	 *		analysis_reference U (status, fail_reason)
+	 *		analysis_relation D·C (CALLS 등 7종)
+	 *   2) 기능: Java 파일을 다시 파싱하고 DB의 선언 정보를 조회해서 ③에서 이름만 적어 둔 참조의 실제 대상을 찾습니다. 그 결과가 "누가 누구를 부르나" 관계가 됩니다.
+	 *   3) 흐름:
+	 *    3-1) 설정 값(캐시 크기, 파일당 제한 시간)과 대상 프로젝트의 jar 목록을 준비한다.
+	 *    3-2) 해석 도구 한 벌(Engine)을 만든다.
+	 *    3-3) 파일 단위 실행기에 "준비 = resolveFile, 저장 = saveFile"을 넘겨 JAVA, 그다음 JSP 파일을 푼다.
+	 *    3-4) 타입 해석기의 통계를 로그로 남긴다.
 	 * </pre>
 	 */
 	@Override
