@@ -36,4 +36,13 @@ public @interface AiTool {
 	 */
 	boolean stepOnly() default false;
 
+	/**
+	 * <pre>
+	 * 이 클래스에 든 Tool의 종류입니다. 화면의 "Tool 찾기" 창이 종류별로 묶어 보여 주는 데만 씁니다.
+	 * 종류가 다른 Tool은 클래스를 나눕니다(예: 코드 Tool은 KnowledgeTool, 문서 Tool은 KnowledgeDocTool).
+	 * MCP는 적지 않습니다. MCP 서버에서 온 Tool에는 common.config.ConfigTool이 붙입니다.
+	 * </pre>
+	 */
+	ToolCategory category() default ToolCategory.GENERAL;
+
 }

@@ -142,7 +142,7 @@ public final class Constants {
 			public final static String PREFIX = "dstone.ai.tool.db";
 		}
 
-		/** dstone-knowledge(Java 분석 결과/문서 검색 서버)에 물어보는 Tool(tools.knowledge.KnowledgeTool)의 설정 키 접두사입니다. */
+		/** dstone-knowledge(Java 분석 결과/문서 검색 서버)에 물어보는 Tool(tools.knowledge.KnowledgeTool, KnowledgeDocTool)의 설정 키 접두사입니다. */
 		public static final class Knowledge {
 			public final static String PREFIX = "dstone.ai.tool.knowledge";
 		}

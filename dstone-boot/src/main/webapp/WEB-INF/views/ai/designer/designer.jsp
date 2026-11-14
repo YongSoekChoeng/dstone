@@ -466,6 +466,7 @@ outArr에 담아 돌려준다.
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/dagre.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/lib/js-yaml.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/picoschema-editor.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/tool-picker.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/workflow-designer.js"></script>
 	<script>
 		DstoneAiDesigner.init({

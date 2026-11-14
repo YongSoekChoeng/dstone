@@ -10,7 +10,7 @@ import java.util.Map;
  * @param description Agent 설명
  * @param input       Agent가 받는 값의 모양(JSON Schema). object면 화면이 입력창 글자를 JSON으로 읽어 보낸다
  * @param output      Agent가 돌려주는 값의 모양(JSON Schema). string이 아니면 스트리밍 채팅으로 부를 수 없다
- * @param tools       이 Agent에서 고를 수 있는 Tool 이름. 화면의 Tool 선택 칸을 채운다
+ * @param tools       이 Agent에서 고를 수 있는 Tool(이름, 설명, 종류). 화면의 "Tool 찾기" 창을 채운다
  */
-public record AgentSummaryResult(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools) {
+public record AgentSummaryResult(String id, String description, Map<String, Object> input, Map<String, Object> output, List<ToolSummaryResult> tools) {
 }

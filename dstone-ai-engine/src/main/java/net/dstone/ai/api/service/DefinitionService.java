@@ -146,7 +146,7 @@ public class DefinitionService extends BaseObject {
 		for (ToolCallback callback : this.configTool.toolCallbackProvider().getToolCallbacks()) {
 			String name = callback.getToolDefinition().name();
 			tools.add(new DefinitionCatalog.ToolItem(name, callback.getToolDefinition().description(), this.schemaOf(callback.getToolDefinition().inputSchema()),
-				this.configTool.isStepOnly(name)));
+				this.configTool.isStepOnly(name), this.configTool.categoryOf(name).name()));
 		}
 		tools.sort(new Comparator<DefinitionCatalog.ToolItem>() {
 			@Override

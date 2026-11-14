@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import net.dstone.boot.ai.vo.AgentSummaryCallResult;
 import net.dstone.boot.ai.vo.AgentSummaryResult;
+import net.dstone.boot.ai.vo.ToolSummaryResult;
 import net.dstone.boot.common.security.vo.CustomUserDetails;
 import net.dstone.boot.common.web.SessionListener;
 import net.dstone.common.config.ConfigProperty;
@@ -45,7 +46,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		List<AgentSummaryResult> summaries = new ArrayList<>();
 		if (results != null) {
 			for (AgentSummaryCallResult result : results) {
-				List<String> tools = result.availableTools() == null ? new ArrayList<String>() : result.availableTools();
+				List<ToolSummaryResult> tools = result.availableTools() == null ? new ArrayList<ToolSummaryResult>() : result.availableTools();
 				summaries.add(new AgentSummaryResult(result.id(), result.description(), result.input(), result.output(), tools));
 			}
 		}

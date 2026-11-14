@@ -58,7 +58,7 @@ spring:
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
         # embedding: 이 엔진은 임베딩 모델을 쓰지 않는다(none). 문서의 임베딩과 검색은 dstone-knowledge가 한다
-        # (Agent가 tools.knowledge.KnowledgeTool의 knowledgeSearchDocs 등으로 그 서버의 검색 API를 부른다).
+        # (Agent가 tools.knowledge.KnowledgeDocTool의 knowledgeSearchDocs 등으로 그 서버의 검색 API를 부른다).
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
@@ -244,7 +244,7 @@ dstone:
                 allowed-jobs:
                     - testApp
             # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)를 부르는 설정(common.knowledge.KnowledgeClient).
-            # 쓰는 곳은 tools.knowledge.KnowledgeTool 하나다: 코드 분석 결과(knowledgeSearch 등)와 올린 문서(knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks).
+            # 쓰는 곳은 tools.knowledge.KnowledgeTool(코드 분석 결과: knowledgeSearch 등)과 KnowledgeDocTool(올린 문서: knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks)이다.
             # base-url이 비어 있으면 그 Tool은 항상 실패 문구로 끝난다 - 주소를 채우는 것이 곧 "켠 상태"다.
             # api-key: dstone-knowledge가 호출자 인증(dstone.knowledge.security.auth.enabled)을 켰을 때만 넣는다. ENC(...)로 적는다.
             # timeout-seconds: 응답 대기 시간(기본 60). 검색은 질문을 임베딩해야 해서 임베딩 서버가 바쁘면 수 초가 걸린다.

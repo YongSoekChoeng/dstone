@@ -22,7 +22,7 @@
 #   .shell.allowed-commands / .python.allowed-scripts 목록이 비어 있으면(기본값이 비어 있습니다)
 #   무조건 "실패: ..."라는 결과를 돌려줍니다. 이건 오류가 아니라 "허용된 게 없으니 막는다"는
 #   의도된 안전장치이므로, LLM이 이 Tool을 골라서 호출은 했는데 결과가 실패로 나와도 정상입니다.
-# - knowledgeSearchDocs(knowledge.KnowledgeTool)는 dstone.ai.tool.knowledge.base-url(dstone-knowledge 주소)이 있고,
+# - knowledgeSearchDocs(knowledge.KnowledgeDocTool)는 dstone.ai.tool.knowledge.base-url(dstone-knowledge 주소)이 있고,
 #   그 서버에 문서를 올려 두어야 결과를 얻을 수 있습니다.
 id: sample-tool-demo-agent
 version: 1.1.0

@@ -1,6 +1,7 @@
 package net.dstone.ai.common.config;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.annotation.ToolCategory;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.runtime.workflow.file.WorkFlowFileRecorder;
@@ -74,6 +76,9 @@ public class ConfigTool extends BaseObject {
 	/** Workflow의 TOOL step에서만 부를 수 있는 Tool(@AiTool(stepOnly = true))의 이름들입니다. */
 	private Set<String> stepOnlyToolNames = Set.of();
 
+	/** Tool 이름 → 종류(@AiTool의 category, MCP Tool은 MCP)입니다. 화면의 "Tool 찾기" 창이 종류별로 묶는 데 씁니다. */
+	private Map<String, ToolCategory> toolCategories = Map.of();
+
 	/**
 	 * <pre>
 	 * 로컬 @AiTool 빈들과 ConfigMcp가 미리 접속해 둔 MCP 서버 Tool들을 모아서 하나의
@@ -88,6 +93,7 @@ public class ConfigTool extends BaseObject {
 		List<ToolCallback> merged = new ArrayList<>();	// TOOL 중 stepOnly 를 제외한 일반 Tool + MCP Tool.
 		List<Object> normalBeans = new ArrayList<>();	// TOOL 중 stepOnly 를 제외한 일반 Tool.
 		List<Object> stepOnlyBeans = new ArrayList<>(); // TOOL 중 stepOnly(step 전용). TOOL스텝이 수행하는 Tool.
+		Map<String, ToolCategory> categories = new HashMap<>();
 		
 		for (Object bean : toolBeans.values()) {
 			AiTool annotation = AnnotationUtils.findAnnotation(bean.getClass(), AiTool.class);
@@ -96,11 +102,20 @@ public class ConfigTool extends BaseObject {
 			} else {
 				normalBeans.add(bean);
 			}
+			// 종류는 클래스에 붙은 @AiTool(category)를 그 클래스의 Tool마다 적어 둔다.
+			ToolCategory category = annotation == null ? ToolCategory.GENERAL : annotation.category();
+			for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(bean).build().getToolCallbacks()) {
+				categories.put(callback.getToolDefinition().name(), category);
+			}
 		}
 		if (!normalBeans.isEmpty()) {
 			merged.addAll(List.of(MethodToolCallbackProvider.builder().toolObjects(normalBeans.toArray()).build().getToolCallbacks()));
 		}
-		merged.addAll(this.configMcp.toolCallbacks());
+		for (ToolCallback callback : this.configMcp.toolCallbacks()) {
+			merged.add(callback);
+			categories.put(callback.getToolDefinition().name(), ToolCategory.MCP);
+		}
+		this.toolCategories = categories;
 
 		// 로컬 Tool이든 MCP Tool이든 똑같이 결과 크기 상한을 씌웁니다.
 		int maxResultChars = this.maxResultChars();
@@ -191,6 +206,19 @@ public class ConfigTool extends BaseObject {
 	 */
 	public boolean isStepOnly(String toolName) {
 		return this.stepOnlyToolNames.contains(toolName);
+	}
+
+	/**
+	 * <pre>
+	 * 이 이름의 Tool이 어느 종류인지 돌려줍니다(소스 RAG, 문서 RAG, MCP, 일반).
+	 * 화면의 "Tool 찾기" 창이 종류별로 묶어 보여 주는 데만 씁니다. 모르는 이름이면 GENERAL입니다.
+	 * </pre>
+	 *
+	 * @param toolName Tool 이름
+	 */
+	public ToolCategory categoryOf(String toolName) {
+		ToolCategory category = this.toolCategories.get(toolName);
+		return category == null ? ToolCategory.GENERAL : category;
 	}
 
 	/**

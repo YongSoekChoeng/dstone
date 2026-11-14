@@ -2633,7 +2633,7 @@ var DstoneAiDesigner = (function () {
 	}
 
 	/* ====================================================================
-	 * 고르기 창: Tool이나 Sub Agent가 많아져도 이름·설명으로 찾아 고를 수 있게 합니다.
+	 * 고르기 창: Skill이나 Sub Agent가 많아져도 이름·설명으로 찾아 고를 수 있게 합니다(Tool은 tool-picker.js의 "Tool 찾기" 창).
 	 * 창 안에서 고친 것은 [고르기]를 눌러야 Agent에 들어갑니다.
 	 * ==================================================================== */
 
@@ -2757,15 +2757,19 @@ var DstoneAiDesigner = (function () {
 		var allTools = tools.indexOf("*") >= 0;
 
 		// Tool 목록: TOOL step 전용 Tool은 Agent에 줄 수 없다(엔진이 막는다). 등록되지 않은 이름도 지우지 않고 보여 준다.
+		// 고르기는 종류별 표로 보여 주는 "Tool 찾기" 창(tool-picker.js)이 맡는다. 칩에는 종류와 설명을 title로 붙인다.
 		var toolItems = [];
+		var pickerTools = [];
 		catalog.tools.forEach(function (tool) {
 			if (!tool.stepOnly) {
-				toolItems.push({ value: tool.name, label: tool.name, title: tool.description || "", disabled: allTools });
+				toolItems.push({ value: tool.name, label: tool.name, title: DstoneToolPicker.labelOf(tool.category) + " · " + (tool.description || ""), disabled: allTools });
+				pickerTools.push({ name: tool.name, description: tool.description || "", category: tool.category, disabled: allTools });
 			}
 		});
 		tools.forEach(function (name) {
 			if (name !== "*" && !findTool(name)) {
 				toolItems.push({ value: name, label: name, note: "등록되지 않음" });
+				pickerTools.push({ name: name, description: "", category: "UNKNOWN", note: "등록되지 않음" });
 			}
 		});
 		// Skill 목록: 엔진이 등록한 Skill(conf/definitions/skills/**/SKILL.md). 등록되지 않은 이름도 지우지 않고 보여 준다.
@@ -2934,8 +2938,13 @@ var DstoneAiDesigner = (function () {
 			button.addEventListener("click", function () {
 				var name = button.getAttribute("data-pick");
 				if (name === "tools") {
-					openPicker("Tool 고르기", toolItems, tools, function (values) {
-						setList("tools", values);
+					DstoneToolPicker.open({
+						title: "Tool 찾기 - " + (f.id || "새 Agent"),
+						tools: pickerTools,
+						chosen: tools,
+						onDone: function (values) {
+							setList("tools", values);
+						}
 					});
 				} else if (name === "skills") {
 					openPicker("Skill 고르기", skillItems, skills, function (values) {

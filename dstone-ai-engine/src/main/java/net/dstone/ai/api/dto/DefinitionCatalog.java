@@ -52,8 +52,9 @@ public record DefinitionCatalog(String location, boolean editable, List<Workflow
 	 * @param description 설명
 	 * @param input       인자 모양(JSON Schema)
 	 * @param stepOnly    TOOL step에서만 부를 수 있는 Tool인지
+	 * @param category    종류(common.annotation.ToolCategory 이름): CODE_RAG, DOC_RAG, MCP, GENERAL. 디자이너의 "Tool 찾기" 창이 종류별로 묶는 데 씁니다
 	 */
-	public record ToolItem(String name, String description, Map<String, Object> input, boolean stepOnly) {
+	public record ToolItem(String name, String description, Map<String, Object> input, boolean stepOnly, String category) {
 	}
 
 	/**

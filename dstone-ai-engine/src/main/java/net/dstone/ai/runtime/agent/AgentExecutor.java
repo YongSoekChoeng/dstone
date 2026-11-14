@@ -514,7 +514,7 @@ public class AgentExecutor extends BaseObject {
 			- Sub Agent: Agent의 subAgents에 적힌 Agent를 Tool처럼 붙입니다(subAgentCallbacks() 참고).
 			- 채팅 요청이 쓸 Tool을 고르면(toolsOverride) 그 Tool만 붙습니다. 빈 목록이면 Tool 없이 부릅니다.
 			  Skill과 Sub Agent는 고르지 않습니다(둘 다 Agent 정의의 일부입니다).
-			- 올린 문서(개발 가이드 등)를 찾는 것도 Tool입니다(KnowledgeTool의 knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks).
+			- 올린 문서(개발 가이드 등)를 찾는 것도 Tool입니다(KnowledgeDocTool의 knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks).
 			  엔진이 질문마다 미리 찾아 붙이지 않고, LLM이 필요할 때 범위(묶음, 문서)를 정해 부릅니다.
 			- toolContext라는 값에 caller와, Workflow step에서 부른 것이면 실행 id·step id(StepRef)를 함께 실어 보냅니다.
 			  실행 id·step id는 파일 Tool이 어떤 파일을 읽고 썼는지 step별로 기록하는 데 씁니다(WorkFlowFileRecorder).
@@ -634,10 +634,23 @@ public class AgentExecutor extends BaseObject {
 	 */
 	public List<String> availableToolNames(AgentDefinition agent, String caller) {
 		List<String> names = new ArrayList<>();
-		for (ToolCallback callback : this.configTool.toolCallbacks(caller, agent.toolNames())) {
+		for (ToolCallback callback : this.availableTools(agent, caller)) {
 			names.add(callback.getToolDefinition().name());
 		}
 		return names;
+	}
+
+	/**
+	 * <pre>
+	 * availableToolNames()와 같은 Tool을 ToolCallback 그대로 돌려줍니다.
+	 * 채팅 화면의 "Tool 찾기" 창에 이름과 함께 설명을 보여 줄 때 씁니다.
+	 * </pre>
+	 *
+	 * @param agent  Agent의 정의
+	 * @param caller 부르는 쪽(tenant). 없으면 null
+	 */
+	public List<ToolCallback> availableTools(AgentDefinition agent, String caller) {
+		return this.configTool.toolCallbacks(caller, agent.toolNames());
 	}
 
 	/**

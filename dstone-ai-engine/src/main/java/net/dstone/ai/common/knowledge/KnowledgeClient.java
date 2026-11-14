@@ -28,7 +28,7 @@ import reactor.core.publisher.Mono;
 /**
  * <pre>
  * dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)의 REST API를 부르는 단 하나의 창구입니다.
- * 이 엔진에서 dstone-knowledge를 쓰는 곳은 tools.knowledge.KnowledgeTool 하나입니다.
+ * 이 엔진에서 dstone-knowledge를 쓰는 곳은 tools.knowledge.KnowledgeTool(소스 코드)과 KnowledgeDocTool(올린 문서)입니다.
  * Agent가 코드 분석 결과와 올린 문서(개발 가이드 등)를 물어볼 때 씁니다. 엔진이 질문마다 문서를 미리 찾아 붙이는 일(RAG Advisor)은 없습니다.
  * 주소, API 키, 대기 시간을 다루는 호출 코드를 Tool과 떼어 여기 둡니다.
  *

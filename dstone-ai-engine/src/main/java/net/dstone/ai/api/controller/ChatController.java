@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,6 +20,8 @@ import jakarta.servlet.http.HttpSession;
 import net.dstone.ai.api.dto.AgentSummary;
 import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
+import net.dstone.ai.api.dto.ToolSummary;
+import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.config.ChatProviders;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
@@ -61,9 +64,11 @@ public class ChatController extends BaseController {
 	AgentRegistry agentRegistry;
 	@Autowired
 	AgentExecutor agentExecutor;
+	@Autowired
+	ConfigTool configTool;
 
 	/**
-	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명), 이 caller에게 붙는 Tool 이름을 담아서
+	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명), 이 caller에게 붙는 Tool(이름, 설명, 종류)을 담아서
 	 * 돌려줍니다. dstone-boot의 "채팅" 화면이 이 목록을 그대로 받아서 agent 선택 드롭다운을
 	 * 채우는 데 씁니다(api.controller.WorkFlowController.list()와 완전히 같은 패턴입니다).
 	 *
@@ -74,7 +79,12 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		List<AgentSummary> summaries = new ArrayList<>();
 		for (AgentDefinition definition : this.agentRegistry.list(caller)) {
-			summaries.add(AgentSummary.from(definition, this.agentExecutor.availableToolNames(definition, caller)));
+			List<ToolSummary> tools = new ArrayList<>();
+			for (ToolCallback callback : this.agentExecutor.availableTools(definition, caller)) {
+				String name = callback.getToolDefinition().name();
+				tools.add(new ToolSummary(name, callback.getToolDefinition().description(), this.configTool.categoryOf(name).name()));
+			}
+			summaries.add(AgentSummary.from(definition, tools));
 		}
 		return summaries;
 	}
