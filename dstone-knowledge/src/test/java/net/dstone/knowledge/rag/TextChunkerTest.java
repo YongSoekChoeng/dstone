@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass09.document;
+package net.dstone.knowledge.rag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

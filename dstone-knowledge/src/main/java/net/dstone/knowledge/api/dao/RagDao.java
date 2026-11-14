@@ -277,7 +277,7 @@ public class RagDao extends BaseDao {
 	 * 벡터 검색. 반드시 트랜잭션 안에서 부릅니다(검색 설정이 그 트랜잭션에만 먹기 때문입니다).
 	 * </pre>
 	 *
-	 * @param condition {model, vector, topK, revisionId?, includeDocuments, tenant?, projectId?, docTypes?, layer?}
+	 * @param condition {model, vector, topK, revisionId?(있으면 코드, 없으면 올린 문서), tenant?, collections?, documentIds?, docTypes?, layer?}
 	 */
 	public List<Map<String, Object>> searchChunks(Map<String, Object> condition) {
 		sqlSessionCommon.update(NS + "enableIterativeScan");
@@ -320,8 +320,8 @@ public class RagDao extends BaseDao {
 	 * 올린 문서와 청크를 저장하고 청크를 임베딩 대기열에 올립니다. 트랜잭션 안에서 부릅니다.
 	 * </pre>
 	 *
-	 * @param document {sourceId, tenant?, projectId?, title, fileName, metadataJson, contentHash}
-	 * @param chunks [{chunkNo, content, contentHash, charCount}]
+	 * @param document {sourceId, tenant?, collection?, title, fileName, metadataJson, contentHash}
+	 * @param chunks [{chunkNo, content, contentHash, charCount, metadataJson}]
 	 * @param priority 임베딩 우선순위(큰 것부터 처리)
 	 */
 	public void insertUpload(Map<String, Object> document, List<Map<String, Object>> chunks, String model, int dimensions, int priority) {
@@ -332,7 +332,6 @@ public class RagDao extends BaseDao {
 			Map<String, Object> param = new HashMap<String, Object>();
 			param.put("docSeq", document.get("docSeq"));
 			param.put("tenant", document.get("tenant"));
-			param.put("metadataJson", document.get("metadataJson"));
 			param.put("chunks", chunks.subList(from, Math.min(chunks.size(), from + slice)));
 			sqlSessionCommon.insert(NS + "insertUploadChunks", param);
 		}
@@ -349,7 +348,7 @@ public class RagDao extends BaseDao {
 	 * 올린 문서 수(목록 조건과 같은 조건으로)
 	 * </pre>
 	 *
-	 * @param condition {tenant?, projectId?, sourceId?, model, size, offset}
+	 * @param condition {tenant?, collection?, sourceId?, model, size, offset}
 	 */
 	public int countUploadDocuments(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countUploadDocuments", condition);
@@ -359,6 +358,40 @@ public class RagDao extends BaseDao {
 	/** 올린 문서 목록. 청크 수와 그중 임베딩이 끝난 수를 같이 준다(끝나야 뜻으로 찾힌다) */
 	public List<Map<String, Object>> selectUploadDocuments(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectUploadDocuments", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 호출자가 올린 문서의 묶음별 문서 수
+	 * </pre>
+	 *
+	 * @param owner {tenant?}
+	 */
+	public List<Map<String, Object>> selectUploadCollections(Map<String, Object> owner) {
+		return sqlSessionCommon.selectList(NS + "selectUploadCollections", owner);
+	}
+
+	/**
+	 * <pre>
+	 * 올린 문서 하나의 청크를 순번 범위로 가져옵니다.
+	 * </pre>
+	 *
+	 * @param docSeq 문서 일련번호
+	 * @param from 처음 순번(포함)
+	 * @param to 마지막 순번(포함)
+	 */
+	public List<Map<String, Object>> selectUploadChunks(long docSeq, int from, int to) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("docSeq", Long.valueOf(docSeq));
+		param.put("from", Integer.valueOf(from));
+		param.put("to", Integer.valueOf(to));
+		return sqlSessionCommon.selectList(NS + "selectUploadChunks", param);
+	}
+
+	/** 올린 문서 하나의 청크 수 */
+	public int countUploadChunks(long docSeq) {
+		Integer count = sqlSessionCommon.selectOne(NS + "countUploadChunks", Long.valueOf(docSeq));
+		return count == null ? 0 : count.intValue();
 	}
 
 	/** 임베딩 하나를 가리키는 열쇠(내용 해시 + 모델) */

@@ -110,14 +110,6 @@
 			</exclusions>
 		</dependency>
 
-		<!-- RAG: 찾은 문서 조각을 프롬프트에 끼워 넣는 ChatClient Advisor(RetrievalAugmentationAdvisor / ContextualQueryAugmenter)를
-		     조립하는 데 쓴다(common.rag.RagRetrievalChain). 검색 자체는 이 모듈이 하지 않고 dstone-knowledge의 REST API를 부른다.
-		     그래서 벡터 저장소(pgvector), 임베딩 모델, 문서 읽기(Tika) 의존성은 이 모듈에 없다. -->
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-rag</artifactId>
-		</dependency>
-
 		<!-- MCP 클라이언트(Phase 4): resources/mcp/*.yml로 정의된 외부 MCP 서버에 접속해 그 서버의 Tool을
 		     끌어온다(common.config.ConfigMcp). STDIO/SSE 트랜스포트 둘 다 이 starter 하나로 커버된다. -->
 		<dependency>

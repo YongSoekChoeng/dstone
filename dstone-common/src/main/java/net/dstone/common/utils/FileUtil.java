@@ -41,6 +41,7 @@ import javax.imageio.ImageIO;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.LineIterator;
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -1657,7 +1658,7 @@ public class FileUtil {
 	    File file = new File(pdfPath);
 	    PDDocument document = null;
 	    try {
-	    	document = PDDocument.load(file);
+	    	document = Loader.loadPDF(file);
 		    PDFRenderer pdfRenderer = new PDFRenderer(document);
 		    makeDir(toPath);
 		    for (int page = 0; page < document.getNumberOfPages(); ++page) {
@@ -1707,7 +1708,7 @@ public class FileUtil {
 	    File file = new File(pdfPath);
 	    PDDocument document = null;
 	    try {
-	    	document = PDDocument.load(file);
+	    	document = Loader.loadPDF(file);
 		    PDFRenderer pdfRenderer = new PDFRenderer(document);
 		    for (int page = 0; page < document.getNumberOfPages(); ++page) {
 		        BufferedImage bim = pdfRenderer.renderImageWithDPI(page, 300, ImageType.RGB);

@@ -759,7 +759,7 @@ var DstoneAiDesigner = (function () {
 
 	/**
 	 * 비어 있는 값이면 키를 지우고, 아니면 넣습니다. "a.b.c" 모양이면 그 깊이에 넣고, 없는 묶음은 만듭니다.
-	 * 지운 뒤 비어 버린 묶음(approval: {}, context: {retrieval: {}})은 위로 올라가며 함께 지웁니다.
+	 * 지운 뒤 비어 버린 묶음(approval: {}, execution: {})은 위로 올라가며 함께 지웁니다.
 	 */
 	function setValue(target, path, value) {
 		var keys = path.split(".");
@@ -2253,11 +2253,9 @@ var DstoneAiDesigner = (function () {
 	var skillDoc = null;
 
 	/** 머리말을 다시 만들 때 키를 놓는 순서(Agent 파일들이 쓰는 순서) */
-	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "context", "tools", "skills", "subAgents", "allowedCallers", "execution"];
+	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "tools", "skills", "subAgents", "allowedCallers", "execution"];
 	var AGENT_SUB_ORDER = {
 		model: ["provider", "name", "temperature", "reasoning"],
-		context: ["sources", "retrieval"],
-		retrieval: ["topK", "similarityThreshold", "allowEmptyContext"],
 		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls", "requiredTools"]
 	};
 
@@ -2749,8 +2747,6 @@ var DstoneAiDesigner = (function () {
 	function renderAgentForm() {
 		var f = agentDoc.front;
 		var model = f.model || {};
-		var context = f.context || {};
-		var retrieval = context.retrieval || {};
 		var execution = f.execution || {};
 		var tools = f.tools && Array.isArray(f.tools.allowed) ? f.tools.allowed.map(String) : [];
 		var skills = f.skills && Array.isArray(f.skills.allowed) ? f.skills.allowed.map(String) : [];
@@ -2758,7 +2754,6 @@ var DstoneAiDesigner = (function () {
 		var subAgentList = Array.isArray(f.subAgents) ? f.subAgents : (f.subAgents && Array.isArray(f.subAgents.agents) ? f.subAgents.agents : []);
 		var subAgents = subAgentList.map(String);
 		var background = !!(f.subAgents && !Array.isArray(f.subAgents) && f.subAgents.background === true);
-		var sources = Array.isArray(context.sources) ? context.sources.map(String) : [];
 		var allTools = tools.indexOf("*") >= 0;
 
 		// Tool 목록: TOOL step 전용 Tool은 Agent에 줄 수 없다(엔진이 막는다). 등록되지 않은 이름도 지우지 않고 보여 준다.
@@ -2851,18 +2846,6 @@ var DstoneAiDesigner = (function () {
 			+ chipList("subAgents", agentItems, subAgents, "고른 Sub Agent가 없습니다.", false)
 			+ (subAgents.length > 0
 				? "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-background\"" + (background ? " checked" : "") + " /> 기다리지 않고 맡길 수 있게 함(background) - 여러 일을 한꺼번에 맡기고 TaskOutput으로 결과를 모읍니다</label>"
-				: "")
-			+ "</section>"
-			+ "<section class=\"wd-agent-sec\"><h4>문서 검색(RAG) <span class=\"wd-help\">context.sources</span></h4>"
-			+ "<p class=\"ai-hint\">켜면 부를 때마다 dstone-knowledge에 올린 문서에서 비슷한 내용을 찾아 프롬프트에 붙여 줍니다. 검색어는 이 Agent가 받은 input입니다. "
-			+ "소스 코드는 찾지 않습니다(코드 분석 결과는 knowledge Tool로 봅니다). Agent가 받는 input은 이 설정과 상관없이 늘 전달됩니다.</p>"
-			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-rag\"" + (sources.indexOf("retrievedDocuments") >= 0 ? " checked" : "") + " /> 올린 문서를 찾아 참고하게 함(retrievedDocuments)</label>"
-			+ (sources.indexOf("retrievedDocuments") >= 0
-				? "<div class=\"wd-agent-grid wd-agent-grid-3\">"
-					+ row("topK", "가져올 조각 수", "<input type=\"number\" min=\"1\" data-agent=\"context.retrieval.topK\" value=\"" + escapeHtml(retrieval.topK === undefined ? "" : String(retrieval.topK)) + "\" />")
-					+ row("similarityThreshold", "0 ~ 1, 이보다 덜 비슷하면 버림", "<input type=\"number\" min=\"0\" max=\"1\" step=\"0.05\" data-agent=\"context.retrieval.similarityThreshold\" value=\"" + escapeHtml(retrieval.similarityThreshold === undefined ? "" : String(retrieval.similarityThreshold)) + "\" />")
-					+ row("allowEmptyContext", "", "<label class=\"wd-check\"><input type=\"checkbox\" data-agent=\"context.retrieval.allowEmptyContext\"" + (retrieval.allowEmptyContext !== false ? " checked" : "") + " /> 찾은 문서가 없어도 답함</label>")
-					+ "</div>"
 				: "")
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>프롬프트 <span class=\"wd-help\">시스템 프롬프트(파일의 --- 아래 전부)</span>"
@@ -2964,23 +2947,6 @@ var DstoneAiDesigner = (function () {
 					});
 				}
 			});
-		});
-		document.getElementById("wd-agent-rag").addEventListener("change", function (e) {
-			// 다른 값(예전 파일의 workflowInput)은 그대로 두고 retrievedDocuments만 넣거나 뺀다.
-			var values = sources.filter(function (v) {
-				return v !== "retrievedDocuments";
-			});
-			if (e.target.checked) {
-				values.push("retrievedDocuments");
-			}
-			agentChange(function () {
-				setValue(agentDoc.front, "context.sources", values.length > 0 ? values : undefined);
-				if (!e.target.checked) {
-					// 엔진은 retrievedDocuments 없이 retrieval을 적으면 막는다.
-					setValue(agentDoc.front, "context.retrieval", undefined);
-				}
-			}, false);
-			renderAgentForm();
 		});
 		var backgroundBox = document.getElementById("wd-agent-background");
 		if (backgroundBox) {
@@ -3277,14 +3243,10 @@ var DstoneAiDesigner = (function () {
 	}
 
 	function readAgentField(key, input) {
-		if (input.type === "checkbox") {
-			// allowEmptyContext 의 기본값은 true라서, 켜면 키를 지우고 끄면 false를 적는다.
-			return input.checked ? undefined : false;
-		}
-		if (key === "model.temperature" || key === "context.retrieval.similarityThreshold") {
+		if (key === "model.temperature") {
 			return numberOf(input.value, false);
 		}
-		if (key.indexOf("execution.max") === 0 || key === "execution.timeoutSeconds" || key === "context.retrieval.topK") {
+		if (key.indexOf("execution.max") === 0 || key === "execution.timeoutSeconds") {
 			return numberOf(input.value, true);
 		}
 		if (key === "allowedCallers" || key === "execution.requiredTools") {

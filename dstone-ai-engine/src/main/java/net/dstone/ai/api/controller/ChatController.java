@@ -38,8 +38,8 @@ import reactor.core.publisher.Flux;
  * 하고(아니면 400), 답은 그 Agent의 output 계약 모양 그대로 돌려줍니다(string이면 글자, object면 객체). 만약 여러 단계(step)를 순서대로 이어서
  * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkFlowController를 사용하면 됩니다.
  *
- * GET /api/ai/chat는 등록된 Agent id+description 목록을 돌려줍니다 - dstone-boot의 "채팅" 화면이
- * agent 선택 드롭다운을 채우는 데 씁니다(api.controller.WorkFlowController의 GET /api/ai/workflow와
+ * GET /api/ai/chat는 등록된 Agent의 id, description, 쓸 수 있는 Tool(availableTools) 목록을 돌려줍니다 - dstone-boot의 "채팅" 화면이
+ * agent 선택 드롭다운과 Tool 선택 칸을 채우는 데 씁니다(api.controller.WorkFlowController의 GET /api/ai/workflow와
  * 같은 패턴입니다).
  *
  * POST /api/ai/chat/stream 은 요청 형식은 위와 완전히 같지만, 응답 방식이 다릅니다. LLM(대규모 언어 모델)이
@@ -63,7 +63,7 @@ public class ChatController extends BaseController {
 	AgentExecutor agentExecutor;
 
 	/**
-	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명)만 담아서
+	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명), 이 caller에게 붙는 Tool 이름을 담아서
 	 * 돌려줍니다. dstone-boot의 "채팅" 화면이 이 목록을 그대로 받아서 agent 선택 드롭다운을
 	 * 채우는 데 씁니다(api.controller.WorkFlowController.list()와 완전히 같은 패턴입니다).
 	 *
@@ -74,7 +74,7 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		List<AgentSummary> summaries = new ArrayList<>();
 		for (AgentDefinition definition : this.agentRegistry.list(caller)) {
-			summaries.add(AgentSummary.from(definition));
+			summaries.add(AgentSummary.from(definition, this.agentExecutor.availableToolNames(definition, caller)));
 		}
 		return summaries;
 	}
@@ -92,7 +92,8 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
-		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model(), null, null);
+		this.checkTools(agent, caller, request);
+		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.tools(), request.model(), null, null);
 		String provider = this.chatProviders.resolve(agent.providerName());
 		return new ChatResponse(output, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}
@@ -111,8 +112,9 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
+		this.checkTools(agent, caller, request);
 		try {
-			return this.agentExecutor.stream(agent, sessionId, caller, request.input(), request.ragEnabled(), request.toolsEnabled(), request.model());
+			return this.agentExecutor.stream(agent, sessionId, caller, request.input(), request.tools(), request.model());
 		} catch (AgentContractException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
@@ -146,6 +148,30 @@ public class ChatController extends BaseController {
 			this.agentExecutor.toUserMessage(agent, request.input());
 		} catch (AgentContractException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
+	}
+
+	/**
+	 * 요청의 tools가 그 Agent에 실제로 붙는 Tool 가운데 있는지 확인합니다. 아니면 400으로 거절합니다.
+	 * 요청으로 Agent에 허락되지 않은 Tool을 켤 수 없게 하려는 것입니다.
+	 *
+	 * @param agent   부를 Agent의 정의입니다.
+	 * @param caller  부르는 쪽(tenant)입니다.
+	 * @param request 검증할 채팅 요청입니다.
+	 */
+	private void checkTools(AgentDefinition agent, String caller, ChatRequest request) {
+		if (request.tools() == null) {
+			return;
+		}
+		List<String> available = this.agentExecutor.availableToolNames(agent, caller);
+		List<String> unknown = new ArrayList<>();
+		for (String name : request.tools()) {
+			if (!available.contains(name)) {
+				unknown.add(name);
+			}
+		}
+		if (!unknown.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agent[" + agent.id() + "]가 쓸 수 없는 Tool입니다: " + unknown + " (쓸 수 있는 Tool = " + available + ")");
 		}
 	}
 

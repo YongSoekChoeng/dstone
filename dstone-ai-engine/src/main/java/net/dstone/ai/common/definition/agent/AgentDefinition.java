@@ -50,7 +50,6 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   description      무엇을 하는 Agent인지. Sub Agent로 쓰이면 필수입니다(부모 LLM이 이걸 보고 고릅니다).
  *   model            provider / name / temperature / reasoning. 비우면 provider 기본값을 씁니다.
  *   input, output    무엇을 받고 무엇을 돌려주는지(Picoschema). 비우면 둘 다 글자입니다.
- *   context          RAG(올려 둔 문서 검색)를 쓸지와 검색 조건.
  *   tools.allowed    LLM에게 보여 줄 Tool 이름. 비우면 Tool을 쓰지 않습니다.
  *   skills.allowed   필요할 때 꺼내 읽을 Skill 이름. 비우면 Skill을 쓰지 않습니다.
  *   subAgents        일을 맡길 수 있는 다른 Agent의 id. 동시에 맡기려면 {agents: [...], background: true}.
@@ -84,16 +83,13 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *     끄는 값이 off가 아니라 none인 이유: YAML은 off를 false로 읽습니다.
  *     provider마다 실제로 보내는 값은 common.config.ConfigChatClient.requestOptions()를 보세요.
  *
- * ■ context (RAG)
- *   sources에 retrievedDocuments를 넣으면 RAG를 씁니다.
- *   workflowInput(부르는 쪽이 넣은 input)은 항상 들어가므로 적어도 되고 안 적어도 됩니다.
- *   retrieval에는 topK, similarityThreshold, allowEmptyContext를 적을 수 있습니다.
- *
  * ■ tools.allowed
  *   tools: { allowed: [searchInFiles, readFile] }   ← 이 두 개만
  *   tools: { allowed: ["*"] }                       ← 등록된 Tool 전부(다른 이름과 섞을 수 없음)
  *   (안 적음)                                       ← Tool 없음
  *   실제로 붙는 Tool은 이 목록과 caller 화이트리스트(dstone.ai.tool.allowed-by-caller)를 둘 다 통과한 것입니다.
+ *   올린 문서(개발 가이드 등)를 참고하게 하려면 knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks를 넣습니다.
+ *   엔진이 미리 찾아 붙이지 않고 LLM이 필요할 때 찾습니다. 반드시 찾게 하려면 execution.requiredTools에도 적습니다.
  *
  * ■ skills.allowed
  *   skills: { allowed: [sql-review] }   ← conf/definitions/skills 아래 SKILL.md의 name
@@ -131,7 +127,6 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  * @param prompt         (필수) 시스템 프롬프트입니다. 로더가 파일 본문을 넣습니다.
  * @param input          받는 값의 모양입니다. 비우면 글자(string)입니다.
  * @param output         돌려주는 값의 모양입니다. 비우면 글자(string)입니다.
- * @param context        답할 때 참고할 자료(RAG)입니다.
  * @param tools          쓸 수 있는 Tool입니다. 비우면 Tool을 쓰지 않습니다.
  * @param skills         필요할 때 꺼내 읽을 Skill입니다. 비우면 Skill을 쓰지 않습니다.
  * @param subAgents      일을 맡길 수 있는 다른 Agent와 맡기는 방식입니다.
@@ -147,7 +142,6 @@ public record AgentDefinition(
 	, String prompt
 	, SchemaDefinition input
 	, SchemaDefinition output
-	, Context context
 	, Tools tools
 	, Skills skills
 	, SubAgents subAgents
@@ -169,11 +163,6 @@ public record AgentDefinition(
 	public static final String ON_INVALID_FAIL = "FAIL";
 	public static final List<String> ON_INVALID_OUTPUTS = List.of(ON_INVALID_RETRY, ON_INVALID_FAIL);
 
-	/** context.sources에 적을 수 있는 값입니다. */
-	public static final String SOURCE_WORKFLOW_INPUT = "workflowInput";
-	public static final String SOURCE_RETRIEVED_DOCUMENTS = "retrievedDocuments";
-	public static final List<String> SOURCES = List.of(SOURCE_WORKFLOW_INPUT, SOURCE_RETRIEVED_DOCUMENTS);
-
 	/**
 	 * agent.model 입니다.
 	 *
@@ -183,25 +172,6 @@ public record AgentDefinition(
 	 * @param reasoning   추론 세기입니다(none / low / medium / high).
 	 */
 	public record Model(String provider, String name, Double temperature, String reasoning) {
-	}
-
-	/**
-	 * agent.context 입니다.
-	 *
-	 * @param sources   참고할 자료의 종류입니다(workflowInput, retrievedDocuments).
-	 * @param retrieval 문서 검색 조건입니다. 비워두면 엔진 공통값을 씁니다.
-	 */
-	public record Context(List<String> sources, Retrieval retrieval) {
-	}
-
-	/**
-	 * agent.context.retrieval 입니다. 값을 비워둔 항목은 엔진 공통값(dstone.ai.rag.retrieval.*, common.rag.RagRetrievalChain 참고)을 씁니다.
-	 *
-	 * @param topK                검색 결과의 최대 개수입니다.
-	 * @param similarityThreshold "이 정도는 관련 있다고 볼 최소 유사도" 기준값입니다.
-	 * @param allowEmptyContext   검색 결과가 하나도 없을 때 true면 그냥 답을 시도하고, false면 "모른다"고 답하게 합니다. 비워두면 true입니다.
-	 */
-	public record Retrieval(Integer topK, Double similarityThreshold, Boolean allowEmptyContext) {
 	}
 
 	/**
@@ -342,31 +312,6 @@ public record AgentDefinition(
 	/** Sub Agent에게 기다리지 않고 일을 맡길 수 있는지(subAgents.background: true) 봅니다. */
 	public boolean subAgentBackground() {
 		return this.subAgents != null && Boolean.TRUE.equals(this.subAgents.background());
-	}
-
-	/** context.sources에 적은 값들입니다. 비워뒀으면 빈 목록입니다. */
-	public List<String> contextSources() {
-		return this.context == null || this.context.sources() == null ? List.of() : this.context.sources();
-	}
-
-	/** 이 Agent가 RAG(올려 둔 문서 검색)를 쓰는지 봅니다(context.sources에 retrievedDocuments가 있으면). */
-	public boolean ragEnabled() {
-		return this.contextSources().contains(SOURCE_RETRIEVED_DOCUMENTS);
-	}
-
-	/** RAG 검색 결과의 최대 개수입니다. 적지 않았으면 null입니다. */
-	public Integer ragTopK() {
-		return this.context == null || this.context.retrieval() == null ? null : this.context.retrieval().topK();
-	}
-
-	/** RAG 검색의 최소 유사도입니다. 적지 않았으면 null입니다. */
-	public Double ragSimilarityThreshold() {
-		return this.context == null || this.context.retrieval() == null ? null : this.context.retrieval().similarityThreshold();
-	}
-
-	/** RAG 검색 결과가 없어도 답을 시도할지입니다. 적지 않았으면 null입니다(엔진은 true로 봅니다). */
-	public Boolean ragAllowEmptyContext() {
-		return this.context == null || this.context.retrieval() == null ? null : this.context.retrieval().allowEmptyContext();
 	}
 
 	/** 이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수입니다. 적지 않았으면 null입니다. */

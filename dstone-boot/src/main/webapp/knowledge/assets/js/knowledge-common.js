@@ -43,7 +43,7 @@ var DstoneKnowledge = (function () {
 		}).then(readResponse);
 	}
 
-	/** 파일을 올립니다(multipart). fields 는 같이 보낼 값들: {sourceId, title, projectId} */
+	/** 파일을 올립니다(multipart). fields 는 같이 보낼 값들: {sourceId, title, collection} */
 	function upload(file, fields) {
 		var form = new FormData();
 		form.append("file", file);

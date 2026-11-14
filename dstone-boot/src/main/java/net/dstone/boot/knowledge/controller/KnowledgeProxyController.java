@@ -51,7 +51,7 @@ public class KnowledgeProxyController extends net.dstone.boot.common.biz.BaseCon
 
 	/**
 	 * <pre>
-	 * 일반 문서 올리기(multipart/form-data): file(필수), sourceId, title, projectId.
+	 * 일반 문서 올리기(multipart/form-data): file(필수), sourceId, title, collection(묶음 이름).
 	 *
 	 * 이 프로젝트는 Spring의 멀티파트 처리를 꺼 두고(conf/application.yml의 spring.servlet.multipart.enabled=false)
 	 * RequestUtil로 직접 받는다. 그래서 MultipartFile 파라미터가 아니라 RequestUtil에서 파일을 꺼낸다.
@@ -67,7 +67,7 @@ public class KnowledgeProxyController extends net.dstone.boot.common.biz.BaseCon
 		File savedFile = new File(requestUtil.getSavedPath(), requestUtil.getSavedFileName(0));
 		try {
 			return this.knowledgeProxyService.upload(savedFile, requestUtil.getOriginalFileName(0), requestUtil.getParameter("sourceId")
-					, requestUtil.getParameter("title"), requestUtil.getParameter("projectId"));
+					, requestUtil.getParameter("title"), requestUtil.getParameter("collection"));
 		} finally {
 			if (savedFile.exists() && !savedFile.delete()) {
 				warn("올린 뒤 임시 파일을 지우지 못했습니다: " + savedFile.getAbsolutePath());

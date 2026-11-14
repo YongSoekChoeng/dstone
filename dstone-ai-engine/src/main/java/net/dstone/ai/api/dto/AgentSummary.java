@@ -16,21 +16,24 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
  * @param description 이 Agent가 무슨 일을 하는지 설명하는 문구입니다(common.definition.agent.AgentDefinition.description()).
  * @param input       이 Agent가 받는 값의 모양(JSON Schema)입니다.
  * @param output      이 Agent가 돌려주는 값의 모양(JSON Schema)입니다.
- * @param tools       이 Agent가 쓸 수 있는 Tool 이름 목록입니다(["*"]는 전부, 빈 목록은 쓰지 않음).
+ * @param tools       Agent 정의에 적힌 Tool 이름 목록입니다(tools.allowed 그대로. ["*"]는 전부, 빈 목록은 쓰지 않음).
+ * @param availableTools 이 caller가 이 Agent를 부를 때 실제로 붙는 Tool 이름입니다("*"를 펼치고 caller 화이트리스트를 거친 것).
+ *                    채팅 화면이 이 가운데 쓸 Tool을 고르게 합니다(채팅 요청의 tools).
  * @param skills      이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다.
  * @param subAgents   이 Agent가 일을 맡길 수 있는 다른 Agent의 id 목록입니다.
  * @param version     이 Agent 정의의 버전입니다.
  * @param role        사람이 읽는 역할 이름입니다(없으면 null).
  */
-public record AgentSummary(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools, List<String> skills, List<String> subAgents, String version, String role) {
+public record AgentSummary(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools, List<String> availableTools, List<String> skills, List<String> subAgents, String version, String role) {
 
 	/**
 	 * AgentDefinition(Agent 전체 정의)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
 	 *
-	 * @param definition 요약으로 바꿔줄 Agent 정의입니다.
+	 * @param definition     요약으로 바꿔줄 Agent 정의입니다.
+	 * @param availableTools 이 caller에게 실제로 붙는 Tool 이름입니다(runtime.agent.AgentExecutor.availableToolNames()).
 	 */
-	public static AgentSummary from(AgentDefinition definition) {
-		return new AgentSummary(definition.id(), definition.description(), definition.inputSchema(), definition.outputSchema(), definition.toolNames(), definition.skillNames(), definition.subAgentIds(), definition.version(), definition.role());
+	public static AgentSummary from(AgentDefinition definition, List<String> availableTools) {
+		return new AgentSummary(definition.id(), definition.description(), definition.inputSchema(), definition.outputSchema(), definition.toolNames(), availableTools, definition.skillNames(), definition.subAgentIds(), definition.version(), definition.role());
 	}
 
 }

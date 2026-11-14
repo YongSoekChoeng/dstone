@@ -60,6 +60,16 @@ public class RagSettings {
 		return Math.max(1000, intProperty("dstone.knowledge.rag.upload.max-chars", 5000000));
 	}
 
+	/**
+	 * <pre>
+	 * 올린 문서의 청크 하나에 담는 본문의 최대 글자 수(기본 1000, 최소 200). 코드 청크(chunk-max-chars)와 따로 둔다.
+	 * 사람이 쓴 글은 짧게 잘라야 임베딩이 한 가지 내용을 담고, 검색 결과로 LLM에 넘길 때도 부담이 적다.
+	 * </pre>
+	 */
+	public int uploadChunkMaxChars() {
+		return Math.max(200, intProperty("dstone.knowledge.rag.upload.chunk-max-chars", 1000));
+	}
+
 	/** 올린 문서의 청크 경계에서 겹쳐 넣는 문단의 최대 글자 수 */
 	public int uploadOverlapChars() {
 		return Math.max(0, intProperty("dstone.knowledge.rag.upload.overlap-chars", 200));

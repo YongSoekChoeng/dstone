@@ -1,5 +1,6 @@
 package net.dstone.boot.ai.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +31,7 @@ public class ChatController extends net.dstone.boot.common.biz.BaseController {
 	@Autowired
 	private ChatService chatService;
 
-	/** 등록된 Agent의 id+description 목록을 조회한다(agent 드롭다운용, WorkFlowTestController.list()와 같은 패턴). */
+	/** 등록된 Agent의 id, description, 고를 수 있는 Tool 목록을 조회한다(agent 드롭다운과 Tool 선택 칸용, WorkFlowTestController.list()와 같은 패턴). */
 	@GetMapping(value = "/list.do")
 	public List<AgentSummaryResult> list() {
 		return this.chatService.listAgents();
@@ -41,9 +42,9 @@ public class ChatController extends net.dstone.boot.common.biz.BaseController {
 		if (request.input() == null || (request.input() instanceof String text && StringUtil.isEmpty(text))) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "input은 필수입니다.");
 		}
-		boolean ragEnabled = Boolean.TRUE.equals(request.ragEnabled());
-		boolean toolsEnabled = Boolean.TRUE.equals(request.toolsEnabled());
-		return this.chatService.streamChat(servletRequest, request.input(), request.agent(), ragEnabled, toolsEnabled, request.model());
+		// 고른 Tool이 없으면(null) 빈 목록으로 보내 Tool 없이 부른다. null을 그대로 보내면 Agent 정의의 Tool이 전부 붙는다.
+		List<String> tools = request.tools() == null ? new ArrayList<String>() : request.tools();
+		return this.chatService.streamChat(servletRequest, request.input(), request.agent(), tools, request.model());
 	}
 
 }

@@ -20,57 +20,65 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<section class="cs-page-head">
 				<p class="cs-eyebrow">AI</p>
 				<h2>채팅</h2>
-				<p>dstone-ai-engine 의 Agent 와 실시간으로 대화합니다. Agent 를 고르고, 필요하면 올린 문서 검색(RAG) · 도구호출(Tool) 을 켠 뒤 메시지를 보냅니다.</p>
+				<p>dstone-ai-engine 의 Agent 와 실시간으로 대화합니다. Agent 를 고르고, 이번 대화에 쓸 도구(Tool)를 고른 뒤 메시지를 보냅니다.</p>
 			</section>
 
 			<section class="ai-panel">
 				<h3>대화 설정</h3>
 				<table class="ai-form">
-					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
 					<tr>
 						<th><label for="chat-agent">Agent</label></th>
 						<td><select id="chat-agent"></select></td>
-						<th>옵션</th>
-						<td class="ai-form-checks"><label title="켜면 직접 올린 문서에서 질문과 가까운 조각을 찾아 답변의 참고자료로 붙입니다. 소스 코드 분석 결과는 여기서 찾지 않습니다(도구호출을 쓰세요)."><input type="checkbox" id="chat-rag-enabled" /> 올린 문서 검색(RAG)</label>
-							<label title="켜면 Agent 에 허용된 Tool 을 씁니다. 소스 코드 분석 결과(테이블 사용처, 호출 관계)도 Tool 로 찾습니다."><input type="checkbox" id="chat-tools-enabled" /> 도구호출(Tool)</label></td>
 						<th><label for="chat-model-override">모델 override</label></th>
 						<td><input type="text" id="chat-model-override" placeholder="비우면 기본값(Agent 정의값)" /></td>
 					</tr>
+					<tr>
+						<th>도구호출(Tool)</th>
+						<td colspan="3">
+							<div class="chat-tools-bar">
+								<button type="button" class="kn-plain" id="chat-tools-docs" title="knowledgeListDocs, knowledgeSearchDocs, knowledgeGetChunks">올린 문서 찾기</button>
+								<button type="button" class="kn-plain" id="chat-tools-all">모두 선택</button>
+								<button type="button" class="kn-plain" id="chat-tools-none">모두 해제</button>
+								<span id="chat-tools-count" class="chat-tools-count"></span>
+							</div>
+							<div id="chat-tools" class="chat-tools ai-form-checks"></div>
+						</td>
+					</tr>
 				</table>
 				<p id="chat-agent-desc" class="ai-hint"></p>
-				<div class="kn-section-title">무엇을 물을 때 무엇을 켜나</div>
-				<p class="ai-hint">"올린 문서 검색(RAG)"과 "도구호출(Tool)"은 찾는 곳이 서로 다릅니다. RAG 는 <b>직접 올린 문서</b>에서만 찾고,
-					소스 코드 분석 결과(테이블을 쓰는 소스, 호출 관계 등)는 <b>Tool</b> 로만 찾습니다.</p>
+				<div class="kn-section-title">무엇을 물을 때 어떤 Tool 을 고르나</div>
+				<p class="ai-hint">Tool 목록은 고른 Agent 가 쓸 수 있는 것만 나옵니다. 고른 Tool 만 이번 대화에 붙고, 하나도 고르지 않으면 Tool 없이 답합니다.
+					Agent 는 필요할 때 Tool 을 직접 불러 찾아봅니다. 질문마다 문서를 미리 찾아 붙이는 일은 없습니다.</p>
 				<table class="document-list-table ai-guide-table">
 					<thead>
-						<tr><th>묻고 싶은 것</th><th>켤 것</th><th>Agent</th><th>이렇게 묻습니다</th></tr>
+						<tr><th>묻고 싶은 것</th><th>고를 Tool</th><th>Agent</th><th>이렇게 묻습니다</th></tr>
 					</thead>
 					<tbody>
 						<tr>
-							<td>올린 문서(설계서, 매뉴얼 등)의 내용</td>
-							<td><b>올린 문서 검색(RAG)</b></td>
+							<td>올린 문서(개발 가이드, 설계서, 매뉴얼 등)의 내용</td>
+							<td><b>올린 문서 찾기</b><br><code>knowledgeListDocs</code> <code>knowledgeSearchDocs</code> <code>knowledgeGetChunks</code></td>
 							<td><code>sample-general-chat</code></td>
-							<td>평소 말하듯 묻습니다. 예: <code>배치 재처리 절차를 알려줘</code><br>
+							<td>평소 말하듯 묻습니다. 어느 문서 묶음인지 같이 적으면 그 안에서만 찾습니다.<br>
+								예: <code>웹스퀘어 가이드에서 GridView 셀을 여러 개 선택하는 방법을 찾아줘</code><br>
 								문서는 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/search/search">코드 분석(Knowledge) &gt; 검색 · 문서</a>에서 올립니다.
-								방금 올린 문서는 임베딩이 끝난 뒤(보통 1분 안쪽)부터 뜻으로 찾힙니다.</td>
+								방금 올린 문서는 임베딩이 끝난 뒤부터 뜻으로 찾힙니다(그 전에도 영문 이름으로는 찾힙니다).</td>
 						</tr>
 						<tr>
 							<td>분석해 둔 소스 코드<br>(어느 테이블을 누가 쓰나, 누가 누구를 부르나, 고치면 어디가 영향받나)</td>
-							<td><b>도구호출(Tool)</b></td>
+							<td><code>knowledgeSearch</code> <code>knowledgeTableUsage</code> <code>knowledgeCallers</code> 등 <code>knowledge*</code></td>
 							<td><code>sample-general-chat</code></td>
 							<td><b>프로젝트 ID 를 같이 적습니다.</b> 예: <code>HI-Japan 프로젝트에서 JC_ACDT_AGMT 테이블을 사용하는 소스들을 알려줘</code><br>
 								프로젝트 ID 는 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/index">코드 분석(Knowledge) &gt; 프로젝트 · 분석</a>의 projectId 입니다. 분석이 끝난(READY) 가장 최근 리비전에서 찾습니다.</td>
 						</tr>
 						<tr>
 							<td>위와 같음 (코드 분석 전용 Agent)</td>
-							<td><b>도구호출(Tool)</b></td>
+							<td>모두 선택</td>
 							<td><code>sample-knowledge-agent</code></td>
 							<td>입력을 JSON 으로 적습니다. 예: <code>{"projectId": "HI-Japan", "question": "JC_ACDT_AGMT 테이블을 사용하는 소스들을 알려줘"}</code></td>
 						</tr>
 					</tbody>
 				</table>
-				<p class="ai-hint">체크하지 않은 옵션은 Agent 정의에 켜져 있어도 이번 대화에서는 꺼집니다. 예를 들어 "도구호출(Tool)"을 끄면 어떤 Agent 든 Tool 없이 답합니다.
-					RAG 는 문서를 못 찾거나 dstone-knowledge 가 응답하지 않으면 오류 없이 참고자료 없는 답을 합니다.</p>
 			</section>
 
 			<section class="ai-panel">

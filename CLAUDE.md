@@ -190,7 +190,7 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 |---|---|
 | `ai-engine-packages.md` | 패키지별 역할, 정의 파일 키(Agent/Workflow/Step), 레지스트리 검증 규칙 |
 | `ai-engine-dataflow.md` | Step 간 데이터 흐름(state 모델), Tool 호출 구조, timeout, 거버넌스 확장 지점 |
-| `ai-engine-features.md` | 일시정지/재개/되감기, `requiredTools`, Step 파일 기록·문서 팝업, Agent별 provider, RAG 위임, Skill·백그라운드 Sub Agent, 무재시작 정의 편집(디자이너) |
+| `ai-engine-features.md` | 일시정지/재개/되감기, `requiredTools`, Step 파일 기록·문서 팝업, Agent별 provider, 올린 문서는 Tool로 읽기(자동 RAG 없음), Skill·백그라운드 Sub Agent, 무재시작 정의 편집(디자이너) |
 | `ai-engine-testing.md` | 서버 없이 Workflow 테스트(`WorkflowTestBase`, `ScriptedChatModel`, `stepper`), 문서 위치 |
 | `ai-engine-tuning.md` | Tool 호출 예산·결과 압축·reasoning, `sm-workflow` 측정과 개선 내역 |
 | `ai-engine-pilot-workflow.md` | `pilot-workflow` step id, 신규개발/일반 경로, 측정 결과 |
@@ -236,7 +236,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro �
 | Anthropic API (or other LLM provider) | Chat model inference | dstone-ai-engine |
 | PostgreSQL | Workflow execution history (`dstone_ai` DB, MyBatis) | dstone-ai-engine |
 | PostgreSQL + pgvector | Analysis results, graph, RAG chunks/embeddings (`dstone_knowledge` DB) | dstone-knowledge |
-| dstone-knowledge | RAG document storage/embedding/search and the `KnowledgeTool` | dstone-ai-engine (when `dstone.ai.rag.enabled=true` or the Tool is used) |
+| dstone-knowledge | Code analysis and uploaded-document storage/embedding/search behind the `KnowledgeTool` | dstone-ai-engine (when the Tool is used) |
 | Ollama (or OpenAI) | Embedding model inference for code RAG (analysis still completes without it; chunks wait in the queue) | dstone-knowledge |
 
 ## Key Environment Variables (`conf/env.properties`)

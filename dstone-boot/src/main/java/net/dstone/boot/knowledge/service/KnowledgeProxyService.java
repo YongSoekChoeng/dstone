@@ -82,9 +82,9 @@ public class KnowledgeProxyService extends net.dstone.boot.common.biz.BaseServic
 	 * @param originalFileName 사용자가 올린 원래 파일 이름. dstone-knowledge가 파일 종류를 알아내고 문서 이름의 기본값으로 쓴다
 	 * @param sourceId 문서 이름(같은 이름이면 바꿔 넣는다). 없으면 파일 이름
 	 * @param title 검색 결과에 보일 제목. 없어도 됨
-	 * @param projectId 이 문서를 붙일 프로젝트. 없어도 됨
+	 * @param collection 묶음 이름(예: nexacro). 없어도 됨
 	 */
-	public ResponseEntity<String> upload(File file, String originalFileName, String sourceId, String title, String projectId) {
+	public ResponseEntity<String> upload(File file, String originalFileName, String sourceId, String title, String collection) {
 		MultipartBodyBuilder builder = new MultipartBodyBuilder();
 		// 받아 둔 파일은 서버가 붙인 이름으로 저장돼 있다. 원래 이름을 따로 붙여 보낸다.
 		builder.part("file", new FileSystemResource(file)).filename(originalFileName);
@@ -94,8 +94,8 @@ public class KnowledgeProxyService extends net.dstone.boot.common.biz.BaseServic
 		if (!StringUtil.isEmpty(title)) {
 			builder.part("title", title);
 		}
-		if (!StringUtil.isEmpty(projectId)) {
-			builder.part("projectId", projectId);
+		if (!StringUtil.isEmpty(collection)) {
+			builder.part("collection", collection);
 		}
 		URI uri;
 		try {

@@ -272,9 +272,9 @@
 
     <insert id="insertDocument" parameterType="net.dstone.knowledge.rag.model.DocumentRow">
         INSERT INTO rag_document
-            (document_id, source_type, project_id, revision_id, doc_type, ref_kind, ref_id, title, source_path, metadata_json, content_hash)
+            (document_id, source_type, revision_id, doc_type, ref_kind, ref_id, title, source_path, metadata_json, content_hash)
         VALUES
-            (#{documentId}, 'CODE', #{projectId}, #{revisionId}, #{docType}, #{refKind}, #{refId}, #{title}, #{sourcePath}
+            (#{documentId}, 'CODE', #{revisionId}, #{docType}, #{refKind}, #{refId}, #{title}, #{sourcePath}
             , CAST(#{metadataJson} AS jsonb), #{contentHash})
     </insert>
 
@@ -390,20 +390,21 @@
     </select>
 
     <!-- 아직 임베딩되지 않은 것을 프로젝트별로. 같은 내용이 여러 리비전에 있어도 프로젝트 안에서는 한 번만 센다.
-         올린 일반 문서는 프로젝트가 없을 수 있다 -->
+         코드 문서는 리비전으로 프로젝트를 찾는다. 올린 일반 문서는 리비전이 없어서 '(올린 문서)'로 묶는다 -->
     <select id="selectPendingEmbeddingByProject" parameterType="string" resultType="java.util.LinkedHashMap">
         SELECT t.project AS "project"
              , COUNT(*) AS "items"
              , COALESCE(SUM(t.chars), 0) AS "chars"
              , MAX(t.priority) AS "priority"
           FROM (
-            SELECT COALESCE(d.project_id, '(올린 문서)') AS project, e.content_hash, MAX(c.char_count) AS chars, MAX(e.priority) AS priority
+            SELECT COALESCE(r.project_id, '(올린 문서)') AS project, e.content_hash, MAX(c.char_count) AS chars, MAX(e.priority) AS priority
               FROM rag_embedding e
               JOIN rag_chunk c ON c.content_hash = e.content_hash
               JOIN rag_document d ON d.doc_seq = c.doc_seq
+              LEFT JOIN analysis_revision r ON r.revision_id = d.revision_id
              WHERE e.model = #{model}
                AND e.status = 'PENDING'
-             GROUP BY COALESCE(d.project_id, '(올린 문서)'), e.content_hash
+             GROUP BY COALESCE(r.project_id, '(올린 문서)'), e.content_hash
           ) t
          GROUP BY t.project
          ORDER BY MAX(t.priority) DESC, COUNT(*) DESC
@@ -479,17 +480,18 @@
     <!-- 넣은 문서의 일련번호를 param 의 docSeq 에 담아 준다 -->
     <insert id="insertUploadDocument" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="docSeq" keyColumn="doc_seq">
         INSERT INTO rag_document
-            (document_id, source_type, tenant, project_id, doc_type, ref_kind, title, source_path, metadata_json, content_hash)
+            (document_id, source_type, tenant, collection, doc_type, ref_kind, title, source_path, metadata_json, content_hash)
         VALUES
-            (#{sourceId}, 'DOCUMENT', #{tenant}, #{projectId}, 'UPLOAD', 'DOCUMENT', #{title}, #{fileName}
+            (#{sourceId}, 'DOCUMENT', #{tenant}, #{collection}, 'UPLOAD', 'DOCUMENT', #{title}, #{fileName}
             , CAST(#{metadataJson} AS jsonb), #{contentHash})
     </insert>
 
+    <!-- 청크마다 덧붙임 정보가 다르다(제목 경로, PDF 쪽) -->
     <insert id="insertUploadChunks" parameterType="java.util.Map">
         INSERT INTO rag_chunk (doc_seq, tenant, chunk_no, chunk_type, content, content_hash, char_count, metadata_json)
         VALUES
         <foreach collection="chunks" item="c" separator=",">
-            (#{docSeq}, #{tenant}, #{c.chunkNo}, 'UPLOAD', #{c.content}, #{c.contentHash}, #{c.charCount}, CAST(#{metadataJson} AS jsonb))
+            (#{docSeq}, #{tenant}, #{c.chunkNo}, 'UPLOAD', #{c.content}, #{c.contentHash}, #{c.charCount}, CAST(#{c.metadataJson} AS jsonb))
         </foreach>
     </insert>
 
@@ -507,7 +509,7 @@
 
     <sql id="uploadListWhere">
          WHERE <include refid="uploadOwner"/>
-        <if test="projectId != null">AND d.project_id = #{projectId}</if>
+        <if test="collection != null">AND d.collection = #{collection}</if>
         <if test="sourceId != null">AND d.document_id = #{sourceId}</if>
     </sql>
 
@@ -521,7 +523,7 @@
         SELECT d.document_id AS "sourceId"
              , d.title AS "title"
              , d.source_path AS "fileName"
-             , d.project_id AS "projectId"
+             , d.collection AS "collection"
              , d.tenant AS "tenant"
              , d.metadata_json::text AS "metadata"
              , to_char(d.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt"
@@ -536,23 +538,57 @@
          LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <!-- 묶음별 문서 수. 묶음이 없는 문서는 collection 이 비어 있는 한 줄로 나온다 -->
+    <select id="selectUploadCollections" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT d.collection AS "collection"
+             , COUNT(*) AS "documents"
+          FROM rag_document d
+         WHERE <include refid="uploadOwner"/>
+         GROUP BY d.collection
+         ORDER BY d.collection NULLS LAST
+    </select>
+
+    <!-- 문서 하나의 청크 몇 개(chunk_no 범위). 검색으로 찾은 조각의 앞뒤를 이어 읽을 때 쓴다 -->
+    <select id="selectUploadChunks" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT c.chunk_no AS "chunkNo"
+             , c.metadata_json->>'headingPath' AS "headingPath"
+             , c.metadata_json->>'pageStart' AS "pageStart"
+             , c.metadata_json->>'pageEnd' AS "pageEnd"
+             , c.content AS "content"
+          FROM rag_chunk c
+         WHERE c.doc_seq = #{docSeq}
+           AND c.chunk_no BETWEEN #{from} AND #{to}
+         ORDER BY c.chunk_no
+    </select>
+
+    <select id="countUploadChunks" parameterType="long" resultType="int">
+        SELECT COUNT(*) FROM rag_chunk WHERE doc_seq = #{docSeq}
+    </select>
+
 
     <!-- ================= 검색 ================= -->
 
-    <!-- 어디에서 찾을지. 코드(리비전 하나)와 일반 문서(호출자의 것)를 따로 또는 같이 찾는다.
-         일반 문서는 올린 호출자(tenant)의 것만 보인다. 인증을 꺼 두면 호출자가 없으므로 tenant 가 비어 있는 문서끼리만 보인다 -->
+    <!-- 어디에서 찾을지. 리비전이 있으면 그 리비전의 코드에서만, 없으면 올린 일반 문서에서만 찾는다. 둘을 섞지 않는다.
+         일반 문서는 올린 호출자(tenant)의 것만 보인다. 인증을 꺼 두면 호출자가 없으므로 tenant 가 비어 있는 문서끼리만 보인다.
+         collections / documentIds 를 주면 그 묶음, 그 문서로 범위를 좁힌다(둘 다 주면 둘 다 맞아야 한다) -->
     <sql id="documentScope">
         c.revision_id IS NULL AND d.source_type = 'DOCUMENT'
         <choose>
             <when test="tenant != null">AND d.tenant = #{tenant}</when>
             <otherwise>AND d.tenant IS NULL</otherwise>
         </choose>
-        <if test="projectId != null">AND d.project_id = #{projectId}</if>
+        <if test="collections != null and collections.size() > 0">
+           AND d.collection IN
+            <foreach collection="collections" item="name" open="(" separator="," close=")">#{name}</foreach>
+        </if>
+        <if test="documentIds != null and documentIds.size() > 0">
+           AND d.document_id IN
+            <foreach collection="documentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
     </sql>
 
     <sql id="searchScope">
         <choose>
-            <when test="revisionId != null and includeDocuments">AND (c.revision_id = #{revisionId} OR (<include refid="documentScope"/>))</when>
             <when test="revisionId != null">AND c.revision_id = #{revisionId}</when>
             <otherwise>AND <include refid="documentScope"/></otherwise>
         </choose>
@@ -567,8 +603,9 @@
                c.chunk_id AS "chunkId"
              , d.source_type AS "sourceType"
              , d.doc_type AS "docType"
-             -- 문서의 ID. 올린 일반 문서는 올릴 때 준 sourceId 다(dstone-ai-engine 의 RAG 가 이것으로 문서를 가려낸다)
+             -- 문서의 ID. 올린 일반 문서는 올릴 때 준 sourceId 다(chunkNo 와 함께 앞뒤 조각을 이어 읽을 때 쓴다)
              , d.document_id AS "documentId"
+             , d.collection AS "collection"
              , d.title AS "title"
              , d.ref_kind AS "refKind"
              , d.ref_id AS "refId"
@@ -576,6 +613,8 @@
              , c.line_start AS "lineStart"
              , c.line_end AS "lineEnd"
              , c.chunk_no AS "chunkNo"
+             -- 올린 문서의 조각이 문서의 어느 장/절에 있는지(예: 2. 엔진 설치 > 2.2 설정). 코드 조각은 비어 있다
+             , c.metadata_json->>'headingPath' AS "headingPath"
              , c.metadata_json::text AS "metadata"
              , c.content AS "content"
     </sql>

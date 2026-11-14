@@ -57,8 +57,8 @@ spring:
         # 고른 provider의 api-key가 비어 있으면 기동이 실패한다(ollama는 키가 없다).
         # (azure-openai는 Spring AI 2.x에서 chat model provider로 제거되어 더 이상 선택할 수 없다.)
         #
-        # embedding: 이 엔진은 임베딩 모델을 쓰지 않는다(none). RAG의 임베딩과 검색은 dstone-knowledge가 한다
-        # (common.rag.RagRetrievalChain이 그 서버의 검색 API를 부른다).
+        # embedding: 이 엔진은 임베딩 모델을 쓰지 않는다(none). 문서의 임베딩과 검색은 dstone-knowledge가 한다
+        # (Agent가 tools.knowledge.KnowledgeTool의 knowledgeSearchDocs 등으로 그 서버의 검색 API를 부른다).
         #
         # chat 외 capability(audio/image/moderation)는 openai starter가 클래스패스에 있으면
         # 기본값으로 자동 활성화를 시도하고(그중 상당수가 기동 시점에 api-key를 요구해서 즉시 기동 실패로 이어진다),
@@ -244,8 +244,8 @@ dstone:
                 allowed-jobs:
                     - testApp
             # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)를 부르는 설정(common.knowledge.KnowledgeClient).
-            # 두 군데서 쓴다: 코드 분석 결과를 물어보는 Tool(tools.knowledge.KnowledgeTool)과 RAG(올린 문서 검색, 아래 dstone.ai.rag).
-            # base-url이 비어 있으면 그 Tool은 항상 실패 문구로 끝나고 RAG도 쓸 수 없다 - 주소를 채우는 것이 곧 "켠 상태"다.
+            # 쓰는 곳은 tools.knowledge.KnowledgeTool 하나다: 코드 분석 결과(knowledgeSearch 등)와 올린 문서(knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks).
+            # base-url이 비어 있으면 그 Tool은 항상 실패 문구로 끝난다 - 주소를 채우는 것이 곧 "켠 상태"다.
             # api-key: dstone-knowledge가 호출자 인증(dstone.knowledge.security.auth.enabled)을 켰을 때만 넣는다. ENC(...)로 적는다.
             # timeout-seconds: 응답 대기 시간(기본 60). 검색은 질문을 임베딩해야 해서 임베딩 서버가 바쁘면 수 초가 걸린다.
             knowledge:
@@ -253,9 +253,10 @@ dstone:
                 base-url: http://${KNOWLEDGE_HOST}:${KNOWLEDGE_PORT}
                 # api-key: ENC(...)
                 timeout-seconds: 60
-                # knowledgeSearch 결과 한 건의 본문 글자 수 상한(기본 1500). 한 번에 10건까지 오므로 1500이면 16,000자가 넘었다(2026-11-05).
+                # knowledgeSearch(코드) 결과 한 건의 본문 글자 수 상한(기본 1500). 한 번에 10건까지 오므로 1500이면 16,000자가 넘었다(2026-11-05).
+                # 올린 문서 조각(knowledgeSearchDocs / knowledgeGetChunks)에는 쓰지 않는다. 문서 조각은 dstone-knowledge가 1,000자 안팎의 장/절 단위로 만들어서 자르지 않는다.
                 max-content-chars: 800
-                # knowledgeSearch 결과 개수 상한(기본 10). LLM이 topK를 더 크게 줘도 이만큼만 준다.
+                # knowledgeSearch / knowledgeSearchDocs 결과 개수 상한(기본 10). LLM이 topK를 더 크게 줘도 이만큼만 준다.
                 # sm-workflow 영향도 step에서 topK 10으로 두 번 찾은 18,000자가 뒤의 18라운드에 계속 실렸다(2026-11-05).
                 max-top-k: 5
             # 등록해 둔 DB를 조회하는 Tool(tools.db.DbQueryTool: dbListConnections / dbListTables / dbDescribeTable / dbQuery) 설정.
@@ -306,22 +307,6 @@ dstone:
                 max-search-file-bytes: 1048576
                 exclude-dirs: .git,.svn,target,node_modules,.settings,.idea,.gradle,.metadata
         
-        ##########################################################################################
-        # RAG 설정.
-        # 이 값이 true여야 common.rag.RagRetrievalChain(검색), Agent의 ragEnabled 설정, searchDocuments Tool이 실제로 동작한다.
-        # 문서의 저장, 임베딩, 검색은 dstone-knowledge가 한다. 문서도 그 서버에 직접 올린다(dstone-boot의 "코드 분석(Knowledge) > 검색 · 문서" 화면). 그래서 위의 dstone.ai.tool.knowledge.base-url(그 서버의 주소)이 채워져 있어야 한다.
-        # RAG가 필요 없는 SI 프로젝트는 false(또는 미설정)로 두면 dstone-knowledge 없이도 그대로 기동된다.
-        ##########################################################################################
-        rag:
-            enabled: true
-            retrieval:
-                top-k: 5
-                # 유사도가 이 값보다 낮은 조각은 버린다(질문에 든 이름이 글자 그대로 들어 있어서 찾힌 조각은 남긴다).
-                # bge-m3(dstone-knowledge가 쓰는 임베딩 모델) 기준 실측: 실제로 관련 있는 문서/질의 쌍도 코사인 유사도가
-                # 0.5를 못 넘는 경우가 흔해서(0.48 등) 0.5로 두면 데이터가 있어도 결과가 통째로 빈다.
-                # 임베딩 모델/도메인마다 분포가 달라 재조정이 필요한 값이다.
-                similarity-threshold: 0.35
-
         ##########################################################################################
         # Security 설정. 
         # security.auth: API Key 인증. enabled=false(기본값)면 인증 없이 전부 통과한다. 현재는 미사용.

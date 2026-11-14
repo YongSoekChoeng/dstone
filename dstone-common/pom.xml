@@ -252,11 +252,13 @@
 		    <version>2.0.0-M2</version> 
 	    </dependency>
 		
-		<!-- PDF API -->
+		<!-- PDF API
+		     Tika 3.3.1(dstone-knowledge, dstone-ai-engine의 문서 읽기)이 쓰는 버전과 맞춘다.
+		     2.x를 두면 Tika가 PDF를 읽다가 NoSuchFieldError로 죽는다(2026-11-14 확인). Tika를 올리면 이것도 같이 올린다. -->
 		<dependency>
 		    <groupId>org.apache.pdfbox</groupId>
 		    <artifactId>pdfbox</artifactId>
-		    <version>2.0.27</version>
+		    <version>3.0.7</version>
 		</dependency>
 		
 		<!-- SFTP -->

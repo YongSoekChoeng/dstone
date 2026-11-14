@@ -28,7 +28,8 @@ import net.dstone.knowledge.rag.SearchKeywords;
 
 /**
  * <pre>
- * 분석 결과와 올린 문서를 찾습니다. "주문 취소는 어디서 처리하나" 같은 질문에 가까운 문서 조각을 돌려줍니다.
+ * 분석 결과나 올린 문서를 찾습니다. "주문 취소는 어디서 처리하나" 같은 질문에 가까운 문서 조각을 돌려줍니다.
+ * 한 번에 한쪽에서만 찾습니다. 프로젝트(리비전)를 주면 코드, 주지 않으면 올린 문서입니다.
  *
  * 두 가지 방법을 같이 씁니다(하이브리드 검색).
  *   - 뜻으로 찾기(벡터): 질문을 임베딩해서 가까운 청크를 찾는다. 글자가 달라도 뜻이 가까우면 나온다.
@@ -79,10 +80,10 @@ public class SearchService extends BaseObject {
 	 * <pre>
 	 * 질문과 가까운 청크를 찾습니다.
 	 * 코드는 리비전 하나에서 찾습니다. revisionId를 주지 않으면 그 프로젝트에서 분석이 끝난 가장 최근 리비전입니다.
-	 * 일반 문서는 호출자가 올린 것에서 찾고, projectId를 주면 그 프로젝트에 붙여 올린 것만 봅니다.
+	 * 일반 문서는 호출자가 올린 것에서 찾고, collections / documentIds를 주면 그 묶음, 그 문서로 좁힙니다.
 	 *
 	 * 흐름:
-	 *   1) 요청 확인: 어디서 찾을지(CODE / DOCUMENT), 리비전, 건수, 최소 유사도
+	 *   1) 요청 확인: 어디서 찾을지(프로젝트가 있으면 코드, 없으면 올린 문서), 리비전, 건수, 최소 유사도
 	 *   2) 질문에서 이름(영문 식별자, 주소)을 뽑는다(VECTOR 모드면 뽑지 않음).
 	 *   3) 질문을 임베딩한다. 임베딩 서버가 죽었으면 이름이 있을 때만 이름 검색으로 바꾼다.
 	 *   4) 뜻으로 찾기(벡터) → 최소 유사도보다 낮은 것은 버린다.
@@ -98,15 +99,19 @@ public class SearchService extends BaseObject {
 		String query = request.getQuery().trim();
 		String mode = modeOf(request.getMode());
 		String projectId = request.getProjectId() == null || request.getProjectId().trim().length() == 0 ? null : request.getProjectId().trim();
-		boolean hasTarget = projectId != null || request.getRevisionId() != null;
-		boolean wantCode = wants(request.getSourceTypes(), "CODE", hasTarget);
-		boolean wantDocuments = wants(request.getSourceTypes(), "DOCUMENT", !hasTarget);
-		if (!wantCode && !wantDocuments) {
-			throw ApiException.badRequest("sourceTypes는 CODE나 DOCUMENT여야 합니다: " + request.getSourceTypes());
+		boolean code = projectId != null || request.getRevisionId() != null;
+		List<String> collections = nonEmpty(request.getCollections());
+		List<String> documentIds = nonEmpty(request.getDocumentIds());
+		List<String> docTypes = nonEmpty(request.getDocTypes());
+		if (code && (!collections.isEmpty() || !documentIds.isEmpty())) {
+			throw ApiException.badRequest("collections / documentIds는 올린 문서를 찾을 때(projectId와 revisionId 없이)만 씁니다.");
+		}
+		if (!code && (!docTypes.isEmpty() || (request.getLayer() != null && request.getLayer().trim().length() > 0))) {
+			throw ApiException.badRequest("docTypes / layer는 코드를 찾을 때(projectId나 revisionId가 있을 때)만 씁니다.");
 		}
 
 		Long revisionId = null;
-		if (wantCode) {
+		if (code) {
 			revisionId = Long.valueOf(resolveRevision(projectId, request.getRevisionId()));
 		}
 		String model = ragSettings.embeddingModel();
@@ -147,11 +152,11 @@ public class SearchService extends BaseObject {
 		final Map<String, Object> condition = new HashMap<String, Object>();
 		condition.put("model", model);
 		condition.put("revisionId", revisionId);
-		condition.put("includeDocuments", Boolean.valueOf(wantDocuments));
 		condition.put("tenant", request.getTenant());
-		condition.put("projectId", projectId);
+		condition.put("collections", collections);
+		condition.put("documentIds", documentIds);
 		condition.put("vector", vectorText);
-		condition.put("docTypes", request.getDocTypes() == null ? new ArrayList<String>() : request.getDocTypes());
+		condition.put("docTypes", docTypes);
 		condition.put("layer", request.getLayer());
 		// 이름이 없으면 합칠 것이 없으니 필요한 만큼만 뽑는다.
 		condition.put("topK", Integer.valueOf(keywords.isEmpty() ? topK : Math.min(MAX_CANDIDATES, Math.max(MIN_CANDIDATES, topK * 3))));
@@ -174,7 +179,7 @@ public class SearchService extends BaseObject {
 		for (int i = 0; i < vectorHits.size(); i++) {
 			Map<String, Object> hit = vectorHits.get(i);
 			double score = ((Number) hit.get("score")).doubleValue();
-			double minScore = "DOCUMENT".equals(hit.get("sourceType")) ? minScoreDocument : minScoreCode;
+			double minScore = code ? minScoreCode : minScoreDocument;
 			if (score >= minScore) {
 				keptVectorHits.add(hit);
 			} else {
@@ -211,10 +216,9 @@ public class SearchService extends BaseObject {
 		if (warning != null) {
 			result.put("warning", warning);
 		}
-		Map<String, Object> minScore = new LinkedHashMap<String, Object>();
-		minScore.put("code", Double.valueOf(minScoreCode));
-		minScore.put("document", Double.valueOf(minScoreDocument));
-		result.put("minScore", minScore);
+		// 어디서 찾았는지: CODE / DOCUMENT
+		result.put("source", code ? "CODE" : "DOCUMENT");
+		result.put("minScore", Double.valueOf(code ? minScoreCode : minScoreDocument));
 		// 뜻으로 찾았지만 유사도가 기준보다 낮아 버린 건수와, 그중 가장 높았던 유사도
 		result.put("belowMinScore", Integer.valueOf(belowMinScore));
 		result.put("bestBelowMinScore", bestBelowMinScore);
@@ -239,17 +243,19 @@ public class SearchService extends BaseObject {
 		return upper;
 	}
 
-	/** sourceTypes에 그 종류가 있는지. 아무것도 적지 않았으면 기본값을 따른다 */
-	private boolean wants(List<String> sourceTypes, String type, boolean defaultValue) {
-		if (sourceTypes == null || sourceTypes.isEmpty()) {
-			return defaultValue;
+	/** 빈 값을 뺀 목록(앞뒤 빈칸은 뗀다). null 이면 빈 목록 */
+	private List<String> nonEmpty(List<String> values) {
+		List<String> result = new ArrayList<String>();
+		if (values == null) {
+			return result;
 		}
-		for (int i = 0; i < sourceTypes.size(); i++) {
-			if (type.equalsIgnoreCase(sourceTypes.get(i))) {
-				return true;
+		for (int i = 0; i < values.size(); i++) {
+			String value = values.get(i);
+			if (value != null && value.trim().length() > 0) {
+				result.add(value.trim());
 			}
 		}
-		return false;
+		return result;
 	}
 
 	/**

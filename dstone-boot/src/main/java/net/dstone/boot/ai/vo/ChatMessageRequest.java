@@ -1,5 +1,7 @@
 package net.dstone.boot.ai.vo;
 
+import java.util.List;
+
 /**
  * /ai/chat/sendMessage.do 요청 바디.
  *
@@ -11,9 +13,12 @@ package net.dstone.boot.ai.vo;
  * 쓰고, 채워서 보내면(화면의 agent 드롭다운에서 고른 값) 이번 메시지 한 번만 그 Agent로 호출한다 -
  * /ai/chat/list.do(dstone-ai-engine의 GET /api/ai/chat을 그대로 받아온 목록)가 이 드롭다운을 채운다.
  *
+ * tools는 이번 메시지에서 쓸 Tool 이름이다(화면의 Tool 선택 칸에서 고른 것, /ai/chat/list.do의 tools 가운데).
+ * 하나도 고르지 않으면 빈 목록이라 Tool 없이 답한다. dstone-ai-engine은 그 Agent에 붙지 않는 이름이 있으면 400으로 거절한다.
+ *
  * model은 비워서 보내면(null/빈 문자열) 선택된 Agent 정의값(그마저 없으면 provider 공통 기본값)을
  * 그대로 쓰고, 채워서 보내면 이번 메시지 한 번만 그 모델로 강제한다 - dstone-ai-engine의
  * AgentDefinition.model(Agent별 기본 모델) 기능을 화면에서 재배포 없이 바로 테스트해볼 수 있게 하기 위한 입력칸이다.
  */
-public record ChatMessageRequest(Object input, String agent, Boolean ragEnabled, Boolean toolsEnabled, String model) {
+public record ChatMessageRequest(Object input, String agent, List<String> tools, String model) {
 }

@@ -46,7 +46,7 @@ import net.dstone.common.utils.StringUtil;
  *
  * 정해진 값만 받는 항목도 기동할 때 검사합니다(checkCallOptions()). 오타가 조용히 무시되지 않게 하려는 것입니다.
  *   model.provider, model.reasoning, model.temperature,
- *   context.sources, execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls / requiredTools
+ *   execution.onInvalidOutput / maxAttempts / timeoutSeconds / maxToolCalls / requiredTools
  *
  * Tool 허용 목록(tools)과 Sub Agent(subAgents)도 기동할 때 검사합니다(checkTools(), checkSubAgents()).
  *   오류(기동 실패)                                         경고(로그만)
@@ -230,15 +230,6 @@ public class AgentRegistry extends BaseObject {
 		}
 		if (definition.temperature() != null && (definition.temperature().doubleValue() < 0 || definition.temperature().doubleValue() > 2)) {
 			throw new IllegalStateException(where + "model.temperature는 0 이상 2 이하여야 합니다: " + definition.temperature());
-		}
-		// context
-		for (String source : definition.contextSources()) {
-			if (!AgentDefinition.SOURCES.contains(source)) {
-				throw new IllegalStateException(where + "context.sources의 '" + source + "'는 쓸 수 없는 값입니다(쓸 수 있는 값 = " + AgentDefinition.SOURCES + ").");
-			}
-		}
-		if (definition.context() != null && definition.context().retrieval() != null && !definition.ragEnabled()) {
-			throw new IllegalStateException(where + "context.retrieval은 context.sources에 " + AgentDefinition.SOURCE_RETRIEVED_DOCUMENTS + "를 적었을 때만 씁니다.");
 		}
 		// execution
 		AgentDefinition.Execution execution = definition.execution();

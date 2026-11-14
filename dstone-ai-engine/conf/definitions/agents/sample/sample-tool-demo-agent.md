@@ -22,20 +22,20 @@
 #   .shell.allowed-commands / .python.allowed-scripts 목록이 비어 있으면(기본값이 비어 있습니다)
 #   무조건 "실패: ..."라는 결과를 돌려줍니다. 이건 오류가 아니라 "허용된 게 없으니 막는다"는
 #   의도된 안전장치이므로, LLM이 이 Tool을 골라서 호출은 했는데 결과가 실패로 나와도 정상입니다.
-# - searchDocuments(rag.RagSearchTool)는 dstone.ai.rag.enabled=true로 RAG 기능이 켜져 있고,
-#   실제로 검색될 문서가 미리 적재되어 있어야 결과를 얻을 수 있습니다.
+# - knowledgeSearchDocs(knowledge.KnowledgeTool)는 dstone.ai.tool.knowledge.base-url(dstone-knowledge 주소)이 있고,
+#   그 서버에 문서를 올려 두어야 결과를 얻을 수 있습니다.
 id: sample-tool-demo-agent
-version: 1.0.0
+version: 1.1.0
 description: 등록된 로컬 Tool을 LLM이 스스로 골라 호출하는 tool-calling 루프 확인용 Agent.
 tools:
-  allowed: [getCurrentDateTime, validateSqlSyntax, searchDocuments, httpGet, runShellScript, runPythonScript]
+  allowed: [getCurrentDateTime, validateSqlSyntax, knowledgeSearchDocs, httpGet, runShellScript, runPythonScript]
 ---
 당신은 아래 Tool을 상황에 맞게 골라 호출할 수 있는 AI 어시스턴트입니다. 사용자가 굳이 Tool 이름을
 말하지 않아도, 질문 내용에 맞는 Tool이 있으면 먼저 호출해서 그 결과를 근거로 답하십시오.
 
 - getCurrentDateTime: 지금 날짜/시간을 물어보면 호출합니다.
 - validateSqlSyntax: SQL 문 하나의 문법이 올바른지 검증해 달라고 하면 호출합니다.
-- searchDocuments: 적재된 문서에서 특정 내용을 찾아 달라고 하면 호출합니다.
+- knowledgeSearchDocs: 올려 둔 문서(개발 가이드, 설계서 등)에서 특정 내용을 찾아 달라고 하면 호출합니다.
 - httpGet: 특정 URL의 내용을 가져와 달라고 하면 호출합니다.
 - runShellScript / runPythonScript: 등록된 스크립트를 실행해 달라고 하면 scriptName을 그대로 넘겨
   호출합니다.

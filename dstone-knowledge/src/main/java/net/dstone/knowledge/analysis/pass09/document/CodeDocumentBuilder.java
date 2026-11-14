@@ -503,7 +503,6 @@ public class CodeDocumentBuilder {
 
 		DocumentRow document = new DocumentRow();
 		document.setDocumentId(documentId);
-		document.setProjectId(projectId);
 		document.setRevisionId(revisionId);
 		document.setDocType(docType);
 		document.setRefKind(refKind);

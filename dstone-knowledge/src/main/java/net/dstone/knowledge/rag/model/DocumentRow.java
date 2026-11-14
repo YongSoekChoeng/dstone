@@ -10,10 +10,7 @@ public class DocumentRow {
 	/** 같은 대상이면 리비전이 달라도 같은 값. 예: METHOD:메소드ID */
 	private String documentId;
 
-	/** 프로젝트 ID */
-	private String projectId;
-
-	/** 리비전 ID */
+	/** 리비전 ID. 프로젝트는 이 리비전으로 찾는다 */
 	private long revisionId;
 
 	/** FILE / TYPE / METHOD */
@@ -43,14 +40,6 @@ public class DocumentRow {
 
 	public void setDocumentId(String documentId) {
 		this.documentId = documentId;
-	}
-
-	public String getProjectId() {
-		return projectId;
-	}
-
-	public void setProjectId(String projectId) {
-		this.projectId = projectId;
 	}
 
 	public long getRevisionId() {

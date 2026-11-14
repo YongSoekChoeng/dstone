@@ -29,7 +29,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	private ConfigProperty configProperty;
 
 	/**
-	 * 등록된 Agent의 id+description 목록을 조회한다("채팅" 화면의 agent 드롭다운용).
+	 * 등록된 Agent의 id, description, 고를 수 있는 Tool 목록을 조회한다("채팅" 화면의 agent 드롭다운과 Tool 선택 칸용).
 	 * WorkFlowTestService.listWorkflows()와 완전히 같은 패턴이다 - dstone-ai-engine의
 	 * GET /api/ai/chat을 그대로 받아와 화면용 VO로 옮겨 담기만 한다.
 	 */
@@ -45,7 +45,8 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		List<AgentSummaryResult> summaries = new ArrayList<>();
 		if (results != null) {
 			for (AgentSummaryCallResult result : results) {
-				summaries.add(new AgentSummaryResult(result.id(), result.description(), result.input(), result.output()));
+				List<String> tools = result.availableTools() == null ? new ArrayList<String>() : result.availableTools();
+				summaries.add(new AgentSummaryResult(result.id(), result.description(), result.input(), result.output(), tools));
 			}
 		}
 		return summaries;
@@ -60,12 +61,14 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 * agent는 화면의 agent 드롭다운 값을 그대로 받는다 - 비어 있으면 기본값(AGENT, sample-general-chat)을
 	 * 쓴다. 프롬프트가 읽는 값은 Agent가 받은 input뿐이라, input 말고 따로 보낼 값은 없다.
 	 *
+	 * tools는 화면에서 고른 Tool 이름을 그대로 보낸다. 빈 목록이면 Tool 없이 답한다.
+	 *
 	 * model은 화면의 모델 override 입력칸 값을 그대로 흘려보낸다 - 비어 있으면 body에 아예 안 실어서
 	 * dstone-ai-engine이 선택된 Agent 정의값(그마저 없으면 provider 공통 기본값)을 쓰게 둔다.
 	 *
 	 * input은 선택한 Agent의 input 모양(글자 또는 객체) 그대로 넘긴다. 모양이 틀리면 dstone-ai-engine이 400으로 거절한다.
 	 */
-	public Flux<String> streamChat(HttpServletRequest servletRequest, Object input, String agent, boolean ragEnabled, boolean toolsEnabled, String model) {
+	public Flux<String> streamChat(HttpServletRequest servletRequest, Object input, String agent, List<String> tools, String model) {
 
 		String resolvedAgent = StringUtil.isEmpty(agent) ? AGENT : agent;
 
@@ -73,8 +76,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 		body.put("sessionId", this.resolveSessionId(servletRequest));
 		body.put("agent", resolvedAgent);
 		body.put("input", input);
-		body.put("ragEnabled", ragEnabled);
-		body.put("toolsEnabled", toolsEnabled);
+		body.put("tools", tools);
 		if (!StringUtil.isEmpty(model)) {
 			body.put("model", model);
 		}

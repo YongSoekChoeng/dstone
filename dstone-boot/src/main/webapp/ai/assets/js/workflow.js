@@ -26,10 +26,6 @@ var DstoneAiWorkflow = (function () {
 			input: "너는 누구니?",
 			note: "dstone-ai-engine의 agents/sample/sample-model-override-agent.md에 적힌 model.name이 지금 켜진 provider의 모델 이름이어야 호출됩니다."
 		},
-		"sample-agent-rag-augmented": {
-			input: "적재된 문서 중에 Spring Batch에 대해 설명해줘.",
-			note: "코드 분석(Knowledge) > 검색 · 문서 화면에서 올린 문서에 실제로 있는 키워드로 바꿔서 보내세요."
-		},
 		"sample-agent-subagent-delegate": {
 			input: "회원 테이블에서 1번 회원을 찾으려고 해. SELECT * FORM member WHERE id = 1 이렇게 쓰면 되지?",
 			note: "Agent가 다른 Agent(Sub Agent)에게 SQL 뽑기와 고치기를 맡깁니다. 맡긴 내역은 dstone-ai-engine 로그(sub-agent:)에 남습니다."
@@ -75,10 +71,6 @@ var DstoneAiWorkflow = (function () {
 		"sample-tool-gated-external": {
 			input: "외부 Tool 게이트 테스트",
 			note: "input은 쓰지 않습니다(아무 글자나 넣으면 됩니다)."
-		},
-		"sample-tool-rag-search": {
-			input: "Spring Batch",
-			note: "코드 분석(Knowledge) > 검색 · 문서 화면에서 올린 문서에 실제로 들어있는 키워드로 바꿔서 보내세요."
 		},
 		"testApp-sdlc": {
 			input: "회원 목록 화면에 가입일자 검색 조건을 추가해줘",

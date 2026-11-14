@@ -1,8 +1,11 @@
 var DstoneAiChat = (function () {
 
 	var urls = {};
-	var messagesEl, inputEl, formEl, agentEl, agentDescEl, ragCheckEl, toolsCheckEl, modelInputEl, sendBtnEl;
-	var agentsById = {}; // id -> {description, input, output}, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
+	var messagesEl, inputEl, formEl, agentEl, agentDescEl, toolsEl, toolsCountEl, modelInputEl, sendBtnEl;
+	var agentsById = {}; // id -> {description, input, output, tools}, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
+
+	// "올린 문서 찾기" 단추가 고르는 Tool(dstone-ai-engine의 KnowledgeTool)
+	var DOC_TOOLS = ["knowledgeListDocs", "knowledgeSearchDocs", "knowledgeGetChunks"];
 
 	function init(options) {
 		urls = options;
@@ -11,8 +14,8 @@ var DstoneAiChat = (function () {
 		formEl = document.getElementById("chat-form");
 		agentEl = document.getElementById("chat-agent");
 		agentDescEl = document.getElementById("chat-agent-desc");
-		ragCheckEl = document.getElementById("chat-rag-enabled");
-		toolsCheckEl = document.getElementById("chat-tools-enabled");
+		toolsEl = document.getElementById("chat-tools");
+		toolsCountEl = document.getElementById("chat-tools-count");
 		modelInputEl = document.getElementById("chat-model-override");
 		sendBtnEl = document.getElementById("chat-send");
 
@@ -27,6 +30,16 @@ var DstoneAiChat = (function () {
 			}
 		});
 		agentEl.addEventListener("change", updateAgentDescription);
+		toolsEl.addEventListener("change", updateToolCount);
+		document.getElementById("chat-tools-docs").addEventListener("click", function () {
+			checkTools(function (name) { return DOC_TOOLS.indexOf(name) >= 0; });
+		});
+		document.getElementById("chat-tools-all").addEventListener("click", function () {
+			checkTools(function () { return true; });
+		});
+		document.getElementById("chat-tools-none").addEventListener("click", function () {
+			checkTools(function () { return false; });
+		});
 
 		loadAgentList();
 	}
@@ -63,6 +76,7 @@ var DstoneAiChat = (function () {
 
 	function updateAgentDescription() {
 		var agent = agentsById[agentEl.value];
+		renderTools(agent ? agent.tools : []);
 		if (!agent) {
 			agentDescEl.textContent = "";
 			return;
@@ -75,6 +89,48 @@ var DstoneAiChat = (function () {
 			hint += " [output이 string이 아니라 이 채팅 화면(스트리밍)에서는 부를 수 없습니다 - POST /api/ai/chat을 쓰십시오]";
 		}
 		agentDescEl.textContent = hint;
+	}
+
+	/**
+	 * 고른 Agent 가 쓸 수 있는 Tool 을 체크박스로 그린다.
+	 * Agent 를 바꿔도, 새 Agent 에도 있는 Tool 은 고른 상태를 그대로 둔다.
+	 */
+	function renderTools(names) {
+		var checked = selectedTools();
+		toolsEl.innerHTML = "";
+		(names || []).slice().sort().forEach(function (name) {
+			var label = document.createElement("label");
+			var box = document.createElement("input");
+			box.type = "checkbox";
+			box.value = name;
+			box.checked = checked.indexOf(name) >= 0;
+			label.appendChild(box);
+			label.appendChild(document.createTextNode(" " + name));
+			toolsEl.appendChild(label);
+		});
+		updateToolCount();
+	}
+
+	/** 조건에 맞는 Tool 만 고른다 */
+	function checkTools(match) {
+		Array.prototype.forEach.call(toolsEl.querySelectorAll("input[type=checkbox]"), function (box) {
+			box.checked = match(box.value);
+		});
+		updateToolCount();
+	}
+
+	/** 고른 Tool 이름 */
+	function selectedTools() {
+		return Array.prototype.filter.call(toolsEl.querySelectorAll("input[type=checkbox]"), function (box) {
+			return box.checked;
+		}).map(function (box) {
+			return box.value;
+		});
+	}
+
+	function updateToolCount() {
+		var total = toolsEl.querySelectorAll("input[type=checkbox]").length;
+		toolsCountEl.textContent = total === 0 ? "" : selectedTools().length + " / " + total + " 개 고름";
 	}
 
 	/** Agent의 input/output 스키마가 글자(string)인지 본다. 스키마가 없으면 글자로 본다. */
@@ -135,8 +191,8 @@ var DstoneAiChat = (function () {
 		var requestBody = JSON.stringify({
 			input: input,
 			agent: agentEl.value,
-			ragEnabled: ragCheckEl.checked,
-			toolsEnabled: toolsCheckEl.checked,
+			// 고른 Tool 만 붙는다. 하나도 고르지 않으면 빈 목록이라 Tool 없이 답한다.
+			tools: selectedTools(),
 			model: model ? model : null
 		});
 

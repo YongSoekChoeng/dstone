@@ -23,8 +23,9 @@ spring:
     servlet:
         multipart:
             # 올리는 일반 문서(PDF, Word 등) 한 건의 최대 크기. 기본값(1MB)으로는 웬만한 문서가 다 거절된다.
-            max-file-size: 50MB
-            max-request-size: 55MB
+            # 그림이 많은 개발 가이드는 Word 파일 하나가 70MB 가까이 된다(웹스퀘어5 SP4 개발 가이드.docx 68MB).
+            max-file-size: 100MB
+            max-request-size: 105MB
     datasource:
         # 분석 결과/그래프/RAG 청크/임베딩을 모두 담는 단일 스키마(PostgreSQL + pgvector).
         # 롤/DB 생성 절차: src/main/resources/schema/01-init-postgresql-dstone-knowledge.sql, docs/software/05.postgresql.md 참고.
@@ -138,6 +139,10 @@ dstone:
             upload:
                 # 문서 하나에서 읽는 최대 글자 수. 넘는 부분은 버리고 응답에 truncated 로 알린다.
                 max-chars: 5000000
+                # 청크 하나에 담는 본문의 최대 글자 수(머리말 빼고). 코드 청크(chunk-max-chars)와 따로 둔다.
+                # 문서는 장/절 단위로 나누고, 짧은 절은 이웃 절과 묶고, 긴 절은 이 크기로 나눈다(rag.DocumentChunker).
+                # 짧아야 임베딩이 한 가지 내용을 담고, 검색 결과로 LLM에 넘길 때도 잘라 내지 않아도 된다.
+                chunk-max-chars: 1000
                 # 청크 경계에서 앞 청크의 마지막 문단을 다음 청크에 다시 넣을 때, 그 문단의 최대 글자 수. 0 이면 겹치지 않는다.
                 overlap-chars: 200
                 # 임베딩 우선순위. 코드(0)보다 커야, 올린 문서가 큰 프로젝트의 대기열 뒤에서 기다리지 않는다.

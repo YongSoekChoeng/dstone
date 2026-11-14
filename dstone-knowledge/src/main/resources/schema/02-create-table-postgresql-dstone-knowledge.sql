@@ -428,9 +428,9 @@ CREATE TABLE IF NOT EXISTS rag_document (
     document_id       VARCHAR(200)  NOT NULL,            -- 같은 대상이면 리비전이 달라도 같은 값
     source_type       VARCHAR(20)   NOT NULL,            -- CODE(분석 결과에서 생성) / DOCUMENT(업로드한 일반 문서)
     tenant            VARCHAR(100),                      -- 호출자별 격리 키. 다른 호출자의 문서가 검색에 섞이지 않게 한다
-    project_id        VARCHAR(100),                      -- CODE 일 때만
-    revision_id       BIGINT,                            -- CODE 일 때만
-    doc_type          VARCHAR(30)   NOT NULL,            -- FILE/TYPE/METHOD(Java) / MAPPER(SQL statement) / VIEW(JSP) / UPLOAD(일반 문서, 예정)
+    collection        VARCHAR(100),                      -- DOCUMENT 일 때만. 올린 문서를 묶는 이름(예: nexacro). 검색 범위를 좁힐 때 쓴다
+    revision_id       BIGINT,                            -- CODE 일 때만. 프로젝트는 이 리비전(analysis_revision)으로 찾는다
+    doc_type          VARCHAR(30)   NOT NULL,            -- FILE/TYPE/METHOD(Java) / MAPPER(SQL statement) / VIEW(JSP) / UPLOAD(올린 일반 문서)
     ref_kind          VARCHAR(20),                       -- 이 문서의 근거가 된 대상 종류 (TYPE/METHOD/FILE ...)
     ref_id            VARCHAR(40),                       -- 그 대상의 ID
     title             VARCHAR(1000),
@@ -441,7 +441,13 @@ CREATE TABLE IF NOT EXISTS rag_document (
 );
 CREATE INDEX IF NOT EXISTS idx_rag_document_revision ON rag_document(revision_id, doc_type);
 CREATE INDEX IF NOT EXISTS idx_rag_document_ref      ON rag_document(revision_id, ref_id);
+-- 테이블을 이미 만든 DB 에도 맞추기 위한 변경(2026-11-14).
+--   collection: 올린 문서의 묶음 이름을 새로 둔다.
+--   project_id: 지운다. 코드 문서는 revision_id 로 프로젝트를 찾고, 올린 문서는 프로젝트에 붙이지 않는다.
+ALTER TABLE rag_document ADD COLUMN IF NOT EXISTS collection VARCHAR(100);
+ALTER TABLE rag_document DROP COLUMN IF EXISTS project_id;
 CREATE INDEX IF NOT EXISTS idx_rag_document_tenant   ON rag_document(tenant, source_type);
+CREATE INDEX IF NOT EXISTS idx_rag_document_collection ON rag_document(tenant, collection) WHERE source_type = 'DOCUMENT';
 CREATE INDEX IF NOT EXISTS idx_rag_document_docid    ON rag_document(document_id);
 -- 파일 하나의 문서를 다시 만들 때(같은 파일을 다시 처리할 때) 그 파일의 문서를 빨리 찾아 지우기 위한 인덱스
 CREATE INDEX IF NOT EXISTS idx_rag_document_path     ON rag_document(revision_id, source_path);
@@ -828,8 +834,8 @@ COMMENT ON COLUMN rag_document.doc_seq               IS '문서 일련번호';
 COMMENT ON COLUMN rag_document.document_id           IS '문서 ID. 같은 대상이면 리비전이 달라도 같은 값';
 COMMENT ON COLUMN rag_document.source_type           IS '출처: CODE(분석 결과에서 생성) / DOCUMENT(업로드한 일반 문서)';
 COMMENT ON COLUMN rag_document.tenant                IS '호출자별 격리 키. 다른 호출자의 문서가 검색에 섞이지 않게 한다';
-COMMENT ON COLUMN rag_document.project_id            IS '프로젝트 ID (CODE 일 때만)';
-COMMENT ON COLUMN rag_document.revision_id           IS '리비전 ID (CODE 일 때만)';
+COMMENT ON COLUMN rag_document.collection            IS '묶음 이름 (DOCUMENT 일 때만). 올린 문서를 묶어 검색 범위를 좁힌다';
+COMMENT ON COLUMN rag_document.revision_id           IS '리비전 ID (CODE 일 때만). 프로젝트는 이 리비전으로 찾는다';
 COMMENT ON COLUMN rag_document.doc_type              IS '문서 종류: FILE/TYPE/METHOD/MAPPER/VIEW/UPLOAD';
 COMMENT ON COLUMN rag_document.ref_kind              IS '근거가 된 대상 종류 (TYPE/METHOD/FILE/SQL/DOCUMENT)';
 COMMENT ON COLUMN rag_document.ref_id                IS '근거가 된 대상 ID';
@@ -849,7 +855,7 @@ COMMENT ON COLUMN rag_chunk.chunk_type               IS '청크 종류: FILE/TYP
 COMMENT ON COLUMN rag_chunk.content                  IS '청크 본문';
 COMMENT ON COLUMN rag_chunk.content_hash             IS '본문의 SHA-256. 임베딩을 찾는 키';
 COMMENT ON COLUMN rag_chunk.char_count               IS '글자 수';
-COMMENT ON COLUMN rag_chunk.metadata_json            IS '덧붙임 정보 (JSON)';
+COMMENT ON COLUMN rag_chunk.metadata_json            IS '덧붙임 정보 (JSON). 올린 문서는 headingPath(제목 경로), pageStart/pageEnd(PDF 쪽)';
 COMMENT ON COLUMN rag_chunk.file_id                  IS '원본 파일 ID';
 COMMENT ON COLUMN rag_chunk.line_start               IS '원본 시작 줄';
 COMMENT ON COLUMN rag_chunk.line_end                 IS '원본 끝 줄';

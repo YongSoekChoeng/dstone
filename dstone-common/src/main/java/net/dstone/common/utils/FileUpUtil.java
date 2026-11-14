@@ -39,7 +39,12 @@ public class FileUpUtil {
 			// Multipart 요청 체크
 			isMultiPart = JakartaServletFileUpload.isMultipartContent(request);
 			
-			long maxPostSize = 15L * 1024 * 1024; // 15MB
+			// 요청 한 건의 최대 크기. resources.fileUp.max-post-size(바이트)로 바꿀 수 있고, 없으면 15MB.
+			long maxPostSize = 15L * 1024 * 1024;
+			String configuredMax = CONFIG.getProperty("resources.fileUp.max-post-size");
+			if (configuredMax != null && configuredMax.trim().length() > 0) {
+				maxPostSize = Long.parseLong(configuredMax.trim());
+			}
 			String saveDirectory = FILEUP_WEB_DIR;
 			net.dstone.common.utils.FileUtil.makeDir(saveDirectory);
 			

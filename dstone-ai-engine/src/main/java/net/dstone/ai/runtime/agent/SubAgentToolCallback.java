@@ -212,7 +212,6 @@ public class SubAgentToolCallback implements ToolCallback {
 				, null					// conversationId. 자식은 매번 새 대화로 시작합니다(부모 대화를 이어받지 않습니다).
 				, this.caller
 				, input
-				, null					// ragOverride
 				, null					// toolsOverride
 				, null					// modelOverride
 				, EnginePrompt.SUB_AGENT

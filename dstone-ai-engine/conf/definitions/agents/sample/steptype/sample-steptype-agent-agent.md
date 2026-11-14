@@ -50,14 +50,6 @@ output:
 tools:
   allowed: [readFileLines, searchInFiles]
 
-# RAG(올려 둔 문서 검색)가 필요할 때만 켭니다. 이 샘플은 쓰지 않습니다.
-# context:
-#   sources: [workflowInput, retrievedDocuments]
-#   retrieval:
-#     topK: 3
-#     similarityThreshold: 0.3
-#     allowEmptyContext: true
-
 execution:
   onInvalidOutput: RETRY                  # 답이 output 모양을 어기면 다시 부른다(기본 FAIL = 바로 실패)
   maxAttempts: 2                          # 처음 호출 포함 모두 2번

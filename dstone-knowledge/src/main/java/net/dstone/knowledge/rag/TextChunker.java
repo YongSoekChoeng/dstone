@@ -1,4 +1,4 @@
-package net.dstone.knowledge.analysis.pass09.document;
+package net.dstone.knowledge.rag;
 
 import java.util.ArrayList;
 import java.util.List;

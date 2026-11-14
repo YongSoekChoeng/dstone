@@ -196,6 +196,9 @@ spring:
 resources: 
     fileUp: 
         path: ${FILE_UPLOAD_ROOT}
+        # 올리는 요청 한 건의 최대 크기(바이트, net.dstone.common.utils.FileUpUtil). 없으면 15MB.
+        # "코드 분석(Knowledge) > 검색 · 문서"에서 올리는 개발 가이드는 Word 하나가 70MB 가까이 된다(받는 쪽 dstone-knowledge는 100MB).
+        max-post-size: 110100480
 
 mail: 
     host: 127.0.0.1

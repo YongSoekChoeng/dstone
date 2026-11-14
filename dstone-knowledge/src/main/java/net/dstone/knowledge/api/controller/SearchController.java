@@ -20,7 +20,7 @@ import net.dstone.knowledge.common.security.CallerContext;
 
 /**
  * <pre>
- * 검색 API입니다. 분석 결과로 만든 문서 조각과 올린 일반 문서를 뜻과 이름으로 찾습니다.
+ * 검색 API입니다. 분석 결과로 만든 문서 조각이나 올린 일반 문서를 뜻과 이름으로 찾습니다. 한 번에 한쪽에서만 찾습니다.
  * </pre>
  */
 @RestController
@@ -33,11 +33,13 @@ public class SearchController {
 	/**
 	 * <pre>
 	 * 검색. 뜻으로 찾기(벡터)와 이름으로 찾기를 같이 합니다.
-	 * 본문: {query, projectId?, revisionId?, sourceTypes?, docTypes?, layer?, mode?, topK?, minScore?}
-	 *   - 코드에서 찾으려면 projectId나 revisionId 가운데 하나가 있어야 합니다. projectId만 주면 분석이 끝난 가장 최근 리비전에서 찾습니다.
-	 *   - sourceTypes: ["CODE", "DOCUMENT"] 가운데 찾을 곳. 없으면 프로젝트를 줬을 때 CODE, 안 줬을 때 DOCUMENT(올린 일반 문서)
-	 *   - docTypes: ["METHOD", "TYPE", "FILE", "MAPPER", "VIEW", "UPLOAD"] 가운데 찾을 것. 없으면 전부
-	 *   - layer: CONTROLLER / SERVICE / REPOSITORY ... 없으면 전부
+	 * 본문: {query, projectId?, revisionId?, collections?, documentIds?, docTypes?, layer?, mode?, topK?, minScore?}
+	 *   - 어디서 찾을지는 projectId / revisionId로 정합니다.
+	 *     둘 가운데 하나가 있으면 코드(분석 결과)에서 찾습니다. projectId만 주면 분석이 끝난 가장 최근 리비전입니다.
+	 *     둘 다 없으면 이 호출자가 올린 일반 문서에서 찾습니다.
+	 *   - 코드를 찾을 때만: docTypes(["METHOD", "TYPE", "FILE", "MAPPER", "VIEW"] 가운데, 없으면 전부), layer(CONTROLLER / SERVICE ...)
+	 *   - 올린 문서를 찾을 때만: collections(묶음 이름 목록), documentIds(문서 이름 목록). 없으면 전부
+	 *     결과마다 documentId, chunkNo, headingPath(제목 경로)가 있어서 GET /api/documents/chunks로 앞뒤를 이어 읽을 수 있습니다.
 	 *   - mode: HYBRID(기본) / VECTOR(뜻만) / KEYWORD(이름만)
 	 *   - topK: 기본 10, 최대 50
 	 *   - minScore: 뜻으로 찾은 결과를 남길 최소 유사도(0~1). 없으면 설정값(dstone.knowledge.rag.search.min-score.*), 0이면 거르지 않음
@@ -51,7 +53,8 @@ public class SearchController {
 		query.setQuery(textOf(request.get("query")));
 		query.setProjectId(textOf(request.get("projectId")));
 		query.setRevisionId(longOf(request.get("revisionId"), "revisionId"));
-		query.setSourceTypes(stringsOf(request.get("sourceTypes")));
+		query.setCollections(stringsOf(request.get("collections")));
+		query.setDocumentIds(stringsOf(request.get("documentIds")));
 		query.setDocTypes(stringsOf(request.get("docTypes")));
 		query.setLayer(textOf(request.get("layer")));
 		query.setMode(textOf(request.get("mode")));

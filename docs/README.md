@@ -205,9 +205,10 @@ spring.autoconfigure.exclude:
 | RabbitMQ | 메시지 큐 | dstone-boot |
 | Kafka | SAGA/Outbox 샘플 기능의 이벤트 발행/구독 | dstone-boot (샘플 기능 한정) |
 | Anthropic API (또는 다른 LLM provider) | Chat 모델 추론 | dstone-ai-engine |
-| PostgreSQL + pgvector | RAG 벡터 저장소 | dstone-ai-engine (Phase 2, `dstone.ai.rag.enabled=true`일 때만) |
-| PostgreSQL + pgvector | 분석 결과 · 그래프 · RAG 청크/임베딩 저장 (`dstone_knowledge` DB) | dstone-knowledge |
-| Ollama (또는 OpenAI) | RAG 임베딩 모델 추론 | dstone-ai-engine (Phase 2, `dstone.ai.rag.enabled=true`일 때만) |
+| PostgreSQL | Workflow 실행 이력 (`dstone_ai` DB) | dstone-ai-engine |
+| PostgreSQL + pgvector | 분석 결과 · 그래프 · 코드와 올린 문서의 청크/임베딩 저장 (`dstone_knowledge` DB) | dstone-knowledge |
+| Ollama (또는 OpenAI) | 청크 임베딩 모델 추론 | dstone-knowledge |
+| dstone-knowledge | 코드 분석 결과와 올린 문서 찾기(`KnowledgeTool`) | dstone-ai-engine (그 Tool을 쓸 때) |
 
 WSL 환경 설치 방법은 [02.environment.md](02.environment.md)와 [software/](software/) 참고. `dstone-ai-engine`의 상세 아키텍처/설정/API는 [09.dstone-ai-engine.md](09.dstone-ai-engine.md) 참고.
 
