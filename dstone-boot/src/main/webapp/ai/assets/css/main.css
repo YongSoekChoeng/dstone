@@ -93,6 +93,11 @@
 	overflow-wrap: normal;
 }
 
+/* 채팅: "어떤 Tool 을 고르나" 안내. 평소엔 접어 두고(details.kn-howto), 눌러야 펼친다 */
+.chat-tool-guide {
+	margin: 12px 0 0;
+}
+
 /* 채팅: 이번 대화에 쓸 Tool. 고른 것은 칩으로 보이고, [찾아서 추가]로 "Tool 찾기" 창(tool-picker.js)을 연다 */
 .chat-tools-count {
 	color: var(--cs-muted);
