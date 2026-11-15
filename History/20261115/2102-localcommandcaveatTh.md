@@ -539,3 +539,17 @@ Knowledge 화면 7개의 "처음이신가요?" 안내를 지금 화면에 맞게
 - 고친 코드: 다섯 가지 시험을 모두 통과했고 스크립트 오류도 없었습니다.
 
 로그인한 실제 dstone-boot에서는 아직 확인하지 않았습니다. 이번 동작 규칙은 `.claude/docs/knowledge-ui.md`에 적어 두었습니다. 아직 커밋하지 않았으니, 올리라고 하시면 커밋해서 올리겠습니다.
+
+---
+
+## 질문
+
+올려줘.
+
+---
+
+## 답변
+
+커밋해서 원격 `main`에 올렸습니다(`b80abadc`). 로컬과 `origin/main`의 내용이 같습니다.
+
+이번 커밋에는 `project.js`, `unresolved.js`, `.claude/docs/knowledge-ui.md`가 들어갔습니다. 화면에 반영하려면 dstone-boot를 다시 빌드하고 배포해야 합니다.
