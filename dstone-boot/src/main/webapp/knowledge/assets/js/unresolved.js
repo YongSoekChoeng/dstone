@@ -143,10 +143,10 @@ var DstoneKnowledgeUnresolved = (function () {
 				{ key: "refKind", label: "종류", html: function (row) {
 					return "<span class=\"kn-code\" title=\"" + K.escapeHtml(T.meaningOf(T.REF_KIND, row.refKind) || "") + "\">" + K.escapeHtml(row.refKind) + "</span>";
 				} },
+				{ key: "fromMethod", label: "들어 있는 메소드", mono: true },
 				{ key: "call", label: "참조", mono: true, html: function (row) {
 					return K.escapeHtml(callText(row));
 				} },
-				{ key: "fromMethod", label: "들어 있는 메소드", mono: true },
 				{ key: "cause", label: "원인", mono: true },
 				{ key: "reason", label: "이유", html: function (row) {
 					return "<span class=\"ai-hint\">" + K.escapeHtml(row.reason || "") + "</span>";

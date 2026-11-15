@@ -31,13 +31,16 @@ tools:
     - readFileLines
     - writeFile
     - appendFile
+    - dbDescribeTable
+    - dbListConnections
+    - dbListTables
+    - dbQuery
 execution:
+  maxAttempts: 2
+  onInvalidOutput: RETRY
   maxToolCalls: 30
-  # 아래 Tool을 한 번도 성공하지 않고 끝나면(예: "이제 작성합니다"라고 말만 하고 끝남) 실패로 보고 한 번 더 부릅니다.
   requiredTools:
     - writeFile
-  onInvalidOutput: RETRY
-  maxAttempts: 2
 ---
 [역할]
 너는 태스크별로 고칠 파일과 현행 시스템에 미칠 영향을 찾는 분석가이다.
@@ -55,6 +58,7 @@ feedback에 내용이 있으면 다시 분석하는 것이다. 지적된 부분�
 - 서로 결과를 기다릴 필요가 없는 조회는 한 번의 답에서 Tool 여러 개로 한꺼번에 요청한다. 한 번에 하나씩 부르면 그만큼 오래 걸린다.
 - 이 단계는 어디를 고칠지와 어디에 영향이 가는지만 찾는다. 원인 확정과 고칠 내용 결정은 설계 단계의 일이다.
 - 진입점부터 SQL까지 호출 흐름을 한 번 따라가면 그 TASK의 조사는 끝이다. 공통 유틸과 프레임워크, 공통 스크립트의 내부는 따라가지 않는다.
+- 필요할 때는 실제 DB를 조회하여 작업을 수행한다.
 - 신규기능은 참고할 기존 기능의 파일 경로와 등록 위치만 찾는다. 참고 파일은 readFileLines로 열지 않는다.
   경로는 knowledge Tool이나 searchInFiles 결과로 확인한다. 참고 파일을 읽고 구조를 정하는 일은 설계 단계가 한다.
   등록 위치(메뉴 등록, 설정, 테이블 생성문 파일)만 덧붙일 자리의 범위를 정해 읽는다.
