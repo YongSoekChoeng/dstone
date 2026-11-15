@@ -46,8 +46,8 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					<thead><tr><th>알고 싶은 것</th><th>예전에는</th><th>여기서는</th></tr></thead>
 					<tbody>
 						<tr><td>"주문 취소는 어디서 처리하지?"</td><td>소스에서 "취소", "cancel" 을 찾아 하나씩 열어 본다</td><td><b>검색 · 문서</b>에 그대로 적는다</td></tr>
-						<tr><td><code>OrderService.cancel</code> 을 누가 부르지? 그 안에서 뭘 부르지?</td><td>IDE 의 "호출 계층"을 여러 번 눌러 따라간다</td><td><b>영향도 · 호출 관계</b>에서 메소드를 찾아 "부르는 쪽" / "불리는 쪽"</td></tr>
-						<tr><td><code>TB_ORDER</code> 에 컬럼을 더하면 어느 화면을 고쳐야 하지?</td><td>SQL 파일에서 테이블 이름을 찾고 → 그 SQL 을 부르는 DAO → 서비스 → 컨트롤러 → JSP 를 손으로 거슬러 올라간다</td><td><b>영향도 · 호출 관계</b>에 테이블 이름을 적고 "분석" 한 번</td></tr>
+						<tr><td><code>OrderService.cancel</code> 을 누가 부르지? 그 안에서 뭘 부르지?</td><td>IDE 의 "호출 계층"을 여러 번 눌러 따라간다</td><td><b>노드 맵</b>에서 메소드를 찾아 관계 트리(왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽)</td></tr>
+						<tr><td><code>TB_ORDER</code> 에 컬럼을 더하면 어느 화면을 고쳐야 하지?</td><td>SQL 파일에서 테이블 이름을 찾고 → 그 SQL 을 부르는 DAO → 서비스 → 컨트롤러 → JSP 를 손으로 거슬러 올라간다</td><td><b>영향도</b>에 테이블(또는 <code>테이블.컬럼</code>) 이름을 적고 "보기" 한 번</td></tr>
 						<tr><td>이번 배포에서 뭐가 달라졌지?</td><td>변경 파일 목록을 보고 짐작한다</td><td><b>리비전 비교</b>가 "새로 열린 주소, 없어진 메소드, 테이블을 바꿔 쓰는 SQL"을 알려 준다</td></tr>
 						<tr><td>설계서에 뭐라고 돼 있었지?</td><td>문서를 찾아 연다</td><td>문서를 올려 두고 <b>검색 · 문서</b>에서 같이 찾는다</td></tr>
 					</tbody>
@@ -132,33 +132,30 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					<b>뜻으로만 찾으면 "관련 있는 것들"이 나오고, 이름을 넣으면 "바로 그것"이 맨 위에 옵니다.</b>
 					그래서 처음에는 말로 찾아 후보를 보고, 거기서 본 이름으로 다시 찾거나 호출 관계 화면으로 넘어가는 식으로 씁니다.</div>
 
-				<h4>따라 하기 ③ 테이블을 고치면 어디가 영향을 받는지 본다 <a href="<%=linkBase%>knowledge/impact/impact">(영향도 · 호출 관계 화면 열기)</a></h4>
+				<h4>따라 하기 ③ 테이블을 고치면 어디가 영향을 받는지 본다 <a href="<%=linkBase%>knowledge/impact/impact">(영향도 화면 열기)</a></h4>
 				<ol>
 					<li>맨 위 프로젝트에서 <code>struts-app</code> 을 고릅니다(리비전은 알아서 골라집니다).</li>
-					<li>"① 대상 찾기"에서 종류를 "테이블"로 바꾸고 <code>TB_BOARD</code> 를 적은 뒤 "찾기".
-						이름이 똑같은 테이블이 바로 골라지고, 아래 "② 결과"에 영향도 탭이 열립니다.</li>
+					<li>"① 대상"에서 종류를 "테이블"로 바꾸고 <code>TB_BOARD</code> 를 적은 뒤 "보기".
+						이름이 똑같은 테이블이 바로 골라지고, 아래 "② 결과"가 나옵니다.</li>
+					<li>"다시 테스트할 곳"의 줄 끝 <b>왜?</b> 를 눌러 봅니다.</li>
 				</ol>
-				<div class="kn-expect">이렇게 나옵니다: 맨 위 결론에 "고치면 화면 3개, 진입점 3개가 영향을 받습니다"(닿는 메소드는 7개, 그중 테이블을 직접 쓰는 메소드 4개).<br>
-					영향받는 곳: <code>/board/list.do</code> 와 <code>/board/save.do</code> 는 신뢰도 <span class="kn-conf-HIGH">HIGH</span>,
-					<code>/board/admin.do</code> 는 <span class="kn-conf-LOW">LOW</span> (이 주소는 요청 값에 따라 실행되는 메소드가 달라져서 클래스까지만 알아냈다는 뜻).
-					화면은 <code>board/edit.jsp</code>, <code>board/list.jsp</code>, <code>common/header.jsp</code> 이고, 그 화면이 부르는 주소와 같은 줄에 묶입니다.<br>
-					건드리는 데이터: <code>TB_BOARD</code> 를 읽는 SQL 과 쓰는 SQL 의 수와 이름.<br>
-					<b>읽는 법:</b> "TB_BOARD 의 구조를 바꾸면 이 세 주소와 세 화면을 확인해야 한다."</div>
+				<div class="kn-expect">이렇게 나옵니다: 숫자 네 개 — 화면 3, 진입점 3, 쓰는 SQL 2, 확인 필요 0.<br>
+					다시 테스트할 곳(확실한 관계): <code>/board/list.do</code>(화면 <code>list.jsp</code>, <code>header.jsp</code>)와 <code>/board/save.do</code>(화면 <code>edit.jsp</code>).<br>
+					추정 관계: <code>/board/admin.do</code> <span class="kn-conf-LOW">LOW</span> — 요청 값에 따라 실행되는 메소드가 달라져서 클래스까지만 알아냈다는 뜻입니다.<br>
+					<b>왜?</b> 를 누르면: 화면 → 진입점 <code>/board/list.do</code> → <code>BoardListAction#execute</code> → <code>BoardDAO#selectBoardList</code>(Board.selectBoardList 실행 · 테이블 읽기).<br>
+					<b>읽는 법:</b> "TB_BOARD 의 구조를 바꾸면 이 두 주소와 세 화면을 확인하고, admin.do 는 실제로 이어지는지 따로 본다."</div>
 
-				<h4>따라 하기 ④ 메소드 하나를 앞뒤로 따라간다 (같은 화면)</h4>
+				<h4>따라 하기 ④ 컬럼 하나만 바꿀 때 (같은 화면)</h4>
 				<ol>
-					<li>"① 대상 찾기"에서 종류를 "메소드"로 두고 <code>BoardDAO#deleteBoard</code> 를 적은 뒤 "찾기".
-						(<code>deleteBoard</code> 만 적으면 같은 이름의 후보가 모두 나옵니다. 그중 BoardDAO 의 것을 누르면 됩니다.)</li>
-					<li>"② 결과"에서 "불리는 쪽" 탭을 누릅니다. 그다음 "부르는 쪽" 탭도 눌러 봅니다.</li>
-					<li>불리는 쪽 표의 <code>Board.deleteBoard</code> 를 누르면 그 SQL 이 새 대상이 되어 영향도가 나옵니다.
-						"지나온 대상"의 메소드 이름을 누르면 돌아옵니다.</li>
+					<li>"① 대상"에서 종류를 "컬럼"으로 바꾸고 <code>TB_BOARD</code> 만 적은 뒤 "보기". SQL 이 쓰는 컬럼 목록이 나옵니다.</li>
+					<li><code>TB_BOARD.TITLE</code> 을 누릅니다.</li>
 				</ol>
-				<div class="kn-expect">이렇게 나옵니다: 불리는 쪽 — 거리 1 "SQL 실행" → <code>Board.deleteBoard</code>, 거리 2 "테이블 쓰기" → <code>TB_BOARD</code>.
-					("이 메소드는 Board.deleteBoard 라는 SQL 을 실행하고, 그 SQL 은 TB_BOARD 에 쓴다.")<br>
-					부르는 쪽 — <code>BoardAdminAction#delete(…)</code>. ("관리자 액션의 delete 가 이 메소드를 부른다.")</div>
+				<div class="kn-expect">이렇게 나옵니다: <code>/board/list.do</code>, <code>/board/save.do</code> 만 남고 <code>/board/admin.do</code>(삭제는 TITLE 을 쓰지 않음)는 빠집니다.<br>
+					확인 필요 1 — <code>Board.countBoard</code> 는 <code>COUNT(*)</code> 라서 TITLE 을 쓰는지 SQL 만으로는 알 수 없다는 뜻입니다.<br>
+					<b>읽는 법:</b> 테이블 전체보다 좁게, 그 컬럼을 실제로 쓰는 기능만 다시 테스트하면 됩니다.</div>
 
 				<h4>따라 하기 ⑤ 두 번 분석해서 차이를 본다 <a href="<%=linkBase%>knowledge/diff/diff">(리비전 비교 화면 열기)</a></h4>
-				<p>이것은 리비전이 둘 이상 있어야 합니다. <code>struts-app</code> 은 하나뿐이라 "비교할 앞 리비전이 없습니다"가 나옵니다.
+				<p>이것은 리비전이 둘 이상 있어야 합니다. 리비전이 하나뿐이면 "비교할 앞 리비전이 없습니다"가 나옵니다.
 					직접 해 보려면: 자기 프로젝트를 한 번 분석 → 소스를 조금 고침 → "증분 분석"을 체크하고 한 번 더 분석 → 리비전 비교 화면에서 "비교".</p>
 				<div class="kn-expect">예를 들어 DAO 의 메소드 이름 하나와 SQL 의 테이블 이름 하나를 바꿨다면: 파일 · 바뀜 2, 메소드 · 없어짐 1 + 생김 1(이름을 바꿨으므로),
 					SQL statement · 바뀜 1, 테이블 사용 · 없어짐 1 + 생김 1(다른 테이블을 쓰게 됐으므로), 호출 · 없어짐 1(옛 이름을 부르던 곳이 끊어졌으므로 — 고쳐야 할 곳!).</div>
@@ -179,7 +176,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 							<span class="kn-conf-HIGH">HIGH</span> 는 확실, <span class="kn-conf-MEDIUM">MEDIUM</span> 은 대체로 맞음(타입은 알고 메소드를 이름으로 고른 경우 등),
 							<span class="kn-conf-LOW">LOW</span> 는 이름만 보고 짐작한 것이라 <b>참고로만</b> 봅니다.</td></tr>
 						<tr><td><b>임베딩</b></td><td>"뜻으로 찾기"를 하려고 분석 결과의 글을 숫자(벡터)로 바꿔 두는 일. 분석이 끝난 뒤에도 뒤에서 계속 진행되고,
-							큰 프로젝트는 한두 시간 걸립니다. 끝나기 전에도 <b>이름으로 찾는 검색과 영향도 · 호출 관계는 바로 됩니다</b>.</td></tr>
+							큰 프로젝트는 한두 시간 걸립니다. 끝나기 전에도 <b>이름으로 찾는 검색과 영향도는 바로 됩니다</b>.</td></tr>
 						<tr><td><b>methodId</b></td><td>메소드 하나를 가리키는 고유한 값(긴 영문 · 숫자). 직접 외울 필요 없이, 메소드 찾기나 검색 결과에서 단추로 이어서 씁니다.</td></tr>
 					</tbody>
 				</table>
@@ -235,30 +232,27 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 						프로젝트를 고르지 않은 채로 검색하면 올린 문서에서만 찾습니다. 스캔한(글자가 그림인) PDF 는 읽지 못합니다.</li>
 				</ul>
 
-				<h4>③ 영향도 · 호출 관계</h4>
+				<h4>③ 영향도</h4>
 				<ul>
-					<li><b>영향도 분석</b> — "이것을 고치면 어디까지 닿는가". 대상을 고르고 이름을 적은 뒤 "분석".
+					<li>질문은 하나입니다: <b>"이것을 고치면 무엇을 다시 테스트해야 하나"</b>. 종류를 고르고 이름을 적은 뒤 "보기".
 						<table class="document-list-table">
 							<thead><tr><th style="width:150px;">대상</th><th>적는 것</th><th>예</th></tr></thead>
 							<tbody>
-								<tr><td>테이블</td><td>테이블 이름 (대소문자 상관없음)</td><td><code>TB_BOARD</code></td></tr>
-								<tr><td>SQL statement</td><td>매퍼의 <code>네임스페이스.id</code></td><td><code>Board.deleteBoard</code></td></tr>
-								<tr><td>타입</td><td>패키지까지 포함한 클래스 이름</td><td><code>com.sample.board.dao.BoardDAO</code></td></tr>
-								<tr><td>메소드</td><td>methodId — 직접 적지 말고 아래 "메소드 찾기"의 "영향도" 단추를 누릅니다</td><td></td></tr>
+								<tr><td>메소드</td><td>메소드 이름. 클래스로 좁히려면 <code>클래스#메소드</code></td><td><code>BoardDAO#deleteBoard</code></td></tr>
+								<tr><td>테이블</td><td>테이블 이름의 일부 (대소문자 상관없음). 비우면 전체 목록</td><td><code>TB_BOARD</code></td></tr>
+								<tr><td>컬럼</td><td><code>테이블.컬럼</code>. 테이블 이름만 적으면 그 테이블의 컬럼 목록이 나옵니다</td><td><code>TB_BOARD.TITLE</code></td></tr>
+								<tr><td>SQL</td><td>매퍼의 <code>네임스페이스.id</code> (일부도 됨)</td><td><code>Board.deleteBoard</code></td></tr>
+								<tr><td>클래스</td><td>클래스 이름의 일부(패키지 포함 가능). 그 클래스의 메소드 전부에서 출발합니다</td><td><code>BoardDAO</code></td></tr>
+								<tr><td>변경분</td><td>이름 대신 견줄 앞 리비전을 고릅니다. 두 리비전 사이에 바뀐 메소드 · SQL · 화면 파일에서 출발합니다</td><td></td></tr>
 							</tbody>
-						</table>
-						결과는 "무엇을 다시 확인하나"를 한 장으로 요약합니다. 맨 위 한 줄 결론, <b>영향받는 곳</b>(화면과 그 화면이 부르는 진입점을 한 줄로 묶어 업무별로 나눈 테스트 목록),
-						<b>건드리는 데이터</b>(테이블마다 읽는 SQL · 쓰는 SQL), <b>믿을 만한가</b>(신뢰도, 깊이 제한, 분석이 놓쳤을 수 있는 호출) 순서입니다.
-						중간에 거치는 메소드는 건수만 보여 주고 목록은 접어 둡니다. 경로는 "부르는 쪽" 탭에서 봅니다.
-						테이블이면 "쓰기만"을 골라 그 테이블을 <b>고치는</b> 기능만 볼 수 있습니다.</li>
-					<li><b>호출 관계</b> — 메소드 이름을 적고 "메소드 찾기" → 나온 줄에서
-						<ul>
-							<li>"부르는 쪽": 이 메소드를 누가 부르는지 거슬러 올라갑니다(컨트롤러, 그 주소를 부르는 화면까지).</li>
-							<li>"불리는 쪽": 이 메소드가 무엇을 부르는지 따라 내려갑니다. <b>실행하는 SQL 과 그 SQL 이 읽고 쓰는 테이블, 여는 화면</b>까지 나옵니다.</li>
-							<li>"영향도": 이 메소드를 대상으로 위의 영향도 분석을 돌립니다.</li>
-						</ul>
-						"따라갈 깊이"를 늘리면 더 멀리까지 따라갑니다(최대 5).</li>
-					<li><b>테이블 이름을 모를 때</b>: "테이블 이름의 일부"를 적고 "테이블 찾기" → 나온 이름을 누르면 영향도 분석으로 이어집니다. 비워 두고 누르면 전체 목록입니다.</li>
+						</table></li>
+					<li>결과는 위에서부터 <b>숫자 네 개</b>(화면 · 진입점 · 쓰는 데이터 · 확인 필요), 한 줄 결론, <b>다시 테스트할 곳</b>(확실한 관계로 이어진 화면과 진입점),
+						<b>추정 관계</b>(덜 확실하거나 짐작이 낀 곳, 접혀 있음), <b>건드리는 데이터</b>, <b>확인 필요</b>(분석이 놓쳤을 수 있는 곳) 순서입니다.</li>
+					<li>줄마다 <b>왜?</b> 를 누르면 대상에서 그 진입점 · 화면까지 이어진 길이 나옵니다. 그냥 호출(HIGH)이 아닌 고리에는 관계와 신뢰도가 붙어서, 어디가 약한지 보입니다.</li>
+					<li>부르는 쪽은 진입점과 화면이 나올 때까지 끝까지 따라갑니다(깊이를 정할 필요가 없습니다).
+						테이블 · 컬럼이면 머리글 오른쪽에서 "쓰기만"을 골라 그것을 <b>고치는</b> 기능만 볼 수 있습니다.</li>
+					<li>누가 누구를 부르는지 그림으로 보려면 머리글 오른쪽의 <b>노드 맵에서 보기</b>를 누릅니다. 그 대상의 관계 트리가 바로 열립니다.</li>
+					<li>변경분에서 "파일 단위로 견준 메소드"가 나오면, 견준 리비전 가운데 하나가 메소드 지문을 남기기 전(분석기 1.5 전)에 분석된 것입니다. 그 파일의 메소드를 모두 넣었으니, 다시 분석하면 바뀐 메소드만 남습니다.</li>
 				</ul>
 
 				<h4>④ 노드 맵</h4>
@@ -276,7 +270,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 						깊이는 각각 최대 10 이고, 너무 많으면(한쪽 3,000개 초과) 가까운 것부터 일부만 나옵니다. 그럴 때는 클래스 대신 메소드 하나를 고르세요
 						(오른쪽 설명의 메소드 이름을 누르면 그 메소드의 트리가 열립니다).</li>
 					<li><b>모델(VO)</b>은 처음에 꺼져 있습니다. getter / setter 호출이 그림을 덮기 때문입니다. 색깔 딱지로 계층을 켜고 끕니다.</li>
-					<li>영향도 분석과 같은 데이터를 봅니다. 표로 정확히 세고 싶으면 "영향도 · 호출 관계", 흐름을 눈으로 따라가고 싶으면 "노드 맵"을 씁니다.</li>
+					<li>영향도 분석과 같은 데이터를 봅니다. 다시 테스트할 곳을 세고 싶으면 "영향도", 누가 누구를 부르는지 눈으로 따라가고 싶으면 "노드 맵"을 씁니다.</li>
 				</ul>
 
 				<h4>⑤ 리비전 비교</h4>

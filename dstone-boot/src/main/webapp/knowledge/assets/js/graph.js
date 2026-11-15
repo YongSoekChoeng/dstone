@@ -157,8 +157,49 @@ var DstoneKnowledgeGraph = (function () {
 			}
 		});
 
-		K.loadProjects(el["kn-graph-project"]).then(loadRevisions).then(loadGraph).catch(function (err) {
+		// 다른 화면(영향도)에서 "노드 맵에서 보기"로 오면 주소에 #p=프로젝트&r=리비전&tree=노드ID 가 붙어 온다.
+		// 그 프로젝트 · 리비전을 고르고, 맵을 그린 뒤 그 노드의 관계 트리를 바로 연다.
+		var wanted = readHash();
+		K.loadProjects(el["kn-graph-project"]).then(function () {
+			selectOption(el["kn-graph-project"], wanted.p);
+			return loadRevisions();
+		}).then(function () {
+			selectOption(el["kn-graph-revision"], wanted.r);
+			return loadGraph();
+		}).then(function () {
+			if (wanted.tree && map.revisionId) {
+				openTree(wanted.tree);
+			}
+			// 한 번 열고 나면 주소를 비운다. 새로 고침할 때마다 팝업이 다시 뜨지 않게
+			if (location.hash) {
+				history.replaceState(null, "", location.pathname + location.search);
+			}
+		}).catch(function (err) {
 			K.message(el["kn-graph-message"], err.message, true);
+		});
+	}
+
+	/** 주소의 #p=..&r=..&tree=.. 를 읽는다 */
+	function readHash() {
+		var state = {};
+		location.hash.replace(/^#/, "").split("&").forEach(function (pair) {
+			var at = pair.indexOf("=");
+			if (at > 0) {
+				state[pair.substring(0, at)] = decodeURIComponent(pair.substring(at + 1));
+			}
+		});
+		return state;
+	}
+
+	/** 고르는 칸에 그 값이 있으면 고른다 */
+	function selectOption(select, value) {
+		if (!value) {
+			return;
+		}
+		Array.prototype.forEach.call(select.options, function (option) {
+			if (option.value === value) {
+				select.value = value;
+			}
 		});
 	}
 

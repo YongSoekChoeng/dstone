@@ -1106,6 +1106,11 @@ public class DeclarationCollector {
 		if (node != null) {
 			row.setLineStart(lineOf(node));
 			row.setLineEnd(endLineOf(node));
+			// 리비전 비교에서 "이 메소드가 정말 바뀌었나"를 가리는 지문(공백·주석 제외)
+			String bodyHash = MethodBodyHash.of(node);
+			if (bodyHash != null) {
+				row.setPropertiesJson("{\"bodyHash\":\"" + bodyHash + "\"}");
+			}
 		}
 		return row;
 	}

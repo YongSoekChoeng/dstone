@@ -171,14 +171,49 @@ public class RelationDao extends BaseDao {
 
 	/**
 	 * <pre>
-	 * 영향 분석: 대상에서 출발해 호출 관계를 거슬러 올라가며 닿는 메소드들
+	 * 영향 분석의 출발점: 대상을 직접 건드리는 노드(nodeId, nodeKind, conf 3/2/1, reason, name)
 	 * </pre>
-	 *
-	 * @param condition {revisionId, targetKind(TABLE / STATEMENT / TYPE / METHOD), target, tableRelationTypes, relationTypes, depth, limit}
-	 * @return 닿는 메소드. depth 0이 대상을 직접 건드리는 메소드
+	 */
+	public List<Map<String, Object>> selectImpactStart(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactStart", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 출발점에서 부르는 쪽으로 끝까지 닿는 노드 사이의 관계(fromId, fromKind, toId, relationType, confidence).
+	 * 거리 · 신뢰도 · 근거 길은 ImpactWalker 가 이것으로 계산합니다.
+	 * </pre>
+	 */
+	public List<Map<String, Object>> selectImpactEdges(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactEdges", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 닿는 메소드 전부(methodId, method, layer, path, lineStart, anonymous). 거리와 신뢰도는 붙어 있지 않습니다.
+	 * </pre>
 	 */
 	public List<Map<String, Object>> selectImpactMethods(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectImpactMethods", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 변경분 대상에서 생기거나 내용이 바뀐 화면 파일(path, change)
+	 * </pre>
+	 */
+	public List<Map<String, Object>> selectImpactChangedScreens(Map<String, Object> condition) {
+		return sqlSessionCommon.selectList(NS + "selectImpactChangedScreens", condition);
+	}
+
+	/**
+	 * <pre>
+	 * 변경분 대상에서 없어진 메소드 수
+	 * </pre>
+	 */
+	public int selectImpactRemovedMethodCount(Map<String, Object> condition) {
+		Integer count = sqlSessionCommon.selectOne(NS + "selectImpactRemovedMethodCount", condition);
+		return count == null ? 0 : count.intValue();
 	}
 
 	/**

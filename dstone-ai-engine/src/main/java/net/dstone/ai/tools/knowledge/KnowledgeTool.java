@@ -208,16 +208,17 @@ public class KnowledgeTool extends BaseObject {
 	}
 
 	@Tool(description = "영향도 분석: 대상을 고치면 닿는 진입점(주소), 화면(JSP), 메소드를 한 번에 돌려준다. "
-		+ "대상은 테이블 / SQL statement / 타입 / 메소드 가운데 하나다. 줄마다 신뢰도가 붙는다: HIGH는 확실한 관계만 따라온 것, MEDIUM은 덜 확실한 관계가 낀 것, "
+		+ "대상은 테이블 / 컬럼 / SQL statement / 타입 / 메소드 / 변경분(앞 리비전과 견줘 바뀐 메소드·SQL) 가운데 하나다. 줄마다 신뢰도가 붙는다: HIGH는 확실한 관계만 따라온 것, MEDIUM은 덜 확실한 관계가 낀 것, "
 		+ "LOW는 짐작이 낀 것이라 참고로만 본다. 리플렉션이나 문자열로 조립한 주소처럼 분석이 잇지 못한 호출은 나오지 않으므로, 결과가 전부라고 단정하지 않는다.")
 	public String knowledgeImpact(@ToolParam(description = "프로젝트 ID") String projectId,
-		@ToolParam(description = "대상의 종류: TABLE(테이블 이름) / STATEMENT(SQL statement 이름) / TYPE(타입 전체 이름) / METHOD(메소드 ID)") String targetKind,
-		@ToolParam(description = "대상. 종류에 따라 테이블 이름, statement 이름(네임스페이스.id), 타입 전체 이름, 메소드 ID") String target,
-		@ToolParam(description = "대상이 테이블일 때만: ALL(기본) / READ(읽는 쪽만) / WRITE(쓰는 쪽만)", required = false) String access) {
+		@ToolParam(description = "대상의 종류: TABLE(테이블 이름) / COLUMN(테이블.컬럼) / STATEMENT(SQL statement 이름) / TYPE(타입 전체 이름) / METHOD(메소드 ID) / CHANGES(기준 리비전 번호 또는 auto)") String targetKind,
+		@ToolParam(description = "대상. 종류에 따라 테이블 이름, 테이블.컬럼, statement 이름(네임스페이스.id), 타입 전체 이름, 메소드 ID, 기준 리비전 번호(auto 면 바로 앞 리비전)") String target,
+		@ToolParam(description = "대상이 테이블 · 컬럼일 때만: ALL(기본) / READ(읽는 쪽만) / WRITE(쓰는 쪽만)", required = false) String access) {
 		String kind = targetKind == null ? "" : targetKind.trim().toUpperCase();
-		String paramName = "TABLE".equals(kind) ? "table" : "STATEMENT".equals(kind) ? "statement" : "TYPE".equals(kind) ? "type" : "METHOD".equals(kind) ? "methodId" : null;
+		String paramName = "TABLE".equals(kind) ? "table" : "COLUMN".equals(kind) ? "column" : "STATEMENT".equals(kind) ? "statement"
+			: "TYPE".equals(kind) ? "type" : "METHOD".equals(kind) ? "methodId" : "CHANGES".equals(kind) ? "changedSince" : null;
 		if (paramName == null) {
-			return "실패: targetKind는 TABLE / STATEMENT / TYPE / METHOD 가운데 하나여야 합니다: " + targetKind;
+			return "실패: targetKind는 TABLE / COLUMN / STATEMENT / TYPE / METHOD / CHANGES 가운데 하나여야 합니다: " + targetKind;
 		}
 		try {
 			Map<String, String> params = new LinkedHashMap<String, String>();

@@ -49,3 +49,19 @@
 | 게시글을 삭제하는 SQL | `MAPPER` `Board.deleteBoard` |
 | 게시글 목록 화면 | `VIEW` `board/list.jsp` |
 | 게시글 저장 요청을 받는 곳 | `TYPE` `com.sample.board.web.BoardSaveAction` |
+
+## 영향도 정답표
+
+소스를 읽고 손으로 센 값이다. `StrutsAppImpactGoldenTest`가 떠 있는 서버의 `/impact` 응답과 견준다(`docs/11` 4.1절).
+신뢰도가 HIGH가 아닌 곳에는 이유를 적었다.
+
+| 대상 | 출발 메소드(`BoardDAO`) | 진입점 | 화면 |
+|---|---|---|---|
+| `table=TB_BOARD` | `countBoard`, `deleteBoard`, `insertBoard`, `selectBoardList` 모두 HIGH | `/board/list.do` HIGH, `/board/save.do` HIGH, `/board/admin.do` LOW(`DispatchAction`이라 타입까지만 이어짐) | `board/list.jsp` HIGH(끝나고 여는 화면), `board/edit.jsp` HIGH, `common/header.jsp` MEDIUM(화면 안의 주소 글자) |
+| `table=TB_BOARD&access=WRITE` | `deleteBoard`, `insertBoard` | `/board/save.do` HIGH, `/board/admin.do` LOW | `board/edit.jsp` HIGH |
+| `column=TB_BOARD.TITLE` | `selectBoardList`, `insertBoard` HIGH, `countBoard` LOW(`COUNT(*)`라 컬럼을 읽지 못함 → `touches[].unsure`) | `/board/list.do`, `/board/save.do` HIGH | `list.jsp`, `edit.jsp` HIGH, `header.jsp` MEDIUM |
+| `statement=Board.deleteBoard` | `deleteBoard` | `/board/admin.do` LOW. 근거 길 `BoardAdminAction#delete` → `BoardDAO#deleteBoard`(Board.deleteBoard 실행) | 없음 |
+| `type=com.sample.board.dao.BoardDAO` | 생성자 포함 메소드 5개 | `admin.do` LOW, `list.do`·`save.do` HIGH | 테이블과 같음. 건드리는 테이블 `TB_BOARD`, `TB_USER` |
+
+변경분(`changedSince`)은 소스를 고쳐 두 번 분석해야 해서 시험 코드에 넣지 않았다. 2026-11-15에 손으로 확인한 값: `BoardDAO.deleteBoard` 몸통에 `if` 를 넣고, `countBoard` 에는 주석만 달고, `board/list.jsp` 끝에 한 줄을 붙여 다시 분석하면
+`changes.methods.BODY = 1`(`deleteBoard`만. 주석만 단 `countBoard` 는 안 잡힘), 바뀐 화면 `board/list.jsp`, 진입점 `/board/admin.do` LOW가 나온다. 같은 소스로 증분 분석한 리비전은 전체 분석과 메소드 지문이 모두 같고, 둘을 견주면 "바뀐 것이 없습니다"(404)가 나온다.

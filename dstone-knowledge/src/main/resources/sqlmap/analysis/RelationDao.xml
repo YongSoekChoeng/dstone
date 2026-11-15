@@ -473,8 +473,22 @@
 
     <sql id="confName">(CASE ${column} WHEN 3 THEN 'HIGH' WHEN 2 THEN 'MEDIUM' ELSE 'LOW' END)</sql>
 
+    <!-- ================= 영향도 분석 =================
+         흐름: 출발점(impactStart) → 부르는 쪽으로 끝까지 닿는 노드(impactReach) → 그 안의 관계를 Java(ImpactWalker)로 보낸다.
+         거리 · 신뢰도 · 근거 길은 Java 가 계산한다. 아래 쿼리들은 닿는 노드에 붙은 것(진입점, 화면 ...)만 돌려주고,
+         거리와 신뢰도는 Java 가 노드 ID 로 붙인다. 노드 ID 목록을 SQL 인자로 넘기지 않는 이유: SQL 로그에 그대로 찍힌다.
+
+         대상 종류(targetKind)
+           TABLE     table + tableRelationTypes(읽기/쓰기)
+           COLUMN    table + column. 그 컬럼을 쓰는 SQL. 컬럼을 읽지 못한 SQL(SELECT * 등)은 LOW 로 함께 넣는다
+           STATEMENT target = 네임스페이스.id 또는 id
+           TYPE      target = 타입 전체 이름
+           METHOD    target = 메소드 ID
+           CHANGES   baseRevisionId 와 견줘 바뀐 메소드와 SQL -->
+
     <!-- 영향도 분석의 대상을 사람이 알아볼 수 있게 설명한다(화면 맨 위 "대상" 머리글).
-         TABLE 은 이름 말고 따로 읽을 것이 없어서 건드리는 statement 수만 센다. 한글명은 서비스가 TableDictionaryService 로 붙인다.
+         graphId 는 노드 맵에서 이 대상의 관계 트리를 여는 ID 다.
+         TABLE · COLUMN 은 이름 말고 따로 읽을 것이 없어서 건드리는 statement 수만 센다. 한글명은 서비스가 TableDictionaryService 로 붙인다.
          STATEMENT 는 이름이 같은 statement 가 여럿일 수 있어서 matches 로 수를 함께 준다(자리는 첫 번째 것). -->
     <select id="selectImpactTarget" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         <choose>
@@ -484,6 +498,7 @@
              , s.layer AS "layer"
              , f.path AS "path"
              , m.line_start AS "lineStart"
+             , m.method_id AS "graphId"
              , (SELECT r.value FROM analysis_resource r
                  WHERE r.revision_id = m.revision_id AND r.resource_type = 'METHOD_TITLE' AND r.name = m.method_id
                  ORDER BY r.resource_id LIMIT 1) AS "title"
@@ -499,6 +514,7 @@
              , s.layer AS "layer"
              , f.path AS "path"
              , s.line_start AS "lineStart"
+             , s.symbol_id AS "graphId"
           FROM analysis_symbol s
           JOIN analysis_file f ON f.file_id = s.file_id
          WHERE s.revision_id = #{revisionId}
@@ -511,6 +527,7 @@
              , mp.statement_type AS "statementType"
              , f.path AS "path"
              , mp.line_start AS "lineStart"
+             , 'S' || mp.mapper_id AS "graphId"
              , COUNT(*) OVER () AS "matches"
           FROM analysis_mapper mp
           JOIN analysis_file f ON f.file_id = mp.file_id
@@ -518,6 +535,16 @@
            AND (mp.statement_id = #{target} OR mp.namespace || '.' || mp.statement_id = #{target})
          ORDER BY f.path, mp.line_start
          LIMIT 1
+            </when>
+            <when test="targetKind == 'COLUMN'">
+        SELECT COUNT(DISTINCT t.from_id) FILTER (WHERE <include refid="columnKnown"/>) AS "statements"
+             , COUNT(DISTINCT t.from_id) FILTER (WHERE NOT <include refid="columnKnown"/>) AS "unknownStatements"
+          FROM analysis_relation t
+         WHERE t.revision_id = #{revisionId}
+           AND t.to_external = #{table}
+           AND t.relation_type IN
+                <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+           AND <include refid="columnMaybe"/>
             </when>
             <otherwise>
         SELECT COUNT(DISTINCT t.from_id) AS "statements"
@@ -530,196 +557,284 @@
         </choose>
     </select>
 
-    <!-- "이것을 고치면 어디까지 닿는가" 를 거슬러 올라가며 모은다.
-         출발점(깊이 0)은 대상을 직접 건드리는 메소드다:
-           TABLE     그 테이블을 읽거나 쓰는 SQL 을 실행하는 메소드
-           STATEMENT 그 SQL statement 를 실행하는 메소드
-           TYPE      그 타입의 모든 메소드
-           METHOD    그 메소드
-         거기서 부르는 쪽으로(CALLS, 가능한 구현, 화면의 요청) depth 만큼 올라간다.
-         conf 는 출발점에서 여기까지 오는 길에서 가장 약한 관계의 신뢰도다. 길이 여럿이면 가장 믿을 만한 길의 값을 쓴다.
-         순환 호출이 있어도 끝난다: depth 로 묶여 있고 UNION 이 같은 (노드, 깊이, 신뢰도)를 다시 넣지 않는다 -->
-    <sql id="impactWalk">
-        WITH RECURSIVE walk (depth, node_id, node_kind, conf) AS (
+    <!-- 이 테이블 관계(t)의 SQL 이 그 컬럼을 쓴다고 적혀 있다 -->
+    <sql id="columnKnown">COALESCE(t.properties_json->'columns' @&gt; jsonb_build_array(CAST(#{column} AS text)), FALSE)</sql>
+
+    <!-- 이 테이블 관계(t)의 SQL 이 그 컬럼을 쓸 수도 있다: 쓴다고 적혀 있거나, 컬럼을 읽지 못했다(목록 없음 = 파서가 못 읽음, 빈 목록 = SELECT * 등) -->
+    <sql id="columnMaybe">
+           (<include refid="columnKnown"/>
+            OR t.properties_json->'columns' IS NULL
+            OR jsonb_array_length(t.properties_json->'columns') = 0)
+    </sql>
+
+    <!-- 출발점: 대상을 직접 건드리는 노드. start(node_id, node_kind, conf, reason, name)
+           conf   그 노드가 대상과 이어진 관계의 신뢰도(3 HIGH · 2 MEDIUM · 1 LOW)
+           reason 왜 출발점인지: READS_TABLE / WRITES_TABLE / COLUMN_UNKNOWN / SQL / TARGET / ADDED / BODY / SIGNATURE / FILE / SQL_ADDED / SQL_CHANGED
+           name   그 이유의 이름(SQL 이름 등) -->
+    <sql id="impactStart">
+        start (node_id, node_kind, conf, reason, name) AS (
             <choose>
-                <when test="targetKind == 'TABLE'">
-            SELECT 0, e.from_id::varchar, 'METHOD'::varchar
+                <when test="targetKind == 'TABLE' or targetKind == 'COLUMN'">
+            SELECT e.from_id::varchar, 'METHOD'::varchar
+                 <choose>
+                     <when test="targetKind == 'COLUMN'">
+                 , CASE WHEN <include refid="columnKnown"/>
+                        THEN LEAST(<include refid="confRank"><property name="column" value="e.confidence"/></include>, <include refid="confRank"><property name="column" value="t.confidence"/></include>)
+                        ELSE 1 END
+                 , (CASE WHEN <include refid="columnKnown"/> THEN t.relation_type ELSE 'COLUMN_UNKNOWN' END)::varchar
+                     </when>
+                     <otherwise>
                  , LEAST(<include refid="confRank"><property name="column" value="e.confidence"/></include>, <include refid="confRank"><property name="column" value="t.confidence"/></include>)
+                 , t.relation_type::varchar
+                     </otherwise>
+                 </choose>
+                 , COALESCE(COALESCE(NULLIF(mp.namespace, '') || '.', '') || mp.statement_id, t.from_id)::varchar
               FROM analysis_relation t
               JOIN analysis_relation e ON e.revision_id = t.revision_id AND e.to_id = t.from_id AND e.relation_type = 'EXECUTES_SQL'
+              LEFT JOIN analysis_mapper mp ON mp.revision_id = t.revision_id AND 'S' || mp.mapper_id = t.from_id
              WHERE t.revision_id = #{revisionId}
+                 <choose>
+                     <when test="targetKind == 'COLUMN'">
+               AND t.to_external = #{table}
+               AND <include refid="columnMaybe"/>
+                     </when>
+                     <otherwise>
                AND t.to_external = #{target}
+                     </otherwise>
+                 </choose>
                AND t.relation_type IN
                     <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
                 </when>
                 <when test="targetKind == 'STATEMENT'">
-            SELECT 0, e.from_id::varchar, 'METHOD'::varchar, <include refid="confRank"><property name="column" value="e.confidence"/></include>
-              FROM analysis_relation e
-             WHERE e.revision_id = #{revisionId}
-               AND e.relation_type = 'EXECUTES_SQL'
-               AND e.to_id IN (SELECT 'S' || mp.mapper_id
-                                 FROM analysis_mapper mp
-                                WHERE mp.revision_id = #{revisionId}
-                                  AND (mp.statement_id = #{target} OR mp.namespace || '.' || mp.statement_id = #{target}))
+            SELECT e.from_id::varchar, 'METHOD'::varchar, <include refid="confRank"><property name="column" value="e.confidence"/></include>
+                 , 'SQL'::varchar, (COALESCE(NULLIF(mp.namespace, '') || '.', '') || mp.statement_id)::varchar
+              FROM analysis_mapper mp
+              JOIN analysis_relation e ON e.revision_id = mp.revision_id AND e.relation_type = 'EXECUTES_SQL' AND e.to_id = 'S' || mp.mapper_id
+             WHERE mp.revision_id = #{revisionId}
+               AND (mp.statement_id = #{target} OR mp.namespace || '.' || mp.statement_id = #{target})
                 </when>
                 <when test="targetKind == 'TYPE'">
-            SELECT 0, m.method_id::varchar, 'METHOD'::varchar, 3
+            SELECT m.method_id::varchar, 'METHOD'::varchar, 3, 'TARGET'::varchar, NULL::varchar
               FROM analysis_method m
               JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
              WHERE m.revision_id = #{revisionId}
                AND s.fqn = #{target}
                 </when>
+                <when test="targetKind == 'CHANGES'">
+            <!-- 바뀐 메소드. 몸통 지문(bodyHash)이 양쪽에 있으면 그것으로, 없으면(지문을 넣기 전에 분석한 리비전) 파일이 바뀌었는지로 가린다.
+                 파일로 가린 것은 그 파일의 메소드가 다 들어가므로 MEDIUM 이다 -->
+            SELECT x.method_id::varchar, 'METHOD'::varchar, CASE WHEN x.reason = 'FILE' THEN 2 ELSE 3 END, x.reason::varchar, NULL::varchar
+              FROM (
+                SELECT n.method_id
+                     , CASE WHEN o.method_id IS NULL THEN 'ADDED'
+                            WHEN o.return_type IS DISTINCT FROM n.return_type OR o.visibility IS DISTINCT FROM n.visibility
+                              OR o.is_static &lt;&gt; n.is_static OR o.is_abstract &lt;&gt; n.is_abstract THEN 'SIGNATURE'
+                            WHEN n.properties_json->>'bodyHash' IS NOT NULL AND o.properties_json->>'bodyHash' IS NOT NULL
+                            THEN CASE WHEN n.properties_json->>'bodyHash' &lt;&gt; o.properties_json->>'bodyHash' THEN 'BODY' END
+                            WHEN nf.checksum IS DISTINCT FROM ofl.checksum THEN 'FILE'
+                        END AS reason
+                  FROM analysis_method n
+                  JOIN analysis_file nf ON nf.file_id = n.file_id
+                  LEFT JOIN analysis_method o ON o.revision_id = #{baseRevisionId} AND o.method_id = n.method_id
+                  LEFT JOIN analysis_file ofl ON ofl.file_id = o.file_id
+                 WHERE n.revision_id = #{revisionId}
+                   AND NOT n.is_synthetic
+              ) x
+             WHERE x.reason IS NOT NULL
+            UNION ALL
+            <!-- 생기거나 내용이 바뀐 SQL 을 실행하는 메소드 -->
+            SELECT e.from_id::varchar, 'METHOD'::varchar, <include refid="confRank"><property name="column" value="e.confidence"/></include>
+                 , (CASE WHEN o.k IS NULL THEN 'SQL_ADDED' ELSE 'SQL_CHANGED' END)::varchar, n.label::varchar
+              FROM (<include refid="impactStatementKeys"><property name="rev" value="revisionId"/></include>) n
+              LEFT JOIN (<include refid="impactStatementKeys"><property name="rev" value="baseRevisionId"/></include>) o ON o.k = n.k
+              JOIN analysis_relation e ON e.revision_id = #{revisionId} AND e.relation_type = 'EXECUTES_SQL' AND e.to_id = 'S' || n.mapper_id
+             WHERE o.k IS NULL OR o.body_hash &lt;&gt; n.body_hash
+                </when>
                 <otherwise>
-            SELECT 0, CAST(#{target} AS varchar), 'METHOD'::varchar, 3
+            SELECT CAST(#{target} AS varchar), 'METHOD'::varchar, 3, 'TARGET'::varchar, NULL::varchar
                 </otherwise>
             </choose>
+        )
+    </sql>
+
+    <!-- SQL statement 를 리비전끼리 짝짓는 열쇠(DiffDao 의 statementKeys 와 같은 규칙) + 이 리비전의 mapper_id -->
+    <sql id="impactStatementKeys">
+        SELECT f.path || '|' || COALESCE(mp.namespace, '') || '|' || mp.statement_id || '|' || (mp.statement_type = 'SQL_FRAGMENT') AS k
+             , COALESCE(NULLIF(mp.namespace, '') || '.', '') || mp.statement_id AS label
+             , md5(COALESCE(mp.sql_body, '')) AS body_hash
+             , mp.mapper_id
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{${rev}}
+    </sql>
+
+    <!-- 출발점에서 부르는 쪽으로(CALLS, 가능한 구현, 화면의 요청, 익명 클래스를 감싸는 메소드) 끝까지 닿는 노드. reach(node_id, node_kind).
+         노드마다 한 번만 담아서(UNION) 순환 호출이 있어도 끝난다. 거리와 신뢰도는 Java(ImpactWalker)가 계산한다 -->
+    <sql id="impactReach">
+        WITH RECURSIVE <include refid="impactStart"/>
+        , reach (node_id, node_kind) AS (
+            SELECT node_id, node_kind FROM start
             UNION
-            -- ENCLOSES_ANONYMOUS(바깥 메소드 → 익명 클래스의 메소드)는 0 칸이다. 익명 클래스 메소드 대신 바깥 메소드를 같은 거리로 본다.
-            -- 대상이 익명 클래스 메소드 자신이면 그 바깥 메소드는 부르는 쪽이므로 1 칸이다.
-            SELECT w.depth + (CASE WHEN r.relation_type = 'ENCLOSES_ANONYMOUS' AND r.to_id &lt;&gt; #{target} THEN 0 ELSE 1 END)
-                 , r.from_id::varchar, r.from_kind::varchar
-                 , LEAST(w.conf, <include refid="confRank"><property name="column" value="r.confidence"/></include>)
-              FROM walk w
+            SELECT r.from_id::varchar, r.from_kind::varchar
+              FROM reach w
               JOIN analysis_relation r
                 ON r.revision_id = #{revisionId}
                AND r.to_id = w.node_id
                AND r.relation_type IN
                     <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
-             WHERE w.depth &lt; #{depth}
-        ), affected AS (
-            SELECT node_id, node_kind, MIN(depth) AS depth, MAX(conf) AS conf
-              FROM walk
-             GROUP BY node_id, node_kind
         )
     </sql>
 
-    <!-- 닿는 메소드. depth 0 이 대상을 직접 건드리는 메소드다 -->
+    <!-- 출발점 목록 -->
+    <select id="selectImpactStart" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        WITH <include refid="impactStart"/>
+        SELECT node_id AS "nodeId", node_kind AS "nodeKind", conf AS "conf", reason AS "reason", name AS "name"
+          FROM start
+    </select>
+
+    <!-- 닿는 노드 사이의 관계 전부. Java 가 이것으로 거리 · 신뢰도 · 근거 길을 계산한다 -->
+    <select id="selectImpactEdges" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="impactReach"/>
+        SELECT DISTINCT r.from_id AS "fromId"
+             , r.from_kind AS "fromKind"
+             , r.to_id AS "toId"
+             , r.relation_type AS "relationType"
+             , r.confidence AS "confidence"
+          FROM reach w
+          JOIN analysis_relation r
+            ON r.revision_id = #{revisionId}
+           AND r.to_id = w.node_id
+           AND r.relation_type IN
+                <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+    </select>
+
+    <!-- 닿는 메소드. anonymous 는 익명 클래스의 메소드인지(목록에서는 빼고, 근거 길에서는 이름으로 쓴다) -->
     <select id="selectImpactMethods" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        <include refid="impactWalk"/>
-        SELECT a.depth AS "depth"
-             , <include refid="confName"><property name="column" value="a.conf"/></include> AS "confidence"
-             , m.method_id AS "methodId"
+        <include refid="impactReach"/>
+        SELECT m.method_id AS "methodId"
              , o.fqn || '#' || m.signature AS "method"
              , o.layer AS "layer"
              , f.path AS "path"
              , m.line_start AS "lineStart"
-          FROM affected a
+             , EXISTS (SELECT 1 FROM analysis_relation x
+                        WHERE x.revision_id = #{revisionId} AND x.relation_type = 'ENCLOSES_ANONYMOUS' AND x.to_id = m.method_id) AS "anonymous"
+          FROM reach a
           JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
           JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
           LEFT JOIN analysis_file f ON f.file_id = m.file_id
          WHERE a.node_kind = 'METHOD'
-           -- 익명 클래스의 메소드는 건너뛴다. 그 대신 그것을 감싸는 바깥 메소드가 같은 거리로 나온다. 대상 자신은 남긴다
-           AND (a.node_id = #{target}
-                OR NOT EXISTS (SELECT 1 FROM analysis_relation x
-                                WHERE x.revision_id = #{revisionId} AND x.relation_type = 'ENCLOSES_ANONYMOUS' AND x.to_id = a.node_id))
-         ORDER BY a.depth, o.fqn, m.signature
-         LIMIT #{limit}
     </select>
 
-    <!-- 닿는 진입점(주소, 스케줄, main ...). 사용자가 이 변경을 겪게 되는 입구다.
+    <!-- 닿는 진입점(주소, 스케줄, main ...). 사용자가 이 변경을 겪게 되는 곳이다.
+         reachedId 는 이 진입점까지 이어 준 닿은 메소드다(거리와 근거 길은 그 메소드의 것을 쓴다).
          메소드 없이 타입까지만 이어진 진입점(Struts 의 DispatchAction 처럼 어느 메소드가 불리는지 모르는 것)은
-         그 타입의 메소드가 하나라도 닿으면 넣되, 짐작이므로 LOW 로 표시한다 -->
+         그 타입의 메소드가 하나라도 닿으면 넣되(matchedBy = TYPE), 짐작이므로 Java 가 LOW 로 표시한다 -->
     <select id="selectImpactEndpoints" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        <include refid="impactWalk"/>
-        SELECT x.*
-          FROM (
-            SELECT e.endpoint_type AS "endpointType"
-                 , e.http_method AS "httpMethod"
-                 , e.path AS "path"
-                 , o.fqn || '#' || m.signature AS "handler"
-                 , m.method_id AS "methodId"
-                 , a.depth AS "depth"
-                 , <include refid="confName"><property name="column" value="a.conf"/></include> AS "confidence"
-                 , 'METHOD' AS "matchedBy"
-              FROM affected a
-              JOIN analysis_endpoint e ON e.revision_id = #{revisionId} AND e.method_id = a.node_id
-              JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
-              JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
-             WHERE a.node_kind = 'METHOD'
-            UNION ALL
-            SELECT e.endpoint_type, e.http_method, e.path, o.fqn, NULL, t.depth, 'LOW', 'TYPE'
-              FROM (SELECT m.owner_symbol_id, MIN(a.depth) AS depth
-                      FROM affected a
-                      JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
-                     WHERE a.node_kind = 'METHOD'
-                     GROUP BY m.owner_symbol_id) t
-              JOIN analysis_endpoint e ON e.revision_id = #{revisionId} AND e.symbol_id = t.owner_symbol_id AND e.method_id IS NULL
-              JOIN analysis_symbol o ON o.revision_id = e.revision_id AND o.symbol_id = e.symbol_id
-          ) x
-         ORDER BY x."depth", x."path", x."handler"
-         LIMIT #{limit}
+        <include refid="impactReach"/>
+        SELECT e.endpoint_type AS "endpointType"
+             , e.http_method AS "httpMethod"
+             , e.path AS "path"
+             , o.fqn || '#' || m.signature AS "handler"
+             , m.method_id AS "methodId"
+             , a.node_id AS "reachedId"
+             , 'METHOD' AS "matchedBy"
+          FROM reach a
+          JOIN analysis_endpoint e ON e.revision_id = #{revisionId} AND e.method_id = a.node_id
+          JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+          JOIN analysis_symbol o ON o.revision_id = m.revision_id AND o.symbol_id = m.owner_symbol_id
+         WHERE a.node_kind = 'METHOD'
+        UNION ALL
+        SELECT e.endpoint_type, e.http_method, e.path, o.fqn, NULL, a.node_id, 'TYPE'
+          FROM reach a
+          JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
+          JOIN analysis_endpoint e ON e.revision_id = #{revisionId} AND e.symbol_id = m.owner_symbol_id AND e.method_id IS NULL
+          JOIN analysis_symbol o ON o.revision_id = e.revision_id AND o.symbol_id = e.symbol_id
+         WHERE a.node_kind = 'METHOD'
     </select>
 
-    <!-- 닿는 화면(JSP). 세 가지 길이 있다:
-           REQUESTS 화면이, 닿는 메소드가 처리하는 주소를 요청한다
-           CALLS    화면 안의 Java 코드가 닿는 메소드를 직접 부른다
-           RENDERS  닿는 메소드가 끝나고 이 화면을 연다(이 화면에 보이는 내용이 달라질 수 있다) -->
+    <!-- 닿는 화면. 세 가지 길이 있다. nodeId 는 그 화면까지 이어 준 닿은 노드다:
+           REQUESTS 화면이, 닿는 메소드가 처리하는 주소를 요청한다(nodeId = 화면 파일 노드)
+           CALLS    화면(JSP) 안의 Java 코드가 닿는 메소드다(nodeId = 그 메소드)
+           RENDERS  닿는 메소드가 끝나고 이 화면을 연다(nodeId = 그 메소드, edgeConf = RENDERS 관계의 신뢰도)
+         screenName / dictScreenName 은 화면명(소스의 제목 · 메뉴 / 화면 사전). 어느 것을 쓸지는 Java 가 고른다 -->
     <select id="selectImpactScreens" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        <include refid="impactWalk"/>
-        SELECT x.path AS "path"
-             , MIN(x.depth) AS "depth"
-             , <include refid="confName"><property name="column" value="MAX(x.conf)"/></include> AS "confidence"
-             , array_to_string(array_agg(DISTINCT x.via), ',') AS "via"
+        <include refid="impactReach"/>
+        SELECT x.via AS "via"
+             , f.path AS "path"
+             , x.node_id AS "nodeId"
+             , x.edge_conf AS "edgeConf"
+             , (SELECT r.value FROM analysis_resource r
+                 WHERE r.revision_id = #{revisionId} AND r.file_id = f.file_id AND r.resource_type = 'SCREEN_NAME'
+                 ORDER BY r.resource_id LIMIT 1) AS "screenName"
+             , (SELECT r.value FROM analysis_resource r
+                 WHERE r.revision_id = #{revisionId} AND r.file_id = f.file_id AND r.resource_type = 'DICT_SCREEN_NAME'
+                 ORDER BY r.resource_id LIMIT 1) AS "dictScreenName"
           FROM (
-            SELECT 'REQUESTS' AS via, f.path, a.depth, a.conf
-              FROM affected a
-              JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = CAST(substr(a.node_id, 2) AS bigint)
+            SELECT 'REQUESTS' AS via, CAST(substr(a.node_id, 2) AS bigint) AS file_id, a.node_id, NULL::varchar AS edge_conf
+              FROM reach a
              WHERE a.node_kind = 'FILE'
             UNION ALL
-            SELECT 'CALLS', f.path, a.depth, a.conf
-              FROM affected a
+            SELECT 'CALLS', m.file_id, a.node_id, NULL
+              FROM reach a
               JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
-              JOIN analysis_file f ON f.file_id = m.file_id AND f.language = 'JSP'
+              JOIN analysis_file mf ON mf.file_id = m.file_id AND mf.language = 'JSP'
              WHERE a.node_kind = 'METHOD'
             UNION ALL
-            SELECT 'RENDERS', f.path, a.depth, LEAST(a.conf, <include refid="confRank"><property name="column" value="r.confidence"/></include>)
-              FROM affected a
+            SELECT 'RENDERS', CAST(substr(r.to_id, 2) AS bigint), a.node_id, r.confidence
+              FROM reach a
               JOIN analysis_relation r ON r.revision_id = #{revisionId} AND r.from_id = a.node_id AND r.relation_type = 'RENDERS' AND r.to_kind = 'FILE'
-              JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = CAST(substr(r.to_id, 2) AS bigint)
              WHERE a.node_kind = 'METHOD'
           ) x
-         GROUP BY x.path
-         ORDER BY MIN(x.depth), x.path
-         LIMIT #{limit}
+          JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = x.file_id
     </select>
 
     <!-- 화면과 메소드의 짝. 영향도 요약에서 "이 화면 → 이 거래"를 한 줄로 묶는 데 쓴다.
            REQUESTS 화면이 그 메소드의 주소(거래 ID)를 요청한다
            RENDERS  그 메소드가 끝나고 이 화면을 연다 -->
     <select id="selectImpactScreenLinks" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        <include refid="impactWalk"/>
+        <include refid="impactReach"/>
         SELECT DISTINCT x.method_id AS "methodId", f.path AS "path", x.via AS "via"
           FROM (
             SELECT r.to_id AS method_id, CAST(substr(r.from_id, 2) AS bigint) AS file_id, 'REQUESTS' AS via
-              FROM affected a
+              FROM reach a
               JOIN analysis_relation r ON r.revision_id = #{revisionId} AND r.to_id = a.node_id AND r.relation_type = 'REQUESTS' AND r.from_kind = 'FILE'
              WHERE a.node_kind = 'METHOD'
             UNION ALL
             SELECT r.from_id, CAST(substr(r.to_id, 2) AS bigint), 'RENDERS'
-              FROM affected a
+              FROM reach a
               JOIN analysis_relation r ON r.revision_id = #{revisionId} AND r.from_id = a.node_id AND r.relation_type = 'RENDERS' AND r.to_kind = 'FILE'
              WHERE a.node_kind = 'METHOD'
           ) x
           JOIN analysis_file f ON f.revision_id = #{revisionId} AND f.file_id = x.file_id
          ORDER BY f.path
-         LIMIT #{limit}
     </select>
 
-    <!-- 대상(메소드 · 타입)에서 부르는 쪽 방향으로 끝까지 따라 내려간 메소드들. 깊이 제한 없이 한 번씩만 담는다(UNION) -->
+    <!-- 변경분 대상에서: 생기거나 내용이 바뀐 화면 파일(JSP · WebSquare · Nexacro). 화면 자체를 고친 것이라 그대로 다시 볼 곳이다 -->
+    <select id="selectImpactChangedScreens" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT n.path AS "path"
+             , CASE WHEN o.path IS NULL THEN 'ADDED' ELSE 'CHANGED' END AS "change"
+          FROM analysis_file n
+          LEFT JOIN analysis_file o ON o.revision_id = #{baseRevisionId} AND o.path = n.path
+         WHERE n.revision_id = #{revisionId}
+           AND n.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+           AND (o.path IS NULL OR o.checksum &lt;&gt; n.checksum)
+         ORDER BY n.path
+    </select>
+
+    <!-- 변경분 대상에서: 없어진 메소드 수(만들어 넣은 멤버 제외). 이것을 부르던 곳은 함께 고쳤어야 하므로 바뀐 메소드로 이미 잡힌다 -->
+    <select id="selectImpactRemovedMethodCount" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*)
+          FROM analysis_method o
+         WHERE o.revision_id = #{baseRevisionId}
+           AND NOT o.is_synthetic
+           AND NOT EXISTS (SELECT 1 FROM analysis_method n WHERE n.revision_id = #{revisionId} AND n.method_id = o.method_id)
+    </select>
+
+    <!-- 출발점(메소드)에서 부르는 방향으로 끝까지 따라 내려간 메소드들. 깊이 제한 없이 한 번씩만 담는다(UNION) -->
     <sql id="impactDown">
-        WITH RECURSIVE down (node_id) AS (
-            <choose>
-                <when test="targetKind == 'TYPE'">
-            SELECT m.method_id::varchar
-              FROM analysis_method m
-              JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
-             WHERE m.revision_id = #{revisionId}
-               AND s.fqn = #{target}
-                </when>
-                <otherwise>
-            SELECT CAST(#{target} AS varchar)
-                </otherwise>
-            </choose>
+        WITH RECURSIVE <include refid="impactStart"/>
+        , down (node_id) AS (
+            SELECT node_id FROM start WHERE node_kind = 'METHOD'
             UNION
             SELECT r.to_id::varchar
               FROM down d
@@ -734,15 +849,24 @@
 
     <!-- 건드리는 데이터: 테이블 하나에 SQL 하나씩, 읽기(READS_TABLE)인지 쓰기(WRITES_TABLE)인지.
            TABLE     그 테이블을 건드리는 SQL (access 조건을 따른다)
+           COLUMN    그 컬럼을 쓰는 SQL. 컬럼을 읽지 못한 SQL 은 columnKnown = false
            STATEMENT 그 SQL 이 건드리는 테이블
-           TYPE / METHOD 끝까지 따라 내려가며 실행하는 SQL 이 건드리는 테이블 -->
+           TYPE / METHOD / CHANGES 끝까지 따라 내려가며 실행하는 SQL 이 건드리는 테이블 -->
     <select id="selectImpactTouches" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        <if test="targetKind == 'TYPE' or targetKind == 'METHOD'">
+        <if test="targetKind == 'TYPE' or targetKind == 'METHOD' or targetKind == 'CHANGES'">
             <include refid="impactDown"/>
         </if>
         SELECT DISTINCT t.to_external AS "table"
              , t.relation_type AS "access"
              , COALESCE(NULLIF(mp.namespace, '') || '.', '') || mp.statement_id AS "statement"
+             <choose>
+                 <when test="targetKind == 'COLUMN'">
+             , <include refid="columnKnown"/> AS "columnKnown"
+                 </when>
+                 <otherwise>
+             , TRUE AS "columnKnown"
+                 </otherwise>
+             </choose>
           FROM analysis_relation t
           JOIN analysis_mapper mp ON mp.revision_id = t.revision_id AND mp.mapper_id = CAST(substr(t.from_id, 2) AS bigint)
          WHERE t.revision_id = #{revisionId}
@@ -752,6 +876,12 @@
            AND t.to_external = #{target}
            AND t.relation_type IN
                 <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+            </when>
+            <when test="targetKind == 'COLUMN'">
+           AND t.to_external = #{table}
+           AND t.relation_type IN
+                <foreach collection="tableRelationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+           AND <include refid="columnMaybe"/>
             </when>
             <when test="targetKind == 'STATEMENT'">
            AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
@@ -772,7 +902,7 @@
     <!-- 놓쳤을 수 있는 부르는 쪽: 닿은 메소드와 이름 · 인자 수가 같은데 분석이 풀지 못한 호출.
          이 호출이 실제로 닿은 메소드를 부르는 것이라면 영향 범위가 더 넓다. total 은 LIMIT 앞의 전체 건수 -->
     <select id="selectImpactMissedCallers" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        <include refid="impactWalk"/>
+        <include refid="impactReach"/>
         SELECT n.name AS "name"
              , r.arg_count AS "argCount"
              , r.scope_text AS "scopeText"
@@ -780,7 +910,7 @@
              , r.line_start AS "lineStart"
              , COUNT(*) OVER () AS "total"
           FROM (SELECT DISTINCT m.name, m.param_count
-                  FROM affected a
+                  FROM reach a
                   JOIN analysis_method m ON m.revision_id = #{revisionId} AND m.method_id = a.node_id
                  WHERE a.node_kind = 'METHOD'
                    AND NOT m.is_constructor) n

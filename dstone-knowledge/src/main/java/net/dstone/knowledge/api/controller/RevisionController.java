@@ -197,38 +197,43 @@ public class RevisionController {
 	/**
 	 * <pre>
 	 * 영향도 분석: 이것을 고치면 닿는 메소드, 진입점(주소), 화면을 한 번에 돌려줍니다.
-	 * 대상은 넷 가운데 하나만 줍니다.
+	 * 진입점과 화면마다 그렇게 판단한 근거 길(chain)이 붙습니다.
+	 * 대상은 여섯 가운데 하나만 줍니다.
 	 *   - table: 테이블 이름. access=READ / WRITE로 읽는 쪽이나 쓰는 쪽만 볼 수 있습니다(기본 ALL).
+	 *   - column: 테이블.컬럼. 그 컬럼을 쓰는 SQL에서 출발합니다. access 도 씁니다.
 	 *   - statement: SQL statement 이름(네임스페이스.id 또는 id)
 	 *   - type: 타입 전체 이름. 그 타입의 모든 메소드에서 출발합니다.
 	 *   - methodId: 메소드 ID
-	 * depth: 몇 단계까지 거슬러 올라갈지(기본 5, 최대 10)
+	 *   - changedSince: 기준 리비전 번호(또는 auto = 앞 리비전). 그 리비전과 견줘 바뀐 메소드 · SQL에서 출발합니다.
+	 * depth: 몇 단계까지 거슬러 올라갈지. 비우면 끝까지 올라갑니다(최대 50).
 	 * </pre>
 	 */
 	@GetMapping("/{revisionId}/impact")
 	public Map<String, Object> getImpact(@PathVariable("revisionId") long revisionId
 			, @RequestParam(name = "table", required = false) String table
+			, @RequestParam(name = "column", required = false) String column
 			, @RequestParam(name = "statement", required = false) String statement
 			, @RequestParam(name = "type", required = false) String type
 			, @RequestParam(name = "methodId", required = false) String methodId
+			, @RequestParam(name = "changedSince", required = false) String changedSince
 			, @RequestParam(name = "access", required = false) String access
 			, @RequestParam(name = "depth", required = false) Integer depth
 			, @RequestParam(name = "includePossible", defaultValue = "true") boolean includePossible) {
-		String[] kinds = { "TABLE", "STATEMENT", "TYPE", "METHOD" };
-		String[] values = { table, statement, type, methodId };
+		String[] kinds = { "TABLE", "COLUMN", "STATEMENT", "TYPE", "METHOD", "CHANGES" };
+		String[] values = { table, column, statement, type, methodId, changedSince };
 		String targetKind = null;
 		String target = null;
 		for (int i = 0; i < values.length; i++) {
 			if (values[i] != null && values[i].trim().length() > 0) {
 				if (targetKind != null) {
-					throw ApiException.badRequest("대상은 table / statement / type / methodId 가운데 하나만 줍니다.");
+					throw ApiException.badRequest("대상은 table / column / statement / type / methodId / changedSince 가운데 하나만 줍니다.");
 				}
 				targetKind = kinds[i];
 				target = values[i];
 			}
 		}
 		if (targetKind == null) {
-			throw ApiException.badRequest("대상이 없습니다. table / statement / type / methodId 가운데 하나를 주세요.");
+			throw ApiException.badRequest("대상이 없습니다. table / column / statement / type / methodId / changedSince 가운데 하나를 주세요.");
 		}
 		return impactService.getImpact(revisionId, targetKind, target, access, depth, includePossible);
 	}

@@ -202,6 +202,11 @@ var DstoneKnowledge = (function () {
 		});
 	}
 
+	/** 다른 화면의 주소. link 는 defaultLink 값(예: knowledge/graph/graph), hash 는 # 뒤에 붙일 글(없으면 빈 글) */
+	function pageUrl(link, hash) {
+		return contextPath + "/defaultLink.do?defaultLink=" + encodeURIComponent(link) + (hash ? "#" + hash : "");
+	}
+
 	/** 신뢰도(HIGH / MEDIUM / LOW)를 색깔 글자로 */
 	function confidence(value) {
 		return "<span class=\"kn-conf-" + escapeHtml(value) + "\">" + escapeHtml(value) + "</span>";
@@ -219,6 +224,7 @@ var DstoneKnowledge = (function () {
 		cards: cards,
 		loadProjects: loadProjects,
 		loadRevisions: loadRevisions,
+		pageUrl: pageUrl,
 		confidence: confidence
 	};
 })();

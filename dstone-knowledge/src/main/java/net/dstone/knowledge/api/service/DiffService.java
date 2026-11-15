@@ -62,17 +62,8 @@ public class DiffService extends BaseObject {
 			throw ApiException.notFound("없는 리비전입니다: " + revisionId);
 		}
 		// 1) 기준 리비전 정하고 확인(같은 프로젝트, 자기 자신이 아님)
-		long baseId = resolveBase(revision, revisionId, baseRevisionId);
-		Map<String, Object> base = revisionDao.selectRevision(baseId);
-		if (base == null) {
-			throw ApiException.notFound("없는 기준 리비전입니다: " + baseId);
-		}
-		if (!String.valueOf(revision.get("projectId")).equals(String.valueOf(base.get("projectId")))) {
-			throw ApiException.badRequest("같은 프로젝트의 리비전끼리만 비교할 수 있습니다: " + revision.get("projectId") + " / " + base.get("projectId"));
-		}
-		if (baseId == revisionId) {
-			throw ApiException.badRequest("자기 자신과는 비교할 수 없습니다.");
-		}
+		Map<String, Object> base = resolveBaseRevision(revision, revisionId, baseRevisionId);
+		long baseId = ((Number) base.get("revisionId")).longValue();
 		int rowLimit = limit == null ? DEFAULT_LIMIT : Math.max(0, Math.min(limit.intValue(), MAX_LIMIT));
 		List<String> targetKinds = kindsOf(kinds);
 
@@ -112,6 +103,31 @@ public class DiffService extends BaseObject {
 		result.put("truncated", Boolean.valueOf(truncated));
 		result.put("changes", changes);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 비교할 기준 리비전을 정하고 확인합니다. 영향도의 "변경분" 대상도 이것을 씁니다.
+	 * 준 값 → 증분 분석의 기준 리비전 → 바로 앞의 READY 리비전 순서로 정하고,
+	 * 있는 리비전인지, 같은 프로젝트인지, 자기 자신이 아닌지 봅니다.
+	 * </pre>
+	 *
+	 * @param revision 대상 리비전(selectRevision 결과)
+	 * @return 기준 리비전(selectRevision 결과)
+	 */
+	public Map<String, Object> resolveBaseRevision(Map<String, Object> revision, long revisionId, Long baseRevisionId) {
+		long baseId = resolveBase(revision, revisionId, baseRevisionId);
+		Map<String, Object> base = revisionDao.selectRevision(baseId);
+		if (base == null) {
+			throw ApiException.notFound("없는 기준 리비전입니다: " + baseId);
+		}
+		if (!String.valueOf(revision.get("projectId")).equals(String.valueOf(base.get("projectId")))) {
+			throw ApiException.badRequest("같은 프로젝트의 리비전끼리만 비교할 수 있습니다: " + revision.get("projectId") + " / " + base.get("projectId"));
+		}
+		if (baseId == revisionId) {
+			throw ApiException.badRequest("자기 자신과는 비교할 수 없습니다.");
+		}
+		return base;
 	}
 
 	/** 비교할 기준 리비전: 준 값 → 증분 분석의 기준 리비전 → 바로 앞의 READY 리비전 순서로 정합니다. */

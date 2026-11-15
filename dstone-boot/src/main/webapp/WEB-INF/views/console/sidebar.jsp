@@ -23,7 +23,7 @@ String[][] aiMenus = {
 String[][] knowledgeMenus = {
 	{"knowledge/index", "프로젝트 · 분석", "folder"},
 	{"knowledge/search/search", "검색 · 문서", "search"},
-	{"knowledge/impact/impact", "영향도 · 호출 관계", "impact"},
+	{"knowledge/impact/impact", "영향도", "impact"},
 	{"knowledge/graph/graph", "노드 맵", "graph"},
 	{"knowledge/diff/diff", "리비전 비교", "diff"},
 	{"knowledge/guide/guide", "사용 안내", "book"}
