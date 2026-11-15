@@ -24,21 +24,25 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			</section>
 
 			<details class="kn-howto">
-				<summary>이렇게 씁니다</summary>
+				<summary>처음이신가요? 이 화면은 이렇게 씁니다 (눌러서 펴기)</summary>
+				<p>코드와 올린 문서를 "말로 물어보듯" 찾는 화면입니다. 아래쪽에서는 설계서 · 매뉴얼 같은 문서를 올립니다.</p>
 				<ol>
-					<li>찾을 곳을 고릅니다. 프로젝트를 고르면 그 프로젝트의 분석 결과(분석이 끝난 가장 최근 리비전)에서, "(올린 문서)"를 고르면 올린 문서에서 찾습니다.</li>
-					<li>평소 말하듯 적고 "찾기". 클래스 · 메소드 · 테이블 이름이나 주소를 알면 같이 적으세요. 이름이 정확히 맞는 것이 위로 올라옵니다.</li>
-					<li>코드 결과 한 건은 메소드 하나 / SQL 하나 / 화면 하나이고, 문서 결과 한 건은 장/절 단위의 조각 하나(1,000자 안팎)입니다. 본문 상자를 누르면 전체가 펴집니다.
-						<code>나온 곳 VECTOR+KEYWORD</code> 는 뜻과 이름 양쪽에서 찾혔다는 뜻이라 가장 믿을 만합니다.</li>
+					<li><b>찾을 곳 고르기</b> — 화면을 처음 열면 <b>"(올린 문서)"</b>가 골라져 있습니다. 코드에서 찾으려면 꼭 프로젝트로 바꾸세요.
+						프로젝트를 고르면 그 프로젝트의 분석 결과(분석이 끝난 가장 최근 리비전)에서 찾습니다.</li>
+					<li><b>물어보기</b> — 평소 말하듯 적고 "찾기"(또는 Enter)를 누릅니다. 클래스 · 메소드 · 테이블 이름이나 주소를 알면 같이 적으세요. 이름이 정확히 맞는 것이 위로 올라옵니다.</li>
+					<li><b>결과 읽기</b> — 결과 위 한 줄에 건수, 걸린 시간, 질문에서 골라낸 이름, 임베딩 진행 상황이 나옵니다.
+						코드 결과 한 건은 메소드 · SQL · 화면 하나이고, 문서 결과 한 건은 장/절 단위 조각 하나(1,000자 안팎)입니다. 회색 본문 상자를 누르면 전체가 펴집니다.
+						"나온 곳"이 <code>VECTOR+KEYWORD</code>면 뜻과 이름 양쪽에서 찾힌 것이라 가장 믿을 만합니다.</li>
 				</ol>
-				예시 (누르면 채워집니다. <code>struts-app</code> 기준):
-				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"게시글을 삭제하는 곳"}'>게시글을 삭제하는 곳</span>
-				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"BoardDAO.deleteBoard"}'>BoardDAO.deleteBoard</span>
-				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"TB_BOARD 를 고치는 SQL"}'>TB_BOARD 를 고치는 SQL</span>
-				<span class="kn-example" data-fill='{"kn-search-project":"struts-app","kn-search-query":"/board/save.do 요청을 받는 곳"}'>/board/save.do 요청을 받는 곳</span>
-				<br>옵션은 그대로 두어도 됩니다. 코드에서는 "종류"를 체크하면 그 종류만(예: SQL 만) 나오고, 올린 문서에서는 "묶음"을 고르면 그 묶음의 문서에서만 찾습니다.
-				결과가 적으면 임베딩이 아직 진행 중일 수 있습니다(검색 결과 위 줄의 "임베딩 PENDING" 숫자). 그동안은 이름을 넣어 찾으세요.
-				뜻으로 찾은 결과는 유사도가 기준(코드 0.5, 올린 문서 0.35)보다 낮으면 버립니다. 그래서 프로젝트와 상관없는 질문에는 결과가 나오지 않습니다.
+				예시 (누르면 "찾을 내용"이 채워집니다. <code>struts-app</code> 표본 기준이니 "찾을 곳"은 직접 고르세요):
+				<span class="kn-example" data-fill='{"kn-search-query":"게시글을 삭제하는 곳"}'>게시글을 삭제하는 곳</span>
+				<span class="kn-example" data-fill='{"kn-search-query":"BoardDAO.deleteBoard"}'>BoardDAO.deleteBoard</span>
+				<span class="kn-example" data-fill='{"kn-search-query":"TB_BOARD 를 고치는 SQL"}'>TB_BOARD 를 고치는 SQL</span>
+				<span class="kn-example" data-fill='{"kn-search-query":"/board/save.do 요청을 받는 곳"}'>/board/save.do 요청을 받는 곳</span>
+				<p>옵션은 그대로 두어도 됩니다. 코드에서 찾을 때 "종류"를 체크하면 그 종류만(예: SQL만) 나오고, 올린 문서에서 찾을 때 "묶음"을 고르면 그 묶음 안에서만 찾습니다.</p>
+				<p>결과가 적다면 임베딩이 아직 진행 중일 수 있습니다(결과 위 줄의 "임베딩 PENDING" 숫자). 그동안은 이름을 넣어 찾으세요.
+					뜻으로 찾은 결과는 유사도가 기준(코드 0.5, 올린 문서 0.35)보다 낮으면 버립니다. 그래서 프로젝트와 상관없는 질문에는 "질문과 가까운 내용이 없습니다"라고 나옵니다.</p>
+				<p>문서를 올릴 때는 파일만 고르고 "올리기"를 누르면 됩니다. 문서 이름과 제목은 비우면 파일 이름이 들어갑니다. 글자가 그림인(스캔한) PDF는 읽지 못합니다.</p>
 			</details>
 
 			<section class="ai-panel">
