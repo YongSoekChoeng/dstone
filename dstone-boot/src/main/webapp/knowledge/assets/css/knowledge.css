@@ -254,20 +254,159 @@
 	font-size: 13px;
 }
 
-/* 사용 안내의 그림(글자로 그린 흐름도) */
-.kn-diagram {
-	background: #f9fafb;
+/* 사용 안내: 첫 문단(조금 크게) */
+.kn-lede { font-size: 15px; color: var(--cs-text); }
+
+/* 사용 안내: "이런 게 궁금할 때 → 이 화면" 표 */
+.kn-ask-table td:first-child { width: 42%; color: var(--cs-text); }
+.kn-ask-table a { font-weight: 700; }
+
+/* 사용 안내 그림 ①: 소스 폴더 → 분석 → 물어보기. 넓으면 가로, 좁으면 세로로 쌓는다 */
+.kn-flow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) 36px minmax(0, 1fr);
+	align-items: stretch;
+	margin: 14px 0 18px;
+}
+.kn-flow-step {
+	position: relative;
+	padding: 16px 16px 14px;
+	background: var(--cs-surface);
 	border: 1px solid var(--cs-border);
-	border-radius: var(--cs-radius-sm);
-	padding: 12px 14px;
-	font-family: var(--cs-mono), "Malgun Gothic", monospace;
+	border-top: 3px solid var(--cs-primary);
+	border-radius: var(--cs-radius);
+}
+.kn-flow-last { background: var(--cs-primary-soft); }
+.kn-flow-no {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--cs-primary);
+	color: #ffffff;
+	font-size: 12px;
+	font-weight: 700;
+}
+.kn-flow-title { margin-top: 8px; font-size: 15px; font-weight: 700; color: var(--cs-text); }
+.kn-flow-title small { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--cs-muted); }
+.kn-flow-items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.kn-flow-items span {
+	padding: 1px 10px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: 999px;
+	background: var(--cs-surface);
 	font-size: 12.5px;
-	line-height: 1.6;
-	white-space: pre;
-	overflow-x: auto;
-	margin: 8px 0 14px;
 	color: var(--cs-text-2);
 }
+.kn-flow-step p { margin: 10px 0 0; font-size: 12.5px; color: var(--cs-muted); line-height: 1.6; }
+/* 단계 사이 화살표: 선 + 삼각형 */
+.kn-flow-arrow { position: relative; }
+.kn-flow-arrow::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 6px;
+	right: 12px;
+	border-top: 2px solid var(--cs-primary);
+}
+.kn-flow-arrow::after {
+	content: "";
+	position: absolute;
+	top: calc(50% - 6px);
+	right: 4px;
+	border-left: 9px solid var(--cs-primary);
+	border-top: 7px solid transparent;
+	border-bottom: 7px solid transparent;
+}
+@media screen and (max-width: 860px) {
+	.kn-flow { grid-template-columns: minmax(0, 1fr); }
+	.kn-flow-arrow { height: 28px; }
+	.kn-flow-arrow::before { top: 4px; bottom: 10px; left: 50%; right: auto; border-top: 0; border-left: 2px solid var(--cs-primary); }
+	.kn-flow-arrow::after { top: auto; bottom: 2px; right: auto; left: calc(50% - 6px); border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 9px solid var(--cs-primary); border-bottom: 0; }
+}
+
+/* 사용 안내 그림 ②: 화면 → … → 테이블 으로 이어진 줄과, 그 줄을 쓰는 두 화면 */
+.kn-path {
+	margin: 12px 0 16px;
+	padding: 16px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+}
+.kn-path-nodes {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: stretch;
+	gap: 8px 22px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.kn-path-nodes li {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 12px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border-strong);
+	border-radius: var(--cs-radius-sm);
+}
+/* 칸 사이의 화살표(마지막 칸 뒤에는 없음) */
+.kn-path-nodes li:not(:last-child)::after {
+	content: "";
+	position: absolute;
+	top: calc(50% - 5px);
+	right: -16px;
+	border-left: 8px solid var(--cs-faint);
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+}
+.kn-path-kind { font-size: 11.5px; font-weight: 700; color: var(--cs-muted); }
+.ai-body .kn-path-nodes code { font-size: 12.5px; background: transparent; border: 0; padding: 0; color: var(--cs-text); }
+.kn-path-uses { display: grid; gap: 8px; margin-top: 14px; }
+.kn-path-use {
+	padding: 8px 12px 8px 14px;
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	font-size: 13px;
+	color: var(--cs-text-2);
+}
+.kn-path-use b { display: block; margin-bottom: 2px; }
+.kn-path-both { border-left: 3px solid var(--cs-primary); }
+.kn-path-both b { color: var(--cs-primary); }
+.kn-path-back { border-left: 3px solid var(--cs-warning); }
+.kn-path-back b { color: var(--cs-warning); }
+
+/* 사용 안내: 상황별 따라 하기 카드 */
+.kn-case {
+	margin: 14px 0;
+	padding: 4px 16px 6px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	background: var(--cs-surface);
+}
+.kn-guide .kn-case h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.kn-case-no {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 6px;
+	background: var(--cs-primary-soft);
+	color: var(--cs-primary);
+	font-size: 13px;
+	font-weight: 700;
+}
+.kn-case-link { margin-left: auto; font-size: 12.5px; font-weight: 600; }
+.kn-case ol { margin: 4px 0 8px; }
+
+/* 사용 안내: 분석 단계 표(두 단계씩 한 줄) */
+.kn-stage-table td:nth-child(odd) { width: 110px; white-space: nowrap; }
 
 /* 사용 안내의 차례 */
 .kn-toc {
