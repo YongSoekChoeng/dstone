@@ -16,6 +16,9 @@ var DstoneKnowledgeUnresolved = (function () {
 	var filter = { cause: null, causeKey: null, name: null, fileId: null, filePath: null };
 	var page = 1;
 	var total = 0;
+	// 요청 번호. 리비전이나 조건을 바꾼 뒤 늦게 도착한 이전 응답은 버린다
+	var groupsRequestNo = 0;
+	var listRequestNo = 0;
 
 	function init() {
 		["kn-unresolved-panel", "kn-unresolved-title", "kn-unresolved-status", "kn-unresolved-kind", "kn-unresolved-path", "kn-unresolved-search-btn",
@@ -46,6 +49,29 @@ var DstoneKnowledgeUnresolved = (function () {
 		el["kn-unresolved-panel"].style.display = "";
 		reload();
 		el["kn-unresolved-panel"].scrollIntoView({ behavior: "smooth" });
+	}
+
+	/**
+	 * 패널을 닫고 내용을 비운다. 다른 리비전의 요약을 열거나, 프로젝트를 바꾸거나, 이 리비전을 지울 때 부른다.
+	 * 읽고 있던 응답이 늦게 와도 그리지 않는다.
+	 */
+	function close() {
+		revision = null;
+		groupsRequestNo++;
+		listRequestNo++;
+		el["kn-unresolved-panel"].style.display = "none";
+		["kn-unresolved-by-cause", "kn-unresolved-by-file", "kn-unresolved-by-name", "kn-unresolved-list", "kn-unresolved-filter"].forEach(function (id) {
+			el[id].innerHTML = "";
+		});
+		el["kn-unresolved-count"].textContent = "";
+		el["kn-unresolved-page"].textContent = "";
+		el["kn-unresolved-message"].textContent = "";
+		el["kn-unresolved-message"].className = "kn-message";
+	}
+
+	/** 지금 열려 있는 리비전 번호. 닫혀 있으면 null */
+	function revisionId() {
+		return revision ? revision.revisionId : null;
 	}
 
 	/** 지금 조건을 API 파라미터로 */
@@ -88,7 +114,11 @@ var DstoneKnowledgeUnresolved = (function () {
 		});
 		el["kn-unresolved-message"].textContent = "";
 		el["kn-unresolved-message"].className = "kn-message";
+		var requestNo = ++groupsRequestNo;
 		K.call("GET", "/api/revisions/" + revision.revisionId + "/unresolved/groups", query({ limit: 50 })).then(function (groups) {
+			if (requestNo !== groupsRequestNo) {
+				return;
+			}
 			K.table(el["kn-unresolved-by-cause"], [
 				{ key: "cause", label: "원인", mono: true, html: function (row) {
 					return "<span title=\"" + K.escapeHtml(row.example) + "\">" + K.escapeHtml(row.cause) + "</span>";
@@ -119,7 +149,9 @@ var DstoneKnowledgeUnresolved = (function () {
 				filter.name = row.name;
 			});
 		}).catch(function (err) {
-			showError(err);
+			if (requestNo === groupsRequestNo) {
+				showError(err);
+			}
 		});
 	}
 
@@ -128,7 +160,11 @@ var DstoneKnowledgeUnresolved = (function () {
 			return;
 		}
 		el["kn-unresolved-list"].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
+		var requestNo = ++listRequestNo;
 		K.call("GET", "/api/revisions/" + revision.revisionId + "/unresolved", query({ page: pageNo, size: PAGE_SIZE })).then(function (result) {
+			if (requestNo !== listRequestNo) {
+				return;
+			}
 			page = result.page;
 			total = result.total;
 			var lastPage = Math.max(1, Math.ceil(total / result.size));
@@ -153,7 +189,9 @@ var DstoneKnowledgeUnresolved = (function () {
 				} }
 			], result.references, "조건에 맞는 참조가 없습니다.");
 		}).catch(function (err) {
-			showError(err);
+			if (requestNo === listRequestNo) {
+				showError(err);
+			}
 		});
 	}
 
@@ -212,5 +250,5 @@ var DstoneKnowledgeUnresolved = (function () {
 		el["kn-unresolved-message"].textContent = err.message;
 	}
 
-	return { init: init, open: open };
+	return { init: init, open: open, close: close, revisionId: revisionId };
 })();

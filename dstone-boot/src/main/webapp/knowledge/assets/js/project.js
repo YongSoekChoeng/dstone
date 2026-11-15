@@ -7,6 +7,12 @@ var DstoneKnowledgeProject = (function () {
 	var el = {};
 	var projectId = null;
 	var pollTimer = null;
+	// 지금 요약을 보여 주는 리비전 번호(닫혀 있으면 null)
+	var summaryRevisionId = null;
+	// 요청 번호. 다른 프로젝트 · 리비전 · Job 을 고른 뒤 늦게 도착한 이전 응답은 버린다
+	var summaryRequestNo = 0;
+	var revisionsRequestNo = 0;
+	var jobRequestNo = 0;
 
 	var T = DstoneKnowledgeTerms;
 
@@ -113,9 +119,14 @@ var DstoneKnowledgeProject = (function () {
 		projectId = project.projectId;
 		stopPolling();
 		el["kn-analysis-panel"].style.display = "";
-		el["kn-summary-panel"].style.display = "none";
+		closeSummary();
 		el["kn-job-box"].style.display = "none";
 		el["kn-selected-project"].textContent = projectId;
+		// 분석 칸은 프로젝트마다 새로 시작한다. 앞 프로젝트의 라벨이 남아 있으면 엉뚱한 리비전을 이어서 분석하게 된다.
+		el["kn-revision-label"].value = "";
+		el["kn-incremental"].checked = false;
+		el["kn-rerun-from"].value = "";
+		el["kn-revision-table"].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
 		// 등록 칸에도 채워 둔다. 경로나 이름을 고쳐서 다시 등록하면 수정이 된다.
 		el["kn-new-project-id"].value = project.projectId;
 		el["kn-new-project-name"].value = project.projectName || "";
@@ -160,14 +171,21 @@ var DstoneKnowledgeProject = (function () {
 		stopPolling();
 		el["kn-job-box"].style.display = "";
 		el["kn-job-id"].textContent = analysisId;
+		var requestNo = jobRequestNo;
 		var load = function () {
 			K.call("GET", "/api/analyses/" + encodeURIComponent(analysisId)).then(function (job) {
+				if (requestNo !== jobRequestNo) {
+					return;
+				}
 				renderJob(job);
 				if (job.status !== "READY" && job.status !== "RUNNING") {
 					stopPolling();
 					loadRevisions();
 				}
 			}).catch(function (err) {
+				if (requestNo !== jobRequestNo) {
+					return;
+				}
 				stopPolling();
 				K.message(el["kn-analysis-message"], err.message, true);
 			});
@@ -176,7 +194,9 @@ var DstoneKnowledgeProject = (function () {
 		pollTimer = setInterval(load, 3000);
 	}
 
+	/** 3초마다 읽기를 멈춘다. 이미 보낸 요청의 응답도 그리지 않는다 */
 	function stopPolling() {
+		jobRequestNo++;
 		if (pollTimer) {
 			clearInterval(pollTimer);
 			pollTimer = null;
@@ -216,7 +236,11 @@ var DstoneKnowledgeProject = (function () {
 	/* ---------------- 리비전 ---------------- */
 
 	function loadRevisions() {
+		var requestNo = ++revisionsRequestNo;
 		K.call("GET", "/api/projects/" + encodeURIComponent(projectId) + "/revisions").then(function (revisions) {
+			if (requestNo !== revisionsRequestNo) {
+				return;
+			}
 			K.table(el["kn-revision-table"], [
 				{ key: "revisionId", label: "#", num: true },
 				{ key: "revisionLabel", label: "라벨" },
@@ -233,7 +257,9 @@ var DstoneKnowledgeProject = (function () {
 				tr.querySelector(".kn-delete-btn").addEventListener("click", function () { deleteRevision(revision); });
 			});
 		}).catch(function (err) {
-			K.message(el["kn-revision-message"], err.message, true);
+			if (requestNo === revisionsRequestNo) {
+				K.message(el["kn-revision-message"], err.message, true);
+			}
 		});
 	}
 
@@ -243,7 +269,12 @@ var DstoneKnowledgeProject = (function () {
 		}
 		K.call("DELETE", "/api/revisions/" + revision.revisionId).then(function () {
 			K.message(el["kn-revision-message"], "지웠습니다: #" + revision.revisionId);
-			el["kn-summary-panel"].style.display = "none";
+			// 지운 리비전의 요약 · 풀지 못한 참조를 보고 있었으면 닫는다. 다른 리비전을 보고 있었으면 그대로 둔다.
+			if (String(summaryRevisionId) === String(revision.revisionId)) {
+				closeSummary();
+			} else if (String(DstoneKnowledgeUnresolved.revisionId()) === String(revision.revisionId)) {
+				DstoneKnowledgeUnresolved.close();
+			}
 			loadRevisions();
 		}).catch(function (err) {
 			K.message(el["kn-revision-message"], err.message, true);
@@ -262,6 +293,15 @@ var DstoneKnowledgeProject = (function () {
 		K.call("POST", "/api/projects/" + encodeURIComponent(projectId) + "/retention", { keep: keep }).then(function (result) {
 			K.message(el["kn-revision-message"], "지운 리비전 " + result.deletedRevisions.length + "개, 건너뛴 리비전 " + result.skippedRevisions.length
 				+ "개, 지운 임베딩 " + result.deletedEmbeddings + "건");
+			// 보고 있던 리비전이 지워졌으면 그 요약 · 풀지 못한 참조를 닫는다
+			(result.deletedRevisions || []).forEach(function (deleted) {
+				var deletedId = String(deleted && deleted.revisionId !== undefined ? deleted.revisionId : deleted);
+				if (String(summaryRevisionId) === deletedId) {
+					closeSummary();
+				} else if (String(DstoneKnowledgeUnresolved.revisionId()) === deletedId) {
+					DstoneKnowledgeUnresolved.close();
+				}
+			});
 			loadRevisions();
 		}).catch(function (err) {
 			K.message(el["kn-revision-message"], err.message, true);
@@ -270,7 +310,23 @@ var DstoneKnowledgeProject = (function () {
 
 	/* ---------------- 리비전 요약 ---------------- */
 
+	/** 리비전 요약과, 그 요약에서 연 "풀지 못한 참조 살펴보기"를 닫는다. 읽고 있던 요약 응답도 버린다 */
+	function closeSummary() {
+		summaryRequestNo++;
+		summaryRevisionId = null;
+		el["kn-summary-panel"].style.display = "none";
+		el["kn-summary-cards"].innerHTML = "";
+		el["kn-summary-sections"].innerHTML = "";
+		DstoneKnowledgeUnresolved.close();
+	}
+
 	function loadSummary(revision) {
+		var requestNo = ++summaryRequestNo;
+		summaryRevisionId = revision.revisionId;
+		// 풀지 못한 참조는 요약에 딸린 것이다. 다른 리비전의 요약을 열면 앞 리비전의 것은 닫는다.
+		if (String(DstoneKnowledgeUnresolved.revisionId()) !== String(revision.revisionId)) {
+			DstoneKnowledgeUnresolved.close();
+		}
 		el["kn-summary-panel"].style.display = "";
 		el["kn-summary-title"].textContent = "#" + revision.revisionId + " " + revision.revisionLabel;
 		el["kn-summary-cards"].innerHTML = "";
@@ -282,13 +338,18 @@ var DstoneKnowledgeProject = (function () {
 			// 적용 진단도 따로. 실패하면 진단 상자만 빠진다.
 			K.call("GET", "/api/revisions/" + revision.revisionId + "/diagnostics").catch(function () { return null; })
 		]).then(function (results) {
+			if (requestNo !== summaryRequestNo) {
+				return;
+			}
 			var summary = results[0];
 			summary.rag = results[1];
 			summary.diagnostics = results[2];
 			renderSummary(summary);
 			el["kn-summary-panel"].scrollIntoView({ behavior: "smooth" });
 		}).catch(function (err) {
-			el["kn-summary-sections"].innerHTML = "<div class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</div>";
+			if (requestNo === summaryRequestNo) {
+				el["kn-summary-sections"].innerHTML = "<div class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</div>";
+			}
 		});
 	}
 
