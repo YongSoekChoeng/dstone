@@ -121,5 +121,6 @@ var DstoneKnowledgeEmbedding = (function () {
 		return two(date.getHours()) + ":" + two(date.getMinutes()) + ":" + two(date.getSeconds());
 	}
 
-	return { init: init };
+	// STATES 는 대시보드도 같은 말과 색으로 보여 주려고 밖에 내놓는다
+	return { init: init, STATES: STATES };
 })();

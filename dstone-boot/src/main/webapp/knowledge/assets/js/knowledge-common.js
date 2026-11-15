@@ -82,7 +82,8 @@ var DstoneKnowledge = (function () {
 	function badge(status) {
 		var name = String(status || "unknown").toLowerCase();
 		// AI 화면의 딱지 색을 같이 쓴다. READY / DONE_WITH_WARNING 처럼 거기 없는 이름은 가까운 색으로 맞춘다.
-		var css = name === "ready" || name === "up" ? "done" : name === "done_with_warning" ? "waiting_approval" : name === "created" ? "cancelled" : name;
+		var css = name === "ready" || name === "up" ? "done" : name === "done_with_warning" ? "waiting_approval" : name === "created" ? "cancelled"
+			: name === "analyzing" ? "running" : name === "down" || name === "db_down" || name === "schema_not_ready" ? "failed" : name;
 		return "<span class=\"workflow-badge workflow-badge-" + escapeHtml(css) + "\">" + escapeHtml(status) + "</span>";
 	}
 

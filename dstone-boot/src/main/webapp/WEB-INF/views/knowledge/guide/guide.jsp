@@ -42,6 +42,8 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 				<table class="document-list-table kn-ask-table">
 					<thead><tr><th>이런 게 궁금할 때</th><th>이 화면에서</th></tr></thead>
 					<tbody>
+						<tr><td>"분석은 어디까지 됐고, 지금 돌고 있는 건 없나?"</td>
+							<td><a href="<%=linkBase%>knowledge/dashboard/dashboard">대시보드</a> — 프로젝트별 분석 상태 · 최근 작업 · 임베딩 · 올린 문서를 한 화면에서 봅니다</td></tr>
 						<tr><td>"주문 취소는 어디서 처리하지?"</td>
 							<td><a href="<%=linkBase%>knowledge/search/search">검색 · 문서</a> — 말로 물어보면 관련된 메소드 · SQL · 화면이 나옵니다</td></tr>
 						<tr><td>"이 테이블(컬럼)을 바꾸면 어느 화면을 다시 테스트해야 하지?"</td>
@@ -181,6 +183,15 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 
 			<section class="ai-panel" id="screens">
 				<h3>5. 화면별 쓰는 법</h3>
+
+				<h4>대시보드</h4>
+				<ul>
+					<li>코드 분석의 첫 화면입니다. 위쪽 카드에서 서버 상태, 프로젝트 수, 돌고 있는 분석, 임베딩 진행률, 올린 문서 수를 봅니다. 카드를 누르면 그 화면으로 갑니다.</li>
+					<li><b>프로젝트 현황</b>: 숫자는 분석이 끝난(<code>READY</code>) 가장 최근 리비전의 것입니다. 프로젝트 이름을 누르면 그 리비전의 요약이 열리고,
+						"영향도" · "노드 맵"을 누르면 그 리비전이 골라진 채로 열립니다. 호출 해석률은 95% 이상이면 초록, 80% 미만이면 빨강입니다.</li>
+					<li><b>최근 분석 작업</b>: 실패한 작업은 이유의 첫 줄이 빨간 글씨로 나옵니다. 돌고 있는 분석이나 임베딩이 있으면 화면이 30초마다 새로 읽습니다.</li>
+					<li><b>올린 문서</b>: 묶음(collection)마다 문서 · 청크 수와 임베딩이 얼마나 끝났는지 봅니다. 로그인한 사용자(API 키)의 문서만 셉니다.</li>
+				</ul>
 
 				<h4>프로젝트 · 분석</h4>
 				<ul>

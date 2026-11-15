@@ -29,13 +29,48 @@ var DstoneKnowledgeProject = (function () {
 			el["kn-health"].innerHTML = K.badge("DOWN");
 			K.message(el["kn-project-message"], err.message, true);
 		});
-		loadProjects();
+		loadProjects().then(openFromHash);
+	}
+
+	/**
+	 * 대시보드에서 프로젝트 줄을 누르면 주소에 #p=프로젝트&r=리비전&l=리비전 라벨 이 붙어 옵니다.
+	 * 그 프로젝트를 고르고, 리비전이 있으면 그 요약까지 바로 엽니다. 한 번 열고 나면 주소를 비웁니다.
+	 */
+	function openFromHash(projects) {
+		var wanted = {};
+		location.hash.replace(/^#/, "").split("&").forEach(function (pair) {
+			var at = pair.indexOf("=");
+			if (at > 0) {
+				wanted[pair.substring(0, at)] = decodeURIComponent(pair.substring(at + 1));
+			}
+		});
+		if (!wanted.p) {
+			return;
+		}
+		history.replaceState(null, "", location.pathname + location.search);
+		var project = null;
+		(projects || []).forEach(function (row) {
+			if (row.projectId === wanted.p) {
+				project = row;
+			}
+		});
+		if (!project) {
+			K.message(el["kn-project-message"], "등록되지 않은 프로젝트입니다: " + wanted.p, true);
+			return;
+		}
+		selectProject(project);
+		if (/^[0-9]+$/.test(wanted.r || "")) {
+			loadSummary({ revisionId: wanted.r, revisionLabel: wanted.l || "" });
+		} else {
+			el["kn-analysis-panel"].scrollIntoView({ behavior: "smooth" });
+		}
 	}
 
 	/* ---------------- 프로젝트 ---------------- */
 
+	/** 프로젝트 표를 다시 그립니다. 다 그리면 프로젝트 목록을 넘겨줍니다(실패하면 빈 목록) */
 	function loadProjects() {
-		K.call("GET", "/api/projects").then(function (projects) {
+		return K.call("GET", "/api/projects").then(function (projects) {
 			K.table(el["kn-project-table"], [
 				{ key: "projectId", label: "projectId", html: function (row) {
 					return "<a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + K.escapeHtml(row.projectId) + "</a>";
@@ -49,8 +84,10 @@ var DstoneKnowledgeProject = (function () {
 					selectProject(projects[index]);
 				});
 			});
+			return projects;
 		}).catch(function (err) {
 			K.message(el["kn-project-message"], err.message, true);
+			return [];
 		});
 	}
 

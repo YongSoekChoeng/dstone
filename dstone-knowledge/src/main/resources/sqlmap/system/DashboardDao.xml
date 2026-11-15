@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 대시보드(웰컴 화면)용 조회. 모두 읽기만 하고, 화면 하나가 API 한 번으로 그려지도록 한꺼번에 모은다 -->
+<mapper namespace="net.dstone.knowledge.api.dao.DashboardDao">
+
+    <!-- 전체 건수: 프로젝트, 분석이 끝난 리비전, 아직 안 끝난 분석, 최근 7일 동안 실패한 분석 -->
+    <select id="selectTotals" resultType="java.util.LinkedHashMap">
+        SELECT (SELECT COUNT(*) FROM analysis_project) AS "projects"
+             , (SELECT COUNT(*) FROM analysis_revision WHERE status = 'READY') AS "readyRevisions"
+             , (SELECT COUNT(*) FROM analysis_job WHERE status IN ('READY', 'RUNNING')) AS "activeJobs"
+             , (SELECT COUNT(*) FROM analysis_job WHERE status = 'FAILED' AND created_at >= now() - INTERVAL '7 days') AS "failedJobs7d"
+    </select>
+
+    <!-- 프로젝트마다 한 줄.
+         latest* = 가장 최근 리비전(분석 중이거나 실패한 것일 수 있다)
+         ready*  = 분석이 끝난(READY) 가장 최근 리비전. 검색·영향도가 기본으로 쓰는 리비전이고, 건수와 품질 지표도 이 리비전의 값이다.
+         품질 지표는 리비전 요약과 같은 값(그 리비전의 지표가 있는 가장 최근 Job)을 읽는다. 계산식은 RelationDao.xml insertMetrics -->
+    <select id="selectProjects" resultType="java.util.LinkedHashMap">
+        SELECT p.project_id AS "projectId"
+             , p.project_name AS "projectName"
+             , p.description AS "description"
+             , (SELECT COUNT(*) FROM analysis_revision x WHERE x.project_id = p.project_id) AS "revisionCount"
+             , (SELECT COUNT(*) FROM analysis_job j WHERE j.project_id = p.project_id AND j.status IN ('READY', 'RUNNING')) AS "activeJobs"
+             , lr.revision_id AS "latestRevisionId"
+             , lr.revision_label AS "latestRevisionLabel"
+             , lr.status AS "latestStatus"
+             , to_char(lr.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "latestCreatedAt"
+             , rr.revision_id AS "readyRevisionId"
+             , rr.revision_label AS "readyRevisionLabel"
+             , to_char(rr.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "readyCreatedAt"
+             , (SELECT COUNT(*) FROM analysis_file f WHERE f.revision_id = rr.revision_id) AS "files"
+             , (SELECT COUNT(*) FROM analysis_method m WHERE m.revision_id = rr.revision_id) AS "methods"
+             , (SELECT COUNT(*) FROM analysis_endpoint e WHERE e.revision_id = rr.revision_id) AS "endpoints"
+             , mt.call_rate AS "callResolutionRate"
+             , mt.parse_rate AS "parseSuccessRate"
+          FROM analysis_project p
+          LEFT JOIN LATERAL (
+                SELECT r.revision_id, r.revision_label, r.status, r.created_at
+                  FROM analysis_revision r
+                 WHERE r.project_id = p.project_id
+                 ORDER BY r.revision_id DESC
+                 LIMIT 1) lr ON TRUE
+          LEFT JOIN LATERAL (
+                SELECT r.revision_id, r.revision_label, r.created_at
+                  FROM analysis_revision r
+                 WHERE r.project_id = p.project_id
+                   AND r.status = 'READY'
+                 ORDER BY r.revision_id DESC
+                 LIMIT 1) rr ON TRUE
+          LEFT JOIN LATERAL (
+                SELECT MAX(m.metric_value) FILTER (WHERE m.metric_name = 'callResolutionRate') AS call_rate
+                     , MAX(m.metric_value) FILTER (WHERE m.metric_name = 'parseSuccessRate') AS parse_rate
+                  FROM analysis_metric m
+                 WHERE m.analysis_id = (
+                        SELECT j.analysis_id FROM analysis_job j
+                          JOIN analysis_metric x ON x.analysis_id = j.analysis_id
+                         WHERE j.revision_id = rr.revision_id
+                         ORDER BY j.created_at DESC, j.analysis_id DESC
+                         LIMIT 1)) mt ON TRUE
+         ORDER BY p.project_id
+    </select>
+
+    <!-- 최근 분석 작업. elapsedSeconds 는 시작부터 끝(안 끝났으면 지금)까지. 오류 글은 앞 500자만 -->
+    <select id="selectRecentJobs" parameterType="int" resultType="java.util.LinkedHashMap">
+        SELECT j.analysis_id AS "analysisId"
+             , j.project_id AS "projectId"
+             , j.revision_id AS "revisionId"
+             , r.revision_label AS "revisionLabel"
+             , j.status AS "status"
+             , j.current_pass AS "currentPass"
+             , j.total_files AS "totalFiles"
+             , j.done_files AS "doneFiles"
+             , LEFT(j.error_message, 500) AS "errorMessage"
+             , to_char(j.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt"
+             , to_char(j.ended_at, 'YYYY-MM-DD HH24:MI:SS') AS "endedAt"
+             , CAST(EXTRACT(EPOCH FROM (COALESCE(j.ended_at, now()) - j.started_at)) AS BIGINT) AS "elapsedSeconds"
+          FROM analysis_job j
+          JOIN analysis_revision r ON r.revision_id = j.revision_id
+         ORDER BY j.created_at DESC, j.analysis_id DESC
+         LIMIT #{limit}
+    </select>
+
+    <!-- 올린 일반 문서의 묶음(collection)별 현황. 호출자(tenant)의 문서만 센다.
+         묶음이 없는 문서는 collection 이 비어 있는 한 줄로 나온다.
+         chunks / embedded / failed 는 청크 수(문서 목록 API 와 같은 기준) -->
+    <select id="selectDocumentCollections" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT d.collection AS "collection"
+             , COUNT(DISTINCT d.doc_seq) AS "documents"
+             , COUNT(c.chunk_id) AS "chunks"
+             , COUNT(e.content_hash) FILTER (WHERE e.status = 'DONE') AS "embedded"
+             , COUNT(e.content_hash) FILTER (WHERE e.status = 'FAILED') AS "failed"
+             , to_char(MAX(d.created_at), 'YYYY-MM-DD HH24:MI:SS') AS "lastUploadedAt"
+          FROM rag_document d
+          LEFT JOIN rag_chunk c ON c.doc_seq = d.doc_seq
+          LEFT JOIN rag_embedding e ON e.content_hash = c.content_hash AND e.model = #{model}
+         WHERE <include refid="net.dstone.knowledge.api.dao.RagDao.uploadOwner"/>
+         GROUP BY d.collection
+         ORDER BY d.collection NULLS LAST
+    </select>
+
+</mapper>

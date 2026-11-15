@@ -21,6 +21,7 @@ String[][] aiMenus = {
 	{"ai/designer/designer", "Workflow 디자이너", "flow"}
 };
 String[][] knowledgeMenus = {
+	{"knowledge/dashboard/dashboard", "대시보드", "dashboard"},
 	{"knowledge/index", "프로젝트 · 분석", "folder"},
 	{"knowledge/search/search", "검색 · 문서", "search"},
 	{"knowledge/impact/impact", "영향도", "impact"},
@@ -36,6 +37,7 @@ icons.put("chat", "<path d='M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 
 icons.put("play", "<circle cx='12' cy='12' r='9'/><path d='m10 8.5 5.5 3.5-5.5 3.5z'/>");
 icons.put("list", "<path d='M8 6h13M8 12h13M8 18h13'/><circle cx='4' cy='6' r='1'/><circle cx='4' cy='12' r='1'/><circle cx='4' cy='18' r='1'/>");
 icons.put("flow", "<rect x='3' y='3' width='7' height='6' rx='1.5'/><rect x='14' y='15' width='7' height='6' rx='1.5'/><path d='M6.5 9v3.5a2 2 0 0 0 2 2H17.5V15'/>");
+icons.put("dashboard", "<rect x='3' y='3' width='8' height='10' rx='1.5'/><rect x='13' y='3' width='8' height='6' rx='1.5'/><rect x='13' y='11' width='8' height='10' rx='1.5'/><rect x='3' y='15' width='8' height='6' rx='1.5'/>");
 icons.put("folder", "<path d='M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z'/>");
 icons.put("search", "<circle cx='11' cy='11' r='7'/><path d='m20 20-3.5-3.5'/>");
 icons.put("impact", "<circle cx='12' cy='12' r='2.5'/><circle cx='12' cy='12' r='6'/><circle cx='12' cy='12' r='9.5'/>");
@@ -46,7 +48,7 @@ icons.put("back", "<path d='M15 18 9 12l6-6'/>");
 
 // 이 화면 묶음의 이름, 첫 화면, 메뉴
 String brandName = knowledge ? "Knowledge" : "AI";
-String brandHome = knowledge ? "knowledge/index" : "ai/index";
+String brandHome = knowledge ? "knowledge/dashboard/dashboard" : "ai/index";
 String[][] menus = knowledge ? knowledgeMenus : aiMenus;
 %>
 <%!
