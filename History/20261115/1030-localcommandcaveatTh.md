@@ -555,3 +555,17 @@ dstone-boot>knowledge 의 사용 안내 에 대해서 정리를 하고자 해.
 **바뀐 파일:** `guide.jsp`, `knowledge.css`, `.claude/docs/knowledge-ui.md`
 
 커밋·푸시하고 boot에 반영하려면 말씀해 주세요. boot 반영은 다시 빌드하고 재시작해야 합니다.
+
+---
+
+## 질문
+
+git 에 올려줘.
+
+---
+
+## 답변
+
+사용 안내 화면 변경을 `196c7c1f`로 커밋하고 `origin/main`에 푸시했습니다. 커밋한 파일은 `guide.jsp`, `knowledge.css`, `.claude/docs/knowledge-ui.md` 세 개입니다. 처음부터 수정되어 있던 `unresolved.js`는 이번에도 넣지 않았습니다.
+
+실행 중인 dstone-boot(7081)에는 아직 반영되지 않았습니다. 새 안내 화면을 보려면 boot를 다시 빌드하고 재시작해야 하니, 원하시면 말씀해 주세요.
