@@ -121,10 +121,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<div id="kn-revision-message" class="kn-message"></div>
 						<details class="kn-howto">
 							<summary>보관 정책</summary>
-							<div class="kn-row">
+							<div class="kn-retention-row">
 								<label for="kn-retention-keep">최근</label>
-								<input type="number" id="kn-retention-keep" min="1" value="5" style="width:70px;" />
-								<label>개만 남기고 지우기</label>
+								<input type="number" id="kn-retention-keep" min="1" value="5" />
+								<label for="kn-retention-keep">개만 남기고 지우기</label>
 								<button type="button" id="kn-retention-btn" class="kn-plain">적용</button>
 							</div>
 						</details>
@@ -164,7 +164,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 									<p class="ai-hint">위 표의 줄을 누르면 그 조건이 아래에 걸리고 바로 조회됩니다. 먼저 <b>원인별</b> 표를 봅니다.
 										같은 기호(예: <code>Model</code>, <code>logger</code>, <code>HttpEntity</code>)가 많이 나오면 그 타입이 든 라이브러리(jar)가 빠진 것입니다.
 										묶음 표의 줄을 누르면 조건이 더 좁혀지고, 맨 아래 목록에 파일 · 줄 번호가 나옵니다.</p>
-									<div class="kn-row">
+									<!-- 조회 조건: 이름 칸을 한 줄로 맞춘 표 모양. 1행 참조의 종류 · 상태, 2행 이유, 3행 파일 경로 + 조회 -->
+									<div class="kn-cond-grid">
 										<label for="kn-unresolved-kind">참조의 종류</label>
 										<select id="kn-unresolved-kind"></select>
 										<label for="kn-unresolved-status">상태</label>
@@ -174,10 +175,12 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 											<option value="IGNORED">IGNORED (일부러 뺌)</option>
 										</select>
 										<label>이유</label>
-										<span id="kn-unresolved-reason" class="kn-reason-cond"></span>
+										<div id="kn-unresolved-reason" class="kn-reason-cond kn-cond-wide"></div>
 										<label for="kn-unresolved-path">파일 경로</label>
-										<input type="text" id="kn-unresolved-path" class="kn-wide" placeholder="경로에 들어간 글자 (예: integration/)" />
-										<button type="button" id="kn-unresolved-search-btn">조회</button>
+										<div class="kn-cond-wide kn-cond-inline">
+											<input type="text" id="kn-unresolved-path" placeholder="경로에 들어간 글자 (예: integration/)" />
+											<button type="button" id="kn-unresolved-search-btn">조회</button>
+										</div>
 									</div>
 									<div id="kn-unresolved-filter" class="kn-unresolved-filter"></div>
 									<div id="kn-unresolved-message" class="kn-message"></div>

@@ -700,15 +700,17 @@ var DstoneKnowledgeProject = (function () {
 				key: column[0],
 				label: column[1],
 				num: numeric,
-				html: column[3] ? function (row) { return withMeaning(row[column[0]], T.meaningOf(column[3], row[column[0]])); } : null
+				html: column[3] ? function (row) {
+					return withMeaning(row[column[0]], T.meaningOf(column[3], row[column[0]]), column[0] === "confidence" ? "kn-conf-tag kn-conf-" + row[column[0]] : "");
+				} : null
 			};
 		}), rows);
 		return box;
 	}
 
-	/** 영문 값 뒤에 한글 뜻을 흐린 글자로 붙인다 */
-	function withMeaning(code, meaning) {
-		return "<span class=\"kn-code\">" + K.escapeHtml(code) + "</span>" + (meaning ? "<span class=\"kn-term\">" + K.escapeHtml(meaning) + "</span>" : "");
+	/** 영문 값 뒤에 한글 뜻을 흐린 글자로 붙인다. css 가 있으면 값에 그 모양을 더한다(신뢰도 색 등) */
+	function withMeaning(code, meaning, css) {
+		return "<span class=\"kn-code" + (css ? " " + K.escapeHtml(css) : "") + "\">" + K.escapeHtml(code) + "</span>" + (meaning ? "<span class=\"kn-term\">" + K.escapeHtml(meaning) + "</span>" : "");
 	}
 
 	/* ---------------- 도우미 ---------------- */
