@@ -244,9 +244,15 @@ var DstoneKnowledgeTerms = (function () {
 		},
 		{
 			tab: "connect", path: "relations.unresolvedReasons", title: "풀지 못한 참조의 이유",
-			what: "\"누구를 가리키는지\" 끝내 정하지 못했거나 일부러 뺀 참조를 이유별로 모은 것입니다.",
-			brief: function (rows) {
-				return topCounts(rows, "status", "count", 3);
+			what: "\"누구를 가리키는지\" 끝내 정하지 못했거나 일부러 뺀 참조를 이유별로 모은 것입니다. 줄을 누르면 아래 \"살펴보기\"에서 그 조건으로 조회합니다.",
+			brief: function (rows, summary) {
+				var rates = {};
+				(valueAt(summary, "relations.metrics") || []).forEach(function (row) {
+					rates[row.name] = row.value;
+				});
+				return topCounts(rows, "status", "count", 3)
+					+ (rates.callUnresolvedRate !== undefined ? " · 호출의 " + rates.callUnresolvedRate + "% 못 풂" : "")
+					+ (rates.callHeuristicRate !== undefined ? " · " + rates.callHeuristicRate + "% 짐작으로 이음" : "");
 			},
 			columns: [
 				["refKind", "참조의 종류", "무엇을 하려던 참조인지", REF_KIND],
@@ -257,7 +263,8 @@ var DstoneKnowledgeTerms = (function () {
 			],
 			read: "상태가 IGNORED 인 줄은 문제가 아닙니다(배열의 length 처럼 관계로 만들 것이 아닌 것). 볼 것은 UNRESOLVED 입니다. "
 				+ "\"프로젝트에 같은 이름의 메소드가 없습니다\"가 많으면 라이브러리(jar)가 빠진 것이고, \"프로젝트 밖의 상위 타입에서 물려받은 메소드로 보입니다\"는 프레임워크 클래스를 물려받아 쓰는 메소드라 jar 가 있으면 풀립니다. "
-				+ "어느 파일의 어느 줄인지, 무엇을 못 찾았는지는 아래 \"풀지 못한 참조 살펴보기\" 버튼으로 봅니다."
+				+ "줄을 누르면 아래 \"살펴보기\"에 그 줄의 참조의 종류 · 상태 · 이유가 조건으로 걸리고, 어느 파일의 어느 줄인지, 무엇을 못 찾았는지가 나옵니다. "
+				+ "이름으로 짐작해 이은 참조는 살펴보기의 상태에서 HEURISTIC 을 고릅니다(이유가 적혀 있지 않아 이 표에는 없습니다)."
 		},
 		{
 			tab: "content", path: "semantic.endpoints", title: "진입점",

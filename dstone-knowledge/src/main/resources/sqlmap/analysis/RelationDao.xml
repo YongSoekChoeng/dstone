@@ -214,6 +214,7 @@
         SELECT ref_kind AS "refKind"
              , status AS "status"
              , split_part(COALESCE(fail_reason, ''), '. ', 1) AS "reason"
+             , md5(split_part(COALESCE(fail_reason, ''), '. ', 1)) AS "reasonKey"
              , COUNT(*) AS "count"
              , MIN(fail_reason) AS "example"
           FROM analysis_reference
@@ -246,6 +247,8 @@
         <if test="cause != null and cause != ''">AND <include refid="unresolvedCause"/> = #{cause}</if>
         <!-- 화면은 원인 글자 대신 이 키로 거른다. 원인에 + 나 앞뒤 빈칸이 들어 있어도 주소를 거치며 바뀌지 않는다 -->
         <if test="causeKey != null and causeKey != ''">AND md5(<include refid="unresolvedCause"/>) = #{causeKey}</if>
+        <!-- "풀지 못한 참조의 이유" 표의 이유(fail_reason 의 첫 문장)로 거른다. 원인 키처럼 md5 로 받는다 -->
+        <if test="reasonKey != null and reasonKey != ''">AND md5(split_part(COALESCE(r.fail_reason, ''), '. ', 1)) = #{reasonKey}</if>
         <if test="name != null and name != ''">AND r.name = #{name}</if>
         <if test="fileId != null">AND r.file_id = #{fileId}</if>
         <if test="path != null and path != ''">AND f.path LIKE '%' || #{path} || '%'</if>

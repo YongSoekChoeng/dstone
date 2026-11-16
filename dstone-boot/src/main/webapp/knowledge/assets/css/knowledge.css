@@ -1593,7 +1593,15 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 
 .kn-fold-body .kn-howto { box-shadow: none; }
 
-/* 연결 품질 탭 안의 "풀지 못한 참조 살펴보기" */
+/* 연결 품질 탭: 누를 수 있는 "풀지 못한 참조의 이유" 줄과, 그 아래 "살펴보기" */
+.kn-click-row { cursor: pointer; }
+.kn-click-row:hover td { background: var(--cs-surface-2); }
+.kn-row-on td { background: var(--cs-primary-soft) !important; }
+.kn-reason-cond { display: inline-flex; align-items: center; max-width: 420px; }
+.kn-reason-cond .ai-hint { margin: 0; }
+.ai-body .kn-reason-cond button.kn-unresolved-chip { max-width: 420px; overflow: hidden; text-overflow: ellipsis; height: 30px; }
+
+
 .kn-subpanel {
 	border-top: 1px solid var(--cs-border);
 	margin-top: 16px;

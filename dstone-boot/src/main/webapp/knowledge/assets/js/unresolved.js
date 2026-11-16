@@ -1,7 +1,8 @@
 /**
  * "프로젝트 · 분석" 화면의 "풀지 못한 참조 살펴보기".
- * 리비전 상세의 연결 품질 탭에서 버튼을 누르면 열린다. 원인(못 찾은 기호) · 파일 · 이름별로 묶어 세고,
- * 묶음을 누르면 그 조건으로 좁혀서 한 건씩(파일 · 줄 · 호출식 · 이유) 보여 준다.
+ * 연결 품질 탭의 "풀지 못한 참조의 이유" 표 바로 아래에 붙는다. 표의 줄을 누르면 그 줄의 참조의 종류 · 상태 · 이유가
+ * 조건으로 걸리고 바로 조회된다. 원인(못 찾은 기호) · 파일 · 이름별로 묶어 세고,
+ * 묶음을 누르면 그 조건으로 더 좁혀서 한 건씩(파일 · 줄 · 호출식 · 이유) 보여 준다.
  */
 var DstoneKnowledgeUnresolved = (function () {
 
@@ -11,21 +12,29 @@ var DstoneKnowledgeUnresolved = (function () {
 
 	var el = {};
 	var revision = null;
-	// 표의 줄을 눌러 건 조건. 셋 다 같이 걸 수 있다
-	// cause 는 보여 줄 글자, causeKey 는 거를 때 보내는 키(원인의 md5)
-	var filter = { cause: null, causeKey: null, name: null, fileId: null, filePath: null };
+	// 표의 줄을 눌러 건 조건. 모두 같이 걸 수 있다
+	// reason · cause 는 보여 줄 글자, reasonKey · causeKey 는 거를 때 보내는 키(글자의 md5)
+	var filter = emptyFilter();
 	var page = 1;
 	var total = 0;
 	// 요청 번호. 리비전이나 조건을 바꾼 뒤 늦게 도착한 이전 응답은 버린다
 	var groupsRequestNo = 0;
 	var listRequestNo = 0;
 
+	function emptyFilter() {
+		return { reason: null, reasonKey: null, cause: null, causeKey: null, name: null, fileId: null, filePath: null };
+	}
+
 	function init() {
-		["kn-unresolved-panel", "kn-unresolved-title", "kn-unresolved-status", "kn-unresolved-kind", "kn-unresolved-path", "kn-unresolved-search-btn",
+		["kn-unresolved-panel", "kn-unresolved-result", "kn-unresolved-reason", "kn-unresolved-status", "kn-unresolved-kind", "kn-unresolved-path", "kn-unresolved-search-btn",
 			"kn-unresolved-filter", "kn-unresolved-message", "kn-unresolved-by-cause", "kn-unresolved-by-file", "kn-unresolved-by-name",
 			"kn-unresolved-count", "kn-unresolved-list", "kn-unresolved-prev-btn", "kn-unresolved-page", "kn-unresolved-next-btn"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
+		// 참조의 종류: "모든 종류" 와 사전(T.REF_KIND)의 종류들
+		el["kn-unresolved-kind"].innerHTML = "<option value=\"\">모든 종류</option>" + Object.keys(T.REF_KIND).map(function (kind) {
+			return "<option value=\"" + kind + "\">" + K.escapeHtml(kind + " (" + T.REF_KIND[kind] + ")") + "</option>";
+		}).join("");
 		el["kn-unresolved-search-btn"].addEventListener("click", function () { reload(); });
 		el["kn-unresolved-status"].addEventListener("change", function () { reload(); });
 		el["kn-unresolved-kind"].addEventListener("change", function () { reload(); });
@@ -38,17 +47,36 @@ var DstoneKnowledgeUnresolved = (function () {
 		el["kn-unresolved-next-btn"].addEventListener("click", function () { loadList(page + 1); });
 	}
 
-	/** 리비전 하나를 연다. status 를 주면 그 상태로 시작한다 (기본 UNRESOLVED) */
-	function open(target, status) {
+	/**
+	 * 리비전 하나에 붙인다. 조건을 처음 값(종류 CALL, 상태 UNRESOLVED)으로 돌리고, 조회는 하지 않는다.
+	 * 이유 표의 줄을 누르거나 "조회"를 눌러야 읽는다(큰 프로젝트는 묶어 세는 데 시간이 걸린다).
+	 */
+	function attach(target) {
+		close();
 		revision = target;
-		filter = { cause: null, causeKey: null, name: null, fileId: null, filePath: null };
-		el["kn-unresolved-status"].value = status || "UNRESOLVED";
+		el["kn-unresolved-status"].value = "UNRESOLVED";
 		el["kn-unresolved-kind"].value = "CALL";
 		el["kn-unresolved-path"].value = "";
-		el["kn-unresolved-title"].textContent = "#" + target.revisionId + " " + (target.revisionLabel || "");
-		el["kn-unresolved-panel"].style.display = "";
+		renderFilter();
+	}
+
+	/**
+	 * "풀지 못한 참조의 이유" 표의 한 줄로 조건을 걸고 조회한다.
+	 * row: {refKind, status, reason, reasonKey}. 이유가 비어 있으면 이유 조건은 걸지 않는다.
+	 */
+	function openReason(row) {
+		if (!revision) {
+			return;
+		}
+		filter = emptyFilter();
+		el["kn-unresolved-kind"].value = row.refKind || "";
+		el["kn-unresolved-status"].value = row.status || "UNRESOLVED";
+		if (row.reason) {
+			filter.reason = row.reason;
+			filter.reasonKey = row.reasonKey;
+		}
 		reload();
-		el["kn-unresolved-panel"].scrollIntoView({ behavior: "smooth" });
+		el["kn-unresolved-panel"].scrollIntoView({ behavior: "smooth", block: "start" });
 	}
 
 	/**
@@ -57,9 +85,10 @@ var DstoneKnowledgeUnresolved = (function () {
 	 */
 	function close() {
 		revision = null;
+		filter = emptyFilter();
 		groupsRequestNo++;
 		listRequestNo++;
-		el["kn-unresolved-panel"].style.display = "none";
+		el["kn-unresolved-result"].style.display = "none";
 		["kn-unresolved-by-cause", "kn-unresolved-by-file", "kn-unresolved-by-name", "kn-unresolved-list", "kn-unresolved-filter"].forEach(function (id) {
 			el[id].innerHTML = "";
 		});
@@ -78,6 +107,9 @@ var DstoneKnowledgeUnresolved = (function () {
 		var path = el["kn-unresolved-path"].value.trim();
 		if (path) {
 			q.path = path;
+		}
+		if (filter.reasonKey !== null) {
+			q.reasonKey = filter.reasonKey;
 		}
 		if (filter.causeKey !== null) {
 			q.causeKey = filter.causeKey;
@@ -98,6 +130,7 @@ var DstoneKnowledgeUnresolved = (function () {
 		if (!revision) {
 			return;
 		}
+		el["kn-unresolved-result"].style.display = "";
 		renderFilter();
 		loadGroups();
 		loadList(1);
@@ -211,6 +244,18 @@ var DstoneKnowledgeUnresolved = (function () {
 
 	/** 걸린 조건을 단추로 보여 준다. 누르면 그 조건이 풀린다 */
 	function renderFilter() {
+		// 이유는 조건 줄 안(참조의 종류 · 상태 다음)에 보인다. 위 표의 줄을 눌러야 걸리고, ✕ 로 푼다
+		if (filter.reason !== null) {
+			el["kn-unresolved-reason"].innerHTML = "<button type=\"button\" class=\"kn-plain kn-unresolved-chip\" title=\"누르면 이 조건을 풉니다\">"
+				+ K.escapeHtml(filter.reason) + " ✕</button>";
+			el["kn-unresolved-reason"].querySelector("button").addEventListener("click", function () {
+				filter.reason = null;
+				filter.reasonKey = null;
+				reload();
+			});
+		} else {
+			el["kn-unresolved-reason"].innerHTML = "<span class=\"ai-hint\">(전체 — 위 표의 줄을 누르면 걸립니다)</span>";
+		}
 		var chips = [];
 		if (filter.cause !== null) {
 			chips.push(["cause", "원인: " + filter.cause]);
@@ -245,5 +290,5 @@ var DstoneKnowledgeUnresolved = (function () {
 		el["kn-unresolved-message"].textContent = err.message;
 	}
 
-	return { init: init, open: open, close: close };
+	return { init: init, attach: attach, openReason: openReason, close: close };
 })();

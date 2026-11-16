@@ -191,9 +191,9 @@ public class RevisionService extends BaseObject {
 	 * @param status UNRESOLVED(기본) / HEURISTIC / IGNORED
 	 * @param refKind CALL / FIELD_ACCESS / TYPE_USE ... 비우면 모든 종류
 	 */
-	public Map<String, Object> getUnresolvedGroups(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path, int limit) {
+	public Map<String, Object> getUnresolvedGroups(long revisionId, String status, String refKind, String reasonKey, String cause, String causeKey, String name, Long fileId, String path, int limit) {
 		findRevision(revisionId);
-		Map<String, Object> condition = unresolvedCondition(revisionId, status, refKind, cause, causeKey, name, fileId, path);
+		Map<String, Object> condition = unresolvedCondition(revisionId, status, refKind, reasonKey, cause, causeKey, name, fileId, path);
 		condition.put("limit", limit < 1 ? 30 : Math.min(limit, MAX_PAGE_SIZE));
 
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
@@ -214,12 +214,12 @@ public class RevisionService extends BaseObject {
 	 *
 	 * @param page 1부터 시작
 	 */
-	public Map<String, Object> getUnresolvedList(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path, int page, int size) {
+	public Map<String, Object> getUnresolvedList(long revisionId, String status, String refKind, String reasonKey, String cause, String causeKey, String name, Long fileId, String path, int page, int size) {
 		findRevision(revisionId);
 		int pageNo = page < 1 ? 1 : page;
 		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);
 
-		Map<String, Object> condition = unresolvedCondition(revisionId, status, refKind, cause, causeKey, name, fileId, path);
+		Map<String, Object> condition = unresolvedCondition(revisionId, status, refKind, reasonKey, cause, causeKey, name, fileId, path);
 		condition.put("size", pageSize);
 		condition.put("offset", (pageNo - 1) * pageSize);
 
@@ -232,7 +232,7 @@ public class RevisionService extends BaseObject {
 	}
 
 	/** 풀지 못한 참조 조회 조건. status 는 UNRESOLVED(기본) / HEURISTIC / IGNORED 가운데 하나, 그 밖이면 400 */
-	private Map<String, Object> unresolvedCondition(long revisionId, String status, String refKind, String cause, String causeKey, String name, Long fileId, String path) {
+	private Map<String, Object> unresolvedCondition(long revisionId, String status, String refKind, String reasonKey, String cause, String causeKey, String name, Long fileId, String path) {
 		String statusValue = status == null || status.trim().isEmpty() ? "UNRESOLVED" : status.trim().toUpperCase();
 		if (!"UNRESOLVED".equals(statusValue) && !"HEURISTIC".equals(statusValue) && !"IGNORED".equals(statusValue)) {
 			throw ApiException.badRequest("status 는 UNRESOLVED / HEURISTIC / IGNORED 가운데 하나입니다: " + status);
@@ -241,6 +241,7 @@ public class RevisionService extends BaseObject {
 		condition.put("revisionId", revisionId);
 		condition.put("status", statusValue);
 		condition.put("refKind", refKind == null ? null : refKind.trim().toUpperCase());
+		condition.put("reasonKey", reasonKey);
 		condition.put("cause", cause);
 		condition.put("causeKey", causeKey);
 		condition.put("name", name);

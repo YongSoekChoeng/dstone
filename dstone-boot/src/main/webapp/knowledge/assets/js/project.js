@@ -352,6 +352,7 @@ var DstoneKnowledgeProject = (function () {
 		current = null;
 		el["kn-summary-panel"].style.display = "none";
 		el["kn-detail-empty"].style.display = "";
+		parkUnresolvedPanel();
 		["kn-summary-cards", "kn-overview", "kn-connect", "kn-content", "kn-history"].forEach(function (id) {
 			el[id].innerHTML = "";
 		});
@@ -374,6 +375,7 @@ var DstoneKnowledgeProject = (function () {
 		el["kn-summary-title"].textContent = "#" + revision.revisionId + " " + (revision.revisionLabel || "");
 		el["kn-summary-badge"].innerHTML = revision.status ? K.badge(revision.status) : "";
 		el["kn-summary-cards"].innerHTML = "";
+		parkUnresolvedPanel();
 		["kn-overview", "kn-connect", "kn-content", "kn-history"].forEach(function (id) {
 			el[id].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
 		});
@@ -452,6 +454,7 @@ var DstoneKnowledgeProject = (function () {
 
 		// 나머지 탭: SECTIONS 를 탭별로 나눠 그린다
 		var targets = { connect: el["kn-connect"], content: el["kn-content"], history: el["kn-history"] };
+		parkUnresolvedPanel();
 		Object.keys(targets).forEach(function (tab) {
 			targets[tab].innerHTML = "";
 		});
@@ -463,9 +466,10 @@ var DstoneKnowledgeProject = (function () {
 			if (section.showIf && !section.showIf(rows)) {
 				return;
 			}
-			targets[section.tab].appendChild(sectionBox(section, rows, summary));
+			var box = sectionBox(section, rows, summary);
+			targets[section.tab].appendChild(box);
 			if (section.path === "relations.unresolvedReasons") {
-				targets[section.tab].appendChild(unresolvedButtons(summary, metrics));
+				attachUnresolved(box, rows, summary);
 			}
 		});
 		Object.keys(targets).forEach(function (tab) {
@@ -641,22 +645,35 @@ var DstoneKnowledgeProject = (function () {
 	/* ---------------- 연결 품질 ---------------- */
 
 	/**
-	 * "풀지 못한 참조 살펴보기" 단추. 못 푼 것(UNRESOLVED)과 짐작으로 이은 것(HEURISTIC)을 따로 연다.
-	 * 누르면 같은 탭 아래에 원인 · 파일별 묶음과 한 건씩의 목록(파일 · 줄 번호)이 나온다.
+	 * "풀지 못한 참조의 이유" 표 바로 아래에 "살펴보기"(unresolved.js)를 붙인다. 표는 펴 두고, 줄을 누르면
+	 * 그 줄의 참조의 종류 · 상태 · 이유가 아래 조건으로 걸려 바로 조회된다. 짐작으로 이은 참조(HEURISTIC)는 상태에서 고른다.
 	 */
-	function unresolvedButtons(summary, metrics) {
-		var box = document.createElement("div");
-		box.className = "kn-row";
-		box.innerHTML = "<button type=\"button\" class=\"kn-plain\" data-status=\"UNRESOLVED\">풀지 못한 참조 살펴보기"
-			+ (metrics.callUnresolvedRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callUnresolvedRate)) + "%)" : "") + "</button>"
-			+ "<button type=\"button\" class=\"kn-plain\" data-status=\"HEURISTIC\">짐작으로 이은 참조 살펴보기"
-			+ (metrics.callHeuristicRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callHeuristicRate)) + "%)" : "") + "</button>";
-		Array.prototype.forEach.call(box.querySelectorAll("button"), function (button) {
-			button.addEventListener("click", function () {
-				DstoneKnowledgeUnresolved.open({ revisionId: summary.revisionId, revisionLabel: summary.revisionLabel }, button.getAttribute("data-status"));
+	function attachUnresolved(box, rows, summary) {
+		box.open = true;
+		var body = box.querySelector(".kn-fold-body");
+		var panel = document.getElementById("kn-unresolved-panel");
+		body.insertBefore(panel, body.querySelector(".kn-howto"));
+		DstoneKnowledgeUnresolved.attach({ revisionId: summary.revisionId, revisionLabel: summary.revisionLabel });
+		var trs = box.querySelectorAll(".kn-scroll tbody tr[data-index]");
+		Array.prototype.forEach.call(trs, function (tr) {
+			tr.classList.add("kn-click-row");
+			tr.title = "누르면 아래에서 이 조건으로 조회합니다";
+			tr.addEventListener("click", function () {
+				Array.prototype.forEach.call(trs, function (other) {
+					other.classList.toggle("kn-row-on", other === tr);
+				});
+				DstoneKnowledgeUnresolved.openReason(rows[parseInt(tr.getAttribute("data-index"), 10)]);
 			});
 		});
-		return box;
+	}
+
+	/** 살펴보기 패널을 원래 자리(숨긴 칸)로 돌려놓는다. 탭 내용을 지우기 전에 불러야 패널이 같이 지워지지 않는다 */
+	function parkUnresolvedPanel() {
+		var panel = document.getElementById("kn-unresolved-panel");
+		var home = document.getElementById("kn-unresolved-home");
+		if (panel.parentNode !== home) {
+			home.appendChild(panel);
+		}
 	}
 
 	/* ---------------- 표 하나 ---------------- */

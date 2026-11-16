@@ -33,7 +33,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					<li><b>리비전 고르기 (왼쪽 아래)</b> — 상태가 <code>READY</code>인 리비전을 누르면 오른쪽에 결과가 열립니다.</li>
 					<li><b>개요 탭</b> — <b>"한눈에 보기"</b>가 모두 초록 ✔이면 그대로 쓰면 됩니다. 주황 <b>!</b>나 빨간 <b>✖</b>가 있으면 그 줄에 무엇을 하면 되는지 적혀 있고,
 						"적용 진단"은 모자란 곳을 해결 방법별(규칙 파일, jar 위치 등)로 나눠 보여 줍니다. 탭 이름 옆의 <b>⚠</b>는 그 탭에 살펴볼 것이 있다는 뜻입니다.</li>
-					<li><b>연결 품질 탭</b> — 누가 무엇을 부르는지 얼마나 풀었는지 봅니다. "풀지 못한 참조 살펴보기"를 누르면 무엇을 못 찾았는지 파일 · 줄 번호까지 나옵니다.</li>
+					<li><b>연결 품질 탭</b> — 누가 무엇을 부르는지 얼마나 풀었는지 봅니다. "풀지 못한 참조의 이유" 표의 줄을 누르면 바로 아래에 그 조건으로 조회되어, 무엇을 못 찾았는지 파일 · 줄 번호까지 나옵니다.</li>
 					<li><b>미사용 탭</b> — 있지만 아무도 쓰지 않는 테이블 · SQL · 클래스 · 메소드 · 화면입니다. 숫자를 누르면 목록이 나오고, 줄을 누르면 노드 맵에서 엽니다.</li>
 					<li><b>물어보기</b> — 왼쪽 메뉴의 "검색 · 문서", "영향도", "노드 맵", "리비전 비교"로 갑니다. 이 화면들은 분석이 끝난 가장 최근 리비전을 알아서 골라 둡니다.</li>
 				</ol>
@@ -157,55 +157,53 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<div class="kn-tab-panel" data-panel="connect" style="display:none;">
 							<p class="ai-hint">분석이 "누가 무엇을 부르는지"를 얼마나 풀었는지 봅니다. 호출 관계 · 영향도 · 리비전 비교가 모두 이 결과를 따라갑니다.</p>
 							<div id="kn-connect"></div>
-							<div id="kn-unresolved-panel" class="kn-subpanel" style="display:none;">
-								<div class="kn-detail-head">
-									<h4>풀지 못한 참조 살펴보기 <span id="kn-unresolved-title" class="workflow-job-id"></span></h4>
-								</div>
-								<p class="ai-hint">분석률을 높이려면 어디부터 봐야 하는지 찾는 곳입니다. 먼저 <b>원인별</b> 표를 봅니다.
-									같은 기호(예: <code>Model</code>, <code>logger</code>, <code>HttpEntity</code>)가 많이 나오면 그 타입이 든 라이브러리(jar)가 빠진 것입니다.
-									프로젝트에 jar 위치를 적고 다시 분석하면 한꺼번에 풀립니다. 표의 줄을 누르면 그 조건으로 좁혀지고, 아래 목록에 파일 · 줄 번호가 나옵니다.</p>
-								<div class="kn-row">
-									<label for="kn-unresolved-status">상태</label>
-									<select id="kn-unresolved-status">
-										<option value="UNRESOLVED">UNRESOLVED (못 풂)</option>
-										<option value="HEURISTIC">HEURISTIC (이름으로 짐작해 이음)</option>
-										<option value="IGNORED">IGNORED (일부러 뺌)</option>
-									</select>
-									<label for="kn-unresolved-kind">참조의 종류</label>
-									<select id="kn-unresolved-kind">
-										<option value="CALL">CALL (메소드 호출)</option>
-										<option value="">모든 종류</option>
-										<option value="FIELD_ACCESS">FIELD_ACCESS (필드 읽기 / 쓰기)</option>
-										<option value="TYPE_USE">TYPE_USE (타입 사용)</option>
-										<option value="CREATE">CREATE (new)</option>
-										<option value="METHOD_REF">METHOD_REF (메소드 참조)</option>
-									</select>
-									<label for="kn-unresolved-path">파일 경로</label>
-									<input type="text" id="kn-unresolved-path" class="kn-wide" placeholder="경로에 들어간 글자 (예: integration/)" />
-									<button type="button" id="kn-unresolved-search-btn">조회</button>
-								</div>
-								<div id="kn-unresolved-filter" class="kn-unresolved-filter"></div>
-								<div id="kn-unresolved-message" class="kn-message"></div>
-								<div class="kn-unresolved-groups">
-									<div>
-										<div class="kn-section-title">원인별 (못 찾은 기호)</div>
-										<div id="kn-unresolved-by-cause" class="kn-scroll"></div>
+							<!-- "풀지 못한 참조 살펴보기". 화면이 "풀지 못한 참조의 이유" 표 바로 아래로 옮겨 붙인다(project.js) -->
+							<div id="kn-unresolved-home" style="display:none;">
+								<div id="kn-unresolved-panel" class="kn-subpanel">
+									<div class="kn-section-title kn-inline-title">살펴보기 <span id="kn-unresolved-count" class="workflow-status-label"></span></div>
+									<p class="ai-hint">위 표의 줄을 누르면 그 조건이 아래에 걸리고 바로 조회됩니다. 먼저 <b>원인별</b> 표를 봅니다.
+										같은 기호(예: <code>Model</code>, <code>logger</code>, <code>HttpEntity</code>)가 많이 나오면 그 타입이 든 라이브러리(jar)가 빠진 것입니다.
+										묶음 표의 줄을 누르면 조건이 더 좁혀지고, 맨 아래 목록에 파일 · 줄 번호가 나옵니다.</p>
+									<div class="kn-row">
+										<label for="kn-unresolved-kind">참조의 종류</label>
+										<select id="kn-unresolved-kind"></select>
+										<label for="kn-unresolved-status">상태</label>
+										<select id="kn-unresolved-status">
+											<option value="UNRESOLVED">UNRESOLVED (못 풂)</option>
+											<option value="HEURISTIC">HEURISTIC (이름으로 짐작해 이음)</option>
+											<option value="IGNORED">IGNORED (일부러 뺌)</option>
+										</select>
+										<label>이유</label>
+										<span id="kn-unresolved-reason" class="kn-reason-cond"></span>
+										<label for="kn-unresolved-path">파일 경로</label>
+										<input type="text" id="kn-unresolved-path" class="kn-wide" placeholder="경로에 들어간 글자 (예: integration/)" />
+										<button type="button" id="kn-unresolved-search-btn">조회</button>
 									</div>
-									<div>
-										<div class="kn-section-title">파일별</div>
-										<div id="kn-unresolved-by-file" class="kn-scroll"></div>
+									<div id="kn-unresolved-filter" class="kn-unresolved-filter"></div>
+									<div id="kn-unresolved-message" class="kn-message"></div>
+									<div id="kn-unresolved-result" style="display:none;">
+										<div class="kn-unresolved-groups">
+											<div>
+												<div class="kn-section-title">원인별 (못 찾은 기호)</div>
+												<div id="kn-unresolved-by-cause" class="kn-scroll"></div>
+											</div>
+											<div>
+												<div class="kn-section-title">파일별</div>
+												<div id="kn-unresolved-by-file" class="kn-scroll"></div>
+											</div>
+											<div>
+												<div class="kn-section-title">부르려던 이름별</div>
+												<div id="kn-unresolved-by-name" class="kn-scroll"></div>
+											</div>
+										</div>
+										<div class="kn-section-title">한 건씩</div>
+										<div id="kn-unresolved-list" class="kn-scroll"></div>
+										<div class="kn-row">
+											<button type="button" id="kn-unresolved-prev-btn" class="kn-plain">이전</button>
+											<span id="kn-unresolved-page" class="workflow-status-label"></span>
+											<button type="button" id="kn-unresolved-next-btn" class="kn-plain">다음</button>
+										</div>
 									</div>
-									<div>
-										<div class="kn-section-title">부르려던 이름별</div>
-										<div id="kn-unresolved-by-name" class="kn-scroll"></div>
-									</div>
-								</div>
-								<div class="kn-section-title">한 건씩 <span id="kn-unresolved-count" class="workflow-status-label"></span></div>
-								<div id="kn-unresolved-list" class="kn-scroll"></div>
-								<div class="kn-row">
-									<button type="button" id="kn-unresolved-prev-btn" class="kn-plain">이전</button>
-									<span id="kn-unresolved-page" class="workflow-status-label"></span>
-									<button type="button" id="kn-unresolved-next-btn" class="kn-plain">다음</button>
 								</div>
 							</div>
 						</div>
