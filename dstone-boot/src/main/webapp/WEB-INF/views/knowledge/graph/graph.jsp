@@ -38,10 +38,11 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<span class="kn-graph-mark" style="background:#fb923c;"></span>주황 테는 그 노드가 부르는 쪽입니다. 바탕을 누르면 풀립니다.
 						큰 프로젝트는 공통 클래스를 거쳐 거의 모든 노드가 이어지므로 "눌렀을 때 강조"를 "바로 옆만"으로 두고 시작하는 편이 보기 쉽습니다.</li>
 					<li><b>오른쪽 설명 읽기</b> — 누른 노드의 위치, 계층, 처리하는 주소, 메소드 · SQL 목록이 나옵니다. 제목 옆의 <b>"소스 보기"</b> · <b>"SQL 보기"</b>를 누르면 실제 코드가 팝업으로 뜹니다.
-						목록의 메소드나 SQL 이름을 누르면 그것의 관계 트리가 열립니다.</li>
-					<li><b>관계 트리</b> — 전체 맵은 클래스끼리의 관계입니다. "어느 메소드가 어느 메소드를 부르는지"는 오른쪽의 <b>"관계 트리 따로 보기"</b>를 눌러 팝업에서 봅니다.
-						가운데가 고른 것, 왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽입니다. 팝업 위쪽에서 양쪽 깊이를 바꾸고, "보일 계층" 칩으로 계층을 끄고 켭니다.
-						숨긴 계층을 건너 이어지는 길은 점선으로 그립니다.</li>
+						목록의 메소드나 SQL 이름을 누르면 관계 트리 창에 그것의 관계 트리가 열립니다.</li>
+					<li><b>관계 트리</b> — 전체 맵은 클래스끼리의 관계입니다. "어느 메소드가 어느 메소드를 부르는지"는 오른쪽의 <b>"관계 트리 따로 보기"</b>를 눌러 <b>새 창(관계 트리 창)</b>에서 봅니다.
+						가운데가 고른 것, 왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽입니다. 창 위쪽에서 양쪽 깊이를 바꾸고, "보일 계층" 칩으로 계층을 끄고 켭니다.
+						숨긴 계층을 건너 이어지는 길은 점선으로 그립니다. 창은 하나만 뜨고, 다른 노드를 열면 그 창의 내용이 바뀝니다.
+						영향도 화면의 "관계 트리 보기"와 프로젝트 · 분석의 미사용 탭도 같은 창을 씁니다. 창이 뜨지 않으면 브라우저에서 이 사이트의 팝업을 허용해 주세요.</li>
 					<li><b>전체 화면</b> — "전체 화면"을 누르면 노드 맵이 브라우저 화면 전체로 커집니다. 그리던 그림과 고른 노드는 그대로입니다.
 						"조건 숨기기"로 위의 조건표를 접으면 그림을 더 넓게 볼 수 있고, <b>Esc</b>나 "전체 화면 끝내기"로 돌아옵니다.</li>
 				</ol>
@@ -125,51 +126,13 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 	</div>
 
-	<%-- 관계 트리 팝업: 고른 노드에 이어진 길을 메소드 단위로 그린다 --%>
-	<div id="kn-tree-modal" class="kn-graph-modal" style="display:none;">
-		<div class="kn-graph-modal-box">
-			<div class="kn-row">
-				<b id="kn-tree-title" class="kn-graph-modal-title"></b>
-				<label for="kn-tree-up">부르는 쪽 깊이</label>
-				<input type="number" id="kn-tree-up" min="0" max="10" value="3" style="width:56px;" />
-				<label for="kn-tree-down">불리는 쪽 깊이</label>
-				<input type="number" id="kn-tree-down" min="0" max="10" value="3" style="width:56px;" />
-				<label><input type="checkbox" id="kn-tree-model" /> 모델(VO) 호출도</label>
-				<button type="button" id="kn-tree-reload">다시 그리기</button>
-				<button type="button" id="kn-tree-full" class="kn-plain">전체 화면</button>
-				<button type="button" id="kn-tree-close" class="kn-plain">닫기</button>
-			</div>
-			<%-- 계층 보이기 / 숨기기. 숨긴 계층을 건너 이어지는 길은 점선으로 잇는다 --%>
-			<div class="kn-row kn-tree-tiers">
-				<span class="kn-tree-tiers-label">보일 계층</span>
-				<span id="kn-tree-tiers"></span>
-			</div>
-			<div id="kn-tree-message" class="kn-message"></div>
-			<div class="kn-graph-body kn-graph-modal-body">
-				<div id="kn-tree-canvas" class="kn-graph-canvas"></div>
-				<div id="kn-tree-detail" class="kn-graph-detail"></div>
-			</div>
-		</div>
-	</div>
-
-	<%-- 소스 / SQL 팝업: 노드 상세의 [소스 보기] [SQL 보기] 버튼으로 연다. 관계 트리 팝업 위에도 뜬다 --%>
-	<div id="kn-code-modal" class="kn-graph-modal kn-code-modal" style="display:none;">
-		<div class="kn-code-box">
-			<div class="kn-row">
-				<b id="kn-code-title" class="kn-graph-modal-title"></b>
-				<button type="button" id="kn-code-raw" class="kn-plain" style="display:none;">원문 보기</button>
-				<button type="button" id="kn-code-copy" class="kn-plain">복사</button>
-				<button type="button" id="kn-code-close" class="kn-plain">닫기</button>
-			</div>
-			<div id="kn-code-where" class="ai-hint kn-mono kn-code-where"></div>
-			<pre id="kn-code-text" class="kn-gd-doc kn-code-text"></pre>
-		</div>
-	</div>
+	<jsp:include page="codeModal.jsp"></jsp:include>
 
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/cytoscape.min.js"></script>
 	<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/highlight-github.min.css" />
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/lib/highlight.min.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-common.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/graph-common.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/graph.js"></script>
 	<script>
 		DstoneKnowledge.init("<%=requestUtil.getStrContextPath()%>");

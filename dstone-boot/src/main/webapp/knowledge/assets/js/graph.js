@@ -3,51 +3,30 @@
  *
  *   1. 전체 맵     클래스 / 화면 / SQL 매퍼 / 테이블이 노드입니다. 많으면 패키지(폴더) 묶음으로 접어서 보여 줍니다.
  *   2. 강조        노드를 누르면 거기에 이어진 노드와 선만 남기고 나머지는 흐리게 합니다.
- *   3. 관계 트리   "따로 보기"를 누르면 그 노드에 이어진 길을 메소드 단위로 팝업에 그립니다.
+ *   3. 관계 트리   "따로 보기"를 누르면 그 노드에 이어진 길을 메소드 단위로 따로 띄운 창(관계 트리 창, tree.js)에 그립니다.
  *   4. 상세        누른 노드의 설명을 오른쪽에 보여 줍니다.
  *
  * 그림은 Cytoscape.js(knowledge/assets/lib/cytoscape.min.js)로 그립니다.
+ * 계층 색, 그림 모양, 오른쪽 상세 칸, 소스 팝업은 관계 트리 창과 같이 쓰므로 graph-common.js 에 있습니다.
  */
 var DstoneKnowledgeGraph = (function () {
 
 	var K = DstoneKnowledge;
+	var G = DstoneKnowledgeGraphCommon;
 	var el = {};
 
-	/** 계층. 이 순서대로 왼쪽에서 오른쪽으로 놓습니다(호출이 흐르는 방향) */
-	var TIERS = [
-		{ key: "VIEW", label: "화면", color: "#0284c7", fill: "#e0f2fe" },
-		{ key: "CONTROLLER", label: "컨트롤러", color: "#2563eb", fill: "#dbeafe" },
-		{ key: "SERVICE", label: "서비스", color: "#7c3aed", fill: "#ede9fe" },
-		{ key: "REPOSITORY", label: "DAO", color: "#d97706", fill: "#fef3c7" },
-		{ key: "MAPPER", label: "SQL 매퍼", color: "#db2777", fill: "#fce7f3" },
-		{ key: "TABLE", label: "테이블", color: "#059669", fill: "#d1fae5" },
-		{ key: "ETC", label: "그 밖", color: "#4b5563", fill: "#f3f4f6" },
-		{ key: "MODEL", label: "모델(VO)", color: "#9ca3af", fill: "#fafafa" }
-	];
-	var TIER_BY_KEY = {};
-	TIERS.forEach(function (tier, index) {
-		tier.index = index;
-		TIER_BY_KEY[tier.key] = tier;
-	});
-	/** 관계 트리에만 있는 계층: 트리에 나온 화면을 부르거나 그 화면이 부르는(끼워 넣거나 띄우는) 다른 화면 */
-	TIER_BY_KEY.SCREEN_LINK = { key: "SCREEN_LINK", label: "화면호출관계", color: "#0e7490", fill: "#cffafe", index: -1 };
+	var TIERS = G.TIERS;
+	var TIER_BY_KEY = G.TIER_BY_KEY;
+	var EDGE_CATS = G.EDGE_CATS;
+	var CAT_OF_RELATION = G.CAT_OF_RELATION;
+	var tierOf = G.tierOf;
+	var labelWidth = G.labelWidth;
+	var styles = G.styles;
+	var highlight = G.highlight;
+	var clearDetail = G.clearDetail;
+	var head = G.head;
+	var detailBody = G.detailBody;
 
-	/** 선의 종류. 서버가 주는 관계 이름을 그림에서 쓰는 몇 가지로 모읍니다 */
-	var EDGE_CATS = {
-		CALL: { label: "호출", color: "#9ca3af" },
-		SQL: { label: "SQL 실행", color: "#db2777" },
-		READ: { label: "테이블 읽기", color: "#059669" },
-		WRITE: { label: "테이블 쓰기", color: "#dc2626" },
-		RENDER: { label: "화면 열기", color: "#0284c7" },
-		REQUEST: { label: "화면의 요청", color: "#0ea5e9" },
-		STRUCT: { label: "상속 · 구현 · 주입", color: "#7c3aed" }
-	};
-	var CAT_OF_RELATION = {
-		CALLS: "CALL", CALLS_POSSIBLE_IMPLEMENTATION: "CALL", ENCLOSES_ANONYMOUS: "CALL", EXECUTES_SQL: "SQL", READS_TABLE: "READ", WRITES_TABLE: "WRITE",
-		RENDERS: "RENDER", REQUESTS: "REQUEST", EXTENDS: "STRUCT", IMPLEMENTS: "STRUCT", INJECTS: "STRUCT", INCLUDES: "STRUCT"
-	};
-
-	var KIND_LABEL = { TYPE: "클래스", METHOD: "메소드", FIELD: "필드", JSP: "화면", MAPPER: "SQL 매퍼", SQL: "SQL", TABLE: "테이블", GROUP: "묶음" };
 	var CONF_RANK = { HIGH: 3, MEDIUM: 2, LOW: 1 };
 
 	/** 노드가 이보다 많으면 처음에 묶음으로 접어서 보여 줍니다 */
@@ -64,20 +43,13 @@ var DstoneKnowledgeGraph = (function () {
 	/** 전체 맵의 상태 */
 	var map = { revisionId: null, graph: null, expanded: {}, view: null, cy: null, selectedId: null, hits: [], hitIndex: 0, loadSeq: 0 };
 
-	/** 관계 트리 팝업의 상태. hidden 은 끈 계층(팝업을 다시 열어도 유지한다). 화면호출관계는 처음에 꺼 둔다 */
-	var tree = { cy: null, startId: null, nodes: {}, result: null, hidden: { SCREEN_LINK: true } };
-
-	/** 관계 트리에서 끄고 켤 수 있는 계층. 모델(VO)은 "모델(VO) 호출도"로 서버에서 가려 받는다 */
-	var TREE_TIERS = ["SCREEN_LINK", "VIEW", "CONTROLLER", "SERVICE", "REPOSITORY", "MAPPER", "TABLE", "ETC"];
-
 	function init() {
 		["kn-graph-project", "kn-graph-revision", "kn-graph-load", "kn-graph-unit", "kn-graph-layout", "kn-graph-range", "kn-graph-low", "kn-graph-struct",
 			"kn-graph-tiers", "kn-graph-edges", "kn-graph-find", "kn-graph-find-btn", "kn-graph-fit", "kn-graph-message", "kn-graph-canvas", "kn-graph-detail",
-			"kn-tree-modal", "kn-tree-title", "kn-tree-up", "kn-tree-down", "kn-tree-model", "kn-tree-reload", "kn-tree-full", "kn-tree-close", "kn-tree-message", "kn-tree-tiers",
-			"kn-tree-canvas", "kn-tree-detail", "kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle",
-			"kn-code-modal", "kn-code-title", "kn-code-where", "kn-code-text", "kn-code-raw", "kn-code-copy", "kn-code-close"].forEach(function (id) {
+			"kn-graph-workspace", "kn-graph-full", "kn-graph-cond-toggle"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
+		G.initCodePopup();
 
 		renderLegend();
 		el["kn-graph-project"].addEventListener("change", function () {
@@ -112,43 +84,13 @@ var DstoneKnowledgeGraph = (function () {
 			}
 		});
 
-		el["kn-tree-close"].addEventListener("click", closeTree);
-		el["kn-tree-full"].addEventListener("click", function () {
-			setTreeFullscreen(!isTreeFullscreen());
-		});
-		el["kn-tree-reload"].addEventListener("click", function () {
-			loadTree(tree.startId);
-		});
-		el["kn-code-close"].addEventListener("click", closeCode);
-		el["kn-code-copy"].addEventListener("click", copyCode);
-		el["kn-code-raw"].addEventListener("click", toggleRawCode);
-		el["kn-code-modal"].addEventListener("click", function (event) {
-			if (event.target === el["kn-code-modal"]) {
-				closeCode();
-			}
-		});
-		el["kn-tree-modal"].addEventListener("click", function (event) {
-			// 팝업 바깥(어두운 바탕)을 누르면 닫는다.
-			if (event.target === el["kn-tree-modal"]) {
-				closeTree();
-			}
-		});
 		document.addEventListener("keydown", function (event) {
 			if (event.key !== "Escape") {
 				return;
 			}
-			// 팝업이 열려 있으면 맨 위 팝업만 닫는다. 전체 화면은 그다음 Esc 에서 끝낸다.
-			if (el["kn-code-modal"].style.display !== "none") {
-				closeCode();
-				return;
-			}
-			if (el["kn-tree-modal"].style.display !== "none") {
-				// 트리 팝업이 전체 화면이면 먼저 원래 크기로 돌리고, 한 번 더 누르면 닫는다.
-				if (isTreeFullscreen()) {
-					setTreeFullscreen(false);
-				} else {
-					closeTree();
-				}
+			// 소스 팝업이 열려 있으면 그것만 닫는다. 전체 화면은 그다음 Esc 에서 끝낸다.
+			if (G.isCodeOpen()) {
+				G.closeCode();
 				return;
 			}
 			var tag = (event.target && event.target.tagName) || "";
@@ -157,9 +99,9 @@ var DstoneKnowledgeGraph = (function () {
 			}
 		});
 
-		// 다른 화면(영향도)에서 "노드 맵에서 보기"로 오면 주소에 #p=프로젝트&r=리비전&tree=노드ID 가 붙어 온다.
-		// 그 프로젝트 · 리비전을 고르고, 맵을 그린 뒤 그 노드의 관계 트리를 바로 연다.
-		var wanted = readHash();
+		// 다른 화면(첫 화면 대시보드)에서 오면 주소에 #p=프로젝트&r=리비전 이 붙어 온다. 그 프로젝트 · 리비전을 고르고 맵을 그린다.
+		// 관계 트리는 이 화면을 거치지 않고 관계 트리 창(knowledge/graph/tree)을 바로 연다.
+		var wanted = K.readHash();
 		K.loadProjects(el["kn-graph-project"]).then(function () {
 			selectOption(el["kn-graph-project"], wanted.p);
 			return loadRevisions();
@@ -167,28 +109,13 @@ var DstoneKnowledgeGraph = (function () {
 			selectOption(el["kn-graph-revision"], wanted.r);
 			return loadGraph();
 		}).then(function () {
-			if (wanted.tree && map.revisionId) {
-				openTree(wanted.tree);
-			}
-			// 한 번 열고 나면 주소를 비운다. 새로 고침할 때마다 팝업이 다시 뜨지 않게
+			// 한 번 쓰고 나면 주소를 비운다
 			if (location.hash) {
 				history.replaceState(null, "", location.pathname + location.search);
 			}
 		}).catch(function (err) {
 			K.message(el["kn-graph-message"], err.message, true);
 		});
-	}
-
-	/** 주소의 #p=..&r=..&tree=.. 를 읽는다 */
-	function readHash() {
-		var state = {};
-		location.hash.replace(/^#/, "").split("&").forEach(function (pair) {
-			var at = pair.indexOf("=");
-			if (at > 0) {
-				state[pair.substring(0, at)] = decodeURIComponent(pair.substring(at + 1));
-			}
-		});
-		return state;
 	}
 
 	/** 고르는 칸에 그 값이 있으면 고른다 */
@@ -308,12 +235,6 @@ var DstoneKnowledgeGraph = (function () {
 		});
 	}
 
-	function tierOf(layer) {
-		if (layer === "WEB_FILTER") {
-			return "CONTROLLER";
-		}
-		return TIER_BY_KEY[layer] ? layer : "ETC";
-	}
 
 	/* ======================= 전체 맵: 그릴 것 고르기 ======================= */
 
@@ -504,14 +425,6 @@ var DstoneKnowledgeGraph = (function () {
 		};
 	}
 
-	/** 글자 수로 노드의 폭을 어림합니다. 한글은 영문보다 넓습니다 */
-	function labelWidth(label) {
-		var width = 18;
-		for (var i = 0; i < label.length; i++) {
-			width += label.charCodeAt(i) > 255 ? 12 : 6.6;
-		}
-		return Math.max(46, Math.min(Math.round(width), 190));
-	}
 
 	/**
 	 * 계층별 배치: 계층마다 세로 줄(여러 열)을 하나씩 주고 왼쪽에서 오른쪽으로 놓습니다.
@@ -616,36 +529,6 @@ var DstoneKnowledgeGraph = (function () {
 		return best;
 	}
 
-	function styles() {
-		return [
-			{ selector: "node", style: {
-				"label": "data(label)", "font-size": 11, "color": "#111827", "text-valign": "center", "text-halign": "center",
-				"text-wrap": "ellipsis", "text-max-width": "data(tw)", "min-zoomed-font-size": 5,
-				"shape": "round-rectangle", "width": "data(w)", "height": 22,
-				"background-color": "data(fill)", "border-color": "data(color)", "border-width": 1.5
-			} },
-			{ selector: "node.kind-JSP", style: { "shape": "round-tag" } },
-			{ selector: "node.kind-MAPPER, node.kind-SQL", style: { "shape": "barrel" } },
-			{ selector: "node.kind-TABLE", style: { "shape": "cut-rectangle" } },
-			{ selector: "node.group", style: { "border-width": 4, "border-style": "double", "font-weight": "bold", "height": 26 } },
-			{ selector: "node.tier", style: {
-				"background-opacity": 0, "border-width": 0, "font-size": 20, "font-weight": "bold", "color": "#6b7280", "width": 10, "height": 10,
-				"text-wrap": "none", "min-zoomed-font-size": 0, "events": "no"
-			} },
-			{ selector: "edge", style: {
-				"width": "data(w)", "line-color": "data(color)", "target-arrow-color": "data(color)", "target-arrow-shape": "triangle", "arrow-scale": 0.8,
-				"curve-style": "bezier", "opacity": 0.55
-			} },
-			{ selector: "edge.low", style: { "line-style": "dashed" } },
-			{ selector: "edge.struct", style: { "line-style": "dotted" } },
-			// 노드를 골랐을 때: 이어진 것만 또렷하게, 나머지는 흐리게
-			{ selector: ".faded", style: { "opacity": 0.08, "text-opacity": 0.3 } },
-			{ selector: "edge.hl", style: { "opacity": 1 } },
-			{ selector: "node.up", style: { "underlay-color": "#60a5fa", "underlay-opacity": 0.45, "underlay-padding": 5 } },
-			{ selector: "node.down", style: { "underlay-color": "#fb923c", "underlay-opacity": 0.45, "underlay-padding": 5 } },
-			{ selector: "node.sel", style: { "underlay-color": "#facc15", "underlay-opacity": 0.9, "underlay-padding": 7, "border-width": 3, "border-color": "#111827" } }
-		];
-	}
 
 	/* ======================= 전체 맵: 고르기 / 강조 ======================= */
 
@@ -665,41 +548,6 @@ var DstoneKnowledgeGraph = (function () {
 		}
 	}
 
-	/**
-	 * @param range ALL(끝까지) 또는 따라갈 걸음 수("1", "2")
-	 * @return {up, down} 강조한 노드들
-	 */
-	function highlight(cy, node, range) {
-		var up;
-		var down;
-		if (range === "ALL") {
-			up = node.predecessors();
-			down = node.successors();
-		} else {
-			up = cy.collection();
-			down = cy.collection();
-			var upFront = node;
-			var downFront = node;
-			for (var i = 0; i < parseInt(range, 10); i++) {
-				upFront = upFront.incomers();
-				downFront = downFront.outgoers();
-				up = up.union(upFront);
-				down = down.union(downFront);
-				upFront = upFront.nodes();
-				downFront = downFront.nodes();
-			}
-		}
-		cy.batch(function () {
-			cy.elements().removeClass("faded up down sel hl");
-			cy.elements().not(up).not(down).not(node).not(".tier").addClass("faded");
-			up.nodes().not(node).addClass("up");
-			down.nodes().not(node).addClass("down");
-			up.edges().addClass("hl");
-			down.edges().addClass("hl");
-			node.addClass("sel");
-		});
-		return { up: up.nodes().not(node), down: down.nodes().not(node) };
-	}
 
 	function clearSelection() {
 		map.selectedId = null;
@@ -808,14 +656,15 @@ var DstoneKnowledgeGraph = (function () {
 	/** 찾은 것 가운데 hitIndex 번째로 갑니다. 메소드면 그 클래스로 간 뒤 메소드의 관계 트리를 엽니다 */
 	function showHit(word) {
 		var hit = map.hits[map.hitIndex];
+		K.message(el["kn-graph-message"], "\"" + word + "\" " + map.hits.length + "건 가운데 " + (map.hitIndex + 1) + "번째: " + hit.fullName
+			+ (map.hits.length > 1 ? " (찾기를 다시 누르면 다음 것)" : ""));
 		if (hit.method) {
 			goTo(hit.node);
+			// 팝업이 막히면 openTree 가 알림 줄을 "창 열기" 링크로 바꾼다. 그래서 알림을 먼저 쓴다.
 			openTree(hit.method.methodId);
 		} else {
 			goTo(hit);
 		}
-		K.message(el["kn-graph-message"], "\"" + word + "\" " + map.hits.length + "건 가운데 " + (map.hitIndex + 1) + "번째: " + hit.fullName
-			+ (map.hits.length > 1 ? " (찾기를 다시 누르면 다음 것)" : ""));
 	}
 
 	/** 서버가 준 노드(클래스 / 화면 / 매퍼 / 테이블) 하나로 갑니다. 꺼 둔 계층이면 켜고, 접힌 묶음이면 펼칩니다 */
@@ -837,10 +686,6 @@ var DstoneKnowledgeGraph = (function () {
 
 	/* ======================= 상세 ======================= */
 
-	function clearDetail(container, text) {
-		container.removeAttribute("data-node");
-		container.innerHTML = "<p class=\"ai-hint\">" + K.escapeHtml(text) + "</p>";
-	}
 
 	/** 전체 맵에서 고른 노드의 설명. 묶음이면 든 것의 목록을, 아니면 서버에서 상세를 가져와 보여 줍니다 */
 	function showMapDetail(node, linked) {
@@ -869,8 +714,8 @@ var DstoneKnowledgeGraph = (function () {
 					? "<button type=\"button\" class=\"kn-btn kn-plain\" data-act=\"collapse\">이 묶음 접기</button>" : "") + "</div>";
 			container.innerHTML = head(detail.kind, detail.name, node.tier) + actions + detailBody(detail) + linkedHtml;
 			bindMapDetail(container, node);
-			bindTreeLinks(container);
-			bindCodeButton(container, detail);
+			G.bindTreeLinks(container, openTree);
+			G.bindCodeButton(container, detail);
 		}).catch(function (err) {
 			container.innerHTML = head(node.kind, node.name, node.tier) + "<p class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</p>";
 		});
@@ -905,13 +750,19 @@ var DstoneKnowledgeGraph = (function () {
 		});
 	}
 
-	/** 상세 안의 "트리" 링크(메소드, SQL statement)를 누르면 그것의 관계 트리를 엽니다 */
-	function bindTreeLinks(container) {
-		Array.prototype.forEach.call(container.querySelectorAll("[data-tree]"), function (link) {
-			link.addEventListener("click", function () {
-				openTree(link.getAttribute("data-tree"));
-			});
-		});
+	/**
+	 * <pre>
+	 * 그 노드의 관계 트리를 관계 트리 창에 엽니다. 창은 하나를 같이 쓰므로 이미 떠 있으면 그 창의 내용만 바뀝니다.
+	 * 브라우저가 팝업을 막으면 맵 위의 알림 줄에 창을 여는 링크를 대신 보여 줍니다.
+	 * </pre>
+	 */
+	function openTree(nodeId) {
+		var url = K.treeUrl(el["kn-graph-project"].value, map.revisionId, nodeId);
+		if (!K.openTreeWindow(url)) {
+			K.message(el["kn-graph-message"], "");
+			el["kn-graph-message"].innerHTML = "<span class=\"kn-error\">브라우저가 팝업을 막았습니다. 이 사이트의 팝업을 허용하거나 </span>"
+				+ "<a href=\"" + K.escapeHtml(url) + "\" target=\"" + K.TREE_WINDOW + "\">여기를 눌러 관계 트리 창을 여세요</a>";
+		}
 	}
 
 	function linkedList(title, nodes) {
@@ -931,593 +782,9 @@ var DstoneKnowledgeGraph = (function () {
 		}).join("") + (items.length > limit ? "<span class=\"ai-hint\">… 그 밖에 " + (items.length - limit) + "개</span>" : "") + "</div>";
 	}
 
-	function head(kind, name, tier) {
-		var color = (TIER_BY_KEY[tier] || TIER_BY_KEY.ETC).color;
-		return "<div class=\"kn-gd-head\"><span class=\"kn-gd-kind\" style=\"background:" + color + ";\">" + K.escapeHtml(KIND_LABEL[kind] || kind) + "</span>"
-			+ "<b>" + K.escapeHtml(name) + "</b></div>";
-	}
 
-	/** 한글명이 어디서 왔는지: DB 코멘트 → DDL 의 COMMENT → DDL 의 주석 → SQL 주석 → 소스 → 사전 파일 순서로 먼저 있는 것을 쓴다 */
-	var NAME_SOURCE = { DB: "DB", DDL: "DDL", DDL_NOTE: "DDL 주석", SQL: "SQL 주석", SOURCE: "소스", DICT: "사전" };
-	var NAME_SOURCE_HINT = {
-		DB: "대상 DB의 코멘트",
-		DDL: "DDL 파일(.sql)의 COMMENT",
-		DDL_NOTE: "DDL 파일(.sql)의 일반 주석",
-		SQL: "매퍼 SQL의 주석",
-		SOURCE: "Java 소스(엔티티, 또는 이름이 같은 VO 필드의 설명). 이름만 같은 필드에서 가져온 것은 다른 테이블의 뜻일 수 있습니다",
-		DICT: "프로젝트 설정에 등록한 사전 파일(CSV). 사람이 짐작해 붙인 이름이 섞여 있을 수 있습니다"
-	};
 
-	/** 출처 표시. 마우스를 올리면 어디서 가져왔는지(파일:줄, 필드, SQL 건수)가 나온다 */
-	function nameSource(source, where) {
-		if (!source) {
-			return "";
-		}
-		var title = (NAME_SOURCE_HINT[source] || source) + (where ? " · " + where : "");
-		return " <span class=\"kn-gd-tag" + (source === "SOURCE" ? " kn-gd-tag-guess" : "") + "\" title=\"" + K.escapeHtml(title) + "\">"
-			+ K.escapeHtml(NAME_SOURCE[source] || source) + "</span>";
-	}
 
-	/** 화면명을 어디서 찾았는지: JSP·WebSquare 는 &lt;title&gt;, Nexacro 는 Form 의 titletext, 둘 다 없으면 메뉴 목록. 한글이 아니면 화면 사전 */
-	var SCREEN_NAME_SOURCE = { TITLE: "title", TITLETEXT: "titletext", MENU: "메뉴", DICT: "사전" };
-	var SCREEN_NAME_HINT = {
-		TITLE: "화면 파일의 <title>",
-		TITLETEXT: "화면 파일의 titletext",
-		MENU: "소스에 적힌 메뉴 목록의 메뉴 이름(화면 파일에 제목이 없어서 가져온 것)",
-		DICT: "프로젝트 설정에 등록한 화면 사전 파일(CSV)의 한글명. 화면 제목이나 메뉴 이름에 한글이 없어서 가져온 것"
-	};
-
-	/** 출처 표시. 마우스를 올리면 찾은 파일과 줄이 나온다 */
-	function screenNameSource(via, where) {
-		if (!via) {
-			return "";
-		}
-		var title = (SCREEN_NAME_HINT[via] || via) + (where ? " · " + where : "");
-		return " <span class=\"kn-gd-tag\" title=\"" + K.escapeHtml(title) + "\">" + K.escapeHtml(SCREEN_NAME_SOURCE[via] || via) + "</span>";
-	}
-
-	/** 테이블의 컬럼: 컬럼명, 컬럼 한글명, 타입, SQL에서 쓰인 정도 */
-	function tableColumns(columns, coverage) {
-		if (!coverage) {
-			// 컬럼을 주지 않는 예전 dstone-knowledge 다.
-			return "<div class=\"kn-section-title\">컬럼</div><p class=\"ai-hint\">dstone-knowledge 가 컬럼을 주지 않는 예전 버전입니다. 새로 빌드해서 다시 띄워 주세요.</p>";
-		}
-		var unread = Number(coverage.unread || 0);
-		var statements = Number(coverage.statements || 0);
-		var html = "<div class=\"kn-section-title\">컬럼 · " + columns.length + "개</div>";
-		if (columns.length > 0) {
-			html += "<table class=\"kn-gd-columns\"><thead><tr><th>컬럼명</th><th>컬럼한글명</th><th>타입</th><th>SQL</th></tr></thead><tbody>"
-				+ columns.map(function (column) {
-					var used = Number(column.statementCount || 0);
-					return "<tr><td class=\"kn-mono\">" + K.escapeHtml(column.column) + "</td>"
-						+ "<td>" + (column.koreanName ? K.escapeHtml(column.koreanName) + nameSource(column.koreanNameSource, column.koreanNameWhere) : "<span class=\"ai-hint\">-</span>") + "</td>"
-						+ "<td class=\"kn-mono\">" + K.escapeHtml(column.dataType || "") + "</td>"
-						+ "<td class=\"ai-hint\">" + (used > 0 ? used + "건" + (column.crud ? " · " + K.escapeHtml(column.crud.split("").join("·")) : "") : "안 씀") + "</td></tr>";
-				}).join("") + "</tbody></table>";
-		}
-		html += dictionaryNote();
-		if (statements > 0 && unread === statements) {
-			html += "<p class=\"ai-hint\">SQL에서 쓰인 컬럼 정보가 없습니다. SQL을 파서로 읽지 못했거나, 컬럼을 모으기 전에 분석한 리비전입니다. "
-				+ "뒤의 경우라면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.</p>";
-		} else if (unread > 0) {
-			html += "<p class=\"ai-hint\">SQL " + unread + "건은 파서로 읽지 못해 컬럼을 뽑지 못했습니다. 목록에 빠진 컬럼이 있을 수 있습니다.</p>";
-		} else if (columns.length === 0) {
-			html += "<p class=\"ai-hint\">SQL에 이름이 적힌 컬럼이 없습니다(SELECT * 등).</p>";
-		}
-		return html;
-	}
-
-	/** 한글명을 찾는 순서 */
-	function dictionaryNote() {
-		return "<p class=\"ai-hint\">한글명은 DB 코멘트 → DDL COMMENT → DDL 주석 → SQL 주석 → 소스 → 사전 파일 순서로 찾습니다.</p>";
-	}
-
-	/** 서버가 준 노드 상세(GET .../graph/node)를 그립니다. 종류마다 들어 있는 항목이 달라서, 있는 것만 그립니다 */
-	function detailBody(detail) {
-		var html = "<div class=\"kn-mono kn-gd-full\">" + K.escapeHtml(detail.fullName) + "</div>";
-		var facts = [];
-		if (detail.kind === "TABLE") {
-			facts.push(["테이블명", detail.koreanName ? K.escapeHtml(detail.koreanName) + nameSource(detail.koreanNameSource, detail.koreanNameWhere) : "<span class=\"ai-hint\">한글명 없음</span>"]);
-			facts.push(["물리명", "<span class=\"kn-mono\">" + K.escapeHtml(detail.name) + "</span>"]);
-		}
-		if (detail.kind === "JSP") {
-			facts.push(["화면명", detail.screenName ? K.escapeHtml(detail.screenName) + screenNameSource(detail.screenNameVia, detail.screenNameWhere)
-				: "<span class=\"ai-hint\" title=\"화면 파일에 &lt;title&gt; 이나 titletext 가 없고, 메뉴 목록(menu-rules)과 화면 사전(screen-file)에서도 찾지 못했습니다. 이 기능보다 먼저 분석한 리비전이면 SEMANTIC 부터 다시 분석하면(rerunFrom: SEMANTIC) 나옵니다.\">화면명 없음</span>"]);
-			if (detail.screenNameOriginal) {
-				// 사전의 한글명을 썼을 때, 화면 제목이나 메뉴에 적힌 원래 이름(일본어 등)
-				facts.push(["원어명", K.escapeHtml(detail.screenNameOriginal)]);
-			}
-		}
-		if (detail.layer) {
-			facts.push(["계층", K.escapeHtml(detail.layer) + (detail.layerConfidence ? " (" + K.confidence(detail.layerConfidence) + ")" : "")]);
-		}
-		if (detail.subType && detail.subType !== detail.kind) {
-			facts.push(["종류", K.escapeHtml(detail.subType)]);
-		}
-		if (detail.returnType) {
-			facts.push(["반환", "<span class=\"kn-mono\">" + K.escapeHtml(detail.returnType) + "</span>"]);
-		}
-		if (detail.path) {
-			facts.push(["파일", "<span class=\"kn-mono\">" + K.escapeHtml(detail.path) + (detail.lineStart ? " (줄 " + detail.lineStart
-				+ (detail.lineEnd ? "-" + detail.lineEnd : "") + ")" : "") + "</span>"]);
-		}
-		if (detail.lineCount) {
-			facts.push(["줄 수", K.escapeHtml(detail.lineCount)]);
-		}
-		if (detail.tables) {
-			facts.push(["테이블", "<span class=\"kn-mono\">" + K.escapeHtml(detail.tables) + "</span>"]);
-		}
-		if (facts.length > 0) {
-			html += "<table class=\"kn-gd-facts\">" + facts.map(function (fact) {
-				return "<tr><th>" + fact[0] + "</th><td>" + fact[1] + "</td></tr>";
-			}).join("") + "</table>";
-		}
-		if (detail.kind === "TABLE") {
-			html += tableColumns(detail.columns || [], detail.columnCoverage);
-		}
-
-		if (detail.endpoints && detail.endpoints.length > 0) {
-			html += "<div class=\"kn-section-title\">처리하는 진입점 · " + detail.endpoints.length + "개</div><div class=\"kn-gd-rows\">" + detail.endpoints.map(function (endpoint) {
-				return "<div><span class=\"kn-gd-tag\">" + K.escapeHtml(endpoint.httpMethod || endpoint.endpointType) + "</span> <span class=\"kn-mono\">"
-					+ K.escapeHtml(endpoint.path || "") + "</span>" + (endpoint.signature ? " <span class=\"ai-hint\">→ " + K.escapeHtml(endpoint.signature) + "</span>" : "") + "</div>";
-			}).join("") + "</div>";
-		}
-		if (detail.methods && detail.methods.length > 0) {
-			// 소스에 없는 메소드(자동으로 생기는 생성자, Lombok 이 만드는 것)는 뒤로 보낸다.
-			var methods = detail.methods.slice().sort(function (a, b) {
-				return (a.isSynthetic ? 1 : 0) - (b.isSynthetic ? 1 : 0);
-			});
-			// 기능명(title)은 메소드 위 주석의 첫 줄이나 @Description 값이다. 분석할 때(SEMANTIC) 저장해 둔 것을 서버가 준다.
-			var titled = methods.filter(function (method) {
-				return method.title;
-			}).length;
-			html += "<div class=\"kn-section-title\">메소드 · " + methods.length + "개"
-				+ (titled > 0 ? " · 기능명 " + titled + "개" : "") + " <span class=\"ai-hint\">(누르면 그 메소드의 관계 트리)</span></div>"
-				+ (detail.methodTitleNote ? "<p class=\"ai-hint\">" + K.escapeHtml(detail.methodTitleNote) + "</p>" : "")
-				+ "<div class=\"kn-gd-rows\">"
-				+ methods.slice(0, 200).map(function (method) {
-					return "<div><a href=\"javascript:void(0)\" class=\"kn-mono\" data-tree=\"" + K.escapeHtml(method.methodId) + "\">" + K.escapeHtml(method.signature) + "</a>"
-						+ (method.title ? " <span class=\"kn-gd-method-title\">" + K.escapeHtml(method.title) + "</span>" : "")
-						+ (method.isSynthetic ? " <span class=\"ai-hint\">자동 생성</span>" : "") + "</div>";
-				}).join("") + (methods.length > 200 ? "<div class=\"ai-hint\">… 그 밖에 " + (methods.length - 200) + "개</div>" : "") + "</div>";
-		}
-		if (detail.statements && detail.statements.length > 0) {
-			html += "<div class=\"kn-section-title\">SQL statement · " + detail.statements.length + "개 <span class=\"ai-hint\">(누르면 그 SQL 의 관계 트리)</span></div>"
-				+ "<div class=\"kn-gd-rows\">" + detail.statements.map(function (statement) {
-					return "<div><span class=\"kn-gd-tag\">" + K.escapeHtml(statement.statementType) + "</span> <a href=\"javascript:void(0)\" class=\"kn-mono\" data-tree=\""
-						+ K.escapeHtml(statement.id) + "\">" + K.escapeHtml(statement.statement) + "</a>"
-						+ (statement.tables ? "<div class=\"ai-hint kn-mono\">" + K.escapeHtml(statement.tables) + "</div>" : "") + "</div>";
-				}).join("") + "</div>";
-		}
-		if (detail.usage && detail.usage.length > 0) {
-			html += "<div class=\"kn-section-title\">이 테이블을 건드리는 SQL · " + detail.usage.length + "건</div><div class=\"kn-gd-rows\">" + detail.usage.map(function (use) {
-				return "<div><span class=\"kn-gd-tag\">" + K.escapeHtml(use.crud || "?") + "</span> <span class=\"kn-mono\">" + K.escapeHtml(use.statement) + "</span> "
-					+ K.confidence(use.confidence) + (use.method ? "<div class=\"ai-hint kn-mono\">← " + K.escapeHtml(use.method) + "</div>" : "") + "</div>";
-			}).join("") + "</div>";
-		}
-		if (detail.document || detail.code) {
-			html += "<div class=\"kn-section-title\">설명 <span class=\"ai-hint\">(분석이 만들어 둔 문서. 검색에 쓰는 것과 같습니다)</span>" + codeButton(detail) + "</div>"
-				+ (detail.document ? "<pre class=\"kn-gd-doc\">" + K.escapeHtml(detail.document) + "</pre>" : "");
-		} else if (detail.kind === "METHOD") {
-			html += "<p class=\"ai-hint\">설명 문서가 없습니다. 단순한 getter / setter 는 문서를 만들지 않습니다.</p>";
-		}
-		return html;
-	}
-
-	/* ======================= 소스 / SQL 팝업 ======================= */
-
-	var CODE_LABEL = { SOURCE: "소스", SQL: "SQL" };
-
-	/** 팝업에 띄운 본문. SQL 이면 들여쓰기를 넣은 것(formatted)과 원문(text)을 바꿔 볼 수 있다 */
-	var codeView = { code: null, raw: false, language: null };
-
-	/** 이보다 긴 글은 색을 입히지 않고 그대로 보여 준다(브라우저가 오래 멈추지 않게) */
-	var HIGHLIGHT_MAX_CHARS = 300000;
-
-	/** 파일 확장자 → highlight.js 언어 이름 */
-	var HIGHLIGHT_LANGUAGE_BY_EXT = { java: "java", jsp: "xml", xml: "xml", xfdl: "xml", xadl: "xml", html: "xml", htm: "xml", js: "javascript", sql: "sql" };
-
-	/**
-	 * 소스 팝업에서 색을 입힐 언어. SQL 이면 sql, 소스면 파일 확장자로 고른다. 모르면 null(색 없이 보여 준다).
-	 */
-	function highlightLanguage(detail) {
-		if (detail.code.kind === "SQL") {
-			return "sql";
-		}
-		var path = String(detail.path || "");
-		var ext = path.lastIndexOf(".") >= 0 ? path.substring(path.lastIndexOf(".") + 1).toLowerCase() : "";
-		return HIGHLIGHT_LANGUAGE_BY_EXT[ext] || null;
-	}
-
-	/** 화면 노드의 [소스 보기] 버튼에 마우스를 올리면 나오는 안내 */
-	var SCREEN_CODE_DISABLED = "화면 문서는 검색용으로 앞부분만 담아 두어서 전체 소스를 보여 줄 수 없습니다";
-
-	/**
-	 * 설명 제목 옆에 붙는 [소스 보기] / [SQL 보기] 버튼. 소스나 SQL 이 없으면 빈 글자.
-	 * 화면(JSP·WebSquare·Nexacro)은 버튼을 꺼 둔다. 문서에 앞부분만 들어 있어서, 띄우면 전체 소스로 오해하기 쉽다.
-	 */
-	function codeButton(detail) {
-		var code = detail.code;
-		if (!code || !code.text) {
-			return "";
-		}
-		var label = K.escapeHtml(CODE_LABEL[code.kind] || "소스") + " 보기";
-		if (detail.kind === "JSP") {
-			return "<button type=\"button\" class=\"kn-plain kn-gd-code-btn\" disabled title=\"" + K.escapeHtml(SCREEN_CODE_DISABLED) + "\">" + label + "</button>";
-		}
-		var lines = code.text.split("\n").length;
-		return "<button type=\"button\" class=\"kn-plain kn-gd-code-btn\" data-code=\"1\" title=\"" + lines + "줄\">" + label + "</button>";
-	}
-
-	function bindCodeButton(container, detail) {
-		var button = container.querySelector("[data-code]");
-		if (button) {
-			button.addEventListener("click", function () {
-				openCode(detail);
-			});
-		}
-	}
-
-	function openCode(detail) {
-		var label = CODE_LABEL[detail.code.kind] || "소스";
-		var kindLabel = KIND_LABEL[detail.kind] || detail.kind;
-		// SQL 노드면 "SQL · SQL ..." 이 되므로 종류는 한 번만 적는다.
-		el["kn-code-title"].textContent = label + " · " + (kindLabel === label ? "" : kindLabel + " ") + (detail.fullName || detail.name);
-		var where = detail.path ? detail.path + (detail.lineStart ? " (줄 " + detail.lineStart + (detail.lineEnd ? "-" + detail.lineEnd : "") + ")" : "") : "";
-		el["kn-code-where"].textContent = where;
-		codeView.code = detail.code;
-		codeView.raw = false;
-		codeView.language = highlightLanguage(detail);
-		// SQL 은 들여쓰기를 넣은 것을 먼저 보여 준다. 원문과 다를 때만 바꿔 보기 버튼을 둔다.
-		el["kn-code-raw"].style.display = detail.code.formatted && detail.code.formatted !== detail.code.text ? "" : "none";
-		showCodeText();
-		el["kn-code-modal"].style.display = "flex";
-	}
-
-	function showCodeText() {
-		var code = codeView.code;
-		var text = !codeView.raw && code.formatted ? code.formatted : code.text;
-		el["kn-code-text"].textContent = text;
-		// 구문 강조(highlight.js, knowledge/assets/lib). 글자는 그대로이고 색만 입히므로 복사는 textContent 로 그대로 된다.
-		if (window.hljs && codeView.language && text.length <= HIGHLIGHT_MAX_CHARS) {
-			el["kn-code-text"].innerHTML = window.hljs.highlight(text, { language: codeView.language, ignoreIllegals: true }).value;
-		}
-		el["kn-code-text"].scrollTop = 0;
-		el["kn-code-text"].scrollLeft = 0;
-		el["kn-code-raw"].textContent = codeView.raw ? "정리해서 보기" : "원문 보기";
-		el["kn-code-copy"].textContent = "복사";
-	}
-
-	function toggleRawCode() {
-		codeView.raw = !codeView.raw;
-		showCodeText();
-	}
-
-	function closeCode() {
-		el["kn-code-modal"].style.display = "none";
-		el["kn-code-text"].textContent = "";
-	}
-
-	/** 클립보드에 복사합니다. http 주소에서는 navigator.clipboard 가 없어서 예전 방식으로 복사합니다 */
-	function copyCode() {
-		var text = el["kn-code-text"].textContent;
-		var done = function () {
-			el["kn-code-copy"].textContent = "복사됨";
-		};
-		if (navigator.clipboard && window.isSecureContext) {
-			navigator.clipboard.writeText(text).then(done).catch(function () {
-				copyByTextarea(text) && done();
-			});
-			return;
-		}
-		if (copyByTextarea(text)) {
-			done();
-		}
-	}
-
-	function copyByTextarea(text) {
-		var area = document.createElement("textarea");
-		area.value = text;
-		area.style.position = "fixed";
-		area.style.top = "-1000px";
-		document.body.appendChild(area);
-		area.select();
-		var ok = false;
-		try {
-			ok = document.execCommand("copy");
-		} catch (e) {
-			ok = false;
-		}
-		document.body.removeChild(area);
-		return ok;
-	}
-
-	/* ======================= 관계 트리 팝업 ======================= */
-
-	function openTree(nodeId) {
-		el["kn-tree-modal"].style.display = "flex";
-		loadTree(nodeId);
-	}
-
-	/* 관계 트리 팝업도 전체 화면으로 키울 수 있다. 같은 팝업을 키우므로 그린 트리와 고른 노드가 그대로 남는다.
-	 * 다시 열 때도 마지막 크기를 그대로 쓴다(계층 보이기 설정처럼). */
-
-	function isTreeFullscreen() {
-		return el["kn-tree-modal"].classList.contains("kn-full");
-	}
-
-	function setTreeFullscreen(on) {
-		el["kn-tree-modal"].classList.toggle("kn-full", on);
-		el["kn-tree-full"].textContent = on ? "전체 화면 끝내기" : "전체 화면";
-		// Cytoscape 는 창 크기만 지켜보므로 칸이 바뀐 것을 직접 알려 주고 그림을 칸에 맞춘다.
-		window.requestAnimationFrame(function () {
-			if (tree.cy) {
-				tree.cy.resize();
-				tree.cy.fit(undefined, 30);
-			}
-		});
-	}
-
-	function closeTree() {
-		el["kn-tree-modal"].style.display = "none";
-		if (tree.cy) {
-			tree.cy.destroy();
-			tree.cy = null;
-		}
-	}
-
-	function loadTree(nodeId) {
-		tree.startId = nodeId;
-		K.message(el["kn-tree-message"], "불러오는 중...");
-		clearDetail(el["kn-tree-detail"], "노드를 누르면 여기에 설명이 나옵니다.");
-		K.call("GET", "/api/revisions/" + map.revisionId + "/graph/neighborhood", {
-			id: nodeId, up: el["kn-tree-up"].value, down: el["kn-tree-down"].value, includeModel: el["kn-tree-model"].checked,
-			// 화면호출관계는 늘 받아 두고 칩으로만 끄고 켠다. 칩을 켤 때 다시 부르지 않아도 되고, 꺼 둔 채로도 몇 개인지 보인다.
-			includeScreenLinks: true
-		}).then(function (result) {
-			el["kn-tree-title"].textContent = (KIND_LABEL[result.start.kind] || result.start.kind) + " " + result.start.fullName;
-			result.nodes.forEach(function (node) {
-				node.tier = node.screenLink ? "SCREEN_LINK" : tierOf(node.layer);
-				node.label = treeLabel(node);
-			});
-			tree.result = result;
-			renderTreeTiers();
-			drawTree();
-		}).catch(function (err) {
-			K.message(el["kn-tree-message"], err.message, true);
-		});
-	}
-
-	/** 관계 트리의 계층 칩(보이기 / 숨기기). 칩 옆 숫자는 이 트리에 있는 그 계층의 노드 수입니다 */
-	function renderTreeTiers() {
-		var counts = {};
-		tree.result.nodes.forEach(function (node) {
-			counts[node.tier] = (counts[node.tier] || 0) + 1;
-		});
-		el["kn-tree-tiers"].innerHTML = TREE_TIERS.map(function (key) {
-			var tier = TIER_BY_KEY[key];
-			return "<label class=\"kn-graph-chip" + (tree.hidden[key] ? " kn-off" : "") + "\" style=\"border-color:" + tier.color + ";background:" + tier.fill + ";\">"
-				+ "<input type=\"checkbox\" data-tree-tier=\"" + key + "\"" + (tree.hidden[key] ? "" : " checked") + " /> " + K.escapeHtml(tier.label)
-				+ " <span>" + (counts[key] || 0) + "</span></label>";
-		}).join("");
-		Array.prototype.forEach.call(el["kn-tree-tiers"].querySelectorAll("input"), function (input) {
-			input.addEventListener("change", function () {
-				var key = input.getAttribute("data-tree-tier");
-				tree.hidden[key] = !input.checked;
-				input.parentNode.classList.toggle("kn-off", !input.checked);
-				clearDetail(el["kn-tree-detail"], "노드를 누르면 여기에 설명이 나옵니다.");
-				drawTree();
-			});
-		});
-	}
-
-	/** 끈 계층이 아니면 보입니다. 고른 노드(가운데)는 늘 보입니다 */
-	function treeVisible(node) {
-		return node.start || !tree.hidden[node.tier];
-	}
-
-	/**
-	 * <pre>
-	 * 보이는 노드끼리의 선을 만듭니다. 숨긴 노드를 거쳐 이어지는 길은 점선(bypass) 하나로 잇습니다.
-	 * 예: 서비스를 끄면 컨트롤러 → (서비스) → DAO 가 컨트롤러 ┄> DAO 가 됩니다.
-	 * 선의 색은 마지막 한 걸음(보이는 노드로 들어가는 선)의 종류를 따릅니다.
-	 * </pre>
-	 */
-	function treeEdges(result) {
-		var outgoing = {};
-		result.edges.forEach(function (edge) {
-			if (edge.type === "INCLUDES" && tree.hidden.SCREEN_LINK) {
-				return;
-			}
-			(outgoing[edge.from] = outgoing[edge.from] || []).push(edge);
-		});
-		var edges = [];
-		var seen = {};
-		result.edges.forEach(function (edge) {
-			var from = tree.nodes[edge.from];
-			var to = tree.nodes[edge.to];
-			// 화면끼리 부르는 선(INCLUDES)은 화면호출관계를 켰을 때만 그린다.
-			if (edge.type === "INCLUDES" && tree.hidden.SCREEN_LINK) {
-				return;
-			}
-			if (!from || !to || !treeVisible(from)) {
-				return;
-			}
-			if (treeVisible(to)) {
-				edges.push({ from: edge.from, to: edge.to, type: edge.type, low: edge.confidence === "LOW", bypass: false });
-				seen[edge.from + ">" + edge.to] = true;
-				return;
-			}
-			// 숨긴 노드에서부터 보이는 노드가 나올 때까지 따라간다(순환이 있어도 한 번씩만 들른다).
-			var visited = {};
-			var stack = [edge.to];
-			visited[edge.to] = true;
-			while (stack.length > 0) {
-				var id = stack.pop();
-				(outgoing[id] || []).forEach(function (next) {
-					var target = tree.nodes[next.to];
-					if (!target || visited[next.to]) {
-						return;
-					}
-					visited[next.to] = true;
-					if (!treeVisible(target)) {
-						stack.push(next.to);
-						return;
-					}
-					var key = edge.from + ">" + next.to;
-					if (!seen[key] && next.to !== edge.from) {
-						seen[key] = true;
-						edges.push({ from: edge.from, to: next.to, type: next.type, low: false, bypass: true });
-					}
-				});
-			}
-		});
-		return edges;
-	}
-
-	/**
-	 * 관계 트리를 그립니다. 노드의 level 이 가로 자리입니다(0 = 고른 것, 음수 = 부르는 쪽, 양수 = 불리는 쪽).
-	 * 한 level 에 노드가 많으면 여러 열로 나눕니다. 끈 계층의 노드는 빼고 자리를 다시 잡습니다.
-	 */
-	function drawTree() {
-		var result = tree.result;
-		var colWidth = 230;
-		var rowHeight = 30;
-		var maxRows = 40;
-		var levels = {};
-		var hiddenCount = 0;
-		tree.nodes = {};
-		result.nodes.forEach(function (node) {
-			tree.nodes[node.id] = node;
-			if (!treeVisible(node)) {
-				hiddenCount++;
-				return;
-			}
-			(levels[node.level] = levels[node.level] || []).push(node);
-		});
-
-		var elements = [];
-		var x = 0;
-		Object.keys(levels).map(Number).sort(function (a, b) {
-			return a - b;
-		}).forEach(function (level) {
-			var list = levels[level];
-			list.sort(function (a, b) {
-				return a.label.localeCompare(b.label);
-			});
-			var cols = Math.ceil(list.length / maxRows);
-			var rows = Math.ceil(list.length / cols);
-			list.forEach(function (node, index) {
-				var tier = TIER_BY_KEY[node.tier];
-				var width = labelWidth(node.label);
-				elements.push({
-					group: "nodes",
-					data: { id: node.id, label: node.label, color: tier.color, fill: tier.fill, w: width, tw: (width - 10) + "px" },
-					// 줄 수가 다른 level 끼리도 가운데가 맞도록 세로로 가운데 정렬한다.
-					position: { x: x + Math.floor(index / rows) * colWidth, y: ((index % rows) - (rows - 1) / 2) * rowHeight },
-					classes: "kind-" + node.kind + (node.start ? " start" : "")
-				});
-			});
-			x += cols * colWidth + 40;
-		});
-		var edges = treeEdges(result);
-		edges.forEach(function (edge, index) {
-			var cat = CAT_OF_RELATION[edge.type] || "CALL";
-			elements.push({
-				group: "edges",
-				data: { id: "e" + index, source: edge.from, target: edge.to, color: EDGE_CATS[cat].color, w: 1.5 },
-				classes: edge.bypass ? "bypass" : (edge.low ? "low" : "")
-			});
-		});
-
-		if (tree.cy) {
-			tree.cy.destroy();
-		}
-		tree.cy = cytoscape({
-			container: el["kn-tree-canvas"],
-			elements: elements,
-			style: styles().concat([{ selector: "node.start", style: { "border-width": 3, "border-color": "#ca8a04", "font-weight": "bold" } },
-				{ selector: "edge.bypass", style: { "line-style": "dotted", "width": 2 } }]),
-			layout: { name: "preset" },
-			minZoom: 0.05,
-			maxZoom: 3
-		});
-		tree.cy.fit(undefined, 30);
-		// 부르는 쪽이 하나도 없으면 깊이를 늘려도 그대로다. 그렇다고 알려 준다.
-		var noCallers = parseInt(el["kn-tree-up"].value, 10) > 0 && !(result.nodes || []).some(function (treeNode) {
-			return treeNode.level < 0;
-		});
-		K.message(el["kn-tree-message"], result.nodeCount === 0
-			? "이어진 것이 없습니다. 아무도 부르지 않고 아무것도 부르지 않거나, 분석이 잇지 못한 호출일 수 있습니다."
-			: "노드 " + result.nodeCount + "개 · 선 " + result.edgeCount + "개"
-				+ (hiddenCount > 0 ? "(끈 계층의 노드 " + hiddenCount + "개는 숨김. 숨긴 노드를 건너 이어지는 길은 점선)" : "")
-				+ ". 가운데(노란 테)가 고른 것, 왼쪽이 부르는 쪽, 오른쪽이 불리는 쪽입니다."
-				+ (noCallers ? " 이것을 부르는 곳은 분석에서 하나도 나오지 않았습니다. 그래서 부르는 쪽 깊이를 늘려도 화면이 나오지 않습니다."
-					+ " 쓰이지 않는 코드이거나, 리플렉션·설정 파일처럼 소스에 이름이 드러나지 않는 방법으로 부를 수 있습니다." : "")
-				+ (result.truncated ? " 너무 많아서 가까운 것부터 일부만 가져왔습니다. 깊이를 줄이거나 더 작은 것(메소드 하나)을 고르세요." : ""), false);
-		tree.cy.on("tap", "node", function (event) {
-			highlight(tree.cy, event.target, "ALL");
-			showTreeDetail(tree.nodes[event.target.id()]);
-		});
-		tree.cy.on("tap", function (event) {
-			if (event.target === tree.cy) {
-				tree.cy.elements().removeClass("faded up down sel hl");
-				clearDetail(el["kn-tree-detail"], "노드를 누르면 여기에 설명이 나옵니다.");
-			}
-		});
-	}
-
-	/** 트리에서는 메소드 이름 앞에 클래스 이름을 붙입니다: OrderService#cancel */
-	function treeLabel(node) {
-		if (node.kind === "METHOD" || node.kind === "FIELD") {
-			return (node.owner ? node.owner + "#" : "") + node.name;
-		}
-		if (node.kind === "JSP") {
-			return String(node.name).replace(/^.*\//, "");
-		}
-		return String(node.name);
-	}
-
-	function showTreeDetail(node) {
-		var container = el["kn-tree-detail"];
-		container.setAttribute("data-node", node.id);
-		container.innerHTML = head(node.kind, node.label, node.tier) + "<p class=\"ai-hint\">불러오는 중...</p>";
-		// 필드는 상세가 따로 없다(필드의 초기값에서 부르는 호출 때문에 트리에 나올 뿐이다).
-		if (node.kind === "FIELD") {
-			container.innerHTML = head(node.kind, node.label, node.tier) + "<div class=\"kn-mono kn-gd-full\">" + K.escapeHtml(node.fullName) + "</div>"
-				+ "<p class=\"ai-hint\">필드입니다. 필드의 초기값에서 부르는 호출이 있어서 여기에 나왔습니다.</p>";
-			return;
-		}
-		K.call("GET", "/api/revisions/" + map.revisionId + "/graph/node", { id: node.id }).then(function (detail) {
-			if (container.getAttribute("data-node") !== node.id) {
-				return;
-			}
-			container.innerHTML = head(detail.kind, node.label, node.tier)
-				+ functionName(detail)
-				+ (node.id === tree.startId ? "" : "<div class=\"kn-gd-actions\"><button type=\"button\" class=\"kn-btn kn-plain\" data-tree=\"" + K.escapeHtml(node.id)
-					+ "\">이 노드를 가운데로 다시 그리기</button></div>")
-				+ detailBody(detail);
-			bindTreeLinks(container);
-			bindCodeButton(container, detail);
-		}).catch(function (err) {
-			container.innerHTML = head(node.kind, node.label, node.tier) + "<p class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</p>";
-		});
-	}
-
-	/**
-	 * 메소드의 기능명(메소드 위 주석의 첫 줄이나 @Description)을 노드 이름 바로 아래에 따로 보여 줍니다.
-	 * 메소드가 아니면 빈 글자입니다.
-	 */
-	function functionName(detail) {
-		if (detail.kind !== "METHOD") {
-			return "";
-		}
-		if (detail.title) {
-			return "<div class=\"kn-gd-func\"><span class=\"kn-gd-func-label\">기능명</span>" + K.escapeHtml(detail.title) + "</div>";
-		}
-		return "<div class=\"kn-gd-func kn-gd-func-none\"><span class=\"kn-gd-func-label\">기능명</span>"
-			+ K.escapeHtml(detail.titleNote || "없음 (메소드 위에 설명 주석이 없습니다)") + "</div>";
-	}
 
 	return { init: init };
 })();

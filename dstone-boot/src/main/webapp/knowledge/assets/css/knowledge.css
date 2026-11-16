@@ -580,6 +580,18 @@ body.kn-full-on {
 		flex: none;
 		max-height: 35vh;
 	}
+
+	/* 관계 트리 창도 창 높이 안에서 그림 위 · 상세 아래로 나눈다 */
+	.kn-tree-body > .kn-graph-canvas {
+		flex: 1 1 auto;
+		height: auto;
+		min-height: 240px;
+	}
+
+	.kn-tree-body > .kn-graph-detail {
+		flex: none;
+		max-height: 35vh;
+	}
 }
 
 .kn-graph-detail {
@@ -839,7 +851,7 @@ body.kn-full-on {
 	vertical-align: middle;
 }
 
-/* 소스 / SQL 팝업. 관계 트리 팝업(1000) 위에 뜬다 */
+/* 소스 / SQL 팝업. 노드 맵과 관계 트리 창에서 화면 위에 뜬다 */
 .kn-code-modal {
 	z-index: 1100;
 }
@@ -869,7 +881,7 @@ body.kn-full-on {
 	word-break: normal;
 }
 
-/* 관계 트리 팝업의 계층 보이기 / 숨기기 */
+/* 관계 트리 창의 계층 보이기 / 숨기기 */
 .kn-tree-tiers {
 	margin-top: 8px;
 }
@@ -886,28 +898,36 @@ body.kn-full-on {
 	opacity: 0.45;
 }
 
-/* 관계 트리 팝업(바깥 어두운 막은 console.css) */
-.kn-graph-modal-box {
-	width: 94vw;
-	height: 90vh;
+/* 관계 트리 창(graph/tree.jsp): 왼쪽 메뉴 없이 트리가 창 가득 찬다. 창 크기를 바꾸면 그림 칸도 따라 바뀐다 */
+body.kn-tree-page {
+	height: 100vh;
+	overflow: hidden;
 	background: var(--cs-surface);
-	border-radius: var(--cs-radius-lg);
-	box-shadow: var(--cs-shadow-lg);
-	padding: 16px 18px;
+}
+
+.kn-tree-window {
+	height: 100vh;
+	box-sizing: border-box;
+	padding: 12px 16px;
 	display: flex;
 	flex-direction: column;
 }
 
-/* 관계 트리 팝업 전체 화면: 바깥 여백을 없애고 팝업 상자가 브라우저 화면을 다 덮는다 */
-.kn-graph-modal.kn-full {
-	padding: 0;
+/* 제목 아래에 프로젝트 · 리비전을 작게 */
+.kn-tree-heading {
+	flex: 1;
+	min-width: 200px;
+	display: flex;
+	flex-direction: column;
+	line-height: 1.35;
 }
 
-.kn-graph-modal.kn-full .kn-graph-modal-box {
-	width: 100vw;
-	height: 100vh;
-	border-radius: 0;
-	box-shadow: none;
+.kn-tree-heading .kn-graph-modal-title {
+	flex: none;
+}
+
+.kn-tree-heading .ai-hint {
+	font-size: 12px;
 }
 
 .kn-graph-modal-title {
@@ -917,15 +937,17 @@ body.kn-full-on {
 	word-break: break-all;
 }
 
-.kn-graph-modal-body {
+/* 그림 칸은 창에서 위쪽 줄들을 뺀 나머지를 모두 쓴다 */
+.kn-tree-body {
 	flex: 1;
 	height: auto;
 	min-height: 0;
+	margin-top: 4px;
 }
 
-/* 관계 트리 팝업의 상세 칸은 본 화면보다 조금(약 1cm) 넓게 */
+/* 관계 트리 창의 상세 칸은 노드 맵보다 조금(약 1cm) 넓게 */
 @media screen and (min-width: 861px) {
-	.kn-graph-modal-body > .kn-graph-detail {
+	.kn-tree-body > .kn-graph-detail {
 		width: 418px;
 	}
 }

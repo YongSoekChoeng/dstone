@@ -11,6 +11,7 @@ var DstoneKnowledge = (function () {
 	function init(path) {
 		contextPath = path || "";
 		bindExamples();
+		bindTreeLinks();
 	}
 
 	/**
@@ -208,6 +209,67 @@ var DstoneKnowledge = (function () {
 		return contextPath + "/defaultLink.do?defaultLink=" + encodeURIComponent(link) + (hash ? "#" + hash : "");
 	}
 
+	/** 주소의 #키=값&키=값 을 {키: 값} 으로 읽는다 */
+	function readHash() {
+		var state = {};
+		location.hash.replace(/^#/, "").split("&").forEach(function (pair) {
+			var at = pair.indexOf("=");
+			if (at > 0) {
+				state[pair.substring(0, at)] = decodeURIComponent(pair.substring(at + 1));
+			}
+		});
+		return state;
+	}
+
+	/* ======================= 관계 트리 창 ======================= */
+
+	/** 관계 트리 창의 이름. 모든 화면이 이 이름 하나를 같이 쓰므로, 창은 늘 하나만 뜨고 새로 열면 내용만 바뀐다 */
+	var TREE_WINDOW = "dstoneKnowledgeTree";
+
+	/** 그 노드의 관계 트리를 그리는 창의 주소. projectId 는 창 제목에 보이려고 같이 넘긴다 */
+	function treeUrl(projectId, revisionId, nodeId) {
+		return pageUrl("knowledge/graph/tree", "p=" + encodeURIComponent(projectId || "") + "&r=" + encodeURIComponent(revisionId)
+			+ "&tree=" + encodeURIComponent(nodeId));
+	}
+
+	/**
+	 * <pre>
+	 * 관계 트리 창을 열거나, 이미 떠 있으면 그 창에 주소를 넣고 앞으로 꺼낸다.
+	 * 브라우저가 팝업을 막으면 false 를 돌려준다.
+	 * </pre>
+	 */
+	function openTreeWindow(url) {
+		var width = Math.min(Math.max(screen.availWidth - 80, 900), 1700);
+		var height = Math.min(Math.max(screen.availHeight - 80, 600), 1100);
+		var features = "width=" + width + ",height=" + height + ",left=40,top=20,resizable=yes,scrollbars=yes";
+		var win = window.open(url, TREE_WINDOW, features);
+		if (!win) {
+			return false;
+		}
+		win.focus();
+		return true;
+	}
+
+	/**
+	 * <pre>
+	 * data-tree-window 가 붙은 링크(&lt;a href="treeUrl(...)" data-tree-window&gt;)를 누르면 관계 트리 창으로 연다.
+	 * 링크라서 가운데 단추나 Ctrl 을 누른 채로 누르면 브라우저가 하던 대로 새 탭에서 열린다.
+	 * 표를 다시 그려도 따로 잇지 않아도 되게 문서 전체에서 한 번만 받는다.
+	 * </pre>
+	 */
+	function bindTreeLinks() {
+		document.addEventListener("click", function (event) {
+			var link = event.target.closest ? event.target.closest("a[data-tree-window]") : null;
+			if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+				return;
+			}
+			if (openTreeWindow(link.href)) {
+				event.preventDefault();
+			}
+			// 팝업이 막혔으면 막지 않는다. 링크의 target 대로 새 탭에서 열린다.
+		});
+	}
+
 	/** 신뢰도(HIGH / MEDIUM / LOW)를 색깔 글자로 */
 	function confidence(value) {
 		return "<span class=\"kn-conf-" + escapeHtml(value) + "\">" + escapeHtml(value) + "</span>";
@@ -226,6 +288,10 @@ var DstoneKnowledge = (function () {
 		loadProjects: loadProjects,
 		loadRevisions: loadRevisions,
 		pageUrl: pageUrl,
+		readHash: readHash,
+		TREE_WINDOW: TREE_WINDOW,
+		treeUrl: treeUrl,
+		openTreeWindow: openTreeWindow,
 		confidence: confidence
 	};
 })();

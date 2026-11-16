@@ -1,7 +1,7 @@
 /**
  * "프로젝트 · 분석" 화면의 미사용 탭.
  * 있지만 아무도 쓰지 않는 테이블 · SQL · 클래스 · 메소드 · 화면의 건수를 카드로 보여 주고, 카드를 누르면 그 목록을 연다.
- * 목록의 줄은 노드 맵(새 창)에서 열어 정말 안 쓰는지 한 번 더 확인할 수 있다.
+ * 목록의 이름을 누르면 관계 트리 창이 떠서, 정말 아무도 부르지 않는지 한 번 더 확인할 수 있다.
  * 계산은 dstone-knowledge 의 /api/revisions/{id}/unused 가 한다(UnusedService).
  */
 var DstoneKnowledgeUnused = (function () {
@@ -229,7 +229,8 @@ var DstoneKnowledgeUnused = (function () {
 				return "<span class=\"kn-grade kn-grade-" + K.escapeHtml(row.grade) + "\" title=\"" + K.escapeHtml(grade[1]) + "\">" + K.escapeHtml(grade[0]) + "</span>";
 			} },
 			{ key: "name", label: "이름", html: function (row) {
-				return "<a href=\"" + K.escapeHtml(graphUrl(row)) + "\" target=\"_blank\" class=\"kn-mono\" title=\"노드 맵에서 열기(새 창)\">" + K.escapeHtml(row.name) + "</a>"
+				return "<a href=\"" + K.escapeHtml(K.treeUrl(target.projectId, target.revisionId, row.graphId)) + "\" target=\"" + K.TREE_WINDOW
+					+ "\" data-tree-window class=\"kn-mono\" title=\"관계 트리 창에서 열기\">" + K.escapeHtml(row.name) + "</a>"
 					+ (row.title ? "<div class=\"kn-term\">" + K.escapeHtml(row.title) + "</div>" : "");
 			} },
 			{ key: "kind", label: "종류", html: function (row) {
@@ -240,12 +241,6 @@ var DstoneKnowledgeUnused = (function () {
 			} },
 			{ key: "reason", label: "까닭" }
 		], rows, "없습니다.");
-	}
-
-	/** 노드 맵에서 그 노드의 관계 트리를 바로 여는 주소 */
-	function graphUrl(row) {
-		return K.pageUrl("knowledge/graph/graph", "p=" + encodeURIComponent(target.projectId) + "&r=" + encodeURIComponent(target.revisionId)
-			+ "&tree=" + encodeURIComponent(row.graphId));
 	}
 
 	/** 지금 조건의 목록 전부를 CSV 로 내려받는다(엑셀에서 한글이 깨지지 않게 BOM 을 붙인다) */

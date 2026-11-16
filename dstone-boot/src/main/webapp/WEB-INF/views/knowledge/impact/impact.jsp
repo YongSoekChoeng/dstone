@@ -43,7 +43,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						지나온 대상은 머리글 아래 "지나온 대상" 줄에 남아 있어 눌러서 돌아갈 수 있고, 브라우저의 뒤로 가기도 됩니다.
 						지금 보고 있는 상태가 주소창에 남으므로 주소를 복사해 다른 사람에게 그대로 보여 줄 수도 있습니다.</li>
 					<li><b>더 보기</b> — 테이블 · 컬럼이 대상이면 머리글 오른쪽의 "SQL" 칸에서 "쓰기만"을 골라 그것을 <b>고치는</b> 기능만 볼 수 있습니다.
-						호출 흐름을 그림으로 보려면 <b>노드 맵에서 보기</b>를 누릅니다.</li>
+						호출 흐름을 그림으로 보려면 <b>관계 트리 보기</b>를 누릅니다. 새 창(관계 트리 창)에 열립니다.</li>
 				</ol>
 				예시 (누르면 종류와 이름이 채워집니다. <code>struts-app</code> 표본 기준이니 프로젝트는 직접 고르고 "보기"를 누르세요):
 				<span class="kn-example" data-fill='{"kn-find-kind":"table","kn-find-name":"TB_BOARD"}'>테이블 TB_BOARD</span>

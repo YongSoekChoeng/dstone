@@ -6,7 +6,7 @@
  *   ①      대상: 종류(메소드 / 테이블 / 컬럼 / SQL / 클래스 / 변경분) + 이름 → 후보 → 하나를 고른다
  *   ②      결과: 숫자 네 개 → 다시 테스트할 곳(확실한 관계) → 추정 관계 → 건드리는 데이터 · 확인 필요
  * 줄마다 [왜?]를 누르면 대상에서 거기까지 이어진 길(근거 길)을 보여 줍니다.
- * 누가 누구를 부르는지 훑어보는 일은 노드 맵이 맡습니다("노드 맵에서 보기").
+ * 누가 누구를 부르는지 메소드 단위로 따라가는 일은 관계 트리 창이 맡습니다("관계 트리 보기").
  * 결과에 나온 이름(밑줄)을 누르면 그것이 새 대상이 됩니다. 지금 상태는 주소창(#...)에 남아서
  * 새로 고침, 뒤로 가기, 링크 전달이 됩니다.
  */
@@ -598,7 +598,7 @@ var DstoneKnowledgeImpact = (function () {
 
 	/**
 	 * 대상 머리글.
-	 *   [종류]  큰 이름  을(를) 고치면                     [노드 맵에서 보기] [테이블 읽기+쓰기 ▾]
+	 *   [종류]  큰 이름  을(를) 고치면                     [관계 트리 보기] [테이블 읽기+쓰기 ▾]
 	 *           설명(기능명 · 전체 이름 · 파일:줄 · 계층 · 한글명 ...)
 	 */
 	function renderHead() {
@@ -611,9 +611,10 @@ var DstoneKnowledgeImpact = (function () {
 				}).join("") + "</select></label>";
 		}
 		if (target.graphId) {
-			var hash = "p=" + encodeURIComponent(el["kn-impact-project"].value) + "&r=" + encodeURIComponent(el["kn-impact-revision"].value)
-				+ "&tree=" + encodeURIComponent(target.graphId);
-			actions += "<a class=\"kn-head-link\" href=\"" + K.escapeHtml(K.pageUrl("knowledge/graph/graph", hash)) + "\">노드 맵에서 보기</a>";
+			// 관계 트리 창으로 연다(knowledge-common.js 의 data-tree-window)
+			var treeUrl = K.treeUrl(el["kn-impact-project"].value, el["kn-impact-revision"].value, target.graphId);
+			actions += "<a class=\"kn-head-link\" href=\"" + K.escapeHtml(treeUrl) + "\" target=\"" + K.TREE_WINDOW + "\" data-tree-window"
+				+ " title=\"부르는 쪽과 불리는 쪽을 메소드 단위로 그린 그림을 새 창에 엽니다\">관계 트리 보기</a>";
 		}
 		var suffix = target.kind === "changes" ? "에서 바뀐 것" : "을(를) 고치면";
 		el["kn-target-head"].innerHTML = "<div class=\"kn-target-head\" tabindex=\"-1\">"
