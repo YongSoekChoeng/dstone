@@ -436,7 +436,7 @@ var DstoneKnowledgeProject = (function () {
 				+ "</div><div class=\"kn-card-label\">" + K.escapeHtml(card[0]) + "</div><div class=\"kn-card-help\">" + K.escapeHtml(card[1]) + "</div></div>";
 		}).join("");
 
-		// 개요: 한눈에 보기 → 미사용 → 적용 진단
+		// 개요: 한눈에 보기 → 미사용 → 파일 구성
 		el["kn-overview"].innerHTML = "";
 		var verdict = verdictLines(summary, metrics);
 		el["kn-overview"].appendChild(verdictBox(verdict));
@@ -448,22 +448,26 @@ var DstoneKnowledgeProject = (function () {
 		if (unused && String(unused.revisionId) === String(summary.revisionId)) {
 			DstoneKnowledgeUnused.renderOverview(unusedBox, unused, function () { showTab("unused"); });
 		}
-		if (summary.diagnostics) {
-			el["kn-overview"].appendChild(diagnosticsBox(summary.diagnostics));
-		}
 
-		// 나머지 탭: SECTIONS 를 탭별로 나눠 그린다
+		// 나머지 탭: SECTIONS 를 탭별로 나눠 그린다. 연결 품질 탭은 맨 위에 적용 진단
 		var targets = { connect: el["kn-connect"], content: el["kn-content"], history: el["kn-history"] };
 		parkUnresolvedPanel();
 		Object.keys(targets).forEach(function (tab) {
 			targets[tab].innerHTML = "";
 		});
+		if (summary.diagnostics) {
+			targets.connect.appendChild(diagnosticsBox(summary.diagnostics));
+		}
 		T.SECTIONS.forEach(function (section) {
 			var rows = section.build ? section.build(summary) : T.valueAt(summary, section.path);
 			if (rows === null || rows === undefined || (Array.isArray(rows) && rows.length === 0)) {
 				return;
 			}
 			if (section.showIf && !section.showIf(rows)) {
+				return;
+			}
+			if (section.tab === "overview") {
+				el["kn-overview"].appendChild(fileRoleBox(section, rows));
 				return;
 			}
 			var box = sectionBox(section, rows, summary);
@@ -607,14 +611,18 @@ var DstoneKnowledgeProject = (function () {
 	 * 새 프로젝트를 처음 분석한 뒤 "규칙만으로 되는지, 개발이 필요한지"를 바로 가리려는 것이다.
 	 */
 	function diagnosticsBox(diagnostics) {
-		var box = document.createElement("div");
-		box.className = "kn-verdict kn-diag";
+		var box = document.createElement("details");
+		box.className = "kn-fold kn-diag";
 		var summary = diagnostics.summary || {};
 		var head = Object.keys(summary).map(function (key) {
 			return "<span class=\"kn-diag-solution kn-diag-" + K.escapeHtml(key) + "\">" + K.escapeHtml(SOLUTION[key] || key) + " " + summary[key] + "</span>";
 		}).join(" ");
-		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">적용 진단</div>"
-			+ "<p class=\"ai-hint\">살펴볼 항목을 해결 방법별로 나눴습니다. <b>규칙 파일로 해결</b>은 conf/rules/projects/" + K.escapeHtml(String(diagnostics.projectId || "").toLowerCase())
+		// 접힌 제목 옆: "규칙 파일로 해결 3 · jar 위치 등록 1", 없으면 "살펴볼 항목 없음"
+		var brief = Object.keys(summary).map(function (key) {
+			return (SOLUTION[key] || key) + " " + summary[key];
+		}).join(" · ");
+		var html = "<summary><span class=\"kn-fold-title\">적용 진단</span><span class=\"kn-fold-brief\">" + K.escapeHtml(brief || "살펴볼 항목 없음") + "</span></summary>"
+			+ "<div class=\"kn-fold-body\"><p class=\"ai-hint\">살펴볼 항목을 해결 방법별로 나눴습니다. <b>규칙 파일로 해결</b>은 conf/rules/projects/" + K.escapeHtml(String(diagnostics.projectId || "").toLowerCase())
 			+ "/ 에 규칙을 적고 SEMANTIC 부터 다시 분석하면 되고, <b>분석기 개발 필요</b>는 지금 지원하는 범위 밖입니다.</p>"
 			+ (head ? "<div class=\"kn-row\">" + head + "</div>" : "<p class=\"ai-hint\">살펴볼 항목이 없습니다.</p>");
 		(diagnostics.checks || []).forEach(function (check) {
@@ -628,7 +636,7 @@ var DstoneKnowledgeProject = (function () {
 					+ K.escapeHtml(check.key) + "\"></div></details>";
 			}
 		});
-		box.innerHTML = html;
+		box.innerHTML = html + "</div>";
 		(diagnostics.checks || []).forEach(function (check) {
 			var target = box.querySelector(".kn-scroll[data-key=\"" + check.key + "\"]");
 			if (target) {
@@ -640,6 +648,51 @@ var DstoneKnowledgeProject = (function () {
 
 	function markOf(level) {
 		return level === "good" ? "✔" : level === "bad" ? "✖" : level === "warn" ? "!" : "·";
+	}
+
+	/* ---------------- 파일 구성 ---------------- */
+
+	/**
+	 * 개요의 "파일 구성" 표. 구분(Java / XML / 기타)마다 소계 줄을 먼저 두고 그 아래에 종류별 줄을 단다.
+	 * 종류의 뜻은 Java 면 계층 사전, 나머지는 쓰임새 사전에서 찾는다(CONFIG 처럼 같은 이름이 양쪽에 있어서 나눠 찾는다).
+	 */
+	function fileRoleBox(section, rows) {
+		var box = document.createElement("div");
+		box.className = "kn-verdict kn-file-role";
+		var groups = [];
+		var byGroup = {};
+		var allFiles = 0;
+		var allLines = 0;
+		rows.forEach(function (row) {
+			if (!byGroup[row.group]) {
+				byGroup[row.group] = { group: row.group, rows: [], fileCount: 0, lineCount: 0 };
+				groups.push(byGroup[row.group]);
+			}
+			byGroup[row.group].rows.push(row);
+			byGroup[row.group].fileCount += row.fileCount;
+			byGroup[row.group].lineCount += row.lineCount;
+			allFiles += row.fileCount;
+			allLines += row.lineCount;
+		});
+		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">" + K.escapeHtml(section.title) + "</div>"
+			+ "<p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p>"
+			+ "<div class=\"kn-scroll\"><table class=\"document-list-table kn-file-role-table\"><thead><tr>"
+			+ "<th>구분</th><th>종류</th><th>뜻</th><th class=\"kn-num\">파일 수</th><th class=\"kn-num\">줄 수</th></tr></thead><tbody>";
+		groups.forEach(function (group) {
+			html += "<tr class=\"kn-file-role-group\"><td colspan=\"3\">" + K.escapeHtml(T.FILE_GROUP[group.group] || group.group) + "</td>"
+				+ "<td class=\"kn-num\">" + T.fmt(group.fileCount) + "</td><td class=\"kn-num\">" + T.fmt(group.lineCount) + "</td></tr>";
+			group.rows.forEach(function (row) {
+				var meaning = row.group === "JAVA" ? T.LAYER[row.kind] : T.FILE_TYPE[row.kind];
+				var languages = row.languages.length > 0 ? " <span class=\"kn-term\">" + K.escapeHtml(row.languages.join(", ")) + "</span>" : "";
+				html += "<tr><td></td><td><span class=\"kn-code\">" + K.escapeHtml(row.kind) + "</span>" + languages + "</td>"
+					+ "<td>" + K.escapeHtml(meaning || "") + "</td>"
+					+ "<td class=\"kn-num\">" + T.fmt(row.fileCount) + "</td><td class=\"kn-num\">" + T.fmt(row.lineCount) + "</td></tr>";
+			});
+		});
+		html += "<tr class=\"kn-file-role-total\"><td colspan=\"3\">모두</td><td class=\"kn-num\">" + T.fmt(allFiles) + "</td><td class=\"kn-num\">" + T.fmt(allLines) + "</td></tr>";
+		html += "</tbody></table></div><details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
+		box.innerHTML = html;
+		return box;
 	}
 
 	/* ---------------- 연결 품질 ---------------- */

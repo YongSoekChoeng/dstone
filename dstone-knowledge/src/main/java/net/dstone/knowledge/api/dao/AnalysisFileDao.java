@@ -49,6 +49,16 @@ public class AnalysisFileDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectSummaryByType", revisionId);
 	}
 
+	/**
+	 * <pre>
+	 * 파일 구성: Java 파일은 계층(컨트롤러, 서비스, DAO …)별로, 나머지는 쓰임새별로 센 파일 수와 줄 수.
+	 * 행마다 group(JAVA / XML / OTHER), kind, language, fileCount, lineCount.
+	 * </pre>
+	 */
+	public List<Map<String, Object>> selectSummaryByRole(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectSummaryByRole", revisionId);
+	}
+
 	/** 인코딩별 파일 수 */
 	public List<Map<String, Object>> selectSummaryByEncoding(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectSummaryByEncoding", revisionId);

@@ -40,7 +40,7 @@ var DstoneKnowledgeGuide = (function () {
 
 	/** 탭 순서대로, 탭 안의 표마다 열의 뜻과 값의 뜻, 읽는 법 */
 	function renderSections(el) {
-		var tabs = [["connect", "연결 품질 탭"], ["content", "분석 내용 탭"], ["history", "실행 기록 탭"]];
+		var tabs = [["overview", "개요 탭"], ["connect", "연결 품질 탭"], ["content", "분석 내용 탭"], ["history", "실행 기록 탭"]];
 		var html = "";
 		var number = 0;
 		tabs.forEach(function (tab) {
