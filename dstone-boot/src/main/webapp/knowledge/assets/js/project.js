@@ -743,7 +743,7 @@ var DstoneKnowledgeProject = (function () {
 	/**
 	 * 개요의 "테이블" 섹션. SQL 이 건드리는 테이블 목록을 바로 보여 준다.
 	 * 이름 글자와 작업 체크박스(읽기 · 추가 · 수정 · 삭제)로 좁히고, 체크한 작업을 모두 하는 테이블만 남긴다.
-	 * 테이블 이름을 누르면 영향도 화면이 새 창으로 열린다.
+	 * 테이블 이름을 누르면 영향도 화면으로 옮겨 간다(뒤로 가기로 돌아온다).
 	 */
 	function tableListBox(section, count, summary) {
 		var box = document.createElement("div");
@@ -757,6 +757,15 @@ var DstoneKnowledgeProject = (function () {
 			+ drillListHtml("테이블 이름에 들어간 글자 (예: TB_CM)", checks)
 			+ "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
 		var opInputs = box.querySelectorAll(".kn-table-ops input");
+		// 테이블 이름은 같은 창에서 영향도 화면으로 옮겨 간다. 뒤로 가기로 돌아오면 이 리비전이 다시 열리도록
+		// 떠나기 직전에 주소에 #p=프로젝트&r=리비전 을 남긴다(이 화면은 열 때 주소를 읽고 비운다).
+		box.addEventListener("click", function (event) {
+			var link = event.target.closest ? event.target.closest(".kn-drill-rows a") : null;
+			if (link && current) {
+				history.replaceState(null, "", location.pathname + location.search + "#p=" + encodeURIComponent(summary.projectId)
+					+ "&r=" + encodeURIComponent(current.revisionId) + "&l=" + encodeURIComponent(current.revisionLabel || ""));
+			}
+		});
 		bindDrillList(box, [], {
 			unit: "개",
 			initial: { label: "", count: count },
@@ -783,7 +792,7 @@ var DstoneKnowledgeProject = (function () {
 				{ key: "table", label: "테이블", html: function (row) {
 					var url = K.pageUrl("knowledge/impact/impact", "p=" + encodeURIComponent(summary.projectId) + "&r=" + encodeURIComponent(summary.revisionId)
 						+ "&k=table&v=" + encodeURIComponent(row.table) + "&l=" + encodeURIComponent(row.table));
-					return "<a class=\"kn-mono\" href=\"" + K.escapeHtml(url) + "\" target=\"_blank\" title=\"영향도 화면에서 보기 (새 창)\">" + K.escapeHtml(row.table) + "</a>";
+					return "<a class=\"kn-mono\" href=\"" + K.escapeHtml(url) + "\" title=\"영향도 화면에서 보기\">" + K.escapeHtml(row.table) + "</a>";
 				} },
 				{ key: "title", label: "한글명" },
 				{ key: "reads", label: "읽기", num: true },

@@ -279,7 +279,7 @@ var DstoneKnowledgeTerms = (function () {
 		},
 		{
 			tab: "overview", path: "tables.count", title: "테이블",
-			what: "SQL 이 읽거나 쓰는 DB 테이블 목록입니다. 읽기 · 추가 · 수정 · 삭제를 체크하면 그 작업을 모두 하는 테이블만 남고, 테이블 이름을 누르면 영향도 화면이 새 창으로 열립니다.",
+			what: "SQL 이 읽거나 쓰는 DB 테이블 목록입니다. 읽기 · 추가 · 수정 · 삭제를 체크하면 그 작업을 모두 하는 테이블만 남고, 테이블 이름을 누르면 영향도 화면으로 옮겨 갑니다.",
 			showIf: function (count) { return Number(count) > 0; },
 			columns: [
 				["table", "테이블", "SQL 에 적힌 테이블 이름. 누르면 영향도 화면"],
