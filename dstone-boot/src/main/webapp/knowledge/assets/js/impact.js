@@ -478,6 +478,7 @@ var DstoneKnowledgeImpact = (function () {
 			trail = at >= 0 ? trail.slice(0, at) : trail.concat([target]);
 		}
 		target = { kind: next.kind, value: next.value, label: next.label || next.value, notes: [], graphId: null, access: "ALL" };
+		fillFind(target);
 		el["kn-result-panel"].hidden = false;
 		renderHead();
 		renderTrail();
@@ -485,6 +486,30 @@ var DstoneKnowledgeImpact = (function () {
 		loadImpact();
 		if (options.scroll) {
 			flashHead(true);
+		}
+	}
+
+	/**
+	 * ① 대상 칸(종류, 이름)을 지금 대상에 맞춘다. 주소창(#k=table&v=…)으로 들어오거나
+	 * 결과 안의 링크로 대상을 옮겨도 칸이 비어 있거나 앞 대상으로 남지 않게 한다.
+	 */
+	function fillFind(current) {
+		var kindEl = el["kn-find-kind"];
+		var known = Array.prototype.some.call(kindEl.options, function (option) {
+			return option.value === current.kind;
+		});
+		if (!known) {
+			return;
+		}
+		kindEl.value = current.kind;
+		updateKindUi();
+		if (current.kind === "changes") {
+			selectOption(el["kn-find-base"], String(current.value));
+		} else if (current.kind === "method") {
+			// 메소드의 값은 id 라서, 찾기 칸에 적는 모양(BoardDAO#deleteBoard)인 보이는 이름을 쓴다
+			el["kn-find-name"].value = String(current.label || "").replace(/\(.*$/, "");
+		} else {
+			el["kn-find-name"].value = current.value;
 		}
 	}
 
