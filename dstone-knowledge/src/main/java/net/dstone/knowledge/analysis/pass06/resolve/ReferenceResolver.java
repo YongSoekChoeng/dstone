@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import com.github.javaparser.Position;
@@ -187,16 +188,7 @@ public class ReferenceResolver {
 		context.fileId = fileId;
 		context.deadlineAt = System.currentTimeMillis() + timeoutMillis;
 		context.checkpoint = checkpoint;
-		if (unit.getPackageDeclaration().isPresent()) {
-			context.packageName = unit.getPackageDeclaration().get().getNameAsString();
-		}
-		for (int i = 0; i < unit.getImports().size(); i++) {
-			ImportDeclaration declaration = unit.getImports().get(i);
-			if (!declaration.isStatic() && !declaration.isAsterisk()) {
-				String name = declaration.getNameAsString();
-				context.imports.put(name.substring(name.lastIndexOf('.') + 1), name);
-			}
-		}
+		readNames(context, unit);
 		// 2) 위치로 찾을 수 있게 참조를 넣어 둔다
 		for (int i = 0; i < references.size(); i++) {
 			Map<String, Object> reference = references.get(i);
@@ -1058,6 +1050,11 @@ public class ReferenceResolver {
 			if (synthetic != null) {
 				return synthetic;
 			}
+			// 상위 타입에서 물려받은 필드(부모 클래스의 protected Logger logger 등)
+			String inherited = inheritedFieldTypeOf((NameExpr) expression);
+			if (inherited != null) {
+				return inherited;
+			}
 		}
 		// 메소드 호출의 결과에 이어 붙인 호출: Member.builder().name("x") 에서 name 의 대상은 builder() 가 돌려주는 타입이다.
 		// 해석기가 모르는 메소드(Lombok이 만든 것)면 DECLARE가 적어 둔 반환 타입으로 이어 간다.
@@ -1076,6 +1073,119 @@ public class ReferenceResolver {
 			}
 		}
 		return null;
+	}
+
+	/** 파일의 패키지와 import(com.a.Foo → Foo = com.a.Foo)를 담습니다. 타입 이름을 전체 이름으로 바꿀 때 씁니다. */
+	private static void readNames(FileContext context, CompilationUnit unit) {
+		if (unit.getPackageDeclaration().isPresent()) {
+			context.packageName = unit.getPackageDeclaration().get().getNameAsString();
+		}
+		for (int i = 0; i < unit.getImports().size(); i++) {
+			ImportDeclaration declaration = unit.getImports().get(i);
+			if (!declaration.isStatic() && !declaration.isAsterisk()) {
+				String name = declaration.getNameAsString();
+				context.imports.put(name.substring(name.lastIndexOf('.') + 1), name);
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 상위 타입(프로젝트 안)에서 물려받은 필드의 타입. 없으면 null입니다.
+	 * 예: OpApiSendBiz extends BaseBiz 에서 logger.info(…) 의 logger 는 BaseBiz 의 protected Logger logger 다.
+	 *
+	 * 해석기는 Logger 가 든 jar 가 없으면 logger 자체를 못 풀고, declaredTypeOf 는 이 파일 안의 선언만 본다.
+	 * 그래서 상위 타입의 소스(AST)에서 그 이름의 필드를 찾고, 타입 이름은 "그 상위 타입 파일"의 import 로 전체 이름을 만든다
+	 * (이 파일의 import 로 바꾸면 다른 Logger 로 잘못 짚을 수 있다).
+	 * private 필드는 물려받지 않으므로 건너뛴다. 가까운 상위 타입부터 본다.
+	 * </pre>
+	 */
+	private String inheritedFieldTypeOf(NameExpr nameExpr) {
+		String name = nameExpr.getNameAsString();
+		List<String> owners = enclosingTypesOf(nameExpr);
+		for (int i = 0; i < owners.size(); i++) {
+			List<ResolvedReferenceTypeDeclaration> ancestors = projectAncestorDeclarationsOf(owners.get(i));
+			for (int j = 0; j < ancestors.size(); j++) {
+				String found = fieldTypeIn(ancestors.get(j), name);
+				if (found != null) {
+					return found;
+				}
+			}
+		}
+		return null;
+	}
+
+	/** 상위 타입 선언의 소스에서 이 이름의 (private 이 아닌) 필드를 찾아, 그 파일 기준의 전체 타입 이름을 돌려줍니다. */
+	private String fieldTypeIn(ResolvedReferenceTypeDeclaration declaration, String name) {
+		Optional<Node> ast = declaration.toAst();
+		if (!ast.isPresent() || !(ast.get() instanceof TypeDeclaration)) {
+			return null;
+		}
+		TypeDeclaration<?> type = (TypeDeclaration<?>) ast.get();
+		List<FieldDeclaration> fields = type.getFields();
+		for (int i = 0; i < fields.size(); i++) {
+			FieldDeclaration field = fields.get(i);
+			if (field.isPrivate()) {
+				continue;
+			}
+			String written = typeOfVariable(field.getVariables(), name);
+			if (written == null) {
+				continue;
+			}
+			if (!type.findCompilationUnit().isPresent()) {
+				return null;
+			}
+			FileContext names = new FileContext();
+			readNames(names, type.findCompilationUnit().get());
+			String typeName = guessTypeName(names, written);
+			if (typeName == null && written.indexOf('.') < 0 && isKnownType("java.lang." + written)) {
+				// import 없이 쓰는 java.lang 타입 (String, Object …)
+				typeName = "java.lang." + written;
+			}
+			return typeName;
+		}
+		return null;
+	}
+
+	/**
+	 * <pre>
+	 * 프로젝트 안에 있는 상위 타입의 선언을 가까운 것부터 모읍니다(부모 → 조부모 …, 인터페이스 포함).
+	 * 중간에 프로젝트 밖 타입(jar 없음)이 있어도 멈추지 않도록, 알아낼 수 있는 것만 모으는 getAncestors(true) 로 한 단계씩 올라갑니다.
+	 * </pre>
+	 */
+	private List<ResolvedReferenceTypeDeclaration> projectAncestorDeclarationsOf(String fqn) {
+		List<ResolvedReferenceTypeDeclaration> result = new ArrayList<ResolvedReferenceTypeDeclaration>();
+		Set<String> seen = new LinkedHashSet<String>();
+		seen.add(fqn);
+		List<ResolvedReferenceTypeDeclaration> level = new ArrayList<ResolvedReferenceTypeDeclaration>();
+		try {
+			SymbolReference<ResolvedReferenceTypeDeclaration> solved = typeSolver.tryToSolveType(fqn);
+			if (!solved.isSolved()) {
+				return result;
+			}
+			level.add(solved.getCorrespondingDeclaration());
+			while (!level.isEmpty()) {
+				List<ResolvedReferenceTypeDeclaration> next = new ArrayList<ResolvedReferenceTypeDeclaration>();
+				for (int i = 0; i < level.size(); i++) {
+					List<ResolvedReferenceType> parents = level.get(i).getAncestors(true);
+					for (int j = 0; j < parents.size(); j++) {
+						String parentName = parents.get(j).getQualifiedName();
+						if (!seen.add(parentName) || !dbSolver.isProjectType(parentName) || !parents.get(j).getTypeDeclaration().isPresent()) {
+							continue;
+						}
+						ResolvedReferenceTypeDeclaration parent = parents.get(j).getTypeDeclaration().get();
+						result.add(parent);
+						next.add(parent);
+					}
+				}
+				level = next;
+			}
+		} catch (StackOverflowError e) {
+			// 여기까지 모은 것만 쓴다.
+		} catch (RuntimeException e) {
+			// 위와 같음
+		}
+		return result;
 	}
 
 	/** 감싸고 있는 타입(과 그 바깥 타입)에 만들어 넣은 필드 가운데 이 이름인 것의 타입. 없으면 null */
@@ -1188,7 +1298,7 @@ public class ReferenceResolver {
 	 * <pre>
 	 * 변수 이름이 가리키는 선언을 소스에서 찾아, 거기 적힌 타입을 돌려줍니다(제네릭은 뺌). 못 찾으면 null입니다.
 	 * 안쪽에서 바깥쪽으로 나가며 찾습니다: 지역 변수 → 메소드/람다/catch의 파라미터 → 감싸고 있는 타입의 필드.
-	 * 해석기처럼 엄밀하지는 않습니다(상위 타입의 필드는 못 찾습니다). 해석기가 실패했을 때만 쓰는 대비책입니다.
+	 * 해석기처럼 엄밀하지는 않습니다(상위 타입의 필드는 여기서 보지 않고 inheritedFieldTypeOf 가 따로 찾습니다). 해석기가 실패했을 때만 쓰는 대비책입니다.
 	 * </pre>
 	 */
 	private String declaredTypeOf(NameExpr nameExpr) {
