@@ -131,14 +131,18 @@ public class RevisionService extends BaseObject {
 	 * 스캔한 파일 목록을 조회합니다.
 	 * </pre>
 	 *
+	 * @param roleGroup 개요 "파일 구성" 표의 구분: SCREEN / JAVA / SQL / CONFIG / OTHER (없으면 전부)
+	 * @param roleKind 같은 표의 종류: Java면 계층(CONTROLLER, SERVICE … '(없음)'), 나머지는 쓰임새(file_type) (없으면 전부)
 	 * @param page 1부터 시작
 	 */
-	public Map<String, Object> getFileList(long revisionId, String language, String fileType, String encoding, String pathLike, int page, int size) {
+	public Map<String, Object> getFileList(long revisionId, String language, String fileType, String encoding, String pathLike, String roleGroup, String roleKind, int page, int size) {
 		findRevision(revisionId);
 		int pageNo = page < 1 ? 1 : page;
 		int pageSize = size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);
 
 		Map<String, Object> condition = condition(revisionId, language, fileType, encoding, pathLike);
+		condition.put("roleGroup", roleGroup);
+		condition.put("roleKind", roleKind);
 		condition.put("size", pageSize);
 		condition.put("offset", (pageNo - 1) * pageSize);
 

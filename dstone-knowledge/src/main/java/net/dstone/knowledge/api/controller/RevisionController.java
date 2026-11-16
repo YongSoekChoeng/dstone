@@ -56,16 +56,23 @@ public class RevisionController {
 		return revisionService.getRevision(revisionId);
 	}
 
-	/** 스캔한 파일 목록. language/fileType/encoding은 일치 조건, path는 포함 조건입니다. */
+	/**
+	 * <pre>
+	 * 스캔한 파일 목록. language/fileType/encoding은 일치 조건, path는 포함 조건입니다.
+	 * roleGroup/roleKind는 개요 "파일 구성" 표의 구분(SCREEN/JAVA/SQL/CONFIG/OTHER)과 종류(Java면 계층, 나머지는 쓰임새)입니다.
+	 * </pre>
+	 */
 	@GetMapping("/{revisionId}/files")
 	public Map<String, Object> getFileList(@PathVariable("revisionId") long revisionId
 			, @RequestParam(name = "language", required = false) String language
 			, @RequestParam(name = "fileType", required = false) String fileType
 			, @RequestParam(name = "encoding", required = false) String encoding
 			, @RequestParam(name = "path", required = false) String path
+			, @RequestParam(name = "roleGroup", required = false) String roleGroup
+			, @RequestParam(name = "roleKind", required = false) String roleKind
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
-		return revisionService.getFileList(revisionId, language, fileType, encoding, path, page, size);
+		return revisionService.getFileList(revisionId, language, fileType, encoding, path, roleGroup, roleKind, page, size);
 	}
 
 	/** 타입 목록. kind와 layer는 일치 조건, name은 전체 이름에 포함 조건입니다. */

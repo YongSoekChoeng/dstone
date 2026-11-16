@@ -467,7 +467,7 @@ var DstoneKnowledgeProject = (function () {
 				return;
 			}
 			if (section.tab === "overview") {
-				el["kn-overview"].appendChild(fileRoleBox(section, rows));
+				el["kn-overview"].appendChild(fileRoleBox(section, rows, summary));
 				return;
 			}
 			var box = sectionBox(section, rows, summary);
@@ -653,10 +653,11 @@ var DstoneKnowledgeProject = (function () {
 	/* ---------------- 파일 구성 ---------------- */
 
 	/**
-	 * 개요의 "파일 구성" 표. 구분(Java / XML / 기타)마다 소계 줄을 먼저 두고 그 아래에 종류별 줄을 단다.
-	 * 종류의 뜻은 Java 면 계층 사전, 나머지는 쓰임새 사전에서 찾는다(CONFIG 처럼 같은 이름이 양쪽에 있어서 나눠 찾는다).
+	 * 개요의 "파일 구성" 표. 구분(화면 / 서버 코드 / SQL / 설정 / 기타)마다 소계 줄을 먼저 두고 그 아래에 종류별 줄을 단다.
+	 * 종류의 뜻은 서버 코드면 계층 사전, 나머지는 쓰임새 사전에서 찾는다(CONFIG 처럼 같은 이름이 양쪽에 있어서 나눠 찾는다).
+	 * 줄(소계 · 합계 줄 포함)을 누르면 표 아래에 그 파일 목록이 열린다.
 	 */
-	function fileRoleBox(section, rows) {
+	function fileRoleBox(section, rows, summary) {
 		var box = document.createElement("div");
 		box.className = "kn-verdict kn-file-role";
 		var groups = [];
@@ -674,25 +675,148 @@ var DstoneKnowledgeProject = (function () {
 			allFiles += row.fileCount;
 			allLines += row.lineCount;
 		});
+
+		// 누를 수 있는 줄마다 목록 조건을 하나씩: { group, kind, label }
+		var targets = [];
 		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">" + K.escapeHtml(section.title) + "</div>"
 			+ "<p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p>"
 			+ "<div class=\"kn-scroll\"><table class=\"document-list-table kn-file-role-table\"><thead><tr>"
 			+ "<th>구분</th><th>종류</th><th>뜻</th><th class=\"kn-num\">파일 수</th><th class=\"kn-num\">줄 수</th></tr></thead><tbody>";
 		groups.forEach(function (group) {
-			html += "<tr class=\"kn-file-role-group\"><td colspan=\"3\">" + K.escapeHtml(T.FILE_GROUP[group.group] || group.group) + "</td>"
+			var name = T.FILE_GROUP_SHORT[group.group] || group.group;
+			targets.push({ group: group.group, kind: null, label: name, count: group.fileCount });
+			html += "<tr class=\"kn-file-role-group kn-click-row\" data-target=\"" + (targets.length - 1) + "\" title=\"" + K.escapeHtml(T.FILE_GROUP[group.group] || "") + "\">"
+				+ "<td colspan=\"3\">" + K.escapeHtml(name) + "</td>"
 				+ "<td class=\"kn-num\">" + T.fmt(group.fileCount) + "</td><td class=\"kn-num\">" + T.fmt(group.lineCount) + "</td></tr>";
 			group.rows.forEach(function (row) {
 				var meaning = row.group === "JAVA" ? T.LAYER[row.kind] : T.FILE_TYPE[row.kind];
 				var languages = row.languages.length > 0 ? " <span class=\"kn-term\">" + K.escapeHtml(row.languages.join(", ")) + "</span>" : "";
-				html += "<tr><td></td><td><span class=\"kn-code\">" + K.escapeHtml(row.kind) + "</span>" + languages + "</td>"
+				targets.push({ group: row.group, kind: row.kind, label: name + " · " + row.kind, count: row.fileCount });
+				html += "<tr class=\"kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td></td><td><span class=\"kn-code\">" + K.escapeHtml(row.kind) + "</span>" + languages + "</td>"
 					+ "<td>" + K.escapeHtml(meaning || "") + "</td>"
 					+ "<td class=\"kn-num\">" + T.fmt(row.fileCount) + "</td><td class=\"kn-num\">" + T.fmt(row.lineCount) + "</td></tr>";
 			});
 		});
-		html += "<tr class=\"kn-file-role-total\"><td colspan=\"3\">모두</td><td class=\"kn-num\">" + T.fmt(allFiles) + "</td><td class=\"kn-num\">" + T.fmt(allLines) + "</td></tr>";
-		html += "</tbody></table></div><details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
+		targets.push({ group: null, kind: null, label: "모든 파일", count: allFiles });
+		html += "<tr class=\"kn-file-role-total kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td colspan=\"3\">모두</td>"
+			+ "<td class=\"kn-num\">" + T.fmt(allFiles) + "</td><td class=\"kn-num\">" + T.fmt(allLines) + "</td></tr>";
+		html += "</tbody></table></div>"
+			+ "<div class=\"kn-file-role-list\" hidden>"
+			+ "<div class=\"kn-section-title\"></div>"
+			+ "<div class=\"kn-row\"><input type=\"text\" class=\"kn-wide kn-file-role-q\" placeholder=\"경로에 들어간 글자 (예: /order/)\" />"
+			+ "<button type=\"button\" class=\"kn-file-role-search\">조회</button><button type=\"button\" class=\"kn-plain kn-file-role-close\">닫기</button></div>"
+			+ "<div class=\"kn-message\"></div><div class=\"kn-scroll kn-file-role-files\"></div>"
+			+ "<div class=\"kn-row\"><button type=\"button\" class=\"kn-plain kn-file-role-prev\">이전</button>"
+			+ "<span class=\"workflow-status-label kn-file-role-page\"></span>"
+			+ "<button type=\"button\" class=\"kn-plain kn-file-role-next\">다음</button></div></div>"
+			+ "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
 		box.innerHTML = html;
+		bindFileList(box, targets, summary.revisionId);
 		return box;
+	}
+
+	/** 파일 구성 표의 줄을 누르면 아래 목록을 그 조건으로 연다. 경로 글자로 좁히고, 50개씩 넘겨 본다 */
+	function bindFileList(box, targets, revisionId) {
+		var listEl = box.querySelector(".kn-file-role-list");
+		var titleEl = listEl.querySelector(".kn-section-title");
+		var queryEl = listEl.querySelector(".kn-file-role-q");
+		var messageEl = listEl.querySelector(".kn-message");
+		var filesEl = listEl.querySelector(".kn-file-role-files");
+		var pageEl = listEl.querySelector(".kn-file-role-page");
+		var prevEl = listEl.querySelector(".kn-file-role-prev");
+		var nextEl = listEl.querySelector(".kn-file-role-next");
+		var trs = box.querySelectorAll(".kn-file-role-table tr[data-target]");
+		var state = { target: null, page: 1, size: 50, pages: 1 };
+		// 늦게 도착한 앞 응답은 버린다
+		var seq = 0;
+
+		function load() {
+			var mine = ++seq;
+			var target = state.target;
+			var params = { page: state.page, size: state.size };
+			if (target.group) {
+				params.roleGroup = target.group;
+			}
+			if (target.kind) {
+				params.roleKind = target.kind;
+			}
+			if (queryEl.value.trim()) {
+				params.path = queryEl.value.trim();
+			}
+			messageEl.className = "kn-message";
+			messageEl.textContent = "불러오는 중...";
+			K.call("GET", "/api/revisions/" + revisionId + "/files", params).then(function (result) {
+				if (mine !== seq) {
+					return;
+				}
+				messageEl.textContent = "";
+				state.pages = Math.max(1, Math.ceil(result.total / state.size));
+				pageEl.textContent = state.page + " / " + state.pages + " 쪽 (모두 " + T.fmt(result.total) + "개)";
+				prevEl.disabled = state.page <= 1;
+				nextEl.disabled = state.page >= state.pages;
+				K.table(filesEl, [
+					{ key: "path", label: "경로", mono: true },
+					{ key: "module", label: "모듈" },
+					{ key: "fileType", label: "쓰임새" },
+					{ key: "lineCount", label: "줄 수", num: true },
+					{ key: "encoding", label: "인코딩" },
+					// 읽기 상태는 Java 문법 읽기 결과라 화면 · 설정 파일은 PENDING 이 정상이다. 그래서 실패한 것만 보여 준다
+					{ key: "parseStatus", label: "읽기 실패", html: function (row) {
+						return row.parseStatus === "FAILED" ? "<span title=\"" + K.escapeHtml(row.parseError || "") + "\">" + K.badge(row.parseStatus) + "</span>" : "";
+					} }
+				], result.files, "조건에 맞는 파일이 없습니다.");
+			}).catch(function (err) {
+				if (mine !== seq) {
+					return;
+				}
+				messageEl.className = "kn-message kn-error";
+				messageEl.textContent = err.message;
+			});
+		}
+
+		Array.prototype.forEach.call(trs, function (tr) {
+			tr.title = tr.title || "누르면 아래에 이 파일 목록이 나옵니다";
+			tr.addEventListener("click", function () {
+				Array.prototype.forEach.call(trs, function (other) {
+					other.classList.toggle("kn-row-on", other === tr);
+				});
+				state.target = targets[parseInt(tr.getAttribute("data-target"), 10)];
+				state.page = 1;
+				queryEl.value = "";
+				titleEl.textContent = state.target.label + " — " + T.fmt(state.target.count) + "개";
+				listEl.hidden = false;
+				load();
+			});
+		});
+		listEl.querySelector(".kn-file-role-search").addEventListener("click", function () {
+			state.page = 1;
+			load();
+		});
+		queryEl.addEventListener("keydown", function (e) {
+			if (e.key === "Enter") {
+				state.page = 1;
+				load();
+			}
+		});
+		prevEl.addEventListener("click", function () {
+			if (state.page > 1) {
+				state.page--;
+				load();
+			}
+		});
+		nextEl.addEventListener("click", function () {
+			if (state.page < state.pages) {
+				state.page++;
+				load();
+			}
+		});
+		listEl.querySelector(".kn-file-role-close").addEventListener("click", function () {
+			seq++;
+			listEl.hidden = true;
+			Array.prototype.forEach.call(trs, function (other) {
+				other.classList.remove("kn-row-on");
+			});
+		});
 	}
 
 	/* ---------------- 연결 품질 ---------------- */

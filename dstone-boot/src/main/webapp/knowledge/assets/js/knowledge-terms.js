@@ -154,10 +154,14 @@ var DstoneKnowledgeTerms = (function () {
 	};
 
 	var FILE_GROUP = {
-		JAVA: "Java",
-		XML: "XML",
-		OTHER: "기타"
+		SCREEN: "화면 (JSP, WebSquare, Nexacro, 화면 공통 스크립트)",
+		JAVA: "서버 코드 (Java)",
+		SQL: "SQL (매퍼, 쿼리 XML, .sql)",
+		CONFIG: "설정 (Spring XML, web.xml, .properties, 빌드 · 로그 설정 …)",
+		OTHER: "그 밖의 파일"
 	};
+	// 표에 쓰는 짧은 이름
+	var FILE_GROUP_SHORT = { SCREEN: "화면", JAVA: "서버 코드", SQL: "SQL", CONFIG: "설정", OTHER: "기타" };
 
 	var TYPE_KIND = {
 		CLASS: "클래스",
@@ -234,9 +238,9 @@ var DstoneKnowledgeTerms = (function () {
 	var SECTIONS = [
 		{
 			tab: "overview", path: "files.byRole", title: "파일 구성",
-			what: "분석한 파일을 Java · XML · 기타로 나누고, Java 는 계층(컨트롤러, 서비스, DAO …)별로, 나머지는 쓰임새별로 센 것입니다.",
+			what: "분석한 파일을 쓰임새(화면 · 서버 코드 · SQL · 설정 · 기타)로 나누고, Java 는 계층(컨트롤러, 서비스, DAO …)별로, 나머지는 종류별로 센 것입니다. 줄을 누르면 아래에 그 파일 목록이 나옵니다.",
 			build: function (summary) {
-				// 같은 구분 · 종류는 한 줄로 (기타의 CONFIG 처럼 언어만 다른 것). 구분은 Java → XML → 기타, 그 안은 파일이 많은 순
+				// 같은 구분 · 종류는 한 줄로 (설정의 CONFIG 처럼 언어만 다른 것). 구분은 화면 → 서버 코드 → SQL → 설정 → 기타, 그 안은 파일이 많은 순
 				var merged = {};
 				var rows = [];
 				(valueAt(summary, "files.byRole") || []).forEach(function (row) {
@@ -245,14 +249,14 @@ var DstoneKnowledgeTerms = (function () {
 						merged[key] = { group: row.group, kind: row.kind, languages: [], fileCount: 0, lineCount: 0 };
 						rows.push(merged[key]);
 					}
-					// 기타는 종류만으로 무슨 파일인지 모를 수 있어 언어를 붙인다 (CONFIG → YAML, PROPERTIES)
-					if (row.group === "OTHER" && row.language !== row.kind && merged[key].languages.indexOf(row.language) < 0) {
+					// Java 가 아니면 언어를 붙인다 (WEBSQUARE → XML, CONFIG → YAML, PROPERTIES)
+					if (row.group !== "JAVA" && row.language !== row.kind && merged[key].languages.indexOf(row.language) < 0) {
 						merged[key].languages.push(row.language);
 					}
 					merged[key].fileCount += Number(row.fileCount) || 0;
 					merged[key].lineCount += Number(row.lineCount) || 0;
 				});
-				var order = { JAVA: 0, XML: 1, OTHER: 2 };
+				var order = { SCREEN: 0, JAVA: 1, SQL: 2, CONFIG: 3, OTHER: 4 };
 				rows.sort(function (a, b) {
 					if (a.group !== b.group) {
 						return order[a.group] - order[b.group];
@@ -264,12 +268,12 @@ var DstoneKnowledgeTerms = (function () {
 				return rows;
 			},
 			columns: [
-				["group", "구분", "Java 파일, XML 파일, 그 밖의 파일", FILE_GROUP],
+				["group", "구분", "파일의 쓰임새", FILE_GROUP],
 				["kind", "종류", "Java 는 그 파일에 맨 먼저 적힌 클래스의 계층('분석 내용' 탭의 '계층' 표와 같은 값), 나머지는 쓰임새('실행 기록' 탭의 '파일 (종류별)' 표와 같은 값)"],
 				["fileCount", "파일 수", ""],
 				["lineCount", "줄 수", "그 파일들의 줄 수 합"]
 			],
-			read: "Java 의 '(없음)'은 계층을 정하지 못한 파일입니다(package-info.java 처럼 클래스가 없는 파일 포함). 많으면 '연결 품질' 탭의 적용 진단에서 '계층을 모르는 클래스'를 봅니다. "
+			read: "WebSquare 화면은 확장자가 .xml 이어도 '화면'에, MyBatis 매퍼와 쿼리 XML 은 'SQL'에 들어갑니다. 서버 코드의 '(없음)'은 계층을 정하지 못한 파일입니다(package-info.java 처럼 클래스가 없는 파일 포함). 많으면 '연결 품질' 탭의 적용 진단에서 '계층을 모르는 클래스'를 봅니다. "
 				+ "SEMANTIC 단계 전의 리비전은 Java 파일이 모두 '(없음)'으로 나옵니다."
 		},
 		{
@@ -600,6 +604,7 @@ var DstoneKnowledgeTerms = (function () {
 		LAYER: LAYER,
 		FILE_TYPE: FILE_TYPE,
 		FILE_GROUP: FILE_GROUP,
+		FILE_GROUP_SHORT: FILE_GROUP_SHORT,
 		REF_KIND: REF_KIND,
 		meaningOf: meaningOf
 	};

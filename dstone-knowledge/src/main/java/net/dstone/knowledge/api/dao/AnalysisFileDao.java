@@ -51,8 +51,8 @@ public class AnalysisFileDao extends BaseDao {
 
 	/**
 	 * <pre>
-	 * 파일 구성: Java 파일은 계층(컨트롤러, 서비스, DAO …)별로, 나머지는 쓰임새별로 센 파일 수와 줄 수.
-	 * 행마다 group(JAVA / XML / OTHER), kind, language, fileCount, lineCount.
+	 * 파일 구성: 쓰임새(화면, 서버 코드, SQL, 설정, 그 밖)로 나누고, Java 파일은 계층(컨트롤러, 서비스, DAO …)별로, 나머지는 쓰임새별로 센 파일 수와 줄 수.
+	 * 행마다 group(SCREEN / JAVA / SQL / CONFIG / OTHER), kind, language, fileCount, lineCount.
 	 * </pre>
 	 */
 	public List<Map<String, Object>> selectSummaryByRole(long revisionId) {
