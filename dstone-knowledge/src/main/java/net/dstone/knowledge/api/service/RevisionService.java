@@ -76,7 +76,7 @@ public class RevisionService extends BaseObject {
 	/**
 	 * <pre>
 	 * 리비전 하나를 조회합니다.
-	 * 단계별 진행 상태, 이 리비전을 돌린 Job들, 스캔한 파일의 요약(종류별/인코딩별/소스 루트별)을 같이 돌려줍니다.
+	 * 단계별 진행 상태, 이 리비전을 돌린 Job들, 스캔한 파일의 요약(종류별/역할별/인코딩별/소스 루트별)을 같이 돌려줍니다.
 	 * </pre>
 	 */
 	public Map<String, Object> getRevision(long revisionId) {
@@ -87,6 +87,7 @@ public class RevisionService extends BaseObject {
 		Map<String, Object> files = new LinkedHashMap<String, Object>();
 		files.put("total", analysisFileDao.countFile(condition(revisionId, null, null, null, null)));
 		files.put("byType", analysisFileDao.selectSummaryByType(revisionId));
+		files.put("byRole", analysisFileDao.selectSummaryByRole(revisionId));
 		files.put("byEncoding", analysisFileDao.selectSummaryByEncoding(revisionId));
 		files.put("javaSourceRoots", analysisFileDao.selectSummaryBySourceRoot(revisionId));
 		result.put("files", files);
