@@ -900,6 +900,14 @@ public class ReferenceResolver {
 			}
 			return;
 		}
+		// 패키지부터 다 적은 타입 이름인데 jar 가 없어 확인할 수 없는 것(org.apache.commons.io.FileUtils).
+		// 맨 앞 마디가 변수가 아니면 Java 문법상 타입이다. 확인은 못 했으므로 MEDIUM / HEURISTIC 으로 남긴다.
+		// 앞부분이 이미 타입이면(com.lowagie.text.Font.HELVETICA) 마지막 마디는 그 타입의 필드라서 아래에서 필드로 푼다.
+		if (looksLikeQualifiedTypeName(text) && !looksLikeQualifiedTypeName(access.getScope().toString()) && !startsWithVariable(access)) {
+			addRelation(context, reference, "USES_TYPE", "EXTERNAL_TYPE", null, text, "MEDIUM", "HEURISTIC", via("QUALIFIED_NAME"));
+			update(context, reference, "EXTERNAL", null);
+			return;
+		}
 		if (looksLikePackage(text) || isPartOfQualifiedName(context, access)) {
 			update(context, reference, "IGNORED", "패키지 이름의 일부입니다.");
 			return;
@@ -1071,8 +1079,54 @@ public class ReferenceResolver {
 			if (typeName != null && (context.imports.containsValue(typeName) || isKnownType(typeName))) {
 				return typeName;
 			}
+			// 패키지부터 다 적은 타입 이름: org.apache.commons.io.FileUtils.readFileToByteArray(f) 의 org.apache.commons.io.FileUtils.
+			// jar 가 없어 확인할 수 없어도, 맨 앞 마디(org)가 변수가 아니면 Java 문법상 패키지 + 타입이다. 소스에 적힌 글자 그대로 쓴다.
+			// 앞부분이 이미 타입이면(com.lowagie.text.Font.HELVETICA) 그 타입의 필드라서, 필드의 타입은 모른다.
+			if (expression instanceof FieldAccessExpr && looksLikeQualifiedTypeName(text)
+					&& !looksLikeQualifiedTypeName(((FieldAccessExpr) expression).getScope().toString())
+					&& !startsWithVariable((FieldAccessExpr) expression)) {
+				return text;
+			}
 		}
 		return null;
+	}
+
+	/**
+	 * <pre>
+	 * 소문자로 시작하는 마디가 둘 이상 이어지고(패키지), 그 뒤가 모두 대문자로 시작하면(타입, 중첩 타입) true 입니다.
+	 *   org.apache.commons.io.FileUtils → true
+	 *   com.lowagie.text.Font           → true
+	 *   request.getSession              → false (패키지 마디가 하나뿐)
+	 * </pre>
+	 */
+	private boolean looksLikeQualifiedTypeName(String text) {
+		String[] parts = text.split("\\.");
+		int packageParts = 0;
+		while (packageParts < parts.length && parts[packageParts].length() > 0 && Character.isLowerCase(parts[packageParts].charAt(0))) {
+			packageParts++;
+		}
+		if (packageParts < 2 || packageParts == parts.length) {
+			return false;
+		}
+		for (int i = packageParts; i < parts.length; i++) {
+			if (parts[i].length() == 0 || !Character.isUpperCase(parts[i].charAt(0))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** a.b.c 의 맨 앞 마디(a)가 이 자리에서 보이는 변수(지역 변수, 파라미터, 필드, 물려받은 필드)면 true 입니다. */
+	private boolean startsWithVariable(FieldAccessExpr access) {
+		Expression first = access;
+		while (first instanceof FieldAccessExpr) {
+			first = ((FieldAccessExpr) first).getScope();
+		}
+		if (!(first instanceof NameExpr)) {
+			return true;
+		}
+		NameExpr name = (NameExpr) first;
+		return declaredTypeOf(name) != null || syntheticFieldTypeOf(name) != null || inheritedFieldTypeOf(name) != null;
 	}
 
 	/** 파일의 패키지와 import(com.a.Foo → Foo = com.a.Foo)를 담습니다. 타입 이름을 전체 이름으로 바꿀 때 씁니다. */
