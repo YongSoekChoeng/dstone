@@ -466,7 +466,7 @@ var DstoneKnowledgeProject = (function () {
 				return;
 			}
 			if (section.tab === "overview") {
-				el["kn-overview"].appendChild(section.path === "tables.byUsage" ? tableUsageBox(section, rows, summary) : fileRoleBox(section, rows, summary));
+				el["kn-overview"].appendChild(section.path === "tables.count" ? tableListBox(section, rows, summary) : fileRoleBox(section, rows, summary));
 				return;
 			}
 			var box = sectionBox(section, rows, summary);
@@ -737,43 +737,40 @@ var DstoneKnowledgeProject = (function () {
 
 	/* ---------------- 테이블 ---------------- */
 
+	/** 테이블 목록의 작업 조건 체크박스: [보낼 값, 이름] */
+	var TABLE_OPS = [["R", "읽기"], ["C", "추가"], ["U", "수정"], ["D", "삭제"]];
+
 	/**
-	 * 개요의 "테이블" 표. SQL 이 건드리는 테이블을 쓰임새(읽고 씀 / 읽기만 / 쓰기만)로 나눈 수.
-	 * 줄을 누르면 아래에 그 테이블 목록이 열리고, 테이블 이름을 누르면 영향도 화면이 새 창으로 열린다.
+	 * 개요의 "테이블" 섹션. SQL 이 건드리는 테이블 목록을 바로 보여 준다.
+	 * 이름 글자와 작업 체크박스(읽기 · 추가 · 수정 · 삭제)로 좁히고, 체크한 작업을 모두 하는 테이블만 남긴다.
+	 * 테이블 이름을 누르면 영향도 화면이 새 창으로 열린다.
 	 */
-	function tableUsageBox(section, rows, summary) {
+	function tableListBox(section, count, summary) {
 		var box = document.createElement("div");
 		box.className = "kn-verdict kn-file-role";
-		var order = { READ_WRITE: 0, READ_ONLY: 1, WRITE_ONLY: 2 };
-		var sorted = rows.slice().sort(function (a, b) {
-			return (order[a.usage] === undefined ? 9 : order[a.usage]) - (order[b.usage] === undefined ? 9 : order[b.usage]);
-		});
-		var targets = [];
-		var allTables = 0;
-		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">" + K.escapeHtml(section.title) + "</div>"
+		var checks = "<span class=\"kn-table-ops\" title=\"체크한 작업을 모두 하는 테이블만 남깁니다\">"
+			+ TABLE_OPS.map(function (op) {
+				return "<label><input type=\"checkbox\" value=\"" + op[0] + "\" /> " + K.escapeHtml(op[1]) + "</label>";
+			}).join("") + "</span>";
+		box.innerHTML = "<div class=\"kn-section-title\" style=\"margin-top:0;\">" + K.escapeHtml(section.title) + " — " + T.fmt(count) + "개</div>"
 			+ "<p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p>"
-			+ "<div class=\"kn-scroll\"><table class=\"document-list-table kn-file-role-table\"><thead><tr>"
-			+ "<th>구분</th><th>뜻</th><th class=\"kn-num\">테이블 수</th><th class=\"kn-num\">SQL 수</th></tr></thead><tbody>";
-		sorted.forEach(function (row) {
-			allTables += Number(row.tables) || 0;
-			targets.push({ usage: row.usage, label: T.TABLE_USAGE_SHORT[row.usage] || row.usage, count: row.tables });
-			html += "<tr class=\"kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td><span class=\"kn-code\">" + K.escapeHtml(row.usage) + "</span></td>"
-				+ "<td>" + K.escapeHtml(T.TABLE_USAGE[row.usage] || "") + "</td>"
-				+ "<td class=\"kn-num\">" + T.fmt(row.tables) + "</td><td class=\"kn-num\">" + T.fmt(row.statements) + "</td></tr>";
-		});
-		targets.push({ usage: null, label: "모든 테이블", count: allTables });
-		// 모두 줄의 SQL 수는 비운다: SQL 하나가 여러 구분의 테이블을 건드리면 겹쳐 세어지기 때문
-		html += "<tr class=\"kn-file-role-total kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td colspan=\"2\">모두</td>"
-			+ "<td class=\"kn-num\">" + T.fmt(allTables) + "</td><td></td></tr>";
-		html += "</tbody></table></div>" + drillListHtml("테이블 이름에 들어간 글자 (예: TB_CM)")
+			+ drillListHtml("테이블 이름에 들어간 글자 (예: TB_CM)", checks)
 			+ "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
-		box.innerHTML = html;
-		bindDrillList(box, targets, {
+		var opInputs = box.querySelectorAll(".kn-table-ops input");
+		bindDrillList(box, [], {
 			unit: "개",
+			initial: { label: "", count: count },
+			reloadOn: opInputs,
 			load: function (target, page, size, q) {
 				var params = { page: page, size: size };
-				if (target.usage) {
-					params.usage = target.usage;
+				var ops = [];
+				Array.prototype.forEach.call(opInputs, function (input) {
+					if (input.checked) {
+						ops.push(input.value);
+					}
+				});
+				if (ops.length) {
+					params.ops = ops.join(",");
 				}
 				if (q) {
 					params.name = q;
@@ -800,11 +797,12 @@ var DstoneKnowledgeProject = (function () {
 
 	/* ---------------- 표 아래 목록 (파일 구성 · 테이블 공용) ---------------- */
 
-	/** 표 아래에 숨겨 둔 목록 칸: 제목, 글자 조건, 결과, 이전 / 다음 */
-	function drillListHtml(placeholder) {
+	/** 표 아래에 숨겨 둔 목록 칸: 제목, 글자 조건(+ extraHtml 조건), 결과, 이전 / 다음 */
+	function drillListHtml(placeholder, extraHtml) {
 		return "<div class=\"kn-drill-list\" hidden>"
 			+ "<div class=\"kn-section-title\"></div>"
 			+ "<div class=\"kn-row\"><input type=\"text\" class=\"kn-wide kn-drill-q\" placeholder=\"" + K.escapeHtml(placeholder) + "\" />"
+			+ (extraHtml || "")
 			+ "<button type=\"button\" class=\"kn-drill-search\">조회</button><button type=\"button\" class=\"kn-plain kn-drill-close\">닫기</button></div>"
 			+ "<div class=\"kn-message\"></div><div class=\"kn-scroll kn-drill-rows\"></div>"
 			+ "<div class=\"kn-row\"><button type=\"button\" class=\"kn-plain kn-drill-prev\">이전</button>"
@@ -815,6 +813,7 @@ var DstoneKnowledgeProject = (function () {
 	/**
 	 * 표의 줄(tr[data-target])을 누르면 아래 목록을 그 조건으로 연다. 글자로 좁히고, 50개씩 넘겨 본다.
 	 * options.load(target, page, size, 글자) 는 { total, rows } 를 돌려주는 Promise, options.columns 는 K.table 의 열.
+	 * options.initial 이 있으면 그 조건으로 처음부터 열어 두고 닫기를 숨긴다. options.reloadOn 의 입력이 바뀌면 1쪽부터 다시 읽는다.
 	 */
 	function bindDrillList(box, targets, options) {
 		var listEl = box.querySelector(".kn-drill-list");
@@ -889,6 +888,22 @@ var DstoneKnowledgeProject = (function () {
 				load();
 			}
 		});
+		if (options.reloadOn) {
+			Array.prototype.forEach.call(options.reloadOn, function (input) {
+				input.addEventListener("change", function () {
+					state.page = 1;
+					load();
+				});
+			});
+		}
+		if (options.initial) {
+			state.target = options.initial;
+			titleEl.hidden = true;
+			// button 은 CSS 가 display 를 정해서 hidden 속성이 안 먹는다
+			listEl.querySelector(".kn-drill-close").style.display = "none";
+			listEl.hidden = false;
+			load();
+		}
 		listEl.querySelector(".kn-drill-close").addEventListener("click", function () {
 			seq++;
 			listEl.hidden = true;

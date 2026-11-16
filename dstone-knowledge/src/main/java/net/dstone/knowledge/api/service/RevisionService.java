@@ -114,9 +114,9 @@ public class RevisionService extends BaseObject {
 		semantic.put("resources", resourceDao.selectResourceSummary(revisionId));
 		result.put("semantic", semantic);
 
-		// 개요의 "테이블" 표: SQL 이 건드리는 테이블을 쓰임새별로
+		// 개요의 "테이블" 섹션: SQL 이 건드리는 테이블 수(목록은 /tables 로 따로 읽는다)
 		Map<String, Object> tables = new LinkedHashMap<String, Object>();
-		tables.put("byUsage", resourceDao.selectTableUsageSummary(revisionId));
+		tables.put("count", resourceDao.countAllTable(revisionId));
 		result.put("tables", tables);
 
 		// 증분 분석이었으면: 기준 리비전에서 얼마나 옮겨 왔고 얼마나 다시 분석했는지

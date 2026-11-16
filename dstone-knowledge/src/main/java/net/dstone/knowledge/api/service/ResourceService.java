@@ -1,5 +1,6 @@
 package net.dstone.knowledge.api.service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,18 +32,37 @@ public class ResourceService extends BaseObject {
 	 * </pre>
 	 *
 	 * @param name 테이블 이름에 이 글자가 들어간 것만(없으면 전부)
-	 * @param usage READ_ONLY(읽기만) / READ_WRITE(읽고 씀) / WRITE_ONLY(쓰기만) (없으면 전부)
+	 * @param ops R(읽기) C(추가) U(수정) D(삭제)를 쉼표로 이은 것. 고른 작업을 모두 하는 테이블만(없으면 전부)
 	 */
-	public Map<String, Object> getTableList(long revisionId, String name, String usage, int page, int size) {
+	public Map<String, Object> getTableList(long revisionId, String name, String ops, int page, int size) {
 		Map<String, Object> condition = paging(revisionId, page, size);
 		condition.put("name", name);
-		condition.put("usage", usage);
+		condition.put("ops", tableOps(ops));
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("total", resourceDao.countTable(condition));
 		result.put("page", condition.get("page"));
 		result.put("size", condition.get("size"));
 		result.put("tables", resourceDao.selectTableList(condition));
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * "R,C" 같은 작업 조건을 목록으로. R C U D 가 아닌 글자와 겹친 것은 버립니다.
+	 * </pre>
+	 */
+	private static List<String> tableOps(String ops) {
+		List<String> list = new ArrayList<String>();
+		if (ops == null) {
+			return list;
+		}
+		for (String op : ops.split(",")) {
+			String one = op.trim().toUpperCase();
+			if (("R".equals(one) || "C".equals(one) || "U".equals(one) || "D".equals(one)) && !list.contains(one)) {
+				list.add(one);
+			}
+		}
+		return list;
 	}
 
 	/**

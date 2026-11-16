@@ -235,14 +235,19 @@
 
     <!-- 테이블 목록: 테이블마다 읽는 SQL / 쓰는 SQL 이 몇 개인지 -->
     <!--
-        테이블을 쓰임새로 나누는 조건. usage 가 있으면 GROUP BY 뒤에 붙인다.
-        READ_ONLY 읽기만 / READ_WRITE 읽고 씀 / WRITE_ONLY 쓰기만
+        작업 조건. ops 는 R(읽기) C(추가) U(수정) D(삭제) 가운데 고른 것이고,
+        고른 작업을 모두 하는 테이블만 남긴다(비어 있으면 전부). GROUP BY 뒤에 붙인다.
     -->
-    <sql id="tableUsageHaving">
-        <if test="usage == 'READ_ONLY'">HAVING COUNT(*) FILTER (WHERE r.relation_type = 'WRITES_TABLE') = 0</if>
-        <if test="usage == 'WRITE_ONLY'">HAVING COUNT(*) FILTER (WHERE r.relation_type = 'READS_TABLE') = 0</if>
-        <if test="usage == 'READ_WRITE'">HAVING COUNT(*) FILTER (WHERE r.relation_type = 'READS_TABLE') &gt; 0
-                                           AND COUNT(*) FILTER (WHERE r.relation_type = 'WRITES_TABLE') &gt; 0</if>
+    <sql id="tableOpsHaving">
+        <if test="ops != null and ops.size() > 0">
+            HAVING
+            <foreach collection="ops" item="op" separator=" AND ">
+                <choose>
+                    <when test='op == "R"'>COUNT(*) FILTER (WHERE r.relation_type = 'READS_TABLE') &gt; 0</when>
+                    <otherwise>COUNT(*) FILTER (WHERE r.properties_json->>'crud' = #{op}) &gt; 0</otherwise>
+                </choose>
+            </foreach>
+        </if>
     </sql>
 
     <!-- title 은 SQL 주석에 적힌 테이블 한글명 가운데 가장 많이 쓰인 것(없으면 NULL) -->
@@ -258,7 +263,7 @@
            AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
         <if test="name != null and name != ''">AND r.to_external LIKE '%' || upper(#{name}) || '%'</if>
          GROUP BY r.to_external
-        <include refid="tableUsageHaving"/>
+        <include refid="tableOpsHaving"/>
          ORDER BY COUNT(*) DESC, r.to_external
          LIMIT #{size} OFFSET #{offset}
     </select>
@@ -271,33 +276,16 @@
                AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
             <if test="name != null and name != ''">AND r.to_external LIKE '%' || upper(#{name}) || '%'</if>
              GROUP BY r.to_external
-            <include refid="tableUsageHaving"/>
+            <include refid="tableOpsHaving"/>
         ) x
     </select>
 
-    <!-- 개요 화면의 "테이블" 표: 쓰임새(읽기만 / 읽고 씀 / 쓰기만)별 테이블 수와, 그 테이블들을 건드리는 SQL statement 수 -->
-    <select id="selectTableUsageSummary" parameterType="long" resultType="java.util.LinkedHashMap">
-        WITH t AS (
-            SELECT r.to_external AS name
-                 , COUNT(*) FILTER (WHERE r.relation_type = 'READS_TABLE') AS reads
-                 , COUNT(*) FILTER (WHERE r.relation_type = 'WRITES_TABLE') AS writes
-              FROM analysis_relation r
-             WHERE r.revision_id = #{revisionId}
-               AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
-             GROUP BY r.to_external
-        ), u AS (
-            SELECT name, CASE WHEN writes = 0 THEN 'READ_ONLY' WHEN reads = 0 THEN 'WRITE_ONLY' ELSE 'READ_WRITE' END AS usage
-              FROM t
-        )
-        SELECT u.usage AS "usage"
-             , COUNT(DISTINCT u.name) AS "tables"
-             , COUNT(DISTINCT r.from_id) AS "statements"
-          FROM u
-          JOIN analysis_relation r
-            ON r.revision_id = #{revisionId}
+    <!-- 개요 화면의 "테이블" 섹션: SQL 이 건드리는 테이블 수 -->
+    <select id="countAllTable" parameterType="long" resultType="int">
+        SELECT COUNT(DISTINCT r.to_external)
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
            AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
-           AND r.to_external = u.name
-         GROUP BY u.usage
     </select>
 
     <!-- 테이블 하나를 건드리는 SQL 과, 그 SQL 을 실행하는 Java 메소드 -->

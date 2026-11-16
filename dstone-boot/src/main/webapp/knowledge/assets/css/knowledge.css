@@ -1742,3 +1742,6 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 	.kn-topbar-text { display: none; }
 	.kn-fold-brief { white-space: normal; }
 }
+/* 개요 "테이블" 목록의 작업 체크박스 */
+.kn-table-ops{display:inline-flex;gap:10px;align-items:center;white-space:nowrap;margin:0 4px;}
+.kn-table-ops label{display:inline-flex;gap:3px;align-items:center;cursor:pointer;}
