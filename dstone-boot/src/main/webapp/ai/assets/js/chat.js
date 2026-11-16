@@ -161,9 +161,60 @@ var DstoneAiChat = (function () {
 		bubble.className = "chat-bubble";
 		bubble.textContent = text;
 		wrap.appendChild(bubble);
+		// 내가 보낸 말은 파란 말풍선이라 드래그해도 잘 안 보여서, 한 번에 복사하는 버튼을 붙인다.
+		if (role === "user") {
+			wrap.appendChild(createCopyButton(text));
+		}
 		messagesEl.appendChild(wrap);
 		messagesEl.scrollTop = messagesEl.scrollHeight;
 		return bubble;
+	}
+
+	/** 누르면 text를 클립보드에 넣는 [복사] 버튼을 만든다. */
+	function createCopyButton(text) {
+		var btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "chat-copy";
+		btn.textContent = "복사";
+		btn.title = "이 메시지를 복사";
+		btn.addEventListener("click", function () {
+			copyText(text).then(function () {
+				btn.textContent = "복사됨";
+			}, function () {
+				btn.textContent = "복사 실패";
+			}).then(function () {
+				setTimeout(function () { btn.textContent = "복사"; }, 1500);
+			});
+		});
+		return btn;
+	}
+
+	/** 클립보드에 글자를 넣는다. http 화면처럼 navigator.clipboard를 못 쓰면 숨긴 textarea로 복사한다. */
+	function copyText(text) {
+		if (navigator.clipboard && window.isSecureContext) {
+			return navigator.clipboard.writeText(text);
+		}
+		return new Promise(function (resolve, reject) {
+			var area = document.createElement("textarea");
+			area.value = text;
+			area.setAttribute("readonly", "");
+			area.style.position = "fixed";
+			area.style.opacity = "0";
+			document.body.appendChild(area);
+			area.select();
+			var ok = false;
+			try {
+				ok = document.execCommand("copy");
+			} catch (e) {
+				ok = false;
+			}
+			document.body.removeChild(area);
+			if (ok) {
+				resolve();
+			} else {
+				reject(new Error("copy failed"));
+			}
+		});
 	}
 
 	// text/event-stream 프레임(빈 줄로 구분)을 파싱한다. 같은 프레임 안의 여러 data: 줄은
