@@ -31,11 +31,14 @@ public class ResourceService extends BaseObject {
 	 * </pre>
 	 *
 	 * @param name 테이블 이름에 이 글자가 들어간 것만(없으면 전부)
+	 * @param usage READ_ONLY(읽기만) / READ_WRITE(읽고 씀) / WRITE_ONLY(쓰기만) (없으면 전부)
 	 */
-	public Map<String, Object> getTableList(long revisionId, String name, int page, int size) {
+	public Map<String, Object> getTableList(long revisionId, String name, String usage, int page, int size) {
 		Map<String, Object> condition = paging(revisionId, page, size);
 		condition.put("name", name);
+		condition.put("usage", usage);
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("total", resourceDao.countTable(condition));
 		result.put("page", condition.get("page"));
 		result.put("size", condition.get("size"));
 		result.put("tables", resourceDao.selectTableList(condition));

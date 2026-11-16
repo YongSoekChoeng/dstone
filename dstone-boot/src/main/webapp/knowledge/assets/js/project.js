@@ -436,14 +436,13 @@ var DstoneKnowledgeProject = (function () {
 				+ "</div><div class=\"kn-card-label\">" + K.escapeHtml(card[0]) + "</div><div class=\"kn-card-help\">" + K.escapeHtml(card[1]) + "</div></div>";
 		}).join("");
 
-		// 개요: 한눈에 보기 → 미사용 → 파일 구성
+		// 개요: 한눈에 보기 → 파일 구성 → 테이블 → 미사용 (가운데 둘은 아래 SECTIONS 에서, 미사용은 그 뒤에 붙인다)
 		el["kn-overview"].innerHTML = "";
 		var verdict = verdictLines(summary, metrics);
 		el["kn-overview"].appendChild(verdictBox(verdict));
 		var unusedBox = document.createElement("div");
 		unusedBox.className = "kn-verdict kn-unused-overview";
 		unusedBox.innerHTML = "<div class=\"kn-section-title\" style=\"margin-top:0;\">미사용</div><p class=\"ai-hint\">계산하는 중...</p>";
-		el["kn-overview"].appendChild(unusedBox);
 		var unused = DstoneKnowledgeUnused.summary();
 		if (unused && String(unused.revisionId) === String(summary.revisionId)) {
 			DstoneKnowledgeUnused.renderOverview(unusedBox, unused, function () { showTab("unused"); });
@@ -467,7 +466,7 @@ var DstoneKnowledgeProject = (function () {
 				return;
 			}
 			if (section.tab === "overview") {
-				el["kn-overview"].appendChild(fileRoleBox(section, rows, summary));
+				el["kn-overview"].appendChild(section.path === "tables.byUsage" ? tableUsageBox(section, rows, summary) : fileRoleBox(section, rows, summary));
 				return;
 			}
 			var box = sectionBox(section, rows, summary);
@@ -476,6 +475,7 @@ var DstoneKnowledgeProject = (function () {
 				attachUnresolved(box, rows, summary);
 			}
 		});
+		el["kn-overview"].appendChild(unusedBox);
 		Object.keys(targets).forEach(function (tab) {
 			if (!targets[tab].firstChild) {
 				targets[tab].innerHTML = "<p class=\"ai-hint\">보여 줄 결과가 없습니다.</p>";
@@ -700,71 +700,150 @@ var DstoneKnowledgeProject = (function () {
 		targets.push({ group: null, kind: null, label: "모든 파일", count: allFiles });
 		html += "<tr class=\"kn-file-role-total kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td colspan=\"3\">모두</td>"
 			+ "<td class=\"kn-num\">" + T.fmt(allFiles) + "</td><td class=\"kn-num\">" + T.fmt(allLines) + "</td></tr>";
-		html += "</tbody></table></div>"
-			+ "<div class=\"kn-file-role-list\" hidden>"
-			+ "<div class=\"kn-section-title\"></div>"
-			+ "<div class=\"kn-row\"><input type=\"text\" class=\"kn-wide kn-file-role-q\" placeholder=\"경로에 들어간 글자 (예: /order/)\" />"
-			+ "<button type=\"button\" class=\"kn-file-role-search\">조회</button><button type=\"button\" class=\"kn-plain kn-file-role-close\">닫기</button></div>"
-			+ "<div class=\"kn-message\"></div><div class=\"kn-scroll kn-file-role-files\"></div>"
-			+ "<div class=\"kn-row\"><button type=\"button\" class=\"kn-plain kn-file-role-prev\">이전</button>"
-			+ "<span class=\"workflow-status-label kn-file-role-page\"></span>"
-			+ "<button type=\"button\" class=\"kn-plain kn-file-role-next\">다음</button></div></div>"
+		html += "</tbody></table></div>" + drillListHtml("경로에 들어간 글자 (예: /order/)")
 			+ "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
 		box.innerHTML = html;
-		bindFileList(box, targets, summary.revisionId);
+		bindDrillList(box, targets, {
+			unit: "개",
+			load: function (target, page, size, q) {
+				var params = { page: page, size: size };
+				if (target.group) {
+					params.roleGroup = target.group;
+				}
+				if (target.kind) {
+					params.roleKind = target.kind;
+				}
+				if (q) {
+					params.path = q;
+				}
+				return K.call("GET", "/api/revisions/" + summary.revisionId + "/files", params).then(function (result) {
+					return { total: result.total, rows: result.files };
+				});
+			},
+			columns: [
+				{ key: "path", label: "경로", mono: true },
+				{ key: "module", label: "모듈" },
+				{ key: "fileType", label: "쓰임새" },
+				{ key: "lineCount", label: "줄 수", num: true },
+				{ key: "encoding", label: "인코딩" },
+				// 읽기 상태는 Java 문법 읽기 결과라 화면 · 설정 파일은 PENDING 이 정상이다. 그래서 실패한 것만 보여 준다
+				{ key: "parseStatus", label: "읽기 실패", html: function (row) {
+					return row.parseStatus === "FAILED" ? "<span title=\"" + K.escapeHtml(row.parseError || "") + "\">" + K.badge(row.parseStatus) + "</span>" : "";
+				} }
+			]
+		});
 		return box;
 	}
 
-	/** 파일 구성 표의 줄을 누르면 아래 목록을 그 조건으로 연다. 경로 글자로 좁히고, 50개씩 넘겨 본다 */
-	function bindFileList(box, targets, revisionId) {
-		var listEl = box.querySelector(".kn-file-role-list");
+	/* ---------------- 테이블 ---------------- */
+
+	/**
+	 * 개요의 "테이블" 표. SQL 이 건드리는 테이블을 쓰임새(읽고 씀 / 읽기만 / 쓰기만)로 나눈 수.
+	 * 줄을 누르면 아래에 그 테이블 목록이 열리고, 테이블 이름을 누르면 영향도 화면이 새 창으로 열린다.
+	 */
+	function tableUsageBox(section, rows, summary) {
+		var box = document.createElement("div");
+		box.className = "kn-verdict kn-file-role";
+		var order = { READ_WRITE: 0, READ_ONLY: 1, WRITE_ONLY: 2 };
+		var sorted = rows.slice().sort(function (a, b) {
+			return (order[a.usage] === undefined ? 9 : order[a.usage]) - (order[b.usage] === undefined ? 9 : order[b.usage]);
+		});
+		var targets = [];
+		var allTables = 0;
+		var html = "<div class=\"kn-section-title\" style=\"margin-top:0;\">" + K.escapeHtml(section.title) + "</div>"
+			+ "<p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p>"
+			+ "<div class=\"kn-scroll\"><table class=\"document-list-table kn-file-role-table\"><thead><tr>"
+			+ "<th>구분</th><th>뜻</th><th class=\"kn-num\">테이블 수</th><th class=\"kn-num\">SQL 수</th></tr></thead><tbody>";
+		sorted.forEach(function (row) {
+			allTables += Number(row.tables) || 0;
+			targets.push({ usage: row.usage, label: T.TABLE_USAGE_SHORT[row.usage] || row.usage, count: row.tables });
+			html += "<tr class=\"kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td><span class=\"kn-code\">" + K.escapeHtml(row.usage) + "</span></td>"
+				+ "<td>" + K.escapeHtml(T.TABLE_USAGE[row.usage] || "") + "</td>"
+				+ "<td class=\"kn-num\">" + T.fmt(row.tables) + "</td><td class=\"kn-num\">" + T.fmt(row.statements) + "</td></tr>";
+		});
+		targets.push({ usage: null, label: "모든 테이블", count: allTables });
+		// 모두 줄의 SQL 수는 비운다: SQL 하나가 여러 구분의 테이블을 건드리면 겹쳐 세어지기 때문
+		html += "<tr class=\"kn-file-role-total kn-click-row\" data-target=\"" + (targets.length - 1) + "\"><td colspan=\"2\">모두</td>"
+			+ "<td class=\"kn-num\">" + T.fmt(allTables) + "</td><td></td></tr>";
+		html += "</tbody></table></div>" + drillListHtml("테이블 이름에 들어간 글자 (예: TB_CM)")
+			+ "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary><p>" + K.escapeHtml(section.read) + "</p></details>";
+		box.innerHTML = html;
+		bindDrillList(box, targets, {
+			unit: "개",
+			load: function (target, page, size, q) {
+				var params = { page: page, size: size };
+				if (target.usage) {
+					params.usage = target.usage;
+				}
+				if (q) {
+					params.name = q;
+				}
+				return K.call("GET", "/api/revisions/" + summary.revisionId + "/tables", params).then(function (result) {
+					return { total: result.total, rows: result.tables };
+				});
+			},
+			columns: [
+				{ key: "table", label: "테이블", html: function (row) {
+					var url = K.pageUrl("knowledge/impact/impact", "p=" + encodeURIComponent(summary.projectId) + "&r=" + encodeURIComponent(summary.revisionId)
+						+ "&k=table&v=" + encodeURIComponent(row.table) + "&l=" + encodeURIComponent(row.table));
+					return "<a class=\"kn-mono\" href=\"" + K.escapeHtml(url) + "\" target=\"_blank\" title=\"영향도 화면에서 보기 (새 창)\">" + K.escapeHtml(row.table) + "</a>";
+				} },
+				{ key: "title", label: "한글명" },
+				{ key: "reads", label: "읽기", num: true },
+				{ key: "inserts", label: "추가", num: true },
+				{ key: "updates", label: "수정", num: true },
+				{ key: "deletes", label: "삭제", num: true }
+			]
+		});
+		return box;
+	}
+
+	/* ---------------- 표 아래 목록 (파일 구성 · 테이블 공용) ---------------- */
+
+	/** 표 아래에 숨겨 둔 목록 칸: 제목, 글자 조건, 결과, 이전 / 다음 */
+	function drillListHtml(placeholder) {
+		return "<div class=\"kn-drill-list\" hidden>"
+			+ "<div class=\"kn-section-title\"></div>"
+			+ "<div class=\"kn-row\"><input type=\"text\" class=\"kn-wide kn-drill-q\" placeholder=\"" + K.escapeHtml(placeholder) + "\" />"
+			+ "<button type=\"button\" class=\"kn-drill-search\">조회</button><button type=\"button\" class=\"kn-plain kn-drill-close\">닫기</button></div>"
+			+ "<div class=\"kn-message\"></div><div class=\"kn-scroll kn-drill-rows\"></div>"
+			+ "<div class=\"kn-row\"><button type=\"button\" class=\"kn-plain kn-drill-prev\">이전</button>"
+			+ "<span class=\"workflow-status-label kn-drill-page\"></span>"
+			+ "<button type=\"button\" class=\"kn-plain kn-drill-next\">다음</button></div></div>";
+	}
+
+	/**
+	 * 표의 줄(tr[data-target])을 누르면 아래 목록을 그 조건으로 연다. 글자로 좁히고, 50개씩 넘겨 본다.
+	 * options.load(target, page, size, 글자) 는 { total, rows } 를 돌려주는 Promise, options.columns 는 K.table 의 열.
+	 */
+	function bindDrillList(box, targets, options) {
+		var listEl = box.querySelector(".kn-drill-list");
 		var titleEl = listEl.querySelector(".kn-section-title");
-		var queryEl = listEl.querySelector(".kn-file-role-q");
+		var queryEl = listEl.querySelector(".kn-drill-q");
 		var messageEl = listEl.querySelector(".kn-message");
-		var filesEl = listEl.querySelector(".kn-file-role-files");
-		var pageEl = listEl.querySelector(".kn-file-role-page");
-		var prevEl = listEl.querySelector(".kn-file-role-prev");
-		var nextEl = listEl.querySelector(".kn-file-role-next");
-		var trs = box.querySelectorAll(".kn-file-role-table tr[data-target]");
+		var rowsEl = listEl.querySelector(".kn-drill-rows");
+		var pageEl = listEl.querySelector(".kn-drill-page");
+		var prevEl = listEl.querySelector(".kn-drill-prev");
+		var nextEl = listEl.querySelector(".kn-drill-next");
+		var trs = box.querySelectorAll("table tr[data-target]");
 		var state = { target: null, page: 1, size: 50, pages: 1 };
 		// 늦게 도착한 앞 응답은 버린다
 		var seq = 0;
 
 		function load() {
 			var mine = ++seq;
-			var target = state.target;
-			var params = { page: state.page, size: state.size };
-			if (target.group) {
-				params.roleGroup = target.group;
-			}
-			if (target.kind) {
-				params.roleKind = target.kind;
-			}
-			if (queryEl.value.trim()) {
-				params.path = queryEl.value.trim();
-			}
 			messageEl.className = "kn-message";
 			messageEl.textContent = "불러오는 중...";
-			K.call("GET", "/api/revisions/" + revisionId + "/files", params).then(function (result) {
+			options.load(state.target, state.page, state.size, queryEl.value.trim()).then(function (result) {
 				if (mine !== seq) {
 					return;
 				}
 				messageEl.textContent = "";
 				state.pages = Math.max(1, Math.ceil(result.total / state.size));
-				pageEl.textContent = state.page + " / " + state.pages + " 쪽 (모두 " + T.fmt(result.total) + "개)";
+				pageEl.textContent = state.page + " / " + state.pages + " 쪽 (모두 " + T.fmt(result.total) + options.unit + ")";
 				prevEl.disabled = state.page <= 1;
 				nextEl.disabled = state.page >= state.pages;
-				K.table(filesEl, [
-					{ key: "path", label: "경로", mono: true },
-					{ key: "module", label: "모듈" },
-					{ key: "fileType", label: "쓰임새" },
-					{ key: "lineCount", label: "줄 수", num: true },
-					{ key: "encoding", label: "인코딩" },
-					// 읽기 상태는 Java 문법 읽기 결과라 화면 · 설정 파일은 PENDING 이 정상이다. 그래서 실패한 것만 보여 준다
-					{ key: "parseStatus", label: "읽기 실패", html: function (row) {
-						return row.parseStatus === "FAILED" ? "<span title=\"" + K.escapeHtml(row.parseError || "") + "\">" + K.badge(row.parseStatus) + "</span>" : "";
-					} }
-				], result.files, "조건에 맞는 파일이 없습니다.");
+				K.table(rowsEl, options.columns, result.rows, "조건에 맞는 것이 없습니다.");
 			}).catch(function (err) {
 				if (mine !== seq) {
 					return;
@@ -775,7 +854,7 @@ var DstoneKnowledgeProject = (function () {
 		}
 
 		Array.prototype.forEach.call(trs, function (tr) {
-			tr.title = tr.title || "누르면 아래에 이 파일 목록이 나옵니다";
+			tr.title = tr.title || "누르면 아래에 목록이 나옵니다";
 			tr.addEventListener("click", function () {
 				Array.prototype.forEach.call(trs, function (other) {
 					other.classList.toggle("kn-row-on", other === tr);
@@ -783,12 +862,12 @@ var DstoneKnowledgeProject = (function () {
 				state.target = targets[parseInt(tr.getAttribute("data-target"), 10)];
 				state.page = 1;
 				queryEl.value = "";
-				titleEl.textContent = state.target.label + " — " + T.fmt(state.target.count) + "개";
+				titleEl.textContent = state.target.label + " — " + T.fmt(state.target.count) + options.unit;
 				listEl.hidden = false;
 				load();
 			});
 		});
-		listEl.querySelector(".kn-file-role-search").addEventListener("click", function () {
+		listEl.querySelector(".kn-drill-search").addEventListener("click", function () {
 			state.page = 1;
 			load();
 		});
@@ -810,7 +889,7 @@ var DstoneKnowledgeProject = (function () {
 				load();
 			}
 		});
-		listEl.querySelector(".kn-file-role-close").addEventListener("click", function () {
+		listEl.querySelector(".kn-drill-close").addEventListener("click", function () {
 			seq++;
 			listEl.hidden = true;
 			Array.prototype.forEach.call(trs, function (other) {

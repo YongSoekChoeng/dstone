@@ -160,6 +160,13 @@ var DstoneKnowledgeTerms = (function () {
 		CONFIG: "설정 (Spring XML, web.xml, .properties, 빌드 · 로그 설정 …)",
 		OTHER: "그 밖의 파일"
 	};
+	var TABLE_USAGE = {
+		READ_WRITE: "읽기도 하고 쓰기도 하는 테이블 (업무 데이터를 고치는 곳)",
+		READ_ONLY: "읽기만 하는 테이블 (코드 · 기준 정보, 다른 시스템이 채우는 테이블 등)",
+		WRITE_ONLY: "쓰기만 하고 읽지 않는 테이블 (이력 · 로그 테이블 등)"
+	};
+	var TABLE_USAGE_SHORT = { READ_WRITE: "읽고 씀", READ_ONLY: "읽기만", WRITE_ONLY: "쓰기만" };
+
 	// 표에 쓰는 짧은 이름
 	var FILE_GROUP_SHORT = { SCREEN: "화면", JAVA: "서버 코드", SQL: "SQL", CONFIG: "설정", OTHER: "기타" };
 
@@ -275,6 +282,17 @@ var DstoneKnowledgeTerms = (function () {
 			],
 			read: "WebSquare 화면은 확장자가 .xml 이어도 '화면'에, MyBatis 매퍼와 쿼리 XML 은 'SQL'에 들어갑니다. 서버 코드의 '(없음)'은 계층을 정하지 못한 파일입니다(package-info.java 처럼 클래스가 없는 파일 포함). 많으면 '연결 품질' 탭의 적용 진단에서 '계층을 모르는 클래스'를 봅니다. "
 				+ "SEMANTIC 단계 전의 리비전은 Java 파일이 모두 '(없음)'으로 나옵니다."
+		},
+		{
+			tab: "overview", path: "tables.byUsage", title: "테이블",
+			what: "SQL 이 읽거나 쓰는 DB 테이블을 쓰임새로 나눈 수입니다. 줄을 누르면 아래에 그 테이블 목록이 나오고, 테이블 이름을 누르면 영향도 화면이 새 창으로 열립니다.",
+			columns: [
+				["usage", "구분", "테이블을 어떻게 쓰는지", TABLE_USAGE],
+				["tables", "테이블 수", ""],
+				["statements", "SQL 수", "그 테이블들을 건드리는 SQL statement 수. SQL 하나가 여러 구분의 테이블을 건드리면 구분마다 센다"]
+			],
+			read: "테이블은 SQL(매퍼, 쿼리 XML, Java 문자열 SQL)에 적힌 이름에서 모은 것이라, SQL 이 하나도 건드리지 않는 테이블은 여기 나오지 않습니다(DDL 이 있으면 '미사용'에 나옵니다). "
+				+ "한글명은 SQL 주석에 적힌 이름입니다. 목록의 읽기 · 추가 · 수정 · 삭제는 그렇게 쓰는 SQL statement 의 수입니다."
 		},
 		{
 			tab: "connect", path: "relations.byType", title: "관계 (종류 · 신뢰도별)",
@@ -605,6 +623,8 @@ var DstoneKnowledgeTerms = (function () {
 		FILE_TYPE: FILE_TYPE,
 		FILE_GROUP: FILE_GROUP,
 		FILE_GROUP_SHORT: FILE_GROUP_SHORT,
+		TABLE_USAGE: TABLE_USAGE,
+		TABLE_USAGE_SHORT: TABLE_USAGE_SHORT,
 		REF_KIND: REF_KIND,
 		meaningOf: meaningOf
 	};

@@ -1026,9 +1026,9 @@ body.kn-full-on {
 /* 개요에서는 표 전체를 한 번에 본다 (다른 표처럼 높이를 자르지 않음) */
 .kn-file-role .kn-scroll { max-height: none; }
 /* 표 아래 파일 목록은 다른 목록처럼 높이를 둔다 */
-.kn-file-role .kn-file-role-files { max-height: 440px; }
+.kn-file-role .kn-drill-rows { max-height: 440px; }
 .kn-file-role-table td:first-child { width: 72px; }
-.kn-file-role-list {
+.kn-drill-list {
 	margin-top: 12px;
 	padding-top: 10px;
 	border-top: 1px dashed var(--cs-border-strong);

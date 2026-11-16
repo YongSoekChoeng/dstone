@@ -23,13 +23,14 @@ public class ResourceController {
 	@Autowired
 	private ResourceService resourceService;
 
-	/** 테이블 목록. name은 이름에 포함 조건입니다. */
+	/** 테이블 목록. name은 이름에 포함 조건, usage는 READ_ONLY / READ_WRITE / WRITE_ONLY 일치 조건입니다. */
 	@GetMapping("/tables")
 	public Map<String, Object> getTableList(@PathVariable("revisionId") long revisionId
 			, @RequestParam(name = "name", required = false) String name
+			, @RequestParam(name = "usage", required = false) String usage
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
-		return resourceService.getTableList(revisionId, name, page, size);
+		return resourceService.getTableList(revisionId, name, usage, page, size);
 	}
 
 	/** 테이블 하나를 건드리는 SQL과 그 SQL을 실행하는 메소드 */

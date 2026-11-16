@@ -167,6 +167,17 @@ public class ResourceDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectResourceSummary", revisionId);
 	}
 
+	/** 테이블 목록의 전체 건수(조건 name, usage) */
+	public int countTable(Map<String, Object> condition) {
+		Integer count = sqlSessionCommon.selectOne(NS + "countTable", condition);
+		return count == null ? 0 : count.intValue();
+	}
+
+	/** 쓰임새(읽기만 / 읽고 씀 / 쓰기만)별 테이블 수와 SQL statement 수 */
+	public List<Map<String, Object>> selectTableUsageSummary(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectTableUsageSummary", revisionId);
+	}
+
 	/** 테이블 목록: 테이블마다 읽는 SQL / 쓰는 SQL 이 몇 개인지 */
 	public List<Map<String, Object>> selectTableList(Map<String, Object> condition) {
 		return sqlSessionCommon.selectList(NS + "selectTableList", condition);
