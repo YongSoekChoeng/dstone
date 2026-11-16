@@ -1,6 +1,6 @@
 /**
- * "사용 안내" 화면: 리비전 요약의 모든 항목 설명을 사전(knowledge-terms.js)에서 꺼내 그립니다.
- * 설명을 화면에 직접 적지 않고 사전에서 그리는 이유: 리비전 요약 화면이 보여 주는 설명과 글자 하나까지 같아야 하기 때문입니다.
+ * "사용 안내" 화면: 리비전 상세(탭)의 모든 항목 설명을 사전(knowledge-terms.js)에서 꺼내 그립니다.
+ * 설명을 화면에 직접 적지 않고 사전에서 그리는 이유: 리비전 상세가 보여 주는 설명과 글자 하나까지 같아야 하기 때문입니다.
  */
 var DstoneKnowledgeGuide = (function () {
 
@@ -9,6 +9,7 @@ var DstoneKnowledgeGuide = (function () {
 
 	function init() {
 		renderCards(document.getElementById("kn-guide-cards"));
+		renderUnused(document.getElementById("kn-guide-unused"));
 		renderSections(document.getElementById("kn-guide-sections"));
 	}
 
@@ -21,13 +22,32 @@ var DstoneKnowledgeGuide = (function () {
 		}));
 	}
 
+	/** 미사용 탭: 종류마다 무엇을 미사용으로 보는지, 등급마다 무슨 뜻인지 */
+	function renderUnused(el) {
+		var html = rowsTable("종류", mapOf(T.UNUSED_KIND));
+		html += rowsTable("등급", mapOf(T.UNUSED_GRADE));
+		el.innerHTML = html;
+	}
+
+	/** {코드: [이름, 뜻]} → {"코드 (이름)": 뜻} */
+	function mapOf(dictionary) {
+		var result = {};
+		Object.keys(dictionary).forEach(function (key) {
+			result[key + " (" + dictionary[key][0] + ")"] = dictionary[key][1];
+		});
+		return result;
+	}
+
+	/** 탭 순서대로, 탭 안의 표마다 열의 뜻과 값의 뜻, 읽는 법 */
 	function renderSections(el) {
+		var tabs = [["connect", "연결 품질 탭"], ["content", "분석 내용 탭"], ["history", "실행 기록 탭"]];
 		var html = "";
-		T.SECTIONS.forEach(function (section, index) {
-			html += "<h4>" + (index + 1) + ". " + K.escapeHtml(section.title) + "</h4><p>" + K.escapeHtml(section.what) + "</p>";
-			if (section.pairs) {
-				html += rowsTable("항목", section.rows);
-			} else {
+		var number = 0;
+		tabs.forEach(function (tab) {
+			html += "<h4>" + K.escapeHtml(tab[1]) + "</h4>";
+			T.SECTIONS.filter(function (section) { return section.tab === tab[0]; }).forEach(function (section) {
+				number++;
+				html += "<h5>" + number + ". " + K.escapeHtml(section.title) + "</h5><p>" + K.escapeHtml(section.what) + "</p>";
 				html += "<table class=\"document-list-table\"><thead><tr><th style=\"width:150px;\">열</th><th style=\"width:150px;\">화면의 이름</th><th>뜻</th></tr></thead><tbody>";
 				section.columns.forEach(function (column) {
 					html += "<tr><td><code>" + K.escapeHtml(column[0]) + "</code></td><td>" + K.escapeHtml(column[1]) + "</td><td>" + K.escapeHtml(column[2])
@@ -39,10 +59,10 @@ var DstoneKnowledgeGuide = (function () {
 						html += rowsTable(column[1] + "의 값", dictionaryOf(column[3]));
 					}
 				});
-			}
-			if (section.read) {
-				html += "<div class=\"kn-note\"><b>읽는 법</b> — " + K.escapeHtml(section.read) + "</div>";
-			}
+				if (section.read) {
+					html += "<div class=\"kn-note\"><b>읽는 법</b> — " + K.escapeHtml(section.read) + "</div>";
+				}
+			});
 		});
 		el.innerHTML = html;
 	}

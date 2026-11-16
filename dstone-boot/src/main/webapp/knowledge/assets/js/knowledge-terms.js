@@ -2,8 +2,8 @@
  * "코드 분석(Knowledge)" 화면에 나오는 말과 숫자의 뜻을 모아 둔 사전입니다.
  *
  * 같은 설명을 두 군데서 씁니다.
- *   - "프로젝트 · 분석" 화면의 리비전 요약: 표의 영문 값 옆에 뜻을 붙이고, 표마다 "이 표 읽는 법"을 보여 준다.
- *   - "사용 안내" 화면: 리비전 요약의 모든 항목을 한꺼번에 풀어 보여 준다.
+ *   - "프로젝트 · 분석" 화면의 리비전 상세(탭): 표의 영문 값 옆에 뜻을 붙이고, 표마다 "이 표 읽는 법"을 보여 준다.
+ *   - "사용 안내" 화면: 리비전 상세의 모든 항목을 한꺼번에 풀어 보여 준다.
  * 설명을 고칠 때는 이 파일만 고치면 두 화면에 같이 반영됩니다.
  *
  * 여기 적힌 뜻은 dstone-knowledge 가 실제로 계산하는 방식에 맞춘 것입니다(품질 지표의 계산식 등).
@@ -171,28 +171,6 @@ var DstoneKnowledgeTerms = (function () {
 		UPLOAD: "올린 일반 문서"
 	};
 
-	var METRIC = {
-		parseSuccessRate: "Java 파일 가운데 문법을 읽는 데 성공한 비율(%). 너무 커서 건너뛴 파일은 계산에서 뺀다. 100 이 정상",
-		callCount: "소스에서 찾은 메소드 호출의 수",
-		callResolutionRate: "호출 가운데 대상이 정해진 비율(%) = (프로젝트 안에서 풀린 것 + 프로젝트 밖의 것으로 풀린 것) ÷ 전체 호출. 가장 중요한 숫자",
-		callHeuristicRate: "호출 가운데 이름으로 짐작해서 이은 비율(%). 낮을수록 좋다",
-		callUnresolvedRate: "호출 가운데 끝내 풀지 못한 비율(%). 낮을수록 좋다",
-		typeResolutionRate: "타입을 가리키는 참조(타입 사용, 상속, 구현, 예외, new) 가운데 풀린 비율(%)",
-		relationCount: "관계의 수. LINK 단계가 계산한 시점의 값이라, 그 뒤 SEMANTIC 단계가 더하는 SQL · 테이블 · 화면 관계는 들어 있지 않다(위 '관계' 카드보다 작다)"
-	};
-
-	var SYNTHETIC_ORIGIN = {
-		DEFAULT_CONSTRUCTOR: "생성자를 하나도 적지 않은 클래스에 컴파일러가 넣어 주는 기본 생성자",
-		LOMBOK_GETTER: "Lombok 이 만드는 getter",
-		LOMBOK_SETTER: "Lombok 이 만드는 setter",
-		LOMBOK_BUILDER: "Lombok @Builder 가 만드는 것",
-		LOMBOK_NO_ARGS_CONSTRUCTOR: "Lombok 이 만드는 기본 생성자",
-		LOMBOK_ALL_ARGS_CONSTRUCTOR: "Lombok 이 만드는 전체 필드 생성자",
-		LOMBOK_REQUIRED_ARGS_CONSTRUCTOR: "Lombok 이 만드는 필수 필드 생성자",
-		RECORD_ACCESSOR: "record 의 구성 요소 조회 메소드",
-		RECORD_CONSTRUCTOR: "record 의 생성자"
-	};
-
 	var RESOURCE_KIND = {
 		CONFIG: "설정 파일의 키 = 값 한 줄",
 		"RESOURCE:SPRING_BEAN": "Spring 설정 XML 에 적은 빈",
@@ -213,14 +191,6 @@ var DstoneKnowledgeTerms = (function () {
 		annotations: "클래스 · 메소드 · 필드 등에 붙은 애노테이션의 수"
 	};
 
-	var CARRY_FILE = {
-		files: "이 리비전의 전체 파일 수",
-		unchangedFiles: "기준 리비전과 내용이 같은 파일. 다시 분석하지 않고 결과를 옮겨 왔다",
-		changedFiles: "경로는 같은데 내용이 달라진 파일. 다시 분석했다",
-		addedFiles: "새로 생긴 파일",
-		removedFiles: "기준 리비전에는 있었는데 없어진 파일"
-	};
-
 	/** SQL 자원의 kind 는 "MAPPER:프레임워크:종류" 모양이라 풀어서 설명한다 */
 	function resourceKind(code) {
 		if (RESOURCE_KIND[code]) {
@@ -237,29 +207,31 @@ var DstoneKnowledgeTerms = (function () {
 	resourceKind.samples = ["MAPPER:MYBATIS:SELECT", "MAPPER:MYBATIS:INSERT", "MAPPER:MYBATIS:SQL_FRAGMENT", "MAPPER:IBATIS:SELECT", "CONFIG", "RESOURCE:SPRING_BEAN",
 		"RESOURCE:COMPONENT_SCAN", "RESOURCE:DEPENDENCY", "RESOURCE:SERVLET_MAPPING", "RESOURCE:FILTER_MAPPING", "RESOURCE:LISTENER"];
 
-	/* ---------- 리비전 요약의 표들 ----------
-	 * path     응답에서 값을 꺼내는 경로
+	/** 코드 규모 표의 항목 → 뜻. 타입의 종류와 멤버를 한 표에 모은다 */
+	function codeSizeItem(code) {
+		return TYPE_KIND[code] || MEMBER[code] || "";
+	}
+	// 사용 안내 화면에서 보여 줄 값들
+	codeSizeItem.samples = Object.keys(TYPE_KIND).concat(Object.keys(MEMBER));
+
+	/* ---------- 리비전 상세의 표들 ----------
+	 * tab      어느 탭에 나오는지: connect(연결 품질) / content(분석 내용) / history(실행 기록)
 	 * title    표의 제목
+	 * path     응답에서 값을 꺼내는 경로. build 가 있으면 쓰지 않는다
+	 * build    (요약 응답) → 표의 행. 응답의 여러 값을 한 표로 모을 때
+	 * brief    (행, 요약 응답) → 접힌 제목 옆에 붙일 한 줄 요약
+	 * showIf   (행) → false 면 표를 아예 보여 주지 않는다
 	 * what     이 표가 무엇을 보여 주는지
 	 * columns  [열 이름, 한글 이름, 뜻, 값의 뜻 사전(없으면 생략)]
 	 * read     이 표를 어떻게 읽고, 어떤 숫자가 나오면 무엇을 해야 하는지
-	 * pairs    true 면 "항목 | 값" 모양의 표(열이 아니라 행마다 뜻이 다르다). rows 에 행의 뜻을 준다
 	 */
 	var SECTIONS = [
 		{
-			path: "relations.metrics", title: "품질 지표",
-			what: "분석이 얼마나 잘 됐는지를 숫자 몇 개로 줄인 것입니다. 요약에서 가장 먼저 볼 표입니다.",
-			columns: [
-				["name", "지표", "지표의 이름", METRIC],
-				["value", "값", "비율은 0 ~ 100 의 %, 나머지는 건수"],
-				["analysisId", "계산한 Job", "이 지표를 계산한 분석 Job. 지표는 LINK 단계에서 계산하므로, LINK 를 다시 돌리지 않은 재실행(예: DOCUMENT 부터 다시)에서는 그대로 남는다"]
-			],
-			read: "대략의 기준으로, callResolutionRate(호출이 풀린 비율)가 95 이상이면 호출 관계 · 영향도 결과를 믿고 써도 됩니다. 80 아래면 라이브러리(jar)를 찾지 못한 경우가 많습니다. "
-				+ "프로젝트 등록 칸에 라이브러리 위치를 적고 다시 분석하세요. parseSuccessRate 가 100 이 아니면 읽지 못한 Java 파일이 있다는 뜻이고, 어느 파일인지는 Job 의 오류 표에 나옵니다."
-		},
-		{
-			path: "relations.byType", title: "관계 (종류 · 신뢰도별)",
+			tab: "connect", path: "relations.byType", title: "관계 (종류 · 신뢰도별)",
 			what: "분석이 알아낸 \"A 가 B 를 ○○한다\"의 수입니다. 호출 관계 · 영향도 · 리비전 비교가 모두 이 관계를 따라갑니다.",
+			brief: function (rows) {
+				return "모두 " + fmt(total(rows, "count")) + " · " + topCounts(rows, "relationType", "count", 3);
+			},
 			columns: [
 				["relationType", "관계", "무슨 관계인지", RELATION_TYPE],
 				["toKind", "가리키는 것", "관계의 끝이 무엇인지. EXTERNAL 로 시작하면 프로젝트 밖(JDK, 라이브러리)", TO_KIND],
@@ -271,8 +243,11 @@ var DstoneKnowledgeTerms = (function () {
 				+ "EXECUTES_SQL 의 UNRESOLVED 는 코드가 부르는 SQL 이름이 매퍼에 없는 것입니다(이름이 틀렸거나 매퍼 파일이 분석 대상에 없음)."
 		},
 		{
-			path: "relations.unresolvedReasons", title: "풀지 못한 참조의 이유",
+			tab: "connect", path: "relations.unresolvedReasons", title: "풀지 못한 참조의 이유",
 			what: "\"누구를 가리키는지\" 끝내 정하지 못했거나 일부러 뺀 참조를 이유별로 모은 것입니다.",
+			brief: function (rows) {
+				return topCounts(rows, "status", "count", 3);
+			},
 			columns: [
 				["refKind", "참조의 종류", "무엇을 하려던 참조인지", REF_KIND],
 				["status", "상태", "못 푼 것인지, 뺀 것인지", REFERENCE_STATUS],
@@ -285,8 +260,11 @@ var DstoneKnowledgeTerms = (function () {
 				+ "어느 파일의 어느 줄인지, 무엇을 못 찾았는지는 아래 \"풀지 못한 참조 살펴보기\" 버튼으로 봅니다."
 		},
 		{
-			path: "semantic.endpoints", title: "진입점",
+			tab: "content", path: "semantic.endpoints", title: "진입점",
 			what: "바깥에서 이 프로그램으로 들어오는 곳(진입점)의 수입니다. 영향도 분석이 \"어느 주소가 영향을 받는지\"를 말할 때 쓰는 것이 이 진입점입니다.",
+			brief: function (rows) {
+				return topCounts(rows, "endpointType", "count", 4);
+			},
 			columns: [
 				["endpointType", "종류", "어떤 진입점인지", ENDPOINT_TYPE],
 				["count", "건수", "그 종류의 진입점 수. 메소드 하나에 주소를 둘 적으면 둘로 센다"]
@@ -294,8 +272,11 @@ var DstoneKnowledgeTerms = (function () {
 			read: "웹 프로그램인데 HTTP 가 0 이면 주소를 알아내지 못한 것입니다(지원하지 않는 프레임워크이거나 설정 파일이 분석 대상에 없음). 그러면 영향도 분석의 '진입점' 표가 비어 나옵니다."
 		},
 		{
-			path: "semantic.layers", title: "계층",
+			tab: "content", path: "semantic.layers", title: "계층",
 			what: "클래스를 역할별로 나눈 것입니다. 검색에서 \"컨트롤러만\"처럼 좁히거나, 영향도 결과를 계층별로 볼 때 씁니다.",
+			brief: function (rows) {
+				return topCounts(rows, "layer", "count", 4);
+			},
 			columns: [
 				["layer", "계층", "클래스의 역할", LAYER],
 				["confidence", "근거", "무엇을 보고 그렇게 나눴는지", LAYER_CONFIDENCE],
@@ -304,8 +285,11 @@ var DstoneKnowledgeTerms = (function () {
 			read: "LOW 는 이름만 보고 나눈 것이라 틀릴 수 있고, 이름 규칙에 맞지 않는 클래스는 '(없음)'이 됩니다. 계층이 틀려도 호출 관계 · 영향도에는 영향이 없습니다."
 		},
 		{
-			path: "semantic.resources", title: "Java 밖의 자원 (SQL, 설정, 빈 …)",
+			tab: "content", path: "semantic.resources", title: "Java 밖의 자원 (SQL, 설정, 빈 …)",
 			what: "Java 소스가 아닌 파일에서 읽어 낸 것들입니다. SQL statement 가 여기 잡혀야 \"메소드 → SQL → 테이블\"이 이어집니다.",
+			brief: function (rows) {
+				return "모두 " + fmt(total(rows, "count")) + " · " + topCounts(rows, "kind", "count", 2);
+			},
 			columns: [
 				["kind", "종류", "무엇을 읽었는지", resourceKind],
 				["count", "건수", "그 종류의 수"]
@@ -313,8 +297,89 @@ var DstoneKnowledgeTerms = (function () {
 			read: "MyBatis / iBATIS 를 쓰는 프로젝트인데 MAPPER 로 시작하는 줄이 없으면 매퍼 XML 이 소스 폴더 안에 없는 것입니다. 그러면 테이블에서 출발하는 영향도 분석을 할 수 없습니다."
 		},
 		{
-			path: "files.byType", title: "파일 (종류별)",
+			tab: "content", title: "코드 규모",
+			what: "찾아낸 타입(클래스 · 인터페이스 …)과 메소드 · 필드 · 애노테이션의 수입니다.",
+			build: function (summary) {
+				var rows = [];
+				(valueAt(summary, "declarations.types") || []).forEach(function (row) {
+					rows.push({ item: row.kind, count: row.count });
+				});
+				var members = valueAt(summary, "declarations.members") || {};
+				Object.keys(MEMBER).forEach(function (key) {
+					if (typeof members[key] === "number") {
+						rows.push({ item: key, count: members[key] });
+					}
+				});
+				return rows;
+			},
+			brief: function (rows, summary) {
+				var members = valueAt(summary, "declarations.members") || {};
+				return "타입 " + fmt(total(valueAt(summary, "declarations.types"), "count")) + " · 메소드 " + fmt(members.methods) + " · 필드 " + fmt(members.fields);
+			},
+			columns: [
+				["item", "항목", "", codeSizeItem],
+				["count", "건수", ""]
+			],
+			read: "이름 있는 타입 + 익명 클래스의 수는 그 프로젝트를 컴파일했을 때 생기는 .class 파일 수와 같습니다. "
+				+ "syntheticMethods(자동 생성 멤버)는 소스에 없는 것이라 검색 문서로는 만들지 않습니다. Lombok 을 쓰는 프로젝트에서 이 숫자가 크게 나오는 것은 정상입니다."
+		},
+		{
+			tab: "history", title: "단계",
+			what: "분석은 아래 단계를 차례로 지나갑니다. 단계마다 상태와, 파일을 몇 개 처리하고 건너뛰거나 실패했는지입니다.",
+			build: function (summary) {
+				var files = {};
+				(valueAt(summary, "declarations.filePasses") || []).forEach(function (row) {
+					files[row.pass] = files[row.pass] || {};
+					files[row.pass][row.status] = (files[row.pass][row.status] || 0) + row.fileCount;
+				});
+				return (valueAt(summary, "passes") || []).map(function (row) {
+					var counts = files[row.pass] || {};
+					return {
+						pass: row.pass, status: row.status,
+						doneFiles: counts.DONE, skippedFiles: counts.SKIPPED, failedFiles: counts.FAILED,
+						startedAt: row.startedAt, endedAt: row.endedAt
+					};
+				});
+			},
+			brief: function (rows) {
+				var notDone = rows.filter(function (row) { return row.status !== "DONE"; }).length;
+				var failed = rows.filter(function (row) { return row.failedFiles > 0; }).length;
+				return (notDone === 0 ? "모든 단계 DONE" : "끝나지 않은 단계 " + notDone + "개") + (failed > 0 ? " · 실패한 파일이 있는 단계 " + failed + "개" : "");
+			},
+			columns: [
+				["pass", "단계", "", PASS],
+				["status", "상태", "", STATUS],
+				["doneFiles", "처리한 파일", "이 단계에서 처리한 파일 수. SQL 만으로 도는 단계(LINK, SEMANTIC, CARRY)는 비어 있다"],
+				["skippedFiles", "건너뛴 파일", "처리할 필요가 없어 건너뛴 파일(Java 코드가 없는 JSP, 읽을 필요 없는 XML 등)"],
+				["failedFiles", "실패한 파일", "이 단계의 결과가 없는 파일. 어느 파일인지는 Job 의 오류 표에 나온다"],
+				["startedAt", "시작", ""],
+				["endedAt", "끝", ""]
+			],
+			read: "모든 단계가 DONE 이어야 리비전이 READY 가 됩니다. 중간에 실패하거나 취소했으면, 같은 라벨로 다시 분석을 시작해 끝나지 않은 단계부터 이어 갈 수 있습니다. "
+				+ "건너뛴 파일은 대부분 정상입니다."
+		},
+		{
+			tab: "history", path: "incremental.passes", title: "증분 분석",
+			what: "증분 분석으로 만든 리비전에만 나옵니다. 단계마다 결과를 옮겨 온 파일과 실제로 다시 분석한 파일의 수입니다.",
+			brief: function (rows, summary) {
+				var files = valueAt(summary, "incremental.files") || {};
+				return "기준 #" + valueAt(summary, "incremental.baseRevisionId") + " · 파일 " + fmt(files.files) + "개 가운데 그대로 " + fmt(files.unchangedFiles)
+					+ " · 바뀜 " + fmt(files.changedFiles) + " · 새로 " + fmt(files.addedFiles) + " · 없어짐 " + fmt(files.removedFiles);
+			},
+			columns: [
+				["pass", "단계", "", PASS],
+				["carriedFiles", "옮겨 온 파일", "다시 분석하지 않고 앞 리비전의 결과를 복사한 파일"],
+				["analyzedFiles", "분석한 파일", "실제로 처리한 파일 (건너뛴 것 포함)"]
+			],
+			read: "그대로인 파일이 대부분이면 증분 분석의 효과가 큽니다. RESOLVE 의 '분석한 파일'이 바뀐 파일 수보다 많은 것은 정상입니다. "
+				+ "파일이 그대로여도 그 파일이 부르는 메소드가 바뀌었으면 다시 풀어야 하기 때문입니다."
+		},
+		{
+			tab: "history", path: "files.byType", title: "파일 (종류별)",
 			what: "소스 폴더에서 찾은 파일을 언어와 쓰임새로 나눈 것입니다.",
+			brief: function (rows, summary) {
+				return "모두 " + fmt(valueAt(summary, "files.total")) + " · " + topCounts(rows, "language", "fileCount", 3);
+			},
 			columns: [
 				["language", "언어", "파일의 언어 (JAVA, JSP, XML, PROPERTIES, YAML, SQL, SCRIPT …)"],
 				["fileType", "쓰임새", "무슨 파일인지", FILE_TYPE],
@@ -325,8 +390,14 @@ var DstoneKnowledgeTerms = (function () {
 			read: "생각한 것보다 Java 파일이 적으면 소스 폴더를 잘못 가리킨 것입니다. target, build, node_modules, .git 같은 폴더는 일부러 훑지 않습니다."
 		},
 		{
-			path: "files.byEncoding", title: "파일 (인코딩별)",
-			what: "파일마다 알아낸 글자 인코딩입니다. 오래된 프로젝트는 EUC-KR 과 UTF-8 이 섞여 있어서 파일마다 따로 알아냅니다.",
+			tab: "history", path: "files.byEncoding", title: "파일 (인코딩별)",
+			what: "파일마다 알아낸 글자 인코딩입니다. 오래된 프로젝트는 EUC-KR 과 UTF-8 이 섞여 있어서 파일마다 따로 알아냅니다. UTF-8 이 아닌 파일이 있을 때만 보입니다.",
+			showIf: function (rows) {
+				return rows.some(function (row) { return row.encoding !== "UTF-8" && row.encoding !== "US-ASCII"; });
+			},
+			brief: function (rows) {
+				return topCounts(rows, "encoding", "fileCount", 3);
+			},
 			columns: [
 				["encoding", "인코딩", "알아낸 인코딩. US-ASCII 는 한글이 없는 파일"],
 				["fileCount", "파일 수", ""]
@@ -334,8 +405,11 @@ var DstoneKnowledgeTerms = (function () {
 			read: "검색 결과의 한글 주석이 깨져 보이면 그 파일의 인코딩을 잘못 알아낸 것입니다."
 		},
 		{
-			path: "files.javaSourceRoots", title: "Java 소스 루트",
+			tab: "history", path: "files.javaSourceRoots", title: "Java 소스 루트",
 			what: "Java 소스가 들어 있는 폴더(패키지가 시작되는 곳)입니다. 예: src/main/java, WEB-INF/classes.",
+			brief: function (rows) {
+				return rows.length + "곳";
+			},
 			columns: [
 				["module", "모듈", "멀티모듈 프로젝트에서 어느 모듈인지. 모듈이 하나면 비어 있다"],
 				["sourceRoot", "소스 루트", "패키지가 시작되는 폴더"],
@@ -344,112 +418,39 @@ var DstoneKnowledgeTerms = (function () {
 			read: "테스트 코드(src/test/java)가 따로 한 줄로 나오면 정상입니다."
 		},
 		{
-			path: "declarations.javaFiles", title: "Java 파일의 문법 읽기 결과",
-			what: "Java 파일을 문법대로 읽는 데 성공했는지와, 어느 Java 버전의 문법으로 읽혔는지입니다.",
-			columns: [
-				["parseStatus", "결과", "OK 는 성공, FAILED 는 문법을 읽지 못함, SKIPPED 는 너무 커서 건너뜀"],
-				["languageLevel", "문법 수준", "읽는 데 성공한 Java 버전. 최신(21)부터 시도하고, 안 되면 8, 1.4 순으로 낮춘다. enum 을 변수 이름으로 쓰는 옛 소스는 1.4 로 읽힌다"],
-				["fileCount", "파일 수", ""]
-			],
-			read: "FAILED 가 있으면 그 파일의 메소드는 분석 결과에 없습니다. 컴파일되지 않는 소스이거나 Java 가 아닌 내용이 든 파일입니다."
-		},
-		{
-			path: "declarations.types", title: "타입",
-			what: "찾아낸 클래스 · 인터페이스 등의 수입니다.",
-			columns: [
-				["kind", "종류", "", TYPE_KIND],
-				["count", "건수", ""]
-			],
-			read: "이름 있는 타입 + 익명 클래스의 수는 그 프로젝트를 컴파일했을 때 생기는 .class 파일 수와 같습니다. 분석이 타입을 빠뜨리지 않았는지 확인하는 쉬운 방법입니다."
-		},
-		{
-			path: "declarations.members", title: "멤버", pairs: true,
-			what: "찾아낸 메소드 · 필드 · 애노테이션의 수입니다.",
-			rows: MEMBER,
-			read: "syntheticMethods(자동 생성 멤버)는 소스에 없는 것이라 검색 문서로는 만들지 않습니다. Lombok 을 쓰는 프로젝트에서 이 숫자가 크게 나오는 것은 정상입니다."
-		},
-		{
-			path: "declarations.synthetic", title: "자동 생성 멤버의 출처",
-			what: "소스에는 없지만 컴파일하면 생기는 멤버를 어디서 왔는지로 나눈 것입니다.",
-			columns: [
-				["origin", "출처", "", SYNTHETIC_ORIGIN],
-				["count", "건수", ""]
-			],
-			read: ""
-		},
-		{
-			path: "declarations.references", title: "참조",
-			what: "소스에서 찾은 \"다른 것을 가리키는 자리\"(호출, new, 타입 사용 …)와 그것이 풀린 결과입니다. 위의 '관계'는 이 참조를 풀어서 만든 것입니다.",
-			columns: [
-				["refKind", "참조의 종류", "", REF_KIND],
-				["status", "풀린 결과", "", REFERENCE_STATUS],
-				["count", "건수", ""]
-			],
-			read: "EXTERNAL 이 많은 것은 정상입니다(String, List 같은 JDK 와 프레임워크를 쓰는 자리가 가장 많다). CALL 의 UNRESOLVED 와 HEURISTIC 이 적을수록 좋습니다."
-		},
-		{
-			path: "declarations.filePasses", title: "파일별 단계 결과",
-			what: "단계마다 파일을 몇 개 처리했고 몇 개를 건너뛰거나 실패했는지입니다.",
-			columns: [
-				["pass", "단계", "", PASS],
-				["status", "결과", "", STATUS],
-				["fileCount", "파일 수", ""]
-			],
-			read: "SKIPPED 는 대부분 정상입니다(DECLARE 의 SKIPPED = Java 코드가 없는 JSP, RESOURCE 의 SKIPPED = 읽을 필요 없는 XML). FAILED 가 있으면 그 파일은 그 단계의 결과가 없습니다. 어느 파일인지는 Job 의 오류 표에 나옵니다."
-		},
-		{
-			path: "passes", title: "단계별 진행",
-			what: "분석은 아래 단계를 차례로 지나갑니다. 단계마다 언제 돌았고 끝났는지입니다.",
-			columns: [
-				["pass", "단계", "", PASS],
-				["status", "상태", "", STATUS],
-				["analysisId", "돌린 Job", "이 단계를 마지막으로 돌린 분석 Job. 이어서 분석하거나 일부 단계만 다시 돌리면 단계마다 Job 이 다를 수 있다"],
-				["totalCount", "처리할 건수", "이 단계가 처리할 파일 수. SQL 만으로 도는 단계(LINK, SEMANTIC, CARRY)는 0"],
-				["doneCount", "처리한 건수", ""],
-				["startedAt", "시작", ""],
-				["endedAt", "끝", ""]
-			],
-			read: "모든 단계가 DONE 이어야 리비전이 READY 가 됩니다. 중간에 실패하거나 취소했으면, 같은 라벨로 다시 분석을 시작해 끝나지 않은 단계부터 이어 갈 수 있습니다."
-		},
-		{
-			path: "incremental.files", title: "증분 분석: 파일", pairs: true,
-			what: "증분 분석으로 만든 리비전에만 나옵니다. 기준(앞) 리비전과 견주어 파일이 얼마나 달라졌는지입니다.",
-			rows: CARRY_FILE,
-			read: "unchangedFiles 가 대부분이면 증분 분석의 효과가 큽니다."
-		},
-		{
-			path: "incremental.passes", title: "증분 분석: 단계별",
-			what: "단계마다 결과를 옮겨 온 파일과 실제로 다시 분석한 파일의 수입니다.",
-			columns: [
-				["pass", "단계", "", PASS],
-				["carriedFiles", "옮겨 온 파일", "다시 분석하지 않고 앞 리비전의 결과를 복사한 파일"],
-				["analyzedFiles", "분석한 파일", "실제로 처리한 파일 (건너뛴 것 포함)"]
-			],
-			read: "RESOLVE 의 '분석한 파일'이 바뀐 파일 수보다 많은 것은 정상입니다. 파일이 그대로여도 그 파일이 부르는 메소드가 바뀌었으면 다시 풀어야 하기 때문입니다."
-		},
-		{
-			path: "rag.documents", title: "검색 문서",
-			what: "검색에 쓰려고 분석 결과로 만든 글입니다. 검색 결과 한 건이 이 문서의 조각(청크) 하나입니다.",
+			tab: "history", path: "rag.documents", title: "검색 준비 (문서 · 임베딩)",
+			what: "검색에 쓰려고 분석 결과로 만든 글과, \"뜻으로 찾기\"에 필요한 임베딩(글을 숫자로 바꾼 것)이 얼마나 됐는지입니다. 임베딩은 분석이 끝난 뒤에도 뒤에서 계속 진행됩니다.",
+			brief: function (rows, summary) {
+				var done = 0;
+				var all = 0;
+				var other = [];
+				(valueAt(summary, "rag.embedding") || []).forEach(function (row) {
+					all += row.chunks;
+					if (row.status === "DONE") {
+						done += row.chunks;
+					} else {
+						other.push(row.status + " " + fmt(row.chunks));
+					}
+				});
+				return "문서 " + fmt(total(rows, "documents")) + " · 청크 " + fmt(total(rows, "chunks"))
+					+ (all > 0 ? " · 임베딩 " + Math.floor(100 * done / all) + "%" + (other.length > 0 ? " (" + other.join(", ") + ")" : "") : "");
+			},
 			columns: [
 				["docType", "문서의 단위", "", DOC_TYPE],
 				["documents", "문서 수", ""],
-				["chunks", "청크 수", "문서를 검색 단위로 자른 조각의 수. 긴 메소드는 여러 조각이 된다"],
+				["chunks", "청크 수", "문서를 검색 단위로 자른 조각의 수. 긴 메소드는 여러 조각이 된다. 검색 결과 한 건이 청크 하나다"],
 				["chars", "글자 수", ""]
 			],
-			read: "METHOD 문서 수가 메소드 수보다 적은 것은 정상입니다. 필드 값을 그대로 주고받는 짧은 getter / setter 는 문서를 따로 만들지 않습니다(클래스 문서의 메소드 목록에는 들어 있다)."
+			read: "METHOD 문서 수가 메소드 수보다 적은 것은 정상입니다. 필드 값을 그대로 주고받는 짧은 getter / setter 는 문서를 따로 만들지 않습니다. "
+				+ "임베딩이 PENDING(대기 중)으로 남아 있는 동안에는 뜻으로 찾는 검색이 끝난 청크에서만 됩니다. FAILED 는 세 번 시도해도 실패한 것입니다. "
+				+ "이름으로 찾는 검색, 호출 관계, 영향도, 리비전 비교는 임베딩과 상관없이 바로 됩니다."
 		},
 		{
-			path: "rag.embedding", title: "임베딩 진행",
-			what: "\"뜻으로 찾기\"를 하려면 청크를 숫자(벡터)로 바꿔 둬야 합니다. 그 일이 얼마나 됐는지입니다. 분석이 끝난 뒤에도 뒤에서 계속 진행됩니다.",
-			columns: [
-				["status", "상태", "DONE 끝남 / PENDING 대기 중 / FAILED 세 번 시도해도 실패 / NONE 대기열에 없음"],
-				["chunks", "청크 수", ""]
-			],
-			read: "PENDING 이 남아 있는 동안에는 뜻으로 찾는 검색이 DONE 인 청크에서만 됩니다. 이름으로 찾는 검색, 호출 관계, 영향도, 리비전 비교는 임베딩과 상관없이 바로 됩니다. 이 서버는 1분에 약 100 청크를 처리합니다."
-		},
-		{
-			path: "jobs", title: "Job 이력",
+			tab: "history", path: "jobs", title: "Job 이력",
 			what: "이 리비전을 만들거나 다시 돌린 분석 실행의 목록입니다(최근 것이 위).",
+			brief: function (rows) {
+				return rows.length + "건" + (rows.length > 0 ? " · 마지막 " + rows[0].status : "");
+			},
 			columns: [
 				["analysisId", "Job", "분석 실행의 번호. A + 날짜 + 그날의 일련번호"],
 				["status", "상태", "", STATUS],
@@ -464,14 +465,67 @@ var DstoneKnowledgeTerms = (function () {
 		}
 	];
 
-	/** 요약 맨 위의 숫자 카드 */
+	/** 개요 탭 맨 위의 숫자 카드 */
 	var CARDS = [
 		["파일", "소스 폴더에서 찾은 모든 파일 (Java, JSP, XML, 설정 …)"],
 		["타입", "클래스 · 인터페이스 · enum · 익명 클래스를 합친 수"],
 		["관계", "알아낸 모든 관계의 수 (호출, 상속, SQL 실행, 테이블 사용, 화면 연결 …)"],
 		["진입점", "바깥에서 들어오는 곳의 수 (웹 주소, 스케줄, main …)"],
+		["호출 해석률", "메소드 호출 가운데 누구를 부르는지 풀린 비율(%). 95 이상이면 호출 관계 · 영향도를 믿고 써도 된다"],
 		["검색 문서", "검색에 쓰려고 만든 글의 수"]
 	];
+
+	/** 미사용 탭의 종류 → [이름, 무엇을 미사용으로 보는지] */
+	var UNUSED_KIND = {
+		TABLE: ["테이블", "DB · DDL 파일 · 테이블 사전에는 있는데, 어떤 SQL 도 읽거나 쓰지 않는 테이블"],
+		SQL: ["SQL", "매퍼(MyBatis, iBATIS, 쿼리 XML)에 있는데, 어떤 메소드도 실행하지 않는 statement. <sql> 조각은 빼고 센다"],
+		TYPE: ["클래스", "다른 클래스 · 화면 · 설정 어디에서도 가리키지 않는 최상위 타입. 진입점이 있는 클래스와 테스트 코드는 빼고 센다"],
+		METHOD: ["메소드", "어떤 메소드 · 화면에서도 부르지 않는 메소드. 생성자, get / set / is 접근자, 재정의한 메소드, 진입점 메소드, 미사용 클래스 안의 메소드는 빼고 센다"],
+		SCREEN: ["화면", "메뉴에 없고, 다른 화면이 열거나 포함하지 않는 화면(JSP, WebSquare, Nexacro). 이름을 계산해서 여는 팝업이 많아 늘 '추정'이다"]
+	};
+
+	/** 미사용 등급 → [이름, 뜻] */
+	var UNUSED_GRADE = {
+		CERTAIN: ["확실", "들어오는 참조가 없고, 쓰일 수 있다는 다른 흔적도 없다"],
+		LIKELY: ["추정", "들어오는 참조는 없지만, 프레임워크가 이름으로 부르거나 분석기가 못 푼 참조가 이것을 가리킬 수 있다"]
+	};
+
+	/* ---------- 한 줄 요약을 만드는 도우미 ---------- */
+
+	function fmt(value) {
+		return typeof value === "number" ? value.toLocaleString() : (value === null || value === undefined ? "-" : String(value));
+	}
+
+	/** "a.b.c" 경로로 값을 꺼냅니다. 중간에 없으면 null */
+	function valueAt(object, path) {
+		var value = object;
+		path.split(".").forEach(function (key) {
+			value = value === null || value === undefined ? null : value[key];
+		});
+		return value === undefined ? null : value;
+	}
+
+	/** 행들의 countKey 를 더한다 */
+	function total(rows, countKey) {
+		var sum = 0;
+		(rows || []).forEach(function (row) {
+			sum += Number(row[countKey]) || 0;
+		});
+		return sum;
+	}
+
+	/** labelKey 별로 더해 많은 것부터 n 개: "CALLS 1,234 · USES_TYPE 567" */
+	function topCounts(rows, labelKey, countKey, n) {
+		var sums = {};
+		(rows || []).forEach(function (row) {
+			var label = row[labelKey] === null || row[labelKey] === undefined || row[labelKey] === "" ? "(없음)" : String(row[labelKey]);
+			sums[label] = (sums[label] || 0) + (Number(row[countKey]) || 0);
+		});
+		var labels = Object.keys(sums).sort(function (a, b) { return sums[b] - sums[a]; });
+		return labels.slice(0, n).map(function (label) { return label + " " + fmt(sums[label]); }).join(" · ")
+			+ (labels.length > n ? " 외 " + (labels.length - n) + "가지" : "");
+	}
+
 
 	/** 값의 뜻을 찾습니다. 사전이 함수면 불러서 얻습니다 */
 	function meaningOf(dictionary, value) {
@@ -485,10 +539,12 @@ var DstoneKnowledgeTerms = (function () {
 	return {
 		SECTIONS: SECTIONS,
 		CARDS: CARDS,
+		UNUSED_KIND: UNUSED_KIND,
+		UNUSED_GRADE: UNUSED_GRADE,
+		valueAt: valueAt,
+		fmt: fmt,
 		PASS: PASS,
-		CONFIDENCE: CONFIDENCE,
 		REF_KIND: REF_KIND,
-		REFERENCE_STATUS: REFERENCE_STATUS,
 		meaningOf: meaningOf
 	};
 })();

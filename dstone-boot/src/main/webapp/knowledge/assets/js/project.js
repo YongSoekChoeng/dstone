@@ -1,33 +1,62 @@
 /**
- * "프로젝트 · 분석" 화면: 프로젝트 등록, 분석 시작과 진행 상황, 리비전 목록, 리비전 요약(품질).
+ * "프로젝트 · 분석" 화면.
+ *   왼쪽: 프로젝트 목록과 등록, 분석 시작과 진행 상황, 리비전 목록
+ *   오른쪽: 고른 리비전의 결과를 탭 다섯 개로 나눠 보여 준다(개요 · 연결 품질 · 분석 내용 · 미사용 · 실행 기록)
+ * 표의 제목과 설명, 어느 탭에 둘지는 knowledge-terms.js 의 SECTIONS 에 있다.
  */
 var DstoneKnowledgeProject = (function () {
 
 	var K = DstoneKnowledge;
+	var T = DstoneKnowledgeTerms;
 	var el = {};
 	var projectId = null;
 	var pollTimer = null;
-	// 지금 요약을 보여 주는 리비전 번호(닫혀 있으면 null)
-	var summaryRevisionId = null;
+	// 지금 오른쪽에 보여 주는 리비전(닫혀 있으면 null)
+	var current = null;
+	// 지금 고른 탭. 다른 리비전을 열어도 같은 탭을 그대로 보여 준다
+	var activeTab = "overview";
+	// 탭마다 "살펴볼 것이 있다(⚠)" 표시. 요약과 미사용 결과가 따로 도착하므로 모아 두었다가 그린다
+	var tabWarnings = {};
 	// 요청 번호. 다른 프로젝트 · 리비전 · Job 을 고른 뒤 늦게 도착한 이전 응답은 버린다
 	var summaryRequestNo = 0;
 	var revisionsRequestNo = 0;
 	var jobRequestNo = 0;
 
-	var T = DstoneKnowledgeTerms;
+	/** 탭 이름 */
+	var TAB_LABELS = { overview: "개요", connect: "연결 품질", content: "분석 내용", unused: "미사용", history: "실행 기록" };
+
+	/** 적용 진단 항목 → 그 내용을 자세히 볼 수 있는 탭. warn / bad 가 나오면 그 탭에 ⚠ 를 붙인다 */
+	var CHECK_TAB = {
+		calls: "connect", unresolvedRequests: "connect", unresolvedSql: "connect", unresolvedPaths: "connect",
+		endpoints: "content", endpointsWithoutMethod: "content", screens: "content", layers: "content", unknownXml: "content", javaSql: "content",
+		parse: "history", unsupportedFiles: "history"
+	};
 
 	function init() {
-		["kn-health", "kn-project-table", "kn-new-project-id", "kn-new-project-name", "kn-new-project-path", "kn-new-project-classpath", "kn-project-save-btn", "kn-project-message",
+		["kn-health", "kn-project-list", "kn-project-message", "kn-project-form", "kn-new-project-id", "kn-new-project-name", "kn-new-project-path",
+			"kn-new-project-classpath", "kn-new-project-btn", "kn-project-save-btn",
 			"kn-analysis-panel", "kn-selected-project", "kn-revision-label", "kn-incremental", "kn-rerun-from", "kn-analysis-start-btn", "kn-analysis-message",
 			"kn-job-box", "kn-job-id", "kn-job-badge", "kn-job-progress", "kn-job-cancel-btn", "kn-job-passes", "kn-job-errors",
-			"kn-revision-table", "kn-retention-keep", "kn-retention-btn", "kn-revision-message",
-			"kn-summary-panel", "kn-summary-title", "kn-summary-cards", "kn-summary-sections"].forEach(function (id) {
+			"kn-revision-list", "kn-retention-keep", "kn-retention-btn", "kn-revision-message",
+			"kn-detail-empty", "kn-summary-panel", "kn-summary-title", "kn-summary-badge", "kn-summary-delete-btn", "kn-tabs",
+			"kn-summary-cards", "kn-overview", "kn-connect", "kn-content", "kn-history"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 		el["kn-project-save-btn"].addEventListener("click", saveProject);
+		el["kn-new-project-btn"].addEventListener("click", clearProjectForm);
 		el["kn-analysis-start-btn"].addEventListener("click", startAnalysis);
 		el["kn-job-cancel-btn"].addEventListener("click", cancelJob);
 		el["kn-retention-btn"].addEventListener("click", applyRetention);
+		el["kn-summary-delete-btn"].addEventListener("click", function () {
+			if (current) {
+				deleteRevision(current);
+			}
+		});
+		Array.prototype.forEach.call(el["kn-tabs"].querySelectorAll(".kn-tab"), function (button) {
+			button.addEventListener("click", function () {
+				showTab(button.getAttribute("data-tab"));
+			});
+		});
 
 		K.call("GET", "/api/system/health").then(function (health) {
 			el["kn-health"].innerHTML = K.badge(health.status);
@@ -40,7 +69,7 @@ var DstoneKnowledgeProject = (function () {
 
 	/**
 	 * 대시보드에서 프로젝트 줄을 누르면 주소에 #p=프로젝트&r=리비전&l=리비전 라벨 이 붙어 옵니다.
-	 * 그 프로젝트를 고르고, 리비전이 있으면 그 요약까지 바로 엽니다. 한 번 열고 나면 주소를 비웁니다.
+	 * 그 프로젝트를 고르고, 리비전이 있으면 그 결과까지 바로 엽니다. 한 번 열고 나면 주소를 비웁니다.
 	 */
 	function openFromHash(projects) {
 		var wanted = {};
@@ -67,27 +96,28 @@ var DstoneKnowledgeProject = (function () {
 		selectProject(project);
 		if (/^[0-9]+$/.test(wanted.r || "")) {
 			loadSummary({ revisionId: wanted.r, revisionLabel: wanted.l || "" });
-		} else {
-			el["kn-analysis-panel"].scrollIntoView({ behavior: "smooth" });
 		}
 	}
 
 	/* ---------------- 프로젝트 ---------------- */
 
-	/** 프로젝트 표를 다시 그립니다. 다 그리면 프로젝트 목록을 넘겨줍니다(실패하면 빈 목록) */
+	/** 프로젝트 목록을 다시 그립니다. 다 그리면 프로젝트 목록을 넘겨줍니다(실패하면 빈 목록) */
 	function loadProjects() {
 		return K.call("GET", "/api/projects").then(function (projects) {
-			K.table(el["kn-project-table"], [
-				{ key: "projectId", label: "projectId", html: function (row) {
-					return "<a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + K.escapeHtml(row.projectId) + "</a>";
-				} },
-				{ key: "projectName", label: "이름" },
-				{ key: "localPath", label: "소스 폴더", mono: true },
-				{ key: "updatedAt", label: "수정 시각" }
-			], projects, "등록된 프로젝트가 없습니다.");
-			eachRow(el["kn-project-table"], function (tr, index) {
-				tr.querySelector("a").addEventListener("click", function () {
-					selectProject(projects[index]);
+			if (!projects || projects.length === 0) {
+				el["kn-project-list"].innerHTML = "<p class=\"ai-hint\">등록된 프로젝트가 없습니다. 아래 \"프로젝트 등록 / 수정\"을 펴서 등록하세요.</p>";
+				el["kn-project-form"].open = true;
+				return [];
+			}
+			el["kn-project-list"].innerHTML = projects.map(function (project, index) {
+				return "<button type=\"button\" class=\"kn-pick" + (project.projectId === projectId ? " kn-pick-on" : "") + "\" data-index=\"" + index + "\">"
+					+ "<span class=\"kn-pick-main\">" + K.escapeHtml(project.projectId) + "</span>"
+					+ (project.projectName && project.projectName !== project.projectId ? "<span class=\"kn-pick-sub\">" + K.escapeHtml(project.projectName) + "</span>" : "")
+					+ "</button>";
+			}).join("");
+			Array.prototype.forEach.call(el["kn-project-list"].querySelectorAll(".kn-pick"), function (button) {
+				button.addEventListener("click", function () {
+					selectProject(projects[parseInt(button.getAttribute("data-index"), 10)]);
 				});
 			});
 			return projects;
@@ -108,16 +138,27 @@ var DstoneKnowledgeProject = (function () {
 		}
 		K.call("POST", "/api/projects", null, body).then(function (project) {
 			K.message(el["kn-project-message"], "등록했습니다: " + project.projectId);
-			loadProjects();
 			selectProject(project);
+			loadProjects();
 		}).catch(function (err) {
 			K.message(el["kn-project-message"], err.message, true);
 		});
 	}
 
+	/** 등록 칸을 비워 새 프로젝트를 적게 한다 */
+	function clearProjectForm() {
+		["kn-new-project-id", "kn-new-project-name", "kn-new-project-path", "kn-new-project-classpath"].forEach(function (id) {
+			el[id].value = "";
+		});
+		el["kn-new-project-id"].focus();
+	}
+
 	function selectProject(project) {
 		projectId = project.projectId;
 		stopPolling();
+		markPicked(el["kn-project-list"], function (button) {
+			return button.querySelector(".kn-pick-main").textContent === projectId;
+		});
 		el["kn-analysis-panel"].style.display = "";
 		closeSummary();
 		el["kn-job-box"].style.display = "none";
@@ -126,7 +167,7 @@ var DstoneKnowledgeProject = (function () {
 		el["kn-revision-label"].value = "";
 		el["kn-incremental"].checked = false;
 		el["kn-rerun-from"].value = "";
-		el["kn-revision-table"].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
+		el["kn-revision-list"].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
 		// 등록 칸에도 채워 둔다. 경로나 이름을 고쳐서 다시 등록하면 수정이 된다.
 		el["kn-new-project-id"].value = project.projectId;
 		el["kn-new-project-name"].value = project.projectName || "";
@@ -210,12 +251,11 @@ var DstoneKnowledgeProject = (function () {
 			+ (job.errorMessage ? " · " + job.errorMessage : "");
 		el["kn-job-cancel-btn"].disabled = !running;
 		K.table(el["kn-job-passes"], [
-			{ key: "pass", label: "단계", html: function (row) { return withMeaning(row.pass, T.PASS[row.pass]); } },
+			{ key: "pass", label: "단계", html: function (row) { return "<span class=\"kn-code\" title=\"" + K.escapeHtml(T.PASS[row.pass] || "") + "\">" + K.escapeHtml(row.pass) + "</span>"; } },
 			{ key: "status", label: "상태", html: function (row) { return K.badge(row.status); } },
-			{ key: "doneCount", label: "처리", num: true },
-			{ key: "totalCount", label: "전체", num: true },
-			{ key: "startedAt", label: "시작" },
-			{ key: "endedAt", label: "끝" }
+			{ key: "progress", label: "처리", num: true, html: function (row) {
+				return row.totalCount ? K.escapeHtml(T.fmt(row.doneCount) + " / " + T.fmt(row.totalCount)) : "";
+			} }
 		], job.passes);
 		if (job.errors && job.errors.length > 0) {
 			el["kn-job-errors"].innerHTML = "<div class=\"kn-section-title\">오류 (앞쪽 " + job.errors.length + "건)</div><div class=\"kn-scroll\"></div>";
@@ -241,20 +281,21 @@ var DstoneKnowledgeProject = (function () {
 			if (requestNo !== revisionsRequestNo) {
 				return;
 			}
-			K.table(el["kn-revision-table"], [
-				{ key: "revisionId", label: "#", num: true },
-				{ key: "revisionLabel", label: "라벨" },
-				{ key: "status", label: "상태", html: function (row) { return K.badge(row.status); } },
-				{ key: "parentRevisionId", label: "증분 기준", html: function (row) { return row.parentRevisionId ? "#" + row.parentRevisionId : ""; } },
-				{ key: "createdAt", label: "만든 시각" },
-				{ key: "action", label: "", html: function () {
-					return "<button type=\"button\" class=\"kn-summary-btn\">요약</button> <button type=\"button\" class=\"kn-delete-btn\">삭제</button>";
-				} }
-			], revisions, "아직 분석한 적이 없습니다.");
-			eachRow(el["kn-revision-table"], function (tr, index) {
-				var revision = revisions[index];
-				tr.querySelector(".kn-summary-btn").addEventListener("click", function () { loadSummary(revision); });
-				tr.querySelector(".kn-delete-btn").addEventListener("click", function () { deleteRevision(revision); });
+			if (!revisions || revisions.length === 0) {
+				el["kn-revision-list"].innerHTML = "<p class=\"ai-hint\">아직 분석한 적이 없습니다. 위의 \"분석 시작\"을 누르세요.</p>";
+				return;
+			}
+			el["kn-revision-list"].innerHTML = revisions.map(function (revision, index) {
+				var on = current && String(current.revisionId) === String(revision.revisionId);
+				return "<button type=\"button\" class=\"kn-pick" + (on ? " kn-pick-on" : "") + "\" data-index=\"" + index + "\" data-id=\"" + revision.revisionId + "\">"
+					+ "<span class=\"kn-pick-main\">#" + revision.revisionId + " " + K.escapeHtml(revision.revisionLabel) + " " + K.badge(revision.status) + "</span>"
+					+ "<span class=\"kn-pick-sub\">" + K.escapeHtml(revision.createdAt || "") + (revision.parentRevisionId ? " · 증분(기준 #" + revision.parentRevisionId + ")" : "") + "</span>"
+					+ "</button>";
+			}).join("");
+			Array.prototype.forEach.call(el["kn-revision-list"].querySelectorAll(".kn-pick"), function (button) {
+				button.addEventListener("click", function () {
+					loadSummary(revisions[parseInt(button.getAttribute("data-index"), 10)]);
+				});
 			});
 		}).catch(function (err) {
 			if (requestNo === revisionsRequestNo) {
@@ -269,11 +310,8 @@ var DstoneKnowledgeProject = (function () {
 		}
 		K.call("DELETE", "/api/revisions/" + revision.revisionId).then(function () {
 			K.message(el["kn-revision-message"], "지웠습니다: #" + revision.revisionId);
-			// 지운 리비전의 요약 · 풀지 못한 참조를 보고 있었으면 닫는다. 다른 리비전을 보고 있었으면 그대로 둔다.
-			if (String(summaryRevisionId) === String(revision.revisionId)) {
+			if (current && String(current.revisionId) === String(revision.revisionId)) {
 				closeSummary();
-			} else if (String(DstoneKnowledgeUnresolved.revisionId()) === String(revision.revisionId)) {
-				DstoneKnowledgeUnresolved.close();
 			}
 			loadRevisions();
 		}).catch(function (err) {
@@ -293,13 +331,11 @@ var DstoneKnowledgeProject = (function () {
 		K.call("POST", "/api/projects/" + encodeURIComponent(projectId) + "/retention", { keep: keep }).then(function (result) {
 			K.message(el["kn-revision-message"], "지운 리비전 " + result.deletedRevisions.length + "개, 건너뛴 리비전 " + result.skippedRevisions.length
 				+ "개, 지운 임베딩 " + result.deletedEmbeddings + "건");
-			// 보고 있던 리비전이 지워졌으면 그 요약 · 풀지 못한 참조를 닫는다
+			// 보고 있던 리비전이 지워졌으면 오른쪽을 닫는다
 			(result.deletedRevisions || []).forEach(function (deleted) {
 				var deletedId = String(deleted && deleted.revisionId !== undefined ? deleted.revisionId : deleted);
-				if (String(summaryRevisionId) === deletedId) {
+				if (current && String(current.revisionId) === deletedId) {
 					closeSummary();
-				} else if (String(DstoneKnowledgeUnresolved.revisionId()) === deletedId) {
-					DstoneKnowledgeUnresolved.close();
 				}
 			});
 			loadRevisions();
@@ -308,32 +344,45 @@ var DstoneKnowledgeProject = (function () {
 		});
 	}
 
-	/* ---------------- 리비전 요약 ---------------- */
+	/* ---------------- 리비전 상세 (오른쪽) ---------------- */
 
-	/** 리비전 요약과, 그 요약에서 연 "풀지 못한 참조 살펴보기"를 닫는다. 읽고 있던 요약 응답도 버린다 */
+	/** 오른쪽을 비우고 안내 글을 보인다. 읽고 있던 응답도 버린다 */
 	function closeSummary() {
 		summaryRequestNo++;
-		summaryRevisionId = null;
+		current = null;
 		el["kn-summary-panel"].style.display = "none";
-		el["kn-summary-cards"].innerHTML = "";
-		el["kn-summary-sections"].innerHTML = "";
+		el["kn-detail-empty"].style.display = "";
+		["kn-summary-cards", "kn-overview", "kn-connect", "kn-content", "kn-history"].forEach(function (id) {
+			el[id].innerHTML = "";
+		});
+		markPicked(el["kn-revision-list"], function () { return false; });
 		DstoneKnowledgeUnresolved.close();
+		DstoneKnowledgeUnused.close();
 	}
 
 	function loadSummary(revision) {
 		var requestNo = ++summaryRequestNo;
-		summaryRevisionId = revision.revisionId;
-		// 풀지 못한 참조는 요약에 딸린 것이다. 다른 리비전의 요약을 열면 앞 리비전의 것은 닫는다.
-		if (String(DstoneKnowledgeUnresolved.revisionId()) !== String(revision.revisionId)) {
-			DstoneKnowledgeUnresolved.close();
-		}
+		current = revision;
+		// 풀지 못한 참조 · 미사용 목록은 리비전에 딸린 것이다. 다른 리비전을 열면 앞 리비전의 것은 닫는다.
+		DstoneKnowledgeUnresolved.close();
+		DstoneKnowledgeUnused.close();
+		markPicked(el["kn-revision-list"], function (button) {
+			return button.getAttribute("data-id") === String(revision.revisionId);
+		});
+		el["kn-detail-empty"].style.display = "none";
 		el["kn-summary-panel"].style.display = "";
-		el["kn-summary-title"].textContent = "#" + revision.revisionId + " " + revision.revisionLabel;
+		el["kn-summary-title"].textContent = "#" + revision.revisionId + " " + (revision.revisionLabel || "");
+		el["kn-summary-badge"].innerHTML = revision.status ? K.badge(revision.status) : "";
 		el["kn-summary-cards"].innerHTML = "";
-		el["kn-summary-sections"].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
+		["kn-overview", "kn-connect", "kn-content", "kn-history"].forEach(function (id) {
+			el[id].innerHTML = "<p class=\"ai-hint\">읽는 중...</p>";
+		});
+		tabWarnings = {};
+		renderTabWarnings();
+		showTab(activeTab);
 		Promise.all([
 			K.call("GET", "/api/revisions/" + revision.revisionId),
-			// RAG 상태는 따로 조회한다. 실패해도 나머지 요약은 보여 준다.
+			// RAG 상태는 따로 조회한다. 실패해도 나머지는 보여 준다.
 			K.call("GET", "/api/revisions/" + revision.revisionId + "/rag").catch(function () { return null; }),
 			// 적용 진단도 따로. 실패하면 진단 상자만 빠진다.
 			K.call("GET", "/api/revisions/" + revision.revisionId + "/diagnostics").catch(function () { return null; })
@@ -344,128 +393,198 @@ var DstoneKnowledgeProject = (function () {
 			var summary = results[0];
 			summary.rag = results[1];
 			summary.diagnostics = results[2];
+			current.revisionLabel = summary.revisionLabel;
+			el["kn-summary-title"].textContent = "#" + summary.revisionId + " " + summary.revisionLabel;
+			el["kn-summary-badge"].innerHTML = K.badge(summary.status);
 			renderSummary(summary);
-			el["kn-summary-panel"].scrollIntoView({ behavior: "smooth" });
+			if (window.innerWidth < 861) {
+				el["kn-summary-panel"].scrollIntoView({ behavior: "smooth" });
+			}
 		}).catch(function (err) {
 			if (requestNo === summaryRequestNo) {
-				el["kn-summary-sections"].innerHTML = "<div class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</div>";
+				el["kn-overview"].innerHTML = "<div class=\"kn-message kn-error\">" + K.escapeHtml(err.message) + "</div>";
 			}
+		});
+		// 미사용은 계산이 오래 걸릴 수 있어 따로 읽는다. 다 되면 개요의 미사용 상자와 탭 표시를 채운다.
+		DstoneKnowledgeUnused.load({ projectId: projectId, revisionId: revision.revisionId, revisionLabel: revision.revisionLabel }, function (unused) {
+			if (requestNo !== summaryRequestNo) {
+				return;
+			}
+			var box = el["kn-overview"].querySelector(".kn-unused-overview");
+			if (box) {
+				DstoneKnowledgeUnused.renderOverview(box, unused, function () { showTab("unused"); });
+			}
+			setTabWarning("unused", unused && unused.warning ? "warn" : null);
 		});
 	}
 
 	function renderSummary(summary) {
+		var metrics = metricsOf(summary);
 		var values = [
-			valueAt(summary, "files.total"),
-			sumOf(valueAt(summary, "declarations.types")),
-			sumOf(valueAt(summary, "relations.byType")),
-			sumOf(valueAt(summary, "semantic.endpoints")),
-			sumOf(valueAt(summary, "rag.documents"), "documents")
+			T.valueAt(summary, "files.total"),
+			sumOf(T.valueAt(summary, "declarations.types"), "count"),
+			sumOf(T.valueAt(summary, "relations.byType"), "count"),
+			sumOf(T.valueAt(summary, "semantic.endpoints"), "count"),
+			metrics.callResolutionRate === undefined ? "-" : metrics.callResolutionRate + "%",
+			sumOf(T.valueAt(summary, "rag.documents"), "documents")
 		];
 		// 카드마다 숫자, 이름, 그 숫자가 무엇을 센 것인지
 		el["kn-summary-cards"].innerHTML = T.CARDS.map(function (card, index) {
-			return "<div class=\"kn-card\" title=\"" + K.escapeHtml(card[1]) + "\"><div class=\"kn-card-value\">" + K.escapeHtml(formatNumber(values[index]))
+			return "<div class=\"kn-card\" title=\"" + K.escapeHtml(card[1]) + "\"><div class=\"kn-card-value\">" + K.escapeHtml(T.fmt(values[index]))
 				+ "</div><div class=\"kn-card-label\">" + K.escapeHtml(card[0]) + "</div><div class=\"kn-card-help\">" + K.escapeHtml(card[1]) + "</div></div>";
 		}).join("");
 
-		el["kn-summary-sections"].innerHTML = "";
-		el["kn-summary-sections"].appendChild(verdictBox(summary));
-		el["kn-summary-sections"].appendChild(unresolvedButtons(summary));
-		if (summary.diagnostics) {
-			el["kn-summary-sections"].appendChild(diagnosticsBox(summary.diagnostics));
+		// 개요: 한눈에 보기 → 미사용 → 적용 진단
+		el["kn-overview"].innerHTML = "";
+		var verdict = verdictLines(summary, metrics);
+		el["kn-overview"].appendChild(verdictBox(verdict));
+		var unusedBox = document.createElement("div");
+		unusedBox.className = "kn-verdict kn-unused-overview";
+		unusedBox.innerHTML = "<div class=\"kn-section-title\" style=\"margin-top:0;\">미사용</div><p class=\"ai-hint\">계산하는 중...</p>";
+		el["kn-overview"].appendChild(unusedBox);
+		var unused = DstoneKnowledgeUnused.summary();
+		if (unused && String(unused.revisionId) === String(summary.revisionId)) {
+			DstoneKnowledgeUnused.renderOverview(unusedBox, unused, function () { showTab("unused"); });
 		}
+		if (summary.diagnostics) {
+			el["kn-overview"].appendChild(diagnosticsBox(summary.diagnostics));
+		}
+
+		// 나머지 탭: SECTIONS 를 탭별로 나눠 그린다
+		var targets = { connect: el["kn-connect"], content: el["kn-content"], history: el["kn-history"] };
+		Object.keys(targets).forEach(function (tab) {
+			targets[tab].innerHTML = "";
+		});
 		T.SECTIONS.forEach(function (section) {
-			var value = valueAt(summary, section.path);
-			if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+			var rows = section.build ? section.build(summary) : T.valueAt(summary, section.path);
+			if (rows === null || rows === undefined || (Array.isArray(rows) && rows.length === 0)) {
 				return;
 			}
-			el["kn-summary-sections"].appendChild(sectionBox(section, value));
-			if (section.path === "relations.unresolvedReasons") {
-				el["kn-summary-sections"].appendChild(unresolvedButtons(summary));
+			if (section.showIf && !section.showIf(rows)) {
+				return;
 			}
+			targets[section.tab].appendChild(sectionBox(section, rows, summary));
+			if (section.path === "relations.unresolvedReasons") {
+				targets[section.tab].appendChild(unresolvedButtons(summary, metrics));
+			}
+		});
+		Object.keys(targets).forEach(function (tab) {
+			if (!targets[tab].firstChild) {
+				targets[tab].innerHTML = "<p class=\"ai-hint\">보여 줄 결과가 없습니다.</p>";
+			}
+		});
+
+		// 탭의 ⚠: 한눈에 보기의 경고, 적용 진단의 warn / bad, 끝나지 않은 리비전
+		verdict.forEach(function (line) {
+			if (line.tab && (line.level === "warn" || line.level === "bad")) {
+				setTabWarning(line.tab, line.level);
+			}
+		});
+		((summary.diagnostics && summary.diagnostics.checks) || []).forEach(function (check) {
+			if (CHECK_TAB[check.key] && (check.level === "warn" || check.level === "bad")) {
+				setTabWarning(CHECK_TAB[check.key], check.level);
+			}
+		});
+		if (summary.status !== "READY") {
+			setTabWarning("history", "bad");
+		}
+	}
+
+	/* ---------------- 탭 ---------------- */
+
+	function showTab(tab) {
+		activeTab = tab;
+		Array.prototype.forEach.call(el["kn-tabs"].querySelectorAll(".kn-tab"), function (button) {
+			var on = button.getAttribute("data-tab") === tab;
+			button.classList.toggle("kn-tab-on", on);
+			button.setAttribute("aria-selected", on ? "true" : "false");
+		});
+		Array.prototype.forEach.call(el["kn-summary-panel"].querySelectorAll(".kn-tab-panel"), function (panel) {
+			panel.style.display = panel.getAttribute("data-panel") === tab ? "" : "none";
 		});
 	}
 
-	/**
-	 * 요약 맨 위의 "한눈에 보기". 숫자를 읽지 않아도 이 리비전을 믿고 써도 되는지 알 수 있게 말로 풀어 준다.
-	 * 기준(95% / 80%)은 대략의 눈금이다. knowledge-terms.js 의 '품질 지표' 설명과 같은 기준을 쓴다.
-	 */
-	function verdictBox(summary) {
-		var lines = [];
-		var metrics = {};
-		(valueAt(summary, "relations.metrics") || []).forEach(function (row) {
-			metrics[row.name] = row.value;
+	/** 탭에 ⚠ 를 붙이거나(level = warn / bad) 뗀다(null). bad 가 warn 보다 앞선다 */
+	function setTabWarning(tab, level) {
+		if (level === null) {
+			delete tabWarnings[tab];
+		} else if (tabWarnings[tab] !== "bad") {
+			tabWarnings[tab] = level;
+		}
+		renderTabWarnings();
+	}
+
+	function renderTabWarnings() {
+		Array.prototype.forEach.call(el["kn-tabs"].querySelectorAll(".kn-tab"), function (button) {
+			var tab = button.getAttribute("data-tab");
+			var level = tabWarnings[tab];
+			button.innerHTML = K.escapeHtml(TAB_LABELS[tab]) + (level ? " <span class=\"kn-tab-warn kn-tab-warn-" + level + "\" title=\"이 탭에 살펴볼 것이 있습니다\">⚠</span>" : "");
 		});
+	}
+
+	/* ---------------- 개요 ---------------- */
+
+	/**
+	 * "한눈에 보기"의 줄들. 숫자를 읽지 않아도 이 리비전을 믿고 써도 되는지 알 수 있게 말로 풀어 준다.
+	 * 기준(95% / 80%)은 대략의 눈금이다. 줄마다 그 내용을 자세히 볼 수 있는 탭을 적어 두어 탭의 ⚠ 로 쓴다.
+	 * @return [{level: good / warn / bad / info, text, tab}]
+	 */
+	function verdictLines(summary, metrics) {
+		var lines = [];
 		if (metrics.callResolutionRate !== undefined && metrics.callResolutionRate !== null) {
 			var rate = Number(metrics.callResolutionRate);
-			lines.push([rate >= 95 ? "good" : rate >= 80 ? "warn" : "bad",
-				"메소드 호출 " + formatNumber(metrics.callCount) + "건 가운데 **" + rate + "%** 가 누구를 부르는지 풀렸습니다. "
-				+ (rate >= 95 ? "호출 관계와 영향도 결과를 믿고 써도 됩니다." : rate >= 80 ? "쓸 수는 있지만 빠진 호출이 있을 수 있습니다. 라이브러리(jar) 위치를 확인하세요."
-					: "빠진 호출이 많습니다. 프로젝트 등록 칸에 라이브러리(jar) 위치를 적고 다시 분석하세요.")]);
+			lines.push({ level: rate >= 95 ? "good" : rate >= 80 ? "warn" : "bad", tab: "connect",
+				text: "메소드 호출 " + T.fmt(metrics.callCount) + "건 가운데 **" + rate + "%** 가 누구를 부르는지 풀렸습니다. "
+					+ (rate >= 95 ? "호출 관계와 영향도 결과를 믿고 써도 됩니다." : rate >= 80 ? "쓸 수는 있지만 빠진 호출이 있을 수 있습니다. 라이브러리(jar) 위치를 확인하세요."
+						: "빠진 호출이 많습니다. 프로젝트 등록 칸에 라이브러리(jar) 위치를 적고 다시 분석하세요.") });
 		}
 		if (metrics.parseSuccessRate !== undefined && metrics.parseSuccessRate !== null) {
 			var parse = Number(metrics.parseSuccessRate);
-			lines.push([parse >= 100 ? "good" : "warn", parse >= 100 ? "Java 파일을 모두 읽었습니다." : "Java 파일의 " + parse + "% 만 읽었습니다. 읽지 못한 파일의 메소드는 결과에 없습니다."]);
+			lines.push({ level: parse >= 100 ? "good" : "warn", tab: "history",
+				text: parse >= 100 ? "Java 파일을 모두 읽었습니다." : "Java 파일의 " + parse + "% 만 읽었습니다. 읽지 못한 파일의 메소드는 결과에 없습니다(실행 기록 탭의 Job 오류)." });
 		}
-		var endpoints = sumOf(valueAt(summary, "semantic.endpoints"));
+		var endpoints = sumOf(T.valueAt(summary, "semantic.endpoints"), "count");
 		if (typeof endpoints === "number") {
-			lines.push([endpoints > 0 ? "good" : "warn", endpoints > 0 ? "진입점(주소 등) " + formatNumber(endpoints) + "개를 찾았습니다."
-				: "진입점을 하나도 찾지 못했습니다. 영향도 분석의 '진입점' 표가 비어 나옵니다."]);
+			lines.push({ level: endpoints > 0 ? "good" : "warn", tab: "content",
+				text: endpoints > 0 ? "진입점(주소 등) " + T.fmt(endpoints) + "개를 찾았습니다." : "진입점을 하나도 찾지 못했습니다. 영향도 분석의 '진입점' 표가 비어 나옵니다." });
 		}
 		var sql = 0;
-		(valueAt(summary, "relations.byType") || []).forEach(function (row) {
+		(T.valueAt(summary, "relations.byType") || []).forEach(function (row) {
 			if (row.relationType === "EXECUTES_SQL" && row.confidence !== "UNRESOLVED") {
 				sql += row.count;
 			}
 		});
-		lines.push([sql > 0 ? "good" : "info", sql > 0 ? "메소드와 SQL 이 " + formatNumber(sql) + "건 이어졌습니다. 테이블에서 출발하는 영향도 분석을 할 수 있습니다."
-			: "메소드와 이어진 SQL 이 없습니다(매퍼 XML 을 쓰지 않는 프로그램이면 정상). 테이블에서 출발하는 영향도 분석은 할 수 없습니다."]);
+		lines.push({ level: sql > 0 ? "good" : "info", tab: "connect",
+			text: sql > 0 ? "메소드와 SQL 이 " + T.fmt(sql) + "건 이어졌습니다. 테이블에서 출발하는 영향도 분석을 할 수 있습니다."
+				: "메소드와 이어진 SQL 이 없습니다(매퍼 XML 을 쓰지 않는 프로그램이면 정상). 테이블에서 출발하는 영향도 분석은 할 수 없습니다." });
 		var done = 0;
-		var total = 0;
-		(valueAt(summary, "rag.embedding") || []).forEach(function (row) {
-			total += row.chunks;
+		var all = 0;
+		(T.valueAt(summary, "rag.embedding") || []).forEach(function (row) {
+			all += row.chunks;
 			if (row.status === "DONE") {
 				done += row.chunks;
 			}
 		});
-		if (total > 0) {
-			var percent = Math.floor(100 * done / total);
-			lines.push([percent >= 100 ? "good" : "info", percent >= 100 ? "임베딩이 끝났습니다. 뜻으로 찾는 검색을 온전히 쓸 수 있습니다."
-				: "임베딩이 " + percent + "% 진행됐습니다(" + formatNumber(done) + " / " + formatNumber(total) + "). 끝날 때까지 뜻으로 찾는 검색은 일부만 됩니다. 이름으로 찾기 · 호출 관계 · 영향도는 지금도 됩니다."]);
+		if (all > 0) {
+			var percent = Math.floor(100 * done / all);
+			lines.push({ level: percent >= 100 ? "good" : "info", tab: "history",
+				text: percent >= 100 ? "임베딩이 끝났습니다. 뜻으로 찾는 검색을 온전히 쓸 수 있습니다."
+					: "임베딩이 " + percent + "% 진행됐습니다(" + T.fmt(done) + " / " + T.fmt(all) + "). 끝날 때까지 뜻으로 찾는 검색은 일부만 됩니다. 이름으로 찾기 · 호출 관계 · 영향도는 지금도 됩니다." });
 		}
 		if (summary.status !== "READY") {
-			lines.unshift(["bad", "이 리비전은 분석이 끝나지 않았습니다(상태 " + summary.status + "). 아래 숫자는 도중까지의 결과입니다."]);
+			lines.unshift({ level: "bad", tab: "history", text: "이 리비전은 분석이 끝나지 않았습니다(상태 " + summary.status + "). 아래 숫자는 도중까지의 결과입니다." });
 		}
+		return lines;
+	}
+
+	function verdictBox(lines) {
 		var box = document.createElement("div");
 		box.className = "kn-verdict";
 		box.innerHTML = "<div class=\"kn-section-title\" style=\"margin-top:0;\">한눈에 보기</div>" + lines.map(function (line) {
-			var mark = line[0] === "good" ? "✔" : line[0] === "bad" ? "✖" : line[0] === "warn" ? "!" : "·";
 			// 글은 먼저 이스케이프하고, **로 감싼 부분만 굵게 바꾼다.
-			var text = K.escapeHtml(line[1]).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-			return "<div class=\"kn-verdict-line kn-verdict-" + line[0] + "\"><span class=\"kn-verdict-mark\">" + mark + "</span>" + text + "</div>";
+			var text = K.escapeHtml(line.text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+			return "<div class=\"kn-verdict-line kn-verdict-" + line.level + "\"><span class=\"kn-verdict-mark\">" + markOf(line.level) + "</span>" + text + "</div>";
 		}).join("");
-		return box;
-	}
-
-	/**
-	 * "풀지 못한 참조 살펴보기" 단추. 못 푼 것(UNRESOLVED)과 짐작으로 이은 것(HEURISTIC)을 따로 연다.
-	 * 누르면 아래 패널에 원인 · 파일별 묶음과 한 건씩의 목록(파일 · 줄 번호)이 나온다.
-	 */
-	function unresolvedButtons(summary) {
-		var metrics = {};
-		(valueAt(summary, "relations.metrics") || []).forEach(function (row) {
-			metrics[row.name] = row.value;
-		});
-		var box = document.createElement("div");
-		box.className = "kn-row";
-		box.innerHTML = "<button type=\"button\" class=\"kn-plain\" data-status=\"UNRESOLVED\">풀지 못한 참조 살펴보기"
-			+ (metrics.callUnresolvedRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callUnresolvedRate)) + "%)" : "") + "</button>"
-			+ "<button type=\"button\" class=\"kn-plain\" data-status=\"HEURISTIC\">짐작으로 이은 참조 살펴보기"
-			+ (metrics.callHeuristicRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callHeuristicRate)) + "%)" : "") + "</button>";
-		Array.prototype.forEach.call(box.querySelectorAll("button"), function (button) {
-			button.addEventListener("click", function () {
-				DstoneKnowledgeUnresolved.open({ revisionId: summary.revisionId, revisionLabel: summary.revisionLabel }, button.getAttribute("data-status"));
-			});
-		});
 		return box;
 	}
 
@@ -495,11 +614,10 @@ var DstoneKnowledgeProject = (function () {
 			+ "/ 에 규칙을 적고 SEMANTIC 부터 다시 분석하면 되고, <b>분석기 개발 필요</b>는 지금 지원하는 범위 밖입니다.</p>"
 			+ (head ? "<div class=\"kn-row\">" + head + "</div>" : "<p class=\"ai-hint\">살펴볼 항목이 없습니다.</p>");
 		(diagnostics.checks || []).forEach(function (check) {
-			var mark = check.level === "good" ? "✔" : check.level === "bad" ? "✖" : check.level === "warn" ? "!" : "·";
-			var count = check.count === null || check.count === undefined ? "" : " (" + formatNumber(check.count)
-				+ (check.total === null || check.total === undefined ? "" : " / " + formatNumber(check.total)) + ")";
+			var count = check.count === null || check.count === undefined ? "" : " (" + T.fmt(check.count)
+				+ (check.total === null || check.total === undefined ? "" : " / " + T.fmt(check.total)) + ")";
 			var solution = SOLUTION[check.solution] ? " <span class=\"kn-diag-solution kn-diag-" + K.escapeHtml(check.solution) + "\">" + K.escapeHtml(SOLUTION[check.solution]) + "</span>" : "";
-			html += "<div class=\"kn-verdict-line kn-verdict-" + K.escapeHtml(check.level) + "\"><span class=\"kn-verdict-mark\">" + mark + "</span><b>"
+			html += "<div class=\"kn-verdict-line kn-verdict-" + K.escapeHtml(check.level) + "\"><span class=\"kn-verdict-mark\">" + markOf(check.level) + "</span><b>"
 				+ K.escapeHtml(check.title) + "</b>" + K.escapeHtml(count) + solution + " — " + K.escapeHtml(check.message) + "</div>";
 			if (check.samples && check.samples.length > 0) {
 				html += "<details class=\"kn-howto kn-diag-samples\"><summary>보기 " + check.samples.length + "건</summary><div class=\"kn-scroll\" data-key=\""
@@ -516,44 +634,59 @@ var DstoneKnowledgeProject = (function () {
 		return box;
 	}
 
-	/** 표 하나: 제목, 무엇을 보여 주는지, 표(영문 값 옆에 뜻), 읽는 법 */
-	function sectionBox(section, value) {
-		var wrap = document.createElement("div");
-		var html = "<div class=\"kn-section-title\">" + K.escapeHtml(section.title) + "</div><p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p><div class=\"kn-scroll\"></div>";
-		var help = "";
-		if (section.columns) {
-			help += "<ul>" + section.columns.filter(function (column) { return column[2]; }).map(function (column) {
-				return "<li><b>" + K.escapeHtml(column[1]) + "</b> <code>" + K.escapeHtml(column[0]) + "</code> — " + K.escapeHtml(column[2]) + "</li>";
-			}).join("") + "</ul>";
-		}
+	function markOf(level) {
+		return level === "good" ? "✔" : level === "bad" ? "✖" : level === "warn" ? "!" : "·";
+	}
+
+	/* ---------------- 연결 품질 ---------------- */
+
+	/**
+	 * "풀지 못한 참조 살펴보기" 단추. 못 푼 것(UNRESOLVED)과 짐작으로 이은 것(HEURISTIC)을 따로 연다.
+	 * 누르면 같은 탭 아래에 원인 · 파일별 묶음과 한 건씩의 목록(파일 · 줄 번호)이 나온다.
+	 */
+	function unresolvedButtons(summary, metrics) {
+		var box = document.createElement("div");
+		box.className = "kn-row";
+		box.innerHTML = "<button type=\"button\" class=\"kn-plain\" data-status=\"UNRESOLVED\">풀지 못한 참조 살펴보기"
+			+ (metrics.callUnresolvedRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callUnresolvedRate)) + "%)" : "") + "</button>"
+			+ "<button type=\"button\" class=\"kn-plain\" data-status=\"HEURISTIC\">짐작으로 이은 참조 살펴보기"
+			+ (metrics.callHeuristicRate !== undefined ? " (호출의 " + K.escapeHtml(String(metrics.callHeuristicRate)) + "%)" : "") + "</button>";
+		Array.prototype.forEach.call(box.querySelectorAll("button"), function (button) {
+			button.addEventListener("click", function () {
+				DstoneKnowledgeUnresolved.open({ revisionId: summary.revisionId, revisionLabel: summary.revisionLabel }, button.getAttribute("data-status"));
+			});
+		});
+		return box;
+	}
+
+	/* ---------------- 표 하나 ---------------- */
+
+	/** 접힌 표 하나: 제목 — 한 줄 요약. 펴면 무엇을 보여 주는지, 표(영문 값 옆에 뜻), 읽는 법 */
+	function sectionBox(section, rows, summary) {
+		var box = document.createElement("details");
+		box.className = "kn-fold";
+		var brief = section.brief ? section.brief(rows, summary) : "";
+		var html = "<summary><span class=\"kn-fold-title\">" + K.escapeHtml(section.title) + "</span>"
+			+ (brief ? "<span class=\"kn-fold-brief\">" + K.escapeHtml(brief) + "</span>" : "") + "</summary>"
+			+ "<div class=\"kn-fold-body\"><p class=\"ai-hint\">" + K.escapeHtml(section.what) + "</p><div class=\"kn-scroll\"></div>";
+		var help = "<ul>" + section.columns.filter(function (column) { return column[2]; }).map(function (column) {
+			return "<li><b>" + K.escapeHtml(column[1]) + "</b> <code>" + K.escapeHtml(column[0]) + "</code> — " + K.escapeHtml(column[2]) + "</li>";
+		}).join("") + "</ul>";
 		if (section.read) {
 			help += "<p>" + K.escapeHtml(section.read) + "</p>";
 		}
-		if (help) {
-			html += "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary>" + help + "</details>";
-		}
-		wrap.innerHTML = html;
-		var tableEl = wrap.querySelector(".kn-scroll");
-		if (section.pairs) {
-			var rows = Object.keys(value).map(function (key) {
-				return { name: key, value: value[key] };
-			});
-			K.table(tableEl, [
-				{ key: "name", label: "항목", html: function (row) { return withMeaning(row.name, section.rows[row.name]); } },
-				{ key: "value", label: "값", num: true }
-			], rows);
-			return wrap;
-		}
-		K.table(tableEl, section.columns.map(function (column) {
-			var numeric = value.length > 0 && typeof value[0][column[0]] === "number";
+		html += "<details class=\"kn-howto\"><summary>이 표 읽는 법</summary>" + help + "</details></div>";
+		box.innerHTML = html;
+		K.table(box.querySelector(".kn-scroll"), section.columns.map(function (column) {
+			var numeric = rows.length > 0 && rows.some(function (row) { return typeof row[column[0]] === "number"; });
 			return {
 				key: column[0],
 				label: column[1],
 				num: numeric,
 				html: column[3] ? function (row) { return withMeaning(row[column[0]], T.meaningOf(column[3], row[column[0]])); } : null
 			};
-		}), value);
-		return wrap;
+		}), rows);
+		return box;
 	}
 
 	/** 영문 값 뒤에 한글 뜻을 흐린 글자로 붙인다 */
@@ -561,42 +694,33 @@ var DstoneKnowledgeProject = (function () {
 		return "<span class=\"kn-code\">" + K.escapeHtml(code) + "</span>" + (meaning ? "<span class=\"kn-term\">" + K.escapeHtml(meaning) + "</span>" : "");
 	}
 
-	function formatNumber(value) {
-		return typeof value === "number" ? value.toLocaleString() : (value === null || value === undefined ? "-" : String(value));
-	}
+	/* ---------------- 도우미 ---------------- */
 
-	/** "a.b.c" 경로로 값을 꺼냅니다. 중간에 없으면 null */
-	function valueAt(object, path) {
-		var value = object;
-		path.split(".").forEach(function (key) {
-			value = value === null || value === undefined ? null : value[key];
+	/** 품질 지표 표를 {이름: 값} 으로 */
+	function metricsOf(summary) {
+		var metrics = {};
+		(T.valueAt(summary, "relations.metrics") || []).forEach(function (row) {
+			metrics[row.name] = row.value;
 		});
-		return value === undefined ? null : value;
+		return metrics;
 	}
 
-	/** 행들의 건수를 더합니다. 건수가 든 키(count 등)는 행에서 처음 나오는 숫자 값으로 봅니다 */
+	/** 행들의 key 값을 더한다. 행 목록이 아니면 "-" */
 	function sumOf(rows, key) {
 		if (!Array.isArray(rows)) {
 			return "-";
 		}
-		var total = 0;
+		var sum = 0;
 		rows.forEach(function (row) {
-			var numberKey = key;
-			if (!numberKey) {
-				Object.keys(row).forEach(function (name) {
-					if (!numberKey && typeof row[name] === "number") {
-						numberKey = name;
-					}
-				});
-			}
-			total += Number(row[numberKey]) || 0;
+			sum += Number(row[key]) || 0;
 		});
-		return total;
+		return sum;
 	}
 
-	function eachRow(container, callback) {
-		Array.prototype.forEach.call(container.querySelectorAll("tbody tr[data-index]"), function (tr) {
-			callback(tr, parseInt(tr.getAttribute("data-index"), 10));
+	/** 고르는 목록에서 test 가 참인 단추 하나만 켠다 */
+	function markPicked(container, test) {
+		Array.prototype.forEach.call(container.querySelectorAll(".kn-pick"), function (button) {
+			button.classList.toggle("kn-pick-on", test(button));
 		});
 	}
 

@@ -133,17 +133,7 @@ public class ScreenScript {
 			this.argIndex = 0;
 		}
 
-		/** 폼 필드 규칙을 만듭니다. 이 이름의 필드에 적힌 값(거래 ID)으로 메소드 이름을 만듭니다. */
-		public static CallRule field(String fieldName, String methodTemplate) {
-			return new CallRule(fieldName, methodTemplate, true, IdTransform.NONE, null);
-		}
-
-		/** 폼 필드 규칙. ID 를 다듬는 방법이 있을 때 */
-		public static CallRule field(String fieldName, String methodTemplate, IdTransform transform) {
-			return new CallRule(fieldName, methodTemplate, true, transform, null);
-		}
-
-		/** 폼 필드 규칙. 규칙이 적힌 자리(at)를 함께 */
+		/** 폼 필드 규칙: 이 이름의 필드에 적힌 값(거래 ID)으로 메소드 이름을 만듭니다. at 은 규칙이 적힌 자리(모르면 null) */
 		public static CallRule field(String fieldName, String methodTemplate, IdTransform transform, String at) {
 			return new CallRule(fieldName, methodTemplate, true, transform, at);
 		}
@@ -269,50 +259,6 @@ public class ScreenScript {
 		}
 	}
 
-	/**
-	 * <pre>
-	 * 설정에 적힌 규칙 글자를 읽습니다.
-	 * 모양: "함수=메소드이름틀" 을 쉼표로 이어 쓴다. 예: "doRequestAjax=perform{id}, gfnTransaction={id}"
-	 * {id}가 없는 틀이나 빈 항목은 버립니다.
-	 * </pre>
-	 */
-	public static List<CallRule> parseRules(String configured) {
-		return parse(configured, false);
-	}
-
-	/**
-	 * <pre>
-	 * 폼 필드 규칙 글자를 읽습니다. 모양은 parseRules 와 같고, 함수 자리에 필드 이름을 적습니다.
-	 * 예: "tranId=perform{id}" → 화면이 만드는 폼의 &lt;input name='tranId' value='JIMC1000M03S'&gt; 를 performJIMC1000M03S 와 잇는다.
-	 * </pre>
-	 */
-	public static List<CallRule> parseFieldRules(String configured) {
-		return parse(configured, true);
-	}
-
-	/** "함수=메소드틀, 함수=메소드틀" 모양의 설정 글을 규칙 목록으로 읽습니다. 틀에 {id} 가 없는 항목은 버립니다. */
-	private static List<CallRule> parse(String configured, boolean field) {
-		List<CallRule> rules = new ArrayList<CallRule>();
-		if (configured == null) {
-			return rules;
-		}
-		String[] items = configured.split(",");
-		for (int i = 0; i < items.length; i++) {
-			String item = items[i].trim();
-			int eq = item.indexOf('=');
-			if (eq <= 0) {
-				continue;
-			}
-			String function = item.substring(0, eq).trim();
-			String template = item.substring(eq + 1).trim();
-			if (function.length() == 0 || template.indexOf("{id}") < 0) {
-				continue;
-			}
-			rules.add(field ? CallRule.field(function, template) : new CallRule(function, template));
-		}
-		return rules;
-	}
-
 	/** 규칙에 맞는 거래 호출을 파일에 나온 순서대로 찾습니다. */
 	public List<Call> findCalls(String text, List<CallRule> rules) {
 		List<Call> calls = new ArrayList<Call>();
@@ -402,11 +348,6 @@ public class ScreenScript {
 			}
 		}
 		return line;
-	}
-
-	/** 이 위치가 주석 안인지 봅니다. 한 번만 물어볼 때 쓰는 편의 메소드입니다(파일 전체를 훑으므로 반복해서 부르지 않는다). */
-	boolean inComment(String text, int index) {
-		return commentMask(text).get(index);
 	}
 
 	/**

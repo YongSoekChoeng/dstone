@@ -61,6 +61,9 @@ public class DbCommentReader extends BaseObject {
 
 	private final Map<String, Cached> cache = new ConcurrentHashMap<String, Cached>();
 
+	/** 프로젝트 ID → 테이블 목록. 프로젝트 수만큼만 쌓인다 */
+	private final Map<String, CachedList> listCache = new ConcurrentHashMap<String, CachedList>();
+
 	/**
 	 * <pre>
 	 * DB에서 읽은 테이블 하나의 설명
@@ -85,6 +88,40 @@ public class DbCommentReader extends BaseObject {
 			this.message = message;
 			this.tableComment = tableComment;
 			this.columns = columns;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * DB에서 읽은 테이블 이름 목록
+	 * </pre>
+	 */
+	public static class TableList {
+
+		/** NOT_CONFIGURED / OK / FAILED */
+		public final String status;
+
+		/** 실패했을 때 그 까닭 */
+		public final String message;
+
+		/** 테이블 이름(대문자) */
+		public final List<String> tables;
+
+		TableList(String status, String message, List<String> tables) {
+			this.status = status;
+			this.message = message;
+			this.tables = tables;
+		}
+	}
+
+	/** 캐시에 넣어 둔 테이블 목록과 그 만료 시각 */
+	private static class CachedList {
+		final long expiresAt;
+		final TableList result;
+
+		CachedList(long expiresAt, TableList result) {
+			this.expiresAt = expiresAt;
+			this.result = result;
 		}
 	}
 
@@ -145,30 +182,11 @@ public class DbCommentReader extends BaseObject {
 	 * </pre>
 	 */
 	private Result load(String url, String projectId, String table) throws SQLException {
-		Properties properties = new Properties();
-		String username = configured(projectId, "username");
-		String password = configured(projectId, "password");
-		if (username != null) {
-			properties.setProperty("user", username);
-		}
-		if (password != null) {
-			properties.setProperty("password", password);
-		}
-		addDriverOptions(url, properties);
-
-		Connection connection = DriverManager.getConnection(url, properties);
+		Connection connection = open(url, projectId);
 		try {
-			try {
-				connection.setReadOnly(true);
-			} catch (SQLException e) {
-				// 읽기 전용을 지원하지 않는 드라이버. 어차피 메타데이터만 읽는다.
-			}
 			DatabaseMetaData meta = connection.getMetaData();
 			String catalog = connection.getCatalog();
-			String schema = configured(projectId, "schema");
-			if (schema == null) {
-				schema = schemaOf(connection);
-			}
+			String schema = schemaFor(connection, projectId);
 			// DB가 이름을 어떤 글자로 저장하는지에 따라 대문자 / 소문자로 찾는다(MySQL, PostgreSQL 은 보통 소문자).
 			String[] names = meta.storesLowerCaseIdentifiers() ? new String[] { table.toLowerCase(Locale.ROOT), table }
 					: new String[] { table, table.toLowerCase(Locale.ROOT) };
@@ -207,6 +225,77 @@ public class DbCommentReader extends BaseObject {
 		} finally {
 			connection.close();
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 대상 DB 스키마에 있는 테이블 이름 전부(대문자). 미사용 분석이 "DB에는 있는데 아무 SQL도 안 쓰는 테이블" 을 찾을 때 씁니다.
+	 * 접속 설정이 없으면 NOT_CONFIGURED 이고 아무 데도 접속하지 않습니다. 결과는 read() 와 같이 잠시 캐시합니다.
+	 * 뷰는 넣지 않고 TABLE 만 셉니다.
+	 * </pre>
+	 *
+	 * @return status / message 와, OK 일 때 tables(이름 목록)
+	 */
+	public TableList listTables(String projectId) {
+		String url = configured(projectId, "url");
+		if (url == null) {
+			return new TableList(NOT_CONFIGURED, null, new ArrayList<String>());
+		}
+		long now = System.currentTimeMillis();
+		CachedList cached = listCache.get(projectId);
+		if (cached != null && cached.expiresAt > now) {
+			return cached.result;
+		}
+		TableList result;
+		try {
+			Connection connection = open(url, projectId);
+			try {
+				List<String> tables = new ArrayList<String>();
+				ResultSet rs = connection.getMetaData().getTables(connection.getCatalog(), schemaFor(connection, projectId), "%", new String[] { "TABLE" });
+				try {
+					while (rs.next()) {
+						tables.add(rs.getString("TABLE_NAME").toUpperCase(Locale.ROOT));
+					}
+				} finally {
+					rs.close();
+				}
+				result = new TableList(OK, null, tables);
+			} finally {
+				connection.close();
+			}
+		} catch (Exception e) {
+			warn("DB 테이블 목록을 읽지 못했습니다. projectId=" + projectId + ", url=" + url + ", 까닭=" + ErrorText.summaryOf(e));
+			result = new TableList(FAILED, ErrorText.summaryOf(e), new ArrayList<String>());
+		}
+		listCache.put(projectId, new CachedList(now + (FAILED.equals(result.status) ? KEEP_FAILED_MILLIS : KEEP_MILLIS), result));
+		return result;
+	}
+
+	/** 설정의 계정으로 읽기 전용 연결을 엽니다(시간 제한 옵션 포함). */
+	private Connection open(String url, String projectId) throws SQLException {
+		Properties properties = new Properties();
+		String username = configured(projectId, "username");
+		String password = configured(projectId, "password");
+		if (username != null) {
+			properties.setProperty("user", username);
+		}
+		if (password != null) {
+			properties.setProperty("password", password);
+		}
+		addDriverOptions(url, properties);
+		Connection connection = DriverManager.getConnection(url, properties);
+		try {
+			connection.setReadOnly(true);
+		} catch (SQLException e) {
+			// 읽기 전용을 지원하지 않는 드라이버. 어차피 메타데이터만 읽는다.
+		}
+		return connection;
+	}
+
+	/** 테이블을 찾을 스키마: 설정 값 → 없으면 연결의 기본 스키마 */
+	private String schemaFor(Connection connection, String projectId) {
+		String schema = configured(projectId, "schema");
+		return schema != null ? schema : schemaOf(connection);
 	}
 
 	/** 접속 / 응답 시간 제한과, 코멘트를 돌려 달라는 옵션. 드라이버마다 이름과 단위가 다르다. */

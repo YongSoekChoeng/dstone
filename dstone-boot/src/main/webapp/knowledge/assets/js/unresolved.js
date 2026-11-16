@@ -1,6 +1,6 @@
 /**
  * "프로젝트 · 분석" 화면의 "풀지 못한 참조 살펴보기".
- * 리비전 요약에서 버튼을 누르면 열린다. 원인(못 찾은 기호) · 파일 · 이름별로 묶어 세고,
+ * 리비전 상세의 연결 품질 탭에서 버튼을 누르면 열린다. 원인(못 찾은 기호) · 파일 · 이름별로 묶어 세고,
  * 묶음을 누르면 그 조건으로 좁혀서 한 건씩(파일 · 줄 · 호출식 · 이유) 보여 준다.
  */
 var DstoneKnowledgeUnresolved = (function () {
@@ -67,11 +67,6 @@ var DstoneKnowledgeUnresolved = (function () {
 		el["kn-unresolved-page"].textContent = "";
 		el["kn-unresolved-message"].textContent = "";
 		el["kn-unresolved-message"].className = "kn-message";
-	}
-
-	/** 지금 열려 있는 리비전 번호. 닫혀 있으면 null */
-	function revisionId() {
-		return revision ? revision.revisionId : null;
 	}
 
 	/** 지금 조건을 API 파라미터로 */
@@ -250,5 +245,5 @@ var DstoneKnowledgeUnresolved = (function () {
 		el["kn-unresolved-message"].textContent = err.message;
 	}
 
-	return { init: init, open: open, close: close, revisionId: revisionId };
+	return { init: init, open: open, close: close };
 })();

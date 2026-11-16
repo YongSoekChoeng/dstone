@@ -3,6 +3,7 @@ package net.dstone.knowledge.analysis.pass08.semantic.screen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -16,16 +17,7 @@ public class ScreenMenuTest {
 
 	private final ScreenMenu screenMenu = new ScreenMenu();
 
-	private final List<ScreenMenu.Rule> rules = ScreenMenu.parseRules("MENU_NM=SRC_PATH");
-
-	@Test
-	public void 규칙_글자를_읽는다() {
-		List<ScreenMenu.Rule> parsed = ScreenMenu.parseRules(" MENU_NM=SRC_PATH , menuName=url, =x, y=, bad");
-		assertEquals(2, parsed.size());
-		assertEquals("menuName", parsed.get(1).getNameKey());
-		assertEquals("url", parsed.get(1).getPathKey());
-		assertTrue(ScreenMenu.parseRules(null).isEmpty());
-	}
+	private final List<ScreenMenu.Rule> rules = Arrays.asList(new ScreenMenu.Rule("MENU_NM", "SRC_PATH", null));
 
 	@Test
 	public void 스크립트에_적힌_메뉴_목록을_읽는다() {

@@ -52,18 +52,6 @@ public class MapperXmlReader {
 
 	/**
 	 * <pre>
-	 * 매퍼 파일을 읽습니다(파일 이름 없이. 쿼리 XML은 읽지 못한다).
-	 * </pre>
-	 *
-	 * @param text 매퍼 파일의 내용
-	 * @return statement와 조각(sql)의 목록. 키: mapperType, namespace, statementId, statementType, parameterType, resultType, sqlBody, lineStart, lineEnd
-	 */
-	public List<Map<String, Object>> read(String text) throws Exception {
-		return read(text, null);
-	}
-
-	/**
-	 * <pre>
 	 * 매퍼 파일 하나를 읽어 statement 목록을 만듭니다.
 	 *
 	 * 흐름:
@@ -74,7 +62,7 @@ public class MapperXmlReader {
 	 *
 	 * @param text 매퍼 파일의 내용
 	 * @param fileName 파일 이름(경로 없이). 쿼리 XML은 네임스페이스가 파일 안에 없고 파일 이름이라서 필요하다. 매퍼만 읽을 때는 null이어도 된다
-	 * @return statement와 조각(sql)의 목록. 키는 read(String)과 같다
+	 * @return statement와 조각(sql)의 목록. 키: mapperType, namespace, statementId, statementType, parameterType, resultType, sqlBody, lineStart, lineEnd
 	 */
 	public List<Map<String, Object>> read(String text, String fileName) throws Exception {
 		List<Map<String, Object>> statements = new ArrayList<Map<String, Object>>();

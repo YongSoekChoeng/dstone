@@ -26,22 +26,29 @@ public class ScreenScriptTest {
 
 	private final ScreenScript screenScript = new ScreenScript();
 
+	/** 함수 이름과 메소드 이름 틀로 호출 규칙 목록을 만든다: rules("함수", "틀", "함수", "틀" …) */
+	private static List<ScreenScript.CallRule> rules(String... pairs) {
+		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>();
+		for (int i = 0; i + 1 < pairs.length; i += 2) {
+			rules.add(new ScreenScript.CallRule(pairs[i], pairs[i + 1]));
+		}
+		return rules;
+	}
+
 	@Test
-	public void 규칙_글자를_읽는다() {
-		List<ScreenScript.CallRule> rules = ScreenScript.parseRules(" doRequestAjax=perform{id} , gfnTran = {id}Service ,잘못된것, noId=perform ");
-		assertEquals(2, rules.size());
+	public void 메소드_이름_틀에_ID를_넣는다() {
+		List<ScreenScript.CallRule> rules = rules("doRequestAjax", "perform{id}", "gfnTran", "{id}Service");
 		assertEquals("doRequestAjax", rules.get(0).getFunction());
 		assertEquals("performORD0100M01S", rules.get(0).methodNameOf("ORD0100M01S"));
 		assertEquals("ORD0100M01SService", rules.get(1).methodNameOf("ORD0100M01S"));
 		// 메소드 이름이 될 수 없는 글자가 섞이면 잇지 않는다.
 		assertNull(rules.get(0).methodNameOf("order.list"));
-		assertTrue(ScreenScript.parseRules(null).isEmpty());
 	}
 
 	@Test
 	public void 거래_호출을_찾고_주석과_변수는_가려낸다() throws Exception {
 		String text = read(WEBSQUARE_APP + "ui/order/OrderList.xml");
-		List<ScreenScript.Call> calls = screenScript.findCalls(text, ScreenScript.parseRules("doRequestAjax=perform{id}"));
+		List<ScreenScript.Call> calls = screenScript.findCalls(text, rules("doRequestAjax", "perform{id}"));
 
 		List<String> ids = new ArrayList<String>();
 		int unknown = 0;
@@ -60,7 +67,7 @@ public class ScreenScriptTest {
 
 	@Test
 	public void 함수를_만드는_곳과_이름이_다른_함수는_호출이_아니다() {
-		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id}");
+		List<ScreenScript.CallRule> rules = rules("doRequestAjax", "perform{id}");
 		assertTrue(screenScript.findCalls("function doRequestAjax(tranId) {}", rules).isEmpty());
 		assertTrue(screenScript.findCalls("xdoRequestAjax(\"A1\")", rules).isEmpty());
 		assertEquals(1, screenScript.findCalls("a = 1; doRequestAjax(\"A1\")", rules).size());
@@ -68,7 +75,7 @@ public class ScreenScriptTest {
 
 	@Test
 	public void 화면_열기_규칙은_화면_ID로_화면_경로를_만든다() {
-		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("fnOpenPage={id}.xml");
+		List<ScreenScript.CallRule> rules = rules("fnOpenPage", "{id}.xml");
 		String text = "parent.scwin.fnOpenPage(\"JIMC1000G\",{\"plyNo\":paramPlyNo});\n"
 				// 화면 ID를 변수로 넘기면 ID 가 없다. 짐작하지 않는다.
 				+ "parent.scwin.fnOpenPage(pageId);\n"
@@ -83,7 +90,8 @@ public class ScreenScriptTest {
 
 	@Test
 	public void 폼_필드_규칙은_필드_값으로_메소드_이름을_만든다() {
-		List<ScreenScript.CallRule> rules = ScreenScript.parseFieldRules("tranId=perform{id}");
+		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>();
+		rules.add(ScreenScript.CallRule.field("tranId", "perform{id}", null, null));
 		String text = "sFormHtml += \"<input type='hidden' name='tranId', value='JIMC1000M03S'/>\";\n"
 				// 값을 변수로 이어 붙이면 ID 가 없다. 짐작하지 않는다.
 				+ "sFormHtml += \"<input type='hidden' name='tranId', value='\" + tranId + \"'/>\";\n"
@@ -101,7 +109,7 @@ public class ScreenScriptTest {
 
 	@Test
 	public void 공통_함수가_여럿이면_규칙마다_찾는다() {
-		List<ScreenScript.CallRule> rules = ScreenScript.parseRules("doRequestAjax=perform{id},gfnCallService=perform{id}");
+		List<ScreenScript.CallRule> rules = rules("doRequestAjax", "perform{id}", "gfnCallService", "perform{id}");
 		String text = "HiJS.svr.doRequestAjax(\"JCST0200M01S\", p);\n"
 				+ "comLib.gfnCallService(\"JIAC0000M02I\", param, fnCallback);\n"
 				// 함수를 만드는 곳은 호출이 아니다.
@@ -137,13 +145,13 @@ public class ScreenScriptTest {
 
 	@Test
 	public void 주석인지_가려낸다() {
-		assertTrue(screenScript.inComment("a(); // b();", 8));
-		assertFalse(screenScript.inComment("a(); // b();\nc();", 13));
-		assertTrue(screenScript.inComment("/* a(); */ b(); /* c();", 19));
-		assertFalse(screenScript.inComment("/* a(); */ b();", 11));
-		assertTrue(screenScript.inComment("<!-- <a/> -->\n<!-- <b/>", 19));
+		assertTrue(screenScript.commentMask("a(); // b();").get(8));
+		assertFalse(screenScript.commentMask("a(); // b();\nc();").get(13));
+		assertTrue(screenScript.commentMask("/* a(); */ b(); /* c();").get(19));
+		assertFalse(screenScript.commentMask("/* a(); */ b();").get(11));
+		assertTrue(screenScript.commentMask("<!-- <a/> -->\n<!-- <b/>").get(19));
 		// http:// 의 //는 주석이 아니다.
-		assertFalse(screenScript.inComment("url = \"http://host/a.do\"; b();", 26));
+		assertFalse(screenScript.commentMask("url = \"http://host/a.do\"; b();").get(26));
 	}
 
 	@Test

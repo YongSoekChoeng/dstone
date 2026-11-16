@@ -41,7 +41,7 @@ public class MapperXmlReaderTest {
 
 	@Test
 	public void MyBatis_매퍼의_statement와_조각을_읽는다() throws Exception {
-		List<Map<String, Object>> rows = reader.read(MYBATIS);
+		List<Map<String, Object>> rows = reader.read(MYBATIS, null);
 
 		// resultMap은 SQL이 아니라서 빠진다: 조각 1 + select 1 + insert 1
 		assertEquals(3, rows.size());
@@ -64,7 +64,7 @@ public class MapperXmlReaderTest {
 
 	@Test
 	public void 조건_태그는_벗기고_include는_표시로_남긴다() throws Exception {
-		String sql = (String) reader.read(MYBATIS).get(1).get("sqlBody");
+		String sql = (String) reader.read(MYBATIS, null).get(1).get("sqlBody");
 
 		// 설명으로 적어 둔 주석은 그대로 둔다.
 		assertTrue(sql.startsWith("/* 주문 목록 */"));
@@ -79,7 +79,7 @@ public class MapperXmlReaderTest {
 
 	@Test
 	public void selectKey의_SQL은_본문에_섞지_않고_CDATA는_보통_글로_읽는다() throws Exception {
-		Map<String, Object> insert = reader.read(MYBATIS).get(2);
+		Map<String, Object> insert = reader.read(MYBATIS, null).get(2);
 
 		assertEquals("INSERT", insert.get("statementType"));
 		assertEquals("INSERT INTO TB_ORDER (ORDER_ID, AMOUNT) VALUES (#{orderId}, #{amount})", insert.get("sqlBody"));
@@ -98,7 +98,7 @@ public class MapperXmlReaderTest {
 				+ "  </statement>\n"
 				+ "  <procedure id='closeMonth'>{ call PRC_CLOSE_MONTH(#ym#) }</procedure>\n"
 				+ "</sqlMap>\n";
-		List<Map<String, Object>> rows = reader.read(text);
+		List<Map<String, Object>> rows = reader.read(text, null);
 
 		assertEquals(2, rows.size());
 		Map<String, Object> statement = rows.get(0);
@@ -118,7 +118,7 @@ public class MapperXmlReaderTest {
 
 	@Test
 	public void 매퍼가_아닌_XML에서는_아무것도_읽지_않는다() throws Exception {
-		assertTrue(reader.read("<beans><bean id=\"a\" class=\"com.x.A\"/></beans>").isEmpty());
+		assertTrue(reader.read("<beans><bean id=\"a\" class=\"com.x.A\"/></beans>", null).isEmpty());
 	}
 
 
@@ -188,7 +188,7 @@ public class MapperXmlReaderTest {
 				+ "  </select>\n"
 				+ "  <select id=\"selectPlain\">SELECT * FROM TB_RULE <if test=\"x\">WHERE X = #{x}</if></select>\n"
 				+ "</mapper>\n";
-		List<Map<String, Object>> rows = reader.read(xml);
+		List<Map<String, Object>> rows = reader.read(xml, null);
 
 		// sql_body 는 그대로 모든 가지를 이은 글이다.
 		assertTrue(((String) rows.get(0).get("sqlBody")).contains("VALUES (#{c})\nSELECT NULL WHERE FALSE"));

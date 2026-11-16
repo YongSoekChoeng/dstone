@@ -223,7 +223,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro �
 | `knowledge-core.md` | 설계 원칙, Job 모델, DECLARE/타입 해석/RESOLVE/LINK/SEMANTIC/RAG Pass, 비Java 리소스, 행 방지, DB 접근 |
 | `knowledge-screens-rich-client.md` | WebSquare/Nexacro 화면, 호출·필드·오픈 규칙, 공통 스크립트, Query XML, 설정 기반 레이어, TRANSACTION 엔드포인트 |
 | `knowledge-search-incremental.md` | 하이브리드 검색, 영향도 분석, 일반 문서 업로드, `rerunFrom`, 증분 분석, 리비전 비교, 보관 정책 |
-| `knowledge-ui.md` | `dstone-boot`의 Knowledge 화면(첫 화면 대시보드 포함), 프록시, 콘솔 디자인, 노드 맵, 테이블 한글명 우선순위 |
+| `knowledge-ui.md` | `dstone-boot`의 Knowledge 화면(첫 화면 대시보드, 프로젝트 · 분석의 2단 + 탭 구성과 미사용 탭 포함), 프록시, 콘솔 디자인, 노드 맵, 테이블 한글명 우선순위 |
 
 
 ## Required Infrastructure

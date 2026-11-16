@@ -84,9 +84,9 @@ public class RuleFileParserTest {
 
 		Rule.HttpEntry http = file.httpEntries.get(0);
 		assertEquals(Arrays.asList("value"), http.classAnnotation("MyMapping").pathAttributes);
-		assertEquals("method", http.methodAnnotation("MyMapping").verbAttribute);
-		assertEquals("GET", http.methodAnnotation("MyGet").httpMethod);
-		assertEquals(Arrays.asList("value", "path"), http.methodAnnotation("MyGet").pathAttributes);
+		assertEquals("method", methodAnnotation(http, "MyMapping").verbAttribute);
+		assertEquals("GET", methodAnnotation(http, "MyGet").httpMethod);
+		assertEquals(Arrays.asList("value", "path"), methodAnnotation(http, "MyGet").pathAttributes);
 
 		assertEquals("BATCH_JOB", file.annotationEntries.get(0).endpointType);
 		assertEquals(Arrays.asList("name"), file.annotationEntries.get(0).pathAttributes);
@@ -312,6 +312,16 @@ public class RuleFileParserTest {
 				files.add(new RuleFileParser(root).parse(new String(Files.readAllBytes(children[i].toPath()), StandardCharsets.UTF_8), path));
 			}
 		}
+	}
+
+	/** 메소드 쪽 애노테이션 규칙 가운데 이 이름인 것. 없으면 null */
+	private static Rule.HttpAnnotation methodAnnotation(Rule.HttpEntry http, String name) {
+		for (int i = 0; i < http.methodAnnotations.size(); i++) {
+			if (http.methodAnnotations.get(i).annotation.equals(name)) {
+				return http.methodAnnotations.get(i);
+			}
+		}
+		return null;
 	}
 
 }

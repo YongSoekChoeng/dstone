@@ -18,6 +18,7 @@ import net.dstone.knowledge.api.service.DiffService;
 import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
 import net.dstone.knowledge.api.service.SymbolService;
+import net.dstone.knowledge.api.service.UnusedService;
 
 /**
  * <pre>
@@ -45,6 +46,9 @@ public class RevisionController {
 
 	@Autowired
 	private DiagnosticService diagnosticService;
+
+	@Autowired
+	private UnusedService unusedService;
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */
 	@GetMapping("/{revisionId}")
@@ -100,6 +104,31 @@ public class RevisionController {
 	@GetMapping("/{revisionId}/diagnostics")
 	public Map<String, Object> getDiagnostics(@PathVariable("revisionId") long revisionId) {
 		return diagnosticService.diagnose(revisionId);
+	}
+
+	/**
+	 * <pre>
+	 * 미사용 분석: 있지만 아무도 쓰지 않는 테이블 · SQL · 클래스 · 메소드 · 화면의 종류별 건수(확실 / 추정)
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/unused")
+	public Map<String, Object> getUnusedSummary(@PathVariable("revisionId") long revisionId) {
+		return unusedService.getSummary(revisionId);
+	}
+
+	/**
+	 * <pre>
+	 * 미사용 목록 한 종류. kind 는 TABLE / SQL / TYPE / METHOD / SCREEN, grade 는 CERTAIN / LIKELY(비우면 둘 다),
+	 * q 는 이름 · 경로 · 한글명에 포함 조건입니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/unused/{kind}")
+	public Map<String, Object> getUnusedList(@PathVariable("revisionId") long revisionId, @PathVariable("kind") String kind
+			, @RequestParam(name = "grade", required = false) String grade
+			, @RequestParam(name = "q", required = false) String q
+			, @RequestParam(name = "page", defaultValue = "1") int page
+			, @RequestParam(name = "size", defaultValue = "50") int size) {
+		return unusedService.getList(revisionId, kind, grade, q, page, size);
 	}
 
 	/**

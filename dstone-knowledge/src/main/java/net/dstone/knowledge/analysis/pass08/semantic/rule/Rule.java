@@ -141,11 +141,6 @@ public abstract class Rule {
 			return find(classAnnotations, name);
 		}
 
-		/** 메소드 쪽 애노테이션 규칙 가운데 이 이름인 것. 없으면 null */
-		public HttpAnnotation methodAnnotation(String name) {
-			return find(methodAnnotations, name);
-		}
-
 		/** 목록에서 애노테이션 이름이 같은 첫 규칙. 없으면 null */
 		private static HttpAnnotation find(List<HttpAnnotation> list, String name) {
 			for (int i = 0; i < list.size(); i++) {

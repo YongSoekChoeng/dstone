@@ -109,21 +109,6 @@ public class DeclarationDao extends BaseDao {
 		return sqlSessionCommon.selectOne(NS + "selectMemberSummary", revisionId);
 	}
 
-	/** 만들어 넣은 멤버를 근거(LOMBOK_GETTER …)별로 센 것 */
-	public List<Map<String, Object>> selectSyntheticSummary(long revisionId) {
-		return sqlSessionCommon.selectList(NS + "selectSyntheticSummary", revisionId);
-	}
-
-	/** 종류·상태별 참조 수 */
-	public List<Map<String, Object>> selectReferenceSummary(long revisionId) {
-		return sqlSessionCommon.selectList(NS + "selectReferenceSummary", revisionId);
-	}
-
-	/** 파싱에 성공한 문법 수준별 Java 파일 수 */
-	public List<Map<String, Object>> selectParseSummary(long revisionId) {
-		return sqlSessionCommon.selectList(NS + "selectParseSummary", revisionId);
-	}
-
 	/** 타입 수(목록과 같은 조건) */
 	public int countType(Map<String, Object> condition) {
 		Integer count = sqlSessionCommon.selectOne(NS + "countType", condition);

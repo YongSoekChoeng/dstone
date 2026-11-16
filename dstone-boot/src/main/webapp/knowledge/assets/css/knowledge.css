@@ -49,6 +49,7 @@
 .kn-num {
 	text-align: right !important;
 	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
 }
 
 .kn-mono {
@@ -1333,4 +1334,315 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 /* 접는 안내(처음이신가요?) 안의 문단 */
 .kn-howto p {
 	margin: 6px 0;
+}
+
+/* ==========================================================================
+   프로젝트 · 분석 화면: 위쪽 상태 줄, 왼쪽(프로젝트 · 리비전) / 오른쪽(리비전 상세 탭) 2단
+   ========================================================================== */
+
+/* 위쪽 한 줄: 서버 상태와 임베딩. 펴면 임베딩 자세히 */
+.kn-topbar {
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	padding: 8px 14px;
+	margin: 0 0 14px;
+	box-shadow: var(--cs-shadow-sm);
+	font-size: 13px;
+}
+
+.kn-topbar > summary {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	cursor: pointer;
+	list-style: none;
+	min-height: 28px;
+}
+
+.kn-topbar > summary::-webkit-details-marker { display: none; }
+
+.kn-topbar > summary::after {
+	content: "자세히";
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--cs-primary);
+	white-space: nowrap;
+}
+
+.kn-topbar[open] > summary::after { content: "접기"; }
+
+.kn-topbar-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+	color: var(--cs-text-2);
+	white-space: nowrap;
+}
+
+.kn-topbar .kn-topbar-bar {
+	display: inline-block;
+	width: 120px;
+	margin: 0;
+	flex: 0 0 auto;
+}
+
+.kn-topbar-text {
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--cs-muted);
+}
+
+.kn-topbar-text .kn-message { margin: 0; display: inline; white-space: nowrap; }
+
+.kn-topbar-body { padding-top: 10px; }
+
+/* 왼쪽 340px, 오른쪽 나머지 */
+.kn-split {
+	display: grid;
+	grid-template-columns: 340px minmax(0, 1fr);
+	gap: 18px;
+	align-items: start;
+}
+
+.kn-side-panel { padding: 16px 16px; }
+
+.kn-side-panel .ai-form-actions { margin-top: 6px; }
+
+/* 왼쪽 입력 칸: 이름 위, 칸 아래 */
+.kn-field {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	margin-bottom: 8px;
+}
+
+.kn-field label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--cs-muted);
+}
+
+.kn-field input,
+.kn-field select {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.kn-check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--cs-text-2);
+	margin: 2px 0 8px;
+}
+
+.kn-project-form { margin: 10px 0 0; padding: 10px 12px; box-shadow: none; }
+
+/* 고르는 목록(프로젝트, 리비전): 한 줄이 단추 하나 */
+.kn-pick-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 320px;
+	overflow-y: auto;
+	margin-bottom: 8px;
+}
+
+.ai-body button.kn-pick {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	height: auto;
+	padding: 7px 10px;
+	text-align: left;
+	white-space: normal;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	color: var(--cs-text);
+	box-shadow: none;
+	font-weight: 600;
+}
+
+.ai-body button.kn-pick:hover {
+	background: var(--cs-surface-2);
+	border-color: var(--cs-border-strong);
+}
+
+.ai-body button.kn-pick.kn-pick-on {
+	background: var(--cs-primary-soft);
+	border-color: var(--cs-primary);
+}
+
+.kn-pick-main { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; word-break: break-all; }
+
+.kn-pick-sub { font-size: 11.5px; font-weight: 400; color: var(--cs-muted); }
+
+/* 오른쪽 */
+.kn-detail { min-height: 360px; }
+
+.kn-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 300px;
+	color: var(--cs-faint);
+	font-size: 14px;
+	text-align: center;
+}
+
+.kn-detail-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.kn-detail-head h3,
+.kn-detail-head h4 { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* 탭 */
+.kn-tabs {
+	display: flex;
+	gap: 2px;
+	border-bottom: 1px solid var(--cs-border);
+	margin: 14px 0 16px;
+	overflow-x: auto;
+}
+
+.ai-body button.kn-tab {
+	height: 38px;
+	padding: 0 16px;
+	background: transparent;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	box-shadow: none;
+	color: var(--cs-muted);
+	font-size: 13.5px;
+}
+
+.ai-body button.kn-tab:hover {
+	background: var(--cs-surface-2);
+	color: var(--cs-text);
+}
+
+.ai-body button.kn-tab.kn-tab-on {
+	color: var(--cs-primary);
+	border-bottom-color: var(--cs-primary);
+	background: transparent;
+}
+
+.kn-tab-warn { font-size: 12px; }
+.kn-tab-warn-warn { color: var(--cs-warning); }
+.kn-tab-warn-bad { color: var(--cs-danger); }
+
+/* 접힌 표: 제목 — 한 줄 요약 */
+.kn-fold {
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	margin: 0 0 8px;
+	background: var(--cs-surface);
+}
+
+.kn-fold > summary {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	padding: 10px 14px;
+	cursor: pointer;
+	list-style: none;
+}
+
+.kn-fold > summary::-webkit-details-marker { display: none; }
+
+.kn-fold > summary::before {
+	content: "";
+	flex: 0 0 auto;
+	width: 6px;
+	height: 6px;
+	border-right: 2px solid var(--cs-primary);
+	border-bottom: 2px solid var(--cs-primary);
+	transform: rotate(-45deg) translateY(-1px);
+	transition: transform 0.15s ease;
+}
+
+.kn-fold[open] > summary::before { transform: rotate(45deg) translateY(-2px); }
+
+.kn-fold > summary:hover { background: var(--cs-surface-2); }
+
+.kn-fold-title { font-weight: 700; color: var(--cs-text); white-space: nowrap; }
+
+.kn-fold-brief {
+	font-size: 12.5px;
+	color: var(--cs-muted);
+	font-variant-numeric: tabular-nums;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.kn-fold-body { padding: 0 14px 4px; }
+
+.kn-fold-body .kn-howto { box-shadow: none; }
+
+/* 연결 품질 탭 안의 "풀지 못한 참조 살펴보기" */
+.kn-subpanel {
+	border-top: 1px solid var(--cs-border);
+	margin-top: 16px;
+	padding-top: 14px;
+}
+
+/* 미사용 탭: 누를 수 있는 카드 */
+.ai-body button.kn-card-button {
+	display: block;
+	height: auto;
+	text-align: left;
+	white-space: normal;
+	color: inherit;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	box-shadow: none;
+	font-weight: 400;
+	padding: 12px 14px;
+}
+
+.ai-body button.kn-card-button:hover { border-color: var(--cs-primary); background: var(--cs-surface); }
+
+.ai-body button.kn-card-button.kn-card-warn { border-left: 3px solid var(--cs-warning); background: var(--cs-warning-soft); }
+
+.ai-body button.kn-card-button.kn-card-on { box-shadow: 0 0 0 2px var(--cs-primary-ring); border-color: var(--cs-primary); }
+
+.kn-inline-title { margin: 0; }
+
+/* 미사용 카드 다섯 장은 한 줄에 */
+@media screen and (min-width: 861px) {
+	.kn-unused-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.kn-grade {
+	display: inline-block;
+	padding: 1px 8px;
+	border-radius: 999px;
+	font-size: 11.5px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.kn-grade-CERTAIN { background: var(--cs-danger-soft); color: var(--cs-danger); }
+.kn-grade-LIKELY { background: var(--cs-warning-soft); color: var(--cs-warning); }
+
+.kn-unused-overview .kn-unused-open { height: 26px; font-size: 12px; margin-left: 6px; }
+
+@media screen and (max-width: 860px) {
+	.kn-split { grid-template-columns: minmax(0, 1fr); }
+	.kn-topbar-text { display: none; }
+	.kn-fold-brief { white-space: normal; }
 }

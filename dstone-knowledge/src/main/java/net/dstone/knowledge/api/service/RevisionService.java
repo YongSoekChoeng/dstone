@@ -93,12 +93,9 @@ public class RevisionService extends BaseObject {
 
 		// DECLARE 단계의 결과. 아직 돌리지 않았으면 전부 0이거나 비어 있다.
 		Map<String, Object> declarations = new LinkedHashMap<String, Object>();
-		declarations.put("javaFiles", declarationDao.selectParseSummary(revisionId));
 		declarations.put("filePasses", filePassDao.selectFilePassSummary(revisionId));
 		declarations.put("types", declarationDao.selectTypeSummary(revisionId));
 		declarations.put("members", declarationDao.selectMemberSummary(revisionId));
-		declarations.put("synthetic", declarationDao.selectSyntheticSummary(revisionId));
-		declarations.put("references", declarationDao.selectReferenceSummary(revisionId));
 		result.put("declarations", declarations);
 
 		// RESOLVE / LINK 단계의 결과

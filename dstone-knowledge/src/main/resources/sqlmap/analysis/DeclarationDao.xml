@@ -120,35 +120,6 @@
             , (SELECT COUNT(*) FROM analysis_annotation WHERE revision_id = #{revisionId}) AS "annotations"
     </select>
 
-    <select id="selectSyntheticSummary" parameterType="long" resultType="java.util.LinkedHashMap">
-        SELECT synthetic_origin AS "origin", COUNT(*) AS "count"
-          FROM analysis_method
-         WHERE revision_id = #{revisionId}
-           AND is_synthetic
-         GROUP BY synthetic_origin
-         ORDER BY synthetic_origin
-    </select>
-
-    <select id="selectReferenceSummary" parameterType="long" resultType="java.util.LinkedHashMap">
-        SELECT ref_kind AS "refKind", status AS "status", COUNT(*) AS "count"
-          FROM analysis_reference
-         WHERE revision_id = #{revisionId}
-         GROUP BY ref_kind, status
-         ORDER BY ref_kind, status
-    </select>
-
-    <!-- 파싱에 성공한 문법 수준별 Java 파일 수 -->
-    <select id="selectParseSummary" parameterType="long" resultType="java.util.LinkedHashMap">
-        SELECT parse_status AS "parseStatus"
-             , COALESCE(language_level, '') AS "languageLevel"
-             , COUNT(*) AS "fileCount"
-          FROM analysis_file
-         WHERE revision_id = #{revisionId}
-           AND language = 'JAVA'
-         GROUP BY parse_status, language_level
-         ORDER BY parse_status, language_level
-    </select>
-
     <sql id="typeWhere">
          WHERE s.revision_id = #{revisionId}
         <if test="kind != null and kind != ''">AND s.kind = #{kind}</if>

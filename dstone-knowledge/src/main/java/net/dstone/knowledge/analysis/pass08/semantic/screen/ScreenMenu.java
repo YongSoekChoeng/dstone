@@ -38,10 +38,6 @@ public class ScreenMenu {
 		/** 이 규칙이 적힌 자리(규칙 파일:줄). 모르면 null */
 		private final String at;
 
-		/** 규칙 파일 위치 없이 만듭니다(단위 테스트용). */
-		public Rule(String nameKey, String pathKey) {
-			this(nameKey, pathKey, null);
-		}
 
 		/**
 		 * <pre>
@@ -118,35 +114,6 @@ public class ScreenMenu {
 	}
 
 	private final ScreenScript screenScript = new ScreenScript();
-
-	/**
-	 * <pre>
-	 * 설정 글자를 규칙으로 바꿉니다.
-	 * 모양: "화면명 키=화면 경로 키" 를 쉼표로 이어 쓴다. 예: "MENU_NM=SRC_PATH, menuName=url"
-	 * 키가 하나라도 비어 있는 항목은 버립니다.
-	 * </pre>
-	 */
-	public static List<Rule> parseRules(String configured) {
-		List<Rule> rules = new ArrayList<Rule>();
-		if (configured == null) {
-			return rules;
-		}
-		String[] items = configured.split(",");
-		for (int i = 0; i < items.length; i++) {
-			String item = items[i].trim();
-			int eq = item.indexOf('=');
-			if (eq <= 0) {
-				continue;
-			}
-			String nameKey = item.substring(0, eq).trim();
-			String pathKey = item.substring(eq + 1).trim();
-			if (nameKey.length() == 0 || pathKey.length() == 0) {
-				continue;
-			}
-			rules.add(new Rule(nameKey, pathKey));
-		}
-		return rules;
-	}
 
 	/** 이 파일에 메뉴 목록이 있을 수 있는지. 경로 키가 글자로 들어 있지 않으면 훑지 않는다 */
 	public static boolean mayContain(String text, List<Rule> rules) {

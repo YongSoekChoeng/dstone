@@ -195,6 +195,14 @@ dstone:
             screen-file:
                 HI-Japan: ../docs/01.analysis/01.as-is/E.기능/00-1.화면목록.csv
         ##########################################################################################
+        # <미사용 분석>  리비전 요약의 "미사용" 탭(api.service.UnusedService).
+        # 들어오는 참조가 없어도, 아래 애노테이션이 붙은 클래스 · 메소드는 프레임워크가 직접 만들고 부르므로 미사용으로 판정하지 않는다.
+        # 애노테이션 단순 이름을 쉼표로 적는다. 비우면 UnusedService 의 기본 목록을 쓴다.
+        # 여기 없는 애노테이션(@Component, @Service …)이 붙은 것은 목록에 넣되 "추정" 으로 둔다.
+        ##########################################################################################
+        unused:
+            framework-annotations: Configuration,SpringBootApplication,ControllerAdvice,RestControllerAdvice,Aspect,WebServlet,WebFilter,WebListener,Entity,Embeddable,MappedSuperclass,SpringBootTest,Test,ParameterizedTest,Bean,PostConstruct,PreDestroy,EventListener,ExceptionHandler,ModelAttribute,InitBinder,Scheduled,KafkaListener,RabbitListener,JmsListener,Around,Before,After,AfterReturning,AfterThrowing,Pointcut
+        ##########################################################################################
         # <보관 정책>  분석이 성공으로 끝날 때마다 그 프로젝트에 적용한다(api.service.RetentionService).
         ##########################################################################################
         retention:
