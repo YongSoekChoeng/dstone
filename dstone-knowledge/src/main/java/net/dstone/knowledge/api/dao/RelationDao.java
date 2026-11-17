@@ -190,6 +190,18 @@ public class RelationDao extends BaseDao {
 
 	/**
 	 * <pre>
+	 * [왜?]의 코드 몇 줄을 읽을 파일(fileId, path, checksum, encoding, localPath). 그 리비전의 파일이 아니면 null 입니다.
+	 * </pre>
+	 */
+	public Map<String, Object> selectImpactSourceFile(long revisionId, long fileId) {
+		Map<String, Object> condition = new HashMap<String, Object>();
+		condition.put("revisionId", Long.valueOf(revisionId));
+		condition.put("fileId", Long.valueOf(fileId));
+		return sqlSessionCommon.selectOne(NS + "selectImpactSourceFile", condition);
+	}
+
+	/**
+	 * <pre>
 	 * 닿는 메소드 전부(methodId, method, layer, path, lineStart, anonymous). 거리와 신뢰도는 붙어 있지 않습니다.
 	 * </pre>
 	 */

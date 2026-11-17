@@ -1266,6 +1266,62 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 .kn-chain-weak { background: var(--cs-warning-soft); color: var(--cs-warning); font-weight: 600; }
 .kn-chain-via { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--cs-primary); }
 
+/* [왜?]를 펼친 칸: 왜 다시 테스트하나 → 왜 추정인가 → 이어진 길 전체 */
+.kn-why-box { display: grid; gap: 14px; padding: 6px 4px; font-size: 13px; color: var(--cs-text-2); white-space: normal; }
+.kn-why-part h5 { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--cs-text); }
+.kn-why-part p { margin: 0; line-height: 1.7; }
+.kn-why-box code { padding: 0 4px; border-radius: 4px; background: var(--cs-surface-3); font-size: 12px; overflow-wrap: anywhere; }
+.kn-why-path > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--cs-text); }
+.kn-why-path > .kn-chain { margin-top: 6px; }
+
+/* 약한 고리 하나: 고리 → 근거 문장 → 소스 몇 줄 → 확인할 것. 왼쪽 주황 선으로 묶는다 */
+.kn-weak { margin-top: 8px; padding: 10px 12px; background: var(--cs-surface); border: 1px solid var(--cs-border); border-left: 3px solid var(--cs-warning); border-radius: var(--cs-radius-sm); }
+.kn-weak-head { font-weight: 600; color: var(--cs-text); overflow-wrap: anywhere; }
+.kn-weak .kn-weak-reason { margin-top: 4px; }
+.kn-weak .kn-weak-check { margin-top: 8px; color: var(--cs-text); }
+.kn-weak-check b { margin-right: 6px; color: var(--cs-warning); }
+
+/* 소스 몇 줄. 근거 줄을 칠하고, 그 줄에서 부르는 이름은 한 번 더 칠한다 */
+.kn-code { margin-top: 8px; }
+.kn-code-head { margin-bottom: 4px; font-size: 12px; color: var(--cs-muted); }
+.kn-code-note { color: var(--cs-warning); font-size: 12px; }
+.kn-code-pre {
+	margin: 0;
+	padding: 6px 0;
+	overflow-x: auto;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre;
+}
+.kn-code-line { display: block; padding: 0 12px 0 0; }
+.kn-code-no { display: inline-block; min-width: 44px; margin-right: 12px; padding-right: 8px; text-align: right; color: var(--cs-faint); border-right: 1px solid var(--cs-border); user-select: none; }
+.kn-code-on { background: var(--cs-warning-soft); }
+.kn-code-on .kn-code-no { color: var(--cs-warning); font-weight: 700; }
+.kn-code-pre mark { padding: 0 1px; border-radius: 3px; background: rgba(180, 83, 9, 0.22); color: inherit; font-weight: 700; }
+
+/* 길 전체의 "파일:줄" 단추. 누르면 그 자리의 소스가 아래에 펴진다 */
+.ai-body button.kn-at {
+	height: auto;
+	margin-left: 6px;
+	padding: 0 6px;
+	border: 1px solid var(--cs-border);
+	border-radius: 4px;
+	background: var(--cs-surface);
+	box-shadow: none;
+	color: var(--cs-muted);
+	font-family: var(--cs-mono);
+	font-size: 11.5px;
+	font-weight: 500;
+	line-height: 1.6;
+}
+.ai-body button.kn-at:hover,
+.ai-body button.kn-at[aria-expanded="true"] { border-color: var(--cs-primary); background: var(--cs-primary-soft); color: var(--cs-primary); }
+.kn-chain li > .kn-code { margin: 6px 0 4px; }
+
 /* 영향도: 추정 관계(접힘) */
 .kn-guessed > summary { cursor: pointer; padding: 4px 0; }
 .kn-guessed > summary:hover .kn-section-title { color: var(--cs-primary); }

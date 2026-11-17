@@ -164,7 +164,8 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 						<li>"다시 테스트할 곳"의 줄마다 <b>왜?</b>를 눌러 근거를 봅니다.</li>
 					</ol>
 					<div class="kn-expect"><b>이렇게 보입니다:</b> 맨 위 숫자 네 개(다시 테스트할 곳 · 추정 관계 · 건드리는 데이터 · 확인 필요, 아래 구역과 짝)와 한 줄 요약 아래에 다시 테스트할 화면과 주소가 나옵니다.
-						<b>왜?</b>를 누르면 이어진 길이 보입니다. 예: <code>edit.jsp</code> → <code>/board/save.do</code> → <code>BoardSaveAction</code> → <code>BoardDAO#insertBoard</code> (Board.insertBoard 실행 · 테이블 쓰기)<br>
+						<b>왜?</b>를 누르면 왜 다시 테스트해야 하는지 한 문장과 이어진 길이 보입니다. 예: <code>edit.jsp</code> → <code>/board/save.do</code> → <code>BoardSaveAction</code> → <code>BoardDAO#insertBoard</code> (Board.insertBoard 실행 · 테이블 쓰기).
+						추정 관계라면 짐작으로 이은 고리마다 까닭, 근거가 된 소스 줄, 확인할 것이 함께 나옵니다.<br>
 						<b>읽는 법:</b> "다시 테스트할 곳"은 꼭 확인할 곳, "추정 관계"는 정말 이어지는지 한 번 더 볼 곳, "확인 필요"는 분석이 놓쳤을 수 있는 곳입니다.</div>
 				</div>
 
@@ -290,7 +291,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 							<li><b>다시 테스트할 곳</b> — 확실한 관계로만 이어진 화면과 주소입니다. 꼭 확인하세요.</li>
 							<li><b>추정 관계</b> — 이어지는 길에 덜 확실한 고리가 낀 곳입니다(접혀 있음). 정말 이어지는지 한 번 더 봅니다.</li>
 							<li><b>확인 필요</b> — 분석이 놓쳤을 수 있는 곳입니다. 0이면 놓친 곳이 없다는 뜻입니다.</li>
-							<li><b>왜?</b> — 고칠 곳에서 그 화면까지 이어진 길입니다. 약한 고리에는 노란 표시가 붙습니다.</li>
+							<li><b>왜?</b> — 왜 다시 테스트해야 하는지와 고칠 곳에서 그 화면까지 이어진 길입니다. 짐작으로 이은 고리가 있으면 그 까닭, 근거가 된 소스 줄, 확인할 것을 보여 줍니다. 길의 <code>파일:줄</code>을 누르면 그 자리의 소스가 펴집니다.</li>
 						</ul></li>
 					<li><b>건드리는 데이터</b> — 대상이 읽고 쓰는 테이블입니다(테이블 · 컬럼이 대상이면 그것을 쓰는 SQL).</li>
 					<li>테이블 · 컬럼이면 머리글 오른쪽의 "SQL" 칸에서 "쓰기만"을 골라, 그것을 <b>고치는</b> 기능만 볼 수 있습니다.</li>

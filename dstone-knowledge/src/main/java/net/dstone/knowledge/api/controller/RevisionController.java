@@ -328,4 +328,17 @@ public class RevisionController {
 		return impactService.getImpact(revisionId, targetKind, target, access, depth, includePossible);
 	}
 
+	/**
+	 * <pre>
+	 * 소스 몇 줄. 영향도 화면의 [왜?]가 근거 관계가 적힌 줄을 보여 줄 때 씁니다.
+	 * line 앞뒤로 around 줄(0 ~ 6)을 돌려줍니다. 분석한 뒤에 파일이 바뀌었으면 changed = true 입니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/files/{fileId}/lines")
+	public Map<String, Object> getSourceLines(@PathVariable("revisionId") long revisionId, @PathVariable("fileId") long fileId
+			, @RequestParam(name = "line") int line
+			, @RequestParam(name = "around", defaultValue = "2") int around) {
+		return impactService.getSourceLines(revisionId, fileId, line, around);
+	}
+
 }

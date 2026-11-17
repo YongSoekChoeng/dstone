@@ -103,7 +103,26 @@ var DstoneKnowledgeImpact = (function () {
 					row.hidden = !row.hidden;
 					button.setAttribute("aria-expanded", row.hidden ? "false" : "true");
 					button.textContent = row.hidden ? "왜?" : "접기";
+					// 약한 고리의 소스 몇 줄은 펼칠 때 읽는다
+					if (!row.hidden) {
+						Array.prototype.forEach.call(row.querySelectorAll(".kn-code[data-file]"), loadCode);
+					}
 				}
+				return;
+			}
+			// 길 전체의 "파일:줄": 그 자리 아래에 소스 몇 줄을 펴고 접는다
+			var at = event.target.closest ? event.target.closest("button.kn-at") : null;
+			if (at) {
+				var item = at.closest("li");
+				var box = item.querySelector(".kn-code");
+				if (box) {
+					box.hidden = !box.hidden;
+				} else {
+					box = codeBox(at.getAttribute("data-file"), at.getAttribute("data-line"), at.getAttribute("data-mark"));
+					item.appendChild(box);
+					loadCode(box);
+				}
+				at.setAttribute("aria-expanded", box.hidden ? "false" : "true");
 			}
 		});
 		window.addEventListener("popstate", function () {
@@ -666,6 +685,8 @@ var DstoneKnowledgeImpact = (function () {
 
 	function renderImpact(result) {
 		lastNodes = result.nodes || {};
+		// [왜?]의 소스 몇 줄은 이 결과를 만든 리비전에서 읽는다
+		whyRevisionPath = revisionPath();
 		var rows = testRows(result);
 		var sure = rows.filter(function (row) { return row.confidence === "HIGH"; });
 		var guessed = rows.filter(function (row) { return row.confidence !== "HIGH"; });
@@ -864,7 +885,7 @@ var DstoneKnowledgeImpact = (function () {
 				+ (withConfidence ? "<td>" + K.confidence(row.confidence) + "</td>" : "")
 				+ "<td class=\"kn-num\">" + row.depth + "</td>"
 				+ "<td><button type=\"button\" class=\"kn-why\" aria-expanded=\"false\" aria-controls=\"" + id + "\">왜?</button></td></tr>"
-				+ "<tr id=\"" + id + "\" class=\"kn-why-row\" hidden><td colspan=\"" + cols + "\">" + chainHtml(row) + "</td></tr>";
+				+ "<tr id=\"" + id + "\" class=\"kn-why-row\" hidden><td colspan=\"" + cols + "\">" + whyHtml(row) + "</td></tr>";
 		});
 		return html + "</tbody></table></div>";
 	}
@@ -918,6 +939,264 @@ var DstoneKnowledgeImpact = (function () {
 		return (lastNodes[step.id] || {}).name || step.id;
 	}
 
+	/** [왜?]가 소스 몇 줄을 읽을 리비전 경로(/api/revisions/{id}). 결과를 그릴 때 정한다 */
+	var whyRevisionPath = null;
+
+	/**
+	 * [왜?]를 눌렀을 때 펴지는 칸. 세 가지에 답한다.
+	 *   1) 왜 다시 테스트하나: 대상에서 이 화면 · 진입점까지 어떻게 이어지는지 한 문장으로
+	 *   2) 왜 추정인가(약한 고리가 있을 때만): 고리마다 분석이 어떻게 이었는지, 근거가 된 소스 줄, 확인할 것
+	 *   3) 이어진 길 전체: 칸마다 "파일:줄"을 누르면 그 자리의 소스가 펴진다
+	 */
+	function whyHtml(row) {
+		var weak = weakLinks(row);
+		var html = "<div class=\"kn-why-box\">"
+			+ "<div class=\"kn-why-part\"><h5>왜 다시 테스트하나</h5><p>" + leadSentence(row) + " " + confidenceSentence(row, weak) + "</p></div>";
+		if (weak.length > 0) {
+			html += "<div class=\"kn-why-part\"><h5>" + (row.confidence === "HIGH" ? "짐작으로 이은 화면" : "왜 추정인가") + " <span class=\"kn-caller-note\">약한 고리 " + weak.length + "곳</span></h5>"
+				+ weak.map(weakHtml).join("") + "</div>";
+		}
+		var steps = row.chain.length + (row.endpoint ? 1 : 0) + (row.screens.length > 0 && row.endpoint ? 1 : 0);
+		html += "<details class=\"kn-why-part kn-why-path\"" + (weak.length === 0 ? " open" : "") + "><summary>이어진 길 전체 (" + steps + "칸)</summary>"
+			+ chainHtml(row) + "</details></div>";
+		return html;
+	}
+
+	/** 대상 이름: "테이블 CSLT_CONSULTANT_SKILL" */
+	function targetText() {
+		return target ? K.escapeHtml(KIND_LABELS[target.kind] || "") + " <b class=\"kn-mono\">" + K.escapeHtml(target.label) + "</b>" : "대상";
+	}
+
+	function leadSentence(row) {
+		var what = "대상 " + targetText();
+		if (row.endpoint) {
+			var entry = "<code class=\"kn-mono\">" + K.escapeHtml((row.endpoint.httpMethod && row.endpoint.httpMethod !== "ALL" ? row.endpoint.httpMethod + " " : "") + (row.endpoint.path || "")) + "</code>";
+			if (row.chain.length <= 1) {
+				return "이 진입점(" + entry + ")의 처리 메소드가 " + what + "에 바로 닿습니다.";
+			}
+			return "이 진입점(" + entry + ")을 부르면 아래 길을 따라 " + what + "까지 실행됩니다.";
+		}
+		var screen = "<code class=\"kn-mono\">" + K.escapeHtml(fileName(row.screens[0] ? row.screens[0].path : "")) + "</code>";
+		if (row.chainVia === "CHANGED") {
+			return "이 화면 파일(" + screen + ") 자체가 바뀌었습니다. 그대로 다시 봐야 합니다.";
+		}
+		if (row.chainVia === "RENDERS") {
+			return "아래 메소드가 " + what + "까지 실행한 뒤 이 화면(" + screen + ")을 엽니다.";
+		}
+		if (row.chainVia === "CALLS") {
+			return "이 화면(" + screen + ") 안의 Java 코드가 아래 길을 따라 " + what + "까지 부릅니다.";
+		}
+		return "이 화면(" + screen + ")에서 요청을 보내면 아래 길을 따라 " + what + "까지 실행됩니다.";
+	}
+
+	function confidenceSentence(row, weak) {
+		var screens = weak.filter(function (link) { return link.screenLink; }).length;
+		if (weak.length === 0 && row.confidence === "HIGH") {
+			return "길의 고리가 모두 소스에서 바로 확인된 관계(HIGH)라서 다시 테스트할 곳에 넣었습니다.";
+		}
+		if (screens === weak.length && row.confidence === "HIGH") {
+			return "진입점부터 대상까지는 확실한 관계(HIGH)입니다. 다만 이 진입점을 부르는 화면 " + screens + "곳은 짐작으로 이었으니, 화면 쪽은 실제로 부르는지 확인하세요.";
+		}
+		return "다만 고리 " + weak.length + "곳이 짐작으로 이어져 있어, 실제로 이어지는지 먼저 확인해야 합니다.";
+	}
+
+	/**
+	 * 약한 고리 목록.
+	 *   type  진입점이 클래스까지만 이어진 것(어느 메소드가 불리는지 모름)
+	 *   edge  길의 관계 하나가 HIGH 가 아닌 것. from 이 to 를 부른다(또는 화면 from 이 to 의 주소를 요청한다)
+	 *   other 줄의 신뢰도는 낮은데 길에서 까닭을 찾지 못한 것(화면과 진입점을 이은 고리 등)
+	 */
+	function weakLinks(row) {
+		var weak = [];
+		if (row.endpoint && row.endpoint.matchedBy === "TYPE") {
+			weak.push({ kind: "type", handler: row.endpoint.handler });
+		}
+		for (var i = 0; i < row.chain.length - 1; i++) {
+			var step = row.chain[i];
+			if (step.confidence && step.confidence !== "HIGH") {
+				weak.push({ kind: "edge", step: step, from: row.chain[i], to: row.chain[i + 1] });
+			}
+		}
+		// 진입점 줄: 이 진입점을 부르는 화면이 짐작으로 이어졌으면 그 고리(화면 → 처리 메소드)도 보여 준다
+		if (row.endpoint) {
+			row.screens.forEach(function (screen) {
+				var chain = screen.chain || [];
+				if (screen.confidence && screen.confidence !== "HIGH" && chain.length > 1 && chain[0].confidence && chain[0].confidence !== "HIGH") {
+					weak.push({ kind: "edge", step: chain[0], from: chain[0], to: chain[1], screenLink: true });
+				}
+			});
+		}
+		if (weak.length === 0 && row.confidence && row.confidence !== "HIGH") {
+			weak.push({ kind: "other", row: row });
+		}
+		return weak;
+	}
+
+	function weakHtml(link) {
+		var head;
+		var explained = explainWeak(link);
+		if (link.kind === "edge") {
+			head = nodeText(link.from) + " → " + nodeText(link.to)
+				+ " <span class=\"kn-chain-rel kn-chain-weak\" title=\"" + K.escapeHtml(link.step.relation) + "\">"
+				+ K.escapeHtml((RELATION_LABELS[link.step.relation] || link.step.relation) + " · " + link.step.confidence) + "</span>";
+		} else if (link.kind === "type") {
+			head = "진입점 → " + K.escapeHtml(simpleName(explained.owner || "")) + " <span class=\"kn-chain-rel kn-chain-weak\">클래스까지만 · LOW</span>";
+		} else {
+			head = "화면 · 진입점 연결 " + K.confidence(link.row.confidence);
+		}
+		var html = "<div class=\"kn-weak\"><div class=\"kn-weak-head\">" + head + "</div>"
+			+ "<p class=\"kn-weak-reason\">" + explained.reason + "</p>";
+		var ev = link.step ? (link.step.evidence || {}) : {};
+		if (ev.fileId && ev.line) {
+			html += codeBox(ev.fileId, ev.line, explained.mark).outerHTML;
+		}
+		html += "<p class=\"kn-weak-check\"><b>확인할 것</b> " + explained.check + "</p></div>";
+		return html;
+	}
+
+	/** 근거 문장 · 확인할 것 · 소스 줄에서 칠할 이름. 분석이 남긴 근거(evidence.via ...)마다 정해진 말로 풀어 쓴다 */
+	function explainWeak(link) {
+		var code = function (text) {
+			return "<code class=\"kn-mono\">" + K.escapeHtml(text) + "</code>";
+		};
+		if (link.kind === "type") {
+			var handler = link.handler || "";
+			return {
+				owner: handler,
+				reason: "이 진입점은 클래스까지만 이어집니다. 요청마다 어느 메소드가 불리는지(Struts DispatchAction의 method 파라미터처럼) 소스만 봐서는 알 수 없어서, "
+					+ "이 클래스의 메소드가 길에 닿기만 하면 넣었습니다.",
+				check: "요청 파라미터를 보고, 이 진입점이 실제로 길의 첫 메소드를 부르는지 확인하세요."
+			};
+		}
+		if (link.kind === "other") {
+			return {
+				reason: "길 안의 고리는 확실하지만, 화면과 진입점을 이은 고리(" + K.escapeHtml(viaText((link.row.screens[0] || {}).via)) + ")가 확실하지 않습니다.",
+				check: "이 화면에서 그 기능을 실행해 실제로 이어지는지 보세요."
+			};
+		}
+		var step = link.step;
+		var ev = step.evidence || {};
+		var to = parseMethod(nodeLabel(link.to));
+		var count = ev.count > 1 ? " 같은 두 곳 사이에 이런 고리가 " + ev.count + "개 있어서, 소스에서 가장 앞에 나온 줄을 보여 줍니다." : "";
+		if (step.relation === "REQUESTS") {
+			var request = ev.requestPath ? code((ev.verb ? ev.verb + " " : "") + ev.requestPath) : "이 주소";
+			var how = ev.script && ev.function
+				? "화면이 " + code(fileName(ev.script)) + "의 " + code(ev.function + "()") + " 함수를 불러 " + request + " 요청을 보낸다고 읽었습니다"
+				: "화면 안의 주소 글자에서 " + request + " 요청을 읽었습니다";
+			var reason = how + (ev.rule ? "(요청 규칙 " + code(ev.rule) + (ev.ruleAt ? ", " + code(ev.ruleAt) : "") + ")" : "")
+				+ ". 실행해 보지 않고 소스만 읽어 이은 관계라 " + K.escapeHtml(step.confidence) + "입니다.";
+			if (ev.baseFrom === "CONDITIONAL") {
+				reason += " 주소 앞부분 " + code(ev.base || "") + " 값은 개발 · 운영에 따라 달라지는 조건식에서 읽은 값이라, 배포 환경에서는 주소가 다를 수 있습니다"
+					+ (ev.baseRuleAt ? "(" + code(ev.baseRuleAt) + ")" : "") + ".";
+			}
+			return {
+				reason: reason + count,
+				check: "이 화면에서 그 기능을 실행해 실제로 그 주소로 요청이 가는지 보세요(브라우저 개발자 도구의 Network 탭).",
+				mark: ev.function || null
+			};
+		}
+		if (step.relation === "CALLS_POSSIBLE_IMPLEMENTATION") {
+			return {
+				reason: "인터페이스나 상위 클래스를 거친 호출입니다. 실행할 때 어느 구현체가 쓰일지는 설정(주입)에 달려 있어서, 가능한 구현체 가운데 하나("
+					+ code(to.owner) + ")로 이었습니다." + count,
+				check: "실제로 주입되는 구현체가 " + code(to.owner) + "인지 확인하세요.",
+				mark: to.name
+			};
+		}
+		if (step.relation === "RENDERS") {
+			return {
+				reason: "메소드가 끝나고 돌려주는 화면 이름으로 이었습니다. 이름을 계산해서 만드는 경우에는 다른 화면일 수 있습니다." + count,
+				check: "그 기능을 실행해 실제로 이 화면이 열리는지 보세요.",
+				mark: null
+			};
+		}
+		if (ev.via === "NAME") {
+			var others = ev.candidates > 1 ? Number(ev.candidates) - 1 : 0;
+			return {
+				reason: "어느 클래스의 메소드인지 알아내지 못해서, 프로젝트에서 이름이 같은 메소드" + (ev.candidates ? " " + K.escapeHtml(String(ev.candidates)) + "개 가운데" : "")
+					+ " 하나(" + code(to.owner + "." + to.name) + ")로 짐작했습니다." + count,
+				check: "이 줄이 부르는 것이 정말 " + code(to.owner + "." + to.name) + "인지 보세요." + (others > 0 ? " 이름이 같은 다른 후보 " + others + "개 쪽일 수도 있습니다." : ""),
+				mark: to.name
+			};
+		}
+		if (ev.via === "OWNER_TYPE") {
+			var overload = step.confidence === "LOW";
+			return {
+				reason: "해석기가 이 호출을 끝까지 풀지 못했습니다(인자의 타입을 확정하지 못한 경우가 많습니다). 그래서 부른 쪽 변수의 타입(" + code(to.owner)
+					+ ") 안에서 이름과 인자 수가 같은 메소드" + (overload ? "가 여러 개(오버로드)라 모두에 이었습니다." : " 하나로 이었습니다.") + count,
+				check: overload ? "인자 타입을 보고 오버로드 가운데 어느 것을 부르는지 확인하세요."
+					: "이 줄의 " + code(to.name) + " 호출이 " + code(to.owner) + "의 것이면 확실한 관계입니다.",
+				mark: to.name
+			};
+		}
+		return {
+			reason: "확실하지 않은 관계입니다(" + K.escapeHtml(step.relation + (ev.status ? ", " + ev.status : "") + (ev.via ? ", " + ev.via : "")) + ")." + count,
+			check: "아래 소스에서 실제로 이어지는지 확인하세요.",
+			mark: to.name
+		};
+	}
+
+	/** com.a.SkillService#consultantCount(Long) → {owner: "SkillService", name: "consultantCount"} */
+	function parseMethod(fqn) {
+		fqn = fqn || "";
+		var hash = fqn.indexOf("#");
+		var owner = hash < 0 ? fqn : fqn.substring(0, hash);
+		var name = hash < 0 ? "" : fqn.substring(hash + 1);
+		var paren = name.indexOf("(");
+		return { owner: simpleName(owner), name: paren < 0 ? name : name.substring(0, paren) };
+	}
+
+	/** 길의 한 칸 이름(링크 없이): 화면이면 파일 이름, 메소드면 클래스#메소드(…) */
+	function nodeText(step) {
+		var name = nodeLabel(step);
+		if (nodeKind(step) === "FILE") {
+			return "<span class=\"kn-mono\" title=\"" + K.escapeHtml(name) + "\">" + K.escapeHtml(fileName(name)) + "</span>";
+		}
+		return "<span class=\"kn-mono\" title=\"" + K.escapeHtml(name) + "\">" + K.escapeHtml(shortMethod(name)) + "</span>";
+	}
+
+	/** 소스 몇 줄을 담을 칸. 내용은 loadCode 가 채운다 */
+	function codeBox(fileId, line, mark) {
+		var box = document.createElement("div");
+		box.className = "kn-code";
+		box.setAttribute("data-file", fileId);
+		box.setAttribute("data-line", line);
+		if (mark) {
+			box.setAttribute("data-mark", mark);
+		}
+		box.innerHTML = "<span class=\"kn-caller-note\">소스를 읽는 중입니다…</span>";
+		return box;
+	}
+
+	/** 근거 줄 앞뒤 두 줄을 읽어 칸을 채운다. 근거 줄은 칠하고, 그 줄에서 부르는 이름은 한 번 더 칠한다 */
+	function loadCode(box) {
+		if (box.getAttribute("data-loaded") || !whyRevisionPath) {
+			return;
+		}
+		box.setAttribute("data-loaded", "1");
+		var line = Number(box.getAttribute("data-line"));
+		var mark = box.getAttribute("data-mark");
+		K.call("GET", whyRevisionPath + "/files/" + encodeURIComponent(box.getAttribute("data-file")) + "/lines", { line: line, around: 2 }).then(function (result) {
+			var head = "<div class=\"kn-code-head\">" + whereText(result.path, line)
+				+ (result.message ? " <span class=\"kn-code-note\">" + K.escapeHtml(result.message) + "</span>" : "") + "</div>";
+			if (!result.available) {
+				box.innerHTML = head;
+				return;
+			}
+			box.innerHTML = head + "<pre class=\"kn-code-pre\">" + (result.lines || []).map(function (item) {
+				var text = K.escapeHtml(item.text);
+				var on = item.no === line;
+				if (on && mark && /^[A-Za-z_$][\w$]*$/.test(mark)) {
+					text = text.replace(new RegExp("\\b" + mark.replace(/\$/g, "\\$") + "\\b", "g"), "<mark>" + mark + "</mark>");
+				}
+				return "<span class=\"kn-code-line" + (on ? " kn-code-on" : "") + "\"><span class=\"kn-code-no\">" + item.no + "</span>" + (text || " ") + "</span>";
+			}).join("") + "</pre>";
+		}).catch(function (err) {
+			box.removeAttribute("data-loaded");
+			box.innerHTML = "<span class=\"kn-code-note\">소스를 읽지 못했습니다: " + K.escapeHtml(err.message) + "</span>";
+		});
+	}
+
 	/**
 	 * 근거 길: 화면 → 진입점 → 처리하는 메소드 → ... → 대상을 직접 건드리는 메소드(그 이유)
 	 * 관계가 그냥 호출(HIGH)이 아니면 그 관계와 신뢰도를 화살표 옆에 적는다. 약한 고리가 어디인지 보이게.
@@ -952,6 +1231,14 @@ var DstoneKnowledgeImpact = (function () {
 				var weak = step.confidence !== "HIGH";
 				note = " <span class=\"kn-chain-rel" + (weak ? " kn-chain-weak" : "") + "\" title=\"" + K.escapeHtml(step.relation) + "\">"
 					+ K.escapeHtml((RELATION_LABELS[step.relation] || step.relation) + (weak ? " · " + step.confidence : "")) + "</span>";
+			}
+			// 다음 칸을 부르는(요청하는) 자리. 누르면 그 소스 몇 줄이 아래에 펴진다
+			var ev = step.evidence;
+			if (ev && ev.fileId && ev.line && index < row.chain.length - 1) {
+				var callee = parseMethod(nodeLabel(row.chain[index + 1]));
+				note += " <button type=\"button\" class=\"kn-at\" aria-expanded=\"false\" data-file=\"" + K.escapeHtml(String(ev.fileId)) + "\" data-line=\"" + K.escapeHtml(String(ev.line))
+					+ "\" data-mark=\"" + K.escapeHtml(step.relation === "REQUESTS" ? (ev.function || "") : callee.name) + "\" title=\"" + K.escapeHtml(ev.path || "") + " — 누르면 소스\">"
+					+ K.escapeHtml(fileName(ev.path) + ":" + ev.line) + "</button>";
 			}
 			items.push(node + note);
 		});

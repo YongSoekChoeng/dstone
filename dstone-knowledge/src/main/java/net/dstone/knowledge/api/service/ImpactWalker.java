@@ -58,6 +58,8 @@ public class ImpactWalker {
 		public final String toId;
 		public final String relationType;
 		public final int conf;
+		/** 이 관계의 근거(소스 위치, 어떻게 이었는지). 화면의 [왜?]가 보여 준다. 없으면 null */
+		public Map<String, Object> evidence;
 
 		public Edge(String fromId, String fromKind, String toId, String relationType, int conf) {
 			this.fromId = fromId;
@@ -82,6 +84,8 @@ public class ImpactWalker {
 		public String relation;
 		/** 이 노드 → parentId 관계 하나의 신뢰도 */
 		public int edgeConf;
+		/** 이 노드 → parentId 관계의 근거. 출발점이거나 근거가 없으면 null */
+		public Map<String, Object> evidence;
 		/** 출발점이면 그 이유(어느 SQL 때문인지 등). 아니면 null */
 		public String via;
 		/** 근거 길의 길이(칸) */
@@ -161,6 +165,7 @@ public class ImpactWalker {
 					reached.parentId = edge.toId;
 					reached.relation = edge.relationType;
 					reached.edgeConf = edge.conf;
+					reached.evidence = edge.evidence;
 				}
 				result.put(id, reached);
 			}

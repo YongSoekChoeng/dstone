@@ -1,5 +1,8 @@
 package net.dstone.knowledge.api.service;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -16,7 +19,10 @@ import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.RelationDao;
 import net.dstone.knowledge.api.dao.RevisionDao;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.common.util.ErrorText;
+import net.dstone.knowledge.common.util.HashText;
 import net.dstone.knowledge.common.util.TableName;
+import net.dstone.knowledge.analysis.common.EncodingDetector;
 
 /**
  * <pre>
@@ -53,11 +59,20 @@ public class ImpactService extends BaseObject {
 	/** 종류별로 돌려주는 최대 행 수 */
 	private static final int MAX_ROWS = 2000;
 
+	/** [왜?]의 소스 몇 줄: 이보다 큰 파일은 읽지 않는다 */
+	private static final long MAX_SOURCE_BYTES = 5L * 1024 * 1024;
+
+	/** [왜?]의 소스 몇 줄: 한 줄이 이보다 길면 자른다(압축한 스크립트 등) */
+	private static final int MAX_LINE_CHARS = 400;
+
 	/** "놓쳤을 수 있는 것"의 예시로 돌려주는 최대 행 수(건수는 전체를 센다) */
 	private static final int GAP_SAMPLES = 20;
 
 	@Autowired
 	private RelationDao relationDao;
+
+	@Autowired
+	private EncodingDetector encodingDetector;
 
 	@Autowired
 	private RevisionDao revisionDao;
@@ -150,8 +165,10 @@ public class ImpactService extends BaseObject {
 		List<Map<String, Object>> edgeRows = starts.isEmpty() ? new ArrayList<Map<String, Object>>() : relationDao.selectImpactEdges(condition);
 		for (int i = 0; i < edgeRows.size(); i++) {
 			Map<String, Object> row = edgeRows.get(i);
-			edges.add(new ImpactWalker.Edge(String.valueOf(row.get("fromId")), String.valueOf(row.get("fromKind")), String.valueOf(row.get("toId"))
-					, String.valueOf(row.get("relationType")), ImpactWalker.rank(row.get("confidence"))));
+			ImpactWalker.Edge edge = new ImpactWalker.Edge(String.valueOf(row.get("fromId")), String.valueOf(row.get("fromKind")), String.valueOf(row.get("toId"))
+					, String.valueOf(row.get("relationType")), ImpactWalker.rank(row.get("confidence")));
+			edge.evidence = evidenceOf(row);
+			edges.add(edge);
 		}
 		Map<String, ImpactWalker.Reached> reached = new ImpactWalker("METHOD".equals(targetKind) ? name : null).walk(starts, edges, depthLimit);
 
@@ -423,8 +440,9 @@ public class ImpactService extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 근거 길: [{id, relation, confidence}, ...]. 첫 칸이 진입점 · 화면 쪽 노드, 마지막 칸이 출발점입니다.
+	 * 근거 길: [{id, relation, confidence, evidence}, ...]. 첫 칸이 진입점 · 화면 쪽 노드, 마지막 칸이 출발점입니다.
 	 * relation 과 confidence 는 그 노드에서 다음 칸(대상 쪽)으로 가는 관계입니다. 마지막 칸에는 via(출발점인 이유)가 붙습니다.
+	 * evidence 는 그 관계의 근거입니다(evidenceOf 참고). 화면의 [왜?]가 "어디서, 왜 이렇게 이었는지"를 보여 주는 데 씁니다.
 	 * </pre>
 	 */
 	private List<Map<String, Object>> chainOf(Map<String, ImpactWalker.Reached> reached, String id) {
@@ -437,12 +455,105 @@ public class ImpactService extends BaseObject {
 			if (node.parentId != null) {
 				step.put("relation", node.relation);
 				step.put("confidence", ImpactWalker.name(node.edgeConf));
+				if (node.evidence != null) {
+					step.put("evidence", node.evidence);
+				}
 			} else if (node.via != null) {
 				step.put("via", node.via);
 			}
 			chain.add(step);
 		}
 		return chain;
+	}
+
+	/**
+	 * <pre>
+	 * 관계 한 줄의 근거(selectImpactEdges 의 ev* 칸). 값이 있는 것만 담습니다.
+	 *   fileId · path · line  근거가 된 소스 위치
+	 *   count                 같은 두 노드 사이 관계의 수(한 메소드 안에서 여러 번 부르면 2 이상)
+	 *   status                RESOLVED / HEURISTIC ...
+	 *   via                   어떻게 이었는지. NAME(이름만 보고), OWNER_TYPE(부른 쪽 타입의 같은 이름 메소드),
+	 *                         IMPORT · URL_RULE(화면 스크립트의 요청 규칙) ...
+	 *   candidates            via = NAME 일 때 같은 이름 후보 수
+	 *   rule · ruleAt · script · function · requestPath · verb · base · baseFrom · baseRuleAt  화면 요청(REQUESTS)의 근거
+	 * </pre>
+	 */
+	private static Map<String, Object> evidenceOf(Map<String, Object> row) {
+		String[][] keys = {
+			{ "evFileId", "fileId" }, { "evPath", "path" }, { "evLine", "line" }, { "evCount", "count" }, { "evStatus", "status" },
+			{ "evVia", "via" }, { "evCandidates", "candidates" }, { "evRule", "rule" }, { "evRuleAt", "ruleAt" },
+			{ "evScript", "script" }, { "evFunction", "function" }, { "evRequestPath", "requestPath" }, { "evVerb", "verb" },
+			{ "evBase", "base" }, { "evBaseFrom", "baseFrom" }, { "evBaseRuleAt", "baseRuleAt" }
+		};
+		Map<String, Object> evidence = new LinkedHashMap<String, Object>();
+		for (int i = 0; i < keys.length; i++) {
+			Object value = row.get(keys[i][0]);
+			if (value != null) {
+				evidence.put(keys[i][1], value);
+			}
+		}
+		return evidence.isEmpty() ? null : evidence;
+	}
+
+	/**
+	 * <pre>
+	 * [왜?]에 보여 줄 소스 몇 줄. 그 리비전의 파일만, 프로젝트 폴더(localPath) 안에서만 읽습니다.
+	 * 분석한 뒤에 파일이 바뀌었으면(checksum 이 다르면) 그래도 읽되 changed = true 로 알립니다(줄 번호가 어긋날 수 있습니다).
+	 * 파일을 못 읽으면 예외 대신 available = false 와 까닭을 돌려줍니다. 화면은 근거 문장만 보여 주면 되기 때문입니다.
+	 * </pre>
+	 *
+	 * @param line   가운데 줄(1부터)
+	 * @param around 앞뒤로 몇 줄 더(0 ~ 6)
+	 */
+	public Map<String, Object> getSourceLines(long revisionId, long fileId, int line, int around) {
+		Map<String, Object> file = relationDao.selectImpactSourceFile(revisionId, fileId);
+		if (file == null) {
+			throw ApiException.notFound("이 리비전의 파일이 아닙니다: " + fileId);
+		}
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("fileId", Long.valueOf(fileId));
+		result.put("path", file.get("path"));
+		result.put("line", Integer.valueOf(line));
+		String localPath = (String) file.get("localPath");
+		byte[] bytes;
+		try {
+			if (localPath == null || localPath.trim().length() == 0) {
+				throw new IllegalStateException("프로젝트 폴더가 등록되어 있지 않습니다.");
+			}
+			Path root = Paths.get(localPath).toRealPath();
+			Path source = root.resolve((String) file.get("path")).normalize();
+			if (!source.startsWith(root) || !Files.isRegularFile(source)) {
+				throw new IllegalStateException("프로젝트 폴더에 파일이 없습니다.");
+			}
+			if (Files.size(source) > MAX_SOURCE_BYTES) {
+				throw new IllegalStateException("파일이 너무 커서 읽지 않습니다.");
+			}
+			bytes = Files.readAllBytes(source);
+		} catch (Exception e) {
+			result.put("available", Boolean.FALSE);
+			result.put("message", "소스를 읽지 못했습니다. " + ErrorText.summaryOf(e));
+			return result;
+		}
+		boolean changed = file.get("checksum") != null && !HashText.sha256(bytes).equals(file.get("checksum"));
+		String[] lines = encodingDetector.decode(bytes, (String) file.get("encoding")).split("\\r?\\n", -1);
+		int span = Math.max(0, Math.min(around, 6));
+		int from = Math.max(1, line - span);
+		int to = Math.min(lines.length, line + span);
+		List<Map<String, Object>> picked = new ArrayList<Map<String, Object>>();
+		for (int no = from; no <= to; no++) {
+			String text = lines[no - 1];
+			Map<String, Object> item = new LinkedHashMap<String, Object>();
+			item.put("no", Integer.valueOf(no));
+			item.put("text", text.length() > MAX_LINE_CHARS ? text.substring(0, MAX_LINE_CHARS) + " …" : text);
+			picked.add(item);
+		}
+		result.put("available", Boolean.TRUE);
+		result.put("changed", Boolean.valueOf(changed));
+		if (changed) {
+			result.put("message", "분석한 뒤에 파일이 바뀌어 줄 번호가 어긋날 수 있습니다.");
+		}
+		result.put("lines", picked);
+		return result;
 	}
 
 	/** 응답에 실린 근거 길의 노드만 골라 이름을 붙입니다 */

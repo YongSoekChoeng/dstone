@@ -697,20 +697,63 @@
           FROM start
     </select>
 
-    <!-- 닿는 노드 사이의 관계 전부. Java 가 이것으로 거리 · 신뢰도 · 근거 길을 계산한다 -->
+    <!-- 닿는 노드 사이의 관계 전부. Java 가 이것으로 거리 · 신뢰도 · 근거 길을 계산한다.
+         같은 두 노드 사이(같은 관계 · 같은 신뢰도)에 관계가 여러 줄이면(한 메소드 안에서 두 번 부름) 한 줄로 묶고,
+         소스에서 가장 앞에 나온 것을 대표 근거(ev*)로 남긴다. 화면의 [왜?]가 "어디서, 왜 이렇게 이었는지"를 보여 주는 데 쓴다.
+           evFileId · evPath · evLine  근거가 된 소스 위치(SQL 로 계산한 관계는 없을 수 있다)
+           evCount                     같은 두 노드 사이 관계의 수
+           evVia ...                   properties_json 의 키: 어떻게 이었는지(NAME, OWNER_TYPE, IMPORT ...)와 그 덧붙임 -->
     <select id="selectImpactEdges" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         <include refid="impactReach"/>
-        SELECT DISTINCT r.from_id AS "fromId"
-             , r.from_kind AS "fromKind"
-             , r.to_id AS "toId"
-             , r.relation_type AS "relationType"
-             , r.confidence AS "confidence"
-          FROM reach w
-          JOIN analysis_relation r
-            ON r.revision_id = #{revisionId}
-           AND r.to_id = w.node_id
-           AND r.relation_type IN
-                <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+        , rel AS (
+            SELECT DISTINCT r.relation_id, r.from_id, r.from_kind, r.to_id, r.relation_type, r.confidence, r.resolution_status
+                 , r.file_id, r.line_start, r.properties_json
+              FROM reach w
+              JOIN analysis_relation r
+                ON r.revision_id = #{revisionId}
+               AND r.to_id = w.node_id
+               AND r.relation_type IN
+                    <foreach collection="relationTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+        )
+        SELECT DISTINCT ON (x.from_id, x.to_id, x.relation_type, x.confidence)
+               x.from_id AS "fromId"
+             , x.from_kind AS "fromKind"
+             , x.to_id AS "toId"
+             , x.relation_type AS "relationType"
+             , x.confidence AS "confidence"
+             , x.resolution_status AS "evStatus"
+             , x.file_id AS "evFileId"
+             , f.path AS "evPath"
+             , x.line_start AS "evLine"
+             , COUNT(*) OVER (PARTITION BY x.from_id, x.to_id, x.relation_type, x.confidence) AS "evCount"
+             , x.properties_json->>'via' AS "evVia"
+             , x.properties_json->>'candidates' AS "evCandidates"
+             , x.properties_json->>'rule' AS "evRule"
+             , x.properties_json->>'ruleAt' AS "evRuleAt"
+             , x.properties_json->>'script' AS "evScript"
+             , x.properties_json->>'function' AS "evFunction"
+             , x.properties_json->>'path' AS "evRequestPath"
+             , x.properties_json->>'verb' AS "evVerb"
+             , x.properties_json->>'base' AS "evBase"
+             , x.properties_json->>'baseFrom' AS "evBaseFrom"
+             , x.properties_json->>'baseRuleAt' AS "evBaseRuleAt"
+          FROM rel x
+          LEFT JOIN analysis_file f ON f.file_id = x.file_id
+         ORDER BY x.from_id, x.to_id, x.relation_type, x.confidence, f.path NULLS LAST, x.line_start NULLS LAST, x.relation_id
+    </select>
+
+    <!-- [왜?]의 코드 몇 줄을 읽을 파일. 그 리비전의 파일이어야 하고, 프로젝트 폴더(localPath)와 SCAN 때의 checksum · 인코딩을 같이 준다 -->
+    <select id="selectImpactSourceFile" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT f.file_id AS "fileId"
+             , f.path AS "path"
+             , f.checksum AS "checksum"
+             , f.encoding AS "encoding"
+             , p.local_path AS "localPath"
+          FROM analysis_file f
+          JOIN analysis_revision v ON v.revision_id = f.revision_id
+          JOIN analysis_project p ON p.project_id = v.project_id
+         WHERE f.revision_id = #{revisionId}
+           AND f.file_id = #{fileId}
     </select>
 
     <!-- 닿는 메소드. anonymous 는 익명 클래스의 메소드인지(목록에서는 빼고, 근거 길에서는 이름으로 쓴다) -->
