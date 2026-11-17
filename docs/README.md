@@ -100,6 +100,7 @@ mvn clean install
 | [10.dstone-saga.md](10.dstone-saga.md) | SAGA + Outbox 패턴 샘플 기능의 전체 실행 흐름 추적 |
 | [11.dstone-knowledge.md](11.dstone-knowledge.md) | Java 애플리케이션 정적 분석 · Knowledge Graph · RAG 데이터 생성 모듈 (M0~M8 구축 완료, 이관(M9) 예정. 0절에 그림으로 보는 안내) |
 | [11.dstone-knowledge-rag.md](11.dstone-knowledge-rag.md) | dstone-knowledge의 RAG: 문서 업로드·소스 분석 → 청킹 → 임베딩 → 검색 한 바퀴, 검색 화면 |
+| [11.dstone-knowledge-rules.md](11.dstone-knowledge-rules.md) | dstone-knowledge의 규칙(conf/rules): 규칙마다 소스 → 처리기 → 테이블 → 조회 → 화면 루트, 규칙 추가 작업 길잡이 |
 | [03.build.md](03.build.md) | 빌드 명령, 산출물, VM 스타일/컨테이너 배포, CI/CD 파이프라인 종합 |
 
 ### 2.2 개발 환경 / 인프라
