@@ -1210,6 +1210,10 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 
 /* 영향도: 맨 위 숫자 네 개. 쓰기가 있으면 빨강, 확인할 것이 있으면 주황, 없으면 초록 테두리 */
 .kn-impact-cards { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); margin: 4px 0 10px; }
+/* 영향도 카드는 누르면 짝인 구역으로 가는 단추다. 단추 기본 테두리가 색 띠를 덮지 않게 다시 적는다 */
+.ai-body .kn-impact-cards button.kn-card-button.kn-card-danger { border-left: 3px solid var(--cs-danger); }
+.ai-body .kn-impact-cards button.kn-card-button.kn-card-warn { border-left: 3px solid var(--cs-warning); background: var(--cs-warning-soft); }
+.ai-body .kn-impact-cards button.kn-card-button.kn-card-ok { border-left: 3px solid var(--cs-success); }
 .kn-card-danger { border-left: 3px solid var(--cs-danger); }
 .kn-card-danger .kn-card-value { color: var(--cs-danger); }
 .kn-card-warn { border-left: 3px solid var(--cs-warning); background: var(--cs-warning-soft); }

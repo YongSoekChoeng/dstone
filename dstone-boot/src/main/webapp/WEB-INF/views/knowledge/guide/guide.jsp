@@ -163,7 +163,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 						<li>컬럼 하나만 바꾼다면 종류를 "컬럼"으로 두고 <code>TB_BOARD.TITLE</code>처럼 적습니다. 테이블 이름만 적으면 컬럼 목록이 나옵니다.</li>
 						<li>"다시 테스트할 곳"의 줄마다 <b>왜?</b>를 눌러 근거를 봅니다.</li>
 					</ol>
-					<div class="kn-expect"><b>이렇게 보입니다:</b> 맨 위 숫자 네 개(화면 · 진입점 · 쓰는 SQL · 확인 필요)와 한 줄 요약 아래에 다시 테스트할 화면과 주소가 나옵니다.
+					<div class="kn-expect"><b>이렇게 보입니다:</b> 맨 위 숫자 네 개(다시 테스트할 곳 · 추정 관계 · 건드리는 데이터 · 확인 필요, 아래 구역과 짝)와 한 줄 요약 아래에 다시 테스트할 화면과 주소가 나옵니다.
 						<b>왜?</b>를 누르면 이어진 길이 보입니다. 예: <code>edit.jsp</code> → <code>/board/save.do</code> → <code>BoardSaveAction</code> → <code>BoardDAO#insertBoard</code> (Board.insertBoard 실행 · 테이블 쓰기)<br>
 						<b>읽는 법:</b> "다시 테스트할 곳"은 꼭 확인할 곳, "추정 관계"는 정말 이어지는지 한 번 더 볼 곳, "확인 필요"는 분석이 놓쳤을 수 있는 곳입니다.</div>
 				</div>

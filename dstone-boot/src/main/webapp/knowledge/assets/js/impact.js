@@ -5,6 +5,7 @@
  *   맨 위   프로젝트 · 리비전 (화면 전체에 적용)
  *   ①      대상: 종류(메소드 / 테이블 / 컬럼 / SQL / 클래스 / 변경분) + 이름 → 후보 → 하나를 고른다
  *   ②      결과: 숫자 네 개 → 다시 테스트할 곳(확실한 관계) → 추정 관계 → 건드리는 데이터 · 확인 필요
+ *           (숫자 카드 네 개는 아래 구역 네 개와 이름 · 숫자가 같은 짝이고, 누르면 그 구역으로 갑니다)
  * 줄마다 [왜?]를 누르면 대상에서 거기까지 이어진 길(근거 길)을 보여 줍니다.
  * 누가 누구를 부르는지 메소드 단위로 따라가는 일은 관계 트리 창이 맡습니다("관계 트리 보기").
  * 결과에 나온 이름(밑줄)을 누르면 그것이 새 대상이 됩니다. 지금 상태는 주소창(#...)에 남아서
@@ -670,25 +671,27 @@ var DstoneKnowledgeImpact = (function () {
 		var body = el["kn-impact-body"];
 		body.innerHTML = cardsHtml(result, sure, guessed, checks) + leadHtml(result, rows, sure, guessed);
 
-		var testSection = sectionWrap(body, "다시 테스트할 곳", sure.length + "곳",
-			"확실한 관계(HIGH)로만 이어진 화면과 진입점입니다. [왜?]를 누르면 대상에서 거기까지 이어진 길이 나옵니다.");
+		var testSection = sectionWrap(body, "다시 테스트할 곳", sure.length + "곳 (" + rowsUnit(sure) + ")",
+			"확실한 관계(HIGH)로 이어진 진입점과, 그 진입점을 부르는 화면입니다. 한 줄이 한 곳입니다. [왜?]를 누르면 대상에서 거기까지 이어진 길이 나옵니다.");
+		testSection.setAttribute("data-section", "test");
 		testSection.insertAdjacentHTML("beforeend", rowsTable(sure, result, false, "확실한 관계로 이어진 화면 · 진입점이 없습니다."));
 
-		if (guessed.length > 0) {
-			var details = document.createElement("details");
-			details.className = "kn-result-section kn-guessed";
-			details.innerHTML = "<summary><span class=\"kn-section-title\">추정 관계</span> <span class=\"kn-section-count\">" + guessed.length + "곳</span></summary>"
-				+ "<p class=\"kn-section-hint\">이어지는 길에 덜 확실한 관계(MEDIUM: 화면 안의 주소 글자, 인터페이스를 거친 호출 등)나 "
-				+ "짐작(LOW: 이름만 보고 이은 관계, 어느 메소드가 불리는지 모르는 진입점)이 낀 곳입니다. 실제로 이어지는지 [왜?]로 확인하세요.</p>"
-				+ rowsTable(guessed, result, true, "");
-			body.appendChild(details);
-		}
+		// 카드와 짝을 맞추려고 0곳이어도 구역을 둔다(접힌 채로).
+		var details = document.createElement("details");
+		details.className = "kn-result-section kn-guessed";
+		details.setAttribute("data-section", "guessed");
+		details.innerHTML = "<summary><span class=\"kn-section-title\">추정 관계</span> <span class=\"kn-section-count\">" + guessed.length + "곳 (" + rowsUnit(guessed) + ")</span></summary>"
+			+ "<p class=\"kn-section-hint\">이어지는 길에 덜 확실한 관계(MEDIUM: 화면 안의 주소 글자, 인터페이스를 거친 호출 등)나 "
+			+ "짐작(LOW: 이름만 보고 이은 관계, 어느 메소드가 불리는지 모르는 진입점)이 낀 곳입니다. 실제로 이어지는지 [왜?]로 확인하세요.</p>"
+			+ rowsTable(guessed, result, true, "추정 관계로만 이어진 곳이 없습니다.");
+		body.appendChild(details);
 
 		var grid = document.createElement("div");
 		grid.className = "kn-impact-grid";
 		body.appendChild(grid);
 		renderTouches(grid, result);
 		renderChecks(grid, result, checks);
+		bindCards(body);
 	}
 
 	/**
@@ -730,26 +733,17 @@ var DstoneKnowledgeImpact = (function () {
 		});
 	}
 
-	/** 맨 위 숫자 네 개: 화면 · 진입점 · 데이터 쓰기 · 확인 필요 */
+	/**
+	 * 맨 위 숫자 네 개. 아래 구역 네 개(다시 테스트할 곳 · 추정 관계 · 건드리는 데이터 · 확인 필요)와 하나씩 짝이고,
+	 * 카드의 숫자는 짝인 구역 제목 옆의 숫자와 같습니다. 카드를 누르면 그 구역으로 갑니다.
+	 */
 	function cardsHtml(result, sure, guessed, checks) {
-		var screens = result.screens || [];
-		var endpoints = result.endpoints || [];
-		var sureScreens = screens.filter(function (s) { return s.confidence === "HIGH"; }).length;
-		var sureEndpoints = endpoints.filter(function (e) { return e.confidence === "HIGH"; }).length;
-		var writes = 0;
-		var reads = 0;
-		(result.touches || []).forEach(function (touch) {
-			writes += touch.writes.length;
-			reads += touch.reads.length;
-		});
-		var dataCard = target.kind === "table" || target.kind === "column"
-			? card(writes, "쓰는 SQL", "읽는 SQL " + reads + "개", writes > 0 ? "kn-card-danger" : "")
-			: card((result.summary || {}).tablesWritten || 0, "쓰는 테이블", "건드리는 테이블 " + (result.touches || []).length + "개", (result.summary || {}).tablesWritten > 0 ? "kn-card-danger" : "");
+		var data = dataCount(result);
 		var html = "<div class=\"kn-cards kn-impact-cards\">"
-			+ card(screens.length, "화면", "확실 " + sureScreens + " · 추정 " + (screens.length - sureScreens), "")
-			+ card(endpoints.length, "진입점", "확실 " + sureEndpoints + " · 추정 " + (endpoints.length - sureEndpoints), "")
-			+ dataCard
-			+ card(checks.count, "확인 필요", checks.count === 0 ? "분석이 놓친 곳 없음" : "아래 \"확인 필요\" 참고", checks.count > 0 ? "kn-card-warn" : "kn-card-ok")
+			+ card("test", sure.length, "다시 테스트할 곳", rowsUnit(sure), "")
+			+ card("guessed", guessed.length, "추정 관계", rowsUnit(guessed), "")
+			+ card("data", data.value, "건드리는 데이터", data.help, data.writes > 0 ? "kn-card-danger" : "")
+			+ card("checks", checks.count, "확인 필요", checks.count === 0 ? "분석이 놓친 곳 없음" : "분석이 놓쳤을 수 있는 곳", checks.count > 0 ? "kn-card-warn" : "kn-card-ok")
 			+ "</div>";
 		if (result.changes) {
 			var c = result.changes;
@@ -762,9 +756,71 @@ var DstoneKnowledgeImpact = (function () {
 		return html;
 	}
 
-	function card(value, label, help, css) {
-		return "<div class=\"kn-card " + (css || "") + "\"><div class=\"kn-card-value\">" + K.escapeHtml(String(value)) + "</div>"
-			+ "<div class=\"kn-card-label\">" + K.escapeHtml(label) + "</div><div class=\"kn-card-help\">" + K.escapeHtml(help) + "</div></div>";
+	/** 누르면 짝인 구역(data-jump)으로 가는 카드 */
+	function card(jump, value, label, help, css) {
+		return "<button type=\"button\" class=\"kn-card kn-card-button " + (css || "") + "\" data-jump=\"" + jump + "\" title=\"아래 '" + K.escapeHtml(label) + "' 구역으로\">"
+			+ "<div class=\"kn-card-value\">" + K.escapeHtml(String(value)) + "</div>"
+			+ "<div class=\"kn-card-label\">" + K.escapeHtml(label) + "</div><div class=\"kn-card-help\">" + K.escapeHtml(help) + "</div></button>";
+	}
+
+	/** 줄 묶음의 단위 풀이: "진입점 4 · 화면 5". 줄 하나 = 진입점 하나 + 그 화면들, 또는 진입점 없는 화면 하나 */
+	function rowsUnit(rows) {
+		var endpoints = 0;
+		var screens = {};
+		var screenCount = 0;
+		rows.forEach(function (row) {
+			if (row.endpoint) {
+				endpoints++;
+			}
+			row.screens.forEach(function (screen) {
+				if (!screens[screen.path]) {
+					screens[screen.path] = true;
+					screenCount++;
+				}
+			});
+		});
+		return "진입점 " + endpoints + " · 화면 " + screenCount;
+	}
+
+	/**
+	 * "건드리는 데이터" 카드와 구역 제목의 숫자.
+	 * 테이블 · 컬럼이 대상이면 그것을 쓰는 SQL 수, 그 밖에는 실행하는 SQL 이 닿는 테이블 수입니다.
+	 */
+	function dataCount(result) {
+		var touches = result.touches || [];
+		var writes = 0;
+		var reads = 0;
+		var unsure = 0;
+		var writtenTables = 0;
+		touches.forEach(function (touch) {
+			writes += touch.writes.length;
+			reads += touch.reads.length;
+			unsure += (touch.unsure || []).length;
+			if (touch.writes.length > 0) {
+				writtenTables++;
+			}
+		});
+		if (target.kind === "table" || target.kind === "column") {
+			return { value: writes + reads + unsure, unit: "SQL", writes: writes,
+				help: "쓰기 " + writes + " · 읽기 " + reads + (unsure ? " · 컬럼 모름 " + unsure : "") };
+		}
+		return { value: touches.length, unit: "테이블", writes: writtenTables, help: "쓰는 테이블 " + writtenTables + " · 읽기만 " + (touches.length - writtenTables) };
+	}
+
+	/** 카드를 누르면 짝인 구역으로 스크롤합니다. 접힌 "추정 관계"는 펼칩니다 */
+	function bindCards(body) {
+		Array.prototype.forEach.call(body.querySelectorAll(".kn-impact-cards [data-jump]"), function (button) {
+			button.addEventListener("click", function () {
+				var section = body.querySelector("[data-section=\"" + button.getAttribute("data-jump") + "\"]");
+				if (!section) {
+					return;
+				}
+				if (section.tagName === "DETAILS") {
+					section.open = true;
+				}
+				section.scrollIntoView({ behavior: "smooth", block: "start" });
+			});
+		});
 	}
 
 	/** 숫자 아래 한 줄 결론 */
@@ -914,7 +970,9 @@ var DstoneKnowledgeImpact = (function () {
 			table: "이 테이블을 읽고 쓰는 SQL입니다.",
 			column: "이 컬럼을 쓰는 SQL입니다."
 		};
-		var wrap = sectionWrap(container, "건드리는 데이터", "테이블 " + touches.length + "개", hints[target.kind] || "");
+		var data = dataCount(result);
+		var wrap = sectionWrap(container, "건드리는 데이터", data.unit + " " + data.value + "개 (" + data.help + ")", hints[target.kind] || "");
+		wrap.setAttribute("data-section", "data");
 		var scroll = document.createElement("div");
 		scroll.className = "kn-scroll";
 		wrap.appendChild(scroll);
@@ -981,8 +1039,9 @@ var DstoneKnowledgeImpact = (function () {
 	}
 
 	function renderChecks(container, result, checks) {
-		var wrap = sectionWrap(container, "확인 필요", checks.count ? checks.count + "건" : "",
+		var wrap = sectionWrap(container, "확인 필요", checks.count + "건",
 			"\"영향 없음\"이 정말 없는 것인지, 분석이 잇지 못한 것인지 가려 봅니다.");
+		wrap.setAttribute("data-section", "checks");
 		var conditions = ["부르는 쪽을 끝까지 따라감 (가장 먼 거리 " + result.depth + ")",
 			result.includePossible ? "인터페이스를 거친 호출 포함" : "인터페이스를 거친 호출 제외"];
 		var html = "<div class=\"kn-target-cond\">" + conditions.map(function (text) { return "<span>" + K.escapeHtml(text) + "</span>"; }).join("") + "</div>";
