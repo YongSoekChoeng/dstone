@@ -130,4 +130,47 @@ public class ScreenUrlsTest {
 		assertEquals("projects/h/f.yml:3", links.get(0).properties().get("ruleAt"));
 		assertTrue(linked.contains("m3"));
 	}
+
+	/* ---------------- Vue / React (conf/rules/common/spa.yml) ---------------- */
+
+	private static final ScreenUrls.Rule GET = ScreenUrls.Rule.call("get", 0, "axios.get(URL)", "common/spa.yml:9").withVerb("GET");
+
+	private static final ScreenUrls.Rule FETCH = ScreenUrls.Rule.call("fetch", 0, "fetch(URL)", "common/spa.yml:15");
+
+	@Test
+	public void 템플릿_글자와_이어_붙인_주소의_값_자리는_중괄호로_남긴다() {
+		String text = "export const fetchBoard = (seq: string) => apiClient.get<Board>(`/sample/boards/${seq}`)\n"
+				+ "export function list() { return http.get('/sample/boards', { params: { title } }) }\n"
+				+ "export function codes(grp) { return axios.get('/common/codes/' + grp) }\n"
+				+ "export function bad(id) { return axios.get('/a/' + id + '.do') }\n"
+				+ "const v = map.get('key')\n";
+		assertEquals(Arrays.asList("/sample/boards/{}", "/sample/boards", "/common/codes/{}"), urls(text, GET));
+		assertEquals("GET", screenUrls.find(text, Arrays.asList(GET)).get(0).getVerb());
+	}
+
+	@Test
+	public void fetch_는_둘째_인자의_method_를_읽는다() {
+		String text = "fetch('/api/members', { method: 'POST', body: JSON.stringify(m) })\nfetch(`/api/members/${id}`)\n";
+		List<ScreenUrls.Hit> hits = screenUrls.find(text, Arrays.asList(FETCH));
+		assertEquals("/api/members", hits.get(0).getUrl());
+		assertEquals("POST", hits.get(0).getVerb());
+		assertEquals("/api/members/{}", hits.get(1).getUrl());
+		assertNull(hits.get(1).getVerb());
+	}
+
+	@Test
+	public void baseURL_은_속성_값이나_이어_붙인_주소의_맨_앞_글자() {
+		ScreenUrls.Rule baseProp = ScreenUrls.Rule.prop("baseURL", "baseURL: URL", "common/spa.yml:17");
+		String vue = "const http = axios.create({\n  baseURL: '/api',\n  timeout: 30000\n})\n";
+		assertEquals("/api", screenUrls.findBases(vue, Arrays.asList(baseProp)).get(0).getUrl());
+		assertEquals("/api", screenUrls.findBases("axios.create({ baseURL: 'http://localhost:8080/api/' })", Arrays.asList(baseProp)).get(0).getUrl());
+
+		String react = "const API_BASE = '/api'\nasync function request(method, path) {\n"
+				+ "  const res = await fetch(API_BASE + path + toQuery(params), { method })\n}\nfetch('/api/members')\n";
+		List<ScreenUrls.Hit> bases = screenUrls.findBases(react, Arrays.asList(FETCH));
+		assertEquals(1, bases.size());
+		assertEquals("/api", bases.get(0).getUrl());
+		// 래퍼 안의 fetch(API_BASE + path) 는 주소 전체가 값이라 주소로는 남지 않는다
+		assertEquals(Arrays.asList("/api/members"), urls(react, FETCH));
+	}
 }

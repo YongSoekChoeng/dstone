@@ -204,6 +204,21 @@ public class ProjectRules {
 		return all;
 	}
 
+	/** 모든 주소 앞에 붙는 글자(baseURL)를 적는 자리(base:). 우선순위 순서이고, 똑같은 규칙은 하나만 */
+	public List<ScreenUrls.Rule> screenBases() {
+		Set<String> keys = new LinkedHashSet<String>();
+		List<ScreenUrls.Rule> all = new ArrayList<ScreenUrls.Rule>();
+		for (int i = 0; i < files.size(); i++) {
+			List<ScreenUrls.Rule> rules = files.get(i).screenBases;
+			for (int j = 0; j < rules.size(); j++) {
+				if (keys.add(rules.get(j).key())) {
+					all.add(rules.get(j));
+				}
+			}
+		}
+		return all;
+	}
+
 	/** 메뉴 목록 규칙. 똑같은 키 짝은 하나만 */
 	public List<ScreenMenu.Rule> screenMenus() {
 		Set<String> keys = new LinkedHashSet<String>();

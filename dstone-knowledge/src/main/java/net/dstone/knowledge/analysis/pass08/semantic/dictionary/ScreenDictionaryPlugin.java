@@ -28,7 +28,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 public class ScreenDictionaryPlugin implements SemanticStep {
 
 	/** 화면 종류(analysis_file.file_type) */
-	private static final List<String> SCREEN_TYPES = Arrays.asList("JSP", "WEBSQUARE", "NEXACRO");
+	private static final List<String> SCREEN_TYPES = Arrays.asList("JSP", "WEBSQUARE", "NEXACRO", "VUE", "REACT");
 
 	private static final int PAGE_SIZE = 200;
 

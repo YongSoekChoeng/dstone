@@ -23,7 +23,7 @@ screen:
 ```text
 conf/rules/
 ├─ projects/{프로젝트ID}/   ① 그 프로젝트만의 관례. 가장 먼저 본다
-├─ common/                  ② 모든 프로젝트의 관례(Java, 서블릿, Spring, JPA, MyBatis)
+├─ common/                  ② 모든 프로젝트의 관례(Java, 서블릿, Spring, JPA, MyBatis, Vue / React)
 └─ guess/                   ③ 짐작. 다른 규칙이 못 정한 것만 채운다(@Component, 이름 끝말)
 ```
 
@@ -43,7 +43,7 @@ conf/rules/
 | `inject:` `proxy:` | 주입받는 필드, 프록시가 끼는 메소드 | `"@Autowired"` |
 | `sql:` | 이 호출은 어떤 SQL을 실행하나 | `_.메소드(SQL)` / `타입#메소드(_, SQL)` / `new 타입(SQL)` |
 | `view:` | 이 호출은 어떤 JSP를 여나 | `{ call: new ModelAndView(VIEW), file: "{VIEW}.jsp" }` |
-| `screen:` | 화면이 어느 서버 메소드를 부르나, 어느 화면을 여나 | `{ call: 함수(ID), to: "perform{ID}" }` / `{ field: 필드, to: ... }` / `{ open: 함수(ID), to: "{ID}.xml" }` / `{ url: 함수(_, URL) }` · `{ url: "url: URL" }` · `{ url: '<form action="URL">', context: /ctx }` / `{ menu: { name: 키, path: 키 } }` |
+| `screen:` | 화면이 어느 서버 메소드를 부르나, 어느 화면을 여나 | `{ call: 함수(ID), to: "perform{ID}" }` / `{ field: 필드, to: ... }` / `{ open: 함수(ID), to: "{ID}.xml" }` / `{ url: 함수(_, URL) }` · `{ url: "url: URL" }` · `{ url: '<form action="URL">', context: /ctx }` · `{ url: axios.get(URL), verb: GET }` / `base: "baseURL: URL"` / `{ menu: { name: 키, path: 키 } }` |
 | `jpa:` | JPA 엔티티와 쿼리 | `entity`, `table`, `naming`, `query`, `namedQuery`, `repository`, `jpql` |
 
 ### 패턴 글자
@@ -95,6 +95,25 @@ screen:
 ```
 
 `?query`, `${ctx}`, `<%= … %>`는 떼고 맞춘다. 이어 붙인 주소(`"/a/" + id + ".do"`)와 여러 번 대입한 변수는 계산할 수 없어서 잇지 않는다.
+
+### Vue / React 화면 (`verb:`, `base:`)
+
+`common/spa.yml`에 axios와 fetch 모양이 들어 있다. 받는 객체는 보지 않으므로 `http.get(…)`, `apiClient.get<T>(…)`, `this.$http.get(…)`도 맞는다.
+
+```yaml
+screen:
+  # 이 자리로 부르는 HTTP 메소드. 같은 주소의 GET 과 POST 를 가려 잇는다
+  - { url: axios.get(URL), verb: GET }
+  # verb 가 없는 함수 규칙은 다음 인자의 method: 'POST' 를 읽는다
+  - url: fetch(URL)
+  # 모든 주소 앞에 붙는 글자. 주소가 진입점과 그대로 맞지 않으면 앞에 붙여 다시 맞춘다
+  - base: "baseURL: URL"        # axios.create({ baseURL: '/api' })
+  - base: fetch(URL)            # fetch(API_BASE + path) 의 API_BASE 값
+```
+
+- 템플릿 글자와 이어 붙인 주소는 값이 들어가는 마디를 `{}`로 두고 진입점의 경로 변수와 맞춘다. `` `/boards/${seq}` ``와 `"/boards/" + seq`는 `/boards/{seq}`에 맞는다. 마디 일부만 값이면(`"/a/" + id + ".do"`) 잇지 않는다.
+- 화면이 import 한 API 모듈, 훅, 컴포저블, 스토어 안의 호출도 `SpaLinker`가 import 를 따라가 찾는다. 이때는 `via = IMPORT`이고 신뢰도가 한 단계 낮다.
+- baseURL 이 프로젝트에 여럿이면 어느 것인지 몰라 한 단계 더 낮춘다. 프로젝트마다 다른 래퍼 함수(`request({ url })` 등)는 `projects/{ID}/`에 `url:`로 더 적는다.
 
 ## 결과에 남는 근거
 

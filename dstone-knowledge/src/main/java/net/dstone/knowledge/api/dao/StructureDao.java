@@ -48,7 +48,7 @@ public class StructureDao extends BaseDao {
 		return sqlSessionCommon.selectList(NS + "selectTablesByFolder", revisionId);
 	}
 
-	/** {type: JSP / WEBSQUARE / NEXACRO, count} */
+	/** {type: JSP / WEBSQUARE / NEXACRO / VUE / REACT, count} */
 	public List<Map<String, Object>> selectScreenTypes(long revisionId) {
 		return sqlSessionCommon.selectList(NS + "selectScreenTypes", revisionId);
 	}

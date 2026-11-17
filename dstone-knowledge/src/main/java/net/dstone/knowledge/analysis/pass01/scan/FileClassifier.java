@@ -22,6 +22,12 @@ public class FileClassifier {
 	/** DDL 파일인지 가리는 문장: CREATE TABLE, COMMENT ON */
 	private static final Pattern DDL_STATEMENT = Pattern.compile("(?i)\\bCREATE\\s+(?:\\w+\\s+){0,3}TABLE\\b|\\bCOMMENT\\s+ON\\s+(?:TABLE|COLUMN)\\b");
 
+	/** react 를 가져다 쓰는 줄. import React from 'react', import { useState } from "react", require('react') */
+	private static final Pattern REACT_IMPORT = Pattern.compile("(?:\\bfrom\\s*|\\brequire\\s*\\(\\s*)[\"']react[\"']");
+
+	/** JSX 태그. 닫는 태그(&lt;/div&gt;), 스스로 닫는 태그(&lt;Grid /&gt;), 대문자로 시작하는 컴포넌트(&lt;Grid ...&gt;) */
+	private static final Pattern JSX_TAG = Pattern.compile("</[A-Za-z][A-Za-z0-9.]*\\s*>|<[A-Za-z][A-Za-z0-9.]*(?:\\s[^<>]*)?/>|<[A-Z][A-Za-z0-9.]*[\\s>]");
+
 	/**
 	 * <pre>
 	 * 확장자로 언어를 정합니다.
@@ -60,6 +66,12 @@ public class FileClassifier {
 		if (name.endsWith(".js") || name.endsWith(".xjs")) {
 			// 화면 공통 스크립트(.xjs 는 Nexacro / X-Platform). 공통 함수가 여는 화면을 찾으려고 스캔한다.
 			// 목록에만 올리고, 내용은 SEMANTIC 의 ScreenLinker 가 읽는다.
+			// React 화면을 .js 로 쓰는 프로젝트도 있어서, 용도(fileTypeOf)는 내용을 보고 정한다.
+			return "SCRIPT";
+		}
+		if (name.endsWith(".vue") || name.endsWith(".jsx") || name.endsWith(".tsx") || name.endsWith(".ts")
+				|| name.endsWith(".mjs")) {
+			// Vue / React 화면과, 화면이 import 하는 모듈(API 함수, 훅, 스토어). 내용은 SEMANTIC 의 SpaLinker 가 읽는다.
 			return "SCRIPT";
 		}
 		return null;
@@ -86,13 +98,35 @@ public class FileClassifier {
 			return "BUILD";
 		}
 		if ("SCRIPT".equals(language)) {
-			return "SCRIPT";
+			return scriptTypeOf(fileName.toLowerCase(Locale.ROOT), text);
 		}
 		if ("SQL".equals(language)) {
 			// 테이블을 만들거나 설명을 다는 문장이 있으면 DDL, 데이터만 넣는 스크립트 등은 SQL_SCRIPT
 			return text != null && DDL_STATEMENT.matcher(text).find() ? "DDL" : "SQL_SCRIPT";
 		}
 		return xmlTypeOf(fileName.toLowerCase(Locale.ROOT), text);
+	}
+
+	/**
+	 * <pre>
+	 * 스크립트 파일이 화면인지 가립니다.
+	 *   .vue                         → VUE   (Vue 단일 파일 컴포넌트)
+	 *   .jsx, .tsx                   → REACT (JSX 를 쓰는 React 컴포넌트)
+	 *   .js 인데 react 를 import 하고 JSX 태그가 있다 → REACT (Create React App 처럼 .js 에 JSX 를 쓰는 프로젝트)
+	 *   그 밖(.js .ts .xjs .mjs)      → SCRIPT (공통 스크립트, API 모듈, 훅, 스토어)
+	 * </pre>
+	 */
+	private String scriptTypeOf(String lowerName, String text) {
+		if (lowerName.endsWith(".vue")) {
+			return "VUE";
+		}
+		if (lowerName.endsWith(".jsx") || lowerName.endsWith(".tsx")) {
+			return "REACT";
+		}
+		if (lowerName.endsWith(".js") && text != null && REACT_IMPORT.matcher(text).find() && JSX_TAG.matcher(text).find()) {
+			return "REACT";
+		}
+		return "SCRIPT";
 	}
 
 	/**

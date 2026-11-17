@@ -4,7 +4,7 @@
 <!-- 적용 진단: 새 프로젝트를 처음 분석한 뒤 "어디가 안 이어졌고, 규칙으로 풀 일인지 개발할 일인지" 를 가리는 데 쓰는 숫자와 보기 -->
 <mapper namespace="net.dstone.knowledge.api.dao.DiagnosticDao">
 
-    <!-- 화면(JSP, WebSquare, Nexacro) 수와, 서버를 하나도 부르지 않는(REQUESTS 가 없는) 화면 수 -->
+    <!-- 화면(JSP, WebSquare, Nexacro, Vue, React) 수와, 서버를 하나도 부르지 않는(REQUESTS 가 없는) 화면 수 -->
     <select id="selectScreenSummary" parameterType="long" resultType="java.util.LinkedHashMap">
         SELECT COUNT(*) AS "total"
              , COUNT(*) FILTER (WHERE NOT EXISTS (
@@ -13,14 +13,14 @@
                        AND r.from_kind = 'FILE' AND r.from_id = 'F' || f.file_id)) AS "noRequest"
           FROM analysis_file f
          WHERE f.revision_id = #{revisionId}
-           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO', 'VUE', 'REACT')
     </select>
 
     <select id="selectScreensWithoutRequest" parameterType="java.util.Map" resultType="string">
         SELECT f.path
           FROM analysis_file f
          WHERE f.revision_id = #{revisionId}
-           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO', 'VUE', 'REACT')
            AND NOT EXISTS (
                 SELECT 1 FROM analysis_relation r
                  WHERE r.revision_id = f.revision_id AND r.relation_type = 'REQUESTS'

@@ -814,14 +814,14 @@
          ORDER BY f.path
     </select>
 
-    <!-- 변경분 대상에서: 생기거나 내용이 바뀐 화면 파일(JSP · WebSquare · Nexacro). 화면 자체를 고친 것이라 그대로 다시 볼 곳이다 -->
+    <!-- 변경분 대상에서: 생기거나 내용이 바뀐 화면 파일(JSP · WebSquare · Nexacro · Vue · React). 화면 자체를 고친 것이라 그대로 다시 볼 곳이다 -->
     <select id="selectImpactChangedScreens" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT n.path AS "path"
              , CASE WHEN o.path IS NULL THEN 'ADDED' ELSE 'CHANGED' END AS "change"
           FROM analysis_file n
           LEFT JOIN analysis_file o ON o.revision_id = #{baseRevisionId} AND o.path = n.path
          WHERE n.revision_id = #{revisionId}
-           AND n.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+           AND n.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO', 'VUE', 'REACT')
            AND (o.path IS NULL OR o.checksum &lt;&gt; n.checksum)
          ORDER BY n.path
     </select>

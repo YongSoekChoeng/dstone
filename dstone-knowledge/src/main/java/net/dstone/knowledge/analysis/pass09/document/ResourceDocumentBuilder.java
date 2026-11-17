@@ -210,6 +210,11 @@ public class ResourceDocumentBuilder {
 		return "WEBSQUARE".equals(fileType) || "NEXACRO".equals(fileType);
 	}
 
+	/** Vue / React 화면 파일인지(analysis_file.file_type) */
+	public static boolean isSpaScreen(String fileType) {
+		return "VUE".equals(fileType) || "REACT".equals(fileType);
+	}
+
 	/** 화면 종류를 사람이 읽는 이름으로. JSP는 따로 적지 않는다(null). */
 	private String screenTypeLabel(String fileType) {
 		if ("WEBSQUARE".equals(fileType)) {
@@ -217,6 +222,12 @@ public class ResourceDocumentBuilder {
 		}
 		if ("NEXACRO".equals(fileType)) {
 			return "Nexacro / X-Platform";
+		}
+		if ("VUE".equals(fileType)) {
+			return "Vue";
+		}
+		if ("REACT".equals(fileType)) {
+			return "React";
 		}
 		return null;
 	}

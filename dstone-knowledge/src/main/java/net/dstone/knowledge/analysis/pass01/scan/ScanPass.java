@@ -376,7 +376,7 @@ public class ScanPass extends BaseObject implements AnalysisPass {
 		Set<String> dirs = new HashSet<String>();
 		String configured = configProperty.getProperty("dstone.knowledge.scan.exclude-dirs");
 		if (configured == null || configured.trim().length() == 0) {
-			configured = ".git,.svn,.hg,node_modules,target,build,.gradle,.idea,.settings,.metadata";
+			configured = ".git,.svn,.hg,node_modules,target,build,dist,.next,.nuxt,.gradle,.idea,.settings,.metadata";
 		}
 		String[] names = configured.split(",");
 		for (int i = 0; i < names.length; i++) {

@@ -484,6 +484,8 @@ public class RuleFileParser {
 	 *   - url: "url: URL"                                    객체 속성에 적은 주소 → 진입점
 	 *   - url: '<form action="URL">'                         HTML 태그 속성에 적은 주소 → 진입점
 	 *   - { url: '<form action="URL">', context: /hi-japan } 주소 앞에 글자로 붙인 컨텍스트 경로를 떼고 맞춘다
+	 *   - { url: axios.get(URL), verb: GET }                 그 자리로 부르는 HTTP 메소드(Vue / React)
+	 *   - base: "baseURL: URL"                               모든 주소 앞에 붙는 글자(axios.create({ baseURL: '/api' }))
 	 * </pre>
 	 */
 	private void readScreens(Reader r, Node node, RuleFile file, StringBuilder mapTexts) {
@@ -502,7 +504,7 @@ public class RuleFileParser {
 				continue;
 			}
 			if (r.has(keys, "url")) {
-				r.allowOnly(keys, "url", "context");
+				r.allowOnly(keys, "url", "context", "verb");
 				Node urlNode = r.valueNode(keys, "url");
 				ScreenUrls.Rule urlRule = readScreenUrl(r, urlNode, r.scalar(urlNode, "screen.url"), at);
 				String context = r.optionalScalar(keys, "context", null);
@@ -513,12 +515,27 @@ public class RuleFileParser {
 					}
 					urlRule.withContext(context);
 				}
+				String verb = r.optionalScalar(keys, "verb", null);
+				if (verb != null) {
+					verb = verb.trim().toUpperCase(Locale.ROOT);
+					if (!HTTP_VERBS.contains(verb)) {
+						throw r.error(r.valueNode(keys, "verb"), "verb 는 HTTP 메소드 하나입니다(" + HTTP_VERBS + "): " + verb);
+					}
+					urlRule.withVerb(verb);
+				}
 				file.screenUrls.add(urlRule);
+				continue;
+			}
+			if (r.has(keys, "base")) {
+				// 모든 주소 앞에 붙는 글자(baseURL)를 적는 자리. 모양은 url: 과 같다.
+				r.allowOnly(keys, "base");
+				Node baseNode = r.valueNode(keys, "base");
+				file.screenBases.add(readScreenUrl(r, baseNode, r.scalar(baseNode, "screen.base"), at));
 				continue;
 			}
 			String kind = r.has(keys, "call") ? "call" : r.has(keys, "field") ? "field" : r.has(keys, "open") ? "open" : null;
 			if (kind == null) {
-				throw r.error(item, "call, field, open, url, menu 가운데 하나를 적습니다. 예: { call: doRequestAjax(ID), to: \"perform{ID}\" }, { url: \"gfn_Transaction(_, URL)\" }");
+				throw r.error(item, "call, field, open, url, base, menu 가운데 하나를 적습니다. 예: { call: doRequestAjax(ID), to: \"perform{ID}\" }, { url: \"gfn_Transaction(_, URL)\" }");
 			}
 			r.allowOnly(keys, kind, "to", "id");
 			String to = r.requiredScalar(keys, item, "to");

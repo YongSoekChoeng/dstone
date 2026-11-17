@@ -107,4 +107,18 @@ public class ScannerTest {
 		assertNull(scanPass.sourceRootOf("src/x/A.java", "a.b"));
 	}
 
+
+	@Test
+	public void Vue_React_화면을_가린다() {
+		assertEquals("SCRIPT", fileClassifier.languageOf("BoardList.vue"));
+		assertEquals("SCRIPT", fileClassifier.languageOf("boardService.ts"));
+		assertEquals("VUE", fileClassifier.fileTypeOf("SCRIPT", "BoardList.vue", "<template><div/></template>"));
+		assertEquals("REACT", fileClassifier.fileTypeOf("SCRIPT", "BoardListPage.tsx", "export default function A() { return <div/> }"));
+		assertEquals("SCRIPT", fileClassifier.fileTypeOf("SCRIPT", "boardService.ts", "export const a = () => apiClient.get<Board>('/a')"));
+		// .js 는 react 를 가져오고 JSX 가 있을 때만 화면이다
+		assertEquals("REACT", fileClassifier.fileTypeOf("SCRIPT", "App.js"
+				, "import React from 'react';\nexport default function App() {\n  return (<Layout><h1>Hi</h1></Layout>);\n}"));
+		assertEquals("SCRIPT", fileClassifier.fileTypeOf("SCRIPT", "useBoards.js", "import { useState } from 'react';\nexport function useBoards() { return a < b; }"));
+		assertEquals("SCRIPT", fileClassifier.fileTypeOf("SCRIPT", "com_lib.js", "var a = '</div>';"));
+	}
 }

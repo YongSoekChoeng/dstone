@@ -50,6 +50,8 @@ public class RuleFile {
 	public final List<ScreenMenu.Rule> screenMenus = new ArrayList<ScreenMenu.Rule>();
 	/** 화면이 서버 주소를 적는 자리(url:). 이 자리의 주소가 진입점 하나와 같으면 HIGH 로 잇는다 */
 	public final List<ScreenUrls.Rule> screenUrls = new ArrayList<ScreenUrls.Rule>();
+	/** 모든 주소 앞에 붙는 글자(baseURL)를 적는 자리(base:). Vue / React 화면의 주소를 진입점과 맞출 때 앞에 붙여 본다 */
+	public final List<ScreenUrls.Rule> screenBases = new ArrayList<ScreenUrls.Rule>();
 	/* jpa: */
 	public final List<Rule.Mark> jpaEntities = new ArrayList<Rule.Mark>();
 	public final List<Rule.Mark> jpaTables = new ArrayList<Rule.Mark>();
@@ -79,7 +81,7 @@ public class RuleFile {
 	public int ruleCount() {
 		return layers.size() + httpEntries.size() + annotationEntries.size() + extendsEntries.size() + xmlEntries.size()
 				+ injects.size() + proxies.size() + sqlCalls.size() + viewCalls.size()
-				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size() + screenUrls.size()
+				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size() + screenUrls.size() + screenBases.size()
 				+ jpaEntities.size() + jpaTables.size() + (jpaNaming == null ? 0 : 1) + jpaQueries.size() + jpaNamedQueries.size()
 				+ jpaRepositories.size() + jpqlMethods.size();
 	}

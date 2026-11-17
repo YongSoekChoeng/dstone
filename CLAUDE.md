@@ -200,7 +200,7 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 
 ### dstone-knowledge: Java Analysis → Knowledge Graph → RAG
 
-Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro 화면 포함)을 분석 모델로 만든 뒤 Knowledge Graph와 RAG 청크로 투영한다. 현재 상태와 마일스톤은 `docs/11.dstone-knowledge.md`.
+Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro, Vue/React 화면 포함)을 분석 모델로 만든 뒤 Knowledge Graph와 RAG 청크로 투영한다. 현재 상태와 마일스톤은 `docs/11.dstone-knowledge.md`.
 
 반드시 지킬 규칙:
 - **패키지**: 분석 코드는 `analysis.passNN.<단계>`(번호 = 실행 순서, 실제 순서는 Pass의 `order()` — 단계를 끼워 넣으면 둘을 같이 맞춘다), 단계 공용 도구는 `analysis.common`, 실행 틀은 `analysis.job`. 임베딩·검색은 `rag`.
@@ -221,7 +221,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro �
 | 파일 | 읽을 때 |
 |---|---|
 | `knowledge-core.md` | 설계 원칙, Job 모델, DECLARE/타입 해석/RESOLVE/LINK/SEMANTIC/RAG Pass, 비Java 리소스, 행 방지, DB 접근 |
-| `knowledge-screens-rich-client.md` | WebSquare/Nexacro 화면, 호출·필드·오픈 규칙, 공통 스크립트, Query XML, 설정 기반 레이어, TRANSACTION 엔드포인트 |
+| `knowledge-screens-rich-client.md` | WebSquare/Nexacro 화면, Vue/React 화면(`SpaLinker`), 호출·필드·오픈 규칙, 공통 스크립트, Query XML, 설정 기반 레이어, TRANSACTION 엔드포인트 |
 | `knowledge-search-incremental.md` | 하이브리드 검색, 영향도 분석, 일반 문서 업로드, `rerunFrom`, 증분 분석, 리비전 비교, 보관 정책 |
 | `knowledge-ui.md` | `dstone-boot`의 Knowledge 화면(첫 화면 대시보드, 프로젝트 · 분석의 2단 + 탭 구성과 미사용 탭 포함), 프록시, 콘솔 디자인, 노드 맵, 테이블 한글명 우선순위 |
 

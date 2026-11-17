@@ -338,6 +338,28 @@ public class SemanticDao extends BaseDao {
 
 	/**
 	 * <pre>
+	 * 진입점 주소, HTTP 메소드와 그것을 처리하는 메소드(Vue / React 화면 → 메소드 연결에 쓴다)
+	 * </pre>
+	 *
+	 * @return [{path, httpMethod, methodId}] - HTTP와 서블릿 진입점
+	 */
+	public List<Map<String, Object>> selectEndpointRoutes(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectEndpointRoutes", revisionId);
+	}
+
+	/**
+	 * <pre>
+	 * 스크립트 파일(language = SCRIPT: .js .ts .vue .jsx .tsx …) 목록. Vue / React 화면이 import 하는 모듈을 경로로 찾는 데 쓴다.
+	 * </pre>
+	 *
+	 * @return [{fileId, path, encoding, fileType}] - 너무 커서 건너뛴 파일은 빼고, 경로 순서
+	 */
+	public List<Map<String, Object>> selectScriptFiles(long revisionId) {
+		return sqlSessionCommon.selectList(NS + "selectScriptFiles", revisionId);
+	}
+
+	/**
+	 * <pre>
 	 * 이 언어의 파일을 file_id 순으로 조금씩 꺼냅니다.
 	 * </pre>
 	 *

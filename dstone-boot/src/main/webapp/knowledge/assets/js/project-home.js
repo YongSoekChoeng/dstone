@@ -234,7 +234,7 @@ var DstoneKnowledgeProjectHome = (function () {
 	}
 
 	/** 화면 종류 · 진입점 종류의 한글 이름 */
-	var SCREEN_TYPES = { JSP: "JSP", WEBSQUARE: "WebSquare", NEXACRO: "Nexacro" };
+	var SCREEN_TYPES = { JSP: "JSP", WEBSQUARE: "WebSquare", NEXACRO: "Nexacro", VUE: "Vue", REACT: "React" };
 	var ENDPOINT_TYPES = { HTTP: "HTTP 주소", JSP: "JSP 직접 호출", MAIN: "main", SERVLET: "서블릿", THREAD: "스레드", SCHEDULE: "스케줄", BATCH: "배치", MESSAGE: "메시지" };
 
 	function renderStructure(structure) {

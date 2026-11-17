@@ -87,7 +87,7 @@
     -->
     <sql id="roleGroup">
         CASE WHEN analysis_file.language = 'JAVA' THEN 'JAVA'
-             WHEN analysis_file.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO', 'NEXACRO_APP', 'SCRIPT') THEN 'SCREEN'
+             WHEN analysis_file.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO', 'NEXACRO_APP', 'VUE', 'REACT', 'SCRIPT') THEN 'SCREEN'
              WHEN analysis_file.file_type IN ('MYBATIS_MAPPER', 'IBATIS_MAPPER', 'QUERY_XML', 'DDL', 'SQL_SCRIPT') THEN 'SQL'
              WHEN analysis_file.file_type IN ('MYBATIS_CONFIG', 'SPRING_XML', 'STRUTS_CONFIG', 'WEB_XML', 'CONFIG', 'BUILD', 'LOG_CONFIG') THEN 'CONFIG'
              ELSE 'OTHER' END

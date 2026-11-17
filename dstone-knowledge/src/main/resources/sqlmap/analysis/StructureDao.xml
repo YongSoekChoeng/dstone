@@ -88,7 +88,7 @@
            AND t.to_external IS NOT NULL
     </select>
 
-    <!-- 화면 파일의 종류별 수(JSP / WEBSQUARE / NEXACRO) -->
+    <!-- 화면 파일의 종류별 수(JSP / WEBSQUARE / NEXACRO / VUE / REACT) -->
     <select id="selectScreenTypes" parameterType="long" resultType="java.util.LinkedHashMap">
         SELECT COALESCE(NULLIF(f.file_type, ''), 'JSP') AS "type"
              , COUNT(*) AS "count"

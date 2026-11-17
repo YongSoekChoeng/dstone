@@ -32,6 +32,7 @@ import net.dstone.knowledge.rag.RagSettings;
  *   Java 파일   → FILE / TYPE / METHOD 문서 (CodeDocumentBuilder)
  *   SQL 매퍼    → statement마다 MAPPER 문서 (ResourceDocumentBuilder)
  *   화면(JSP)   → 파일마다 VIEW 문서 (ResourceDocumentBuilder)
+ *   화면(Vue / React) → 파일마다 VIEW 문서 (ResourceDocumentBuilder). 화면이 아닌 스크립트는 건너뛴다
  *
  * 임베딩 자체는 여기서 하지 않습니다. 임베딩은 가장 오래 걸리는 일이라(청크 하나에 0.5초쯤) 분석 Job과 떼어 두었습니다.
  * 서버 안의 EmbeddingWorker가 대기열을 알아서 비웁니다. 그래서 이 단계는 금방 끝나고,
@@ -188,6 +189,33 @@ public class DocumentPass extends BaseObject implements AnalysisPass {
 
 			@Override
 			public FileResult write(Map<String, Object> file, CodeDocumentBuilder.Result prepared) throws Exception {
+				return save(context, file, prepared, model, dimensions, counts);
+			}
+
+			@Override
+			public void reset() {
+			}
+		});
+
+		// 4) Vue / React 화면: JSP 처럼 파일 하나가 화면 문서 하나다. 화면이 아닌 스크립트(API 모듈, 공통 스크립트)는 건너뛴다.
+		filePassRunner.run(context, NAME, "SCRIPT", new FileHandler<CodeDocumentBuilder.Result>() {
+			@Override
+			public CodeDocumentBuilder.Result prepare(Map<String, Object> file) throws Exception {
+				if (!ResourceDocumentBuilder.isSpaScreen((String) file.get("fileType"))) {
+					return null;
+				}
+				long fileId = ((Number) file.get("fileId")).longValue();
+				byte[] bytes = Files.readAllBytes(root.resolve((String) file.get("path")));
+				String text = encodingDetector.decode(bytes, (String) file.get("encoding"));
+				file.put("screenNames", ragDao.selectScreenNamesByFile(context.getRevisionId(), fileId));
+				return resourceBuilder.buildView(file, text, ragDao.selectViewLinksByFile(context.getRevisionId(), fileId));
+			}
+
+			@Override
+			public FileResult write(Map<String, Object> file, CodeDocumentBuilder.Result prepared) throws Exception {
+				if (prepared == null) {
+					return FileResult.skipped("화면이 아닌 스크립트입니다.");
+				}
 				return save(context, file, prepared, model, dimensions, counts);
 			}
 

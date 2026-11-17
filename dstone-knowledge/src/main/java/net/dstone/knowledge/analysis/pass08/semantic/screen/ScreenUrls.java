@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -23,14 +24,29 @@ import java.util.regex.Pattern;
  *   - 변수(CALL, PROP 만): 그 호출을 감싼 함수 안에서 따옴표 글자를 딱 한 번 대입한 변수.
  *     함수 안에서 대입하지 않았으면 파일 전체에서 딱 한 번 대입한 변수.
  *     매개변수이거나, 두 번 이상 대입했거나, 글자를 이어 붙였으면("/a/" + id + ".do") 모르는 값입니다.
+ *   - 템플릿 글자와 이어 붙인 주소(Vue / React): `/boards/${seq}`, "/boards/" + seq
+ *     글자로 적힌 마디는 그대로, 값이 들어가는 자리는 {} 로 둡니다(/boards/{}). {} 는 진입점의 경로 변수({seq}) 하고만 맞습니다.
+ *     JSP / WebSquare 연결은 진입점 주소와 똑같아야 이으므로 {} 가 든 주소는 거기서 맞을 일이 없습니다.
  * 주소는 ?query 와 #… 를 떼고, 앞에 붙은 컨텍스트 경로 변수(${ctx}, &lt;%= … %&gt;)와 서비스 접두어(svc::)를 뗀 모양입니다.
  * 규칙에 컨텍스트 경로(context: /hi-japan)를 적었으면, 주소가 그 글자로 시작할 때만 떼어 냅니다.
+ * 규칙에 HTTP 메소드(verb: GET)를 적었으면 찾은 주소에 붙여 둡니다. 적지 않은 함수 규칙은 다음 인자의 method: 'POST' 를 읽습니다(fetch).
+ *
+ * baseURL 규칙(screen: 의 base:)은 같은 모양으로 "모든 주소 앞에 붙는 글자"를 찾습니다(findBases).
  * </pre>
  */
 public class ScreenUrls {
 
-	/** 주소처럼 생긴 글자. ScreenScript 의 주소 모양과 같다 */
-	private static final Pattern PATH = Pattern.compile("/[A-Za-z0-9_\\-]+(?:/[A-Za-z0-9_\\-]+)*(?:\\.[A-Za-z0-9]+)?");
+	/** 주소처럼 생긴 글자. ScreenScript 의 주소 모양에 값 자리({})를 더했다 */
+	private static final Pattern PATH = Pattern.compile("/[A-Za-z0-9_\\-{}]+(?:/[A-Za-z0-9_\\-{}]+)*(?:\\.[A-Za-z0-9]+)?");
+
+	/** http://host:port 처럼 주소 앞에 붙은 서버 이름. baseURL 에서 뗀다 */
+	private static final Pattern ORIGIN = Pattern.compile("^[A-Za-z][A-Za-z0-9+.\\-]*://[^/]*");
+
+	/** fetch(url, { method: 'POST' }) 의 HTTP 메소드 */
+	private static final Pattern METHOD_OPTION = Pattern.compile("(?:^|[{,\\s])[\"']?method[\"']?\\s*:\\s*[\"'`]([A-Za-z]+)[\"'`]");
+
+	/** TypeScript 제네릭 호출의 타입 인자. apiClient.get&lt;Board[]&gt;( 의 &lt;Board[]&gt; (한 번 중첩까지) */
+	private static final String TYPE_ARGS = "(?:<[^<>()=;]*(?:<[^<>()=;]*>[^<>()=;]*)*>)?";
 
 	/** 서비스 접두어가 붙은 주소. 예: svc::order/list.do */
 	private static final Pattern PREFIXED = Pattern.compile("^[A-Za-z][A-Za-z0-9_]*::/?(.*)$");
@@ -67,6 +83,8 @@ public class ScreenUrls {
 		private final String at;
 		/** 화면이 주소 앞에 글자로 붙여 쓰는 컨텍스트 경로. 예: /hi-japan. 없으면 null */
 		private String context;
+		/** 이 자리로 부르는 HTTP 메소드(GET, POST …). 규칙에 적지 않았으면 null */
+		private String verb;
 		private final Pattern pattern;
 
 		private Rule(Kind kind, String name, String attribute, int argIndex, String text, String at) {
@@ -78,7 +96,8 @@ public class ScreenUrls {
 			this.at = at;
 			if (kind == Kind.CALL) {
 				// 함수 이름 앞에 다른 이름 글자가 붙으면 다른 함수다(xgfn_Transaction). 점은 괜찮다(this.gfn_Transaction).
-				this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])" + Pattern.quote(name) + "\\s*\\(");
+				// TypeScript 는 이름과 괄호 사이에 타입 인자를 적기도 한다(apiClient.get<Board>(…)).
+				this.pattern = Pattern.compile("(?<![A-Za-z0-9_$])" + Pattern.quote(name) + "\\s*" + TYPE_ARGS + "\\s*\\(");
 			} else if (kind == Kind.PROP) {
 				// 속성 이름은 따옴표로 싸도 된다("url": …). 값은 뒤에서 따로 읽는다.
 				this.pattern = Pattern.compile("(?<![A-Za-z0-9_$.])([\"']?)" + Pattern.quote(name) + "\\1\\s*:(?!:)\\s*");
@@ -138,6 +157,16 @@ public class ScreenUrls {
 			return this;
 		}
 
+		public String getVerb() {
+			return verb;
+		}
+
+		/** 이 자리로 부르는 HTTP 메소드를 정합니다(규칙 파일의 verb:). 이 규칙을 돌려준다 */
+		public Rule withVerb(String verb) {
+			this.verb = verb;
+			return this;
+		}
+
 		/** 컨텍스트 경로를 뗀 주소. 그 경로로 시작하지 않으면 그대로 */
 		String withoutContext(String url) {
 			if (context != null && url.startsWith(context + "/")) {
@@ -148,7 +177,7 @@ public class ScreenUrls {
 
 		/** 똑같은 규칙을 하나만 남길 때 쓰는 열쇠 */
 		public String key() {
-			return kind + "|" + name + "|" + attribute + "|" + argIndex + "|" + context;
+			return kind + "|" + name + "|" + attribute + "|" + argIndex + "|" + context + "|" + verb;
 		}
 	}
 
@@ -159,12 +188,14 @@ public class ScreenUrls {
 		private final String url;
 		private final int index;
 		private final String variable;
+		private final String verb;
 
-		Hit(Rule rule, String url, int index, String variable) {
+		Hit(Rule rule, String url, int index, String variable, String verb) {
 			this.rule = rule;
 			this.url = url;
 			this.index = index;
 			this.variable = variable;
+			this.verb = verb;
 		}
 
 		public Rule getRule() {
@@ -184,6 +215,11 @@ public class ScreenUrls {
 		/** 변수로 넘겨 그 값을 읽었으면 변수 이름. 글자를 바로 적었으면 null */
 		public String getVariable() {
 			return variable;
+		}
+
+		/** HTTP 메소드(GET, POST …). 규칙에도 호출에도 없으면 null(어느 것이든) */
+		public String getVerb() {
+			return verb;
 		}
 	}
 
@@ -292,13 +328,14 @@ public class ScreenUrls {
 					continue;
 				}
 				String written;
+				List<String> args = null;
 				if (rule.kind == Kind.ATTR) {
 					written = m.group(2);
 				} else if (rule.kind == Kind.CALL) {
 					if (isDeclaration(text, m.start())) {
 						continue;
 					}
-					List<String> args = screenScript.arguments(text, m.end(), comments);
+					args = screenScript.arguments(text, m.end(), comments);
 					if (args == null || rule.argIndex >= args.size()) {
 						continue;
 					}
@@ -316,24 +353,201 @@ public class ScreenUrls {
 				String variable = null;
 				// HTML 속성은 정규식이 따옴표를 이미 벗겨 냈다. 나머지는 따옴표 글자인지 본다.
 				String value = rule.kind == Kind.ATTR ? written : literal(written);
-				if (value == null && rule.kind != Kind.ATTR && IDENTIFIER.matcher(written).matches()) {
-					// 2) 변수로 넘겼다. 필요할 때 한 번만 코드 자리와 함수 범위를 모은다.
+				if (value == null && rule.kind != Kind.ATTR) {
+					// 2) 변수, 템플릿 글자, 이어 붙인 글자. 필요할 때 한 번만 코드 자리와 함수 범위를 모은다.
 					if (nonCode == null) {
 						nonCode = scriptFunctions.nonCode(text);
 						scopes = functionScopes(text, nonCode);
 					}
-					value = variableValue(text, nonCode, scopes, written, m.start());
-					variable = value == null ? null : written;
+					if (IDENTIFIER.matcher(written).matches()) {
+						value = variableValue(text, nonCode, scopes, written, m.start());
+						variable = value == null ? null : written;
+					} else {
+						value = composite(text, nonCode, scopes, written, m.start());
+					}
 				}
 				// 3) 주소 모양으로 다듬기
 				String url = normalize(value);
 				if (url != null) {
 					url = rule.withoutContext(url);
-					hits.add(new Hit(rule, url, m.start(), variable));
+					hits.add(new Hit(rule, url, m.start(), variable, verbOf(rule, args)));
 				}
 			}
 		}
 		return hits;
+	}
+
+	/**
+	 * <pre>
+	 * baseURL 규칙(screen: 의 base:)으로 "모든 주소 앞에 붙는 글자"를 찾습니다. 계산할 수 있는 것만 받습니다.
+	 *   baseURL: '/api'                         → /api   (속성 값 하나)
+	 *   baseURL: 'http://localhost:8080/api/'   → /api   (서버 이름과 끝의 / 는 뗀다)
+	 *   fetch(API_BASE + path)                  → /api   (API_BASE 에 '/api' 를 딱 한 번 대입했고, 뒤에 다른 값이 이어질 때)
+	 *   fetch('/api/members')                   → 없음   (주소 하나는 baseURL 이 아니다)
+	 * </pre>
+	 */
+	public List<Hit> findBases(String text, List<Rule> rules) {
+		List<Hit> bases = new ArrayList<Hit>();
+		if (rules == null || rules.isEmpty()) {
+			return bases;
+		}
+		BitSet comments = screenScript.commentMask(text);
+		BitSet nonCode = null;
+		List<int[]> scopes = null;
+		for (int r = 0; r < rules.size(); r++) {
+			Rule rule = rules.get(r);
+			Matcher m = rule.pattern.matcher(text);
+			while (m.find()) {
+				if (comments.get(m.start())) {
+					continue;
+				}
+				String written = writtenAt(text, rule, m, comments);
+				if (written == null) {
+					continue;
+				}
+				if (nonCode == null) {
+					nonCode = scriptFunctions.nonCode(text);
+					scopes = functionScopes(text, nonCode);
+				}
+				String value;
+				if (rule.kind == Kind.ATTR) {
+					value = written;
+				} else if (literal(written) != null) {
+					// 글자 하나: 속성 값이면 baseURL 이고, 함수 인자면 그냥 주소다.
+					value = rule.kind == Kind.PROP ? literal(written) : null;
+				} else if (IDENTIFIER.matcher(written).matches()) {
+					value = rule.kind == Kind.PROP ? variableValue(text, nonCode, scopes, written, m.start()) : null;
+				} else {
+					// 이어 붙인 값: 맨 앞 글자 뒤에 다른 값이 이어지면 그 앞 글자가 baseURL 이다.
+					String joined = composite(text, nonCode, scopes, written, m.start());
+					int hole = joined == null ? -1 : joined.indexOf("${");
+					value = hole > 0 ? joined.substring(0, hole) : null;
+				}
+				String base = baseOf(value);
+				if (base != null) {
+					bases.add(new Hit(rule, base, m.start(), null, null));
+				}
+			}
+		}
+		return bases;
+	}
+
+	/** 규칙이 가리키는 자리에 적힌 글자(따옴표 포함). 읽을 수 없으면 null */
+	private String writtenAt(String text, Rule rule, Matcher m, BitSet comments) {
+		if (rule.kind == Kind.ATTR) {
+			return m.group(2);
+		}
+		if (rule.kind == Kind.CALL) {
+			if (isDeclaration(text, m.start())) {
+				return null;
+			}
+			List<String> args = screenScript.arguments(text, m.end(), comments);
+			return args == null || rule.argIndex >= args.size() ? null : args.get(rule.argIndex);
+		}
+		return startsProperty(text, m.start(), comments) ? valueText(text, m.end()) : null;
+	}
+
+	/** 규칙의 HTTP 메소드. 규칙에 없으면 주소 다음 인자의 method: 값(fetch(url, { method: 'POST' })). 그것도 없으면 null */
+	private String verbOf(Rule rule, List<String> args) {
+		if (rule.verb != null) {
+			return rule.verb;
+		}
+		if (rule.kind != Kind.CALL || args == null || rule.argIndex + 1 >= args.size()) {
+			return null;
+		}
+		Matcher m = METHOD_OPTION.matcher(args.get(rule.argIndex + 1));
+		return m.find() ? m.group(1).toUpperCase(Locale.ROOT) : null;
+	}
+
+	/** baseURL 값을 다듬습니다. http://host 와 끝의 / 를 떼고, 주소 모양(/api)이 아니면 null. / 하나뿐이면 null(붙일 것이 없다) */
+	static String baseOf(String value) {
+		if (value == null) {
+			return null;
+		}
+		String s = ORIGIN.matcher(value.trim()).replaceFirst("");
+		while (s.endsWith("/")) {
+			s = s.substring(0, s.length() - 1);
+		}
+		if (s.length() == 0 || s.indexOf('{') >= 0 || s.indexOf('$') >= 0) {
+			return null;
+		}
+		return PATH.matcher(s).matches() ? s : null;
+	}
+
+	/**
+	 * <pre>
+	 * 템플릿 글자나 + 로 이어 붙인 값을 글자 하나로 만듭니다. 값이 들어가는 곳은 ${…} 로 남깁니다. 읽을 수 없으면 null.
+	 *   `/boards/${seq}`              → /boards/${seq}
+	 *   "/boards/" + seq + "/files"   → /boards/${}/files
+	 *   API_BASE + path               → /api${}   (API_BASE 에 글자를 딱 한 번 대입했을 때)
+	 * 따옴표 글자, 템플릿 글자, 이름(한 번 대입한 변수면 그 글자) 말고는 모두 ${} 입니다.
+	 * </pre>
+	 */
+	private String composite(String text, BitSet nonCode, List<int[]> scopes, String written, int index) {
+		String template = template(written);
+		if (template != null) {
+			return template;
+		}
+		List<String> terms = splitPlus(written.trim());
+		if (terms == null || terms.size() < 2) {
+			return null;
+		}
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < terms.size(); i++) {
+			String term = terms.get(i).trim();
+			String value = literal(term);
+			if (value == null) {
+				value = template(term);
+			}
+			if (value == null && IDENTIFIER.matcher(term).matches()) {
+				value = variableValue(text, nonCode, scopes, term, index);
+			}
+			sb.append(value == null ? "${}" : value);
+		}
+		return sb.toString();
+	}
+
+	/** `…` 하나면 그 안의 글자, 아니면 null */
+	private String template(String written) {
+		String s = written.trim();
+		if (s.length() >= 2 && s.charAt(0) == '`' && s.indexOf('`', 1) == s.length() - 1) {
+			return s.substring(1, s.length() - 1);
+		}
+		return null;
+	}
+
+	/** 맨 바깥의 + 로 나눈 항들. 따옴표·괄호 안의 + 는 나누지 않는다. 짝이 맞지 않으면 null */
+	private List<String> splitPlus(String s) {
+		List<String> terms = new ArrayList<String>();
+		int depth = 0;
+		char quote = 0;
+		int start = 0;
+		for (int i = 0; i < s.length(); i++) {
+			char c = s.charAt(i);
+			if (quote != 0) {
+				if (c == '\\') {
+					i++;
+				} else if (c == quote) {
+					quote = 0;
+				}
+				continue;
+			}
+			if (c == '"' || c == '\'' || c == '`') {
+				quote = c;
+			} else if (c == '(' || c == '[' || c == '{') {
+				depth++;
+			} else if (c == ')' || c == ']' || c == '}') {
+				depth--;
+			} else if (c == '+' && depth == 0) {
+				terms.add(s.substring(start, i));
+				start = i + 1;
+			}
+		}
+		if (quote != 0 || depth != 0) {
+			return null;
+		}
+		terms.add(s.substring(start));
+		return terms;
 	}
 
 	/**
@@ -371,6 +585,11 @@ public class ScreenUrls {
 		if (prefixed.matches()) {
 			s = "/" + prefixed.group(1);
 		}
+		// 가운데의 ${…} 는 값이 들어가는 자리다. {} 로 바꿔 둔다(그 안의 ? 나 # 에서 주소를 자르지 않게 먼저 바꾼다).
+		s = placeholders(s);
+		if (s == null) {
+			return null;
+		}
 		int cut = s.length();
 		int question = s.indexOf('?');
 		int hash = s.indexOf('#');
@@ -385,7 +604,52 @@ public class ScreenUrls {
 			cut = Math.min(cut, semicolon);
 		}
 		s = s.substring(0, cut);
-		return PATH.matcher(s).matches() ? s : null;
+		if (!PATH.matcher(s).matches()) {
+			return null;
+		}
+		// 값 자리는 마디 하나를 통째로 차지할 때만 받는다. "/a/" + id + ".do" 처럼 마디 일부가 값이면 계산할 수 없다.
+		String[] segments = s.split("/");
+		for (int i = 0; i < segments.length; i++) {
+			if (segments[i].indexOf('{') >= 0 && !"{}".equals(segments[i])) {
+				return null;
+			}
+		}
+		return s;
+	}
+
+	/** ${…} 를 {} 로 바꿉니다. 중괄호 짝이 맞지 않으면 null */
+	private static String placeholders(String s) {
+		if (s.indexOf("${") < 0) {
+			return s;
+		}
+		StringBuilder sb = new StringBuilder();
+		int i = 0;
+		while (i < s.length()) {
+			if (!s.startsWith("${", i)) {
+				sb.append(s.charAt(i));
+				i++;
+				continue;
+			}
+			int depth = 0;
+			int j = i + 1;
+			for (; j < s.length(); j++) {
+				char c = s.charAt(j);
+				if (c == '{') {
+					depth++;
+				} else if (c == '}') {
+					depth--;
+					if (depth == 0) {
+						break;
+					}
+				}
+			}
+			if (j >= s.length()) {
+				return null;
+			}
+			sb.append("{}");
+			i = j + 1;
+		}
+		return sb.toString();
 	}
 
 	/** 인자나 값 하나가 따옴표 글자 하나면 그 내용, 아니면 null */
@@ -421,7 +685,7 @@ public class ScreenUrls {
 		}
 		char c = text.charAt(i);
 		int end;
-		if (c == '"' || c == '\'') {
+		if (c == '"' || c == '\'' || c == '`') {
 			end = text.indexOf(c, i + 1);
 			int newline = text.indexOf('\n', i + 1);
 			if (end < 0 || (newline >= 0 && newline < end)) {

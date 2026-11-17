@@ -200,7 +200,7 @@
     </select>
 
     <!--
-        화면(JSP, WebSquare, Nexacro): 다른 화면이 열거나 포함하지 않고(INCLUDES), 컨트롤러가 보여 주지 않고(RENDERS),
+        화면(JSP, WebSquare, Nexacro, Vue, React): 다른 화면이 열거나 포함하지 않고(INCLUDES), 컨트롤러가 보여 주지 않고(RENDERS),
         JSP 진입점도 아니고, 메뉴에도 없는 화면.
     -->
     <select id="selectScreenCandidates" parameterType="long" resultType="java.util.LinkedHashMap">
@@ -214,7 +214,7 @@
                  LIMIT 1) AS "title"
           FROM analysis_file f
          WHERE f.revision_id = #{revisionId}
-           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO')
+           AND f.file_type IN ('JSP', 'WEBSQUARE', 'NEXACRO', 'VUE', 'REACT')
            AND f.path NOT LIKE '%src/test/%'
            AND NOT EXISTS (
                 SELECT 1 FROM analysis_relation r

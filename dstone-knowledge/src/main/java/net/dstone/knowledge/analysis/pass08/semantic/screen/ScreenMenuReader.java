@@ -40,7 +40,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 public class ScreenMenuReader implements SemanticStep {
 
 	/** 메뉴의 화면 경로가 가리킬 수 있는 화면 종류(analysis_file.file_type) */
-	private static final List<String> SCREEN_TYPES = Arrays.asList("JSP", "WEBSQUARE", "NEXACRO");
+	private static final List<String> SCREEN_TYPES = Arrays.asList("JSP", "WEBSQUARE", "NEXACRO", "VUE", "REACT");
 
 	/** 메뉴 목록이 들어 있을 수 있는 파일의 언어(analysis_file.language) */
 	private static final List<String> MENU_LANGUAGES = Arrays.asList("JSP", "XML");

@@ -505,6 +505,26 @@
            AND path IS NOT NULL
     </select>
 
+    <!-- 진입점 주소와 HTTP 메소드(GET / POST … / ALL). Vue / React 화면은 같은 주소의 GET 과 POST 를 가려서 잇는다 -->
+    <select id="selectEndpointRoutes" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT path AS "path", http_method AS "httpMethod", method_id AS "methodId"
+          FROM analysis_endpoint
+         WHERE revision_id = #{revisionId}
+           AND endpoint_type IN ('HTTP', 'SERVLET')
+           AND method_id IS NOT NULL
+           AND path IS NOT NULL
+    </select>
+
+    <!-- 스크립트 파일 목록(.js .ts .vue .jsx .tsx …). Vue / React 화면이 import 하는 모듈을 경로로 찾는다 -->
+    <select id="selectScriptFiles" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT file_id AS "fileId", path AS "path", encoding AS "encoding", file_type AS "fileType"
+          FROM analysis_file
+         WHERE revision_id = #{revisionId}
+           AND language = 'SCRIPT'
+           AND parse_status &lt;&gt; 'SKIPPED'
+         ORDER BY path
+    </select>
+
     <select id="selectFilePage" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
         SELECT file_id AS "fileId", path AS "path", encoding AS "encoding"
           FROM analysis_file

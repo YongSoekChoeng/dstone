@@ -137,6 +137,8 @@ var DstoneKnowledgeTerms = (function () {
 		WEBSQUARE: "WebSquare 화면 (XML)",
 		NEXACRO: "Nexacro / X-Platform 화면 (.xfdl)",
 		NEXACRO_APP: "Nexacro / X-Platform 애플리케이션 정의 (.xadl)",
+		VUE: "Vue 화면 (.vue)",
+		REACT: "React 화면 (.jsx, .tsx)",
 		MYBATIS_MAPPER: "MyBatis SQL 매퍼",
 		IBATIS_MAPPER: "iBATIS SQL 매퍼",
 		QUERY_XML: "쿼리 XML (JEF 계열 프레임워크의 document / query / statement)",
@@ -149,7 +151,7 @@ var DstoneKnowledgeTerms = (function () {
 		LOG_CONFIG: "로그 설정",
 		DDL: "DDL 스크립트 (.sql. 테이블 / 컬럼 설명을 읽는다)",
 		SQL_SCRIPT: "그 밖의 SQL 스크립트 (.sql. 읽지 않는다)",
-		SCRIPT: "화면 공통 스크립트 (.js, .xjs. 공통 함수가 여는 화면을 찾는 데만 쓴다)",
+		SCRIPT: "스크립트 (.js, .ts, .xjs. 화면 공통 함수, Vue / React 화면이 import 하는 API 모듈·훅)",
 		XML: "그 밖의 XML"
 	};
 

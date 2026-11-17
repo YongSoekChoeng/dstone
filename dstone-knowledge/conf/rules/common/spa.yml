@@ -1,0 +1,19 @@
+# Vue / React 화면이 서버를 부르는 모양. 이런 코드가 없는 프로젝트에서는 아무 일도 하지 않는다.
+# 화면이 import 하는 API 모듈, 훅, 컴포저블, 스토어 안의 호출도 SpaLinker 가 import 를 따라가 찾는다.
+# 받는 객체(axios. http. apiClient. this.$http.)는 보지 않는다. 마지막 이름과 괄호만 맞으면 된다.
+# 이 모양은 JSP · WebSquare 화면에도 쓴다($.get('/a.do') 처럼 주소가 진입점과 똑같을 때만 잇는다).
+description: Vue / React 화면이 서버 주소를 적는 자리(axios, fetch 와 그 래퍼)와 baseURL
+
+screen:
+  # http.get('/sample/boards'), axios.get(`/sample/boards/${seq}`), apiClient.get<Board[]>('/sample/boards')
+  - { url: axios.get(URL), verb: GET }
+  - { url: axios.post(URL), verb: POST }
+  - { url: axios.put(URL), verb: PUT }
+  - { url: axios.patch(URL), verb: PATCH }
+  - { url: axios.delete(URL), verb: DELETE }
+  # fetch('/api/members', { method: 'POST' }). HTTP 메소드는 둘째 인자의 method 로 읽는다
+  - url: fetch(URL)
+  # axios.create({ baseURL: '/api' }). 주소를 진입점과 맞출 때 앞에 붙여 본다
+  - base: "baseURL: URL"
+  # fetch(API_BASE + path). 이어 붙인 주소의 맨 앞 글자(한 번만 대입한 변수의 값)
+  - base: fetch(URL)

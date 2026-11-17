@@ -30,6 +30,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFile;
 import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFiles;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.JspLinker;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenLinker;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.SpaLinker;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenMenuReader;
 import net.dstone.knowledge.analysis.pass08.semantic.sql.DbCatalogStep;
 import net.dstone.knowledge.analysis.pass08.semantic.sql.JavaSqlLinker;
@@ -80,6 +81,7 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 	@Autowired private ViewLinker viewLinker;
 	@Autowired private JspLinker jspLinker;
 	@Autowired private ScreenLinker screenLinker;
+	@Autowired private SpaLinker spaLinker;
 	@Autowired private ScreenMenuReader screenMenuReader;
 	@Autowired private SourceNamePlugin sourceNamePlugin;
 	@Autowired private MethodTitlePlugin methodTitlePlugin;
@@ -123,6 +125,7 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 			| 10  | ViewLinker             | view            | 메소드 → JSP(RENDERS). 화면 연결은 입구가 다 만들어진 뒤 
 			| 11  | JspLinker              |                 | JSP → 메소드(REQUESTS), JSP → JSP(INCLUDES), JSP 화면명.
 			| 12  | ScreenLinker           | screen          | WebSquare·Nexacro 화면 → 메소드·화면, 거래 입구, 화면명.
+			| 12.5| SpaLinker              | screen > url, base | Vue·React 화면 → 메소드(import 를 따라간 호출 포함)·화면.
 			| 13  | ScreenMenuReader       | screen > menu   | 메뉴 목록에서 화면명. 화면 파일의 제목이 먼저
 			| 14  | SourceNamePlugin       |                 | Java 소스에서 테이블·컬럼 한글명. SQL에 쓰인 컬럼이 다 모인 뒤
 			| 15  | MethodTitlePlugin      |                 | 메소드 기능명.
@@ -152,6 +155,7 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 			viewLinker, 
 			jspLinker, 
 			screenLinker, 
+			spaLinker,
 			screenMenuReader,
 			// 6) 이름 사전. SQL 에서 쓰인 컬럼과 화면 제목이 다 모인 뒤에 돈다.
 			sourceNamePlugin, 
@@ -386,6 +390,16 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 		|     |                        |               |                         <입력> analysis_endpoint <입력>
 		|     |                        |               |   ScreenLinker.saveRuleStatus() - ID를 글자로 적지 않은 호출 통계 → insertSemanticResource(SEMANTIC_STATUS, SCREEN_RULES)
 		|     |                        |               |                         <입력> analysis_resource <입력>
+		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		| 12.5| SpaLinker              | screen > url, | SpaLinker.run()                                                                   * Vue·React 화면 → 메소드(REQUESTS), 화면·스크립트 → 화면(INCLUDES).
+		|     |                        |   base        |   SemanticDao.selectScriptFiles() - .js .ts .vue .jsx .tsx 목록 (VUE·REACT 화면이 없으면 끝)
+		|     |                        |               |   화면이 아닌 스크립트마다: ScreenUrls.findBases() - baseURL / SpaModules.parse() → linkIncludes()
+		|     |                        |               |   SemanticDao.selectEndpointRoutes() → SpaEndpoints - 주소·HTTP 메소드·경로 변수로 맞출 진입점
+		|     |                        |               |   화면마다 linkScreen():
+		|     |                        |               |     ScreenUrls.find() - 화면에 바로 적힌 호출 → linkRequest() (via URL_RULE)
+		|     |                        |               |     linkIncludes() - import 한 다른 화면 (via IMPORT)
+		|     |                        |               |     SpaModules.uses() → resolveImport() → collect() - 쓰는 import 를 따라간 호출 → linkRequest() (via IMPORT)
+		|     |                        |               |                         <입력> analysis_relation (REQUESTS, INCLUDES) <입력>
 		-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 		| 13  | ScreenMenuReader       | screen > menu | ScreenMenuReader.run()                                                            * 메뉴 목록에서 화면명. 화면 파일의 제목이 먼저다.
 		|     |                        |               |   ProjectRules.screenMenus() - 없으면 끝
