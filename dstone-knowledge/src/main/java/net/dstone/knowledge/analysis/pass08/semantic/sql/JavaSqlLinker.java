@@ -16,6 +16,7 @@ import net.dstone.knowledge.api.dao.ResourceDao;
 import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.common.util.TableName;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
+import net.dstone.knowledge.analysis.common.DbCatalog;
 import net.dstone.knowledge.analysis.common.SqlTableExtractor;
 import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
@@ -75,6 +76,8 @@ public class JavaSqlLinker implements SemanticStep {
 		for (int i = 0; i < written.size(); i++) {
 			tempTables.add(TableName.bare(written.get(i)));
 		}
+		// DB 에서 읽어 둔 테이블 정의(없으면 DDL). SELECT * 를 펴는 데 쓴다(MapperLinker 와 같다).
+		DbCatalog catalog = resourceDao.selectCatalog(revisionId);
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
@@ -87,7 +90,7 @@ public class JavaSqlLinker implements SemanticStep {
 				afterId = ((Number) statement.get("mapperId")).longValue();
 				statements++;
 				String language = languageOf(statement, jpqlCalls);
-				int added = linkTables(revisionId, statement, language, entities, unknownEntities, tempTables);
+				int added = linkTables(revisionId, statement, language, entities, unknownEntities, tempTables, catalog);
 				tables += added;
 				if (added == 0) {
 					noTable++;
@@ -126,7 +129,7 @@ public class JavaSqlLinker implements SemanticStep {
 	 * @return 만든 테이블 관계 수
 	 */
 	private int linkTables(long revisionId, Map<String, Object> statement, String language, JpaEntities entities, Set<String> unknownEntities
-			, Set<String> tempTables) {
+			, Set<String> tempTables, DbCatalog catalog) {
 		String from = "S" + statement.get("mapperId");
 		Object fileId = statement.get("fileId");
 		Object line = statement.get("lineStart");
@@ -160,26 +163,13 @@ public class JavaSqlLinker implements SemanticStep {
 			return count;
 		}
 		// SQL: 테이블마다 CRUD, 쓴 컬럼, SQL 주석에 적힌 한글명을 덧붙여 남긴다.
-		List<SqlTableExtractor.TableUse> uses = tableExtractor.extract(sql, (String) statement.get("statementType"));
+		List<SqlTableExtractor.TableUse> uses = SqlTableExtractor.applyCatalog(tableExtractor.extract(sql, (String) statement.get("statementType")), catalog);
 		for (int i = 0; i < uses.size(); i++) {
 			SqlTableExtractor.TableUse use = uses.get(i);
 			if (use.system || tempTables.contains(use.table)) {
 				continue;
 			}
-			Map<String, Object> properties = new LinkedHashMap<String, Object>();
-			properties.put("crud", use.crud);
-			if (!SqlTableExtractor.VIA_PARSER.equals(use.via)) {
-				// PATTERN(정규식) / DRUID. 둘 다 컬럼은 읽지 않는다.
-				properties.put("via", use.via);
-			} else {
-				properties.put("columns", use.columns);
-			}
-			if (!use.columnComments.isEmpty()) {
-				properties.put("columnComments", use.columnComments);
-			}
-			if (use.tableComment != null) {
-				properties.put("tableComment", use.tableComment);
-			}
+			Map<String, Object> properties = use.properties();
 			resourceDao.insertRelation(relation(revisionId, "SQL", from, "R".equals(use.crud) ? "READS_TABLE" : "WRITES_TABLE", "TABLE", null, use.table
 					, use.guessed ? "MEDIUM" : "HIGH", use.guessed ? "HEURISTIC" : "RESOLVED", properties, fileId, line));
 			count++;

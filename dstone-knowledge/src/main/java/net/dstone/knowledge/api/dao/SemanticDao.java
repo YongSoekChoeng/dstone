@@ -557,6 +557,44 @@ public class SemanticDao extends BaseDao {
 
 	/**
 	 * <pre>
+	 * 파일과 상관없는 analysis_resource 행 여러 개를 한 번에 넣습니다(DB 에서 읽은 테이블 · 컬럼 정의).
+	 * 행마다 resourceType, name, location, value, properties(Map) 를 넣어 둡니다.
+	 * </pre>
+	 */
+	public void insertResources(long revisionId, List<Map<String, Object>> rows) {
+		List<Map<String, Object>> params = new ArrayList<Map<String, Object>>();
+		for (int i = 0; i < rows.size(); i++) {
+			Map<String, Object> row = rows.get(i);
+			Map<String, Object> param = new HashMap<String, Object>(row);
+			@SuppressWarnings("unchecked")
+			Map<String, Object> properties = (Map<String, Object>) row.get("properties");
+			param.put("propertiesJson", JsonText.of(properties == null ? new HashMap<String, Object>() : properties));
+			params.add(param);
+		}
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("rows", params);
+		sqlSessionCommon.insert(NS + "insertResources", param);
+	}
+
+	/**
+	 * <pre>
+	 * DB 접속 하나의 테이블 · 컬럼 정의를 이 프로젝트의 가장 최근 READY 리비전에서 물려받습니다(이번에 붙지 못했을 때).
+	 * </pre>
+	 *
+	 * @param source DB 접속 이름
+	 * @return 물려받은 행 수(테이블 + 컬럼). 0 이면 물려받을 것이 없었다
+	 */
+	public int inheritDbCatalog(long revisionId, String projectId, String source) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("revisionId", revisionId);
+		param.put("projectId", projectId);
+		param.put("source", source);
+		return sqlSessionCommon.insert(NS + "inheritDbCatalog", param);
+	}
+
+	/**
+	 * <pre>
 	 * SEMANTIC 이 만든 analysis_resource 행 하나를 남깁니다(기능명, 사전에서 찾은 이름, 플러그인 상태).
 	 * </pre>
 	 *

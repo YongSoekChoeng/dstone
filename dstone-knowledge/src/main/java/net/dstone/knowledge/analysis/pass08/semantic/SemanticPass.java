@@ -31,6 +31,7 @@ import net.dstone.knowledge.analysis.pass08.semantic.rule.RuleFiles;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.JspLinker;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenLinker;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenMenuReader;
+import net.dstone.knowledge.analysis.pass08.semantic.sql.DbCatalogStep;
 import net.dstone.knowledge.analysis.pass08.semantic.sql.JavaSqlLinker;
 import net.dstone.knowledge.analysis.pass08.semantic.sql.JpaQueryReader;
 import net.dstone.knowledge.analysis.pass08.semantic.sql.MapperLinker;
@@ -71,6 +72,7 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 	@Autowired private LayerResolver layerResolver;
 	@Autowired private EntryFinder entryFinder;
 	@Autowired private WiringMarker wiringMarker;
+	@Autowired private DbCatalogStep dbCatalogStep;
 	@Autowired private JpaQueryReader jpaQueryReader;
 	@Autowired private MapperLinker mapperLinker;
 	@Autowired private SqlLinker sqlLinker;
@@ -113,6 +115,7 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 			| 3   | LayerResolver          | layer           | 클래스의 계층. 입구보다 먼저. 상위 클래스의 주소를 물려받는 컨트롤러를 알아보려고 
 			| 4   | EntryFinder            | entry           | 애노테이션·상속·설정 XML로 입구, main(), 바로 열리는 JSP. 화면 연결보다 먼저(화면 글자와 견줄 주소가 있어야 한다)
 			| 5   | WiringMarker           | inject, proxy   | 주입 관계, 프록시가 끼는 메소드.
+			| 5.5 | DbCatalogStep          |                 | 등록한 DB 접속에서 테이블·컬럼 정의를 읽어 리비전에 남긴다(DB_TABLE·DB_COLUMN). SQL 연결보다 먼저
 			| 6   | JpaQueryReader         | jpa             | JPA 쿼리를 statement로. MapperLinker보다 먼저(이름 있는 쿼리를 이름으로 찾게)
 			| 7   | MapperLinker           |                 | SQL 관계를 모두 지우고, 매퍼 인터페이스 방식 연결과 매퍼 SQL → 테이블.
 			| 8   | SqlLinker              | sql             | 호출 인자로 SQL 이름을 계산해 메소드 → statement. MapperLinker 다음.
@@ -137,8 +140,10 @@ public class SemanticPass extends BaseObject implements AnalysisPass {
 			// 3) 입구와 주입 · 프록시.
 			entryFinder, 
 			wiringMarker,
-			// 4) SQL. JPA statement 를 먼저 만들고, MapperLinker 가 SQL 관계를 지운 뒤 다시 만든다.
+			// 4) SQL. DB 에서 테이블 정의를 먼저 읽어 둔다(SELECT * 펴기 등에 쓴다).
+			//    JPA statement 를 먼저 만들고, MapperLinker 가 SQL 관계를 지운 뒤 다시 만든다.
 			//    SqlLinker 가 이름 있는 JPA 쿼리(createNamedQuery)까지 잇고, JavaSqlLinker 가 Java 문자열 SQL · JPA 를 테이블과 잇는다.
+			dbCatalogStep,
 			jpaQueryReader, 
 			mapperLinker, 
 			sqlLinker, 

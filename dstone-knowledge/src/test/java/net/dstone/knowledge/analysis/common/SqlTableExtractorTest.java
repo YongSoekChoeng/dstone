@@ -292,6 +292,108 @@ public class SqlTableExtractorTest {
 		assertTrue(!anyGuessed(uses));
 	}
 
+	@Test
+	public void 모든_컬럼을_쓰는_SQL은_테이블_정의_목록으로_편다() {
+		DbCatalog catalog = catalog("DB_COLUMN", "TB_ORDER", "ORDER_ID", "DB_COLUMN", "TB_ORDER", "AMOUNT", "DB_COLUMN", "TB_ITEM", "ITEM_ID");
+
+		// SELECT * : 목록의 컬럼을 모두 더한다. WHERE 에 쓴 것도 그대로 둔다.
+		SqlTableExtractor.TableUse star = only(SqlTableExtractor.applyCatalog(
+				extractor.extract("SELECT * FROM TB_ORDER WHERE ORDER_ID = #{id}", "SELECT"), catalog));
+		assertEquals("[AMOUNT, ORDER_ID]", star.columns.toString());
+		assertEquals("DB", star.properties().get("allColumns"));
+
+		// 별칭.* 은 그 별칭의 테이블만
+		List<SqlTableExtractor.TableUse> aliased = SqlTableExtractor.applyCatalog(extractor.extract(
+				"SELECT o.*, i.ITEM_ID FROM TB_ORDER o JOIN TB_ITEM i ON i.ITEM_ID = o.ORDER_ID", "SELECT"), catalog);
+		assertEquals("DB", find(aliased, "TB_ORDER").allColumnsFrom);
+		assertEquals(null, find(aliased, "TB_ITEM").allColumnsFrom);
+
+		// 컬럼 목록 없는 INSERT 는 대상의 모든 컬럼
+		SqlTableExtractor.TableUse insert = only(SqlTableExtractor.applyCatalog(
+				extractor.extract("INSERT INTO TB_ORDER VALUES (#{id}, #{amount})", "INSERT"), catalog));
+		assertEquals("[AMOUNT, ORDER_ID]", insert.columns.toString());
+
+		// COUNT(*) 는 모든 컬럼이 아니다
+		assertEquals(null, only(SqlTableExtractor.applyCatalog(extractor.extract("SELECT COUNT(*) FROM TB_ORDER", "SELECT"), catalog)).allColumnsFrom);
+
+		// 목록이 없으면 펴지 못했다고 남긴다(영향도가 "컬럼을 모름"으로 다룬다)
+		SqlTableExtractor.TableUse unknown = only(SqlTableExtractor.applyCatalog(
+				extractor.extract("SELECT * FROM TB_ORDER WHERE ORDER_ID = #{id}", "SELECT"), DbCatalog.empty()));
+		assertEquals("[ORDER_ID]", unknown.columns.toString());
+		assertEquals("UNKNOWN", unknown.properties().get("allColumns"));
+	}
+
+	@Test
+	public void 별칭_없는_컬럼은_그것을_가진_테이블이_하나일_때만_주인으로_정한다() {
+		DbCatalog catalog = catalog("DB_COLUMN", "TB_ORDER", "ORDER_ID", "DB_COLUMN", "TB_ORDER", "REG_DT"
+				, "DB_COLUMN", "TB_ITEM", "ITEM_NM", "DB_COLUMN", "TB_ITEM", "REG_DT");
+		List<SqlTableExtractor.TableUse> uses = SqlTableExtractor.applyCatalog(extractor.extract(
+				"SELECT ITEM_NM, REG_DT FROM TB_ORDER o, TB_ITEM i WHERE o.ORDER_ID = i.ITEM_ID", "SELECT"), catalog);
+
+		// ITEM_NM 은 TB_ITEM 에만 있다. REG_DT 는 둘 다 있어서 정하지 않는다.
+		assertTrue(find(uses, "TB_ITEM").columns.contains("ITEM_NM"));
+		assertEquals("[ITEM_NM]", find(uses, "TB_ITEM").ownedColumns.toString());
+		assertTrue(!find(uses, "TB_ORDER").columns.contains("REG_DT"));
+		assertTrue(!find(uses, "TB_ITEM").columns.contains("REG_DT"));
+
+		// 목록에 없는 테이블이 끼어 있으면 아무것도 정하지 않는다
+		List<SqlTableExtractor.TableUse> partly = SqlTableExtractor.applyCatalog(extractor.extract(
+				"SELECT ITEM_NM FROM TB_ITEM i, TB_OTHER t WHERE i.ITEM_ID = t.ITEM_ID", "SELECT"), catalog);
+		assertTrue(find(partly, "TB_ITEM").ownedColumns.isEmpty());
+	}
+
+	@Test
+	public void DB_목록이_있으면_없는_테이블과_컬럼을_표시하고_DDL만_있으면_표시하지_않는다() {
+		DbCatalog db = catalog("DB_COLUMN", "TB_ORDER", "ORDER_ID");
+		List<SqlTableExtractor.TableUse> uses = SqlTableExtractor.applyCatalog(extractor.extract(
+				"SELECT o.ORDER_ID, o.ORDR_NM, g.X FROM TB_ORDER o JOIN TB_GONE g ON g.ID = o.ORDER_ID", "SELECT"), db);
+		assertEquals("[ORDR_NM]", find(uses, "TB_ORDER").unknownColumns.toString());
+		assertTrue(find(uses, "TB_GONE").dbMissing);
+
+		DbCatalog ddl = catalog("DDL_COLUMN", "TB_ORDER", "ORDER_ID");
+		List<SqlTableExtractor.TableUse> byDdl = SqlTableExtractor.applyCatalog(extractor.extract(
+				"SELECT * FROM TB_GONE", "SELECT"), ddl);
+		assertTrue(!find(byDdl, "TB_GONE").dbMissing);
+	}
+
+	@Test
+	public void 테이블_정의는_DB가_DDL보다_먼저이고_먼저_등록한_접속이_이긴다() {
+		DbCatalog catalog = catalog("DDL_COLUMN", "TB_ORDER", "OLD_COL", "DB_COLUMN", "TB_ORDER", "ORDER_ID"
+				, "DB_COLUMN#second", "TB_ORDER", "OTHER_COL", "DDL_COLUMN", "TB_DDL_ONLY", "A");
+		assertEquals("[ORDER_ID]", catalog.columnsOf("TB_ORDER").toString());
+		assertEquals("DB", catalog.sourceOf("TB_ORDER"));
+		assertEquals("DDL", catalog.sourceOf("TB_DDL_ONLY"));
+	}
+
+	/** (종류[#접속], 테이블, 컬럼) 셋씩. 접속 이름을 안 적으면 first */
+	private DbCatalog catalog(String... values) {
+		List<java.util.Map<String, Object>> rows = new ArrayList<java.util.Map<String, Object>>();
+		for (int i = 0; i + 2 < values.length; i += 3) {
+			java.util.Map<String, Object> row = new java.util.HashMap<String, Object>();
+			String[] type = values[i].split("#");
+			row.put("resourceType", type[0]);
+			row.put("location", type[0].startsWith("DB_") ? (type.length > 1 ? type[1] : "first") : null);
+			row.put("table", values[i + 1]);
+			row.put("column", values[i + 2]);
+			rows.add(row);
+		}
+		return DbCatalog.of(rows);
+	}
+
+	private SqlTableExtractor.TableUse only(List<SqlTableExtractor.TableUse> uses) {
+		assertEquals(1, uses.size());
+		return uses.get(0);
+	}
+
+	private SqlTableExtractor.TableUse find(List<SqlTableExtractor.TableUse> uses, String table) {
+		for (int i = 0; i < uses.size(); i++) {
+			if (uses.get(i).table.equals(table)) {
+				return uses.get(i);
+			}
+		}
+		throw new AssertionError(table + " 이 없습니다: " + textOf(uses));
+	}
+
 	/** 순서와 상관없이 비교하려고 "테이블:종류"를 이름순으로 늘어놓습니다. */
 	private String textOf(List<SqlTableExtractor.TableUse> uses) {
 		List<String> texts = new ArrayList<String>();

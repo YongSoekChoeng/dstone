@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Repository;
 
+import net.dstone.knowledge.analysis.common.DbCatalog;
 import net.dstone.knowledge.common.biz.BaseDao;
 
 /**
@@ -74,6 +75,16 @@ public class ResourceDao extends BaseDao {
 	/** choose 가지마다 편 SQL 본문(가지 순서대로). 없으면 빈 목록 */
 	public List<String> selectChooseVariants(long mapperId) {
 		return sqlSessionCommon.selectList(NS + "selectChooseVariants", mapperId);
+	}
+
+	/**
+	 * <pre>
+	 * 테이블 정의 목록. DB 에서 읽어 둔 것(SEMANTIC 의 dbCatalog 처리기)과 DDL 파일의 것을 합칩니다(DB 가 먼저).
+	 * </pre>
+	 */
+	public DbCatalog selectCatalog(long revisionId) {
+		List<Map<String, Object>> rows = sqlSessionCommon.selectList(NS + "selectCatalogRows", revisionId);
+		return DbCatalog.of(rows);
 	}
 
 	/** 이 리비전의 SQL이 CREATE TEMP TABLE 로 만드는 임시 테이블의 이름(적힌 그대로) */

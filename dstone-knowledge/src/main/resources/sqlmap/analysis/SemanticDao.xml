@@ -92,7 +92,7 @@
          WHERE revision_id = #{revisionId}
            AND resource_type IN ('SERVLET_MAPPING', 'FILTER_MAPPING', 'LISTENER', 'SOURCE_NAME', 'SOURCE_TABLE_NAME', 'SCREEN_NAME'
                                , 'METHOD_TITLE', 'METHOD_TITLE_SKIP', 'DICT_SCREEN_NAME', 'DICT_TABLE_NAME', 'DICT_COLUMN_NAME', 'SEMANTIC_STATUS'
-                               , 'RULE_SET')
+                               , 'RULE_SET', 'DB_TABLE', 'DB_COLUMN')
     </delete>
 
     <delete id="deleteInjects" parameterType="long">
@@ -288,6 +288,36 @@
         VALUES
             (#{revisionId}, #{endpointType}, #{httpMethod}, #{path}, #{symbolId}, #{methodId}
             , CAST(#{propertiesJson} AS jsonb), #{fileId}, #{lineStart, jdbcType=INTEGER})
+    </insert>
+
+    <!-- 여러 행을 한 번에(DB 에서 읽은 테이블 · 컬럼 정의). rows 의 각 항목은 insertResource 와 같은 키 -->
+    <insert id="insertResources" parameterType="java.util.Map">
+        INSERT INTO analysis_resource
+            (revision_id, resource_type, name, location, value, properties_json, file_id, line_start)
+        VALUES
+        <foreach collection="rows" item="r" separator=",">
+            (#{revisionId}, #{r.resourceType}, #{r.name, jdbcType=VARCHAR}, #{r.location, jdbcType=VARCHAR}, #{r.value, jdbcType=VARCHAR}
+            , CAST(#{r.propertiesJson} AS jsonb), NULL, NULL)
+        </foreach>
+    </insert>
+
+    <!-- DB 접속 하나의 테이블 · 컬럼 정의를, 이 프로젝트에서 가장 최근에 끝난(READY) 다른 리비전에서 물려받는다.
+         이번에 그 DB 에 붙지 못했을 때 쓴다. inheritedFrom = 처음 읽은 리비전(물려받은 것을 또 물려받아도 바뀌지 않는다) -->
+    <insert id="inheritDbCatalog" parameterType="java.util.Map">
+        INSERT INTO analysis_resource
+            (revision_id, resource_type, name, location, value, properties_json, file_id, line_start)
+        SELECT #{revisionId}, r.resource_type, r.name, r.location, r.value
+             , r.properties_json || jsonb_build_object('inheritedFrom', COALESCE(CAST(r.properties_json->>'inheritedFrom' AS BIGINT), r.revision_id))
+             , NULL, NULL
+          FROM analysis_resource r
+         WHERE r.revision_id = (SELECT max(v.revision_id)
+                                  FROM analysis_revision v
+                                 WHERE v.project_id = #{projectId}
+                                   AND v.status = 'READY'
+                                   AND v.revision_id &lt;&gt; #{revisionId})
+           AND r.resource_type IN ('DB_TABLE', 'DB_COLUMN')
+           AND r.location = #{source}
+         ORDER BY r.resource_id
     </insert>
 
     <insert id="insertResource" parameterType="java.util.Map">

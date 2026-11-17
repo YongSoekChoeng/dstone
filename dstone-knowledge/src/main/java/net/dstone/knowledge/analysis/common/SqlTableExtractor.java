@@ -28,6 +28,8 @@ import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.merge.Merge;
+import net.sf.jsqlparser.statement.select.AllColumns;
+import net.sf.jsqlparser.statement.select.AllTableColumns;
 import net.sf.jsqlparser.statement.select.FromItem;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.PlainSelect;
@@ -67,6 +69,11 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
  *        , tbsy_auth tb2   /* 권한 *&#47;                → TBSY_AUTH = 권한 (FROM 을 앞줄에 쓰거나 쉼표로 늘어놓은 테이블도)
  * 한글이 들어 있는 주석만, 그리고 어느 테이블(컬럼)의 것인지 확실할 때만 넣습니다.
  * "식 AS 별칭 /* 설명 *&#47;" 처럼 별칭을 설명한 주석은 테이블 컬럼의 것이 아니라서 뺍니다.
+ *
+ * SQL 글만으로는 알 수 없는 컬럼이 두 가지 있습니다. 이것은 표시만 해 두고, 테이블 정의 목록(DbCatalog)이 있으면
+ * applyCatalog() 가 채웁니다.
+ *   - "모든 컬럼": SELECT *, A.*, 컬럼 목록 없는 INSERT                     → allColumns
+ *   - 테이블이 둘 이상인 FROM 에서 별칭 없이 적은 컬럼(SELECT NM FROM A, B)   → unowned
  * </pre>
  */
 public class SqlTableExtractor {
@@ -180,6 +187,24 @@ public class SqlTableExtractor {
 		/** SQL 주석에 적힌 이 테이블의 한글명. 없으면 null */
 		public final String tableComment;
 
+		/** SELECT * · 별칭.* · 컬럼 목록 없는 INSERT 처럼 이 테이블의 "모든 컬럼"을 쓴다 */
+		public boolean allColumns;
+
+		/** 테이블이 둘 이상인 FROM 에서 별칭 없이 적은 컬럼 가운데 이 테이블도 주인 후보인 것 */
+		public List<Unowned> unowned = new ArrayList<Unowned>();
+
+		/** applyCatalog 가 정한 것: 모든 컬럼을 채운 출처(DB / DDL). 목록에 이 테이블이 없어 못 채웠으면 UNKNOWN. allColumns 가 아니면 null */
+		public String allColumnsFrom;
+
+		/** applyCatalog 가 주인을 정해 더한 컬럼(별칭 없이 적은 것) */
+		public List<String> ownedColumns = new ArrayList<String>();
+
+		/** applyCatalog 가 정한 것: DB 목록을 읽었는데 이 테이블이 없다(오타, 시노님, 다른 스키마 등) */
+		public boolean dbMissing;
+
+		/** applyCatalog 가 정한 것: DB 에 있는 테이블인데 그 테이블에 없는 컬럼 */
+		public List<String> unknownColumns = new ArrayList<String>();
+
 		TableUse(String table, String crud, String via, boolean system, List<String> columns) {
 			this(table, crud, via, system, columns, new LinkedHashMap<String, String>(), null);
 		}
@@ -193,6 +218,73 @@ public class SqlTableExtractor {
 			this.columns = columns;
 			this.columnComments = columnComments;
 			this.tableComment = tableComment;
+		}
+
+		/** 컬럼 · 한글명만 바꾼 사본. 표시(allColumns, unowned 등)는 그대로 옮긴다 */
+		TableUse copy(List<String> newColumns, Map<String, String> newColumnComments, String newTableComment) {
+			TableUse copy = new TableUse(table, crud, via, system, newColumns, newColumnComments, newTableComment);
+			copy.allColumns = allColumns;
+			copy.unowned = unowned;
+			copy.allColumnsFrom = allColumnsFrom;
+			copy.ownedColumns = ownedColumns;
+			copy.dbMissing = dbMissing;
+			copy.unknownColumns = unknownColumns;
+			return copy;
+		}
+
+		/**
+		 * <pre>
+		 * 테이블 관계(READS_TABLE / WRITES_TABLE)의 properties_json 에 남길 것.
+		 *   crud, via(파서가 아니면), columns(파서로 읽었으면. 빈 목록 = 쓴 컬럼을 못 찾음), columnComments, tableComment,
+		 *   allColumns(DB / DDL / UNKNOWN), ownedColumns, dbMissing, unknownColumns
+		 * </pre>
+		 */
+		public Map<String, Object> properties() {
+			Map<String, Object> properties = new LinkedHashMap<String, Object>();
+			properties.put("crud", crud);
+			if (!VIA_PARSER.equals(via)) {
+				// PATTERN(정규식) / DRUID. 둘 다 컬럼은 읽지 않는다.
+				properties.put("via", via);
+			} else {
+				// 파서로 읽었으면 쓰인 컬럼도 남긴다. 없으면 빈 목록이다(COUNT(*) 등). 키가 없으면 "컬럼을 못 읽은 SQL"이다.
+				properties.put("columns", columns);
+			}
+			if (allColumnsFrom != null) {
+				// SELECT * 등. DB / DDL 이면 그 목록으로 columns 를 채웠고, UNKNOWN 이면 columns 가 모자랄 수 있다.
+				properties.put("allColumns", allColumnsFrom);
+			}
+			if (!ownedColumns.isEmpty()) {
+				properties.put("ownedColumns", ownedColumns);
+			}
+			if (dbMissing) {
+				properties.put("dbMissing", Boolean.TRUE);
+			}
+			if (!unknownColumns.isEmpty()) {
+				properties.put("unknownColumns", unknownColumns);
+			}
+			// SQL 주석에 적힌 한글명. 테이블 상세에서 DB 코멘트, DDL 설명이 없을 때 쓴다.
+			if (!columnComments.isEmpty()) {
+				properties.put("columnComments", columnComments);
+			}
+			if (tableComment != null) {
+				properties.put("tableComment", tableComment);
+			}
+			return properties;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 테이블이 둘 이상인 FROM 에서 별칭 없이 적은 컬럼 하나와, 그 FROM 의 테이블들(주인 후보)
+	 * </pre>
+	 */
+	public static class Unowned {
+		public final String column;
+		public final Set<String> tables;
+
+		Unowned(String column, Set<String> tables) {
+			this.column = column;
+			this.tables = tables;
 		}
 	}
 
@@ -293,8 +385,103 @@ public class SqlTableExtractor {
 				columnComments.put(entry.getKey(), entry.getValue());
 			}
 		}
-		return new TableUse(a.table, a.crud, better.via, a.system || b.system, columns, columnComments
+		TableUse merged = new TableUse(a.table, a.crud, better.via, a.system || b.system, columns, columnComments
 				, a.tableComment != null ? a.tableComment : b.tableComment);
+		merged.allColumns = a.allColumns || b.allColumns;
+		merged.unowned = new ArrayList<Unowned>(a.unowned);
+		merged.unowned.addAll(b.unowned);
+		return merged;
+	}
+
+	/**
+	 * <pre>
+	 * 테이블 정의 목록(DB 나 DDL)으로 SQL 글만으로는 몰랐던 컬럼을 채우고, DB 에 없는 이름을 표시합니다.
+	 * 파서로 읽은 것(columns 가 있는 것)만 채웁니다. 정규식 · Druid 로 찾은 것은 테이블 이름만 확인합니다.
+	 *
+	 *   1) 모든 컬럼(SELECT * 등): 목록에 그 테이블이 있으면 그 컬럼을 모두 더한다(allColumnsFrom = DB / DDL). 없으면 UNKNOWN.
+	 *   2) 별칭 없는 컬럼: 그 FROM 의 테이블을 모두 목록에서 찾을 수 있고, 그 컬럼을 가진 테이블이 딱 하나면 그 테이블의 것.
+	 *      목록에 없는 테이블이 끼어 있거나 둘 이상이 가졌으면 정하지 않는다(짐작하지 않는다).
+	 *   3) DB 에서 읽은 목록이 있을 때만: 테이블이 DB 에 없으면 dbMissing, DB 에 있는 테이블인데 없는 컬럼은 unknownColumns.
+	 *      DDL 은 일부만 있을 때가 많아서 이 표시를 하지 않는다.
+	 * </pre>
+	 */
+	public static List<TableUse> applyCatalog(List<TableUse> uses, DbCatalog catalog) {
+		if (catalog == null || catalog.size() == 0) {
+			List<TableUse> result = new ArrayList<TableUse>();
+			for (int i = 0; i < uses.size(); i++) {
+				TableUse use = uses.get(i);
+				if (use.allColumns && use.columns != null) {
+					use = use.copy(use.columns, use.columnComments, use.tableComment);
+					use.allColumnsFrom = "UNKNOWN";
+				}
+				result.add(use);
+			}
+			return result;
+		}
+		List<TableUse> result = new ArrayList<TableUse>();
+		for (int i = 0; i < uses.size(); i++) {
+			TableUse use = uses.get(i);
+			List<String> columns = use.columns;
+			String allColumnsFrom = null;
+			List<String> owned = new ArrayList<String>();
+			if (columns != null) {
+				Set<String> merged = new TreeSet<String>(columns);
+				// 1) 모든 컬럼
+				if (use.allColumns) {
+					if (catalog.knows(use.table)) {
+						merged.addAll(catalog.columnsOf(use.table));
+						allColumnsFrom = catalog.sourceOf(use.table);
+					} else {
+						allColumnsFrom = "UNKNOWN";
+					}
+				}
+				// 2) 별칭 없는 컬럼의 주인
+				for (int u = 0; u < use.unowned.size(); u++) {
+					Unowned unowned = use.unowned.get(u);
+					if (!merged.contains(unowned.column) && use.table.equals(ownerOf(unowned, catalog))) {
+						merged.add(unowned.column);
+						owned.add(unowned.column);
+					}
+				}
+				columns = new ArrayList<String>(merged);
+			}
+			TableUse applied = use.copy(columns, use.columnComments, use.tableComment);
+			applied.allColumnsFrom = allColumnsFrom;
+			applied.ownedColumns = owned;
+			// 3) DB 에 없는 이름
+			if (catalog.hasDb() && !use.system) {
+				if (!catalog.knows(use.table) || !catalog.inDb(use.table)) {
+					applied.dbMissing = true;
+				} else if (columns != null) {
+					List<String> unknown = new ArrayList<String>();
+					for (int c = 0; c < columns.size(); c++) {
+						if (!catalog.has(use.table, columns.get(c))) {
+							unknown.add(columns.get(c));
+						}
+					}
+					applied.unknownColumns = unknown;
+				}
+			}
+			result.add(applied);
+		}
+		return result;
+	}
+
+	/** 별칭 없이 적은 컬럼의 주인. 후보 테이블을 모두 목록에서 찾을 수 있고 그 컬럼을 가진 것이 딱 하나일 때만, 아니면 null */
+	private static String ownerOf(Unowned unowned, DbCatalog catalog) {
+		String owner = null;
+		for (String table : unowned.tables) {
+			if (!catalog.knows(table)) {
+				return null;
+			}
+			if (catalog.has(table, unowned.column)) {
+				if (owner != null) {
+					return null;
+				}
+				owner = table;
+			}
+		}
+		return owner;
 	}
 
 	/** 찾은 방법의 확실한 정도. 클수록 확실하다 */
@@ -451,6 +638,10 @@ public class SqlTableExtractor {
 				continue;
 			}
 			uses.put(name + "|R", new TableUse(name, "R", VIA_PARSER, isSystemObject(names.get(i)), finder.columnsOf(name)));
+		}
+		for (TableUse use : uses.values()) {
+			use.allColumns = finder.allColumnTables.contains(use.table);
+			use.unowned = finder.unownedOf(use.table);
 		}
 		return withComments(new ArrayList<TableUse>(uses.values()), comments, finder);
 	}
@@ -679,8 +870,7 @@ public class SqlTableExtractor {
 		for (int i = 0; i < uses.size(); i++) {
 			TableUse use = uses.get(i);
 			Map<String, String> byColumn = columnComments.get(use.table);
-			result.add(new TableUse(use.table, use.crud, use.via, use.system, use.columns
-					, byColumn == null ? new LinkedHashMap<String, String>() : byColumn, tableComments.get(use.table)));
+			result.add(use.copy(use.columns, byColumn == null ? new LinkedHashMap<String, String>() : byColumn, tableComments.get(use.table)));
 		}
 		return result;
 	}
@@ -695,9 +885,33 @@ public class SqlTableExtractor {
 	 *   COL    : 그 FROM에 테이블이 하나뿐일 때만 그 테이블. 둘 이상이거나 서브쿼리가 끼어 있으면 넣지 않는다.
 	 *   INSERT 의 컬럼 목록, UPDATE 의 SET 왼쪽은 대상 테이블의 컬럼이다.
 	 * SELECT 목록에서 붙인 별칭(AS CNT)은 컬럼이 아니므로 뺍니다.
+	 *
+	 * 글만으로 정할 수 없는 것은 따로 적어 둡니다(테이블 정의 목록이 있으면 applyCatalog 가 채운다).
+	 *   SELECT * (그 FROM 의 테이블 모두), A.* (A 가 가리키는 테이블), 컬럼 목록 없는 INSERT(대상) → allColumnTables
+	 *   테이블만 둘 이상인 FROM 에서 별칭 없이 적은 컬럼(서브쿼리가 끼면 빼다) → unowned
 	 * </pre>
 	 */
 	private class ColumnFinder extends TablesNamesFinder {
+
+		/** "모든 컬럼"을 쓴 테이블 */
+		final Set<String> allColumnTables = new HashSet<String>();
+
+		/** 주인을 못 정한 컬럼 */
+		private final List<Unowned> unowned = new ArrayList<Unowned>();
+
+		/** FROM 하나의 테이블들. 테이블이 둘 이상이고 서브쿼리가 없을 때만, 아니면 null */
+		private final List<Set<String>> scopeTables = new ArrayList<Set<String>>();
+
+		/** 이 테이블이 주인 후보인 것 */
+		List<Unowned> unownedOf(String table) {
+			List<Unowned> found = new ArrayList<Unowned>();
+			for (int i = 0; i < unowned.size(); i++) {
+				if (unowned.get(i).tables.contains(table)) {
+					found.add(unowned.get(i));
+				}
+			}
+			return found;
+		}
 
 		/** FROM 하나에 있는 이름(별칭 또는 테이블 이름) → 테이블. 서브쿼리 별칭이면 "" */
 		private final List<Map<String, String>> scopes = new ArrayList<Map<String, String>>();
@@ -760,9 +974,40 @@ public class SqlTableExtractor {
 			}
 			push(items);
 			try {
+				markAllColumns(select.getSelectItems());
 				super.visit(select);
 			} finally {
 				pop();
+			}
+		}
+
+		/**
+		 * <pre>
+		 * SELECT 목록의 * 와 A.* 를 적어 둡니다.
+		 *   *   : 지금 FROM 의 테이블 모두(서브쿼리는 테이블이 아니라 뺀다)
+		 *   A.* : A 가 가리키는 테이블. 서브쿼리 별칭이면 뺀다
+		 * </pre>
+		 */
+		private void markAllColumns(List<SelectItem<?>> items) {
+			if (items == null || scopes.isEmpty()) {
+				return;
+			}
+			Map<String, String> scope = scopes.get(scopes.size() - 1);
+			for (int i = 0; i < items.size(); i++) {
+				Object expression = items.get(i).getExpression();
+				if (expression instanceof AllTableColumns) {
+					Table owner = ((AllTableColumns) expression).getTable();
+					String table = owner == null || owner.getName() == null ? null : scope.get(nameOf(owner.getName()));
+					if (table != null && table.length() > 0) {
+						allColumnTables.add(table);
+					}
+				} else if (expression instanceof AllColumns) {
+					for (String table : scope.values()) {
+						if (table.length() > 0) {
+							allColumnTables.add(table);
+						}
+					}
+				}
 			}
 		}
 
@@ -810,10 +1055,13 @@ public class SqlTableExtractor {
 		@Override
 		public void visit(Insert insert) {
 			String target = normalize(insert.getTable().getFullyQualifiedName());
-			if (insert.getColumns() != null) {
+			if (insert.getColumns() != null && !insert.getColumns().isEmpty()) {
 				for (int i = 0; i < insert.getColumns().size(); i++) {
 					add(target, insert.getColumns().get(i).getColumnName());
 				}
+			} else if (target != null) {
+				// INSERT INTO T VALUES (...) / INSERT INTO T SELECT ... : T 의 모든 컬럼에 값을 넣는다.
+				allColumnTables.add(target);
 			}
 			super.visit(insert);
 		}
@@ -834,7 +1082,12 @@ public class SqlTableExtractor {
 				if (onlyTables.isEmpty() || selectAliases.contains(nameOf(column.getColumnName()))) {
 					return;
 				}
-				add(onlyTables.get(onlyTables.size() - 1), column.getColumnName());
+				String only = onlyTables.get(onlyTables.size() - 1);
+				if (only != null) {
+					add(only, column.getColumnName());
+				} else {
+					addUnowned(scopeTables.get(scopeTables.size() - 1), column.getColumnName());
+				}
 				return;
 			}
 			for (int i = scopes.size() - 1; i >= 0; i--) {
@@ -890,6 +1143,14 @@ public class SqlTableExtractor {
 			}
 			scopes.add(scope);
 			onlyTables.add(tables == 1 && !others ? only : null);
+			Set<String> names = null;
+			if (tables > 1 && !others) {
+				names = new TreeSet<String>();
+				for (String table : scope.values()) {
+					names.add(table);
+				}
+			}
+			scopeTables.add(names);
 		}
 
 		/** 별칭이 가리키는 테이블을 기억합니다(같은 별칭이 여러 테이블에 쓰일 수 있어 집합으로). */
@@ -906,6 +1167,24 @@ public class SqlTableExtractor {
 		private void pop() {
 			scopes.remove(scopes.size() - 1);
 			onlyTables.remove(onlyTables.size() - 1);
+			scopeTables.remove(scopeTables.size() - 1);
+		}
+
+		/** 주인을 못 정한 컬럼 하나를 적어 둔다. 이름이 아닌 것은 add() 와 같은 기준으로 뺀다 */
+		private void addUnowned(Set<String> tables, String columnName) {
+			if (tables == null || columnName == null || unowned.size() >= MAX_COLUMNS) {
+				return;
+			}
+			String name = nameOf(columnName);
+			if (name.length() == 0 || name.startsWith("X_") || NOT_COLUMNS.indexOf("|" + name + "|") >= 0 || !isIdentifier(name)) {
+				return;
+			}
+			for (int i = 0; i < unowned.size(); i++) {
+				if (unowned.get(i).column.equals(name) && unowned.get(i).tables.equals(tables)) {
+					return;
+				}
+			}
+			unowned.add(new Unowned(name, tables));
 		}
 
 		/** 테이블의 컬럼으로 이름 하나를 더합니다. 키워드·${} 자리·이름이 아닌 것은 빼고, 테이블마다 MAX_COLUMNS 개까지만 */

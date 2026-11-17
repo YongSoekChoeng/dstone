@@ -3,7 +3,6 @@ package net.dstone.knowledge.analysis.pass08.semantic.sql;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +15,7 @@ import net.dstone.knowledge.common.util.JsonText;
 import net.dstone.knowledge.common.util.TableName;
 import net.dstone.knowledge.analysis.job.AnalysisJobContext;
 import net.dstone.knowledge.analysis.pass04.resource.MapperXmlReader;
+import net.dstone.knowledge.analysis.common.DbCatalog;
 import net.dstone.knowledge.analysis.common.SqlTableExtractor;
 import net.dstone.knowledge.analysis.pass08.semantic.SemanticStep;
 
@@ -79,7 +79,9 @@ public class MapperLinker implements SemanticStep {
 
 		return "statement " + index.statements.size() + ", 조각 " + index.fragments.size() + ". 인터페이스 방식으로 이은 메소드 " + byInterface
 				+ ". 테이블 관계 " + tables[0] + "(파서 " + tables[1] + ", Druid " + tables[3] + ", 정규식 " + tables[2] + ")"
-				+ ". 뺀 시스템 · 임시 테이블 " + tables[4] + ".";
+				+ ". 뺀 시스템 · 임시 테이블 " + tables[4] + "."
+				+ (tables[5] + tables[6] + tables[7] == 0 ? "" : " 테이블 정의 목록으로 SELECT * 를 편 관계 " + tables[5] + ", 주인을 정한 컬럼 " + tables[6]
+						+ ", DB 에 없는 테이블 관계 " + tables[7] + ".");
 	}
 
 	/**
@@ -89,15 +91,19 @@ public class MapperLinker implements SemanticStep {
 	 * 흐름(statement 를 mapperId 순서로 PAGE_SIZE 개씩 읽으며):
 	 *   1) &lt;include refid&gt; 로 끼워 넣는 SQL 조각을 펼쳐 SQL 글을 완성한다. choose 가 있으면 가지마다 따로 만든다.
 	 *   2) 테이블과 CRUD, 쓰인 컬럼을 뽑는다(파서 → Druid → 정규식).
+	 *      테이블 정의 목록(DB 에서 읽어 둔 것, 없으면 DDL)으로 SELECT * 를 펴고 별칭 없는 컬럼의 주인을 정한다. DB 에 없는 이름은 표시한다.
 	 *   3) 시스템 카탈로그와 임시 테이블은 빼고, 테이블마다 READS_TABLE / WRITES_TABLE 관계를 넣는다. 정규식으로 짐작한 것은 MEDIUM.
 	 * </pre>
 	 *
-	 * @return [테이블 관계 수, 파서로 읽은 statement 수, 정규식이 낀 statement 수, Druid 가 낀 statement 수, 뺀 시스템 · 임시 테이블 수]
+	 * @return [테이블 관계 수, 파서로 읽은 statement 수, 정규식이 낀 statement 수, Druid 가 낀 statement 수, 뺀 시스템 · 임시 테이블 수,
+	 *          SELECT * 를 편 관계 수, 주인을 정한 컬럼 수, DB 에 없는 테이블 관계 수]
 	 */
 	private int[] extractTables(AnalysisJobContext context, StatementIndex index) {
 		long revisionId = context.getRevisionId();
 		Set<String> tempTables = tempTablesOf(revisionId);
-		int relations = 0, parsed = 0, guessed = 0, druid = 0, skipped = 0;
+		// DB 에서 읽어 둔 테이블 정의(없으면 DDL). SELECT * 를 펴고 별칭 없는 컬럼의 주인을 정하는 데 쓴다.
+		DbCatalog catalog = resourceDao.selectCatalog(revisionId);
+		int relations = 0, parsed = 0, guessed = 0, druid = 0, skipped = 0, expanded = 0, owned = 0, missing = 0;
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
@@ -110,7 +116,8 @@ public class MapperLinker implements SemanticStep {
 				afterId = ((Number) statement.get("mapperId")).longValue();
 				// 1) 조각 펼치기(가지마다) → 2) 테이블 뽑기
 				List<String> sqls = sqlsOf(statement, index);
-				List<SqlTableExtractor.TableUse> uses = tableExtractor.extractAll(sqls, (String) statement.get("statementType"));
+				List<SqlTableExtractor.TableUse> uses = SqlTableExtractor.applyCatalog(
+						tableExtractor.extractAll(sqls, (String) statement.get("statementType")), catalog);
 				// 3) 테이블마다 관계
 				boolean anyGuessed = false, anyDruid = false;
 				for (int t = 0; t < uses.size(); t++) {
@@ -121,21 +128,14 @@ public class MapperLinker implements SemanticStep {
 					}
 					anyGuessed = anyGuessed || use.guessed;
 					anyDruid = anyDruid || SqlTableExtractor.VIA_DRUID.equals(use.via);
-					Map<String, Object> properties = new LinkedHashMap<String, Object>();
-					properties.put("crud", use.crud);
-					if (!SqlTableExtractor.VIA_PARSER.equals(use.via)) {
-						// PATTERN(정규식) / DRUID. 둘 다 컬럼은 읽지 않는다.
-						properties.put("via", use.via);
-					} else {
-						// 파서로 읽었으면 쓰인 컬럼도 남긴다. 없으면 빈 목록이다(SELECT * 등). 키가 없으면 "컬럼을 못 읽은 SQL"이다.
-						properties.put("columns", use.columns);
+					// crud, 쓴 컬럼, SELECT * 를 편 출처, DB 에 없는 이름, SQL 주석의 한글명
+					Map<String, Object> properties = use.properties();
+					if (use.allColumnsFrom != null && !"UNKNOWN".equals(use.allColumnsFrom)) {
+						expanded++;
 					}
-					// SQL 주석에 적힌 한글명. 테이블 상세에서 DB 코멘트, DDL 설명이 없을 때 쓴다.
-					if (!use.columnComments.isEmpty()) {
-						properties.put("columnComments", use.columnComments);
-					}
-					if (use.tableComment != null) {
-						properties.put("tableComment", use.tableComment);
+					owned += use.ownedColumns.size();
+					if (use.dbMissing) {
+						missing++;
 					}
 					resourceDao.insertRelation(relation(revisionId, "SQL", "S" + afterId, "R".equals(use.crud) ? "READS_TABLE" : "WRITES_TABLE"
 							, "TABLE", null, use.table, use.guessed ? "MEDIUM" : "HIGH", use.guessed ? "HEURISTIC" : "RESOLVED"
@@ -153,7 +153,7 @@ public class MapperLinker implements SemanticStep {
 				}
 			}
 		}
-		return new int[] { relations, parsed, guessed, druid, skipped };
+		return new int[] { relations, parsed, guessed, druid, skipped, expanded, owned, missing };
 	}
 
 	/** 이 리비전의 SQL이 CREATE TEMP TABLE 로 만드는 임시 테이블(스키마 · 따옴표를 뗀 대문자) */

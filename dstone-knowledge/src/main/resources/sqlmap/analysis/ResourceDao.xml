@@ -106,6 +106,19 @@
 
     <!-- 이 리비전의 SQL이 CREATE TEMP TABLE 로 만드는 임시 테이블의 이름(적힌 그대로. 스키마 · 따옴표는 Java 에서 뗀다).
          다른 statement 가 그 이름을 읽어도 업무 테이블이 아니므로 테이블 관계로 넣지 않는다 -->
+    <!-- 테이블 정의 목록(DbCatalog): DB 에서 읽어 둔 것(DB_TABLE / DB_COLUMN, location = 접속 이름)과 DDL 파일의 것.
+         resource_id 순서 = DB 접속을 등록한 순서. 테이블 · 컬럼은 스키마를 뗀 대문자다 -->
+    <select id="selectCatalogRows" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT r.resource_type AS "resourceType"
+             , r.location AS "location"
+             , CASE WHEN r.resource_type IN ('DB_TABLE', 'DDL_TABLE') THEN r.name ELSE r.properties_json->>'table' END AS "table"
+             , CASE WHEN r.resource_type IN ('DB_COLUMN', 'DDL_COLUMN') THEN r.properties_json->>'column' END AS "column"
+          FROM analysis_resource r
+         WHERE r.revision_id = #{revisionId}
+           AND r.resource_type IN ('DB_TABLE', 'DB_COLUMN', 'DDL_TABLE', 'DDL_COLUMN')
+         ORDER BY r.resource_id
+    </select>
+
     <select id="selectTempTableNames" parameterType="long" resultType="string">
         SELECT DISTINCT t.m[1]
           FROM analysis_mapper mp

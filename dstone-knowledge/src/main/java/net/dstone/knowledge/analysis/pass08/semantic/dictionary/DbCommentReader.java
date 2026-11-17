@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,7 +43,8 @@ import net.dstone.knowledge.common.util.ErrorText;
  *   - SCHEMA.TABLE 처럼 스키마가 붙어 있으면 그 스키마를 적어 둔 접속을 먼저 봅니다.
  *   - 그 밖에는 등록한 순서대로 보고, 처음 찾은 곳의 것을 씁니다(결과의 source 가 그 접속 이름).
  *
- * 분석 결과(DB)에 저장하지 않고, 화면에서 테이블 상세를 열 때 그 테이블 하나만 읽습니다.
+ * 코멘트는 분석 결과(DB)에 저장하지 않고, 화면에서 테이블 상세를 열 때 그 테이블 하나만 읽습니다.
+ * 테이블 · 컬럼 정의(이름, 타입)는 분석할 때 readCatalog() 로 모두 읽어 리비전에 남깁니다(DbCatalogStep).
  * 코멘트는 소스가 아니라 운영 DB의 것이라 리비전과 상관이 없고, 저장해 두면 DB에서 고친 코멘트가 다시 분석할 때까지 안 바뀌기 때문입니다.
  * JDBC 의 표준 메타데이터(getTables / getColumns 의 REMARKS)로 읽으므로 DB 종류마다 SQL을 따로 두지 않습니다.
  * 읽기만 하고(read-only 접속), 오래 기다리지 않습니다(접속 10초, 응답 30초).
@@ -154,6 +156,28 @@ public class DbCommentReader extends BaseObject {
 			this.password = password;
 			this.schema = schema;
 		}
+
+		/** 접속 이름(화면에서 붙인 이름) */
+		public String getName() {
+			return name;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 접속 하나에서 읽은 테이블 · 컬럼 정의(분석 때 리비전에 남기는 것). 이름은 스키마를 뗀 대문자입니다.
+	 * </pre>
+	 */
+	public static class Catalog {
+
+		/** 실제로 본 스키마. 알 수 없으면 null */
+		public String schema;
+
+		/** 테이블 → 종류(TABLE / VIEW). 이름 순 */
+		public final Map<String, String> tables = new java.util.TreeMap<String, String>();
+
+		/** 컬럼마다 {table, column, dataType, ordinal}. 테이블 · 순서대로 */
+		public final List<Map<String, Object>> columns = new ArrayList<Map<String, Object>>();
 	}
 
 	/** 캐시에 넣어 둔 테이블 목록과 그 만료 시각 */
@@ -416,6 +440,61 @@ public class DbCommentReader extends BaseObject {
 		return result;
 	}
 
+	/**
+	 * <pre>
+	 * 접속 하나의 스키마에 있는 테이블 · 뷰와 그 컬럼 정의를 모두 읽습니다. 분석(SEMANTIC 의 dbCatalog 처리기)이 부릅니다.
+	 * 캐시하지 않습니다. 코멘트는 읽지 않습니다(화면에서 테이블을 열 때 read() 로 그때그때 읽는다).
+	 * 같은 이름이 여러 번 나오면(스키마를 정하지 못해 모든 스키마를 본 경우) 처음 것만 씁니다.
+	 * </pre>
+	 */
+	public Catalog readCatalog(Target target) throws SQLException {
+		Connection connection = open(target);
+		try {
+			DatabaseMetaData meta = connection.getMetaData();
+			Catalog catalog = new Catalog();
+			catalog.schema = schemaFor(connection, target);
+			Map<String, String> tableSchemas = new HashMap<String, String>();
+			ResultSet tables = meta.getTables(connection.getCatalog(), catalog.schema, "%", new String[] { "TABLE", "VIEW" });
+			try {
+				while (tables.next()) {
+					String name = tables.getString("TABLE_NAME").toUpperCase(Locale.ROOT);
+					if (!catalog.tables.containsKey(name)) {
+						catalog.tables.put(name, String.valueOf(tables.getString("TABLE_TYPE")).toUpperCase(Locale.ROOT));
+						tableSchemas.put(name, tables.getString("TABLE_SCHEM"));
+					}
+				}
+			} finally {
+				tables.close();
+			}
+			ResultSet rs = meta.getColumns(connection.getCatalog(), catalog.schema, "%", "%");
+			try {
+				while (rs.next()) {
+					String table = rs.getString("TABLE_NAME").toUpperCase(Locale.ROOT);
+					// 시스템 객체 등 위에서 고르지 않은 것, 다른 스키마의 같은 이름은 뺀다.
+					if (!tableSchemas.containsKey(table) || !sameText(tableSchemas.get(table), rs.getString("TABLE_SCHEM"))) {
+						continue;
+					}
+					Map<String, Object> column = new LinkedHashMap<String, Object>();
+					column.put("table", table);
+					column.put("column", rs.getString("COLUMN_NAME").toUpperCase(Locale.ROOT));
+					column.put("dataType", typeOf(rs));
+					column.put("ordinal", Integer.valueOf(rs.getInt("ORDINAL_POSITION")));
+					catalog.columns.add(column);
+				}
+			} finally {
+				rs.close();
+			}
+			return catalog;
+		} finally {
+			connection.close();
+		}
+	}
+
+	/** 둘 다 null 이거나 같은 글자 */
+	private boolean sameText(String a, String b) {
+		return a == null ? b == null : a.equals(b);
+	}
+
 	/** 프로젝트의 접속 정보를 고쳤을 때 부릅니다. 그 프로젝트에 대해 기억해 둔 결과를 지웁니다 */
 	public void forget(String projectId) {
 		listCache.remove(projectId);
@@ -434,7 +513,7 @@ public class DbCommentReader extends BaseObject {
 	 * 저장된 비밀번호는 여기서 풉니다. 풀지 못하면(암호화 키가 바뀐 경우 등) 그 접속은 비밀번호 없이 시도합니다.
 	 * </pre>
 	 */
-	List<Target> targets(String projectId) {
+	public List<Target> targets(String projectId) {
 		List<Target> targets = new ArrayList<Target>();
 		List<Map<String, Object>> rows = projectDbDao.selectList(projectId);
 		for (int i = 0; i < rows.size(); i++) {
