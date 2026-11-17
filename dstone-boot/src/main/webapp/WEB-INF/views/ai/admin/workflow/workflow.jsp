@@ -23,13 +23,15 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 				<div class="row main-row">
 					<div class="col-12">
 			<section class="cs-page-head">
-				<p class="cs-eyebrow">AI</p>
 				<h2>Workflow 실행 관리</h2>
-				<p>이미 시작된 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다. 실행 중에 문제가 보이면 일시정지하고, 해결한 뒤 멈춘 step부터 이어 갑니다.
-					step이 작성한 md 문서는 스텝 이력의 '문서' 칸이나 아래 'step 문서' 표에서 열어 보고, 승인하기 전에 고칠 수 있습니다.
-					엔진이 동시에 돌리는 실행 수에는 한도가 있어서, 사람이 많으면 새 실행은 QUEUED(대기)로 차례를 기다립니다.
-					일시정지·재개·되감기·문서 저장은 실행을 시작한 사람과 관리자만 할 수 있습니다.
-					임의 workflowId를 직접 실행해보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">Workflow 테스트</a> 화면을 쓰십시오.</p>
+				<p>시작된 실행을 찾아보고, 사람의 승인을 기다리는 실행은 승인하거나 반려합니다. 실행 중에 문제가 보이면 일시정지했다가, 고친 뒤 멈춘 step부터 이어 갑니다.
+					step이 남긴 문서는 승인하기 전에 열어 보고 고칠 수 있습니다.</p>
+				<details class="ai-dev-note">
+					<summary>알아 둘 것</summary>
+					<p>엔진이 동시에 돌리는 실행 수에는 한도가 있어서, 붐빌 때 새 실행은 "대기 중"으로 차례를 기다립니다.
+						일시정지, 재개, 되감기, 문서 저장은 실행을 시작한 사람과 관리자만 할 수 있습니다.
+						Workflow를 직접 실행해 보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">Workflow 테스트</a>를 씁니다.</p>
+				</details>
 			</section>
 
 			<section class="ai-panel">
@@ -40,19 +42,19 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 						<th><label for="workflow-admin-status-filter">상태</label></th>
 						<td><select id="workflow-admin-status-filter">
 								<option value="">전체</option>
-								<option value="WAITING_APPROVAL">WAITING_APPROVAL</option>
-								<option value="QUEUED">QUEUED</option>
-								<option value="RUNNING">RUNNING</option>
-								<option value="PAUSED">PAUSED</option>
-								<option value="DONE">DONE</option>
-								<option value="FAILED">FAILED</option>
-								<option value="CANCELLED">CANCELLED</option>
+								<option value="WAITING_APPROVAL">승인 대기</option>
+								<option value="QUEUED">대기 중</option>
+								<option value="RUNNING">실행 중</option>
+								<option value="PAUSED">일시정지</option>
+								<option value="DONE">완료</option>
+								<option value="FAILED">실패</option>
+								<option value="CANCELLED">취소됨</option>
 							</select></td>
-						<th><label for="workflow-admin-workflow-filter">workflowId</label></th>
+						<th><label for="workflow-admin-workflow-filter">Workflow</label></th>
 						<td><input type="text" id="workflow-admin-workflow-filter" placeholder="일부만 적어도 찾습니다" /></td>
 					</tr>
 					<tr>
-						<th><label for="workflow-admin-execution-filter">executionId</label></th>
+						<th><label for="workflow-admin-execution-filter">실행 ID</label></th>
 						<td><input type="text" id="workflow-admin-execution-filter" placeholder="일부만 적어도 찾습니다" /></td>
 						<th><label for="workflow-admin-mine-filter">시작한 사람</label></th>
 						<td><label class="wa-check"><input type="checkbox" id="workflow-admin-mine-filter" checked /> 내 실행만</label></td>
@@ -78,8 +80,8 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 						</colgroup>
 						<thead>
 							<tr>
-								<th>executionId</th>
-								<th>workflowId</th>
+								<th>실행 ID</th>
+								<th>Workflow</th>
 								<th>시작한 사람</th>
 								<th>상태</th>
 								<th class="wa-num">현재 스텝</th>
@@ -100,7 +102,7 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 				<table class="ai-form">
 					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
 					<tr>
-						<th>executionId</th>
+						<th>실행 ID</th>
 						<td><span id="workflow-admin-detail-id" class="workflow-job-id">-</span></td>
 						<th>상태</th>
 						<td><span id="workflow-admin-detail-badge" class="workflow-badge">-</span></td>

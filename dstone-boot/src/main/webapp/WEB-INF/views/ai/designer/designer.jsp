@@ -18,12 +18,10 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div class="row main-row">
 					<div class="col-12">
 			<section class="cs-page-head">
-				<p class="cs-eyebrow">AI</p>
 				<h2>Workflow 디자이너</h2>
-				<p>dstone-ai-engine의 Workflow 정의(conf/definitions/workflows/**.yml)를 그림으로 보고 고칩니다.
-					왼쪽 상자에서 step을 끌어다 놓고, step의 위·아래·왼쪽·오른쪽 동그라미 중 하나를 끌어 다른 step에 놓으면 화살표(다음 step)가 생깁니다.
-					step이나 화살표를 누르면 오른쪽에서 설정을 고칠 수 있고, 빈 곳을 누르면 Workflow 전체 설정이 나옵니다.
-					[저장]은 엔진이 전부 검사해서 통과했을 때만 파일에 쓰고 바로 반영합니다(엔진을 다시 띄우지 않아도 됩니다).</p>
+				<p>Workflow를 그림으로 보며 고칩니다. 왼쪽에서 step을 끌어다 놓고, step 가장자리의 동그라미를 다른 step으로 끌면 다음 순서를 잇는 화살표가 생깁니다.
+					step이나 화살표를 누르면 오른쪽에서 설정을 고치고, 빈 곳을 누르면 Workflow 전체 설정이 나옵니다.
+					[저장]하면 엔진이 먼저 검사하고, 통과한 경우에만 정의 파일에 써서 바로 반영합니다. 엔진을 다시 띄우지 않아도 됩니다.</p>
 			</section>
 
 			<section class="ai-panel">
@@ -37,19 +35,28 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							<p id="wd-path-hint" class="ai-hint"></p></td>
 					</tr>
 				</table>
-				<div class="ai-form-actions">
-					<span id="wd-status" class="workflow-status"></span>
-					<button type="button" id="wd-new-btn" class="kn-plain">새 Workflow</button>
-					<button type="button" id="wd-copy-btn" class="kn-plain">복사해서 새로</button>
-					<button type="button" id="wd-rename-btn" class="kn-plain" title="id와 파일 이름을 함께 바꿉니다">이름 변경</button>
-					<button type="button" id="wd-agents-btn" class="kn-plain" title="Workflow와 상관없이 Agent를 미리 만들고 고칩니다">Agent 관리</button>
-					<button type="button" id="wd-skills-btn" class="kn-plain" title="Agent나 Workflow와 상관없이 Skill을 만들고 고칩니다">Skill 관리</button>
-					<button type="button" id="wd-reload-btn" class="kn-plain" title="정의 폴더의 파일을 엔진이 다시 읽습니다(손으로 고친 파일 반영)">엔진 다시 읽기</button>
-					<button type="button" id="wd-layout-btn" class="kn-plain">자동 배치</button>
-					<button type="button" id="wd-undo-btn" class="kn-plain" title="Ctrl+Z">되돌리기</button>
-					<button type="button" id="wd-delete-btn" class="kn-plain">삭제</button>
-					<button type="button" id="wd-check-btn">검사</button>
-					<button type="button" id="wd-save-btn">저장</button>
+				<%-- 툴바: 하는 일끼리 묶는다. 파일 | 정의 | 그림 편집 … 오른쪽 끝에 검사·저장 --%>
+				<div class="ai-form-actions wd-toolbar">
+					<span class="wd-tool-group" role="group" aria-label="Workflow 파일">
+						<button type="button" id="wd-new-btn" class="kn-plain">새 Workflow</button>
+						<button type="button" id="wd-copy-btn" class="kn-plain">복사해서 새로</button>
+						<button type="button" id="wd-rename-btn" class="kn-plain" title="id와 파일 이름을 함께 바꿉니다">이름 변경</button>
+						<button type="button" id="wd-delete-btn" class="kn-plain">삭제</button>
+					</span>
+					<span class="wd-tool-group" role="group" aria-label="그림 편집">
+						<button type="button" id="wd-layout-btn" class="kn-plain">자동 배치</button>
+						<button type="button" id="wd-undo-btn" class="kn-plain" title="Ctrl+Z">되돌리기</button>
+					</span>
+					<span class="wd-tool-group" role="group" aria-label="Agent, Skill, 엔진">
+						<button type="button" id="wd-agents-btn" class="kn-plain" title="Workflow와 상관없이 Agent를 미리 만들고 고칩니다">Agent 관리</button>
+						<button type="button" id="wd-skills-btn" class="kn-plain" title="Agent나 Workflow와 상관없이 Skill을 만들고 고칩니다">Skill 관리</button>
+						<button type="button" id="wd-reload-btn" class="kn-plain" title="정의 폴더의 파일을 엔진이 다시 읽습니다(손으로 고친 파일 반영)">엔진 다시 읽기</button>
+					</span>
+					<span class="wd-tool-save">
+						<span id="wd-status" class="workflow-status"></span>
+						<button type="button" id="wd-check-btn" class="kn-plain">검사</button>
+						<button type="button" id="wd-save-btn">저장</button>
+					</span>
 				</div>
 				<div id="wd-message" class="wd-message"></div>
 			</section>
@@ -448,8 +455,6 @@ outArr에 담아 돌려준다.
 						<button type="button" id="wd-pick-cancel-btn" class="kn-plain">취소</button>
 						<button type="button" id="wd-pick-ok-btn">고르기</button>
 					</div>
-				</div>
-			</div>
 				</div>
 			</div>
 					</div>

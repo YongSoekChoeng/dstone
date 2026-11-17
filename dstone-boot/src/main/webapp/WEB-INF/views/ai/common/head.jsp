@@ -9,4 +9,6 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<%-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, AI 화면의 부품은 ai 의 main.css 에 있다. 코드 분석 화면은 knowledge.css 를 더한다 --%>
 		<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/ai/assets/css/console.css" />
 		<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/ai/assets/css/main.css" />
+		<%-- 상태 이름(완료, 승인 대기 …)과 step 종류 이름을 화면들이 같이 쓴다 --%>
+		<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/ai-common.js"></script>
 	</head>

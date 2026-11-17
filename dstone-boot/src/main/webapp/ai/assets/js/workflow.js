@@ -128,11 +128,16 @@ var DstoneAiWorkflow = (function () {
 					workflowsById[workflow.id] = workflow;
 				});
 				fillWorkflowSelect(workflows || []);
+				// 개요 화면의 [실행해 보기]는 주소 뒤에 #workflowId 를 붙여 온다. 있으면 그 Workflow를 골라 둔다
+				var wanted = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+				if (wanted && workflowsById[wanted]) {
+					workflowIdEl.value = wanted;
+				}
 				updateWorkflowDescription();
 				fillSample();
 			})
 			.catch(function (err) {
-				workflowIdDescEl.textContent = "workflow 목록을 불러오지 못했습니다: " + err.message;
+				workflowIdDescEl.textContent = "Workflow 목록을 불러오지 못했습니다: " + err.message;
 			});
 	}
 
@@ -176,7 +181,7 @@ var DstoneAiWorkflow = (function () {
 		var workflow = workflowsById[workflowIdEl.value];
 		workflowIdDescEl.textContent = workflow ? (workflow.description || "") : "";
 		inputSchemaEl.textContent = workflow && workflow.input
-			? "input 모양: " + (isTextInput(workflow) ? "글자(string) - 입력칸의 글자를 그대로 보냅니다." : "JSON - 입력칸을 JSON으로 읽어 보냅니다. " + JSON.stringify(workflow.input))
+			? "입력값 형식: " + (isTextInput(workflow) ? "글자. 적은 그대로 보냅니다." : "JSON. 아래 모양에 맞춰 적습니다. " + JSON.stringify(workflow.input))
 			: "";
 	}
 
@@ -200,11 +205,11 @@ var DstoneAiWorkflow = (function () {
 		var workflowId = workflowIdEl.value.trim();
 		var inputText = inputEl.value.trim();
 		if (!workflowId) {
-			alert("workflowId를 선택하세요.");
+			alert("실행할 Workflow를 고르세요.");
 			return;
 		}
 		if (!inputText) {
-			alert("input을 입력하세요.");
+			alert("입력값을 적으세요.");
 			return;
 		}
 
@@ -213,7 +218,7 @@ var DstoneAiWorkflow = (function () {
 			try {
 				input = JSON.parse(inputText);
 			} catch (e) {
-				alert("이 Workflow의 input은 JSON이어야 합니다: " + e.message);
+				alert("이 Workflow의 입력값은 JSON이어야 합니다: " + e.message);
 				return;
 			}
 		}
@@ -237,10 +242,10 @@ var DstoneAiWorkflow = (function () {
 			})
 			.then(function (result) {
 				if (result.error) {
-					submitStatusEl.textContent = "제출 실패: " + result.error;
+					submitStatusEl.textContent = "실행 요청 실패: " + result.error;
 					return;
 				}
-				submitStatusEl.textContent = "제출 완료";
+				submitStatusEl.textContent = "실행을 시작했습니다";
 				startTracking(workflowId, result.executionId);
 			})
 			.catch(function (err) {
@@ -253,7 +258,7 @@ var DstoneAiWorkflow = (function () {
 
 	function setSubmitLoading(loading) {
 		submitBtn.disabled = loading;
-		submitStatusEl.textContent = loading ? "제출 중입니다..." : submitStatusEl.textContent;
+		submitStatusEl.textContent = loading ? "실행을 요청하는 중입니다…" : submitStatusEl.textContent;
 	}
 
 	function startTracking(workflowId, executionId) {
@@ -316,8 +321,7 @@ var DstoneAiWorkflow = (function () {
 	}
 
 	function setBadge(status) {
-		statusBadgeEl.textContent = status || "-";
-		statusBadgeEl.className = "workflow-badge workflow-badge-" + (status || "unknown").toLowerCase();
+		DstoneAi.setBadge(statusBadgeEl, status);
 	}
 
 	function addHistoryRow(workflowId, executionId) {
@@ -326,7 +330,7 @@ var DstoneAiWorkflow = (function () {
 			"<td>" + escapeHtml(new Date().toLocaleTimeString()) + "</td>" +
 			"<td>" + escapeHtml(workflowId) + "</td>" +
 			"<td><a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + escapeHtml(executionId) + "</a></td>" +
-			"<td class=\"workflow-history-status\">QUEUED</td>";
+			"<td class=\"workflow-history-status\">" + DstoneAi.badgeHtml("QUEUED") + "</td>";
 		tr.querySelector(".workflow-history-jobid").addEventListener("click", function () {
 			trackExisting(executionId);
 		});
@@ -337,7 +341,7 @@ var DstoneAiWorkflow = (function () {
 	function updateHistoryRow(executionId, status) {
 		var tr = historyRows[executionId];
 		if (tr) {
-			tr.querySelector(".workflow-history-status").textContent = status || "-";
+			tr.querySelector(".workflow-history-status").innerHTML = DstoneAi.badgeHtml(status);
 		}
 	}
 

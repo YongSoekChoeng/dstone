@@ -1,6 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%
 net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.RequestUtil(request, response);
+String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink=";
 %>
 <!DOCTYPE HTML>
 <html>
@@ -18,43 +19,53 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div class="row main-row">
 					<div class="col-12">
 			<section class="cs-page-head">
-				<p class="cs-eyebrow">AI</p>
-				<h2>개요</h2>
-				<p>dstone-ai-engine과 연동되는 AI 기능 모음입니다. "사용자"는 누구나 기능을 직접 눌러 보는 화면이고,
-					"관리자"는 진행 중인 작업(Workflow 실행, 정의)을 보고 판단·조작하는 화면입니다.</p>
+				<h2>AI 엔진</h2>
+				<p>업무 절차를 Workflow로 정해 두면 순서, 갈림길, 사람의 승인은 엔진이 지키고 각 단계의 판단은 AI Agent가 맡습니다.</p>
+				<%-- 엔진 연결, Workflow 수, 실행 현황을 한 줄로. 평소엔 조용하고, 승인 대기나 연결 문제가 있을 때만 색이 붙는다(overview.js) --%>
+				<p id="ov-status" class="ov-status" aria-live="polite">엔진 상태를 확인하고 있습니다…</p>
 			</section>
 
-			<section class="ai-panel">
-				<h3>사용자</h3>
-				<div class="ai-card-list">
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/chat/chat">
-						<h3>채팅</h3>
-						<p>dstone-ai-engine과 실시간으로 대화합니다. 이번 대화에 쓸 Tool(올린 문서 찾기, 코드 분석 등)을 골라 붙일 수 있습니다.</p>
-					</a>
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/workflow/workflow">
-						<h3>Workflow 테스트</h3>
-						<p>등록된 Workflow 중 하나를 골라 submit/status 비동기 Workflow 호출을 확인합니다.</p>
-					</a>
-				</div>
-			</section>
+			<div class="ov-grid">
+				<section class="ai-panel ov-flows">
+					<div class="ov-flows-head">
+						<h3>Workflow <span id="ov-flow-count" class="ov-count"></span></h3>
+						<div id="ov-folders" class="ov-folders" role="group" aria-label="폴더로 좁히기"></div>
+					</div>
+					<%-- 띠의 색이 무엇인지. 띠 한 칸 = step 하나, 정의 파일에 적힌 순서 --%>
+					<ul class="ov-legend" aria-label="step 종류">
+						<li><i class="ov-seg ov-seg-AGENT"></i>Agent가 판단</li>
+						<li><i class="ov-seg ov-seg-SUPERVISOR"></i>결과 검토</li>
+						<li><i class="ov-seg ov-seg-ROUTER"></i>갈림길</li>
+						<li><i class="ov-seg ov-seg-TOOL"></i>도구 실행</li>
+						<li><i class="ov-seg ov-seg-APPROVAL"></i>사람이 승인</li>
+						<li><i class="ov-seg ov-seg-TOOL ov-seg-each"></i>항목마다 반복</li>
+					</ul>
+					<div id="ov-flow-list" class="ov-flow-list">
+						<p class="ov-empty">Workflow 목록을 불러오고 있습니다…</p>
+					</div>
+				</section>
 
-			<section class="ai-panel">
-				<h3>관리자</h3>
-				<div class="ai-card-list">
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/search/search">
-						<h3>문서 올리기</h3>
-						<p>Agent가 참고할 문서(개발 가이드 등)를 묶음별로 올리고 지우는 곳입니다. 문서는 dstone-knowledge에 저장되고, Agent는 knowledgeSearchDocs 같은 Tool로 거기서 찾습니다.</p>
-					</a>
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/admin/workflow/workflow">
-						<h3>Workflow 실행 관리</h3>
-						<p>진행 중인 Workflow 실행을 조회하고, 승인 대기 중인 실행을 승인/반려합니다.</p>
-					</a>
-					<a class="ai-card" href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=ai/designer/designer">
-						<h3>Workflow 디자이너</h3>
-						<p>Workflow 정의를 그림으로 보고, step을 끌어다 놓고 화살표로 이어 고칩니다. 저장하면 엔진이 검사한 뒤 바로 반영합니다.</p>
-					</a>
-				</div>
-			</section>
+				<aside class="ov-side">
+					<section class="ai-panel">
+						<div class="ov-side-head">
+							<h3>최근 실행</h3>
+							<a href="<%=linkBase%>ai/admin/workflow/workflow">실행 관리</a>
+						</div>
+						<ol id="ov-runs" class="ov-runs">
+							<li class="ov-empty">불러오고 있습니다…</li>
+						</ol>
+					</section>
+
+					<section class="ai-panel ov-chat">
+						<h3>Agent와 대화하기</h3>
+						<p>등록된 Agent에게 바로 물어봅니다. 올린 문서나 분석해 둔 소스 코드를 찾아 보고 답하게 할 수 있습니다.</p>
+						<div class="ov-chat-actions">
+							<a class="cs-btn" href="<%=linkBase%>ai/chat/chat">채팅 열기</a>
+							<a href="<%=linkBase%>knowledge/search/search">참고 문서 올리기</a>
+						</div>
+					</section>
+				</aside>
+			</div>
 					</div>
 				</div>
 			</div>
@@ -63,5 +74,14 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<jsp:include page="common/footer.jsp"></jsp:include>
 
 	</div>
+
+	<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/overview.js"></script>
+	<script>
+		DstoneAiOverview.init({
+			workflowsUrl: "<%=requestUtil.getStrContextPath()%>/ai/overview/workflows.do",
+			runsUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/list.do",
+			linkBase: "<%=linkBase%>"
+		});
+	</script>
 </body>
 </html>

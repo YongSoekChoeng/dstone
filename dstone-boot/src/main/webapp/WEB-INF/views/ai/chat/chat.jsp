@@ -18,31 +18,64 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 				<div class="row main-row">
 					<div class="col-12">
 			<section class="cs-page-head">
-				<p class="cs-eyebrow">AI</p>
 				<h2>채팅</h2>
-				<p>dstone-ai-engine 의 Agent 와 실시간으로 대화합니다. Agent 를 고르고, 이번 대화에 쓸 도구(Tool)를 고른 뒤 메시지를 보냅니다.</p>
+				<p>Agent에게 바로 물어봅니다. 오른쪽에서 Agent와 Agent가 쓸 도구(Tool)를 고르면, 필요할 때 Agent가 도구로 문서나 소스를 찾아 보고 답합니다.</p>
 			</section>
 
-			<section class="ai-panel">
-				<h3>대화 설정</h3>
-				<table class="ai-form">
-					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
-					<tr>
-						<th><label for="chat-agent">Agent</label></th>
-						<td><select id="chat-agent"></select></td>
-						<th><label for="chat-model-override">모델 override</label></th>
-						<td><input type="text" id="chat-model-override" placeholder="비우면 기본값(Agent 정의값)" /></td>
-					</tr>
-					<tr>
-						<th>도구호출(Tool)</th>
-						<td colspan="3">
-							<div id="chat-tools" class="chat-tools wd-chip-list"></div>
-						</td>
-					</tr>
-				</table>
-				<p id="chat-agent-desc" class="ai-hint"></p>
+			<div class="chat-layout">
+				<section class="ai-panel chat-main" aria-label="대화">
+					<div class="ai-chat-box">
+						<div class="chat-scroll">
+							<%-- 대화가 없을 때만 보인다(chat.js 가 첫 메시지를 보낼 때 숨긴다). 예시를 누르면 입력창을 채우고, 필요한 Tool 을 골라 둔다 --%>
+							<div id="chat-welcome" class="chat-welcome">
+								<h3>무엇을 물어볼까요?</h3>
+								<p>아래 예시를 누르면 입력창에 채워지고, 그 질문에 필요한 도구도 함께 골라집니다.</p>
+								<div class="chat-examples">
+									<button type="button" class="chat-example" data-tools="DOC_RAG" data-text="웹스퀘어 가이드에서 GridView 셀을 여러 개 선택하는 방법을 찾아줘">
+										<b>올린 문서에서 찾기</b>
+										<span>웹스퀘어 가이드에서 GridView 셀을 여러 개 선택하는 방법을 찾아줘</span>
+									</button>
+									<button type="button" class="chat-example" data-tools="CODE_RAG" data-text="분석해 둔 프로젝트 목록을 보여 주고, 첫 번째 프로젝트에서 가장 많은 SQL이 쓰는 테이블을 알려줘">
+										<b>분석한 소스에서 찾기</b>
+										<span>분석해 둔 프로젝트 목록을 보여 주고, 첫 번째 프로젝트에서 가장 많은 SQL이 쓰는 테이블을 알려줘</span>
+									</button>
+									<button type="button" class="chat-example" data-tools="" data-text="Spring Batch에서 Chunk 방식과 Tasklet 방식은 언제 각각 쓰는지 설명해줘">
+										<b>도구 없이 묻기</b>
+										<span>Spring Batch에서 Chunk 방식과 Tasklet 방식은 언제 각각 쓰는지 설명해줘</span>
+									</button>
+								</div>
+							</div>
+							<div id="chat-messages" class="chat-messages"></div>
+						</div>
+
+						<form id="chat-form" class="chat-form">
+							<div class="chat-input-row">
+								<textarea id="chat-input" class="chat-input" placeholder="메시지를 입력하세요. Enter로 보내고, Shift+Enter로 줄을 바꿉니다." rows="2"></textarea>
+								<button type="submit" id="chat-send" class="chat-send">보내기</button>
+							</div>
+						</form>
+					</div>
+				</section>
+
+				<aside class="ai-panel chat-side" aria-label="대화 설정">
+					<h3>대화 설정</h3>
+					<label class="chat-field-name" for="chat-agent">Agent</label>
+					<select id="chat-agent"></select>
+					<p id="chat-agent-desc" class="ai-hint chat-agent-desc"></p>
+
+					<p class="chat-field-name">이번 대화에 쓸 도구</p>
+					<div id="chat-tools" class="chat-tools wd-chip-list"></div>
+
+					<details class="chat-advanced">
+						<summary>고급 설정</summary>
+						<label class="chat-field-name" for="chat-model-override">모델 바꾸기</label>
+						<input type="text" id="chat-model-override" placeholder="비우면 Agent에 정한 모델" />
+					</details>
+				</aside>
+			</div>
+
 				<details class="kn-howto chat-tool-guide">
-					<summary>무엇을 물을 때 어떤 Tool 을 고르나 (눌러서 펴기)</summary>
+					<summary>무엇을 물을 때 어떤 도구를 고르나 (눌러서 펴기)</summary>
 					<p class="ai-hint">[+ 찾아서 추가]를 누르면 고른 Agent 가 쓸 수 있는 Tool 이 종류별(소스 RAG, 문서 RAG, MCP, 일반) 표로 나옵니다. 표 머리의 체크박스로 그 종류를 한꺼번에 고를 수 있습니다.
 						고른 Tool 만 이번 대화에 붙고, 하나도 고르지 않으면 Tool 없이 답합니다.
 						Agent 는 필요할 때 Tool 을 직접 불러 찾아봅니다. 질문마다 문서를 미리 찾아 붙이는 일은 없습니다.</p>
@@ -76,21 +109,6 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						</tbody>
 					</table>
 				</details>
-			</section>
-
-			<section class="ai-panel">
-				<h3>대화</h3>
-				<div class="ai-chat-box">
-					<div id="chat-messages" class="chat-messages"></div>
-
-					<form id="chat-form" class="chat-form">
-						<div class="chat-input-row">
-							<textarea id="chat-input" class="chat-input" placeholder="메시지를 입력하세요..." rows="2"></textarea>
-							<button type="submit" id="chat-send" class="chat-send">전송</button>
-						</div>
-					</form>
-				</div>
-			</section>
 					</div>
 				</div>
 			</div>

@@ -151,7 +151,7 @@ var DstoneAiWorkflowAdmin = (function () {
 				"<td><a href=\"javascript:void(0)\" class=\"workflow-history-jobid\">" + escapeHtml(row.executionId) + "</a></td>" +
 				"<td>" + escapeHtml(row.workflowId) + "</td>" +
 				"<td>" + escapeHtml(row.requestedBy || "-") + "</td>" +
-				"<td><span class=\"workflow-badge workflow-badge-" + escapeHtml((row.status || "unknown").toLowerCase()) + "\">" + escapeHtml(row.status) + "</span></td>" +
+				"<td>" + DstoneAi.badgeHtml(row.status) + "</td>" +
 				"<td class=\"wa-num\">" + row.currentStepIndex + "</td>" +
 				"<td>" + escapeHtml(formatTime(row.updatedAt)) + "</td>";
 			tr.querySelector(".workflow-history-jobid").addEventListener("click", function () {
@@ -218,8 +218,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 		detailIdEl.textContent = detail.executionId;
 		detailRequesterEl.textContent = detail.requestedBy || "-";
-		detailBadgeEl.textContent = detail.status;
-		detailBadgeEl.className = "workflow-badge workflow-badge-" + (detail.status || "unknown").toLowerCase();
+		DstoneAi.setBadge(detailBadgeEl, detail.status);
 		// output은 Workflow에 따라 글자일 수도, 객체일 수도 있다 - 객체면 보기 좋게 JSON으로 펼친다.
 		var output = detail.output;
 		if (output != null && typeof output !== "string") {
@@ -833,7 +832,8 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 목록에 지금 보이는 그 실행의 상태(QUEUED → RUNNING처럼 바뀌면 목록도 새로 읽으려고 본다).
 	function currentListStatus(executionId) {
 		var tr = listBodyEl.querySelector("tr[data-execution-id=\"" + executionId + "\"] .workflow-badge");
-		return tr ? tr.textContent : null;
+		// 글자는 한글 이름이라 원래 상태 코드(data-status)를 본다
+		return tr ? tr.getAttribute("data-status") : null;
 	}
 
 	// 2026-11-02T04:55:03.123Z → 이 PC 시각의 2026-11-02 13:55:03

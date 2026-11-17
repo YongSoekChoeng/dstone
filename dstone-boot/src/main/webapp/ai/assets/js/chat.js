@@ -5,6 +5,7 @@ var DstoneAiChat = (function () {
 	var agentsById = {}; // id -> {description, input, output, tools}, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
 	var availableTools = []; // 고른 Agent 가 쓸 수 있는 Tool [{name, description, category}]
 	var chosenTools = [];    // 이번 대화에 쓸 Tool 이름
+	var welcomeEl;           // 대화가 없을 때 보이는 안내와 예시 질문
 
 	function init(options) {
 		urls = options;
@@ -29,6 +30,11 @@ var DstoneAiChat = (function () {
 		});
 		agentEl.addEventListener("change", updateAgentDescription);
 		toolsEl.addEventListener("click", onToolsClick);
+
+		welcomeEl = document.getElementById("chat-welcome");
+		if (welcomeEl) {
+			welcomeEl.addEventListener("click", onExampleClick);
+		}
 
 		loadAgentList();
 	}
@@ -144,6 +150,29 @@ var DstoneAiChat = (function () {
 		}
 	}
 
+	/**
+	 * 예시 질문을 누르면 입력창을 채우고, 그 질문에 필요한 종류(data-tools)의 Tool 을 모두 골라 둔다.
+	 * data-tools 가 비어 있으면 Tool 을 모두 뺀다. 바로 보내지는 않는다(고쳐서 보낼 수 있게).
+	 */
+	function onExampleClick(e) {
+		var example = e.target.closest(".chat-example");
+		if (!example) {
+			return;
+		}
+		var category = example.getAttribute("data-tools");
+		var names = [];
+		for (var i = 0; i < availableTools.length; i++) {
+			var tool = availableTools[i];
+			if (category && tool.category === category && !tool.disabled) {
+				names.push(tool.name);
+			}
+		}
+		chosenTools = names;
+		renderTools(availableTools);
+		inputEl.value = example.getAttribute("data-text");
+		inputEl.focus();
+	}
+
 	function escapeHtml(value) {
 		return String(value === undefined || value === null ? "" : value)
 			.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -166,8 +195,14 @@ var DstoneAiChat = (function () {
 			wrap.appendChild(createCopyButton(text));
 		}
 		messagesEl.appendChild(wrap);
-		messagesEl.scrollTop = messagesEl.scrollHeight;
+		scrollToEnd();
 		return bubble;
+	}
+
+	/** 대화 칸(안내 + 메시지를 감싼 .chat-scroll)을 맨 아래로 내린다 */
+	function scrollToEnd() {
+		var box = messagesEl.parentNode;
+		box.scrollTop = box.scrollHeight;
 	}
 
 	/** 누르면 text를 클립보드에 넣는 [복사] 버튼을 만든다. */
@@ -248,6 +283,9 @@ var DstoneAiChat = (function () {
 			}
 		}
 		var model = modelInputEl.value.trim();
+		if (welcomeEl) {
+			welcomeEl.hidden = true;
+		}
 		appendMessage("user", model ? message + " (model: " + model + ")" : message);
 		inputEl.value = "";
 		sendBtnEl.disabled = true;
@@ -289,7 +327,7 @@ var DstoneAiChat = (function () {
 					parsed.tokens.forEach(function (token) {
 						answer += token;
 						assistantBubble.textContent = answer;
-						messagesEl.scrollTop = messagesEl.scrollHeight;
+						scrollToEnd();
 					});
 					return read();
 				});
