@@ -106,6 +106,44 @@ var DstoneKnowledge = (function () {
 		return "<span class=\"workflow-badge workflow-badge-" + escapeHtml(css) + "\" title=\"" + escapeHtml(status) + "\">" + escapeHtml(label) + "</span>";
 	}
 
+	/** 상태 코드의 한글 이름(딱지 없이 글자만 쓸 때). kind 는 badge() 와 같다 */
+	function statusLabel(status, kind) {
+		var name = String(status || "").toLowerCase();
+		return (kind === "job" && JOB_BADGE_LABELS[name]) || BADGE_LABELS[name] || status || "";
+	}
+
+	/**
+	 * 계층 흐름 띠의 칸. 노드 맵의 계층과 같은 순서 · 이름 · 색입니다(graph-common.js TIERS, knowledge.css --kn-layer-*).
+	 *   key  계층별 개수의 이름(GET /api/dashboard 의 projects[], GET /api/revisions/{id}/structure 의 layers)
+	 *   unit 숫자 밑에 붙는 설명
+	 */
+	var LAYER_STRIP = [
+		{ key: "screens", layer: "view", label: "화면", unit: "화면 파일" },
+		{ key: "controllers", layer: "controller", label: "컨트롤러", unit: "클래스" },
+		{ key: "services", layer: "service", label: "서비스", unit: "클래스" },
+		{ key: "daos", layer: "dao", label: "DAO", unit: "클래스" },
+		{ key: "sqlStatements", layer: "sql", label: "SQL", unit: "" },
+		{ key: "tables", layer: "table", label: "테이블", unit: "SQL 에 나오는 테이블" }
+	];
+
+	/**
+	 * 화면 → 컨트롤러 → 서비스 → DAO → SQL → 테이블 개수를 화살 모양 띠로 그린 HTML.
+	 * mapUrl 이 있으면 칸마다 그 주소(노드 맵)로 가는 링크가 됩니다. 0개인 칸은 흐리게 그립니다.
+	 */
+	function layerStrip(counts, mapUrl) {
+		var html = "<div class=\"kn-strip\" role=\"list\" aria-label=\"계층별 개수\">";
+		LAYER_STRIP.forEach(function (step) {
+			var count = Number(counts[step.key]) || 0;
+			var unit = step.key === "sqlStatements" ? "문 · 매퍼 파일 " + (Number(counts.mappers) || 0).toLocaleString() + "개" : step.unit;
+			var inner = "<span class=\"kn-strip-label\">" + escapeHtml(step.label) + "</span><span class=\"kn-strip-num\">" + count.toLocaleString()
+				+ "</span><span class=\"kn-strip-unit\">" + escapeHtml(unit) + "</span>";
+			html += "<div role=\"listitem\" class=\"kn-strip-step kn-layer-" + step.layer + (count === 0 ? " kn-strip-zero" : "") + "\">"
+				+ (mapUrl ? "<a href=\"" + escapeHtml(mapUrl) + "\" title=\"노드 맵에서 보기\">" + inner + "</a>" : "<span class=\"kn-strip-box\">" + inner + "</span>")
+				+ "</div>";
+		});
+		return html + "</div>";
+	}
+
 	/** 처리 결과나 오류를 한 줄로 알립니다 */
 	function message(el, text, isError) {
 		el.textContent = text || "";
@@ -215,7 +253,7 @@ var DstoneKnowledge = (function () {
 				var pick = !withEmpty && !selected && revision.status === "READY";
 				selected = selected || pick;
 				html += "<option value=\"" + revision.revisionId + "\"" + (pick ? " selected" : "") + ">#" + revision.revisionId + " " + escapeHtml(revision.revisionLabel)
-					+ " (" + escapeHtml(revision.status) + ")</option>";
+					+ " (" + escapeHtml(statusLabel(revision.status)) + ")</option>";
 			});
 			selectEl.innerHTML = html;
 			return revisions || [];
@@ -299,6 +337,8 @@ var DstoneKnowledge = (function () {
 		upload: upload,
 		escapeHtml: escapeHtml,
 		badge: badge,
+		statusLabel: statusLabel,
+		layerStrip: layerStrip,
 		message: message,
 		table: table,
 		autoTable: autoTable,

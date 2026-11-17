@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import net.dstone.knowledge.api.service.AnalysisService;
 import net.dstone.knowledge.api.service.RetentionService;
 import net.dstone.knowledge.common.exception.ApiException;
+import net.dstone.knowledge.api.service.ProjectDbService;
 import net.dstone.knowledge.api.service.ProjectService;
 import net.dstone.knowledge.api.service.RevisionService;
 
@@ -41,15 +42,34 @@ public class ProjectController {
 	@Autowired
 	private RevisionService revisionService;
 
+	@Autowired
+	private ProjectDbService projectDbService;
+
 	/**
 	 * <pre>
 	 * 프로젝트 등록(같은 projectId가 있으면 수정).
-	 * 본문: {projectId, localPath, projectName?, rootPackages?, javaVersion?, sourceEncoding?, description?}
+	 * 본문: {projectId, localPath, projectName?, rootPackages?, javaVersion?, sourceEncoding?, description?,
+	 *        dbConnections?: [{dbSeq?, dbName, envLabel?, jdbcUrl, username?, password?, schemaName?}]}
+	 * dbConnections 를 보내면 접속 정보를 통째로 바꿉니다(적은 순서 = 찾는 순서). 비밀번호를 비우거나 **** 이면 저장된 값을 그대로 둡니다.
+	 * 응답의 비밀번호는 언제나 **** 입니다.
 	 * </pre>
 	 */
 	@PostMapping
 	public Map<String, Object> saveProject(@RequestBody Map<String, Object> request) {
 		return projectService.saveProject(request);
+	}
+
+	/**
+	 * <pre>
+	 * DB 접속 시험. 저장하지 않은 값으로도 시험할 수 있습니다.
+	 * 본문: {dbSeq?, jdbcUrl, username?, password?, schemaName?}. 비밀번호를 비우거나 **** 이면 dbSeq 로 저장된 비밀번호를 씁니다.
+	 * 응답: {ok, message?, product?, schema?, tableCount?, elapsedMillis}. 붙지 못해도 200 이고 ok=false 입니다.
+	 * </pre>
+	 */
+	@PostMapping("/{projectId}/db-connections/test")
+	public Map<String, Object> testDbConnection(@PathVariable("projectId") String projectId, @RequestBody(required = false) Map<String, Object> request) {
+		projectService.getProject(projectId);
+		return projectDbService.test(projectId, request);
 	}
 
 	@GetMapping

@@ -209,7 +209,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro �
 - `sqlSessionBatch` 트랜잭션 안에서 `sqlSessionCommon`을 쓰지 않는다.
 - 프레임워크 관례(애노테이션, SQL 이름을 받는 메소드, 상위 타입, 화면 함수)는 먼저 규칙 파일에 **코드 모양 그대로** 적는다(`conf/rules/README.md`, `docs/11` 3장). 폴더가 우선순위다: `projects/{프로젝트ID}/` > `common/` > `guess/`. 규칙 파일의 절(`layer:` `entry:` `sql:` …)마다 처리기가 하나다(`LayerResolver`, `EntryFinder`, `SqlLinker` …). 규칙으로 안 되는 것만 새 `SemanticStep` bean을 만들어 `SemanticPass.steps()`에 넣고, Java를 다시 파싱하지 말고 `analysis_*` 테이블에서 SQL로 도출한다. 규칙으로 만든 결과에는 `ruleAt`(파일:줄)을 남긴다. 단계마다 지원하지 않는 것은 `docs/11` 2장의 "못 하는 것".
 - 이름(statement, 거래 ID, 화면 경로)은 **계산하고 추측하지 않는다.** 따옴표 리터럴만 인정한다.
-- 비밀값은 저장하지 않는다(`****`). XML은 모두 `common.util.SafeXml`로 읽는다. JSQLParser는 fast mode, 호출 스레드에서만.
+- 비밀값은 저장하지 않는다(`****`). 예외는 프로젝트의 DB 접속 비밀번호(`analysis_project_db`) 하나로, `EncUtil`로 암호화해 저장하고 API는 `****`만 돌려준다(`ProjectDbService`). XML은 모두 `common.util.SafeXml`로 읽는다. JSQLParser는 fast mode, 호출 스레드에서만.
 - `analysis_*`만 원본이다. `kg_*`는 VIEW, `rag_*`는 언제든 재생성. 임베딩 키는 `(content_hash, model)`이며 모델명·차원은 `RagSettings`로 읽는다.
 - 대화형 요청에서 `EmbeddingModel`을 부를 때는 `rag.EmbeddingGate`를 거친다.
 - Lombok을 쓰지 않는다 (저장소 전체 규칙).

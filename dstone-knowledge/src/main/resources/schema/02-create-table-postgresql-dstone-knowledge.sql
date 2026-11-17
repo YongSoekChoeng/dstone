@@ -66,6 +66,24 @@ ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS classpath TEXT;
 -- common/ 과 guess/ 의 규칙, 그리고 이 프로젝트 폴더(conf/rules/projects/{프로젝트ID})의 규칙은 적지 않아도 쓴다.
 ALTER TABLE analysis_project ADD COLUMN IF NOT EXISTS rule_sets TEXT;
 
+-- 분석 대상 프로젝트가 쓰는 DB 의 접속 정보. 없어도 되고, 여러 개여도 된다(업무별로 DB 가 나뉜 경우).
+-- 테이블 · 컬럼의 정의와 코멘트를 찾을 때 소스보다 먼저 여기를 본다(DbCommentReader). sort_order 순서대로 찾는다.
+-- 비밀번호는 EncUtil 로 암호화해서 넣고, API 는 어떤 경우에도 돌려주지 않는다(****).
+CREATE TABLE IF NOT EXISTS analysis_project_db (
+    project_id        VARCHAR(100)  NOT NULL REFERENCES analysis_project (project_id) ON DELETE CASCADE,
+    db_seq            INTEGER       NOT NULL,           -- 프로젝트 안에서의 번호. 고칠 때 저장된 비밀번호를 찾는 데 쓴다
+    db_name           VARCHAR(100)  NOT NULL,           -- 화면에 보일 이름 (예: 계정계)
+    env_label         VARCHAR(50),                      -- 어느 환경의 DB 인지 (예: 개발, 검증, 운영)
+    jdbc_url          VARCHAR(1000) NOT NULL,
+    username          VARCHAR(200),
+    password_enc      TEXT,                             -- EncUtil 로 암호화한 비밀번호
+    schema_name       VARCHAR(200),                     -- 테이블이 있는 스키마. 없으면 접속한 사용자의 기본 스키마
+    sort_order        INTEGER       NOT NULL DEFAULT 0, -- 찾는 순서
+    created_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, db_seq)
+);
+
 -- 리비전: 한 프로젝트의 어느 시점(커밋 등)
 CREATE TABLE IF NOT EXISTS analysis_revision (
     revision_id         BIGSERIAL     PRIMARY KEY,

@@ -18,6 +18,7 @@ import net.dstone.knowledge.api.service.DiffService;
 import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
 import net.dstone.knowledge.api.service.SymbolService;
+import net.dstone.knowledge.api.service.StructureService;
 import net.dstone.knowledge.api.service.UnusedService;
 
 /**
@@ -49,6 +50,20 @@ public class RevisionController {
 
 	@Autowired
 	private UnusedService unusedService;
+
+	@Autowired
+	private StructureService structureService;
+
+	/**
+	 * <pre>
+	 * 현행 구조: 계층별 개수(노드 맵과 같은 기준), 업무 영역별 규모, 화면 · 진입점 종류, 신뢰도.
+	 * 프로젝트 화면의 첫 탭이 이것 하나로 그려집니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/structure")
+	public Map<String, Object> getStructure(@PathVariable("revisionId") long revisionId) {
+		return structureService.getStructure(revisionId);
+	}
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */
 	@GetMapping("/{revisionId}")

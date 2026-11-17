@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 프로젝트가 쓰는 DB 의 접속 정보(analysis_project_db). 비밀번호는 암호화된 채로만 오간다 -->
+<mapper namespace="net.dstone.knowledge.api.dao.ProjectDbDao">
+
+    <!-- 프로젝트의 접속 정보를 찾는 순서대로. passwordEnc 는 서버 안에서만 쓰고 API 로 내보내지 않는다 -->
+    <select id="selectList" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT db_seq AS "dbSeq"
+             , db_name AS "dbName"
+             , env_label AS "envLabel"
+             , jdbc_url AS "jdbcUrl"
+             , username AS "username"
+             , password_enc AS "passwordEnc"
+             , schema_name AS "schemaName"
+             , sort_order AS "sortOrder"
+             , to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt"
+          FROM analysis_project_db
+         WHERE project_id = #{projectId}
+         ORDER BY sort_order, db_seq
+    </select>
+
+    <delete id="deleteByProject" parameterType="string">
+        DELETE FROM analysis_project_db WHERE project_id = #{projectId}
+    </delete>
+
+    <insert id="insert" parameterType="java.util.Map">
+        INSERT INTO analysis_project_db
+            (project_id, db_seq, db_name, env_label, jdbc_url, username, password_enc, schema_name, sort_order)
+        VALUES
+            (#{projectId}, #{dbSeq}, #{dbName}, #{envLabel}, #{jdbcUrl}, #{username}, #{passwordEnc}, #{schemaName}, #{sortOrder})
+    </insert>
+
+</mapper>

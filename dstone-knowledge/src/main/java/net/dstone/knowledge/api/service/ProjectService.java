@@ -28,6 +28,9 @@ public class ProjectService extends BaseObject {
 	@Autowired
 	private RuleFiles ruleFiles;
 
+	@Autowired
+	private ProjectDbService projectDbService;
+
 	/**
 	 * <pre>
 	 * 프로젝트를 등록합니다. 같은 projectId가 이미 있으면 내용을 고칩니다.
@@ -35,6 +38,7 @@ public class ProjectService extends BaseObject {
 	 * 소스는 이 서버가 직접 읽을 수 있는 로컬 폴더여야 합니다(localPath).
 	 * ruleSets 에는 빌려 쓸 다른 프로젝트의 규칙(conf/rules/projects 아래 폴더 이름 hi-japan, 또는 파일 hi-japan/backend)을 적습니다.
 	 * git 저장소에서 받아 오는 기능은 증분 분석(M7) 때 붙입니다.
+	 * dbConnections(선택, 목록)를 보내면 DB 접속 정보를 통째로 바꿉니다. 보내지 않으면 저장된 접속 정보를 건드리지 않습니다.
 	 * </pre>
 	 */
 	public Map<String, Object> saveProject(Map<String, Object> request) {
@@ -54,6 +58,10 @@ public class ProjectService extends BaseObject {
 			throw ApiException.badRequest("localPath가 없거나 폴더가 아닙니다: " + localPath);
 		}
 
+		// DB 접속 정보가 잘못됐으면 프로젝트도 저장하지 않도록 먼저 확인한다
+		boolean withDb = request.containsKey("dbConnections");
+		List<Map<String, Object>> dbConnections = withDb ? projectDbService.check(request.get("dbConnections")) : null;
+
 		Map<String, Object> project = new HashMap<String, Object>();
 		project.put("projectId", projectId);
 		String projectName = text(request, "projectName");
@@ -66,19 +74,23 @@ public class ProjectService extends BaseObject {
 		project.put("ruleSets", ruleSets(request == null ? null : request.get("ruleSets")));
 		project.put("description", text(request, "description"));
 		projectDao.upsertProject(project);
-		return projectDao.selectProject(projectId);
+		if (withDb) {
+			projectDbService.replace(projectId, dbConnections);
+		}
+		return getProject(projectId);
 	}
 
 	public List<Map<String, Object>> getProjectList() {
 		return projectDao.selectProjectList();
 	}
 
-	/** 프로젝트를 조회합니다. 없으면 404 예외를 던집니다. */
+	/** 프로젝트를 조회합니다. DB 접속 정보(비밀번호는 ****)를 dbConnections 로 붙입니다. 없으면 404 예외를 던집니다. */
 	public Map<String, Object> getProject(String projectId) {
 		Map<String, Object> project = projectDao.selectProject(projectId);
 		if (project == null) {
 			throw ApiException.notFound("등록되지 않은 프로젝트입니다: " + projectId);
 		}
+		project.put("dbConnections", projectDbService.list(projectId));
 		return project;
 	}
 

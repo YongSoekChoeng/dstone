@@ -18,26 +18,36 @@ import org.springframework.stereotype.Component;
 
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
+import net.dstone.common.utils.EncUtil;
+import net.dstone.knowledge.api.dao.ProjectDbDao;
 import net.dstone.knowledge.common.util.ErrorText;
 
 /**
  * <pre>
- * 분석 대상 프로젝트가 쓰는 DB에서 테이블 / 컬럼 코멘트(한글명)를 읽습니다.
+ * 분석 대상 프로젝트가 쓰는 DB에서 테이블 / 컬럼의 정의와 코멘트(한글명)를 읽습니다.
  *
- * 있어도 되고 없어도 되는 기능입니다. 대부분의 프로젝트는 DB 접속 정보를 받지 못하므로,
- * 설정이 없으면 아무 데도 접속하지 않고 NOT_CONFIGURED 를 돌려줍니다. 그때는 DDL 파일, SQL 주석의 한글명을 씁니다.
+ * 있어도 되고 없어도 되는 기능입니다. 접속 정보가 없으면 아무 데도 접속하지 않고 NOT_CONFIGURED 를 돌려줍니다.
+ * 그때는 DDL 파일, SQL 주석의 한글명을 씁니다.
  *
- * 설정(conf/application.yml, 프로젝트 ID 마다):
- *   dstone.knowledge.dictionary.db.{프로젝트ID}.url       jdbc:mysql://... / jdbc:oracle:thin:@... / jdbc:postgresql://...
- *   dstone.knowledge.dictionary.db.{프로젝트ID}.username
- *   dstone.knowledge.dictionary.db.{프로젝트ID}.password  ENC(...) 로 적는다
- *   dstone.knowledge.dictionary.db.{프로젝트ID}.schema    (선택) 테이블이 있는 스키마. 없으면 접속한 사용자의 기본 스키마
+ * 접속 정보는 두 곳에서 찾습니다.
+ *   1) 프로젝트 화면에서 등록한 것(analysis_project_db). 여러 개일 수 있고, 등록한 순서대로 찾습니다.
+ *      비밀번호는 암호화돼 저장돼 있고 여기서만 풀어 씁니다.
+ *   2) 1)이 하나도 없을 때만, 예전 방식인 설정 파일(conf/application.yml, 프로젝트 ID 마다):
+ *        dstone.knowledge.dictionary.db.{프로젝트ID}.url       jdbc:mysql://... / jdbc:oracle:thin:@... / jdbc:postgresql://...
+ *        dstone.knowledge.dictionary.db.{프로젝트ID}.username
+ *        dstone.knowledge.dictionary.db.{프로젝트ID}.password  ENC(...) 로 적는다
+ *        dstone.knowledge.dictionary.db.{프로젝트ID}.schema    (선택)
+ *
+ * 접속이 여러 개일 때 테이블 하나를 찾는 순서:
+ *   - SCHEMA.TABLE 처럼 스키마가 붙어 있으면 그 스키마를 적어 둔 접속을 먼저 봅니다.
+ *   - 그 밖에는 등록한 순서대로 보고, 처음 찾은 곳의 것을 씁니다(결과의 source 가 그 접속 이름).
  *
  * 분석 결과(DB)에 저장하지 않고, 화면에서 테이블 상세를 열 때 그 테이블 하나만 읽습니다.
  * 코멘트는 소스가 아니라 운영 DB의 것이라 리비전과 상관이 없고, 저장해 두면 DB에서 고친 코멘트가 다시 분석할 때까지 안 바뀌기 때문입니다.
  * JDBC 의 표준 메타데이터(getTables / getColumns 의 REMARKS)로 읽으므로 DB 종류마다 SQL을 따로 두지 않습니다.
  * 읽기만 하고(read-only 접속), 오래 기다리지 않습니다(접속 10초, 응답 30초).
  * 같은 테이블은 10분 동안 다시 읽지 않습니다. 실패도 1분 동안 기억해서, DB가 죽었을 때 상세를 열 때마다 기다리지 않게 합니다.
+ * 접속 정보를 고치면 forget() 으로 그 프로젝트의 기억을 지웁니다.
  * </pre>
  */
 @Component
@@ -58,6 +68,9 @@ public class DbCommentReader extends BaseObject {
 
 	@Autowired
 	private ConfigProperty configProperty;
+
+	@Autowired
+	private ProjectDbDao projectDbDao;
 
 	private final Map<String, Cached> cache = new ConcurrentHashMap<String, Cached>();
 
@@ -83,11 +96,19 @@ public class DbCommentReader extends BaseObject {
 		/** 컬럼마다 {column, comment, dataType, ordinal}. DB에 정의된 순서 */
 		public final List<Map<String, Object>> columns;
 
+		/** 찾은 접속의 이름(OK 일 때). 접속이 여러 개일 때 어디서 찾았는지 알린다 */
+		public final String source;
+
 		Result(String status, String message, String tableComment, List<Map<String, Object>> columns) {
+			this(status, message, tableComment, columns, null);
+		}
+
+		Result(String status, String message, String tableComment, List<Map<String, Object>> columns, String source) {
 			this.status = status;
 			this.message = message;
 			this.tableComment = tableComment;
 			this.columns = columns;
+			this.source = source;
 		}
 	}
 
@@ -111,6 +132,27 @@ public class DbCommentReader extends BaseObject {
 			this.status = status;
 			this.message = message;
 			this.tables = tables;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 접속 하나. 비밀번호는 풀린 값이라 이 클래스 밖으로 내보내지 않습니다(로그, 응답 모두).
+	 * </pre>
+	 */
+	public static class Target {
+		final String name;
+		final String url;
+		final String username;
+		final String password;
+		final String schema;
+
+		public Target(String name, String url, String username, String password, String schema) {
+			this.name = name;
+			this.url = url;
+			this.username = username;
+			this.password = password;
+			this.schema = schema;
 		}
 	}
 
@@ -145,8 +187,8 @@ public class DbCommentReader extends BaseObject {
 	 * @param table 테이블 이름(대문자)
 	 */
 	public Result read(String projectId, String table) {
-		String url = configured(projectId, "url");
-		if (url == null) {
+		List<Target> targets = targets(projectId);
+		if (targets.isEmpty()) {
 			return new Result(NOT_CONFIGURED, null, null, new ArrayList<Map<String, Object>>());
 		}
 		String key = projectId + "|" + table;
@@ -155,14 +197,7 @@ public class DbCommentReader extends BaseObject {
 		if (cached != null && cached.expiresAt > now) {
 			return cached.result;
 		}
-		Result result;
-		try {
-			result = load(url, projectId, table);
-		} catch (Exception e) {
-			// 비밀번호가 메시지에 섞여 나올 일은 없지만, 접속 주소 정도만 남긴다.
-			warn("DB 코멘트를 읽지 못했습니다. projectId=" + projectId + ", table=" + table + ", url=" + url + ", 까닭=" + ErrorText.summaryOf(e));
-			result = new Result(FAILED, ErrorText.summaryOf(e), null, new ArrayList<Map<String, Object>>());
-		}
+		Result result = readFrom(ordered(targets, table), projectId, table);
 		if (cache.size() > MAX_CACHE) {
 			cache.clear();
 		}
@@ -172,21 +207,78 @@ public class DbCommentReader extends BaseObject {
 
 	/**
 	 * <pre>
+	 * 접속을 차례로 보며 테이블을 찾습니다. 처음 찾은 곳의 결과를 돌려줍니다.
+	 * 어디서도 못 찾았으면 NOT_FOUND, 붙지도 못한 곳만 있었으면 FAILED(까닭을 이어 적는다).
+	 * </pre>
+	 */
+	private Result readFrom(List<Target> targets, String projectId, String table) {
+		String bare = table.indexOf('.') >= 0 ? table.substring(table.lastIndexOf('.') + 1) : table;
+		StringBuilder failures = new StringBuilder();
+		StringBuilder notFound = new StringBuilder();
+		for (int i = 0; i < targets.size(); i++) {
+			Target target = targets.get(i);
+			try {
+				Result one = load(target, bare);
+				if (OK.equals(one.status)) {
+					return one;
+				}
+				notFound.append(notFound.length() == 0 ? "" : ", ").append(target.name);
+			} catch (Exception e) {
+				// 비밀번호가 메시지에 섞여 나올 일은 없지만, 접속 이름과 주소 정도만 남긴다.
+				warn("DB 코멘트를 읽지 못했습니다. projectId=" + projectId + ", table=" + table + ", 접속=" + target.name + ", url=" + target.url
+						+ ", 까닭=" + ErrorText.summaryOf(e));
+				failures.append(failures.length() == 0 ? "" : " / ").append(target.name).append(": ").append(ErrorText.summaryOf(e));
+			}
+		}
+		if (notFound.length() == 0 && failures.length() > 0) {
+			return new Result(FAILED, failures.toString(), null, new ArrayList<Map<String, Object>>());
+		}
+		String message = "DB에 이 테이블이 없습니다(찾아본 접속: " + notFound + ")." + (failures.length() > 0 ? " 붙지 못한 접속 - " + failures : "");
+		return new Result(NOT_FOUND, message, null, new ArrayList<Map<String, Object>>());
+	}
+
+	/**
+	 * <pre>
+	 * 찾는 순서. SCHEMA.TABLE 처럼 스키마가 붙어 있으면 그 스키마를 적어 둔 접속을 앞으로 옮기고, 나머지는 등록한 순서 그대로.
+	 * </pre>
+	 */
+	private List<Target> ordered(List<Target> targets, String table) {
+		int dot = table.lastIndexOf('.');
+		if (dot <= 0) {
+			return targets;
+		}
+		String schema = table.substring(0, dot);
+		List<Target> first = new ArrayList<Target>();
+		List<Target> rest = new ArrayList<Target>();
+		for (int i = 0; i < targets.size(); i++) {
+			Target target = targets.get(i);
+			if (target.schema != null && target.schema.equalsIgnoreCase(schema)) {
+				first.add(target);
+			} else {
+				rest.add(target);
+			}
+		}
+		first.addAll(rest);
+		return first;
+	}
+
+	/**
+	 * <pre>
 	 * 대상 DB에 직접 붙어 테이블 하나의 코멘트와 컬럼(이름, 코멘트, 타입, 순서)을 읽습니다.
 	 *
 	 * 흐름:
-	 *   1) 설정의 계정으로 읽기 전용 연결을 연다(시간 제한 옵션 포함).
+	 *   1) 접속 정보의 계정으로 읽기 전용 연결을 연다(시간 제한 옵션 포함).
 	 *   2) 스키마: 설정 값 → 없으면 연결의 기본 스키마
 	 *   3) DB가 이름을 저장하는 대소문자부터 테이블을 찾고, 찾으면 컬럼 메타데이터를 읽는다.
 	 *   4) 어느 쪽으로도 없으면 NOT_FOUND
 	 * </pre>
 	 */
-	private Result load(String url, String projectId, String table) throws SQLException {
-		Connection connection = open(url, projectId);
+	private Result load(Target target, String table) throws SQLException {
+		Connection connection = open(target);
 		try {
 			DatabaseMetaData meta = connection.getMetaData();
 			String catalog = connection.getCatalog();
-			String schema = schemaFor(connection, projectId);
+			String schema = schemaFor(connection, target);
 			// DB가 이름을 어떤 글자로 저장하는지에 따라 대문자 / 소문자로 찾는다(MySQL, PostgreSQL 은 보통 소문자).
 			String[] names = meta.storesLowerCaseIdentifiers() ? new String[] { table.toLowerCase(Locale.ROOT), table }
 					: new String[] { table, table.toLowerCase(Locale.ROOT) };
@@ -219,7 +311,7 @@ public class DbCommentReader extends BaseObject {
 				} finally {
 					rs.close();
 				}
-				return new Result(OK, null, tableComment, columns);
+				return new Result(OK, null, tableComment, columns, target.name);
 			}
 			return new Result(NOT_FOUND, "DB에 이 테이블이 없습니다(스키마 " + schema + ").", null, new ArrayList<Map<String, Object>>());
 		} finally {
@@ -237,8 +329,8 @@ public class DbCommentReader extends BaseObject {
 	 * @return status / message 와, OK 일 때 tables(이름 목록)
 	 */
 	public TableList listTables(String projectId) {
-		String url = configured(projectId, "url");
-		if (url == null) {
+		List<Target> targets = targets(projectId);
+		if (targets.isEmpty()) {
 			return new TableList(NOT_CONFIGURED, null, new ArrayList<String>());
 		}
 		long now = System.currentTimeMillis();
@@ -246,44 +338,143 @@ public class DbCommentReader extends BaseObject {
 		if (cached != null && cached.expiresAt > now) {
 			return cached.result;
 		}
-		TableList result;
-		try {
-			Connection connection = open(url, projectId);
+		// 접속마다 읽어 합친다. 한 곳이라도 읽었으면 OK 이고, 못 읽은 곳은 message 에 남긴다.
+		java.util.Set<String> tables = new java.util.TreeSet<String>();
+		StringBuilder failures = new StringBuilder();
+		int ok = 0;
+		for (int i = 0; i < targets.size(); i++) {
+			Target target = targets.get(i);
 			try {
-				List<String> tables = new ArrayList<String>();
-				ResultSet rs = connection.getMetaData().getTables(connection.getCatalog(), schemaFor(connection, projectId), "%", new String[] { "TABLE" });
-				try {
-					while (rs.next()) {
-						tables.add(rs.getString("TABLE_NAME").toUpperCase(Locale.ROOT));
-					}
-				} finally {
-					rs.close();
-				}
-				result = new TableList(OK, null, tables);
-			} finally {
-				connection.close();
+				tables.addAll(tableNames(target));
+				ok++;
+			} catch (Exception e) {
+				warn("DB 테이블 목록을 읽지 못했습니다. projectId=" + projectId + ", 접속=" + target.name + ", url=" + target.url + ", 까닭=" + ErrorText.summaryOf(e));
+				failures.append(failures.length() == 0 ? "" : " / ").append(target.name).append(": ").append(ErrorText.summaryOf(e));
 			}
-		} catch (Exception e) {
-			warn("DB 테이블 목록을 읽지 못했습니다. projectId=" + projectId + ", url=" + url + ", 까닭=" + ErrorText.summaryOf(e));
-			result = new TableList(FAILED, ErrorText.summaryOf(e), new ArrayList<String>());
 		}
+		TableList result = ok > 0 ? new TableList(OK, failures.length() == 0 ? null : failures.toString(), new ArrayList<String>(tables))
+				: new TableList(FAILED, failures.toString(), new ArrayList<String>());
 		listCache.put(projectId, new CachedList(now + (FAILED.equals(result.status) ? KEEP_FAILED_MILLIS : KEEP_MILLIS), result));
 		return result;
 	}
 
-	/** 설정의 계정으로 읽기 전용 연결을 엽니다(시간 제한 옵션 포함). */
-	private Connection open(String url, String projectId) throws SQLException {
+	/** 접속 하나의 스키마에 있는 테이블 이름(대문자). 뷰는 넣지 않는다 */
+	private List<String> tableNames(Target target) throws SQLException {
+		Connection connection = open(target);
+		try {
+			List<String> tables = new ArrayList<String>();
+			ResultSet rs = connection.getMetaData().getTables(connection.getCatalog(), schemaFor(connection, target), "%", new String[] { "TABLE" });
+			try {
+				while (rs.next()) {
+					tables.add(rs.getString("TABLE_NAME").toUpperCase(Locale.ROOT));
+				}
+			} finally {
+				rs.close();
+			}
+			return tables;
+		} finally {
+			connection.close();
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 접속 시험. 프로젝트 화면의 [접속 시험] 버튼이 부릅니다. 캐시를 쓰지 않고 그때그때 붙어 봅니다.
+	 * 돌려주는 것: ok, message(실패 까닭), product(DB 이름 · 버전), schema(실제로 볼 스키마), tableCount(그 스키마의 테이블 수)
+	 * 비밀번호는 돌려주지 않습니다.
+	 * </pre>
+	 */
+	public Map<String, Object> test(Target target) {
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		long started = System.currentTimeMillis();
+		try {
+			Connection connection = open(target);
+			try {
+				DatabaseMetaData meta = connection.getMetaData();
+				String schema = schemaFor(connection, target);
+				int count = 0;
+				ResultSet rs = meta.getTables(connection.getCatalog(), schema, "%", new String[] { "TABLE" });
+				try {
+					while (rs.next()) {
+						count++;
+					}
+				} finally {
+					rs.close();
+				}
+				result.put("ok", Boolean.TRUE);
+				result.put("product", meta.getDatabaseProductName() + " " + meta.getDatabaseProductVersion());
+				result.put("schema", schema);
+				result.put("tableCount", Integer.valueOf(count));
+			} finally {
+				connection.close();
+			}
+		} catch (Exception e) {
+			result.put("ok", Boolean.FALSE);
+			result.put("message", ErrorText.summaryOf(e));
+		}
+		result.put("elapsedMillis", Long.valueOf(System.currentTimeMillis() - started));
+		return result;
+	}
+
+	/** 프로젝트의 접속 정보를 고쳤을 때 부릅니다. 그 프로젝트에 대해 기억해 둔 결과를 지웁니다 */
+	public void forget(String projectId) {
+		listCache.remove(projectId);
+		String prefix = projectId + "|";
+		java.util.Iterator<String> keys = cache.keySet().iterator();
+		while (keys.hasNext()) {
+			if (keys.next().startsWith(prefix)) {
+				keys.remove();
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 이 프로젝트의 접속 목록. 화면에서 등록한 것이 있으면 그것을 순서대로, 없으면 설정 파일의 것 하나, 그것도 없으면 빈 목록.
+	 * 저장된 비밀번호는 여기서 풉니다. 풀지 못하면(암호화 키가 바뀐 경우 등) 그 접속은 비밀번호 없이 시도합니다.
+	 * </pre>
+	 */
+	List<Target> targets(String projectId) {
+		List<Target> targets = new ArrayList<Target>();
+		List<Map<String, Object>> rows = projectDbDao.selectList(projectId);
+		for (int i = 0; i < rows.size(); i++) {
+			Map<String, Object> row = rows.get(i);
+			targets.add(new Target(String.valueOf(row.get("dbName")), (String) row.get("jdbcUrl"), blankToNull((String) row.get("username")),
+					decrypt(projectId, (String) row.get("passwordEnc")), blankToNull((String) row.get("schemaName"))));
+		}
+		if (targets.isEmpty()) {
+			String url = configured(projectId, "url");
+			if (url != null) {
+				targets.add(new Target("설정 파일", url, configured(projectId, "username"), configured(projectId, "password"), configured(projectId, "schema")));
+			}
+		}
+		return targets;
+	}
+
+	/** 저장된 비밀번호를 풉니다. 비었으면 null */
+	private String decrypt(String projectId, String encrypted) {
+		if (blankToNull(encrypted) == null) {
+			return null;
+		}
+		try {
+			return EncUtil.decrypt(encrypted);
+		} catch (RuntimeException e) {
+			warn("저장된 DB 비밀번호를 풀지 못했습니다(암호화 키가 바뀌었을 수 있습니다). projectId=" + projectId);
+			return null;
+		}
+	}
+
+	/** 접속 정보의 계정으로 읽기 전용 연결을 엽니다(시간 제한 옵션 포함). */
+	private Connection open(Target target) throws SQLException {
 		Properties properties = new Properties();
-		String username = configured(projectId, "username");
-		String password = configured(projectId, "password");
-		if (username != null) {
-			properties.setProperty("user", username);
+		if (target.username != null) {
+			properties.setProperty("user", target.username);
 		}
-		if (password != null) {
-			properties.setProperty("password", password);
+		if (target.password != null) {
+			properties.setProperty("password", target.password);
 		}
-		addDriverOptions(url, properties);
-		Connection connection = DriverManager.getConnection(url, properties);
+		addDriverOptions(target.url, properties);
+		Connection connection = DriverManager.getConnection(target.url, properties);
 		try {
 			connection.setReadOnly(true);
 		} catch (SQLException e) {
@@ -292,10 +483,9 @@ public class DbCommentReader extends BaseObject {
 		return connection;
 	}
 
-	/** 테이블을 찾을 스키마: 설정 값 → 없으면 연결의 기본 스키마 */
-	private String schemaFor(Connection connection, String projectId) {
-		String schema = configured(projectId, "schema");
-		return schema != null ? schema : schemaOf(connection);
+	/** 테이블을 찾을 스키마: 접속 정보에 적은 값 → 없으면 연결의 기본 스키마 */
+	private String schemaFor(Connection connection, Target target) {
+		return target.schema != null ? target.schema : schemaOf(connection);
 	}
 
 	/** 접속 / 응답 시간 제한과, 코멘트를 돌려 달라는 옵션. 드라이버마다 이름과 단위가 다르다. */

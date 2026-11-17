@@ -1348,7 +1348,8 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 .kn-strip { display: flex; }
 .kn-strip-step { flex: 1 1 0; min-width: 0; margin-left: -6px; }
 .kn-strip-step:first-child { margin-left: 0; }
-.ai-body .kn-strip-step a {
+.ai-body .kn-strip-step a,
+.ai-body .kn-strip-step .kn-strip-box {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
@@ -1359,15 +1360,15 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 	clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
 	transition: filter 0.12s;
 }
-.ai-body .kn-strip-step:first-child a { padding-left: 14px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); border-radius: var(--cs-radius-sm) 0 0 var(--cs-radius-sm); }
-.ai-body .kn-strip-step:last-child a { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%); border-radius: 0 var(--cs-radius-sm) var(--cs-radius-sm) 0; }
+.ai-body .kn-strip-step:first-child a, .ai-body .kn-strip-step:first-child .kn-strip-box { padding-left: 14px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); border-radius: var(--cs-radius-sm) 0 0 var(--cs-radius-sm); }
+.ai-body .kn-strip-step:last-child a, .ai-body .kn-strip-step:last-child .kn-strip-box { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%); border-radius: 0 var(--cs-radius-sm) var(--cs-radius-sm) 0; }
 .ai-body .kn-strip-step a:hover { filter: brightness(0.96); text-decoration: none; }
 .ai-body .kn-strip-step a:focus-visible { outline: 2px solid var(--kn-c); outline-offset: 2px; }
 .kn-strip-label { font-size: 12px; font-weight: 700; color: var(--kn-c); }
 .kn-strip-num { font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: -0.03em; color: var(--cs-text); font-variant-numeric: tabular-nums; }
 .kn-strip-unit { font-size: 11.5px; color: var(--cs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 0개인 계층(예: DAO 없이 매퍼 인터페이스를 바로 부르는 구조)은 흐리게. 빠뜨린 게 아니라 없다는 뜻 */
-.kn-strip-zero a { background: var(--cs-surface-2) !important; }
+.kn-strip-zero a, .kn-strip-zero .kn-strip-box { background: var(--cs-surface-2) !important; }
 .kn-strip-zero .kn-strip-num { color: var(--cs-faint); }
 
 .kn-flow-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; margin-top: 12px; font-size: 13px; color: var(--cs-muted); }
@@ -1377,7 +1378,8 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 	/* 좁으면 화살 대신 세 칸씩 두 줄 */
 	.kn-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 	.kn-strip-step { margin-left: 0; }
-	.ai-body .kn-strip-step a, .ai-body .kn-strip-step:first-child a, .ai-body .kn-strip-step:last-child a { clip-path: none; padding: 10px 12px; border-radius: var(--cs-radius-sm); }
+	.ai-body .kn-strip-step a, .ai-body .kn-strip-step .kn-strip-box, .ai-body .kn-strip-step:first-child a, .ai-body .kn-strip-step:last-child a,
+	.ai-body .kn-strip-step:first-child .kn-strip-box, .ai-body .kn-strip-step:last-child .kn-strip-box { clip-path: none; padding: 10px 12px; border-radius: var(--cs-radius-sm); }
 }
 
 .kn-dash-start[hidden] { display: none; }
@@ -1824,3 +1826,103 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 /* 개요 "테이블" 목록의 작업 체크박스 */
 .kn-table-ops{display:inline-flex;gap:10px;align-items:center;white-space:nowrap;margin:0 4px;}
 .kn-table-ops label{display:inline-flex;gap:3px;align-items:center;cursor:pointer;}
+
+/* ==========================================================================
+   "프로젝트" 화면(knowledge/project/project): 목록 → 홈(신뢰도 + 현행 구조) → 등록 · 설정
+   ========================================================================== */
+
+.kn-proj-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.kn-proj-head > div > p { max-width: 980px; margin: 0; color: var(--cs-muted); font-size: 14px; line-height: 1.7; }
+.kn-proj-actions { display: flex; gap: 8px; }
+.kn-proj-actions [hidden] { display: none; }
+#kn-proj-list-view[hidden], #kn-proj-home[hidden], #kn-proj-form-view[hidden], #kn-proj-empty[hidden], #kn-proj-structure[hidden] { display: none; }
+
+/* 목록: 프로젝트마다 한 줄. 줄 전체가 링크 */
+.kn-proj-list { display: grid; gap: 10px; }
+.ai-body a.kn-proj-item {
+	display: block;
+	padding: 14px 18px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-lg);
+	color: var(--cs-text);
+	text-decoration: none;
+}
+.ai-body a.kn-proj-item:hover { border-color: var(--cs-border-strong); text-decoration: none; }
+.ai-body a.kn-proj-item:focus-visible { outline: 2px solid var(--cs-primary); outline-offset: 2px; }
+.kn-proj-item-name b { font-size: 17px; letter-spacing: -0.02em; }
+.kn-proj-item-desc { margin-top: 2px; font-size: 13px; color: var(--cs-text-2); }
+.kn-proj-item-path { margin-top: 4px; color: var(--cs-faint); }
+.kn-proj-item-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; font-size: 13px; color: var(--cs-muted); }
+.kn-proj-item-facts b { color: var(--cs-text); font-variant-numeric: tabular-nums; }
+.kn-proj-when { color: var(--cs-faint); font-variant-numeric: tabular-nums; }
+
+/* 홈: 목록으로 · 리비전 고르기, 그 아래 신뢰도 한 줄 */
+.kn-proj-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+.ai-body a.kn-proj-back { font-size: 13px; font-weight: 600; }
+.ai-body a.kn-proj-back::before { content: "‹ "; }
+.kn-proj-rev { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--cs-muted); }
+.kn-proj-rev select { min-width: 280px; }
+.kn-proj-trust {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 20px;
+	padding: 10px 14px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	font-size: 13px;
+	color: var(--cs-muted);
+}
+.kn-proj-trust b { color: var(--cs-text); font-variant-numeric: tabular-nums; }
+.kn-proj-trust .kn-dash-rate-good > b { color: var(--cs-success); }
+.kn-proj-trust .kn-dash-rate-warn > b { color: var(--cs-warning); }
+.kn-proj-trust .kn-dash-rate-bad > b { color: var(--cs-danger); }
+.kn-proj-trust-label { font-weight: 700; color: var(--cs-text-2); }
+.kn-proj-trust-reason { flex: 1 1 320px; min-width: 0; }
+.kn-proj-trust a { margin-left: auto; font-weight: 600; white-space: nowrap; }
+
+.kn-proj-empty { padding: 28px 22px; background: var(--cs-surface); border: 1px dashed var(--cs-border-strong); border-radius: var(--cs-radius-lg); color: var(--cs-text-2); }
+.kn-proj-empty p { margin: 0 0 6px; }
+
+/* 현행 구조: 흐름 띠 → 화면 기술 · 진입점 종류 → 업무 영역 표 */
+.kn-proj-kinds { display: flex; flex-wrap: wrap; gap: 4px 24px; margin: 12px 2px 18px; font-size: 13px; color: var(--cs-muted); }
+.kn-proj-kinds b { color: var(--cs-text-2); font-weight: 600; margin-right: 4px; }
+.kn-proj-sectionhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.kn-proj-sectionhead h3 { margin: 0; }
+.ai-body .kn-proj-sectionhead .kn-btn { height: 30px; font-size: 12px; }
+.kn-proj-areas { max-height: 560px; }
+.kn-proj-areas .document-list-table { min-width: 760px; }
+/* 영역 이름 옆 막대: 영역 크기(화면 + 진입점 + 클래스 + SQL 문)를 가장 큰 영역에 견준 길이 */
+.kn-proj-area { display: flex; align-items: center; gap: 10px; min-width: 200px; }
+.kn-proj-area > span { flex: 0 0 auto; min-width: 72px; font-weight: 600; }
+.kn-proj-area i { flex: 1; height: 6px; border-radius: 999px; background: var(--cs-surface-3); overflow: hidden; }
+.kn-proj-area i b { display: block; height: 100%; border-radius: 999px; background: var(--cs-primary); opacity: 0.55; }
+.kn-proj-zero { color: var(--cs-faint); }
+
+/* 등록 · 설정 */
+.kn-proj-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.kn-proj-wide { grid-column: 1 / -1; }
+.kn-proj-subtitle { margin: 18px 0 4px; font-size: 15px; }
+.kn-proj-subtitle small { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--cs-muted); }
+.kn-proj-dbs { display: grid; gap: 10px; margin: 10px 0; }
+.kn-proj-db { padding: 12px 14px 10px; border: 1px solid var(--cs-border); border-radius: var(--cs-radius); background: var(--cs-surface-2); }
+.kn-proj-db-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 12px; }
+.kn-proj-db-fields .kn-field { margin-bottom: 6px; }
+.kn-proj-db-fields .kn-field > span { font-size: 12px; font-weight: 600; color: var(--cs-muted); }
+.kn-proj-db-url { grid-column: span 2; }
+.kn-proj-db-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ai-body .kn-proj-db-actions .kn-btn { height: 28px; padding: 0 10px; font-size: 12px; }
+.ai-body .kn-proj-db-actions .kn-proj-db-remove { color: var(--cs-danger); }
+.kn-proj-db-result { font-size: 12.5px; color: var(--cs-muted); }
+.kn-proj-db-ok { color: var(--cs-success); font-weight: 600; }
+.kn-proj-db-bad { color: var(--cs-danger); font-weight: 600; }
+.kn-proj-form-actions { margin-top: 14px; }
+
+@media screen and (max-width: 860px) {
+	.kn-proj-grid, .kn-proj-db-fields { grid-template-columns: minmax(0, 1fr); }
+	.kn-proj-db-url { grid-column: auto; }
+	.kn-proj-rev select { min-width: 0; width: 100%; }
+	.kn-proj-trust a { margin-left: 0; }
+}

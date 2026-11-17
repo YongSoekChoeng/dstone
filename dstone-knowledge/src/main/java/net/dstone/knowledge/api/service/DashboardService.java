@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import net.dstone.common.core.BaseObject;
 import net.dstone.knowledge.api.dao.DashboardDao;
+import net.dstone.knowledge.api.dao.StructureDao;
 import net.dstone.knowledge.rag.RagSettings;
 
 /**
@@ -32,6 +33,9 @@ public class DashboardService extends BaseObject {
 
 	@Autowired
 	private DashboardDao dashboardDao;
+
+	@Autowired
+	private StructureDao structureDao;
 
 	@Autowired
 	private EmbeddingStatusService embeddingStatusService;
@@ -59,11 +63,31 @@ public class DashboardService extends BaseObject {
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		result.put("generatedAt", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 		result.put("totals", dashboardDao.selectTotals());
-		result.put("projects", dashboardDao.selectProjects());
+		result.put("projects", projects());
 		result.put("recentJobs", dashboardDao.selectRecentJobs(RECENT_JOBS));
 		result.put("documents", documents(tenant));
 		result.put("embedding", embedding());
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 프로젝트마다 한 줄. 분석이 끝난 리비전이 있으면 계층별 개수(screens, controllers, services, daos, mappers, sqlStatements, tables)를 붙인다.
+	 * 계층별 개수는 프로젝트 화면의 "현행 구조"와 같은 SQL(StructureDao.selectLayerCounts)이라 두 화면의 숫자가 늘 같다.
+	 * </pre>
+	 */
+	private List<Map<String, Object>> projects() {
+		List<Map<String, Object>> projects = dashboardDao.selectProjects();
+		for (int i = 0; i < projects.size(); i++) {
+			Object ready = projects.get(i).get("readyRevisionId");
+			if (ready instanceof Number) {
+				Map<String, Object> layers = structureDao.selectLayerCounts(((Number) ready).longValue());
+				if (layers != null) {
+					projects.get(i).putAll(layers);
+				}
+			}
+		}
+		return projects;
 	}
 
 	/** 올린 문서 현황: 묶음별 줄을 더한 합계 + 묶음별 줄 + 최근 올린 문서 몇 건 */

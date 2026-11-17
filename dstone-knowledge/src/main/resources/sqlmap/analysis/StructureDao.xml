@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 리비전의 "현행 구조"(계층별 개수, 업무 영역별 규모). 저장된 분석 결과를 읽기만 한다.
+     업무 영역으로 묶는 일(공통 앞부분 떼기)은 Java(StructureService)가 한다. 여기서는 패키지 / 폴더 단위로 센 행만 돌려준다 -->
+<mapper namespace="net.dstone.knowledge.api.dao.StructureDao">
+
+    <!-- 계층별 개수. 노드 맵의 계층 칸과 같은 기준이다(GraphDao.xml selectGraphNodes, graph-common.js tierOf):
+           화면 = 화면 파일(JSP · WebSquare · Nexacro), 컨트롤러 · 서비스 · DAO = 가장 바깥 클래스(화면 안에서 만든 것은 뺀다),
+           웹 필터(WEB_FILTER)는 컨트롤러 칸, SQL 문은 SQL_FRAGMENT 를 뺀 것, 테이블은 SQL 에 나오는 테이블.
+         대시보드(DashboardService)도 이 숫자를 쓴다 -->
+    <select id="selectLayerCounts" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT (SELECT COUNT(*) FROM analysis_file f
+                 WHERE f.revision_id = #{revisionId}
+                   AND <include refid="net.dstone.knowledge.api.dao.GraphDao.isScreen"/>) AS "screens"
+             , ly.controllers AS "controllers"
+             , ly.services AS "services"
+             , ly.daos AS "daos"
+             , (SELECT COUNT(DISTINCT mp.file_id) FROM analysis_mapper mp WHERE mp.revision_id = #{revisionId}) AS "mappers"
+             , (SELECT COUNT(*) FROM analysis_mapper mp WHERE mp.revision_id = #{revisionId} AND mp.statement_type &lt;&gt; 'SQL_FRAGMENT') AS "sqlStatements"
+             , (SELECT COUNT(DISTINCT t.to_external) FROM analysis_relation t
+                 WHERE t.revision_id = #{revisionId} AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')) AS "tables"
+          FROM (SELECT COUNT(*) FILTER (WHERE s.layer IN ('CONTROLLER', 'WEB_FILTER')) AS controllers
+                     , COUNT(*) FILTER (WHERE s.layer = 'SERVICE') AS services
+                     , COUNT(*) FILTER (WHERE s.layer = 'REPOSITORY') AS daos
+                  FROM analysis_symbol s
+                  JOIN analysis_file f ON f.file_id = s.file_id
+                 WHERE s.revision_id = #{revisionId}
+                   AND s.outer_symbol_id IS NULL
+                   AND f.language &lt;&gt; 'JSP') ly
+    </select>
+
+    <!-- 패키지마다 계층별 클래스 수(가장 바깥 클래스, 화면 안에서 만든 것은 뺀다). layer: CONTROLLER / SERVICE / REPOSITORY -->
+    <select id="selectClassesByPackage" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT COALESCE(s.package_name, '') AS "key"
+             , (CASE WHEN s.layer = 'WEB_FILTER' THEN 'CONTROLLER' ELSE s.layer END) AS "layer"
+             , COUNT(*) AS "count"
+          FROM analysis_symbol s
+          JOIN analysis_file f ON f.file_id = s.file_id
+         WHERE s.revision_id = #{revisionId}
+           AND s.outer_symbol_id IS NULL
+           AND f.language &lt;&gt; 'JSP'
+           AND s.layer IN ('CONTROLLER', 'WEB_FILTER', 'SERVICE', 'REPOSITORY')
+         GROUP BY 1, 2
+    </select>
+
+    <!-- 폴더마다 화면 파일 수 -->
+    <select id="selectScreensByFolder" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="net.dstone.knowledge.api.dao.GraphDao.folderOf"><property name="column" value="f.path"/></include> AS "key"
+             , COUNT(*) AS "count"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND <include refid="net.dstone.knowledge.api.dao.GraphDao.isScreen"/>
+         GROUP BY 1
+    </select>
+
+    <!-- 패키지마다 진입점 수(주소를 받는 메소드가 든 클래스의 패키지). 클래스가 없는 진입점(화면 파일 자체)은 뺀다 -->
+    <select id="selectEndpointsByPackage" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT COALESCE(s.package_name, '') AS "key"
+             , COUNT(*) AS "count"
+          FROM analysis_endpoint e
+          JOIN analysis_symbol s ON s.revision_id = e.revision_id AND s.symbol_id = e.symbol_id
+         WHERE e.revision_id = #{revisionId}
+         GROUP BY 1
+    </select>
+
+    <!-- SQL 매퍼 파일의 폴더마다 SQL 문 수(SQL_FRAGMENT 는 뺀다) -->
+    <select id="selectStatementsByFolder" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="net.dstone.knowledge.api.dao.GraphDao.folderOf"><property name="column" value="f.path"/></include> AS "key"
+             , COUNT(*) AS "count"
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.statement_type &lt;&gt; 'SQL_FRAGMENT'
+         GROUP BY 1
+    </select>
+
+    <!-- SQL 매퍼 파일의 폴더와, 그 폴더의 SQL 이 쓰는 테이블(겹치지 않게). 영역마다 테이블 수를 셀 때 쓴다 -->
+    <select id="selectTablesByFolder" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT <include refid="net.dstone.knowledge.api.dao.GraphDao.folderOf"><property name="column" value="f.path"/></include> AS "key"
+             , t.to_external AS "table"
+          FROM analysis_relation t
+          JOIN analysis_mapper mp ON mp.revision_id = t.revision_id AND 'S' || mp.mapper_id = t.from_id
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE t.revision_id = #{revisionId}
+           AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND t.from_kind = 'SQL'
+           AND t.to_external IS NOT NULL
+    </select>
+
+    <!-- 화면 파일의 종류별 수(JSP / WEBSQUARE / NEXACRO) -->
+    <select id="selectScreenTypes" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT COALESCE(NULLIF(f.file_type, ''), 'JSP') AS "type"
+             , COUNT(*) AS "count"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND <include refid="net.dstone.knowledge.api.dao.GraphDao.isScreen"/>
+         GROUP BY 1
+         ORDER BY 2 DESC
+    </select>
+
+</mapper>

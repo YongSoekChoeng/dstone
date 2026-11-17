@@ -12,7 +12,8 @@ String contextPath = requestUtil.getStrContextPath();
 String linkBase = contextPath + "/defaultLink.do?defaultLink=";
 boolean knowledge = "knowledge".equals(request.getParameter("section"));
 
-// 메뉴 한 줄: {화면(defaultLink), 이름, 아이콘 이름}
+// 메뉴 한 줄: {화면(defaultLink), 이름, 아이콘 이름}. 첫 칸이 "#group" 이면 메뉴가 아니라 묶음 제목 줄이다
+
 String[][] aiMenus = {
 	{"ai/index", "개요", "home"},
 	{"ai/chat/chat", "채팅", "chat"},
@@ -20,13 +21,18 @@ String[][] aiMenus = {
 	{"ai/admin/workflow/workflow", "Workflow 실행 관리", "list"},
 	{"ai/designer/designer", "Workflow 디자이너", "flow"}
 };
+// 코드 분석 메뉴는 쓰는 목적으로 묶는다: 현행 파악(차세대 전환의 ASIS 분석), 변경 영향(SM 단계의 수정 영향도), 관리(분석을 돌리고 점검하는 사람용)
 String[][] knowledgeMenus = {
 	{"knowledge/dashboard/dashboard", "대시보드", "dashboard"},
-	{"knowledge/index", "프로젝트 · 분석", "folder"},
-	{"knowledge/search/search", "검색 · 문서", "search"},
-	{"knowledge/impact/impact", "영향도", "impact"},
+	{"#group", "현행 파악", ""},
+	{"knowledge/project/project", "프로젝트", "folder"},
 	{"knowledge/graph/graph", "노드 맵", "graph"},
+	{"knowledge/search/search", "검색 · 문서", "search"},
+	{"#group", "변경 영향", ""},
+	{"knowledge/impact/impact", "영향도", "impact"},
 	{"knowledge/diff/diff", "리비전 비교", "diff"},
+	{"#group", "관리", ""},
+	{"knowledge/index", "분석 실행 · 진단", "tool"},
 	{"knowledge/guide/guide", "사용 안내", "book"}
 };
 
@@ -45,6 +51,7 @@ icons.put("graph", "<circle cx='5' cy='6' r='2'/><circle cx='19' cy='6' r='2'/><
 icons.put("diff", "<path d='M7 3v12M3 7h8M17 21V9M13 17h8'/>");
 icons.put("book", "<path d='M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z'/><path d='M4 19.5A1.5 1.5 0 0 0 5.5 21H20'/>");
 icons.put("back", "<path d='M15 18 9 12l6-6'/>");
+icons.put("tool", "<path d='M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z'/>");
 
 // 이 화면 묶음의 이름, 첫 화면, 메뉴
 String brandName = knowledge ? "Knowledge" : "AI";
@@ -52,8 +59,11 @@ String brandHome = knowledge ? "knowledge/dashboard/dashboard" : "ai/index";
 String[][] menus = knowledge ? knowledgeMenus : aiMenus;
 %>
 <%!
-	/** 메뉴 한 줄의 HTML. 지금 화면이면 cs-nav-on 을 붙인다 */
+	/** 메뉴 한 줄의 HTML. 지금 화면이면 cs-nav-on 을 붙인다. 묶음 제목 줄("#group")이면 제목만 */
 	private String menuItem(String linkBase, String currentLink, String[] menu, java.util.Map<String, String> icons) {
+		if ("#group".equals(menu[0])) {
+			return "<p class=\"cs-nav-group\">" + menu[1] + "</p>";
+		}
 		boolean on = currentLink.equals(menu[0]);
 		return "<a href=\"" + linkBase + menu[0] + "\" class=\"cs-nav-item" + (on ? " cs-nav-on" : "") + "\"" + (on ? " aria-current=\"page\"" : "") + ">"
 			+ "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">" + icons.get(menu[2]) + "</svg><span>" + menu[1] + "</span></a>";
@@ -67,7 +77,9 @@ String[][] menus = knowledge ? knowledgeMenus : aiMenus;
 				<%-- dstone-boot 의 첫 화면으로 돌아간다(dstone-boot 왼쪽 메뉴의 "main" 과 같은 곳) --%>
 				<a class="cs-nav-item cs-nav-home" href="<%=contextPath%>/views/main"><svg viewBox="0 0 24 24" aria-hidden="true"><%=icons.get("back")%></svg><span>dstone-boot로 돌아가기</span></a>
 				<nav class="cs-nav" aria-label="<%=brandName%> 메뉴">
-					<p class="cs-nav-group"><%=knowledge ? "코드 분석" : "AI"%></p>
+<% if (!knowledge) { %>
+					<p class="cs-nav-group">AI</p>
+<% } %>
 <%
 for (int i = 0; i < menus.length; i++) {
 	out.print(menuItem(linkBase, currentLink, menus[i], icons));

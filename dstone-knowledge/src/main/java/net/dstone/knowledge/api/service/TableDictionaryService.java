@@ -207,6 +207,8 @@ public class TableDictionaryService extends BaseObject {
 		Map<String, Object> dictionary = new LinkedHashMap<String, Object>();
 		dictionary.put("db", db.status);
 		dictionary.put("dbMessage", db.message);
+		// 접속이 여러 개일 때 어느 접속에서 찾았는지(OK 일 때만)
+		dictionary.put("dbSource", db.source);
 		dictionary.put("ddlFiles", new ArrayList<String>(ddlFiles));
 		dictionary.put("file", fileState);
 		dictionary.put("fileMessage", fileMessage);

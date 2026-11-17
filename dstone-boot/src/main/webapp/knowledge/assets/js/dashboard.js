@@ -147,20 +147,6 @@ var DstoneKnowledgeDashboard = (function () {
 		return "<span class=\"" + cls + "\">" + inner + "</span>";
 	}
 
-	/**
-	 * 흐름 띠의 칸. 노드 맵의 계층과 같은 순서 · 이름 · 색이다(graph-common.js TIERS, knowledge.css --kn-layer-*).
-	 *   key  대시보드 API 의 건수 이름
-	 *   unit 숫자 밑에 붙는 설명
-	 */
-	var FLOW = [
-		{ key: "screens", layer: "view", label: "화면", unit: "화면 파일" },
-		{ key: "controllers", layer: "controller", label: "컨트롤러", unit: "클래스" },
-		{ key: "services", layer: "service", label: "서비스", unit: "클래스" },
-		{ key: "daos", layer: "dao", label: "DAO", unit: "클래스" },
-		{ key: "sqlStatements", layer: "sql", label: "SQL", unit: "" },
-		{ key: "tables", layer: "table", label: "테이블", unit: "SQL 에 나오는 테이블" }
-	];
-
 	/** 프로젝트마다 한 장 */
 	function renderProjects(projects) {
 		el["kn-dash-project-count"].textContent = projects.length > 0 ? format(projects.length) : "";
@@ -193,7 +179,7 @@ var DstoneKnowledgeDashboard = (function () {
 			hash += "&r=" + row.readyRevisionId + "&l=" + encodeURIComponent(row.readyRevisionLabel || "");
 		}
 		var name = row.projectName && row.projectName !== row.projectId ? " <span class=\"kn-flow-alias\">" + K.escapeHtml(row.projectName) + "</span>" : "";
-		return "<a class=\"kn-flow-project\" href=\"" + K.escapeHtml(K.pageUrl("knowledge/index", hash)) + "\">" + K.escapeHtml(row.projectId) + "</a>" + name;
+		return "<a class=\"kn-flow-project\" href=\"" + K.escapeHtml(K.pageUrl("knowledge/project/project", hash)) + "\">" + K.escapeHtml(row.projectId) + "</a>" + name;
 	}
 
 	/**
@@ -214,17 +200,7 @@ var DstoneKnowledgeDashboard = (function () {
 
 	/** 화면 → 컨트롤러 → 서비스 → DAO → SQL → 테이블. 칸을 누르면 그 리비전의 노드 맵이 열린다 */
 	function flowStrip(row) {
-		var mapUrl = K.pageUrl("knowledge/graph/graph", "p=" + encodeURIComponent(row.projectId) + "&r=" + row.readyRevisionId);
-		var html = "<div class=\"kn-strip\" role=\"list\" aria-label=\"계층별 개수\">";
-		for (var i = 0; i < FLOW.length; i++) {
-			var step = FLOW[i];
-			var count = number(row[step.key]);
-			var unit = step.key === "sqlStatements" ? "문 · 매퍼 파일 " + format(row.mappers) + "개" : step.unit;
-			html += "<div role=\"listitem\" class=\"kn-strip-step kn-layer-" + step.layer + (count === 0 ? " kn-strip-zero" : "") + "\">"
-				+ "<a href=\"" + K.escapeHtml(mapUrl) + "\" title=\"노드 맵에서 보기\"><span class=\"kn-strip-label\">" + K.escapeHtml(step.label) + "</span>"
-				+ "<span class=\"kn-strip-num\">" + format(count) + "</span><span class=\"kn-strip-unit\">" + K.escapeHtml(unit) + "</span></a></div>";
-		}
-		return html + "</div>";
+		return K.layerStrip(row, K.pageUrl("knowledge/graph/graph", "p=" + encodeURIComponent(row.projectId) + "&r=" + row.readyRevisionId));
 	}
 
 	/** 호출 해석률: 숫자 + 짧은 막대. 95% 이상 초록, 80% 이상 주황, 그 밑은 빨강 */

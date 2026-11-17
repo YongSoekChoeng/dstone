@@ -17,10 +17,11 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 			<div class="container">
 				<div class="row main-row">
 					<div class="col-12">
+			<%-- 분석을 돌리고 결과를 점검하는 사람(관리자)용 화면. 고객에게 보여 줄 현행 구조는 "프로젝트" 화면(knowledge/project/project)에 있다 --%>
 			<section class="cs-page-head">
-				<p class="cs-eyebrow">코드 분석</p>
-				<h2>프로젝트 · 분석</h2>
-				<p>왼쪽에서 프로젝트와 리비전을 고르면, 오른쪽에 그 리비전의 분석 결과가 탭으로 나옵니다.</p>
+				<h2>분석 실행 · 진단</h2>
+				<p>분석을 세밀하게 돌리고(단계 지정, 증분), 연결 품질 · 실행 기록으로 결과를 점검합니다.
+					현행 구조를 보려면 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/project/project">프로젝트</a> 화면으로 가세요.</p>
 			</section>
 
 			<details class="kn-howto">

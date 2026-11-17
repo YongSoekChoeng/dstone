@@ -20,5 +20,6 @@ TRUNCATE
 	, analysis_job;
 
 DELETE FROM analysis_revision;
+DELETE FROM analysis_project_db;
 DELETE FROM analysis_project;
 commit;
