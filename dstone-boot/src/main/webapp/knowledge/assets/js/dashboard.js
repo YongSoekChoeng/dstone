@@ -18,7 +18,7 @@ var DstoneKnowledgeDashboard = (function () {
 	var RATE_WARN = 80;
 
 	function init() {
-		["kn-dash-updated", "kn-dash-refresh-btn", "kn-dash-message", "kn-dash-cards", "kn-dash-start", "kn-dash-projects",
+		["kn-dash-updated", "kn-dash-refresh-btn", "kn-dash-message", "kn-dash-status", "kn-dash-start", "kn-dash-projects", "kn-dash-project-count",
 			"kn-dash-jobs", "kn-dash-embed-badge", "kn-dash-embed", "kn-dash-docs"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
@@ -55,7 +55,7 @@ var DstoneKnowledgeDashboard = (function () {
 			K.call("GET", "/api/system/health").catch(function (healthErr) {
 				return { status: "DOWN", error: healthErr.message };
 			}).then(function (health) {
-				el["kn-dash-cards"].innerHTML = serverCard(health);
+				el["kn-dash-status"].innerHTML = serverItem(health);
 			});
 			K.message(el["kn-dash-message"], "현황을 읽지 못했습니다: " + err.message, true);
 		}).then(function () {
@@ -90,7 +90,7 @@ var DstoneKnowledgeDashboard = (function () {
 
 	function render(health, data) {
 		var projects = data.projects || [];
-		renderCards(health, data);
+		renderStatus(health, data);
 		el["kn-dash-start"].hidden = projects.length > 0;
 		renderProjects(projects);
 		renderJobs(data.recentJobs || []);
@@ -98,112 +98,147 @@ var DstoneKnowledgeDashboard = (function () {
 		renderDocuments(data.documents || {});
 	}
 
-	/** 숫자 카드 5장 */
-	function renderCards(health, data) {
+	/**
+	 * 맨 위 상태 한 줄: 서버 · 분석 작업 · 임베딩 · 올린 문서.
+	 * 평소에는 조용한 회색 글씨이고, 문제가 있을 때(서버 안 됨, 실패, 임베딩 멈춤)만 색이 붙는다.
+	 */
+	function renderStatus(health, data) {
 		var totals = data.totals || {};
 		var embedding = data.embedding || {};
 		var docs = (data.documents || {}).totals || {};
-		var html = serverCard(health);
-
-		html += card("프로젝트", format(totals.projects), "분석이 끝난 리비전 " + format(totals.readyRevisions) + "개", "", "knowledge/index");
+		var html = serverItem(health);
 
 		var active = number(totals.activeJobs);
 		var failed = number(totals.failedJobs7d);
-		html += card("진행 중인 분석", format(active), failed > 0 ? "최근 7일 실패 " + format(failed) + "건" : "최근 7일 실패 없음",
-			failed > 0 || active > 0 ? "kn-card-warn" : "", "knowledge/index");
+		var jobs = active > 0 ? "분석 " + format(active) + "건 진행 중" : "진행 중인 분석 없음";
+		if (failed > 0) {
+			jobs += " · 최근 7일 실패 " + format(failed) + "건";
+		}
+		html += statusItem("분석", jobs, active > 0 ? "busy" : failed > 0 ? "warn" : "", "knowledge/index");
 
 		if (embedding.error || !embedding.totals) {
-			html += card("임베딩", "-", embedding.error ? "읽지 못했습니다" : "정보 없음", "", "knowledge/index");
+			html += statusItem("임베딩", embedding.error ? "읽지 못함" : "정보 없음", "warn", "knowledge/index");
 		} else {
 			var state = stateOf(embedding.state);
-			html += card("임베딩", embedding.totals.percent + "%", state.label + (number(embedding.totals.pending) > 0 ? " · 남은 " + format(embedding.totals.pending) + "건" : ""),
-				embedding.state === "DONE" ? "kn-card-ok" : embedding.state === "STOPPED" ? "kn-card-danger" : "", "knowledge/index");
+			html += statusItem("임베딩", embedding.totals.percent + "% · " + state.label,
+				embedding.state === "STOPPED" ? "bad" : embedding.state === "WORKING" || embedding.state === "WAITING" ? "busy" : "", "knowledge/index");
 		}
 
-		html += card("올린 문서", format(docs.documents), "묶음 " + format(docs.collections) + "개 · 청크 " + format(docs.chunks) + "개", "", "knowledge/search/search");
-		el["kn-dash-cards"].innerHTML = html;
+		html += statusItem("올린 문서", format(docs.documents) + "건 · 묶음 " + format(docs.collections) + "개", "", "knowledge/search/search");
+		el["kn-dash-status"].innerHTML = html;
 	}
 
-	/** 서버 상태 카드. UP 이 아니면 빨간 카드에 이유를 적는다 */
-	function serverCard(health) {
+	/** 서버 상태. UP 이 아니면 빨간색으로 이유를 적는다 */
+	function serverItem(health) {
 		var up = health && health.status === "UP";
-		var help = up ? "분석기 " + (health.analyzerVersion || "-") + " · DB " + ((health.db && health.db.database) || "-")
+		var text = up ? "정상 · 분석기 " + (health.analyzerVersion || "-")
 			: health && health.status === "SCHEMA_NOT_READY" ? "DB 테이블이 덜 만들어졌습니다(스키마 SQL 확인)"
 			: "dstone-knowledge 또는 DB 에 연결할 수 없습니다";
-		return "<div class=\"kn-card kn-dash-card" + (up ? " kn-card-ok" : " kn-card-danger") + "\"><div class=\"kn-card-value\">" + K.badge(health ? health.status : "DOWN")
-			+ "</div><div class=\"kn-card-label\">서버 상태</div><div class=\"kn-card-help\">" + K.escapeHtml(help) + "</div></div>";
+		return statusItem("서버", text, up ? "ok" : "bad", "");
 	}
 
-	/** 카드 한 장. link 가 있으면 카드 전체가 그 화면으로 가는 링크가 된다 */
-	function card(label, value, help, css, link) {
-		var inner = "<div class=\"kn-card-value\">" + K.escapeHtml(value) + "</div><div class=\"kn-card-label\">" + K.escapeHtml(label)
-			+ "</div><div class=\"kn-card-help\">" + K.escapeHtml(help) + "</div>";
-		var cls = "kn-card kn-dash-card" + (css ? " " + css : "");
+	/** 상태 한 칸. level: ok / busy / warn / bad / "" (보통). link 가 있으면 그 화면으로 가는 링크 */
+	function statusItem(name, text, level, link) {
+		var inner = "<i aria-hidden=\"true\"></i><b>" + K.escapeHtml(name) + "</b> " + K.escapeHtml(text);
+		var cls = "kn-dash-status-item" + (level ? " kn-dash-status-" + level : "");
 		if (link) {
 			return "<a class=\"" + cls + "\" href=\"" + K.escapeHtml(K.pageUrl(link)) + "\">" + inner + "</a>";
 		}
-		return "<div class=\"" + cls + "\">" + inner + "</div>";
+		return "<span class=\"" + cls + "\">" + inner + "</span>";
 	}
 
-	/** 프로젝트 현황 표 */
+	/**
+	 * 흐름 띠의 칸. 노드 맵의 계층과 같은 순서 · 이름 · 색이다(graph-common.js TIERS, knowledge.css --kn-layer-*).
+	 *   key  대시보드 API 의 건수 이름
+	 *   unit 숫자 밑에 붙는 설명
+	 */
+	var FLOW = [
+		{ key: "screens", layer: "view", label: "화면", unit: "화면 파일" },
+		{ key: "controllers", layer: "controller", label: "컨트롤러", unit: "클래스" },
+		{ key: "services", layer: "service", label: "서비스", unit: "클래스" },
+		{ key: "daos", layer: "dao", label: "DAO", unit: "클래스" },
+		{ key: "sqlStatements", layer: "sql", label: "SQL", unit: "" },
+		{ key: "tables", layer: "table", label: "테이블", unit: "SQL 에 나오는 테이블" }
+	];
+
+	/** 프로젝트마다 한 장 */
 	function renderProjects(projects) {
-		K.table(el["kn-dash-projects"], [
-			{ key: "projectId", label: "프로젝트", html: projectCell },
-			{ key: "ready", label: "분석이 끝난 리비전", html: readyCell },
-			{ key: "latestStatus", label: "최근 리비전", html: latestCell },
-			{ key: "files", label: "파일", num: true, html: function (row) { return countCell(row, "files"); } },
-			{ key: "methods", label: "메소드", num: true, html: function (row) { return countCell(row, "methods"); } },
-			{ key: "endpoints", label: "진입점", num: true, html: function (row) { return countCell(row, "endpoints"); } },
-			{ key: "callResolutionRate", label: "호출 해석률", html: rateCell },
-			{ key: "links", label: "", html: linksCell }
-		], projects, "등록된 프로젝트가 없습니다.");
+		el["kn-dash-project-count"].textContent = projects.length > 0 ? format(projects.length) : "";
+		var html = "";
+		for (var i = 0; i < projects.length; i++) {
+			html += projectCard(projects[i]);
+		}
+		el["kn-dash-projects"].innerHTML = html;
 	}
 
-	function projectCell(row) {
+	function projectCard(row) {
+		var html = "<article class=\"kn-flow-card\">";
+		html += "<header class=\"kn-flow-head\"><div class=\"kn-flow-name\">" + projectLink(row) + revisionText(row) + "</div>"
+			+ linksCell(row) + "</header>";
+		if (!row.readyRevisionId) {
+			html += "<p class=\"kn-flow-empty\">" + (row.latestRevisionId ? "아직 분석이 끝난 리비전이 없습니다." : "아직 분석하지 않았습니다. 프로젝트 화면에서 분석을 시작하세요.") + "</p>";
+			return html + "</article>";
+		}
+		html += flowStrip(row);
+		html += "<footer class=\"kn-flow-foot\"><span>진입점 <b>" + format(row.endpoints) + "</b></span><span>메소드 <b>" + format(row.methods)
+			+ "</b></span><span>파일 <b>" + format(row.files) + "</b></span>" + rateCell(row)
+			+ (row.parseSuccessRate === null || row.parseSuccessRate === undefined ? "" : "<span>파싱 성공 <b>" + Number(row.parseSuccessRate).toFixed(1) + "%</b></span>")
+			+ "</footer>";
+		return html + "</article>";
+	}
+
+	function projectLink(row) {
 		var hash = "p=" + encodeURIComponent(row.projectId);
 		if (row.readyRevisionId) {
 			hash += "&r=" + row.readyRevisionId + "&l=" + encodeURIComponent(row.readyRevisionLabel || "");
 		}
-		var name = row.projectName && row.projectName !== row.projectId ? "<div class=\"kn-dash-sub\">" + K.escapeHtml(row.projectName) + "</div>" : "";
-		return "<a class=\"kn-dash-project\" href=\"" + K.escapeHtml(K.pageUrl("knowledge/index", hash)) + "\">" + K.escapeHtml(row.projectId) + "</a>" + name;
+		var name = row.projectName && row.projectName !== row.projectId ? " <span class=\"kn-flow-alias\">" + K.escapeHtml(row.projectName) + "</span>" : "";
+		return "<a class=\"kn-flow-project\" href=\"" + K.escapeHtml(K.pageUrl("knowledge/index", hash)) + "\">" + K.escapeHtml(row.projectId) + "</a>" + name;
 	}
 
-	function readyCell(row) {
-		if (!row.readyRevisionId) {
-			return "<span class=\"ai-hint\">아직 없음</span>";
+	/**
+	 * 이름 옆 리비전 설명: 분석이 끝난 리비전과 그 시각.
+	 * 가장 최근 리비전이 그것과 다르면(분석 중이거나 실패) 그 상태를 딱지로 덧붙인다.
+	 */
+	function revisionText(row) {
+		var html = "<span class=\"kn-flow-rev\">";
+		if (row.readyRevisionId) {
+			html += "#" + row.readyRevisionId + " · " + K.escapeHtml(row.readyCreatedAt) + " 분석";
 		}
-		return "#" + row.readyRevisionId + " " + K.escapeHtml(row.readyRevisionLabel) + "<div class=\"kn-dash-sub\">" + K.escapeHtml(row.readyCreatedAt) + "</div>";
+		if (row.latestRevisionId && (row.latestRevisionId !== row.readyRevisionId || number(row.activeJobs) > 0)) {
+			html += " " + K.badge(number(row.activeJobs) > 0 && row.latestStatus !== "ANALYZING" ? "ANALYZING" : row.latestStatus)
+				+ (row.latestRevisionId !== row.readyRevisionId ? " <span class=\"kn-flow-alias\">#" + row.latestRevisionId + "</span>" : "");
+		}
+		return html + " · 리비전 " + format(row.revisionCount) + "개</span>";
 	}
 
-	/** 가장 최근 리비전이 분석이 끝난 리비전과 다를 때(분석 중이거나 실패)만 그 리비전을 따로 적는다 */
-	function latestCell(row) {
-		if (!row.latestRevisionId) {
-			return "<span class=\"ai-hint\">분석한 적 없음</span>";
+	/** 화면 → 컨트롤러 → 서비스 → DAO → SQL → 테이블. 칸을 누르면 그 리비전의 노드 맵이 열린다 */
+	function flowStrip(row) {
+		var mapUrl = K.pageUrl("knowledge/graph/graph", "p=" + encodeURIComponent(row.projectId) + "&r=" + row.readyRevisionId);
+		var html = "<div class=\"kn-strip\" role=\"list\" aria-label=\"계층별 개수\">";
+		for (var i = 0; i < FLOW.length; i++) {
+			var step = FLOW[i];
+			var count = number(row[step.key]);
+			var unit = step.key === "sqlStatements" ? "문 · 매퍼 파일 " + format(row.mappers) + "개" : step.unit;
+			html += "<div role=\"listitem\" class=\"kn-strip-step kn-layer-" + step.layer + (count === 0 ? " kn-strip-zero" : "") + "\">"
+				+ "<a href=\"" + K.escapeHtml(mapUrl) + "\" title=\"노드 맵에서 보기\"><span class=\"kn-strip-label\">" + K.escapeHtml(step.label) + "</span>"
+				+ "<span class=\"kn-strip-num\">" + format(count) + "</span><span class=\"kn-strip-unit\">" + K.escapeHtml(unit) + "</span></a></div>";
 		}
-		var html = K.badge(number(row.activeJobs) > 0 && row.latestStatus !== "ANALYZING" ? "ANALYZING" : row.latestStatus);
-		if (row.latestRevisionId !== row.readyRevisionId) {
-			html += "<div class=\"kn-dash-sub\">#" + row.latestRevisionId + " " + K.escapeHtml(row.latestRevisionLabel) + "</div>";
-		}
-		html += "<div class=\"kn-dash-sub\">리비전 " + format(row.revisionCount) + "개</div>";
-		return html;
-	}
-
-	function countCell(row, key) {
-		return row.readyRevisionId ? K.escapeHtml(format(row[key])) : "";
+		return html + "</div>";
 	}
 
 	/** 호출 해석률: 숫자 + 짧은 막대. 95% 이상 초록, 80% 이상 주황, 그 밑은 빨강 */
 	function rateCell(row) {
 		if (row.callResolutionRate === null || row.callResolutionRate === undefined) {
-			return row.readyRevisionId ? "<span class=\"ai-hint\">-</span>" : "";
+			return "";
 		}
 		var rate = Number(row.callResolutionRate);
 		var level = rate >= RATE_GOOD ? "good" : rate >= RATE_WARN ? "warn" : "bad";
 		var tip = rate >= RATE_GOOD ? "호출 관계와 영향도 결과를 믿고 써도 됩니다."
 			: rate >= RATE_WARN ? "빠진 호출이 있을 수 있습니다. 라이브러리(jar) 위치를 확인하세요."
 			: "빠진 호출이 많습니다. 프로젝트에 라이브러리(jar) 위치를 적고 다시 분석하세요.";
-		return "<div class=\"kn-dash-rate kn-dash-rate-" + level + "\" title=\"" + K.escapeHtml(tip) + "\"><span>" + rate.toFixed(1) + "%</span>"
-			+ "<i><b style=\"width:" + Math.max(0, Math.min(100, rate)) + "%\"></b></i></div>";
+		return "<span class=\"kn-dash-rate kn-dash-rate-" + level + "\" title=\"" + K.escapeHtml(tip) + "\">호출 해석률 <b>" + rate.toFixed(1) + "%</b>"
+			+ "<i><b style=\"width:" + Math.max(0, Math.min(100, rate)) + "%\"></b></i></span>";
 	}
 
 	/** 분석이 끝난 리비전이 있으면 그 리비전으로 영향도 · 노드 맵을 바로 연다 */
@@ -223,7 +258,7 @@ var DstoneKnowledgeDashboard = (function () {
 				return K.escapeHtml(row.projectId) + "<div class=\"kn-dash-sub\">#" + row.revisionId + " " + K.escapeHtml(row.revisionLabel) + "</div>";
 			} },
 			{ key: "status", label: "상태", html: function (row) {
-				var html = K.badge(row.status);
+				var html = K.badge(row.status, "job");
 				if (row.status === "RUNNING" && row.currentPass) {
 					html += "<div class=\"kn-dash-sub\">" + K.escapeHtml(row.currentPass)
 						+ (number(row.totalFiles) > 0 ? " " + format(row.doneFiles) + " / " + format(row.totalFiles) : "") + "</div>";

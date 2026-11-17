@@ -1299,32 +1299,106 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 .kn-dash-updated { font-size: 12px; color: var(--cs-faint); font-variant-numeric: tabular-nums; }
 .ai-body .kn-dash-refresh .kn-btn { height: 30px; font-size: 12px; font-weight: 600; }
 
-/* 숫자 카드 줄. 카드가 링크면 눌러서 그 화면으로 간다 */
-.kn-dash-cards { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin: 0 0 18px; }
-.ai-body a.kn-dash-card { display: block; color: inherit; text-decoration: none; transition: border-color 0.15s, box-shadow 0.15s; }
-.ai-body a.kn-dash-card:hover { border-color: var(--cs-primary); box-shadow: var(--cs-shadow); text-decoration: none; }
-.kn-dash-card .kn-card-value .workflow-badge { font-size: 13px; vertical-align: middle; }
+/* 맨 위 상태 한 줄. 평소에는 조용하고, 문제가 있을 때만 점과 글자에 색이 붙는다 */
+.kn-dash-status { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: -8px 0 18px; font-size: 13px; color: var(--cs-muted); }
+.kn-dash-status-item { display: inline-flex; align-items: center; gap: 6px; color: var(--cs-muted); }
+.ai-body a.kn-dash-status-item { color: var(--cs-muted); text-decoration: none; }
+.ai-body a.kn-dash-status-item:hover { color: var(--cs-text); text-decoration: underline; }
+.kn-dash-status-item b { font-weight: 600; color: var(--cs-text-2); }
+.kn-dash-status-item i { width: 7px; height: 7px; border-radius: 50%; background: var(--cs-faint); }
+.kn-dash-status-ok i { background: var(--cs-success); }
+.kn-dash-status-busy i { background: var(--cs-info); }
+.kn-dash-status-warn i { background: var(--cs-warning); }
+.kn-dash-status-warn, .ai-body a.kn-dash-status-warn { color: var(--cs-warning); }
+.kn-dash-status-bad i { background: var(--cs-danger); }
+.kn-dash-status-bad, .ai-body a.kn-dash-status-bad { color: var(--cs-danger); font-weight: 600; }
+
+/* ---------- 계층 색 ----------
+   노드 맵의 계층 색(graph-common.js TIERS)과 같은 값. 이 제품만의 색이라 흐름 띠 같은 곳에서 되풀이해 쓴다. 바꾸면 거기도 같이 바꾼다 */
+:root {
+	--kn-layer-view: #0284c7;       --kn-layer-view-fill: #e0f2fe;
+	--kn-layer-controller: #4338ca; --kn-layer-controller-fill: #e0e7ff;
+	--kn-layer-service: #7c3aed;    --kn-layer-service-fill: #ede9fe;
+	--kn-layer-dao: #d97706;        --kn-layer-dao-fill: #fef3c7;
+	--kn-layer-sql: #db2777;        --kn-layer-sql-fill: #fce7f3;
+	--kn-layer-table: #059669;      --kn-layer-table-fill: #d1fae5;
+}
+.kn-layer-view { --kn-c: var(--kn-layer-view); --kn-f: var(--kn-layer-view-fill); }
+.kn-layer-controller { --kn-c: var(--kn-layer-controller); --kn-f: var(--kn-layer-controller-fill); }
+.kn-layer-service { --kn-c: var(--kn-layer-service); --kn-f: var(--kn-layer-service-fill); }
+.kn-layer-dao { --kn-c: var(--kn-layer-dao); --kn-f: var(--kn-layer-dao-fill); }
+.kn-layer-sql { --kn-c: var(--kn-layer-sql); --kn-f: var(--kn-layer-sql-fill); }
+.kn-layer-table { --kn-c: var(--kn-layer-table); --kn-f: var(--kn-layer-table-fill); }
+
+/* ---------- 프로젝트 카드와 흐름 띠 ---------- */
+.kn-dash-title { margin: 0 0 10px; font-size: 16px; }
+.kn-dash-count { margin-left: 4px; font-size: 13px; font-weight: 600; color: var(--cs-faint); font-variant-numeric: tabular-nums; }
+.kn-flow-list { display: grid; gap: 14px; margin-bottom: 22px; }
+.kn-flow-card { padding: 16px 18px 14px; background: var(--cs-surface); border: 1px solid var(--cs-border); border-radius: var(--cs-radius-lg); }
+.kn-flow-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 12px; }
+.kn-flow-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.ai-body a.kn-flow-project { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--cs-text); }
+.ai-body a.kn-flow-project:hover { color: var(--cs-primary); }
+.kn-flow-alias { font-size: 13px; color: var(--cs-muted); }
+.kn-flow-rev { font-size: 12.5px; color: var(--cs-faint); font-variant-numeric: tabular-nums; }
+.kn-flow-rev .workflow-badge { vertical-align: 1px; }
+.kn-flow-empty { margin: 0; font-size: 13px; color: var(--cs-muted); }
+
+/* 흐름 띠: 호출이 흐르는 방향(화면 → 테이블)이라 화살 모양으로 잇는다 */
+.kn-strip { display: flex; }
+.kn-strip-step { flex: 1 1 0; min-width: 0; margin-left: -6px; }
+.kn-strip-step:first-child { margin-left: 0; }
+.ai-body .kn-strip-step a {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 10px 14px 10px 24px;
+	background: var(--kn-f);
+	color: var(--cs-text);
+	text-decoration: none;
+	clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
+	transition: filter 0.12s;
+}
+.ai-body .kn-strip-step:first-child a { padding-left: 14px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); border-radius: var(--cs-radius-sm) 0 0 var(--cs-radius-sm); }
+.ai-body .kn-strip-step:last-child a { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%); border-radius: 0 var(--cs-radius-sm) var(--cs-radius-sm) 0; }
+.ai-body .kn-strip-step a:hover { filter: brightness(0.96); text-decoration: none; }
+.ai-body .kn-strip-step a:focus-visible { outline: 2px solid var(--kn-c); outline-offset: 2px; }
+.kn-strip-label { font-size: 12px; font-weight: 700; color: var(--kn-c); }
+.kn-strip-num { font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: -0.03em; color: var(--cs-text); font-variant-numeric: tabular-nums; }
+.kn-strip-unit { font-size: 11.5px; color: var(--cs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 0개인 계층(예: DAO 없이 매퍼 인터페이스를 바로 부르는 구조)은 흐리게. 빠뜨린 게 아니라 없다는 뜻 */
+.kn-strip-zero a { background: var(--cs-surface-2) !important; }
+.kn-strip-zero .kn-strip-num { color: var(--cs-faint); }
+
+.kn-flow-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; margin-top: 12px; font-size: 13px; color: var(--cs-muted); }
+.kn-flow-foot b { color: var(--cs-text); font-variant-numeric: tabular-nums; }
+
+@media screen and (max-width: 900px) {
+	/* 좁으면 화살 대신 세 칸씩 두 줄 */
+	.kn-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+	.kn-strip-step { margin-left: 0; }
+	.ai-body .kn-strip-step a, .ai-body .kn-strip-step:first-child a, .ai-body .kn-strip-step:last-child a { clip-path: none; padding: 10px 12px; border-radius: var(--cs-radius-sm); }
+}
 
 .kn-dash-start[hidden] { display: none; }
 
 /* 표 안의 둘째 줄(이름, 날짜 등) */
 .kn-dash-sub { margin-top: 2px; font-size: 12px; color: var(--cs-faint); }
 .kn-dash-sub-inline { font-size: 12px; color: var(--cs-faint); }
-.ai-body a.kn-dash-project { font-weight: 700; }
 
 /* 호출 해석률: 숫자 + 짧은 막대 */
-.kn-dash-rate { display: flex; align-items: center; gap: 8px; min-width: 120px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.kn-dash-rate span { width: 52px; text-align: right; }
-.kn-dash-rate i { flex: 1; height: 6px; border-radius: 999px; background: var(--cs-surface-3); overflow: hidden; }
-.kn-dash-rate b { display: block; height: 100%; border-radius: 999px; }
-.kn-dash-rate-good { color: var(--cs-success); }
-.kn-dash-rate-good b { background: var(--cs-success); }
-.kn-dash-rate-warn { color: var(--cs-warning); }
-.kn-dash-rate-warn b { background: var(--cs-warning); }
-.kn-dash-rate-bad { color: var(--cs-danger); }
-.kn-dash-rate-bad b { background: var(--cs-danger); }
+.kn-dash-rate { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.kn-dash-rate > b { font-weight: 700; }
+.kn-dash-rate i { width: 72px; height: 6px; border-radius: 999px; background: var(--cs-surface-3); overflow: hidden; }
+.kn-dash-rate i b { display: block; height: 100%; border-radius: 999px; }
+.kn-dash-rate-good > b { color: var(--cs-success); }
+.kn-dash-rate-good i b { background: var(--cs-success); }
+.kn-dash-rate-warn > b { color: var(--cs-warning); }
+.kn-dash-rate-warn i b { background: var(--cs-warning); }
+.kn-dash-rate-bad > b { color: var(--cs-danger); }
+.kn-dash-rate-bad i b { background: var(--cs-danger); }
 
-.kn-dash-actions { display: inline-flex; gap: 10px; white-space: nowrap; font-size: 13px; }
+.kn-dash-actions { display: inline-flex; gap: 14px; white-space: nowrap; font-size: 13px; font-weight: 600; }
 
 /* 실패 이유 · 완료 표시 */
 .kn-dash-error { margin-top: 4px; max-width: 360px; font-size: 12px; color: var(--cs-danger); line-height: 1.45; word-break: break-all; }
@@ -1350,25 +1424,8 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 	.kn-dash-docs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
-/* 바로 가기 */
-.kn-dash-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.ai-body .kn-dash-links a {
-	display: block;
-	padding: 12px 14px;
-	border: 1px solid var(--cs-border);
-	border-radius: var(--cs-radius);
-	background: var(--cs-surface);
-	color: var(--cs-text);
-	text-decoration: none;
-	transition: border-color 0.15s, background 0.15s;
-}
-.ai-body .kn-dash-links a:hover { border-color: var(--cs-primary); background: var(--cs-primary-soft); text-decoration: none; }
-.kn-dash-links b { display: block; font-size: 14px; color: var(--cs-primary); }
-.kn-dash-links span { display: block; margin-top: 4px; font-size: 12.5px; color: var(--cs-muted); line-height: 1.5; }
-
 @media screen and (max-width: 860px) {
 	.kn-dash-head { align-items: flex-start; }
-	#kn-dash-projects .document-list-table { min-width: 760px; }
 	/* 좁은 화면에서는 표를 누르지 않고 가로로 밀어 본다 */
 	#kn-dash-jobs { overflow-x: auto; }
 	#kn-dash-jobs .document-list-table { min-width: 600px; }

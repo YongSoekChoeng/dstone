@@ -46,7 +46,8 @@ public class DashboardService extends BaseObject {
 	 * <pre>
 	 * 대시보드 한 화면 분량을 돌려줍니다.
 	 *   totals     프로젝트 수, 분석이 끝난 리비전 수, 진행 중인 분석 수, 최근 7일 실패 수
-	 *   projects   프로젝트마다 최근 리비전과 분석이 끝난 최근 리비전(건수, 호출 해석률)
+	 *   projects   프로젝트마다 최근 리비전과 분석이 끝난 최근 리비전(건수, 호출 해석률,
+	 *              계층별 개수: 화면 → 컨트롤러 → 서비스 → DAO → SQL 매퍼 · SQL 문 → 테이블)
 	 *   recentJobs 최근 분석 작업
 	 *   documents  올린 일반 문서: 합계, 묶음별 현황, 최근 올린 문서 (호출자 것만)
 	 *   embedding  임베딩 대기열 현황(/api/system/embedding 과 같은 내용)

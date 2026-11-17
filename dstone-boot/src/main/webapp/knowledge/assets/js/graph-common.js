@@ -13,10 +13,14 @@ var DstoneKnowledgeGraphCommon = (function () {
 	/** 소스 / SQL 팝업의 요소들. initCodePopup() 에서 채운다 */
 	var el = {};
 
-	/** 계층. 이 순서대로 왼쪽에서 오른쪽으로 놓습니다(호출이 흐르는 방향) */
+	/**
+	 * 계층. 이 순서대로 왼쪽에서 오른쪽으로 놓습니다(호출이 흐르는 방향).
+	 * 색은 대시보드의 흐름 띠(knowledge.css 의 --kn-layer-*)와 같은 값입니다. 바꾸면 거기도 같이 바꿉니다.
+	 * 화면(하늘색)과 컨트롤러가 나란히 놓여도 구분되도록 컨트롤러는 남색으로 둡니다.
+	 */
 	var TIERS = [
 		{ key: "VIEW", label: "화면", color: "#0284c7", fill: "#e0f2fe" },
-		{ key: "CONTROLLER", label: "컨트롤러", color: "#2563eb", fill: "#dbeafe" },
+		{ key: "CONTROLLER", label: "컨트롤러", color: "#4338ca", fill: "#e0e7ff" },
 		{ key: "SERVICE", label: "서비스", color: "#7c3aed", fill: "#ede9fe" },
 		{ key: "REPOSITORY", label: "DAO", color: "#d97706", fill: "#fef3c7" },
 		{ key: "MAPPER", label: "SQL 매퍼", color: "#db2777", fill: "#fce7f3" },

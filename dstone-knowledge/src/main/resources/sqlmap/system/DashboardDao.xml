@@ -32,6 +32,14 @@
              , (SELECT COUNT(*) FROM analysis_file f WHERE f.revision_id = rr.revision_id) AS "files"
              , (SELECT COUNT(*) FROM analysis_method m WHERE m.revision_id = rr.revision_id) AS "methods"
              , (SELECT COUNT(*) FROM analysis_endpoint e WHERE e.revision_id = rr.revision_id) AS "endpoints"
+             , ly.screens AS "screens"
+             , ly.controllers AS "controllers"
+             , ly.services AS "services"
+             , ly.daos AS "daos"
+             , (SELECT COUNT(DISTINCT mp.file_id) FROM analysis_mapper mp WHERE mp.revision_id = rr.revision_id) AS "mappers"
+             , (SELECT COUNT(*) FROM analysis_mapper mp WHERE mp.revision_id = rr.revision_id AND mp.statement_type &lt;&gt; 'SQL_FRAGMENT') AS "sqlStatements"
+             , (SELECT COUNT(DISTINCT t.to_external) FROM analysis_relation t
+                 WHERE t.revision_id = rr.revision_id AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')) AS "tables"
              , mt.call_rate AS "callResolutionRate"
              , mt.parse_rate AS "parseSuccessRate"
           FROM analysis_project p
@@ -48,6 +56,21 @@
                    AND r.status = 'READY'
                  ORDER BY r.revision_id DESC
                  LIMIT 1) rr ON TRUE
+          <!-- 계층별 개수. 노드 맵의 계층 칸과 같은 기준이다(GraphDao.xml selectGraphNodes, graph-common.js tierOf):
+                 화면 = 화면 파일(JSP · WebSquare · Nexacro), 컨트롤러 · 서비스 · DAO = 가장 바깥 클래스(화면 안에서 만든 것은 뺀다).
+                 웹 필터(WEB_FILTER)는 노드 맵처럼 컨트롤러 칸에 넣는다 -->
+          LEFT JOIN LATERAL (
+                SELECT (SELECT COUNT(*) FROM analysis_file f
+                         WHERE f.revision_id = rr.revision_id
+                           AND <include refid="net.dstone.knowledge.api.dao.GraphDao.isScreen"/>) AS screens
+                     , COUNT(*) FILTER (WHERE s.layer IN ('CONTROLLER', 'WEB_FILTER')) AS controllers
+                     , COUNT(*) FILTER (WHERE s.layer = 'SERVICE') AS services
+                     , COUNT(*) FILTER (WHERE s.layer = 'REPOSITORY') AS daos
+                  FROM analysis_symbol s
+                  JOIN analysis_file f ON f.file_id = s.file_id
+                 WHERE s.revision_id = rr.revision_id
+                   AND s.outer_symbol_id IS NULL
+                   AND f.language &lt;&gt; 'JSP') ly ON TRUE
           LEFT JOIN LATERAL (
                 SELECT MAX(m.metric_value) FILTER (WHERE m.metric_name = 'callResolutionRate') AS call_rate
                      , MAX(m.metric_value) FILTER (WHERE m.metric_name = 'parseSuccessRate') AS parse_rate

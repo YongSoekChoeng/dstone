@@ -246,13 +246,13 @@ var DstoneKnowledgeProject = (function () {
 
 	function renderJob(job) {
 		var running = job.status === "READY" || job.status === "RUNNING";
-		el["kn-job-badge"].innerHTML = K.badge(job.status);
+		el["kn-job-badge"].innerHTML = K.badge(job.status, "job");
 		el["kn-job-progress"].textContent = (job.currentPass ? "단계 " + job.currentPass : "") + (job.errorCount ? " · 오류 " + job.errorCount + "건" : "")
 			+ (job.errorMessage ? " · " + job.errorMessage : "");
 		el["kn-job-cancel-btn"].disabled = !running;
 		K.table(el["kn-job-passes"], [
 			{ key: "pass", label: "단계", html: function (row) { return "<span class=\"kn-code\" title=\"" + K.escapeHtml(T.PASS[row.pass] || "") + "\">" + K.escapeHtml(row.pass) + "</span>"; } },
-			{ key: "status", label: "상태", html: function (row) { return K.badge(row.status); } },
+			{ key: "status", label: "상태", html: function (row) { return K.badge(row.status, "job"); } },
 			{ key: "progress", label: "처리", num: true, html: function (row) {
 				return row.totalCount ? K.escapeHtml(T.fmt(row.doneCount) + " / " + T.fmt(row.totalCount)) : "";
 			} }

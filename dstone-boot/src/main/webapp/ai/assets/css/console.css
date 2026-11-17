@@ -8,6 +8,15 @@
    화면 스크립트가 쓰는 class 이름(ai-form, ai-panel, document-list-table, kn-* ...)은 그대로 두고 모양만 정합니다.
    ========================================================================== */
 
+/* 글꼴 파일을 같이 배포한다. 고객 PC에 Pretendard 가 없어도, 폐쇄망이어도 같은 글꼴로 보인다(라이선스: fonts/Pretendard.LICENSE.txt, OFL) */
+@font-face {
+	font-family: "Pretendard Variable";
+	font-weight: 45 920;
+	font-style: normal;
+	font-display: swap;
+	src: url("../fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+
 :root {
 	/* 바탕과 면 */
 	--cs-bg: #f4f6f9;
@@ -56,8 +65,8 @@
 	--cs-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
 	--cs-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14);
 
-	/* 글꼴. 시스템에 있는 것을 순서대로 쓴다(외부 글꼴을 내려받지 않는다) */
-	--cs-font: "Pretendard", "Pretendard Variable", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+	/* 글꼴. 같이 배포한 Pretendard Variable 을 먼저 쓰고, 못 읽으면 시스템 글꼴을 순서대로 쓴다(외부에서 내려받지 않는다) */
+	--cs-font: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 	--cs-mono: "JetBrains Mono", "D2Coding", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 

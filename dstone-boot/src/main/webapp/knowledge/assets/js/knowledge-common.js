@@ -79,13 +79,31 @@ var DstoneKnowledge = (function () {
 		return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 	}
 
-	/** 상태를 색깔 있는 딱지로 */
-	function badge(status) {
+	/**
+	 * 상태 딱지에 보이는 한글 이름. 서버가 주는 코드(READY, DONE_WITH_WARNING ...)는 딱지에 마우스를 올리면 보인다.
+	 * READY 는 리비전에서는 "분석 완료", 분석 작업에서는 "대기"라서 작업 것은 따로 둔다.
+	 */
+	var BADGE_LABELS = {
+		up: "정상", down: "연결 안 됨", db_down: "DB 연결 안 됨", schema_not_ready: "스키마 없음",
+		created: "만듦", analyzing: "분석 중", ready: "분석 완료", failed: "실패",
+		running: "진행 중", done: "완료", done_with_warning: "완료(경고)", cancelled: "취소됨", ok: "성공"
+	};
+	var JOB_BADGE_LABELS = { ready: "대기" };
+
+	/**
+	 * 상태를 색깔 있는 딱지로
+	 * @param status 서버가 주는 상태 코드
+	 * @param kind "job" 이면 분석 작업의 상태(READY = 대기). 그 밖에는 리비전 · 서버 상태
+	 */
+	function badge(status, kind) {
 		var name = String(status || "unknown").toLowerCase();
+		var job = kind === "job";
 		// AI 화면의 딱지 색을 같이 쓴다. READY / DONE_WITH_WARNING 처럼 거기 없는 이름은 가까운 색으로 맞춘다.
-		var css = name === "ready" || name === "up" ? "done" : name === "done_with_warning" ? "waiting_approval" : name === "created" ? "cancelled"
-			: name === "analyzing" ? "running" : name === "down" || name === "db_down" || name === "schema_not_ready" ? "failed" : name;
-		return "<span class=\"workflow-badge workflow-badge-" + escapeHtml(css) + "\">" + escapeHtml(status) + "</span>";
+		var css = name === "ready" ? (job ? "queued" : "done") : name === "up" ? "done" : name === "done_with_warning" ? "waiting_approval"
+			: name === "created" ? "cancelled" : name === "analyzing" ? "running"
+			: name === "down" || name === "db_down" || name === "schema_not_ready" ? "failed" : name;
+		var label = (job && JOB_BADGE_LABELS[name]) || BADGE_LABELS[name] || status;
+		return "<span class=\"workflow-badge workflow-badge-" + escapeHtml(css) + "\" title=\"" + escapeHtml(status) + "\">" + escapeHtml(label) + "</span>";
 	}
 
 	/** 처리 결과나 오류를 한 줄로 알립니다 */
