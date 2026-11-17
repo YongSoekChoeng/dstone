@@ -3,6 +3,7 @@ package net.dstone.knowledge.api.service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,6 +72,9 @@ public class UnusedService extends BaseObject {
 	private DbCommentReader dbCommentReader;
 
 	@Autowired
+	private StructureService structureService;
+
+	@Autowired
 	private ConfigProperty configProperty;
 
 	/** 후보 쿼리를 한 트랜잭션에서 돌린다(그 안에서만 JIT 을 끈다) */
@@ -126,12 +130,28 @@ public class UnusedService extends BaseObject {
 		return body;
 	}
 
+	/** 접속 정보처럼 리비전 밖의 것이 바뀌어 판정이 달라질 수 있을 때 부릅니다. 기억해 둔 결과를 모두 지웁니다 */
+	public void forget() {
+		cache.clear();
+	}
+
+	/** 클래스 이름(com.a.B 또는 com.a.B.Inner)에서 패키지. 점이 없으면 빈 글 */
+	private String packageOf(String className) {
+		if (className == null) {
+			return "";
+		}
+		int dot = className.lastIndexOf('.');
+		return dot > 0 ? className.substring(0, dot) : "";
+	}
+
 	/**
 	 * <pre>
-	 * 한 종류의 목록. grade(CERTAIN / LIKELY)는 일치 조건, q 는 이름 · 경로 · 한글명에 포함 조건(대소문자 무시)입니다.
+	 * 한 종류의 목록. grade(CERTAIN / LIKELY)는 일치 조건, q 는 이름 · 경로 · 한글명에 포함 조건(대소문자 무시),
+	 * area 는 업무 영역 일치 조건입니다.
+	 * 응답의 areas 는 grade · q 로 거른 뒤(area 로 거르기 전)의 영역별 건수입니다. 화면이 영역 고르기 칸을 그릴 때 씁니다.
 	 * </pre>
 	 */
-	public Map<String, Object> getList(long revisionId, String kind, String grade, String q, int page, int size) {
+	public Map<String, Object> getList(long revisionId, String kind, String grade, String q, String area, int page, int size) {
 		String upperKind = kind == null ? "" : kind.toUpperCase(Locale.ROOT);
 		if (!KINDS.contains(upperKind)) {
 			throw ApiException.badRequest("kind 는 " + KINDS + " 가운데 하나여야 합니다: " + kind);
@@ -141,12 +161,19 @@ public class UnusedService extends BaseObject {
 		String needle = q == null || q.trim().length() == 0 ? null : q.trim().toLowerCase(Locale.ROOT);
 		List<Map<String, Object>> all = compute(revisionId).rows.get(upperKind);
 		List<Map<String, Object>> matched = new ArrayList<Map<String, Object>>();
+		Map<String, Integer> areaCounts = new HashMap<String, Integer>();
 		for (int i = 0; i < all.size(); i++) {
 			Map<String, Object> row = all.get(i);
 			if (grade != null && grade.length() > 0 && !grade.equalsIgnoreCase(String.valueOf(row.get("grade")))) {
 				continue;
 			}
 			if (needle != null && !contains(row, needle)) {
+				continue;
+			}
+			String rowArea = row.get("area") == null ? "" : String.valueOf(row.get("area"));
+			Integer count = areaCounts.get(rowArea);
+			areaCounts.put(rowArea, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+			if (area != null && area.length() > 0 && !area.equals(rowArea)) {
 				continue;
 			}
 			matched.add(row);
@@ -160,7 +187,34 @@ public class UnusedService extends BaseObject {
 		body.put("page", Integer.valueOf(safePage));
 		body.put("size", Integer.valueOf(safeSize));
 		body.put("rows", new ArrayList<Map<String, Object>>(matched.subList(from, to)));
+		body.put("areas", areaList(areaCounts));
 		return body;
+	}
+
+	/** 영역별 건수를 많은 것부터. 이름이 ( 로 시작하는 것((그 밖) 등)과 빈 영역은 맨 뒤 */
+	private List<Map<String, Object>> areaList(Map<String, Integer> counts) {
+		List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+		for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+			Map<String, Object> item = new LinkedHashMap<String, Object>();
+			item.put("area", entry.getKey());
+			item.put("count", entry.getValue());
+			list.add(item);
+		}
+		java.util.Collections.sort(list, new java.util.Comparator<Map<String, Object>>() {
+			@Override
+			public int compare(Map<String, Object> a, Map<String, Object> b) {
+				String aName = String.valueOf(a.get("area"));
+				String bName = String.valueOf(b.get("area"));
+				boolean aLast = aName.length() == 0 || aName.startsWith("(");
+				boolean bLast = bName.length() == 0 || bName.startsWith("(");
+				if (aLast != bLast) {
+					return aLast ? 1 : -1;
+				}
+				int diff = ((Integer) b.get("count")).intValue() - ((Integer) a.get("count")).intValue();
+				return diff != 0 ? diff : aName.compareTo(bName);
+			}
+		});
+		return list;
 	}
 
 	/** 캐시가 맞으면 그대로, 아니면 다시 계산 */
@@ -229,6 +283,24 @@ public class UnusedService extends BaseObject {
 
 		// 5) 테이블
 		List<Map<String, Object>> tables = tables(revisionId, String.valueOf(revision.get("projectId")), judge, computed.facts);
+
+		// 업무 영역. 프로젝트 화면의 "현행 구조"와 같은 규칙(StructureService.Areas)이라 두 화면의 영역 이름이 같다.
+		// 테이블은 쓰는 SQL 이 없어서(그래서 미사용이다) 영역을 정할 수 없다.
+		StructureService.Areas areas = structureService.areas(revisionId);
+		for (int i = 0; i < sqls.size(); i++) {
+			sqls.get(i).put("area", areas.ofMapperFile((String) sqls.get(i).get("path")));
+		}
+		for (int i = 0; i < screens.size(); i++) {
+			screens.get(i).put("area", areas.ofScreenFile((String) screens.get(i).get("path")));
+		}
+		for (int i = 0; i < types.size(); i++) {
+			types.get(i).put("area", areas.ofPackage(packageOf((String) types.get(i).get("name"))));
+		}
+		for (int i = 0; i < methods.size(); i++) {
+			String name = (String) methods.get(i).get("name");
+			int hash = name == null ? -1 : name.indexOf('#');
+			methods.get(i).put("area", areas.ofPackage(packageOf(hash > 0 ? name.substring(0, hash) : name)));
+		}
 
 		computed.rows.put(TABLE, tables);
 		computed.rows.put(SQL, sqls);

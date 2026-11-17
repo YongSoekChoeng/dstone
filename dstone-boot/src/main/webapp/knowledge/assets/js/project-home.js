@@ -25,7 +25,9 @@ var DstoneKnowledgeProjectHome = (function () {
 		["kn-proj-title", "kn-proj-sub", "kn-proj-new", "kn-proj-run", "kn-proj-edit", "kn-proj-message", "kn-proj-list-view", "kn-proj-list",
 			"kn-proj-home", "kn-proj-back", "kn-proj-revision", "kn-proj-trust", "kn-proj-empty", "kn-proj-structure", "kn-proj-strip", "kn-proj-kinds",
 			"kn-proj-area-note", "kn-proj-areas", "kn-proj-area-csv", "kn-proj-form-view", "kn-proj-form-title", "kn-pf-id", "kn-pf-name", "kn-pf-path",
-			"kn-pf-classpath", "kn-pf-desc", "kn-pf-dbs", "kn-pf-db-add", "kn-pf-message", "kn-pf-cancel", "kn-pf-save"].forEach(function (id) {
+			"kn-pf-classpath", "kn-pf-desc", "kn-pf-dbs", "kn-pf-db-add", "kn-pf-message", "kn-pf-cancel", "kn-pf-save",
+			"kn-proj-tabs", "kn-pu-notes", "kn-pu-kinds", "kn-pu-area", "kn-pu-q", "kn-pu-csv", "kn-pu-message", "kn-pu-list", "kn-pu-prev", "kn-pu-page",
+			"kn-pu-next"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 		el["kn-proj-new"].addEventListener("click", function () { go("new=1"); });
@@ -37,7 +39,7 @@ var DstoneKnowledgeProjectHome = (function () {
 		});
 		el["kn-proj-revision"].addEventListener("change", function () {
 			var revisionId = el["kn-proj-revision"].value;
-			history.replaceState(null, "", "#p=" + encodeURIComponent(current.projectId) + "&r=" + revisionId);
+			replaceHash();
 			loadStructure(revisionId);
 		});
 		el["kn-proj-area-csv"].addEventListener("click", downloadAreas);
@@ -45,6 +47,8 @@ var DstoneKnowledgeProjectHome = (function () {
 		el["kn-pf-cancel"].addEventListener("click", function () { history.back(); });
 		el["kn-pf-save"].addEventListener("click", save);
 		el["kn-pf-dbs"].addEventListener("click", onDbRowClick);
+		bindTabs();
+		bindUnused();
 		window.addEventListener("hashchange", route);
 		route();
 	}
@@ -136,6 +140,7 @@ var DstoneKnowledgeProjectHome = (function () {
 
 	function showHome(projectId, revisionId) {
 		show("home");
+		openTab(K.readHash().t === "unused" ? "unused" : "structure", true);
 		var no = ++requestNo;
 		var sameProject = current.projectId === projectId && current.project;
 		current.projectId = projectId;
@@ -187,6 +192,11 @@ var DstoneKnowledgeProjectHome = (function () {
 			current.structure = structure;
 			renderTrust(structure.trust || {});
 			renderStructure(structure);
+			// 전환 제외 후보는 그 탭이 열려 있을 때만 읽는다(처음 계산에 몇 초 걸릴 수 있다)
+			unused.revisionId = null;
+			if (currentTab === "unused") {
+				loadUnused();
+			}
 		}).catch(fail);
 	}
 
@@ -323,6 +333,306 @@ var DstoneKnowledgeProjectHome = (function () {
 				+ ". 끝나면 리비전 목록에 새 리비전이 생깁니다. 진행 상황은 <a href=\"" + K.escapeHtml(link) + "\">분석 실행 · 진단</a> 화면이나 대시보드에서 봅니다.";
 		}).catch(fail).then(function () {
 			el["kn-proj-run"].disabled = false;
+		});
+	}
+
+	/* ======================= 탭 ======================= */
+
+	var currentTab = "structure";
+
+	function bindTabs() {
+		el["kn-proj-tabs"].addEventListener("click", function (event) {
+			var tab = event.target.closest ? event.target.closest("button[data-tab]") : null;
+			if (tab) {
+				openTab(tab.getAttribute("data-tab"));
+			}
+		});
+	}
+
+	/** 탭을 연다. quiet 가 아니면 주소의 t 도 바꾸고, 그 탭의 내용을 (아직 안 읽었으면) 읽는다 */
+	function openTab(name, quiet) {
+		currentTab = name;
+		Array.prototype.forEach.call(el["kn-proj-tabs"].querySelectorAll("button[data-tab]"), function (button) {
+			var on = button.getAttribute("data-tab") === name;
+			button.className = "kn-tab" + (on ? " kn-tab-on" : "");
+			button.setAttribute("aria-selected", on ? "true" : "false");
+		});
+		Array.prototype.forEach.call(document.querySelectorAll("#kn-proj-home .kn-tab-panel"), function (panel) {
+			panel.hidden = panel.getAttribute("data-panel") !== name;
+		});
+		if (quiet) {
+			return;
+		}
+		replaceHash();
+		if (name === "unused" && current.revisionId && unused.revisionId !== current.revisionId) {
+			loadUnused();
+		}
+	}
+
+	/** 지금 프로젝트 · 리비전 · 탭을 주소에 적는다(뒤로 가기 기록은 남기지 않는다) */
+	function replaceHash() {
+		var revisionId = el["kn-proj-revision"].value || current.revisionId;
+		history.replaceState(null, "", "#p=" + encodeURIComponent(current.projectId) + (revisionId ? "&r=" + revisionId : "")
+			+ (currentTab !== "structure" ? "&t=" + currentTab : ""));
+	}
+
+	/* ======================= 전환 제외 후보 ======================= */
+
+	var T = window.DstoneKnowledgeTerms;
+
+	/** 보여 주는 순서. 차세대 범위를 정할 때 먼저 보는 것(화면, SQL)부터 */
+	var UNUSED_ORDER = ["SCREEN", "SQL", "TYPE", "METHOD", "TABLE"];
+
+	/** 지금 고른 조건과, 마지막으로 읽은 요약 */
+	var unused = { revisionId: null, summary: null, kind: null, grade: "", area: "", q: "", page: 1, size: 50, total: 0 };
+	var searchTimer = null;
+
+	function bindUnused() {
+		el["kn-pu-kinds"].addEventListener("click", function (event) {
+			var button = event.target.closest ? event.target.closest("button[data-kind]") : null;
+			if (button) {
+				pickKind(button.getAttribute("data-kind"));
+			}
+		});
+		Array.prototype.forEach.call(document.querySelectorAll(".kn-pu-grade"), function (button) {
+			button.addEventListener("click", function () {
+				Array.prototype.forEach.call(document.querySelectorAll(".kn-pu-grade"), function (other) {
+					other.className = "kn-pu-grade" + (other === button ? " kn-pu-on" : "");
+				});
+				unused.grade = button.getAttribute("data-grade");
+				unused.page = 1;
+				loadUnusedList();
+			});
+		});
+		el["kn-pu-area"].addEventListener("change", function () {
+			unused.area = el["kn-pu-area"].value;
+			unused.page = 1;
+			loadUnusedList();
+		});
+		el["kn-pu-q"].addEventListener("input", function () {
+			clearTimeout(searchTimer);
+			searchTimer = setTimeout(function () {
+				unused.q = el["kn-pu-q"].value.trim();
+				unused.page = 1;
+				loadUnusedList();
+			}, 300);
+		});
+		el["kn-pu-prev"].addEventListener("click", function () {
+			if (unused.page > 1) {
+				unused.page--;
+				loadUnusedList();
+			}
+		});
+		el["kn-pu-next"].addEventListener("click", function () {
+			if (unused.page * unused.size < unused.total) {
+				unused.page++;
+				loadUnusedList();
+			}
+		});
+		el["kn-pu-csv"].addEventListener("click", downloadUnused);
+	}
+
+	/** 요약(종류별 건수와 알아 둘 사실)을 읽고, 건수가 있는 첫 종류의 목록을 연다 */
+	function loadUnused() {
+		var revisionId = current.revisionId;
+		unused.revisionId = revisionId;
+		el["kn-pu-kinds"].innerHTML = "";
+		el["kn-pu-notes"].innerHTML = "";
+		el["kn-pu-list"].innerHTML = "";
+		K.message(el["kn-pu-message"], "아무도 쓰지 않는 것을 찾는 중입니다. 처음에는 몇 초 걸립니다…");
+		K.call("GET", "/api/revisions/" + encodeURIComponent(revisionId) + "/unused").then(function (summary) {
+			if (unused.revisionId !== revisionId) {
+				return;
+			}
+			unused.summary = summary;
+			renderUnusedNotes(summary);
+			var counts = {};
+			(summary.kinds || []).forEach(function (item) {
+				counts[item.kind] = item;
+			});
+			var first = null;
+			UNUSED_ORDER.forEach(function (kind) {
+				if (!first && counts[kind] && counts[kind].total > 0) {
+					first = kind;
+				}
+			});
+			pickKind(unused.kind && counts[unused.kind] && counts[unused.kind].total > 0 ? unused.kind : first || "SCREEN");
+		}).catch(function (err) {
+			K.message(el["kn-pu-message"], err.message, true);
+		});
+	}
+
+	/** 판정을 읽을 때 알아 둘 것: 해석률이 낮음, 메뉴 정보 없음, 테이블을 견줄 목록이 없음 */
+	function renderUnusedNotes(summary) {
+		var notes = [];
+		if (summary.warning) {
+			notes.push("<p class=\"kn-proj-note kn-proj-note-warn\">" + K.escapeHtml(summary.warning) + "</p>");
+		}
+		var sources = summary.tableSources || {};
+		if (sources.db !== "OK") {
+			var settings = "#p=" + encodeURIComponent(current.projectId) + "&edit=1";
+			var why = sources.db === "FAILED" ? "등록한 DB 에서 테이블 목록을 읽지 못했습니다(" + K.escapeHtml(sources.dbMessage || "") + "). "
+				: "DB 접속이 등록되지 않았습니다. ";
+			notes.push("<p class=\"kn-proj-note\">" + why + "<a href=\"" + K.escapeHtml(settings) + "\">프로젝트 설정</a>에서 DB 접속을 등록하면 "
+				+ "<b>DB 에는 있는데 아무 SQL 도 쓰지 않는 테이블</b>까지 찾습니다."
+				+ (sources.ddl > 0 || sources.dict > 0 ? " 지금은 DDL 파일 · 테이블 사전의 목록과만 견줍니다." : "") + "</p>");
+		}
+		if (summary.menuKnown === false) {
+			notes.push("<p class=\"kn-proj-note\">메뉴 정보가 분석에 없어 화면은 모두 <b>추정</b>입니다. 메뉴에서만 여는 화면이 섞여 있을 수 있습니다.</p>");
+		}
+		el["kn-pu-notes"].innerHTML = notes.join("");
+	}
+
+	/** 종류 단추: 건수, 그 가운데 확실한 것, 전체 대비 비율(셀 수 있는 종류만) */
+	function renderUnusedKinds() {
+		var counts = {};
+		((unused.summary && unused.summary.kinds) || []).forEach(function (item) {
+			counts[item.kind] = item;
+		});
+		el["kn-pu-kinds"].innerHTML = UNUSED_ORDER.map(function (kind) {
+			var item = counts[kind] || { total: 0, certain: 0 };
+			var base = baseOf(kind, item);
+			var ratio = base > 0 && item.total > 0 ? "전체의 " + Math.max(1, Math.round(100 * item.total / base)) + "%" : "";
+			var on = kind === unused.kind;
+			return "<button type=\"button\" role=\"tab\" aria-selected=\"" + on + "\" data-kind=\"" + kind + "\" class=\"kn-pu-kind" + (on ? " kn-pu-on" : "")
+				+ (item.total === 0 ? " kn-pu-none" : "") + "\" title=\"" + K.escapeHtml(T.UNUSED_KIND[kind][1]) + "\">"
+				+ "<span class=\"kn-pu-kind-name\">" + K.escapeHtml(T.UNUSED_KIND[kind][0]) + "</span>"
+				+ "<span class=\"kn-pu-kind-num\">" + format(item.total) + "</span>"
+				+ "<span class=\"kn-pu-kind-sub\">" + (item.total > 0 ? "확실 " + format(item.certain) + " · 추정 " + format(item.total - item.certain)
+					+ (ratio ? " · " + ratio : "") : "없음") + "</span></button>";
+		}).join("");
+	}
+
+	/** 비율의 바탕(전체 수). 현행 구조의 계층별 개수를 쓴다. 클래스 · 메소드는 셀 바탕이 달라 비율을 내지 않는다 */
+	function baseOf(kind, item) {
+		var layers = (current.structure && current.structure.layers) || {};
+		if (kind === "SCREEN") {
+			return number(layers.screens);
+		}
+		if (kind === "SQL") {
+			return number(layers.sqlStatements);
+		}
+		if (kind === "TABLE") {
+			// SQL 에 나오는 테이블 + 아무 SQL 도 안 쓰는 테이블
+			return number(layers.tables) + number(item.total);
+		}
+		return 0;
+	}
+
+	function pickKind(kind) {
+		unused.kind = kind;
+		unused.area = "";
+		unused.page = 1;
+		renderUnusedKinds();
+		loadUnusedList();
+	}
+
+	function unusedQuery(page, size) {
+		var query = { page: page, size: size };
+		if (unused.grade) {
+			query.grade = unused.grade;
+		}
+		if (unused.q) {
+			query.q = unused.q;
+		}
+		if (unused.area) {
+			query.area = unused.area;
+		}
+		return query;
+	}
+
+	function loadUnusedList() {
+		var revisionId = unused.revisionId;
+		var kind = unused.kind;
+		K.message(el["kn-pu-message"], "");
+		K.call("GET", "/api/revisions/" + encodeURIComponent(revisionId) + "/unused/" + kind, unusedQuery(unused.page, unused.size)).then(function (result) {
+			if (unused.revisionId !== revisionId || unused.kind !== kind) {
+				return;
+			}
+			unused.total = result.total;
+			renderAreaSelect(result.areas || []);
+			renderUnusedList(result);
+		}).catch(function (err) {
+			K.message(el["kn-pu-message"], err.message, true);
+		});
+	}
+
+	/** 업무 영역 고르기: 영역별 건수를 붙인다. 테이블처럼 영역이 없는 종류는 숨긴다 */
+	function renderAreaSelect(areas) {
+		var named = areas.filter(function (item) { return !!item.area; });
+		el["kn-pu-area"].parentNode.hidden = named.length === 0;
+		var total = 0;
+		areas.forEach(function (item) {
+			total += item.count;
+		});
+		el["kn-pu-area"].innerHTML = "<option value=\"\">모든 영역 (" + format(total) + ")</option>" + named.map(function (item) {
+			return "<option value=\"" + K.escapeHtml(item.area) + "\"" + (item.area === unused.area ? " selected" : "") + ">" + K.escapeHtml(item.area)
+				+ " (" + format(item.count) + ")</option>";
+		}).join("");
+	}
+
+	function renderUnusedList(result) {
+		var revisionId = unused.revisionId;
+		K.table(el["kn-pu-list"], [
+			{ key: "name", label: "이름", html: function (row) {
+				var name = K.escapeHtml(row.name) + (row.title ? " <span class=\"kn-flow-alias\">" + K.escapeHtml(row.title) + "</span>" : "");
+				if (!row.graphId) {
+					return name;
+				}
+				return "<a href=\"" + K.escapeHtml(K.treeUrl(current.projectId, revisionId, row.graphId)) + "\" data-tree-window title=\"관계 트리 창에서 확인\">" + name + "</a>";
+			} },
+			{ key: "area", label: "업무 영역", html: function (row) { return row.area ? "<span class=\"kn-mono\">" + K.escapeHtml(row.area) + "</span>" : ""; } },
+			{ key: "grade", label: "등급", html: function (row) {
+				var grade = T.UNUSED_GRADE[row.grade] || [row.grade, ""];
+				return "<span class=\"kn-pu-badge kn-pu-badge-" + K.escapeHtml(String(row.grade).toLowerCase()) + "\" title=\"" + K.escapeHtml(grade[1]) + "\">"
+					+ K.escapeHtml(grade[0]) + "</span>";
+			} },
+			{ key: "reason", label: "근거" },
+			{ key: "path", label: "위치", html: function (row) {
+				return row.path ? "<span class=\"kn-mono\">" + K.escapeHtml(row.path) + (row.line ? ":" + row.line : "") + "</span>" : "";
+			} }
+		], result.rows || [], "조건에 맞는 것이 없습니다.");
+		var pages = Math.max(1, Math.ceil(result.total / unused.size));
+		el["kn-pu-page"].textContent = format(result.total) + "건 · " + unused.page + " / " + pages + " 쪽";
+		el["kn-pu-prev"].disabled = unused.page <= 1;
+		el["kn-pu-next"].disabled = unused.page >= pages;
+	}
+
+	/** 지금 조건의 목록 전부를 CSV 로(엑셀에서 한글이 깨지지 않게 BOM 을 붙인다) */
+	function downloadUnused() {
+		if (!unused.revisionId || !unused.kind) {
+			return;
+		}
+		var revisionId = unused.revisionId;
+		var kind = unused.kind;
+		var rows = [];
+		var size = 500;
+		K.message(el["kn-pu-message"], "내려받을 목록을 모으는 중…");
+		var next = function (page) {
+			return K.call("GET", "/api/revisions/" + revisionId + "/unused/" + kind, unusedQuery(page, size)).then(function (result) {
+				rows = rows.concat(result.rows || []);
+				return page * size < result.total ? next(page + 1) : rows;
+			});
+		};
+		next(1).then(function (all) {
+			var lines = ["종류,업무 영역,등급,이름,한글명,근거,파일,줄"];
+			all.forEach(function (row) {
+				lines.push([T.UNUSED_KIND[kind][0], row.area, (T.UNUSED_GRADE[row.grade] || [row.grade])[0], row.name, row.title, row.reason, row.path, row.line]
+					.map(csv).join(","));
+			});
+			var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+			var link = document.createElement("a");
+			link.href = URL.createObjectURL(blob);
+			link.download = current.projectId + "-r" + revisionId + "-전환제외후보-" + T.UNUSED_KIND[kind][0] + ".csv";
+			document.body.appendChild(link);
+			link.click();
+			setTimeout(function () {
+				URL.revokeObjectURL(link.href);
+				link.remove();
+			}, 0);
+			K.message(el["kn-pu-message"], "");
+		}).catch(function (err) {
+			K.message(el["kn-pu-message"], err.message, true);
 		});
 	}
 

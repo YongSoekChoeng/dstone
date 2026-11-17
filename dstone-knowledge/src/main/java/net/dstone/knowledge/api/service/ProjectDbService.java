@@ -45,6 +45,9 @@ public class ProjectDbService extends BaseObject {
 	private DbCommentReader dbCommentReader;
 
 	@Autowired
+	private UnusedService unusedService;
+
+	@Autowired
 	@Qualifier("txTemplateCommon")
 	private TransactionTemplate txTemplateCommon;
 
@@ -167,6 +170,8 @@ public class ProjectDbService extends BaseObject {
 			}
 		});
 		dbCommentReader.forget(projectId);
+		// "DB에는 있는데 아무 SQL 도 안 쓰는 테이블" 판정이 접속 정보를 따르므로 다시 계산하게 한다
+		unusedService.forget();
 		info("DB 접속 정보 저장: projectId=" + projectId + ", 접속 " + inserts.size() + "개");
 	}
 

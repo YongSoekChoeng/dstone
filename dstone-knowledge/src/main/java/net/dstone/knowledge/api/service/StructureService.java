@@ -89,11 +89,10 @@ public class StructureService extends BaseObject {
 		List<Map<String, Object>> statements = structureDao.selectStatementsByFolder(revisionId);
 		List<Map<String, Object>> tables = structureDao.selectTablesByFolder(revisionId);
 
-		// 공통 앞부분은 종류마다 따로 구한다(패키지는 '.', 폴더는 '/').
-		// 진입점은 클래스와 같은 패키지 체계라 클래스의 앞부분을 같이 쓴다.
-		List<String> javaPrefix = dominantPrefix(merge(classes, endpoints), "\\.");
-		List<String> screenPrefix = dominantPrefix(screens, "/");
-		List<String> mapperPrefix = dominantPrefix(statements, "/");
+		Areas resolver = new Areas(classes, endpoints, screens, statements);
+		List<String> javaPrefix = resolver.javaPrefix;
+		List<String> screenPrefix = resolver.screenPrefix;
+		List<String> mapperPrefix = resolver.mapperPrefix;
 
 		Map<String, Map<String, Object>> areas = new HashMap<String, Map<String, Object>>();
 		for (int i = 0; i < classes.size(); i++) {
@@ -150,6 +149,59 @@ public class StructureService extends BaseObject {
 		prefixes.put("screen", join(screenPrefix, "/"));
 		prefixes.put("mapper", join(mapperPrefix, "/"));
 		result.put("areaPrefixes", prefixes);
+	}
+
+	/**
+	 * <pre>
+	 * 한 리비전의 업무 영역 판별기. 다른 화면(전환 제외 후보 등)이 행마다 영역을 붙일 때 씁니다.
+	 * 공통 앞부분은 "현행 구조"와 같은 행으로 구하므로 두 화면의 영역 이름이 늘 같습니다.
+	 * </pre>
+	 */
+	public Areas areas(long revisionId) {
+		return new Areas(structureDao.selectClassesByPackage(revisionId), structureDao.selectEndpointsByPackage(revisionId),
+				structureDao.selectScreensByFolder(revisionId), structureDao.selectStatementsByFolder(revisionId));
+	}
+
+	/**
+	 * <pre>
+	 * 업무 영역 판별기. 공통 앞부분은 종류마다 따로 구한다(패키지는 '.', 폴더는 '/').
+	 * 진입점은 클래스와 같은 패키지 체계라 클래스의 앞부분을 같이 쓴다.
+	 * </pre>
+	 */
+	public class Areas {
+		final List<String> javaPrefix;
+		final List<String> screenPrefix;
+		final List<String> mapperPrefix;
+
+		Areas(List<Map<String, Object>> classes, List<Map<String, Object>> endpoints, List<Map<String, Object>> screens, List<Map<String, Object>> statements) {
+			this.javaPrefix = dominantPrefix(merge(classes, endpoints), "\\.");
+			this.screenPrefix = dominantPrefix(screens, "/");
+			this.mapperPrefix = dominantPrefix(statements, "/");
+		}
+
+		/** 패키지(com.frameq.hsl.sa.web)의 영역 */
+		public String ofPackage(String packageName) {
+			return areaOf(packageName, "\\.", javaPrefix);
+		}
+
+		/** 화면 파일 경로의 영역(파일 이름은 뗀다) */
+		public String ofScreenFile(String path) {
+			return areaOf(folderOf(path), "/", screenPrefix);
+		}
+
+		/** SQL 매퍼 파일 경로의 영역(파일 이름은 뗀다) */
+		public String ofMapperFile(String path) {
+			return areaOf(folderOf(path), "/", mapperPrefix);
+		}
+
+		/** 경로에서 폴더만. 폴더가 없으면 빈 글(= 루트) */
+		private String folderOf(String path) {
+			if (path == null) {
+				return "";
+			}
+			int slash = path.lastIndexOf('/');
+			return slash > 0 ? path.substring(0, slash) : "";
+		}
 	}
 
 	/** 영역 하나의 규모(정렬용): 화면 + 진입점 + 클래스 + SQL 문 */

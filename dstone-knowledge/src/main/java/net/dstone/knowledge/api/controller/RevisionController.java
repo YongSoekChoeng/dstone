@@ -141,16 +141,18 @@ public class RevisionController {
 	/**
 	 * <pre>
 	 * 미사용 목록 한 종류. kind 는 TABLE / SQL / TYPE / METHOD / SCREEN, grade 는 CERTAIN / LIKELY(비우면 둘 다),
-	 * q 는 이름 · 경로 · 한글명에 포함 조건입니다.
+	 * q 는 이름 · 경로 · 한글명에 포함 조건, area 는 업무 영역(행의 area, 현행 구조와 같은 규칙)입니다.
+	 * 응답의 areas 는 영역별 건수입니다.
 	 * </pre>
 	 */
 	@GetMapping("/{revisionId}/unused/{kind}")
 	public Map<String, Object> getUnusedList(@PathVariable("revisionId") long revisionId, @PathVariable("kind") String kind
 			, @RequestParam(name = "grade", required = false) String grade
 			, @RequestParam(name = "q", required = false) String q
+			, @RequestParam(name = "area", required = false) String area
 			, @RequestParam(name = "page", defaultValue = "1") int page
 			, @RequestParam(name = "size", defaultValue = "50") int size) {
-		return unusedService.getList(revisionId, kind, grade, q, page, size);
+		return unusedService.getList(revisionId, kind, grade, q, area, page, size);
 	}
 
 	/**

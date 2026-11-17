@@ -3,7 +3,7 @@
 	"프로젝트" 화면. 분석한 애플리케이션의 현행 구조를 보는 곳입니다(차세대 전환의 ASIS 분석, SM 의 영향도 출발점).
 	한 화면에 세 가지 모습이 있고, 주소의 # 로 나뉩니다(project-home.js).
 	  (없음)          프로젝트 목록
-	  #p=ID&r=리비전   프로젝트 홈: 신뢰도 한 줄 + 탭(현행 구조 ...)
+	  #p=ID&r=리비전   프로젝트 홈: 신뢰도 한 줄 + 탭(현행 구조, 전환 제외 후보). &t=unused 면 그 탭
 	  #new / #p=ID&edit=1   프로젝트 등록 / 설정(DB 접속 정보 포함)
 	분석을 세밀하게 돌리거나 연결 품질 · 실행 기록을 보는 일은 "분석 실행 · 진단"(knowledge/index) 화면에서 합니다.
 --%>
@@ -54,6 +54,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 				<div class="kn-tabs" id="kn-proj-tabs" role="tablist">
 					<button type="button" class="kn-tab kn-tab-on" data-tab="structure" role="tab">현행 구조</button>
+					<button type="button" class="kn-tab" data-tab="unused" role="tab">전환 제외 후보</button>
 				</div>
 
 				<div class="kn-tab-panel" data-panel="structure">
@@ -70,6 +71,34 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							<div id="kn-proj-areas" class="kn-scroll kn-proj-areas"></div>
 						</section>
 					</div>
+				</div>
+
+				<%-- 전환 제외 후보: 아무 데서도 쓰지 않아 옮기지 않아도 될 수 있는 것(미사용 분석, GET /revisions/{id}/unused) --%>
+				<div class="kn-tab-panel" data-panel="unused" hidden>
+					<p class="kn-proj-lead">아무 데서도 쓰지 않아 <b>차세대로 옮기지 않아도 될 수 있는 것</b>입니다. 들어오는 참조가 하나도 없는 것을 모았습니다.
+						<b>확실</b>은 쓰일 흔적이 없는 것, <b>추정</b>은 프레임워크가 이름으로 부르거나 분석기가 못 푼 참조가 가리킬 수 있는 것입니다.
+						빼기 전에 이름을 눌러 관계 트리로 한 번 더 확인하세요.</p>
+					<div id="kn-pu-notes" class="kn-proj-notes"></div>
+					<div id="kn-pu-kinds" class="kn-pu-kinds" role="tablist" aria-label="종류"></div>
+					<section class="ai-panel kn-pu-panel">
+						<div class="kn-pu-filters">
+							<div class="kn-pu-grades" role="group" aria-label="등급">
+								<button type="button" class="kn-pu-grade kn-pu-on" data-grade="">모두</button>
+								<button type="button" class="kn-pu-grade" data-grade="CERTAIN">확실</button>
+								<button type="button" class="kn-pu-grade" data-grade="LIKELY">추정</button>
+							</div>
+							<label class="kn-pu-area">업무 영역 <select id="kn-pu-area"></select></label>
+							<input type="search" id="kn-pu-q" class="kn-pu-q" placeholder="이름 · 경로에 들어간 글자" />
+							<button type="button" id="kn-pu-csv" class="kn-btn kn-plain">CSV 내려받기</button>
+						</div>
+						<div id="kn-pu-message" class="kn-message"></div>
+						<div id="kn-pu-list" class="kn-scroll kn-pu-list"></div>
+						<div class="kn-pu-pager">
+							<button type="button" id="kn-pu-prev" class="kn-btn kn-plain">이전</button>
+							<span id="kn-pu-page"></span>
+							<button type="button" id="kn-pu-next" class="kn-btn kn-plain">다음</button>
+						</div>
+					</section>
 				</div>
 			</section>
 
@@ -106,6 +135,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 	</div>
 
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-common.js"></script>
+	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/knowledge-terms.js"></script>
 	<script src="<%=requestUtil.getStrContextPath()%>/knowledge/assets/js/project-home.js"></script>
 	<script>
 		DstoneKnowledge.init("<%=requestUtil.getStrContextPath()%>");

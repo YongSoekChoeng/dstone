@@ -1926,3 +1926,55 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 	.kn-proj-rev select { min-width: 0; width: 100%; }
 	.kn-proj-trust a { margin-left: 0; }
 }
+
+/* ---------- 프로젝트 홈: 전환 제외 후보 탭 ---------- */
+#kn-proj-home .kn-tab-panel[hidden] { display: none; }
+.kn-proj-lead { max-width: 980px; margin: 0 0 12px; font-size: 13.5px; line-height: 1.7; color: var(--cs-text-2); }
+.kn-proj-notes:empty { display: none; }
+.kn-proj-notes { display: grid; gap: 6px; margin-bottom: 14px; }
+.kn-proj-note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--cs-info); background: var(--cs-info-soft); border-radius: var(--cs-radius-sm); font-size: 13px; color: var(--cs-text-2); }
+.kn-proj-note-warn { border-left-color: var(--cs-warning); background: var(--cs-warning-soft); }
+
+/* 종류 단추: 큰 숫자 + 확실 건수 · 전체 대비 비율. 고른 것은 대표 색 테두리 */
+.kn-pu-kinds { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ai-body button.kn-pu-kind {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	height: auto;
+	padding: 10px 14px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	box-shadow: none;
+	color: var(--cs-text);
+	text-align: left;
+}
+.ai-body button.kn-pu-kind:hover { border-color: var(--cs-border-strong); background: var(--cs-surface); }
+.ai-body button.kn-pu-kind.kn-pu-on { border-color: var(--cs-primary); box-shadow: inset 0 0 0 1px var(--cs-primary); background: var(--cs-primary-soft); }
+.kn-pu-kind-name { font-size: 12.5px; font-weight: 700; color: var(--cs-muted); }
+.kn-pu-kind-num { font-size: 24px; font-weight: 700; line-height: 1.25; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.kn-pu-kind-sub { font-size: 12px; color: var(--cs-muted); }
+.kn-pu-none .kn-pu-kind-num { color: var(--cs-faint); }
+
+/* 거르기 줄: 등급 · 업무 영역 · 검색 · CSV */
+.kn-pu-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
+.kn-pu-grades { display: inline-flex; border: 1px solid var(--cs-border); border-radius: var(--cs-radius-sm); overflow: hidden; }
+.ai-body button.kn-pu-grade { height: 30px; padding: 0 12px; border: 0; border-radius: 0; background: var(--cs-surface); box-shadow: none; color: var(--cs-muted); font-size: 12.5px; }
+.ai-body button.kn-pu-grade + button.kn-pu-grade { border-left: 1px solid var(--cs-border); }
+.ai-body button.kn-pu-grade.kn-pu-on { background: var(--cs-primary-soft); color: var(--cs-primary); font-weight: 700; }
+.kn-pu-area { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--cs-muted); }
+.kn-pu-area[hidden] { display: none; }
+.kn-pu-q { flex: 1 1 220px; min-width: 180px; }
+.ai-body .kn-pu-filters .kn-btn { height: 30px; font-size: 12px; }
+.kn-pu-list { max-height: 560px; }
+.kn-pu-list .document-list-table { min-width: 880px; }
+.kn-pu-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.kn-pu-badge-certain { background: var(--cs-success-soft); color: var(--cs-success); }
+.kn-pu-badge-likely { background: var(--cs-warning-soft); color: var(--cs-warning); }
+.kn-pu-pager { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-size: 13px; color: var(--cs-muted); }
+.ai-body .kn-pu-pager .kn-btn { height: 28px; font-size: 12px; }
+
+@media screen and (max-width: 860px) {
+	.kn-pu-kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
