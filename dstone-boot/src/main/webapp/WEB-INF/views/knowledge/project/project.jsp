@@ -123,9 +123,9 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 					</section>
 				</div>
 
-				<%-- 전환 제외 후보: 아무 데서도 쓰지 않아 옮기지 않아도 될 수 있는 것(미사용 분석, GET /revisions/{id}/unused) --%>
+				<%-- 전환 제외 후보: 들어오는 참조가 하나도 없는 것(미사용 분석, GET /revisions/{id}/unused) --%>
 				<div class="kn-tab-panel" data-panel="unused" hidden>
-					<p class="kn-proj-lead">아무 데서도 쓰지 않아 <b>차세대로 옮기지 않아도 될 수 있는 것</b>입니다. 들어오는 참조가 하나도 없는 것을 모았습니다.
+					<p class="kn-proj-lead">들어오는 참조가 하나도 없는 것을 모았습니다.
 						<b>확실</b>은 쓰일 흔적이 없는 것, <b>추정</b>은 프레임워크가 이름으로 부르거나 분석기가 못 푼 참조가 가리킬 수 있는 것입니다.
 						빼기 전에 이름을 눌러 관계 트리로 한 번 더 확인하세요.</p>
 					<div id="kn-pu-notes" class="kn-proj-notes"></div>

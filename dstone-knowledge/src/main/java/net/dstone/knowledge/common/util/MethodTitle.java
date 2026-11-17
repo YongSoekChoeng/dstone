@@ -17,10 +17,16 @@ import java.util.Locale;
  * 기능명이 아닌 글은 버립니다: 양식만 남은 자리 채움 글("(Be sure to write a brief description)", "(non-Javadoc)" 처럼
  * 괄호로 감싸고 한글이 없는 글), 저작권 문구, 주석으로 막아 둔 코드, "]" 같은 기호, "result" 같은 소문자 한 단어.
  * 첫 줄이 이런 글이면 그다음 줄 대신 @Description 을 봅니다.
+ * 구역을 나누는 장식 줄도 다듬습니다. 앞뒤의 * = - # ~ 를 떼고, "시작"으로 끝나면 그 말을 떼고, "끝"으로 끝나면 버립니다.
+ *   /******** 파일다운로드 기능 시작 ********&#47;   → 파일다운로드 기능
+ *   /******** FLD Convert 관련 기능 끝 ********&#47;  → (버림. 앞 구역이 끝났다는 표시일 뿐이다)
  * 파싱하지 않고 줄을 거슬러 올라가며 읽습니다. 빈 줄은 건너뛰고, 블록 주석이나 // 줄들이 나오면 그것을 봅니다.
  * </pre>
  */
 public final class MethodTitle {
+
+	/** 장식으로 쓰는 기호 */
+	private static final String DECORATION = "*=-#~";
 
 	/** 기능명으로 보여 줄 최대 글자 수 */
 	private static final int MAX_LENGTH = 60;
@@ -116,11 +122,44 @@ public final class MethodTitle {
 				text = text.substring(1).trim();
 			}
 			text = text.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
-			if (text.length() > 0) {
-				result.add(text);
+			// 앞뒤 장식 기호(**** / ==== 등)를 떼고, 뗀 것이 있으면 구역 표시 줄로 본다.
+			String bare = stripDecoration(text);
+			if (bare.length() < text.length() && bare.length() > 0) {
+				bare = sectionTitle(bare);
+			}
+			if (bare != null && bare.length() > 0) {
+				result.add(bare);
 			}
 		}
 		return result;
+	}
+
+	/** 앞뒤의 장식 기호(* = - # ~)와 공백을 뗀 글 */
+	private static String stripDecoration(String text) {
+		int from = 0;
+		int to = text.length();
+		while (from < to && (DECORATION.indexOf(text.charAt(from)) >= 0 || Character.isWhitespace(text.charAt(from)))) {
+			from++;
+		}
+		while (to > from && (DECORATION.indexOf(text.charAt(to - 1)) >= 0 || Character.isWhitespace(text.charAt(to - 1)))) {
+			to--;
+		}
+		return text.substring(from, to);
+	}
+
+	/** 구역 표시 줄의 글: "… 시작"이면 그 말을 떼고, "… 끝"이면 null(기능명이 아니다) */
+	private static String sectionTitle(String text) {
+		String lower = text.toLowerCase(Locale.ROOT);
+		if (lower.endsWith(" 끝") || lower.endsWith(" end")) {
+			return null;
+		}
+		if (lower.endsWith(" 시작")) {
+			return text.substring(0, text.length() - " 시작".length()).trim();
+		}
+		if (lower.endsWith(" start") || lower.endsWith(" begin")) {
+			return text.substring(0, text.lastIndexOf(' ')).trim();
+		}
+		return text;
 	}
 
 	/** 기능명으로 쓸 만하면 그 글, 비었거나 자리 채움 글이면 null */

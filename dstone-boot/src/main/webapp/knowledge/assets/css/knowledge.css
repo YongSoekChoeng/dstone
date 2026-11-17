@@ -2009,3 +2009,61 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 /* 숫자를 링크처럼 보이게 하는 단추(프로그램 수 → 그 프로그램 목록) */
 .ai-body button.kn-link-btn { height: auto; padding: 0; border: 0; background: none; box-shadow: none; color: var(--cs-primary); font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 2px; }
 .ai-body button.kn-link-btn:hover { background: none; color: var(--cs-primary-hover); }
+
+/* ============================== 표 컬럼 너비 고정 + 끌어서 조정 (knowledge-common.js 의 watchTables) ============================== */
+/* 너비는 colgroup 으로 정한다. 내용이 길어도 칸이 넓어지지 않고 칸 안에서 줄을 바꾼다. */
+table.kn-fixed-table {
+	table-layout: fixed;
+}
+
+table.kn-fixed-table th {
+	position: relative;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+table.kn-fixed-table td {
+	overflow: hidden;
+	overflow-wrap: anywhere;
+}
+
+/* 한 줄로 두는 칸(숫자, 코드)은 넘치면 … 으로 줄인다 */
+table.kn-fixed-table td.kn-num,
+table.kn-fixed-table .kn-code {
+	text-overflow: ellipsis;
+}
+
+/* 머리글 오른쪽 끝의 손잡이 */
+.kn-col-resizer {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 7px;
+	height: 100%;
+	cursor: col-resize;
+	user-select: none;
+	z-index: 2;
+}
+
+.kn-col-resizer::after {
+	content: "";
+	position: absolute;
+	top: 25%;
+	right: 3px;
+	width: 1px;
+	height: 50%;
+	background: var(--cs-border);
+}
+
+.kn-col-resizer:hover::after,
+.kn-col-resizing .kn-col-resizer::after {
+	background: var(--cs-primary);
+	width: 2px;
+}
+
+/* 끄는 동안에는 글자가 선택되지 않고 어디서나 크기 조절 커서 */
+body.kn-col-resizing,
+body.kn-col-resizing * {
+	cursor: col-resize !important;
+	user-select: none !important;
+}

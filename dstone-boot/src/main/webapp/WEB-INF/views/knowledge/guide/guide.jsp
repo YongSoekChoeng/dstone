@@ -46,7 +46,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 							<td><a href="<%=linkBase%>knowledge/dashboard/dashboard">대시보드</a> — 프로젝트별 분석 상태 · 최근 작업 · 임베딩 · 올린 문서를 한 화면에서 봅니다</td></tr>
 						<tr><td>"현행 시스템은 업무별로 얼마나 크고, 프로그램이 어떤 테이블을 쓰지?"</td>
 							<td><a href="<%=linkBase%>knowledge/project/project">프로젝트</a> — 현행 구조 · 프로그램 목록 · 테이블 CRUD 를 보고 CSV 로 내려받습니다</td></tr>
-						<tr><td>"차세대로 옮기지 않아도 되는 건 뭐지?"</td>
+						<tr><td>"아무 데서도 쓰지 않는 건 뭐지?"</td>
 							<td><a href="<%=linkBase%>knowledge/project/project">프로젝트</a>의 "전환 제외 후보" — 아무 데서도 쓰지 않는 화면 · SQL · 클래스 · 테이블과 그 근거가 나옵니다</td></tr>
 						<tr><td>"주문 취소는 어디서 처리하지?"</td>
 							<td><a href="<%=linkBase%>knowledge/search/search">검색 · 문서</a> — 말로 물어보면 관련된 메소드 · SQL · 화면이 나옵니다</td></tr>
@@ -206,7 +206,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					<li><b>현행 구조</b>: 화면 → 컨트롤러 → 서비스 → DAO → SQL → 테이블이 몇 개인지와, 업무 영역별 규모입니다. 업무 영역은 패키지 · 폴더의 공통 앞부분을 뗀 첫 마디입니다.</li>
 					<li><b>프로그램 목록</b>: 진입점(주소 · 배치 · main)마다 요청하는 화면과, 호출을 끝까지 따라가 닿는 SQL · 테이블(C/R/U/D)입니다. AS-IS 프로그램 목록으로 CSV 를 내려받을 수 있습니다.</li>
 					<li><b>테이블 · CRUD</b>: 테이블마다 만들고 · 읽고 · 고치고 · 지우는 프로그램 수입니다. 프로그램 수를 누르면 그 프로그램 목록으로 가고, CRUD 매트릭스를 CSV 로 내려받을 수 있습니다.</li>
-					<li><b>전환 제외 후보</b>: 아무 데서도 쓰지 않아 옮기지 않아도 될 수 있는 화면 · SQL · 클래스 · 메소드 · 테이블입니다. 확실 · 추정 등급과 근거가 붙습니다.</li>
+					<li><b>전환 제외 후보</b>: 들어오는 참조가 하나도 없는 화면 · SQL · 클래스 · 메소드 · 테이블입니다. 확실 · 추정 등급과 근거가 붙습니다.</li>
 					<li><b>프로젝트 설정</b>: 소스 폴더, 라이브러리 위치와 <b>DB 접속</b>(여러 개)을 고칩니다. DB 접속이 있으면 테이블 · 컬럼의 정의와 한글명을 소스보다 먼저 DB 에서 찾고, DB 에만 있는 테이블도 전환 제외 후보에 나옵니다. 비밀번호는 암호화해 저장하고 다시 보여 주지 않습니다.</li>
 				</ul>
 

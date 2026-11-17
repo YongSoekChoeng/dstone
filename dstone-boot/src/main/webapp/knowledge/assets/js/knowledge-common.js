@@ -12,6 +12,239 @@ var DstoneKnowledge = (function () {
 		contextPath = path || "";
 		bindExamples();
 		bindTreeLinks();
+		watchTables();
+	}
+
+	/* ============================== 표 컬럼 너비: 고정 + 끌어서 조정 ============================== */
+
+	/** 너비를 고정할 표. 입력 폼 표(ai-form)는 뺀다 */
+	var FIXED_TABLE = "table.document-list-table, table.kn-gd-facts, table.kn-gd-columns";
+
+	/** 컬럼이 이보다 좁아지지 않는다 */
+	var MIN_COL = 48;
+
+	/** 처음 잴 때 한 칸이 가질 수 있는 가장 넓은 너비. 긴 경로 하나가 표를 다 차지하지 않게 한다 */
+	var MAX_FIRST_COL = 480;
+
+	/** 이 화면에서 정한 너비. 표 머리글이 같으면 다시 그려도(거르기, 정렬, 페이지 이동) 같은 너비를 쓴다 */
+	var columnWidths = {};
+
+	/**
+	 * <pre>
+	 * 화면에 나타나는 목록 표의 컬럼 너비를 고정합니다. 내용에 따라 너비가 바뀌지 않고, 머리글 오른쪽 끝을 끌어 너비를 바꿉니다.
+	 *   - 처음 너비는 표가 처음 그려질 때 한 번만 재서 정하고, 그 뒤로는 내용이 바뀌어도 그대로 둔다.
+	 *   - 사용자가 바꾼 너비는 화면 · 표 머리글마다 이 브라우저에 기억해 둔다(다음에 열어도 같다).
+	 *   - 넘치는 글은 칸 안에서 줄을 바꾼다. 표가 자리보다 넓어지면 표를 감싼 곳에서 가로로 스크롤한다.
+	 * 표는 화면마다 여러 방식(K.table, 직접 만든 HTML, JSP)으로 그려지므로, 새로 붙는 표를 지켜보다가 처리합니다.
+	 * </pre>
+	 */
+	function watchTables() {
+		var scheduled = false;
+		function scan() {
+			scheduled = false;
+			Array.prototype.forEach.call(document.querySelectorAll(FIXED_TABLE), fixTable);
+		}
+		function schedule() {
+			if (!scheduled) {
+				scheduled = true;
+				window.setTimeout(scan, 30);
+			}
+		}
+		scan();
+		if (window.MutationObserver) {
+			// 숨겨 둔 탭이 열릴 때(hidden, class, style)도 다시 본다. 숨은 표는 자리 너비를 알 수 없어 열릴 때 처리한다.
+			new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style"] });
+		}
+		window.addEventListener("resize", schedule);
+	}
+
+	/** 표 하나의 너비를 고정하고 손잡이를 붙인다. 이미 처리했으면 아무것도 안 한다 */
+	function fixTable(table) {
+		if (table.getAttribute("data-kn-fixed") === "1" || table.classList.contains("ai-form")) {
+			return;
+		}
+		var headers = headerCells(table);
+		if (headers.length === 0 || table.offsetParent === null || !hasRows(table)) {
+			return;
+		}
+		var key = widthKey(headers);
+		var widths = columnWidths[key] || storedWidths(key) || defaultWidths(table, headers);
+		columnWidths[key] = widths;
+		var colgroup = document.createElement("colgroup");
+		headers.forEach(function (th, index) {
+			var col = document.createElement("col");
+			col.style.width = widths[index] + "px";
+			colgroup.appendChild(col);
+			addResizer(table, th, index, key);
+		});
+		table.insertBefore(colgroup, table.firstChild);
+		table.classList.add("kn-fixed-table");
+		setTableWidth(table, widths);
+		allowSideScroll(table);
+		table.setAttribute("data-kn-fixed", "1");
+	}
+
+	/** 내용 행이 있는지. "없습니다" 한 줄(칸을 합친 행)만 있으면 아직 재지 않는다 */
+	function hasRows(table) {
+		var body = table.tBodies[0];
+		if (!body || body.rows.length === 0) {
+			return false;
+		}
+		return !(body.rows.length === 1 && body.rows[0].cells.length === 1 && body.rows[0].cells[0].colSpan > 1);
+	}
+
+	/** 맨 위 머리글 줄의 칸들. 머리글이 없거나 칸을 합친 표는 다루지 않는다(빈 배열) */
+	function headerCells(table) {
+		var row = table.tHead && table.tHead.rows.length === 1 ? table.tHead.rows[0] : null;
+		if (!row) {
+			return [];
+		}
+		var cells = Array.prototype.slice.call(row.cells);
+		for (var i = 0; i < cells.length; i++) {
+			if (cells[i].colSpan > 1) {
+				return [];
+			}
+		}
+		return cells;
+	}
+
+	/** 화면 + 머리글 글자로 만든 이름. 같은 머리글의 표는 같은 너비를 쓴다 */
+	function widthKey(headers) {
+		var labels = headers.map(function (th) {
+			return (th.textContent || "").trim();
+		});
+		return "kn-colw:" + location.pathname + location.search.replace(/[?&](p|r|t)=[^&]*/g, "") + "|" + labels.join("|");
+	}
+
+	function storedWidths(key) {
+		try {
+			var text = window.localStorage.getItem(key);
+			var widths = text ? JSON.parse(text) : null;
+			return Array.isArray(widths) ? widths : null;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function storeWidths(key, widths) {
+		try {
+			window.localStorage.setItem(key, JSON.stringify(widths));
+		} catch (e) {
+			// 저장할 수 없는 브라우저(개인 정보 보호 모드 등). 이번 화면에서만 기억한다.
+		}
+	}
+
+	/**
+	 * 처음 너비. 표가 처음 그려졌을 때 한 번만 재고, 그 뒤로는 바꾸지 않는다(거르기 · 다시 그리기로 너비가 바뀌지 않게).
+	 *   1) 지금 그려진 대로 칸마다 너비를 잰다(한 칸은 MAX_FIRST_COL 까지).
+	 *   2) 합이 자리보다 좁으면, 숫자 칸을 뺀 칸들을 비율대로 넓혀 자리를 채운다.
+	 */
+	function defaultWidths(table, headers) {
+		var space = (table.parentElement && table.parentElement.clientWidth) || 960;
+		var widths = headers.map(function (th) {
+			return Math.max(MIN_COL, Math.min(MAX_FIRST_COL, Math.ceil(th.getBoundingClientRect().width)));
+		});
+		var total = sum(widths);
+		var flexible = 0;
+		headers.forEach(function (th, index) {
+			if (!th.classList.contains("kn-num")) {
+				flexible += widths[index];
+			}
+		});
+		if (total < space - 2 && flexible > 0) {
+			var extra = space - 2 - total;
+			widths = widths.map(function (width, index) {
+				return headers[index].classList.contains("kn-num") ? width : width + Math.floor(extra * width / flexible);
+			});
+		}
+		return widths;
+	}
+
+	function sum(values) {
+		var total = 0;
+		values.forEach(function (value) {
+			total += value;
+		});
+		return total;
+	}
+
+	/** 표 너비 = 컬럼 너비의 합. 자리보다 넓으면 가로 스크롤이 생긴다 */
+	function setTableWidth(table, widths) {
+		var total = sum(widths);
+		table.style.width = total + "px";
+		table.style.minWidth = total + "px";
+	}
+
+	/** 표를 감싼 곳이 넘치는 표를 잘라 버리지 않고 가로로 스크롤하게 한다 */
+	function allowSideScroll(table) {
+		var parent = table.parentElement;
+		if (parent && window.getComputedStyle(parent).overflowX === "visible") {
+			parent.style.overflowX = "auto";
+		}
+	}
+
+	/** 머리글 오른쪽 끝에 끌어서 너비를 바꾸는 손잡이를 붙인다. 두 번 누르면 처음 너비로 돌아간다 */
+	function addResizer(table, th, index, key) {
+		var handle = document.createElement("span");
+		handle.className = "kn-col-resizer";
+		handle.setAttribute("aria-hidden", "true");
+		handle.title = "끌어서 너비 조정 (두 번 누르면 처음 너비)";
+		handle.addEventListener("mousedown", function (event) {
+			if (event.button !== 0) {
+				return;
+			}
+			event.preventDefault();
+			event.stopPropagation();
+			var widths = columnWidths[key];
+			var startX = event.clientX;
+			var startWidth = widths[index];
+			var col = table.querySelector("colgroup").children[index];
+			document.body.classList.add("kn-col-resizing");
+			function move(e) {
+				widths[index] = Math.max(MIN_COL, Math.round(startWidth + e.clientX - startX));
+				col.style.width = widths[index] + "px";
+				setTableWidth(table, widths);
+			}
+			function up() {
+				document.removeEventListener("mousemove", move);
+				document.removeEventListener("mouseup", up);
+				document.body.classList.remove("kn-col-resizing");
+				storeWidths(key, widths);
+				applyWidths(key, table);
+			}
+			document.addEventListener("mousemove", move);
+			document.addEventListener("mouseup", up);
+		});
+		// 손잡이를 눌러도 머리글 정렬 등 다른 동작이 일어나지 않게 한다.
+		handle.addEventListener("click", function (event) {
+			event.stopPropagation();
+		});
+		handle.addEventListener("dblclick", function (event) {
+			event.stopPropagation();
+			try {
+				window.localStorage.removeItem(key);
+			} catch (e) {
+				// 지울 수 없으면 그대로 둔다.
+			}
+			columnWidths[key] = defaultWidths(table, headerCells(table));
+			applyWidths(key, null);
+		});
+		th.appendChild(handle);
+	}
+
+	/** 같은 머리글의 다른 표(같은 화면에 여럿일 때)에도 너비를 맞춘다. except 는 이미 맞춘 표 */
+	function applyWidths(key, except) {
+		var widths = columnWidths[key];
+		Array.prototype.forEach.call(document.querySelectorAll("table.kn-fixed-table"), function (table) {
+			if (table === except || widthKey(headerCells(table)) !== key) {
+				return;
+			}
+			var cols = table.querySelector("colgroup").children;
+			for (var i = 0; i < cols.length && i < widths.length; i++) {
+				cols[i].style.width = widths[i] + "px";
+			}
+			setTableWidth(table, widths);
+		});
 	}
 
 	/**

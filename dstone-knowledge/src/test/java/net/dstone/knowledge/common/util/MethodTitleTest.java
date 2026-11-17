@@ -105,4 +105,26 @@ public class MethodTitleTest {
 		assertNull(MethodTitle.of(lines, Integer.valueOf(1)));
 	}
 
+	@Test
+	public void 구역_표시_줄은_장식을_떼고_시작은_떼고_끝은_버린다() {
+		String[] start = {
+				"	/************************************ 파일다운로드 기능 시작 ************************************/",
+				"	protected void downloadFile(String filePath) throws Exception {",
+		};
+		assertEquals("파일다운로드 기능", MethodTitle.of(start, Integer.valueOf(2)));
+
+		String[] end = {
+				"	/************************************ FLD Convert 관련 기능 끝 ************************************/",
+				"",
+				"	protected void other() {",
+		};
+		assertNull(MethodTitle.of(end, Integer.valueOf(3)));
+
+		String[] plain = {
+				"	/** ===== 주문 조회 ===== */",
+				"	public void select() {",
+		};
+		assertEquals("주문 조회", MethodTitle.of(plain, Integer.valueOf(2)));
+	}
+
 }
