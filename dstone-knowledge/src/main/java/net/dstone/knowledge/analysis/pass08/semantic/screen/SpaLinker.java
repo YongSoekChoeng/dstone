@@ -135,7 +135,7 @@ public class SpaLinker implements SemanticStep {
 			List<ScreenUrls.Hit> found = screenUrls.findBases(text, baseRules);
 			for (int b = 0; b < found.size(); b++) {
 				if (!run.bases.containsKey(found.get(b).getUrl())) {
-					run.bases.put(found.get(b).getUrl(), found.get(b).getRule());
+					run.bases.put(found.get(b).getUrl(), found.get(b));
 				}
 			}
 			if (text.indexOf("import") >= 0) {
@@ -318,7 +318,11 @@ public class SpaLinker implements SemanticStep {
 		properties.put("ruleAt", hit.getRule().getAt());
 		if (base != null) {
 			properties.put("base", base);
-			properties.put("baseRuleAt", run.bases.get(base).getAt());
+			properties.put("baseRuleAt", run.bases.get(base).getRule().getAt());
+			if (run.bases.get(base).isConditional()) {
+				// baseURL 을 조건식에서 읽었다(env ?? (DEV ? 'http://localhost:8080/api' : '/api')). 배포 때 다른 값일 수 있다
+				properties.put("baseFrom", "CONDITIONAL");
+			}
 		}
 		if (hit.getVariable() != null) {
 			properties.put("variable", hit.getVariable());
@@ -438,8 +442,8 @@ public class SpaLinker implements SemanticStep {
 		final Map<String, ModuleInfo> modules = new HashMap<String, ModuleInfo>();
 		/** 폴더 → 그 폴더에 쓰는 별칭(접두어 → 가리키는 폴더). 별칭 설정이 없으면 빈 Map */
 		final Map<String, Map<String, String>> aliases = new HashMap<String, Map<String, String>>();
-		/** baseURL → 그것을 찾은 규칙. 찾은 순서대로 */
-		final Map<String, ScreenUrls.Rule> bases = new LinkedHashMap<String, ScreenUrls.Rule>();
+		/** baseURL → 그것을 찾은 자리(규칙, 조건식에서 읽었는지). 찾은 순서대로 */
+		final Map<String, ScreenUrls.Hit> bases = new LinkedHashMap<String, ScreenUrls.Hit>();
 		final List<ScreenUrls.Rule> urlRules;
 		SpaEndpoints endpoints;
 		final Counts counts = new Counts();

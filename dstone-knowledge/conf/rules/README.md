@@ -113,6 +113,7 @@ screen:
 
 - 템플릿 글자와 이어 붙인 주소는 값이 들어가는 마디를 `{}`로 두고 진입점의 경로 변수와 맞춘다. `` `/boards/${seq}` ``와 `"/boards/" + seq`는 `/boards/{seq}`에 맞는다. 마디 일부만 값이면(`"/a/" + id + ".do"`) 잇지 않는다.
 - 화면이 import 한 API 모듈, 훅, 컴포저블, 스토어 안의 호출도 `SpaLinker`가 import 를 따라가 찾는다. 이때는 `via = IMPORT`이고 신뢰도가 한 단계 낮다.
+- baseURL 을 조건식으로 적었으면(`baseURL: import.meta.env.VITE_API ?? (DEV ? 'http://localhost:8080/api' : '/api')`) 식 안의 따옴표 글자를 다듬은 값이 **모두 같을 때만** 그 값(`/api`)을 쓴다. 식에는 따옴표 글자, `??`, `||`, `? :`, 괄호, 환경 변수(`import.meta.env.X`, `process.env.X`)만 있어야 하고, 같은 식을 한 번 대입한 변수(`const API_BASE = …`)도 읽는다. 이렇게 이은 관계에는 `baseFrom = CONDITIONAL`이 남는다(배포 때 환경 변수가 다른 값을 줄 수 있다).
 - baseURL 이 프로젝트에 여럿이면 어느 것인지 몰라 한 단계 더 낮춘다. 프로젝트마다 다른 래퍼 함수(`request({ url })` 등)는 `projects/{ID}/`에 `url:`로 더 적는다.
 
 ## 결과에 남는 근거

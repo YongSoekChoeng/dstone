@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
  * 규칙에 HTTP 메소드(verb: GET)를 적었으면 찾은 주소에 붙여 둡니다. 적지 않은 함수 규칙은 다음 인자의 method: 'POST' 를 읽습니다(fetch).
  *
  * baseURL 규칙(screen: 의 base:)은 같은 모양으로 "모든 주소 앞에 붙는 글자"를 찾습니다(findBases).
+ * baseURL 은 조건식(env ?? (DEV ? 'http://localhost:8080/api' : '/api'))도 읽습니다. 글자 후보가 모두 같은 값일 때만입니다.
  * </pre>
  */
 public class ScreenUrls {
@@ -189,13 +190,20 @@ public class ScreenUrls {
 		private final int index;
 		private final String variable;
 		private final String verb;
+		/** baseURL 을 조건식(env ?? (DEV ? 'http://localhost:8080/api' : '/api'))에서 읽었으면 true */
+		private final boolean conditional;
 
 		Hit(Rule rule, String url, int index, String variable, String verb) {
+			this(rule, url, index, variable, verb, false);
+		}
+
+		Hit(Rule rule, String url, int index, String variable, String verb, boolean conditional) {
 			this.rule = rule;
 			this.url = url;
 			this.index = index;
 			this.variable = variable;
 			this.verb = verb;
+			this.conditional = conditional;
 		}
 
 		public Rule getRule() {
@@ -220,6 +228,16 @@ public class ScreenUrls {
 		/** HTTP 메소드(GET, POST …). 규칙에도 호출에도 없으면 null(어느 것이든) */
 		public String getVerb() {
 			return verb;
+		}
+
+		/**
+		 * <pre>
+		 * baseURL 을 조건식에서 읽었는지. 조건식의 글자 후보가 모두 같은 값일 때만 받지만,
+		 * 환경 변수(import.meta.env.X)가 배포 때 다른 값을 줄 수도 있어서 결과에 표시해 둔다.
+		 * </pre>
+		 */
+		public boolean isConditional() {
+			return conditional;
 		}
 	}
 
@@ -384,6 +402,11 @@ public class ScreenUrls {
 	 *   baseURL: 'http://localhost:8080/api/'   → /api   (서버 이름과 끝의 / 는 뗀다)
 	 *   fetch(API_BASE + path)                  → /api   (API_BASE 에 '/api' 를 딱 한 번 대입했고, 뒤에 다른 값이 이어질 때)
 	 *   fetch('/api/members')                   → 없음   (주소 하나는 baseURL 이 아니다)
+	 *
+	 * 조건식도 받습니다. 식 안의 글자 후보를 다듬은 값이 모두 같을 때만입니다(agreedBase).
+	 *   baseURL: import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8080/api' : '/api')   → /api
+	 *   const API_BASE = (위와 같은 식);  fetch(API_BASE + path)                                                       → /api
+	 *   baseURL: isProd ? '/api' : '/mock'                                                                             → 없음 (후보가 다르다)
 	 * </pre>
 	 */
 	public List<Hit> findBases(String text, List<Rule> rules) {
@@ -402,7 +425,12 @@ public class ScreenUrls {
 					continue;
 				}
 				String written = writtenAt(text, rule, m, comments);
-				if (written == null) {
+				// 속성 값이 글자나 이름 하나가 아니면(조건식 등) 식 전체를 읽어 둔다
+				String expression = null;
+				if (written == null && rule.kind == Kind.PROP && startsProperty(text, m.start(), comments)) {
+					expression = expressionText(text, m.end());
+				}
+				if (written == null && expression == null) {
 					continue;
 				}
 				if (nonCode == null) {
@@ -410,26 +438,302 @@ public class ScreenUrls {
 					scopes = functionScopes(text, nonCode);
 				}
 				String value;
-				if (rule.kind == Kind.ATTR) {
+				boolean conditional = false;
+				if (expression != null) {
+					// 조건식: baseURL: env ?? (DEV ? 'http://localhost:8080/api' : '/api')
+					value = agreedBase(expression);
+					conditional = value != null;
+				} else if (rule.kind == Kind.ATTR) {
 					value = written;
 				} else if (literal(written) != null) {
 					// 글자 하나: 속성 값이면 baseURL 이고, 함수 인자면 그냥 주소다.
 					value = rule.kind == Kind.PROP ? literal(written) : null;
 				} else if (IDENTIFIER.matcher(written).matches()) {
-					value = rule.kind == Kind.PROP ? variableValue(text, nonCode, scopes, written, m.start()) : null;
+					value = null;
+					if (rule.kind == Kind.PROP) {
+						value = variableValue(text, nonCode, scopes, written, m.start());
+						if (value == null) {
+							// 변수에 조건식을 한 번 대입했으면 그 식을 본다
+							value = agreedBase(variableExpression(text, nonCode, scopes, written, m.start()));
+							conditional = value != null;
+						}
+					}
 				} else {
 					// 이어 붙인 값: 맨 앞 글자 뒤에 다른 값이 이어지면 그 앞 글자가 baseURL 이다.
 					String joined = composite(text, nonCode, scopes, written, m.start());
 					int hole = joined == null ? -1 : joined.indexOf("${");
 					value = hole > 0 ? joined.substring(0, hole) : null;
+					if (value == null) {
+						// 맨 앞이 조건식을 한 번 대입한 변수면(fetch(API_BASE + path)) 그 식을 본다
+						List<String> terms = splitPlus(written.trim());
+						String first = terms == null || terms.size() < 2 ? null : terms.get(0).trim();
+						if (first != null && IDENTIFIER.matcher(first).matches()) {
+							value = agreedBase(variableExpression(text, nonCode, scopes, first, m.start()));
+							conditional = value != null;
+						}
+					}
 				}
 				String base = baseOf(value);
 				if (base != null) {
-					bases.add(new Hit(rule, base, m.start(), null, null));
+					bases.add(new Hit(rule, base, m.start(), null, null, conditional));
 				}
 			}
 		}
 		return bases;
+	}
+
+	/* ---------------- 조건식 baseURL ---------------- */
+
+	/** 조건식 안에서 "값을 모르지만 받아들이는" 자리: 빌드 · 배포 때 정해지는 환경 변수 */
+	private static final Pattern ENV_REF = Pattern.compile("(?:import\\.meta\\.env|process\\.env)\\.[A-Za-z_$][A-Za-z0-9_$]*");
+
+	/** 조건식을 읽을 때 볼 최대 길이. 짝이 맞지 않는 코드에서 파일 끝까지 읽지 않게 한다 */
+	private static final int MAX_EXPRESSION_CHARS = 500;
+
+	/**
+	 * <pre>
+	 * 조건식 하나의 글자 후보를 다듬은 값이 모두 같으면 그 값, 아니면 null.
+	 *   env ?? (DEV ? 'http://localhost:8080/api' : '/api')   → 후보 /api, /api → /api
+	 *   isProd ? '/api' : '/mock'                               → 후보가 달라 null
+	 *   env ?? ''                                               → '' 는 baseURL 이 아니라 null
+	 *   env                                                     → 글자 후보가 없어 null
+	 * 식은 따옴표 글자, ??, ||, ? :, 괄호, 환경 변수(import.meta.env.X, process.env.X)로만 되어 있어야 합니다.
+	 * 삼항식의 조건 부분은 값이 아니라서 무엇이 적혀 있든 보지 않습니다. 그 밖의 이름이나 호출이 값 자리에 있으면 계산할 수 없어 null 입니다.
+	 * </pre>
+	 */
+	String agreedBase(String expression) {
+		if (expression == null) {
+			return null;
+		}
+		List<String> candidates = new ArrayList<String>();
+		if (!alternatives(expression, candidates, 0) || candidates.isEmpty()) {
+			return null;
+		}
+		String agreed = null;
+		for (int i = 0; i < candidates.size(); i++) {
+			String base = baseOf(candidates.get(i));
+			if (base == null || (agreed != null && !agreed.equals(base))) {
+				return null;
+			}
+			agreed = base;
+		}
+		return agreed;
+	}
+
+	/** 식이 낼 수 있는 글자 값들을 out 에 모읍니다. 계산할 수 없는 값 자리가 있으면 false */
+	private boolean alternatives(String expression, List<String> out, int depth) {
+		if (expression == null || depth > 10) {
+			return false;
+		}
+		String s = stripParens(expression.trim());
+		if (s == null || s.length() == 0) {
+			return false;
+		}
+		// 1) 따옴표 글자, ${…} 없는 템플릿 글자
+		String value = literal(s);
+		if (value == null) {
+			String template = template(s);
+			value = template != null && template.indexOf("${") < 0 ? template : null;
+		}
+		if (value != null) {
+			out.add(value);
+			return true;
+		}
+		// 2) 환경 변수: 값은 모르지만 받아들인다(글자 후보만으로 정한다)
+		if (ENV_REF.matcher(s).matches()) {
+			return true;
+		}
+		boolean[] top = topLevel(s);
+		if (top == null) {
+			return false;
+		}
+		// 3) 삼항식 조건 ? 가 : 나 — 우선순위가 가장 낮아 먼저 나눈다. 조건은 값이 아니라 보지 않는다
+		int question = ternaryAt(s, top, 0);
+		if (question >= 0) {
+			int colon = matchingColon(s, top, question);
+			if (colon < 0) {
+				return false;
+			}
+			return alternatives(s.substring(question + 1, colon), out, depth + 1) && alternatives(s.substring(colon + 1), out, depth + 1);
+		}
+		// 4) a ?? b, a || b
+		List<String> parts = new ArrayList<String>();
+		int start = 0;
+		for (int i = 0; i + 1 < s.length(); i++) {
+			if (top[i] && top[i + 1] && ((s.charAt(i) == '?' && s.charAt(i + 1) == '?') || (s.charAt(i) == '|' && s.charAt(i + 1) == '|'))) {
+				parts.add(s.substring(start, i));
+				start = i + 2;
+				i++;
+			}
+		}
+		if (parts.isEmpty()) {
+			return false;
+		}
+		parts.add(s.substring(start));
+		for (int i = 0; i < parts.size(); i++) {
+			if (!alternatives(parts.get(i), out, depth + 1)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** 식 전체를 감싼 괄호를 벗깁니다. ( a ) ?? ( b ) 처럼 감싸지 않은 것은 그대로. 짝이 안 맞으면 null */
+	private String stripParens(String s) {
+		String current = s;
+		while (current.length() >= 2 && current.charAt(0) == '(' && current.charAt(current.length() - 1) == ')') {
+			boolean[] top = topLevel(current);
+			if (top == null) {
+				return null;
+			}
+			// 첫 ( 의 짝이 맨 끝 ) 이면 안쪽의 모든 글자가 바깥 높이에 있지 않다
+			boolean wraps = true;
+			for (int i = 1; i < current.length() - 1; i++) {
+				if (top[i]) {
+					wraps = false;
+					break;
+				}
+			}
+			if (!wraps) {
+				break;
+			}
+			current = current.substring(1, current.length() - 1).trim();
+		}
+		return current;
+	}
+
+	/**
+	 * <pre>
+	 * 글자마다 "괄호 바깥이고 따옴표 밖"인지 표시합니다. 여는 괄호 자리 자체는 바깥으로 칩니다.
+	 * 따옴표나 괄호의 짝이 맞지 않으면 null.
+	 * </pre>
+	 */
+	private boolean[] topLevel(String s) {
+		boolean[] top = new boolean[s.length()];
+		int depth = 0;
+		char quote = 0;
+		for (int i = 0; i < s.length(); i++) {
+			char c = s.charAt(i);
+			if (quote != 0) {
+				if (c == '\\') {
+					i++;
+				} else if (c == quote) {
+					quote = 0;
+				}
+				continue;
+			}
+			if (c == '"' || c == '\'' || c == '`') {
+				quote = c;
+				continue;
+			}
+			if (c == ')' || c == ']' || c == '}') {
+				depth--;
+				if (depth < 0) {
+					return null;
+				}
+			}
+			top[i] = depth == 0;
+			if (c == '(' || c == '[' || c == '{') {
+				depth++;
+			}
+		}
+		return quote != 0 || depth != 0 ? null : top;
+	}
+
+	/** from 부터 바깥 높이의 삼항 연산자 ? 자리. ?? 와 ?. 는 아니다. 없으면 -1 */
+	private int ternaryAt(String s, boolean[] top, int from) {
+		for (int i = from; i < s.length(); i++) {
+			if (!top[i] || s.charAt(i) != '?') {
+				continue;
+			}
+			char before = i > 0 ? s.charAt(i - 1) : ' ';
+			char after = i + 1 < s.length() ? s.charAt(i + 1) : ' ';
+			if (before == '?' || after == '?' || after == '.') {
+				continue;
+			}
+			return i;
+		}
+		return -1;
+	}
+
+	/** question 자리의 ? 와 짝인 바깥 높이의 : 자리. 안에 든 삼항식(a ? b ? c : d : e)은 건너뛴다. 없으면 -1 */
+	private int matchingColon(String s, boolean[] top, int question) {
+		int nested = 0;
+		for (int i = question + 1; i < s.length(); i++) {
+			if (!top[i]) {
+				continue;
+			}
+			if (ternaryAt(s, top, i) == i) {
+				nested++;
+			} else if (s.charAt(i) == ':') {
+				if (nested == 0) {
+					return i;
+				}
+				nested--;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * <pre>
+	 * from 부터 값 하나(식)를 읽습니다. 바깥 높이의 , } ) ; 앞까지입니다.
+	 * 줄바꿈은 식이 연산자(?? || ? :)로 끝났거나 다음 줄이 연산자로 시작할 때만 이어 읽습니다.
+	 * 짝이 맞지 않거나 너무 길면 null.
+	 *   baseURL: env ?? (DEV ? 'a' : '/api'),   → env ?? (DEV ? 'a' : '/api')
+	 * </pre>
+	 */
+	private String expressionText(String text, int from) {
+		int limit = Math.min(text.length(), from + MAX_EXPRESSION_CHARS);
+		int depth = 0;
+		char quote = 0;
+		int i = from;
+		for (; i < limit; i++) {
+			char c = text.charAt(i);
+			if (quote != 0) {
+				if (c == '\\') {
+					i++;
+				} else if (c == quote) {
+					quote = 0;
+				}
+				continue;
+			}
+			if (c == '"' || c == '\'' || c == '`') {
+				quote = c;
+			} else if (c == '(' || c == '[' || c == '{') {
+				depth++;
+			} else if (c == ')' || c == ']' || c == '}') {
+				if (depth == 0) {
+					break;
+				}
+				depth--;
+			} else if (depth == 0 && (c == ',' || c == ';')) {
+				break;
+			} else if (depth == 0 && c == '\n' && !continuesOnNextLine(text, from, i)) {
+				break;
+			}
+		}
+		if (i >= limit && i < text.length()) {
+			return null;
+		}
+		if (quote != 0 || depth != 0) {
+			return null;
+		}
+		String expression = text.substring(from, i).trim();
+		return expression.length() == 0 ? null : expression;
+	}
+
+	/** newline 자리의 줄바꿈 뒤로 식이 이어지는지: 앞이 연산자로 끝나거나 다음 줄이 연산자로 시작한다 */
+	private boolean continuesOnNextLine(String text, int from, int newline) {
+		String before = text.substring(from, newline).trim();
+		if (before.endsWith("??") || before.endsWith("||") || before.endsWith("?") || before.endsWith(":")) {
+			return true;
+		}
+		int i = newline + 1;
+		while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
+			i++;
+		}
+		return i < text.length() && (text.charAt(i) == '?' || text.charAt(i) == ':' || text.startsWith("||", i));
 	}
 
 	/** 규칙이 가리키는 자리에 적힌 글자(따옴표 포함). 읽을 수 없으면 null */
@@ -838,6 +1142,27 @@ public class ScreenUrls {
 	 * </pre>
 	 */
 	String variableValue(String text, BitSet nonCode, List<int[]> scopes, String name, int index) {
+		List<int[]> found = visibleAssignments(text, nonCode, scopes, name, index);
+		return found == null ? null : single(text, found);
+	}
+
+	/**
+	 * <pre>
+	 * 변수 name 에 딱 한 번 = 로 대입한 오른쪽 식의 글자. 따옴표 글자가 아니어도 된다(조건식 baseURL 을 읽으려고).
+	 *   const API_BASE = import.meta.env.X ?? '/api'   → import.meta.env.X ?? '/api'
+	 * 매개변수이거나, 대입이 없거나 여러 번이면 null. 어느 대입을 보는지는 variableValue 와 같다.
+	 * </pre>
+	 */
+	private String variableExpression(String text, BitSet nonCode, List<int[]> scopes, String name, int index) {
+		List<int[]> found = visibleAssignments(text, nonCode, scopes, name, index);
+		if (found == null || found.size() != 1 || found.get(0)[2] != 1) {
+			return null;
+		}
+		return expressionText(text, found.get(0)[1]);
+	}
+
+	/** index 자리에서 보이는 name 의 대입들(variableValue 의 1~3단계). 감싼 함수의 매개변수면 null */
+	private List<int[]> visibleAssignments(String text, BitSet nonCode, List<int[]> scopes, String name, int index) {
 		// 1) 감싼 함수
 		int[] scope = null;
 		for (int i = 0; i < scopes.size(); i++) {
@@ -859,10 +1184,10 @@ public class ScreenUrls {
 			Matcher declared = Pattern.compile("(?<![A-Za-z0-9_$.])(?:var|let|const)\\s+" + Pattern.quote(name) + "(?![A-Za-z0-9_$])").matcher(text);
 			declared.region(scope[0], scope[1]);
 			if (!inside.isEmpty() || declared.find()) {
-				return single(text, inside);
+				return inside;
 			}
 		}
-		return single(text, assignments(text, nonCode, assign, 0, text.length()));
+		return assignments(text, nonCode, assign, 0, text.length());
 	}
 
 	/** from ~ to 안의 대입들. 한 칸은 {대입 연산자 시작, 연산자 끝, = 하나뿐이면 1 아니면 0} */

@@ -173,4 +173,55 @@ public class ScreenUrlsTest {
 		// 래퍼 안의 fetch(API_BASE + path) 는 주소 전체가 값이라 주소로는 남지 않는다
 		assertEquals(Arrays.asList("/api/members"), urls(react, FETCH));
 	}
+
+	private static final ScreenUrls.Rule BASE_PROP = ScreenUrls.Rule.prop("baseURL", "baseURL: URL", "common/spa.yml:17");
+
+	@Test
+	public void baseURL_조건식은_글자_후보가_모두_같으면_그_값() {
+		// hl-hr-project frontend/src/services/api.js 의 모양
+		String vite = "import axios from 'axios'\n\nconst api = axios.create({\n"
+				+ "  baseURL: import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8080/api' : '/api'),\n"
+				+ "  withCredentials: true,\n})\n";
+		List<ScreenUrls.Hit> bases = screenUrls.findBases(vite, Arrays.asList(BASE_PROP));
+		assertEquals(1, bases.size());
+		assertEquals("/api", bases.get(0).getUrl());
+		assertTrue(bases.get(0).isConditional());
+
+		// 글자 하나로 적은 baseURL 은 조건식 표시가 없다
+		assertTrue(!screenUrls.findBases("axios.create({ baseURL: '/api' })", Arrays.asList(BASE_PROP)).get(0).isConditional());
+
+		// || 와 process.env, 여러 줄에 걸친 식
+		String cra = "const http = axios.create({\n  baseURL: process.env.REACT_APP_API\n    || '/api/',\n  timeout: 1000\n})\n";
+		assertEquals("/api", screenUrls.findBases(cra, Arrays.asList(BASE_PROP)).get(0).getUrl());
+	}
+
+	@Test
+	public void baseURL_조건식을_대입한_변수도_읽는다() {
+		String text = "const API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8080/api' : '/api')\n"
+				+ "const http = axios.create({ baseURL: API_BASE })\n"
+				+ "export function request(path) { return fetch(API_BASE + path) }\n";
+		List<ScreenUrls.Hit> props = screenUrls.findBases(text, Arrays.asList(BASE_PROP));
+		assertEquals(1, props.size());
+		assertEquals("/api", props.get(0).getUrl());
+		assertTrue(props.get(0).isConditional());
+		List<ScreenUrls.Hit> calls = screenUrls.findBases(text, Arrays.asList(FETCH));
+		assertEquals(1, calls.size());
+		assertEquals("/api", calls.get(0).getUrl());
+	}
+
+	@Test
+	public void baseURL_조건식의_후보가_다르거나_계산할_수_없으면_버린다() {
+		List<ScreenUrls.Rule> rules = Arrays.asList(BASE_PROP);
+		// 후보가 다르다
+		assertTrue(screenUrls.findBases("axios.create({ baseURL: isProd ? '/api' : '/mock' })", rules).isEmpty());
+		// 빈 글자는 baseURL 이 아니다
+		assertTrue(screenUrls.findBases("axios.create({ baseURL: import.meta.env.VITE_API ?? '' })", rules).isEmpty());
+		// 글자 후보가 없다
+		assertTrue(screenUrls.findBases("axios.create({ baseURL: import.meta.env.VITE_API })", rules).isEmpty());
+		// 값 자리에 환경 변수가 아닌 이름이나 호출이 있으면 계산할 수 없다
+		assertTrue(screenUrls.findBases("axios.create({ baseURL: config.api ?? '/api' })", rules).isEmpty());
+		assertTrue(screenUrls.findBases("axios.create({ baseURL: getBase() || '/api' })", rules).isEmpty());
+		// 여러 번 대입한 변수
+		assertTrue(screenUrls.findBases("let B = env.X ?? '/api'\nB = '/v2'\naxios.create({ baseURL: B })", rules).isEmpty());
+	}
 }
