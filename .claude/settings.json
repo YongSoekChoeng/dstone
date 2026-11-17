@@ -11,5 +11,18 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "repomix-mcp@repomix": true,
+    "repomix-commands@repomix": true,
+    "repomix-explorer@repomix": true
+  },
+  "extraKnownMarketplaces": {
+    "repomix": {
+      "source": {
+        "source": "github",
+        "repo": "yamadashy/repomix"
+      }
+    }
   }
 }
