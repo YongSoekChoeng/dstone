@@ -181,7 +181,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 				<div class="kn-case">
 					<h4><span class="kn-case-no">D</span> 호출 흐름을 그림으로 볼 때 <a class="kn-case-link" href="<%=linkBase%>knowledge/graph/graph">노드 맵 열기</a></h4>
 					<ol>
-						<li>프로젝트를 고르면 전체 그림이 그려집니다. "이름으로 찾기"에 <code>BoardDAO.deleteBoard</code>처럼 적으면 그 메소드의 관계 트리가 열립니다.</li>
+						<li>프로젝트를 고르면 전체 그림이 그려집니다. "이름으로 찾기"에 <code>BoardDAO.deleteBoard</code>처럼 적으면 그 메소드의 관계 트리가, <code>매퍼.SQL이름</code>으로 적으면 그 SQL의 관계 트리가 열립니다.</li>
 						<li>관계 트리는 따로 뜬 창에 그립니다. 영향도 화면의 <b>관계 트리 보기</b>나 미사용 탭의 이름을 눌러도 노드 맵을 거치지 않고 같은 창이 바로 뜹니다.</li>
 					</ol>
 					<div class="kn-expect"><b>이렇게 보입니다:</b> 가운데가 고른 메소드, 왼쪽이 그것을 부르는 쪽(화면까지), 오른쪽이 그것이 부르는 쪽(SQL · 테이블까지)입니다.</div>

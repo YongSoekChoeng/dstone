@@ -570,6 +570,7 @@ var DstoneKnowledgeGraph = (function () {
 	/**
 	 * 이름으로 노드를 찾아 그리로 갑니다. 접힌 묶음 안에 있으면 그 묶음을 펼칩니다. 다시 누르면 다음 것으로 갑니다.
 	 * 맞는 노드가 없고 "클래스.메소드"(또는 "클래스#메소드") 모양이면, 그 클래스로 간 뒤 메소드의 관계 트리를 엽니다.
+	 * "매퍼.SQL이름"(예: JADB3010D.selectListAdd)도 같은 식으로 매퍼로 간 뒤 그 SQL 의 관계 트리를 엽니다.
 	 */
 	function find() {
 		var word = el["kn-graph-find"].value.trim().toLowerCase();
@@ -612,18 +613,21 @@ var DstoneKnowledgeGraph = (function () {
 		return hits;
 	}
 
-	/** "클래스.메소드" 찾기. 클래스(화면 안의 Java 코드 포함)마다 메소드 목록을 가져와, 이름에 메소드 부분이 들어간 것을 모읍니다 */
+	/**
+	 * "클래스.메소드" 찾기. 클래스(화면 안의 Java 코드 포함)는 메소드 목록을, 매퍼는 SQL statement 목록을 가져와
+	 * 이름에 뒷부분이 들어간 것을 모읍니다. 그래서 "JADB3010D.selectListAdd"처럼 SQL 이름으로도 찾을 수 있습니다.
+	 */
 	function findMethods(word, typeWord, methodWord) {
-		var types = nodesNamed(typeWord, ["TYPE", "JSP"]);
+		var types = nodesNamed(typeWord, ["TYPE", "JSP", "MAPPER"]);
 		if (types.length === 0) {
-			K.message(el["kn-graph-message"], "\"" + typeWord + "\" 이(가) 이름에 들어간 클래스가 없습니다.", true);
+			K.message(el["kn-graph-message"], "\"" + typeWord + "\" 이(가) 이름에 들어간 클래스나 매퍼가 없습니다.", true);
 			return;
 		}
 		var checked = types.slice(0, METHOD_FIND_TYPE_MAX);
-		K.message(el["kn-graph-message"], "클래스 " + checked.length + "개에서 메소드 \"" + methodWord + "\" 을(를) 찾는 중...");
+		K.message(el["kn-graph-message"], "클래스 · 매퍼 " + checked.length + "개에서 메소드 · SQL \"" + methodWord + "\" 을(를) 찾는 중...");
 		Promise.all(checked.map(function (type) {
 			return K.call("GET", "/api/revisions/" + map.revisionId + "/graph/node", { id: type.id }).then(function (detail) {
-				return { type: type, methods: detail.methods || [] };
+				return { type: type, methods: detail.methods || [], statements: detail.statements || [] };
 			});
 		})).then(function (results) {
 			// 그사이에 다른 이름을 찾았거나 리비전을 바꿨다.
@@ -636,15 +640,21 @@ var DstoneKnowledgeGraph = (function () {
 				result.methods.forEach(function (method) {
 					var name = String(method.name).toLowerCase();
 					if (name.indexOf(methodWord) >= 0) {
-						(name === methodWord ? exact : partial).push({ node: result.type, method: method, fullName: result.type.fullName + "." + method.signature });
+						(name === methodWord ? exact : partial).push({ node: result.type, treeId: method.methodId, fullName: result.type.fullName + "." + method.signature });
+					}
+				});
+				result.statements.forEach(function (statement) {
+					var name = statementName(statement).toLowerCase();
+					if (name.indexOf(methodWord) >= 0) {
+						(name === methodWord ? exact : partial).push({ node: result.type, treeId: statement.id, fullName: "SQL " + statement.statement });
 					}
 				});
 			});
-			// 이름이 정확히 같은 메소드를 앞에 둔다.
+			// 이름이 정확히 같은 것을 앞에 둔다.
 			map.hits = exact.concat(partial);
 			if (map.hits.length === 0) {
-				K.message(el["kn-graph-message"], "\"" + typeWord + "\" 클래스 " + checked.length + "개에 이름에 \"" + methodWord + "\" 이(가) 들어간 메소드가 없습니다."
-					+ (types.length > checked.length ? " 클래스가 " + types.length + "개라 앞의 " + checked.length + "개만 봤습니다. 클래스 이름을 더 길게 적으세요." : ""), true);
+				K.message(el["kn-graph-message"], "\"" + typeWord + "\" 클래스 · 매퍼 " + checked.length + "개에 이름에 \"" + methodWord + "\" 이(가) 들어간 메소드나 SQL이 없습니다."
+					+ (types.length > checked.length ? " 후보가 " + types.length + "개라 앞의 " + checked.length + "개만 봤습니다. 이름을 더 길게 적으세요." : ""), true);
 				return;
 			}
 			showHit(word);
@@ -653,15 +663,22 @@ var DstoneKnowledgeGraph = (function () {
 		});
 	}
 
-	/** 찾은 것 가운데 hitIndex 번째로 갑니다. 메소드면 그 클래스로 간 뒤 메소드의 관계 트리를 엽니다 */
+	/** statement 이름에서 앞의 namespace 를 뗀 것 ("JADB3010D.selectListAdd" → "selectListAdd") */
+	function statementName(statement) {
+		var full = String(statement.statement || "");
+		var prefix = statement.namespace ? statement.namespace + "." : "";
+		return prefix && full.indexOf(prefix) === 0 ? full.substring(prefix.length) : full;
+	}
+
+	/** 찾은 것 가운데 hitIndex 번째로 갑니다. 메소드나 SQL 이면 그 클래스(매퍼)로 간 뒤 관계 트리를 엽니다 */
 	function showHit(word) {
 		var hit = map.hits[map.hitIndex];
 		K.message(el["kn-graph-message"], "\"" + word + "\" " + map.hits.length + "건 가운데 " + (map.hitIndex + 1) + "번째: " + hit.fullName
 			+ (map.hits.length > 1 ? " (찾기를 다시 누르면 다음 것)" : ""));
-		if (hit.method) {
+		if (hit.treeId) {
 			goTo(hit.node);
 			// 팝업이 막히면 openTree 가 알림 줄을 "창 열기" 링크로 바꾼다. 그래서 알림을 먼저 쓴다.
-			openTree(hit.method.methodId);
+			openTree(hit.treeId);
 		} else {
 			goTo(hit);
 		}

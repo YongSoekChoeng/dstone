@@ -31,7 +31,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						선은 "부르는 쪽 → 불리는 쪽"입니다. 선이 굵을수록 그 사이의 호출이 많습니다.
 						마우스 휠로 확대하고 바탕을 끌어서 옮깁니다. 맵이 크면 글자가 보이도록 왼쪽 위부터 보여 주니, 전체 모양은 <b>"화면에 맞추기"</b>로 봅니다.</li>
 					<li><b>이름으로 찾기</b> — 클래스 · 화면 · 테이블 이름의 일부를 적고 "찾기"(또는 Enter)를 누르면 그 노드로 갑니다. 같은 이름이 여럿이면 다시 누를 때마다 다음 것으로 넘어갑니다.
-						<code>클래스.메소드</code>처럼 적으면 그 메소드의 관계 트리가 바로 열립니다.</li>
+						<code>클래스.메소드</code>처럼 적으면 그 메소드의 관계 트리가 바로 열립니다. <code>매퍼.SQL이름</code>(예: <code>JADB3010D.selectListAdd</code>)으로 적으면 그 SQL의 관계 트리가 열립니다.</li>
 					<li><b>묶음 펼치기</b> — 노드가 많은 프로젝트는 패키지(폴더) <b>묶음</b>으로 접혀서 나옵니다(테두리가 두 줄인 노드). 묶음을 <b>두 번 누르면 펼쳐집니다</b>.
 						"보기 단위"를 "클래스"로 바꾸면 처음부터 모두 펼쳐서 그립니다.</li>
 					<li><b>노드 누르기</b> — 누른 노드에 이어진 것만 남고 나머지는 흐려집니다. <span class="kn-graph-mark" style="background:#60a5fa;"></span>파란 테는 그 노드를 부르는 쪽,
@@ -69,7 +69,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 						<th><label for="kn-graph-revision">리비전</label></th>
 						<td><select id="kn-graph-revision"></select></td>
 						<th><label for="kn-graph-find">이름으로 찾기</label></th>
-						<td><div class="ai-form-inline"><input type="text" id="kn-graph-find" placeholder="클래스 / 화면 / 테이블 / 클래스.메소드" />
+						<td><div class="ai-form-inline"><input type="text" id="kn-graph-find" placeholder="클래스 / 화면 / 테이블 / 클래스.메소드 / 매퍼.SQL" />
 							<button type="button" id="kn-graph-find-btn" class="kn-plain">찾기</button></div></td>
 					</tr>
 					<tr>
