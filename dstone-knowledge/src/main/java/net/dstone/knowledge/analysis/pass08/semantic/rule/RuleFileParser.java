@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -26,6 +27,7 @@ import org.yaml.snakeyaml.nodes.SequenceNode;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.IdTransform;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenMenu;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenScript;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenUrls;
 import net.dstone.knowledge.common.util.HashText;
 
 /**
@@ -478,6 +480,10 @@ public class RuleFileParser {
 	 *   - { open: fnOpenPage(_, ID), to: "{ID}.xml" }          화면 함수 → 화면 파일
 	 *   - { menu: { name: MENU_NM, path: SRC_PATH } }          메뉴 목록 → 화면명
 	 *   - { call: callTx(ID), to: "{ID}", id: { match: '^SVC_(.*)$', replace: 'svc_$1', case: LOWER, map: tx-map.csv } }
+	 *   - url: this.gfn_Transaction(_, URL)                  화면 함수의 인자에 적은 주소 → 진입점
+	 *   - url: "url: URL"                                    객체 속성에 적은 주소 → 진입점
+	 *   - url: '<form action="URL">'                         HTML 태그 속성에 적은 주소 → 진입점
+	 *   - { url: '<form action="URL">', context: /hi-japan } 주소 앞에 글자로 붙인 컨텍스트 경로를 떼고 맞춘다
 	 * </pre>
 	 */
 	private void readScreens(Reader r, Node node, RuleFile file, StringBuilder mapTexts) {
@@ -495,9 +501,24 @@ public class RuleFileParser {
 				file.screenMenus.add(new ScreenMenu.Rule(name, path, at));
 				continue;
 			}
+			if (r.has(keys, "url")) {
+				r.allowOnly(keys, "url", "context");
+				Node urlNode = r.valueNode(keys, "url");
+				ScreenUrls.Rule urlRule = readScreenUrl(r, urlNode, r.scalar(urlNode, "screen.url"), at);
+				String context = r.optionalScalar(keys, "context", null);
+				if (context != null) {
+					context = context.trim();
+					if (!URL_CONTEXT.matcher(context).matches()) {
+						throw r.error(r.valueNode(keys, "context"), "context 는 / 로 시작하는 경로 하나입니다(끝에 / 없이). 예: /hi-japan: " + context);
+					}
+					urlRule.withContext(context);
+				}
+				file.screenUrls.add(urlRule);
+				continue;
+			}
 			String kind = r.has(keys, "call") ? "call" : r.has(keys, "field") ? "field" : r.has(keys, "open") ? "open" : null;
 			if (kind == null) {
-				throw r.error(item, "call, field, open, menu 가운데 하나를 적습니다. 예: { call: doRequestAjax(ID), to: \"perform{ID}\" }");
+				throw r.error(item, "call, field, open, url, menu 가운데 하나를 적습니다. 예: { call: doRequestAjax(ID), to: \"perform{ID}\" }, { url: \"gfn_Transaction(_, URL)\" }");
 			}
 			r.allowOnly(keys, kind, "to", "id");
 			String to = r.requiredScalar(keys, item, "to");
@@ -529,6 +550,52 @@ public class RuleFileParser {
 			ScreenScript.CallRule rule = new ScreenScript.CallRule(call.name, template, argIndex, transform, at);
 			("call".equals(kind) ? file.screenCalls : file.screenOpens).add(rule);
 		}
+	}
+
+	/** url: 의 HTML 속성 모양. 예: <form action="URL"> */
+	private static final Pattern URL_ATTR = Pattern.compile("^<([A-Za-z][A-Za-z0-9:_-]*)\\s+([A-Za-z][A-Za-z0-9:_-]*)\\s*=\\s*([\"']?)URL\\3\\s*/?>$");
+
+	/** url: 의 context. 예: /hi-japan */
+	private static final Pattern URL_CONTEXT = Pattern.compile("^/[A-Za-z0-9_\\-]+(?:/[A-Za-z0-9_\\-]+)*$");
+
+	/** url: 의 객체 속성 모양. 예: url: URL, "url": URL */
+	private static final Pattern URL_PROP = Pattern.compile("^([\"']?)([A-Za-z_$][A-Za-z0-9_$]*)\\1\\s*:\\s*URL$");
+
+	/**
+	 * <pre>
+	 * screen: 의 url: 한 줄을 읽습니다. 적은 모양으로 종류를 가립니다.
+	 *   <form action="URL">          HTML 태그 속성
+	 *   url: URL                     객체 속성
+	 *   this.gfn_Transaction(_, URL) 함수 인자(앞의 this. 같은 마디는 없어도 맞는다)
+	 * </pre>
+	 */
+	private ScreenUrls.Rule readScreenUrl(Reader r, Node node, String text, String at) {
+		String t = text.trim();
+		if (t.startsWith("<")) {
+			Matcher attr = URL_ATTR.matcher(t);
+			if (!attr.matches()) {
+				throw r.error(node, "HTML 속성은 <태그 속성=\"URL\"> 로 적습니다. 예: <form action=\"URL\">: " + text);
+			}
+			return ScreenUrls.Rule.attr(attr.group(1), attr.group(2), t, at);
+		}
+		Matcher prop = URL_PROP.matcher(t);
+		if (prop.matches()) {
+			return ScreenUrls.Rule.prop(prop.group(2), t, at);
+		}
+		CodePattern.Call call;
+		try {
+			call = CodePattern.call(t, CodePattern.CallKind.SCRIPT_FUNCTION, Arrays.asList("URL"));
+		} catch (IllegalArgumentException e) {
+			throw r.error(node, e.getMessage() + " (url: 은 함수(_, URL), 속성: URL, <태그 속성=\"URL\"> 가운데 하나로 적습니다)");
+		}
+		int argIndex = call.indexOf("URL");
+		if (argIndex < 0) {
+			throw r.error(node, "URL 자리를 적어야 어느 인자가 주소인지 압니다. 예: " + call.name + "(_, URL)");
+		}
+		if (argIndex > MAX_ARG_INDEX) {
+			throw r.error(node, "인자 자리는 " + (MAX_ARG_INDEX + 1) + "번째까지 볼 수 있습니다: " + text);
+		}
+		return ScreenUrls.Rule.call(call.name, argIndex, t, at);
 	}
 
 	/**

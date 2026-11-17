@@ -16,6 +16,11 @@ screen:
   - field: tranId
     to: perform{ID}
 
+  # 출력 버튼이 만드는 폼. 주소 앞에 컨텍스트 경로를 글자로 붙여 쓴다(context 로 떼고 맞춘다).
+  # "<form id='pform' action='/hi-japan/reporting.do' method='POST'>"
+  - url: '<form action="URL">'
+    context: /hi-japan
+
   # 화면 ID 로 다른 화면을 연다. 그 경로로 끝나는 화면이 하나일 때만 잇는다.
   # parent.scwin.fnOpenPage("JIMC1000G", ...) → JIMC1000G.xml
   - open: fnOpenPage(ID)

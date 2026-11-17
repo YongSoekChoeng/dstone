@@ -5,6 +5,7 @@ import java.util.List;
 
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenMenu;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenScript;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenUrls;
 
 /**
  * <pre>
@@ -47,6 +48,8 @@ public class RuleFile {
 	public final List<ScreenScript.CallRule> screenFields = new ArrayList<ScreenScript.CallRule>();
 	public final List<ScreenScript.CallRule> screenOpens = new ArrayList<ScreenScript.CallRule>();
 	public final List<ScreenMenu.Rule> screenMenus = new ArrayList<ScreenMenu.Rule>();
+	/** 화면이 서버 주소를 적는 자리(url:). 이 자리의 주소가 진입점 하나와 같으면 HIGH 로 잇는다 */
+	public final List<ScreenUrls.Rule> screenUrls = new ArrayList<ScreenUrls.Rule>();
 	/* jpa: */
 	public final List<Rule.Mark> jpaEntities = new ArrayList<Rule.Mark>();
 	public final List<Rule.Mark> jpaTables = new ArrayList<Rule.Mark>();
@@ -76,7 +79,7 @@ public class RuleFile {
 	public int ruleCount() {
 		return layers.size() + httpEntries.size() + annotationEntries.size() + extendsEntries.size() + xmlEntries.size()
 				+ injects.size() + proxies.size() + sqlCalls.size() + viewCalls.size()
-				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size()
+				+ screenCalls.size() + screenFields.size() + screenOpens.size() + screenMenus.size() + screenUrls.size()
 				+ jpaEntities.size() + jpaTables.size() + (jpaNaming == null ? 0 : 1) + jpaQueries.size() + jpaNamedQueries.size()
 				+ jpaRepositories.size() + jpqlMethods.size();
 	}

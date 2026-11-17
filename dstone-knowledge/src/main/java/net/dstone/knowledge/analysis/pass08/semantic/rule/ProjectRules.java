@@ -11,6 +11,7 @@ import java.util.Set;
 
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenMenu;
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenScript;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenUrls;
 
 /**
  * <pre>
@@ -184,6 +185,21 @@ public class ProjectRules {
 		List<ScreenScript.CallRule> all = new ArrayList<ScreenScript.CallRule>();
 		for (int i = 0; i < files.size(); i++) {
 			addScreenRules(all, files.get(i).screenOpens, keys, "open");
+		}
+		return all;
+	}
+
+	/** 화면이 서버 주소를 적는 자리(url:). 우선순위 순서이고, 똑같은 규칙은 하나만 */
+	public List<ScreenUrls.Rule> screenUrls() {
+		Set<String> keys = new LinkedHashSet<String>();
+		List<ScreenUrls.Rule> all = new ArrayList<ScreenUrls.Rule>();
+		for (int i = 0; i < files.size(); i++) {
+			List<ScreenUrls.Rule> rules = files.get(i).screenUrls;
+			for (int j = 0; j < rules.size(); j++) {
+				if (keys.add(rules.get(j).key())) {
+					all.add(rules.get(j));
+				}
+			}
 		}
 		return all;
 	}

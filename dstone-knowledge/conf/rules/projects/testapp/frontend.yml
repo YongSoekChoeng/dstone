@@ -1,0 +1,13 @@
+# testApp 화면(JSP + jQuery/Kendo UI)의 관례. 화면에 이 모양이 없으면 아무 일도 하지 않는다.
+description: 화면이 서버 주소를 적는 자리(데이터소스·업로드·팝업 설정, 폼)
+
+screen:
+  # Kendo 데이터소스와 $.ajax 설정. read: { url: "/commoncode/getCommonCode.ajax?..." }
+  - url: "url: URL"
+  # 팝업 설정. { pURL: "/system/member/memberRegi.pop?..." }
+  - url: "pURL: URL"
+  # Kendo 업로드 설정. async: { saveUrl: "...", removeUrl: "..." }
+  - url: "saveUrl: URL"
+  - url: "removeUrl: URL"
+  # <form action="/files/getFile.do?...">
+  - url: '<form action="URL">'

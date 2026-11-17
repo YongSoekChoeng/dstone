@@ -1,0 +1,12 @@
+# H-Energy 화면(Nexacro)의 관례. 화면에 이 함수가 없으면 아무 일도 하지 않는다.
+description: 화면이 서버 주소를 넘기는 거래 함수
+
+screen:
+  # 거래 함수의 둘째 인자가 서버 주소다. 따옴표 글자나, 같은 함수 안에서 글자를 한 번만 대입한 변수만 읽는다.
+  # var strUrl = "/hhr/ws/insertWabDtAutoCrt.do";  this.gfn_Transaction(strSvc, strUrl, ...)
+  - url: this.gfn_Transaction(_, URL)
+  - url: this.gfn_transaction(_, URL)
+  - url: this.bfn_trExec(_, URL)
+  - url: this.fn_trans(_, URL)
+  # Nexacro 기본 거래 함수. this.transaction(sSvcID, sURL, ...)
+  - url: this.transaction(_, URL)

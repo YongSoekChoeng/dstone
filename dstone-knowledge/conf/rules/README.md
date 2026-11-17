@@ -43,7 +43,7 @@ conf/rules/
 | `inject:` `proxy:` | 주입받는 필드, 프록시가 끼는 메소드 | `"@Autowired"` |
 | `sql:` | 이 호출은 어떤 SQL을 실행하나 | `_.메소드(SQL)` / `타입#메소드(_, SQL)` / `new 타입(SQL)` |
 | `view:` | 이 호출은 어떤 JSP를 여나 | `{ call: new ModelAndView(VIEW), file: "{VIEW}.jsp" }` |
-| `screen:` | 화면이 어느 서버 메소드를 부르나, 어느 화면을 여나 | `{ call: 함수(ID), to: "perform{ID}" }` / `{ field: 필드, to: ... }` / `{ open: 함수(ID), to: "{ID}.xml" }` / `{ menu: { name: 키, path: 키 } }` |
+| `screen:` | 화면이 어느 서버 메소드를 부르나, 어느 화면을 여나 | `{ call: 함수(ID), to: "perform{ID}" }` / `{ field: 필드, to: ... }` / `{ open: 함수(ID), to: "{ID}.xml" }` / `{ url: 함수(_, URL) }` · `{ url: "url: URL" }` · `{ url: '<form action="URL">', context: /ctx }` / `{ menu: { name: 키, path: 키 } }` |
 | `jpa:` | JPA 엔티티와 쿼리 | `entity`, `table`, `naming`, `query`, `namedQuery`, `repository`, `jpql` |
 
 ### 패턴 글자
@@ -77,6 +77,24 @@ screen:
     to: "{ID}"
     id: { map: tx-map.csv }
 ```
+
+### 화면 주소 자리 (`url:`)
+
+화면이 서버 주소를 적는 자리를 코드 모양 그대로 적는다. 그 자리의 주소가 진입점 주소와 똑같고 처리 메소드가 하나면 `HIGH`로 잇는다. 규칙이 없으면 "화면에 주소 글자가 있다"는 것만 보고 `MEDIUM`으로 잇는다.
+
+```yaml
+screen:
+  # 함수 인자. 따옴표 글자, 또는 같은 함수 안에서 글자를 한 번만 대입한 변수만 읽는다
+  # var strUrl = "/hhr/a.do"; this.gfn_Transaction(strSvc, strUrl, ...)
+  - url: this.gfn_Transaction(_, URL)
+  # 객체 속성. $.ajax({ url: "/a.ajax" }), Kendo read: { url: "/a.ajax?..." }
+  - url: "url: URL"
+  # HTML 태그 속성. 주소 앞에 컨텍스트 경로를 글자로 붙여 쓰면 context 로 뗀다
+  - url: '<form action="URL">'
+    context: /hi-japan
+```
+
+`?query`, `${ctx}`, `<%= … %>`는 떼고 맞춘다. 이어 붙인 주소(`"/a/" + id + ".do"`)와 여러 번 대입한 변수는 계산할 수 없어서 잇지 않는다.
 
 ## 결과에 남는 근거
 

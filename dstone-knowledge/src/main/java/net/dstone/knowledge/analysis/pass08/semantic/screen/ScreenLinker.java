@@ -95,6 +95,8 @@ public class ScreenLinker implements SemanticStep {
 
 	private final ScriptFunctions scriptFunctions = new ScriptFunctions();
 
+	private final ScreenUrls screenUrls = new ScreenUrls();
+
 	@Override
 	public String name() {
 		return "screen";
@@ -121,6 +123,8 @@ public class ScreenLinker implements SemanticStep {
 		// 1) 규칙 파일 screen: 의 call 규칙 다음에 field 규칙(폼 필드에 거래 ID를 담아 보내는 화면. 출력 화면이 이렇게 많이 부른다).
 		List<ScreenScript.CallRule> rules = new ArrayList<ScreenScript.CallRule>(context.getProjectRules().screenCalls());
 		List<ScreenScript.CallRule> openRules = new ArrayList<ScreenScript.CallRule>(context.getProjectRules().screenOpens());
+		// 화면이 서버 주소를 적는 자리(url:). 주소 글자로 잇기(MEDIUM)보다 먼저 돌아야 HIGH 로 남는다.
+		List<ScreenUrls.Rule> urlRules = context.getProjectRules().screenUrls();
 
 		Map<String, List<String>> handlers = null;
 		Map<String, CommonFunction> commons = null;
@@ -155,6 +159,7 @@ public class ScreenLinker implements SemanticStep {
 				counts.titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
 				Set<String> linked = new HashSet<String>();
 				List<CommonUse> uses = commonUsesOf(text, commons);
+				linkUrls(revisionId, fileId, text, urlRules, handlers, linked, counts);
 				linkPaths(revisionId, fileId, text, handlers, uses, linked, counts);
 				linkCalls(revisionId, fileId, text, rules, uses, linked, counts);
 				Set<Long> screens = linkScreens(revisionId, fileId, (String) file.get("path"), (String) file.get("fileType"), text, openRules, counts);
@@ -167,7 +172,7 @@ public class ScreenLinker implements SemanticStep {
 		// 4) 거래 진입점과 규칙 상태
 		int endpoints = insertEndpoints(revisionId, counts);
 		int hinted = saveRuleStatus(revisionId, counts, rules, openRules);
-		return "리치클라이언트 화면 " + counts.files + "개. 주소로 이은 요청 " + counts.byPath + ", 거래 호출로 이은 요청 " + counts.byCall
+		return "리치클라이언트 화면 " + counts.files + "개. 주소 규칙(url:)으로 이은 요청 " + counts.byUrl + ", 주소 글자로 이은 요청 " + counts.byPath + ", 거래 호출로 이은 요청 " + counts.byCall
 				+ "(메소드 없음 " + counts.missing + ", ID를 글자로 적지 않은 호출 " + counts.unknown + "), 화면 → 화면 " + counts.screens
 				+ "(그 가운데 공통 함수를 거친 것 " + counts.byCommon + "), 공통 함수를 거친 요청 거래 " + counts.byCommonCall
 				+ " / 주소 " + counts.byCommonPath
@@ -329,6 +334,26 @@ public class ScreenLinker implements SemanticStep {
 			list.add((String) endpoints.get(i).get("methodId"));
 		}
 		return handlers;
+	}
+
+	/**
+	 * <pre>
+	 * 규칙(screen: 의 url:)이 말하는 자리에 적은 주소를 진입점과 잇습니다(via = URL_RULE).
+	 * 처리하는 메소드가 하나면 HIGH 입니다. 같은 메소드는 한 번만 잇습니다.
+	 * </pre>
+	 */
+	private void linkUrls(long revisionId, long fileId, String text, List<ScreenUrls.Rule> rules, Map<String, List<String>> handlers
+			, Set<String> linked, Counts counts) {
+		if (rules.isEmpty() || handlers.isEmpty()) {
+			return;
+		}
+		List<ScreenUrls.Link> links = ScreenUrls.links(screenUrls.find(text, rules), handlers, linked);
+		for (int i = 0; i < links.size(); i++) {
+			ScreenUrls.Link link = links.get(i);
+			semanticDao.insertRelation(relation(revisionId, fileId, "REQUESTS", "METHOD", link.getMethodId(), null, link.getConfidence()
+					, link.getResolutionStatus(), link.properties(), Integer.valueOf(screenScript.lineAt(text, link.getHit().getIndex()))));
+			counts.byUrl++;
+		}
 	}
 
 	/**
@@ -850,6 +875,8 @@ public class ScreenLinker implements SemanticStep {
 	/** 한 번의 실행에서 센 것들 */
 	private static class Counts {
 		int files;
+		/** 주소 규칙(url:)으로 이은 요청 */
+		int byUrl;
 		int byPath;
 		int byCall;
 		int missing;

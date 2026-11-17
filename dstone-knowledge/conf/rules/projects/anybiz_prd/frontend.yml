@@ -1,0 +1,17 @@
+# anybiz_prd 화면(JSP + jQuery/Kendo UI)의 관례. 화면에 이 모양이 없으면 아무 일도 하지 않는다.
+description: 화면이 서버 주소를 적는 자리(데이터소스·업로드·팝업 설정, 폼, 탭 열기)
+
+screen:
+  # Kendo 데이터소스와 $.ajax 설정. read: { url: "/insa/guarantee/getGuaranteeList.ajax?..." }
+  - url: "url: URL"
+  # 팝업 설정. { pURL: '/board/board/itemRegi.pop?...' }
+  - url: "pURL: URL"
+  # Kendo 업로드 설정. async: { saveUrl: "...", removeUrl: "..." }
+  - url: "saveUrl: URL"
+  - url: "removeUrl: URL"
+  # <form action="/contract/existingcontract/getExpirationContractList.do?...">
+  - url: '<form action="URL">'
+  # $('#myForm').attr("action", "/insa/certificate/updateCertificateIssue.ajax?...")
+  - url: attr(_, URL)
+  # parent.addTab("CN_1100", "연체/실효 확인", "/contract/collectcontract/overdueContract.go", ...)
+  - url: addTab(_, _, URL)

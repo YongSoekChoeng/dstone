@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenScript;
+import net.dstone.knowledge.analysis.pass08.semantic.screen.ScreenUrls;
 
 /**
  * <pre>
@@ -39,6 +40,31 @@ public class RuleFileParserTest {
 				parser.parse(text, path);
 			}
 		});
+	}
+
+	@Test
+	public void 화면_주소_규칙은_적은_모양으로_종류를_가린다() {
+		RuleFile file = parse("screen:\n"
+				+ "  - url: this.gfn_Transaction(_, URL)\n"
+				+ "  - url: \"url: URL\"\n"
+				+ "  - url: '<form action=\"URL\">'\n", "projects/h-energy/frontend.yml");
+		assertEquals(3, file.screenUrls.size());
+		assertEquals(ScreenUrls.Kind.CALL, file.screenUrls.get(0).getKind());
+		assertEquals("gfn_Transaction", file.screenUrls.get(0).getName());
+		assertEquals(1, file.screenUrls.get(0).getArgIndex());
+		assertEquals("projects/h-energy/frontend.yml:2", file.screenUrls.get(0).getAt());
+		assertEquals(ScreenUrls.Kind.PROP, file.screenUrls.get(1).getKind());
+		assertEquals("url", file.screenUrls.get(1).getName());
+		assertEquals(ScreenUrls.Kind.ATTR, file.screenUrls.get(2).getKind());
+		assertEquals("form", file.screenUrls.get(2).getName());
+		assertEquals("action", file.screenUrls.get(2).getAttribute());
+		assertEquals(3, file.ruleCount());
+
+		assertTrue(parseFails("screen:\n  - url: gfn_Transaction(_, ID)\n", "common/x.yml").getMessage().contains("URL"));
+		assertTrue(parseFails("screen:\n  - url: '<form action>'\n", "common/x.yml").getMessage().contains("<태그"));
+		assertEquals("/hi-japan", parse("screen:\n  - { url: '<form action=\"URL\">', context: /hi-japan }\n", "common/x.yml").screenUrls.get(0).getContext());
+		assertTrue(parseFails("screen:\n  - { url: '<form action=\"URL\">', context: hi-japan/ }\n", "common/x.yml").getMessage().contains("context"));
+		assertTrue(parseFails("screen:\n  - { url: \"url: URL\", to: x }\n", "common/x.yml").getMessage().length() > 0);
 	}
 
 	@Test

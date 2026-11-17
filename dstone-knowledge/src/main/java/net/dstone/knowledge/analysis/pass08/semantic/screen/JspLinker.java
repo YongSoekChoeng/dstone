@@ -72,6 +72,8 @@ public class JspLinker implements SemanticStep {
 
 	private final ScreenScript screenScript = new ScreenScript();
 
+	private final ScreenUrls screenUrls = new ScreenUrls();
+
 	@Override
 	public String name() {
 		return "jsp";
@@ -100,9 +102,11 @@ public class JspLinker implements SemanticStep {
 		}
 
 		Path root = Paths.get(context.getProjectValue("localPath")).toRealPath();
+		// 화면이 서버 주소를 적는 자리(url:). 주소 글자로 잇기(MEDIUM)보다 먼저 돌아야 HIGH 로 남는다.
+		List<ScreenUrls.Rule> urlRules = context.getProjectRules().screenUrls();
 		// 스크립트 경로 → 그 스크립트에 적힌 진입점 주소. 여러 화면이 같은 공통 스크립트를 불러오므로 한 번만 읽는다.
 		Map<String, ScriptPaths> scripts = new HashMap<String, ScriptPaths>();
-		int files = 0, requests = 0, includes = 0, titled = 0, byScript = 0;
+		int files = 0, requests = 0, includes = 0, titled = 0, byScript = 0, byUrl = 0;
 		long afterId = 0;
 		while (true) {
 			context.checkCancelled();
@@ -125,12 +129,13 @@ public class JspLinker implements SemanticStep {
 				files++;
 				titled += saveScreenName(revisionId, fileId, (String) file.get("path"), text);
 				Set<String> linked = new HashSet<String>();
+				byUrl += linkUrls(revisionId, fileId, text, urlRules, handlers, linked);
 				requests += linkRequests(revisionId, fileId, text, handlers, linked);
 				byScript += linkScriptRequests(revisionId, fileId, text, handlers, linked, root, scripts);
 				includes += linkIncludes(revisionId, fileId, (String) file.get("path"), text);
 			}
 		}
-		return "JSP " + files + "개. 화면이 요청하는 주소 " + requests + "(불러온 스크립트에 적힌 것 " + byScript + "), 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
+		return "JSP " + files + "개. 주소 규칙(url:)으로 이은 요청 " + byUrl + ", 화면이 요청하는 주소 " + requests + "(불러온 스크립트에 적힌 것 " + byScript + "), 끼워 넣기 " + includes + ", 화면명 " + titled + ".";
 	}
 
 	/** 화면명(<title>, titletext)을 찾아 남깁니다. 남겼으면 1 */
@@ -143,6 +148,25 @@ public class JspLinker implements SemanticStep {
 		properties.put("via", title.getVia());
 		semanticDao.insertScreenName(revisionId, fileId, path, title.getName(), properties, Integer.valueOf(title.getLine()));
 		return 1;
+	}
+
+	/**
+	 * <pre>
+	 * 규칙(screen: 의 url:)이 말하는 자리에 적은 주소를 진입점과 잇습니다(via = URL_RULE).
+	 * 처리하는 메소드가 하나면 HIGH 입니다. 같은 메소드는 한 번만 잇습니다(linked).
+	 * </pre>
+	 */
+	private int linkUrls(long revisionId, long fileId, String text, List<ScreenUrls.Rule> rules, Map<String, List<String>> handlers, Set<String> linked) {
+		if (rules.isEmpty() || handlers.isEmpty()) {
+			return 0;
+		}
+		List<ScreenUrls.Link> links = ScreenUrls.links(screenUrls.find(text, rules), handlers, linked);
+		for (int i = 0; i < links.size(); i++) {
+			ScreenUrls.Link link = links.get(i);
+			semanticDao.insertRelation(relation(revisionId, "FILE", "F" + fileId, "REQUESTS", "METHOD", link.getMethodId(), link.getConfidence()
+					, link.getResolutionStatus(), link.properties(), fileId, lineAt(text, link.getHit().getIndex())));
+		}
+		return links.size();
 	}
 
 	/** JSP 안의 주소 가운데 진입점과 같은 것을 찾아 잇습니다. 같은 메소드는 한 번만 잇습니다(linked). */

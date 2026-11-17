@@ -412,6 +412,25 @@ public class ScreenScript {
 	 * </pre>
 	 */
 	public List<String> literalArguments(String text, int from, BitSet comments) {
+		List<String> arguments = arguments(text, from, comments);
+		if (arguments == null) {
+			return null;
+		}
+		List<String> literals = new ArrayList<String>();
+		for (int i = 0; i < arguments.size(); i++) {
+			literals.add(literalOf(arguments.get(i)));
+		}
+		return literals;
+	}
+
+	/**
+	 * <pre>
+	 * 여는 괄호 바로 뒤(from)부터 짝이 맞는 닫는 괄호까지를 인자로 나눠, 인자마다 적힌 글자 그대로(앞뒤 공백 제외) 돌려줍니다.
+	 *   gfn_Transaction(strSvc, strUrl, "a=b") → [strSvc, strUrl, "a=b"]
+	 * 나누는 방법과 한도는 literalArguments 와 같습니다. 괄호 짝이 맞지 않거나 너무 길면 null 입니다.
+	 * </pre>
+	 */
+	public List<String> arguments(String text, int from, BitSet comments) {
 		List<String> literals = new ArrayList<String>();
 		StringBuilder current = new StringBuilder();
 		int depth = 0;
@@ -446,14 +465,14 @@ public class ScreenScript {
 						return null;
 					}
 					if (literals.size() > 0 || current.toString().trim().length() > 0) {
-						literals.add(literalOf(current.toString()));
+						literals.add(current.toString().trim());
 					}
 					return literals;
 				}
 				depth--;
 			} else if (c == ',' && depth == 0) {
 				// 맨 바깥 쉼표: 인자 하나 끝
-				literals.add(literalOf(current.toString()));
+				literals.add(current.toString().trim());
 				current.setLength(0);
 				if (literals.size() >= MAX_ARGUMENTS) {
 					return literals;
