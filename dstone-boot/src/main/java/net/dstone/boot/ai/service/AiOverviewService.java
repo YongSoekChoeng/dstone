@@ -53,6 +53,26 @@ public class AiOverviewService extends net.dstone.boot.common.biz.BaseService {
 		return results;
 	}
 
+	/**
+	 * <pre>
+	 * Workflow 하나의 step 요약. 실행 관리 화면의 실행 상세가 머리의 step 흐름 띠를 그리는 데 씁니다.
+	 * 지금 정의 파일 기준이라, 실행한 뒤에 정의를 고쳤으면 그 실행이 실제로 돈 step과 다를 수 있습니다.
+	 * </pre>
+	 * @param workflowId Workflow id
+	 * @return step 목록. 정의를 못 읽으면 error에 이유를 담습니다
+	 */
+	public WorkFlowOverviewResult workflowSteps(String workflowId) {
+		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		List<WorkFlowOverviewResult.Step> steps = new ArrayList<WorkFlowOverviewResult.Step>();
+		String error = null;
+		try {
+			steps = this.readSteps(baseUrl, workflowId);
+		} catch (Exception e) {
+			error = e.getMessage();
+		}
+		return new WorkFlowOverviewResult(workflowId, null, null, steps, error);
+	}
+
 	/** 정의 원문을 받아 steps 아래의 id, type, 부르는 대상, forEach 여부만 뽑습니다. */
 	@SuppressWarnings("unchecked")
 	private List<WorkFlowOverviewResult.Step> readSteps(String baseUrl, String workflowId) {

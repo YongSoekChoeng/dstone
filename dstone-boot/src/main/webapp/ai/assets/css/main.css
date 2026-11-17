@@ -2580,3 +2580,433 @@ body.wd-full-on {
 		border-right: 0;
 	}
 }
+
+/* ---------- Workflow 실행 관리: 실행 상세 ---------- */
+
+/*
+ * 위에서부터 머리(무슨 실행이고 어디까지 왔나) → 지금 할 일 → 진행 기록 + 고른 step → 결과 → 산출 문서.
+ * 눈에 띄는 것은 개요 화면에서 가져온 step 흐름 띠 하나뿐이고, 나머지는 콘솔의 기본 모양을 그대로 쓴다.
+ */
+
+.wa-head {
+	padding-bottom: 18px;
+	margin-bottom: 18px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.wa-head-title {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+}
+
+.ai-panel .wa-head-title h3 {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	overflow-wrap: anywhere;
+}
+
+.ai-body dl.wa-head-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 28px;
+	margin: 10px 0 0;
+}
+
+.wa-head-meta dt {
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.wa-head-meta dd {
+	margin: 0;
+	color: var(--cs-text);
+	font-size: 13px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.wa-flow {
+	margin-top: 16px;
+}
+
+.wa-strip .ov-seg {
+	max-width: 80px;
+	height: 16px;
+	cursor: pointer;
+}
+
+/* 아직 돌지 않은 step은 옅게, 건너뛴 step은 옅은 줄무늬 */
+.wa-strip .wa-seg-todo {
+	opacity: 0.2;
+	cursor: default;
+}
+
+.wa-strip .wa-seg-skipped {
+	opacity: 0.2;
+	cursor: default;
+	background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.8) 0 2px, transparent 2px 6px);
+}
+
+/* 지금 칸은 진한 테두리, 실패한 칸은 빨간 테두리 */
+.wa-strip .wa-seg-current {
+	box-shadow: 0 0 0 2px var(--cs-surface), 0 0 0 4px var(--cs-text);
+}
+
+.wa-strip .wa-seg-failed {
+	box-shadow: 0 0 0 2px var(--cs-surface), 0 0 0 4px var(--cs-danger);
+}
+
+.wa-strip-running .wa-seg-current {
+	animation: wa-seg-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wa-seg-pulse {
+	50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wa-strip-running .wa-seg-current { animation: none; }
+}
+
+.wa-strip-text {
+	margin-top: 10px;
+	color: var(--cs-text-2);
+	font-size: 13px;
+}
+
+/* 지금 할 일: 왼쪽 굵은 선의 색으로 급한 정도를 나눈다 */
+.wa-todo {
+	margin: 0 0 20px;
+	padding: 14px 18px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-left: 4px solid var(--cs-faint);
+	border-radius: var(--cs-radius);
+	font-size: 13px;
+	color: var(--cs-text-2);
+}
+
+.wa-todo-waiting_approval,
+.wa-todo-paused {
+	border-left-color: var(--cs-warning);
+	background: var(--cs-warning-soft);
+}
+
+.wa-todo-running,
+.wa-todo-queued {
+	border-left-color: var(--cs-info);
+}
+
+.wa-todo-failed {
+	border-left-color: var(--cs-danger);
+}
+
+.wa-todo-title {
+	color: var(--cs-text);
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.wa-todo-reason {
+	margin-top: 4px;
+	color: var(--cs-danger);
+	overflow-wrap: anywhere;
+}
+
+.wa-todo-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px 16px;
+	margin-top: 8px;
+}
+
+.wa-todo-sub {
+	margin: 4px 0 12px;
+}
+
+.wa-decision {
+	display: grid;
+	grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+	gap: 12px;
+}
+
+.wa-decision-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.wa-decision-field > span {
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.ai-body .wa-decision-field input,
+.ai-body .wa-decision-field textarea {
+	width: 100%;
+}
+
+.ai-body .wa-decision-field textarea {
+	min-height: 38px;
+	height: 38px;
+	resize: vertical;
+}
+
+.wa-todo .ai-form-actions {
+	margin-top: 12px;
+}
+
+/* 진행 기록(왼쪽)과 고른 step(오른쪽). 좁으면 위아래로 */
+.wa-run {
+	display: grid;
+	grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+	gap: 20px;
+	align-items: start;
+}
+
+.wa-run-list .wa-table-scroll {
+	margin-bottom: 0;
+}
+
+/* 모든 줄은 한 줄. 넘치는 글자는 말줄임하고, 전체는 오른쪽 구역에서 본다 */
+.wa-table.wa-history-table {
+	min-width: 0;
+}
+
+.wa-history-table td {
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+.wa-history-table tbody tr[data-index] {
+	cursor: pointer;
+}
+
+.wa-history-table tbody tr[data-index]:focus-visible {
+	outline: none;
+}
+
+.wa-history-table tbody tr[data-index]:focus-visible td {
+	background: var(--cs-surface-2);
+}
+
+.document-list-table.wa-history-table tbody tr.wa-selected td {
+	background: var(--cs-primary-soft);
+}
+
+.document-list-table.wa-history-table tbody tr.wa-selected td:first-child {
+	box-shadow: inset 3px 0 0 var(--cs-primary);
+}
+
+.wa-history-table .wa-history-empty {
+	color: var(--cs-muted);
+	cursor: default;
+}
+
+.wa-history-table .wa-step-cell {
+	color: var(--cs-text);
+	font-weight: 600;
+}
+
+.wa-type-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	margin-right: 8px;
+	border-radius: 50%;
+	background: var(--cs-faint);
+	vertical-align: 1px;
+}
+
+.wa-type-AGENT { background: var(--ai-step-AGENT); }
+.wa-type-SUPERVISOR { background: var(--ai-step-SUPERVISOR); }
+.wa-type-ROUTER { background: var(--ai-step-ROUTER); }
+.wa-type-TOOL { background: var(--ai-step-TOOL); }
+.wa-type-APPROVAL { background: var(--ai-step-APPROVAL); }
+
+.wa-outcome {
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.wa-outcome-ok {
+	color: var(--cs-success);
+}
+
+.wa-outcome-fail {
+	color: var(--cs-danger);
+}
+
+/* 지난 회차 문서만 남은 step의 표시. 자세한 경고는 오른쪽 구역에 나온다 */
+.wa-doc-alert {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+	font-size: 12px;
+	font-weight: 800;
+}
+
+/* 고른 step 구역. 진행 기록이 길어도 화면에 붙어 따라온다 */
+.wa-step-pane {
+	position: sticky;
+	top: 16px;
+	margin-top: 30px;
+	padding: 16px 18px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	min-width: 0;
+}
+
+.ai-body .wa-step-empty {
+	margin: 0;
+	padding: 28px 8px;
+	color: var(--cs-muted);
+	font-size: 13px;
+	text-align: center;
+}
+
+.wa-step-name {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	font-size: 15px;
+	overflow-wrap: anywhere;
+}
+
+.wa-step-name .wa-type-dot {
+	margin-right: 2px;
+}
+
+.wa-step-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 14px;
+	margin: 4px 0 12px;
+	color: var(--cs-muted);
+	font-size: 12px;
+}
+
+.wa-step-text,
+.wa-result {
+	margin: 0;
+	max-height: 420px;
+	overflow: auto;
+	padding: 12px 14px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	color: var(--cs-text);
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.wa-step-text:focus-visible,
+.wa-result:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--cs-primary-ring);
+}
+
+.wa-result {
+	max-height: 360px;
+}
+
+.wa-result.wa-result-empty {
+	color: var(--cs-muted);
+	font-family: inherit;
+	font-size: 13px;
+}
+
+.wa-step-text.wa-text-failed,
+.wa-result.wa-text-failed {
+	color: var(--cs-danger);
+}
+
+.wa-step-tools {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 6px;
+}
+
+.ai-body .wa-step-tools button {
+	height: 28px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wa-step-docs:empty {
+	display: none;
+}
+
+.wa-step-docs {
+	margin-top: 12px;
+}
+
+.wa-step-docs-label {
+	margin-bottom: 6px;
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.wa-step-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid var(--cs-border);
+}
+
+.wa-step-pane .wa-rewind {
+	margin-bottom: 0;
+}
+
+.wa-context {
+	margin-top: 8px;
+}
+
+.wa-context summary {
+	color: var(--cs-muted);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.wa-context .wa-result {
+	margin-top: 8px;
+}
+
+@media screen and (max-width: 1180px) {
+	.wa-run {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.wa-step-pane {
+		position: static;
+		margin-top: 0;
+	}
+}
+
+@media screen and (max-width: 640px) {
+	.wa-decision {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

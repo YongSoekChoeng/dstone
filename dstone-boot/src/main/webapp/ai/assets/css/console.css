@@ -67,7 +67,8 @@
 
 	/* 글꼴. 같이 배포한 Pretendard Variable 을 먼저 쓰고, 못 읽으면 시스템 글꼴을 순서대로 쓴다(외부에서 내려받지 않는다) */
 	--cs-font: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-	--cs-mono: "JetBrains Mono", "D2Coding", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+	/* 한글은 고정폭 글꼴에 없는 경우가 많아, 같이 배포한 Pretendard 로 이어서 그린다(없으면 네모 글자로 보인다) */
+	--cs-mono: "JetBrains Mono", "D2Coding", "SFMono-Regular", Consolas, "Liberation Mono", "Pretendard Variable", monospace;
 }
 
 /* ---------- 기본 ---------- */
@@ -859,6 +860,81 @@ label.wd-check {
 	font-size: 12px;
 }
 
+/* ---------- 칸 너비 고정 + 끌어서 조절 (ai-table.js) ---------- */
+
+/* 표가 화면보다 넓어지면 표만 가로로 밀린다 */
+.ai-col-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+/* 칸 너비가 정해졌으니 넘치는 글자는 칸 안에서 줄을 바꾸고, 줄을 못 바꾸는 칸은 말줄임한다 */
+table.ai-col-fixed th,
+table.ai-col-fixed td {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	overflow-wrap: anywhere;
+}
+
+/* 머리 칸 오른쪽 끝의 손잡이 자리 */
+table.ai-col-fixed > thead > tr > th {
+	position: relative;
+}
+
+/* Tool 고르기 창의 머리 칸은 목록을 내려도 위에 붙어 있어야 한다 */
+table.tp-table.ai-col-fixed > thead > tr > th {
+	position: sticky;
+}
+
+.ai-col-grip {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 9px;
+	cursor: col-resize;
+	touch-action: none;
+	z-index: 1;
+}
+
+/* 평소에는 칸 경계에 옅은 선만, 마우스를 올리거나 끄는 동안에는 대표 색 선 */
+.ai-col-grip::after {
+	content: "";
+	position: absolute;
+	top: 25%;
+	bottom: 25%;
+	right: 0;
+	width: 1px;
+	background: var(--cs-border-strong);
+}
+
+table.ai-col-fixed > thead > tr > th:last-child > .ai-col-grip::after {
+	display: none;
+}
+
+.ai-col-grip:hover::after,
+.ai-col-grip:focus-visible::after,
+.ai-col-dragging .ai-col-grip:active::after {
+	top: 0;
+	bottom: 0;
+	right: 1px;
+	width: 3px;
+	border-radius: 2px;
+	background: var(--cs-primary);
+	display: block;
+}
+
+.ai-col-grip:focus-visible {
+	outline: none;
+}
+
+/* 끄는 동안에는 글자가 선택되지 않고 커서가 바뀌지 않게 한다 */
+body.ai-col-dragging-body {
+	cursor: col-resize;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
 /* ---------- 상태 딱지 ---------- */
 
 .workflow-badge {
@@ -950,81 +1026,12 @@ label.wd-check {
 	text-align: right;
 }
 
-/*
- * 스텝 이력 표는 칸 너비를 내용에 맞춥니다.
- * stepId·type·ref·결과·소요·시각·재실행처럼 짧은 칸은 글자만큼만 차지하고(줄바꿈 없음),
- * 남는 너비는 '내용/사유' 칸이 다 가져갑니다.
- */
-.wa-table.wa-history-table {
-	table-layout: auto;
-	min-width: 980px;
-}
-
-.wa-history-table .wa-fit {
-	width: 1%;
-	white-space: nowrap;
-}
-
-.wa-history-table .wa-text-cell {
-	min-width: 240px;
-}
-
-/* 문서 칸은 파일 이름 단추가 두세 개 들어갈 만큼만 잡습니다. 긴 이름은 단추 안에서 말줄임합니다. */
-.wa-history-table .wa-doc-col {
-	width: 200px;
-}
-
-.ai-body .document-list-table.wa-history-table button.wa-doc-chip {
-	display: inline-block;
-	max-width: 200px;
-	white-space: nowrap;
-	text-align: left;
-}
-
 .wa-table tr.wa-selected td {
 	background: var(--cs-info-soft);
 }
 
-/* 평소에는 두 줄까지만 보여 줍니다. */
-.wa-text-preview {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	line-clamp: 2;
-	overflow: hidden;
-}
-
-/* 펼친 내용은 칸 안에서 줄을 바꾸고, 아주 길면 그 안에서만 스크롤합니다. */
-.wa-text-full {
-	margin: 0;
-	max-height: 320px;
-	overflow: auto;
-	padding: 8px 10px;
-	background: var(--cs-surface-2);
-	border: 1px solid var(--cs-border);
-	border-radius: var(--cs-radius);
-	font-family: Consolas, "D2Coding", monospace;
-	font-size: 12px;
-	line-height: 1.55;
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-}
-
 .wa-text-failed {
 	color: var(--cs-danger);
-}
-
-.document-list-table button.wa-text-toggle {
-	height: auto;
-	margin-top: 4px;
-	padding: 0;
-	border: 0;
-	background: none;
-	box-shadow: none;
-	color: var(--cs-info);
-	font-size: 12px;
-	font-weight: 600;
-	cursor: pointer;
 }
 
 .wa-pager {
@@ -1135,17 +1142,10 @@ label.wd-check {
 	margin-top: 2px;
 }
 
-.ai-body .document-list-table button.wa-rewind-btn {
-	height: auto;
-	padding: 3px 8px;
-	font-size: 12px;
-	white-space: nowrap;
-}
-
 /* ---------- Workflow 실행 관리: step 문서 ---------- */
 
-/* 스텝 이력의 '문서' 칸에 다는 파일 이름 단추. 작성한 파일은 색을 채우고, 읽기만 한 파일은 테두리만 둡니다. */
-.ai-body .document-list-table button.wa-doc-chip {
+/* 고른 step 구역에 다는 파일 이름 단추. 작성한 파일은 색을 채우고, 읽기만 한 파일은 테두리만 둡니다. */
+.ai-body button.wa-doc-chip {
 	height: auto;
 	max-width: 100%;
 	margin: 0 4px 4px 0;
@@ -1161,17 +1161,17 @@ label.wd-check {
 	text-overflow: ellipsis;
 }
 
-.ai-body .document-list-table button.wa-doc-chip-write {
+.ai-body button.wa-doc-chip-write {
 	background: var(--cs-primary-soft);
 }
 
-.ai-body .document-list-table button.wa-doc-chip:hover {
+.ai-body button.wa-doc-chip:hover {
 	background: var(--cs-primary);
 	color: #fff;
 }
 
-.ai-body .document-list-table button.wa-doc-chip-missing,
-.ai-body .document-list-table button.wa-doc-chip-missing:hover {
+.ai-body button.wa-doc-chip-missing,
+.ai-body button.wa-doc-chip-missing:hover {
 	border-color: var(--cs-border);
 	background: var(--cs-surface-3);
 	color: var(--cs-faint);

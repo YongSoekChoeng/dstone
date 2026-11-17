@@ -11,4 +11,6 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 		<link rel="stylesheet" href="<%=requestUtil.getStrContextPath()%>/ai/assets/css/main.css" />
 		<%-- 상태 이름(완료, 승인 대기 …)과 step 종류 이름을 화면들이 같이 쓴다 --%>
 		<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/ai-common.js"></script>
+		<%-- 목록 표의 칸 너비를 고정하고 머리 칸 경계를 끌어서 바꾸게 한다 --%>
+		<script src="<%=requestUtil.getStrContextPath()%>/ai/assets/js/ai-table.js"></script>
 	</head>

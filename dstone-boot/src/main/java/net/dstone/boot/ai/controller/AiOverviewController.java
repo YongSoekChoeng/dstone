@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import net.dstone.boot.ai.service.AiOverviewService;
@@ -27,6 +28,12 @@ public class AiOverviewController extends net.dstone.boot.common.biz.BaseControl
 	@GetMapping(value = "/workflows.do")
 	public List<WorkFlowOverviewResult> workflows() {
 		return this.aiOverviewService.workflows();
+	}
+
+	/** Workflow 하나의 step 종류와 순서(실행 상세의 step 흐름 띠) */
+	@GetMapping(value = "/workflowSteps.do")
+	public WorkFlowOverviewResult workflowSteps(@RequestParam String workflowId) {
+		return this.aiOverviewService.workflowSteps(workflowId);
 	}
 
 }

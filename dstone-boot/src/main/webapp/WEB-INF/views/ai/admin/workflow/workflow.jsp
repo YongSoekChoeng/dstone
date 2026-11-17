@@ -97,88 +97,151 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 				</div>
 			</section>
 
-			<section class="ai-panel" id="workflow-admin-detail-panel" style="display:none;">
-				<h3>실행 상세</h3>
-				<table class="ai-form">
-					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
-					<tr>
-						<th>실행 ID</th>
-						<td><span id="workflow-admin-detail-id" class="workflow-job-id">-</span></td>
-						<th>상태</th>
-						<td><span id="workflow-admin-detail-badge" class="workflow-badge">-</span></td>
-					</tr>
-					<tr>
-						<th>시작한 사람</th>
-						<td colspan="3"><span id="workflow-admin-detail-requester">-</span></td>
-					</tr>
-					<tr>
-						<th><label for="workflow-admin-detail-result">결과 / 실패사유</label></th>
-						<td colspan="3"><textarea id="workflow-admin-detail-result" class="workflow-textarea" readonly></textarea></td>
-					</tr>
-					<tr>
-						<th><label for="workflow-admin-detail-context">context</label></th>
-						<td colspan="3"><textarea id="workflow-admin-detail-context" class="workflow-textarea workflow-textarea-small" readonly></textarea></td>
-					</tr>
-				</table>
-
-				<div id="workflow-admin-control" class="wa-control" style="display:none;">
-					<div class="wa-control-text">
-						<div id="workflow-admin-control-message"></div>
-						<ul id="workflow-admin-control-warnings" class="wa-control-warnings"></ul>
+			<%--
+				실행 상세. 위에서부터 [머리: 무슨 실행이고 어디까지 왔나] → [지금 할 일] → [진행 기록 + 고른 step] → [결과] → [산출 문서].
+				할 일(승인, 재개)을 맨 위에 두어 스크롤하지 않고 처리하게 한다.
+			--%>
+			<section class="ai-panel wa-detail" id="workflow-admin-detail-panel" style="display:none;">
+				<header class="wa-head">
+					<div class="wa-head-title">
+						<h3 id="wa-head-workflow">-</h3>
+						<span id="workflow-admin-detail-badge" class="workflow-badge">-</span>
 					</div>
-					<div class="wa-control-buttons">
-						<span id="workflow-admin-control-status" class="workflow-status"></span>
-						<button type="button" id="workflow-admin-pause-btn">일시정지</button>
-						<button type="button" id="workflow-admin-resume-btn">재개</button>
+					<dl class="wa-head-meta">
+						<div><dt>실행 ID</dt><dd id="workflow-admin-detail-id" class="workflow-job-id">-</dd></div>
+						<div><dt>시작한 사람</dt><dd id="workflow-admin-detail-requester">-</dd></div>
+						<div><dt>시작</dt><dd id="wa-head-created">-</dd></div>
+						<div><dt>걸린 시간</dt><dd id="wa-head-elapsed">-</dd></div>
+					</dl>
+					<%-- 개요 화면과 같은 step 흐름 띠. 칸을 누르면 그 step의 마지막 기록을 고른다 --%>
+					<div class="wa-flow">
+						<ol id="wa-strip" class="ov-strip wa-strip" aria-label="step 흐름"></ol>
+						<div id="wa-strip-text" class="wa-strip-text"></div>
+					</div>
+				</header>
+
+				<%-- 지금 할 일. 상태에 따라 하나만 보인다(승인 / 일시정지 / 재개 / 다시 실행). 끝난 실행이면 숨긴다 --%>
+				<div id="wa-todo" class="wa-todo" style="display:none;">
+					<div id="wa-todo-title" class="wa-todo-title"></div>
+
+					<div id="workflow-admin-control" class="wa-todo-row" style="display:none;">
+						<div class="wa-control-text">
+							<div id="workflow-admin-control-message"></div>
+							<ul id="workflow-admin-control-warnings" class="wa-control-warnings"></ul>
+						</div>
+						<div class="wa-control-buttons">
+							<span id="workflow-admin-control-status" class="workflow-status"></span>
+							<button type="button" id="workflow-admin-pause-btn" class="kn-plain">일시정지</button>
+							<button type="button" id="workflow-admin-resume-btn">재개</button>
+						</div>
+					</div>
+
+					<div id="workflow-admin-decision-form" style="display:none;">
+						<div id="workflow-admin-decision-step" class="wa-todo-sub"></div>
+						<div class="wa-decision">
+							<label class="wa-decision-field">
+								<span>결정하는 사람</span>
+								<%-- 로그인했으면 결정한 사람은 로그인 사용자로 남는다(바꿀 수 없다). 로그인하지 않은 환경에서만 직접 적는다 --%>
+								<input type="text" id="workflow-admin-approver" placeholder="결정하는 사람/역할" value="<%=org.springframework.web.util.HtmlUtils.htmlEscape(loginUser)%>" <%=loginUser.isEmpty() ? "" : "readonly"%> />
+							</label>
+							<label class="wa-decision-field wa-decision-comment">
+								<span>의견 (선택)</span>
+								<textarea id="workflow-admin-comment" class="workflow-textarea workflow-textarea-small" rows="2"></textarea>
+							</label>
+						</div>
+						<div class="ai-form-actions">
+							<span id="workflow-admin-decision-status" class="workflow-status"></span>
+							<%-- 승인/반려 방식 APPROVAL일 때 보이는 버튼 --%>
+							<button type="button" id="workflow-admin-reject-btn" class="kn-plain">반려</button>
+							<button type="button" id="workflow-admin-approve-btn">승인</button>
+							<%-- 선택지 방식 APPROVAL(routes)일 때는 선택지 이름마다 버튼이 여기에 하나씩 만들어진다 --%>
+							<span id="workflow-admin-route-buttons" class="ai-form-buttons"></span>
+						</div>
 					</div>
 				</div>
 
-				<%-- 스텝 이력의 [여기서 다시]를 누르면 나온다. 무엇이 남고 무엇을 지울지 보여 주고 확인을 받는다 --%>
-				<div id="workflow-admin-rewind" class="wa-control wa-rewind" style="display:none;">
-					<div class="wa-control-text">
-						<div id="workflow-admin-rewind-message"></div>
-						<ul id="workflow-admin-rewind-warnings" class="wa-control-warnings"></ul>
-						<%-- 구간의 step이 새로 만든 파일(재실행할 때 지운다)과 원래 있던 파일을 고친 것(그대로 둔다) --%>
-						<details id="workflow-admin-rewind-files" class="wa-rewind-files" style="display:none;">
-							<summary></summary>
-							<ul></ul>
-						</details>
-						<details id="workflow-admin-rewind-kept" class="wa-rewind-files" style="display:none;">
-							<summary></summary>
-							<ul></ul>
-						</details>
-						<label id="workflow-admin-rewind-clear-label" class="wa-rewind-clear" style="display:none;">
-							<input type="checkbox" id="workflow-admin-rewind-clear" /> <span></span>
-						</label>
+				<%-- 진행 기록(한 줄씩) + 고른 step의 전체 내용. 좁은 화면에서는 위아래로 놓인다 --%>
+				<div class="wa-run">
+					<div class="wa-run-list">
+						<div class="kn-section-title">진행 기록 <span id="wa-history-count" class="ai-hint"></span></div>
+						<div class="wa-table-scroll">
+							<table id="workflow-admin-history-table" class="document-list-table wa-table wa-history-table">
+								<colgroup>
+									<col style="width:150px" />
+									<col style="width:62px" />
+									<col style="width:72px" />
+									<col />
+									<col style="width:56px" />
+									<col style="width:84px" />
+								</colgroup>
+								<thead>
+									<tr>
+										<th>step</th>
+										<th>결과</th>
+										<th class="wa-num">소요</th>
+										<th>내용/사유</th>
+										<th class="wa-num">문서</th>
+										<th>시각</th>
+									</tr>
+								</thead>
+								<tbody id="workflow-admin-history-body"></tbody>
+							</table>
+						</div>
 					</div>
-					<div class="wa-control-buttons">
-						<span id="workflow-admin-rewind-status" class="workflow-status"></span>
-						<button type="button" id="workflow-admin-rewind-run-btn">다시 실행</button>
-						<button type="button" id="workflow-admin-rewind-cancel-btn" class="kn-plain">취소</button>
-					</div>
+
+					<aside id="wa-step-pane" class="wa-step-pane" aria-live="polite">
+						<p id="wa-step-empty" class="wa-step-empty">진행 기록에서 줄을 고르면 그 step의 전체 내용과 문서를 여기서 봅니다.</p>
+						<div id="wa-step-body" style="display:none;">
+							<div class="wa-step-head">
+								<div class="wa-step-name"><span id="wa-step-dot" class="wa-type-dot"></span><b id="wa-step-id"></b> <span id="wa-step-badge" class="workflow-badge"></span></div>
+								<div id="wa-step-meta" class="wa-step-meta"></div>
+							</div>
+							<pre id="wa-step-text" class="wa-step-text" tabindex="0"></pre>
+							<div class="wa-step-tools">
+								<span id="wa-step-copy-status" class="workflow-status"></span>
+								<button type="button" id="wa-step-copy" class="kn-plain">복사</button>
+							</div>
+							<div id="wa-step-docs" class="wa-step-docs"></div>
+							<div class="wa-step-actions">
+								<button type="button" id="wa-step-rewind" class="kn-plain">이 step부터 다시 실행</button>
+							</div>
+
+							<%-- [이 step부터 다시 실행]을 누르면 나온다. 무엇이 남고 무엇을 지울지 보여 주고 확인을 받는다 --%>
+							<div id="workflow-admin-rewind" class="wa-control wa-rewind" style="display:none;">
+								<div class="wa-control-text">
+									<div id="workflow-admin-rewind-message"></div>
+									<ul id="workflow-admin-rewind-warnings" class="wa-control-warnings"></ul>
+									<%-- 구간의 step이 새로 만든 파일(재실행할 때 지운다)과 원래 있던 파일을 고친 것(그대로 둔다) --%>
+									<details id="workflow-admin-rewind-files" class="wa-rewind-files" style="display:none;">
+										<summary></summary>
+										<ul></ul>
+									</details>
+									<details id="workflow-admin-rewind-kept" class="wa-rewind-files" style="display:none;">
+										<summary></summary>
+										<ul></ul>
+									</details>
+									<label id="workflow-admin-rewind-clear-label" class="wa-rewind-clear" style="display:none;">
+										<input type="checkbox" id="workflow-admin-rewind-clear" /> <span></span>
+									</label>
+								</div>
+								<div class="wa-control-buttons">
+									<span id="workflow-admin-rewind-status" class="workflow-status"></span>
+									<button type="button" id="workflow-admin-rewind-cancel-btn" class="kn-plain">취소</button>
+									<button type="button" id="workflow-admin-rewind-run-btn">다시 실행</button>
+								</div>
+							</div>
+						</div>
+					</aside>
 				</div>
 
-				<div class="kn-section-title">스텝 이력</div>
-				<div class="wa-table-scroll">
-					<table id="workflow-admin-history-table" class="document-list-table wa-table wa-history-table">
-						<thead>
-							<tr>
-								<th class="wa-fit">stepId</th>
-								<th class="wa-fit">type</th>
-								<th class="wa-fit">ref</th>
-								<th class="wa-fit">결과</th>
-								<th class="wa-fit wa-num">소요(ms)</th>
-								<th>내용/사유</th>
-								<th class="wa-doc-col">문서</th>
-								<th class="wa-fit">시각</th>
-								<th class="wa-fit">재실행</th>
-							</tr>
-						</thead>
-						<tbody id="workflow-admin-history-body"></tbody>
-					</table>
-				</div>
+				<div class="kn-section-title">결과</div>
+				<pre id="workflow-admin-detail-result" class="wa-result"></pre>
+				<details class="wa-context">
+					<summary>context 보기 (개발용)</summary>
+					<pre id="workflow-admin-detail-context" class="wa-result"></pre>
+				</details>
 
-				<div class="kn-section-title">step 문서
+				<div class="kn-section-title">산출 문서
 					<span id="workflow-admin-docs-count" class="ai-hint"></span>
 					<label class="wa-docs-all"><input type="checkbox" id="workflow-admin-docs-all" /> 모든 파일 보기</label>
 				</div>
@@ -202,30 +265,6 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 						</thead>
 						<tbody id="workflow-admin-docs-body"></tbody>
 					</table>
-				</div>
-
-				<div id="workflow-admin-decision-form" style="display:none;">
-					<div class="kn-section-title">승인/반려 <span id="workflow-admin-decision-step" class="ai-hint"></span></div>
-					<table class="ai-form">
-						<colgroup><col class="ai-form-name" /><col /></colgroup>
-						<tr>
-							<th><label for="workflow-admin-approver">approver</label></th>
-							<%-- 로그인했으면 결정한 사람은 로그인 사용자로 남는다(바꿀 수 없다). 로그인하지 않은 환경에서만 직접 적는다 --%>
-							<td><input type="text" id="workflow-admin-approver" placeholder="결정하는 사람/역할" value="<%=org.springframework.web.util.HtmlUtils.htmlEscape(loginUser)%>" <%=loginUser.isEmpty() ? "" : "readonly"%> /></td>
-						</tr>
-						<tr>
-							<th><label for="workflow-admin-comment">comment</label></th>
-							<td><textarea id="workflow-admin-comment" class="workflow-textarea workflow-textarea-small" placeholder="(선택)"></textarea></td>
-						</tr>
-					</table>
-					<div class="ai-form-actions">
-						<span id="workflow-admin-decision-status" class="workflow-status"></span>
-						<%-- 승인/반려 방식 APPROVAL일 때 보이는 버튼 --%>
-						<button type="button" id="workflow-admin-approve-btn">승인</button>
-						<button type="button" id="workflow-admin-reject-btn" class="kn-plain">반려</button>
-						<%-- 선택지 방식 APPROVAL(routes)일 때는 선택지 이름마다 버튼이 여기에 하나씩 만들어진다 --%>
-						<span id="workflow-admin-route-buttons" class="ai-form-buttons"></span>
-					</div>
 				</div>
 			</section>
 					</div>
@@ -287,7 +326,9 @@ String loginUser = request.getRemoteUser() == null ? "" : request.getRemoteUser(
 			rewindUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/rewind.do",
 			filesUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/files.do",
 			fileContentUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/fileContent.do",
-			saveFileUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/saveFile.do"
+			saveFileUrl: "<%=requestUtil.getStrContextPath()%>/ai/admin/workflow/saveFile.do",
+			// 실행 상세 머리의 step 흐름 띠
+			workflowStepsUrl: "<%=requestUtil.getStrContextPath()%>/ai/overview/workflowSteps.do"
 		});
 	</script>
 </body>
