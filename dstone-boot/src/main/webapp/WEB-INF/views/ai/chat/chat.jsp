@@ -65,7 +65,7 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 								<td><b>소스 RAG</b> 모두<br><code>knowledgeSearch</code> <code>knowledgeTableUsage</code> <code>knowledgeCallers</code> 등</td>
 								<td><code>sample-general-chat</code></td>
 								<td><b>프로젝트 ID 를 같이 적습니다.</b> 예: <code>HI-Japan 프로젝트에서 JC_ACDT_AGMT 테이블을 사용하는 소스들을 알려줘</code><br>
-									프로젝트 ID 는 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/index">코드 분석(Knowledge) &gt; 프로젝트 · 분석</a>의 projectId 입니다. 분석이 끝난(READY) 가장 최근 리비전에서 찾습니다.</td>
+									프로젝트 ID 는 <a href="<%=requestUtil.getStrContextPath()%>/defaultLink.do?defaultLink=knowledge/project/project">코드 분석(Knowledge) &gt; 프로젝트</a> 목록의 굵은 이름입니다. 분석이 끝난(READY) 가장 최근 리비전에서 찾습니다.</td>
 							</tr>
 							<tr>
 								<td>위와 같음 (코드 분석 전용 Agent)</td>

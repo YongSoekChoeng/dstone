@@ -27,7 +27,8 @@ var DstoneKnowledgeProjectHome = (function () {
 			"kn-proj-area-note", "kn-proj-areas", "kn-proj-area-csv", "kn-proj-form-view", "kn-proj-form-title", "kn-pf-id", "kn-pf-name", "kn-pf-path",
 			"kn-pf-classpath", "kn-pf-desc", "kn-pf-dbs", "kn-pf-db-add", "kn-pf-message", "kn-pf-cancel", "kn-pf-save",
 			"kn-proj-tabs", "kn-pu-notes", "kn-pu-kinds", "kn-pu-area", "kn-pu-q", "kn-pu-csv", "kn-pu-message", "kn-pu-list", "kn-pu-prev", "kn-pu-page",
-			"kn-pu-next"].forEach(function (id) {
+			"kn-pu-next", "kn-pg-table-filter", "kn-pg-area", "kn-pg-q", "kn-pg-csv", "kn-pg-message", "kn-pg-list", "kn-pg-prev", "kn-pg-page", "kn-pg-next",
+			"kn-cr-summary", "kn-cr-q", "kn-cr-csv", "kn-cr-message", "kn-cr-list", "kn-cr-prev", "kn-cr-page", "kn-cr-next"].forEach(function (id) {
 			el[id] = document.getElementById(id);
 		});
 		el["kn-proj-new"].addEventListener("click", function () { go("new=1"); });
@@ -49,6 +50,8 @@ var DstoneKnowledgeProjectHome = (function () {
 		el["kn-pf-dbs"].addEventListener("click", onDbRowClick);
 		bindTabs();
 		bindUnused();
+		bindPrograms();
+		bindCrud();
 		window.addEventListener("hashchange", route);
 		route();
 	}
@@ -140,7 +143,8 @@ var DstoneKnowledgeProjectHome = (function () {
 
 	function showHome(projectId, revisionId) {
 		show("home");
-		openTab(K.readHash().t === "unused" ? "unused" : "structure", true);
+		var tab = K.readHash().t;
+		openTab(TABS.indexOf(tab) >= 0 ? tab : "structure", true);
 		var no = ++requestNo;
 		var sameProject = current.projectId === projectId && current.project;
 		current.projectId = projectId;
@@ -192,11 +196,11 @@ var DstoneKnowledgeProjectHome = (function () {
 			current.structure = structure;
 			renderTrust(structure.trust || {});
 			renderStructure(structure);
-			// 전환 제외 후보는 그 탭이 열려 있을 때만 읽는다(처음 계산에 몇 초 걸릴 수 있다)
+			// 나머지 탭은 열려 있을 때만 읽는다(처음 계산에 몇 초 걸릴 수 있다)
 			unused.revisionId = null;
-			if (currentTab === "unused") {
-				loadUnused();
-			}
+			programs.revisionId = null;
+			crud.revisionId = null;
+			loadTab(currentTab);
 		}).catch(fail);
 	}
 
@@ -340,6 +344,9 @@ var DstoneKnowledgeProjectHome = (function () {
 
 	var currentTab = "structure";
 
+	/** 탭 이름(주소의 t 값) */
+	var TABS = ["structure", "programs", "crud", "unused"];
+
 	function bindTabs() {
 		el["kn-proj-tabs"].addEventListener("click", function (event) {
 			var tab = event.target.closest ? event.target.closest("button[data-tab]") : null;
@@ -364,8 +371,24 @@ var DstoneKnowledgeProjectHome = (function () {
 			return;
 		}
 		replaceHash();
-		if (name === "unused" && current.revisionId && unused.revisionId !== current.revisionId) {
+		loadTab(name);
+	}
+
+	/** 그 탭의 내용을 아직 이 리비전으로 읽지 않았으면 읽는다 */
+	function loadTab(name) {
+		if (!current.revisionId) {
+			return;
+		}
+		if (name === "unused" && unused.revisionId !== current.revisionId) {
 			loadUnused();
+		} else if (name === "programs" && programs.revisionId !== current.revisionId) {
+			programs.revisionId = current.revisionId;
+			programs.page = 1;
+			loadPrograms();
+		} else if (name === "crud" && crud.revisionId !== current.revisionId) {
+			crud.revisionId = current.revisionId;
+			crud.page = 1;
+			loadCrud();
 		}
 	}
 
@@ -374,6 +397,353 @@ var DstoneKnowledgeProjectHome = (function () {
 		var revisionId = el["kn-proj-revision"].value || current.revisionId;
 		history.replaceState(null, "", "#p=" + encodeURIComponent(current.projectId) + (revisionId ? "&r=" + revisionId : "")
 			+ (currentTab !== "structure" ? "&t=" + currentTab : ""));
+	}
+
+	/* ======================= 프로그램 목록 ======================= */
+
+	var programs = { revisionId: null, q: "", area: "", table: "", page: 1, size: 50, total: 0 };
+	var programTimer = null;
+
+	/** 진입점 종류의 짧은 이름. HTTP 는 따로 적지 않는다 */
+	var ENDPOINT_SHORT = { JSP: "JSP", MAIN: "main", SERVLET: "서블릿", THREAD: "스레드", SCHEDULE: "스케줄", BATCH: "배치", MESSAGE: "메시지" };
+
+	/** 신뢰도 한글 이름 */
+	var CONFIDENCE = { HIGH: "높음", MEDIUM: "보통", LOW: "낮음" };
+
+	function bindPrograms() {
+		el["kn-pg-area"].addEventListener("change", function () {
+			programs.area = el["kn-pg-area"].value;
+			programs.page = 1;
+			loadPrograms();
+		});
+		el["kn-pg-q"].addEventListener("input", function () {
+			clearTimeout(programTimer);
+			programTimer = setTimeout(function () {
+				programs.q = el["kn-pg-q"].value.trim();
+				programs.page = 1;
+				loadPrograms();
+			}, 300);
+		});
+		el["kn-pg-table-filter"].addEventListener("click", function () {
+			programs.table = "";
+			programs.page = 1;
+			loadPrograms();
+		});
+		el["kn-pg-prev"].addEventListener("click", function () {
+			if (programs.page > 1) {
+				programs.page--;
+				loadPrograms();
+			}
+		});
+		el["kn-pg-next"].addEventListener("click", function () {
+			if (programs.page * programs.size < programs.total) {
+				programs.page++;
+				loadPrograms();
+			}
+		});
+		el["kn-pg-csv"].addEventListener("click", downloadPrograms);
+	}
+
+	function programQuery(page, size) {
+		var query = { page: page, size: size };
+		if (programs.q) {
+			query.q = programs.q;
+		}
+		if (programs.area) {
+			query.area = programs.area;
+		}
+		if (programs.table) {
+			query.table = programs.table;
+		}
+		return query;
+	}
+
+	function loadPrograms() {
+		var revisionId = programs.revisionId;
+		el["kn-pg-table-filter"].hidden = !programs.table;
+		el["kn-pg-table-filter"].innerHTML = programs.table ? "테이블 <b>" + K.escapeHtml(programs.table) + "</b> 을(를) 쓰는 프로그램만 <span aria-hidden=\"true\">×</span>" : "";
+		el["kn-pg-table-filter"].title = "누르면 이 조건을 풉니다";
+		K.message(el["kn-pg-message"], programs.total === 0 && !el["kn-pg-list"].innerHTML ? "프로그램마다 호출을 끝까지 따라가는 중입니다. 처음에는 몇 초 걸립니다…" : "");
+		K.call("GET", "/api/revisions/" + encodeURIComponent(revisionId) + "/programs", programQuery(programs.page, programs.size)).then(function (result) {
+			if (programs.revisionId !== revisionId) {
+				return;
+			}
+			K.message(el["kn-pg-message"], "");
+			programs.total = result.total;
+			renderSelect(el["kn-pg-area"], result.areas || [], programs.area);
+			renderPrograms(result);
+		}).catch(function (err) {
+			K.message(el["kn-pg-message"], err.message, true);
+		});
+	}
+
+	/** 업무 영역 고르기 칸: 영역별 건수를 붙인다 */
+	function renderSelect(select, areas, picked) {
+		var total = 0;
+		areas.forEach(function (item) {
+			total += item.count;
+		});
+		select.innerHTML = "<option value=\"\">모든 영역 (" + format(total) + ")</option>" + areas.filter(function (item) { return !!item.area; }).map(function (item) {
+			return "<option value=\"" + K.escapeHtml(item.area) + "\"" + (item.area === picked ? " selected" : "") + ">" + K.escapeHtml(item.area)
+				+ " (" + format(item.count) + ")</option>";
+		}).join("");
+	}
+
+	function renderPrograms(result) {
+		var revisionId = programs.revisionId;
+		K.table(el["kn-pg-list"], [
+			{ key: "path", label: "프로그램", html: function (row) {
+				var kind = ENDPOINT_SHORT[row.endpointType] ? "<span class=\"kn-pg-kind\">" + K.escapeHtml(ENDPOINT_SHORT[row.endpointType]) + "</span>" : "";
+				var handler = row.handler
+					? (row.methodId ? "<a href=\"" + K.escapeHtml(K.treeUrl(current.projectId, revisionId, row.methodId)) + "\" data-tree-window title=\"관계 트리 창에서 보기\">"
+						+ K.escapeHtml(row.handler) + "</a>" : K.escapeHtml(row.handler))
+					: "<span class=\"ai-hint\">처리 메소드 없음</span>";
+				return "<div class=\"kn-pg-path\">" + kind + "<span class=\"kn-mono\">" + K.escapeHtml(row.path || "") + "</span></div><div class=\"kn-pg-handler\">" + handler + "</div>";
+			} },
+			{ key: "area", label: "업무 영역", html: function (row) { return "<span class=\"kn-mono\">" + K.escapeHtml(row.area || "") + "</span>"; } },
+			{ key: "screens", label: "화면", html: function (row) {
+				if (!row.screenCount) {
+					return "<span class=\"kn-proj-zero\">-</span>";
+				}
+				var names = row.screens.map(function (screen) { return K.escapeHtml(screen.replace(/^.*\//, "")); });
+				return "<span title=\"" + K.escapeHtml(row.screens.join("\n")) + "\">" + names.join("<br>")
+					+ (row.screenCount > row.screens.length ? "<br><span class=\"ai-hint\">외 " + (row.screenCount - row.screens.length) + "개</span>" : "") + "</span>";
+			} },
+			{ key: "sqlCount", label: "SQL", num: true, html: function (row) { return countCell(row.sqlCount); } },
+			{ key: "tables", label: "테이블 (C / R / U / D)", html: tablesCell },
+			{ key: "confidence", label: "신뢰도", html: function (row) {
+				return row.confidence ? "<span class=\"kn-conf-" + K.escapeHtml(row.confidence) + "\" title=\"테이블까지 가는 길 가운데 가장 약한 관계\">"
+					+ K.escapeHtml(CONFIDENCE[row.confidence] || row.confidence) + "</span>" : "";
+			} }
+		], result.rows || [], "조건에 맞는 프로그램이 없습니다.");
+		pager(el["kn-pg-page"], el["kn-pg-prev"], el["kn-pg-next"], result.total, programs.page, programs.size);
+	}
+
+	/** 테이블 칸: 수와 C/R/U/D 별 수. 눌러서 펴면 테이블마다 글자와 신뢰도(테이블 이름은 영향도로 가는 링크) */
+	function tablesCell(row) {
+		if (!row.tableCount) {
+			return "<span class=\"kn-proj-zero\">닿는 테이블 없음</span>";
+		}
+		var summary = "<b>" + format(row.tableCount) + "</b>개 " + ["C", "R", "U", "D"].map(function (letter) {
+			return "<span class=\"kn-crud-mini" + (row[letter] ? "" : " kn-proj-zero") + "\">" + letter + " " + row[letter] + "</span>";
+		}).join("");
+		var list = row.tables.map(function (table) {
+			return "<li><a href=\"" + K.escapeHtml(impactUrl(table.table)) + "\" class=\"kn-mono\">" + K.escapeHtml(table.table) + "</a> "
+				+ crudLetters(table.crud) + (table.confidence !== "HIGH" ? " <span class=\"kn-conf-" + K.escapeHtml(table.confidence) + "\">"
+					+ K.escapeHtml(CONFIDENCE[table.confidence] || table.confidence) + "</span>" : "") + "</li>";
+		}).join("");
+		return "<details class=\"kn-pg-tables\"><summary>" + summary + "</summary><ul>" + list + "</ul></details>";
+	}
+
+	/** C R U D 네 칸. 있는 글자만 진하게 */
+	function crudLetters(crud) {
+		return "<span class=\"kn-crud\">" + ["C", "R", "U", "D"].map(function (letter) {
+			return "<i class=\"" + (String(crud || "").indexOf(letter) >= 0 ? "kn-crud-on kn-crud-" + letter : "") + "\">" + letter + "</i>";
+		}).join("") + "</span>";
+	}
+
+	/** 그 테이블의 영향도(다시 테스트할 곳) 화면 */
+	function impactUrl(table) {
+		return K.pageUrl("knowledge/impact/impact", "p=" + encodeURIComponent(current.projectId) + "&r=" + current.revisionId + "&k=table&v=" + encodeURIComponent(table));
+	}
+
+	function pager(label, prev, next, total, page, size) {
+		var pages = Math.max(1, Math.ceil(total / size));
+		label.textContent = format(total) + "건 · " + page + " / " + pages + " 쪽";
+		prev.disabled = page <= 1;
+		next.disabled = page >= pages;
+	}
+
+	/** 목록 API 를 끝까지 읽어 모은다(내려받기용) */
+	function fetchAll(path, query) {
+		var rows = [];
+		var size = 1000;
+		var next = function (page) {
+			var q = {};
+			Object.keys(query || {}).forEach(function (key) {
+				q[key] = query[key];
+			});
+			q.page = page;
+			q.size = size;
+			return K.call("GET", path, q).then(function (result) {
+				rows = rows.concat(result.rows || []);
+				return page * size < result.total ? next(page + 1) : rows;
+			});
+		};
+		return next(1);
+	}
+
+	/** 지금 조건의 프로그램 목록 전부를 CSV 로. 엑셀에서 바로 열리게 BOM 을 붙인다 */
+	function downloadPrograms() {
+		if (!programs.revisionId) {
+			return;
+		}
+		var revisionId = programs.revisionId;
+		var query = programQuery(1, 1);
+		delete query.page;
+		delete query.size;
+		K.message(el["kn-pg-message"], "내려받을 목록을 모으는 중…");
+		fetchAll("/api/revisions/" + revisionId + "/programs", query).then(function (rows) {
+			var lines = ["주소,종류,처리 메소드,클래스,업무 영역,화면 수,화면(앞 3개),SQL 수,테이블 수,C,R,U,D,신뢰도,테이블(CRUD)"];
+			rows.forEach(function (row) {
+				var tables = (row.tables || []).map(function (table) { return table.table + "(" + table.crud + ")"; }).join("; ");
+				lines.push([row.path, row.endpointType, row.handler, row.type, row.area, row.screenCount, (row.screens || []).join("; "), row.sqlCount,
+					row.tableCount, row.C, row.R, row.U, row.D, CONFIDENCE[row.confidence] || "", tables].map(csv).join(","));
+			});
+			saveCsv(lines, current.projectId + "-r" + revisionId + "-프로그램목록.csv");
+			K.message(el["kn-pg-message"], "");
+		}).catch(function (err) {
+			K.message(el["kn-pg-message"], err.message, true);
+		});
+	}
+
+	function saveCsv(lines, name) {
+		var blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+		var link = document.createElement("a");
+		link.href = URL.createObjectURL(blob);
+		link.download = name;
+		document.body.appendChild(link);
+		link.click();
+		setTimeout(function () {
+			URL.revokeObjectURL(link.href);
+			link.remove();
+		}, 0);
+	}
+
+	/* ======================= 테이블 · CRUD ======================= */
+
+	var crud = { revisionId: null, letter: "", q: "", page: 1, size: 50, total: 0 };
+	var crudTimer = null;
+
+	function bindCrud() {
+		Array.prototype.forEach.call(document.querySelectorAll(".kn-cr-letter"), function (button) {
+			button.addEventListener("click", function () {
+				Array.prototype.forEach.call(document.querySelectorAll(".kn-cr-letter"), function (other) {
+					other.className = "kn-pu-grade kn-cr-letter" + (other === button ? " kn-pu-on" : "");
+				});
+				crud.letter = button.getAttribute("data-crud");
+				crud.page = 1;
+				loadCrud();
+			});
+		});
+		el["kn-cr-q"].addEventListener("input", function () {
+			clearTimeout(crudTimer);
+			crudTimer = setTimeout(function () {
+				crud.q = el["kn-cr-q"].value.trim();
+				crud.page = 1;
+				loadCrud();
+			}, 300);
+		});
+		el["kn-cr-prev"].addEventListener("click", function () {
+			if (crud.page > 1) {
+				crud.page--;
+				loadCrud();
+			}
+		});
+		el["kn-cr-next"].addEventListener("click", function () {
+			if (crud.page * crud.size < crud.total) {
+				crud.page++;
+				loadCrud();
+			}
+		});
+		// 프로그램 수를 누르면 그 테이블을 쓰는 프로그램 목록으로
+		el["kn-cr-list"].addEventListener("click", function (event) {
+			var button = event.target.closest ? event.target.closest("button[data-table]") : null;
+			if (!button) {
+				return;
+			}
+			programs.table = button.getAttribute("data-table");
+			programs.area = "";
+			programs.q = "";
+			el["kn-pg-q"].value = "";
+			programs.page = 1;
+			programs.revisionId = current.revisionId;
+			openTab("programs");
+			loadPrograms();
+		});
+		el["kn-cr-csv"].addEventListener("click", downloadMatrix);
+	}
+
+	function crudQuery(page, size) {
+		var query = { page: page, size: size };
+		if (crud.letter) {
+			query.crud = crud.letter;
+		}
+		if (crud.q) {
+			query.q = crud.q;
+		}
+		return query;
+	}
+
+	function loadCrud() {
+		var revisionId = crud.revisionId;
+		K.call("GET", "/api/revisions/" + encodeURIComponent(revisionId) + "/programs/tables", crudQuery(crud.page, crud.size)).then(function (result) {
+			if (crud.revisionId !== revisionId) {
+				return;
+			}
+			K.message(el["kn-cr-message"], "");
+			crud.total = result.total;
+			var totals = result.totals || {};
+			el["kn-cr-summary"].innerHTML = "<span><b>테이블</b> " + format(totals.tables) + "개</span><span><b>프로그램</b> " + format(totals.programs) + "개</span>"
+				+ "<span title=\"SQL 에는 나오지만, 어느 진입점에서 출발해도 그 SQL 까지 닿지 않는 테이블. 배치 · 외부 호출 전용이거나 쓰지 않는 SQL 일 수 있습니다\">"
+				+ "<b>어느 프로그램에서도 닿지 않는 테이블</b> " + format(totals.unreached) + "개</span>";
+			renderCrud(result);
+		}).catch(function (err) {
+			K.message(el["kn-cr-message"], err.message, true);
+		});
+	}
+
+	function renderCrud(result) {
+		K.table(el["kn-cr-list"], [
+			{ key: "table", label: "테이블", html: function (row) {
+				return "<a href=\"" + K.escapeHtml(impactUrl(row.table)) + "\" class=\"kn-mono\" title=\"이 테이블을 바꾸면 다시 테스트할 곳(영향도)\">" + K.escapeHtml(row.table) + "</a>";
+			} },
+			{ key: "programs", label: "프로그램", num: true, html: function (row) {
+				return row.programs ? "<button type=\"button\" class=\"kn-link-btn\" data-table=\"" + K.escapeHtml(row.table) + "\" title=\"이 테이블을 쓰는 프로그램 보기\">"
+					+ format(row.programs) + "</button>" : "<span class=\"kn-proj-zero\" title=\"어느 프로그램에서도 닿지 않습니다\">0</span>";
+			} },
+			{ key: "C", label: "C", num: true, html: function (row) { return countCell(row.C); } },
+			{ key: "R", label: "R", num: true, html: function (row) { return countCell(row.R); } },
+			{ key: "U", label: "U", num: true, html: function (row) { return countCell(row.U); } },
+			{ key: "D", label: "D", num: true, html: function (row) { return countCell(row.D); } },
+			{ key: "sqlCount", label: "SQL", num: true, html: function (row) { return countCell(row.sqlCount); } },
+			{ key: "areas", label: "쓰는 업무 영역", html: function (row) {
+				var areas = row.areas || [];
+				return "<span class=\"kn-mono\">" + K.escapeHtml(areas.slice(0, 5).join(", ")) + "</span>"
+					+ (areas.length > 5 ? " <span class=\"ai-hint\">외 " + (areas.length - 5) + "</span>" : "");
+			} }
+		], result.rows || [], "조건에 맞는 테이블이 없습니다.");
+		pager(el["kn-cr-page"], el["kn-cr-prev"], el["kn-cr-next"], result.total, crud.page, crud.size);
+	}
+
+	/**
+	 * CRUD 매트릭스: 줄 = 프로그램, 칸 = 테이블(쓰는 프로그램이 많은 순), 값 = C/R/U/D 글자.
+	 * 어느 프로그램에서도 닿지 않는 테이블은 칸을 만들지 않는다.
+	 */
+	function downloadMatrix() {
+		if (!crud.revisionId) {
+			return;
+		}
+		var revisionId = crud.revisionId;
+		K.message(el["kn-cr-message"], "매트릭스를 만드는 중…");
+		Promise.all([fetchAll("/api/revisions/" + revisionId + "/programs/tables", {}), fetchAll("/api/revisions/" + revisionId + "/programs", {})]).then(function (results) {
+			var tables = results[0].filter(function (row) { return row.programs > 0; }).map(function (row) { return row.table; });
+			var lines = [["주소", "처리 메소드", "업무 영역"].concat(tables).map(csv).join(",")];
+			results[1].forEach(function (row) {
+				if (!row.tableCount) {
+					return;
+				}
+				var byTable = {};
+				row.tables.forEach(function (table) {
+					byTable[table.table] = table.crud;
+				});
+				lines.push([row.path, row.handler, row.area].concat(tables.map(function (table) { return byTable[table] || ""; })).map(csv).join(","));
+			});
+			saveCsv(lines, current.projectId + "-r" + revisionId + "-CRUD매트릭스.csv");
+			K.message(el["kn-cr-message"], "");
+		}).catch(function (err) {
+			K.message(el["kn-cr-message"], err.message, true);
+		});
 	}
 
 	/* ======================= 전환 제외 후보 ======================= */

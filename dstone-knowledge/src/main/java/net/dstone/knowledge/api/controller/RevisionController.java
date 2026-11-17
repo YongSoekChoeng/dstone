@@ -18,6 +18,7 @@ import net.dstone.knowledge.api.service.DiffService;
 import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
 import net.dstone.knowledge.api.service.SymbolService;
+import net.dstone.knowledge.api.service.ProgramService;
 import net.dstone.knowledge.api.service.StructureService;
 import net.dstone.knowledge.api.service.UnusedService;
 
@@ -54,6 +55,9 @@ public class RevisionController {
 	@Autowired
 	private StructureService structureService;
 
+	@Autowired
+	private ProgramService programService;
+
 	/**
 	 * <pre>
 	 * 현행 구조: 계층별 개수(노드 맵과 같은 기준), 업무 영역별 규모, 화면 · 진입점 종류, 신뢰도.
@@ -63,6 +67,37 @@ public class RevisionController {
 	@GetMapping("/{revisionId}/structure")
 	public Map<String, Object> getStructure(@PathVariable("revisionId") long revisionId) {
 		return structureService.getStructure(revisionId);
+	}
+
+	/**
+	 * <pre>
+	 * 프로그램 목록: 진입점마다 요청하는 화면, 닿는 메소드 · SQL 수, 쓰는 테이블과 C / R / U / D, 가장 약한 길의 신뢰도.
+	 * q 는 주소 · 처리 메소드에 포함 조건, area 는 업무 영역, table 은 그 테이블을 쓰는 프로그램만입니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/programs")
+	public Map<String, Object> getPrograms(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "q", required = false) String q
+			, @RequestParam(name = "area", required = false) String area
+			, @RequestParam(name = "table", required = false) String table
+			, @RequestParam(name = "page", defaultValue = "1") int page
+			, @RequestParam(name = "size", defaultValue = "50") int size) {
+		return programService.getPrograms(revisionId, q, area, table, page, size);
+	}
+
+	/**
+	 * <pre>
+	 * 테이블 CRUD: 테이블마다 C / R / U / D 하는 프로그램 수, 그 테이블을 쓰는 SQL 수, 쓰는 업무 영역.
+	 * q 는 테이블 이름 포함 조건, crud 는 그 글자(C / R / U / D)가 있는 테이블만입니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/programs/tables")
+	public Map<String, Object> getProgramTables(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "q", required = false) String q
+			, @RequestParam(name = "crud", required = false) String crud
+			, @RequestParam(name = "page", defaultValue = "1") int page
+			, @RequestParam(name = "size", defaultValue = "50") int size) {
+		return programService.getTables(revisionId, q, crud, page, size);
 	}
 
 	/** 리비전 조회: 상태, 단계별 진행 상태, Job 목록, 스캔한 파일 요약 */

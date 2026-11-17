@@ -3,7 +3,7 @@
 	"프로젝트" 화면. 분석한 애플리케이션의 현행 구조를 보는 곳입니다(차세대 전환의 ASIS 분석, SM 의 영향도 출발점).
 	한 화면에 세 가지 모습이 있고, 주소의 # 로 나뉩니다(project-home.js).
 	  (없음)          프로젝트 목록
-	  #p=ID&r=리비전   프로젝트 홈: 신뢰도 한 줄 + 탭(현행 구조, 전환 제외 후보). &t=unused 면 그 탭
+	  #p=ID&r=리비전   프로젝트 홈: 신뢰도 한 줄 + 탭(현행 구조, 프로그램 목록, 테이블 · CRUD, 전환 제외 후보). &t=programs|crud|unused 면 그 탭
 	  #new / #p=ID&edit=1   프로젝트 등록 / 설정(DB 접속 정보 포함)
 	분석을 세밀하게 돌리거나 연결 품질 · 실행 기록을 보는 일은 "분석 실행 · 진단"(knowledge/index) 화면에서 합니다.
 --%>
@@ -54,6 +54,8 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 
 				<div class="kn-tabs" id="kn-proj-tabs" role="tablist">
 					<button type="button" class="kn-tab kn-tab-on" data-tab="structure" role="tab">현행 구조</button>
+					<button type="button" class="kn-tab" data-tab="programs" role="tab">프로그램 목록</button>
+					<button type="button" class="kn-tab" data-tab="crud" role="tab">테이블 · CRUD</button>
 					<button type="button" class="kn-tab" data-tab="unused" role="tab">전환 제외 후보</button>
 				</div>
 
@@ -71,6 +73,54 @@ net.dstone.common.utils.RequestUtil requestUtil = new net.dstone.common.utils.Re
 							<div id="kn-proj-areas" class="kn-scroll kn-proj-areas"></div>
 						</section>
 					</div>
+				</div>
+
+				<%-- 프로그램 목록: 진입점마다 요청하는 화면, 끝까지 따라가 닿는 SQL · 테이블(C/R/U/D). GET /revisions/{id}/programs --%>
+				<div class="kn-tab-panel" data-panel="programs" hidden>
+					<p class="kn-proj-lead"><b>프로그램</b>은 진입점(주소 · 배치 · main) 하나입니다. 그 프로그램을 요청하는 화면과, 호출을 끝까지 따라가 닿는 SQL · 테이블을 보여 줍니다.
+						차세대의 <b>AS-IS 프로그램 목록</b>으로 내려받아 쓸 수 있습니다. 신뢰도는 테이블까지 가는 길 가운데 가장 약한 관계의 것입니다.</p>
+					<section class="ai-panel kn-pu-panel">
+						<div class="kn-pu-filters">
+							<span id="kn-pg-table-filter" class="kn-pg-chip" hidden></span>
+							<label class="kn-pu-area">업무 영역 <select id="kn-pg-area"></select></label>
+							<input type="search" id="kn-pg-q" class="kn-pu-q" placeholder="주소 · 처리 메소드에 들어간 글자" />
+							<button type="button" id="kn-pg-csv" class="kn-btn kn-plain">프로그램 목록 CSV</button>
+						</div>
+						<div id="kn-pg-message" class="kn-message"></div>
+						<div id="kn-pg-list" class="kn-scroll kn-pg-list"></div>
+						<div class="kn-pu-pager">
+							<button type="button" id="kn-pg-prev" class="kn-btn kn-plain">이전</button>
+							<span id="kn-pg-page"></span>
+							<button type="button" id="kn-pg-next" class="kn-btn kn-plain">다음</button>
+						</div>
+					</section>
+				</div>
+
+				<%-- 테이블 · CRUD: 테이블마다 C/R/U/D 하는 프로그램 수. GET /revisions/{id}/programs/tables --%>
+				<div class="kn-tab-panel" data-panel="crud" hidden>
+					<p class="kn-proj-lead">테이블마다 만들고(<b>C</b>) 읽고(<b>R</b>) 고치고(<b>U</b>) 지우는(<b>D</b>) 프로그램이 몇 개인지 봅니다.
+						숫자를 누르면 그 프로그램 목록으로 갑니다. 프로그램 × 테이블 <b>CRUD 매트릭스</b>를 CSV 로 내려받을 수 있습니다.</p>
+					<div id="kn-cr-summary" class="kn-proj-kinds"></div>
+					<section class="ai-panel kn-pu-panel">
+						<div class="kn-pu-filters">
+							<div class="kn-pu-grades" role="group" aria-label="CRUD">
+								<button type="button" class="kn-pu-grade kn-cr-letter kn-pu-on" data-crud="">모두</button>
+								<button type="button" class="kn-pu-grade kn-cr-letter" data-crud="C">C 만듦</button>
+								<button type="button" class="kn-pu-grade kn-cr-letter" data-crud="R">R 읽음</button>
+								<button type="button" class="kn-pu-grade kn-cr-letter" data-crud="U">U 고침</button>
+								<button type="button" class="kn-pu-grade kn-cr-letter" data-crud="D">D 지움</button>
+							</div>
+							<input type="search" id="kn-cr-q" class="kn-pu-q" placeholder="테이블 이름에 들어간 글자" />
+							<button type="button" id="kn-cr-csv" class="kn-btn kn-plain">CRUD 매트릭스 CSV</button>
+						</div>
+						<div id="kn-cr-message" class="kn-message"></div>
+						<div id="kn-cr-list" class="kn-scroll kn-pu-list"></div>
+						<div class="kn-pu-pager">
+							<button type="button" id="kn-cr-prev" class="kn-btn kn-plain">이전</button>
+							<span id="kn-cr-page"></span>
+							<button type="button" id="kn-cr-next" class="kn-btn kn-plain">다음</button>
+						</div>
+					</section>
 				</div>
 
 				<%-- 전환 제외 후보: 아무 데서도 쓰지 않아 옮기지 않아도 될 수 있는 것(미사용 분석, GET /revisions/{id}/unused) --%>

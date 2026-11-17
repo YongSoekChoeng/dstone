@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 프로그램 목록과 테이블 CRUD(ProgramService)의 재료. 저장된 관계를 읽기만 한다.
+     진입점마다 끝까지 따라가는 일은 Java 가 메모리에서 한다(여기서는 관계를 한 번씩만 읽는다).
+     따라가는 관계는 영향도와 같다: CALLS, CALLS_POSSIBLE_IMPLEMENTATION, ENCLOSES_ANONYMOUS(메소드 → 메소드),
+     EXECUTES_SQL(메소드 → SQL), READS_TABLE / WRITES_TABLE(SQL → 테이블), REQUESTS(화면 → 메소드) -->
+<mapper namespace="net.dstone.knowledge.api.dao.ProgramDao">
+
+    <!-- 진입점(프로그램) 목록. 처리하는 메소드와 그 클래스, 파일 위치 -->
+    <select id="selectEndpoints" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT e.endpoint_id AS "endpointId"
+             , e.endpoint_type AS "endpointType"
+             , e.http_method AS "httpMethod"
+             , e.path AS "path"
+             , e.method_id AS "methodId"
+             , s.fqn AS "type"
+             , COALESCE(s.package_name, '') AS "packageName"
+             , m.name AS "methodName"
+             , f.path AS "file"
+             , e.line_start AS "line"
+          FROM analysis_endpoint e
+          LEFT JOIN analysis_symbol s ON s.revision_id = e.revision_id AND s.symbol_id = e.symbol_id
+          LEFT JOIN analysis_method m ON m.revision_id = e.revision_id AND m.method_id = e.method_id
+          LEFT JOIN analysis_file f ON f.file_id = e.file_id
+         WHERE e.revision_id = #{revisionId}
+         ORDER BY e.path, e.endpoint_id
+    </select>
+
+    <!-- 따라갈 관계 전부: 메소드 → 메소드, 메소드 → SQL. 못 푼 것(to_id 없음)은 뺀다 -->
+    <select id="selectEdges" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "from"
+             , r.to_id AS "to"
+             , r.to_kind AS "toKind"
+             , r.confidence AS "confidence"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.from_kind = 'METHOD'
+           AND r.to_id IS NOT NULL
+           AND ((r.to_kind = 'METHOD' AND r.relation_type IN ('CALLS', 'CALLS_POSSIBLE_IMPLEMENTATION', 'ENCLOSES_ANONYMOUS'))
+             OR (r.to_kind = 'SQL' AND r.relation_type = 'EXECUTES_SQL'))
+    </select>
+
+    <!-- SQL → 테이블과 그 C / R / U / D -->
+    <select id="selectTableEdges" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "sql"
+             , r.to_external AS "table"
+             , COALESCE(r.properties_json->>'crud', CASE WHEN r.relation_type = 'READS_TABLE' THEN 'R' ELSE 'U' END) AS "crud"
+             , r.confidence AS "confidence"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type IN ('READS_TABLE', 'WRITES_TABLE')
+           AND r.from_kind = 'SQL'
+           AND r.to_external IS NOT NULL
+    </select>
+
+    <!-- 화면 → 메소드(화면이 요청하는 주소를 처리하는 메소드). 화면 이름은 파일 경로 -->
+    <select id="selectScreenRequests" parameterType="long" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT r.to_id AS "method"
+             , f.path AS "screen"
+          FROM analysis_relation r
+          JOIN analysis_file f ON f.revision_id = r.revision_id AND 'F' || f.file_id = r.from_id
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type = 'REQUESTS'
+           AND r.to_kind = 'METHOD'
+    </select>
+
+</mapper>

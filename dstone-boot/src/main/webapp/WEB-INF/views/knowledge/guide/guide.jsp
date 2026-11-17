@@ -44,6 +44,10 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					<tbody>
 						<tr><td>"분석은 어디까지 됐고, 지금 돌고 있는 건 없나?"</td>
 							<td><a href="<%=linkBase%>knowledge/dashboard/dashboard">대시보드</a> — 프로젝트별 분석 상태 · 최근 작업 · 임베딩 · 올린 문서를 한 화면에서 봅니다</td></tr>
+						<tr><td>"현행 시스템은 업무별로 얼마나 크고, 프로그램이 어떤 테이블을 쓰지?"</td>
+							<td><a href="<%=linkBase%>knowledge/project/project">프로젝트</a> — 현행 구조 · 프로그램 목록 · 테이블 CRUD 를 보고 CSV 로 내려받습니다</td></tr>
+						<tr><td>"차세대로 옮기지 않아도 되는 건 뭐지?"</td>
+							<td><a href="<%=linkBase%>knowledge/project/project">프로젝트</a>의 "전환 제외 후보" — 아무 데서도 쓰지 않는 화면 · SQL · 클래스 · 테이블과 그 근거가 나옵니다</td></tr>
 						<tr><td>"주문 취소는 어디서 처리하지?"</td>
 							<td><a href="<%=linkBase%>knowledge/search/search">검색 · 문서</a> — 말로 물어보면 관련된 메소드 · SQL · 화면이 나옵니다</td></tr>
 						<tr><td>"이 테이블(컬럼)을 바꾸면 어느 화면을 다시 테스트해야 하지?"</td>
@@ -115,13 +119,13 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 				<h3>3. 시작하기</h3>
 				<p>1 ~ 3은 프로젝트마다 한 번만 하면 됩니다. 그 뒤로는 4를 필요할 때마다 씁니다.</p>
 				<div class="kn-steps">
-					<a class="kn-step" href="<%=linkBase%>knowledge/index">
+					<a class="kn-step" href="<%=linkBase%>knowledge/project/project">
 						<span class="kn-step-no">1</span><span class="kn-step-title">프로젝트 등록</span>
-						<p>"프로젝트 · 분석" 화면에서 프로젝트 ID와 <b>소스 폴더</b>를 적고 등록합니다. 소스 폴더는 내 PC가 아니라 분석 서버에 있는 경로입니다.</p>
+						<p>"프로젝트" 화면의 "프로젝트 등록"에서 프로젝트 ID와 <b>소스 폴더</b>를 적습니다. 소스 폴더는 내 PC가 아니라 분석 서버에 있는 경로입니다. DB 접속 정보는 있으면 같이 적습니다.</p>
 					</a>
-					<a class="kn-step" href="<%=linkBase%>knowledge/index">
+					<a class="kn-step" href="<%=linkBase%>knowledge/project/project">
 						<span class="kn-step-no">2</span><span class="kn-step-title">분석 시작</span>
-						<p>프로젝트를 고르고 "분석 시작"을 누릅니다. 단계마다 진행 상황이 보입니다. 파일이 수백 개면 몇 분, 수천 개면 그보다 오래 걸립니다.</p>
+						<p>프로젝트 화면에서 "분석 실행"을 누릅니다(단계를 골라 다시 돌리거나 증분 분석을 하려면 "분석 실행 · 진단" 화면). 단계마다 진행 상황이 보입니다. 파일이 수백 개면 몇 분, 수천 개면 그보다 오래 걸립니다.</p>
 					</a>
 					<a class="kn-step" href="<%=linkBase%>knowledge/index">
 						<span class="kn-step-no">3</span><span class="kn-step-title">결과 확인</span>
@@ -138,7 +142,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 			<section class="ai-panel" id="tutorial">
 				<h3>4. 상황별 따라 하기</h3>
 				<p>자주 하는 일 네 가지입니다. 예시는 저장소에 든 게시판 표본 <code>struts-app</code>(게시글 목록 · 저장 · 삭제)을 기준으로 적었습니다. 내 프로젝트에서는 이름만 바꿔서 하면 됩니다.</p>
-				<div class="kn-note">표본으로 직접 따라 해 보려면 "프로젝트 · 분석"에서 projectId <code>struts-app</code>, 소스 폴더
+				<div class="kn-note">표본으로 직접 따라 해 보려면 "프로젝트" 화면에서 projectId <code>struts-app</code>, 소스 폴더
 					<code>dstone-knowledge/src/test/resources/samples/struts-app</code>(이 개발 서버에서는 <code>/app/dstone/dstone-knowledge/src/test/resources/samples/struts-app</code>)로 등록하고 분석하세요. 몇 초면 끝납니다.</div>
 
 				<div class="kn-case">
@@ -196,9 +200,19 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					<li><b>올린 문서</b>: 묶음(collection)마다 문서 · 청크 수와 임베딩이 얼마나 끝났는지 봅니다. 로그인한 사용자(API 키)의 문서만 셉니다.</li>
 				</ul>
 
-				<h4>프로젝트 · 분석</h4>
+				<h4>프로젝트</h4>
 				<ul>
-					<li>화면이 두 칸입니다. <b>왼쪽</b>에 프로젝트 목록과 등록 칸, 분석 시작, 리비전 목록이 있고, <b>오른쪽</b>에 고른 리비전의 결과가 탭 다섯 개(개요 · 연결 품질 · 분석 내용 · 미사용 · 실행 기록)로 나옵니다.
+					<li>목록에서 프로젝트를 누르면 그 프로젝트의 홈이 열립니다. 위쪽에 리비전 고르기와 <b>신뢰도 한 줄</b>(호출 해석률, 짐작으로 이은 비율, 파싱 성공률, 가장 많이 못 푼 이유)이 있고, 그 아래 탭 네 개가 있습니다.</li>
+					<li><b>현행 구조</b>: 화면 → 컨트롤러 → 서비스 → DAO → SQL → 테이블이 몇 개인지와, 업무 영역별 규모입니다. 업무 영역은 패키지 · 폴더의 공통 앞부분을 뗀 첫 마디입니다.</li>
+					<li><b>프로그램 목록</b>: 진입점(주소 · 배치 · main)마다 요청하는 화면과, 호출을 끝까지 따라가 닿는 SQL · 테이블(C/R/U/D)입니다. AS-IS 프로그램 목록으로 CSV 를 내려받을 수 있습니다.</li>
+					<li><b>테이블 · CRUD</b>: 테이블마다 만들고 · 읽고 · 고치고 · 지우는 프로그램 수입니다. 프로그램 수를 누르면 그 프로그램 목록으로 가고, CRUD 매트릭스를 CSV 로 내려받을 수 있습니다.</li>
+					<li><b>전환 제외 후보</b>: 아무 데서도 쓰지 않아 옮기지 않아도 될 수 있는 화면 · SQL · 클래스 · 메소드 · 테이블입니다. 확실 · 추정 등급과 근거가 붙습니다.</li>
+					<li><b>프로젝트 설정</b>: 소스 폴더, 라이브러리 위치와 <b>DB 접속</b>(여러 개)을 고칩니다. DB 접속이 있으면 테이블 · 컬럼의 정의와 한글명을 소스보다 먼저 DB 에서 찾고, DB 에만 있는 테이블도 전환 제외 후보에 나옵니다. 비밀번호는 암호화해 저장하고 다시 보여 주지 않습니다.</li>
+				</ul>
+
+				<h4>분석 실행 · 진단 (관리)</h4>
+				<ul>
+					<li>분석을 돌리고 결과를 점검하는 사람용 화면입니다. 화면이 두 칸입니다. <b>왼쪽</b>에 프로젝트 목록과 등록 칸, 분석 시작, 리비전 목록이 있고, <b>오른쪽</b>에 고른 리비전의 결과가 탭 다섯 개(개요 · 연결 품질 · 분석 내용 · 미사용 · 실행 기록)로 나옵니다.
 						분석 칸은 왼쪽 목록에서 프로젝트를 눌러야 열립니다. 맨 위 한 줄에는 서버 상태와 임베딩 진행이 나옵니다.</li>
 					<li><b>프로젝트 등록</b>: 프로젝트 ID는 영문으로 짧게 적습니다(나중에 바꿀 수 없습니다). 소스 폴더는 분석 서버의 경로입니다.
 						Maven 프로젝트 폴더든, 운영 서버에서 받아 온 WAR를 푼 폴더든 됩니다.
@@ -327,7 +341,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 
 			<section class="ai-panel" id="summary">
 				<h3>7. 리비전 결과 읽는 법 (모든 항목의 뜻)</h3>
-				<p>"프로젝트 · 분석" 화면에서 리비전을 누르면 오른쪽에 나오는 탭입니다. 분석이 <b>얼마나 만들어졌고, 얼마나 믿을 만한지</b>를 보여 줍니다.
+				<p>"분석 실행 · 진단" 화면에서 리비전을 누르면 오른쪽에 나오는 탭입니다. 분석이 <b>얼마나 만들어졌고, 얼마나 믿을 만한지</b>를 보여 줍니다.
 					항목이 많지만 다 읽을 필요는 없습니다. 아래 순서로 보면 됩니다.</p>
 				<ol>
 					<li><b>개요 탭의 "한눈에 보기"만 본다.</b> 숫자를 말로 풀어 둔 것입니다. 초록색 ✔ 만 있으면 그대로 쓰면 됩니다.
@@ -383,7 +397,7 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 							<td>한 프로젝트에는 분석이 하나씩만 돕니다. 끝나기를 기다리거나 "취소"를 누릅니다.</td></tr>
 						<tr><td>검색 결과가 적거나 엉뚱하다</td>
 							<td>먼저 "찾을 곳"이 "(올린 문서)"로 남아 있지 않은지 봅니다. 코드에서 찾으려면 프로젝트를 골라야 합니다.
-								그래도 적으면 임베딩이 아직 끝나지 않았을 수 있습니다("프로젝트 · 분석" 맨 위 한 줄의 임베딩). 그동안은 클래스 · 메소드 · 테이블 이름을 넣어 찾으세요.</td></tr>
+								그래도 적으면 임베딩이 아직 끝나지 않았을 수 있습니다(대시보드 맨 위 한 줄의 임베딩). 그동안은 클래스 · 메소드 · 테이블 이름을 넣어 찾으세요.</td></tr>
 						<tr><td>검색이 몇 초 넘게 걸린다</td>
 							<td>임베딩이 뒤에서 도는 동안에는 느려질 수 있습니다. 임베딩이 끝나면 빨라집니다.</td></tr>
 						<tr><td>영향도에서 "그 테이블을 건드리는 SQL을 실행하는 메소드가 없습니다"</td>

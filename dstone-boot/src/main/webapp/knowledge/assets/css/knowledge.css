@@ -1978,3 +1978,34 @@ a.kn-retarget:hover { color: var(--cs-primary-hover); text-decoration-color: cur
 @media screen and (max-width: 860px) {
 	.kn-pu-kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- 프로젝트 홈: 프로그램 목록 · 테이블 CRUD 탭 ---------- */
+.kn-pg-list { max-height: 640px; }
+.kn-pg-list .document-list-table { min-width: 980px; }
+.kn-pg-list td { vertical-align: top; }
+.kn-pg-path { display: flex; align-items: baseline; gap: 6px; font-weight: 600; color: var(--cs-text); word-break: break-all; }
+.kn-pg-kind { flex: 0 0 auto; padding: 0 6px; border-radius: var(--cs-radius-sm); background: var(--cs-surface-3); font-size: 11px; font-weight: 700; color: var(--cs-text-2); }
+.kn-pg-handler { margin-top: 2px; font-size: 12.5px; }
+.kn-pg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--cs-primary-soft); color: var(--cs-primary); font-size: 12.5px; cursor: pointer; }
+.kn-pg-chip[hidden] { display: none; }
+.kn-pg-chip span { font-weight: 700; }
+
+/* 테이블 칸: 요약(수 + C/R/U/D 별 수)을 누르면 테이블 목록이 펴진다 */
+.kn-pg-tables summary { cursor: pointer; white-space: nowrap; }
+.kn-pg-tables summary b { font-variant-numeric: tabular-nums; }
+.kn-pg-tables ul { margin: 6px 0 2px; padding: 0; list-style: none; max-height: 240px; overflow: auto; }
+.kn-pg-tables li { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 12.5px; }
+.kn-crud-mini { margin-left: 8px; font-size: 12px; color: var(--cs-text-2); font-variant-numeric: tabular-nums; }
+
+/* C R U D 네 칸. 있는 글자만 색을 칠한다(만듦 초록, 읽음 파랑, 고침 주황, 지움 빨강) */
+.kn-crud { display: inline-flex; gap: 2px; }
+.kn-crud i { width: 16px; height: 16px; line-height: 16px; text-align: center; font-style: normal; font-size: 10.5px; font-weight: 700; border-radius: 3px; color: var(--cs-faint); background: var(--cs-surface-3); }
+.kn-crud i.kn-crud-on { color: #fff; }
+.kn-crud i.kn-crud-C { background: var(--cs-success); }
+.kn-crud i.kn-crud-R { background: var(--cs-info); }
+.kn-crud i.kn-crud-U { background: var(--cs-warning); }
+.kn-crud i.kn-crud-D { background: var(--cs-danger); }
+
+/* 숫자를 링크처럼 보이게 하는 단추(프로그램 수 → 그 프로그램 목록) */
+.ai-body button.kn-link-btn { height: auto; padding: 0; border: 0; background: none; box-shadow: none; color: var(--cs-primary); font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 2px; }
+.ai-body button.kn-link-btn:hover { background: none; color: var(--cs-primary-hover); }

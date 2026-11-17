@@ -13,7 +13,7 @@ var DstoneKnowledgeDashboard = (function () {
 	var timer = null;
 	var loading = false;
 
-	/** 호출 해석률 눈금. 프로젝트 · 분석 화면의 "한눈에 보기"(project.js verdictBox)와 같은 기준 */
+	/** 호출 해석률 눈금. 분석 실행 · 진단 화면의 "한눈에 보기"(project.js verdictBox)와 같은 기준 */
 	var RATE_GOOD = 95;
 	var RATE_WARN = 80;
 
