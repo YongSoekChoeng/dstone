@@ -633,3 +633,32 @@ MEDIUM인 이유는 화면이 import한 API 모듈 안의 호출을 따라간 �
 ## 답변
 
 새 jar로 4081을 다시 띄웠습니다(PID 40526). 헬스 체크가 응답할 때까지 기다리는 중이고, 확인되면 결과를 알려 드리겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>bylywrmiu</task-id>
+<tool-use-id>toolu_01H1ex5LoDEGj9yuqdkJ7T3Y</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/5a10eed7-b4c1-4979-93b0-2a3ecac7fa1c/tasks/bylywrmiu.output</output-file>
+<status>completed</status>
+<summary>Background command "4081 기동 완료 대기" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+## 답변
+
+올리고 재기동까지 끝났습니다.
+
+- **푸시**: `c1cdf536 feat(knowledge): 조건식으로 적은 baseURL 읽기`를 `main`에 올렸습니다.
+- **재기동**:
+  1. 실행 중인 분석 작업이 없는 것을 확인하고 `bin/stopApp.sh`로 중지했습니다.
+  2. jar를 다시 빌드했습니다.
+  3. `bin/startApp.sh`로 기동했습니다(PID 40526, profile `wsl`).
+- **상태 확인**:
+  - `/api/system/health`가 `UP`을 돌려줍니다. DB 연결 정상, 분석기 버전 1.7입니다.
+  - hl-hr-project 리비전 246의 규칙 비교는 `upToDate: true`입니다. 분석할 때 쓴 규칙과 지금 규칙이 같다는 뜻입니다.
+
+리비전 246(hl-hr-project), 234·235·236은 시험 인스턴스에서 이미 새 코드로 다시 분석해 두었습니다. 그래서 따로 재분석하지 않아도 Knowledge 화면(노드 맵, 영향도, 프로그램 목록)에 화면 → 진입점 연결이 바로 나옵니다. 앞으로 하는 분석도 새 방식으로 돕니다.
