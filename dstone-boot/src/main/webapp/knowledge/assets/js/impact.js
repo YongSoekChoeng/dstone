@@ -71,21 +71,12 @@ var DstoneKnowledgeImpact = (function () {
 				setTimeout(updateKindUi, 0);
 			});
 		});
+		// 프로젝트나 리비전을 바꾸면 ① 대상과 ② 결과를 모두 처음 상태로 돌린다.
+		// 앞 리비전의 대상을 그대로 다시 조회하면, 변경분의 "견줄 리비전"처럼 새 리비전에서는 맞지 않는 값이 남기 때문이다.
 		el["kn-impact-project"].addEventListener("change", function () {
-			loadRevisions().then(function () {
-				clearTarget();
-				updateKindUi();
-				writeHash(false);
-			});
+			loadRevisions().then(resetAll);
 		});
-		el["kn-impact-revision"].addEventListener("change", function () {
-			clearFound();
-			updateKindUi();
-			if (target) {
-				loadImpact();
-			}
-			writeHash(false);
-		});
+		el["kn-impact-revision"].addEventListener("change", resetAll);
 		// 결과와 후보 목록의 밑줄 친 이름: 누르면 그것이 새 대상
 		document.addEventListener("click", function (event) {
 			var link = event.target.closest ? event.target.closest("a.kn-retarget[data-kind]") : null;
@@ -519,6 +510,17 @@ var DstoneKnowledgeImpact = (function () {
 		trail = [];
 		el["kn-result-panel"].hidden = true;
 		clearFound();
+	}
+
+	/** 프로젝트 · 리비전을 바꿨을 때: 종류는 첫째(메소드)로, 이름 칸은 비우고, 후보 · 결과 · 지나온 대상을 지운다 */
+	function resetAll() {
+		clearTarget();
+		el["kn-impact-body"].innerHTML = "";
+		K.message(el["kn-impact-message"], "");
+		el["kn-find-kind"].selectedIndex = 0;
+		el["kn-find-name"].value = "";
+		updateKindUi();
+		writeHash(false);
 	}
 
 	function loadImpact() {
