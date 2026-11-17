@@ -158,10 +158,10 @@ public class RuleFileParserTest {
 	}
 
 	@Test
-	public void 옛_형식의_키는_새_형식을_알려_준다() {
-		assertTrue(parseFails("order: 500\n", "common/x.yml").getMessage().contains("폴더가 정합니다"));
-		assertTrue(parseFails("callArguments: []\n", "common/x.yml").getMessage().contains("sql / view"));
-		assertTrue(parseFails("layers: {}\n", "common/x.yml").getMessage().contains("layer 로"));
+	public void 옛_형식의_키는_모르는_키로_막는다() {
+		assertTrue(parseFails("order: 500\n", "common/x.yml").getMessage().contains("모르는 키입니다: order"));
+		assertTrue(parseFails("callArguments: []\n", "common/x.yml").getMessage().contains("모르는 키입니다: callArguments"));
+		assertTrue(parseFails("layers: {}\n", "common/x.yml").getMessage().contains("모르는 키입니다: layers"));
 	}
 
 	@Test
