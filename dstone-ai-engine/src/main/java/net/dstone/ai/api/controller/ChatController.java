@@ -42,8 +42,8 @@ import reactor.core.publisher.Flux;
  * 하고(아니면 400), 답은 그 Agent의 output 계약 모양 그대로 돌려줍니다(string이면 글자, object면 객체). 만약 여러 단계(step)를 순서대로 이어서
  * 실행하고 싶다면, 이 컨트롤러 대신 api.controller.WorkFlowController를 사용하면 됩니다.
  *
- * GET /api/ai/chat는 등록된 Agent의 id, description, 쓸 수 있는 Tool(availableTools) 목록을 돌려줍니다 - dstone-boot의 "채팅" 화면이
- * agent 선택 드롭다운과 Tool 선택 칸을 채우는 데 씁니다(api.controller.WorkFlowController의 GET /api/ai/workflow와
+ * GET /api/ai/chat는 등록된 Agent의 id, description, 언제나 붙는 Tool(availableTools), 더 붙일 수 있는 Tool(addableTools)을
+ * 돌려줍니다 - 채팅 화면(/ai/chat)이 agent 선택 드롭다운과 Tool 칸을 채우는 데 씁니다(api.controller.WorkFlowController의 GET /api/ai/workflow와
  * 같은 패턴입니다).
  *
  * POST /api/ai/chat/stream 은 요청 형식은 위와 완전히 같지만, 응답 방식이 다릅니다. LLM(대규모 언어 모델)이
@@ -69,8 +69,8 @@ public class ChatController extends BaseController {
 	ConfigTool configTool;
 
 	/**
-	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명), 이 caller에게 붙는 Tool(이름, 설명, 종류)을 담아서
-	 * 돌려줍니다. dstone-boot의 "채팅" 화면이 이 목록을 그대로 받아서 agent 선택 드롭다운을
+	 * 이 caller(호출 주체)가 쓸 수 있는 Agent들의 목록을, id와 description(설명), 언제나 붙는 Tool과 더 붙일 수 있는 Tool(이름, 설명, 종류)을
+	 * 담아서 돌려줍니다. 채팅 화면(/ai/chat)이 이 목록을 그대로 받아서 agent 선택 드롭다운과 Tool 칸을
 	 * 채우는 데 씁니다(api.controller.WorkFlowController.list()와 완전히 같은 패턴입니다).
 	 *
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
@@ -80,14 +80,25 @@ public class ChatController extends BaseController {
 		String caller = CallerContext.get(servletRequest);
 		List<AgentSummary> summaries = new ArrayList<>();
 		for (AgentDefinition definition : this.agentRegistry.list(caller)) {
-			List<ToolSummary> tools = new ArrayList<>();
-			for (ToolCallback callback : this.agentExecutor.availableTools(definition, caller)) {
-				String name = callback.getToolDefinition().name();
-				tools.add(new ToolSummary(name, callback.getToolDefinition().description(), this.configTool.categoryOf(name).name()));
-			}
-			summaries.add(AgentSummary.from(definition, tools));
+			List<ToolSummary> tools = this.toSummaries(this.agentExecutor.availableTools(definition, caller));
+			List<ToolSummary> addable = this.toSummaries(this.agentExecutor.addableTools(definition, caller));
+			summaries.add(AgentSummary.from(definition, tools, addable));
 		}
 		return summaries;
+	}
+
+	/**
+	 * Tool을 화면에 보여 줄 모양(이름, 설명, 종류)으로 바꿉니다.
+	 *
+	 * @param callbacks 바꿀 Tool 목록
+	 */
+	private List<ToolSummary> toSummaries(List<ToolCallback> callbacks) {
+		List<ToolSummary> tools = new ArrayList<>();
+		for (ToolCallback callback : callbacks) {
+			String name = callback.getToolDefinition().name();
+			tools.add(new ToolSummary(name, callback.getToolDefinition().description(), this.configTool.categoryOf(name).name()));
+		}
+		return tools;
 	}
 
 	/**
@@ -163,8 +174,9 @@ public class ChatController extends BaseController {
 	}
 
 	/**
-	 * 요청의 tools가 그 Agent에 실제로 붙는 Tool 가운데 있는지 확인합니다. 아니면 400으로 거절합니다.
-	 * 요청으로 Agent에 허락되지 않은 Tool을 켤 수 없게 하려는 것입니다.
+	 * 요청의 tools(더 붙일 Tool)가 이 caller가 쓸 수 있는 Tool인지 확인합니다. 아니면 400으로 거절합니다.
+	 * caller 화이트리스트 밖의 Tool이나 TOOL step 전용 Tool을 요청으로 켤 수 없게 하려는 것입니다.
+	 * Agent 정의에 이미 있는 이름은 받아 주지만 아무 일도 하지 않습니다(이미 붙어 있습니다).
 	 *
 	 * @param agent   부를 Agent의 정의입니다.
 	 * @param caller  부르는 쪽(tenant)입니다.
@@ -174,7 +186,8 @@ public class ChatController extends BaseController {
 		if (request.tools() == null) {
 			return;
 		}
-		List<String> available = this.agentExecutor.availableToolNames(agent, caller);
+		List<String> available = new ArrayList<>(this.agentExecutor.availableToolNames(agent, caller));
+		available.addAll(this.agentExecutor.addableToolNames(agent, caller));
 		List<String> unknown = new ArrayList<>();
 		for (String name : request.tools()) {
 			if (!available.contains(name)) {

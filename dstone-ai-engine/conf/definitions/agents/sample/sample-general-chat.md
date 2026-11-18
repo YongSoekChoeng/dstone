@@ -13,17 +13,14 @@
 #   input이 글자 하나(사용자가 친 말)라서 채울 필드가 없습니다. 역할을 바꿔 가며 부르고 싶다면 input을 object로
 #   선언하고 프롬프트에 ${input.role}을 쓰는 Agent를 씁니다(예: sample-role-reply-agent.md).
 # - input/output을 선언하지 않았으므로 둘 다 string입니다(글자를 받아 글자로 답함).
-# - tools.allowed: ["*"]도 그대로 둡니다. "*"는 등록된 Tool을 전부 쓸 수 있다는 뜻으로,
-#   무엇이든 물어볼 수 있는 범용 채팅 Agent라서 이렇게 열어 두었습니다(caller 화이트리스트는 그대로 적용됩니다).
-#   채팅 화면의 Tool 선택(ChatRequest의 tools)은 이 목록 가운데 "이번 요청에 쓸 것"만 고릅니다.
-#   하나도 고르지 않으면 Tool 없이 답합니다. 여기 tools를 지우면 화면에 고를 Tool이 나오지 않습니다.
+# - tools는 일부러 적지 않았습니다. 채팅에서는 Agent에 적힌 Tool이 언제나 붙고, 화면에서 고른 Tool(ChatRequest의 tools)은
+#   거기에 더해집니다. 여기에 "*"를 적으면 등록된 Tool이 매번 모두 붙어 일반 질문에도 토큰과 시간이 늘고, 화면에서 더 고를 것도 남지 않습니다.
+#   그래서 이 Agent는 Tool 없이 답하는 것이 기본이고, 필요한 Tool은 화면의 [+ 찾아서 추가]로 그때그때 붙입니다.
 #   올린 문서(개발 가이드 등)를 참고하게 하려면 화면에서 knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks를 고릅니다.
-#   업무용 Agent는 "*" 대신 실제로 쓰는 Tool 이름만 적으십시오(예: sample-tool-demo-agent.md).
+#   업무용 Agent는 실제로 쓰는 Tool 이름을 적습니다(예: sample-tool-demo-agent.md). 적은 Tool은 채팅에서도 늘 붙습니다.
 id: sample-general-chat
 version: 1.0.0
 description: 일반 대화용 기본 Agent. 채팅 화면(/ai/chat)이 처음에 고른다.
-tools:
-  allowed: ["*"]
 ---
 당신은 친절한 AI 어시스턴트입니다.
 답변은 항상 한국어로, 간결하게 합니다.

@@ -30,7 +30,7 @@
 					<div class="col-12">
 			<section class="cs-page-head">
 				<h2>채팅</h2>
-				<p>Agent에게 바로 물어봅니다. 오른쪽에서 Agent와 Agent가 쓸 도구(Tool)를 고르면, 필요할 때 Agent가 도구로 문서나 소스를 찾아 보고 답합니다.</p>
+				<p>Agent에게 바로 물어봅니다. Agent에 정해 둔 도구(Tool)는 늘 붙고, 오른쪽에서 도구를 더 고를 수 있습니다. Agent는 필요할 때 도구로 문서나 소스를 찾아 보고 답합니다.</p>
 			</section>
 
 			<div class="chat-layout">
@@ -87,12 +87,12 @@
 
 				<details class="kn-howto chat-tool-guide">
 					<summary>무엇을 물을 때 어떤 도구를 고르나 (눌러서 펴기)</summary>
-					<p class="ai-hint">[+ 찾아서 추가]를 누르면 고른 Agent 가 쓸 수 있는 Tool 이 종류별(소스 RAG, 문서 RAG, MCP, 일반) 표로 나옵니다. 표 머리의 체크박스로 그 종류를 한꺼번에 고를 수 있습니다.
-						고른 Tool 만 이번 대화에 붙고, 하나도 고르지 않으면 Tool 없이 답합니다.
+					<p class="ai-hint">Agent 정의에 적힌 Tool 은 늘 붙습니다(점선 칩, 뺄 수 없음). [+ 찾아서 추가]를 누르면 그 밖에 더 붙일 수 있는 Tool 이 종류별(소스 RAG, 문서 RAG, MCP, 일반) 표로 나옵니다. 표 머리의 체크박스로 그 종류를 한꺼번에 고를 수 있습니다.
+						더 고른 Tool 은 이번 대화에만 붙습니다. Agent 에 Tool 이 없고 더 고르지도 않으면 Tool 없이 답합니다.
 						Agent 는 필요할 때 Tool 을 직접 불러 찾아봅니다. 질문마다 문서를 미리 찾아 붙이는 일은 없습니다.</p>
 					<table class="document-list-table ai-guide-table">
 						<thead>
-							<tr><th>묻고 싶은 것</th><th>고를 Tool</th><th>Agent</th><th>이렇게 묻습니다</th></tr>
+							<tr><th>묻고 싶은 것</th><th>더 고를 Tool</th><th>Agent</th><th>이렇게 묻습니다</th></tr>
 						</thead>
 						<tbody>
 							<tr>
@@ -113,7 +113,7 @@
 							</tr>
 							<tr>
 								<td>위와 같음 (코드 분석 전용 Agent)</td>
-								<td><b>소스 RAG</b> 모두</td>
+								<td>없음 (Agent 에 이미 붙어 있음)</td>
 								<td><code>sample-knowledge-agent</code></td>
 								<td>입력을 JSON 으로 적습니다. 예: <code>{"projectId": "HI-Japan", "question": "JC_ACDT_AGMT 테이블을 사용하는 소스들을 알려줘"}</code></td>
 							</tr>

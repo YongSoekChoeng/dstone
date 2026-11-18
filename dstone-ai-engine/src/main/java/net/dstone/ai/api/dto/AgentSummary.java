@@ -8,7 +8,7 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
 /**
  * GET /api/ai/chat(등록된 Agent 목록 조회) 응답에 담기는 항목 하나입니다.
  *
- * api.dto.WorkFlowSummary와 같은 목적입니다 - dstone-boot의 "채팅" 화면에서 agent id를 사람이 직접
+ * api.dto.WorkFlowSummary와 같은 목적입니다 - 채팅 화면(/ai/chat)에서 agent id를 사람이 직접
  * 타이핑하지 않고 드롭다운으로 고를 수 있게 하기 위한 DTO입니다. prompt 원문 같은 나머지 상세
  * 정의는 담지 않고, 입출력 계약(input/output 스키마)과 쓸 수 있는 Tool/Skill/Sub Agent 이름만 함께 담습니다.
  *
@@ -17,24 +17,26 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
  * @param input       이 Agent가 받는 값의 모양(JSON Schema)입니다.
  * @param output      이 Agent가 돌려주는 값의 모양(JSON Schema)입니다.
  * @param tools       Agent 정의에 적힌 Tool 이름 목록입니다(tools.allowed 그대로. ["*"]는 전부, 빈 목록은 쓰지 않음).
- * @param availableTools 이 caller가 이 Agent를 부를 때 실제로 붙는 Tool입니다("*"를 펼치고 caller 화이트리스트를 거친 것).
- *                    이름과 함께 설명과 종류(소스 RAG, 문서 RAG, MCP, 일반)를 담습니다. 채팅 화면의 "Tool 찾기" 창이
- *                    이 가운데 쓸 Tool을 종류별로 보여 주고 고르게 합니다(채팅 요청의 tools에는 이름만 넣습니다).
+ * @param availableTools 이 caller가 이 Agent를 부를 때 언제나 붙는 Tool입니다("*"를 펼치고 caller 화이트리스트를 거친 것).
+ *                    이름과 함께 설명과 종류(소스 RAG, 문서 RAG, MCP, 일반)를 담습니다. 채팅 화면이 "Agent 기본" Tool로 보여 줍니다.
+ * @param addableTools 채팅 요청의 tools로 더 붙일 수 있는 Tool입니다(caller 화이트리스트를 통과했고 Agent에 없는 것).
+ *                    채팅 화면의 "Tool 찾기" 창이 이 가운데 더 붙일 Tool을 종류별로 보여 주고 고르게 합니다(요청에는 이름만 넣습니다).
  * @param skills      이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다.
  * @param subAgents   이 Agent가 일을 맡길 수 있는 다른 Agent의 id 목록입니다.
  * @param version     이 Agent 정의의 버전입니다.
  * @param role        사람이 읽는 역할 이름입니다(없으면 null).
  */
-public record AgentSummary(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools, List<ToolSummary> availableTools, List<String> skills, List<String> subAgents, String version, String role) {
+public record AgentSummary(String id, String description, Map<String, Object> input, Map<String, Object> output, List<String> tools, List<ToolSummary> availableTools, List<ToolSummary> addableTools, List<String> skills, List<String> subAgents, String version, String role) {
 
 	/**
 	 * AgentDefinition(Agent 전체 정의)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
 	 *
 	 * @param definition     요약으로 바꿔줄 Agent 정의입니다.
-	 * @param availableTools 이 caller에게 실제로 붙는 Tool입니다(ChatController가 AgentExecutor.availableToolNames()로 고른 것).
+	 * @param availableTools 이 caller에게 언제나 붙는 Tool입니다(AgentExecutor.availableTools()).
+	 * @param addableTools   채팅 요청으로 더 붙일 수 있는 Tool입니다(AgentExecutor.addableTools()).
 	 */
-	public static AgentSummary from(AgentDefinition definition, List<ToolSummary> availableTools) {
-		return new AgentSummary(definition.id(), definition.description(), definition.inputSchema(), definition.outputSchema(), definition.toolNames(), availableTools, definition.skillNames(), definition.subAgentIds(), definition.version(), definition.role());
+	public static AgentSummary from(AgentDefinition definition, List<ToolSummary> availableTools, List<ToolSummary> addableTools) {
+		return new AgentSummary(definition.id(), definition.description(), definition.inputSchema(), definition.outputSchema(), definition.toolNames(), availableTools, addableTools, definition.skillNames(), definition.subAgentIds(), definition.version(), definition.role());
 	}
 
 }

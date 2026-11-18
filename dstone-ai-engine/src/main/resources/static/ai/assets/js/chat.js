@@ -3,8 +3,9 @@ var DstoneAiChat = (function () {
 	var urls = {};
 	var messagesEl, inputEl, formEl, agentEl, agentDescEl, toolsEl, modelInputEl, sendBtnEl;
 	var agentsById = {}; // id -> {description, input, output, tools}, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
-	var availableTools = []; // 고른 Agent 가 쓸 수 있는 Tool [{name, description, category}]
-	var chosenTools = [];    // 이번 대화에 쓸 Tool 이름
+	var agentTools = [];     // 고른 Agent 에 언제나 붙는 Tool [{name, description, category}] (Agent 정의의 tools)
+	var addableTools = [];   // 더 붙일 수 있는 Tool [{name, description, category}] (Agent 에 없는 것)
+	var chosenTools = [];    // 이번 대화에 더 붙일 Tool 이름
 	var welcomeEl;           // 대화가 없을 때 보이는 안내와 예시 질문
 
 	function init(options) {
@@ -71,7 +72,8 @@ var DstoneAiChat = (function () {
 
 	function updateAgentDescription() {
 		var agent = agentsById[agentEl.value];
-		renderTools(agent ? (agent.availableTools || []) : []);
+		agentTools = agent ? (agent.availableTools || []) : [];
+		renderTools(agent ? (agent.addableTools || []) : []);
 		if (!agent) {
 			agentDescEl.textContent = "";
 			return;
@@ -87,40 +89,54 @@ var DstoneAiChat = (function () {
 	}
 
 	/**
-	 * 고른 Tool 을 칩으로 그린다(Workflow 디자이너의 Agent 창과 같은 모양).
-	 * 칩의 × 로 빼고, [+ 찾아서 추가]로 "Tool 찾기" 창(tool-picker.js)을 열어 종류별 표에서 고른다.
-	 * Agent 를 바꾸면, 새 Agent 에도 있는 Tool 만 고른 채로 남긴다.
+	 * 이번 대화에 붙는 Tool 을 칩으로 그린다(Workflow 디자이너의 Agent 창과 같은 모양).
+	 * - Agent 정의의 Tool(agentTools): 언제나 붙는다. 점선 칩이고 × 가 없다.
+	 * - 더 고른 Tool(chosenTools): 칩의 × 로 빼고, [+ 찾아서 추가]로 "Tool 찾기" 창(tool-picker.js)을 열어 종류별 표에서 고른다.
+	 * Agent 를 바꾸면, 새 Agent 에도 더 붙일 수 있는 Tool 만 고른 채로 남긴다.
 	 */
 	function renderTools(tools) {
-		availableTools = tools || [];
+		addableTools = tools || [];
 		chosenTools = chosenTools.filter(function (name) {
 			return findTool(name) !== null;
 		});
 		var html = "";
-		if (availableTools.length === 0) {
-			html += "<span class=\"ai-hint\">이 Agent 는 고를 수 있는 Tool 이 없습니다.</span>";
-		} else if (chosenTools.length === 0) {
-			html += "<span class=\"ai-hint\">고른 Tool 이 없습니다(Tool 없이 답합니다).</span>";
+		if (agentTools.length === 0 && chosenTools.length === 0) {
+			html += "<span class=\"ai-hint\">붙은 Tool 이 없습니다(Tool 없이 답합니다).</span>";
 		}
-		chosenTools.forEach(function (name) {
-			var tool = findTool(name);
-			var category = DstoneToolPicker.labelOf(tool.category);
-			html += "<span class=\"wd-chip\" title=\"" + escapeHtml(category + " · " + (tool.description || "")) + "\">"
-				+ "<span class=\"chat-tool-cat\">" + escapeHtml(category) + "</span>" + escapeHtml(name)
-				+ "<button type=\"button\" class=\"wd-chip-x\" data-tool-remove=\"" + escapeHtml(name) + "\" title=\"빼기\">×</button></span>";
+		agentTools.forEach(function (tool) {
+			html += toolChip(tool, true);
 		});
-		html += "<button type=\"button\" class=\"kn-plain wd-pick-btn\" data-tool-pick=\"1\"" + (availableTools.length === 0 ? " disabled" : "") + ">+ 찾아서 추가</button>";
-		if (availableTools.length > 0) {
-			html += "<span class=\"chat-tools-count\">" + chosenTools.length + " / " + availableTools.length + " 개 고름</span>";
+		chosenTools.forEach(function (name) {
+			html += toolChip(findTool(name), false);
+		});
+		html += "<button type=\"button\" class=\"kn-plain wd-pick-btn\" data-tool-pick=\"1\"" + (addableTools.length === 0 ? " disabled" : "") + ">+ 찾아서 추가</button>";
+		html += "<span class=\"chat-tools-count\">기본 " + agentTools.length + "개";
+		if (addableTools.length > 0) {
+			html += " · 더 고름 " + chosenTools.length + " / " + addableTools.length + "개";
+		} else if (agentTools.length > 0) {
+			html += " · 더 붙일 Tool 없음";
 		}
+		html += "</span>";
 		toolsEl.innerHTML = html;
 	}
 
-	/** 이 Agent 가 쓸 수 있는 Tool 가운데 이 이름인 것. 없으면 null */
+	/** Tool 칩 하나. fixed 면 Agent 정의의 Tool 이라 × 없이 "기본"으로 표시한다 */
+	function toolChip(tool, fixed) {
+		var category = DstoneToolPicker.labelOf(tool.category);
+		var title = (fixed ? "Agent 기본(뺄 수 없음) · " : "") + category + " · " + (tool.description || "");
+		var html = "<span class=\"wd-chip" + (fixed ? " chat-tool-fixed" : "") + "\" title=\"" + escapeHtml(title) + "\">"
+			+ "<span class=\"chat-tool-cat\">" + escapeHtml(fixed ? "기본 · " + category : category) + "</span>" + escapeHtml(tool.name);
+		if (!fixed) {
+			html += "<button type=\"button\" class=\"wd-chip-x\" data-tool-remove=\"" + escapeHtml(tool.name) + "\" title=\"빼기\">×</button>";
+		}
+		return html + "</span>";
+	}
+
+	/** 더 붙일 수 있는 Tool 가운데 이 이름인 것. 없으면 null */
 	function findTool(name) {
-		for (var i = 0; i < availableTools.length; i++) {
-			if (availableTools[i].name === name) {
-				return availableTools[i];
+		for (var i = 0; i < addableTools.length; i++) {
+			if (addableTools[i].name === name) {
+				return addableTools[i];
 			}
 		}
 		return null;
@@ -134,25 +150,26 @@ var DstoneAiChat = (function () {
 			chosenTools = chosenTools.filter(function (one) {
 				return one !== name;
 			});
-			renderTools(availableTools);
+			renderTools(addableTools);
 			return;
 		}
 		if (e.target.closest("[data-tool-pick]")) {
 			DstoneToolPicker.open({
-				title: "Tool 찾기 - " + agentEl.value,
-				tools: availableTools,
+				title: "더 붙일 Tool 찾기 - " + agentEl.value,
+				tools: addableTools,
 				chosen: chosenTools,
 				onDone: function (names) {
 					chosenTools = names;
-					renderTools(availableTools);
+					renderTools(addableTools);
 				}
 			});
 		}
 	}
 
 	/**
-	 * 예시 질문을 누르면 입력창을 채우고, 그 질문에 필요한 종류(data-tools)의 Tool 을 모두 골라 둔다.
-	 * data-tools 가 비어 있으면 Tool 을 모두 뺀다. 바로 보내지는 않는다(고쳐서 보낼 수 있게).
+	 * 예시 질문을 누르면 입력창을 채우고, 그 질문에 필요한 종류(data-tools)의 Tool 을 모두 더 골라 둔다.
+	 * Agent 에 이미 있는 Tool 은 더 고를 필요가 없다(addableTools 에 없다).
+	 * data-tools 가 비어 있으면 더 고른 Tool 을 모두 뺀다(Agent 기본 Tool 은 그대로). 바로 보내지는 않는다(고쳐서 보낼 수 있게).
 	 */
 	function onExampleClick(e) {
 		var example = e.target.closest(".chat-example");
@@ -161,14 +178,14 @@ var DstoneAiChat = (function () {
 		}
 		var category = example.getAttribute("data-tools");
 		var names = [];
-		for (var i = 0; i < availableTools.length; i++) {
-			var tool = availableTools[i];
+		for (var i = 0; i < addableTools.length; i++) {
+			var tool = addableTools[i];
 			if (category && tool.category === category && !tool.disabled) {
 				names.push(tool.name);
 			}
 		}
 		chosenTools = names;
-		renderTools(availableTools);
+		renderTools(addableTools);
 		inputEl.value = example.getAttribute("data-text");
 		inputEl.focus();
 	}
@@ -296,7 +313,7 @@ var DstoneAiChat = (function () {
 		var requestBody = JSON.stringify({
 			input: input,
 			agent: agentEl.value,
-			// 고른 Tool 만 붙는다. 하나도 고르지 않으면 빈 목록이라 Tool 없이 답한다.
+			// Agent 기본 Tool 은 서버가 언제나 붙인다. 여기에는 더 고른 Tool 만 담는다(비면 Agent 정의 그대로).
 			tools: chosenTools.slice(),
 			model: model ? model : null
 		});

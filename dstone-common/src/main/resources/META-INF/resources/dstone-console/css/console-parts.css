@@ -406,7 +406,7 @@
 	margin: 12px 0 0;
 }
 
-/* 채팅: 이번 대화에 쓸 Tool. 고른 것은 칩으로 보이고, [찾아서 추가]로 "Tool 찾기" 창(tool-picker.js)을 연다 */
+/* 채팅: 이번 대화에 붙는 Tool. Agent 기본 Tool과 더 고른 Tool이 칩으로 보이고, [찾아서 추가]로 "Tool 찾기" 창(tool-picker.js)을 연다 */
 .chat-tools-count {
 	color: var(--cs-muted);
 	font-size: 12.5px;
@@ -415,6 +415,13 @@
 
 .chat-tools .wd-chip {
 	font-family: var(--cs-mono);
+}
+
+/* Agent 정의에 있어 언제나 붙는 Tool. 뺄 수 없으니 × 가 없고 점선 테두리로 구분한다 */
+.chat-tools .wd-chip.chat-tool-fixed {
+	padding-right: 10px;
+	border-style: dashed;
+	background: var(--cs-surface-3);
 }
 
 /* 칩 앞의 종류 표시(소스 RAG, 문서 RAG …) */

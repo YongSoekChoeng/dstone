@@ -105,11 +105,12 @@ import reactor.core.publisher.SignalType;
  * - stream(): 답을 토큰 단위로 흘려보냅니다. output이 string인 Agent만 쓸 수 있습니다(채팅 화면 전용).
  * - callForSchema(): 엔진이 정한 모양으로 답을 받습니다. SUPERVISOR({pass, reason}), ROUTER({route, reason})가 씁니다.
  *
- * call()/stream() 메서드에는 toolsOverride/modelOverride라는 파라미터가 있습니다.
+ * call()/stream() 메서드에는 extraTools/modelOverride라는 파라미터가 있습니다.
  * 이 값들을 null로 주면 AgentDefinition에 정의된 기본값을 그대로 쓰고(agent.model()도 null이면 provider 공통 기본 모델을 씁니다),
  * 값을 직접 주면 그 한 번의 호출에서만 그 값을 적용합니다.
- * 단, toolsOverride는 Agent에 붙는 Tool(availableToolNames()) 가운데 "이번에 쓸 것"만 고릅니다. 목록에 없는 Tool은 넣어도 켜지지 않습니다.
- * 예를 들어 dstone-boot의 채팅 화면에서는 같은 Agent를 쓰면서도 사용자가 화면에서 쓸 Tool을 고르거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 값들을 그대로 넘겨줍니다.
+ * extraTools는 Agent 정의의 Tool에 "이번에 더 붙일 Tool"입니다. Agent 정의의 Tool은 언제나 붙고, 요청으로 뺄 수 없습니다.
+ * 더 붙일 수 있는 것은 caller 화이트리스트를 통과한 Tool 가운데 Agent에 없는 것(addableToolNames())뿐입니다. 그 밖의 이름은 넣어도 켜지지 않습니다.
+ * 예를 들어 채팅 화면(/ai/chat)에서는 같은 Agent를 쓰면서도 사용자가 Tool을 더 붙이거나 모델을 바꿔볼 수 있게 하려고 api.controller.ChatController가 이 값들을 그대로 넘겨줍니다.
  * 반면 Workflow의 step은 이 두 값을 항상 null로 넘겨서(callForSchema()에는 아예 없습니다), Agent 정의에 적힌 값을 그대로 씁니다.
  * </pre>
  */
@@ -156,13 +157,13 @@ public class AgentExecutor extends BaseObject {
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
-	 * @param toolsOverride 이번 호출에서 쓸 Tool 이름(Agent에 붙는 Tool 가운데). 빈 목록이면 Tool 없이 부름. null이면 Agent의 tools 목록 그대로
+	 * @param extraTools    Agent 정의의 Tool에 이번 호출에서만 더 붙일 Tool 이름(addableToolNames() 가운데). null이나 빈 목록이면 Agent 정의 그대로
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구(EnginePrompt.SUB_AGENT 등). 덧붙일 것이 없으면 null
 	 * @param stepRef       이 호출을 보낸 Workflow 실행과 step. Tool 호출까지 따라가서 파일 기록에 쓰입니다. Workflow 밖이면 null
 	 * @throws AgentContractException input이나 LLM의 답이 Agent 계약과 맞지 않을 때
 	 */
-	public Object call(AgentDefinition agent, String conversationId, String caller, Object input, List<String> toolsOverride, String modelOverride, String engineRule, StepRef stepRef) {
+	public Object call(AgentDefinition agent, String conversationId, String caller, Object input, List<String> extraTools, String modelOverride, String engineRule, StepRef stepRef) {
 		String userMessage = this.toUserMessage(agent, input);
 		// 답이 계약(output 모양 등)을 지키지 않았을 때만 다시 부릅니다(execution.onInvalidOutput: RETRY, maxAttempts).
 		// 넣는 값이 틀린 것은 다시 불러도 같으므로 위에서 바로 실패하고, 외부 연결 오류 같은 예외는 잡지 않고 그대로 올려보냅니다.
@@ -172,9 +173,9 @@ public class AgentExecutor extends BaseObject {
 			SubAgentTasks tasks = this.newTasks(agent);
 			Set<String> succeededTools = ConcurrentHashMap.newKeySet();
 			try {
-				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, toolsOverride, modelOverride, engineRule, tasks, stepRef, succeededTools);
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, engineRule, tasks, stepRef, succeededTools);
 				Object answer = this.ask(spec, userMessage, agent.outputSchema(), agent, modelOverride);
-				this.checkRequiredTools(agent, toolsOverride, succeededTools, answer);
+				this.checkRequiredTools(agent, succeededTools, answer);
 				return answer;
 			} catch (AgentContractException e) {
 				last = e;
@@ -200,7 +201,7 @@ public class AgentExecutor extends BaseObject {
 	 * - ROUTER step: {route: string, reason: string}
 	 * 넣는 값은 call()과 같이 Agent input 계약으로 검사합니다.
 	 *
-	 * toolsOverride/modelOverride 파라미터는 없습니다. Workflow의 step은 요청마다 값을 바꿔 부르는
+	 * extraTools/modelOverride 파라미터는 없습니다. Workflow의 step은 요청마다 값을 바꿔 부르는
 	 * 기능(ChatController에서만 쓰는 기능입니다)을 쓰지 않기 때문입니다.
 	 * </pre>
 	 * @param agent     호출할 Agent의 정의
@@ -219,7 +220,7 @@ public class AgentExecutor extends BaseObject {
 		try {
 			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, engineRule, tasks, stepRef, succeededTools);
 			Object answer = this.ask(spec, userMessage, schema, agent, null);
-			this.checkRequiredTools(agent, null, succeededTools, answer);
+			this.checkRequiredTools(agent, succeededTools, answer);
 			return answer;
 		} finally {
 			if (tasks != null) {
@@ -241,17 +242,17 @@ public class AgentExecutor extends BaseObject {
 	 * @param conversationId 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param input         Agent에게 넣을 값(Agent input 모양)
-	 * @param toolsOverride 이번 호출에서 쓸 Tool 이름(Agent에 붙는 Tool 가운데). 빈 목록이면 Tool 없이 부름. null이면 Agent의 tools 목록 그대로
+	 * @param extraTools    Agent 정의의 Tool에 이번 호출에서만 더 붙일 Tool 이름(addableToolNames() 가운데). null이나 빈 목록이면 Agent 정의 그대로
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @throws AgentContractException input이 Agent 계약과 맞지 않거나, Agent output이 string이 아닐 때
 	 */
-	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Object input, List<String> toolsOverride, String modelOverride) {
+	public Flux<String> stream(AgentDefinition agent, String conversationId, String caller, Object input, List<String> extraTools, String modelOverride) {
 		if (!JsonSchemaUtil.STRING.equals(JsonSchemaUtil.typeOf(agent.outputSchema()))) {
 			throw new AgentContractException("agent[" + agent.id() + "]의 output이 string이 아니라서 스트리밍으로 부를 수 없습니다(POST /api/ai/chat을 쓰십시오).");
 		}
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
-		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, toolsOverride, modelOverride, null, tasks, null, null).user(userMessage).stream().content();
+		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, null, tasks, null, null).user(userMessage).stream().content();
 		if (tasks == null) {
 			return answer;
 		}
@@ -453,14 +454,14 @@ public class AgentExecutor extends BaseObject {
 	 * @param caller        이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 	 * @param agent         호출할 Agent의 정의
 	 * @param input         Agent에게 넣을 값(프롬프트의 ${input…} 자리를 채웁니다)
-	 * @param toolsOverride 이번 호출에서 쓸 Tool 이름(Agent에 붙는 Tool 가운데). 빈 목록이면 Tool 없이 부름. null이면 Agent의 tools 목록 그대로
+	 * @param extraTools    Agent 정의의 Tool에 이번 호출에서만 더 붙일 Tool 이름(addableToolNames() 가운데). null이나 빈 목록이면 Agent 정의 그대로
 	 * @param modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 	 * @param engineRule    엔진 규칙에 덧붙일 문구. 덧붙일 것이 없으면 null
 	 * @param tasks         백그라운드로 맡긴 Sub Agent 일을 들고 있을 곳(newTasks()). 백그라운드를 쓰지 않는 Agent면 null
 	 * @param stepRef       이 호출을 보낸 Workflow 실행과 step. ToolContext에 실어 Tool까지 넘깁니다. Workflow 밖이면 null
 	 * @param succeededTools 성공한 Tool 이름을 적어 둘 곳(execution.requiredTools 확인용). 확인하지 않으면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, List<String> toolsOverride, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef, Set<String> succeededTools) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, List<String> extraTools, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef, Set<String> succeededTools) {
 
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
 		
@@ -512,7 +513,8 @@ public class AgentExecutor extends BaseObject {
 			  tools가 비어 있으면 붙지 않습니다. caller 화이트리스트 설정이 아예 없으면 그쪽은 전부 통과입니다.
 			- Skill: Agent의 skills.allowed에 적힌 Skill을 Skill Tool 하나로 붙입니다(SkillTool).
 			- Sub Agent: Agent의 subAgents에 적힌 Agent를 Tool처럼 붙입니다(subAgentCallbacks() 참고).
-			- 채팅 요청이 쓸 Tool을 고르면(toolsOverride) 그 Tool만 붙습니다. 빈 목록이면 Tool 없이 부릅니다.
+			- 채팅 요청이 Tool을 더 고르면(extraTools) Agent 정의의 Tool에 더해 붙습니다. Agent 정의의 Tool은 빠지지 않습니다.
+			  더 붙는 것은 caller 화이트리스트를 통과했고 Agent에 없는 Tool뿐입니다(addableTools()).
 			  Skill과 Sub Agent는 고르지 않습니다(둘 다 Agent 정의의 일부입니다).
 			- 올린 문서(개발 가이드 등)를 찾는 것도 Tool입니다(KnowledgeDocTool의 knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks).
 			  엔진이 질문마다 미리 찾아 붙이지 않고, LLM이 필요할 때 범위(묶음, 문서)를 정해 부릅니다.
@@ -534,10 +536,12 @@ public class AgentExecutor extends BaseObject {
 			- 앞 라운드 답에 붙은 추론 글(reasoning)은 다음 라운드에 다시 보내지 않습니다
 			  (ReasoningStripAdvisor. dstone.ai.agent.keep-reasoning이 true면 붙이지 않습니다).
 		************************************************************************/
-		List<ToolCallback> tools = new ArrayList<>();
-		for (ToolCallback callback : this.configTool.toolCallbacks(caller, agent.toolNames())) {
-			if (toolsOverride == null || toolsOverride.contains(callback.getToolDefinition().name())) {
-				tools.add(callback);
+		List<ToolCallback> tools = new ArrayList<>(this.availableTools(agent, caller));
+		if (extraTools != null && !extraTools.isEmpty()) {
+			for (ToolCallback callback : this.addableTools(agent, caller)) {
+				if (extraTools.contains(callback.getToolDefinition().name())) {
+					tools.add(callback);
+				}
 			}
 		}
 		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent));
@@ -624,9 +628,9 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 이 caller가 이 Agent를 부를 때 붙는 Tool의 이름입니다(tools.allowed와 caller 화이트리스트를 둘 다 통과한 것, "*"는 펼친 것).
-	 * 채팅 화면이 고를 수 있는 Tool 목록을 보여 주고, 채팅 요청의 tools가 이 안에 있는지 확인하는 데 씁니다.
-	 * Skill Tool과 Sub Agent는 들어가지 않습니다(고를 수 없는 Agent 정의의 일부입니다).
+	 * 이 caller가 이 Agent를 부를 때 언제나 붙는 Tool의 이름입니다(tools.allowed와 caller 화이트리스트를 둘 다 통과한 것, "*"는 펼친 것).
+	 * 채팅 화면은 이 Tool을 "Agent 기본"으로 보여 줍니다. 요청으로 뺄 수 없습니다.
+	 * Skill Tool과 Sub Agent는 들어가지 않습니다(Agent 정의의 일부라 따로 붙습니다).
 	 * </pre>
 	 *
 	 * @param agent  Agent의 정의
@@ -643,7 +647,7 @@ public class AgentExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * availableToolNames()와 같은 Tool을 ToolCallback 그대로 돌려줍니다.
-	 * 채팅 화면의 "Tool 찾기" 창에 이름과 함께 설명을 보여 줄 때 씁니다.
+	 * 채팅 화면에 이름과 함께 설명을 보여 줄 때 씁니다.
 	 * </pre>
 	 *
 	 * @param agent  Agent의 정의
@@ -655,26 +659,59 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
+	 * 채팅 요청(extraTools)으로 이 Agent에 더 붙일 수 있는 Tool의 이름입니다.
+	 * caller 화이트리스트를 통과한 Tool 가운데 Agent 정의에 이미 있는 것을 뺀 나머지입니다.
+	 * Agent가 tools.allowed: ["*"]이면 이미 전부 붙어 있으니 빈 목록입니다.
+	 * </pre>
+	 *
+	 * @param agent  Agent의 정의
+	 * @param caller 부르는 쪽(tenant). 없으면 null
+	 */
+	public List<String> addableToolNames(AgentDefinition agent, String caller) {
+		List<String> names = new ArrayList<>();
+		for (ToolCallback callback : this.addableTools(agent, caller)) {
+			names.add(callback.getToolDefinition().name());
+		}
+		return names;
+	}
+
+	/**
+	 * <pre>
+	 * addableToolNames()와 같은 Tool을 ToolCallback 그대로 돌려줍니다.
+	 * 채팅 화면의 "Tool 찾기" 창에 이름과 함께 설명을 보여 줄 때 씁니다.
+	 * </pre>
+	 *
+	 * @param agent  Agent의 정의
+	 * @param caller 부르는 쪽(tenant). 없으면 null
+	 */
+	public List<ToolCallback> addableTools(AgentDefinition agent, String caller) {
+		List<String> agentTools = this.availableToolNames(agent, caller);
+		List<ToolCallback> result = new ArrayList<>();
+		for (ToolCallback callback : this.configTool.toolCallbacks(caller, List.of(AgentDefinition.ALL_TOOLS))) {
+			if (!agentTools.contains(callback.getToolDefinition().name())) {
+				result.add(callback);
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * <pre>
 	 * execution.requiredTools(꼭 성공해야 하는 Tool)를 이번 호출에서 모두 성공했는지 확인합니다.
 	 * 모델이 "이제 산출물을 작성합니다"라고 말만 하고 writeFile 없이 끝내도 답 자체는 멀쩡한 글자라서,
 	 * 이 확인이 없으면 저장되지 않은 결과가 성공으로 넘어갑니다(sm-workflow step09에서 실제로 있었던 일입니다).
 	 * 빠진 Tool이 있으면 계약 위반(AgentContractException)입니다. onInvalidOutput: RETRY면 call()이 다시 부릅니다.
-	 * 채팅에서 쓸 Tool을 골라 부른 호출은, 고르지 않은 Tool을 부를 수 없었으니 그 Tool은 확인하지 않습니다.
+	 * Agent 정의의 Tool은 채팅에서도 언제나 붙으므로 모두 확인합니다.
 	 * </pre>
 	 *
 	 * @param agent          호출한 Agent의 정의
-	 * @param toolsOverride  채팅에서 고른 Tool 이름. null이면 Agent 정의 그대로라 모두 확인합니다
 	 * @param succeededTools 이번 호출에서 성공한 Tool 이름
 	 * @param answer         받은 답(오류 메시지에 앞부분을 보여 줍니다)
 	 * @throws AgentContractException 꼭 성공해야 하는 Tool 중 성공하지 않은 것이 있을 때
 	 */
-	private void checkRequiredTools(AgentDefinition agent, List<String> toolsOverride, Set<String> succeededTools, Object answer) {
+	private void checkRequiredTools(AgentDefinition agent, Set<String> succeededTools, Object answer) {
 		List<String> missing = new ArrayList<>();
 		for (String toolName : agent.requiredTools()) {
-			// 이번 호출에서 고르지 않은 Tool은 부를 수 없었으니 따지지 않는다.
-			if (toolsOverride != null && !toolsOverride.contains(toolName)) {
-				continue;
-			}
 			if (!succeededTools.contains(toolName)) {
 				missing.add(toolName);
 			}

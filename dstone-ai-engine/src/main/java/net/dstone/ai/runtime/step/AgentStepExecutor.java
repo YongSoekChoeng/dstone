@@ -20,7 +20,7 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  *   string(기본)         LLM 답변 원문(글자)               input이 Agent input 모양이 아님
  *   object 등            output 모양대로 읽은 값(맵 등)      위 경우 + LLM이 output 모양을 지키지 않음
  *
- * Workflow의 step에서 Agent를 부를 때는 요청마다 Tool/모델을 바꾸는 기능(toolsOverride 등)을 쓰지 않고
+ * Workflow의 step에서 Agent를 부를 때는 요청마다 Tool/모델을 바꾸는 기능(extraTools 등)을 쓰지 않고
  * 항상 Agent 정의값을 그대로 씁니다. 그 기능은 api.controller.ChatController처럼 Agent 하나를 직접 부르는
  * 화면에서만 씁니다.
  * </pre>
@@ -56,7 +56,7 @@ public class AgentStepExecutor {
 					, execution.conversationIdOf(step)	// conversationId. 대화방 id. 이 대화방의 이전 대화를 기억해서 이어 갑니다. null이면 대화 기억 없이 부릅니다
 					, execution.caller()				// caller. 이 호출을 보낸 앱/서비스의 식별자(tenant를 구분하는 값)
 					, input								// input. Agent에게 넣을 값(Agent input 모양)
-					, null								// toolsOverride 이번 호출에서 쓸 Tool 이름(null이면 Agent의 tools 목록 그대로)
+					, null								// extraTools 이번 호출에서만 더 붙일 Tool 이름(null이면 Agent의 tools 목록 그대로)
 					, null								// modelOverride 이번 호출에서만 쓸 모델명을 강제로 지정하고 싶을 때 씀(null이면 Agent의 model을 쓰고, 그것도 없으면 provider 공통 기본 모델을 씀)
 					, null								// engineRule 엔진 규칙에 덧붙일 문구. AGENT step은 공통 규칙만 씁니다
 					, new StepRef(execution.executionId(), step.id())	// stepRef. 이 step이 읽고 쓴 파일을 기록하는 데 씁니다
