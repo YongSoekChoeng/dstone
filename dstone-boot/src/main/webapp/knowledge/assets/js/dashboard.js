@@ -114,14 +114,15 @@ var DstoneKnowledgeDashboard = (function () {
 		if (failed > 0) {
 			jobs += " · 최근 7일 실패 " + format(failed) + "건";
 		}
-		html += statusItem("분석", jobs, active > 0 ? "busy" : failed > 0 ? "warn" : "", "knowledge/index");
+		// 분석 · 임베딩의 자세한 상태는 담당자용 "분석 실행 · 진단" 화면에 있다. 그 화면은 담당자만 보므로 링크를 걸지 않는다.
+		html += statusItem("분석", jobs, active > 0 ? "busy" : failed > 0 ? "warn" : "", null);
 
 		if (embedding.error || !embedding.totals) {
-			html += statusItem("임베딩", embedding.error ? "읽지 못함" : "정보 없음", "warn", "knowledge/index");
+			html += statusItem("임베딩", embedding.error ? "읽지 못함" : "정보 없음", "warn", null);
 		} else {
 			var state = stateOf(embedding.state);
 			html += statusItem("임베딩", embedding.totals.percent + "% · " + state.label,
-				embedding.state === "STOPPED" ? "bad" : embedding.state === "WORKING" || embedding.state === "WAITING" ? "busy" : "", "knowledge/index");
+				embedding.state === "STOPPED" ? "bad" : embedding.state === "WORKING" || embedding.state === "WAITING" ? "busy" : "", null);
 		}
 
 		html += statusItem("올린 문서", format(docs.documents) + "건 · 묶음 " + format(docs.collections) + "개", "", "knowledge/search/search");

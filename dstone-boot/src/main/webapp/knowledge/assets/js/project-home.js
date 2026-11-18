@@ -206,7 +206,8 @@ var DstoneKnowledgeProjectHome = (function () {
 
 	/**
 	 * 신뢰도 한 줄. 개발 리더가 가장 먼저 묻는 "이 결과 믿어도 되나?"에 답한다.
-	 * 자세한 내용(못 푼 참조를 파일 · 줄까지)은 "분석 실행 · 진단" 화면의 연결 품질 탭에 있다.
+	 * 자세한 내용(못 푼 참조를 파일 · 줄까지)은 담당자용 "분석 실행 · 진단" 화면의 연결 품질 탭에 있다.
+	 * 그 화면은 분석툴 담당자만 보므로 여기서 링크를 걸지 않는다.
 	 */
 	function renderTrust(trust) {
 		var rate = trust.callResolutionRate;
@@ -226,10 +227,6 @@ var DstoneKnowledgeProjectHome = (function () {
 			html += "<span class=\"kn-proj-trust-reason\">못 푼 참조 <b>" + format(trust.unresolvedCount) + "</b>건 · 가장 많은 이유: "
 				+ K.escapeHtml(trust.topUnresolvedReason.reason) + " (" + format(trust.topUnresolvedReason.count) + "건)</span>";
 		}
-		var label = el["kn-proj-revision"].options[el["kn-proj-revision"].selectedIndex];
-		var diagnose = K.pageUrl("knowledge/index", "p=" + encodeURIComponent(current.projectId) + "&r=" + current.revisionId
-			+ "&l=" + encodeURIComponent(label ? label.text.replace(/^#\d+\s+/, "").replace(/\s+\(.*\)$/, "") : ""));
-		html += "<a href=\"" + K.escapeHtml(diagnose) + "\">진단 보기</a>";
 		el["kn-proj-trust"].innerHTML = html;
 	}
 
@@ -331,10 +328,9 @@ var DstoneKnowledgeProjectHome = (function () {
 		}
 		el["kn-proj-run"].disabled = true;
 		K.call("POST", "/api/projects/" + encodeURIComponent(current.projectId) + "/analyses", null, {}).then(function (result) {
-			var link = K.pageUrl("knowledge/index", "p=" + encodeURIComponent(current.projectId));
 			el["kn-proj-message"].className = "kn-message";
 			el["kn-proj-message"].innerHTML = "분석을 시작했습니다" + (result && result.analysisId ? " (" + K.escapeHtml(result.analysisId) + ")" : "")
-				+ ". 끝나면 리비전 목록에 새 리비전이 생깁니다. 진행 상황은 <a href=\"" + K.escapeHtml(link) + "\">분석 실행 · 진단</a> 화면이나 대시보드에서 봅니다.";
+				+ ". 끝나면 리비전 목록에 새 리비전이 생깁니다. 진행 상황은 <a href=\"" + K.escapeHtml(K.pageUrl("knowledge/dashboard/dashboard")) + "\">대시보드</a>에서 봅니다.";
 		}).catch(fail).then(function () {
 			el["kn-proj-run"].disabled = false;
 		});

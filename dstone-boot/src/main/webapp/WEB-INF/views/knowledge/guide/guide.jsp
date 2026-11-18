@@ -125,11 +125,11 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 					</a>
 					<a class="kn-step" href="<%=linkBase%>knowledge/project/project">
 						<span class="kn-step-no">2</span><span class="kn-step-title">분석 시작</span>
-						<p>프로젝트 화면에서 "분석 실행"을 누릅니다(단계를 골라 다시 돌리거나 증분 분석을 하려면 "분석 실행 · 진단" 화면). 단계마다 진행 상황이 보입니다. 파일이 수백 개면 몇 분, 수천 개면 그보다 오래 걸립니다.</p>
+						<p>프로젝트 화면에서 "분석 실행"을 누릅니다. 단계마다 진행 상황이 보입니다. 파일이 수백 개면 몇 분, 수천 개면 그보다 오래 걸립니다.</p>
 					</a>
-					<a class="kn-step" href="<%=linkBase%>knowledge/index">
+					<a class="kn-step" href="<%=linkBase%>knowledge/project/project">
 						<span class="kn-step-no">3</span><span class="kn-step-title">결과 확인</span>
-						<p>리비전 상태가 <b>READY</b>가 되면 쓸 수 있습니다. 리비전을 누르면 오른쪽 개요 탭에서 분석이 잘 됐는지 한눈에 보입니다.</p>
+						<p>분석이 끝나면 프로젝트 화면의 리비전 목록에 새 리비전이 생깁니다. 리비전을 고르면 신뢰도 한 줄과 현행 구조가 보입니다.</p>
 					</a>
 					<a class="kn-step" href="<%=linkBase%>knowledge/impact/impact">
 						<span class="kn-step-no">4</span><span class="kn-step-title">물어보기</span>

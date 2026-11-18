@@ -57,13 +57,13 @@ String linkBase = requestUtil.getStrContextPath() + "/defaultLink.do?defaultLink
 				<h3>처음 오셨나요?</h3>
 				<p class="ai-hint">아직 등록한 프로젝트가 없습니다. 아래 순서대로 하면 몇 분 안에 첫 결과를 볼 수 있습니다.</p>
 				<div class="kn-steps">
-					<a class="kn-step" href="<%=linkBase%>knowledge/index">
+					<a class="kn-step" href="<%=linkBase%>knowledge/project/project#new=1">
 						<span class="kn-step-no">1</span><span class="kn-step-title">프로젝트 등록</span>
 						<p>프로젝트 ID와 소스 폴더(분석 서버에 있는 경로)를 적고 등록합니다.</p>
 					</a>
-					<a class="kn-step" href="<%=linkBase%>knowledge/index">
+					<a class="kn-step" href="<%=linkBase%>knowledge/project/project">
 						<span class="kn-step-no">2</span><span class="kn-step-title">분석 시작</span>
-						<p>아무것도 적지 않고 "분석 시작"을 누르면 됩니다.</p>
+						<p>프로젝트 화면에서 프로젝트를 고르고 "분석 실행"을 누르면 됩니다.</p>
 					</a>
 					<a class="kn-step" href="<%=linkBase%>knowledge/guide/guide">
 						<span class="kn-step-no">3</span><span class="kn-step-title">사용 안내 읽기</span>
