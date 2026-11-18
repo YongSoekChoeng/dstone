@@ -77,10 +77,14 @@ spring:
             #- org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
     security: 
         enabled: true # 스프링시큐리티사용 여부(true/false)
-    session:  # Redis 를 Spring Session 으로 사용할 경우 store-type 를 redis 로 세팅.
-        store-type: redis # 세션 저장소(none/redis)
-        redis: 
-            namespace: dstone:session # 세션을 저장하는 데 사용되는 키의 네임스페이스					
+    # 세션은 Redis 에 둔다(Spring Session, pom 의 spring-boot-starter-session-data-redis). 서버를 여러 개 띄워도 로그인이 이어진다.
+    # 쿠키 이름(JSESSIONID)과 만료(120m)는 위 server.servlet.session 값을 그대로 쓴다.
+    session:
+        data:
+            redis:
+                namespace: dstone:session # 세션을 저장하는 Redis 키의 앞부분
+                # indexed: 사용자 id 로 세션을 찾을 수 있다(중복 로그인 처리, common.web.LoginSession). 세션 만료 이벤트도 받는다.
+                repository-type: indexed
     data:  
         # Redis 설정
         redis: 

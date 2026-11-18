@@ -15,7 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.boot.common.config.ConfigSecurity;
 import net.dstone.boot.common.security.svc.CustomUserService;
 import net.dstone.boot.common.security.vo.CustomUserDetails;
-import net.dstone.boot.common.web.SessionListener;
+import net.dstone.boot.common.web.LoginSession;
 import net.dstone.boot.common.biz.BaseController;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.consts.ErrCd;
@@ -47,7 +47,7 @@ public class CustomSecurityController extends BaseController {
 			mav = new ModelAndView("jsonView"); 
 		}
 		Map<String, Object> dmIsLogin = new HashMap<String, Object>();
-		if( request.getSession().getAttribute(SessionListener.USER_LOGIN_SESSION_KEY) != null ) {
+		if( request.getSession().getAttribute(LoginSession.USER_LOGIN_SESSION_KEY) != null ) {
 			dmIsLogin.put("isLogin", "Y");
 		}else {
 			dmIsLogin.put("isLogin", "N");

@@ -36,7 +36,7 @@ import net.dstone.boot.common.security.CustomAuthSucessHandler;
 import net.dstone.boot.common.security.CustomAuthenticationProvider;
 import net.dstone.boot.common.security.CustomUsernamePasswordAuthenticationFilter;
 import net.dstone.boot.common.security.svc.CustomUserService;
-import net.dstone.boot.common.web.SessionListener;
+import net.dstone.boot.common.web.LoginSession;
 
 @Configuration
 @ConditionalOnProperty(name = "spring.security.enabled", havingValue = "true" )
@@ -121,7 +121,7 @@ public class ConfigSecurity extends BaseObject{
 			.accessDeniedHandler(acessDeniedHandler())
         );
 		// 7. 세션 설정
-		SessionListener.USER_LOGIN_PRIVILEGE_KIND = SessionListener.USER_LOGIN_PRIVILEGE_KIND_LATER;
+		LoginSession.USER_LOGIN_PRIVILEGE_KIND = LoginSession.USER_LOGIN_PRIVILEGE_KIND_LATER;
 
 		return http.build();
 	}
@@ -245,7 +245,7 @@ public class ConfigSecurity extends BaseObject{
 	        	boolean result = false;
 	            try {
 	            	// (Login)인증 체크
-	            	if( request.getSession() != null && request.getSession().getAttribute(SessionListener.USER_LOGIN_SESSION_KEY) != null ) {
+	            	if( request.getSession() != null && request.getSession().getAttribute(LoginSession.USER_LOGIN_SESSION_KEY) != null ) {
 	            		// (Login)인증 된 경우 자원에 대한 권한 체크
 	            		result = customAuthChecker.check(request, authentication.get());
 	            		// (Login)인증 되었고 자원 권한이 있는 경우

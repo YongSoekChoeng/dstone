@@ -61,6 +61,20 @@
 			</exclusions>
 		</dependency>
 
+		<!-- Redis 세션(Spring Session). Boot 4부터 세션 자동설정이 따로 된 모듈(spring-boot-session-data-redis)이라
+		     dstone-common 의 spring-session-data-redis 라이브러리만으로는 켜지지 않는다(그동안 Tomcat 메모리 세션이었다).
+		     스타터가 끌어오는 logback 은 log4j2 와 겹치므로 뺀다(actuator 와 같은 처리). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-session-data-redis</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

@@ -17,7 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import net.dstone.boot.common.security.vo.CustomUserDetails;
-import net.dstone.boot.common.web.SessionListener;
+import net.dstone.boot.common.web.LoginSession;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.web.console.ConsoleSessionFilter;
 import net.dstone.common.web.console.SessionUser;
@@ -90,7 +90,7 @@ public class SsoController extends net.dstone.boot.common.biz.BaseController {
 	/** 세션의 로그인 사용자를 넘길 모양(SessionUser)으로 바꾼다. 로그인하지 않았으면 null */
 	private SessionUser loginUser(HttpServletRequest request) {
 		HttpSession session = request.getSession(false);
-		Object value = session == null ? null : session.getAttribute(SessionListener.USER_LOGIN_SESSION_KEY);
+		Object value = session == null ? null : session.getAttribute(LoginSession.USER_LOGIN_SESSION_KEY);
 		if (!(value instanceof CustomUserDetails)) {
 			return null;
 		}

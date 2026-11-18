@@ -15,7 +15,6 @@ import net.dstone.common.core.BaseObject;
 	ConfigCallLog.class,
 	ConfigDatasource.class,
 	ConfigKafka.class,
-	ConfigListener.class,
 	ConfigMapper.class,
 	net.dstone.common.config.ConfigProperty.class,
 	ConfigRabbitMQ.class,
