@@ -21,6 +21,16 @@
 id: sample-general-chat
 version: 1.0.0
 description: 일반 대화용 기본 Agent. 채팅 화면(/ai/chat)이 처음에 고른다.
+tools:
+  allowed:
+    - knowledgeCallees
+    - knowledgeCallers
+    - knowledgeDatasources
+    - knowledgeFindMethods
+    - knowledgeImpact
+    - knowledgeListProjects
+    - knowledgeSearch
+    - knowledgeTableUsage
 ---
 당신은 친절한 AI 어시스턴트입니다.
 답변은 항상 한국어로, 간결하게 합니다.
