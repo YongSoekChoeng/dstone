@@ -34,7 +34,7 @@ public final class Constants {
 			public final static String ADVISOR_CONTEXT_KEY = REQUEST_ATTRIBUTE;
 		}
 
-		/** 화면을 쓰는 사람(사용자)을 dstone-boot가 알려 줄 때 쓰는 헤더입니다(common.security.RequesterContext가 읽습니다). */
+		/** API 키로 인증된 앱이 화면을 쓰는 사람(사용자)을 알려 줄 때 쓰는 헤더입니다(common.security.RequesterContext가 읽습니다). */
 		public static final class Requester {
 			/** 로그인 사용자 id(URL 인코딩). */
 			public final static String USER_HEADER = "X-Dstone-User";
@@ -254,7 +254,7 @@ public final class Constants {
 	 *   mcp/**\/*.yml                  MCP 서버 하나에 파일 하나
 	 * 패턴 안의 "**"는 하위 디렉토리를 몇 단계든 자유롭게 포함한다는 뜻입니다. 그래서 workflows/agents/mcp 폴더
 	 * 바로 아래에 파일을 두어도 되고, workflows/billing/*.yml 처럼 원하는 이름의 서브 디렉토리를 만들어서 관리해도 똑같이 인식됩니다.
-	 * 정의 폴더가 jar 밖에 있어서 화면(dstone-boot의 Workflow 디자이너)에서 고쳐 저장할 수 있고, 엔진을 다시 띄우지 않고 다시 읽을 수 있습니다.
+	 * 정의 폴더가 jar 밖에 있어서 화면(Workflow 디자이너, static/ai/designer)에서 고쳐 저장할 수 있고, 엔진을 다시 띄우지 않고 다시 읽을 수 있습니다.
 	 * 아래 경로는 모두 정의 폴더 기준의 상대 경로입니다.
 	 * </pre>
 	 */

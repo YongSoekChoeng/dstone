@@ -61,7 +61,44 @@ var DstoneAi = (function () {
 		return div.innerHTML.replace(/"/g, "&quot;");
 	}
 
+	/**
+	 * 엔진 API(/api/ai/**)를 부른다. 성공하면 응답 JSON(본문이 없으면 null)을, 실패하면 서버가 준 사유를 담은 Error 를 돌려준다.
+	 * 화면을 연 사람은 세션 쿠키로 엔진에 전해진다(엔진의 RequesterContext 가 세션 사용자를 읽는다).
+	 * body 가 있으면 JSON 으로 보낸다.
+	 */
+	function api(method, url, body) {
+		var init = { method: method, headers: { "Accept": "application/json" } };
+		if (body !== undefined && body !== null) {
+			init.headers["Content-Type"] = "application/json";
+			init.body = JSON.stringify(body);
+		}
+		return fetch(url, init).then(function (response) {
+			return response.text().then(function (raw) {
+				var parsed = null;
+				try {
+					parsed = raw ? JSON.parse(raw) : null;
+				} catch (e) {
+					parsed = null;
+				}
+				if (!response.ok) {
+					var reason = parsed && (parsed.message || parsed.error);
+					var error = new Error(reason || ("서버 오류(" + response.status + ")"));
+					error.status = response.status;
+					throw error;
+				}
+				return parsed;
+			});
+		});
+	}
+
+	/** 실행 한 건의 API 주소. suffix 는 "/pause" 처럼 뒤에 붙일 경로(없으면 상세) */
+	function executionUrl(executionId, suffix) {
+		return "/api/ai/workflow/executions/" + encodeURIComponent(executionId) + (suffix || "");
+	}
+
 	return {
+		api: api,
+		executionUrl: executionUrl,
 		STEP_TYPES: STEP_TYPES,
 		statusLabel: statusLabel,
 		setBadge: setBadge,

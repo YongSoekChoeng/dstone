@@ -22,6 +22,7 @@ import net.dstone.ai.api.dto.WorkFlowRequest;
 import net.dstone.ai.api.dto.WorkFlowResponse;
 import net.dstone.ai.api.dto.WorkFlowStatusResponse;
 import net.dstone.ai.api.dto.WorkFlowSubmitResponse;
+import net.dstone.ai.api.dto.WorkFlowOverview;
 import net.dstone.ai.api.dto.WorkFlowSummary;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
@@ -97,6 +98,35 @@ public class WorkFlowController extends BaseController {
 	 * @param request        Workflow에 넘길 입력값(input, Workflow input 모양)과 세션 ID를 담고 있습니다.
 	 * @param servletRequest 이 요청을 보낸 caller(호출 주체)를 식별하기 위해 쓰는 HTTP 요청 객체입니다.
 	 */
+	/**
+	 * <pre>
+	 * 등록된 Workflow 마다 step 종류와 순서를 붙인 목록입니다(AI 개요 화면의 step 흐름 띠).
+	 * 목록(GET /api/ai/workflow)과 같이 이 caller 가 실행할 수 있는 Workflow 만 나옵니다.
+	 * </pre>
+	 */
+	@GetMapping("/overview")
+	public List<WorkFlowOverview> overview(HttpServletRequest servletRequest) {
+		String caller = CallerContext.get(servletRequest);
+		List<WorkFlowOverview> overviews = new ArrayList<WorkFlowOverview>();
+		for (WorkFlowDefinition definition : this.workFlowRegistry.list(caller)) {
+			overviews.add(WorkFlowOverview.from(definition, this.workFlowRegistry.pathOf(definition.id())));
+		}
+		return overviews;
+	}
+
+	/**
+	 * <pre>
+	 * Workflow 하나의 step 종류와 순서입니다(실행 관리 화면의 실행 상세 머리의 step 흐름 띠).
+	 * </pre>
+	 *
+	 * @param workflowId Workflow id
+	 */
+	@GetMapping("/{workflowId}/steps")
+	public WorkFlowOverview steps(@PathVariable String workflowId, HttpServletRequest servletRequest) {
+		WorkFlowDefinition definition = this.workFlowRegistry.resolve(workflowId, CallerContext.get(servletRequest));
+		return WorkFlowOverview.from(definition, this.workFlowRegistry.pathOf(definition.id()));
+	}
+
 	@PostMapping("/{workflowId}/execute")
 	public WorkFlowResponse execute(@PathVariable String workflowId, @RequestBody WorkFlowRequest request, HttpServletRequest servletRequest) {
 		String caller = CallerContext.get(servletRequest);

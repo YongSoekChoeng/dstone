@@ -71,7 +71,7 @@ var DstoneAiChat = (function () {
 
 	function updateAgentDescription() {
 		var agent = agentsById[agentEl.value];
-		renderTools(agent ? agent.tools : []);
+		renderTools(agent ? (agent.availableTools || []) : []);
 		if (!agent) {
 			agentDescEl.textContent = "";
 			return;

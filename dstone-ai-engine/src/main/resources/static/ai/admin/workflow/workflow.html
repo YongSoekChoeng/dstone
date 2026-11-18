@@ -329,18 +329,8 @@
 	<script src="/ai/assets/js/workflow-admin.js"></script>
 	<script>
 		DstoneAiWorkflowAdmin.init({
-			listUrl: "/ai/admin/workflow/list.do",
-			detailUrl: "/ai/admin/workflow/detail.do",
-			decisionUrl: "/ai/admin/workflow/decision.do",
-			pauseUrl: "/ai/admin/workflow/pause.do",
-			resumeUrl: "/ai/admin/workflow/resume.do",
-			rewindPointUrl: "/ai/admin/workflow/rewindPoint.do",
-			rewindUrl: "/ai/admin/workflow/rewind.do",
-			filesUrl: "/ai/admin/workflow/files.do",
-			fileContentUrl: "/ai/admin/workflow/fileContent.do",
-			saveFileUrl: "/ai/admin/workflow/saveFile.do",
-			// 실행 상세 머리의 step 흐름 띠
-			workflowStepsUrl: "/ai/overview/workflowSteps.do"
+			// 목록. 나머지 호출(상세, 승인, 일시정지, 되감기, 문서)은 실행 id 로 주소를 만든다(DstoneAi.executionUrl)
+			listUrl: "/api/ai/workflow/executions"
 		});
 		// 결정한 사람은 세션 사용자로 남는다(바꿀 수 없다). 로그인을 끈 환경이면 설정의 기본 사용자다
 		DstoneConsole.session().then(function (info) {

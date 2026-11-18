@@ -116,9 +116,9 @@
 	<script src="/ai/assets/js/workflow.js"></script>
 	<script>
 		DstoneAiWorkflow.init({
-			listUrl: "/ai/workflow/list.do",
-			submitUrl: "/ai/workflow/submit.do",
-			statusUrl: "/ai/workflow/status.do"
+			listUrl: "/api/ai/workflow",
+			submitUrl: "/api/ai/workflow/{id}/submit",
+			statusUrl: "/api/ai/workflow/status/{id}"
 		});
 	</script>
 </body>

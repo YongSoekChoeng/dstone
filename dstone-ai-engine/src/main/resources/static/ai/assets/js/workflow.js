@@ -225,31 +225,17 @@ var DstoneAiWorkflow = (function () {
 
 		setSubmitLoading(true);
 
-		fetch(urls.submitUrl, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				workflowId: workflowId,
-				input: input,
-				sessionId: sessionIdEl.value.trim() || null
-			})
+		DstoneAi.api("POST", urls.submitUrl.replace("{id}", encodeURIComponent(workflowId)), {
+			input: input,
+			sessionId: sessionIdEl.value.trim() || null
 		})
-			.then(function (response) {
-				if (!response.ok) {
-					throw new Error("서버 오류(" + response.status + ")");
-				}
-				return response.json();
-			})
 			.then(function (result) {
-				if (result.error) {
-					submitStatusEl.textContent = "실행 요청 실패: " + result.error;
-					return;
-				}
 				submitStatusEl.textContent = "실행을 시작했습니다";
 				startTracking(workflowId, result.executionId);
 			})
 			.catch(function (err) {
-				submitStatusEl.textContent = "요청 실패: " + err.message;
+				// 엔진이 거절한 사유(예: 실행 대기열이 꽉 차서 503)를 그대로 보여 준다.
+				submitStatusEl.textContent = "실행 요청 실패: " + (err.status ? err.status + " - " : "") + err.message;
 			})
 			.finally(function () {
 				setSubmitLoading(false);
@@ -281,12 +267,7 @@ var DstoneAiWorkflow = (function () {
 	}
 
 	function fetchStatus(executionId) {
-		fetch(urls.statusUrl, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ executionId: executionId })
-		})
-			.then(function (response) { return response.json(); })
+		DstoneAi.api("GET", urls.statusUrl.replace("{id}", encodeURIComponent(executionId)))
 			.then(function (result) {
 				if (executionId !== activeExecutionId) {
 					// 그 사이 다른 executionId를 선택했으면(이력 클릭) 이 응답은 화면에 반영하지 않는다.
@@ -296,7 +277,7 @@ var DstoneAiWorkflow = (function () {
 				setBadge(result.status);
 				resultEl.value = result.status === "FAILED" || result.status === "ERROR"
 					? (result.error || "")
-					: toText(result.result);
+					: toText(result.output);
 				updateHistoryRow(executionId, result.status);
 
 				if (result.status === "DONE" || result.status === "FAILED" || result.status === "ERROR") {

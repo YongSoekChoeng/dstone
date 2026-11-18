@@ -12,7 +12,7 @@
  * YAML 탭에서 직접 고친 글자도 그대로 저장됩니다. 그림에서 고치면 맨 위 주석만 남기고 다시 만듭니다.
  *
  * 그리기는 X6(AntV), 자동 배치는 dagre, YAML 읽고 쓰기는 js-yaml을 씁니다(모두 ai/assets/lib에 넣어 둔 파일).
- * 서버 호출은 이 앱의 /ai/designer/call.do(console.controller.WorkFlowDesignerController)를 거쳐 정의 API(/api/ai/definitions)로 갑니다.
+ * 서버 호출은 같은 앱의 정의 API(/api/ai/definitions)를 바로 부릅니다.
  */
 var DstoneAiDesigner = (function () {
 
@@ -178,15 +178,16 @@ var DstoneAiDesigner = (function () {
 	 * ==================================================================== */
 
 	/**
-	 * dstone-ai-engine의 정의 API 하나를 부릅니다.
+	 * 정의 API(/api/ai/definitions/**) 하나를 바로 부릅니다. path 는 /api/ai/definitions 로 시작하는 경로입니다.
 	 * 검사에 걸린 경우({ok: false, message}, HTTP 200)는 그대로 돌려주고, 4xx/5xx는 message를 담은 Error로 돌려줍니다.
 	 */
 	function call(method, path, body) {
-		return fetch(urls.callUrl, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ method: method, path: path, body: body || null })
-		}).then(function (response) {
+		var init = { method: method, headers: { "Accept": "application/json" } };
+		if (method === "POST") {
+			init.headers["Content-Type"] = "application/json";
+			init.body = JSON.stringify(body || {});
+		}
+		return fetch(path, init).then(function (response) {
 			return response.text().then(function (text) {
 				var data = null;
 				try {

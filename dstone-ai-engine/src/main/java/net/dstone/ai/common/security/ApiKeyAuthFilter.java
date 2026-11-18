@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
+import net.dstone.common.web.console.ConsoleSessionFilter;
 
 /**
  * <pre>
@@ -38,6 +39,11 @@ import net.dstone.common.utils.StringUtil;
  * Authorization Server가 없기 때문입니다(dstone-boot의 OAuth2는 소셜 로그인을 위한 client일 뿐,
  * IdP 역할을 하는 서버는 아닙니다). 이 엔진을 호출하는 쪽도 정해진 SI 프로젝트들끼리의 서비스 간
  * 호출이라서, SI 프로젝트마다 키를 하나씩 발급해 주는 것만으로 충분합니다.
+ *
+ * 이 앱의 AI 화면(브라우저)은 키 없이 /api/ai/** 를 부릅니다. 그래서 화면 로그인을 켠 환경
+ * (dstone.ai.console.login.enabled=true)에서 세션에 사용자가 있으면 키 대신 세션을 믿고, caller 는
+ * dstone.ai.console.caller(기본 dstone-console)로 둡니다. 로그인을 끈 환경에서는 누구나 기본 세션을 받을 수
+ * 있으므로 세션을 믿지 않습니다. 인증을 켜려면 화면 로그인도 같이 켜야 화면이 동작합니다.
  * </pre>
  */
 @Component
@@ -72,6 +78,12 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 		String apiKey = request.getHeader(Constants.Security.Auth.DEFAULT_HEADER_NAME);
+		if (StringUtil.isEmpty(apiKey) && this.isConsoleUser(request)) {
+			String consoleCaller = configProperty.getProperty("dstone.ai.console.caller");
+			CallerContext.set(request, StringUtil.isEmpty(consoleCaller) ? "dstone-console" : consoleCaller.trim());
+			filterChain.doFilter(request, response);
+			return;
+		}
 		if (StringUtil.isEmpty(apiKey)) {
 			reject(response, "API Key 헤더[" + Constants.Security.Auth.DEFAULT_HEADER_NAME + "]가 없습니다.");
 			return;
@@ -105,6 +117,11 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
 		CallerContext.set(request, caller);
 		filterChain.doFilter(request, response);
+	}
+
+	/** 화면 로그인을 켠 환경에서 세션에 화면 사용자가 있는지(dstone-boot 에서 넘어온 사람) */
+	private boolean isConsoleUser(HttpServletRequest request) {
+		return Boolean.parseBoolean(this.configProperty.getProperty("dstone.ai.console.login.enabled")) && ConsoleSessionFilter.currentUser(request) != null;
 	}
 
 	/**

@@ -133,8 +133,6 @@ var DstoneAiWorkflowAdmin = (function () {
 
 		// step 문서 팝업. 저장하면 목록(크기, 수정 시각)을 다시 읽는다.
 		DstoneAiDocViewer.init({
-			contentUrl: urls.fileContentUrl,
-			saveUrl: urls.saveFileUrl,
 			onSaved: function (executionId) {
 				if (executionId === activeExecutionId) {
 					loadFiles(executionId);
@@ -172,12 +170,14 @@ var DstoneAiWorkflowAdmin = (function () {
 		params.set("status", statusFilterEl.value);
 		params.set("workflowId", workflowFilterEl.value.trim());
 		params.set("executionId", executionFilterEl.value.trim());
-		// 여러 사람이 함께 쓰므로 기본은 내가 시작한 실행만 본다.
-		params.set("mine", mineFilterEl.checked ? "true" : "false");
 		params.set("page", page);
 		params.set("size", PAGE_SIZE);
-		fetch(urls.listUrl + "?" + params.toString(), { method: "POST" })
-			.then(function (response) { return response.json(); })
+		// 여러 사람이 함께 쓰므로 기본은 내가 시작한 실행만 본다(세션 사용자 id 로 거른다).
+		DstoneConsole.session()
+			.then(function (info) {
+				params.set("requestedBy", mineFilterEl.checked && info.userId ? info.userId : "");
+				return DstoneAi.api("GET", urls.listUrl + "?" + params.toString());
+			})
 			.then(function (result) {
 				var total = result.total || 0;
 				var lastPage = Math.max(Math.ceil(total / PAGE_SIZE) - 1, 0);
@@ -247,8 +247,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	function loadDetail(executionId) {
-		fetch(urls.detailUrl + "?executionId=" + encodeURIComponent(executionId), { method: "POST" })
-			.then(function (response) { return response.json(); })
+		DstoneAi.api("GET", DstoneAi.executionUrl(executionId))
 			.then(renderDetail)
 			.catch(function (err) { alert("상세 조회 실패: " + err.message); });
 	}
@@ -301,15 +300,14 @@ var DstoneAiWorkflowAdmin = (function () {
 	/*
 	 * 개요 화면과 같은 step 흐름 띠. 칸마다 상태를 붙인다.
 	 * 완료(채움) / 실패(빨간 테두리) / 지금(테두리, 실행 중이면 깜박임) / 건너뜀(옅은 줄무늬) / 아직(옅게).
-	 * 정의는 /ai/overview/workflowSteps.do로 한 번만 읽는다. 못 읽으면 진행 기록에 나온 step만으로 그린다.
+	 * 정의는 GET /api/ai/workflow/{id}/steps 로 한 번만 읽는다. 못 읽으면 진행 기록에 나온 step만으로 그린다.
 	 */
 	function renderStrip(detail) {
 		var workflowId = detail.workflowId;
 		var defs = stepDefs[workflowId];
-		if (defs === undefined && urls.workflowStepsUrl && workflowId) {
+		if (defs === undefined && workflowId) {
 			stepDefs[workflowId] = "loading";
-			fetch(urls.workflowStepsUrl + "?workflowId=" + encodeURIComponent(workflowId))
-				.then(function (response) { return response.json(); })
+			DstoneAi.api("GET", "/api/ai/workflow/" + encodeURIComponent(workflowId) + "/steps")
 				.then(function (result) {
 					stepDefs[workflowId] = (result && !result.error && result.steps && result.steps.length > 0) ? result.steps : null;
 				})
@@ -744,15 +742,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 	// step들이 읽고 쓴 파일 목록을 읽는다. 엔진이 예전 버전이라 이 API가 없으면 문서 칸만 비워 둔다.
 	function loadFiles(executionId) {
-		fetch(urls.filesUrl + "?executionId=" + encodeURIComponent(executionId), { method: "POST" })
-			.then(function (response) {
-				return response.json().then(function (body) {
-					if (!response.ok) {
-						throw new Error(body.message || ("서버 오류(" + response.status + ")"));
-					}
-					return body;
-				});
-			})
+		DstoneAi.api("GET", DstoneAi.executionUrl(executionId, "/files"))
 			.then(function (result) {
 				if (executionId !== activeExecutionId) {
 					return;
@@ -1021,9 +1011,6 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 고른 step으로 되돌리면 무엇이 남고 무엇을 지울 수 있는지 엔진에 물어 패널에 보여 준다.
 	function openRewind(stepId) {
 		var executionId = activeExecutionId;
-		var params = new URLSearchParams();
-		params.set("executionId", executionId);
-		params.set("fromStep", stepId);
 		rewindEl.style.display = "";
 		rewindMessageEl.textContent = stepId + " step을 확인하는 중입니다...";
 		rewindWarningsEl.innerHTML = "";
@@ -1033,7 +1020,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		rewindStatusEl.textContent = "";
 		rewindRunBtn.disabled = true;
 		currentRewind = null;
-		fetchJson(urls.rewindPointUrl + "?" + params.toString())
+		DstoneAi.api("GET", DstoneAi.executionUrl(executionId, "/rewind?fromStep=" + encodeURIComponent(stepId)))
 			.then(function (point) {
 				if (executionId !== activeExecutionId) {
 					return;
@@ -1103,13 +1090,9 @@ var DstoneAiWorkflowAdmin = (function () {
 		if (!window.confirm(message)) {
 			return;
 		}
-		var params = new URLSearchParams();
-		params.set("executionId", activeExecutionId);
-		params.set("fromStep", point.fromStep);
-		params.set("clearState", clear ? "true" : "false");
 		rewindStatusEl.textContent = "요청 중입니다...";
 		rewindRunBtn.disabled = true;
-		fetchJson(urls.rewindUrl + "?" + params.toString())
+		DstoneAi.api("POST", DstoneAi.executionUrl(activeExecutionId, "/rewind"), { fromStep: point.fromStep, clearState: clear })
 			.then(function (detail) {
 				closeRewind();
 				renderDetail(detail);
@@ -1130,19 +1113,8 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	// POST로 부르고, 실패 응답이면 본문의 message로 오류를 낸다.
-	function fetchJson(url) {
-		return fetch(url, { method: "POST" }).then(function (response) {
-			return response.json().then(function (body) {
-				if (!response.ok) {
-					throw new Error(body.message || ("서버 오류(" + response.status + ")"));
-				}
-				return body;
-			});
-		});
-	}
-
 	function pause() {
-		control(urls.pauseUrl, "일시정지 요청 중입니다...");
+		control("/pause", "일시정지 요청 중입니다...");
 	}
 
 	function resume() {
@@ -1155,21 +1127,13 @@ var DstoneAiWorkflowAdmin = (function () {
 			message += "\n\n" + point.warnings.join("\n");
 		}
 		if (window.confirm(message)) {
-			control(urls.resumeUrl, "요청 중입니다...");
+			control("/resume", "요청 중입니다...");
 		}
 	}
 
-	function control(url, progress) {
+	function control(action, progress) {
 		controlStatusEl.textContent = progress;
-		fetch(url + "?executionId=" + encodeURIComponent(activeExecutionId), { method: "POST" })
-			.then(function (response) {
-				return response.json().then(function (body) {
-					if (!response.ok) {
-						throw new Error(body.message || ("서버 오류(" + response.status + ")"));
-					}
-					return body;
-				});
-			})
+		DstoneAi.api("POST", DstoneAi.executionUrl(activeExecutionId, action))
 			.then(function (detail) {
 				controlStatusEl.textContent = "";
 				renderDetail(detail);
@@ -1193,8 +1157,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		pollTimer = setTimeout(function () {
 			pollTimer = null;
 			var executionId = detail.executionId;
-			fetch(urls.detailUrl + "?executionId=" + encodeURIComponent(executionId), { method: "POST" })
-				.then(function (response) { return response.json(); })
+			DstoneAi.api("GET", DstoneAi.executionUrl(executionId))
 				.then(function (latest) {
 					if (executionId !== activeExecutionId) {
 						return;
@@ -1275,26 +1238,14 @@ var DstoneAiWorkflowAdmin = (function () {
 			return;
 		}
 		decisionStatusEl.textContent = "처리 중입니다...";
-		fetch(urls.decisionUrl, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				executionId: activeExecutionId,
-				approved: approved,
-				route: route,
-				approver: approverEl.value.trim(),
-				comment: commentEl.value.trim() || null
-			})
+		// 결정한 사람은 엔진이 세션 사용자로 남긴다(approver 값보다 우선).
+		// 409: 다른 사람이 먼저 결정함, 503: 실행 대기열이 꽉 참 등. 엔진이 준 사유를 보여 준다.
+		DstoneAi.api("POST", DstoneAi.executionUrl(activeExecutionId, "/decision"), {
+			approved: approved,
+			route: route,
+			approver: approverEl.value.trim(),
+			comment: commentEl.value.trim() || null
 		})
-			.then(function (response) {
-				return response.json().then(function (body) {
-					if (!response.ok) {
-						// 409: 다른 사람이 먼저 결정함, 503: 실행 대기열이 꽉 참 등. 엔진이 준 사유를 보여 준다.
-						throw new Error(body.message || ("서버 오류(" + response.status + ")"));
-					}
-					return body;
-				});
-			})
 			.then(function (detail) {
 				// 엔진은 결정을 받으면 이어서 돌릴 실행을 대기열에 넣고 바로 돌려준다(QUEUED). 진행은 자동 갱신으로 본다.
 				decisionStatusEl.textContent = "결정을 전달했습니다. 이어서 실행합니다 (" + detail.status + ")";

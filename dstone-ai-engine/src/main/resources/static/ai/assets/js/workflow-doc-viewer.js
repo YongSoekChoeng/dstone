@@ -11,7 +11,8 @@
  * 저장은 엔진이 막는 경우가 있습니다(저장 기능 꺼짐 403, 실행 중이거나 연 뒤에 파일이 바뀜 409).
  * 그때는 엔진이 준 사유를 그대로 보여 주고, [다시 읽기]로 새 내용을 받게 합니다.
  *
- * 쓰는 법: DstoneAiDocViewer.init({contentUrl, saveUrl, onSaved}) 한 번, 그 뒤 DstoneAiDocViewer.open(executionId, path, info)
+ * 쓰는 법: DstoneAiDocViewer.init({onSaved}) 한 번, 그 뒤 DstoneAiDocViewer.open(executionId, path, info).
+ * 파일은 엔진 API(GET/POST /api/ai/workflow/executions/{id}/files/content)로 읽고 저장한다
  */
 var DstoneAiDocViewer = (function () {
 
@@ -125,11 +126,8 @@ var DstoneAiDocViewer = (function () {
 	}
 
 	function load() {
-		var params = new URLSearchParams();
-		params.set("executionId", executionId);
-		params.set("path", path);
 		var requested = path;
-		post(urls.contentUrl + "?" + params.toString(), null)
+		DstoneAi.api("GET", DstoneAi.executionUrl(executionId, "/files/content?path=" + encodeURIComponent(path)))
 			.then(function (result) {
 				if (requested !== path) {
 					return;
@@ -179,8 +177,7 @@ var DstoneAiDocViewer = (function () {
 		saving = true;
 		saveBtn.disabled = true;
 		setStatus("저장하는 중입니다...", false);
-		post(urls.saveUrl, {
-			executionId: executionId,
+		DstoneAi.api("POST", DstoneAi.executionUrl(executionId, "/files/content"), {
 			path: path,
 			text: textEl.value,
 			baseHash: content.hash
@@ -394,29 +391,6 @@ var DstoneAiDocViewer = (function () {
 				return;
 			}
 			hljs.highlightElement(block);
-		});
-	}
-
-	// 엔진이 거절하면 {status, message}가 온다. 그 사유를 오류 문구로 쓴다.
-	function post(url, body) {
-		var init = { method: "POST" };
-		if (body) {
-			init.headers = { "Content-Type": "application/json" };
-			init.body = JSON.stringify(body);
-		}
-		return fetch(url, init).then(function (response) {
-			return response.text().then(function (raw) {
-				var parsed = null;
-				try {
-					parsed = raw ? JSON.parse(raw) : null;
-				} catch (e) {
-					parsed = null;
-				}
-				if (!response.ok || !parsed) {
-					throw new Error((parsed && parsed.message) || ("서버 오류(" + response.status + ")"));
-				}
-				return parsed;
-			});
 		});
 	}
 

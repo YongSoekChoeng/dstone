@@ -29,8 +29,9 @@ import net.dstone.common.config.ConfigProperty;
  *   3. 로그인을 켰는데 세션이 없음: 화면이면 dstone-boot 의 /sso/go.do 로 보내 표를 받아 오게 하고, 화면이 부르는 API 면 401.
  *
  * 이 필터가 보는 주소는 화면 쪽뿐입니다.
- *   - "/"(첫 화면으로 보냄), uiRoot 아래(화면과 화면용 API. uiRoot/assets/ 는 뺌), /console/ 아래(세션 정보)
- * 다른 서버가 부르는 /api/** 는 건드리지 않습니다. 그쪽은 예전처럼 X-API-Key 필터가 지킵니다.
+ *   - "/"(첫 화면으로 보냄), uiRoot 아래(화면. uiRoot/assets/ 는 뺌), /console/ 아래(세션 정보)
+ * /api/** 는 건드리지 않습니다. 화면 스크립트도 /api/** 를 바로 부르는데, 그때 각 앱은 이 필터가 넣어 둔
+ * 세션 사용자를 읽어 사람을 정합니다(currentUser). API 보호는 각 앱의 X-API-Key 필터가 맡습니다.
  *
  * GET /console/session 은 화면 스크립트(dstone-console/js/console.js)가 왼쪽 메뉴를 그릴 때 부릅니다.
  * 사용자, 로그인 사용 여부, 다른 앱 주소를 JSON 으로 돌려줍니다.

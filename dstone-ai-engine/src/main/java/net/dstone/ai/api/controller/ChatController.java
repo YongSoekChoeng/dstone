@@ -27,6 +27,7 @@ import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.security.CallerContext;
+import net.dstone.ai.common.security.RequesterContext;
 import net.dstone.ai.runtime.agent.AgentExecutor;
 import net.dstone.common.biz.BaseController;
 import net.dstone.common.config.ConfigProperty;
@@ -98,7 +99,7 @@ public class ChatController extends BaseController {
 	@PostMapping
 	public ChatResponse chat(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		this.validateRequest(request);
-		String sessionId = this.resolveSessionId(request);
+		String sessionId = this.resolveSessionId(request, servletRequest);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
@@ -118,7 +119,7 @@ public class ChatController extends BaseController {
 	@PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<String> chatStream(@RequestBody ChatRequest request, HttpServletRequest servletRequest) {
 		this.validateRequest(request);
-		String sessionId = this.resolveSessionId(request);
+		String sessionId = this.resolveSessionId(request, servletRequest);
 		String caller = CallerContext.get(servletRequest);
 		AgentDefinition agent = this.agentRegistry.resolve(request.agent(), caller);
 		this.checkInput(agent, request);
@@ -190,7 +191,12 @@ public class ChatController extends BaseController {
 	 *
 	 * @param request sessionId 값을 가져올 채팅 요청입니다.
 	 */
-	private String resolveSessionId(ChatRequest request) {
+	private String resolveSessionId(ChatRequest request, HttpServletRequest servletRequest) {
+		// 이 앱의 AI 화면에서 부른 요청이면 세션 사용자로 정한다(남의 대화를 이어 가지 못하게 본문 값보다 먼저).
+		String screenSessionId = RequesterContext.chatSessionIdOf(servletRequest);
+		if (screenSessionId != null) {
+			return screenSessionId;
+		}
 		HttpSession session = this.getSession(true);
 		return session.getAttribute(DEFAULT_SESSION_KEY) != null ? session.getAttribute(DEFAULT_SESSION_KEY).toString() : (StringUtil.isEmpty(request.sessionId()) ? UUID.randomUUID().toString() : request.sessionId());
 	}

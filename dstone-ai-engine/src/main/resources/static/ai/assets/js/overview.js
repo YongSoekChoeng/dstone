@@ -1,8 +1,8 @@
 /*
  * AI 개요 화면(views/ai/index.jsp).
  * - 맨 위 한 줄: 엔진 연결, Workflow 수, 실행 현황(실행 중, 대기 중, 승인 대기). 승인 대기가 있거나 연결이 안 될 때만 색이 붙는다.
- * - Workflow 목록: Workflow마다 step을 정의 순서대로 색 띠로 그린다(/ai/overview/workflows.do).
- * - 최근 실행: 실행 관리 화면과 같은 목록 API(/ai/admin/workflow/list.do)의 첫 몇 건.
+ * - Workflow 목록: Workflow마다 step을 정의 순서대로 색 띠로 그린다(GET /api/ai/workflow/overview).
+ * - 최근 실행: 실행 관리 화면과 같은 목록 API(GET /api/ai/workflow/executions)의 첫 몇 건.
  */
 var DstoneAiOverview = (function () {
 
@@ -235,10 +235,9 @@ var DstoneAiOverview = (function () {
 	function fetchRuns(status, size) {
 		var params = new URLSearchParams();
 		params.set("status", status);
-		params.set("mine", "false");
 		params.set("page", "0");
 		params.set("size", String(size));
-		return fetch(urls.runsUrl + "?" + params.toString(), { method: "POST" }).then(function (response) {
+		return fetch(urls.runsUrl + "?" + params.toString()).then(function (response) {
 			var type = response.headers.get("Content-Type") || "";
 			if (!response.ok || type.indexOf("json") < 0) {
 				throw new Error("응답 " + response.status);
