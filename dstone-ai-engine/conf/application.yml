@@ -279,13 +279,13 @@ dstone:
                 max-rows: 100
                 max-cell-chars: 200
                 query-timeout-seconds: 30
-                # connections:
-                #     sample-app:
-                #         url: jdbc:mysql://${DB_HOST}:${DB_PORT}/sampleDB
-                #         username: readonly_user
-                #         password: ENC(...)
-                #         schema: sampleDB
-                #         description: dstone-boot 샘플 DB
+                connections:
+                    testApp:
+                        url: jdbc:mysql://${TESTAPP_DB_HOST}:${TESTAPP_DB_PORT}/${TESTAPP_DB_DATABASE}
+                        username: ${TESTAPP_DB_PASSWD}
+                        password: ENC(${DB_HOST})
+                        schema: ${TESTAPP_DB_DATABASE}
+                        description: testApp 샘플 DB
             # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
             # "잘렸으니 범위를 좁혀 다시 호출하라"는 안내를 붙인다(common.config.ConfigTool, 기본 60000).
             # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 결과 하나가 컨텍스트 한도나 응답 대기 시간을 넘긴다.
