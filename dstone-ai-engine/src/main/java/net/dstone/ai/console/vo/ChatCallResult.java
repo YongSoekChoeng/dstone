@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * dstone-ai-engine의 POST /api/ai/chat 응답 계약(ChatResponse)과 JSON 모양만 맞춘 VO.

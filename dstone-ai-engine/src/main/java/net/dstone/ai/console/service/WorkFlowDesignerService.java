@@ -1,9 +1,8 @@
-package net.dstone.boot.ai.service;
+package net.dstone.ai.console.service;
 
 import java.net.URI;
 import java.util.function.Function;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,7 +12,6 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Mono;
 
@@ -28,13 +26,10 @@ import reactor.core.publisher.Mono;
  * </pre>
  */
 @Service
-public class WorkFlowDesignerService extends net.dstone.boot.common.biz.BaseService {
+public class WorkFlowDesignerService extends ConsoleBaseService {
 
 	/** 넘겨줄 수 있는 경로의 앞부분 */
 	private static final String PATH_PREFIX = "/api/ai/definitions";
-
-	@Autowired
-	private ConfigProperty configProperty;
 
 	/**
 	 * @param method GET / POST
@@ -51,9 +46,9 @@ public class WorkFlowDesignerService extends net.dstone.boot.common.biz.BaseServ
 				|| path.indexOf('?') >= 0 || path.indexOf('#') >= 0 || path.indexOf('\\') >= 0) {
 			return error(HttpStatus.BAD_REQUEST, "path는 " + PATH_PREFIX + "로 시작하는 경로여야 합니다: " + path);
 		}
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		if (StringUtil.isEmpty(baseUrl)) {
-			return error(HttpStatus.SERVICE_UNAVAILABLE, "dstone-ai-engine 주소가 설정되지 않았습니다(interface.ai-engine.base-url).");
+			return error(HttpStatus.SERVICE_UNAVAILABLE, "엔진 API 주소가 설정되지 않았습니다(dstone.ai.console.engine-url).");
 		}
 		// 한글이 든 경로(id)가 깨지지 않게 인코딩한다.
 		URI uri = UriComponentsBuilder.fromUriString(baseUrl.trim()).path(path).build().encode().toUri();
@@ -79,14 +74,14 @@ public class WorkFlowDesignerService extends net.dstone.boot.common.biz.BaseServ
 				}
 			}).block();
 		} catch (RuntimeException e) {
-			return error(HttpStatus.BAD_GATEWAY, "dstone-ai-engine을 부르지 못했습니다. 서버가 떠 있는지, interface.ai-engine.base-url이 맞는지 확인하세요: " + e.getMessage());
+			return error(HttpStatus.BAD_GATEWAY, "엔진 API를 부르지 못했습니다. dstone.ai.console.engine-url이 맞는지 확인하세요: " + e.getMessage());
 		}
 	}
 
 	/**
 	 * <pre>
 	 * 오류를 dstone-ai-engine의 정의 API 실패 응답과 같은 모양({ok: false, message})으로 돌려줍니다.
-	 * 예외를 던지지 않는 이유: dstone-boot의 공통 예외 처리를 타면 상태 코드가 200이 되고 메시지 모양도 달라진다.
+	 * 예외를 던지지 않는 이유: 예외로 던지면 화면이 받는 상태 코드와 메시지 모양이 정의 API의 실패 응답과 달라진다.
 	 * </pre>
 	 */
 	private ResponseEntity<String> error(HttpStatus status, String message) {

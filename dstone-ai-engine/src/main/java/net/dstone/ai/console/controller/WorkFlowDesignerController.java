@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.controller;
+package net.dstone.ai.console.controller;
 
 import java.util.Map;
 
@@ -9,17 +9,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import net.dstone.boot.ai.service.WorkFlowDesignerService;
+import net.dstone.ai.console.service.WorkFlowDesignerService;
 
 /**
  * <pre>
- * "Workflow 디자이너" 화면(views/ai/designer/designer.jsp)이 dstone-ai-engine의 정의 API(/api/ai/definitions)를 부를 때 거치는 창구입니다.
+ * "Workflow 디자이너" 화면(static/ai/designer/designer.html)이 dstone-ai-engine의 정의 API(/api/ai/definitions)를 부를 때 거치는 창구입니다.
  * 화면의 스크립트가 여기로 요청을 보내면 WorkFlowDesignerService가 dstone-ai-engine에 그대로 넘겨줍니다.
  * </pre>
  */
 @RestController
 @RequestMapping("/ai/designer/*")
-public class WorkFlowDesignerController extends net.dstone.boot.common.biz.BaseController {
+public class WorkFlowDesignerController {
 
 	@Autowired
 	private WorkFlowDesignerService workFlowDesignerService;

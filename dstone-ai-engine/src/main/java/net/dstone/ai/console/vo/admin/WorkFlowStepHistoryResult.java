@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo.admin;
+package net.dstone.ai.console.vo.admin;
 
 /**
  * dstone-ai-engine의 실행 상세 응답(history 배열 항목)과 JSON 모양만 맞춘 VO.

@@ -12,7 +12,7 @@
  * YAML 탭에서 직접 고친 글자도 그대로 저장됩니다. 그림에서 고치면 맨 위 주석만 남기고 다시 만듭니다.
  *
  * 그리기는 X6(AntV), 자동 배치는 dagre, YAML 읽고 쓰기는 js-yaml을 씁니다(모두 ai/assets/lib에 넣어 둔 파일).
- * 서버 호출은 dstone-boot의 /ai/designer/call.do를 거쳐 dstone-ai-engine의 /api/ai/definitions로 갑니다.
+ * 서버 호출은 이 앱의 /ai/designer/call.do(console.controller.WorkFlowDesignerController)를 거쳐 정의 API(/api/ai/definitions)로 갑니다.
  */
 var DstoneAiDesigner = (function () {
 

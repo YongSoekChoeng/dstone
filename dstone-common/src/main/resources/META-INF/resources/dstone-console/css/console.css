@@ -1,10 +1,10 @@
 /* ==========================================================================
-   AI 화면(Dstone AI)과 코드 분석 화면(Dstone Knowledge)의 바탕 모양
-   (두 화면은 메뉴가 따로지만 모양은 이 파일 하나를 같이 쓴다)
+   AI 화면(dstone-ai-engine)과 코드 분석 화면(dstone-knowledge)의 바탕 모양
+   (두 앱은 따로 뜨지만 모양은 dstone-common 에 든 이 파일 하나를 같이 쓴다. 주소: /dstone-console/css/console.css)
    --------------------------------------------------------------------------
    색, 글꼴, 간격을 아래 변수(토큰)로만 정하고, 나머지 규칙은 모두 이 변수를 씁니다.
    색을 바꾸려면 :root 의 값만 고치면 됩니다.
-   이 파일 다음에 ai/assets/css/main.css(AI 화면 부품), knowledge.css(코드 분석 화면 부품)를 읽습니다.
+   이 파일 다음에 console-parts.css(패널, 표, 입력 칸 같은 화면 부품), knowledge.css(코드 분석 화면 부품)를 읽습니다.
    화면 스크립트가 쓰는 class 이름(ai-form, ai-panel, document-list-table, kn-* ...)은 그대로 두고 모양만 정합니다.
    ========================================================================== */
 
@@ -303,6 +303,34 @@ body.ai-body {
 
 .ai-body .cs-nav-home:hover {
 	border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* 메뉴 아래의 사용자 이름(세션 정보, console.js). 로그인을 끈 환경이면 "(로그인 없음)"이 붙는다 */
+.ai-body .cs-nav-user {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: auto 10px 4px;
+	padding-top: 12px;
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	font-size: 12px;
+	color: var(--cs-side-muted);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.ai-body .cs-nav-user[hidden] {
+	display: none;
+}
+
+.ai-body .cs-nav-user svg {
+	flex: 0 0 16px;
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.7;
 }
 
 /* 본문 */

@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo.admin;
+package net.dstone.ai.console.vo.admin;
 
 /**
  * Workflow 실행 관리 화면의 문서 팝업에서 고친 파일을 저장하는 요청이다.

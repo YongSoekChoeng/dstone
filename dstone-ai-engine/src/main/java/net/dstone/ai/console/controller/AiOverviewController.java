@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.controller;
+package net.dstone.ai.console.controller;
 
 import java.util.List;
 
@@ -8,18 +8,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import net.dstone.boot.ai.service.AiOverviewService;
-import net.dstone.boot.ai.vo.WorkFlowOverviewResult;
+import net.dstone.ai.console.service.AiOverviewService;
+import net.dstone.ai.console.vo.WorkFlowOverviewResult;
 
 /**
  * <pre>
- * AI 개요 화면(views/ai/index.jsp)이 부르는 API입니다.
+ * AI 개요 화면(static/ai/index.html)이 부르는 API입니다.
  * 실행 현황(실행 중, 승인 대기 …)은 실행 관리 화면의 목록 API(/ai/admin/workflow/list.do)를 그대로 씁니다.
  * </pre>
  */
 @RestController
 @RequestMapping("/ai/overview/*")
-public class AiOverviewController extends net.dstone.boot.common.biz.BaseController {
+public class AiOverviewController {
 
 	@Autowired
 	private AiOverviewService aiOverviewService;

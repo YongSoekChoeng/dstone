@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.service.admin;
+package net.dstone.ai.console.service.admin;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -7,12 +7,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
-import net.dstone.boot.ai.service.AiEngineUser;
-import net.dstone.boot.ai.vo.admin.WorkFlowDecisionRequest;
-import net.dstone.boot.ai.vo.admin.WorkFlowExecutionDetailResult;
-import net.dstone.boot.ai.vo.admin.WorkFlowExecutionPageResult;
-import net.dstone.boot.ai.vo.admin.WorkFlowFileSaveRequest;
-import net.dstone.common.config.ConfigProperty;
+import net.dstone.ai.console.service.AiEngineUser;
+import net.dstone.ai.console.service.ConsoleBaseService;
+import net.dstone.ai.console.vo.admin.WorkFlowDecisionRequest;
+import net.dstone.ai.console.vo.admin.WorkFlowExecutionDetailResult;
+import net.dstone.ai.console.vo.admin.WorkFlowExecutionPageResult;
+import net.dstone.ai.console.vo.admin.WorkFlowFileSaveRequest;
 
 /**
  * dstone-ai-engine의 Workflow 실행 조회/승인/일시정지/재개 API(GET /executions, GET /executions/{id}, POST
@@ -20,10 +20,7 @@ import net.dstone.common.config.ConfigProperty;
  * 달리, 이미 시작된 실행을 보고 판단·조작하는 쪽이다.
  */
 @Service
-public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService {
-
-	@Autowired
-	private ConfigProperty configProperty;
+public class WorkFlowAdminService extends ConsoleBaseService {
 
 	/** 엔진 호출마다 로그인 사용자 헤더(X-Dstone-User 등)를 붙입니다. 엔진이 시작한 사람·결정한 사람을 남기고, 남의 실행 조작을 막는 데 씁니다. */
 	@Autowired
@@ -38,7 +35,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param size        한 페이지의 건수
 	 */
 	public WorkFlowExecutionPageResult list(String status, String workflowId, String executionId, boolean mine, int page, int size) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		String requestedBy = mine ? this.aiEngineUser.currentUser() : null;
 		return this.getWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow/executions?status={status}&workflowId={workflowId}&executionId={executionId}&requestedBy={requestedBy}&page={page}&size={size}",
@@ -69,7 +66,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param fromStep    다시 시작할 step id
 	 */
 	public String rewindPoint(String executionId, String fromStep) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		return this.getWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/rewind?fromStep={fromStep}", executionId, fromStep)
 				.headers(this.aiEngineUser.headers())
@@ -86,7 +83,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param clearState  true면 그 step부터 뒤에서 저장한 state 값을 지우고 시작합니다
 	 */
 	public WorkFlowExecutionDetailResult rewind(String executionId, String fromStep, boolean clearState) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("fromStep", fromStep);
 		body.put("clearState", Boolean.valueOf(clearState));
@@ -101,7 +98,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	}
 
 	private WorkFlowExecutionDetailResult control(String executionId, String action) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		return this.getLargeResponseWebClient().post()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/{action}", executionId, action)
 				.headers(this.aiEngineUser.headers())
@@ -112,7 +109,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 
 	/** @param executionId 상세를 조회할 실행 id */
 	public WorkFlowExecutionDetailResult detail(String executionId) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		// 상세 응답에는 실행 컨텍스트가 통째로 들어 있어 커질 수 있다. 기본 한도(256KB)로는 못 받는 경우가 있었다.
 		return this.getLargeResponseWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}", executionId)
@@ -131,7 +128,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param executionId 실행 id
 	 */
 	public String files(String executionId) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		// 개발 step은 소스 파일을 많이 읽어서 목록이 길어질 수 있습니다.
 		return this.getLargeResponseWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/files", executionId)
@@ -148,7 +145,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param path        파일 경로(목록에 나온 값)
 	 */
 	public String fileContent(String executionId, String path) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		// 문서가 256KB를 넘을 수 있어서 큰 응답용 WebClient를 씁니다(엔진은 2MB까지 보내 줍니다).
 		return this.getLargeResponseWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow/executions/{executionId}/files/content?path={path}", executionId, path)
@@ -164,7 +161,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param request 실행 id, 파일 경로, 새 내용, 열 때 받은 hash
 	 */
 	public String saveFileContent(WorkFlowFileSaveRequest request) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("path", request.path());
 		body.put("text", request.text());
@@ -189,7 +186,7 @@ public class WorkFlowAdminService extends net.dstone.boot.common.biz.BaseService
 	 * @param request 결정을 내릴 실행 id와 승인 여부/결정자/사유
 	 */
 	public WorkFlowExecutionDetailResult decide(WorkFlowDecisionRequest request) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("approved", request.approved());

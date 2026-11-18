@@ -1,0 +1,124 @@
+<!DOCTYPE HTML>
+<html>
+
+	<head>
+		<title>Dstone Knowledge</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, 화면 부품은 console-parts.css(둘 다 dstone-common), 코드 분석 화면 부품은 knowledge.css -->
+		<link rel="stylesheet" href="/dstone-console/css/console.css" />
+		<link rel="stylesheet" href="/dstone-console/css/console-parts.css" />
+		<link rel="stylesheet" href="/knowledge/assets/css/knowledge.css" />
+		<!-- 왼쪽 메뉴와 세션 정보(console.js), 코드 분석 메뉴 목록(knowledge-menu.js) -->
+		<script src="/dstone-console/js/console.js"></script>
+		<script src="/knowledge/assets/js/knowledge-menu.js"></script>
+	</head>
+
+<body class="ai-body">
+	<div id="page-wrapper">
+
+			<!-- 왼쪽 메뉴. console.js 가 *-menu.js 의 목록으로 그린다 -->
+			<aside id="header-wrapper" class="cs-sidebar"></aside>
+
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section class="cs-page-head">
+				<p class="cs-eyebrow">코드 분석</p>
+				<h2>영향도</h2>
+				<p>테이블 · 컬럼 · SQL · 클래스 · 메소드, 또는 이번 변경분을 고치면 무엇을 다시 테스트해야 하는지 봅니다.</p>
+			</section>
+
+			<details class="kn-howto">
+				<summary>처음이신가요? 이 화면은 이렇게 씁니다 (눌러서 펴기)</summary>
+				<p>"이것을 고치면 어디를 다시 테스트해야 하지?"에 답하는 화면입니다. 고칠 것을 하나 고르면, 거기서 화면과 주소 쪽으로 거슬러 올라가며 영향받는 곳을 찾아 줍니다.</p>
+				<ol>
+					<li><b>프로젝트와 리비전 고르기</b> — 맨 위에서 고릅니다. 리비전은 분석이 끝난 가장 최근 것이 미리 골라져 있습니다. 프로젝트나 리비전을 바꾸면 ① 대상과 ② 결과가 모두 처음 상태로 돌아갑니다.</li>
+					<li><b>① 대상</b> — 종류(메소드 · 테이블 · 컬럼 · SQL · 클래스 · 변경분)를 고르고 이름을 적은 뒤 "보기"(또는 Enter)를 누릅니다.
+						입력 칸의 흐린 글자가 무엇을 적으면 되는지 알려 줍니다. 후보가 여럿이면 목록에서 밑줄 친 이름을 눌러 하나를 고르고, 하나뿐이면 바로 골라집니다.
+						"변경분"은 이름 대신 견줄 앞 리비전을 고릅니다. 두 번 분석한 사이에 바뀐 코드에서 출발합니다.</li>
+					<li><b>② 결과</b> — 맨 위 숫자 카드 네 개와 한 줄 요약부터 봅니다. 카드 네 개는 아래 구역 네 개와 이름 · 숫자가 같고, 카드를 누르면 그 구역으로 갑니다.
+						<ul>
+							<li><b>다시 테스트할 곳</b>: 확실한 관계(HIGH)로 이어진 진입점(주소 등)과 그 진입점을 부르는 화면입니다. 한 줄(진입점 하나 + 그 화면들)을 한 곳으로 셉니다. 꼭 확인하세요.</li>
+							<li><b>추정 관계</b>: 덜 확실한 관계나 이름만 보고 짐작한 관계가 낀 곳입니다. 접혀 있으니 눌러서 펴 보세요.</li>
+							<li><b>건드리는 데이터</b>: 대상이 읽고 쓰는 테이블입니다. 테이블 · 컬럼이 대상이면 그것을 쓰는 SQL 수를 셉니다.</li>
+							<li><b>확인 필요</b>: 분석이 놓쳤을 수 있는 호출입니다. 0이면 놓친 곳이 없다는 뜻입니다.</li>
+						</ul>
+						줄마다 <b>[왜?]</b>를 누르면 왜 다시 테스트해야 하는지, 추정이면 무엇 때문에 확실하지 않은지(근거가 된 소스 줄과 확인할 것)가 나옵니다.</li>
+					<li><b>옮겨 다니기</b> — 결과에서 <a href="javascript:void(0)" class="kn-retarget" tabindex="-1">밑줄 친 이름</a>을 누르면 그것이 새 대상이 됩니다.
+						지나온 대상은 머리글 아래 "지나온 대상" 줄에 남아 있어 눌러서 돌아갈 수 있고, 브라우저의 뒤로 가기도 됩니다.
+						지금 보고 있는 상태가 주소창에 남으므로 주소를 복사해 다른 사람에게 그대로 보여 줄 수도 있습니다.</li>
+					<li><b>더 보기</b> — 테이블 · 컬럼이 대상이면 머리글 오른쪽의 "SQL" 칸에서 "쓰기만"을 골라 그것을 <b>고치는</b> 기능만 볼 수 있습니다.
+						호출 흐름을 그림으로 보려면 <b>관계 트리 보기</b>를 누릅니다. 새 창(관계 트리 창)에 열립니다.</li>
+				</ol>
+				예시 (누르면 종류와 이름이 채워집니다. <code>struts-app</code> 표본 기준이니 프로젝트는 직접 고르고 "보기"를 누르세요):
+				<span class="kn-example" data-fill='{"kn-find-kind":"table","kn-find-name":"TB_BOARD"}'>테이블 TB_BOARD</span>
+				<span class="kn-example" data-fill='{"kn-find-kind":"column","kn-find-name":"TB_BOARD.TITLE"}'>컬럼 TB_BOARD.TITLE</span>
+				<span class="kn-example" data-fill='{"kn-find-kind":"statement","kn-find-name":"Board.deleteBoard"}'>SQL Board.deleteBoard</span>
+				<span class="kn-example" data-fill='{"kn-find-kind":"method","kn-find-name":"BoardDAO#deleteBoard"}'>메소드 deleteBoard</span>
+			</details>
+
+			<section class="ai-panel kn-scope">
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="kn-impact-project">프로젝트</label></th>
+						<td><select id="kn-impact-project"></select></td>
+						<th><label for="kn-impact-revision">리비전</label></th>
+						<td><select id="kn-impact-revision"></select></td>
+					</tr>
+				</table>
+			</section>
+
+			<section class="ai-panel">
+				<h3>① 대상</h3>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col class="kn-find-kindcol" /><col /><col class="ai-form-btncol" /></colgroup>
+					<tr>
+						<th><label for="kn-find-kind">종류</label></th>
+						<td><select id="kn-find-kind">
+								<option value="method">메소드</option>
+								<option value="table">테이블</option>
+								<option value="column">컬럼</option>
+								<option value="statement">SQL</option>
+								<option value="type">클래스</option>
+								<option value="changes">변경분</option>
+							</select></td>
+						<td><input type="text" id="kn-find-name" /><select id="kn-find-base" hidden></select></td>
+						<td class="ai-form-btn"><button type="button" id="kn-find-btn">보기</button></td>
+					</tr>
+				</table>
+				<div id="kn-find-message" class="kn-message"></div>
+				<div id="kn-find-table" class="kn-scroll kn-find-list"></div>
+			</section>
+
+			<section class="ai-panel" id="kn-result-panel" hidden>
+				<h3>② 결과</h3>
+				<div id="kn-target-head"></div>
+				<div id="kn-trail" class="kn-trail"></div>
+				<div id="kn-impact-message" class="kn-message"></div>
+				<div id="kn-impact-body"></div>
+			</section>
+
+					 </div>
+				</div>
+			</div>
+		</div>
+
+			<footer id="footer-wrapper" class="cs-footer">
+				<span>Dstone Knowledge</span>
+				<span>dstone-knowledge · 코드 분석</span>
+			</footer>
+
+	</div>
+
+	<script src="/knowledge/assets/js/knowledge-common.js"></script>
+	<script src="/knowledge/assets/js/impact.js"></script>
+	<script>
+		DstoneKnowledge.init("");
+		DstoneKnowledgeImpact.init();
+	</script>
+</body>
+</html>

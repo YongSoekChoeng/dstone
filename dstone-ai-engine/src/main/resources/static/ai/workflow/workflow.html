@@ -1,0 +1,125 @@
+<!DOCTYPE HTML>
+<html>
+
+	<head>
+		<title>Dstone AI</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, 화면 부품은 console-parts.css. 둘 다 dstone-common 에 들어 있다 -->
+		<link rel="stylesheet" href="/dstone-console/css/console.css" />
+		<link rel="stylesheet" href="/dstone-console/css/console-parts.css" />
+		<!-- 왼쪽 메뉴와 세션 정보(console.js), AI 메뉴 목록(ai-menu.js) -->
+		<script src="/dstone-console/js/console.js"></script>
+		<script src="/ai/assets/js/ai-menu.js"></script>
+		<!-- 상태 이름(완료, 승인 대기 …)과 step 종류 이름을 화면들이 같이 쓴다 -->
+		<script src="/ai/assets/js/ai-common.js"></script>
+		<!-- 목록 표의 칸 너비를 고정하고 머리 칸 경계를 끌어서 바꾸게 한다 -->
+		<script src="/ai/assets/js/ai-table.js"></script>
+	</head>
+
+<body class="ai-body">
+	<div id="page-wrapper">
+
+			<!-- 왼쪽 메뉴. console.js 가 *-menu.js 의 목록으로 그린다 -->
+			<aside id="header-wrapper" class="cs-sidebar"></aside>
+
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section class="cs-page-head">
+				<h2>Workflow 테스트</h2>
+				<p>Workflow 하나를 골라 입력값을 넣고 실행해 봅니다. 실행은 엔진에서 따로 돌고, 이 화면은 5초마다 상태를 확인해 끝나면 결과를 보여 줍니다.
+					승인을 기다리는 실행은 <a href="/ai/admin/workflow/workflow.html">Workflow 실행 관리</a>에서 승인하거나 반려합니다.</p>
+				<details class="ai-dev-note">
+					<summary>개발자용: 이 화면이 부르는 API</summary>
+					<p><code>GET /api/ai/workflow</code>(목록), <code>POST /api/ai/workflow/{workflowId}/submit</code>(실행, executionId를 바로 돌려줌),
+						<code>GET /api/ai/workflow/executions/{executionId}</code>(상태). 상태는 QUEUED → RUNNING → DONE / FAILED / WAITING_APPROVAL 순으로 바뀝니다.</p>
+				</details>
+			</section>
+
+			<section class="ai-panel">
+				<h3>실행할 Workflow</h3>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th><label for="workflow-id">Workflow</label></th>
+						<td><select id="workflow-id"></select>
+							<p id="workflow-id-desc" class="ai-hint"></p></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-input">입력값</label></th>
+						<td><p id="workflow-input-schema" class="ai-hint"></p>
+							<textarea id="workflow-input" class="workflow-textarea" placeholder="예: SELECT 1 FROM dual"></textarea>
+							<p id="workflow-sample-note" class="ai-hint"></p></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-session-id">세션 ID</label></th>
+						<td><input type="text" id="workflow-session-id" placeholder="(선택) 비우면 새로 만듭니다. 이전 실행의 대화를 이어 가려면 그 세션 ID를 적습니다" /></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
+					<span id="workflow-submit-status" class="workflow-status"></span>
+					<button type="button" id="workflow-submit-btn">실행</button>
+				</div>
+			</section>
+
+			<section class="ai-panel">
+				<h3>실행 상태</h3>
+				<table class="ai-form">
+					<colgroup><col class="ai-form-name" /><col /><col class="ai-form-name" /><col /></colgroup>
+					<tr>
+						<th>실행 ID</th>
+						<td><span id="workflow-job-id" class="workflow-job-id">-</span></td>
+						<th>상태</th>
+						<td><span id="workflow-status-badge" class="workflow-badge">-</span></td>
+					</tr>
+					<tr>
+						<th><label for="workflow-result">결과 / 오류</label></th>
+						<td colspan="3"><textarea id="workflow-result" class="workflow-textarea" readonly></textarea></td>
+					</tr>
+				</table>
+				<div class="ai-form-actions">
+					<button type="button" id="workflow-poll-stop-btn" class="kn-plain" disabled>자동 확인 멈추기</button>
+					<button type="button" id="workflow-poll-refresh-btn" disabled>지금 새로고침</button>
+				</div>
+			</section>
+
+			<section class="ai-panel">
+				<h3>이 화면에서 실행한 것</h3>
+				<p class="ai-hint">이 화면을 새로고침하면 사라지는 목록입니다(서버에 남는 기록은 Workflow 실행 관리에서 봅니다). 실행 ID를 누르면 그 실행의 상태를 다시 확인합니다.</p>
+				<table id="workflow-history-table" class="document-list-table">
+					<thead>
+						<tr>
+							<th>실행 시각</th>
+							<th>Workflow</th>
+							<th>실행 ID</th>
+							<th>상태</th>
+						</tr>
+					</thead>
+					<tbody id="workflow-history-body"></tbody>
+				</table>
+			</section>
+					</div>
+				</div>
+			</div>
+		</div>
+
+			<footer id="footer-wrapper" class="cs-footer">
+				<span>Dstone AI</span>
+				<span>dstone-ai-engine</span>
+			</footer>
+
+	</div>
+
+	<script src="/ai/assets/js/workflow.js"></script>
+	<script>
+		DstoneAiWorkflow.init({
+			listUrl: "/ai/workflow/list.do",
+			submitUrl: "/ai/workflow/submit.do",
+			statusUrl: "/ai/workflow/status.do"
+		});
+	</script>
+</body>
+</html>

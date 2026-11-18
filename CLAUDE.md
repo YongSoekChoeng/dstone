@@ -105,9 +105,10 @@ cd dstone-common && mvn -q exec:java -Dexec.mainClass=net.dstone.common.utils.En
 
 ### Security
 
-- **dstone-boot**: Spring Security enabled (`spring.security.enabled: true`), with custom auth handlers in `net.dstone.boot.common.security`, OAuth2 social login (Google/Naver/Kakao), and Redis-based distributed sessions (`dstone:session` namespace).
+- **dstone-boot**: Spring Security enabled (`spring.security.enabled: true`), with custom auth handlers in `net.dstone.boot.common.security`, OAuth2 social login (Google/Naver/Kakao), and Redis-based distributed sessions (`dstone:session` namespace) — but the Boot 4 Spring Session auto-config module is not on the classpath, so sessions are really Tomcat in-memory (checked 2026-11-18).
 - **dstone-batch**: Spring Security excluded via `spring.autoconfigure.exclude`.
 - **dstone-knowledge**: Spring Security excluded the same way. `common.security.ApiKeyAuthFilter` (`X-API-Key`, `dstone.knowledge.security.auth.enabled`, default off, `/api/system/health` exempt) sets the caller in `CallerContext`; the caller is the tenant of uploaded general documents only — code analysis results are not split per caller.
+- **Consoles (AI screens in dstone-ai-engine, Knowledge screens in dstone-knowledge, since 2026-11-18)**: static HTML under each module's `src/main/resources/static/{ai,knowledge}/`, shared look/sidebar in `dstone-common` `META-INF/resources/dstone-console/`. `dstone-common` `web.console.ConsoleSessionFilter` sets the session user: `dstone.{ai,knowledge}.console.login.enabled` off → configured default user; on → only via dstone-boot `/sso/go.do?target=…` (`common.sso.SsoController`, one-time encrypted `ssoToken`). Session cookies must not be named `JSESSIONID` (cookies ignore ports). Details: `docs/09` 18장, `docs/11` 4장, `docs/06` 10장.
 - **dstone-ai-engine**: Spring Security (and its Actuator management-endpoint security) excluded via `spring.autoconfigure.exclude` — no Spring Security filter chain. Auth is instead a lightweight opt-in servlet filter, `common.security.ApiKeyAuthFilter` (`X-API-Key` header, `dstone.ai.security.auth.enabled`), paired with `common.security.RateLimitFilter` (`dstone.ai.security.ratelimit.enabled`).
 
 ### dstone-boot: Multiple Datasources
@@ -223,7 +224,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro, 
 | `knowledge-core.md` | 설계 원칙, Job 모델, DECLARE/타입 해석/RESOLVE/LINK/SEMANTIC/RAG Pass, 비Java 리소스, 행 방지, DB 접근 |
 | `knowledge-screens-rich-client.md` | WebSquare/Nexacro 화면, Vue/React 화면(`SpaLinker`), 호출·필드·오픈 규칙, 공통 스크립트, Query XML, 설정 기반 레이어, TRANSACTION 엔드포인트 |
 | `knowledge-search-incremental.md` | 하이브리드 검색, 영향도 분석, 일반 문서 업로드, `rerunFrom`, 증분 분석, 리비전 비교, 보관 정책 |
-| `knowledge-ui.md` | `dstone-boot`의 Knowledge 화면(첫 화면 대시보드, 프로젝트 · 분석의 2단 + 탭 구성과 미사용 탭 포함), 프록시, 콘솔 디자인, 노드 맵, 테이블 한글명 우선순위 |
+| `knowledge-ui.md` | Knowledge 화면(이 모듈의 `static/knowledge`, 2026-11-18 dstone-boot에서 옮김. 첫 화면 대시보드, 프로젝트 · 분석의 2단 + 탭 구성과 미사용 탭 포함), 콘솔 디자인, 노드 맵, 테이블 한글명 우선순위 |
 
 
 ## Required Infrastructure
@@ -249,7 +250,7 @@ Java 애플리케이션(Spring과 레거시 plain Java, JSP, WebSquare/Nexacro, 
 | `REDIS_HOST` / `REDIS_PORT` | Redis server |
 | `RABBITMQ_HOST` / `RABBITMQ_PORT` | RabbitMQ server (dstone-boot) |
 | `FILE_UPLOAD_ROOT` | File upload root path (dstone-boot) |
-| `KNOWLEDGE_HOST` / `KNOWLEDGE_PORT` | dstone-ai-engine and dstone-boot: where `dstone-knowledge` listens (`localhost` locally, the kind bridge gateway `172.18.0.1` in `env-k8s.properties`); used by `dstone.ai.tool.knowledge.base-url` (ai-engine Tool and RAG) and `interface.knowledge.base-url` (dstone-boot screens) |
+| `KNOWLEDGE_HOST` / `KNOWLEDGE_PORT` | dstone-ai-engine: where `dstone-knowledge` listens (`localhost` locally, the kind bridge gateway `172.18.0.1` in `env-k8s.properties`); used by `dstone.ai.tool.knowledge.base-url` (ai-engine Tool and RAG). Browser-facing app URLs are not env vars: `interface.sso.targets.*` (boot) and `dstone.*.console.urls.*` |
 | `MCP_STDIO_COMMAND_PREFIX` | dstone-ai-engine only, Windows-only: tokens prepended to every STDIO MCP server's command (e.g. `cmd.exe /c`) so `.cmd`/`.bat`-based commands like `npx` can be launched — `ProcessBuilder` can't run them directly on Windows without going through the command interpreter. Unset on Linux/WSL/k8s. |
 
 Jasypt's decryption key is **not** an env var — see "Sensitive Config Encryption" above.

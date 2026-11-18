@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo.admin;
+package net.dstone.ai.console.vo.admin;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * 채팅 화면이 고를 수 있는 Tool 한 개. dstone-ai-engine의 GET /api/ai/chat 응답의 availableTools 항목과

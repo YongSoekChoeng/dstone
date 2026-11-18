@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 import java.util.List;
 
@@ -6,8 +6,8 @@ import java.util.List;
  * /ai/chat/sendMessage.do 요청 바디.
  *
  * input은 선택한 Agent의 input 모양이어야 한다 - 보통은 입력창의 글자 그대로이고, Agent input이 object면
- * 화면이 입력창 글자를 JSON으로 읽어서 객체로 보낸다(/ai/chat/list.do가 돌려주는 input 스키마로 판단). sessionId는 화면에서 받지 않는다 - dstone-boot가 로그인 사용자
- * ID를 자체 sessionId로 써서 dstone-ai-engine에 넘기므로 클라이언트가 관리할 필요가 없다.
+ * 화면이 입력창 글자를 JSON으로 읽어서 객체로 보낸다(/ai/chat/list.do가 돌려주는 input 스키마로 판단). sessionId는 화면에서 받지 않는다 - ChatService가 세션 사용자
+ * ID를 sessionId로 써서 엔진 API에 넘기므로 클라이언트가 관리할 필요가 없다.
  *
  * agent는 비워서 보내면(null/빈 문자열) 기본 Agent(ChatService.AGENT, sample-general-chat)를 그대로
  * 쓰고, 채워서 보내면(화면의 agent 드롭다운에서 고른 값) 이번 메시지 한 번만 그 Agent로 호출한다 -

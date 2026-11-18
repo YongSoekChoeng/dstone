@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * dstone-ai-engine의 GET /api/ai/workflow/executions/{executionId} 응답과 JSON 모양만 맞춘 VO다 - 실제

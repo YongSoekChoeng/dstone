@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * /ai/workflow/submit.do 요청 바디. dstone-ai-engine의 POST /api/ai/workflow/{workflowId}/submit을

@@ -1,33 +1,26 @@
-package net.dstone.boot.ai.service;
+package net.dstone.ai.console.service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
-import net.dstone.boot.ai.vo.AgentSummaryCallResult;
-import net.dstone.boot.ai.vo.AgentSummaryResult;
-import net.dstone.boot.ai.vo.ToolSummaryResult;
-import net.dstone.boot.common.security.vo.CustomUserDetails;
-import net.dstone.boot.common.web.SessionListener;
-import net.dstone.common.config.ConfigProperty;
+import net.dstone.ai.console.vo.AgentSummaryCallResult;
+import net.dstone.ai.console.vo.AgentSummaryResult;
+import net.dstone.ai.console.vo.ToolSummaryResult;
+import net.dstone.common.web.console.ConsoleSessionFilter;
+import net.dstone.common.web.console.SessionUser;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 @Service
-public class ChatService extends net.dstone.boot.common.biz.BaseService {
+public class ChatService extends ConsoleBaseService {
 
 	private static final String AGENT = "sample-general-chat";
-
-	@Autowired
-	private ConfigProperty configProperty;
 
 	/**
 	 * 등록된 Agent의 id, description, 고를 수 있는 Tool 목록을 조회한다("채팅" 화면의 agent 드롭다운과 Tool 선택 칸용).
@@ -35,7 +28,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 	 * GET /api/ai/chat을 그대로 받아와 화면용 VO로 옮겨 담기만 한다.
 	 */
 	public List<AgentSummaryResult> listAgents() {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 
 		AgentSummaryCallResult[] results = this.getWebClient().get()
 				.uri(baseUrl + "/api/ai/chat")
@@ -55,8 +48,8 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 
 	/**
 	 * dstone-ai-engine의 POST /api/ai/chat/stream을 그대로 흘려보낸다. sessionId는 화면에서 받지 않고
-	 * 로그인 사용자 ID를 그대로 쓴다 - 사용자 한 명당 대화가 하나 계속 이어지는 구조다(멀티 대화방 아님).
-	 * dstone-boot ↔ dstone-ai-engine은 서버 대 서버 호출이라 쿠키가 전달되지 않으므로, sessionId를
+	 * 세션 사용자 id를 쓴다(resolveSessionId) - 사용자 한 명당 대화가 하나 계속 이어지는 구조다(멀티 대화방 아님).
+	 * 엔진 API는 HTTP로 부르므로 브라우저 쿠키가 전달되지 않는다. 그래서 sessionId를
 	 * 매 요청 명시적으로 실어 보내야 대화가 끊기지 않는다.
 	 *
 	 * agent는 화면의 agent 드롭다운 값을 그대로 받는다 - 비어 있으면 기본값(AGENT, sample-general-chat)을
@@ -82,7 +75,7 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 			body.put("model", model);
 		}
 
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 
 		return this.getWebClient().post()
 				.uri(baseUrl + "/api/ai/chat/stream")
@@ -93,10 +86,21 @@ public class ChatService extends net.dstone.boot.common.biz.BaseService {
 				.bodyToFlux(String.class);
 	}
 
+	/**
+	 * <pre>
+	 * 대화를 이어 갈 세션 id. dstone-boot 에서 넘어온 사용자면 로그인 id 그대로라, 사람마다 대화 하나가 계속 이어진다.
+	 * 로그인을 끈 기본 사용자는 여러 사람이 같은 id 를 쓰므로 브라우저 세션 id 를 붙여 대화가 섞이지 않게 한다.
+	 * </pre>
+	 */
 	private String resolveSessionId(HttpServletRequest servletRequest) {
-		HttpSession session = servletRequest.getSession(true);
-		CustomUserDetails userDetails = (CustomUserDetails) session.getAttribute(SessionListener.USER_LOGIN_SESSION_KEY);
-		return userDetails.getUsername();
+		SessionUser user = ConsoleSessionFilter.currentUser(servletRequest);
+		if (user == null) {
+			return "anonymous:" + servletRequest.getSession(true).getId();
+		}
+		if ("DEFAULT".equals(user.getSource())) {
+			return user.getUserId() + ":" + servletRequest.getSession(true).getId();
+		}
+		return user.getUserId();
 	}
 
 }

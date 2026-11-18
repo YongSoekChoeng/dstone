@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * /ai/workflow/submit.do 응답. dstone-ai-engine 호출이 성공하면 executionId가, 실패하면(잘못된 workflowId,

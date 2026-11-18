@@ -1,8 +1,8 @@
 /**
  * "코드 분석(Knowledge)" 화면들이 같이 쓰는 도우미입니다.
  *
- * dstone-knowledge 의 API 는 브라우저가 직접 부르지 않고 dstone-boot 의 /knowledge/api/call.do 를 거칩니다
- * (knowledge.controller.KnowledgeProxyController). 그래서 화면에서는 call("GET", "/api/projects") 처럼 부릅니다.
+ * 화면은 dstone-knowledge 가 직접 내려주므로 API(/api/**)도 같은 서버에 바로 부릅니다. 예: call("GET", "/api/projects").
+ * 화면을 연 사람(세션)은 common.web.ConfigConsole 의 ConsoleSessionFilter 가 정합니다.
  */
 var DstoneKnowledge = (function () {
 
@@ -270,11 +270,21 @@ var DstoneKnowledge = (function () {
 	 * 성공하면 응답 JSON 을, 실패하면(4xx/5xx) 서버가 준 message 를 담은 Error 를 돌려줍니다.
 	 */
 	function call(method, path, query, body) {
-		return fetch(contextPath + "/knowledge/api/call.do", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ method: method, path: path, query: query || null, body: body || null })
-		}).then(readResponse);
+		var params = new URLSearchParams();
+		Object.keys(query || {}).forEach(function (key) {
+			var value = query[key];
+			// 값이 비어 있는 것은 붙이지 않는다
+			if (value !== null && value !== undefined && String(value).trim() !== "") {
+				params.append(key, String(value).trim());
+			}
+		});
+		var url = contextPath + path + (params.toString() ? "?" + params.toString() : "");
+		var options = { method: method, headers: { "Accept": "application/json" } };
+		if (body && method === "POST") {
+			options.headers["Content-Type"] = "application/json";
+			options.body = JSON.stringify(body);
+		}
+		return fetch(url, options).then(readResponse);
 	}
 
 	/** 파일을 올립니다(multipart). fields 는 같이 보낼 값들: {sourceId, title, collection} */
@@ -286,7 +296,7 @@ var DstoneKnowledge = (function () {
 				form.append(key, fields[key]);
 			}
 		});
-		return fetch(contextPath + "/knowledge/api/upload.do", { method: "POST", body: form }).then(readResponse);
+		return fetch(contextPath + "/api/documents", { method: "POST", body: form }).then(readResponse);
 	}
 
 	function readResponse(response) {
@@ -493,9 +503,9 @@ var DstoneKnowledge = (function () {
 		});
 	}
 
-	/** 다른 화면의 주소. link 는 defaultLink 값(예: knowledge/graph/graph), hash 는 # 뒤에 붙일 글(없으면 빈 글) */
+	/** 다른 화면의 주소. link 는 화면 경로(예: knowledge/graph/graph), hash 는 # 뒤에 붙일 글(없으면 빈 글) */
 	function pageUrl(link, hash) {
-		return contextPath + "/defaultLink.do?defaultLink=" + encodeURIComponent(link) + (hash ? "#" + hash : "");
+		return contextPath + "/" + link + ".html" + (hash ? "#" + hash : "");
 	}
 
 	/** 주소의 #키=값&키=값 을 {키: 값} 으로 읽는다 */

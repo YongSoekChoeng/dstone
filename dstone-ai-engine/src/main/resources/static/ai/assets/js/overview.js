@@ -123,7 +123,7 @@ var DstoneAiOverview = (function () {
 		}
 		countEl.textContent = shown.length + "개";
 		if (shown.length === 0) {
-			listEl.innerHTML = "<p class=\"ov-empty\">등록된 Workflow가 없습니다. <a href=\"" + urls.linkBase + "ai/designer/designer\">디자이너</a>에서 새로 만들 수 있습니다.</p>";
+			listEl.innerHTML = "<p class=\"ov-empty\">등록된 Workflow가 없습니다. <a href=\"" + urls.linkBase + "ai/designer/designer.html\">디자이너</a>에서 새로 만들 수 있습니다.</p>";
 			return;
 		}
 		var html = "";
@@ -147,8 +147,8 @@ var DstoneAiOverview = (function () {
 			+ "<p class=\"ov-flow-meta\">" + esc(summary(steps)) + "</p>"
 			+ "</div>"
 			+ "<div class=\"ov-flow-links\">"
-			+ "<a href=\"" + urls.linkBase + "ai/workflow/workflow#" + encodeURIComponent(id) + "\">실행해 보기</a>"
-			+ "<a href=\"" + urls.linkBase + "ai/designer/designer#" + encodeURIComponent(id) + "\">흐름 열기</a>"
+			+ "<a href=\"" + urls.linkBase + "ai/workflow/workflow.html#" + encodeURIComponent(id) + "\">실행해 보기</a>"
+			+ "<a href=\"" + urls.linkBase + "ai/designer/designer.html#" + encodeURIComponent(id) + "\">흐름 열기</a>"
 			+ "</div>"
 			+ "</article>";
 		return html;
@@ -299,7 +299,7 @@ var DstoneAiOverview = (function () {
 			parts.push("<span>실행 중 " + counts.RUNNING + "</span>");
 			parts.push("<span>대기 중 " + counts.QUEUED + "</span>");
 			if (counts.WAITING_APPROVAL > 0) {
-				parts.push("<a class=\"ov-status-item ov-status-warn\" href=\"" + urls.linkBase + "ai/admin/workflow/workflow\">승인 대기 " + counts.WAITING_APPROVAL + "건, 확인하러 가기</a>");
+				parts.push("<a class=\"ov-status-item ov-status-warn\" href=\"" + urls.linkBase + "ai/admin/workflow/workflow.html\">승인 대기 " + counts.WAITING_APPROVAL + "건, 확인하러 가기</a>");
 			} else {
 				parts.push("<span>승인 대기 0</span>");
 			}

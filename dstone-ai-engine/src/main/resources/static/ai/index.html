@@ -1,0 +1,100 @@
+<!DOCTYPE HTML>
+<html>
+
+	<head>
+		<title>Dstone AI</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, 화면 부품은 console-parts.css. 둘 다 dstone-common 에 들어 있다 -->
+		<link rel="stylesheet" href="/dstone-console/css/console.css" />
+		<link rel="stylesheet" href="/dstone-console/css/console-parts.css" />
+		<!-- 왼쪽 메뉴와 세션 정보(console.js), AI 메뉴 목록(ai-menu.js) -->
+		<script src="/dstone-console/js/console.js"></script>
+		<script src="/ai/assets/js/ai-menu.js"></script>
+		<!-- 상태 이름(완료, 승인 대기 …)과 step 종류 이름을 화면들이 같이 쓴다 -->
+		<script src="/ai/assets/js/ai-common.js"></script>
+		<!-- 목록 표의 칸 너비를 고정하고 머리 칸 경계를 끌어서 바꾸게 한다 -->
+		<script src="/ai/assets/js/ai-table.js"></script>
+	</head>
+
+<body class="ai-body">
+	<div id="page-wrapper">
+
+			<!-- 왼쪽 메뉴. console.js 가 *-menu.js 의 목록으로 그린다 -->
+			<aside id="header-wrapper" class="cs-sidebar"></aside>
+
+		<!-- Main -->
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section class="cs-page-head">
+				<h2>AI 엔진</h2>
+				<p>업무 절차를 Workflow로 정해 두면 순서, 갈림길, 사람의 승인은 엔진이 지키고 각 단계의 판단은 AI Agent가 맡습니다.</p>
+				<!-- 엔진 연결, Workflow 수, 실행 현황을 한 줄로. 평소엔 조용하고, 승인 대기나 연결 문제가 있을 때만 색이 붙는다(overview.js) -->
+				<p id="ov-status" class="ov-status" aria-live="polite">엔진 상태를 확인하고 있습니다…</p>
+			</section>
+
+			<div class="ov-grid">
+				<section class="ai-panel ov-flows">
+					<div class="ov-flows-head">
+						<h3>Workflow <span id="ov-flow-count" class="ov-count"></span></h3>
+						<div id="ov-folders" class="ov-folders" role="group" aria-label="폴더로 좁히기"></div>
+					</div>
+					<!-- 띠의 색이 무엇인지. 띠 한 칸 = step 하나, 정의 파일에 적힌 순서 -->
+					<ul class="ov-legend" aria-label="step 종류">
+						<li><i class="ov-seg ov-seg-AGENT"></i>Agent가 판단</li>
+						<li><i class="ov-seg ov-seg-SUPERVISOR"></i>결과 검토</li>
+						<li><i class="ov-seg ov-seg-ROUTER"></i>갈림길</li>
+						<li><i class="ov-seg ov-seg-TOOL"></i>도구 실행</li>
+						<li><i class="ov-seg ov-seg-APPROVAL"></i>사람이 승인</li>
+						<li><i class="ov-seg ov-seg-TOOL ov-seg-each"></i>항목마다 반복</li>
+					</ul>
+					<div id="ov-flow-list" class="ov-flow-list">
+						<p class="ov-empty">Workflow 목록을 불러오고 있습니다…</p>
+					</div>
+				</section>
+
+				<aside class="ov-side">
+					<section class="ai-panel">
+						<div class="ov-side-head">
+							<h3>최근 실행</h3>
+							<a href="/ai/admin/workflow/workflow.html">실행 관리</a>
+						</div>
+						<ol id="ov-runs" class="ov-runs">
+							<li class="ov-empty">불러오고 있습니다…</li>
+						</ol>
+					</section>
+
+					<section class="ai-panel ov-chat">
+						<h3>Agent와 대화하기</h3>
+						<p>등록된 Agent에게 바로 물어봅니다. 올린 문서나 분석해 둔 소스 코드를 찾아 보고 답하게 할 수 있습니다.</p>
+						<div class="ov-chat-actions">
+							<a class="cs-btn" href="/ai/chat/chat.html">채팅 열기</a>
+							<a href="#" data-app-link="knowledge:/knowledge/search/search.html">참고 문서 올리기</a>
+						</div>
+					</section>
+				</aside>
+			</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+			<footer id="footer-wrapper" class="cs-footer">
+				<span>Dstone AI</span>
+				<span>dstone-ai-engine</span>
+			</footer>
+
+	</div>
+
+	<script src="/ai/assets/js/overview.js"></script>
+	<script>
+		DstoneAiOverview.init({
+			workflowsUrl: "/ai/overview/workflows.do",
+			runsUrl: "/ai/admin/workflow/list.do",
+			linkBase: "/"
+		});
+	</script>
+</body>
+</html>

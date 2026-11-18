@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.service;
+package net.dstone.ai.console.service;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,13 +10,12 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
-import net.dstone.boot.ai.vo.WorkFlowOverviewResult;
-import net.dstone.boot.ai.vo.WorkFlowSummaryResult;
-import net.dstone.common.config.ConfigProperty;
+import net.dstone.ai.console.vo.WorkFlowOverviewResult;
+import net.dstone.ai.console.vo.WorkFlowSummaryResult;
 
 /**
  * <pre>
- * AI 개요 화면(views/ai/index.jsp)에 보여 줄 Workflow 요약을 만듭니다.
+ * AI 개요 화면(static/ai/index.html)에 보여 줄 Workflow 요약을 만듭니다.
  *
  * 엔진의 Workflow 목록(GET /api/ai/workflow)에는 id와 설명만 있어서,
  * Workflow마다 정의 원문(GET /api/ai/definitions/workflows/{id})을 읽어 step의 종류와 순서만 뽑습니다.
@@ -27,10 +26,7 @@ import net.dstone.common.config.ConfigProperty;
  * </pre>
  */
 @Service
-public class AiOverviewService extends net.dstone.boot.common.biz.BaseService {
-
-	@Autowired
-	private ConfigProperty configProperty;
+public class AiOverviewService extends ConsoleBaseService {
 
 	/** Workflow 목록은 테스트 화면과 같은 것을 씁니다(같은 caller 규칙). */
 	@Autowired
@@ -38,7 +34,7 @@ public class AiOverviewService extends net.dstone.boot.common.biz.BaseService {
 
 	/** @return 엔진에 등록된 Workflow마다 step 요약을 붙인 목록 */
 	public List<WorkFlowOverviewResult> workflows() {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		List<WorkFlowOverviewResult> results = new ArrayList<WorkFlowOverviewResult>();
 		for (WorkFlowSummaryResult summary : this.workFlowTestService.listWorkflows()) {
 			List<WorkFlowOverviewResult.Step> steps = new ArrayList<WorkFlowOverviewResult.Step>();
@@ -62,7 +58,7 @@ public class AiOverviewService extends net.dstone.boot.common.biz.BaseService {
 	 * @return step 목록. 정의를 못 읽으면 error에 이유를 담습니다
 	 */
 	public WorkFlowOverviewResult workflowSteps(String workflowId) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 		List<WorkFlowOverviewResult.Step> steps = new ArrayList<WorkFlowOverviewResult.Step>();
 		String error = null;
 		try {

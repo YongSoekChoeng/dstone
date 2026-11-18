@@ -3,6 +3,12 @@ server:
     error:
         whitelabel:
             enabled: true
+    servlet:
+        session:
+            # 화면(코드 분석 콘솔)의 세션. 쿠키는 포트를 가리지 않아서 dstone-boot(JSESSIONID)와 이름이 같으면 서로 덮어쓴다.
+            cookie:
+                name: DSTONE_KNOWLEDGE_SESSION
+            timeout: 120m
 
 spring:
     main:
@@ -233,3 +239,27 @@ dstone:
                 #       caller: sample-si-project
                 #     - key: ENC(...)
                 #       caller: another-caller
+
+        ##########################################################################################
+        # <화면(코드 분석 콘솔)>
+        # 화면은 이 앱이 직접 내려준다(src/main/resources/static/knowledge/**, 첫 화면 http://localhost:4081/).
+        # 화면을 연 사람은 dstone-common 의 ConsoleSessionFilter 가 정한다(common.web.ConfigConsole).
+        # login.enabled: false 면 로그인 없이 default-user 로 쓴다(혼자 띄워 쓸 때).
+        #                true 면 dstone-boot 메뉴의 링크로만 들어온다. dstone-boot 의 로그인 사용자가 그대로 넘어온다.
+        #                세션이 없으면 dstone-boot 의 /sso/go.do 로 보내 로그인 정보를 받아 온다.
+        # caller: 로그인을 켜고 API 키 인증(security.auth)도 켰을 때, 화면이 올린 문서의 호출자 이름.
+        # urls: 브라우저가 여는 각 앱의 주소. 왼쪽 메뉴의 "dstone-boot로 돌아가기"와 앱 사이 링크에 쓴다.
+        ##########################################################################################
+        console:
+            login:
+                enabled: false
+                token-max-age-seconds: 60
+                default-user:
+                    id: local
+                    name: 로컬 사용자
+                    admin: true
+            caller: dstone-console
+            urls:
+                boot: http://localhost:7081
+                ai: http://localhost:8081
+                knowledge: http://localhost:4081

@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo.admin;
+package net.dstone.ai.console.vo.admin;
 
 /**
  * /ai/admin/workflow/decision.do 요청 바디. dstone-ai-engine의 POST /api/ai/workflow/executions/{executionId}/decision을

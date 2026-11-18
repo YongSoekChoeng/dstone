@@ -161,8 +161,18 @@
 				<targetPath>${project.basedir}/target/classes</targetPath>
 				<excludes>
 					<exclude>**/*.java</exclude>
+					<!-- 화면 자원(JS 라이브러리, 글꼴)은 ${...}/@...@ 치환을 하면 깨진다. 아래 resource 로 그대로 복사한다 -->
+					<exclude>static/**</exclude>
 				</excludes>
 				<filtering>true</filtering>
+			</resource>
+			<resource>
+				<directory>src/main/resources</directory>
+				<targetPath>${project.basedir}/target/classes</targetPath>
+				<includes>
+					<include>static/**</include>
+				</includes>
+				<filtering>false</filtering>
 			</resource>
 		</resources>
 		<plugins>

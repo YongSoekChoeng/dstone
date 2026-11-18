@@ -376,6 +376,8 @@
                 <targetPath>${project.basedir}/target/classes</targetPath>
 				<excludes>
 					<exclude>**/*.java</exclude>
+            		<!-- 화면 자원(JS 라이브러리, 글꼴)은 ${...}/@...@ 치환을 하면 깨진다. 아래 resource 로 그대로 복사한다 -->
+            		<exclude>META-INF/resources/**</exclude>
 					<!-- Resources Replacement(Ones in conf directory should be used instead.) Start  -->
 					<!-- 로컬환경에서는 주석처리하지만 서버환경에서는 주석제거해야하는 부분(설정파일이 war에 들어가게 되면 conf안의 파일보다 해당 설정을 먼저 읽어버리는 경우가 있음.)  시작 -->
 					<!--
@@ -386,6 +388,14 @@
 					<!-- Resources Replacement(Ones in conf directory should be used instead.) End  -->
 				</excludes>
                 <filtering>true</filtering>
+            </resource>
+            <resource>
+            	<directory>src/main/resources</directory>
+            	<targetPath>${project.basedir}/target/classes</targetPath>
+            	<includes>
+            		<include>META-INF/resources/**</include>
+            	</includes>
+            	<filtering>false</filtering>
             </resource>
         </resources>
 		<plugins>

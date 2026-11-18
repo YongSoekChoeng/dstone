@@ -15,7 +15,7 @@ import net.dstone.common.utils.StringUtil;
  * <pre>
  * 이 요청을 보낸 "사람"(사용자)을 읽습니다. caller(CallerContext)가 "어느 앱이 불렀나"라면, 이것은 "그 앱의 어느 사용자가 눌렀나"입니다.
  *
- * dstone-boot는 화면에서 엔진을 부를 때 로그인 사용자 id를 X-Dstone-User 헤더(URL 인코딩)에,
+ * AI 화면용 API(console.service.AiEngineUser)는 엔진을 부를 때 세션 사용자 id를 X-Dstone-User 헤더(URL 인코딩)에,
  * 관리자 여부를 X-Dstone-User-Admin 헤더("true")에 실어 보냅니다.
  * - Workflow를 시작하면 이 사용자를 실행의 REQUESTED_BY로 남깁니다.
  * - 일시정지/재개/되감기/문서 저장은 그 실행을 시작한 사람이나 관리자만 할 수 있습니다(checkOwner()).

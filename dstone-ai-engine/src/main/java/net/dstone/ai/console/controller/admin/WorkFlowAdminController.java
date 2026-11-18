@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.controller.admin;
+package net.dstone.ai.console.controller.admin;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -12,11 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
-import net.dstone.boot.ai.service.admin.WorkFlowAdminService;
-import net.dstone.boot.ai.vo.admin.WorkFlowDecisionRequest;
-import net.dstone.boot.ai.vo.admin.WorkFlowExecutionDetailResult;
-import net.dstone.boot.ai.vo.admin.WorkFlowExecutionPageResult;
-import net.dstone.boot.ai.vo.admin.WorkFlowFileSaveRequest;
+import net.dstone.ai.console.service.admin.WorkFlowAdminService;
+import net.dstone.ai.console.vo.admin.WorkFlowDecisionRequest;
+import net.dstone.ai.console.vo.admin.WorkFlowExecutionDetailResult;
+import net.dstone.ai.console.vo.admin.WorkFlowExecutionPageResult;
+import net.dstone.ai.console.vo.admin.WorkFlowFileSaveRequest;
 import net.dstone.common.utils.StringUtil;
 
 /**
@@ -28,7 +28,7 @@ import net.dstone.common.utils.StringUtil;
  */
 @RestController
 @RequestMapping("/ai/admin/workflow/*")
-public class WorkFlowAdminController extends net.dstone.boot.common.biz.BaseController {
+public class WorkFlowAdminController {
 
 	@Autowired
 	private WorkFlowAdminService workFlowAdminService;

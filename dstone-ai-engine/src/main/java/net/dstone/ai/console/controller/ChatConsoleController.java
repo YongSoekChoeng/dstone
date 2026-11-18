@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.controller;
+package net.dstone.ai.console.controller;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,19 +14,19 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
-import net.dstone.boot.ai.service.ChatService;
-import net.dstone.boot.ai.vo.AgentSummaryResult;
-import net.dstone.boot.ai.vo.ChatMessageRequest;
+import net.dstone.ai.console.service.ChatService;
+import net.dstone.ai.console.vo.AgentSummaryResult;
+import net.dstone.ai.console.vo.ChatMessageRequest;
 import net.dstone.common.utils.StringUtil;
 import reactor.core.publisher.Flux;
 
 /**
- * 채팅창 메시지 전송 전용 컨트롤러. 다른 기능들과 달리 화면(JSP)을 반환하는 액션이 없고(전부 AJAX 스트리밍
+ * 채팅창 메시지 전송 전용 컨트롤러(엔진의 api.controller.ChatController 와 bean 이름이 겹치지 않게 ChatConsoleController 로 둔다). 화면(HTML)을 반환하는 액션이 없고(전부 AJAX 스트리밍
  * 응답) 그래서 BaseController(@Controller)의 ModelAndView/jsonView 패턴 대신 @RestController로 둔다.
  */
 @RestController
 @RequestMapping("/ai/chat/*")
-public class ChatController extends net.dstone.boot.common.biz.BaseController {
+public class ChatConsoleController {
 
 	@Autowired
 	private ChatService chatService;

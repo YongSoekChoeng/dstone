@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.service;
+package net.dstone.ai.console.service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -10,14 +10,13 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import net.dstone.boot.ai.vo.WorkFlowStatusCallResult;
-import net.dstone.boot.ai.vo.WorkFlowStatusResult;
-import net.dstone.boot.ai.vo.WorkFlowSubmitCallResult;
-import net.dstone.boot.ai.vo.WorkFlowSubmitResult;
-import net.dstone.boot.ai.vo.WorkFlowSummaryCallResult;
-import net.dstone.boot.ai.vo.WorkFlowSummaryResult;
-import net.dstone.boot.ai.vo.WorkFlowTestRequest;
-import net.dstone.common.config.ConfigProperty;
+import net.dstone.ai.console.vo.WorkFlowStatusCallResult;
+import net.dstone.ai.console.vo.WorkFlowStatusResult;
+import net.dstone.ai.console.vo.WorkFlowSubmitCallResult;
+import net.dstone.ai.console.vo.WorkFlowSubmitResult;
+import net.dstone.ai.console.vo.WorkFlowSummaryCallResult;
+import net.dstone.ai.console.vo.WorkFlowSummaryResult;
+import net.dstone.ai.console.vo.WorkFlowTestRequest;
 import net.dstone.common.utils.StringUtil;
 
 /**
@@ -32,10 +31,7 @@ import net.dstone.common.utils.StringUtil;
  * (ai/service/admin/WorkFlowAdminService.list()와 동일한 방식).
  */
 @Service
-public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService {
-
-	@Autowired
-	private ConfigProperty configProperty;
+public class WorkFlowTestService extends ConsoleBaseService {
 
 	/** 실행을 시작한 사람으로 남도록 로그인 사용자 헤더를 붙입니다(실행 관리 화면의 "내 실행만"). */
 	@Autowired
@@ -43,7 +39,7 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 
 	/** 등록된 Workflow의 id+description 목록을 조회한다("Workflow 테스트" 화면의 workflowId 드롭다운용). */
 	public List<WorkFlowSummaryResult> listWorkflows() {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 
 		WorkFlowSummaryCallResult[] results = this.getWebClient().get()
 				.uri(baseUrl + "/api/ai/workflow")
@@ -62,7 +58,7 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 
 	/** @param request 호출할 workflowId와 input(Workflow input 모양)/세션ID */
 	public WorkFlowSubmitResult submit(WorkFlowTestRequest request) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("input", request.input());
@@ -89,7 +85,7 @@ public class WorkFlowTestService extends net.dstone.boot.common.biz.BaseService 
 
 	/** @param executionId 상태를 조회할 실행 id */
 	public WorkFlowStatusResult status(String executionId) {
-		String baseUrl = this.configProperty.getProperty("interface.ai-engine.base-url");
+		String baseUrl = this.engineUrl();
 
 		try {
 			// 상세 응답(컨텍스트 + 결과)은 커질 수 있어서 큰 응답용 WebClient로 받는다.

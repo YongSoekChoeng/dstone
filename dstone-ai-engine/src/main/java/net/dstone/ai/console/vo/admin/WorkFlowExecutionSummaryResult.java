@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo.admin;
+package net.dstone.ai.console.vo.admin;
 
 /**
  * dstone-ai-engine의 GET /api/ai/workflow/executions 응답 items 한 항목과 JSON 모양만 맞춘 VO. 모듈 간

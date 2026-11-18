@@ -1,0 +1,72 @@
+<!DOCTYPE HTML>
+<html>
+
+<!-- 관계 트리 창. 노드 맵 · 영향도 · 미사용 탭이 window.open 으로 띄운다(knowledge-common.js 의 openTreeWindow).
+     따로 뜬 창이라 왼쪽 메뉴 없이 트리만 창 가득 그린다. 무엇을 그릴지는 주소의 #p=..&r=..&tree=.. 로 받는다(tree.js) -->
+	<head>
+		<title>Dstone Knowledge</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, 화면 부품은 console-parts.css(둘 다 dstone-common), 코드 분석 화면 부품은 knowledge.css -->
+		<link rel="stylesheet" href="/dstone-console/css/console.css" />
+		<link rel="stylesheet" href="/dstone-console/css/console-parts.css" />
+		<link rel="stylesheet" href="/knowledge/assets/css/knowledge.css" />
+		<!-- 왼쪽 메뉴와 세션 정보(console.js), 코드 분석 메뉴 목록(knowledge-menu.js) -->
+		<script src="/dstone-console/js/console.js"></script>
+		<script src="/knowledge/assets/js/knowledge-menu.js"></script>
+	</head>
+
+<body class="ai-body kn-tree-page">
+	<div class="kn-tree-window">
+		<div class="kn-row">
+			<div class="kn-tree-heading">
+				<b id="kn-tree-title" class="kn-graph-modal-title">관계 트리</b>
+				<span id="kn-tree-where" class="ai-hint"></span>
+			</div>
+			<label for="kn-tree-up">부르는 쪽 깊이</label>
+			<input type="number" id="kn-tree-up" min="0" max="10" value="3" style="width:56px;" />
+			<label for="kn-tree-down">불리는 쪽 깊이</label>
+			<input type="number" id="kn-tree-down" min="0" max="10" value="3" style="width:56px;" />
+			<label><input type="checkbox" id="kn-tree-model" /> 모델(VO) 호출도</label>
+			<button type="button" id="kn-tree-reload">다시 그리기</button>
+			<button type="button" id="kn-tree-full" class="kn-plain">전체 화면</button>
+			<button type="button" id="kn-tree-close" class="kn-plain">닫기</button>
+		</div>
+		<!-- 계층 보이기 / 숨기기. 숨긴 계층을 건너 이어지는 길은 점선으로 잇는다 -->
+		<div class="kn-row kn-tree-tiers">
+			<span class="kn-tree-tiers-label">보일 계층</span>
+			<span id="kn-tree-tiers"></span>
+		</div>
+		<div id="kn-tree-message" class="kn-message"></div>
+		<div class="kn-graph-body kn-tree-body">
+			<div id="kn-tree-canvas" class="kn-graph-canvas"></div>
+			<div id="kn-tree-detail" class="kn-graph-detail"></div>
+		</div>
+	</div>
+
+	<!-- 소스 / SQL 팝업: 노드 상세의 [소스 보기] [SQL 보기] 버튼으로 연다. 노드 맵과 관계 트리 창이 같이 쓴다(graph-common.js) -->
+	<div id="kn-code-modal" class="kn-graph-modal kn-code-modal" style="display:none;">
+		<div class="kn-code-box">
+			<div class="kn-row">
+				<b id="kn-code-title" class="kn-graph-modal-title"></b>
+				<button type="button" id="kn-code-raw" class="kn-plain" style="display:none;">원문 보기</button>
+				<button type="button" id="kn-code-copy" class="kn-plain">복사</button>
+				<button type="button" id="kn-code-close" class="kn-plain">닫기</button>
+			</div>
+			<div id="kn-code-where" class="ai-hint kn-mono kn-code-where"></div>
+			<pre id="kn-code-text" class="kn-gd-doc kn-code-text"></pre>
+		</div>
+	</div>
+
+	<script src="/knowledge/assets/lib/cytoscape.min.js"></script>
+	<link rel="stylesheet" href="/knowledge/assets/lib/highlight-github.min.css" />
+	<script src="/knowledge/assets/lib/highlight.min.js"></script>
+	<script src="/knowledge/assets/js/knowledge-common.js"></script>
+	<script src="/knowledge/assets/js/graph-common.js"></script>
+	<script src="/knowledge/assets/js/tree.js"></script>
+	<script>
+		DstoneKnowledge.init("");
+		DstoneKnowledgeTree.init();
+	</script>
+</body>
+</html>

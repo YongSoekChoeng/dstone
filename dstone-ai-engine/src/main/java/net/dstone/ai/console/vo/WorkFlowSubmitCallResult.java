@@ -1,4 +1,4 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * dstone-ai-engine의 POST /api/ai/workflow/{workflowId}/submit 응답 계약(WorkFlowSubmitResponse)과

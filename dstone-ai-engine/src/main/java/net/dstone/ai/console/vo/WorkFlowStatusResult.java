@@ -1,8 +1,8 @@
-package net.dstone.boot.ai.vo;
+package net.dstone.ai.console.vo;
 
 /**
  * /ai/workflow/status.do 응답. dstone-ai-engine의 실행 상태(RUNNING/WAITING_APPROVAL/DONE/FAILED/
- * CANCELLED)와 값은 같지만, dstone-boot ↔ dstone-ai-engine 호출 자체가 실패한 경우(존재하지 않는
+ * CANCELLED)와 값은 같지만, 화면용 서비스 → 엔진 API 호출 자체가 실패한 경우(존재하지 않는
  * executionId, 네트워크 오류 등)를 화면에 알려주기 위한 "ERROR" 상태가 하나 더 있다 - 이때는 error에 실패
  * 사유가 담긴다.
  *
