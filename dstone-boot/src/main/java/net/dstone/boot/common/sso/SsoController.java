@@ -3,11 +3,8 @@ package net.dstone.boot.common.sso;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,8 +12,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
-import net.dstone.boot.common.security.vo.CustomUserDetails;
 import net.dstone.boot.common.web.LoginSession;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.web.console.ConsoleSessionFilter;
@@ -33,7 +28,8 @@ import net.dstone.common.web.console.SsoToken;
  * 받은 앱(ConsoleSessionFilter)은 표를 풀어 자기 세션에 이 사용자를 넣습니다. 그래서 두 앱은 이 앱과 같은 사람으로 화면을 엽니다.
  * 받은 앱이 로그인을 켰는데 세션이 없으면 다시 이 주소로 보내므로, 로그인하지 않았으면 여기서 로그인 화면으로 갑니다.
  *
- * 앱 주소는 interface.sso.targets.{target} 입니다. 관리자 여부는 interface.sso.admin-roles 로 정합니다.
+ * 앱 주소는 interface.sso.targets.{target} 입니다(env*.properties 의 *_PUBLIC_URL). 관리자 여부는 interface.sso.admin-roles 로 정합니다(LoginSession).
+ * 받는 앱은 이 표가 없어도, 같은 브라우저의 dstone-boot 쿠키로 Redis 세션을 읽어 같은 사용자를 알아냅니다(2순위). 이 표는 1순위입니다.
  * 이 주소는 로그인한 사람이면 누구나 쓸 수 있습니다(ConfigSecurity 의 /sso/**).
  * </pre>
  */
@@ -44,6 +40,10 @@ public class SsoController extends net.dstone.boot.common.biz.BaseController {
 
 	@Autowired
 	private ConfigProperty configProperty;
+
+	/** 로그인 사용자(SessionUser). 관리자 여부는 LoginSession 이 interface.sso.admin-roles 로 정한다 */
+	@Autowired
+	private LoginSession loginSession;
 
 	/**
 	 * @param target 갈 앱. ai 또는 knowledge
@@ -67,7 +67,7 @@ public class SsoController extends net.dstone.boot.common.biz.BaseController {
 			return;
 		}
 
-		SessionUser user = this.loginUser(request);
+		SessionUser user = this.loginSession.sessionUser(request);
 		if (user == null) {
 			// 보안을 끈 환경(spring.security.enabled=false): 넘길 사용자가 없다. 받는 앱이 로그인을 껐으면 기본 사용자로 연다.
 			response.sendRedirect(baseUrl + safePath);
@@ -85,48 +85,6 @@ public class SsoController extends net.dstone.boot.common.biz.BaseController {
 		String url = baseUrl + safePath + (safePath.indexOf('?') >= 0 ? "&" : "?") + ConsoleSessionFilter.TOKEN_PARAM + "=" + token + hash;
 		this.info("다른 앱으로 로그인 사용자를 넘깁니다: target=" + target + ", user=" + user.getUserId());
 		response.sendRedirect(url);
-	}
-
-	/** 세션의 로그인 사용자를 넘길 모양(SessionUser)으로 바꾼다. 로그인하지 않았으면 null */
-	private SessionUser loginUser(HttpServletRequest request) {
-		HttpSession session = request.getSession(false);
-		Object value = session == null ? null : session.getAttribute(LoginSession.USER_LOGIN_SESSION_KEY);
-		if (!(value instanceof CustomUserDetails)) {
-			return null;
-		}
-		CustomUserDetails details = (CustomUserDetails) value;
-		List<String> roles = new ArrayList<String>();
-		if (details.getAuthorities() != null) {
-			for (GrantedAuthority authority : details.getAuthorities()) {
-				String role = stripRolePrefix(authority.getAuthority());
-				if (role != null && role.length() > 0) {
-					roles.add(role);
-				}
-			}
-		}
-		// 로그인 정보에 따로 이름이 없어 id 를 이름으로도 쓴다.
-		return new SessionUser(details.getUsername(), details.getUsername(), this.isAdmin(roles), roles, "BOOT");
-	}
-
-	/** interface.sso.admin-roles(쉼표 구분, 기본 ADMIN) 가운데 하나라도 가졌으면 관리자 */
-	private boolean isAdmin(List<String> roles) {
-		String configured = this.configProperty.getProperty("interface.sso.admin-roles");
-		String adminRoles = configured == null || configured.trim().length() == 0 ? "ADMIN" : configured;
-		for (String role : roles) {
-			for (String admin : adminRoles.split(",")) {
-				if (role.equalsIgnoreCase(stripRolePrefix(admin.trim()))) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	private static String stripRolePrefix(String role) {
-		if (role == null) {
-			return null;
-		}
-		return role.startsWith("ROLE_") ? role.substring("ROLE_".length()) : role;
 	}
 
 }
