@@ -282,8 +282,8 @@ dstone:
                 connections:
                     testApp:
                         url: jdbc:mysql://${TESTAPP_DB_HOST}:${TESTAPP_DB_PORT}/${TESTAPP_DB_DATABASE}
-                        username: ${TESTAPP_DB_PASSWD}
-                        password: ENC(${DB_HOST})
+                        username: testapp
+                        password: ENC(aJthN1LCbd20mh4yIXE3sbx5c2k3o5D9bh/4prcRGDI=)
                         schema: ${TESTAPP_DB_DATABASE}
                         description: testApp 샘플 DB
             # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
