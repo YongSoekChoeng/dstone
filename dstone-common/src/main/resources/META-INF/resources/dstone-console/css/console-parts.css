@@ -791,6 +791,29 @@
 	color: var(--cs-primary);
 }
 
+/* "이 화면에서 실행한 것"에서 지금 "실행 상태"에 보이는 줄 */
+.document-list-table tbody tr.workflow-history-on td {
+	background: var(--cs-primary-soft);
+}
+
+.document-list-table tbody tr.workflow-history-on td:first-child {
+	box-shadow: inset 3px 0 0 var(--cs-primary);
+}
+
+/* 실행 ID를 누르면 "실행 상태" 칸이 바뀌었다는 것을 잠깐 테두리로 알린다 */
+.ai-panel.workflow-panel-flash {
+	animation: workflow-panel-flash 1.2s ease-out;
+}
+
+@keyframes workflow-panel-flash {
+	0% {
+		box-shadow: 0 0 0 3px var(--cs-primary-ring);
+	}
+	100% {
+		box-shadow: 0 0 0 3px transparent;
+	}
+}
+
 /* ---------- Workflow 디자이너(ai/designer/designer.jsp) ---------- */
 
 .wd-wrap {

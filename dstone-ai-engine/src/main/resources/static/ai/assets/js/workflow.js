@@ -11,6 +11,8 @@ var DstoneAiWorkflow = (function () {
 	var pollTimer = null;
 	var activeExecutionId = null;
 	var historyRows = {}; // executionId -> <tr> element, 화면에서 제출한 작업만 기억(서버 저장 아님)
+	var historyStatus = {}; // executionId -> 마지막으로 본 상태
+	var historyTimer = null; // "실행 상태"에 안 보이는 실행의 줄 상태를 따로 확인하는 타이머
 	var workflowsById = {}; // id -> {description, input}, 목록 조회 결과를 드롭다운 change 시 다시 쓰기 위해 기억
 	var sampleNoteEl;
 
@@ -259,6 +261,7 @@ var DstoneAiWorkflow = (function () {
 		pollRefreshBtn.disabled = false;
 
 		addHistoryRow(workflowId, executionId);
+		watchOtherRows();
 
 		fetchStatus(executionId);
 		pollTimer = setInterval(function () {
@@ -314,16 +317,89 @@ var DstoneAiWorkflow = (function () {
 			"<td class=\"workflow-history-status\">" + DstoneAi.badgeHtml("QUEUED") + "</td>";
 		tr.querySelector(".workflow-history-jobid").addEventListener("click", function () {
 			trackExisting(executionId);
+			showStatusPanel();
 		});
 		historyBodyEl.insertBefore(tr, historyBodyEl.firstChild);
 		historyRows[executionId] = tr;
+		markActiveRow();
+	}
+
+	/** 지금 "실행 상태"에 보이는 실행의 줄에 표시를 단다. */
+	function markActiveRow() {
+		Object.keys(historyRows).forEach(function (id) {
+			historyRows[id].classList.toggle("workflow-history-on", id === activeExecutionId);
+		});
+	}
+
+	/**
+	 * 실행 ID를 누르면 바뀌는 곳은 위쪽 "실행 상태" 칸이다. 목록을 보던 자리에서는 그 칸이 화면 밖이라
+	 * 아무 일도 없는 것처럼 보이므로, 그 칸으로 옮겨 가고 테두리를 잠깐 빛나게 한다.
+	 */
+	function showStatusPanel() {
+		var panel = executionIdEl.closest(".ai-panel");
+		if (!panel) {
+			return;
+		}
+		panel.scrollIntoView({ behavior: "smooth", block: "start" });
+		panel.classList.remove("workflow-panel-flash");
+		// 같은 줄을 연달아 눌러도 다시 빛나도록 클래스를 뗐다가 다음 그림 때 붙인다.
+		void panel.offsetWidth;
+		panel.classList.add("workflow-panel-flash");
 	}
 
 	function updateHistoryRow(executionId, status) {
 		var tr = historyRows[executionId];
 		if (tr) {
 			tr.querySelector(".workflow-history-status").innerHTML = DstoneAi.badgeHtml(status);
+			historyStatus[executionId] = status;
 		}
+		watchOtherRows();
+	}
+
+	/** 더 볼 것이 없는 상태(끝났거나 사람이 손대야 다시 움직이는 상태) */
+	function isSettled(status) {
+		return status === "DONE" || status === "FAILED" || status === "ERROR"
+			|| status === "WAITING_APPROVAL" || status === "PAUSED";
+	}
+
+	/**
+	 * 다른 실행 ID를 눌러 "실행 상태"가 그쪽으로 바뀌면, 원래 보던 실행은 위쪽 폴링에서 빠진다.
+	 * 그 줄이 "실행 중"에 멈춰 보이지 않도록, 아직 끝나지 않은 다른 줄의 상태도 같은 간격으로 확인한다.
+	 */
+	function watchOtherRows() {
+		var pending = Object.keys(historyRows).filter(function (id) {
+			return id !== activeExecutionId && !isSettled(historyStatus[id]);
+		});
+		if (pending.length === 0) {
+			if (historyTimer) {
+				clearInterval(historyTimer);
+				historyTimer = null;
+			}
+			return;
+		}
+		if (!historyTimer) {
+			historyTimer = setInterval(refreshOtherRows, POLL_INTERVAL_MS);
+		}
+	}
+
+	function refreshOtherRows() {
+		Object.keys(historyRows).forEach(function (id) {
+			if (id === activeExecutionId || isSettled(historyStatus[id])) {
+				return;
+			}
+			DstoneAi.api("GET", urls.statusUrl.replace("{id}", encodeURIComponent(id)))
+				.then(function (result) {
+					if (id !== activeExecutionId) {
+						updateHistoryRow(id, result.status);
+					}
+				})
+				.catch(function () {
+					// 조회가 안 되면 그 줄은 더 확인하지 않는다(누르면 다시 불러온다).
+					historyStatus[id] = "ERROR";
+					watchOtherRows();
+				});
+		});
+		watchOtherRows();
 	}
 
 	/** 이력 목록에서 이전에 제출한 executionId를 다시 클릭했을 때, 그 작업의 폴링을 다시 시작한다. */
@@ -331,6 +407,8 @@ var DstoneAiWorkflow = (function () {
 		stopPolling();
 		activeExecutionId = executionId;
 		executionIdEl.textContent = executionId;
+		markActiveRow();
+		watchOtherRows();
 		resultEl.value = "";
 		pollStopBtn.disabled = false;
 		pollRefreshBtn.disabled = false;
