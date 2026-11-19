@@ -33,7 +33,8 @@ public class SmFeedbackTest extends WorkflowTestBase {
 		String feedback = this.feedbackOf("step09", context);
 
 		assertThat(feedback).contains("- 설계 승인(step10): 승인 / 개발진행해.")
-			.contains("- 개발 승인(step15): 재설계 / 존재하지 않는 UPLOADS를 import한다");
+			.contains("- 개발 승인(step16): 재설계 / 존재하지 않는 UPLOADS를 import한다")
+			.contains("- 컴파일 확인(step15):");
 	}
 
 	@Test
@@ -45,7 +46,18 @@ public class SmFeedbackTest extends WorkflowTestBase {
 
 		assertThat(feedback).contains("- 설계 승인(step10): 영향도 재분석 / 참고 파일이 틀렸다")
 			.contains("- 영향도 분석 승인(step07):  / ")
-			.contains("- 개발 승인(step15):  /");
+			.contains("- 개발 승인(step16):  /");
+	}
+
+	@Test
+	void 개발_step은_컴파일_오류와_개발_승인을_받는다() {
+		Map<String, Object> context = WorkFlowContext.create("D:/work", "sm-workflow", "test");
+		WorkFlowContext.state(context).put("compileError", "실패: 종료 코드 1\n[ERROR] src/main/java/A.java:[3,29] cannot find symbol");
+
+		String feedback = this.feedbackOf("step14", context);
+
+		assertThat(feedback).contains("- 컴파일 확인(step15): 실패: 종료 코드 1").contains("A.java:[3,29] cannot find symbol")
+			.contains("- 개발 승인(step16):  /");
 	}
 
 	private String feedbackOf(String stepId, Map<String, Object> context) {

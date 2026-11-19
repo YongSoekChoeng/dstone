@@ -1,5 +1,6 @@
 package net.dstone.ai.tools.shell;
 
+import java.io.File;
 import java.util.List;
 
 import org.springframework.ai.tool.annotation.Tool;
@@ -33,6 +34,33 @@ public class ShellExecTool extends ExternalProcessTool {
 	@Override
 	protected String auditLabel() {
 		return "shell";
+	}
+
+	/**
+	 * <pre>
+	 * 확장자 없이 등록한 경로면 지금 OS에 맞는 스크립트를 찾아 씁니다.
+	 * Windows는 경로.bat, 경로.cmd 순서로, 그 밖(리눅스, WSL, k8s)은 경로.sh를 찾습니다.
+	 * 그래서 같은 이름 하나로 Windows와 리눅스에서 각자 맞는 스크립트가 실행됩니다(예: scripts/sm/compile-check).
+	 * 등록한 경로에 파일이 그대로 있거나 이미 확장자가 있으면 손대지 않습니다. 맞는 파일이 없어도 등록한 경로를 그대로 돌려주어,
+	 * 실행 단계에서 "프로세스를 시작하지 못했습니다"로 실패하게 둡니다.
+	 * </pre>
+	 *
+	 * @param path 설정에 등록된 경로
+	 */
+	@Override
+	protected String platformPath(String path) {
+		File registered = new File(path);
+		if (registered.isFile() || registered.getName().contains(".")) {
+			return path;
+		}
+		boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+		String[] extensions = windows ? new String[] { ".bat", ".cmd" } : new String[] { ".sh" };
+		for (String extension : extensions) {
+			if (new File(path + extension).isFile()) {
+				return path + extension;
+			}
+		}
+		return path;
 	}
 
 	/**

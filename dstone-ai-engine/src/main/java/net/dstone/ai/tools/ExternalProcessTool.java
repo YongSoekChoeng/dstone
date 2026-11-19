@@ -52,6 +52,7 @@ public abstract class ExternalProcessTool extends BaseObject {
 		if (scriptPath == null) {
 			return "실패: 화이트리스트에 없는 스크립트입니다: " + scriptName;
 		}
+		scriptPath = this.platformPath(scriptPath);
 		List<String> command = new ArrayList<>(commandPrefix);
 		command.add(scriptPath);
 		if (args != null) {
@@ -60,6 +61,18 @@ public abstract class ExternalProcessTool extends BaseObject {
 		String result = ExternalProcessRunner.run(command, this.timeout(), this.maxOutputChars());
 		LogUtil.sysout("dstone-ai-engine tool-audit: " + this.auditLabel() + " scriptName=" + scriptName + " path=" + scriptPath + " args=" + args + " -> " + result);
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 등록된 경로를 지금 OS에 맞는 실제 경로로 바꿉니다. 기본은 그대로 돌려줍니다.
+	 * (ShellExecTool은 확장자 없이 등록한 경로에 Windows면 .bat/.cmd, 그 밖이면 .sh를 붙여 찾습니다.)
+	 * </pre>
+	 *
+	 * @param path 설정에 등록된 경로
+	 */
+	protected String platformPath(String path) {
+		return path;
 	}
 
 	/** @param scriptName 경로를 찾아볼 스크립트의 등록된 이름입니다. */
