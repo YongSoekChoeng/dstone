@@ -1,4 +1,0 @@
-# 스크립트 줄바꿈 고정: Windows에서 받아도 .sh는 LF(bash가 CRLF를 못 읽음), .bat/.ps1은 CRLF
-*.sh  text eol=lf
-*.bat text eol=crlf
-*.ps1 text eol=crlf
