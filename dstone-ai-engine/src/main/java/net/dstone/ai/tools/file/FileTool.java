@@ -391,6 +391,71 @@ public class FileTool {
 		return result.toString();
 	}
 
+	/**
+	 * <pre>
+	 * 마크다운 문서에서 제목 하나 아래의 내용만 꺼냅니다. 앞뒤 공백과 빈 줄은 뗍니다.
+	 * 요청서 같은 문서의 한 항목(예: "## 소스경로" 아래 한 줄)을 TOOL step이 state에 담아 다음 step에 넘길 때 씁니다.
+	 * 엔진이나 Tool이 특정 문서 양식을 알 필요가 없도록, 어느 제목을 읽을지는 Workflow가 정합니다.
+	 *
+	 * - heading은 '#'를 뺀 제목 글자입니다. 앞뒤 공백과 대소문자는 가리지 않습니다.
+	 * - 내용은 그 제목 다음 줄부터, 같은 수준이거나 더 높은 수준의 다음 제목 앞까지입니다(더 낮은 수준의 하위 제목은 내용에 포함).
+	 * - 파일이 없거나 제목이 없거나 내용이 비어 있으면 "실패: ..."로 돌려줍니다. TOOL step은 이것을 실패로 봅니다.
+	 * </pre>
+	 *
+	 * @param fileFullPath 마크다운 파일의 절대경로
+	 * @param heading      찾을 제목('#' 제외)
+	 */
+	@Tool(description = "절대경로 fileFullPath의 마크다운 문서에서 제목 heading('#' 제외) 아래의 내용만 돌려준다. "
+		+ "다음 같은 수준 이상의 제목 앞까지이며 앞뒤 공백은 뗀다. 제목이 없거나 내용이 비면 '실패: ...'를 돌려준다.")
+	public String readMarkdownSection(
+			@ToolParam(description = "마크다운 파일의 절대경로") String fileFullPath,
+			@ToolParam(description = "찾을 제목. '#'는 빼고 적는다. 예: 소스경로") String heading) {
+		String contents = this.readOrNull(fileFullPath);
+		if (contents == null) {
+			return CANNOT_READ_MESSAGE + fileFullPath;
+		}
+		if (heading == null || heading.isBlank()) {
+			return "실패: heading이 비어 있습니다.";
+		}
+		String wanted = heading.trim();
+		String[] lines = contents.split("\r?\n", -1);
+		int level = -1;
+		StringBuilder section = new StringBuilder();
+		for (String line : lines) {
+			int lineLevel = headingLevel(line);
+			if (level < 0) {
+				if (lineLevel > 0 && line.substring(lineLevel).trim().equalsIgnoreCase(wanted)) {
+					level = lineLevel;
+				}
+				continue;
+			}
+			if (lineLevel > 0 && lineLevel <= level) {
+				break;
+			}
+			section.append(line).append('\n');
+		}
+		if (level < 0) {
+			return "실패: 제목 '" + wanted + "'이(가) 없습니다: " + fileFullPath;
+		}
+		String text = section.toString().strip();
+		if (text.isEmpty()) {
+			return "실패: 제목 '" + wanted + "' 아래에 내용이 없습니다: " + fileFullPath;
+		}
+		return text;
+	}
+
+	/** 마크다운 제목 줄이면 '#'의 개수(1~6), 아니면 0을 돌려줍니다. "#" 다음에 공백이 있어야 제목입니다. */
+	private static int headingLevel(String line) {
+		int count = 0;
+		while (count < line.length() && line.charAt(count) == '#') {
+			count++;
+		}
+		if (count == 0 || count > 6 || (count < line.length() && line.charAt(count) != ' ' && line.charAt(count) != '\t')) {
+			return 0;
+		}
+		return count;
+	}
+
 	@Tool(description = "절대경로 fileFullPath 파일의 끝부분만 읽어서 반환한다. 로그 파일처럼 크고 최근 내용(끝부분)이 중요한 파일을 읽을 때 사용한다.")
 	public String readFileTail(@ToolParam String fileFullPath) {
 		String contents = this.readOrNull(fileFullPath);

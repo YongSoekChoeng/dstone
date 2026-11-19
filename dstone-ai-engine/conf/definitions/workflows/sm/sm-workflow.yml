@@ -9,23 +9,26 @@
 #
 # 다시 돌릴 때는 리뷰 사유와 승인 화면에 적은 의견이 Agent의 feedback으로 전달됩니다. 의견을 적어야 같은 결과가 되풀이되지 않습니다.
 # feedback에는 그 step으로 되돌아올 수 있는 모든 뒤쪽 판정·승인을 "- 이름(stepNN): 결정 / 의견" 한 줄씩 넣습니다.
-# 경로를 새로 이으면 이 목록에도 넣으십시오(2026-11-19, 개발 승인 [재설계]의 의견이 step09에 전달되지 않아 같은 오류가 되풀이된 일).
+# 경로를 새로 이으면 이 목록에도 넣으십시오(2026-11-19, 개발 승인 [재설계]의 의견이 아키텍처 설계 step에 전달되지 않아 같은 오류가 되풀이된 일).
 # 결정을 함께 넣는 것은 지난번 '승인' 때 적은 "진행해" 같은 말을 지적으로 오해하지 않게 하려는 것입니다(Agent 프롬프트의 [feedback 읽는 법]).
 #
 # 개발 결과는 작업 폴더의 dev-resources에 "원본 소스 루트 기준 같은 경로"로 쌓입니다(원본은 건드리지 않습니다).
 # 원본에서 지워야 하는 파일은 dev-resources/_delete-files.txt에 한 줄에 하나씩 적습니다. 반영할 때 이 목록의 파일을 지우고, 이 파일 자체는 옮기지 않습니다.
-# 개발 폴더는 처음 개발할 때와 재설계 뒤에만 비웁니다(step13). [재개발]은 있는 결과를 고칩니다.
+# 개발 폴더는 처음 개발할 때와 재설계 뒤에만 비웁니다(step14). [재개발]은 있는 결과를 고칩니다.
 #
-# 컴파일 확인(2026-11-19): 개발 Agent가 끝나기 전에 scripts/sm/compile-check로 스스로 컴파일해 고치고(최대 3번),
-# 그 뒤 step15가 같은 스크립트로 한 번 더 확인합니다. 통과하든 실패하든 개발 승인(step16)으로 가고, 실패 내용은
+# 컴파일 확인(2026-11-19): 개발 Agent가 끝나기 전에 범용 스크립트 overlay-compile(conf/scripts/build)로 스스로 컴파일해 고치고(최대 3번),
+# 그 뒤 step16이 같은 스크립트로 한 번 더 확인합니다. 통과하든 실패하든 개발 승인(step17)으로 가고, 실패 내용은
 # 진행 기록과 다음 개발·설계의 feedback에 남습니다. 컴파일 오류를 사람이 찾지 않게 하려는 것입니다.
+#
+# 원본 소스 경로는 step02가 요청서의 "## 소스경로" 아래 내용을 범용 Tool readMarkdownSection으로 읽어 state.sourceDir에 둡니다.
+# 엔진과 스크립트는 요청서 양식을 모르고, 경로는 이 Workflow가 인자로 넘깁니다.
 #
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣고,
 # 뒤의 step은 ${input}/${state.now}로 씁니다. 날짜 하나를 얻으려고 LLM을 부르지 않으려는 것입니다
 # (Agent로 할 때는 같은 Tool을 12번 되풀이한 적이 있습니다).
 ################################################################################################################
 id: sm-workflow
-version: 1.5.0
+version: 1.6.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -59,6 +62,17 @@ steps:
     onFailure: FAIL
 
   - id: step02
+    name: 소스경로 읽기
+    type: TOOL
+    tool: readMarkdownSection
+    with:
+      fileFullPath: ${input}/00.request.md
+      heading: 소스경로
+    save: sourceDir
+    next: step03
+    onFailure: FAIL
+
+  - id: step03
     name: 고객요청사항 분석
     type: AGENT
     agent: sm-requirement-analyze-agent
@@ -66,13 +80,13 @@ steps:
       base_dir: ${input}/${state.now}
       request: ${state.request}
       feedback: |-
-        - 리뷰 판정(step04): 통과 ${state.review.pass:} / ${state.review.reason:}
-        - 리뷰 불통과 처리 결정(step05): ${state.reviewDecision.decision:} / ${state.reviewDecision.comment:}
-        - 영향도 분석 승인(step07): ${state.impactApproval.decision:} / ${state.impactApproval.comment:}
-        - 개발 승인(step16): ${state.developApproval.decision:} / ${state.developApproval.comment:}
-    next: step03
+        - 리뷰 판정(step05): 통과 ${state.review.pass:} / ${state.review.reason:}
+        - 리뷰 불통과 처리 결정(step06): ${state.reviewDecision.decision:} / ${state.reviewDecision.comment:}
+        - 영향도 분석 승인(step08): ${state.impactApproval.decision:} / ${state.impactApproval.comment:}
+        - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
+    next: step04
 
-  - id: step03
+  - id: step04
     name: 고객요구사항분석서 읽기
     type: TOOL
     tool: readFile
@@ -80,10 +94,10 @@ steps:
       fileFullPath: ${input}/${state.now}/01.customer_requirement.md
       maxChars: 60000
     save: requirement
-    next: step04
+    next: step05
     onFailure: FAIL
 
-  - id: step04
+  - id: step05
     name: 고객요청사항 분석 리뷰
     type: SUPERVISOR
     agent: sm-requirement-analyze-reviewer-agent
@@ -92,21 +106,21 @@ steps:
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
-    next: step06
-    onFailure: step05
+    next: step07
+    onFailure: step06
 
-  - id: step05
+  - id: step06
     name: 리뷰 불통과 처리 결정
     type: APPROVAL
     approval:
       approverRole: PL
     save: reviewDecision
     routes:
-      그대로 진행: step06
-      고객요청사항 재분석: step02
+      그대로 진행: step07
+      고객요청사항 재분석: step03
       중지: FAIL
 
-  - id: step06
+  - id: step07
     name: 영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
@@ -115,25 +129,25 @@ steps:
       request: ${state.request}
       requirement: ${state.requirement}
       feedback: |-
-        - 영향도 분석 승인(step07): ${state.impactApproval.decision:} / ${state.impactApproval.comment:}
-        - 설계 승인(step10): ${state.designApproval.decision:} / ${state.designApproval.comment:}
-        - 개발 승인(step16): ${state.developApproval.decision:} / ${state.developApproval.comment:}
-    next: step07
+        - 영향도 분석 승인(step08): ${state.impactApproval.decision:} / ${state.impactApproval.comment:}
+        - 설계 승인(step11): ${state.designApproval.decision:} / ${state.designApproval.comment:}
+        - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
+    next: step08
     save: impactPath
 
-  - id: step07
+  - id: step08
     name: 영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: impactApproval
     routes:
-      승인(설계진행): step08
-      고객요청사항 재분석: step02
-      영향도 재분석: step06
+      승인(설계진행): step09
+      고객요청사항 재분석: step03
+      영향도 재분석: step07
       중지: FAIL
 
-  - id: step08
+  - id: step09
     name: 영향도분석서 읽기
     type: TOOL
     tool: readFile
@@ -141,10 +155,10 @@ steps:
       fileFullPath: ${input}/${state.now}/02.impact.md
       maxChars: 60000
     save: impact
-    next: step09
+    next: step10
     onFailure: FAIL
 
-  - id: step09
+  - id: step10
     name: 아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
@@ -154,25 +168,25 @@ steps:
       requirement: ${state.requirement}
       impact: ${state.impact}
       feedback: |-
-        - 설계 승인(step10): ${state.designApproval.decision:} / ${state.designApproval.comment:}
-        - 컴파일 확인(step15): ${state.compileError:}
-        - 개발 승인(step16): ${state.developApproval.decision:} / ${state.developApproval.comment:}
-    next: step10
+        - 설계 승인(step11): ${state.designApproval.decision:} / ${state.designApproval.comment:}
+        - 컴파일 확인(step16): ${state.compileError:}
+        - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
+    next: step11
     save: architectPath
 
-  - id: step10
+  - id: step11
     name: 설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: designApproval
     routes:
-      승인(개발진행): step11
-      영향도 재분석: step06
-      재설계: step09
+      승인(개발진행): step12
+      영향도 재분석: step07
+      재설계: step10
       중지: FAIL
 
-  - id: step11
+  - id: step12
     name: 상세 설계서 읽기
     type: TOOL
     tool: readFile
@@ -180,10 +194,10 @@ steps:
       fileFullPath: ${input}/${state.now}/03-1.design.md
       maxChars: 60000
     save: design
-    next: step12
+    next: step13
     onFailure: FAIL
 
-  - id: step12
+  - id: step13
     name: 태스크아이템 목록 읽기
     type: TOOL
     tool: readFile
@@ -191,46 +205,50 @@ steps:
       fileFullPath: ${input}/${state.now}/03-2.taskitems.md
       maxChars: 60000
     save: taskitems
-    next: step13
+    next: step14
     onFailure: FAIL
 
-  - id: step13
+  - id: step14
     name: 기존개발디렉토리초기화
     type: TOOL
     tool: deleteDir
     with:
       fileFullPath: ${input}/${state.now}/dev-resources
-    next: step14
+    next: step15
 
-  - id: step14
+  - id: step15
     name: 개발
     type: AGENT
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
+      source_dir: ${state.sourceDir}
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
       feedback: |-
-        - 컴파일 확인(step15): ${state.compileError:}
-        - 개발 승인(step16): ${state.developApproval.decision:} / ${state.developApproval.comment:}
-    next: step15
+        - 컴파일 확인(step16): ${state.compileError:}
+        - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
+    next: step16
     onFailure: FAIL
 
-  - id: step15
+  - id: step16
     name: 컴파일 확인
     type: TOOL
     tool: runShellScript
     with:
-      scriptName: sm-compile-check
+      scriptName: overlay-compile
       args:
-        - ${input}/${state.now}
+        - ${state.sourceDir}
+        - ${input}/${state.now}/dev-resources
+        - ${input}/${state.now}/compile-check
+        - ${input}/${state.now}/dev-resources/_delete-files.txt
     save: compileResult
     saveError: compileError
-    next: step16
-    onFailure: step16
+    next: step17
+    onFailure: step17
 
-  - id: step16
+  - id: step17
     name: 개발 승인
     type: APPROVAL
     approval:
@@ -238,10 +256,10 @@ steps:
     save: developApproval
     routes:
       승인: END
-      고객요청사항 재분석: step02
-      영향도 재분석: step06
-      재설계: step09
-      재개발: step14
+      고객요청사항 재분석: step03
+      영향도 재분석: step07
+      재설계: step10
+      재개발: step15
       실패: FAIL
 state:
   request: 고객 요청서 내용
@@ -254,8 +272,9 @@ state:
   design: 상세 설계서 내용
   taskitems: 태스크아이템 목록 내용
   now: 작업을 시작한 시각(yyyyMMdd-HHmm). 작업 폴더 이름으로 쓴다
-  developApproval: 개발 승인(step16) 결과
-  impactPath: 영향도 분석(step06)이 돌려준 답(저장 파일과 결정 필요 사항)
-  architectPath: 아키텍처 설계(step09)가 돌려준 답(저장 파일과 결정 필요 사항)
-  compileResult: 컴파일 확인(step15)이 통과했을 때의 출력
-  compileError: 컴파일 확인(step15)이 실패했을 때의 오류(통과하면 비어 있다)
+  developApproval: 개발 승인(step17) 결과
+  impactPath: 영향도 분석(step07)이 돌려준 답(저장 파일과 결정 필요 사항)
+  architectPath: 아키텍처 설계(step10)가 돌려준 답(저장 파일과 결정 필요 사항)
+  sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
+  compileResult: 컴파일 확인(step16)이 통과했을 때의 출력
+  compileError: 컴파일 확인(step16)이 실패했을 때의 오류(통과하면 비어 있다)

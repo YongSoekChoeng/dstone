@@ -47,6 +47,20 @@ public class WorkFlowTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void 요청서의_소스경로를_LLM_없이_state에_담는다() throws IOException {
+		this.writeDoc("00.request.md", "## 현업요청\n이미지 게시판\n\n## 프로젝트ID\n\ttestApp\n\n## 소스경로\n\tD:/AppHome/testApp\n");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
+		flow.step("step00");
+		flow.step("step01");
+		flow.step("step02");
+		assertThat(flow.state("sourceDir")).isEqualTo("D:/AppHome/testApp");
+		assertThat(flow.currentStepId()).isEqualTo("step03");
+		if (!this.chatModel.isLlmCall()) {
+			assertThat(this.chatModel.prompts()).isEmpty();
+		}
+	}
+
+	@Test
 	void 설계_step이_태스크_목록을_저장하지_못하면_개발로_넘어가지_않는다() throws IOException {
 		assumeFalse(this.chatModel.isLlmCall());
 		// 작업 폴더는 입력 폴더/실행 시각입니다. 설계서만 만들고 태스크아이템 목록은 만들지 않습니다.
@@ -55,10 +69,10 @@ public class WorkFlowTest extends WorkflowTestBase {
 		this.writeDoc(now + "/03-1.design.md", "설계서 내용");
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
 		flow.put("now", now);
-		flow.jumpTo("step11");
-		flow.step("step11");
-		assertThat(flow.state("design")).isEqualTo("설계서 내용");
+		flow.jumpTo("step12");
 		flow.step("step12");
+		assertThat(flow.state("design")).isEqualTo("설계서 내용");
+		flow.step("step13");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(this.chatModel.prompts()).isEmpty();
 	}

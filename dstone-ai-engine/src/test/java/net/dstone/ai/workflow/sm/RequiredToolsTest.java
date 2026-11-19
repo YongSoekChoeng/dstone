@@ -23,7 +23,7 @@ import net.dstone.ai.support.WorkflowTestBase;
 /**
  * <pre>
  * Agent의 execution.requiredTools(꼭 성공해야 하는 Tool)를 확인합니다.
- * sm-requirement-analyze-agent(sm-workflow step02)는 requiredTools: [writeFile], onInvalidOutput: RETRY, maxAttempts: 2입니다.
+ * sm-requirement-analyze-agent(sm-workflow step03)는 requiredTools: [writeFile], onInvalidOutput: RETRY, maxAttempts: 2입니다.
  * - writeFile 없이 "이제 작성합니다"라고만 답하면 한 번 더 부르고, 두 번 다 그러면 step이 실패합니다.
  * - 두 번째에 writeFile을 부르면 step은 성공합니다.
  * - tools.allowed에 없는 이름을 requiredTools에 적으면 [검사]에서 막힙니다.
@@ -33,7 +33,7 @@ public class RequiredToolsTest extends WorkflowTestBase {
 
 	private static final String WORKFLOW_ID = "sm-workflow";
 
-	private static final String STEP_ID = "step02";
+	private static final String STEP_ID = "step03";
 
 	private static final String AGENT_ID = "sm-requirement-analyze-agent";
 
@@ -72,7 +72,7 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		flow.step(STEP_ID);
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(flow.currentStepId()).isEqualTo("step03");
+		assertThat(flow.currentStepId()).isEqualTo("step04");
 		assertThat(Files.readString(doc)).isEqualTo("# 고객 요구사항");
 		assertThat(this.chatModel.prompts()).hasSize(3);
 	}
@@ -90,7 +90,7 @@ public class RequiredToolsTest extends WorkflowTestBase {
 	@Test
 	void 둘_중_하나만_적은_항목은_어느_것이든_성공하면_된다() throws IOException {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
-		// sm-architect-agent(step09)는 requiredTools: [writeFile|editFileTexts]다. 지적을 반영할 때는 editFileTexts로만 끝난다.
+		// sm-architect-agent(step10)는 requiredTools: [writeFile|editFileTexts]다. 지적을 반영할 때는 editFileTexts로만 끝난다.
 		Path design = this.workDir.resolve("03-1.design.md");
 		Files.writeString(design, "import kr.co.gnx.system.file.UPLOADS;\n");
 		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + design.toString().replace("\\", "/")
@@ -102,9 +102,9 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		input.put("request", "## 현업요청\n이미지 게시판");
 		input.put("requirement", "# 요구사항");
 		input.put("impact", "# 영향도");
-		input.put("feedback", "- 개발 승인(step15): 재설계 / UPLOADS import가 틀렸다");
-		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step09", input);
-		flow.step("step09");
+		input.put("feedback", "- 개발 승인(step17): 재설계 / UPLOADS import가 틀렸다");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step10", input);
+		flow.step("step10");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(Files.readString(design)).contains("kr.co.gnx.config.Constants.UPLOADS");

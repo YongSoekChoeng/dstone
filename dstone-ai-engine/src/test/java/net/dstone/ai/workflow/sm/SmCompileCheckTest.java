@@ -21,7 +21,7 @@ import net.dstone.ai.support.WorkflowTestBase;
 
 /**
  * <pre>
- * sm-workflow의 컴파일 확인 step(step15)을 실제 스크립트(scripts/sm/compile-check)와 Maven으로 돌려 봅니다(LLM 없음).
+ * sm-workflow의 컴파일 확인 step(step16)을 실제 범용 스크립트(conf/scripts/build/overlay-compile)와 Maven으로 돌려 봅니다(LLM 없음).
  * 작은 Maven 프로젝트를 임시 폴더에 만들고, dev-resources에 넣은 파일로 통과·실패와 삭제 목록을 확인합니다.
  * mvn이 없는 곳에서는 건너뜁니다. 처음 한 번은 Maven 플러그인을 받느라 오래 걸릴 수 있습니다.
  * </pre>
@@ -45,20 +45,18 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 			"  <properties><maven.compiler.release>17</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>",
 			"</project>"), StandardCharsets.UTF_8);
 		Files.writeString(source.resolve("src/main/java/demo/Old.java"), "package demo;\npublic class Old {}\n", StandardCharsets.UTF_8);
-		Path request = this.root.resolve("request");
-		this.workDir = request.resolve("20261119-1700");
+		this.workDir = this.root.resolve("work");
 		Files.createDirectories(this.workDir.resolve("dev-resources/src/main/java/demo"));
-		Files.writeString(request.resolve("00.request.md"), "## 현업요청\n시험\n\n## 소스경로\n\t" + source.toString().replace("\\", "/") + "\n", StandardCharsets.UTF_8);
 	}
 
 	@Test
 	void 통과하면_compileResult에_남고_다음은_개발_승인이다() throws IOException {
 		this.devFile("New.java", "package demo;\npublic class New { Old old = new Old(); }\n");
 
-		WorkflowStepper flow = this.stepper("sm-workflow", "step15", this.args());
-		flow.step("step15");
+		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
+		flow.step("step16");
 
-		assertThat(flow.currentStepId()).isEqualTo("step16");
+		assertThat(flow.currentStepId()).isEqualTo("step17");
 		assertThat(String.valueOf(flow.state("compileResult"))).contains("compile OK");
 		assertThat(flow.state("compileError")).isNull();
 	}
@@ -67,10 +65,10 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 	void 없는_클래스를_쓰면_오류가_compileError에_남고_개발_승인으로_간다() throws IOException {
 		this.devFile("New.java", "package demo;\nimport demo.missing.UPLOADS;\npublic class New {}\n");
 
-		WorkflowStepper flow = this.stepper("sm-workflow", "step15", this.args());
-		flow.step("step15");
+		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
+		flow.step("step16");
 
-		assertThat(flow.currentStepId()).isEqualTo("step16");
+		assertThat(flow.currentStepId()).isEqualTo("step17");
 		assertThat(String.valueOf(flow.state("compileError"))).startsWith("실패:")
 			.contains("src/main/java/demo/New.java").contains("demo.missing");
 	}
@@ -81,8 +79,8 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 		this.devFile("New.java", "package demo;\npublic class New { Old old; }\n");
 		Files.writeString(this.workDir.resolve("dev-resources/_delete-files.txt"), "src/main/java/demo/Old.java\n", StandardCharsets.UTF_8);
 
-		WorkflowStepper flow = this.stepper("sm-workflow", "step15", this.args());
-		flow.step("step15");
+		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
+		flow.step("step16");
 
 		assertThat(String.valueOf(flow.state("compileError"))).contains("deleted in copy: src/main/java/demo/Old.java").contains("Old");
 		assertThat(this.root.resolve("source/src/main/java/demo/Old.java")).exists();
@@ -94,11 +92,19 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 
 	private Map<String, Object> args() {
 		Map<String, Object> input = new LinkedHashMap<String, Object>();
-		input.put("scriptName", "sm-compile-check");
+		input.put("scriptName", "overlay-compile");
 		List<String> args = new ArrayList<String>();
-		args.add(this.workDir.toString().replace("\\", "/"));
+		// sm-workflow step16의 with와 같은 순서: 원본, 변경 폴더, 작업 폴더, 삭제 목록
+		args.add(slash(this.root.resolve("source")));
+		args.add(slash(this.workDir.resolve("dev-resources")));
+		args.add(slash(this.workDir.resolve("compile-check")));
+		args.add(slash(this.workDir.resolve("dev-resources/_delete-files.txt")));
 		input.put("args", args);
 		return input;
+	}
+
+	private static String slash(Path path) {
+		return path.toString().replace("\\", "/");
 	}
 
 	private static boolean mavenAvailable() {

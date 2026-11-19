@@ -176,6 +176,7 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 반드시 지킬 규칙 (상세 근거는 아래 문서):
 - **YAML에 로직을 넣지 않는다.** 표현식은 값을 읽는 경로(`${input…}`/`${state.x.y}`/`${item…}`/`:기본값`)뿐이다. 필터·검증·문서 렌더링은 TOOL step이 부르는 Java Tool로 만든다.
 - **Workflow 전용 Tool 클래스를 만들지 않는다.** 순서: 정의 파일 수정 → 기존 범용 Tool → 새 범용 Tool → Workflow 단순화. 엔진 전용 Tool은 `@AiTool(stepOnly = true)`.
+- 엔진·Tool·스크립트는 특정 Workflow를 몰라야 한다. 스크립트는 `conf/scripts/<용도>/`에 두고 값은 모두 인자로 받는다(`conf/scripts/README.md`). 업무·환경에 맞추는 일은 Workflow 정의가 한다.
 - Step 결과는 `save`/`saveError`/`saveInput`/`saveEach`로 이름을 붙여 `state`에 저장한다. 모든 이름은 Workflow `state:`에 선언해야 하며, 저장되지 않은 결과는 읽을 수 없다.
 - `ChatClient` 호출은 `AgentExecutor`를 거친다. 직접 부르는 새 코드는 `ConfigChatClient.requestOptions()`를 붙인다 (Spring AI 2.0.1에서 timeout이 기본 60초로 덮어써짐).
 - `Advisor`를 Spring bean으로 만들지 않는다 (`defaultAdvisors` 목록을 대체해 `LlmLoggerAdvisor`가 빠진다). 호출마다 `AgentExecutor.buildSpec()`에서 붙인다.

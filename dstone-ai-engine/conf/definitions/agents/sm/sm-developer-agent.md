@@ -11,13 +11,14 @@
 # output을 JSON으로 둔 이유: 글자 답이면 LLM이 할 일을 다 끝내지 않고 빈 답으로 멈춰도 성공으로 넘어간다.
 # JSON 답은 엔진이 검사하므로 빈 답이면 이 step이 실패한다.
 id: sm-developer-agent
-version: 1.6.0
+version: 1.7.0
 description: 개발 에이전트. 상세 설계서와 태스크아이템 목록을 바탕으로 개발을 진행한다.
 model:
   temperature: 0.2
   reasoning: medium
 input:
   base_dir: string, 작업 폴더의 절대경로
+  source_dir: string, 원본 소스 루트의 절대경로(요청서의 소스경로)
   request: string, 고객 요청서(00.request.md)의 내용. 소스경로가 들어 있다
   design: string, 상세 설계서(03-1.design.md)의 내용
   taskitems: string, 태스크아이템 목록(03-2.taskitems.md)의 내용
@@ -46,7 +47,7 @@ execution:
 
 [입력]
 request, design, taskitems로 세 문서의 내용을 받는다. 이 문서들을 파일로 다시 읽지 않는다.
-request의 '소스경로' 아래에 적힌 값이 원본 소스의 루트다.
+원본 소스의 루트는 source_dir이다(요청서의 '소스경로'와 같다).
 feedback에 지적이 있으면 다시 개발하는 것이다. 지적된 부분을 반드시 고친다. 태스크아이템 목록 파일에 '완료'로 적힌 항목이라도 지적과 관련 있으면 다시 확인해서 고친다.
 
 
@@ -92,8 +93,9 @@ feedback은 이 단계로 되돌아올 수 있는 뒤쪽 판정과 승인을 한
       원본 소스에서 그 선언("class 이름", "interface 이름", "enum 이름", 메서드 이름)을 찾아 패키지와 인자 모양을 확인한다.
     - 찾지 못하면 지어내지 말고 그 태스크아이템을 '보류'로 두고 무엇이 없는지 적는다.
 2. 컴파일을 확인한다.
-  - 모든 태스크아이템을 끝낸 뒤 runShellScript를 scriptName "sm-compile-check", args [${input.base_dir}] 로 부른다.
-    원본 소스 사본에 dev-resources를 덮어씌워 컴파일해 본다(원본은 바뀌지 않는다).
+  - 모든 태스크아이템을 끝낸 뒤 runShellScript를 scriptName "overlay-compile"로, args는 아래 네 값을 이 순서로 넣어 부른다.
+    [${input.source_dir}, ${input.base_dir}/dev-resources, ${input.base_dir}/compile-check, ${input.base_dir}/dev-resources/_delete-files.txt]
+    원본 소스 사본에 dev-resources를 덮어씌우고 삭제 목록을 지운 뒤 컴파일해 본다(원본은 바뀌지 않는다).
   - "통과:"로 시작하면 끝이다.
   - "실패:"로 시작하면 [ERROR] 줄의 파일(소스경로 기준 경로)과 줄 번호, 없는 심볼(symbol)을 보고 dev-resources의 그 파일을 고친 뒤 다시 부른다.
     없는 심볼은 1-5대로 선언을 찾아 맞춘다. 오류가 dev-resources에 없는 원본 파일에서 났으면, 우리가 바꾼 것(지운 파일, 바꾼 메서드 모양) 때문인지 보고 그쪽을 고친다.

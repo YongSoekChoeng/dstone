@@ -240,17 +240,18 @@ dstone:
         tool:
             # 등록된 스크립트만 실행하는 Tool(tools.shell.ShellExecTool, runShellScript) 설정.
             # allowed-commands에 없는 이름은 실행하지 않는다(비어 있으면 사실상 꺼짐).
+            # 스크립트는 conf/scripts/ 아래에 용도별로 둔다(conf/scripts/README.md). 특정 Workflow 전용 스크립트는 두지 않고,
+            # 경로·빌드 명령 같은 값은 Workflow가 인자로 넘긴다.
             # path를 확장자 없이 적으면 OS를 보고 고른다: Windows는 path.bat(없으면 .cmd), 그 밖은 path.sh.
-            # sm-compile-check: sm-workflow의 컴파일 확인(개발 Agent와 컴파일 확인 step이 부른다). 인자는 작업 폴더 하나.
-            #   원본 소스 사본에 dev-resources를 덮어씌워 mvn compile 한다(scripts/sm/compile-check.sh 설명 참고).
+            # overlay-compile: 원본 사본에 변경 폴더를 덮어씌워 컴파일한다. 인자: 원본 폴더, 변경 폴더, 작업 폴더, [삭제 목록 파일], [빌드 명령]
             # timeout-seconds: 컴파일은 처음 한 번 의존성을 받느라 오래 걸릴 수 있어 넉넉히 둔다(기본 10초).
             # max-output-chars: 오류 줄을 다 보여 주려고 늘린다(기본 4000자).
             shell:
                 timeout-seconds: 600
                 max-output-chars: 12000
                 allowed-commands:
-                    - name: sm-compile-check
-                      path: ${APP_HOME}/dstone-ai-engine/scripts/sm/compile-check
+                    - name: overlay-compile
+                      path: ${APP_CONF_DIR}/scripts/build/overlay-compile
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를
             # 채우는 것 자체가 곧 "이 Tool을 켠 상태"다. api-token은 DB 비밀번호와 동일한 ENC(...)

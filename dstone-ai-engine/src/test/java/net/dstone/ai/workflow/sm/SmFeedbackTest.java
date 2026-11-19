@@ -17,8 +17,8 @@ import net.dstone.ai.support.WorkflowTestBase;
 /**
  * <pre>
  * sm-workflow에서 feedback을 받는 step이 뒤쪽 승인의 결정과 의견을 모두 받는지 확인합니다(LLM 없음).
- * 2026-11-19 실행 4c163653: step15(개발 승인)에서 [재설계]를 고르고 "UPLOADS import가 틀렸다"고 적었는데,
- * step09는 step10의 의견만 받게 되어 있어서 지난번 설계 승인 때 적은 "개발진행해."만 받고 고칠 게 없다고 끝냈습니다.
+ * 2026-11-19 실행 4c163653: 개발 승인에서 [재설계]를 고르고 "UPLOADS import가 틀렸다"고 적었는데,
+ * 아키텍처 설계 step은 설계 승인의 의견만 받게 되어 있어서 지난번 설계 승인 때 적은 "개발진행해."만 받고 고칠 게 없다고 끝냈습니다.
  * </pre>
  */
 public class SmFeedbackTest extends WorkflowTestBase {
@@ -30,11 +30,11 @@ public class SmFeedbackTest extends WorkflowTestBase {
 		state.put("designApproval", approval("승인", "개발진행해."));
 		state.put("developApproval", approval("재설계", "존재하지 않는 UPLOADS를 import한다"));
 
-		String feedback = this.feedbackOf("step09", context);
+		String feedback = this.feedbackOf("step10", context);
 
-		assertThat(feedback).contains("- 설계 승인(step10): 승인 / 개발진행해.")
-			.contains("- 개발 승인(step16): 재설계 / 존재하지 않는 UPLOADS를 import한다")
-			.contains("- 컴파일 확인(step15):");
+		assertThat(feedback).contains("- 설계 승인(step11): 승인 / 개발진행해.")
+			.contains("- 개발 승인(step17): 재설계 / 존재하지 않는 UPLOADS를 import한다")
+			.contains("- 컴파일 확인(step16):");
 	}
 
 	@Test
@@ -42,11 +42,11 @@ public class SmFeedbackTest extends WorkflowTestBase {
 		Map<String, Object> context = WorkFlowContext.create("D:/work", "sm-workflow", "test");
 		WorkFlowContext.state(context).put("designApproval", approval("영향도 재분석", "참고 파일이 틀렸다"));
 
-		String feedback = this.feedbackOf("step06", context);
+		String feedback = this.feedbackOf("step07", context);
 
-		assertThat(feedback).contains("- 설계 승인(step10): 영향도 재분석 / 참고 파일이 틀렸다")
-			.contains("- 영향도 분석 승인(step07):  / ")
-			.contains("- 개발 승인(step16):  /");
+		assertThat(feedback).contains("- 설계 승인(step11): 영향도 재분석 / 참고 파일이 틀렸다")
+			.contains("- 영향도 분석 승인(step08):  / ")
+			.contains("- 개발 승인(step17):  /");
 	}
 
 	@Test
@@ -54,10 +54,10 @@ public class SmFeedbackTest extends WorkflowTestBase {
 		Map<String, Object> context = WorkFlowContext.create("D:/work", "sm-workflow", "test");
 		WorkFlowContext.state(context).put("compileError", "실패: 종료 코드 1\n[ERROR] src/main/java/A.java:[3,29] cannot find symbol");
 
-		String feedback = this.feedbackOf("step14", context);
+		String feedback = this.feedbackOf("step15", context);
 
-		assertThat(feedback).contains("- 컴파일 확인(step15): 실패: 종료 코드 1").contains("A.java:[3,29] cannot find symbol")
-			.contains("- 개발 승인(step16):  /");
+		assertThat(feedback).contains("- 컴파일 확인(step16): 실패: 종료 코드 1").contains("A.java:[3,29] cannot find symbol")
+			.contains("- 개발 승인(step17):  /");
 	}
 
 	private String feedbackOf(String stepId, Map<String, Object> context) {
