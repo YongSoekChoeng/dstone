@@ -403,17 +403,31 @@ var DstoneAiDesigner = (function () {
 		return body;
 	}
 
+	/**
+	 * [검사]·[저장] 직전에 step id를 순서대로 다시 매깁니다(renumberSteps).
+	 * YAML 탭에서 고친 글자가 그림에 아직 반영되지 않았으면 그 글자를 그대로 보내야 하므로 건너뜁니다.
+	 * @return 결과 안내 뒤에 붙일 글(바뀐 것이 없으면 "")
+	 */
+	function autoRenumber() {
+		if (textEdited) {
+			return " (YAML 탭에서 고친 글자라 step id 자동 채번은 건너뛰었습니다. [그림에 반영] 뒤에 다시 누르면 매깁니다.)";
+		}
+		var changes = renumberSteps();
+		return changes ? " (step id를 순서대로 다시 매겼습니다: " + changes + ")" : "";
+	}
+
 	function checkWorkflow() {
 		if (!doc) {
 			return;
 		}
+		var renumbered = autoRenumber();
 		setStatus("검사하는 중...");
 		call("POST", "/api/ai/definitions/workflows/check", requestBody(false)).then(function (result) {
 			setStatus("");
 			if (result.ok) {
-				showMessage("ok", "검사를 통과했습니다. (Workflow " + result.workflows + "개, Agent " + result.agents + "개를 함께 검사)");
+				showMessage("ok", "검사를 통과했습니다. (Workflow " + result.workflows + "개, Agent " + result.agents + "개를 함께 검사)" + renumbered);
 			} else {
-				showMessage("error", result.message);
+				showMessage("error", result.message + renumbered);
 			}
 		}).catch(function (e) {
 			setStatus("");
@@ -428,11 +442,12 @@ var DstoneAiDesigner = (function () {
 		if (textEdited && !window.confirm("YAML 탭에서 고친 글자를 그대로 저장합니다(그림에는 아직 반영하지 않았습니다). 저장할까요?")) {
 			return;
 		}
+		var renumbered = autoRenumber();
 		setStatus("저장하는 중...");
 		call("POST", "/api/ai/definitions/workflows/save", requestBody(true)).then(function (result) {
 			setStatus("");
 			if (!result.ok) {
-				showMessage("error", "저장하지 않았습니다. " + result.message);
+				showMessage("error", "저장하지 않았습니다. " + result.message + renumbered);
 				return;
 			}
 			var savedId = doc.model.id;
@@ -447,7 +462,7 @@ var DstoneAiDesigner = (function () {
 			doc.originalPath = result.path;
 			dirty = false;
 			showPanel();
-			showMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path);
+			showMessage("ok", "저장하고 엔진에 바로 반영했습니다: " + result.path + renumbered);
 			loadCatalog().then(function () {
 				if (textEdited) {
 					openWorkflow(savedId);
@@ -1022,6 +1037,151 @@ var DstoneAiDesigner = (function () {
 			});
 			selected = { type: "step", id: newId };
 		});
+	}
+
+	/**
+	 * step id를 흐름 순서대로 step00, step01 ... 로 다시 매기고, steps 목록도 그 순서로 줄 세웁니다. [검사]와 [저장] 직전에 부릅니다.
+	 * 순서: 첫 step에서 출발해 화살표를 따라가며 처음 만나는 순서(깊이 우선).
+	 *  - 한 step에서는 onFailure → next → routes(적힌 순서) → rejectTo 순으로 따라간다.
+	 *    그래서 실패나 갈래로 빠지는 step은 갈라진 step 바로 뒤 번호를 받는다(sm-workflow의 step04 → step05 처럼).
+	 *  - 이미 번호를 받은 step으로 되돌아가는 화살표는 다시 따라가지 않는다.
+	 *  - 어디서도 닿지 않는 step은 맨 뒤에 목록 순서대로 붙인다.
+	 * 첫 번호는 00이고, 지금 첫 step이 step01이면 01부터 매깁니다(이미 그렇게 쓰던 Workflow의 id를 흔들지 않으려고).
+	 * 바뀐 것이 없으면 model을 건드리지 않습니다(YAML을 다시 만들지 않으니 본문 주석도 그대로입니다).
+	 * @return 바뀐 id 안내 글("a → step01, ...") 또는 ""
+	 */
+	function renumberSteps() {
+		var list = steps();
+		if (!list || list.length === 0) {
+			return "";
+		}
+		var byId = {};
+		list.forEach(function (step) {
+			if (step && step.id) {
+				byId[String(step.id)] = step;
+			}
+		});
+		// 흐름 순서로 줄 세운다.
+		var ordered = [];
+		var seen = [];
+		var visit = function (step) {
+			if (!step || seen.indexOf(step) >= 0) {
+				return;
+			}
+			seen.push(step);
+			ordered.push(step);
+			var targets = [];
+			if (step.onFailure) {
+				targets.push(String(step.onFailure));
+			}
+			if (step.next) {
+				targets.push(String(step.next));
+			}
+			if (step.routes && typeof step.routes === "object") {
+				Object.keys(step.routes).forEach(function (name) {
+					targets.push(String(step.routes[name]));
+				});
+			}
+			if (step.approval && step.approval.rejectTo) {
+				targets.push(String(step.approval.rejectTo));
+			}
+			targets.forEach(function (target) {
+				if (Object.prototype.hasOwnProperty.call(byId, target)) {
+					visit(byId[target]);
+				}
+			});
+		};
+		visit(list[0]);
+		list.forEach(function (step) {
+			if (step && seen.indexOf(step) < 0) {
+				seen.push(step);
+				ordered.push(step);
+			}
+		});
+		// 새 id를 정한다(옛 id → 새 id).
+		var start = list[0] && list[0].id === "step01" ? 1 : 0;
+		var map = {};
+		var changes = [];
+		var orderChanged = false;
+		ordered.forEach(function (step, i) {
+			var n = start + i;
+			var newId = "step" + (n < 10 ? "0" + n : String(n));
+			if (step.id !== newId) {
+				if (step.id) {
+					map[String(step.id)] = newId;
+				}
+				changes.push((step.id || "(id 없음)") + " → " + newId);
+			}
+			if (list[i] !== step) {
+				orderChanged = true;
+			}
+		});
+		if (changes.length === 0 && !orderChanged) {
+			return "";
+		}
+		var renamed = function (id) {
+			return id !== undefined && id !== null && Object.prototype.hasOwnProperty.call(map, String(id)) ? map[String(id)] : id;
+		};
+		change(function () {
+			// 화살표 대상은 옛 id로 찾아야 하므로, step의 id보다 먼저 한꺼번에 바꾼다(step03 ↔ step04처럼 서로 맞바뀌어도 섞이지 않는다).
+			ordered.forEach(function (step) {
+				if (step.next) {
+					step.next = renamed(step.next);
+				}
+				if (step.onFailure) {
+					step.onFailure = renamed(step.onFailure);
+				}
+				if (step.routes && typeof step.routes === "object") {
+					Object.keys(step.routes).forEach(function (name) {
+						step.routes[name] = renamed(step.routes[name]);
+					});
+				}
+				if (step.approval && step.approval.rejectTo) {
+					step.approval.rejectTo = renamed(step.approval.rejectTo);
+				}
+			});
+			ordered.forEach(function (step, i) {
+				var n = start + i;
+				step.id = "step" + (n < 10 ? "0" + n : String(n));
+			});
+			list.length = 0;
+			ordered.forEach(function (step) {
+				list.push(step);
+			});
+			// state 설명에 적힌 stepNN도 맞춘다("step14 step의 결과"처럼 [state 맞추기]가 적은 글). stepNN 모양만 바꾼다.
+			if (doc.model.state && typeof doc.model.state === "object" && !Array.isArray(doc.model.state)) {
+				Object.keys(doc.model.state).forEach(function (name) {
+					var text = doc.model.state[name];
+					if (typeof text === "string") {
+						doc.model.state[name] = text.replace(/\bstep\d+\b/g, function (word) {
+							return renamed(word);
+						});
+					}
+				});
+			}
+			// 노드 위치, 꺾는 점, 연결점의 키도 새 id로 옮긴다.
+			var nextPositions = {};
+			Object.keys(positions).forEach(function (id) {
+				nextPositions[renamed(id)] = positions[id];
+			});
+			positions = nextPositions;
+			var moveKeys = function (source) {
+				var moved = {};
+				Object.keys(source).forEach(function (key) {
+					var bar = key.indexOf("|");
+					moved[bar < 0 ? key : renamed(key.substring(0, bar)) + key.substring(bar)] = source[key];
+				});
+				return moved;
+			};
+			edgeVertices = moveKeys(edgeVertices);
+			edgePorts = moveKeys(edgePorts);
+			if (selected && selected.type === "step") {
+				selected = { type: "step", id: renamed(selected.id) };
+			} else if (selected && selected.type === "edge") {
+				selected = { type: "edge", from: renamed(selected.from), kind: selected.kind, route: selected.route };
+			}
+		});
+		return changes.length > 0 ? changes.join(", ") : "순서만 바꿈";
 	}
 
 	/** 고른 것(step 또는 화살표)을 지웁니다. step을 지우면 그 step을 가리키던 화살표도 지웁니다. */
@@ -1902,7 +2062,7 @@ var DstoneAiDesigner = (function () {
 	function showStepPanel(step) {
 		var fields = STEP_FIELDS[step.type] || [];
 		var html = "<h4><span class=\"wd-type-chip wd-type-" + escapeHtml(step.type) + "\">" + escapeHtml(step.type) + "</span> step</h4>"
-			+ row("id", "영문, 숫자, 밑줄", "<input type=\"text\" id=\"wd-step-id\" value=\"" + escapeHtml(step.id) + "\" />")
+			+ row("id", "[검사]·[저장] 때 흐름 순서대로 stepNN으로 다시 매김", "<input type=\"text\" id=\"wd-step-id\" value=\"" + escapeHtml(step.id) + "\" />")
 			+ row("name", "사람이 읽는 이름(예: 요구사항 분석). 실행에는 안 씀", "<input type=\"text\" id=\"wd-step-name\" value=\"" + escapeHtml(step.name === undefined || step.name === null ? "" : String(step.name)) + "\" />");
 		fields.forEach(function (key) {
 			var value = getValue(step, key);
