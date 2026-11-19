@@ -165,7 +165,7 @@ var DstoneAiOverview = (function () {
 		var html = "<ol class=\"ov-strip\" aria-label=\"step " + steps.length + "개\">";
 		for (var i = 0; i < steps.length; i++) {
 			var step = steps[i];
-			var tip = step.id + " · " + DstoneAi.stepTypeLabel(step.type) + (step.target ? " · " + step.target : "") + (step.forEach ? " · 항목마다 반복" : "");
+			var tip = step.id + (step.name ? " " + step.name : "") + " · " + DstoneAi.stepTypeLabel(step.type) + (step.target ? " · " + step.target : "") + (step.forEach ? " · 항목마다 반복" : "");
 			html += "<li class=\"ov-seg ov-seg-" + esc(step.type) + (step.forEach ? " ov-seg-each" : "") + "\" title=\"" + esc(tip) + "\"><span>" + esc(tip) + "</span></li>";
 		}
 		return html + "</ol>";

@@ -17,7 +17,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 머리, 지금 할 일, 고른 step 구역
 	var headWorkflowEl, headCreatedEl, headElapsedEl, stripEl, stripTextEl;
 	var todoEl, todoTitleEl, todoReasonEl, historyCountEl;
-	var paneEmptyEl, paneBodyEl, paneDotEl, paneIdEl, paneBadgeEl, paneMetaEl, paneTextEl, paneDocsEl, paneRewindBtn, paneCopyStatusEl;
+	var paneEmptyEl, paneBodyEl, paneDotEl, paneIdEl, paneNameEl, paneBadgeEl, paneMetaEl, paneTextEl, paneDocsEl, paneRewindBtn, paneCopyStatusEl;
 	// [다시 실행]으로 고른 step의 미리보기(엔진 GET .../rewind 응답). 패널을 닫으면 비운다.
 	var currentRewind = null;
 
@@ -83,6 +83,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		paneBodyEl = document.getElementById("wa-step-body");
 		paneDotEl = document.getElementById("wa-step-dot");
 		paneIdEl = document.getElementById("wa-step-id");
+		paneNameEl = document.getElementById("wa-step-title");
 		paneBadgeEl = document.getElementById("wa-step-badge");
 		paneMetaEl = document.getElementById("wa-step-meta");
 		paneTextEl = document.getElementById("wa-step-text");
@@ -317,6 +318,9 @@ var DstoneAiWorkflowAdmin = (function () {
 				.then(function () {
 					if (currentDetail && currentDetail.workflowId === workflowId) {
 						renderStrip(currentDetail);
+						// 이름은 정의에만 있으므로, 정의가 늦게 오면 진행 기록과 고른 step 구역도 다시 그린다.
+						paneKey = null;
+						renderHistory(currentDetail);
 					}
 				});
 		}
@@ -333,12 +337,12 @@ var DstoneAiWorkflowAdmin = (function () {
 				done++;
 			}
 			if (state === "current") {
-				currentText = step.id + " (" + DstoneAi.stepTypeLabel(step.type) + ")";
+				currentText = stepLabel(step.id) + " (" + DstoneAi.stepTypeLabel(step.type) + ")";
 			}
 			if (state === "failed") {
-				failedText = step.id;
+				failedText = stepLabel(step.id);
 			}
-			var tip = step.id + ", " + DstoneAi.stepTypeLabel(step.type) + (step.target ? ", " + step.target : "") + (step.forEach ? ", 항목마다 반복" : "") + " - " + SEGMENT_LABELS[state];
+			var tip = step.id + (step.name ? " " + step.name : "") + ", " + DstoneAi.stepTypeLabel(step.type) + (step.target ? ", " + step.target : "") + (step.forEach ? ", 항목마다 반복" : "") + " - " + SEGMENT_LABELS[state];
 			html += "<li class=\"ov-seg ov-seg-" + escapeHtml(step.type) + (step.forEach ? " ov-seg-each" : "") + " wa-seg-" + state + "\""
 				+ " data-step-id=\"" + escapeHtml(step.id) + "\" title=\"" + escapeHtml(tip) + "\"><span>" + escapeHtml(tip) + "</span></li>";
 		}
@@ -476,14 +480,16 @@ var DstoneAiWorkflowAdmin = (function () {
 			tr.setAttribute("data-index", index);
 			tr.setAttribute("tabindex", "0");
 			var text = historyText(h);
+			var name = stepNameOf(h);
 			tr.innerHTML =
-				"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(h.stepId) + "</span></td>" +
+				"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(h.stepId) + "</span>"
+					+ (name ? "<span class=\"wa-step-cell-name\">" + escapeHtml(name) + "</span>" : "") + "</td>" +
 				"<td><span class=\"wa-outcome wa-outcome-" + (h.success ? "ok" : "fail") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
 				"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : escapeHtml(durationText(h.durationMs))) + "</td>" +
 				"<td class=\"wa-line" + (h.success ? "" : " wa-text-failed") + "\">" + escapeHtml(text ? text.replace(/\s+/g, " ").substring(0, 300) : "-") + "</td>" +
 				"<td class=\"wa-num wa-doc-count\"></td>" +
 				"<td title=\"" + escapeHtml(formatTime(h.executedAt)) + "\">" + escapeHtml(clockText(h.executedAt)) + "</td>";
-			tr.title = h.stepId + ", " + DstoneAi.stepTypeLabel(h.stepType) + (h.ref ? ", " + h.ref : "");
+			tr.title = h.stepId + (name ? " " + name : "") + ", " + DstoneAi.stepTypeLabel(h.stepType) + (h.ref ? ", " + h.ref : "");
 			historyBodyEl.appendChild(tr);
 		});
 
@@ -626,7 +632,10 @@ var DstoneAiWorkflowAdmin = (function () {
 		paneKey = key;
 
 		paneDotEl.className = "wa-type-dot wa-type-" + (h.stepType || "");
+		var paneName = stepNameOf(h);
 		paneIdEl.textContent = h.stepId;
+		paneNameEl.textContent = paneName || "";
+		paneNameEl.style.display = paneName ? "" : "none";
 		paneBadgeEl.className = "workflow-badge workflow-badge-" + (h.success ? "done" : "failed");
 		paneBadgeEl.textContent = h.success ? "성공" : "실패";
 		paneMetaEl.innerHTML = "";
@@ -665,7 +674,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 		paneRewindBtn.textContent = stepId + "부터 다시 실행";
 		paneRewindBtn.disabled = isActive(currentDetail.status);
-		paneRewindBtn.title = paneRewindBtn.disabled ? "실행 중에는 되돌릴 수 없습니다. 먼저 일시정지하세요." : stepId + " step부터 다시 실행합니다";
+		paneRewindBtn.title = paneRewindBtn.disabled ? "실행 중에는 되돌릴 수 없습니다. 먼저 일시정지하세요." : stepLabel(stepId) + " step부터 다시 실행합니다";
 	}
 
 	function addMeta(text) {
@@ -807,6 +816,41 @@ var DstoneAiWorkflowAdmin = (function () {
 	// forEach step의 이력은 "apply[0]"처럼 순번이 붙는다. 파일 기록은 순번 없이 step id로 남는다.
 	function baseStepId(stepId) {
 		return String(stepId || "").replace(/\[\d+\]$/, "");
+	}
+
+	/*
+	 * step의 사람용 이름(정의의 name). 정의는 지금 등록된 것이라, 실행한 뒤에 step 번호를 다시 매겼으면
+	 * 같은 id가 다른 step일 수 있다. 그래서 기록 줄은 종류와 부른 대상(Agent/Tool)이 정의와 같을 때만 이름을 붙인다.
+	 */
+	function stepDefOf(stepId) {
+		var defs = currentDetail ? stepDefs[currentDetail.workflowId] : null;
+		if (!defs || defs === "loading") {
+			return null;
+		}
+		var id = baseStepId(stepId);
+		for (var i = 0; i < defs.length; i++) {
+			if (defs[i].id === id) {
+				return defs[i];
+			}
+		}
+		return null;
+	}
+
+	function stepNameOf(h) {
+		var def = stepDefOf(h.stepId);
+		if (!def || !def.name) {
+			return null;
+		}
+		if ((h.stepType && def.type && h.stepType !== def.type) || (h.ref && def.target && h.ref !== def.target)) {
+			return null;
+		}
+		return def.name;
+	}
+
+	/** "step06(영향도 분석)"처럼 id 뒤에 이름을 붙인다. 이름이 없으면 id만 */
+	function stepLabel(stepId) {
+		var def = stepDefOf(stepId);
+		return def && def.name ? stepId + "(" + def.name + ")" : String(stepId);
 	}
 
 	// 이 step이 앞 회차에서는 문서를 썼는데, 마지막 회차(since 이후)에는 한 문서도 쓰지 않았으면 앞 회차 문서들을 돌려준다.
@@ -1000,7 +1044,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			controlMessageEl.textContent = point.problem;
 			return;
 		}
-		controlMessageEl.textContent = (detail.status === "FAILED" ? "다시 실행할 step: " : "재개할 step: ") + point.stepId + " (" + point.stepType + ")";
+		controlMessageEl.textContent = (detail.status === "FAILED" ? "다시 실행할 step: " : "재개할 step: ") + stepLabel(point.stepId) + " (" + point.stepType + ")";
 		(point.warnings || []).forEach(function (warning) {
 			var li = document.createElement("li");
 			li.textContent = warning;
@@ -1012,7 +1056,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	function openRewind(stepId) {
 		var executionId = activeExecutionId;
 		rewindEl.style.display = "";
-		rewindMessageEl.textContent = stepId + " step을 확인하는 중입니다...";
+		rewindMessageEl.textContent = stepLabel(stepId) + " step을 확인하는 중입니다...";
 		rewindWarningsEl.innerHTML = "";
 		rewindFilesEl.style.display = "none";
 		rewindKeptEl.style.display = "none";
@@ -1122,7 +1166,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		if (!point) {
 			return;
 		}
-		var message = point.stepId + " step부터 이어 갈까요?";
+		var message = stepLabel(point.stepId) + " step부터 이어 갈까요?";
 		if (point.warnings && point.warnings.length > 0) {
 			message += "\n\n" + point.warnings.join("\n");
 		}
@@ -1222,7 +1266,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 		var label = "";
 		if (pendingApproval) {
-			label = pendingApproval.stepId + " step에서 결정을 기다립니다." + (pendingApproval.approverRole ? " 결정할 사람: " + pendingApproval.approverRole + "." : "")
+			label = stepLabel(pendingApproval.stepId) + " step에서 결정을 기다립니다." + (pendingApproval.approverRole ? " 결정할 사람: " + pendingApproval.approverRole + "." : "")
 				+ (hasRoutes ? " 아래 선택지 중 하나를 고르세요." : " 진행 기록에서 앞 step의 결과와 문서를 확인한 뒤 결정하세요.");
 		}
 		decisionStepEl.textContent = label;

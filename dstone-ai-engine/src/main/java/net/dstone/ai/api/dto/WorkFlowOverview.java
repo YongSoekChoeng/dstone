@@ -22,11 +22,12 @@ public record WorkFlowOverview(String id, String description, String path, List<
 
 	/**
 	 * @param id      step id
+	 * @param name    사람이 읽는 step 이름(정의의 name, 예: 영향도 분석). 없으면 null
 	 * @param type    AGENT, SUPERVISOR, ROUTER, TOOL, APPROVAL
 	 * @param target  step이 부르는 Agent 또는 Tool 이름. 없으면 null
 	 * @param forEach 항목마다 반복하는 step이면 true
 	 */
-	public record Step(String id, String type, String target, boolean forEach) {
+	public record Step(String id, String name, String type, String target, boolean forEach) {
 	}
 
 	/**
@@ -37,7 +38,7 @@ public record WorkFlowOverview(String id, String description, String path, List<
 		List<Step> steps = new ArrayList<Step>();
 		if (definition.steps() != null) {
 			for (StepDefinition step : definition.steps()) {
-				steps.add(new Step(step.id(), step.type() == null ? null : step.type().name(), StepDefinition.refOf(step), StepDefinition.forEachOf(step) != null));
+				steps.add(new Step(step.id(), step.name(), step.type() == null ? null : step.type().name(), StepDefinition.refOf(step), StepDefinition.forEachOf(step) != null));
 			}
 		}
 		return new WorkFlowOverview(definition.id(), definition.description(), path, steps);

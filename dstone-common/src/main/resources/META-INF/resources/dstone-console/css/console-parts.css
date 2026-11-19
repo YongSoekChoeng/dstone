@@ -2847,6 +2847,24 @@ body.wd-full-on {
 	font-weight: 600;
 }
 
+/* step id 아래 한 줄로 보이는 사람용 이름(정의의 name). 칸이 좁으면 말줄임이 되고, 줄 전체의 풍선도움말에 다 나온다 */
+.wa-history-table .wa-step-cell-name {
+	display: block;
+	margin-left: 16px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+/* 고른 step 구역 제목의 이름 */
+.wa-step-name .wa-step-title {
+	color: var(--cs-text-2);
+	font-weight: 600;
+}
+
 .wa-type-dot {
 	display: inline-block;
 	width: 8px;
