@@ -87,6 +87,39 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		assertThat(message).contains("execution.requiredTools").contains("readFile").contains("tools.allowed에 없습니다");
 	}
 
+	@Test
+	void 둘_중_하나만_적은_항목은_어느_것이든_성공하면_된다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
+		// sm-architect-agent(step09)는 requiredTools: [writeFile|editFileTexts]다. 지적을 반영할 때는 editFileTexts로만 끝난다.
+		Path design = this.workDir.resolve("03-1.design.md");
+		Files.writeString(design, "import kr.co.gnx.system.file.UPLOADS;\n");
+		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + design.toString().replace("\\", "/")
+			+ "\", \"edits\": [{\"before\": \"kr.co.gnx.system.file.UPLOADS\", \"after\": \"kr.co.gnx.config.Constants.UPLOADS\"}]}");
+		this.chatModel.answer("지적된 import만 고쳤습니다.");
+
+		Map<String, Object> input = new LinkedHashMap<>();
+		input.put("base_dir", this.workDir.toString().replace("\\", "/"));
+		input.put("request", "## 현업요청\n이미지 게시판");
+		input.put("requirement", "# 요구사항");
+		input.put("impact", "# 영향도");
+		input.put("feedback", "- 개발 승인(step15): 재설계 / UPLOADS import가 틀렸다");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step09", input);
+		flow.step("step09");
+
+		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(Files.readString(design)).contains("kr.co.gnx.config.Constants.UPLOADS");
+	}
+
+	@Test
+	void 둘_중_하나_이름도_tools_allowed에_있어야_한다() {
+		String path = this.agentRegistry.pathOf(AGENT_ID);
+		String text = this.source(path).replace("  requiredTools:\n    - writeFile", "  requiredTools:\n    - writeFile|readFile");
+
+		String message = this.checkFails(Map.of(path, text));
+
+		assertThat(message).contains("execution.requiredTools").contains("'readFile'").contains("tools.allowed에 없습니다");
+	}
+
 	private Map<String, Object> stepInput() {
 		Map<String, Object> input = new LinkedHashMap<>();
 		input.put("base_dir", this.workDir.toString().replace("\\", "/"));

@@ -711,9 +711,16 @@ public class AgentExecutor extends BaseObject {
 	 */
 	private void checkRequiredTools(AgentDefinition agent, Set<String> succeededTools, Object answer) {
 		List<String> missing = new ArrayList<>();
-		for (String toolName : agent.requiredTools()) {
-			if (!succeededTools.contains(toolName)) {
-				missing.add(toolName);
+		for (String entry : agent.requiredTools()) {
+			// "writeFile|editFileTexts"처럼 |로 나눠 적은 항목은 그중 하나만 성공하면 된다.
+			boolean done = false;
+			for (String toolName : entry.split("\\|")) {
+				if (succeededTools.contains(toolName.trim())) {
+					done = true;
+				}
+			}
+			if (!done) {
+				missing.add(entry);
 			}
 		}
 		if (missing.isEmpty()) {

@@ -303,6 +303,8 @@ public class AgentRegistry extends BaseObject {
 	 * - LLM이 볼 수 없는 Tool은 부를 수도 없으므로, tools.allowed에 있는 이름만 적을 수 있습니다.
 	 *   tools.allowed가 "*"이면 등록된 Tool 이름이어야 합니다(TOOL step 전용 Tool은 안 됩니다).
 	 * - 같은 이름을 두 번 적으면 막습니다(오타로 다른 이름을 빠뜨린 것일 수 있습니다).
+	 * - "writeFile|editFileTexts"처럼 |로 나눠 적으면 그중 하나만 성공하면 됩니다. 나눈 이름마다 위 검사를 합니다.
+	 *   (기존 문서를 지적된 곳만 고치는 Agent는 writeFile 없이 editFileTexts로 끝날 수 있기 때문입니다.)
 	 * </pre>
 	 *
 	 * @param definition      검사할 Agent 정의
@@ -312,21 +314,31 @@ public class AgentRegistry extends BaseObject {
 		List<String> required = definition.requiredTools();
 		String where = "agent[" + definition.id() + "]의 execution.requiredTools";
 		List<String> seen = new ArrayList<>();
-		for (String toolName : required) {
-			if (toolName == null || toolName.isBlank()) {
+		for (String entry : required) {
+			if (entry == null || entry.isBlank()) {
 				throw new IllegalStateException(where + "에 빈 이름이 있습니다: " + required);
 			}
-			if (seen.contains(toolName)) {
-				throw new IllegalStateException(where + "에 '" + toolName + "'를 두 번 적었습니다: " + required);
+			for (String part : entry.split("\\|")) {
+				this.checkRequiredToolName(definition, registeredTools, where, required, seen, part.trim());
 			}
-			seen.add(toolName);
-			if (definition.allowsAllTools()) {
-				if (!registeredTools.contains(toolName) || this.configTool.isStepOnly(toolName)) {
-					throw new IllegalStateException(where + "의 '" + toolName + "'는 LLM에게 줄 수 있는 등록된 Tool이 아닙니다.");
-				}
-			} else if (!definition.toolNames().contains(toolName)) {
-				throw new IllegalStateException(where + "의 '" + toolName + "'가 tools.allowed에 없습니다. LLM이 볼 수 없는 Tool은 부를 수 없으니 tools.allowed에도 적으십시오. tools.allowed = " + definition.toolNames());
+		}
+	}
+
+	/** requiredTools의 이름 하나(| 로 나눈 것 포함)를 검사합니다. */
+	private void checkRequiredToolName(AgentDefinition definition, List<String> registeredTools, String where, List<String> required, List<String> seen, String toolName) {
+		if (toolName.isEmpty()) {
+			throw new IllegalStateException(where + "에 빈 이름이 있습니다: " + required);
+		}
+		if (seen.contains(toolName)) {
+			throw new IllegalStateException(where + "에 '" + toolName + "'를 두 번 적었습니다: " + required);
+		}
+		seen.add(toolName);
+		if (definition.allowsAllTools()) {
+			if (!registeredTools.contains(toolName) || this.configTool.isStepOnly(toolName)) {
+				throw new IllegalStateException(where + "의 '" + toolName + "'는 LLM에게 줄 수 있는 등록된 Tool이 아닙니다.");
 			}
+		} else if (!definition.toolNames().contains(toolName)) {
+			throw new IllegalStateException(where + "의 '" + toolName + "'가 tools.allowed에 없습니다. LLM이 볼 수 없는 Tool은 부를 수 없으니 tools.allowed에도 적으십시오. tools.allowed = " + definition.toolNames());
 		}
 	}
 
