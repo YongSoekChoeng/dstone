@@ -120,7 +120,7 @@ steps:
       approverRole: PL
     save: impactApproval
     routes:
-      승인: step08
+      승인(설계진행): step08
       고객요청사항 재분석: step02
       영향도 재분석: step06
       중지: FAIL
@@ -158,7 +158,7 @@ steps:
       approverRole: PL
     save: designApproval
     routes:
-      승인: step11
+      승인(개발진행): step11
       영향도 재분석: step06
       재설계: step09
       중지: FAIL
@@ -202,8 +202,7 @@ steps:
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
-      feedback: |-
-        - 개발 승인(step15): ${state.developApproval.decision:} / ${state.developApproval.comment:}
+      feedback: "- 개발 승인(step15): ${state.developApproval.decision:} / ${state.developApproval.comment:}"
     next: step15
     onFailure: FAIL
 
@@ -217,9 +216,9 @@ steps:
       승인: END
       고객요청사항 재분석: step02
       영향도 재분석: step06
+      재설계: step09
       재개발: step14
       실패: FAIL
-      재설계: step09
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용

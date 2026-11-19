@@ -142,13 +142,13 @@
       "x" : 1100,
       "y" : 1100
     } ],
-    "step15|route|재개발" : [ {
-      "x" : 940,
-      "y" : 1570
-    } ],
     "step15|route|재설계" : [ {
       "x" : 960,
       "y" : 1310
+    } ],
+    "step15|route|재개발" : [ {
+      "x" : 940,
+      "y" : 1570
     } ]
   },
   "ports" : {
@@ -240,6 +240,10 @@
       "source" : "right",
       "target" : "right"
     },
+    "step15|route|재설계" : {
+      "source" : "right",
+      "target" : "right"
+    },
     "step15|route|재개발" : {
       "source" : "right",
       "target" : "right"
@@ -247,10 +251,6 @@
     "step15|route|실패" : {
       "source" : "left",
       "target" : "in"
-    },
-    "step15|route|재설계" : {
-      "source" : "right",
-      "target" : "right"
     }
   }
 }
