@@ -5,46 +5,46 @@
       "y" : -230
     },
     "END" : {
-      "x" : 860,
-      "y" : 1590
+      "x" : 880,
+      "y" : 1790
     },
     "FAIL" : {
       "x" : 30,
-      "y" : 1590
+      "y" : 1800
     },
     "step13" : {
-      "x" : 640,
-      "y" : 1330
-    },
-    "step12" : {
-      "x" : 170,
-      "y" : 1250
+      "x" : 630,
+      "y" : 1460
     },
     "step11" : {
       "x" : 170,
-      "y" : 1120
+      "y" : 1250
     },
     "step10" : {
       "x" : 170,
-      "y" : 970
+      "y" : 1120
     },
     "step09" : {
+      "x" : 170,
+      "y" : 970
+    },
+    "step08" : {
       "x" : 630,
       "y" : 840
     },
-    "step08" : {
+    "step07" : {
       "x" : 170,
       "y" : 760
     },
-    "step07" : {
+    "step06" : {
       "x" : 170,
       "y" : 610
     },
-    "step06" : {
+    "step05" : {
       "x" : 620,
       "y" : 460
     },
-    "step05" : {
+    "step15" : {
       "x" : 170,
       "y" : 360
     },
@@ -70,7 +70,11 @@
     },
     "step14" : {
       "x" : 170,
-      "y" : 1420
+      "y" : 1640
+    },
+    "step12" : {
+      "x" : 170,
+      "y" : 1380
     }
   },
   "edges" : {
@@ -78,59 +82,69 @@
       "x" : 54,
       "y" : 120
     } ],
-    "step05|route|고객요청사항 재분석" : [ {
-      "x" : 540,
-      "y" : 220
-    } ],
-    "step05|route|중지" : [ {
-      "x" : 80,
-      "y" : 460
-    }, {
-      "x" : 54,
-      "y" : 490
-    } ],
-    "step07|route|고객요청사항 재분석" : [ {
+    "step06|route|고객요청사항 재분석" : [ {
       "x" : 940,
       "y" : 360
     }, {
       "x" : 940,
       "y" : 210
     } ],
-    "step07|route|영향도 재분석" : [ {
+    "step06|route|영향도 재분석" : [ {
       "x" : 610,
       "y" : 610
     }, {
       "x" : 790,
       "y" : 590
     } ],
-    "step10|route|영향도 재분석" : [ {
+    "step09|route|영향도 재분석" : [ {
       "x" : 1010,
       "y" : 760
     } ],
-    "step10|route|아키텍처 재설계" : [ {
+    "step09|route|아키텍처 재설계" : [ {
       "x" : 600,
       "y" : 980
     }, {
       "x" : 890,
       "y" : 980
     } ],
+    "step14|route|승인" : [ {
+      "x" : 580,
+      "y" : 1750
+    } ],
     "step14|route|고객요청사항 재분석" : [ {
-      "x" : 1100,
-      "y" : 1160
+      "x" : 430,
+      "y" : 1390
     }, {
-      "x" : 1100,
-      "y" : 1030
+      "x" : 540,
+      "y" : 1180
+    }, {
+      "x" : 1050,
+      "y" : 1180
+    }, {
+      "x" : 1050,
+      "y" : 770
     } ],
     "step14|route|영향도 재분석" : [ {
-      "x" : 1150,
+      "x" : 470,
+      "y" : 1210
+    }, {
+      "x" : 1100,
       "y" : 1100
     } ],
     "step14|route|재개발" : [ {
-      "x" : 780,
-      "y" : 1420
+      "x" : 940,
+      "y" : 1570
+    } ],
+    "step15|route|고객요청사항 재분석" : [ {
+      "x" : 540,
+      "y" : 220
+    } ],
+    "step15|route|중지" : [ {
+      "x" : 80,
+      "y" : 460
     }, {
-      "x" : 1050,
-      "y" : 1420
+      "x" : 54,
+      "y" : 490
     } ]
   },
   "ports" : {
@@ -162,39 +176,39 @@
       "source" : "left",
       "target" : "in"
     },
-    "step05|route|그대로 진행" : {
-      "source" : "right",
-      "target" : "in"
-    },
-    "step07|route|고객요청사항 재분석" : {
+    "step06|route|고객요청사항 재분석" : {
       "source" : "right",
       "target" : "right"
     },
-    "step07|route|영향도 재분석" : {
+    "step06|route|영향도 재분석" : {
       "source" : "right",
       "target" : "right"
     },
-    "step07|route|중지" : {
+    "step06|route|중지" : {
       "source" : "left",
       "target" : "in"
     },
-    "step08|next|" : {
+    "step07|next|" : {
       "source" : "right",
       "target" : "in"
     },
-    "step08|onFailure|" : {
+    "step07|onFailure|" : {
       "source" : "left",
       "target" : "in"
     },
-    "step10|route|영향도 재분석" : {
+    "step09|route|영향도 재분석" : {
       "source" : "right",
       "target" : "right"
     },
-    "step10|route|아키텍처 재설계" : {
+    "step09|route|아키텍처 재설계" : {
       "source" : "right",
       "target" : "right"
     },
-    "step10|route|중지" : {
+    "step09|route|중지" : {
+      "source" : "left",
+      "target" : "in"
+    },
+    "step10|onFailure|" : {
       "source" : "left",
       "target" : "in"
     },
@@ -204,10 +218,6 @@
     },
     "step12|next|" : {
       "source" : "right",
-      "target" : "in"
-    },
-    "step12|onFailure|" : {
-      "source" : "left",
       "target" : "in"
     },
     "step13|onFailure|" : {
@@ -228,6 +238,10 @@
     },
     "step14|route|실패" : {
       "source" : "left",
+      "target" : "in"
+    },
+    "step15|route|그대로 진행" : {
+      "source" : "right",
       "target" : "in"
     }
   }

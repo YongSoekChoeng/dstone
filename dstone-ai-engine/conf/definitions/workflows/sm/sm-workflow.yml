@@ -78,21 +78,10 @@ steps:
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
-    next: step06
-    onFailure: step05
+    next: step05
+    onFailure: step15
 
   - id: step05
-    name: 리뷰 불통과 처리 결정
-    type: APPROVAL
-    approval:
-      approverRole: PL
-    save: reviewDecision
-    routes:
-      그대로 진행: step06
-      고객요청사항 재분석: step02
-      중지: FAIL
-
-  - id: step06
     name: 영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
@@ -103,32 +92,32 @@ steps:
       feedback: |-
         ${state.impactApproval.comment:}
         ${state.developApproval.comment:}
-    next: step07
+    next: step06
     save: impactPath
 
-  - id: step07
+  - id: step06
     name: 영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: impactApproval
     routes:
-      승인: step08
+      승인: step07
       고객요청사항 재분석: step02
-      영향도 재분석: step06
+      영향도 재분석: step05
       중지: FAIL
 
-  - id: step08
+  - id: step07
     name: 영향도분석서 읽기
     type: TOOL
     tool: readFile
     with:
       fileFullPath: ${input}/${state.now}/02.impact.md
     save: impact
-    next: step09
+    next: step08
     onFailure: FAIL
 
-  - id: step09
+  - id: step08
     name: 아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
@@ -138,40 +127,48 @@ steps:
       requirement: ${state.requirement}
       impact: ${state.impact}
       feedback: ${state.designApproval.comment:}
-    next: step10
+    next: step09
     save: architectPath
 
-  - id: step10
+  - id: step09
     name: 설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: designApproval
     routes:
-      승인: step11
-      영향도 재분석: step06
-      아키텍처 재설계: step09
+      승인: step10
+      영향도 재분석: step05
+      아키텍처 재설계: step08
       중지: FAIL
 
-  - id: step11
+  - id: step10
     name: 상세 설계서 읽기
     type: TOOL
     tool: readFile
     with:
       fileFullPath: ${input}/${state.now}/03-1.design.md
     save: design
-    next: step12
+    next: step11
     onFailure: FAIL
 
-  - id: step12
+  - id: step11
     name: 태스크아이템 목록 읽기
     type: TOOL
     tool: readFile
     with:
       fileFullPath: ${input}/${state.now}/03-2.taskitems.md
     save: taskitems
-    next: step13
+    next: step12
     onFailure: FAIL
+
+  - id: step12
+    name: 기존개발디렉토리초기화
+    type: TOOL
+    tool: deleteDir
+    with:
+      fileFullPath: ${input}/${state.now}/dev-resources
+    next: step13
 
   - id: step13
     name: 개발
@@ -195,9 +192,20 @@ steps:
     routes:
       승인: END
       고객요청사항 재분석: step02
-      영향도 재분석: step06
+      영향도 재분석: step05
       재개발: step13
       실패: FAIL
+
+  - id: step15
+    name: 리뷰 불통과 처리 결정
+    type: APPROVAL
+    approval:
+      approverRole: PL
+    save: reviewDecision
+    routes:
+      그대로 진행: step05
+      고객요청사항 재분석: step02
+      중지: FAIL
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
@@ -210,5 +218,5 @@ state:
   taskitems: 태스크아이템 목록 내용
   now: 작업을 시작한 시각(yyyyMMdd-HHmm). 작업 폴더 이름으로 쓴다
   developApproval: step14 step의 결과
-  impactPath: step09 step의 결과
-  architectPath: step09 step의 결과
+  impactPath: step08 step의 결과
+  architectPath: step08 step의 결과
