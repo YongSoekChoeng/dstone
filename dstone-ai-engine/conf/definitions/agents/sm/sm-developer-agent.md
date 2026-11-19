@@ -11,7 +11,7 @@
 # output을 JSON으로 둔 이유: 글자 답이면 LLM이 할 일을 다 끝내지 않고 빈 답으로 멈춰도 성공으로 넘어간다.
 # JSON 답은 엔진이 검사하므로 빈 답이면 이 step이 실패한다.
 id: sm-developer-agent
-version: 1.7.0
+version: 1.8.0
 description: 개발 에이전트. 상세 설계서와 태스크아이템 목록을 바탕으로 개발을 진행한다.
 model:
   temperature: 0.2
@@ -37,7 +37,7 @@ tools:
     - appendFile
     - copyFileWithReplace
     - searchInFiles
-    - runShellScript
+    - compileJava
 execution:
   maxToolCalls: 120
 ---
@@ -93,14 +93,15 @@ feedback은 이 단계로 되돌아올 수 있는 뒤쪽 판정과 승인을 한
       원본 소스에서 그 선언("class 이름", "interface 이름", "enum 이름", 메서드 이름)을 찾아 패키지와 인자 모양을 확인한다.
     - 찾지 못하면 지어내지 말고 그 태스크아이템을 '보류'로 두고 무엇이 없는지 적는다.
 2. 컴파일을 확인한다.
-  - 모든 태스크아이템을 끝낸 뒤 runShellScript를 scriptName "overlay-compile"로, args는 아래 네 값을 이 순서로 넣어 부른다.
-    [${input.source_dir}, ${input.base_dir}/dev-resources, ${input.base_dir}/compile-check, ${input.base_dir}/dev-resources/_delete-files.txt]
-    원본 소스 사본에 dev-resources를 덮어씌우고 삭제 목록을 지운 뒤 컴파일해 본다(원본은 바뀌지 않는다).
-  - "통과:"로 시작하면 끝이다.
-  - "실패:"로 시작하면 [ERROR] 줄의 파일(소스경로 기준 경로)과 줄 번호, 없는 심볼(symbol)을 보고 dev-resources의 그 파일을 고친 뒤 다시 부른다.
+  - 모든 태스크아이템을 끝낸 뒤 compileJava를 부른다.
+    sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources, outputDir ${input.base_dir}/compile-check,
+    deleteList ${input.base_dir}/dev-resources/_delete-files.txt. 나머지 인자는 비운다.
+    원본은 바뀌지 않는다. 바뀐 파일과, 바뀐 클래스를 쓰는 원본 파일만 컴파일해 본다.
+  - success가 true면 끝이다.
+  - false면 오류 줄(파일:줄:칸: 내용)을 보고 dev-resources의 그 파일을 고친 뒤 다시 부른다. "(원본)"이 붙은 파일은 원본 파일이 우리 변경 때문에 깨진 것이다.
     없는 심볼은 1-5대로 선언을 찾아 맞춘다. 오류가 dev-resources에 없는 원본 파일에서 났으면, 우리가 바꾼 것(지운 파일, 바꾼 메서드 모양) 때문인지 보고 그쪽을 고친다.
-  - runShellScript는 이번 일에서 최대 3번까지 부른다. 3번째도 실패하면 더 고치지 말고, 남은 오류를 관련 태스크아이템의 '보류' 이유로 적는다.
-  - 스크립트를 찾지 못했다거나(화이트리스트 없음) 실행할 수 없다는 답이면 다시 부르지 않고 넘어간다. 다음 step이 한 번 더 확인한다.
+  - compileJava는 이번 일에서 최대 3번까지 부른다. 3번째도 실패하면 더 고치지 말고, 남은 오류를 관련 태스크아이템의 '보류' 이유로 적는다.
+  - 원본의 클래스 파일이 없다거나 컴파일러가 없다는 답처럼 코드와 상관없는 실패면 다시 부르지 않고 넘어간다. 다음 step이 한 번 더 확인한다.
 3. 결과를 ${input.base_dir}/03-2.taskitems.md 에 기록한다. 이 단계를 빼먹고 답하지 않는다.
   - editFileTexts를 한 번 불러 해당 행만 고친다. writeFile로 전체를 다시 쓰지 않는다.
   - 구현한 태스크아이템은 상태를 '완료'로 바꾸고 변경 요약(바꾼 파일, 위치, 내용)을 덧붙인다.
