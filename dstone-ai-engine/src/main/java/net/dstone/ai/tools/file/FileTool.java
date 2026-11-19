@@ -234,19 +234,49 @@ public class FileTool {
 	 */
 	private static final String CANNOT_READ_MESSAGE = "실패: 파일을 읽을 수 없습니다(존재하지 않거나 읽기 권한이 없음): ";
 
+	/**
+	 * <pre>
+	 * 파일을 읽습니다. 읽는 양은 설정값(dstone.ai.tool.file.max-read-chars, 기본 30000자)까지입니다.
+	 * Java 코드에서 부를 때 쓰는 모양입니다(FileSetTool 등).
+	 * </pre>
+	 *
+	 * @param fileFullPath 읽을 파일의 절대경로
+	 */
+	public String readFile(String fileFullPath) {
+		return this.readFile(fileFullPath, null);
+	}
+
+	/**
+	 * <pre>
+	 * 파일을 읽습니다. 너무 크면 앞부분만 주고 잘렸다는 안내를 붙입니다.
+	 *
+	 * maxChars를 비우면 설정값(기본 30000자)까지 읽습니다.
+	 * TOOL step이 문서를 통째로 다음 Agent에 넘길 때는 maxChars를 크게 줍니다.
+	 * 문서가 잘린 채 넘어가면 Agent가 없는 부분을 지어내려다 같은 생각만 되풀이하기 때문입니다
+	 * (2026-11-19, sm-workflow 개발 step이 30000자에서 잘린 설계서를 받고 출력 한도를 다 쓴 일).
+	 * 다만 엔진은 모든 Tool 결과를 dstone.ai.tool.max-result-chars(기본 60000자)에서 한 번 더 자르므로, 그보다 크게 줘도 소용이 없습니다.
+	 * </pre>
+	 *
+	 * @param fileFullPath 읽을 파일의 절대경로
+	 * @param maxChars     돌려줄 최대 글자 수. 비우거나 0 이하면 설정값
+	 */
 	@Tool(description = "절대경로 fileFullPath의 파일을 읽어서 파일내용을 스트링형식으로 반환한다. 사용자가 '파일 읽기' 등을 요청할 때 사용한다. "
 		+ "파일이 크면 앞부분만 반환하고 잘렸다는 안내를 붙인다. 로그처럼 끝부분이 중요한 큰 파일은 readFileTail을 사용한다. 같은 파일을 다시 읽지 마라.")
-	public String readFile(@ToolParam String fileFullPath) {
+	public String readFile(
+			@ToolParam(description = "읽을 파일의 절대경로(파일명 포함)") String fileFullPath,
+			@ToolParam(required = false, description = "돌려줄 최대 글자 수. 보통은 비워 둔다(설정값을 쓴다)") Integer maxChars) {
 		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
 			return CANNOT_READ_MESSAGE + fileFullPath;
 		}
-		int maxChars = this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
-		if (contents.length() <= maxChars) {
+		int limit = (maxChars != null && maxChars.intValue() > 0)
+			? maxChars.intValue()
+			: this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
+		if (contents.length() <= limit) {
 			return contents;
 		}
-		return contents.substring(0, maxChars)
-			+ "\n\n...(파일이 커서 전체 " + contents.length() + "자 중 앞 " + maxChars + "자만 반환했습니다. 끝부분이 필요하면 readFileTail을 사용하세요.)";
+		return contents.substring(0, limit)
+			+ "\n\n...(파일이 커서 전체 " + contents.length() + "자 중 앞 " + limit + "자만 반환했습니다. 끝부분이 필요하면 readFileTail을 사용하세요.)";
 	}
 
 	/**
