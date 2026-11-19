@@ -26,6 +26,7 @@ import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.annotation.ToolCategory;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
+import net.dstone.ai.runtime.tool.ToolCallGate;
 import net.dstone.ai.runtime.workflow.file.WorkFlowFileRecorder;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
@@ -46,7 +47,8 @@ import net.dstone.common.utils.LogUtil;
  * 이렇게 하면 한 앱에게만 허용된 Tool을 다른 앱이 가져다 쓰는 일을 막을 수 있습니다.
  * 특정 caller에 대한 화이트리스트 설정이 아예 없으면, 그 caller는 화이트리스트 제한이 없는 것으로 보고 등록된 Tool을 전부 허용합니다.
  *
- * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌우고, 호출할 때마다 로그 한 줄(이름, 인자, 결과 길이)을 남깁니다(LimitedToolCallback).
+ * 그리고 모든 Tool에 "결과 크기 상한"을 한 번에 씌웁니다(LimitedToolCallback).
+ * Tool 실행은 runtime.tool.ToolCallGate를 거치므로, 호출 로그는 ConfigCallLog가 그 bean에 AOP로 남깁니다.
  * Workflow step에서 부른 파일 Tool이면 어떤 파일을 읽고 썼는지도 여기서 기록합니다(WorkFlowFileRecorder).
  * Tool 결과는 대화 이력에 쌓여 다음 LLM 호출마다 다시 보내지기 때문에, 어떤 Tool이든 결과가 크면 모델의 컨텍스트 한도를 넘거나 응답 대기 시간을 넘겨 버립니다. 
  * Tool마다 따로 막으면 새 Tool이나 MCP Tool에서 빠뜨리기 쉬우므로, 여기서 모든 Tool에 마지막 안전망을 하나 둡니다.
@@ -54,8 +56,6 @@ import net.dstone.common.utils.LogUtil;
  */
 @Component
 public class ConfigTool extends BaseObject {
-
-	private static final org.slf4j.Logger TOOL_CALL_LOGGER = org.slf4j.LoggerFactory.getLogger(ConfigTool.class);
 
 	@Autowired
 	private ApplicationContext applicationContext;
@@ -67,6 +67,8 @@ public class ConfigTool extends BaseObject {
 	private Environment environment;
 	@Autowired
 	private WorkFlowFileRecorder fileRecorder;
+	@Autowired
+	private ToolCallGate toolCallGate;
 
 	/** 설정이 없을 때 쓰는 Tool (한건당)호출 결과 글자 수 상한입니다(대략 2만 토큰 안팎). */
 	private static final int DEFAULT_MAX_RESULT_CHARS = 60000;
@@ -121,14 +123,14 @@ public class ConfigTool extends BaseObject {
 		int maxResultChars = this.maxResultChars();
 		List<ToolCallback> limited = new ArrayList<>(merged.size());
 		for (ToolCallback callback : merged) {
-			limited.add(new LimitedToolCallback(callback, maxResultChars, this.fileRecorder));
+			limited.add(new LimitedToolCallback(callback, maxResultChars, this.fileRecorder, this.toolCallGate));
 		}
 		// TOOL step 전용 Tool은 상한 없이 등록합니다(호출 로그는 똑같이 남깁니다).
 		Set<String> stepOnlyNames = new HashSet<>();
 		if (!stepOnlyBeans.isEmpty()) {
 			for (ToolCallback callback : MethodToolCallbackProvider.builder().toolObjects(stepOnlyBeans.toArray()).build().getToolCallbacks()) {
 				merged.add(callback);
-				limited.add(new LimitedToolCallback(callback, Integer.MAX_VALUE, this.fileRecorder));
+				limited.add(new LimitedToolCallback(callback, Integer.MAX_VALUE, this.fileRecorder, this.toolCallGate));
 				stepOnlyNames.add(callback.getToolDefinition().name());
 			}
 		}
@@ -230,7 +232,7 @@ public class ConfigTool extends BaseObject {
 	 * @param callback 상한을 씌울 ToolCallback
 	 */
 	public ToolCallback limited(ToolCallback callback) {
-		return new LimitedToolCallback(callback, this.maxResultChars(), this.fileRecorder);
+		return new LimitedToolCallback(callback, this.maxResultChars(), this.fileRecorder, this.toolCallGate);
 	}
 
 	/**
@@ -332,8 +334,6 @@ public class ConfigTool extends BaseObject {
 	 */
 	private static final class LimitedToolCallback implements ToolCallback {
 
-		/** 호출 로그에 남길 인자의 최대 글자 수입니다. */
-		private static final int MAX_LOGGED_ARGUMENT_CHARS = 300;
 		/** Tool 인자(JSON)가 온전한지 읽어 보는 용도입니다. */
 		private static final ObjectMapper ARGUMENT_READER = new ObjectMapper();
 		/** 인자가 끊겨서 왔을 때 LLM에게 돌려주는 안내입니다. */
@@ -344,16 +344,19 @@ public class ConfigTool extends BaseObject {
 		private final ToolCallback delegate;
 		private final int maxResultChars;
 		private final WorkFlowFileRecorder fileRecorder;
+		private final ToolCallGate toolCallGate;
 
 		/**
 		 * @param delegate       실제 Tool 호출을 맡는 원래 ToolCallback입니다.
 		 * @param maxResultChars 결과로 돌려줄 최대 글자 수입니다.
 		 * @param fileRecorder   Workflow step이 읽고 쓴 파일을 기록하는 곳입니다.
+		 * @param toolCallGate   Tool을 실제로 실행하는 bean입니다. 호출 로그가 여기에 걸립니다.
 		 */
-		private LimitedToolCallback(ToolCallback delegate, int maxResultChars, WorkFlowFileRecorder fileRecorder) {
+		private LimitedToolCallback(ToolCallback delegate, int maxResultChars, WorkFlowFileRecorder fileRecorder, ToolCallGate toolCallGate) {
 			this.delegate = delegate;
 			this.maxResultChars = maxResultChars;
 			this.fileRecorder = fileRecorder;
+			this.toolCallGate = toolCallGate;
 		}
 
 		@Override
@@ -369,22 +372,22 @@ public class ConfigTool extends BaseObject {
 		@Override
 		public String call(String toolInput) {
 			if (this.isCutOff(toolInput)) {
-				return this.logged(toolInput, CUT_OFF_ARGUMENT_MESSAGE);
+				return CUT_OFF_ARGUMENT_MESSAGE;
 			}
-			return this.logged(toolInput, this.limit(this.delegate.call(toolInput)));
+			return this.limit(this.toolCallGate.invoke(this.delegate.getToolDefinition().name(), toolInput, null, this.delegate));
 		}
 
 		@Override
 		public String call(String toolInput, ToolContext toolContext) {
 			if (this.isCutOff(toolInput)) {
-				return this.logged(toolInput, CUT_OFF_ARGUMENT_MESSAGE);
+				return CUT_OFF_ARGUMENT_MESSAGE;
 			}
 			// 쓰는 Tool이면 부르기 전에 없던 파일을 봐 둡니다. 재실행 때 이 실행이 새로 만든 파일만 지우기 위해서입니다.
 			List<String> missingBefore = this.fileRecorder.missingBefore(this.delegate.getToolDefinition().name(), toolInput, toolContext);
-			String result = this.delegate.call(toolInput, toolContext);
+			String result = this.toolCallGate.invoke(this.delegate.getToolDefinition().name(), toolInput, toolContext, this.delegate);
 			// Workflow step에서 부른 파일 Tool이면 어떤 파일을 읽고 썼는지 남깁니다(자르기 전의 답으로 성공 여부를 봅니다).
 			this.fileRecorder.record(this.delegate.getToolDefinition().name(), toolInput, result, toolContext, missingBefore);
-			return this.logged(toolInput, this.limit(result));
+			return this.limit(result);
 		}
 
 		/**
@@ -408,22 +411,6 @@ public class ConfigTool extends BaseObject {
 				LogUtil.sysout("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 인자 JSON이 끊겨서 도착했습니다(출력 토큰 한도 초과로 보임) - " + toolInput.length() + "자, " + e.getClass().getSimpleName());
 				return true;
 			}
-		}
-
-		/**
-		 * Tool을 한 번 부를 때마다 이름, 인자, 결과 길이를 한 줄로 남기고 결과를 그대로 돌려줍니다.
-		 * LLM이 스스로 Tool을 고르는 호출은 다른 곳에 기록이 남지 않습니다. 이 한 줄이 없으면 LLM이 같은 검색을
-		 * 수십 번 되풀이할 때 무엇을 찾고 있었는지 알 수 없습니다.
-		 * 인자가 길면(파일 내용을 통째로 넘기는 writeFile 등) 앞부분만 남깁니다.
-		 */
-		private String logged(String toolInput, String result) {
-			String arguments = toolInput == null ? "" : toolInput.replace('\n', ' ');
-			if (arguments.length() > MAX_LOGGED_ARGUMENT_CHARS) {
-				arguments = arguments.substring(0, MAX_LOGGED_ARGUMENT_CHARS) + "...(전체 " + toolInput.length() + "자)";
-			}
-			// 기동 스크립트가 stdout을 버리므로 execution.log에 남도록 로거로 씁니다. Agent가 무엇을 되풀이하는지 볼 때 필요합니다.
-			TOOL_CALL_LOGGER.info("dstone-ai-engine tool: [" + this.delegate.getToolDefinition().name() + "] 호출 - 인자 " + arguments + " / 결과 " + (result == null ? 0 : result.length()) + "자");
-			return result;
 		}
 
 		/** 결과가 상한을 넘으면 앞부분만 남기고 안내를 붙입니다. */

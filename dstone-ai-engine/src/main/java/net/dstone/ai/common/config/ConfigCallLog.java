@@ -17,6 +17,8 @@ import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.util.JacksonUtils;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
@@ -61,7 +63,7 @@ public class ConfigCallLog extends BaseObject {
 	private final static String WORKFLOW_POINTCUT 		= "execution(* net.dstone.ai.runtime.workflow.WorkFlowExecutor.run(..))" + " && !" + NO_LOG_REGEX;
 	private final static String STEPEXECUTOR_POINTCUT 	= "execution(* net.dstone.ai.runtime.step.*StepExecutor.run(..))" + " && !" + NO_LOG_REGEX;
 	private final static String AGENT_POINTCUT 			= "execution(* net.dstone.ai.runtime.agent.AgentExecutor.*(..))" + " && !" + NO_LOG_REGEX;
-	private final static String TOOL_POINTCUT 			= "execution(* net.dstone.ai.runtime.tool.ToolExecutor.*(..))" + " && !" + NO_LOG_REGEX;
+	private final static String TOOL_POINTCUT 			= "execution(* net.dstone.ai.runtime.tool.ToolCallGate.invoke(..))" + " && !" + NO_LOG_REGEX;
 	private final static boolean PARAM_MULTI_LINE 		= false;
 
 	
@@ -348,14 +350,16 @@ public class ConfigCallLog extends BaseObject {
 	
 	/**
 	 * <pre>
-	 * tools 패키지(Agent나 TOOL 스텝이 호출할 수 있는 Tool들이 들어있는 패키지)의 메소드가
-	 * 호출될 때마다 "시작"과 "끝" 두 줄을 로그로 남깁니다. 어떤 Tool이 어떤 값으로 호출됐고
+	 * Tool이 실행될 때마다 "시작"과 "끝" 두 줄을 로그로 남깁니다. 어떤 Tool이 어떤 값으로 호출됐고
 	 * 무엇을 돌려줬는지 확인할 수 있습니다.
 	 *
-	 * 참고: 스프링 AOP는 public 메소드만 감시할 수 있습니다.
+	 * TOOL step이든, AGENT step에서 LLM이 고른 Tool이든, MCP·Skill·Sub Agent든 실행은 모두
+	 * runtime.tool.ToolCallGate.invoke(...)를 지나므로 그 메소드 하나만 감시합니다.
+	 * 앞 단계에서 막혀 실행되지 않은 호출(예산 초과, 같은 파일 다시 읽기, 끊긴 인자 등)은 남지 않습니다.
+	 * 결과는 자르기 전의 원래 값입니다. 인자 중 ToolCallback은 내부 객체라 로그에서 뺍니다.
 	 * </pre>
 	 *
-	 * @param joinPoint 지금 호출되고 있는 tools 패키지 메소드에 대한 정보
+	 * @param joinPoint 지금 호출되고 있는 ToolCallGate.invoke(...)에 대한 정보
 	 * @return 원래 메소드가 반환하는 값을 그대로 돌려줍니다
 	 * @throws Throwable 원래 메소드에서 예외가 발생하면 그 예외를 그대로 다시 던집니다
 	 */
@@ -390,9 +394,9 @@ public class ConfigCallLog extends BaseObject {
 		log.append("<input>");
 		log.append("\n");
 		if(PARAM_MULTI_LINE) {
-			log.append(""+ this.buildParamInfo(joinPoint) +"");
+			log.append(""+ this.buildToolParamInfo(paramNames, paramValues) +"");
 		}else {
-			log.append(""+ this.removeCarrageReturn(this.buildParamInfo(joinPoint)) +"");
+			log.append(""+ this.removeCarrageReturn(this.buildToolParamInfo(paramNames, paramValues)) +"");
 		}
 		log.append("\n");
 		log.append("</input>");
@@ -409,9 +413,9 @@ public class ConfigCallLog extends BaseObject {
 		log.append("<output>");
 		log.append("\n");	
 		if(PARAM_MULTI_LINE) {
-			log.append(""+ output.toString() +"");
+			log.append(""+ String.valueOf(output) +"");
 		}else {
-			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
+			log.append(""+ this.removeCarrageReturn(String.valueOf(output)) +"");
 		}
 		log.append("\n");
 		log.append("</output>");
@@ -421,6 +425,37 @@ public class ConfigCallLog extends BaseObject {
 		return output;
 	}
 	
+	/**
+	 * <pre>
+	 * Tool 호출 로그에 남길 인자 목록을 "이름=[값]" 모양으로 만듭니다.
+	 * ToolCallback은 내부 객체라 통째로 찍으면 읽을 수 없으므로 빼고, ToolContext는 안에 든 값만 찍습니다.
+	 * </pre>
+	 *
+	 * @param paramNames  인자 이름들
+	 * @param paramValues 인자 값들
+	 */
+	private String buildToolParamInfo(String[] paramNames, Object[] paramValues) {
+		StringBuffer info = new StringBuffer();
+		if (paramNames == null || paramValues == null) {
+			return "";
+		}
+		int minLength = Math.min(paramNames.length, paramValues.length);
+		for (int i = 0; i < minLength; i++) {
+			Object value = paramValues[i];
+			if (value instanceof ToolCallback) {
+				continue;
+			}
+			if (info.length() > 0) {
+				info.append(", ");
+			}
+			if (value instanceof ToolContext) {
+				value = ((ToolContext) value).getContext();
+			}
+			info.append(paramNames[i]).append("=[").append(String.valueOf(value)).append("]");
+		}
+		return info.toString();
+	}
+
 	/**
 	 * 로그를 읽는 사람이 "이 호출이 정확히 무엇에 관한 것인지" 한눈에 알아볼 수 있도록, 클래스 이름과
 	 * 메소드 이름에 덧붙일 짧은 식별자를 만들어 줍니다. 예를 들어 인자로 WorkFlowDefinition을

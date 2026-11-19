@@ -16,9 +16,11 @@ import net.dstone.common.core.BaseObject;
 
 /**
  * <pre>
- * TOOL step이 LLM을 거치지 않고 Tool 하나를 이름만으로 직접 호출할 때 반드시 지나가는 유일한 통로입니다. 
- * 모든 TOOL 호출이 예외 없이 이 클래스를 거치기 때문에, 나중에 governance 기능이 생겨서 Tool 호출 내역을 감사하거나 제한하고 싶어질 때도 
- * 이 클래스 하나만 손보면 됩니다.
+ * TOOL step이 LLM을 거치지 않고 Tool 하나를 이름만으로 직접 호출할 때 지나가는 통로입니다.
+ * caller 화이트리스트를 검사하고, ToolContext에 caller·실행 id·step id를 실어 부른 뒤, 결과 JSON을 풀어 돌려줍니다.
+ *
+ * TOOL step 전용입니다. AGENT step에서 LLM이 고른 Tool은 이 클래스를 거치지 않습니다.
+ * 두 경로 모두의 Tool 실행이 지나가는 곳은 runtime.tool.ToolCallGate입니다. 호출 로그와 감사·제한 기능은 그쪽에 둡니다.
  * </pre>
  */
 @Component
