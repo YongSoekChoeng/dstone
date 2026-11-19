@@ -379,6 +379,12 @@ public class FileTool {
 	public void deleteFile(@ToolParam String fileFullPath) {
 		net.dstone.common.utils.FileUtil.deleteFile(fileFullPath);
 	}
+	
+	@Tool(description = "절대경로 filePath의 디렉토리(폴더)를 삭제한다. 사용자가 '경로 삭제'/'폴더 삭제'/'디렉토리 삭제' 등을 요청할 때 사용한다.")
+	public void deleteDir(@ToolParam String fileFullPath) {
+		net.dstone.common.utils.FileUtil.deleteDir(fileFullPath);
+	}
+
 
 	/**
 	 * <pre>
