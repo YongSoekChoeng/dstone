@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
-import net.dstone.ai.common.config.ChatProviders;
+import net.dstone.ai.common.config.ConfigProviders;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
@@ -74,7 +74,7 @@ public class AgentRegistry extends BaseObject {
 	@Autowired
 	private ConfigTool configTool;
 	@Autowired
-	private ChatProviders chatProviders;
+	private ConfigProviders configProviders;
 	@Autowired
 	private SkillRegistry skillRegistry;
 
@@ -218,7 +218,7 @@ public class AgentRegistry extends BaseObject {
 	private void checkCallOptions(AgentDefinition definition) {
 		String where = "agent[" + definition.id() + "]의 ";
 		// model
-		String providerProblem = this.chatProviders.problemOf(definition.providerName());
+		String providerProblem = this.configProviders.problemOf(definition.providerName());
 		if (providerProblem != null) {
 			throw new IllegalStateException(where + providerProblem);
 		}

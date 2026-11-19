@@ -13,7 +13,7 @@ import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import net.dstone.ai.common.config.ChatProviders;
+import net.dstone.ai.common.config.ConfigProviders;
 import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.registry.DefinitionReloader;
@@ -43,14 +43,14 @@ public class SampleAgentProviderOverrideTest extends WorkflowTestBase {
 
 	@Test
 	void model_provider를_적은_Agent는_그_provider로_부르고_Tool도_돌아간다() {
-		assumeFalse(ChatProviders.OLLAMA.equals(this.chatProviders.defaultProvider()), "기본 provider가 ollama면 다른 provider로 갈 일이 없습니다.");
+		assumeFalse(ConfigProviders.OLLAMA.equals(this.chatProviders.defaultProvider()), "기본 provider가 ollama면 다른 provider로 갈 일이 없습니다.");
 		this.chatModel.answerToolCalls("getCurrentDateTime", "{}");
 		this.chatModel.answer("지금은 낮입니다.");
 
 		WorkFlowExecution execution = this.run(WORKFLOW_ID, "지금 시각을 알려 줘.");
 
 		assertThat(execution.status()).as(String.valueOf(execution)).isEqualTo(WorkFlowExecutionStatus.DONE);
-		assertThat(this.chatProviders.created()).contains(ChatProviders.OLLAMA);
+		assertThat(this.chatProviders.created()).contains(ConfigProviders.OLLAMA);
 		if (!this.chatModel.isLlmCall()) {
 			assertThat(this.chatModel.prompts()).hasSize(2);
 		}
@@ -58,14 +58,14 @@ public class SampleAgentProviderOverrideTest extends WorkflowTestBase {
 
 	@Test
 	void provider마다_맞는_종류의_옵션을_만든다() {
-		assertThat(this.configChatClient.requestOptions(ChatProviders.OLLAMA, null, "none", null, null).build()).isInstanceOf(OllamaChatOptions.class);
-		assertThat(this.configChatClient.requestOptions(ChatProviders.ANTHROPIC, null, "none", null, null).build()).isInstanceOf(AnthropicChatOptions.class);
-		assertThat(this.configChatClient.requestOptions(ChatProviders.OPENAI, null, "none", null, null).build()).isInstanceOf(OpenAiChatOptions.class);
+		assertThat(this.configChatClient.requestOptions(ConfigProviders.OLLAMA, null, "none", null, null).build()).isInstanceOf(OllamaChatOptions.class);
+		assertThat(this.configChatClient.requestOptions(ConfigProviders.ANTHROPIC, null, "none", null, null).build()).isInstanceOf(AnthropicChatOptions.class);
+		assertThat(this.configChatClient.requestOptions(ConfigProviders.OPENAI, null, "none", null, null).build()).isInstanceOf(OpenAiChatOptions.class);
 	}
 
 	@Test
 	void 실제_ChatModel은_spring_ai_설정의_기본_모델로_만들어진다() {
-		for (String provider : ChatProviders.SUPPORTED) {
+		for (String provider : ConfigProviders.SUPPORTED) {
 			String expected = this.configProperty.getProperty("spring.ai." + provider + ".chat.options.model");
 			assertThat(this.chatProviders.createRealModel(provider).getDefaultOptions().getModel()).as(provider).isEqualTo(expected);
 		}

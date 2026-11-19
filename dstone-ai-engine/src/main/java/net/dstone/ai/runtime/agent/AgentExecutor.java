@@ -31,7 +31,7 @@ import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
 import net.dstone.ai.common.advisors.LlmCallGateAdvisor;
 import net.dstone.ai.common.advisors.ReasoningStripAdvisor;
 import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
-import net.dstone.ai.common.config.ChatProviders;
+import net.dstone.ai.common.config.ConfigProviders;
 import net.dstone.ai.common.config.ConfigChatClient;
 import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
@@ -124,7 +124,7 @@ public class AgentExecutor extends BaseObject {
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
 	@Autowired
-	private ChatProviders chatProviders;
+	private ConfigProviders configProviders;
 	@Autowired
 	private LlmCallGate llmCallGate;
 	@Autowired
@@ -363,8 +363,8 @@ public class AgentExecutor extends BaseObject {
 	private Object reshape(AgentDefinition agent, String modelOverride, String answer, Map<String, Object> schema, String jsonSchema, AgentContractException failure) {
 		this.info("agent[" + agent.id() + "]의 답에 계약에 맞는 JSON이 없어 형식 변환을 한 번 부릅니다: " + failure.getMessage());
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
-		String provider = this.chatProviders.resolve(agent.providerName());
-		ChatClient.ChatClientRequestSpec spec = this.chatProviders.clientOf(provider).prompt().system(EnginePrompt.compose(EnginePrompt.RESHAPE, null));
+		String provider = this.configProviders.resolve(agent.providerName());
+		ChatClient.ChatClientRequestSpec spec = this.configProviders.clientOf(provider).prompt().system(EnginePrompt.compose(EnginePrompt.RESHAPE, null));
 		spec = this.gated(spec, provider, agent.id());
 		ChatOptions.Builder<?> options = this.configChatClient.requestOptions(provider, model, "none", null, agent.timeoutSeconds());
 		if (options != null) {
@@ -469,8 +469,8 @@ public class AgentExecutor extends BaseObject {
 		/************************************************************************
 		1. 요청 스펙을 만들기 시작합니다.
 		************************************************************************/
-		String provider = this.chatProviders.resolve(agent.providerName());
-		ChatClient.ChatClientRequestSpec spec = this.chatProviders.clientOf(provider).prompt();
+		String provider = this.configProviders.resolve(agent.providerName());
+		ChatClient.ChatClientRequestSpec spec = this.configProviders.clientOf(provider).prompt();
 
 		/************************************************************************
 		2. 대화방 id(conversationId)가 있으면, 그 대화방의 이전 대화를 기억하는 Advisor를 붙입니다.

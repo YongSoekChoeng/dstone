@@ -22,7 +22,7 @@ import net.dstone.ai.api.dto.ChatRequest;
 import net.dstone.ai.api.dto.ChatResponse;
 import net.dstone.ai.api.dto.ToolSummary;
 import net.dstone.ai.common.config.ConfigTool;
-import net.dstone.ai.common.config.ChatProviders;
+import net.dstone.ai.common.config.ConfigProviders;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.registry.AgentRegistry;
@@ -60,7 +60,7 @@ public class ChatController extends BaseController {
 	@Autowired
 	ConfigProperty configProperty;
 	@Autowired
-	ChatProviders chatProviders;
+	ConfigProviders configProviders;
 	@Autowired
 	AgentRegistry agentRegistry;
 	@Autowired
@@ -116,7 +116,7 @@ public class ChatController extends BaseController {
 		this.checkInput(agent, request);
 		this.checkTools(agent, caller, request);
 		Object output = this.agentExecutor.call(agent, sessionId, caller, request.input(), request.tools(), request.model(), null, null);
-		String provider = this.chatProviders.resolve(agent.providerName());
+		String provider = this.configProviders.resolve(agent.providerName());
 		return new ChatResponse(output, provider, sessionId, request.agent(), this.resolveModel(request, agent, provider));
 	}
 

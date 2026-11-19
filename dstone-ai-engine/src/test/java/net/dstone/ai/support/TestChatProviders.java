@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.springframework.ai.chat.model.ChatModel;
 
-import net.dstone.ai.common.config.ChatProviders;
+import net.dstone.ai.common.config.ConfigProviders;
 
 /**
  * <pre>
@@ -13,7 +13,7 @@ import net.dstone.ai.common.config.ChatProviders;
  * dstone.ai.test.llmcall이 true면 운영과 똑같이 실제 ChatModel을 만듭니다.
  * </pre>
  */
-public class TestChatProviders extends ChatProviders {
+public class TestChatProviders extends ConfigProviders {
 
 	private final ScriptedChatModel chatModel;
 

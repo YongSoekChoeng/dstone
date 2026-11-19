@@ -62,7 +62,7 @@ import net.dstone.common.utils.StringUtil;
  * </pre>
  */
 @Component
-public class ChatProviders {
+public class ConfigProviders {
 
 	public static final String ANTHROPIC = "anthropic";
 	public static final String OPENAI = "openai";

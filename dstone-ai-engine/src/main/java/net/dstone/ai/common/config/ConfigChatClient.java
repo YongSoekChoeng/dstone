@@ -177,7 +177,7 @@ public class ConfigChatClient {
 	 * - reasoning을 적지 않은 Agent에는 아무것도 넣지 않습니다(provider와 모델의 기본 동작을 씁니다).
 	 * </pre>
 	 *
-	 * @param provider  이번 호출이 가는 provider입니다(ChatProviders.resolve()). 옵션은 그 provider에 맞는 종류로 만듭니다.
+	 * @param provider  이번 호출이 가는 provider입니다(ConfigProviders.resolve()). 옵션은 그 provider에 맞는 종류로 만듭니다.
 	 * @param model     이번 호출에서 쓸 모델명입니다. 비어 있으면 provider 공통 기본 모델을 씁니다.
 	 * @param reasoning 이번 호출의 추론 세기입니다(none/low/medium/high). 비어 있으면 provider와 모델의 기본 동작을 씁니다.
 	 * @param temperature 이번 호출의 temperature입니다. 비어 있으면 provider 설정값을 씁니다.
