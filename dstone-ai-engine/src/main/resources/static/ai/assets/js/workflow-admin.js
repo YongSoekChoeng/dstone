@@ -17,6 +17,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 머리, 지금 할 일, 고른 step 구역
 	var headWorkflowEl, headCreatedEl, headElapsedEl, stripEl, stripTextEl;
 	var todoEl, todoTitleEl, todoReasonEl, historyCountEl;
+	var historyPagerEl;
 	var paneEmptyEl, paneBodyEl, paneDotEl, paneIdEl, paneNameEl, paneBadgeEl, paneMetaEl, paneTextEl, paneDocsEl, paneRewindBtn, paneCopyStatusEl;
 	// [다시 실행]으로 고른 step의 미리보기(엔진 GET .../rewind 응답). 패널을 닫으면 비운다.
 	var currentRewind = null;
@@ -33,6 +34,10 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 진행 기록에서 고른 줄의 순번(-1이면 없음). 사람이 직접 골랐으면 pickedByUser가 true다.
 	var selectedIndex = -1;
 	var pickedByUser = false;
+	/** 진행 기록 페이지(0 = 가장 최근 20줄). 사람이 페이지 단추를 눌렀으면 자동 갱신 때도 그 페이지에 머문다 */
+	var historyPage = 0;
+	var historyPageByUser = false;
+	var HISTORY_PAGE_SIZE = 20;
 	// 고른 step 구역에 마지막으로 그린 내용. 같으면 다시 그리지 않는다(읽던 스크롤을 지킨다).
 	var paneKey = null;
 	// Workflow별 step 정의(흐름 띠용). 값이 "loading"이면 읽는 중이다.
@@ -65,6 +70,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		detailContextEl = document.getElementById("workflow-admin-detail-context");
 		historyBodyEl = document.getElementById("workflow-admin-history-body");
 		historyCountEl = document.getElementById("wa-history-count");
+		historyPagerEl = document.getElementById("wa-history-pager");
 
 		headWorkflowEl = document.getElementById("wa-head-workflow");
 		headCreatedEl = document.getElementById("wa-head-created");
@@ -260,6 +266,8 @@ var DstoneAiWorkflowAdmin = (function () {
 			currentFiles = null;
 			selectedIndex = -1;
 			pickedByUser = false;
+			historyPage = 0;
+			historyPageByUser = false;
 			paneKey = null;
 			closeRewind();
 		}
@@ -468,39 +476,108 @@ var DstoneAiWorkflowAdmin = (function () {
 
 	/* ---------- 진행 기록: 한 줄씩 ---------- */
 
+	/*
+	 * 진행 기록. 가장 최근 줄이 맨 위이고(시간 역순), 20줄씩 페이지로 나눈다.
+	 * 줄의 data-index는 기록 배열(시간순)의 위치 그대로라서, 고르기·문서 개수·되감기는 순서와 상관없이 같은 값을 쓴다.
+	 */
 	function renderHistory(detail) {
 		var history = detail.history || [];
 		historyCountEl.textContent = history.length > 0 ? history.length + "줄" : "";
-		historyBodyEl.innerHTML = "";
-		if (history.length === 0) {
-			historyBodyEl.innerHTML = "<tr><td colspan=\"6\" class=\"wa-history-empty\">아직 끝난 step이 없습니다.</td></tr>";
-		}
-		history.forEach(function (h, index) {
-			var tr = document.createElement("tr");
-			tr.setAttribute("data-index", index);
-			tr.setAttribute("tabindex", "0");
-			var text = historyText(h);
-			var name = stepNameOf(h);
-			tr.innerHTML =
-				"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(h.stepId) + "</span>"
-					+ (name ? "<span class=\"wa-step-cell-name\">" + escapeHtml(name) + "</span>" : "") + "</td>" +
-				"<td><span class=\"wa-outcome wa-outcome-" + (h.success ? "ok" : "fail") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
-				"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : escapeHtml(durationText(h.durationMs))) + "</td>" +
-				"<td class=\"wa-line" + (h.success ? "" : " wa-text-failed") + "\">" + escapeHtml(text ? text.replace(/\s+/g, " ").substring(0, 300) : "-") + "</td>" +
-				"<td class=\"wa-num wa-doc-count\"></td>" +
-				"<td title=\"" + escapeHtml(formatTime(h.executedAt)) + "\">" + escapeHtml(clockText(h.executedAt)) + "</td>";
-			tr.title = h.stepId + (name ? " " + name : "") + ", " + DstoneAi.stepTypeLabel(h.stepType) + (h.ref ? ", " + h.ref : "");
-			historyBodyEl.appendChild(tr);
-		});
 
 		// 고를 줄: 사람이 고른 줄이 있으면 그대로, 아니면 실패한 마지막 줄, 그것도 없으면 마지막 줄(실행 중이면 새 줄을 따라간다)
 		if (!pickedByUser || selectedIndex >= history.length) {
 			selectedIndex = defaultRow(detail);
 			pickedByUser = false;
 		}
+		// 페이지: 사람이 페이지를 넘겼거나 줄을 직접 골랐으면 그대로, 아니면 자동으로 고른 줄(보통 최근 줄)이 있는 페이지
+		if (!historyPageByUser && !pickedByUser && selectedIndex >= 0) {
+			historyPage = pageOfRow(selectedIndex);
+		}
+		drawHistoryRows();
+	}
+
+	function historyPageCount() {
+		var history = (currentDetail && currentDetail.history) || [];
+		return Math.max(Math.ceil(history.length / HISTORY_PAGE_SIZE), 1);
+	}
+
+	/** 기록 배열의 index가 몇 번째 페이지에 나오는지(최근 줄이 0페이지) */
+	function pageOfRow(index) {
+		var history = (currentDetail && currentDetail.history) || [];
+		return Math.floor((history.length - 1 - index) / HISTORY_PAGE_SIZE);
+	}
+
+	/** 지금 페이지의 줄을 최근 것부터 그리고, 페이지 단추와 문서 칸, 고른 step 구역을 맞춘다 */
+	function drawHistoryRows() {
+		var history = (currentDetail && currentDetail.history) || [];
+		historyPage = Math.min(Math.max(historyPage, 0), historyPageCount() - 1);
+		historyBodyEl.innerHTML = "";
+		if (history.length === 0) {
+			historyBodyEl.innerHTML = "<tr><td colspan=\"6\" class=\"wa-history-empty\">아직 끝난 step이 없습니다.</td></tr>";
+		}
+		var first = history.length - 1 - historyPage * HISTORY_PAGE_SIZE;
+		var last = Math.max(first - HISTORY_PAGE_SIZE + 1, 0);
+		for (var index = first; index >= last; index--) {
+			historyBodyEl.appendChild(historyRow(history[index], index));
+		}
+		renderHistoryPager();
 		renderHistoryDocs();
 		highlightRow();
 		renderPane();
+	}
+
+	function historyRow(h, index) {
+		var tr = document.createElement("tr");
+		tr.setAttribute("data-index", index);
+		tr.setAttribute("tabindex", "0");
+		var text = historyText(h);
+		var name = stepNameOf(h);
+		tr.innerHTML =
+			"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(h.stepId) + "</span>"
+				+ (name ? "<span class=\"wa-step-cell-name\">" + escapeHtml(name) + "</span>" : "") + "</td>" +
+			"<td><span class=\"wa-outcome wa-outcome-" + (h.success ? "ok" : "fail") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
+			"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : escapeHtml(durationText(h.durationMs))) + "</td>" +
+			"<td class=\"wa-line" + (h.success ? "" : " wa-text-failed") + "\">" + escapeHtml(text ? text.replace(/\s+/g, " ").substring(0, 300) : "-") + "</td>" +
+			"<td class=\"wa-num wa-doc-count\"></td>" +
+			"<td title=\"" + escapeHtml(formatTime(h.executedAt)) + "\">" + escapeHtml(clockText(h.executedAt)) + "</td>";
+		tr.title = (index + 1) + "번째 줄, " + h.stepId + (name ? " " + name : "") + ", " + DstoneAi.stepTypeLabel(h.stepType) + (h.ref ? ", " + h.ref : "");
+		return tr;
+	}
+
+	// [이전] 1 2 3 [다음]. 목록 표와 같은 모양. 한 페이지에 다 들어가면 단추를 숨긴다
+	function renderHistoryPager() {
+		var history = (currentDetail && currentDetail.history) || [];
+		var pages = historyPageCount();
+		historyPagerEl.innerHTML = "";
+		historyPagerEl.style.display = history.length > HISTORY_PAGE_SIZE ? "" : "none";
+		if (history.length <= HISTORY_PAGE_SIZE) {
+			return;
+		}
+		addHistoryPageButton("최근", 0, historyPage === 0);
+		addHistoryPageButton("이전", historyPage - 1, historyPage === 0);
+		var from = Math.max(historyPage - 2, 0);
+		var to = Math.min(historyPage + 2, pages - 1);
+		for (var page = from; page <= to; page++) {
+			addHistoryPageButton(String(page + 1), page, page === historyPage);
+		}
+		addHistoryPageButton("다음", historyPage + 1, historyPage === pages - 1);
+	}
+
+	function addHistoryPageButton(label, page, disabled) {
+		var button = document.createElement("button");
+		button.type = "button";
+		button.textContent = label;
+		button.disabled = disabled;
+		if (page !== historyPage || label === "최근" || label === "이전" || label === "다음") {
+			button.className = "kn-plain";
+		}
+		button.addEventListener("click", function () {
+			historyPage = page;
+			// 맨 앞(최근) 페이지로 돌아오면 다시 새 줄을 따라간다
+			historyPageByUser = page !== 0;
+			drawHistoryRows();
+		});
+		historyPagerEl.appendChild(button);
 	}
 
 	function defaultRow(detail) {
@@ -540,6 +617,12 @@ var DstoneAiWorkflowAdmin = (function () {
 			}
 		}
 		selectedIndex = index;
+		if (pageOfRow(index) !== historyPage) {
+			historyPage = pageOfRow(index);
+			historyPageByUser = historyPage !== 0;
+			drawHistoryRows();
+			return;
+		}
 		highlightRow();
 		renderPane();
 	}
@@ -560,10 +643,11 @@ var DstoneAiWorkflowAdmin = (function () {
 		}
 		var index = Number(tr.getAttribute("data-index"));
 		var next = null;
+		// 최근 줄이 위에 있으므로 ↓는 더 이전 기록(index - 1), ↑는 더 최근 기록(index + 1)이다
 		if (event.key === "ArrowDown") {
-			next = index + 1;
-		} else if (event.key === "ArrowUp") {
 			next = index - 1;
+		} else if (event.key === "ArrowUp") {
+			next = index + 1;
 		} else if (event.key === "Enter" || event.key === " ") {
 			event.preventDefault();
 			selectRow(index, true);
@@ -571,11 +655,16 @@ var DstoneAiWorkflowAdmin = (function () {
 		} else {
 			return;
 		}
+		var history = (currentDetail && currentDetail.history) || [];
+		if (next < 0 || next >= history.length) {
+			return;
+		}
+		event.preventDefault();
+		// 다른 페이지의 줄이면 selectRow가 페이지를 넘기고 다시 그린다
+		selectRow(next, true);
 		var target = historyBodyEl.querySelector("tr[data-index=\"" + next + "\"]");
 		if (target) {
-			event.preventDefault();
 			target.focus();
-			selectRow(next, true);
 		}
 	}
 
