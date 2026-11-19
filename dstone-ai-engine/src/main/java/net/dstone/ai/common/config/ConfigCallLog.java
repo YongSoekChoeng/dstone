@@ -53,7 +53,7 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	private final static String NO_LOG_REGEX 			= "@annotation(net.dstone.common.annotation.NoAspectLog)";
 
-	public static boolean IS_LLM_LOGGING_YN 			= false;
+	public static boolean IS_LLM_LOGGING_YN 			= true;
 	public final static String SAPERATE_LINE 			= "\n|--------------------------------------------------------------------------------------------------------------------------------------|\n";
 	public final static String SAPERATE_LINE_HALF_PRONT = "\n|----------------------------------------------------";
 	public final static String SAPERATE_LINE_HALF_END 	= "----------------------------------------------------|\n";
