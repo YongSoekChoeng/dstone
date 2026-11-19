@@ -111,11 +111,11 @@
       "x" : 1010,
       "y" : 760
     } ],
-    "step10|route|아키텍처 재설계" : [ {
+    "step10|route|재설계" : [ {
       "x" : 600,
       "y" : 980
     }, {
-      "x" : 890,
+      "x" : 920,
       "y" : 980
     } ],
     "step15|route|승인" : [ {
@@ -145,6 +145,10 @@
     "step15|route|재개발" : [ {
       "x" : 940,
       "y" : 1570
+    } ],
+    "step15|route|재설계" : [ {
+      "x" : 960,
+      "y" : 1310
     } ]
   },
   "ports" : {
@@ -204,7 +208,7 @@
       "source" : "right",
       "target" : "right"
     },
-    "step10|route|아키텍처 재설계" : {
+    "step10|route|재설계" : {
       "source" : "right",
       "target" : "right"
     },
@@ -243,6 +247,10 @@
     "step15|route|실패" : {
       "source" : "left",
       "target" : "in"
+    },
+    "step15|route|재설계" : {
+      "source" : "right",
+      "target" : "right"
     }
   }
 }

@@ -154,7 +154,7 @@ steps:
     routes:
       승인: step11
       영향도 재분석: step06
-      아키텍처 재설계: step09
+      재설계: step09
       중지: FAIL
 
   - id: step11
@@ -212,6 +212,7 @@ steps:
       영향도 재분석: step06
       재개발: step14
       실패: FAIL
+      재설계: step09
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
