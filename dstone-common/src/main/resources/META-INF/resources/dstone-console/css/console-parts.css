@@ -2785,9 +2785,10 @@ body.wd-full-on {
 	width: 100%;
 }
 
+/* 의견 칸은 세 줄 높이(textarea rows="3"). 더 길게 쓰면 끌어서 늘린다 */
 .ai-body .wa-decision-field textarea {
-	min-height: 38px;
-	height: 38px;
+	min-height: 0;
+	height: auto;
 	resize: vertical;
 }
 

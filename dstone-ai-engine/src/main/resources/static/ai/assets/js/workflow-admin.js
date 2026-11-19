@@ -34,10 +34,10 @@ var DstoneAiWorkflowAdmin = (function () {
 	// 진행 기록에서 고른 줄의 순번(-1이면 없음). 사람이 직접 골랐으면 pickedByUser가 true다.
 	var selectedIndex = -1;
 	var pickedByUser = false;
-	/** 진행 기록 페이지(0 = 가장 최근 20줄). 사람이 페이지 단추를 눌렀으면 자동 갱신 때도 그 페이지에 머문다 */
+	/** 진행 기록 페이지(0 = 가장 최근 10줄). 사람이 페이지 단추를 눌렀으면 자동 갱신 때도 그 페이지에 머문다 */
 	var historyPage = 0;
 	var historyPageByUser = false;
-	var HISTORY_PAGE_SIZE = 20;
+	var HISTORY_PAGE_SIZE = 10;
 	// 고른 step 구역에 마지막으로 그린 내용. 같으면 다시 그리지 않는다(읽던 스크롤을 지킨다).
 	var paneKey = null;
 	// Workflow별 step 정의(흐름 띠용). 값이 "loading"이면 읽는 중이다.
@@ -477,7 +477,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	/* ---------- 진행 기록: 한 줄씩 ---------- */
 
 	/*
-	 * 진행 기록. 가장 최근 줄이 맨 위이고(시간 역순), 20줄씩 페이지로 나눈다.
+	 * 진행 기록. 가장 최근 줄이 맨 위이고(시간 역순), 10줄씩 페이지로 나눈다.
 	 * 줄의 data-index는 기록 배열(시간순)의 위치 그대로라서, 고르기·문서 개수·되감기는 순서와 상관없이 같은 값을 쓴다.
 	 */
 	function renderHistory(detail) {
