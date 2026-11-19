@@ -1040,13 +1040,17 @@ var DstoneAiDesigner = (function () {
 	}
 
 	/**
-	 * step id를 흐름 순서대로 step00, step01 ... 로 다시 매기고, steps 목록도 그 순서로 줄 세웁니다. [검사]와 [저장] 직전에 부릅니다.
-	 * 순서: 첫 step에서 출발해 화살표를 따라가며 처음 만나는 순서(깊이 우선).
-	 *  - 한 step에서는 onFailure → next → routes(적힌 순서) → rejectTo 순으로 따라간다.
-	 *    그래서 실패나 갈래로 빠지는 step은 갈라진 step 바로 뒤 번호를 받는다(sm-workflow의 step04 → step05 처럼).
-	 *  - 이미 번호를 받은 step으로 되돌아가는 화살표는 다시 따라가지 않는다.
-	 *  - 어디서도 닿지 않는 step은 맨 뒤에 목록 순서대로 붙인다.
+	 * step id를 시작부터 END까지 지나가는 순서대로 step00, step01 ... 로 다시 매기고, steps 목록도 그 순서로 줄 세웁니다.
+	 * [검사]와 [저장] 직전에 부릅니다.
+	 * 순서:
+	 *  1) 시작(첫 step)에서 출발해 "주된 길"을 따라 END(또는 FAIL, 이미 번호를 받은 step)를 만날 때까지 차례로 번호를 준다.
+	 *     주된 길 = next(비어 있으면 엔진처럼 목록상 다음 step). ROUTER/APPROVAL은 routes에 맨 먼저 적힌 경로.
+	 *  2) 그 길에서 갈라지는 화살표(onFailure, 두 번째 이후 routes, rejectTo)의 step은 갈라진 순서대로 모아 두었다가,
+	 *     1)이 끝나면 하나씩 꺼내 같은 방법으로 그 갈래의 길을 따라 번호를 준다.
+	 *     예) sm-workflow: step04의 onFailure(리뷰 불통과 처리)는 step14(개발 승인)까지 다 매긴 뒤 맨 끝 번호를 받는다.
+	 *  3) 어디서도 닿지 않는 step은 맨 뒤에 목록 순서대로 붙인다.
 	 * 첫 번호는 00이고, 지금 첫 step이 step01이면 01부터 매깁니다(이미 그렇게 쓰던 Workflow의 id를 흔들지 않으려고).
+	 * 목록 순서가 바뀌면 next를 비워 둔 step의 "목록상 다음 step"도 바뀌므로, 그런 step에는 원래 가던 곳을 next로 적어 둡니다.
 	 * 바뀐 것이 없으면 model을 건드리지 않습니다(YAML을 다시 만들지 않으니 본문 주석도 그대로입니다).
 	 * @return 바뀐 id 안내 글("a → step01, ...") 또는 ""
 	 */
@@ -1061,41 +1065,68 @@ var DstoneAiDesigner = (function () {
 				byId[String(step.id)] = step;
 			}
 		});
-		// 흐름 순서로 줄 세운다.
-		var ordered = [];
-		var seen = [];
-		var visit = function (step) {
-			if (!step || seen.indexOf(step) >= 0) {
-				return;
+		var hasRoutes = function (step) {
+			return step.routes && typeof step.routes === "object" && !Array.isArray(step.routes);
+		};
+		// next를 비워 둔 step이 지금 목록에서 가는 곳(목록상 다음 step, 마지막이면 END)
+		var implicitNext = function (step) {
+			var i = list.indexOf(step);
+			return i >= 0 && i + 1 < list.length && list[i + 1] && list[i + 1].id ? String(list[i + 1].id) : END_ID;
+		};
+		// 주된 길로 가는 곳
+		var mainTarget = function (step) {
+			if (hasRoutes(step)) {
+				var names = Object.keys(step.routes);
+				return names.length > 0 ? String(step.routes[names[0]]) : null;
 			}
-			seen.push(step);
-			ordered.push(step);
+			return step.next ? String(step.next) : implicitNext(step);
+		};
+		// 갈라지는 곳(갈라지는 순서대로)
+		var branchTargets = function (step) {
 			var targets = [];
-			if (step.onFailure) {
-				targets.push(String(step.onFailure));
-			}
-			if (step.next) {
-				targets.push(String(step.next));
-			}
-			if (step.routes && typeof step.routes === "object") {
-				Object.keys(step.routes).forEach(function (name) {
+			if (hasRoutes(step)) {
+				Object.keys(step.routes).slice(1).forEach(function (name) {
 					targets.push(String(step.routes[name]));
 				});
+			}
+			if (step.onFailure) {
+				targets.push(String(step.onFailure));
 			}
 			if (step.approval && step.approval.rejectTo) {
 				targets.push(String(step.approval.rejectTo));
 			}
-			targets.forEach(function (target) {
-				if (Object.prototype.hasOwnProperty.call(byId, target)) {
-					visit(byId[target]);
-				}
-			});
+			return targets;
 		};
-		visit(list[0]);
+		// 시작부터 END까지 지나가는 순서로 줄 세운다.
+		var ordered = [];
+		var waiting = [list[0]];
+		while (waiting.length > 0) {
+			var current = waiting.shift();
+			while (current && ordered.indexOf(current) < 0) {
+				ordered.push(current);
+				branchTargets(current).forEach(function (target) {
+					if (Object.prototype.hasOwnProperty.call(byId, target)) {
+						waiting.push(byId[target]);
+					}
+				});
+				var main = mainTarget(current);
+				current = main !== null && Object.prototype.hasOwnProperty.call(byId, main) ? byId[main] : null;
+			}
+		}
 		list.forEach(function (step) {
-			if (step && seen.indexOf(step) < 0) {
-				seen.push(step);
+			if (step && ordered.indexOf(step) < 0) {
 				ordered.push(step);
+			}
+		});
+		// 줄을 바꾸기 전에, next를 비워 둔 step이 원래 가던 곳을 기억해 둔다(줄이 바뀌어 목록상 다음 step이 달라지면 next로 적는다).
+		var keepNext = [];
+		ordered.forEach(function (step, i) {
+			if (step && !hasRoutes(step) && !step.next) {
+				var before = implicitNext(step);
+				var after = i + 1 < ordered.length && ordered[i + 1] && ordered[i + 1].id ? String(ordered[i + 1].id) : END_ID;
+				if (before !== after) {
+					keepNext.push({ step: step, next: before });
+				}
 			}
 		});
 		// 새 id를 정한다(옛 id → 새 id).
@@ -1123,6 +1154,9 @@ var DstoneAiDesigner = (function () {
 			return id !== undefined && id !== null && Object.prototype.hasOwnProperty.call(map, String(id)) ? map[String(id)] : id;
 		};
 		change(function () {
+			keepNext.forEach(function (item) {
+				item.step.next = item.next;
+			});
 			// 화살표 대상은 옛 id로 찾아야 하므로, step의 id보다 먼저 한꺼번에 바꾼다(step03 ↔ step04처럼 서로 맞바뀌어도 섞이지 않는다).
 			ordered.forEach(function (step) {
 				if (step.next) {
@@ -2062,7 +2096,7 @@ var DstoneAiDesigner = (function () {
 	function showStepPanel(step) {
 		var fields = STEP_FIELDS[step.type] || [];
 		var html = "<h4><span class=\"wd-type-chip wd-type-" + escapeHtml(step.type) + "\">" + escapeHtml(step.type) + "</span> step</h4>"
-			+ row("id", "[검사]·[저장] 때 흐름 순서대로 stepNN으로 다시 매김", "<input type=\"text\" id=\"wd-step-id\" value=\"" + escapeHtml(step.id) + "\" />")
+			+ row("id", "[검사]·[저장] 때 시작~END 순서대로 stepNN으로 다시 매김", "<input type=\"text\" id=\"wd-step-id\" value=\"" + escapeHtml(step.id) + "\" />")
 			+ row("name", "사람이 읽는 이름(예: 요구사항 분석). 실행에는 안 씀", "<input type=\"text\" id=\"wd-step-name\" value=\"" + escapeHtml(step.name === undefined || step.name === null ? "" : String(step.name)) + "\" />");
 		fields.forEach(function (key) {
 			var value = getValue(step, key);
