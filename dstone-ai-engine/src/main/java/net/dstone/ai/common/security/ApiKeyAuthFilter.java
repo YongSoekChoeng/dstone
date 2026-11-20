@@ -42,7 +42,7 @@ import net.dstone.common.web.console.ConsoleSessionFilter;
  *
  * 이 앱의 AI 화면(브라우저)은 키 없이 /api/ai/** 를 부릅니다. 그래서 화면 로그인을 켠 환경
  * (dstone.ai.console.login.enabled=true)에서 세션에 사용자가 있으면 키 대신 세션을 믿고, caller 는
- * dstone.ai.console.caller(기본 dstone-console)로 둡니다. 로그인을 끈 환경에서는 누구나 기본 세션을 받을 수
+ * dstone.ai.console.caller(기본 dstone-ai-screen)로 둡니다. 로그인을 끈 환경에서는 누구나 기본 세션을 받을 수
  * 있으므로 세션을 믿지 않습니다. 인증을 켜려면 화면 로그인도 같이 켜야 화면이 동작합니다.
  * </pre>
  */
@@ -80,7 +80,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 		String apiKey = request.getHeader(Constants.Security.Auth.DEFAULT_HEADER_NAME);
 		if (StringUtil.isEmpty(apiKey) && this.isConsoleUser(request)) {
 			String consoleCaller = configProperty.getProperty("dstone.ai.console.caller");
-			CallerContext.set(request, StringUtil.isEmpty(consoleCaller) ? "dstone-console" : consoleCaller.trim());
+			CallerContext.set(request, StringUtil.isEmpty(consoleCaller) ? "dstone-ai-screen" : consoleCaller.trim());
 			filterChain.doFilter(request, response);
 			return;
 		}

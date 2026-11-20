@@ -58,7 +58,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 		String apiKey = request.getHeader(HEADER_NAME);
 		if ((apiKey == null || apiKey.trim().length() == 0) && this.isConsoleUser(request)) {
 			String consoleCaller = configProperty.getProperty(ConfigConsole.PREFIX + ".caller");
-			CallerContext.set(request, consoleCaller == null || consoleCaller.trim().length() == 0 ? "dstone-console" : consoleCaller.trim());
+			CallerContext.set(request, consoleCaller == null || consoleCaller.trim().length() == 0 ? "dstone-knowledge-screen" : consoleCaller.trim());
 			filterChain.doFilter(request, response);
 			return;
 		}

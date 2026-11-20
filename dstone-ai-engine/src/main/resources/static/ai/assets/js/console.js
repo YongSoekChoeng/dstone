@@ -1,5 +1,5 @@
 /**
- * dstone-ai-engine, dstone-knowledge 화면(콘솔)이 같이 쓰는 도우미입니다. dstone-common 안에 있어 두 앱이 같은 파일을 씁니다.
+ * dstone-ai-engine, dstone-knowledge 화면이 같이 쓰는 도우미입니다. 두 앱(ai/assets, knowledge/assets)에 하나씩 있으니 고칠 때 둘 다 맞춥니다.
  *
  * 하는 일:
  *   - 왼쪽 메뉴를 그린다(예전 dstone-boot 의 views/console/sidebar.jsp). 메뉴 목록은 앱마다 *-menu.js 가 넘긴다.
@@ -8,7 +8,7 @@
  *
  * 쓰는 법(화면 HTML):
  *   <aside id="header-wrapper" class="cs-sidebar"></aside>
- *   <script src="/dstone-console/js/console.js"></script>
+ *   <script src="/ai/assets/js/console.js"></script>
  *   <script src="/ai/assets/js/ai-menu.js"></script>   ← DstoneConsole.sidebar({...}) 를 부른다
  */
 var DstoneConsole = (function () {

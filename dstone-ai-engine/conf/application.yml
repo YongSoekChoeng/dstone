@@ -359,7 +359,7 @@ dstone:
                     id: local
                     name: 로컬 사용자
                     admin: true
-            caller: dstone-console
+            caller: dstone-ai-screen
             urls:
                 boot: ${BOOT_PUBLIC_URL}
                 ai: ${AI_ENGINE_PUBLIC_URL}

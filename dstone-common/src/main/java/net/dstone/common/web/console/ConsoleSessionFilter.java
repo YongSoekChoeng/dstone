@@ -43,7 +43,7 @@ import net.dstone.common.config.ConfigProperty;
  *     dstone-boot 에서 로그아웃하면 API 쪽 사람도 바로 없어지게 하려는 것이다. 쿠키가 없는 서버 간 호출은 아무 일도 없다.
  *     API 보호(막기)는 각 앱의 X-API-Key 필터가 맡습니다.
  *
- * GET /console/session 은 화면 스크립트(dstone-console/js/console.js)가 왼쪽 메뉴를 그릴 때 부릅니다.
+ * GET /console/session 은 화면 스크립트(각 앱의 assets/js/console.js)가 왼쪽 메뉴를 그릴 때 부릅니다.
  * 사용자, 로그인 사용 여부, 다른 앱 주소를 JSON 으로 돌려줍니다.
  *
  * 설정({prefix} 아래):
