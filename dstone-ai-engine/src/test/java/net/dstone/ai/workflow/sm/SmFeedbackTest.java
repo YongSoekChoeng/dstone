@@ -60,6 +60,25 @@ public class SmFeedbackTest extends WorkflowTestBase {
 			.contains("- 개발 승인(step17):  /");
 	}
 
+	/**
+	 * <pre>
+	 * 승인하고 앞으로 진행할 때 승인자가 남긴 의견이 다음 Agent step에 표시와 함께 가는지 봅니다(2026-11-20).
+	 * 리뷰 불통과 처리(step06) → 영향도(step07), 영향도 승인(step08) → 설계(step10), 설계 승인(step11) → 개발(step15).
+	 * </pre>
+	 */
+	@Test
+	void 앞으로_진행시킨_승인의_의견은_다음_Agent_step이_표시와_함께_받는다() {
+		Map<String, Object> context = WorkFlowContext.create("D:/work", "sm-workflow", "test");
+		Map<String, Object> state = WorkFlowContext.state(context);
+		state.put("reviewDecision", approval("그대로 진행", "TASK-03은 범위에서 뺀다"));
+		state.put("impactApproval", approval("승인(설계진행)", "공통 코드 테이블도 같이 봐 주세요"));
+		state.put("designApproval", approval("승인(개발진행)", "로그는 기존 Logger를 쓴다"));
+
+		assertThat(this.feedbackOf("step07", context)).contains("- [이 단계로 보냄] 리뷰 불통과 처리 결정(step06): 그대로 진행 / TASK-03은 범위에서 뺀다");
+		assertThat(this.feedbackOf("step10", context)).contains("- [이 단계로 보냄] 영향도 분석 승인(step08): 승인(설계진행) / 공통 코드 테이블도 같이 봐 주세요");
+		assertThat(this.feedbackOf("step15", context)).contains("- [이 단계로 보냄] 설계 승인(step11): 승인(개발진행) / 로그는 기존 Logger를 쓴다");
+	}
+
 	private String feedbackOf(String stepId, Map<String, Object> context) {
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve("sm-workflow", null);
 		for (StepDefinition step : workflow.steps()) {

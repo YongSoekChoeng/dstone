@@ -9,6 +9,8 @@
 #
 # 다시 돌릴 때는 리뷰 사유와 승인 화면에 적은 의견이 Agent의 feedback으로 전달됩니다. 의견을 적어야 같은 결과가 되풀이되지 않습니다.
 # feedback에는 그 step으로 되돌아올 수 있는 모든 뒤쪽 판정·승인을 "- 이름(stepNN): 결정 / 의견" 한 줄씩 넣습니다.
+# 승인하고 앞으로 진행해서 오는 step에는 그 승인도 "- [이 단계로 보냄] 이름(stepNN): 결정 / 의견"으로 맨 앞에 넣습니다.
+# 승인자가 진행시키면서 남긴 당부(예: "X 테이블도 같이 봐 주세요")를 다음 Agent가 받게 하려는 것입니다(2026-11-20).
 # 경로를 새로 이으면 이 목록에도 넣으십시오(2026-11-19, 개발 승인 [재설계]의 의견이 아키텍처 설계 step에 전달되지 않아 같은 오류가 되풀이된 일).
 # 결정을 함께 넣는 것은 지난번 '승인' 때 적은 "진행해" 같은 말을 지적으로 오해하지 않게 하려는 것입니다(Agent 프롬프트의 [feedback 읽는 법]).
 #
@@ -28,7 +30,7 @@
 # (Agent로 할 때는 같은 Tool을 12번 되풀이한 적이 있습니다).
 ################################################################################################################
 id: sm-workflow
-version: 1.6.0
+version: 1.7.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -129,6 +131,7 @@ steps:
       request: ${state.request}
       requirement: ${state.requirement}
       feedback: |-
+        - [이 단계로 보냄] 리뷰 불통과 처리 결정(step06): ${state.reviewDecision.decision:} / ${state.reviewDecision.comment:}
         - 영향도 분석 승인(step08): ${state.impactApproval.decision:} / ${state.impactApproval.comment:}
         - 설계 승인(step11): ${state.designApproval.decision:} / ${state.designApproval.comment:}
         - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
@@ -168,6 +171,7 @@ steps:
       requirement: ${state.requirement}
       impact: ${state.impact}
       feedback: |-
+        - [이 단계로 보냄] 영향도 분석 승인(step08): ${state.impactApproval.decision:} / ${state.impactApproval.comment:}
         - 설계 승인(step11): ${state.designApproval.decision:} / ${state.designApproval.comment:}
         - 컴파일 확인(step16): ${state.compileError:}
         - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
@@ -227,6 +231,7 @@ steps:
       design: ${state.design}
       taskitems: ${state.taskitems}
       feedback: |-
+        - [이 단계로 보냄] 설계 승인(step11): ${state.designApproval.decision:} / ${state.designApproval.comment:}
         - 컴파일 확인(step16): ${state.compileError:}
         - 개발 승인(step17): ${state.developApproval.decision:} / ${state.developApproval.comment:}
     next: step16
