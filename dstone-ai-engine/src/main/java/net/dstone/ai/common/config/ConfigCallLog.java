@@ -85,7 +85,7 @@ public class ConfigCallLog extends BaseObject {
 	@Around("execution(* net.dstone.ai.*..*Controller.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doControllerProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
 		this.sysout("\n\n||===================================== [" + joinPoint.getTarget().getClass().getName() + "] START ======================================||");
-		this.info("+->[CONTROLLER] {" + signatureLog(joinPoint) + "}");
+		this.info("+->[CONTROLLER] {" + this.trimParams( signatureLog(joinPoint)) + "}");
 
 		/*****************************************************************************************************
 		 * 컨트롤러가 호출되면 먼저 응답 헤더 successYn 값을 "Y"(성공)로 미리 세팅해 둡니다.
@@ -125,7 +125,7 @@ public class ConfigCallLog extends BaseObject {
 	 */
 	@Around("execution(* net.dstone.ai.api.*..*Service*.*(..))" + " && !" + NO_LOG_REGEX)
 	public Object doServiceProfiling(ProceedingJoinPoint joinPoint) throws Throwable {
-		this.info("+--->[SERVICE ] {" + signatureLog(joinPoint) + "}");
+		this.info("+--->[SERVICE ] {" + this.trimParams( signatureLog(joinPoint)) + "}");
 		return joinPoint.proceed();
 	}
 
@@ -149,7 +149,7 @@ public class ConfigCallLog extends BaseObject {
 			if (noLog) {
 				ThreadContext.put("SUPPRESS_SQL_LOG", "Y");
 			} else {
-				this.info("+----->[DAO   ] {" + signatureLog(joinPoint) + "}");
+				this.info("+----->[DAO   ] {" + this.trimParams(signatureLog(joinPoint)) + "}");
 			}
 			return joinPoint.proceed();
 		} finally {
@@ -186,11 +186,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ this.buildParamInfo(joinPoint) +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn( this.buildParamInfo(joinPoint)) +"");
-		}
+		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\n");
 		log.append("</input>");
 		log.append(SAPERATE_LINE);
@@ -205,11 +201,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<output>");
 		log.append("\n");
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ output.toString() +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
-		}
+		log.append(this.trimParams(output.toString()));
 		log.append("\n");
 		log.append("</output>");
 		log.append(SAPERATE_LINE);
@@ -258,11 +250,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ this.buildParamInfo(joinPoint) +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(this.buildParamInfo(joinPoint)) +"");
-		}
+		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\n");
 		log.append("</input>");
 		log.append(SAPERATE_LINE);
@@ -277,11 +265,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<output>");
 		log.append("\n");		
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ output.toString() +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
-		}
+		log.append(this.trimParams(output.toString()));
 		log.append("\n");
 		log.append("</output>");
 		log.append(SAPERATE_LINE);
@@ -315,11 +299,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ this.buildParamInfo(joinPoint) +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(this.buildParamInfo(joinPoint)) +"");
-		}
+		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\n");
 		log.append("</input>");
 		log.append(SAPERATE_LINE);
@@ -334,11 +314,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<output>");
 		log.append("\n");	
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ output.toString() +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(output.toString()) +"");
-		}
+		log.append(this.trimParams(output.toString()));
 		log.append("\n");
 		log.append("</output>");
 		log.append(SAPERATE_LINE);
@@ -393,11 +369,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<input>");
 		log.append("\n");
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ this.buildToolParamInfo(paramNames, paramValues) +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(this.buildToolParamInfo(paramNames, paramValues)) +"");
-		}
+		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\n");
 		log.append("</input>");
 		log.append(SAPERATE_LINE);
@@ -412,11 +384,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\n");
 		log.append("<output>");
 		log.append("\n");	
-		if(PARAM_MULTI_LINE) {
-			log.append(""+ String.valueOf(output) +"");
-		}else {
-			log.append(""+ this.removeCarrageReturn(String.valueOf(output)) +"");
-		}
+		log.append(this.trimParams(output.toString()));
 		log.append("\n");
 		log.append("</output>");
 		log.append(SAPERATE_LINE);
@@ -470,18 +438,22 @@ public class ConfigCallLog extends BaseObject {
 	public String getIdentity(ProceedingJoinPoint joinPoint) {
 		StringBuffer identity = new StringBuffer();
 		String div = "-";
-		if(joinPoint != null) {
+		if (joinPoint != null) {
 			int args = joinPoint.getArgs().length;
 			for (int i = 0; i < args; i++) {
 				Object param = joinPoint.getArgs()[i];
-				if( param instanceof WorkFlowDefinition ) {
-					WorkFlowDefinition workFlowDefinition = (WorkFlowDefinition)param;
-					if(identity.length() > 0) {identity.append(div);}
-					identity.append("workFlow(id=" + workFlowDefinition.id()+")");
-				}else if( param instanceof StepDefinition ) {
-					StepDefinition stepDefinition = (StepDefinition)param;
-					if(identity.length() > 0) {identity.append(div);}
-					identity.append("step(id=" + stepDefinition.id() + ", type="+stepDefinition.type() + ", ref="+StepDefinition.refOf(stepDefinition)+")");
+				if (param instanceof WorkFlowDefinition) {
+					WorkFlowDefinition workFlowDefinition = (WorkFlowDefinition) param;
+					if (identity.length() > 0) {
+						identity.append(div);
+					}
+					identity.append("workFlow(id=" + workFlowDefinition.id() + ")");
+				} else if (param instanceof StepDefinition) {
+					StepDefinition stepDefinition = (StepDefinition) param;
+					if (identity.length() > 0) {
+						identity.append(div);
+					}
+					identity.append("step(id=" + stepDefinition.id() + ", type=" + stepDefinition.type() + ", ref=" + StepDefinition.refOf(stepDefinition) + ")");
 				}else if( param instanceof AgentDefinition ) {
 					AgentDefinition agentDefinition = (AgentDefinition)param;
 					if(identity.length() > 0) {identity.append(div);}
@@ -490,6 +462,15 @@ public class ConfigCallLog extends BaseObject {
 			}
 		}
 		return identity.toString();
+	}
+	
+
+	private String trimParams(String input) {
+		String output = input;
+		if(!PARAM_MULTI_LINE) {
+			output = this.removeCarrageReturn(output) ;
+		}
+		return output;
 	}
 	
 	private String removeCarrageReturn(String input) {
