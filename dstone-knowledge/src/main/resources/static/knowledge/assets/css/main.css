@@ -1,0 +1,3163 @@
+/* ==========================================================================
+   AI 화면(개요, 채팅, Workflow 테스트/실행 관리/디자이너)의 부품 모양
+   --------------------------------------------------------------------------
+   바탕(색 변수, 왼쪽 메뉴, 구역, 표, 입력 칸, 단추, 상태 딱지)은 console.css 에 있고, 여기서는 그 변수를 씁니다.
+   코드 분석 화면(dstone-knowledge)도 이 파일을 읽습니다(구역 안 작은 제목, 목록 표의 링크 같은 공통 부품 때문).
+   이 파일은 dstone-ai-engine(ai/assets)과 dstone-knowledge(knowledge/assets)에 하나씩 있으니 고칠 때 둘 다 맞춘다.
+   ========================================================================== */
+
+/* ---------- 개요(ai/index) ---------- */
+
+/* step 종류별 색. 디자이너의 .wd-type-* 와 workflow-designer.js 의 TYPE_COLORS 와 같은 색 */
+:root {
+	--ai-step-AGENT: #2563eb;
+	--ai-step-SUPERVISOR: #7c3aed;
+	--ai-step-ROUTER: #d97706;
+	--ai-step-TOOL: #059669;
+	--ai-step-APPROVAL: #db2777;
+}
+
+/* 맨 위 한 줄: 엔진 연결 | Workflow 수 | 실행 현황. 평소엔 회색 글자, 문제가 있을 때만 색 */
+.ai-body .cs-page-head .ov-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 12px;
+	margin-top: 14px;
+	color: var(--cs-text-2);
+	font-size: 13px;
+}
+
+.ov-status-sep {
+	width: 1px;
+	height: 12px;
+	background: var(--cs-border-strong);
+}
+
+.ov-status-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+.ov-status-item::before {
+	content: "";
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.ov-status-ok { color: var(--cs-success); }
+.ov-status-warn { color: var(--cs-warning); }
+.ov-status-bad { color: var(--cs-danger); }
+
+.ai-body a.ov-status-warn {
+	padding: 2px 10px;
+	border-radius: 999px;
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+}
+
+/* 본문: 왼쪽 Workflow 목록, 오른쪽 최근 실행과 채팅 */
+.ov-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 320px;
+	gap: 18px;
+	align-items: start;
+}
+
+.ov-flows-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.ov-count {
+	margin-left: 4px;
+	color: var(--cs-muted);
+	font-weight: 500;
+	font-size: 14px;
+}
+
+/* 폴더 고르기: 붙어 있는 단추 묶음 */
+.ov-folders {
+	display: inline-flex;
+	padding: 3px;
+	border-radius: 9px;
+	background: var(--cs-surface-3);
+}
+
+.ai-body .ov-folders button {
+	height: 28px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--cs-text-2);
+	font-weight: 500;
+	box-shadow: none;
+}
+
+.ai-body .ov-folders button span {
+	color: var(--cs-faint);
+	font-weight: 500;
+}
+
+.ai-body .ov-folders button:hover {
+	background: rgba(255, 255, 255, 0.6);
+	color: var(--cs-text);
+}
+
+.ai-body .ov-folders button[aria-pressed="true"] {
+	background: var(--cs-surface);
+	color: var(--cs-text);
+	font-weight: 700;
+	box-shadow: var(--cs-shadow-sm);
+}
+
+/* 띠 색 설명 */
+.ai-body ul.ov-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 18px;
+	margin: 14px 0 4px;
+	padding: 0;
+	list-style: none;
+	color: var(--cs-muted);
+	font-size: 12px;
+}
+
+.ov-legend li {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.ov-legend .ov-seg {
+	display: inline-block;
+	width: 14px;
+	height: 10px;
+	border-radius: 3px;
+}
+
+/* step 한 칸. 색은 종류, 줄무늬는 항목마다 반복 */
+.ov-seg { background: var(--cs-faint); }
+.ov-seg-AGENT { background: var(--ai-step-AGENT); }
+.ov-seg-SUPERVISOR { background: var(--ai-step-SUPERVISOR); }
+.ov-seg-ROUTER { background: var(--ai-step-ROUTER); }
+.ov-seg-TOOL { background: var(--ai-step-TOOL); }
+.ov-seg-APPROVAL { background: var(--ai-step-APPROVAL); }
+
+.ov-seg.ov-seg-each {
+	background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.55) 0 2px, transparent 2px 5px);
+}
+
+/* Workflow 한 줄: [이름과 설명] [step 띠] [바로 가기]. 카드로 나누지 않고 선으로 나눈다 */
+.ov-flow-list {
+	margin-top: 6px;
+}
+
+.ov-flow {
+	display: grid;
+	grid-template-columns: minmax(200px, 0.9fr) minmax(0, 1.3fr) auto;
+	align-items: center;
+	gap: 8px 28px;
+	padding: 16px 0;
+	border-top: 1px solid var(--cs-border);
+}
+
+.ov-flow:first-child {
+	border-top: 0;
+}
+
+.ov-flow-text h4 {
+	margin: 0 0 2px;
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	overflow-wrap: anywhere;
+}
+
+.ai-body .ov-flow-text p {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	margin: 0;
+	color: var(--cs-muted);
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.ai-body ol.ov-strip {
+	display: flex;
+	gap: 3px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ov-strip .ov-seg {
+	position: relative;
+	flex: 1 1 0;
+	min-width: 8px;
+	max-width: 64px;
+	height: 22px;
+	border-radius: 4px;
+}
+
+.ov-strip .ov-seg:first-child {
+	border-radius: 7px 4px 4px 7px;
+}
+
+.ov-strip .ov-seg:last-child {
+	border-radius: 4px 7px 7px 4px;
+}
+
+.ov-strip .ov-seg:only-child {
+	border-radius: 7px;
+}
+
+.ov-strip .ov-seg:hover {
+	box-shadow: 0 0 0 2px var(--cs-surface), 0 0 0 4px currentColor;
+	color: var(--cs-text);
+}
+
+/* 칸 안의 글자는 화면 읽기 프로그램용. 눈에는 title(마우스를 올리면 보임)로 보인다 */
+.ov-seg span {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.ai-body .ov-flow-meta {
+	margin: 6px 0 0;
+	color: var(--cs-muted);
+	font-size: 12px;
+}
+
+.ai-body .ov-strip-error {
+	margin: 0;
+	color: var(--cs-danger);
+	font-size: 12.5px;
+}
+
+.ov-flow-links {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 4px;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.ai-body .ov-empty {
+	margin: 0;
+	padding: 18px 0;
+	color: var(--cs-muted);
+	font-size: 13px;
+}
+
+/* 오른쪽: 최근 실행, 채팅 */
+.ov-side .ai-panel {
+	margin-bottom: 18px;
+}
+
+.ov-side-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	font-size: 13px;
+}
+
+.ai-body ol.ov-runs {
+	margin: 10px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ov-runs li {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 2px 10px;
+	padding: 9px 0;
+	border-top: 1px solid var(--cs-border);
+}
+
+.ov-runs li:first-child {
+	border-top: 0;
+}
+
+.ov-runs li.ov-empty {
+	display: block;
+}
+
+.ov-run-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.ov-run-time {
+	grid-column: 1;
+	color: var(--cs-faint);
+	font-size: 12px;
+}
+
+.ov-runs .workflow-badge {
+	grid-row: 1 / span 2;
+	grid-column: 2;
+}
+
+.ai-body .ov-chat p {
+	margin: 8px 0 14px;
+	color: var(--cs-muted);
+	font-size: 13px;
+}
+
+.ov-chat-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.ai-body a.cs-btn:hover {
+	color: #fff;
+	text-decoration: none;
+	background: var(--cs-primary-hover);
+	border-color: var(--cs-primary-hover);
+}
+
+@media screen and (max-width: 1200px) {
+	.ov-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+@media screen and (max-width: 760px) {
+	.ov-flow {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.ov-flow-links {
+		flex-direction: row;
+		gap: 16px;
+	}
+
+	/* step 이 많은 Workflow(30개 넘게)도 한 줄에 들어가게 칸을 더 좁힌다 */
+	.ai-body ol.ov-strip {
+		gap: 2px;
+	}
+
+	.ov-strip .ov-seg {
+		min-width: 3px;
+	}
+
+	.ov-folders {
+		max-width: 100%;
+		overflow-x: auto;
+	}
+}
+
+/* workflow 설명: YAML의 description에 적은 줄바꿈을 그대로 보여 준다(description: | 로 여러 줄을 적은 경우) */
+#workflow-id-desc {
+	white-space: pre-line;
+}
+
+/* ---------- 채팅 ---------- */
+
+/* "무엇을 물을 때 무엇을 켜나" 표 */
+.ai-guide-table td {
+	vertical-align: top;
+	line-height: 1.65;
+}
+
+.ai-guide-table td:nth-child(2),
+.ai-guide-table td:nth-child(3) {
+	white-space: nowrap;
+}
+
+.ai-guide-table code {
+	white-space: normal;
+}
+
+/* Agent 이름은 줄을 꺾지 않는다 */
+.ai-guide-table td:nth-child(3) code {
+	white-space: nowrap;
+	overflow-wrap: normal;
+}
+
+/* 채팅: "어떤 Tool 을 고르나" 안내. 평소엔 접어 두고(details.kn-howto), 눌러야 펼친다 */
+.chat-tool-guide {
+	margin: 12px 0 0;
+}
+
+/* 채팅: 이번 대화에 붙는 Tool. Agent 기본 Tool과 더 고른 Tool이 칩으로 보이고, [찾아서 추가]로 "Tool 찾기" 창(tool-picker.js)을 연다 */
+.chat-tools-count {
+	color: var(--cs-muted);
+	font-size: 12.5px;
+	margin-left: 4px;
+}
+
+.chat-tools .wd-chip {
+	font-family: var(--cs-mono);
+}
+
+/* Agent 정의에 있어 언제나 붙는 Tool. 뺄 수 없으니 × 가 없고 점선 테두리로 구분한다 */
+.chat-tools .wd-chip.chat-tool-fixed {
+	padding-right: 10px;
+	border-style: dashed;
+	background: var(--cs-surface-3);
+}
+
+/* 칩 앞의 종류 표시(소스 RAG, 문서 RAG …) */
+.chat-tool-cat {
+	font-family: var(--cs-font);
+	font-size: 10.5px;
+	color: var(--cs-muted);
+	padding: 0 5px;
+	border-radius: 4px;
+	background: var(--cs-surface-3);
+}
+
+.ai-chat-box {
+	display: flex;
+	flex-direction: column;
+	height: 68vh;
+	min-height: 460px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	background: var(--cs-surface-2);
+	overflow: hidden;
+}
+
+.chat-messages {
+	flex: 1;
+	overflow-y: auto;
+	padding: 22px 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+
+.chat-message {
+	display: flex;
+}
+
+.chat-message-user {
+	justify-content: flex-end;
+}
+
+.chat-message-assistant {
+	justify-content: flex-start;
+}
+
+.chat-bubble {
+	max-width: min(72%, 860px);
+	padding: 10px 14px;
+	border-radius: 14px;
+	font-size: 14px;
+	line-height: 1.65;
+	letter-spacing: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+	box-shadow: var(--cs-shadow-sm);
+}
+
+.chat-message-user .chat-bubble {
+	background: var(--cs-primary);
+	color: #fff;
+	border-bottom-right-radius: 4px;
+}
+
+/* 파란 말풍선에서도 드래그한 부분이 보이게 */
+.chat-message-user .chat-bubble::selection {
+	background: #fff;
+	color: var(--cs-primary);
+}
+
+/* 내 메시지 왼쪽의 [복사] 버튼. 말풍선에 마우스를 올리면 진해진다. */
+.chat-copy {
+	align-self: flex-end;
+	order: -1;
+	margin-right: 6px;
+	padding: 2px 8px;
+	border: 1px solid var(--cs-border);
+	border-radius: 6px;
+	background: var(--cs-surface);
+	color: var(--cs-muted);
+	font-size: 12px;
+	line-height: 1.6;
+	cursor: pointer;
+	opacity: 0.45;
+	transition: opacity 0.12s ease;
+}
+
+.chat-message:hover .chat-copy,
+.chat-copy:focus-visible {
+	opacity: 1;
+}
+
+.chat-copy:hover {
+	color: var(--cs-primary);
+	border-color: var(--cs-primary);
+}
+
+.chat-message-assistant .chat-bubble {
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	color: var(--cs-text);
+	border-bottom-left-radius: 4px;
+}
+
+.chat-bubble-pending::after {
+	content: "";
+	display: inline-block;
+	width: 18px;
+	height: 6px;
+	margin-left: 4px;
+	vertical-align: middle;
+	background: radial-gradient(circle, var(--cs-faint) 2px, transparent 2.5px) 0 50% / 6px 6px repeat-x;
+	animation: cs-typing 1s steps(3) infinite;
+}
+
+@keyframes cs-typing {
+	from { width: 6px; }
+	to { width: 24px; }
+}
+
+.chat-form {
+	border-top: 1px solid var(--cs-border);
+	background: var(--cs-surface);
+	padding: 14px 16px;
+	margin: 0;
+}
+
+.chat-input-row {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+}
+
+.ai-body textarea.chat-input {
+	flex: 1;
+	min-height: 44px;
+	max-height: 200px;
+	padding: 11px 12px;
+	resize: none;
+	font-size: 14px;
+}
+
+.ai-body button.chat-send {
+	height: 44px;
+	padding: 0 22px;
+	font-size: 14px;
+}
+
+/* 채팅 화면 배치: 왼쪽 대화(넓게), 오른쪽 설정(좁게). 대화 칸은 화면 높이에 맞춘다 */
+.chat-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 340px;
+	gap: 18px;
+	align-items: start;
+}
+
+.ai-panel.chat-main {
+	padding: 0;
+	overflow: hidden;
+}
+
+.chat-main .ai-chat-box {
+	height: calc(100vh - 210px);
+	min-height: 520px;
+	border: 0;
+	border-radius: 0;
+	background: var(--cs-surface);
+}
+
+/* 안내와 메시지를 같이 굴린다(chat.js scrollToEnd) */
+.chat-scroll {
+	flex: 1;
+	overflow-y: auto;
+	background: var(--cs-surface-2);
+}
+
+.chat-main .chat-messages {
+	flex: none;
+	overflow: visible;
+}
+
+.chat-main .chat-messages:empty {
+	display: none;
+}
+
+/* 대화가 없을 때: 무엇을 물을지 예시를 보여 준다 */
+.chat-welcome {
+	max-width: 620px;
+	margin: 0 auto;
+	padding: 56px 24px 32px;
+}
+
+.chat-welcome[hidden] {
+	display: none;
+}
+
+.chat-welcome h3 {
+	font-size: 20px;
+	margin: 0 0 6px;
+}
+
+.ai-body .chat-welcome > p {
+	margin: 0 0 20px;
+	color: var(--cs-muted);
+	font-size: 13.5px;
+}
+
+.chat-examples {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.ai-body button.chat-example {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+	height: auto;
+	padding: 12px 16px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	background: var(--cs-surface);
+	color: var(--cs-text);
+	text-align: left;
+	white-space: normal;
+	line-height: 1.5;
+	box-shadow: none;
+}
+
+.ai-body button.chat-example:hover {
+	border-color: var(--cs-primary);
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.chat-example b {
+	font-size: 12.5px;
+	color: var(--cs-primary);
+}
+
+.chat-example span {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--cs-text-2);
+}
+
+/* 오른쪽 설정 칸 */
+.ai-panel.chat-side {
+	position: sticky;
+	top: 20px;
+}
+
+.ai-body .chat-field-name {
+	display: block;
+	margin: 18px 0 6px;
+	font-size: 12.5px;
+	font-weight: 700;
+	color: var(--cs-text-2);
+}
+
+.chat-side h3 + .chat-field-name {
+	margin-top: 14px;
+}
+
+.chat-side select,
+.chat-side input[type="text"] {
+	width: 100%;
+}
+
+.ai-body .chat-agent-desc {
+	margin: 8px 0 0;
+	font-size: 12.5px;
+	line-height: 1.6;
+}
+
+.chat-side .chat-tools {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.chat-advanced {
+	margin-top: 18px;
+	padding-top: 14px;
+	border-top: 1px solid var(--cs-border);
+}
+
+.chat-advanced summary {
+	cursor: pointer;
+	color: var(--cs-muted);
+	font-size: 13px;
+}
+
+.chat-advanced[open] summary {
+	color: var(--cs-text-2);
+}
+
+.chat-layout + .chat-tool-guide {
+	margin-top: 18px;
+}
+
+@media screen and (max-width: 1100px) {
+	.chat-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.ai-panel.chat-side {
+		position: static;
+		order: -1;
+	}
+
+	.chat-main .ai-chat-box {
+		height: 72vh;
+		min-height: 420px;
+	}
+}
+
+/* ---------- Workflow 테스트 / 실행 관리 ---------- */
+
+.ai-body textarea.workflow-textarea {
+	min-height: 120px;
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	line-height: 1.55;
+}
+
+.ai-body textarea.workflow-textarea-small {
+	min-height: 64px;
+}
+
+.workflow-status {
+	font-size: 13px;
+	color: var(--cs-muted);
+}
+
+.workflow-status-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 12px;
+	flex-wrap: wrap;
+}
+
+.workflow-status-label {
+	font-size: 13px;
+	color: var(--cs-muted);
+}
+
+.workflow-job-id {
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	color: var(--cs-text-2);
+	font-weight: 500;
+}
+
+.ai-panel > h3 .workflow-job-id:not(:empty) {
+	background: var(--cs-surface-3);
+	border-radius: 4px;
+	padding: 1px 8px;
+}
+
+.ai-body a.workflow-history-jobid {
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	font-weight: 500;
+	color: var(--cs-primary);
+}
+
+/* "이 화면에서 실행한 것"에서 지금 "실행 상태"에 보이는 줄 */
+.document-list-table tbody tr.workflow-history-on td {
+	background: var(--cs-primary-soft);
+}
+
+.document-list-table tbody tr.workflow-history-on td:first-child {
+	box-shadow: inset 3px 0 0 var(--cs-primary);
+}
+
+/* 실행 ID를 누르면 "실행 상태" 칸이 바뀌었다는 것을 잠깐 테두리로 알린다 */
+.ai-panel.workflow-panel-flash {
+	animation: workflow-panel-flash 1.2s ease-out;
+}
+
+@keyframes workflow-panel-flash {
+	0% {
+		box-shadow: 0 0 0 3px var(--cs-primary-ring);
+	}
+	100% {
+		box-shadow: 0 0 0 3px transparent;
+	}
+}
+
+/* ---------- Workflow 디자이너(ai/designer/designer.jsp) ---------- */
+
+.wd-wrap {
+	display: flex;
+	gap: 14px;
+	align-items: stretch;
+}
+
+.wd-palette {
+	flex: 0 0 160px;
+	font-size: 12.5px;
+}
+
+.wd-palette-title {
+	margin: 0 0 8px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--cs-muted);
+}
+
+.wd-palette-title + .wd-legend,
+.wd-palette-item + .wd-palette-title {
+	margin-top: 16px;
+}
+
+.wd-palette-item {
+	border: 1px solid var(--cs-border-strong);
+	border-left-width: 4px;
+	border-radius: 8px;
+	padding: 7px 10px;
+	margin-bottom: 8px;
+	cursor: grab;
+	user-select: none;
+	line-height: 1.35;
+	background: var(--cs-surface);
+	box-shadow: var(--cs-shadow-sm);
+	transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+.wd-palette-item:hover {
+	box-shadow: var(--cs-shadow);
+	transform: translateX(2px);
+}
+
+.wd-palette-item:active {
+	cursor: grabbing;
+}
+
+.wd-palette-item b {
+	display: block;
+	font-size: 12px;
+	letter-spacing: 0.02em;
+	color: var(--cs-text);
+}
+
+.wd-palette-item span {
+	color: var(--cs-muted);
+	font-size: 12px;
+}
+
+/* step 종류별 색. workflow-designer.js 의 TYPE_COLORS 와 같은 색 */
+.wd-type-AGENT { border-color: #2563eb; background-color: #f5f8ff; }
+.wd-type-SUPERVISOR { border-color: #7c3aed; background-color: #f8f5ff; }
+.wd-type-ROUTER { border-color: #d97706; background-color: #fffaf0; }
+.wd-type-TOOL { border-color: #059669; background-color: #f2fbf7; }
+.wd-type-APPROVAL { border-color: #db2777; background-color: #fdf4f9; }
+
+.wd-palette-item.wd-type-AGENT,
+.wd-palette-item.wd-type-SUPERVISOR,
+.wd-palette-item.wd-type-ROUTER,
+.wd-palette-item.wd-type-TOOL,
+.wd-palette-item.wd-type-APPROVAL {
+	border-top-color: var(--cs-border);
+	border-right-color: var(--cs-border);
+	border-bottom-color: var(--cs-border);
+}
+
+.wd-legend {
+	margin: 0 0 4px;
+	color: var(--cs-text-2);
+	line-height: 1.5;
+}
+
+.wd-legend-line {
+	display: inline-block;
+	width: 24px;
+	height: 0;
+	margin-right: 6px;
+	vertical-align: middle;
+	border-top: 2px solid #4e4d43;
+}
+
+.wd-legend-fail { border-top: 2px dashed #b91c1c; }
+.wd-legend-route { border-top-color: #d97706; }
+
+.wd-palette-help {
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid var(--cs-border);
+	color: var(--cs-muted);
+	line-height: 1.7;
+}
+
+.wd-center {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.wd-tabs {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-bottom: 8px;
+	flex-wrap: wrap;
+}
+
+/* 그림 / YAML 탭: 붙어 있는 두 칸짜리 전환 단추 */
+.ai-body button.wd-tab {
+	height: 30px;
+	background: var(--cs-surface);
+	border-color: var(--cs-border-strong);
+	color: var(--cs-text-2);
+	box-shadow: none;
+}
+
+.ai-body button.wd-tab:hover {
+	background: var(--cs-surface-2);
+	color: var(--cs-text);
+}
+
+.ai-body button.wd-tab-on,
+.ai-body button.wd-tab-on:hover {
+	background: var(--cs-text);
+	border-color: var(--cs-text);
+	color: #fff;
+}
+
+/* 선 모양 고르기 */
+.wd-tabs label.wd-line-style {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: 12px;
+	font-size: 12.5px;
+	color: var(--cs-text-2);
+}
+
+.ai-body .wd-tabs label.wd-line-style select {
+	height: 30px;
+	font-size: 12.5px;
+}
+
+.wd-tabs label.wd-hide-fail {
+	margin-left: 12px;
+	font-size: 12.5px;
+}
+
+.wd-tabs .ai-hint {
+	margin: 0 0 0 8px;
+	font-size: 12.5px;
+}
+
+.wd-graph-box {
+	position: relative;
+	height: 72vh;
+	min-height: 480px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	overflow: hidden;
+}
+
+.wd-canvas {
+	width: 100%;
+	height: 100%;
+}
+
+.wd-yaml-box .ai-hint {
+	margin-top: 0;
+}
+
+.ai-body textarea.wd-yaml {
+	width: 100%;
+	height: 66vh;
+	min-height: 440px;
+	font-family: var(--cs-mono);
+	font-size: 12.5px;
+	line-height: 1.55;
+	white-space: pre;
+	tab-size: 2;
+	background: #fbfcfd;
+}
+
+.wd-props {
+	flex: 0 0 360px;
+	max-height: calc(72vh + 40px);
+	overflow-y: auto;
+	font-size: 13px;
+	padding: 2px 4px 2px 14px;
+	border-left: 1px solid var(--cs-border);
+}
+
+.wd-props h4 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 10px;
+	font-size: 14px;
+	color: var(--cs-text);
+}
+
+.wd-props h4 ~ h4 {
+	margin-top: 18px;
+	padding-top: 14px;
+	border-top: 1px solid var(--cs-border);
+}
+
+.wd-props h4 + .ai-hint {
+	margin-top: 0;
+}
+
+.wd-field {
+	margin-bottom: 12px;
+}
+
+.wd-field > label {
+	display: block;
+	font-weight: 600;
+	color: var(--cs-text-2);
+	margin-bottom: 4px;
+	font-size: 12.5px;
+}
+
+.wd-help {
+	font-weight: 400;
+	color: var(--cs-faint);
+	font-size: 12px;
+}
+
+.wd-field input[type="text"],
+.wd-field input[type="number"],
+.wd-field select,
+.wd-field textarea {
+	width: 100%;
+}
+
+.ai-body .wd-field textarea {
+	min-height: 64px;
+}
+
+.ai-body .wd-field textarea.wd-code {
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	white-space: pre;
+}
+
+.wd-desc {
+	margin: 6px 0 4px;
+	color: var(--cs-muted);
+	font-size: 12.5px;
+}
+
+.wd-schema {
+	margin: 6px 0;
+	padding: 8px 10px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	font-size: 11.5px;
+	line-height: 1.55;
+	white-space: pre-wrap;
+	max-height: 150px;
+	overflow-y: auto;
+	color: var(--cs-text-2);
+}
+
+/* SUPERVISOR/ROUTER: 엔진이 정한 답 모양과 routes 이름 확인 */
+.wd-fixed-sec {
+	margin: 14px 0 6px;
+	padding-top: 12px;
+	border-top: 1px dashed var(--cs-border);
+}
+
+.wd-fixed-sec h4 {
+	margin-bottom: 6px;
+}
+
+.wd-schema.wd-fixed-out {
+	background: var(--cs-info-soft);
+	border-color: #c7d6fb;
+	color: var(--cs-info);
+	font-weight: 600;
+}
+
+.wd-route-list {
+	margin: 4px 0 8px;
+	padding: 0;
+	list-style: none;
+	font-size: 12.5px;
+}
+
+.wd-route-list li {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 3px 0;
+}
+
+.wd-route-mark {
+	display: inline-flex;
+	justify-content: center;
+	width: 16px;
+	font-weight: 700;
+}
+
+.wd-route-ok .wd-route-mark {
+	color: var(--cs-success);
+}
+
+.wd-route-bad,
+.wd-route-bad .wd-route-mark {
+	color: var(--cs-danger);
+}
+
+p.wd-route-bad {
+	margin: 6px 0;
+	padding: 6px 10px;
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-danger-soft);
+	font-size: 12.5px;
+	line-height: 1.55;
+}
+
+.wd-route-list em {
+	font-style: normal;
+	font-size: 11.5px;
+}
+
+.wd-fixed-out-box {
+	padding: 10px 12px;
+	border: 1px solid #c7d6fb;
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface-2);
+	font-size: 12.5px;
+}
+
+.wd-fixed-out-box b {
+	color: var(--cs-info);
+}
+
+.wd-fixed-out-box p {
+	margin: 4px 0;
+	color: var(--cs-text-2);
+}
+
+.wd-inline-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.wd-inline-actions button {
+	height: 28px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wd-type-chip {
+	display: inline-flex;
+	align-items: center;
+	height: 22px;
+	padding: 0 8px;
+	border: 1px solid;
+	border-radius: 6px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	color: var(--cs-text);
+}
+
+.wd-edge-list {
+	margin: 0 0 6px;
+	padding-left: 18px;
+}
+
+.wd-dialog-box {
+	background: var(--cs-surface);
+	width: min(980px, 96vw);
+	max-height: 92vh;
+	overflow-y: auto;
+	padding: 20px 22px;
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-lg);
+}
+
+.wd-dialog-box h3 {
+	margin: 0 0 12px;
+	font-size: 16px;
+}
+
+.ai-body textarea.wd-agent-text {
+	height: 60vh;
+	min-height: 320px;
+	margin-top: 4px;
+}
+
+/* Agent 창: 제목 줄(제목 + 닫기) */
+.wd-agent-box {
+	width: min(1180px, 96vw);
+}
+
+.wd-dialog-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.wd-dialog-head h3 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+}
+
+.wd-dialog-head .workflow-job-id:not(:empty) {
+	background: var(--cs-surface-3);
+	border-radius: 4px;
+	padding: 1px 8px;
+}
+
+/* Agent 양식: 묶음마다 한 칸, 넓으면 두 칸씩 나란히 */
+.wd-agent-form {
+	max-height: 62vh;
+	overflow-y: auto;
+	padding-right: 6px;
+}
+
+.wd-agent-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 20px;
+}
+
+.wd-agent-grid-3 {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-top: 10px;
+}
+
+.wd-agent-sec {
+	padding: 14px 0 6px;
+	border-top: 1px solid var(--cs-border);
+}
+
+.wd-agent-grid > .wd-agent-sec:first-child,
+.wd-agent-form > .wd-agent-grid:first-child > .wd-agent-sec {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.wd-agent-sec h4 {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin: 0 0 10px;
+	font-size: 14px;
+	color: var(--cs-text);
+}
+
+.wd-agent-sec h4 ~ h4 {
+	margin-top: 16px;
+}
+
+.wd-agent-sec .ai-hint {
+	font-size: 12.5px;
+	margin-bottom: 10px;
+}
+
+/* 고른 Tool, Sub Agent: 칩으로 나란히, 끝에 [찾아서 추가] */
+.wd-chip-list {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin: 6px 0 4px;
+}
+
+.wd-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 26px;
+	padding: 0 4px 0 10px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: 999px;
+	background: var(--cs-surface-2);
+	font-size: 12.5px;
+	color: var(--cs-text);
+}
+
+.wd-chip-warn {
+	border-color: var(--cs-warning);
+	background: var(--cs-warning-soft);
+}
+
+.ai-body button.wd-chip-x {
+	width: 20px;
+	height: 20px;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--cs-muted);
+	font-size: 14px;
+	line-height: 1;
+}
+
+.ai-body button.wd-chip-x:hover {
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+}
+
+.ai-body button.wd-pick-btn {
+	height: 26px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wd-chip em,
+.wd-check em,
+.wd-pick-row em {
+	font-style: normal;
+	color: var(--cs-faint);
+	font-size: 11.5px;
+	margin-left: 2px;
+}
+
+/* 고르기 창: Agent 창 위에 뜬다 */
+.wd-pick-dialog {
+	z-index: 1010;
+}
+
+.wd-pick-box {
+	width: min(720px, 96vw);
+	display: flex;
+	flex-direction: column;
+}
+
+.wd-pick-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	margin-bottom: 10px;
+}
+
+.ai-body .wd-pick-bar input[type="search"] {
+	flex: 1 1 260px;
+}
+
+.wd-pick-bar .ai-hint {
+	margin: 0;
+}
+
+.wd-pick-list {
+	height: min(52vh, 480px);
+	overflow-y: auto;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+}
+
+.wd-pick-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin: 0;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--cs-border);
+	cursor: pointer;
+	font-weight: normal;
+}
+
+.wd-pick-row:hover {
+	background: var(--cs-primary-soft);
+}
+
+.wd-pick-row input {
+	margin-top: 3px;
+	flex: none;
+}
+
+.wd-pick-main {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.wd-pick-name {
+	font-family: var(--cs-mono);
+	font-size: 13px;
+	color: var(--cs-text);
+	word-break: break-all;
+}
+
+.wd-pick-group {
+	font-family: var(--cs-font);
+	font-size: 11px;
+	padding: 0 6px;
+	border-radius: 4px;
+	background: var(--cs-surface-3);
+	color: var(--cs-muted);
+	white-space: nowrap;
+}
+
+.wd-pick-desc {
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--cs-muted);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.wd-pick-off {
+	cursor: not-allowed;
+}
+
+.wd-pick-off .wd-pick-name,
+.wd-pick-off .wd-pick-desc {
+	color: var(--cs-faint);
+}
+
+/* Agent 관리, Skill 관리 창: 좁은 화면에서 입력 표가 눌려 잘리지 않게 하고, 창 전체를 스크롤한다 */
+#wd-agents-dialog .wd-dialog-box > *,
+#wd-skills-dialog .wd-dialog-box > * {
+	flex-shrink: 0;
+}
+
+.wd-agents-row {
+	align-items: center;
+}
+
+.wd-agents-row .wd-pick-main {
+	flex: 1 1 auto;
+}
+
+.wd-agents-actions {
+	display: flex;
+	flex: 0 0 auto;
+	gap: 6px;
+}
+
+.wd-pick-empty {
+	padding: 16px;
+}
+
+/* ---------- "Tool 찾기" 창(tool-picker.js): 종류별 표 ---------- */
+
+.tp-box {
+	width: min(1040px, 96vw);
+}
+
+/* 디자이너의 Agent 창 위에도 뜬다 */
+.tp-dialog {
+	z-index: 1020;
+}
+
+.tp-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.ai-body button.tp-tab {
+	height: 28px;
+	padding: 0 12px;
+	font-size: 12.5px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: 999px;
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.ai-body button.tp-tab:hover {
+	border-color: var(--cs-primary);
+}
+
+.ai-body button.tp-tab-on,
+.ai-body button.tp-tab-on:hover {
+	background: var(--cs-primary);
+	border-color: var(--cs-primary);
+	color: #fff;
+}
+
+.tp-tab-num {
+	font-size: 11px;
+	opacity: 0.75;
+	margin-left: 2px;
+}
+
+.tp-list {
+	flex: 1 1 auto;
+	height: min(58vh, 560px);
+	overflow-y: auto;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	padding: 4px 12px 12px;
+}
+
+.tp-group + .tp-group {
+	margin-top: 14px;
+}
+
+.tp-group-title {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	margin: 10px 0 6px;
+	font-size: 14px;
+}
+
+.tp-group-num {
+	font-size: 12px;
+	font-weight: normal;
+	color: var(--cs-muted);
+}
+
+.tp-group-hint {
+	font-size: 12px;
+	font-weight: normal;
+	color: var(--cs-faint);
+}
+
+.tp-table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+	font-size: 12.5px;
+}
+
+.tp-col-check {
+	width: 36px;
+}
+
+.tp-col-name {
+	width: 34%;
+}
+
+.tp-table th,
+.tp-table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--cs-border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.tp-table thead th {
+	background: var(--cs-surface-2);
+	color: var(--cs-muted);
+	font-weight: 600;
+	position: sticky;
+	top: 0;
+}
+
+.tp-table tbody tr {
+	cursor: pointer;
+}
+
+.tp-table tbody tr:hover {
+	background: var(--cs-primary-soft);
+}
+
+.tp-table tr.tp-row-on {
+	background: var(--cs-surface-2);
+}
+
+.tp-table tr.tp-row-off {
+	cursor: not-allowed;
+	color: var(--cs-faint);
+}
+
+.tp-hit {
+	display: block;
+	margin: 0;
+}
+
+.tp-name {
+	font-family: var(--cs-mono);
+	word-break: break-all;
+}
+
+.tp-name em {
+	font-family: var(--cs-font);
+	font-style: normal;
+	color: var(--cs-warning);
+	font-size: 11.5px;
+}
+
+.tp-desc {
+	color: var(--cs-muted);
+	line-height: 1.5;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.tp-foot {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.tp-foot-gap {
+	flex: 1 1 auto;
+}
+
+.ai-body textarea.wd-agent-prompt {
+	width: 100%;
+	min-height: 260px;
+	height: 34vh;
+	white-space: pre-wrap;
+	font-size: 12.5px;
+	line-height: 1.6;
+}
+
+/* 프롬프트 칸: 가이드 단추, 눌러서 넣는 자리, 실시간 검사 */
+.ai-body button.wd-guide-btn {
+	margin-left: auto;
+	height: 28px;
+	padding: 0 12px;
+	font-size: 12px;
+	color: var(--cs-primary);
+	border-color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+}
+
+.ai-body button.wd-guide-btn::before {
+	content: "?";
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	margin-right: 6px;
+	border-radius: 50%;
+	background: var(--cs-primary);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.wd-slot-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 14px;
+	margin: 0 0 8px;
+}
+
+.wd-slot-label {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--cs-muted);
+}
+
+.wd-slot-group {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+}
+
+.wd-slot-group > em {
+	font-style: normal;
+	font-size: 11.5px;
+	color: var(--cs-faint);
+	margin-right: 2px;
+}
+
+.ai-body button.wd-slot {
+	height: 24px;
+	min-width: 0;
+	padding: 0 8px;
+	border: 1px dashed var(--cs-border-strong);
+	border-radius: 6px;
+	background: var(--cs-surface);
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	color: var(--cs-primary);
+}
+
+.ai-body button.wd-slot:hover:not(:disabled) {
+	border-style: solid;
+	border-color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+}
+
+.ai-body button.wd-slot:disabled {
+	color: var(--cs-faint);
+	cursor: not-allowed;
+}
+
+.wd-prompt-lint:empty {
+	display: none;
+}
+
+.wd-prompt-lint {
+	margin-top: 8px;
+	padding: 8px 12px;
+	border-radius: var(--cs-radius-sm);
+	font-size: 12.5px;
+	line-height: 1.6;
+}
+
+.wd-prompt-lint-ok {
+	background: var(--cs-success-soft);
+	color: var(--cs-success);
+}
+
+.wd-prompt-lint-bad {
+	background: var(--cs-warning-soft);
+	border: 1px solid #f3d19c;
+	color: var(--cs-text-2);
+}
+
+.wd-prompt-lint-bad strong {
+	color: var(--cs-warning);
+	margin-right: 10px;
+}
+
+.ai-body .wd-prompt-lint-bad button {
+	height: 24px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wd-prompt-lint ul {
+	margin: 6px 0 0;
+	padding-left: 18px;
+}
+
+/* 입력·출력 작성 가이드 창 */
+.wd-guide-dialog {
+	z-index: 1020;
+}
+
+.wd-guide-box {
+	width: min(980px, 96vw);
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	padding: 0;
+}
+
+.wd-guide-head {
+	align-items: flex-start;
+	padding: 20px 24px 12px;
+	margin: 0;
+}
+
+.wd-guide-head .cs-eyebrow {
+	margin: 0 0 2px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--cs-primary);
+}
+
+.wd-guide-head h3 {
+	font-size: 19px;
+}
+
+.wd-guide-sub {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--cs-muted);
+}
+
+.wd-guide-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 0 24px 12px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.ai-body .wd-guide-nav button {
+	height: 28px;
+	padding: 0 12px;
+	border: 1px solid var(--cs-border);
+	border-radius: 999px;
+	background: var(--cs-surface-2);
+	font-size: 12.5px;
+	color: var(--cs-text-2);
+}
+
+.ai-body .wd-guide-nav button:hover {
+	border-color: var(--cs-primary);
+	color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+}
+
+.wd-guide-body {
+	overflow-y: auto;
+	padding: 4px 24px 24px;
+	font-size: 13.5px;
+	line-height: 1.7;
+	color: var(--cs-text-2);
+}
+
+.wd-guide-sec {
+	padding: 20px 0 6px;
+	border-top: 1px solid var(--cs-border);
+	scroll-margin-top: 8px;
+}
+
+.wd-guide-sec:first-child {
+	border-top: 0;
+}
+
+.wd-guide-sec h4 {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 12px;
+	font-size: 16px;
+	color: var(--cs-text);
+}
+
+.wd-guide-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: var(--cs-side-bg);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.wd-guide-sec h5 {
+	margin: 0 0 4px;
+	font-size: 13.5px;
+	color: var(--cs-text);
+}
+
+.wd-guide-sec p {
+	margin: 0 0 10px;
+}
+
+.wd-guide-rule {
+	padding: 10px 14px;
+	margin-bottom: 16px;
+	border-left: 4px solid var(--cs-primary);
+	border-radius: 0 var(--cs-radius-sm) var(--cs-radius-sm) 0;
+	background: var(--cs-primary-soft);
+	color: var(--cs-text);
+}
+
+/* 흐름: 단계마다 카드 하나, 사이에 화살표 */
+.wd-flow {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 22px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: none;
+}
+
+.wd-flow li {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 10px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface);
+	box-shadow: var(--cs-shadow-sm);
+}
+
+.wd-flow li + li::before {
+	content: "→";
+	position: absolute;
+	left: -18px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--cs-faint);
+	font-weight: 700;
+}
+
+.wd-flow b {
+	font-size: 12.5px;
+	color: var(--cs-text);
+}
+
+.wd-flow small {
+	font-size: 11.5px;
+	line-height: 1.45;
+	color: var(--cs-muted);
+}
+
+.wd-flow-tag {
+	align-self: flex-start;
+	padding: 0 7px;
+	border-radius: 4px;
+	background: var(--cs-surface-3);
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--cs-muted);
+}
+
+.wd-flow-in {
+	background: var(--cs-info-soft);
+	color: var(--cs-info);
+}
+
+.wd-flow-prompt {
+	background: var(--cs-primary-soft);
+	color: var(--cs-primary);
+}
+
+.wd-flow-out {
+	background: var(--cs-success-soft);
+	color: var(--cs-success);
+}
+
+.wd-guide-cols {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 10px;
+}
+
+.wd-guide-card {
+	padding: 12px 14px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface-2);
+}
+
+.wd-guide-card p {
+	margin: 0;
+	font-size: 13px;
+}
+
+.ai-body pre.wd-guide-code {
+	margin: 0 0 10px;
+	padding: 12px 14px;
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-side-bg);
+	color: #dbe4ef;
+	font-size: 12.5px;
+	line-height: 1.65;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.wd-guide-code .k {
+	color: #7dd3e6;
+}
+
+.wd-guide-code .c {
+	color: #7c8aa0;
+}
+
+.wd-guide-caption {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.wd-guide-caption small {
+	font-weight: normal;
+	font-size: 11.5px;
+	color: var(--cs-faint);
+}
+
+.wd-guide-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 12px;
+	font-size: 13px;
+}
+
+.wd-guide-table th,
+.wd-guide-table td {
+	padding: 7px 10px;
+	border-bottom: 1px solid var(--cs-border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.wd-guide-table th {
+	background: var(--cs-surface-2);
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.wd-guide-table td:first-child {
+	width: 34%;
+	white-space: nowrap;
+}
+
+.wd-guide-notes {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 13px;
+}
+
+.wd-guide-notes li + li {
+	margin-top: 4px;
+}
+
+/* 실수: 왼쪽 나쁜 예, 오른쪽 좋은 예 */
+.wd-guide-pairs {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 12px;
+}
+
+.wd-guide-bad,
+.wd-guide-good {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 12px;
+	border-radius: var(--cs-radius-sm);
+	border-left: 4px solid;
+}
+
+.wd-guide-bad {
+	border-left-color: var(--cs-danger);
+	background: var(--cs-danger-soft);
+}
+
+.wd-guide-good {
+	border-left-color: var(--cs-success);
+	background: var(--cs-success-soft);
+}
+
+.wd-guide-bad > span,
+.wd-guide-good > span {
+	font-size: 11.5px;
+	font-weight: 700;
+}
+
+.wd-guide-bad > span {
+	color: var(--cs-danger);
+}
+
+.wd-guide-bad > span::before {
+	content: "✕ ";
+}
+
+.wd-guide-good > span {
+	color: var(--cs-success);
+}
+
+.wd-guide-good > span::before {
+	content: "✓ ";
+}
+
+.ai-body .wd-guide-bad code,
+.ai-body .wd-guide-good code {
+	align-self: flex-start;
+	background: rgba(255, 255, 255, 0.7);
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.wd-guide-sec .wd-guide-foot {
+	margin-top: 12px;
+	font-size: 12.5px;
+	color: var(--cs-muted);
+}
+
+@media screen and (max-width: 860px) {
+	.wd-flow {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.wd-flow li + li::before {
+		display: none;
+	}
+
+	.wd-guide-cols,
+	.wd-guide-pairs {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.wd-guide-good {
+		margin-bottom: 8px;
+	}
+
+	.wd-guide-table td:first-child {
+		white-space: normal;
+	}
+
+	.wd-guide-head,
+	.wd-guide-nav,
+	.wd-guide-body {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+}
+
+@media screen and (max-width: 860px) {
+	.wd-agent-grid,
+	.wd-agent-grid-3 {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* 전체 화면: 디자이너 작업 영역이 화면 전체를 덮는다(창들은 z-index 1000 이상이라 그 위에 뜬다) */
+.ai-body button.wd-full-btn {
+	margin-left: auto;
+	height: 30px;
+	padding: 0 12px;
+	font-size: 12.5px;
+}
+
+.ai-body button.wd-full-btn::before {
+	content: "⤢";
+	margin-right: 6px;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.wd-full-bar {
+	display: none;
+}
+
+/* 전체 화면일 때는 맨 위 띠의 [전체 화면 끝내기]를 쓴다 */
+.wd-full .wd-full-btn {
+	display: none;
+}
+
+body.wd-full-on {
+	overflow: hidden;
+}
+
+.wd-workspace.wd-full {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 12px 18px 14px;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	background: var(--cs-surface);
+}
+
+.wd-full .wd-full-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	padding-bottom: 10px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.wd-full-bar h3 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	font-size: 16px;
+	color: var(--cs-text);
+}
+
+.wd-full-bar .workflow-job-id:not(:empty) {
+	background: var(--cs-surface-3);
+	border-radius: 4px;
+	padding: 1px 8px;
+	font-size: 13px;
+}
+
+.wd-full-message {
+	flex: 1 1 240px;
+	min-width: 0;
+}
+
+.wd-full-message .wd-message {
+	margin: 0;
+	max-height: 64px;
+	overflow-y: auto;
+}
+
+.wd-full-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.ai-body .wd-full-actions button {
+	height: 32px;
+	padding: 0 14px;
+	font-size: 13px;
+}
+
+.ai-body .wd-full-actions button.wd-full-exit {
+	border-color: var(--cs-text-2);
+	color: var(--cs-text);
+}
+
+.wd-full .wd-wrap {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.wd-full .wd-palette {
+	overflow-y: auto;
+}
+
+.wd-full .wd-center {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.wd-full .wd-graph-box {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+.wd-full .wd-yaml-box {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.ai-body .wd-full textarea.wd-yaml {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+.wd-full .wd-props {
+	max-height: none;
+	min-height: 0;
+}
+
+/* 좁은 화면에서는 위아래로 쌓는다 */
+@media screen and (max-width: 1200px) {
+	.wd-wrap {
+		flex-direction: column;
+	}
+
+	.wd-workspace.wd-full {
+		overflow-y: auto;
+	}
+
+	.wd-full .wd-wrap {
+		flex: none;
+	}
+
+	.wd-full .wd-graph-box {
+		flex: none;
+		height: 70vh;
+	}
+
+	.wd-palette {
+		flex: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.wd-palette-item {
+		margin: 0;
+	}
+
+	.wd-palette-title,
+	.wd-legend,
+	.wd-palette-help {
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+
+	.wd-props {
+		flex: none;
+		max-height: none;
+		border-left: 0;
+		border-top: 1px solid var(--cs-border);
+		padding: 14px 0 0;
+	}
+}
+
+/* ---------- 입출력 모양 편집기(picoschema-editor.js) ---------- */
+
+.pe-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+
+.ai-body .pe-head select.pe-mode {
+	width: auto;
+	min-width: 190px;
+}
+
+.pe-count {
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.pe-single {
+	display: grid;
+	grid-template-columns: 170px minmax(0, 1fr);
+	gap: 8px;
+}
+
+.pe-none,
+.pe-reason {
+	margin: 0;
+	font-size: 12.5px;
+	color: var(--cs-muted);
+}
+
+.pe-reason {
+	color: var(--cs-warning);
+	margin-bottom: 6px;
+}
+
+.ai-body textarea.pe-raw {
+	width: 100%;
+	min-height: 120px;
+}
+
+/* 필드 목록. 한 줄에 필드 하나: 이름 / 타입 / 필수 / 설명 / enum 값 또는 목록 항목 / 단추 */
+.pe-fields {
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	max-height: 380px;
+	overflow-y: auto;
+	background: var(--cs-surface);
+}
+
+.pe-row {
+	display: grid;
+	/* 마지막(단추) 칸 폭을 고정해야 줄마다 단추 수가 달라도 칸이 어긋나지 않는다 */
+	grid-template-columns: minmax(150px, 1.3fr) 150px 44px minmax(160px, 2fr) minmax(120px, 1.1fr) 112px;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 8px;
+	border-bottom: 1px solid var(--cs-surface-3);
+}
+
+.pe-row:last-child {
+	border-bottom: 0;
+}
+
+.pe-row:hover {
+	background: #fafbfd;
+}
+
+.pe-row-head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--cs-surface-2);
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--cs-muted);
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.pe-row-head:hover {
+	background: var(--cs-surface-2);
+}
+
+.pe-row-empty {
+	display: block;
+	padding-left: calc(14px + var(--pe-depth, 0) * 20px);
+	font-size: 12px;
+	color: var(--cs-faint);
+}
+
+.pe-row-bad {
+	background: #fffafa;
+}
+
+.pe-name {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding-left: calc(var(--pe-depth, 0) * 20px);
+	min-width: 0;
+}
+
+.pe-row input[type="text"],
+.pe-row select {
+	width: 100%;
+	min-width: 0;
+	height: 30px;
+	font-size: 12.5px;
+}
+
+.pe-row-bad .pe-name input {
+	border-color: #f0a9a9;
+}
+
+.pe-req {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	font-size: 12px;
+	color: var(--cs-text-2);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.pe-acts {
+	display: inline-flex;
+	justify-content: flex-end;
+	gap: 2px;
+}
+
+/* 줄 안의 작은 단추(접기, 하위 추가, 위·아래, 지우기) */
+.ai-body button.pe-icon,
+.ai-body button.pe-toggle {
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--cs-muted);
+	font-size: 13px;
+	font-weight: 600;
+	box-shadow: none;
+}
+
+.ai-body button.pe-icon:hover,
+.ai-body button.pe-toggle:hover {
+	background: var(--cs-surface-3);
+	border-color: var(--cs-border);
+	color: var(--cs-text);
+}
+
+.ai-body button.pe-icon:disabled,
+.ai-body button.pe-icon:disabled:hover {
+	background: transparent;
+	border-color: transparent;
+	color: var(--cs-border-strong);
+}
+
+.ai-body button.pe-del:hover {
+	color: var(--cs-danger);
+}
+
+.ai-body button.pe-toggle {
+	flex: none;
+	width: 20px;
+}
+
+.pe-toggle-space {
+	flex: none;
+	width: 20px;
+}
+
+.pe-problem {
+	grid-column: 1 / -1;
+	padding-left: calc(22px + var(--pe-depth, 0) * 20px);
+	font-size: 11.5px;
+	color: var(--cs-danger);
+}
+
+.ai-body button.pe-add {
+	margin-top: 8px;
+	height: 28px;
+	font-size: 12px;
+}
+
+/* 좁은 칸(디자이너 오른쪽 설정 칸): 한 필드를 두 줄로 */
+.pe-compact .pe-single {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.pe-compact .pe-row {
+	grid-template-columns: minmax(0, 1fr) 118px auto;
+	grid-template-areas:
+		"name type req"
+		"desc desc desc"
+		"extra extra acts";
+	row-gap: 4px;
+	padding: 7px 6px;
+}
+
+.pe-compact .pe-name { grid-area: name; }
+.pe-compact .pe-type { grid-area: type; }
+.pe-compact .pe-req { grid-area: req; }
+.pe-compact .pe-desc { grid-area: desc; padding-left: calc(22px + var(--pe-depth, 0) * 14px); }
+.pe-compact .pe-extra { grid-area: extra; padding-left: calc(22px + var(--pe-depth, 0) * 14px); }
+.pe-compact .pe-acts { grid-area: acts; justify-self: end; }
+.pe-compact .pe-name { padding-left: calc(var(--pe-depth, 0) * 14px); }
+.pe-compact .pe-extra:empty { display: none; }
+
+.pe-compact .pe-fields {
+	max-height: 420px;
+}
+
+/* ---------- 화면 머리의 접힌 설명(개발자용 API, 알아 둘 것) ---------- */
+
+.ai-dev-note {
+	max-width: 980px;
+	margin-top: 8px;
+	font-size: 13px;
+}
+
+.ai-dev-note summary {
+	cursor: pointer;
+	color: var(--cs-muted);
+}
+
+.ai-dev-note summary:hover {
+	color: var(--cs-text-2);
+}
+
+.ai-body .ai-dev-note p {
+	margin: 6px 0 0;
+	color: var(--cs-muted);
+	line-height: 1.7;
+}
+
+/* ---------- 디자이너 툴바: 하는 일끼리 묶고, 검사·저장은 오른쪽 끝 ---------- */
+
+.ai-form-actions.wd-toolbar {
+	justify-content: flex-start;
+	gap: 8px 6px;
+}
+
+.wd-tool-group {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding-right: 10px;
+	margin-right: 4px;
+	border-right: 1px solid var(--cs-border);
+}
+
+/* 검사·저장 바로 앞 묶음은 구분선이 필요 없다 */
+.wd-tool-group:nth-last-child(2) {
+	border-right: 0;
+}
+
+.wd-tool-save {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+}
+
+.ai-body .wd-toolbar button {
+	min-width: 0;
+	padding: 0 11px;
+}
+
+.ai-body .wd-tool-save button {
+	min-width: 72px;
+}
+
+@media screen and (max-width: 760px) {
+	.wd-tool-group {
+		padding-right: 0;
+		margin-right: 0;
+		border-right: 0;
+	}
+}
+
+/* ---------- Workflow 실행 관리: 실행 상세 ---------- */
+
+/*
+ * 위에서부터 머리(무슨 실행이고 어디까지 왔나) → 지금 할 일 → 진행 기록 + 고른 step → 결과 → 산출 문서.
+ * 눈에 띄는 것은 개요 화면에서 가져온 step 흐름 띠 하나뿐이고, 나머지는 콘솔의 기본 모양을 그대로 쓴다.
+ */
+
+.wa-head {
+	padding-bottom: 18px;
+	margin-bottom: 18px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.wa-head-title {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+}
+
+.ai-panel .wa-head-title h3 {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	overflow-wrap: anywhere;
+}
+
+.ai-body dl.wa-head-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 28px;
+	margin: 10px 0 0;
+}
+
+.wa-head-meta dt {
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.wa-head-meta dd {
+	margin: 0;
+	color: var(--cs-text);
+	font-size: 13px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.wa-flow {
+	margin-top: 16px;
+}
+
+/* 실행 목록의 '현재 스텝' 칸. 길면 말줄임, 전체는 풍선 도움말(title)로. 칸 너비는 ai-table.js가 굳히므로 칸을 넓히면 더 보인다 */
+.wa-cell-ellipsis {
+	display: block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* step 흐름 카드. 한 줄로 늘어놓고 넘치면 옆으로 넘겨 본다 */
+.ai-body ol.wa-cards {
+	display: flex;
+	gap: 8px;
+	margin: 0;
+	padding: 4px 2px 8px;
+	list-style: none;
+	overflow-x: auto;
+}
+
+.wa-card {
+	flex: 0 0 156px;
+	min-width: 0;
+	padding: 8px 10px;
+	border: 1px solid var(--cs-border);
+	border-left: 4px solid var(--cs-faint);
+	border-radius: 8px;
+	background: var(--cs-surface);
+	cursor: pointer;
+}
+
+/* 왼쪽 굵은 선의 색이 step 종류다(개요 화면의 띠 색과 같다) */
+.wa-card-AGENT { border-left-color: var(--ai-step-AGENT); }
+.wa-card-SUPERVISOR { border-left-color: var(--ai-step-SUPERVISOR); }
+.wa-card-ROUTER { border-left-color: var(--ai-step-ROUTER); }
+.wa-card-TOOL { border-left-color: var(--ai-step-TOOL); }
+.wa-card-APPROVAL { border-left-color: var(--ai-step-APPROVAL); }
+
+.wa-card:hover {
+	background: var(--cs-surface-2);
+}
+
+.wa-card-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	font-size: 11px;
+	color: var(--cs-muted);
+}
+
+.wa-card-state {
+	padding: 1px 6px;
+	border-radius: 999px;
+	background: var(--cs-surface-3);
+	white-space: nowrap;
+}
+
+/* 글자가 길면 한 줄에서 자르고, 전체는 카드의 풍선 도움말(title)로 본다 */
+.wa-card-id,
+.wa-card-name,
+.wa-card-type {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wa-card-id {
+	margin-top: 4px;
+	color: var(--cs-text);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.wa-card-name {
+	margin-top: 2px;
+	color: var(--cs-text-2);
+	font-size: 12px;
+}
+
+.wa-card-type {
+	margin-top: 2px;
+	color: var(--cs-muted);
+	font-size: 11px;
+}
+
+/* 아직 돌지 않은 step은 옅게, 건너뛴 step은 점선으로 옅게 */
+.wa-card.wa-seg-todo {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.wa-card.wa-seg-skipped {
+	opacity: 0.5;
+	border-style: dashed;
+	cursor: default;
+}
+
+/* 완료는 상태 글자를 초록으로, 지금은 진한 테두리, 실패는 빨간 테두리 */
+.wa-card.wa-seg-done .wa-card-state {
+	background: color-mix(in srgb, var(--ai-step-TOOL) 14%, transparent);
+	color: var(--ai-step-TOOL);
+}
+
+.wa-card.wa-seg-current {
+	box-shadow: 0 0 0 2px var(--cs-text);
+}
+
+.wa-card.wa-seg-current .wa-card-state {
+	background: var(--cs-text);
+	color: var(--cs-surface);
+}
+
+.wa-card.wa-seg-failed {
+	box-shadow: 0 0 0 2px var(--cs-danger);
+}
+
+.wa-card.wa-seg-failed .wa-card-state {
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+}
+
+.wa-cards-running .wa-seg-current {
+	animation: wa-seg-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wa-seg-pulse {
+	50% { box-shadow: 0 0 0 2px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wa-cards-running .wa-seg-current { animation: none; }
+}
+
+.wa-strip-text {
+	margin-top: 10px;
+	color: var(--cs-text-2);
+	font-size: 13px;
+}
+
+/* 지금 할 일: 왼쪽 굵은 선의 색으로 급한 정도를 나눈다 */
+.wa-todo {
+	margin: 0 0 20px;
+	padding: 14px 18px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-left: 4px solid var(--cs-faint);
+	border-radius: var(--cs-radius);
+	font-size: 13px;
+	color: var(--cs-text-2);
+}
+
+.wa-todo-waiting_approval,
+.wa-todo-paused {
+	border-left-color: var(--cs-warning);
+	background: var(--cs-warning-soft);
+}
+
+.wa-todo-running,
+.wa-todo-queued {
+	border-left-color: var(--cs-info);
+}
+
+.wa-todo-failed {
+	border-left-color: var(--cs-danger);
+}
+
+.wa-todo-title {
+	color: var(--cs-text);
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.wa-todo-reason {
+	margin-top: 4px;
+	color: var(--cs-danger);
+	overflow-wrap: anywhere;
+}
+
+.wa-todo-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px 16px;
+	margin-top: 8px;
+}
+
+.wa-todo-sub {
+	margin: 4px 0 12px;
+}
+
+.wa-decision {
+	display: grid;
+	grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+	gap: 12px;
+}
+
+.wa-decision-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.wa-decision-field > span {
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.ai-body .wa-decision-field input,
+.ai-body .wa-decision-field textarea {
+	width: 100%;
+}
+
+/* 의견 칸은 세 줄 높이(textarea rows="3"). 더 길게 쓰면 끌어서 늘린다 */
+.ai-body .wa-decision-field textarea {
+	min-height: 0;
+	height: auto;
+	resize: vertical;
+}
+
+.wa-todo .ai-form-actions {
+	margin-top: 12px;
+}
+
+/* 진행 기록(왼쪽)과 고른 step(오른쪽). 좁으면 위아래로 */
+.wa-run {
+	display: grid;
+	grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+	gap: 20px;
+	align-items: start;
+}
+
+.wa-run-list .wa-table-scroll {
+	margin-bottom: 0;
+}
+
+/* 모든 줄은 한 줄. 넘치는 글자는 말줄임하고, 전체는 오른쪽 구역에서 본다 */
+.wa-table.wa-history-table {
+	min-width: 0;
+}
+
+.wa-history-table td {
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+.wa-history-table tbody tr[data-index] {
+	cursor: pointer;
+}
+
+.wa-history-table tbody tr[data-index]:focus-visible {
+	outline: none;
+}
+
+.wa-history-table tbody tr[data-index]:focus-visible td {
+	background: var(--cs-surface-2);
+}
+
+.document-list-table.wa-history-table tbody tr.wa-selected td {
+	background: var(--cs-primary-soft);
+}
+
+.document-list-table.wa-history-table tbody tr.wa-selected td:first-child {
+	box-shadow: inset 3px 0 0 var(--cs-primary);
+}
+
+.wa-history-table .wa-history-empty {
+	color: var(--cs-muted);
+	cursor: default;
+}
+
+.wa-history-table .wa-step-cell {
+	color: var(--cs-text);
+	font-weight: 600;
+}
+
+/* step id 아래 한 줄로 보이는 사람용 이름(정의의 name). 칸이 좁으면 말줄임이 되고, 줄 전체의 풍선도움말에 다 나온다 */
+.wa-history-table .wa-step-cell-name {
+	display: block;
+	margin-left: 16px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+/* 진행 기록의 페이지 단추(20줄 단위). 표 바로 아래 오른쪽 */
+.wa-history-pager {
+	justify-content: flex-end;
+	margin-top: 8px;
+}
+
+/* 고른 step 구역 제목의 이름 */
+.wa-step-name .wa-step-title {
+	color: var(--cs-text-2);
+	font-weight: 600;
+}
+
+.wa-type-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	margin-right: 8px;
+	border-radius: 50%;
+	background: var(--cs-faint);
+	vertical-align: 1px;
+}
+
+.wa-type-AGENT { background: var(--ai-step-AGENT); }
+.wa-type-SUPERVISOR { background: var(--ai-step-SUPERVISOR); }
+.wa-type-ROUTER { background: var(--ai-step-ROUTER); }
+.wa-type-TOOL { background: var(--ai-step-TOOL); }
+.wa-type-APPROVAL { background: var(--ai-step-APPROVAL); }
+
+.wa-outcome {
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.wa-outcome-ok {
+	color: var(--cs-success);
+}
+
+.wa-outcome-fail {
+	color: var(--cs-danger);
+}
+
+/* 지난 회차 문서만 남은 step의 표시. 자세한 경고는 오른쪽 구역에 나온다 */
+.wa-doc-alert {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+	font-size: 12px;
+	font-weight: 800;
+}
+
+/* 고른 step 구역. 진행 기록이 길어도 화면에 붙어 따라온다 */
+.wa-step-pane {
+	position: sticky;
+	top: 16px;
+	margin-top: 30px;
+	padding: 16px 18px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	min-width: 0;
+}
+
+.ai-body .wa-step-empty {
+	margin: 0;
+	padding: 28px 8px;
+	color: var(--cs-muted);
+	font-size: 13px;
+	text-align: center;
+}
+
+.wa-step-name {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	font-size: 15px;
+	overflow-wrap: anywhere;
+}
+
+.wa-step-name .wa-type-dot {
+	margin-right: 2px;
+}
+
+.wa-step-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 14px;
+	margin: 4px 0 12px;
+	color: var(--cs-muted);
+	font-size: 12px;
+}
+
+.wa-step-text,
+.wa-result {
+	margin: 0;
+	max-height: 420px;
+	overflow: auto;
+	padding: 12px 14px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	color: var(--cs-text);
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.wa-step-text:focus-visible,
+.wa-result:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--cs-primary-ring);
+}
+
+.wa-result {
+	max-height: 360px;
+}
+
+.wa-result.wa-result-empty {
+	color: var(--cs-muted);
+	font-family: inherit;
+	font-size: 13px;
+}
+
+.wa-step-text.wa-text-failed,
+.wa-result.wa-text-failed {
+	color: var(--cs-danger);
+}
+
+.wa-step-tools {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 6px;
+}
+
+.ai-body .wa-step-tools button {
+	height: 28px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.wa-step-docs:empty {
+	display: none;
+}
+
+.wa-step-docs {
+	margin-top: 12px;
+}
+
+.wa-step-docs-label {
+	margin-bottom: 6px;
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.wa-step-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid var(--cs-border);
+}
+
+.wa-step-pane .wa-rewind {
+	margin-bottom: 0;
+}
+
+.wa-context {
+	margin-top: 8px;
+}
+
+.wa-context summary {
+	color: var(--cs-muted);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.wa-context .wa-result {
+	margin-top: 8px;
+}
+
+@media screen and (max-width: 1180px) {
+	.wa-run {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.wa-step-pane {
+		position: static;
+		margin-top: 0;
+	}
+}
+
+@media screen and (max-width: 640px) {
+	.wa-decision {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

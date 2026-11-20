@@ -1,0 +1,1679 @@
+/* ==========================================================================
+   AI 화면(dstone-ai-engine)과 코드 분석 화면(dstone-knowledge)의 바탕 모양
+   (두 앱은 따로 뜨지만 같은 모양을 쓴다. 이 파일은 dstone-ai-engine(ai/assets)과 dstone-knowledge(knowledge/assets)에 하나씩 있으니 고칠 때 둘 다 맞춘다)
+   --------------------------------------------------------------------------
+   색, 글꼴, 간격을 아래 변수(토큰)로만 정하고, 나머지 규칙은 모두 이 변수를 씁니다.
+   색을 바꾸려면 :root 의 값만 고치면 됩니다.
+   이 파일 다음에 main.css(패널, 표, 입력 칸 같은 화면 부품), knowledge.css(코드 분석 화면 부품)를 읽습니다.
+   화면 스크립트가 쓰는 class 이름(ai-form, ai-panel, document-list-table, kn-* ...)은 그대로 두고 모양만 정합니다.
+   ========================================================================== */
+
+/* 글꼴 파일을 같이 배포한다. 고객 PC에 Pretendard 가 없어도, 폐쇄망이어도 같은 글꼴로 보인다(라이선스: fonts/Pretendard.LICENSE.txt, OFL) */
+@font-face {
+	font-family: "Pretendard Variable";
+	font-weight: 45 920;
+	font-style: normal;
+	font-display: swap;
+	src: url("../fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+
+:root {
+	/* 바탕과 면 */
+	--cs-bg: #f4f6f9;
+	--cs-surface: #ffffff;
+	--cs-surface-2: #f8fafc;
+	--cs-surface-3: #f1f4f8;
+	--cs-border: #e3e8ef;
+	--cs-border-strong: #cdd5df;
+
+	/* 글자 */
+	--cs-text: #18212f;
+	--cs-text-2: #3d4a5c;
+	--cs-muted: #677489;
+	--cs-faint: #98a2b3;
+
+	/* 대표 색(청록). 단추, 링크, 고른 메뉴 */
+	--cs-primary: #0e7490;
+	--cs-primary-hover: #0b5f77;
+	--cs-primary-soft: #e6f4f7;
+	--cs-primary-ring: rgba(14, 116, 144, 0.22);
+
+	/* 상태 색 */
+	--cs-success: #15803d;
+	--cs-success-soft: #e8f6ed;
+	--cs-warning: #b45309;
+	--cs-warning-soft: #fdf3e2;
+	--cs-danger: #c02626;
+	--cs-danger-soft: #fdecec;
+	--cs-info: #1d4ed8;
+	--cs-info-soft: #e9effd;
+
+	/* 왼쪽 메뉴 */
+	--cs-side-bg: #0f1726;
+	--cs-side-text: #b4bfcf;
+	--cs-side-muted: #6c7a90;
+	--cs-side-hover: rgba(255, 255, 255, 0.06);
+	--cs-side-on: rgba(56, 189, 211, 0.16);
+	--cs-side-on-text: #ffffff;
+	--cs-side-width: 248px;
+
+	/* 모양 */
+	--cs-radius-sm: 6px;
+	--cs-radius: 10px;
+	--cs-radius-lg: 14px;
+	--cs-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+	--cs-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+	--cs-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14);
+
+	/* 글꼴. 같이 배포한 Pretendard Variable 을 먼저 쓰고, 못 읽으면 시스템 글꼴을 순서대로 쓴다(외부에서 내려받지 않는다) */
+	--cs-font: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+	/* 한글은 고정폭 글꼴에 없는 경우가 많아, 같이 배포한 Pretendard 로 이어서 그린다(없으면 네모 글자로 보인다) */
+	--cs-mono: "JetBrains Mono", "D2Coding", "SFMono-Regular", Consolas, "Liberation Mono", "Pretendard Variable", monospace;
+}
+
+/* ---------- 기본 ---------- */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body.ai-body {
+	margin: 0;
+	background: var(--cs-bg);
+	color: var(--cs-text);
+	font-family: var(--cs-font);
+	font-size: 14px;
+	line-height: 1.6;
+	letter-spacing: -0.01em;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	word-break: keep-all;
+	overflow-wrap: anywhere;
+}
+
+.ai-body h1,
+.ai-body h2,
+.ai-body h3,
+.ai-body h4,
+.ai-body h5 {
+	margin: 0;
+	color: var(--cs-text);
+	font-weight: 700;
+	line-height: 1.35;
+	letter-spacing: -0.02em;
+}
+
+.ai-body p {
+	margin: 0 0 12px;
+}
+
+.ai-body a {
+	color: var(--cs-primary);
+	text-decoration: none;
+}
+
+.ai-body a:hover {
+	color: var(--cs-primary-hover);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.ai-body b,
+.ai-body strong {
+	font-weight: 700;
+}
+
+.ai-body ol,
+.ai-body ul {
+	margin: 8px 0;
+	padding-left: 22px;
+}
+
+.ai-body ul {
+	list-style: disc;
+}
+
+.ai-body ol {
+	list-style: decimal;
+}
+
+.ai-body li {
+	margin: 2px 0;
+}
+
+.ai-body code,
+.ai-body pre,
+.ai-body kbd {
+	font-family: var(--cs-mono);
+	letter-spacing: 0;
+}
+
+.ai-body code {
+	background: var(--cs-surface-3);
+	border: 1px solid var(--cs-border);
+	border-radius: 4px;
+	padding: 0 5px;
+	font-size: 0.86em;
+	color: var(--cs-text-2);
+}
+
+.ai-body hr {
+	border: 0;
+	border-top: 1px solid var(--cs-border);
+	margin: 20px 0;
+}
+
+.ai-body ::selection {
+	background: var(--cs-primary-ring);
+}
+
+/* ---------- 콘솔 틀: 왼쪽 메뉴 + 본문 ---------- */
+
+/* 화면 JSP 의 #page-wrapper 안에 [왼쪽 메뉴(header.jsp)] [#main] [바닥글(footer.jsp)] 순서로 들어온다 */
+.ai-body #page-wrapper {
+	display: grid;
+	grid-template-columns: var(--cs-side-width) minmax(0, 1fr);
+	grid-template-rows: 1fr auto;
+	min-height: 100vh;
+}
+
+.cs-sidebar {
+	grid-column: 1;
+	grid-row: 1 / span 2;
+	position: sticky;
+	top: 0;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--cs-side-bg);
+	color: var(--cs-side-text);
+	padding: 18px 12px 14px;
+	overflow-y: auto;
+	z-index: 20;
+}
+
+.ai-body .cs-brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 4px 10px 18px;
+	color: #fff;
+	text-decoration: none;
+}
+
+.ai-body .cs-brand:hover {
+	color: #fff;
+	text-decoration: none;
+}
+
+.cs-brand-mark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	background: linear-gradient(135deg, #22b8cf 0%, #0e7490 100%);
+	color: #fff;
+	font-weight: 800;
+	font-size: 13px;
+	letter-spacing: -0.02em;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.cs-brand-text {
+	font-size: 15px;
+	letter-spacing: -0.01em;
+	color: #d6dde8;
+}
+
+.cs-brand-text b {
+	color: #fff;
+}
+
+.cs-nav {
+	flex: 1;
+}
+
+.ai-body .cs-nav-group {
+	margin: 20px 10px 6px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--cs-side-muted);
+}
+
+.ai-body .cs-nav-group:first-child {
+	margin-top: 4px;
+}
+
+.ai-body .cs-nav-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	margin: 1px 0;
+	border-radius: 8px;
+	color: var(--cs-side-text);
+	font-size: 13.5px;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.ai-body .cs-nav-item:hover {
+	background: var(--cs-side-hover);
+	color: #fff;
+	text-decoration: none;
+}
+
+.ai-body .cs-nav-item.cs-nav-on {
+	background: var(--cs-side-on);
+	color: var(--cs-side-on-text);
+	font-weight: 600;
+	box-shadow: inset 2px 0 0 #38bdd3;
+}
+
+.cs-nav-item svg {
+	flex: 0 0 18px;
+	width: 18px;
+	height: 18px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.7;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	opacity: 0.9;
+}
+
+/* dstone-boot 로 돌아가는 링크. 이 화면 묶음의 메뉴가 아니라 "나가는 문"이라 테두리로 구분한다 */
+.ai-body .cs-nav-home {
+	margin: 0 0 6px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color: #d6dde8;
+	font-size: 13px;
+}
+
+.ai-body .cs-nav-home:hover {
+	border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* 메뉴 아래의 사용자 이름(세션 정보, console.js). 로그인을 끈 환경이면 "(로그인 없음)"이 붙는다 */
+.ai-body .cs-nav-user {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: auto 10px 4px;
+	padding-top: 12px;
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	font-size: 12px;
+	color: var(--cs-side-muted);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.ai-body .cs-nav-user[hidden] {
+	display: none;
+}
+
+.ai-body .cs-nav-user svg {
+	flex: 0 0 16px;
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.7;
+}
+
+/* 본문 */
+.ai-body #main {
+	grid-column: 2;
+	min-width: 0;
+	padding: 28px 32px 40px;
+}
+
+.ai-body #main > .container {
+	width: 100%;
+	max-width: 1680px;
+	margin: 0 auto;
+}
+
+.ai-body .row,
+.ai-body .col-12 {
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+.cs-footer {
+	grid-column: 2;
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	padding: 14px 32px 20px;
+	border-top: 1px solid var(--cs-border);
+	color: var(--cs-faint);
+	font-size: 12px;
+}
+
+/* 좁은 화면: 왼쪽 메뉴를 위쪽 가로 막대로 바꾼다 */
+@media screen and (max-width: 1024px) {
+	.ai-body #page-wrapper {
+		display: block;
+	}
+
+	.cs-sidebar {
+		position: sticky;
+		height: auto;
+		flex-direction: row;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 12px;
+		overflow-x: auto;
+		overflow-y: hidden;
+	}
+
+	.ai-body .cs-brand {
+		padding: 0 8px 0 0;
+	}
+
+	.cs-brand-text {
+		display: none;
+	}
+
+	.cs-nav {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.ai-body .cs-nav-group {
+		display: none;
+	}
+
+	.ai-body .cs-nav-item {
+		padding: 7px 10px;
+	}
+
+	.ai-body .cs-nav-home {
+		margin: 0;
+		padding: 6px 10px;
+	}
+
+	.ai-body #main {
+		padding: 20px 16px 32px;
+	}
+
+	.cs-footer {
+		padding: 14px 16px 20px;
+	}
+}
+
+/* ---------- 페이지 머리: 화면 이름과 설명 ---------- */
+
+.cs-page-head {
+	margin: 0 0 22px;
+}
+
+.cs-page-head .cs-eyebrow {
+	margin: 0 0 4px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--cs-primary);
+}
+
+.cs-page-head h2 {
+	font-size: 24px;
+	margin: 0 0 6px;
+	text-align: left;
+}
+
+.cs-page-head > p:not(.cs-eyebrow) {
+	max-width: 980px;
+	margin: 0;
+	color: var(--cs-muted);
+	font-size: 14px;
+	line-height: 1.7;
+}
+
+/* ---------- 구역(카드) ---------- */
+
+.ai-panel {
+	position: relative;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-sm);
+	padding: 20px 22px;
+	margin: 0 0 18px;
+}
+
+.ai-panel > h3 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--cs-text);
+	margin: 0 0 6px;
+}
+
+/* 구역 끝에 붙는 여백(표, 단추 줄의 아래 여백)은 구역 안쪽 여백과 겹치므로 없앤다 */
+.ai-panel > :last-child {
+	margin-bottom: 0;
+}
+
+.ai-panel > h3 + p,
+.ai-panel > h3 + .ai-hint {
+	margin-top: 0;
+}
+
+.kn-section-title {
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--cs-text);
+	margin: 22px 0 8px;
+}
+
+.ai-panel > .kn-section-title:first-child {
+	margin-top: 0;
+}
+
+/* 작은 안내 글 */
+.ai-hint {
+	color: var(--cs-muted);
+	font-size: 13px;
+	line-height: 1.65;
+	margin: 0 0 14px;
+}
+
+/* ---------- 단추 ---------- */
+
+.ai-body button,
+.ai-body .cs-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	height: 34px;
+	padding: 0 14px;
+	border: 1px solid var(--cs-primary);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-primary);
+	color: #fff;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	box-shadow: var(--cs-shadow-sm);
+	transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ai-body button:hover {
+	background: var(--cs-primary-hover);
+	border-color: var(--cs-primary-hover);
+}
+
+.ai-body button:focus-visible,
+.ai-body a:focus-visible,
+.ai-body summary:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--cs-primary-ring);
+}
+
+/* 덜 중요한 단추(흰 바탕) */
+.ai-body button.kn-plain {
+	background: var(--cs-surface);
+	border-color: var(--cs-border-strong);
+	color: var(--cs-text-2);
+}
+
+.ai-body button.kn-plain:hover {
+	background: var(--cs-surface-2);
+	border-color: var(--cs-faint);
+	color: var(--cs-text);
+}
+
+.ai-body button:disabled,
+.ai-body button:disabled:hover {
+	background: var(--cs-surface-3);
+	border-color: var(--cs-border);
+	color: var(--cs-faint);
+	box-shadow: none;
+	cursor: not-allowed;
+}
+
+/* ---------- 입력 칸 ---------- */
+
+.ai-body input[type="text"],
+.ai-body input[type="number"],
+.ai-body input[type="password"],
+.ai-body input[type="search"],
+.ai-body select,
+.ai-body textarea {
+	height: 34px;
+	padding: 0 10px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface);
+	color: var(--cs-text);
+	font-family: inherit;
+	font-size: 13px;
+	letter-spacing: 0;
+	box-shadow: var(--cs-shadow-sm);
+	transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ai-body select {
+	padding-right: 30px;
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23677489' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+	cursor: pointer;
+}
+
+.ai-body textarea {
+	height: auto;
+	min-height: 96px;
+	padding: 8px 10px;
+	line-height: 1.55;
+	resize: vertical;
+}
+
+.ai-body input::placeholder,
+.ai-body textarea::placeholder {
+	color: var(--cs-faint);
+}
+
+.ai-body input:hover,
+.ai-body select:hover,
+.ai-body textarea:hover {
+	border-color: var(--cs-faint);
+}
+
+.ai-body input:focus,
+.ai-body select:focus,
+.ai-body textarea:focus {
+	outline: none;
+	border-color: var(--cs-primary);
+	box-shadow: 0 0 0 3px var(--cs-primary-ring);
+}
+
+.ai-body input[readonly],
+.ai-body textarea[readonly] {
+	background: var(--cs-surface-2);
+	color: var(--cs-text-2);
+}
+
+.ai-body input[type="checkbox"],
+.ai-body input[type="radio"] {
+	width: 15px;
+	height: 15px;
+	margin: 0;
+	accent-color: var(--cs-primary);
+	cursor: pointer;
+	vertical-align: middle;
+}
+
+.ai-body input[type="file"] {
+	font-family: inherit;
+	font-size: 13px;
+	color: var(--cs-text-2);
+}
+
+.ai-body input[type="file"]::file-selector-button {
+	height: 30px;
+	margin-right: 10px;
+	padding: 0 12px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface);
+	color: var(--cs-text-2);
+	font-family: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+/* ---------- 조건 표: 이름과 입력 칸을 줄 맞춰 놓는 표 ---------- */
+
+/* 한 줄에 (이름, 입력)을 한 쌍에서 세 쌍까지 놓고, 단추는 표 아래 오른쪽(ai-form-actions)에 둔다 */
+.ai-form {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: separate;
+	border-spacing: 0;
+	margin: 4px 0 14px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	overflow: hidden;
+}
+
+.ai-form col.ai-form-name {
+	width: 140px;
+}
+
+.ai-form col.ai-form-btncol {
+	width: 120px;
+}
+
+.ai-form th,
+.ai-form td {
+	border-bottom: 1px solid var(--cs-border);
+	vertical-align: middle;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.ai-form tr:last-child > th,
+.ai-form tr:last-child > td {
+	border-bottom: 0;
+}
+
+.ai-form th {
+	padding: 10px 14px;
+	background: var(--cs-surface-2);
+	border-right: 1px solid var(--cs-border);
+	color: var(--cs-text-2);
+	font-weight: 600;
+	text-align: left;
+	word-break: keep-all;
+}
+
+.ai-form td {
+	padding: 8px 12px;
+	background: var(--cs-surface);
+	color: var(--cs-text-2);
+}
+
+.ai-form td + th {
+	border-left: 1px solid var(--cs-border);
+}
+
+.ai-form th label {
+	color: inherit;
+	font-weight: inherit;
+}
+
+/* 표 안의 입력 칸은 칸을 가득 채운다 */
+.ai-form input[type="text"],
+.ai-form input[type="number"],
+.ai-form input[type="password"],
+.ai-form select,
+.ai-form textarea {
+	display: block;
+	width: 100%;
+}
+
+.ai-form textarea {
+	min-height: 120px;
+}
+
+.ai-form textarea.workflow-textarea-small {
+	min-height: 64px;
+}
+
+.ai-form input[type="file"] {
+	width: 100%;
+}
+
+/* 체크박스 여러 개를 한 칸에 나란히 */
+.ai-form-checks label,
+label.wd-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 3px 18px 3px 0;
+	white-space: nowrap;
+	cursor: pointer;
+	color: var(--cs-text-2);
+}
+
+/* 한 칸에 입력과 단추(또는 짧은 글)를 나란히 */
+.ai-form-inline {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ai-form-inline input[type="text"] {
+	flex: 1;
+	min-width: 0;
+}
+
+.ai-form input.ai-form-short {
+	width: 96px;
+	display: inline-block;
+}
+
+/* 줄 끝에 단추만 들어가는 칸 */
+.ai-form td.ai-form-btn {
+	text-align: center;
+	padding: 8px;
+}
+
+.ai-form td.ai-form-btn button {
+	width: 100%;
+}
+
+.ai-form td .ai-hint {
+	margin: 6px 0 0;
+	font-size: 12.5px;
+}
+
+.ai-form td .ai-hint:empty {
+	display: none;
+}
+
+.ai-form td .kn-row {
+	margin: 2px 0;
+}
+
+/* 표 아래 오른쪽에 놓는 단추 줄 */
+.ai-form-actions {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 14px;
+}
+
+.ai-form-actions button {
+	min-width: 88px;
+}
+
+.ai-form-buttons {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.ai-form-buttons:empty {
+	display: none;
+}
+
+/* 좁은 화면에서는 한 줄에 한 쌍씩 */
+@media screen and (max-width: 860px) {
+	.ai-form,
+	.ai-form tbody,
+	.ai-form tr,
+	.ai-form th,
+	.ai-form td {
+		display: block;
+		width: 100%;
+	}
+
+	.ai-form colgroup {
+		display: none;
+	}
+
+	.ai-form th {
+		border-right: 0;
+		padding-bottom: 6px;
+	}
+
+	.ai-form td + th {
+		border-left: 0;
+	}
+}
+
+/* ---------- 목록 표 ---------- */
+
+/* Workflow 화면과 코드 분석 화면이 같이 쓴다(문서 업로드 화면에서 쓰던 이름이 남은 것) */
+.document-list-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: 13px;
+	letter-spacing: 0;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	overflow: hidden;
+	margin: 4px 0 12px;
+}
+
+.document-list-table th,
+.document-list-table td {
+	text-align: left;
+	padding: 9px 12px;
+	border-bottom: 1px solid var(--cs-border);
+	line-height: 1.5;
+	vertical-align: middle;
+}
+
+.document-list-table th {
+	background: var(--cs-surface-2);
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.document-list-table td {
+	color: var(--cs-text-2);
+}
+
+.document-list-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.document-list-table tbody tr:hover td {
+	background: #fafbfd;
+}
+
+.document-list-table td a {
+	font-weight: 600;
+}
+
+.document-list-table button {
+	height: 28px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+/* ---------- 칸 너비 고정 + 끌어서 조절 (ai-table.js) ---------- */
+
+/* 표가 화면보다 넓어지면 표만 가로로 밀린다 */
+.ai-col-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+/* 칸 너비가 정해졌으니 넘치는 글자는 칸 안에서 줄을 바꾸고, 줄을 못 바꾸는 칸은 말줄임한다 */
+table.ai-col-fixed th,
+table.ai-col-fixed td {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	overflow-wrap: anywhere;
+}
+
+/* 머리 칸 오른쪽 끝의 손잡이 자리 */
+table.ai-col-fixed > thead > tr > th {
+	position: relative;
+}
+
+/* Tool 고르기 창의 머리 칸은 목록을 내려도 위에 붙어 있어야 한다 */
+table.tp-table.ai-col-fixed > thead > tr > th {
+	position: sticky;
+}
+
+.ai-col-grip {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 9px;
+	cursor: col-resize;
+	touch-action: none;
+	z-index: 1;
+}
+
+/* 평소에는 칸 경계에 옅은 선만, 마우스를 올리거나 끄는 동안에는 대표 색 선 */
+.ai-col-grip::after {
+	content: "";
+	position: absolute;
+	top: 25%;
+	bottom: 25%;
+	right: 0;
+	width: 1px;
+	background: var(--cs-border-strong);
+}
+
+table.ai-col-fixed > thead > tr > th:last-child > .ai-col-grip::after {
+	display: none;
+}
+
+.ai-col-grip:hover::after,
+.ai-col-grip:focus-visible::after,
+.ai-col-dragging .ai-col-grip:active::after {
+	top: 0;
+	bottom: 0;
+	right: 1px;
+	width: 3px;
+	border-radius: 2px;
+	background: var(--cs-primary);
+	display: block;
+}
+
+.ai-col-grip:focus-visible {
+	outline: none;
+}
+
+/* 끄는 동안에는 글자가 선택되지 않고 커서가 바뀌지 않게 한다 */
+body.ai-col-dragging-body {
+	cursor: col-resize;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* ---------- 상태 딱지 ---------- */
+
+.workflow-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 22px;
+	padding: 0 9px;
+	border-radius: 999px;
+	font-size: 11.5px;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	background: var(--cs-surface-3);
+	color: var(--cs-muted);
+	white-space: nowrap;
+}
+
+.workflow-badge::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+	opacity: 0.85;
+}
+
+.workflow-badge:empty::before,
+.workflow-badge-:empty {
+	display: none;
+}
+
+.workflow-badge-running {
+	background: var(--cs-info-soft);
+	color: var(--cs-info);
+}
+
+.workflow-badge-queued {
+	background: var(--cs-surface-3);
+	color: var(--cs-info);
+}
+
+.workflow-badge-done {
+	background: var(--cs-success-soft);
+	color: var(--cs-success);
+}
+
+.workflow-badge-failed,
+.workflow-badge-error {
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+}
+
+.workflow-badge-waiting_approval {
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+}
+
+.workflow-badge-paused {
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+}
+
+.workflow-badge-cancelled {
+	background: var(--cs-surface-3);
+	color: var(--cs-muted);
+}
+
+/* ---------- Workflow 실행 관리 ---------- */
+
+/* 좁은 화면에서는 표만 가로로 밀립니다. 페이지 전체가 밀리지 않습니다. */
+.wa-table-scroll {
+	overflow-x: auto;
+	margin: 4px 0 12px;
+}
+
+/* 칸 너비를 colgroup대로 고정해서, 긴 글자가 다른 칸을 밀어내지 못하게 합니다. */
+.wa-table {
+	table-layout: fixed;
+	min-width: 760px;
+	margin: 0;
+}
+
+.wa-table td {
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+
+.wa-table .wa-num {
+	text-align: right;
+}
+
+.wa-table tr.wa-selected td {
+	background: var(--cs-info-soft);
+}
+
+.wa-text-failed {
+	color: var(--cs-danger);
+}
+
+.wa-pager {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+/* 조회 조건의 "내 실행만" 체크박스 */
+.wa-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+.wa-pager-total {
+	font-size: 13px;
+	color: var(--cs-muted);
+}
+
+.wa-pager-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.wa-pager-buttons button {
+	min-width: 32px;
+	height: 30px;
+	padding: 0 8px;
+	font-size: 12px;
+}
+
+.wa-control {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 12px 0;
+	padding: 12px 14px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	font-size: 13px;
+	color: var(--cs-text-2);
+}
+
+.wa-control-text {
+	flex: 1 1 320px;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.wa-control-warnings {
+	margin: 6px 0 0;
+	padding-left: 18px;
+	color: var(--cs-warning);
+}
+
+.wa-control-warnings:empty {
+	display: none;
+}
+
+.wa-control-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+/* ---------- Workflow 실행 관리: 지난 step부터 다시 ---------- */
+
+/* [여기서 다시]를 누르면 나오는 확인 패널. 일시정지/재개 패널과 같은 모양에 왼쪽 줄로 구분합니다. */
+.wa-rewind {
+	border-left: 3px solid var(--cs-warning);
+}
+
+.wa-rewind-files {
+	margin-top: 6px;
+}
+
+.wa-rewind-files summary {
+	cursor: pointer;
+	color: var(--cs-text-2);
+}
+
+.wa-rewind-files ul {
+	margin: 4px 0 0;
+	padding-left: 18px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+}
+
+.wa-rewind-clear {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	margin-top: 8px;
+	color: var(--cs-text);
+	font-weight: 600;
+}
+
+.wa-rewind-clear input {
+	margin-top: 2px;
+}
+
+/* ---------- Workflow 실행 관리: step 문서 ---------- */
+
+/* 고른 step 구역에 다는 파일 이름 단추. 작성한 파일은 색을 채우고, 읽기만 한 파일은 테두리만 둡니다. */
+.ai-body button.wa-doc-chip {
+	height: auto;
+	max-width: 100%;
+	margin: 0 4px 4px 0;
+	padding: 3px 8px;
+	border: 1px solid var(--cs-primary);
+	border-radius: 999px;
+	background: var(--cs-surface);
+	color: var(--cs-primary);
+	box-shadow: none;
+	font-size: 12px;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ai-body button.wa-doc-chip-write {
+	background: var(--cs-primary-soft);
+}
+
+.ai-body button.wa-doc-chip:hover {
+	background: var(--cs-primary);
+	color: #fff;
+}
+
+.ai-body button.wa-doc-chip-missing,
+.ai-body button.wa-doc-chip-missing:hover {
+	border-color: var(--cs-border);
+	background: var(--cs-surface-3);
+	color: var(--cs-faint);
+	text-decoration: line-through;
+}
+
+/* 마지막 회차에 문서를 하나도 쓰지 않은 step에 붙이는 경고. 지난 회차 문서를 새 문서로 착각하지 않게 합니다. */
+.wa-doc-warning {
+	margin: 2px 0 4px;
+	padding: 4px 8px;
+	border: 1px solid var(--cs-warning);
+	border-radius: var(--cs-radius-sm, 6px);
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+	font-size: 12px;
+	font-weight: 600;
+	white-space: normal;
+}
+
+.wa-docs-all {
+	float: right;
+	font-size: 13px;
+	font-weight: 400;
+	color: var(--cs-text-2);
+	cursor: pointer;
+}
+
+.wa-doc-name {
+	font-weight: 600;
+	color: var(--cs-text);
+}
+
+.wa-doc-path-text {
+	font-family: var(--cs-mono);
+	font-size: 11px;
+	color: var(--cs-muted);
+}
+
+/* 팝업 바탕. 화면 전체를 덮고 가운데에 상자를 둡니다. */
+.wa-doc-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 1200;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 38, 0.45);
+}
+
+.wa-doc-modal[hidden],
+.wa-doc-modal [hidden] {
+	display: none !important;
+}
+
+/* 팝업이 떠 있는 동안 뒤쪽 화면이 스크롤되지 않게 합니다. */
+body.wa-doc-open {
+	overflow: hidden;
+}
+
+.wa-doc-box {
+	display: flex;
+	flex-direction: column;
+	width: min(1560px, 96vw);
+	height: min(900px, 92vh);
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-lg);
+	box-shadow: var(--cs-shadow-lg);
+	overflow: hidden;
+	animation: wa-doc-in 0.14s ease-out;
+}
+
+@keyframes wa-doc-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wa-doc-box { animation: none; }
+}
+
+.wa-doc-modal.wa-full {
+	padding: 0;
+}
+
+.wa-doc-modal.wa-full .wa-doc-box {
+	width: 100vw;
+	height: 100vh;
+	border-radius: 0;
+}
+
+.wa-doc-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 16px;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.wa-doc-titles {
+	flex: 1 1 280px;
+	min-width: 0;
+}
+
+.wa-doc-title {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--cs-text);
+	overflow-wrap: anywhere;
+}
+
+/* 저장하지 않은 변경이 있으면 제목 앞에 점을 찍습니다. */
+.wa-doc-dirty .wa-doc-title::before {
+	content: "\25CF  ";
+	color: var(--cs-warning);
+}
+
+.wa-doc-path {
+	margin-top: 2px;
+	font-family: var(--cs-mono);
+	font-size: 11px;
+	color: var(--cs-muted);
+	overflow-wrap: anywhere;
+}
+
+.wa-doc-tabs {
+	display: inline-flex;
+	padding: 3px;
+	background: var(--cs-surface-3);
+	border-radius: var(--cs-radius);
+}
+
+.ai-body .wa-doc-tabs button {
+	height: 30px;
+	padding: 0 16px;
+	border: 0;
+	background: transparent;
+	color: var(--cs-text-2);
+	box-shadow: none;
+}
+
+.ai-body .wa-doc-tabs button:hover {
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.ai-body .wa-doc-tabs button.on {
+	background: var(--cs-surface);
+	color: var(--cs-primary);
+	box-shadow: var(--cs-shadow-sm);
+}
+
+.ai-body .wa-doc-tabs button:disabled {
+	background: transparent;
+	color: var(--cs-faint);
+}
+
+.wa-doc-head-buttons {
+	display: flex;
+	gap: 6px;
+}
+
+.wa-doc-notice {
+	padding: 8px 16px;
+	background: var(--cs-surface-2);
+	border-bottom: 1px solid var(--cs-border);
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--cs-text-2);
+}
+
+.wa-doc-notice-warn {
+	color: var(--cs-warning);
+}
+
+.wa-doc-notice-info {
+	color: var(--cs-info);
+}
+
+.wa-doc-body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+}
+
+/* 보기: 팝업 폭을 거의 다 씁니다. 분석서는 넓은 표가 많아서, 폭을 좁게 묶으면 표가 읽기 어렵습니다. */
+.wa-doc-view {
+	flex: 1;
+	min-width: 0;
+	overflow: auto;
+	padding: 28px 2.5%;
+	scroll-behavior: smooth;
+}
+
+/* 수정: 왼쪽 원문, 오른쪽 미리보기. 좁은 화면에서는 위아래로 놓습니다. */
+.wa-doc-edit {
+	flex: 1;
+	min-width: 0;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+}
+
+.ai-body textarea.wa-doc-text {
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	margin: 0;
+	padding: 16px;
+	border: 0;
+	border-right: 1px solid var(--cs-border);
+	border-radius: 0;
+	background: var(--cs-surface-2);
+	box-shadow: none;
+	resize: none;
+	font-family: var(--cs-mono);
+	font-size: 13px;
+	line-height: 1.6;
+	tab-size: 4;
+}
+
+.ai-body textarea.wa-doc-text:focus {
+	box-shadow: inset 0 0 0 2px var(--cs-primary-ring);
+}
+
+.wa-doc-preview {
+	min-width: 0;
+	overflow: auto;
+	padding: 16px 24px;
+}
+
+/* github-markdown-css 위에 이 화면의 글꼴만 맞춥니다. */
+.wa-doc-modal .markdown-body {
+	font-family: var(--cs-font);
+	font-size: 14px;
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.wa-doc-modal .markdown-body pre,
+.wa-doc-modal .markdown-body code {
+	font-family: var(--cs-mono);
+}
+
+/*
+ * 표는 본문 폭을 꽉 채웁니다(github-markdown-css는 글자 길이만큼만 넓혀서 표가 좁게 보입니다).
+ * 칸이 많아 폭을 넘는 표는 그 표만 가로로 스크롤합니다.
+ */
+.wa-doc-modal .markdown-body table {
+	display: table;
+	width: 100%;
+	max-width: none;
+}
+
+.wa-doc-modal .markdown-body .wa-doc-table-wrap {
+	overflow-x: auto;
+	margin-bottom: 16px;
+}
+
+.wa-doc-modal .markdown-body .wa-doc-table-wrap > table {
+	margin-bottom: 0;
+}
+
+/* highlight.js가 칠한 코드 블록은 GitHub 코드 블록 배경을 그대로 씁니다. */
+.wa-doc-modal .markdown-body pre code.hljs {
+	padding: 0;
+	background: transparent;
+}
+
+.wa-doc-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 10px 16px;
+	border-top: 1px solid var(--cs-border);
+	background: var(--cs-surface-2);
+}
+
+.wa-doc-meta {
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.wa-doc-status {
+	flex: 1;
+	min-width: 160px;
+	text-align: right;
+	font-size: 12px;
+	color: var(--cs-text-2);
+}
+
+.wa-doc-status.wa-doc-status-failed {
+	color: var(--cs-danger);
+	font-weight: 600;
+}
+
+@media (max-width: 760px) {
+	.wa-doc-modal {
+		padding: 0;
+	}
+
+	.wa-doc-box {
+		width: 100vw;
+		height: 100vh;
+		border-radius: 0;
+	}
+
+	.wa-doc-edit {
+		grid-template-columns: 1fr;
+		grid-template-rows: 1fr 1fr;
+	}
+
+	.ai-body textarea.wa-doc-text {
+		border-right: 0;
+		border-bottom: 1px solid var(--cs-border);
+	}
+
+	.wa-doc-view {
+		padding: 16px;
+	}
+
+	.wa-docs-all {
+		float: none;
+		display: block;
+		margin-top: 4px;
+	}
+}
+
+/* ---------- 알림 줄 ---------- */
+
+.kn-message,
+.wd-message {
+	font-size: 13px;
+	color: var(--cs-text-2);
+	margin: 8px 0;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.kn-message:empty,
+.wd-message:empty {
+	display: none;
+}
+
+.kn-message.kn-error,
+.wd-message-error {
+	color: var(--cs-danger);
+	background: var(--cs-danger-soft);
+	border: 1px solid #f6caca;
+	border-radius: var(--cs-radius-sm);
+	padding: 9px 12px;
+}
+
+.wd-message-ok {
+	color: var(--cs-success);
+	background: var(--cs-success-soft);
+	border: 1px solid #c3e6cf;
+	border-radius: var(--cs-radius-sm);
+	padding: 9px 12px;
+}
+
+.wd-message-info {
+	color: var(--cs-text-2);
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	padding: 9px 12px;
+}
+
+/* ---------- "이렇게 씁니다" 접는 안내 ---------- */
+
+.kn-howto {
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-left: 3px solid var(--cs-primary);
+	border-radius: var(--cs-radius);
+	padding: 12px 16px;
+	margin: 0 0 18px;
+	font-size: 13px;
+	line-height: 1.75;
+	color: var(--cs-text-2);
+	box-shadow: var(--cs-shadow-sm);
+}
+
+.kn-howto summary {
+	cursor: pointer;
+	font-weight: 700;
+	color: var(--cs-text);
+	list-style: none;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.kn-howto summary::-webkit-details-marker {
+	display: none;
+}
+
+.kn-howto summary::before {
+	content: "";
+	width: 7px;
+	height: 7px;
+	border-right: 2px solid var(--cs-primary);
+	border-bottom: 2px solid var(--cs-primary);
+	transform: rotate(-45deg);
+	transition: transform 0.15s ease;
+}
+
+.kn-howto[open] summary {
+	margin-bottom: 8px;
+}
+
+.kn-howto[open] summary::before {
+	transform: rotate(45deg);
+}
+
+/* 예시를 눌러 입력 칸에 채우는 단추(button 이 아니라 span 인 것도 있다) */
+.ai-body .kn-example {
+	display: inline-flex;
+	align-items: center;
+	height: 24px;
+	border: 1px dashed #8fc3d0;
+	background: var(--cs-primary-soft);
+	color: var(--cs-primary);
+	border-radius: 999px;
+	padding: 0 10px;
+	margin: 2px 4px 2px 0;
+	font-size: 12px;
+	font-weight: 600;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.ai-body button.kn-example:hover {
+	background: #d5edf2;
+	border-color: var(--cs-primary);
+	color: var(--cs-primary-hover);
+}
+
+/* ---------- 창(대화 상자) ---------- */
+
+.wd-dialog,
+.kn-graph-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 38, 0.48);
+	backdrop-filter: blur(2px);
+	z-index: 1000;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+}
+
+/* ---------- 스크롤 막대 ---------- */
+
+.ai-body ::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.ai-body ::-webkit-scrollbar-thumb {
+	background: #cfd6df;
+	border-radius: 999px;
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+.ai-body ::-webkit-scrollbar-thumb:hover {
+	background-color: #b3bdca;
+}
+
+.cs-sidebar::-webkit-scrollbar-thumb {
+	background-color: rgba(255, 255, 255, 0.12);
+}
