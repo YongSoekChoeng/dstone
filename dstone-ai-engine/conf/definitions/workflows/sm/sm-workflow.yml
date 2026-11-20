@@ -114,7 +114,7 @@ steps:
     save: reviewDecision
     routes:
       그대로 진행: step07
-      요구사항 수정: step18
+      요구사항 수정: step20
       요구사항 다시 작성: step03
       중지: FAIL
 
@@ -141,7 +141,7 @@ steps:
       승인(설계진행): step09
       영향도 수정: step19
       영향도 다시 작성: step07
-      요구사항 수정: step18
+      요구사항 수정: step20
       중지: FAIL
 
   - id: step09
@@ -177,7 +177,7 @@ steps:
     save: designApproval
     routes:
       승인(개발진행): step12
-      설계 수정: step20
+      설계 수정: step18
       설계 다시 작성: step10
       영향도 수정: step19
       중지: FAIL
@@ -251,38 +251,12 @@ steps:
     routes:
       승인: END
       재개발: step15
-      설계 수정: step20
+      설계 수정: step18
       영향도 수정: step19
-      요구사항 수정: step18
+      요구사항 수정: step20
       실패: FAIL
 
   - id: step18
-    name: 고객요구사항분석서 수정
-    type: AGENT
-    agent: document-revise-agent
-    with:
-      documents:
-        - ${input}/${state.now}/01.customer_requirement.md
-      request: ${state.request}
-      instruction: ${arrival}
-      history: ${decisions:}
-    save: revision
-    next: step04
-
-  - id: step19
-    name: 영향도분석서 수정
-    type: AGENT
-    agent: document-revise-agent
-    with:
-      documents:
-        - ${input}/${state.now}/02.impact.md
-      request: ${state.request}
-      instruction: ${arrival}
-      history: ${decisions:}
-    save: revision
-    next: step08
-
-  - id: step20
     name: 설계서 수정
     type: AGENT
     agent: document-revise-agent
@@ -298,6 +272,31 @@ steps:
     save: revision
     next: step11
 
+  - id: step19
+    name: 영향도분석서 수정
+    type: AGENT
+    agent: document-revise-agent
+    with:
+      documents:
+        - ${input}/${state.now}/02.impact.md
+      request: ${state.request}
+      instruction: ${arrival}
+      history: ${decisions:}
+    save: revision
+    next: step08
+
+  - id: step20
+    name: 고객요구사항분석서 수정
+    type: AGENT
+    agent: document-revise-agent
+    with:
+      documents:
+        - ${input}/${state.now}/01.customer_requirement.md
+      request: ${state.request}
+      instruction: ${arrival}
+      history: ${decisions:}
+    save: revision
+    next: step04
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
@@ -312,7 +311,7 @@ state:
   developApproval: 개발 승인(step17) 결과
   impactPath: 영향도 분석(step07)이 돌려준 답(저장 파일과 결정 필요 사항)
   architectPath: 아키텍처 설계(step10)가 돌려준 답(저장 파일과 결정 필요 사항)
-  revision: 문서 수정(step18~20)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
+  revision: 문서 수정(step20~20)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
   sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
   compileResult: 컴파일 확인(step16)이 통과했을 때의 출력
   compileError: 컴파일 확인(step16)이 실패했을 때의 오류(통과하면 비어 있다)
