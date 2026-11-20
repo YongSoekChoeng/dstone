@@ -835,11 +835,15 @@ public class AgentExecutor extends BaseObject {
 		AtomicInteger used = new AtomicInteger();
 		// 꼭 해야 하는 Tool(requiredTools)을 아직 못 했으면 마지막 몇 번은 그 Tool 몫으로 남겨 둡니다(ToolCallBudgetCallback).
 		AtomicInteger reserveRefusals = new AtomicInteger();
+		// 같은 Tool을 같은 인자로 다시 불러 또 실패할 호출을 막는 기억입니다(RepeatFailureGuardCallback). 이 호출의 Tool들이 함께 씁니다.
+		Map<String, String> failures = new ConcurrentHashMap<String, String>();
 		List<String> requiredTools = succeededTools == null ? null : agent.requiredTools();
 		List<ToolCallback> result = new ArrayList<>(callbacks.size());
 		for (ToolCallback callback : callbacks) {
 			// 다시 읽기 막기는 횟수 세기보다 안쪽에 둡니다. 막은 호출도 한 번으로 셉니다.
 			ToolCallback inner = readHistory == null ? callback : new RereadGuardCallback(callback, readHistory, agent.id());
+			// 같은 인자로 이미 실패한 호출은 실행하지 않습니다. 막은 호출도 바깥의 횟수 세기에서 한 번으로 셉니다.
+			inner = new RepeatFailureGuardCallback(inner, failures, agent.id());
 			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals, writtenPaths));
 		}
 		return result;

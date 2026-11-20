@@ -227,7 +227,8 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	 * 결과는 그대로 돌려줍니다.
 	 */
 	private String recorded(String result, String toolInput) {
-		boolean ok = result == null || !result.stripLeading().startsWith("실패:");
+		// 글자를 돌려주는 Tool의 답은 JSON 글자("실패: ...")로 감싸여 오므로 따옴표까지 보는 FileAccessRule.isFailure()로 가린다.
+		boolean ok = !FileAccessRule.isFailure(result);
 		String name = this.delegate.getToolDefinition().name();
 		if (this.succeeded != null && ok) {
 			this.succeeded.add(name);

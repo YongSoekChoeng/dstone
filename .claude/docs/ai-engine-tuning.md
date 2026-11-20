@@ -46,3 +46,14 @@ Notes: the original `9294e45d` failure (99 calls, no save) did not reproduce in 
 
 Reading: the save guarantees work (no lost saves in 6 new-definition design runs vs 1/3 baseline failure); knowledge use on impact is back; cost per run is not lower and varies 4× run to run on this model. Open issues: (1) the revise agent uses `readFile` (given for its documents) on source files — give it `readFileLines` only; (2) `requiredTools` cannot express "the main document must change" — candidate generic engine option `execution.requiredWrites` (input field(s) whose paths must be written in the call, checked from the file-access records).
 
+**Round 3–4 — design revise only (2026-11-20 14:50–15:23, n=3 each).** Round 3 = `document-revise-agent` 1.2.0 (`readFileLines` only, `requiredWrites: [${input.documents[0]}]`): 3/3 ok, quality 5/5 ×3, 106/176/459s, 16/13/49 tools, 223k/282k/1.83M tok — the 459s run made 35 `editFileTexts` calls, 31 byte-identical. Round 4 = + `RepeatFailureGuardCallback` and the quoted-failure fix: 3/3 ok, quality 5/5 ×3, 91/152/136s, 23/25/11 tools, 521k/732k/190k tok (the guard did not fire; no identical repeats occurred).
+
+| design revise | ok / quality | time | tools | tokens |
+|---|---|---|---|---|
+| baseline (architect, glm) | 3/3, 5/5 ×3 | 70–176s | 18–24 | 320–627k |
+| 2.1.0 revise agent | 3/3, quality 2/3 | 35–91s | 11–41 | 211k–1.85M |
+| round 3 | 3/3, 5/5 ×3 | 106–459s | 13–49 | 223k–1.83M |
+| round 4 | 3/3, 5/5 ×3 | 91–152s | 11–25 | 190–732k |
+
+Design revise is now at baseline quality with comparable or lower cost and no outlier in 3 runs.
+
