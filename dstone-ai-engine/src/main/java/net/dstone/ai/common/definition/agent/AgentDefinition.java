@@ -52,6 +52,7 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   input, output    무엇을 받고 무엇을 돌려주는지(Picoschema). 비우면 둘 다 글자입니다.
  *   tools.allowed    LLM에게 보여 줄 Tool 이름. 비우면 Tool을 쓰지 않습니다.
  *   skills.allowed   필요할 때 꺼내 읽을 Skill 이름. 비우면 Skill을 쓰지 않습니다.
+ *   skills.preload   언제나 필요해서 시스템 프롬프트에 미리 넣어 둘 Skill 이름.
  *   subAgents        일을 맡길 수 있는 다른 Agent의 id. 동시에 맡기려면 {agents: [...], background: true}.
  *   allowedCallers   호출을 허락할 caller(tenant). 비우면 누구나 부를 수 있습니다.
  *   execution        다시 부르기, 대기 시간, Tool 호출 한도.
@@ -96,6 +97,12 @@ import net.dstone.ai.common.definition.SchemaDefinition;
  *   LLM에게는 Skill이라는 Tool 하나가 보이고, 그 설명에 고른 Skill의 이름과 설명이 들어갑니다.
  *   LLM이 Skill을 부르면 SKILL.md 본문을 Tool 결과로 받아 그대로 따릅니다(runtime.agent.SkillTool).
  *   Skill 폴더의 참고 파일까지 읽게 하려면 tools.allowed에 readFile도 적어야 합니다.
+ *
+ * ■ skills.preload
+ *   skills: { preload: [source-investigation] }
+ *   이 Agent가 일할 때마다 필요한 Skill은 미리 넣어 둡니다. 본문이 시스템 프롬프트의 업무 지시 뒤에 붙습니다(AgentExecutor).
+ *   Tool 호출을 쓰지 않고, LLM이 부르지 않아 빠지는 일도 없습니다. 여러 Agent가 같은 Skill을 미리 넣어 한 파일로 같이 씁니다.
+ *   경우에 따라서만 필요한 Skill(기술별 지식 등)은 allowed에 둡니다. 둘 다 적어도 됩니다.
  *
  * ■ subAgents
  *   여기 적은 Agent는 LLM에게 Tool 하나로 보입니다(이름 = id, 설명 = description, 인자 = input 스키마).
@@ -185,9 +192,10 @@ public record AgentDefinition(
 	/**
 	 * agent.skills 입니다.
 	 *
-	 * @param allowed 이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다.
+	 * @param allowed 이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다(필요할 때 Skill Tool로 부름).
+	 * @param preload 시스템 프롬프트에 미리 넣어 둘 Skill 이름 목록입니다(언제나 필요한 것).
 	 */
-	public record Skills(List<String> allowed) {
+	public record Skills(List<String> allowed, List<String> preload) {
 	}
 
 	/**
@@ -302,6 +310,11 @@ public record AgentDefinition(
 	/** 이 Agent가 꺼내 읽을 수 있는 Skill 이름 목록입니다. 비워뒀으면 빈 목록입니다. */
 	public List<String> skillNames() {
 		return this.skills == null || this.skills.allowed() == null ? List.of() : this.skills.allowed();
+	}
+
+	/** 시스템 프롬프트에 미리 넣어 둘 Skill 이름 목록입니다. 비워뒀으면 빈 목록입니다. */
+	public List<String> preloadSkillNames() {
+		return this.skills == null || this.skills.preload() == null ? List.of() : this.skills.preload();
 	}
 
 	/** 이 Agent가 일을 맡길 수 있는 Agent id 목록입니다. 비워뒀으면 빈 목록입니다. */

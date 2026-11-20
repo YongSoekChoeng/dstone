@@ -150,12 +150,15 @@ public class FileTool {
 	@Tool(description = "basePath 디렉토리와 하위디렉토리의 파일 내용에서 keyword가 들어 있는 줄을 찾아 '파일절대경로:줄번호: 그 줄 내용' 목록으로 반환한다(matches). "
 		+ "basePath에 파일 경로를 주면 그 파일 하나에서만 찾는다(fileNamePattern은 보지 않는다). "
 		+ "어떤 소스가 특정 컬럼명/테이블명/클래스명/메서드명/URL/문구를 쓰는지 찾을 때 사용한다. 파일을 하나씩 열어 보기 전에 먼저 이 Tool로 후보를 찾아라. "
-		+ "keyword는 정규식이 아니라 단순 문자열이며 대소문자를 구분하지 않는다. 결과가 많으면 일부만 반환하고 truncated=true와 안내(message)를 준다 - "
+		+ "keyword는 정규식이 아니라 단순 문자열이며 대소문자를 구분하지 않는다. 여러 개를 찾으려면 |로 이어 한 번에 부른다(예: imageSave|thumbnail|getFileDAO - 그중 하나라도 있는 줄). "
+		+ "같은 파일이나 폴더에서 키워드마다 따로 부르지 마라. 찾은 줄의 앞뒤도 보려면 contextLines를 준다(readFileLines를 따로 부르지 않아도 된다). "
+		+ "결과가 많으면 일부만 반환하고 truncated=true와 안내(message)를 준다 - "
 		+ "그때는 keyword를 더 구체적으로 하거나 fileNamePattern/basePath로 범위를 좁혀 다시 호출한다.")
 	public Map<String, Object> searchInFiles(
 			@ToolParam(description = "검색을 시작할 디렉토리의 절대경로. 파일 하나에서만 찾으려면 그 파일의 절대경로") String basePath,
-			@ToolParam(description = "찾을 문자열(정규식 아님, 대소문자 구분 안 함)") String keyword,
-			@ToolParam(required = false, description = "검색할 파일명 패턴. 콤마로 여러 개 지정 가능. 예) *.java,*.xml  비워두면 모든 파일") String fileNamePattern) {
+			@ToolParam(description = "찾을 문자열(정규식 아님, 대소문자 구분 안 함). 여러 개는 |로 이어 적는다. 예) imageSave|thumbnail") String keyword,
+			@ToolParam(required = false, description = "검색할 파일명 패턴. 콤마로 여러 개 지정 가능. 예) *.java,*.xml  비워두면 모든 파일") String fileNamePattern,
+			@ToolParam(required = false, description = "찾은 줄의 앞뒤로 함께 보여 줄 줄 수(0~10). 비우면 0(찾은 줄만)") Integer contextLines) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		List<String> matches = new ArrayList<>();
 		result.put("matches", matches);
@@ -189,7 +192,15 @@ public class FileTool {
 		}
 		int maxMatches = this.intProperty("max-search-matches", DEFAULT_MAX_SEARCH_MATCHES);
 		int maxFileBytes = this.intProperty("max-search-file-bytes", DEFAULT_MAX_SEARCH_FILE_BYTES);
-		String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
+		// 키워드를 |로 여러 개 받습니다. 모델이 같은 파일에서 키워드마다 한 번씩 부르면 그만큼 LLM 호출이 늘기 때문입니다
+		// (2026-11-20 실행 9294e45d: FileService.java 한 파일을 imageSave, thumbnail, public FileVO, getFileDAO로 따로 검색).
+		List<String> lowerKeywords = new ArrayList<>();
+		for (String part : keyword.split("\\|")) {
+			if (!part.isBlank()) {
+				lowerKeywords.add(part.trim().toLowerCase(Locale.ROOT));
+			}
+		}
+		int around = contextLines == null ? 0 : Math.max(0, Math.min(MAX_SEARCH_CONTEXT_LINES, contextLines.intValue()));
 
 		int totalMatches = 0;
 		int searchedFiles = 0;
@@ -205,12 +216,12 @@ public class FileTool {
 			searchedFiles++;
 			String[] lines = contents.split("\r?\n", -1);
 			for (int i = 0; i < lines.length; i++) {
-				if (!lines[i].toLowerCase(Locale.ROOT).contains(lowerKeyword)) {
+				if (!containsAny(lines[i].toLowerCase(Locale.ROOT), lowerKeywords)) {
 					continue;
 				}
 				totalMatches++;
 				if (matches.size() < maxMatches) {
-					matches.add(this.toPath(file) + ":" + (i + 1) + ": " + this.shorten(lines[i].trim()));
+					matches.add(around == 0 ? this.toPath(file) + ":" + (i + 1) + ": " + this.shorten(lines[i].trim()) : this.withContext(file, lines, i, around));
 				}
 			}
 		}
@@ -226,6 +237,39 @@ public class FileTool {
 			result.put("message", "일치하는 줄이 없습니다(검색한 파일 " + searchedFiles + "개). 다른 keyword나 다른 경로로 시도해 보세요.");
 		}
 		return result;
+	}
+
+	/** searchInFiles의 contextLines 최대값입니다. */
+	private static final int MAX_SEARCH_CONTEXT_LINES = 10;
+
+	/** 줄에 키워드 가운데 하나라도 들어 있는가(둘 다 소문자로 받습니다). */
+	private static boolean containsAny(String lowerLine, List<String> lowerKeywords) {
+		for (String keyword : lowerKeywords) {
+			if (lowerLine.contains(keyword)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * <pre>
+	 * 찾은 줄과 그 앞뒤 줄을 한 덩어리로 만듭니다. 찾은 줄에는 >를 붙입니다.
+	 *   /src/A.java:12
+	 *     11| ...
+	 *   > 12| 찾은 줄
+	 *     13| ...
+	 * </pre>
+	 */
+	private String withContext(File file, String[] lines, int index, int around) {
+		StringBuilder block = new StringBuilder();
+		block.append(this.toPath(file)).append(":").append(index + 1);
+		int from = Math.max(0, index - around);
+		int to = Math.min(lines.length - 1, index + around);
+		for (int i = from; i <= to; i++) {
+			block.append("\n").append(i == index ? "> " : "  ").append(i + 1).append("| ").append(this.shorten(lines[i]));
+		}
+		return block.toString();
 	}
 
 	/**

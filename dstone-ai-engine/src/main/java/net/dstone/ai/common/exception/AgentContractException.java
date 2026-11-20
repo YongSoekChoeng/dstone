@@ -14,9 +14,26 @@ public class AgentContractException extends RuntimeException {
 
 	private static final long serialVersionUID = 1L;
 
+	/** 계약을 어긴 답의 글자입니다. 답을 받은 뒤 어긴 것이 드러났을 때만 있습니다(그 밖에는 null). */
+	private final String answer;
+
 	/** @param message 무엇이 어떻게 틀렸는지 설명하는 문장입니다. */
 	public AgentContractException(String message) {
+		this(message, null);
+	}
+
+	/**
+	 * @param message 무엇이 어떻게 틀렸는지 설명하는 문장입니다.
+	 * @param answer  계약을 어긴 답의 글자입니다. 다시 부를 때 지난 답으로 넘깁니다(AgentExecutor.call()). 없으면 null입니다.
+	 */
+	public AgentContractException(String message, String answer) {
 		super(message);
+		this.answer = answer;
+	}
+
+	/** 계약을 어긴 답의 글자입니다. 없으면 null입니다. */
+	public String answer() {
+		return this.answer;
 	}
 
 }

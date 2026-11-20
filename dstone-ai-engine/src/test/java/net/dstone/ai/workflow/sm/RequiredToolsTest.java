@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.registry.DefinitionReloader;
+import net.dstone.ai.support.ScriptedChatModel;
 import net.dstone.ai.support.WorkflowStepper;
 import net.dstone.ai.support.WorkflowTestBase;
 
@@ -58,6 +60,10 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.errorMessage()).contains("2번 불렀지만").contains("[writeFile]").contains("requiredTools");
 		assertThat(this.chatModel.prompts()).hasSize(2);
+		// 다시 부를 때는 지난 시도가 왜 실패했고 무엇을 답했는지 함께 보낸다(처음부터 다시 조사하지 않게).
+		String retry = ScriptedChatModel.textOf(this.chatModel.prompts().get(1));
+		assertThat(retry).contains("[지난 시도]").contains("requiredTools").contains("요청을 파악했습니다. 이제 산출물을 작성합니다.");
+		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(0))).doesNotContain("[지난 시도]");
 	}
 
 	@Test
@@ -90,7 +96,7 @@ public class RequiredToolsTest extends WorkflowTestBase {
 	@Test
 	void 둘_중_하나만_적은_항목은_어느_것이든_성공하면_된다() throws IOException {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
-		// sm-architect-agent(step10)는 requiredTools: [writeFile|editFileTexts]다. 지적을 반영할 때는 editFileTexts로만 끝난다.
+		// document-revise-agent(step20 설계서 수정)는 requiredTools: [editFileTexts|writeFile|appendFile]다. 고칠 때는 editFileTexts로만 끝난다.
 		Path design = this.workDir.resolve("03-1.design.md");
 		Files.writeString(design, "import kr.co.gnx.system.file.UPLOADS;\n");
 		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + design.toString().replace("\\", "/")
@@ -98,13 +104,11 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		this.chatModel.answer("지적된 import만 고쳤습니다.");
 
 		Map<String, Object> input = new LinkedHashMap<>();
-		input.put("base_dir", this.workDir.toString().replace("\\", "/"));
+		input.put("documents", List.of(design.toString().replace("\\", "/")));
 		input.put("request", "## 현업요청\n이미지 게시판");
-		input.put("requirement", "# 요구사항");
-		input.put("impact", "# 영향도");
-		input.put("feedback", "- 개발 승인(step17): 재설계 / UPLOADS import가 틀렸다");
-		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step10", input);
-		flow.step("step10");
+		input.put("instruction", "개발 승인(step17)의 결정: 설계 수정\n의견:\nUPLOADS import가 틀렸다");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step20", input);
+		flow.step("step20");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(Files.readString(design)).contains("kr.co.gnx.config.Constants.UPLOADS");

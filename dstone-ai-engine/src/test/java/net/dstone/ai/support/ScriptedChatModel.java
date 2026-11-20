@@ -60,6 +60,9 @@ public class ScriptedChatModel implements ChatModel {
 	/** 지금까지 받은 프롬프트입니다(받은 순서). */
 	private final List<Prompt> prompts = new ArrayList<Prompt>();
 
+	/** 실제 LLM이 돌려준 답입니다(llmCall이 true일 때만 쌓입니다). 평가 테스트가 Tool 호출 수를 셀 때 씁니다. */
+	private final List<ChatResponse> responses = new ArrayList<ChatResponse>();
+
 	/**
 	 * @param llmCall true면 실제 provider를 부릅니다(dstone.ai.test.llmcall)
 	 * @param context 실제 provider의 ChatModel 빈을 찾을 컨텍스트
@@ -138,6 +141,12 @@ public class ScriptedChatModel implements ChatModel {
 		this.answers.clear();
 		this.answersWhen.clear();
 		this.prompts.clear();
+		this.responses.clear();
+	}
+
+	/** 실제 LLM이 돌려준 답의 복사본입니다(llmCall이 true일 때만 쌓입니다). */
+	public synchronized List<ChatResponse> responses() {
+		return new ArrayList<ChatResponse>(this.responses);
 	}
 
 	/** 지금까지 받은 프롬프트의 복사본입니다. */
@@ -183,7 +192,11 @@ public class ScriptedChatModel implements ChatModel {
 		}
 		if (this.llmCall) {
 			// 실제 LLM은 오래 걸릴 수 있어서 잠금 밖에서 부릅니다(forEach step이 동시에 부를 수 있습니다).
-			return this.realModel().call(prompt);
+			ChatResponse real = this.realModel().call(prompt);
+			synchronized (this) {
+				this.responses.add(real);
+			}
+			return real;
 		}
 		synchronized (this) {
 			Object answer = this.next(prompt.getContents());

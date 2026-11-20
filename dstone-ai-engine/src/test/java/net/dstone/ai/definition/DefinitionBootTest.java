@@ -41,7 +41,7 @@ public class DefinitionBootTest extends WorkflowTestBase {
 		}
 		// dstone-boot 채팅 화면이 id를 코드에 적어 두고 부르는 Agent입니다.
 		assertThat(agentIds).contains("sample-general-chat");
-		assertThat(workflowIds).contains("pilot-workflow", "sample-tool-chain-basic");
+		assertThat(workflowIds).contains("sm-workflow", "sample-tool-chain-basic");
 	}
 
 }

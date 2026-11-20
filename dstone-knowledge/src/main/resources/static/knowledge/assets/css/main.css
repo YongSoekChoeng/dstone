@@ -3161,3 +3161,11 @@ body.wd-full-on {
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
+
+/* ---------- 실행 관리: 승인 선택지 옆 "받는 곳" ---------- */
+/* 결정을 고르면 어느 step(Agent)이 의견을 읽는지 작게 보여 준다 */
+.ai-route-receiver {
+	font-size: 12px;
+	color: var(--cs-muted);
+	margin: 0 12px 0 4px;
+}

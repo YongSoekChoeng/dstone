@@ -1387,14 +1387,25 @@ var DstoneAiWorkflowAdmin = (function () {
 			button.type = "button";
 			button.textContent = route;
 			button.addEventListener("click", function () { decide(false, route); });
+			// 이 결정을 고르면 누가 일을 받는지(의견을 읽는 Agent)를 버튼 옆에 작게 보여 준다.
+			var receiver = pendingApproval.receivers && pendingApproval.receivers[route];
+			if (receiver) {
+				button.title = "받는 곳: " + receiver;
+			}
 			routeButtonsEl.appendChild(button);
+			if (receiver) {
+				var hint = document.createElement("small");
+				hint.className = "ai-route-receiver";
+				hint.textContent = "→ " + receiver;
+				routeButtonsEl.appendChild(hint);
+			}
 			routeButtonsEl.appendChild(document.createTextNode(" "));
 		});
 
 		var label = "";
 		if (pendingApproval) {
 			label = stepLabel(pendingApproval.stepId) + " step에서 결정을 기다립니다." + (pendingApproval.approverRole ? " 결정할 사람: " + pendingApproval.approverRole + "." : "")
-				+ (hasRoutes ? " 아래 선택지 중 하나를 고르세요." : " 진행 기록에서 앞 step의 결과와 문서를 확인한 뒤 결정하세요.");
+				+ (hasRoutes ? " 아래 선택지 중 하나를 고르세요. 의견은 선택지 옆에 적힌 step이 읽습니다." : " 진행 기록에서 앞 step의 결과와 문서를 확인한 뒤 결정하세요.");
 		}
 		decisionStepEl.textContent = label;
 	}

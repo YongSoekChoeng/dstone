@@ -185,17 +185,18 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 - 테스트: `mvn test -DskipTests=false` (pom에서 기본 skip). 실제 LLM은 `-Ddstone.ai.test.llmcall=true`. 테스트는 main의 `conf/definitions`와 `conf/application.yml`을 그대로 쓴다 (테스트 전용 정의 파일 없음).
 - Workflow 실행은 `WorkFlowThreadPools`의 풀에서 `QUEUED`→`RUNNING`으로 돈다. 상태 전이는 조건부 UPDATE(`markQueued`/`markStarted`)로만 하고, 고아 실행 정리는 heartbeat 기준이라 같은 DB에 시험 사본을 띄워도 된다(`ai-engine-features.md` "Concurrent use").
 - 실행 중인 `target/*.jar|war`를 그 자리에서 다시 빌드하지 않는다. 사본을 다른 포트로 띄워 시험한다.
+- **Agent가 실패하면 프롬프트에 한 줄 더하기 전에 실패를 분류한다**(엔진/입력/Tool/Workflow 구조/Skill/모델/프롬프트). 사람의 결정은 엔진이 `${arrival}`·`${decisions}`로 전달하고, 여러 Agent가 같이 쓰는 방법은 Skill(`skills.preload`/`allowed`)로 둔다. 고친 뒤에는 `SmAgentEvalTest`(실제 LLM)로 기준선과 비교한다 — `ai-engine-agent-principles.md`.
 
 필요할 때 읽을 문서 (`.claude/docs/`):
 
 | 파일 | 읽을 때 |
 |---|---|
+| `ai-engine-agent-principles.md` | Agent 정의·프롬프트·Skill을 만들거나 고칠 때, Agent 실패를 분석할 때(실패 분류, 프롬프트 원칙, 평가 세트) |
 | `ai-engine-packages.md` | 패키지별 역할, 정의 파일 키(Agent/Workflow/Step), 레지스트리 검증 규칙 |
 | `ai-engine-dataflow.md` | Step 간 데이터 흐름(state 모델), Tool 호출 구조, timeout, 거버넌스 확장 지점 |
 | `ai-engine-features.md` | 일시정지/재개/되감기, `requiredTools`, Step 파일 기록·문서 팝업, Agent별 provider, 올린 문서는 Tool로 읽기(자동 RAG 없음), Skill·백그라운드 Sub Agent, 무재시작 정의 편집(디자이너) |
 | `ai-engine-testing.md` | 서버 없이 Workflow 테스트(`WorkflowTestBase`, `ScriptedChatModel`, `stepper`), 문서 위치 |
 | `ai-engine-tuning.md` | Tool 호출 예산·결과 압축·reasoning, `sm-workflow` 측정과 개선 내역 |
-| `ai-engine-pilot-workflow.md` | `pilot-workflow` step id, 신규개발/일반 경로, 측정 결과 |
 | `ai-engine-history.md` | 형식 변경 이력과 과거 검증 기록 |
 
 현재 상태의 전체 설명은 `docs/09.dstone-ai-engine.md` (§7 YAML 필드 레퍼런스, §8 템플릿).

@@ -17,7 +17,7 @@ import net.dstone.ai.common.consts.StepType;
  *   - id: step01
  *     name: 요구사항 분석
  *     type: AGENT
- *     agent: pilot-requirment-analyzer-agent
+ *     agent: sm-requirement-analyze-agent
  *     with:
  *       requirement: ${input.requirement}
  *     save: requirementAnalysis

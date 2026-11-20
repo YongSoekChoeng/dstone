@@ -1,5 +1,6 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,6 +33,11 @@ import net.dstone.common.utils.LogUtil;
  * 부를 때마다 LLM 호출이 한 번씩 나가므로 시간만 씁니다. Workflow에서는 step 실패가 되어 onFailure로 갑니다.
  * Spring AI에도 자체 한도(spring.ai.tools.limits)가 있지만 Agent마다 다르게 줄 수 없어서, 그쪽은 넉넉히 두고 여기서 먼저 막습니다.
  *
+ * 꼭 해야 하는 Tool(execution.requiredTools, 예: 결과 저장)을 아직 성공하지 못했으면 마지막 몇 번은 그 Tool 몫으로 남겨 둡니다(reserveFor()).
+ * 그 구간에서 다른 Tool을 부르면 실행하지 않고(횟수도 쓰지 않고) "지금 저장하라"고 돌려줍니다. 안내만으로는 조사를 멈추지 않는 모델이 있어서
+ * (2026-11-20 실행 9294e45d: 설계 Agent가 남은 횟수 안내를 받고도 50번을 모두 조사에 쓰고 저장하지 못했습니다) 엔진이 막습니다.
+ * 꼭 해야 하는 Tool을 한 번 성공하면 남겨 둔 몫도 풀립니다.
+ *
  * 이 클래스는 Spring 빈이 아닙니다. Agent를 부를 때마다 AgentExecutor가 새로 만듭니다(횟수가 호출마다 따로이기 때문입니다).
  * 같은 Agent 호출에 붙는 Tool들은 used 하나를 함께 씁니다. Sub Agent 호출은 세지 않습니다(그쪽은 자기 한도가 따로 있습니다).
  *
@@ -49,6 +55,8 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	private final AtomicInteger used;
 	private final int maxCalls;
 	private final Set<String> succeeded;
+	private final List<String> requiredTools;
+	private final AtomicInteger reserveRefusals;
 
 	/**
 	 * @param delegate 실제 Tool 호출을 맡는 원래 ToolCallback입니다.
@@ -68,11 +76,27 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	 * @param succeeded 성공한 Tool 이름을 적어 둘 곳입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다. 필요 없으면 null
 	 */
 	public ToolCallBudgetCallback(ToolCallback delegate, String agentId, AtomicInteger used, int maxCalls, Set<String> succeeded) {
+		this(delegate, agentId, used, maxCalls, succeeded, null, null);
+	}
+
+	/**
+	 * @param delegate        실제 Tool 호출을 맡는 원래 ToolCallback입니다.
+	 * @param agentId         이 Tool을 쓰는 Agent의 id입니다(로그용).
+	 * @param used            지금까지 부른 횟수입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다.
+	 * @param maxCalls        부를 수 있는 최대 횟수입니다.
+	 * @param succeeded       성공한 Tool 이름을 적어 둘 곳입니다. requiredTools를 주면 꼭 있어야 합니다.
+	 * @param requiredTools   꼭 해야 하는 Tool(execution.requiredTools. "writeFile|editFileTexts"처럼 |로 나눈 항목은 하나만 성공하면 됨). 없으면 null
+	 * @param reserveRefusals 남겨 둔 몫 때문에 거절한 횟수입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다. requiredTools가 없으면 null
+	 */
+	public ToolCallBudgetCallback(ToolCallback delegate, String agentId, AtomicInteger used, int maxCalls, Set<String> succeeded, List<String> requiredTools,
+			AtomicInteger reserveRefusals) {
 		this.delegate = delegate;
 		this.agentId = agentId;
 		this.used = used;
 		this.maxCalls = maxCalls;
 		this.succeeded = succeeded;
+		this.requiredTools = requiredTools == null || succeeded == null ? List.of() : requiredTools;
+		this.reserveRefusals = reserveRefusals == null ? new AtomicInteger() : reserveRefusals;
 	}
 
 	@Override
@@ -87,6 +111,9 @@ public class ToolCallBudgetCallback implements ToolCallback {
 
 	@Override
 	public String call(String toolInput) {
+		if (this.mustSaveFirst()) {
+			return this.saveFirst();
+		}
 		int count = this.used.incrementAndGet();
 		if (count > this.maxCalls) {
 			return this.refused(count);
@@ -96,6 +123,9 @@ public class ToolCallBudgetCallback implements ToolCallback {
 
 	@Override
 	public String call(String toolInput, ToolContext toolContext) {
+		if (this.mustSaveFirst()) {
+			return this.saveFirst();
+		}
 		int count = this.used.incrementAndGet();
 		if (count > this.maxCalls) {
 			return this.refused(count);
@@ -119,6 +149,75 @@ public class ToolCallBudgetCallback implements ToolCallback {
 			+ "Tool을 더 부르지 마십시오. 지금까지 알아낸 것으로 답을 마무리하고, 확인하지 못한 것은 확인하지 못했다고 적으십시오.";
 	}
 
+	/**
+	 * 남은 횟수가 꼭 해야 하는 Tool 몫만 남았는데, 그 Tool을 아직 성공하지 못했고, 이 Tool이 그 Tool이 아니면 true입니다.
+	 */
+	private boolean mustSaveFirst() {
+		int reserve = reserveFor(this.maxCalls, this.requiredTools);
+		if (reserve == 0 || this.requiredDone() || this.isRequired(this.delegate.getToolDefinition().name())) {
+			return false;
+		}
+		return this.maxCalls - this.used.get() <= reserve;
+	}
+
+	/**
+	 * 남겨 둔 몫 때문에 이 Tool을 실행하지 않았다는 안내입니다. 횟수는 쓰지 않습니다.
+	 *
+	 * @throws AgentContractException 안내를 MAX_REFUSALS번 돌려준 뒤에도 또 다른 Tool을 불렀을 때
+	 */
+	private String saveFirst() {
+		int refusals = this.reserveRefusals.incrementAndGet();
+		String names = String.join(", ", this.requiredTools);
+		if (refusals > MAX_REFUSALS) {
+			throw new AgentContractException("agent[" + this.agentId + "]가 남은 Tool 호출을 꼭 해야 하는 Tool(" + names + ")에 쓰지 않고 다른 Tool을 계속 불러서 중단했습니다.");
+		}
+		LogUtil.sysout("dstone-ai-engine tool: agent[" + this.agentId + "]의 남은 Tool 호출은 [" + names + "] 몫이라 [" + this.delegate.getToolDefinition().name() + "]를 실행하지 않았습니다.");
+		return "실패: 남은 Tool 호출 " + (this.maxCalls - this.used.get()) + "번은 꼭 해야 하는 Tool(" + names + ") 몫입니다. 이 Tool은 실행되지 않았습니다. "
+			+ "조사를 멈추고 지금까지 알아낸 것으로 결과를 " + names + "로 저장하십시오. 확인하지 못한 것은 확인하지 못했다고 결과에 적으십시오.";
+	}
+
+	/** 꼭 해야 하는 Tool 항목을 모두 성공했는가. */
+	private boolean requiredDone() {
+		for (String entry : this.requiredTools) {
+			boolean done = false;
+			for (String name : entry.split("\\|")) {
+				if (this.succeeded.contains(name.trim())) {
+					done = true;
+				}
+			}
+			if (!done) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** 이 이름이 꼭 해야 하는 Tool 가운데 하나인가. */
+	private boolean isRequired(String toolName) {
+		for (String entry : this.requiredTools) {
+			for (String name : entry.split("\\|")) {
+				if (name.trim().equals(toolName)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 꼭 해야 하는 Tool 몫으로 남겨 둘 횟수입니다. 꼭 해야 하는 Tool이 없으면 0, 있으면 항목 수의 2배와 한도의 10분의 1 가운데 큰 값(적어도 3번)입니다.
+	 * 저장은 보통 writeFile 한 번과 appendFile 몇 번이라서 이 정도면 충분합니다.
+	 *
+	 * @param maxCalls      한도
+	 * @param requiredTools 꼭 해야 하는 Tool 항목
+	 */
+	static int reserveFor(int maxCalls, List<String> requiredTools) {
+		if (requiredTools == null || requiredTools.isEmpty()) {
+			return 0;
+		}
+		return Math.min(maxCalls - 1, Math.max(3, Math.max(requiredTools.size() * 2, maxCalls / 10)));
+	}
+
 	/** 결과가 "실패:"로 시작하지 않으면 이 Tool을 성공한 것으로 적어 둡니다. 결과는 그대로 돌려줍니다. */
 	private String recorded(String result) {
 		if (this.succeeded != null && (result == null || !result.stripLeading().startsWith("실패:"))) {
@@ -137,7 +236,12 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (remaining == 0) {
 			notice = "(안내: Tool 호출 횟수 " + this.maxCalls + "번을 모두 썼습니다. 이제 Tool을 부를 수 없습니다. 지금까지 알아낸 것으로 답을 마무리하십시오.)";
 		} else {
-			notice = "(안내: Tool을 앞으로 " + remaining + "번만 더 부를 수 있습니다(한도 " + this.maxCalls + "번). 조사를 멈추고, 저장할 결과가 있으면 지금 저장하십시오.)";
+			notice = "(안내: Tool을 앞으로 " + remaining + "번만 더 부를 수 있습니다(한도 " + this.maxCalls + "번). 조사를 멈추고, 저장할 결과가 있으면 지금 저장하십시오.";
+			int reserve = reserveFor(this.maxCalls, this.requiredTools);
+			if (reserve > 0 && !this.requiredDone()) {
+				notice += " 마지막 " + reserve + "번은 꼭 해야 하는 Tool(" + String.join(", ", this.requiredTools) + ")에만 쓸 수 있습니다.";
+			}
+			notice += ")";
 		}
 		return (result == null ? "" : result) + "\n\n" + notice;
 	}

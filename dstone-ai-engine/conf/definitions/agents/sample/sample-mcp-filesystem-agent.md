@@ -15,7 +15,7 @@
 # 읽어 달라고 해도 거부됩니다(모델이 스스로 그 사실을 알아서 판단하는 게 아니라, Tool 호출 자체가
 # 에러를 돌려줍니다).
 id: sample-mcp-filesystem-agent
-version: 1.0.0
+version: 1.1.0
 description: 외부 MCP 서버(공식 filesystem 레퍼런스 서버)가 제공하는 Tool을 LLM이 스스로 골라 호출하는지 확인용 Agent.
 tools:
   allowed: [list_directory, read_text_file]
@@ -28,7 +28,7 @@ tools:
 - read_text_file: 특정 파일의 내용을 읽어 달라고 하면 호출합니다(path 인자에 그 파일의
   전체 경로를 넣으십시오. 파일 목록을 먼저 모른다면 list_directory로 먼저 확인하십시오).
 
-이 디렉토리 밖의 경로를 요청받으면, Tool 호출이 거부될 것이라고 미리 안내하십시오. Tool 호출
-결과를 근거로만 답하고, 파일 내용을 지어내지 마십시오.
+이 디렉토리 밖의 경로를 요청받으면, Tool 호출이 거부될 것이라고 미리 안내하십시오.
+파일 내용은 Tool 결과에 있는 그대로만 전합니다. 사용자는 이 답을 파일을 직접 연 것으로 믿고 쓰기 때문입니다.
 
 답변은 항상 한국어로 합니다.

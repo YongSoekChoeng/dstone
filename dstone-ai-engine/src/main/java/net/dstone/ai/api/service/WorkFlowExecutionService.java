@@ -2,6 +2,7 @@ package net.dstone.ai.api.service;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import net.dstone.ai.api.dto.PendingApproval;
 import net.dstone.ai.api.dto.ResumePoint;
 import net.dstone.ai.api.dto.RewindPoint;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.common.definition.workflow.WorkFlowDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
@@ -386,6 +388,8 @@ public class WorkFlowExecutionService extends BaseService {
 		for (String stepId : point.steps()) {
 			WorkFlowContext.clearApproval(context, stepId);
 		}
+		// 다시 시작하는 step이 받을 지시(${arrival})를 되살립니다. 그 step으로 오게 했던 마지막 결정입니다.
+		WorkFlowContext.restoreArrival(context, this.arrivalFor(workflow, context, point.fromStep()));
 		WorkFlowContext.setCurrentStep(context, point.fromStep());
 		List<String> deleted = this.deleteFiles(executionId, point.deleteFiles());
 		this.fileStore.deleteSteps(executionId, point.steps());
@@ -617,7 +621,54 @@ public class WorkFlowExecutionService extends BaseService {
 		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
 			return null;
 		}
-		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact());
+		Map<String, String> receivers = new LinkedHashMap<String, String>();
+		for (Map.Entry<String, String> route : approval.decisionRoutes().entrySet()) {
+			receivers.put(route.getKey(), this.receiverLabel(workflow, route.getValue()));
+		}
+		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers);
+	}
+
+	/**
+	 * <pre>
+	 * 되감아 다시 시작할 step이 받아야 할 결정을 찾습니다. 결정 기록을 최근 것부터 보며, 그 결정으로 간 곳에서
+	 * 문서를 읽는 TOOL step을 건너뛰었을 때 fromStep에 닿는 첫 결정입니다. 없으면 null입니다.
+	 * </pre>
+	 *
+	 * @param workflow Workflow 정의입니다.
+	 * @param context  실행 컨텍스트입니다.
+	 * @param fromStep 다시 시작할 step의 id입니다.
+	 */
+	private Map<String, Object> arrivalFor(WorkFlowDefinition workflow, Map<String, Object> context, String fromStep) {
+		List<Map<String, Object>> decisions = WorkFlowContext.decisions(context);
+		for (int i = decisions.size() - 1; i >= 0; i--) {
+			Object to = decisions.get(i).get("to");
+			StepDefinition receiver = to == null ? null : workflow.receiverOf(to.toString());
+			if (receiver != null && receiver.id().equals(fromStep)) {
+				return decisions.get(i);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 흐름이 target으로 갔을 때 일을 받는 곳을 사람이 읽는 글로 돌려줍니다(문서를 읽는 TOOL step은 건너뜀).
+	 *
+	 * @param workflow Workflow 정의입니다.
+	 * @param target   route가 가리키는 곳(step id, END, FAIL)입니다.
+	 */
+	private String receiverLabel(WorkFlowDefinition workflow, String target) {
+		if (Constants.WorkFlow.END_SENTINEL.equals(target)) {
+			return "끝(END)";
+		}
+		if (Constants.WorkFlow.FAIL_SENTINEL.equals(target)) {
+			return "실패로 끝냄(FAIL)";
+		}
+		StepDefinition receiver = workflow.receiverOf(target);
+		if (receiver == null) {
+			return target;
+		}
+		String ref = StepDefinition.refOf(receiver);
+		return receiver.id() + (StringUtil.isEmpty(receiver.name()) ? "" : " " + receiver.name()) + (StringUtil.isEmpty(ref) ? "" : " · " + ref);
 	}
 
 	/**

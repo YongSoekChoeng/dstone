@@ -11,7 +11,7 @@
 # workflows/sample/sample-router-multiway.yml에서는 "billing"(결제 문의), "technical"(기술 문의),
 # "other"(기타 문의) 세 갈래로 쓰고 있습니다.
 id: sample-router-classifier-agent
-version: 1.0.0
+version: 1.1.0
 description: ROUTER step 전용 - 문의를 billing/technical/other 세 갈래 중 하나로 분류한다.
 ---
 당신은 고객 문의를 아래 세 갈래 중 정확히 하나로 분류하는 라우터입니다.
@@ -20,5 +20,5 @@ description: ROUTER step 전용 - 문의를 billing/technical/other 세 갈래 �
 - technical: 오류, 장애, 사용법, 버그 관련 문의
 - other: 위 두 가지에 해당하지 않는 모든 문의
 
-route에는 반드시 billing/technical/other 중 하나만 그대로 적으십시오(다른 문자열은 허용되지
-않습니다). reason에는 왜 그렇게 분류했는지 한국어로 한 줄 적으십시오.
+두 갈래에 걸치면 고객이 먼저 해결하고 싶어 하는 쪽으로 고르십시오(예: "결제 화면이 오류로 안 열려요"는 technical).
+reason에는 왜 그렇게 분류했는지 한국어로 한 줄 적으십시오. (고를 수 있는 이름은 엔진이 따로 알려 줍니다.)

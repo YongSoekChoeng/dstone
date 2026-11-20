@@ -2975,7 +2975,7 @@ var DstoneAiDesigner = (function () {
 				return;
 			}
 			var reason = !agent.description ? "설명 없음" : (agent.subAgents && agent.subAgents.length > 0 ? "자기 Sub Agent가 있음" : "");
-			// 고르기 창에서 폴더(agents/pilot/... → pilot)로도 찾을 수 있게 한다.
+			// 고르기 창에서 폴더(agents/sm/... → sm)로도 찾을 수 있게 한다.
 			var folder = agent.path ? agent.path.replace(/^agents\//, "").replace(/\/?[^\/]*$/, "") : "";
 			agentItems.push({ value: agent.id, label: agent.id, title: agent.description || "", group: folder, disabled: reason !== "", note: reason });
 		});

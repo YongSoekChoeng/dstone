@@ -1,5 +1,7 @@
 package net.dstone.ai.runtime.workflow.execution;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,8 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
  *   approvals:  { stepId: { decision, approver, comment } }   아직 쓰지 않은 승인 결정(엔진 내부용)
  *   definition: { id, version }                               이 실행을 시작한 Workflow 정의
  *   currentStep: 지금 차례인 step의 id(엔진 내부용). 정의가 바뀌어 순번이 밀려도 재개할 자리를 찾으려고 둡니다.
+ *   decisions:  [ { step, name, kind, decision, approver, comment, to, at } ]  내려진 결정(승인, 판정) 기록. ${decisions}로 읽습니다
+ *   arrival:    지금 step으로 오게 만든 마지막 결정(위 기록 하나). ${arrival}로 읽습니다
  *
  * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 save에 적힌 이름으로 state에 저장하고(saveOutput()),
  * 뒤의 step은 "${state.이름}"으로 읽습니다(common.expression.ContextResolver).
@@ -177,6 +181,77 @@ public final class WorkFlowContext {
 		}
 		Object decision = ((Map<String, Object>) approvals).get(stepId);
 		return decision instanceof Map ? (Map<String, Object>) decision : null;
+	}
+
+	/**
+	 * <pre>
+	 * 실행 중에 내려진 결정(APPROVAL의 승인, SUPERVISOR의 판정)을 기록하고, 다음에 LLM을 부를 step이 받도록 arrival로 둡니다.
+	 * 기록은 지우지 않고 쌓습니다(${decisions}). arrival은 결정 하나뿐이고(${arrival}), LLM을 부르는 step이 성공하면 비웁니다(clearArrival()).
+	 * 그래서 TOOL step을 몇 개 거쳐도 다음 Agent step이 "왜 여기로 왔는지"를 받습니다.
+	 * </pre>
+	 *
+	 * @param context  실행 컨텍스트
+	 * @param stepId   결정을 내린 step의 id
+	 * @param stepName 그 step의 name(없으면 null)
+	 * @param kind     APPROVAL 또는 SUPERVISOR
+	 * @param decision 고른 route 이름(APPROVAL) 또는 통과/불통과(SUPERVISOR)
+	 * @param approver 결정한 사람(SUPERVISOR는 null)
+	 * @param comment  의견 또는 판정 사유
+	 * @param to       이 결정으로 가게 된 곳(step id, END, FAIL)
+	 */
+	@SuppressWarnings("unchecked")
+	public static void recordDecision(Map<String, Object> context, String stepId, String stepName, String kind, String decision, String approver, String comment, String to) {
+		Map<String, Object> record = new LinkedHashMap<>();
+		record.put("step", stepId);
+		record.put("name", stepName);
+		record.put("kind", kind);
+		record.put("decision", decision);
+		record.put("approver", approver);
+		record.put("comment", comment);
+		record.put("to", to);
+		record.put("at", OffsetDateTime.now().toString());
+		Object decisions = context.get(Context.DECISIONS);
+		if (!(decisions instanceof List)) {
+			decisions = new ArrayList<Object>();
+			context.put(Context.DECISIONS, decisions);
+		}
+		((List<Object>) decisions).add(record);
+		context.put(Context.ARRIVAL, record);
+	}
+
+	/**
+	 * 지금 step으로 오게 만든 결정을 비웁니다. LLM을 부르는 step이 성공한 뒤에 부릅니다(그 결정은 그 step이 받아 썼습니다).
+	 *
+	 * @param context 실행 컨텍스트
+	 */
+	public static void clearArrival(Map<String, Object> context) {
+		context.remove(Context.ARRIVAL);
+	}
+
+	/**
+	 * 지금까지 기록된 결정 목록입니다(오래된 것부터). 없으면 빈 목록입니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 */
+	@SuppressWarnings("unchecked")
+	public static List<Map<String, Object>> decisions(Map<String, Object> context) {
+		Object decisions = context.get(Context.DECISIONS);
+		return decisions instanceof List ? (List<Map<String, Object>>) decisions : List.of();
+	}
+
+	/**
+	 * 결정 하나를 다시 arrival로 둡니다. 지난 step으로 되돌려 다시 돌릴 때, 그 step으로 오게 했던 결정을 되살리려고 씁니다.
+	 * null이면 arrival을 비웁니다.
+	 *
+	 * @param context  실행 컨텍스트
+	 * @param decision 되살릴 결정(decisions() 가운데 하나) 또는 null
+	 */
+	public static void restoreArrival(Map<String, Object> context, Map<String, Object> decision) {
+		if (decision == null) {
+			context.remove(Context.ARRIVAL);
+		} else {
+			context.put(Context.ARRIVAL, decision);
+		}
 	}
 
 	/**

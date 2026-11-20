@@ -430,8 +430,8 @@ public class WorkFlowRegistry extends BaseObject {
 			if (!STEP_ID.matcher(StepDefinition.itemKeyOf(step)).matches()) {
 				throw this.error(definition, step, "itemVariable은 영문, 숫자, 밑줄(_)만 쓸 수 있습니다(표현식에서 ${" + StepDefinition.itemKeyOf(step) + "}로 읽기 때문입니다).");
 			}
-			if (Context.INPUT.equals(StepDefinition.itemKeyOf(step)) || Context.STATE.equals(StepDefinition.itemKeyOf(step))) {
-				throw this.error(definition, step, "itemVariable로 input, state는 쓸 수 없습니다(표현식이 이미 쓰는 이름입니다).");
+			if (ContextResolver.isContextRoot(StepDefinition.itemKeyOf(step))) {
+				throw this.error(definition, step, "itemVariable로 input, state, arrival, decisions는 쓸 수 없습니다(표현식이 이미 쓰는 이름입니다).");
 			}
 			if (StepDefinition.memoryOf(step)) {
 				throw this.error(definition, step, "memory: true는 forEach와 함께 쓸 수 없습니다(동시에 도는 반복들이 한 대화방에 섞여 쓰이기 때문입니다).");
@@ -753,7 +753,7 @@ public class WorkFlowRegistry extends BaseObject {
 			return;
 		}
 		if (!Context.STATE.equals(reference.root()) || path.isEmpty()) {
-			// forEach 변수(${item...})와 state 전체(${state})는 더 볼 것이 없습니다.
+			// forEach 변수(${item...}), 결정 기록(${arrival}, ${decisions}), state 전체(${state})는 더 볼 것이 없습니다.
 			return;
 		}
 		String name = path.get(0);

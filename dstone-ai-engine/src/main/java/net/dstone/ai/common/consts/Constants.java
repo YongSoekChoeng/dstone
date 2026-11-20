@@ -183,6 +183,10 @@ public final class Constants {
 			public final static String DEFINITION = "definition";
 			/** 지금 차례인 step의 id입니다(엔진 내부용). 재개할 자리를 찾을 때 씁니다. */
 			public final static String CURRENT_STEP = "currentStep";
+			/** 실행 중에 내려진 결정(APPROVAL의 승인, SUPERVISOR의 판정)이 오래된 것부터 쌓이는 루트입니다(${decisions}). */
+			public final static String DECISIONS = "decisions";
+			/** 지금 step으로 오게 만든 마지막 결정입니다(${arrival}). LLM을 부르는 step이 성공하면 비웁니다. */
+			public final static String ARRIVAL = "arrival";
 		}
 
 		/**

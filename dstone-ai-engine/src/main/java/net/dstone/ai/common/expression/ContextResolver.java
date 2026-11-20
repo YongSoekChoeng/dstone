@@ -22,6 +22,11 @@ import net.dstone.ai.common.schema.JsonSchemaUtil;
  *   ${state.analysis.sql}       그 값 안의 필드
  *   ${state.files[0].path}      리스트의 n번째(0부터)
  *   ${item}  ${item.path}       forEach로 반복 중일 때 이번 항목(itemVariable을 적었으면 그 이름)
+ *   ${arrival}                  이 step으로 오게 만든 마지막 결정(승인, 판정)을 사람이 읽는 글로. 없으면 null
+ *   ${arrival.comment}          그 결정의 필드(step, name, kind, decision, approver, comment, to, at)
+ *   ${decisions}                이 실행에서 지금까지 내려진 결정 전체를 사람이 읽는 글로(오래된 것부터). 없으면 null
+ *   ${decisions[0].decision}    그 목록의 n번째 결정의 필드
+ *   arrival과 decisions는 엔진이 채웁니다(WorkFlowContext.recordDecision()). Workflow가 승인 의견을 Agent에 넘길 때 씁니다.
  *
  * ## 쓰는 모양은 두 가지
  * 1) 값 전체가 표현식 하나면, 읽어 온 값을 타입 그대로(글자, 숫자, 객체, 리스트) 넘깁니다.
@@ -129,12 +134,14 @@ public final class ContextResolver {
 	 */
 	public static String check(Reference reference, Collection<String> variableNames) {
 		String root = reference.root();
-		if (Context.INPUT.equals(root) || Context.STATE.equals(root) || variableNames.contains(root)) {
+		if (isContextRoot(root) || variableNames.contains(root)) {
 			return null;
 		}
 		List<String> allowed = new ArrayList<>();
 		allowed.add(Context.INPUT);
 		allowed.add(Context.STATE);
+		allowed.add(Context.ARRIVAL);
+		allowed.add(Context.DECISIONS);
 		allowed.addAll(variableNames);
 		return reference.text() + " - '" + root + "'에서는 값을 읽을 수 없습니다(이 자리에서 읽을 수 있는 곳 = " + allowed + ").";
 	}
@@ -238,14 +245,22 @@ public final class ContextResolver {
 	 */
 	private static Object evaluate(Reference reference, Map<String, Object> context, Map<String, Object> variables) {
 		Object root;
-		if (Context.INPUT.equals(reference.root()) || Context.STATE.equals(reference.root())) {
+		if (isContextRoot(reference.root())) {
 			root = context == null ? null : context.get(reference.root());
 		} else if (variables != null && variables.containsKey(reference.root())) {
 			root = variables.get(reference.root());
 		} else {
-			throw new ExpressionException(reference.text() + " - '" + reference.root() + "'에서는 값을 읽을 수 없습니다(input, state, forEach 변수만 읽습니다).");
+			throw new ExpressionException(reference.text() + " - '" + reference.root() + "'에서는 값을 읽을 수 없습니다(input, state, arrival, decisions, forEach 변수만 읽습니다).");
 		}
 		Object value = read(root, reference.path());
+		// 결정 기록을 통째로 읽으면 Agent가 읽을 글로 바꿔 줍니다. 필드를 짚으면(예: ${arrival.comment}) 그 값 그대로입니다.
+		if (reference.path().isEmpty() && value != null) {
+			if (Context.ARRIVAL.equals(reference.root()) && value instanceof Map<?, ?> decision) {
+				value = DecisionText.of(decision);
+			} else if (Context.DECISIONS.equals(reference.root()) && value instanceof List<?> decisions) {
+				value = DecisionText.of(decisions);
+			}
+		}
 		if (value != null || reference.defaultValue() == null) {
 			return value;
 		}
@@ -347,6 +362,15 @@ public final class ContextResolver {
 			throw new ExpressionException(source + " - 읽을 경로가 비어 있습니다. 예: ${input}, ${state.analysis}");
 		}
 		return segments;
+	}
+
+	/**
+	 * 실행 컨텍스트에서 바로 읽는 이름인지 봅니다(input, state, arrival, decisions). forEach 변수는 따로 봅니다.
+	 *
+	 * @param root 표현식의 첫 이름
+	 */
+	public static boolean isContextRoot(String root) {
+		return Context.INPUT.equals(root) || Context.STATE.equals(root) || Context.ARRIVAL.equals(root) || Context.DECISIONS.equals(root);
 	}
 
 	/** 이름에 쓸 수 있는 글자인지 봅니다(글자, 숫자, 밑줄, 하이픈. 한글 이름도 됩니다). */

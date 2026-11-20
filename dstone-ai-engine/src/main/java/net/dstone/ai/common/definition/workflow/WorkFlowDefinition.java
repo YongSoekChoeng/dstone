@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import net.dstone.ai.common.definition.SchemaDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 
 /**
  * <pre>
@@ -16,7 +17,7 @@ import net.dstone.ai.common.definition.workflow.step.StepDefinition;
  * Workflow의 id로 이 정의를 찾아서 실제로 실행을 담당하는 runtime.workflow.WorkFlowExecutor에게 넘겨줍니다.
  *
  * ## 파일 모양
- *   id: pilot-modernization
+ *   id: sm-workflow
  *   version: 1.0.0
  *   description: 요구사항 분석부터 구현까지의 AI 개발 Workflow
  *   input: string, 작업 폴더 경로                  # 실행 요청의 input 모양(비워두면 글자 하나)
@@ -109,6 +110,51 @@ public record WorkFlowDefinition(
 	 */
 	public Integer maxIterations() {
 		return this.settings == null ? null : this.settings.maxIterations();
+	}
+
+
+	/**
+	 * <pre>
+	 * 흐름이 stepId로 갔을 때 그 일을 처음 받는 step을 돌려줍니다. TOOL step은 문서를 읽는 것 같은 준비 단계라서 건너뛰고,
+	 * 성공했을 때 가는 곳(next, 없으면 목록상 다음 step)을 따라가 TOOL이 아닌 첫 step을 찾습니다.
+	 * END, FAIL이거나 찾지 못하면(없는 id, TOOL끼리 도는 고리) null입니다.
+	 *
+	 * 승인 화면이 "이 결정을 고르면 누가 받는가"를 보여 줄 때와, 되감을 때 그 step으로 오게 했던 결정을 되살릴 때 씁니다.
+	 * </pre>
+	 *
+	 * @param stepId 흐름이 가는 곳(step id, END, FAIL)
+	 */
+	public StepDefinition receiverOf(String stepId) {
+		String current = stepId;
+		for (int guard = 0; guard <= this.steps.size(); guard++) {
+			int index = this.indexOf(current);
+			if (index < 0) {
+				return null;
+			}
+			StepDefinition step = this.steps.get(index);
+			if (!(step instanceof ToolStepDefinition)) {
+				return step;
+			}
+			String next = StepDefinition.nextOf(step);
+			if (next == null) {
+				next = index + 1 < this.steps.size() ? this.steps.get(index + 1).id() : null;
+			}
+			current = next;
+		}
+		return null;
+	}
+
+	/** step id가 목록의 몇 번째인지 돌려줍니다. 없으면(END, FAIL, null 포함) -1입니다. */
+	private int indexOf(String stepId) {
+		if (stepId == null || this.steps == null) {
+			return -1;
+		}
+		for (int i = 0; i < this.steps.size(); i++) {
+			if (this.steps.get(i).id().equals(stepId)) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 }

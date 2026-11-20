@@ -262,6 +262,12 @@ public class WorkFlowExecutor extends BaseObject {
 				}
 
 				/****************************************************************************************
+				6-1) 사람의 승인과 감독의 판정을 결정 기록에 남깁니다(${decisions}, ${arrival}).
+				     LLM을 부르는 step이 성공했으면, 그 step이 받아 쓴 결정(arrival)을 비웁니다.
+				****************************************************************************************/
+				this.noteDecision(currentExecution.context(), step, outcome, nextId);
+
+				/****************************************************************************************
 				7) 다음 곳으로 갑니다.
 				   - END    : Workflow 전체를 성공으로 끝냅니다. workflow의 return을 계산한 값을 최종 결과로 남깁니다
 				              (return을 적지 않았으면 state 전체).
@@ -530,6 +536,43 @@ public class WorkFlowExecutor extends BaseObject {
 			execution.executionId(),
 			stepHistoryEntry
 		);
+	}
+
+	/**
+	 * <pre>
+	 * step 하나가 끝난 뒤 결정 기록을 정리합니다.
+	 * - LLM을 부르는 step(AGENT, SUPERVISOR, ROUTER)이 성공했으면 arrival을 비웁니다. 그 step이 ${arrival}로 받아 썼기 때문입니다.
+	 *   실패했으면 그대로 둡니다. 같은 step을 되감아 다시 돌릴 때도 같은 지시를 받아야 하기 때문입니다.
+	 * - APPROVAL은 사람이 고른 결정과 의견을, SUPERVISOR는 통과/불통과와 사유를 기록하고 arrival로 둡니다.
+	 *   TOOL step은 arrival을 건드리지 않으므로, 문서를 읽는 TOOL step을 거쳐도 다음 Agent step이 결정을 받습니다.
+	 * </pre>
+	 *
+	 * @param context 실행 컨텍스트입니다.
+	 * @param step    방금 끝난 step의 정의입니다.
+	 * @param outcome 그 step의 결과입니다.
+	 * @param nextId  다음에 갈 곳입니다(step id, END, FAIL).
+	 */
+	@SuppressWarnings("unchecked")
+	private void noteDecision(Map<String, Object> context, StepDefinition step, StepOutcome outcome, String nextId) {
+		boolean callsLlm = step instanceof AgentStepDefinition || step instanceof SupervisorStepDefinition || step instanceof RouterStepDefinition;
+		if (callsLlm && outcome.success()) {
+			WorkFlowContext.clearArrival(context);
+		}
+		if (!(outcome.output() instanceof Map)) {
+			return;
+		}
+		Map<String, Object> output = (Map<String, Object>) outcome.output();
+		if (step instanceof ApprovalStepDefinition) {
+			WorkFlowContext.recordDecision(context, step.id(), step.name(), step.type().name(), textOf(output.get("decision")), textOf(output.get("approver")), textOf(output.get("comment")), nextId);
+		} else if (step instanceof SupervisorStepDefinition) {
+			String verdict = Boolean.TRUE.equals(output.get("pass")) ? "통과" : "불통과";
+			WorkFlowContext.recordDecision(context, step.id(), step.name(), step.type().name(), verdict, null, textOf(output.get("reason")), nextId);
+		}
+	}
+
+	/** 값을 글자로 바꿉니다. null은 null입니다. */
+	private static String textOf(Object value) {
+		return value == null ? null : value.toString();
 	}
 
 	/**

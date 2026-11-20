@@ -62,7 +62,7 @@ import net.dstone.common.utils.StringUtil;
  *
  * Skill(skills.allowed)도 기동할 때 검사합니다(checkSkills()).
  *   오류(기동 실패)                                         경고(로그만)
- *   skills.allowed에 등록되지 않은 Skill 이름을 적음          Skill 폴더에 참고 파일이 있는데 tools.allowed에 readFile이 없음
+ *   skills.allowed/preload에 등록되지 않은 Skill 이름을 적음  Skill 폴더에 참고 파일이 있는데 tools.allowed에 readFile이 없음
  *   엔진이 붙이는 Tool 이름(Skill, TaskOutput)과 같은 이름의 Tool이나 Sub Agent가 있음
  * </pre>
  */
@@ -424,6 +424,13 @@ public class AgentRegistry extends BaseObject {
 			SkillDefinition skill = skills.get(name);
 			if (skill == null) {
 				throw new IllegalStateException(where + "skills.allowed에 적은 '" + name + "'는 등록된 Skill이 아닙니다(conf/definitions/skills 아래 SKILL.md의 name). 등록된 Skill = " + skills.keySet());
+			}
+			needsReadFile = needsReadFile || SkillTool.hasReferenceFiles(skill);
+		}
+		for (String name : definition.preloadSkillNames()) {
+			SkillDefinition skill = skills.get(name);
+			if (skill == null) {
+				throw new IllegalStateException(where + "skills.preload에 적은 '" + name + "'는 등록된 Skill이 아닙니다(conf/definitions/skills 아래 SKILL.md의 name). 등록된 Skill = " + skills.keySet());
 			}
 			needsReadFile = needsReadFile || SkillTool.hasReferenceFiles(skill);
 		}

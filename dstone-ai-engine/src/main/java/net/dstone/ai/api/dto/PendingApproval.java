@@ -1,6 +1,7 @@
 package net.dstone.ai.api.dto;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 실행이 WAITING_APPROVAL(승인 대기)로 멈춰 있을 때, "지금 어떤 결정을 기다리는지"를 알려주는 값입니다.
@@ -12,6 +13,8 @@ import java.util.List;
  * @param approverRole 누가 결정해야 하는지 YAML에 적어 둔 값입니다(없으면 null).
  * @param routes       고를 수 있는 결정 이름들입니다.
  * @param artifact     무엇을 승인하는지 YAML에 적어 둔 이름입니다(없으면 null).
+ * @param receivers    결정 이름 → 그 결정을 고르면 일을 받는 곳(예: "step10 아키텍처 설계 · sm-architect-agent").
+ *                     문서를 읽는 TOOL step은 건너뛰고 처음 만나는 step을 적습니다. 승인자가 의견을 누가 읽을지 알고 쓰게 하려는 것입니다.
  */
-public record PendingApproval(String stepId, String approverRole, List<String> routes, String artifact) {
+public record PendingApproval(String stepId, String approverRole, List<String> routes, String artifact, Map<String, String> receivers) {
 }

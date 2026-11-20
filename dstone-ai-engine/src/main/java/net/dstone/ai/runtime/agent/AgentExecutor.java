@@ -174,7 +174,9 @@ public class AgentExecutor extends BaseObject {
 			Set<String> succeededTools = ConcurrentHashMap.newKeySet();
 			try {
 				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, engineRule, tasks, stepRef, succeededTools);
-				Object answer = this.ask(spec, userMessage, agent.outputSchema(), agent, modelOverride);
+				// 다시 부를 때는 지난 시도가 왜 실패했고 무엇을 답했는지 함께 보냅니다. 지난 시도가 조사해 둔 내용을 처음부터 다시 조사하지 않게 하려는 것입니다.
+				String message = last == null ? userMessage : userMessage + this.retryNote(last);
+				Object answer = this.ask(spec, message, agent.outputSchema(), agent, modelOverride);
 				this.checkRequiredTools(agent, succeededTools, answer);
 				return answer;
 			} catch (AgentContractException e) {
@@ -192,6 +194,33 @@ public class AgentExecutor extends BaseObject {
 			throw new AgentContractException(maxAttempts + "번 불렀지만 계약에 맞는 답을 받지 못했습니다. 마지막 사유: " + last.getMessage());
 		}
 		throw last;
+	}
+
+	/** 다시 부를 때 붙이는 지난 답의 최대 글자 수입니다. 넘으면 앞부분만 붙입니다. */
+	private static final int RETRY_ANSWER_MAX_CHARS = 20000;
+
+	/**
+	 * <pre>
+	 * 다시 부를 때 사용자 메시지 끝에 붙일 안내를 만듭니다(엔진 규칙이라 Agent 파일에 적지 않습니다).
+	 * 지난 시도가 실패한 이유와 지난 답을 함께 넘깁니다. 2026-11-20 실행 9294e45d: 설계 Agent가 첫 시도에서 조사를 마치고
+	 * "확정한 반영 내용"까지 답에 적었는데, 두 번째 시도는 그 답을 모른 채 같은 조사를 처음부터 되풀이하다 또 한도를 다 썼습니다.
+	 * </pre>
+	 *
+	 * @param failure 지난 시도의 실패
+	 */
+	private String retryNote(AgentContractException failure) {
+		StringBuilder note = new StringBuilder();
+		note.append("\n\n[지난 시도]\n");
+		note.append("이 일은 한 번 시도했지만 다음 이유로 실패했습니다: ").append(failure.getMessage()).append("\n");
+		String answer = failure.answer();
+		if (!StringUtil.isEmpty(answer)) {
+			if (answer.length() > RETRY_ANSWER_MAX_CHARS) {
+				answer = answer.substring(0, RETRY_ANSWER_MAX_CHARS) + "\n...(뒷부분 생략)";
+			}
+			note.append("지난 시도의 마지막 답은 아래와 같습니다. 이미 조사하고 정한 내용은 다시 조사하지 말고, 이 내용을 바탕으로 남은 일(특히 결과 저장)부터 하십시오.\n");
+			note.append("<<<지난 답\n").append(answer).append("\n지난 답>>>");
+		}
+		return note.toString();
 	}
 
 	/**
@@ -504,7 +533,7 @@ public class AgentExecutor extends BaseObject {
 			  없는 값은 빈 글자가 됩니다(${input.필드:기본값}이면 기본값).
 			- 이번에 처리할 데이터(input)는 사용자 메시지로도 함께 들어갑니다.
 		************************************************************************/
-		String taskPrompt = PromptText.render(agent.promptText(), input, agent.outputSchema());
+		String taskPrompt = PromptText.render(agent.promptText(), input, agent.outputSchema()) + this.preloadedSkills(agent);
 		spec = spec.system(EnginePrompt.compose(engineRule, taskPrompt));
 
 		/************************************************************************
@@ -731,7 +760,7 @@ public class AgentExecutor extends BaseObject {
 			text = text.substring(0, 200) + "...";
 		}
 		throw new AgentContractException("agent[" + agent.id() + "]가 꼭 성공해야 하는 Tool " + missing + "를 성공하지 못한 채 답을 끝냈습니다"
-			+ "(결과를 저장하지 않고 끝났을 수 있습니다. execution.requiredTools). 답 앞부분: " + text);
+			+ "(결과를 저장하지 않고 끝났을 수 있습니다. execution.requiredTools). 답 앞부분: " + text, answer == null ? null : JsonSchemaUtil.toText(answer));
 	}
 
 	/**
@@ -752,11 +781,14 @@ public class AgentExecutor extends BaseObject {
 			maxCalls = Constants.Agent.DEFAULT_TOOL_MAX_CALLS;
 		}
 		AtomicInteger used = new AtomicInteger();
+		// 꼭 해야 하는 Tool(requiredTools)을 아직 못 했으면 마지막 몇 번은 그 Tool 몫으로 남겨 둡니다(ToolCallBudgetCallback).
+		AtomicInteger reserveRefusals = new AtomicInteger();
+		List<String> requiredTools = succeededTools == null ? null : agent.requiredTools();
 		List<ToolCallback> result = new ArrayList<>(callbacks.size());
 		for (ToolCallback callback : callbacks) {
 			// 다시 읽기 막기는 횟수 세기보다 안쪽에 둡니다. 막은 호출도 한 번으로 셉니다.
 			ToolCallback inner = readHistory == null ? callback : new RereadGuardCallback(callback, readHistory, agent.id());
-			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools));
+			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals));
 		}
 		return result;
 	}
@@ -824,6 +856,33 @@ public class AgentExecutor extends BaseObject {
 			}
 		}
 		return skills;
+	}
+
+	/**
+	 * <pre>
+	 * Agent의 skills.preload에 적은 Skill 본문을 업무 지시 뒤에 붙일 글로 만듭니다. 없으면 빈 글자입니다.
+	 * 본문은 변수 치환을 하지 않습니다(Skill은 여러 Agent가 같이 쓰므로 특정 Agent의 input을 모릅니다).
+	 *
+	 *   [Skill: source-investigation]
+	 *   (본문)
+	 * </pre>
+	 *
+	 * @param agent Agent의 정의
+	 */
+	private String preloadedSkills(AgentDefinition agent) {
+		StringBuilder text = new StringBuilder();
+		for (String name : agent.preloadSkillNames()) {
+			SkillDefinition skill = this.skillRegistry.find(name);
+			if (skill == null) {
+				continue;
+			}
+			text.append("\n\n[Skill: ").append(name).append("]\n");
+			if (skill.baseDir() != null && SkillTool.hasReferenceFiles(skill)) {
+				text.append("(이 Skill의 참고 파일은 ").append(skill.baseDir()).append(" 폴더에 있습니다.)\n");
+			}
+			text.append(skill.content().strip());
+		}
+		return text.toString();
 	}
 
 	/**
