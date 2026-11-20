@@ -11,6 +11,7 @@ id: sm-analyze-impact-agent
 version: 1.6.0
 description: 고객요구사항분석서의 태스크가 현행 시스템에 미치는 영향도를 분석한다.
 model:
+  name: z-ai/glm-5.3-flash
   temperature: 0.2
   reasoning: high
 input:
