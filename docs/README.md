@@ -179,7 +179,7 @@ spring.datasource.<name>.hikari:
 
 각 모듈의 실제 테이블 생성 스크립트는 `src/main/resources/schema/*.sql`(dstone-boot/dstone-batch/dstone-batchadmin 각각에 있음)에 있다 — Spring Batch/Boot이 자동으로 스키마를 만들지 않으므로(`initialize-schema: NEVER`) 최초 1회 수동 실행해야 한다.
 
-> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓴다. 벡터 테이블(`vector_store`)은 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성하지만, Workflow 실행 영속화 테이블(`AI_WORKFLOW_EXECUTION*`)은 다른 dstone 모듈과 동일하게 수동 스키마 SQL(`schema/01-create-table-postgresql-ai-workflow-execution.sql`)을 배포 전에 한 번 실행해야 한다. 상세: [09.dstone-ai-engine.md 11절](09.dstone-ai-engine.md#11-설정-레퍼런스-confapplicationyml).
+> `dstone-ai-engine`은 예외다: datasource가 하나뿐이라(`spring.datasource.*`, PostgreSQL+pgvector) `<name>` 세그먼트 없이 표준 Spring Boot 단일 datasource 자동설정을 그대로 쓴다. 벡터 테이블(`vector_store`)은 `spring.ai.vectorstore.pgvector.initialize-schema: true`로 앱이 직접 생성하지만, Workflow 실행 영속화 테이블(`AI_WORKFLOW_EXECUTION*`)은 다른 dstone 모듈과 동일하게 수동 스키마 SQL(`schema/01-create-table-postgresql-ai-workflow-execution.sql`)을 배포 전에 한 번 실행해야 한다. 상세: [09.dstone-ai-engine.md 11절](09.dstone-ai-engine.md#13-applicationyml-항목-설명).
 
 ### 3.4 Spring Security 설정 방식
 
