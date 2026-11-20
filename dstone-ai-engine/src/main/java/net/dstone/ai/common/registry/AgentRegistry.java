@@ -16,6 +16,7 @@ import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.skill.SkillDefinition;
+import net.dstone.ai.common.expression.ContextResolver;
 import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.loader.DefinitionFile;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
@@ -53,6 +54,7 @@ import net.dstone.common.utils.StringUtil;
  *   tools.allowed에 "*"와 다른 이름을 함께 적음               tools.allowed에 등록되지 않은 Tool 이름이 있음(MCP 서버가 꺼져 있을 수 있음)
  *   tools.allowed에 TOOL step 전용 Tool을 적음
  *   execution.requiredTools의 이름이 tools.allowed에 없음
+ *   execution.requiredWrites가 ${input.…} 표현식이 아니거나, 그 경로가 Agent input에 없음
  *   subAgents의 id가 없는 Agent임                            부모를 쓸 수 있는 caller가 Sub Agent는 쓸 수 없음
  *   Sub Agent가 자기 subAgents를 가짐(깊이는 한 단계뿐)
  *   Sub Agent에 description이 없음
@@ -137,6 +139,7 @@ public class AgentRegistry extends BaseObject {
 		for (AgentDefinition definition : resolved.values()) {
 			this.checkTools(definition, registeredTools);
 			this.checkRequiredTools(definition, registeredTools);
+			this.checkRequiredWrites(definition);
 			this.checkSubAgents(definition, resolved, registeredTools);
 			this.checkSkills(definition, skills, registeredTools);
 		}
@@ -320,6 +323,39 @@ public class AgentRegistry extends BaseObject {
 			}
 			for (String part : entry.split("\\|")) {
 				this.checkRequiredToolName(definition, registeredTools, where, required, seen, part.trim());
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * execution.requiredWrites(한 번 부를 때 꼭 써야 하는 파일)를 검사합니다.
+	 * 항목마다 ${input.…} 표현식이 적어도 하나 있어야 하고(글자 사이에 섞어도 된다. 예: ${input.base_dir}/01.md),
+	 * input 말고 다른 곳을 읽으면 안 되며, 그 경로가 Agent input 모양에 있어야 합니다.
+	 * </pre>
+	 *
+	 * @param definition 검사할 Agent 정의
+	 */
+	private void checkRequiredWrites(AgentDefinition definition) {
+		String where = "agent[" + definition.id() + "]의 execution.requiredWrites";
+		for (String entry : definition.requiredWrites()) {
+			List<ContextResolver.Reference> references;
+			try {
+				references = entry == null ? List.of() : ContextResolver.references(entry);
+			} catch (RuntimeException e) {
+				throw new IllegalStateException(where + "의 '" + entry + "' - " + e.getMessage());
+			}
+			if (references.isEmpty()) {
+				throw new IllegalStateException(where + "의 '" + entry + "' - 입력 속 파일 경로를 가리키는 표현식으로 적습니다. 예: ${input.documents[0]}");
+			}
+			for (ContextResolver.Reference reference : references) {
+				if (!"input".equals(reference.root())) {
+					throw new IllegalStateException(where + "의 '" + entry + "' - 이 Agent가 받은 input만 읽을 수 있습니다(" + reference.text() + ").");
+				}
+				String problem = JsonSchemaUtil.checkPath(definition.inputSchema(), "input", reference.path());
+				if (problem != null) {
+					throw new IllegalStateException(where + "의 '" + entry + "' - " + problem);
+				}
 			}
 		}
 	}

@@ -10,6 +10,7 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 
 import net.dstone.ai.common.exception.AgentContractException;
+import net.dstone.ai.runtime.workflow.file.FileAccessRule;
 import net.dstone.common.utils.LogUtil;
 
 /**
@@ -57,6 +58,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	private final Set<String> succeeded;
 	private final List<String> requiredTools;
 	private final AtomicInteger reserveRefusals;
+	private final Set<String> writtenPaths;
 
 	/**
 	 * @param delegate 실제 Tool 호출을 맡는 원래 ToolCallback입니다.
@@ -76,7 +78,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	 * @param succeeded 성공한 Tool 이름을 적어 둘 곳입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다. 필요 없으면 null
 	 */
 	public ToolCallBudgetCallback(ToolCallback delegate, String agentId, AtomicInteger used, int maxCalls, Set<String> succeeded) {
-		this(delegate, agentId, used, maxCalls, succeeded, null, null);
+		this(delegate, agentId, used, maxCalls, succeeded, null, null, null);
 	}
 
 	/**
@@ -87,9 +89,10 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	 * @param succeeded       성공한 Tool 이름을 적어 둘 곳입니다. requiredTools를 주면 꼭 있어야 합니다.
 	 * @param requiredTools   꼭 해야 하는 Tool(execution.requiredTools. "writeFile|editFileTexts"처럼 |로 나눈 항목은 하나만 성공하면 됨). 없으면 null
 	 * @param reserveRefusals 남겨 둔 몫 때문에 거절한 횟수입니다. 같은 Agent 호출에 붙는 Tool들이 함께 씁니다. requiredTools가 없으면 null
+	 * @param writtenPaths    성공한 Tool이 쓴 파일 경로를 적어 둘 곳입니다(execution.requiredWrites 확인용, FileAccessRule로 가려냄). 필요 없으면 null
 	 */
 	public ToolCallBudgetCallback(ToolCallback delegate, String agentId, AtomicInteger used, int maxCalls, Set<String> succeeded, List<String> requiredTools,
-			AtomicInteger reserveRefusals) {
+			AtomicInteger reserveRefusals, Set<String> writtenPaths) {
 		this.delegate = delegate;
 		this.agentId = agentId;
 		this.used = used;
@@ -97,6 +100,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		this.succeeded = succeeded;
 		this.requiredTools = requiredTools == null || succeeded == null ? List.of() : requiredTools;
 		this.reserveRefusals = reserveRefusals == null ? new AtomicInteger() : reserveRefusals;
+		this.writtenPaths = writtenPaths;
 	}
 
 	@Override
@@ -118,7 +122,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (count > this.maxCalls) {
 			return this.refused(count);
 		}
-		return this.withNotice(this.recorded(this.delegate.call(toolInput)), count);
+		return this.withNotice(this.recorded(this.delegate.call(toolInput), toolInput), count);
 	}
 
 	@Override
@@ -130,7 +134,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (count > this.maxCalls) {
 			return this.refused(count);
 		}
-		return this.withNotice(this.recorded(this.delegate.call(toolInput, toolContext)), count);
+		return this.withNotice(this.recorded(this.delegate.call(toolInput, toolContext), toolInput), count);
 	}
 
 	/**
@@ -218,10 +222,22 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		return Math.min(maxCalls - 1, Math.max(3, Math.max(requiredTools.size() * 2, maxCalls / 10)));
 	}
 
-	/** 결과가 "실패:"로 시작하지 않으면 이 Tool을 성공한 것으로 적어 둡니다. 결과는 그대로 돌려줍니다. */
-	private String recorded(String result) {
-		if (this.succeeded != null && (result == null || !result.stripLeading().startsWith("실패:"))) {
-			this.succeeded.add(this.delegate.getToolDefinition().name());
+	/**
+	 * 결과가 "실패:"로 시작하지 않으면 이 Tool을 성공한 것으로 적어 둡니다. 쓴 파일이 있으면 그 경로도 적어 둡니다(requiredWrites 확인용).
+	 * 결과는 그대로 돌려줍니다.
+	 */
+	private String recorded(String result, String toolInput) {
+		boolean ok = result == null || !result.stripLeading().startsWith("실패:");
+		String name = this.delegate.getToolDefinition().name();
+		if (this.succeeded != null && ok) {
+			this.succeeded.add(name);
+		}
+		if (this.writtenPaths != null && ok) {
+			for (FileAccessRule.FileAccess access : FileAccessRule.of(name, toolInput)) {
+				if (FileAccessRule.WRITE.equals(access.action()) && access.path() != null) {
+					this.writtenPaths.add(access.path());
+				}
+			}
 		}
 		return result;
 	}

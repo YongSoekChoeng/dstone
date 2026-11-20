@@ -265,8 +265,11 @@ public record AgentDefinition(
 	 * @param onInvalidOutput 답이 output 모양을 지키지 않았을 때의 동작입니다(RETRY / FAIL). 비워두면 FAIL입니다.
 	 * @param maxToolCalls    이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수입니다. 비워두면 엔진 공통값을 씁니다.
 	 * @param requiredTools   이 Agent를 한 번 부르는 동안 꼭 한 번 이상 성공해야 하는 Tool 이름입니다. 비워두면 검사하지 않습니다.
+	 * @param requiredWrites  이 Agent를 한 번 부르는 동안 꼭 써야(고쳐야) 하는 파일입니다. 입력 속 파일 경로를 가리키는 표현식으로 적습니다
+	 *                        (예: ${input.documents[0]}, ${input.base_dir}/01.md). 값이 목록이면 목록의 파일을 모두 써야 합니다. 비워두면 검사하지 않습니다.
 	 */
-	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls, List<String> requiredTools) {
+	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls, List<String> requiredTools,
+		List<String> requiredWrites) {
 	}
 
 	/** 시스템 프롬프트 원문입니다(파일의 본문). */
@@ -330,6 +333,11 @@ public record AgentDefinition(
 	/** 이 Agent를 한 번 부르는 동안 Tool을 부를 수 있는 최대 횟수입니다. 적지 않았으면 null입니다. */
 	public Integer maxToolCalls() {
 		return this.execution == null ? null : this.execution.maxToolCalls();
+	}
+
+	/** 한 번 부르는 동안 꼭 써야 하는 파일을 가리키는 표현식입니다(execution.requiredWrites). 적지 않았으면 빈 목록입니다. */
+	public List<String> requiredWrites() {
+		return this.execution == null || this.execution.requiredWrites() == null ? List.of() : this.execution.requiredWrites();
 	}
 
 	/** 한 번 부르는 동안 꼭 성공해야 하는 Tool 이름입니다(execution.requiredTools). 적지 않았으면 빈 목록입니다. */

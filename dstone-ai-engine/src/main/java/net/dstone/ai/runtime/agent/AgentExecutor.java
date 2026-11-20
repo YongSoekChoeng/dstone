@@ -1,6 +1,8 @@
 package net.dstone.ai.runtime.agent;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +39,7 @@ import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
 import net.dstone.ai.common.definition.skill.SkillDefinition;
+import net.dstone.ai.common.expression.ContextResolver;
 import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.exception.AgentContractException;
 import net.dstone.ai.common.exec.ExecContext;
@@ -45,6 +48,7 @@ import net.dstone.ai.common.registry.SkillRegistry;
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 import net.dstone.ai.runtime.prompt.EnginePrompt;
 import net.dstone.ai.runtime.tool.StepRef;
+import net.dstone.ai.runtime.workflow.file.FileAccessRule;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.StringUtil;
 import jakarta.annotation.PreDestroy;
@@ -172,12 +176,14 @@ public class AgentExecutor extends BaseObject {
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			SubAgentTasks tasks = this.newTasks(agent);
 			Set<String> succeededTools = ConcurrentHashMap.newKeySet();
+			Set<String> writtenPaths = ConcurrentHashMap.newKeySet();
 			try {
-				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, engineRule, tasks, stepRef, succeededTools);
+				ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, engineRule, tasks, stepRef, succeededTools, writtenPaths);
 				// 다시 부를 때는 지난 시도가 왜 실패했고 무엇을 답했는지 함께 보냅니다. 지난 시도가 조사해 둔 내용을 처음부터 다시 조사하지 않게 하려는 것입니다.
 				String message = last == null ? userMessage : userMessage + this.retryNote(last);
 				Object answer = this.ask(spec, message, agent.outputSchema(), agent, modelOverride);
 				this.checkRequiredTools(agent, succeededTools, answer);
+				this.checkRequiredWrites(agent, input, writtenPaths, answer);
 				return answer;
 			} catch (AgentContractException e) {
 				last = e;
@@ -246,10 +252,12 @@ public class AgentExecutor extends BaseObject {
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
 		Set<String> succeededTools = ConcurrentHashMap.newKeySet();
+		Set<String> writtenPaths = ConcurrentHashMap.newKeySet();
 		try {
-			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, engineRule, tasks, stepRef, succeededTools);
+			ChatClient.ChatClientRequestSpec spec = this.buildSpec(conversationId, caller, agent, input, null, null, engineRule, tasks, stepRef, succeededTools, writtenPaths);
 			Object answer = this.ask(spec, userMessage, schema, agent, null);
 			this.checkRequiredTools(agent, succeededTools, answer);
+			this.checkRequiredWrites(agent, input, writtenPaths, answer);
 			return answer;
 		} finally {
 			if (tasks != null) {
@@ -281,7 +289,7 @@ public class AgentExecutor extends BaseObject {
 		}
 		String userMessage = this.toUserMessage(agent, input);
 		SubAgentTasks tasks = this.newTasks(agent);
-		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, null, tasks, null, null).user(userMessage).stream().content();
+		Flux<String> answer = this.buildSpec(conversationId, caller, agent, input, extraTools, modelOverride, null, tasks, null, null, null).user(userMessage).stream().content();
 		if (tasks == null) {
 			return answer;
 		}
@@ -489,8 +497,9 @@ public class AgentExecutor extends BaseObject {
 	 * @param tasks         백그라운드로 맡긴 Sub Agent 일을 들고 있을 곳(newTasks()). 백그라운드를 쓰지 않는 Agent면 null
 	 * @param stepRef       이 호출을 보낸 Workflow 실행과 step. ToolContext에 실어 Tool까지 넘깁니다. Workflow 밖이면 null
 	 * @param succeededTools 성공한 Tool 이름을 적어 둘 곳(execution.requiredTools 확인용). 확인하지 않으면 null
+	 * @param writtenPaths  성공한 Tool이 쓴 파일 경로를 적어 둘 곳(execution.requiredWrites 확인용). 확인하지 않으면 null
 	 */
-	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, List<String> extraTools, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef, Set<String> succeededTools) {
+	private ChatClient.ChatClientRequestSpec buildSpec(String conversationId, String caller, AgentDefinition agent, Object input, List<String> extraTools, String modelOverride, String engineRule, SubAgentTasks tasks, StepRef stepRef, Set<String> succeededTools, Set<String> writtenPaths) {
 
 		String model = !StringUtil.isEmpty(modelOverride) ? modelOverride : this.agentRegistry.modelOf(agent);
 		
@@ -579,7 +588,7 @@ public class AgentExecutor extends BaseObject {
 		}
 		// 이 호출에서 이미 읽은 파일 범위를 적어 둘 장부입니다. 같은 범위를 또 읽으면 Tool을 실행하지 않습니다(RereadGuardCallback).
 		ReadHistory readHistory = this.environment.getProperty(Constants.Agent.TOOL_REREAD_GUARD, Boolean.class, Boolean.TRUE).booleanValue() ? new ReadHistory() : null;
-		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools, readHistory));
+		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools, writtenPaths, readHistory));
 		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks, stepRef));
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
@@ -765,6 +774,48 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
+	 * execution.requiredWrites(꼭 써야 하는 파일)를 이번 호출에서 모두 썼는지 확인합니다.
+	 * requiredTools는 "그 Tool을 한 번이라도 성공했나"만 봅니다. 그래서 고칠 문서가 여럿일 때 다른 문서만 고치고 끝내도 통과합니다
+	 * (2026-11-20 평가: 문서 수정 Agent가 태스크아이템 목록만 고치고 설계서는 그대로 둔 채 "고쳤다"고 답했습니다).
+	 * 항목은 입력 속 파일 경로를 가리키는 표현식이고(${input.documents[0]}), 값이 목록이면 목록의 파일을 모두 써야 합니다.
+	 * 경로는 파일 기록과 같은 규칙(FileAccessRule.normalize, \ → /)으로 비교합니다. 빠진 것이 있으면 계약 위반이고,
+	 * onInvalidOutput: RETRY면 call()이 [지난 시도]와 함께 다시 부릅니다.
+	 * </pre>
+	 *
+	 * @param agent        호출한 Agent의 정의
+	 * @param input        이번 호출에 넣은 값
+	 * @param writtenPaths 이번 호출에서 성공한 Tool이 쓴 파일 경로
+	 * @param answer       받은 답(다시 부를 때 넘깁니다)
+	 * @throws AgentContractException 꼭 써야 하는 파일 중 쓰지 않은 것이 있을 때
+	 */
+	@SuppressWarnings("unchecked")
+	private void checkRequiredWrites(AgentDefinition agent, Object input, Set<String> writtenPaths, Object answer) {
+		if (agent.requiredWrites().isEmpty()) {
+			return;
+		}
+		Map<String, Object> context = new LinkedHashMap<String, Object>();
+		context.put("input", input);
+		List<String> missing = new ArrayList<>();
+		for (String entry : agent.requiredWrites()) {
+			Object value = ContextResolver.resolve(entry, context, null);
+			List<Object> paths = value instanceof List ? (List<Object>) value : Collections.singletonList(value);
+			for (Object path : paths) {
+				String normalized = path == null ? null : FileAccessRule.normalize(path.toString());
+				if (normalized != null && !writtenPaths.contains(normalized)) {
+					missing.add(normalized);
+				}
+			}
+		}
+		if (missing.isEmpty()) {
+			return;
+		}
+		throw new AgentContractException("agent[" + agent.id() + "]가 꼭 고쳐야 하는 파일 " + missing + "을 이번 호출에서 쓰지 않았습니다"
+			+ "(execution.requiredWrites). 다른 파일만 고쳤거나 고치기가 실패했을 수 있습니다. 쓴 파일 = " + writtenPaths,
+			answer == null ? null : JsonSchemaUtil.toText(answer));
+	}
+
+	/**
+	 * <pre>
 	 * Tool들에 "이 Agent 호출에서 부를 수 있는 횟수"를 씌워 돌려줍니다(ToolCallBudgetCallback).
 	 * 횟수는 Agent의 execution.maxToolCalls가 있으면 그 값, 없으면 dstone.ai.agent.tool.max-calls(기본 100)입니다.
 	 * 여기 들어온 Tool들이 횟수 하나를 함께 씁니다(Tool마다 따로 세지 않습니다).
@@ -773,9 +824,10 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent          호출할 Agent의 정의
 	 * @param callbacks      이 Agent에 붙일 Tool들
 	 * @param succeededTools 성공한 Tool 이름을 적어 둘 곳. 필요 없으면 null
+	 * @param writtenPaths   성공한 Tool이 쓴 파일 경로를 적어 둘 곳. 필요 없으면 null
 	 * @param readHistory    이 호출에서 읽은 파일 범위 장부. 주면 같은 범위를 다시 읽지 못하게 막습니다(RereadGuardCallback). 끄면 null
 	 */
-	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools, ReadHistory readHistory) {
+	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools, Set<String> writtenPaths, ReadHistory readHistory) {
 		int maxCalls = agent.maxToolCalls() != null ? agent.maxToolCalls().intValue() : this.intProperty(Constants.Agent.TOOL_MAX_CALLS, Constants.Agent.DEFAULT_TOOL_MAX_CALLS);
 		if (maxCalls <= 0) {
 			maxCalls = Constants.Agent.DEFAULT_TOOL_MAX_CALLS;
@@ -788,7 +840,7 @@ public class AgentExecutor extends BaseObject {
 		for (ToolCallback callback : callbacks) {
 			// 다시 읽기 막기는 횟수 세기보다 안쪽에 둡니다. 막은 호출도 한 번으로 셉니다.
 			ToolCallback inner = readHistory == null ? callback : new RereadGuardCallback(callback, readHistory, agent.id());
-			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals));
+			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals, writtenPaths));
 		}
 		return result;
 	}

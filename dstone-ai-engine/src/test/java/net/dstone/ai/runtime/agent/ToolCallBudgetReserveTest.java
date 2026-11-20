@@ -91,7 +91,7 @@ class ToolCallBudgetReserveTest {
 	}
 
 	private ToolCallback budgeted(String name) {
-		return new ToolCallBudgetCallback(new FakeTool(name, this.succeeded), "test-agent", this.used, MAX_CALLS, this.succeeded, this.required, this.refusals);
+		return new ToolCallBudgetCallback(new FakeTool(name, this.succeeded), "test-agent", this.used, MAX_CALLS, this.succeeded, this.required, this.refusals, null);
 	}
 
 	/** 부르면 "ok:이름"을 돌려주는 가짜 Tool입니다. */

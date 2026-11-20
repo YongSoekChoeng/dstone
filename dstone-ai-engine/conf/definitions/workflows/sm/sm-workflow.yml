@@ -311,7 +311,7 @@ state:
   developApproval: 개발 승인(step17) 결과
   impactPath: 영향도 분석(step07)이 돌려준 답(저장 파일과 결정 필요 사항)
   architectPath: 아키텍처 설계(step10)가 돌려준 답(저장 파일과 결정 필요 사항)
-  revision: 문서 수정(step20~20)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
+  revision: 문서 수정(step18~20)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
   sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
   compileResult: 컴파일 확인(step16)이 통과했을 때의 출력
   compileError: 컴파일 확인(step16)이 실패했을 때의 오류(통과하면 비어 있다)

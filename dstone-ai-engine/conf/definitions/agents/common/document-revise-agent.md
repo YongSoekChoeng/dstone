@@ -5,7 +5,7 @@
 # 고치는 방법·조사 방법·지시 읽는 법은 Skill로 미리 넣습니다(skills.preload). 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 쓰는 곳: workflows/sm/sm-workflow.yml step18~20
 id: document-revise-agent
-version: 1.1.0
+version: 1.2.0
 description: 이미 있는 문서를 instruction(사람의 지시)대로 고친다. 지시받은 부분만 고치고 나머지는 그대로 둔다. 필요하면 소스와 DB를 읽어 확인한다.
 model:
   # 설계서를 고칠 때 예전 설계 Agent(sm-architect-agent)와 같은 모델로 맞춘다. 기본 모델(qwen3.8-27b, medium)로는
@@ -22,7 +22,6 @@ input:
 output: string
 tools:
   allowed:
-    - readFile
     - readFileLines
     - editFileTexts
     - writeFile
@@ -49,6 +48,9 @@ execution:
   maxToolCalls: 40
   requiredTools:
     - editFileTexts|writeFile|appendFile
+  # 주 문서는 꼭 고쳐야 한다. requiredTools만으로는 다른 문서만 고치고 끝내도 통과했다(2026-11-20 평가).
+  requiredWrites:
+    - ${input.documents[0]}
   onInvalidOutput: RETRY
   maxAttempts: 2
 ---
@@ -57,11 +59,12 @@ execution:
 앞선 지시로 고쳐 둔 내용이 사라지지 않게 하는 것이 가장 중요하다.
 
 [입력]
-- documents: 고칠 문서들이다. 첫 번째가 주 문서다. 나머지는 주 문서를 고친 결과에 맞춰 함께 고칠 문서다(예: 설계서를 고치면 태스크아이템 목록과 DDL도 맞춘다). 없는 파일은 건너뛴다.
+- documents: 고칠 문서들이다. 첫 번째가 주 문서이고, 이번 호출에서 반드시 고쳐야 한다(엔진이 확인한다). 나머지는 주 문서를 고친 결과에 맞춰 함께 고칠 문서다(예: 설계서를 고치면 태스크아이템 목록과 DDL도 맞춘다). 없는 파일은 건너뛴다.
 - instruction: 이번에 반영할 지시다. history와 reference는 참고 자료다.
 
 [하는 일]
-1. 문서를 readFile로 한 번씩 읽는다(maxChars 60000). 다시 읽지 않는다.
+1. 고칠 문서를 readFileLines로 한 번씩 읽는다(범위 없이 부르면 300줄까지 오고, 더 있으면 이어 읽으라는 안내가 붙는다). 다시 읽지 않는다.
+   소스 파일은 문서가 아니다. 소스는 Skill source-investigation대로 필요한 범위만 읽는다.
 2. 지시를 항목으로 나누고, 항목마다 아래를 끝낸 뒤 다음 항목으로 넘어간다. 모든 항목을 조사한 뒤 한꺼번에 고치지 않는다.
    - 문서와 지시만으로 고칠 수 있으면 바로 editFileTexts로 고친다.
    - 사실 확인이 필요하면 그 항목에 필요한 만큼만 조사하고 곧바로 고친다.

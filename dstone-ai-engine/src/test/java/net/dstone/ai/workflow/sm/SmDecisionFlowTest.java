@@ -86,8 +86,8 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step06");
 		flow.step("step06");
 		flow.decide("요구사항 수정", "TASK-02 완료 기준을 확인할 수 있게 고쳐 주세요");
-		assertThat(flow.currentStepId()).isEqualTo("step18");
-		flow.step("step18");
+		assertThat(flow.currentStepId()).isEqualTo("step20");
+		flow.step("step20");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step04");
