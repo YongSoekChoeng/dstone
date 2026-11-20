@@ -213,7 +213,7 @@ var DstoneAiWorkflowAdmin = (function () {
 				"<td>" + escapeHtml(row.workflowId) + "</td>" +
 				"<td>" + escapeHtml(row.requestedBy || "-") + "</td>" +
 				"<td>" + DstoneAi.badgeHtml(row.status) + "</td>" +
-				"<td class=\"wa-num\">" + row.currentStepIndex + "</td>" +
+				currentStepCell(row) +
 				"<td>" + escapeHtml(formatTime(row.updatedAt)) + "</td>";
 			tr.querySelector(".workflow-history-jobid").addEventListener("click", function () {
 				loadDetail(row.executionId);
@@ -223,6 +223,13 @@ var DstoneAiWorkflowAdmin = (function () {
 		if (!executions || executions.length === 0) {
 			listBodyEl.innerHTML = "<tr><td colspan=\"6\">조건에 맞는 실행이 없습니다.</td></tr>";
 		}
+	}
+
+	// 현재 스텝 칸. step id를 보여 주고, 길면 말줄임 + 풍선 도움말로 전체를 보여 준다.
+	// id 기록이 생기기 전에 시작한 옛 실행이면 순번(1부터)만 보여 준다.
+	function currentStepCell(row) {
+		var text = row.currentStepId ? row.currentStepId : "#" + (row.currentStepIndex + 1);
+		return "<td><span class=\"wa-cell-ellipsis\" title=\"" + escapeHtml(text) + "\">" + escapeHtml(text) + "</span></td>";
 	}
 
 	// [이전] 1 2 3 [다음]. 지금 페이지 앞뒤로 두 개씩만 보여 준다.
@@ -307,8 +314,9 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	/*
-	 * 개요 화면과 같은 step 흐름 띠. 칸마다 상태를 붙인다.
-	 * 완료(채움) / 실패(빨간 테두리) / 지금(테두리, 실행 중이면 깜박임) / 건너뜀(옅은 줄무늬) / 아직(옅게).
+	 * step 흐름 카드. 카드마다 step id, 이름, 종류(대상), 상태를 보여 준다.
+	 * 완료 / 실패(빨간 테두리) / 지금(진한 테두리, 실행 중이면 깜박임) / 건너뜀(점선, 옅게) / 아직(옅게).
+	 * 글자가 길면 말줄임으로 자르고, 카드에 마우스를 올리면 풍선 도움말로 전체를 보여 준다.
 	 * 정의는 GET /api/ai/workflow/{id}/steps 로 한 번만 읽는다. 못 읽으면 진행 기록에 나온 step만으로 그린다.
 	 */
 	function renderStrip(detail) {
@@ -350,13 +358,12 @@ var DstoneAiWorkflowAdmin = (function () {
 			if (state === "failed") {
 				failedText = stepLabel(step.id);
 			}
-			var tip = step.id + (step.name ? " " + step.name : "") + ", " + DstoneAi.stepTypeLabel(step.type) + (step.target ? ", " + step.target : "") + (step.forEach ? ", 항목마다 반복" : "") + " - " + SEGMENT_LABELS[state];
-			html += "<li class=\"ov-seg ov-seg-" + escapeHtml(step.type) + (step.forEach ? " ov-seg-each" : "") + " wa-seg-" + state + "\""
-				+ " data-step-id=\"" + escapeHtml(step.id) + "\" title=\"" + escapeHtml(tip) + "\"><span>" + escapeHtml(tip) + "</span></li>";
+			html += stepCardHtml(step, i, state);
 		}
 		stripEl.innerHTML = html;
-		// 실행 중이면 '지금' 칸만 천천히 깜박인다
-		stripEl.className = "ov-strip wa-strip" + (detail.status === "RUNNING" ? " wa-strip-running" : "");
+		// 실행 중이면 '지금' 카드만 천천히 깜박인다
+		stripEl.className = "wa-cards" + (detail.status === "RUNNING" ? " wa-cards-running" : "");
+		scrollToCurrentCard(detail);
 		Array.prototype.forEach.call(stripEl.children, function (li) {
 			li.addEventListener("click", function () {
 				var row = runs.lastRow[li.getAttribute("data-step-id")];
@@ -382,6 +389,37 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	var SEGMENT_LABELS = { done: "완료", failed: "실패", current: "지금 여기", skipped: "건너뜀", todo: "아직" };
+
+	// 카드 한 장. 맨 위 줄은 순번과 상태, 그 아래 step id, 이름, 종류·대상 순서다.
+	function stepCardHtml(step, index, state) {
+		var typeText = DstoneAi.stepTypeLabel(step.type) + (step.target ? " · " + step.target : "") + (step.forEach ? " · 항목마다 반복" : "");
+		var tip = step.id + (step.name ? "\n" + step.name : "") + "\n" + typeText + "\n상태: " + SEGMENT_LABELS[state];
+		return "<li class=\"wa-card wa-card-" + escapeHtml(step.type) + " wa-seg-" + state + "\""
+			+ " data-step-id=\"" + escapeHtml(step.id) + "\" title=\"" + escapeHtml(tip) + "\">"
+			+ "<div class=\"wa-card-top\"><span class=\"wa-card-no\">" + (index + 1) + "</span>"
+			+ "<span class=\"wa-card-state\">" + escapeHtml(SEGMENT_LABELS[state]) + "</span></div>"
+			+ "<div class=\"wa-card-id\">" + escapeHtml(step.id) + "</div>"
+			+ "<div class=\"wa-card-name\">" + escapeHtml(step.name || "-") + "</div>"
+			+ "<div class=\"wa-card-type\">" + escapeHtml(typeText) + "</div>"
+			+ "</li>";
+	}
+
+	// 카드가 많아 옆으로 넘칠 때 '지금'(없으면 실패) 카드가 보이게 가로로만 옮긴다.
+	// 새로 고칠 때마다 옮기면 사용자가 둘러보던 자리를 빼앗으므로, 실행이나 지금 step이 바뀔 때만 옮긴다.
+	var lastScrollKey = null;
+	function scrollToCurrentCard(detail) {
+		var key = detail.executionId + "|" + detail.currentStepIndex + "|" + detail.status;
+		if (key === lastScrollKey) {
+			return;
+		}
+		lastScrollKey = key;
+		var card = stripEl.querySelector(".wa-seg-current") || stripEl.querySelector(".wa-seg-failed");
+		if (!card) {
+			stripEl.scrollLeft = 0;
+			return;
+		}
+		stripEl.scrollLeft = Math.max(card.offsetLeft - stripEl.offsetLeft - 24, 0);
+	}
 
 	function segmentState(detail, step, index, runs) {
 		var row = runs.lastRow[step.id];

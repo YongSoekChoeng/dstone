@@ -116,7 +116,7 @@ public class WorkFlowController extends BaseController {
 
 	/**
 	 * <pre>
-	 * Workflow 하나의 step 종류와 순서입니다(실행 관리 화면의 실행 상세 머리의 step 흐름 띠).
+	 * Workflow 하나의 step 종류와 순서입니다(실행 관리 화면의 실행 상세 머리의 step 흐름 카드).
 	 * </pre>
 	 *
 	 * @param workflowId Workflow id

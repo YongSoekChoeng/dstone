@@ -22,7 +22,8 @@
         , REQUESTED_BY AS "requestedBy"
     </sql>
 
-    <!-- 목록 화면용. 큰 CONTEXT_JSON / RESULT_TEXT 는 읽지 않는다(목록에는 필요 없고, 여러 사람이 자주 새로 고치면 부담이 크다) -->
+    <!-- 목록 화면용. 큰 CONTEXT_JSON / RESULT_TEXT 는 통째로 읽지 않는다(목록에는 필요 없고, 여러 사람이 자주 새로 고치면 부담이 크다).
+         지금 step id(컨텍스트의 currentStep)만 꺼내 온다 -->
     <sql id="executionSummaryColumns">
         EXECUTION_ID AS "executionId"
         , WORKFLOW_ID AS "workflowId"
@@ -30,6 +31,7 @@
         , SESSION_ID AS "sessionId"
         , STATUS AS "status"
         , CURRENT_STEP_INDEX AS "currentStepIndex"
+        , CONTEXT_JSON->>'currentStep' AS "currentStepId"
         , ERROR_MESSAGE AS "errorMessage"
         , CREATED_AT AS "createdAt"
         , UPDATED_AT AS "updatedAt"

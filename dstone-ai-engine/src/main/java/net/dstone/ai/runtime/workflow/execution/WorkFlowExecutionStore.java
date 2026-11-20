@@ -305,9 +305,15 @@ public class WorkFlowExecutionStore extends BaseDao {
 
 	/**
 	 * AI_WORKFLOW_EXECUTION 한 행을 WorkFlowExecution으로 바꿉니다. CONTEXT_JSON 컬럼은 다시 컨텍스트 맵으로 되돌립니다.
-	 * 목록 조회는 CONTEXT_JSON과 RESULT_TEXT를 읽지 않으므로, 그때는 빈 컨텍스트와 null 결과가 들어갑니다.
+	 * 목록 조회는 CONTEXT_JSON과 RESULT_TEXT를 읽지 않으므로, 그때는 지금 step id(currentStepId)만 든 컨텍스트와 null 결과가 들어갑니다.
 	 */
 	private WorkFlowExecution mapExecution(Map<String, Object> row) {
+		Map<String, Object> context = this.fromJson(this.textOf(row.get("contextJson")));
+		// 목록 조회는 컨텍스트 대신 지금 step id만 따로 읽어 온다
+		String currentStepId = this.textOf(row.get("currentStepId"));
+		if (currentStepId != null && WorkFlowContext.currentStep(context) == null) {
+			WorkFlowContext.setCurrentStep(context, currentStepId);
+		}
 		return new WorkFlowExecution(
 			this.textOf(row.get("executionId")),
 			this.textOf(row.get("workflowId")),
@@ -315,7 +321,7 @@ public class WorkFlowExecutionStore extends BaseDao {
 			this.textOf(row.get("sessionId")),
 			WorkFlowExecutionStatus.valueOf(this.textOf(row.get("status"))),
 			row.get("currentStepIndex") == null ? 0 : ((Number) row.get("currentStepIndex")).intValue(),
-			this.fromJson(this.textOf(row.get("contextJson"))),
+			context,
 			this.fromResultJson(this.textOf(row.get("resultText"))),
 			this.textOf(row.get("errorMessage")),
 			this.toInstant(row.get("createdAt")),

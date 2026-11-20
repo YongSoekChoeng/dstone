@@ -2665,43 +2665,138 @@ body.wd-full-on {
 	margin-top: 16px;
 }
 
-.wa-strip .ov-seg {
-	max-width: 80px;
-	height: 16px;
+/* 실행 목록의 '현재 스텝' 칸. 길면 말줄임, 전체는 풍선 도움말(title)로. 칸 너비는 ai-table.js가 굳히므로 칸을 넓히면 더 보인다 */
+.wa-cell-ellipsis {
+	display: block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* step 흐름 카드. 한 줄로 늘어놓고 넘치면 옆으로 넘겨 본다 */
+.ai-body ol.wa-cards {
+	display: flex;
+	gap: 8px;
+	margin: 0;
+	padding: 4px 2px 8px;
+	list-style: none;
+	overflow-x: auto;
+}
+
+.wa-card {
+	flex: 0 0 156px;
+	min-width: 0;
+	padding: 8px 10px;
+	border: 1px solid var(--cs-border);
+	border-left: 4px solid var(--cs-faint);
+	border-radius: 8px;
+	background: var(--cs-surface);
 	cursor: pointer;
 }
 
-/* 아직 돌지 않은 step은 옅게, 건너뛴 step은 옅은 줄무늬 */
-.wa-strip .wa-seg-todo {
-	opacity: 0.2;
+/* 왼쪽 굵은 선의 색이 step 종류다(개요 화면의 띠 색과 같다) */
+.wa-card-AGENT { border-left-color: var(--ai-step-AGENT); }
+.wa-card-SUPERVISOR { border-left-color: var(--ai-step-SUPERVISOR); }
+.wa-card-ROUTER { border-left-color: var(--ai-step-ROUTER); }
+.wa-card-TOOL { border-left-color: var(--ai-step-TOOL); }
+.wa-card-APPROVAL { border-left-color: var(--ai-step-APPROVAL); }
+
+.wa-card:hover {
+	background: var(--cs-surface-2);
+}
+
+.wa-card-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	font-size: 11px;
+	color: var(--cs-muted);
+}
+
+.wa-card-state {
+	padding: 1px 6px;
+	border-radius: 999px;
+	background: var(--cs-surface-3);
+	white-space: nowrap;
+}
+
+/* 글자가 길면 한 줄에서 자르고, 전체는 카드의 풍선 도움말(title)로 본다 */
+.wa-card-id,
+.wa-card-name,
+.wa-card-type {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wa-card-id {
+	margin-top: 4px;
+	color: var(--cs-text);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.wa-card-name {
+	margin-top: 2px;
+	color: var(--cs-text-2);
+	font-size: 12px;
+}
+
+.wa-card-type {
+	margin-top: 2px;
+	color: var(--cs-muted);
+	font-size: 11px;
+}
+
+/* 아직 돌지 않은 step은 옅게, 건너뛴 step은 점선으로 옅게 */
+.wa-card.wa-seg-todo {
+	opacity: 0.5;
 	cursor: default;
 }
 
-.wa-strip .wa-seg-skipped {
-	opacity: 0.2;
+.wa-card.wa-seg-skipped {
+	opacity: 0.5;
+	border-style: dashed;
 	cursor: default;
-	background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.8) 0 2px, transparent 2px 6px);
 }
 
-/* 지금 칸은 진한 테두리, 실패한 칸은 빨간 테두리 */
-.wa-strip .wa-seg-current {
-	box-shadow: 0 0 0 2px var(--cs-surface), 0 0 0 4px var(--cs-text);
+/* 완료는 상태 글자를 초록으로, 지금은 진한 테두리, 실패는 빨간 테두리 */
+.wa-card.wa-seg-done .wa-card-state {
+	background: color-mix(in srgb, var(--ai-step-TOOL) 14%, transparent);
+	color: var(--ai-step-TOOL);
 }
 
-.wa-strip .wa-seg-failed {
-	box-shadow: 0 0 0 2px var(--cs-surface), 0 0 0 4px var(--cs-danger);
+.wa-card.wa-seg-current {
+	box-shadow: 0 0 0 2px var(--cs-text);
 }
 
-.wa-strip-running .wa-seg-current {
+.wa-card.wa-seg-current .wa-card-state {
+	background: var(--cs-text);
+	color: var(--cs-surface);
+}
+
+.wa-card.wa-seg-failed {
+	box-shadow: 0 0 0 2px var(--cs-danger);
+}
+
+.wa-card.wa-seg-failed .wa-card-state {
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+}
+
+.wa-cards-running .wa-seg-current {
 	animation: wa-seg-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes wa-seg-pulse {
-	50% { opacity: 0.45; }
+	50% { box-shadow: 0 0 0 2px transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.wa-strip-running .wa-seg-current { animation: none; }
+	.wa-cards-running .wa-seg-current { animation: none; }
 }
 
 .wa-strip-text {

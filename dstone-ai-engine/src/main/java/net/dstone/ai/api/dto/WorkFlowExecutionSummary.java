@@ -2,6 +2,7 @@ package net.dstone.ai.api.dto;
 
 import java.time.Instant;
 
+import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 
 /**
@@ -16,11 +17,12 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  * @param caller           이 Workflow를 호출한 앱이나 서비스를 가리키는 식별자(tenant)입니다.
  * @param status           지금 이 실행이 어떤 상태인지를 나타냅니다.
  * @param currentStepIndex 지금 실행 중이거나 방금 끝난 스텝이 몇 번째 순서인지를 나타냅니다.
+ * @param currentStepId    그 스텝의 id입니다. 이 기록이 생기기 전에 시작한 실행이면 null입니다.
  * @param createdAt        이 실행이 처음 생성된 시각입니다.
  * @param updatedAt        상태가 마지막으로 바뀐 시각입니다.
  * @param requestedBy      이 실행을 시작한 사용자(dstone-boot 로그인 id)입니다. API로 직접 시작했으면 null입니다.
  */
-public record WorkFlowExecutionSummary(String executionId, String workflowId, String caller, String status, int currentStepIndex, Instant createdAt, Instant updatedAt, String requestedBy) {
+public record WorkFlowExecutionSummary(String executionId, String workflowId, String caller, String status, int currentStepIndex, String currentStepId, Instant createdAt, Instant updatedAt, String requestedBy) {
 
 	/**
 	 * WorkFlowExecution(실행 상태)을 받아, 목록에 보여줄 요약 항목 하나로 바꿔줍니다.
@@ -28,7 +30,7 @@ public record WorkFlowExecutionSummary(String executionId, String workflowId, St
 	 * @param execution 요약으로 바꿔줄 실행 상태입니다.
 	 */
 	public static WorkFlowExecutionSummary from(WorkFlowExecution execution) {
-		return new WorkFlowExecutionSummary(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), execution.createdAt(), execution.updatedAt(), execution.requestedBy());
+		return new WorkFlowExecutionSummary(execution.executionId(), execution.workflowId(), execution.caller(), execution.status().name(), execution.currentStepIndex(), WorkFlowContext.currentStep(execution.context()), execution.createdAt(), execution.updatedAt(), execution.requestedBy());
 	}
 
 }

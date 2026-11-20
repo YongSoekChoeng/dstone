@@ -84,7 +84,7 @@
 							<col style="width:22%" />
 							<col style="width:110px" />
 							<col style="width:150px" />
-							<col style="width:84px" />
+							<col style="width:140px" />
 							<col style="width:160px" />
 						</colgroup>
 						<thead>
@@ -93,7 +93,7 @@
 								<th>Workflow</th>
 								<th>시작한 사람</th>
 								<th>상태</th>
-								<th class="wa-num">현재 스텝</th>
+								<th>현재 스텝</th>
 								<th>수정시각</th>
 							</tr>
 						</thead>
@@ -122,9 +122,9 @@
 						<div><dt>시작</dt><dd id="wa-head-created">-</dd></div>
 						<div><dt>걸린 시간</dt><dd id="wa-head-elapsed">-</dd></div>
 					</dl>
-					<!-- 개요 화면과 같은 step 흐름 띠. 칸을 누르면 그 step의 마지막 기록을 고른다 -->
+					<!-- step 흐름 카드. 카드를 누르면 그 step의 마지막 기록을 고른다 -->
 					<div class="wa-flow">
-						<ol id="wa-strip" class="ov-strip wa-strip" aria-label="step 흐름"></ol>
+						<ol id="wa-strip" class="wa-cards" aria-label="step 흐름"></ol>
 						<div id="wa-strip-text" class="wa-strip-text"></div>
 					</div>
 				</header>
