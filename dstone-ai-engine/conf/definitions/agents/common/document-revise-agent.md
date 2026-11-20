@@ -5,11 +5,14 @@
 # 고치는 방법·조사 방법·지시 읽는 법은 Skill로 미리 넣습니다(skills.preload). 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 쓰는 곳: workflows/sm/sm-workflow.yml step18~20
 id: document-revise-agent
-version: 1.0.0
+version: 1.1.0
 description: 이미 있는 문서를 instruction(사람의 지시)대로 고친다. 지시받은 부분만 고치고 나머지는 그대로 둔다. 필요하면 소스와 DB를 읽어 확인한다.
 model:
+  # 설계서를 고칠 때 예전 설계 Agent(sm-architect-agent)와 같은 모델로 맞춘다. 기본 모델(qwen3.8-27b, medium)로는
+  # 평가에서 한 번 추론이 출력 한도(6만 토큰)를 다 써서 실패했다(2026-11-20).
+  name: z-ai/glm-5.3-flash
   temperature: 0.2
-  reasoning: medium
+  reasoning: high
 input:
   documents(array, 고칠 문서 파일의 절대경로. 첫 번째가 주 문서이고 나머지는 함께 맞춰야 하는 문서): string
   instruction: string, 이번에 반영할 지시(이 단계로 오게 만든 결정과 의견)
@@ -30,6 +33,7 @@ tools:
     - knowledgeCallers
     - knowledgeCallees
     - knowledgeTableUsage
+    - knowledgeImpact
     - dbListConnections
     - dbListTables
     - dbDescribeTable

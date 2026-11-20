@@ -2935,6 +2935,8 @@ var DstoneAiDesigner = (function () {
 		var execution = f.execution || {};
 		var tools = f.tools && Array.isArray(f.tools.allowed) ? f.tools.allowed.map(String) : [];
 		var skills = f.skills && Array.isArray(f.skills.allowed) ? f.skills.allowed.map(String) : [];
+		// 미리 넣는 Skill(skills.preload): 시스템 프롬프트에 본문이 늘 붙는다. Tool 호출로 부르지 않는다.
+		var preloadSkills = f.skills && Array.isArray(f.skills.preload) ? f.skills.preload.map(String) : [];
 		// subAgents는 목록이거나 {agents: [...], background: true} 모양이다.
 		var subAgentList = Array.isArray(f.subAgents) ? f.subAgents : (f.subAgents && Array.isArray(f.subAgents.agents) ? f.subAgents.agents : []);
 		var subAgents = subAgentList.map(String);
@@ -2963,8 +2965,9 @@ var DstoneAiDesigner = (function () {
 			var folder = skill.path ? skill.path.replace(/^skills\//, "").replace(/\/[^\/]*\/SKILL\.md$/, "") : "";
 			skillItems.push({ value: skill.name, label: skill.name, title: skill.description || "", group: folder });
 		});
-		skills.forEach(function (name) {
-			if (!(catalog.skills || []).some(function (skill) { return skill.name === name; })) {
+		skills.concat(preloadSkills).forEach(function (name) {
+			if (!(catalog.skills || []).some(function (skill) { return skill.name === name; })
+					&& !skillItems.some(function (item) { return item.value === name; })) {
 				skillItems.push({ value: name, label: name, note: "등록되지 않음" });
 			}
 		});
@@ -3027,7 +3030,10 @@ var DstoneAiDesigner = (function () {
 			+ "<label class=\"wd-check\"><input type=\"checkbox\" id=\"wd-agent-all-tools\"" + (allTools ? " checked" : "") + " /> 전부(*) - 등록된 Tool을 모두 씀(TOOL step 전용 Tool은 빠짐)</label>"
 			+ (allTools ? "" : chipList("tools", toolItems, tools, "고른 Tool이 없습니다(Tool 없이 답만 함).", false))
 			+ "</section>"
-			+ "<section class=\"wd-agent-sec\"><h4>Skill <span class=\"wd-help\">필요할 때 꺼내 읽는 작업 안내서(SKILL.md). LLM에게는 Skill이라는 Tool 하나로 보입니다</span></h4>"
+			+ "<section class=\"wd-agent-sec\"><h4>Skill <span class=\"wd-help\">작업 안내서(SKILL.md)</span></h4>"
+			+ "<p class=\"ai-hint\"><b>미리 넣기(preload)</b> - 이 Agent가 일할 때마다 필요한 Skill. 본문이 시스템 프롬프트 뒤에 늘 붙습니다(Tool 호출 없음).</p>"
+			+ chipList("preloadSkills", skillItems, preloadSkills, "미리 넣는 Skill이 없습니다.", false)
+			+ "<p class=\"ai-hint\"><b>필요할 때 부르기(allowed)</b> - 경우에 따라서만 필요한 Skill. LLM에게는 Skill이라는 Tool 하나로 보입니다.</p>"
 			+ chipList("skills", skillItems, skills, "고른 Skill이 없습니다.", false)
 			+ "<p class=\"ai-hint\">Skill 폴더의 참고 파일까지 읽게 하려면 Tool에 readFile도 고르십시오. 새 Skill은 위쪽 [Skill 관리]에서 만듭니다.</p>"
 			+ "</section>"
@@ -3105,7 +3111,8 @@ var DstoneAiDesigner = (function () {
 				if (name === "subAgents") {
 					writeSubAgents(values, background);
 				} else {
-					setValue(agentDoc.front, name === "tools" ? "tools.allowed" : "skills.allowed", values.length > 0 ? values : undefined);
+					var path = name === "tools" ? "tools.allowed" : (name === "preloadSkills" ? "skills.preload" : "skills.allowed");
+					setValue(agentDoc.front, path, values.length > 0 ? values : undefined);
 				}
 			}, false);
 			renderAgentForm();
@@ -3114,7 +3121,8 @@ var DstoneAiDesigner = (function () {
 			button.addEventListener("click", function () {
 				var name = button.getAttribute("data-chip-remove");
 				var value = button.getAttribute("data-value");
-				setList(name, (name === "tools" ? tools : (name === "skills" ? skills : subAgents)).filter(function (v) {
+				var current = name === "tools" ? tools : (name === "skills" ? skills : (name === "preloadSkills" ? preloadSkills : subAgents));
+				setList(name, current.filter(function (v) {
 					return v !== value;
 				}));
 			});
@@ -3134,6 +3142,10 @@ var DstoneAiDesigner = (function () {
 				} else if (name === "skills") {
 					openPicker("Skill 고르기", skillItems, skills, function (values) {
 						setList("skills", values);
+					});
+				} else if (name === "preloadSkills") {
+					openPicker("미리 넣을 Skill 고르기", skillItems, preloadSkills, function (values) {
+						setList("preloadSkills", values);
 					});
 				} else {
 					openPicker("Sub Agent 고르기", agentItems, subAgents, function (values) {
@@ -3717,7 +3729,7 @@ var DstoneAiDesigner = (function () {
 
 	function skillUsersOf(name) {
 		return catalog.agents.filter(function (agent) {
-			return (agent.skills || []).indexOf(name) >= 0;
+			return (agent.skills || []).indexOf(name) >= 0 || (agent.preloadSkills || []).indexOf(name) >= 0;
 		});
 	}
 

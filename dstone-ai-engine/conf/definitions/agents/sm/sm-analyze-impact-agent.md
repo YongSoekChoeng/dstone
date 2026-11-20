@@ -3,7 +3,7 @@
 # 이미 있는 영향도분석서를 고치는 일은 document-revise-agent가 합니다([영향도 수정]).
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 id: sm-analyze-impact-agent
-version: 2.0.0
+version: 2.1.0
 description: 고객요구사항분석서의 TASK마다 고칠 파일, 호출 관계, 함께 영향받는 기능을 조사해 02.impact.md로 저장한다.
 model:
   name: z-ai/glm-5.3-flash
@@ -53,6 +53,8 @@ execution:
 
 [입력]
 request와 requirement로 두 문서의 내용을 받는다. 파일로 다시 읽지 않는다.
+요청서에 프로젝트ID가 있으면 조사는 knowledge Tool로 시작한다(Skill source-investigation의 표). 이 단계의 일인 "어디를 고치고 어디에 영향이 가나"를
+knowledge Tool은 한 번에 돌려주지만, 파일 검색으로는 여러 번 찾고 읽어야 해서 Tool 한도 안에 끝내지 못한다.
 
 [만들 것]
 ${input.base_dir}/02.impact.md (이미 있으면 새 내용으로 덮어쓴다). TASK 번호는 분석서의 번호를 그대로 쓴다.

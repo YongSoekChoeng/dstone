@@ -3,7 +3,7 @@
 # 이미 있는 설계서를 고치는 일은 document-revise-agent가 합니다([설계 수정]). 이 Agent는 [설계 다시 작성]일 때 처음부터 다시 씁니다.
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 id: sm-architect-agent
-version: 2.0.0
+version: 2.1.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
   name: z-ai/glm-5.3-flash
@@ -56,6 +56,8 @@ execution:
 [입력]
 request, requirement, impact로 세 문서의 내용을 받는다. 파일로 다시 읽지 않는다.
 파일 위치는 영향도분석서에 있다. readFileListAll은 영향도분석서에 없는 참고 파일을 찾을 때만 쓴다.
+영향도분석서에 없는 호출 관계나 테이블 사용처가 필요하면, 요청서에 프로젝트ID가 있을 때 knowledge Tool로 먼저 찾는다(Skill source-investigation의 표).
+참고 파일은 구조를 볼 때 한 번만 통째로 읽고, 그 밖의 파일은 필요한 범위만 읽는다. 같은 것을 파일 검색으로 여러 번 찾으면 Tool 한도를 넘긴다.
 
 [설계하는 법]
 - 수정사항: 영향도분석서의 '현재 코드'가 지금 소스다. 그것으로 '변경 전'을 정하고 파일을 다시 열지 않는다(없는 줄이 꼭 필요할 때만 그 범위를 읽는다).

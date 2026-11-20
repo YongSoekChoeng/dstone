@@ -91,6 +91,8 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 		c.check("02 저장", c.exists("02.impact.md"));
 		c.check("TASK 표", c.contains("02.impact.md", "TASK-01"));
 		c.check("소스경로 기준", c.contains("02.impact.md", c.sourceDir));
+		// 요청서에 프로젝트ID가 있으므로 조사는 knowledge Tool로 시작해야 한다(Skill source-investigation).
+		c.check("knowledge Tool 사용", c.toolCalls("knowledge") > 0);
 		c.report();
 	}
 
@@ -224,6 +226,22 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 				this.failure = e.getMessage();
 			}
 			this.seconds = (System.currentTimeMillis() - start) / 1000;
+		}
+
+		/** 이번 사례에서 LLM이 요청한 Tool 호출 가운데 이름이 prefix로 시작하는 것의 수입니다. */
+		int toolCalls(String prefix) {
+			int count = 0;
+			for (ChatResponse response : SmAgentEvalTest.this.chatModel.responses()) {
+				if (response.getResult() == null || response.getResult().getOutput() == null) {
+					continue;
+				}
+				for (AssistantMessage.ToolCall call : response.getResult().getOutput().getToolCalls()) {
+					if (call.name().startsWith(prefix)) {
+						count++;
+					}
+				}
+			}
+			return count;
 		}
 
 		boolean exists(String file) {
