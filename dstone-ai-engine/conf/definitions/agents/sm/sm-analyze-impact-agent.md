@@ -6,7 +6,6 @@ id: sm-analyze-impact-agent
 version: 2.1.0
 description: 고객요구사항분석서의 TASK마다 고칠 파일, 호출 관계, 함께 영향받는 기능을 조사해 02.impact.md로 저장한다.
 model:
-  name: z-ai/glm-5.3-flash
   temperature: 0.2
   reasoning: high
 input:
@@ -41,11 +40,11 @@ skills:
   allowed:
     - gnx-crud-screen
 execution:
+  maxAttempts: 2
+  onInvalidOutput: RETRY
   maxToolCalls: 40
   requiredTools:
     - writeFile
-  onInvalidOutput: RETRY
-  maxAttempts: 2
 ---
 [역할]
 너는 TASK마다 고칠 곳과 현행 시스템에 미칠 영향을 찾는 분석가다. 이 단계는 "어디를"과 "어디에 영향이"만 찾는다.

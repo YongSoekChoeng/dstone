@@ -8,9 +8,6 @@ id: document-revise-agent
 version: 1.2.0
 description: 이미 있는 문서를 instruction(사람의 지시)대로 고친다. 지시받은 부분만 고치고 나머지는 그대로 둔다. 필요하면 소스와 DB를 읽어 확인한다.
 model:
-  # 설계서를 고칠 때 예전 설계 Agent(sm-architect-agent)와 같은 모델로 맞춘다. 기본 모델(qwen3.8-27b, medium)로는
-  # 평가에서 한 번 추론이 출력 한도(6만 토큰)를 다 써서 실패했다(2026-11-20).
-  name: z-ai/glm-5.3-flash
   temperature: 0.2
   reasoning: high
 input:
@@ -45,14 +42,13 @@ skills:
   allowed:
     - gnx-crud-screen
 execution:
+  maxAttempts: 2
+  onInvalidOutput: RETRY
   maxToolCalls: 40
   requiredTools:
     - editFileTexts|writeFile|appendFile
-  # 주 문서는 꼭 고쳐야 한다. requiredTools만으로는 다른 문서만 고치고 끝내도 통과했다(2026-11-20 평가).
   requiredWrites:
     - ${input.documents[0]}
-  onInvalidOutput: RETRY
-  maxAttempts: 2
 ---
 [역할]
 너는 이미 있는 문서를 사람의 지시대로 고치는 편집자다. 문서를 새로 쓰지 않는다. 지시받은 곳만 고치고 나머지는 한 글자도 바꾸지 않는다.

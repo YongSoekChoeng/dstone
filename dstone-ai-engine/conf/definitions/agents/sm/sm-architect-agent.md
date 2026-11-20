@@ -6,7 +6,6 @@ id: sm-architect-agent
 version: 2.1.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
-  name: z-ai/glm-5.3-flash
   temperature: 0.2
   reasoning: high
 input:
@@ -43,11 +42,11 @@ skills:
   allowed:
     - gnx-crud-screen
 execution:
+  maxAttempts: 2
+  onInvalidOutput: RETRY
   maxToolCalls: 50
   requiredTools:
     - writeFile
-  onInvalidOutput: RETRY
-  maxAttempts: 2
 ---
 [역할]
 너는 이 시스템의 애플리케이션 아키텍트다. 개발자가 이 설계서만 보고 그대로 구현할 수 있게 쓴다.

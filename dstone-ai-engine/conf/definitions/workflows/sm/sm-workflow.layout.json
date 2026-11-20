@@ -123,10 +123,6 @@
       "x" : 0,
       "y" : 250
     } ],
-    "step06|route|요구사항 다시 작성" : [ {
-      "x" : 460,
-      "y" : 200
-    } ],
     "step06|route|중지" : [ {
       "x" : 54,
       "y" : 510
@@ -177,10 +173,6 @@
       "source" : "left",
       "target" : "in"
     },
-    "step06|route|요구사항 다시 작성" : {
-      "source" : "right",
-      "target" : "in"
-    },
     "step08|route|영향도 수정" : {
       "source" : "left",
       "target" : "right"
@@ -192,10 +184,6 @@
     "step09|next|" : {
       "source" : "right",
       "target" : "in"
-    },
-    "step11|route|설계 다시 작성" : {
-      "source" : "out",
-      "target" : "left"
     },
     "step12|onFailure|" : {
       "source" : "left",

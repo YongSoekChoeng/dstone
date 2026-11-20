@@ -115,7 +115,6 @@ steps:
     routes:
       그대로 진행: step07
       요구사항 수정: step20
-      요구사항 다시 작성: step03
       중지: FAIL
 
   - id: step07
@@ -178,7 +177,6 @@ steps:
     routes:
       승인(개발진행): step12
       설계 수정: step18
-      설계 다시 작성: step10
       영향도 수정: step19
       중지: FAIL
 
