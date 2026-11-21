@@ -477,6 +477,7 @@ public class ConfigCallLog extends BaseObject {
 		String output = "";
 		if( input != null ) {
 			output = input;
+			output = StringUtil.textTail(output, 200);
 			output = StringUtil.replace(output, "\r\n", "");
 			output = StringUtil.replace(output, "\n", "");
 		}

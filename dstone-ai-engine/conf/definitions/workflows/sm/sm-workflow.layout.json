@@ -212,6 +212,10 @@
     "step17|route|요구사항 수정" : {
       "source" : "left",
       "target" : "in"
+    },
+    "step20|next|" : {
+      "source" : "right",
+      "target" : "left"
     }
   }
 }
