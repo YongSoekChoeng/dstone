@@ -49,8 +49,6 @@ skills:
   preload:
     - handling-instructions
     - source-investigation
-  allowed:
-    - gnx-crud-screen
 execution:
   maxToolCalls: 150
   requiredTools:
