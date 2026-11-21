@@ -395,3 +395,53 @@ Update memory to match the decision.
 ## 답변
 
 Tests are still running. I'll report the results when they finish.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>by2vpjk8e</task-id>
+<tool-use-id>toolu_01UZVj9knh8zEEsJBqPH3mwK</tool-use-id>
+<output-file>/tmp/claude-1000/-app-dstone/4fe99213-ce23-4d3d-9fcf-2c5fe70430a4/tasks/by2vpjk8e.output</output-file>
+<status>completed</status>
+<summary>Background command "mvn -q test -DskipTests=false -Ddstone.ai.test.llmcall=false -Dtest='DefinitionBootTest,SmDecisionFlowTest,WorkFlowTest,RequiredToolsTest,SampleAgentProviderOverrideTest' -Dsurefire.failIfNoSpecifiedTests=false &gt; /tmp/claude-1000/-app-dstone/4fe99213-ce23-4d3d-9fcf-2c5fe70430a4/scratchpad/t2.log 2&gt;&amp;1; echo rc=$?; grep -h 'Tests run' target/surefire-reports/*{DefinitionBoot,SmDecisionFlow,sm.WorkFlowTest,RequiredTools,ProviderOverride}*.txt; grep -h -B2 -A25 '&lt;&lt;&lt; FAIL\|&lt;&lt;&lt; ERR' target/surefire-reports/*SmDecisionFlow*.txt target/surefire-reports/*DefinitionBoot*.txt | head -50" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+## 답변
+
+해결 Agent를 만들고 개발 승인(step17)에 "전문가 해결" 경로를 붙였습니다. 기본 모델은 qwen 27B로 되돌렸고, gpt-oss-120b는 해결 Agent만 씁니다. 미리 넣은 답으로 도는 테스트는 통과했지만, 실제 gpt-oss-120b로는 아직 돌려 보지 않았습니다.
+
+**모델 배정**
+- **기본 Agent들:** `qwen/qwen3.8-27b`입니다. `application.yml`은 원래대로 되돌렸습니다.
+- **해결 Agent:** 새로 만든 `sm-troubleshooter-agent`만 `model.name: openai/gpt-oss-120b`, `reasoning: high`를 씁니다.
+  - 이 OpenRouter ID는 Hugging Face의 `openai/gpt-oss-120b`와 같은 가중치이고 Apache 2.0 라이선스입니다.
+  - 사내 서버로 옮길 때는 `base-url`과 모델 이름만 바꾸면 됩니다.
+
+**사용 흐름**
+개발 승인에서 **[전문가 해결]**을 고르고 의견에 본 증상을 적습니다(예: "업로드한 파일이 테이블에 저장되지 않음"). 그러면 설계서·목록을 다시 읽고(step23~24) → 해결 Agent(step25) → 컴파일 확인(step16) → 개발 승인으로 돌아옵니다. 해결 Agent가 실패하면 실행 전체가 멈추지 않고 개발 승인으로 돌아갑니다.
+
+**해결 Agent가 하는 일** (기본 개발 Agent와 다른 점)
+- 증상마다 화면 스크립트 → Controller → Service → SQL → 테이블까지 따라가서 값이 끊기는 곳을 찾습니다.
+- 원본에서 이미 동작하는 기능과 한 줄씩 비교합니다. 라이브러리 사용이 의심되면 Kendo JS 같은 라이브러리 소스까지 확인합니다. 이번 `rawFile` 버그는 이 단계에서 잡히는 종류입니다.
+- 원인마다 근거를 파일:줄로 적고, 근거가 없으면 고치지 않고 "사람이 확인할 것"으로 남깁니다.
+- 지난 재개발에서 이미 써 본 방식은 되풀이하지 않습니다.
+- 설계서와 다르게 고칠 수 있습니다. 대신 고친 내용은 반드시 설계서에 남겨야 하고, 설계서를 저장하지 않으면 엔진이 실패로 처리합니다(`requiredWrites`).
+- 답에 원인·근거, 고친 것, 설계서와 달라진 점, 못 푼 것이 나와서 승인 화면에서 보입니다.
+
+**테스트**
+- `SmDecisionFlowTest`(새 테스트 포함 5개), 정의 부팅 검증, `WorkFlowTest`, `RequiredToolsTest` 모두 통과했습니다.
+- 새 테스트는 전문가 해결을 골랐을 때 증상이 Agent에 전달되는지, 설계서가 고쳐지는지, 그다음 step16으로 가는지를 미리 넣은 답으로 확인합니다.
+- `SampleAgentProviderOverrideTest` 1건은 실패했습니다. 이 테스트는 로컬 Ollama(11434 포트)를 실제로 부르는데, 지금 Ollama가 꺼져 있어 연결 시간 초과가 났습니다. 이번 변경과는 관계없습니다.
+
+**바뀐 파일 (아직 커밋하지 않음)**
+- 새 파일: `sm-troubleshooter-agent.md`
+- 수정: `sm-workflow.yml`(2.2.0), `sm-developer-agent.md`(2.1.0, 앞의 설계서 동기화 작업), `SmDecisionFlowTest`, `docs/09` 11.1절, `.claude/docs/ai-engine-tuning.md`
+
+**다음 단계 제안**
+1. Windows의 `9dc51bb8` 실행은 지금 개발 승인 대기 상태입니다. 커밋 → Windows에서 pull → 재시작한 뒤 **[전문가 해결]**을 골라 보시면 바로 시험할 수 있습니다. 진행 중이던 실행에 새 경로가 보이는지는 확인하지 않았습니다. 안 보이면 새로 실행하셔야 합니다.
+2. gpt-oss-120b는 OpenRouter에서 유료입니다(입력 100만 토큰당 $0.09, 출력 $0.36). 크레딧이 있어야 호출됩니다.
+
+커밋할까요?
