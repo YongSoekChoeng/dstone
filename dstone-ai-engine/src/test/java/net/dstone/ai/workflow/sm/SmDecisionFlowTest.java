@@ -30,6 +30,8 @@ import net.dstone.ai.support.WorkflowTestBase;
  * - 승인하고 앞으로 진행하면(step08 → TOOL step09 → step10) TOOL step을 건너뛰어 다음 Agent가 받는다.
  * - 승인 화면은 결정마다 그 의견을 받을 step(Agent)을 보여 준다.
  * - [~ 수정]을 고르면 문서 수정 Agent가 그 의견을 지시로 받는다.
+ * - [재개발]을 고르면 설계서와 목록을 다시 읽고(step21~22) 개발 폴더는 그대로 둔 채 개발로 간다(sm-workflow 2.1.0).
+ * - [전문가 해결]을 고르면 설계서와 목록을 다시 읽고(step23~24) 해결 Agent(step25)가 증상을 받아 고친 뒤 컴파일 확인으로 간다(2.2.0).
  * </pre>
  */
 public class SmDecisionFlowTest extends WorkflowTestBase {
@@ -97,9 +99,71 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void 재개발을_고르면_설계서와_목록을_다시_읽고_개발로_간다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
+		// 지난 재개발이 설계서와 목록을 고쳐 둔 상태입니다. state에는 고치기 전 내용이 남아 있습니다.
+		Path folder = this.folder();
+		Files.writeString(folder.resolve("03-1.design.md"), "# 설계 (재개발 반영)", StandardCharsets.UTF_8);
+		Files.writeString(folder.resolve("03-2.taskitems.md"), "# 목록 (재개발 반영)", StandardCharsets.UTF_8);
+		Files.createDirectories(folder.resolve("dev-resources"));
+		Files.writeString(folder.resolve("dev-resources/A.java"), "class A {}", StandardCharsets.UTF_8);
+
+		WorkflowStepper flow = this.atStep("step17");
+		flow.put("design", "# 설계 (옛 내용)").put("taskitems", "# 목록 (옛 내용)");
+		flow.step("step17");
+		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
+		PendingApproval pending = this.pendingApproval(flow.execution());
+		assertThat(pending.receivers().get("재개발")).isEqualTo("step15 개발 · sm-developer-agent");
+
+		flow.decide("재개발", "업로드한 파일이 저장되지 않음");
+		assertThat(flow.currentStepId()).isEqualTo("step21");
+		flow.step("step21");
+		flow.step("step22");
+
+		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(flow.currentStepId()).isEqualTo("step15");
+		assertThat(flow.state("design")).isEqualTo("# 설계 (재개발 반영)");
+		assertThat(flow.state("taskitems")).isEqualTo("# 목록 (재개발 반영)");
+		// 재개발은 개발 폴더를 비우지 않습니다(비우는 step14는 설계 승인 뒤에만 지납니다).
+		assertThat(folder.resolve("dev-resources/A.java")).exists();
+		assertThat(this.chatModel.prompts()).isEmpty();
+	}
+
+	@Test
+	void 전문가_해결을_고르면_해결_Agent가_증상을_받고_설계서를_고친_뒤_컴파일_확인으로_간다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
+		Path folder = this.folder();
+		Path design = folder.resolve("03-1.design.md");
+		Files.writeString(design, "selectedFile = e.files[0];", StandardCharsets.UTF_8);
+		Files.writeString(folder.resolve("03-2.taskitems.md"), "# 목록", StandardCharsets.UTF_8);
+		String designPath = design.toString().replace("\\", "/");
+		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + designPath + "\", \"edits\": [{\"before\": \"e.files[0];\", \"after\": \"e.files[0].rawFile;\"}]}");
+		this.chatModel.answer("{\"causes\": [\"업로드 안 됨 → Kendo 파일 객체를 그대로 보냄 → kendo.upload.min.js\"], \"changes\": [\"imageBoardView.jsp: rawFile 전송\"],"
+			+ " \"designChanges\": [], \"unresolved\": [], \"compiled\": true, \"designSynced\": true}");
+
+		WorkflowStepper flow = this.atStep("step17");
+		flow.step("step17");
+		PendingApproval pending = this.pendingApproval(flow.execution());
+		assertThat(pending.receivers().get("전문가 해결")).isEqualTo("step25 전문가 해결 · sm-troubleshooter-agent");
+
+		flow.decide("전문가 해결", "업로드한 파일이 테이블에 저장되지 않음");
+		assertThat(flow.currentStepId()).isEqualTo("step23");
+		flow.step("step23");
+		flow.step("step24");
+		flow.step("step25");
+
+		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(flow.currentStepId()).isEqualTo("step16");
+		assertThat(Files.readString(design, StandardCharsets.UTF_8)).contains("e.files[0].rawFile;");
+		assertThat(String.valueOf(flow.state("troubleshoot"))).contains("rawFile");
+		String prompt = ScriptedChatModel.textOf(this.chatModel.prompts().get(0));
+		assertThat(prompt).contains("개발 승인(step17)의 결정: 전문가 해결").contains("업로드한 파일이 테이블에 저장되지 않음").contains("selectedFile = e.files[0];");
+	}
+
+	@Test
 	void Agent_step은_모두_결정_기록을_읽는다() {
 		Map<String, Object> context = WorkFlowContext.create(this.workDir.toString(), WORKFLOW_ID, "test");
-		for (String stepId : List.of("step03", "step07", "step10", "step15", "step18", "step19", "step20")) {
+		for (String stepId : List.of("step03", "step07", "step10", "step15", "step18", "step19", "step20", "step25")) {
 			String with = String.valueOf(this.withOf(stepId));
 			assertThat(with).as(stepId).contains("instruction=${arrival").contains("history=${decisions");
 		}
