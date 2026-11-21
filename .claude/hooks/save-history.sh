@@ -123,6 +123,9 @@ echo "[History] 저장 완료: ${FILEPATH}" >&2
 (
   cd "$(dirname "$(dirname "$(dirname "$0")")")" || exit 0
   git add "History/${DATE_DIR}/${FILENAME}" 2>/dev/null || exit 0
+  # 지난 달 이력은 월 단위 zip으로 묶어 같이 커밋 (History/YYYYMM.zip)
+  bash "$(dirname "$0")/archive-history.sh" "History" 2>/dev/null
+  git add -A History 2>/dev/null
   git diff --cached --quiet && exit 0
   git commit -m "history: ${DATE_DIR} ${HHMM} - ${TOPIC}" \
     --no-gpg-sign 2>/dev/null || exit 0
