@@ -57,12 +57,13 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step10 아키텍처 설계 · sm-architect-agent");
+		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step27 기존 설계서 맞춤 · document-revise-agent 또는 step10 아키텍처 설계 · sm-architect-agent");
 		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step24 영향도분석서 수정 · document-revise-agent");
 		assertThat(pending.receivers().get("중지")).isEqualTo("실패로 끝냄(FAIL)");
 
 		flow.decide("승인(설계진행)", "공통 코드 테이블도 같이 봐 주세요");
 		flow.step("step09");
+		flow.step("step26"); // 설계서가 아직 없으므로 새로 쓰는 길로 간다
 		flow.step("step10");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
@@ -88,8 +89,8 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step06");
 		flow.step("step06");
 		flow.decide("요구사항 수정", "TASK-02 완료 기준을 확인할 수 있게 고쳐 주세요");
-		assertThat(flow.currentStepId()).isEqualTo("step25");
-		flow.step("step25");
+		assertThat(flow.currentStepId()).isEqualTo("step30");
+		flow.step("step30");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step04");
@@ -139,7 +140,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		String designPath = design.toString().replace("\\", "/");
 		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + designPath + "\", \"edits\": [{\"before\": \"e.files[0];\", \"after\": \"e.files[0].rawFile;\"}]}");
 		this.chatModel.answer("{\"causes\": [\"업로드 안 됨 → Kendo 파일 객체를 그대로 보냄 → kendo.upload.min.js\"], \"changes\": [\"imageBoardView.jsp: rawFile 전송\"],"
-			+ " \"designChanges\": [], \"verification\": [\"코드만 읽음: 업로드 후 테이블 행을 확인\"], \"unresolved\": [], \"compiled\": true, \"designSynced\": true}");
+			+ " \"designChanges\": [], \"verification\": [\"코드만 읽음: 업로드 후 테이블 행을 확인\"], \"unresolved\": [], \"reproduced\": \"못 함 - 테스트\", \"compiled\": true, \"designSynced\": true}");
 
 		WorkflowStepper flow = this.atStep("step17");
 		flow.step("step17");

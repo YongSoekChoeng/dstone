@@ -642,16 +642,20 @@ public class WorkFlowExecutionService extends BaseService {
 		List<Map<String, Object>> decisions = WorkFlowContext.decisions(context);
 		for (int i = decisions.size() - 1; i >= 0; i--) {
 			Object to = decisions.get(i).get("to");
-			StepDefinition receiver = to == null ? null : workflow.receiverOf(to.toString());
-			if (receiver != null && receiver.id().equals(fromStep)) {
-				return decisions.get(i);
+			if (to == null) {
+				continue;
+			}
+			for (StepDefinition receiver : workflow.receiversOf(to.toString())) {
+				if (receiver.id().equals(fromStep)) {
+					return decisions.get(i);
+				}
 			}
 		}
 		return null;
 	}
 
 	/**
-	 * 흐름이 target으로 갔을 때 일을 받는 곳을 사람이 읽는 글로 돌려줍니다(문서를 읽는 TOOL step은 건너뜀).
+	 * 흐름이 target으로 갔을 때 일을 받는 곳을 사람이 읽는 글로 돌려줍니다(문서를 읽는 TOOL step은 건너뛰고, 갈릴 수 있으면 "또는"으로 잇습니다).
 	 *
 	 * @param workflow Workflow 정의입니다.
 	 * @param target   route가 가리키는 곳(step id, END, FAIL)입니다.
@@ -663,12 +667,12 @@ public class WorkFlowExecutionService extends BaseService {
 		if (Constants.WorkFlow.FAIL_SENTINEL.equals(target)) {
 			return "실패로 끝냄(FAIL)";
 		}
-		StepDefinition receiver = workflow.receiverOf(target);
-		if (receiver == null) {
-			return target;
+		List<String> labels = new ArrayList<>();
+		for (StepDefinition receiver : workflow.receiversOf(target)) {
+			String ref = StepDefinition.refOf(receiver);
+			labels.add(receiver.id() + (StringUtil.isEmpty(receiver.name()) ? "" : " " + receiver.name()) + (StringUtil.isEmpty(ref) ? "" : " · " + ref));
 		}
-		String ref = StepDefinition.refOf(receiver);
-		return receiver.id() + (StringUtil.isEmpty(receiver.name()) ? "" : " " + receiver.name()) + (StringUtil.isEmpty(ref) ? "" : " · " + ref);
+		return labels.isEmpty() ? target : String.join(" 또는 ", labels);
 	}
 
 	/**

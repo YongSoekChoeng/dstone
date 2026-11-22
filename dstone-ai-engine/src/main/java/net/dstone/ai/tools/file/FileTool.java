@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.config.ConfigTool;
 import net.dstone.ai.common.consts.Constants;
 
 /**
@@ -294,28 +295,36 @@ public class FileTool {
 	 * <pre>
 	 * 파일을 읽습니다. 너무 크면 앞부분만 주고 잘렸다는 안내를 붙입니다.
 	 *
-	 * maxChars를 비우면 설정값(기본 30000자)까지 읽습니다.
-	 * TOOL step이 문서를 통째로 다음 Agent에 넘길 때는 maxChars를 크게 줍니다.
+	 * - maxChars를 비우면: 설정값(기본 30000자)까지 읽고, 넘으면 앞부분과 안내를 줍니다.
+	 * - maxChars를 적으면: "통째로 필요하다"는 뜻입니다. 넘으면 자르지 않고 "실패: ..."로 답합니다.
+	 * TOOL step이 문서를 통째로 다음 Agent에 넘길 때 maxChars를 적습니다.
 	 * 문서가 잘린 채 넘어가면 Agent가 없는 부분을 지어내려다 같은 생각만 되풀이하기 때문입니다
 	 * (2026-11-19, sm-workflow 개발 step이 30000자에서 잘린 설계서를 받고 출력 한도를 다 쓴 일).
-	 * 다만 엔진은 모든 Tool 결과를 dstone.ai.tool.max-result-chars(기본 60000자)에서 한 번 더 자르므로, 그보다 크게 줘도 소용이 없습니다.
+	 * 엔진은 Tool 결과를 dstone.ai.tool.max-result-chars(기본 60000자)에서 한 번 더 자릅니다.
+	 * 그래서 maxChars를 그보다 크게 적어도, 그 값을 넘는 파일은 실패입니다.
 	 * </pre>
 	 *
 	 * @param fileFullPath 읽을 파일의 절대경로
-	 * @param maxChars     돌려줄 최대 글자 수. 비우거나 0 이하면 설정값
+	 * @param maxChars     통째로 받을 수 있는 최대 글자 수. 비우거나 0 이하면 설정값까지만 읽음
 	 */
 	@Tool(description = "절대경로 fileFullPath의 파일을 읽어서 파일내용을 스트링형식으로 반환한다. 사용자가 '파일 읽기' 등을 요청할 때 사용한다. "
-		+ "파일이 크면 앞부분만 반환하고 잘렸다는 안내를 붙인다. 로그처럼 끝부분이 중요한 큰 파일은 readFileTail을 사용한다. 같은 파일을 다시 읽지 마라.")
+		+ "maxChars를 비우면 큰 파일은 앞부분만 반환하고 잘렸다는 안내를 붙인다. 로그처럼 끝부분이 중요한 큰 파일은 readFileTail을 사용한다. 같은 파일을 다시 읽지 마라.")
 	public String readFile(
 			@ToolParam(description = "읽을 파일의 절대경로(파일명 포함)") String fileFullPath,
-			@ToolParam(required = false, description = "돌려줄 최대 글자 수. 보통은 비워 둔다(설정값을 쓴다)") Integer maxChars) {
+			@ToolParam(required = false, description = "파일을 통째로 받아야 할 때만 적는 최대 글자 수. 파일이 이보다 크면 자르지 않고 실패한다. 보통은 비워 둔다") Integer maxChars) {
 		String contents = this.readOrNull(fileFullPath);
 		if (contents == null) {
 			return CANNOT_READ_MESSAGE + fileFullPath;
 		}
-		int limit = (maxChars != null && maxChars.intValue() > 0)
-			? maxChars.intValue()
-			: this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
+		if (maxChars != null && maxChars.intValue() > 0) {
+			int whole = Math.min(maxChars.intValue(), this.maxResultChars());
+			if (contents.length() > whole) {
+				return "실패: 파일이 " + contents.length() + "자라서 통째로 읽을 수 없습니다(상한 " + whole + "자 = maxChars와 "
+					+ Constants.Tool.POLICY_PREFIX + ".max-result-chars 가운데 작은 값). 파일을 줄이거나 두 값을 올리십시오: " + fileFullPath;
+			}
+			return contents;
+		}
+		int limit = this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
 		if (contents.length() <= limit) {
 			return contents;
 		}
@@ -1677,6 +1686,12 @@ public class FileTool {
 			return defaultValue;
 		}
 		return value.intValue();
+	}
+
+	/** 엔진이 Tool 결과를 자르는 글자 수입니다(dstone.ai.tool.max-result-chars). */
+	private int maxResultChars() {
+		Integer value = this.environment.getProperty(Constants.Tool.POLICY_PREFIX + ".max-result-chars", Integer.class);
+		return value == null || value.intValue() <= 0 ? ConfigTool.DEFAULT_MAX_RESULT_CHARS : value.intValue();
 	}
 
 }

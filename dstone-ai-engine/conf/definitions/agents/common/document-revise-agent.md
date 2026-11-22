@@ -3,7 +3,7 @@
 # 문서를 처음 쓰는 Agent와 나눈 이유: 처음 쓰는 일(조사하고 작성)과 고치는 일(지시받은 곳만 수정)은 성격이 달라서,
 # 한 프롬프트에 둘을 넣으면 고칠 때도 처음처럼 조사하다 한도를 다 썼습니다(2026-11-20 실행 9294e45d).
 # 고치는 방법·조사 방법·지시 읽는 법은 Skill로 미리 넣습니다(skills.preload). 기술별 관례는 필요할 때 부릅니다(skills.allowed).
-# 쓰는 곳: workflows/sm/sm-workflow.yml step18~20
+# 쓰는 곳: workflows/sm/sm-workflow.yml step23~25, 27, 29, 30
 id: document-revise-agent
 version: 1.2.0
 description: 이미 있는 문서를 instruction(사람의 지시)대로 고친다. 지시받은 부분만 고치고 나머지는 그대로 둔다. 필요하면 소스와 DB를 읽어 확인한다.

@@ -5,6 +5,7 @@
 # 문서는 LLM이 아니라 TOOL step이 읽어서 Agent의 입력으로 넘깁니다. 읽으려고 LLM을 한 번 더 부르지 않으려는 것입니다.
 # 파일이 없으면 TOOL step이 실패하므로, 앞 step이 문서를 저장하지 못한 채 다음으로 넘어가지 않습니다.
 # 문서를 읽는 step은 maxChars: 60000으로 읽습니다(엔진의 Tool 결과 상한 max-result-chars와 같은 값).
+# 그보다 크면 잘라서 넘기지 않고 실패로 멈춥니다. 문서를 줄이거나 두 값을 올린 뒤 이어서 실행합니다.
 #
 # 사람의 승인 의견과 검토 판정은 엔진이 전달합니다(2.0.0, 2026-11-20).
 #   instruction: ${arrival:}    이 step으로 오게 만든 마지막 결정(승인 결정과 의견, 또는 리뷰 판정과 사유)
@@ -12,8 +13,12 @@
 # route를 새로 이어도 이 두 줄은 고칠 필요가 없습니다. 읽는 법은 Skill handling-instructions에 있습니다.
 #
 # 문서를 고치는 일과 새로 쓰는 일은 다른 Agent가 합니다.
-#   [~ 수정]      document-revise-agent가 기존 문서에서 지시받은 부분만 고칩니다(step23~25).
-#   [~ 다시 작성]  그 문서를 만든 Agent가 처음부터 다시 씁니다.
+#   [~ 수정]      document-revise-agent가 기존 문서에서 지시받은 부분만 고칩니다(step23~25, step30).
+#   [~ 다시 작성]  그 문서를 만든 Agent가 처음부터 다시 씁니다. 사람이 고를 때만 그렇게 합니다.
+# 앞 문서가 바뀌어도 뒤 문서를 새로 쓰지 않습니다(2.3.0). 새로 쓰면 재개발·전문가 해결로 고친 것이 사라집니다.
+#   step28: 영향도분석서가 있으면 step29가 맞춰 고치고, 없으면 step07이 씁니다.
+#   step26: 설계서가 있으면 step27이 맞춰 고치고, 없으면 step10이 씁니다.
+#   파일이 있는지만 보려고 readFileLines로 첫 줄을 읽습니다. 처음 실행 때 이 두 step이 실패로 남는 것은 정상입니다.
 #
 # 개발 결과는 작업 폴더의 dev-resources에 "원본 소스 루트 기준 같은 경로"로 쌓입니다(원본은 건드리지 않습니다).
 # 원본에서 지워야 하는 파일은 dev-resources/_delete-files.txt에 한 줄에 하나씩 적습니다.
@@ -37,7 +42,7 @@
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.2.0
+version: 2.3.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -114,7 +119,7 @@ steps:
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
-    next: step07
+    next: step28
     onFailure: step06
 
   - id: step06
@@ -124,8 +129,9 @@ steps:
       approverRole: PL
     save: reviewDecision
     routes:
-      그대로 진행: step07
-      요구사항 수정: step25
+      그대로 진행: step28
+      요구사항 수정: step30
+      다시 리뷰: step04
       중지: FAIL
 
   - id: step07
@@ -162,7 +168,7 @@ steps:
       fileFullPath: ${input}/${state.now}/02.impact.md
       maxChars: 60000
     save: impact
-    next: step10
+    next: step26
     onFailure: FAIL
 
   - id: step10
@@ -188,6 +194,7 @@ steps:
     routes:
       승인(개발진행): step12
       설계 수정: step23
+      설계 다시 작성: step10
       영향도 수정: step24
       중지: FAIL
 
@@ -219,6 +226,8 @@ steps:
     tool: deleteDir
     with:
       fileFullPath: ${input}/${state.now}/dev-resources
+    # 폴더를 비우면 지난 컴파일 오류도 옛것이다. 성공하면 saveError가 compileError를 비운다.
+    saveError: compileError
     next: step15
 
   - id: step15
@@ -368,6 +377,91 @@ steps:
       history: ${decisions:}
     save: revision
     next: step04
+
+  - id: step26
+    name: 기존 설계서 확인
+    type: TOOL
+    tool: readFileLines
+    with:
+      fileFullPath: ${input}/${state.now}/03-1.design.md
+      startLine: 1
+      endLine: 1
+    next: step27
+    onFailure: step10
+
+  - id: step27
+    name: 기존 설계서 맞춤
+    type: AGENT
+    agent: document-revise-agent
+    with:
+      documents:
+        - ${input}/${state.now}/03-1.design.md
+        - ${input}/${state.now}/03-2.taskitems.md
+        - ${input}/${state.now}/03-3.ddl(데이터베이스).md
+      request: ${state.request}
+      instruction: |-
+        reference에 있는 요구사항분석서와 영향도분석서의 지금 내용에 설계 문서를 맞춘다.
+        두 문서와 어긋나는 곳과 빠진 곳만 고친다. 재개발과 전문가 해결로 고친 내용('## 수정 이력')은 두 문서와 어긋나지 않는 한 그대로 둔다.
+        아래는 이 일로 오게 한 결정이다. 의견이 있으면 함께 반영한다.
+        ${arrival:}
+      history: ${decisions:}
+      reference: |-
+        [요구사항분석서]
+        ${state.requirement}
+
+        [영향도분석서]
+        ${state.impact}
+    save: revision
+    next: step11
+
+  - id: step28
+    name: 기존 영향도분석서 확인
+    type: TOOL
+    tool: readFileLines
+    with:
+      fileFullPath: ${input}/${state.now}/02.impact.md
+      startLine: 1
+      endLine: 1
+    next: step29
+    onFailure: step07
+
+  - id: step29
+    name: 기존 영향도분석서 맞춤
+    type: AGENT
+    agent: document-revise-agent
+    with:
+      documents:
+        - ${input}/${state.now}/02.impact.md
+      request: ${state.request}
+      instruction: |-
+        reference에 있는 요구사항분석서의 지금 내용에 영향도분석서를 맞춘다.
+        어긋나는 곳과 빠진 곳만 고치고, 나머지는 그대로 둔다.
+        아래는 이 일로 오게 한 결정이다. 의견이 있으면 함께 반영한다.
+        ${arrival:}
+      history: ${decisions:}
+      reference: |-
+        [요구사항분석서]
+        ${state.requirement}
+    save: revision
+    next: step08
+
+  - id: step30
+    name: 리뷰 지적에 따른 요구사항 수정
+    type: AGENT
+    agent: document-revise-agent
+    with:
+      documents:
+        - ${input}/${state.now}/01.customer_requirement.md
+      request: ${state.request}
+      # 사람의 결정이 arrival을 차지하므로 리뷰어의 지적은 따로 붙인다.
+      instruction: |-
+        ${arrival:}
+
+        리뷰어의 지적(사람의 의견과 어긋나면 사람의 의견을 따른다):
+        ${state.review.reason:}
+      history: ${decisions:}
+    save: revision
+    next: step04
 state:
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
@@ -382,8 +476,8 @@ state:
   developApproval: 개발 승인(step17) 결과
   impactPath: 영향도 분석(step07)이 돌려준 답(저장 파일과 결정 필요 사항)
   architectPath: 아키텍처 설계(step10)가 돌려준 답(저장 파일과 결정 필요 사항)
-  revision: 문서 수정(step23~25)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
+  revision: 문서 수정(step23~25, 27, 29, 30)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
   sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
   compileResult: 컴파일 확인(step16)이 통과했을 때의 출력
-  compileError: 컴파일 확인(step16)이 실패했을 때의 오류(통과하면 비어 있다)
+  compileError: 컴파일 확인(step16)이 실패했을 때의 오류(통과하거나 step14가 개발 폴더를 비우면 비어 있다)
   troubleshoot: 전문가 해결(step22)이 돌려준 답(원인과 근거, 고친 것, 설계서와 달라진 점, 못 푼 것)

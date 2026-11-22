@@ -47,7 +47,21 @@ class FileToolReadTest {
 	@Test
 	void maxChars를_주면_그만큼_읽는다() {
 		assertThat(this.tool.readFile(this.file.toString(), Integer.valueOf(100))).isEqualTo("0123456789ABCDEFGHIJ");
-		assertThat(this.tool.readFile(this.file.toString(), Integer.valueOf(15))).startsWith("0123456789ABCDE\n").contains("앞 15자만");
+	}
+
+	@Test
+	void maxChars보다_크면_자르지_않고_실패한다() {
+		assertThat(this.tool.readFile(this.file.toString(), Integer.valueOf(20))).isEqualTo("0123456789ABCDEFGHIJ");
+		assertThat(this.tool.readFile(this.file.toString(), Integer.valueOf(19))).startsWith("실패:").contains("20자", "상한 19자").doesNotContain("0123456789");
+	}
+
+	@Test
+	void maxChars가_엔진의_결과_상한보다_커도_상한을_넘으면_실패한다() {
+		MockEnvironment environment = new MockEnvironment();
+		environment.setProperty("dstone.ai.tool.max-result-chars", "12");
+		ReflectionTestUtils.setField(this.tool, "environment", environment);
+
+		assertThat(this.tool.readFile(this.file.toString(), Integer.valueOf(100))).startsWith("실패:").contains("상한 12자");
 	}
 
 	@Test

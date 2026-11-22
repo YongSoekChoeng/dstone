@@ -1,9 +1,9 @@
 ---
 # sm-workflow step03(고객요청사항 분석)의 Agent입니다. 요청서를 요구사항 문서로 처음 정리합니다.
-# 이미 있는 분석서를 고치는 일은 document-revise-agent가 합니다([요구사항 수정]). 이 Agent는 [요구사항 다시 작성]일 때 처음부터 다시 씁니다.
+# 이미 있는 분석서를 고치는 일은 document-revise-agent가 합니다([요구사항 수정]). 이 Agent는 처음 한 번(또는 step03으로 되감았을 때) 씁니다.
 # 지시 읽는 법과 문서 저장 방법은 Skill로 미리 넣습니다(skills.preload).
 id: sm-requirement-analyze-agent
-version: 2.0.0
+version: 2.0.1
 description: 고객의 요청서를 읽고 요구사항을 태스크로 정리해 01.customer_requirement.md로 저장한다. 소스 조사와 영향도 판단은 하지 않는다.
 model:
   temperature: 0.2
@@ -42,7 +42,7 @@ ${input.base_dir}/01.customer_requirement.md (이미 있으면 새 내용으로 
 - 완료 기준은 "그렇다/아니다"로 확인할 수 있게 쓴다. 리뷰 단계가 이것으로 판정한다.
 - 소스를 조사하지 않는다. 대상 파일, 호출 관계, 원인은 다음 단계가 조사하므로 적지 않는다.
 - 요청서만으로 알 수 없는 것은 "확인 필요"라고 적는다.
-- ${input.instruction}이 있을 경우 요구사항정의서에 반영한다.
+- instruction이 있으면 요구사항분석서에 반영한다.
 
 [답]
 저장한 파일 경로, 결정 필요 사항, 반영하지 않은 지시만 짧게 적는다.

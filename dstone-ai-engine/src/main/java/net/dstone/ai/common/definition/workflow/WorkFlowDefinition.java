@@ -1,7 +1,10 @@
 package net.dstone.ai.common.definition.workflow;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -115,33 +118,47 @@ public record WorkFlowDefinition(
 
 	/**
 	 * <pre>
-	 * 흐름이 stepId로 갔을 때 그 일을 처음 받는 step을 돌려줍니다. TOOL step은 문서를 읽는 것 같은 준비 단계라서 건너뛰고,
-	 * 성공했을 때 가는 곳(next, 없으면 목록상 다음 step)을 따라가 TOOL이 아닌 첫 step을 찾습니다.
-	 * END, FAIL이거나 찾지 못하면(없는 id, TOOL끼리 도는 고리) null입니다.
+	 * 흐름이 stepId로 갔을 때 그 일을 처음 받을 수 있는 step들을 돌려줍니다.
+	 * TOOL step은 문서를 읽는 것 같은 준비 단계라서 건너뜁니다. 이때 성공 길(next, 없으면 목록상 다음 step)과
+	 * 실패 길(onFailure)을 둘 다 따라갑니다. "파일이 있으면 고치고, 없으면 새로 쓴다"처럼 TOOL step이 길을 가르기도 하고,
+	 * 어느 길로 가든 사람의 결정(arrival)은 그대로 전해지기 때문입니다.
+	 *
+	 * 성공 길에서 찾은 step이 앞에 옵니다. END, FAIL이거나 찾지 못하면(없는 id, TOOL끼리 도는 고리) 빈 목록입니다.
 	 *
 	 * 승인 화면이 "이 결정을 고르면 누가 받는가"를 보여 줄 때와, 되감을 때 그 step으로 오게 했던 결정을 되살릴 때 씁니다.
 	 * </pre>
 	 *
 	 * @param stepId 흐름이 가는 곳(step id, END, FAIL)
 	 */
-	public StepDefinition receiverOf(String stepId) {
-		String current = stepId;
-		for (int guard = 0; guard <= this.steps.size(); guard++) {
-			int index = this.indexOf(current);
-			if (index < 0) {
-				return null;
-			}
-			StepDefinition step = this.steps.get(index);
-			if (!(step instanceof ToolStepDefinition)) {
-				return step;
-			}
-			String next = StepDefinition.nextOf(step);
-			if (next == null) {
-				next = index + 1 < this.steps.size() ? this.steps.get(index + 1).id() : null;
-			}
-			current = next;
+	public List<StepDefinition> receiversOf(String stepId) {
+		List<StepDefinition> receivers = new ArrayList<>();
+		this.collectReceivers(stepId, new HashSet<String>(), receivers);
+		return receivers;
+	}
+
+	/**
+	 * stepId부터 TOOL step을 건너뛰며 일을 받을 step을 모읍니다.
+	 *
+	 * @param stepId    지금 볼 곳
+	 * @param visited   이미 본 step id(고리에서 멈추려고)
+	 * @param receivers 찾은 step을 담을 목록
+	 */
+	private void collectReceivers(String stepId, Set<String> visited, List<StepDefinition> receivers) {
+		int index = this.indexOf(stepId);
+		if (index < 0 || !visited.add(stepId)) {
+			return;
 		}
-		return null;
+		StepDefinition step = this.steps.get(index);
+		if (!(step instanceof ToolStepDefinition)) {
+			receivers.add(step);
+			return;
+		}
+		String next = StepDefinition.nextOf(step);
+		if (next == null && index + 1 < this.steps.size()) {
+			next = this.steps.get(index + 1).id();
+		}
+		this.collectReceivers(next, visited, receivers);
+		this.collectReceivers(step.onFailure(), visited, receivers);
 	}
 
 	/** step id가 목록의 몇 번째인지 돌려줍니다. 없으면(END, FAIL, null 포함) -1입니다. */

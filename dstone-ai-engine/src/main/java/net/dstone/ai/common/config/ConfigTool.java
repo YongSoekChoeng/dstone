@@ -71,7 +71,7 @@ public class ConfigTool extends BaseObject {
 	private ToolCallGate toolCallGate;
 
 	/** 설정이 없을 때 쓰는 Tool (한건당)호출 결과 글자 수 상한입니다(대략 2만 토큰 안팎). */
-	private static final int DEFAULT_MAX_RESULT_CHARS = 60000;
+	public static final int DEFAULT_MAX_RESULT_CHARS = 60000;
 
 	private ToolCallbackProvider toolCallbackProvider;
 
