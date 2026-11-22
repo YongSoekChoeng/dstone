@@ -108,7 +108,12 @@ spring:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
                      # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash | qwen/qwen3.8-27b | openai/gpt-oss-120b
                      model: qwen/qwen3.8-27b
-                     temperature: 0.4
+                     # temperature 0.6: Qwen3 모델 카드가 생각(thinking) 모드에 권하는 값. 낮은 temperature는 끝없는 반복을 부를 수 있다고 경고한다.
+                     # presence-penalty: 이미 나온 토큰을 다시 쓰면 불이익(0~2). 같은 문장을 수만 토큰 되풀이하던 일을 막으려고 넣었다(2026-11-22).
+                     # top_p 0.95 / top_k 20(카드 권장)은 넣지 않는다. 설계 Agent가 설계서에서 코드를 빼고 설명만 쓰게 됐다(평가 측정, .claude/docs/ai-engine-tuning.md).
+                     # frequency-penalty도 넣지 않는다. 같은 단어가 원래 많은 코드·SQL을 망칠 수 있다.
+                     temperature: 0.6
+                     presence-penalty: 1.0
                      max-tokens: 60000
              # timeout / max-retries: Spring AI의 기본값은 60초 / 3회다. Tool 호출이 여러 번 붙은 요청은 응답이
              # timeout : LLM호출 타임아웃.
