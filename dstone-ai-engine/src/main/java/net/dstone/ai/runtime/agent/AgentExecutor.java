@@ -42,6 +42,7 @@ import net.dstone.ai.common.definition.skill.SkillDefinition;
 import net.dstone.ai.common.expression.ContextResolver;
 import net.dstone.ai.common.expression.PromptText;
 import net.dstone.ai.common.exception.AgentContractException;
+import net.dstone.ai.common.exception.EmptyAnswerException;
 import net.dstone.ai.common.exec.ExecContext;
 import net.dstone.ai.common.registry.AgentRegistry;
 import net.dstone.ai.common.registry.SkillRegistry;
@@ -171,7 +172,9 @@ public class AgentExecutor extends BaseObject {
 		String userMessage = this.toUserMessage(agent, input);
 		// 답이 계약(output 모양 등)을 지키지 않았을 때만 다시 부릅니다(execution.onInvalidOutput: RETRY, maxAttempts).
 		// 넣는 값이 틀린 것은 다시 불러도 같으므로 위에서 바로 실패하고, 외부 연결 오류 같은 예외는 잡지 않고 그대로 올려보냅니다.
+		// 빈 답(EmptyAnswerException)은 모델이 가끔 내는 사고라서 Agent 설정과 상관없이 한 번은 더 부릅니다.
 		int maxAttempts = agent.maxAttempts();
+		boolean emptyRetried = false;
 		AgentContractException last = null;
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			SubAgentTasks tasks = this.newTasks(agent);
@@ -187,6 +190,10 @@ public class AgentExecutor extends BaseObject {
 				return answer;
 			} catch (AgentContractException e) {
 				last = e;
+				if (e instanceof EmptyAnswerException && !emptyRetried && attempt == maxAttempts) {
+					emptyRetried = true;
+					maxAttempts++;
+				}
 				if (attempt < maxAttempts) {
 					this.info("agent[" + agent.id() + "]의 답이 계약과 맞지 않아 다시 부릅니다(" + attempt + "/" + maxAttempts + "): " + e.getMessage());
 				}
@@ -451,7 +458,28 @@ public class AgentExecutor extends BaseObject {
 			throw new AgentContractException("LLM이 답을 쓰기 전에 출력 토큰 한도(max-tokens)를 다 썼습니다(finishReason=LENGTH" + usedTokens + "). "
 				+ "추론이 길어져서 생기는 일입니다. max-tokens를 올리거나, Agent가 긴 계산(줄 세기 등)이나 긴 고민을 머릿속으로 하지 않도록 Tool과 prompt를 고치십시오.");
 		}
+		if (text != null && StringUtil.isEmpty(text.strip())) {
+			// 답도 Tool 호출도 없이 끝났습니다. Tool 호출을 추론 글에 써 버린 경우가 많아서, 추론 글의 끝을 함께 남깁니다.
+			throw new EmptyAnswerException("모델이 빈 답을 냈습니다(finishReason=" + finishReason + "). Tool 호출을 실제 호출 대신 추론 글에 쓰고 멈춘 경우가 많습니다."
+				+ this.reasoningTail(response));
+		}
 		return text;
+	}
+
+	/** 빈 답 사유에 붙일 추론 글 끝부분의 최대 글자 수입니다. */
+	private static final int REASONING_TAIL_CHARS = 300;
+
+	/** 응답의 추론 글(reasoningContent) 끝부분을 " 추론 글 끝: …" 모양으로 돌려줍니다. 없으면 빈 글자입니다. */
+	private String reasoningTail(ChatResponse response) {
+		Object reasoning = response.getResult().getOutput().getMetadata() == null ? null : response.getResult().getOutput().getMetadata().get("reasoningContent");
+		if (reasoning == null || StringUtil.isEmpty(reasoning.toString().strip())) {
+			return "";
+		}
+		String value = reasoning.toString().strip();
+		if (value.length() > REASONING_TAIL_CHARS) {
+			value = "…" + value.substring(value.length() - REASONING_TAIL_CHARS);
+		}
+		return " 추론 글 끝: " + value;
 	}
 
 	/**
