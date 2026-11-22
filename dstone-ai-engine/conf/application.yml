@@ -247,6 +247,27 @@ dstone:
                 allowed-commands:
                     - name: test-server-deploy
                       path: ${TEST_SERVER_DEPLOY_SCRIPT:}
+            # 원본 + 개발 결과로 임시 시험 서버를 띄우고 내리는 Tool(tools.build.TestServerTool, startTestServer/stopTestServer) 설정.
+            # 사본은 {work-root}/{프로젝트ID}-server/app 에 두고 다음에 다시 쓴다(처음만 전체 복사). 서버는 띄운 step이 끝나면 내려간다.
+            # Maven 프로젝트(tomcat7/tomcat6, spring-boot, jetty 플러그인)만 띄운다. 사본은 원본 설정 그대로 원래 DB에 붙는다.
+            test-server:
+                # 비우면 {사용자 홈}/.dstone-ai-engine
+                work-root: ${TEST_SERVER_WORK_ROOT:}
+                # WAR 프로젝트를 올릴 설치된 Tomcat(CATALINA_HOME). 이것을 함께 쓰되 사본 폴더에 전용 CATALINA_BASE를 만들어 빈 포트로 띄운다.
+                # 비우면 WAR도 pom의 tomcat/jetty 플러그인으로 띄운다(앱에 따라 서블릿 API가 부딪쳐 못 뜰 수 있다).
+                tomcat-home: ${TEST_SERVER_TOMCAT_HOME:}
+                # Maven 실행 파일(PATH에서 찾는다). Windows는 cmd.exe /c 로 감싸 부른다.
+                maven-command: ${TEST_SERVER_MAVEN_COMMAND:mvn}
+                # 빌드와 기동을 기다리는 시간. 처음에는 의존성을 받느라 오래 걸릴 수 있다.
+                start-timeout-seconds: 600
+                # 같은 프로젝트를 다른 실행이 쓰고 있을 때 기다리는 시간
+                lock-wait-seconds: 60
+                # Java 버전별 JDK 경로. 버전은 프로젝트 관리의 Java 버전 → 원본 pom.xml → 원본 클래스 파일 순서로 정한다.
+                # 경로는 서버(PC)마다 달라서 DB가 아니라 env*.properties에 둔다. 비어 있으면 엔진과 같은 JDK로 띄운다.
+                java-home-8: ${JAVA_HOME_8:}
+                java-home-11: ${JAVA_HOME_11:}
+                java-home-17: ${JAVA_HOME_17:}
+                java-home-21: ${JAVA_HOME_21:}
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를
             # 채우는 것 자체가 곧 "이 Tool을 켠 상태"다. api-token은 DB 비밀번호와 동일한 ENC(...)

@@ -167,12 +167,17 @@ CREATE TABLE IF NOT EXISTS ai_management_project (
     SOURCE_DIR        VARCHAR(1000),
     SCM_TYPE          VARCHAR(20),
     SCM_URL           VARCHAR(1000),
+    JAVA_VERSION      VARCHAR(10),
     USE_YN            CHAR(1)       NOT NULL DEFAULT 'Y',
     CREATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
     CREATED_BY        VARCHAR(50),
     UPDATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
     UPDATED_BY        VARCHAR(50)
 );
+-- 2026-11-22 추가. 이미 만든 DB 에도 다시 실행하면 붙는다.
+-- 임시 시험 서버(tools.build.TestServerTool)를 띄울 Java 버전(예: 8, 17). JDK 경로는 서버마다 다르므로 env*.properties 의 JAVA_HOME_<버전>에 둔다.
+-- 비우면 원본 pom.xml 이나 클래스 파일에서 읽는다.
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS JAVA_VERSION VARCHAR(10);
 CREATE TABLE IF NOT EXISTS ai_management_project_db (
     PROJECT_ID        VARCHAR(50)   NOT NULL REFERENCES ai_management_project(PROJECT_ID) ON DELETE CASCADE,
     DB_SEQ            INT           NOT NULL,

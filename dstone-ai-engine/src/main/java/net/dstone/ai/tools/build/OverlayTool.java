@@ -126,7 +126,8 @@ public class OverlayTool extends BaseObject {
 				String rel = from.relativize(file).toString().replace(File.separatorChar, '/');
 				expected.add(rel);
 				Path dest = to.resolve(rel);
-				if (Files.exists(dest) && Files.size(dest) == attrs.size() && Files.getLastModifiedTime(dest).equals(attrs.lastModifiedTime())) {
+				// 수정 시각은 밀리초까지만 비교한다. 복사본에는 파일 시스템에 따라 마이크로초까지만 남아서(원본은 나노초), 그대로 비교하면 늘 달라 매번 전부 복사한다.
+				if (Files.exists(dest) && Files.size(dest) == attrs.size() && Files.getLastModifiedTime(dest).toMillis() == attrs.lastModifiedTime().toMillis()) {
 					return FileVisitResult.CONTINUE;
 				}
 				Files.createDirectories(dest.getParent());

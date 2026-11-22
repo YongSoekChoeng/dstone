@@ -8,7 +8,7 @@
 
     <select id="selectProjectList" resultType="java.util.LinkedHashMap">
         SELECT P.PROJECT_ID AS "projectId", P.PROJECT_NAME AS "projectName", P.DESCRIPTION AS "description", P.SOURCE_DIR AS "sourceDir",
-               P.SCM_TYPE AS "scmType", P.SCM_URL AS "scmUrl", P.USE_YN AS "useYn", P.UPDATED_AT AS "updatedAt", P.UPDATED_BY AS "updatedBy",
+               P.SCM_TYPE AS "scmType", P.SCM_URL AS "scmUrl", P.JAVA_VERSION AS "javaVersion", P.USE_YN AS "useYn", P.UPDATED_AT AS "updatedAt", P.UPDATED_BY AS "updatedBy",
                (SELECT COUNT(*) FROM ai_management_project_db D WHERE D.PROJECT_ID = P.PROJECT_ID) AS "dbCount"
           FROM ai_management_project P
          ORDER BY P.PROJECT_ID
@@ -16,7 +16,7 @@
 
     <select id="selectProject" parameterType="string" resultType="java.util.LinkedHashMap">
         SELECT PROJECT_ID AS "projectId", PROJECT_NAME AS "projectName", DESCRIPTION AS "description", SOURCE_DIR AS "sourceDir",
-               SCM_TYPE AS "scmType", SCM_URL AS "scmUrl", USE_YN AS "useYn"
+               SCM_TYPE AS "scmType", SCM_URL AS "scmUrl", JAVA_VERSION AS "javaVersion", USE_YN AS "useYn"
           FROM ai_management_project
          WHERE PROJECT_ID = #{projectId}
     </select>
@@ -46,11 +46,11 @@
     </select>
 
     <insert id="upsertProject" parameterType="java.util.Map">
-        INSERT INTO ai_management_project (PROJECT_ID, PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, USE_YN, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
-        VALUES (#{projectId}, #{projectName}, #{description}, #{sourceDir}, #{scmType}, #{scmUrl}, #{useYn}, now(), #{by}, now(), #{by})
+        INSERT INTO ai_management_project (PROJECT_ID, PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, USE_YN, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
+        VALUES (#{projectId}, #{projectName}, #{description}, #{sourceDir}, #{scmType}, #{scmUrl}, #{javaVersion}, #{useYn}, now(), #{by}, now(), #{by})
         ON CONFLICT (PROJECT_ID) DO UPDATE
            SET PROJECT_NAME = EXCLUDED.PROJECT_NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, SOURCE_DIR = EXCLUDED.SOURCE_DIR,
-               SCM_TYPE = EXCLUDED.SCM_TYPE, SCM_URL = EXCLUDED.SCM_URL, USE_YN = EXCLUDED.USE_YN, UPDATED_AT = now(), UPDATED_BY = EXCLUDED.UPDATED_BY
+               SCM_TYPE = EXCLUDED.SCM_TYPE, SCM_URL = EXCLUDED.SCM_URL, JAVA_VERSION = EXCLUDED.JAVA_VERSION, USE_YN = EXCLUDED.USE_YN, UPDATED_AT = now(), UPDATED_BY = EXCLUDED.UPDATED_BY
     </insert>
 
     <delete id="deleteProjectDbs" parameterType="string">

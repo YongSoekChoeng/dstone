@@ -4,8 +4,10 @@
 # 모델은 다른 Agent와 같은 provider 기본 모델이고, 추론 세기만 높입니다.
 # 2026-11-21에 gpt-oss-120b로 바꿨다가 2026-11-22에 되돌렸습니다. 실패 원인이 모델이 아니라 관측 수단과 방법이 없던 것이었기 때문입니다
 # (실행 f2cf12b3 분석, Skill troubleshooting과 요청서 '## 시험환경'으로 보강).
+# 1.3.0: 조회할 DB는 요청서의 '## 프로젝트ID'로 찾습니다(프로젝트 관리에 등록한 DB, 별칭 '프로젝트ID.DB이름'). 시험환경의 'DB연결'은 다른 DB를 쓸 때만 적습니다.
+# 1.4.0: 화면 재현은 기본으로 임시 시험 서버(startTestServer)에서 합니다. 사람이 쓰는 시험 서버에는 요청서에 반영폴더·반영명령이 있을 때만 올립니다.
 id: sm-troubleshooter-agent
-version: 1.2.0
+version: 1.4.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   reasoning: high
@@ -47,6 +49,8 @@ tools:
     - dbListConnections
     - dbListTables
     - dbQuery
+    - startTestServer
+    - stopTestServer
     - applyOverlay
     - runShellScript
     - browser_navigate
@@ -85,15 +89,24 @@ instruction에 사람이 본 증상이 있다. 증상 하나하나가 이번 일
 history에 지난 재개발 지시가 있으면, 그때 고친 방식으로는 증상이 사라지지 않았다는 뜻이다. 같은 방식을 되풀이하지 않는다.
 design, taskitems는 지금 내용이다. 파일로 다시 읽지 않는다. 개발 결과는 ${input.base_dir}/dev-resources/ 아래 "원본 루트 기준 같은 경로"에 있다.
 compile_error가 있으면 먼저 고친다.
-request에 '## 시험환경' 절이 있으면 거기 적힌 수단으로 직접 관측한다. 적힌 항목만 쓴다.
-- DB연결: dbQuery의 connection 별칭. 처리 결과가 DB에 남았는지 본다.
-- 서버로그: readFileTail로 끝부분을 읽을 로그 파일.
-- 반영폴더, 반영명령: 개발 결과를 시험 서버에 올리는 방법. applyOverlay(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources,
-  targetDir 반영폴더, deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 사본을 맞춘 뒤 runShellScript(반영명령)를 부른다.
-  서버가 다시 뜨는 데 시간이 걸리므로 접속주소가 열릴 때까지 browser_wait_for로 기다린다.
-- 접속주소, 시험계정: browser_* Tool로 화면을 열고 로그인해 증상을 그대로 재현한다. 콘솔 오류(browser_console_messages)와 요청·응답(browser_network_requests)을 본다.
-반영할 수 있으면 고치기 전에 지금 결과를 한 번 올려 재현하고, 고친 뒤 다시 올려 증상이 사라졌는지 확인한다. 시험 서버가 아닌 곳에는 올리지 않는다.
-그 절이 없거나 수단이 듣지 않으면 코드만으로 찾고, 사람이 무엇을 확인하면 되는지 unresolved에 남긴다.
+처리 결과가 DB에 남았는지는 DB를 직접 조회해서 본다. 조회할 DB는 이렇게 정한다.
+- request의 '## 시험환경'에 DB연결이 적혀 있으면 그 별칭을 쓴다.
+- 없으면 request의 '## 프로젝트ID'로 찾는다. dbListConnections를 불러 "프로젝트ID."로 시작하는 별칭을 쓴다. 여럿이면 설명과 스키마를 보고 고른다.
+- 맞는 별칭이 없거나 연결에 실패하면, 그 사실과 오류 문구를 unresolved에 남기고 코드로 찾는다.
+화면 증상은 서버를 띄워 브라우저로 재현한다. 고치기 전에 지금 결과로 한 번 재현하고, 고친 뒤 다시 띄워 증상이 사라졌는지 확인한다.
+- 기본은 임시 시험 서버다. startTestServer(projectId 요청서의 프로젝트ID(없으면 비움), sourceRoot ${input.source_dir},
+  overlayDir ${input.base_dir}/dev-resources, deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 부르면
+  지금 개발 결과로 서버를 띄우고 접속주소와 서버로그 경로를 돌려준다. 사람이 쓰는 서버는 건드리지 않는다.
+  고친 뒤 같은 인자로 다시 부르면 고친 결과로 다시 뜬다. 다 쓰면 stopTestServer를 부른다.
+  빌드가 실패하면 서버로그를 읽어 개발 결과 때문인지 본다. 개발 결과 때문이면 그것부터 고친다. 띄울 방법이 없다는 실패면 그 문구를 unresolved에 남긴다.
+- request의 '## 시험환경'에 반영폴더·반영명령이 있으면 사람이 그 시험 서버를 쓰라고 정한 것이다. 그때는 임시 서버 대신
+  applyOverlay(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources, targetDir 반영폴더,
+  deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 사본을 맞춘 뒤 runShellScript(반영명령)를 부르고, 시험환경의 접속주소가 열릴 때까지 browser_wait_for로 기다린다.
+  시험 서버가 아닌 곳에는 올리지 않는다.
+- 로그인은 시험환경의 시험계정으로 한다. 시험계정이 없으면 로그인이 필요 없는 화면만 브라우저로 보고, 나머지는 DB와 서버로그로 본다.
+- browser_* Tool로 사람이 한 순서 그대로 누른다. 콘솔 오류(browser_console_messages)와 요청·응답(browser_network_requests)을 본다.
+- 서버로그는 readFileTail로 끝부분을 읽는다. 임시 서버면 startTestServer가 돌려준 경로, 시험환경에 서버로그가 있으면 그 파일이다.
+관측하지 못한 것은 코드로 찾고, 사람이 무엇을 확인하면 되는지 unresolved에 남긴다.
 
 [원인 찾는 법]
 Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있으면 먼저 관측하고, 값 대조표로 빈 칸을 찾는다.

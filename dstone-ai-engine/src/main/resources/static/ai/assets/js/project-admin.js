@@ -46,7 +46,7 @@
 		editing = project;
 		document.getElementById("pj-form-title").textContent = project ? "고치기: " + project.projectId : "새로 만들기";
 		var p = project || { useYn: "Y" };
-		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "useYn"].forEach(function (key) {
+		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "javaVersion", "useYn"].forEach(function (key) {
 			document.getElementById("pj-" + key).value = p[key] == null ? "" : p[key];
 		});
 		document.getElementById("pj-projectId").readOnly = !!project;
@@ -94,7 +94,7 @@
 	document.getElementById("pj-form").addEventListener("submit", function (event) {
 		event.preventDefault();
 		var body = {};
-		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "useYn"].forEach(function (key) {
+		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "javaVersion", "useYn"].forEach(function (key) {
 			body[key] = document.getElementById("pj-" + key).value.trim();
 		});
 		body.dbs = Array.prototype.map.call(dbBody.querySelectorAll("tr"), function (tr) {

@@ -89,6 +89,9 @@ public class WorkFlowExecutor extends BaseObject {
 	private WorkFlowThreadPools threadPools;
 	@Autowired
 	private WorkFlowExecutionStore executionStore;
+	/** step이 끝날 때마다 부를 bean들입니다(예: 임시 시험 서버를 내리는 tools.build.TestServerTool). */
+	@Autowired
+	private List<StepEndListener> stepEndListeners;
 
 	/**
 	 * <pre>
@@ -233,6 +236,9 @@ public class WorkFlowExecutor extends BaseObject {
 					// 스택은 로그 파일에 남깁니다. 실행 상태에는 한 줄 메시지만 들어가서, 그것만으로는 원인을 찾기 어렵습니다.
 					this.error("step[" + step.id() + "] 실행 중 예외가 발생했습니다(executionId=" + currentExecution.executionId() + ")\n" + ProviderErrorMessage.stackTraceOf(e));
 					return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
+				} finally {
+					// step 안에서 Tool이 띄운 것을 정리할 기회를 줍니다(성공·실패·예외 모두).
+					this.notifyStepEnded(currentExecution.executionId(), step.id());
 				}
 
 				/****************************************************************************************
@@ -307,6 +313,25 @@ public class WorkFlowExecutor extends BaseObject {
 			ExecContext.getInstance().removeCurrentContext();
 		}
 		
+	}
+
+	/**
+	 * <pre>
+	 * step이 끝났다고 StepEndListener들에게 알립니다.
+	 * 리스너 하나가 실패해도 Workflow 진행은 막지 않습니다. 로그만 남깁니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 * @param stepId      끝난 step id
+	 */
+	private void notifyStepEnded(String executionId, String stepId) {
+		for (StepEndListener listener : this.stepEndListeners) {
+			try {
+				listener.stepEnded(executionId, stepId);
+			} catch (RuntimeException e) {
+				this.error("step[" + stepId + "] 종료 처리(" + listener.getClass().getSimpleName() + ")에 실패했습니다(executionId=" + executionId + ") - " + e.getMessage());
+			}
+		}
 	}
 
 	/**

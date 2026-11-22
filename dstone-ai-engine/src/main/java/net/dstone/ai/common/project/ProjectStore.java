@@ -23,7 +23,7 @@ import net.dstone.common.utils.EncUtil;
  * 프로젝트 관리(ai_management_project, ai_management_project_db)의 저장과 조회입니다. SQL은 resources/sqlmap/project/ProjectDao.xml.
  *
  * ## 테이블정의
- *   ai_management_project     PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, USE_YN
+ *   ai_management_project     PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, USE_YN
  *   ai_management_project_db  PROJECT_ID + DB_SEQ(KEY), DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, DESCRIPTION, SORT_ORDER
  *
  * 비밀번호는 EncUtil 로 암호화해 저장합니다. 화면 API(list/find)는 비밀번호를 돌려주지 않고 "있는지"만 알려 줍니다.
@@ -38,6 +38,9 @@ public class ProjectStore extends BaseDao {
 
 	/** 이름 규칙(프로젝트ID, DB 이름). DB Tool 별칭에 쓰이므로 점은 쓰지 않습니다. */
 	private static final String ID_PATTERN = "[A-Za-z0-9_-]{1,50}";
+
+	/** Java 버전 규칙(8, 11, 17, 21 처럼 숫자만). 1.8 같은 옛 표기는 받지 않습니다. */
+	private static final String JAVA_VERSION_PATTERN = "[0-9]{1,3}";
 
 	/** 형상관리 종류 */
 	public static final List<String> SCM_TYPES = List.of("GIT", "SVN", "NONE");
@@ -68,7 +71,7 @@ public class ProjectStore extends BaseDao {
 	/**
 	 * 프로젝트를 만들거나 고칩니다. DB 목록은 통째로 바꿉니다.
 	 *
-	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
+	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, javaVersion, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
 	 * @param by      작업한 사람
 	 */
 	@SuppressWarnings("unchecked")
@@ -84,6 +87,10 @@ public class ProjectStore extends BaseDao {
 		if (scmType != null && !SCM_TYPES.contains(scmType)) {
 			throw new IllegalArgumentException("형상관리 종류는 " + SCM_TYPES + " 가운데 하나입니다: " + scmType);
 		}
+		String javaVersion = text(project, "javaVersion");
+		if (javaVersion != null && !javaVersion.matches(JAVA_VERSION_PATTERN)) {
+			throw new IllegalArgumentException("Java 버전은 숫자로 넣으세요(예: 8, 17): " + javaVersion);
+		}
 		final Map<String, Object> param = new HashMap<String, Object>();
 		param.put("projectId", projectId);
 		param.put("projectName", text(project, "projectName"));
@@ -91,6 +98,7 @@ public class ProjectStore extends BaseDao {
 		param.put("sourceDir", text(project, "sourceDir"));
 		param.put("scmType", scmType);
 		param.put("scmUrl", text(project, "scmUrl"));
+		param.put("javaVersion", javaVersion);
 		param.put("useYn", "N".equals(text(project, "useYn")) ? "N" : "Y");
 		param.put("by", by);
 
