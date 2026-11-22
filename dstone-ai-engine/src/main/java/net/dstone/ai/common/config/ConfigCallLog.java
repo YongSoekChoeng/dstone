@@ -244,32 +244,32 @@ public class ConfigCallLog extends BaseObject {
 		methodName = joinPoint.getSignature().getName();
 		String calleeInfo = " Call 정보 : " + className + "." + methodName + "()";
 
-		log.append("\n");
-		log.append(SAPERATE_LINE);
-		log.append("[StepExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
-		log.append("\n");
-		log.append("<input>");
-		log.append("\n");
-		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
-		log.append("\n");
-		log.append("</input>");
-		log.append(SAPERATE_LINE);
-		this.info(log.toString());
+		log.append("\t").append("\n");
+		log.append("\t").append(SAPERATE_LINE);
+		log.append("\t").append("[StepExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
+		log.append("\t").append("\n");
+		log.append("\t").append("<input>");
+		log.append("\t").append("\n");
+		log.append("\t").append(this.trimParams(this.buildParamInfo(joinPoint)));
+		log.append("\t").append("\n");
+		log.append("\t").append("</input>");
+		log.append("\t").append(SAPERATE_LINE);
+		this.info(log.append("\t").toString());
 		
 		output = joinPoint.proceed();
 		
-		log.setLength(0);
-		log.append("\n");
-		log.append(SAPERATE_LINE);
-		log.append("[StepExecutor - "+identity+"]"+calleeInfo+" End !!!");
-		log.append("\n");
-		log.append("<output>");
-		log.append("\n");		
-		log.append(this.trimParams(output.toString()));
-		log.append("\n");
-		log.append("</output>");
-		log.append(SAPERATE_LINE);
-		this.info(log.toString());
+		log.append("\t").setLength(0);
+		log.append("\t").append("\n");
+		log.append("\t").append(SAPERATE_LINE);
+		log.append("\t").append("[StepExecutor - "+identity+"]"+calleeInfo+" End !!!");
+		log.append("\t").append("\n");
+		log.append("\t").append("<output>");
+		log.append("\t").append("\n");		
+		log.append("\t").append(this.trimParams(output.toString()));
+		log.append("\t").append("\n");
+		log.append("\t").append("</output>");
+		log.append("\t").append(SAPERATE_LINE);
+		this.info(log.append("\t").toString());
 		
 		return output;
 	}
@@ -293,32 +293,32 @@ public class ConfigCallLog extends BaseObject {
 		methodName = joinPoint.getSignature().getName();
 		String calleeInfo = " Call 정보 : " + className + "." + methodName + "()";
 
-		log.append("\n");
-		log.append(SAPERATE_LINE);
-		log.append("[AgentExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
-		log.append("\n");
-		log.append("<input>");
-		log.append("\n");
-		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
-		log.append("\n");
-		log.append("</input>");
-		log.append(SAPERATE_LINE);
-		this.info(log.toString());
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append("[AgentExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("<input>");
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append(this.trimParams(this.buildParamInfo(joinPoint)));
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("</input>");
+		log.append("\t\t").append(SAPERATE_LINE);
+		this.info(log.append("\t\t").toString());
 		
 		output = joinPoint.proceed();
 		
-		log.setLength(0);
-		log.append("\n");
-		log.append(SAPERATE_LINE);
-		log.append("[AgentExecutor - "+identity+"]"+calleeInfo+" End !!!");
-		log.append("\n");
-		log.append("<output>");
-		log.append("\n");	
-		log.append(this.trimParams(output.toString()));
-		log.append("\n");
-		log.append("</output>");
-		log.append(SAPERATE_LINE);
-		this.info(log.toString());
+		log.append("\t\t").setLength(0);
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append("[AgentExecutor - "+identity+"]"+calleeInfo+" End !!!");
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("<output>");
+		log.append("\t\t").append("\n");	
+		log.append("\t\t").append(this.trimParams(output.toString()));
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("</output>");
+		log.append("\t\t").append(SAPERATE_LINE);
+		this.info(log.append("\t\t").toString());
 
 		return output;
 	}
@@ -363,32 +363,32 @@ public class ConfigCallLog extends BaseObject {
 			}
 		}
 
-		log.append("\n");
-		log.append(SAPERATE_LINE);
-		log.append("[Tools - "+toolName+"]"+calleeInfo+" Start !!!" );
-		log.append("\n");
-		log.append("<input>");
-		log.append("\n");
-		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
-		log.append("\n");
-		log.append("</input>");
-		log.append(SAPERATE_LINE);
-		this.info(log.toString());
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append("[Tools - "+toolName+"]"+calleeInfo+" Start !!!" );
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("<input>");
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append(this.trimParams(this.buildParamInfo(joinPoint)));
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("</input>");
+		log.append("\t\t").append(SAPERATE_LINE);
+		this.info(log.append("\t\t").toString());
 		
 		Object output = joinPoint.proceed();
 
-		log.setLength(0);
-		log.append("\n");
-		log.append(SAPERATE_LINE);
-		log.append("[Tools - "+toolName+"]"+calleeInfo+" End !!!" );
-		log.append("\n");
-		log.append("<output>");
-		log.append("\n");	
-		log.append(this.trimParams(output.toString()));
-		log.append("\n");
-		log.append("</output>");
-		log.append(SAPERATE_LINE);
-		this.info(log.toString());
+		log.append("\t\t").setLength(0);
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append("[Tools - "+toolName+"]"+calleeInfo+" End !!!" );
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("<output>");
+		log.append("\t\t").append("\n");	
+		log.append("\t\t").append(this.trimParams(output.toString()));
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("</output>");
+		log.append("\t\t").append(SAPERATE_LINE);
+		this.info(log.append("\t\t").toString());
 		
 		return output;
 	}
@@ -477,7 +477,7 @@ public class ConfigCallLog extends BaseObject {
 		String output = "";
 		if( input != null ) {
 			output = input;
-			output = StringUtil.textTail(output, 200);
+			output = StringUtil.textTail(output, 500);
 			output = StringUtil.replace(output, "\r\n", "");
 			output = StringUtil.replace(output, "\n", "");
 		}
