@@ -2853,42 +2853,169 @@ body.wd-full-on {
 	margin-top: 8px;
 }
 
-.wa-todo-sub {
-	margin: 4px 0 12px;
+/* ---------- 지금 할 일: 승인 대기 ----------
+   [무엇을 기다리나] → [안내] → [의견] → [결정] 순서로 위에서 아래로 읽는다.
+   흰 카드 하나에 담아 노란 띠(경고색) 안에서도 입력 영역이 또렷하게 보이게 한다 */
+.wa-decide {
+	margin-top: 12px;
+	padding: 16px 18px;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	box-shadow: var(--cs-shadow-sm);
 }
 
-.wa-decision {
-	display: grid;
-	grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
-	gap: 12px;
-}
-
-.wa-decision-field {
+/* 기다리는 step · 결정할 역할 · 결정하는 사람: 이름표와 값을 위아래로, 항목끼리는 세로 선으로 나눈다 */
+.ai-body dl.wa-decide-meta {
 	display: flex;
-	flex-direction: column;
-	gap: 4px;
+	flex-wrap: wrap;
+	gap: 10px 0;
+	margin: 0 0 12px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--cs-border);
 }
 
-.wa-decision-field > span {
+.wa-decide-meta > div {
+	min-width: 0;
+	padding: 0 20px;
+	border-left: 1px solid var(--cs-border);
+}
+
+.wa-decide-meta > div:first-child {
+	padding-left: 0;
+	border-left: 0;
+}
+
+.wa-decide-meta dt {
+	margin: 0 0 3px;
 	color: var(--cs-muted);
-	font-size: 12px;
+	font-size: 11.5px;
 	font-weight: 600;
 }
 
-.ai-body .wa-decision-field input,
-.ai-body .wa-decision-field textarea {
+.wa-decide-meta dd {
+	margin: 0;
+	color: var(--cs-text);
+	font-size: 14px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.wa-decide-guide {
+	margin: 0 0 14px;
+	color: var(--cs-text-2);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+/* 의견, 결정 같은 작은 제목 */
+.wa-decide-label {
+	display: block;
+	margin-bottom: 6px;
+	color: var(--cs-text);
+	font-size: 12.5px;
+	font-weight: 700;
+}
+
+.wa-decide-label small {
+	margin-left: 6px;
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+.wa-decide-comment {
+	display: block;
+}
+
+/* 사람이 쓰는 글이라 고정폭 글꼴이 아닌 본문 글꼴로. 세 줄 높이에서 시작하고 끌어서 늘린다 */
+.ai-body .wa-decide-comment textarea {
+	display: block;
 	width: 100%;
+	min-height: 76px;
+	font-size: 13.5px;
 }
 
-/* 의견 칸은 세 줄 높이(textarea rows="3"). 더 길게 쓰면 끌어서 늘린다 */
-.ai-body .wa-decision-field textarea {
-	min-height: 0;
+.wa-decide-choices-box {
+	margin-top: 16px;
+}
+
+/* 선택지 카드: 개수가 늘어도 같은 너비로 줄을 맞춰 채우고, 넘치면 다음 줄로 간다 */
+.wa-choices {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 10px;
+}
+
+/* 공통 단추 모양(한 줄, 34px, 진한 바탕)을 카드 모양으로 바꾼다 */
+.ai-body button.wa-choice {
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 4px;
 	height: auto;
-	resize: vertical;
+	min-height: 60px;
+	padding: 10px 14px 10px 16px;
+	border: 1px solid var(--cs-border-strong);
+	border-left: 4px solid var(--cs-primary);
+	border-radius: 8px;
+	background: var(--cs-surface);
+	color: var(--cs-text);
+	text-align: left;
+	white-space: normal;
+	line-height: 1.35;
 }
 
-.wa-todo .ai-form-actions {
-	margin-top: 12px;
+.ai-body button.wa-choice:hover {
+	border-color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+	color: var(--cs-text);
+	box-shadow: var(--cs-shadow);
+}
+
+.ai-body button.wa-choice:disabled,
+.ai-body button.wa-choice:disabled:hover {
+	border-color: var(--cs-border);
+	border-left-color: var(--cs-faint);
+	background: var(--cs-surface-2);
+	box-shadow: none;
+}
+
+.wa-choice-name {
+	font-size: 14px;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+.wa-choice-to {
+	color: var(--cs-muted);
+	font-size: 12px;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
+/* 아래 줄: 왼쪽에 처리 상태, 오른쪽에 승인/반려 단추 */
+.wa-decide-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 16px;
+	margin-top: 14px;
+}
+
+.wa-decide-foot .workflow-status:empty {
+	display: none;
+}
+
+.wa-decide-buttons {
+	display: inline-flex;
+	gap: 8px;
+	margin-left: auto;
+}
+
+.ai-body .wa-decide-buttons button {
+	min-width: 96px;
 }
 
 /* 진행 기록(왼쪽)과 고른 step(오른쪽). 좁으면 위아래로 */
@@ -3156,16 +3283,26 @@ body.wd-full-on {
 	}
 }
 
+/* 좁은 화면: 정보 항목은 한 줄에 하나씩, 선택지 카드는 한 줄을 다 쓴다 */
 @media screen and (max-width: 640px) {
-	.wa-decision {
+	.ai-body dl.wa-decide-meta {
+		flex-direction: column;
+	}
+
+	.wa-decide-meta > div {
+		padding: 0;
+		border-left: 0;
+	}
+
+	.wa-choices {
 		grid-template-columns: minmax(0, 1fr);
 	}
-}
 
-/* ---------- 실행 관리: 승인 선택지 옆 "받는 곳" ---------- */
-/* 결정을 고르면 어느 step(Agent)이 의견을 읽는지 작게 보여 준다 */
-.ai-route-receiver {
-	font-size: 12px;
-	color: var(--cs-muted);
-	margin: 0 12px 0 4px;
+	.wa-decide-buttons {
+		width: 100%;
+	}
+
+	.ai-body .wa-decide-buttons button {
+		flex: 1 1 0;
+	}
 }
