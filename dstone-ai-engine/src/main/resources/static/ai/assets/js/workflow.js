@@ -51,10 +51,6 @@ var DstoneAiWorkflow = (function () {
 			input: "SELECT * FORM member WHERE id = 1",
 			note: "\"FORM\" 오타를 fix Agent가 고친 뒤 validate를 통과하면 SUCCESS입니다."
 		},
-		"sample-mcp-filesystem-list": {
-			input: "/app/dstone/dstone-ai-engine/mcp/server-filesystem/sample",
-			note: "지금 환경의 APP_HOME 기준 경로입니다(Windows 로컬이면 D:/AppHome/framework/dstone/... 로 바꾸세요)."
-		},
 		"sample-router-multiway": {
 			input: { message: "지난달 카드 요금이 잘못 청구된 것 같아요.", role: "친절한 상담원" },
 			note: "message를 \"로그인이 안 돼요\"(technical), \"회사 위치가 어디인가요\"(other)로 바꾸면 다른 분기로 갑니다."

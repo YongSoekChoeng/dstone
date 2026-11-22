@@ -17,8 +17,8 @@
 
 caller별 접근 제어는 서버 단위가 아니라 다른 Tool과 똑같이 `dstone.ai.tool.allowed-by-caller`(Tool 이름 기준)로 한다.
 
-**MCP 서버**: `definitions/mcp/sample/sample-filesystem.yml` — 공식 filesystem 레퍼런스 서버를 STDIO로 띄워
-`${APP_HOME}/${APP_NAME}/mcp/server-filesystem` 하나만 노출한다(`list_directory`/`directory_tree`/`read_text_file`/`write_file`/`edit_file`/`move_file`만 허용).
+**MCP 서버 예**: `definitions/mcp/common/browser.yml` — 설치해 둔 Playwright MCP를 `node`로 바로 띄우고(폐쇄망에서 내려받지 않게),
+화면 재현에 필요한 Tool만 연다. 설치 경로는 `env*.properties` 값으로 받아, 설치하지 않은 환경에서는 건너뛴다.
 
 ### 2 MCP 서버 뼈대
 

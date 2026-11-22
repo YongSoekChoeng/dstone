@@ -280,6 +280,10 @@ Jenkins Job SCM checkout must be the full monorepo root (not a per-module sparse
 | dstone-ai-engine | 8081 | JAR |
 | dstone-knowledge | 4081 | JAR |
 
+## Product Hygiene
+
+dstone is a product for sale. Keep only refined, application-agnostic content in the repository: no samples, scratch data, or anything tied to one target app (testApp etc.). Samples or test material needed while working go only into the volatile, git-ignored `/app/dstone/temp/` — anything there may be deleted at any time.
+
 ## Documentation
 
 Whenever changes are made on resources, Check if docs should be changed too.
