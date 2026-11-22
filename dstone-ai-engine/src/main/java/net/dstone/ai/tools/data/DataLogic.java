@@ -1,11 +1,13 @@
 package net.dstone.ai.tools.data;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import net.dstone.ai.common.schema.JsonSchemaUtil;
 
@@ -151,6 +153,61 @@ public final class DataLogic {
 			}
 		}
 		return problems;
+	}
+
+	/**
+	 * <pre>
+	 * 값(목록이면 항목마다)에 expected와 같은 것이 있는지 봅니다. 글자로 견줍니다.
+	 * </pre>
+	 *
+	 * @param value    볼 값이나 목록
+	 * @param expected 찾을 값
+	 * @param field    항목에서 볼 필드. 비우면 항목 자체
+	 */
+	public static Map<String, Object> containsValue(Object value, String expected, String field) {
+		List<?> items = value instanceof List<?> list ? list : (value == null ? List.of() : List.of(value));
+		boolean found = false;
+		for (Object item : items) {
+			Object current = item;
+			if (field != null && !field.isBlank()) {
+				for (String name : field.trim().split("\\.")) {
+					current = current instanceof Map<?, ?> map ? map.get(name) : null;
+				}
+			}
+			if (current != null && String.valueOf(current).equals(expected)) {
+				found = true;
+				break;
+			}
+		}
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("success", found);
+		result.put("message", found ? "'" + expected + "' 있음" : "'" + expected + "' 없음");
+		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 되풀이 횟수를 하나 올립니다. scope는 길 수 있어(결정 기록 전체) 해시로만 남깁니다.
+	 * </pre>
+	 *
+	 * @param previous 지난 결과
+	 * @param max      최대 횟수
+	 * @param scope    바뀌면 처음부터 세는 값
+	 */
+	public static Map<String, Object> countUp(Object previous, Integer max, String scope) {
+		String key = UUID.nameUUIDFromBytes((scope == null ? "" : scope).getBytes(StandardCharsets.UTF_8)).toString();
+		int count = 0;
+		if (previous instanceof Map<?, ?> map && key.equals(map.get("scope")) && map.get("count") instanceof Number number) {
+			count = number.intValue();
+		}
+		int limit = max == null ? 0 : max.intValue();
+		boolean within = count < limit;
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("success", within);
+		result.put("count", within ? count + 1 : count);
+		result.put("scope", key);
+		result.put("message", within ? (count + 1) + "/" + limit + "번째" : "최대 " + limit + "번을 다 써서 더 되풀이하지 않습니다.");
+		return result;
 	}
 
 	/**

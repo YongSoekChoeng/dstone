@@ -1,5 +1,6 @@
 package net.dstone.ai.tools.build;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -18,6 +19,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,6 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.imageio.ImageIO;
 
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
@@ -39,6 +43,9 @@ import net.dstone.ai.common.project.ProjectStore;
 import net.dstone.ai.runtime.tool.StepRef;
 import net.dstone.ai.runtime.tool.ToolOutcome;
 import net.dstone.ai.runtime.workflow.StepEndListener;
+import net.dstone.ai.tools.build.sandbox.SandboxException;
+import net.dstone.ai.tools.build.sandbox.SandboxRegistry;
+import net.dstone.ai.tools.build.sandbox.TestSandbox;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 
@@ -83,7 +90,13 @@ import net.dstone.common.core.BaseObject;
  * Agent가 stopTestServer를 부르지 않아도, 띄운 step이 끝나면(StepEndListener) 내립니다. 엔진이 내려갈 때도 내립니다.
  * 사본 폴더는 지우지 않습니다(다음에 다시 씀). 지우고 싶으면 폴더를 직접 지우면 됩니다.
  *
- * DB는 따로 만들지 않습니다. 사본은 원본 설정 그대로 원래 DB에 붙습니다. 개발·시험 DB에서만 쓰십시오.
+ * ## 두 가지 모드
+ * - startTestServer: DB를 따로 만들지 않습니다. 사본은 원본 설정 그대로 원래 DB에 붙습니다. 개발·시험 DB에서만 쓰십시오.
+ * - startSandboxServer: 띄울 때마다 일회용 DB에 복제하고 DDL을 거기에만 반영합니다. 앱의 접속과 원본 폴더 경로도 사본 쪽으로 돌립니다(tools.build.sandbox.TestSandbox).
+ *   격리를 보장할 수 없으면 원래 DB로 대신 띄우지 않고 실패하며, 실패의 원인을 cause로 알려 줍니다.
+ *     code         개발 결과가 원인(DDL 오류, 빌드 실패, 앱 기동 실패). 고치면 된다
+ *     environment  환경이 원인(지원하지 않는 구성, 설치·설정 없음, 외부 의존). 코드를 고쳐도 소용없다
+ *   빌드한 파일만 띄웁니다: Spring Boot는 java -jar, 그 밖의 WAR는 설치된 Tomcat. Maven 플러그인으로 띄우는 방식은 격리 옵션을 확인할 수 없어 쓰지 않습니다.
  * </pre>
  */
 @AiTool
@@ -115,6 +128,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	@Autowired
 	private ProjectStore projectStore;
 
+	@Autowired
+	private SandboxRegistry sandboxRegistry;
+
 	/** 이 엔진이 띄운 서버들(키: 프로젝트키) */
 	private final Map<String, RunningServer> running = new ConcurrentHashMap<String, RunningServer>();
 
@@ -128,7 +144,23 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		FileLock lock;
 		String url;
 		File log;
+		TestSandbox sandbox;
 	}
+
+	/** startSandboxServer 한 번의 요청과, 실패했을 때의 원인 */
+	private static final class SandboxRequest {
+		String ddlFile;
+		String cause = CAUSE_ENVIRONMENT;
+	}
+
+	/** 실패 원인: 개발 결과. 고치면 된다 */
+	private static final String CAUSE_CODE = "code";
+
+	/** 실패 원인: 환경. 코드를 고쳐도 소용없다 */
+	private static final String CAUSE_ENVIRONMENT = "environment";
+
+	/** 앱이 DB 로그인에 실패한 흔적. 프로젝트 관리의 계정이 앱의 계정과 다른 환경 문제다 */
+	private static final Pattern LOGIN_FAILED = Pattern.compile("Access denied for user|password authentication failed for user");
 
 	/** 띄우는 방법 하나(플러그인 종류에 따라 정함) */
 	private static final class Launch {
@@ -148,13 +180,41 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			@ToolParam(required = false, description = "삭제 목록 파일의 절대경로. 원본 루트 기준 상대경로가 한 줄에 하나") String deleteList,
 			ToolContext toolContext) {
 		try {
-			return this.start(projectId, sourceRoot, overlayDir, deleteList, StepRef.from(toolContext));
+			return this.start(projectId, sourceRoot, overlayDir, deleteList, StepRef.from(toolContext), null);
 		} catch (IOException | RuntimeException e) {
 			return ToolOutcome.fail("임시 시험 서버를 띄우지 못했습니다: " + e.getMessage());
 		}
 	}
 
-	@Tool(description = "startTestServer로 띄운 임시 시험 서버를 내린다. 사본 폴더는 다음에 다시 쓰려고 남긴다.")
+	@Tool(description = "격리된 시험 서버를 띄운다. 프로젝트 DB를 일회용 DB로 복제하고 ddlFile의 DDL을 거기에만 반영하므로, 화면에서 등록·수정·삭제를 해도 원래 DB와 파일은 바뀌지 않는다. "
+		+ "접속주소, 서버로그, dbQuery에 쓸 복제본 별칭(sandbox-...)을 돌려준다. 실패하면 cause가 code(개발 결과가 원인)나 environment(환경이 원인, 고쳐도 소용없음)다. "
+		+ "다시 부르면 복제본부터 새로 만든다. 다 쓰면 stopTestServer를 부른다(부르지 않아도 step이 끝나면 내려간다).")
+	public Map<String, Object> startSandboxServer(
+			@ToolParam(description = "프로젝트ID. 복제할 DB를 프로젝트 관리에서 찾는다") String projectId,
+			@ToolParam(description = "원본 소스 루트의 절대경로(읽기만 한다)") String sourceRoot,
+			@ToolParam(description = "원본 루트 기준 같은 경로로 바뀐 파일·새 파일이 들어 있는 폴더(개발 결과)의 절대경로") String overlayDir,
+			@ToolParam(required = false, description = "복제본에 반영할 DDL 파일(.sql, 또는 ```sql 블록이 든 .md)의 절대경로. 없으면 비운다") String ddlFile,
+			@ToolParam(required = false, description = "삭제 목록 파일의 절대경로. 원본 루트 기준 상대경로가 한 줄에 하나") String deleteList,
+			ToolContext toolContext) {
+		SandboxRequest request = new SandboxRequest();
+		request.ddlFile = ddlFile;
+		ToolOutcome outcome;
+		try {
+			outcome = isBlank(projectId)
+				? ToolOutcome.fail("프로젝트ID가 없어 복제할 DB를 알 수 없습니다. 자동 검증을 하지 못합니다.")
+				: this.start(projectId, sourceRoot, overlayDir, deleteList, StepRef.from(toolContext), request);
+		} catch (IOException | RuntimeException e) {
+			request.cause = CAUSE_ENVIRONMENT;
+			outcome = ToolOutcome.fail("격리 시험 서버를 띄우지 못했습니다: " + e.getMessage());
+		}
+		Map<String, Object> result = new LinkedHashMap<String, Object>();
+		result.put("success", outcome.success());
+		result.put("cause", Boolean.TRUE.equals(outcome.success()) ? "" : request.cause);
+		result.put("message", outcome.message());
+		return result;
+	}
+
+	@Tool(description = "startTestServer나 startSandboxServer로 띄운 임시 시험 서버를 내린다. 사본 폴더는 다음에 다시 쓰려고 남긴다.")
 	public ToolOutcome stopTestServer(
 			@ToolParam(required = false, description = "startTestServer에 준 프로젝트ID. 없으면 비운다") String projectId,
 			@ToolParam(description = "startTestServer에 준 원본 소스 루트의 절대경로") String sourceRoot) {
@@ -176,6 +236,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	/** step이 끝나면 그 실행·step이 띄운 서버를 내립니다. */
 	@Override
 	public void stepEnded(String executionId, String stepId) {
+		if (executionId != null && stepId != null) {
+			this.sandboxRegistry.stepEnded(new StepRef(executionId, stepId));
+		}
 		Iterator<RunningServer> it = new ArrayList<RunningServer>(this.running.values()).iterator();
 		while (it.hasNext()) {
 			RunningServer server = it.next();
@@ -195,7 +258,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 	}
 
-	private ToolOutcome start(String projectId, String sourceRootText, String overlayText, String deleteList, StepRef stepRef) throws IOException {
+	private ToolOutcome start(String projectId, String sourceRootText, String overlayText, String deleteList, StepRef stepRef, SandboxRequest request) throws IOException {
 		if (isBlank(sourceRootText) || isBlank(overlayText)) {
 			return ToolOutcome.fail("sourceRoot, overlayDir는 모두 필요합니다.");
 		}
@@ -240,6 +303,13 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			}
 			Files.writeString(sourceFile.toPath(), sourceRoot.getPath(), StandardCharsets.UTF_8);
 
+			if (request != null) {
+				String problem = this.createSandbox(server, projectId.trim(), base, sourceRoot, app, request);
+				if (problem != null) {
+					return ToolOutcome.fail(problem);
+				}
+			}
+
 			// 4) 포트와 JDK를 정한다.
 			File appPom = new File(app, "pom.xml");
 			String pomText = Files.readString(appPom.toPath(), StandardCharsets.UTF_8);
@@ -255,12 +325,39 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			String kind;
 			String contextPath;
 			Process process;
-			if (isWar(pomText) && tomcatHome != null) {
+			long runLogFrom = 0L;
+			boolean bootArchive = request != null && pluginBlock(pomText, "spring-boot-maven-plugin") != null;
+			if (request != null && !bootArchive && !(isWar(pomText) && tomcatHome != null)) {
+				return ToolOutcome.fail("격리 시험 서버로 띄울 수 없는 구성입니다(되는 것: Spring Boot 단일 모듈, 또는 WAR + 설정 tomcat-home). 자동 검증을 하지 못합니다.");
+			}
+			if (bootArchive) {
+				// Boot는 실제 배포처럼 java -jar로 띄운다(Boot 3 이상은 설치된 Tomcat 9에 올릴 수 없기도 하다).
+				String buildProblem = this.mavenPackage(app, javaHome, log, key, server.sandbox);
+				if (buildProblem != null) {
+					request.cause = CAUSE_CODE;
+					return ToolOutcome.fail("빌드하지 못했습니다(" + buildProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
+				}
+				File archive = findBootArchive(new File(app, "target"));
+				if (archive == null) {
+					return ToolOutcome.fail("mvn package 뒤에 실행할 jar나 WAR가 없습니다: " + app);
+				}
+				String problem = prepareRun(server.sandbox, archive, port, forProject(this.config("sandbox-trusted-libs", ""), projectId));
+				if (problem != null) {
+					return ToolOutcome.fail(problem);
+				}
+				kind = "java -jar " + archive.getName();
+				contextPath = "/";
+				runLogFrom = log.length();
+				process = this.startArchive(app, archive, javaHome, log, key, port, server.sandbox);
+			} else if (isWar(pomText) && tomcatHome != null) {
 				String tomcatPath = tomcatPathOf(pomText);
 				contextPath = tomcatPath == null ? "/" : tomcatPath;
 				kind = "WAR + Tomcat(" + tomcatHome.getPath() + ", 전용 CATALINA_BASE)";
-				String buildProblem = this.mavenPackage(app, javaHome, log, key);
+				String buildProblem = this.mavenPackage(app, javaHome, log, key, server.sandbox);
 				if (buildProblem != null) {
+					if (request != null) {
+						request.cause = CAUSE_CODE;
+					}
 					return ToolOutcome.fail("WAR를 만들지 못했습니다(" + buildProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
 				}
 				File war = findWar(new File(app, "target"));
@@ -268,8 +365,15 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 					return ToolOutcome.fail("mvn package 뒤에 target 아래 WAR 파일이 없습니다: " + app);
 				}
 				File catalinaBase = new File(base, TOMCAT_BASE_DIR);
+				if (request != null) {
+					String problem = prepareRun(server.sandbox, war, port, forProject(this.config("sandbox-trusted-libs", ""), projectId));
+					if (problem != null) {
+						return ToolOutcome.fail(problem);
+					}
+				}
 				prepareCatalinaBase(tomcatHome, catalinaBase, port, war, contextPath);
-				process = this.startCatalina(tomcatHome, catalinaBase, javaHome, log, key);
+				runLogFrom = log.length();
+				process = this.startCatalina(tomcatHome, catalinaBase, javaHome, log, key, server.sandbox);
 			} else {
 				Launch launch = launchOf(pomText, port);
 				if (launch == null) {
@@ -300,12 +404,23 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			int timeout = Integer.parseInt(this.config("start-timeout-seconds", "600"));
 			String waitProblem = waitUntilUp(process, port, contextPath, timeout);
 			if (waitProblem != null) {
+				if (request != null) {
+					request.cause = startupCause(server.sandbox, log, runLogFrom);
+					waitProblem += deniedNote(server.sandbox);
+				}
 				return ToolOutcome.fail("임시 시험 서버가 뜨지 않았습니다(" + waitProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
 			}
 			// Tomcat에 올린 앱이 시작에 실패해도 Tomcat 자체는 떠서 응답(404)을 준다. 그 경우는 실패로 본다.
 			if (kind.startsWith("WAR") && httpStatus(port, contextPath) == HttpURLConnection.HTTP_NOT_FOUND) {
+				if (request != null) {
+					request.cause = startupCause(server.sandbox, log, runLogFrom);
+				}
 				return ToolOutcome.fail("Tomcat은 떴지만 앱(" + contextPath + ")이 시작되지 않았습니다(404). 서버 로그에서 앱 시작 오류를 보십시오: " + log + "\n"
-					+ tail(log, LOG_TAIL_LINES));
+					+ tail(log, LOG_TAIL_LINES) + deniedNote(server.sandbox));
+			}
+			// 격리 옵션을 JVM이 정말 받았는지 본다. JVM은 JAVA_TOOL_OPTIONS를 받으면 그렇다고 로그에 찍는다.
+			if (server.sandbox != null && !textFrom(log, runLogFrom).contains("-DsocksProxyHost=127.0.0.1")) {
+				return ToolOutcome.fail("앱 JVM에 격리 옵션이 들어갔는지 확인할 수 없어 내렸습니다(원래 DB에 쓸 수 있어서).");
 			}
 			started = true;
 			StringBuilder message = new StringBuilder();
@@ -315,6 +430,19 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			message.append("방식: ").append(kind).append(", JDK: ").append(javaHome == null ? "엔진과 같은 JDK(" + System.getProperty("java.version") + ")" : javaHome.getPath()).append('\n');
 			message.append("사본: ").append(app.getPath()).append(" (").append(overlay.message()).append(")");
 			message.append('\n').append(this.accountLine(projectId));
+			if (server.sandbox != null) {
+				Map<String, Map<String, String>> clones = server.sandbox.readConnections();
+				this.sandboxRegistry.opened(stepRef, server.url, clones);
+				message.append("\n복제본 DB 별칭(dbQuery의 alias): ").append(String.join(", ", clones.keySet()));
+				for (String line : server.sandbox.report()) {
+					message.append('\n').append(line);
+				}
+				message.append(deniedNote(server.sandbox));
+				String sample = this.uploadSample();
+				if (sample != null) {
+					message.append("\n업로드 시험용 파일(browser_file_upload의 paths): ").append(sample);
+				}
+			}
 			for (String note : notes) {
 				message.append('\n').append(note);
 			}
@@ -324,6 +452,144 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 				this.stop(server);
 			}
 		}
+	}
+
+	/** 격리 환경을 만들어 server에 답니다. 실패면 이유. */
+	private String createSandbox(RunningServer server, String projectId, File base, File sourceRoot, File app, SandboxRequest request) {
+		Map<String, Map<String, String>> connections = new LinkedHashMap<String, Map<String, String>>();
+		for (Map.Entry<String, Map<String, String>> entry : this.projectStore.connections().entrySet()) {
+			if (entry.getKey().startsWith(projectId + ".")) {
+				connections.put(entry.getKey(), entry.getValue());
+			}
+		}
+		Map<String, String> homes = new LinkedHashMap<String, String>();
+		for (String kind : TestSandbox.kinds()) {
+			homes.put(kind, this.config("sandbox-" + kind + "-home", ""));
+		}
+		try {
+			server.sandbox = TestSandbox.create(base, sourceRoot, app, connections, request.ddlFile, homes,
+				Integer.parseInt(this.config("sandbox-max-db-mb", "2048")), forProject(this.config("sandbox-allow-hosts", ""), projectId));
+			return null;
+		} catch (SandboxException e) {
+			request.cause = e.code() ? CAUSE_CODE : CAUSE_ENVIRONMENT;
+			return e.getMessage();
+		}
+	}
+
+	/** 빌드 산출물이 격리를 지킬 수 있는지 보고, 앱이 자기 포트를 부를 수 있게 엽니다. 실패면 이유. */
+	private static String prepareRun(TestSandbox sandbox, File archive, int port, String trustedLibs) {
+		try {
+			sandbox.checkArtifact(archive, trustedLibs);
+			sandbox.allowSelf(port);
+			return null;
+		} catch (SandboxException e) {
+			return e.getMessage();
+		}
+	}
+
+	/** 기동 실패의 원인. 막은 외부 접속이나 DB 로그인 실패가 있으면 환경, 아니면 개발 결과 */
+	private static String startupCause(TestSandbox sandbox, File log, long from) {
+		return !sandbox.denied().isEmpty() || LOGIN_FAILED.matcher(textFrom(log, from)).find() ? CAUSE_ENVIRONMENT : CAUSE_CODE;
+	}
+
+	/**
+	 * <pre>
+	 * "프로젝트ID=값, 프로젝트ID=값" 모양의 설정에서 그 프로젝트의 값만 쉼표로 이어 돌려줍니다.
+	 * 격리를 푸는 예외라 엔진 전체에 걸지 않습니다. 한 프로젝트 때문에 푼 것이 다른 프로젝트까지 풀면 안 됩니다.
+	 * </pre>
+	 */
+	static String forProject(String setting, String projectId) {
+		List<String> values = new ArrayList<String>();
+		if (!isBlank(setting) && !isBlank(projectId)) {
+			for (String item : setting.split(",")) {
+				int equals = item.indexOf('=');
+				if (equals > 0 && item.substring(0, equals).trim().equals(projectId.trim())) {
+					values.add(item.substring(equals + 1).trim());
+				}
+			}
+		}
+		return String.join(",", values);
+	}
+
+	private static String deniedNote(TestSandbox sandbox) {
+		if (sandbox == null || sandbox.denied().isEmpty()) {
+			return "";
+		}
+		return "\n막은 외부 접속: " + String.join(", ", sandbox.denied()) + " (앱에 꼭 필요하면 관리자가 설정 sandbox-allow-hosts에 '프로젝트ID=host:port'로 더한다)";
+	}
+
+	private static String textFrom(File log, long from) {
+		try (RandomAccessFile file = new RandomAccessFile(log, "r")) {
+			file.seek(Math.min(from, file.length()));
+			byte[] bytes = new byte[(int) (file.length() - file.getFilePointer())];
+			file.readFully(bytes);
+			return new String(bytes, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			return "";
+		}
+	}
+
+	/** 업로드 화면을 시험할 그림 파일. 브라우저 MCP가 읽어도 되는 폴더(설정 upload-sample-dir)에 둡니다. */
+	private String uploadSample() {
+		String dir = this.config("upload-sample-dir", "");
+		// env의 MCP 폴더가 비면 "/output"만 남는다. 그때는 만들지 않는다
+		if (dir.isEmpty() || dir.equals("/output") || !new File(dir).getParentFile().isDirectory()) {
+			return null;
+		}
+		File sample = new File(dir, "dstone-upload-sample.png");
+		try {
+			if (!sample.isFile()) {
+				Files.createDirectories(sample.getParentFile().toPath());
+				ImageIO.write(new BufferedImage(320, 240, BufferedImage.TYPE_INT_RGB), "png", sample);
+			}
+			return sample.getAbsolutePath();
+		} catch (IOException e) {
+			this.warn("dstone-ai-engine tool: 업로드 시험용 파일을 만들지 못했습니다: " + e.getMessage());
+			return null;
+		}
+	}
+
+	/** Spring Boot가 만든 실행 파일(jar 또는 WAR)을 찾습니다. */
+	private static File findBootArchive(File target) {
+		File[] files = target.listFiles();
+		if (files == null) {
+			return null;
+		}
+		for (File file : files) {
+			String name = file.getName();
+			if (file.isFile() && (name.endsWith(".war") || (name.endsWith(".jar")
+				&& !name.endsWith("-sources.jar") && !name.endsWith("-javadoc.jar") && !name.endsWith("-plain.jar")))) {
+				return file;
+			}
+		}
+		return null;
+	}
+
+	/** Spring Boot 실행 파일을 격리 옵션과 함께 띄웁니다. */
+	private Process startArchive(File app, File archive, File javaHome, File log, String key, int port, TestSandbox sandbox) throws IOException {
+		File home = javaHome != null ? javaHome : new File(System.getProperty("java.home"));
+		List<String> command = new ArrayList<String>();
+		command.add(new File(home, isWindows() ? "bin/java.exe" : "bin/java").getPath());
+		command.add(MARKER + key);
+		command.addAll(Arrays.asList(UTF8_OUTPUT.split(" ")));
+		command.add("-jar");
+		command.add(archive.getPath());
+		command.add("--server.port=" + port);
+		command.add("--server.servlet.context-path=/");
+		ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
+		isolate(builder, sandbox.appOptions());
+		return builder.start();
+	}
+
+	/**
+	 * JVM에 격리 옵션을 넣습니다. JAVA_TOOL_OPTIONS는 스크립트가 JAVA_OPTS를 덮어써도, 자식 JVM을 새로 띄워도 들어갑니다.
+	 * 이것을 덮어쓸 수 있는 _JAVA_OPTIONS는 뺍니다.
+	 */
+	private static void isolate(ProcessBuilder builder, String options) {
+		Map<String, String> env = builder.environment();
+		String current = env.get("JAVA_TOOL_OPTIONS");
+		env.put("JAVA_TOOL_OPTIONS", isBlank(current) ? options : current + " " + options);
+		env.remove("_JAVA_OPTIONS");
 	}
 
 	/**
@@ -397,6 +663,10 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			killTree(server.process.toHandle());
 		}
 		this.running.remove(server.key, server);
+		if (server.sandbox != null) {
+			this.sandboxRegistry.closed(server.sandbox.readConnections().keySet());
+			server.sandbox.close();
+		}
 		try {
 			if (server.lock != null && server.lock.isValid()) {
 				server.lock.release();
@@ -739,16 +1009,19 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	}
 
 	/** 사본에서 mvn package를 돌려 WAR를 만듭니다. 성공하면 null, 실패하면 이유. 출력은 log에 덧붙입니다. */
-	private String mavenPackage(File app, File javaHome, File log, String key) throws IOException {
+	private String mavenPackage(File app, File javaHome, File log, String key, TestSandbox sandbox) throws IOException {
 		List<String> command = this.mavenCommand(key);
 		// clean을 함께 한다. 사본은 다음 실행에서도 다시 쓰는데, Maven 증분 빌드는 소스가 없어진 클래스를 지우지 않아
-		// 지난 실행의 클래스가 WAR에 남는다(2026-11-22 실행 86b3660b: 지난 실행의 ImageBoardDAO와 bean 이름이 부딪쳐 앱이 뜨지 않음).
+		// 지난 실행의 클래스가 WAR에 남는다(2026-11-22 실행 86b3660b: 지난 실행의 DAO와 bean 이름이 부딪쳐 앱이 뜨지 않음).
 		command.add("clean");
 		command.add("package");
 		ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
 		utf8Maven(builder);
 		if (javaHome != null) {
 			builder.environment().put("JAVA_HOME", javaHome.getPath());
+		}
+		if (sandbox != null) {
+			isolate(builder, sandbox.buildOptions()); // 빌드 중에도 원래 DB로는 가지 못하게
 		}
 		Process process = builder.start();
 		try {
@@ -766,7 +1039,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	}
 
 	/** 전용 CATALINA_BASE로 Tomcat을 띄웁니다(catalina run, 앞에서 돌아감). */
-	private Process startCatalina(File tomcatHome, File catalinaBase, File javaHome, File log, String key) throws IOException {
+	private Process startCatalina(File tomcatHome, File catalinaBase, File javaHome, File log, String key, TestSandbox sandbox) throws IOException {
 		List<String> command = new ArrayList<String>();
 		if (isWindows()) {
 			command.add("cmd.exe");
@@ -786,6 +1059,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		if (javaHome != null) {
 			env.put("JAVA_HOME", javaHome.getPath());
 			env.remove("JRE_HOME");
+		}
+		if (sandbox != null) {
+			isolate(builder, sandbox.appOptions());
 		}
 		return builder.start();
 	}

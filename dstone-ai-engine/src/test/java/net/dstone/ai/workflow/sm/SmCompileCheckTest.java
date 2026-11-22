@@ -55,13 +55,13 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 통과하면_compileResult에_남고_다음은_개발_승인이다() throws IOException {
+	void 통과하면_compileResult에_남고_다음은_자동_검증이다() throws IOException {
 		this.devFile("New.java", "package demo;\npublic class New { Old old = new Old(); }\n");
 
 		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
 		flow.step("step16");
 
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.currentStepId()).isEqualTo("step31");
 		assertThat(String.valueOf(flow.state("compileResult"))).contains("컴파일 통과").contains("Maven");
 		assertThat(flow.state("compileError")).isNull();
 	}

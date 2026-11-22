@@ -1,0 +1,120 @@
+package net.dstone.ai.tools.build.sandbox;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import net.dstone.ai.runtime.tool.StepRef;
+import net.dstone.ai.runtime.tool.ToolCallCheck;
+
+/**
+ * <pre>
+ * 지금 떠 있는 격리 시험 환경의 명부입니다.
+ *
+ * - DB Tool에 복제본의 별칭(sandbox-…)을 알려 줍니다.
+ * - 격리 시험 서버를 띄운 step은 그 step이 끝날 때까지 복제본과 시험 서버만 보게 막습니다.
+ *   원래 서버 화면에서 [삭제]를 누르거나 원래 DB를 보고 통과라고 판정하면 안 되기 때문입니다.
+ *   서버를 내린 뒤에도 step이 끝날 때까지는 막습니다.
+ * </pre>
+ */
+@Component
+public class SandboxRegistry implements ToolCallCheck {
+
+	/** 복제본 DB 별칭의 앞부분 */
+	public static final String ALIAS_PREFIX = "sandbox-";
+
+	private static final Set<String> DB_TOOLS = Set.of("dbQuery", "dbListTables", "dbDescribeTable");
+	private static final String NAVIGATE = "browser_navigate";
+	private static final ObjectMapper JSON = new ObjectMapper();
+
+	/**
+	 * step 하나가 보는 시험 환경입니다.
+	 *
+	 * @param url     시험 서버 주소
+	 * @param aliases 복제본 별칭들
+	 */
+	private record View(String url, Set<String> aliases) {
+	}
+
+	private final Map<StepRef, View> views = new ConcurrentHashMap<StepRef, View>();
+	private final Map<String, Map<String, String>> connections = new ConcurrentHashMap<String, Map<String, String>>();
+
+	/**
+	 * 시험 서버가 떴을 때 올립니다.
+	 *
+	 * @param stepRef     띄운 실행과 step. Workflow 밖이면 null(막지는 않음)
+	 * @param url         시험 서버 주소
+	 * @param connections 복제본 접속 정보
+	 */
+	public void opened(StepRef stepRef, String url, Map<String, Map<String, String>> connections) {
+		this.connections.putAll(connections);
+		if (stepRef != null) {
+			this.views.put(stepRef, new View(url, Set.copyOf(connections.keySet())));
+		}
+	}
+
+	/** 시험 서버를 내렸을 때 별칭을 뺍니다. */
+	public void closed(Set<String> aliases) {
+		for (String alias : aliases) {
+			this.connections.remove(alias);
+		}
+	}
+
+	/** step이 끝났을 때 막던 것을 풉니다. */
+	public void stepEnded(StepRef stepRef) {
+		this.views.remove(stepRef);
+	}
+
+	/** 지금 쓸 수 있는 복제본들 */
+	public Map<String, Map<String, String>> connections() {
+		return new LinkedHashMap<String, Map<String, String>>(this.connections);
+	}
+
+	@Override
+	public String check(String toolName, String toolInput, StepRef stepRef) {
+		if (stepRef == null || (!NAVIGATE.equals(toolName) && !DB_TOOLS.contains(toolName))) {
+			return null;
+		}
+		View view = this.views.get(stepRef);
+		if (view == null) {
+			return null;
+		}
+		JsonNode args;
+		try {
+			args = JSON.readTree(toolInput == null ? "{}" : toolInput);
+		} catch (IOException e) {
+			return "인자를 읽을 수 없어 격리 시험 중에는 실행하지 않습니다.";
+		}
+		if (NAVIGATE.equals(toolName)) {
+			String url = args.path("url").asText("").trim();
+			if ("about:blank".equals(url) || sameOrigin(view.url(), url)) {
+				return null;
+			}
+			return "격리 시험 중에는 시험 서버(" + view.url() + ")의 화면만 엽니다. 다른 서버는 원래 DB에 쓸 수 있습니다.";
+		}
+		if (view.aliases().contains(args.path("alias").asText("").trim())) {
+			return null;
+		}
+		return "격리 시험 중에는 복제본 DB만 봅니다. alias는 " + view.aliases() + " 가운데 하나입니다. 원래 DB에는 이번 시험의 결과가 없습니다.";
+	}
+
+	private static boolean sameOrigin(String expected, String actual) {
+		try {
+			URI left = URI.create(expected);
+			URI right = URI.create(actual);
+			return left.getHost() != null && left.getHost().equalsIgnoreCase(right.getHost()) && left.getPort() == right.getPort()
+				&& left.getScheme().equalsIgnoreCase(right.getScheme());
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
+	}
+
+}

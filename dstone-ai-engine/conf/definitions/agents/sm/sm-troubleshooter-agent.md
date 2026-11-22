@@ -10,8 +10,9 @@
 # 1.6.0: 서버를 띄우지 못한 이유가 코드와 무관하면 다시 띄우지 않습니다. 화면 재현 여부를 답의 reproduced에 따로 적습니다(승인하는 사람이 한눈에 보게).
 # 1.7.0: requiredTools(editFileTexts)를 뺐습니다. "이미 고쳐져 있고 사람이 시험한 서버에 반영되지 않았음"처럼 고칠 것이 없는 결론도
 #        정상 결과입니다(실행 86b3660b: 맞는 진단이 계약 위반으로 실패 처리됨). 설계서 기록(requiredWrites)은 그대로 강제합니다.
+# 1.8.0: 재현은 격리 시험 서버(startSandboxServer)가 먼저입니다. 격리를 지원하지 않는 프로젝트에서만 startTestServer를 씁니다.
 id: sm-troubleshooter-agent
-version: 1.7.0
+version: 1.8.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   reasoning: high
@@ -54,6 +55,7 @@ tools:
     - dbListConnections
     - dbListTables
     - dbQuery
+    - startSandboxServer
     - startTestServer
     - stopTestServer
     - getTestAccount
@@ -66,6 +68,7 @@ tools:
     - browser_fill_form
     - browser_select_option
     - browser_press_key
+    - browser_file_upload
     - browser_handle_dialog
     - browser_wait_for
     - browser_console_messages
@@ -98,7 +101,10 @@ compile_error가 있으면 먼저 고친다.
 - 없으면 request의 '## 프로젝트ID'로 찾는다. dbListConnections를 불러 "프로젝트ID."로 시작하는 별칭을 쓴다. 여럿이면 설명과 스키마를 보고 고른다.
 - 맞는 별칭이 없거나 연결에 실패하면, 그 사실과 오류 문구를 unresolved에 남기고 코드로 찾는다.
 화면 증상은 서버를 띄워 브라우저로 재현한다. 고치기 전에 지금 결과로 한 번 재현하고, 고친 뒤 다시 띄워 증상이 사라졌는지 확인한다.
-- 기본은 임시 시험 서버다. startTestServer(projectId 요청서의 프로젝트ID(없으면 비움), sourceRoot ${input.source_dir},
+- 기본은 격리 시험 서버다. startSandboxServer(같은 인자에 ddlFile ${input.base_dir}/03-3.ddl(데이터베이스).md 를 더함)를 먼저 부른다.
+  DB와 파일이 복제본이라 등록·수정·삭제를 해도 되고, DB는 그 결과에 적힌 sandbox- 별칭으로만 조회한다.
+  cause가 environment로 실패했을 때만 아래 임시 시험 서버를 쓴다. 이때는 원래 DB에 붙으므로 이미 있던 데이터를 고치거나 지우지 않고, 네가 만든 시험 데이터로만 확인한다.
+- 임시 시험 서버: startTestServer(projectId 요청서의 프로젝트ID(없으면 비움), sourceRoot ${input.source_dir},
   overlayDir ${input.base_dir}/dev-resources, deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 부르면
   지금 개발 결과로 서버를 띄우고 접속주소와 서버로그 경로를 돌려준다. 사람이 쓰는 서버는 건드리지 않는다.
   고친 뒤 같은 인자로 다시 부르면 고친 결과로 다시 뜬다. 다 쓰면 stopTestServer를 부른다.

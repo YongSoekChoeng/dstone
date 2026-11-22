@@ -55,13 +55,13 @@ public record EvalCase(String id, String description, String agent, String fixtu
 	 * <pre>
 	 * 채점 기준 하나입니다. 종류(kind)마다 쓰는 값이 다릅니다.
 	 *
-	 *   answerContains   {field: causes, text: mb_id}   답의 그 칸(없으면 답 전체)에 글자가 있다
+	 *   answerContains   {field: causes, text: user_id}   답의 그 칸(없으면 답 전체)에 글자가 있다
 	 *   answerNotEmpty   verification                    답의 그 칸이 비어 있지 않다
 	 *   answerEquals     {field: compiled, value: true}  답의 그 칸 값이 같다(글자로 비교)
 	 *   fileExists       02.impact.md                    작업 폴더에 파일이 있다
 	 *   fileChanged      03-1.design.md                  처음 복사한 내용과 달라졌다(없던 파일이 생긴 것도 포함)
 	 *   fileContains     {file: 02.impact.md, text: TASK-01}
-	 *   textIncreased    {files: [a.java, b.java], text: setMb_id}  파일들에서 글자가 나온 횟수 합이 처음보다 늘었다
+	 *   textIncreased    {files: [a.java, b.java], text: setUserId}  파일들에서 글자가 나온 횟수 합이 처음보다 늘었다
 	 *   toolUsed         {name: dbQuery, min: 1}         이름이 name으로 시작하는 Tool을 min번 이상 요청했다
 	 * </pre>
 	 *

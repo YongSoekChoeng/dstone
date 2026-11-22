@@ -42,6 +42,9 @@ import net.dstone.common.core.BaseObject;
  * 결과에 이제까지 넣은 비밀값이 섞여 있으면 ****로 가립니다(브라우저 Tool은 실행한 코드에 입력값을 담아 돌려줍니다).
  * 호출 로그는 이 메서드의 인자(자리표시자 그대로)와 반환값(가린 결과)을 남기므로 로그에도 실제 값이 남지 않습니다.
  *
+ * ## 실행 전 확인
+ * ToolCallCheck bean들이 "지금은 안 된다"고 하면 실행하지 않고 그 이유를 실패로 돌려줍니다(예: 격리 시험 중 원래 DB 조회).
+ *
  * 주의: 이 클래스는 ConfigTool에 의존하면 안 됩니다. ConfigTool이 이 bean을 주입받기 때문에 순환 참조가 생깁니다.
  * 예산 초과·같은 파일 다시 읽기·모르는 Tool처럼 앞 단계에서 막힌 호출은 Tool을 실행하지 않으므로 여기까지 오지 않습니다.
  * </pre>
@@ -66,6 +69,9 @@ public class ToolCallGate extends BaseObject {
 	@Autowired
 	private ConfigProperty configProperty;
 
+	@Autowired
+	private List<ToolCallCheck> toolCallChecks;
+
 	/** 이제까지 넣은 비밀값(JSON 안에 들어간 모양 포함). 결과를 가릴 때 씁니다. 메모리에만 둡니다. */
 	private final Set<String> usedSecrets = ConcurrentHashMap.newKeySet();
 
@@ -82,6 +88,13 @@ public class ToolCallGate extends BaseObject {
 	 * @return Tool이 돌려준 결과(비밀값은 가림)
 	 */
 	public String invoke(String toolName, String toolInput, ToolContext toolContext, ToolCallback delegate) {
+		StepRef stepRef = StepRef.from(toolContext);
+		for (ToolCallCheck check : this.toolCallChecks) {
+			String problem = check.check(toolName, toolInput, stepRef);
+			if (problem != null) {
+				return "실패: " + problem;
+			}
+		}
 		String input = toolInput;
 		if (toolInput != null && SECRET.matcher(toolInput).find()) {
 			if (!this.secretAllowedTools().contains(toolName)) {

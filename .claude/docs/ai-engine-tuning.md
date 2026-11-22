@@ -81,3 +81,21 @@ Measured with qwen3.8-27b on a copy of `86b3660b`'s documents (47,435-char desig
 | 2.3.0 step27 revise | 4/4 ×3 | 8/8, 4/4, 2/2 ×3 | 47.6–47.7k | 9 ×3, change applied ×3 |
 
 One revise run also added an unrequested scale cap (no upscaling). Only this one change shape was measured; a large requirement change through step27/29 and a full workflow run were not. Still open from the diagnosis: first-pass design quality, static and runtime gates before the development approval, project-convention Skill on site, eval checks that measure behaviour (developer-write scored 10/10 on a design with known runtime defects).
+
+**sm-workflow 2.4.0 — verify before the development approval (2026-11-23).** User approved "clone a disposable DB per run and apply DDL only there", and asked that it not be app-specific. Design choices and why:
+- separate DB server process, not a second schema on the same server: LLM DDL may say `DROP DATABASE` or `otherdb.table`.
+- SOCKS guard via `JAVA_TOOL_OPTIONS` (`socksNonProxyHosts=` empty), not URL rewriting: addresses come from env vars, code, JNDI. Intercepts localhost on JDK 8/11/21/24 (Linux, Windows); NIO bypasses it, hence the artifact check (fail closed).
+- exceptions are per project: an engine-wide `ojdbc` trust would have opened every Oracle project.
+- `sm-auto-fix-agent` is separate from the troubleshooter so the unattended path cannot apply to the original or boot a server on the original DB. Known gap: the per-step guard starts when `startSandboxServer` succeeds; before that `dbQuery` (read-only) and `browser_navigate` (clicks there can write) still reach the originals.
+- verifier contract is `browser_navigate|browser_snapshot`: navigate already returns a snapshot; requiring snapshot threw away correct answers (2/2).
+
+Verified: attack test on both DB kinds (14 hostile scripts, original unchanged); Tool-path E2E on Nexacro WAR, two Spring Boot+MySQL SPAs, a WAR with legacy Spring, a Boot+PostgreSQL app, and an NIO app (refused); Windows binaries (MySQL 8.1, PostgreSQL 18.6) x JDK 8/11/21, and Windows 8.1 tools against MySQL 8.4.
+
+Real LLM (qwen3.8-27b), synthetic memo app, entering at step16, graded by an independent HTTP test:
+
+| case | n | result | time |
+|---|---|---|---|
+| no bug | 3 | 3/3 all PASS, nothing changed | 64-71 s |
+| 3 planted bugs (column length, missing WHERE value, partial update loses a value) | 3 | all repaired within 2 fixes as seen from the screen; HTTP test 3/3, 3/3, 2/3 (one fix was only in the HTML, so the API still lost the value) | 210-239 s |
+
+Not measured: a full run from a request, a large app with login, first-pass pass rate on several request types. Known gap: the verifier only tests through the screen.

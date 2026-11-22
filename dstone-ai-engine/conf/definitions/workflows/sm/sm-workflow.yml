@@ -38,11 +38,17 @@
 # compileJava는 원본 전체를 빌드하지 않고, 원본이 만들어 둔 클래스 폴더와 의존성을 참조해 바뀐 파일(과 그것을 쓰는 원본 파일)만 컴파일합니다.
 # 그래서 원본을 한 번은 빌드해 두어야 합니다(없으면 그렇다고 실패로 알립니다).
 #
+# 자동 동작 검증(2.4.0): 컴파일이 통과하면 사람에게 묻기 전에 실제로 돌려 봅니다.
+#   step32: 일회용 DB에 복제 + DDL 반영 + 빌드 + 기동. 실패 원인이 개발 결과(code)면 자동 수정, 환경(environment)이면 사람에게.
+#   step34: 검증 Agent가 완료 기준을 눌러 보고 PASS/FAIL/BLOCKED를 냄. FAIL이 있으면 자동 수정.
+#   step36: 자동 수정은 사람의 결정 하나마다 최대 2번. 사람이 새로 시키면 다시 2번.
+#   격리할 수 없는 프로젝트(지원하지 않는 DB·구성, 프로젝트ID 없음)는 통과로 치지 않고 이유와 함께 개발 승인으로 갑니다(state의 sandboxError).
+#
 # 원본 소스 경로는 step02가 요청서의 "## 소스경로" 아래 내용을 범용 Tool readMarkdownSection으로 읽어 state.sourceDir에 둡니다.
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.3.0
+version: 2.4.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -257,7 +263,7 @@ steps:
       deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
     save: compileResult
     saveError: compileError
-    next: step17
+    next: step31
     onFailure: step17
 
   - id: step17
@@ -462,7 +468,131 @@ steps:
       history: ${decisions:}
     save: revision
     next: step04
+
+  - id: step31
+    name: 자동 검증할 프로젝트 확인
+    type: TOOL
+    tool: readMarkdownSection
+    with:
+      fileFullPath: ${input}/00.request.md
+      heading: 프로젝트ID
+    save: projectId
+    saveError: projectIdError
+    next: step32
+    onFailure: step17
+
+  - id: step32
+    name: 격리 기동 확인
+    type: TOOL
+    tool: startSandboxServer
+    with:
+      projectId: ${state.projectId}
+      sourceRoot: ${state.sourceDir}
+      overlayDir: ${input}/${state.now}/dev-resources
+      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
+      deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
+    save: sandboxCheck
+    saveError: sandboxError
+    next: step34
+    onFailure: step33
+
+  - id: step33
+    name: 기동 실패가 개발 결과 탓인지
+    type: TOOL
+    tool: containsValue
+    with:
+      value: ${state.sandboxCheck.cause:}
+      expected: code
+    next: step36
+    onFailure: step17
+
+  - id: step34
+    name: 동작 검증
+    type: AGENT
+    agent: sm-verifier-agent
+    with:
+      base_dir: ${input}/${state.now}
+      source_dir: ${state.sourceDir}
+      project_id: ${state.projectId}
+      requirement: ${state.requirement}
+      design: ${state.design}
+      history: ${decisions:}
+    save: verification
+    saveError: verificationError
+    next: step35
+    onFailure: step17
+
+  - id: step35
+    name: 실패한 완료 기준이 있는지
+    type: TOOL
+    tool: containsValue
+    with:
+      value: ${state.verification.scenarios}
+      field: result
+      expected: FAIL
+    next: step36
+    onFailure: step17
+
+  - id: step36
+    name: 자동 수정 횟수 확인
+    type: TOOL
+    tool: countUp
+    with:
+      previous: ${state.autoFixRound}
+      max: 2
+      scope: ${decisions:}
+    save: autoFixRound
+    next: step37
+    onFailure: step17
+
+  - id: step37
+    name: 자동 수정 전 설계서 다시 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/${state.now}/03-1.design.md
+      maxChars: 60000
+    save: design
+    next: step38
+    onFailure: step17
+
+  - id: step38
+    name: 자동 수정 전 태스크아이템 목록 다시 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
+      maxChars: 60000
+    save: taskitems
+    next: step39
+    onFailure: step17
+
+  - id: step39
+    name: 자동 수정
+    type: AGENT
+    agent: sm-auto-fix-agent
+    with:
+      base_dir: ${input}/${state.now}
+      source_dir: ${state.sourceDir}
+      project_id: ${state.projectId}
+      request: ${state.request}
+      design: ${state.design}
+      taskitems: ${state.taskitems}
+      boot_error: ${state.sandboxError:}
+      verification: ${state.verification}
+      history: ${decisions:}
+    save: autoFix
+    next: step16
+    onFailure: step17
 state:
+  projectId: 요청서의 프로젝트ID(step31)
+  projectIdError: 프로젝트ID가 없어 자동 검증을 못 한 이유
+  sandboxCheck: 격리 기동 확인(step32) 결과({success, cause, message})
+  sandboxError: 격리 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
+  verification: 동작 검증(step34) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
+  verificationError: 동작 검증 Agent가 끝내지 못한 이유
+  autoFixRound: 자동 수정 횟수({count, scope})
+  autoFix: 자동 수정(step39)이 돌려준 답
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
   review: 리뷰 판정 결과

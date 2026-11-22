@@ -33,6 +33,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.project.ProjectStore;
+import net.dstone.ai.tools.build.sandbox.SandboxRegistry;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -45,6 +46,8 @@ import net.dstone.common.utils.StringUtil;
  *   dbListTables        테이블 / 뷰 목록
  *   dbDescribeTable     테이블 하나의 컬럼, 타입, PK, 코멘트
  *   dbQuery             조회(SELECT) 문장 하나 실행
+ *
+ * 격리 시험 서버가 떠 있는 동안에는 그 일회용 복제본도 별칭 "sandbox-…"로 조회합니다(tools.build.sandbox.SandboxRegistry).
  *
  * 접속 정보는 LLM에게서 받지 않습니다. 프로젝트관리에 등록한 DB(별칭 "프로젝트ID.DB이름")와 설정(dstone.ai.tool.db.connections.{별칭})에 적어 둔 DB만,
  * 별칭으로만 부를 수 있습니다. 등록된 DB가 없으면(기본값) 모든 호출이 실패 문구로 끝나므로,
@@ -87,6 +90,10 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 	/** 프로젝트 관리의 DB 목록. 단위 테스트처럼 직접 만든 Tool에서는 null이다 */
 	@Autowired
 	private ProjectStore projectStore;
+
+	/** 떠 있는 격리 시험 DB 목록. 직접 만든 Tool에서는 null이다 */
+	@Autowired
+	private SandboxRegistry sandboxRegistry;
 
 	/** 별칭마다 하나씩 만든 커넥션 풀. 처음 부를 때 만든다 */
 	private final Map<String, Pool> pools = new ConcurrentHashMap<String, Pool>();
@@ -559,6 +566,27 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 			.bind(Constants.Tool.Db.PREFIX + ".connections", Bindable.mapOf(String.class, DbConnectionSetting.class)).orElse(new LinkedHashMap<String, DbConnectionSetting>());
 		for (Map.Entry<String, DbConnectionSetting> entry : configured.entrySet()) {
 			result.putIfAbsent(entry.getKey(), entry.getValue());
+		}
+		if (this.sandboxRegistry != null) {
+			Map<String, Map<String, String>> sandboxes = this.sandboxRegistry.connections();
+			for (Map.Entry<String, Map<String, String>> entry : sandboxes.entrySet()) {
+				DbConnectionSetting setting = new DbConnectionSetting();
+				setting.setUrl(entry.getValue().get("url"));
+				setting.setUsername(entry.getValue().get("username"));
+				setting.setPassword(entry.getValue().get("password"));
+				setting.setDescription(entry.getValue().get("description"));
+				// MySQL은 DB가 카탈로그라 스키마로 쓰고, 다른 DB는 접속한 기본 스키마를 쓴다
+				if (setting.getUrl().startsWith("jdbc:mysql:")) {
+					setting.setSchema(entry.getValue().get("schema"));
+				}
+				result.put(entry.getKey(), setting);
+			}
+			// 내려간 시험 DB의 커넥션 풀은 닫는다
+			for (Map.Entry<String, Pool> pool : this.pools.entrySet()) {
+				if (pool.getKey().startsWith(SandboxRegistry.ALIAS_PREFIX) && !sandboxes.containsKey(pool.getKey()) && this.pools.remove(pool.getKey(), pool.getValue())) {
+					pool.getValue().dataSource.close();
+				}
+			}
 		}
 		return result;
 	}
