@@ -146,40 +146,29 @@
 					</div>
 
 					<!--
-						승인 대기. 위에서부터 [무엇을 기다리나(step·역할·결정하는 사람)] → [안내] → [의견] → [결정].
-						선택지 방식(routes)이면 선택지마다 카드가 하나씩 생기고, 승인/반려 방식이면 아래 오른쪽 단추 두 개를 쓴다.
+						승인 대기. [안내 한 줄] 아래에 왼쪽은 결정 목록, 오른쪽은 의견과 보내기 단추.
+						결정을 먼저 고르고 단추로 보낸다(잘못 눌러 바로 넘어가지 않게). 승인/반려 방식이면 목록에 승인·반려 두 줄이 나온다.
 					-->
 					<div id="workflow-admin-decision-form" class="wa-decide" style="display:none;">
-						<dl class="wa-decide-meta">
-							<div><dt>기다리는 step</dt><dd id="wa-decide-step">-</dd></div>
-							<div id="wa-decide-role-item"><dt>결정할 역할</dt><dd id="wa-decide-role">-</dd></div>
-							<div>
-								<dt>결정하는 사람</dt>
-								<!-- 결정한 사람은 세션 사용자로 남는다(바꿀 수 없다). 값은 아래 스크립트가 세션 정보로 채운다 -->
-								<dd id="wa-decide-user">-</dd>
-								<input type="hidden" id="workflow-admin-approver" value="" />
-							</div>
-						</dl>
 						<p id="workflow-admin-decision-step" class="wa-decide-guide"></p>
+						<!-- 결정한 사람은 세션 사용자로 남는다(바꿀 수 없다). 값은 아래 스크립트가 세션 정보로 채운다 -->
+						<input type="hidden" id="workflow-admin-approver" value="" />
 
-						<label class="wa-decide-comment" for="workflow-admin-comment">
-							<span class="wa-decide-label">의견 <small>선택 · 고른 결정과 함께 다음 step에 전달됩니다</small></span>
-							<textarea id="workflow-admin-comment" rows="3" placeholder="고칠 점이나 확인할 점을 적어 주세요"></textarea>
-						</label>
+						<div class="wa-decide-body">
+							<fieldset class="wa-decide-choices">
+								<legend class="wa-decide-label">결정</legend>
+								<div id="workflow-admin-route-buttons" class="wa-choice-list"></div>
+							</fieldset>
 
-						<!-- 선택지 방식 APPROVAL(routes)일 때 선택지마다 카드가 하나씩 만들어진다 -->
-						<div id="wa-decide-choices-box" class="wa-decide-choices-box" style="display:none;">
-							<div class="wa-decide-label">결정</div>
-							<div id="workflow-admin-route-buttons" class="wa-choices" role="group" aria-label="결정 선택지"></div>
-						</div>
-
-						<div class="wa-decide-foot">
-							<span id="workflow-admin-decision-status" class="workflow-status"></span>
-							<!-- 승인/반려 방식 APPROVAL일 때 보이는 단추 -->
-							<span id="wa-decide-buttons" class="wa-decide-buttons">
-								<button type="button" id="workflow-admin-reject-btn" class="kn-plain">반려</button>
-								<button type="button" id="workflow-admin-approve-btn">승인</button>
-							</span>
+							<div class="wa-decide-side">
+								<label class="wa-decide-label" for="workflow-admin-comment">의견 <small>선택</small></label>
+								<textarea id="workflow-admin-comment" rows="4" placeholder="고칠 점이나 확인할 점을 적어 주세요"></textarea>
+								<div id="wa-decide-receiver" class="wa-decide-receiver"></div>
+								<div class="wa-decide-foot">
+									<span id="workflow-admin-decision-status" class="workflow-status"></span>
+									<button type="button" id="wa-decide-submit" disabled>결정 보내기</button>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -353,7 +342,6 @@
 		// 결정한 사람은 세션 사용자로 남는다(바꿀 수 없다). 로그인을 끈 환경이면 설정의 기본 사용자다
 		DstoneConsole.session().then(function (info) {
 			document.getElementById("workflow-admin-approver").value = info.userId || "";
-			document.getElementById("wa-decide-user").textContent = info.userId || "-";
 		});
 	</script>
 </body>
