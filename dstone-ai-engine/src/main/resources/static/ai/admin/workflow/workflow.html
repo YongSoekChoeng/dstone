@@ -162,7 +162,8 @@
 
 							<div class="wa-decide-side">
 								<label class="wa-decide-label" for="workflow-admin-comment">의견 <small>선택</small></label>
-								<textarea id="workflow-admin-comment" rows="4" placeholder="고칠 점이나 확인할 점을 적어 주세요"></textarea>
+								<!-- 동작 문제를 맡길 때 증거를 붙이도록 안내한다. "안 된다"만 받은 Agent는 추측으로 고칠 수밖에 없다(2026-11-22 실행 f2cf12b3) -->
+								<textarea id="workflow-admin-comment" rows="4" placeholder="고칠 점이나 확인할 점을 적어 주세요.&#10;동작하지 않는 문제라면 재현 순서, 오류 메시지, 서버 로그나 브라우저 네트워크 응답을 붙여 주세요. 원인을 훨씬 정확히 찾습니다."></textarea>
 								<div id="wa-decide-receiver" class="wa-decide-receiver"></div>
 								<div class="wa-decide-foot">
 									<span id="workflow-admin-decision-status" class="workflow-status"></span>

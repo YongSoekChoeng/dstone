@@ -30,8 +30,8 @@ import net.dstone.ai.support.WorkflowTestBase;
  * - 승인하고 앞으로 진행하면(step08 → TOOL step09 → step10) TOOL step을 건너뛰어 다음 Agent가 받는다.
  * - 승인 화면은 결정마다 그 의견을 받을 step(Agent)을 보여 준다.
  * - [~ 수정]을 고르면 문서 수정 Agent가 그 의견을 지시로 받는다.
- * - [재개발]을 고르면 설계서와 목록을 다시 읽고(step21~22) 개발 폴더는 그대로 둔 채 개발로 간다(sm-workflow 2.1.0).
- * - [전문가 해결]을 고르면 설계서와 목록을 다시 읽고(step23~24) 해결 Agent(step25)가 증상을 받아 고친 뒤 컴파일 확인으로 간다(2.2.0).
+ * - [재개발]을 고르면 설계서와 목록을 다시 읽고(step18~19) 개발 폴더는 그대로 둔 채 개발로 간다(sm-workflow 2.1.0).
+ * - [전문가 해결]을 고르면 설계서와 목록을 다시 읽고(step20~21) 해결 Agent(step22)가 증상을 받아 고친 뒤 컴파일 확인으로 간다(2.2.0).
  * </pre>
  */
 public class SmDecisionFlowTest extends WorkflowTestBase {
@@ -58,7 +58,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 
 		PendingApproval pending = this.pendingApproval(flow.execution());
 		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step10 아키텍처 설계 · sm-architect-agent");
-		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step19 영향도분석서 수정 · document-revise-agent");
+		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step24 영향도분석서 수정 · document-revise-agent");
 		assertThat(pending.receivers().get("중지")).isEqualTo("실패로 끝냄(FAIL)");
 
 		flow.decide("승인(설계진행)", "공통 코드 테이블도 같이 봐 주세요");
@@ -88,8 +88,8 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step06");
 		flow.step("step06");
 		flow.decide("요구사항 수정", "TASK-02 완료 기준을 확인할 수 있게 고쳐 주세요");
-		assertThat(flow.currentStepId()).isEqualTo("step20");
-		flow.step("step20");
+		assertThat(flow.currentStepId()).isEqualTo("step25");
+		flow.step("step25");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step04");
@@ -116,9 +116,9 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		assertThat(pending.receivers().get("재개발")).isEqualTo("step15 개발 · sm-developer-agent");
 
 		flow.decide("재개발", "업로드한 파일이 저장되지 않음");
-		assertThat(flow.currentStepId()).isEqualTo("step21");
-		flow.step("step21");
-		flow.step("step22");
+		assertThat(flow.currentStepId()).isEqualTo("step18");
+		flow.step("step18");
+		flow.step("step19");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step15");
@@ -139,18 +139,18 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		String designPath = design.toString().replace("\\", "/");
 		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + designPath + "\", \"edits\": [{\"before\": \"e.files[0];\", \"after\": \"e.files[0].rawFile;\"}]}");
 		this.chatModel.answer("{\"causes\": [\"업로드 안 됨 → Kendo 파일 객체를 그대로 보냄 → kendo.upload.min.js\"], \"changes\": [\"imageBoardView.jsp: rawFile 전송\"],"
-			+ " \"designChanges\": [], \"unresolved\": [], \"compiled\": true, \"designSynced\": true}");
+			+ " \"designChanges\": [], \"verification\": [\"코드만 읽음: 업로드 후 테이블 행을 확인\"], \"unresolved\": [], \"compiled\": true, \"designSynced\": true}");
 
 		WorkflowStepper flow = this.atStep("step17");
 		flow.step("step17");
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("전문가 해결")).isEqualTo("step25 전문가 해결 · sm-troubleshooter-agent");
+		assertThat(pending.receivers().get("전문가 해결")).isEqualTo("step22 전문가 해결 · sm-troubleshooter-agent");
 
 		flow.decide("전문가 해결", "업로드한 파일이 테이블에 저장되지 않음");
-		assertThat(flow.currentStepId()).isEqualTo("step23");
-		flow.step("step23");
-		flow.step("step24");
-		flow.step("step25");
+		assertThat(flow.currentStepId()).isEqualTo("step20");
+		flow.step("step20");
+		flow.step("step21");
+		flow.step("step22");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step16");
@@ -163,7 +163,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 	@Test
 	void Agent_step은_모두_결정_기록을_읽는다() {
 		Map<String, Object> context = WorkFlowContext.create(this.workDir.toString(), WORKFLOW_ID, "test");
-		for (String stepId : List.of("step03", "step07", "step10", "step15", "step18", "step19", "step20", "step25")) {
+		for (String stepId : List.of("step03", "step07", "step10", "step15", "step23", "step24", "step25", "step22")) {
 			String with = String.valueOf(this.withOf(stepId));
 			assertThat(with).as(stepId).contains("instruction=${arrival").contains("history=${decisions");
 		}

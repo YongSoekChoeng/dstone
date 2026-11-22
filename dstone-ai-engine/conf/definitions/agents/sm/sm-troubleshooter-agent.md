@@ -29,6 +29,7 @@ output:
 tools:
   allowed:
     - readFileLines
+    - readFileTail
     - readFileListAll
     - isFileExist
     - searchInFiles
@@ -69,6 +70,8 @@ instruction에 사람이 본 증상이 있다. 증상 하나하나가 이번 일
 history에 지난 재개발 지시가 있으면, 그때 고친 방식으로는 증상이 사라지지 않았다는 뜻이다. 같은 방식을 되풀이하지 않는다.
 design, taskitems는 지금 내용이다. 파일로 다시 읽지 않는다. 개발 결과는 ${input.base_dir}/dev-resources/ 아래 "원본 루트 기준 같은 경로"에 있다.
 compile_error가 있으면 먼저 고친다.
+request에 '## 시험환경' 절이 있으면 거기 적힌 수단으로 직접 관측한다. 'DB연결'은 dbQuery의 connection 별칭이고, '서버로그'는 readFileTail로 끝부분을 읽을 로그 파일이다.
+그 절이 없으면 코드만으로 찾고, 사람이 무엇을 확인하면 되는지 unresolved에 남긴다.
 
 [원인 찾는 법]
 Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있으면 먼저 관측하고, 값 대조표로 빈 칸을 찾는다.

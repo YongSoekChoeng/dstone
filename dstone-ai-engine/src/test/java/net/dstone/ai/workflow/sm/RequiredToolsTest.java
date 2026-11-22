@@ -96,7 +96,7 @@ public class RequiredToolsTest extends WorkflowTestBase {
 	@Test
 	void 둘_중_하나만_적은_항목은_어느_것이든_성공하면_된다() throws IOException {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
-		// document-revise-agent(step18 설계서 수정)는 requiredTools: [editFileTexts|writeFile|appendFile]다. 고칠 때는 editFileTexts로만 끝난다.
+		// document-revise-agent(step23 설계서 수정)는 requiredTools: [editFileTexts|writeFile|appendFile]다. 고칠 때는 editFileTexts로만 끝난다.
 		Path design = this.workDir.resolve("03-1.design.md");
 		Files.writeString(design, "import kr.co.gnx.system.file.UPLOADS;\n");
 		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + design.toString().replace("\\", "/")
@@ -107,8 +107,8 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		input.put("documents", List.of(design.toString().replace("\\", "/")));
 		input.put("request", "## 현업요청\n이미지 게시판");
 		input.put("instruction", "개발 승인(step17)의 결정: 설계 수정\n의견:\nUPLOADS import가 틀렸다");
-		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step18", input);
-		flow.step("step18");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step23", input);
+		flow.step("step23");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(Files.readString(design)).contains("kr.co.gnx.config.Constants.UPLOADS");
@@ -131,8 +131,8 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		Map<String, Object> input = new LinkedHashMap<>();
 		input.put("documents", List.of(design.toString().replace("\\", "/"), taskitems.toString().replace("\\", "/")));
 		input.put("instruction", "설계 승인(step11)의 결정: 설계 수정\n의견:\n최대 50MB로");
-		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step18", input);
-		flow.step("step18");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, "step23", input);
+		flow.step("step23");
 
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.errorMessage()).contains("requiredWrites").contains("03-1.design.md");
