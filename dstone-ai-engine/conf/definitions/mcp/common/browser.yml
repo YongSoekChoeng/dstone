@@ -1,0 +1,31 @@
+# 헤드리스 브라우저를 다루는 MCP 서버(Playwright MCP)입니다.
+# 전문가 해결 Agent가 시험 서버의 화면을 직접 열어 재현하고, 콘솔 오류와 네트워크 응답을 보는 데 씁니다.
+# 설치 폴더와 브라우저 경로는 env*.properties의 PLAYWRIGHT_MCP_HOME, PLAYWRIGHT_BROWSER입니다.
+# 비어 있는 환경에서는 서버가 뜨지 않고 건너뜁니다(엔진은 그대로 뜨고, 이 Tool을 적은 Agent에는 경고만 남습니다).
+# npx -y로 띄우지 않고 설치한 파일을 node로 바로 실행합니다. 폐쇄망에서 실행할 때 내려받으려 하지 않게 하려는 것입니다.
+id: browser
+transport: STDIO
+command: node
+args:
+  - ${PLAYWRIGHT_MCP_HOME}/node_modules/@playwright/mcp/cli.js
+  - --headless
+  - --isolated
+  - --executable-path
+  - ${PLAYWRIGHT_BROWSER}
+  - --output-dir
+  - ${PLAYWRIGHT_MCP_HOME}/output
+# 화면 재현에 필요한 것만 엽니다. 임의 코드 실행(browser_run_code_unsafe, browser_evaluate)과 파일 올리기는 뺍니다.
+allowedTools:
+  - browser_navigate
+  - browser_snapshot
+  - browser_click
+  - browser_type
+  - browser_fill_form
+  - browser_select_option
+  - browser_press_key
+  - browser_handle_dialog
+  - browser_wait_for
+  - browser_console_messages
+  - browser_network_requests
+  - browser_network_request
+  - browser_close

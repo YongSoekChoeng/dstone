@@ -11,8 +11,11 @@
 | `url` | SSE | 접속할 서버 URL |
 | `allowedTools` | | 이 서버의 Tool 중 실제로 가져올 이름 목록. 비우면 전부 |
 
-접속에 실패한 서버는 로그만 남기고 건너뛴다(엔진 기동은 계속된다). caller별 접근 제어는 서버 단위가 아니라 다른 Tool과
-똑같이 `dstone.ai.tool.allowed-by-caller`(Tool 이름 기준)로 한다.
+접속에 실패한 서버는 로그만 남기고 건너뛴다(엔진 기동은 계속된다).
+`command`·`args`·`url`의 `${이름}`은 `env*.properties` 값으로 바뀐다. 값이 비어 `${이름}`이 그대로 남으면 접속을 시도하지 않고
+바로 건너뛴다(로그 "건너뜀 - 설정값이 비어 있습니다"). 설치한 환경에서만 쓰는 서버는 이렇게 환경 값으로 켜고 끈다(예: `common/browser.yml`).
+
+caller별 접근 제어는 서버 단위가 아니라 다른 Tool과 똑같이 `dstone.ai.tool.allowed-by-caller`(Tool 이름 기준)로 한다.
 
 **MCP 서버**: `definitions/mcp/sample/sample-filesystem.yml` — 공식 filesystem 레퍼런스 서버를 STDIO로 띄워
 `${APP_HOME}/${APP_NAME}/mcp/server-filesystem` 하나만 노출한다(`list_directory`/`directory_tree`/`read_text_file`/`write_file`/`edit_file`/`move_file`만 허용).

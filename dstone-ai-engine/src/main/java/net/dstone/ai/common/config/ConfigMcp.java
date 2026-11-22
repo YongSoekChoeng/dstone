@@ -2,6 +2,8 @@ package net.dstone.ai.common.config;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
@@ -54,6 +56,12 @@ public class ConfigMcp extends BaseObject {
 	@PostConstruct
 	public void connect() {
 		for (McpServerDefinition definition : this.mcpServerRegistry.all()) {
+			String unresolved = this.unresolvedOf(definition);
+			if (unresolved != null) {
+				// 이 환경에 설치하지 않아 env*.properties 값을 비워 둔 서버입니다. 띄워 봐야 접속을 기다리다(약 20초) 실패하므로 바로 건너뜁니다.
+				LogUtil.sysout("dstone-ai-engine mcp: [" + definition.id() + "] 건너뜀 - 설정값이 비어 있습니다(" + unresolved + "). 이 서버의 Tool은 등록되지 않습니다.");
+				continue;
+			}
 			try {
 				this.connectOne(definition);
 			} catch (Exception e) {
@@ -61,6 +69,35 @@ public class ConfigMcp extends BaseObject {
 			}
 		}
 	}
+
+	/**
+	 * <pre>
+	 * 정의의 command·args·url에 치환되지 않은 ${이름}이 남아 있으면 그 글자를 돌려줍니다. 없으면 null입니다.
+	 * 정의 파일을 읽을 때 env*.properties에 값이 없는 ${이름}은 그대로 남습니다(YamlDefinitionLoader).
+	 * </pre>
+	 *
+	 * @param definition 살펴볼 MCP 서버 정의
+	 */
+	private String unresolvedOf(McpServerDefinition definition) {
+		List<String> values = new ArrayList<>();
+		values.add(definition.command());
+		values.add(definition.url());
+		if (definition.args() != null) {
+			values.addAll(definition.args());
+		}
+		for (String value : values) {
+			if (value != null) {
+				Matcher matcher = UNRESOLVED.matcher(value);
+				if (matcher.find()) {
+					return matcher.group();
+				}
+			}
+		}
+		return null;
+	}
+
+	/** 치환되지 않고 남은 ${이름}입니다. */
+	private static final Pattern UNRESOLVED = Pattern.compile("\\$\\{[A-Z0-9_]+\\}");
 
 	/**
 	 * <pre>

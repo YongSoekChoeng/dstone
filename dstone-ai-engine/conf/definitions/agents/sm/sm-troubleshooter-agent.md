@@ -4,7 +4,7 @@
 # 기본 Agent들은 가벼운 기본 모델을 쓰고, 이 Agent만 더 강한 모델(model.name)과 높은 추론 세기를 씁니다.
 # 폐쇄망 POC에서도 그대로 설치할 수 있는 오픈 웨이트 모델(gpt-oss-120b, Apache 2.0)을 골랐습니다(2026-11-21).
 id: sm-troubleshooter-agent
-version: 1.1.0
+version: 1.2.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   name: openai/gpt-oss-120b
@@ -47,6 +47,21 @@ tools:
     - dbListConnections
     - dbListTables
     - dbQuery
+    - applyOverlay
+    - runShellScript
+    - browser_navigate
+    - browser_snapshot
+    - browser_click
+    - browser_type
+    - browser_fill_form
+    - browser_select_option
+    - browser_press_key
+    - browser_handle_dialog
+    - browser_wait_for
+    - browser_console_messages
+    - browser_network_requests
+    - browser_network_request
+    - browser_close
 skills:
   preload:
     - handling-instructions
@@ -70,8 +85,15 @@ instruction에 사람이 본 증상이 있다. 증상 하나하나가 이번 일
 history에 지난 재개발 지시가 있으면, 그때 고친 방식으로는 증상이 사라지지 않았다는 뜻이다. 같은 방식을 되풀이하지 않는다.
 design, taskitems는 지금 내용이다. 파일로 다시 읽지 않는다. 개발 결과는 ${input.base_dir}/dev-resources/ 아래 "원본 루트 기준 같은 경로"에 있다.
 compile_error가 있으면 먼저 고친다.
-request에 '## 시험환경' 절이 있으면 거기 적힌 수단으로 직접 관측한다. 'DB연결'은 dbQuery의 connection 별칭이고, '서버로그'는 readFileTail로 끝부분을 읽을 로그 파일이다.
-그 절이 없으면 코드만으로 찾고, 사람이 무엇을 확인하면 되는지 unresolved에 남긴다.
+request에 '## 시험환경' 절이 있으면 거기 적힌 수단으로 직접 관측한다. 적힌 항목만 쓴다.
+- DB연결: dbQuery의 connection 별칭. 처리 결과가 DB에 남았는지 본다.
+- 서버로그: readFileTail로 끝부분을 읽을 로그 파일.
+- 반영폴더, 반영명령: 개발 결과를 시험 서버에 올리는 방법. applyOverlay(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources,
+  targetDir 반영폴더, deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 사본을 맞춘 뒤 runShellScript(반영명령)를 부른다.
+  서버가 다시 뜨는 데 시간이 걸리므로 접속주소가 열릴 때까지 browser_wait_for로 기다린다.
+- 접속주소, 시험계정: browser_* Tool로 화면을 열고 로그인해 증상을 그대로 재현한다. 콘솔 오류(browser_console_messages)와 요청·응답(browser_network_requests)을 본다.
+반영할 수 있으면 고치기 전에 지금 결과를 한 번 올려 재현하고, 고친 뒤 다시 올려 증상이 사라졌는지 확인한다. 시험 서버가 아닌 곳에는 올리지 않는다.
+그 절이 없거나 수단이 듣지 않으면 코드만으로 찾고, 사람이 무엇을 확인하면 되는지 unresolved에 남긴다.
 
 [원인 찾는 법]
 Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있으면 먼저 관측하고, 값 대조표로 빈 칸을 찾는다.
