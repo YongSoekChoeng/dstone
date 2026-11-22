@@ -4,7 +4,7 @@
 # 기본 Agent들은 가벼운 기본 모델을 쓰고, 이 Agent만 더 강한 모델(model.name)과 높은 추론 세기를 씁니다.
 # 폐쇄망 POC에서도 그대로 설치할 수 있는 오픈 웨이트 모델(gpt-oss-120b, Apache 2.0)을 골랐습니다(2026-11-21).
 id: sm-troubleshooter-agent
-version: 1.0.0
+version: 1.1.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   name: openai/gpt-oss-120b
@@ -22,6 +22,7 @@ output:
   causes(array, 증상마다 "증상 → 원인 → 근거(파일:줄)" 한 줄): string
   changes(array, 고친 파일과 고친 내용 한 줄씩): string
   designChanges(array, 설계서와 다르게 고친 점과 이유. 없으면 빈 목록): string
+  verification(array, 고친 것마다 확인한 방법 한 줄. 직접 관측했으면 무엇을 봤는지(조회 결과·로그·재현), 코드만 읽었으면 그렇다고 적고 사람이 볼 것): string
   unresolved(array, 해결하지 못한 증상과 사람이 확인할 것. 없으면 빈 목록): string
   compiled: boolean, 마지막 compileJava가 통과했는가
   designSynced: boolean, 고친 내용을 03-1.design.md에 옮겨 적었는가
@@ -49,6 +50,7 @@ skills:
   preload:
     - handling-instructions
     - source-investigation
+    - troubleshooting
   allowed:
     - projects/**
 execution:
@@ -69,13 +71,11 @@ design, taskitems는 지금 내용이다. 파일로 다시 읽지 않는다. 개
 compile_error가 있으면 먼저 고친다.
 
 [원인 찾는 법]
-1. 증상마다 흐름을 끝까지 따라간다. 화면 이벤트와 스크립트 → 보내는 URL과 값 → Controller 매핑과 파라미터 바인딩 → Service → DAO와 매퍼 SQL → 테이블(DDL, dbDescribeTable).
-   값이 끊기거나 이름이 어긋나는 곳이 원인이다. 대상은 dev-resources의 지금 파일이다.
-2. 원본에서 같은 일을 하는, 이미 동작하는 기능을 찾아(knowledgeSearch, searchInFiles) 같은 부분을 한 줄씩 비교한다. 다른 곳이 가장 먼저 의심할 곳이다.
-3. 라이브러리(Kendo UI, jQuery 등)나 공통 유틸의 쓰임이 의심되면, 원본에서 그 API를 쓰는 예를 찾는다. 예가 없으면 원본에 들어 있는 라이브러리 소스를 searchInFiles로 찾아
-   그 API가 실제로 무엇을 주고받는지 확인한다. Skill source-investigation의 "공통 내부는 따라가지 않는다"는 이 Agent에는 해당하지 않는다. 원인이 그 안에 있을 수 있다.
-4. 원인마다 근거를 파일:줄로 댄다. 근거 없이 "아마 ~일 것"으로 고치지 않는다.
-   근거를 찾지 못하면 고치지 말고 unresolved에 무엇을 보면 알 수 있는지(브라우저 콘솔, 네트워크 요청, 서버 로그의 어느 줄) 적는다.
+Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있으면 먼저 관측하고, 값 대조표로 빈 칸을 찾는다.
+- 대상은 dev-resources의 지금 파일이다. 원본에서 같은 일을 하는, 이미 동작하는 기능과 한 줄씩 비교한다.
+- 라이브러리나 공통 유틸의 쓰임이 의심되면 원본에서 그 API를 쓰는 예를 찾고, 예가 없으면 원본에 들어 있는 라이브러리 소스를 searchInFiles로 찾아 확인한다.
+  Skill source-investigation의 "공통 내부는 따라가지 않는다"는 이 Agent에는 해당하지 않는다. 원인이 그 안에 있을 수 있다.
+- 원인마다 근거를 파일:줄이나 관측 결과로 댄다. 근거 없이 "아마 ~일 것"으로 고치지 않는다.
 
 [고치는 법]
 - 원본 소스는 읽기만 한다. 결과는 dev-resources에만 쓴다. 원본 파일을 처음 고칠 때는 copyFileWithReplace(원본, 저장 경로, 빈 목록)로 복사한 뒤 고친다.
@@ -96,5 +96,6 @@ compile_error가 있으면 먼저 고친다.
 
 [답]
 기록까지 마친 뒤에 답한다. ${output.causes}에 증상별 원인과 근거를, ${output.changes}에 고친 파일과 내용을,
-${output.designChanges}에 설계서와 다르게 고친 점을, ${output.unresolved}에 못 푼 증상과 사람이 확인할 것을,
+${output.designChanges}에 설계서와 다르게 고친 점을, ${output.verification}에 고친 것마다 확인한 방법을,
+${output.unresolved}에 못 푼 증상과 사람이 확인할 것을,
 ${output.compiled}에 마지막 컴파일 통과 여부를, ${output.designSynced}에 설계서 반영 여부를 적는다.

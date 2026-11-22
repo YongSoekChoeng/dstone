@@ -2,7 +2,7 @@
 # sm-workflow step15(개발)의 Agent입니다. 설계서대로 dev-resources에 소스를 만들고 고친 뒤, 컴파일을 확인하고 결과를 태스크아이템 목록에 기록합니다.
 # 조사 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 id: sm-developer-agent
-version: 2.1.0
+version: 2.2.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -37,6 +37,7 @@ skills:
   preload:
     - handling-instructions
     - source-investigation
+    - troubleshooting
   allowed:
     - projects/**
 execution:
