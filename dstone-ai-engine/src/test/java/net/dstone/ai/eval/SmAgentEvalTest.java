@@ -52,6 +52,12 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 
 	private static final Path FIXTURE = Paths.get("src/test/resources/eval/sm/work002");
 
+	/**
+	 * 전문가 해결 사례(실행 f2cf12b3, 2026-11-22). 다섯 번 맡겨도 "게시물 삭제가 안 된다"를 풀지 못한 시점의 설계서·개발 결과·결정 기록입니다.
+	 * 진짜 원인은 삭제 SQL의 WHERE 조건값(mb_id)을 Controller·Service 어디에서도 채우지 않은 것입니다(오류 없이 0건 삭제).
+	 */
+	private static final Path TROUBLESHOOT_FIXTURE = Paths.get("src/test/resources/eval/sm/troubleshoot-delete");
+
 	private static final Path OUT_ROOT = Paths.get("target/eval");
 
 	private static final String RUN_ID = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -139,15 +145,103 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 		c.report();
 	}
 
+	@Test
+	void 전문가_해결_삭제_증거없음() throws Exception {
+		this.troubleshootDelete("전문가_해결_삭제_증거없음", null);
+	}
+
+	@Test
+	void 전문가_해결_삭제_시험환경() throws Exception {
+		this.troubleshootDelete("전문가_해결_삭제_시험환경", "- DB연결: " + System.getProperty("dstone.ai.eval.db-connection", "testApp") + "\n");
+	}
+
+	/**
+	 * <pre>
+	 * 시험 서버에 올려 브라우저로 재현까지 하는 사례입니다. 이 PC에 시험 서버가 준비되어 있어야 합니다.
+	 * 기본값은 WSL의 testApp 시험 사본(docs/software/16.playwright-mcp.md 4절)이고, 값은 시스템 프로퍼티로 바꿀 수 있습니다.
+	 *   -Ddstone.ai.eval.stage-dir=/app/testApp-stage   -Ddstone.ai.eval.url=http://localhost:7080
+	 *   -Ddstone.ai.eval.account="admin / test1234!"     -Ddstone.ai.eval.server-log=/opt/tomcat9/logs/catalina.out
+	 * 반영 스크립트는 conf/application.yml의 runShellScript 등록 이름 test-server-deploy(env의 TEST_SERVER_DEPLOY_SCRIPT)입니다.
+	 * </pre>
+	 */
+	@Test
+	void 전문가_해결_삭제_재현() throws Exception {
+		String environment = "- DB연결: " + System.getProperty("dstone.ai.eval.db-connection", "testApp") + "\n"
+			+ "- 서버로그: " + System.getProperty("dstone.ai.eval.server-log", "/opt/tomcat9/logs/catalina.out") + "\n"
+			+ "- 반영폴더: " + System.getProperty("dstone.ai.eval.stage-dir", "/app/testApp-stage") + "\n"
+			+ "- 반영명령: test-server-deploy\n"
+			+ "- 접속주소: " + System.getProperty("dstone.ai.eval.url", "http://localhost:7080") + "\n"
+			+ "- 시험계정: " + System.getProperty("dstone.ai.eval.account", "admin / test1234!") + "\n";
+		this.troubleshootDelete("전문가_해결_삭제_재현", environment);
+	}
+
+	/**
+	 * <pre>
+	 * 전문가 해결(sm-troubleshooter-agent)이 "여전히 삭제가 안 된다"만 받고 진짜 원인을 찾는지 봅니다.
+	 * environment가 있으면 요청서에 '## 시험환경' 절로 붙이고, 적힌 수단을 실제로 썼는지도 봅니다.
+	 * DB연결 별칭은 -Ddstone.ai.eval.db-connection(기본 testApp)으로 바꿀 수 있습니다.
+	 * </pre>
+	 *
+	 * @param environment '## 시험환경' 아래에 붙일 줄들. 없으면 null
+	 */
+	private void troubleshootDelete(String name, String environment) throws Exception {
+		Case c = this.newCase(name, TROUBLESHOOT_FIXTURE);
+		if (environment != null) {
+			c.request = c.request.stripTrailing() + "\n\n## 시험환경\n" + environment;
+			Files.writeString(c.requestDir.resolve("00.request.md"), c.request, StandardCharsets.UTF_8);
+		}
+		c.copyDoc("03-1.design.md");
+		c.copyDoc("03-2.taskitems.md");
+		c.copyDoc("03-3.ddl(데이터베이스).md");
+		c.copyDevResources();
+		Map<String, Object> input = new LinkedHashMap<String, Object>();
+		input.put("base_dir", c.workDir.toString().replace('\\', '/'));
+		input.put("source_dir", c.sourceDir);
+		input.put("request", c.request);
+		input.put("design", c.doc("03-1.design.md"));
+		input.put("taskitems", c.doc("03-2.taskitems.md"));
+		input.put("instruction", c.inputOf("instruction"));
+		input.put("history", c.inputOf("history"));
+		input.put("compile_error", "");
+		c.run("sm-troubleshooter-agent", input);
+
+		String controller = "dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardController.java";
+		String service = "dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardService.java";
+		int before = c.countOriginal(controller, "setMb_id") + c.countOriginal(service, "setMb_id");
+		int after = c.count(controller, "setMb_id") + c.count(service, "setMb_id");
+		c.check("원인에 조건값(mb_id) 누락", c.answerOf("causes").contains("mb_id"));
+		c.check("삭제 경로에 mb_id 채움", after > before);
+		c.check("설계서 반영", c.changed("03-1.design.md"));
+		c.check("컴파일 통과", "true".equals(c.answerOf("compiled")));
+		c.check("확인 방법 기록", !c.answerOf("verification").isEmpty() && !"[]".equals(c.answerOf("verification")));
+		if (environment != null && environment.contains("DB연결")) {
+			c.check("dbQuery로 관측", c.toolCalls("dbQuery") > 0);
+		}
+		if (environment != null && environment.contains("반영명령")) {
+			c.check("시험 서버에 반영", c.toolCalls("applyOverlay") > 0 && c.toolCalls("runShellScript") > 0);
+			c.check("브라우저로 재현", c.toolCalls("browser_") > 0);
+			// 브라우저로 누르면 체크박스가 체크된 채로 남지 않는 문제도 있습니다(2026-11-22 확인). 찾았는지 참고로 봅니다.
+			c.check("(참고) 체크 유지 문제", c.answerOf("causes").contains("체크"));
+		}
+		c.report();
+	}
+
 	/**
 	 * 사례 하나의 작업 폴더를 만듭니다. 요청서는 폴더 위(요청 폴더)에 두고, 작업 폴더는 그 아래 실행시각 폴더입니다.
 	 */
 	private Case newCase(String name) throws IOException {
+		return this.newCase(name, FIXTURE);
+	}
+
+	/**
+	 * 사례 하나의 작업 폴더를 만듭니다. fixture는 00.request.md와 docs/가 들어 있는 사례 폴더입니다.
+	 */
+	private Case newCase(String name, Path fixture) throws IOException {
 		Path requestDir = OUT_ROOT.resolve(RUN_ID).resolve(name).toAbsolutePath();
 		Path workDir = requestDir.resolve("work");
 		Files.createDirectories(workDir);
-		Case c = new Case(name, requestDir, workDir, System.getProperty("dstone.ai.eval.source-dir", "/app/testApp"));
-		c.request = c.fill(Files.readString(FIXTURE.resolve("00.request.md"), StandardCharsets.UTF_8));
+		Case c = new Case(name, fixture, requestDir, workDir, System.getProperty("dstone.ai.eval.source-dir", "/app/testApp"));
+		c.request = c.fill(Files.readString(fixture.resolve("00.request.md"), StandardCharsets.UTF_8));
 		Files.writeString(requestDir.resolve("00.request.md"), c.request, StandardCharsets.UTF_8);
 		this.chatModel.reset();
 		return c;
@@ -157,6 +251,7 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 	private class Case {
 
 		final String name;
+		final Path fixture;
 		final Path requestDir;
 		final Path workDir;
 		final String sourceDir;
@@ -164,13 +259,15 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 		final List<String> checks = new ArrayList<String>();
 		String request;
 		String agentId;
+		Object answer;
 		boolean success;
 		String failure;
 		long seconds;
 		int passed;
 
-		Case(String name, Path requestDir, Path workDir, String sourceDir) {
+		Case(String name, Path fixture, Path requestDir, Path workDir, String sourceDir) {
 			this.name = name;
+			this.fixture = fixture;
 			this.requestDir = requestDir;
 			this.workDir = workDir;
 			this.sourceDir = sourceDir;
@@ -182,9 +279,81 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 		}
 
 		void copyDoc(String file) throws IOException {
-			String text = this.fill(Files.readString(FIXTURE.resolve("docs").resolve(file), StandardCharsets.UTF_8));
+			String text = this.fill(Files.readString(this.fixture.resolve("docs").resolve(file), StandardCharsets.UTF_8));
 			Files.writeString(this.workDir.resolve(file), text, StandardCharsets.UTF_8);
 			this.original.put(file, text);
+		}
+
+		/** 사례 폴더의 dev-resources를 작업 폴더로 옮깁니다(경로 자리는 채웁니다). 옮긴 파일의 처음 내용은 original에 둡니다. */
+		void copyDevResources() throws IOException {
+			final Path from = this.fixture.resolve("dev-resources");
+			List<Path> files = new ArrayList<Path>();
+			try (java.util.stream.Stream<Path> walk = Files.walk(from)) {
+				java.util.Iterator<Path> it = walk.iterator();
+				while (it.hasNext()) {
+					Path p = it.next();
+					if (Files.isRegularFile(p)) {
+						files.add(p);
+					}
+				}
+			}
+			for (Path file : files) {
+				String rel = "dev-resources/" + from.relativize(file).toString().replace('\\', '/');
+				Path to = this.workDir.resolve(rel);
+				Files.createDirectories(to.getParent());
+				String text = this.fill(Files.readString(file, StandardCharsets.UTF_8));
+				Files.writeString(to, text, StandardCharsets.UTF_8);
+				this.original.put(rel, text);
+			}
+		}
+
+		/** 사례 폴더의 input.json에서 값 하나를 꺼냅니다(경로 자리는 채웁니다). */
+		@SuppressWarnings("unchecked")
+		String inputOf(String key) throws IOException {
+			Map<String, Object> all = new ObjectMapper().readValue(this.fixture.resolve("input.json").toFile(), Map.class);
+			return this.fill(String.valueOf(all.get(key)));
+		}
+
+		/** Agent 답(맵)의 한 항목을 글자로 돌려줍니다. 없으면 빈 글자입니다. */
+		String answerOf(String key) {
+			if (this.answer instanceof Map<?, ?> map && map.get(key) != null) {
+				return String.valueOf(map.get(key));
+			}
+			return "";
+		}
+
+		/** 파일에서 text가 몇 번 나오는지 셉니다. 파일이 없으면 0입니다. */
+		int count(String file, String text) {
+			try {
+				if (!this.exists(file)) {
+					return 0;
+				}
+				String doc = this.doc(file);
+				int n = 0;
+				int at = doc.indexOf(text);
+				while (at >= 0) {
+					n++;
+					at = doc.indexOf(text, at + text.length());
+				}
+				return n;
+			} catch (IOException e) {
+				return 0;
+			}
+		}
+
+		/** 처음 내용(original)에서 text가 몇 번 나왔는지 셉니다. */
+		int countOriginal(String file, String text) {
+			String doc = this.original.get(file);
+			if (doc == null) {
+				return 0;
+			}
+			int n = 0;
+			int at = doc.indexOf(text);
+			while (at >= 0) {
+				n++;
+				at = doc.indexOf(text, at + text.length());
+			}
+			return n;
 		}
 
 		String doc(String file) throws IOException {
@@ -202,7 +371,7 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 		 */
 		@SuppressWarnings("unchecked")
 		String decisionText(String stepId, String stepName, String stateName, String decisionName) throws IOException {
-			Map<String, Object> all = new ObjectMapper().readValue(FIXTURE.resolve("decisions.json").toFile(), Map.class);
+			Map<String, Object> all = new ObjectMapper().readValue(this.fixture.resolve("decisions.json").toFile(), Map.class);
 			Map<String, Object> one = (Map<String, Object>) all.get(stateName);
 			Map<String, Object> record = new LinkedHashMap<String, Object>();
 			record.put("step", stepId);
@@ -219,7 +388,7 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 			AgentDefinition agent = SmAgentEvalTest.this.agentRegistry.find(agentId);
 			long start = System.currentTimeMillis();
 			try {
-				SmAgentEvalTest.this.agentExecutor.call(agent, null, null, input, null, null, null, null);
+				this.answer = SmAgentEvalTest.this.agentExecutor.call(agent, null, null, input, null, null, null, null);
 				this.success = true;
 			} catch (RuntimeException e) {
 				this.success = false;
