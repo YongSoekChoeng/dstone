@@ -34,6 +34,9 @@ tools:
     - dbListConnections
     - dbListTables
     - dbQuery
+    - knowledgeGetChunks
+    - knowledgeListDocs
+    - knowledgeSearchDocs
 skills:
   preload:
     - handling-instructions
