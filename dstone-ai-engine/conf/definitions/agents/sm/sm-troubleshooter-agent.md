@@ -1,8 +1,9 @@
 ---
-# sm-workflow 개발 승인(step17)의 [전문가 해결]로 부르는 Agent입니다(step25).
+# sm-workflow 개발 승인(step17)의 [전문가 해결]로 부르는 Agent입니다(step22).
 # 기본 개발 Agent가 만든 결과가 사람 확인에서 동작하지 않을 때, 증상에서 원인을 찾아 고치고 고친 것을 설계서에 남깁니다.
-# 기본 Agent들은 가벼운 기본 모델을 쓰고, 이 Agent만 더 강한 모델(model.name)과 높은 추론 세기를 씁니다.
-# 폐쇄망 POC에서도 그대로 설치할 수 있는 오픈 웨이트 모델(gpt-oss-120b, Apache 2.0)을 골랐습니다(2026-11-21).
+# 모델은 다른 Agent와 같은 provider 기본 모델이고, 추론 세기만 높입니다.
+# 2026-11-21에 gpt-oss-120b로 바꿨다가 2026-11-22에 되돌렸습니다. 실패 원인이 모델이 아니라 관측 수단과 방법이 없던 것이었기 때문입니다
+# (실행 f2cf12b3 분석, Skill troubleshooting과 요청서 '## 시험환경'으로 보강).
 id: sm-troubleshooter-agent
 version: 1.2.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.

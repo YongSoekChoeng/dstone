@@ -147,12 +147,12 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 
 	@Test
 	void 전문가_해결_삭제_증거없음() throws Exception {
-		this.troubleshootDelete("전문가_해결_삭제_증거없음", null);
+		this.troubleshootDelete("전문가_해결_삭제_증거없음", "troubleshoot-none", null);
 	}
 
 	@Test
 	void 전문가_해결_삭제_시험환경() throws Exception {
-		this.troubleshootDelete("전문가_해결_삭제_시험환경", "- DB연결: " + System.getProperty("dstone.ai.eval.db-connection", "testApp") + "\n");
+		this.troubleshootDelete("전문가_해결_삭제_시험환경", "troubleshoot-db", "- DB연결: " + System.getProperty("dstone.ai.eval.db-connection", "testApp") + "\n");
 	}
 
 	/**
@@ -172,7 +172,7 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 			+ "- 반영명령: test-server-deploy\n"
 			+ "- 접속주소: " + System.getProperty("dstone.ai.eval.url", "http://localhost:7080") + "\n"
 			+ "- 시험계정: " + System.getProperty("dstone.ai.eval.account", "admin / test1234!") + "\n";
-		this.troubleshootDelete("전문가_해결_삭제_재현", environment);
+		this.troubleshootDelete("전문가_해결_삭제_재현", "troubleshoot-reproduce", environment);
 	}
 
 	/**
@@ -182,10 +182,14 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 	 * DB연결 별칭은 -Ddstone.ai.eval.db-connection(기본 testApp)으로 바꿀 수 있습니다.
 	 * </pre>
 	 *
+	 * 작업 폴더 이름은 영문(folder)으로 둡니다. 2026-11-22 첫 측정에서 한글 폴더 이름(…/20261122-111421/전문가_해결_…)을
+	 * 모델이 '-'로 이어 옮겨 적어 개발 결과를 찾지 못하고 Tool 한도를 다 쓴 일이 있었습니다.
+	 *
+	 * @param folder      작업 폴더 이름(영문)
 	 * @param environment '## 시험환경' 아래에 붙일 줄들. 없으면 null
 	 */
-	private void troubleshootDelete(String name, String environment) throws Exception {
-		Case c = this.newCase(name, TROUBLESHOOT_FIXTURE);
+	private void troubleshootDelete(String name, String folder, String environment) throws Exception {
+		Case c = this.newCase(name, folder, TROUBLESHOOT_FIXTURE);
 		if (environment != null) {
 			c.request = c.request.stripTrailing() + "\n\n## 시험환경\n" + environment;
 			Files.writeString(c.requestDir.resolve("00.request.md"), c.request, StandardCharsets.UTF_8);
@@ -230,14 +234,14 @@ public class SmAgentEvalTest extends WorkflowTestBase {
 	 * 사례 하나의 작업 폴더를 만듭니다. 요청서는 폴더 위(요청 폴더)에 두고, 작업 폴더는 그 아래 실행시각 폴더입니다.
 	 */
 	private Case newCase(String name) throws IOException {
-		return this.newCase(name, FIXTURE);
+		return this.newCase(name, name, FIXTURE);
 	}
 
 	/**
-	 * 사례 하나의 작업 폴더를 만듭니다. fixture는 00.request.md와 docs/가 들어 있는 사례 폴더입니다.
+	 * 사례 하나의 작업 폴더를 만듭니다. folder는 작업 폴더 이름, fixture는 00.request.md와 docs/가 들어 있는 사례 폴더입니다.
 	 */
-	private Case newCase(String name, Path fixture) throws IOException {
-		Path requestDir = OUT_ROOT.resolve(RUN_ID).resolve(name).toAbsolutePath();
+	private Case newCase(String name, String folder, Path fixture) throws IOException {
+		Path requestDir = OUT_ROOT.resolve(RUN_ID).resolve(folder).toAbsolutePath();
 		Path workDir = requestDir.resolve("work");
 		Files.createDirectories(workDir);
 		Case c = new Case(name, fixture, requestDir, workDir, System.getProperty("dstone.ai.eval.source-dir", "/app/testApp"));
