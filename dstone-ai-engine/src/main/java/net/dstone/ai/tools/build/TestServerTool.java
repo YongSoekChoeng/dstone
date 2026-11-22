@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -282,6 +283,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 				List<String> command = this.mavenCommand(key);
 				command.addAll(launch.goals);
 				ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
+				utf8Maven(builder);
 				if (javaHome != null) {
 					builder.environment().put("JAVA_HOME", javaHome.getPath());
 				}
@@ -677,12 +679,24 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 
 	private static String tail(File log, int lines) {
 		try {
-			List<String> all = Files.readAllLines(log.toPath(), StandardCharsets.UTF_8);
+			// UTF-8이 아닌 글자가 섞여 있어도 실패하지 않게, 깨진 글자만 대체해서 읽는다.
+			String text = new String(Files.readAllBytes(log.toPath()), StandardCharsets.UTF_8);
+			List<String> all = Arrays.asList(text.split("\\r?\\n", -1));
 			int from = Math.max(0, all.size() - lines);
 			return String.join("\n", all.subList(from, all.size()));
 		} catch (IOException | RuntimeException e) {
 			return "(로그를 읽지 못했습니다: " + e.getMessage() + ")";
 		}
+	}
+
+	/** 띄운 JVM의 콘솔 출력을 UTF-8로 맞추는 옵션입니다(server.log를 읽을 수 있게). */
+	private static final String UTF8_OUTPUT = "-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8";
+
+	/** Maven 출력도 UTF-8로 맞춥니다. 이미 있는 MAVEN_OPTS 뒤에 덧붙입니다. */
+	private static void utf8Maven(ProcessBuilder builder) {
+		Map<String, String> env = builder.environment();
+		String current = env.get("MAVEN_OPTS");
+		env.put("MAVEN_OPTS", current == null || current.isBlank() ? UTF8_OUTPUT : current + " " + UTF8_OUTPUT);
 	}
 
 	/** mvn 명령 앞부분(Windows는 cmd.exe /c, 우리 표시 포함)입니다. */
@@ -704,6 +718,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		List<String> command = this.mavenCommand(key);
 		command.add("package");
 		ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
+		utf8Maven(builder);
 		if (javaHome != null) {
 			builder.environment().put("JAVA_HOME", javaHome.getPath());
 		}
@@ -739,7 +754,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		env.put("CATALINA_HOME", tomcatHome.getPath());
 		env.put("CATALINA_BASE", catalinaBase.getPath());
 		env.put("CATALINA_PID", ""); // 사람이 쓰는 Tomcat의 PID 파일을 건드리지 않게
-		env.put("CATALINA_OPTS", MARKER + key);
+		env.put("CATALINA_OPTS", MARKER + key + " " + UTF8_OUTPUT);
 		if (javaHome != null) {
 			env.put("JAVA_HOME", javaHome.getPath());
 			env.remove("JRE_HOME");
@@ -751,6 +766,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	 * <pre>
 	 * 전용 CATALINA_BASE를 만듭니다. 매번 conf를 설치된 Tomcat에서 다시 복사하고, webapps·work·temp는 비웁니다.
 	 * server.xml은 shutdown 포트를 끄고(-1), 주석이 아닌 첫 HTTP Connector의 포트만 바꾸고, 나머지 Connector(AJP, HTTPS)는 지웁니다.
+	 * 사람이 그 Tomcat에 등록해 둔 다른 앱(server.xml의 <Context>, conf/Catalina 아래 파일)은 뺍니다. 그 앱의 경로가 없으면 Host 기동이 실패합니다.
 	 * </pre>
 	 */
 	static void prepareCatalinaBase(File tomcatHome, File catalinaBase, int port, File war, String contextPath) throws IOException {
@@ -765,6 +781,17 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 		Files.createDirectories(new File(catalinaBase, "logs").toPath());
 		copyTree(new File(tomcatHome, "conf").toPath(), new File(catalinaBase, "conf").toPath());
+		// 사람이 그 Tomcat에 등록해 둔 다른 앱(conf/Catalina/{host}/*.xml)은 가져오지 않는다. 경로가 없으면 기동이 실패한다.
+		Path perAppContexts = new File(catalinaBase, "conf/Catalina").toPath();
+		if (Files.exists(perAppContexts)) {
+			deleteTree(perAppContexts);
+		}
+		// 콘솔 출력(server.log)을 UTF-8로 맞춘다. Windows는 콘솔 인코딩(MS949)으로 나와 읽지 못한다.
+		File logging = new File(catalinaBase, "conf/logging.properties");
+		if (logging.isFile()) {
+			String props = new String(Files.readAllBytes(logging.toPath()), StandardCharsets.ISO_8859_1);
+			Files.write(logging.toPath(), patchConsoleEncoding(props).getBytes(StandardCharsets.ISO_8859_1));
+		}
 		File serverXml = new File(catalinaBase, "conf/server.xml");
 		String xml = Files.readString(serverXml.toPath(), StandardCharsets.UTF_8);
 		Files.writeString(serverXml.toPath(), patchServerXml(xml, port), StandardCharsets.UTF_8);
@@ -772,9 +799,10 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		Files.copy(war.toPath(), new File(catalinaBase, "webapps/" + name + ".war").toPath());
 	}
 
-	/** server.xml의 포트를 바꿉니다(prepareCatalinaBase 설명 참고). */
+	/** server.xml의 포트를 바꾸고 다른 앱의 Context를 뺍니다(prepareCatalinaBase 설명 참고). */
 	static String patchServerXml(String xml, int port) {
 		String text = xml.replaceFirst("<Server\\s+port=\"[^\"]*\"", Matcher.quoteReplacement("<Server port=\"-1\""));
+		text = removeContexts(text);
 		Matcher m = Pattern.compile("<!--.*?-->|<Connector\\b[^>]*?(?:/>|>.*?</Connector>)", Pattern.DOTALL).matcher(text);
 		StringBuilder out = new StringBuilder();
 		int last = 0;
@@ -797,6 +825,32 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 		out.append(text.substring(last));
 		return out.toString();
+	}
+
+	/** 주석이 아닌 <Context …/> 또는 <Context …>…</Context>를 주석 한 줄로 바꿉니다. */
+	static String removeContexts(String xml) {
+		Matcher m = Pattern.compile("<!--.*?-->|<Context\\b[^>]*?(?:/>|>.*?</Context>)", Pattern.DOTALL).matcher(xml);
+		StringBuilder out = new StringBuilder();
+		int last = 0;
+		while (m.find()) {
+			if (m.group().startsWith("<!--")) {
+				continue;
+			}
+			out.append(xml, last, m.start()).append("<!-- dstone 임시 시험 서버에서 뺌(사람이 등록한 다른 앱) -->");
+			last = m.end();
+		}
+		out.append(xml.substring(last));
+		return out.toString();
+	}
+
+	/** logging.properties의 콘솔 인코딩을 UTF-8로 바꾸거나, 없으면 덧붙입니다. */
+	static String patchConsoleEncoding(String props) {
+		String key = "java.util.logging.ConsoleHandler.encoding";
+		Matcher m = Pattern.compile("(?m)^\\s*" + Pattern.quote(key) + "\\s*=.*$").matcher(props);
+		if (m.find()) {
+			return m.replaceAll(Matcher.quoteReplacement(key + " = UTF-8"));
+		}
+		return props + (props.endsWith("\n") ? "" : "\n") + key + " = UTF-8\n";
 	}
 
 	private static File findWar(File target) {
