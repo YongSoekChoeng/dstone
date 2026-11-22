@@ -11,8 +11,8 @@ dstone_ai 기본 데이터(사용자 관리). 02-create-table-postgresql-dstone-
 개요, 채팅은 로그인한 모두에게 보인다(ALL_USERS_YN='Y').
 **********************************************/
 
-INSERT INTO ai_management_user (USER_ID, USER_NAME, PASSWORD_HASH, USE_YN, PW_CHANGE_YN, CREATED_BY, UPDATED_BY) VALUES
-    ('admin', '관리자', 'pbkdf2$120000$tPXLXzOLD21hdd/h7X7KHg==$PQJahIHgCe5UW7Tc2MHr5GqQnVpBsyu2un6pn+bMBHc=', 'Y', 'Y', 'system', 'system')
+INSERT INTO ai_management_user (USER_ID, USER_NAME, PASSWORD_ENC, USE_YN, PW_CHANGE_YN, CREATED_BY, UPDATED_BY) VALUES
+    ('admin', '관리자', 'HzsuRlsZJZ/wYCXUD+jizdxofGHSszL9PiDbo9L0DcQ=', 'Y', 'Y', 'system', 'system')
 ON CONFLICT (USER_ID) DO NOTHING;
 
 INSERT INTO ai_management_group (GROUP_ID, GROUP_NAME, DESCRIPTION, SORT_ORDER) VALUES

@@ -41,7 +41,8 @@ public class CustomAuthenticationProvider extends BaseObject implements Authenti
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         String user_id = (String)authentication.getPrincipal();    
         String user_pw = (String)authentication.getCredentials();
-        this.debug("사용자가 입력한 로그인정보입니다. {" + user_id + "/" + user_pw +"}");
+        // 비밀번호 원문은 로그에 남기지 않는다.
+        this.debug("사용자가 입력한 로그인정보입니다. {" + user_id + "/****}");
         
         Map<String, String> param = new HashMap<String, String>();
         param.put(ConfigSecurity.USERNAME_PARAMETER, user_id);
@@ -53,7 +54,8 @@ public class CustomAuthenticationProvider extends BaseObject implements Authenti
         	if( result == null || result.isEmpty() ) {
         		throw new SecException(ErrCd.USER_NOT_REG);
         	}else {
-        		if( !result.containsKey("USER_PW") || !user_pw.equals(result.get("USER_PW")) ) {
+        		// 비밀번호는 EncUtil.encrypt 로 암호화해 저장한다(dstone 모든 모듈 공통). 풀어서 넣은 값과 비교한다.
+        		if( !result.containsKey("USER_PW") || !passwordMatches(user_pw, (String)result.get("USER_PW")) ) {
         			throw new SecException(ErrCd.WRONG_PASSWD);
         		}
         	}
@@ -93,4 +95,17 @@ public class CustomAuthenticationProvider extends BaseObject implements Authenti
 		}
     }
     
+
+    /** 넣은 비밀번호가 저장된 암호문(EncUtil.encrypt)을 푼 값과 같은지 본다. 풀 수 없는 값이면 false */
+    private static boolean passwordMatches(String password, String stored) {
+        if (password == null || stored == null || stored.isEmpty()) {
+            return false;
+        }
+        try {
+            return password.equals(net.dstone.common.utils.EncUtil.decrypt(stored));
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
 }

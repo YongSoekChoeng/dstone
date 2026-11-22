@@ -12,7 +12,7 @@ import org.mybatis.spring.SqlSessionTemplate;
  * 앱마다 데이터는 따로 두고(테이블 이름 앞부분이 다름) SQL과 이 코드는 한 벌만 둡니다.
  *
  * ## 테이블정의(앞부분 {tp} 생략)
- *   user        사용자(USER_ID KEY, USER_NAME, PASSWORD_HASH, USE_YN, PW_CHANGE_YN, LOGIN_FAIL_COUNT, LAST_LOGIN_AT)
+ *   user        사용자(USER_ID KEY, USER_NAME, PASSWORD_ENC(EncUtil 암호문), USE_YN, PW_CHANGE_YN, LOGIN_FAIL_COUNT, LAST_LOGIN_AT)
  *   group       사용자그룹(GROUP_ID KEY, GROUP_NAME, DESCRIPTION, SORT_ORDER)
  *   group_user  그룹의 사용자(GROUP_ID, USER_ID)
  *   auth        권한(AUTH_ID KEY, AUTH_NAME, DESCRIPTION, ADMIN_YN, SORT_ORDER)

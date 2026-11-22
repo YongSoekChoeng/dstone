@@ -44,6 +44,8 @@ public class AdminService extends BaseService {
             //NEW KEY 생성 부분 구현 
             newKeyVo.setGROUP_ID( paramVo.getGROUP_ID() ); 
             //paramVo.setUSER_ID( sampleCudDao.selectSampleMemberNewKey(newKeyVo).getUSER_ID() ); 
+            //비밀번호는 EncUtil.encrypt 로 암호화해 저장한다(dstone 모든 모듈 공통)
+            encryptPassword(paramVo);
             //DAO 호출부분 구현 
             sampleCudDao.insertSampleMember(paramVo);  
             
@@ -74,6 +76,8 @@ public class AdminService extends BaseService {
             /************************ 변수 정의 끝 **************************/  
              
             /************************ 비즈니스로직 시작 ************************/  
+            //비밀번호를 바꿀 때만 암호화한다(비워 두면 매퍼가 USER_PW 를 건드리지 않는다)
+            encryptPassword(paramVo);
             //DAO 호출부분 구현 
             sampleCudDao.updateSampleMember(paramVo);  
             isSuccess = true; 
@@ -171,4 +175,13 @@ public class AdminService extends BaseService {
         return returnMap; 
     } 
 
-} 
+
+    /** 넣은 비밀번호가 있으면 EncUtil.encrypt 로 암호화해 둔다. 비어 있으면 그대로 둔다 */
+    private static void encryptPassword(net.dstone.boot.sample.cud.vo.SampleMemberCudVo paramVo) {
+        String password = paramVo.getUSER_PW();
+        if (password != null && !password.isEmpty()) {
+            paramVo.setUSER_PW(net.dstone.common.utils.EncUtil.encrypt(password));
+        }
+    }
+
+}

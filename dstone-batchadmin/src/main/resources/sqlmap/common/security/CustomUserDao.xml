@@ -7,7 +7,7 @@
     <select id="selectUser" parameterType="map" resultType="hashmap">
         SELECT
             A.USER_ID       /* 사용자ID */
-            , A.USER_PW     /* 비밀번호(BCrypt해시) */
+            , A.USER_PW     /* 비밀번호(EncUtil.encrypt 암호문) */
             , A.USER_NM     /* 사용자명 */
             , A.USE_YN      /* 사용여부 */
         FROM

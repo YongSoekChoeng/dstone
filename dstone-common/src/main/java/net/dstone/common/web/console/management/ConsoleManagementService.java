@@ -12,7 +12,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import net.dstone.common.web.console.PasswordHasher;
+import net.dstone.common.utils.EncUtil;
 import net.dstone.common.web.console.SessionUser;
 
 /**
@@ -28,6 +28,8 @@ import net.dstone.common.web.console.SessionUser;
  *   - 쓰지 않음(USE_YN=N)인 사용자는 로그인할 수 없습니다.
  *   - 관리자가 만들거나 초기화한 비밀번호는 첫 로그인 때 바꿔야 합니다(PW_CHANGE_YN=Y).
  *   - 비밀번호는 8자 이상, 영문과 숫자를 함께 씁니다.
+ * 비밀번호는 dstone 의 모든 모듈과 같이 EncUtil.encrypt 로 암호화해 저장하고(PASSWORD_ENC), 로그인할 때 EncUtil.decrypt 로 풀어
+ * 넣은 값과 비교합니다(EncUtil 은 같은 값도 매번 다르게 암호화하므로 다시 암호화해서 비교할 수 없습니다).
  * 이 클래스는 Spring 빈으로 스캔되지 않습니다. 각 앱의 ConfigConsole 이 만듭니다.
  * </pre>
  */
@@ -86,7 +88,7 @@ public class ConsoleManagementService {
 		if (!"Y".equals(row.get("useYn"))) {
 			return new LoginResult(null, false, "사용이 중지된 계정입니다. 관리자에게 문의하세요.");
 		}
-		boolean ok = PasswordHasher.matches(password, (String) row.get("passwordHash"));
+		boolean ok = passwordMatches(password, (String) row.get("passwordEnc"));
 		param.put("success", Boolean.valueOf(ok));
 		this.dao.write("updateLoginResult", param);
 		if (!ok) {
@@ -133,17 +135,17 @@ public class ConsoleManagementService {
 		Map<String, Object> param = this.dao.param();
 		param.put("userId", userId);
 		Map<String, Object> row = this.dao.one("selectLoginUser", param);
-		if (row == null || !PasswordHasher.matches(currentPassword, (String) row.get("passwordHash"))) {
+		if (row == null || !passwordMatches(currentPassword, (String) row.get("passwordEnc"))) {
 			return "지금 비밀번호가 맞지 않습니다.";
 		}
 		String problem = passwordProblem(newPassword);
 		if (problem != null) {
 			return problem;
 		}
-		if (PasswordHasher.matches(newPassword, (String) row.get("passwordHash"))) {
+		if (passwordMatches(newPassword, (String) row.get("passwordEnc"))) {
 			return "지금과 다른 비밀번호를 쓰세요.";
 		}
-		param.put("passwordHash", PasswordHasher.hash(newPassword));
+		param.put("passwordEnc", EncUtil.encrypt(newPassword));
 		param.put("pwChangeYn", "N");
 		param.put("by", userId);
 		this.dao.write("updatePassword", param);
@@ -300,7 +302,7 @@ public class ConsoleManagementService {
 			if (problem != null) {
 				throw new IllegalArgumentException("초기 " + problem);
 			}
-			param.put("passwordHash", PasswordHasher.hash(initialPassword));
+			param.put("passwordEnc", EncUtil.encrypt(initialPassword));
 		} else if (userId.equals(by) && "N".equals(useYn)) {
 			throw new IllegalArgumentException("자기 계정은 쓰지 않음으로 바꿀 수 없습니다.");
 		}
@@ -330,7 +332,7 @@ public class ConsoleManagementService {
 		if (this.dao.count("countUser", param) == 0) {
 			throw new IllegalArgumentException("사용자가 없습니다: " + userId);
 		}
-		param.put("passwordHash", PasswordHasher.hash(newPassword));
+		param.put("passwordEnc", EncUtil.encrypt(newPassword));
 		param.put("pwChangeYn", "Y");
 		param.put("by", by);
 		this.dao.write("updatePassword", param);
@@ -482,6 +484,18 @@ public class ConsoleManagementService {
 	}
 
 	/* ============================== 도움 ============================== */
+
+	/** 넣은 비밀번호가 저장된 암호문(EncUtil.encrypt)을 푼 값과 같은지 봅니다. 풀 수 없는 값이면 false입니다. */
+	private static boolean passwordMatches(String password, String stored) {
+		if (password == null || stored == null || stored.isEmpty()) {
+			return false;
+		}
+		try {
+			return password.equals(EncUtil.decrypt(stored));
+		} catch (RuntimeException e) {
+			return false;
+		}
+	}
 
 	private static void checkId(String label, String id) {
 		if (id == null || !id.matches(ID_PATTERN)) {

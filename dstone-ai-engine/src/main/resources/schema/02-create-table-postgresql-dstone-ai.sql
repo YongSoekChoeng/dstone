@@ -92,13 +92,13 @@ ai_management_* (사용자 관리, 2026-11-22)
 AI 화면(콘솔)의 로그인과 메뉴 권한. 규칙은 dstone-common 의 ConsoleManagementService, SQL 은 dstone-common 의 sqlmap/console/ConsoleManagementDao.xml.
   사용자 ─(그룹 소속)→ 사용자그룹 ─(권한 부여)→ 권한 ─(메뉴 연결)→ 메뉴
   메뉴는 "모두에게 보임(ALL_USERS_YN)"이거나 사용자의 그룹이 가진 권한에 연결되어 있으면 보인다. ADMIN_YN 권한을 가진 사람은 관리자다.
-  비밀번호는 PBKDF2 해시만 저장한다(PasswordHasher). 5번 연달아 틀리면 잠기고, 관리자가 초기화하면 풀린다.
+  비밀번호는 EncUtil.encrypt 로 암호화해 저장하고 로그인할 때 EncUtil.decrypt 로 풀어 비교한다(dstone 모든 모듈 공통). 5번 연달아 틀리면 잠기고, 관리자가 초기화하면 풀린다.
 기본 데이터(관리자 계정, 그룹, 권한, 메뉴)는 03-create-data-postgresql-*.sql 에 있다.
 **********************************************/
 CREATE TABLE IF NOT EXISTS ai_management_user (
     USER_ID           VARCHAR(50)  PRIMARY KEY,
     USER_NAME         VARCHAR(100) NOT NULL,
-    PASSWORD_HASH     VARCHAR(200) NOT NULL,
+    PASSWORD_ENC      VARCHAR(500) NOT NULL,
     USE_YN            CHAR(1)      NOT NULL DEFAULT 'Y',
     PW_CHANGE_YN      CHAR(1)      NOT NULL DEFAULT 'Y',
     LOGIN_FAIL_COUNT  INT          NOT NULL DEFAULT 0,
@@ -294,10 +294,10 @@ COMMENT ON COLUMN AI_EVAL_RUN.CREATED_AT         IS '요청 시각';
 COMMENT ON COLUMN AI_EVAL_RUN.STARTED_AT         IS '시작 시각';
 COMMENT ON COLUMN AI_EVAL_RUN.FINISHED_AT        IS '끝난 시각';
 
-COMMENT ON TABLE  ai_management_user             IS '콘솔 사용자. 비밀번호는 PBKDF2 해시만 저장';
+COMMENT ON TABLE  ai_management_user             IS '콘솔 사용자. 비밀번호는 EncUtil 로 암호화해 저장';
 COMMENT ON COLUMN ai_management_user.USER_ID     IS '아이디';
 COMMENT ON COLUMN ai_management_user.USER_NAME   IS '이름';
-COMMENT ON COLUMN ai_management_user.PASSWORD_HASH IS '비밀번호 해시(pbkdf2$반복$소금$해시)';
+COMMENT ON COLUMN ai_management_user.PASSWORD_ENC  IS '비밀번호(EncUtil.encrypt 암호문)';
 COMMENT ON COLUMN ai_management_user.USE_YN      IS '사용 여부(N이면 로그인 불가)';
 COMMENT ON COLUMN ai_management_user.PW_CHANGE_YN IS '다음 로그인 때 비밀번호를 바꿔야 하는지(관리자가 만들거나 초기화하면 Y)';
 COMMENT ON COLUMN ai_management_user.LOGIN_FAIL_COUNT IS '연달아 틀린 횟수(5번이면 잠김)';

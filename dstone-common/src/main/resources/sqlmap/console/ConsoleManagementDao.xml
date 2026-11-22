@@ -10,7 +10,7 @@
     <!-- ===================== 로그인 ===================== -->
 
     <select id="selectLoginUser" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
-        SELECT USER_ID AS "userId", USER_NAME AS "userName", PASSWORD_HASH AS "passwordHash", USE_YN AS "useYn",
+        SELECT USER_ID AS "userId", USER_NAME AS "userName", PASSWORD_ENC AS "passwordEnc", USE_YN AS "useYn",
                PW_CHANGE_YN AS "pwChangeYn", LOGIN_FAIL_COUNT AS "loginFailCount"
           FROM ${tp}user
          WHERE USER_ID = #{userId}
@@ -31,7 +31,7 @@
 
     <update id="updatePassword" parameterType="java.util.Map">
         UPDATE ${tp}user
-           SET PASSWORD_HASH = #{passwordHash}, PW_CHANGE_YN = #{pwChangeYn}, LOGIN_FAIL_COUNT = 0, UPDATED_AT = now(), UPDATED_BY = #{by}
+           SET PASSWORD_ENC = #{passwordEnc}, PW_CHANGE_YN = #{pwChangeYn}, LOGIN_FAIL_COUNT = 0, UPDATED_AT = now(), UPDATED_BY = #{by}
          WHERE USER_ID = #{userId}
     </update>
 
@@ -72,8 +72,8 @@
     </select>
 
     <insert id="insertUser" parameterType="java.util.Map">
-        INSERT INTO ${tp}user (USER_ID, USER_NAME, PASSWORD_HASH, USE_YN, PW_CHANGE_YN, LOGIN_FAIL_COUNT, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
-        VALUES (#{userId}, #{userName}, #{passwordHash}, #{useYn}, 'Y', 0, now(), #{by}, now(), #{by})
+        INSERT INTO ${tp}user (USER_ID, USER_NAME, PASSWORD_ENC, USE_YN, PW_CHANGE_YN, LOGIN_FAIL_COUNT, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
+        VALUES (#{userId}, #{userName}, #{passwordEnc}, #{useYn}, 'Y', 0, now(), #{by}, now(), #{by})
     </insert>
 
     <update id="updateUser" parameterType="java.util.Map">
