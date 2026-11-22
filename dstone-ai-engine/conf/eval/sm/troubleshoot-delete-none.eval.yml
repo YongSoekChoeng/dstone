@@ -1,0 +1,35 @@
+# 전문가 해결(sm-troubleshooter-agent). 실행 f2cf12b3(2026-11-22)에서 "게시물 삭제가 안 된다"를 다섯 번 맡겨도 풀지 못한 시점의 자료다.
+# 진짜 원인은 삭제 SQL의 WHERE mb_id = #{mb_id}에 아무도 값을 넣지 않은 것(오류 없이 0건 삭제).
+# 2026-11-22 측정: 이 자료 상태에서는 개선 전 정의(qwen)도 원인을 찾았다. 개선 효과를 가르는 사례는 아니다(.claude/docs/ai-engine-tuning.md).
+id: troubleshoot-delete-none
+description: 증상("여전히 삭제가 안 된다")만 받고, 관측 수단 없이 코드만으로 진짜 원인(삭제 조건값 mb_id 누락)을 찾아 고치는지 본다.
+agent: sm-troubleshooter-agent
+fixture: sm/troubleshoot-delete
+params:
+  sourceDir: /app/testApp
+request:
+  file: 00.request.md
+input:
+  base_dir: ${workDir}
+  source_dir: ${param.sourceDir}
+  request: ${request}
+  design: ${file:03-1.design.md}
+  taskitems: ${file:03-2.taskitems.md}
+  instruction: ${fixture:input/instruction.txt}
+  history: ${fixture:input/history.txt}
+  compile_error: ""
+checks:
+  - name: 원인에 조건값(mb_id) 누락
+    answerContains: {field: causes, text: mb_id}
+  - name: 삭제 경로에 mb_id 채움
+    textIncreased:
+      files:
+        - dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardController.java
+        - dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardService.java
+      text: setMb_id
+  - name: 설계서 반영
+    fileChanged: 03-1.design.md
+  - name: 컴파일 통과
+    answerEquals: {field: compiled, value: "true"}
+  - name: 확인 방법 기록
+    answerNotEmpty: verification

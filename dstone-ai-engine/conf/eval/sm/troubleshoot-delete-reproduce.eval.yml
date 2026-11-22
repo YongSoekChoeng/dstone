@@ -1,0 +1,55 @@
+# 전문가 해결(sm-troubleshooter-agent). troubleshoot-delete-none과 같은 자료에 시험 서버 반영과 브라우저 재현까지 열었다.
+# 이 PC에 시험 서버가 있어야 한다. 기본값은 WSL의 testApp 시험 사본(docs/software/16.playwright-mcp.md 4절).
+# 주의: 시험 서버 DB의 실제 행을 지운다. 돌리기 전에 지워도 되는 게시물을 하나 등록해 둔다.
+id: troubleshoot-delete-reproduce
+description: 시험 서버에 올려 브라우저로 재현·확인까지 하면서 진짜 원인(삭제 조건값 mb_id 누락)을 찾아 고치는지 본다.
+agent: sm-troubleshooter-agent
+fixture: sm/troubleshoot-delete
+params:
+  sourceDir: /app/testApp
+  dbConnection: testApp
+  serverLog: /opt/tomcat9/logs/catalina.out
+  stageDir: /app/testApp-stage
+  deployCommand: test-server-deploy
+  url: http://localhost:7080
+  account: admin / test1234!
+request:
+  file: 00.request.md
+  append: |
+    ## 시험환경
+    - DB연결: ${param.dbConnection}
+    - 서버로그: ${param.serverLog}
+    - 반영폴더: ${param.stageDir}
+    - 반영명령: ${param.deployCommand}
+    - 접속주소: ${param.url}
+    - 시험계정: ${param.account}
+input:
+  base_dir: ${workDir}
+  source_dir: ${param.sourceDir}
+  request: ${request}
+  design: ${file:03-1.design.md}
+  taskitems: ${file:03-2.taskitems.md}
+  instruction: ${fixture:input/instruction.txt}
+  history: ${fixture:input/history.txt}
+  compile_error: ""
+checks:
+  - name: 원인에 조건값(mb_id) 누락
+    answerContains: {field: causes, text: mb_id}
+  - name: 삭제 경로에 mb_id 채움
+    textIncreased:
+      files:
+        - dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardController.java
+        - dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardService.java
+      text: setMb_id
+  - name: 설계서 반영
+    fileChanged: 03-1.design.md
+  - name: 컴파일 통과
+    answerEquals: {field: compiled, value: "true"}
+  - name: 확인 방법 기록
+    answerNotEmpty: verification
+  - name: dbQuery로 관측
+    toolUsed: dbQuery
+  - name: 시험 서버에 반영
+    toolUsed: applyOverlay
+  - name: 브라우저로 재현
+    toolUsed: browser_

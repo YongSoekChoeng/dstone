@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- Agent 평가 실행(AI_EVAL_RUN).
+     테이블 정의: schema/02-create-table-postgresql-dstone-ai.sql
+     runtime.eval.EvalRunStore 가 쓴다 -->
+<mapper namespace="net.dstone.ai.runtime.eval.EvalRunStore">
+
+    <insert id="insertRun" parameterType="java.util.Map">
+        INSERT INTO AI_EVAL_RUN
+            (RUN_ID, BATCH_ID, CASE_ID, AGENT_ID, AGENT_VERSION, MODEL, PARAMS_JSON, STATUS, REQUESTED_BY, OWNER_INSTANCE, CREATED_AT)
+        VALUES
+            (#{runId}, #{batchId}, #{caseId}, #{agentId}, #{agentVersion}, #{model}, CAST(#{paramsJson} AS JSONB), 'QUEUED', #{requestedBy}, #{ownerInstance}, now())
+    </insert>
+
+    <!-- 대기 중인 행만 RUNNING으로 바꾼다(같은 행을 두 번 돌리지 않게) -->
+    <update id="markStarted" parameterType="java.util.Map">
+        UPDATE AI_EVAL_RUN
+           SET STATUS = 'RUNNING'
+             , STARTED_AT = now()
+             , WORK_DIR = #{workDir}
+         WHERE RUN_ID = #{runId}
+           AND STATUS = 'QUEUED'
+    </update>
+
+    <update id="markFinished" parameterType="java.util.Map">
+        UPDATE AI_EVAL_RUN
+           SET STATUS = #{status}
+             , PASSED = #{passed, jdbcType=INTEGER}
+             , TOTAL = #{total, jdbcType=INTEGER}
+             , CHECKS_JSON = CAST(#{checksJson, jdbcType=VARCHAR} AS JSONB)
+             , ANSWER_JSON = CAST(#{answerJson, jdbcType=VARCHAR} AS JSONB)
+             , FAILURE = #{failure, jdbcType=VARCHAR}
+             , DURATION_MS = #{durationMs, jdbcType=BIGINT}
+             , ROUNDS = #{rounds, jdbcType=INTEGER}
+             , TOOL_CALLS = #{toolCalls, jdbcType=INTEGER}
+             , TOOLS_JSON = CAST(#{toolsJson, jdbcType=VARCHAR} AS JSONB)
+             , PROMPT_TOKENS = #{promptTokens, jdbcType=BIGINT}
+             , COMPLETION_TOKENS = #{completionTokens, jdbcType=BIGINT}
+             , WORK_DIR = COALESCE(#{workDir, jdbcType=VARCHAR}, WORK_DIR)
+             , FINISHED_AT = now()
+         WHERE RUN_ID = #{runId}
+    </update>
+
+    <!-- 같은 호스트의 예전 엔진 인스턴스가 남긴, 끝나지 않은 평가를 실패로 정리한다(엔진이 다시 뜨면 그 평가는 이어지지 않는다) -->
+    <update id="failOrphans" parameterType="java.util.Map">
+        UPDATE AI_EVAL_RUN
+           SET STATUS = 'FAILED'
+             , FAILURE = '엔진이 다시 떠서 이 평가는 끝나지 못했습니다.'
+             , FINISHED_AT = now()
+         WHERE STATUS IN ('QUEUED', 'RUNNING')
+           AND OWNER_INSTANCE LIKE #{hostPrefix}
+           AND OWNER_INSTANCE &lt;&gt; #{ownerInstance}
+    </update>
+
+    <sql id="columns">
+        SELECT RUN_ID AS "runId"
+             , BATCH_ID AS "batchId"
+             , CASE_ID AS "caseId"
+             , AGENT_ID AS "agentId"
+             , AGENT_VERSION AS "agentVersion"
+             , MODEL AS "model"
+             , PARAMS_JSON::TEXT AS "paramsJson"
+             , STATUS AS "status"
+             , PASSED AS "passed"
+             , TOTAL AS "total"
+             , FAILURE AS "failure"
+             , DURATION_MS AS "durationMs"
+             , ROUNDS AS "rounds"
+             , TOOL_CALLS AS "toolCalls"
+             , TOOLS_JSON::TEXT AS "toolsJson"
+             , PROMPT_TOKENS AS "promptTokens"
+             , COMPLETION_TOKENS AS "completionTokens"
+             , WORK_DIR AS "workDir"
+             , REQUESTED_BY AS "requestedBy"
+             , CREATED_AT AS "createdAt"
+             , STARTED_AT AS "startedAt"
+             , FINISHED_AT AS "finishedAt"
+    </sql>
+
+    <!-- 최근 것부터. caseId가 있으면 그 사례만 -->
+    <select id="selectRunList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <include refid="columns"/>
+          FROM AI_EVAL_RUN
+        <where>
+            <if test="caseId != null and caseId != ''">CASE_ID = #{caseId}</if>
+        </where>
+         ORDER BY CREATED_AT DESC, RUN_ID
+         LIMIT #{limit}
+    </select>
+
+    <select id="selectRun" parameterType="string" resultType="java.util.LinkedHashMap">
+        <include refid="columns"/>
+             , CHECKS_JSON::TEXT AS "checksJson"
+             , ANSWER_JSON::TEXT AS "answerJson"
+          FROM AI_EVAL_RUN
+         WHERE RUN_ID = #{runId}
+    </select>
+
+</mapper>

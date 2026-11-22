@@ -13,7 +13,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			["/ai/chat/chat.html", "채팅", "chat"],
 			["/ai/workflow/workflow.html", "Workflow 테스트", "play"],
 			["/ai/admin/workflow/workflow.html", "Workflow 실행 관리", "list"],
-			["/ai/designer/designer.html", "Workflow 디자이너", "flow"]
+			["/ai/designer/designer.html", "Workflow 디자이너", "flow"],
+			["/ai/admin/eval/eval.html", "Agent 평가", "diff"]
 		]
 	});
 });

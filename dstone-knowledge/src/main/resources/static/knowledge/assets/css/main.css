@@ -3325,3 +3325,97 @@ body.wd-full-on {
 		overflow-wrap: anywhere;
 	}
 }
+
+/* ==========================================================================
+   Agent 평가 화면(ai/admin/eval/eval.html)
+   ========================================================================== */
+.ev-row {
+	cursor: pointer;
+}
+
+.ev-row:hover td {
+	background: var(--cs-surface-2);
+}
+
+.ev-row-on td,
+.ev-row-on:hover td {
+	background: var(--cs-primary-soft);
+}
+
+.ev-row:focus-visible {
+	outline: 2px solid var(--cs-primary-ring);
+	outline-offset: -2px;
+}
+
+.ev-case-bad td {
+	color: var(--cs-danger);
+}
+
+.ev-score-full {
+	color: var(--cs-success);
+	font-weight: 600;
+}
+
+.ev-run-filter {
+	justify-content: flex-start;
+	margin-bottom: 8px;
+}
+
+.ev-checks {
+	list-style: none;
+	margin: 0 0 12px;
+	padding: 0;
+}
+
+.ev-checks li {
+	list-style: none;
+	margin: 0;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.ev-mark {
+	display: inline-block;
+	min-width: 44px;
+	margin-right: 8px;
+	padding: 1px 6px;
+	border-radius: var(--cs-radius-sm);
+	font-size: 12px;
+	text-align: center;
+}
+
+.ev-ok .ev-mark {
+	background: var(--cs-success-soft);
+	color: var(--cs-success);
+}
+
+.ev-ng .ev-mark {
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+}
+
+.ev-failure {
+	margin: 0 0 12px;
+	padding: 8px 12px;
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-danger-soft);
+	color: var(--cs-danger);
+	overflow-wrap: anywhere;
+}
+
+.ev-tools {
+	overflow-wrap: anywhere;
+}
+
+.ev-answer {
+	max-height: 420px;
+	overflow: auto;
+	padding: 12px;
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-sm);
+	background: var(--cs-surface-2);
+	font-family: var(--cs-mono);
+	font-size: 12px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}

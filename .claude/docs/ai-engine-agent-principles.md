@@ -37,7 +37,11 @@ Agent 파일 본문의 순서: **역할 한 줄 → 입력의 뜻 → 만들 것
 
 ## 4. 고친 뒤에는 평가 세트로 확인한다
 
-- `src/test/java/net/dstone/ai/eval/SmAgentEvalTest`: 실제 실행에서 뽑은 사례를 실제 LLM으로 돌린다(`-Ddstone.ai.test.llmcall=true -Ddstone.ai.eval=true`).
-- 결과는 `target/eval/report.md`에 쌓인다. 저장 여부, 시간, LLM 회차, Tool 호출 수, 꼭 들어가야 할 내용을 본다.
-- 프롬프트·모델·엔진을 바꾸면 세트를 다시 돌려 기준선과 비교한다. 새 실패 사례를 만나면 프롬프트를 고치기 전에 그 사례를 세트에 먼저 넣는다.
+- 평가 세트는 엔진 기능이다(2026-11-22, 사용자 결정: `src/test`는 언제든 지울 수 있는 자원이라 평가 사례를 두지 않는다).
+  - 사례: `dstone-ai-engine/conf/eval/**/<id>.eval.yml` + 자료 폴더(그 시점의 요청서·문서·개발 결과·결정 글). 형식은 `runtime.eval.EvalCase`와 `docs/09` 15장.
+  - 실행: 화면 "Agent 평가"(`/ai/admin/eval/eval.html`) 또는 `POST /api/ai/eval/runs {caseId, params, model, repeat}`. 실제 LLM을 부른다.
+  - 결과: `AI_EVAL_RUN`(채점, 시간, LLM 회차, Tool 호출, 토큰, 작업 폴더). 화면의 비교 표가 (사례, Agent 버전, 모델)별 평균을 보여 준다.
+- 프롬프트·모델·엔진을 바꾸면 같은 사례를 다시 돌려 기준선과 비교한다. LLM 결과는 매번 달라서 3번 이상 돌린다.
+- 새 실패 사례를 만나면 프롬프트를 고치기 전에 그 사례를 먼저 넣는다. 실패한 그 시점의 자료(작업 폴더, 실행 로그의 Agent 입력)는 금방 바뀌거나 지워지므로 바로 떠 둔다.
+- 사례가 개선 전과 후를 가르는지도 확인한다. 개선 전 정의로도 통과하는 사례는 효과를 보여 주지 못한다(`ai-engine-tuning.md` 2026-11-22).
 - 측정 결과는 `ai-engine-tuning.md`에 남긴다.

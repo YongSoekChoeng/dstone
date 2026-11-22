@@ -1,5 +1,6 @@
 package net.dstone.ai.common.advisors;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -86,6 +87,7 @@ public class AgentCallStatsAdvisor implements CallAdvisor {
 	String record(ChatResponse response, long elapsedMs) {
 		this.rounds++;
 		StringBuilder requested = new StringBuilder();
+		List<String> requestedNames = new ArrayList<String>();
 		if (response != null) {
 			List<Generation> results = response.getResults();
 			for (Generation generation : results == null ? List.<Generation>of() : results) {
@@ -96,19 +98,24 @@ public class AgentCallStatsAdvisor implements CallAdvisor {
 					Integer count = this.toolCounts.get(toolCall.name());
 					this.toolCounts.put(toolCall.name(), Integer.valueOf(count == null ? 1 : count.intValue() + 1));
 					requested.append(requested.length() == 0 ? "" : ", ").append(toolCall.name());
+					requestedNames.add(toolCall.name());
 				}
 			}
 		}
 
 		String roundTokens = "";
+		long prompt = 0;
+		long completion = 0;
 		if (response != null && response.getMetadata() != null && response.getMetadata().getUsage() != null) {
 			Usage usage = response.getMetadata().getUsage();
-			long prompt = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens().longValue();
-			long completion = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens().longValue();
+			prompt = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens().longValue();
+			completion = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens().longValue();
 			this.promptTokens += prompt;
 			this.completionTokens += completion;
 			roundTokens = ", 입력 " + prompt + "토큰, 출력 " + completion + "토큰";
 		}
+		// 평가 실행처럼 숫자를 받아 갈 쪽이 있으면 그쪽에도 더합니다(AgentCallStats.begin()을 부른 스레드만).
+		AgentCallStats.add(requestedNames, prompt, completion);
 
 		String line = "dstone-ai-engine agent: agent[" + this.agentId + "] " + this.rounds + "회차 " + elapsedMs + "ms" + roundTokens
 			+ (requested.length() == 0 ? ", Tool 요청 없음" : ", Tool 요청 [" + requested + "]");

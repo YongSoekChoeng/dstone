@@ -1,0 +1,23 @@
+# 영향도 분석(sm-analyze-impact-agent). 실행 9294e45d(2026-11-20)의 요구사항분석서에서 시작한다.
+id: impact-write
+description: 영향도분석서(02)를 저장하는지, TASK 표와 소스경로 기준 경로를 쓰는지, 프로젝트ID가 있으니 knowledge Tool로 조사를 시작하는지 본다.
+agent: sm-analyze-impact-agent
+fixture: sm/work002
+copy: [01.customer_requirement.md]
+params:
+  sourceDir: /app/testApp
+request:
+  file: 00.request.md
+input:
+  base_dir: ${workDir}
+  request: ${request}
+  requirement: ${file:01.customer_requirement.md}
+checks:
+  - name: 02 저장
+    fileExists: 02.impact.md
+  - name: TASK 표
+    fileContains: {file: 02.impact.md, text: TASK-01}
+  - name: 소스경로 기준
+    fileContains: {file: 02.impact.md, text: "${param.sourceDir}"}
+  - name: knowledge Tool 사용
+    toolUsed: knowledge

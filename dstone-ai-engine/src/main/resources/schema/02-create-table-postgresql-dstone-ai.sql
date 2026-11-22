@@ -86,6 +86,45 @@ COMMENT ON 은 덮어쓰기라 이 절만 따로 여러 번 실행해도 된다(
 테이블이나 컬럼을 새로 추가하면 여기에도 코멘트를 함께 적는다.
 **********************************************/
 
+/**********************************************
+AI_EVAL_RUN
+
+Agent 평가 실행 1건 = 1행(2026-11-22). 평가 사례(conf/eval/**/*.eval.yml) 하나를 Agent에게 한 번 풀게 한 결과다.
+runtime.eval.EvalRunner가 대기열에 넣을 때 QUEUED로 쓰고, 돌면서 RUNNING, 끝나면 DONE(Agent가 답함) 또는 FAILED(Agent 호출 실패)로 바꾼다.
+같은 요청으로 여러 번 돌린 것은 BATCH_ID가 같다(반복 측정). 정의·모델을 바꾸기 전후를 AGENT_VERSION, MODEL로 비교한다.
+채점 결과(CHECKS_JSON)와 Agent 답(ANSWER_JSON)은 화면이 그대로 보여 준다. 작업 폴더(WORK_DIR)에는 Agent가 만든 파일이 남는다.
+기존 DB에는 이 절만 실행하면 된다(IF NOT EXISTS).
+**********************************************/
+CREATE TABLE IF NOT EXISTS AI_EVAL_RUN (
+    RUN_ID              VARCHAR(36) PRIMARY KEY,
+    BATCH_ID            VARCHAR(36) NOT NULL,
+    CASE_ID             VARCHAR(100) NOT NULL,
+    AGENT_ID            VARCHAR(100) NOT NULL,
+    AGENT_VERSION       VARCHAR(30),
+    MODEL               VARCHAR(200),
+    PARAMS_JSON         JSONB NOT NULL DEFAULT '{}',
+    STATUS              VARCHAR(20) NOT NULL,      -- QUEUED/RUNNING/DONE/FAILED
+    PASSED              INT,
+    TOTAL               INT,
+    CHECKS_JSON         JSONB,
+    ANSWER_JSON         JSONB,
+    FAILURE             TEXT,
+    DURATION_MS         BIGINT,
+    ROUNDS              INT,
+    TOOL_CALLS          INT,
+    TOOLS_JSON          JSONB,
+    PROMPT_TOKENS       BIGINT,
+    COMPLETION_TOKENS   BIGINT,
+    WORK_DIR            VARCHAR(1000),
+    REQUESTED_BY        VARCHAR(100),
+    OWNER_INSTANCE      VARCHAR(100),
+    CREATED_AT          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    STARTED_AT          TIMESTAMPTZ,
+    FINISHED_AT         TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS IDX_AI_EVAL_RUN_CASE ON AI_EVAL_RUN(CASE_ID, CREATED_AT DESC);
+CREATE INDEX IF NOT EXISTS IDX_AI_EVAL_RUN_CREATED ON AI_EVAL_RUN(CREATED_AT DESC, RUN_ID);
+
 COMMENT ON TABLE  AI_WORKFLOW_EXECUTION                      IS 'Workflow 실행 1건의 현재 상태 (실행 1건 = 1행)';
 COMMENT ON COLUMN AI_WORKFLOW_EXECUTION.EXECUTION_ID         IS '실행 ID (UUID)';
 COMMENT ON COLUMN AI_WORKFLOW_EXECUTION.WORKFLOW_ID          IS '실행한 Workflow 정의 ID';
@@ -124,3 +163,30 @@ COMMENT ON COLUMN AI_WORKFLOW_EXECUTION_FILE.ACCESS_COUNT    IS '접근 횟수';
 COMMENT ON COLUMN AI_WORKFLOW_EXECUTION_FILE.FIRST_AT        IS '처음 접근한 시각';
 COMMENT ON COLUMN AI_WORKFLOW_EXECUTION_FILE.LAST_AT         IS '마지막으로 접근한 시각';
 COMMENT ON COLUMN AI_WORKFLOW_EXECUTION_FILE.CREATED         IS 'WRITE 일 때 이 step 이 새로 만든 파일인지. 재실행 때 이 파일만 지운다 (이 열이 생기기 전 기록은 NULL)';
+
+COMMENT ON TABLE  AI_EVAL_RUN                    IS 'Agent 평가 실행 1건 = 1행. 평가 사례(conf/eval)를 Agent에게 한 번 풀게 한 결과와 채점';
+COMMENT ON COLUMN AI_EVAL_RUN.RUN_ID             IS '평가 실행 ID';
+COMMENT ON COLUMN AI_EVAL_RUN.BATCH_ID           IS '같은 요청으로 여러 번 돌린 묶음 ID(반복 측정)';
+COMMENT ON COLUMN AI_EVAL_RUN.CASE_ID            IS '평가 사례 id(*.eval.yml의 id)';
+COMMENT ON COLUMN AI_EVAL_RUN.AGENT_ID           IS '푼 Agent id';
+COMMENT ON COLUMN AI_EVAL_RUN.AGENT_VERSION      IS '그때 Agent 정의의 version';
+COMMENT ON COLUMN AI_EVAL_RUN.MODEL              IS '쓴 모델(요청에서 바꿨으면 그 값, 아니면 Agent·provider 기본)';
+COMMENT ON COLUMN AI_EVAL_RUN.PARAMS_JSON        IS '사례 params에 넣은 값';
+COMMENT ON COLUMN AI_EVAL_RUN.STATUS             IS '상태: QUEUED/RUNNING/DONE(Agent가 답함)/FAILED(Agent 호출 실패·준비 실패)';
+COMMENT ON COLUMN AI_EVAL_RUN.PASSED             IS '통과한 채점 항목 수';
+COMMENT ON COLUMN AI_EVAL_RUN.TOTAL              IS '채점 항목 수';
+COMMENT ON COLUMN AI_EVAL_RUN.CHECKS_JSON        IS '채점 항목별 결과 [{name, kind, ok, detail}]';
+COMMENT ON COLUMN AI_EVAL_RUN.ANSWER_JSON        IS 'Agent 답(앞부분만)';
+COMMENT ON COLUMN AI_EVAL_RUN.FAILURE            IS '실패 사유';
+COMMENT ON COLUMN AI_EVAL_RUN.DURATION_MS        IS 'Agent 호출에 걸린 시간(밀리초)';
+COMMENT ON COLUMN AI_EVAL_RUN.ROUNDS             IS 'LLM을 부른 횟수(재시도 포함)';
+COMMENT ON COLUMN AI_EVAL_RUN.TOOL_CALLS         IS 'Tool 요청 수 합';
+COMMENT ON COLUMN AI_EVAL_RUN.TOOLS_JSON         IS 'Tool 이름별 요청 수';
+COMMENT ON COLUMN AI_EVAL_RUN.PROMPT_TOKENS      IS '입력 토큰 합(회차마다 보낸 대화 전체를 더한 값)';
+COMMENT ON COLUMN AI_EVAL_RUN.COMPLETION_TOKENS  IS '출력 토큰 합';
+COMMENT ON COLUMN AI_EVAL_RUN.WORK_DIR           IS '이 실행의 작업 폴더(Agent가 만든 파일이 남는다)';
+COMMENT ON COLUMN AI_EVAL_RUN.REQUESTED_BY       IS '평가를 시작한 사용자';
+COMMENT ON COLUMN AI_EVAL_RUN.OWNER_INSTANCE     IS '이 평가를 돌린 엔진 인스턴스 id. 그 인스턴스가 다시 뜨면 끝나지 않은 행을 FAILED로 정리한다';
+COMMENT ON COLUMN AI_EVAL_RUN.CREATED_AT         IS '요청 시각';
+COMMENT ON COLUMN AI_EVAL_RUN.STARTED_AT         IS '시작 시각';
+COMMENT ON COLUMN AI_EVAL_RUN.FINISHED_AT        IS '끝난 시각';
