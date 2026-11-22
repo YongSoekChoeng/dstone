@@ -490,11 +490,17 @@ var DstoneAiWorkflowAdmin = (function () {
 		var waitingApproval = detail.status === "WAITING_APPROVAL";
 		decisionFormEl.style.display = waitingApproval ? "" : "none";
 		if (waitingApproval) {
+			// 새로 승인 대기에 들어왔을 때(다른 실행을 골랐거나, 결정 뒤 다음 승인 step에 닿았을 때)만 입력칸을 비운다.
+			// 자동 갱신 중에는 같은 대기가 이어지므로 쓰던 의견을 지우지 않는다.
 			if (decisionFormEl.getAttribute("data-execution") !== detail.executionId) {
 				decisionStatusEl.textContent = "";
+				commentEl.value = "";
 				decisionFormEl.setAttribute("data-execution", detail.executionId);
 			}
 			renderDecisionButtons(detail.pendingApproval);
+		} else {
+			// 대기가 끝났으니 다음에 다시 승인 대기가 되면 새 대기로 본다.
+			decisionFormEl.removeAttribute("data-execution");
 		}
 		var show = waitingApproval || controlEl.style.display !== "none" || detail.status === "FAILED";
 		todoEl.style.display = show ? "" : "none";
@@ -1430,6 +1436,8 @@ var DstoneAiWorkflowAdmin = (function () {
 		})
 			.then(function (detail) {
 				// 엔진은 결정을 받으면 이어서 돌릴 실행을 대기열에 넣고 바로 돌려준다(QUEUED). 진행은 자동 갱신으로 본다.
+				// 보낸 의견은 비운다. 남겨 두면 다음 step의 결과처럼 보일 수 있다.
+				commentEl.value = "";
 				decisionStatusEl.textContent = "결정을 전달했습니다. 이어서 실행합니다 (" + detail.status + ")";
 				renderDetail(detail);
 				loadList(currentPage);
