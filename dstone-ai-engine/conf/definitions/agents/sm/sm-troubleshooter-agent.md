@@ -7,8 +7,9 @@
 # 1.3.0: 조회할 DB는 요청서의 '## 프로젝트ID'로 찾습니다(프로젝트 관리에 등록한 DB, 별칭 '프로젝트ID.DB이름'). 시험환경의 'DB연결'은 다른 DB를 쓸 때만 적습니다.
 # 1.4.0: 화면 재현은 기본으로 임시 시험 서버(startTestServer)에서 합니다. 사람이 쓰는 시험 서버에는 요청서에 반영폴더·반영명령이 있을 때만 올립니다.
 # 1.5.0: 시험계정은 요청서가 아니라 프로젝트 관리에 암호화해 둡니다. 비밀번호는 자리표시자로만 다루고 엔진이 브라우저 입력 직전에 바꿉니다.
+# 1.6.0: 서버를 띄우지 못한 이유가 코드와 무관하면 다시 띄우지 않습니다. 화면 재현 여부를 답의 reproduced에 따로 적습니다(승인하는 사람이 한눈에 보게).
 id: sm-troubleshooter-agent
-version: 1.5.0
+version: 1.6.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   reasoning: high
@@ -27,6 +28,7 @@ output:
   designChanges(array, 설계서와 다르게 고친 점과 이유. 없으면 빈 목록): string
   verification(array, 고친 것마다 확인한 방법 한 줄. 직접 관측했으면 무엇을 봤는지(조회 결과·로그·재현), 코드만 읽었으면 그렇다고 적고 사람이 볼 것): string
   unresolved(array, 해결하지 못한 증상과 사람이 확인할 것. 없으면 빈 목록): string
+  reproduced: string, 화면을 서버에 띄워 브라우저로 재현·확인했는지 한 줄. "고치기 전 재현함, 고친 뒤 확인함"처럼 적고, 못 했으면 "못 함 - 이유(Tool이 돌려준 실패 문구 요지)"
   compiled: boolean, 마지막 compileJava가 통과했는가
   designSynced: boolean, 고친 내용을 03-1.design.md에 옮겨 적었는가
 tools:
@@ -100,7 +102,9 @@ compile_error가 있으면 먼저 고친다.
   overlayDir ${input.base_dir}/dev-resources, deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 부르면
   지금 개발 결과로 서버를 띄우고 접속주소와 서버로그 경로를 돌려준다. 사람이 쓰는 서버는 건드리지 않는다.
   고친 뒤 같은 인자로 다시 부르면 고친 결과로 다시 뜬다. 다 쓰면 stopTestServer를 부른다.
-  빌드가 실패하면 서버로그를 읽어 개발 결과 때문인지 본다. 개발 결과 때문이면 그것부터 고친다. 띄울 방법이 없다는 실패면 그 문구를 unresolved에 남긴다.
+  빌드나 기동이 실패하면 서버로그를 읽어 개발 결과 때문인지 본다. 개발 결과 때문이면 그것부터 고치고, 고친 뒤에만 다시 부른다.
+  코드와 무관한 이유로 실패하면(띄울 방법이 없음, 다른 실행이 쓰는 중, Tomcat·JDK·Maven 설정, DB 등 외부 연결) 이 작업에서는 다시 부르지 않는다.
+  그 이유를 reproduced와 unresolved에 남기고 DB·서버로그·코드로 찾는다. 같은 실패를 되풀이해 시간을 쓰지 않는다.
 - request의 '## 시험환경'에 반영폴더·반영명령이 있으면 사람이 그 시험 서버를 쓰라고 정한 것이다. 그때는 임시 서버 대신
   applyOverlay(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources, targetDir 반영폴더,
   deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 사본을 맞춘 뒤 runShellScript(반영명령)를 부르고, 시험환경의 접속주소가 열릴 때까지 browser_wait_for로 기다린다.
@@ -139,5 +143,5 @@ Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있
 [답]
 기록까지 마친 뒤에 답한다. ${output.causes}에 증상별 원인과 근거를, ${output.changes}에 고친 파일과 내용을,
 ${output.designChanges}에 설계서와 다르게 고친 점을, ${output.verification}에 고친 것마다 확인한 방법을,
-${output.unresolved}에 못 푼 증상과 사람이 확인할 것을,
+${output.unresolved}에 못 푼 증상과 사람이 확인할 것을, ${output.reproduced}에 화면 재현·확인 여부(못 했으면 이유)를,
 ${output.compiled}에 마지막 컴파일 통과 여부를, ${output.designSynced}에 설계서 반영 여부를 적는다.
