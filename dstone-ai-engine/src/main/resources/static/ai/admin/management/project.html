@@ -45,6 +45,8 @@
 						<tr><th><label for="pj-scmType">형상관리 종류</label></th><td><select id="pj-scmType"><option value="">(선택 안 함)</option><option value="GIT">GIT</option><option value="SVN">SVN</option><option value="NONE">없음</option></select></td></tr>
 						<tr><th><label for="pj-scmUrl">형상관리 URL</label></th><td><input type="text" id="pj-scmUrl" /></td></tr>
 						<tr><th><label for="pj-javaVersion">Java 버전</label></th><td><input type="text" id="pj-javaVersion" placeholder="예: 8, 17 (비우면 원본 pom.xml이나 클래스 파일에서 읽음). JDK 경로는 서버의 env 설정 JAVA_HOME_버전" /></td></tr>
+						<tr><th><label for="pj-testUserId">시험계정</label></th><td><input type="text" id="pj-testUserId" autocomplete="off" placeholder="화면 재현에 쓸 시험 서버 전용 계정 ID(운영 계정 금지)" /></td></tr>
+						<tr><th><label for="pj-testPassword">시험계정 비밀번호</label></th><td><input type="password" id="pj-testPassword" autocomplete="new-password" /><div class="ai-hint">암호화해 저장하고 다시 보여 주지 않습니다. Agent에게도 주지 않고, 엔진이 브라우저에 입력할 때만 넣습니다. 바꿀 때만 넣으세요.</div></td></tr>
 						<tr><th><label for="pj-useYn">사용</label></th><td><select id="pj-useYn"><option value="Y">예</option><option value="N">아니오(DB Tool 에서도 숨김)</option></select></td></tr>
 					</table>
 

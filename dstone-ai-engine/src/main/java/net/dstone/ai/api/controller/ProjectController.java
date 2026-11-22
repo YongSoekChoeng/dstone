@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.ai.common.project.ProjectStore;
 import net.dstone.ai.common.security.RequesterContext;
+import net.dstone.common.annotation.NoAspectLog;
 import net.dstone.common.biz.BaseController;
 
 /**
@@ -52,6 +53,8 @@ public class ProjectController extends BaseController {
 		return ResponseEntity.ok((Object) project);
 	}
 
+	/** 본문에 비밀번호(DB, 시험계정)가 있어서 호출 로그(ConfigCallLog)에 남기지 않습니다. */
+	@NoAspectLog
 	@PostMapping
 	public ResponseEntity<Object> save(@RequestBody Map<String, Object> body, HttpServletRequest request) {
 		if (!RequesterContext.isAdmin(request)) {

@@ -137,6 +137,11 @@ public final class Constants {
 			public final static String PREFIX = "dstone.ai.tool.file";
 		}
 
+		/** 비밀값 자리표시자 ${secret:...}를 쓸 수 있는 Tool 목록(쉼표로 구분, runtime.tool.ToolCallGate)의 설정 키입니다. */
+		public static final class Secret {
+			public final static String ALLOWED_TOOLS = "dstone.ai.tool.secret.allowed-tools";
+		}
+
 		/** 원본 + 개발 결과로 임시 시험 서버를 띄우고 내리는 Tool(tools.build.TestServerTool)의 설정 키 접두사입니다. */
 		public static final class TestServer {
 			public final static String PREFIX = "dstone.ai.tool.test-server";

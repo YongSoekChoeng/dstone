@@ -168,6 +168,8 @@ CREATE TABLE IF NOT EXISTS ai_management_project (
     SCM_TYPE          VARCHAR(20),
     SCM_URL           VARCHAR(1000),
     JAVA_VERSION      VARCHAR(10),
+    TEST_USER_ID      VARCHAR(100),
+    TEST_PASSWORD_ENC VARCHAR(500),
     USE_YN            CHAR(1)       NOT NULL DEFAULT 'Y',
     CREATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
     CREATED_BY        VARCHAR(50),
@@ -178,6 +180,10 @@ CREATE TABLE IF NOT EXISTS ai_management_project (
 -- 임시 시험 서버(tools.build.TestServerTool)를 띄울 Java 버전(예: 8, 17). JDK 경로는 서버마다 다르므로 env*.properties 의 JAVA_HOME_<버전>에 둔다.
 -- 비우면 원본 pom.xml 이나 클래스 파일에서 읽는다.
 ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS JAVA_VERSION VARCHAR(10);
+-- 화면 재현에 쓰는 시험 서버 전용 계정. 비밀번호는 EncUtil 로 암호화하고 API 는 돌려주지 않는다.
+-- Agent 에게는 비밀번호 대신 자리표시자 ${secret:프로젝트ID.testPassword} 만 주고, 엔진(ToolCallGate)이 허용한 Tool 에 넘기기 직전에만 바꾼다.
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_USER_ID VARCHAR(100);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_PASSWORD_ENC VARCHAR(500);
 CREATE TABLE IF NOT EXISTS ai_management_project_db (
     PROJECT_ID        VARCHAR(50)   NOT NULL REFERENCES ai_management_project(PROJECT_ID) ON DELETE CASCADE,
     DB_SEQ            INT           NOT NULL,

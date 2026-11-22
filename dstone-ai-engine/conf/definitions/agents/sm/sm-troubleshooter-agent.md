@@ -6,8 +6,9 @@
 # (실행 f2cf12b3 분석, Skill troubleshooting과 요청서 '## 시험환경'으로 보강).
 # 1.3.0: 조회할 DB는 요청서의 '## 프로젝트ID'로 찾습니다(프로젝트 관리에 등록한 DB, 별칭 '프로젝트ID.DB이름'). 시험환경의 'DB연결'은 다른 DB를 쓸 때만 적습니다.
 # 1.4.0: 화면 재현은 기본으로 임시 시험 서버(startTestServer)에서 합니다. 사람이 쓰는 시험 서버에는 요청서에 반영폴더·반영명령이 있을 때만 올립니다.
+# 1.5.0: 시험계정은 요청서가 아니라 프로젝트 관리에 암호화해 둡니다. 비밀번호는 자리표시자로만 다루고 엔진이 브라우저 입력 직전에 바꿉니다.
 id: sm-troubleshooter-agent
-version: 1.4.0
+version: 1.5.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   reasoning: high
@@ -51,6 +52,7 @@ tools:
     - dbQuery
     - startTestServer
     - stopTestServer
+    - getTestAccount
     - applyOverlay
     - runShellScript
     - browser_navigate
@@ -103,7 +105,9 @@ compile_error가 있으면 먼저 고친다.
   applyOverlay(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources, targetDir 반영폴더,
   deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 사본을 맞춘 뒤 runShellScript(반영명령)를 부르고, 시험환경의 접속주소가 열릴 때까지 browser_wait_for로 기다린다.
   시험 서버가 아닌 곳에는 올리지 않는다.
-- 로그인은 시험환경의 시험계정으로 한다. 시험계정이 없으면 로그인이 필요 없는 화면만 브라우저로 보고, 나머지는 DB와 서버로그로 본다.
+- 로그인은 프로젝트 관리의 시험계정으로 한다. startTestServer 결과의 '시험계정' 줄(사람이 쓰는 시험 서버면 getTestAccount)에 ID와 비밀번호 자리표시자가 있다.
+  비밀번호 칸에는 그 결과에 적힌 자리표시자(secret으로 시작하는 표시)를 글자 그대로 browser_type이나 browser_fill_form에 넣는다. 엔진이 넣기 직전에 실제 값으로 바꾼다.
+  실제 비밀번호를 알아내려 하거나, 자리표시자를 파일·답·다른 Tool에 적지 않는다. 시험계정이 없으면 로그인이 필요 없는 화면만 브라우저로 보고, 나머지는 DB와 서버로그로 본다.
 - browser_* Tool로 사람이 한 순서 그대로 누른다. 콘솔 오류(browser_console_messages)와 요청·응답(browser_network_requests)을 본다.
 - 서버로그는 readFileTail로 끝부분을 읽는다. 임시 서버면 startTestServer가 돌려준 경로, 시험환경에 서버로그가 있으면 그 파일이다.
 관측하지 못한 것은 코드로 찾고, 사람이 무엇을 확인하면 되는지 unresolved에 남긴다.

@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import net.dstone.ai.common.biz.BaseDao;
+import net.dstone.ai.runtime.tool.SecretSource;
 import net.dstone.common.utils.EncUtil;
 
 /**
@@ -23,16 +24,21 @@ import net.dstone.common.utils.EncUtil;
  * 프로젝트 관리(ai_management_project, ai_management_project_db)의 저장과 조회입니다. SQL은 resources/sqlmap/project/ProjectDao.xml.
  *
  * ## 테이블정의
- *   ai_management_project     PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, USE_YN
+ *   ai_management_project     PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, TEST_USER_ID, TEST_PASSWORD_ENC, USE_YN
  *   ai_management_project_db  PROJECT_ID + DB_SEQ(KEY), DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, DESCRIPTION, SORT_ORDER
  *
+ * 시험계정(TEST_USER_ID, TEST_PASSWORD_ENC)은 화면 재현용 시험 서버 전용 계정입니다. 비밀번호는 Agent에게도 주지 않고,
+ * 자리표시자 ${secret:프로젝트ID.testPassword}를 엔진(runtime.tool.ToolCallGate)이 secret()으로 바꿉니다.
  * 비밀번호는 EncUtil 로 암호화해 저장합니다. 화면 API(list/find)는 비밀번호를 돌려주지 않고 "있는지"만 알려 줍니다.
  * 고칠 때 비밀번호 칸을 비워 두면 저장된 비밀번호를 그대로 씁니다(같은 DB_SEQ 기준).
  * DB Tool(tools.db.DbQueryTool)은 connections()로 "프로젝트ID.DB이름" 별칭과 복호화한 접속 정보를 받습니다.
  * </pre>
  */
 @Repository
-public class ProjectStore extends BaseDao {
+public class ProjectStore extends BaseDao implements SecretSource {
+
+	/** 비밀값 참조의 이름: 시험계정 비밀번호 */
+	public static final String SECRET_TEST_PASSWORD = "testPassword";
 
 	private static final String NS = "net.dstone.ai.common.project.ProjectStore.";
 
@@ -71,7 +77,7 @@ public class ProjectStore extends BaseDao {
 	/**
 	 * 프로젝트를 만들거나 고칩니다. DB 목록은 통째로 바꿉니다.
 	 *
-	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, javaVersion, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
+	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, javaVersion, testUserId, testPassword?, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
 	 * @param by      작업한 사람
 	 */
 	@SuppressWarnings("unchecked")
@@ -99,6 +105,16 @@ public class ProjectStore extends BaseDao {
 		param.put("scmType", scmType);
 		param.put("scmUrl", text(project, "scmUrl"));
 		param.put("javaVersion", javaVersion);
+		// 시험계정: 비밀번호 칸을 비워 두면 저장된 것을 그대로 쓴다. ID를 지우면 비밀번호도 지운다.
+		String testUserId = text(project, "testUserId");
+		String testPassword = project.get("testPassword") == null ? null : String.valueOf(project.get("testPassword"));
+		String testPasswordEnc = null;
+		if (testUserId != null) {
+			testPasswordEnc = testPassword != null && !testPassword.isEmpty() ? EncUtil.encrypt(testPassword)
+				: (String) this.sqlSessionCommon.selectOne(NS + "selectTestPasswordEnc", projectId);
+		}
+		param.put("testUserId", testUserId);
+		param.put("testPasswordEnc", testPasswordEnc);
 		param.put("useYn", "N".equals(text(project, "useYn")) ? "N" : "Y");
 		param.put("by", by);
 
@@ -160,6 +176,32 @@ public class ProjectStore extends BaseDao {
 	 * DB Tool 이 쓸 접속 정보입니다. 별칭은 "프로젝트ID.DB이름", 값은 {url, username, password(복호화), schema, description}.
 	 * 쓰지 않는 프로젝트의 DB는 넣지 않습니다.
 	 */
+	/**
+	 * <pre>
+	 * 비밀값 자리표시자의 실제 값입니다(runtime.tool.ToolCallGate가 부릅니다). 참조는 "프로젝트ID.이름"이고 이름은 testPassword 하나입니다.
+	 * 쓰지 않는 프로젝트(USE_YN='N')나 값이 없으면 null입니다. 돌려준 값은 로그에 남기지 않습니다.
+	 * </pre>
+	 *
+	 * @param reference "프로젝트ID.testPassword"
+	 */
+	@Override
+	public String secret(String reference) {
+		if (reference == null) {
+			return null;
+		}
+		int dot = reference.lastIndexOf('.');
+		if (dot <= 0 || !SECRET_TEST_PASSWORD.equals(reference.substring(dot + 1))) {
+			return null;
+		}
+		String projectId = reference.substring(0, dot);
+		Map<String, Object> project = this.sqlSessionCommon.selectOne(NS + "selectProject", projectId);
+		if (project == null || !"Y".equals(project.get("useYn"))) {
+			return null;
+		}
+		String enc = this.sqlSessionCommon.selectOne(NS + "selectTestPasswordEnc", projectId);
+		return enc == null || enc.isEmpty() ? null : EncUtil.decrypt(enc);
+	}
+
 	public Map<String, Map<String, String>> connections() {
 		Map<String, Map<String, String>> result = new LinkedHashMap<String, Map<String, String>>();
 		List<Map<String, Object>> rows = this.sqlSessionCommon.selectList(NS + "selectConnectionList");

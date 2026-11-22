@@ -164,6 +164,12 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		return ToolOutcome.pass("임시 시험 서버를 내렸습니다: " + key);
 	}
 
+	@Tool(description = "프로젝트 관리에 등록된 시험계정(화면 로그인용)을 알려 준다. 비밀번호는 알려 주지 않고, 비밀번호 칸에 글자 그대로 넣을 자리표시자를 준다. "
+		+ "startTestServer 결과에도 같은 내용이 있다. 사람이 쓰는 시험 서버에 로그인할 때 쓴다.")
+	public ToolOutcome getTestAccount(@ToolParam(description = "프로젝트ID(요청서의 프로젝트ID)") String projectId) {
+		return ToolOutcome.pass(this.accountLine(projectId));
+	}
+
 	/** step이 끝나면 그 실행·step이 띄운 서버를 내립니다. */
 	@Override
 	public void stepEnded(String executionId, String stepId) {
@@ -299,6 +305,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			message.append("서버로그: ").append(log.getPath()).append('\n');
 			message.append("방식: ").append(kind).append(", JDK: ").append(javaHome == null ? "엔진과 같은 JDK(" + System.getProperty("java.version") + ")" : javaHome.getPath()).append('\n');
 			message.append("사본: ").append(app.getPath()).append(" (").append(overlay.message()).append(")");
+			message.append('\n').append(this.accountLine(projectId));
 			for (String note : notes) {
 				message.append('\n').append(note);
 			}
@@ -307,6 +314,32 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			if (!started) {
 				this.stop(server);
 			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 화면에 로그인할 시험계정 안내 한 줄입니다(프로젝트 관리의 시험계정).
+	 * 비밀번호는 알려 주지 않고 자리표시자만 줍니다. 엔진(ToolCallGate)이 브라우저 입력 Tool에 넘길 때만 실제 값으로 바꿉니다.
+	 * </pre>
+	 */
+	private String accountLine(String projectId) {
+		if (isBlank(projectId)) {
+			return "시험계정: 없음(프로젝트ID가 없음). 로그인이 필요 없는 화면만 볼 수 있습니다.";
+		}
+		try {
+			Map<String, Object> project = this.projectStore.find(projectId.trim());
+			Object userId = project == null ? null : project.get("testUserId");
+			if (userId == null || isBlank(userId.toString())) {
+				return "시험계정: 없음(프로젝트 관리에 시험계정이 없음). 로그인이 필요 없는 화면만 볼 수 있습니다.";
+			}
+			if (!"Y".equals(project.get("hasTestPassword"))) {
+				return "시험계정: ID " + userId + " (비밀번호는 프로젝트 관리에 없음)";
+			}
+			return "시험계정: ID " + userId + ", 비밀번호 칸에는 ${secret:" + projectId.trim() + "." + ProjectStore.SECRET_TEST_PASSWORD
+				+ "}를 글자 그대로 넣는다(browser_type, browser_fill_form에서만 엔진이 실제 값으로 바꿔 넣는다)";
+		} catch (RuntimeException e) {
+			return "시험계정: 읽지 못했습니다(" + e.getMessage() + ")";
 		}
 	}
 

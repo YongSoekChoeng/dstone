@@ -46,9 +46,12 @@
 		editing = project;
 		document.getElementById("pj-form-title").textContent = project ? "고치기: " + project.projectId : "새로 만들기";
 		var p = project || { useYn: "Y" };
-		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "javaVersion", "useYn"].forEach(function (key) {
+		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "javaVersion", "testUserId", "useYn"].forEach(function (key) {
 			document.getElementById("pj-" + key).value = p[key] == null ? "" : p[key];
 		});
+		var testPassword = document.getElementById("pj-testPassword");
+		testPassword.value = "";
+		testPassword.placeholder = p.hasTestPassword === "Y" ? "저장됨(바꿀 때만)" : "";
 		document.getElementById("pj-projectId").readOnly = !!project;
 		dbBody.innerHTML = (p.dbs || []).map(dbRow).join("");
 		document.getElementById("pj-delete").hidden = !project;
@@ -94,9 +97,10 @@
 	document.getElementById("pj-form").addEventListener("submit", function (event) {
 		event.preventDefault();
 		var body = {};
-		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "javaVersion", "useYn"].forEach(function (key) {
+		["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "javaVersion", "testUserId", "useYn"].forEach(function (key) {
 			body[key] = document.getElementById("pj-" + key).value.trim();
 		});
+		body.testPassword = document.getElementById("pj-testPassword").value;
 		body.dbs = Array.prototype.map.call(dbBody.querySelectorAll("tr"), function (tr) {
 			function v(cls) {
 				return tr.querySelector("." + cls).value.trim();
