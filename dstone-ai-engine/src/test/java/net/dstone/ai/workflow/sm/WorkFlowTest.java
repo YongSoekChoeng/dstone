@@ -48,12 +48,12 @@ public class WorkFlowTest extends WorkflowTestBase {
 
 	@Test
 	void 요청서의_소스경로를_LLM_없이_state에_담는다() throws IOException {
-		this.writeDoc("00.request.md", "## 현업요청\n이미지 게시판\n\n## 프로젝트ID\n\ttestApp\n\n## 소스경로\n\tD:/AppHome/testApp\n");
+		this.writeDoc("00.request.md", "## 현업요청\n이미지 게시판\n\n## 프로젝트ID\n\tmyApp\n\n## 소스경로\n\tD:/AppHome/myApp\n");
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
 		flow.step("step00");
 		flow.step("step01");
 		flow.step("step02");
-		assertThat(flow.state("sourceDir")).isEqualTo("D:/AppHome/testApp");
+		assertThat(flow.state("sourceDir")).isEqualTo("D:/AppHome/myApp");
 		assertThat(flow.currentStepId()).isEqualTo("step03");
 		if (!this.chatModel.isLlmCall()) {
 			assertThat(this.chatModel.prompts()).isEmpty();

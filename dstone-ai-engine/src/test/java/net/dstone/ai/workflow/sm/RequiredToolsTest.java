@@ -98,9 +98,9 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
 		// document-revise-agent(step23 설계서 수정)는 requiredTools: [editFileTexts|writeFile|appendFile]다. 고칠 때는 editFileTexts로만 끝난다.
 		Path design = this.workDir.resolve("03-1.design.md");
-		Files.writeString(design, "import kr.co.gnx.system.file.UPLOADS;\n");
+		Files.writeString(design, "import com.example.system.file.UPLOADS;\n");
 		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + design.toString().replace("\\", "/")
-			+ "\", \"edits\": [{\"before\": \"kr.co.gnx.system.file.UPLOADS\", \"after\": \"kr.co.gnx.config.Constants.UPLOADS\"}]}");
+			+ "\", \"edits\": [{\"before\": \"com.example.system.file.UPLOADS\", \"after\": \"com.example.config.Constants.UPLOADS\"}]}");
 		this.chatModel.answer("지적된 import만 고쳤습니다.");
 
 		Map<String, Object> input = new LinkedHashMap<>();
@@ -111,7 +111,7 @@ public class RequiredToolsTest extends WorkflowTestBase {
 		flow.step("step23");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(Files.readString(design)).contains("kr.co.gnx.config.Constants.UPLOADS");
+		assertThat(Files.readString(design)).contains("com.example.config.Constants.UPLOADS");
 	}
 
 	@Test

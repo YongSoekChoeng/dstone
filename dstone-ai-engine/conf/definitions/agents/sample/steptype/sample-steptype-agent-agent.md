@@ -18,7 +18,7 @@
 #     onFailure: FAIL
 #
 # 채팅 API로 바로 불러 볼 수도 있습니다.
-#   POST /api/ai/chat  {"agent": "sample-steptype-agent-agent", "input": {"filePath": "/app/testApp/src/Foo.java"}}
+#   POST /api/ai/chat  {"agent": "sample-steptype-agent-agent", "input": {"filePath": "/app/myApp/src/Foo.java"}}
 # ─────────────────────────────────────────────────────────────
 id: sample-steptype-agent-agent
 version: 1.0.0

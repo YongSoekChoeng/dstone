@@ -69,10 +69,6 @@ var DstoneAiWorkflow = (function () {
 		"sample-tool-gated-external": {
 			input: "외부 Tool 게이트 테스트",
 			note: "input은 쓰지 않습니다(아무 글자나 넣으면 됩니다)."
-		},
-		"testApp-sdlc": {
-			input: "회원 목록 화면에 가입일자 검색 조건을 추가해줘",
-			note: "승인을 모두 통과하면 Jenkins Job \"testApp\" 빌드가 실제로 기동됩니다. 테스트만 하려면 code-review 단계에서 반려하세요."
 		}
 	};
 

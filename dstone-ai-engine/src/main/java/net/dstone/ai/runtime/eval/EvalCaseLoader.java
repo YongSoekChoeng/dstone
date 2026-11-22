@@ -165,9 +165,10 @@ public class EvalCaseLoader extends BaseObject {
 			requestAppend = request.get("append") == null ? null : String.valueOf(request.get("append"));
 		}
 		Object rawInput = root.get("input");
-		if (!(rawInput instanceof Map)) {
-			throw new IllegalStateException("input이 없습니다. Agent에 넣을 값을 이름: 값 모양으로 적으십시오.");
+		if (!(rawInput instanceof Map) && !(rawInput instanceof String)) {
+			throw new IllegalStateException("input이 없습니다. Agent input 모양대로 이름: 값(맵)이나 글자로 적으십시오.");
 		}
+		Object input = rawInput instanceof Map ? new LinkedHashMap<String, Object>((Map<String, Object>) rawInput) : rawInput;
 		List<EvalCase.Check> checks = new ArrayList<EvalCase.Check>();
 		Object rawChecks = root.get("checks");
 		if (!(rawChecks instanceof List) || ((List<Object>) rawChecks).isEmpty()) {
@@ -188,7 +189,7 @@ public class EvalCaseLoader extends BaseObject {
 			}
 		}
 		return new EvalCase(id, this.text(root, "description", false), this.text(root, "agent", true), this.text(root, "fixture", false), copy, params,
-			requestFile, requestAppend, new LinkedHashMap<String, Object>((Map<String, Object>) rawInput), checks, path);
+			requestFile, requestAppend, input, checks, path);
 	}
 
 	@SuppressWarnings("unchecked")

@@ -256,8 +256,8 @@ dstone:
                 base-url: http://localhost:8080
                 user: jysn007
                 api-token: ENC(koeh9W9G8vYjPVBZAeO3GWxg8Uv3PYssUy8aykBFHNMVke4YNjWubBwxGu7xp+hDZbfMwSgwbXj7ZE87Gp1cpQ==)
-                allowed-jobs:
-                    - testApp
+                # 기동을 허락할 Job 이름 목록. 비어 있으면 이 Tool은 항상 실패로 끝난다(현장마다 채운다).
+                allowed-jobs: []
             # dstone-knowledge(Java 분석 결과와 올린 문서를 담아 둔 서버)를 부르는 설정(common.knowledge.KnowledgeClient).
             # 쓰는 곳은 tools.knowledge.KnowledgeTool(코드 분석 결과: knowledgeSearch 등)과 KnowledgeDocTool(올린 문서: knowledgeListDocs / knowledgeSearchDocs / knowledgeGetChunks)이다.
             # base-url이 비어 있으면 그 Tool은 항상 실패 문구로 끝난다 - 주소를 채우는 것이 곧 "켠 상태"다.
@@ -288,13 +288,14 @@ dstone:
                 max-rows: 100
                 max-cell-chars: 200
                 query-timeout-seconds: 30
-                connections:
-                    testApp:
-                        url: jdbc:mysql://${TESTAPP_DB_HOST}:${TESTAPP_DB_PORT}/${TESTAPP_DB_DATABASE}
-                        username: testapp
-                        password: ENC(aJthN1LCbd20mh4yIXE3sbx5c2k3o5D9bh/4prcRGDI=)
-                        schema: ${TESTAPP_DB_DATABASE}
-                        description: testApp 샘플 DB
+                # 조회할 DB를 별칭으로 등록한다(현장마다 채운다). 비어 있으면 DB Tool은 실패 문구로 끝난다.
+                #   {별칭}:
+                #       url: jdbc:mysql://${업무DB_HOST}:${업무DB_PORT}/{스키마}
+                #       username: (읽기 전용 계정)
+                #       password: ENC(...)
+                #       schema: {스키마}
+                #       description: 무슨 DB인지
+                connections: {}
             # max-result-chars: 어떤 Tool이든(로컬 @AiTool, MCP 공통) 결과 한 건이 이 글자 수를 넘으면 앞부분만 남기고
             # "잘렸으니 범위를 좁혀 다시 호출하라"는 안내를 붙인다(common.config.ConfigTool, 기본 60000).
             # Tool 결과는 대화 이력에 쌓여 매 호출마다 다시 보내지므로, 큰 결과 하나가 컨텍스트 한도나 응답 대기 시간을 넘긴다.

@@ -16,12 +16,12 @@ import java.util.Map;
  *   fixture: sm/troubleshoot-delete      ← 자료 폴더(conf/eval 기준). 그 안의 work/ 가 작업 폴더로 복사된다
  *   copy: [01.customer_requirement.md]   ← work/ 가운데 복사할 것만(파일이나 폴더). 비우면 전부
  *   params:                              ← 실행할 때 바꿀 수 있는 값과 기본값
- *     sourceDir: /app/testApp
+ *     sourceDir: /app/myApp
  *   request:                             ← 요청서(작업 폴더 위 요청 폴더에 00.request.md로 둠). 선택
  *     file: 00.request.md                   fixture 안의 파일
  *     append: |                             끝에 덧붙일 글
  *       ## 시험환경
- *   input:                               ← Agent input. 값 안의 자리는 아래 표
+ *   input:                               ← Agent input(맵이나 글자). 값 안의 자리는 아래 표
  *     base_dir: ${workDir}
  *   checks:                              ← 채점 기준. 하나에 종류 하나
  *     - name: 설계서 반영
@@ -44,12 +44,12 @@ import java.util.Map;
  * @param params      바꿀 수 있는 값과 기본값(적은 순서 유지)
  * @param requestFile 요청서로 쓸 fixture 안 파일. 없으면 null
  * @param requestAppend 요청서 끝에 덧붙일 글. 없으면 null
- * @param input       Agent input(값은 자리를 채우기 전 글자)
+ * @param input       Agent input. Agent input 모양대로 맵이나 글자(값은 자리를 채우기 전 글자)
  * @param checks      채점 기준
  * @param path        사례 파일 경로(conf/eval 기준)
  */
 public record EvalCase(String id, String description, String agent, String fixture, List<String> copy, Map<String, String> params, String requestFile,
-	String requestAppend, Map<String, Object> input, List<Check> checks, String path) {
+	String requestAppend, Object input, List<Check> checks, String path) {
 
 	/**
 	 * <pre>

@@ -194,7 +194,7 @@ public class SkillRegistry extends BaseObject {
 		return false;
 	}
 
-	/** Skill 파일이 폴더 지정 항목이 가리키는 폴더 아래에 있는지 봅니다(skills/projects/gnx-crud-screen/SKILL.md ← projects/**). */
+	/** Skill 파일이 폴더 지정 항목이 가리키는 폴더 아래에 있는지 봅니다(skills/projects/my-conventions/SKILL.md ← projects/**). */
 	private static boolean inFolder(SkillDefinition skill, String entry) {
 		String folder = entry.substring(0, entry.length() - FOLDER_PATTERN_SUFFIX.length());
 		String prefix = Constants.Definition.SKILL_DIR + "/" + folder + "/";

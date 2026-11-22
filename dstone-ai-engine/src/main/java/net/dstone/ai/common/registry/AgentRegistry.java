@@ -3,6 +3,7 @@ package net.dstone.ai.common.registry;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.TreeMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -65,7 +66,7 @@ import net.dstone.common.utils.StringUtil;
  * Skill(skills.allowed)도 기동할 때 검사합니다(checkSkills()).
  *   오류(기동 실패)                                         경고(로그만)
  *   skills.allowed/preload에 등록되지 않은 Skill 이름을 적음  Skill 폴더에 참고 파일이 있는데 tools.allowed에 readFile이 없음
- *   skills.preload에 폴더 지정(projects/**)을 적음         skills.allowed의 폴더 지정에 걸리는 Skill이 없음
+ *   skills.preload에 폴더 지정(projects/**)을 적음         skills.allowed의 폴더 지정에 걸리는 Skill이 없음(폴더마다 한 줄 [안내])
  *   엔진이 붙이는 Tool 이름(Skill, TaskOutput)과 같은 이름의 Tool이나 Sub Agent가 있음
  * </pre>
  */
@@ -137,12 +138,20 @@ public class AgentRegistry extends BaseObject {
 		}
 		// tools/subAgents는 다른 Agent를 가리키므로, 전부 읽은 뒤에 검사합니다.
 		List<String> registeredTools = this.configTool.toolNames();
+		Map<String, List<String>> emptyFolders = new TreeMap<>();
 		for (AgentDefinition definition : resolved.values()) {
 			this.checkTools(definition, registeredTools);
 			this.checkRequiredTools(definition, registeredTools);
 			this.checkRequiredWrites(definition);
 			this.checkSubAgents(definition, resolved, registeredTools);
-			this.checkSkills(definition, skills, registeredTools);
+			this.checkSkills(definition, skills, registeredTools, emptyFolders);
+		}
+		// 폴더 지정(projects/**)에 걸리는 Skill이 없으면 폴더마다 한 줄만 남깁니다.
+		// 프로젝트 관례 Skill을 아직 넣지 않은 현장에서는 이것이 정상이라, Agent마다 되풀이해 경고하지 않습니다.
+		for (Map.Entry<String, List<String>> entry : emptyFolders.entrySet()) {
+			String folder = entry.getKey().substring(0, entry.getKey().length() - SkillRegistry.FOLDER_PATTERN_SUFFIX.length());
+			LogUtil.sysout("dstone-ai-engine agent: [안내] skills.allowed의 '" + entry.getKey() + "'에 걸리는 Skill이 아직 없습니다(conf/definitions/"
+				+ Constants.Definition.SKILL_DIR + "/" + folder + " 폴더). 이 폴더 지정을 쓰는 Agent = " + entry.getValue());
 		}
 		return resolved;
 	}
@@ -451,7 +460,7 @@ public class AgentRegistry extends BaseObject {
 	 * @param skills          등록될 Skill 전체(이름 → 정의)
 	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
 	 */
-	private void checkSkills(AgentDefinition definition, Map<String, SkillDefinition> skills, List<String> registeredTools) {
+	private void checkSkills(AgentDefinition definition, Map<String, SkillDefinition> skills, List<String> registeredTools, Map<String, List<String>> emptyFolders) {
 		String where = "agent[" + definition.id() + "]의 ";
 		if (!definition.skillNames().isEmpty()) {
 			this.checkEngineToolName(definition, SkillTool.NAME, registeredTools);
@@ -459,10 +468,14 @@ public class AgentRegistry extends BaseObject {
 		boolean needsReadFile = false;
 		for (String name : definition.skillNames()) {
 			if (SkillRegistry.isFolderPattern(name)) {
-				// 폴더 지정(projects/**)은 그 폴더가 아직 비어 있을 수 있습니다. 폴더 이름을 잘못 적었을 수 있으니 경고만 남깁니다.
+				// 폴더 지정(projects/**)은 그 폴더가 아직 비어 있을 수 있습니다. 모아 두었다가 check()가 폴더마다 한 줄로 알립니다.
 				if (!SkillRegistry.matchesAny(name, skills)) {
-					LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + "skills.allowed의 '" + name + "'에 걸리는 Skill이 없습니다(conf/definitions/"
-						+ Constants.Definition.SKILL_DIR + "/" + name.substring(0, name.length() - SkillRegistry.FOLDER_PATTERN_SUFFIX.length()) + " 폴더를 확인하십시오).");
+					List<String> users = emptyFolders.get(name);
+					if (users == null) {
+						users = new ArrayList<>();
+						emptyFolders.put(name, users);
+					}
+					users.add(definition.id());
 				}
 				continue;
 			}

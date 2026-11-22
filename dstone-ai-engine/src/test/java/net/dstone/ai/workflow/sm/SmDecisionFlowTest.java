@@ -180,7 +180,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 	/** 앞 step이 저장했을 값을 넣고 stepId부터 시작하는 실행을 만듭니다. */
 	private WorkflowStepper atStep(String stepId) {
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
-		flow.put("now", NOW).put("request", "## 현업요청\n이미지 게시판\n## 소스경로\n/app/testApp").put("requirement", "# 요구사항").put("sourceDir", "/app/testApp");
+		flow.put("now", NOW).put("request", "## 현업요청\n이미지 게시판\n## 소스경로\n/app/myApp").put("requirement", "# 요구사항").put("sourceDir", "/app/myApp");
 		return flow.jumpTo(stepId);
 	}
 

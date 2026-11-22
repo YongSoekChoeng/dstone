@@ -6,21 +6,28 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import net.dstone.ai.support.WorkflowTestBase;
 
 /**
  * <pre>
- * 평가 기능(conf/eval 사례 → 작업 폴더 → Agent 호출 → 채점 → AI_EVAL_RUN)을 미리 넣은 LLM 답으로 확인합니다.
- * 실제 LLM으로 재는 일은 엔진의 평가 화면(/ai/admin/eval/eval.html)이나 API(/api/ai/eval)로 합니다.
+ * 평가 기능(사례 → 작업 폴더 → Agent 호출 → 채점 → 저장)을 미리 넣은 LLM 답으로 확인합니다.
+ * 저장소에는 평가 사례를 두지 않으므로(사례는 현장의 conf/eval에 둡니다), 테스트가 임시 폴더에 사례를 만들어
+ * dstone.ai.eval.location으로 가리킵니다. 사례의 Agent는 샘플 Agent(sample-basic-echo-agent)입니다.
  * </pre>
  */
 public class EvalRunnerTest extends WorkflowTestBase {
+
+	private static final String LOCATION = "dstone.ai.eval.location";
 
 	@Autowired
 	private EvalCaseLoader loader;
@@ -31,76 +38,97 @@ public class EvalRunnerTest extends WorkflowTestBase {
 	@Autowired
 	private EvalRunStore store;
 
+	@TempDir
+	Path dir;
+
+	@BeforeEach
+	void writeCase() throws Exception {
+		Path root = this.dir.resolve("eval");
+		write(root.resolve("demo/echo-check.eval.yml"), String.join("\n",
+			"id: echo-check",
+			"description: 시험용 사례",
+			"agent: sample-basic-echo-agent",
+			"fixture: demo/data",
+			"params:",
+			"  name: 기본값",
+			"request:",
+			"  file: request.md",
+			"  append: \"- 덧붙임: ${param.name}\"",
+			"input: \"${request}${file:note.md}\"",
+			"checks:",
+			"  - name: 인사함",
+			"    answerContains: 안녕",
+			"  - name: 메모 그대로",
+			"    fileChanged: note.md",
+			"  - name: Tool 안 씀",
+			"    toolUsed: {name: dbQuery, min: 1}",
+			""));
+		write(root.resolve("demo/data/request.md"), "# 요청 ${param.name}\n");
+		write(root.resolve("demo/data/work/note.md"), "폴더 ${workDir} / EL ${_csrf.token}\n");
+		write(root.resolve("demo/bad.eval.yml"), "id: other-name\nagent: x\ninput: a\nchecks: [{fileExists: a}]\n");
+		System.setProperty(LOCATION, root.toString());
+	}
+
+	@AfterEach
+	void clearLocation() {
+		System.clearProperty(LOCATION);
+	}
+
+	private static void write(Path file, String text) throws Exception {
+		Files.createDirectories(file.getParent());
+		Files.writeString(file, text, StandardCharsets.UTF_8);
+	}
+
 	@Test
-	void conf_eval의_사례는_모두_읽힌다() {
+	void 틀린_사례는_사유와_함께_목록에_남는다() {
 		List<EvalCaseLoader.Loaded> all = this.loader.loadAll();
-		assertThat(all).isNotEmpty();
-		for (EvalCaseLoader.Loaded loaded : all) {
-			assertThat(loaded.problem()).as(loaded.path()).isNull();
-		}
+		assertThat(all).hasSize(2);
+		EvalCaseLoader.Loaded bad = all.get(0);
+		assertThat(bad.path()).isEqualTo("demo/bad.eval.yml");
+		assertThat(bad.problem()).contains("파일 이름");
+		assertThat(all.get(1).evalCase().id()).isEqualTo("echo-check");
 	}
 
 	@Test
 	void 사례를_풀게_하고_채점해서_남긴다() throws Exception {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
-		EvalCase evalCase = this.loader.find("requirement-write");
-		// Agent는 저장(writeFile)하지 않고 말로만 답합니다. 이 Agent는 requiredTools: [writeFile], 재시도 2번이라
-		// 두 번 다 실패로 끝나고, 채점은 그래도 끝까지 해서 남깁니다.
-		this.chatModel.answer("저장했습니다.", "저장했습니다.");
-		assertThat(evalCase.agent()).isEqualTo("sm-requirement-analyze-agent");
+		this.chatModel.answer("안녕하세요.");
 
-		Map<String, Object> started = this.runner.start("requirement-write", null, null, 1, "tester");
+		Map<String, String> params = new LinkedHashMap<String, String>();
+		params.put("name", "바꾼값");
+		Map<String, Object> started = this.runner.start("echo-check", params, null, 1, "tester");
 		String runId = ((List<?>) started.get("runIds")).get(0).toString();
 		Map<String, Object> run = this.waitDone(runId);
 
-		assertThat(run.get("status")).isEqualTo("FAILED");
-		assertThat(String.valueOf(run.get("failure"))).contains("writeFile");
-		assertThat(run.get("passed")).isEqualTo(0);
+		assertThat(run.get("status")).isEqualTo("DONE");
+		assertThat(run.get("answer")).isEqualTo("안녕하세요.");
 		assertThat(run.get("total")).isEqualTo(3);
-		assertThat(run.get("caseId")).isEqualTo("requirement-write");
-		assertThat(run.get("agentId")).isEqualTo("sm-requirement-analyze-agent");
-		assertThat(((Number) run.get("rounds")).intValue()).isEqualTo(2);
+		assertThat(run.get("passed")).isEqualTo(1);
+		assertThat(((Number) run.get("rounds")).intValue()).isEqualTo(1);
+		// Agent에 들어간 글: 요청서(자리를 채움 + 덧붙임) + 작업 폴더 파일 내용
+		String sent = net.dstone.ai.support.ScriptedChatModel.textOf(this.chatModel.prompts().get(0));
+		assertThat(sent).contains("# 요청 바꾼값").contains("- 덧붙임: 바꾼값").contains("EL ${_csrf.token}");
 		Path workDir = Path.of(String.valueOf(run.get("workDir")));
-		// 요청서는 작업 폴더 위 요청 폴더에 자리를 채워 남습니다.
-		String request = Files.readString(workDir.getParent().resolve("00.request.md"), StandardCharsets.UTF_8);
-		assertThat(request).contains("/app/testApp").doesNotContain("${param.sourceDir}");
-		// copy: []라 작업 폴더에는 아무것도 복사되지 않습니다.
-		assertThat(workDir.resolve("02.impact.md")).doesNotExist();
+		assertThat(Files.readString(workDir.resolve("note.md"), StandardCharsets.UTF_8)).contains(workDir.toString().replace('\\', '/'));
+		assertThat(Files.readString(workDir.getParent().resolve("00.request.md"), StandardCharsets.UTF_8)).contains("바꾼값");
 	}
 
 	@Test
-	void 작업_폴더를_준비하고_채점한다() throws Exception {
-		EvalCase evalCase = this.loader.find("troubleshoot-delete-db");
-		Path requestDir = Files.createTempDirectory("eval-test").resolve("troubleshoot-delete-db");
-		Map<String, String> params = new java.util.LinkedHashMap<String, String>(evalCase.params());
-		EvalWorkspace workspace = new EvalWorkspace(evalCase, this.loader.root().resolve(evalCase.fixture()), requestDir, params);
-		workspace.prepare();
-
-		@SuppressWarnings("unchecked")
-		Map<String, Object> input = (Map<String, Object>) workspace.input();
-		assertThat(String.valueOf(input.get("base_dir"))).isEqualTo(workspace.workDir().toString().replace('\\', '/'));
-		assertThat(String.valueOf(input.get("request"))).contains("## 시험환경").contains("- DB연결: testApp");
-		assertThat(String.valueOf(input.get("instruction"))).contains("삭제가 안되고 있어");
-		assertThat(String.valueOf(input.get("design"))).startsWith("# 설계서");
-		// JSP의 ${...}(EL)는 자리 채우기에서 건드리지 않습니다.
-		Path jsp = workspace.workDir().resolve("dev-resources/src/main/webapp/WEB-INF/views/test/imageboard/imageBoard.jsp");
-		assertThat(Files.readString(jsp, StandardCharsets.UTF_8)).contains("${_csrf.parameterName}");
-
-		// Agent가 Service에 mb_id를 넣고 설계서를 고쳤다고 치고 채점합니다.
-		Path service = workspace.workDir().resolve("dev-resources/src/main/java/kr/co/gnx/test/imageboard/ImageBoardService.java");
-		Files.writeString(service, Files.readString(service, StandardCharsets.UTF_8) + "\n// vo.setMb_id(mbId);\n", StandardCharsets.UTF_8);
-		Files.writeString(workspace.workDir().resolve("03-1.design.md"), "고침", StandardCharsets.UTF_8);
-		Map<String, Object> answer = Map.of("causes", List.of("삭제 WHERE mb_id 값이 비어 있음"), "compiled", Boolean.TRUE, "verification", List.of("관측: dbQuery"));
-		List<Map<String, Object>> checks = workspace.check(answer, Map.of("dbQuery", Integer.valueOf(1)));
-
-		assertThat(checks).hasSize(6);
-		for (Map<String, Object> check : checks) {
-			assertThat(check.get("ok")).as(String.valueOf(check)).isEqualTo(Boolean.TRUE);
+	void 없는_사례나_없는_params는_거절한다() {
+		String noCase = null;
+		try {
+			this.runner.start("nothing", null, null, 1, "tester");
+		} catch (IllegalArgumentException e) {
+			noCase = e.getMessage();
 		}
-		// 아무것도 안 했으면 떨어집니다.
-		List<Map<String, Object>> none = new EvalWorkspace(evalCase, this.loader.root().resolve(evalCase.fixture()), requestDir.resolveSibling("again"), params)
-			.check(null, Map.of());
-		assertThat(none.get(0).get("ok")).isEqualTo(Boolean.FALSE);
+		String noParam = null;
+		try {
+			this.runner.start("echo-check", Map.of("zzz", "1"), null, 1, "tester");
+		} catch (IllegalArgumentException e) {
+			noParam = e.getMessage();
+		}
+		assertThat(noCase).contains("없습니다");
+		assertThat(noParam).contains("zzz");
 	}
 
 	/** 평가가 끝날 때까지(최대 60초) 기다립니다. */

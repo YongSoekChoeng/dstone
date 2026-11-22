@@ -53,9 +53,9 @@ class FileToolReadTest {
 	@Test
 	void 마크다운_제목_아래_내용만_꺼낸다() throws Exception {
 		Path doc = this.dir.resolve("request.md");
-		Files.writeString(doc, "# 요청서\n## 현업요청\n게시판\n### 상세\n목록\n## 소스경로\n\n\tD:/AppHome/testApp  \n\n## 끝\n", StandardCharsets.UTF_8);
+		Files.writeString(doc, "# 요청서\n## 현업요청\n게시판\n### 상세\n목록\n## 소스경로\n\n\tD:/AppHome/myApp  \n\n## 끝\n", StandardCharsets.UTF_8);
 
-		assertThat(this.tool.readMarkdownSection(doc.toString(), "소스경로")).isEqualTo("D:/AppHome/testApp");
+		assertThat(this.tool.readMarkdownSection(doc.toString(), "소스경로")).isEqualTo("D:/AppHome/myApp");
 		// 낮은 수준의 하위 제목은 내용에 들어가고, 같은 수준의 다음 제목에서 끝난다
 		assertThat(this.tool.readMarkdownSection(doc.toString(), " 현업요청 ")).isEqualTo("게시판\n### 상세\n목록");
 		assertThat(this.tool.readMarkdownSection(doc.toString(), "없는제목")).startsWith("실패:");
