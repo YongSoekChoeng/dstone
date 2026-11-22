@@ -1,0 +1,57 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Dstone Knowledge · 사용자관리</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/knowledge/assets/css/console.css" />
+		<link rel="stylesheet" href="/knowledge/assets/css/main.css" />
+		<script src="/knowledge/assets/js/console.js"></script>
+		<script src="/knowledge/assets/js/knowledge-menu.js"></script>
+	</head>
+<body class="ai-body" data-page="user">
+	<div id="page-wrapper">
+		<aside id="header-wrapper" class="cs-sidebar"></aside>
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section class="cs-page-head">
+				<h2>사용자관리</h2>
+				<p>콘솔에 로그인하는 사람을 만들고, 사용자그룹에 넣습니다. 새로 만들거나 비밀번호를 초기화하면 다음 로그인 때 비밀번호를 바꾸게 합니다. 비밀번호를 5번 연달아 틀리면 잠기고, 비밀번호를 초기화하면 풀립니다.</p>
+			</section>
+
+			<section class="ai-panel">
+				<h3>목록 <span id="mg-count" class="ai-hint"></span></h3>
+				<div class="wa-table-scroll">
+					<table class="document-list-table wa-table">
+						<thead id="mg-list-head"></thead>
+						<tbody id="mg-list-body"></tbody>
+					</table>
+				</div>
+			</section>
+
+			<section class="ai-panel">
+				<h3 id="mg-form-title">새로 만들기</h3>
+				<form id="mg-form">
+					<table class="ai-form">
+						<colgroup><col class="ai-form-name" /><col /></colgroup>
+						<tbody></tbody>
+					</table>
+					<div class="ai-form-actions">
+						<span id="mg-status" class="workflow-status"></span>
+						<span id="mg-extra"></span>
+						<button type="button" id="mg-delete" class="kn-plain" hidden>지우기</button>
+						<button type="button" id="mg-new" class="kn-plain">새로 만들기</button>
+						<button type="submit">저장</button>
+					</div>
+				</form>
+			</section>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script src="/knowledge/assets/js/management.js"></script>
+</body>
+</html>

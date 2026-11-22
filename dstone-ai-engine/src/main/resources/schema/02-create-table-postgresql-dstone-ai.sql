@@ -87,6 +87,109 @@ COMMENT ON 은 덮어쓰기라 이 절만 따로 여러 번 실행해도 된다(
 **********************************************/
 
 /**********************************************
+ai_management_* (사용자 관리, 2026-11-22)
+
+AI 화면(콘솔)의 로그인과 메뉴 권한. 규칙은 dstone-common 의 ConsoleManagementService, SQL 은 dstone-common 의 sqlmap/console/ConsoleManagementDao.xml.
+  사용자 ─(그룹 소속)→ 사용자그룹 ─(권한 부여)→ 권한 ─(메뉴 연결)→ 메뉴
+  메뉴는 "모두에게 보임(ALL_USERS_YN)"이거나 사용자의 그룹이 가진 권한에 연결되어 있으면 보인다. ADMIN_YN 권한을 가진 사람은 관리자다.
+  비밀번호는 PBKDF2 해시만 저장한다(PasswordHasher). 5번 연달아 틀리면 잠기고, 관리자가 초기화하면 풀린다.
+기본 데이터(관리자 계정, 그룹, 권한, 메뉴)는 03-create-data-postgresql-*.sql 에 있다.
+**********************************************/
+CREATE TABLE IF NOT EXISTS ai_management_user (
+    USER_ID           VARCHAR(50)  PRIMARY KEY,
+    USER_NAME         VARCHAR(100) NOT NULL,
+    PASSWORD_HASH     VARCHAR(200) NOT NULL,
+    USE_YN            CHAR(1)      NOT NULL DEFAULT 'Y',
+    PW_CHANGE_YN      CHAR(1)      NOT NULL DEFAULT 'Y',
+    LOGIN_FAIL_COUNT  INT          NOT NULL DEFAULT 0,
+    LAST_LOGIN_AT     TIMESTAMPTZ,
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CREATED_BY        VARCHAR(50),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_BY        VARCHAR(50)
+);
+CREATE TABLE IF NOT EXISTS ai_management_group (
+    GROUP_ID          VARCHAR(50)  PRIMARY KEY,
+    GROUP_NAME        VARCHAR(100) NOT NULL,
+    DESCRIPTION       VARCHAR(500),
+    SORT_ORDER        INT          NOT NULL DEFAULT 0,
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ai_management_group_user (
+    GROUP_ID          VARCHAR(50)  NOT NULL REFERENCES ai_management_group(GROUP_ID) ON DELETE CASCADE,
+    USER_ID           VARCHAR(50)  NOT NULL REFERENCES ai_management_user(USER_ID) ON DELETE CASCADE,
+    PRIMARY KEY (GROUP_ID, USER_ID)
+);
+CREATE TABLE IF NOT EXISTS ai_management_auth (
+    AUTH_ID           VARCHAR(50)  PRIMARY KEY,
+    AUTH_NAME         VARCHAR(100) NOT NULL,
+    DESCRIPTION       VARCHAR(500),
+    ADMIN_YN          CHAR(1)      NOT NULL DEFAULT 'N',
+    SORT_ORDER        INT          NOT NULL DEFAULT 0,
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ai_management_group_auth (
+    GROUP_ID          VARCHAR(50)  NOT NULL REFERENCES ai_management_group(GROUP_ID) ON DELETE CASCADE,
+    AUTH_ID           VARCHAR(50)  NOT NULL REFERENCES ai_management_auth(AUTH_ID) ON DELETE CASCADE,
+    PRIMARY KEY (GROUP_ID, AUTH_ID)
+);
+CREATE TABLE IF NOT EXISTS ai_management_menu (
+    MENU_ID           VARCHAR(50)  PRIMARY KEY,
+    PARENT_ID         VARCHAR(50),
+    MENU_NAME         VARCHAR(100) NOT NULL,
+    URL               VARCHAR(300),
+    ICON              VARCHAR(30),
+    SORT_ORDER        INT          NOT NULL DEFAULT 0,
+    USE_YN            CHAR(1)      NOT NULL DEFAULT 'Y',
+    ALL_USERS_YN      CHAR(1)      NOT NULL DEFAULT 'N',
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ai_management_auth_menu (
+    AUTH_ID           VARCHAR(50)  NOT NULL REFERENCES ai_management_auth(AUTH_ID) ON DELETE CASCADE,
+    MENU_ID           VARCHAR(50)  NOT NULL REFERENCES ai_management_menu(MENU_ID) ON DELETE CASCADE,
+    PRIMARY KEY (AUTH_ID, MENU_ID)
+);
+
+/**********************************************
+ai_management_project / ai_management_project_db (프로젝트 관리, 2026-11-22)
+
+작업 대상 프로젝트. 화면은 관리자 > 프로젝트관리(/ai/admin/management/project.html), API 는 /api/ai/projects.
+프로젝트 DB 는 여러 개 둘 수 있고, DB Tool(dbQuery 등)이 "프로젝트ID.DB이름" 별칭으로 접속한다(tools.db.DbQueryTool).
+비밀번호는 EncUtil 로 암호화해 저장하고 API 는 어떤 경우에도 돌려주지 않는다(****). 계정은 읽기 권한만 있는 것을 쓴다.
+**********************************************/
+CREATE TABLE IF NOT EXISTS ai_management_project (
+    PROJECT_ID        VARCHAR(50)   PRIMARY KEY,
+    PROJECT_NAME      VARCHAR(200)  NOT NULL,
+    DESCRIPTION       TEXT,
+    SOURCE_DIR        VARCHAR(1000),
+    SCM_TYPE          VARCHAR(20),
+    SCM_URL           VARCHAR(1000),
+    USE_YN            CHAR(1)       NOT NULL DEFAULT 'Y',
+    CREATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CREATED_BY        VARCHAR(50),
+    UPDATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    UPDATED_BY        VARCHAR(50)
+);
+CREATE TABLE IF NOT EXISTS ai_management_project_db (
+    PROJECT_ID        VARCHAR(50)   NOT NULL REFERENCES ai_management_project(PROJECT_ID) ON DELETE CASCADE,
+    DB_SEQ            INT           NOT NULL,
+    DB_NAME           VARCHAR(50)   NOT NULL,
+    JDBC_URL          VARCHAR(1000) NOT NULL,
+    USERNAME          VARCHAR(200),
+    PASSWORD_ENC      TEXT,
+    SCHEMA_NAME       VARCHAR(200),
+    DESCRIPTION       VARCHAR(500),
+    SORT_ORDER        INT           NOT NULL DEFAULT 0,
+    CREATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    PRIMARY KEY (PROJECT_ID, DB_SEQ),
+    UNIQUE (PROJECT_ID, DB_NAME)
+);
+
+/**********************************************
 AI_EVAL_RUN
 
 Agent 평가 실행 1건 = 1행(2026-11-22). 평가 사례(conf/eval/**/*.eval.yml) 하나를 Agent에게 한 번 풀게 한 결과다.
@@ -190,3 +293,38 @@ COMMENT ON COLUMN AI_EVAL_RUN.OWNER_INSTANCE     IS '이 평가를 돌린 엔진
 COMMENT ON COLUMN AI_EVAL_RUN.CREATED_AT         IS '요청 시각';
 COMMENT ON COLUMN AI_EVAL_RUN.STARTED_AT         IS '시작 시각';
 COMMENT ON COLUMN AI_EVAL_RUN.FINISHED_AT        IS '끝난 시각';
+
+COMMENT ON TABLE  ai_management_user             IS '콘솔 사용자. 비밀번호는 PBKDF2 해시만 저장';
+COMMENT ON COLUMN ai_management_user.USER_ID     IS '아이디';
+COMMENT ON COLUMN ai_management_user.USER_NAME   IS '이름';
+COMMENT ON COLUMN ai_management_user.PASSWORD_HASH IS '비밀번호 해시(pbkdf2$반복$소금$해시)';
+COMMENT ON COLUMN ai_management_user.USE_YN      IS '사용 여부(N이면 로그인 불가)';
+COMMENT ON COLUMN ai_management_user.PW_CHANGE_YN IS '다음 로그인 때 비밀번호를 바꿔야 하는지(관리자가 만들거나 초기화하면 Y)';
+COMMENT ON COLUMN ai_management_user.LOGIN_FAIL_COUNT IS '연달아 틀린 횟수(5번이면 잠김)';
+COMMENT ON COLUMN ai_management_user.LAST_LOGIN_AT IS '마지막 로그인 시각';
+COMMENT ON TABLE  ai_management_group            IS '사용자그룹';
+COMMENT ON TABLE  ai_management_group_user       IS '사용자그룹에 속한 사용자';
+COMMENT ON TABLE  ai_management_auth             IS '권한. 메뉴를 묶어 그룹에 준다';
+COMMENT ON COLUMN ai_management_auth.ADMIN_YN    IS '관리자 권한인지(관리 화면·API, 남의 실행 조작)';
+COMMENT ON TABLE  ai_management_group_auth       IS '사용자그룹이 가진 권한';
+COMMENT ON TABLE  ai_management_menu             IS '왼쪽 메뉴. URL 이 없으면 묶음 제목';
+COMMENT ON COLUMN ai_management_menu.PARENT_ID   IS '상위 메뉴(묶음) ID';
+COMMENT ON COLUMN ai_management_menu.ICON        IS '아이콘 이름(assets/js/console.js 의 ICONS)';
+COMMENT ON COLUMN ai_management_menu.ALL_USERS_YN IS '로그인한 모두에게 보이는지';
+COMMENT ON TABLE  ai_management_auth_menu        IS '권한이 여는 메뉴';
+
+COMMENT ON TABLE  ai_management_project              IS '작업 대상 프로젝트';
+COMMENT ON COLUMN ai_management_project.PROJECT_ID   IS '프로젝트ID(요청서의 프로젝트ID, DB 별칭 앞부분)';
+COMMENT ON COLUMN ai_management_project.PROJECT_NAME IS '프로젝트명';
+COMMENT ON COLUMN ai_management_project.DESCRIPTION  IS '프로젝트 설명';
+COMMENT ON COLUMN ai_management_project.SOURCE_DIR   IS '소스 디렉토리(절대경로)';
+COMMENT ON COLUMN ai_management_project.SCM_TYPE     IS '형상관리 종류(GIT/SVN/NONE …)';
+COMMENT ON COLUMN ai_management_project.SCM_URL      IS '형상관리 URL';
+COMMENT ON COLUMN ai_management_project.USE_YN       IS '사용 여부';
+COMMENT ON TABLE  ai_management_project_db           IS '프로젝트가 쓰는 DB 접속 정보(여러 개). DB Tool 별칭은 프로젝트ID.DB이름';
+COMMENT ON COLUMN ai_management_project_db.DB_SEQ    IS '프로젝트 안의 번호';
+COMMENT ON COLUMN ai_management_project_db.DB_NAME   IS 'DB 이름(영문·숫자·_-). 별칭의 뒷부분';
+COMMENT ON COLUMN ai_management_project_db.JDBC_URL  IS 'JDBC URL';
+COMMENT ON COLUMN ai_management_project_db.USERNAME  IS '접속 계정(읽기 전용 권장)';
+COMMENT ON COLUMN ai_management_project_db.PASSWORD_ENC IS 'EncUtil 로 암호화한 비밀번호. API 는 돌려주지 않는다';
+COMMENT ON COLUMN ai_management_project_db.SCHEMA_NAME IS '스키마';

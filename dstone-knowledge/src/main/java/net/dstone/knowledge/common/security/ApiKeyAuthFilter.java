@@ -13,7 +13,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.common.config.ConfigProperty;
-import net.dstone.common.web.console.ConsoleSessionFilter;
+import net.dstone.common.web.console.ConsoleLoginFilter;
 import net.dstone.knowledge.common.web.ConfigConsole;
 
 /**
@@ -27,10 +27,9 @@ import net.dstone.knowledge.common.web.ConfigConsole;
  * 서비스마다 키 하나를 주는 것으로 충분합니다. 그래서 헤더 하나만 보는 가벼운 필터로 했습니다.
  * /api/system/health는 살아 있는지 확인하는 주소라 키 없이 통과시킵니다.
  *
- * 이 앱의 코드 분석 화면(브라우저)은 키 없이 /api/** 를 부릅니다. 그래서 로그인을 켠 환경
- * (dstone.knowledge.console.login.enabled=true)에서 세션에 사용자가 있으면 키 대신 세션을 믿고,
- * 호출자 이름은 dstone.knowledge.console.caller 로 둡니다. 로그인을 끈 환경에서는 누구나 세션을 받을 수 있으므로
- * 세션을 믿지 않습니다. 인증을 켜려면 화면 로그인도 같이 켜야 화면이 동작합니다.
+ * 이 앱의 코드 분석 화면(브라우저)은 키 없이 /api/** 를 부릅니다. 그래서 세션에 로그인한 사용자가 있으면
+ * (화면의 로그인, ConsoleLoginFilter) 키 대신 세션을 믿고, 호출자 이름은 dstone.knowledge.console.caller 로 둡니다
+ * (올린 문서의 주인(tenant)이 되므로 바꾸면 화면에서 올린 기존 문서가 보이지 않습니다).
  * </pre>
  */
 @Component
@@ -90,7 +89,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
 	/** 로그인을 켠 환경에서 세션에 화면 사용자가 있는지(dstone-boot 에서 넘어온 사람) */
 	private boolean isConsoleUser(HttpServletRequest request) {
-		return Boolean.parseBoolean(configProperty.getProperty(ConfigConsole.PREFIX + ".login.enabled")) && ConsoleSessionFilter.currentUser(request) != null;
+		return ConsoleLoginFilter.currentUser(request) != null;
 	}
 
 	/** 다른 오류 응답(ApiExceptionHandler)과 같은 모양으로 401을 돌려줍니다. */

@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.common.utils.StringUtil;
-import net.dstone.common.web.console.ConsoleSessionFilter;
+import net.dstone.common.web.console.ConsoleLoginFilter;
 import net.dstone.common.web.console.SessionUser;
 
 /**
@@ -18,7 +18,7 @@ import net.dstone.common.web.console.SessionUser;
  * 이 요청을 보낸 "사람"(사용자)을 읽습니다. caller(CallerContext)가 "어느 앱이 불렀나"라면, 이것은 "그 앱의 어느 사용자가 눌렀나"입니다.
  *
  * 사람을 정하는 길은 둘뿐입니다.
- *   1. 화면 세션: 이 앱의 AI 화면(static/ai/**)에서 부른 요청이면 세션 사용자(SessionUser, ConsoleSessionFilter 가 넣음)입니다.
+ *   1. 화면 세션: 이 앱의 AI 화면(static/ai/**)에서 부른 요청이면 세션 사용자(SessionUser, 로그인 화면에서 로그인하면 ConsoleController 가 넣음)입니다.
  *      dstone-boot 에서 넘어왔으면 그 로그인 사용자, 로그인을 껐으면 설정의 기본 사용자입니다.
  *   2. 앱이 알려 준 사용자: API 키로 인증된 앱(CallerContext 에 caller 가 있음)이 보낸 X-Dstone-User(URL 인코딩),
  *      X-Dstone-User-Admin("true") 헤더입니다. 키 없이 온 헤더는 누구나 꾸며 보낼 수 있어 믿지 않습니다.
@@ -38,7 +38,7 @@ public final class RequesterContext {
 
 	/** 요청한 사용자 id입니다. 모르면 null입니다. */
 	public static String userOf(HttpServletRequest request) {
-		SessionUser sessionUser = ConsoleSessionFilter.currentUser(request);
+		SessionUser sessionUser = ConsoleLoginFilter.currentUser(request);
 		String user = null;
 		if (sessionUser != null) {
 			user = sessionUser.getUserId();
@@ -56,7 +56,7 @@ public final class RequesterContext {
 
 	/** 요청한 사용자가 관리자인지 돌려줍니다. */
 	public static boolean isAdmin(HttpServletRequest request) {
-		SessionUser sessionUser = ConsoleSessionFilter.currentUser(request);
+		SessionUser sessionUser = ConsoleLoginFilter.currentUser(request);
 		if (sessionUser != null) {
 			return sessionUser.isAdmin();
 		}
@@ -72,7 +72,7 @@ public final class RequesterContext {
 	 * </pre>
 	 */
 	public static String chatSessionIdOf(HttpServletRequest request) {
-		SessionUser sessionUser = ConsoleSessionFilter.currentUser(request);
+		SessionUser sessionUser = ConsoleLoginFilter.currentUser(request);
 		if (sessionUser == null) {
 			return null;
 		}

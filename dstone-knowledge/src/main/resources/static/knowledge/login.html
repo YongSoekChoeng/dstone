@@ -1,0 +1,44 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>로그인 · Dstone Knowledge</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/knowledge/assets/css/console.css" />
+	</head>
+<body class="ai-body cs-login-body">
+	<main class="cs-login">
+		<div class="cs-login-brand">
+			<span class="cs-brand-mark" aria-hidden="true">K</span>
+			<span><b>Dstone</b> Knowledge</span>
+		</div>
+
+		<form id="cs-login-form" class="cs-login-card" autocomplete="on">
+			<h1>로그인</h1>
+			<label for="cs-user-id">아이디</label>
+			<input type="text" id="cs-user-id" name="username" autocomplete="username" required />
+			<label for="cs-password">비밀번호</label>
+			<input type="password" id="cs-password" name="password" autocomplete="current-password" required />
+			<button type="submit">로그인</button>
+		</form>
+
+		<form id="cs-change-form" class="cs-login-card" hidden>
+			<h1>비밀번호 변경</h1>
+			<label for="cs-current-password">지금 비밀번호</label>
+			<input type="password" id="cs-current-password" autocomplete="current-password" required />
+			<label for="cs-new-password">새 비밀번호</label>
+			<input type="password" id="cs-new-password" autocomplete="new-password" required />
+			<label for="cs-new-password2">새 비밀번호 확인</label>
+			<input type="password" id="cs-new-password2" autocomplete="new-password" required />
+			<p class="cs-login-hint">8자 이상, 영문과 숫자를 함께 쓰세요.</p>
+			<div class="cs-login-actions">
+				<button type="button" id="cs-change-cancel" class="cs-login-secondary">취소</button>
+				<button type="submit">바꾸기</button>
+			</div>
+		</form>
+
+		<p id="cs-login-message" class="cs-login-message" role="alert"></p>
+	</main>
+	<script src="/knowledge/assets/js/login.js"></script>
+</body>
+</html>

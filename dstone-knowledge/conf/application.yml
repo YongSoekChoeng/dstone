@@ -5,7 +5,7 @@ server:
             enabled: true
     servlet:
         session:
-            # 화면(코드 분석 콘솔)의 세션. 쿠키는 포트를 가리지 않아서 dstone-boot(JSESSIONID)와 이름이 같으면 서로 덮어쓴다.
+            # 화면(코드 분석 콘솔)의 로그인 세션. 쿠키는 포트를 가리지 않아서 같은 호스트의 다른 앱과 이름이 같으면 서로 덮어쓴다.
             cookie:
                 name: DSTONE_KNOWLEDGE_SESSION
             timeout: 120m
@@ -68,12 +68,6 @@ spring:
             base-url: http://localhost:11434
             embedding:
                 model: bge-m3:latest
-    data:
-        # dstone-boot 와 같은 Redis. 화면 로그인을 켰을 때 dstone-boot 의 로그인 세션을 읽는 데만 쓴다(dstone.knowledge.console.login).
-        redis:
-            host: ${REDIS_HOST}
-            port: ${REDIS_PORT}
-            timeout: 3000
     http:
         clients:
             # 임베딩 서버가 응답하지 않을 때 끝없이 기다리지 않게 한다.
@@ -249,28 +243,14 @@ dstone:
         ##########################################################################################
         # <화면(코드 분석 콘솔)>
         # 화면은 이 앱이 직접 내려준다(src/main/resources/static/knowledge/**, 첫 화면 http://localhost:4081/).
-        # 화면을 연 사람은 dstone-common 의 ConsoleSessionFilter 가 정한다(common.web.ConfigConsole).
-        # login.enabled: false 면 로그인 없이 default-user 로 쓴다(혼자 띄워 쓸 때).
-        #                true 면 요청마다 1순위 주소의 ssoToken(dstone-boot 링크가 붙임), 2순위 dstone-boot 의 Redis 세션
-        #                (같은 브라우저의 dstone-boot 쿠키로 읽음)으로 사람을 정한다. dstone-boot 에서 로그아웃하면 여기서도 바로 빠진다.
-        #                둘 다 없으면 dstone-boot 의 /sso/go.do 로 보내 로그인하게 한다.
-        # caller: 로그인을 켜고 API 키 인증(security.auth)도 켰을 때, 화면이 올린 문서의 호출자 이름.
-        # urls: 브라우저가 여는 각 앱의 주소(값은 conf/env*.properties 의 *_PUBLIC_URL). 왼쪽 메뉴의 "dstone-boot로 돌아가기"와 앱 사이 링크에 쓴다.
+        # 로그인은 이 앱의 로그인 화면(/knowledge/login.html)에서 하고, 사람·그룹·권한·메뉴는 이 앱 DB 의 knowledge_management_* 테이블로 관리한다
+        # (관리자 > 사용자관리·사용자그룹관리·메뉴관리·권한관리. 규칙은 dstone-common 의 ConsoleLoginFilter, common.web.ConfigConsole).
+        # caller: 화면(로그인한 세션)에서 부른 요청의 호출자 이름. 화면에서 올린 일반 문서의 주인(tenant)이 되므로 바꾸지 않는다.
+        # urls: 브라우저가 여는 각 앱의 주소(값은 conf/env*.properties 의 *_PUBLIC_URL). 앱 사이 링크에 쓴다.
+        #       앱마다 로그인이 따로라, 다른 앱 화면에서는 그 앱에 다시 로그인한다.
         ##########################################################################################
         console:
-            login:
-                enabled: false
-                token-max-age-seconds: 60
-                # 2순위: dstone-boot 의 Redis 세션. dstone-boot 의 server.servlet.session.cookie.name, spring.session.data.redis.namespace 와 같아야 한다.
-                boot-session:
-                    cookie-name: JSESSIONID
-                    namespace: dstone:session
-                default-user:
-                    id: local
-                    name: 로컬 사용자
-                    admin: true
             caller: dstone-knowledge-screen
             urls:
-                boot: ${BOOT_PUBLIC_URL}
                 ai: ${AI_ENGINE_PUBLIC_URL}
                 knowledge: ${KNOWLEDGE_PUBLIC_URL}

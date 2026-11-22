@@ -1,0 +1,57 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Dstone AI · 메뉴관리</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/ai/assets/css/console.css" />
+		<link rel="stylesheet" href="/ai/assets/css/main.css" />
+		<script src="/ai/assets/js/console.js"></script>
+		<script src="/ai/assets/js/ai-menu.js"></script>
+	</head>
+<body class="ai-body" data-page="menu">
+	<div id="page-wrapper">
+		<aside id="header-wrapper" class="cs-sidebar"></aside>
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section class="cs-page-head">
+				<h2>메뉴관리</h2>
+				<p>왼쪽 메뉴입니다. 주소가 없는 메뉴는 묶음 제목입니다. "모두에게 보임"이 아닌 메뉴는 권한에 연결된 사람만 보고 열 수 있습니다.</p>
+			</section>
+
+			<section class="ai-panel">
+				<h3>목록 <span id="mg-count" class="ai-hint"></span></h3>
+				<div class="wa-table-scroll">
+					<table class="document-list-table wa-table">
+						<thead id="mg-list-head"></thead>
+						<tbody id="mg-list-body"></tbody>
+					</table>
+				</div>
+			</section>
+
+			<section class="ai-panel">
+				<h3 id="mg-form-title">새로 만들기</h3>
+				<form id="mg-form">
+					<table class="ai-form">
+						<colgroup><col class="ai-form-name" /><col /></colgroup>
+						<tbody></tbody>
+					</table>
+					<div class="ai-form-actions">
+						<span id="mg-status" class="workflow-status"></span>
+						<span id="mg-extra"></span>
+						<button type="button" id="mg-delete" class="kn-plain" hidden>지우기</button>
+						<button type="button" id="mg-new" class="kn-plain">새로 만들기</button>
+						<button type="submit">저장</button>
+					</div>
+				</form>
+			</section>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script src="/ai/assets/js/management.js"></script>
+</body>
+</html>

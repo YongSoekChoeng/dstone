@@ -2,7 +2,7 @@
  * "코드 분석(Knowledge)" 화면들이 같이 쓰는 도우미입니다.
  *
  * 화면은 dstone-knowledge 가 직접 내려주므로 API(/api/**)도 같은 서버에 바로 부릅니다. 예: call("GET", "/api/projects").
- * 화면을 연 사람(세션)은 common.web.ConfigConsole 의 ConsoleSessionFilter 가 정합니다.
+ * 화면을 연 사람(세션)은 로그인 화면(/knowledge/login.html)에서 정해집니다(common.web.ConfigConsole, dstone-common ConsoleLoginFilter).
  */
 var DstoneKnowledge = (function () {
 

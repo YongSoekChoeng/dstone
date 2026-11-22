@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.utils.StringUtil;
-import net.dstone.common.web.console.ConsoleSessionFilter;
+import net.dstone.common.web.console.ConsoleLoginFilter;
 
 /**
  * <pre>
@@ -40,15 +40,16 @@ import net.dstone.common.web.console.ConsoleSessionFilter;
  * IdP 역할을 하는 서버는 아닙니다). 이 엔진을 호출하는 쪽도 정해진 SI 프로젝트들끼리의 서비스 간
  * 호출이라서, SI 프로젝트마다 키를 하나씩 발급해 주는 것만으로 충분합니다.
  *
- * 이 앱의 AI 화면(브라우저)은 키 없이 /api/ai/** 를 부릅니다. 그래서 화면 로그인을 켠 환경
- * (dstone.ai.console.login.enabled=true)에서 세션에 사용자가 있으면 키 대신 세션을 믿고, caller 는
- * dstone.ai.console.caller(기본 dstone-ai-screen)로 둡니다. 로그인을 끈 환경에서는 누구나 기본 세션을 받을 수
- * 있으므로 세션을 믿지 않습니다. 인증을 켜려면 화면 로그인도 같이 켜야 화면이 동작합니다.
+ * 이 앱의 AI 화면(브라우저)은 키 없이 /api/ai/** 를 부릅니다. 그래서 세션에 로그인한 사용자가 있으면
+ * (화면의 로그인, ConsoleLoginFilter) 키 대신 세션을 믿고, caller 는 dstone-ai-screen 으로 둡니다.
  * </pre>
  */
 @Component
 @Order(1)
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
+
+	/** 화면(로그인한 세션)에서 부른 요청의 caller 이름입니다. */
+	public static final String CONSOLE_CALLER = "dstone-ai-screen";
 
 	@Autowired
 	ConfigProperty configProperty;
@@ -79,8 +80,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 		String apiKey = request.getHeader(Constants.Security.Auth.DEFAULT_HEADER_NAME);
 		if (StringUtil.isEmpty(apiKey) && this.isConsoleUser(request)) {
-			String consoleCaller = configProperty.getProperty("dstone.ai.console.caller");
-			CallerContext.set(request, StringUtil.isEmpty(consoleCaller) ? "dstone-ai-screen" : consoleCaller.trim());
+			CallerContext.set(request, CONSOLE_CALLER);
 			filterChain.doFilter(request, response);
 			return;
 		}
@@ -121,7 +121,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
 	/** 화면 로그인을 켠 환경에서 세션에 화면 사용자가 있는지(dstone-boot 에서 넘어온 사람) */
 	private boolean isConsoleUser(HttpServletRequest request) {
-		return Boolean.parseBoolean(this.configProperty.getProperty("dstone.ai.console.login.enabled")) && ConsoleSessionFilter.currentUser(request) != null;
+		return ConsoleLoginFilter.currentUser(request) != null;
 	}
 
 	/**

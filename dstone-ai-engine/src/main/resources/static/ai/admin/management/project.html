@@ -1,0 +1,75 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Dstone AI · 프로젝트관리</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/ai/assets/css/console.css" />
+		<link rel="stylesheet" href="/ai/assets/css/main.css" />
+		<script src="/ai/assets/js/console.js"></script>
+		<script src="/ai/assets/js/ai-menu.js"></script>
+		<script src="/ai/assets/js/ai-common.js"></script>
+	</head>
+<body class="ai-body">
+	<div id="page-wrapper">
+		<aside id="header-wrapper" class="cs-sidebar"></aside>
+		<div id="main">
+			<div class="container">
+				<div class="row main-row">
+					<div class="col-12">
+			<section class="cs-page-head">
+				<h2>프로젝트관리</h2>
+				<p>작업 대상 프로젝트입니다. 소스 위치, 형상관리, 프로젝트가 쓰는 DB(여러 개)를 적습니다.
+					DB는 Agent의 DB Tool이 <code>프로젝트ID.DB이름</code> 별칭으로 조회합니다. 계정은 읽기 권한만 있는 것을 쓰세요.</p>
+			</section>
+
+			<section class="ai-panel">
+				<h3>목록 <span id="pj-count" class="ai-hint"></span></h3>
+				<div class="wa-table-scroll">
+					<table class="document-list-table wa-table">
+						<thead><tr><th>프로젝트ID</th><th>프로젝트명</th><th>소스 디렉토리</th><th>형상관리</th><th>DB</th><th>사용</th></tr></thead>
+						<tbody id="pj-list-body"></tbody>
+					</table>
+				</div>
+			</section>
+
+			<section class="ai-panel">
+				<h3 id="pj-form-title">새로 만들기</h3>
+				<form id="pj-form">
+					<table class="ai-form">
+						<colgroup><col class="ai-form-name" /><col /></colgroup>
+						<tr><th><label for="pj-projectId">프로젝트ID</label></th><td><input type="text" id="pj-projectId" placeholder="영문·숫자·_- (요청서의 프로젝트ID)" /></td></tr>
+						<tr><th><label for="pj-projectName">프로젝트명</label></th><td><input type="text" id="pj-projectName" /></td></tr>
+						<tr><th><label for="pj-description">프로젝트설명</label></th><td><textarea id="pj-description" rows="3"></textarea></td></tr>
+						<tr><th><label for="pj-sourceDir">소스 디렉토리</label></th><td><input type="text" id="pj-sourceDir" placeholder="엔진이 읽을 수 있는 절대경로" /></td></tr>
+						<tr><th><label for="pj-scmType">형상관리 종류</label></th><td><select id="pj-scmType"><option value="">(선택 안 함)</option><option value="GIT">GIT</option><option value="SVN">SVN</option><option value="NONE">없음</option></select></td></tr>
+						<tr><th><label for="pj-scmUrl">형상관리 URL</label></th><td><input type="text" id="pj-scmUrl" /></td></tr>
+						<tr><th><label for="pj-useYn">사용</label></th><td><select id="pj-useYn"><option value="Y">예</option><option value="N">아니오(DB Tool 에서도 숨김)</option></select></td></tr>
+					</table>
+
+					<div class="kn-section-title">데이터베이스 <button type="button" id="pj-add-db" class="kn-plain">DB 더하기</button></div>
+					<div class="wa-table-scroll">
+						<table class="document-list-table wa-table pj-db-table">
+							<colgroup><col style="width:120px" /><col /><col style="width:130px" /><col style="width:150px" /><col style="width:110px" /><col style="width:160px" /><col style="width:72px" /></colgroup>
+							<thead><tr><th>DB 이름</th><th>JDBC URL</th><th>계정</th><th>비밀번호</th><th>스키마</th><th>설명</th><th></th></tr></thead>
+							<tbody id="pj-db-body"></tbody>
+						</table>
+					</div>
+					<p class="ai-hint">비밀번호는 암호화해 저장하고 화면에 다시 보여 주지 않습니다. 고칠 때 비워 두면 저장된 비밀번호를 그대로 씁니다.</p>
+
+					<div class="ai-form-actions">
+						<span id="pj-status" class="workflow-status"></span>
+						<button type="button" id="pj-delete" class="kn-plain" hidden>지우기</button>
+						<button type="button" id="pj-new" class="kn-plain">새로 만들기</button>
+						<button type="submit">저장</button>
+					</div>
+				</form>
+			</section>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script src="/ai/assets/js/project-admin.js"></script>
+</body>
+</html>

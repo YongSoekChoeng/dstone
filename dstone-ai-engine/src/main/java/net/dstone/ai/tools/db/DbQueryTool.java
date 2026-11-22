@@ -32,6 +32,7 @@ import com.zaxxer.hikari.HikariDataSource;
 
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.project.ProjectStore;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -45,7 +46,7 @@ import net.dstone.common.utils.StringUtil;
  *   dbDescribeTable     테이블 하나의 컬럼, 타입, PK, 코멘트
  *   dbQuery             조회(SELECT) 문장 하나 실행
  *
- * 접속 정보는 LLM에게서 받지 않습니다. 설정(dstone.ai.tool.db.connections.{별칭})에 적어 둔 DB만,
+ * 접속 정보는 LLM에게서 받지 않습니다. 프로젝트관리에 등록한 DB(별칭 "프로젝트ID.DB이름")와 설정(dstone.ai.tool.db.connections.{별칭})에 적어 둔 DB만,
  * 별칭으로만 부를 수 있습니다. 등록된 DB가 없으면(기본값) 모든 호출이 실패 문구로 끝나므로,
  * 별칭을 등록하는 것이 곧 "이 Tool을 켠 상태"입니다.
  *
@@ -83,6 +84,10 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 	@Autowired
 	private Environment environment;
 
+	/** 프로젝트 관리의 DB 목록. 단위 테스트처럼 직접 만든 Tool에서는 null이다 */
+	@Autowired
+	private ProjectStore projectStore;
+
 	/** 별칭마다 하나씩 만든 커넥션 풀. 처음 부를 때 만든다 */
 	private final Map<String, Pool> pools = new ConcurrentHashMap<String, Pool>();
 
@@ -102,7 +107,7 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 	public String dbListConnections() {
 		Map<String, DbConnectionSetting> connections = this.connections();
 		if (connections.isEmpty()) {
-			return "실패: 등록된 DB가 없습니다. 관리자가 dstone.ai.tool.db.connections에 별칭을 등록해야 합니다.";
+			return "실패: 등록된 DB가 없습니다. 관리자가 프로젝트관리에서 프로젝트 DB를 등록해야 합니다.";
 		}
 		StringBuilder sb = new StringBuilder();
 		Iterator<Map.Entry<String, DbConnectionSetting>> it = connections.entrySet().iterator();
@@ -524,10 +529,38 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 
 	/* ============================== 설정 ============================== */
 
-	/** 등록된 DB들. 별칭 순서는 설정에 적은 순서 */
+	/**
+	 * <pre>
+	 * 등록된 DB들입니다. 두 곳에서 모읍니다.
+	 *   1. 프로젝트 관리의 DB(관리자 > 프로젝트관리, ai_management_project_db). 별칭은 "프로젝트ID.DB이름"
+	 *   2. 설정 dstone.ai.tool.db.connections.{별칭}(선택. 프로젝트에 묶이지 않는 DB를 따로 둘 때)
+	 * 프로젝트 DB를 읽지 못하면(DB 연결 오류 등) 로그만 남기고 설정의 DB만 씁니다.
+	 * </pre>
+	 */
 	Map<String, DbConnectionSetting> connections() {
-		Map<String, DbConnectionSetting> empty = new LinkedHashMap<String, DbConnectionSetting>();
-		return Binder.get(this.environment).bind(Constants.Tool.Db.PREFIX + ".connections", Bindable.mapOf(String.class, DbConnectionSetting.class)).orElse(empty);
+		Map<String, DbConnectionSetting> result = new LinkedHashMap<String, DbConnectionSetting>();
+		if (this.projectStore != null) {
+			try {
+				for (Map.Entry<String, Map<String, String>> entry : this.projectStore.connections().entrySet()) {
+					Map<String, String> value = entry.getValue();
+					DbConnectionSetting setting = new DbConnectionSetting();
+					setting.setUrl(value.get("url"));
+					setting.setUsername(value.get("username"));
+					setting.setPassword(value.get("password"));
+					setting.setSchema(value.get("schema"));
+					setting.setDescription(value.get("description"));
+					result.put(entry.getKey(), setting);
+				}
+			} catch (RuntimeException e) {
+				LogUtil.sysout("dstone-ai-engine tool: 프로젝트 DB 목록을 읽지 못했습니다(설정의 DB만 씁니다): " + e.getMessage());
+			}
+		}
+		Map<String, DbConnectionSetting> configured = Binder.get(this.environment)
+			.bind(Constants.Tool.Db.PREFIX + ".connections", Bindable.mapOf(String.class, DbConnectionSetting.class)).orElse(new LinkedHashMap<String, DbConnectionSetting>());
+		for (Map.Entry<String, DbConnectionSetting> entry : configured.entrySet()) {
+			result.putIfAbsent(entry.getKey(), entry.getValue());
+		}
+		return result;
 	}
 
 	private int maxRows() {
@@ -558,7 +591,7 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 	private String unknownAlias(String alias) {
 		Map<String, DbConnectionSetting> connections = this.connections();
 		if (connections.isEmpty()) {
-			return "실패: 등록된 DB가 없습니다. 관리자가 dstone.ai.tool.db.connections에 별칭을 등록해야 합니다.";
+			return "실패: 등록된 DB가 없습니다. 관리자가 프로젝트관리에서 프로젝트 DB를 등록해야 합니다.";
 		}
 		return "실패: 등록되지 않은 DB 별칭입니다: " + alias + ". 쓸 수 있는 별칭: " + String.join(", ", connections.keySet());
 	}

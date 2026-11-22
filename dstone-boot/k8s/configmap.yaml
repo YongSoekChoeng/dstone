@@ -218,16 +218,6 @@ data:
                 simple-encrypt-key: jysn007db2admin!
     
     interface:
-        sso:
-          # 왼쪽 메뉴의 "AI", "코드 분석(Knowledge)" 링크(/sso/go.do?target=...)가 로그인 사용자를 넘겨 여는 앱 주소.
-          # 화면은 각 앱이 직접 내려준다. 브라우저가 여는 주소라 Pod 안 주소(Service DNS)가 아니라 브라우저 기준 주소를 적는다.
-          # 로그인 사용자는 한 번 쓰는 표(net.dstone.common.web.console.SsoToken, 60초)에 담겨 주소의 ssoToken 으로 넘어간다.
-          targets:
-            ai: ${AI_ENGINE_PUBLIC_URL}
-            knowledge: ${KNOWLEDGE_PUBLIC_URL}
-          # 이 역할(ROLE_ID) 중 하나라도 가진 사용자는 관리자로 넘긴다. 관리자는 AI 실행 관리 화면에서 다른 사람의 실행도
-          # 조작(일시정지/재개/되감기/문서 저장)할 수 있다. 쉼표로 구분하고 "ROLE_" 접두어는 붙여도 되고 안 붙여도 된다.
-          admin-roles: ADMIN
         naver:
           # 발급받은 클라이언트ID
           client-id: WCdNwqKh3uohtkernz7O

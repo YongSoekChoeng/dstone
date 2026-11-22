@@ -71,7 +71,6 @@ public class ConfigSecurity extends BaseObject{
 	public static String WEBSOCKET_STOMP_SUB_ACTION		= ConfigWebSocket.WEBSOCKET_STOMP_SUB_PREFIX + "/**";	// 웹소켓(stomp) 구독프리픽스
 	public static String TEST_ACTION 					= "/test/**";										// 테스트 액션(PathPatternRequestMatcher 제약으로 중간 ** 패턴에서 완화, MQ_ACTION 주석 참고)
 	public static String ACTUATOR_HEALTH_ACTION			= "/actuator/health/**";								// k8s liveness/readiness probe 액션
-	public static String SSO_ACTION						= "/sso/**";											// 다른 앱(dstone-ai-engine, dstone-knowledge) 화면으로 로그인 사용자를 넘기는 링크(common.sso.SsoController)
 
 	public static String ERROR_URL_PATTERN				= "/error/**"; 											// 에러 URL패턴.(스프링 내부적으로 호출되는 에러 URL패턴 존재. Permit All로 설정)
 	
@@ -205,8 +204,6 @@ public class ConfigSecurity extends BaseObject{
 			).permitAll()
 			/*** 페이지마다 include/forward 되는 자원은 모두 허용 ***/
 			.dispatcherTypeMatchers(DispatcherType.INCLUDE, DispatcherType.FORWARD).permitAll() 
-			/*** 다른 앱(AI, 코드 분석) 화면으로 가는 링크는 로그인한 사람이면 누구나(역할별 URL 권한과 상관없이) ***/
-			.requestMatchers(PathPatternRequestMatcher.pathPattern(SSO_ACTION)).authenticated()
 		);
 
 		/*** 기본설정-역할별URL DB설정(정적체크-Application기동시 한번만 전체설정 받아오는 경우) ***/

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 콘솔 사용자 관리(사용자, 사용자그룹, 권한, 메뉴). PostgreSQL.
+     테이블 이름 앞부분 ${tp}는 앱이 정한다(ai_management_, knowledge_management_). 사람이 넣은 값이 아니라 코드의 상수라 ${}로 붙인다.
+     테이블 정의는 각 앱의 schema/02-create-table-*.sql 에 있다.
+     net.dstone.common.web.console.management.ConsoleManagementDao 가 쓴다 -->
+<mapper namespace="net.dstone.common.web.console.management.ConsoleManagementDao">
+
+    <!-- ===================== 로그인 ===================== -->
+
+    <select id="selectLoginUser" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT USER_ID AS "userId", USER_NAME AS "userName", PASSWORD_HASH AS "passwordHash", USE_YN AS "useYn",
+               PW_CHANGE_YN AS "pwChangeYn", LOGIN_FAIL_COUNT AS "loginFailCount"
+          FROM ${tp}user
+         WHERE USER_ID = #{userId}
+    </select>
+
+    <update id="updateLoginResult" parameterType="java.util.Map">
+        UPDATE ${tp}user
+        <choose>
+            <when test="success">
+               SET LOGIN_FAIL_COUNT = 0, LAST_LOGIN_AT = now()
+            </when>
+            <otherwise>
+               SET LOGIN_FAIL_COUNT = LOGIN_FAIL_COUNT + 1
+            </otherwise>
+        </choose>
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updatePassword" parameterType="java.util.Map">
+        UPDATE ${tp}user
+           SET PASSWORD_HASH = #{passwordHash}, PW_CHANGE_YN = #{pwChangeYn}, LOGIN_FAIL_COUNT = 0, UPDATED_AT = now(), UPDATED_BY = #{by}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 사용자가 가진 권한(그룹을 거쳐서) -->
+    <select id="selectUserAuths" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT A.AUTH_ID AS "authId", A.ADMIN_YN AS "adminYn"
+          FROM ${tp}group_user GU
+          JOIN ${tp}group_auth GA ON GA.GROUP_ID = GU.GROUP_ID
+          JOIN ${tp}auth A ON A.AUTH_ID = GA.AUTH_ID
+         WHERE GU.USER_ID = #{userId}
+    </select>
+
+    <!-- 사용자가 볼 수 있는 메뉴(모두에게 보이는 메뉴 + 권한으로 받은 메뉴). 묶음(부모)은 서비스가 붙인다 -->
+    <select id="selectUserMenuIds" parameterType="java.util.Map" resultType="string">
+        SELECT M.MENU_ID
+          FROM ${tp}menu M
+         WHERE M.USE_YN = 'Y'
+           AND (M.ALL_USERS_YN = 'Y'
+                OR M.MENU_ID IN (SELECT AM.MENU_ID
+                                   FROM ${tp}auth_menu AM
+                                   JOIN ${tp}group_auth GA ON GA.AUTH_ID = AM.AUTH_ID
+                                   JOIN ${tp}group_user GU ON GU.GROUP_ID = GA.GROUP_ID
+                                  WHERE GU.USER_ID = #{userId}))
+    </select>
+
+    <!-- ===================== 사용자 ===================== -->
+
+    <select id="selectUserList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT U.USER_ID AS "userId", U.USER_NAME AS "userName", U.USE_YN AS "useYn", U.PW_CHANGE_YN AS "pwChangeYn",
+               U.LOGIN_FAIL_COUNT AS "loginFailCount", U.LAST_LOGIN_AT AS "lastLoginAt", U.UPDATED_AT AS "updatedAt",
+               COALESCE((SELECT STRING_AGG(GU.GROUP_ID, ',' ORDER BY GU.GROUP_ID) FROM ${tp}group_user GU WHERE GU.USER_ID = U.USER_ID), '') AS "groupIds"
+          FROM ${tp}user U
+         ORDER BY U.USER_ID
+    </select>
+
+    <select id="countUser" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*) FROM ${tp}user WHERE USER_ID = #{userId}
+    </select>
+
+    <insert id="insertUser" parameterType="java.util.Map">
+        INSERT INTO ${tp}user (USER_ID, USER_NAME, PASSWORD_HASH, USE_YN, PW_CHANGE_YN, LOGIN_FAIL_COUNT, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
+        VALUES (#{userId}, #{userName}, #{passwordHash}, #{useYn}, 'Y', 0, now(), #{by}, now(), #{by})
+    </insert>
+
+    <update id="updateUser" parameterType="java.util.Map">
+        UPDATE ${tp}user
+           SET USER_NAME = #{userName}, USE_YN = #{useYn}, UPDATED_AT = now(), UPDATED_BY = #{by}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <delete id="deleteUserGroups" parameterType="java.util.Map">
+        DELETE FROM ${tp}group_user WHERE USER_ID = #{userId}
+    </delete>
+
+    <insert id="insertUserGroup" parameterType="java.util.Map">
+        INSERT INTO ${tp}group_user (GROUP_ID, USER_ID) VALUES (#{groupId}, #{userId})
+    </insert>
+
+    <delete id="deleteUser" parameterType="java.util.Map">
+        DELETE FROM ${tp}user WHERE USER_ID = #{userId}
+    </delete>
+
+    <!-- ===================== 사용자그룹 ===================== -->
+
+    <select id="selectGroupList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT G.GROUP_ID AS "groupId", G.GROUP_NAME AS "groupName", G.DESCRIPTION AS "description", G.SORT_ORDER AS "sortOrder",
+               (SELECT COUNT(*) FROM ${tp}group_user GU WHERE GU.GROUP_ID = G.GROUP_ID) AS "userCount",
+               COALESCE((SELECT STRING_AGG(GA.AUTH_ID, ',' ORDER BY GA.AUTH_ID) FROM ${tp}group_auth GA WHERE GA.GROUP_ID = G.GROUP_ID), '') AS "authIds"
+          FROM ${tp}group G
+         ORDER BY G.SORT_ORDER, G.GROUP_ID
+    </select>
+
+    <insert id="upsertGroup" parameterType="java.util.Map">
+        INSERT INTO ${tp}group (GROUP_ID, GROUP_NAME, DESCRIPTION, SORT_ORDER, CREATED_AT, UPDATED_AT)
+        VALUES (#{groupId}, #{groupName}, #{description}, #{sortOrder}, now(), now())
+        ON CONFLICT (GROUP_ID) DO UPDATE
+           SET GROUP_NAME = EXCLUDED.GROUP_NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, SORT_ORDER = EXCLUDED.SORT_ORDER, UPDATED_AT = now()
+    </insert>
+
+    <delete id="deleteGroupAuths" parameterType="java.util.Map">
+        DELETE FROM ${tp}group_auth WHERE GROUP_ID = #{groupId}
+    </delete>
+
+    <insert id="insertGroupAuth" parameterType="java.util.Map">
+        INSERT INTO ${tp}group_auth (GROUP_ID, AUTH_ID) VALUES (#{groupId}, #{authId})
+    </insert>
+
+    <delete id="deleteGroupUsers" parameterType="java.util.Map">
+        DELETE FROM ${tp}group_user WHERE GROUP_ID = #{groupId}
+    </delete>
+
+    <delete id="deleteGroup" parameterType="java.util.Map">
+        DELETE FROM ${tp}group WHERE GROUP_ID = #{groupId}
+    </delete>
+
+    <!-- ===================== 권한 ===================== -->
+
+    <select id="selectAuthList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT A.AUTH_ID AS "authId", A.AUTH_NAME AS "authName", A.DESCRIPTION AS "description", A.ADMIN_YN AS "adminYn", A.SORT_ORDER AS "sortOrder",
+               COALESCE((SELECT STRING_AGG(AM.MENU_ID, ',' ORDER BY AM.MENU_ID) FROM ${tp}auth_menu AM WHERE AM.AUTH_ID = A.AUTH_ID), '') AS "menuIds"
+          FROM ${tp}auth A
+         ORDER BY A.SORT_ORDER, A.AUTH_ID
+    </select>
+
+    <insert id="upsertAuth" parameterType="java.util.Map">
+        INSERT INTO ${tp}auth (AUTH_ID, AUTH_NAME, DESCRIPTION, ADMIN_YN, SORT_ORDER, CREATED_AT, UPDATED_AT)
+        VALUES (#{authId}, #{authName}, #{description}, #{adminYn}, #{sortOrder}, now(), now())
+        ON CONFLICT (AUTH_ID) DO UPDATE
+           SET AUTH_NAME = EXCLUDED.AUTH_NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, ADMIN_YN = EXCLUDED.ADMIN_YN, SORT_ORDER = EXCLUDED.SORT_ORDER, UPDATED_AT = now()
+    </insert>
+
+    <delete id="deleteAuthMenus" parameterType="java.util.Map">
+        DELETE FROM ${tp}auth_menu WHERE AUTH_ID = #{authId}
+    </delete>
+
+    <insert id="insertAuthMenu" parameterType="java.util.Map">
+        INSERT INTO ${tp}auth_menu (AUTH_ID, MENU_ID) VALUES (#{authId}, #{menuId})
+    </insert>
+
+    <delete id="deleteAuthGroups" parameterType="java.util.Map">
+        DELETE FROM ${tp}group_auth WHERE AUTH_ID = #{authId}
+    </delete>
+
+    <delete id="deleteAuth" parameterType="java.util.Map">
+        DELETE FROM ${tp}auth WHERE AUTH_ID = #{authId}
+    </delete>
+
+    <!-- ===================== 메뉴 ===================== -->
+
+    <select id="selectMenuList" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT MENU_ID AS "menuId", PARENT_ID AS "parentId", MENU_NAME AS "menuName", URL AS "url", ICON AS "icon",
+               SORT_ORDER AS "sortOrder", USE_YN AS "useYn", ALL_USERS_YN AS "allUsersYn"
+          FROM ${tp}menu
+         ORDER BY SORT_ORDER, MENU_ID
+    </select>
+
+    <insert id="upsertMenu" parameterType="java.util.Map">
+        INSERT INTO ${tp}menu (MENU_ID, PARENT_ID, MENU_NAME, URL, ICON, SORT_ORDER, USE_YN, ALL_USERS_YN, CREATED_AT, UPDATED_AT)
+        VALUES (#{menuId}, #{parentId}, #{menuName}, #{url}, #{icon}, #{sortOrder}, #{useYn}, #{allUsersYn}, now(), now())
+        ON CONFLICT (MENU_ID) DO UPDATE
+           SET PARENT_ID = EXCLUDED.PARENT_ID, MENU_NAME = EXCLUDED.MENU_NAME, URL = EXCLUDED.URL, ICON = EXCLUDED.ICON,
+               SORT_ORDER = EXCLUDED.SORT_ORDER, USE_YN = EXCLUDED.USE_YN, ALL_USERS_YN = EXCLUDED.ALL_USERS_YN, UPDATED_AT = now()
+    </insert>
+
+    <select id="countChildMenu" parameterType="java.util.Map" resultType="int">
+        SELECT COUNT(*) FROM ${tp}menu WHERE PARENT_ID = #{menuId}
+    </select>
+
+    <delete id="deleteMenuAuths" parameterType="java.util.Map">
+        DELETE FROM ${tp}auth_menu WHERE MENU_ID = #{menuId}
+    </delete>
+
+    <delete id="deleteMenu" parameterType="java.util.Map">
+        DELETE FROM ${tp}menu WHERE MENU_ID = #{menuId}
+    </delete>
+
+</mapper>

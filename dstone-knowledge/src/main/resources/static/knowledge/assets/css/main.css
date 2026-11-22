@@ -3419,3 +3419,22 @@ body.wd-full-on {
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
+
+/* ==========================================================================
+   사용자 관리 화면(admin/management/*.html, assets/js/management.js)
+   ========================================================================== */
+.mg-checks {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 520px;
+	overflow: auto;
+}
+
+.mg-ok {
+	color: var(--cs-success);
+}
+
+.mg-error {
+	color: var(--cs-danger);
+}

@@ -2,14 +2,16 @@
  * dstone-ai-engine, dstone-knowledge 화면이 같이 쓰는 도우미입니다. 두 앱(ai/assets, knowledge/assets)에 하나씩 있으니 고칠 때 둘 다 맞춥니다.
  *
  * 하는 일:
- *   - 왼쪽 메뉴를 그린다(예전 dstone-boot 의 views/console/sidebar.jsp). 메뉴 목록은 앱마다 *-menu.js 가 넘긴다.
- *   - 세션 정보(GET /console/session)를 한 번 받아 둔다. 사용자 이름, 로그인 사용 여부, 다른 앱 주소가 들어 있다.
+ *   - 왼쪽 메뉴를 그린다. 메뉴는 서버가 정한 "이 사람이 볼 수 있는 메뉴"다(GET /console/session 의 menus, 사용자 관리의 메뉴·권한).
+ *     URL 이 없는 메뉴는 묶음 제목 줄이다. 맨 아래에 사용자 이름, [비밀번호 변경], [로그아웃]을 둔다.
+ *   - 세션 정보(GET /console/session)를 한 번 받아 둔다. 로그인이 끊겼으면(401) 로그인 화면으로 보낸다.
  *   - 다른 앱으로 가는 링크(data-app-link="knowledge:/knowledge/search/search.html")의 주소를 채운다.
+ *     앱마다 로그인이 따로라, 다른 앱 화면에서는 그 앱에 다시 로그인한다.
  *
  * 쓰는 법(화면 HTML):
  *   <aside id="header-wrapper" class="cs-sidebar"></aside>
  *   <script src="/knowledge/assets/js/console.js"></script>
- *   <script src="/knowledge/assets/js/knowledge-menu.js"></script>   ← DstoneConsole.sidebar({...}) 를 부른다
+ *   <script src="/knowledge/assets/js/knowledge-menu.js"></script>   ← DstoneConsole.sidebar({brand, mark, home}) 를 부른다
  */
 var DstoneConsole = (function () {
 
@@ -34,32 +36,36 @@ var DstoneConsole = (function () {
 
 	var sessionPromise = null;
 
-	/** 세션 정보. 한 화면에서 한 번만 묻는다. 못 받으면 빈 값으로 채운다(메뉴는 그대로 그린다) */
+	/** 이 화면이 속한 앱의 로그인 화면(/ai/login.html, /knowledge/login.html) */
+	function loginPage() {
+		var parts = location.pathname.split("/");
+		return "/" + (parts[1] || "") + "/login.html";
+	}
+
+	/** 세션 정보. 한 화면에서 한 번만 묻는다. 로그인이 끊겼으면 로그인 화면으로 보낸다 */
 	function session() {
 		if (!sessionPromise) {
 			sessionPromise = fetch("/console/session", { headers: { "Accept": "application/json" } }).then(function (response) {
+				if (response.status === 401) {
+					location.href = loginPage() + "?next=" + encodeURIComponent(location.pathname + location.search);
+					return {};
+				}
 				return response.ok ? response.json() : {};
 			}).catch(function () {
 				return {};
 			}).then(function (info) {
 				info.urls = info.urls || {};
+				info.menus = info.menus || [];
 				return info;
 			});
 		}
 		return sessionPromise;
 	}
 
-	/**
-	 * 다른 앱 화면의 주소. 같은 앱이면 path 그대로.
-	 * 로그인을 켠 환경이면 dstone-boot 를 거쳐 가야 로그인 정보가 넘어가므로 dstone-boot 의 /sso/go.do 로 보낸다.
-	 * 갈 주소를 모르면 null.
-	 */
+	/** 다른 앱 화면의 주소. 같은 앱이면 path 그대로. 갈 주소를 모르면 null */
 	function appUrl(info, app, path) {
 		if (!app || app === info.app) {
 			return path;
-		}
-		if (info.loginEnabled && info.urls.boot) {
-			return info.urls.boot + "/sso/go.do?target=" + encodeURIComponent(app) + "&path=" + encodeURIComponent(path);
 		}
 		return info.urls[app] ? info.urls[app] + path : null;
 	}
@@ -74,47 +80,46 @@ var DstoneConsole = (function () {
 
 	/**
 	 * 왼쪽 메뉴를 그린다.
-	 * options: {brand: "AI", mark: "AI", home: "/ai/index.html", group: "AI"(첫 묶음 제목, 없어도 됨),
-	 *           menus: [[주소, 이름, 아이콘] ...]}. 주소가 "#group" 이면 메뉴가 아니라 묶음 제목 줄이다.
+	 * options: {brand: "AI", mark: "AI", home: "/ai/index.html"}. 메뉴 목록은 서버가 준다(session().menus).
 	 */
 	function sidebar(options) {
 		var aside = document.getElementById("header-wrapper");
 		if (!aside) {
 			return;
 		}
-		var current = location.pathname;
-		var html = "<a class=\"cs-brand\" href=\"" + escapeHtml(options.home) + "\">"
+		aside.innerHTML = "<a class=\"cs-brand\" href=\"" + escapeHtml(options.home) + "\">"
 			+ "<span class=\"cs-brand-mark\" aria-hidden=\"true\">" + escapeHtml(options.mark) + "</span>"
 			+ "<span class=\"cs-brand-text\"><b>Dstone</b> " + escapeHtml(options.brand) + "</span></a>"
-			// dstone-boot 주소를 알면 돌아가는 링크를 채운다(session() 뒤)
-			+ "<a class=\"cs-nav-item cs-nav-home\" id=\"cs-nav-boot\" href=\"#\" hidden>" + icon("back") + "<span>dstone-boot로 돌아가기</span></a>"
-			+ "<nav class=\"cs-nav\" aria-label=\"" + escapeHtml(options.brand) + " 메뉴\">";
-		if (options.group) {
-			html += "<p class=\"cs-nav-group\">" + escapeHtml(options.group) + "</p>";
-		}
-		options.menus.forEach(function (menu) {
-			if (menu[0] === "#group") {
-				html += "<p class=\"cs-nav-group\">" + escapeHtml(menu[1]) + "</p>";
-				return;
-			}
-			var on = current === menu[0];
-			html += "<a href=\"" + escapeHtml(menu[0]) + "\" class=\"cs-nav-item" + (on ? " cs-nav-on" : "") + "\"" + (on ? " aria-current=\"page\"" : "") + ">"
-				+ icon(menu[2]) + "<span>" + escapeHtml(menu[1]) + "</span></a>";
-		});
-		html += "</nav><p class=\"cs-nav-user\" id=\"cs-nav-user\" hidden>" + icon("user") + "<span></span></p>";
-		aside.innerHTML = html;
+			+ "<nav class=\"cs-nav\" id=\"cs-nav\" aria-label=\"" + escapeHtml(options.brand) + " 메뉴\"></nav>"
+			+ "<div class=\"cs-nav-user\" id=\"cs-nav-user\" hidden>" + icon("user") + "<span class=\"cs-nav-user-name\"></span>"
+			+ "<span class=\"cs-nav-user-actions\"><a href=\"" + escapeHtml(loginPage()) + "?change=1\">비밀번호 변경</a>"
+			+ "<button type=\"button\" id=\"cs-logout\">로그아웃</button></span></div>";
 
 		session().then(function (info) {
-			if (info.urls.boot) {
-				var back = document.getElementById("cs-nav-boot");
-				back.href = info.urls.boot + "/views/main";
-				back.hidden = false;
-			}
+			var current = location.pathname;
+			var html = "";
+			info.menus.forEach(function (menu) {
+				if (!menu.url) {
+					html += "<p class=\"cs-nav-group\">" + escapeHtml(menu.menuName) + "</p>";
+					return;
+				}
+				var on = current === menu.url;
+				html += "<a href=\"" + escapeHtml(menu.url) + "\" class=\"cs-nav-item" + (on ? " cs-nav-on" : "") + "\"" + (on ? " aria-current=\"page\"" : "") + ">"
+					+ icon(menu.icon) + "<span>" + escapeHtml(menu.menuName) + "</span></a>";
+			});
+			document.getElementById("cs-nav").innerHTML = html;
 			if (info.userId) {
 				var user = document.getElementById("cs-nav-user");
-				user.querySelector("span").textContent = (info.userName || info.userId) + (info.source === "DEFAULT" ? " (로그인 없음)" : "");
+				user.querySelector(".cs-nav-user-name").textContent = info.userName || info.userId;
 				user.title = "로그인 id: " + info.userId + (info.admin ? " · 관리자" : "");
 				user.hidden = false;
+			}
+		});
+		aside.addEventListener("click", function (event) {
+			if (event.target && event.target.id === "cs-logout") {
+				fetch("/console/logout", { method: "POST" }).then(function () {
+					location.href = loginPage();
+				});
 			}
 		});
 	}

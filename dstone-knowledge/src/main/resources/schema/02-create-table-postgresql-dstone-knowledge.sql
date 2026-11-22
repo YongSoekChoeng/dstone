@@ -922,3 +922,90 @@ COMMENT ON COLUMN kg_edge.properties_json            IS '덧붙임 정보 (JSON)
 COMMENT ON COLUMN kg_edge.file_id                    IS '근거가 된 파일 ID';
 COMMENT ON COLUMN kg_edge.line_start                 IS '근거가 된 시작 줄';
 COMMENT ON COLUMN kg_edge.line_end                   IS '근거가 된 끝 줄';
+
+/**********************************************
+knowledge_management_* (사용자 관리, 2026-11-22)
+
+코드 분석 화면(콘솔)의 로그인과 메뉴 권한. 규칙은 dstone-common 의 ConsoleManagementService, SQL 은 dstone-common 의 sqlmap/console/ConsoleManagementDao.xml.
+  사용자 ─(그룹 소속)→ 사용자그룹 ─(권한 부여)→ 권한 ─(메뉴 연결)→ 메뉴
+  메뉴는 "모두에게 보임(ALL_USERS_YN)"이거나 사용자의 그룹이 가진 권한에 연결되어 있으면 보인다. ADMIN_YN 권한을 가진 사람은 관리자다.
+  비밀번호는 PBKDF2 해시만 저장한다(PasswordHasher). 5번 연달아 틀리면 잠기고, 관리자가 초기화하면 풀린다.
+기본 데이터(관리자 계정, 그룹, 권한, 메뉴)는 03-create-data-postgresql-*.sql 에 있다.
+**********************************************/
+CREATE TABLE IF NOT EXISTS knowledge_management_user (
+    USER_ID           VARCHAR(50)  PRIMARY KEY,
+    USER_NAME         VARCHAR(100) NOT NULL,
+    PASSWORD_HASH     VARCHAR(200) NOT NULL,
+    USE_YN            CHAR(1)      NOT NULL DEFAULT 'Y',
+    PW_CHANGE_YN      CHAR(1)      NOT NULL DEFAULT 'Y',
+    LOGIN_FAIL_COUNT  INT          NOT NULL DEFAULT 0,
+    LAST_LOGIN_AT     TIMESTAMPTZ,
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CREATED_BY        VARCHAR(50),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_BY        VARCHAR(50)
+);
+CREATE TABLE IF NOT EXISTS knowledge_management_group (
+    GROUP_ID          VARCHAR(50)  PRIMARY KEY,
+    GROUP_NAME        VARCHAR(100) NOT NULL,
+    DESCRIPTION       VARCHAR(500),
+    SORT_ORDER        INT          NOT NULL DEFAULT 0,
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS knowledge_management_group_user (
+    GROUP_ID          VARCHAR(50)  NOT NULL REFERENCES knowledge_management_group(GROUP_ID) ON DELETE CASCADE,
+    USER_ID           VARCHAR(50)  NOT NULL REFERENCES knowledge_management_user(USER_ID) ON DELETE CASCADE,
+    PRIMARY KEY (GROUP_ID, USER_ID)
+);
+CREATE TABLE IF NOT EXISTS knowledge_management_auth (
+    AUTH_ID           VARCHAR(50)  PRIMARY KEY,
+    AUTH_NAME         VARCHAR(100) NOT NULL,
+    DESCRIPTION       VARCHAR(500),
+    ADMIN_YN          CHAR(1)      NOT NULL DEFAULT 'N',
+    SORT_ORDER        INT          NOT NULL DEFAULT 0,
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS knowledge_management_group_auth (
+    GROUP_ID          VARCHAR(50)  NOT NULL REFERENCES knowledge_management_group(GROUP_ID) ON DELETE CASCADE,
+    AUTH_ID           VARCHAR(50)  NOT NULL REFERENCES knowledge_management_auth(AUTH_ID) ON DELETE CASCADE,
+    PRIMARY KEY (GROUP_ID, AUTH_ID)
+);
+CREATE TABLE IF NOT EXISTS knowledge_management_menu (
+    MENU_ID           VARCHAR(50)  PRIMARY KEY,
+    PARENT_ID         VARCHAR(50),
+    MENU_NAME         VARCHAR(100) NOT NULL,
+    URL               VARCHAR(300),
+    ICON              VARCHAR(30),
+    SORT_ORDER        INT          NOT NULL DEFAULT 0,
+    USE_YN            CHAR(1)      NOT NULL DEFAULT 'Y',
+    ALL_USERS_YN      CHAR(1)      NOT NULL DEFAULT 'N',
+    CREATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UPDATED_AT        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS knowledge_management_auth_menu (
+    AUTH_ID           VARCHAR(50)  NOT NULL REFERENCES knowledge_management_auth(AUTH_ID) ON DELETE CASCADE,
+    MENU_ID           VARCHAR(50)  NOT NULL REFERENCES knowledge_management_menu(MENU_ID) ON DELETE CASCADE,
+    PRIMARY KEY (AUTH_ID, MENU_ID)
+);
+
+COMMENT ON TABLE  knowledge_management_user             IS '콘솔 사용자. 비밀번호는 PBKDF2 해시만 저장';
+COMMENT ON COLUMN knowledge_management_user.USER_ID     IS '아이디';
+COMMENT ON COLUMN knowledge_management_user.USER_NAME   IS '이름';
+COMMENT ON COLUMN knowledge_management_user.PASSWORD_HASH IS '비밀번호 해시(pbkdf2$반복$소금$해시)';
+COMMENT ON COLUMN knowledge_management_user.USE_YN      IS '사용 여부(N이면 로그인 불가)';
+COMMENT ON COLUMN knowledge_management_user.PW_CHANGE_YN IS '다음 로그인 때 비밀번호를 바꿔야 하는지(관리자가 만들거나 초기화하면 Y)';
+COMMENT ON COLUMN knowledge_management_user.LOGIN_FAIL_COUNT IS '연달아 틀린 횟수(5번이면 잠김)';
+COMMENT ON COLUMN knowledge_management_user.LAST_LOGIN_AT IS '마지막 로그인 시각';
+COMMENT ON TABLE  knowledge_management_group            IS '사용자그룹';
+COMMENT ON TABLE  knowledge_management_group_user       IS '사용자그룹에 속한 사용자';
+COMMENT ON TABLE  knowledge_management_auth             IS '권한. 메뉴를 묶어 그룹에 준다';
+COMMENT ON COLUMN knowledge_management_auth.ADMIN_YN    IS '관리자 권한인지(관리 화면·API, 남의 실행 조작)';
+COMMENT ON TABLE  knowledge_management_group_auth       IS '사용자그룹이 가진 권한';
+COMMENT ON TABLE  knowledge_management_menu             IS '왼쪽 메뉴. URL 이 없으면 묶음 제목';
+COMMENT ON COLUMN knowledge_management_menu.PARENT_ID   IS '상위 메뉴(묶음) ID';
+COMMENT ON COLUMN knowledge_management_menu.ICON        IS '아이콘 이름(assets/js/console.js 의 ICONS)';
+COMMENT ON COLUMN knowledge_management_menu.ALL_USERS_YN IS '로그인한 모두에게 보이는지';
+COMMENT ON TABLE  knowledge_management_auth_menu        IS '권한이 여는 메뉴';
+

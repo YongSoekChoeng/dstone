@@ -27,6 +27,8 @@ public class RequesterContextTest {
 
 	private MockHttpServletRequest requestOf(String user, boolean admin) {
 		MockHttpServletRequest request = new MockHttpServletRequest();
+		// X-Dstone-User 헤더는 API 키로 인증된 앱(CallerContext 에 caller 가 있음)이 보낸 것만 믿는다.
+		CallerContext.set(request, "test-app");
 		if (user != null) {
 			request.addHeader("X-Dstone-User", URLEncoder.encode(user, StandardCharsets.UTF_8));
 		}

@@ -29,7 +29,11 @@ public class ConfigMapper extends BaseObject {
 		SqlSessionFactoryBean bean = new SqlSessionFactoryBean();
 		bean.setDataSource(dataSource);
 		bean.setConfigLocation(pmrpr.getResource("classpath:/sqlmap/sql-mapper-config.xml"));
-		bean.setMapperLocations(pmrpr.getResources("classpath:/sqlmap/**/*Dao.xml"));
+		// 이 앱의 매퍼 + dstone-common 의 콘솔 사용자 관리 매퍼(sqlmap/console, 테이블 이름 앞부분은 코드가 넘김)
+		java.util.List<org.springframework.core.io.Resource> mappers = new java.util.ArrayList<org.springframework.core.io.Resource>();
+		java.util.Collections.addAll(mappers, pmrpr.getResources("classpath:/sqlmap/**/*Dao.xml"));
+		java.util.Collections.addAll(mappers, pmrpr.getResources("classpath*:/sqlmap/console/*Dao.xml"));
+		bean.setMapperLocations(mappers.toArray(new org.springframework.core.io.Resource[0]));
 		return bean.getObject();
 	}
 
