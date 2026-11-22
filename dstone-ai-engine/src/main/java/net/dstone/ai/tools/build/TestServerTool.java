@@ -51,7 +51,7 @@ import net.dstone.common.core.BaseObject;
  * ## 폴더
  * 프로젝트마다 폴더 하나를 캐시처럼 다시 씁니다. 처음 한 번만 원본 전체를 복사하고, 다음부터는 바뀐 파일만 복사합니다.
  *   {작업 루트}/{프로젝트키}-server/
- *     app/         시험용 사본(applyOverlay가 원본 + 개발 결과로 맞춤, 빌드 결과도 여기 쌓임)
+ *     app/         시험용 사본(applyOverlay가 원본 + 개발 결과로 맞춤. 빌드 결과(target)는 띄울 때마다 clean으로 새로 만듦)
  *     tomcat/      WAR 방식일 때의 전용 CATALINA_BASE(conf, webapps, logs, work, temp)
  *     server.log   서버 출력(readFileTail로 읽음)
  *     server.pid   띄운 프로세스 번호(엔진이 죽어 남은 프로세스를 다음에 정리하려고)
@@ -63,7 +63,7 @@ import net.dstone.common.core.BaseObject;
  * ## 띄우는 방법
  * Maven 프로젝트만 지원합니다. 포트는 비어 있는 것을 골라 씁니다. 사람이 쓰는 서버와 겹치지 않게 하려는 것입니다.
  * 1) packaging이 war이고 설정 tomcat-home(env의 TEST_SERVER_TOMCAT_HOME)이 있으면, 실제 배포와 같은 방식으로 띄웁니다.
- *    mvn package로 WAR를 만들고, 설치된 Tomcat을 함께 쓰되 사본 폴더 안에 전용 CATALINA_BASE(tomcat/)를 만들어 거기에 올립니다.
+ *    mvn clean package로 WAR를 만들고(clean: 지난 실행의 클래스가 남지 않게), 설치된 Tomcat을 함께 쓰되 사본 폴더 안에 전용 CATALINA_BASE(tomcat/)를 만들어 거기에 올립니다.
  *    설치된 Tomcat의 conf를 복사해 HTTP 포트만 바꾸고 shutdown 포트와 AJP는 끕니다. 사람이 쓰는 Tomcat은 건드리지 않습니다.
  *    context path는 pom의 tomcat 플러그인 <path>, 없으면 / 입니다.
  * 2) 아니면 원본 pom.xml의 플러그인으로 띄웁니다.
@@ -78,6 +78,8 @@ import net.dstone.common.core.BaseObject;
  * 못 찾으면 엔진이 쓰는 JDK로 띄우고 결과에 그렇다고 적습니다.
  *
  * ## 내리기
+ * 접속 판정: HTTP 응답이 오면 뜬 것으로 보되, WAR 방식에서 앱 경로가 404면 앱이 시작에 실패한 것으로 보고 실패를 돌려줍니다.
+ *
  * Agent가 stopTestServer를 부르지 않아도, 띄운 step이 끝나면(StepEndListener) 내립니다. 엔진이 내려갈 때도 내립니다.
  * 사본 폴더는 지우지 않습니다(다음에 다시 씀). 지우고 싶으면 폴더를 직접 지우면 됩니다.
  *
@@ -299,6 +301,11 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			String waitProblem = waitUntilUp(process, port, contextPath, timeout);
 			if (waitProblem != null) {
 				return ToolOutcome.fail("임시 시험 서버가 뜨지 않았습니다(" + waitProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
+			}
+			// Tomcat에 올린 앱이 시작에 실패해도 Tomcat 자체는 떠서 응답(404)을 준다. 그 경우는 실패로 본다.
+			if (kind.startsWith("WAR") && httpStatus(port, contextPath) == HttpURLConnection.HTTP_NOT_FOUND) {
+				return ToolOutcome.fail("Tomcat은 떴지만 앱(" + contextPath + ")이 시작되지 않았습니다(404). 서버 로그에서 앱 시작 오류를 보십시오: " + log + "\n"
+					+ tail(log, LOG_TAIL_LINES));
 			}
 			started = true;
 			StringBuilder message = new StringBuilder();
@@ -556,6 +563,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 		if (tomcat != null) {
 			launch.kind = tomcatGoal.substring(0, tomcatGoal.indexOf(':'));
+			launch.goals.add("clean"); // 지난 실행의 클래스가 남지 않게(mavenPackage 설명 참고)
 			launch.goals.add(tomcatGoal);
 			launch.goals.add("-Dmaven.tomcat.port=" + port);
 			Matcher path = Pattern.compile("<path>\\s*([^<$]*)\\s*</path>").matcher(tomcat);
@@ -569,6 +577,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 		if (pluginBlock(pomText, "spring-boot-maven-plugin") != null) {
 			launch.kind = "spring-boot";
+			launch.goals.add("clean");
 			launch.goals.add("spring-boot:run");
 			launch.goals.add("-Dspring-boot.run.arguments=--server.port=" + port); // Boot 2 이상
 			launch.goals.add("-Drun.arguments=--server.port=" + port); // Boot 1
@@ -576,6 +585,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 		if (pluginBlock(pomText, "jetty-maven-plugin") != null || pluginBlock(pomText, "maven-jetty-plugin") != null) {
 			launch.kind = "jetty";
+			launch.goals.add("clean");
 			launch.goals.add("jetty:run");
 			launch.goals.add("-Djetty.http.port=" + port);
 			launch.goals.add("-Djetty.port=" + port);
@@ -668,6 +678,21 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		return timeoutSeconds + "초 안에 접속되지 않았습니다";
 	}
 
+	/** 그 경로에 GET을 보내 응답 코드를 돌려줍니다. 응답이 없으면 -1. */
+	private static int httpStatus(int port, String path) {
+		try {
+			HttpURLConnection connection = (HttpURLConnection) URI.create("http://localhost:" + port + path).toURL().openConnection();
+			connection.setConnectTimeout(2000);
+			connection.setReadTimeout(30000);
+			connection.setInstanceFollowRedirects(false);
+			int status = connection.getResponseCode();
+			connection.disconnect();
+			return status;
+		} catch (IOException e) {
+			return -1;
+		}
+	}
+
 	private static int freePort() throws IOException {
 		ServerSocket socket = new ServerSocket(0);
 		try {
@@ -716,6 +741,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	/** 사본에서 mvn package를 돌려 WAR를 만듭니다. 성공하면 null, 실패하면 이유. 출력은 log에 덧붙입니다. */
 	private String mavenPackage(File app, File javaHome, File log, String key) throws IOException {
 		List<String> command = this.mavenCommand(key);
+		// clean을 함께 한다. 사본은 다음 실행에서도 다시 쓰는데, Maven 증분 빌드는 소스가 없어진 클래스를 지우지 않아
+		// 지난 실행의 클래스가 WAR에 남는다(2026-11-22 실행 86b3660b: 지난 실행의 ImageBoardDAO와 bean 이름이 부딪쳐 앱이 뜨지 않음).
+		command.add("clean");
 		command.add("package");
 		ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
 		utf8Maven(builder);

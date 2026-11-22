@@ -8,8 +8,10 @@
 # 1.4.0: 화면 재현은 기본으로 임시 시험 서버(startTestServer)에서 합니다. 사람이 쓰는 시험 서버에는 요청서에 반영폴더·반영명령이 있을 때만 올립니다.
 # 1.5.0: 시험계정은 요청서가 아니라 프로젝트 관리에 암호화해 둡니다. 비밀번호는 자리표시자로만 다루고 엔진이 브라우저 입력 직전에 바꿉니다.
 # 1.6.0: 서버를 띄우지 못한 이유가 코드와 무관하면 다시 띄우지 않습니다. 화면 재현 여부를 답의 reproduced에 따로 적습니다(승인하는 사람이 한눈에 보게).
+# 1.7.0: requiredTools(editFileTexts)를 뺐습니다. "이미 고쳐져 있고 사람이 시험한 서버에 반영되지 않았음"처럼 고칠 것이 없는 결론도
+#        정상 결과입니다(실행 86b3660b: 맞는 진단이 계약 위반으로 실패 처리됨). 설계서 기록(requiredWrites)은 그대로 강제합니다.
 id: sm-troubleshooter-agent
-version: 1.6.0
+version: 1.7.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   reasoning: high
@@ -79,8 +81,6 @@ skills:
     - projects/**
 execution:
   maxToolCalls: 150
-  requiredTools:
-    - editFileTexts
   requiredWrites:
     - ${input.base_dir}/03-1.design.md
 ---
@@ -124,6 +124,9 @@ Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있
 - 원인마다 근거를 파일:줄이나 관측 결과로 댄다. 근거 없이 "아마 ~일 것"으로 고치지 않는다.
 
 [고치는 법]
+- 고칠 것이 없을 수 있다. 증상의 원인이 dev-resources에서 이미 고쳐져 있는데 사람이 시험한 서버에 아직 반영되지 않은 경우가 그렇다.
+  dev-resources의 지금 코드와 관측 결과(DB에 남은 값, 오류 문구)를 대조해 그렇다고 판단되면 코드를 고치지 않는다.
+  changes에 "고칠 것 없음 - 이유", unresolved에 사람이 반영할 파일 목록을 적고, 설계서 '## 수정 이력'에는 그 판단을 한 줄 남긴다.
 - 원본 소스는 읽기만 한다. 결과는 dev-resources에만 쓴다. 원본 파일을 처음 고칠 때는 copyFileWithReplace(원본, 저장 경로, 빈 목록)로 복사한 뒤 고친다.
   지울 파일은 직접 지우지 않고 ${input.base_dir}/dev-resources/_delete-files.txt 에 원본 루트 기준 상대경로를 appendFile로 적는다.
 - 새 방식을 만들지 않는다. 원본에 같은 일을 하는 관례가 있으면 그 모양을 따른다.
