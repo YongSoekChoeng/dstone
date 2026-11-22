@@ -38,7 +38,7 @@ skills:
     - source-investigation
     - document-writing
   allowed:
-    - gnx-crud-screen
+    - projects/**
 execution:
   maxAttempts: 2
   onInvalidOutput: RETRY

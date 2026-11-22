@@ -904,14 +904,8 @@ public class AgentExecutor extends BaseObject {
 	 * @param agent Agent의 정의
 	 */
 	private List<SkillDefinition> skillsOf(AgentDefinition agent) {
-		List<SkillDefinition> skills = new ArrayList<>();
-		for (String name : agent.skillNames()) {
-			SkillDefinition skill = this.skillRegistry.find(name);
-			if (skill != null) {
-				skills.add(skill);
-			}
-		}
-		return skills;
+		// 이름 하나씩 적은 것과 폴더 지정(projects/**)을 함께 풀어 줍니다.
+		return SkillRegistry.select(agent.skillNames(), this.skillRegistry.all());
 	}
 
 	/**

@@ -65,6 +65,7 @@ import net.dstone.common.utils.StringUtil;
  * Skill(skills.allowed)도 기동할 때 검사합니다(checkSkills()).
  *   오류(기동 실패)                                         경고(로그만)
  *   skills.allowed/preload에 등록되지 않은 Skill 이름을 적음  Skill 폴더에 참고 파일이 있는데 tools.allowed에 readFile이 없음
+ *   skills.preload에 폴더 지정(projects/**)을 적음         skills.allowed의 폴더 지정에 걸리는 Skill이 없음
  *   엔진이 붙이는 Tool 이름(Skill, TaskOutput)과 같은 이름의 Tool이나 Sub Agent가 있음
  * </pre>
  */
@@ -457,13 +458,26 @@ public class AgentRegistry extends BaseObject {
 		}
 		boolean needsReadFile = false;
 		for (String name : definition.skillNames()) {
+			if (SkillRegistry.isFolderPattern(name)) {
+				// 폴더 지정(projects/**)은 그 폴더가 아직 비어 있을 수 있습니다. 폴더 이름을 잘못 적었을 수 있으니 경고만 남깁니다.
+				if (!SkillRegistry.matchesAny(name, skills)) {
+					LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + "skills.allowed의 '" + name + "'에 걸리는 Skill이 없습니다(conf/definitions/"
+						+ Constants.Definition.SKILL_DIR + "/" + name.substring(0, name.length() - SkillRegistry.FOLDER_PATTERN_SUFFIX.length()) + " 폴더를 확인하십시오).");
+				}
+				continue;
+			}
 			SkillDefinition skill = skills.get(name);
 			if (skill == null) {
 				throw new IllegalStateException(where + "skills.allowed에 적은 '" + name + "'는 등록된 Skill이 아닙니다(conf/definitions/skills 아래 SKILL.md의 name). 등록된 Skill = " + skills.keySet());
 			}
+		}
+		for (SkillDefinition skill : SkillRegistry.select(definition.skillNames(), skills)) {
 			needsReadFile = needsReadFile || SkillTool.hasReferenceFiles(skill);
 		}
 		for (String name : definition.preloadSkillNames()) {
+			if (SkillRegistry.isFolderPattern(name)) {
+				throw new IllegalStateException(where + "skills.preload에는 폴더 지정('" + name + "')을 쓸 수 없습니다. 늘 넣을 Skill은 이름으로 적고, 골라 쓸 Skill 묶음은 skills.allowed에 적으십시오.");
+			}
 			SkillDefinition skill = skills.get(name);
 			if (skill == null) {
 				throw new IllegalStateException(where + "skills.preload에 적은 '" + name + "'는 등록된 Skill이 아닙니다(conf/definitions/skills 아래 SKILL.md의 name). 등록된 Skill = " + skills.keySet());

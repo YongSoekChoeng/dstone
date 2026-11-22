@@ -49,6 +49,8 @@ skills:
   preload:
     - handling-instructions
     - source-investigation
+  allowed:
+    - projects/**
 execution:
   maxToolCalls: 150
   requiredTools:

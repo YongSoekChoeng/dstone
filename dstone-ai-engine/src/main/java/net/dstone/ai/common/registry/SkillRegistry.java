@@ -45,6 +45,9 @@ public class SkillRegistry extends BaseObject {
 	/** Skill 설명의 최대 길이입니다. 설명은 Skill을 쓰는 모든 Agent의 Tool 설명에 늘 들어가므로 짧게 둡니다. */
 	private static final int MAX_DESCRIPTION_LENGTH = 1024;
 
+	/** skills.allowed에서 폴더 아래 Skill 전부를 가리킬 때 쓰는 꼬리입니다(예: projects/**). */
+	public static final String FOLDER_PATTERN_SUFFIX = "/**";
+
 	@Autowired
 	private YamlDefinitionLoader loader;
 
@@ -128,6 +131,79 @@ public class SkillRegistry extends BaseObject {
 	/** 등록된 Skill을 이름 순으로 돌려줍니다(화면 목록용). */
 	public List<SkillDefinition> list() {
 		List<SkillDefinition> result = new ArrayList<>(this.byName.values());
+		result.sort(new Comparator<SkillDefinition>() {
+			@Override
+			public int compare(SkillDefinition a, SkillDefinition b) {
+				return a.name().compareTo(b.name());
+			}
+		});
+		return result;
+	}
+
+	/**
+	 * <pre>
+	 * skills.allowed에 적은 항목을 실제 Skill 목록으로 바꿉니다.
+	 * 항목은 두 가지 모양입니다.
+	 *   sql-review      ← Skill 이름 하나
+	 *   projects/**     ← skills/projects/ 아래에 있는 Skill 전부(폴더 지정)
+	 *
+	 * 폴더 지정은 프로젝트마다 다른 관례 Skill을 위해 둡니다. 새 프로젝트가 생겨도 Skill 폴더만 더하면 되고,
+	 * Agent 정의는 고치지 않아도 됩니다. Agent는 Skill 설명을 보고 지금 소스에 맞는 것만 꺼내 읽습니다.
+	 * 같은 Skill이 여러 항목에 걸리면 한 번만 넣습니다. 없는 이름은 건너뜁니다(검사는 AgentRegistry가 합니다).
+	 * </pre>
+	 *
+	 * @param entries skills.allowed에 적은 항목
+	 * @param skills  찾을 Skill 전체(이름 → 정의)
+	 */
+	public static List<SkillDefinition> select(List<String> entries, Map<String, SkillDefinition> skills) {
+		Map<String, SkillDefinition> selected = new LinkedHashMap<>();
+		for (String entry : entries) {
+			if (isFolderPattern(entry)) {
+				for (SkillDefinition skill : sortedByName(skills)) {
+					if (inFolder(skill, entry)) {
+						selected.putIfAbsent(skill.name(), skill);
+					}
+				}
+			} else {
+				SkillDefinition skill = skills.get(entry);
+				if (skill != null) {
+					selected.putIfAbsent(skill.name(), skill);
+				}
+			}
+		}
+		return new ArrayList<>(selected.values());
+	}
+
+	/** projects/**처럼 폴더를 가리키는 항목인지 봅니다. */
+	public static boolean isFolderPattern(String entry) {
+		return entry != null && entry.endsWith(FOLDER_PATTERN_SUFFIX);
+	}
+
+	/**
+	 * 폴더 지정 항목에 걸리는 Skill이 하나라도 있는지 봅니다. 폴더 이름을 잘못 적은 것을 알려 주는 데 씁니다.
+	 *
+	 * @param entry  projects/** 같은 항목
+	 * @param skills 찾을 Skill 전체(이름 → 정의)
+	 */
+	public static boolean matchesAny(String entry, Map<String, SkillDefinition> skills) {
+		for (SkillDefinition skill : skills.values()) {
+			if (inFolder(skill, entry)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Skill 파일이 폴더 지정 항목이 가리키는 폴더 아래에 있는지 봅니다(skills/projects/gnx-crud-screen/SKILL.md ← projects/**). */
+	private static boolean inFolder(SkillDefinition skill, String entry) {
+		String folder = entry.substring(0, entry.length() - FOLDER_PATTERN_SUFFIX.length());
+		String prefix = Constants.Definition.SKILL_DIR + "/" + folder + "/";
+		return skill.path() != null && skill.path().replace('\\', '/').startsWith(prefix);
+	}
+
+	/** 폴더 지정으로 고른 Skill이 늘 같은 순서로 나오도록 이름 순으로 늘어놓습니다. */
+	private static List<SkillDefinition> sortedByName(Map<String, SkillDefinition> skills) {
+		List<SkillDefinition> result = new ArrayList<>(skills.values());
 		result.sort(new Comparator<SkillDefinition>() {
 			@Override
 			public int compare(SkillDefinition a, SkillDefinition b) {

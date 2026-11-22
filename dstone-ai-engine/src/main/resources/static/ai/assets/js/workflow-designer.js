@@ -2965,6 +2965,18 @@ var DstoneAiDesigner = (function () {
 			var folder = skill.path ? skill.path.replace(/^skills\//, "").replace(/\/[^\/]*\/SKILL\.md$/, "") : "";
 			skillItems.push({ value: skill.name, label: skill.name, title: skill.description || "", group: folder });
 		});
+		// 폴더 지정(예: projects/**): 그 폴더 아래 Skill을 모두 후보로 주고, Agent가 설명을 보고 맞는 것만 읽는다.
+		// 프로젝트마다 다른 관례 Skill을 Agent를 고치지 않고 늘릴 때 쓴다. skills.allowed에만 쓸 수 있다.
+		var skillFolders = [];
+		(catalog.skills || []).forEach(function (skill) {
+			var folder = skill.path ? skill.path.replace(/^skills\//, "").replace(/\/[^\/]*\/SKILL\.md$/, "") : "";
+			if (folder && skillFolders.indexOf(folder) < 0) {
+				skillFolders.push(folder);
+			}
+		});
+		skillFolders.sort().forEach(function (folder) {
+			skillItems.push({ value: folder + "/**", label: folder + "/**", title: "skills/" + folder + " 아래 Skill 전부(Agent가 설명을 보고 골라 읽음)", group: "폴더 전체" });
+		});
 		skills.concat(preloadSkills).forEach(function (name) {
 			if (!(catalog.skills || []).some(function (skill) { return skill.name === name; })
 					&& !skillItems.some(function (item) { return item.value === name; })) {
@@ -3032,7 +3044,7 @@ var DstoneAiDesigner = (function () {
 			+ "</section>"
 			+ "<section class=\"wd-agent-sec\"><h4>Skill <span class=\"wd-help\">작업 안내서(SKILL.md)</span></h4>"
 			+ "<p class=\"ai-hint\"><b>미리 넣기(preload)</b> - 이 Agent가 일할 때마다 필요한 Skill. 본문이 시스템 프롬프트 뒤에 늘 붙습니다(Tool 호출 없음).</p>"
-			+ chipList("preloadSkills", skillItems, preloadSkills, "미리 넣는 Skill이 없습니다.", false)
+			+ chipList("preloadSkills", skillItems.filter(function (item) { return !/\/\*\*$/.test(item.value); }), preloadSkills, "미리 넣는 Skill이 없습니다.", false)
 			+ "<p class=\"ai-hint\"><b>필요할 때 부르기(allowed)</b> - 경우에 따라서만 필요한 Skill. LLM에게는 Skill이라는 Tool 하나로 보입니다.</p>"
 			+ chipList("skills", skillItems, skills, "고른 Skill이 없습니다.", false)
 			+ "<p class=\"ai-hint\">Skill 폴더의 참고 파일까지 읽게 하려면 Tool에 readFile도 고르십시오. 새 Skill은 위쪽 [Skill 관리]에서 만듭니다.</p>"
@@ -3144,7 +3156,7 @@ var DstoneAiDesigner = (function () {
 						setList("skills", values);
 					});
 				} else if (name === "preloadSkills") {
-					openPicker("미리 넣을 Skill 고르기", skillItems, preloadSkills, function (values) {
+					openPicker("미리 넣을 Skill 고르기", skillItems.filter(function (item) { return !/\/\*\*$/.test(item.value); }), preloadSkills, function (values) {
 						setList("preloadSkills", values);
 					});
 				} else {

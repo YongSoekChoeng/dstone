@@ -38,7 +38,7 @@ skills:
     - handling-instructions
     - source-investigation
   allowed:
-    - gnx-crud-screen
+    - projects/**
 execution:
   maxToolCalls: 120
   requiredTools:

@@ -1,9 +1,11 @@
 ---
-# testApp처럼 kr.co.gnx 패키지를 쓰는 프로젝트(Spring MVC + MyBatis + JSP/Kendo UI)의 관례입니다.
-# 영향도·설계·개발·문서 수정 Agent가 skills.allowed로 갖고 있다가, 대상 소스가 이 모양일 때만 불러 읽습니다.
-# 다른 기술의 프로젝트를 다루게 되면 그 프로젝트의 Skill을 같은 방식으로 하나 더 만듭니다(Agent 프롬프트는 고치지 않습니다).
+# kr.co.gnx 패키지를 쓰는 프로젝트(Spring MVC + MyBatis + JSP/Kendo UI)의 관례입니다.
+# skills/projects/ 아래 Skill은 프로젝트마다 다른 관례입니다. Agent는 skills.allowed에 'projects/**' 한 줄로 이 폴더 전체를 받고,
+# 설명을 보고 지금 소스에 맞는 것만 불러 읽습니다.
+# 다른 프로젝트를 다루게 되면 이 폴더에 그 프로젝트의 Skill 폴더를 하나 더 만듭니다. Agent와 Workflow는 고치지 않습니다.
+# 설명(description)에는 프로젝트 이름보다 소스에서 바로 확인되는 모양(패키지, 상위 클래스 등)을 적습니다.
 name: gnx-crud-screen
-description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트(testApp 등)에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고칠 때 쓴다. 층별 파일 위치, 이름 규칙, 파일 업로드, 그리드 화면의 관례.
+description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고칠 때 쓴다. 층별 파일 위치, 이름 규칙, 파일 업로드, 그리드 화면의 관례.
 ---
 기본 참고 기능은 샘플게시판이다. 새 화면을 만들 때는 이 층별 파일을 참고 파일로 삼고, 달라지는 점만 적는다.
 
