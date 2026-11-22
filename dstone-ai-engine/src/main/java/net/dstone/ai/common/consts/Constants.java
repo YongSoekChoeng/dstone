@@ -93,6 +93,8 @@ public final class Constants {
 		 * false면 보내기 직전에 뺍니다(common.advisors.ReasoningStripAdvisor).
 		 */
 		public final static String KEEP_REASONING = "dstone.ai.agent.keep-reasoning";
+		/** 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드를 한 번 다시 부를지(기본 true, common.advisors.RunawayRetryAdvisor)입니다. */
+		public final static String RUNAWAY_RETRY = "dstone.ai.agent.runaway-retry";
 	}
 
 	/** Tool을 caller별로 허용/차단하는 설정 키의 접두사(prefix)들입니다(common.config.ConfigTool과 tools 패키지 아래의 각 Tool이 사용합니다). */

@@ -225,6 +225,8 @@ dstone:
         ##########################################################################################
         agent:
             keep-reasoning: false
+            # 같은 생각을 되풀이하다 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드를, 대화를 그대로 두고 한 번 다시 부른다(RunawayRetryAdvisor).
+            runaway-retry: true
             sub-agent:
                 max-calls: 10
                 background-threads: 4

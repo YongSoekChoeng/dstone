@@ -83,12 +83,18 @@ public class OverlayTool extends BaseObject {
 		Files.createDirectories(target);
 		Set<String> expected = new LinkedHashSet<String>();
 		int[] copied = new int[] { 0 };
-		this.copyTree(source, target, skip, null, expected, copied);
+		// 개발 결과에 있는 파일은 원본 단계에서 복사하지 않고 개발 결과 단계에서만 맞춘다.
+		// 원본을 먼저 덮었다가 개발 결과로 다시 덮으면, 두 파일의 크기·수정 시각이 우연히 같을 때 원본 내용이 남는다(그리고 매번 두 번 복사한다).
+		Set<String> overlayFiles = new LinkedHashSet<String>();
+		if (Files.isDirectory(overlay)) {
+			this.copyTree(overlay, null, skip, deleteListPath, null, overlayFiles, null);
+		}
+		this.copyTree(source, target, skip, null, overlayFiles, expected, copied);
 		int sourceCopied = copied[0];
 		copied[0] = 0;
 		int overlaid = 0;
 		if (Files.isDirectory(overlay)) {
-			this.copyTree(overlay, target, skip, deleteListPath, expected, copied);
+			this.copyTree(overlay, target, skip, deleteListPath, null, expected, copied);
 			overlaid = copied[0];
 		}
 		int deleted = 0;
@@ -107,8 +113,9 @@ public class OverlayTool extends BaseObject {
 	/**
 	 * from 폴더의 파일을 to 폴더의 같은 경로로 복사합니다. 내용이 같으면(크기와 수정 시각이 같으면) 건너뜁니다.
 	 * 복사한 파일 수는 copied[0]에 더하고, 사본에 있어야 할 상대경로는 expected에 모읍니다.
+	 * leaveTo에 있는 상대경로는 복사하지 않습니다(다른 단계가 맞춥니다). to가 null이면 복사하지 않고 상대경로만 모읍니다.
 	 */
-	private void copyTree(final Path from, final Path to, final Set<String> skip, final Path exclude, final Set<String> expected, final int[] copied) throws IOException {
+	private void copyTree(final Path from, final Path to, final Set<String> skip, final Path exclude, final Set<String> leaveTo, final Set<String> expected, final int[] copied) throws IOException {
 		Files.walkFileTree(from, new SimpleFileVisitor<Path>() {
 			@Override
 			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
@@ -125,6 +132,9 @@ public class OverlayTool extends BaseObject {
 				}
 				String rel = from.relativize(file).toString().replace(File.separatorChar, '/');
 				expected.add(rel);
+				if (to == null || (leaveTo != null && leaveTo.contains(rel))) {
+					return FileVisitResult.CONTINUE;
+				}
 				Path dest = to.resolve(rel);
 				// 수정 시각은 밀리초까지만 비교한다. 복사본에는 파일 시스템에 따라 마이크로초까지만 남아서(원본은 나노초), 그대로 비교하면 늘 달라 매번 전부 복사한다.
 				if (Files.exists(dest) && Files.size(dest) == attrs.size() && Files.getLastModifiedTime(dest).toMillis() == attrs.lastModifiedTime().toMillis()) {

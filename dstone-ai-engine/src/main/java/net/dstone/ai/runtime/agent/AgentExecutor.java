@@ -32,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
 import net.dstone.ai.common.advisors.LlmCallGateAdvisor;
 import net.dstone.ai.common.advisors.ReasoningStripAdvisor;
+import net.dstone.ai.common.advisors.RunawayRetryAdvisor;
 import net.dstone.ai.common.advisors.ToolResultCompactionAdvisor;
 import net.dstone.ai.common.config.ConfigProviders;
 import net.dstone.ai.common.config.ConfigChatClient;
@@ -601,6 +602,8 @@ public class AgentExecutor extends BaseObject {
 			  (ToolResultCompactionAdvisor. dstone.ai.agent.tool.keep-result-chars가 0이면 붙이지 않습니다).
 			- 앞 라운드 답에 붙은 추론 글(reasoning)은 다음 라운드에 다시 보내지 않습니다
 			  (ReasoningStripAdvisor. dstone.ai.agent.keep-reasoning이 true면 붙이지 않습니다).
+			- 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드는 같은 대화로 한 번 다시 부릅니다
+			  (RunawayRetryAdvisor. dstone.ai.agent.runaway-retry가 false면 붙이지 않습니다).
 		************************************************************************/
 		List<ToolCallback> tools = new ArrayList<>(this.availableTools(agent, caller));
 		if (extraTools != null && !extraTools.isEmpty()) {
@@ -630,6 +633,11 @@ public class AgentExecutor extends BaseObject {
 		// 앞 라운드 답에 붙은 추론 글은 다음 라운드에 다시 보내지 않습니다(ReasoningStripAdvisor). 대화 기억에서 온 앞 답에도 적용됩니다.
 		if (!this.environment.getProperty(Constants.Agent.KEEP_REASONING, Boolean.class, Boolean.FALSE).booleanValue()) {
 			spec = spec.advisors(new ReasoningStripAdvisor(agent.id()));
+		}
+
+		// 같은 생각을 되풀이하다 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드는, 대화를 그대로 두고 한 번 다시 부릅니다(RunawayRetryAdvisor).
+		if (this.environment.getProperty(Constants.Agent.RUNAWAY_RETRY, Boolean.class, Boolean.TRUE).booleanValue()) {
+			spec = spec.advisors(new RunawayRetryAdvisor(agent.id()));
 		}
 
 		// LLM 호출 횟수, Tool별 호출 횟수, 토큰을 로그에 남깁니다(Tool이 없어도 붙입니다).
