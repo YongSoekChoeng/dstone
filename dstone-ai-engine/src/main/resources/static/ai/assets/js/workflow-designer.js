@@ -11,7 +11,7 @@
  * 저장할 글자(YAML)는 model을 고칠 때만 새로 만듭니다. 그래서 노드 위치만 옮기고 저장하면 파일 글자는 그대로이고(주석 유지),
  * YAML 탭에서 직접 고친 글자도 그대로 저장됩니다. 그림에서 고치면 맨 위 주석만 남기고 다시 만듭니다.
  *
- * 그리기는 X6(AntV), 자동 배치는 dagre, YAML 읽고 쓰기는 js-yaml을 씁니다(모두 ai/assets/lib에 넣어 둔 파일).
+ * 그리기는 X6(AntV), YAML 읽고 쓰기는 js-yaml을 씁니다(모두 ai/assets/lib에 넣어 둔 파일). 자동 배치는 이 파일이 직접 합니다(autoLayout).
  * 서버 호출은 같은 앱의 정의 API(/api/ai/definitions)를 바로 부릅니다.
  */
 var DstoneAiDesigner = (function () {
@@ -19,8 +19,8 @@ var DstoneAiDesigner = (function () {
 	var START_ID = "__START__";
 	var END_ID = "END";
 	var FAIL_ID = "FAIL";
-	var STEP_W = 230;
-	var STEP_H = 72;
+	var STEP_W = 200;
+	var STEP_H = 50;
 	var TERM_SIZE = 48;
 
 	/** step 종류별 색(테두리, 바탕) */
@@ -989,24 +989,40 @@ var DstoneAiDesigner = (function () {
 		});
 	}
 
-	/** 이름 앞의 순번 모양("01-", "123-"). 다시 맞출 때 떼어 냅니다. */
-	var NAME_NUMBER = /^\d{2,3}-/;
+	/** 흐름 순서를 셀 때 한 step에서 따라갈 곳(onFailure → next(비면 목록상 다음 step) → routes → rejectTo). */
+	function flowTargets(step, list) {
+		var targets = [];
+		if (step.onFailure) {
+			targets.push(String(step.onFailure));
+		}
+		if (step.routes && typeof step.routes === "object" && !Array.isArray(step.routes)) {
+			Object.keys(step.routes).forEach(function (name) {
+				targets.push(String(step.routes[name]));
+			});
+		} else if (step.next) {
+			targets.push(String(step.next));
+		} else {
+			var i = list.indexOf(step);
+			targets.push(i >= 0 && i + 1 < list.length && list[i + 1] && list[i + 1].id ? String(list[i + 1].id) : END_ID);
+		}
+		if (step.approval && step.approval.rejectTo) {
+			targets.push(String(step.approval.rejectTo));
+		}
+		return targets;
+	}
 
 	/**
-	 * step 이름 앞에 흐름 순서대로 순번("01-", "02-" ...)을 붙입니다. [검사]와 [저장] 직전에 부릅니다.
-	 * step id와 steps 목록의 순서는 바꾸지 않습니다. id는 한 번 정하면 불변이라, 테스트·평가 사례·실행 중인 작업이 가리키는 step이 흔들리지 않습니다.
-	 * 순서: 첫 step에서 출발해 화살표를 따라가며 처음 만나는 순서(깊이 우선).
+	 * step을 흐름 순서로 줄 세웁니다(이름 앞 순번과 자동 배치가 같이 씁니다).
+	 * 첫 step에서 출발해 화살표를 따라가며 처음 만나는 순서(깊이 우선)입니다.
 	 *  - 한 step에서는 onFailure → next(비어 있으면 엔진처럼 목록상 다음 step) → routes(적힌 순서) → rejectTo 순으로 따라간다.
-	 *  - 이미 번호를 받은 step으로 되돌아가는 화살표는 다시 따라가지 않는다.
+	 *  - 이미 만난 step으로 되돌아가는 화살표는 다시 따라가지 않는다.
 	 *  - 어디서도 닿지 않는 step은 맨 뒤에 목록 순서대로 붙인다.
-	 * 이미 붙어 있던 순번은 떼고 새로 붙입니다. 이름이 없는 step은 "NN-step id"가 됩니다.
-	 * 바뀐 것이 없으면 model을 건드리지 않습니다(YAML을 다시 만들지 않으니 본문 주석도 그대로입니다).
-	 * @return 바뀐 이름 안내 글("step05: 05-리뷰, ...") 또는 ""
+	 * @return step 목록(흐름 순서)
 	 */
-	function numberStepNames() {
+	function flowOrderSteps() {
 		var list = steps();
 		if (!list || list.length === 0) {
-			return "";
+			return [];
 		}
 		var byId = {};
 		list.forEach(function (step) {
@@ -1014,39 +1030,13 @@ var DstoneAiDesigner = (function () {
 				byId[String(step.id)] = step;
 			}
 		});
-		var hasRoutes = function (step) {
-			return step.routes && typeof step.routes === "object" && !Array.isArray(step.routes);
-		};
-		// next를 비워 둔 step이 가는 곳(목록상 다음 step, 마지막이면 END)
-		var implicitNext = function (step) {
-			var i = list.indexOf(step);
-			return i >= 0 && i + 1 < list.length && list[i + 1] && list[i + 1].id ? String(list[i + 1].id) : END_ID;
-		};
-		// 한 step에서 따라갈 곳(따라가는 순서대로)
-		var targetsOf = function (step) {
-			var targets = [];
-			if (step.onFailure) {
-				targets.push(String(step.onFailure));
-			}
-			if (hasRoutes(step)) {
-				Object.keys(step.routes).forEach(function (name) {
-					targets.push(String(step.routes[name]));
-				});
-			} else {
-				targets.push(step.next ? String(step.next) : implicitNext(step));
-			}
-			if (step.approval && step.approval.rejectTo) {
-				targets.push(String(step.approval.rejectTo));
-			}
-			return targets;
-		};
 		var ordered = [];
 		var visit = function (step) {
 			if (!step || ordered.indexOf(step) >= 0) {
 				return;
 			}
 			ordered.push(step);
-			targetsOf(step).forEach(function (target) {
+			flowTargets(step, list).forEach(function (target) {
 				if (Object.prototype.hasOwnProperty.call(byId, target)) {
 					visit(byId[target]);
 				}
@@ -1058,6 +1048,25 @@ var DstoneAiDesigner = (function () {
 				ordered.push(step);
 			}
 		});
+		return ordered;
+	}
+
+	/** 이름 앞의 순번 모양("01-", "123-"). 다시 맞출 때 떼어 냅니다. */
+	var NAME_NUMBER = /^\d{2,3}-/;
+
+	/**
+	 * step 이름 앞에 흐름 순서대로 순번("01-", "02-" ...)을 붙입니다. [검사]와 [저장] 직전에 부릅니다.
+	 * step id와 steps 목록의 순서는 바꾸지 않습니다. id는 한 번 정하면 불변이라, 테스트·평가 사례·실행 중인 작업이 가리키는 step이 흔들리지 않습니다.
+	 * 순서는 flowOrderSteps(자동 배치와 같은 순서)입니다.
+	 * 이미 붙어 있던 순번은 떼고 새로 붙입니다. 이름이 없는 step은 "NN-step id"가 됩니다.
+	 * 바뀐 것이 없으면 model을 건드리지 않습니다(YAML을 다시 만들지 않으니 본문 주석도 그대로입니다).
+	 * @return 바뀐 이름 안내 글("step05: 05-리뷰, ...") 또는 ""
+	 */
+	function numberStepNames() {
+		var ordered = flowOrderSteps();
+		if (ordered.length === 0) {
+			return "";
+		}
 		var width = ordered.length >= 100 ? 3 : 2;
 		var plan = [];
 		ordered.forEach(function (step, i) {
@@ -1483,8 +1492,8 @@ var DstoneAiDesigner = (function () {
 			data: { kind: "step", type: step.type },
 			attrs: {
 				body: { fill: color.fill, stroke: color.stroke, strokeWidth: isSelectedStep(step.id) ? 3 : 1.5, rx: 8, ry: 8 },
-				// 맨 윗줄에 이름(없으면 step id), 그 아래에 종류·대상. step id는 이름이 있을 때 맨 아래에 작게 남긴다.
-				label: { text: shorten(step.name || step.id, 22) + "\n" + shorten(second, 34) + (step.name ? "\n(" + shorten(step.id, 30) + ")" : ""), fill: "#283121", fontSize: 12 }
+				// 윗줄에 이름(없으면 step id), 아랫줄에 종류·대상. step id는 노드를 누르면 오른쪽 설정 칸에 나온다.
+				label: { text: shorten(step.name || step.id, 17) + "\n" + shorten(second, 30), fill: "#283121", fontSize: 12 }
 			},
 			ports: { groups: PORT_GROUPS, items: portItems() }
 		};
@@ -1526,7 +1535,7 @@ var DstoneAiDesigner = (function () {
 			source: { cell: from, port: ports.source },
 			target: { cell: to, port: ports.target },
 			vertices: clone(edgeVertices[edgeKey(from, kind, route)] || []),
-			router: routerOf(ports.source, ports.target),
+			router: routerOf(ports.source, ports.target, alignedPath(from, to, ports, edgeVertices[edgeKey(from, kind, route)])),
 			connector: LINE_STYLES[lineStyle].connector,
 			zIndex: 1,
 			data: { kind: kind, from: from, route: route },
@@ -1686,14 +1695,57 @@ var DstoneAiDesigner = (function () {
 		return live;
 	}
 
-	/** 화살표 길 찾기. 직각 선(manhattan)이면 연결점이 있는 쪽으로 나가고 들어오게 방향을 정해 줍니다. */
-	function routerOf(sourcePort, targetPort) {
+	/**
+	 * 화살표 길 찾기. 직각 선(manhattan)이면 연결점이 있는 쪽으로 나가고 들어오게 방향을 정해 줍니다.
+	 * 직각 선인데 연결점 → 꺾는 점 → 연결점이 모두 가로·세로로 맞아 있으면(자동 배치가 정한 길) 길을 새로 찾지 않고 점을 그대로 잇습니다.
+	 * 길 찾기(manhattan, orth)는 연결점에서 다시 길을 찾으면서 엉뚱한 쪽으로 먼저 나가 연결점 옆에 작은 고리를 만들기 때문입니다.
+	 * 사람이 점을 옮겨 어긋나면 지금처럼 직각 길 찾기를 씁니다.
+	 */
+	function routerOf(sourcePort, targetPort, aligned) {
+		if (aligned && lineStyle === "manhattan") {
+			return { name: "normal" };
+		}
 		var router = clone(LINE_STYLES[lineStyle].router);
 		if (router.name === "manhattan") {
 			router.args.startDirections = [PORT_SIDES[sourcePort] || "bottom"];
 			router.args.endDirections = [PORT_SIDES[targetPort] || "top"];
 		}
 		return router;
+	}
+
+	/** 노드 연결점(in/out/left/right)의 자리입니다. 위치를 모르면 null입니다. */
+	function portPoint(id, port) {
+		if (!positions[id]) {
+			return null;
+		}
+		var b = layoutBox(id);
+		if (port === "in") {
+			return { x: b.cx, y: b.y };
+		}
+		if (port === "out") {
+			return { x: b.cx, y: b.bottom };
+		}
+		if (port === "left") {
+			return { x: b.x, y: b.cy };
+		}
+		return { x: b.right, y: b.cy };
+	}
+
+	/** 연결점 → 꺾는 점들 → 연결점의 모든 구간이 가로나 세로로 맞는지(1px 안쪽) 봅니다. 꺾는 점이 없으면 두 연결점이 일직선인지 봅니다. */
+	function alignedPath(from, to, ports, vertices) {
+		vertices = vertices || [];
+		var start = portPoint(from, ports.source);
+		var end = portPoint(to, ports.target);
+		if (!start || !end) {
+			return false;
+		}
+		var points = [start].concat(vertices, [end]);
+		for (var i = 1; i < points.length; i++) {
+			if (Math.abs(points[i].x - points[i - 1].x) > 1 && Math.abs(points[i].y - points[i - 1].y) > 1) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** 위치가 없는 노드에 자리를 줍니다. 위치가 하나도 없으면 전체를 자동 배치합니다. */
@@ -1725,87 +1777,336 @@ var DstoneAiDesigner = (function () {
 
 	/**
 	 * 자동 배치 간격(px).
-	 * node = 같은 줄의 노드 사이, rank = 줄 사이, fail = 그림 오른쪽 끝(바깥 길 포함)과 FAIL 사이,
-	 * loop = 그림 바깥으로 돌아가는 화살표의 첫 길이 그림에서 떨어지는 거리, lane = 그 길끼리의 간격
+	 * margin = 노드 옆면과 첫 통로 선 사이(화살표가 노드에서 수직으로 나와 보이는 길이), lane = 세로 통로 안 선끼리의 간격,
+	 * gapMargin·track = 줄 사이 가로 통로의 여백과 선끼리의 간격, minGutter·minGap = 통로가 비었을 때의 폭,
+	 * fail = 그림 오른쪽 끝과 FAIL 사이
 	 */
-	var LAYOUT_GAP = { node: 28, rank: 48, fail: 40, loop: 22, lane: 10 };
-	/** 한 줄에 놓는 step 수의 한도. 넘치는 step은 다음 줄로 내려 그림이 옆으로 길어지지 않게 합니다. */
-	var LAYOUT_ROW_MAX = 3;
-	/** 줄을 나눌 때 화살표 종류별 무게. 무거울수록 두 노드를 바로 위아래 줄에 둡니다. 줄기(layoutSpine)는 30입니다. */
-	var LAYOUT_WEIGHT = { start: 8, next: 8, route: 3, onFailure: 2, rejectTo: 1 };
+	var GRID = { margin: 14, lane: 10, gapMargin: 12, track: 8, minGutter: 30, minGap: 26, fail: 24 };
+	/** 같은 두 노드 사이에 화살표가 여럿일 때 곧은 선을 받을 차례(앞이 먼저) */
+	var STRAIGHT_PRIORITY = ["start", "next", "route", "onFailure", "rejectTo"];
 
 	/**
-	 * 위에서 아래로 자동 배치합니다. 노드 위치와 함께 화살표의 꺾는 점·연결점도 새로 정합니다.
+	 * 위에서 아래로, 단(column)을 나눠 자동 배치합니다. 노드 위치와 함께 화살표의 꺾는 점·연결점도 새로 정합니다.
 	 * <pre>
-	 * 1. 줄기: 시작에서 next(없으면 첫 경로)를 따라간 길입니다. 줄기는 맨 왼쪽 한 열에 곧게 세웁니다.
-	 * 2. 줄 나누기: dagre로 노드마다 몇 번째 줄인지만 정합니다. 바로 아랫줄로 가는 화살표만 넣고,
-	 *    한 줄에 step이 LAYOUT_ROW_MAX개를 넘으면 남는 step을 다음 줄로 내립니다.
-	 * 3. 가로 자리: 노드를 바로 윗줄의 부모 아래에 놓고, 겹치면 오른쪽으로 붙여 놓습니다(dagre의 가로 배치는 쓰지 않습니다.
-	 *    dagre는 긴 화살표가 지나갈 자리를 줄마다 비워 두어 노드가 옆으로 크게 밀립니다).
-	 * 4. 화살표
-	 *    - 바로 아랫줄로 가는 화살표: 아래 → 위로 곧게 잇습니다. 한 step에서 여러 갈래가 나가면 맨 바깥 갈래는 옆 연결점으로 내보냅니다.
-	 *    - 되돌아가는 화살표(반복)와 두 줄 이상 건너는 화살표: 그림 바깥 왼쪽·오른쪽에 선마다 따로 세로 길을 둡니다.
-	 *    - FAIL로 가는 화살표: FAIL을 오른쪽 아래에 두고, step 오른쪽에서 나와 FAIL 위의 세로줄 하나로 모읍니다.
+	 * 1. 순서: 흐름 순서(flowOrderSteps, 이름 앞 순번과 같음). 맨 앞에 시작, 맨 뒤에 END.
+	 * 2. 단 나누기: 순서대로 한 단을 위에서 아래로 채우고, 차면 오른쪽 단으로 넘어갑니다(신문 단처럼).
+	 *    한 단의 칸 수는 그림 전체가 캔버스 비율에 가깝게 되도록 고릅니다(한 화면에 보이게).
+	 * 3. 화살표는 정해진 통로로만 지나갑니다. 노드 위로는 지나가지 않습니다.
+	 *    - 같은 단 바로 아래 노드로 가는 화살표 하나: 아래 → 위로 곧게
+	 *    - 아래로 건너뛰는 화살표: 오른쪽으로 나가 단 오른쪽 통로로 내려가 오른쪽으로 들어감
+	 *    - 위로 되돌아가는 화살표: 왼쪽으로 나가 단 왼쪽 통로로 올라가 왼쪽으로 들어감
+	 *    - 다른 단으로 가는 화살표: 그쪽 옆으로 나가 통로 → (필요하면 줄 사이 가로 통로) → 받는 노드 옆 통로 → 옆으로 들어감
+	 *    - FAIL로 가는 화살표: 오른쪽으로 나가 단 오른쪽 통로로 내려가, 맨 아래 가로 통로를 따라 오른쪽 아래 FAIL로
+	 * 4. 통로 안에서는 화살표마다 자리(lane)를 따로 줍니다. 위아래(가로 통로는 좌우) 구간이 겹치는 선은 다른 자리에 두고,
+	 *    같은 노드의 같은 연결점으로 들어가는 선만 한 자리를 같이 씁니다(끝에서 어차피 합쳐집니다).
+	 *    통로 폭은 필요한 자리 수만큼만 잡습니다.
 	 * </pre>
 	 */
 	function autoLayout() {
-		var stepList = [];
+		var order = flowOrderSteps();
 		var stepIds = {};
-		steps().forEach(function (step) {
-			if (step && step.id && !stepIds[step.id]) {
-				stepIds[step.id] = true;
-				stepList.push(step);
-			}
+		order.forEach(function (step) {
+			stepIds[step.id] = true;
 		});
-		var edges = layoutEdges(stepList, stepIds);
-		markBackEdges(edges, stepList);
-		var spine = layoutSpine(edges);
-		var layered = layoutRows(stepList, edges, spine);
+		var edges = layoutEdges(order, stepIds);
+		var items = [START_ID];
+		order.forEach(function (step) {
+			items.push(step.id);
+		});
+		if (edges.some(function (edge) {
+			return edge.to === END_ID;
+		})) {
+			items.push(END_ID);
+		}
+		var rows = gridRows(items.length);
+		var cols = Math.ceil(items.length / rows);
+		var cell = {};
+		items.forEach(function (id, i) {
+			cell[id] = { c: Math.floor(i / rows), r: i % rows };
+		});
+
+		// 1) 화살표마다 길을 정한다(통로 번호와 구간만, 아직 px는 아님).
+		var plans = planEdges(edges, cell, rows, cols);
+		// 2) 통로마다 자리를 나눈다.
+		var vLanes = assignLanes(plans.v);
+		var hLanes = assignLanes(plans.h);
+		// 3) 통로 폭이 정해졌으니 노드 자리를 정한다.
+		var gutterW = {};
+		var gapH = {};
+		for (var g = -1; g < cols; g++) {
+			var lanes = vLanes.count[g] || 0;
+			gutterW[g] = lanes === 0 ? GRID.minGutter : Math.max(GRID.minGutter, GRID.margin * 2 + (lanes - 1) * GRID.lane);
+		}
+		for (var k = -1; k < rows; k++) {
+			var tracks = hLanes.count[k] || 0;
+			gapH[k] = tracks === 0 ? (k === -1 ? 10 : GRID.minGap) : Math.max(GRID.minGap, GRID.gapMargin * 2 + (tracks - 1) * GRID.track);
+		}
+		var colX = [];
+		var x = 20 + gutterW[-1];
+		for (var c = 0; c < cols; c++) {
+			colX.push(x);
+			x += STEP_W + gutterW[c];
+		}
+		var rowY = [];
+		var y = 20 + gapH[-1];
+		for (var r = 0; r < rows; r++) {
+			rowY.push(y);
+			y += STEP_H + gapH[r];
+		}
+		var geo = {
+			cx: function (id) {
+				return colX[cell[id].c] + STEP_W / 2;
+			},
+			cy: function (id) {
+				return rowY[cell[id].r] + STEP_H / 2;
+			},
+			laneX: function (g, lane) {
+				// 맨 왼쪽 바깥 통로는 노드에 가까운 오른쪽부터, 나머지는 왼쪽(나가는 노드 쪽)부터 채운다.
+				if (g < 0) {
+					return Math.round(colX[0] - GRID.margin - lane * GRID.lane);
+				}
+				return Math.round(colX[g] + STEP_W + GRID.margin + lane * GRID.lane);
+			},
+			trackY: function (k, track) {
+				var top = k < 0 ? rowY[0] - gapH[-1] : rowY[k] + STEP_H;
+				return Math.round(top + (k < 0 ? 5 : GRID.gapMargin) + track * GRID.track);
+			}
+		};
 
 		positions = {};
-		placeRows(layered.rows, layered.row, edges, spine);
-		var box = { left: Infinity, right: -Infinity, bottom: -Infinity };
-		Object.keys(positions).forEach(function (id) {
-			var b = layoutBox(id);
-			box.left = Math.min(box.left, b.x);
-			box.right = Math.max(box.right, b.right);
-			box.bottom = Math.max(box.bottom, b.bottom);
+		items.forEach(function (id) {
+			var size = layoutSize(id);
+			positions[id] = {
+				x: Math.round(colX[cell[id].c] + (STEP_W - size.w) / 2),
+				y: Math.round(rowY[cell[id].r] + (STEP_H - size.h) / 2)
+			};
 		});
+		var rightEnd = colX[cols - 1] + STEP_W + gutterW[cols - 1];
+		var busY = plans.failUsed ? geo.trackY(rows - 1, hLanes.lane[plans.failBusKey]) : Math.round(y);
+		positions[FAIL_ID] = { x: Math.round(rightEnd + GRID.fail), y: Math.round(busY - TERM_SIZE / 2) };
 		if (!positions[END_ID]) {
-			// 어느 step도 END로 가지 않으면 맨 아래 가운데에 둔다.
-			positions[END_ID] = { x: Math.round((box.left + box.right) / 2 - TERM_SIZE / 2), y: Math.round(box.bottom + LAYOUT_GAP.rank) };
-			box.bottom = box.bottom + LAYOUT_GAP.rank + TERM_SIZE;
+			// 어느 step도 END로 가지 않으면 FAIL 위에 둔다(그림 안에는 자리가 없어도 된다).
+			positions[END_ID] = { x: positions[FAIL_ID].x, y: Math.max(20, positions[FAIL_ID].y - TERM_SIZE - 20) };
 		}
 
+		// 4) 꺾는 점과 연결점을 px로 적는다.
 		edgeVertices = {};
 		edgePorts = {};
-		var sides = {};
-		var tracks = [];
-		var failFrom = {};
-		var outside = [];
-		var short = [];
+		plans.edges.forEach(function (plan) {
+			edgePorts[plan.key] = { source: plan.source, target: plan.target };
+			var points = [];
+			plan.path.forEach(function (part) {
+				if (part.v) {
+					var lx = geo.laneX(part.v.g, vLanes.lane[part.v.id]);
+					points.push({ x: lx, y: Math.round(part.from === "s" ? geo.cy(plan.from) : (part.from === "t" ? geo.cy(plan.to) : part.fromY(geo, hLanes))) });
+					points.push({ x: lx, y: Math.round(part.to === "t" ? geo.cy(plan.to) : (part.to === "s" ? geo.cy(plan.from) : part.toY(geo, hLanes))) });
+				}
+			});
+			// 이어지는 같은 점은 하나만 둔다.
+			var clean = [];
+			points.forEach(function (p) {
+				var last = clean[clean.length - 1];
+				if (!last || last.x !== p.x || last.y !== p.y) {
+					clean.push(p);
+				}
+			});
+			if (plan.self) {
+				var b = layoutBox(plan.from);
+				var sx = clean.length > 0 ? clean[0].x : Math.round(b.right + GRID.margin);
+				clean = [{ x: sx, y: Math.round(b.cy) }, { x: sx, y: Math.round(b.y - 10) }, { x: Math.round(b.cx), y: Math.round(b.y - 10) }];
+			}
+			if (clean.length > 0) {
+				edgeVertices[plan.key] = clean;
+			}
+		});
+	}
+
+	/**
+	 * 한 단에 놓을 칸 수를 고릅니다. 그림 전체(가로/세로)가 캔버스 비율에 가깝고, 한 단으로 캔버스 높이에 들어가면 한 단으로 둡니다.
+	 * 통로 폭은 아직 모르므로 대강의 값으로 셉니다.
+	 */
+	function gridRows(n) {
+		var width = els.canvas && els.canvas.clientWidth > 0 ? els.canvas.clientWidth : 900;
+		var height = els.canvas && els.canvas.clientHeight > 0 ? els.canvas.clientHeight : 640;
+		var colPitch = STEP_W + 60;
+		var rowPitch = STEP_H + 34;
+		if (n * rowPitch <= height) {
+			return Math.max(n, 1);
+		}
+		var target = Math.min(2.5, Math.max(0.8, width / height));
+		var best = n;
+		var bestScore = Infinity;
+		for (var rows = 3; rows <= n; rows++) {
+			var cols = Math.ceil(n / rows);
+			var score = Math.abs(Math.log((cols * colPitch) / (rows * rowPitch) / target));
+			// 마지막 단이 거의 빈 경우는 조금 덜 좋게 본다.
+			score += ((cols * rows - n) / rows) * 0.15;
+			if (score < bestScore) {
+				bestScore = score;
+				best = rows;
+			}
+		}
+		return best;
+	}
+
+	/**
+	 * 화살표마다 길을 정합니다. 단위는 통로 번호와 "칸 단위 좌표"입니다(px는 나중에).
+	 * 세로 좌표: r번째 줄 노드 가운데 = 2r + 1, k번째 줄 아래 가로 통로 = 2k + 2(k = -1은 맨 위, rows - 1은 맨 아래 통로).
+	 * 가로 좌표: c번째 단 가운데 = 2c + 1, g번째 단 오른쪽 세로 통로 = 2g + 2(g = -1은 맨 왼쪽 바깥 통로).
+	 * @return {edges: [plan], v: [세로 구간], h: [가로 구간], failUsed, failBusKey}
+	 */
+	function planEdges(edges, cell, rows, cols) {
+		var result = { edges: [], v: [], h: [], failUsed: false, failBusKey: "h|fail-bus" };
+		var seq = 0;
+		var yNode = function (id) {
+			return 2 * cell[id].r + 1;
+		};
+		var yGap = function (k) {
+			return 2 * k + 2;
+		};
+		var xGutter = function (g) {
+			return 2 * g + 2;
+		};
+		var addV = function (g, a, b, group) {
+			var seg = { id: "v" + (seq++), g: g, lo: Math.min(a, b), hi: Math.max(a, b), group: group };
+			result.v.push(seg);
+			return seg;
+		};
+		var addH = function (k, a, b, group, id) {
+			var seg = { id: id || "h" + (seq++), g: k, lo: Math.min(a, b), hi: Math.max(a, b), group: group };
+			result.h.push(seg);
+			return seg;
+		};
+		// 같은 두 노드 사이(같은 단 바로 아래)에서 곧은 선을 받을 화살표를 먼저 고른다.
+		var straight = {};
 		edges.forEach(function (edge) {
+			var s = cell[edge.from];
+			var t = cell[edge.to];
+			if (!s || !t || edge.to === FAIL_ID || s.c !== t.c || t.r !== s.r + 1) {
+				return;
+			}
+			var pair = edge.from + ">" + edge.to;
+			var mine = STRAIGHT_PRIORITY.indexOf(edge.kind);
+			if (!straight[pair] || mine < STRAIGHT_PRIORITY.indexOf(straight[pair].kind)) {
+				straight[pair] = edge;
+			}
+		});
+		var failSegs = [];
+		edges.forEach(function (edge) {
+			var s = cell[edge.from];
+			var plan = { key: edge.key, from: edge.from, to: edge.to, source: "out", target: "in", path: [] };
 			if (edge.to === FAIL_ID) {
-				failFrom[edge.from] = true;
-			} else if (edge.from === edge.to) {
-				routeSelfLoop(edge, sides);
-			} else if (edge.back || layered.row[edge.to] - layered.row[edge.from] !== 1) {
-				outside.push(edge);
-			} else {
-				short.push(edge);
+				// 단 오른쪽 통로로 내려가 맨 아래 가로 통로(모든 실패 화살표가 같이 쓰는 한 줄)로 FAIL까지
+				plan.source = "right";
+				plan.target = "left";
+				var fv = addV(s.c, yNode(edge.from), yGap(rows - 1), "fail");
+				failSegs.push(fv);
+				plan.path.push({ v: fv, from: "s", to: "bus" });
+				plan.path[0].toY = function (geo, hLanes) {
+					return geo.trackY(rows - 1, hLanes.lane[result.failBusKey]);
+				};
+				result.failUsed = true;
+				result.edges.push(plan);
+				return;
 			}
-		});
-		var outer = routeOutsideEdges(outside, sides, failFrom, tracks);
-		// FAIL은 오른쪽 바깥 길보다 더 바깥, 맨 아래 줄에 둔다.
-		positions[FAIL_ID] = { x: Math.round(Math.max(box.right, outer.right) + LAYOUT_GAP.fail), y: Math.round(box.bottom - TERM_SIZE) };
-		short.forEach(function (edge) {
-			routeShortEdge(edge, short, sides);
-		});
-		edges.forEach(function (edge) {
-			if (edge.to === FAIL_ID && edge.from !== edge.to) {
-				routeFailEdge(edge, sides, tracks);
+			var t = cell[edge.to];
+			if (!s || !t) {
+				return;
 			}
+			if (edge.from === edge.to) {
+				plan.self = true;
+				plan.source = "right";
+				plan.target = "in";
+				var sv = addV(s.c, yNode(edge.from) - 1, yNode(edge.from), "e|" + edge.key);
+				plan.path.push({ v: sv, from: "s", to: "s" });
+				result.edges.push(plan);
+				return;
+			}
+			if (straight[edge.from + ">" + edge.to] === edge) {
+				result.edges.push(plan);
+				return;
+			}
+			var into = "t|" + edge.to;
+			if (s.c === t.c) {
+				// 같은 단: 아래로 건너뛰면 오른쪽 통로, 위로 되돌아가면 왼쪽 통로
+				var down = t.r > s.r;
+				var g = down ? s.c : s.c - 1;
+				plan.source = down ? "right" : "left";
+				plan.target = plan.source;
+				var v1 = addV(g, yNode(edge.from), yNode(edge.to), into + "|" + plan.target);
+				plan.path.push({ v: v1, from: "s", to: "t" });
+				result.edges.push(plan);
+				return;
+			}
+			var right = t.c > s.c;
+			var sg = right ? s.c : s.c - 1;
+			var tg = right ? t.c - 1 : t.c;
+			plan.source = right ? "right" : "left";
+			plan.target = right ? "left" : "right";
+			if (sg === tg) {
+				var v2 = addV(sg, yNode(edge.from), yNode(edge.to), into + "|" + plan.target);
+				plan.path.push({ v: v2, from: "s", to: "t" });
+				result.edges.push(plan);
+				return;
+			}
+			// 나가는 쪽 통로 → 줄 사이 가로 통로 → 받는 쪽 통로
+			var k = t.r >= s.r ? s.r : s.r - 1;
+			var ha = addH(k, xGutter(sg), xGutter(tg), "e|" + edge.key);
+			var va = addV(sg, yNode(edge.from), yGap(k), "e|" + edge.key);
+			var vb = addV(tg, yGap(k), yNode(edge.to), into + "|" + plan.target);
+			var trackOf = function (geo, hLanes) {
+				return geo.trackY(k, hLanes.lane[ha.id]);
+			};
+			plan.path.push({ v: va, from: "s", to: "gap", toY: trackOf });
+			plan.path.push({ v: vb, from: "gap", to: "t", fromY: trackOf });
+			result.edges.push(plan);
 		});
+		if (result.failUsed) {
+			// 맨 아래 가로 통로의 실패 줄 하나(맨 왼쪽 실패 통로부터 오른쪽 끝 FAIL까지)
+			var left = Infinity;
+			failSegs.forEach(function (seg) {
+				left = Math.min(left, xGutter(seg.g));
+			});
+			addH(rows - 1, left, xGutter(cols - 1) + 1, "fail", result.failBusKey);
+		}
+		return result;
+	}
+
+	/**
+	 * 통로마다 구간에 자리(lane) 번호를 줍니다. 짧은 구간부터 0번 자리에 넣고, 같은 자리에서 구간이 겹치면(끝이 닿아도)
+	 * 다음 자리로 갑니다. 같은 group(같은 노드의 같은 연결점으로 들어가는 선, 실패 선)끼리는 겹쳐도 한 자리를 씁니다.
+	 * @return {lane: {구간 id: 자리 번호}, count: {통로 번호: 자리 수}}
+	 */
+	function assignLanes(segs) {
+		var result = { lane: {}, count: {} };
+		var byGutter = {};
+		segs.forEach(function (seg) {
+			(byGutter[seg.g] = byGutter[seg.g] || []).push(seg);
+		});
+		Object.keys(byGutter).forEach(function (g) {
+			var list = byGutter[g].slice().sort(function (a, b) {
+				// 실패 선은 가장 길게 보고 맨 바깥 자리로 보낸다.
+				var fa = a.group === "fail" ? 1 : 0;
+				var fb = b.group === "fail" ? 1 : 0;
+				if (fa !== fb) {
+					return fa - fb;
+				}
+				return (a.hi - a.lo) - (b.hi - b.lo);
+			});
+			var placed = [];
+			list.forEach(function (seg) {
+				var lane = 0;
+				while (placed.some(function (other) {
+					return other.lane === lane && other.seg.group !== seg.group && other.seg.lo <= seg.hi && seg.lo <= other.seg.hi;
+				})) {
+					lane++;
+				}
+				placed.push({ lane: lane, seg: seg });
+				result.lane[seg.id] = lane;
+				result.count[g] = Math.max(result.count[g] || 0, lane + 1);
+			});
+		});
+		return result;
 	}
 
 	/** 자동 배치에 쓰는 화살표 목록입니다. 없는 step을 가리키는 화살표는 뺍니다. [{from, to, kind, route, key}] */
@@ -1824,234 +2125,6 @@ var DstoneAiDesigner = (function () {
 		return edges;
 	}
 
-	/** 시작에서 흐름을 따라가다 이미 지나온 step으로 돌아가는 화살표에 back = true를 붙입니다. */
-	function markBackEdges(edges, stepList) {
-		var byFrom = {};
-		edges.forEach(function (edge) {
-			(byFrom[edge.from] = byFrom[edge.from] || []).push(edge);
-		});
-		// 0 = 아직, 1 = 지나는 중(지금 길 위에 있음), 2 = 끝남
-		var state = {};
-		var visit = function (id) {
-			state[id] = 1;
-			(byFrom[id] || []).forEach(function (edge) {
-				if (state[edge.to] === 1) {
-					edge.back = true;
-				} else if (!state[edge.to]) {
-					visit(edge.to);
-				}
-			});
-			state[id] = 2;
-		};
-		visit(START_ID);
-		// 시작에서 닿지 않는 step도 파일 순서대로 훑는다.
-		stepList.forEach(function (step) {
-			if (!state[step.id]) {
-				visit(step.id);
-			}
-		});
-	}
-
-	/**
-	 * 줄기: 시작에서 next를 따라간 길입니다. next가 없으면 첫 경로(routes의 맨 앞), 그것도 없으면 아래로 가는 다른 화살표를 따라갑니다.
-	 * @return {edges: {화살표 키: true}, nodes: {노드 id: true}}
-	 */
-	function layoutSpine(edges) {
-		var spine = { edges: {}, nodes: {} };
-		var byFrom = {};
-		edges.forEach(function (edge) {
-			(byFrom[edge.from] = byFrom[edge.from] || []).push(edge);
-		});
-		var current = START_ID;
-		spine.nodes[START_ID] = true;
-		while (current) {
-			var pick = null;
-			(byFrom[current] || []).forEach(function (edge) {
-				if (!pick && !edge.back && edge.to !== FAIL_ID && (edge.kind === "next" || edge.kind === "start")) {
-					pick = edge;
-				}
-			});
-			(byFrom[current] || []).forEach(function (edge) {
-				if (!pick && !edge.back && edge.to !== FAIL_ID && edge.kind === "route") {
-					pick = edge;
-				}
-			});
-			// next·경로가 모두 되돌아가는 화살표면, 아래로 가는 다른 화살표(onFailure 등)로 줄기를 잇는다.
-			(byFrom[current] || []).forEach(function (edge) {
-				if (!pick && !edge.back && edge.to !== FAIL_ID) {
-					pick = edge;
-				}
-			});
-			if (!pick || spine.nodes[pick.to]) {
-				break;
-			}
-			spine.edges[pick.key] = true;
-			spine.nodes[pick.to] = true;
-			current = pick.to;
-		}
-		return spine;
-	}
-
-	/**
-	 * 노드마다 몇 번째 줄인지 정합니다(dagre는 이 일에만 씁니다).
-	 * <pre>
-	 * 처음에는 아래로 가는 화살표를 모두 넣어 줄을 나누고, 두 줄 이상 건너는 화살표는 빼고 다시 나눕니다
-	 * (빼야 dagre가 그 선 때문에 줄을 늘리지 않습니다. 뺀 화살표는 그림 바깥 길로 그립니다).
-	 * 한 줄에 step이 LAYOUT_ROW_MAX개를 넘으면 오른쪽 것부터 다음 줄로 내리고 다시 나눕니다.
-	 * </pre>
-	 * @return {row: {노드 id: 줄 번호}, rows: [[노드 id(왼쪽부터)]]}
-	 */
-	function layoutRows(stepList, edges, spine) {
-		var endUsed = edges.some(function (edge) {
-			return edge.to === END_ID && !edge.back;
-		});
-		var skip = {};
-		var extra = {};
-		var run = function () {
-			var g = new dagre.graphlib.Graph({ multigraph: true });
-			g.setGraph({ rankdir: "TB", nodesep: 10, ranksep: 10 });
-			g.setDefaultEdgeLabel(function () {
-				return {};
-			});
-			g.setNode(START_ID, { width: TERM_SIZE, height: TERM_SIZE });
-			stepList.forEach(function (step) {
-				g.setNode(step.id, { width: STEP_W, height: STEP_H });
-			});
-			if (endUsed) {
-				g.setNode(END_ID, { width: TERM_SIZE, height: TERM_SIZE });
-			}
-			edges.forEach(function (edge) {
-				if (edge.back || edge.to === FAIL_ID || edge.from === edge.to || skip[edge.key]) {
-					return;
-				}
-				var weight = spine.edges[edge.key] ? 30 : (LAYOUT_WEIGHT[edge.kind] || 1);
-				g.setEdge(edge.from, edge.to, { weight: weight, minlen: 1 + (extra[edge.to] || 0) }, edge.key);
-			});
-			dagre.layout(g);
-			// 같은 줄의 노드는 가운데 높이(y)가 같다. y 순서가 줄 번호다.
-			var ys = [];
-			g.nodes().forEach(function (id) {
-				var y = Math.round(g.node(id).y);
-				if (ys.indexOf(y) < 0) {
-					ys.push(y);
-				}
-			});
-			ys.sort(function (a, b) {
-				return a - b;
-			});
-			var result = { row: {}, rows: ys.map(function () {
-				return [];
-			}) };
-			g.nodes().forEach(function (id) {
-				var r = ys.indexOf(Math.round(g.node(id).y));
-				result.row[id] = r;
-				result.rows[r].push(id);
-			});
-			result.rows.forEach(function (row) {
-				row.sort(function (a, b) {
-					return g.node(a).x - g.node(b).x;
-				});
-			});
-			return result;
-		};
-		var layered = run();
-		edges.forEach(function (edge) {
-			if (!edge.back && edge.to !== FAIL_ID && layered.row[edge.to] - layered.row[edge.from] > 1) {
-				skip[edge.key] = true;
-			}
-		});
-		layered = run();
-		for (var i = 0; i < 8; i++) {
-			var crowded = false;
-			layered.rows.forEach(function (row) {
-				var stepsInRow = row.filter(function (id) {
-					return id !== START_ID && id !== END_ID;
-				});
-				if (stepsInRow.length > LAYOUT_ROW_MAX) {
-					// 줄기는 그 줄에 남긴다.
-					stepsInRow.filter(function (id) {
-						return !spine.nodes[id];
-					}).slice(-(stepsInRow.length - LAYOUT_ROW_MAX)).forEach(function (id) {
-						extra[id] = (extra[id] || 0) + 1;
-					});
-					crowded = true;
-				}
-			});
-			if (!crowded) {
-				break;
-			}
-			layered = run();
-		}
-		return layered;
-	}
-
-	/**
-	 * 줄마다 노드의 가로 자리를 정합니다.
-	 * <pre>
-	 * 노드는 바로 윗줄 부모의 가운데 아래에 두려 합니다(부모가 여럿이면 줄기 → 무거운 화살표 → 왼쪽 부모 순).
-	 * 줄기 노드를 먼저 놓고, 나머지는 원하는 자리 순으로 놓으며 앞 노드와 겹치면 오른쪽으로 붙입니다.
-	 * 마지막에 그림 전체를 왼쪽 위(20, 20)에 맞춥니다.
-	 * </pre>
-	 */
-	function placeRows(rows, row, edges, spine) {
-		var top = 0;
-		rows.forEach(function (ids, r) {
-			var height = 0;
-			ids.forEach(function (id) {
-				height = Math.max(height, layoutSize(id).h);
-			});
-			var want = {};
-			ids.forEach(function (id) {
-				var best = null;
-				edges.forEach(function (edge) {
-					if (edge.to !== id || edge.back || edge.from === edge.to || !positions[edge.from] || row[edge.from] !== r - 1) {
-						return;
-					}
-					var parent = layoutBox(edge.from);
-					var score = (spine.edges[edge.key] ? 1000 : 0) + (LAYOUT_WEIGHT[edge.kind] || 1) * 10 - parent.x / 100000;
-					if (!best || score > best.score) {
-						best = { score: score, x: parent.cx - layoutSize(id).w / 2 };
-					}
-				});
-				want[id] = best ? best.x : null;
-			});
-			var order = ids.slice().sort(function (a, b) {
-				var sa = spine.nodes[a] ? 0 : 1;
-				var sb = spine.nodes[b] ? 0 : 1;
-				if (sa !== sb) {
-					return sa - sb;
-				}
-				var wa = want[a] === null ? Infinity : want[a];
-				var wb = want[b] === null ? Infinity : want[b];
-				if (wa !== wb) {
-					return wa - wb;
-				}
-				return ids.indexOf(a) - ids.indexOf(b);
-			});
-			var cursor = null;
-			order.forEach(function (id) {
-				var size = layoutSize(id);
-				var x = want[id];
-				if (x === null) {
-					x = cursor === null ? 0 : cursor;
-				} else if (cursor !== null) {
-					x = Math.max(x, cursor);
-				}
-				positions[id] = { x: Math.round(x), y: Math.round(top + (height - size.h) / 2) };
-				cursor = x + size.w + LAYOUT_GAP.node;
-			});
-			top += height + LAYOUT_GAP.rank;
-		});
-		var left = Infinity;
-		Object.keys(positions).forEach(function (id) {
-			left = Math.min(left, positions[id].x);
-		});
-		Object.keys(positions).forEach(function (id) {
-			positions[id].x = Math.round(positions[id].x - left + 20);
-			positions[id].y = Math.round(positions[id].y + 20);
-		});
-	}
-
 	function layoutSize(id) {
 		return id === START_ID || id === END_ID || id === FAIL_ID ? { w: TERM_SIZE, h: TERM_SIZE } : { w: STEP_W, h: STEP_H };
 	}
@@ -2061,234 +2134,6 @@ var DstoneAiDesigner = (function () {
 		var p = positions[id] || { x: 0, y: 0 };
 		var size = layoutSize(id);
 		return { x: p.x, y: p.y, w: size.w, h: size.h, right: p.x + size.w, bottom: p.y + size.h, cx: p.x + size.w / 2, cy: p.y + size.h / 2 };
-	}
-
-	/** 가로선(y, x1~x2)이나 세로 띠가 다른 노드를 지나는지 봅니다. skip의 노드는 셈에서 뺍니다. */
-	function layoutBlocked(x1, x2, y1, y2, skip) {
-		var lo = Math.min(x1, x2);
-		var hi = Math.max(x1, x2);
-		var top = Math.min(y1, y2);
-		var low = Math.max(y1, y2);
-		return Object.keys(positions).some(function (id) {
-			if (skip.indexOf(id) >= 0) {
-				return false;
-			}
-			var b = layoutBox(id);
-			return b.x - 6 < hi && b.right + 6 > lo && b.y - 6 < low && b.bottom + 6 > top;
-		});
-	}
-
-	function claimSide(sides, id, side) {
-		sides[id] = sides[id] || {};
-		sides[id][side] = true;
-	}
-
-	function sideFree(sides, id, side) {
-		return !(sides[id] && sides[id][side]);
-	}
-
-	/** 자기 자신으로 돌아가는 화살표: 오른쪽으로 나가 위로 돌아 윗면으로 들어옵니다. */
-	function routeSelfLoop(edge, sides) {
-		var b = layoutBox(edge.from);
-		var x = b.right + LAYOUT_GAP.loop;
-		edgePorts[edge.key] = { source: "right", target: "in" };
-		edgeVertices[edge.key] = [{ x: x, y: Math.round(b.cy) }, { x: x, y: b.y - 14 }];
-		claimSide(sides, edge.from, "right");
-	}
-
-	/**
-	 * 그림 바깥으로 도는 화살표(되돌아가는 것, 두 줄 이상 건너는 것)의 길을 정합니다.
-	 * <pre>
-	 * 화살표마다 왼쪽이나 오른쪽에 세로 길을 두고, 두 노드의 옆 연결점에서 그 길로 나가고 들어옵니다.
-	 * 세로 길은 그림 전체의 끝이 아니라, 그 화살표가 지나는 높이에 있는 노드들 바로 바깥에 둡니다
-	 * (아래쪽에 넓은 줄이 있어도 위쪽 화살표는 위쪽 노드 옆으로 지나가므로 그림이 덜 넓어집니다).
-	 * 쪽은 가로선이 다른 노드를 지나지 않는 쪽, 둘 다 되면 가까운 쪽을 고릅니다.
-	 * 옆에 다른 노드가 있어 가로로 못 나가면 아래(들어갈 때는 위) 연결점을 써서 줄 사이 빈 곳으로 돌아갑니다.
-	 * 위아래 구간이 겹치는 화살표는 서로 다른 길을 씁니다(짧은 것이 안쪽).
-	 * 같은 노드로 들어가는 화살표는 끝에서 어차피 합쳐지므로 한 길을 같이 씁니다.
-	 * </pre>
-	 * @return {left, right} 가장 바깥 길의 x (FAIL 자리를 정할 때 씁니다)
-	 */
-	function routeOutsideEdges(list, sides, failFrom, tracks) {
-		var segs = [];
-		var outer = { left: Infinity, right: -Infinity };
-		var span = function (edge) {
-			return Math.abs(layoutBox(edge.from).cy - layoutBox(edge.to).cy);
-		};
-		// 이미 놓인 다른 화살표의 세로 길과 너무 가까우면서 위아래가 겹치는지 봅니다(같은 노드로 가는 길은 겹쳐도 됩니다).
-		var clash = function (side, x, top, low, to) {
-			return segs.some(function (seg) {
-				return seg.side === side && seg.to !== to && Math.abs(seg.x - x) < LAYOUT_GAP.lane && seg.top < low && seg.low > top;
-			});
-		};
-		var step = function (side) {
-			return side === "left" ? -LAYOUT_GAP.lane : LAYOUT_GAP.lane;
-		};
-		list.slice().sort(function (a, b) {
-			return span(a) - span(b);
-		}).forEach(function (edge) {
-			var s = layoutBox(edge.from);
-			var t = layoutBox(edge.to);
-			var best = null;
-			["left", "right"].forEach(function (side) {
-				var reach = layoutReach(side, Math.min(s.y, t.y), Math.max(s.bottom, t.bottom));
-				var near = side === "left" ? reach - LAYOUT_GAP.loop : reach + LAYOUT_GAP.loop;
-				var plan = {
-					side: side,
-					sBlocked: layoutBlocked(side === "left" ? s.x : s.right, near, s.cy, s.cy, [edge.from]),
-					tBlocked: layoutBlocked(side === "left" ? t.x : t.right, near, t.cy, t.cy, [edge.to]),
-					cost: 0
-				};
-				// 막혀서 줄 사이로 돌아가는 길은 선이 길어지므로 덜 좋다.
-				plan.cost += (plan.sBlocked ? 5000 : 0) + (plan.tBlocked ? 5000 : 0);
-				// 같은 연결점을 다른 선과 나눠 쓰면 그 자리에서 선이 겹친다. 오른쪽은 실패 화살표가 쓸 자리다.
-				if (!plan.sBlocked && (!sideFree(sides, edge.from, side) || (side === "right" && failFrom[edge.from]))) {
-					plan.cost += 1000;
-				}
-				if (!plan.tBlocked && !sideFree(sides, edge.to, side)) {
-					plan.cost += 1000;
-				}
-				plan.cost += side === "left" ? (s.x - near) + (t.x - near) : (near - s.right) + (near - t.right);
-				if (!best || plan.cost < best.cost) {
-					best = plan;
-				}
-			});
-			var side = best.side;
-			var yFrom = best.sBlocked ? s.bottom + LAYOUT_GAP.rank / 2 : s.cy;
-			var yTo = best.tBlocked ? t.y - LAYOUT_GAP.rank / 2 : t.cy;
-			var top = Math.min(yFrom, yTo) - 8;
-			var low = Math.max(yFrom, yTo) + 8;
-			var reach = layoutReach(side, top, low);
-			var base = side === "left" ? reach - LAYOUT_GAP.loop : reach + LAYOUT_GAP.loop;
-			var x = null;
-			segs.forEach(function (seg) {
-				var outside = side === "left" ? seg.x <= base : seg.x >= base;
-				if (x === null && seg.side === side && seg.to === edge.to && outside && !clash(side, seg.x, top, low, edge.to)) {
-					x = seg.x;
-				}
-			});
-			if (x === null) {
-				x = base;
-				while (clash(side, x, top, low, edge.to)) {
-					x += step(side);
-				}
-			}
-			x = Math.round(x);
-			segs.push({ side: side, x: x, top: top, low: low, to: edge.to });
-			outer[side] = side === "left" ? Math.min(outer.left, x) : Math.max(outer.right, x);
-			var points = [];
-			var ports = { source: side, target: side };
-			if (best.sBlocked) {
-				var ys = takeTrack(tracks, s.bottom, s.cx, x);
-				ports.source = "out";
-				points.push({ x: Math.round(s.cx), y: ys }, { x: x, y: ys });
-			} else {
-				points.push({ x: x, y: Math.round(s.cy) });
-				claimSide(sides, edge.from, side);
-			}
-			if (best.tBlocked) {
-				var yt = takeTrack(tracks, t.y - LAYOUT_GAP.rank, x, t.cx);
-				ports.target = "in";
-				points.push({ x: x, y: yt }, { x: Math.round(t.cx), y: yt });
-			} else {
-				points.push({ x: x, y: Math.round(t.cy) });
-				claimSide(sides, edge.to, side);
-			}
-			edgePorts[edge.key] = ports;
-			edgeVertices[edge.key] = points;
-		});
-		return outer;
-	}
-
-	/** 높이 top~low 사이에 걸친 노드들의 가장 왼쪽(side = left) 또는 가장 오른쪽 끝 x입니다. */
-	function layoutReach(side, top, low) {
-		var reach = side === "left" ? Infinity : -Infinity;
-		Object.keys(positions).forEach(function (id) {
-			var b = layoutBox(id);
-			if (b.y - 6 < low && b.bottom + 6 > top) {
-				reach = side === "left" ? Math.min(reach, b.x) : Math.max(reach, b.right);
-			}
-		});
-		return reach;
-	}
-
-	/**
-	 * 줄 사이 빈 곳(gapTop 아래 LAYOUT_GAP.rank 높이)에서 가로선 하나가 지나갈 높이를 고릅니다.
-	 * 같은 높이에서 x 구간이 겹치는 가로선이 이미 있으면 다른 높이를 씁니다.
-	 */
-	function takeTrack(tracks, gapTop, x1, x2) {
-		var lo = Math.min(x1, x2);
-		var hi = Math.max(x1, x2);
-		var offsets = [13, 19, 29, 35, 24, 8, 40];
-		for (var i = 0; i < offsets.length; i++) {
-			var y = Math.round(gapTop + offsets[i]);
-			var clash = tracks.some(function (used) {
-				return Math.abs(used.y - y) < 4 && used.lo < hi + 4 && used.hi > lo - 4;
-			});
-			if (!clash) {
-				tracks.push({ y: y, lo: lo, hi: hi });
-				return y;
-			}
-		}
-		return Math.round(gapTop + LAYOUT_GAP.rank / 2);
-	}
-
-	/**
-	 * 바로 아랫줄로 가는 화살표. 기본은 아래 → 위입니다.
-	 * 한 step에서 여러 갈래가 나가면, 그쪽 맨 끝 갈래만 옆 연결점으로 내보내 아래 점에서 선이 겹치지 않게 합니다
-	 * (가운데 갈래가 옆 연결점을 쓰면 더 바깥 갈래가 그 선을 가로질러 갑니다).
-	 */
-	function routeShortEdge(edge, short, sides) {
-		var s = layoutBox(edge.from);
-		var t = layoutBox(edge.to);
-		var xs = [];
-		short.forEach(function (other) {
-			if (other.from === edge.from) {
-				xs.push(layoutBox(other.to).cx);
-			}
-		});
-		if (xs.length < 2) {
-			return;
-		}
-		var side = null;
-		if (t.cx < s.x - 8 && t.cx <= Math.min.apply(null, xs)) {
-			side = "left";
-		} else if (t.cx > s.right + 8 && t.cx >= Math.max.apply(null, xs)) {
-			side = "right";
-		}
-		if (side && sideFree(sides, edge.from, side) && !layoutBlocked(side === "left" ? s.x : s.right, t.cx, s.cy, s.cy, [edge.from])) {
-			edgePorts[edge.key] = { source: side, target: "in" };
-			edgeVertices[edge.key] = [{ x: Math.round(t.cx), y: Math.round(s.cy) }];
-			claimSide(sides, edge.from, side);
-		}
-	}
-
-	/**
-	 * FAIL로 가는 화살표: step 오른쪽으로 나가 FAIL 위의 세로줄로 모입니다.
-	 * 오른쪽에 다른 노드가 있으면 바로 아래 줄 사이 빈 곳으로 내려가 그 높이로 FAIL 세로줄까지 갑니다.
-	 */
-	function routeFailEdge(edge, sides, tracks) {
-		var s = layoutBox(edge.from);
-		var f = layoutBox(FAIL_ID);
-		var fx = Math.round(f.cx);
-		var rightFree = sideFree(sides, edge.from, "right");
-		if (rightFree && !layoutBlocked(s.right, f.cx, s.cy, s.cy, [edge.from, FAIL_ID])) {
-			edgePorts[edge.key] = { source: "right", target: "in" };
-			edgeVertices[edge.key] = [{ x: fx, y: Math.round(s.cy) }];
-			claimSide(sides, edge.from, "right");
-			return;
-		}
-		if (rightFree) {
-			var x = Math.round(s.right + 14);
-			var y = takeTrack(tracks, s.bottom, x, fx);
-			edgePorts[edge.key] = { source: "right", target: "in" };
-			edgeVertices[edge.key] = [{ x: x, y: Math.round(s.cy) }, { x: x, y: y }, { x: fx, y: y }];
-			claimSide(sides, edge.from, "right");
-			return;
-		}
-		var y2 = takeTrack(tracks, s.bottom, s.cx, fx);
-		edgePorts[edge.key] = { source: "out", target: "in" };
-		edgeVertices[edge.key] = [{ x: Math.round(s.cx), y: y2 }, { x: fx, y: y2 }];
 	}
 
 	/* ====================================================================
