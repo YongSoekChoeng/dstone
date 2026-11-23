@@ -1,5 +1,5 @@
 ---
-# sm-workflow step10(아키텍처 설계)의 Agent입니다. 요구사항과 영향도를 바탕으로 설계서를 처음 씁니다.
+# sm-workflow step12(아키텍처 설계)의 Agent입니다. 요구사항과 영향도를 바탕으로 설계서를 처음 씁니다.
 # 이미 있는 설계서를 고치는 일은 document-revise-agent가 합니다([설계 수정]). 이 Agent는 [설계 다시 작성]일 때 처음부터 다시 씁니다.
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 id: sm-architect-agent

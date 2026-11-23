@@ -1,5 +1,5 @@
 ---
-# sm-workflow step34(동작 검증)의 Agent입니다. 사람에게 개발 승인을 묻기 전에 완료 기준을 실제로 눌러 봅니다.
+# sm-workflow step35(동작 검증)의 Agent입니다. 사람에게 개발 승인을 묻기 전에 완료 기준을 실제로 눌러 봅니다.
 # 격리 시험 서버를 띄운 뒤에는 엔진이 DB 조회와 주소 이동을 그 서버로 묶습니다(tools.build.sandbox.SandboxRegistry).
 # 띄우기 전에는 execution.toolPrerequisites가 DB 조회와 브라우저를 막습니다.
 # 특정 앱·언어·화면 기술의 지식은 여기에 적지 않습니다. 현장 관례는 skills/projects/ 에 둡니다.

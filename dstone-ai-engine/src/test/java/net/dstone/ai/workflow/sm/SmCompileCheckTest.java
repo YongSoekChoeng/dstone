@@ -22,7 +22,7 @@ import net.dstone.ai.support.WorkflowTestBase;
 
 /**
  * <pre>
- * sm-workflow의 컴파일 확인 step(step16, 범용 Tool compileJava)을 LLM 없이 돌려 봅니다.
+ * sm-workflow의 컴파일 확인 step(step18, 범용 Tool compileJava)을 LLM 없이 돌려 봅니다.
  * 작은 Maven 프로젝트를 임시 폴더에 만들고(원본 클래스는 javac로 미리 만들어 둔다), 의존성 경로는 실제 mvn으로 구합니다.
  * mvn이 없는 곳에서는 건너뜁니다.
  * </pre>
@@ -58,10 +58,10 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 	void 통과하면_compileResult에_남고_다음은_자동_검증이다() throws IOException {
 		this.devFile("New.java", "package demo;\npublic class New { Old old = new Old(); }\n");
 
-		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
-		flow.step("step16");
+		WorkflowStepper flow = this.stepper("sm-workflow", "step18", this.args());
+		flow.step("step18");
 
-		assertThat(flow.currentStepId()).isEqualTo("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step28");
 		assertThat(String.valueOf(flow.state("compileResult"))).contains("컴파일 통과").contains("Maven");
 		assertThat(flow.state("compileError")).isNull();
 	}
@@ -70,10 +70,10 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 	void 없는_클래스를_쓰면_오류가_compileError에_남고_개발_승인으로_간다() throws IOException {
 		this.devFile("New.java", "package demo;\nimport demo.missing.UPLOADS;\npublic class New {}\n");
 
-		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
-		flow.step("step16");
+		WorkflowStepper flow = this.stepper("sm-workflow", "step18", this.args());
+		flow.step("step18");
 
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 		assertThat(String.valueOf(flow.state("compileError"))).contains("src/main/java/demo/New.java:2:").contains("demo.missing");
 	}
 
@@ -82,8 +82,8 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 		this.devFile("New.java", "package demo;\npublic class New { Old old; }\n");
 		Files.writeString(this.workDir.resolve("dev-resources/_delete-files.txt"), "src/main/java/demo/Old.java\n", StandardCharsets.UTF_8);
 
-		WorkflowStepper flow = this.stepper("sm-workflow", "step16", this.args());
-		flow.step("step16");
+		WorkflowStepper flow = this.stepper("sm-workflow", "step18", this.args());
+		flow.step("step18");
 
 		assertThat(String.valueOf(flow.state("compileError"))).contains("src/main/java/demo/New.java: 삭제 목록의 클래스 demo.Old");
 		assertThat(this.source.resolve("src/main/java/demo/Old.java")).exists();
@@ -93,7 +93,7 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 		Files.writeString(this.workDir.resolve("dev-resources/src/main/java/demo/" + name), text, StandardCharsets.UTF_8);
 	}
 
-	/** sm-workflow step16의 with와 같은 값 */
+	/** sm-workflow step18의 with와 같은 값 */
 	private Map<String, Object> args() {
 		Map<String, Object> input = new LinkedHashMap<String, Object>();
 		input.put("sourceRoot", slash(this.source));

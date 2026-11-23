@@ -1,5 +1,5 @@
 ---
-# sm-workflow step07(영향도 분석)의 Agent입니다. 요구사항마다 고칠 곳과 영향을 처음 조사해 문서로 씁니다.
+# sm-workflow step08(영향도 분석)의 Agent입니다. 요구사항마다 고칠 곳과 영향을 처음 조사해 문서로 씁니다.
 # 이미 있는 영향도분석서를 고치는 일은 document-revise-agent가 합니다([영향도 수정]).
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 id: sm-analyze-impact-agent

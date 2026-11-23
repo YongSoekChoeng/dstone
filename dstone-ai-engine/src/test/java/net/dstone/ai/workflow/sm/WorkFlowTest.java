@@ -69,10 +69,10 @@ public class WorkFlowTest extends WorkflowTestBase {
 		this.writeDoc(now + "/03-1.design.md", "설계서 내용");
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
 		flow.put("now", now);
-		flow.jumpTo("step12");
-		flow.step("step12");
+		flow.jumpTo("step14");
+		flow.step("step14");
 		assertThat(flow.state("design")).isEqualTo("설계서 내용");
-		flow.step("step13");
+		flow.step("step15");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(this.chatModel.prompts()).isEmpty();
 	}

@@ -47,15 +47,15 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		this.chatModel.answerToolCalls("appendFile", this.appendArguments(design));
 		this.chatModel.answer("고친 파일: 03-1.design.md");
 
-		WorkflowStepper flow = this.atStep("step08");
-		flow.step("step08");
-		flow.decide("승인(설계진행)", "APPROVAL_COMMENT");
+		WorkflowStepper flow = this.atStep("step09");
 		flow.step("step09");
-		flow.step("step26");
-		assertThat(flow.currentStepId()).isEqualTo("step27");
-		flow.step("step27");
+		flow.decide("승인(설계진행)", "APPROVAL_COMMENT");
+		flow.step("step10");
+		flow.step("step11");
+		assertThat(flow.currentStepId()).isEqualTo("step37");
+		flow.step("step37");
 
-		assertThat(flow.currentStepId()).isEqualTo("step11");
+		assertThat(flow.currentStepId()).isEqualTo("step13");
 		assertThat(Files.readString(design, StandardCharsets.UTF_8)).contains("FIX_FROM_REDEVELOP");
 		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(0))).contains("NEW_IMPACT", "APPROVAL_COMMENT");
 	}
@@ -63,30 +63,30 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 	@Test
 	void 설계서가_없으면_처음부터_쓴다() throws IOException {
 		this.write("02.impact.md", "# 영향도");
-		WorkflowStepper flow = this.atStep("step09");
-		flow.step("step09");
-		flow.step("step26");
+		WorkflowStepper flow = this.atStep("step10");
+		flow.step("step10");
+		flow.step("step11");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(flow.currentStepId()).isEqualTo("step10");
+		assertThat(flow.currentStepId()).isEqualTo("step12");
 	}
 
 	@Test
 	void 설계서가_상한보다_커도_있는_것으로_본다() throws IOException {
 		this.write("03-1.design.md", "# 설계\n" + "x".repeat(70000));
-		WorkflowStepper flow = this.atStep("step26");
-		flow.step("step26");
+		WorkflowStepper flow = this.atStep("step11");
+		flow.step("step11");
 
-		assertThat(flow.currentStepId()).isEqualTo("step27");
+		assertThat(flow.currentStepId()).isEqualTo("step37");
 	}
 
 	@Test
 	void 설계를_처음부터_다시_쓰는_길은_사람이_고른다() {
-		WorkflowStepper flow = this.atStep("step11");
-		flow.step("step11");
+		WorkflowStepper flow = this.atStep("step13");
+		flow.step("step13");
 		flow.decide("설계 다시 작성", "구조를 바꿔 주세요");
 
-		assertThat(flow.currentStepId()).isEqualTo("step10");
+		assertThat(flow.currentStepId()).isEqualTo("step12");
 	}
 
 	@Test
@@ -100,32 +100,32 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		flow.put("requirement", "# 요구사항 NEW_REQUIREMENT");
 		flow.step("step06");
 		flow.decide("그대로 진행", "진행");
-		flow.step("step28");
-		assertThat(flow.currentStepId()).isEqualTo("step29");
-		flow.step("step29");
+		flow.step("step07");
+		assertThat(flow.currentStepId()).isEqualTo("step38");
+		flow.step("step38");
 
-		assertThat(flow.currentStepId()).isEqualTo("step08");
+		assertThat(flow.currentStepId()).isEqualTo("step09");
 		assertThat(Files.readString(impact, StandardCharsets.UTF_8)).contains("IMPACT_FIX");
 		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(0))).contains("NEW_REQUIREMENT");
 	}
 
 	@Test
 	void 영향도분석서가_없으면_처음부터_쓴다() {
-		WorkflowStepper flow = this.atStep("step28");
-		flow.step("step28");
+		WorkflowStepper flow = this.atStep("step07");
+		flow.step("step07");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(flow.currentStepId()).isEqualTo("step07");
+		assertThat(flow.currentStepId()).isEqualTo("step08");
 	}
 
 	@Test
 	void 개발_폴더를_비우면_옛_컴파일_오류도_비운다() throws IOException {
 		this.write("dev-resources/A.java", "class A {}");
-		WorkflowStepper flow = this.atStep("step14");
+		WorkflowStepper flow = this.atStep("step16");
 		flow.put("compileError", "A.java:1 OLD_ERROR");
-		flow.step("step14");
+		flow.step("step16");
 
-		assertThat(flow.currentStepId()).isEqualTo("step15");
+		assertThat(flow.currentStepId()).isEqualTo("step17");
 		assertThat(flow.state("compileError")).isNull();
 	}
 
@@ -143,7 +143,7 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		flow.put("review", review);
 		flow.step("step06");
 		flow.decide("요구사항 수정", "HUMAN_COMMENT");
-		flow.step("step30");
+		flow.step("step39");
 
 		assertThat(flow.currentStepId()).isEqualTo("step04");
 		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(0))).contains("REVIEWER_REASON", "HUMAN_COMMENT");
@@ -161,8 +161,8 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 	@Test
 	void 상한보다_큰_설계서는_잘린_채로_넘기지_않는다() throws IOException {
 		this.write("03-1.design.md", "x".repeat(60001));
-		WorkflowStepper flow = this.atStep("step12");
-		flow.step("step12");
+		WorkflowStepper flow = this.atStep("step14");
+		flow.step("step14");
 
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.execution().errorMessage()).contains("60001");
@@ -170,13 +170,13 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 
 	@Test
 	void 되감아도_새로_쓰는_Agent가_승인_의견을_돌려받는다() {
-		WorkflowStepper flow = this.atStep("step08");
-		flow.step("step08");
+		WorkflowStepper flow = this.atStep("step09");
+		flow.step("step09");
 		flow.decide("승인(설계진행)", "REWIND_COMMENT");
-		// step09는 문서가 없어 실패하지만, 되감기는 그 앞의 결정 기록만 본다
-		flow.step("step09"); // 결정이 어디로 갔는지 기록된 뒤의 실행
+		// step10는 문서가 없어 실패하지만, 되감기는 그 앞의 결정 기록만 본다
+		flow.step("step10"); // 결정이 어디로 갔는지 기록된 뒤의 실행
 
-		for (String stepId : List.of("step10", "step27")) {
+		for (String stepId : List.of("step12", "step37")) {
 			Object restored = ReflectionTestUtils.invokeMethod(this.workFlowExecutionService, "arrivalFor",
 				this.workFlowRegistry.resolve(WORKFLOW_ID, null), flow.execution().context(), stepId);
 			assertThat(String.valueOf(restored)).as(stepId).contains("REWIND_COMMENT");

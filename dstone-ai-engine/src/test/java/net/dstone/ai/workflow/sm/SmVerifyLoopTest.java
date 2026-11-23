@@ -34,72 +34,72 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	@Test
 	void 프로젝트ID가_없으면_검증하지_않고_사람에게_간다() throws Exception {
 		Files.writeString(this.workDir.resolve("00.request.md"), "## 현업요청\n목록 화면", StandardCharsets.UTF_8);
-		WorkflowStepper flow = this.atStep("step31");
-		flow.step("step31");
+		WorkflowStepper flow = this.atStep("step28");
+		flow.step("step28");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 		assertThat(String.valueOf(flow.state("projectIdError"))).contains("프로젝트ID");
 	}
 
 	@Test
 	void 격리할_수_없으면_통과로_치지_않고_이유를_남긴다() {
-		WorkflowStepper flow = this.atStep("step32");
+		WorkflowStepper flow = this.atStep("step29");
 		flow.put("projectId", "noSuchProject").put("sourceDir", this.workDir.toString());
-		flow.step("step32");
+		flow.step("step29");
 
-		assertThat(flow.currentStepId()).isEqualTo("step33");
+		assertThat(flow.currentStepId()).isEqualTo("step30");
 		assertThat(String.valueOf(flow.state("sandboxCheck"))).contains("cause=environment");
-		flow.step("step33");
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		flow.step("step30");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 		assertThat(flow.state("sandboxError")).isNotNull();
 	}
 
 	@Test
 	void 개발_결과_탓인_기동_실패는_자동_수정으로_간다() {
-		WorkflowStepper flow = this.atStep("step33");
+		WorkflowStepper flow = this.atStep("step30");
 		flow.put("sandboxCheck", Map.of("success", Boolean.FALSE, "cause", "code", "message", "DDL 오류"));
-		flow.step("step33");
+		flow.step("step30");
 
-		assertThat(flow.currentStepId()).isEqualTo("step36");
+		assertThat(flow.currentStepId()).isEqualTo("step31");
 	}
 
 	@Test
 	void FAIL이_있으면_자동_수정으로_간다() {
-		WorkflowStepper flow = this.atStep("step35");
+		WorkflowStepper flow = this.atStep("step36");
 		flow.put("verification", Map.of("scenarios", List.of(Map.of("result", "PASS"), Map.of("result", "FAIL"))));
-		flow.step("step35");
+		flow.step("step36");
 
-		assertThat(flow.currentStepId()).isEqualTo("step36");
+		assertThat(flow.currentStepId()).isEqualTo("step31");
 	}
 
 	@Test
 	void FAIL이_없으면_사람에게_간다() {
-		WorkflowStepper flow = this.atStep("step35");
+		WorkflowStepper flow = this.atStep("step36");
 		flow.put("verification", Map.of("scenarios", List.of(Map.of("result", "PASS"), Map.of("result", "BLOCKED"))));
-		flow.step("step35");
+		flow.step("step36");
 
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 	}
 
 	@Test
 	void 자동_수정은_두_번까지고_사람이_새로_시키면_다시_센다() {
 		assumeFalse(this.chatModel.isLlmCall());
-		WorkflowStepper flow = this.atStep("step36");
-		flow.step("step36");
-		assertThat(flow.currentStepId()).isEqualTo("step37");
-		flow.jumpTo("step36");
-		flow.step("step36");
-		assertThat(flow.currentStepId()).isEqualTo("step37");
-		flow.jumpTo("step36");
-		flow.step("step36");
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		WorkflowStepper flow = this.atStep("step31");
+		flow.step("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step32");
+		flow.jumpTo("step31");
+		flow.step("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step32");
+		flow.jumpTo("step31");
+		flow.step("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 
-		flow.step("step17");
+		flow.step("step19");
 		flow.decide("재개발", "다시 해 주세요");
-		flow.jumpTo("step36");
-		flow.step("step36");
-		assertThat(flow.currentStepId()).isEqualTo("step37");
+		flow.jumpTo("step31");
+		flow.step("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step32");
 	}
 
 	/** stepId부터 시작합니다. */
