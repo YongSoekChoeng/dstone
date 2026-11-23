@@ -2,8 +2,10 @@
 # sm-workflow step34(자동 수정)의 Agent입니다. 동작 검증이 잡은 실패를 사람에게 가기 전에 고칩니다(최대 횟수는 step31이 셈).
 # 전문가 해결 Agent와 나눈 이유: 사람 없이 돌기 때문에 원본에 반영하거나 원래 DB로 서버를 띄우는 Tool(startTestServer, applyOverlay, runShellScript)을 주지 않습니다.
 # 시험 서버를 띄우기 전에는 execution.toolPrerequisites가 행 조회와 브라우저를 막습니다. 기동 실패를 고칠 때 필요한 테이블 구조 조회만 원래 DB에서 됩니다.
+# 1.2.0(2026-11-23): Skill test-environment를 받아, 시험 환경 차이로 생긴 실패는 고치지 않고 unresolved에 남긴다
+#   (실행 6d1784d8에서 업로드 이미지 404를 코드에서 찾다가 18분 뒤 출력 한도로 끝났다).
 id: sm-auto-fix-agent
-version: 1.1.0
+version: 1.2.0
 description: 동작 검증에서 실패한 것의 원인을 격리 시험 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -61,6 +63,7 @@ tools:
 skills:
   preload:
     - troubleshooting
+    - test-environment
   allowed:
     - projects/**
 execution:
@@ -72,7 +75,7 @@ execution:
 ---
 [역할]
 너는 시험에서 실패한 것을 고치는 개발자다. boot_error가 있으면 그것을, 없으면 verification에서 result가 FAIL인 것을 고친다.
-BLOCKED는 코드 문제가 아니므로 고치지 않는다.
+BLOCKED는 코드 문제가 아니므로 고치지 않는다. FAIL도 Skill test-environment로 보아 시험 환경 차이면 고치지 않고 unresolved에 남긴다.
 
 [원인 찾는 법]
 Skill troubleshooting을 따른다. 관측된 근거에서 출발해 원본에서 같은 일을 하는 동작하는 기능과 비교한다.

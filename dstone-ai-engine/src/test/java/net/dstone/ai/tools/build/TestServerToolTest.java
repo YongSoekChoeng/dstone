@@ -2,7 +2,16 @@ package net.dstone.ai.tools.build;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * <pre>
@@ -56,6 +65,31 @@ public class TestServerToolTest {
 		assertThat(TestServerTool.patchTomcatPort(pom, 51000)).contains("<port>51000</port>").doesNotContain("7080");
 		assertThat(TestServerTool.keyOf(null, "D:/AppHome/demo/")).isEqualTo("demo");
 		assertThat(TestServerTool.keyOf("my app", "x")).isEqualTo("my_app");
+	}
+
+	@TempDir
+	Path dir;
+
+	@Test
+	void 정적_경로는_Context_파일로_열고_격리_때는_사본_폴더로_바꾼다() throws IOException {
+		File source = Files.createDirectories(this.dir.resolve("src/myApp")).toFile();
+		File app = Files.createDirectories(this.dir.resolve("work/app")).toFile();
+		File base = Files.createDirectories(this.dir.resolve("work/tomcat")).toFile();
+		File outside = Files.createDirectories(this.dir.resolve("shared/img")).toFile();
+		List<String[]> paths = new ArrayList<String[]>();
+		paths.add(new String[] { "/Upload", source.getPath().replace('\\', '/') + "/uploadData/Upload" });
+		paths.add(new String[] { "/files/img", outside.getPath().replace('\\', '/') });
+		paths.add(new String[] { "/none", this.dir.resolve("nowhere").toString().replace('\\', '/') });
+
+		String line = TestServerTool.addStaticContexts(base, paths, source, app, true);
+
+		File upload = new File(base, "conf/Catalina/localhost/Upload.xml");
+		assertThat(Files.readString(upload.toPath(), StandardCharsets.UTF_8)).contains(new File(app, "uploadData/Upload").getAbsolutePath());
+		assertThat(new File(app, "uploadData/Upload")).isDirectory();
+		assertThat(Files.readString(new File(base, "conf/Catalina/localhost/files#img.xml").toPath(), StandardCharsets.UTF_8)).contains(outside.getAbsolutePath());
+		assertThat(new File(base, "conf/Catalina/localhost/none.xml")).doesNotExist();
+		assertThat(line).contains("/Upload →").contains("폴더가 없어 열지 않음");
+		assertThat(TestServerTool.addStaticContexts(base, new ArrayList<String[]>(), source, app, true)).contains("없음");
 	}
 
 }

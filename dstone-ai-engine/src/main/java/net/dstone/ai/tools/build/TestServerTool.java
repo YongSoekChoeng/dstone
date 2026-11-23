@@ -381,6 +381,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			File log = new File(base, LOG_FILE);
 			Files.deleteIfExists(log.toPath());
 			server.log = log;
+			// 원래 환경과 다른 점. Agent가 이것 때문에 생긴 실패를 개발 결과 탓으로 보지 않게 결과에 적는다.
+			List<String> differences = new ArrayList<String>();
+			List<String[]> staticPaths = this.staticPaths(projectId, notes);
 
 			// 5) 띄운다. 출력은 server.log로 보낸다.
 			File tomcatHome = this.tomcatHome();
@@ -409,6 +412,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 				}
 				kind = "java -jar " + archive.getName();
 				contextPath = "/";
+				differences.add(staticPathsNotApplied(staticPaths));
 				runLogFrom = log.length();
 				process = this.startArchive(app, archive, javaHome, log, key, port, server.sandbox);
 			} else if (isWar(pomText) && tomcatHome != null) {
@@ -434,6 +438,8 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 					}
 				}
 				prepareCatalinaBase(tomcatHome, catalinaBase, port, war, contextPath);
+				differences.add("설치된 Tomcat에 사람이 등록해 둔 다른 앱(Context)은 띄우지 않았습니다.");
+				differences.add(addStaticContexts(catalinaBase, staticPaths, sourceRoot, app, server.sandbox != null));
 				runLogFrom = log.length();
 				process = this.startCatalina(tomcatHome, catalinaBase, javaHome, log, key, server.sandbox);
 			} else {
@@ -448,6 +454,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 				}
 				kind = "mvn " + launch.goals.get(0);
 				contextPath = launch.contextPath;
+				differences.add(staticPathsNotApplied(staticPaths));
 				List<String> command = this.mavenCommand(key);
 				command.addAll(launch.goals);
 				ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
@@ -509,6 +516,10 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			}
 			for (String note : notes) {
 				message.append('\n').append(note);
+			}
+			message.append("\n원래 환경과 다른 점(이것 때문에 생긴 실패는 개발 결과 탓이 아닙니다):");
+			for (String difference : differences) {
+				message.append("\n- ").append(difference);
 			}
 			server.message = message.toString();
 			return ToolOutcome.pass(server.message);
@@ -625,6 +636,71 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 		File file = new File(path.trim());
 		text.append(inputPath(path)).append(' ').append(file.isFile() ? file.length() + " " + file.lastModified() : "없음").append('\n');
+	}
+
+	/** 프로젝트 관리의 시험 서버 정적 경로를 읽습니다. 읽지 못하면 notes에 남기고 빈 목록입니다. */
+	private List<String[]> staticPaths(String projectId, List<String> notes) {
+		if (isBlank(projectId)) {
+			return new ArrayList<String[]>();
+		}
+		try {
+			Map<String, Object> project = this.projectStore.find(projectId.trim());
+			Object text = project == null ? null : project.get("testStaticPaths");
+			return ProjectStore.parseStaticPaths(text == null ? null : text.toString());
+		} catch (RuntimeException e) {
+			notes.add("프로젝트 관리의 시험 서버 정적 경로를 읽지 못했습니다: " + e.getMessage());
+			return new ArrayList<String[]>();
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 시험 서버 정적 경로마다 전용 CATALINA_BASE에 Context 파일(conf/Catalina/localhost/{이름}.xml)을 만들어, 그 주소를 그 폴더로 엽니다.
+	 * 앱(/)보다 긴 주소라서 Tomcat은 그 주소의 요청을 이 Context로 보냅니다.
+	 * 격리 시험 서버에서는 앱이 쓰는 원본 폴더 경로도 사본 경로로 바뀌므로, 원본 안의 폴더는 사본 쪽 폴더로 엽니다.
+	 * 폴더가 없으면 사본 안에서는 만들고, 사본 밖이면 건너뜁니다(원래 자리에 폴더를 만들지 않으려고).
+	 * 돌려주는 값은 "원래 환경과 다른 점"에 적을 한 줄입니다.
+	 * </pre>
+	 */
+	static String addStaticContexts(File catalinaBase, List<String[]> staticPaths, File sourceRoot, File app, boolean sandbox) throws IOException {
+		String guide = "웹앱 밖 폴더를 여는 주소는 프로젝트 관리의 '시험 서버 정적 경로'에 적힌 것만 엽니다. 그 밖의 주소가 404면 원래 서버의 웹서버 설정 차이일 수 있습니다";
+		if (staticPaths.isEmpty()) {
+			return guide + ". 지금 적힌 것: 없음";
+		}
+		File contexts = new File(catalinaBase, "conf/Catalina/localhost");
+		Files.createDirectories(contexts.toPath());
+		List<String> opened = new ArrayList<String>();
+		String sourcePrefix = sourceRoot.getPath().replace('\\', '/');
+		for (String[] path : staticPaths) {
+			String folder = path[1];
+			boolean inSource = folder.toLowerCase(Locale.ROOT).startsWith(sourcePrefix.toLowerCase(Locale.ROOT) + "/");
+			File docBase = sandbox && inSource ? new File(app, folder.substring(sourcePrefix.length() + 1)) : new File(folder);
+			if (!docBase.isDirectory()) {
+				if (sandbox && inSource) {
+					Files.createDirectories(docBase.toPath());
+				} else {
+					opened.add(path[0] + " → (폴더가 없어 열지 않음: " + folder + ")");
+					continue;
+				}
+			}
+			String name = path[0].substring(1).replace('/', '#');
+			String xml = "<Context docBase=\"" + xmlText(docBase.getAbsolutePath()) + "\" />\n";
+			Files.writeString(new File(contexts, name + ".xml").toPath(), xml, StandardCharsets.UTF_8);
+			opened.add(path[0] + " → " + docBase.getAbsolutePath());
+		}
+		return guide + ". 지금 연 것: " + String.join(", ", opened);
+	}
+
+	/** Boot·플러그인 방식에서는 정적 경로를 열 수 없다는 한 줄입니다. */
+	private static String staticPathsNotApplied(List<String[]> staticPaths) {
+		return staticPaths.isEmpty()
+			? "웹앱 밖 폴더를 여는 주소(원래 서버의 웹서버 설정)는 없습니다. 그런 주소가 404면 환경 차이일 수 있습니다"
+			: "프로젝트 관리의 '시험 서버 정적 경로'는 WAR + Tomcat 방식에서만 엽니다. 이 방식에서는 열지 않았습니다";
+	}
+
+	/** XML 속성 값으로 쓸 수 있게 바꿉니다. */
+	private static String xmlText(String value) {
+		return value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
 	/** 격리 환경을 만들어 server에 답니다. 실패면 이유. */

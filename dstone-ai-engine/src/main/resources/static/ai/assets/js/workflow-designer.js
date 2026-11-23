@@ -2717,7 +2717,8 @@ var DstoneAiDesigner = (function () {
 			return "<p class=\"ai-hint\">없습니다.</p>";
 		}
 		return "<ul class=\"wd-edge-list\">" + list.map(function (edge) {
-			var name = edge.kind === "route" ? "경로 " + edge.route : (edge.kind === "onFailure" ? "실패(onFailure)" : (edge.kind === "rejectTo" ? "반려(approval.rejectTo)" : "다음(next)"));
+			// APPROVAL의 경로 이름은 승인자가 고르는 결정 그 자체(예: 승인, 재개발)라 앞에 '경로'를 붙이지 않는다.
+			var name = edge.kind === "route" ? (step.type === "APPROVAL" ? edge.route : "경로 " + edge.route) : (edge.kind === "onFailure" ? "실패(onFailure)" : (edge.kind === "rejectTo" ? "반려(approval.rejectTo)" : "다음(next)"));
 			return "<li><a href=\"javascript:void(0)\" data-edge-select=\"1\" data-kind=\"" + escapeHtml(edge.kind) + "\" data-route=\"" + escapeHtml(edge.route || "") + "\">"
 				+ escapeHtml(name) + "</a> → " + stepLink(edge.target) + "</li>";
 		}).join("") + "</ul>";

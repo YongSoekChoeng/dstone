@@ -184,6 +184,10 @@ ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS JAVA_VERSION VARCHAR(
 -- Agent 에게는 비밀번호 대신 자리표시자 ${secret:프로젝트ID.testPassword} 만 주고, 엔진(ToolCallGate)이 허용한 Tool 에 넘기기 직전에만 바꾼다.
 ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_USER_ID VARCHAR(100);
 ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_PASSWORD_ENC VARCHAR(500);
+-- 2026-11-23 추가. 시험 서버 정적 경로: 원래 환경에서 웹서버나 다른 설정이 열어 주는 "주소 → 폴더"를 한 줄에 하나씩 "/주소=폴더"로 적는다.
+-- 예: 앱이 웹앱 밖 폴더에 저장한 업로드 파일을 /Upload 주소로 여는 경우. 임시 시험 서버(WAR + Tomcat)가 그 주소를 그 폴더로 연다.
+-- 폴더가 원본 소스 안이면 격리 시험 서버에서는 사본 쪽 폴더로 바꿔 연다(앱이 쓰는 경로도 사본으로 바뀌므로).
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_STATIC_PATHS TEXT;
 CREATE TABLE IF NOT EXISTS ai_management_project_db (
     PROJECT_ID        VARCHAR(50)   NOT NULL REFERENCES ai_management_project(PROJECT_ID) ON DELETE CASCADE,
     DB_SEQ            INT           NOT NULL,

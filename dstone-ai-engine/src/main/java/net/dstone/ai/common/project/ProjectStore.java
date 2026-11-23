@@ -77,7 +77,7 @@ public class ProjectStore extends BaseDao implements SecretSource {
 	/**
 	 * 프로젝트를 만들거나 고칩니다. DB 목록은 통째로 바꿉니다.
 	 *
-	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, javaVersion, testUserId, testPassword?, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
+	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, javaVersion, testUserId, testPassword?, testStaticPaths?, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
 	 * @param by      작업한 사람
 	 */
 	@SuppressWarnings("unchecked")
@@ -115,6 +115,7 @@ public class ProjectStore extends BaseDao implements SecretSource {
 		}
 		param.put("testUserId", testUserId);
 		param.put("testPasswordEnc", testPasswordEnc);
+		param.put("testStaticPaths", staticPathsText(text(project, "testStaticPaths")));
 		param.put("useYn", "N".equals(text(project, "useYn")) ? "N" : "Y");
 		param.put("by", by);
 
@@ -227,6 +228,66 @@ public class ProjectStore extends BaseDao implements SecretSource {
 		param.put("projectId", projectId);
 		param.put("dbSeq", Integer.valueOf(String.valueOf(dbSeq).trim()));
 		return this.sqlSessionCommon.selectOne(NS + "selectPasswordEnc", param);
+	}
+
+	/**
+	 * <pre>
+	 * 시험 서버 정적 경로 글을 검사하고 줄마다 "/주소=폴더" 모양으로 맞춰 돌려줍니다. 비었으면 null입니다.
+	 * 원래 환경에서 웹서버나 다른 설정이 열어 주는 주소를 임시 시험 서버도 열게 하려는 값입니다(예: /Upload=D:/app/uploadData/Upload).
+	 * </pre>
+	 *
+	 * @param text 화면에서 받은 글(한 줄에 하나)
+	 */
+	static String staticPathsText(String text) {
+		List<String[]> paths = parseStaticPaths(text);
+		if (paths.isEmpty()) {
+			return null;
+		}
+		StringBuilder out = new StringBuilder();
+		for (String[] path : paths) {
+			if (out.length() > 0) {
+				out.append('\n');
+			}
+			out.append(path[0]).append('=').append(path[1]);
+		}
+		return out.toString();
+	}
+
+	/**
+	 * <pre>
+	 * 시험 서버 정적 경로 글을 [주소, 폴더] 목록으로 읽습니다. 빈 줄과 #로 시작하는 줄은 건너뜁니다.
+	 * 주소는 /로 시작하고 끝의 /는 뗍니다. "/"(앱 전체)는 쓸 수 없습니다. 모양이 틀리면 IllegalArgumentException입니다.
+	 * </pre>
+	 *
+	 * @param text 저장된 글
+	 */
+	public static List<String[]> parseStaticPaths(String text) {
+		List<String[]> paths = new ArrayList<String[]>();
+		if (text == null) {
+			return paths;
+		}
+		List<String> seen = new ArrayList<String>();
+		for (String raw : text.split("\r?\n")) {
+			String line = raw.trim();
+			if (line.isEmpty() || line.startsWith("#")) {
+				continue;
+			}
+			int equals = line.indexOf('=');
+			String url = equals < 0 ? "" : line.substring(0, equals).trim();
+			String folder = equals < 0 ? "" : line.substring(equals + 1).trim().replace('\\', '/');
+			while (url.length() > 1 && url.endsWith("/")) {
+				url = url.substring(0, url.length() - 1);
+			}
+			if (!url.matches("/[A-Za-z0-9._~/-]+") || url.contains("//") || url.contains("..") || folder.isEmpty()) {
+				throw new IllegalArgumentException("시험 서버 정적 경로는 한 줄에 하나씩 '/주소=폴더' 모양으로 적습니다(주소는 /로 시작, 앱 전체 '/'는 안 됨): " + line);
+			}
+			if (seen.contains(url)) {
+				throw new IllegalArgumentException("시험 서버 정적 경로에 같은 주소가 두 번 있습니다: " + url);
+			}
+			seen.add(url);
+			paths.add(new String[] { url, folder });
+		}
+		return paths;
 	}
 
 	private static String text(Map<String, Object> map, String key) {

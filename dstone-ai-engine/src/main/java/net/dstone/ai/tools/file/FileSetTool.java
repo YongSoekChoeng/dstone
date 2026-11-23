@@ -1,9 +1,17 @@
 package net.dstone.ai.tools.file;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -141,4 +149,126 @@ public class FileSetTool {
 		return result;
 	}
 
+
+	/** 이 크기보다 큰 파일은 내용 대신 크기와 수정 시각으로 비교합니다(읽는 데 오래 걸리지 않게). */
+	private static final long HASH_LIMIT_BYTES = 5L * 1024 * 1024;
+
+	/** 바뀐 파일을 안내 글에 이 개수까지만 적습니다. */
+	private static final int MAX_LISTED_CHANGES = 100;
+
+	/**
+	 * <pre>
+	 * 폴더 아래 파일들의 지금 상태(스냅샷)를 만들고, 지난번 스냅샷과 비교해 바뀐 파일을 알려 줍니다.
+	 * 돌려주는 값: {first, changed: [상대경로], snapshot: {상대경로: 내용 해시}, summary: 사람·Agent가 읽을 한 덩어리 글}
+	 * - first: previous가 비어 비교할 것이 없으면 true(changed는 빈 목록)
+	 * - changed: 새로 생기거나, 내용이 바뀌거나, 없어진 파일(없어진 것은 "(삭제) 경로")
+	 * 결과를 save해 두었다가 다음에 그 snapshot을 previous로 넘기면 "그 사이에 바뀐 것"이 됩니다.
+	 * 비교는 내용 해시로 합니다(다시 써도 내용이 같으면 바뀌지 않은 것). 아주 큰 파일만 크기와 수정 시각으로 봅니다.
+	 *
+	 * YAML 예: 지난 검증 뒤로 작업 폴더에서 바뀐 파일
+	 *   tool: fileChanges
+	 *   with: { basePath: "${input}/work", previous: "${state.workChanges.snapshot:}", excludeDirs: compile-check }
+	 *   save: workChanges
+	 * </pre>
+	 *
+	 * @param basePath    볼 폴더의 절대경로
+	 * @param previous    지난번 결과의 snapshot. 처음이면 비움
+	 * @param excludeDirs 보지 않을 폴더 이름(쉼표로 여럿). 빌드 결과처럼 매번 바뀌는 폴더를 뺀다
+	 */
+	@Tool(description = "폴더 아래 파일의 스냅샷을 만들고 지난 스냅샷(previous)과 비교해 바뀐 파일을 {first, changed, snapshot, summary}로 돌려준다.")
+	public Map<String, Object> fileChanges(
+			@ToolParam(description = "볼 폴더의 절대경로") String basePath,
+			@ToolParam(required = false, description = "지난번 결과의 snapshot({상대경로: 해시}). 처음이면 비움") Object previous,
+			@ToolParam(required = false, description = "보지 않을 폴더 이름. 쉼표로 여럿") String excludeDirs) {
+		if (basePath == null || basePath.isBlank() || !new File(basePath.trim()).isDirectory()) {
+			return this.fail("폴더가 없습니다: " + basePath);
+		}
+		List<String> excluded = new ArrayList<>();
+		if (excludeDirs != null) {
+			for (String name : excludeDirs.split(",")) {
+				if (!name.isBlank()) {
+					excluded.add(name.trim());
+				}
+			}
+		}
+		File root = new File(basePath.trim());
+		Map<String, String> snapshot = new TreeMap<>();
+		try {
+			collect(root, root, excluded, snapshot);
+		} catch (IOException e) {
+			return this.fail("파일을 읽지 못했습니다: " + e.getMessage());
+		}
+		boolean first = !(previous instanceof Map) || ((Map<?, ?>) previous).isEmpty();
+		List<String> changed = new ArrayList<>();
+		if (!first) {
+			Map<?, ?> before = (Map<?, ?>) previous;
+			for (Map.Entry<String, String> entry : snapshot.entrySet()) {
+				Object old = before.get(entry.getKey());
+				if (old == null || !old.toString().equals(entry.getValue())) {
+					changed.add(entry.getKey());
+				}
+			}
+			for (Object key : before.keySet()) {
+				if (!snapshot.containsKey(String.valueOf(key))) {
+					changed.add("(삭제) " + key);
+				}
+			}
+		}
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("first", first);
+		result.put("changed", changed);
+		result.put("snapshot", snapshot);
+		result.put("summary", summary(first, changed));
+		return result;
+	}
+
+	/** 바뀐 파일 목록을 읽기 좋은 글로 만듭니다. */
+	private static String summary(boolean first, List<String> changed) {
+		if (first) {
+			return "처음 확인이라 비교할 지난 스냅샷이 없습니다.";
+		}
+		if (changed.isEmpty()) {
+			return "지난 스냅샷 뒤로 바뀐 파일이 없습니다.";
+		}
+		StringBuilder text = new StringBuilder("지난 스냅샷 뒤로 바뀐 파일 " + changed.size() + "개:");
+		for (int i = 0; i < changed.size() && i < MAX_LISTED_CHANGES; i++) {
+			text.append("\n- ").append(changed.get(i));
+		}
+		if (changed.size() > MAX_LISTED_CHANGES) {
+			text.append("\n- ...외 ").append(changed.size() - MAX_LISTED_CHANGES).append("개");
+		}
+		return text.toString();
+	}
+
+	/** 폴더 아래 파일을 "상대경로 → 해시"로 모읍니다. 뺄 폴더는 들어가지 않습니다. */
+	private static void collect(File root, File dir, List<String> excluded, Map<String, String> snapshot) throws IOException {
+		File[] children = dir.listFiles();
+		if (children == null) {
+			return;
+		}
+		Arrays.sort(children);
+		for (File child : children) {
+			if (child.isDirectory()) {
+				if (!excluded.contains(child.getName())) {
+					collect(root, child, excluded, snapshot);
+				}
+			} else if (child.isFile()) {
+				String relative = root.toPath().relativize(child.toPath()).toString().replace('\\', '/');
+				snapshot.put(relative, fingerprint(child));
+			}
+		}
+	}
+
+	/** 파일 하나의 해시입니다. 아주 큰 파일은 크기와 수정 시각입니다. */
+	private static String fingerprint(File file) throws IOException {
+		if (file.length() > HASH_LIMIT_BYTES) {
+			return "size:" + file.length() + ",modified:" + file.lastModified();
+		}
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			return HexFormat.of().formatHex(digest.digest(Files.readAllBytes(file.toPath()))).substring(0, 16);
+		} catch (NoSuchAlgorithmException e) {
+			throw new IOException(e);
+		}
+	}
 }

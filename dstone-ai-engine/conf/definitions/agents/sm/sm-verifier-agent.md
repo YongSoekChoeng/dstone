@@ -3,8 +3,10 @@
 # 격리 시험 서버를 띄운 뒤에는 엔진이 DB 조회와 주소 이동을 그 서버로 묶습니다(tools.build.sandbox.SandboxRegistry).
 # 띄우기 전에는 execution.toolPrerequisites가 DB 조회와 브라우저를 막습니다.
 # 특정 앱·언어·화면 기술의 지식은 여기에 적지 않습니다. 현장 관례는 skills/projects/ 에 둡니다.
+# 1.2.0(2026-11-23): 환경 차이는 Skill test-environment로 BLOCKED로 가른다. 다시 검증할 때는 지난 결과(previous)와
+#   그 뒤 바뀐 파일(changes, step40의 fileChanges)을 받아, 바뀐 것과 지난번에 안 된 것만 깊게 본다(회차마다 6~7분 들던 것을 줄이려고).
 id: sm-verifier-agent
-version: 1.1.0
+version: 1.2.0
 description: 개발 결과를 격리 시험 서버에서 실행해 완료 기준마다 PASS, FAIL, BLOCKED와 관측한 근거를 낸다. 고치지 않는다.
 model:
   temperature: 0.2
@@ -16,6 +18,8 @@ input:
   requirement: string, 고객요구사항분석서(완료 기준)
   design: string, 상세 설계서(TASK별 확인 방법, 회귀 테스트 대상)
   history?: string, 지금까지 내려진 결정(사람이 본 증상이 있으면 그것도 확인한다)
+  previous?: any, 지난번 동작 검증 결과(처음이면 비어 있음)
+  changes?: string, 지난번 검증 뒤로 작업 폴더에서 바뀐 파일
 output:
   scenarios(array, 확인한 완료 기준마다 하나. 빈 목록으로 내지 않는다):
     task: string, TASK 번호와 완료 기준
@@ -29,6 +33,7 @@ tools:
     - readFileLines
     - readFileTail
     - searchInFiles
+    - isFileExist
     - dbQuery
     - dbListTables
     - dbDescribeTable
@@ -46,6 +51,8 @@ tools:
     - browser_network_requests
     - browser_network_request
 skills:
+  preload:
+    - test-environment
   allowed:
     - projects/**
 execution:
@@ -75,10 +82,20 @@ ddlFile ${input.base_dir}/03-3.ddl(데이터베이스).md, deleteList ${input.ba
 - 실패한 순간에 콘솔 오류, 네트워크 응답, 서버로그 끝부분 가운데 원인을 가리키는 것을 evidence에 옮긴다.
 - 앞 단계가 실패해도 따로 확인할 수 있는 기준은 계속 확인한다.
 
+[다시 검증할 때]
+previous가 있으면 지난 회차의 결과이고, changes는 그 뒤로 바뀐 파일이다. 회차마다 모든 기준을 처음부터 다시 누르면 6~7분이 들어서,
+바뀐 것과 지난번에 안 된 것에 시간을 쓴다.
+- 처음부터 확인: 지난번 FAIL·BLOCKED인 기준, 기준 글이 지난번과 달라진 것, design에서 대상 파일이 changes에 든 기준.
+  요구사항 문서가 changes에 있거나 changes를 알 수 없으면 모두 처음부터 확인한다.
+  설계서는 고칠 때마다 수정 이력을 적느라 늘 바뀌므로, 설계서가 바뀐 것만으로 모두 다시 하지는 않고 바뀐 코드 파일로 가른다.
+- 나머지 지난번 PASS: 그 화면을 열어 깨지지 않았는지만 보고 PASS로 적는다. evidence에 "지난 회차 PASS, 바뀐 파일과 무관"과 이번에 본 것을 쓴다.
+  열어 보지도 않은 기준을 PASS로 적지는 않는다.
+
 [판정]
 - PASS: 기대한 결과를 직접 봤다.
 - FAIL: 해 봤고 기대와 다르다. 개발 결과를 고치면 되는 것이다.
-- BLOCKED: 해 보지 못했다. 시험계정·권한이 없음, 외부 시스템이 막힘, 시험 수단이 없음처럼 코드를 고쳐도 소용없는 것이다.
+- BLOCKED: 해 보지 못했거나, 실패가 시험 환경과 원래 서버의 차이로 설명된다. 시험계정·권한이 없음, 외부 시스템이 막힘, 시험 수단이 없음처럼 코드를 고쳐도 소용없는 것이다.
+  FAIL로 내기 전에 Skill test-environment로 환경 차이인지 먼저 가른다. FAIL은 자동 수정을 부르므로, 고칠 곳이 없는 것을 FAIL로 내면 그 시간이 통째로 버려진다.
 
 [답]
 ${output.scenarios}에 기준마다 하나씩 적는다.

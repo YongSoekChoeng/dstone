@@ -16,7 +16,7 @@
 
     <select id="selectProject" parameterType="string" resultType="java.util.LinkedHashMap">
         SELECT PROJECT_ID AS "projectId", PROJECT_NAME AS "projectName", DESCRIPTION AS "description", SOURCE_DIR AS "sourceDir",
-               SCM_TYPE AS "scmType", SCM_URL AS "scmUrl", JAVA_VERSION AS "javaVersion", TEST_USER_ID AS "testUserId",
+               SCM_TYPE AS "scmType", SCM_URL AS "scmUrl", JAVA_VERSION AS "javaVersion", TEST_USER_ID AS "testUserId", TEST_STATIC_PATHS AS "testStaticPaths",
                CASE WHEN TEST_PASSWORD_ENC IS NULL OR TEST_PASSWORD_ENC = '' THEN 'N' ELSE 'Y' END AS "hasTestPassword", USE_YN AS "useYn"
           FROM ai_management_project
          WHERE PROJECT_ID = #{projectId}
@@ -52,11 +52,11 @@
     </select>
 
     <insert id="upsertProject" parameterType="java.util.Map">
-        INSERT INTO ai_management_project (PROJECT_ID, PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, TEST_USER_ID, TEST_PASSWORD_ENC, USE_YN, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
-        VALUES (#{projectId}, #{projectName}, #{description}, #{sourceDir}, #{scmType}, #{scmUrl}, #{javaVersion}, #{testUserId}, #{testPasswordEnc}, #{useYn}, now(), #{by}, now(), #{by})
+        INSERT INTO ai_management_project (PROJECT_ID, PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, TEST_USER_ID, TEST_PASSWORD_ENC, TEST_STATIC_PATHS, USE_YN, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
+        VALUES (#{projectId}, #{projectName}, #{description}, #{sourceDir}, #{scmType}, #{scmUrl}, #{javaVersion}, #{testUserId}, #{testPasswordEnc}, #{testStaticPaths}, #{useYn}, now(), #{by}, now(), #{by})
         ON CONFLICT (PROJECT_ID) DO UPDATE
            SET PROJECT_NAME = EXCLUDED.PROJECT_NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, SOURCE_DIR = EXCLUDED.SOURCE_DIR,
-               SCM_TYPE = EXCLUDED.SCM_TYPE, SCM_URL = EXCLUDED.SCM_URL, JAVA_VERSION = EXCLUDED.JAVA_VERSION, TEST_USER_ID = EXCLUDED.TEST_USER_ID, TEST_PASSWORD_ENC = EXCLUDED.TEST_PASSWORD_ENC, USE_YN = EXCLUDED.USE_YN, UPDATED_AT = now(), UPDATED_BY = EXCLUDED.UPDATED_BY
+               SCM_TYPE = EXCLUDED.SCM_TYPE, SCM_URL = EXCLUDED.SCM_URL, JAVA_VERSION = EXCLUDED.JAVA_VERSION, TEST_USER_ID = EXCLUDED.TEST_USER_ID, TEST_PASSWORD_ENC = EXCLUDED.TEST_PASSWORD_ENC, TEST_STATIC_PATHS = EXCLUDED.TEST_STATIC_PATHS, USE_YN = EXCLUDED.USE_YN, UPDATED_AT = now(), UPDATED_BY = EXCLUDED.UPDATED_BY
     </insert>
 
     <delete id="deleteProjectDbs" parameterType="string">
