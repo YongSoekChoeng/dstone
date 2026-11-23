@@ -1297,6 +1297,7 @@ var DstoneAiDesigner = (function () {
 			}
 		});
 		graph.use(selection);
+		bindNavButtons();
 
 		dnd = new X6.Dnd({
 			target: graph,
@@ -1483,6 +1484,85 @@ var DstoneAiDesigner = (function () {
 				graph.zoomToFit({ padding: 30, maxScale: 1 });
 			}
 		});
+	}
+
+	/** 이동 버튼 한 번에 움직이는 거리(화면 픽셀)와 확대 버튼 한 번에 바뀌는 배율 */
+	var NAV_PAN_STEP = 80;
+	var NAV_ZOOM_STEP = 0.1;
+	/** 확대 범위. 마우스 휠(Ctrl+휠) 설정과 같게 둡니다 */
+	var NAV_MIN_SCALE = 0.2;
+	var NAV_MAX_SCALE = 2;
+
+	/**
+	 * 그림 오른쪽 위의 이동·확대 버튼을 연결합니다.
+	 * 화살표는 "그쪽을 보러 간다"는 뜻입니다. ▲를 누르면 위쪽이 보이도록 그림이 아래로 내려갑니다.
+	 * 이동·확대 버튼은 누르고 있으면 계속 움직입니다.
+	 */
+	function bindNavButtons() {
+		var box = els.graphBox;
+		var repeatTimer = null;
+		var repeatDelay = null;
+
+		function stopRepeat() {
+			window.clearTimeout(repeatDelay);
+			window.clearInterval(repeatTimer);
+			repeatDelay = null;
+			repeatTimer = null;
+		}
+
+		function runNav(button) {
+			var pan = button.getAttribute("data-pan");
+			var zoom = button.getAttribute("data-zoom");
+			if (pan === "up") {
+				graph.translateBy(0, NAV_PAN_STEP);
+			} else if (pan === "down") {
+				graph.translateBy(0, -NAV_PAN_STEP);
+			} else if (pan === "left") {
+				graph.translateBy(NAV_PAN_STEP, 0);
+			} else if (pan === "right") {
+				graph.translateBy(-NAV_PAN_STEP, 0);
+			} else if (zoom === "in") {
+				graph.zoom(NAV_ZOOM_STEP, { minScale: NAV_MIN_SCALE, maxScale: NAV_MAX_SCALE });
+			} else if (zoom === "out") {
+				graph.zoom(-NAV_ZOOM_STEP, { minScale: NAV_MIN_SCALE, maxScale: NAV_MAX_SCALE });
+			} else if (zoom === "reset") {
+				graph.zoom(1, { absolute: true });
+			} else if (button.getAttribute("data-nav-fit")) {
+				graph.zoomToFit({ padding: 30, maxScale: 1 });
+			}
+		}
+
+		// 누르는 순간 한 번 움직이고, 잠시 뒤부터는 누르고 있는 동안 계속 움직인다. 맞춤·100%는 한 번만.
+		box.addEventListener("mousedown", function (e) {
+			var button = e.target.closest(".wd-nav [data-pan], .wd-nav [data-zoom], .wd-nav [data-nav-fit]");
+			if (!button || e.button !== 0) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			stopRepeat();
+			runNav(button);
+			if (button.getAttribute("data-pan") || button.getAttribute("data-zoom") === "in" || button.getAttribute("data-zoom") === "out") {
+				repeatDelay = window.setTimeout(function () {
+					repeatTimer = window.setInterval(function () {
+						runNav(button);
+					}, 60);
+				}, 350);
+			}
+		});
+		document.addEventListener("mouseup", stopRepeat);
+		box.addEventListener("mouseleave", stopRepeat);
+		// 버튼 위의 클릭이 그림(빈 곳 클릭 = 선택 풀기, 영역 선택)으로 넘어가지 않게 막는다.
+		box.querySelector(".wd-nav").addEventListener("click", function (e) {
+			e.stopPropagation();
+		});
+
+		var level = document.getElementById("wd-zoom-level");
+		function showZoomLevel() {
+			level.textContent = Math.round(graph.zoom() * 100) + "%";
+		}
+		graph.on("scale", showZoomLevel);
+		showZoomLevel();
 	}
 
 	/**

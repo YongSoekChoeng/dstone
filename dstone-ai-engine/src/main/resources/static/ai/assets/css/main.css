@@ -992,6 +992,71 @@
 	height: 100%;
 }
 
+/* 그림 오른쪽 위의 이동·확대 버튼 */
+.wd-nav {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px;
+	background: rgba(255, 255, 255, 0.92);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius);
+	box-shadow: 0 1px 4px rgba(15, 23, 38, 0.08);
+	user-select: none;
+}
+
+.wd-nav-pad {
+	display: grid;
+	grid-template-columns: repeat(3, 26px);
+	grid-template-rows: repeat(3, 26px);
+	gap: 2px;
+}
+
+.wd-nav-up { grid-area: 1 / 2; }
+.wd-nav-left { grid-area: 2 / 1; }
+.wd-nav-fit { grid-area: 2 / 2; }
+.wd-nav-right { grid-area: 2 / 3; }
+.wd-nav-down { grid-area: 3 / 2; }
+
+.wd-nav-zoom {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 2px;
+}
+
+.wd-nav .wd-nav-btn,
+.wd-nav .wd-nav-level {
+	min-width: 26px;
+	height: 26px;
+	padding: 0;
+	margin: 0;
+	font-size: 12px;
+	line-height: 1;
+	color: var(--cs-text-2);
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border-strong);
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.wd-nav .wd-nav-level {
+	min-width: 46px;
+	font-size: 11px;
+	color: var(--cs-muted);
+}
+
+.wd-nav .wd-nav-btn:hover,
+.wd-nav .wd-nav-level:hover {
+	color: var(--cs-primary);
+	background: var(--cs-primary-soft);
+	border-color: var(--cs-primary);
+}
+
 /* 연결점(작은 원)은 평소에 숨긴다. 늘 보이면 노드 테두리 위에서 화살표 끝을 가린다.
    노드에 마우스를 올리면(화살표를 새로 이을 때) 보인다 */
 .wd-canvas .x6-port-body {

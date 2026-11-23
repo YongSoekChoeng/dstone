@@ -101,7 +101,7 @@
 						<p class="wd-legend"><span class="wd-legend-line wd-legend-next"></span>다음(next)</p>
 						<p class="wd-legend"><span class="wd-legend-line wd-legend-fail"></span>실패(onFailure)</p>
 						<p class="wd-legend"><span class="wd-legend-line wd-legend-route"></span>경로(routes)</p>
-						<p class="wd-palette-help">step 누르기: 이어진 화살표·step 강조<br />Delete: 고른 것 지우기<br />Ctrl+휠: 확대/축소<br />빈 곳 끌기: 여러 step 고르기(고른 step을 끌면 같이 옮겨짐)<br />Ctrl+누르기: step 하나씩 더 고르기<br />Shift+끌기: 화면 이동</p>
+						<p class="wd-palette-help">step 누르기: 이어진 화살표·step 강조<br />Delete: 고른 것 지우기<br />Ctrl+휠: 확대/축소<br />빈 곳 끌기: 여러 step 고르기(고른 step을 끌면 같이 옮겨짐)<br />Ctrl+누르기: step 하나씩 더 고르기<br />Shift+끌기: 화면 이동<br />오른쪽 위 버튼: 이동·확대/축소(누르고 있으면 계속), ⤢ 전체 맞춤</p>
 					</div>
 					<div class="wd-center">
 						<div class="wd-tabs">
@@ -121,6 +121,21 @@
 						</div>
 						<div id="wd-graph-box" class="wd-graph-box">
 							<div id="wd-canvas" class="wd-canvas"></div>
+							<!-- 그림 이동·확대 버튼. 누르고 있으면 계속 움직입니다 -->
+							<div class="wd-nav" aria-label="그림 이동과 확대">
+								<div class="wd-nav-pad">
+									<button type="button" class="wd-nav-btn wd-nav-up" data-pan="up" title="위로 이동">▲</button>
+									<button type="button" class="wd-nav-btn wd-nav-left" data-pan="left" title="왼쪽으로 이동">◀</button>
+									<button type="button" class="wd-nav-btn wd-nav-fit" data-nav-fit="1" title="그림 전체가 보이게 맞춤">⤢</button>
+									<button type="button" class="wd-nav-btn wd-nav-right" data-pan="right" title="오른쪽으로 이동">▶</button>
+									<button type="button" class="wd-nav-btn wd-nav-down" data-pan="down" title="아래로 이동">▼</button>
+								</div>
+								<div class="wd-nav-zoom">
+									<button type="button" class="wd-nav-btn" data-zoom="in" title="확대">＋</button>
+									<button type="button" class="wd-nav-level" data-zoom="reset" title="100%로 되돌리기"><span id="wd-zoom-level">100%</span></button>
+									<button type="button" class="wd-nav-btn" data-zoom="out" title="축소">－</button>
+								</div>
+							</div>
 						</div>
 						<div id="wd-yaml-box" class="wd-yaml-box" style="display: none;">
 							<p class="ai-hint">여기서 고친 글자는 [저장] 때 그대로 저장됩니다(주석 포함). 그림에 반영하려면 [그림에 반영]을 누르십시오.
