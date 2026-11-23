@@ -263,6 +263,11 @@ dstone:
                 # 설치 버전은 원래 DB와 같거나 높게. AppArmor가 켜진 Linux는 work-root 아래에 mysqld가 쓸 수 있게 허용해야 한다.
                 sandbox-mysql-home: ${TEST_SERVER_MYSQL_HOME:}
                 sandbox-postgresql-home: ${TEST_SERVER_POSTGRESQL_HOME:}
+                # Oracle은 설치 폴더 대신 시험 전용 서버(12c 이상 CDB, 원래 DB와 다른 서버)에 실행마다 PDB를 만든다. 비우면 Oracle은 자동 검증하지 않는다.
+                # 계정은 그 서버의 SYSDBA. 비밀번호는 ENC(...)로 적는다.
+                sandbox-oracle-url: ${TEST_SERVER_ORACLE_URL:}
+                sandbox-oracle-username: ${TEST_SERVER_ORACLE_USERNAME:}
+                sandbox-oracle-password: ${TEST_SERVER_ORACLE_PASSWORD:}
                 # 복제할 DB 하나의 크기 상한
                 sandbox-max-db-mb: 2048
                 # 격리 중에도 앱이 접속해도 되는 곳. 프로젝트마다 적는다(프로젝트ID=host:port, 쉼표로 구분). 시험 중 이곳에는 실제로 쓰게 되므로 시험용만 적는다

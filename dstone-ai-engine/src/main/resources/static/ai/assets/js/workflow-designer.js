@@ -2976,7 +2976,7 @@ var DstoneAiDesigner = (function () {
 	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "tools", "skills", "subAgents", "allowedCallers", "execution"];
 	var AGENT_SUB_ORDER = {
 		model: ["provider", "name", "temperature", "reasoning"],
-		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls", "requiredTools"]
+		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls", "requiredTools", "toolPrerequisites"]
 	};
 
 	function bindAgentDialog() {

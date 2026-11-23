@@ -1,6 +1,7 @@
 package net.dstone.ai.tools.build.sandbox;
 
 import java.io.File;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -28,13 +29,13 @@ final class PostgresKind implements SandboxDatabaseKind {
 	}
 
 	@Override
-	public boolean backslashEscapes() {
-		return false;
+	public SandboxDdl.Dialect dialect() {
+		return SandboxDdl.Dialect.POSTGRESQL;
 	}
 
 	@Override
-	public SandboxDatabase create(File dir, String home, int maxDbMb) throws SandboxException {
-		return new SandboxPostgres(dir, home, maxDbMb);
+	public SandboxDatabase create(File dir, Map<String, String> settings, int maxDbMb) throws SandboxException {
+		return new SandboxPostgres(dir, settings.get("postgresql-home"), maxDbMb);
 	}
 
 }

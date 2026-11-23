@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.stereotype.Component;
 
@@ -32,6 +33,7 @@ public class SandboxRegistry implements ToolCallCheck {
 	public static final String ALIAS_PREFIX = "sandbox-";
 
 	private static final Set<String> DB_TOOLS = Set.of("dbQuery", "dbListTables", "dbDescribeTable");
+	private static final String BROWSER = "browser_";
 	private static final String NAVIGATE = "browser_navigate";
 	private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -40,8 +42,9 @@ public class SandboxRegistry implements ToolCallCheck {
 	 *
 	 * @param url     시험 서버 주소
 	 * @param aliases 복제본 별칭들
+	 * @param opened  시험 서버 화면을 열었는가
 	 */
-	private record View(String url, Set<String> aliases) {
+	private record View(String url, Set<String> aliases, AtomicBoolean opened) {
 	}
 
 	private final Map<StepRef, View> views = new ConcurrentHashMap<StepRef, View>();
@@ -57,7 +60,7 @@ public class SandboxRegistry implements ToolCallCheck {
 	public void opened(StepRef stepRef, String url, Map<String, Map<String, String>> connections) {
 		this.connections.putAll(connections);
 		if (stepRef != null) {
-			this.views.put(stepRef, new View(url, Set.copyOf(connections.keySet())));
+			this.views.put(stepRef, new View(url, Set.copyOf(connections.keySet()), new AtomicBoolean()));
 		}
 	}
 
@@ -80,12 +83,16 @@ public class SandboxRegistry implements ToolCallCheck {
 
 	@Override
 	public String check(String toolName, String toolInput, StepRef stepRef) {
-		if (stepRef == null || (!NAVIGATE.equals(toolName) && !DB_TOOLS.contains(toolName))) {
+		if (stepRef == null || (!toolName.startsWith(BROWSER) && !DB_TOOLS.contains(toolName))) {
 			return null;
 		}
 		View view = this.views.get(stepRef);
 		if (view == null) {
 			return null;
+		}
+		if (toolName.startsWith(BROWSER) && !NAVIGATE.equals(toolName)) {
+			// 브라우저는 앞 step과 같이 쓴다. 열려 있던 원래 서버 화면을 그대로 누르면 안 된다
+			return view.opened().get() ? null : "먼저 browser_navigate로 시험 서버(" + view.url() + ")를 엽니다. 지금 열려 있는 화면은 원래 서버일 수 있습니다.";
 		}
 		JsonNode args;
 		try {
@@ -95,7 +102,11 @@ public class SandboxRegistry implements ToolCallCheck {
 		}
 		if (NAVIGATE.equals(toolName)) {
 			String url = args.path("url").asText("").trim();
-			if ("about:blank".equals(url) || sameOrigin(view.url(), url)) {
+			if ("about:blank".equals(url)) {
+				return null;
+			}
+			if (sameOrigin(view.url(), url)) {
+				view.opened().set(true);
 				return null;
 			}
 			return "격리 시험 중에는 시험 서버(" + view.url() + ")의 화면만 엽니다. 다른 서버는 원래 DB에 쓸 수 있습니다.";

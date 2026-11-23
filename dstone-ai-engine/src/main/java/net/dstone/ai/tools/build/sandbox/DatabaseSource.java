@@ -9,8 +9,8 @@ import java.util.List;
  *
  * @param name     프로젝트 관리의 별칭
  * @param hosts    접속 주소들(여러 개면 첫째에서 읽음)
- * @param database DB 이름
- * @param options  JDBC 주소의 ? 뒤(? 포함). 없으면 빈 글자
+ * @param database DB 이름(Oracle은 스키마 주인)
+ * @param options  JDBC 주소의 ? 뒤(? 포함). 없으면 빈 글자. Oracle은 접속할 서비스나 SID
  * @param username 계정
  * @param password 비밀번호
  */

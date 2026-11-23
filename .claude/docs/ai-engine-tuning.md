@@ -86,7 +86,7 @@ One revise run also added an unrequested scale cap (no upscaling). Only this one
 - separate DB server process, not a second schema on the same server: LLM DDL may say `DROP DATABASE` or `otherdb.table`.
 - SOCKS guard via `JAVA_TOOL_OPTIONS` (`socksNonProxyHosts=` empty), not URL rewriting: addresses come from env vars, code, JNDI. Intercepts localhost on JDK 8/11/21/24 (Linux, Windows); NIO bypasses it, hence the artifact check (fail closed).
 - exceptions are per project: an engine-wide `ojdbc` trust would have opened every Oracle project.
-- `sm-auto-fix-agent` is separate from the troubleshooter so the unattended path cannot apply to the original or boot a server on the original DB. Known gap: the per-step guard starts when `startSandboxServer` succeeds; before that `dbQuery` (read-only) and `browser_navigate` (clicks there can write) still reach the originals.
+- `sm-auto-fix-agent` is separate from the troubleshooter so the unattended path cannot apply to the original or boot a server on the original DB. The per-step guard alone left a hole before `startSandboxServer` succeeded; closed the same day, see below.
 - verifier contract is `browser_navigate|browser_snapshot`: navigate already returns a snapshot; requiring snapshot threw away correct answers (2/2).
 
 Verified: attack test on both DB kinds (14 hostile scripts, original unchanged); Tool-path E2E on Nexacro WAR, two Spring Boot+MySQL SPAs, a WAR with legacy Spring, a Boot+PostgreSQL app, and an NIO app (refused); Windows binaries (MySQL 8.1, PostgreSQL 18.6) x JDK 8/11/21, and Windows 8.1 tools against MySQL 8.4.
@@ -99,3 +99,29 @@ Real LLM (qwen3.8-27b), synthetic memo app, entering at step16, graded by an ind
 | 3 planted bugs (column length, missing WHERE value, partial update loses a value) | 3 | all repaired within 2 fixes as seen from the screen; HTTP test 3/3, 3/3, 2/3 (one fix was only in the HTML, so the API still lost the value) | 210-239 s |
 
 Not measured: a full run from a request, a large app with login, first-pass pass rate on several request types. Known gap: the verifier only tests through the screen.
+
+**Same day, after 2.4.0 — guard holes and Oracle sandbox.**
+- Holes found after the 2.4.0 commit: (1) the per-step guard began only after a successful start; (2) a Tool returning `{"success":false}` was recorded as succeeded, so `requiredTools: startSandboxServer` passed on a failed boot; (3) the shared browser could still show the original app. Fixes: `execution.toolPrerequisites`; the success record ignores `success:false` (only there: putting it in `FileAccessRule.isFailure` would make the repeat guard block compile → edit → recompile); `browser_*` waits for a navigate to the sandbox.
+- ojdbc routes, measured with fake endpoints on JDK 8/11/21/24: 11.2, 21c, 23ai honour SOCKS; 12.2-19.25 use NIO unless `oracle.jdbc.javaNetNio=false` (an app setting true wins, hence the artifact scan). So `ojdbc` no longer needs a trusted-libs exception.
+- Oracle = per-run PDB on a dedicated test CDB + Data Pump network import as the unprivileged schema user (privileged importer gets ORA-39149) + a TNS relay that rewrites SERVICE_NAME/SID. With javaNetNio=false the driver splits connect data into 255-byte DATA packets; the relay must reassemble.
+- Verified on two disposable 23ai Free instances: 92 checks (16 driver jars x 4 URLs, 14 hostile scripts, orphan PDB cleanup, original unchanged), Tool-path boot of two Spring Boot apps (ojdbc 19.3 and 23.5, 57-61 s). Not verified: 19c/21c servers, mixed versions, non-UTF8 source.
+- Rechecked after the reboot: a MySQL WAR carrying ojdbc6 + ojdbc8 boots through `startSandboxServer` with no `sandbox-trusted-libs` entry (HTTP 200, original DB and site refused, original checksum unchanged); the real-LLM verify loop (planted-bug memo case) still repairs all three bugs with the new guards, and no guard refused a normal step.
+
+**First full runs from a request (2026-11-23, sm-workflow 2.4.0, qwen3.8-27b on OpenRouter).** Synthetic Spring Boot + MySQL app (employee list only), knowledge test instance on a disposable PostgreSQL, disposable source MySQL. Three requests that state the API contract: new table CRUD (memo, 12 checks), search + paging on the existing list (search, 9), business rules (notice: required fields, period check, only current notices, 11). Every approval chose the forward route (step06 그대로 진행, step08/11 승인); stopped at step17. Graded with no LLM: boot the result on a fresh sandbox clone, call the API, query the clone. "first" = the dev result right after the first step16, "final" = when the run stopped. 15 runs, two at a time. Harness and data are in temp only.
+
+| request | reached step17 | first all-pass | final all-pass | time to step17 |
+|---|---|---|---|---|
+| memo | 4/5 | 3/5 | 4/5 | 566-854 s |
+| search | 4/5 | 4/4 | 4/4 | 242-378 s |
+| notice | 2/5 | 4/5 | 5/5 | 339-448 s |
+| total | 10/15 | 11/14 | 13/14 | median ~7 min |
+
+End to end (reached step17 and all checks pass): 10/15.
+
+Failure classes:
+- Engine / provider (5/15, the largest): one LLM call got no response for 5 min (`timeout: 5m`), okhttp cancelled the stream and the step failed, so the whole run stopped (step34 x4, step05 x1). The call before it was normal each time (14-19k input tokens). Not retried although `max-retries: 1`. Cause not settled: provider stall or a reasoning runaway (calls are not streamed and `max-tokens: 60000`, so a long generation sends no bytes; the longest successful call was 197 s). Candidates: retry a timed-out call once, lower the output cap for Tool-loop agents.
+- Developer (3 of 14 first results): partial update lost the body (memo-4, memo-5), delete did nothing (memo-5), the list returned `start_date` instead of the promised `startDate` (notice-3). memo-5 and notice-3 were repaired by the auto-fix loop (1 and 2 rounds); memo-4 stopped on the timeout before its verification finished. One more first result (search-1) had a screen-only bug (department options hard-coded as `개발부`, DB holds `개발`); the API grader cannot see it, the verifier found and fixed it.
+- Requirement review failed in 3 runs (memo-1, memo-5, notice-3), each time on a real ambiguity in the request (update keeps blanks vs title required; date format). The forward route was taken, so this measures "human ignores the review".
+- Verifier: no false PASS seen (every run that reached step17 graded all-pass); each FAIL it raised was a real defect.
+
+Limits: small app without login, requests spell out the API, the grader checks the API only, n=5 per request, approvals never send work back.

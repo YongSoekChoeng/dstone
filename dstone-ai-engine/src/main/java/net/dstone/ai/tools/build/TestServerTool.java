@@ -160,7 +160,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	private static final String CAUSE_ENVIRONMENT = "environment";
 
 	/** 앱이 DB 로그인에 실패한 흔적. 프로젝트 관리의 계정이 앱의 계정과 다른 환경 문제다 */
-	private static final Pattern LOGIN_FAILED = Pattern.compile("Access denied for user|password authentication failed for user");
+	private static final Pattern LOGIN_FAILED = Pattern.compile("Access denied for user|password authentication failed for user|ORA-01017");
 
 	/** 띄우는 방법 하나(플러그인 종류에 따라 정함) */
 	private static final class Launch {
@@ -462,12 +462,12 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 				connections.put(entry.getKey(), entry.getValue());
 			}
 		}
-		Map<String, String> homes = new LinkedHashMap<String, String>();
-		for (String kind : TestSandbox.kinds()) {
-			homes.put(kind, this.config("sandbox-" + kind + "-home", ""));
+		Map<String, String> settings = new LinkedHashMap<String, String>();
+		for (String name : TestSandbox.settingNames()) {
+			settings.put(name, this.config("sandbox-" + name, ""));
 		}
 		try {
-			server.sandbox = TestSandbox.create(base, sourceRoot, app, connections, request.ddlFile, homes,
+			server.sandbox = TestSandbox.create(base, sourceRoot, app, connections, request.ddlFile, settings,
 				Integer.parseInt(this.config("sandbox-max-db-mb", "2048")), forProject(this.config("sandbox-allow-hosts", ""), projectId));
 			return null;
 		} catch (SandboxException e) {

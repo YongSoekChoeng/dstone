@@ -1,9 +1,9 @@
 ---
 # sm-workflow step39(자동 수정)의 Agent입니다. 동작 검증이 잡은 실패를 사람에게 가기 전에 고칩니다(최대 횟수는 step36이 셈).
 # 전문가 해결 Agent와 나눈 이유: 사람 없이 돌기 때문에 원본에 반영하거나 원래 DB로 서버를 띄우는 Tool(startTestServer, applyOverlay, runShellScript)을 주지 않습니다.
-# dbQuery와 브라우저는 시험 서버를 띄우기 전에는 원래 DB 조회와 다른 주소 열기가 됩니다.
+# 시험 서버를 띄우기 전에는 execution.toolPrerequisites가 행 조회와 브라우저를 막습니다. 기동 실패를 고칠 때 필요한 테이블 구조 조회만 원래 DB에서 됩니다.
 id: sm-auto-fix-agent
-version: 1.0.0
+version: 1.1.0
 description: 동작 검증에서 실패한 것의 원인을 격리 시험 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -65,6 +65,8 @@ skills:
     - projects/**
 execution:
   maxToolCalls: 120
+  toolPrerequisites:
+    startSandboxServer: [dbQuery, "browser_*"]
   requiredWrites:
     - ${input.base_dir}/03-1.design.md
 ---

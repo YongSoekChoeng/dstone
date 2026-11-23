@@ -267,9 +267,11 @@ public record AgentDefinition(
 	 * @param requiredTools   이 Agent를 한 번 부르는 동안 꼭 한 번 이상 성공해야 하는 Tool 이름입니다. 비워두면 검사하지 않습니다.
 	 * @param requiredWrites  이 Agent를 한 번 부르는 동안 꼭 써야(고쳐야) 하는 파일입니다. 입력 속 파일 경로를 가리키는 표현식으로 적습니다
 	 *                        (예: ${input.documents[0]}, ${input.base_dir}/01.md). 값이 목록이면 목록의 파일을 모두 써야 합니다. 비워두면 검사하지 않습니다.
+	 * @param toolPrerequisites 먼저 성공해야 하는 Tool → 그 전에는 실행하지 않을 Tool들입니다(끝의 *는 앞부분 일치).
+	 *                          예: {startSandboxServer: [dbQuery, "browser_*"]}. 비워두면 순서를 보지 않습니다.
 	 */
 	public record Execution(Integer maxAttempts, Integer timeoutSeconds, String onInvalidOutput, Integer maxToolCalls, List<String> requiredTools,
-		List<String> requiredWrites) {
+		List<String> requiredWrites, Map<String, List<String>> toolPrerequisites) {
 	}
 
 	/** 시스템 프롬프트 원문입니다(파일의 본문). */
@@ -338,6 +340,11 @@ public record AgentDefinition(
 	/** 한 번 부르는 동안 꼭 써야 하는 파일을 가리키는 표현식입니다(execution.requiredWrites). 적지 않았으면 빈 목록입니다. */
 	public List<String> requiredWrites() {
 		return this.execution == null || this.execution.requiredWrites() == null ? List.of() : this.execution.requiredWrites();
+	}
+
+	/** 먼저 성공해야 하는 Tool → 그 전에는 막을 Tool들입니다(execution.toolPrerequisites). 적지 않았으면 빈 맵입니다. */
+	public Map<String, List<String>> toolPrerequisites() {
+		return this.execution == null || this.execution.toolPrerequisites() == null ? Map.of() : this.execution.toolPrerequisites();
 	}
 
 	/** 한 번 부르는 동안 꼭 성공해야 하는 Tool 이름입니다(execution.requiredTools). 적지 않았으면 빈 목록입니다. */

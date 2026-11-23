@@ -33,10 +33,11 @@ final class SandboxPaths {
 	private static final long MAX_TEXT_BYTES = 5L * 1024 * 1024;
 
 	/** 일반 소켓을 쓰지 않아 SandboxGuard가 잡지 못하는 DB 드라이버의 주소 */
-	private static final Pattern UNGUARDED_URL = Pattern.compile("jdbc:(?:log4jdbc:)?(oracle|sqlserver|db2|tibero|cubrid|sap):", Pattern.CASE_INSENSITIVE);
+	private static final Pattern UNGUARDED_URL = Pattern.compile("jdbc:(?:log4jdbc:)?(oracle:(?:oci8?|kprb)|sqlserver|db2|tibero|cubrid|sap):", Pattern.CASE_INSENSITIVE);
 
 	private final List<Pattern> from = new ArrayList<Pattern>();
 	private final List<String> to = new ArrayList<String>();
+	private final List<String> needles = new ArrayList<String>();
 
 	/**
 	 * @param sourceRoot 원본 폴더
@@ -59,7 +60,13 @@ final class SandboxPaths {
 		String raw = new String(source.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
 		// /app/myApp이 /app/myApp2나 /other/app/myApp 안에서 걸리지 않게 앞뒤를 본다
 		this.from.add(Pattern.compile("(?<![A-Za-z0-9_.-])" + Pattern.quote(raw) + "(?![A-Za-z0-9_-]|\\.[A-Za-z0-9])", ignoreCase ? Pattern.CASE_INSENSITIVE : 0));
+		this.needles.add(source);
 		this.to.add(Matcher.quoteReplacement(new String(copy.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1)));
+	}
+
+	/** 바꿀 경로의 글자들. DB에서 고칠 행을 먼저 찾을 때 씁니다. */
+	List<String> needles() {
+		return this.needles;
 	}
 
 	/** 바이트 그대로 읽은 글자(ISO-8859-1)에서 경로를 바꿉니다. */

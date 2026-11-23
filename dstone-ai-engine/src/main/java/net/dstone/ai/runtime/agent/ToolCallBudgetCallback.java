@@ -1,8 +1,10 @@
 package net.dstone.ai.runtime.agent;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -52,6 +54,9 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	static final int MAX_REFUSALS = 3;
 
 	private final ToolCallback delegate;
+	/** 결과 객체의 맨 앞쪽 success가 false인 모양 */
+	private static final Pattern NOT_SUCCEEDED = Pattern.compile("^\\s*\\{\\s*\"success\"\\s*:\\s*false\\b");
+
 	private final String agentId;
 	private final AtomicInteger used;
 	private final int maxCalls;
@@ -59,6 +64,7 @@ public class ToolCallBudgetCallback implements ToolCallback {
 	private final List<String> requiredTools;
 	private final AtomicInteger reserveRefusals;
 	private final Set<String> writtenPaths;
+	private Map<String, List<String>> prerequisites = Map.of();
 
 	/**
 	 * @param delegate 실제 Tool 호출을 맡는 원래 ToolCallback입니다.
@@ -103,6 +109,20 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		this.writtenPaths = writtenPaths;
 	}
 
+	/**
+	 * <pre>
+	 * Tool을 부르는 순서를 강제합니다(execution.toolPrerequisites). 프롬프트의 "먼저 부른다"만으로는 지켜지지 않기 때문입니다.
+	 * 성공 기록(succeeded)이 있어야 동작합니다.
+	 * </pre>
+	 *
+	 * @param prerequisites 먼저 성공해야 하는 Tool → 그 전에는 실행하지 않을 Tool들
+	 * @return 자기 자신
+	 */
+	ToolCallBudgetCallback prerequisites(Map<String, List<String>> prerequisites) {
+		this.prerequisites = prerequisites == null || this.succeeded == null ? Map.of() : prerequisites;
+		return this;
+	}
+
 	@Override
 	public ToolDefinition getToolDefinition() {
 		return this.delegate.getToolDefinition();
@@ -122,6 +142,10 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (count > this.maxCalls) {
 			return this.refused(count);
 		}
+		String early = this.tooEarly();
+		if (early != null) {
+			return this.withNotice(early, count);
+		}
 		return this.withNotice(this.recorded(this.delegate.call(toolInput), toolInput), count);
 	}
 
@@ -134,7 +158,29 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		if (count > this.maxCalls) {
 			return this.refused(count);
 		}
+		String early = this.tooEarly();
+		if (early != null) {
+			return this.withNotice(early, count);
+		}
 		return this.withNotice(this.recorded(this.delegate.call(toolInput, toolContext), toolInput), count);
+	}
+
+	/** 먼저 성공해야 하는 Tool이 남아 있으면 실행하지 않았다는 안내를, 없으면 null을 돌려줍니다. */
+	private String tooEarly() {
+		String name = this.delegate.getToolDefinition().name();
+		for (Map.Entry<String, List<String>> entry : this.prerequisites.entrySet()) {
+			if (this.succeeded.contains(entry.getKey())) {
+				continue;
+			}
+			for (String held : entry.getValue()) {
+				boolean prefix = held.endsWith("*") && name.startsWith(held.substring(0, held.length() - 1));
+				if (prefix || held.equals(name)) {
+					return "실패: " + name + "는 " + entry.getKey() + "가 성공한 뒤에만 부를 수 있습니다. 실행하지 않았습니다. "
+						+ entry.getKey() + "가 계속 실패하면 이 Tool 없이 마무리하고, 확인하지 못한 것은 확인하지 못했다고 적으십시오.";
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -230,7 +276,9 @@ public class ToolCallBudgetCallback implements ToolCallback {
 		// 글자를 돌려주는 Tool의 답은 JSON 글자("실패: ...")로 감싸여 오므로 따옴표까지 보는 FileAccessRule.isFailure()로 가린다.
 		boolean ok = !FileAccessRule.isFailure(result);
 		String name = this.delegate.getToolDefinition().name();
-		if (this.succeeded != null && ok) {
+		// {"success":false}는 Tool이 돌기는 했지만 성공한 것이 아니다.
+		// isFailure()에 합치지 않는다. 합치면 컴파일 실패 → 수정 → 같은 인자로 재컴파일까지 '반복 실패'로 막힌다.
+		if (this.succeeded != null && ok && (result == null || !NOT_SUCCEEDED.matcher(result).find())) {
 			this.succeeded.add(name);
 		}
 		if (this.writtenPaths != null && ok) {

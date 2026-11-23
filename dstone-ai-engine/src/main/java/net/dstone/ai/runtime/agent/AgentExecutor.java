@@ -880,7 +880,8 @@ public class AgentExecutor extends BaseObject {
 			ToolCallback inner = readHistory == null ? callback : new RereadGuardCallback(callback, readHistory, agent.id());
 			// 같은 인자로 이미 실패한 호출은 실행하지 않습니다. 막은 호출도 바깥의 횟수 세기에서 한 번으로 셉니다.
 			inner = new RepeatFailureGuardCallback(inner, failures, agent.id());
-			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals, writtenPaths));
+			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals, writtenPaths)
+				.prerequisites(agent.toolPrerequisites()));
 		}
 		return result;
 	}

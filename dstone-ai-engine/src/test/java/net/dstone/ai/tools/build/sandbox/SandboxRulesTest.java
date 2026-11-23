@@ -36,7 +36,7 @@ class SandboxRulesTest {
 	@Test
 	void 마크다운은_sql_블록만_실행하고_롤백은_뺀다() {
 		String text = "# DDL\n```sql\nCREATE TABLE a(x varchar(9) default 'p;q');\n-- 주석;\nINSERT INTO a VALUES('1');\n```\n## 롤백\n```sql\nDROP TABLE a;\n```\n";
-		SandboxDdl.Script script = SandboxDdl.parse("ddl.md", text, true);
+		SandboxDdl.Script script = SandboxDdl.parse("ddl.md", text, SandboxDdl.Dialect.MYSQL);
 
 		assertThat(script.problem()).isNull();
 		assertThat(script.statements()).hasSize(2);
@@ -45,14 +45,39 @@ class SandboxRulesTest {
 
 	@Test
 	void 블록_밖의_DDL은_조용히_빼먹지_않는다() {
-		assertThat(SandboxDdl.parse("ddl.md", "# DDL\nCREATE TABLE a(x int);\n", true).problem()).contains("블록 밖");
+		assertThat(SandboxDdl.parse("ddl.md", "# DDL\nCREATE TABLE a(x int);\n", SandboxDdl.Dialect.MYSQL).problem()).contains("블록 밖");
 	}
 
 	@Test
 	void DB마다_다른_따옴표_규칙으로_나눈다() {
-		assertThat(SandboxDdl.split("INSERT INTO a VALUES('x\\';y'); SELECT 1", true)).hasSize(2);
-		assertThat(SandboxDdl.split("INSERT INTO a VALUES('x\\'); SELECT 1", false)).hasSize(2);
-		assertThat(SandboxDdl.split("DO $$ BEGIN PERFORM 1; END $$; SELECT 1", false)).hasSize(2);
+		assertThat(SandboxDdl.split("INSERT INTO a VALUES('x\\';y'); SELECT 1", SandboxDdl.Dialect.MYSQL)).hasSize(2);
+		assertThat(SandboxDdl.split("INSERT INTO a VALUES('x\\'); SELECT 1", SandboxDdl.Dialect.POSTGRESQL)).hasSize(2);
+		assertThat(SandboxDdl.split("DO $$ BEGIN PERFORM 1; END $$; SELECT 1", SandboxDdl.Dialect.POSTGRESQL)).hasSize(2);
+	}
+
+	@Test
+	void Oracle은_PLSQL을_슬래시_줄까지_한_문장으로_본다() {
+		String text = "SET DEFINE OFF\n-- 주석;\nCREATE TABLE a(x VARCHAR2(9) DEFAULT 'p;q');\n"
+			+ "CREATE OR REPLACE TRIGGER a_t BEFORE INSERT ON a FOR EACH ROW\nBEGIN\n  :new.x := q'[it's;]';\nEND;\n/\n"
+			+ "UPDATE a\nSET x = '1';\nCREATE TYPE t AS OBJECT(n NUMBER);\n/\n";
+
+		assertThat(SandboxDdl.split(text, SandboxDdl.Dialect.ORACLE)).containsExactly(
+			"CREATE TABLE a(x VARCHAR2(9) DEFAULT 'p;q')",
+			"CREATE OR REPLACE TRIGGER a_t BEFORE INSERT ON a FOR EACH ROW\nBEGIN\n  :new.x := q'[it's;]';\nEND;",
+			"UPDATE a\nSET x = '1'",
+			"CREATE TYPE t AS OBJECT(n NUMBER)");
+	}
+
+	@Test
+	void Oracle_주소를_읽고_서비스는_늘_시험_PDB로_바꾼다() {
+		assertThat(OracleAddress.of("jdbc:oracle:thin:@db:1521:ORCL").connectData()).isEqualTo("(SID=ORCL)");
+		assertThat(OracleAddress.of("jdbc:log4jdbc:oracle:thin:@//db/shop.local").hosts()).containsExactly(new SandboxGuard.Endpoint("db", 1521));
+		assertThat(OracleAddress.of("jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=a)(PORT=1530))(ADDRESS=(HOST=b)(PORT=1531)(PROTOCOL=TCP))(CONNECT_DATA=(SERVICE_NAME=S)))").hosts()).hasSize(2);
+		assertThat(OracleAddress.of("jdbc:oracle:thin:@MYALIAS")).isNull();
+		assertThat(OracleAddress.of("jdbc:oracle:thin:@tcps://db:2484/S")).isNull();
+
+		assertThat(OracleRelay.retarget("(DESCRIPTION=(CONNECT_DATA=(SID=ORCL)(SERVER=SHARED)(CID=(PROGRAM=app))))", "SBX"))
+			.isEqualTo("(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=SBX)(CID=(PROGRAM=app))))");
 	}
 
 	@Test
@@ -111,7 +136,9 @@ class SandboxRulesTest {
 
 		assertThat(registry.check("dbQuery", "{\"alias\":\"sandbox-a.shop\"}", step)).isNull();
 		assertThat(registry.check("dbQuery", "{\"alias\":\"shop.main\"}", step)).isNotNull();
+		assertThat(registry.check("browser_click", "{}", step)).as("앞 step이 열어 둔 화면").isNotNull();
 		assertThat(registry.check("browser_navigate", "{\"url\":\"http://localhost:40001/list\"}", step)).isNull();
+		assertThat(registry.check("browser_click", "{}", step)).isNull();
 		assertThat(registry.check("browser_navigate", "{\"url\":\"http://localhost:8080/list\"}", step)).isNotNull();
 		assertThat(registry.check("dbQuery", "{\"alias\":\"shop.main\"}", new StepRef("run", "step07"))).isNull();
 

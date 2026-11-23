@@ -32,8 +32,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 앱의 설정 파일에서 접속 주소를 찾아 바꾸지 않습니다. 주소는 환경변수·코드·JNDI 어디에나 있을 수 있어서 하나만 놓쳐도 원래 DB에 쓰기 때문입니다.
  * 대신 JVM 옵션(jvmOptions())으로 새 소켓을 전부 이리로 보냅니다. JDK 8·11·21·24(Linux, Windows)에서 localhost까지 잡히는 것을 확인했습니다.
  *
- * 잡지 못하는 것: NIO SocketChannel로 여는 연결(Oracle·SQL Server 드라이버, Netty 계열).
- * 그래서 그런 DB를 쓰는 프로젝트는 격리 시험 서버를 띄우지 않습니다(TestSandbox).
+ * Oracle thin 드라이버는 12c~19c가 NIO로 접속합니다. oracle.jdbc.javaNetNio=false를 주면 일반 소켓을 써서 잡힙니다
+ * (11g, 21c, 23ai는 주지 않아도 잡힘. 11.2~23.26, JDK 8·11·21·24에서 확인). 앱이 그 값을 되돌리면 우회되므로 SandboxArtifact가 막습니다.
+ * oracle.net.disableOob는 중계가 TCP 긴급 데이터를 옮기지 못해서 끕니다.
+ *
+ * 잡지 못하는 것: NIO SocketChannel로 여는 연결(SQL Server 드라이버, Netty 계열).
+ * 그래서 그런 것을 쓰는 프로젝트는 격리 시험 서버를 띄우지 않습니다(TestSandbox).
  * </pre>
  */
 final class SandboxGuard implements Closeable {
@@ -93,7 +97,8 @@ final class SandboxGuard implements Closeable {
 
 	/** 이 문을 지나게 하는 JVM 옵션입니다. socksNonProxyHosts를 비워야 localhost도 지나갑니다. */
 	String jvmOptions() {
-		return "-DsocksProxyHost=127.0.0.1 -DsocksProxyPort=" + this.listener.getLocalPort() + " -DsocksProxyVersion=5 -DsocksNonProxyHosts=";
+		return "-DsocksProxyHost=127.0.0.1 -DsocksProxyPort=" + this.listener.getLocalPort() + " -DsocksProxyVersion=5 -DsocksNonProxyHosts="
+			+ " -Doracle.jdbc.javaNetNio=false -Doracle.net.disableOob=true";
 	}
 
 	/** 막은 연결(호스트:포트)들입니다. */

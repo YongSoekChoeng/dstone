@@ -14,15 +14,30 @@ import java.util.regex.Pattern;
  * - 바로 위 제목이나 줄에 롤백·원복이라고 적힌 블록은 실행하지 않습니다. 방금 만든 것을 되돌려 버리기 때문입니다.
  * - 블록 밖에 DDL이 있으면 실패입니다. 조용히 빼먹고 "반영했다"고 하지 않으려는 것입니다.
  *
+ * Oracle의 PL/SQL은 /만 있는 줄에서 끝납니다. SQL*Plus의 꾸밈 명령(SET, PROMPT 등)은 건너뜁니다.
+ *
  * mysql 명령줄 도구에 넘기지 않고 문장으로 나눠 JDBC로 보냅니다.
  * 명령줄 도구는 system, \! 같은 OS 명령을 실행할 수 있는데, 이 파일은 LLM이 쓴 것이기 때문입니다.
  * </pre>
  */
 final class SandboxDdl {
 
-	private static final Pattern SQL_START = Pattern.compile("(?is)^(\\s|--[^\\n]*\\n|#[^\\n]*\\n|/\\*.*?\\*/)*(CREATE|ALTER|INSERT|COMMENT|GRANT|DO|DROP|UPDATE|DELETE|REPLACE|RENAME|TRUNCATE|SET|USE|DELIMITER)\\b.*");
+	private static final Pattern SQL_START = Pattern.compile("(?is)^(\\s|--[^\\n]*\\n|#[^\\n]*\\n|/\\*.*?\\*/)*(CREATE|ALTER|BEGIN|DECLARE|INSERT|COMMENT|GRANT|DO|DROP|UPDATE|DELETE|REPLACE|RENAME|TRUNCATE|SET|USE|DELIMITER)\\b.*");
 	private static final Pattern DDL_OUTSIDE = Pattern.compile("(?i)^\\s*(CREATE\\s+(TABLE|INDEX|UNIQUE|VIEW)|ALTER\\s+TABLE|DROP\\s+TABLE|INSERT\\s+INTO)\\s+\\S.*");
 	private static final Pattern UNDO = Pattern.compile("(?i).*(롤백|원복|되돌리|rollback).*");
+
+	private static final Pattern PLSQL_START = Pattern.compile("(?is)^(CREATE\\s+(OR\\s+REPLACE\\s+)?((NON)?EDITIONABLE\\s+)?(FUNCTION|PROCEDURE|PACKAGE|TRIGGER|TYPE\\s+BODY)\\b|DECLARE\\b|BEGIN\\b).*");
+	private static final Pattern PLUS_COMMAND = Pattern.compile("(?i)^(PROMPT|REM|REMARK|SPOOL|WHENEVER|SHOW|EXIT|QUIT|SET(?!\\s+(ROLE|TRANSACTION|CONSTRAINTS?)\\b))(\\s.*)?$");
+
+	/** 문장을 나누는 규칙 */
+	enum Dialect {
+		/** \\가 다음 글자를 감쌈, DELIMITER */
+		MYSQL,
+		/** $$ ... $$ */
+		POSTGRESQL,
+		/** PL/SQL은 / 줄에서 끝남, q'[...]' */
+		ORACLE
+	}
 
 	/**
 	 * 꺼낸 결과입니다.
@@ -43,10 +58,10 @@ final class SandboxDdl {
 	 * @param fileName 파일 이름(.sql인지 봄)
 	 * @param text     파일 내용
 	 */
-	static Script parse(String fileName, String text, boolean backslashEscapes) {
+	static Script parse(String fileName, String text, Dialect dialect) {
 		List<String> statements = new ArrayList<String>();
 		if (fileName.toLowerCase().endsWith(".sql")) {
-			statements.addAll(split(text, backslashEscapes));
+			statements.addAll(split(text, dialect));
 			return new Script(statements, 0, null);
 		}
 		int skipped = 0;
@@ -72,13 +87,13 @@ final class SandboxDdl {
 				}
 			} else if (trimmed.startsWith("```")) {
 				String body = block.toString();
-				boolean sql = "sql".equals(language) || "mysql".equals(language) || "ddl".equals(language)
+				boolean sql = "sql".equals(language) || "oracle".equals(language) || "plsql".equals(language) || "mysql".equals(language) || "ddl".equals(language)
 					|| (language.isEmpty() && SQL_START.matcher(body).matches());
 				if (sql) {
 					if (UNDO.matcher(heading).matches() || UNDO.matcher(before).matches()) {
 						skipped++;
 					} else {
-						statements.addAll(split(body, backslashEscapes));
+						statements.addAll(split(body, dialect));
 					}
 				}
 				language = null;
@@ -94,7 +109,11 @@ final class SandboxDdl {
 	}
 
 	/** 문장으로 나눕니다. 따옴표·주석 안의 구분자는 건너뛰고 DELIMITER 줄을 따릅니다. 주석뿐인 조각은 버립니다. */
-	static List<String> split(String text, boolean backslashEscapes) {
+	static List<String> split(String text, Dialect dialect) {
+		if (dialect == Dialect.ORACLE) {
+			return splitOracle(text);
+		}
+		boolean backslashEscapes = dialect == Dialect.MYSQL;
 		List<String> result = new ArrayList<String>();
 		String sql = text.replace("\r\n", "\n");
 		String delimiter = ";";
@@ -157,6 +176,74 @@ final class SandboxDdl {
 		}
 		if (hasCode) {
 			result.add(current.toString().trim());
+		}
+		return result;
+	}
+
+	/** Oracle 규칙으로 나눕니다. 보통 문장은 ;를 빼고, PL/SQL은 마지막 ;까지 보냅니다. */
+	private static List<String> splitOracle(String text) {
+		List<String> result = new ArrayList<String>();
+		String sql = text.replace("\r\n", "\n");
+		StringBuilder current = new StringBuilder();
+		int codeFrom = -1;
+		boolean block = false;
+		int i = 0;
+		while (i < sql.length()) {
+			char c = sql.charAt(i);
+			int lineEnd = endOfLine(sql, i);
+			boolean lineStart = sql.substring(sql.lastIndexOf('\n', i - 1) + 1, i).isBlank();
+			if (lineStart && c == '/' && "/".equals(sql.substring(i, lineEnd).trim())) {
+				if (codeFrom >= 0) {
+					result.add(current.substring(codeFrom).trim());
+				}
+				current.setLength(0);
+				codeFrom = -1;
+				block = false;
+				i = lineEnd;
+				continue;
+			}
+			if (codeFrom < 0 && lineStart && PLUS_COMMAND.matcher(sql.substring(i, lineEnd).trim()).matches()) {
+				i = lineEnd;
+				continue;
+			}
+			if (c == ';' && !block) {
+				if (codeFrom >= 0) {
+					result.add(current.substring(codeFrom).trim());
+				}
+				current.setLength(0);
+				codeFrom = -1;
+				i++;
+				continue;
+			}
+			int end = i + 1;
+			boolean code = !Character.isWhitespace(c);
+			if (sql.startsWith("--", i)) {
+				end = lineEnd;
+				code = false;
+			} else if (sql.startsWith("/*", i)) {
+				int close = sql.indexOf("*/", i + 2);
+				end = close < 0 ? sql.length() : close + 2;
+				code = false;
+			} else if ((c == 'q' || c == 'Q') && i + 2 < sql.length() && sql.charAt(i + 1) == '\''
+				&& (i == 0 || !Character.isLetterOrDigit(sql.charAt(i - 1)))) {
+				char open = sql.charAt(i + 2);
+				int pair = "[{(<".indexOf(open);
+				char shut = pair < 0 ? open : "]})>".charAt(pair);
+				int close = sql.indexOf(shut + "'", i + 3);
+				end = close < 0 ? sql.length() : close + 2;
+			} else if (c == '\'' || c == '"') {
+				int close = sql.indexOf(c, i + 1);
+				end = close < 0 ? sql.length() : close + 1;
+			}
+			if (code && codeFrom < 0) {
+				codeFrom = current.length();
+				block = PLSQL_START.matcher(sql.substring(i, Math.min(sql.length(), i + 200))).matches();
+			}
+			current.append(sql, i, end);
+			i = end;
+		}
+		if (codeFrom >= 0) {
+			result.add(current.substring(codeFrom).trim());
 		}
 		return result;
 	}

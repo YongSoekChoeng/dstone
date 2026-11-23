@@ -27,7 +27,10 @@ public final class TestSandbox {
 	private static final String DIR = "sandbox";
 
 	/** 지원하는 DB 종류들 */
-	private static final List<SandboxDatabaseKind> KINDS = List.of(new MysqlKind(), new PostgresKind());
+	private static final List<SandboxDatabaseKind> KINDS = List.of(new MysqlKind(), new PostgresKind(), new OracleKind());
+
+	/** 읽는 설정들(키 sandbox-{이름}) */
+	private static final List<String> SETTINGS = List.of("mysql-home", "postgresql-home", "oracle-url", "oracle-username", "oracle-password");
 
 	private final String id = UUID.randomUUID().toString().substring(0, 8);
 	private final SandboxDatabase database;
@@ -39,13 +42,9 @@ public final class TestSandbox {
 		this.database = database;
 	}
 
-	/** 지원하는 DB 종류의 이름들(설정 키 sandbox-{이름}-home에 씀) */
-	public static List<String> kinds() {
-		List<String> result = new ArrayList<String>();
-		for (SandboxDatabaseKind kind : KINDS) {
-			result.add(kind.id());
-		}
-		return result;
+	/** 읽어야 할 설정의 이름들(설정 키 sandbox-{이름}) */
+	public static List<String> settingNames() {
+		return SETTINGS;
 	}
 
 	/**
@@ -56,12 +55,12 @@ public final class TestSandbox {
 	 * @param app         원본 + 개발 결과로 맞춘 사본
 	 * @param connections 프로젝트 관리의 DB들(별칭 → url, username, password, schema). 첫째 DB에 DDL을 반영
 	 * @param ddlFile     DDL 파일. 없거나 빈 값이면 DDL 없음
-	 * @param homes       DB 종류 → 설치 폴더
+	 * @param settings    settingNames()의 이름 → 설정값
 	 * @param maxDbMb     복제할 DB 하나의 크기 상한
 	 * @param allowHosts  앱이 접속해도 되는 곳(host:port, 쉼표로 구분)
 	 */
 	public static TestSandbox create(File base, File sourceRoot, File app, Map<String, Map<String, String>> connections,
-		String ddlFile, Map<String, String> homes, int maxDbMb, String allowHosts) throws SandboxException {
+		String ddlFile, Map<String, String> settings, int maxDbMb, String allowHosts) throws SandboxException {
 		if (connections.isEmpty()) {
 			throw new SandboxException("프로젝트 관리에 이 프로젝트의 DB가 없어 격리 시험 DB를 만들 수 없습니다.", false);
 		}
@@ -71,7 +70,7 @@ public final class TestSandbox {
 			Map<String, String> value = entry.getValue();
 			sources.add(kind.source(entry.getKey(), value.get("url"), value.get("username"), value.get("password"), value.get("schema")));
 		}
-		TestSandbox sandbox = new TestSandbox(kind.create(new File(base, DIR), homes.get(kind.id()), maxDbMb));
+		TestSandbox sandbox = new TestSandbox(kind.create(new File(base, DIR), settings, maxDbMb));
 		boolean ready = false;
 		try {
 			String unguarded = SandboxPaths.unguardedDatabase(app);
@@ -80,7 +79,7 @@ public final class TestSandbox {
 			}
 			SandboxPaths paths = new SandboxPaths(sourceRoot.getAbsolutePath(), app.getAbsolutePath());
 			// DDL 파일의 잘못은 복제(수십 초)보다 먼저 알린다
-			SandboxDdl.Script script = readScript(ddlFile, paths, kind.backslashEscapes());
+			SandboxDdl.Script script = readScript(ddlFile, paths, kind.dialect());
 
 			int rewritten = paths.rewrite(app);
 			sandbox.database.create(sources, paths);
@@ -139,12 +138,12 @@ public final class TestSandbox {
 			+ ", 한 프로젝트에 한 종류). 원래 DB로 대신 시험하지 않습니다.", false);
 	}
 
-	private static SandboxDdl.Script readScript(String ddlFile, SandboxPaths paths, boolean backslashEscapes) throws IOException, SandboxException {
+	private static SandboxDdl.Script readScript(String ddlFile, SandboxPaths paths, SandboxDdl.Dialect dialect) throws IOException, SandboxException {
 		if (ddlFile == null || ddlFile.isBlank() || !new File(ddlFile.trim()).exists()) {
 			return new SandboxDdl.Script(List.of(), 0, null);
 		}
 		File file = new File(ddlFile.trim());
-		SandboxDdl.Script script = SandboxDdl.parse(file.getName(), paths.shift(Files.readString(file.toPath(), StandardCharsets.UTF_8)), backslashEscapes);
+		SandboxDdl.Script script = SandboxDdl.parse(file.getName(), paths.shift(Files.readString(file.toPath(), StandardCharsets.UTF_8)), dialect);
 		if (script.problem() != null) {
 			throw new SandboxException("DDL 파일을 실행할 수 없습니다(" + file + "): " + script.problem(), true);
 		}

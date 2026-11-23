@@ -55,6 +55,7 @@ import net.dstone.common.utils.StringUtil;
  *   tools.allowed에 "*"와 다른 이름을 함께 적음               tools.allowed에 등록되지 않은 Tool 이름이 있음(MCP 서버가 꺼져 있을 수 있음)
  *   tools.allowed에 TOOL step 전용 Tool을 적음
  *   execution.requiredTools의 이름이 tools.allowed에 없음
+ *   execution.toolPrerequisites의 이름이 tools.allowed에 없음
  *   execution.requiredWrites가 ${input.…} 표현식이 아니거나, 그 경로가 Agent input에 없음
  *   subAgents의 id가 없는 Agent임                            부모를 쓸 수 있는 caller가 Sub Agent는 쓸 수 없음
  *   Sub Agent가 자기 subAgents를 가짐(깊이는 한 단계뿐)
@@ -142,6 +143,7 @@ public class AgentRegistry extends BaseObject {
 		for (AgentDefinition definition : resolved.values()) {
 			this.checkTools(definition, registeredTools);
 			this.checkRequiredTools(definition, registeredTools);
+			this.checkToolPrerequisites(definition, registeredTools);
 			this.checkRequiredWrites(definition);
 			this.checkSubAgents(definition, resolved, registeredTools);
 			this.checkSkills(definition, skills, registeredTools, emptyFolders);
@@ -365,6 +367,43 @@ public class AgentRegistry extends BaseObject {
 				String problem = JsonSchemaUtil.checkPath(definition.inputSchema(), "input", reference.path());
 				if (problem != null) {
 					throw new IllegalStateException(where + "의 '" + entry + "' - " + problem);
+				}
+			}
+		}
+	}
+
+	/**
+	 * <pre>
+	 * execution.toolPrerequisites(Tool을 부르는 순서)를 검사합니다.
+	 * 이름이 틀리면 막으려던 Tool이 조용히 열리므로 기동할 때 실패시킵니다.
+	 * </pre>
+	 *
+	 * @param definition      검사할 Agent 정의
+	 * @param registeredTools 지금 등록되어 있는 Tool 이름 목록
+	 */
+	private void checkToolPrerequisites(AgentDefinition definition, List<String> registeredTools) {
+		List<String> visible = definition.allowsAllTools() ? registeredTools : definition.toolNames();
+		for (Map.Entry<String, List<String>> entry : definition.toolPrerequisites().entrySet()) {
+			String where = "agent[" + definition.id() + "]의 execution.toolPrerequisites." + entry.getKey();
+			if (!visible.contains(entry.getKey())) {
+				throw new IllegalStateException(where + " - 먼저 부를 Tool이 tools.allowed에 없습니다. 부를 수 없으면 뒤의 Tool이 영영 막힙니다.");
+			}
+			if (entry.getValue() == null || entry.getValue().isEmpty()) {
+				throw new IllegalStateException(where + " - 막을 Tool을 적으십시오.");
+			}
+			for (String held : entry.getValue()) {
+				boolean found = false;
+				boolean holdsItself = false;
+				if (held != null && !held.isBlank()) {
+					boolean prefix = held.endsWith("*");
+					String head = prefix ? held.substring(0, held.length() - 1) : held;
+					holdsItself = prefix ? entry.getKey().startsWith(head) : entry.getKey().equals(head);
+					for (String name : visible) {
+						found |= prefix ? name.startsWith(head) : name.equals(head);
+					}
+				}
+				if (!found || holdsItself) {
+					throw new IllegalStateException(where + "의 '" + held + "' - tools.allowed에 있는 다른 Tool이어야 합니다.");
 				}
 			}
 		}
