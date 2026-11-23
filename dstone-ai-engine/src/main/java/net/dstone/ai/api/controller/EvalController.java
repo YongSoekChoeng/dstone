@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import net.dstone.ai.api.dto.EvalRunRequest;
 import net.dstone.ai.common.security.RequesterContext;
+import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.registry.WorkFlowRegistry;
 import net.dstone.ai.runtime.eval.EvalCase;
 import net.dstone.ai.runtime.eval.EvalCaseLoader;
 import net.dstone.ai.runtime.eval.EvalRunStore;
@@ -53,6 +55,9 @@ public class EvalController extends BaseController {
 	@Autowired
 	private EvalRunStore store;
 
+	@Autowired
+	private WorkFlowRegistry workFlowRegistry;
+
 	/** 사례 목록입니다. */
 	@GetMapping("/cases")
 	public List<Map<String, Object>> cases() {
@@ -71,6 +76,7 @@ public class EvalController extends BaseController {
 				item.put("approvals", evalCase.approvals());
 				item.put("snapshotAfter", evalCase.snapshotAfter());
 				item.put("needsServer", Boolean.valueOf(evalCase.needsServer()));
+				item.put("stepNames", this.stepNames(evalCase));
 				item.put("params", evalCase.params());
 				List<String> checks = new ArrayList<String>();
 				for (EvalCase.Check check : evalCase.checks()) {
@@ -109,6 +115,24 @@ public class EvalController extends BaseController {
 			return this.error(HttpStatus.NOT_FOUND, "평가 실행이 없습니다: " + runId);
 		}
 		return ResponseEntity.ok((Object) run);
+	}
+
+	/** Workflow 사례의 step id → 이름(화면이 id 대신 이름을 보이도록). Workflow를 찾지 못하면 빈 맵입니다. */
+	private Map<String, String> stepNames(EvalCase evalCase) {
+		Map<String, String> names = new LinkedHashMap<String, String>();
+		if (!evalCase.isWorkflow()) {
+			return names;
+		}
+		try {
+			for (StepDefinition step : this.workFlowRegistry.resolve(evalCase.workflow(), null).steps()) {
+				if (step.name() != null) {
+					names.put(step.id(), step.name());
+				}
+			}
+		} catch (RuntimeException e) {
+			// 등록되지 않은 Workflow면 이름 없이 id로 보인다(시작할 때 400으로 알려 준다).
+		}
+		return names;
 	}
 
 	private ResponseEntity<Object> error(HttpStatus status, String message) {

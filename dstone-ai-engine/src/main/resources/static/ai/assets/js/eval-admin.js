@@ -108,10 +108,11 @@
 		var desc = "채점 항목: " + (item.checks || []).join(", ");
 		if (item.workflow) {
 			var approvals = item.approvals || {};
-			var rules = Object.keys(approvals).map(function (step) { return step + "=" + approvals[step]; });
+			var names = item.stepNames || {};
+			var rules = Object.keys(approvals).map(function (step) { return (names[step] || step) + "=" + approvals[step]; });
 			desc += " | 승인: " + (rules.length === 0 ? "없음(첫 승인에서 멈추고 채점)" : rules.join(", ") + " (이 밖의 승인에서 멈추고 채점)");
 			if (item.snapshotAfter) {
-				desc += " | " + item.snapshotAfter + " 직후 결과도 따로 채점";
+				desc += " | " + (names[item.snapshotAfter] || item.snapshotAfter) + " 직후 결과도 따로 채점";
 			}
 		}
 		if (item.needsServer) {
@@ -212,7 +213,7 @@
 		runs.forEach(function (run) {
 			var on = run.runId === selectedRunId;
 			var full = run.total && run.passed === run.total;
-			var stopped = run.stoppedAt ? " <span class=\"ai-hint\">" + esc(run.stoppedAt) + "</span>" : "";
+			var stopped = run.stoppedAt ? " <span class=\"ai-hint\" title=\"" + esc(run.stoppedAt) + "\">" + esc(run.stoppedAtName || run.stoppedAt) + "</span>" : "";
 			html += "<tr class=\"ev-row" + (on ? " ev-row-on" : "") + "\" data-run=\"" + esc(run.runId) + "\" tabindex=\"0\">"
 				+ "<td>" + esc(shortTime(run.createdAt)) + "</td>"
 				+ "<td>" + esc(run.caseId) + "</td>"
@@ -300,8 +301,8 @@
 		var flow = run.answer && typeof run.answer === "object" ? run.answer.workflowRun : null;
 		if (flow) {
 			meta.push(["Workflow 실행 ID", (flow.executionId || "-") + " (실행 관리 화면에서 찾을 수 있습니다)"]);
-			meta.push(["끝난 모양", (flow.end || "-") + (flow.stoppedAt ? " @ " + flow.stoppedAt : "") + ", " + (flow.steps || 0) + " step"]);
-			meta.push(["고른 승인", (flow.decisions || []).map(function (d) { return d.step + "=" + d.decision; }).join(", ") || "없음"]);
+			meta.push(["끝난 모양", (flow.end || "-") + (flow.stoppedAt ? " @ " + (flow.stoppedAtName || flow.stoppedAt) : "") + ", " + (flow.steps || 0) + " step"]);
+			meta.push(["고른 승인", (flow.decisions || []).map(function (d) { return (d.stepName || d.step) + "=" + d.decision; }).join(", ") || "없음"]);
 		}
 		var params = run.params || {};
 		Object.keys(params).forEach(function (name) {
@@ -314,7 +315,7 @@
 		var snapshot = flow ? flow.snapshot : null;
 		var snapshotTitle = document.getElementById("ev-detail-snapshot-title");
 		snapshotTitle.style.display = snapshot ? "" : "none";
-		snapshotTitle.textContent = snapshot ? "떠 둔 결과의 채점(" + snapshot.after + " 직후, " + snapshot.passed + "/" + snapshot.total + ")" : "";
+		snapshotTitle.textContent = snapshot ? "떠 둔 결과의 채점(" + (snapshot.afterName || snapshot.after) + " 직후, " + snapshot.passed + "/" + snapshot.total + ")" : "";
 		document.getElementById("ev-detail-snapshot").innerHTML = snapshot ? checksHtml(snapshot.checks || []) : "";
 		var failure = document.getElementById("ev-detail-failure");
 		failure.style.display = run.failure ? "" : "none";

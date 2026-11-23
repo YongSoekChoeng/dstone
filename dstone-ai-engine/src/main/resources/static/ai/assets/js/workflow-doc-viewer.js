@@ -296,7 +296,7 @@ var DstoneAiDocViewer = (function () {
 		if (info && info.steps && info.steps.length) {
 			var parts = [];
 			info.steps.forEach(function (step) {
-				parts.push(step.stepId + (step.action === "WRITE" ? "(작성)" : "(읽음)"));
+				parts.push((step.stepName || step.stepId) + (step.action === "WRITE" ? "(작성)" : "(읽음)"));
 			});
 			lines.push({ text: "이 파일을 건드린 step: " + parts.join(", "), kind: "" });
 		}

@@ -75,6 +75,7 @@
              , WORK_DIR AS "workDir"
              , ANSWER_JSON->'workflowRun'->>'executionId' AS "executionId"
              , ANSWER_JSON->'workflowRun'->>'stoppedAt' AS "stoppedAt"
+             , ANSWER_JSON->'workflowRun'->>'stoppedAtName' AS "stoppedAtName"
              , CAST(ANSWER_JSON->'workflowRun'->'snapshot'->>'passed' AS INT) AS "snapshotPassed"
              , CAST(ANSWER_JSON->'workflowRun'->'snapshot'->>'total' AS INT) AS "snapshotTotal"
              , REQUESTED_BY AS "requestedBy"

@@ -398,7 +398,7 @@ var DstoneAiWorkflowAdmin = (function () {
 
 	var SEGMENT_LABELS = { done: "완료", failed: "실패", current: "지금 여기", skipped: "건너뜀", todo: "아직" };
 
-	// 카드 한 장. 맨 위 줄은 순번과 상태, 그 아래 step id, 이름, 종류·대상 순서다.
+	// 카드 한 장. 맨 위 줄은 순번과 상태, 그 아래 이름(없으면 step id), 종류·대상 순서다. step id는 마우스를 올리면 보인다.
 	function stepCardHtml(step, index, state) {
 		var typeText = DstoneAi.stepTypeLabel(step.type) + (step.target ? " · " + step.target : "") + (step.forEach ? " · 항목마다 반복" : "");
 		var tip = step.id + (step.name ? "\n" + step.name : "") + "\n" + typeText + "\n상태: " + SEGMENT_LABELS[state];
@@ -406,8 +406,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			+ " data-step-id=\"" + escapeHtml(step.id) + "\" title=\"" + escapeHtml(tip) + "\">"
 			+ "<div class=\"wa-card-top\"><span class=\"wa-card-no\">" + (index + 1) + "</span>"
 			+ "<span class=\"wa-card-state\">" + escapeHtml(SEGMENT_LABELS[state]) + "</span></div>"
-			+ "<div class=\"wa-card-id\">" + escapeHtml(step.id) + "</div>"
-			+ "<div class=\"wa-card-name\">" + escapeHtml(step.name || "-") + "</div>"
+			+ "<div class=\"wa-card-id\">" + escapeHtml(step.name || step.id) + "</div>"
 			+ "<div class=\"wa-card-type\">" + escapeHtml(typeText) + "</div>"
 			+ "</li>";
 	}
@@ -586,8 +585,8 @@ var DstoneAiWorkflowAdmin = (function () {
 		var text = historyText(h);
 		var name = stepNameOf(h);
 		tr.innerHTML =
-			"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(h.stepId) + "</span>"
-				+ (name ? "<span class=\"wa-step-cell-name\">" + escapeHtml(name) + "</span>" : "") + "</td>" +
+			"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(name || h.stepId) + "</span>"
+				+ (name && /\[\d+\]$/.test(h.stepId || "") ? "<span class=\"wa-step-cell-name\">" + escapeHtml(h.stepId.replace(/^.*(\[\d+\])$/, "$1")) + "</span>" : "") + "</td>" +
 			"<td><span class=\"wa-outcome wa-outcome-" + (h.success ? "ok" : "fail") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
 			"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : escapeHtml(durationText(h.durationMs))) + "</td>" +
 			"<td class=\"wa-line" + (h.success ? "" : " wa-text-failed") + "\">" + escapeHtml(text ? text.replace(/\s+/g, " ").substring(0, 300) : "-") + "</td>" +
@@ -775,8 +774,9 @@ var DstoneAiWorkflowAdmin = (function () {
 
 		paneDotEl.className = "wa-type-dot wa-type-" + (h.stepType || "");
 		var paneName = stepNameOf(h);
-		paneIdEl.textContent = h.stepId;
-		paneNameEl.textContent = paneName || "";
+		// 이름을 앞에, step id는 옆에 작게 둔다.
+		paneIdEl.textContent = paneName || h.stepId;
+		paneNameEl.textContent = paneName ? h.stepId : "";
 		paneNameEl.style.display = paneName ? "" : "none";
 		paneBadgeEl.className = "workflow-badge workflow-badge-" + (h.success ? "done" : "failed");
 		paneBadgeEl.textContent = h.success ? "성공" : "실패";
@@ -814,9 +814,9 @@ var DstoneAiWorkflowAdmin = (function () {
 			}
 		}
 
-		paneRewindBtn.textContent = stepId + "부터 다시 실행";
+		paneRewindBtn.textContent = stepLabel(stepId) + "부터 다시 실행";
 		paneRewindBtn.disabled = isActive(currentDetail.status);
-		paneRewindBtn.title = paneRewindBtn.disabled ? "실행 중에는 되돌릴 수 없습니다. 먼저 일시정지하세요." : stepLabel(stepId) + " step부터 다시 실행합니다";
+		paneRewindBtn.title = paneRewindBtn.disabled ? "실행 중에는 되돌릴 수 없습니다. 먼저 일시정지하세요." : stepLabel(stepId) + "(" + stepId + ")부터 다시 실행합니다";
 	}
 
 	function addMeta(text) {
@@ -961,7 +961,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	/*
-	 * step의 사람용 이름(정의의 name). 정의는 지금 등록된 것이라, 실행한 뒤에 step 번호를 다시 매겼으면
+	 * step의 사람용 이름(정의의 name). 정의는 지금 등록된 것이라, 예전(step id를 다시 매기던 때) 실행이면
 	 * 같은 id가 다른 step일 수 있다. 그래서 기록 줄은 종류와 부른 대상(Agent/Tool)이 정의와 같을 때만 이름을 붙인다.
 	 */
 	function stepDefOf(stepId) {
@@ -992,7 +992,8 @@ var DstoneAiWorkflowAdmin = (function () {
 	/** "step06(영향도 분석)"처럼 id 뒤에 이름을 붙인다. 이름이 없으면 id만 */
 	function stepLabel(stepId) {
 		var def = stepDefOf(stepId);
-		return def && def.name ? stepId + "(" + def.name + ")" : String(stepId);
+		// 화면에는 이름을 보인다(이름이 없을 때만 step id). step id는 툴팁이나 옆에 작게 둔다.
+		return def && def.name ? def.name : String(stepId);
 	}
 
 	// 이 step이 앞 회차에서는 문서를 썼는데, 마지막 회차(since 이후)에는 한 문서도 쓰지 않았으면 앞 회차 문서들을 돌려준다.
@@ -1044,7 +1045,13 @@ var DstoneAiWorkflowAdmin = (function () {
 	}
 
 	function openDoc(file) {
-		DstoneAiDocViewer.open(activeExecutionId, file.path, file, currentDetail ? currentDetail.status : null);
+		// 문서 보기에는 step 이름으로 보이도록 이름을 붙여 넘긴다(목록의 항목은 그대로 둔다).
+		var shown = Object.assign({}, file, {
+			steps: (file.steps || []).map(function (step) {
+				return Object.assign({}, step, { stepName: stepLabel(step.stepId) });
+			})
+		});
+		DstoneAiDocViewer.open(activeExecutionId, file.path, shown, currentDetail ? currentDetail.status : null);
 	}
 
 	// 'step 문서' 표. 기본은 md만, [모든 파일 보기]를 켜면 step이 읽은 소스 파일까지 보여 준다.
@@ -1073,7 +1080,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			var tr = document.createElement("tr");
 			var steps = [];
 			(file.steps || []).forEach(function (step) {
-				steps.push(step.stepId + (step.action === "WRITE" ? "(작성)" : "(읽음)"));
+				steps.push(stepLabel(step.stepId) + (step.action === "WRITE" ? "(작성)" : "(읽음)"));
 			});
 			tr.innerHTML =
 				"<td class=\"wa-doc-name-cell\"></td>" +

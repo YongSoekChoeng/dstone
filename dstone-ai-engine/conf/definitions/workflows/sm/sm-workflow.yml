@@ -64,7 +64,7 @@ input: string, 요청서(00.request.md)가 들어 있는 폴더의 절대경로
 steps:
 
   - id: step00
-    name: 사전작업
+    name: 01-사전작업
     type: TOOL
     tool: getToDate
     with:
@@ -74,7 +74,7 @@ steps:
     onFailure: FAIL
 
   - id: step01
-    name: 고객요청서 읽기
+    name: 02-고객요청서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -84,7 +84,7 @@ steps:
     onFailure: FAIL
 
   - id: step02
-    name: 소스경로 읽기
+    name: 03-소스경로 읽기
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -95,7 +95,7 @@ steps:
     onFailure: FAIL
 
   - id: step03
-    name: 고객요청사항 분석
+    name: 04-고객요청사항 분석
     type: AGENT
     agent: sm-requirement-analyze-agent
     with:
@@ -106,7 +106,7 @@ steps:
     next: step04
 
   - id: step04
-    name: 고객요구사항분석서 읽기
+    name: 05-고객요구사항분석서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -117,7 +117,7 @@ steps:
     onFailure: FAIL
 
   - id: step05
-    name: 고객요청사항 분석 리뷰
+    name: 06-고객요청사항 분석 리뷰
     type: SUPERVISOR
     agent: sm-requirement-analyze-reviewer-agent
     with:
@@ -129,7 +129,7 @@ steps:
     onFailure: step06
 
   - id: step06
-    name: 리뷰 불통과 처리 결정
+    name: 07-리뷰 불통과 처리 결정
     type: APPROVAL
     approval:
       approverRole: PL
@@ -141,7 +141,7 @@ steps:
       중지: FAIL
 
   - id: step07
-    name: 기존 영향도분석서 확인
+    name: 08-기존 영향도분석서 확인
     type: TOOL
     tool: readFileLines
     with:
@@ -152,7 +152,7 @@ steps:
     onFailure: step08
 
   - id: step08
-    name: 영향도 분석
+    name: 09-영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
     with:
@@ -165,7 +165,7 @@ steps:
     save: impactPath
 
   - id: step09
-    name: 영향도 분석 승인
+    name: 10-영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -178,7 +178,7 @@ steps:
       중지: FAIL
 
   - id: step10
-    name: 영향도분석서 읽기
+    name: 11-영향도분석서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -189,7 +189,7 @@ steps:
     onFailure: FAIL
 
   - id: step11
-    name: 기존 설계서 확인
+    name: 12-기존 설계서 확인
     type: TOOL
     tool: readFileLines
     with:
@@ -200,7 +200,7 @@ steps:
     onFailure: step12
 
   - id: step12
-    name: 아키텍처 설계
+    name: 13-아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
     with:
@@ -214,7 +214,7 @@ steps:
     save: architectPath
 
   - id: step13
-    name: 설계 승인
+    name: 14-설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -227,7 +227,7 @@ steps:
       중지: FAIL
 
   - id: step14
-    name: 상세 설계서 읽기
+    name: 15-상세 설계서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -238,7 +238,7 @@ steps:
     onFailure: FAIL
 
   - id: step15
-    name: 태스크아이템 목록 읽기
+    name: 16-태스크아이템 목록 읽기
     type: TOOL
     tool: readFile
     with:
@@ -249,7 +249,7 @@ steps:
     onFailure: FAIL
 
   - id: step16
-    name: 기존개발디렉토리초기화
+    name: 17-기존개발디렉토리초기화
     type: TOOL
     tool: deleteDir
     with:
@@ -258,7 +258,7 @@ steps:
     next: step17
 
   - id: step17
-    name: 개발
+    name: 18-개발
     type: AGENT
     agent: sm-developer-agent
     with:
@@ -274,7 +274,7 @@ steps:
     onFailure: FAIL
 
   - id: step18
-    name: 컴파일 확인
+    name: 19-컴파일 확인
     type: TOOL
     tool: compileJava
     with:
@@ -288,7 +288,7 @@ steps:
     onFailure: step19
 
   - id: step19
-    name: 개발 승인
+    name: 20-개발 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -303,7 +303,7 @@ steps:
       실패: FAIL
 
   - id: step20
-    name: 재개발 전 설계서 다시 읽기
+    name: 21-재개발 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -314,7 +314,7 @@ steps:
     onFailure: FAIL
 
   - id: step21
-    name: 재개발 전 태스크아이템 목록 다시 읽기
+    name: 22-재개발 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -325,7 +325,7 @@ steps:
     onFailure: FAIL
 
   - id: step22
-    name: 전문가 해결 전 설계서 다시 읽기
+    name: 23-전문가 해결 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -336,7 +336,7 @@ steps:
     onFailure: FAIL
 
   - id: step23
-    name: 전문가 해결 전 태스크아이템 목록 다시 읽기
+    name: 24-전문가 해결 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -347,7 +347,7 @@ steps:
     onFailure: FAIL
 
   - id: step24
-    name: 전문가 해결
+    name: 25-전문가 해결
     type: AGENT
     agent: sm-troubleshooter-agent
     with:
@@ -364,7 +364,7 @@ steps:
     onFailure: step19
 
   - id: step25
-    name: 설계서 수정
+    name: 26-설계서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -380,7 +380,7 @@ steps:
     next: step13
 
   - id: step26
-    name: 영향도분석서 수정
+    name: 27-영향도분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -393,7 +393,7 @@ steps:
     next: step09
 
   - id: step27
-    name: 고객요구사항분석서 수정
+    name: 28-고객요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -406,7 +406,7 @@ steps:
     next: step04
 
   - id: step28
-    name: 자동 검증할 프로젝트 확인
+    name: 29-자동 검증할 프로젝트 확인
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -418,7 +418,7 @@ steps:
     onFailure: step19
 
   - id: step29
-    name: 격리 기동 확인
+    name: 30-격리 기동 확인
     type: TOOL
     tool: startSandboxServer
     with:
@@ -433,7 +433,7 @@ steps:
     onFailure: step30
 
   - id: step30
-    name: 기동 실패가 개발 결과 탓인지
+    name: 31-기동 실패가 개발 결과 탓인지
     type: TOOL
     tool: containsValue
     with:
@@ -443,7 +443,7 @@ steps:
     onFailure: step19
 
   - id: step31
-    name: 자동 수정 횟수 확인
+    name: 32-자동 수정 횟수 확인
     type: TOOL
     tool: countUp
     with:
@@ -455,7 +455,7 @@ steps:
     onFailure: step19
 
   - id: step32
-    name: 자동 수정 전 설계서 다시 읽기
+    name: 33-자동 수정 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -466,7 +466,7 @@ steps:
     onFailure: step19
 
   - id: step33
-    name: 자동 수정 전 태스크아이템 목록 다시 읽기
+    name: 34-자동 수정 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -477,7 +477,7 @@ steps:
     onFailure: step19
 
   - id: step34
-    name: 자동 수정
+    name: 35-자동 수정
     type: AGENT
     agent: sm-auto-fix-agent
     with:
@@ -495,7 +495,7 @@ steps:
     onFailure: step19
 
   - id: step35
-    name: 동작 검증
+    name: 36-동작 검증
     type: AGENT
     agent: sm-verifier-agent
     with:
@@ -511,7 +511,7 @@ steps:
     onFailure: step19
 
   - id: step36
-    name: 실패한 완료 기준이 있는지
+    name: 37-실패한 완료 기준이 있는지
     type: TOOL
     tool: containsValue
     with:
@@ -522,7 +522,7 @@ steps:
     onFailure: step19
 
   - id: step37
-    name: 기존 설계서 맞춤
+    name: 38-기존 설계서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -547,7 +547,7 @@ steps:
     next: step13
 
   - id: step38
-    name: 기존 영향도분석서 맞춤
+    name: 39-기존 영향도분석서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -567,7 +567,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 리뷰 지적에 따른 요구사항 수정
+    name: 40-리뷰 지적에 따른 요구사항 수정
     type: AGENT
     agent: document-revise-agent
     with:

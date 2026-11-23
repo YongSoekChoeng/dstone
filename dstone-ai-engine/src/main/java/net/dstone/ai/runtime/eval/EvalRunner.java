@@ -282,6 +282,7 @@ public class EvalRunner extends BaseObject {
 					List<Map<String, Object>> firstChecks = this.grade(runId, "snapshot", evalCase, flow.snapshot, flow.snapshotState, stats.toolCounts());
 					Map<String, Object> first = new LinkedHashMap<String, Object>();
 					first.put("after", evalCase.snapshotAfter());
+					first.put("afterName", flow.snapshotAfterName);
 					first.put("dir", flow.snapshot.requestDir().toString());
 					first.put("passed", Integer.valueOf(countPassed(firstChecks)));
 					first.put("total", Integer.valueOf(firstChecks.size()));
@@ -340,6 +341,8 @@ public class EvalRunner extends BaseObject {
 		String end;
 		/** 멈춘(끝난) step id */
 		String stoppedAt;
+		/** 멈춘(끝난) step의 이름(화면 표시용, 없으면 null) */
+		String stoppedAtName;
 		/** 실행 실패 사유(평가 실패로 남깁니다). 멈춰서 채점한 것은 실패가 아닙니다 */
 		String failure;
 		int steps;
@@ -347,6 +350,8 @@ public class EvalRunner extends BaseObject {
 		List<Map<String, Object>> decisions = new ArrayList<Map<String, Object>>();
 		/** snapshotAfter로 떠 둔 작업 공간(없으면 null) */
 		EvalWorkspace snapshot;
+		/** 떠 둔 step의 이름(화면 표시용) */
+		String snapshotAfterName;
 		/** 떠 둘 때의 state */
 		Map<String, Object> snapshotState;
 		/** 끝난(멈춘) 뒤의 state */
@@ -357,6 +362,7 @@ public class EvalRunner extends BaseObject {
 			map.put("executionId", this.executionId);
 			map.put("end", this.end);
 			map.put("stoppedAt", this.stoppedAt);
+			map.put("stoppedAtName", this.stoppedAtName);
 			map.put("steps", Integer.valueOf(this.steps));
 			map.put("decisions", this.decisions);
 			return map;
@@ -399,6 +405,7 @@ public class EvalRunner extends BaseObject {
 				WorkFlowContext.recordApproval(execution.context(), stepId, decision, "eval", null);
 				Map<String, Object> chosen = new LinkedHashMap<String, Object>();
 				chosen.put("step", stepId);
+				chosen.put("stepName", workflow.steps().get(execution.currentStepIndex()).name());
 				chosen.put("decision", decision);
 				run.decisions.add(chosen);
 				execution = execution.started();
@@ -423,9 +430,12 @@ public class EvalRunner extends BaseObject {
 			if (run.snapshot == null && stepId.equals(evalCase.snapshotAfter()) && execution.status() != WorkFlowExecutionStatus.PAUSED) {
 				run.snapshot = workspace.snapshot(workspace.requestDir().resolveSibling(workspace.requestDir().getFileName() + "-snapshot"));
 				run.snapshotState = new LinkedHashMap<String, Object>(WorkFlowContext.state(execution.context()));
+				run.snapshotAfterName = findStep(workflow, stepId).name();
 				run.snapshot.setState(run.snapshotState);
 			}
 		}
+		StepDefinition stopped = run.stoppedAt == null ? null : findStep(workflow, run.stoppedAt);
+		run.stoppedAtName = stopped == null ? null : stopped.name();
 		run.state = new LinkedHashMap<String, Object>(WorkFlowContext.state(execution.context()));
 		workspace.setState(run.state);
 		LogUtil.sysout("dstone-ai-engine eval: [" + evalCase.id() + "] workflow 실행 " + run.executionId + " " + run.end + " at " + run.stoppedAt + " (" + run.steps + " step)");

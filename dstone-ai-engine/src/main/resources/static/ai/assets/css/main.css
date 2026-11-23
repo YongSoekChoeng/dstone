@@ -2731,10 +2731,10 @@ body.wd-full-on {
 	white-space: nowrap;
 }
 
+/* 카드의 큰 글씨는 step 이름이다(없으면 step id). step id는 풍선 도움말로 본다 */
 .wa-card-id {
 	margin-top: 4px;
 	color: var(--cs-text);
-	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: 13px;
 	font-weight: 600;
 }
@@ -3083,7 +3083,7 @@ body.wd-full-on {
 	font-weight: 600;
 }
 
-/* step id 아래 한 줄로 보이는 사람용 이름(정의의 name). 칸이 좁으면 말줄임이 되고, 줄 전체의 풍선도움말에 다 나온다 */
+/* 이름 아래 한 줄로 보이는 보조 표시(항목마다 반복한 step의 회차 [n]). 칸이 좁으면 말줄임이 되고, 줄 전체의 풍선도움말에 다 나온다 */
 .wa-history-table .wa-step-cell-name {
 	display: block;
 	margin-left: 16px;
