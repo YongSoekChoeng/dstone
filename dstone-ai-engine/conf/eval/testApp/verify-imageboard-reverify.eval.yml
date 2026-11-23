@@ -1,0 +1,40 @@
+# 실행 0bc967d2(2026-11-23) step35 2차 동작 검증의 입력을 뜬 사례입니다(지난 결과 = 1차 검증, 바뀐 파일 = imageBoard.jsp).
+# 개발 결과(work/dev-resources)는 마지막 자동 수정까지 반영한 것이라 제목 클릭, 썸네일 클릭, 수정이 모두 되어야 합니다.
+# 그때 문제:
+#   - 1차에서는 메뉴를 거쳐 들어가 업로드(imageUrl.ajax 200)와 썸네일 표시까지 됐는데, 2·3차는 화면 주소로 바로 들어가 업로드 요청이
+#     한 번도 나가지 않았고, 이를 "헤드리스 브라우저 한계"라며 썸네일 기준을 BLOCKED(환경)로 냈습니다.
+#   - 근거에 "미확인"이라고 적고도 PASS를 냈습니다(페이징 넘김, 파일 선택 뒤 업로드).
+# 격리 시험 서버(Windows Tomcat·Maven)와 Playwright MCP를 쓰므로 그것들이 있는 엔진에서만 돌 수 있습니다. 한 번에 8~10분 걸립니다.
+# 격리 서버의 복제본 DB에 등록·삭제를 실제로 합니다(원래 DB는 건드리지 않음).
+id: verify-imageboard-reverify
+description: 이미지 게시판 재검증 - 지난번 된 업로드를 환경 탓으로 돌리지 않는지, 직접 보지 않은 것을 PASS로 내지 않는지
+agent: sm-verifier-agent
+fixture: testApp/verify-imageboard-reverify
+params:
+  sourceDir: D:/AppHome/testApp
+  projectId: testApp
+input:
+  base_dir: ${workDir}
+  source_dir: ${param.sourceDir}
+  project_id: ${param.projectId}
+  requirement: ${fixture:input/requirement.md}
+  design: ${fixture:input/design.md}
+  history: ${fixture:input/history.txt}
+  previous: ${fixture:input/previous.txt}
+  changes: ${fixture:input/changes.txt}
+# 답의 scenarios는 Java 글자 모양({task=..., result=..., steps=..., evidence=...})으로 맞춘다. ((?!task=).)*는 다음 기준으로 넘어가지 않게 막는다
+checks:
+  - name: 업로드를 실제로 함
+    toolUsed: {name: browser_file_upload, min: 1}
+  - name: 썸네일 기준을 BLOCKED로 내지 않음
+    answerNotMatches:
+      field: scenarios
+      pattern: 'task=[^=]*썸네일 클릭((?!task=).)*result=BLOCKED'
+  - name: 썸네일 기준 PASS
+    answerMatches:
+      field: scenarios
+      pattern: 'task=[^=]*썸네일 클릭((?!task=).)*result=PASS'
+  - name: 미확인인 것을 PASS로 내지 않음
+    answerNotMatches:
+      field: scenarios
+      pattern: 'result=PASS((?!task=).)*미확인'

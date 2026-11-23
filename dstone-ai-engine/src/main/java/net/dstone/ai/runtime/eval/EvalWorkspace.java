@@ -377,6 +377,22 @@ public class EvalWorkspace {
 						ok = now != null && now.contains(this.fill(String.valueOf(map.get("text")), false));
 						break;
 					}
+					case "fileMatches":
+					case "fileNotMatches": {
+						String now = this.readWork(this.fill(String.valueOf(map.get("file")), false));
+						boolean found = now != null && find(now, String.valueOf(map.get("pattern")));
+						ok = "fileMatches".equals(check.kind()) ? found : now != null && !found;
+						detail = now == null ? "파일 없음" : found ? "찾음" : "못 찾음";
+						break;
+					}
+					case "answerMatches":
+					case "answerNotMatches": {
+						String text = answerText(answer, (String) map.get("field"));
+						boolean found = find(text, String.valueOf(map.get("pattern")));
+						ok = "answerMatches".equals(check.kind()) ? found : answer != null && !found;
+						detail = answer == null ? "답 없음" : found ? "찾음" : "못 찾음";
+						break;
+					}
 					case "textIncreased": {
 						String text = String.valueOf(map.get("text"));
 						int before = 0;
@@ -560,6 +576,16 @@ public class EvalWorkspace {
 			return value == null ? "" : String.valueOf(value);
 		}
 		return "";
+	}
+
+	/**
+	 * <pre>
+	 * 글에 정규식과 맞는 곳이 있는지 봅니다. 줄을 넘어 맞출 수 있게 DOTALL로 컴파일합니다.
+	 * "있으면 안 되는 모양"(예: 함수 호출 방식과 본문이 어긋난 코드)을 채점할 때 씁니다.
+	 * </pre>
+	 */
+	private static boolean find(String text, String pattern) {
+		return Pattern.compile(pattern, Pattern.DOTALL).matcher(text).find();
 	}
 
 	private static int count(String text, String part) {

@@ -38,7 +38,8 @@ Agent 파일 본문의 순서: **역할 한 줄 → 입력의 뜻 → 만들 것
 ## 4. 고친 뒤에는 평가 세트로 확인한다
 
 - 평가 세트는 엔진 기능이다(2026-11-22, 사용자 결정: `src/test`는 언제든 지울 수 있는 자원이라 평가 사례를 두지 않는다).
-  - 사례: `dstone-ai-engine/conf/eval/**/<id>.eval.yml` + 자료 폴더(그 시점의 요청서·문서·개발 결과·결정 글). 형식은 `runtime.eval.EvalCase`와 `docs/09` 15장.
+  - 사례: `dstone-ai-engine/conf/eval/{프로젝트ID}/<id>.eval.yml` + 자료 폴더(그 시점의 요청서·문서·개발 결과·결정 글). 형식은 `runtime.eval.EvalCase`와 `docs/09` 15장. 앱 관례는 범용 Skill이 아니라 `skills/projects/{프로젝트ID}/<이름>/`에 둔다(2026-11-23 사용자 결정).
+  - "있으면 안 되는 모양"은 `fileNotMatches`/`answerNotMatches`로 채점한다. 채점 식은 기준선을 돌리기 전에 결함 있는 산출물과 고친 산출물 양쪽에 맞춰 보고, 기준선 결과도 눈으로 한 번 본다(2026-11-23: 메서드 경계를 넘은 식과 대소문자를 놓친 식이 헛통과·헛실패를 냈다).
   - 실행: 화면 "Agent 평가"(`/ai/admin/eval/eval.html`) 또는 `POST /api/ai/eval/runs {caseId, params, model, repeat}`. 실제 LLM을 부른다.
   - 결과: `AI_EVAL_RUN`(채점, 시간, LLM 회차, Tool 호출, 토큰, 작업 폴더). 화면의 비교 표가 (사례, Agent 버전, 모델)별 평균을 보여 준다.
   - Workflow 사례(`workflow:`, 2026-11-23): 요청서부터 흐름 전체를 돌리고 결과물을 격리 시험 서버에 띄워 `http`·`dbQuery`로 채점한다. 한 Agent를 고친 효과가 최종 결과물에 닿는지는 이것으로 본다(`docs/09` 15장).

@@ -13,6 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -44,7 +46,7 @@ public class EvalCaseLoader extends BaseObject {
 	private static final Set<String> CASE_KEYS = Set.of("id", "description", "agent", "workflow", "approvals", "snapshotAfter", "server", "fixture", "copy", "params", "request", "input", "checks");
 
 	private static final Set<String> CHECK_KINDS = Set.of("answerContains", "answerNotEmpty", "answerEquals", "fileExists", "fileChanged", "fileContains", "textIncreased", "toolUsed",
-		EvalCase.Check.HTTP, EvalCase.Check.DB_QUERY);
+		"fileMatches", "fileNotMatches", "answerMatches", "answerNotMatches", EvalCase.Check.HTTP, EvalCase.Check.DB_QUERY);
 
 	/** server에 쓸 수 있는 이름(TestServerTool.startSandboxServer의 인자)과 꼭 있어야 하는 것 */
 	private static final Set<String> SERVER_KEYS = Set.of("projectId", "sourceRoot", "overlayDir", "ddlFile", "deleteList");
@@ -255,6 +257,19 @@ public class EvalCaseLoader extends BaseObject {
 			Map<String, Object> query = value instanceof Map ? (Map<String, Object>) value : null;
 			if (query == null || query.get("sql") == null || (query.get("equals") == null && query.get("rows") == null)) {
 				throw new IllegalStateException("dbQuery 채점은 {sql, equals} 또는 {sql, rows} 모양이어야 합니다: " + map);
+			}
+		}
+		if (kind.endsWith("Matches")) {
+			// 정규식이 틀리면 돌려 볼 때가 아니라 읽을 때 알려 준다
+			Map<String, Object> spec = value instanceof Map ? (Map<String, Object>) value : null;
+			String target = kind.startsWith("file") ? "file" : "field";
+			if (spec == null || spec.get("pattern") == null || (kind.startsWith("file") && spec.get(target) == null)) {
+				throw new IllegalStateException(kind + " 채점은 {" + target + ", pattern} 모양이어야 합니다: " + map);
+			}
+			try {
+				Pattern.compile(String.valueOf(spec.get("pattern")), Pattern.DOTALL);
+			} catch (PatternSyntaxException e) {
+				throw new IllegalStateException(kind + " 채점의 pattern이 정규식으로 맞지 않습니다: " + e.getDescription() + " - " + spec.get("pattern"));
 			}
 		}
 		return new EvalCase.Check(name == null ? kind : name, kind, value);

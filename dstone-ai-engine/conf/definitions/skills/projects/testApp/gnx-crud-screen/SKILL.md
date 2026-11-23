@@ -1,0 +1,46 @@
+---
+# 프로젝트 testApp(패키지 kr.co.gnx, Spring MVC + MyBatis + JSP/Kendo UI)의 관례입니다.
+# skills/projects/{프로젝트ID}/ 아래 Skill은 그 프로젝트에만 맞는 관례입니다. Agent는 skills.allowed의 'projects/**' 한 줄로 받고,
+# 설명을 보고 지금 소스에 맞는 것만 불러 읽습니다. 범용 Skill(skills/sm)과 Agent 프롬프트에는 이런 이름을 적지 않습니다.
+# 2026-11-23 실행 0bc967d2: 그리드 버튼 핸들러를 링크 onclick으로 옮기며 this가 어긋남, 팝업 Controller가 json_string을 풀지 않음,
+#   검증이 화면 주소로 바로 들어가 업로드를 못 함 - 세 가지를 아래 "그리드 행 클릭과 팝업", "동작 검증" 절에 적었습니다.
+name: gnx-crud-screen
+description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 파일 업로드, 동작 검증의 관례.
+---
+기본 참고 기능은 샘플게시판이다. 새 화면을 만들 때는 이 층별 파일을 참고 파일로 삼고, 달라지는 점만 적는다.
+
+| 층 | 위치(소스경로 기준) | 관례 |
+|---|---|---|
+| 화면 | src/main/webapp/WEB-INF/views/{업무}/{기능}/{화면}.jsp | Kendo UI 그리드. 공통 함수 genexon.initKendoUI_grid_inlineEdit(...) 등을 쓴다. 데이터 주소는 transport의 read/create/update/destroy에 .ajax 주소로 적는다 |
+| Controller | src/main/java/kr/co/gnx/{업무}/{기능}/{이름}Controller.java | @Controller(value="이름Controller"), BaseController 상속. 화면 이동은 /{업무}/{기능}/{화면}.go → ModelAndView("/{업무}/{기능}/{화면}"), 팝업은 *.pop, 데이터는 *.ajax → ModelAndView("jsonView") |
+| Service | .../{이름}Service.java | @Service, BaseService 상속. 이름이 *Service라서 메서드 하나가 트랜잭션 하나다(context-transaction.xml) |
+| DAO | .../{이름}DAO.java | @Repository(value="이름DAO"), BaseDAO 상속. getSqlSession().selectList("네임스페이스.쿼리ID", vo) |
+| VO | .../{이름}VO.java | BaseVO 상속. 필드는 스네이크 표기(mb_id, search_word) |
+| 매퍼 | src/main/resources/sqlmap/mapper/{업무}/{이름}-mapper.xml | namespace는 짧은 이름(예: SampleBoard). resultType="bmap". 조건은 `@kr.co.gnx.comm.util.CommUtil@isNotEmpty(값)` |
+
+샘플게시판 파일: kr/co/gnx/sample/board/SampleBoard{Controller,Service,DAO,VO}.java, sqlmap/mapper/sample/sampleboard-mapper.xml, views/sample/board/sampleBoard.jsp.
+샘플게시판에는 팝업이 없다. 팝업(등록·수정·조회)이 있는 참고 기능은 회원사 관리다: views/system/member/member.jsp(목록) + memberRegi.jsp(팝업) + kr/co/gnx/system/member/MemberController.java.
+
+## 그리드 행 클릭과 팝업
+
+- 그리드 `command` 버튼의 `click` 핸들러는 Kendo가 부르며 `this`가 그리드다. 그래서 `this.dataItem($(e.target).closest("tr"))`로 행을 얻는다(member.jsp의 memberRegi).
+- 컬럼 `template`에 HTML `onclick`을 직접 쓰면 `this`는 그 요소(a, img)다. 이때는 `$("#grid").data("kendoGrid").dataItem($(e.target).closest("tr"))`로 행을 얻는다.
+- `genexon.PopWindowOpen({pID, pTitle, pURL, data, ...})`은 `data`를 `json_string` 하나로 묶어 팝업 주소에 붙여 보낸다.
+  팝업 Controller(*.pop)는 `vo.getJson_string()`이 있으면 `JSONObject.fromObject(...)` → `JSONObject.toBean(..., 이름VO.class)`로 풀어 VO를 채운다. 참고: MemberController의 `/system/member/memberRegi.pop`.
+  풀지 않으면 VO가 비어 팝업이 늘 등록모드로 열린다.
+
+## 자주 쓰는 공통
+- 로그인 사용자: Controller에서 SessionUtil.getSessionVO(request.getSession()).getUser() → getMb_id(). 데이터는 mb_id로 나눈다.
+- 그리드 목록 조회도 검색 조건을 json_string 하나로 보낸다. Controller가 JSONObject.fromObject(vo.getJson_string())로 풀어 VO로 바꾼다.
+- 그리드 저장(등록/수정/삭제)은 {"models":[...]} JSON 본문(@RequestBody JSONObject)이다. Service는 models를 돌며 DAO를 부른다.
+- 삭제는 실제 DELETE 대신 use_yn='N'으로 바꾸는 방식을 쓰는 테이블이 많다. 참고 기능의 쿼리를 보고 따른다.
+- 파일 업로드: kr.co.gnx.system.file.FileService의 fileSave(MultipartFile, UPLOADS[, FileVO]) / imageSave(MultipartFile, UPLOADS). 저장 위치 종류는 kr.co.gnx.config.Constants.UPLOADS enum(IMAGE, UPIMAGE 등)이다. 화면은 kendoUpload(saveUrl = *.ajax, autoUpload)이고, 참고는 memberRegi.jsp + MemberController.infoUrl.
+- 업로드 최대 크기는 src/main/resources/spring/context-common.xml의 multipartResolver maxUploadSize다(전체 공통). 화면마다 다른 제한은 Controller나 화면 스크립트에서 검사한다.
+- 이미지 처리: kr.co.gnx.comm.util.ImageUtil. 메서드 이름과 인자는 선언을 찾아 확인하고 쓴다.
+- 메뉴는 DB 테이블(tbsy_resource 등)에 등록한다. 소스가 아니므로 등록 SQL을 설계서에 적고, 실제 DB 반영은 사람이 한다.
+
+## 동작 검증
+
+- 로그인 뒤 index.go의 왼쪽 메뉴로 화면에 들어간다. 팝업은 메뉴 틀(genexon.body) 안에 열린다.
+- 2026-11-23 실행 0bc967d2: 화면 주소(*.go)로 바로 연 팝업에서는 파일을 넣어도 업로드 요청(*.ajax)이 나가지 않았다. index.go 메뉴로 들어가 팝업의 Choose File을 누른 뒤 파일을 넣었을 때는 업로드가 됐다. 업로드가 안 되면 이 경로로 다시 해 본다.
+- 목록 페이지 크기는 화면 아래의 "N건 출력"이다. 페이지 넘김을 보려면 그보다 많은 행이 있어야 한다.

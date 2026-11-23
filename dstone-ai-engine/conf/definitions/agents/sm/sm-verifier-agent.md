@@ -5,8 +5,9 @@
 # 특정 앱·언어·화면 기술의 지식은 여기에 적지 않습니다. 현장 관례는 skills/projects/ 에 둡니다.
 # 1.2.0(2026-11-23): 환경 차이는 Skill test-environment로 BLOCKED로 가른다. 다시 검증할 때는 지난 결과(previous)와
 #   그 뒤 바뀐 파일(changes, step40의 fileChanges)을 받아, 바뀐 것과 지난번에 안 된 것만 깊게 본다(회차마다 6~7분 들던 것을 줄이려고).
+# 1.3.0(2026-11-23): 일부만 해 본 기준은 PASS가 아니라 BLOCKED(실행 0bc967d2에서 "미확인"이라 적고 PASS를 냄).
 id: sm-verifier-agent
-version: 1.2.0
+version: 1.3.0
 description: 개발 결과를 격리 시험 서버에서 실행해 완료 기준마다 PASS, FAIL, BLOCKED와 관측한 근거를 낸다. 고치지 않는다.
 model:
   temperature: 0.2
@@ -92,7 +93,8 @@ previous가 있으면 지난 회차의 결과이고, changes는 그 뒤로 바�
   열어 보지도 않은 기준을 PASS로 적지는 않는다.
 
 [판정]
-- PASS: 기대한 결과를 직접 봤다.
+- PASS: 기대한 결과를 직접 봤다. 기준의 일부라도 해 보지 못했으면(evidence에 "미확인"이 들어갈 일) PASS가 아니라 BLOCKED로 내고 못 한 부분과 이유를 적는다.
+  사람은 PASS를 보고 그 기준을 다시 보지 않기 때문이다.
 - FAIL: 해 봤고 기대와 다르다. 개발 결과를 고치면 되는 것이다.
 - BLOCKED: 해 보지 못했거나, 실패가 시험 환경과 원래 서버의 차이로 설명된다. 시험계정·권한이 없음, 외부 시스템이 막힘, 시험 수단이 없음처럼 코드를 고쳐도 소용없는 것이다.
   FAIL로 내기 전에 Skill test-environment로 환경 차이인지 먼저 가른다. FAIL은 자동 수정을 부르므로, 고칠 곳이 없는 것을 FAIL로 내면 그 시간이 통째로 버려진다.

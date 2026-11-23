@@ -21,7 +21,7 @@ import net.dstone.ai.support.WorkflowTestBase;
 /**
  * <pre>
  * 평가 기능(사례 → 작업 폴더 → Agent 호출 → 채점 → 저장)을 미리 넣은 LLM 답으로 확인합니다.
- * 저장소에는 평가 사례를 두지 않으므로(사례는 현장의 conf/eval에 둡니다), 테스트가 임시 폴더에 사례를 만들어
+ * 저장소의 conf/eval 사례에 기대지 않도록 테스트가 임시 폴더에 사례를 만들어
  * dstone.ai.eval.location으로 가리킵니다. 사례의 Agent는 샘플 Agent(sample-basic-echo-agent)입니다.
  * </pre>
  */
@@ -62,6 +62,14 @@ public class EvalRunnerTest extends WorkflowTestBase {
 			"    fileChanged: note.md",
 			"  - name: Tool 안 씀",
 			"    toolUsed: {name: dbQuery, min: 1}",
+			"  - name: 답 모양",
+			"    answerMatches: {pattern: '안녕.*요'}",
+			"  - name: 답에 없어야 할 말",
+			"    answerNotMatches: {pattern: '실패'}",
+			"  - name: 메모에 EL 남음",
+			"    fileMatches: {file: note.md, pattern: 'EL \\$\\{_csrf'}",
+			"  - name: 메모에 없어야 할 모양",
+			"    fileNotMatches: {file: note.md, pattern: 'zzz'}",
 			""));
 		write(root.resolve("demo/data/request.md"), "# 요청 ${param.name}\n");
 		write(root.resolve("demo/data/work/note.md"), "폴더 ${workDir} / EL ${_csrf.token}\n");
@@ -90,6 +98,18 @@ public class EvalRunnerTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void 정규식이_틀린_채점은_읽을_때_알려_준다() throws Exception {
+		write(this.dir.resolve("eval/demo/regex-bad.eval.yml"), "id: regex-bad\nagent: x\ninput: a\nchecks: [{fileMatches: {file: a, pattern: '(a'}}]\n");
+		String problem = null;
+		for (EvalCaseLoader.Loaded loaded : this.loader.loadAll()) {
+			if ("demo/regex-bad.eval.yml".equals(loaded.path())) {
+				problem = loaded.problem();
+			}
+		}
+		assertThat(problem).contains("정규식");
+	}
+
+	@Test
 	void 사례를_풀게_하고_채점해서_남긴다() throws Exception {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
 		this.chatModel.answer("안녕하세요.");
@@ -102,8 +122,8 @@ public class EvalRunnerTest extends WorkflowTestBase {
 
 		assertThat(run.get("status")).isEqualTo("DONE");
 		assertThat(run.get("answer")).isEqualTo("안녕하세요.");
-		assertThat(run.get("total")).isEqualTo(3);
-		assertThat(run.get("passed")).isEqualTo(1);
+		assertThat(run.get("total")).isEqualTo(7);
+		assertThat(run.get("passed")).isEqualTo(5);
 		assertThat(((Number) run.get("rounds")).intValue()).isEqualTo(1);
 		// Agent에 들어간 글: 요청서(자리를 채움 + 덧붙임) + 작업 폴더 파일 내용
 		String sent = net.dstone.ai.support.ScriptedChatModel.textOf(this.chatModel.prompts().get(0));

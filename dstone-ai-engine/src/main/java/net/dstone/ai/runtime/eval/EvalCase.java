@@ -103,6 +103,11 @@ public record EvalCase(String id, String description, String agent, String workf
 	 *   fileContains     {file: 02.impact.md, text: TASK-01}
 	 *   textIncreased    {files: [a.java, b.java], text: setUserId}  파일들에서 글자가 나온 횟수 합이 처음보다 늘었다
 	 *   toolUsed         {name: dbQuery, min: 1}         이름이 name으로 시작하는 Tool을 min번 이상 요청했다
+	 *   fileMatches      {file: 03-1.design.md, pattern: '정규식'}  파일에 정규식과 맞는 곳이 있다(DOTALL)
+	 *   fileNotMatches   {file: 03-1.design.md, pattern: '정규식'}  파일이 있고, 맞는 곳이 없다(있으면 안 되는 모양)
+	 *   answerMatches    {field: scenarios, pattern: '정규식'}      답의 그 칸(없으면 답 전체)에 맞는 곳이 있다
+	 *   answerNotMatches {field: scenarios, pattern: '정규식'}      답이 있고, 그 칸에 맞는 곳이 없다
+	 *   (답의 칸이 목록·맵이면 Java 글자 모양 "{task=..., result=PASS}"로 바꿔 맞춘다)
 	 * </pre>
 	 *
 	 * @param name  화면과 결과에 보일 이름

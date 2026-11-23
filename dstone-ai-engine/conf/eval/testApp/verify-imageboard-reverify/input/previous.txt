@@ -1,0 +1,88 @@
+{
+ "scenarios": [
+  {
+   "task": "TASK-01 ① 목록화면에서 등록된 이미지 게시물 목록이 표시되는가?",
+   "result": "PASS",
+   "steps": "로그인 → 테스트>이미지게시판 메뉴 진입 → 등록 버튼으로 '테스트제목1'(파일 dstone-upload-sample.png)과 '테스트제목2' 등록 → 목록 확인",
+   "evidence": "등록 후 목록 그리드에 SEQ 1(테스트제목1, 썸네일 img, 관리자)과 SEQ 2(테스트제목2, 관리자) 2행 표시. dbQuery: tbts_image_board에 seq 1,2 (use_yn='Y') 존재."
+  },
+  {
+   "task": "TASK-01 ② 페이징이 동작하는가?",
+   "result": "PASS",
+   "steps": "목록화면 하단 페이징 영역 확인 (serverPaging:true, 20건 출력)",
+   "evidence": "그리드 하단에 첫/이전/다음/마지막 페이지 링크와 '20건 출력' 페이지사이즈 셀렉터가 표시되고, dataSource에 serverPaging:true로 서버 페이징 구성. (참고: 20건 초과 데이터로 실제 페이지 넘김은 미확인 - 2건만 등록)"
+  },
+  {
+   "task": "TASK-01 ③ 테이블에 체크박스, SEQ, 썸네일, 제목, 등록자 항목이 표시되는가?",
+   "result": "PASS",
+   "steps": "목록화면 그리드 헤더/행 확인",
+   "evidence": "헤더: chk(체크박스), SEQ, 썸네일, 제목, 등록자 5개 컬럼 표시. 행에 체크박스, seq값, 썸네일 img, 제목 링크, 등록자(관리자) 표시."
+  },
+  {
+   "task": "TASK-01 ④ 제목 입력 시 해당 제목으로 조회되는가?",
+   "result": "PASS",
+   "steps": "제목 검색란에 '테스트제목1' 입력 → 검색 버튼 클릭",
+   "evidence": "검색 후 그리드에 SEQ 1(테스트제목1) 1행만 표시되고, 테스트제목2는 조회되지 않음. LIKE 조건으로 제목 필터링 정상."
+  },
+  {
+   "task": "TASK-02 ① 전체선택 버튼 클릭 시 모든 체크박스가 체크되는가?",
+   "result": "PASS",
+   "steps": "2행 표시 상태에서 전체선택 버튼 클릭",
+   "evidence": "클릭 후 SEQ 1,2 두 행의 체크박스 모두 [checked] 상태로 변경됨."
+  },
+  {
+   "task": "TASK-02 ② 등록 버튼 클릭 시 상세화면 팝업이 편집모드로 노출되는가?",
+   "result": "PASS",
+   "steps": "등록 버튼 클릭",
+   "evidence": "'이미지 등록' 팝업이 노출되고 제목 입력란이 비어 있으며(편집/등록모드), 저장 버튼 표시, 등록자 '관리자' 자동세팅. seq가 없어 insertImageBoard.ajax로 동작."
+  },
+  {
+   "task": "TASK-02 ③ 삭제 버튼 클릭 시 체크된 게시물이 삭제되는가?",
+   "result": "PASS",
+   "steps": "전체선택 후 SEQ 2 체크박스만 해제(SEQ 1만 체크) → 삭제 버튼 → 확인(OK)",
+   "evidence": "deleteImageBoard.ajax 200 응답. dbQuery: seq 1 use_yn='N'(논리삭제), seq 2 use_yn='Y'(유지). 재조회 목록에 SEQ 2(테스트제목2)만 표시되고 SEQ 1은 사라짐. 체크된 항목만 삭제됨."
+  },
+  {
+   "task": "TASK-03 ① 목록에서 제목 클릭 시 상세화면 팝업이 조회모드로 노출되는가?",
+   "result": "FAIL",
+   "steps": "목록에서 '테스트제목1' 제목 링크 클릭",
+   "evidence": "팝업이 열리지 않음. 콘솔 오류: 'TypeError: this.dataItem is not a function at HTMLAnchorElement.imageBoardView (imageBoard.go:343:26)'. 원인: imageBoard.jsp의 제목 템플릿 onclick=\"imageBoardView.call(this, event)\"에서 this가 <a> 요소(HTMLAnchorElement)로 전달되어 this.dataItem이 존재하지 않음. 그리드 인스턴스를 참조하도록 수정 필요."
+  },
+  {
+   "task": "TASK-03 ② 목록에서 썸네일 클릭 시 이미지 팝업이 노출되는가?",
+   "result": "FAIL",
+   "steps": "목록에서 썸네일 이미지 클릭",
+   "evidence": "팝업이 열리지 않음. 콘솔 오류: 'TypeError: this.dataItem is not a function at HTMLImageElement.imageThumbView (imageBoard.go:367:18)'. 제목 클릭과 동일한 원인(onclick=\"imageThumbView.call(this, event)\"에서 this가 <img> 요소). 이미지 팝업 미노출."
+  },
+  {
+   "task": "TASK-04 ① 상세화면에 제목, 등록자, 파일업로드버튼 항목이 표시되는가?",
+   "result": "PASS",
+   "steps": "등록 버튼으로 팝업 열기 → 항목 확인",
+   "evidence": "팝업에 제목(입력란), 등록자(입력란), 파일(Choose File/선택 버튼 + 이미지 선택 영역) 3개 항목 표시."
+  },
+  {
+   "task": "TASK-04 ② 등록자가 로그인 사용자명으로 자동 세팅되는가?",
+   "result": "PASS",
+   "steps": "등록 팝업 열기 → 등록자 필드 확인",
+   "evidence": "등록자 필드에 로그인 사용자명 '관리자'가 자동 입력되어 있고 readonly 상태."
+  },
+  {
+   "task": "TASK-04 ③ 파일업로드버튼 클릭 시 로컬에서 이미지를 선택할 수 있는가?",
+   "result": "PASS",
+   "steps": "팝업에서 파일 선택 영역 클릭 → 로컬 파일 dstone-upload-sample.png 선택",
+   "evidence": "파일 선택 다이얼로그가 열리고 png 파일 선택 가능. kendoUpload가 '전송 완료 100%'로 업로드 처리, imageUrl.ajax 200 응답, file_no/file_url hidden에 값 세팅."
+  },
+  {
+   "task": "TASK-04 ④ 저장버튼 클릭 시 등록내용이 저장되는가?",
+   "result": "PASS",
+   "steps": "제목 '테스트제목1' 입력 + 파일 업로드 → 저장 버튼 → 확인(OK)",
+   "evidence": "insertImageBoard.ajax 200, 응답 count:1. dbQuery: tbts_image_board에 seq 1 (title=테스트제목1, file_no=87d94d51..., file_url=/Upload/UpImages/PRD/...png, writer_nm=관리자, use_yn=Y) 등록. 재조회 목록에 신규 행 표시."
+  },
+  {
+   "task": "TASK-04 ⑤ 수정버튼 클릭 시 등록내용이 수정되는가?",
+   "result": "BLOCKED",
+   "steps": "수정(조회) 팝업 진입 시도 - 목록에서 제목 클릭",
+   "evidence": "수정/조회 팝업의 유일한 진입 경로인 '제목 클릭'이 TASK-03 ①의 JS 오류(this.dataItem is not a function)로 실패하여 수정 팝업을 열 수 없어 수정 저장까지 검증 불가. updateImageBoard.ajax 엔드포인트 자체는 존재하나 화면 경로를 통해 도달하지 못함. TASK-03 제목 클릭 버그 수정 후 재검증 필요."
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+# 실행 0bc967d2(2026-11-23) step12의 설계 Agent 입력을 그대로 뜬 사례입니다.
+# 그때 설계서에 결함 두 개가 있었고, 개발은 그대로 옮겼으며, 동작 검증에서 한 번에 하나씩 드러나 검증·수정 루프가 두 바퀴 더 돌았습니다(약 20분).
+#   1) 참고 화면의 그리드 버튼 핸들러 본문(this.dataItem, this = 그리드)을 가져오면서 부르는 쪽은 HTML onclick(.call(this) = 링크 요소)으로 바꿈
+#   2) 팝업을 여는 화면 쪽은 회원 화면에서, 팝업 Controller는 팝업이 없는 샘플게시판에서 가져와 화면이 보낸 json_string을 풀지 않음
+# 대상 앱의 원본 소스를 읽으므로 sourceDir은 엔진이 도는 곳 기준 경로입니다(WSL에서 돌리면 /mnt/d/AppHome/testApp).
+id: design-imageboard
+description: 이미지 게시판 설계 - 참고 코드를 옮길 때 호출 방식과 본문이 맞는지, 팝업 화면과 Controller가 같은 형식으로 주고받는지
+agent: sm-architect-agent
+fixture: testApp/design-imageboard
+params:
+  sourceDir: D:/AppHome/testApp
+input:
+  base_dir: ${workDir}
+  request: ${fixture:input/request.md}
+  requirement: ${fixture:input/requirement.md}
+  impact: ${fixture:input/impact.md}
+  instruction: ${fixture:input/instruction.txt}
+  history: ${fixture:input/history.txt}
+checks:
+  - name: 설계서 저장
+    fileExists: 03-1.design.md
+  - name: 태스크아이템 저장
+    fileExists: 03-2.taskitems.md
+  # HTML onclick에서 .call(this)로 부르는 함수가 this.dataItem(그리드 전용)을 쓰면 실패. 수정 이력의 오류 문구는 "= this.dataItem("이 아니라 걸리지 않는다
+  - name: 클릭 함수의 호출 방식과 본문이 맞음
+    fileNotMatches:
+      file: 03-1.design.md
+      pattern: '(\.call\(this\b.*=\s*this\.dataItem\(|=\s*this\.dataItem\(.*\.call\(this\b)'
+  # 팝업 메서드 본문 안에서만 찾는다(다음 매핑을 넘지 않음). 2026-11-23 기준선에서 없는 genexon.popData를 지어내 화면에서 받는 설계도 나왔다 - 그것도 실패
+  - name: 팝업 Controller가 화면이 보낸 json_string을 품
+    fileMatches:
+      file: 03-1.design.md
+      pattern: '\.pop"[^)]*\)\s*public\s+ModelAndView\s+\w+\([^)]*\)[^{]*\{((?!@RequestMapping|@GetMapping|@PostMapping).)*?[Jj]son_string'
