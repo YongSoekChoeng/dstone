@@ -1,6 +1,10 @@
 package net.dstone.ai.runtime.eval;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
@@ -9,13 +13,17 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * <pre>
@@ -25,13 +33,41 @@ import java.util.regex.Pattern;
  *   {요청 폴더}/work/               ← 작업 폴더. 자료 폴더의 work/ 아래를 그대로 복사(글자 파일은 자리를 채움)
  *
  * 자료 폴더의 work/ 밖의 파일(요청서, 지시 글 등)은 복사하지 않고 ${fixture:경로}와 request.file로 읽습니다.
+ * Workflow 사례는 작업 폴더가 요청 폴더 자체입니다(Workflow가 그 아래에 결과를 씁니다).
  * 자리 채우기는 정해진 이름만 바꿉니다. 다른 ${…}(JSP EL 등)는 그대로 둡니다.
  * </pre>
  */
 public class EvalWorkspace {
 
-	/** 바꾸는 자리: ${workDir} ${requestDir} ${param.이름} ${request} ${file:경로} ${fixture:경로} */
-	private static final Pattern TOKEN = Pattern.compile("\\$\\{(workDir|requestDir|request|param\\.[A-Za-z0-9_-]+|file:[^}]+|fixture:[^}]+)\\}");
+	/** 바꾸는 자리: ${workDir} ${requestDir} ${param.이름} ${request} ${file:경로} ${fixture:경로} ${state.이름} ${saved.이름} */
+	private static final Pattern TOKEN = Pattern.compile("\\$\\{(workDir|requestDir|request|param\\.[A-Za-z0-9_-]+|state\\.[A-Za-z0-9_.-]+|saved\\.[A-Za-z0-9_-]+|file:[^}]+|fixture:[^}]+)\\}");
+
+	/** http 채점 한 번의 응답 대기 상한 */
+	private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(60);
+
+	/** dbQuery 채점에서 읽는 최대 행 수 */
+	private static final int MAX_DB_ROWS = 1000;
+
+	private static final ObjectMapper JSON = new ObjectMapper();
+
+	/**
+	 * <pre>
+	 * http·dbQuery 채점이 쓰는 격리 시험 서버입니다. EvalRunner가 띄우고 넘깁니다.
+	 * </pre>
+	 */
+	public interface Probe {
+
+		/** 서버 접속주소(끝의 / 없이) */
+		String baseUrl();
+
+		/**
+		 * 복제본 DB에서 SELECT 하나를 실행합니다.
+		 *
+		 * @param sql     SELECT 문장
+		 * @param maxRows 최대 행 수
+		 */
+		List<Map<String, Object>> rows(String sql, int maxRows);
+	}
 
 	private final EvalCase evalCase;
 	private final Path fixtureDir;
@@ -40,6 +76,10 @@ public class EvalWorkspace {
 	private final Map<String, String> params;
 	private final Map<String, String> original = new LinkedHashMap<String, String>();
 	private String request = "";
+	/** Workflow가 끝난(멈춘) 뒤의 state. ${state.이름}이 읽습니다 */
+	private Map<String, Object> state = new LinkedHashMap<String, Object>();
+	/** http 채점이 save로 남긴 값. ${saved.이름}이 읽습니다 */
+	private final Map<String, String> saved = new LinkedHashMap<String, String>();
 
 	/**
 	 * @param evalCase   사례
@@ -51,8 +91,66 @@ public class EvalWorkspace {
 		this.evalCase = evalCase;
 		this.fixtureDir = fixtureDir;
 		this.requestDir = requestDir;
-		this.workDir = requestDir.resolve("work");
+		this.workDir = evalCase.isWorkflow() ? requestDir : requestDir.resolve("work");
 		this.params = params;
+	}
+
+	/** 요청 폴더입니다. */
+	public Path requestDir() {
+		return this.requestDir;
+	}
+
+	/**
+	 * Workflow가 끝난(멈춘) 뒤의 state를 넣습니다. ${state.이름}이 이 값을 읽습니다.
+	 *
+	 * @param state Workflow 컨텍스트의 state
+	 */
+	public void setState(Map<String, Object> state) {
+		this.state = state == null ? new LinkedHashMap<String, Object>() : state;
+	}
+
+	/**
+	 * <pre>
+	 * 요청 폴더를 copyTo로 통째로 복사하고, 그 사본을 가리키는 작업 공간을 돌려줍니다(snapshotAfter).
+	 * 사본의 ${requestDir}·${workDir}는 사본 쪽이고 params, 요청서, 처음 복사한 내용은 같습니다.
+	 * </pre>
+	 *
+	 * @param copyTo 사본을 둘 새 폴더
+	 */
+	public EvalWorkspace snapshot(Path copyTo) throws IOException {
+		copyTree(this.requestDir, copyTo);
+		EvalWorkspace copy = new EvalWorkspace(this.evalCase, this.fixtureDir, copyTo, this.params);
+		copy.request = this.request;
+		copy.original.putAll(this.original);
+		return copy;
+	}
+
+	/** 폴더를 통째로 복사합니다. */
+	private static void copyTree(final Path from, final Path to) throws IOException {
+		Files.walkFileTree(from, new SimpleFileVisitor<Path>() {
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				Files.createDirectories(to.resolve(from.relativize(dir).toString()));
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				Files.copy(file, to.resolve(from.relativize(file).toString()), StandardCopyOption.REPLACE_EXISTING);
+				return FileVisitResult.CONTINUE;
+			}
+		});
+	}
+
+	/**
+	 * server 값의 자리를 채워 돌려줍니다(TestServerTool.startSandboxServer에 넘길 인자).
+	 */
+	public Map<String, String> serverArgs() throws IOException {
+		Map<String, String> result = new LinkedHashMap<String, String>();
+		for (Map.Entry<String, String> entry : this.evalCase.server().entrySet()) {
+			result.put(entry.getKey(), this.fill(entry.getValue(), false));
+		}
+		return result;
 	}
 
 	/** 작업 폴더입니다. */
@@ -131,6 +229,18 @@ public class EvalWorkspace {
 					throw new IllegalStateException("사례 '" + this.evalCase.id() + "'의 params에 '" + key + "'가 없습니다: " + matcher.group());
 				}
 				value = this.params.get(key);
+			} else if (name.startsWith("state.")) {
+				Object found = stateValue(this.state, name.substring("state.".length()));
+				if (found == null) {
+					throw new IllegalStateException("Workflow state에 '" + name.substring("state.".length()) + "'가 없습니다: " + matcher.group());
+				}
+				value = String.valueOf(found);
+			} else if (name.startsWith("saved.")) {
+				String key = name.substring("saved.".length());
+				if (!this.saved.containsKey(key)) {
+					throw new IllegalStateException("앞 http 채점이 save로 남긴 '" + key + "'가 없습니다: " + matcher.group());
+				}
+				value = this.saved.get(key);
 			} else if (withFiles && "request".equals(name)) {
 				value = this.request;
 			} else if (withFiles && name.startsWith("file:")) {
@@ -142,6 +252,18 @@ public class EvalWorkspace {
 		}
 		matcher.appendTail(result);
 		return result.toString();
+	}
+
+	/** state 안의 값을 점으로 이은 이름으로 찾습니다(예: compileResult.success). */
+	private static Object stateValue(Map<String, Object> state, String dotted) {
+		Object node = state;
+		for (String part : dotted.split("\\.")) {
+			if (!(node instanceof Map<?, ?> map)) {
+				return null;
+			}
+			node = map.get(part);
+		}
+		return node;
 	}
 
 	private String readFixture(String rel) throws IOException {
@@ -204,8 +326,20 @@ public class EvalWorkspace {
 	 * @param toolCounts Tool 이름별 요청 수
 	 * @return [{name, kind, ok, detail}]
 	 */
-	@SuppressWarnings("unchecked")
 	public List<Map<String, Object>> check(Object answer, Map<String, Integer> toolCounts) {
+		return this.check(answer, toolCounts, null);
+	}
+
+	/**
+	 * 끝난 뒤 채점합니다. http·dbQuery 채점은 probe(격리 시험 서버)가 있어야 합니다.
+	 *
+	 * @param answer     Agent 답(실패했으면 null)
+	 * @param toolCounts Tool 이름별 요청 수
+	 * @param probe      격리 시험 서버(띄우지 못했거나 필요 없으면 null)
+	 * @return [{name, kind, ok, detail}]
+	 */
+	@SuppressWarnings("unchecked")
+	public List<Map<String, Object>> check(Object answer, Map<String, Integer> toolCounts, Probe probe) {
 		List<Map<String, Object>> results = new ArrayList<Map<String, Object>>();
 		for (EvalCase.Check check : this.evalCase.checks()) {
 			boolean ok;
@@ -229,17 +363,17 @@ public class EvalWorkspace {
 						break;
 					}
 					case "fileExists": {
-						ok = Files.exists(this.workDir.resolve(String.valueOf(value)));
+						ok = Files.exists(this.workDir.resolve(this.fill(String.valueOf(value), false)));
 						break;
 					}
 					case "fileChanged": {
-						String rel = String.valueOf(value);
+						String rel = this.fill(String.valueOf(value), false);
 						String now = this.readWork(rel);
 						ok = now != null && !now.equals(this.original.get(rel));
 						break;
 					}
 					case "fileContains": {
-						String now = this.readWork(String.valueOf(map.get("file")));
+						String now = this.readWork(this.fill(String.valueOf(map.get("file")), false));
 						ok = now != null && now.contains(this.fill(String.valueOf(map.get("text")), false));
 						break;
 					}
@@ -268,6 +402,31 @@ public class EvalWorkspace {
 						detail = used + "번";
 						break;
 					}
+					case EvalCase.Check.HTTP: {
+						if (probe == null) {
+							throw new IllegalStateException("격리 시험 서버가 없어 채점하지 못했습니다");
+						}
+						detail = this.checkHttp(probe, map);
+						ok = detail.startsWith("ok");
+						break;
+					}
+					case EvalCase.Check.DB_QUERY: {
+						if (probe == null) {
+							throw new IllegalStateException("격리 시험 서버가 없어 채점하지 못했습니다");
+						}
+						List<Map<String, Object>> rows = probe.rows(this.fill(String.valueOf(map.get("sql")), false), MAX_DB_ROWS);
+						if (map.get("rows") != null) {
+							int expected = Integer.parseInt(String.valueOf(map.get("rows")));
+							ok = rows.size() == expected;
+							detail = rows.size() + "행";
+						} else {
+							String expected = this.fill(String.valueOf(map.get("equals")), false);
+							Object first = rows.isEmpty() || rows.get(0).isEmpty() ? null : rows.get(0).values().iterator().next();
+							ok = first != null && expected.equals(String.valueOf(first));
+							detail = "값 " + (rows.isEmpty() ? "(행 없음)" : String.valueOf(first));
+						}
+						break;
+					}
 					default:
 						throw new IllegalStateException("모르는 채점 종류입니다: " + check.kind());
 				}
@@ -283,6 +442,104 @@ public class EvalWorkspace {
 			results.add(result);
 		}
 		return results;
+	}
+
+	/**
+	 * <pre>
+	 * http 채점 하나를 합니다. 적은 것만 봅니다: status, json(경로 → 값), contains(글자 목록).
+	 * 맞으면 "ok ..."로 시작하는 글자를, 틀리면 무엇이 달랐는지를 돌려줍니다. save는 맞든 틀리든 찾은 값을 남깁니다.
+	 * </pre>
+	 */
+	@SuppressWarnings("unchecked")
+	private String checkHttp(Probe probe, Map<String, Object> spec) throws IOException {
+		String method = spec.get("method") == null ? "GET" : String.valueOf(spec.get("method")).toUpperCase(java.util.Locale.ROOT);
+		String path = this.fill(String.valueOf(spec.get("path")), false);
+		String url = probe.baseUrl() + (path.startsWith("/") ? path : "/" + path);
+		Object rawBody = spec.get("body");
+		String body = null;
+		if (rawBody instanceof String text) {
+			body = this.fill(text, false);
+		} else if (rawBody != null) {
+			body = JSON.writeValueAsString(this.fillPlain(rawBody));
+		}
+		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(HTTP_TIMEOUT).header("Content-Type", "application/json");
+		builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+		HttpResponse<String> response;
+		try {
+			response = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build().send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("요청을 기다리다 중단되었습니다", e);
+		}
+		String text = response.body() == null ? "" : response.body();
+		Object json = null;
+		try {
+			json = text.isBlank() ? null : JSON.readValue(text, Object.class);
+		} catch (IOException e) {
+			// JSON이 아닌 응답(HTML 등)이면 json 검사는 실패하고 contains는 글자로 봅니다.
+		}
+		Object rawSave = spec.get("save");
+		if (rawSave instanceof Map) {
+			for (Map.Entry<String, Object> entry : ((Map<String, Object>) rawSave).entrySet()) {
+				String picked = JsonPick.pick(json, String.valueOf(entry.getValue()));
+				if (picked != null) {
+					this.saved.put(entry.getKey(), picked);
+				}
+			}
+		}
+		List<String> wrong = new ArrayList<String>();
+		if (spec.get("status") != null && !String.valueOf(spec.get("status")).equals(String.valueOf(response.statusCode()))) {
+			wrong.add("status " + response.statusCode() + "(기대 " + spec.get("status") + ")");
+		}
+		Object rawJson = spec.get("json");
+		if (rawJson instanceof Map) {
+			for (Map.Entry<String, Object> entry : ((Map<String, Object>) rawJson).entrySet()) {
+				String expected = this.fill(String.valueOf(entry.getValue()), false);
+				String actual = JsonPick.pick(json, entry.getKey());
+				if (!expected.equals(actual)) {
+					wrong.add(entry.getKey() + "=" + actual + "(기대 " + expected + ")");
+				}
+			}
+		}
+		Object rawContains = spec.get("contains");
+		if (rawContains != null) {
+			List<Object> parts = rawContains instanceof List ? (List<Object>) rawContains : List.of(rawContains);
+			for (Object part : parts) {
+				String expected = this.fill(String.valueOf(part), false);
+				if (!text.contains(expected)) {
+					wrong.add("본문에 '" + expected + "' 없음");
+				}
+			}
+		}
+		String head = method + " " + path + " → " + response.statusCode();
+		if (wrong.isEmpty()) {
+			return "ok " + head;
+		}
+		String snippet = text.replaceAll("\\s+", " ");
+		return head + ": " + String.join(", ", wrong) + " | 응답: " + (snippet.length() > 300 ? snippet.substring(0, 300) + "…" : snippet);
+	}
+
+	/** 글자·목록·맵 안의 글자 자리를 채웁니다(요청서·파일 자리는 채우지 않음). */
+	@SuppressWarnings("unchecked")
+	private Object fillPlain(Object value) throws IOException {
+		if (value instanceof String text) {
+			return this.fill(text, false);
+		}
+		if (value instanceof List<?> list) {
+			List<Object> result = new ArrayList<Object>();
+			for (Object item : list) {
+				result.add(this.fillPlain(item));
+			}
+			return result;
+		}
+		if (value instanceof Map<?, ?> map) {
+			Map<String, Object> result = new LinkedHashMap<String, Object>();
+			for (Map.Entry<String, Object> entry : ((Map<String, Object>) map).entrySet()) {
+				result.put(entry.getKey(), this.fillPlain(entry.getValue()));
+			}
+			return result;
+		}
+		return value;
 	}
 
 	private String readWork(String rel) throws IOException {

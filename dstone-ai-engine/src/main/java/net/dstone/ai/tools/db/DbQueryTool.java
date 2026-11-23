@@ -283,6 +283,69 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 		}
 	}
 
+	/**
+	 * <pre>
+	 * dbQuery와 같은 검사(SELECT 하나만, 행 수 상한)를 거쳐 조회하고, 행을 글자로 풀지 않고 돌려줍니다.
+	 * LLM이 부르는 Tool이 아니라 엔진이 값을 비교할 때 씁니다(Agent 평가의 dbQuery 채점).
+	 * </pre>
+	 *
+	 * @param alias   DB 별칭
+	 * @param sql     SELECT 문장 하나
+	 * @param maxRows 돌려받을 최대 행 수(상한보다 크면 상한)
+	 * @return 행 목록. 한 행은 {열 이름: 값}이고, 열 순서를 지킵니다
+	 * @throws IllegalArgumentException 별칭이 없거나 문장이 검사를 통과하지 못했을 때
+	 * @throws IllegalStateException    쿼리가 실패했을 때
+	 */
+	public List<Map<String, Object>> selectRows(String alias, String sql, int maxRows) {
+		DbConnectionSetting setting = this.connections().get(nvl(alias).trim());
+		if (setting == null) {
+			throw new IllegalArgumentException("등록되지 않은 DB 별칭입니다: " + alias);
+		}
+		String trimmed = trimSql(sql);
+		String problem = DbSqlGuard.check(trimmed);
+		if (problem != null) {
+			this.audit(alias, trimmed, "거부 " + problem);
+			throw new IllegalArgumentException(problem);
+		}
+		int limit = Math.min(Math.max(maxRows, 1), this.maxRows());
+		Connection connection = null;
+		Statement statement = null;
+		try {
+			connection = this.open(alias.trim(), setting);
+			statement = connection.createStatement();
+			statement.setMaxRows(limit);
+			statement.setQueryTimeout(this.queryTimeoutSeconds());
+			ResultSet rs = statement.executeQuery(trimmed);
+			List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+			try {
+				ResultSetMetaData meta = rs.getMetaData();
+				while (rs.next()) {
+					Map<String, Object> row = new LinkedHashMap<String, Object>();
+					for (int i = 1; i <= meta.getColumnCount(); i++) {
+						row.put(meta.getColumnLabel(i), rs.getObject(i));
+					}
+					rows.add(row);
+				}
+			} finally {
+				rs.close();
+			}
+			this.audit(alias, trimmed, rows.size() + "행");
+			return rows;
+		} catch (Exception e) {
+			this.audit(alias, trimmed, "실패 " + e.getMessage());
+			throw new IllegalStateException("쿼리 실행 오류 - " + oneLine(e.getMessage()), e);
+		} finally {
+			if (statement != null) {
+				try {
+					statement.close();
+				} catch (Exception ignore) {
+					// 닫다가 난 오류는 결과와 상관없다
+				}
+			}
+			this.close(connection);
+		}
+	}
+
 	/* ============================== 결과 만들기 ============================== */
 
 	/** 테이블 하나의 설명. 그 이름의 테이블이 없으면 null */

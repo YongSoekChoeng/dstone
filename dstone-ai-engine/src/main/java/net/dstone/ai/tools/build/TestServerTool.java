@@ -151,6 +151,10 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	private static final class SandboxRequest {
 		String ddlFile;
 		String cause = CAUSE_ENVIRONMENT;
+		/** 띄운 서버의 접속주소(성공했을 때만) */
+		String url;
+		/** 복제본 DB 별칭(성공했을 때만) */
+		List<String> dbAliases = new ArrayList<String>();
 	}
 
 	/** 실패 원인: 개발 결과. 고치면 된다 */
@@ -211,6 +215,11 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		result.put("success", outcome.success());
 		result.put("cause", Boolean.TRUE.equals(outcome.success()) ? "" : request.cause);
 		result.put("message", outcome.message());
+		// 프로그램이 읽을 값(엔진의 Agent 평가가 씁니다). 글자 message를 풀어 읽지 않게 따로 둡니다.
+		if (Boolean.TRUE.equals(outcome.success())) {
+			result.put("url", request.url);
+			result.put("dbAliases", request.dbAliases);
+		}
 		return result;
 	}
 
@@ -433,6 +442,8 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			if (server.sandbox != null) {
 				Map<String, Map<String, String>> clones = server.sandbox.readConnections();
 				this.sandboxRegistry.opened(stepRef, server.url, clones);
+				request.url = server.url;
+				request.dbAliases.addAll(clones.keySet());
 				message.append("\n복제본 DB 별칭(dbQuery의 alias): ").append(String.join(", ", clones.keySet()));
 				for (String line : server.sandbox.report()) {
 					message.append('\n').append(line);

@@ -67,6 +67,10 @@ public class EvalController extends BaseController {
 				item.put("id", evalCase.id());
 				item.put("description", evalCase.description());
 				item.put("agent", evalCase.agent());
+				item.put("workflow", evalCase.workflow());
+				item.put("approvals", evalCase.approvals());
+				item.put("snapshotAfter", evalCase.snapshotAfter());
+				item.put("needsServer", Boolean.valueOf(evalCase.needsServer()));
 				item.put("params", evalCase.params());
 				List<String> checks = new ArrayList<String>();
 				for (EvalCase.Check check : evalCase.checks()) {

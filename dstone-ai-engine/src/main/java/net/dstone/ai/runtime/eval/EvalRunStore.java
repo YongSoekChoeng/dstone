@@ -42,7 +42,7 @@ public class EvalRunStore extends BaseDao {
 	 * @param runId         평가 실행 ID
 	 * @param batchId       묶음 ID
 	 * @param evalCase      사례
-	 * @param agentVersion  Agent 정의의 version
+	 * @param agentVersion  Agent 정의의 version(Workflow 사례면 Workflow 정의의 version)
 	 * @param model         쓸 모델(바꾸지 않았으면 Agent·provider 기본 모델 이름)
 	 * @param params        사례 params에 넣은 값
 	 * @param requestedBy   시작한 사용자
@@ -53,7 +53,8 @@ public class EvalRunStore extends BaseDao {
 		param.put("runId", runId);
 		param.put("batchId", batchId);
 		param.put("caseId", evalCase.id());
-		param.put("agentId", evalCase.agent());
+		// Workflow 사례면 AGENT_ID/AGENT_VERSION 칸에 Workflow id와 version을 둡니다(평가 대상의 id와 version).
+		param.put("agentId", evalCase.target());
 		param.put("agentVersion", agentVersion);
 		param.put("model", model);
 		param.put("paramsJson", toJson(params));

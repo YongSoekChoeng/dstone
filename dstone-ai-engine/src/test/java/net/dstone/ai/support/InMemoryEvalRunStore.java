@@ -24,7 +24,7 @@ public class InMemoryEvalRunStore extends EvalRunStore {
 		row.put("runId", runId);
 		row.put("batchId", batchId);
 		row.put("caseId", evalCase.id());
-		row.put("agentId", evalCase.agent());
+		row.put("agentId", evalCase.target());
 		row.put("agentVersion", agentVersion);
 		row.put("model", model);
 		row.put("params", new LinkedHashMap<String, String>(params));

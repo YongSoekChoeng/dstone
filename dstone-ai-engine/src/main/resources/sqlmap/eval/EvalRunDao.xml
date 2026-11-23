@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<!-- Agent 평가 실행(AI_EVAL_RUN).
+<!-- Agent 평가 실행(AI_EVAL_RUN). Workflow 사례는 AGENT_ID/AGENT_VERSION에 Workflow id/version을 두고,
+     실행 ID·멈춘 자리·떠 둔 결과의 채점은 ANSWER_JSON의 workflowRun 칸에 둔다(runtime.eval.EvalRunner).
      테이블 정의: schema/02-create-table-postgresql-dstone-ai.sql
      runtime.eval.EvalRunStore 가 쓴다 -->
 <mapper namespace="net.dstone.ai.runtime.eval.EvalRunStore">
@@ -72,6 +73,10 @@
              , PROMPT_TOKENS AS "promptTokens"
              , COMPLETION_TOKENS AS "completionTokens"
              , WORK_DIR AS "workDir"
+             , ANSWER_JSON->'workflowRun'->>'executionId' AS "executionId"
+             , ANSWER_JSON->'workflowRun'->>'stoppedAt' AS "stoppedAt"
+             , CAST(ANSWER_JSON->'workflowRun'->'snapshot'->>'passed' AS INT) AS "snapshotPassed"
+             , CAST(ANSWER_JSON->'workflowRun'->'snapshot'->>'total' AS INT) AS "snapshotTotal"
              , REQUESTED_BY AS "requestedBy"
              , CREATED_AT AS "createdAt"
              , STARTED_AT AS "startedAt"

@@ -139,6 +139,19 @@ public record WorkFlowExecution(
 
 	/**
 	 * <pre>
+	 * 끝까지 가지 않고 닫을 때의 상태를 만듭니다. 지금은 Agent 평가가 정한 자리(승인 대기 등)에서 멈추고 채점한 실행을 닫을 때 씁니다.
+	 * 멈춘 자리(currentStepIndex)와 state는 그대로 두므로 실행 관리 화면에서 어디까지 갔는지 볼 수 있습니다.
+	 * </pre>
+	 *
+	 * @param reason 닫은 이유입니다(errorMessage 칸에 남습니다).
+	 * @return status가 CANCELLED로 바뀐 새 WorkFlowExecution입니다.
+	 */
+	public WorkFlowExecution cancelled(String reason) {
+		return new WorkFlowExecution(this.executionId, this.workflowId, this.caller, this.sessionId, WorkFlowExecutionStatus.CANCELLED, this.currentStepIndex, this.context, this.output, reason, this.createdAt, Instant.now(), this.requestedBy);
+	}
+
+	/**
+	 * <pre>
 	 * 사람의 승인을 기다리며 멈춰야 할 때의 상태를 만듭니다.
 	 * </pre>
 	 *

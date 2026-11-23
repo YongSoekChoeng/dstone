@@ -2,7 +2,8 @@
  * Agent 평가 화면(/ai/admin/eval/eval.html).
  *   사례 목록(GET /api/ai/eval/cases) → 사례를 고르면 params·모델·반복 수를 넣고 시작(POST /api/ai/eval/runs)
  *   결과 목록(GET /api/ai/eval/runs) → 줄을 누르면 상세(GET /api/ai/eval/runs/{id})
- *   비교 표는 결과 목록을 (사례, Agent 버전, 모델)로 묶어 화면에서 평균을 낸다.
+ *   비교 표는 결과 목록을 (사례, 대상 버전, 모델)로 묶어 화면에서 평균을 낸다.
+ *   Workflow 사례는 모델을 바꿀 수 없고, snapshotAfter가 있으면 떠 둔 결과(첫 결과물)의 채점도 같이 보인다.
  * 끝나지 않은 평가가 있으면 5초마다 목록을 다시 읽는다.
  */
 (function () {
@@ -55,6 +56,19 @@
 		return run.passed + "/" + run.total;
 	}
 
+	/** 떠 둔 결과(snapshotAfter)의 채점이 있으면 "첫 → 마지막", 없으면 마지막만 */
+	function scoreWithSnapshot(run) {
+		if (run.snapshotTotal === null || run.snapshotTotal === undefined) {
+			return score(run);
+		}
+		return run.snapshotPassed + "/" + run.snapshotTotal + " → " + score(run);
+	}
+
+	/** 사례가 부르는 대상: Agent id 또는 "Workflow id" */
+	function targetOf(item) {
+		return item.workflow ? "Workflow " + item.workflow : item.agent;
+	}
+
 	/* ---------- 사례 ---------- */
 
 	function loadCases() {
@@ -80,7 +94,7 @@
 			var on = selectedCase && selectedCase.id === item.id;
 			html += "<tr class=\"ev-row" + (on ? " ev-row-on" : "") + "\" data-index=\"" + index + "\" tabindex=\"0\">"
 				+ "<td><span class=\"workflow-job-id\">" + esc(item.id) + "</span></td>"
-				+ "<td>" + esc(item.agent) + "</td>"
+				+ "<td>" + esc(targetOf(item)) + "</td>"
 				+ "<td>" + esc(item.description || "") + "</td>"
 				+ "<td>" + (item.checks ? item.checks.length : 0) + "개</td></tr>";
 		});
@@ -91,14 +105,28 @@
 		selectedCase = item;
 		renderCases();
 		document.getElementById("ev-start-case").textContent = item.id;
-		document.getElementById("ev-start-desc").textContent = "채점 항목: " + (item.checks || []).join(", ");
+		var desc = "채점 항목: " + (item.checks || []).join(", ");
+		if (item.workflow) {
+			var approvals = item.approvals || {};
+			var rules = Object.keys(approvals).map(function (step) { return step + "=" + approvals[step]; });
+			desc += " | 승인: " + (rules.length === 0 ? "없음(첫 승인에서 멈추고 채점)" : rules.join(", ") + " (이 밖의 승인에서 멈추고 채점)");
+			if (item.snapshotAfter) {
+				desc += " | " + item.snapshotAfter + " 직후 결과도 따로 채점";
+			}
+		}
+		if (item.needsServer) {
+			desc += " | 격리 시험 서버를 띄워 채점";
+		}
+		document.getElementById("ev-start-desc").textContent = desc;
 		var html = "";
 		var params = item.params || {};
 		Object.keys(params).forEach(function (name) {
 			html += "<tr><th><label for=\"ev-param-" + esc(name) + "\">" + esc(name) + "</label></th>"
 				+ "<td><input type=\"text\" class=\"ev-param\" id=\"ev-param-" + esc(name) + "\" data-name=\"" + esc(name) + "\" value=\"" + esc(params[name]) + "\" /></td></tr>";
 		});
-		html += "<tr><th><label for=\"ev-model\">모델</label></th><td><input type=\"text\" id=\"ev-model\" placeholder=\"비우면 Agent·provider 기본 모델 (예: qwen/qwen3.8-27b)\" /></td></tr>"
+		html += (item.workflow
+				? "<tr><th>모델</th><td><input type=\"hidden\" id=\"ev-model\" value=\"\" /><span class=\"ai-hint\">Workflow 사례는 각 Agent 정의의 모델로 돕니다.</span></td></tr>"
+				: "<tr><th><label for=\"ev-model\">모델</label></th><td><input type=\"text\" id=\"ev-model\" placeholder=\"비우면 Agent·provider 기본 모델 (예: qwen/qwen3.8-27b)\" /></td></tr>")
 			+ "<tr><th><label for=\"ev-repeat\">반복</label></th><td><select id=\"ev-repeat\">"
 			+ "<option value=\"1\">1번</option><option value=\"2\">2번</option><option value=\"3\" selected>3번</option><option value=\"4\">4번</option><option value=\"5\">5번</option>"
 			+ "</select> <span class=\"ai-hint\">한 번만 돌린 결과는 우연일 수 있어서 3번 이상을 권합니다.</span></td></tr>";
@@ -184,20 +212,21 @@
 		runs.forEach(function (run) {
 			var on = run.runId === selectedRunId;
 			var full = run.total && run.passed === run.total;
+			var stopped = run.stoppedAt ? " <span class=\"ai-hint\">" + esc(run.stoppedAt) + "</span>" : "";
 			html += "<tr class=\"ev-row" + (on ? " ev-row-on" : "") + "\" data-run=\"" + esc(run.runId) + "\" tabindex=\"0\">"
 				+ "<td>" + esc(shortTime(run.createdAt)) + "</td>"
 				+ "<td>" + esc(run.caseId) + "</td>"
 				+ "<td>" + esc(run.agentVersion || "-") + "</td>"
 				+ "<td>" + esc(run.model || "-") + "</td>"
-				+ "<td>" + DstoneAi.badgeHtml(run.status) + "</td>"
-				+ "<td class=\"" + (full ? "ev-score-full" : "") + "\">" + esc(score(run)) + "</td>"
+				+ "<td>" + DstoneAi.badgeHtml(run.status) + stopped + "</td>"
+				+ "<td class=\"" + (full ? "ev-score-full" : "") + "\">" + esc(scoreWithSnapshot(run)) + "</td>"
 				+ "<td>" + esc(duration(run.durationMs)) + "</td>"
 				+ "<td>" + esc(run.toolCalls === null || run.toolCalls === undefined ? "-" : String(run.toolCalls)) + "</td></tr>";
 		});
 		runBody.innerHTML = html;
 	}
 
-	/** (사례, Agent 버전, 모델)로 묶어 끝난 평가의 평균을 낸다 */
+	/** (사례, 대상 버전, 모델)로 묶어 끝난 평가의 평균을 낸다. 떠 둔 결과가 있으면 그 평균도 */
 	function renderCompare(runs) {
 		var groups = {};
 		var order = [];
@@ -210,18 +239,23 @@
 			}
 			var key = run.caseId + "\u0000" + (run.agentVersion || "") + "\u0000" + (run.model || "");
 			if (!groups[key]) {
-				groups[key] = { caseId: run.caseId, version: run.agentVersion, model: run.model, n: 0, rate: 0, ms: 0, tools: 0, tokens: 0 };
+				groups[key] = { caseId: run.caseId, version: run.agentVersion, model: run.model, n: 0, rate: 0, full: 0, sn: 0, srate: 0, ms: 0, tools: 0, tokens: 0 };
 				order.push(key);
 			}
 			var g = groups[key];
 			g.n++;
 			g.rate += run.total ? run.passed / run.total : 0;
+			g.full += run.total && run.passed === run.total ? 1 : 0;
+			if (run.snapshotTotal) {
+				g.sn++;
+				g.srate += run.snapshotPassed / run.snapshotTotal;
+			}
 			g.ms += Number(run.durationMs || 0);
 			g.tools += Number(run.toolCalls || 0);
 			g.tokens += Number(run.promptTokens || 0);
 		});
 		if (order.length === 0) {
-			compareBody.innerHTML = "<tr><td colspan=\"8\">끝난 평가가 없습니다.</td></tr>";
+			compareBody.innerHTML = "<tr><td colspan=\"10\">끝난 평가가 없습니다.</td></tr>";
 			return;
 		}
 		order.sort();
@@ -231,6 +265,8 @@
 			html += "<tr><td>" + esc(g.caseId) + "</td><td>" + esc(g.version || "-") + "</td><td>" + esc(g.model || "-") + "</td>"
 				+ "<td>" + g.n + "</td>"
 				+ "<td>" + Math.round(g.rate / g.n * 100) + "%</td>"
+				+ "<td>" + g.full + "/" + g.n + "</td>"
+				+ "<td>" + (g.sn ? Math.round(g.srate / g.sn * 100) + "%" : "-") + "</td>"
 				+ "<td>" + esc(duration(g.ms / g.n)) + "</td>"
 				+ "<td>" + Math.round(g.tools / g.n) + "</td>"
 				+ "<td>" + Math.round(g.tokens / g.n).toLocaleString() + "</td></tr>";
@@ -251,7 +287,7 @@
 		document.getElementById("ev-detail-id").textContent = run.runId;
 		var meta = [
 			["사례", run.caseId],
-			["Agent", run.agentId + " " + (run.agentVersion || "")],
+			["대상", run.agentId + " " + (run.agentVersion || "")],
 			["모델", run.model || "-"],
 			["상태", DstoneAi.statusLabel(run.status)],
 			["채점", score(run)],
@@ -261,6 +297,12 @@
 			["시작한 사람", run.requestedBy || "-"],
 			["작업 폴더", run.workDir || "-"]
 		];
+		var flow = run.answer && typeof run.answer === "object" ? run.answer.workflowRun : null;
+		if (flow) {
+			meta.push(["Workflow 실행 ID", (flow.executionId || "-") + " (실행 관리 화면에서 찾을 수 있습니다)"]);
+			meta.push(["끝난 모양", (flow.end || "-") + (flow.stoppedAt ? " @ " + flow.stoppedAt : "") + ", " + (flow.steps || 0) + " step"]);
+			meta.push(["고른 승인", (flow.decisions || []).map(function (d) { return d.step + "=" + d.decision; }).join(", ") || "없음"]);
+		}
 		var params = run.params || {};
 		Object.keys(params).forEach(function (name) {
 			meta.push(["params." + name, params[name]]);
@@ -268,11 +310,12 @@
 		document.getElementById("ev-detail-meta").innerHTML = meta.map(function (pair) {
 			return "<div><dt>" + esc(pair[0]) + "</dt><dd>" + esc(String(pair[1])) + "</dd></div>";
 		}).join("");
-		var checks = run.checks || [];
-		document.getElementById("ev-detail-checks").innerHTML = checks.length === 0 ? "<li>아직 채점하지 않았습니다.</li>" : checks.map(function (check) {
-			return "<li class=\"" + (check.ok ? "ev-ok" : "ev-ng") + "\"><span class=\"ev-mark\">" + (check.ok ? "통과" : "실패") + "</span>"
-				+ esc(check.name) + (check.detail ? " <span class=\"ai-hint\">" + esc(check.detail) + "</span>" : "") + "</li>";
-		}).join("");
+		document.getElementById("ev-detail-checks").innerHTML = checksHtml(run.checks || []);
+		var snapshot = flow ? flow.snapshot : null;
+		var snapshotTitle = document.getElementById("ev-detail-snapshot-title");
+		snapshotTitle.style.display = snapshot ? "" : "none";
+		snapshotTitle.textContent = snapshot ? "떠 둔 결과의 채점(" + snapshot.after + " 직후, " + snapshot.passed + "/" + snapshot.total + ")" : "";
+		document.getElementById("ev-detail-snapshot").innerHTML = snapshot ? checksHtml(snapshot.checks || []) : "";
 		var failure = document.getElementById("ev-detail-failure");
 		failure.style.display = run.failure ? "" : "none";
 		failure.textContent = run.failure ? "실패 사유: " + run.failure : "";
@@ -283,6 +326,13 @@
 		}).join(", ");
 		document.getElementById("ev-detail-answer").textContent = run.answer === null || run.answer === undefined ? "(답 없음)"
 			: (typeof run.answer === "string" ? run.answer : JSON.stringify(run.answer, null, 2));
+	}
+
+	function checksHtml(checks) {
+		return checks.length === 0 ? "<li>아직 채점하지 않았습니다.</li>" : checks.map(function (check) {
+			return "<li class=\"" + (check.ok ? "ev-ok" : "ev-ng") + "\"><span class=\"ev-mark\">" + (check.ok ? "통과" : "실패") + "</span>"
+				+ esc(check.name) + (check.detail ? " <span class=\"ai-hint\">" + esc(check.detail) + "</span>" : "") + "</li>";
+		}).join("");
 	}
 
 	runBody.addEventListener("click", function (event) {

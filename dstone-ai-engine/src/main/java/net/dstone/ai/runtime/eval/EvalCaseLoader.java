@@ -41,9 +41,14 @@ public class EvalCaseLoader extends BaseObject {
 	/** 사례 파일 이름 꼬리입니다. 자료 폴더 안의 다른 yml(대상 앱의 설정 등)과 섞이지 않게 따로 둡니다. */
 	public static final String SUFFIX = ".eval.yml";
 
-	private static final Set<String> CASE_KEYS = Set.of("id", "description", "agent", "fixture", "copy", "params", "request", "input", "checks");
+	private static final Set<String> CASE_KEYS = Set.of("id", "description", "agent", "workflow", "approvals", "snapshotAfter", "server", "fixture", "copy", "params", "request", "input", "checks");
 
-	private static final Set<String> CHECK_KINDS = Set.of("answerContains", "answerNotEmpty", "answerEquals", "fileExists", "fileChanged", "fileContains", "textIncreased", "toolUsed");
+	private static final Set<String> CHECK_KINDS = Set.of("answerContains", "answerNotEmpty", "answerEquals", "fileExists", "fileChanged", "fileContains", "textIncreased", "toolUsed",
+		EvalCase.Check.HTTP, EvalCase.Check.DB_QUERY);
+
+	/** server에 쓸 수 있는 이름(TestServerTool.startSandboxServer의 인자)과 꼭 있어야 하는 것 */
+	private static final Set<String> SERVER_KEYS = Set.of("projectId", "sourceRoot", "overlayDir", "ddlFile", "deleteList");
+	private static final Set<String> SERVER_REQUIRED = Set.of("projectId", "sourceRoot", "overlayDir");
 
 	@Autowired
 	private Environment environment;
@@ -188,8 +193,32 @@ public class EvalCaseLoader extends BaseObject {
 				copy.add(String.valueOf(item));
 			}
 		}
-		return new EvalCase(id, this.text(root, "description", false), this.text(root, "agent", true), this.text(root, "fixture", false), copy, params,
-			requestFile, requestAppend, input, checks, path);
+		String agent = this.text(root, "agent", false);
+		String workflow = this.text(root, "workflow", false);
+		if ((agent == null) == (workflow == null)) {
+			throw new IllegalStateException("agent와 workflow 가운데 하나만 적습니다(Agent 하나를 잴 때 agent, 흐름 전체를 잴 때 workflow).");
+		}
+		Map<String, String> approvals = this.textMap(root, "approvals");
+		String snapshotAfter = this.text(root, "snapshotAfter", false);
+		if (workflow == null && (!approvals.isEmpty() || snapshotAfter != null)) {
+			throw new IllegalStateException("approvals와 snapshotAfter는 workflow 사례에만 씁니다.");
+		}
+		Map<String, String> server = this.textMap(root, "server");
+		for (String key : server.keySet()) {
+			if (!SERVER_KEYS.contains(key)) {
+				throw new IllegalStateException("server의 '" + key + "'는 쓸 수 없는 이름입니다(쓸 수 있는 이름 = " + SERVER_KEYS + ").");
+			}
+		}
+		EvalCase evalCase = new EvalCase(id, this.text(root, "description", false), agent, workflow, approvals, snapshotAfter, server,
+			this.text(root, "fixture", false), copy, params, requestFile, requestAppend, input, checks, path);
+		if (evalCase.needsServer()) {
+			for (String key : SERVER_REQUIRED) {
+				if (server.get(key) == null || server.get(key).isBlank()) {
+					throw new IllegalStateException("http/dbQuery 채점이 있으면 server에 " + SERVER_REQUIRED + "를 적어야 합니다(없는 것: " + key + ").");
+				}
+			}
+		}
+		return evalCase;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -217,7 +246,35 @@ public class EvalCaseLoader extends BaseObject {
 		if (kind == null) {
 			throw new IllegalStateException("채점 항목에 종류가 없습니다: " + map);
 		}
+		if (EvalCase.Check.HTTP.equals(kind)) {
+			if (!(value instanceof Map) || ((Map<String, Object>) value).get("path") == null) {
+				throw new IllegalStateException("http 채점은 {method, path, body, status, json, contains, save} 모양이고 path가 있어야 합니다: " + map);
+			}
+		}
+		if (EvalCase.Check.DB_QUERY.equals(kind)) {
+			Map<String, Object> query = value instanceof Map ? (Map<String, Object>) value : null;
+			if (query == null || query.get("sql") == null || (query.get("equals") == null && query.get("rows") == null)) {
+				throw new IllegalStateException("dbQuery 채점은 {sql, equals} 또는 {sql, rows} 모양이어야 합니다: " + map);
+			}
+		}
 		return new EvalCase.Check(name == null ? kind : name, kind, value);
+	}
+
+	/** 이름: 값 모양의 키를 글자 맵으로 읽습니다(적은 순서 유지). 없으면 빈 맵입니다. */
+	@SuppressWarnings("unchecked")
+	private Map<String, String> textMap(Map<String, Object> root, String key) {
+		Map<String, String> result = new LinkedHashMap<String, String>();
+		Object raw = root.get(key);
+		if (raw == null) {
+			return result;
+		}
+		if (!(raw instanceof Map)) {
+			throw new IllegalStateException(key + "는 이름: 값 모양이어야 합니다.");
+		}
+		for (Map.Entry<String, Object> entry : ((Map<String, Object>) raw).entrySet()) {
+			result.put(String.valueOf(entry.getKey()), entry.getValue() == null ? "" : String.valueOf(entry.getValue()));
+		}
+		return result;
 	}
 
 	private String text(Map<String, Object> root, String key, boolean required) {
