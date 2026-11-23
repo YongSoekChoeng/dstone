@@ -136,6 +136,7 @@ steps:
     save: reviewDecision
     routes:
       그대로 진행: step07
+      고객 요청사항 재분석: step03
       요구사항 수정: step39
       다시 리뷰: step04
       중지: FAIL

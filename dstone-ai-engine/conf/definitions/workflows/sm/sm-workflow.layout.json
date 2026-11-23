@@ -209,6 +209,13 @@
       "x" : 274,
       "y" : 675
     } ],
+    "step06|route|고객 요청사항 재분석" : [ {
+      "x" : -30,
+      "y" : 593
+    }, {
+      "x" : -30,
+      "y" : 365
+    } ],
     "step06|route|요구사항 수정" : [ {
       "x" : 264,
       "y" : 593
@@ -670,6 +677,10 @@
     "step06|route|그대로 진행" : {
       "source" : "out",
       "target" : "in"
+    },
+    "step06|route|고객 요청사항 재분석" : {
+      "source" : "left",
+      "target" : "left"
     },
     "step06|route|요구사항 수정" : {
       "source" : "right",
