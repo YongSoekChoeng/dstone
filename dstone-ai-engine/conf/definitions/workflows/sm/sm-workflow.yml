@@ -125,7 +125,7 @@ steps:
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
-    next: step28
+    next: step07
     onFailure: step06
 
   - id: step06
@@ -135,12 +135,23 @@ steps:
       approverRole: PL
     save: reviewDecision
     routes:
-      그대로 진행: step28
-      요구사항 수정: step30
+      그대로 진행: step07
+      요구사항 수정: step39
       다시 리뷰: step04
       중지: FAIL
 
   - id: step07
+    name: 기존 영향도분석서 확인
+    type: TOOL
+    tool: readFileLines
+    with:
+      fileFullPath: ${input}/${state.now}/02.impact.md
+      startLine: 1
+      endLine: 1
+    next: step38
+    onFailure: step08
+
+  - id: step08
     name: 영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
@@ -150,23 +161,23 @@ steps:
       requirement: ${state.requirement}
       instruction: ${arrival:}
       history: ${decisions:}
-    next: step08
+    next: step09
     save: impactPath
 
-  - id: step08
+  - id: step09
     name: 영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: impactApproval
     routes:
-      승인(설계진행): step09
-      영향도 수정: step24
-      영향도 다시 작성: step07
-      요구사항 수정: step25
+      승인(설계진행): step10
+      영향도 수정: step26
+      영향도 다시 작성: step08
+      요구사항 수정: step27
       중지: FAIL
 
-  - id: step09
+  - id: step10
     name: 영향도분석서 읽기
     type: TOOL
     tool: readFile
@@ -174,10 +185,21 @@ steps:
       fileFullPath: ${input}/${state.now}/02.impact.md
       maxChars: 60000
     save: impact
-    next: step26
+    next: step11
     onFailure: FAIL
 
-  - id: step10
+  - id: step11
+    name: 기존 설계서 확인
+    type: TOOL
+    tool: readFileLines
+    with:
+      fileFullPath: ${input}/${state.now}/03-1.design.md
+      startLine: 1
+      endLine: 1
+    next: step37
+    onFailure: step12
+
+  - id: step12
     name: 아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
@@ -188,23 +210,23 @@ steps:
       impact: ${state.impact}
       instruction: ${arrival:}
       history: ${decisions:}
-    next: step11
+    next: step13
     save: architectPath
 
-  - id: step11
+  - id: step13
     name: 설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
     save: designApproval
     routes:
-      승인(개발진행): step12
-      설계 수정: step23
-      설계 다시 작성: step10
-      영향도 수정: step24
+      승인(개발진행): step14
+      설계 수정: step25
+      설계 다시 작성: step12
+      영향도 수정: step26
       중지: FAIL
 
-  - id: step12
+  - id: step14
     name: 상세 설계서 읽기
     type: TOOL
     tool: readFile
@@ -212,10 +234,10 @@ steps:
       fileFullPath: ${input}/${state.now}/03-1.design.md
       maxChars: 60000
     save: design
-    next: step13
+    next: step15
     onFailure: FAIL
 
-  - id: step13
+  - id: step15
     name: 태스크아이템 목록 읽기
     type: TOOL
     tool: readFile
@@ -223,20 +245,19 @@ steps:
       fileFullPath: ${input}/${state.now}/03-2.taskitems.md
       maxChars: 60000
     save: taskitems
-    next: step14
+    next: step16
     onFailure: FAIL
 
-  - id: step14
+  - id: step16
     name: 기존개발디렉토리초기화
     type: TOOL
     tool: deleteDir
     with:
       fileFullPath: ${input}/${state.now}/dev-resources
-    # 폴더를 비우면 지난 컴파일 오류도 옛것이다. 성공하면 saveError가 compileError를 비운다.
     saveError: compileError
-    next: step15
+    next: step17
 
-  - id: step15
+  - id: step17
     name: 개발
     type: AGENT
     agent: sm-developer-agent
@@ -249,10 +270,10 @@ steps:
       instruction: ${arrival:}
       history: ${decisions:}
       compile_error: ${state.compileError:}
-    next: step16
+    next: step18
     onFailure: FAIL
 
-  - id: step16
+  - id: step18
     name: 컴파일 확인
     type: TOOL
     tool: compileJava
@@ -263,10 +284,10 @@ steps:
       deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
     save: compileResult
     saveError: compileError
-    next: step31
-    onFailure: step17
+    next: step28
+    onFailure: step19
 
-  - id: step17
+  - id: step19
     name: 개발 승인
     type: APPROVAL
     approval:
@@ -274,37 +295,15 @@ steps:
     save: developApproval
     routes:
       승인: END
-      재개발: step18
-      전문가 해결: step20
-      설계 수정: step23
-      영향도 수정: step24
-      요구사항 수정: step25
+      재개발: step20
+      전문가 해결: step22
+      설계 수정: step25
+      영향도 수정: step26
+      요구사항 수정: step27
       실패: FAIL
 
-  - id: step18
-    name: 재개발 전 설계서 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
-    next: step19
-    onFailure: FAIL
-
-  - id: step19
-    name: 재개발 전 태스크아이템 목록 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
-      maxChars: 60000
-    save: taskitems
-    next: step15
-    onFailure: FAIL
-
   - id: step20
-    name: 전문가 해결 전 설계서 다시 읽기
+    name: 재개발 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -315,6 +314,28 @@ steps:
     onFailure: FAIL
 
   - id: step21
+    name: 재개발 전 태스크아이템 목록 다시 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
+      maxChars: 60000
+    save: taskitems
+    next: step17
+    onFailure: FAIL
+
+  - id: step22
+    name: 전문가 해결 전 설계서 다시 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/${state.now}/03-1.design.md
+      maxChars: 60000
+    save: design
+    next: step23
+    onFailure: FAIL
+
+  - id: step23
     name: 전문가 해결 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
@@ -322,10 +343,10 @@ steps:
       fileFullPath: ${input}/${state.now}/03-2.taskitems.md
       maxChars: 60000
     save: taskitems
-    next: step22
+    next: step24
     onFailure: FAIL
 
-  - id: step22
+  - id: step24
     name: 전문가 해결
     type: AGENT
     agent: sm-troubleshooter-agent
@@ -339,10 +360,10 @@ steps:
       history: ${decisions:}
       compile_error: ${state.compileError:}
     save: troubleshoot
-    next: step16
-    onFailure: step17
+    next: step18
+    onFailure: step19
 
-  - id: step23
+  - id: step25
     name: 설계서 수정
     type: AGENT
     agent: document-revise-agent
@@ -356,9 +377,9 @@ steps:
       history: ${decisions:}
       reference: ${state.compileError:}
     save: revision
-    next: step11
+    next: step13
 
-  - id: step24
+  - id: step26
     name: 영향도분석서 수정
     type: AGENT
     agent: document-revise-agent
@@ -369,9 +390,9 @@ steps:
       instruction: ${arrival}
       history: ${decisions:}
     save: revision
-    next: step08
+    next: step09
 
-  - id: step25
+  - id: step27
     name: 고객요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
@@ -384,18 +405,123 @@ steps:
     save: revision
     next: step04
 
-  - id: step26
-    name: 기존 설계서 확인
+  - id: step28
+    name: 자동 검증할 프로젝트 확인
     type: TOOL
-    tool: readFileLines
+    tool: readMarkdownSection
+    with:
+      fileFullPath: ${input}/00.request.md
+      heading: 프로젝트ID
+    save: projectId
+    saveError: projectIdError
+    next: step29
+    onFailure: step19
+
+  - id: step29
+    name: 격리 기동 확인
+    type: TOOL
+    tool: startSandboxServer
+    with:
+      projectId: ${state.projectId}
+      sourceRoot: ${state.sourceDir}
+      overlayDir: ${input}/${state.now}/dev-resources
+      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
+      deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
+    save: sandboxCheck
+    saveError: sandboxError
+    next: step35
+    onFailure: step30
+
+  - id: step30
+    name: 기동 실패가 개발 결과 탓인지
+    type: TOOL
+    tool: containsValue
+    with:
+      value: ${state.sandboxCheck.cause:}
+      expected: code
+    next: step31
+    onFailure: step19
+
+  - id: step31
+    name: 자동 수정 횟수 확인
+    type: TOOL
+    tool: countUp
+    with:
+      previous: ${state.autoFixRound}
+      max: 2
+      scope: ${decisions:}
+    save: autoFixRound
+    next: step32
+    onFailure: step19
+
+  - id: step32
+    name: 자동 수정 전 설계서 다시 읽기
+    type: TOOL
+    tool: readFile
     with:
       fileFullPath: ${input}/${state.now}/03-1.design.md
-      startLine: 1
-      endLine: 1
-    next: step27
-    onFailure: step10
+      maxChars: 60000
+    save: design
+    next: step33
+    onFailure: step19
 
-  - id: step27
+  - id: step33
+    name: 자동 수정 전 태스크아이템 목록 다시 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
+      maxChars: 60000
+    save: taskitems
+    next: step34
+    onFailure: step19
+
+  - id: step34
+    name: 자동 수정
+    type: AGENT
+    agent: sm-auto-fix-agent
+    with:
+      base_dir: ${input}/${state.now}
+      source_dir: ${state.sourceDir}
+      project_id: ${state.projectId}
+      request: ${state.request}
+      design: ${state.design}
+      taskitems: ${state.taskitems}
+      boot_error: ${state.sandboxError:}
+      verification: ${state.verification}
+      history: ${decisions:}
+    save: autoFix
+    next: step18
+    onFailure: step19
+
+  - id: step35
+    name: 동작 검증
+    type: AGENT
+    agent: sm-verifier-agent
+    with:
+      base_dir: ${input}/${state.now}
+      source_dir: ${state.sourceDir}
+      project_id: ${state.projectId}
+      requirement: ${state.requirement}
+      design: ${state.design}
+      history: ${decisions:}
+    save: verification
+    saveError: verificationError
+    next: step36
+    onFailure: step19
+
+  - id: step36
+    name: 실패한 완료 기준이 있는지
+    type: TOOL
+    tool: containsValue
+    with:
+      value: ${state.verification.scenarios}
+      field: result
+      expected: FAIL
+    next: step31
+    onFailure: step19
+
+  - id: step37
     name: 기존 설계서 맞춤
     type: AGENT
     agent: document-revise-agent
@@ -418,20 +544,9 @@ steps:
         [영향도분석서]
         ${state.impact}
     save: revision
-    next: step11
+    next: step13
 
-  - id: step28
-    name: 기존 영향도분석서 확인
-    type: TOOL
-    tool: readFileLines
-    with:
-      fileFullPath: ${input}/${state.now}/02.impact.md
-      startLine: 1
-      endLine: 1
-    next: step29
-    onFailure: step07
-
-  - id: step29
+  - id: step38
     name: 기존 영향도분석서 맞춤
     type: AGENT
     agent: document-revise-agent
@@ -449,9 +564,9 @@ steps:
         [요구사항분석서]
         ${state.requirement}
     save: revision
-    next: step08
+    next: step09
 
-  - id: step30
+  - id: step39
     name: 리뷰 지적에 따른 요구사항 수정
     type: AGENT
     agent: document-revise-agent
@@ -459,7 +574,6 @@ steps:
       documents:
         - ${input}/${state.now}/01.customer_requirement.md
       request: ${state.request}
-      # 사람의 결정이 arrival을 차지하므로 리뷰어의 지적은 따로 붙인다.
       instruction: |-
         ${arrival:}
 
@@ -468,131 +582,15 @@ steps:
       history: ${decisions:}
     save: revision
     next: step04
-
-  - id: step31
-    name: 자동 검증할 프로젝트 확인
-    type: TOOL
-    tool: readMarkdownSection
-    with:
-      fileFullPath: ${input}/00.request.md
-      heading: 프로젝트ID
-    save: projectId
-    saveError: projectIdError
-    next: step32
-    onFailure: step17
-
-  - id: step32
-    name: 격리 기동 확인
-    type: TOOL
-    tool: startSandboxServer
-    with:
-      projectId: ${state.projectId}
-      sourceRoot: ${state.sourceDir}
-      overlayDir: ${input}/${state.now}/dev-resources
-      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
-      deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
-    save: sandboxCheck
-    saveError: sandboxError
-    next: step34
-    onFailure: step33
-
-  - id: step33
-    name: 기동 실패가 개발 결과 탓인지
-    type: TOOL
-    tool: containsValue
-    with:
-      value: ${state.sandboxCheck.cause:}
-      expected: code
-    next: step36
-    onFailure: step17
-
-  - id: step34
-    name: 동작 검증
-    type: AGENT
-    agent: sm-verifier-agent
-    with:
-      base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
-      project_id: ${state.projectId}
-      requirement: ${state.requirement}
-      design: ${state.design}
-      history: ${decisions:}
-    save: verification
-    saveError: verificationError
-    next: step35
-    onFailure: step17
-
-  - id: step35
-    name: 실패한 완료 기준이 있는지
-    type: TOOL
-    tool: containsValue
-    with:
-      value: ${state.verification.scenarios}
-      field: result
-      expected: FAIL
-    next: step36
-    onFailure: step17
-
-  - id: step36
-    name: 자동 수정 횟수 확인
-    type: TOOL
-    tool: countUp
-    with:
-      previous: ${state.autoFixRound}
-      max: 2
-      scope: ${decisions:}
-    save: autoFixRound
-    next: step37
-    onFailure: step17
-
-  - id: step37
-    name: 자동 수정 전 설계서 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
-    next: step38
-    onFailure: step17
-
-  - id: step38
-    name: 자동 수정 전 태스크아이템 목록 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
-      maxChars: 60000
-    save: taskitems
-    next: step39
-    onFailure: step17
-
-  - id: step39
-    name: 자동 수정
-    type: AGENT
-    agent: sm-auto-fix-agent
-    with:
-      base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
-      project_id: ${state.projectId}
-      request: ${state.request}
-      design: ${state.design}
-      taskitems: ${state.taskitems}
-      boot_error: ${state.sandboxError:}
-      verification: ${state.verification}
-      history: ${decisions:}
-    save: autoFix
-    next: step16
-    onFailure: step17
 state:
-  projectId: 요청서의 프로젝트ID(step31)
+  projectId: 요청서의 프로젝트ID(step28)
   projectIdError: 프로젝트ID가 없어 자동 검증을 못 한 이유
-  sandboxCheck: 격리 기동 확인(step32) 결과({success, cause, message})
+  sandboxCheck: 격리 기동 확인(step29) 결과({success, cause, message})
   sandboxError: 격리 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
-  verification: 동작 검증(step34) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
+  verification: 동작 검증(step35) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
   verificationError: 동작 검증 Agent가 끝내지 못한 이유
   autoFixRound: 자동 수정 횟수({count, scope})
-  autoFix: 자동 수정(step39)이 돌려준 답
+  autoFix: 자동 수정(step34)이 돌려준 답
   request: 고객 요청서 내용
   requirement: 고객요구사항분석서 내용
   review: 리뷰 판정 결과
@@ -603,11 +601,11 @@ state:
   design: 상세 설계서 내용
   taskitems: 태스크아이템 목록 내용
   now: 작업을 시작한 시각(yyyyMMdd-HHmm). 작업 폴더 이름으로 쓴다
-  developApproval: 개발 승인(step17) 결과
-  impactPath: 영향도 분석(step07)이 돌려준 답(저장 파일과 결정 필요 사항)
-  architectPath: 아키텍처 설계(step10)가 돌려준 답(저장 파일과 결정 필요 사항)
-  revision: 문서 수정(step23~25, 27, 29, 30)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
+  developApproval: 개발 승인(step19) 결과
+  impactPath: 영향도 분석(step08)이 돌려준 답(저장 파일과 결정 필요 사항)
+  architectPath: 아키텍처 설계(step12)가 돌려준 답(저장 파일과 결정 필요 사항)
+  revision: 문서 수정(step25~25, 27, 29, 30)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
   sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
-  compileResult: 컴파일 확인(step16)이 통과했을 때의 출력
-  compileError: 컴파일 확인(step16)이 실패했을 때의 오류(통과하거나 step14가 개발 폴더를 비우면 비어 있다)
-  troubleshoot: 전문가 해결(step22)이 돌려준 답(원인과 근거, 고친 것, 설계서와 달라진 점, 못 푼 것)
+  compileResult: 컴파일 확인(step18)이 통과했을 때의 출력
+  compileError: 컴파일 확인(step18)이 실패했을 때의 오류(통과하거나 step16가 개발 폴더를 비우면 비어 있다)
+  troubleshoot: 전문가 해결(step24)이 돌려준 답(원인과 근거, 고친 것, 설계서와 달라진 점, 못 푼 것)
