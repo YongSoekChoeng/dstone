@@ -157,7 +157,7 @@ steps:
     onFailure: FAIL
 
   - id: step08
-    name: 09-영향도 분석
+    name: 40-영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
     with:
@@ -205,7 +205,7 @@ steps:
     onFailure: FAIL
 
   - id: step12
-    name: 13-아키텍처 설계
+    name: 39-아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
     with:
@@ -423,7 +423,7 @@ steps:
     onFailure: step19
 
   - id: step29
-    name: 30-격리 기동 확인
+    name: 31-격리 기동 확인
     type: TOOL
     tool: startSandboxServer
     with:
@@ -438,7 +438,7 @@ steps:
     onFailure: step30
 
   - id: step30
-    name: 31-기동 실패가 개발 결과 탓인지
+    name: 32-기동 실패가 개발 결과 탓인지
     type: TOOL
     tool: containsValue
     with:
@@ -448,7 +448,7 @@ steps:
     onFailure: step19
 
   - id: step31
-    name: 32-자동 수정 횟수 확인
+    name: 33-자동 수정 횟수 확인
     type: TOOL
     tool: countUp
     with:
@@ -460,7 +460,7 @@ steps:
     onFailure: step19
 
   - id: step32
-    name: 33-자동 수정 전 설계서 다시 읽기
+    name: 34-자동 수정 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -471,7 +471,7 @@ steps:
     onFailure: step19
 
   - id: step33
-    name: 34-자동 수정 전 태스크아이템 목록 다시 읽기
+    name: 35-자동 수정 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -482,7 +482,7 @@ steps:
     onFailure: step19
 
   - id: step34
-    name: 35-자동 수정
+    name: 36-자동 수정
     type: AGENT
     agent: sm-auto-fix-agent
     with:
@@ -500,7 +500,7 @@ steps:
     onFailure: step19
 
   - id: step35
-    name: 36-동작 검증
+    name: 37-동작 검증
     type: AGENT
     agent: sm-verifier-agent
     with:
@@ -518,7 +518,7 @@ steps:
     onFailure: step19
 
   - id: step36
-    name: 37-실패한 완료 기준이 있는지
+    name: 38-실패한 완료 기준이 있는지
     type: TOOL
     tool: containsValue
     with:
@@ -529,7 +529,7 @@ steps:
     onFailure: step19
 
   - id: step37
-    name: 38-기존 설계서 맞춤
+    name: 13-기존 설계서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -554,7 +554,7 @@ steps:
     next: step13
 
   - id: step38
-    name: 39-기존 영향도분석서 맞춤
+    name: 09-기존 영향도분석서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -574,7 +574,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 40-리뷰 지적에 따른 요구사항 수정
+    name: 41-리뷰 지적에 따른 요구사항 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -589,8 +589,9 @@ steps:
       history: ${decisions:}
     save: revision
     next: step04
+
   - id: step40
-    name: 41-검증 전 바뀐 파일 확인(격리 기동 전)
+    name: 30-검증 전 바뀐 파일 확인(격리 기동 전)
     type: TOOL
     tool: fileChanges
     with:
@@ -600,7 +601,6 @@ steps:
     save: workChanges
     next: step29
     onFailure: step29
-
 state:
   projectId: 요청서의 프로젝트ID(step28)
   projectIdError: 프로젝트ID가 없어 자동 검증을 못 한 이유
