@@ -1505,6 +1505,83 @@ var DstoneAiDesigner = (function () {
 		return selected && selected.type === "edge" && selected.from === from && selected.kind === kind && (selected.route || null) === (route || null);
 	}
 
+	/** 강조 중에 관계없는 노드·화살표를 흐리게 그릴 때의 불투명도 */
+	var DIM_OPACITY = 0.25;
+
+	/**
+	 * step 하나를 골랐을 때 함께 강조할 노드를 모읍니다.
+	 * 그 step으로 들어오는 화살표의 출발 노드와, 나가는 화살표의 도착 노드입니다. step을 고르지 않았으면 null.
+	 * 반환: { id: 고른 step id, nodes: { 노드 id: true } }
+	 */
+	function focusOf() {
+		if (!selected || selected.type !== "step" || !stepById(selected.id)) {
+			return null;
+		}
+		var id = selected.id;
+		var nodes = {};
+		var list = steps();
+		var known = {};
+		list.forEach(function (step) {
+			if (step && step.id) {
+				known[step.id] = true;
+			}
+		});
+		if (list.length > 0 && list[0] && list[0].id === id) {
+			nodes[START_ID] = true;
+		}
+		list.forEach(function (step) {
+			if (!step || !step.id) {
+				return;
+			}
+			outgoing(step).forEach(function (edge) {
+				// 그림에서 숨긴 실패 화살표는 강조하지 않는다(redraw()와 같은 조건).
+				if (hideFailEdges && edge.target === FAIL_ID && edge.kind !== "route") {
+					return;
+				}
+				if (step.id === id) {
+					var exists = known[edge.target] || edge.target === END_ID || edge.target === FAIL_ID;
+					nodes[exists ? edge.target : "missing:" + edge.target] = true;
+				}
+				if (edge.target === id) {
+					nodes[step.id] = true;
+				}
+			});
+		});
+		return { id: id, nodes: nodes };
+	}
+
+	/** 강조 중이면 노드 설정을 고칩니다. 이어진 노드는 테두리를 굵게, 관계없는 노드는 흐리게. */
+	function focusNode(config, focus) {
+		if (!focus || config.id === focus.id) {
+			return config;
+		}
+		if (focus.nodes[config.id]) {
+			config.attrs.body.strokeWidth = 3;
+		} else {
+			config.attrs.body.opacity = DIM_OPACITY;
+			config.attrs.label.opacity = DIM_OPACITY;
+		}
+		return config;
+	}
+
+	/** 강조 중이면 화살표 설정을 고칩니다. 고른 step에서 나가거나 들어오는 화살표는 굵게, 나머지는 흐리게. */
+	function focusEdge(config, from, to, focus) {
+		if (!focus) {
+			return config;
+		}
+		if (from === focus.id || to === focus.id) {
+			config.attrs.line.strokeWidth = 3;
+		} else {
+			config.attrs.line.opacity = DIM_OPACITY;
+			config.labels.forEach(function (label) {
+				label.attrs.text.opacity = DIM_OPACITY;
+			});
+			// 흐린 선이 강조한 선 위로 지나가지 않게 아래에 그린다.
+			config.zIndex = 0;
+		}
+		return config;
+	}
+
 	function shorten(text, max) {
 		text = String(text === undefined || text === null ? "" : text);
 		return text.length > max ? text.substring(0, max - 1) + "…" : text;
@@ -1593,21 +1670,23 @@ var DstoneAiDesigner = (function () {
 		}
 		var cells = [];
 		var ids = {};
-		cells.push(graph.createNode(terminalNodeConfig(START_ID, "시작", "#007b9d")));
-		cells.push(graph.createNode(terminalNodeConfig(END_ID, "END", "#15803d")));
-		cells.push(graph.createNode(terminalNodeConfig(FAIL_ID, "FAIL", "#b91c1c")));
+		// step 하나를 골랐으면 이어진 화살표와 노드만 또렷하게, 나머지는 흐리게 그린다.
+		var focus = focusOf();
+		cells.push(graph.createNode(focusNode(terminalNodeConfig(START_ID, "시작", "#007b9d"), focus)));
+		cells.push(graph.createNode(focusNode(terminalNodeConfig(END_ID, "END", "#15803d"), focus)));
+		cells.push(graph.createNode(focusNode(terminalNodeConfig(FAIL_ID, "FAIL", "#b91c1c"), focus)));
 		steps().forEach(function (step) {
 			if (!step || !step.id || ids[step.id]) {
 				return;
 			}
 			ids[step.id] = true;
-			cells.push(graph.createNode(stepNodeConfig(step, positions[step.id] || { x: 0, y: 0 })));
+			cells.push(graph.createNode(focusNode(stepNodeConfig(step, positions[step.id] || { x: 0, y: 0 }), focus)));
 		});
 		var missing = {};
 		if (steps().length > 0 && steps()[0] && steps()[0].id) {
 			var startEdge = edgeConfig(START_ID, steps()[0].id, "start", null);
 			startEdge.id = "edge|start";
-			cells.push(graph.createEdge(startEdge));
+			cells.push(graph.createEdge(focusEdge(startEdge, START_ID, steps()[0].id, focus)));
 		}
 		steps().forEach(function (step) {
 			outgoing(step).forEach(function (edge) {
@@ -1621,7 +1700,7 @@ var DstoneAiDesigner = (function () {
 					if (!missing[missingId]) {
 						missing[missingId] = true;
 						var p = positions[step.id] || { x: 0, y: 0 };
-						cells.push(graph.createNode({
+						cells.push(graph.createNode(focusNode({
 							id: missingId, shape: "rect", x: p.x + 40, y: p.y + STEP_H + 50, width: 150, height: 40, zIndex: 2,
 							data: { kind: "missing" },
 							attrs: {
@@ -1629,11 +1708,11 @@ var DstoneAiDesigner = (function () {
 								label: { text: "없는 step: " + shorten(target, 14), fill: "#b91c1c", fontSize: 11 }
 							},
 							ports: { groups: PORT_GROUPS, items: portItems() }
-						}));
+						}, focus)));
 					}
 					target = missingId;
 				}
-				cells.push(graph.createEdge(edgeConfig(step.id, target, edge.kind, edge.route)));
+				cells.push(graph.createEdge(focusEdge(edgeConfig(step.id, target, edge.kind, edge.route), step.id, edge.target, focus)));
 			});
 		});
 		// 영역 선택은 그림을 다시 그리면 풀린다. 먼저 비워야 지워진 노드 둘레에 선택 상자가 남지 않는다.
