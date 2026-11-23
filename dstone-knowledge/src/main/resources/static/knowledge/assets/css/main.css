@@ -1214,6 +1214,27 @@ p.wd-route-bad {
 	padding-left: 18px;
 }
 
+/* 디자이너 영역 선택: 고른 step 둘레 상자와 끌 때 보이는 네모 */
+#wd-canvas .x6-widget-selection-box {
+	border: 2px dashed var(--cs-primary);
+	box-shadow: none;
+}
+
+#wd-canvas .x6-widget-selection-rubberband {
+	background-color: rgba(0, 123, 157, 0.12);
+	border: 1px solid #007b9d;
+	opacity: 1;
+}
+
+.wd-step-link {
+	font-weight: 700;
+}
+
+.wd-step-id {
+	color: var(--cs-muted);
+	font-size: 0.92em;
+}
+
 .wd-dialog-box {
 	background: var(--cs-surface);
 	width: min(980px, 96vw);

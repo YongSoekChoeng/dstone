@@ -95,6 +95,8 @@ var DstoneAiDesigner = (function () {
 	var lastMouseDown = null;
 	/** 고른 것: null(Workflow 전체) | {type: "step", id} | {type: "edge", from, kind, route} */
 	var selected = null;
+	/** X6 영역 선택 플러그인(여러 step을 한꺼번에 골라 옮길 때 씁니다). 그림을 다시 그리면 고른 것이 풀립니다 */
+	var selection = null;
 	/** 저장하지 않은 변경이 있는지 */
 	var dirty = false;
 	/** YAML 탭에서 글자를 고쳤는데 아직 그림에 반영하지 않았는지 */
@@ -1234,7 +1236,8 @@ var DstoneAiDesigner = (function () {
 			height: els.canvas.clientHeight,
 			background: { color: "#fafaf8" },
 			grid: { size: 10, visible: true },
-			panning: { enabled: true },
+			// 빈 곳을 그냥 끌면 영역 선택(아래 Selection), Shift를 누르고 끌면 화면 이동.
+			panning: { enabled: true, modifiers: "shift" },
 			mousewheel: { enabled: true, modifiers: ["ctrl", "meta"], minScale: 0.2, maxScale: 2 },
 			interacting: {
 				edgeMovable: false,
@@ -1278,6 +1281,23 @@ var DstoneAiDesigner = (function () {
 		});
 		window.addEventListener("resize", fitCanvas);
 
+		// 영역 선택: 빈 곳을 끌어 네모 안의 step을 한꺼번에 고르고, 고른 step 하나를 끌면 나머지도 같이 움직인다.
+		// Ctrl(맥은 Cmd)을 누르고 step을 누르면 하나씩 더하거나 뺀다. 시작·END·FAIL·화살표는 고르지 않는다.
+		selection = new X6.Selection({
+			enabled: true,
+			rubberband: true,
+			multiple: true,
+			movable: true,
+			showNodeSelectionBox: true,
+			// 선택 상자가 마우스를 가로채지 않게 해서, 상자가 아니라 step을 직접 끌어도 같이 움직이게 한다.
+			pointerEvents: "none",
+			filter: function (cell) {
+				var data = cell.getData() || {};
+				return cell.isNode() && data.kind === "step";
+			}
+		});
+		graph.use(selection);
+
 		dnd = new X6.Dnd({
 			target: graph,
 			scaled: false,
@@ -1289,6 +1309,10 @@ var DstoneAiDesigner = (function () {
 		});
 
 		graph.on("node:click", function (args) {
+			if (args.e && (args.e.ctrlKey || args.e.metaKey)) {
+				// Ctrl/Cmd+누르기는 여러 개 고르기에 쓴다. 다시 그리면 고른 것이 풀리므로 그대로 둔다.
+				return;
+			}
 			var data = args.node.getData() || {};
 			selected = data.kind === "step" ? { type: "step", id: args.node.id } : null;
 			redraw();
@@ -1373,8 +1397,18 @@ var DstoneAiDesigner = (function () {
 			dirty = true;
 		});
 		graph.on("node:moved", function (args) {
-			var p = args.node.getPosition();
-			positions[args.node.id] = { x: Math.round(p.x), y: Math.round(p.y) };
+			// 여러 개를 골라 끌었으면 같이 움직인 step의 위치도 모두 적는다.
+			var moved = [args.node];
+			var picked = selection.getSelectedCells();
+			for (var i = 0; i < picked.length; i++) {
+				if (picked[i].isNode() && picked[i] !== args.node) {
+					moved.push(picked[i]);
+				}
+			}
+			for (var j = 0; j < moved.length; j++) {
+				var p = moved[j].getPosition();
+				positions[moved[j].id] = { x: Math.round(p.x), y: Math.round(p.y) };
+			}
 			dirty = true;
 		});
 	}
@@ -1602,6 +1636,10 @@ var DstoneAiDesigner = (function () {
 				cells.push(graph.createEdge(edgeConfig(step.id, target, edge.kind, edge.route)));
 			});
 		});
+		// 영역 선택은 그림을 다시 그리면 풀린다. 먼저 비워야 지워진 노드 둘레에 선택 상자가 남지 않는다.
+		if (selection) {
+			selection.clean();
+		}
 		graph.resetCells(cells);
 		// 고른 화살표에는 꺾는 점 도구를 붙인다(선 위를 끌면 점이 생기고, 점을 끌면 옮기고, 두 번 누르면 지운다).
 		if (selected && selected.type === "edge") {
@@ -2405,6 +2443,7 @@ var DstoneAiDesigner = (function () {
 				showPanel();
 			});
 		});
+		bindStepLinks();
 		document.getElementById("wd-delete-step-btn").addEventListener("click", deleteSelected);
 		var openAgentBtn = document.getElementById("wd-open-agent-btn");
 		if (openAgentBtn) {
@@ -2507,8 +2546,38 @@ var DstoneAiDesigner = (function () {
 		return "<ul class=\"wd-edge-list\">" + list.map(function (edge) {
 			var name = edge.kind === "route" ? "경로 " + edge.route : (edge.kind === "onFailure" ? "실패(onFailure)" : (edge.kind === "rejectTo" ? "반려(approval.rejectTo)" : "다음(next)"));
 			return "<li><a href=\"javascript:void(0)\" data-edge-select=\"1\" data-kind=\"" + escapeHtml(edge.kind) + "\" data-route=\"" + escapeHtml(edge.route || "") + "\">"
-				+ escapeHtml(name) + "</a> → <b>" + escapeHtml(edge.target) + "</b></li>";
+				+ escapeHtml(name) + "</a> → " + stepLink(edge.target) + "</li>";
 		}).join("") + "</ul>";
+	}
+
+	/** 화살표가 가는 곳을 "step명 (step id)"로 보여 줍니다. 있는 step이면 누를 수 있는 링크로 만들어 그 step으로 옮겨 갑니다. */
+	function stepLink(id) {
+		var target = stepById(id);
+		if (!target) {
+			// END·FAIL, 또는 없는 step(빨간 점선 상자)
+			return "<b>" + escapeHtml(id) + "</b>";
+		}
+		var label = target.name ? escapeHtml(target.name) + " <span class=\"wd-step-id\">(" + escapeHtml(id) + ")</span>" : escapeHtml(id);
+		return "<a href=\"javascript:void(0)\" class=\"wd-step-link\" data-step-goto=\"" + escapeHtml(id) + "\">" + label + "</a>";
+	}
+
+	/** 설정 칸 안의 step 링크를 누르면 그 step을 고르고 그림 한가운데로 옮깁니다. */
+	function bindStepLinks() {
+		Array.prototype.forEach.call(els.props.querySelectorAll("[data-step-goto]"), function (link) {
+			link.addEventListener("click", function () {
+				var id = link.getAttribute("data-step-goto");
+				if (!stepById(id)) {
+					return;
+				}
+				selected = { type: "step", id: id };
+				redraw();
+				showPanel();
+				var node = graph.getCellById(id);
+				if (node) {
+					graph.centerCell(node);
+				}
+			});
+		});
 	}
 
 	function showEdgePanel(edge) {
@@ -2524,7 +2593,7 @@ var DstoneAiDesigner = (function () {
 		var kinds = edgeKindsOf(step.type);
 		var kindNames = { next: "다음(next)", onFailure: "실패(onFailure)", route: "경로(routes)", rejectTo: "반려(approval.rejectTo)" };
 		var html = "<h4>화살표</h4>"
-			+ "<p><b>" + escapeHtml(edge.from) + "</b> → <b>" + escapeHtml(current.target) + "</b></p>"
+			+ "<p>" + stepLink(edge.from) + " → " + stepLink(current.target) + "</p>"
 			+ row("종류", "", "<select id=\"wd-edge-kind\">" + kinds.concat(kinds.indexOf(edge.kind) < 0 ? [edge.kind] : []).map(function (kind) {
 				return "<option value=\"" + kind + "\"" + (kind === edge.kind ? " selected" : "") + ">" + kindNames[kind] + "</option>";
 			}).join("") + "</select>");
@@ -2556,6 +2625,7 @@ var DstoneAiDesigner = (function () {
 		html += "<div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-delete-edge-btn\">이 화살표 지우기</button>"
 			+ "<button type=\"button\" class=\"kn-plain\" id=\"wd-back-step-btn\">" + escapeHtml(edge.from) + " step 설정</button></div>";
 		els.props.innerHTML = html;
+		bindStepLinks();
 
 		document.getElementById("wd-edge-kind").addEventListener("change", function (e) {
 			var kind = e.target.value;
