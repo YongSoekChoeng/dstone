@@ -310,9 +310,29 @@ public class WorkFlowExecutor extends BaseObject {
 		} catch (Exception e) {
 			throw e;
 		} finally {
+			// 실행이 어떤 이유로든 루프를 벗어나면, 다음 step을 위해 남겨 둔 것(임시 시험 서버 등)을 모두 정리합니다.
+			this.notifyExecutionLeft(currentExecution.executionId());
 			ExecContext.getInstance().removeCurrentContext();
 		}
 		
+	}
+
+	/**
+	 * <pre>
+	 * 실행이 루프를 벗어났다고 StepEndListener들에게 알립니다.
+	 * 리스너 하나가 실패해도 다른 리스너는 부릅니다. 로그만 남깁니다.
+	 * </pre>
+	 *
+	 * @param executionId 실행 id
+	 */
+	private void notifyExecutionLeft(String executionId) {
+		for (StepEndListener listener : this.stepEndListeners) {
+			try {
+				listener.executionLeft(executionId);
+			} catch (RuntimeException e) {
+				this.error("실행 종료 정리(" + listener.getClass().getSimpleName() + ")에 실패했습니다(executionId=" + executionId + ") - " + e.getMessage());
+			}
+		}
 	}
 
 	/**

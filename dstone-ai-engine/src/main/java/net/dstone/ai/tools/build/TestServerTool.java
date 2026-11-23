@@ -87,7 +87,15 @@ import net.dstone.common.core.BaseObject;
  * ## 내리기
  * 접속 판정: HTTP 응답이 오면 뜬 것으로 보되, WAR 방식에서 앱 경로가 404면 앱이 시작에 실패한 것으로 보고 실패를 돌려줍니다.
  *
- * Agent가 stopTestServer를 부르지 않아도, 띄운 step이 끝나면(StepEndListener) 내립니다. 엔진이 내려갈 때도 내립니다.
+ * Agent가 stopTestServer를 부르지 않아도 엔진이 내립니다.
+ * - 띄운 step이 끝나면 바로 내리지 않고 다음 step 하나까지만 둡니다(넘겨주기). 다음 step이 같은 입력으로 다시 부르면
+ *   새로 띄우지 않고 그 서버를 그대로 돌려줍니다(재사용). 그 step이 끝나면 내립니다. 다시 쓰지 않았으면 다음 step이 끝날 때 내립니다.
+ *   예: sm-workflow는 기동 확인 TOOL step이 띄운 서버를 바로 다음 검증 Agent가 다시 부릅니다. 넘겨주기가 없으면 한 회차에
+ *   서버를 두 번(각 1~2분) 띄웁니다(2026-11-23).
+ * - 실행이 엔진 루프를 벗어나면(끝남, 실패, 승인 대기, 일시정지, 예외) 그 실행의 서버를 모두 내립니다(executionLeft).
+ * - 엔진이 내려갈 때도 모두 내립니다.
+ * 재사용은 실행, 입력(프로젝트·원본·개발 결과·DDL·삭제 목록 경로), 개발 결과·DDL·삭제 목록 파일의 크기와 수정 시각이 모두 같고
+ * 프로세스가 살아 있을 때만 합니다. 하나라도 다르면 내리고 새로 띄웁니다. 같은 step 안에서 다시 부르면 늘 새로 띄웁니다.
  * 사본 폴더는 지우지 않습니다(다음에 다시 씀). 지우고 싶으면 폴더를 직접 지우면 됩니다.
  *
  * ## 두 가지 모드
@@ -145,6 +153,12 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		String url;
 		File log;
 		TestSandbox sandbox;
+		/** 띄울 때의 입력과 파일 상태. 같으면 다음 step이 다시 쓸 수 있습니다 */
+		String fingerprint;
+		/** 띄운 step이 끝나 다음 step으로 넘겨 둔 상태인가 */
+		boolean carried;
+		/** 띄웠을 때 돌려준 안내(재사용할 때 같은 내용을 다시 줍니다) */
+		String message;
 	}
 
 	/** startSandboxServer 한 번의 요청과, 실패했을 때의 원인 */
@@ -175,6 +189,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 
 	@Tool(description = "원본 소스에 개발 결과를 얹은 사본으로 임시 시험 서버를 띄우고, 접속 주소와 서버 로그 파일 경로를 돌려준다. "
 		+ "사람이 쓰는 서버는 건드리지 않는다. 이미 이 실행이 띄운 서버가 있으면 내리고 지금 개발 결과로 다시 띄운다(고친 뒤 확인할 때 다시 부른다). "
+		+ "단, 바로 앞 step이 같은 입력으로 띄운 서버가 떠 있으면 새로 띄우지 않고 그대로 쓴다. "
 		+ "빌드와 기동을 기다리므로 몇 분 걸릴 수 있다. 다 쓰면 stopTestServer를 부른다(부르지 않아도 step이 끝나면 내려간다). "
 		+ "Maven 프로젝트(tomcat, spring-boot, jetty 플러그인)만 띄울 수 있다. 사본은 원래 DB에 붙는다.")
 	public ToolOutcome startTestServer(
@@ -192,7 +207,8 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 
 	@Tool(description = "격리된 시험 서버를 띄운다. 프로젝트 DB를 일회용 DB로 복제하고 ddlFile의 DDL을 거기에만 반영하므로, 화면에서 등록·수정·삭제를 해도 원래 DB와 파일은 바뀌지 않는다. "
 		+ "접속주소, 서버로그, dbQuery에 쓸 복제본 별칭(sandbox-...)을 돌려준다. 실패하면 cause가 code(개발 결과가 원인)나 environment(환경이 원인, 고쳐도 소용없음)다. "
-		+ "다시 부르면 복제본부터 새로 만든다. 다 쓰면 stopTestServer를 부른다(부르지 않아도 step이 끝나면 내려간다).")
+		+ "같은 step에서 다시 부르면 복제본부터 새로 만든다. 바로 앞 step이 같은 입력으로 띄운 서버가 떠 있으면 새로 띄우지 않고 그대로 쓴다(그 사실을 결과에 적는다). "
+		+ "다 쓰면 stopTestServer를 부른다(부르지 않아도 step이 끝나면 내려간다).")
 	public Map<String, Object> startSandboxServer(
 			@ToolParam(description = "프로젝트ID. 복제할 DB를 프로젝트 관리에서 찾는다") String projectId,
 			@ToolParam(description = "원본 소스 루트의 절대경로(읽기만 한다)") String sourceRoot,
@@ -242,17 +258,48 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		return ToolOutcome.pass(this.accountLine(projectId));
 	}
 
-	/** step이 끝나면 그 실행·step이 띄운 서버를 내립니다. */
+	/**
+	 * <pre>
+	 * step이 끝났을 때 그 실행의 서버를 정리합니다.
+	 * - 방금 끝난 step이 띄웠거나 다시 쓴 서버: 내리지 않고 다음 step 하나까지 둡니다(carried).
+	 * - 앞 step에서 넘겨받았는데 이 step이 다시 쓰지 않은 서버: 내립니다.
+	 * </pre>
+	 */
 	@Override
 	public void stepEnded(String executionId, String stepId) {
 		if (executionId != null && stepId != null) {
 			this.sandboxRegistry.stepEnded(new StepRef(executionId, stepId));
 		}
+		if (executionId == null || stepId == null) {
+			return;
+		}
 		Iterator<RunningServer> it = new ArrayList<RunningServer>(this.running.values()).iterator();
 		while (it.hasNext()) {
 			RunningServer server = it.next();
-			if (executionId != null && executionId.equals(server.executionId) && stepId != null && stepId.equals(server.stepId)) {
-				this.info("dstone-ai-engine tool: step[" + stepId + "]이 끝나 임시 시험 서버를 내립니다: " + server.key);
+			if (!executionId.equals(server.executionId)) {
+				continue;
+			}
+			if (stepId.equals(server.stepId) && !server.carried) {
+				server.carried = true;
+				this.info("dstone-ai-engine tool: step[" + stepId + "]이 끝났지만, 다음 step이 같은 입력으로 다시 쓸 수 있게 임시 시험 서버를 한 step 더 둡니다: " + server.key);
+			} else {
+				this.info("dstone-ai-engine tool: 넘겨받은 step[" + stepId + "]이 끝나 임시 시험 서버를 내립니다: " + server.key);
+				this.stop(server);
+			}
+		}
+	}
+
+	/** 실행이 엔진 루프를 벗어나면(끝남, 실패, 승인 대기, 일시정지, 예외) 그 실행의 서버를 모두 내립니다. */
+	@Override
+	public void executionLeft(String executionId) {
+		if (executionId == null) {
+			return;
+		}
+		Iterator<RunningServer> it = new ArrayList<RunningServer>(this.running.values()).iterator();
+		while (it.hasNext()) {
+			RunningServer server = it.next();
+			if (executionId.equals(server.executionId)) {
+				this.info("dstone-ai-engine tool: 실행[" + executionId + "]이 멈추거나 끝나 임시 시험 서버를 내립니다: " + server.key);
 				this.stop(server);
 			}
 		}
@@ -281,15 +328,21 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		File base = new File(this.workRoot(), key + "-server");
 		Files.createDirectories(base.toPath());
 
-		// 1) 같은 실행이 띄운 서버가 있으면 내린다(고친 뒤 다시 띄우는 경우). 다른 실행이 쓰는 중이면 기다린다.
+		// 1) 같은 실행이 띄운 서버가 있으면, 앞 step이 같은 입력으로 넘겨준 것은 그대로 쓰고 아니면 내린다(고친 뒤 다시 띄우는 경우).
+		//    다른 실행이 쓰는 중이면 기다린다.
+		String fingerprint = fingerprintOf(projectId, sourceRootText, overlayText, deleteList, request == null ? null : request.ddlFile);
 		RunningServer previous = this.running.get(key);
 		if (previous != null && sameExecution(previous.executionId, executionId)) {
+			if (canReuse(previous, stepRef, fingerprint, request != null)) {
+				return this.reuse(previous, stepRef, request);
+			}
 			this.stop(previous);
 		}
 		RunningServer server = new RunningServer();
 		server.key = key;
 		server.executionId = executionId;
 		server.stepId = stepRef == null ? null : stepRef.stepId();
+		server.fingerprint = fingerprint;
 		String lockProblem = this.acquireLock(server, base);
 		if (lockProblem != null) {
 			return ToolOutcome.fail(lockProblem);
@@ -457,12 +510,121 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			for (String note : notes) {
 				message.append('\n').append(note);
 			}
-			return ToolOutcome.pass(message.toString());
+			server.message = message.toString();
+			return ToolOutcome.pass(server.message);
 		} finally {
 			if (!started) {
 				this.stop(server);
 			}
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 실행·step이 띄운 서버로 맡겨 둡니다(프로세스 없이). 넘겨주기와 내리기 규칙을 서버 없이 확인할 때 씁니다(같은 패키지의 테스트).
+	 * </pre>
+	 */
+	void track(String key, String executionId, String stepId) {
+		RunningServer server = new RunningServer();
+		server.key = key;
+		server.executionId = executionId;
+		server.stepId = stepId;
+		this.running.put(key, server);
+	}
+
+	/** 그 키의 서버를 아직 맡고 있는지(내리지 않았는지) 봅니다. */
+	boolean isRunning(String key) {
+		return this.running.containsKey(key);
+	}
+
+	/**
+	 * <pre>
+	 * 앞 step이 넘겨준 서버를 이 step이 그대로 써도 되는지 봅니다.
+	 * 넘겨 둔 상태이고, 다른 step이 부르고, 같은 종류(격리 여부)이고, 입력과 파일 상태가 같고, 프로세스가 살아 있어야 합니다.
+	 * 같은 step 안에서 다시 부르는 것은 고친 뒤 새로 띄우려는 것이므로 쓰지 않습니다.
+	 * </pre>
+	 */
+	private static boolean canReuse(RunningServer server, StepRef stepRef, String fingerprint, boolean sandbox) {
+		return server.carried
+			&& stepRef != null && stepRef.stepId() != null && !stepRef.stepId().equals(server.stepId)
+			&& (server.sandbox != null) == sandbox
+			&& fingerprint.equals(server.fingerprint)
+			&& server.process != null && server.process.isAlive()
+			&& server.message != null;
+	}
+
+	/** 넘겨받은 서버를 이 step의 것으로 바꾸고, 띄웠을 때와 같은 안내를 돌려줍니다. */
+	private ToolOutcome reuse(RunningServer server, StepRef stepRef, SandboxRequest request) {
+		String from = server.stepId;
+		server.stepId = stepRef.stepId();
+		server.carried = false;
+		if (server.sandbox != null) {
+			Map<String, Map<String, String>> clones = server.sandbox.readConnections();
+			this.sandboxRegistry.opened(stepRef, server.url, clones);
+			request.url = server.url;
+			request.dbAliases.addAll(clones.keySet());
+		}
+		this.info("dstone-ai-engine tool: step[" + from + "]이 같은 입력으로 띄운 임시 시험 서버를 step[" + stepRef.stepId() + "]이 그대로 씁니다: " + server.key);
+		return ToolOutcome.pass("앞 step(" + from + ")이 같은 입력으로 띄운 서버가 떠 있어 새로 띄우지 않고 그대로 씁니다. "
+			+ "앞 step이 화면이나 DB에서 바꾼 데이터는 남아 있을 수 있습니다. 처음 상태가 필요하면 stopTestServer를 부른 뒤 다시 띄우십시오.\n"
+			+ server.message);
+	}
+
+	/**
+	 * <pre>
+	 * 서버를 다시 써도 되는지 가리는 값입니다. 입력 경로들과, 개발 결과 폴더·DDL·삭제 목록 파일마다 경로·크기·수정 시각을 이어 붙입니다.
+	 * 원본 소스 폴더는 크고 시험 중에 바뀌지 않으므로 경로만 봅니다.
+	 * </pre>
+	 */
+	static String fingerprintOf(String projectId, String sourceRoot, String overlayDir, String deleteList, String ddlFile) {
+		StringBuilder text = new StringBuilder();
+		text.append(inputPath(projectId)).append('|').append(inputPath(sourceRoot)).append('|').append(inputPath(overlayDir))
+			.append('|').append(inputPath(deleteList)).append('|').append(inputPath(ddlFile)).append('\n');
+		if (!isBlank(overlayDir)) {
+			File overlay = new File(overlayDir.trim());
+			appendTree(overlay, overlay, text);
+		}
+		appendFile(deleteList, text);
+		appendFile(ddlFile, text);
+		return text.toString();
+	}
+
+	/** 앞뒤 공백, 역슬래시, 끝의 슬래시 차이로 다른 입력이 되지 않게 맞춥니다. */
+	private static String inputPath(String value) {
+		if (value == null) {
+			return "";
+		}
+		String path = value.trim().replace('\\', '/');
+		while (path.length() > 1 && path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
+		return path;
+	}
+
+	/** 폴더 아래 파일을 이름순으로 "상대경로 크기 수정시각" 줄로 덧붙입니다. */
+	private static void appendTree(File root, File dir, StringBuilder text) {
+		File[] children = dir.listFiles();
+		if (children == null) {
+			return;
+		}
+		Arrays.sort(children);
+		for (File child : children) {
+			if (child.isDirectory()) {
+				appendTree(root, child, text);
+			} else {
+				text.append(root.toPath().relativize(child.toPath()).toString().replace('\\', '/'))
+					.append(' ').append(child.length()).append(' ').append(child.lastModified()).append('\n');
+			}
+		}
+	}
+
+	/** 파일 하나의 크기와 수정 시각을 덧붙입니다(없으면 없다고). */
+	private static void appendFile(String path, StringBuilder text) {
+		if (isBlank(path)) {
+			return;
+		}
+		File file = new File(path.trim());
+		text.append(inputPath(path)).append(' ').append(file.isFile() ? file.length() + " " + file.lastModified() : "없음").append('\n');
 	}
 
 	/** 격리 환경을 만들어 server에 답니다. 실패면 이유. */

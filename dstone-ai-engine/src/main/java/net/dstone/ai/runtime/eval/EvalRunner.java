@@ -497,7 +497,9 @@ public class EvalRunner extends BaseObject {
 			}
 			return checks;
 		} finally {
+			// 평가는 step 하나로 끝나므로, 다음 step을 위해 남겨 두지 말고 모두 내립니다.
 			this.testServerTool.stepEnded(executionId, stepId);
+			this.testServerTool.executionLeft(executionId);
 		}
 	}
 
