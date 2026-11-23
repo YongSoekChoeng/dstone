@@ -1850,9 +1850,9 @@ var DstoneAiDesigner = (function () {
 	 * node = 같은 줄의 노드 사이, rank = 줄 사이, fail = 그림 오른쪽 끝(바깥 길 포함)과 FAIL 사이,
 	 * loop = 그림 바깥으로 돌아가는 화살표의 첫 길이 그림에서 떨어지는 거리, lane = 그 길끼리의 간격
 	 */
-	var LAYOUT_GAP = { node: 28, rank: 48, fail: 40, loop: 20, lane: 10 };
+	var LAYOUT_GAP = { node: 28, rank: 48, fail: 40, loop: 22, lane: 10 };
 	/** 한 줄에 놓는 step 수의 한도. 넘치는 step은 다음 줄로 내려 그림이 옆으로 길어지지 않게 합니다. */
-	var LAYOUT_ROW_MAX = 4;
+	var LAYOUT_ROW_MAX = 3;
 	/** 줄을 나눌 때 화살표 종류별 무게. 무거울수록 두 노드를 바로 위아래 줄에 둡니다. 줄기(layoutSpine)는 30입니다. */
 	var LAYOUT_WEIGHT = { start: 8, next: 8, route: 3, onFailure: 2, rejectTo: 1 };
 
@@ -1917,9 +1917,9 @@ var DstoneAiDesigner = (function () {
 				short.push(edge);
 			}
 		});
-		var outer = routeOutsideEdges(outside, box, sides, failFrom, tracks);
+		var outer = routeOutsideEdges(outside, sides, failFrom, tracks);
 		// FAIL은 오른쪽 바깥 길보다 더 바깥, 맨 아래 줄에 둔다.
-		positions[FAIL_ID] = { x: Math.round(outer.right + LAYOUT_GAP.fail), y: Math.round(box.bottom - TERM_SIZE) };
+		positions[FAIL_ID] = { x: Math.round(Math.max(box.right, outer.right) + LAYOUT_GAP.fail), y: Math.round(box.bottom - TERM_SIZE) };
 		short.forEach(function (edge) {
 			routeShortEdge(edge, short, sides);
 		});
@@ -2221,18 +2221,30 @@ var DstoneAiDesigner = (function () {
 	/**
 	 * 그림 바깥으로 도는 화살표(되돌아가는 것, 두 줄 이상 건너는 것)의 길을 정합니다.
 	 * <pre>
-	 * 그림 바깥 왼쪽이나 오른쪽에 화살표마다 세로 길을 두고, 두 노드의 옆 연결점에서 그 길로 나가고 들어옵니다.
+	 * 화살표마다 왼쪽이나 오른쪽에 세로 길을 두고, 두 노드의 옆 연결점에서 그 길로 나가고 들어옵니다.
+	 * 세로 길은 그림 전체의 끝이 아니라, 그 화살표가 지나는 높이에 있는 노드들 바로 바깥에 둡니다
+	 * (아래쪽에 넓은 줄이 있어도 위쪽 화살표는 위쪽 노드 옆으로 지나가므로 그림이 덜 넓어집니다).
 	 * 쪽은 가로선이 다른 노드를 지나지 않는 쪽, 둘 다 되면 가까운 쪽을 고릅니다.
 	 * 옆에 다른 노드가 있어 가로로 못 나가면 아래(들어갈 때는 위) 연결점을 써서 줄 사이 빈 곳으로 돌아갑니다.
-	 * 위아래 구간이 겹치는 화살표는 서로 다른 길을 씁니다(짧은 것이 안쪽). 겹치지 않으면 같은 길을 나눠 씁니다.
+	 * 위아래 구간이 겹치는 화살표는 서로 다른 길을 씁니다(짧은 것이 안쪽).
+	 * 같은 노드로 들어가는 화살표는 끝에서 어차피 합쳐지므로 한 길을 같이 씁니다.
 	 * </pre>
 	 * @return {left, right} 가장 바깥 길의 x (FAIL 자리를 정할 때 씁니다)
 	 */
-	function routeOutsideEdges(list, box, sides, failFrom, tracks) {
-		var lanes = { left: [], right: [] };
-		var outer = { left: box.left, right: box.right };
+	function routeOutsideEdges(list, sides, failFrom, tracks) {
+		var segs = [];
+		var outer = { left: Infinity, right: -Infinity };
 		var span = function (edge) {
 			return Math.abs(layoutBox(edge.from).cy - layoutBox(edge.to).cy);
+		};
+		// 이미 놓인 다른 화살표의 세로 길과 너무 가까우면서 위아래가 겹치는지 봅니다(같은 노드로 가는 길은 겹쳐도 됩니다).
+		var clash = function (side, x, top, low, to) {
+			return segs.some(function (seg) {
+				return seg.side === side && seg.to !== to && Math.abs(seg.x - x) < LAYOUT_GAP.lane && seg.top < low && seg.low > top;
+			});
+		};
+		var step = function (side) {
+			return side === "left" ? -LAYOUT_GAP.lane : LAYOUT_GAP.lane;
 		};
 		list.slice().sort(function (a, b) {
 			return span(a) - span(b);
@@ -2241,7 +2253,8 @@ var DstoneAiDesigner = (function () {
 			var t = layoutBox(edge.to);
 			var best = null;
 			["left", "right"].forEach(function (side) {
-				var near = side === "left" ? box.left - LAYOUT_GAP.loop : box.right + LAYOUT_GAP.loop;
+				var reach = layoutReach(side, Math.min(s.y, t.y), Math.max(s.bottom, t.bottom));
+				var near = side === "left" ? reach - LAYOUT_GAP.loop : reach + LAYOUT_GAP.loop;
 				var plan = {
 					side: side,
 					sBlocked: layoutBlocked(side === "left" ? s.x : s.right, near, s.cy, s.cy, [edge.from]),
@@ -2257,7 +2270,7 @@ var DstoneAiDesigner = (function () {
 				if (!plan.tBlocked && !sideFree(sides, edge.to, side)) {
 					plan.cost += 1000;
 				}
-				plan.cost += side === "left" ? (s.x - box.left) + (t.x - box.left) : (box.right - s.right) + (box.right - t.right);
+				plan.cost += side === "left" ? (s.x - near) + (t.x - near) : (near - s.right) + (near - t.right);
 				if (!best || plan.cost < best.cost) {
 					best = plan;
 				}
@@ -2267,16 +2280,23 @@ var DstoneAiDesigner = (function () {
 			var yTo = best.tBlocked ? t.y - LAYOUT_GAP.rank / 2 : t.cy;
 			var top = Math.min(yFrom, yTo) - 8;
 			var low = Math.max(yFrom, yTo) + 8;
-			var k = 0;
-			while (lanes[side][k] && lanes[side][k].some(function (used) {
-				return used.top < low && used.low > top;
-			})) {
-				k++;
+			var reach = layoutReach(side, top, low);
+			var base = side === "left" ? reach - LAYOUT_GAP.loop : reach + LAYOUT_GAP.loop;
+			var x = null;
+			segs.forEach(function (seg) {
+				var outside = side === "left" ? seg.x <= base : seg.x >= base;
+				if (x === null && seg.side === side && seg.to === edge.to && outside && !clash(side, seg.x, top, low, edge.to)) {
+					x = seg.x;
+				}
+			});
+			if (x === null) {
+				x = base;
+				while (clash(side, x, top, low, edge.to)) {
+					x += step(side);
+				}
 			}
-			lanes[side][k] = lanes[side][k] || [];
-			lanes[side][k].push({ top: top, low: low });
-			var x = side === "left" ? box.left - LAYOUT_GAP.loop - k * LAYOUT_GAP.lane : box.right + LAYOUT_GAP.loop + k * LAYOUT_GAP.lane;
 			x = Math.round(x);
+			segs.push({ side: side, x: x, top: top, low: low, to: edge.to });
 			outer[side] = side === "left" ? Math.min(outer.left, x) : Math.max(outer.right, x);
 			var points = [];
 			var ports = { source: side, target: side };
@@ -2300,6 +2320,18 @@ var DstoneAiDesigner = (function () {
 			edgeVertices[edge.key] = points;
 		});
 		return outer;
+	}
+
+	/** 높이 top~low 사이에 걸친 노드들의 가장 왼쪽(side = left) 또는 가장 오른쪽 끝 x입니다. */
+	function layoutReach(side, top, low) {
+		var reach = side === "left" ? Infinity : -Infinity;
+		Object.keys(positions).forEach(function (id) {
+			var b = layoutBox(id);
+			if (b.y - 6 < low && b.bottom + 6 > top) {
+				reach = side === "left" ? Math.min(reach, b.x) : Math.max(reach, b.right);
+			}
+		});
+		return reach;
 	}
 
 	/**
