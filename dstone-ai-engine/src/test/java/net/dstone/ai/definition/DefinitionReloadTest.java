@@ -133,6 +133,19 @@ public class DefinitionReloadTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void TOOL_step에_next와_routes를_함께_적으면_검사에서_막힌다() {
+		String workflowId = "sm-workflow";
+		String path = this.workFlowRegistry.pathOf(workflowId);
+		String text = this.definitionService.source("workflows", workflowId).text().replace("      \"false\": step08\n", "      \"false\": step08\n    next: step08\n");
+		assertThat(text).contains("    next: step08\n");
+
+		DefinitionChangeResult result = this.definitionService.check("workflows", new DefinitionChangeRequest(path, path, text, null));
+
+		assertThat(result.ok()).isFalse();
+		assertThat(result.message()).contains("step07").contains("next와 routes를 함께");
+	}
+
+	@Test
 	void 틀린_내용은_이유를_돌려주고_등록된_정의는_그대로다() {
 		WorkFlowDefinition registered = this.workFlowRegistry.all().get(WORKFLOW_ID);
 		String path = this.workFlowRegistry.pathOf(WORKFLOW_ID);

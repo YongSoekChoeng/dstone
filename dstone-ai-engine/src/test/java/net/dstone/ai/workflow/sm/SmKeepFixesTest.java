@@ -16,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
+import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.support.ScriptedChatModel;
 import net.dstone.ai.support.WorkflowStepper;
 import net.dstone.ai.support.WorkflowTestBase;
@@ -69,6 +70,9 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step12");
+		// 없는 것도 정상 결과라서 실패로 남지 않는다(isFileExist + routes)
+		assertThat(this.lastHistory(flow).success()).isTrue();
+		assertThat(this.lastHistory(flow).outputSummary()).contains("false");
 	}
 
 	@Test
@@ -116,6 +120,8 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step08");
+		assertThat(this.lastHistory(flow).success()).isTrue();
+		assertThat(this.lastHistory(flow).outputSummary()).contains("false");
 	}
 
 	@Test
@@ -201,6 +207,13 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
 		flow.put("now", NOW).put("request", "## 현업요청\n이미지 게시판").put("requirement", "# 요구사항").put("sourceDir", "/app/myApp");
 		return flow.jumpTo(stepId);
+	}
+
+
+	/** 방금 실행한 step의 이력 한 줄입니다. */
+	private StepHistoryEntry lastHistory(WorkflowStepper flow) {
+		List<StepHistoryEntry> history = flow.history();
+		return history.get(history.size() - 1);
 	}
 
 }

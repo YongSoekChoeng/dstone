@@ -336,7 +336,7 @@ public class WorkFlowRegistry extends BaseObject {
 	/**
 	 * <pre>
 	 * step마다 다음에 갈 수 있는 step id들을 모읍니다(END/FAIL은 빼고). 그러면서 갈 곳이 올바른지 검사합니다.
-	 * - ROUTER, APPROVAL: routes의 값들
+	 * - ROUTER, APPROVAL, routes를 적은 TOOL: routes의 값들
 	 * - 그 밖: next(비어 있으면 목록의 다음 step, 마지막이면 END)
 	 * - 모두: onFailure(비어 있으면 FAIL)
 	 * </pre>
@@ -452,6 +452,7 @@ public class WorkFlowRegistry extends BaseObject {
 				this.checkRouteNames(definition, step, router);
 				break;
 			case ToolStepDefinition tool:
+				this.checkToolRoutes(definition, step, tool);
 				Map<String, Object> toolSchema = this.toolInputSchema(tool.tool());
 				if (toolSchema == null) {
 					this.warn(definition, step, "부르는 Tool '" + tool.tool()
@@ -470,6 +471,34 @@ public class WorkFlowRegistry extends BaseObject {
 					throw this.error(definition, step, "approval.rejectTo(" + rejectTo + ")와 routes.REJECTED(" + rejectedRoute + ")가 서로 다릅니다. 같은 뜻이므로 한쪽만 적거나 같은 곳을 적으십시오.");
 				}
 				break;
+		}
+	}
+
+	/**
+	 * <pre>
+	 * TOOL step의 routes를 검사합니다. routes를 적었으면
+	 * - 이름이 1개 이상 있어야 하고
+	 * - next와 함께 쓸 수 없고(갈 곳을 두 군데서 정하게 되므로)
+	 * - forEach와 함께 쓸 수 없습니다(결과가 반복마다 하나씩이라 값 하나로 고를 수 없으므로).
+	 * 갈 곳이 있는 step인지는 nextSteps()가 다른 step과 똑같이 봅니다.
+	 * </pre>
+	 *
+	 * @param definition 검사 중인 Workflow 정의
+	 * @param step       검사할 step
+	 * @param tool       TOOL step 정의
+	 */
+	private void checkToolRoutes(WorkFlowDefinition definition, StepDefinition step, ToolStepDefinition tool) {
+		if (tool.routes() == null) {
+			return;
+		}
+		if (tool.routes().isEmpty()) {
+			throw this.error(definition, step, "routes를 적었으면 Tool이 돌려줄 값 → 갈 곳을 1개 이상 적어야 합니다. 예: routes: {\"true\": step38, \"false\": step08}");
+		}
+		if (!StringUtil.isEmpty(tool.next())) {
+			throw this.error(definition, step, "TOOL step에 next와 routes를 함께 적을 수 없습니다. routes를 적으면 Tool이 돌려준 값으로 갈 곳을 정하므로 next를 지우십시오.");
+		}
+		if (StepDefinition.forEachOf(step) != null) {
+			throw this.error(definition, step, "forEach step에는 routes를 적을 수 없습니다(결과가 반복마다 하나씩이라 값 하나로 갈 곳을 고를 수 없습니다).");
 		}
 	}
 

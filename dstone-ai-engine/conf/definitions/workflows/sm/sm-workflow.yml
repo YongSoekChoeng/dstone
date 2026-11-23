@@ -18,7 +18,8 @@
 # 앞 문서가 바뀌어도 뒤 문서를 새로 쓰지 않습니다(2.3.0). 새로 쓰면 재개발·전문가 해결로 고친 것이 사라집니다.
 #   step07: 영향도분석서가 있으면 step38이 맞춰 고치고, 없으면 step08이 씁니다.
 #   step11: 설계서가 있으면 step37이 맞춰 고치고, 없으면 step12가 씁니다.
-#   파일이 있는지만 보려고 readFileLines로 첫 줄을 읽습니다. 처음 실행 때 이 두 step이 실패로 남는 것은 정상입니다.
+#   파일이 있는지는 범용 Tool isFileExist가 true/false로 알려 주고, step의 routes가 그 값으로 갈 곳을 나눕니다(2.4.1).
+#   파일이 없는 것은 정상 결과라서 실행 이력에 실패로 남지 않습니다.
 #
 # 개발 결과는 작업 폴더의 dev-resources에 "원본 소스 루트 기준 같은 경로"로 쌓입니다(원본은 건드리지 않습니다).
 # 원본에서 지워야 하는 파일은 dev-resources/_delete-files.txt에 한 줄에 하나씩 적습니다.
@@ -48,7 +49,7 @@
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.4.0
+version: 2.4.1
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -144,13 +145,13 @@ steps:
   - id: step07
     name: 08-기존 영향도분석서 확인
     type: TOOL
-    tool: readFileLines
+    tool: isFileExist
     with:
-      fileFullPath: ${input}/${state.now}/02.impact.md
-      startLine: 1
-      endLine: 1
-    next: step38
-    onFailure: step08
+      filePath: ${input}/${state.now}/02.impact.md
+    routes:
+      "true": step38
+      "false": step08
+    onFailure: FAIL
 
   - id: step08
     name: 09-영향도 분석
@@ -192,13 +193,13 @@ steps:
   - id: step11
     name: 12-기존 설계서 확인
     type: TOOL
-    tool: readFileLines
+    tool: isFileExist
     with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      startLine: 1
-      endLine: 1
-    next: step37
-    onFailure: step12
+      filePath: ${input}/${state.now}/03-1.design.md
+    routes:
+      "true": step37
+      "false": step12
+    onFailure: FAIL
 
   - id: step12
     name: 13-아키텍처 설계

@@ -603,7 +603,7 @@ public class WorkFlowExecutor extends BaseObject {
 	/**
 	 * <pre>
 	 * step 하나가 끝난 뒤 다음에 갈 곳을 정합니다. step id를 돌려주거나, Workflow를 끝낼 때는 "END"/"FAIL" 예약어를 돌려줍니다.
-	 * - 성공한 ROUTER와 APPROVAL: 고른 route(ROUTER는 LLM이, APPROVAL은 사람이 고름)를 routes에서 찾습니다.
+	 * - 성공한 ROUTER와 APPROVAL, routes를 적은 TOOL: 고른 route(ROUTER는 LLM이, APPROVAL은 사람이 고르고, TOOL은 Tool이 돌려준 값)를 routes에서 찾습니다.
 	 *   routes에 없는 이름이면 예외를 던집니다.
 	 * - 그 밖의 성공: next에 적은 곳. 비어 있으면 목록상 다음 step, 마지막 step이면 END입니다.
 	 * - 실패: onFailure에 적은 곳. 비어 있으면 FAIL입니다.

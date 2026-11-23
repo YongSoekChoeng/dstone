@@ -216,6 +216,11 @@ public class WorkflowStepper {
 		return ids;
 	}
 
+	/** 지금까지 남은 실행 이력을 차례로 돌려줍니다(성공했는지, 실패 사유까지 볼 때 씁니다). */
+	public List<StepHistoryEntry> history() {
+		return this.store.findHistory(this.execution.executionId());
+	}
+
 	/** step을 실행해도 되는 상태인지, 차례인 step이 stepId인지 봅니다. */
 	private void checkTurn(String stepId) {
 		WorkFlowExecutionStatus status = this.execution.status();

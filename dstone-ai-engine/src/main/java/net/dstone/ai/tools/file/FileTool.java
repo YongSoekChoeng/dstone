@@ -1519,8 +1519,22 @@ public class FileTool {
 		}
 	}
 
-	@Tool(description = "절대경로 fileFullPath(폴더+파일명)파일이 존재하는지 여부를 boolean 값으로 반환한다. 저장 결과 안내 문구를 돌려준다. 사용자가 '파일 존재' 등을 요청할 때 사용한다.")
-	public boolean isFileExist(@ToolParam(description = "저장할 파일의 절대경로(파일명 포함)") String filePath) {
+	/**
+	 * <pre>
+	 * 파일(또는 폴더)이 있으면 true, 없으면 false를 돌려줍니다. 내용은 읽지 않습니다.
+	 *
+	 * 없는 것도 정상 결과라서 실패로 돌려주지 않습니다. TOOL step은 이 값을 routes로 받아 갈 곳을 나눕니다.
+	 *   tool: isFileExist
+	 *   with: { filePath: "${input}/02.impact.md" }
+	 *   routes: { "true": 고치는step, "false": 새로쓰는step }
+	 * 예전 sm-workflow는 readFileLines로 첫 줄을 읽어 보고 실패하면 onFailure로 나눴습니다. 그러면 처음 실행할 때마다
+	 * 실행 이력에 실패가 남아 진짜 실패와 섞였습니다(2026-11-23).
+	 * </pre>
+	 *
+	 * @param filePath 확인할 파일의 절대경로
+	 */
+	@Tool(description = "절대경로 filePath(폴더+파일명)의 파일이 있으면 true, 없으면 false를 반환한다. 파일 내용은 읽지 않는다. 파일이 있는지만 알면 될 때 사용한다.")
+	public boolean isFileExist(@ToolParam(description = "확인할 파일의 절대경로(파일명 포함)") String filePath) {
 		return net.dstone.common.utils.FileUtil.isFileExist(filePath);
 	}
 

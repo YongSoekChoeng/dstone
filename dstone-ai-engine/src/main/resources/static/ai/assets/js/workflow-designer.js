@@ -914,6 +914,10 @@ var DstoneAiDesigner = (function () {
 		if (type === "APPROVAL") {
 			return ["route"];
 		}
+		if (type === "TOOL") {
+			// TOOL은 Tool이 돌려준 값으로 갈 곳을 나눌 수 있다(routes). routes를 쓰면 next는 쓰지 않는다.
+			return ["next", "route", "onFailure"];
+		}
 		return ["next", "onFailure"];
 	}
 
@@ -925,9 +929,18 @@ var DstoneAiDesigner = (function () {
 			delete step.onFailure;
 		} else if (kind === "route" && step.routes) {
 			delete step.routes[route];
+			// TOOL의 routes는 비어 있으면 안 되므로(엔진 검사), 마지막 경로를 지우면 routes 키도 지운다.
+			if (step.type === "TOOL" && !hasRoutes(step)) {
+				delete step.routes;
+			}
 		} else if (kind === "rejectTo" && step.approval) {
 			delete step.approval.rejectTo;
 		}
+	}
+
+	/** routes에 경로가 하나라도 있는지 봅니다. */
+	function hasRoutes(step) {
+		return !!(step.routes && typeof step.routes === "object" && Object.keys(step.routes).length);
 	}
 
 	/** 아직 쓰지 않은 경로 이름을 하나 만듭니다(APPROVAL은 APPROVED, REJECTED부터). */
@@ -972,7 +985,8 @@ var DstoneAiDesigner = (function () {
 			return;
 		}
 		change(function () {
-			if (source.type === "ROUTER" || source.type === "APPROVAL") {
+			// TOOL은 이미 routes로 나누고 있을 때만 경로를 하나 더 만든다(아니면 next → onFailure 순서).
+			if (source.type === "ROUTER" || source.type === "APPROVAL" || (source.type === "TOOL" && hasRoutes(source))) {
 				var name = newRouteName(source);
 				source.routes = source.routes || {};
 				source.routes[name] = to;
@@ -2757,7 +2771,8 @@ var DstoneAiDesigner = (function () {
 				return "<option value=\"" + kind + "\"" + (kind === edge.kind ? " selected" : "") + ">" + kindNames[kind] + "</option>";
 			}).join("") + "</select>");
 		if (edge.kind === "route") {
-			var help = step.type === "APPROVAL" ? "승인자가 고르는 결정 이름(예: APPROVED, REJECTED)" : "ROUTER Agent가 고르는 경로 이름";
+			var help = step.type === "APPROVAL" ? "승인자가 고르는 결정 이름(예: APPROVED, REJECTED)"
+				: (step.type === "TOOL" ? "Tool이 돌려주는 값과 똑같이 적습니다(예: isFileExist는 true, false)" : "ROUTER Agent가 고르는 경로 이름");
 			var otherNames = Object.keys(step.routes || {}).filter(function (name) { return name !== edge.route; });
 			html += row("경로 이름", help, "<input type=\"text\" id=\"wd-edge-route\" list=\"wd-route-names\" value=\"" + escapeHtml(edge.route) + "\" />"
 				+ "<datalist id=\"wd-route-names\">" + otherNames.map(function (name) { return "<option value=\"" + escapeHtml(name) + "\"></option>"; }).join("") + "</datalist>"
@@ -2791,6 +2806,15 @@ var DstoneAiDesigner = (function () {
 			change(function () {
 				if ((kind === "next" && step.next) || (kind === "onFailure" && step.onFailure)) {
 					showMessage("error", "이 step에는 " + kind + " 화살표가 이미 있습니다. 그것을 먼저 지우십시오.");
+					return false;
+				}
+				// TOOL은 next와 routes를 함께 쓸 수 없다(엔진이 켜질 때 막는다).
+				if (step.type === "TOOL" && kind === "route" && step.next && edge.kind !== "next") {
+					showMessage("error", "TOOL step은 next와 routes를 함께 쓸 수 없습니다. next 화살표를 먼저 지우거나, next 화살표를 경로로 바꾸십시오.");
+					return false;
+				}
+				if (step.type === "TOOL" && kind === "next" && hasRoutes(step) && !(edge.kind === "route" && Object.keys(step.routes).length === 1)) {
+					showMessage("error", "TOOL step은 next와 routes를 함께 쓸 수 없습니다. 경로 화살표를 먼저 지우십시오.");
 					return false;
 				}
 				removeEdge(step, edge.kind, edge.route);

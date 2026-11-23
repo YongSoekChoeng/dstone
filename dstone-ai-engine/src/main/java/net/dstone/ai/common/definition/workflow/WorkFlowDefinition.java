@@ -119,8 +119,8 @@ public record WorkFlowDefinition(
 	/**
 	 * <pre>
 	 * 흐름이 stepId로 갔을 때 그 일을 처음 받을 수 있는 step들을 돌려줍니다.
-	 * TOOL step은 문서를 읽는 것 같은 준비 단계라서 건너뜁니다. 이때 성공 길(next, 없으면 목록상 다음 step)과
-	 * 실패 길(onFailure)을 둘 다 따라갑니다. "파일이 있으면 고치고, 없으면 새로 쓴다"처럼 TOOL step이 길을 가르기도 하고,
+	 * TOOL step은 문서를 읽는 것 같은 준비 단계라서 건너뜁니다. 이때 성공 길(next, 없으면 목록상 다음 step,
+	 * routes를 적었으면 routes의 갈 곳 모두)과 실패 길(onFailure)을 둘 다 따라갑니다. "파일이 있으면 고치고, 없으면 새로 쓴다"처럼 TOOL step이 길을 가르기도 하고,
 	 * 어느 길로 가든 사람의 결정(arrival)은 그대로 전해지기 때문입니다.
 	 *
 	 * 성공 길에서 찾은 step이 앞에 옵니다. END, FAIL이거나 찾지 못하면(없는 id, TOOL끼리 도는 고리) 빈 목록입니다.
@@ -153,11 +153,19 @@ public record WorkFlowDefinition(
 			receivers.add(step);
 			return;
 		}
-		String next = StepDefinition.nextOf(step);
-		if (next == null && index + 1 < this.steps.size()) {
-			next = this.steps.get(index + 1).id();
+		// routes를 적은 TOOL step은 Tool이 돌려준 값에 따라 어느 쪽으로든 갈 수 있으므로 모두 따라갑니다.
+		Map<String, String> routes = StepDefinition.routesOf(step);
+		if (routes != null) {
+			for (String target : routes.values()) {
+				this.collectReceivers(target, visited, receivers);
+			}
+		} else {
+			String next = StepDefinition.nextOf(step);
+			if (next == null && index + 1 < this.steps.size()) {
+				next = this.steps.get(index + 1).id();
+			}
+			this.collectReceivers(next, visited, receivers);
 		}
-		this.collectReceivers(next, visited, receivers);
 		this.collectReceivers(step.onFailure(), visited, receivers);
 	}
 

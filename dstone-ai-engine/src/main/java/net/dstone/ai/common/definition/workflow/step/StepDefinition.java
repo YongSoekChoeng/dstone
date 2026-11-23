@@ -26,7 +26,7 @@ import net.dstone.common.utils.StringUtil;
  *   TOOL        ToolStepDefinition         Tool 하나를 LLM 없이 직접 호출함       ToolStepExecutor
  *   APPROVAL    ApprovalStepDefinition     사람이 routes 중 하나를 고를 때까지 기다림   ApprovalStepExecutor
  *
- * record에 없는 키를 적으면(예: TOOL step에 routes, APPROVAL step에 with) 엔진이 켜질 때
+ * record에 없는 키를 적으면(예: AGENT step에 routes, APPROVAL step에 with) 엔진이 켜질 때
  * "쓸 수 없는 키"로 바로 막힙니다.
  *
  * ## 이 interface가 하는 일
@@ -69,7 +69,7 @@ import net.dstone.common.utils.StringUtil;
  * - 다음 step: next와 onFailure를 둘 다 비워두면 성공 시 목록의 다음 step으로, 실패 시 Workflow 전체 실패로 끝납니다.
  *   onFailure에 앞쪽 step의 id를 적으면 재시도 루프가 되고, 무한 반복은 workflow.settings.maxIterations가 막습니다.
  *   "END"/"FAIL" 예약어를 적으면 그 자리에서 Workflow 전체를 성공/실패로 끝냅니다.
- *   ROUTER와 APPROVAL은 next 대신 routes로 갈 곳을 정합니다.
+ *   ROUTER와 APPROVAL은 next 대신 routes로 갈 곳을 정합니다. TOOL도 routes를 적으면 Tool이 돌려준 값으로 갈 곳을 정합니다.
  *
  * - 대화 기억: step끼리 넘기는 값은 state뿐입니다. LLM을 부르는 step은 기본적으로 이전 대화를 보지 않고
  *   input만 보고 답합니다. memory: true를 적은 step만 자기 대화방(sessionId:stepId)에서 이전에 자기가 나눈 대화를
@@ -180,6 +180,7 @@ public sealed interface StepDefinition
 
 	/**
 	 * 성공했을 때 갈 곳(next)을 돌려줍니다. 비워뒀으면 null이고, ROUTER와 APPROVAL은 routes로 갈 곳을 정하므로 항상 null입니다.
+	 * routes를 적은 TOOL step은 routes가 갈 곳을 정합니다(next와 함께 적으면 엔진이 켜질 때 막힙니다).
 	 *
 	 * @param step next를 꺼낼 step
 	 */
@@ -203,6 +204,7 @@ public sealed interface StepDefinition
 	 * 이름을 골라서 갈 곳을 정하는 step이면 그 routes(이름 → 갈 곳)를 돌려줍니다. 아니면 null입니다.
 	 * - ROUTER: LLM이 이름을 고릅니다.
 	 * - APPROVAL: 사람이 이름을 고릅니다.
+	 * - TOOL: routes를 적었을 때만. Tool이 돌려준 값이 곧 이름입니다.
 	 * </pre>
 	 *
 	 * @param step routes를 꺼낼 step
@@ -213,6 +215,9 @@ public sealed interface StepDefinition
 		}
 		if (step instanceof ApprovalStepDefinition approval) {
 			return approval.decisionRoutes();
+		}
+		if (step instanceof ToolStepDefinition tool && tool.routes() != null) {
+			return tool.routes();
 		}
 		return null;
 	}

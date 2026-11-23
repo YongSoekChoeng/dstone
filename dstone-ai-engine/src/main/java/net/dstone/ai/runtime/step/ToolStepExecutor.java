@@ -28,6 +28,8 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  *    글자면 그 글자가 "실패"(Constants.Outcome.FAIL_PREFIX)로 시작하는지로 판정합니다. 그 밖의 모양은 성공입니다.
  *    실패면 ToolOutcome의 message(없으면 응답 글자)를 실패 사유(error)로 남깁니다.
  *    실패 이유와 받은 입력은 step에 saveError / saveInput으로 이름을 적어 두면 onFailure로 이동한 step이 ${state.이름}으로 읽을 수 있습니다.
+ * 5) 갈 곳 고르기: step에 routes가 있고 성공했으면, output(글자·숫자·true/false 하나)을 글자로 바꾼 값이 곧 route입니다.
+ *    routes에 없는 값이면 실패로 돌려서 onFailure를 따르게 합니다(Workflow를 예외로 멈추지 않습니다).
  * </pre>
  */
 @Component
@@ -54,7 +56,7 @@ public class ToolStepExecutor {
 
 		if (output instanceof Map && ((Map<String, Object>) output).get("success") instanceof Boolean success) {
 			if (success) {
-				return StepOutcome.success(output);
+				return this.succeeded(step, output);
 			}
 			Object message = ((Map<String, Object>) output).get("message");
 			return StepOutcome.failure(output, message == null ? toolResult : message.toString());
@@ -62,7 +64,29 @@ public class ToolStepExecutor {
 		if (output instanceof String text && text.startsWith(Constants.Outcome.FAIL_PREFIX)) {
 			return StepOutcome.failure(output, text);
 		}
-		return StepOutcome.success(output);
+		return this.succeeded(step, output);
+	}
+
+	/**
+	 * <pre>
+	 * 성공한 결과를 만듭니다. routes가 없으면 그냥 성공이고, 있으면 output 값으로 route를 정합니다(클래스 설명의 5번).
+	 * output이 맵이나 목록이면 값 하나가 아니라서 고를 수 없으므로 실패입니다.
+	 * </pre>
+	 *
+	 * @param step   실행한 step의 정의입니다.
+	 * @param output Tool 응답으로 만든 output입니다.
+	 */
+	private StepOutcome succeeded(ToolStepDefinition step, Object output) {
+		Map<String, String> routes = step.routes();
+		if (routes == null) {
+			return StepOutcome.success(output);
+		}
+		String route = (output instanceof String || output instanceof Number || output instanceof Boolean) ? output.toString().strip() : null;
+		if (route == null || !routes.containsKey(route)) {
+			return StepOutcome.failure(output, "Tool[" + step.tool() + "]이 돌려준 값으로 갈 곳을 정하지 못했습니다. 값이 routes 이름 "
+				+ routes.keySet() + " 중 하나여야 합니다(받은 값: " + output + ").");
+		}
+		return StepOutcome.routed(output, route);
 	}
 
 	/**
