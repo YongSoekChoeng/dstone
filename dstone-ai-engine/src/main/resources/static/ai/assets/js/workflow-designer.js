@@ -2896,7 +2896,10 @@ var DstoneAiDesigner = (function () {
 			ids.push(current);
 		}
 		return ids.map(function (id) {
-			return "<option value=\"" + escapeHtml(id) + "\"" + (id === current ? " selected" : "") + ">" + escapeHtml(id) + "</option>";
+			// 이름이 있는 step은 "step명 (step id)"로, END·FAIL·없는 step은 id만 보여 줍니다.
+			var target = stepById(id);
+			var label = target && target.name ? target.name + " (" + id + ")" : id;
+			return "<option value=\"" + escapeHtml(id) + "\"" + (id === current ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
 		}).join("");
 	}
 
