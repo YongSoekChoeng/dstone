@@ -33,6 +33,12 @@ import net.dstone.common.core.BaseObject;
  *   dstone.ai.llm.gate.rate-limit-retries            429를 받았을 때 다시 보내는 횟수(기본 3)
  *   dstone.ai.llm.gate.backoff-initial-millis        첫 재시도 전에 쉬는 시간(기본 2000). 재시도마다 두 배로 늘립니다
  *   dstone.ai.llm.gate.backoff-max-millis            한 번에 쉬는 시간의 상한(기본 30000)
+ *   dstone.ai.llm.gate.read-timeout-retries          응답을 기다리다 시간 초과로 끊겼을 때 다시 보내는 횟수(기본 1)
+ *
+ * 시간 초과를 따로 다시 보내는 이유:
+ * OpenRouter는 응답 헤더(200)를 먼저 보내고 본문을 나중에 만듭니다. 본문을 기다리다 끊기면 SDK는 연결 오류가 아니라
+ * "Error reading response"로 보고, spring.ai.*.max-retries로는 다시 보내지 않습니다. 그러면 그 step이 실패하고
+ * Workflow 전체가 멈춥니다(2026-11-23 측정: 15번 중 5번). 요청 한 번만 다시 보내면 앞 라운드의 Tool 결과는 그대로 이어집니다.
  *
  * 스트리밍(채팅 화면)은 대화형이라 이 문지기를 거치지 않습니다.
  * </pre>
@@ -50,6 +56,7 @@ public class LlmCallGate extends BaseObject {
 	private static final int DEFAULT_RATE_LIMIT_RETRIES = 3;
 	private static final long DEFAULT_BACKOFF_INITIAL_MILLIS = 2000L;
 	private static final long DEFAULT_BACKOFF_MAX_MILLIS = 30000L;
+	private static final int DEFAULT_READ_TIMEOUT_RETRIES = 1;
 
 	@Autowired
 	private Environment environment;
@@ -92,6 +99,38 @@ public class LlmCallGate extends BaseObject {
 	/** 429를 받았을 때 다시 보내는 횟수입니다. */
 	public int rateLimitRetries() {
 		return Math.max(this.intProperty("rate-limit-retries", DEFAULT_RATE_LIMIT_RETRIES), 0);
+	}
+
+	/** 응답을 기다리다 시간 초과로 끊겼을 때 다시 보내는 횟수입니다. */
+	public int readTimeoutRetries() {
+		return Math.max(this.intProperty("read-timeout-retries", DEFAULT_READ_TIMEOUT_RETRIES), 0);
+	}
+
+	/**
+	 * <pre>
+	 * 이 예외가 "응답을 기다리다 시간 초과로 끊긴 것"인지 봅니다. 원인 사슬에 InterruptedIOException(SocketTimeoutException 포함)이 있으면 그렇습니다.
+	 * 실행 취소로 스레드가 중단된 경우도 같은 예외가 나므로, 이 스레드가 중단 상태면 아니라고 봅니다.
+	 * </pre>
+	 *
+	 * @param e LLM 호출에서 난 예외
+	 */
+	public static boolean isReadTimeout(Throwable e) {
+		if (Thread.currentThread().isInterrupted()) {
+			return false;
+		}
+		Throwable current = e;
+		int depth = 0;
+		while (current != null && depth < 10) {
+			if (current instanceof java.io.InterruptedIOException) {
+				return true;
+			}
+			if (current.getCause() == current) {
+				break;
+			}
+			current = current.getCause();
+			depth++;
+		}
+		return false;
 	}
 
 	/**

@@ -15,6 +15,7 @@ import net.dstone.ai.runtime.agent.LlmCallGate;
  * ORDER가 0이라 다른 dstone Advisor(-110 ~ -50)와 ToolCallingAdvisor보다 안쪽, 실제 모델 호출 바로 앞에서 돕니다.
  * ToolCallingAdvisor는 라운드마다 자기 뒤의 Advisor 사슬을 새로 이어 부르므로, 이 Advisor는 "LLM 요청 한 번"마다 한 번 돕니다.
  * 그래서 429로 다시 보내는 것은 그 요청 하나뿐이고, 앞 라운드에서 이미 실행한 Tool은 다시 돌지 않습니다.
+ * 응답을 기다리다 시간 초과로 끊긴 요청도 같은 식으로 한 번 더 보냅니다(쉬지 않음, 횟수는 LlmCallGate.readTimeoutRetries()).
  *
  * 재시도할 때는 쉬는 동안 차례(permit)를 내려놓습니다. 그래야 쉬는 요청이 다른 요청의 자리를 막지 않습니다.
  * 같은 사슬로 다시 부를 수 없어서(사슬은 한 번 쓰면 비어 버립니다) 재시도마다 chain.copy(this)로 이 뒤의 사슬을 새로 만듭니다.
@@ -59,7 +60,9 @@ public class LlmCallGateAdvisor implements CallAdvisor {
 	@Override
 	public ChatClientResponse adviseCall(ChatClientRequest chatClientRequest, CallAdvisorChain callAdvisorChain) {
 		int retries = this.gate.rateLimitRetries();
+		int timeoutRetries = this.gate.readTimeoutRetries();
 		int attempt = 0;
+		int timeoutAttempt = 0;
 		while (true) {
 			RuntimeException failure;
 			this.gate.acquire(this.provider);
@@ -73,13 +76,21 @@ public class LlmCallGateAdvisor implements CallAdvisor {
 				// 성공이든 실패든 차례는 바로 내려놓습니다. 쉬는 동안 다른 요청이 들어갈 수 있게 하려는 것입니다.
 				this.gate.release(this.provider);
 			}
-			if (attempt >= retries || !LlmCallGate.isRateLimited(failure)) {
+			// 응답을 기다리다 끊긴 것은 쉬지 않고 바로 한 번 더 보냅니다(LlmCallGate.readTimeoutRetries 설명 참고).
+			if (!LlmCallGate.isRateLimited(failure) && LlmCallGate.isReadTimeout(failure) && timeoutAttempt < timeoutRetries) {
+				timeoutAttempt++;
+				attempt++;
+				LOGGER.warn("dstone-ai-engine agent: agent[" + this.agentId + "] provider[" + this.provider + "]의 응답을 기다리다 시간 초과로 끊겼습니다. "
+					+ "이 요청만 다시 보냅니다(" + timeoutAttempt + "/" + timeoutRetries + "): " + failure.getMessage());
+				continue;
+			}
+			if (attempt - timeoutAttempt >= retries || !LlmCallGate.isRateLimited(failure)) {
 				throw failure;
 			}
 			attempt++;
-			long wait = this.gate.backoffMillis(attempt);
+			long wait = this.gate.backoffMillis(attempt - timeoutAttempt);
 			LOGGER.warn("dstone-ai-engine agent: agent[" + this.agentId + "] provider[" + this.provider + "]가 요청 한도 초과(429)를 돌려줬습니다. "
-				+ wait + "ms 쉬고 다시 보냅니다(" + attempt + "/" + retries + "): " + failure.getMessage());
+				+ wait + "ms 쉬고 다시 보냅니다(" + (attempt - timeoutAttempt) + "/" + retries + "): " + failure.getMessage());
 			this.sleep(wait);
 		}
 	}
