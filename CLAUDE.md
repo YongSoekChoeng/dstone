@@ -188,7 +188,7 @@ Spring AI 기반, provider에 독립적인 AI 엔진. **Workflow → Step → Ag
 - Workflow 실행은 `WorkFlowThreadPools`의 풀에서 `QUEUED`→`RUNNING`으로 돈다. 상태 전이는 조건부 UPDATE(`markQueued`/`markStarted`)로만 하고, 고아 실행 정리는 heartbeat 기준이라 같은 DB에 시험 사본을 띄워도 된다(`ai-engine-features.md` "Concurrent use").
 - 실행 중인 `target/*.jar|war`를 그 자리에서 다시 빌드하지 않는다. 사본을 다른 포트로 띄워 시험한다.
 - 자동으로 쓰기·DDL을 하는 시험은 `startSandboxServer`(일회용 복제본)로만 한다. 격리를 보장 못 하면 원래 DB로 대신하지 말고 실패시키며, 예외 설정은 프로젝트별로만 둔다(`docs/09` 11.2절).
-- **Agent가 실패하면 프롬프트에 한 줄 더하기 전에 실패를 분류한다**(엔진/입력/Tool/Workflow 구조/Skill/모델/프롬프트). 사람의 결정은 엔진이 `${arrival}`·`${decisions}`로 전달하고, 여러 Agent가 같이 쓰는 방법은 Skill(`skills.preload`/`allowed`)로 둔다. 고친 뒤에는 엔진의 Agent 평가(사례 `conf/eval/**/*.eval.yml`, 화면 `/ai/admin/eval/eval.html`, 결과 `AI_EVAL_RUN`)로 기준선과 비교한다. 평가 사례는 `src/test`에 두지 않는다(지울 수 있는 자원) — `ai-engine-agent-principles.md`.
+- **Agent가 실패하면 프롬프트에 한 줄 더하기 전에 실패를 분류한다**(엔진/입력/Tool/Workflow 구조/Skill/모델/프롬프트). 사람의 결정은 엔진이 `${arrival}`·`${decisions}`로 전달하고, 여러 Agent가 같이 쓰는 방법은 Skill(`skills.preload`/`allowed`)로 둔다. 고친 뒤에는 엔진의 Agent 평가(사례 `conf/eval/**/*.eval.yml`, 화면 `/ai/admin/eval/eval.html`, 결과 `AI_EVAL_RUN`)로 기준선과 비교한다. 사례는 실행 관리 > 진행 기록 > [평가 사례로 만들기](Step 스냅숏)로 만든다. 평가 사례는 `src/test`에 두지 않는다(지울 수 있는 자원) — `ai-engine-agent-principles.md`.
 
 필요할 때 읽을 문서 (`.claude/docs/`):
 

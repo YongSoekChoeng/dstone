@@ -211,6 +211,21 @@ public class EvalWorkspace {
 	 * @param withFiles true면 ${request} ${file:} ${fixture:}도 채웁니다(input에서만)
 	 */
 	String fill(String text, boolean withFiles) throws IOException {
+		return this.fill(text, withFiles, true);
+	}
+
+	/**
+	 * <pre>
+	 * 글자의 자리를 채웁니다. strict가 false면 모르는 ${param.…}·${state.…}·${saved.…}를 오류 없이 그대로 둡니다.
+	 * 작업 폴더로 복사하는 파일(work/)은 strict=false로 채웁니다. 대상 앱의 JSP에 흔한 ${param.id} 같은 EL이
+	 * 사례의 params로 오해받아 사례 전체가 실패하지 않게 하려는 것입니다.
+	 * </pre>
+	 *
+	 * @param text      채울 글자
+	 * @param withFiles true면 ${request} ${file:} ${fixture:}도 채웁니다(input에서만)
+	 * @param strict    true면 모르는 이름을 오류로 알립니다
+	 */
+	String fill(String text, boolean withFiles, boolean strict) throws IOException {
 		if (text == null || text.indexOf("${") < 0) {
 			return text;
 		}
@@ -225,28 +240,32 @@ public class EvalWorkspace {
 				value = slash(this.requestDir);
 			} else if (name.startsWith("param.")) {
 				String key = name.substring("param.".length());
-				if (!this.params.containsKey(key)) {
+				if (this.params.containsKey(key)) {
+					value = this.params.get(key);
+				} else if (strict) {
 					throw new IllegalStateException("사례 '" + this.evalCase.id() + "'의 params에 '" + key + "'가 없습니다: " + matcher.group());
 				}
-				value = this.params.get(key);
 			} else if (name.startsWith("state.")) {
 				Object found = stateValue(this.state, name.substring("state.".length()));
-				if (found == null) {
+				if (found != null) {
+					value = String.valueOf(found);
+				} else if (strict) {
 					throw new IllegalStateException("Workflow state에 '" + name.substring("state.".length()) + "'가 없습니다: " + matcher.group());
 				}
-				value = String.valueOf(found);
 			} else if (name.startsWith("saved.")) {
 				String key = name.substring("saved.".length());
-				if (!this.saved.containsKey(key)) {
+				if (this.saved.containsKey(key)) {
+					value = this.saved.get(key);
+				} else if (strict) {
 					throw new IllegalStateException("앞 http 채점이 save로 남긴 '" + key + "'가 없습니다: " + matcher.group());
 				}
-				value = this.saved.get(key);
 			} else if (withFiles && "request".equals(name)) {
 				value = this.request;
 			} else if (withFiles && name.startsWith("file:")) {
 				value = Files.readString(this.workDir.resolve(name.substring("file:".length())), StandardCharsets.UTF_8);
 			} else if (withFiles && name.startsWith("fixture:")) {
-				value = this.fill(this.readFixture(name.substring("fixture:".length())), false);
+				// 자료 파일(설계서·이력 등)에는 대상 앱의 EL(${param.id} 등)이 섞일 수 있어 모르는 이름은 그대로 둔다
+				value = this.fill(this.readFixture(name.substring("fixture:".length())), false, false);
 			}
 			matcher.appendReplacement(result, Matcher.quoteReplacement(value == null ? matcher.group() : value));
 		}
@@ -296,7 +315,7 @@ public class EvalWorkspace {
 				Files.write(to, bytes);
 				continue;
 			}
-			String filled = this.fill(text, false);
+			String filled = this.fill(text, false, false);
 			Files.writeString(to, filled, StandardCharsets.UTF_8);
 			this.original.put(rel, filled);
 		}

@@ -31,6 +31,7 @@ import net.dstone.ai.runtime.step.ApprovalStepExecutor;
 import net.dstone.ai.runtime.step.RouterStepExecutor;
 import net.dstone.ai.runtime.step.StepOutcome;
 import net.dstone.ai.runtime.step.SupervisorStepExecutor;
+import net.dstone.ai.runtime.workflow.snapshot.StepSnapshotRecorder;
 import net.dstone.ai.runtime.step.ToolStepExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
@@ -92,6 +93,9 @@ public class WorkFlowExecutor extends BaseObject {
 	/** step이 끝날 때마다 부를 bean들입니다(예: 임시 시험 서버를 내리는 tools.build.TestServerTool). */
 	@Autowired
 	private List<StepEndListener> stepEndListeners;
+	/** Agent step이 마주한 입력·파일·답을 남깁니다(평가 사례 만들기용). */
+	@Autowired
+	private StepSnapshotRecorder snapshotRecorder;
 
 	/**
 	 * <pre>
@@ -179,6 +183,11 @@ public class WorkFlowExecutor extends BaseObject {
 		try {
 			
 			ExecContext.getInstance().put("WorkFlowExecution", currentExecution);
+
+			// 처음 시작하는 실행이면 Workflow input을 남겨 둡니다(Workflow 평가 사례의 요청 폴더). 이미 있으면 그대로 둡니다.
+			if (currentIndex == 0) {
+				this.snapshotRecorder.beginExecution(workflow.id(), currentExecution.executionId(), currentExecution.context().get(Constants.WorkFlow.Context.INPUT));
+			}
 
 			// 실행을 시작한 뒤에 정의 파일이 바뀌어 배포됐으면(버전이 다르면) 알려 둡니다. 실행은 지금 등록된 정의로 이어 갑니다.
 			String startedVersion = WorkFlowContext.definitionVersion(currentExecution.context());
@@ -495,11 +504,46 @@ public class WorkFlowExecutor extends BaseObject {
 		StepOutcome outcome;
 		try {
 			resolvedInput = inputOverride != NO_INPUT ? inputOverride : this.resolveInput(step, execution.context(), variables);
-			outcome = this.runStep(execution, step, resolvedInput);
+			outcome = this.runSnapshotted(execution, step, resolvedInput, variables == null);
 		} catch (ExpressionException e) {
 			outcome = StepOutcome.failure(null, "input을 채우지 못했습니다 - " + e.getMessage());
 		}
 		return outcome.withCall(resolvedInput, (System.nanoTime() - start) / 1_000_000);
+	}
+
+	/**
+	 * <pre>
+	 * step을 실행하되, Agent가 판단하는 step(AGENT, SUPERVISOR)이면 그 장면을 스냅숏으로 남깁니다(StepSnapshotRecorder).
+	 * forEach 반복은 남기지 않습니다. 반복들이 같은 step id로 동시에 돌아 서로의 Tool 호출을 가를 수 없기 때문입니다.
+	 * StepExecutor가 예외를 던져도 스냅숏은 실패로 닫고 예외는 그대로 올려보냅니다.
+	 * </pre>
+	 */
+	private StepOutcome runSnapshotted(WorkFlowExecution execution, StepDefinition step, Object resolvedInput, boolean single) {
+		String agentId = null;
+		if (step instanceof AgentStepDefinition agent) {
+			agentId = agent.agent();
+		} else if (step instanceof SupervisorStepDefinition supervisor) {
+			agentId = supervisor.agent();
+		}
+		if (!single || agentId == null) {
+			return this.runStep(execution, step, resolvedInput);
+		}
+		this.snapshotRecorder.beginStep(execution.workflowId(), execution.executionId(), step.id(), step.type().name(), agentId, resolvedInput);
+		StepOutcome outcome = null;
+		String thrown = null;
+		try {
+			outcome = this.runStep(execution, step, resolvedInput);
+			return outcome;
+		} catch (RuntimeException e) {
+			thrown = ProviderErrorMessage.of(e);
+			throw e;
+		} finally {
+			if (outcome != null) {
+				this.snapshotRecorder.endStep(execution.executionId(), step.id(), outcome.success(), outcome.output(), outcome.error());
+			} else {
+				this.snapshotRecorder.endStep(execution.executionId(), step.id(), false, null, thrown);
+			}
+		}
 	}
 
 	/**

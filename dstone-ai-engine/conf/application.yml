@@ -173,6 +173,19 @@ dstone:
                 edit-enabled: true
                 editable-extensions: md
                 max-read-bytes: 2097152
+            # Agent step 스냅숏(runtime.workflow.snapshot.StepSnapshotRecorder). Agent가 마주한 입력·파일·답을 남겨
+            # 실행 관리 > 진행 기록 > [평가 사례로 만들기]로 그 장면을 평가 사례(conf/eval)로 만든다.
+            # root: 비우면 {APP_HOME}/LOGS/dstone-ai-engine/snapshot. k8s처럼 LOGS가 Pod 안에만 있으면 영구 볼륨 경로로 바꾼다.
+            # max-step-bytes: step 하나가 남기는 최대 용량. 넘는 파일은 manifest에 "생략"으로만 적는다.
+            # max-dir-bytes / max-dir-files: 입력 값이 폴더면 이 안일 때만 통째로 복사한다(소스 폴더처럼 큰 폴더는 건드린 파일만).
+            # retention-days: 이 날수가 지난 실행 폴더는 지운다(0이면 지우지 않음). LOGS 정리 스크립트가 있으면 snapshot은 빼 둔다.
+            snapshot:
+                enabled: true
+                root:
+                max-step-bytes: 52428800
+                max-dir-bytes: 20971520
+                max-dir-files: 3000
+                retention-days: 30
             # 실행 스레드 풀(runtime.workflow.WorkFlowThreadPools). 여러 사람이 동시에 돌려도 이 수만큼만 돌고, 나머지는 QUEUED로 차례를 기다린다.
             # max-running: 동시에 도는 Workflow 수. LLM 동시 요청 한도(dstone.ai.llm.gate)와 함께 잡는다.
             # max-queued: 차례를 기다릴 수 있는 Workflow 수. 넘치면 새 실행·재개·승인을 503으로 거절한다.

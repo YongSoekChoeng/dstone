@@ -1,0 +1,303 @@
+/* --------------------------------------------------------------------------
+   평가 사례 만들기 대화상자(eval-case-maker.js). 실행 관리 화면에서만 쓴다.
+   색과 둥글기는 console.css의 변수를 그대로 쓴다.
+   -------------------------------------------------------------------------- */
+
+.ec-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 1250;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 38, 0.45);
+}
+
+.ec-modal[hidden],
+.ec-modal [hidden] {
+	display: none !important;
+}
+
+.ec-box {
+	display: flex;
+	flex-direction: column;
+	width: min(1080px, 96vw);
+	max-height: 94vh;
+	background: var(--cs-surface);
+	border: 1px solid var(--cs-border);
+	border-radius: var(--cs-radius-lg, 10px);
+	box-shadow: var(--cs-shadow-lg, 0 12px 40px rgba(0, 0, 0, 0.18));
+}
+
+.ec-head {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	padding: 14px 18px 10px;
+	border-bottom: 1px solid var(--cs-border);
+}
+
+.ec-title {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--cs-text);
+}
+
+.ec-sub {
+	flex: 1;
+	font-size: 12px;
+	color: var(--cs-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ec-body {
+	flex: 1;
+	overflow: auto;
+	padding: 14px 18px;
+}
+
+.ec-guide {
+	margin: 0 0 12px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	background: var(--cs-primary-soft);
+	color: var(--cs-primary-hover);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.ec-grid {
+	display: grid;
+	grid-template-columns: 110px 1fr;
+	gap: 8px 12px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.ec-grid label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--cs-text-2);
+}
+
+.ec-grid input[type="text"],
+.ec-grid select,
+.ec-grid textarea,
+.ec-editor input[type="text"],
+.ec-editor input[type="number"],
+.ec-editor select,
+.ec-editor textarea {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 5px 8px;
+	border: 1px solid var(--cs-border-strong);
+	border-radius: 5px;
+	font: inherit;
+	font-size: 13px;
+	background: var(--cs-surface);
+	color: var(--cs-text);
+}
+
+.ec-grid textarea {
+	resize: vertical;
+}
+
+.ec-hint {
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.ec-warn {
+	margin: 0 0 10px;
+	padding: 6px 10px 6px 26px;
+	border-radius: 6px;
+	background: var(--cs-warning-soft);
+	color: var(--cs-warning);
+	font-size: 12px;
+}
+
+.ec-section-title {
+	margin: 14px 0 6px;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--cs-text);
+}
+
+.ec-then {
+	margin-bottom: 8px;
+	font-size: 12px;
+}
+
+.ec-then pre {
+	max-height: 220px;
+	overflow: auto;
+	margin: 6px 0;
+	padding: 8px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: 5px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+/* 채점 기준 목록 */
+.ec-checks {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.ec-checks th,
+.ec-checks td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--cs-border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.ec-checks th {
+	font-size: 12px;
+	color: var(--cs-muted);
+	font-weight: 600;
+}
+
+.ec-role {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 9px;
+	font-size: 11px;
+	background: var(--cs-surface-3);
+	color: var(--cs-text-2);
+}
+
+.ec-role.core {
+	background: var(--cs-info-soft);
+	color: var(--cs-info);
+}
+
+.ec-sentence {
+	color: var(--cs-text-2);
+	font-size: 12px;
+}
+
+.ec-then-ok { color: var(--cs-success); font-weight: 700; }
+.ec-then-fail { color: var(--cs-danger); font-weight: 700; }
+.ec-then-none { color: var(--cs-faint); }
+.ec-verdict { display: block; font-size: 11px; }
+.ec-verdict.good { color: var(--cs-success); }
+.ec-verdict.bad { color: var(--cs-warning); }
+
+.ec-row-buttons {
+	white-space: nowrap;
+}
+
+.ec-row-buttons button {
+	margin-left: 4px;
+}
+
+.ec-empty {
+	padding: 12px;
+	color: var(--cs-muted);
+	font-size: 13px;
+	text-align: center;
+}
+
+/* 기준 하나 편집 */
+.ec-editor {
+	margin-top: 10px;
+	padding: 12px 14px;
+	border: 1px solid var(--cs-primary);
+	border-radius: 8px;
+	background: var(--cs-surface-2);
+}
+
+.ec-step {
+	margin-bottom: 10px;
+}
+
+.ec-step-title {
+	margin-bottom: 4px;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--cs-text);
+}
+
+.ec-symptoms {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 4px 16px;
+	font-size: 13px;
+}
+
+.ec-symptoms label.disabled {
+	color: var(--cs-faint);
+}
+
+.ec-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+	font-size: 13px;
+}
+
+.ec-inline input[type="text"] {
+	width: auto;
+	flex: 1 1 160px;
+}
+
+.ec-inline select {
+	width: auto;
+	min-width: 160px;
+}
+
+.ec-readout {
+	margin: 8px 0;
+	padding: 6px 10px;
+	border-left: 3px solid var(--cs-primary);
+	background: var(--cs-surface);
+	font-size: 13px;
+	color: var(--cs-text);
+}
+
+.ec-editor-foot {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+}
+
+.ec-yaml {
+	max-height: 320px;
+	overflow: auto;
+	padding: 8px;
+	background: var(--cs-surface-2);
+	border: 1px solid var(--cs-border);
+	border-radius: 5px;
+	font-size: 12px;
+	white-space: pre;
+}
+
+.ec-foot {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 18px;
+	border-top: 1px solid var(--cs-border);
+}
+
+.ec-status {
+	flex: 1;
+	font-size: 12px;
+	color: var(--cs-muted);
+}
+
+.ec-status.error {
+	color: var(--cs-danger);
+}
+
+.ec-status.done {
+	color: var(--cs-success);
+}

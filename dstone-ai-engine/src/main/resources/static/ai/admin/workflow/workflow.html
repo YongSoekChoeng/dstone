@@ -8,6 +8,7 @@
 		<!-- 바탕(색, 글꼴, 왼쪽 메뉴, 표, 입력 칸, 단추)은 console.css, 화면 부품은 main.css (둘 다 ai/assets/css) -->
 		<link rel="stylesheet" href="/ai/assets/css/console.css" />
 		<link rel="stylesheet" href="/ai/assets/css/main.css" />
+		<link rel="stylesheet" href="/ai/assets/css/eval-case-maker.css" />
 		<!-- 왼쪽 메뉴와 세션 정보(console.js), AI 메뉴 목록(ai-menu.js) -->
 		<script src="/ai/assets/js/console.js"></script>
 		<script src="/ai/assets/js/ai-menu.js"></script>
@@ -115,6 +116,8 @@
 					<div class="wa-head-title">
 						<h3 id="wa-head-workflow">-</h3>
 						<span id="workflow-admin-detail-badge" class="workflow-badge">-</span>
+						<!-- 이 실행을 처음부터 다시 돌리는 Workflow 평가 사례를 만든다(요청 폴더 + 사람 결정). 끝난 실행에서만 -->
+						<button type="button" id="wa-eval-flow" class="kn-plain" style="margin-left:auto">Workflow 평가 사례로 만들기</button>
 					</div>
 					<dl class="wa-head-meta">
 						<div><dt>실행 ID</dt><dd id="workflow-admin-detail-id" class="workflow-job-id">-</dd></div>
@@ -221,6 +224,8 @@
 							<div id="wa-step-docs" class="wa-step-docs"></div>
 							<div class="wa-step-actions">
 								<button type="button" id="wa-step-rewind" class="kn-plain">이 step부터 다시 실행</button>
+								<!-- 이 Agent step 회차가 마주한 입력·파일·답(스냅숏)으로 Agent 평가 사례를 만든다 -->
+								<button type="button" id="wa-step-eval" class="kn-plain">평가 사례로 만들기</button>
 							</div>
 
 							<!-- [이 step부터 다시 실행]을 누르면 나온다. 무엇이 남고 무엇을 지울지 보여 주고 확인을 받는다 -->
@@ -334,6 +339,7 @@
 	<script src="/ai/assets/lib/purify.min.js"></script>
 	<script src="/ai/assets/lib/highlight.min.js"></script>
 	<script src="/ai/assets/js/workflow-doc-viewer.js"></script>
+	<script src="/ai/assets/js/eval-case-maker.js"></script>
 	<script src="/ai/assets/js/workflow-admin.js"></script>
 	<script>
 		DstoneAiWorkflowAdmin.init({

@@ -65,6 +65,10 @@ data:
             workflow:
                 file:
                     edit-enabled: false
+                # Agent step 스냅숏(평가 사례 만들기용). Pod 안의 LOGS는 재배포하면 사라지고 conf/는 읽기 전용이라
+                # 사례(conf/eval)를 저장할 수도 없어서 끈다. 쓰려면 영구 볼륨을 붙이고 snapshot.root와 dstone.ai.eval.location을 그 볼륨으로 둔다.
+                snapshot:
+                    enabled: false
             ##########################################################################################
             # <화면(AI 콘솔)>
             # 화면은 이 앱이 직접 내려준다(src/main/resources/static/ai/**, 첫 화면 http://localhost:8081/).

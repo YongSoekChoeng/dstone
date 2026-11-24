@@ -23,7 +23,7 @@ var DstoneAiWorkflowAdmin = (function () {
 	var headWorkflowEl, headCreatedEl, headElapsedEl, stripEl, stripTextEl;
 	var todoEl, todoTitleEl, todoReasonEl, historyCountEl;
 	var historyPagerEl;
-	var paneEmptyEl, paneBodyEl, paneDotEl, paneIdEl, paneNameEl, paneBadgeEl, paneMetaEl, paneTextEl, paneDocsEl, paneRewindBtn, paneCopyStatusEl;
+	var paneEmptyEl, paneBodyEl, paneDotEl, paneIdEl, paneNameEl, paneBadgeEl, paneMetaEl, paneTextEl, paneDocsEl, paneRewindBtn, paneEvalBtn, flowEvalBtn, paneCopyStatusEl;
 	// [다시 실행]으로 고른 step의 미리보기(엔진 GET .../rewind 응답). 패널을 닫으면 비운다.
 	var currentRewind = null;
 
@@ -100,6 +100,19 @@ var DstoneAiWorkflowAdmin = (function () {
 		paneTextEl = document.getElementById("wa-step-text");
 		paneDocsEl = document.getElementById("wa-step-docs");
 		paneRewindBtn = document.getElementById("wa-step-rewind");
+		paneEvalBtn = document.getElementById("wa-step-eval");
+		paneEvalBtn.addEventListener("click", function () {
+			var h = selectedHistory();
+			if (h && currentDetail) {
+				DstoneAiEvalCaseMaker.openStep(currentDetail.executionId, h);
+			}
+		});
+		flowEvalBtn = document.getElementById("wa-eval-flow");
+		flowEvalBtn.addEventListener("click", function () {
+			if (currentDetail) {
+				DstoneAiEvalCaseMaker.openExecution(currentDetail.executionId);
+			}
+		});
 		paneCopyStatusEl = document.getElementById("wa-step-copy-status");
 		paneRewindBtn.addEventListener("click", function () {
 			var h = selectedHistory();
@@ -318,6 +331,9 @@ var DstoneAiWorkflowAdmin = (function () {
 		// 아직 돌고 있으면 지금까지, 멈췄거나 끝났으면 마지막 변경 시각까지
 		var end = isActive(detail.status) ? Date.now() : Date.parse(detail.updatedAt);
 		headElapsedEl.textContent = isNaN(start) || isNaN(end) ? "-" : durationText(Math.max(end - start, 0));
+		// Workflow 평가 사례는 돌고 있지 않은 실행에서만 만든다(요청 폴더와 결정이 더 바뀌지 않게)
+		flowEvalBtn.disabled = isActive(detail.status);
+		flowEvalBtn.title = flowEvalBtn.disabled ? "실행이 끝나거나 멈춘 뒤에 만들 수 있습니다" : "이 실행의 요청 폴더와 사람 결정으로 Workflow 평가 사례를 만듭니다(conf/eval)";
 		renderStrip(detail);
 	}
 
@@ -814,6 +830,10 @@ var DstoneAiWorkflowAdmin = (function () {
 			}
 		}
 
+		// 평가 사례: Agent가 판단한 step(AGENT, SUPERVISOR)의 한 회차만. forEach 반복(id[0])은 스냅숏이 없다
+		var evalable = (h.stepType === "AGENT" || h.stepType === "SUPERVISOR") && !/\[\d+\]$/.test(h.stepId);
+		paneEvalBtn.style.display = evalable ? "" : "none";
+		paneEvalBtn.title = "이 회차의 입력·파일·답으로 Agent 평가 사례를 만듭니다(conf/eval)";
 		paneRewindBtn.textContent = stepLabel(stepId) + "부터 다시 실행";
 		paneRewindBtn.disabled = isActive(currentDetail.status);
 		paneRewindBtn.title = paneRewindBtn.disabled ? "실행 중에는 되돌릴 수 없습니다. 먼저 일시정지하세요." : stepLabel(stepId) + "(" + stepId + ")부터 다시 실행합니다";
