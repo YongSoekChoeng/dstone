@@ -4,8 +4,11 @@
 # 설명을 보고 지금 소스에 맞는 것만 불러 읽습니다. 범용 Skill(skills/sm)과 Agent 프롬프트에는 이런 이름을 적지 않습니다.
 # 2026-11-23 실행 0bc967d2: 그리드 버튼 핸들러를 링크 onclick으로 옮기며 this가 어긋남, 팝업 Controller가 json_string을 풀지 않음,
 #   검증이 화면 주소로 바로 들어가 업로드를 못 함 - 세 가지를 아래 "그리드 행 클릭과 팝업", "동작 검증" 절에 적었습니다.
+# 2026-11-24(실행 6d1784d8의 자동 수정 원인, 원본으로 확인): 팝업 저장을 그리드 저장 방식(@RequestBody)으로 받아 415,
+#   팝업에 세션 값(mb_id, 등록자)을 채우지 않아 업로드가 세션 mb_id를 빈 값으로 덮음, selectable만 두어 체크박스 열이 없음
+#   - "팝업 저장과 세션 값", "그리드 체크박스" 절에 적었습니다.
 name: gnx-crud-screen
-description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 파일 업로드, 동작 검증의 관례.
+description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 팝업 저장과 세션 값, 그리드 체크박스, 파일 업로드, 동작 검증의 관례.
 ---
 기본 참고 기능은 샘플게시판이다. 새 화면을 만들 때는 이 층별 파일을 참고 파일로 삼고, 달라지는 점만 적는다.
 
@@ -28,6 +31,25 @@ description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서
 - `genexon.PopWindowOpen({pID, pTitle, pURL, data, ...})`은 `data`를 `json_string` 하나로 묶어 팝업 주소에 붙여 보낸다.
   팝업 Controller(*.pop)는 `vo.getJson_string()`이 있으면 `JSONObject.fromObject(...)` → `JSONObject.toBean(..., 이름VO.class)`로 풀어 VO를 채운다. 참고: MemberController의 `/system/member/memberRegi.pop`.
   풀지 않으면 VO가 비어 팝업이 늘 등록모드로 열린다.
+
+## 팝업 저장과 세션 값
+
+저장 방식이 두 가지다. 화면과 Controller가 같은 방식이어야 한다. 섞으면 415(Unsupported Media Type)가 나거나 값이 비어 들어간다.
+
+| 어디서 저장하나 | 화면 | Controller(*.ajax) |
+|---|---|---|
+| 그리드 인라인 편집 | transport create/update/destroy가 `{"models":[...]}` JSON을 보낸다 | `@RequestBody JSONObject`로 받아 models를 돈다 |
+| 팝업 폼 | `$('#myForm').ajaxForm({...})` + `$('#myForm').submit()`, form은 `enctype="multipart/form-data"`(memberRegi.jsp) | `이름VO vo` 매개변수 바인딩으로 받는다(MemberController.insertMember). `@RequestBody`를 쓰지 않는다 |
+
+- 로그인 사용자에게서 와야 하는 값(mb_id, 등록자 이름 등)은 화면 hidden 필드에 맡기지 않는다. Controller에서 `SessionUtil.getSessionVO(request.getSession()).getUser()`로 읽어 VO에 넣는다(MemberController의 목록 조회 `memberVO.setMb_id(UserSession.getMb_id())`).
+  팝업을 등록모드로 열 때 화면에 보여 줄 값(등록자 등)도 팝업 Controller(*.pop)가 세션에서 채워 `mv.addObject`로 넘긴다.
+- MemberController의 업로드(`infoUrl.ajax`, `deleteUrl.ajax`)는 `UserSession.setMb_id(화면이 보낸 mb_id)`로 **세션 사용자의 mb_id를 바꾼다**. 회원사 관리는 관리자가 다른 회사 정보를 고치는 화면이라 그렇게 한다.
+  다른 기능에서 이 업로드를 참고할 때는 그 줄을 옮기지 않는다. 옮기면 화면이 빈 mb_id를 보냈을 때 세션 mb_id가 빈 값으로 덮이고, 그 뒤 저장한 행이 목록(WHERE mb_id=...)에서 사라진다.
+
+## 그리드 체크박스
+
+- 원본 화면에는 그리드 체크박스 열을 쓰는 곳이 없다. 참고할 기존 코드가 없으니 설계서에 열 정의를 글자 그대로 적는다.
+- Kendo 그리드의 `selectable: "multiple"`은 행 선택만 켠다. 체크박스 열은 생기지 않는다. 체크박스가 필요하면 columns에 template 열(`<input type="checkbox" .../>`)을 넣고, 전체선택·선택삭제는 그 체크박스의 checked로 행을 모은다.
 
 ## 자주 쓰는 공통
 - 로그인 사용자: Controller에서 SessionUtil.getSessionVO(request.getSession()).getUser() → getMb_id(). 데이터는 mb_id로 나눈다.

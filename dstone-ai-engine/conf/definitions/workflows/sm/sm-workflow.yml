@@ -48,12 +48,16 @@
 #   step29가 띄운 서버는 바로 다음 step35가 같은 입력으로 다시 부르면 그대로 씁니다(엔진의 넘겨주기는 한 step까지라 둘 사이에 step을 넣지 않습니다).
 #   step40(step29 앞)은 지난 검증 뒤로 작업 폴더에서 바뀐 파일을 범용 Tool fileChanges로 찾아, step35가 바뀐 것과 지난번에 안 된 것만 깊게 보게 합니다(2.5.0).
 #   시험 환경이 원래 서버와 달라서 생긴 실패는 검증이 BLOCKED로 내고 자동 수정이 고치지 않습니다(Skill test-environment, 2.5.0).
+#   step41(step40 앞)이 설계서를 다시 읽어 step35에 넘깁니다(2.6.0). 자동 수정·전문가 해결이 설계서를 고친 뒤에도
+#   검증 Agent가 고치기 전 설계서를 받지 않게 하려는 것입니다.
+#
+# 요구사항 리뷰(step05)는 판정만 돌려주고 분석서를 고치지 않습니다(2.6.0). 불통과 사유는 엔진이 다음 단계에 넘깁니다.
 #
 # 원본 소스 경로는 step02가 요청서의 "## 소스경로" 아래 내용을 범용 Tool readMarkdownSection으로 읽어 state.sourceDir에 둡니다.
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.5.0
+version: 2.6.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -126,7 +130,6 @@ steps:
     type: SUPERVISOR
     agent: sm-requirement-analyze-reviewer-agent
     with:
-      base_dir: ${input}/${state.now}
       request: ${state.request}
       requirement: ${state.requirement}
     save: review
@@ -420,7 +423,7 @@ steps:
       heading: 프로젝트ID
     save: projectId
     saveError: projectIdError
-    next: step40
+    next: step41
     onFailure: step19
 
   - id: step29
@@ -602,6 +605,17 @@ steps:
     save: workChanges
     next: step29
     onFailure: step29
+
+  - id: step41
+    name: 30-검증 전 설계서 다시 읽기
+    type: TOOL
+    tool: readFile
+    with:
+      fileFullPath: ${input}/${state.now}/03-1.design.md
+      maxChars: 60000
+    save: design
+    next: step40
+    onFailure: step19
 state:
   projectId: 요청서의 프로젝트ID(step28)
   projectIdError: 프로젝트ID가 없어 자동 검증을 못 한 이유
@@ -625,7 +639,7 @@ state:
   developApproval: 개발 승인(step19) 결과
   impactPath: 영향도 분석(step08)이 돌려준 답(저장 파일과 결정 필요 사항)
   architectPath: 아키텍처 설계(step12)가 돌려준 답(저장 파일과 결정 필요 사항)
-  revision: 문서 수정(step25~25, 27, 29, 30)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
+  revision: 문서 수정(step25~27, 37~39)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
   sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
   compileResult: 컴파일 확인(step18)이 통과했을 때의 출력
   compileError: 컴파일 확인(step18)이 실패했을 때의 오류(통과하거나 step16가 개발 폴더를 비우면 비어 있다)

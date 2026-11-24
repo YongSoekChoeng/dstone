@@ -124,6 +124,10 @@
       "x" : 1100,
       "y" : 658
     },
+    "step41" : {
+      "x" : 1360,
+      "y" : 620
+    },
     "step29" : {
       "x" : 1100,
       "y" : 740
@@ -955,10 +959,6 @@
     "step27|next|" : {
       "source" : "left",
       "target" : "right"
-    },
-    "step28|next|" : {
-      "source" : "out",
-      "target" : "in"
     },
     "step28|onFailure|" : {
       "source" : "left",

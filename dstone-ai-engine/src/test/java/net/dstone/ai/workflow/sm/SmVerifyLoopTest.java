@@ -43,6 +43,15 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void 프로젝트ID가_있으면_설계서를_다시_읽으러_간다() throws Exception {
+		Files.writeString(this.workDir.resolve("00.request.md"), "## 현업요청\n목록 화면\n## 프로젝트ID\nmyApp", StandardCharsets.UTF_8);
+		WorkflowStepper flow = this.atStep("step28");
+		flow.step("step28");
+
+		assertThat(flow.currentStepId()).isEqualTo("step41");
+	}
+
+	@Test
 	void 격리할_수_없으면_통과로_치지_않고_이유를_남긴다() {
 		WorkflowStepper flow = this.atStep("step29");
 		flow.put("projectId", "noSuchProject").put("sourceDir", this.workDir.toString());
@@ -53,6 +62,24 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.step("step30");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
 		assertThat(flow.state("sandboxError")).isNotNull();
+	}
+
+	/**
+	 * <pre>
+	 * 자동 수정·전문가 해결은 설계서도 고칩니다. 검증 Agent가 고치기 전 설계서를 받지 않도록
+	 * 격리 기동 앞에서 설계서를 다시 읽는지 봅니다(2.6.0).
+	 * </pre>
+	 */
+	@Test
+	void 검증_전에_고친_설계서를_다시_읽는다() throws Exception {
+		Path runDir = Files.createDirectories(this.workDir.resolve("20261122-2300"));
+		Files.writeString(runDir.resolve("03-1.design.md"), "# 설계서\n## 수정 이력\n자동 수정: 고침", StandardCharsets.UTF_8);
+		WorkflowStepper flow = this.atStep("step41");
+		flow.put("design", "# 설계서(고치기 전)");
+		flow.step("step41");
+
+		assertThat(flow.currentStepId()).isEqualTo("step40");
+		assertThat(String.valueOf(flow.state("design"))).contains("자동 수정: 고침");
 	}
 
 	@Test
