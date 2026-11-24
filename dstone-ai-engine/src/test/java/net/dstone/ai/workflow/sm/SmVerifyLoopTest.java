@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
+import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.support.WorkflowStepper;
 import net.dstone.ai.support.WorkflowTestBase;
 
@@ -62,6 +63,8 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.step("step30");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
 		assertThat(flow.state("sandboxError")).isNotNull();
+		// 환경 탓이라 자동 수정하지 않는 것은 정상 판정이라 이력에 실패로 남지 않는다(2.6.1)
+		assertThat(this.lastHistory(flow, "step30").success()).isTrue();
 	}
 
 	/**
@@ -107,6 +110,8 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.step("step36");
 
 		assertThat(flow.currentStepId()).isEqualTo("step19");
+		// "FAIL 없음"은 좋은 결과라 이력에 실패로 남지 않는다(2.6.1)
+		assertThat(this.lastHistory(flow, "step36").success()).isTrue();
 	}
 
 	@Test
@@ -121,12 +126,26 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.jumpTo("step31");
 		flow.step("step31");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
+		// 한도를 다 쓴 것도 정상 판정이라 이력에 실패로 남지 않는다(2.6.1)
+		assertThat(this.lastHistory(flow, "step31").success()).isTrue();
 
 		flow.step("step19");
 		flow.decide("재개발", "다시 해 주세요");
 		flow.jumpTo("step31");
 		flow.step("step31");
 		assertThat(flow.currentStepId()).isEqualTo("step32");
+	}
+
+	/** 그 step의 마지막 실행 이력입니다. */
+	private StepHistoryEntry lastHistory(WorkflowStepper flow, String stepId) {
+		StepHistoryEntry found = null;
+		for (StepHistoryEntry entry : flow.history()) {
+			if (stepId.equals(entry.stepId())) {
+				found = entry;
+			}
+		}
+		assertThat(found).as(stepId + " 이력").isNotNull();
+		return found;
 	}
 
 	/** stepId부터 시작합니다. */

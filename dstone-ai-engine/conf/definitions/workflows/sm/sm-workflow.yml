@@ -44,6 +44,9 @@
 #   step29: 일회용 DB에 복제 + DDL 반영 + 빌드 + 기동. 실패 원인이 개발 결과(code)면 자동 수정, 환경(environment)이면 사람에게.
 #   step35: 검증 Agent가 완료 기준을 눌러 보고 PASS/FAIL/BLOCKED를 냄. FAIL이 있으면 자동 수정.
 #   step31: 자동 수정은 사람의 결정 하나마다 최대 2번. 사람이 새로 시키면 다시 2번.
+#   이 고리의 판정(step30 개발 결과 탓인지, step31 횟수가 남았는지, step36 FAIL이 있는지)은 실패가 아니라 정상 결과입니다.
+#   그래서 범용 Tool containsValue(true/false)와 countUp(route: within/over)의 값을 routes로 받아 나눕니다(2.6.1).
+#   "FAIL 없음", "한도를 다 씀"이 실행 이력에 실패로 남지 않고, onFailure는 Tool이 정말 실패했을 때만 씁니다.
 #   격리할 수 없는 프로젝트(지원하지 않는 DB·구성, 프로젝트ID 없음)는 통과로 치지 않고 이유와 함께 개발 승인으로 갑니다(state의 sandboxError).
 #   step29가 띄운 서버는 바로 다음 step35가 같은 입력으로 다시 부르면 그대로 씁니다(엔진의 넘겨주기는 한 step까지라 둘 사이에 step을 넣지 않습니다).
 #   step40(step29 앞)은 지난 검증 뒤로 작업 폴더에서 바뀐 파일을 범용 Tool fileChanges로 찾아, step35가 바뀐 것과 지난번에 안 된 것만 깊게 보게 합니다(2.5.0).
@@ -57,7 +60,7 @@
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.6.0
+version: 2.6.1
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -448,7 +451,9 @@ steps:
     with:
       value: ${state.sandboxCheck.cause:}
       expected: code
-    next: step31
+    routes:
+      "true": step31
+      "false": step19
     onFailure: step19
 
   - id: step31
@@ -460,7 +465,9 @@ steps:
       max: 2
       scope: ${decisions:}
     save: autoFixRound
-    next: step32
+    routes:
+      within: step32
+      over: step19
     onFailure: step19
 
   - id: step32
@@ -529,7 +536,9 @@ steps:
       value: ${state.verification.scenarios}
       field: result
       expected: FAIL
-    next: step31
+    routes:
+      "true": step31
+      "false": step19
     onFailure: step19
 
   - id: step37
@@ -623,7 +632,7 @@ state:
   sandboxError: 격리 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
   verification: 동작 검증(step35) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
   verificationError: 동작 검증 Agent가 끝내지 못한 이유
-  autoFixRound: 자동 수정 횟수({count, scope})
+  autoFixRound: 자동 수정 횟수({route, count, scope, message})
   autoFix: 자동 수정(step34)이 돌려준 답
   workChanges: 지난 동작 검증 뒤로 작업 폴더에서 바뀐 파일(step40, {first, changed, snapshot, summary})
   request: 고객 요청서 내용

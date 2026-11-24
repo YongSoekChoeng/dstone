@@ -25,6 +25,12 @@ public final class DataLogic {
 	/** 검증에 걸린 것이 없을 때의 글자입니다. */
 	public static final String NO_PROBLEM = "문제 없음";
 
+	/** countUp의 route: 아직 한도 안이라 한 번 더 해도 됩니다. */
+	public static final String COUNT_WITHIN = "within";
+
+	/** countUp의 route: 한도를 다 써서 더 되풀이하지 않습니다. */
+	public static final String COUNT_OVER = "over";
+
 	/** 파일이 있는지 알려 주는 것입니다(검증 규칙 filesExist / filesAbsent가 씁니다. 테스트에서는 가짜로 바꿉니다). */
 	public interface FileCheck {
 		boolean exists(String path);
@@ -158,15 +164,15 @@ public final class DataLogic {
 	/**
 	 * <pre>
 	 * 값(목록이면 항목마다)에 expected와 같은 것이 있는지 봅니다. 글자로 견줍니다.
+	 * 없는 것도 정상 결과라서 실패로 돌려주지 않고 true/false로 답합니다.
 	 * </pre>
 	 *
 	 * @param value    볼 값이나 목록
 	 * @param expected 찾을 값
 	 * @param field    항목에서 볼 필드. 비우면 항목 자체
 	 */
-	public static Map<String, Object> containsValue(Object value, String expected, String field) {
+	public static boolean containsValue(Object value, String expected, String field) {
 		List<?> items = value instanceof List<?> list ? list : (value == null ? List.of() : List.of(value));
-		boolean found = false;
 		for (Object item : items) {
 			Object current = item;
 			if (field != null && !field.isBlank()) {
@@ -175,19 +181,17 @@ public final class DataLogic {
 				}
 			}
 			if (current != null && String.valueOf(current).equals(expected)) {
-				found = true;
-				break;
+				return true;
 			}
 		}
-		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("success", found);
-		result.put("message", found ? "'" + expected + "' 있음" : "'" + expected + "' 없음");
-		return result;
+		return false;
 	}
 
 	/**
 	 * <pre>
 	 * 되풀이 횟수를 하나 올립니다. scope는 길 수 있어(결정 기록 전체) 해시로만 남깁니다.
+	 * 한도를 다 쓴 것도 정상 결과라서 실패로 돌려주지 않습니다. route가 within(한도 안) 또는 over(한도를 다 씀)이고,
+	 * TOOL step은 이 값을 routes로 받아 갈 곳을 나눕니다.
 	 * </pre>
 	 *
 	 * @param previous 지난 결과
@@ -203,7 +207,7 @@ public final class DataLogic {
 		int limit = max == null ? 0 : max.intValue();
 		boolean within = count < limit;
 		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("success", within);
+		result.put("route", within ? COUNT_WITHIN : COUNT_OVER);
 		result.put("count", within ? count + 1 : count);
 		result.put("scope", key);
 		result.put("message", within ? (count + 1) + "/" + limit + "번째" : "최대 " + limit + "번을 다 써서 더 되풀이하지 않습니다.");

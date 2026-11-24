@@ -29,6 +29,8 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
  *    실패면 ToolOutcome의 message(없으면 응답 글자)를 실패 사유(error)로 남깁니다.
  *    실패 이유와 받은 입력은 step에 saveError / saveInput으로 이름을 적어 두면 onFailure로 이동한 step이 ${state.이름}으로 읽을 수 있습니다.
  * 5) 갈 곳 고르기: step에 routes가 있고 성공했으면, output(글자·숫자·true/false 하나)을 글자로 바꾼 값이 곧 route입니다.
+ *    output이 맵이면 그 안의 route 값으로 고릅니다(ROUTER 결과 {route, reason}과 같은 모양). 맵 전체를 save하면서
+ *    갈 곳도 나눠야 하는 Tool(예: countUp의 {route, count, scope})이 이렇게 씁니다.
  *    routes에 없는 값이면 실패로 돌려서 onFailure를 따르게 합니다(Workflow를 예외로 멈추지 않습니다).
  * </pre>
  */
@@ -36,6 +38,9 @@ import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 public class ToolStepExecutor {
 
 	/** 응답 전체가 JSON 하나일 때만 JSON으로 봅니다("123 개"처럼 JSON 뒤에 글자가 더 붙으면 글자로 봅니다). */
+	/** 맵으로 답하는 Tool이 갈 곳을 알려 주는 필드 이름입니다(ROUTER 결과의 route와 같은 이름). */
+	private static final String ROUTE_KEY = "route";
+
 	private final ObjectMapper objectMapper = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
 	@Autowired
@@ -70,7 +75,7 @@ public class ToolStepExecutor {
 	/**
 	 * <pre>
 	 * 성공한 결과를 만듭니다. routes가 없으면 그냥 성공이고, 있으면 output 값으로 route를 정합니다(클래스 설명의 5번).
-	 * output이 맵이나 목록이면 값 하나가 아니라서 고를 수 없으므로 실패입니다.
+	 * output이 맵이면 그 안의 route 값으로 고릅니다. route가 없는 맵이나 목록은 값 하나가 아니라서 고를 수 없으므로 실패입니다.
 	 * </pre>
 	 *
 	 * @param step   실행한 step의 정의입니다.
@@ -81,7 +86,8 @@ public class ToolStepExecutor {
 		if (routes == null) {
 			return StepOutcome.success(output);
 		}
-		String route = (output instanceof String || output instanceof Number || output instanceof Boolean) ? output.toString().strip() : null;
+		Object value = output instanceof Map<?, ?> map ? map.get(ROUTE_KEY) : output;
+		String route = (value instanceof String || value instanceof Number || value instanceof Boolean) ? value.toString().strip() : null;
 		if (route == null || !routes.containsKey(route)) {
 			return StepOutcome.failure(output, "Tool[" + step.tool() + "]이 돌려준 값으로 갈 곳을 정하지 못했습니다. 값이 routes 이름 "
 				+ routes.keySet() + " 중 하나여야 합니다(받은 값: " + output + ").");
