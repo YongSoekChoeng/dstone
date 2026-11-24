@@ -17,6 +17,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.annotation.RepeatableTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
@@ -41,6 +42,8 @@ public class HttpCallTool extends BaseObject {
 	/**
 	 * @param url 요청할 전체 URL입니다(http 또는 https). 이 URL의 호스트가 화이트리스트에 등록되어 있어야 합니다.
 	 */
+	// 서버가 뜰 때까지 같은 주소를 다시 찔러 보는 일이 정상이라 "반복 호출"로 세지 않습니다.
+	@RepeatableTool
 	@Tool(description = "사전에 허용된 호스트에 한해 HTTP GET 요청을 보내고 응답 본문을 반환한다.  url의 호스트가 화이트리스트에 없으면 거부된다.")
 	public String httpGet(@ToolParam(description = "요청할 전체 URL(http 또는 https)") String url) {
 		URI uri;

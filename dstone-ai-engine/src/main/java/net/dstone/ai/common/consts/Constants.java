@@ -85,8 +85,27 @@ public final class Constants {
 		/**
 		 * Agent 호출 한 번 안에서 이미 읽은 파일 범위를 다시 읽지 못하게 막을지 정하는 설정 키입니다(dstone.ai.agent.tool.reread-guard, 기본 true).
 		 * 막으면 Tool을 실행하지 않고 "앞의 결과를 보라"는 안내를 돌려줍니다(runtime.agent.RereadGuardCallback).
+		 * 이미 받은 Skill을 또 부르는 것도 같은 설정으로 막습니다(runtime.agent.SkillTool).
 		 */
 		public final static String TOOL_REREAD_GUARD = "dstone.ai.agent.tool.reread-guard";
+
+		/**
+		 * 같은 Tool을 같은 인자로 연달아 불러 결과까지 똑같을 때, 몇 번째부터 결과 대신 안내를 줄지 정하는 설정 키입니다
+		 * (dstone.ai.agent.tool.repeat-guard.notice-at). 0이면 안내하지 않습니다(runtime.agent.RepeatCallGuardCallback).
+		 */
+		public final static String TOOL_REPEAT_NOTICE_AT = "dstone.ai.agent.tool.repeat-guard.notice-at";
+
+		/** 위 설정이 없을 때 쓰는 값입니다. */
+		public final static int DEFAULT_TOOL_REPEAT_NOTICE_AT = 3;
+
+		/**
+		 * 같은 Tool을 같은 인자로 연달아 불러 결과까지 똑같을 때, 몇 번째에 그 Agent 호출을 "반복 호출"로 중단할지 정하는 설정 키입니다
+		 * (dstone.ai.agent.tool.repeat-guard.fail-at). 0이면 중단하지 않습니다(runtime.agent.RepeatCallGuardCallback).
+		 */
+		public final static String TOOL_REPEAT_FAIL_AT = "dstone.ai.agent.tool.repeat-guard.fail-at";
+
+		/** 위 설정이 없을 때 쓰는 값입니다. */
+		public final static int DEFAULT_TOOL_REPEAT_FAIL_AT = 5;
 
 		/**
 		 * 앞 라운드 답에 붙은 추론 글(reasoning)을 다음 LLM 호출에 다시 보낼지 정하는 설정 키입니다(dstone.ai.agent.keep-reasoning, 기본 false).

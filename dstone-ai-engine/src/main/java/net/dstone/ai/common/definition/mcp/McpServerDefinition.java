@@ -30,6 +30,8 @@ import net.dstone.ai.common.consts.McpTransport;
  * @param url          transport가 SSE일 때, 접속할 서버의 URL입니다
  * @param allowedTools 이 서버가 제공하는 여러 Tool 중에서 실제로 가져다 쓸 Tool의 이름 목록입니다.
  *                     비워두면 이 서버가 제공하는 Tool을 전부 가져옵니다
+ * @param repeatableTools 같은 인자로 연달아 불러 같은 결과가 나와도 정상인 Tool(기다리는 용도)의 이름 목록입니다.
+ *                     "반복 호출" 감지(runtime.agent.RepeatCallGuardCallback)에서 빠집니다. 비워두면 모든 Tool을 셉니다
  */
 public record McpServerDefinition(
 	String id
@@ -38,5 +40,6 @@ public record McpServerDefinition(
 	, List<String> args
 	, String url
 	, List<String> allowedTools
+	, List<String> repeatableTools
 	) {
 }

@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <pre>
@@ -15,6 +17,8 @@ import java.util.Map;
  *
  * 파일이 바뀌었으면 다시 읽어야 하므로, 읽을 때의 파일 상태(stamp: 고친 시각과 크기)를 함께 적습니다.
  * 상태가 달라졌으면 그 파일의 기록은 없는 것으로 봅니다.
+ *
+ * 이번 호출에서 이미 받은 Skill 이름도 함께 적습니다. 같은 Skill을 또 부르면 본문 대신 안내만 돌려줍니다(SkillTool).
  *
  * 이 클래스는 파일을 직접 건드리지 않는 순수한 장부라 단위 테스트로 확인할 수 있습니다.
  * Spring 빈이 아니며 Agent 호출마다 새로 만듭니다(AgentExecutor).
@@ -27,6 +31,9 @@ public class ReadHistory {
 
 	/** 키(읽은 방식 + 경로)마다의 기록입니다. */
 	private final Map<String, Entry> entries = new HashMap<String, Entry>();
+
+	/** 이번 호출에서 본문을 이미 받은 Skill 이름들입니다. */
+	private final Set<String> skills = new HashSet<String>();
 
 	/** 한 파일을 한 방식으로 읽은 기록입니다. */
 	private static class Entry {
@@ -111,13 +118,28 @@ public class ReadHistory {
 
 	/**
 	 * <pre>
-	 * 기록을 모두 지웁니다.
-	 * 대화가 길어져 오래된 Tool 결과를 줄였을 때(ToolResultCompactionAdvisor) 부릅니다. 그때는 앞에서 읽은 내용이
-	 * 대화에 온전히 남아 있지 않으므로 다시 읽게 해야 합니다.
+	 * Skill 본문을 건넸다고 적어 둡니다. 처음 건네는 것이면 true, 이미 건넨 것이면 false입니다.
+	 * </pre>
+	 *
+	 * @param name Skill 이름
+	 */
+	public synchronized boolean recordSkill(String name) {
+		if (name == null) {
+			return true;
+		}
+		return this.skills.add(name);
+	}
+
+	/**
+	 * <pre>
+	 * 기록을 모두 지웁니다(읽은 파일 범위와 받은 Skill 모두).
+	 * 대화가 길어져 오래된 Tool 결과를 줄였을 때(ToolResultCompactionAdvisor) 부릅니다. 그때는 앞에서 읽은 내용이나
+	 * Skill 본문이 대화에 온전히 남아 있지 않으므로 다시 받게 해야 합니다.
 	 * </pre>
 	 */
 	public synchronized void clear() {
 		this.entries.clear();
+		this.skills.clear();
 	}
 
 	/** 읽은 방식(Tool 이름)과 경로를 합친 키입니다. 줄 번호가 붙은 결과와 안 붙은 결과는 따로 셉니다. */

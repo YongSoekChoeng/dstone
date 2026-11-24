@@ -10,6 +10,7 @@
 | `args` | STDIO | `command`에 넘길 인자 리스트 |
 | `url` | SSE | 접속할 서버 URL |
 | `allowedTools` | | 이 서버의 Tool 중 실제로 가져올 이름 목록. 비우면 전부 |
+| `repeatableTools` | | 같은 인자로 연달아 불러 같은 결과가 나와도 정상인 Tool(기다리는 용도) 이름 목록. "반복 호출" 감지(`dstone.ai.agent.tool.repeat-guard`)에서 빠진다. 비우면 모두 센다 |
 
 접속에 실패한 서버는 로그만 남기고 건너뛴다(엔진 기동은 계속된다).
 `command`·`args`·`url`의 `${이름}`은 `env*.properties` 값으로 바뀐다. 값이 비어 `${이름}`이 그대로 남으면 접속을 시도하지 않고

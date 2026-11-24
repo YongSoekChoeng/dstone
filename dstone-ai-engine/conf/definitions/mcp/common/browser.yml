@@ -31,3 +31,6 @@ allowedTools:
   - browser_network_requests
   - browser_network_request
   - browser_close
+# 화면이 바뀔 때까지 기다리는 Tool은 같은 결과가 몇 번 나와도 정상이라 "반복 호출"로 세지 않습니다.
+repeatableTools:
+  - browser_wait_for

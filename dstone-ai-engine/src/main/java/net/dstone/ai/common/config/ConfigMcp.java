@@ -1,7 +1,9 @@
 package net.dstone.ai.common.config;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,6 +54,9 @@ public class ConfigMcp extends BaseObject {
 	private McpServerRegistry mcpServerRegistry;
 
 	private final List<ToolCallback> toolCallbacks = new ArrayList<>();
+
+	/** 정의 파일의 repeatableTools에 적혀 있고 실제로 등록된 Tool 이름들입니다(반복 호출 감지에서 빠집니다). */
+	private final Set<String> repeatableToolNames = new HashSet<>();
 
 	@PostConstruct
 	public void connect() {
@@ -123,6 +128,9 @@ public class ConfigMcp extends BaseObject {
 				if (this.isAllowed(definition, callback)) {
 					this.toolCallbacks.add(new SerializedToolCallback(callback, serverLock));
 					added++;
+					if (definition.repeatableTools() != null && definition.repeatableTools().contains(callback.getToolDefinition().name())) {
+						this.repeatableToolNames.add(callback.getToolDefinition().name());
+					}
 				}
 			}
 			LogUtil.sysout("dstone-ai-engine mcp: [" + definition.id() + "] 접속 성공 - Tool " + discovered.size() + "개 중 " + added + "개 등록");
@@ -252,6 +260,15 @@ public class ConfigMcp extends BaseObject {
 	 */
 	public List<ToolCallback> toolCallbacks() {
 		return List.copyOf(this.toolCallbacks);
+	}
+
+	/**
+	 * <pre>
+	 * 정의 파일의 repeatableTools에 적힌 MCP Tool 이름들입니다. 같은 인자로 연달아 불러도 "반복 호출"로 세지 않습니다.
+	 * </pre>
+	 */
+	public Set<String> repeatableToolNames() {
+		return Set.copyOf(this.repeatableToolNames);
 	}
 
 }

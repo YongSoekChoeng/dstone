@@ -36,6 +36,12 @@ import net.dstone.common.utils.LogUtil;
  * - 설명문과 응답을 한국어로, "실패: ..." 같은 엔진의 다른 Tool과 같은 모양으로 맞추려고 합니다.
  *
  * Skill 본문은 Tool 결과로 대화에 들어가므로, 다른 Tool처럼 결과 크기 상한과 호출 횟수 한도가 함께 씌워집니다(AgentExecutor).
+ *
+ * 같은 Skill을 또 부르면 본문을 다시 주지 않고 짧은 안내만 돌려줍니다(ReadHistory.recordSkill()).
+ * 본문은 이미 대화에 있으니 다시 줄 필요가 없고, 다시 주면 부를 때마다 본문만큼 입력이 불어납니다.
+ * (2026-11-24 sm-developer-agent가 일을 마친 뒤 같은 Skill을 30번 연달아 불러 입력이 63k에서 117k 토큰까지 늘었습니다.)
+ * 오래된 Tool 결과를 줄여 본문이 잘렸으면 장부가 비워지므로 그때는 다시 받을 수 있습니다(ToolResultCompactionAdvisor).
+ * 장부가 없으면(dstone.ai.agent.tool.reread-guard=false) 부를 때마다 본문을 줍니다.
  * </pre>
  */
 public final class SkillTool {
@@ -66,8 +72,9 @@ public final class SkillTool {
 	 *
 	 * @param agentId 이 Tool을 쓰는 Agent의 id(로그용)
 	 * @param skills  이 Agent가 쓸 수 있는 Skill들
+	 * @param history 이번 호출에서 받은 Skill을 적어 둘 장부. null이면 같은 Skill을 또 불러도 본문을 줍니다
 	 */
-	public static ToolCallback build(String agentId, List<SkillDefinition> skills) {
+	public static ToolCallback build(String agentId, List<SkillDefinition> skills, ReadHistory history) {
 		if (skills == null || skills.isEmpty()) {
 			return null;
 		}
@@ -81,7 +88,7 @@ public final class SkillTool {
 			byName.put(skill.name(), librarySkill);
 			listing.add(librarySkill.toXml());
 		}
-		return FunctionToolCallback.builder(NAME, new SkillFunction(agentId, byName))
+		return FunctionToolCallback.builder(NAME, new SkillFunction(agentId, byName, history))
 			.description(String.format(DESCRIPTION, String.join("\n", listing)))
 			.inputType(SkillsTool.SkillsInput.class)
 			.build();
@@ -124,10 +131,12 @@ public final class SkillTool {
 
 		private final String agentId;
 		private final Map<String, SkillsTool.Skill> byName;
+		private final ReadHistory history;
 
-		private SkillFunction(String agentId, Map<String, SkillsTool.Skill> byName) {
+		private SkillFunction(String agentId, Map<String, SkillsTool.Skill> byName, ReadHistory history) {
 			this.agentId = agentId;
 			this.byName = byName;
+			this.history = history;
 		}
 
 		@Override
@@ -138,6 +147,11 @@ public final class SkillTool {
 				LogUtil.sysout("dstone-ai-engine skill: agent[" + this.agentId + "]가 없는 Skill '" + name + "'을 불렀습니다.");
 				return "실패: '" + name + "'라는 Skill은 쓸 수 없습니다. 쓸 수 있는 Skill = " + this.byName.keySet();
 			}
+			// 이번 호출에서 이미 준 Skill이면 본문 대신 안내만 돌려줍니다.
+			if (this.history != null && !this.history.recordSkill(name)) {
+				LogUtil.sysout("dstone-ai-engine skill: agent[" + this.agentId + "]가 이미 받은 Skill '" + name + "'을 또 불러서 본문 대신 안내만 돌려줬습니다.");
+				return alreadyLoadedNotice(name);
+			}
 			LogUtil.sysout("dstone-ai-engine skill: agent[" + this.agentId + "] -> skill[" + name + "] " + skill.content().length() + "자");
 			StringBuilder reply = new StringBuilder();
 			reply.append("Skill '").append(name).append("' 안내입니다.\n");
@@ -147,6 +161,12 @@ public final class SkillTool {
 			}
 			reply.append("\n").append(skill.content());
 			return reply.toString();
+		}
+
+		/** 이미 받은 Skill을 또 불렀을 때 돌려주는 안내입니다. */
+		private static String alreadyLoadedNotice(String name) {
+			return "(안내: Skill '" + name + "'의 안내는 이번 작업에서 이미 받았고 위 대화에 그대로 있습니다. 다시 부르지 마십시오. "
+				+ "그 안내대로 하던 일을 이어 가고, 할 일을 다 했으면 최종 답을 내십시오.)";
 		}
 
 	}

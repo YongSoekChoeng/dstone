@@ -1,5 +1,6 @@
 package net.dstone.ai.common.config;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,9 +11,11 @@ import java.util.Set;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -23,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.annotation.AiTool;
+import net.dstone.ai.common.annotation.RepeatableTool;
 import net.dstone.ai.common.annotation.ToolCategory;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.agent.AgentDefinition;
@@ -78,6 +82,9 @@ public class ConfigTool extends BaseObject {
 	/** Workflow의 TOOL step에서만 부를 수 있는 Tool(@AiTool(stepOnly = true))의 이름들입니다. */
 	private Set<String> stepOnlyToolNames = Set.of();
 
+	/** 같은 인자로 연달아 불러도 "반복 호출"로 세지 않는 Tool(@RepeatableTool, MCP 정의의 repeatableTools)의 이름들입니다. */
+	private Set<String> repeatableToolNames = Set.of();
+
 	/** Tool 이름 → 종류(@AiTool의 category, MCP Tool은 MCP)입니다. 화면의 "Tool 찾기" 창이 종류별로 묶는 데 씁니다. */
 	private Map<String, ToolCategory> toolCategories = Map.of();
 
@@ -96,8 +103,10 @@ public class ConfigTool extends BaseObject {
 		List<Object> normalBeans = new ArrayList<>();	// TOOL 중 stepOnly 를 제외한 일반 Tool.
 		List<Object> stepOnlyBeans = new ArrayList<>(); // TOOL 중 stepOnly(step 전용). TOOL스텝이 수행하는 Tool.
 		Map<String, ToolCategory> categories = new HashMap<>();
+		Set<String> repeatableNames = new HashSet<>();
 		
 		for (Object bean : toolBeans.values()) {
+			repeatableNames.addAll(repeatableToolNamesOf(bean));
 			AiTool annotation = AnnotationUtils.findAnnotation(bean.getClass(), AiTool.class);
 			if (annotation != null && annotation.stepOnly()) {
 				stepOnlyBeans.add(bean);
@@ -118,6 +127,8 @@ public class ConfigTool extends BaseObject {
 			categories.put(callback.getToolDefinition().name(), ToolCategory.MCP);
 		}
 		this.toolCategories = categories;
+		repeatableNames.addAll(this.configMcp.repeatableToolNames());
+		this.repeatableToolNames = repeatableNames;
 
 		// 로컬 Tool이든 MCP Tool이든 똑같이 결과 크기 상한을 씌웁니다.
 		int maxResultChars = this.maxResultChars();
@@ -208,6 +219,31 @@ public class ConfigTool extends BaseObject {
 	 */
 	public boolean isStepOnly(String toolName) {
 		return this.stepOnlyToolNames.contains(toolName);
+	}
+
+	/**
+	 * <pre>
+	 * 이 이름의 Tool이 같은 인자로 연달아 불러 같은 결과가 나와도 정상인 Tool(기다리는 용도)인지 봅니다.
+	 * 로컬 Tool은 @RepeatableTool, MCP Tool은 정의 파일의 repeatableTools로 정합니다(runtime.agent.RepeatCallGuardCallback).
+	 * </pre>
+	 *
+	 * @param toolName Tool 이름
+	 */
+	public boolean isRepeatable(String toolName) {
+		return this.repeatableToolNames.contains(toolName);
+	}
+
+	/** Tool 빈에서 @RepeatableTool이 붙은 @Tool 메서드의 Tool 이름을 모읍니다. 이름은 @Tool(name)이 있으면 그 값, 없으면 메서드 이름입니다. */
+	private static Set<String> repeatableToolNamesOf(Object bean) {
+		Set<String> names = new HashSet<>();
+		for (Method method : AopUtils.getTargetClass(bean).getMethods()) {
+			Tool tool = AnnotationUtils.findAnnotation(method, Tool.class);
+			if (tool == null || AnnotationUtils.findAnnotation(method, RepeatableTool.class) == null) {
+				continue;
+			}
+			names.add(tool.name() == null || tool.name().isEmpty() ? method.getName() : tool.name());
+		}
+		return names;
 	}
 
 	/**

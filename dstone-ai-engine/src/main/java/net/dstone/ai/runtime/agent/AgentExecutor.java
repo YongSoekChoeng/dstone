@@ -596,8 +596,11 @@ public class AgentExecutor extends BaseObject {
 			  Map.of()처럼 엔트리가 0개인 Map도 "빈 Map"으로 취급되므로, caller가 null인 경우에도 엔트리를
 			  최소 1개는 넣어 둡니다.
 			- Tool과 Skill에는 호출 횟수 한도를 씌웁니다(budgeted() 참고). 둘이 횟수 하나를 함께 씁니다.
-			- 이번 호출에서 이미 읽은 파일 범위를 또 읽으면 Tool을 실행하지 않고 안내만 돌려줍니다(RereadGuardCallback.
-			  dstone.ai.agent.tool.reread-guard가 false면 끕니다).
+			- 이번 호출에서 이미 읽은 파일 범위를 또 읽으면 Tool을 실행하지 않고 안내만 돌려줍니다(RereadGuardCallback).
+			  이미 받은 Skill을 또 불러도 본문 대신 안내만 돌려줍니다(SkillTool). 둘 다 dstone.ai.agent.tool.reread-guard가 false면 끕니다.
+			- 같은 Tool을 같은 인자로 연달아 불러 결과까지 똑같으면, 3번째부터 결과 대신 안내를 주고 5번째에 이 호출을 "반복 호출"로
+			  끝냅니다(RepeatCallGuardCallback. 횟수는 dstone.ai.agent.tool.repeat-guard.notice-at / fail-at).
+			  기다리는 용도의 Tool(@RepeatableTool, MCP 정의의 repeatableTools)과 Sub Agent는 세지 않습니다.
 			- Tool이나 Sub Agent가 하나라도 붙으면, 쌓인 Tool 결과가 너무 커졌을 때 오래된 것부터 줄이는 Advisor도 함께 붙입니다
 			  (ToolResultCompactionAdvisor. dstone.ai.agent.tool.keep-result-chars가 0이면 붙이지 않습니다).
 			- 앞 라운드 답에 붙은 추론 글(reasoning)은 다음 라운드에 다시 보내지 않습니다
@@ -613,14 +616,20 @@ public class AgentExecutor extends BaseObject {
 				}
 			}
 		}
-		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent));
+		// 이 호출에서 이미 읽은 파일 범위와 받은 Skill을 적어 둘 장부입니다.
+		// 같은 범위를 또 읽으면 Tool을 실행하지 않고(RereadGuardCallback), 같은 Skill을 또 부르면 본문 대신 안내만 줍니다(SkillTool).
+		ReadHistory readHistory = this.environment.getProperty(Constants.Agent.TOOL_REREAD_GUARD, Boolean.class, Boolean.TRUE).booleanValue() ? new ReadHistory() : null;
+		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent), readHistory);
 		if (skillTool != null) {
 			tools.add(this.configTool.limited(skillTool));
 		}
-		// 이 호출에서 이미 읽은 파일 범위를 적어 둘 장부입니다. 같은 범위를 또 읽으면 Tool을 실행하지 않습니다(RereadGuardCallback).
-		ReadHistory readHistory = this.environment.getProperty(Constants.Agent.TOOL_REREAD_GUARD, Boolean.class, Boolean.TRUE).booleanValue() ? new ReadHistory() : null;
-		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools, writtenPaths, readHistory));
-		callbacks.addAll(this.subAgentCallbacks(agent, caller, tasks, stepRef));
+		// 같은 Tool을 같은 인자로 연달아 불러 결과까지 같은지 세는 장부입니다(RepeatCallGuardCallback). Tool과 Sub Agent가 함께 씁니다.
+		RepeatCallGuardCallback.Tracker repeatTracker = new RepeatCallGuardCallback.Tracker();
+		List<ToolCallback> callbacks = new ArrayList<>(this.budgeted(agent, tools, succeededTools, writtenPaths, readHistory, repeatTracker));
+		for (ToolCallback subAgentCallback : this.subAgentCallbacks(agent, caller, tasks, stepRef)) {
+			// Sub Agent와 TaskOutput은 세지 않습니다. 다만 사이에 불렸으면 "연달아"가 끊기도록 셈을 처음부터 다시 하게 감쌉니다.
+			callbacks.add(new RepeatCallGuardCallback(subAgentCallback, repeatTracker, agent.id(), true, 0, 0));
+		}
 		if (!callbacks.isEmpty()) {
 			spec = spec.toolCallbacks(callbacks);
 			spec = spec.toolContext(StepRef.toolContextOf(caller, stepRef));
@@ -863,7 +872,7 @@ public class AgentExecutor extends BaseObject {
 	 * @param writtenPaths   성공한 Tool이 쓴 파일 경로를 적어 둘 곳. 필요 없으면 null
 	 * @param readHistory    이 호출에서 읽은 파일 범위 장부. 주면 같은 범위를 다시 읽지 못하게 막습니다(RereadGuardCallback). 끄면 null
 	 */
-	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools, Set<String> writtenPaths, ReadHistory readHistory) {
+	private List<ToolCallback> budgeted(AgentDefinition agent, List<ToolCallback> callbacks, Set<String> succeededTools, Set<String> writtenPaths, ReadHistory readHistory, RepeatCallGuardCallback.Tracker repeatTracker) {
 		int maxCalls = agent.maxToolCalls() != null ? agent.maxToolCalls().intValue() : this.intProperty(Constants.Agent.TOOL_MAX_CALLS, Constants.Agent.DEFAULT_TOOL_MAX_CALLS);
 		if (maxCalls <= 0) {
 			maxCalls = Constants.Agent.DEFAULT_TOOL_MAX_CALLS;
@@ -874,12 +883,18 @@ public class AgentExecutor extends BaseObject {
 		// 같은 Tool을 같은 인자로 다시 불러 또 실패할 호출을 막는 기억입니다(RepeatFailureGuardCallback). 이 호출의 Tool들이 함께 씁니다.
 		Map<String, String> failures = new ConcurrentHashMap<String, String>();
 		List<String> requiredTools = succeededTools == null ? null : agent.requiredTools();
+		int repeatNoticeAt = this.intProperty(Constants.Agent.TOOL_REPEAT_NOTICE_AT, Constants.Agent.DEFAULT_TOOL_REPEAT_NOTICE_AT);
+		int repeatFailAt = this.intProperty(Constants.Agent.TOOL_REPEAT_FAIL_AT, Constants.Agent.DEFAULT_TOOL_REPEAT_FAIL_AT);
 		List<ToolCallback> result = new ArrayList<>(callbacks.size());
 		for (ToolCallback callback : callbacks) {
 			// 다시 읽기 막기는 횟수 세기보다 안쪽에 둡니다. 막은 호출도 한 번으로 셉니다.
 			ToolCallback inner = readHistory == null ? callback : new RereadGuardCallback(callback, readHistory, agent.id());
 			// 같은 인자로 이미 실패한 호출은 실행하지 않습니다. 막은 호출도 바깥의 횟수 세기에서 한 번으로 셉니다.
 			inner = new RepeatFailureGuardCallback(inner, failures, agent.id());
+			// 같은 호출·같은 결과가 연달아 나오면 안내하거나 중단합니다. 안쪽 포장지가 돌려준 같은 안내가 되풀이되는 것도 셉니다.
+			// 횟수 세기(ToolCallBudgetCallback)보다 안쪽에 둬서, 거기서 붙이는 "남은 횟수" 안내 때문에 결과가 달라 보이지 않게 합니다.
+			boolean repeatable = this.configTool.isRepeatable(callback.getToolDefinition().name());
+			inner = new RepeatCallGuardCallback(inner, repeatTracker, agent.id(), repeatable, repeatNoticeAt, repeatFailAt);
 			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals, writtenPaths)
 				.prerequisites(agent.toolPrerequisites()));
 		}
