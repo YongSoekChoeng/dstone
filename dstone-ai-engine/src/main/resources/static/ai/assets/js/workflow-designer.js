@@ -3210,7 +3210,7 @@ var DstoneAiDesigner = (function () {
 			}).join("") + "</select>");
 		if (edge.kind === "route") {
 			var help = step.type === "APPROVAL" ? "승인자가 고르는 결정 이름(예: APPROVED, REJECTED)"
-				: (step.type === "TOOL" ? "Tool이 돌려주는 값과 똑같이 적습니다(예: isFileExist는 true, false)" : "ROUTER Agent가 고르는 경로 이름");
+				: (step.type === "TOOL" ? "Tool이 돌려주는 값과 똑같이 적습니다(예: isFileExist는 true, false. 맵으로 답하는 Tool은 그 route 값, 예: countUp은 within, over)" : "ROUTER Agent가 고르는 경로 이름");
 			var otherNames = Object.keys(step.routes || {}).filter(function (name) { return name !== edge.route; });
 			html += row("경로 이름", help, "<input type=\"text\" id=\"wd-edge-route\" list=\"wd-route-names\" value=\"" + escapeHtml(edge.route) + "\" />"
 				+ "<datalist id=\"wd-route-names\">" + otherNames.map(function (name) { return "<option value=\"" + escapeHtml(name) + "\"></option>"; }).join("") + "</datalist>"
