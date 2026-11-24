@@ -253,7 +253,7 @@ dstone:
                     - name: test-server-deploy
                       path: ${TEST_SERVER_DEPLOY_SCRIPT:}
             # 비밀값 자리표시자 ${secret:프로젝트ID.testPassword}를 실제 값으로 바꿔 넘길 Tool(쉼표로 구분, runtime.tool.ToolCallGate).
-            # LLM에게는 비밀번호 대신 자리표시자만 준다. 여기 없는 Tool에 자리표시자를 주면 실행하지 않는다. 결과에 섞인 비밀값은 ****로 가린다.
+            # LLM에게는 비밀번호 대신 자리표시자만 준다. 여기 없는 Tool에 자리표시자를 주면 실행하지 않는다. 결과에 섞인 비밀값은 자리표시자로 되돌려 가린다.
             secret:
                 allowed-tools: browser_type,browser_fill_form
             # 원본 + 개발 결과로 임시 시험 서버를 띄우고 내리는 Tool(tools.build.TestServerTool, startTestServer/stopTestServer) 설정.
