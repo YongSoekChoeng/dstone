@@ -237,3 +237,19 @@ step을 선택했을 때 나오는 설정 패널에는 routes 항목이 없어�
 ```
 ai-engine: sm-workflow 판정 step을 실패 대신 routes로 나눔 (2.6.1)
 ```
+
+---
+
+## 질문
+
+응 올려줘.
+
+---
+
+## 답변
+
+GitHub `main`에 올렸습니다. 커밋은 `b939d4ed`이고, 변경한 파일 9개가 모두 들어갔습니다.
+
+실제로 쓰려면 아래 두 가지가 더 필요합니다.
+- Windows 쪽 클론(`D:/AppHome/framework/dstone`)에서 `git pull`을 받아야 합니다.
+- 돌고 있는 dstone-ai-engine을 다시 빌드하고 재시작해야 합니다. Java 코드도 바뀌어서 정의 파일만 다시 읽어서는 반영되지 않습니다.
