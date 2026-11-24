@@ -54,13 +54,22 @@
 #   step41(step40 앞)이 설계서를 다시 읽어 step35에 넘깁니다(2.6.0). 자동 수정·전문가 해결이 설계서를 고친 뒤에도
 #   검증 Agent가 고치기 전 설계서를 받지 않게 하려는 것입니다.
 #
+# 검증 수준 고르기(2.7.0): 모든 변경에 서버를 띄우고 화면을 누를 필요는 없어서, 설계 승인(step13)에서 사람이 고릅니다.
+#   승인(개발진행)                 화면 검증(위의 자동 동작 검증 그대로)
+#   승인(개발진행, 기동만 확인)     격리 서버가 뜨는지만 보고 개발 승인으로(step45). 화면이 없는 변경(배치, 연동, 쿼리만)
+#   승인(개발진행, 컴파일만)        서버를 띄우지 않고 개발 승인으로. 동작이 바뀌지 않는 변경(주석, 안내 문구, 설정값 하나)
+#   설계서의 '검증 방법 제안'(sm-architect-agent)이 어느 쪽인지와 이유를 적어 두고, 고르는 것은 사람입니다.
+#   생략은 첫 검증에만 적용합니다. 재개발·전문가 해결·자동 수정으로 다시 돌 때는 화면 검증으로 갑니다.
+#   step42가 countUp(max 1)으로 첫 검증인지 세고(within = 처음, over = 다시 돌 때), step43~44가 승인 결정을 봅니다.
+#   분기는 step28 뒤에 둡니다. step29와 step35 사이에는 step을 넣지 않습니다(서버 넘겨주기, 위 설명).
+#
 # 요구사항 리뷰(step05)는 판정만 돌려주고 분석서를 고치지 않습니다(2.6.0). 불통과 사유는 엔진이 다음 단계에 넘깁니다.
 #
 # 원본 소스 경로는 step02가 요청서의 "## 소스경로" 아래 내용을 범용 Tool readMarkdownSection으로 읽어 state.sourceDir에 둡니다.
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.6.1
+version: 2.7.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -233,6 +242,8 @@ steps:
     save: designApproval
     routes:
       승인(개발진행): step14
+      승인(개발진행, 기동만 확인): step14
+      승인(개발진행, 컴파일만): step14
       설계 수정: step25
       설계 다시 작성: step12
       영향도 수정: step26
@@ -426,8 +437,60 @@ steps:
       heading: 프로젝트ID
     save: projectId
     saveError: projectIdError
-    next: step41
+    next: step42
     onFailure: step19
+
+  - id: step42
+    name: 29-첫 검증인지(검증 생략은 첫 검증에만)
+    type: TOOL
+    tool: countUp
+    with:
+      previous: ${state.verifyRound:}
+      max: 1
+    save: verifyRound
+    routes:
+      within: step43
+      over: step41
+    onFailure: step41
+
+  - id: step43
+    name: 29-컴파일만 확인으로 승인했는지
+    type: TOOL
+    tool: containsValue
+    with:
+      value: ${state.designApproval.decision:}
+      expected: 승인(개발진행, 컴파일만)
+    routes:
+      "true": step19
+      "false": step44
+    onFailure: step41
+
+  - id: step44
+    name: 29-기동만 확인으로 승인했는지
+    type: TOOL
+    tool: containsValue
+    with:
+      value: ${state.designApproval.decision:}
+      expected: 승인(개발진행, 기동만 확인)
+    routes:
+      "true": step45
+      "false": step41
+    onFailure: step41
+
+  - id: step45
+    name: 31-격리 기동만 확인
+    type: TOOL
+    tool: startSandboxServer
+    with:
+      projectId: ${state.projectId}
+      sourceRoot: ${state.sourceDir}
+      overlayDir: ${input}/${state.now}/dev-resources
+      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
+      deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
+    save: sandboxCheck
+    saveError: sandboxError
+    next: step19
+    onFailure: step30
 
   - id: step29
     name: 31-격리 기동 확인
@@ -628,7 +691,8 @@ steps:
 state:
   projectId: 요청서의 프로젝트ID(step28)
   projectIdError: 프로젝트ID가 없어 자동 검증을 못 한 이유
-  sandboxCheck: 격리 기동 확인(step29) 결과({success, cause, message})
+  sandboxCheck: 격리 기동 확인(step29, 기동만 확인이면 step45) 결과({success, cause, message})
+  verifyRound: 첫 검증인지 센 값(step42, {route, count, scope, message}). within이면 처음이라 설계 승인에서 고른 검증 생략을 따른다
   sandboxError: 격리 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
   verification: 동작 검증(step35) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
   verificationError: 동작 검증 Agent가 끝내지 못한 이유

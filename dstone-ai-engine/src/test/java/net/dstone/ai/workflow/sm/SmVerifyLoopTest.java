@@ -47,9 +47,68 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	void 프로젝트ID가_있으면_설계서를_다시_읽으러_간다() throws Exception {
 		Files.writeString(this.workDir.resolve("00.request.md"), "## 현업요청\n목록 화면\n## 프로젝트ID\nmyApp", StandardCharsets.UTF_8);
 		WorkflowStepper flow = this.atStep("step28");
+		flow.put("designApproval", Map.of("decision", "승인(개발진행)"));
 		flow.step("step28");
+		flow.step("step42");
+		flow.step("step43");
+		flow.step("step44");
 
 		assertThat(flow.currentStepId()).isEqualTo("step41");
+	}
+
+	/**
+	 * <pre>
+	 * 설계 승인에서 고른 검증 수준을 첫 검증에서 따르는지 봅니다(2.7.0).
+	 * 컴파일만이면 서버를 띄우지 않고, 기동만 확인이면 격리 기동만 하고 사람에게 갑니다.
+	 * 이 판정들은 정상 결과라 이력에 실패로 남지 않습니다.
+	 * </pre>
+	 */
+	@Test
+	void 컴파일만으로_승인하면_첫_검증은_서버_없이_사람에게_간다() {
+		WorkflowStepper flow = this.atStep("step42");
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 컴파일만)"));
+		flow.step("step42");
+		assertThat(flow.currentStepId()).isEqualTo("step43");
+		flow.step("step43");
+
+		assertThat(flow.currentStepId()).isEqualTo("step19");
+		assertThat(this.lastHistory(flow, "step43").success()).isTrue();
+	}
+
+	@Test
+	void 기동만_확인으로_승인하면_첫_검증은_격리_기동만_한다() {
+		WorkflowStepper flow = this.atStep("step42");
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 기동만 확인)"));
+		flow.step("step42");
+		flow.step("step43");
+		assertThat(flow.currentStepId()).isEqualTo("step44");
+		flow.step("step44");
+
+		assertThat(flow.currentStepId()).isEqualTo("step45");
+		assertThat(this.lastHistory(flow, "step44").success()).isTrue();
+	}
+
+	@Test
+	void 기동만_확인에서_기동에_실패하면_기동_실패_판정으로_간다() {
+		WorkflowStepper flow = this.atStep("step45");
+		flow.put("projectId", "noSuchProject").put("sourceDir", this.workDir.toString());
+		flow.step("step45");
+
+		assertThat(flow.currentStepId()).isEqualTo("step30");
+	}
+
+	@Test
+	void 다시_돌_때는_검증을_생략하지_않고_화면_검증으로_간다() {
+		WorkflowStepper flow = this.atStep("step42");
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 컴파일만)"));
+		flow.step("step42");
+		assertThat(flow.currentStepId()).isEqualTo("step43");
+
+		// 재개발·전문가 해결·자동 수정을 거쳐 다시 컴파일 확인 뒤로 온 경우
+		flow.jumpTo("step42");
+		flow.step("step42");
+		assertThat(flow.currentStepId()).isEqualTo("step41");
+		assertThat(this.lastHistory(flow, "step42").success()).isTrue();
 	}
 
 	@Test
