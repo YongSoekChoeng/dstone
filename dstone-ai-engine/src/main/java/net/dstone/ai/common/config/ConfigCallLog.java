@@ -56,7 +56,8 @@ public class ConfigCallLog extends BaseObject {
 	private final static String NO_LOG_REGEX 			= "@annotation(net.dstone.common.annotation.NoAspectLog)";
 
 	public static boolean IS_LLM_LOGGING_YN 			= true;
-	public final static String SAPERATE_LINE 			= "\n|--------------------------------------------------------------------------------------------------------------------------------------|\n";
+	private final static String SAPERATE_LINE 			= "|--------------------------------------------------------------------------------------------------------------------------------------|";
+	
 	public final static String SAPERATE_LINE_HALF_PRONT = "\n|----------------------------------------------------";
 	public final static String SAPERATE_LINE_HALF_END 	= "----------------------------------------------------|\n";
 	
@@ -68,6 +69,11 @@ public class ConfigCallLog extends BaseObject {
 
 	
 	/****************************************** 로깅 관련 AOP 설정 시작 ******************************************/
+	
+	private static String getSaperateLine(String space) {
+		String line = "\n" + StringUtil.ifEmpty(space, "") + SAPERATE_LINE + "\n";
+		return line;
+	}
 
 	/**
 	 * <pre>
@@ -181,7 +187,7 @@ public class ConfigCallLog extends BaseObject {
 		String calleeInfo = " Call 정보 : " + className + "." + methodName + "()";
 
 		log.append("\n");
-		log.append(SAPERATE_LINE);
+		log.append(getSaperateLine(""));
 		log.append("[WorkFlowExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
 		log.append("\n");
 		log.append("<input>");
@@ -189,14 +195,14 @@ public class ConfigCallLog extends BaseObject {
 		log.append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\n");
 		log.append("</input>");
-		log.append(SAPERATE_LINE);
+		log.append(getSaperateLine(""));
 		this.info(log.toString());
 		
 		output = joinPoint.proceed();
 		
 		log.setLength(0);
 		log.append("\n");
-		log.append(SAPERATE_LINE);
+		log.append(getSaperateLine(""));
 		log.append("[WorkFlowExecutor - "+identity+"]"+calleeInfo+" End !!!");
 		log.append("\n");
 		log.append("<output>");
@@ -204,7 +210,7 @@ public class ConfigCallLog extends BaseObject {
 		log.append(this.trimParams(output.toString()));
 		log.append("\n");
 		log.append("</output>");
-		log.append(SAPERATE_LINE);
+		log.append(getSaperateLine(""));
 		this.info(log.toString());
 		
 		return output;
@@ -245,7 +251,7 @@ public class ConfigCallLog extends BaseObject {
 		String calleeInfo = " Call 정보 : " + className + "." + methodName + "()";
 
 		log.append("\t").append("\n");
-		log.append("\t").append(SAPERATE_LINE);
+		log.append("\t").append(getSaperateLine("\t"));
 		log.append("\t").append("[StepExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
 		log.append("\t").append("\n");
 		log.append("\t").append("<input>");
@@ -253,23 +259,22 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\t").append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\t").append("\n");
 		log.append("\t").append("</input>");
-		log.append("\t").append(SAPERATE_LINE);
-		this.info(log.append("\t").toString());
+		this.info(log.toString());
 		
 		output = joinPoint.proceed();
 		
 		log.append("\t").setLength(0);
-		log.append("\t").append("\n");
-		log.append("\t").append(SAPERATE_LINE);
-		log.append("\t").append("[StepExecutor - "+identity+"]"+calleeInfo+" End !!!");
 		log.append("\t").append("\n");
 		log.append("\t").append("<output>");
 		log.append("\t").append("\n");		
 		log.append("\t").append(this.trimParams(output.toString()));
 		log.append("\t").append("\n");
 		log.append("\t").append("</output>");
-		log.append("\t").append(SAPERATE_LINE);
-		this.info(log.append("\t").toString());
+		log.append("\t").append("\n");
+		log.append("\t").append("[StepExecutor - "+identity+"]"+calleeInfo+" End !!!");
+		log.append("\t").append(getSaperateLine("\t"));
+		log.append("\t").append("\n");
+		this.info(log.toString());
 		
 		return output;
 	}
@@ -294,7 +299,7 @@ public class ConfigCallLog extends BaseObject {
 		String calleeInfo = " Call 정보 : " + className + "." + methodName + "()";
 
 		log.append("\t\t").append("\n");
-		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append(getSaperateLine("\t\t"));
 		log.append("\t\t").append("[AgentExecutor - "+identity+"]"+calleeInfo+" Start !!!" );
 		log.append("\t\t").append("\n");
 		log.append("\t\t").append("<input>");
@@ -302,23 +307,23 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\t\t").append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\t\t").append("\n");
 		log.append("\t\t").append("</input>");
-		log.append("\t\t").append(SAPERATE_LINE);
-		this.info(log.append("\t\t").toString());
+		log.append("\t\t").append(getSaperateLine("\t\t"));
+		this.info(log.toString());
 		
 		output = joinPoint.proceed();
 		
 		log.append("\t\t").setLength(0);
 		log.append("\t\t").append("\n");
-		log.append("\t\t").append(SAPERATE_LINE);
-		log.append("\t\t").append("[AgentExecutor - "+identity+"]"+calleeInfo+" End !!!");
-		log.append("\t\t").append("\n");
+		log.append("\t\t").append(getSaperateLine("\t\t"));
 		log.append("\t\t").append("<output>");
 		log.append("\t\t").append("\n");	
 		log.append("\t\t").append(this.trimParams(output.toString()));
 		log.append("\t\t").append("\n");
 		log.append("\t\t").append("</output>");
-		log.append("\t\t").append(SAPERATE_LINE);
-		this.info(log.append("\t\t").toString());
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("[AgentExecutor - "+identity+"]"+calleeInfo+" End !!!");
+		log.append("\t\t").append(getSaperateLine("\t\t"));
+		this.info(log.toString());
 
 		return output;
 	}
@@ -364,7 +369,7 @@ public class ConfigCallLog extends BaseObject {
 		}
 
 		log.append("\t\t").append("\n");
-		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append(getSaperateLine("\t\t"));
 		log.append("\t\t").append("[Tools - "+toolName+"]"+calleeInfo+" Start !!!" );
 		log.append("\t\t").append("\n");
 		log.append("\t\t").append("<input>");
@@ -372,22 +377,20 @@ public class ConfigCallLog extends BaseObject {
 		log.append("\t\t").append(this.trimParams(this.buildParamInfo(joinPoint)));
 		log.append("\t\t").append("\n");
 		log.append("\t\t").append("</input>");
-		log.append("\t\t").append(SAPERATE_LINE);
 		this.info(log.append("\t\t").toString());
 		
 		Object output = joinPoint.proceed();
 
 		log.append("\t\t").setLength(0);
 		log.append("\t\t").append("\n");
-		log.append("\t\t").append(SAPERATE_LINE);
-		log.append("\t\t").append("[Tools - "+toolName+"]"+calleeInfo+" End !!!" );
-		log.append("\t\t").append("\n");
 		log.append("\t\t").append("<output>");
 		log.append("\t\t").append("\n");	
 		log.append("\t\t").append(this.trimParams(output.toString()));
 		log.append("\t\t").append("\n");
 		log.append("\t\t").append("</output>");
-		log.append("\t\t").append(SAPERATE_LINE);
+		log.append("\t\t").append("\n");
+		log.append("\t\t").append("[Tools - "+toolName+"]"+calleeInfo+" End !!!" );
+		log.append("\t\t").append(getSaperateLine("\t\t"));
 		this.info(log.append("\t\t").toString());
 		
 		return output;
