@@ -973,6 +973,14 @@
 	font-size: 12.5px;
 }
 
+/* 노드는 그대로 두고 화살표만 다시 놓는 버튼 */
+.ai-body .wd-tabs button.wd-reroute-btn {
+	margin-left: 8px;
+	height: 30px;
+	padding: 0 12px;
+	font-size: 12.5px;
+}
+
 .wd-tabs .ai-hint {
 	margin: 0 0 0 8px;
 	font-size: 12.5px;
