@@ -1615,14 +1615,17 @@ var DstoneAiDesigner = (function () {
 	var FOCUS_NEXT = 2;
 
 	/**
-	 * 강조할 때 이어진 노드의 테두리 색과 이름 앞에 붙일 표시(노드 폭이 좁아 기호만. 뜻은 왼쪽 범례).
+	 * 강조할 때 이어진 노드의 테두리·바탕 색과 이름 앞에 붙일 표시(노드 폭이 좁아 기호만. 뜻은 왼쪽 범례).
+	 * 기본 배율(30%대)에서는 테두리 색과 글자가 잘 보이지 않아 바탕을 옅게 칠한다. 이전과 다음은 서로 멀리 떨어진 색(보라 / 초록)으로.
 	 * 화살표 색은 종류(다음·실패·경로)를 뜻하므로 건드리지 않고, 노드 쪽에서만 이전과 다음을 나눈다.
 	 * 경로 화살표의 주황(#d97706)과 겹치지 않는 색을 쓴다.
 	 */
 	var FOCUS_ROLES = {};
-	FOCUS_ROLES[FOCUS_PREV] = { stroke: "#7c3aed", mark: "◀ " };
-	FOCUS_ROLES[FOCUS_NEXT] = { stroke: "#2563eb", mark: "▶ " };
-	FOCUS_ROLES[FOCUS_PREV | FOCUS_NEXT] = { stroke: "#db2777", mark: "◀▶ " };
+	FOCUS_ROLES[FOCUS_PREV] = { stroke: "#7c3aed", fill: "#ede9fe", mark: "◀ " };
+	FOCUS_ROLES[FOCUS_NEXT] = { stroke: "#16a34a", fill: "#dcfce7", mark: "▶ " };
+	FOCUS_ROLES[FOCUS_PREV | FOCUS_NEXT] = { stroke: "#db2777", fill: "#fce7f3", mark: "◀▶ " };
+	/** 고른 step 자신 */
+	var FOCUS_SELF = { stroke: "#1f2937", fill: "#fef08a" };
 
 	/**
 	 * step 하나를 골랐을 때 함께 강조할 노드를 모읍니다.
@@ -1671,17 +1674,25 @@ var DstoneAiDesigner = (function () {
 	}
 
 	/**
-	 * 강조 중이면 노드 설정을 고칩니다. 이어진 노드는 관계(이전·다음)에 따라 테두리 색과 이름 앞 표시를 바꾸고 굵게,
+	 * 강조 중이면 노드 설정을 고칩니다. 이어진 노드는 관계(이전·다음)에 따라 테두리·바탕 색과 이름 앞 표시를 바꾸고 굵게,
 	 * 관계없는 노드는 흐리게. 시작·END·FAIL 동그라미는 글자가 짧아 표시를 붙이지 않고 색만 바꾼다.
 	 */
 	function focusNode(config, focus) {
-		if (!focus || config.id === focus.id) {
+		if (!focus) {
+			return config;
+		}
+		if (config.id === focus.id) {
+			// 고른 step은 종류 색(TOOL 초록 등)이 다음 step의 초록과 헷갈리지 않게 진한 테두리와 노란 바탕으로
+			config.attrs.body.strokeWidth = 4;
+			config.attrs.body.stroke = FOCUS_SELF.stroke;
+			config.attrs.body.fill = FOCUS_SELF.fill;
 			return config;
 		}
 		var role = FOCUS_ROLES[focus.nodes[config.id]];
 		if (role) {
-			config.attrs.body.strokeWidth = 3;
+			config.attrs.body.strokeWidth = 4;
 			config.attrs.body.stroke = role.stroke;
+			config.attrs.body.fill = role.fill;
 			if (config.data && config.data.kind !== "terminal") {
 				config.attrs.label.text = role.mark + config.attrs.label.text;
 				config.attrs.label.fill = role.stroke;
