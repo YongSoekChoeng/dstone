@@ -894,7 +894,7 @@ public class AgentExecutor extends BaseObject {
 			// 같은 호출·같은 결과가 연달아 나오면 안내하거나 중단합니다. 안쪽 포장지가 돌려준 같은 안내가 되풀이되는 것도 셉니다.
 			// 횟수 세기(ToolCallBudgetCallback)보다 안쪽에 둬서, 거기서 붙이는 "남은 횟수" 안내 때문에 결과가 달라 보이지 않게 합니다.
 			boolean repeatable = this.configTool.isRepeatable(callback.getToolDefinition().name());
-			inner = new RepeatCallGuardCallback(inner, repeatTracker, agent.id(), repeatable, repeatNoticeAt, repeatFailAt);
+			inner = new RepeatCallGuardCallback(inner, repeatTracker, agent.id(), repeatable, repeatNoticeAt, repeatFailAt).progress(succeededTools, writtenPaths);
 			result.add(new ToolCallBudgetCallback(inner, agent.id(), used, maxCalls, succeededTools, requiredTools, reserveRefusals, writtenPaths)
 				.prerequisites(agent.toolPrerequisites()));
 		}

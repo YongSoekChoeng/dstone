@@ -87,6 +87,25 @@ class RepeatCallGuardTest {
 		}
 	}
 
+	@Test
+	void 중단_오류에_그때까지_한_일을_붙인다() {
+		java.util.Set<String> succeeded = new java.util.LinkedHashSet<String>();
+		succeeded.add("editFileTexts");
+		java.util.Set<String> written = new java.util.LinkedHashSet<String>();
+		written.add("D:/work/03-1.design.md");
+		ToolCallback guarded = new RepeatCallGuardCallback(new FakeTool("Skill", "본문"), this.tracker, "test-agent", false, NOTICE_AT, FAIL_AT)
+			.progress(succeeded, written);
+		for (int i = 0; i < FAIL_AT - 1; i++) {
+			guarded.call("{}");
+		}
+		assertThatThrownBy(new org.assertj.core.api.ThrowableAssert.ThrowingCallable() {
+			@Override
+			public void call() {
+				guarded.call("{}");
+			}
+		}).hasMessageContaining("성공한 Tool: [editFileTexts]").hasMessageContaining("쓴 파일 1개: [D:/work/03-1.design.md]");
+	}
+
 	private ToolCallback guarded(ToolCallback tool, boolean exempt) {
 		return new RepeatCallGuardCallback(tool, this.tracker, "test-agent", exempt, NOTICE_AT, FAIL_AT);
 	}

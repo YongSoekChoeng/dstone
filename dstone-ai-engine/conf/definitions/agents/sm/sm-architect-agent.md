@@ -61,7 +61,7 @@ execution:
 [입력]
 request, requirement, impact로 세 문서의 내용을 받는다. 파일로 다시 읽지 않는다.
 파일 위치는 영향도분석서에 있다. readFileListAll은 영향도분석서에 없는 참고 파일을 찾을 때만 쓴다.
-영향도분석서에 없는 호출 관계나 테이블 사용처가 필요하면, 요청서에 프로젝트ID가 있을 때 knowledge Tool로 먼저 찾는다(Skill source-investigation의 표).
+영향도분석서에 없는 호출 관계나 테이블 사용처가 필요하면, 요청서에 프로젝트ID가 있을 때 knowledge Tool로 먼저 찾는다(아래에 붙은 [Skill: source-investigation]의 표).
 참고 파일은 구조를 볼 때 한 번만 통째로 읽고, 그 밖의 파일은 필요한 범위만 읽는다. 같은 것을 파일 검색으로 여러 번 찾으면 Tool 한도를 넘긴다.
 reference_error가 비어 있고 reference_code가 있으면, 그것이 본뜰 기능의 원본 코드다. 이미 읽은 것이므로 그 파일들을 다시 열지 않는다.
 - 새 파일의 참고 파일은 이 코드에 나온 파일에서 고른다. 화면과 그 화면이 부르는 Controller·Service·SQL, 팝업을 여는 쪽과 팝업 화면처럼

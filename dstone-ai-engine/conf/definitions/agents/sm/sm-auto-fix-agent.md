@@ -5,10 +5,12 @@
 # 1.2.0(2026-11-23): Skill test-environment를 받아, 시험 환경 차이로 생긴 실패는 고치지 않고 unresolved에 남긴다
 #   (실행 6d1784d8에서 업로드 이미지 404를 코드에서 찾다가 18분 뒤 출력 한도로 끝났다).
 # 1.3.0(2026-11-25): 고친 뒤 checkSources로 XML·JSP·JavaScript 형식을 확인한다.
+# 1.3.1(2026-11-25): "Skill troubleshooting을 따른다"를 "아래에 붙은 [Skill: …] 안내"로 고쳤다. preload Skill은 프롬프트 뒤에 이미 붙어 있고 Skill Tool 목록에는 없는데,
+#   모델이 Tool로 부르다 실패하고 Skill 호출을 되풀이했다(실행 d9f0bcc0, 반복 호출로 중단).
 # requiredWrites(설계서)는 고칠 것이 없을 때도 '## 수정 이력' 한 줄을 남기게 하려는 것이다. 빼면 아무것도 안 쓴 답이 성공으로 지나가
 #   같은 코드로 격리 기동과 동작 검증을 다시 돈다(2026-11-25 실행에서 쓴 파일 없이 끝난 호출 2건을 이 계약이 잡았다).
 id: sm-auto-fix-agent
-version: 1.3.0
+version: 1.3.1
 description: 동작 검증에서 실패한 것의 원인을 격리 시험 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -79,10 +81,10 @@ execution:
 ---
 [역할]
 너는 시험에서 실패한 것을 고치는 개발자다. boot_error가 있으면 그것을, 없으면 verification에서 result가 FAIL인 것을 고친다.
-BLOCKED는 코드 문제가 아니므로 고치지 않는다. FAIL도 Skill test-environment로 보아 시험 환경 차이면 고치지 않고 unresolved에 남긴다.
+BLOCKED는 코드 문제가 아니므로 고치지 않는다. FAIL도 아래에 붙은 [Skill: test-environment] 안내로 보아 시험 환경 차이면 고치지 않고 unresolved에 남긴다.
 
 [원인 찾는 법]
-Skill troubleshooting을 따른다. 관측된 근거에서 출발해 원본에서 같은 일을 하는 동작하는 기능과 비교한다.
+아래에 붙은 [Skill: troubleshooting] 안내를 따른다. 관측된 근거에서 출발해 원본에서 같은 일을 하는 동작하는 기능과 비교한다.
 공통 유틸을 부른다면 그것이 기대하는 값(세션, 초기화, 필수 인자)까지 읽는다.
 재현이 필요하면 startSandboxServer(projectId ${input.project_id}, sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources,
 ddlFile ${input.base_dir}/03-3.ddl(데이터베이스).md, deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 부르고, 그 결과의 주소와 복제본 별칭만 쓴다.

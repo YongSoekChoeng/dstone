@@ -1,5 +1,9 @@
 package net.dstone.ai.runtime.agent;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -72,6 +76,8 @@ public class RepeatCallGuardCallback implements ToolCallback {
 	private final boolean exempt;
 	private final int noticeAt;
 	private final int failAt;
+	private Set<String> succeededTools;
+	private Set<String> writtenPaths;
 
 	/**
 	 * @param delegate 실제 Tool 호출을 맡는 ToolCallback
@@ -88,6 +94,19 @@ public class RepeatCallGuardCallback implements ToolCallback {
 		this.exempt = exempt;
 		this.noticeAt = noticeAt;
 		this.failAt = failAt;
+	}
+
+	/**
+	 * 중단할 때 오류 문구에 "그때까지 한 일"을 붙이려고, 이 호출의 진행 기록을 알려 줍니다(없으면 null).
+	 * 일은 다 해 놓고 마무리만 못 한 경우와 아무것도 못 한 경우를 오류만 보고 가르기 위한 것입니다.
+	 *
+	 * @param succeededTools 성공한 Tool 이름들
+	 * @param writtenPaths   성공한 Tool이 쓴 파일 경로들
+	 */
+	public RepeatCallGuardCallback progress(Set<String> succeededTools, Set<String> writtenPaths) {
+		this.succeededTools = succeededTools;
+		this.writtenPaths = writtenPaths;
+		return this;
 	}
 
 	@Override
@@ -125,7 +144,7 @@ public class RepeatCallGuardCallback implements ToolCallback {
 		int count = this.tracker.record(key, result == null ? "" : result);
 		if (this.failAt > 0 && count >= this.failAt) {
 			throw new AgentContractException("반복 호출: agent[" + this.agentId + "]가 [" + name + "]를 같은 인자로 " + count
-				+ "번 연달아 불렀고 결과도 매번 같아서 중단했습니다. 인자: " + abbreviate(toolInput));
+				+ "번 연달아 불렀고 결과도 매번 같아서 중단했습니다. 인자: " + abbreviate(toolInput) + this.progressText());
 		}
 		if (this.noticeAt > 0 && count >= this.noticeAt) {
 			LogUtil.sysout("dstone-ai-engine tool: agent[" + this.agentId + "]가 [" + name + "]를 같은 인자로 " + count
@@ -133,6 +152,24 @@ public class RepeatCallGuardCallback implements ToolCallback {
 			return notice(name, count, this.failAt);
 		}
 		return result;
+	}
+
+	/** 중단 오류에 덧붙일, 그때까지 한 일입니다. 알려 준 기록이 없으면 빈 글자입니다. */
+	private String progressText() {
+		StringBuilder text = new StringBuilder();
+		try {
+			if (this.succeededTools != null) {
+				text.append(" / 성공한 Tool: ").append(this.succeededTools.isEmpty() ? "없음" : new ArrayList<String>(this.succeededTools));
+			}
+			if (this.writtenPaths != null) {
+				List<String> paths = new ArrayList<String>(this.writtenPaths);
+				text.append(" / 쓴 파일 ").append(paths.size()).append("개").append(paths.isEmpty() ? "" : ": " + paths);
+			}
+		} catch (RuntimeException e) {
+			// 다른 스레드가 기록을 바꾸는 중이면 덧붙이지 않습니다. 오류 원인이 가려지면 안 됩니다.
+			return "";
+		}
+		return text.toString();
 	}
 
 	/** 결과 대신 돌려주는 안내입니다. */

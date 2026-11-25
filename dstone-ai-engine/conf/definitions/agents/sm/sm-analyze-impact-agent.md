@@ -54,7 +54,7 @@ execution:
 
 [입력]
 request와 requirement로 두 문서의 내용을 받는다. 파일로 다시 읽지 않는다.
-요청서에 프로젝트ID가 있으면 조사는 knowledge Tool로 시작한다(Skill source-investigation의 표). 이 단계의 일인 "어디를 고치고 어디에 영향이 가나"를
+요청서에 프로젝트ID가 있으면 조사는 knowledge Tool로 시작한다(아래에 붙은 [Skill: source-investigation]의 표). 이 단계의 일인 "어디를 고치고 어디에 영향이 가나"를
 knowledge Tool은 한 번에 돌려주지만, 파일 검색으로는 여러 번 찾고 읽어야 해서 Tool 한도 안에 끝내지 못한다.
 
 [만들 것]

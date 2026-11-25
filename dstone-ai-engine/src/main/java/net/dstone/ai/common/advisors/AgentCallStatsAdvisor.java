@@ -28,6 +28,8 @@ import org.springframework.ai.chat.model.Generation;
  * Tool 요청이 없는 답(마지막 답)이 오면 합계를 한 줄 더 남깁니다.
  * Tool 호출 한도 초과처럼 이 Advisor 바깥에서 끊기면 합계 줄은 남지 않지만 회차별 줄은 남아 있습니다.
  *
+ * Tool을 요청한 회차에는 모델이 함께 쓴 말(본문, 추론 글 제외)을 300자까지 남깁니다. 마무리를 못 하고 Tool만 부르는 Agent가
+ * 무슨 생각으로 그러는지 볼 수 있게 하려는 것입니다(2026-11-25 실행 d9f0bcc0). 마지막 답(Tool 요청 없음)의 본문은 남기지 않습니다.
  * Tool 인자와 결과는 남기지 않습니다. 크기도 크고, 파일 내용이 그대로 로그에 쌓이기 때문입니다.
  * 스트리밍 호출은 세지 않습니다(CallAdvisor만 구현합니다).
  *
@@ -40,6 +42,9 @@ public class AgentCallStatsAdvisor implements CallAdvisor {
 
 	/** Advisor 순서입니다. ToolCallingAdvisor(가장 앞 + 300)보다 뒤여야 LLM을 부를 때마다 돕니다. */
 	public static final int ORDER = -50;
+
+	/** 회차 로그에 남기는 모델 말의 최대 글자 수입니다. */
+	private static final int SAID_MAX_CHARS = 300;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AgentCallStatsAdvisor.class);
 
@@ -87,10 +92,14 @@ public class AgentCallStatsAdvisor implements CallAdvisor {
 	String record(ChatResponse response, long elapsedMs) {
 		this.rounds++;
 		StringBuilder requested = new StringBuilder();
+		StringBuilder said = new StringBuilder();
 		List<String> requestedNames = new ArrayList<String>();
 		if (response != null) {
 			List<Generation> results = response.getResults();
 			for (Generation generation : results == null ? List.<Generation>of() : results) {
+				if (generation.getOutput() != null && generation.getOutput().getText() != null && !generation.getOutput().getText().isBlank()) {
+					said.append(said.length() == 0 ? "" : " ").append(generation.getOutput().getText().strip());
+				}
 				if (generation.getOutput() == null || generation.getOutput().getToolCalls() == null) {
 					continue;
 				}
@@ -118,12 +127,21 @@ public class AgentCallStatsAdvisor implements CallAdvisor {
 		AgentCallStats.add(requestedNames, prompt, completion);
 
 		String line = "dstone-ai-engine agent: agent[" + this.agentId + "] " + this.rounds + "회차 " + elapsedMs + "ms" + roundTokens
-			+ (requested.length() == 0 ? ", Tool 요청 없음" : ", Tool 요청 [" + requested + "]");
+			+ (requested.length() == 0 ? ", Tool 요청 없음" : ", Tool 요청 [" + requested + "]") + (requested.length() == 0 ? "" : saidText(said));
 		if (requested.length() > 0) {
 			return line;
 		}
 		return line + "\ndstone-ai-engine agent: agent[" + this.agentId + "] 합계 - LLM " + this.rounds + "회, Tool " + this.toolCounts
 			+ ", 입력 " + this.promptTokens + "토큰, 출력 " + this.completionTokens + "토큰, " + (System.currentTimeMillis() - this.startedAt) + "ms";
+	}
+
+	/** 모델이 Tool 요청과 함께 쓴 말(본문)을 로그 한 줄에 맞게 줄입니다. 말이 없으면 빈 글자입니다. 추론 글은 담기지 않는 본문만입니다. */
+	private static String saidText(StringBuilder said) {
+		if (said.length() == 0) {
+			return "";
+		}
+		String oneLine = said.toString().replaceAll("\\s+", " ");
+		return ", 말 [" + (oneLine.length() > SAID_MAX_CHARS ? oneLine.substring(0, SAID_MAX_CHARS) + "..." : oneLine) + "]";
 	}
 
 }

@@ -41,6 +41,15 @@ public class AgentCallStatsAdvisorTest {
 	}
 
 	@Test
+	void Tool을_요청한_회차에는_모델의_말을_남기고_마지막_답의_본문은_남기지_않는다() {
+		AgentCallStatsAdvisor advisor = new AgentCallStatsAdvisor("a");
+		String first = advisor.record(this.response(100, 10, "readFile"), 5);
+		assertThat(first).contains("말 [답]");
+		String last = advisor.record(this.response(100, 10), 5);
+		assertThat(last).doesNotContain("말 [");
+	}
+
+	@Test
 	void 답이_없어도_죽지_않는다() {
 		assertThat(new AgentCallStatsAdvisor("a").record(null, 1)).contains("합계 - LLM 1회");
 	}
