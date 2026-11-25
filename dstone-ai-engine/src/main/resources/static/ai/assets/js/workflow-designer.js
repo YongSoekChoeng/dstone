@@ -1680,6 +1680,23 @@ var DstoneAiDesigner = (function () {
 	 * 반환: { id: 고른 step id, nodes: { 노드 id: 관계 값 } }
 	 */
 	function focusOf() {
+		if (selected && selected.type === "edge" && selected.kind !== "start" && stepById(selected.from)) {
+			// 화살표를 골랐으면 그 화살표와 양 끝 노드만 또렷하게(나가는 쪽은 고른 step처럼, 들어가는 쪽은 다음 step처럼) 그린다.
+			var edgeStep = stepById(selected.from);
+			var edgeTarget = null;
+			outgoing(edgeStep).forEach(function (edge) {
+				if (edge.kind === selected.kind && (edge.route || null) === (selected.route || null)) {
+					edgeTarget = edge.target;
+				}
+			});
+			if (edgeTarget === null) {
+				return null;
+			}
+			var targetId = (stepById(edgeTarget) || edgeTarget === END_ID || edgeTarget === FAIL_ID) ? edgeTarget : "missing:" + edgeTarget;
+			var edgeNodes = {};
+			edgeNodes[targetId] = FOCUS_NEXT;
+			return { id: selected.from, nodes: edgeNodes, edgeId: "edge|" + selected.from + "|" + selected.kind + "|" + (selected.route || "") };
+		}
 		if (!selected || selected.type !== "step" || !stepById(selected.id)) {
 			return null;
 		}
@@ -1755,8 +1772,8 @@ var DstoneAiDesigner = (function () {
 		if (!focus) {
 			return config;
 		}
-		if (from === focus.id || to === focus.id) {
-			config.attrs.line.strokeWidth = 3;
+		if (focus.edgeId ? config.id === focus.edgeId : (from === focus.id || to === focus.id)) {
+			config.attrs.line.strokeWidth = focus.edgeId ? 5 : 3;
 		} else {
 			config.attrs.line.opacity = DIM_OPACITY;
 			config.labels.forEach(function (label) {
@@ -3135,6 +3152,11 @@ var DstoneAiDesigner = (function () {
 				selected = { type: "edge", from: step.id, kind: link.getAttribute("data-kind"), route: link.getAttribute("data-route") || null };
 				redraw();
 				showPanel();
+				// 고른 화살표가 화면 밖일 수 있으니 그림 한가운데로 옮긴다
+				var pickedEdge = graph.getCellById("edge|" + selected.from + "|" + selected.kind + "|" + (selected.route || ""));
+				if (pickedEdge) {
+					graph.centerCell(pickedEdge);
+				}
 			});
 		});
 		bindStepLinks();
