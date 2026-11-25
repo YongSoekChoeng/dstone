@@ -114,8 +114,8 @@ public final class Constants {
 		public final static String KEEP_REASONING = "dstone.ai.agent.keep-reasoning";
 		/** 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드를 한 번 다시 부를지(기본 true, common.advisors.RunawayRetryAdvisor)입니다. */
 		public final static String RUNAWAY_RETRY = "dstone.ai.agent.runaway-retry";
-		/** 이미 받은 Skill을 안내를 받고도 또 부르는 응답을 그 자리에서 끝낼지(기본 true, common.advisors.RedundantSkillCallAdvisor)입니다. */
-		public final static String REDUNDANT_SKILL_END = "dstone.ai.agent.redundant-skill-end";
+		/** 본문과 함께 또 불러도 달라질 것이 없는 Tool 호출만 덧붙인 응답을 그 자리에서 끝낼지(기본 true, common.advisors.RedundantToolCallAdvisor)입니다. */
+		public final static String REDUNDANT_TOOL_END = "dstone.ai.agent.redundant-tool-end";
 	}
 
 	/** Tool을 caller별로 허용/차단하는 설정 키의 접두사(prefix)들입니다(common.config.ConfigTool과 tools 패키지 아래의 각 Tool이 사용합니다). */

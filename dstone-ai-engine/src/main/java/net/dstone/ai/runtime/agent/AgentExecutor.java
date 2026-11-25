@@ -30,7 +30,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
-import net.dstone.ai.common.advisors.RedundantSkillCallAdvisor;
+import net.dstone.ai.common.advisors.RedundantToolCallAdvisor;
 import net.dstone.ai.common.advisors.LlmCallGateAdvisor;
 import net.dstone.ai.common.advisors.ReasoningStripAdvisor;
 import net.dstone.ai.common.advisors.RunawayRetryAdvisor;
@@ -645,10 +645,11 @@ public class AgentExecutor extends BaseObject {
 			spec = spec.advisors(new ReasoningStripAdvisor(agent.id()));
 		}
 
-		// 일을 마치고 최종 답을 본문에 쓰면서 이미 받은 Skill을 또 부르는 응답은 그 자리에서 끝냅니다(RedundantSkillCallAdvisor). Skill Tool이 있을 때만 의미가 있습니다.
-		if (skillTool != null && readHistory != null
-			&& this.environment.getProperty(Constants.Agent.REDUNDANT_SKILL_END, Boolean.class, Boolean.TRUE).booleanValue()) {
-			spec = spec.advisors(new RedundantSkillCallAdvisor(agent.id(), readHistory));
+		// 일을 마치고 최종 답을 본문에 쓰면서 또 불러도 달라질 것이 없는 Tool(이미 받은 Skill, 같은 결과가 이미 두 번 나온 같은 호출)을 덧붙인 응답은
+		// 그 자리에서 끝냅니다(RedundantToolCallAdvisor). Tool 호출이 하나라도 있어야 의미가 있습니다.
+		if (!callbacks.isEmpty()
+			&& this.environment.getProperty(Constants.Agent.REDUNDANT_TOOL_END, Boolean.class, Boolean.TRUE).booleanValue()) {
+			spec = spec.advisors(new RedundantToolCallAdvisor(agent.id(), readHistory, repeatTracker));
 		}
 
 		// 같은 생각을 되풀이하다 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드는, 대화를 그대로 두고 한 번 다시 부릅니다(RunawayRetryAdvisor).

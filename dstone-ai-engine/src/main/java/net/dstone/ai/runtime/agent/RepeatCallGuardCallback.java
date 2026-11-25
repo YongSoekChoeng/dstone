@@ -62,6 +62,19 @@ public class RepeatCallGuardCallback implements ToolCallback {
 			return this.count;
 		}
 
+		/**
+		 * <pre>
+		 * 이 호출이 "바로 앞 호출과 같은 Tool, 같은 인자"일 때, 그 호출이 같은 결과로 연달아 몇 번 끝났는지 돌려줍니다. 아니면 0입니다.
+		 * 모델이 응답으로 요청한 Tool 호출을 아직 실행하기 전에, 그것이 또 같은 호출인지 미리 볼 때 씁니다(RedundantSkillCallAdvisor).
+		 * </pre>
+		 *
+		 * @param toolName  Tool 이름
+		 * @param arguments 모델이 준 인자(JSON 글자)
+		 */
+		public synchronized int identicalRuns(String toolName, String arguments) {
+			return keyOf(toolName, arguments).equals(this.lastKey) ? this.count : 0;
+		}
+
 		/** 셈을 처음부터 다시 합니다. 세지 않는 Tool을 불렀을 때 씁니다. */
 		synchronized void reset() {
 			this.lastKey = null;
@@ -140,7 +153,7 @@ public class RepeatCallGuardCallback implements ToolCallback {
 			return result;
 		}
 		String name = this.delegate.getToolDefinition().name();
-		String key = name + "\u0000" + (toolInput == null ? "" : toolInput.strip());
+		String key = keyOf(name, toolInput);
 		int count = this.tracker.record(key, result == null ? "" : result);
 		if (this.failAt > 0 && count >= this.failAt) {
 			throw new AgentContractException("반복 호출: agent[" + this.agentId + "]가 [" + name + "]를 같은 인자로 " + count
@@ -170,6 +183,11 @@ public class RepeatCallGuardCallback implements ToolCallback {
 			return "";
 		}
 		return text.toString();
+	}
+
+	/** 장부에 적는 "같은 호출" 키입니다. Tool 이름과 인자(앞뒤 공백 뺀 것)가 같으면 같은 호출입니다. */
+	static String keyOf(String toolName, String toolInput) {
+		return toolName + "\u0000" + (toolInput == null ? "" : toolInput.strip());
 	}
 
 	/** 결과 대신 돌려주는 안내입니다. */
