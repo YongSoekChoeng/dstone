@@ -130,3 +130,22 @@ No Java hits? Let me check the source and definitions more directly.
 알겠습니다. 지금 구성 그대로 두겠습니다.
 
 다만 앞에서 말한 문서 하나는 실제 동작과 다릅니다. `docs/software/16.playwright-mcp.md` 59번 줄과 67번 줄에는 아직 `sm-troubleshooter-agent`가 기본으로 `startTestServer`를 쓴다고 적혀 있습니다. 실제로는 1.8.0부터 `startSandboxServer`를 먼저 부르고, 격리에 실패했을 때만 `startTestServer`로 넘어갑니다. 이 두 줄만 고칠지 알려 주세요.
+
+---
+
+## 질문
+
+응 고쳐줘.
+
+---
+
+## 답변
+
+`docs/software/16.playwright-mcp.md`를 1.8.0 이후 동작에 맞게 고쳤습니다.
+
+- **59번 줄 (`sm-troubleshooter-agent` 설명):** 기본은 격리 시험 서버(`startSandboxServer`)이고, 격리를 지원하지 않아 `cause: environment`로 실패할 때만 임시 시험 서버(`startTestServer`)를 쓴다고 바꿨습니다.
+- **시험 서버 구성 표:** 원래 "임시 시험 서버(기본)" 한 줄이었는데 두 줄로 나눴습니다.
+  - "격리 시험 서버(기본)": 일회용 DB를 복제해서 띄운다는 설명을 붙이고, 지원 범위는 `docs/09` 11.2절을 보라고 적었습니다.
+  - "임시 시험 서버(격리 실패 시)": 기존 설명에 사본이 원래 DB에 붙는다는 점을 덧붙였습니다.
+
+바꾼 것은 이 파일 하나이고, 커밋은 아직 하지 않았습니다.
