@@ -210,3 +210,19 @@ Windows 쪽 실행 로그(11-21~25)를 확인했습니다.
 ## 답변
 
 22회차에서 `compileJava`를 불렀습니다. 다음은 컴파일 결과를 보고 `03-2.taskitems.md`에 기록하는 단계입니다. 그 직후가 이번에 보려는 구간이라 계속 지켜보겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b4h5gq8v5</task-id>
+<summary>Monitor event: "ai-engine Skill 호출·최종 답·반복 중단 (Windows 인스턴스 execution.log)"</summary>
+<event>2026-11-25 10:33:33 agent[sm-developer-agent] 23회차 35925ms, 입력 67552토큰, 출력 3419토큰, Tool 요청 [editFileTexts]</event>
+</task-notification>
+
+---
+
+## 답변
+
+23회차에 `editFileTexts`를 불러 기록 단계에 들어갔습니다. 다음 회차가 최종 답(`Tool 요청 없음`)인지 `Skill`인지가 판단 지점입니다.
