@@ -72,8 +72,6 @@ execution:
   maxToolCalls: 120
   toolPrerequisites:
     startSandboxServer: [dbQuery, "browser_*"]
-  requiredWrites:
-    - ${input.base_dir}/03-1.design.md
 ---
 [역할]
 너는 시험에서 실패한 것을 고치는 개발자다. boot_error가 있으면 그것을, 없으면 verification에서 result가 FAIL인 것을 고친다.

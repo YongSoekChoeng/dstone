@@ -187,7 +187,7 @@ steps:
     onFailure: FAIL
 
   - id: step08
-    name: 45-영향도 분석
+    name: 58-영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
     with:
@@ -224,7 +224,7 @@ steps:
     onFailure: FAIL
 
   - id: step11
-    name: 12-기존 설계서 확인
+    name: 13-기존 설계서 확인
     type: TOOL
     tool: isFileExist
     with:
@@ -235,7 +235,7 @@ steps:
     onFailure: FAIL
 
   - id: step12
-    name: 44-아키텍처 설계
+    name: 52-아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
     with:
@@ -251,7 +251,7 @@ steps:
     save: architectPath
 
   - id: step13
-    name: 14-설계 승인
+    name: 16-설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -266,7 +266,7 @@ steps:
       중지: FAIL
 
   - id: step14
-    name: 15-상세 설계서 읽기
+    name: 17-상세 설계서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -277,7 +277,7 @@ steps:
     onFailure: FAIL
 
   - id: step15
-    name: 16-태스크아이템 목록 읽기
+    name: 18-태스크아이템 목록 읽기
     type: TOOL
     tool: readFile
     with:
@@ -288,7 +288,7 @@ steps:
     onFailure: FAIL
 
   - id: step16
-    name: 17-기존개발디렉토리초기화
+    name: 19-기존개발디렉토리초기화
     type: TOOL
     tool: deleteDir
     with:
@@ -297,7 +297,7 @@ steps:
     next: step17
 
   - id: step17
-    name: 18-개발
+    name: 20-개발
     type: AGENT
     agent: sm-developer-agent
     with:
@@ -314,7 +314,7 @@ steps:
     onFailure: FAIL
 
   - id: step18
-    name: 19-컴파일 확인
+    name: 22-컴파일 확인
     type: TOOL
     tool: compileJava
     with:
@@ -328,7 +328,7 @@ steps:
     onFailure: step19
 
   - id: step19
-    name: 20-개발 승인
+    name: 23-개발 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -343,7 +343,7 @@ steps:
       실패: FAIL
 
   - id: step20
-    name: 21-재개발 전 설계서 다시 읽기
+    name: 24-재개발 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -354,7 +354,7 @@ steps:
     onFailure: FAIL
 
   - id: step21
-    name: 22-재개발 전 태스크아이템 목록 다시 읽기
+    name: 25-재개발 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -365,7 +365,7 @@ steps:
     onFailure: FAIL
 
   - id: step22
-    name: 23-전문가 해결 전 설계서 다시 읽기
+    name: 26-전문가 해결 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -376,7 +376,7 @@ steps:
     onFailure: FAIL
 
   - id: step23
-    name: 24-전문가 해결 전 태스크아이템 목록 다시 읽기
+    name: 27-전문가 해결 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -387,7 +387,7 @@ steps:
     onFailure: FAIL
 
   - id: step24
-    name: 25-전문가 해결
+    name: 28-전문가 해결
     type: AGENT
     agent: sm-troubleshooter-agent
     with:
@@ -404,7 +404,7 @@ steps:
     onFailure: step19
 
   - id: step25
-    name: 26-설계서 수정
+    name: 29-설계서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -420,7 +420,7 @@ steps:
     next: step50
 
   - id: step26
-    name: 27-영향도분석서 수정
+    name: 30-영향도분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -433,7 +433,7 @@ steps:
     next: step09
 
   - id: step27
-    name: 28-고객요구사항분석서 수정
+    name: 31-고객요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -446,7 +446,7 @@ steps:
     next: step04
 
   - id: step28
-    name: 29-자동 검증할 프로젝트 확인
+    name: 33-자동 검증할 프로젝트 확인
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -458,7 +458,7 @@ steps:
     onFailure: step19
 
   - id: step42
-    name: 30-첫 검증인지(검증 생략은 첫 검증에만)
+    name: 34-첫 검증인지(검증 생략은 첫 검증에만)
     type: TOOL
     tool: countUp
     with:
@@ -471,7 +471,7 @@ steps:
     onFailure: step41
 
   - id: step43
-    name: 41-컴파일만 확인으로 승인했는지
+    name: 45-컴파일만 확인으로 승인했는지
     type: TOOL
     tool: containsValue
     with:
@@ -483,7 +483,7 @@ steps:
     onFailure: step41
 
   - id: step44
-    name: 42-기동만 확인으로 승인했는지
+    name: 46-기동만 확인으로 승인했는지
     type: TOOL
     tool: containsValue
     with:
@@ -495,7 +495,7 @@ steps:
     onFailure: step41
 
   - id: step45
-    name: 43-격리 기동만 확인
+    name: 47-격리 기동만 확인
     type: TOOL
     tool: startSandboxServer
     with:
@@ -510,7 +510,7 @@ steps:
     onFailure: step30
 
   - id: step29
-    name: 33-격리 기동 확인
+    name: 37-격리 기동 확인
     type: TOOL
     tool: startSandboxServer
     with:
@@ -525,7 +525,7 @@ steps:
     onFailure: step30
 
   - id: step30
-    name: 34-기동 실패가 개발 결과 탓인지
+    name: 38-기동 실패가 개발 결과 탓인지
     type: TOOL
     tool: containsValue
     with:
@@ -537,7 +537,7 @@ steps:
     onFailure: step19
 
   - id: step31
-    name: 35-자동 수정 횟수 확인
+    name: 39-자동 수정 횟수 확인
     type: TOOL
     tool: countUp
     with:
@@ -551,7 +551,7 @@ steps:
     onFailure: step19
 
   - id: step32
-    name: 36-자동 수정 전 설계서 다시 읽기
+    name: 40-자동 수정 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -562,7 +562,7 @@ steps:
     onFailure: step19
 
   - id: step33
-    name: 37-자동 수정 전 태스크아이템 목록 다시 읽기
+    name: 41-자동 수정 전 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -573,7 +573,7 @@ steps:
     onFailure: step19
 
   - id: step34
-    name: 38-자동 수정
+    name: 42-자동 수정
     type: AGENT
     agent: sm-auto-fix-agent
     with:
@@ -591,7 +591,7 @@ steps:
     onFailure: step19
 
   - id: step35
-    name: 39-동작 검증
+    name: 43-동작 검증
     type: AGENT
     agent: sm-verifier-agent
     with:
@@ -609,7 +609,7 @@ steps:
     onFailure: step19
 
   - id: step36
-    name: 40-실패한 완료 기준이 있는지
+    name: 44-실패한 완료 기준이 있는지
     type: TOOL
     tool: containsValue
     with:
@@ -622,7 +622,7 @@ steps:
     onFailure: step19
 
   - id: step37
-    name: 13-기존 설계서 맞춤
+    name: 14-기존 설계서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -667,7 +667,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 46-리뷰 지적에 따른 요구사항분석서 수정
+    name: 59-리뷰 지적에 따른 요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -684,7 +684,7 @@ steps:
     next: step04
 
   - id: step40
-    name: 32-검증 전 바뀐 파일 확인(격리 기동 전)
+    name: 36-검증 전 바뀐 파일 확인(격리 기동 전)
     type: TOOL
     tool: fileChanges
     with:
@@ -696,7 +696,7 @@ steps:
     onFailure: step29
 
   - id: step41
-    name: 31-검증 전 설계서 다시 읽기
+    name: 35-검증 전 설계서 다시 읽기
     type: TOOL
     tool: readFile
     with:
@@ -705,8 +705,9 @@ steps:
     save: design
     next: step40
     onFailure: step19
+
   - id: step46
-    name: 47-참고 기능 시작점 읽기
+    name: 12-참고 기능 시작점 읽기
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -718,7 +719,7 @@ steps:
     onFailure: step11
 
   - id: step47
-    name: 48-참고 기능을 찾을 프로젝트 확인
+    name: 55-참고 기능을 찾을 프로젝트 확인
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -730,7 +731,7 @@ steps:
     onFailure: step11
 
   - id: step48
-    name: 49-참고 기능 코드 모으기
+    name: 56-참고 기능 코드 모으기
     type: TOOL
     tool: knowledgeFeatureCode
     with:
@@ -744,7 +745,7 @@ steps:
     onFailure: step11
 
   - id: step49
-    name: 50-참고 기능 코드 읽기
+    name: 57-참고 기능 코드 읽기
     type: TOOL
     tool: readFile
     with:
@@ -756,7 +757,7 @@ steps:
     onFailure: step11
 
   - id: step50
-    name: 51-설계 문서 형식 확인
+    name: 15-설계 문서 형식 확인
     type: TOOL
     tool: checkDocuments
     with:
@@ -771,7 +772,7 @@ steps:
     onFailure: step13
 
   - id: step51
-    name: 52-설계 문서 형식 자동 수정 횟수 확인
+    name: 53-설계 문서 형식 자동 수정 횟수 확인
     type: TOOL
     tool: countUp
     with:
@@ -785,7 +786,7 @@ steps:
     onFailure: step13
 
   - id: step52
-    name: 53-설계 문서 형식 고치기
+    name: 54-설계 문서 형식 고치기
     type: AGENT
     agent: document-revise-agent
     with:
@@ -804,7 +805,7 @@ steps:
     next: step50
 
   - id: step53
-    name: 54-개발 결과 형식 확인
+    name: 32-개발 결과 형식 확인
     type: TOOL
     tool: checkSources
     with:
@@ -816,7 +817,7 @@ steps:
     onFailure: step28
 
   - id: step54
-    name: 55-손대지 못한 보류가 없는지
+    name: 21-손대지 못한 보류가 없는지
     type: TOOL
     tool: containsValue
     with:
@@ -828,7 +829,7 @@ steps:
     onFailure: step18
 
   - id: step55
-    name: 56-보류 이어서 개발 횟수 확인
+    name: 50-보류 이어서 개발 횟수 확인
     type: TOOL
     tool: countUp
     with:
@@ -842,7 +843,7 @@ steps:
     onFailure: step18
 
   - id: step56
-    name: 57-형식 오류 고치기 횟수 확인
+    name: 48-형식 오류 고치기 횟수 확인
     type: TOOL
     tool: countUp
     with:
@@ -856,7 +857,7 @@ steps:
     onFailure: step28
 
   - id: step57
-    name: 58-보류 이어서 개발
+    name: 51-보류 이어서 개발
     type: AGENT
     agent: sm-developer-agent
     with:
@@ -877,7 +878,7 @@ steps:
     onFailure: step18
 
   - id: step58
-    name: 59-형식 오류 고치기
+    name: 49-형식 오류 고치기
     type: AGENT
     agent: sm-developer-agent
     with:
