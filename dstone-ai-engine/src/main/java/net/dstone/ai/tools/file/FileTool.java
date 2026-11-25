@@ -1641,8 +1641,9 @@ public class FileTool {
 	/**
 	 * 검색용으로 파일을 글자로 읽습니다. 바이너리 파일(이미지, class, jar 등)이거나 읽지 못하면 null입니다.
 	 * 먼저 UTF-8로 읽어 보고, 깨지면 MS949(오래된 국내 프로젝트의 EUC-KR 소스)로 다시 읽습니다.
+	 * 원본 소스를 읽는 다른 Tool(tools.knowledge.KnowledgeFeatureTool)도 같은 방식으로 읽으려고 공개합니다.
 	 */
-	private String readText(File file) {
+	public static String readText(File file) {
 		byte[] bytes;
 		try {
 			bytes = Files.readAllBytes(file.toPath());

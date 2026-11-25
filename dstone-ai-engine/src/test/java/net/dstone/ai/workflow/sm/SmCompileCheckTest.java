@@ -61,9 +61,13 @@ public class SmCompileCheckTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.stepper("sm-workflow", "step18", this.args());
 		flow.step("step18");
 
-		assertThat(flow.currentStepId()).isEqualTo("step28");
+		assertThat(flow.currentStepId()).isEqualTo("step53");
 		assertThat(String.valueOf(flow.state("compileResult"))).contains("컴파일 통과").contains("Maven");
 		assertThat(flow.state("compileError")).isNull();
+		// 컴파일 뒤에는 서버를 띄우지 않는 형식 검사(XML·JSP·JavaScript)를 거쳐 자동 검증으로 간다
+		flow.step("step53");
+		assertThat(flow.currentStepId()).isEqualTo("step28");
+		assertThat(flow.stateMap("sourceCheck").get("route")).isEqualTo("ok");
 	}
 
 	@Test

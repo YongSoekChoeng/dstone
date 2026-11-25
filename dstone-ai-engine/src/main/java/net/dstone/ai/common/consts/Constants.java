@@ -168,6 +168,11 @@ public final class Constants {
 			public final static String PREFIX = "dstone.ai.tool.test-server";
 		}
 
+		/** 서버를 띄우지 않고 형식 오류를 찾는 Tool(tools.build.StaticCheckTool)의 설정 키 접두사입니다. */
+		public static final class StaticCheck {
+			public final static String PREFIX = "dstone.ai.tool.static-check";
+		}
+
 		/** 등록해 둔 DB를 조회하는 Tool(tools.db.DbQueryTool)의 설정 키 접두사입니다. */
 		public static final class Db {
 			public final static String PREFIX = "dstone.ai.tool.db";

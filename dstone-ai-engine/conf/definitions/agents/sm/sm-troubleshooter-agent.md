@@ -11,8 +11,9 @@
 # 1.7.0: requiredTools(editFileTexts)를 뺐습니다. "이미 고쳐져 있고 사람이 시험한 서버에 반영되지 않았음"처럼 고칠 것이 없는 결론도
 #        정상 결과입니다(실행 86b3660b: 맞는 진단이 계약 위반으로 실패 처리됨). 설계서 기록(requiredWrites)은 그대로 강제합니다.
 # 1.8.0: 재현은 격리 시험 서버(startSandboxServer)가 먼저입니다. 격리를 지원하지 않는 프로젝트에서만 startTestServer를 씁니다.
+# 1.9.0(2026-11-25): 고친 뒤 checkSources로 XML·JSP·JavaScript 형식을 확인합니다.
 id: sm-troubleshooter-agent
-version: 1.8.0
+version: 1.9.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
   reasoning: high
@@ -46,6 +47,7 @@ tools:
     - appendFile
     - copyFileWithReplace
     - compileJava
+    - checkSources
     - knowledgeCallees
     - knowledgeCallers
     - knowledgeFindMethods
@@ -141,6 +143,7 @@ Skill troubleshooting을 따른다. 증상을 나누고, 관측할 수단이 있
 - 다 고친 뒤 compileJava를 부른다(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources,
   outputDir ${input.base_dir}/compile-check, deleteList ${input.base_dir}/dev-resources/_delete-files.txt, 나머지는 비움).
   실패하면 고쳐서 최대 3번까지 다시 부른다. 클래스 파일이나 컴파일러가 없다는 것처럼 코드와 상관없는 실패면 다시 부르지 않는다.
+  JSP·XML·JavaScript를 고쳤으면 checkSources(overlayDir ${input.base_dir}/dev-resources)로 형식도 확인한다.
 
 [설계서와 목록에 남기는 법]
 설계를 다시 하면 개발 폴더를 비우고 설계서대로 처음부터 만든다. 설계서에 없는 수정은 그때 사라지므로, 고친 것은 모두 ${input.base_dir}/03-1.design.md에도 고친다.

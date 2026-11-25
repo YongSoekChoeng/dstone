@@ -277,6 +277,11 @@ dstone:
             # LLM에게는 비밀번호 대신 자리표시자만 준다. 여기 없는 Tool에 자리표시자를 주면 실행하지 않는다. 결과에 섞인 비밀값은 자리표시자로 되돌려 가린다.
             secret:
                 allowed-tools: browser_type,browser_fill_form
+            # 서버를 띄우지 않고 형식 오류를 찾는 Tool(tools.build.StaticCheckTool, checkDocuments/checkSources) 설정.
+            # JavaScript 구문은 node --check로 본다. node를 실행할 수 없으면 그 검사만 건너뛰고 결과의 skipped에 적는다.
+            static-check:
+                # node 명령(빈칸으로 나눈 토큰). PATH에 없으면 전체 경로로 적는다
+                node-command: ${STATIC_CHECK_NODE_COMMAND:node}
             # 원본 + 개발 결과로 임시 시험 서버를 띄우고 내리는 Tool(tools.build.TestServerTool, startTestServer/stopTestServer) 설정.
             # 사본은 {work-root}/{프로젝트ID}-server/app 에 두고 다음에 다시 쓴다(처음만 전체 복사). 서버는 띄운 step이 끝나면 내려간다.
             # Maven 프로젝트(tomcat7/tomcat6, spring-boot, jetty 플러그인)만 띄운다. 사본은 원본 설정 그대로 원래 DB에 붙는다.

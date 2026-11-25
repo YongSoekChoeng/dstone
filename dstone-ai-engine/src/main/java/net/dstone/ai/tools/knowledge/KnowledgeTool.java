@@ -555,21 +555,7 @@ public class KnowledgeTool extends BaseObject {
 
 	/** 프로젝트에서 분석이 끝난(READY) 가장 최근 리비전의 번호 */
 	private long latestRevision(String projectId) throws KnowledgeCallException {
-		if (StringUtil.isEmpty(projectId)) {
-			throw new KnowledgeCallException("실패: projectId가 비어 있습니다. knowledgeListProjects로 프로젝트 ID를 먼저 확인하세요.");
-		}
-		JsonNode revisions = this.get("/api/projects/" + projectId.trim() + "/revisions", null);
-		long latest = -1;
-		for (int i = 0; i < revisions.size(); i++) {
-			JsonNode revision = revisions.get(i);
-			if ("READY".equals(text(revision, "status"))) {
-				latest = Math.max(latest, revision.path("revisionId").asLong());
-			}
-		}
-		if (latest < 0) {
-			throw new KnowledgeCallException("실패: 분석이 끝난 리비전이 없는 프로젝트입니다: " + projectId);
-		}
-		return latest;
+		return this.knowledgeClient.latestRevision(projectId);
 	}
 
 	private void appendMore(StringBuilder sb, int total, int shown) {

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 기능 한 묶음(FeatureService)의 재료. 저장된 관계를 읽기만 한다.
+     화면 → (REQUESTS) → 처리 메소드 → (CALLS ...) → 메소드 → (EXECUTES_SQL) → SQL, 메소드 → (RENDERS) → 화면(팝업 등)
+     한 번에 다 읽지 않고, 닿은 노드의 id 묶음마다 다음 관계를 읽는다(기능 하나는 작고, 프로젝트 전체는 클 수 있어서). -->
+<mapper namespace="net.dstone.knowledge.api.dao.FeatureDao">
+
+    <!-- 주소가 정확히 같은 진입점 -->
+    <select id="selectEndpointsByPath" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.path AS "path"
+             , e.method_id AS "methodId"
+          FROM analysis_endpoint e
+         WHERE e.revision_id = #{revisionId}
+           AND e.path = #{path}
+           AND e.method_id IS NOT NULL
+         ORDER BY e.endpoint_id
+    </select>
+
+    <!-- 경로가 같거나 그 경로로 끝나는 파일(화면). 앞부분을 생략하고 적은 경로도 찾는다 -->
+    <select id="selectFilesByPath" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT f.file_id AS "fileId"
+             , f.path AS "path"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND (f.path = #{path} OR f.path LIKE '%/' || #{path})
+         ORDER BY length(f.path), f.path
+         LIMIT 5
+    </select>
+
+    <!-- 화면이 요청하는 처리 메소드. via(SCRIPT_SRC면 그 화면이 넣은 스크립트 파일 안에서 요청)와 스크립트 경로를 함께 -->
+    <select id="selectScreenRequests" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "from"
+             , r.to_id AS "to"
+             , r.confidence AS "confidence"
+             , r.properties_json->>'via' AS "via"
+             , r.properties_json->>'script' AS "script"
+             , r.properties_json->>'requestPath' AS "requestPath"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type = 'REQUESTS'
+           AND r.to_kind = 'METHOD'
+           AND r.to_id IS NOT NULL
+           AND r.from_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 처리 메소드를 요청하는 화면(주소로 시작했을 때 그 주소를 부르는 화면을 찾으려고) -->
+    <select id="selectRequestingScreens" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "from"
+             , r.to_id AS "to"
+             , r.properties_json->>'via' AS "via"
+             , r.properties_json->>'script' AS "script"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type = 'REQUESTS'
+           AND r.from_kind = 'FILE'
+           AND r.to_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 여러 화면이 함께 넣는 스크립트(공통 스크립트). 그 안의 요청은 한 기능의 것이 아니라서 따라가지 않는다 -->
+    <select id="selectSharedScripts" parameterType="java.util.Map" resultType="string">
+        SELECT r.properties_json->>'script'
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type = 'REQUESTS'
+           AND r.properties_json->>'via' = 'SCRIPT_SRC'
+           AND r.properties_json->>'script' IS NOT NULL
+         GROUP BY r.properties_json->>'script'
+        HAVING count(DISTINCT r.from_id) &gt; #{maxScreens}
+    </select>
+
+    <!-- 화면을 돌려주는 메소드(그 화면을 여는 주소의 처리 메소드) -->
+    <select id="selectRenderingMethods" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "from"
+             , r.to_id AS "to"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.relation_type = 'RENDERS'
+           AND r.from_kind = 'METHOD'
+           AND r.to_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 메소드에서 나가는 관계: 메소드 → 메소드, 메소드 → SQL, 메소드 → 화면(RENDERS). 못 푼 것(to_id 없음)은 뺀다 -->
+    <select id="selectMethodEdges" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT r.from_id AS "from"
+             , r.to_id AS "to"
+             , r.to_kind AS "toKind"
+             , r.relation_type AS "type"
+             , r.confidence AS "confidence"
+          FROM analysis_relation r
+         WHERE r.revision_id = #{revisionId}
+           AND r.from_kind = 'METHOD'
+           AND r.to_id IS NOT NULL
+           AND ((r.to_kind = 'METHOD' AND r.relation_type IN ('CALLS', 'CALLS_POSSIBLE_IMPLEMENTATION', 'ENCLOSES_ANONYMOUS'))
+             OR (r.to_kind = 'SQL' AND r.relation_type = 'EXECUTES_SQL')
+             OR (r.to_kind = 'FILE' AND r.relation_type = 'RENDERS'))
+           AND r.from_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 메소드 정보: 클래스, 계층, 파일 위치 -->
+    <select id="selectMethods" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT m.method_id AS "methodId"
+             , s.fqn AS "owner"
+             , s.layer AS "layer"
+             , m.signature AS "signature"
+             , m.is_synthetic AS "isSynthetic"
+             , f.path AS "path"
+             , m.line_start AS "lineStart"
+             , m.line_end AS "lineEnd"
+          FROM analysis_method m
+          LEFT JOIN analysis_symbol s ON s.revision_id = m.revision_id AND s.symbol_id = m.owner_symbol_id
+          LEFT JOIN analysis_file f ON f.file_id = m.file_id
+         WHERE m.revision_id = #{revisionId}
+           AND m.method_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- SQL statement 정보와 건드리는 테이블 -->
+    <select id="selectStatements" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT 'S' || mp.mapper_id AS "id"
+             , COALESCE(mp.namespace || '.', '') || mp.statement_id AS "statement"
+             , mp.statement_type AS "statementType"
+             , f.path AS "path"
+             , mp.line_start AS "lineStart"
+             , mp.line_end AS "lineEnd"
+             , (SELECT string_agg(DISTINCT t.to_external || '('
+                        || (CASE WHEN t.relation_type = 'READS_TABLE' THEN 'R' ELSE COALESCE(t.properties_json->>'crud', 'W') END) || ')', ', ')
+                  FROM analysis_relation t
+                 WHERE t.revision_id = mp.revision_id
+                   AND t.from_id = 'S' || mp.mapper_id
+                   AND t.relation_type IN ('READS_TABLE', 'WRITES_TABLE')) AS "tables"
+          FROM analysis_mapper mp
+          JOIN analysis_file f ON f.file_id = mp.file_id
+         WHERE mp.revision_id = #{revisionId}
+           AND mp.mapper_id IN
+           <foreach collection="mapperIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 파일(화면) 경로 -->
+    <select id="selectFiles" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT 'F' || f.file_id AS "id"
+             , f.path AS "path"
+             , f.line_count AS "lineCount"
+          FROM analysis_file f
+         WHERE f.revision_id = #{revisionId}
+           AND f.file_id IN
+           <foreach collection="fileIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 처리 메소드의 주소 -->
+    <select id="selectEndpointsByMethods" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT e.method_id AS "methodId"
+             , e.path AS "path"
+          FROM analysis_endpoint e
+         WHERE e.revision_id = #{revisionId}
+           AND e.method_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+         ORDER BY e.path
+    </select>
+
+</mapper>

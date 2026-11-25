@@ -1,6 +1,7 @@
 package net.dstone.knowledge.api.controller;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import net.dstone.knowledge.common.exception.ApiException;
 import net.dstone.knowledge.api.service.CallGraphService;
 import net.dstone.knowledge.api.service.DiagnosticService;
 import net.dstone.knowledge.api.service.DiffService;
+import net.dstone.knowledge.api.service.FeatureService;
 import net.dstone.knowledge.api.service.ImpactService;
 import net.dstone.knowledge.api.service.RevisionService;
 import net.dstone.knowledge.api.service.SymbolService;
@@ -42,6 +44,9 @@ public class RevisionController {
 
 	@Autowired
 	private ImpactService impactService;
+
+	@Autowired
+	private FeatureService featureService;
 
 	@Autowired
 	private DiffService diffService;
@@ -252,6 +257,18 @@ public class RevisionController {
 			, @RequestParam(name = "includePossible", defaultValue = "true") boolean includePossible
 			, @RequestParam(name = "includeExternal", defaultValue = "false") boolean includeExternal) {
 		return callGraphService.getCallees(revisionId, methodId, depth, includePossible, includeExternal);
+	}
+
+	/**
+	 * <pre>
+	 * 기능 한 묶음: 화면 파일 경로나 주소에서 시작해 그 기능의 화면, 주소, 메소드, SQL을 모읍니다(팝업 화면 포함).
+	 * 새 기능을 설계할 때 본뜰 기존 기능 하나를 통째로 보려는 것입니다. entry 는 여러 개 줄 수 있습니다.
+	 * </pre>
+	 */
+	@GetMapping("/{revisionId}/feature")
+	public Map<String, Object> getFeature(@PathVariable("revisionId") long revisionId
+			, @RequestParam(name = "entry") List<String> entries) {
+		return featureService.getFeature(revisionId, entries);
 	}
 
 	/** 리비전과 거기에 딸린 분석 결과를 모두 지웁니다. 되돌릴 수 없습니다. */

@@ -61,6 +61,25 @@ public class KnowledgeClient extends BaseObject {
 		return this.exchange("GET " + path, this.webClient().get().uri(this.uriOf(path, params)));
 	}
 
+	/** 프로젝트에서 분석이 끝난(READY) 가장 최근 리비전의 번호. knowledge Tool들이 같이 씁니다. */
+	public long latestRevision(String projectId) throws KnowledgeCallException {
+		if (StringUtil.isEmpty(projectId)) {
+			throw new KnowledgeCallException("실패: projectId가 비어 있습니다. knowledgeListProjects로 프로젝트 ID를 먼저 확인하세요.");
+		}
+		JsonNode revisions = this.get("/api/projects/" + projectId.trim() + "/revisions", null);
+		long latest = -1;
+		for (int i = 0; i < revisions.size(); i++) {
+			JsonNode revision = revisions.get(i);
+			if ("READY".equals(revision.path("status").asText())) {
+				latest = Math.max(latest, revision.path("revisionId").asLong());
+			}
+		}
+		if (latest < 0) {
+			throw new KnowledgeCallException("실패: 분석이 끝난 리비전이 없는 프로젝트입니다: " + projectId);
+		}
+		return latest;
+	}
+
 	public JsonNode post(String path, Map<String, Object> body) throws KnowledgeCallException {
 		String json;
 		try {

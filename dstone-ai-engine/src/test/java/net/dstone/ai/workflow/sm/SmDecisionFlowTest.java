@@ -57,12 +57,13 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step37 기존 설계서 맞춤 · document-revise-agent 또는 step12 아키텍처 설계 · sm-architect-agent");
-		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step26 영향도분석서 수정 · document-revise-agent");
+		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step37 13-기존 설계서 맞춤 · document-revise-agent 또는 step12 44-아키텍처 설계 · sm-architect-agent");
+		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step26 27-영향도분석서 수정 · document-revise-agent");
 		assertThat(pending.receivers().get("중지")).isEqualTo("실패로 끝냄(FAIL)");
 
 		flow.decide("승인(설계진행)", "공통 코드 테이블도 같이 봐 주세요");
 		flow.step("step10");
+		flow.step("step46"); // 영향도분석서에 '참고 기능' 절이 없으면 본뜰 기능의 코드 없이 설계로 간다
 		flow.step("step11"); // 설계서가 아직 없으므로 새로 쓰는 길로 간다
 		flow.step("step12");
 
@@ -88,7 +89,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 
 		WorkflowStepper flow = this.atStep("step06");
 		flow.step("step06");
-		flow.decide("요구사항 수정", "TASK-02 완료 기준을 확인할 수 있게 고쳐 주세요");
+		flow.decide("요구사항분석서 수정", "TASK-02 완료 기준을 확인할 수 있게 고쳐 주세요");
 		assertThat(flow.currentStepId()).isEqualTo("step39");
 		flow.step("step39");
 
@@ -96,7 +97,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		assertThat(flow.currentStepId()).isEqualTo("step04");
 		assertThat(Files.readString(requirement, StandardCharsets.UTF_8)).contains("목록에 10건씩 보인다");
 		String prompt = ScriptedChatModel.textOf(this.chatModel.prompts().get(0));
-		assertThat(prompt).contains(path).contains("리뷰 불통과 처리 결정(step06)의 결정: 요구사항 수정").contains("TASK-02 완료 기준을 확인할 수 있게");
+		assertThat(prompt).contains(path).contains("리뷰 불통과 처리 결정(step06)의 결정: 요구사항분석서 수정").contains("TASK-02 완료 기준을 확인할 수 있게");
 	}
 
 	@Test
@@ -114,7 +115,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		flow.step("step19");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("재개발")).isEqualTo("step17 개발 · sm-developer-agent");
+		assertThat(pending.receivers().get("재개발")).isEqualTo("step17 18-개발 · sm-developer-agent");
 
 		flow.decide("재개발", "업로드한 파일이 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step20");
@@ -145,7 +146,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step19");
 		flow.step("step19");
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("전문가 해결")).isEqualTo("step24 전문가 해결 · sm-troubleshooter-agent");
+		assertThat(pending.receivers().get("전문가 해결")).isEqualTo("step24 25-전문가 해결 · sm-troubleshooter-agent");
 
 		flow.decide("전문가 해결", "업로드한 파일이 테이블에 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step22");

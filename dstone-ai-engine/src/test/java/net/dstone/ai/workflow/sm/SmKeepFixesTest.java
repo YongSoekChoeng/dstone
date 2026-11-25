@@ -52,9 +52,12 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		flow.step("step09");
 		flow.decide("승인(설계진행)", "APPROVAL_COMMENT");
 		flow.step("step10");
+		flow.step("step46"); // '참고 기능' 절이 없으면 본뜰 기능의 코드 없이 간다
 		flow.step("step11");
 		assertThat(flow.currentStepId()).isEqualTo("step37");
 		flow.step("step37");
+		assertThat(flow.currentStepId()).isEqualTo("step50");
+		flow.step("step50");
 
 		assertThat(flow.currentStepId()).isEqualTo("step13");
 		assertThat(Files.readString(design, StandardCharsets.UTF_8)).contains("FIX_FROM_REDEVELOP");
@@ -66,6 +69,8 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		this.write("02.impact.md", "# 영향도");
 		WorkflowStepper flow = this.atStep("step10");
 		flow.step("step10");
+		flow.step("step46");
+		assertThat(String.valueOf(flow.state("referenceError"))).contains("참고 기능");
 		flow.step("step11");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
@@ -148,20 +153,11 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step06");
 		flow.put("review", review);
 		flow.step("step06");
-		flow.decide("요구사항 수정", "HUMAN_COMMENT");
+		flow.decide("요구사항분석서 수정", "HUMAN_COMMENT");
 		flow.step("step39");
 
 		assertThat(flow.currentStepId()).isEqualTo("step04");
 		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(0))).contains("REVIEWER_REASON", "HUMAN_COMMENT");
-	}
-
-	@Test
-	void 리뷰_답을_못_받았으면_다시_리뷰할_수_있다() {
-		WorkflowStepper flow = this.atStep("step06");
-		flow.step("step06");
-		flow.decide("다시 리뷰", "판정을 받지 못함");
-
-		assertThat(flow.currentStepId()).isEqualTo("step04");
 	}
 
 	@Test

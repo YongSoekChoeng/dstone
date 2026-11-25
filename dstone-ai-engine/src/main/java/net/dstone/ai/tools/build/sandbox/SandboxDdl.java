@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * 명령줄 도구는 system, \! 같은 OS 명령을 실행할 수 있는데, 이 파일은 LLM이 쓴 것이기 때문입니다.
  * </pre>
  */
-final class SandboxDdl {
+public final class SandboxDdl {
 
 	private static final Pattern SQL_START = Pattern.compile("(?is)^(\\s|--[^\\n]*\\n|#[^\\n]*\\n|/\\*.*?\\*/)*(CREATE|ALTER|BEGIN|DECLARE|INSERT|COMMENT|GRANT|DO|DROP|UPDATE|DELETE|REPLACE|RENAME|TRUNCATE|SET|USE|DELIMITER)\\b.*");
 	private static final Pattern DDL_OUTSIDE = Pattern.compile("(?i)^\\s*(CREATE\\s+(TABLE|INDEX|UNIQUE|VIEW)|ALTER\\s+TABLE|DROP\\s+TABLE|INSERT\\s+INTO)\\s+\\S.*");
@@ -52,6 +52,18 @@ final class SandboxDdl {
 	private static final Pattern DOLLAR_TAG = Pattern.compile("\\$([A-Za-z_][A-Za-z0-9_]*)?\\$");
 
 	private SandboxDdl() {
+	}
+
+	/**
+	 * <pre>
+	 * DB 없이 파일 모양만 봅니다. 격리 시험 서버에 올리기 전에 같은 규칙으로 걸러, 사람이 승인한 뒤에야 기동이 실패하는 일을 막습니다
+	 * (실행 ff9ec3c7: 설계서 DDL 끝에 남은 ``` 하나로 기동이 두 번 실패). tools.build.StaticCheckTool이 씁니다.
+	 * </pre>
+	 *
+	 * @return 실행할 수 없는 이유. 문제가 없으면 null
+	 */
+	public static String problemOf(String fileName, String text) {
+		return parse(fileName, text, Dialect.MYSQL).problem();
 	}
 
 	/**

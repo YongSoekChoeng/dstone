@@ -4,8 +4,9 @@
 # 시험 서버를 띄우기 전에는 execution.toolPrerequisites가 행 조회와 브라우저를 막습니다. 기동 실패를 고칠 때 필요한 테이블 구조 조회만 원래 DB에서 됩니다.
 # 1.2.0(2026-11-23): Skill test-environment를 받아, 시험 환경 차이로 생긴 실패는 고치지 않고 unresolved에 남긴다
 #   (실행 6d1784d8에서 업로드 이미지 404를 코드에서 찾다가 18분 뒤 출력 한도로 끝났다).
+# 1.3.0(2026-11-25): 고친 뒤 checkSources로 XML·JSP·JavaScript 형식을 확인한다.
 id: sm-auto-fix-agent
-version: 1.2.0
+version: 1.3.0
 description: 동작 검증에서 실패한 것의 원인을 격리 시험 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -35,6 +36,7 @@ tools:
     - appendFile
     - copyFileWithReplace
     - compileJava
+    - checkSources
     - knowledgeSearch
     - knowledgeFindMethods
     - knowledgeCallers
@@ -90,7 +92,7 @@ ddlFile ${input.base_dir}/03-3.ddl(데이터베이스).md, deleteList ${input.ba
 - 고친 것은 ${input.base_dir}/03-1.design.md 의 해당 코드에도 같은 before/after로 고치고, '## 수정 이력'에 "- 자동 수정: (실패) → (원인) → (고친 것)" 한 줄을 남긴다.
   설계를 다시 하면 개발 폴더를 비우고 설계서대로 만들기 때문에, 설계서에 없는 수정은 사라진다. 고칠 것이 없다고 판단했어도 그 한 줄은 남긴다.
 - 컴파일할 언어면 compileJava(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources, outputDir ${input.base_dir}/compile-check,
-  deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 확인한다.
+  deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 확인한다. JSP·XML·JavaScript를 고쳤으면 checkSources(overlayDir ${input.base_dir}/dev-resources)로 형식을 확인한다.
 
 [답]
 ${output.causes}, ${output.changes}, ${output.unresolved}에 짧게 적는다.

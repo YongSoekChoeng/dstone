@@ -2,8 +2,9 @@
 # sm-workflow step12(아키텍처 설계)의 Agent입니다. 요구사항과 영향도를 바탕으로 설계서를 처음 씁니다.
 # 이미 있는 설계서를 고치는 일은 document-revise-agent가 합니다([설계 수정]). 이 Agent는 [설계 다시 작성]일 때 처음부터 다시 씁니다.
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
+# 2.3.0(2026-11-25): reference_code로 본뜰 기능의 코드(화면부터 SQL까지, 팝업 포함)를 받는다. 참고 파일은 거기서 고른다.
 id: sm-architect-agent
-version: 2.2.0
+version: 2.3.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
   temperature: 0.2
@@ -13,6 +14,8 @@ input:
   request: string, 고객 요청서(00.request.md)의 내용. 소스경로가 들어 있다
   requirement: string, 고객요구사항분석서(01.customer_requirement.md)의 내용
   impact: string, 영향도분석서(02.impact.md)의 내용
+  reference_code?: string, 본뜰 기존 기능의 원본 코드(02-1.reference-code.md). 화면 → 주소 → 메소드 → SQL을 분석 결과의 관계로 모은 것
+  reference_error?: string, 본뜰 기능의 코드를 모으지 못한 이유. 있으면 reference_code는 지난 것이므로 쓰지 않는다
   instruction?: string, 이번 일을 시킨 결정(영향도 승인의 결정과 의견 등)
   history?: string, 이 작업에서 지금까지 내려진 결정 전체
 output: string
@@ -60,6 +63,11 @@ request, requirement, impact로 세 문서의 내용을 받는다. 파일로 다
 파일 위치는 영향도분석서에 있다. readFileListAll은 영향도분석서에 없는 참고 파일을 찾을 때만 쓴다.
 영향도분석서에 없는 호출 관계나 테이블 사용처가 필요하면, 요청서에 프로젝트ID가 있을 때 knowledge Tool로 먼저 찾는다(Skill source-investigation의 표).
 참고 파일은 구조를 볼 때 한 번만 통째로 읽고, 그 밖의 파일은 필요한 범위만 읽는다. 같은 것을 파일 검색으로 여러 번 찾으면 Tool 한도를 넘긴다.
+reference_error가 비어 있고 reference_code가 있으면, 그것이 본뜰 기능의 원본 코드다. 이미 읽은 것이므로 그 파일들을 다시 열지 않는다.
+- 새 파일의 참고 파일은 이 코드에 나온 파일에서 고른다. 화면과 그 화면이 부르는 Controller·Service·SQL, 팝업을 여는 쪽과 팝업 화면처럼
+  주고받는 짝은 이 코드에 함께 나온 것끼리 쓴다. 여기 있는 동작하는 방식(업로드, 팝업 열기와 값 넘기기, 공통 서비스를 부르기 전에 하는 일)을
+  바꾸지 않고 본뜬다. 다르게 짓는 방식은 요구가 그것을 바꾸라고 할 때만 쓰고, 그 이유를 설계서에 적는다.
+- 이 코드에 없는 것(위치만 적힌 것, '따라가지 않은 것')이 필요하면 그 범위만 읽는다.
 
 [설계하는 법]
 - 수정사항: 영향도분석서의 '현재 코드'가 지금 소스다. 그것으로 '변경 전'을 정하고 파일을 다시 열지 않는다(없는 줄이 꼭 필요할 때만 그 범위를 읽는다).

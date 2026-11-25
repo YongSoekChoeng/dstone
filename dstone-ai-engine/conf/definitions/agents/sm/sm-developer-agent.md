@@ -3,8 +3,10 @@
 # 조사 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 2.3.0(2026-11-24): DB에만 적용하는 태스크아이템(DDL, 메뉴·데이터 INSERT)은 SQL이 03-3에 있으면 '완료'로 둔다.
 #   그때까지 보류 6건이 모두 "DB 반영은 사람이 해야 함"이었고, 코드를 못 짠 보류는 없었다. 승인 화면의 보류 수가 잡음이 됐다.
+# 2.4.0(2026-11-25): 컴파일 뒤 checkSources로 XML·JSP·JavaScript 형식을 스스로 확인한다. Workflow가 다시 부를 때는 check_result로
+#   지난 결과의 보류나 형식 오류를 받는다(step57·58).
 id: sm-developer-agent
-version: 2.3.0
+version: 2.4.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -18,6 +20,7 @@ input:
   instruction?: string, 이번 일을 시킨 결정(설계 승인, 또는 개발 승인의 재개발 지시)
   history?: string, 이 작업에서 지금까지 내려진 결정 전체
   compile_error?: string, 지난 컴파일 확인에서 난 오류(없으면 비어 있음)
+  check_result?: string, Workflow가 다시 부른 이유(지난 개발의 보류, 개발 결과의 형식 오류). 없으면 비어 있음
 output:
   completed: integer, '완료'로 기록한 태스크아이템 수
   pending: integer, '보류'로 기록한 태스크아이템 수
@@ -35,6 +38,7 @@ tools:
     - copyFileWithReplace
     - searchInFiles
     - compileJava
+    - checkSources
 skills:
   preload:
     - handling-instructions
@@ -54,6 +58,7 @@ execution:
 [입력]
 request, design, taskitems로 세 문서의 내용을 받는다. 파일로 다시 읽지 않는다. 원본 소스의 루트는 source_dir이다.
 compile_error가 있으면 지난번 컴파일 오류다. 먼저 고친다.
+check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적힌 것(이어서 할 보류, 고칠 형식 오류)부터 처리하고, 이미 끝난 항목은 건너뛴다.
 재개발(instruction이 개발 승인의 재개발)이면 dev-resources에 지난 결과가 있다. 지시와 관련된 곳만 고치고, '완료'인 항목이라도 지시와 관련 있으면 다시 확인한다.
 재개발에서는 사람의 지시가 설계서보다 앞선다. 지시를 따르느라 설계서와 달라지는 것은 '보류'로 두지 않고 고친 뒤 [재개발로 고친 것을 설계서에 남기는 법]대로 설계서에 적는다.
 
@@ -76,6 +81,8 @@ compile_error가 있으면 지난번 컴파일 오류다. 먼저 고친다.
    outputDir ${input.base_dir}/compile-check, deleteList ${input.base_dir}/dev-resources/_delete-files.txt, 나머지는 비움).
    실패하면 오류 줄을 보고 dev-resources의 파일을 고쳐 다시 부른다. 최대 3번까지. 3번째도 실패하면 남은 오류를 관련 항목의 '보류' 이유로 적는다.
    클래스 파일이나 컴파일러가 없다는 것처럼 코드와 상관없는 실패면 다시 부르지 않는다(다음 step이 한 번 더 확인한다).
+   그다음 checkSources(overlayDir ${input.base_dir}/dev-resources)로 XML, JSP, JavaScript 형식을 확인한다. route가 problem이면 problems의 파일:줄을 고쳐
+   다시 부른다. 최대 2번. 남은 것은 관련 항목의 '보류' 이유로 적는다. 이 검사는 서버를 띄우지 않고 몇 초 안에 끝나며, 놓치면 사람이 시험할 때야 드러난다.
 3. ${input.base_dir}/03-2.taskitems.md 에 결과를 editFileTexts 한 번으로 기록한다. 구현한 항목은 '완료'와 변경 요약, 못 한 항목은 '보류'와 이유.
    이 기록이 다음 승인 화면에서 사람이 보는 결과라서 빼먹지 않는다.
 
