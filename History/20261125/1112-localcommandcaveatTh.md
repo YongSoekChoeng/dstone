@@ -632,3 +632,19 @@ Skill 문제와는 다른 실패입니다.
 ## 답변
 
 6회차에 `editFileTexts`를 불렀습니다. 03-2 기록이나 설계서 반영으로 보입니다. 다음 회차를 지켜보겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b7a0w7wk9</task-id>
+<summary>Monitor event: "ai-engine Skill 호출·최종 답·반복 중단 (재개발, Windows 인스턴스 execution.log)"</summary>
+<event>2026-11-25 11:12:21 agent[sm-developer-agent] 8회차 4707ms, 입력 58440토큰, 출력 1047토큰, Tool 요청 [editFileTexts]</event>
+</task-notification>
+
+---
+
+## 답변
+
+8회차에 다시 `editFileTexts`를 불렀습니다. 6회차와 8회차의 기록 중 하나는 설계서, 하나는 03-2로 보입니다. 이 다음 회차가 확인 지점입니다.
