@@ -106,7 +106,7 @@ spring:
              chat:
                  options:
                      # OpenRouter에서 제공하는 완전 무료 모델 지정(:free 를 붙여야 무료로 호출됨.)
-                     # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash | qwen/qwen3.8-27b | openai/gpt-oss-120b
+                     # google/gemma-4-26b-a4b-it | deepseek/deepseek-v4.1-flash | qwen/qwen3.8-27b | qwen/qwen3.8-flash | openai/gpt-oss-120b
                      model: qwen/qwen3.8-27b
                      temperature: 0.4
                      max-tokens: 60000

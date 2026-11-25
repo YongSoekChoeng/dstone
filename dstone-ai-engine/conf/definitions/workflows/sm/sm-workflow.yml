@@ -127,7 +127,7 @@ steps:
     next: step04
 
   - id: step04
-    name: 05-고객요구사항분석서 읽기
+    name: 05-요구사항분석서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -156,9 +156,8 @@ steps:
     save: reviewDecision
     routes:
       그대로 진행: step07
-      고객 요청사항 재분석: step03
-      요구사항 수정: step39
-      다시 리뷰: step04
+      고객요청사항 재분석: step03
+      요구사항분석서 수정: step39
       중지: FAIL
 
   - id: step07
@@ -194,7 +193,7 @@ steps:
     routes:
       승인(설계진행): step10
       영향도 수정: step26
-      영향도 다시 작성: step08
+      영향도 재분석: step08
       요구사항 수정: step27
       중지: FAIL
 
@@ -650,7 +649,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 46-리뷰 지적에 따른 요구사항 수정
+    name: 46-리뷰 지적에 따른 요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:

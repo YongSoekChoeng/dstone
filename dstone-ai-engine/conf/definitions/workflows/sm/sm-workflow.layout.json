@@ -233,25 +233,18 @@
       "x" : 272,
       "y" : 695
     } ],
-    "step06|route|고객 요청사항 재분석" : [ {
+    "step06|route|고객요청사항 재분석" : [ {
       "x" : 34,
       "y" : 613
     }, {
       "x" : 34,
       "y" : 379
     } ],
-    "step06|route|요구사항 수정" : [ {
+    "step06|route|요구사항분석서 수정" : [ {
       "x" : 282,
       "y" : 613
     }, {
       "x" : 282,
-      "y" : 461
-    } ],
-    "step06|route|다시 리뷰" : [ {
-      "x" : 44,
-      "y" : 613
-    }, {
-      "x" : 44,
       "y" : 461
     } ],
     "step06|route|중지" : [ {
@@ -289,7 +282,7 @@
       "x" : 778,
       "y" : 145
     } ],
-    "step09|route|영향도 다시 작성" : [ {
+    "step09|route|영향도 재분석" : [ {
       "x" : 540,
       "y" : 55
     }, {
@@ -887,16 +880,12 @@
       "source" : "out",
       "target" : "in"
     },
-    "step06|route|고객 요청사항 재분석" : {
+    "step06|route|고객요청사항 재분석" : {
       "source" : "left",
       "target" : "left"
     },
-    "step06|route|요구사항 수정" : {
+    "step06|route|요구사항분석서 수정" : {
       "source" : "right",
-      "target" : "left"
-    },
-    "step06|route|다시 리뷰" : {
-      "source" : "left",
       "target" : "left"
     },
     "step06|route|중지" : {
@@ -927,7 +916,7 @@
       "source" : "right",
       "target" : "left"
     },
-    "step09|route|영향도 다시 작성" : {
+    "step09|route|영향도 재분석" : {
       "source" : "left",
       "target" : "right"
     },

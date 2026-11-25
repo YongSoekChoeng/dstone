@@ -15,6 +15,7 @@ id: sm-troubleshooter-agent
 version: 1.8.0
 description: 개발 결과가 동작하지 않을 때 증상에서 원인을 찾아(화면 → Controller → SQL → 테이블, 동작하는 기존 기능·라이브러리 소스와 비교) dev-resources를 고치고, 고친 내용을 설계서와 태스크아이템 목록에 남긴다.
 model:
+  name: qwen/qwen3.8-flash
   reasoning: high
 input:
   base_dir: string, 작업 폴더의 절대경로
