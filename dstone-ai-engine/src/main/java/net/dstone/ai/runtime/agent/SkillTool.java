@@ -53,9 +53,10 @@ public final class SkillTool {
 	public static final String READ_TOOL = "readFile";
 
 	private static final String DESCRIPTION = String.join("\n"
-		, "작업 안내서(Skill)를 불러옵니다."
-		, "지금 할 일에 맞는 Skill이 아래 목록에 있으면, 일을 시작하기 전에 그 Skill의 이름으로 이 Tool을 부르십시오."
-		, "돌아온 안내를 그대로 따르십시오. 같은 Skill은 한 번만 부르면 됩니다. 목록에 없는 이름은 부르지 마십시오."
+		, "작업 안내서(Skill)를 불러옵니다. 받은 안내는 이 대화에 계속 남으므로 Skill 하나는 한 번만 부릅니다."
+		, "- 부를 때: 작업을 처음 시작할 때, 아래 목록에 이번 작업에 맞는 Skill이 있고 아직 그 안내를 받지 않았을 때."
+		, "- 부르지 않을 때: 위 대화에 이미 \"Skill '이름' 안내입니다.\"가 있는 Skill, 목록에 없는 이름, 일을 다 마친 뒤."
+		, "일을 다 마쳤으면 이 Tool을 부르지 말고 바로 최종 답을 냅니다."
 		, ""
 		, "<available_skills>"
 		, "%s"
