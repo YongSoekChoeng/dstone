@@ -447,3 +447,30 @@ STEP END 	[StepExecutor - step(id=step35, type=AGENT, ref=sm-verifier-agent)] Ca
 ## 답변
 
 두 번째 자동 수정 `sm-auto-fix-agent`가 6회차에 `Skill`을 불렀습니다. 이번 Agent 호출은 새로 시작된 것이고 앞 회차에 `Skill`이 잡히지 않았으므로, 처음 받는 호출로 보입니다. 이번 Agent 호출 안에서 같은 Skill을 다시 부르는지 계속 지켜보겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>bn9nz191w</task-id>
+<summary>Monitor event: "ai-engine Skill 호출·최종 답·반복 중단 (Windows 인스턴스 execution.log)"</summary>
+<event>2026-11-25 10:49:29 agent[sm-auto-fix-agent] 10회차 2421ms, 입력 41677토큰, 출력 298토큰, Tool 요청 없음
+STEP END 	[StepExecutor - step(id=step34, type=AGENT, ref=sm-auto-fix-agent)] Call 정보 : AgentStepExecutor.run() End !!!</event>
+</task-notification>
+
+---
+
+## 답변
+
+두 번째 `sm-auto-fix-agent`(step34)는 10회차에 최종 답을 내고 끝났습니다. `Skill`은 6회차에 한 번만 불렀고 다시 부르지 않았습니다.
+
+새 문구 반영 뒤 누적 결과입니다.
+
+| Agent 호출 | `Skill` 호출 | 끝에서 반복 |
+|---|---|---|
+| `sm-developer-agent` (step17) | 2번 | 1번, 안내를 받고 바로 답함 |
+| `sm-verifier-agent` (step35) ×2 | 0번 | 없음 |
+| `sm-auto-fix-agent` (step34) ×2 | 각 1번 | 없음 |
+
+감시는 계속합니다.
