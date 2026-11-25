@@ -937,6 +937,7 @@ var DstoneAiDesigner = (function () {
 			delete step.onFailure;
 		} else if (kind === "route" && step.routes) {
 			delete step.routes[route];
+			removeHint(step, route);
 			// TOOL의 routes는 비어 있으면 안 되므로(엔진 검사), 마지막 경로를 지우면 routes 키도 지운다.
 			if (step.type === "TOOL" && !hasRoutes(step)) {
 				delete step.routes;
@@ -944,6 +945,51 @@ var DstoneAiDesigner = (function () {
 		} else if (kind === "rejectTo" && step.approval) {
 			delete step.approval.rejectTo;
 		}
+	}
+
+	/** 승인 결정의 안내문(approval.hints)을 지웁니다. hints가 비면 hints 키도, approval이 비면 approval 키도 남기지 않습니다. */
+	function removeHint(step, route) {
+		if (!step.approval || !step.approval.hints) {
+			return;
+		}
+		delete step.approval.hints[route];
+		if (!Object.keys(step.approval.hints).length) {
+			delete step.approval.hints;
+		}
+		if (!Object.keys(step.approval).length) {
+			delete step.approval;
+		}
+	}
+
+	/** 승인 결정의 안내문을 적습니다. 빈 글자면 지웁니다. */
+	function setHint(step, route, text) {
+		if (!text) {
+			removeHint(step, route);
+			return;
+		}
+		step.approval = step.approval || {};
+		step.approval.hints = step.approval.hints || {};
+		step.approval.hints[route] = text;
+	}
+
+	/** 결정 이름이 바뀌면 안내문 키도 따라가게 합니다(같은 자리를 유지). 옮길 곳에 이미 안내문이 있으면 그것을 남깁니다. */
+	function renameHint(step, from, to) {
+		if (!step.approval || !step.approval.hints || !Object.prototype.hasOwnProperty.call(step.approval.hints, from)) {
+			return;
+		}
+		var hints = step.approval.hints;
+		var moved = hints[from];
+		var next = {};
+		Object.keys(hints).forEach(function (key) {
+			if (key === from) {
+				if (!Object.prototype.hasOwnProperty.call(hints, to)) {
+					next[to] = moved;
+				}
+			} else {
+				next[key] = hints[key];
+			}
+		});
+		step.approval.hints = next;
 	}
 
 	/** routes에 경로가 하나라도 있는지 봅니다. */
@@ -3253,6 +3299,11 @@ var DstoneAiDesigner = (function () {
 			html += row("경로 이름", help, "<input type=\"text\" id=\"wd-edge-route\" list=\"wd-route-names\" value=\"" + escapeHtml(edge.route) + "\" />"
 				+ "<datalist id=\"wd-route-names\">" + otherNames.map(function (name) { return "<option value=\"" + escapeHtml(name) + "\"></option>"; }).join("") + "</datalist>"
 				+ (otherNames.length ? "<p class=\"ai-hint\">이미 있는 이름(" + escapeHtml(otherNames.join(", ")) + ")을 적으면 그 경로의 갈 곳을 이 화살표의 갈 곳으로 옮깁니다.</p>" : ""));
+			if (step.type === "APPROVAL") {
+				var hintText = (step.approval && step.approval.hints && step.approval.hints[edge.route]) || "";
+				html += row("안내문", "승인 화면에서 이 결정에 마우스를 올리면 풍선도움말로 보입니다. 비워 두면 보이지 않습니다(approval.hints).",
+					"<textarea id=\"wd-edge-hint\" rows=\"4\">" + escapeHtml(hintText) + "</textarea>");
+			}
 			if (step.type === "ROUTER" && routesMissingInPrompt(step).indexOf(edge.route) >= 0) {
 				html += "<p class=\"wd-route-bad\">'" + escapeHtml(edge.route) + "'는 Agent(" + escapeHtml(step.agent || "") + ") 프롬프트에 없는 이름입니다."
 					+ " LLM은 프롬프트에 적힌 경로 이름으로 답하므로, 그 이름으로 바꾸십시오.</p>";
@@ -3336,6 +3387,7 @@ var DstoneAiDesigner = (function () {
 						}
 					});
 					step.routes = next;
+					renameHint(step, edge.route, name);
 					// 꺾는 점도 새 이름을 따라간다(갈 곳을 옮긴 경우에는 이 화살표의 점이 그 이름의 점이 된다).
 					if (existing) {
 						delete edgeVertices[edgeKey(step.id, "route", name)];
@@ -3343,6 +3395,15 @@ var DstoneAiDesigner = (function () {
 					}
 					moveEdgeVertices(edgeKey(step.id, "route", edge.route), edgeKey(step.id, "route", name));
 					selected = { type: "edge", from: step.id, kind: "route", route: name };
+				});
+			});
+		}
+		var hintInput = document.getElementById("wd-edge-hint");
+		if (hintInput) {
+			hintInput.addEventListener("change", function () {
+				var text = hintInput.value.trim();
+				change(function () {
+					setHint(step, edge.route, text);
 				});
 			});
 		}
