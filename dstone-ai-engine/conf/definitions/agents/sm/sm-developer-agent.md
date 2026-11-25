@@ -5,8 +5,10 @@
 #   그때까지 보류 6건이 모두 "DB 반영은 사람이 해야 함"이었고, 코드를 못 짠 보류는 없었다. 승인 화면의 보류 수가 잡음이 됐다.
 # 2.4.0(2026-11-25): 컴파일 뒤 checkSources로 XML·JSP·JavaScript 형식을 스스로 확인한다. Workflow가 다시 부를 때는 check_result로
 #   지난 결과의 보류나 형식 오류를 받는다(step57·58).
+# 2.5.0(2026-11-25): 보류 가운데 다시 부르면 이어서 할 수 있는 것의 수를 unfinished로 따로 답한다. Workflow는 이것만 보고 다시 부른다
+#   (실행 55b0be49: 사람이 DB에 반영할 DDL 보류 하나로 다시 불렸고, 할 일이 없어 같은 Skill만 되풀이하다 멈췄다).
 id: sm-developer-agent
-version: 2.4.0
+version: 2.5.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -25,6 +27,7 @@ output:
   completed: integer, '완료'로 기록한 태스크아이템 수
   pending: integer, '보류'로 기록한 태스크아이템 수
   pendingReasons(array, 보류인 태스크아이템 번호와 그 이유. 없으면 빈 목록): string
+  unfinished: integer, 보류 가운데 손대지 못해 다시 부르면 이어서 할 수 있는 것의 수(파일을 아직 만들지 않음 등). 사람의 결정이나 DB 반영이 필요한 보류는 세지 않는다
   notApplied(array, 반영하지 않은 지시와 이유. 없으면 빈 목록): string
   taskitemsRecorded: boolean, 03-2.taskitems.md의 상태 칸을 고쳐 저장했는가
   designSynced: boolean, 재개발로 고친 내용을 03-1.design.md에도 옮겨 적었는가(재개발이 아니거나 고친 것이 없으면 false)
@@ -100,5 +103,7 @@ check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적�
 
 [답]
 기록까지 마친 뒤에 답한다. ${output.completed}와 ${output.pending}에 건수를, ${output.pendingReasons}에 보류 항목과 이유를,
+${output.unfinished}에 보류 가운데 손대지 못한 것(다시 부르면 이어서 할 수 있는 것)의 수를 적는다. 설계서와 달라 사람이 정해야 하는 것,
+선언을 찾지 못한 것, 사람이 DB에 반영할 것, 고쳐 봐도 남은 컴파일·형식 오류는 다시 불러도 할 수 없으므로 세지 않는다.
 ${output.notApplied}에 반영하지 않은 지시와 이유를, ${output.taskitemsRecorded}에 기록 저장 여부를,
 ${output.designSynced}에 재개발로 고친 내용을 설계서에 옮겨 적었는지를 적는다.

@@ -19,7 +19,7 @@ import net.dstone.ai.support.WorkflowTestBase;
  * <pre>
  * sm-workflow가 사람에게 보내기 전에 기계로 잡을 수 있는 것을 먼저 잡는지 봅니다(LLM 없음, 2.8.0).
  * - 설계 문서의 형식 오류(닫히지 않은 코드 블록 등)는 문서 수정 Agent가 한 번 고친 뒤 설계 승인으로 간다.
- * - 개발 Agent가 보류를 남기면 한 번 더 부른다.
+ * - 개발 Agent가 손대지 못한 보류를 남기면 한 번 더 부른다(사람이 할 보류만 남으면 부르지 않는다).
  * - 개발 결과의 형식 오류(XML 등)는 개발 Agent가 한 번 고친 뒤 자동 검증으로 간다.
  * - 한도를 다 쓰면 멈추지 않고 다음으로 간다.
  * - 본뜰 기능의 코드는 '참고 기능' 절과 프로젝트ID가 있을 때만 모으고, 모으지 못해도 설계로 간다.
@@ -62,9 +62,9 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 개발_보류가_남으면_한_번_더_개발한다() {
+	void 손대지_못한_보류가_남으면_한_번_더_개발한다() {
 		WorkflowStepper flow = this.atStep("step54");
-		flow.put("develop", this.develop(2));
+		flow.put("develop", this.develop(2, 1));
 		flow.step("step54");
 		assertThat(flow.currentStepId()).isEqualTo("step55");
 		flow.step("step55");
@@ -77,9 +77,19 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 보류가_없으면_컴파일_확인으로_간다() {
+	void 사람이_할_보류만_남으면_다시_부르지_않고_컴파일_확인으로_간다() {
 		WorkflowStepper flow = this.atStep("step54");
-		flow.put("develop", this.develop(0));
+		flow.put("develop", this.develop(1, 0));
+		flow.step("step54");
+		assertThat(flow.currentStepId()).isEqualTo("step18");
+	}
+
+	@Test
+	void 답에_unfinished가_없으면_다시_부르지_않는다() {
+		WorkflowStepper flow = this.atStep("step54");
+		Map<String, Object> develop = this.develop(1, 0);
+		develop.remove("unfinished");
+		flow.put("develop", develop);
 		flow.step("step54");
 		assertThat(flow.currentStepId()).isEqualTo("step18");
 	}
@@ -112,10 +122,11 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 		assertThat(String.valueOf(flow.state("referenceError"))).contains("프로젝트ID");
 	}
 
-	private Map<String, Object> develop(int pending) {
+	private Map<String, Object> develop(int pending, int unfinished) {
 		Map<String, Object> develop = new LinkedHashMap<String, Object>();
 		develop.put("completed", Integer.valueOf(3));
 		develop.put("pending", Integer.valueOf(pending));
+		develop.put("unfinished", Integer.valueOf(unfinished));
 		develop.put("pendingReasons", pending == 0 ? new java.util.ArrayList<String>() : java.util.Arrays.asList("TASK-ITEM-05: 파일 아직 생성되지 않음"));
 		return develop;
 	}

@@ -72,7 +72,9 @@
 # 사람에게 가기 전 형식 검사(2.8.0): 사람 승인 한 번이 20~40분이라 기계로 잡을 수 있는 것은 먼저 잡습니다.
 #   설계 뒤(step50): 범용 Tool checkDocuments가 닫히지 않은 코드 블록, 칸이 어긋난 표, DDL을 격리 서버와 같은 규칙으로 읽어 봅니다.
 #     걸리면 document-revise-agent가 그것만 고칩니다(step52, 사람의 결정 하나마다 1번, step51이 셈). 그 뒤 설계 승인으로 갑니다.
-#   개발 뒤(step54): 개발 Agent가 남긴 보류가 있으면 한 번 더 부릅니다(step57, 1번).
+#   개발 뒤(step54): 개발 Agent가 손대지 못한 보류(unfinished)를 남기면 한 번 더 부릅니다(step57, 1번).
+#     사람의 결정이나 DB 반영이 필요한 보류는 다시 불러도 할 일이 없어서 세지 않습니다(2.8.1, 실행 55b0be49).
+#     답에 unfinished가 없으면 0으로 봅니다.
 #   컴파일 뒤(step53): 범용 Tool checkSources가 XML, JSP의 <% %>와 태그 짝, JavaScript 구문을 봅니다. 걸리면 개발 Agent가 고칩니다(step58, 1번).
 #   다시 부를 때는 step17이 아니라 step57·58을 씁니다. 지난 결과(보류, 형식 오류)를 그 경로에서만 넘겨, 새 개발에 묵은 지적이 따라가지 않게 하려는 것입니다.
 #
@@ -82,7 +84,7 @@
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.8.0
+version: 2.8.1
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
@@ -814,11 +816,11 @@ steps:
     onFailure: step28
 
   - id: step54
-    name: 55-개발 보류가 없는지
+    name: 55-손대지 못한 보류가 없는지
     type: TOOL
     tool: containsValue
     with:
-      value: ${state.develop.pending:}
+      value: ${state.develop.unfinished:0}
       expected: "0"
     routes:
       "true": step18
@@ -867,8 +869,8 @@ steps:
       history: ${decisions:}
       compile_error: ${state.compileError:}
       check_result: |-
-        지난 개발이 '보류'로 남긴 태스크아이템이다. 이유가 "아직 만들지 않음"처럼 일을 끝내지 못한 것이면 이어서 구현한다.
-        설계서와 다르게 만들어야 해서 보류한 것은 그대로 보류로 둔다.
+        지난 개발이 손대지 못하고 '보류'로 남긴 태스크아이템이 있다. 그것을 이어서 구현한다.
+        사람의 결정이나 DB 반영이 필요해 보류한 것은 그대로 보류로 둔다.
         ${state.develop.pendingReasons:}
     save: develop
     next: step18
