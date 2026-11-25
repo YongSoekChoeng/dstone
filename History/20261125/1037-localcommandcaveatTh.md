@@ -329,3 +329,33 @@ Skill 반복 감시는 계속합니다. 검증 step이 실패로 끝나거나 �
 ## 답변
 
 같은 종류로 보이는 브라우저 MCP 오류가 하나 더 찍혔습니다(10:37:05). `sm-verifier-agent`의 업로드 재시도로 보이며, 이번 줄의 오류 내용은 열어 보지 않았습니다. step이 실패로 끝나거나 반복 중단이 나면 그때 자세히 보겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b4h5gq8v5</task-id>
+<summary>Monitor event: "ai-engine Skill 호출·최종 답·반복 중단 (Windows 인스턴스 execution.log)"</summary>
+<event>2026-11-25 10:37:09 ERROR [org.springframework.ai.mcp.SyncMcpToolCallback] Error calling tool: [TextContent[annotations=null, text=### Error</event>
+</task-notification>
+
+---
+
+## 답변
+
+브라우저 업로드 오류가 반복되며 알림이 늘고 있습니다(10:37:05, 10:37:09). 이번 감시의 목적은 Skill 반복이므로, MCP Tool 오류는 빼고 감시를 다시 걸겠습니다. 이 오류들이 계속 쌓여 검증 step이 실패하면 그 실패는 STEP FAIL 줄로 잡힙니다.
+
+---
+
+## 답변
+
+감시를 다시 걸었습니다. 이제 브라우저 MCP 오류는 알림에서 빠지고 아래 항목만 알려 드립니다.
+
+- `Skill` 호출 회차와 "이미 받은 Skill" 안내
+- 최종 답 회차
+- step 종료와 실패
+- 반복 호출로 인한 중단
+- 그 밖의 ERROR
+
+감시는 30분 동안 유지되고, 끝나면 다시 걸겠습니다.
