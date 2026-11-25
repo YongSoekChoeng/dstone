@@ -600,3 +600,19 @@ Skill 문제와는 다른 실패입니다.
 ## 답변
 
 재시도(2번째 시도)가 3회차에서 `editFileTexts`를 세 번 동시에 불렀습니다. 첫 시도에서 이미 조사를 마쳤기 때문에 바로 수정에 들어간 것으로 보입니다. `[지난 시도]` 전달이 이렇게 하려고 넣은 장치입니다. 계속 지켜보겠습니다.
+
+---
+
+## 질문
+
+<task-notification>
+<task-id>b7a0w7wk9</task-id>
+<summary>Monitor event: "ai-engine Skill 호출·최종 답·반복 중단 (재개발, Windows 인스턴스 execution.log)"</summary>
+<event>2026-11-25 11:11:24 agent[sm-developer-agent] 4회차 3841ms, 입력 47477토큰, 출력 185토큰, Tool 요청 [compileJava]</event>
+</task-notification>
+
+---
+
+## 답변
+
+4회차에 `compileJava`를 불렀습니다. 다음은 03-2 기록과 설계서 반영(재개발이라 필요함)이고, 그 직후가 확인 지점입니다.
