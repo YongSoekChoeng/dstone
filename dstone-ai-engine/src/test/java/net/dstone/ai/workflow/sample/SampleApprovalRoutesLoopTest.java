@@ -34,6 +34,8 @@ public class SampleApprovalRoutesLoopTest extends WorkflowTestBase {
 		assertThat(waiting.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 		assertThat(this.pendingApproval(waiting).stepId()).isEqualTo("choose");
 		assertThat(this.pendingApproval(waiting).routes()).containsExactlyInAnyOrder("완료", "다시", "중단");
+		// 안내문(approval.hints)은 적은 결정에만 붙는다
+		assertThat(this.pendingApproval(waiting).hints()).containsOnlyKeys("다시");
 
 		WorkFlowExecution again = this.decide(waiting, "다시", "한 번 더");
 		assertThat(again.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);

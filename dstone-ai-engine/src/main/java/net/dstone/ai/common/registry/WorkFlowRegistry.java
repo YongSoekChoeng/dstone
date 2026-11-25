@@ -470,6 +470,11 @@ public class WorkFlowRegistry extends BaseObject {
 				if (rejectTo != null && rejectedRoute != null && !rejectTo.equals(rejectedRoute)) {
 					throw this.error(definition, step, "approval.rejectTo(" + rejectTo + ")와 routes.REJECTED(" + rejectedRoute + ")가 서로 다릅니다. 같은 뜻이므로 한쪽만 적거나 같은 곳을 적으십시오.");
 				}
+				for (String hintKey : approval.hints().keySet()) {
+					if (!approval.decisionRoutes().containsKey(hintKey)) {
+						throw this.error(definition, step, "approval.hints의 '" + hintKey + "'는 고를 수 있는 결정 이름이 아닙니다. routes에 적은 이름(" + approval.decisionRoutes().keySet() + ") 가운데 하나여야 합니다.");
+					}
+				}
 				break;
 		}
 	}

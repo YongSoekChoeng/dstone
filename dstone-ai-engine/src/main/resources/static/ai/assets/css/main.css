@@ -3076,6 +3076,11 @@ body.wd-full-on {
 	white-space: nowrap;
 }
 
+.wa-choice-name.has-hint {
+	text-decoration: underline dotted;
+	text-underline-offset: 3px;
+	cursor: help;
+}
 .wa-choice.is-selected .wa-choice-name {
 	color: var(--cs-primary-hover);
 }

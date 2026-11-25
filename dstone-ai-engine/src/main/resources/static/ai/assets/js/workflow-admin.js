@@ -1420,14 +1420,15 @@ var DstoneAiWorkflowAdmin = (function () {
 	function renderDecisionButtons(pendingApproval) {
 		var routes = (pendingApproval && pendingApproval.routes) || [];
 		var receivers = (pendingApproval && pendingApproval.receivers) || {};
+		var hints = (pendingApproval && pendingApproval.hints) || {};
 		decisionChoices = [];
 		if (routes.length > 0) {
 			routes.forEach(function (route) {
-				decisionChoices.push({ name: route, approved: false, route: route, receiver: receivers[route] || "" });
+				decisionChoices.push({ name: route, approved: false, route: route, receiver: receivers[route] || "", hint: hints[route] || "" });
 			});
 		} else {
-			decisionChoices.push({ name: "승인", approved: true, route: null, receiver: "" });
-			decisionChoices.push({ name: "반려", approved: false, route: null, receiver: "" });
+			decisionChoices.push({ name: "승인", approved: true, route: null, receiver: "", hint: "" });
+			decisionChoices.push({ name: "반려", approved: false, route: null, receiver: "", hint: "" });
 		}
 
 		// 고른 결정이 목록에 그대로 있으면 새 목록의 같은 줄로 옮긴다
@@ -1459,6 +1460,12 @@ var DstoneAiWorkflowAdmin = (function () {
 			name.className = "wa-choice-name";
 			name.textContent = choice.name;
 			row.appendChild(name);
+
+			// 결정의 뜻을 적은 안내문(approval.hints)은 줄 어디에 올려도 풍선도움말로 보인다
+			if (choice.hint) {
+				row.title = choice.hint;
+				name.className += " has-hint";
+			}
 
 			if (choice.route) {
 				var to = document.createElement("span");

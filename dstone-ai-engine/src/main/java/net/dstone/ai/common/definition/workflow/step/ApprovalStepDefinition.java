@@ -65,8 +65,10 @@ public record ApprovalStepDefinition(
 	 * @param approverRole           누가 결정해야 하는지 기록해 두는 값입니다. 서버가 실제로 역할을 검사하지는 않습니다.
 	 * @param rejectTo               반려(REJECTED)했을 때 갈 step의 id입니다. routes의 REJECTED와 같은 뜻입니다.
 	 * @param requireCommentOnReject true면 APPROVED가 아닌 결정에 의견(comment)이 꼭 있어야 합니다.
+	 * @param hints                  결정 이름 → 그 결정이 무슨 뜻인지 적은 안내문입니다. 승인 화면에서 그 결정에 마우스를 올리면 풍선도움말로 보입니다.
+	 *                               실행에는 쓰이지 않으며, 키는 고를 수 있는 결정 이름이어야 합니다.
 	 */
-	public record Approval(String artifact, String approverRole, String rejectTo, Boolean requireCommentOnReject) {
+	public record Approval(String artifact, String approverRole, String rejectTo, Boolean requireCommentOnReject, Map<String, String> hints) {
 	}
 
 	@Override
@@ -88,6 +90,14 @@ public record ApprovalStepDefinition(
 	/** 무엇을 승인하는지입니다. 적지 않았으면 null입니다. */
 	public String artifact() {
 		return this.approval == null ? null : this.approval.artifact();
+	}
+
+	/** 결정 이름 → 안내문입니다. 적지 않았으면 빈 맵입니다. */
+	public Map<String, String> hints() {
+		if (this.approval == null || this.approval.hints() == null) {
+			return new LinkedHashMap<>();
+		}
+		return this.approval.hints();
 	}
 
 	/** APPROVED가 아닌 결정에 의견이 꼭 있어야 하는지 봅니다. */

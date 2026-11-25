@@ -54,6 +54,8 @@ steps:
     type: APPROVAL
     approval:
       approverRole: team-lead
+      hints:
+        다시: 앞 step부터 한 번 더 돌립니다. 승인 화면에서 이 결정에 마우스를 올리면 풍선도움말로 보입니다.
     save: choice
     routes:
       완료: END

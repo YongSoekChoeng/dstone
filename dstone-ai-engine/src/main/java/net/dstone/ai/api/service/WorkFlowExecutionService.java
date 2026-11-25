@@ -625,7 +625,7 @@ public class WorkFlowExecutionService extends BaseService {
 		for (Map.Entry<String, String> route : approval.decisionRoutes().entrySet()) {
 			receivers.put(route.getKey(), this.receiverLabel(workflow, route.getValue()));
 		}
-		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers);
+		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers, approval.hints());
 	}
 
 	/**
