@@ -403,7 +403,9 @@ public class KnowledgeFeatureTool extends BaseObject {
 			while (value.endsWith("`") || value.endsWith("\"") || value.endsWith("'")) {
 				value = value.substring(0, value.length() - 1);
 			}
-			if (!value.isEmpty() && !list.contains(value)) {
+			// 경로나 주소 모양(/ 또는 확장자가 있는 것)만. 절 안의 설명 문장("(목록·등록 …)")은 시작점이 아니다
+			boolean pathLike = value.contains("/") || value.matches("[^\\s()]+\\.[A-Za-z0-9]+");
+			if (!value.isEmpty() && pathLike && !value.startsWith("(") && !list.contains(value)) {
 				list.add(value);
 			}
 		}

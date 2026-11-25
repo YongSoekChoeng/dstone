@@ -46,8 +46,8 @@ public class KnowledgeFeatureToolTest {
 
 	@Test
 	void 시작점은_한_줄에_하나_목록_기호와_설명을_뗀다() {
-		List<String> entries = KnowledgeFeatureTool.splitEntries("## 참고 기능\n- `/system/member/member.go` — 회원 관리\n* WEB-INF/views/a.jsp\n\n/x.do, /y.do\n- `/x.do`\n");
-		assertThat(entries).containsExactly("/system/member/member.go", "WEB-INF/views/a.jsp", "/x.do", "/y.do");
+		List<String> entries = KnowledgeFeatureTool.splitEntries("## 참고 기능\n- `/system/member/member.go` — 회원 관리\n* WEB-INF/views/a.jsp\n\n/x.do, /y.do\n- `/x.do`\n- board.jsp\n\n(목록·등록팝업·파일업로드를 한 기능에서 모두 하는 회원 관리. 썸네일 팝업은 확인 필요.)\n");
+		assertThat(entries).containsExactly("/system/member/member.go", "WEB-INF/views/a.jsp", "/x.do", "/y.do", "board.jsp");
 	}
 
 	@Test
