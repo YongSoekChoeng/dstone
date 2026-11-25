@@ -3989,6 +3989,7 @@ var DstoneAiDesigner = (function () {
 
 		var html = ""
 			+ "<div class=\"wd-agent-grid\">"
+			+ "<div class=\"wd-agent-col\">"
 			+ "<section class=\"wd-agent-sec\"><h4>기본</h4>"
 			+ row("id", "Workflow step의 agent에 적는 이름", agentDoc.originalPath
 				? "<input type=\"text\" value=\"" + escapeHtml(f.id === undefined ? "" : String(f.id)) + "\" readonly /><div class=\"wd-inline-actions\"><button type=\"button\" class=\"kn-plain\" id=\"wd-agent-rename-btn\"" + (catalog.editable ? "" : " disabled") + ">이름 변경</button></div>"
@@ -4008,7 +4009,10 @@ var DstoneAiDesigner = (function () {
 				var label = v === "" ? "(모델 기본값)" : v + (v === "none" ? " - 추론 끔" : "");
 				return "<option value=\"" + v + "\"" + (String(model.reasoning === undefined ? "" : model.reasoning) === v ? " selected" : "") + ">" + label + "</option>";
 			}).join("") + "</select>")
-			+ "<h4>실행</h4>"
+			+ "</section>"
+			+ "</div>"
+			+ "<div class=\"wd-agent-col\">"
+			+ "<section class=\"wd-agent-sec\"><h4>실행</h4>"
 			+ row("execution.onInvalidOutput", "답이 output 모양과 다를 때", "<select data-agent=\"execution.onInvalidOutput\">" + [["", "(기본: FAIL)"], ["RETRY", "RETRY - 다시 묻기"], ["FAIL", "FAIL - step 실패"]].map(function (o) {
 				return "<option value=\"" + o[0] + "\"" + (String(execution.onInvalidOutput || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
 			}).join("") + "</select>")
@@ -4016,9 +4020,10 @@ var DstoneAiDesigner = (function () {
 			+ row("execution.timeoutSeconds", "응답 제한 시간(초)", "<input type=\"number\" min=\"1\" data-agent=\"execution.timeoutSeconds\" value=\"" + escapeHtml(execution.timeoutSeconds === undefined ? "" : String(execution.timeoutSeconds)) + "\" />")
 			+ row("execution.maxToolCalls", "한 번 불릴 때 Tool 호출 한도", "<input type=\"number\" min=\"1\" data-agent=\"execution.maxToolCalls\" value=\"" + escapeHtml(execution.maxToolCalls === undefined ? "" : String(execution.maxToolCalls)) + "\" />")
 			+ row("execution.requiredTools", "꼭 성공해야 하는 Tool(쉼표로 구분). 예: writeFile - 부르지 않고 끝나면 실패", "<input type=\"text\" data-agent=\"execution.requiredTools\" value=\"" + escapeHtml((Array.isArray(execution.requiredTools) ? execution.requiredTools : []).join(", ")) + "\" />")
-			+ row("execution.requiredWrites", "꼭 써야 하는 파일. 한 줄에 하나, input 경로를 가리키는 표현식. 예: ${input.base_dir}/03-1.design.md - 쓰지 않고 끝나면 실패", "<textarea data-agent=\"execution.requiredWrites\" rows=\"2\">" + escapeHtml(requiredWritesText(execution.requiredWrites)) + "</textarea>")
+			+ row("execution.requiredWrites", "꼭 써야 하는 파일. 한 줄에 하나, input 경로를 가리키는 표현식. 예(두 파일): ${input.base_dir}/03-1.design.md 와 ${input.base_dir}/03-2.summary.md 를 각각 한 줄에 적습니다 - 하나라도 쓰지 않고 끝나면 실패", "<textarea data-agent=\"execution.requiredWrites\" rows=\"2\">" + escapeHtml(requiredWritesText(execution.requiredWrites)) + "</textarea>")
 			+ row("execution.toolPrerequisites", "먼저 성공해야 쓸 수 있는 Tool. 한 줄에 하나, '선행 Tool: 막을 Tool, …'. 예: startSandboxServer: dbQuery, browser_*", "<textarea data-agent=\"execution.toolPrerequisites\" rows=\"2\">" + escapeHtml(prerequisitesText(execution.toolPrerequisites)) + "</textarea>")
 			+ "</section>"
+			+ "</div>"
 			+ "</div>"
 			+ "<section class=\"wd-agent-sec\"><h4>입출력 계약</h4>"
 			+ "<p class=\"ai-hint\">무엇을 받고 무엇을 돌려주는지 정합니다. 값 하나(예: 글자)이거나, 이름이 붙은 필드 묶음입니다. "

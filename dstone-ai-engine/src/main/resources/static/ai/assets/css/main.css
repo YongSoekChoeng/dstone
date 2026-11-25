@@ -1395,6 +1395,7 @@ p.wd-route-bad {
 }
 
 .wd-agent-grid > .wd-agent-sec:first-child,
+.wd-agent-col > .wd-agent-sec:first-child,
 .wd-agent-form > .wd-agent-grid:first-child > .wd-agent-sec {
 	border-top: 0;
 	padding-top: 0;
