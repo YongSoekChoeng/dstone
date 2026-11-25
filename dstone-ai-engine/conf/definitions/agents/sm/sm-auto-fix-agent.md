@@ -5,6 +5,8 @@
 # 1.2.0(2026-11-23): Skill test-environment를 받아, 시험 환경 차이로 생긴 실패는 고치지 않고 unresolved에 남긴다
 #   (실행 6d1784d8에서 업로드 이미지 404를 코드에서 찾다가 18분 뒤 출력 한도로 끝났다).
 # 1.3.0(2026-11-25): 고친 뒤 checkSources로 XML·JSP·JavaScript 형식을 확인한다.
+# requiredWrites(설계서)는 고칠 것이 없을 때도 '## 수정 이력' 한 줄을 남기게 하려는 것이다. 빼면 아무것도 안 쓴 답이 성공으로 지나가
+#   같은 코드로 격리 기동과 동작 검증을 다시 돈다(2026-11-25 실행에서 쓴 파일 없이 끝난 호출 2건을 이 계약이 잡았다).
 id: sm-auto-fix-agent
 version: 1.3.0
 description: 동작 검증에서 실패한 것의 원인을 격리 시험 서버에서 찾아 개발 결과와 설계서를 고친다.
@@ -72,6 +74,8 @@ execution:
   maxToolCalls: 120
   toolPrerequisites:
     startSandboxServer: [dbQuery, "browser_*"]
+  requiredWrites:
+    - ${input.base_dir}/03-1.design.md
 ---
 [역할]
 너는 시험에서 실패한 것을 고치는 개발자다. boot_error가 있으면 그것을, 없으면 verification에서 result가 FAIL인 것을 고친다.

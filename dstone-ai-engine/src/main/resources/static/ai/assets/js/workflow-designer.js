@@ -3428,7 +3428,7 @@ var DstoneAiDesigner = (function () {
 	var AGENT_KEY_ORDER = ["id", "version", "role", "description", "model", "input", "output", "tools", "skills", "subAgents", "allowedCallers", "execution"];
 	var AGENT_SUB_ORDER = {
 		model: ["provider", "name", "temperature", "reasoning"],
-		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls", "requiredTools", "toolPrerequisites"]
+		execution: ["maxAttempts", "onInvalidOutput", "timeoutSeconds", "maxToolCalls", "requiredTools", "toolPrerequisites", "requiredWrites"]
 	};
 
 	function bindAgentDialog() {
@@ -4016,6 +4016,8 @@ var DstoneAiDesigner = (function () {
 			+ row("execution.timeoutSeconds", "응답 제한 시간(초)", "<input type=\"number\" min=\"1\" data-agent=\"execution.timeoutSeconds\" value=\"" + escapeHtml(execution.timeoutSeconds === undefined ? "" : String(execution.timeoutSeconds)) + "\" />")
 			+ row("execution.maxToolCalls", "한 번 불릴 때 Tool 호출 한도", "<input type=\"number\" min=\"1\" data-agent=\"execution.maxToolCalls\" value=\"" + escapeHtml(execution.maxToolCalls === undefined ? "" : String(execution.maxToolCalls)) + "\" />")
 			+ row("execution.requiredTools", "꼭 성공해야 하는 Tool(쉼표로 구분). 예: writeFile - 부르지 않고 끝나면 실패", "<input type=\"text\" data-agent=\"execution.requiredTools\" value=\"" + escapeHtml((Array.isArray(execution.requiredTools) ? execution.requiredTools : []).join(", ")) + "\" />")
+			+ row("execution.requiredWrites", "꼭 써야 하는 파일. 한 줄에 하나, input 경로를 가리키는 표현식. 예: ${input.base_dir}/03-1.design.md - 쓰지 않고 끝나면 실패", "<textarea data-agent=\"execution.requiredWrites\" rows=\"2\">" + escapeHtml(requiredWritesText(execution.requiredWrites)) + "</textarea>")
+			+ row("execution.toolPrerequisites", "먼저 성공해야 쓸 수 있는 Tool. 한 줄에 하나, '선행 Tool: 막을 Tool, …'. 예: startSandboxServer: dbQuery, browser_*", "<textarea data-agent=\"execution.toolPrerequisites\" rows=\"2\">" + escapeHtml(prerequisitesText(execution.toolPrerequisites)) + "</textarea>")
 			+ "</section>"
 			+ "</div>"
 			+ "<section class=\"wd-agent-sec\"><h4>입출력 계약</h4>"
@@ -4462,10 +4464,63 @@ var DstoneAiDesigner = (function () {
 			});
 			return list.length > 0 ? list : undefined;
 		}
+		if (key === "execution.requiredWrites") {
+			var paths = input.value.split("\n").map(function (v) {
+				return v.trim();
+			}).filter(function (v) {
+				return v !== "";
+			});
+			return paths.length > 0 ? paths : undefined;
+		}
+		if (key === "execution.toolPrerequisites") {
+			return readPrerequisites(input.value);
+		}
 		if (key === "input" || key === "output") {
 			return textToValue(input.value);
 		}
 		return input.value.trim() === "" ? undefined : input.value.trim();
+	}
+
+	/** execution.requiredWrites를 양식 칸 글자(한 줄에 하나)로 바꿉니다. 목록이 아니라 글자 하나로 적혀 있어도 보여 줍니다. */
+	function requiredWritesText(value) {
+		if (Array.isArray(value)) {
+			return value.join("\n");
+		}
+		return value === undefined || value === null ? "" : String(value);
+	}
+
+	/** execution.toolPrerequisites를 양식 칸 글자로 바꿉니다. 한 줄이 "선행 Tool: 막을 Tool, 막을 Tool"입니다. */
+	function prerequisitesText(value) {
+		if (!value || typeof value !== "object" || Array.isArray(value)) {
+			return "";
+		}
+		return Object.keys(value).map(function (tool) {
+			var blocked = value[tool];
+			return tool + ": " + (Array.isArray(blocked) ? blocked.join(", ") : String(blocked === undefined || blocked === null ? "" : blocked));
+		}).join("\n");
+	}
+
+	/** 양식 칸 글자를 execution.toolPrerequisites 맵으로 읽습니다. 모양이 틀린 줄이 있으면 그 줄을 알려 주고 멈춥니다. */
+	function readPrerequisites(text) {
+		var result = {};
+		text.split("\n").forEach(function (line, index) {
+			var trimmed = line.trim();
+			if (trimmed === "") {
+				return;
+			}
+			var colon = trimmed.indexOf(":");
+			var tool = colon < 0 ? "" : trimmed.substring(0, colon).trim();
+			var blocked = colon < 0 ? [] : trimmed.substring(colon + 1).split(",").map(function (v) {
+				return v.trim();
+			}).filter(function (v) {
+				return v !== "";
+			});
+			if (tool === "" || blocked.length === 0) {
+				throw new Error((index + 1) + "번째 줄은 '선행 Tool: 막을 Tool, …' 모양이어야 합니다: " + trimmed);
+			}
+			result[tool] = (result[tool] || []).concat(blocked);
+		});
+		return Object.keys(result).length > 0 ? result : undefined;
 	}
 
 	function agentRequest(action) {
