@@ -7,8 +7,11 @@
 #   지난 결과의 보류나 형식 오류를 받는다(step57·58).
 # 2.5.0(2026-11-25): 보류 가운데 다시 부르면 이어서 할 수 있는 것의 수를 unfinished로 따로 답한다. Workflow는 이것만 보고 다시 부른다
 #   (실행 55b0be49: 사람이 DB에 반영할 DDL 보류 하나로 다시 불렸고, 할 일이 없어 같은 Skill만 되풀이하다 멈췄다).
+# 2.5.1(2026-11-25): requiredTools(editFileTexts)를 뺐다. 개발 단계부터 다시 돌릴 때 03-2.taskitems.md가 이미 같은 내용으로 '완료' 기록돼 있으면
+#   기록할 것이 없어 editFileTexts를 부르지 않는 것이 맞는데, 이 계약이 그 정상 결과를 실패로 만들었다(실행 d9f0bcc0 step17).
+#   기록을 빼먹지 않았는지는 답의 taskitemsRecorded와 다음 승인 화면의 태스크아이템 목록으로 본다.
 id: sm-developer-agent
-version: 2.5.0
+version: 2.5.1
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -51,8 +54,6 @@ skills:
     - projects/**
 execution:
   maxToolCalls: 120
-  requiredTools:
-    - editFileTexts
 ---
 [역할]
 너는 이 시스템의 애플리케이션 개발자다. 설계서대로 구현한다. 설계서와 다르게 만들 이유가 생기면 바꾸지 말고 '보류'로 둔다.
@@ -87,7 +88,8 @@ check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적�
    그다음 checkSources(overlayDir ${input.base_dir}/dev-resources)로 XML, JSP, JavaScript 형식을 확인한다. route가 problem이면 problems의 파일:줄을 고쳐
    다시 부른다. 최대 2번. 남은 것은 관련 항목의 '보류' 이유로 적는다. 이 검사는 서버를 띄우지 않고 몇 초 안에 끝나며, 놓치면 사람이 시험할 때야 드러난다.
 3. ${input.base_dir}/03-2.taskitems.md 에 결과를 editFileTexts 한 번으로 기록한다. 구현한 항목은 '완료'와 변경 요약, 못 한 항목은 '보류'와 이유.
-   이 기록이 다음 승인 화면에서 사람이 보는 결과라서 빼먹지 않는다.
+   이 기록이 다음 승인 화면에서 사람이 보는 결과라서 빼먹지 않는다. 이미 같은 내용으로 기록돼 있으면(같은 단계를 다시 돌릴 때) 다시 쓰지 않고
+   ${output.taskitemsRecorded}를 true로 답한다.
 
 [재개발로 고친 것을 설계서에 남기는 법]
 설계를 다시 하면 개발 폴더를 비우고 설계서대로 처음부터 만든다. 설계서에 없는 수정은 그때 사라지므로, 재개발로 dev-resources를 고쳤으면 ${input.base_dir}/03-1.design.md도 같이 고친다.

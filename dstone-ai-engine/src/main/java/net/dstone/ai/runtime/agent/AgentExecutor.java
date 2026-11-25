@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.advisors.AgentCallStatsAdvisor;
+import net.dstone.ai.common.advisors.RedundantSkillCallAdvisor;
 import net.dstone.ai.common.advisors.LlmCallGateAdvisor;
 import net.dstone.ai.common.advisors.ReasoningStripAdvisor;
 import net.dstone.ai.common.advisors.RunawayRetryAdvisor;
@@ -642,6 +643,12 @@ public class AgentExecutor extends BaseObject {
 		// 앞 라운드 답에 붙은 추론 글은 다음 라운드에 다시 보내지 않습니다(ReasoningStripAdvisor). 대화 기억에서 온 앞 답에도 적용됩니다.
 		if (!this.environment.getProperty(Constants.Agent.KEEP_REASONING, Boolean.class, Boolean.FALSE).booleanValue()) {
 			spec = spec.advisors(new ReasoningStripAdvisor(agent.id()));
+		}
+
+		// 일을 마치고 최종 답을 본문에 쓰면서 이미 받은 Skill을 또 부르는 응답은 그 자리에서 끝냅니다(RedundantSkillCallAdvisor). Skill Tool이 있을 때만 의미가 있습니다.
+		if (skillTool != null && readHistory != null
+			&& this.environment.getProperty(Constants.Agent.REDUNDANT_SKILL_END, Boolean.class, Boolean.TRUE).booleanValue()) {
+			spec = spec.advisors(new RedundantSkillCallAdvisor(agent.id(), readHistory));
 		}
 
 		// 같은 생각을 되풀이하다 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드는, 대화를 그대로 두고 한 번 다시 부릅니다(RunawayRetryAdvisor).

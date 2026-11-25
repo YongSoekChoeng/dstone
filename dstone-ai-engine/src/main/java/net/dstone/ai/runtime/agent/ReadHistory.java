@@ -130,6 +130,11 @@ public class ReadHistory {
 		return this.skills.add(name);
 	}
 
+	/** 이번 호출에서 이 Skill의 본문을 이미 건넸는지 봅니다(건네지 않았으면 false). 기록은 바꾸지 않습니다. */
+	public synchronized boolean hasSkill(String name) {
+		return name != null && this.skills.contains(name);
+	}
+
 	/**
 	 * <pre>
 	 * 기록을 모두 지웁니다(읽은 파일 범위와 받은 Skill 모두).

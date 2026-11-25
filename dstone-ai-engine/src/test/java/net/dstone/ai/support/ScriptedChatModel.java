@@ -108,6 +108,26 @@ public class ScriptedChatModel implements ChatModel {
 	}
 
 	/**
+	 * <pre>
+	 * LLM이 본문(설명 글)과 Tool 호출을 함께 내는 답을 넣어 둡니다. qwen이 마무리 라운드에도 본문과 Tool 호출을 같이 내는 모양입니다.
+	 *   chatModel.answerToolCallsWithText("모든 작업이 완료되었습니다.", "Skill", "{\"command\": \"sql-review\"}");
+	 * </pre>
+	 *
+	 * @param text            본문
+	 * @param nameAndArguments Tool 이름, 인자, Tool 이름, 인자, ...
+	 */
+	public synchronized void answerToolCallsWithText(String text, String... nameAndArguments) {
+		if (this.llmCall) {
+			return;
+		}
+		this.answers.add(new TextWithCalls(text, toolCalls(nameAndArguments)));
+	}
+
+	/** 본문과 Tool 호출을 함께 내는 답입니다. */
+	private record TextWithCalls(String text, List<AssistantMessage.ToolCall> calls) {
+	}
+
+	/**
 	 * 프롬프트에 marker가 들어 있을 때만 꺼낼 글자 답을 넣어 둡니다.
 	 *
 	 * @param marker 프롬프트(시스템 + 사용자 메시지)에 들어 있어야 할 글자
@@ -207,6 +227,8 @@ public class ScriptedChatModel implements ChatModel {
 			AssistantMessage message;
 			if (answer instanceof String text) {
 				message = new AssistantMessage(text);
+			} else if (answer instanceof TextWithCalls both) {
+				message = AssistantMessage.builder().content(both.text()).toolCalls(both.calls()).build();
 			} else {
 				@SuppressWarnings("unchecked")
 				List<AssistantMessage.ToolCall> calls = (List<AssistantMessage.ToolCall>) answer;

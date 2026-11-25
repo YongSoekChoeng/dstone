@@ -61,6 +61,24 @@ public class SampleAgentSkillTest extends WorkflowTestBase {
 	}
 
 	@Test
+	void 마무리_본문과_함께_이미_받은_Skill을_또_부르면_그_본문이_최종_답이_된다() {
+		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 Tool 흐름을 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
+		// 2026-11-25 실행 d9f0bcc0의 모양: 일을 마친 모델이 최종 답을 본문에 쓰면서 이미 받은 Skill을 계속 부른다.
+		this.chatModel.answerToolCalls("Skill", "{\"command\": \"sql-review\"}");
+		this.chatModel.answerToolCallsWithText("결과: 통과\nSELECT 1\n고친 곳 없음", "Skill", "{\"command\": \"sql-review\"}");
+		this.chatModel.answerToolCallsWithText("모든 작업이 완료되었습니다.", "Skill", "{\"command\": \"sql-review\"}");
+		// 끝나지 않고 더 불리면 준비된 답이 없어 실행이 FAILED가 된다(아래 단정이 그것을 잡는다).
+
+		WorkFlowExecution execution = this.run(WORKFLOW_ID, "SELECT 1 이 SQL 좀 봐줘");
+
+		assertThat(execution.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+		assertThat(this.state(execution).get("answer")).isEqualTo("결과: 통과\nSELECT 1\n고친 곳 없음");
+		assertThat(this.chatModel.prompts()).hasSize(3);
+		// 첫 번째 재호출에는 "이미 받았다"는 안내가 돌아갔다.
+		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(2))).contains("이미 받았고 위 대화에 그대로 있습니다");
+	}
+
+	@Test
 	void 없는_Skill_이름을_부르면_실패_안내가_돌아온다() {
 		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 Tool 흐름을 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
 		this.chatModel.answerToolCalls("Skill", "{\"command\": \"no-such-skill\"}");

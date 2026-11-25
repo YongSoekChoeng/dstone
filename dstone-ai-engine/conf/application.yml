@@ -248,6 +248,8 @@ dstone:
             keep-reasoning: false
             # 같은 생각을 되풀이하다 출력 한도에 걸려 답도 Tool 호출도 없이 끝난 라운드를, 대화를 그대로 두고 한 번 다시 부른다(RunawayRetryAdvisor).
             runaway-retry: true
+            # 이미 받은 Skill을 "이미 받았다"는 안내를 받고도 또 부르는 응답은, 그 응답의 본문을 최종 답으로 삼고 Tool 고리를 끝낸다(RedundantSkillCallAdvisor).
+            redundant-skill-end: true
             sub-agent:
                 max-calls: 10
                 background-threads: 4
