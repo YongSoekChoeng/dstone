@@ -6,7 +6,6 @@ id: sm-analyze-impact-agent
 version: 2.1.0
 description: 고객요구사항분석서의 TASK마다 고칠 파일, 호출 관계, 함께 영향받는 기능을 조사해 02.impact.md로 저장한다.
 model:
-  name: qwen/qwen3.8-flash
   temperature: 0.2
   reasoning: high
 input:

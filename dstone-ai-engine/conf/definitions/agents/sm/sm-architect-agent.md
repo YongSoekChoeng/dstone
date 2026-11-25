@@ -6,7 +6,6 @@ id: sm-architect-agent
 version: 2.2.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
-  name: qwen/qwen3.8-flash
   temperature: 0.2
   reasoning: high
 input:
