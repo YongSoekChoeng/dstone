@@ -1610,10 +1610,25 @@ var DstoneAiDesigner = (function () {
 	/** 강조 중에 관계없는 노드·화살표를 흐리게 그릴 때의 불투명도 */
 	var DIM_OPACITY = 0.25;
 
+	/** 고른 step과의 관계. 비트로 더한다(되돌아오는 고리면 이전이면서 다음이다) */
+	var FOCUS_PREV = 1;
+	var FOCUS_NEXT = 2;
+
+	/**
+	 * 강조할 때 이어진 노드의 테두리 색과 이름 앞에 붙일 표시(노드 폭이 좁아 기호만. 뜻은 왼쪽 범례).
+	 * 화살표 색은 종류(다음·실패·경로)를 뜻하므로 건드리지 않고, 노드 쪽에서만 이전과 다음을 나눈다.
+	 * 경로 화살표의 주황(#d97706)과 겹치지 않는 색을 쓴다.
+	 */
+	var FOCUS_ROLES = {};
+	FOCUS_ROLES[FOCUS_PREV] = { stroke: "#7c3aed", mark: "◀ " };
+	FOCUS_ROLES[FOCUS_NEXT] = { stroke: "#2563eb", mark: "▶ " };
+	FOCUS_ROLES[FOCUS_PREV | FOCUS_NEXT] = { stroke: "#db2777", mark: "◀▶ " };
+
 	/**
 	 * step 하나를 골랐을 때 함께 강조할 노드를 모읍니다.
-	 * 그 step으로 들어오는 화살표의 출발 노드와, 나가는 화살표의 도착 노드입니다. step을 고르지 않았으면 null.
-	 * 반환: { id: 고른 step id, nodes: { 노드 id: true } }
+	 * 그 step으로 들어오는 화살표의 출발 노드는 이전(FOCUS_PREV), 나가는 화살표의 도착 노드는 다음(FOCUS_NEXT)입니다.
+	 * 둘 다인 노드(고른 step과 서로 오가는 고리)는 두 값을 더합니다. step을 고르지 않았으면 null.
+	 * 반환: { id: 고른 step id, nodes: { 노드 id: 관계 값 } }
 	 */
 	function focusOf() {
 		if (!selected || selected.type !== "step" || !stepById(selected.id)) {
@@ -1628,8 +1643,11 @@ var DstoneAiDesigner = (function () {
 				known[step.id] = true;
 			}
 		});
+		function mark(nodeId, role) {
+			nodes[nodeId] = (nodes[nodeId] || 0) | role;
+		}
 		if (list.length > 0 && list[0] && list[0].id === id) {
-			nodes[START_ID] = true;
+			mark(START_ID, FOCUS_PREV);
 		}
 		list.forEach(function (step) {
 			if (!step || !step.id) {
@@ -1642,23 +1660,32 @@ var DstoneAiDesigner = (function () {
 				}
 				if (step.id === id) {
 					var exists = known[edge.target] || edge.target === END_ID || edge.target === FAIL_ID;
-					nodes[exists ? edge.target : "missing:" + edge.target] = true;
+					mark(exists ? edge.target : "missing:" + edge.target, FOCUS_NEXT);
 				}
 				if (edge.target === id) {
-					nodes[step.id] = true;
+					mark(step.id, FOCUS_PREV);
 				}
 			});
 		});
 		return { id: id, nodes: nodes };
 	}
 
-	/** 강조 중이면 노드 설정을 고칩니다. 이어진 노드는 테두리를 굵게, 관계없는 노드는 흐리게. */
+	/**
+	 * 강조 중이면 노드 설정을 고칩니다. 이어진 노드는 관계(이전·다음)에 따라 테두리 색과 이름 앞 표시를 바꾸고 굵게,
+	 * 관계없는 노드는 흐리게. 시작·END·FAIL 동그라미는 글자가 짧아 표시를 붙이지 않고 색만 바꾼다.
+	 */
 	function focusNode(config, focus) {
 		if (!focus || config.id === focus.id) {
 			return config;
 		}
-		if (focus.nodes[config.id]) {
+		var role = FOCUS_ROLES[focus.nodes[config.id]];
+		if (role) {
 			config.attrs.body.strokeWidth = 3;
+			config.attrs.body.stroke = role.stroke;
+			if (config.data && config.data.kind !== "terminal") {
+				config.attrs.label.text = role.mark + config.attrs.label.text;
+				config.attrs.label.fill = role.stroke;
+			}
 		} else {
 			config.attrs.body.opacity = DIM_OPACITY;
 			config.attrs.label.opacity = DIM_OPACITY;

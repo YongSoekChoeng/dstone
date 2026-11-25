@@ -911,6 +911,21 @@
 .wd-legend-fail { border-top: 2px dashed #b91c1c; }
 .wd-legend-route { border-top-color: #d97706; }
 
+/* 디자이너에서 step을 골랐을 때 이어진 노드의 테두리 색(workflow-designer.js의 FOCUS_ROLES와 같은 색) */
+.wd-legend-box {
+	display: inline-block;
+	width: 18px;
+	height: 12px;
+	margin-right: 6px;
+	vertical-align: middle;
+	border: 2px solid #4e4d43;
+	border-radius: 3px;
+}
+
+.wd-legend-prev { border-color: #7c3aed; }
+.wd-legend-next-step { border-color: #2563eb; }
+.wd-legend-both { border-color: #db2777; }
+
 .wd-palette-help {
 	margin-top: 16px;
 	padding-top: 12px;
