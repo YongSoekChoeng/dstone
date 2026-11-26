@@ -12,6 +12,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.dstone.ai.common.config.ConfigTool;
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.core.BaseObject;
 
 /**
@@ -46,7 +47,10 @@ public class ToolExecutor extends BaseObject {
 			throw new IllegalStateException("caller[" + caller + "]가 쓸 수 있는 Tool 중 '" + toolName + "'가 없습니다(화이트리스트 또는 이름을 확인하십시오).");
 		}
 		// caller와 실행 id·step id를 ToolContext에 싣는다.
-		ToolContext toolContext = new ToolContext(StepRef.toolContextOf(caller, stepRef));
+		// LLM이 고른 호출이 아니라는 표시도 함께 싣는다(ToolCallGate의 비밀값 자리표시자 처리가 본다).
+		Map<String, Object> context = StepRef.toolContextOf(caller, stepRef);
+		context.put(Constants.Tool.CONTEXT_DIRECT_CALL, Boolean.TRUE);
+		ToolContext toolContext = new ToolContext(context);
 		String rawResult = callback.call(jsonInput, toolContext);
 		return this.unwrap(rawResult);
 	}

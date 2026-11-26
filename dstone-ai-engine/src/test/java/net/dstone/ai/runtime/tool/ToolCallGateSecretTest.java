@@ -3,15 +3,19 @@ package net.dstone.ai.runtime.tool;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import net.dstone.ai.common.consts.Constants;
 import net.dstone.common.config.ConfigProperty;
 
 /**
@@ -74,6 +78,17 @@ class ToolCallGateSecretTest {
 		assertThat(this.echo.lastInput).isNull();
 	}
 
+	@Test
+	void placeholderIsPassedAsTextForToolStepCalls() {
+		Map<String, Object> context = new HashMap<String, Object>();
+		context.put(Constants.Tool.CONTEXT_DIRECT_CALL, Boolean.TRUE);
+
+		this.gate.invoke("containsValue", "{\"text\": \"" + PLACEHOLDER + "\"}", new ToolContext(context), this.echo);
+
+		// TOOL step의 호출은 막지 않되, 실제 값은 넣지 않는다
+		assertThat(this.echo.lastInput).contains(PLACEHOLDER).doesNotContain(SECRET);
+	}
+
 	/** 받은 인자 안의 text를 fill('…') 모양으로 돌려줍니다. */
 	private static class EchoTool implements ToolCallback {
 
@@ -82,6 +97,11 @@ class ToolCallGateSecretTest {
 		@Override
 		public ToolDefinition getToolDefinition() {
 			return DefaultToolDefinition.builder().name("echo").description("echo").inputSchema("{}").build();
+		}
+
+		@Override
+		public String call(String toolInput, ToolContext toolContext) {
+			return this.call(toolInput);
 		}
 
 		@Override

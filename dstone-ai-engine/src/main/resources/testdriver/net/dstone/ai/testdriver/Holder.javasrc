@@ -12,7 +12,10 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Savepoint;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +46,7 @@ final class Holder {
 	/** 원래 드라이버를 찾지 못할 때 이름으로 불러 볼 클래스(URL 종류별) */
 	private static final String[][] KNOWN_DRIVERS = {
 		{ "jdbc:log4jdbc:", "net.sf.log4jdbc.sql.jdbcapi.DriverSpy" }, { "jdbc:log4jdbc:", "net.sf.log4jdbc.DriverSpy" },
-		{ "jdbc:mysql:", "com.mysql.cj.jdbc.Driver" }, { "jdbc:mysql:", "com.mysql.jdbc.Driver" },
+		{ "jdbc:mysql:", "com.mysql.cj.jdbc.Driver" }, { "jdbc:mysql:", "com.mysql.jdbc.Driver" }, { "jdbc:mysql:", "org.mariadb.jdbc.Driver" },
 		{ "jdbc:mariadb:", "org.mariadb.jdbc.Driver" }, { "jdbc:postgresql:", "org.postgresql.Driver" },
 		{ "jdbc:oracle:", "oracle.jdbc.OracleDriver" }, { "jdbc:oracle:", "oracle.jdbc.driver.OracleDriver" } };
 
@@ -249,11 +252,34 @@ final class Holder {
 		return out.toString();
 	}
 
-	/** 원래 드라이버로 연결합니다. 앱의 클래스로더(TCCL)에서 드라이버를 찾습니다. */
+	/**
+	 * <pre>
+	 * 원래 드라이버로 연결합니다. 앱의 클래스로더(TCCL)에서 드라이버를 찾습니다.
+	 * 찾는 순서: 앱 설정에 적혀 있던 드라이버(dstone.testdriver.drivers) → URL 종류의 알려진 드라이버 → ServiceLoader → DriverManager.
+	 * URL만 보고 고르면 안 됩니다. 한 앱에 드라이버가 둘 이상이면 다른 것이 URL을 가로챕니다
+	 * (예: 옛 MariaDB 드라이버는 jdbc:mysql: URL도 받지만 MySQL 8의 인증은 하지 못합니다).
+	 * </pre>
+	 */
 	private static Connection connectReal(String url, Properties info) throws SQLException {
 		ClassLoader loader = Thread.currentThread().getContextClassLoader();
 		if (loader == null) {
 			loader = Holder.class.getClassLoader();
+		}
+		for (String name : knownDriversFor(url, System.getProperty("dstone.testdriver.drivers", ""))) {
+			try {
+				Driver driver = (Driver) Class.forName(name, true, loader).newInstance();
+				// 드라이버가 info를 바꿔도 다음 시도에 번지지 않게 복사본을 준다
+				Connection connection = driver.connect(url, (Properties) info.clone());
+				if (connection != null) {
+					return connection;
+				}
+			} catch (ClassNotFoundException e) {
+				// 다음 이름
+			} catch (InstantiationException e) {
+				// 다음 이름
+			} catch (IllegalAccessException e) {
+				// 다음 이름
+			}
 		}
 		Iterator<Driver> drivers = ServiceLoader.load(Driver.class, loader).iterator();
 		while (drivers.hasNext()) {
@@ -267,31 +293,27 @@ final class Holder {
 				continue;
 			}
 			if (driver.acceptsURL(url)) {
-				Connection connection = driver.connect(url, info);
+				Connection connection = driver.connect(url, (Properties) info.clone());
 				if (connection != null) {
 					return connection;
 				}
-			}
-		}
-		for (String[] known : KNOWN_DRIVERS) {
-			if (!url.startsWith(known[0])) {
-				continue;
-			}
-			try {
-				Driver driver = (Driver) Class.forName(known[1], true, loader).newInstance();
-				Connection connection = driver.connect(url, info);
-				if (connection != null) {
-					return connection;
-				}
-			} catch (ClassNotFoundException e) {
-				// 다음 이름
-			} catch (InstantiationException e) {
-				// 다음 이름
-			} catch (IllegalAccessException e) {
-				// 다음 이름
 			}
 		}
 		return DriverManager.getConnection(url, info);
+	}
+
+	/** URL 종류의 알려진 드라이버 이름들. 앱 설정에 적혀 있던 것(쉼표로 구분)을 앞에 둡니다. */
+	private static List<String> knownDriversFor(String url, String configured) {
+		List<String> names = Arrays.asList(configured.split(","));
+		List<String> first = new ArrayList<String>();
+		List<String> rest = new ArrayList<String>();
+		for (String[] known : KNOWN_DRIVERS) {
+			if (url.startsWith(known[0])) {
+				(names.contains(known[1]) ? first : rest).add(known[1]);
+			}
+		}
+		first.addAll(rest);
+		return first;
 	}
 
 	/* ---------------------------------------------------------------- 감싼 연결 */

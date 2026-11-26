@@ -134,6 +134,8 @@ public final class Constants {
 		public final static String CONTEXT_EXECUTION_ID = "net.dstone.ai.workflow.executionId";
 		/** 위와 같은 용도로 step id를 싣는 키입니다. */
 		public final static String CONTEXT_STEP_ID = "net.dstone.ai.workflow.stepId";
+		/** TOOL step이 Tool을 직접 부른 호출임을 싣는 키입니다(LLM이 고른 호출에는 없습니다). */
+		public final static String CONTEXT_DIRECT_CALL = "net.dstone.ai.tool.directCall";
 
 		/** 셸 스크립트를 실행하는 Tool(tools.shell.ShellExecTool)의 설정 키 접두사입니다. */
 		public static final class Shell {

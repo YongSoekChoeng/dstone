@@ -80,6 +80,8 @@ public final class RunLayer {
 		public int pathFiles;
 		/** Spring Boot 설정 파일의 datasource URL을 바꿨는가 */
 		public boolean bootDatasource;
+		/** 테스트 드라이버로 바꿔 넣은 원래 드라이버 클래스 이름들 */
+		public Set<String> driversFound = new LinkedHashSet<String>();
 	}
 
 	private static final Set<String> SKIP = Set.of(".git", ".svn", "node_modules", ".gradle", ".idea", "target", "build", "bin", "out");
@@ -290,8 +292,12 @@ public final class RunLayer {
 			boolean java = lower.endsWith(".java");
 			for (String driver : DRIVER_CLASSES) {
 				String quoted = Pattern.quote(driver);
-				text = java ? text.replaceAll("\"" + quoted + "\"", Matcher.quoteReplacement("\"" + TestDriverJar.DRIVER_CLASS + "\""))
+				String replaced = java ? text.replaceAll("\"" + quoted + "\"", Matcher.quoteReplacement("\"" + TestDriverJar.DRIVER_CLASS + "\""))
 					: text.replaceAll("(?<![A-Za-z0-9_.])" + quoted + "(?![A-Za-z0-9_.])", Matcher.quoteReplacement(TestDriverJar.DRIVER_CLASS));
+				if (!replaced.equals(text)) {
+					result.driversFound.add(driver);
+					text = replaced;
+				}
 			}
 			boolean descriptor = lower.endsWith("web.xml") || lower.endsWith("context.xml");
 			if (!descriptor) {

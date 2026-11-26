@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -138,6 +140,8 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		List<String> differences = new ArrayList<String>();
 		List<String> notes = new ArrayList<String>();
 		boolean bootDatasource;
+		/** 앱 설정에서 테스트 드라이버로 바꾼 원래 드라이버들. 테스트 드라이버가 실제 연결에 먼저 씁니다 */
+		Set<String> originalDrivers = new LinkedHashSet<String>();
 		File driverJar;
 		/** 실행이 승인 대기 등으로 루프를 벗어난 때(유휴 시작). 루프 안이면 0 */
 		volatile long idleSince;
@@ -367,6 +371,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 			RunLayer.sync(new File(spec.stageDir, "classes"), new File(run.dir, "classes"));
 			run.notes.addAll(layer.notes);
 			run.bootDatasource = layer.bootDatasource;
+			run.originalDrivers.addAll(layer.driversFound);
 			List<TomcatBase.JndiResource> jndi = new ArrayList<TomcatBase.JndiResource>();
 			for (Map<String, String> db : dbs) {
 				if (!isBlank(db.get("jndiName"))) {
@@ -559,6 +564,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		List<String> command = new ArrayList<String>();
 		String driverProps = "-Ddstone.testdriver.control=" + new File(run.dir, CONTROL_FILE).getAbsolutePath()
 			+ " -Ddstone.testdriver.lockWaitSeconds=" + this.config("db-lock-wait-seconds", "30");
+		if (!run.originalDrivers.isEmpty()) {
+			driverProps += " -Ddstone.testdriver.drivers=" + String.join(",", run.originalDrivers);
+		}
 		ProcessBuilder builder;
 		long logFrom = run.log.isFile() ? run.log.length() : 0L;
 		if (run.boot) {

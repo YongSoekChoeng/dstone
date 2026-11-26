@@ -127,6 +127,7 @@ public class TestServerToolTest {
 		String globals = Files.readString(new File(spec.stageDir, "classes/globals.xml").toPath(), StandardCharsets.UTF_8);
 		assertThat(globals).contains("jdbc:dstonetest:jdbc:mysql://localhost:3306/testApp?useSSL=false&amp;a=b")
 			.contains(TestDriverJar.DRIVER_CLASS).contains(spec.dataDir.getAbsolutePath().replace('\\', '/') + "/uploadData");
+		assertThat(result.driversFound).containsExactly("com.mysql.cj.jdbc.Driver");
 		assertThat(Files.readString(new File(spec.stageDir, "classes/context-ds.xml").toPath(), StandardCharsets.UTF_8)).contains("java:comp/env/jdbc/main");
 		assertThat(new File(spec.stageDir, "webapp/WEB-INF/web.xml")).as("web.xml의 res-ref-name은 바꾸지 않아 바뀐 파일이 아님").doesNotExist();
 		assertThat(new File(spec.stageDir, "webapp/list.jsp")).isFile();

@@ -39,7 +39,9 @@ import net.dstone.common.core.BaseObject;
  * ## 비밀값 자리표시자
  * LLM에게 비밀번호를 주지 않으려고, 인자에 ${secret:참조}를 쓰게 합니다(예: ${secret:myApp.testPassword}).
  * 설정 dstone.ai.tool.secret.allowed-tools에 적은 Tool(브라우저 입력)에 넘기기 직전에만 SecretSource로 실제 값을 넣고,
- * 그 밖의 Tool에 자리표시자를 주면 실행하지 않고 실패로 돌려줍니다(파일에 적거나 다른 곳으로 보내지 못하게).
+ * LLM이 그 밖의 Tool에 자리표시자를 주면 실행하지 않고 실패로 돌려줍니다(파일에 적거나 다른 곳으로 보내지 못하게).
+ * TOOL step의 호출은 자리표시자를 바꾸지 않은 글자 그대로 넘깁니다. 실제 값이 들어가지 않으며, Agent가 결과에 "자리표시자를 입력했다"고
+ * 적은 글을 다음 step이 읽는 일이 있기 때문입니다.
  * 결과에 이제까지 넣은 비밀값이 섞여 있으면 그 값의 자리표시자(${secret:참조})로 되돌려 가립니다(브라우저 Tool은 실행한 코드에 입력값을 담아 돌려줍니다).
  * ****가 아니라 자리표시자로 되돌리는 까닭: Agent가 결과를 보고 "제대로 들어갔다"와 "두 번 들어갔다·다른 값이 들어 있다"를 구별할 수 있게 하려고입니다.
  * ****로 가리면 입력이 맞았는지 알 수 없어 같은 입력을 되풀이하다가, 칸에 있던 값 뒤에 덧붙여 로그인에 실패하곤 했습니다(2026-11-24).
@@ -97,17 +99,23 @@ public class ToolCallGate extends BaseObject {
 		}
 		String input = toolInput;
 		if (toolInput != null && SECRET.matcher(toolInput).find()) {
-			if (!this.secretAllowedTools().contains(toolName)) {
+			if (this.secretAllowedTools().contains(toolName)) {
+				StringBuilder missing = new StringBuilder();
+				input = this.resolveSecrets(toolInput, missing);
+				if (missing.length() > 0) {
+					return "실패: 비밀값을 찾지 못했습니다: " + missing + ". 프로젝트 관리에서 시험계정을 확인하십시오.";
+				}
+			} else if (!isDirectCall(toolContext)) {
 				return "실패: 비밀값 자리표시자(${secret:...})는 " + this.secretAllowedTools() + " Tool에만 쓸 수 있습니다. 다른 Tool에는 넘기지 않습니다.";
-			}
-			StringBuilder missing = new StringBuilder();
-			input = this.resolveSecrets(toolInput, missing);
-			if (missing.length() > 0) {
-				return "실패: 비밀값을 찾지 못했습니다: " + missing + ". 프로젝트 관리에서 시험계정을 확인하십시오.";
 			}
 		}
 		String result = toolContext == null ? delegate.call(input) : delegate.call(input, toolContext);
 		return this.mask(result);
+	}
+
+	/** TOOL step이 부른 호출인지 봅니다(ToolExecutor가 표시합니다). */
+	private static boolean isDirectCall(ToolContext toolContext) {
+		return toolContext != null && Boolean.TRUE.equals(toolContext.getContext().get(Constants.Tool.CONTEXT_DIRECT_CALL));
 	}
 
 	/** 자리표시자를 실제 값으로 바꿉니다. 값은 JSON 문자열 안에 들어가므로 JSON 규칙대로 이스케이프합니다. */
