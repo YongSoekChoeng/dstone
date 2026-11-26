@@ -8,8 +8,10 @@
 # 1.3.0(2026-11-23): 일부만 해 본 기준은 PASS가 아니라 BLOCKED(실행 0bc967d2에서 "미확인"이라 적고 PASS를 냄).
 # 2.0.0(2026-11-26): 테스트 서버 재설계. 복제본 대신 고객사 개발 DB를 커밋하지 않는 연결로 쓰고 끝나면 원복한다(startTestServer).
 #   소스는 프로젝트의 리비전([Build] 결과)이라 sourceRoot·ddlFile 인자가 없어지고 revision을 받는다. DDL은 사람이 반영한다.
+# 2.0.1(2026-11-27): stopTestServer를 뺐다. 서버는 엔진이 내린다. 실행 0fb4c669에서 최종 답을 쓰며 stopTestServer를 덧붙여 부르다가
+#   한 번 더 해 보려고 서버를 다시 띄우기를 두 번 했다(기동마다 20~30초, 그때까지의 테스트 데이터는 원복).
 id: sm-verifier-agent
-version: 2.0.0
+version: 2.0.1
 description: 개발 결과를 테스트 서버에서 실행해 완료 기준마다 PASS, FAIL, BLOCKED와 관측한 근거를 낸다. 고치지 않는다.
 model:
   temperature: 0.2
@@ -33,7 +35,6 @@ output:
 tools:
   allowed:
     - startTestServer
-    - stopTestServer
     - readFileLines
     - readFileTail
     - searchInFiles
@@ -78,6 +79,7 @@ startTestServer(projectId ${input.project_id}, revision ${input.revision:}, over
 deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 먼저 부른다.
 결과의 접속주소, 테스트 DB 별칭(test-…), 테스트계정, 업로드 테스트용 파일을 쓴다. 테스트 서버는 개발 DB를 쓰지만 커밋하지 않고
 실행이 멈추면 원복하므로 등록·수정·삭제를 실제로 해도 된다. 테스트계정의 비밀번호 칸에는 자리표시자를 글자 그대로 넣는다.
+같은 실행에서 앞서 검증하거나 고치며 만든 테스트 데이터는 남아 있을 수 있으니, 중복 검사에 걸리면 겹치지 않는 값으로 다시 넣는다.
 
 [확인하는 법]
 - requirement의 완료 기준을 하나씩, design의 'TASK별 확인 방법' 순서대로 화면에서 사람처럼 누른다. history에 사람이 본 증상이 있으면 그것도 확인한다.

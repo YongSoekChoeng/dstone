@@ -11,8 +11,9 @@
 #   같은 코드로 서버 기동과 동작 검증을 다시 돈다(2026-11-25 실행에서 쓴 파일 없이 끝난 호출 2건을 이 계약이 잡았다).
 # 2.0.0(2026-11-26): 테스트 서버 재설계(startTestServer, 개발 DB를 커밋하지 않고 쓰고 원복). DDL은 테스트 중 실행되지 않으므로,
 #   DB 구조가 원인이면 DDL 문서만 고치고 사람이 개발 DB에 반영하도록 unresolved에 남긴다.
+# 2.0.1(2026-11-27): stopTestServer를 뺐다(sm-verifier-agent 2.0.1과 같은 이유). 서버는 엔진이 내린다.
 id: sm-auto-fix-agent
-version: 2.0.0
+version: 2.0.1
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -55,7 +56,6 @@ tools:
     - dbListTables
     - dbDescribeTable
     - startTestServer
-    - stopTestServer
     - browser_navigate
     - browser_snapshot
     - browser_click

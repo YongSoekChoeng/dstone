@@ -179,7 +179,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 	@Tool(description = "테스트 서버를 띄운다. 프로젝트의 현재 리비전(프로젝트 관리 [Build] 결과)에 개발 결과를 얹어 띄우고, 고객사 개발 DB를 쓰되 실행이 멈추거나 끝나면 원복한다. "
 		+ "이미 이 실행의 서버가 떠 있으면 바뀐 파일만 반영한다(JSP·정적 파일은 바로, Java·XML·설정은 context reload. reload하면 세션이 끊기니 다시 로그인한다). "
 		+ "결과: {success, cause(code: 개발 결과 탓 | environment: 환경 탓), message, url, serverLog, dbAliases(test-…: 테스트 서버와 같은 연결로 조회, 커밋 안 한 데이터가 보임)}. "
-		+ "테스트 중 DDL은 실행되지 않는다(DDL은 사람이 개발 DB에 반영). 다 쓰면 stopTestServer를 불러도 되고, 부르지 않아도 엔진이 내린다.")
+		+ "테스트 중 DDL은 실행되지 않는다(DDL은 사람이 개발 DB에 반영). 다 써도 따로 내리지 않아도 된다. 엔진이 내린다.")
 	public Map<String, Object> startTestServer(
 			@ToolParam(description = "프로젝트ID") String projectId,
 			@ToolParam(required = false, description = "쓸 리비전(Workflow가 시작할 때 받은 값). 비우면 프로젝트의 현재 리비전") String revision,
