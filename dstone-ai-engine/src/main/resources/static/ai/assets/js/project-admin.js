@@ -13,13 +13,17 @@
 	var editing = null;
 	var FIELDS = ["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "scmUsername", "javaVersion", "wasContainer", "wasVersion", "contextPath",
 		"buildType", "buildArgs", "buildWebRoot", "buildClassesDir", "buildLibDir", "buildSourceDirs", "testUserId", "testStaticPaths", "useYn"];
+	// 빌드 종류별 명령과, 저장된 인자가 없을 때 칸에 채워 보여 줄 참고용 기본값
 	var COMMANDS = {
-		MAVEN: { command: "mvn -B -DskipTests package {인자}", placeholder: "예: -pl web -am (비워도 됨)" },
-		GRADLE: { command: "gradlew(없으면 gradle) build -x test {인자}", placeholder: "비워도 됨" },
-		ANT: { command: "ant {인자}", placeholder: "target 이름(비우면 기본 target)" },
-		SHELL: { command: "{등록된 스크립트} {리비전 소스 경로}", placeholder: "등록된 스크립트 이름(dstone.ai.tool.shell.allowed-commands)" },
-		NONE: { command: "엔진이 소스 폴더 전체를 javac로 컴파일합니다", placeholder: "(인자 없음)" }
+		MAVEN: { command: "mvn -B -DskipTests package {인자}", placeholder: "예: -pl web -am (비워도 됨)", sample: "-Dmaven.test.skip=true" },
+		GRADLE: { command: "gradlew(없으면 gradle) build -x test {인자}", placeholder: "비워도 됨", sample: "--no-daemon" },
+		ANT: { command: "ant {인자}", placeholder: "target 이름(비우면 기본 target)", sample: "war" },
+		SHELL: { command: "{등록된 스크립트} {리비전 소스 경로}", placeholder: "등록된 스크립트 이름(dstone.ai.tool.shell.allowed-commands)", sample: "" },
+		NONE: { command: "엔진이 소스 폴더 전체를 javac로 컴파일합니다", placeholder: "(인자 없음)", sample: "" }
 	};
+	var shellScripts = [];
+	// 인자 칸의 값이 참고용 기본값으로 채운 것인지(사람이 고치면 false). 종류를 바꾸면 그 종류의 기본값으로 바꾼다
+	var argsSampled = false;
 	var buildRevisions = [];
 	var pollTimer = null;
 	var buildStatus = document.getElementById("pj-buildStatus");
@@ -74,6 +78,7 @@
 		revisionBody.innerHTML = "";
 		buildLog.hidden = true;
 		buildStatus.textContent = "";
+		argsSampled = false;
 		showBuildType();
 		if (project) {
 			loadBuild(project.projectId);
@@ -169,6 +174,13 @@
 		var args = document.getElementById("pj-buildArgs");
 		args.placeholder = info ? info.placeholder : "";
 		args.disabled = type === "NONE";
+		// 저장된 인자가 없으면 참고용 기본값을 채워 보여 준다. 필요 없으면 지우고 저장하면 된다
+		if (args.value.trim() === "" || argsSampled) {
+			var sample = !info ? "" : type === "SHELL" ? (shellScripts[0] || "") : info.sample;
+			args.value = sample;
+			argsSampled = sample !== "";
+		}
+		document.getElementById("pj-buildArgsHint").hidden = !argsSampled;
 		var needInput = buildRevisions.length > 0 && buildRevisions[0].status === "INPUT";
 		var manualSaved = ["buildWebRoot", "buildClassesDir", "buildLibDir", "buildSourceDirs"].some(function (key) {
 			return document.getElementById("pj-" + key).value.trim() !== "";
@@ -211,6 +223,10 @@
 	}
 
 	document.getElementById("pj-buildType").addEventListener("change", showBuildType);
+	document.getElementById("pj-buildArgs").addEventListener("input", function () {
+		argsSampled = false;
+		document.getElementById("pj-buildArgsHint").hidden = true;
+	});
 	document.getElementById("pj-build").addEventListener("click", function () {
 		if (!editing) {
 			return;
@@ -249,6 +265,8 @@
 			select.appendChild(option);
 		});
 		select.value = current;
+		shellScripts = options.shellScripts || [];
+		showBuildType();
 		document.getElementById("pj-shellScripts").innerHTML = (options.shellScripts || []).map(function (name) {
 			return "<option value=\"" + esc(name) + "\"></option>";
 		}).join("");

@@ -13,6 +13,13 @@ server:
 spring:
     main:
         allow-bean-definition-overriding: true
+    # 콘솔 화면 파일(HTML·JS·CSS)을 브라우저가 매번 서버에 확인하게 한다(바뀌지 않았으면 304라 가볍다).
+    # 캐시 지시가 없으면 브라우저가 예전 JS를 한동안 그대로 써서, 새 화면에 예전 스크립트가 돌며 저장 값이 빠질 수 있다(2026-11-26).
+    web:
+        resources:
+            cache:
+                cachecontrol:
+                    no-cache: true
     ##########################################################################################
     # <자동설정기능>
     # dstone-common이 Spring Security를 클래스패스에 올려 두기 때문에, 따로 빼 주지 않으면
