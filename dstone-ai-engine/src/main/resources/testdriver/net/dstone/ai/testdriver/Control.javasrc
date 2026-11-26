@@ -1,0 +1,152 @@
+package net.dstone.ai.testdriver;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.security.SecureRandom;
+import java.util.Iterator;
+
+/**
+ * <pre>
+ * 엔진이 테스트 서버(앱 JVM) 안의 드라이버에 명령을 보내는 창구입니다. 127.0.0.1의 빈 포트에서 받습니다.
+ * 포트와 일회용 토큰은 시스템 속성 dstone.testdriver.control 이 가리키는 파일에 "port=…" "token=…" 줄로 씁니다(엔진이 읽음).
+ *
+ * 요청: 첫 줄 토큰, 둘째 줄 명령. 응답은 글자 줄들.
+ *   STATUS                          OK 다음 줄마다 "url\t계정\t물리 연결 수\t쓰는 중(Y/N)"
+ *   ROLLBACK                        트랜잭션 전체를 되돌린다. OK 또는 FAIL 이유
+ *   QUERY                           다음 줄 URL, 계정, 최대 행 수, 나머지는 SQL(SELECT·WITH만).
+ *                                   OK 다음 줄에 칼럼 이름(탭 구분), 그다음 행들(\t \n \\ 는 이스케이프, NULL은 \N), 잘렸으면 MORE
+ *                                   그 DB에 앱이 아직 연결하지 않았으면 NOCONN
+ * </pre>
+ */
+final class Control {
+
+	private static boolean started;
+
+	private Control() {
+	}
+
+	static synchronized void startOnce() {
+		if (started) {
+			return;
+		}
+		started = true;
+		String path = System.getProperty("dstone.testdriver.control");
+		if (path == null || path.trim().isEmpty()) {
+			return;
+		}
+		try {
+			final ServerSocket server = new ServerSocket(0, 20, InetAddress.getByName("127.0.0.1"));
+			byte[] random = new byte[16];
+			new SecureRandom().nextBytes(random);
+			StringBuilder token = new StringBuilder();
+			for (byte b : random) {
+				token.append(String.format("%02x", Integer.valueOf(b & 0xff)));
+			}
+			final String secret = token.toString();
+			File file = new File(path.trim());
+			File temp = new File(file.getPath() + ".tmp");
+			OutputStream out = new FileOutputStream(temp);
+			try {
+				out.write(("port=" + server.getLocalPort() + "\ntoken=" + secret + "\n").getBytes("UTF-8"));
+			} finally {
+				out.close();
+			}
+			if (!temp.renameTo(file)) {
+				file.delete();
+				temp.renameTo(file);
+			}
+			Thread thread = new Thread(new Runnable() {
+				public void run() {
+					while (!server.isClosed()) {
+						try {
+							final Socket socket = server.accept();
+							Thread worker = new Thread(new Runnable() {
+								public void run() {
+									serve(socket, secret);
+								}
+							}, "dstone-testdriver-control-worker");
+							worker.setDaemon(true);
+							worker.start();
+						} catch (IOException e) {
+							// 다음 요청
+						}
+					}
+				}
+			}, "dstone-testdriver-control");
+			thread.setDaemon(true);
+			thread.start();
+		} catch (IOException e) {
+			System.err.println("[dstone-testdriver] 제어 창구를 열지 못했습니다: " + e);
+		}
+	}
+
+	private static void serve(Socket socket, String secret) {
+		try {
+			socket.setSoTimeout(120000);
+			BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
+			OutputStream out = socket.getOutputStream();
+			String token = in.readLine();
+			String command = in.readLine();
+			String answer;
+			if (!secret.equals(token) || command == null) {
+				answer = "FAIL 토큰이 맞지 않습니다";
+			} else if ("STATUS".equals(command)) {
+				StringBuilder text = new StringBuilder("OK\n");
+				Iterator<Holder> holders = TestDriver.HOLDERS.values().iterator();
+				while (holders.hasNext()) {
+					Holder holder = holders.next();
+					text.append(holder.url).append('\t').append(holder.user).append('\t').append(holder.physicalCount.get()).append('\t')
+						.append(holder.lock.isLocked() ? "Y" : "N").append('\n');
+				}
+				answer = text.toString();
+			} else if ("ROLLBACK".equals(command)) {
+				StringBuilder problems = new StringBuilder();
+				Iterator<Holder> holders = TestDriver.HOLDERS.values().iterator();
+				while (holders.hasNext()) {
+					Holder holder = holders.next();
+					String problem = holder.rollbackAll(TestDriver.intProperty("dstone.testdriver.lockWaitSeconds", 30));
+					if (problem != null) {
+						problems.append(holder.url).append(": ").append(problem).append("; ");
+					}
+				}
+				answer = problems.length() == 0 ? "OK\n" : "FAIL " + problems + "\n";
+			} else if ("QUERY".equals(command)) {
+				String url = in.readLine();
+				String user = in.readLine();
+				int maxRows = Integer.parseInt(in.readLine().trim());
+				StringBuilder sql = new StringBuilder();
+				char[] buffer = new char[4096];
+				int read;
+				while ((read = in.read(buffer)) > 0) {
+					sql.append(buffer, 0, read);
+				}
+				Holder holder = TestDriver.HOLDERS.get(url + "\u0000" + (user == null ? "" : user));
+				answer = holder == null ? "NOCONN\n" : holder.query(sql.toString().trim(), maxRows);
+			} else {
+				answer = "FAIL 모르는 명령입니다: " + command;
+			}
+			out.write(answer.getBytes("UTF-8"));
+			out.flush();
+		} catch (Exception e) {
+			try {
+				socket.getOutputStream().write(("FAIL " + e).getBytes("UTF-8"));
+			} catch (IOException ignored) {
+				// 끊겼다
+			}
+		} finally {
+			try {
+				socket.close();
+			} catch (IOException e) {
+				// 닫혔다
+			}
+		}
+	}
+
+}

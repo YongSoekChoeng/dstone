@@ -33,7 +33,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.project.ProjectStore;
-import net.dstone.ai.tools.build.sandbox.SandboxRegistry;
+import net.dstone.ai.tools.build.testserver.TestDriverClient;
+import net.dstone.ai.tools.build.testserver.TestServerRegistry;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
 import net.dstone.common.utils.StringUtil;
@@ -47,7 +48,8 @@ import net.dstone.common.utils.StringUtil;
  *   dbDescribeTable     테이블 하나의 컬럼, 타입, PK, 코멘트
  *   dbQuery             조회(SELECT) 문장 하나 실행
  *
- * 격리 시험 서버가 떠 있는 동안에는 그 일회용 복제본도 별칭 "sandbox-…"로 조회합니다(tools.build.sandbox.SandboxRegistry).
+ * 테스트 서버가 떠 있는 동안에는 테스트 DB도 별칭 "test-…"로 조회합니다(tools.build.testserver.TestServerRegistry).
+ * 그 별칭의 dbQuery는 테스트 서버 안의 같은 연결에서 실행해 커밋하지 않은 테스트 데이터가 보입니다. 테이블·구조 조회는 개발 DB로 합니다.
  *
  * 접속 정보는 LLM에게서 받지 않습니다. 프로젝트관리에 등록한 DB(별칭 "프로젝트ID.DB이름")와 설정(dstone.ai.tool.db.connections.{별칭})에 적어 둔 DB만,
  * 별칭으로만 부를 수 있습니다. 등록된 DB가 없으면(기본값) 모든 호출이 실패 문구로 끝나므로,
@@ -93,7 +95,7 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 
 	/** 떠 있는 격리 시험 DB 목록. 직접 만든 Tool에서는 null이다 */
 	@Autowired
-	private SandboxRegistry sandboxRegistry;
+	private TestServerRegistry sandboxRegistry;
 
 	/** 별칭마다 하나씩 만든 커넥션 풀. 처음 부를 때 만든다 */
 	private final Map<String, Pool> pools = new ConcurrentHashMap<String, Pool>();
@@ -247,6 +249,10 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 		if (maxRows != null && maxRows.intValue() > 0 && maxRows.intValue() < limit) {
 			limit = maxRows.intValue();
 		}
+		String viaTestServer = this.queryTestServer(alias.trim(), trimmed, limit);
+		if (viaTestServer != null) {
+			return viaTestServer;
+		}
 		Connection connection = null;
 		Statement statement = null;
 		try {
@@ -308,6 +314,25 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 			throw new IllegalArgumentException(problem);
 		}
 		int limit = Math.min(Math.max(maxRows, 1), this.maxRows());
+		Map<String, String> testDb = this.sandboxRegistry == null || !alias.trim().startsWith(TestServerRegistry.ALIAS_PREFIX) ? null
+			: this.sandboxRegistry.connections().get(alias.trim());
+		if (testDb != null && testDb.get("control") != null) {
+			TestDriverClient.QueryResult result = new TestDriverClient(new java.io.File(testDb.get("control"))).query(testDb.get("url"), testDb.get("username"), trimmed, limit);
+			if ("OK".equals(result.status)) {
+				List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+				for (String[] values : result.rows) {
+					Map<String, Object> row = new LinkedHashMap<String, Object>();
+					for (int i = 0; i < result.columns.size() && i < values.length; i++) {
+						row.put(result.columns.get(i), values[i]);
+					}
+					rows.add(row);
+				}
+				return rows;
+			}
+			if (!"NOCONN".equals(result.status)) {
+				throw new IllegalStateException("테스트 서버에서 조회하지 못했습니다: " + result.message);
+			}
+		}
 		Connection connection = null;
 		Statement statement = null;
 		try {
@@ -646,12 +671,68 @@ public class DbQueryTool extends BaseObject implements DisposableBean {
 			}
 			// 내려간 시험 DB의 커넥션 풀은 닫는다
 			for (Map.Entry<String, Pool> pool : this.pools.entrySet()) {
-				if (pool.getKey().startsWith(SandboxRegistry.ALIAS_PREFIX) && !sandboxes.containsKey(pool.getKey()) && this.pools.remove(pool.getKey(), pool.getValue())) {
+				if (pool.getKey().startsWith(TestServerRegistry.ALIAS_PREFIX) && !sandboxes.containsKey(pool.getKey()) && this.pools.remove(pool.getKey(), pool.getValue())) {
 					pool.getValue().dataSource.close();
 				}
 			}
 		}
 		return result;
+	}
+
+	/**
+	 * <pre>
+	 * 테스트 DB 별칭이면 테스트 서버 안의 같은 연결에서 조회합니다(커밋하지 않은 테스트 데이터가 보임).
+	 * 앱이 아직 그 DB에 연결하지 않았으면 null을 돌려 개발 DB로 바로 조회하게 합니다(그때는 바뀐 데이터가 없음).
+	 * 테스트 DB 별칭이 아니면 null입니다.
+	 * </pre>
+	 */
+	private String queryTestServer(String alias, String sql, int limit) {
+		if (this.sandboxRegistry == null || !alias.startsWith(TestServerRegistry.ALIAS_PREFIX)) {
+			return null;
+		}
+		Map<String, String> setting = this.sandboxRegistry.connections().get(alias);
+		if (setting == null || setting.get("control") == null) {
+			return null;
+		}
+		TestDriverClient.QueryResult result = new TestDriverClient(new java.io.File(setting.get("control"))).query(setting.get("url"), setting.get("username"), sql, limit);
+		if ("NOCONN".equals(result.status)) {
+			return null;
+		}
+		if (!"OK".equals(result.status)) {
+			this.audit(alias, sql, "실패 " + result.message);
+			return "실패: 테스트 서버에서 조회하지 못했습니다 - " + oneLine(result.message);
+		}
+		Pattern mask = this.maskPattern();
+		int maxCell = this.maxCellChars();
+		StringBuilder sb = new StringBuilder("열: ");
+		boolean[] masked = new boolean[result.columns.size()];
+		for (int c = 0; c < result.columns.size(); c++) {
+			masked[c] = mask.matcher(nvl(result.columns.get(c))).find();
+			sb.append(c > 0 ? " | " : "").append(result.columns.get(c));
+		}
+		sb.append('\n');
+		int rows = 0;
+		for (String[] row : result.rows) {
+			rows++;
+			sb.append(rows).append(") ");
+			for (int c = 0; c < row.length; c++) {
+				String value = row[c] == null ? "NULL" : row[c].replace("\r", " ").replace("\n", " ");
+				if (value.length() > maxCell) {
+					value = value.substring(0, maxCell) + "…";
+				}
+				sb.append(c > 0 ? " | " : "").append(masked.length > c && masked[c] ? "****" : value);
+			}
+			sb.append('\n');
+		}
+		if (rows == 0) {
+			sb.append("(결과 없음)\n");
+		} else if (result.more) {
+			sb.append(rows).append("행까지만 보였습니다. 더 있습니다(조건을 좁히거나 집계 쿼리로 다시 조회하세요).\n");
+		} else {
+			sb.append(rows).append("행\n");
+		}
+		this.audit(alias, sql, rows + "행(테스트 서버 연결)");
+		return sb.toString();
 	}
 
 	private int maxRows() {

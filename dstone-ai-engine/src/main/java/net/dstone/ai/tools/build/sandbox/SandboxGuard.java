@@ -40,7 +40,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 그래서 그런 것을 쓰는 프로젝트는 격리 시험 서버를 띄우지 않습니다(TestSandbox).
  * </pre>
  */
-final class SandboxGuard implements Closeable {
+public final class SandboxGuard implements Closeable {
 
 	private static final int VERSION = 5;
 	private static final int TYPE_IPV4 = 1;
@@ -59,7 +59,7 @@ final class SandboxGuard implements Closeable {
 	 * @param host 호스트 이름이나 IP
 	 * @param port 포트. 0이면 모든 포트(허용 목록에서만)
 	 */
-	record Endpoint(String host, int port) {
+	public record Endpoint(String host, int port) {
 	}
 
 	private final ServerSocket listener;
@@ -69,13 +69,16 @@ final class SandboxGuard implements Closeable {
 	private final boolean allowOthers;
 	private final Set<Socket> open = ConcurrentHashMap.newKeySet();
 	private final Set<String> denied = new ConcurrentSkipListSet<String>();
+	/** 이어 주되 수를 세는 곳(테스트 서버의 개발 DB). 테스트 드라이버를 거치지 않은 연결을 찾으려고 셉니다 */
+	private final List<Endpoint> watched = new CopyOnWriteArrayList<Endpoint>();
+	private final java.util.concurrent.atomic.AtomicInteger watchedCount = new java.util.concurrent.atomic.AtomicInteger();
 
 	/**
 	 * @param redirected   일회용 DB로 돌릴 원래 DB 주소들
 	 * @param redirectPort 일회용 DB의 포트(127.0.0.1)
 	 * @param allowOthers  true면 그 밖의 연결도 잇는다(빌드용)
 	 */
-	SandboxGuard(List<Endpoint> redirected, int redirectPort, boolean allowOthers) throws IOException {
+	public SandboxGuard(List<Endpoint> redirected, int redirectPort, boolean allowOthers) throws IOException {
 		this.redirected = new ArrayList<Endpoint>(redirected);
 		this.redirectPort = redirectPort;
 		this.allowOthers = allowOthers;
@@ -91,18 +94,28 @@ final class SandboxGuard implements Closeable {
 	}
 
 	/** 그대로 이어 줄 곳을 더합니다. */
-	void allow(Endpoint endpoint) {
+	public void allow(Endpoint endpoint) {
 		this.allowed.add(endpoint);
 	}
 
+	/** 그대로 이어 주되 연결 수를 셀 곳을 더합니다. */
+	public void watch(Endpoint endpoint) {
+		this.watched.add(endpoint);
+	}
+
+	/** watch한 곳으로 이은 연결 수(지금까지 합계)입니다. */
+	public int watchedCount() {
+		return this.watchedCount.get();
+	}
+
 	/** 이 문을 지나게 하는 JVM 옵션입니다. socksNonProxyHosts를 비워야 localhost도 지나갑니다. */
-	String jvmOptions() {
+	public String jvmOptions() {
 		return "-DsocksProxyHost=127.0.0.1 -DsocksProxyPort=" + this.listener.getLocalPort() + " -DsocksProxyVersion=5 -DsocksNonProxyHosts="
 			+ " -Doracle.jdbc.javaNetNio=false -Doracle.net.disableOob=true";
 	}
 
 	/** 막은 연결(호스트:포트)들입니다. */
-	List<String> denied() {
+	public List<String> denied() {
 		return new ArrayList<String>(this.denied);
 	}
 
@@ -194,6 +207,12 @@ final class SandboxGuard implements Closeable {
 				return new InetSocketAddress("127.0.0.1", this.redirectPort);
 			}
 		}
+		for (Endpoint endpoint : this.watched) {
+			if (endpoint.port() == port && sameHost(endpoint.host(), host)) {
+				this.watchedCount.incrementAndGet();
+				return new InetSocketAddress(host, port);
+			}
+		}
 		if (this.allowOthers) {
 			return new InetSocketAddress(host, port);
 		}
@@ -206,7 +225,7 @@ final class SandboxGuard implements Closeable {
 	}
 
 	/** 두 이름이 같은 컴퓨터를 가리키는가. 이 컴퓨터를 가리키는 이름(localhost, 127.x, ::1, LAN IP)은 모두 같다고 봅니다. */
-	static boolean sameHost(String expected, String actual) {
+	public static boolean sameHost(String expected, String actual) {
 		if (expected.equalsIgnoreCase(actual)) {
 			return true;
 		}

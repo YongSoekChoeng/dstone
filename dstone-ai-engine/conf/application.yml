@@ -270,12 +270,12 @@ dstone:
             # 미리 등록한 셸 스크립트만 실행하는 Tool(tools.shell.ShellExecTool, runShellScript) 설정.
             # allowed-commands에 없는 이름은 실행하지 않는다. 경로가 비어 있는 항목은 실행에 실패할 뿐이다.
             shell:
-                # 시험용 사본을 빌드하고 시험 서버에 올리는 스크립트. 경로는 환경마다 env*.properties의 TEST_SERVER_DEPLOY_SCRIPT.
-                # 빌드와 서버 재시작을 기다려야 해서 시간 제한을 넉넉히 둔다.
+                # 프로젝트 관리의 빌드 종류 Shell이 고를 수 있는 빌드 스크립트도 여기에 등록한다(인자로 리비전 소스 경로를 받음).
+                # 경로는 환경마다 env*.properties의 PROJECT_BUILD_SCRIPT. 대상 앱마다 다르므로 현장에서 채운다.
                 timeout-seconds: 600
                 allowed-commands:
-                    - name: test-server-deploy
-                      path: ${TEST_SERVER_DEPLOY_SCRIPT:}
+                    - name: project-build
+                      path: ${PROJECT_BUILD_SCRIPT:}
             # 비밀값 자리표시자 ${secret:프로젝트ID.testPassword}를 실제 값으로 바꿔 넘길 Tool(쉼표로 구분, runtime.tool.ToolCallGate).
             # LLM에게는 비밀번호 대신 자리표시자만 준다. 여기 없는 Tool에 자리표시자를 주면 실행하지 않는다. 결과에 섞인 비밀값은 자리표시자로 되돌려 가린다.
             secret:
@@ -285,44 +285,50 @@ dstone:
             static-check:
                 # node 명령(빈칸으로 나눈 토큰). PATH에 없으면 전체 경로로 적는다
                 node-command: ${STATIC_CHECK_NODE_COMMAND:node}
-            # 원본 + 개발 결과로 임시 시험 서버를 띄우고 내리는 Tool(tools.build.TestServerTool, startTestServer/stopTestServer) 설정.
-            # 사본은 {work-root}/{프로젝트ID}-server/app 에 두고 다음에 다시 쓴다(처음만 전체 복사). 서버는 띄운 step이 끝나면 내려간다.
-            # Maven 프로젝트(tomcat7/tomcat6, spring-boot, jetty 플러그인)만 띄운다. 사본은 원본 설정 그대로 원래 DB에 붙는다.
+            # 테스트 서버 Tool(tools.build.TestServerTool, startTestServer/stopTestServer)과 리비전 빌드(common.project.ProjectBuildService) 설정.
+            # 설계: docs/temp/dstone-ai-테스트관련재설계/01.설계.md. 프로젝트의 리비전([Build] 결과)에 개발 결과를 얹어 실행마다 서버 하나를 띄운다.
+            # 고객사 개발 DB를 테스트 드라이버(커밋하지 않는 연결)로 쓰고, 실행이 멈추거나 끝나면 원복한다. 테스트 중 DDL은 실행하지 않는다.
             test-server:
-                # 비우면 {사용자 홈}/.dstone-ai-engine
+                # 리비전({work-root}/{프로젝트ID}/rev)과 실행 층({work-root}/{프로젝트ID}/runs)을 둘 곳. 비우면 {사용자 홈}/.dstone-ai-engine
                 work-root: ${TEST_SERVER_WORK_ROOT:}
-                # 격리 시험 서버(startSandboxServer). DB 종류마다 설치 폴더(bin 또는 sbin이 있는 곳). 비우면 그 DB는 자동 검증하지 않는다.
-                # 설치 버전은 원래 DB와 같거나 높게. AppArmor가 켜진 Linux는 work-root 아래에 mysqld가 쓸 수 있게 허용해야 한다.
-                sandbox-mysql-home: ${TEST_SERVER_MYSQL_HOME:}
-                sandbox-postgresql-home: ${TEST_SERVER_POSTGRESQL_HOME:}
-                # Oracle은 설치 폴더 대신 시험 전용 서버(12c 이상 CDB, 원래 DB와 다른 서버)에 실행마다 PDB를 만든다. 비우면 Oracle은 자동 검증하지 않는다.
-                # 계정은 그 서버의 SYSDBA. 비밀번호는 ENC(...)로 적는다.
-                sandbox-oracle-url: ${TEST_SERVER_ORACLE_URL:}
-                sandbox-oracle-username: ${TEST_SERVER_ORACLE_USERNAME:}
-                sandbox-oracle-password: ${TEST_SERVER_ORACLE_PASSWORD:}
-                # 복제할 DB 하나의 크기 상한
-                sandbox-max-db-mb: 2048
-                # 격리 중에도 앱이 접속해도 되는 곳. 프로젝트마다 적는다(프로젝트ID=host:port, 쉼표로 구분). 시험 중 이곳에는 실제로 쓰게 되므로 시험용만 적는다
-                sandbox-allow-hosts: ${TEST_SERVER_ALLOW_HOSTS:}
-                # NIO 접속 라이브러리지만 그 프로젝트는 쓰지 않는다고 사람이 확인한 것(프로젝트ID=jar 이름 앞부분, 쉼표로 구분)
-                sandbox-trusted-libs: ${TEST_SERVER_TRUSTED_LIBS:}
-                # 업로드 시험용 파일을 둘 곳. 브라우저 MCP가 읽어도 되는 폴더여야 한다
+                # WAR 앱을 올릴 설치된 Tomcat(CATALINA_HOME). javax 앱은 9, jakarta 앱은 10 또는 11. 실행마다 전용 CATALINA_BASE로 띄우므로 그 Tomcat의 앱은 건드리지 않는다
+                tomcat-home-9: ${TOMCAT_HOME_9:}
+                tomcat-home-10: ${TOMCAT_HOME_10:}
+                tomcat-home-11: ${TOMCAT_HOME_11:}
+                # 테스트 중에도 앱이 접속해도 되는 곳. 프로젝트마다 적는다(프로젝트ID=host:port, 쉼표로 구분). 그 밖의 외부 접속은 막는다(개발 DB는 테스트 드라이버를 거쳐 연다)
+                allow-hosts: ${TEST_SERVER_ALLOW_HOSTS:}
+                # NIO 접속 라이브러리지만 그 프로젝트는 쓰지 않는다고 사람이 확인한 것(프로젝트ID=jar 이름 앞부분, 쉼표로 구분). NIO는 외부 접속 차단을 우회한다
+                trusted-libs: ${TEST_SERVER_TRUSTED_LIBS:}
+                # 이 패키지를 import한 앱은 Tomcat으로 띄우지 않는다(벤더 전용 API). EJB도 띄우지 않는다
+                vendor-api-prefixes: weblogic.,com.bea.,com.ibm.websphere.,com.ibm.ws.,jeus.,tmax.
+                # 업로드 테스트용 파일을 둘 곳. 브라우저 MCP가 읽어도 되는 폴더여야 한다
                 upload-sample-dir: ${PLAYWRIGHT_MCP_HOME:}/output
-                # WAR 프로젝트를 올릴 설치된 Tomcat(CATALINA_HOME). 이것을 함께 쓰되 사본 폴더에 전용 CATALINA_BASE를 만들어 빈 포트로 띄운다.
-                # 비우면 WAR도 pom의 tomcat/jetty 플러그인으로 띄운다(앱에 따라 서블릿 API가 부딪쳐 못 뜰 수 있다).
-                tomcat-home: ${TEST_SERVER_TOMCAT_HOME:}
-                # Maven 실행 파일(PATH에서 찾는다). Windows는 cmd.exe /c 로 감싸 부른다.
+                # Maven 실행 파일(리비전 빌드). Windows는 cmd.exe /c 로 감싸 부른다.
                 maven-command: ${TEST_SERVER_MAVEN_COMMAND:mvn}
-                # 빌드와 기동을 기다리는 시간. 처음에는 의존성을 받느라 오래 걸릴 수 있다.
+                # 서버 기동·다시 올리기를 기다리는 시간
                 start-timeout-seconds: 600
-                # 같은 프로젝트를 다른 실행이 쓰고 있을 때 기다리는 시간
+                # 동시에 띄울 테스트 서버 수와, 자리가 없을 때 기다리는 시간
+                max-servers: 3
                 lock-wait-seconds: 60
+                # 실행이 승인 대기·일시정지인 동안 서버를 두는 시간(분). 지나면 내리고 다음에 다시 띄운다
+                idle-minutes: 30
+                # 실행 루프 안에서 개발 DB 연결을 잡을 수 있는 시간(분). 넘으면 원복하고 서버를 내린다(행 잠금이 오래 남지 않게)
+                db-hold-minutes: 60
+                # 테스트 DB 연결 차례를 기다리는 시간(초). 넘으면 그 요청만 실패한다
+                db-lock-wait-seconds: 30
                 # Java 버전별 JDK 경로. 버전은 프로젝트 관리의 Java 버전 → 원본 pom.xml → 원본 클래스 파일 순서로 정한다.
                 # 경로는 서버(PC)마다 달라서 DB가 아니라 env*.properties에 둔다. 비어 있으면 엔진과 같은 JDK로 띄운다.
+                java-home-6: ${JAVA_HOME_6:}
+                java-home-7: ${JAVA_HOME_7:}
                 java-home-8: ${JAVA_HOME_8:}
                 java-home-11: ${JAVA_HOME_11:}
                 java-home-17: ${JAVA_HOME_17:}
                 java-home-21: ${JAVA_HOME_21:}
+                java-home-25: ${JAVA_HOME_25:}
+                # 리비전 빌드(프로젝트 관리의 [Build], common.project.ProjectBuildService). 리비전은 {work-root}/{프로젝트ID}/rev/{리비전}에 둔다.
+                # 빌드 한 번의 시간 상한(분)과, 지우지 않고 남길 리비전 수(현재 리비전과 실행 중인 실행이 쓰는 것은 따로 남긴다)
+                build-timeout-minutes: 30
+                keep-revisions: 3
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를
             # 채우는 것 자체가 곧 "이 Tool을 켠 상태"다. api-token은 DB 비밀번호와 동일한 ENC(...)

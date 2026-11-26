@@ -36,6 +36,7 @@ import net.dstone.ai.runtime.step.ToolStepExecutor;
 import net.dstone.ai.runtime.workflow.execution.StepHistoryEntry;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.common.core.BaseObject;
 
@@ -320,7 +321,8 @@ public class WorkFlowExecutor extends BaseObject {
 			throw e;
 		} finally {
 			// 실행이 어떤 이유로든 루프를 벗어나면, 다음 step을 위해 남겨 둔 것(임시 시험 서버 등)을 모두 정리합니다.
-			this.notifyExecutionLeft(currentExecution.executionId());
+			this.notifyExecutionLeft(currentExecution.executionId(), currentExecution.status() == WorkFlowExecutionStatus.WAITING_APPROVAL
+				|| currentExecution.status() == WorkFlowExecutionStatus.PAUSED);
 			ExecContext.getInstance().removeCurrentContext();
 		}
 		
@@ -333,11 +335,12 @@ public class WorkFlowExecutor extends BaseObject {
 	 * </pre>
 	 *
 	 * @param executionId 실행 id
+	 * @param resumable   승인 대기나 일시정지라 다시 이어질 수 있는가
 	 */
-	private void notifyExecutionLeft(String executionId) {
+	private void notifyExecutionLeft(String executionId, boolean resumable) {
 		for (StepEndListener listener : this.stepEndListeners) {
 			try {
-				listener.executionLeft(executionId);
+				listener.executionLeft(executionId, resumable);
 			} catch (RuntimeException e) {
 				this.error("실행 종료 정리(" + listener.getClass().getSimpleName() + ")에 실패했습니다(executionId=" + executionId + ") - " + e.getMessage());
 			}

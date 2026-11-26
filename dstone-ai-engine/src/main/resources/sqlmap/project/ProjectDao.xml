@@ -8,7 +8,7 @@
 
     <select id="selectProjectList" resultType="java.util.LinkedHashMap">
         SELECT P.PROJECT_ID AS "projectId", P.PROJECT_NAME AS "projectName", P.DESCRIPTION AS "description", P.SOURCE_DIR AS "sourceDir",
-               P.SCM_TYPE AS "scmType", P.SCM_URL AS "scmUrl", P.JAVA_VERSION AS "javaVersion", P.USE_YN AS "useYn", P.UPDATED_AT AS "updatedAt", P.UPDATED_BY AS "updatedBy",
+               P.SCM_TYPE AS "scmType", P.SCM_URL AS "scmUrl", P.JAVA_VERSION AS "javaVersion", P.CURRENT_REVISION AS "currentRevision", P.USE_YN AS "useYn", P.UPDATED_AT AS "updatedAt", P.UPDATED_BY AS "updatedBy",
                (SELECT COUNT(*) FROM ai_management_project_db D WHERE D.PROJECT_ID = P.PROJECT_ID) AS "dbCount"
           FROM ai_management_project P
          ORDER BY P.PROJECT_ID
@@ -16,7 +16,12 @@
 
     <select id="selectProject" parameterType="string" resultType="java.util.LinkedHashMap">
         SELECT PROJECT_ID AS "projectId", PROJECT_NAME AS "projectName", DESCRIPTION AS "description", SOURCE_DIR AS "sourceDir",
-               SCM_TYPE AS "scmType", SCM_URL AS "scmUrl", JAVA_VERSION AS "javaVersion", TEST_USER_ID AS "testUserId", TEST_STATIC_PATHS AS "testStaticPaths",
+               SCM_TYPE AS "scmType", SCM_URL AS "scmUrl", SCM_USERNAME AS "scmUsername",
+               CASE WHEN SCM_PASSWORD_ENC IS NULL OR SCM_PASSWORD_ENC = '' THEN 'N' ELSE 'Y' END AS "hasScmPassword",
+               JAVA_VERSION AS "javaVersion", WAS_CONTAINER AS "wasContainer", WAS_VERSION AS "wasVersion", CONTEXT_PATH AS "contextPath",
+               BUILD_TYPE AS "buildType", BUILD_ARGS AS "buildArgs", BUILD_WEB_ROOT AS "buildWebRoot", BUILD_CLASSES_DIR AS "buildClassesDir",
+               BUILD_LIB_DIR AS "buildLibDir", BUILD_SOURCE_DIRS AS "buildSourceDirs", CURRENT_REVISION AS "currentRevision",
+               TEST_USER_ID AS "testUserId", TEST_STATIC_PATHS AS "testStaticPaths",
                CASE WHEN TEST_PASSWORD_ENC IS NULL OR TEST_PASSWORD_ENC = '' THEN 'N' ELSE 'Y' END AS "hasTestPassword", USE_YN AS "useYn"
           FROM ai_management_project
          WHERE PROJECT_ID = #{projectId}
@@ -27,9 +32,14 @@
         SELECT TEST_PASSWORD_ENC FROM ai_management_project WHERE PROJECT_ID = #{projectId}
     </select>
 
+    <!-- 형상관리 비밀번호(암호문). 빌드할 때와 저장할 때 비워 둔 값을 이어 쓸 때만 읽는다 -->
+    <select id="selectScmPasswordEnc" parameterType="string" resultType="string">
+        SELECT SCM_PASSWORD_ENC FROM ai_management_project WHERE PROJECT_ID = #{projectId}
+    </select>
+
     <!-- 화면용 DB 목록(비밀번호는 있는지만) -->
     <select id="selectProjectDbList" parameterType="string" resultType="java.util.LinkedHashMap">
-        SELECT DB_SEQ AS "dbSeq", DB_NAME AS "dbName", JDBC_URL AS "jdbcUrl", USERNAME AS "username", SCHEMA_NAME AS "schemaName",
+        SELECT DB_SEQ AS "dbSeq", DB_NAME AS "dbName", JDBC_URL AS "jdbcUrl", USERNAME AS "username", SCHEMA_NAME AS "schemaName", JNDI_NAME AS "jndiName",
                DESCRIPTION AS "description", SORT_ORDER AS "sortOrder",
                CASE WHEN PASSWORD_ENC IS NULL OR PASSWORD_ENC = '' THEN 'N' ELSE 'Y' END AS "hasPassword"
           FROM ai_management_project_db
@@ -40,7 +50,7 @@
     <!-- DB Tool 접속용: 쓰는 프로젝트의 DB 전부(비밀번호 포함) -->
     <select id="selectConnectionList" resultType="java.util.LinkedHashMap">
         SELECT D.PROJECT_ID AS "projectId", P.PROJECT_NAME AS "projectName", D.DB_NAME AS "dbName", D.JDBC_URL AS "jdbcUrl", D.USERNAME AS "username",
-               D.PASSWORD_ENC AS "passwordEnc", D.SCHEMA_NAME AS "schemaName", D.DESCRIPTION AS "description"
+               D.PASSWORD_ENC AS "passwordEnc", D.SCHEMA_NAME AS "schemaName", D.JNDI_NAME AS "jndiName", D.DESCRIPTION AS "description"
           FROM ai_management_project_db D
           JOIN ai_management_project P ON P.PROJECT_ID = D.PROJECT_ID
          WHERE P.USE_YN = 'Y'
@@ -52,11 +62,17 @@
     </select>
 
     <insert id="upsertProject" parameterType="java.util.Map">
-        INSERT INTO ai_management_project (PROJECT_ID, PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, TEST_USER_ID, TEST_PASSWORD_ENC, TEST_STATIC_PATHS, USE_YN, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
-        VALUES (#{projectId}, #{projectName}, #{description}, #{sourceDir}, #{scmType}, #{scmUrl}, #{javaVersion}, #{testUserId}, #{testPasswordEnc}, #{testStaticPaths}, #{useYn}, now(), #{by}, now(), #{by})
+        INSERT INTO ai_management_project (PROJECT_ID, PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, SCM_USERNAME, SCM_PASSWORD_ENC, JAVA_VERSION,
+               WAS_CONTAINER, WAS_VERSION, CONTEXT_PATH, BUILD_TYPE, BUILD_ARGS, BUILD_WEB_ROOT, BUILD_CLASSES_DIR, BUILD_LIB_DIR, BUILD_SOURCE_DIRS,
+               TEST_USER_ID, TEST_PASSWORD_ENC, TEST_STATIC_PATHS, USE_YN, CREATED_AT, CREATED_BY, UPDATED_AT, UPDATED_BY)
+        VALUES (#{projectId}, #{projectName}, #{description}, #{sourceDir}, #{scmType}, #{scmUrl}, #{scmUsername}, #{scmPasswordEnc}, #{javaVersion},
+               #{wasContainer}, #{wasVersion}, #{contextPath}, #{buildType}, #{buildArgs}, #{buildWebRoot}, #{buildClassesDir}, #{buildLibDir}, #{buildSourceDirs},
+               #{testUserId}, #{testPasswordEnc}, #{testStaticPaths}, #{useYn}, now(), #{by}, now(), #{by})
         ON CONFLICT (PROJECT_ID) DO UPDATE
            SET PROJECT_NAME = EXCLUDED.PROJECT_NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, SOURCE_DIR = EXCLUDED.SOURCE_DIR,
-               SCM_TYPE = EXCLUDED.SCM_TYPE, SCM_URL = EXCLUDED.SCM_URL, JAVA_VERSION = EXCLUDED.JAVA_VERSION, TEST_USER_ID = EXCLUDED.TEST_USER_ID, TEST_PASSWORD_ENC = EXCLUDED.TEST_PASSWORD_ENC, TEST_STATIC_PATHS = EXCLUDED.TEST_STATIC_PATHS, USE_YN = EXCLUDED.USE_YN, UPDATED_AT = now(), UPDATED_BY = EXCLUDED.UPDATED_BY
+               SCM_TYPE = EXCLUDED.SCM_TYPE, SCM_URL = EXCLUDED.SCM_URL, SCM_USERNAME = EXCLUDED.SCM_USERNAME, SCM_PASSWORD_ENC = EXCLUDED.SCM_PASSWORD_ENC, JAVA_VERSION = EXCLUDED.JAVA_VERSION,
+               WAS_CONTAINER = EXCLUDED.WAS_CONTAINER, WAS_VERSION = EXCLUDED.WAS_VERSION, CONTEXT_PATH = EXCLUDED.CONTEXT_PATH, BUILD_TYPE = EXCLUDED.BUILD_TYPE, BUILD_ARGS = EXCLUDED.BUILD_ARGS,
+               BUILD_WEB_ROOT = EXCLUDED.BUILD_WEB_ROOT, BUILD_CLASSES_DIR = EXCLUDED.BUILD_CLASSES_DIR, BUILD_LIB_DIR = EXCLUDED.BUILD_LIB_DIR, BUILD_SOURCE_DIRS = EXCLUDED.BUILD_SOURCE_DIRS, TEST_USER_ID = EXCLUDED.TEST_USER_ID, TEST_PASSWORD_ENC = EXCLUDED.TEST_PASSWORD_ENC, TEST_STATIC_PATHS = EXCLUDED.TEST_STATIC_PATHS, USE_YN = EXCLUDED.USE_YN, UPDATED_AT = now(), UPDATED_BY = EXCLUDED.UPDATED_BY
     </insert>
 
     <delete id="deleteProjectDbs" parameterType="string">
@@ -64,9 +80,55 @@
     </delete>
 
     <insert id="insertProjectDb" parameterType="java.util.Map">
-        INSERT INTO ai_management_project_db (PROJECT_ID, DB_SEQ, DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, DESCRIPTION, SORT_ORDER, CREATED_AT, UPDATED_AT)
-        VALUES (#{projectId}, #{dbSeq}, #{dbName}, #{jdbcUrl}, #{username}, #{passwordEnc}, #{schemaName}, #{description}, #{sortOrder}, now(), now())
+        INSERT INTO ai_management_project_db (PROJECT_ID, DB_SEQ, DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, JNDI_NAME, DESCRIPTION, SORT_ORDER, CREATED_AT, UPDATED_AT)
+        VALUES (#{projectId}, #{dbSeq}, #{dbName}, #{jdbcUrl}, #{username}, #{passwordEnc}, #{schemaName}, #{jndiName}, #{description}, #{sortOrder}, now(), now())
     </insert>
+
+    <!-- ===== 리비전 빌드(ai_management_project_revision, common.project.ProjectBuildService) ===== -->
+
+    <select id="selectRevisionList" parameterType="string" resultType="java.util.LinkedHashMap">
+        SELECT REVISION AS "revision", SCM_REVISION AS "scmRevision", STATUS AS "status", KIND AS "kind", WEB_ROOT AS "webRoot", CLASSES_DIR AS "classesDir",
+               LIB_DIR AS "libDir", MAIN_CLASS AS "mainClass", MESSAGE AS "message", REQUESTED_BY AS "requestedBy", STARTED_AT AS "startedAt", FINISHED_AT AS "finishedAt"
+          FROM ai_management_project_revision
+         WHERE PROJECT_ID = #{projectId}
+         ORDER BY STARTED_AT DESC
+    </select>
+
+    <select id="selectRevision" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        SELECT REVISION AS "revision", SCM_REVISION AS "scmRevision", STATUS AS "status", KIND AS "kind", WEB_ROOT AS "webRoot", CLASSES_DIR AS "classesDir",
+               LIB_DIR AS "libDir", MAIN_CLASS AS "mainClass", MESSAGE AS "message", STARTED_AT AS "startedAt", FINISHED_AT AS "finishedAt"
+          FROM ai_management_project_revision
+         WHERE PROJECT_ID = #{projectId} AND REVISION = #{revision}
+    </select>
+
+    <insert id="upsertRevision" parameterType="java.util.Map">
+        INSERT INTO ai_management_project_revision (PROJECT_ID, REVISION, SCM_REVISION, STATUS, REQUESTED_BY, STARTED_AT)
+        VALUES (#{projectId}, #{revision}, #{scmRevision}, 'BUILDING', #{by}, now())
+        ON CONFLICT (PROJECT_ID, REVISION) DO UPDATE
+           SET STATUS = 'BUILDING', SCM_REVISION = EXCLUDED.SCM_REVISION, KIND = NULL, WEB_ROOT = NULL, CLASSES_DIR = NULL, LIB_DIR = NULL, MAIN_CLASS = NULL,
+               MESSAGE = NULL, REQUESTED_BY = EXCLUDED.REQUESTED_BY, STARTED_AT = now(), FINISHED_AT = NULL
+    </insert>
+
+    <update id="finishRevision" parameterType="java.util.Map">
+        UPDATE ai_management_project_revision
+           SET STATUS = #{status}, KIND = #{kind}, WEB_ROOT = #{webRoot}, CLASSES_DIR = #{classesDir}, LIB_DIR = #{libDir}, MAIN_CLASS = #{mainClass},
+               MESSAGE = #{message}, FINISHED_AT = now()
+         WHERE PROJECT_ID = #{projectId} AND REVISION = #{revision}
+    </update>
+
+    <!-- 엔진이 다시 뜨면 빌드 중이던 것은 끝나지 못한 것이다 -->
+    <update id="abandonBuildingRevisions">
+        UPDATE ai_management_project_revision SET STATUS = 'FAILED', MESSAGE = '엔진이 다시 떠서 빌드가 중단됐습니다.', FINISHED_AT = now()
+         WHERE STATUS = 'BUILDING'
+    </update>
+
+    <delete id="deleteRevision" parameterType="java.util.Map">
+        DELETE FROM ai_management_project_revision WHERE PROJECT_ID = #{projectId} AND REVISION = #{revision}
+    </delete>
+
+    <update id="updateCurrentRevision" parameterType="java.util.Map">
+        UPDATE ai_management_project SET CURRENT_REVISION = #{revision} WHERE PROJECT_ID = #{projectId}
+    </update>
 
     <delete id="deleteProject" parameterType="string">
         DELETE FROM ai_management_project WHERE PROJECT_ID = #{projectId}

@@ -7,15 +7,8 @@ import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URI;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -25,6 +18,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,717 +32,937 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import net.dstone.ai.common.annotation.AiTool;
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.project.ProjectBuildService;
 import net.dstone.ai.common.project.ProjectStore;
 import net.dstone.ai.runtime.tool.StepRef;
 import net.dstone.ai.runtime.tool.ToolOutcome;
 import net.dstone.ai.runtime.workflow.StepEndListener;
-import net.dstone.ai.tools.build.sandbox.SandboxException;
-import net.dstone.ai.tools.build.sandbox.SandboxRegistry;
-import net.dstone.ai.tools.build.sandbox.TestSandbox;
+import net.dstone.ai.tools.build.sandbox.SandboxArtifact;
+import net.dstone.ai.tools.build.sandbox.SandboxGuard;
+import net.dstone.ai.tools.build.testserver.RunLayer;
+import net.dstone.ai.tools.build.testserver.TestDriverClient;
+import net.dstone.ai.tools.build.testserver.TestDriverJar;
+import net.dstone.ai.tools.build.testserver.TestServerRegistry;
+import net.dstone.ai.tools.build.testserver.TomcatBase;
+import net.dstone.ai.tools.build.testserver.WasCheck;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
 
 /**
  * <pre>
- * 원본 소스 + 개발 결과로 임시 시험 서버를 띄우고 내리는 Tool입니다.
- * 문제 해결 Agent가 고치기 전에 증상을 재현하고, 고친 뒤 증상이 사라졌는지 브라우저로 확인하는 데 씁니다.
- * 사람이 쓰는 시험 서버는 건드리지 않습니다.
+ * 테스트 서버 Tool입니다. 프로젝트의 리비전(프로젝트 관리의 [Build] 결과) + 개발 결과로 서버를 띄우고, 고객사 개발 DB를 쓰되 끝나면 원복합니다.
+ * 설계: docs/temp/dstone-ai-테스트관련재설계/01.설계.md 5·6장.
  *
- * ## 폴더
- * 프로젝트마다 폴더 하나를 캐시처럼 다시 씁니다. 처음 한 번만 원본 전체를 복사하고, 다음부터는 바뀐 파일만 복사합니다.
- *   {작업 루트}/{프로젝트키}-server/
- *     app/         시험용 사본(applyOverlay가 원본 + 개발 결과로 맞춤. 빌드 결과(target)는 띄울 때마다 clean으로 새로 만듦)
- *     tomcat/      WAR 방식일 때의 전용 CATALINA_BASE(conf, webapps, logs, work, temp)
- *     server.log   서버 출력(readFileTail로 읽음)
- *     server.pid   띄운 프로세스 번호(엔진이 죽어 남은 프로세스를 다음에 정리하려고)
- *     server.lock  같은 프로젝트를 두 실행이 동시에 쓰지 않게 잡는 잠금
- *     source.txt   사본을 만든 원본 경로(다른 원본이면 사본을 새로 만듦)
- * 작업 루트는 dstone.ai.tool.test-server.work-root(env의 TEST_SERVER_WORK_ROOT), 비우면 {사용자 홈}/.dstone-ai-engine 입니다.
- * 프로젝트키는 프로젝트ID, 없으면 원본 폴더 이름입니다.
+ * ## 폴더({작업 루트}/{프로젝트ID}/runs/{실행ID})
+ *   webapp/   실행 전용 docBase(개발 결과의 웹 파일, 바꾼 설정)       classes/  컴파일 결과와 바꾼 리소스(먼저 읽힘)
+ *   data/     소스에 박힌 원본 절대경로를 이리로 바꿈                  tomcat/   실행 전용 CATALINA_BASE
+ *   stage/    다음 반영을 만드는 곳                                     server.log, server.pid, driver-control.txt(테스트 드라이버 창구)
+ * 리비전 폴더와 원본 소스 디렉토리는 읽기만 합니다.
  *
- * ## 띄우는 방법
- * Maven 프로젝트만 지원합니다. 포트는 비어 있는 것을 골라 씁니다. 사람이 쓰는 서버와 겹치지 않게 하려는 것입니다.
- * 1) packaging이 war이고 설정 tomcat-home(env의 TEST_SERVER_TOMCAT_HOME)이 있으면, 실제 배포와 같은 방식으로 띄웁니다.
- *    mvn clean package로 WAR를 만들고(clean: 지난 실행의 클래스가 남지 않게), 설치된 Tomcat을 함께 쓰되 사본 폴더 안에 전용 CATALINA_BASE(tomcat/)를 만들어 거기에 올립니다.
- *    설치된 Tomcat의 conf를 복사해 HTTP 포트만 바꾸고 shutdown 포트와 AJP는 끕니다. 사람이 쓰는 Tomcat은 건드리지 않습니다.
- *    context path는 pom의 tomcat 플러그인 <path>, 없으면 / 입니다.
- * 2) 아니면 원본 pom.xml의 플러그인으로 띄웁니다.
- *   tomcat7/tomcat6-maven-plugin   mvn tomcat7:run  (사본 pom의 그 플러그인 <port>만 빈 포트로 바꿉니다)
- *   spring-boot-maven-plugin       mvn spring-boot:run  (--server.port 인자)
- *   jetty-maven-plugin             mvn jetty:run  (-Djetty.http.port)
- * 플러그인 방식은 앱 jar와 플러그인의 서블릿 API가 부딪쳐 못 뜨는 앱이 있습니다(WAR에 servlet-api가 딸려 들어간 경우). 그런 앱은 1)로 띄웁니다.
+ * ## 띄우기
+ * WAR는 설치된 Tomcat(javax 앱은 tomcat-home-9, jakarta 앱은 tomcat-home-10·11)에 Resources로 실행 층과 리비전을 겹쳐 올리고,
+ * Spring Boot는 리비전의 클래스·lib로 java -cp 실행합니다(jar를 다시 만들지 않음). EJB·벤더 API를 쓰는 앱은 띄우지 않습니다(WasCheck).
  *
- * ## JDK
- * 프로젝트 관리의 Java 버전(ai_management_project.JAVA_VERSION) → 원본 pom.xml의 컴파일 버전 → 원본 클래스 파일 순서로 버전을 정하고,
- * 그 버전의 JDK 경로를 설정 java-home-{버전}(env의 JAVA_HOME_{버전})에서 찾습니다. 경로는 서버마다 달라서 DB에 두지 않습니다.
- * 못 찾으면 엔진이 쓰는 JDK로 띄우고 결과에 그렇다고 적습니다.
+ * ## 다시 부르면(같은 실행, 같은 리비전)
+ * 바뀐 파일만 반영합니다. JSP·정적 파일은 복사만(즉시), Java·XML·설정은 context reload(Context 파일의 수정 시각을 바꿈), Boot는 JVM 재시작.
  *
- * ## 내리기
- * 접속 판정: HTTP 응답이 오면 뜬 것으로 보되, WAR 방식에서 앱 경로가 404면 앱이 시작에 실패한 것으로 보고 실패를 돌려줍니다.
+ * ## DB
+ * 앱의 JDBC URL과 드라이버를 테스트 드라이버로 바꿔(RunLayer), 개발 DB를 커밋하지 않는 연결 하나로 씁니다. 실행이 승인 대기·일시정지로
+ * 루프를 벗어나면 원복(rollback)하고, 끝나거나 서버를 내릴 때도 원복합니다. 연결이 끊기면 DB가 원복합니다.
+ * 테스트 DB 별칭(test-DB이름)으로 dbQuery하면 테스트 서버 안의 같은 연결에서 조회합니다(커밋하지 않은 데이터가 보임).
  *
- * Agent가 stopTestServer를 부르지 않아도 엔진이 내립니다.
- * - 띄운 step이 끝나면 바로 내리지 않고 다음 step 하나까지만 둡니다(넘겨주기). 다음 step이 같은 입력으로 다시 부르면
- *   새로 띄우지 않고 그 서버를 그대로 돌려줍니다(재사용). 그 step이 끝나면 내립니다. 다시 쓰지 않았으면 다음 step이 끝날 때 내립니다.
- *   예: sm-workflow는 기동 확인 TOOL step이 띄운 서버를 바로 다음 검증 Agent가 다시 부릅니다. 넘겨주기가 없으면 한 회차에
- *   서버를 두 번(각 1~2분) 띄웁니다(2026-11-23).
- * - 실행이 엔진 루프를 벗어나면(끝남, 실패, 승인 대기, 일시정지, 예외) 그 실행의 서버를 모두 내립니다(executionLeft).
- * - 엔진이 내려갈 때도 모두 내립니다.
- * 재사용은 실행, 입력(프로젝트·원본·개발 결과·DDL·삭제 목록 경로), 개발 결과·DDL·삭제 목록 파일의 크기와 수정 시각이 모두 같고
- * 프로세스가 살아 있을 때만 합니다. 하나라도 다르면 내리고 새로 띄웁니다. 같은 step 안에서 다시 부르면 늘 새로 띄웁니다.
- * 사본 폴더는 지우지 않습니다(다음에 다시 씀). 지우고 싶으면 폴더를 직접 지우면 됩니다.
- *
- * ## 두 가지 모드
- * - startTestServer: DB를 따로 만들지 않습니다. 사본은 원본 설정 그대로 원래 DB에 붙습니다. 개발·시험 DB에서만 쓰십시오.
- * - startSandboxServer: 띄울 때마다 일회용 DB에 복제하고 DDL을 거기에만 반영합니다. 앱의 접속과 원본 폴더 경로도 사본 쪽으로 돌립니다(tools.build.sandbox.TestSandbox).
- *   격리를 보장할 수 없으면 원래 DB로 대신 띄우지 않고 실패하며, 실패의 원인을 cause로 알려 줍니다.
- *     code         개발 결과가 원인(DDL 오류, 빌드 실패, 앱 기동 실패). 고치면 된다
- *     environment  환경이 원인(지원하지 않는 구성, 설치·설정 없음, 외부 의존). 코드를 고쳐도 소용없다
- *   빌드한 파일만 띄웁니다: Spring Boot는 java -jar, 그 밖의 WAR는 설치된 Tomcat. Maven 플러그인으로 띄우는 방식은 격리 옵션을 확인할 수 없어 쓰지 않습니다.
+ * ## 수명
+ * 실행마다 서버 하나. step이 끝나도 두고, 실행이 끝나면 내립니다. 승인 대기·일시정지 중에는 유휴 idle-minutes가 지나면 내립니다.
+ * DB 연결을 db-hold-minutes보다 오래 잡으면 원복하고 내립니다. 동시 서버는 max-servers까지(넘으면 기다림).
  * </pre>
  */
 @AiTool
 public class TestServerTool extends BaseObject implements StepEndListener {
 
-	/** 기본 작업 루트(사용자 홈 아래)입니다. */
-	private static final String DEFAULT_ROOT_NAME = ".dstone-ai-engine";
-
-	/** 사본 폴더 등 하위 이름 */
-	private static final String APP_DIR = "app";
-	private static final String LOG_FILE = "server.log";
-	private static final String PID_FILE = "server.pid";
-	private static final String LOCK_FILE = "server.lock";
-	private static final String SOURCE_FILE = "source.txt";
-	private static final String TOMCAT_BASE_DIR = "tomcat";
-
-	/** 띄운 프로세스의 명령줄에 넣어 두는 표시입니다. 엔진이 죽어 남은 프로세스를 정리할 때 우리가 띄운 것인지 확인합니다. */
+	/** 띄운 프로세스의 명령줄 표시(엔진이 죽어 남은 프로세스를 정리할 때 씀) */
 	private static final String MARKER = "-Ddstone.ai.test-server=";
 
-	/** 실패할 때 결과에 붙일 로그 끝줄 수 */
+	/** 띄운 JVM의 콘솔 출력을 UTF-8로 */
+	private static final String UTF8_OUTPUT = "-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8";
+
 	private static final int LOG_TAIL_LINES = 40;
+	private static final String CAUSE_CODE = "code";
+	private static final String CAUSE_ENVIRONMENT = "environment";
+	private static final String CONTROL_FILE = "driver-control.txt";
+	private static final String DEFAULT_VENDOR_PREFIXES = "weblogic.,com.bea.,com.ibm.websphere.,com.ibm.ws.,jeus.,tmax.";
 
 	@Autowired
 	private ConfigProperty configProperty;
 
 	@Autowired
-	private OverlayTool overlayTool;
-
-	@Autowired
 	private ProjectStore projectStore;
 
 	@Autowired
-	private SandboxRegistry sandboxRegistry;
+	private ProjectBuildService projectBuildService;
 
-	/** 이 엔진이 띄운 서버들(키: 프로젝트키) */
-	private final Map<String, RunningServer> running = new ConcurrentHashMap<String, RunningServer>();
+	@Autowired
+	private JavaCompileTool javaCompileTool;
 
-	/** 띄운 서버 하나의 정보입니다. */
-	private static final class RunningServer {
+	@Autowired
+	private TestServerRegistry registry;
+
+	/** 실행별 서버(키: 실행ID, Workflow 밖이면 adhoc-프로젝트ID) */
+	private final Map<String, Run> runs = new ConcurrentHashMap<String, Run>();
+
+	private ScheduledExecutorService reaper;
+
+	/** 테스트 서버 하나 */
+	private static final class Run {
 		String key;
+		String projectId;
 		String executionId;
-		String stepId;
-		Process process;
-		RandomAccessFile lockFile;
-		FileLock lock;
-		String url;
+		String revision;
+		Map<String, Object> resolved;
+		File dir;
 		File log;
-		TestSandbox sandbox;
-		/** 띄울 때의 입력과 파일 상태. 같으면 다음 step이 다시 쓸 수 있습니다 */
-		String fingerprint;
-		/** 띄운 step이 끝나 다음 step으로 넘겨 둔 상태인가 */
-		boolean carried;
-		/** 띄웠을 때 돌려준 안내(재사용할 때 같은 내용을 다시 줍니다) */
-		String message;
-	}
-
-	/** startSandboxServer 한 번의 요청과, 실패했을 때의 원인 */
-	private static final class SandboxRequest {
-		String ddlFile;
-		String cause = CAUSE_ENVIRONMENT;
-		/** 띄운 서버의 접속주소(성공했을 때만) */
+		File descriptor;
+		Process process;
+		int port;
 		String url;
-		/** 복제본 DB 별칭(성공했을 때만) */
-		List<String> dbAliases = new ArrayList<String>();
+		String contextPath;
+		boolean boot;
+		File javaHome;
+		File tomcatHome;
+		SandboxGuard guard;
+		TestDriverClient driver;
+		Map<String, Map<String, String>> aliases = new LinkedHashMap<String, Map<String, String>>();
+		List<String> differences = new ArrayList<String>();
+		List<String> notes = new ArrayList<String>();
+		boolean bootDatasource;
+		File driverJar;
+		/** 실행이 승인 대기 등으로 루프를 벗어난 때(유휴 시작). 루프 안이면 0 */
+		volatile long idleSince;
+		/** DB 연결을 잡기 시작한 때(띄운 때, 마지막 원복 때) */
+		volatile long dbSince;
 	}
 
-	/** 실패 원인: 개발 결과. 고치면 된다 */
-	private static final String CAUSE_CODE = "code";
-
-	/** 실패 원인: 환경. 코드를 고쳐도 소용없다 */
-	private static final String CAUSE_ENVIRONMENT = "environment";
-
-	/** 앱이 DB 로그인에 실패한 흔적. 프로젝트 관리의 계정이 앱의 계정과 다른 환경 문제다 */
-	private static final Pattern LOGIN_FAILED = Pattern.compile("Access denied for user|password authentication failed for user|ORA-01017");
-
-	/** 띄우는 방법 하나(플러그인 종류에 따라 정함) */
-	private static final class Launch {
-		String kind;
-		List<String> goals = new ArrayList<String>();
-		String contextPath = "/";
+	/** 한 번의 요청 결과 */
+	private static final class Answer {
+		boolean success;
+		String cause = "";
+		String message;
+		Map<String, Object> timings = new LinkedHashMap<String, Object>();
 	}
 
-	@Tool(description = "원본 소스에 개발 결과를 얹은 사본으로 임시 시험 서버를 띄우고, 접속 주소와 서버 로그 파일 경로를 돌려준다. "
-		+ "사람이 쓰는 서버는 건드리지 않는다. 이미 이 실행이 띄운 서버가 있으면 내리고 지금 개발 결과로 다시 띄운다(고친 뒤 확인할 때 다시 부른다). "
-		+ "단, 바로 앞 step이 같은 입력으로 띄운 서버가 떠 있으면 새로 띄우지 않고 그대로 쓴다. "
-		+ "빌드와 기동을 기다리므로 몇 분 걸릴 수 있다. 다 쓰면 stopTestServer를 부른다(부르지 않아도 step이 끝나면 내려간다). "
-		+ "Maven 프로젝트(tomcat, spring-boot, jetty 플러그인)만 띄울 수 있다. 사본은 원래 DB에 붙는다.")
-	public ToolOutcome startTestServer(
-			@ToolParam(required = false, description = "프로젝트ID(요청서의 프로젝트ID). Java 버전을 찾고 사본 폴더 이름에 쓴다. 없으면 비운다") String projectId,
-			@ToolParam(description = "원본 소스 루트의 절대경로(읽기만 한다)") String sourceRoot,
-			@ToolParam(description = "원본 루트 기준 같은 경로로 바뀐 파일·새 파일이 들어 있는 폴더(개발 결과)의 절대경로") String overlayDir,
+	@PostConstruct
+	public void init() {
+		this.reaper = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable runnable) {
+				Thread thread = new Thread(runnable, "dstone-test-server-reaper");
+				thread.setDaemon(true);
+				return thread;
+			}
+		});
+		this.reaper.scheduleWithFixedDelay(new Runnable() {
+			@Override
+			public void run() {
+				TestServerTool.this.reap();
+			}
+		}, 60, 60, TimeUnit.SECONDS);
+		this.killLeftovers();
+	}
+
+	@Tool(description = "테스트 서버를 띄운다. 프로젝트의 현재 리비전(프로젝트 관리 [Build] 결과)에 개발 결과를 얹어 띄우고, 고객사 개발 DB를 쓰되 실행이 멈추거나 끝나면 원복한다. "
+		+ "이미 이 실행의 서버가 떠 있으면 바뀐 파일만 반영한다(JSP·정적 파일은 바로, Java·XML·설정은 context reload. reload하면 세션이 끊기니 다시 로그인한다). "
+		+ "결과: {success, cause(code: 개발 결과 탓 | environment: 환경 탓), message, url, serverLog, dbAliases(test-…: 테스트 서버와 같은 연결로 조회, 커밋 안 한 데이터가 보임)}. "
+		+ "테스트 중 DDL은 실행되지 않는다(DDL은 사람이 개발 DB에 반영). 다 쓰면 stopTestServer를 불러도 되고, 부르지 않아도 엔진이 내린다.")
+	public Map<String, Object> startTestServer(
+			@ToolParam(description = "프로젝트ID") String projectId,
+			@ToolParam(required = false, description = "쓸 리비전(Workflow가 시작할 때 받은 값). 비우면 프로젝트의 현재 리비전") String revision,
+			@ToolParam(required = false, description = "개발 결과 폴더(원본 소스 루트 기준 같은 경로로 바뀐 파일·새 파일)의 절대경로. 없으면 비운다") String overlayDir,
 			@ToolParam(required = false, description = "삭제 목록 파일의 절대경로. 원본 루트 기준 상대경로가 한 줄에 하나") String deleteList,
 			ToolContext toolContext) {
+		StepRef stepRef = StepRef.from(toolContext);
+		Answer answer = new Answer();
+		Run run = null;
 		try {
-			return this.start(projectId, sourceRoot, overlayDir, deleteList, StepRef.from(toolContext), null);
+			if (isBlank(projectId) || this.projectStore.settings(projectId.trim()) == null) {
+				answer.message = "프로젝트 관리에 없는 프로젝트ID라 테스트 서버를 띄우지 못합니다: " + projectId;
+				answer.cause = CAUSE_ENVIRONMENT;
+			} else {
+				run = this.start(projectId.trim(), revision, overlayDir, deleteList, stepRef, answer);
+			}
 		} catch (IOException | RuntimeException e) {
-			return ToolOutcome.fail("임시 시험 서버를 띄우지 못했습니다: " + e.getMessage());
-		}
-	}
-
-	@Tool(description = "격리된 시험 서버를 띄운다. 프로젝트 DB를 일회용 DB로 복제하고 ddlFile의 DDL을 거기에만 반영하므로, 화면에서 등록·수정·삭제를 해도 원래 DB와 파일은 바뀌지 않는다. "
-		+ "접속주소, 서버로그, dbQuery에 쓸 복제본 별칭(sandbox-...)을 돌려준다. 실패하면 cause가 code(개발 결과가 원인)나 environment(환경이 원인, 고쳐도 소용없음)다. "
-		+ "같은 step에서 다시 부르면 복제본부터 새로 만든다. 바로 앞 step이 같은 입력으로 띄운 서버가 떠 있으면 새로 띄우지 않고 그대로 쓴다(그 사실을 결과에 적는다). "
-		+ "다 쓰면 stopTestServer를 부른다(부르지 않아도 step이 끝나면 내려간다).")
-	public Map<String, Object> startSandboxServer(
-			@ToolParam(description = "프로젝트ID. 복제할 DB를 프로젝트 관리에서 찾는다") String projectId,
-			@ToolParam(description = "원본 소스 루트의 절대경로(읽기만 한다)") String sourceRoot,
-			@ToolParam(description = "원본 루트 기준 같은 경로로 바뀐 파일·새 파일이 들어 있는 폴더(개발 결과)의 절대경로") String overlayDir,
-			@ToolParam(required = false, description = "복제본에 반영할 DDL 파일(.sql, 또는 ```sql 블록이 든 .md)의 절대경로. 없으면 비운다") String ddlFile,
-			@ToolParam(required = false, description = "삭제 목록 파일의 절대경로. 원본 루트 기준 상대경로가 한 줄에 하나") String deleteList,
-			ToolContext toolContext) {
-		SandboxRequest request = new SandboxRequest();
-		request.ddlFile = ddlFile;
-		ToolOutcome outcome;
-		try {
-			outcome = isBlank(projectId)
-				? ToolOutcome.fail("프로젝트ID가 없어 복제할 DB를 알 수 없습니다. 자동 검증을 하지 못합니다.")
-				: this.start(projectId, sourceRoot, overlayDir, deleteList, StepRef.from(toolContext), request);
-		} catch (IOException | RuntimeException e) {
-			request.cause = CAUSE_ENVIRONMENT;
-			outcome = ToolOutcome.fail("격리 시험 서버를 띄우지 못했습니다: " + e.getMessage());
+			this.error("dstone-ai-engine tool: 테스트 서버를 띄우다 오류: " + e);
+			answer.success = false;
+			answer.cause = CAUSE_ENVIRONMENT;
+			answer.message = "테스트 서버를 띄우지 못했습니다: " + e.getMessage();
 		}
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
-		result.put("success", outcome.success());
-		result.put("cause", Boolean.TRUE.equals(outcome.success()) ? "" : request.cause);
-		result.put("message", outcome.message());
-		// 프로그램이 읽을 값(엔진의 Agent 평가가 씁니다). 글자 message를 풀어 읽지 않게 따로 둡니다.
-		if (Boolean.TRUE.equals(outcome.success())) {
-			result.put("url", request.url);
-			result.put("dbAliases", request.dbAliases);
+		result.put("success", Boolean.valueOf(answer.success));
+		result.put("cause", answer.success ? "" : answer.cause);
+		result.put("message", answer.message);
+		if (answer.success && run != null) {
+			result.put("url", run.url);
+			result.put("serverLog", run.log.getAbsolutePath());
+			result.put("dbAliases", new ArrayList<String>(run.aliases.keySet()));
+			result.put("revision", run.revision);
 		}
+		result.put("timings", answer.timings);
 		return result;
 	}
 
-	@Tool(description = "startTestServer나 startSandboxServer로 띄운 임시 시험 서버를 내린다. 사본 폴더는 다음에 다시 쓰려고 남긴다.")
-	public ToolOutcome stopTestServer(
-			@ToolParam(required = false, description = "startTestServer에 준 프로젝트ID. 없으면 비운다") String projectId,
-			@ToolParam(description = "startTestServer에 준 원본 소스 루트의 절대경로") String sourceRoot) {
-		String key = keyOf(projectId, sourceRoot);
-		RunningServer server = this.running.get(key);
-		if (server == null) {
-			return ToolOutcome.pass("떠 있는 임시 시험 서버가 없습니다: " + key);
+	@Tool(description = "이 실행의 테스트 서버를 내리고 개발 DB의 테스트 데이터를 원복한다.")
+	public ToolOutcome stopTestServer(@ToolParam(description = "startTestServer에 준 프로젝트ID") String projectId, ToolContext toolContext) {
+		StepRef stepRef = StepRef.from(toolContext);
+		Run run = this.runs.get(keyOf(stepRef, projectId));
+		if (run == null) {
+			return ToolOutcome.pass("떠 있는 테스트 서버가 없습니다.");
 		}
-		this.stop(server);
-		return ToolOutcome.pass("임시 시험 서버를 내렸습니다: " + key);
+		String problem = this.stop(run);
+		return ToolOutcome.pass("테스트 서버를 내렸습니다." + (problem == null ? " 개발 DB의 테스트 데이터를 원복했습니다." : " 원복 확인 필요: " + problem));
 	}
 
-	@Tool(description = "프로젝트 관리에 등록된 시험계정(화면 로그인용)을 알려 준다. 비밀번호는 알려 주지 않고, 비밀번호 칸에 글자 그대로 넣을 자리표시자를 준다. "
-		+ "startTestServer 결과에도 같은 내용이 있다. 사람이 쓰는 시험 서버에 로그인할 때 쓴다.")
+	@Tool(description = "프로젝트 관리에 등록된 테스트계정(화면 로그인용)을 알려 준다. 비밀번호는 알려 주지 않고, 비밀번호 칸에 글자 그대로 넣을 자리표시자를 준다.")
 	public ToolOutcome getTestAccount(@ToolParam(description = "프로젝트ID(요청서의 프로젝트ID)") String projectId) {
 		return ToolOutcome.pass(this.accountLine(projectId));
 	}
 
-	/**
-	 * <pre>
-	 * step이 끝났을 때 그 실행의 서버를 정리합니다.
-	 * - 방금 끝난 step이 띄웠거나 다시 쓴 서버: 내리지 않고 다음 step 하나까지 둡니다(carried).
-	 * - 앞 step에서 넘겨받았는데 이 step이 다시 쓰지 않은 서버: 내립니다.
-	 * </pre>
-	 */
+	/* ---------------------------------------------------------------- StepEndListener */
+
 	@Override
 	public void stepEnded(String executionId, String stepId) {
 		if (executionId != null && stepId != null) {
-			this.sandboxRegistry.stepEnded(new StepRef(executionId, stepId));
-		}
-		if (executionId == null || stepId == null) {
-			return;
-		}
-		Iterator<RunningServer> it = new ArrayList<RunningServer>(this.running.values()).iterator();
-		while (it.hasNext()) {
-			RunningServer server = it.next();
-			if (!executionId.equals(server.executionId)) {
-				continue;
-			}
-			if (stepId.equals(server.stepId) && !server.carried) {
-				server.carried = true;
-				this.info("dstone-ai-engine tool: step[" + stepId + "]이 끝났지만, 다음 step이 같은 입력으로 다시 쓸 수 있게 임시 시험 서버를 한 step 더 둡니다: " + server.key);
-			} else {
-				this.info("dstone-ai-engine tool: 넘겨받은 step[" + stepId + "]이 끝나 임시 시험 서버를 내립니다: " + server.key);
-				this.stop(server);
-			}
+			this.registry.stepEnded(new StepRef(executionId, stepId));
 		}
 	}
 
-	/** 실행이 엔진 루프를 벗어나면(끝남, 실패, 승인 대기, 일시정지, 예외) 그 실행의 서버를 모두 내립니다. */
 	@Override
 	public void executionLeft(String executionId) {
+		this.executionLeft(executionId, false);
+	}
+
+	/** 승인 대기·일시정지면 원복만 하고 서버는 둡니다(유휴 시간이 지나면 내림). 끝남·실패면 내립니다. */
+	@Override
+	public void executionLeft(String executionId, boolean resumable) {
 		if (executionId == null) {
 			return;
 		}
-		Iterator<RunningServer> it = new ArrayList<RunningServer>(this.running.values()).iterator();
-		while (it.hasNext()) {
-			RunningServer server = it.next();
-			if (executionId.equals(server.executionId)) {
-				this.info("dstone-ai-engine tool: 실행[" + executionId + "]이 멈추거나 끝나 임시 시험 서버를 내립니다: " + server.key);
-				this.stop(server);
-			}
+		Run run = this.runs.get(executionId);
+		if (run == null) {
+			return;
+		}
+		if (!resumable) {
+			this.info("dstone-ai-engine tool: 실행[" + executionId + "]이 끝나 테스트 서버를 내리고 DB를 원복합니다.");
+			this.stop(run);
+			return;
+		}
+		String problem = run.driver.rollback();
+		run.dbSince = System.currentTimeMillis();
+		run.idleSince = System.currentTimeMillis();
+		if (problem != null) {
+			this.warn("dstone-ai-engine tool: 실행[" + executionId + "]의 개발 DB 원복이 실패해 서버를 내립니다(연결이 끊기면 DB가 되돌림): " + problem);
+			this.stop(run);
+		} else {
+			this.info("dstone-ai-engine tool: 실행[" + executionId + "]이 기다리는 동안 개발 DB를 원복했습니다. 서버는 유휴 시간까지 둡니다.");
 		}
 	}
 
-	/** 엔진이 내려갈 때 띄운 서버를 모두 내립니다. */
 	@PreDestroy
 	public void stopAll() {
-		Iterator<RunningServer> it = new ArrayList<RunningServer>(this.running.values()).iterator();
+		if (this.reaper != null) {
+			this.reaper.shutdownNow();
+		}
+		Iterator<Run> it = new ArrayList<Run>(this.runs.values()).iterator();
 		while (it.hasNext()) {
 			this.stop(it.next());
 		}
 	}
 
-	private ToolOutcome start(String projectId, String sourceRootText, String overlayText, String deleteList, StepRef stepRef, SandboxRequest request) throws IOException {
-		if (isBlank(sourceRootText) || isBlank(overlayText)) {
-			return ToolOutcome.fail("sourceRoot, overlayDir는 모두 필요합니다.");
-		}
-		File sourceRoot = new File(sourceRootText.trim()).getAbsoluteFile();
-		File pom = new File(sourceRoot, "pom.xml");
-		if (!pom.isFile()) {
-			return ToolOutcome.fail("원본에 pom.xml이 없습니다. 임시 시험 서버는 Maven 프로젝트만 띄울 수 있습니다: " + sourceRoot);
-		}
-		String key = keyOf(projectId, sourceRootText);
-		String executionId = stepRef == null ? null : stepRef.executionId();
-		File base = new File(this.workRoot(), key + "-server");
-		Files.createDirectories(base.toPath());
+	/* ---------------------------------------------------------------- 띄우기와 반영 */
 
-		// 1) 같은 실행이 띄운 서버가 있으면, 앞 step이 같은 입력으로 넘겨준 것은 그대로 쓰고 아니면 내린다(고친 뒤 다시 띄우는 경우).
-		//    다른 실행이 쓰는 중이면 기다린다.
-		String fingerprint = fingerprintOf(projectId, sourceRootText, overlayText, deleteList, request == null ? null : request.ddlFile);
-		RunningServer previous = this.running.get(key);
-		if (previous != null && sameExecution(previous.executionId, executionId)) {
-			if (canReuse(previous, stepRef, fingerprint, request != null)) {
-				return this.reuse(previous, stepRef, request);
+	private Run start(String projectId, String revision, String overlayText, String deleteText, StepRef stepRef, Answer answer) throws IOException {
+		String key = keyOf(stepRef, projectId);
+		Map<String, Object> resolved = this.projectBuildService.resolve(projectId, isBlank(revision) ? null : revision.trim());
+		if (resolved == null) {
+			answer.cause = CAUSE_ENVIRONMENT;
+			answer.message = "빌드된 리비전이 없어 테스트 서버를 띄우지 못합니다" + (isBlank(revision) ? "" : "(리비전 " + revision + ")")
+				+ ". 프로젝트 관리에서 [Build]를 누르면 다음부터 테스트할 수 있습니다.";
+			return null;
+		}
+		File overlay = isBlank(overlayText) ? null : new File(overlayText.trim());
+		File deleteList = isBlank(deleteText) ? null : new File(deleteText.trim());
+		synchronized (key.intern()) {
+			Run run = this.runs.get(key);
+			if (run != null && run.process != null && run.process.isAlive() && run.revision.equals(resolved.get("revision"))) {
+				run.idleSince = 0L;
+				this.apply(run, overlay, deleteList, answer);
+				if (answer.success) {
+					this.registry.opened(stepRef, run.url, run.aliases);
+				}
+				return run;
 			}
-			this.stop(previous);
+			if (run != null) {
+				this.stop(run);
+			}
+			if (!this.waitForSlot(answer)) {
+				return null;
+			}
+			run = this.launch(key, projectId, stepRef, resolved, overlay, deleteList, answer);
+			if (run != null && answer.success) {
+				this.registry.opened(stepRef, run.url, run.aliases);
+			}
+			return run;
 		}
-		RunningServer server = new RunningServer();
-		server.key = key;
-		server.executionId = executionId;
-		server.stepId = stepRef == null ? null : stepRef.stepId();
-		server.fingerprint = fingerprint;
-		String lockProblem = this.acquireLock(server, base);
-		if (lockProblem != null) {
-			return ToolOutcome.fail(lockProblem);
-		}
+	}
+
+	private Run launch(String key, String projectId, StepRef stepRef, Map<String, Object> resolved, File overlay, File deleteList, Answer answer) throws IOException {
+		long t0 = System.currentTimeMillis();
+		Map<String, Object> project = this.projectStore.settings(projectId);
+		Run run = new Run();
+		run.key = key;
+		run.projectId = projectId;
+		run.executionId = stepRef == null ? null : stepRef.executionId();
+		run.revision = String.valueOf(resolved.get("revision"));
+		run.resolved = resolved;
+		run.boot = ProjectBuildService.KIND_BOOT.equals(resolved.get("kind"));
+		run.dir = new File(new File(this.projectBuildService.projectDir(projectId), "runs"), safe(key));
+		RunLayer.deleteTreeQuietly(run.dir);
+		Files.createDirectories(run.dir.toPath());
+		Files.writeString(new File(run.dir, ProjectBuildService.RUN_REVISION_FILE).toPath(), run.revision, StandardCharsets.UTF_8);
+		run.log = new File(run.dir, "server.log");
+		File revDir = new File(String.valueOf(resolved.get("revisionDir")));
+		File revSrc = new File(String.valueOf(resolved.get("sourceRoot")));
+		File webRoot = fileOrNull(resolved.get("webRoot"));
+		File classesDir = fileOrNull(resolved.get("classesDir"));
+		File libDir = fileOrNull(resolved.get("libDir"));
 		boolean started = false;
 		try {
-			// 2) 엔진이 죽어서 남아 있던 프로세스가 있으면 정리한다(잠금을 얻었으니 주인은 없다).
-			this.killLeftover(base, key);
-
-			// 3) 사본을 맞춘다. 다른 원본으로 만든 사본이면 새로 만든다.
-			File app = new File(base, APP_DIR);
-			File sourceFile = new File(base, SOURCE_FILE);
-			String recorded = sourceFile.isFile() ? Files.readString(sourceFile.toPath(), StandardCharsets.UTF_8).trim() : "";
-			if (!recorded.equals(sourceRoot.getPath()) && app.exists()) {
-				deleteTree(app.toPath());
+			// 1) Tomcat으로 띄울 수 있는 앱인가
+			WasCheck.Result was = WasCheck.check(revDir, revSrc, webRoot, libDir, splitList(this.config("vendor-api-prefixes", DEFAULT_VENDOR_PREFIXES)));
+			if (was.blocker != null) {
+				answer.cause = CAUSE_ENVIRONMENT;
+				answer.message = was.blocker + ". 이 프로젝트는 서버 기동 테스트를 하지 않고 정적 확인까지만 합니다.";
+				return null;
 			}
-			ToolOutcome overlay = this.overlayTool.applyOverlay(sourceRoot.getPath(), overlayText.trim(), app.getPath(), deleteList, null);
-			if (!Boolean.TRUE.equals(overlay.success())) {
-				return ToolOutcome.fail("사본을 맞추지 못했습니다: " + overlay.message());
-			}
-			Files.writeString(sourceFile.toPath(), sourceRoot.getPath(), StandardCharsets.UTF_8);
-
-			if (request != null) {
-				String problem = this.createSandbox(server, projectId.trim(), base, sourceRoot, app, request);
-				if (problem != null) {
-					return ToolOutcome.fail(problem);
-				}
+			List<String> unguarded = SandboxArtifact.unguardedJars(libDir, splitList(forProject(this.config("trusted-libs", ""), projectId)));
+			if (!unguarded.isEmpty()) {
+				answer.cause = CAUSE_ENVIRONMENT;
+				answer.message = "외부 접속을 막을 수 없는 라이브러리(NIO)가 있어 테스트 서버를 띄우지 않습니다: " + String.join(", ", unguarded)
+					+ ". 쓰지 않는 것이면 관리자가 설정 trusted-libs에 '" + projectId + "=jar 이름 앞부분'으로 더합니다.";
+				return null;
 			}
 
-			// 4) 포트와 JDK를 정한다.
-			File appPom = new File(app, "pom.xml");
-			String pomText = Files.readString(appPom.toPath(), StandardCharsets.UTF_8);
-			int port = freePort();
-			List<String> notes = new ArrayList<String>();
-			File javaHome = this.javaHome(projectId, pomText, sourceRoot, notes);
-			File log = new File(base, LOG_FILE);
-			Files.deleteIfExists(log.toPath());
-			server.log = log;
-			// 원래 환경과 다른 점. Agent가 이것 때문에 생긴 실패를 개발 결과 탓으로 보지 않게 결과에 적는다.
-			List<String> differences = new ArrayList<String>();
-			List<String[]> staticPaths = this.staticPaths(projectId, notes);
-
-			// 5) 띄운다. 출력은 server.log로 보낸다.
-			File tomcatHome = this.tomcatHome();
-			String kind;
-			String contextPath;
-			Process process;
-			long runLogFrom = 0L;
-			boolean bootArchive = request != null && pluginBlock(pomText, "spring-boot-maven-plugin") != null;
-			if (request != null && !bootArchive && !(isWar(pomText) && tomcatHome != null)) {
-				return ToolOutcome.fail("격리 시험 서버로 띄울 수 없는 구성입니다(되는 것: Spring Boot 단일 모듈, 또는 WAR + 설정 tomcat-home). 자동 검증을 하지 못합니다.");
+			// 2) 실행 층
+			List<Map<String, String>> dbs = this.projectDbs(projectId);
+			RunLayer.Spec spec = this.spec(run, project, resolved, revDir, revSrc, webRoot, classesDir, libDir, overlay, deleteList, dbs);
+			RunLayer.Result layer = RunLayer.build(spec, this.javaCompileTool);
+			answer.timings.put("layerMs", Long.valueOf(System.currentTimeMillis() - t0));
+			if (layer.codeProblem != null) {
+				answer.cause = CAUSE_CODE;
+				answer.message = "개발 결과를 컴파일하지 못해 테스트 서버를 띄우지 않았습니다:\n" + layer.codeProblem;
+				return null;
 			}
-			if (bootArchive) {
-				// Boot는 실제 배포처럼 java -jar로 띄운다(Boot 3 이상은 설치된 Tomcat 9에 올릴 수 없기도 하다).
-				String buildProblem = this.mavenPackage(app, javaHome, log, key, server.sandbox);
-				if (buildProblem != null) {
-					request.cause = CAUSE_CODE;
-					return ToolOutcome.fail("빌드하지 못했습니다(" + buildProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
+			RunLayer.sync(new File(spec.stageDir, "webapp"), new File(run.dir, "webapp"));
+			RunLayer.sync(new File(spec.stageDir, "classes"), new File(run.dir, "classes"));
+			run.notes.addAll(layer.notes);
+			run.bootDatasource = layer.bootDatasource;
+			List<TomcatBase.JndiResource> jndi = new ArrayList<TomcatBase.JndiResource>();
+			for (Map<String, String> db : dbs) {
+				if (!isBlank(db.get("jndiName"))) {
+					TomcatBase.JndiResource resource = new TomcatBase.JndiResource();
+					resource.name = stripEnv(db.get("jndiName"));
+					resource.url = db.get("url");
+					resource.username = db.get("username");
+					resource.password = db.get("password");
+					jndi.add(resource);
 				}
-				File archive = findBootArchive(new File(app, "target"));
-				if (archive == null) {
-					return ToolOutcome.fail("mvn package 뒤에 실행할 jar나 WAR가 없습니다: " + app);
+			}
+			if (!dbs.isEmpty() && layer.urlsFound.isEmpty() && jndi.isEmpty()) {
+				answer.cause = CAUSE_ENVIRONMENT;
+				answer.message = "앱의 설정·소스에서 프로젝트 관리에 등록한 DB의 JDBC URL을 찾지 못했습니다(URL을 조각으로 조립하는 앱일 수 있음). "
+					+ "테스트 데이터를 원복할 수 없어 띄우지 않습니다. DB가 JNDI로 연결되면 프로젝트 관리의 DB에 JNDI 이름을 넣으십시오.";
+				return null;
+			}
+			for (Map<String, String> db : dbs) {
+				if (!layer.urlsFound.contains(db.get("url")) && isBlank(db.get("jndiName"))) {
+					run.differences.add("프로젝트 DB '" + db.get("dbName") + "'의 URL은 앱 설정에서 찾지 못했습니다. 앱이 그 DB에 직접 연결하면 감지해 서버를 내립니다.");
 				}
-				String problem = prepareRun(server.sandbox, archive, port, forProject(this.config("sandbox-trusted-libs", ""), projectId));
-				if (problem != null) {
-					return ToolOutcome.fail(problem);
+			}
+			if (layer.pathFiles > 0) {
+				run.differences.add("소스에 박힌 원본 폴더 경로(" + project.get("sourceDir") + ")를 테스트 서버 전용 폴더(" + new File(run.dir, "data")
+					+ ")로 바꿨습니다(" + layer.pathFiles + "개 파일). 그 폴더는 비어서 시작하므로 기존 첨부 파일은 없습니다.");
+			}
+
+			// 3) 문(외부 접속 차단, DB 연결 세기)과 드라이버
+			run.driverJar = TestDriverJar.ensure(this.projectBuildService.workRoot());
+			run.guard = new SandboxGuard(new ArrayList<SandboxGuard.Endpoint>(), 0, false);
+			for (Map<String, String> db : dbs) {
+				for (SandboxGuard.Endpoint endpoint : endpointsOf(db.get("url"))) {
+					run.guard.watch(endpoint);
 				}
-				kind = "java -jar " + archive.getName();
-				contextPath = "/";
-				differences.add(staticPathsNotApplied(staticPaths));
-				runLogFrom = log.length();
-				process = this.startArchive(app, archive, javaHome, log, key, port, server.sandbox);
-			} else if (isWar(pomText) && tomcatHome != null) {
-				String tomcatPath = tomcatPathOf(pomText);
-				contextPath = tomcatPath == null ? "/" : tomcatPath;
-				kind = "WAR + Tomcat(" + tomcatHome.getPath() + ", 전용 CATALINA_BASE)";
-				String buildProblem = this.mavenPackage(app, javaHome, log, key, server.sandbox);
-				if (buildProblem != null) {
-					if (request != null) {
-						request.cause = CAUSE_CODE;
-					}
-					return ToolOutcome.fail("WAR를 만들지 못했습니다(" + buildProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
-				}
-				File war = findWar(new File(app, "target"));
-				if (war == null) {
-					return ToolOutcome.fail("mvn package 뒤에 target 아래 WAR 파일이 없습니다: " + app);
-				}
-				File catalinaBase = new File(base, TOMCAT_BASE_DIR);
-				if (request != null) {
-					String problem = prepareRun(server.sandbox, war, port, forProject(this.config("sandbox-trusted-libs", ""), projectId));
-					if (problem != null) {
-						return ToolOutcome.fail(problem);
-					}
-				}
-				prepareCatalinaBase(tomcatHome, catalinaBase, port, war, contextPath);
-				differences.add("설치된 Tomcat에 사람이 등록해 둔 다른 앱(Context)은 띄우지 않았습니다.");
-				differences.add(addStaticContexts(catalinaBase, staticPaths, sourceRoot, app, server.sandbox != null));
-				runLogFrom = log.length();
-				process = this.startCatalina(tomcatHome, catalinaBase, javaHome, log, key, server.sandbox);
+			}
+			for (String host : splitList(forProject(this.config("allow-hosts", ""), projectId))) {
+				int colon = host.lastIndexOf(':');
+				run.guard.allow(colon > 0 ? new SandboxGuard.Endpoint(host.substring(0, colon), Integer.parseInt(host.substring(colon + 1))) : new SandboxGuard.Endpoint(host, 0));
+			}
+			run.driver = new TestDriverClient(new File(run.dir, CONTROL_FILE));
+			run.port = freePort();
+			run.guard.allow(new SandboxGuard.Endpoint("localhost", run.port));
+			run.javaHome = this.javaHome(project, run.notes);
+
+			// 4) 띄우기
+			long t1 = System.currentTimeMillis();
+			if (run.boot) {
+				run.contextPath = "/";
+				run.differences.add(staticPathsNotApplied(project));
 			} else {
-				Launch launch = launchOf(pomText, port);
-				if (launch == null) {
-					return ToolOutcome.fail("pom.xml에서 서버를 띄울 방법을 찾지 못했습니다. WAR 프로젝트는 설정 tomcat-home(env의 TEST_SERVER_TOMCAT_HOME)을 채우고, "
-						+ "아니면 tomcat7/tomcat6, spring-boot, jetty 플러그인이 있어야 합니다. 이 프로젝트는 요청서 시험환경의 반영폴더·반영명령으로 시험 서버에 올려야 합니다.");
+				run.tomcatHome = this.tomcatHome(was.jakarta);
+				if (run.tomcatHome == null) {
+					answer.cause = CAUSE_ENVIRONMENT;
+					answer.message = (was.jakarta ? "jakarta 앱이라 Tomcat 10 이상(설정 tomcat-home-10 또는 tomcat-home-11)" : "javax 앱이라 Tomcat 9(설정 tomcat-home-9)")
+						+ "이 필요한데 이 서버에 설정되지 않았습니다.";
+					return null;
 				}
-				if (launch.kind.startsWith("tomcat")) {
-					// tomcat 플러그인은 pom에 적힌 <port>가 명령줄 값보다 우선이라, 사본의 pom에서만 바꾼다(원본은 그대로).
-					Files.writeString(appPom.toPath(), patchTomcatPort(pomText, port), StandardCharsets.UTF_8);
+				int major = TomcatBase.majorVersion(run.tomcatHome);
+				if (major > 0 && major < 9) {
+					run.notes.add("참고: Tomcat " + major + "입니다. 테스트 서버는 Tomcat 8.5 이상에서만 확인했습니다.");
 				}
-				kind = "mvn " + launch.goals.get(0);
-				contextPath = launch.contextPath;
-				differences.add(staticPathsNotApplied(staticPaths));
-				List<String> command = this.mavenCommand(key);
-				command.addAll(launch.goals);
-				ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-				utf8Maven(builder);
-				if (javaHome != null) {
-					builder.environment().put("JAVA_HOME", javaHome.getPath());
-				}
-				process = builder.start();
+				run.contextPath = contextPathOf(project, was);
+				List<String[]> staticPaths = this.staticPaths(project, run);
+				run.descriptor = TomcatBase.prepare(run.tomcatHome, new File(run.dir, "tomcat"), run.port, run.contextPath, new File(run.dir, "webapp"),
+					new File(run.dir, "classes"), webRoot, classesDir, libDir, jndi, run.driverJar, staticPaths, run.notes);
+				run.differences.add("설치된 Tomcat에 사람이 등록해 둔 다른 앱(Context)은 띄우지 않았습니다.");
 			}
-			Files.writeString(new File(base, PID_FILE).toPath(), String.valueOf(process.pid()), StandardCharsets.UTF_8);
-			server.process = process;
-			server.url = "http://localhost:" + port + contextPath;
-			this.running.put(key, server);
-
-			// 6) 접속될 때까지 기다린다.
-			int timeout = Integer.parseInt(this.config("start-timeout-seconds", "600"));
-			String waitProblem = waitUntilUp(process, port, contextPath, timeout);
-			if (waitProblem != null) {
-				if (request != null) {
-					request.cause = startupCause(server.sandbox, log, runLogFrom);
-					waitProblem += deniedNote(server.sandbox);
-				}
-				return ToolOutcome.fail("임시 시험 서버가 뜨지 않았습니다(" + waitProblem + "). 서버 로그: " + log + "\n" + tail(log, LOG_TAIL_LINES));
+			String problem = this.startProcess(run);
+			answer.timings.put("startMs", Long.valueOf(System.currentTimeMillis() - t1));
+			if (problem != null) {
+				answer.cause = this.startupCause(run);
+				answer.message = "테스트 서버가 뜨지 않았습니다(" + problem + "). 서버 로그: " + run.log + "\n" + tail(run.log, LOG_TAIL_LINES) + this.deniedNote(run);
+				return null;
 			}
-			// Tomcat에 올린 앱이 시작에 실패해도 Tomcat 자체는 떠서 응답(404)을 준다. 그 경우는 실패로 본다.
-			if (kind.startsWith("WAR") && httpStatus(port, contextPath) == HttpURLConnection.HTTP_NOT_FOUND) {
-				if (request != null) {
-					request.cause = startupCause(server.sandbox, log, runLogFrom);
-				}
-				return ToolOutcome.fail("Tomcat은 떴지만 앱(" + contextPath + ")이 시작되지 않았습니다(404). 서버 로그에서 앱 시작 오류를 보십시오: " + log + "\n"
-					+ tail(log, LOG_TAIL_LINES) + deniedNote(server.sandbox));
+			String bypass = this.bypassCheck(run);
+			if (bypass != null) {
+				answer.cause = CAUSE_ENVIRONMENT;
+				answer.message = bypass;
+				return null;
 			}
-			// 격리 옵션을 JVM이 정말 받았는지 본다. JVM은 JAVA_TOOL_OPTIONS를 받으면 그렇다고 로그에 찍는다.
-			if (server.sandbox != null && !textFrom(log, runLogFrom).contains("-DsocksProxyHost=127.0.0.1")) {
-				return ToolOutcome.fail("앱 JVM에 격리 옵션이 들어갔는지 확인할 수 없어 내렸습니다(원래 DB에 쓸 수 있어서).");
+			this.runs.put(key, run);
+			run.dbSince = System.currentTimeMillis();
+			for (Map<String, String> db : dbs) {
+				Map<String, String> setting = new LinkedHashMap<String, String>(db);
+				setting.put("control", new File(run.dir, CONTROL_FILE).getAbsolutePath());
+				setting.put("description", "테스트 서버의 DB(" + db.get("dbName") + "). 테스트 서버와 같은 연결로 조회해 커밋하지 않은 테스트 데이터가 보입니다");
+				run.aliases.put(TestServerRegistry.ALIAS_PREFIX + db.get("dbName"), setting);
 			}
 			started = true;
-			StringBuilder message = new StringBuilder();
-			message.append("임시 시험 서버를 띄웠습니다.\n");
-			message.append("접속주소: ").append(server.url).append('\n');
-			message.append("서버로그: ").append(log.getPath()).append('\n');
-			message.append("방식: ").append(kind).append(", JDK: ").append(javaHome == null ? "엔진과 같은 JDK(" + System.getProperty("java.version") + ")" : javaHome.getPath()).append('\n');
-			message.append("사본: ").append(app.getPath()).append(" (").append(overlay.message()).append(")");
-			message.append('\n').append(this.accountLine(projectId));
-			if (server.sandbox != null) {
-				Map<String, Map<String, String>> clones = server.sandbox.readConnections();
-				this.sandboxRegistry.opened(stepRef, server.url, clones);
-				request.url = server.url;
-				request.dbAliases.addAll(clones.keySet());
-				message.append("\n복제본 DB 별칭(dbQuery의 alias): ").append(String.join(", ", clones.keySet()));
-				for (String line : server.sandbox.report()) {
-					message.append('\n').append(line);
-				}
-				message.append(deniedNote(server.sandbox));
-				String sample = this.uploadSample();
-				if (sample != null) {
-					message.append("\n업로드 시험용 파일(browser_file_upload의 paths): ").append(sample);
-				}
-			}
-			for (String note : notes) {
-				message.append('\n').append(note);
-			}
-			message.append("\n원래 환경과 다른 점(이것 때문에 생긴 실패는 개발 결과 탓이 아닙니다):");
-			for (String difference : differences) {
-				message.append("\n- ").append(difference);
-			}
-			server.message = message.toString();
-			return ToolOutcome.pass(server.message);
+			answer.success = true;
+			answer.timings.put("totalMs", Long.valueOf(System.currentTimeMillis() - t0));
+			answer.message = this.describe(run, "테스트 서버를 띄웠습니다.");
+			return run;
 		} finally {
 			if (!started) {
-				this.stop(server);
+				this.stop(run);
 			}
 		}
 	}
 
-	/**
-	 * <pre>
-	 * 실행·step이 띄운 서버로 맡겨 둡니다(프로세스 없이). 넘겨주기와 내리기 규칙을 서버 없이 확인할 때 씁니다(같은 패키지의 테스트).
-	 * </pre>
-	 */
-	void track(String key, String executionId, String stepId) {
-		RunningServer server = new RunningServer();
-		server.key = key;
-		server.executionId = executionId;
-		server.stepId = stepId;
-		this.running.put(key, server);
-	}
-
-	/** 그 키의 서버를 아직 맡고 있는지(내리지 않았는지) 봅니다. */
-	boolean isRunning(String key) {
-		return this.running.containsKey(key);
-	}
-
-	/**
-	 * <pre>
-	 * 앞 step이 넘겨준 서버를 이 step이 그대로 써도 되는지 봅니다.
-	 * 넘겨 둔 상태이고, 다른 step이 부르고, 같은 종류(격리 여부)이고, 입력과 파일 상태가 같고, 프로세스가 살아 있어야 합니다.
-	 * 같은 step 안에서 다시 부르는 것은 고친 뒤 새로 띄우려는 것이므로 쓰지 않습니다.
-	 * </pre>
-	 */
-	private static boolean canReuse(RunningServer server, StepRef stepRef, String fingerprint, boolean sandbox) {
-		return server.carried
-			&& stepRef != null && stepRef.stepId() != null && !stepRef.stepId().equals(server.stepId)
-			&& (server.sandbox != null) == sandbox
-			&& fingerprint.equals(server.fingerprint)
-			&& server.process != null && server.process.isAlive()
-			&& server.message != null;
-	}
-
-	/** 넘겨받은 서버를 이 step의 것으로 바꾸고, 띄웠을 때와 같은 안내를 돌려줍니다. */
-	private ToolOutcome reuse(RunningServer server, StepRef stepRef, SandboxRequest request) {
-		String from = server.stepId;
-		server.stepId = stepRef.stepId();
-		server.carried = false;
-		if (server.sandbox != null) {
-			Map<String, Map<String, String>> clones = server.sandbox.readConnections();
-			this.sandboxRegistry.opened(stepRef, server.url, clones);
-			request.url = server.url;
-			request.dbAliases.addAll(clones.keySet());
+	/** 떠 있는 서버에 바뀐 것만 반영합니다. */
+	private void apply(Run run, File overlay, File deleteList, Answer answer) throws IOException {
+		long t0 = System.currentTimeMillis();
+		Map<String, Object> project = this.projectStore.settings(run.projectId);
+		RunLayer.Spec spec = this.spec(run, project, run.resolved, new File(String.valueOf(run.resolved.get("revisionDir"))), new File(String.valueOf(run.resolved.get("sourceRoot"))),
+			fileOrNull(run.resolved.get("webRoot")), fileOrNull(run.resolved.get("classesDir")), fileOrNull(run.resolved.get("libDir")), overlay, deleteList, this.projectDbs(run.projectId));
+		RunLayer.Result layer = RunLayer.build(spec, this.javaCompileTool);
+		answer.timings.put("layerMs", Long.valueOf(System.currentTimeMillis() - t0));
+		if (layer.codeProblem != null) {
+			answer.cause = CAUSE_CODE;
+			answer.message = "개발 결과를 컴파일하지 못했습니다. 테스트 서버는 지난번 반영 상태 그대로입니다:\n" + layer.codeProblem;
+			return;
 		}
-		this.info("dstone-ai-engine tool: step[" + from + "]이 같은 입력으로 띄운 임시 시험 서버를 step[" + stepRef.stepId() + "]이 그대로 씁니다: " + server.key);
-		return ToolOutcome.pass("앞 step(" + from + ")이 같은 입력으로 띄운 서버가 떠 있어 새로 띄우지 않고 그대로 씁니다. "
-			+ "앞 step이 화면이나 DB에서 바꾼 데이터는 남아 있을 수 있습니다. 처음 상태가 필요하면 stopTestServer를 부른 뒤 다시 띄우십시오.\n"
-			+ server.message);
+		List<String> webChanged = RunLayer.sync(new File(spec.stageDir, "webapp"), new File(run.dir, "webapp"));
+		List<String> classChanged = RunLayer.sync(new File(spec.stageDir, "classes"), new File(run.dir, "classes"));
+		boolean needReload = !classChanged.isEmpty();
+		for (String rel : webChanged) {
+			if (rel.startsWith("WEB-INF/")) {
+				needReload = true;
+			}
+		}
+		String how;
+		long t1 = System.currentTimeMillis();
+		if (webChanged.isEmpty() && classChanged.isEmpty()) {
+			how = "지난번과 바뀐 것이 없어 그대로 씁니다.";
+		} else if (!needReload && !run.boot) {
+			how = "바뀐 화면 파일 " + webChanged.size() + "개를 바로 반영했습니다(서버를 다시 올리지 않음).";
+		} else {
+			String problem = run.boot ? "Spring Boot" : this.reload(run);
+			if (problem != null) {
+				// reload가 안 되면(또는 Boot면) JVM을 다시 띄운다. 연결이 끊기므로 DB의 테스트 데이터도 원복된다
+				run.driver.rollback();
+				killTree(run.process.toHandle());
+				Files.deleteIfExists(new File(run.dir, CONTROL_FILE).toPath());
+				String startProblem = this.startProcess(run);
+				if (startProblem != null) {
+					answer.cause = this.startupCause(run);
+					answer.message = "바뀐 것을 반영하려고 서버를 다시 띄웠지만 뜨지 않았습니다(" + startProblem + "). 서버 로그: " + run.log + "\n" + tail(run.log, LOG_TAIL_LINES);
+					this.stop(run);
+					return;
+				}
+				run.dbSince = System.currentTimeMillis();
+				how = "바뀐 파일(" + (webChanged.size() + classChanged.size()) + "개)을 반영하려고 JVM을 다시 띄웠습니다(" + problem + "). 세션이 끊겼으니 다시 로그인하십시오. 개발 DB의 테스트 데이터도 원복되었습니다.";
+			} else {
+				how = "바뀐 파일(" + (webChanged.size() + classChanged.size()) + "개)을 반영하려고 앱을 다시 올렸습니다(context reload). 세션이 끊겼으니 다시 로그인하십시오. DB의 테스트 데이터는 남아 있습니다.";
+			}
+		}
+		answer.timings.put("applyMs", Long.valueOf(System.currentTimeMillis() - t1));
+		String bypass = this.bypassCheck(run);
+		if (bypass != null) {
+			answer.cause = CAUSE_ENVIRONMENT;
+			answer.message = bypass;
+			this.stop(run);
+			return;
+		}
+		run.notes.clear();
+		run.notes.addAll(layer.notes);
+		answer.success = true;
+		answer.message = this.describe(run, "이 실행의 테스트 서버가 떠 있어 다시 띄우지 않았습니다. " + how);
+	}
+
+	private RunLayer.Spec spec(Run run, Map<String, Object> project, Map<String, Object> resolved, File revDir, File revSrc, File webRoot, File classesDir, File libDir,
+		File overlay, File deleteList, List<Map<String, String>> dbs) {
+		RunLayer.Spec spec = new RunLayer.Spec();
+		spec.revDir = revDir;
+		spec.revSrc = revSrc;
+		spec.webRoot = webRoot;
+		spec.classesDir = classesDir;
+		spec.libDir = libDir;
+		spec.originalSource = text(project, "sourceDir");
+		spec.dataDir = new File(run.dir, "data");
+		spec.overlayDir = overlay;
+		spec.deleteList = deleteList;
+		spec.stageDir = new File(run.dir, "stage");
+		for (Map<String, String> db : dbs) {
+			spec.dbUrls.add(db.get("url"));
+			if (!isBlank(db.get("jndiName"))) {
+				spec.jndiNames.add(stripEnv(db.get("jndiName")));
+			}
+		}
+		spec.sourceDirs.addAll(splitList(text(project, "buildSourceDirs")));
+		String javaVersion = text(project, "javaVersion");
+		spec.release = javaVersion == null ? 0 : Integer.parseInt(javaVersion);
+		spec.boot = ProjectBuildService.KIND_BOOT.equals(resolved.get("kind"));
+		return spec;
+	}
+
+	/** 프로세스를 띄우고 접속될 때까지 기다립니다. 뜨면 null, 아니면 이유. */
+	private String startProcess(Run run) throws IOException {
+		List<String> command = new ArrayList<String>();
+		String driverProps = "-Ddstone.testdriver.control=" + new File(run.dir, CONTROL_FILE).getAbsolutePath()
+			+ " -Ddstone.testdriver.lockWaitSeconds=" + this.config("db-lock-wait-seconds", "30");
+		ProcessBuilder builder;
+		long logFrom = run.log.isFile() ? run.log.length() : 0L;
+		if (run.boot) {
+			File home = run.javaHome != null ? run.javaHome : new File(System.getProperty("java.home"));
+			command.add(new File(home, isWindows() ? "bin/java.exe" : "bin/java").getPath());
+			command.add(MARKER + run.key);
+			command.addAll(Arrays.asList(UTF8_OUTPUT.split(" ")));
+			command.addAll(Arrays.asList(driverProps.split(" ")));
+			if (run.bootDatasource) {
+				command.add("-Dspring.datasource.driver-class-name=" + TestDriverJar.DRIVER_CLASS);
+			}
+			command.add("-cp");
+			command.add(new File(run.dir, "classes").getAbsolutePath() + File.pathSeparator + run.resolved.get("classesDir") + File.pathSeparator
+				+ run.resolved.get("libDir") + File.separator + "*" + File.pathSeparator + run.driverJar.getAbsolutePath());
+			command.add(String.valueOf(run.resolved.get("mainClass")));
+			command.add("--server.port=" + run.port);
+			command.add("--server.servlet.context-path=/");
+			builder = new ProcessBuilder(command).directory(run.dir);
+		} else {
+			command.addAll(TomcatBase.command(run.tomcatHome));
+			File catalinaBase = new File(run.dir, "tomcat");
+			builder = new ProcessBuilder(command).directory(catalinaBase);
+			Map<String, String> env = builder.environment();
+			env.put("CATALINA_HOME", run.tomcatHome.getPath());
+			env.put("CATALINA_BASE", catalinaBase.getPath());
+			env.put("CATALINA_PID", "");
+			env.put("CATALINA_OPTS", MARKER + run.key + " " + UTF8_OUTPUT + " " + driverProps);
+			if (run.javaHome != null) {
+				env.put("JAVA_HOME", run.javaHome.getPath());
+				env.remove("JRE_HOME");
+			}
+		}
+		builder.redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(run.log));
+		Map<String, String> env = builder.environment();
+		String current = env.get("JAVA_TOOL_OPTIONS");
+		env.put("JAVA_TOOL_OPTIONS", isBlank(current) ? run.guard.jvmOptions() : current + " " + run.guard.jvmOptions());
+		env.remove("_JAVA_OPTIONS");
+		run.process = builder.start();
+		Files.writeString(new File(run.dir, "server.pid").toPath(), String.valueOf(run.process.pid()), StandardCharsets.UTF_8);
+		run.url = "http://localhost:" + run.port + ("/".equals(run.contextPath) ? "/" : run.contextPath + "/");
+		int timeout = Integer.parseInt(this.config("start-timeout-seconds", "600"));
+		String problem = waitUntilUp(run.process, run.port, run.contextPath, timeout);
+		if (problem != null) {
+			return problem;
+		}
+		if (!run.boot && httpStatus(run.port, run.contextPath) == HttpURLConnection.HTTP_NOT_FOUND) {
+			return "Tomcat은 떴지만 앱(" + run.contextPath + ")이 시작되지 않았습니다(404)";
+		}
+		if (!textFrom(run.log, logFrom).contains("-DsocksProxyHost=127.0.0.1")) {
+			return "앱 JVM에 외부 접속 차단 옵션이 들어갔는지 확인할 수 없습니다";
+		}
+		return null;
 	}
 
 	/**
 	 * <pre>
-	 * 서버를 다시 써도 되는지 가리는 값입니다. 입력 경로들과, 개발 결과 폴더·DDL·삭제 목록 파일마다 경로·크기·수정 시각을 이어 붙입니다.
-	 * 원본 소스 폴더는 크고 시험 중에 바뀌지 않으므로 경로만 봅니다.
+	 * Context 파일의 수정 시각을 바꿔 Tomcat이 앱을 다시 올리게 하고(HostConfig, 최대 10초 간격으로 봄), 끝날 때까지 기다립니다.
+	 * Tomcat은 다시 올릴 때 Context 파일 경로를 로그에 두 번(시작, 끝) 남기므로 그것을 봅니다. 되면 null, 아니면 이유.
 	 * </pre>
 	 */
-	static String fingerprintOf(String projectId, String sourceRoot, String overlayDir, String deleteList, String ddlFile) {
-		StringBuilder text = new StringBuilder();
-		text.append(inputPath(projectId)).append('|').append(inputPath(sourceRoot)).append('|').append(inputPath(overlayDir))
-			.append('|').append(inputPath(deleteList)).append('|').append(inputPath(ddlFile)).append('\n');
-		if (!isBlank(overlayDir)) {
-			File overlay = new File(overlayDir.trim());
-			appendTree(overlay, overlay, text);
+	private String reload(Run run) throws IOException {
+		long from = run.log.length();
+		String path = run.descriptor.getAbsolutePath();
+		if (!run.descriptor.setLastModified(System.currentTimeMillis() + 1000L)) {
+			Files.writeString(run.descriptor.toPath(), Files.readString(run.descriptor.toPath(), StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 		}
-		appendFile(deleteList, text);
-		appendFile(ddlFile, text);
-		return text.toString();
+		long deadline = System.currentTimeMillis() + Long.parseLong(this.config("start-timeout-seconds", "600")) * 1000L;
+		while (System.currentTimeMillis() < deadline) {
+			if (!run.process.isAlive()) {
+				return "Tomcat이 끝났습니다";
+			}
+			String text = textFrom(run.log, from);
+			int count = 0;
+			int at = text.indexOf(path);
+			while (at >= 0) {
+				count++;
+				at = text.indexOf(path, at + path.length());
+			}
+			if (count >= 2) {
+				int status = httpStatus(run.port, run.contextPath);
+				return status == HttpURLConnection.HTTP_NOT_FOUND || status < 0 ? "다시 올린 앱이 응답하지 않습니다(" + status + ")" : null;
+			}
+			if (count == 0 && System.currentTimeMillis() - deadline + Long.parseLong(this.config("start-timeout-seconds", "600")) * 1000L > 30000L) {
+				return "Tomcat이 30초 안에 다시 올리기를 시작하지 않았습니다";
+			}
+			sleep(1000L);
+		}
+		return "다시 올리기가 끝나지 않았습니다";
 	}
 
-	/** 앞뒤 공백, 역슬래시, 끝의 슬래시 차이로 다른 입력이 되지 않게 맞춥니다. */
-	private static String inputPath(String value) {
-		if (value == null) {
+	/** 테스트 드라이버를 거치지 않은 DB 연결이 있는지 봅니다. 있으면 이유. */
+	private String bypassCheck(Run run) {
+		int watched = run.guard.watchedCount();
+		int physical = run.driver.physicalConnections();
+		if (physical >= 0 && watched > physical) {
+			this.stop(run);
+			return "앱이 테스트 드라이버를 거치지 않고 개발 DB에 직접 연결했습니다(연결 " + watched + "개, 드라이버 " + physical + "개). "
+				+ "테스트 데이터를 원복할 수 없어 서버를 내렸습니다. URL을 코드에서 조립하거나 다른 설정 파일에서 읽는 앱일 수 있습니다.";
+		}
+		return null;
+	}
+
+	/** 서버를 내리고 DB를 원복합니다. 원복 문제가 있으면 그 이유(연결이 끊기면 DB가 되돌림). */
+	private String stop(Run run) {
+		if (run == null) {
+			return null;
+		}
+		String problem = null;
+		if (run.driver != null) {
+			problem = run.driver.rollback();
+		}
+		if (run.process != null) {
+			killTree(run.process.toHandle());
+		}
+		if (run.guard != null) {
+			run.guard.close();
+		}
+		this.registry.closed(run.aliases.keySet());
+		this.runs.remove(run.key, run);
+		// 비밀번호가 든 설정과 실행 층은 지우고 로그만 남긴다
+		if (run.dir != null) {
+			for (String name : new String[] { "tomcat", "stage", "webapp", "classes", "data", CONTROL_FILE, ProjectBuildService.RUN_REVISION_FILE, "server.pid" }) {
+				RunLayer.deleteTreeQuietly(new File(run.dir, name));
+			}
+		}
+		return problem;
+	}
+
+	/** 유휴·DB 점유 상한을 넘은 서버를 내립니다(1분마다). */
+	private void reap() {
+		long now = System.currentTimeMillis();
+		long idle = Long.parseLong(this.config("idle-minutes", "30")) * 60000L;
+		long hold = Long.parseLong(this.config("db-hold-minutes", "60")) * 60000L;
+		Iterator<Run> it = new ArrayList<Run>(this.runs.values()).iterator();
+		while (it.hasNext()) {
+			Run run = it.next();
+			try {
+				if (run.process == null || !run.process.isAlive()) {
+					this.info("dstone-ai-engine tool: 테스트 서버 프로세스가 끝나 있어 정리합니다: " + run.key);
+					this.stop(run);
+				} else if (run.idleSince > 0 && now - run.idleSince > idle) {
+					this.info("dstone-ai-engine tool: 유휴 시간이 지나 테스트 서버를 내립니다: " + run.key);
+					this.stop(run);
+				} else if (run.idleSince == 0 && now - run.dbSince > hold) {
+					this.warn("dstone-ai-engine tool: 개발 DB 연결을 " + (hold / 60000L) + "분 넘게 잡아 원복하고 테스트 서버를 내립니다: " + run.key);
+					this.stop(run);
+				}
+			} catch (RuntimeException e) {
+				this.warn("dstone-ai-engine tool: 테스트 서버 정리 실패(" + run.key + "): " + e.getMessage());
+			}
+		}
+	}
+
+	/** 동시 서버 수가 상한이면 lock-wait-seconds까지 기다립니다. */
+	private boolean waitForSlot(Answer answer) {
+		int max = Integer.parseInt(this.config("max-servers", "3"));
+		long deadline = System.currentTimeMillis() + Long.parseLong(this.config("lock-wait-seconds", "60")) * 1000L;
+		while (this.runs.size() >= max) {
+			if (System.currentTimeMillis() >= deadline) {
+				answer.cause = CAUSE_ENVIRONMENT;
+				answer.message = "동시에 띄울 수 있는 테스트 서버(" + max + "개)가 모두 쓰이는 중입니다. 다른 실행이 끝난 뒤 다시 부르십시오.";
+				return false;
+			}
+			sleep(2000L);
+		}
+		return true;
+	}
+
+	/* ---------------------------------------------------------------- 결과 글 */
+
+	private String describe(Run run, String head) {
+		StringBuilder message = new StringBuilder(head).append('\n');
+		message.append("접속주소: ").append(run.url).append('\n');
+		message.append("서버로그: ").append(run.log.getPath()).append('\n');
+		message.append("리비전: ").append(run.revision).append(", 방식: ").append(run.boot ? "Spring Boot(java -cp)" : "Tomcat(" + run.tomcatHome + ")")
+			.append(", JDK: ").append(run.javaHome == null ? "엔진과 같은 JDK(" + System.getProperty("java.version") + ")" : run.javaHome.getPath()).append('\n');
+		message.append("테스트 DB 별칭(dbQuery의 alias, 커밋하지 않은 테스트 데이터가 보임): ").append(String.join(", ", run.aliases.keySet())).append('\n');
+		message.append("DB: 고객사 개발 DB를 쓰되 커밋하지 않습니다. 실행이 멈추거나 끝나면 원복합니다. 테스트 중 DDL은 실행되지 않습니다.\n");
+		message.append(this.accountLine(run.projectId));
+		String sample = this.uploadSample();
+		if (sample != null) {
+			message.append("\n업로드 테스트용 파일(browser_file_upload의 paths): ").append(sample);
+		}
+		for (String note : run.notes) {
+			message.append('\n').append(note);
+		}
+		message.append(this.deniedNote(run));
+		message.append("\n원래 환경과 다른 점(이것 때문에 생긴 실패는 개발 결과 탓이 아닙니다):");
+		for (String difference : run.differences) {
+			message.append("\n- ").append(difference);
+		}
+		message.append("\n- 테스트 DB는 한 연결을 차례로 씁니다. 다른 요청이 오래 쓰면 'dstone 테스트 DB … 잠금 대기' 오류가 날 수 있습니다.");
+		return message.toString();
+	}
+
+	private String deniedNote(Run run) {
+		if (run.guard == null || run.guard.denied().isEmpty()) {
 			return "";
 		}
-		String path = value.trim().replace('\\', '/');
-		while (path.length() > 1 && path.endsWith("/")) {
-			path = path.substring(0, path.length() - 1);
-		}
-		return path;
+		return "\n막은 외부 접속: " + String.join(", ", run.guard.denied()) + " (앱에 꼭 필요하면 관리자가 설정 allow-hosts에 '프로젝트ID=host:port'로 더한다)";
 	}
 
-	/** 폴더 아래 파일을 이름순으로 "상대경로 크기 수정시각" 줄로 덧붙입니다. */
-	private static void appendTree(File root, File dir, StringBuilder text) {
-		File[] children = dir.listFiles();
-		if (children == null) {
-			return;
-		}
-		Arrays.sort(children);
-		for (File child : children) {
-			if (child.isDirectory()) {
-				appendTree(root, child, text);
-			} else {
-				text.append(root.toPath().relativize(child.toPath()).toString().replace('\\', '/'))
-					.append(' ').append(child.length()).append(' ').append(child.lastModified()).append('\n');
-			}
-		}
+	/** 기동 실패의 원인. 막은 외부 접속, DB 로그인 실패, 드라이버 문제면 환경, 아니면 개발 결과 */
+	private String startupCause(Run run) {
+		String text = tail(run.log, 400);
+		boolean environment = (run.guard != null && !run.guard.denied().isEmpty())
+			|| Pattern.compile("Access denied for user|password authentication failed|ORA-01017|No suitable driver|dstone 테스트 DB").matcher(text).find();
+		return environment ? CAUSE_ENVIRONMENT : CAUSE_CODE;
 	}
 
-	/** 파일 하나의 크기와 수정 시각을 덧붙입니다(없으면 없다고). */
-	private static void appendFile(String path, StringBuilder text) {
-		if (isBlank(path)) {
-			return;
-		}
-		File file = new File(path.trim());
-		text.append(inputPath(path)).append(' ').append(file.isFile() ? file.length() + " " + file.lastModified() : "없음").append('\n');
-	}
-
-	/** 프로젝트 관리의 시험 서버 정적 경로를 읽습니다. 읽지 못하면 notes에 남기고 빈 목록입니다. */
-	private List<String[]> staticPaths(String projectId, List<String> notes) {
+	/** 테스트계정 안내 한 줄입니다. 비밀번호는 자리표시자만 줍니다. */
+	private String accountLine(String projectId) {
 		if (isBlank(projectId)) {
-			return new ArrayList<String[]>();
+			return "테스트계정: 없음(프로젝트ID가 없음). 로그인이 필요 없는 화면만 볼 수 있습니다.";
 		}
 		try {
 			Map<String, Object> project = this.projectStore.find(projectId.trim());
-			Object text = project == null ? null : project.get("testStaticPaths");
-			return ProjectStore.parseStaticPaths(text == null ? null : text.toString());
-		} catch (RuntimeException e) {
-			notes.add("프로젝트 관리의 시험 서버 정적 경로를 읽지 못했습니다: " + e.getMessage());
-			return new ArrayList<String[]>();
-		}
-	}
-
-	/**
-	 * <pre>
-	 * 시험 서버 정적 경로마다 전용 CATALINA_BASE에 Context 파일(conf/Catalina/localhost/{이름}.xml)을 만들어, 그 주소를 그 폴더로 엽니다.
-	 * 앱(/)보다 긴 주소라서 Tomcat은 그 주소의 요청을 이 Context로 보냅니다.
-	 * 격리 시험 서버에서는 앱이 쓰는 원본 폴더 경로도 사본 경로로 바뀌므로, 원본 안의 폴더는 사본 쪽 폴더로 엽니다.
-	 * 폴더가 없으면 사본 안에서는 만들고, 사본 밖이면 건너뜁니다(원래 자리에 폴더를 만들지 않으려고).
-	 * 돌려주는 값은 "원래 환경과 다른 점"에 적을 한 줄입니다.
-	 * </pre>
-	 */
-	static String addStaticContexts(File catalinaBase, List<String[]> staticPaths, File sourceRoot, File app, boolean sandbox) throws IOException {
-		String guide = "웹앱 밖 폴더를 여는 주소는 프로젝트 관리의 '시험 서버 정적 경로'에 적힌 것만 엽니다. 그 밖의 주소가 404면 원래 서버의 웹서버 설정 차이일 수 있습니다";
-		if (staticPaths.isEmpty()) {
-			return guide + ". 지금 적힌 것: 없음";
-		}
-		File contexts = new File(catalinaBase, "conf/Catalina/localhost");
-		Files.createDirectories(contexts.toPath());
-		List<String> opened = new ArrayList<String>();
-		String sourcePrefix = sourceRoot.getPath().replace('\\', '/');
-		for (String[] path : staticPaths) {
-			String folder = path[1];
-			boolean inSource = folder.toLowerCase(Locale.ROOT).startsWith(sourcePrefix.toLowerCase(Locale.ROOT) + "/");
-			File docBase = sandbox && inSource ? new File(app, folder.substring(sourcePrefix.length() + 1)) : new File(folder);
-			if (!docBase.isDirectory()) {
-				if (sandbox && inSource) {
-					Files.createDirectories(docBase.toPath());
-				} else {
-					opened.add(path[0] + " → (폴더가 없어 열지 않음: " + folder + ")");
-					continue;
-				}
+			Object userId = project == null ? null : project.get("testUserId");
+			if (userId == null || isBlank(userId.toString())) {
+				return "테스트계정: 없음(프로젝트 관리에 테스트계정이 없음). 로그인이 필요 없는 화면만 볼 수 있습니다.";
 			}
-			String name = path[0].substring(1).replace('/', '#');
-			String xml = "<Context docBase=\"" + xmlText(docBase.getAbsolutePath()) + "\" />\n";
-			Files.writeString(new File(contexts, name + ".xml").toPath(), xml, StandardCharsets.UTF_8);
-			opened.add(path[0] + " → " + docBase.getAbsolutePath());
+			if (!"Y".equals(project.get("hasTestPassword"))) {
+				return "테스트계정: ID " + userId + " (비밀번호는 프로젝트 관리에 없음)";
+			}
+			return "테스트계정: ID " + userId + ", 비밀번호 칸에는 ${secret:" + projectId.trim() + "." + ProjectStore.SECRET_TEST_PASSWORD
+				+ "}를 글자 그대로 넣는다(browser_type, browser_fill_form에서만 엔진이 실제 값으로 바꿔 넣는다)";
+		} catch (RuntimeException e) {
+			return "테스트계정: 읽지 못했습니다(" + e.getMessage() + ")";
 		}
-		return guide + ". 지금 연 것: " + String.join(", ", opened);
 	}
 
-	/** Boot·플러그인 방식에서는 정적 경로를 열 수 없다는 한 줄입니다. */
-	private static String staticPathsNotApplied(List<String[]> staticPaths) {
-		return staticPaths.isEmpty()
-			? "웹앱 밖 폴더를 여는 주소(원래 서버의 웹서버 설정)는 없습니다. 그런 주소가 404면 환경 차이일 수 있습니다"
-			: "프로젝트 관리의 '시험 서버 정적 경로'는 WAR + Tomcat 방식에서만 엽니다. 이 방식에서는 열지 않았습니다";
+	/** 업로드 화면을 테스트할 그림 파일(설정 upload-sample-dir). */
+	private String uploadSample() {
+		String dir = this.config("upload-sample-dir", "");
+		if (dir.isEmpty() || dir.equals("/output") || new File(dir).getParentFile() == null || !new File(dir).getParentFile().isDirectory()) {
+			return null;
+		}
+		File sample = new File(dir, "dstone-upload-sample.png");
+		try {
+			if (!sample.isFile()) {
+				Files.createDirectories(sample.getParentFile().toPath());
+				ImageIO.write(new BufferedImage(320, 240, BufferedImage.TYPE_INT_RGB), "png", sample);
+			}
+			return sample.getAbsolutePath();
+		} catch (IOException e) {
+			return null;
+		}
 	}
 
-	/** XML 속성 값으로 쓸 수 있게 바꿉니다. */
-	private static String xmlText(String value) {
-		return value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;");
-	}
+	/* ---------------------------------------------------------------- 설정과 도우미 */
 
-	/** 격리 환경을 만들어 server에 답니다. 실패면 이유. */
-	private String createSandbox(RunningServer server, String projectId, File base, File sourceRoot, File app, SandboxRequest request) {
-		Map<String, Map<String, String>> connections = new LinkedHashMap<String, Map<String, String>>();
+	/** 프로젝트의 DB들(쓰는 프로젝트만): {dbName, url, username, password, schema, jndiName} */
+	private List<Map<String, String>> projectDbs(String projectId) {
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
 		for (Map.Entry<String, Map<String, String>> entry : this.projectStore.connections().entrySet()) {
 			if (entry.getKey().startsWith(projectId + ".")) {
-				connections.put(entry.getKey(), entry.getValue());
+				Map<String, String> db = new LinkedHashMap<String, String>(entry.getValue());
+				db.put("dbName", entry.getKey().substring(projectId.length() + 1));
+				result.add(db);
 			}
 		}
-		Map<String, String> settings = new LinkedHashMap<String, String>();
-		for (String name : TestSandbox.settingNames()) {
-			settings.put(name, this.config("sandbox-" + name, ""));
-		}
+		return result;
+	}
+
+	/** 테스트서버 정적 경로. 원본 소스 안의 폴더는 data 쪽으로 바꿔 엽니다. */
+	private List<String[]> staticPaths(Map<String, Object> project, Run run) {
+		List<String[]> result = new ArrayList<String[]>();
+		List<String[]> configured;
 		try {
-			server.sandbox = TestSandbox.create(base, sourceRoot, app, connections, request.ddlFile, settings,
-				Integer.parseInt(this.config("sandbox-max-db-mb", "2048")), forProject(this.config("sandbox-allow-hosts", ""), projectId));
+			configured = ProjectStore.parseStaticPaths(text(project, "testStaticPaths"));
+		} catch (IllegalArgumentException e) {
+			run.notes.add("테스트서버 정적 경로를 읽지 못했습니다: " + e.getMessage());
+			return result;
+		}
+		String source = text(project, "sourceDir");
+		String sourcePrefix = source == null ? null : source.replace('\\', '/').replaceAll("/+$", "");
+		List<String> opened = new ArrayList<String>();
+		for (String[] path : configured) {
+			String folder = path[1];
+			if (sourcePrefix != null && folder.toLowerCase(Locale.ROOT).startsWith(sourcePrefix.toLowerCase(Locale.ROOT) + "/")) {
+				File data = new File(new File(run.dir, "data"), folder.substring(sourcePrefix.length() + 1));
+				data.mkdirs();
+				folder = data.getAbsolutePath();
+			}
+			if (!new File(folder).isDirectory()) {
+				run.notes.add("테스트서버 정적 경로 " + path[0] + "의 폴더가 없어 열지 않았습니다: " + folder);
+				continue;
+			}
+			result.add(new String[] { path[0], folder });
+			opened.add(path[0] + " → " + folder);
+		}
+		run.differences.add("웹앱 밖 폴더를 여는 주소는 프로젝트 관리의 '테스트서버 정적 경로'에 적힌 것만 엽니다. 그 밖의 주소가 404면 원래 서버의 웹서버 설정 차이일 수 있습니다. 지금 연 것: "
+			+ (opened.isEmpty() ? "없음" : String.join(", ", opened)));
+		return result;
+	}
+
+	private static String staticPathsNotApplied(Map<String, Object> project) {
+		return isBlank(text(project, "testStaticPaths")) ? "웹앱 밖 폴더를 여는 주소(원래 서버의 웹서버 설정)는 없습니다. 그런 주소가 404면 환경 차이일 수 있습니다"
+			: "프로젝트 관리의 '테스트서버 정적 경로'는 Tomcat 방식에서만 엽니다. Spring Boot에서는 열지 않았습니다";
+	}
+
+	private static String contextPathOf(Map<String, Object> project, WasCheck.Result was) {
+		String path = text(project, "contextPath");
+		if (path == null) {
+			path = was.contextPath;
+		}
+		if (path == null || path.isEmpty()) {
+			return "/";
+		}
+		path = path.replaceAll("/+$", "");
+		return path.isEmpty() ? "/" : path.startsWith("/") ? path : "/" + path;
+	}
+
+	/** 쓸 JDK(프로젝트 Java 버전 → 리비전 클래스 파일). 못 찾으면 null(엔진 JDK)이고 notes에 남깁니다. */
+	private File javaHome(Map<String, Object> project, List<String> notes) {
+		String version = text(project, "javaVersion");
+		if (version == null) {
 			return null;
-		} catch (SandboxException e) {
-			request.cause = e.code() ? CAUSE_CODE : CAUSE_ENVIRONMENT;
-			return e.getMessage();
+		}
+		File home = this.projectBuildService.javaHome(version);
+		if (home == null && !version.equals(String.valueOf(Runtime.version().feature()))) {
+			notes.add("참고: Java " + version + "용 JDK 경로가 설정(env의 JAVA_HOME_" + version + ")에 없어 엔진과 같은 JDK(Java " + Runtime.version().feature()
+				+ ")로 띄웠습니다. 서버가 이상하게 동작하면 이것부터 의심하십시오.");
+		}
+		return home;
+	}
+
+	/** javax 앱은 tomcat-home-9, jakarta 앱은 tomcat-home-10, 11. 없으면 예전 설정 tomcat-home. */
+	private File tomcatHome(boolean jakarta) {
+		String[] keys = jakarta ? new String[] { "tomcat-home-10", "tomcat-home-11" } : new String[] { "tomcat-home-9", "tomcat-home" };
+		for (String key : keys) {
+			String path = this.config(key, "");
+			if (!isBlank(path)) {
+				File home = new File(path.trim());
+				if (new File(home, isWindows() ? "bin/catalina.bat" : "bin/catalina.sh").isFile()) {
+					return home;
+				}
+			}
+		}
+		return null;
+	}
+
+	/** 엔진이 죽어 남은 테스트 서버 프로세스를 정리합니다(명령줄 표시가 있을 때만). */
+	private void killLeftovers() {
+		File[] projects = this.projectBuildService.workRoot().listFiles();
+		if (projects == null) {
+			return;
+		}
+		for (File project : projects) {
+			File[] runDirs = new File(project, "runs").listFiles();
+			if (runDirs == null) {
+				continue;
+			}
+			for (File runDir : runDirs) {
+				File pidFile = new File(runDir, "server.pid");
+				if (!pidFile.isFile()) {
+					continue;
+				}
+				try {
+					long pid = Long.parseLong(Files.readString(pidFile.toPath(), StandardCharsets.UTF_8).trim());
+					Optional<ProcessHandle> handle = ProcessHandle.of(pid);
+					if (handle.isPresent() && handle.get().isAlive()) {
+						Optional<String> commandLine = handle.get().info().commandLine();
+						if (commandLine.isPresent() && commandLine.get().contains(MARKER)) {
+							this.info("dstone-ai-engine tool: 남아 있던 테스트 서버 프로세스를 내립니다: " + runDir + " pid=" + pid);
+							killTree(handle.get());
+						}
+					}
+					Files.deleteIfExists(pidFile.toPath());
+				} catch (IOException | RuntimeException e) {
+					this.warn("dstone-ai-engine tool: 남은 테스트 서버를 확인하지 못했습니다(" + runDir + "): " + e.getMessage());
+				}
+			}
 		}
 	}
 
-	/** 빌드 산출물이 격리를 지킬 수 있는지 보고, 앱이 자기 포트를 부를 수 있게 엽니다. 실패면 이유. */
-	private static String prepareRun(TestSandbox sandbox, File archive, int port, String trustedLibs) {
-		try {
-			sandbox.checkArtifact(archive, trustedLibs);
-			sandbox.allowSelf(port);
-			return null;
-		} catch (SandboxException e) {
-			return e.getMessage();
+	/** JDBC URL의 DB 주소들입니다(MySQL·MariaDB·PostgreSQL은 //host:port, Oracle은 @host:port 또는 HOST=·PORT=). */
+	static List<SandboxGuard.Endpoint> endpointsOf(String url) {
+		List<SandboxGuard.Endpoint> result = new ArrayList<SandboxGuard.Endpoint>();
+		if (url == null) {
+			return result;
 		}
+		String text = url.replaceFirst("^jdbc:(log4jdbc:)?", "");
+		int defaultPort = text.startsWith("postgresql") ? 5432 : text.startsWith("oracle") ? 1521 : text.startsWith("sqlserver") ? 1433 : 3306;
+		Matcher description = Pattern.compile("(?i)\\(HOST\\s*=\\s*([^)\\s]+)\\)\\s*\\(PORT\\s*=\\s*(\\d+)\\)").matcher(text);
+		while (description.find()) {
+			result.add(new SandboxGuard.Endpoint(description.group(1), Integer.parseInt(description.group(2))));
+		}
+		if (!result.isEmpty()) {
+			return result;
+		}
+		Matcher m = Pattern.compile("(?://|@//|@)([^/?;:@]+(?::\\d+)?(?:,[^/?;:@]+(?::\\d+)?)*)").matcher(text);
+		if (m.find()) {
+			for (String part : m.group(1).split(",")) {
+				int colon = part.lastIndexOf(':');
+				String host = colon > 0 ? part.substring(0, colon) : part;
+				int port = colon > 0 ? Integer.parseInt(part.substring(colon + 1)) : defaultPort;
+				result.add(new SandboxGuard.Endpoint(host.replace("[", "").replace("]", ""), port));
+			}
+		}
+		return result;
 	}
 
-	/** 기동 실패의 원인. 막은 외부 접속이나 DB 로그인 실패가 있으면 환경, 아니면 개발 결과 */
-	private static String startupCause(TestSandbox sandbox, File log, long from) {
-		return !sandbox.denied().isEmpty() || LOGIN_FAILED.matcher(textFrom(log, from)).find() ? CAUSE_ENVIRONMENT : CAUSE_CODE;
-	}
-
-	/**
-	 * <pre>
-	 * "프로젝트ID=값, 프로젝트ID=값" 모양의 설정에서 그 프로젝트의 값만 쉼표로 이어 돌려줍니다.
-	 * 격리를 푸는 예외라 엔진 전체에 걸지 않습니다. 한 프로젝트 때문에 푼 것이 다른 프로젝트까지 풀면 안 됩니다.
-	 * </pre>
-	 */
+	/** "프로젝트ID=값, 프로젝트ID=값" 모양의 설정에서 그 프로젝트의 값만 쉼표로 이어 돌려줍니다. */
 	static String forProject(String setting, String projectId) {
 		List<String> values = new ArrayList<String>();
 		if (!isBlank(setting) && !isBlank(projectId)) {
@@ -760,435 +976,57 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		return String.join(",", values);
 	}
 
-	private static String deniedNote(TestSandbox sandbox) {
-		if (sandbox == null || sandbox.denied().isEmpty()) {
-			return "";
-		}
-		return "\n막은 외부 접속: " + String.join(", ", sandbox.denied()) + " (앱에 꼭 필요하면 관리자가 설정 sandbox-allow-hosts에 '프로젝트ID=host:port'로 더한다)";
+	private static String keyOf(StepRef stepRef, String projectId) {
+		return stepRef != null && stepRef.executionId() != null ? stepRef.executionId() : "adhoc-" + (projectId == null ? "" : projectId.trim());
 	}
 
-	private static String textFrom(File log, long from) {
-		try (RandomAccessFile file = new RandomAccessFile(log, "r")) {
-			file.seek(Math.min(from, file.length()));
-			byte[] bytes = new byte[(int) (file.length() - file.getFilePointer())];
-			file.readFully(bytes);
-			return new String(bytes, StandardCharsets.UTF_8);
-		} catch (IOException e) {
-			return "";
-		}
+	private static String stripEnv(String jndiName) {
+		String name = jndiName.trim();
+		return name.startsWith("java:comp/env/") ? name.substring("java:comp/env/".length()) : name;
 	}
 
-	/** 업로드 화면을 시험할 그림 파일. 브라우저 MCP가 읽어도 되는 폴더(설정 upload-sample-dir)에 둡니다. */
-	private String uploadSample() {
-		String dir = this.config("upload-sample-dir", "");
-		// env의 MCP 폴더가 비면 "/output"만 남는다. 그때는 만들지 않는다
-		if (dir.isEmpty() || dir.equals("/output") || !new File(dir).getParentFile().isDirectory()) {
-			return null;
-		}
-		File sample = new File(dir, "dstone-upload-sample.png");
-		try {
-			if (!sample.isFile()) {
-				Files.createDirectories(sample.getParentFile().toPath());
-				ImageIO.write(new BufferedImage(320, 240, BufferedImage.TYPE_INT_RGB), "png", sample);
-			}
-			return sample.getAbsolutePath();
-		} catch (IOException e) {
-			this.warn("dstone-ai-engine tool: 업로드 시험용 파일을 만들지 못했습니다: " + e.getMessage());
-			return null;
-		}
+	private static String safe(String key) {
+		return key.replaceAll("[^A-Za-z0-9._-]", "_");
 	}
 
-	/** Spring Boot가 만든 실행 파일(jar 또는 WAR)을 찾습니다. */
-	private static File findBootArchive(File target) {
-		File[] files = target.listFiles();
-		if (files == null) {
-			return null;
-		}
-		for (File file : files) {
-			String name = file.getName();
-			if (file.isFile() && (name.endsWith(".war") || (name.endsWith(".jar")
-				&& !name.endsWith("-sources.jar") && !name.endsWith("-javadoc.jar") && !name.endsWith("-plain.jar")))) {
-				return file;
-			}
-		}
-		return null;
+	private static File fileOrNull(Object path) {
+		return path == null || isBlank(String.valueOf(path)) ? null : new File(String.valueOf(path));
 	}
 
-	/** Spring Boot 실행 파일을 격리 옵션과 함께 띄웁니다. */
-	private Process startArchive(File app, File archive, File javaHome, File log, String key, int port, TestSandbox sandbox) throws IOException {
-		File home = javaHome != null ? javaHome : new File(System.getProperty("java.home"));
-		List<String> command = new ArrayList<String>();
-		command.add(new File(home, isWindows() ? "bin/java.exe" : "bin/java").getPath());
-		command.add(MARKER + key);
-		command.addAll(Arrays.asList(UTF8_OUTPUT.split(" ")));
-		command.add("-jar");
-		command.add(archive.getPath());
-		command.add("--server.port=" + port);
-		command.add("--server.servlet.context-path=/");
-		ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-		isolate(builder, sandbox.appOptions());
-		return builder.start();
-	}
-
-	/**
-	 * JVM에 격리 옵션을 넣습니다. JAVA_TOOL_OPTIONS는 스크립트가 JAVA_OPTS를 덮어써도, 자식 JVM을 새로 띄워도 들어갑니다.
-	 * 이것을 덮어쓸 수 있는 _JAVA_OPTIONS는 뺍니다.
-	 */
-	private static void isolate(ProcessBuilder builder, String options) {
-		Map<String, String> env = builder.environment();
-		String current = env.get("JAVA_TOOL_OPTIONS");
-		env.put("JAVA_TOOL_OPTIONS", isBlank(current) ? options : current + " " + options);
-		env.remove("_JAVA_OPTIONS");
-	}
-
-	/**
-	 * <pre>
-	 * 화면에 로그인할 시험계정 안내 한 줄입니다(프로젝트 관리의 시험계정).
-	 * 비밀번호는 알려 주지 않고 자리표시자만 줍니다. 엔진(ToolCallGate)이 브라우저 입력 Tool에 넘길 때만 실제 값으로 바꿉니다.
-	 * </pre>
-	 */
-	private String accountLine(String projectId) {
-		if (isBlank(projectId)) {
-			return "시험계정: 없음(프로젝트ID가 없음). 로그인이 필요 없는 화면만 볼 수 있습니다.";
-		}
-		try {
-			Map<String, Object> project = this.projectStore.find(projectId.trim());
-			Object userId = project == null ? null : project.get("testUserId");
-			if (userId == null || isBlank(userId.toString())) {
-				return "시험계정: 없음(프로젝트 관리에 시험계정이 없음). 로그인이 필요 없는 화면만 볼 수 있습니다.";
-			}
-			if (!"Y".equals(project.get("hasTestPassword"))) {
-				return "시험계정: ID " + userId + " (비밀번호는 프로젝트 관리에 없음)";
-			}
-			return "시험계정: ID " + userId + ", 비밀번호 칸에는 ${secret:" + projectId.trim() + "." + ProjectStore.SECRET_TEST_PASSWORD
-				+ "}를 글자 그대로 넣는다(browser_type, browser_fill_form에서만 엔진이 실제 값으로 바꿔 넣는다)";
-		} catch (RuntimeException e) {
-			return "시험계정: 읽지 못했습니다(" + e.getMessage() + ")";
-		}
-	}
-
-	/**
-	 * <pre>
-	 * 프로젝트 잠금을 잡습니다. 다른 실행(이 엔진이든 다른 엔진이든)이 쓰고 있으면 lock-wait-seconds 동안 기다립니다.
-	 * 잡으면 null, 못 잡으면 그 이유를 돌려줍니다.
-	 * </pre>
-	 */
-	private String acquireLock(RunningServer server, File base) throws IOException {
-		long waitMillis = Long.parseLong(this.config("lock-wait-seconds", "60")) * 1000L;
-		long deadline = System.currentTimeMillis() + waitMillis;
-		RandomAccessFile file = new RandomAccessFile(new File(base, LOCK_FILE), "rw");
-		FileChannel channel = file.getChannel();
-		while (true) {
-			FileLock lock = null;
-			try {
-				lock = channel.tryLock();
-			} catch (OverlappingFileLockException e) {
-				lock = null; // 이 엔진의 다른 실행이 잡고 있다
-			}
-			if (lock != null) {
-				server.lockFile = file;
-				server.lock = lock;
-				return null;
-			}
-			if (System.currentTimeMillis() >= deadline) {
-				file.close();
-				RunningServer holder = this.running.get(server.key);
-				return "다른 실행이 이 프로젝트의 임시 시험 서버를 쓰고 있습니다" + (holder == null || holder.executionId == null ? "" : "(실행 " + holder.executionId + ")")
-					+ ". 그 실행이 끝난 뒤 다시 부르십시오.";
-			}
-			try {
-				Thread.sleep(2000L);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				file.close();
-				return "기다리는 중에 중단되었습니다.";
-			}
-		}
-	}
-
-	/** 서버 하나를 내리고 잠금을 풉니다. 여러 번 불러도 됩니다. */
-	private void stop(RunningServer server) {
-		if (server.process != null) {
-			killTree(server.process.toHandle());
-		}
-		this.running.remove(server.key, server);
-		if (server.sandbox != null) {
-			this.sandboxRegistry.closed(server.sandbox.readConnections().keySet());
-			server.sandbox.close();
-		}
-		try {
-			if (server.lock != null && server.lock.isValid()) {
-				server.lock.release();
-			}
-			if (server.lockFile != null) {
-				server.lockFile.close();
-			}
-		} catch (IOException e) {
-			this.warn("dstone-ai-engine tool: 임시 시험 서버 잠금을 풀지 못했습니다(" + server.key + "): " + e.getMessage());
-		}
-	}
-
-	/** 엔진이 죽어 남은 프로세스를 정리합니다. 명령줄에 우리 표시가 있을 때만 내립니다(번호가 다른 프로세스에 다시 쓰였을 수 있어서). */
-	private void killLeftover(File base, String key) {
-		File pidFile = new File(base, PID_FILE);
-		if (!pidFile.isFile()) {
-			return;
-		}
-		try {
-			long pid = Long.parseLong(Files.readString(pidFile.toPath(), StandardCharsets.UTF_8).trim());
-			Optional<ProcessHandle> handle = ProcessHandle.of(pid);
-			if (handle.isPresent() && handle.get().isAlive()) {
-				Optional<String> commandLine = handle.get().info().commandLine();
-				if (commandLine.isPresent() && commandLine.get().contains(MARKER + key)) {
-					this.info("dstone-ai-engine tool: 남아 있던 임시 시험 서버 프로세스를 내립니다: " + key + " pid=" + pid);
-					killTree(handle.get());
+	private static List<String> splitList(String text) {
+		List<String> result = new ArrayList<String>();
+		if (!isBlank(text)) {
+			for (String part : text.split("[,\\n]")) {
+				if (!part.trim().isEmpty()) {
+					result.add(part.trim());
 				}
 			}
-			Files.deleteIfExists(pidFile.toPath());
-		} catch (IOException | RuntimeException e) {
-			this.warn("dstone-ai-engine tool: 남은 임시 시험 서버를 확인하지 못했습니다(" + key + "): " + e.getMessage());
 		}
+		return result;
 	}
 
-	/** 프로세스와 그 자식들을 내립니다. 먼저 정상 종료를 요청하고, 10초 안에 안 끝나면 강제로 내립니다. */
-	private static void killTree(ProcessHandle root) {
-		List<ProcessHandle> all = new ArrayList<ProcessHandle>();
-		Iterator<ProcessHandle> descendants = root.descendants().iterator();
-		while (descendants.hasNext()) {
-			all.add(descendants.next());
-		}
-		all.add(root);
-		for (ProcessHandle handle : all) {
-			handle.destroy();
-		}
-		long deadline = System.currentTimeMillis() + 10000L;
-		for (ProcessHandle handle : all) {
-			while (handle.isAlive() && System.currentTimeMillis() < deadline) {
-				try {
-					Thread.sleep(200L);
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					break;
-				}
-			}
-			if (handle.isAlive()) {
-				handle.destroyForcibly();
-			}
-		}
+	private static String text(Map<String, Object> map, String key) {
+		Object value = map == null ? null : map.get(key);
+		return value == null || String.valueOf(value).trim().isEmpty() ? null : String.valueOf(value).trim();
 	}
 
-	/**
-	 * <pre>
-	 * 쓸 JDK를 정합니다. 버전 순서: 프로젝트 관리의 Java 버전 → 원본 pom.xml → 원본 클래스 파일.
-	 * 경로는 설정 java-home-{버전}. 못 찾으면 null(엔진과 같은 JDK)이고 notes에 이유를 남깁니다.
-	 * </pre>
-	 */
-	private File javaHome(String projectId, String pomText, File sourceRoot, List<String> notes) {
-		String version = null;
-		String from = null;
-		if (!isBlank(projectId)) {
-			try {
-				Map<String, Object> project = this.projectStore.find(projectId.trim());
-				Object value = project == null ? null : project.get("javaVersion");
-				if (value != null && !isBlank(value.toString())) {
-					version = value.toString().trim();
-					from = "프로젝트 관리";
-				}
-			} catch (RuntimeException e) {
-				notes.add("프로젝트 관리에서 Java 버전을 읽지 못했습니다: " + e.getMessage());
-			}
-		}
-		if (version == null) {
-			version = javaVersionOfPom(pomText);
-			from = version == null ? null : "pom.xml";
-		}
-		if (version == null) {
-			version = javaVersionOfClasses(new File(sourceRoot, "target/classes"));
-			from = version == null ? null : "원본 클래스 파일";
-		}
-		if (version == null) {
-			notes.add("참고: Java 버전을 알 수 없어 엔진과 같은 JDK로 띄웠습니다. 프로젝트 관리에 Java 버전을 넣으면 그 JDK를 씁니다.");
-			return null;
-		}
-		String path = this.config("java-home-" + version, "");
-		if (!isBlank(path) && new File(path.trim()).isDirectory()) {
-			return new File(path.trim());
-		}
-		if (version.equals(String.valueOf(Runtime.version().feature()))) {
-			return null; // 엔진과 같은 버전이면 그대로 쓴다
-		}
-		notes.add("참고: Java " + version + "(" + from + ")용 JDK 경로가 설정(env의 JAVA_HOME_" + version + ")에 없어 엔진과 같은 JDK(Java "
-			+ Runtime.version().feature() + ")로 띄웠습니다. 서버가 이상하게 동작하면 이것부터 의심하십시오.");
-		return null;
+	private String config(String name, String defaultValue) {
+		String value = this.configProperty.getProperty(Constants.Tool.TestServer.PREFIX + "." + name);
+		return isBlank(value) ? defaultValue : value.trim();
 	}
 
-	/** pom.xml에 적힌 컴파일 버전을 읽습니다(1.8 → 8). 못 찾으면 null. */
-	static String javaVersionOfPom(String pomText) {
-		String[] tags = { "maven.compiler.release", "maven.compiler.source", "java.version", "java-version", "release", "source" };
-		for (String tag : tags) {
-			Matcher m = Pattern.compile("<" + Pattern.quote(tag) + ">\\s*([0-9.]+)\\s*</" + Pattern.quote(tag) + ">").matcher(pomText);
-			if (m.find()) {
-				String v = m.group(1);
-				return v.startsWith("1.") ? v.substring(2) : v;
-			}
-		}
-		return null;
-	}
-
-	/** 원본 클래스 파일 하나의 major 버전으로 Java 버전을 정합니다(52 → 8). 못 찾으면 null. */
-	private static String javaVersionOfClasses(File classesDir) {
-		if (!classesDir.isDirectory()) {
-			return null;
-		}
-		final File[] found = new File[1];
-		try {
-			Files.walkFileTree(classesDir.toPath(), new SimpleFileVisitor<Path>() {
-				@Override
-				public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
-					if (path.toString().endsWith(".class")) {
-						found[0] = path.toFile();
-						return FileVisitResult.TERMINATE;
-					}
-					return FileVisitResult.CONTINUE;
-				}
-			});
-			if (found[0] == null) {
-				return null;
-			}
-			byte[] head = Files.readAllBytes(found[0].toPath());
-			if (head.length >= 8) {
-				int major = ((head[6] & 0xff) << 8) | (head[7] & 0xff);
-				return String.valueOf(major - 44);
-			}
-		} catch (IOException e) {
-			// 읽지 못하면 모르는 것으로
-		}
-		return null;
-	}
-
-	/**
-	 * <pre>
-	 * pom.xml의 플러그인을 보고 띄우는 방법을 정합니다. 못 정하면 null.
-	 * tomcat은 tomcat7:run 기본 경로가 /artifactId 라서, 플러그인에 <path>가 없으면 그것을 씁니다.
-	 * </pre>
-	 */
-	static Launch launchOf(String pomText, int port) {
-		Launch launch = new Launch();
-		String tomcat = pluginBlock(pomText, "tomcat7-maven-plugin");
-		String tomcatGoal = "tomcat7:run";
-		if (tomcat == null) {
-			tomcat = pluginBlock(pomText, "tomcat6-maven-plugin");
-			tomcatGoal = "tomcat6:run";
-		}
-		if (tomcat != null) {
-			launch.kind = tomcatGoal.substring(0, tomcatGoal.indexOf(':'));
-			launch.goals.add("clean"); // 지난 실행의 클래스가 남지 않게(mavenPackage 설명 참고)
-			launch.goals.add(tomcatGoal);
-			launch.goals.add("-Dmaven.tomcat.port=" + port);
-			Matcher path = Pattern.compile("<path>\\s*([^<$]*)\\s*</path>").matcher(tomcat);
-			if (path.find()) {
-				launch.contextPath = normalizePath(path.group(1));
-			} else {
-				String artifactId = projectArtifactId(pomText);
-				launch.contextPath = artifactId == null ? "/" : "/" + artifactId;
-			}
-			return launch;
-		}
-		if (pluginBlock(pomText, "spring-boot-maven-plugin") != null) {
-			launch.kind = "spring-boot";
-			launch.goals.add("clean");
-			launch.goals.add("spring-boot:run");
-			launch.goals.add("-Dspring-boot.run.arguments=--server.port=" + port); // Boot 2 이상
-			launch.goals.add("-Drun.arguments=--server.port=" + port); // Boot 1
-			return launch;
-		}
-		if (pluginBlock(pomText, "jetty-maven-plugin") != null || pluginBlock(pomText, "maven-jetty-plugin") != null) {
-			launch.kind = "jetty";
-			launch.goals.add("clean");
-			launch.goals.add("jetty:run");
-			launch.goals.add("-Djetty.http.port=" + port);
-			launch.goals.add("-Djetty.port=" + port);
-			return launch;
-		}
-		return null;
-	}
-
-	/** tomcat 플러그인 블록 안의 <port> 값만 바꿉니다. 블록에 <port>가 없으면 그대로 둡니다(-Dmaven.tomcat.port가 쓰임). */
-	static String patchTomcatPort(String pomText, int port) {
-		Matcher m = PLUGIN.matcher(pomText);
-		StringBuilder out = new StringBuilder();
-		int last = 0;
-		while (m.find()) {
-			String block = m.group();
-			if (block.contains("tomcat7-maven-plugin") || block.contains("tomcat6-maven-plugin")) {
-				String patched = block.replaceFirst("<port>[^<]*</port>", Matcher.quoteReplacement("<port>" + port + "</port>"));
-				out.append(pomText, last, m.start()).append(patched);
-				last = m.end();
-			}
-		}
-		out.append(pomText.substring(last));
-		return out.toString();
-	}
-
-	/** <plugin>…</plugin> 하나(중첩 없음) */
-	private static final Pattern PLUGIN = Pattern.compile("<plugin>(?:(?!</plugin>).)*</plugin>", Pattern.DOTALL);
-
-	private static String pluginBlock(String pomText, String artifactId) {
-		Matcher m = PLUGIN.matcher(pomText);
-		while (m.find()) {
-			if (m.group().contains("<artifactId>" + artifactId + "</artifactId>")) {
-				return m.group();
-			}
-		}
-		return null;
-	}
-
-	/** 프로젝트 자신의 artifactId(parent, 의존성, 플러그인 것 제외)입니다. */
-	private static String projectArtifactId(String pomText) {
-		String text = pomText.replaceAll("(?s)<parent>.*?</parent>", "")
-			.replaceAll("(?s)<dependencies>.*?</dependencies>", "")
-			.replaceAll("(?s)<dependencyManagement>.*?</dependencyManagement>", "")
-			.replaceAll("(?s)<build>.*?</build>", "")
-			.replaceAll("(?s)<profiles>.*?</profiles>", "");
-		Matcher m = Pattern.compile("<artifactId>\\s*([^<]+?)\\s*</artifactId>").matcher(text);
-		return m.find() ? m.group(1) : null;
-	}
-
-	private static String normalizePath(String path) {
-		String p = path.trim();
-		if (p.isEmpty()) {
-			return "/";
-		}
-		return p.startsWith("/") ? p : "/" + p;
-	}
-
-	/**
-	 * <pre>
-	 * 접속될 때까지 기다립니다. HTTP 응답이 오면(상태 코드는 무엇이든) 뜬 것으로 봅니다.
-	 * 프로세스가 먼저 끝나거나 시간이 지나면 그 이유를 돌려줍니다. 뜨면 null.
-	 * </pre>
-	 */
+	/** 접속될 때까지 기다립니다(HTTP 응답이 오면 뜬 것). 뜨면 null. */
 	private static String waitUntilUp(Process process, int port, String contextPath, int timeoutSeconds) {
 		long deadline = System.currentTimeMillis() + timeoutSeconds * 1000L;
 		while (System.currentTimeMillis() < deadline) {
 			if (!process.isAlive()) {
 				return "프로세스가 끝났습니다. 종료 코드 " + process.exitValue();
 			}
-			try {
-				HttpURLConnection connection = (HttpURLConnection) URI.create("http://localhost:" + port + contextPath).toURL().openConnection();
-				connection.setConnectTimeout(2000);
-				connection.setReadTimeout(10000);
-				connection.setInstanceFollowRedirects(false);
-				int status = connection.getResponseCode();
-				connection.disconnect();
-				if (status > 0) {
-					return null;
-				}
-			} catch (IOException e) {
-				// 아직 안 떴다
+			if (httpStatus(port, contextPath) > 0) {
+				return null;
 			}
 			try {
-				process.waitFor(3, TimeUnit.SECONDS);
+				process.waitFor(2, TimeUnit.SECONDS);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 				return "기다리는 중에 중단되었습니다";
@@ -1197,10 +1035,9 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		return timeoutSeconds + "초 안에 접속되지 않았습니다";
 	}
 
-	/** 그 경로에 GET을 보내 응답 코드를 돌려줍니다. 응답이 없으면 -1. */
 	private static int httpStatus(int port, String path) {
 		try {
-			HttpURLConnection connection = (HttpURLConnection) URI.create("http://localhost:" + port + path).toURL().openConnection();
+			HttpURLConnection connection = (HttpURLConnection) URI.create("http://localhost:" + port + ("/".equals(path) ? "/" : path + "/")).toURL().openConnection();
 			connection.setConnectTimeout(2000);
 			connection.setReadTimeout(30000);
 			connection.setInstanceFollowRedirects(false);
@@ -1221,294 +1058,55 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		}
 	}
 
+	/** 프로세스와 자식들을 내립니다. 10초 안에 안 끝나면 강제로. */
+	private static void killTree(ProcessHandle root) {
+		List<ProcessHandle> all = new ArrayList<ProcessHandle>();
+		Iterator<ProcessHandle> descendants = root.descendants().iterator();
+		while (descendants.hasNext()) {
+			all.add(descendants.next());
+		}
+		all.add(root);
+		for (ProcessHandle handle : all) {
+			handle.destroy();
+		}
+		long deadline = System.currentTimeMillis() + 10000L;
+		for (ProcessHandle handle : all) {
+			while (handle.isAlive() && System.currentTimeMillis() < deadline) {
+				sleep(200L);
+			}
+			if (handle.isAlive()) {
+				handle.destroyForcibly();
+			}
+		}
+	}
+
 	private static String tail(File log, int lines) {
 		try {
-			// UTF-8이 아닌 글자가 섞여 있어도 실패하지 않게, 깨진 글자만 대체해서 읽는다.
 			String text = new String(Files.readAllBytes(log.toPath()), StandardCharsets.UTF_8);
 			List<String> all = Arrays.asList(text.split("\\r?\\n", -1));
-			int from = Math.max(0, all.size() - lines);
-			return String.join("\n", all.subList(from, all.size()));
+			return String.join("\n", all.subList(Math.max(0, all.size() - lines), all.size()));
 		} catch (IOException | RuntimeException e) {
 			return "(로그를 읽지 못했습니다: " + e.getMessage() + ")";
 		}
 	}
 
-	/** 띄운 JVM의 콘솔 출력을 UTF-8로 맞추는 옵션입니다(server.log를 읽을 수 있게). */
-	private static final String UTF8_OUTPUT = "-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8";
-
-	/** Maven 출력도 UTF-8로 맞춥니다. 이미 있는 MAVEN_OPTS 뒤에 덧붙입니다. */
-	private static void utf8Maven(ProcessBuilder builder) {
-		Map<String, String> env = builder.environment();
-		String current = env.get("MAVEN_OPTS");
-		env.put("MAVEN_OPTS", current == null || current.isBlank() ? UTF8_OUTPUT : current + " " + UTF8_OUTPUT);
+	private static String textFrom(File log, long from) {
+		try (RandomAccessFile file = new RandomAccessFile(log, "r")) {
+			file.seek(Math.min(from, file.length()));
+			byte[] bytes = new byte[(int) (file.length() - file.getFilePointer())];
+			file.readFully(bytes);
+			return new String(bytes, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			return "";
+		}
 	}
 
-	/** mvn 명령 앞부분(Windows는 cmd.exe /c, 우리 표시 포함)입니다. */
-	private List<String> mavenCommand(String key) {
-		List<String> command = new ArrayList<String>();
-		if (isWindows()) {
-			command.add("cmd.exe");
-			command.add("/c");
-		}
-		command.add(this.config("maven-command", "mvn"));
-		command.add("-B");
-		command.add("-DskipTests");
-		command.add(MARKER + key);
-		return command;
-	}
-
-	/** 사본에서 mvn package를 돌려 WAR를 만듭니다. 성공하면 null, 실패하면 이유. 출력은 log에 덧붙입니다. */
-	private String mavenPackage(File app, File javaHome, File log, String key, TestSandbox sandbox) throws IOException {
-		List<String> command = this.mavenCommand(key);
-		// clean을 함께 한다. 사본은 다음 실행에서도 다시 쓰는데, Maven 증분 빌드는 소스가 없어진 클래스를 지우지 않아
-		// 지난 실행의 클래스가 WAR에 남는다(2026-11-22 실행 86b3660b: 지난 실행의 DAO와 bean 이름이 부딪쳐 앱이 뜨지 않음).
-		command.add("clean");
-		command.add("package");
-		ProcessBuilder builder = new ProcessBuilder(command).directory(app).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-		utf8Maven(builder);
-		if (javaHome != null) {
-			builder.environment().put("JAVA_HOME", javaHome.getPath());
-		}
-		if (sandbox != null) {
-			isolate(builder, sandbox.buildOptions()); // 빌드 중에도 원래 DB로는 가지 못하게
-		}
-		Process process = builder.start();
+	private static void sleep(long millis) {
 		try {
-			int timeout = Integer.parseInt(this.config("start-timeout-seconds", "600"));
-			if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
-				killTree(process.toHandle());
-				return timeout + "초 안에 끝나지 않았습니다";
-			}
+			Thread.sleep(millis);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			killTree(process.toHandle());
-			return "기다리는 중에 중단되었습니다";
 		}
-		return process.exitValue() == 0 ? null : "mvn package 종료 코드 " + process.exitValue();
-	}
-
-	/** 전용 CATALINA_BASE로 Tomcat을 띄웁니다(catalina run, 앞에서 돌아감). */
-	private Process startCatalina(File tomcatHome, File catalinaBase, File javaHome, File log, String key, TestSandbox sandbox) throws IOException {
-		List<String> command = new ArrayList<String>();
-		if (isWindows()) {
-			command.add("cmd.exe");
-			command.add("/c");
-			command.add(new File(tomcatHome, "bin/catalina.bat").getPath());
-		} else {
-			command.add("sh");
-			command.add(new File(tomcatHome, "bin/catalina.sh").getPath());
-		}
-		command.add("run");
-		ProcessBuilder builder = new ProcessBuilder(command).directory(catalinaBase).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-		Map<String, String> env = builder.environment();
-		env.put("CATALINA_HOME", tomcatHome.getPath());
-		env.put("CATALINA_BASE", catalinaBase.getPath());
-		env.put("CATALINA_PID", ""); // 사람이 쓰는 Tomcat의 PID 파일을 건드리지 않게
-		env.put("CATALINA_OPTS", MARKER + key + " " + UTF8_OUTPUT);
-		if (javaHome != null) {
-			env.put("JAVA_HOME", javaHome.getPath());
-			env.remove("JRE_HOME");
-		}
-		if (sandbox != null) {
-			isolate(builder, sandbox.appOptions());
-		}
-		return builder.start();
-	}
-
-	/**
-	 * <pre>
-	 * 전용 CATALINA_BASE를 만듭니다. 매번 conf를 설치된 Tomcat에서 다시 복사하고, webapps·work·temp는 비웁니다.
-	 * server.xml은 shutdown 포트를 끄고(-1), 주석이 아닌 첫 HTTP Connector의 포트만 바꾸고, 나머지 Connector(AJP, HTTPS)는 지웁니다.
-	 * 사람이 그 Tomcat에 등록해 둔 다른 앱(server.xml의 <Context>, conf/Catalina 아래 파일)은 뺍니다. 그 앱의 경로가 없으면 Host 기동이 실패합니다.
-	 * </pre>
-	 */
-	static void prepareCatalinaBase(File tomcatHome, File catalinaBase, int port, File war, String contextPath) throws IOException {
-		Files.createDirectories(catalinaBase.toPath());
-		String[] clean = { "conf", "webapps", "work", "temp" };
-		for (String name : clean) {
-			Path dir = new File(catalinaBase, name).toPath();
-			if (Files.exists(dir)) {
-				deleteTree(dir);
-			}
-			Files.createDirectories(dir);
-		}
-		Files.createDirectories(new File(catalinaBase, "logs").toPath());
-		copyTree(new File(tomcatHome, "conf").toPath(), new File(catalinaBase, "conf").toPath());
-		// 사람이 그 Tomcat에 등록해 둔 다른 앱(conf/Catalina/{host}/*.xml)은 가져오지 않는다. 경로가 없으면 기동이 실패한다.
-		Path perAppContexts = new File(catalinaBase, "conf/Catalina").toPath();
-		if (Files.exists(perAppContexts)) {
-			deleteTree(perAppContexts);
-		}
-		// 콘솔 출력(server.log)을 UTF-8로 맞춘다. Windows는 콘솔 인코딩(MS949)으로 나와 읽지 못한다.
-		File logging = new File(catalinaBase, "conf/logging.properties");
-		if (logging.isFile()) {
-			String props = new String(Files.readAllBytes(logging.toPath()), StandardCharsets.ISO_8859_1);
-			Files.write(logging.toPath(), patchConsoleEncoding(props).getBytes(StandardCharsets.ISO_8859_1));
-		}
-		File serverXml = new File(catalinaBase, "conf/server.xml");
-		String xml = Files.readString(serverXml.toPath(), StandardCharsets.UTF_8);
-		Files.writeString(serverXml.toPath(), patchServerXml(xml, port), StandardCharsets.UTF_8);
-		String name = "/".equals(contextPath) ? "ROOT" : contextPath.substring(1).replace('/', '#');
-		Files.copy(war.toPath(), new File(catalinaBase, "webapps/" + name + ".war").toPath());
-	}
-
-	/** server.xml의 포트를 바꾸고 다른 앱의 Context를 뺍니다(prepareCatalinaBase 설명 참고). */
-	static String patchServerXml(String xml, int port) {
-		String text = xml.replaceFirst("<Server\\s+port=\"[^\"]*\"", Matcher.quoteReplacement("<Server port=\"-1\""));
-		text = removeContexts(text);
-		Matcher m = Pattern.compile("<!--.*?-->|<Connector\\b[^>]*?(?:/>|>.*?</Connector>)", Pattern.DOTALL).matcher(text);
-		StringBuilder out = new StringBuilder();
-		int last = 0;
-		boolean httpDone = false;
-		while (m.find()) {
-			String part = m.group();
-			if (part.startsWith("<!--")) {
-				continue;
-			}
-			String replaced;
-			boolean http = !part.contains("AJP") && !part.contains("SSLEnabled=\"true\"");
-			if (http && !httpDone) {
-				replaced = part.replaceFirst("port=\"[^\"]*\"", Matcher.quoteReplacement("port=\"" + port + "\""));
-				httpDone = true;
-			} else {
-				replaced = "<!-- dstone 임시 시험 서버에서 끔 -->";
-			}
-			out.append(text, last, m.start()).append(replaced);
-			last = m.end();
-		}
-		out.append(text.substring(last));
-		return out.toString();
-	}
-
-	/** 주석이 아닌 <Context …/> 또는 <Context …>…</Context>를 주석 한 줄로 바꿉니다. */
-	static String removeContexts(String xml) {
-		Matcher m = Pattern.compile("<!--.*?-->|<Context\\b[^>]*?(?:/>|>.*?</Context>)", Pattern.DOTALL).matcher(xml);
-		StringBuilder out = new StringBuilder();
-		int last = 0;
-		while (m.find()) {
-			if (m.group().startsWith("<!--")) {
-				continue;
-			}
-			out.append(xml, last, m.start()).append("<!-- dstone 임시 시험 서버에서 뺌(사람이 등록한 다른 앱) -->");
-			last = m.end();
-		}
-		out.append(xml.substring(last));
-		return out.toString();
-	}
-
-	/** logging.properties의 콘솔 인코딩을 UTF-8로 바꾸거나, 없으면 덧붙입니다. */
-	static String patchConsoleEncoding(String props) {
-		String key = "java.util.logging.ConsoleHandler.encoding";
-		Matcher m = Pattern.compile("(?m)^\\s*" + Pattern.quote(key) + "\\s*=.*$").matcher(props);
-		if (m.find()) {
-			return m.replaceAll(Matcher.quoteReplacement(key + " = UTF-8"));
-		}
-		return props + (props.endsWith("\n") ? "" : "\n") + key + " = UTF-8\n";
-	}
-
-	private static File findWar(File target) {
-		File[] files = target.listFiles();
-		if (files == null) {
-			return null;
-		}
-		for (File file : files) {
-			if (file.isFile() && file.getName().endsWith(".war")) {
-				return file;
-			}
-		}
-		return null;
-	}
-
-	static boolean isWar(String pomText) {
-		return Pattern.compile("<packaging>\\s*war\\s*</packaging>").matcher(pomText).find();
-	}
-
-	/** pom의 tomcat 플러그인에 적힌 <path>입니다. 없으면 null. */
-	static String tomcatPathOf(String pomText) {
-		String block = pluginBlock(pomText, "tomcat7-maven-plugin");
-		if (block == null) {
-			block = pluginBlock(pomText, "tomcat6-maven-plugin");
-		}
-		if (block == null) {
-			return null;
-		}
-		Matcher path = Pattern.compile("<path>\\s*([^<$]*)\\s*</path>").matcher(block);
-		return path.find() ? normalizePath(path.group(1)) : null;
-	}
-
-	/** 설정 tomcat-home입니다. 비었거나 bin/catalina 스크립트가 없으면 null. */
-	private File tomcatHome() {
-		String path = this.config("tomcat-home", "");
-		if (isBlank(path)) {
-			return null;
-		}
-		File home = new File(path.trim());
-		File script = new File(home, isWindows() ? "bin/catalina.bat" : "bin/catalina.sh");
-		return script.isFile() ? home : null;
-	}
-
-	private static void copyTree(final Path from, final Path to) throws IOException {
-		Files.walkFileTree(from, new SimpleFileVisitor<Path>() {
-			@Override
-			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-				Files.createDirectories(to.resolve(from.relativize(dir).toString()));
-				return FileVisitResult.CONTINUE;
-			}
-
-			@Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				Files.copy(file, to.resolve(from.relativize(file).toString()));
-				return FileVisitResult.CONTINUE;
-			}
-		});
-	}
-
-	private static void deleteTree(Path root) throws IOException {
-		Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
-			@Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				Files.delete(file);
-				return FileVisitResult.CONTINUE;
-			}
-
-			@Override
-			public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-				Files.delete(dir);
-				return FileVisitResult.CONTINUE;
-			}
-		});
-	}
-
-	/** 작업 루트(설정 work-root, 비우면 {사용자 홈}/.dstone-ai-engine)입니다. */
-	private File workRoot() {
-		String configured = this.config("work-root", "");
-		if (!isBlank(configured)) {
-			return new File(configured.trim());
-		}
-		return new File(System.getProperty("user.home"), DEFAULT_ROOT_NAME);
-	}
-
-	/** 사본 폴더 이름에 쓸 키(프로젝트ID, 없으면 원본 폴더 이름). 경로에 못 쓰는 글자는 _로 바꿉니다. */
-	static String keyOf(String projectId, String sourceRoot) {
-		String raw = projectId;
-		if (isBlank(raw)) {
-			String path = sourceRoot == null ? "" : sourceRoot.trim().replace('\\', '/');
-			while (path.endsWith("/")) {
-				path = path.substring(0, path.length() - 1);
-			}
-			raw = path.substring(path.lastIndexOf('/') + 1);
-		}
-		String key = raw.trim().replaceAll("[^A-Za-z0-9_-]", "_");
-		return key.isEmpty() ? "project" : key;
-	}
-
-	private static boolean sameExecution(String a, String b) {
-		return a == null ? b == null : a.equals(b);
-	}
-
-	private String config(String name, String defaultValue) {
-		String value = this.configProperty.getProperty(Constants.Tool.TestServer.PREFIX + "." + name);
-		return isBlank(value) ? defaultValue : value.trim();
 	}
 
 	private static boolean isWindows() {

@@ -165,7 +165,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 	@Test
 	void Agent_step은_모두_결정_기록을_읽는다() {
 		Map<String, Object> context = WorkFlowContext.create(this.workDir.toString(), WORKFLOW_ID, "test");
-		for (String stepId : List.of("step03", "step08", "step12", "step17", "step25", "step26", "step27", "step24")) {
+		for (String stepId : List.of("step03", "step08", "step12", "step17", "step25", "step26", "step27")) {
 			String with = String.valueOf(this.withOf(stepId));
 			assertThat(with).as(stepId).contains("instruction=${arrival").contains("history=${decisions");
 		}

@@ -6,6 +6,13 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="stylesheet" href="/ai/assets/css/console.css" />
 		<link rel="stylesheet" href="/ai/assets/css/main.css" />
+		<style>
+			.pj-inline label { margin-right: 4px; }
+			.pj-inline select, .pj-inline input.pj-short { width: auto; min-width: 140px; display: inline-block; margin-right: 12px; }
+			.pj-inline #pj-buildArgs { width: 320px; display: inline-block; }
+			.pj-build-bar { margin-top: 8px; }
+			.pj-build-log { max-height: 360px; overflow: auto; white-space: pre-wrap; font-size: 12px; }
+		</style>
 		<script src="/ai/assets/js/console.js"></script>
 		<script src="/ai/assets/js/ai-menu.js"></script>
 		<script src="/ai/assets/js/ai-common.js"></script>
@@ -19,7 +26,7 @@
 					<div class="col-12">
 			<section class="cs-page-head">
 				<h2>프로젝트관리</h2>
-				<p>작업 대상 프로젝트입니다. 소스 위치, 형상관리, 프로젝트가 쓰는 DB(여러 개)를 적습니다.
+				<p>작업 대상 프로젝트입니다. 소스 위치, 형상관리, WAS와 빌드, 프로젝트가 쓰는 DB(여러 개)를 적습니다. [Build]로 만든 리비전을 테스트 서버가 씁니다.
 					DB는 Agent의 DB Tool이 <code>프로젝트ID.DB이름</code> 별칭으로 조회합니다. 계정은 읽기 권한만 있는 것을 쓰세요.</p>
 			</section>
 
@@ -27,7 +34,7 @@
 				<h3>목록 <span id="pj-count" class="ai-hint"></span></h3>
 				<div class="wa-table-scroll">
 					<table class="document-list-table wa-table">
-						<thead><tr><th>프로젝트ID</th><th>프로젝트명</th><th>소스 디렉토리</th><th>형상관리</th><th>DB</th><th>사용</th></tr></thead>
+						<thead><tr><th>프로젝트ID</th><th>프로젝트명</th><th>소스 디렉토리</th><th>형상관리</th><th>현재 리비전</th><th>DB</th><th>사용</th></tr></thead>
 						<tbody id="pj-list-body"></tbody>
 					</table>
 				</div>
@@ -44,22 +51,53 @@
 						<tr><th><label for="pj-sourceDir">소스 디렉토리</label></th><td><input type="text" id="pj-sourceDir" placeholder="엔진이 읽을 수 있는 절대경로" /></td></tr>
 						<tr><th><label for="pj-scmType">형상관리 종류</label></th><td><select id="pj-scmType"><option value="">(선택 안 함)</option><option value="GIT">GIT</option><option value="SVN">SVN</option><option value="NONE">없음</option></select></td></tr>
 						<tr><th><label for="pj-scmUrl">형상관리 URL</label></th><td><input type="text" id="pj-scmUrl" /></td></tr>
-						<tr><th><label for="pj-javaVersion">Java 버전</label></th><td><input type="text" id="pj-javaVersion" placeholder="예: 8, 17 (비우면 원본 pom.xml이나 클래스 파일에서 읽음). JDK 경로는 서버의 env 설정 JAVA_HOME_버전" /></td></tr>
-						<tr><th><label for="pj-testUserId">시험계정</label></th><td><input type="text" id="pj-testUserId" autocomplete="off" placeholder="화면 재현에 쓸 시험 서버 전용 계정 ID(운영 계정 금지)" /></td></tr>
-						<tr><th><label for="pj-testPassword">시험계정 비밀번호</label></th><td><input type="password" id="pj-testPassword" autocomplete="new-password" /><div class="ai-hint">암호화해 저장하고 다시 보여 주지 않습니다. Agent에게도 주지 않고, 엔진이 브라우저에 입력할 때만 넣습니다. 바꿀 때만 넣으세요.</div></td></tr>
-						<tr><th><label for="pj-testStaticPaths">시험 서버 정적 경로</label></th><td><textarea id="pj-testStaticPaths" rows="3" placeholder="/Upload=D:/AppHome/myApp/uploadData/Upload&#10;/Download=D:/AppHome/myApp/uploadData/Download"></textarea><div class="ai-hint">여러 개는 줄바꿈으로 구분합니다(한 줄에 하나씩 '/주소=폴더'). 원래 서버에서 웹서버나 다른 설정이 열어 주는 주소를 적습니다. 예를 들어 앱이 웹앱 밖 폴더에 저장한 업로드 파일을 여는 주소입니다. 임시 시험 서버(WAR + Tomcat)가 그 주소를 그 폴더로 엽니다. 적지 않으면 시험 서버에서는 그 주소가 404입니다.</div></td></tr>
+						<tr><th><label for="pj-scmUsername">형상관리 계정</label></th><td><input type="text" id="pj-scmUsername" autocomplete="off" placeholder="계정 ID(비우면 엔진 서버의 SSH 키·인증 캐시를 씀)" /></td></tr>
+						<tr><th><label for="pj-scmPassword">형상관리 비밀번호</label></th><td><input type="password" id="pj-scmPassword" autocomplete="new-password" /><div class="ai-hint">git은 비밀번호 대신 액세스 토큰을 권장합니다. 암호화해 저장하고 다시 보여 주지 않습니다. 바꿀 때만 넣으세요.</div></td></tr>
+						<tr><th><label for="pj-javaVersion">Java 버전</label></th><td><select id="pj-javaVersion"><option value="">(자동)</option></select><div class="ai-hint">(자동)이면 빌드 설정이나 클래스 파일에서 읽습니다. JDK 경로는 서버의 env 설정 JAVA_HOME_버전입니다.</div></td></tr>
+						<tr><th>WAS</th><td class="pj-inline">
+							<label for="pj-wasContainer">컨테이너</label> <select id="pj-wasContainer"><option value="">(선택 안 함)</option><option value="BOOT">Spring Boot(내장서버)</option><option value="TOMCAT">Tomcat</option><option value="JEUS">Jeus</option><option value="WEBLOGIC">WebLogic</option><option value="WEBSPHERE">WebSphere</option></select>
+							<label for="pj-wasVersion">버전</label> <input type="text" id="pj-wasVersion" class="pj-short" placeholder="예: 9, 8.1" />
+							<label for="pj-contextPath">컨텍스트 경로</label> <input type="text" id="pj-contextPath" class="pj-short" placeholder="/ (비우면 설정에서 읽음)" />
+							<div class="ai-hint">테스트 서버는 원래 WAS를 Tomcat(Boot는 내장 서버)으로 바꿔 띄웁니다. EJB나 벤더 전용 기능을 쓰는 앱은 서버 기동 테스트를 하지 않습니다.</div></td></tr>
+						<tr><th>빌드</th><td class="pj-inline">
+							<label for="pj-buildType">종류</label> <select id="pj-buildType"><option value="">(선택 안 함)</option><option value="MAVEN">Maven</option><option value="GRADLE">Gradle</option><option value="ANT">Ant</option><option value="SHELL">Shell(등록된 스크립트)</option><option value="NONE">빌드 없음(엔진이 javac)</option></select>
+							<label for="pj-buildArgs">인자</label> <input type="text" id="pj-buildArgs" list="pj-shellScripts" /><datalist id="pj-shellScripts"></datalist>
+							<div id="pj-buildCommand" class="ai-hint"></div>
+							<div id="pj-buildManual" hidden>
+								<div class="ai-hint">산출물 구조를 자동으로 못 찾을 때만 넣습니다(소스 루트 기준 상대경로).</div>
+								<label for="pj-buildWebRoot">웹 루트</label> <input type="text" id="pj-buildWebRoot" class="pj-short" placeholder="WebContent" />
+								<label for="pj-buildClassesDir">클래스</label> <input type="text" id="pj-buildClassesDir" class="pj-short" placeholder="WebContent/WEB-INF/classes" />
+								<label for="pj-buildLibDir">lib</label> <input type="text" id="pj-buildLibDir" class="pj-short" placeholder="WebContent/WEB-INF/lib" />
+								<label for="pj-buildSourceDirs">소스 폴더</label> <input type="text" id="pj-buildSourceDirs" class="pj-short" placeholder="src (빌드 없음일 때, 쉼표로 여러 개)" />
+							</div>
+							<div class="pj-build-bar"><button type="button" id="pj-build" class="kn-plain" disabled>Build</button> <span id="pj-buildStatus" class="ai-hint"></span></div>
+							<div class="ai-hint">저장한 설정으로 빌드합니다. 형상관리가 있으면 소스를 먼저 받습니다. 성공하면 그 리비전이 현재 리비전이 되고, 이미 시작한 실행은 시작할 때의 리비전을 계속 씁니다.</div>
+						</td></tr>
+						<tr><th><label for="pj-testUserId">테스트계정</label></th><td><input type="text" id="pj-testUserId" autocomplete="off" placeholder="테스트 서버 화면에 로그인할 계정 ID(운영 계정 금지)" /><div class="ai-hint">테스트 서버는 고객사 개발 DB에 붙으므로, 그 DB에 있는 테스트용 계정을 넣습니다. Agent가 화면에서 등록·수정·삭제를 해 보는 데 씁니다(테스트가 끝나면 데이터는 원복합니다).</div></td></tr>
+						<tr><th><label for="pj-testPassword">테스트계정 비밀번호</label></th><td><input type="password" id="pj-testPassword" autocomplete="new-password" /><div class="ai-hint">암호화해 저장하고 다시 보여 주지 않습니다. Agent에게도 주지 않고, 엔진이 브라우저에 입력할 때만 넣습니다. 바꿀 때만 넣으세요.</div></td></tr>
+						<tr><th><label for="pj-testStaticPaths">테스트서버 정적 경로</label></th><td><textarea id="pj-testStaticPaths" rows="3" placeholder="/Upload=D:/AppHome/myApp/uploadData/Upload&#10;/Download=D:/AppHome/myApp/uploadData/Download"></textarea><div class="ai-hint">여러 개는 줄바꿈으로 구분합니다(한 줄에 하나씩 '/주소=폴더'). 원래 서버에서 웹서버나 다른 설정이 열어 주는 주소를 적습니다. 예를 들어 앱이 웹앱 밖 폴더에 저장한 업로드 파일을 여는 주소입니다. Tomcat 테스트 서버가 그 주소를 그 폴더로 엽니다. 적지 않으면 테스트 서버에서는 그 주소가 404입니다.</div></td></tr>
 						<tr><th><label for="pj-useYn">사용</label></th><td><select id="pj-useYn"><option value="Y">예</option><option value="N">아니오(DB Tool 에서도 숨김)</option></select></td></tr>
 					</table>
 
 					<div class="kn-section-title">데이터베이스 <button type="button" id="pj-add-db" class="kn-plain">DB 더하기</button></div>
 					<div class="wa-table-scroll">
 						<table class="document-list-table wa-table pj-db-table">
-							<colgroup><col style="width:120px" /><col /><col style="width:130px" /><col style="width:150px" /><col style="width:110px" /><col style="width:160px" /><col style="width:72px" /></colgroup>
-							<thead><tr><th>DB 이름</th><th>JDBC URL</th><th>계정</th><th>비밀번호</th><th>스키마</th><th>설명</th><th></th></tr></thead>
+							<colgroup><col style="width:120px" /><col /><col style="width:130px" /><col style="width:150px" /><col style="width:110px" /><col style="width:130px" /><col style="width:150px" /><col style="width:72px" /></colgroup>
+							<thead><tr><th>DB 이름</th><th>JDBC URL</th><th>계정</th><th>비밀번호</th><th>스키마</th><th>JNDI 이름</th><th>설명</th><th></th></tr></thead>
 							<tbody id="pj-db-body"></tbody>
 						</table>
 					</div>
-					<p class="ai-hint">비밀번호는 암호화해 저장하고 화면에 다시 보여 주지 않습니다. 고칠 때 비워 두면 저장된 비밀번호를 그대로 씁니다.</p>
+					<p class="ai-hint">비밀번호는 암호화해 저장하고 화면에 다시 보여 주지 않습니다. 고칠 때 비워 두면 저장된 비밀번호를 그대로 씁니다.
+						JNDI 이름은 앱이 JNDI로 DB를 찾을 때(예: jdbc/myDS) 테스트 서버가 이 DB와 짝짓는 이름입니다.</p>
+
+					<div class="kn-section-title">리비전 <span class="ai-hint">현재: <span id="pj-currentRevision">-</span></span></div>
+					<div class="wa-table-scroll">
+						<table class="document-list-table wa-table">
+							<thead><tr><th>리비전</th><th>상태</th><th>종류</th><th>시작</th><th>끝</th><th>안내</th><th></th></tr></thead>
+							<tbody id="pj-revision-body"></tbody>
+						</table>
+					</div>
+					<pre id="pj-buildLog" class="pj-build-log" hidden></pre>
 
 					<div class="ai-form-actions">
 						<span id="pj-status" class="workflow-status"></span>

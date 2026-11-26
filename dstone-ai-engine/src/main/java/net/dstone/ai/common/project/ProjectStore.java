@@ -24,10 +24,12 @@ import net.dstone.common.utils.EncUtil;
  * 프로젝트 관리(ai_management_project, ai_management_project_db)의 저장과 조회입니다. SQL은 resources/sqlmap/project/ProjectDao.xml.
  *
  * ## 테이블정의
- *   ai_management_project     PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, JAVA_VERSION, TEST_USER_ID, TEST_PASSWORD_ENC, USE_YN
- *   ai_management_project_db  PROJECT_ID + DB_SEQ(KEY), DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, DESCRIPTION, SORT_ORDER
+ *   ai_management_project           PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, SCM_USERNAME, SCM_PASSWORD_ENC, JAVA_VERSION,
+ *                                   WAS_CONTAINER, WAS_VERSION, CONTEXT_PATH, BUILD_*(리비전 빌드), CURRENT_REVISION, TEST_USER_ID, TEST_PASSWORD_ENC, TEST_STATIC_PATHS, USE_YN
+ *   ai_management_project_db        PROJECT_ID + DB_SEQ(KEY), DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, JNDI_NAME, DESCRIPTION, SORT_ORDER
+ *   ai_management_project_revision  PROJECT_ID + REVISION(KEY). 리비전 빌드 기록(ProjectBuildService)
  *
- * 시험계정(TEST_USER_ID, TEST_PASSWORD_ENC)은 화면 재현용 시험 서버 전용 계정입니다. 비밀번호는 Agent에게도 주지 않고,
+ * 테스트계정(TEST_USER_ID, TEST_PASSWORD_ENC)은 테스트 서버 화면에 로그인할 계정입니다. 비밀번호는 Agent에게도 주지 않고,
  * 자리표시자 ${secret:프로젝트ID.testPassword}를 엔진(runtime.tool.ToolCallGate)이 secret()으로 바꿉니다.
  * 비밀번호는 EncUtil 로 암호화해 저장합니다. 화면 API(list/find)는 비밀번호를 돌려주지 않고 "있는지"만 알려 줍니다.
  * 고칠 때 비밀번호 칸을 비워 두면 저장된 비밀번호를 그대로 씁니다(같은 DB_SEQ 기준).
@@ -37,7 +39,7 @@ import net.dstone.common.utils.EncUtil;
 @Repository
 public class ProjectStore extends BaseDao implements SecretSource {
 
-	/** 비밀값 참조의 이름: 시험계정 비밀번호 */
+	/** 비밀값 참조의 이름: 테스트계정 비밀번호 */
 	public static final String SECRET_TEST_PASSWORD = "testPassword";
 
 	private static final String NS = "net.dstone.ai.common.project.ProjectStore.";
@@ -50,6 +52,12 @@ public class ProjectStore extends BaseDao implements SecretSource {
 
 	/** 형상관리 종류 */
 	public static final List<String> SCM_TYPES = List.of("GIT", "SVN", "NONE");
+
+	/** 원래 WAS 종류 */
+	public static final List<String> WAS_CONTAINERS = List.of("BOOT", "TOMCAT", "JEUS", "WEBLOGIC", "WEBSPHERE");
+
+	/** 빌드 종류(ProjectBuildService) */
+	public static final List<String> BUILD_TYPES = List.of("MAVEN", "GRADLE", "ANT", "SHELL", "NONE");
 
 	private TransactionTemplate tx;
 
@@ -77,7 +85,9 @@ public class ProjectStore extends BaseDao implements SecretSource {
 	/**
 	 * 프로젝트를 만들거나 고칩니다. DB 목록은 통째로 바꿉니다.
 	 *
-	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, javaVersion, testUserId, testPassword?, testStaticPaths?, useYn, dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, description}]}
+	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, scmUsername, scmPassword?, javaVersion, wasContainer, wasVersion, contextPath,
+	 *                buildType, buildArgs, buildWebRoot, buildClassesDir, buildLibDir, buildSourceDirs, testUserId, testPassword?, testStaticPaths?, useYn,
+	 *                dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, jndiName, description}]}
 	 * @param by      작업한 사람
 	 */
 	@SuppressWarnings("unchecked")
@@ -105,7 +115,38 @@ public class ProjectStore extends BaseDao implements SecretSource {
 		param.put("scmType", scmType);
 		param.put("scmUrl", text(project, "scmUrl"));
 		param.put("javaVersion", javaVersion);
-		// 시험계정: 비밀번호 칸을 비워 두면 저장된 것을 그대로 쓴다. ID를 지우면 비밀번호도 지운다.
+		// 형상관리 계정: 비밀번호 칸을 비워 두면 저장된 것을 그대로 쓴다. 계정을 지우면 비밀번호도 지운다.
+		String scmUsername = text(project, "scmUsername");
+		String scmPassword = project.get("scmPassword") == null ? null : String.valueOf(project.get("scmPassword"));
+		String scmPasswordEnc = null;
+		if (scmUsername != null) {
+			scmPasswordEnc = scmPassword != null && !scmPassword.isEmpty() ? EncUtil.encrypt(scmPassword)
+				: (String) this.sqlSessionCommon.selectOne(NS + "selectScmPasswordEnc", projectId);
+		}
+		param.put("scmUsername", scmUsername);
+		param.put("scmPasswordEnc", scmPasswordEnc);
+		String wasContainer = text(project, "wasContainer");
+		if (wasContainer != null && !WAS_CONTAINERS.contains(wasContainer)) {
+			throw new IllegalArgumentException("WAS 종류는 " + WAS_CONTAINERS + " 가운데 하나입니다: " + wasContainer);
+		}
+		String buildType = text(project, "buildType");
+		if (buildType != null && !BUILD_TYPES.contains(buildType)) {
+			throw new IllegalArgumentException("빌드 종류는 " + BUILD_TYPES + " 가운데 하나입니다: " + buildType);
+		}
+		String contextPath = text(project, "contextPath");
+		if (contextPath != null && !contextPath.matches("/[A-Za-z0-9._~/-]*")) {
+			throw new IllegalArgumentException("컨텍스트 경로는 /로 시작합니다(예: /, /myApp): " + contextPath);
+		}
+		param.put("wasContainer", wasContainer);
+		param.put("wasVersion", text(project, "wasVersion"));
+		param.put("contextPath", contextPath);
+		param.put("buildType", buildType);
+		param.put("buildArgs", text(project, "buildArgs"));
+		param.put("buildWebRoot", relativePath(text(project, "buildWebRoot"), "웹 루트"));
+		param.put("buildClassesDir", relativePath(text(project, "buildClassesDir"), "클래스 폴더"));
+		param.put("buildLibDir", relativePath(text(project, "buildLibDir"), "lib 폴더"));
+		param.put("buildSourceDirs", text(project, "buildSourceDirs"));
+		// 테스트계정: 비밀번호 칸을 비워 두면 저장된 것을 그대로 쓴다. ID를 지우면 비밀번호도 지운다.
 		String testUserId = text(project, "testUserId");
 		String testPassword = project.get("testPassword") == null ? null : String.valueOf(project.get("testPassword"));
 		String testPasswordEnc = null;
@@ -152,6 +193,7 @@ public class ProjectStore extends BaseDao implements SecretSource {
 			row.put("username", text(db, "username"));
 			row.put("passwordEnc", passwordEnc);
 			row.put("schemaName", text(db, "schemaName"));
+			row.put("jndiName", text(db, "jndiName"));
 			row.put("description", text(db, "description"));
 			row.put("sortOrder", Integer.valueOf(seq * 10));
 			dbRows.add(row);
@@ -166,6 +208,84 @@ public class ProjectStore extends BaseDao implements SecretSource {
 				}
 			}
 		});
+	}
+
+	/**
+	 * <pre>
+	 * 빌드와 테스트 서버가 쓸 프로젝트 설정입니다(비밀번호 제외, 쓰지 않는 프로젝트도 포함). 없으면 null입니다.
+	 * </pre>
+	 */
+	public Map<String, Object> settings(String projectId) {
+		return this.sqlSessionCommon.selectOne(NS + "selectProject", projectId);
+	}
+
+	/** 형상관리 비밀번호(복호화)입니다. 없으면 null. 로그에 남기지 않습니다. */
+	public String scmPassword(String projectId) {
+		String enc = this.sqlSessionCommon.selectOne(NS + "selectScmPasswordEnc", projectId);
+		return enc == null || enc.isEmpty() ? null : EncUtil.decrypt(enc);
+	}
+
+	/** 리비전 빌드 기록(최근 것부터)입니다. */
+	public List<Map<String, Object>> revisions(String projectId) {
+		return this.sqlSessionCommon.selectList(NS + "selectRevisionList", projectId);
+	}
+
+	/** 리비전 하나입니다. 없으면 null. */
+	public Map<String, Object> revision(String projectId, String revision) {
+		return this.sqlSessionCommon.selectOne(NS + "selectRevision", revisionKey(projectId, revision));
+	}
+
+	/** 리비전 빌드를 시작한 것으로 적습니다(같은 이름이 있으면 다시 BUILDING). */
+	public void startRevision(String projectId, String revision, String scmRevision, String by) {
+		Map<String, Object> param = revisionKey(projectId, revision);
+		param.put("scmRevision", scmRevision);
+		param.put("by", by);
+		this.sqlSessionCommon.insert(NS + "upsertRevision", param);
+	}
+
+	/**
+	 * 리비전 빌드의 결과를 적습니다.
+	 *
+	 * @param result {status, kind, webRoot, classesDir, libDir, mainClass, message}
+	 */
+	public void finishRevision(String projectId, String revision, Map<String, Object> result) {
+		Map<String, Object> param = revisionKey(projectId, revision);
+		param.putAll(result);
+		this.sqlSessionCommon.update(NS + "finishRevision", param);
+	}
+
+	/** 테스트 서버가 쓸 현재 리비전을 바꿉니다. */
+	public void setCurrentRevision(String projectId, String revision) {
+		this.sqlSessionCommon.update(NS + "updateCurrentRevision", revisionKey(projectId, revision));
+	}
+
+	/** 리비전 기록을 지웁니다(폴더는 부르는 쪽이 지웁니다). */
+	public void deleteRevision(String projectId, String revision) {
+		this.sqlSessionCommon.delete(NS + "deleteRevision", revisionKey(projectId, revision));
+	}
+
+	/** 엔진이 다시 뜰 때 빌드 중이던 기록을 실패로 바꿉니다. */
+	public void abandonBuildingRevisions() {
+		this.sqlSessionCommon.update(NS + "abandonBuildingRevisions");
+	}
+
+	private static Map<String, Object> revisionKey(String projectId, String revision) {
+		Map<String, Object> param = new HashMap<String, Object>();
+		param.put("projectId", projectId);
+		param.put("revision", revision);
+		return param;
+	}
+
+	/** 리비전 소스 루트 기준 상대경로만 받습니다(절대경로나 ..는 거절). */
+	private static String relativePath(String path, String label) {
+		if (path == null) {
+			return null;
+		}
+		String normalized = path.replace('\\', '/');
+		if (normalized.startsWith("/") || normalized.matches("^[A-Za-z]:.*") || normalized.contains("..")) {
+			throw new IllegalArgumentException(label + "는 소스 루트 기준 상대경로로 넣으세요(예: WebContent): " + path);
+		}
+		return normalized;
 	}
 
 	/** 프로젝트를 지웁니다(DB 목록도 함께). */
@@ -213,6 +333,7 @@ public class ProjectStore extends BaseDao implements SecretSource {
 			String enc = (String) row.get("passwordEnc");
 			setting.put("password", enc == null || enc.isEmpty() ? null : EncUtil.decrypt(enc));
 			setting.put("schema", (String) row.get("schemaName"));
+			setting.put("jndiName", (String) row.get("jndiName"));
 			String description = (String) row.get("description");
 			setting.put("description", (row.get("projectName") + " · " + row.get("dbName")) + (description == null || description.isBlank() ? "" : " - " + description));
 			result.put(row.get("projectId") + "." + row.get("dbName"), setting);
@@ -232,8 +353,8 @@ public class ProjectStore extends BaseDao implements SecretSource {
 
 	/**
 	 * <pre>
-	 * 시험 서버 정적 경로 글을 검사하고 줄마다 "/주소=폴더" 모양으로 맞춰 돌려줍니다. 비었으면 null입니다.
-	 * 원래 환경에서 웹서버나 다른 설정이 열어 주는 주소를 임시 시험 서버도 열게 하려는 값입니다(예: /Upload=D:/app/uploadData/Upload).
+	 * 테스트서버 정적 경로 글을 검사하고 줄마다 "/주소=폴더" 모양으로 맞춰 돌려줍니다. 비었으면 null입니다.
+	 * 원래 환경에서 웹서버나 다른 설정이 열어 주는 주소를 테스트 서버도 열게 하려는 값입니다(예: /Upload=D:/app/uploadData/Upload).
 	 * </pre>
 	 *
 	 * @param text 화면에서 받은 글(한 줄에 하나)
@@ -255,7 +376,7 @@ public class ProjectStore extends BaseDao implements SecretSource {
 
 	/**
 	 * <pre>
-	 * 시험 서버 정적 경로 글을 [주소, 폴더] 목록으로 읽습니다. 빈 줄과 #로 시작하는 줄은 건너뜁니다.
+	 * 테스트서버 정적 경로 글을 [주소, 폴더] 목록으로 읽습니다. 빈 줄과 #로 시작하는 줄은 건너뜁니다.
 	 * 주소는 /로 시작하고 끝의 /는 뗍니다. "/"(앱 전체)는 쓸 수 없습니다. 모양이 틀리면 IllegalArgumentException입니다.
 	 * </pre>
 	 *
@@ -279,10 +400,10 @@ public class ProjectStore extends BaseDao implements SecretSource {
 				url = url.substring(0, url.length() - 1);
 			}
 			if (!url.matches("/[A-Za-z0-9._~/-]+") || url.contains("//") || url.contains("..") || folder.isEmpty()) {
-				throw new IllegalArgumentException("시험 서버 정적 경로는 한 줄에 하나씩 '/주소=폴더' 모양으로 적습니다(주소는 /로 시작, 앱 전체 '/'는 안 됨): " + line);
+				throw new IllegalArgumentException("테스트서버 정적 경로는 한 줄에 하나씩 '/주소=폴더' 모양으로 적습니다(주소는 /로 시작, 앱 전체 '/'는 안 됨): " + line);
 			}
 			if (seen.contains(url)) {
-				throw new IllegalArgumentException("시험 서버 정적 경로에 같은 주소가 두 번 있습니다: " + url);
+				throw new IllegalArgumentException("테스트서버 정적 경로에 같은 주소가 두 번 있습니다: " + url);
 			}
 			seen.add(url);
 			paths.add(new String[] { url, folder });

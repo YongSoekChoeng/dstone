@@ -25,7 +25,7 @@ import java.util.zip.ZipFile;
  * 다 잡는다는 뜻은 아닙니다. 이름을 바꾼 jar, 라이브러리 안의 네이티브 코드는 알아보지 못합니다.
  * </pre>
  */
-final class SandboxArtifact {
+public final class SandboxArtifact {
 
 	private static final Pattern NIO_LIBRARY = Pattern.compile("^(mssql-jdbc|sqljdbc|db2jcc|jcc-|tibero|lettuce|netty-transport|netty-all|mongodb-driver|mongo-java-driver"
 		+ "|kafka-clients|grpc-netty|httpasyncclient|reactor-netty|r2dbc-|hazelcast|aerospike|cassandra-driver|java-driver-core|spymemcached|xmemcached|zookeeper).*\\.jar$");
@@ -80,6 +80,27 @@ final class SandboxArtifact {
 						}
 					}
 				}
+			}
+		}
+		return found;
+	}
+
+	/**
+	 * lib 폴더에서 가드가 잡지 못하는 접속 라이브러리(NIO) jar를 찾습니다. 테스트 서버는 풀린 WAR를 쓰므로 jar 이름만 봅니다.
+	 *
+	 * @param libDir  WEB-INF/lib 같은 jar 폴더
+	 * @param trusted 사람이 확인한 jar 이름의 앞부분들
+	 */
+	public static List<String> unguardedJars(File libDir, List<String> trusted) {
+		List<String> found = new ArrayList<String>();
+		File[] jars = libDir == null ? null : libDir.listFiles();
+		if (jars == null) {
+			return found;
+		}
+		for (File jar : jars) {
+			String name = jar.getName().toLowerCase(Locale.ROOT);
+			if (NIO_LIBRARY.matcher(name).matches() && !startsWithAny(name, trusted)) {
+				found.add(jar.getName());
 			}
 		}
 		return found;

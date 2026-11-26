@@ -30,7 +30,7 @@ public final class SandboxDdl {
 	private static final Pattern PLUS_COMMAND = Pattern.compile("(?i)^(PROMPT|REM|REMARK|SPOOL|WHENEVER|SHOW|EXIT|QUIT|SET(?!\\s+(ROLE|TRANSACTION|CONSTRAINTS?)\\b))(\\s.*)?$");
 
 	/** 문장을 나누는 규칙 */
-	enum Dialect {
+	public enum Dialect {
 		/** \\가 다음 글자를 감쌈, DELIMITER */
 		MYSQL,
 		/** $$ ... $$ */
@@ -46,7 +46,7 @@ public final class SandboxDdl {
 	 * @param skipped    실행하지 않은 롤백 블록 수
 	 * @param problem    실행할 수 없는 이유. 없으면 null
 	 */
-	record Script(List<String> statements, int skipped, String problem) {
+	public record Script(List<String> statements, int skipped, String problem) {
 	}
 
 	private static final Pattern DOLLAR_TAG = Pattern.compile("\\$([A-Za-z_][A-Za-z0-9_]*)?\\$");
@@ -70,7 +70,7 @@ public final class SandboxDdl {
 	 * @param fileName 파일 이름(.sql인지 봄)
 	 * @param text     파일 내용
 	 */
-	static Script parse(String fileName, String text, Dialect dialect) {
+	public static Script parse(String fileName, String text, Dialect dialect) {
 		List<String> statements = new ArrayList<String>();
 		if (fileName.toLowerCase().endsWith(".sql")) {
 			statements.addAll(split(text, dialect));

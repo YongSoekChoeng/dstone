@@ -26,10 +26,10 @@ import java.util.regex.Pattern;
  * 원본 폴더 밖을 가리키는 절대경로는 바꾸지 못합니다.
  * </pre>
  */
-final class SandboxPaths {
+public final class SandboxPaths {
 
 	private static final Set<String> SKIP_DIRS = Set.of(".git", ".svn", ".idea", ".settings", ".gradle", "node_modules", "target", "build", "out");
-	private static final Set<String> TEXT_EXTENSIONS = Set.of("java", "kt", "groovy", "xml", "properties", "yml", "yaml", "json", "jsp", "jspf", "js", "conf", "cfg", "ini", "sql", "txt", "md");
+	public static final Set<String> TEXT_EXTENSIONS = Set.of("java", "kt", "groovy", "xml", "properties", "yml", "yaml", "json", "jsp", "jspf", "js", "conf", "cfg", "ini", "sql", "txt", "md");
 	private static final long MAX_TEXT_BYTES = 5L * 1024 * 1024;
 
 	/** 일반 소켓을 쓰지 않아 SandboxGuard가 잡지 못하는 DB 드라이버의 주소 */
@@ -43,7 +43,7 @@ final class SandboxPaths {
 	 * @param sourceRoot 원본 폴더
 	 * @param copyRoot   사본 폴더
 	 */
-	SandboxPaths(String sourceRoot, String copyRoot) {
+	public SandboxPaths(String sourceRoot, String copyRoot) {
 		String source = trimSlash(sourceRoot.replace('\\', '/'));
 		String copy = trimSlash(copyRoot.replace('\\', '/'));
 		boolean drive = source.matches("^[A-Za-z]:.*");
@@ -65,12 +65,12 @@ final class SandboxPaths {
 	}
 
 	/** 바꿀 경로의 글자들. DB에서 고칠 행을 먼저 찾을 때 씁니다. */
-	List<String> needles() {
+	public List<String> needles() {
 		return this.needles;
 	}
 
 	/** 바이트 그대로 읽은 글자(ISO-8859-1)에서 경로를 바꿉니다. */
-	String shiftRaw(String raw) {
+	public String shiftRaw(String raw) {
 		String result = raw;
 		for (int i = 0; i < this.from.size(); i++) {
 			result = this.from.get(i).matcher(result).replaceAll(this.to.get(i));
@@ -79,7 +79,7 @@ final class SandboxPaths {
 	}
 
 	/** 보통 글자에서 경로를 바꿉니다. */
-	String shift(String text) {
+	public String shift(String text) {
 		String raw = new String(text.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
 		return new String(this.shiftRaw(raw).getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
 	}
@@ -107,7 +107,7 @@ final class SandboxPaths {
 	 *
 	 * @param app 사본 폴더
 	 */
-	static String unguardedDatabase(File app) throws IOException {
+	public static String unguardedDatabase(File app) throws IOException {
 		for (Path file : textFiles(app)) {
 			String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
 			if (name.endsWith(".md") || name.endsWith(".txt") || name.endsWith(".sql")) {

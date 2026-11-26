@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import net.dstone.ai.runtime.tool.StepRef;
+import net.dstone.ai.tools.build.testserver.TestServerRegistry;
 
 /**
  * <pre>
@@ -66,18 +67,6 @@ class SandboxRulesTest {
 			"CREATE OR REPLACE TRIGGER a_t BEFORE INSERT ON a FOR EACH ROW\nBEGIN\n  :new.x := q'[it's;]';\nEND;",
 			"UPDATE a\nSET x = '1'",
 			"CREATE TYPE t AS OBJECT(n NUMBER)");
-	}
-
-	@Test
-	void Oracle_주소를_읽고_서비스는_늘_시험_PDB로_바꾼다() {
-		assertThat(OracleAddress.of("jdbc:oracle:thin:@db:1521:ORCL").connectData()).isEqualTo("(SID=ORCL)");
-		assertThat(OracleAddress.of("jdbc:log4jdbc:oracle:thin:@//db/shop.local").hosts()).containsExactly(new SandboxGuard.Endpoint("db", 1521));
-		assertThat(OracleAddress.of("jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=a)(PORT=1530))(ADDRESS=(HOST=b)(PORT=1531)(PROTOCOL=TCP))(CONNECT_DATA=(SERVICE_NAME=S)))").hosts()).hasSize(2);
-		assertThat(OracleAddress.of("jdbc:oracle:thin:@MYALIAS")).isNull();
-		assertThat(OracleAddress.of("jdbc:oracle:thin:@tcps://db:2484/S")).isNull();
-
-		assertThat(OracleRelay.retarget("(DESCRIPTION=(CONNECT_DATA=(SID=ORCL)(SERVER=SHARED)(CID=(PROGRAM=app))))", "SBX"))
-			.isEqualTo("(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=SBX)(CID=(PROGRAM=app))))");
 	}
 
 	@Test
@@ -129,12 +118,30 @@ class SandboxRulesTest {
 	}
 
 	@Test
-	void 격리_중인_step은_복제본과_시험_서버만_본다() {
-		SandboxRegistry registry = new SandboxRegistry();
-		StepRef step = new StepRef("run", "step34");
-		registry.opened(step, "http://localhost:40001/", Map.of("sandbox-a.shop", Map.of("url", "jdbc:mysql://127.0.0.1/shop")));
+	void 테스트_서버는_개발_DB로_그대로_잇되_연결_수를_센다() throws Exception {
+		InetAddress loopback = InetAddress.getByName("127.0.0.1");
+		try (ServerSocket db = new ServerSocket(0, 5, loopback);
+			SandboxGuard guard = new SandboxGuard(List.of(), 0, false)) {
+			guard.watch(new SandboxGuard.Endpoint("localhost", db.getLocalPort()));
+			int proxyPort = Integer.parseInt(guard.jvmOptions().replaceAll(".*socksProxyPort=([0-9]+).*", "$1"));
+			Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(loopback, proxyPort));
+			try (Socket app = new Socket(proxy)) {
+				app.connect(new InetSocketAddress(loopback, db.getLocalPort()), 5000);
+				try (Socket received = db.accept()) {
+					assertThat(received.isConnected()).isTrue();
+				}
+			}
+			assertThat(guard.watchedCount()).isEqualTo(1);
+		}
+	}
 
-		assertThat(registry.check("dbQuery", "{\"alias\":\"sandbox-a.shop\"}", step)).isNull();
+	@Test
+	void 테스트_중인_step은_테스트_DB와_테스트_서버만_본다() {
+		TestServerRegistry registry = new TestServerRegistry();
+		StepRef step = new StepRef("run", "step34");
+		registry.opened(step, "http://localhost:40001/", Map.of("test-main", Map.of("url", "jdbc:mysql://127.0.0.1/shop")));
+
+		assertThat(registry.check("dbQuery", "{\"alias\":\"test-main\"}", step)).isNull();
 		assertThat(registry.check("dbQuery", "{\"alias\":\"shop.main\"}", step)).isNotNull();
 		assertThat(registry.check("browser_click", "{}", step)).as("앞 step이 열어 둔 화면").isNotNull();
 		assertThat(registry.check("browser_navigate", "{\"url\":\"http://localhost:40001/list\"}", step)).isNull();

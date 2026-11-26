@@ -203,6 +203,50 @@ CREATE TABLE IF NOT EXISTS ai_management_project_db (
     PRIMARY KEY (PROJECT_ID, DB_SEQ),
     UNIQUE (PROJECT_ID, DB_NAME)
 );
+-- 2026-11-26 추가(테스트 서버 재설계, docs/temp/dstone-ai-테스트관련재설계). 이미 만든 DB 에도 다시 실행하면 붙는다.
+-- 형상관리 계정. 비밀번호(토큰)는 EncUtil 로 암호화하고 API 는 돌려주지 않는다.
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS SCM_USERNAME VARCHAR(200);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS SCM_PASSWORD_ENC TEXT;
+-- 원래 WAS. 테스트 서버는 Tomcat(또는 Spring Boot 내장 서버)으로 바꿔 띄운다.
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS WAS_CONTAINER VARCHAR(20);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS WAS_VERSION VARCHAR(30);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS CONTEXT_PATH VARCHAR(200);
+-- 리비전 빌드([Build] 버튼, common.project.ProjectBuildService). 명령은 종류별로 정해져 있고 BUILD_ARGS 는 그 뒤에 붙는 인자다.
+-- SHELL 이면 BUILD_ARGS 가 dstone.ai.tool.shell.allowed-commands 에 등록된 이름이다.
+-- BUILD_WEB_ROOT 등 넷은 산출물 구조를 자동으로 못 찾을 때만 넣는다(리비전 소스 루트 기준 상대경로).
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS BUILD_TYPE VARCHAR(10);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS BUILD_ARGS VARCHAR(1000);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS BUILD_WEB_ROOT VARCHAR(1000);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS BUILD_CLASSES_DIR VARCHAR(1000);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS BUILD_LIB_DIR VARCHAR(1000);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS BUILD_SOURCE_DIRS VARCHAR(1000);
+ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS CURRENT_REVISION VARCHAR(100);
+-- 앱이 JNDI 로 DB 를 찾을 때 이 DB 와 짝짓는 이름(예: jdbc/myDS)
+ALTER TABLE ai_management_project_db ADD COLUMN IF NOT EXISTS JNDI_NAME VARCHAR(200);
+
+/**********************************************
+ai_management_project_revision (리비전 빌드 기록, 2026-11-26)
+
+프로젝트 관리의 [Build] 한 번 = 1행. 소스를 {작업 루트}/{프로젝트ID}/rev/{REVISION}/src 로 복사해 빌드하고,
+테스트 서버가 쓸 산출물 위치(리비전 폴더 기준)를 남긴다. 성공(OK)하면 ai_management_project.CURRENT_REVISION 이 이것으로 바뀐다.
+STATUS: BUILDING(빌드 중) / OK / FAILED / INPUT(빌드는 됐으나 산출물 구조를 못 찾아 사람이 입력해야 함)
+**********************************************/
+CREATE TABLE IF NOT EXISTS ai_management_project_revision (
+    PROJECT_ID    VARCHAR(50)  NOT NULL REFERENCES ai_management_project(PROJECT_ID) ON DELETE CASCADE,
+    REVISION      VARCHAR(100) NOT NULL,
+    SCM_REVISION  VARCHAR(100),
+    STATUS        VARCHAR(10)  NOT NULL,
+    KIND          VARCHAR(10),
+    WEB_ROOT      VARCHAR(1000),
+    CLASSES_DIR   VARCHAR(1000),
+    LIB_DIR       VARCHAR(1000),
+    MAIN_CLASS    VARCHAR(300),
+    MESSAGE       TEXT,
+    REQUESTED_BY  VARCHAR(100),
+    STARTED_AT    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    FINISHED_AT   TIMESTAMPTZ,
+    PRIMARY KEY (PROJECT_ID, REVISION)
+);
 
 /**********************************************
 AI_EVAL_RUN
@@ -343,3 +387,13 @@ COMMENT ON COLUMN ai_management_project_db.JDBC_URL  IS 'JDBC URL';
 COMMENT ON COLUMN ai_management_project_db.USERNAME  IS '접속 계정(읽기 전용 권장)';
 COMMENT ON COLUMN ai_management_project_db.PASSWORD_ENC IS 'EncUtil 로 암호화한 비밀번호. API 는 돌려주지 않는다';
 COMMENT ON COLUMN ai_management_project_db.SCHEMA_NAME IS '스키마';
+COMMENT ON COLUMN ai_management_project_db.JNDI_NAME IS '앱이 JNDI 로 찾는 이름(테스트 서버가 이 DB 와 짝지음)';
+COMMENT ON COLUMN ai_management_project.SCM_USERNAME     IS '형상관리 계정';
+COMMENT ON COLUMN ai_management_project.SCM_PASSWORD_ENC IS 'EncUtil 로 암호화한 형상관리 비밀번호(토큰). API 는 돌려주지 않는다';
+COMMENT ON COLUMN ai_management_project.WAS_CONTAINER    IS '원래 WAS(BOOT/TOMCAT/JEUS/WEBLOGIC/WEBSPHERE)';
+COMMENT ON COLUMN ai_management_project.WAS_VERSION      IS '원래 WAS 버전';
+COMMENT ON COLUMN ai_management_project.CONTEXT_PATH     IS '원래 서버의 컨텍스트 경로(비우면 벤더 설정에서 읽음)';
+COMMENT ON COLUMN ai_management_project.BUILD_TYPE       IS '빌드 종류(MAVEN/GRADLE/ANT/SHELL/NONE)';
+COMMENT ON COLUMN ai_management_project.BUILD_ARGS       IS '정해진 빌드 명령 뒤에 붙는 인자. SHELL 이면 등록된 스크립트 이름';
+COMMENT ON COLUMN ai_management_project.CURRENT_REVISION IS '테스트 서버가 쓰는 현재 리비전';
+COMMENT ON TABLE  ai_management_project_revision          IS '리비전 빌드 기록([Build] 한 번 = 1행)';

@@ -143,7 +143,7 @@ public class EvalWorkspace {
 	}
 
 	/**
-	 * server 값의 자리를 채워 돌려줍니다(TestServerTool.startSandboxServer에 넘길 인자).
+	 * server 값의 자리를 채워 돌려줍니다(TestServerTool.startTestServer에 넘길 인자).
 	 */
 	public Map<String, String> serverArgs() throws IOException {
 		Map<String, String> result = new LinkedHashMap<String, String>();

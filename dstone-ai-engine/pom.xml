@@ -163,6 +163,7 @@
 					<exclude>**/*.java</exclude>
 					<!-- 화면 자원(JS 라이브러리, 글꼴)은 ${...}/@...@ 치환을 하면 깨진다. 아래 resource 로 그대로 복사한다 -->
 					<exclude>static/**</exclude>
+					<exclude>testdriver/**</exclude>
 				</excludes>
 				<filtering>true</filtering>
 			</resource>
@@ -171,6 +172,8 @@
 				<targetPath>${project.basedir}/target/classes</targetPath>
 				<includes>
 					<include>static/**</include>
+					<!-- 테스트 드라이버 소스(엔진이 실행 중에 Java 8로 컴파일, tools.build.testserver.TestDriverJar) -->
+					<include>testdriver/**</include>
 				</includes>
 				<filtering>false</filtering>
 			</resource>

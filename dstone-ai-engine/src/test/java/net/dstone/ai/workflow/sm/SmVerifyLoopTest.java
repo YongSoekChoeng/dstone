@@ -33,22 +33,25 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	Path workDir;
 
 	@Test
-	void 프로젝트ID가_없으면_검증하지_않고_사람에게_간다() throws Exception {
-		Files.writeString(this.workDir.resolve("00.request.md"), "## 현업요청\n목록 화면", StandardCharsets.UTF_8);
+	void 빌드된_리비전이_없으면_검증하지_않고_사람에게_간다() throws Exception {
 		WorkflowStepper flow = this.atStep("step28");
+		flow.put("projectRevision", Map.of("route", "none", "message", "빌드된 리비전이 없습니다."));
 		flow.step("step28");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step19");
-		assertThat(String.valueOf(flow.state("projectIdError"))).contains("프로젝트ID");
+		assertThat(this.lastHistory(flow, "step28").success()).isTrue();
 	}
 
 	@Test
-	void 프로젝트ID가_있으면_설계서를_다시_읽으러_간다() throws Exception {
-		Files.writeString(this.workDir.resolve("00.request.md"), "## 현업요청\n목록 화면\n## 프로젝트ID\nmyApp", StandardCharsets.UTF_8);
+	void 리비전이_있고_DDL이_없으면_설계서를_다시_읽으러_간다() throws Exception {
 		WorkflowStepper flow = this.atStep("step28");
+		flow.put("projectId", "myApp").put("projectRevision", Map.of("route", "ok", "revision", "r1"));
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 전체 확인)"));
 		flow.step("step28");
+		assertThat(flow.currentStepId()).isEqualTo("step60");
+		flow.step("step60");
+		assertThat(String.valueOf(flow.state("ddlCheck"))).contains("route=none");
 		flow.step("step42");
 		flow.step("step43");
 		flow.step("step44");
@@ -59,7 +62,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	/**
 	 * <pre>
 	 * 설계 승인에서 고른 검증 수준을 첫 검증에서 따르는지 봅니다(2.7.0).
-	 * 최소 확인이면 서버를 띄우지 않고, 간이 확인이면 격리 기동만 하고 사람에게 갑니다.
+	 * 최소 확인이면 서버를 띄우지 않고, 간이 확인이면 서버 기동만 하고 사람에게 갑니다.
 	 * 이 판정들은 정상 결과라 이력에 실패로 남지 않습니다.
 	 * </pre>
 	 */
@@ -76,7 +79,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 기동만_확인으로_승인하면_첫_검증은_격리_기동만_한다() {
+	void 기동만_확인으로_승인하면_첫_검증은_서버_기동만_한다() {
 		WorkflowStepper flow = this.atStep("step42");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 간이 확인)"));
 		flow.step("step42");
@@ -112,24 +115,24 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 격리할_수_없으면_통과로_치지_않고_이유를_남긴다() {
+	void 테스트_서버를_띄울_수_없으면_통과로_치지_않고_이유를_남긴다() {
 		WorkflowStepper flow = this.atStep("step29");
-		flow.put("projectId", "noSuchProject").put("sourceDir", this.workDir.toString());
+		flow.put("projectId", "noSuchProject").put("projectRevision", Map.of("route", "ok", "revision", "r1"));
 		flow.step("step29");
 
 		assertThat(flow.currentStepId()).isEqualTo("step30");
-		assertThat(String.valueOf(flow.state("sandboxCheck"))).contains("cause=environment");
+		assertThat(String.valueOf(flow.state("serverCheck"))).contains("cause=environment");
 		flow.step("step30");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
-		assertThat(flow.state("sandboxError")).isNotNull();
+		assertThat(flow.state("serverError")).isNotNull();
 		// 환경 탓이라 자동 수정하지 않는 것은 정상 판정이라 이력에 실패로 남지 않는다(2.6.1)
 		assertThat(this.lastHistory(flow, "step30").success()).isTrue();
 	}
 
 	/**
 	 * <pre>
-	 * 자동 수정·전문가 해결은 설계서도 고칩니다. 검증 Agent가 고치기 전 설계서를 받지 않도록
-	 * 격리 기동 앞에서 설계서를 다시 읽는지 봅니다(2.6.0).
+	 * 자동 수정은 설계서도 고칩니다. 검증 Agent가 고치기 전 설계서를 받지 않도록
+	 * 서버 기동 앞에서 설계서를 다시 읽는지 봅니다(2.6.0).
 	 * </pre>
 	 */
 	@Test
@@ -147,7 +150,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	@Test
 	void 개발_결과_탓인_기동_실패는_자동_수정으로_간다() {
 		WorkflowStepper flow = this.atStep("step30");
-		flow.put("sandboxCheck", Map.of("success", Boolean.FALSE, "cause", "code", "message", "DDL 오류"));
+		flow.put("serverCheck", Map.of("success", Boolean.FALSE, "cause", "code", "message", "컴파일 오류"));
 		flow.step("step30");
 
 		assertThat(flow.currentStepId()).isEqualTo("step31");

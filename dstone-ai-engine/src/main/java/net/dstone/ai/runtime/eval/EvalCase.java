@@ -33,7 +33,7 @@ import java.util.Map;
  *   approvals:                           ← 승인 step → 고를 결정. 여기에 없는 승인에 도착하면 거기서 멈추고 채점
  *     step06: 그대로 진행
  *   snapshotAfter: step17                ← 이 step이 처음 끝났을 때 요청 폴더를 떠 두고 같은 checks로 따로 채점(예: 첫 개발본)
- *   server:                              ← http/dbQuery 채점용 격리 시험 서버(TestServerTool.startSandboxServer와 같은 값)
+ *   server:                              ← http/dbQuery 채점용 테스트 서버(TestServerTool.startTestServer와 같은 값)
  *     projectId: ${param.projectId}
  *     sourceRoot: ${param.sourceDir}
  *     overlayDir: ${requestDir}/${state.now}/dev-resources

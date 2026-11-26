@@ -1,0 +1,466 @@
+package net.dstone.ai.testdriver;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Savepoint;
+import java.sql.Statement;
+import java.util.Iterator;
+import java.util.Properties;
+import java.util.ServiceLoader;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Pattern;
+
+/**
+ * <pre>
+ * 물리 연결 하나와, 그 연결을 차례로 쓰게 하는 잠금입니다.
+ *
+ * 단위(unit): 앱의 트랜잭션 하나. autocommit을 끈 연결이면 첫 문장부터 commit/rollback/close까지, 켠 연결이면 문장 하나입니다.
+ * 단위를 시작할 때 잠금을 잡고 savepoint를 하나 만듭니다.
+ *   앱 commit   → savepoint를 풀고(내용은 트랜잭션에 남음) 잠금을 놓는다
+ *   앱 rollback → savepoint까지 되돌리고 잠금을 놓는다
+ * 그래서 앞 요청이 저장한 데이터는 남고, 앱이 rollback해도 그 요청의 것만 사라집니다. 커밋은 한 번도 하지 않습니다.
+ * 잠금은 스레드 단위입니다. 화면이 Ajax를 병렬로 불러도 단위가 섞이지 않습니다. 잠금 대기 상한은 dstone.testdriver.lockWaitSeconds(기본 30초).
+ * </pre>
+ */
+final class Holder {
+
+	/** 테스트 중에 실행하지 않는 문장(앞의 주석·공백은 건너뜀) */
+	private static final Pattern DDL = Pattern.compile("(?is)^(\\s|--[^\\n]*\\n|/\\*.*?\\*/)*(CREATE|ALTER|DROP|TRUNCATE|RENAME|GRANT|REVOKE|COMMENT\\s+ON)\\b.*");
+
+	/** 엔진의 조회 창구에서 받는 문장 */
+	private static final Pattern READ_ONLY = Pattern.compile("(?is)^(\\s|--[^\\n]*\\n|/\\*.*?\\*/)*(SELECT|WITH)\\b.*");
+
+	/** 원래 드라이버를 찾지 못할 때 이름으로 불러 볼 클래스(URL 종류별) */
+	private static final String[][] KNOWN_DRIVERS = {
+		{ "jdbc:log4jdbc:", "net.sf.log4jdbc.sql.jdbcapi.DriverSpy" }, { "jdbc:log4jdbc:", "net.sf.log4jdbc.DriverSpy" },
+		{ "jdbc:mysql:", "com.mysql.cj.jdbc.Driver" }, { "jdbc:mysql:", "com.mysql.jdbc.Driver" },
+		{ "jdbc:mariadb:", "org.mariadb.jdbc.Driver" }, { "jdbc:postgresql:", "org.postgresql.Driver" },
+		{ "jdbc:oracle:", "oracle.jdbc.OracleDriver" }, { "jdbc:oracle:", "oracle.jdbc.driver.OracleDriver" } };
+
+	final String url;
+	final String user;
+	private final Properties info;
+	final ReentrantLock lock = new ReentrantLock();
+	private Connection physical;
+	private Savepoint unit;
+	/** 지금까지 연 물리 연결 수(엔진이 우회 연결을 찾을 때 씀) */
+	final AtomicInteger physicalCount = new AtomicInteger();
+
+	Holder(String url, String user, Properties info) {
+		this.url = url;
+		this.user = user;
+		this.info = info;
+	}
+
+	/** 앱에 줄 연결(감싼 것)입니다. */
+	Connection open() throws SQLException {
+		this.ensurePhysical();
+		return (Connection) Proxy.newProxyInstance(Holder.class.getClassLoader(), new Class<?>[] { Connection.class }, new ConnectionHandler(this));
+	}
+
+	private synchronized Connection ensurePhysical() throws SQLException {
+		if (this.physical == null || this.physical.isClosed()) {
+			this.physical = connectReal(this.url, this.info);
+			this.physical.setAutoCommit(false);
+			this.physicalCount.incrementAndGet();
+			this.unit = null;
+		}
+		return this.physical;
+	}
+
+	Connection physical() throws SQLException {
+		return this.ensurePhysical();
+	}
+
+	/** 단위를 시작합니다(이미 이 스레드의 단위가 있으면 그대로). */
+	void begin() throws SQLException {
+		if (!this.lock.isHeldByCurrentThread()) {
+			int wait = TestDriver.intProperty("dstone.testdriver.lockWaitSeconds", 30);
+			boolean got;
+			try {
+				got = this.lock.tryLock(wait, TimeUnit.SECONDS);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new SQLException("dstone 테스트 DB: 연결 차례를 기다리다 중단되었습니다.");
+			}
+			if (!got) {
+				throw new SQLException("dstone 테스트 DB: 다른 요청이 이 연결을 쓰고 있어 " + wait + "초를 기다렸지만 차례가 오지 않았습니다(잠금 대기). "
+					+ "테스트 환경의 차이이며 개발 결과의 결함이 아닐 수 있습니다.");
+			}
+		}
+		if (this.unit == null) {
+			this.unit = this.physical().setSavepoint();
+		}
+	}
+
+	/** 이 스레드가 단위를 갖고 있는가 */
+	boolean inUnit() {
+		return this.lock.isHeldByCurrentThread();
+	}
+
+	/**
+	 * 단위를 끝냅니다. keep이면 내용을 남기고(앱의 commit), 아니면 단위 시작까지 되돌립니다(앱의 rollback).
+	 */
+	void end(boolean keep) throws SQLException {
+		if (!this.lock.isHeldByCurrentThread()) {
+			return;
+		}
+		try {
+			if (this.unit != null) {
+				Savepoint savepoint = this.unit;
+				this.unit = null;
+				if (!keep) {
+					this.physical().rollback(savepoint);
+				}
+				try {
+					this.physical().releaseSavepoint(savepoint);
+				} catch (SQLException e) {
+					// Oracle 등은 풀기를 지원하지 않는다. 남겨 둬도 된다
+				}
+			}
+		} finally {
+			while (this.lock.isHeldByCurrentThread()) {
+				this.lock.unlock();
+			}
+		}
+	}
+
+	/** 트랜잭션 전체를 되돌립니다(엔진의 ROLLBACK). 쓰는 중이면 waitSeconds까지 기다립니다. */
+	String rollbackAll(int waitSeconds) {
+		boolean got;
+		try {
+			got = this.lock.tryLock(waitSeconds, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return "중단됨";
+		}
+		if (!got) {
+			return "쓰는 중이라 되돌리지 못함";
+		}
+		try {
+			synchronized (this) {
+				if (this.physical != null && !this.physical.isClosed()) {
+					this.physical.rollback();
+				}
+				this.unit = null;
+			}
+			return null;
+		} catch (SQLException e) {
+			return e.getMessage();
+		} finally {
+			this.lock.unlock();
+		}
+	}
+
+	/** 엔진의 조회. 같은 연결(커밋하지 않은 테스트 데이터가 보임)에서 SELECT만 실행합니다. */
+	String query(String sql, int maxRows) {
+		if (!READ_ONLY.matcher(sql).matches()) {
+			return "FAIL SELECT나 WITH로 시작하는 조회만 실행합니다.";
+		}
+		int wait = TestDriver.intProperty("dstone.testdriver.lockWaitSeconds", 30);
+		boolean got;
+		try {
+			got = this.lock.tryLock(wait, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return "FAIL 중단됨";
+		}
+		if (!got) {
+			return "FAIL 앱이 이 연결을 쓰고 있어 조회하지 못했습니다(잠금 대기 " + wait + "초).";
+		}
+		Savepoint savepoint = null;
+		try {
+			Connection connection = this.physical();
+			savepoint = connection.setSavepoint();
+			Statement statement = connection.createStatement();
+			try {
+				statement.setMaxRows(maxRows + 1);
+				ResultSet rs = statement.executeQuery(sql);
+				StringBuilder out = new StringBuilder("OK\n");
+				ResultSetMetaData meta = rs.getMetaData();
+				int columns = meta.getColumnCount();
+				for (int i = 1; i <= columns; i++) {
+					out.append(i > 1 ? "\t" : "").append(escape(meta.getColumnLabel(i)));
+				}
+				out.append('\n');
+				int rows = 0;
+				while (rs.next()) {
+					if (rows >= maxRows) {
+						out.append("MORE\n");
+						break;
+					}
+					for (int i = 1; i <= columns; i++) {
+						Object value = rs.getObject(i);
+						out.append(i > 1 ? "\t" : "").append(value == null ? "\\N" : escape(String.valueOf(value)));
+					}
+					out.append('\n');
+					rows++;
+				}
+				return out.toString();
+			} finally {
+				statement.close();
+			}
+		} catch (SQLException e) {
+			return "FAIL " + e.getMessage();
+		} finally {
+			try {
+				if (savepoint != null) {
+					this.physical().rollback(savepoint);
+				}
+			} catch (SQLException e) {
+				// 조회는 바꾼 것이 없다
+			}
+			this.lock.unlock();
+		}
+	}
+
+	static void checkNotDdl(String sql) throws SQLException {
+		if (sql != null && DDL.matcher(sql).matches()) {
+			throw new SQLException("dstone 테스트 DB: 테스트 중에는 DDL(CREATE, ALTER, DROP, TRUNCATE 등)을 실행하지 않습니다. DDL은 사람이 개발 DB에 반영합니다.");
+		}
+	}
+
+	private static String escape(String text) {
+		StringBuilder out = new StringBuilder();
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (c == '\\') {
+				out.append("\\\\");
+			} else if (c == '\t') {
+				out.append("\\t");
+			} else if (c == '\n') {
+				out.append("\\n");
+			} else if (c == '\r') {
+				out.append("\\r");
+			} else {
+				out.append(c);
+			}
+		}
+		return out.toString();
+	}
+
+	/** 원래 드라이버로 연결합니다. 앱의 클래스로더(TCCL)에서 드라이버를 찾습니다. */
+	private static Connection connectReal(String url, Properties info) throws SQLException {
+		ClassLoader loader = Thread.currentThread().getContextClassLoader();
+		if (loader == null) {
+			loader = Holder.class.getClassLoader();
+		}
+		Iterator<Driver> drivers = ServiceLoader.load(Driver.class, loader).iterator();
+		while (drivers.hasNext()) {
+			Driver driver;
+			try {
+				driver = drivers.next();
+			} catch (Throwable t) {
+				continue;
+			}
+			if (driver instanceof TestDriver) {
+				continue;
+			}
+			if (driver.acceptsURL(url)) {
+				Connection connection = driver.connect(url, info);
+				if (connection != null) {
+					return connection;
+				}
+			}
+		}
+		for (String[] known : KNOWN_DRIVERS) {
+			if (!url.startsWith(known[0])) {
+				continue;
+			}
+			try {
+				Driver driver = (Driver) Class.forName(known[1], true, loader).newInstance();
+				Connection connection = driver.connect(url, info);
+				if (connection != null) {
+					return connection;
+				}
+			} catch (ClassNotFoundException e) {
+				// 다음 이름
+			} catch (InstantiationException e) {
+				// 다음 이름
+			} catch (IllegalAccessException e) {
+				// 다음 이름
+			}
+		}
+		return DriverManager.getConnection(url, info);
+	}
+
+	/* ---------------------------------------------------------------- 감싼 연결 */
+
+	/** 앱이 받는 Connection. 트랜잭션 메소드만 바꾸고 나머지는 물리 연결에 넘깁니다. */
+	static final class ConnectionHandler implements InvocationHandler {
+		private final Holder holder;
+		private boolean autoCommit = true;
+		private boolean readOnly;
+		private int isolation = -1;
+		private boolean closed;
+		/** 이 연결이 연 단위가 있는가(autocommit을 끈 트랜잭션). 다른 연결이 연 단위는 끝내지 않는다 */
+		private boolean started;
+		private Connection self;
+
+		ConnectionHandler(Holder holder) {
+			this.holder = holder;
+		}
+
+		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+			this.self = (Connection) proxy;
+			String name = method.getName();
+			if ("close".equals(name) || "abort".equals(name)) {
+				if (!this.closed) {
+					this.closed = true;
+					// 끝내지 않은 트랜잭션은 풀(pool)처럼 되돌린다
+					this.finish(false);
+				}
+				return null;
+			}
+			if ("isClosed".equals(name)) {
+				return Boolean.valueOf(this.closed);
+			}
+			if ("equals".equals(name)) {
+				return Boolean.valueOf(proxy == args[0]);
+			}
+			if ("hashCode".equals(name)) {
+				return Integer.valueOf(System.identityHashCode(proxy));
+			}
+			if ("toString".equals(name)) {
+				return "dstone-testdriver connection(" + this.holder.url + ")";
+			}
+			if (this.closed && !"isValid".equals(name)) {
+				throw new SQLException("dstone 테스트 DB: 닫은 연결입니다.");
+			}
+			if ("setAutoCommit".equals(name)) {
+				boolean value = ((Boolean) args[0]).booleanValue();
+				if (value && !this.autoCommit) {
+					this.finish(true); // JDBC: autocommit을 켜면 그때까지를 커밋한다
+				}
+				this.autoCommit = value;
+				return null;
+			}
+			if ("getAutoCommit".equals(name)) {
+				return Boolean.valueOf(this.autoCommit);
+			}
+			if ("commit".equals(name)) {
+				this.finish(true);
+				return null;
+			}
+			if ("rollback".equals(name) && (args == null || args.length == 0)) {
+				this.finish(false);
+				return null;
+			}
+			if ("setReadOnly".equals(name)) {
+				this.readOnly = ((Boolean) args[0]).booleanValue();
+				return null;
+			}
+			if ("isReadOnly".equals(name)) {
+				return Boolean.valueOf(this.readOnly);
+			}
+			if ("setTransactionIsolation".equals(name)) {
+				// 트랜잭션 중에 바꾸면 실패하는 DB가 있어 기억만 한다
+				this.isolation = ((Integer) args[0]).intValue();
+				return null;
+			}
+			if ("getTransactionIsolation".equals(name) && this.isolation >= 0) {
+				return Integer.valueOf(this.isolation);
+			}
+			if ("unwrap".equals(name) && ((Class<?>) args[0]).isInstance(proxy)) {
+				return proxy;
+			}
+			if ("isWrapperFor".equals(name) && ((Class<?>) args[0]).isInstance(proxy)) {
+				return Boolean.TRUE;
+			}
+			if (("prepareStatement".equals(name) || "prepareCall".equals(name)) && args != null && args[0] instanceof String) {
+				checkNotDdl((String) args[0]);
+			}
+			if ("setSavepoint".equals(name) || "rollback".equals(name) || "releaseSavepoint".equals(name)) {
+				this.beginUnit(); // 앱의 savepoint는 단위 안에서 그대로 쓴다
+			}
+			Object result;
+			try {
+				result = method.invoke(this.holder.physical(), args);
+			} catch (InvocationTargetException e) {
+				throw e.getCause();
+			}
+			if (result instanceof Statement) {
+				Class<?> type = method.getReturnType();
+				return Proxy.newProxyInstance(Holder.class.getClassLoader(), new Class<?>[] { type }, new StatementHandler(this, (Statement) result));
+			}
+			return result;
+		}
+
+		/** 단위를 잡습니다. 이미 이 스레드의 단위가 있으면 그 안에서 씁니다. 돌려주는 값: 원래 단위가 있었는가 */
+		boolean beginUnit() throws SQLException {
+			boolean already = this.holder.inUnit();
+			this.holder.begin();
+			if (!already && !this.autoCommit) {
+				this.started = true;
+			}
+			return already;
+		}
+
+		/** 이 연결이 연 단위를 끝냅니다. */
+		void finish(boolean keep) throws SQLException {
+			if (this.started) {
+				this.started = false;
+				this.holder.end(keep);
+			}
+		}
+	}
+
+	/** 앱이 받는 Statement. 실행할 때 단위를 잡고, autocommit이면 문장 하나로 끝냅니다. */
+	static final class StatementHandler implements InvocationHandler {
+		private final ConnectionHandler connection;
+		private final Statement target;
+
+		StatementHandler(ConnectionHandler connection, Statement target) {
+			this.connection = connection;
+			this.target = target;
+		}
+
+		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+			String name = method.getName();
+			if ("getConnection".equals(name)) {
+				return this.connection.self;
+			}
+			if ("equals".equals(name)) {
+				return Boolean.valueOf(proxy == args[0]);
+			}
+			if ("hashCode".equals(name)) {
+				return Integer.valueOf(System.identityHashCode(proxy));
+			}
+			if (("addBatch".equals(name) || name.startsWith("execute")) && args != null && args.length > 0 && args[0] instanceof String) {
+				checkNotDdl((String) args[0]);
+			}
+			if (!name.startsWith("execute")) {
+				try {
+					return method.invoke(this.target, args);
+				} catch (InvocationTargetException e) {
+					throw e.getCause();
+				}
+			}
+			Holder holder = this.connection.holder;
+			boolean already = this.connection.beginUnit();
+			boolean ok = false;
+			try {
+				Object result = method.invoke(this.target, args);
+				ok = true;
+				return result;
+			} catch (InvocationTargetException e) {
+				throw e.getCause();
+			} finally {
+				if (this.connection.autoCommit && !already) {
+					holder.end(ok);
+				}
+			}
+		}
+	}
+
+}

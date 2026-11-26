@@ -57,7 +57,7 @@ import net.dstone.common.utils.LogUtil;
  *   승인은 사례의 approvals대로 고르고, 규칙이 없는 승인에 도착하면 멈춰 채점한 뒤 그 실행을 CANCELLED로 닫습니다.
  *   snapshotAfter step이 처음 끝나면 요청 폴더를 떠 두었다가 같은 checks로 따로 채점합니다(첫 결과물과 마지막 결과물 비교).
  *   Workflow 정보(실행 ID, 멈춘 자리, 떠 둔 것의 채점)는 ANSWER_JSON의 workflowRun 칸에 남깁니다.
- * http·dbQuery 채점이 있으면 사례의 server 값으로 격리 시험 서버(TestServerTool.startSandboxServer)를 띄워 채점하고 내립니다.
+ * http·dbQuery 채점이 있으면 사례의 server 값으로 테스트 서버(TestServerTool.startTestServer)를 띄워 채점하고 내립니다(개발 DB는 원복).
  *
  * 평가 스레드는 기본 하나입니다(dstone.ai.eval.threads). 평가가 시험 서버나 공유 DB를 건드릴 수 있어서 한 번에 하나씩 돌립니다.
  * 작업 폴더는 dstone.ai.eval.work-root(기본 {APP_HOME}/LOGS/dstone-ai-engine/eval) 아래 실행마다 새로 만들고 지우지 않습니다.
@@ -444,7 +444,7 @@ public class EvalRunner extends BaseObject {
 
 	/**
 	 * <pre>
-	 * 작업 공간을 채점합니다. http·dbQuery 채점이 있으면 격리 시험 서버를 띄워 쓰고 내립니다.
+	 * 작업 공간을 채점합니다. http·dbQuery 채점이 있으면 테스트 서버를 띄워 쓰고 내립니다(개발 DB는 원복).
 	 * 서버를 띄우지 못하면 그 채점들은 실패로 남고, 다른 채점은 그대로 합니다.
 	 * </pre>
 	 */
@@ -460,8 +460,8 @@ public class EvalRunner extends BaseObject {
 		try {
 			Map<String, String> args = workspace.serverArgs();
 			ToolContext toolContext = new ToolContext(Map.of(Constants.Tool.CONTEXT_EXECUTION_ID, executionId, Constants.Tool.CONTEXT_STEP_ID, stepId));
-			Map<String, Object> started = this.testServerTool.startSandboxServer(args.get("projectId"), args.get("sourceRoot"), args.get("overlayDir"),
-				blankToNull(args.get("ddlFile")), blankToNull(args.get("deleteList")), toolContext);
+			Map<String, Object> started = this.testServerTool.startTestServer(args.get("projectId"), blankToNull(args.get("revision")), args.get("overlayDir"),
+				blankToNull(args.get("deleteList")), toolContext);
 			if (Boolean.TRUE.equals(started.get("success"))) {
 				final String url = stripSlash(String.valueOf(started.get("url")));
 				List<String> aliases = (List<String>) started.get("dbAliases");
@@ -475,7 +475,7 @@ public class EvalRunner extends BaseObject {
 					@Override
 					public List<Map<String, Object>> rows(String sql, int maxRows) {
 						if (alias == null) {
-							throw new IllegalStateException("격리 시험 서버에 복제본 DB가 없습니다");
+							throw new IllegalStateException("테스트 서버에 프로젝트 DB가 없습니다");
 						}
 						return EvalRunner.this.dbQueryTool.selectRows(alias, sql, maxRows);
 					}
@@ -491,7 +491,7 @@ public class EvalRunner extends BaseObject {
 			if (serverProblem != null) {
 				for (Map<String, Object> check : checks) {
 					if (EvalCase.Check.HTTP.equals(check.get("kind")) || EvalCase.Check.DB_QUERY.equals(check.get("kind"))) {
-						check.put("detail", "격리 시험 서버를 띄우지 못했습니다: " + oneLine(serverProblem));
+						check.put("detail", "테스트 서버를 띄우지 못했습니다: " + oneLine(serverProblem));
 					}
 				}
 			}

@@ -15,7 +15,7 @@
 # 문서를 고치는 일과 새로 쓰는 일은 다른 Agent가 합니다.
 #   [~ 수정]      document-revise-agent가 기존 문서에서 지시받은 부분만 고칩니다(step25~27, step39).
 #   [~ 다시 작성]  그 문서를 만든 Agent가 처음부터 다시 씁니다. 사람이 고를 때만 그렇게 합니다.
-# 앞 문서가 바뀌어도 뒤 문서를 새로 쓰지 않습니다(2.3.0). 새로 쓰면 재개발·전문가 해결로 고친 것이 사라집니다.
+# 앞 문서가 바뀌어도 뒤 문서를 새로 쓰지 않습니다(2.3.0). 새로 쓰면 재개발·자동 수정으로 고친 것이 사라집니다.
 #   step07: 영향도분석서가 있으면 step38이 맞춰 고치고, 없으면 step08이 씁니다.
 #   step11: 설계서가 있으면 step37이 맞춰 고치고, 없으면 step12가 씁니다.
 #   파일이 있는지는 범용 Tool isFileExist가 true/false로 알려 주고, step의 routes가 그 값으로 갈 곳을 나눕니다(2.4.1).
@@ -28,41 +28,41 @@
 # 그래서 나중에 설계 수정을 거쳐 개발 폴더를 다시 비워도 재개발로 고친 것이 사라지지 않습니다.
 # 재개발 때는 step20~21이 설계서와 태스크아이템 목록을 다시 읽어 넘깁니다(지난 개발이 고친 최신 내용).
 #
-# [전문가 해결](2.2.0): 개발 결과가 동작하지 않을 때 사람이 고릅니다. 승인 의견에 본 증상을 적습니다.
-#   step22~23이 설계서와 목록을 다시 읽고, step24의 sm-troubleshooter-agent가 원인을 찾아 고친 뒤 설계서에도 남깁니다.
-#   그 Agent가 프로젝트 DB를 조회하고, 격리 시험 서버(startSandboxServer)를 띄워 브라우저로 재현·확인까지 합니다(docs/09 11.1절).
-#   격리를 지원하지 않는 프로젝트에서만 원래 DB에 붙는 임시 시험 서버(startTestServer)를 씁니다.
-#   로그인할 시험계정은 프로젝트 관리에 둡니다(요청서에는 계정을 적지 않습니다).
-#   끝나면 컴파일 확인(step18)을 거쳐 개발 승인으로 돌아옵니다.
+# 프로젝트와 리비전(2.9.0, 테스트 서버 재설계): 요청서의 '## 프로젝트ID'는 필수입니다(step02). step59가 프로젝트 관리의 현재 리비전
+#   ([Build]로 빌드한 소스와 산출물)을 state.projectRevision에 두고, 이 실행은 끝까지 그 리비전만 씁니다. 그 사이 새 [Build]가 있어도 영향이 없습니다.
+#   빌드한 리비전이 없으면 멈추지 않고 소스 디렉토리로 진행하되, 서버 기동 테스트는 하지 않습니다(step28).
+#   전문가 해결 경로(sm-troubleshooter-agent)는 2.9.0에서 없앴습니다. 동작하지 않으면 재개발로 고칩니다.
 #
 # 컴파일 확인: 개발 Agent가 끝나기 전에 범용 Tool compileJava로 스스로 컴파일해 고치고(최대 3번), 그 뒤 step18이 같은 Tool로 한 번 더 확인합니다.
 # 통과하든 실패하든 개발 승인(step19)으로 가고, 실패 내용은 다음 개발·설계 수정에 전달됩니다.
 # compileJava는 원본 전체를 빌드하지 않고, 원본이 만들어 둔 클래스 폴더와 의존성을 참조해 바뀐 파일(과 그것을 쓰는 원본 파일)만 컴파일합니다.
-# 그래서 원본을 한 번은 빌드해 두어야 합니다(없으면 그렇다고 실패로 알립니다).
+# 원본 클래스는 리비전의 빌드 결과(프로젝트 관리 [Build])를 씁니다.
 #
 # 자동 동작 검증(2.4.0): 컴파일이 통과하면 사람에게 묻기 전에 실제로 돌려 봅니다.
-#   step29: 일회용 DB에 복제 + DDL 반영 + 빌드 + 기동. 실패 원인이 개발 결과(code)면 자동 수정, 환경(environment)이면 사람에게.
+#   step29: 테스트 서버 기동(리비전 + 개발 결과, 고객사 개발 DB를 커밋하지 않는 연결로 쓰고 실행이 멈추면 원복). 실패 원인이 개발 결과(code)면 자동 수정, 환경(environment)이면 사람에게.
 #   step35: 검증 Agent가 완료 기준을 눌러 보고 PASS/FAIL/BLOCKED를 냄. FAIL이 있으면 자동 수정.
 #   step31: 자동 수정은 사람의 결정 하나마다 최대 2번. 사람이 새로 시키면 다시 2번.
 #   이 고리의 판정(step30 개발 결과 탓인지, step31 횟수가 남았는지, step36 FAIL이 있는지)은 실패가 아니라 정상 결과입니다.
 #   그래서 범용 Tool containsValue(true/false)와 countUp(route: within/over)의 값을 routes로 받아 나눕니다(2.6.1).
 #   "FAIL 없음", "한도를 다 씀"이 실행 이력에 실패로 남지 않고, onFailure는 Tool이 정말 실패했을 때만 씁니다.
-#   격리할 수 없는 프로젝트(지원하지 않는 DB·구성, 프로젝트ID 없음)는 통과로 치지 않고 이유와 함께 개발 승인으로 갑니다(state의 sandboxError).
-#   step29가 띄운 서버는 바로 다음 step35가 같은 입력으로 다시 부르면 그대로 씁니다(엔진의 넘겨주기는 한 step까지라 둘 사이에 step을 넣지 않습니다).
+#   테스트 서버를 띄울 수 없는 프로젝트(빌드된 리비전 없음, EJB·벤더 전용 기능, Tomcat·JDK 없음)는 통과로 치지 않고 이유와 함께 개발 승인으로 갑니다(state의 serverError).
+#   테스트 서버는 실행마다 하나라 step29가 띄운 서버를 step35·step34가 그대로 받고, 다시 부르면 바뀐 파일만 반영합니다.
+# DDL 반영 확인(2.9.0): 테스트 서버는 DDL을 실행하지 않습니다. step60이 DDL 문서의 테이블·컬럼이 개발 DB에 있는지 보고,
+#   없으면 step61 승인에서 사람이 개발 DB에 반영한 뒤 승인합니다. 반영하면 다음부터는 묻지 않습니다.
 #   step40(step29 앞)은 지난 검증 뒤로 작업 폴더에서 바뀐 파일을 범용 Tool fileChanges로 찾아, step35가 바뀐 것과 지난번에 안 된 것만 깊게 보게 합니다(2.5.0).
-#   시험 환경이 원래 서버와 달라서 생긴 실패는 검증이 BLOCKED로 내고 자동 수정이 고치지 않습니다(Skill test-environment, 2.5.0).
-#   step41(step40 앞)이 설계서를 다시 읽어 step35에 넘깁니다(2.6.0). 자동 수정·전문가 해결이 설계서를 고친 뒤에도
+#   테스트 환경이 원래 서버와 달라서 생긴 실패는 검증이 BLOCKED로 내고 자동 수정이 고치지 않습니다(Skill test-environment, 2.5.0).
+#   step41(step40 앞)이 설계서를 다시 읽어 step35에 넘깁니다(2.6.0). 자동 수정이 설계서를 고친 뒤에도
 #   검증 Agent가 고치기 전 설계서를 받지 않게 하려는 것입니다.
 #
 # 검증 수준 고르기(2.7.0): 모든 변경에 서버를 띄우고 화면을 누를 필요는 없어서, 설계 승인(step13)에서 사람이 고릅니다.
 #   승인(개발진행, 전체 확인)  화면 검증(위의 자동 동작 검증 그대로)
-#   승인(개발진행, 간이 확인)  격리 서버가 뜨는지만 보고 개발 승인으로(step45). 화면이 없는 변경(배치, 연동, 쿼리만)
+#   승인(개발진행, 간이 확인)  테스트 서버가 뜨는지만 보고 개발 승인으로(step45). 화면이 없는 변경(배치, 연동, 쿼리만)
 #   승인(개발진행, 최소 확인)  서버를 띄우지 않고 소스 오류만 확인하고 개발 승인으로. 동작이 바뀌지 않는 변경(주석, 안내 문구, 설정값 하나)
 #   이름만으로는 뜻이 안 보여서 approval.hints에 결정마다 안내문을 적었고, 승인 화면에서 풍선도움말로 보입니다.
 #   설계서의 '검증 방법 제안'(sm-architect-agent)이 어느 쪽인지와 이유를 적어 두고, 고르는 것은 사람입니다.
-#   생략은 첫 검증에만 적용합니다. 재개발·전문가 해결·자동 수정으로 다시 돌 때는 화면 검증으로 갑니다.
+#   생략은 첫 검증에만 적용합니다. 재개발·자동 수정으로 다시 돌 때는 화면 검증으로 갑니다.
 #   step42가 countUp(max 1)으로 첫 검증인지 세고(within = 처음, over = 다시 돌 때), step43~44가 승인 결정을 봅니다.
-#   분기는 step28 뒤에 둡니다. step29와 step35 사이에는 step을 넣지 않습니다(서버 넘겨주기, 위 설명).
+#   분기는 step28·step60 뒤에 둡니다.
 #
 # 본뜰 기능의 코드(2.8.0): 영향도분석서의 '## 참고 기능'(본뜰 기존 기능의 화면 경로나 주소)을 step46이 읽고,
 #   step48의 범용 Tool knowledgeFeatureCode가 dstone-knowledge의 관계(화면 → 주소 → 메소드 → SQL, 메소드 → 팝업 화면)를 따라
@@ -71,7 +71,7 @@
 #   프로젝트ID나 '참고 기능'이 없거나 모으지 못하면 이유를 state.referenceError에 두고 예전처럼 설계합니다(그 네 step의 saveError).
 #
 # 사람에게 가기 전 형식 검사(2.8.0): 사람 승인 한 번이 20~40분이라 기계로 잡을 수 있는 것은 먼저 잡습니다.
-#   설계 뒤(step50): 범용 Tool checkDocuments가 닫히지 않은 코드 블록, 칸이 어긋난 표, DDL을 격리 서버와 같은 규칙으로 읽어 봅니다.
+#   설계 뒤(step50): 범용 Tool checkDocuments가 닫히지 않은 코드 블록, 칸이 어긋난 표, DDL을 DDL 반영 확인(step60)과 같은 규칙으로 읽어 봅니다.
 #     걸리면 document-revise-agent가 그것만 고칩니다(step52, 사람의 결정 하나마다 1번, step51이 셈). 그 뒤 설계 승인으로 갑니다.
 #   개발 뒤(step54): 개발 Agent가 손대지 못한 보류(unfinished)를 남기면 한 번 더 부릅니다(step57, 1번).
 #     사람의 결정이나 DB 반영이 필요한 보류는 다시 불러도 할 일이 없어서 세지 않습니다(2.8.1, 실행 55b0be49).
@@ -81,16 +81,16 @@
 #
 # 요구사항 리뷰(step05)는 판정만 돌려주고 분석서를 고치지 않습니다(2.6.0). 불통과 사유는 엔진이 다음 단계에 넘깁니다.
 #
-# 원본 소스 경로는 step02가 요청서의 "## 소스경로" 아래 내용을 범용 Tool readMarkdownSection으로 읽어 state.sourceDir에 둡니다.
+# 소스 경로는 프로젝트의 리비전에서 옵니다(state.projectRevision.sourceRoot). 요청서의 '## 소스경로'는 읽지 않습니다.
 # 작업 폴더는 "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.8.2
+version: 2.9.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
-  요청서에는 '현업요청', '소스경로'와, 그 소스를 dstone-knowledge에 분석해 두었다면 '프로젝트ID'를 적는다.
-  계정·비밀번호는 요청서에 적지 않는다. 화면 로그인용 시험계정은 프로젝트 관리에 두면 전문가 해결 Agent가 임시 시험 서버에서 그 계정으로 확인한다.
-  DB는 프로젝트ID로 프로젝트 관리에 등록한 DB를 찾아 조회한다(다른 DB를 쓸 때만 시험환경에 'DB연결'을 적는다).
+  요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
+  계정·비밀번호는 요청서에 적지 않는다. 화면 로그인용 테스트계정은 프로젝트 관리에 두면 테스트 서버에서 그 계정으로 확인한다.
+  DB는 프로젝트 관리에 등록한 개발 DB를 쓰고, 테스트로 바뀐 데이터는 원복한다. DDL은 사람이 개발 DB에 반영한다.
   예)
   D:/WorkShop/00.SM/work004
 settings:
@@ -121,13 +121,23 @@ steps:
     onFailure: FAIL
 
   - id: step02
-    name: 03-소스경로 읽기
+    name: 03-프로젝트ID 읽기
     type: TOOL
     tool: readMarkdownSection
     with:
       fileFullPath: ${input}/00.request.md
-      heading: 소스경로
-    save: sourceDir
+      heading: 프로젝트ID
+    save: projectId
+    next: step59
+    onFailure: FAIL
+
+  - id: step59
+    name: 03-1-프로젝트 리비전 정하기
+    type: TOOL
+    tool: resolveProjectRevision
+    with:
+      projectId: ${state.projectId}
+    save: projectRevision
     next: step03
     onFailure: FAIL
 
@@ -257,8 +267,8 @@ steps:
     approval:
       approverRole: PL
       hints:
-        승인(개발진행, 전체 확인): 개발 뒤 시험 서버를 띄우고 화면을 직접 눌러 확인합니다. 화면에 보이는 것이나 화면 동작이 바뀌는 변경은 이것을 고르세요. 가장 오래 걸립니다(몇 분 이상).
-        승인(개발진행, 간이 확인): 개발 뒤 시험 서버가 정상으로 뜨는지만 봅니다. 화면은 열지 않습니다. 배치, 외부 연동, 쿼리만 바뀌는 변경에 맞습니다(2분 안팎).
+        승인(개발진행, 전체 확인): 개발 뒤 테스트 서버를 띄우고 화면을 직접 눌러 확인합니다. 화면에 보이는 것이나 화면 동작이 바뀌는 변경은 이것을 고르세요. 가장 오래 걸립니다(몇 분 이상).
+        승인(개발진행, 간이 확인): 개발 뒤 테스트 서버가 정상으로 뜨는지만 봅니다. 화면은 열지 않습니다. 배치, 외부 연동, 쿼리만 바뀌는 변경에 맞습니다(2분 안팎).
         승인(개발진행, 최소 확인): 개발 뒤 서버를 띄우지 않고 소스 오류만 확인합니다. 주석, 안내 문구, 설정값 하나처럼 동작이 바뀌지 않는 변경에 맞습니다(수 초).
     save: designApproval
     routes:
@@ -307,7 +317,7 @@ steps:
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
+      source_dir: ${state.projectRevision.sourceRoot}
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
@@ -323,7 +333,7 @@ steps:
     type: TOOL
     tool: compileJava
     with:
-      sourceRoot: ${state.sourceDir}
+      sourceRoot: ${state.projectRevision.sourceRoot}
       overlayDir: ${input}/${state.now}/dev-resources
       outputDir: ${input}/${state.now}/compile-check
       deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
@@ -341,7 +351,6 @@ steps:
     routes:
       승인: END
       재개발: step20
-      전문가 해결: step22
       설계 수정: step25
       영향도 수정: step26
       요구사항 수정: step27
@@ -368,45 +377,6 @@ steps:
     save: taskitems
     next: step17
     onFailure: FAIL
-
-  - id: step22
-    name: 26-전문가 해결 전 설계서 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
-    next: step23
-    onFailure: FAIL
-
-  - id: step23
-    name: 27-전문가 해결 전 태스크아이템 목록 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
-      maxChars: 60000
-    save: taskitems
-    next: step24
-    onFailure: FAIL
-
-  - id: step24
-    name: 28-전문가 해결
-    type: AGENT
-    agent: sm-troubleshooter-agent
-    with:
-      base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
-      request: ${state.request}
-      design: ${state.design}
-      taskitems: ${state.taskitems}
-      instruction: ${arrival}
-      history: ${decisions:}
-      compile_error: ${state.compileError:}
-    save: troubleshoot
-    next: step18
-    onFailure: step19
 
   - id: step25
     name: 29-설계서 수정
@@ -451,16 +421,44 @@ steps:
     next: step04
 
   - id: step28
-    name: 33-자동 검증할 프로젝트 확인
+    name: 33-테스트할 리비전이 있는지
     type: TOOL
-    tool: readMarkdownSection
+    tool: containsValue
     with:
-      fileFullPath: ${input}/00.request.md
-      heading: 프로젝트ID
-    save: projectId
-    saveError: projectIdError
-    next: step42
+      value: ${state.projectRevision.route:}
+      expected: ok
+    routes:
+      "true": step60
+      "false": step19
     onFailure: step19
+
+  - id: step60
+    name: 33-1-DDL 반영 확인
+    type: TOOL
+    tool: checkDdlApplied
+    with:
+      projectId: ${state.projectId}
+      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
+    save: ddlCheck
+    routes:
+      none: step42
+      ok: step42
+      missing: step61
+    onFailure: step42
+
+  - id: step61
+    name: 33-2-DDL 반영 승인
+    type: APPROVAL
+    approval:
+      approverRole: PL
+      hints:
+        DDL 반영함: 03-3.ddl(데이터베이스).md 의 DDL을 개발 DB에 반영했습니다. 반영됐는지 다시 확인한 뒤 테스트 서버로 검증합니다.
+        테스트 없이 진행: DDL을 아직 반영하지 않고 서버 기동 테스트 없이 개발 승인으로 갑니다.
+    save: ddlApproval
+    routes:
+      DDL 반영함: step60
+      테스트 없이 진행: step19
+      중지: FAIL
 
   - id: step42
     name: 34-첫 검증인지(검증 생략은 첫 검증에만)
@@ -500,32 +498,30 @@ steps:
     onFailure: step41
 
   - id: step45
-    name: 47-격리 기동만 확인
+    name: 47-테스트 서버 기동만 확인
     type: TOOL
-    tool: startSandboxServer
+    tool: startTestServer
     with:
       projectId: ${state.projectId}
-      sourceRoot: ${state.sourceDir}
+      revision: ${state.projectRevision.revision}
       overlayDir: ${input}/${state.now}/dev-resources
-      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
       deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
-    save: sandboxCheck
-    saveError: sandboxError
+    save: serverCheck
+    saveError: serverError
     next: step19
     onFailure: step30
 
   - id: step29
-    name: 37-격리 기동 확인
+    name: 37-테스트 서버 기동 확인
     type: TOOL
-    tool: startSandboxServer
+    tool: startTestServer
     with:
       projectId: ${state.projectId}
-      sourceRoot: ${state.sourceDir}
+      revision: ${state.projectRevision.revision}
       overlayDir: ${input}/${state.now}/dev-resources
-      ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
       deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
-    save: sandboxCheck
-    saveError: sandboxError
+    save: serverCheck
+    saveError: serverError
     next: step35
     onFailure: step30
 
@@ -534,7 +530,7 @@ steps:
     type: TOOL
     tool: containsValue
     with:
-      value: ${state.sandboxCheck.cause:}
+      value: ${state.serverCheck.cause:}
       expected: code
     routes:
       "true": step31
@@ -583,12 +579,13 @@ steps:
     agent: sm-auto-fix-agent
     with:
       base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
+      source_dir: ${state.projectRevision.sourceRoot}
       project_id: ${state.projectId}
+      revision: ${state.projectRevision.revision:}
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
-      boot_error: ${state.sandboxError:}
+      boot_error: ${state.serverError:}
       verification: ${state.verification}
       history: ${decisions:}
     save: autoFix
@@ -601,8 +598,9 @@ steps:
     agent: sm-verifier-agent
     with:
       base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
+      source_dir: ${state.projectRevision.sourceRoot}
       project_id: ${state.projectId}
+      revision: ${state.projectRevision.revision:}
       requirement: ${state.requirement}
       design: ${state.design}
       history: ${decisions:}
@@ -638,7 +636,7 @@ steps:
       request: ${state.request}
       instruction: |-
         reference에 있는 요구사항분석서와 영향도분석서의 지금 내용에 설계 문서를 맞춘다.
-        두 문서와 어긋나는 곳과 빠진 곳만 고친다. 재개발과 전문가 해결로 고친 내용('## 수정 이력')은 두 문서와 어긋나지 않는 한 그대로 둔다.
+        두 문서와 어긋나는 곳과 빠진 곳만 고친다. 재개발과 자동 수정으로 고친 내용('## 수정 이력')은 두 문서와 어긋나지 않는 한 그대로 둔다.
         아래는 이 일로 오게 한 결정이다. 의견이 있으면 함께 반영한다.
         ${arrival:}
       history: ${decisions:}
@@ -689,7 +687,7 @@ steps:
     next: step04
 
   - id: step40
-    name: 36-검증 전 바뀐 파일 확인(격리 기동 전)
+    name: 36-검증 전 바뀐 파일 확인(서버 기동 전)
     type: TOOL
     tool: fileChanges
     with:
@@ -741,7 +739,7 @@ steps:
     tool: knowledgeFeatureCode
     with:
       projectId: ${state.projectId}
-      sourceRoot: ${state.sourceDir}
+      sourceRoot: ${state.projectRevision.sourceRoot}
       entries: ${state.referenceEntries}
       outputFile: ${input}/${state.now}/02-1.reference-code.md
     save: referenceResult
@@ -867,7 +865,7 @@ steps:
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
+      source_dir: ${state.projectRevision.sourceRoot}
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
@@ -888,7 +886,7 @@ steps:
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
-      source_dir: ${state.sourceDir}
+      source_dir: ${state.projectRevision.sourceRoot}
       request: ${state.request}
       design: ${state.design}
       taskitems: ${state.taskitems}
@@ -900,11 +898,13 @@ steps:
     next: step18
     onFailure: step28
 state:
-  projectId: 요청서의 프로젝트ID(step28)
-  projectIdError: 프로젝트ID가 없어 자동 검증을 못 한 이유
-  sandboxCheck: 격리 기동 확인(step29, 기동만 확인이면 step45) 결과({success, cause, message})
+  projectId: 요청서의 프로젝트ID(step02)
+  serverCheck: 테스트 서버 기동 확인(step29, 기동만 확인이면 step45) 결과({success, cause, message, url, dbAliases})
   verifyRound: 첫 검증인지 센 값(step42, {route, count, scope, message}). within이면 처음이라 설계 승인에서 고른 검증 생략을 따른다
-  sandboxError: 격리 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
+  serverError: 테스트 서버 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
+  projectRevision: 이 실행이 쓰는 프로젝트 리비전(step59. route는 ok 또는 none, 그 밖에 revision, sourceRoot, kind, message)
+  ddlCheck: DDL이 개발 DB에 반영됐는지(step60. route는 none, ok, missing 가운데 하나, 그 밖에 missing, message)
+  ddlApproval: DDL 반영 승인(step61)의 결정
   verification: 동작 검증(step35) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
   verificationError: 동작 검증 Agent가 끝내지 못한 이유
   autoFixRound: 자동 수정 횟수({route, count, scope, message})
@@ -924,10 +924,8 @@ state:
   impactPath: 영향도 분석(step08)이 돌려준 답(저장 파일과 결정 필요 사항)
   architectPath: 아키텍처 설계(step12)가 돌려준 답(저장 파일과 결정 필요 사항)
   revision: 문서 수정(step25~27, 37~39)이 돌려준 답(고친 파일, 반영한 지시, 반영하지 않은 지시)
-  sourceDir: 원본 소스 경로(요청서의 "## 소스경로", step02)
   compileResult: 컴파일 확인(step18)이 통과했을 때의 출력
   compileError: 컴파일 확인(step18)이 실패했을 때의 오류(통과하거나 step16가 개발 폴더를 비우면 비어 있다)
-  troubleshoot: 전문가 해결(step24)이 돌려준 답(원인과 근거, 고친 것, 설계서와 달라진 점, 못 푼 것)
   referenceEntries: 영향도분석서의 '## 참고 기능'(본뜰 기존 기능의 화면 경로나 주소, step46)
   referenceResult: 참고 기능 코드 모으기(step48) 결과({success, file, included, omitted, notFound, message})
   referenceCode: 본뜰 기능의 코드 문서(02-1.reference-code.md, step49) 내용

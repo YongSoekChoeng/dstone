@@ -31,4 +31,18 @@ public interface StepEndListener {
 	default void executionLeft(String executionId) {
 	}
 
+	/**
+	 * <pre>
+	 * executionLeft와 같지만, 실행이 다시 이어질 수 있는지(승인 대기, 일시정지)를 함께 알려 줍니다.
+	 * 이어질 실행이면 다시 띄우는 비용이 큰 것(테스트 서버 JVM)은 남겨 두고, 붙잡고 있으면 안 되는 것(DB 트랜잭션)만 정리할 수 있습니다.
+	 * 기본 구현은 executionLeft(executionId)를 부릅니다.
+	 * </pre>
+	 *
+	 * @param executionId 루프를 벗어난 Workflow 실행 id
+	 * @param resumable   승인 대기나 일시정지라 다시 이어질 수 있으면 true. 끝남·실패·예외면 false
+	 */
+	default void executionLeft(String executionId, boolean resumable) {
+		this.executionLeft(executionId);
+	}
+
 }

@@ -1,0 +1,101 @@
+package net.dstone.ai.testdriver;
+
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.DriverPropertyInfo;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
+
+/**
+ * <pre>
+ * dstone-ai-engine 테스트 서버의 JDBC 드라이버입니다. 테스트 서버(앱 JVM) 안에서 돕니다.
+ * 엔진이 이 소스를 Java 8 바이트코드로 컴파일해 jar로 만들고(tools.build.testserver.TestDriverJar), 테스트 서버의 classpath에 넣습니다.
+ * 앱 설정의 JDBC URL은 엔진이 jdbc:dstonetest:{원래 URL}로 바꿔 둡니다.
+ *
+ * 하는 일: 개발 DB를 쓰되 테스트가 끝나면 원복합니다.
+ * - URL·계정마다 물리 연결을 하나만 열고 autocommit을 끕니다(Holder).
+ * - 앱이 받는 연결은 모두 그 물리 연결을 감싼 것입니다. commit은 커밋하지 않고, rollback은 마지막 commit 자리(savepoint)까지만 되돌립니다.
+ * - 엔진이 제어 창구(Control)로 ROLLBACK을 보내면 트랜잭션 전체를 되돌립니다. 연결이 끊겨도 DB가 되돌립니다.
+ * - 테스트 중 DDL은 실행하지 않습니다(MySQL·Oracle은 DDL이 그때까지의 작업을 커밋하므로).
+ * 의존성이 없어야 하고, Java 8 문법만 씁니다.
+ * </pre>
+ */
+public final class TestDriver implements Driver {
+
+	/** 이 드라이버가 받는 URL의 앞부분 */
+	public static final String PREFIX = "jdbc:dstonetest:";
+
+	/** URL·계정 → 물리 연결 하나 */
+	static final Map<String, Holder> HOLDERS = new ConcurrentHashMap<String, Holder>();
+
+	static {
+		try {
+			DriverManager.registerDriver(new TestDriver());
+		} catch (SQLException e) {
+			System.err.println("[dstone-testdriver] 드라이버를 등록하지 못했습니다: " + e);
+		}
+		Control.startOnce();
+	}
+
+	public Connection connect(String url, Properties info) throws SQLException {
+		if (!this.acceptsURL(url)) {
+			return null;
+		}
+		String real = url.substring(PREFIX.length());
+		Properties copy = new Properties();
+		if (info != null) {
+			copy.putAll(info);
+		}
+		String user = copy.getProperty("user", "");
+		String key = real + "\u0000" + user;
+		Holder holder;
+		synchronized (HOLDERS) {
+			holder = HOLDERS.get(key);
+			if (holder == null) {
+				holder = new Holder(real, user, copy);
+				HOLDERS.put(key, holder);
+			}
+		}
+		return holder.open();
+	}
+
+	public boolean acceptsURL(String url) {
+		return url != null && url.startsWith(PREFIX);
+	}
+
+	public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
+		return new DriverPropertyInfo[0];
+	}
+
+	public int getMajorVersion() {
+		return 1;
+	}
+
+	public int getMinorVersion() {
+		return 0;
+	}
+
+	public boolean jdbcCompliant() {
+		return false;
+	}
+
+	public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+		throw new SQLFeatureNotSupportedException();
+	}
+
+	/** 설정값(시스템 속성) 숫자 하나를 읽습니다. */
+	static int intProperty(String name, int defaultValue) {
+		try {
+			String value = System.getProperty(name);
+			return value == null || value.trim().isEmpty() ? defaultValue : Integer.parseInt(value.trim());
+		} catch (NumberFormatException e) {
+			return defaultValue;
+		}
+	}
+
+}

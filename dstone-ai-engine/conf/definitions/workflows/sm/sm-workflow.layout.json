@@ -104,18 +104,6 @@
       "x" : 606,
       "y" : 1112
     },
-    "step22" : {
-      "x" : 1162,
-      "y" : 30
-    },
-    "step23" : {
-      "x" : 1162,
-      "y" : 112
-    },
-    "step24" : {
-      "x" : 884,
-      "y" : 826
-    },
     "step25" : {
       "x" : 328,
       "y" : 308
@@ -460,19 +448,6 @@
       "x" : 1932,
       "y" : 761
     } ],
-    "step19|route|전문가 해결" : [ {
-      "x" : 840,
-      "y" : 949
-    }, {
-      "x" : 840,
-      "y" : 888
-    }, {
-      "x" : 1148,
-      "y" : 888
-    }, {
-      "x" : 1148,
-      "y" : 55
-    } ],
     "step19|route|설계 수정" : [ {
       "x" : 582,
       "y" : 949
@@ -518,38 +493,6 @@
     }, {
       "x" : 820,
       "y" : 1174
-    } ],
-    "step22|onFailure|" : [ {
-      "x" : 1416,
-      "y" : 55
-    }, {
-      "x" : 1416,
-      "y" : 1174
-    } ],
-    "step23|next|" : [ {
-      "x" : 1138,
-      "y" : 137
-    }, {
-      "x" : 1138,
-      "y" : 851
-    } ],
-    "step23|onFailure|" : [ {
-      "x" : 1416,
-      "y" : 137
-    }, {
-      "x" : 1416,
-      "y" : 1174
-    } ],
-    "step24|next|" : [ {
-      "x" : 820,
-      "y" : 851
-    } ],
-    "step24|onFailure|" : [ {
-      "x" : 860,
-      "y" : 851
-    }, {
-      "x" : 860,
-      "y" : 949
     } ],
     "step25|next|" : [ {
       "x" : 562,
@@ -1359,10 +1302,6 @@
       "source" : "out",
       "target" : "in"
     },
-    "step19|route|전문가 해결" : {
-      "source" : "right",
-      "target" : "left"
-    },
     "step19|route|설계 수정" : {
       "source" : "left",
       "target" : "right"
@@ -1394,30 +1333,6 @@
     "step21|onFailure|" : {
       "source" : "right",
       "target" : "left"
-    },
-    "step22|next|" : {
-      "source" : "out",
-      "target" : "in"
-    },
-    "step22|onFailure|" : {
-      "source" : "right",
-      "target" : "left"
-    },
-    "step23|next|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step23|onFailure|" : {
-      "source" : "right",
-      "target" : "left"
-    },
-    "step24|next|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step24|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
     },
     "step25|next|" : {
       "source" : "right",

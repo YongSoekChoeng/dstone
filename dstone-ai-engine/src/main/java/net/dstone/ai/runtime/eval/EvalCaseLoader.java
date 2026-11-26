@@ -48,9 +48,12 @@ public class EvalCaseLoader extends BaseObject {
 	private static final Set<String> CHECK_KINDS = Set.of("answerContains", "answerNotEmpty", "answerEquals", "fileExists", "fileChanged", "fileContains", "textIncreased", "toolUsed",
 		"fileMatches", "fileNotMatches", "answerMatches", "answerNotMatches", EvalCase.Check.HTTP, EvalCase.Check.DB_QUERY);
 
-	/** server에 쓸 수 있는 이름(TestServerTool.startSandboxServer의 인자)과 꼭 있어야 하는 것 */
-	private static final Set<String> SERVER_KEYS = Set.of("projectId", "sourceRoot", "overlayDir", "ddlFile", "deleteList");
-	private static final Set<String> SERVER_REQUIRED = Set.of("projectId", "sourceRoot", "overlayDir");
+	/**
+	 * server에 쓸 수 있는 이름(TestServerTool.startTestServer의 인자)과 꼭 있어야 하는 것.
+	 * sourceRoot, ddlFile은 예전(복제본 시험 서버) 사례를 읽으려고 받기만 하고 쓰지 않습니다(소스는 프로젝트의 리비전, DDL은 사람이 반영).
+	 */
+	private static final Set<String> SERVER_KEYS = Set.of("projectId", "revision", "overlayDir", "deleteList", "sourceRoot", "ddlFile");
+	private static final Set<String> SERVER_REQUIRED = Set.of("projectId", "overlayDir");
 
 	@Autowired
 	private Environment environment;

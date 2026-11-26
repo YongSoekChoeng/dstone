@@ -8,6 +8,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -331,10 +332,141 @@ public class JavaCompileTool extends BaseObject {
 		return ToolOutcome.fail(message.toString().strip());
 	}
 
+	/**
+	 * <pre>
+	 * 빌드 도구 없이 소스 전체를 컴파일합니다. 프로젝트 관리의 빌드 종류가 "빌드 없음"일 때 리비전 빌드(common.project.ProjectBuildService)가 부릅니다.
+	 * 소스 폴더의 .java는 모두 컴파일하고, 그 밖의 파일(properties, XML 등)은 결과 폴더에 그대로 복사합니다.
+	 * lib 폴더를 주지 않으면 원본 폴더(Eclipse .classpath, WEB-INF/lib)에서 jar를 찾습니다.
+	 * </pre>
+	 *
+	 * @param root       소스 루트
+	 * @param sourceDirs 소스 폴더들(비우면 찾는다)
+	 * @param libDirs    jar가 든 폴더나 jar 파일들(찾은 것에 더한다)
+	 * @param out        결과 클래스 폴더(지우고 새로 만든다)
+	 * @param release    Java 버전(0 이하면 엔진 버전)
+	 * @param encoding   소스 인코딩(비우면 UTF-8)
+	 * @return 성공이면 null, 실패면 이유(오류 줄 포함)
+	 */
+	public String compileAll(File root, List<File> sourceDirs, List<File> libDirs, File out, int release, String encoding) throws IOException {
+		JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+		if (compiler == null) {
+			return "이 엔진은 JRE에서 돌고 있어 Java 컴파일러가 없습니다(JDK에서 띄워야 합니다).";
+		}
+		Layout layout = new Layout();
+		this.detect(root, layout);
+		if (sourceDirs != null && !sourceDirs.isEmpty()) {
+			layout.sourceDirs.clear();
+			layout.sourceDirs.addAll(sourceDirs);
+		}
+		if (libDirs != null) {
+			for (File lib : libDirs) {
+				addJars(lib, layout.jars);
+			}
+		}
+		if (layout.sourceDirs.isEmpty()) {
+			return "소스 폴더를 찾지 못했습니다. 프로젝트 관리의 소스 폴더를 넣으십시오: " + root;
+		}
+		deleteRecursively(out.toPath());
+		Files.createDirectories(out.toPath());
+		List<File> units = new ArrayList<File>();
+		for (File dir : layout.sourceDirs) {
+			units.addAll(listJava(dir));
+			copyResources(dir, out);
+		}
+		if (units.isEmpty()) {
+			return "소스 폴더에 .java 파일이 없습니다: " + layout.sourceDirs;
+		}
+		Charset charset = isBlank(encoding) ? StandardCharsets.UTF_8 : Charset.forName(encoding.trim());
+		List<String> classPath = new ArrayList<String>();
+		Set<String> jarNames = new LinkedHashSet<String>();
+		for (File jar : layout.jars) {
+			if (jarNames.add(jar.getName())) {
+				classPath.add(jar.getAbsolutePath());
+			}
+		}
+		List<String> options = new ArrayList<String>();
+		options.add("-d");
+		options.add(out.getAbsolutePath());
+		options.add("-classpath");
+		options.add(String.join(File.pathSeparator, classPath));
+		options.add("--release");
+		options.add(String.valueOf(release > 0 ? Math.max(release, 8) : Runtime.version().feature()));
+		options.add("-encoding");
+		options.add(charset.name());
+		options.add("-nowarn");
+		options.add("-Xlint:none");
+		options.add("-proc:full");
+		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
+		boolean ok;
+		StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, Locale.getDefault(), charset);
+		try {
+			ok = compiler.getTask(null, fileManager, diagnostics, options, null, fileManager.getJavaFileObjectsFromFiles(units)).call().booleanValue();
+		} finally {
+			fileManager.close();
+		}
+		if (ok) {
+			return null;
+		}
+		StringBuilder message = new StringBuilder("컴파일 오류(소스 " + units.size() + "개):\n");
+		int shown = 0;
+		for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
+			if (diagnostic.getKind() != Diagnostic.Kind.ERROR || shown >= MAX_ERROR_LINES) {
+				continue;
+			}
+			String where = diagnostic.getSource() == null ? "" : diagnostic.getSource().getName() + ":" + diagnostic.getLineNumber() + ": ";
+			message.append(where).append(diagnostic.getMessage(Locale.getDefault()).replace("\r", "").replace("\n", " / ")).append('\n');
+			shown++;
+		}
+		return message.toString().strip();
+	}
+
+	/** 소스 폴더의 .java 밖 파일을 결과 폴더의 같은 자리에 복사합니다. */
+	private static void copyResources(final File sourceDir, final File out) throws IOException {
+		final Path base = sourceDir.toPath();
+		Files.walkFileTree(base, new SimpleFileVisitor<Path>() {
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+				return SKIP_DIRS.contains(dir.getFileName().toString()) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				if (!file.toString().endsWith(".java")) {
+					Path target = out.toPath().resolve(base.relativize(file).toString());
+					Files.createDirectories(target.getParent());
+					Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+				}
+				return FileVisitResult.CONTINUE;
+			}
+		});
+	}
+
 	/* ---------------------------------------------------------------- 구조 찾기 */
 
 	/** 원본 폴더를 보고 소스·클래스·의존성 위치를 찾습니다. */
 	private void detect(File root, Layout layout) throws IOException {
+		// 프로젝트 관리의 [Build]로 만든 리비전이면 그 빌드 결과(클래스·lib)를 그대로 쓴다(빌드 도구를 다시 부르지 않음)
+		File buildLayout = root.getParentFile() == null ? null : new File(root.getParentFile(), "build-layout.properties");
+		if (buildLayout != null && buildLayout.isFile()) {
+			java.util.Properties props = new java.util.Properties();
+			try (java.io.Reader reader = Files.newBufferedReader(buildLayout.toPath(), StandardCharsets.UTF_8)) {
+				props.load(reader);
+			}
+			String classes = props.getProperty("classesDir");
+			String lib = props.getProperty("libDir");
+			if (classes != null && new File(classes).isDirectory() && lib != null && new File(lib).isDirectory()) {
+				layout.kind = "리비전 빌드";
+				layout.classesDirs.add(new File(classes));
+				addJars(new File(lib), layout.jars);
+				for (String candidate : new String[] { "src/main/java", "src", "JavaSource" }) {
+					if (new File(root, candidate).isDirectory()) {
+						layout.sourceDirs.add(new File(root, candidate));
+						break;
+					}
+				}
+				return;
+			}
+		}
 		File pom = new File(root, "pom.xml");
 		File gradle = new File(root, "build.gradle");
 		File gradleKts = new File(root, "build.gradle.kts");
