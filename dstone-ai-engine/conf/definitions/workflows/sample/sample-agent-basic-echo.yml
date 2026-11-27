@@ -24,6 +24,7 @@ return: ${state.reply}
 steps:
 
   - id: reply
+    name: 01-reply
     type: AGENT
     agent: sample-basic-echo-agent
     with: ${input}

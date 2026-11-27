@@ -1,0 +1,31 @@
+{
+  "nodes" : {
+    "__START__" : {
+      "x" : 126,
+      "y" : 31
+    },
+    "reply" : {
+      "x" : 50,
+      "y" : 106
+    },
+    "END" : {
+      "x" : 126,
+      "y" : 183
+    },
+    "FAIL" : {
+      "x" : 304,
+      "y" : 234
+    }
+  },
+  "edges" : { },
+  "ports" : {
+    "__START__|start|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "reply|next|" : {
+      "source" : "out",
+      "target" : "in"
+    }
+  }
+}
