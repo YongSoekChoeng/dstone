@@ -61,7 +61,7 @@ class SkillToolTest {
 	}
 
 	private static SkillDefinition skill(String name) {
-		SkillDefinition.FrontMatter front = new SkillDefinition.FrontMatter(name, name + " 설명", null, null, null, null);
+		SkillDefinition.FrontMatter front = new SkillDefinition.FrontMatter(name, name + " 설명", null, null, null, null, null);
 		return new SkillDefinition("skills/" + name + "/SKILL.md", null, front, BODY);
 	}
 

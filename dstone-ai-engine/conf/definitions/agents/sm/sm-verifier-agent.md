@@ -26,8 +26,9 @@
 # 2.7.0(2026-11-28): PASS는 사용자가 화면에서 본 것으로만 낸다. 알린 오류는 건마다 번호를 붙인 id를 쓴다. 실행 5def8189에서 중복 안내가
 #   응답 본문의 스크립트에만 있고 화면에는 성공 안내가 뜨는 기능이 PASS였고, 알린 오류 여러 건이 같은 id라 결과가 섞였다.
 #   함께 고친 Skill: browser-testing(화면 들어가기, 반응이 없을 때), test-environment(5절).
+# 2.8.0(2026-11-28): 프로젝트의 항상 읽는 Skill(preload: true)이 처음부터 프롬프트에 붙는다. 평가 비교에서 전후를 가르려고 버전을 올린다.
 id: sm-verifier-agent
-version: 2.7.0
+version: 2.8.0
 description: 개발 결과를 테스트 서버에서 실행해 완료 기준마다 PASS, FAIL, BLOCKED와 관측한 근거를 낸다. 고치지 않는다.
 model:
   temperature: 0.2

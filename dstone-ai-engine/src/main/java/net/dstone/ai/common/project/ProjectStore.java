@@ -25,7 +25,7 @@ import net.dstone.common.utils.EncUtil;
  *
  * ## 테이블정의
  *   ai_management_project           PROJECT_ID(KEY), PROJECT_NAME, DESCRIPTION, SOURCE_DIR, SCM_TYPE, SCM_URL, SCM_USERNAME, SCM_PASSWORD_ENC, JAVA_VERSION,
- *                                   WAS_CONTAINER, WAS_VERSION, CONTEXT_PATH, BUILD_*(리비전 빌드), CURRENT_REVISION, TEST_USER_ID, TEST_PASSWORD_ENC, TEST_STATIC_PATHS, TEST_ENTRY_GUIDE, USE_YN
+ *                                   WAS_CONTAINER, WAS_VERSION, CONTEXT_PATH, BUILD_*(리비전 빌드), CURRENT_REVISION, TEST_USER_ID, TEST_PASSWORD_ENC, TEST_STATIC_PATHS, USE_YN
  *   ai_management_project_db        PROJECT_ID + DB_SEQ(KEY), DB_NAME, JDBC_URL, USERNAME, PASSWORD_ENC, SCHEMA_NAME, JNDI_NAME, DESCRIPTION, SORT_ORDER
  *   ai_management_project_revision  PROJECT_ID + REVISION(KEY). 리비전 빌드 기록(ProjectBuildService)
  *
@@ -86,7 +86,7 @@ public class ProjectStore extends BaseDao implements SecretSource {
 	 * 프로젝트를 만들거나 고칩니다. DB 목록은 통째로 바꿉니다.
 	 *
 	 * @param project {projectId, projectName, description, sourceDir, scmType, scmUrl, scmUsername, scmPassword?, javaVersion, wasContainer, wasVersion, contextPath,
-	 *                buildType, buildArgs, buildWebRoot, buildClassesDir, buildLibDir, buildSourceDirs, testUserId, testPassword?, testStaticPaths?, testEntryGuide?, useYn,
+	 *                buildType, buildArgs, buildWebRoot, buildClassesDir, buildLibDir, buildSourceDirs, testUserId, testPassword?, testStaticPaths?, useYn,
 	 *                dbs: [{dbSeq?, dbName, jdbcUrl, username, password?, schemaName, jndiName, description}]}
 	 * @param by      작업한 사람
 	 */
@@ -157,7 +157,6 @@ public class ProjectStore extends BaseDao implements SecretSource {
 		param.put("testUserId", testUserId);
 		param.put("testPasswordEnc", testPasswordEnc);
 		param.put("testStaticPaths", staticPathsText(text(project, "testStaticPaths")));
-		param.put("testEntryGuide", text(project, "testEntryGuide"));
 		param.put("useYn", "N".equals(text(project, "useYn")) ? "N" : "Y");
 		param.put("by", by);
 

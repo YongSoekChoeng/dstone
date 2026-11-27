@@ -7,12 +7,11 @@
 # 2026-11-24(실행 6d1784d8의 자동 수정 원인, 원본으로 확인): 팝업 저장을 그리드 저장 방식(@RequestBody)으로 받아 415,
 #   팝업에 세션 값(mb_id, 등록자)을 채우지 않아 업로드가 세션 mb_id를 빈 값으로 덮음, selectable만 두어 체크박스 열이 없음
 #   - "팝업 저장과 세션 값", "그리드 체크박스" 절에 적었습니다.
-# 2026-11-27: dstone-knowledge에 올린 Kendo UI 문서(묶음 kendo)를 언제, 어떻게 볼지 "올린 문서" 절에 적었습니다.
-#   문서는 testApp의 Kendo(v2016.1.112)보다 새 버전이라 기존 소스를 먼저 따르게 했습니다.
+# 2026-11-28: 화면 들어가는 법과 Kendo UI 문서 안내는 항상 읽는 testapp-basics로 옮겼습니다.
 # 2026-11-28(실행 5def8189): 예약 상세 팝업이 NULL 컬럼에서 ClassCastException, NumberFormatException으로 차례로 실패, DropDownList에
 #   undefined 표시, 그리드 template의 this.field 오류 - "bmap 값 꺼내기", "드롭다운과 그리드 template" 절에 적었습니다(원본 BaseMap, genexon.js, member.jsp로 확인).
 name: gnx-crud-screen
-description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 팝업 저장과 세션 값, 그리드 체크박스, 파일 업로드, bmap 조회 결과 꺼내기, 드롭다운과 그리드 template, 동작 검증의 관례와 Kendo UI 문서 찾는 법.
+description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 팝업 저장과 세션 값, 그리드 체크박스, 파일 업로드, bmap 조회 결과 꺼내기, 드롭다운과 그리드 template, 동작 검증의 관례.
 ---
 기본 참고 기능은 샘플게시판이다. 새 화면을 만들 때는 이 층별 파일을 참고 파일로 삼고, 달라지는 점만 적는다.
 
@@ -88,18 +87,8 @@ if(cnt != null && !"".equals(String.valueOf(cnt))) vo.setAttendee_cnt(Integer.pa
 - 이미지 처리: kr.co.gnx.comm.util.ImageUtil. 메서드 이름과 인자는 선언을 찾아 확인하고 쓴다.
 - 메뉴는 DB 테이블(tbsy_resource 등)에 등록한다. 소스가 아니므로 등록 SQL을 설계서에 적고, 실제 DB 반영은 사람이 한다.
 
-## 올린 문서
-
-Kendo UI 문서는 묶음 `kendo`에 올려 둔다. 문서 Tool(knowledgeSearchDocs)이 있으면, 기존 소스에서 쓰임을 찾지 못한
-Kendo 옵션·메서드·이벤트를 쓰기 전에 `collections=kendo`로 찾는다. 질문에는 컴포넌트와 이름을 함께 넣는다(예: `grid selectable`).
-
-이 프로젝트는 Kendo UI v2016.1.112이고 올린 문서는 더 새 버전이다.
-- 기존 소스에 같은 기능의 사용 예가 있으면 문서보다 소스를 따른다.
-- 문서에서만 확인한 옵션·메서드는 산출물에 "확인 필요(버전)"라고 적는다.
-- 문서 Tool이 없거나 검색 결과가 없으면 기존 소스를 기준으로 한다.
-
 ## 동작 검증
 
-- 로그인 뒤 index.go의 왼쪽 메뉴로 화면에 들어간다. 팝업은 메뉴 틀(genexon.body) 안에 열린다.
+- 화면은 testapp-basics의 "화면 들어가는 법"대로 들어간다. 팝업은 메뉴 틀(genexon.body) 안에 열린다.
 - 2026-11-23 실행 0bc967d2: 화면 주소(*.go)로 바로 연 팝업에서는 파일을 넣어도 업로드 요청(*.ajax)이 나가지 않았다. index.go 메뉴로 들어가 팝업의 Choose File을 누른 뒤 파일을 넣었을 때는 업로드가 됐다. 업로드가 안 되면 이 경로로 다시 해 본다.
 - 목록 페이지 크기는 화면 아래의 "N건 출력"이다. 페이지 넘김을 보려면 그보다 많은 행이 있어야 한다.

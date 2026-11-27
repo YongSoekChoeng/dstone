@@ -178,6 +178,24 @@ public class SkillRegistry extends BaseObject {
 
 	/**
 	 * <pre>
+	 * 고른 Skill 가운데 항상 읽는 것(preload: true) 또는 필요할 때 부르는 것만 돌려줍니다. 순서는 그대로입니다.
+	 * </pre>
+	 *
+	 * @param selected   select()로 고른 Skill
+	 * @param alwaysRead true면 항상 읽는 것, false면 필요할 때 부르는 것
+	 */
+	public static List<SkillDefinition> filter(List<SkillDefinition> selected, boolean alwaysRead) {
+		List<SkillDefinition> result = new ArrayList<>();
+		for (SkillDefinition skill : selected) {
+			if (skill.alwaysRead() == alwaysRead) {
+				result.add(skill);
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * <pre>
 	 * skills.allowed 항목의 ${input.…} 자리를 이번 호출의 input 값으로 채웁니다.
 	 *   projects/${input.project_id}/**  →  projects/my-project/**
 	 *

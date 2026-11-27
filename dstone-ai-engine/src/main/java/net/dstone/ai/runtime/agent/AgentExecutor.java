@@ -572,7 +572,7 @@ public class AgentExecutor extends BaseObject {
 			  없는 값은 빈 글자가 됩니다(${input.필드:기본값}이면 기본값).
 			- 이번에 처리할 데이터(input)는 사용자 메시지로도 함께 들어갑니다.
 		************************************************************************/
-		String taskPrompt = PromptText.render(agent.promptText(), input, agent.outputSchema()) + this.preloadedSkills(agent);
+		String taskPrompt = PromptText.render(agent.promptText(), input, agent.outputSchema()) + this.preloadedSkills(agent, input);
 		spec = spec.system(EnginePrompt.compose(engineRule, taskPrompt));
 
 		/************************************************************************
@@ -620,7 +620,7 @@ public class AgentExecutor extends BaseObject {
 		// 이 호출에서 이미 읽은 파일 범위와 받은 Skill을 적어 둘 장부입니다.
 		// 같은 범위를 또 읽으면 Tool을 실행하지 않고(RereadGuardCallback), 같은 Skill을 또 부르면 본문 대신 안내만 줍니다(SkillTool).
 		ReadHistory readHistory = this.environment.getProperty(Constants.Agent.TOOL_REREAD_GUARD, Boolean.class, Boolean.TRUE).booleanValue() ? new ReadHistory() : null;
-		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent, input), readHistory);
+		ToolCallback skillTool = SkillTool.build(agent.id(), SkillRegistry.filter(this.skillsOf(agent, input), false), readHistory);
 		if (skillTool != null) {
 			tools.add(this.configTool.limited(skillTool));
 		}
@@ -971,7 +971,8 @@ public class AgentExecutor extends BaseObject {
 
 	/**
 	 * <pre>
-	 * Agent의 skills.preload에 적은 Skill 본문을 업무 지시 뒤에 붙일 글로 만듭니다. 없으면 빈 글자입니다.
+	 * 처음부터 읽힐 Skill 본문을 업무 지시 뒤에 붙일 글로 만듭니다. 없으면 빈 글자입니다.
+	 * Agent의 skills.preload에 적은 것과, skills.allowed의 후보 가운데 머리말이 preload: true인 것입니다(같은 Skill은 한 번만).
 	 * 본문은 변수 치환을 하지 않습니다(Skill은 여러 Agent가 같이 쓰므로 특정 Agent의 input을 모릅니다).
 	 *
 	 *   [Skill: source-investigation]
@@ -979,15 +980,22 @@ public class AgentExecutor extends BaseObject {
 	 * </pre>
 	 *
 	 * @param agent Agent의 정의
+	 * @param input 이번 호출에서 Agent가 받은 값(skills.allowed의 ${input.…}을 채웁니다)
 	 */
-	private String preloadedSkills(AgentDefinition agent) {
-		StringBuilder text = new StringBuilder();
+	private String preloadedSkills(AgentDefinition agent, Object input) {
+		Map<String, SkillDefinition> skills = new LinkedHashMap<>();
 		for (String name : agent.preloadSkillNames()) {
 			SkillDefinition skill = this.skillRegistry.find(name);
-			if (skill == null) {
-				continue;
+			if (skill != null) {
+				skills.put(skill.name(), skill);
 			}
-			text.append("\n\n[Skill: ").append(name).append("]\n");
+		}
+		for (SkillDefinition skill : SkillRegistry.filter(this.skillsOf(agent, input), true)) {
+			skills.putIfAbsent(skill.name(), skill);
+		}
+		StringBuilder text = new StringBuilder();
+		for (SkillDefinition skill : skills.values()) {
+			text.append("\n\n[Skill: ").append(skill.name()).append("]\n");
 			if (skill.baseDir() != null && SkillTool.hasReferenceFiles(skill)) {
 				text.append("(이 Skill의 참고 파일은 ").append(skill.baseDir()).append(" 폴더에 있습니다.)\n");
 			}

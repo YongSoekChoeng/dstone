@@ -5,8 +5,9 @@
 # 2.3.0(2026-11-25): reference_code로 본뜰 기능의 코드(화면부터 SQL까지, 팝업 포함)를 받는다. 참고 파일은 거기서 고른다.
 # 2.4.0(2026-11-27): 원본 소스 루트를 source_dir로 받는다(2.9.0부터 요청서에 소스경로가 없다).
 # 2.5.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
+# 2.6.0(2026-11-28): 프로젝트의 항상 읽는 Skill(preload: true)이 처음부터 프롬프트에 붙는다. 평가 비교에서 전후를 가르려고 버전을 올린다.
 id: sm-architect-agent
-version: 2.5.0
+version: 2.6.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
   temperature: 0.2

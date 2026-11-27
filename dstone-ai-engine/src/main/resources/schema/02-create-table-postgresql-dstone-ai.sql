@@ -193,9 +193,6 @@ ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_PASSWORD_ENC VAR
 -- 예: 앱이 웹앱 밖 폴더에 저장한 업로드 파일을 /Upload 주소로 여는 경우. 임시 시험 서버(WAR + Tomcat)가 그 주소를 그 폴더로 연다.
 -- 폴더가 원본 소스 안이면 격리 시험 서버에서는 사본 쪽 폴더로 바꿔 연다(앱이 쓰는 경로도 사본으로 바뀌므로).
 ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_STATIC_PATHS TEXT;
--- 2026-11-28 추가. 테스트 서버에서 화면에 들어가는 법(시작 화면, 메뉴로 이동하는 순서 등)을 사람이 글로 적는다.
--- startTestServer 결과에 그대로 실려, 화면을 확인하는 Agent가 따로 찾아 읽지 않아도 받는다. 비우면 아무것도 싣지 않는다.
-ALTER TABLE ai_management_project ADD COLUMN IF NOT EXISTS TEST_ENTRY_GUIDE TEXT;
 CREATE TABLE IF NOT EXISTS ai_management_project_db (
     PROJECT_ID        VARCHAR(50)   NOT NULL REFERENCES ai_management_project(PROJECT_ID) ON DELETE CASCADE,
     DB_SEQ            INT           NOT NULL,
@@ -406,5 +403,4 @@ COMMENT ON COLUMN ai_management_project.CONTEXT_PATH     IS '원래 서버의 �
 COMMENT ON COLUMN ai_management_project.BUILD_TYPE       IS '빌드 종류(MAVEN/GRADLE/ANT/SHELL/NONE)';
 COMMENT ON COLUMN ai_management_project.BUILD_ARGS       IS '정해진 빌드 명령 뒤에 붙는 인자. SHELL 이면 등록된 스크립트 이름';
 COMMENT ON COLUMN ai_management_project.CURRENT_REVISION IS '테스트 서버가 쓰는 현재 리비전';
-COMMENT ON COLUMN ai_management_project.TEST_ENTRY_GUIDE IS '테스트 서버에서 화면에 들어가는 법(startTestServer 결과에 실림)';
 COMMENT ON TABLE  ai_management_project_revision          IS '리비전 빌드 기록([Build] 한 번 = 1행)';

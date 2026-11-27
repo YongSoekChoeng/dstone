@@ -22,7 +22,7 @@ public class SkillSelectTest {
 
 	/** 시험용 Skill 하나를 만듭니다. */
 	private static SkillDefinition skill(String path, String name) {
-		SkillDefinition.FrontMatter front = new SkillDefinition.FrontMatter(name, name + " 설명", null, null, null, null);
+		SkillDefinition.FrontMatter front = new SkillDefinition.FrontMatter(name, name + " 설명", null, null, null, null, null);
 		return new SkillDefinition(path, null, front, "본문");
 	}
 
@@ -81,6 +81,16 @@ public class SkillSelectTest {
 		for (String bad : List.of(" ", "..", "alpha/beta", "*")) {
 			assertThat(SkillRegistry.resolveEntries(entries, Map.of("project_id", bad))).containsExactly("sql-review");
 		}
+	}
+
+	@Test
+	void preload_표시가_있는_Skill만_항상_읽는_것으로_가른다() {
+		SkillDefinition.FrontMatter front = new SkillDefinition.FrontMatter("basics", "설명", null, null, null, null, Boolean.TRUE);
+		List<SkillDefinition> selected = List.of(new SkillDefinition("skills/projects/alpha/basics/SKILL.md", null, front, "본문"),
+			skill("skills/projects/alpha/a-conv/SKILL.md", "a-conv"));
+
+		assertThat(names(SkillRegistry.filter(selected, true))).containsExactly("basics");
+		assertThat(names(SkillRegistry.filter(selected, false))).containsExactly("a-conv");
 	}
 
 	@Test

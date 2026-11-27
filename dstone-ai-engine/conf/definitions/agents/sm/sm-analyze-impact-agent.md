@@ -6,8 +6,9 @@
 #   dstone-knowledge에서 그 기능의 코드를 화면부터 SQL까지 모아 설계 Agent에 넘긴다(Tool knowledgeFeatureCode).
 # 2.3.0(2026-11-27): 원본 소스 루트를 source_dir로 받는다(2.9.0부터 요청서에 소스경로가 없다).
 # 2.4.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
+# 2.5.0(2026-11-28): 프로젝트의 항상 읽는 Skill(preload: true)이 처음부터 프롬프트에 붙는다. 평가 비교에서 전후를 가르려고 버전을 올린다.
 id: sm-analyze-impact-agent
-version: 2.4.0
+version: 2.5.0
 description: 고객요구사항분석서의 TASK마다 고칠 파일, 호출 관계, 함께 영향받는 기능을 조사해 02.impact.md로 저장한다.
 model:
   temperature: 0.2

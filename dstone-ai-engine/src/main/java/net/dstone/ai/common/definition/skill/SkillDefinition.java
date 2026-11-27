@@ -20,12 +20,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *   ---
  *   name: sql-review                 ← (필수) 폴더 이름과 같아야 합니다. 영문 소문자, 숫자, 하이픈
  *   description: SQL을 검토할 때 ...  ← (필수) Agent가 이 설명을 보고 언제 쓸지 정합니다
+ *   preload: true                    ← (선택) 후보로 받는 Agent의 프롬프트에 처음부터 붙입니다
  *   ---
  *   # SQL 검토 순서                   ← 본문. Skill을 부르면 Agent에게 그대로 갑니다
  *   1. ...
  *
  * ■ 누가 쓰나
- *   Agent 머리말의 skills.allowed에 이름을 적은 Agent만 씁니다(runtime.agent.SkillTool).
+ *   Agent 머리말의 skills.allowed에 이름이나 폴더를 적은 Agent만 씁니다(runtime.agent.SkillTool).
+ *
+ * ■ 항상 읽는 Skill(preload: true)
+ *   일을 시작하기 전에 꼭 알아야 하는 짧은 안내에 씁니다. Skill Tool로 부를 때까지 기다리면 소스를 고친 뒤에야 읽기도 하므로,
+ *   이 Skill을 후보로 받는 Agent에게는 첫 호출부터 시스템 프롬프트에 본문을 붙이고 Skill Tool 목록에서는 뺍니다.
  * </pre>
  *
  * @param path    정의 폴더 기준 경로입니다(예: skills/sample/sql-review/SKILL.md).
@@ -38,7 +43,7 @@ public record SkillDefinition(String path, String baseDir, FrontMatter front, St
 	/**
 	 * <pre>
 	 * SKILL.md의 머리말입니다. 공개 형식의 키를 그대로 받습니다.
-	 * 엔진이 쓰는 것은 name과 description뿐이고, 나머지는 다른 곳에서 만든 Skill을 그대로 가져와도
+	 * 엔진이 쓰는 것은 name, description, preload이고, 나머지는 다른 곳에서 만든 Skill을 그대로 가져와도
 	 * 읽히게 하려고 받아만 둡니다. 이 밖의 키는 오타일 수 있어서 읽을 때 막습니다.
 	 * </pre>
 	 *
@@ -48,6 +53,7 @@ public record SkillDefinition(String path, String baseDir, FrontMatter front, St
 	 * @param compatibility 실행 환경 요구 사항입니다. 엔진은 쓰지 않습니다.
 	 * @param metadata      그 밖의 정보입니다. 엔진은 쓰지 않습니다.
 	 * @param allowedTools  공개 형식의 allowed-tools입니다. 엔진은 쓰지 않습니다(쓸 Tool은 Agent의 tools.allowed가 정합니다).
+	 * @param preload       true면 후보로 받는 Agent의 프롬프트에 처음부터 붙입니다. 없으면 Agent가 필요할 때 부릅니다.
 	 */
 	public record FrontMatter(
 		String name
@@ -56,12 +62,18 @@ public record SkillDefinition(String path, String baseDir, FrontMatter front, St
 		, String compatibility
 		, Map<String, Object> metadata
 		, @JsonProperty("allowed-tools") Object allowedTools
+		, Boolean preload
 		) {
 	}
 
 	/** Skill 이름입니다. */
 	public String name() {
 		return this.front == null ? null : this.front.name();
+	}
+
+	/** 후보로 받는 Agent의 프롬프트에 처음부터 붙이는 Skill인지 봅니다. */
+	public boolean alwaysRead() {
+		return this.front != null && Boolean.TRUE.equals(this.front.preload());
 	}
 
 	/** Skill 설명입니다. */
