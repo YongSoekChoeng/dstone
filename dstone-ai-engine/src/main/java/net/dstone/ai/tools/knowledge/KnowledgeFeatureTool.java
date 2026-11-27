@@ -93,7 +93,8 @@ public class KnowledgeFeatureTool extends BaseObject {
 			@ToolParam(description = "원본 소스 루트의 절대경로. 분석 결과의 상대경로를 여기에 붙여 읽는다") String sourceRoot,
 			@ToolParam(description = "본뜰 기능의 화면 파일 경로나 주소. 한 줄에 하나(목록 기호와 백틱은 무시)") String entries,
 			@ToolParam(description = "결과를 쓸 Markdown 파일의 절대경로") String outputFile,
-			@ToolParam(required = false, description = "문서 글자 수 한도. 비우면 56000") Integer maxChars) {
+			@ToolParam(required = false, description = "문서 글자 수 한도. 비우면 56000") Integer maxChars,
+			@ToolParam(required = false, description = "sourceRoot의 형상관리 리비전. 분석한 리비전과 다르면 경고를 남긴다") String sourceRevision) {
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
 		List<String> entryList = splitEntries(entries);
 		if (entryList.isEmpty()) {
@@ -103,12 +104,16 @@ public class KnowledgeFeatureTool extends BaseObject {
 			return fail(result, "projectId, sourceRoot, outputFile을 모두 주십시오.");
 		}
 		JsonNode feature;
+		String warning = null;
 		try {
 			long revisionId = this.knowledgeClient.latestRevision(projectId);
 			Map<String, String> params = new LinkedHashMap<String, String>();
 			// 서버는 쉼표로 나눈 값을 목록으로 받는다(주소와 파일 경로에는 쉼표가 없다)
 			params.put("entry", String.join(",", entryList));
 			feature = this.knowledgeClient.get("/api/revisions/" + revisionId + "/feature", params);
+			if (isScmRevision(sourceRevision)) {
+				warning = revisionWarning(this.labelOf(projectId, revisionId), sourceRevision.trim());
+			}
 		} catch (KnowledgeCallException e) {
 			return fail(result, e.getMessage());
 		}
@@ -128,6 +133,9 @@ public class KnowledgeFeatureTool extends BaseObject {
 		List<Piece> pieces = piecesOf(feature);
 		int limit = maxChars == null || maxChars.intValue() < 1000 ? DEFAULT_MAX_CHARS : maxChars.intValue();
 		String markdown = render(feature, pieces, new File(sourceRoot.trim()), limit, notFound);
+		if (warning != null) {
+			markdown = "> 주의: " + warning + "\n\n" + markdown;
+		}
 		try {
 			File out = new File(outputFile.trim());
 			if (out.getParentFile() != null) {
@@ -157,8 +165,39 @@ public class KnowledgeFeatureTool extends BaseObject {
 		result.put("notFound", notFound);
 		result.put("message", "본뜰 기능의 코드 " + included + "조각을 " + outputFile.trim() + "에 적었습니다"
 			+ (omitted.isEmpty() ? "." : ". 한도나 파일 문제로 위치만 적은 것 " + omitted.size() + "개.")
-			+ (notFound.isEmpty() ? "" : " 찾지 못한 시작점: " + String.join(", ", notFound)));
+			+ (notFound.isEmpty() ? "" : " 찾지 못한 시작점: " + String.join(", ", notFound))
+			+ (warning == null ? "" : " 주의: " + warning));
+		if (warning != null) {
+			result.put("warning", warning);
+		}
 		return result;
+	}
+
+	/* ======================= 리비전 맞춰 보기 ======================= */
+
+	private String labelOf(String projectId, long revisionId) throws KnowledgeCallException {
+		JsonNode revisions = this.knowledgeClient.get("/api/projects/" + projectId.trim() + "/revisions", null);
+		for (int i = 0; i < revisions.size(); i++) {
+			if (revisions.get(i).path("revisionId").asLong() == revisionId) {
+				return revisions.get(i).path("revisionLabel").asText("");
+			}
+		}
+		return "";
+	}
+
+	/** 형상관리 리비전인지 봅니다. 빈 값과 빌드 시각(yyyyMMdd-HHmmss)은 견줄 수 없어 아닙니다. */
+	static boolean isScmRevision(String revision) {
+		return revision != null && !revision.trim().isEmpty() && !revision.trim().matches("\\d{8}-\\d{6}");
+	}
+
+	/** 분석 리비전 이름이 소스 리비전(커밋 해시는 앞부분만 같아도 됨)과 맞지 않으면 경고 글, 맞으면 null. */
+	static String revisionWarning(String label, String sourceRevision) {
+		boolean hash = label.length() >= 7 && sourceRevision.length() >= 7;
+		if (label.equals(sourceRevision) || (hash && (label.startsWith(sourceRevision) || sourceRevision.startsWith(label)))) {
+			return null;
+		}
+		return "분석한 리비전(" + label + ")이 소스 리비전(" + sourceRevision + ")과 같다고 확인되지 않습니다. 그 사이 소스가 바뀌었으면 "
+			+ "아래 코드의 줄 범위가 어긋날 수 있으니 원본을 읽어 확인하십시오.";
 	}
 
 	/* ======================= 조각 만들기 ======================= */

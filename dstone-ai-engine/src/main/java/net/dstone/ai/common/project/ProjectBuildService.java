@@ -13,6 +13,8 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -23,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -34,6 +37,9 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.consts.Constants;
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowExecutionStore;
 import net.dstone.ai.tools.build.JavaCompileTool;
 import net.dstone.common.config.ConfigProperty;
 import net.dstone.common.core.BaseObject;
@@ -41,8 +47,9 @@ import net.dstone.common.core.BaseObject;
 /**
  * <pre>
  * 프로젝트 관리의 [Build]를 처리합니다(리비전 빌드). 설계: docs/temp/dstone-ai-테스트관련재설계/01.설계.md 4장.
+ * [Build]는 백그라운드 스레드로(startBuild), Workflow의 리비전 갱신은 끝날 때까지 기다려(refresh) 같은 순서를 밟습니다.
  *
- * ## 순서(백그라운드 스레드 하나, 같은 프로젝트는 한 번에 하나)
+ * ## 순서(같은 프로젝트는 한 번에 하나)
  * 1. 형상관리가 있으면 소스 디렉토리를 갱신한다(git pull --ff-only, svn update). 폴더가 비었으면 받는다(clone, checkout).
  * 2. 리비전 이름: 형상관리 리비전 앞 12자, 없으면 빌드 시각(yyyyMMdd-HHmmss).
  *    같은 리비전이 이미 OK면 다시 빌드하지 않고 현재 리비전만 바꾼다. INPUT(구조 입력 필요)이면 빌드 없이 구조만 다시 찾는다.
@@ -56,6 +63,10 @@ import net.dstone.common.core.BaseObject;
  *      NONE    엔진이 소스 전체를 javac(JavaCompileTool.compileAll) → rev/{리비전}/classes
  * 5. 산출물을 찾는다(detectOutputs). 경로는 리비전 폴더 기준 상대경로로 남긴다.
  * 6. 성공(OK)하면 현재 리비전을 바꾸고, 오래된 리비전을 지운다(keep-revisions, 실행이 쓰는 것과 현재 것은 남김).
+ *
+ * ## 리비전 정리
+ * 빌드에 성공하면 오래된 리비전을 지웁니다. 현재 리비전, 테스트 서버가 쓰는 리비전, 끝나지 않은 실행이 받아 간 리비전
+ * ({작업 루트}/{프로젝트ID}/pins/{실행ID})은 keep-revisions를 넘어도 지우지 않습니다.
  *
  * 형상관리 비밀번호는 명령줄에 싣지 않는다(git은 GIT_ASKPASS 스크립트가 환경변수에서 읽고, svn은 --password-from-stdin).
  * 리비전 폴더는 빌드가 끝나면 읽기만 한다. 고객의 소스 디렉토리 값은 바꾸지 않는다.
@@ -79,6 +90,9 @@ public class ProjectBuildService extends BaseObject {
 
 	/** 실행 폴더가 쓰는 리비전을 적어 두는 파일 이름(runs/{실행ID}/revision.txt). 정리할 때 이 리비전은 지우지 않습니다. */
 	public static final String RUN_REVISION_FILE = "revision.txt";
+
+	/** 실행이 받아 간 리비전을 적어 두는 폴더(pins/{실행ID}) */
+	private static final String PIN_DIR = "pins";
 
 	/** 리비전 폴더의 산출물 위치 안내 파일(JavaCompileTool이 읽음) */
 	public static final String LAYOUT_FILE = "build-layout.properties";
@@ -107,8 +121,17 @@ public class ProjectBuildService extends BaseObject {
 	@Autowired
 	private JavaCompileTool javaCompileTool;
 
-	/** 빌드 중인 프로젝트 */
-	private final Set<String> building = ConcurrentHashMap.newKeySet();
+	@Autowired
+	private WorkFlowExecutionStore executionStore;
+
+	/** 프로젝트별 빌드 차례(한 번에 하나, 먼저 온 순서대로) */
+	private final Map<String, Semaphore> buildTurns = new ConcurrentHashMap<String, Semaphore>();
+
+	/** 프로젝트별로 리비전을 받아 가는 일과 지우는 일이 겹치지 않게 하는 잠금 */
+	private final Map<String, Object> pinLocks = new ConcurrentHashMap<String, Object>();
+
+	/** 프로젝트별 마지막 빌드 실패. 기다리던 실행이 같은 리비전을 다시 빌드하지 않게 합니다 */
+	private final Map<String, BuildOutcome> lastFailures = new ConcurrentHashMap<String, BuildOutcome>();
 
 	/** 프로젝트별 마지막 빌드 안내(화면이 읽음) */
 	private final Map<String, String> lastMessage = new ConcurrentHashMap<String, String>();
@@ -143,7 +166,8 @@ public class ProjectBuildService extends BaseObject {
 			throw new IllegalArgumentException("빌드 종류를 먼저 저장하세요.");
 		}
 		checkArgs(text(project, "buildArgs"));
-		if (!this.building.add(projectId)) {
+		final Semaphore turn = this.buildTurn(projectId);
+		if (!turn.tryAcquire()) {
 			throw new IllegalStateException("이 프로젝트는 이미 빌드 중입니다.");
 		}
 		this.lastMessage.put(projectId, "빌드 중입니다.");
@@ -151,13 +175,13 @@ public class ProjectBuildService extends BaseObject {
 			@Override
 			public void run() {
 				try {
-					String message = ProjectBuildService.this.build(projectId, project, by);
-					ProjectBuildService.this.lastMessage.put(projectId, message);
+					BuildOutcome outcome = ProjectBuildService.this.build(projectId, project, by, 0L);
+					ProjectBuildService.this.lastMessage.put(projectId, outcome.message());
 				} catch (Exception e) {
 					ProjectBuildService.this.error("dstone-ai-engine project: 빌드 중 오류 " + projectId + ": " + e);
 					ProjectBuildService.this.lastMessage.put(projectId, "빌드 중 오류가 났습니다: " + e.getMessage());
 				} finally {
-					ProjectBuildService.this.building.remove(projectId);
+					turn.release();
 				}
 			}
 		}, "dstone-project-build-" + projectId);
@@ -166,10 +190,91 @@ public class ProjectBuildService extends BaseObject {
 		return "빌드를 시작했습니다. 몇 분 걸릴 수 있습니다.";
 	}
 
+	/**
+	 * <pre>
+	 * 형상관리에서 새 소스를 받아 리비전을 만들고 끝날 때까지 기다립니다([Build]와 같은 순서).
+	 * 새 커밋이 없으면 빌드하지 않고 지난 리비전을 그대로 씁니다. 같은 프로젝트를 빌드 중이면 차례를 기다립니다.
+	 * 형상관리가 없는 프로젝트(리비전 이름이 빌드 시각이라 매번 다시 빌드하게 됨)와 빌드 설정이 없는 프로젝트는 갱신하지 않습니다.
+	 * </pre>
+	 *
+	 * @return 갱신 결과. 갱신 대상이 아니면 null
+	 * @throws IllegalArgumentException 빌드 인자가 잘못됨
+	 */
+	public BuildOutcome refresh(String projectId, String by) throws IOException, InterruptedException {
+		if (!isRefreshable(this.projectStore.settings(projectId))) {
+			return null;
+		}
+		long asked = System.currentTimeMillis();
+		Semaphore turn = this.buildTurn(projectId);
+		turn.acquire();
+		try {
+			// 기다리는 동안 설정이 바뀌었을 수 있어 다시 읽는다
+			Map<String, Object> project = this.projectStore.settings(projectId);
+			if (!isRefreshable(project)) {
+				return null;
+			}
+			checkArgs(text(project, "buildArgs"));
+			this.lastMessage.put(projectId, "빌드 중입니다.");
+			BuildOutcome outcome = this.build(projectId, project, by, asked);
+			this.lastMessage.put(projectId, outcome.message());
+			return outcome;
+		} catch (IOException e) {
+			this.lastMessage.put(projectId, "빌드 중 오류가 났습니다: " + e.getMessage());
+			throw e;
+		} finally {
+			turn.release();
+		}
+	}
+
+	/** Workflow가 갱신할 수 있는 프로젝트인지(형상관리, 소스 디렉토리, 빌드 종류가 있는지) 봅니다. */
+	static boolean isRefreshable(Map<String, Object> project) {
+		if (project == null) {
+			return false;
+		}
+		String scmType = text(project, "scmType");
+		return ("GIT".equals(scmType) || "SVN".equals(scmType)) && !isBlank(text(project, "sourceDir")) && !isBlank(text(project, "buildType"));
+	}
+
+	private Semaphore buildTurn(String projectId) {
+		Semaphore turn = this.buildTurns.get(projectId);
+		if (turn == null) {
+			this.buildTurns.putIfAbsent(projectId, new Semaphore(1, true));
+			turn = this.buildTurns.get(projectId);
+		}
+		return turn;
+	}
+
+	private Object pinLock(String projectId) {
+		Object lock = this.pinLocks.get(projectId);
+		if (lock == null) {
+			this.pinLocks.putIfAbsent(projectId, new Object());
+			lock = this.pinLocks.get(projectId);
+		}
+		return lock;
+	}
+
+	/**
+	 * <pre>
+	 * resolve와 같지만, 실행이 이 리비전을 쓴다고 적어 두어 실행이 끝나기 전에는 지워지지 않게 합니다.
+	 * executionId가 없으면(Workflow 밖) 적지 않습니다.
+	 * </pre>
+	 */
+	public Map<String, Object> resolveAndPin(String projectId, String revision, String executionId) throws IOException {
+		synchronized (this.pinLock(projectId)) {
+			Map<String, Object> resolved = this.resolve(projectId, revision);
+			if (resolved != null && isSafeName(executionId)) {
+				File dir = new File(this.projectDir(projectId), PIN_DIR);
+				Files.createDirectories(dir.toPath());
+				Files.writeString(new File(dir, executionId).toPath(), String.valueOf(resolved.get("revision")), StandardCharsets.UTF_8);
+			}
+			return resolved;
+		}
+	}
+
 	/** 빌드 중인지와 마지막 안내입니다. */
 	public Map<String, Object> status(String projectId) {
 		Map<String, Object> result = new LinkedHashMap<String, Object>();
-		result.put("running", Boolean.valueOf(this.building.contains(projectId)));
+		result.put("running", Boolean.valueOf(this.buildTurn(projectId).availablePermits() == 0));
 		result.put("message", this.lastMessage.get(projectId));
 		return result;
 	}
@@ -270,7 +375,8 @@ public class ProjectBuildService extends BaseObject {
 
 	/* ---------------------------------------------------------------- 빌드 */
 
-	private String build(String projectId, Map<String, Object> project, String by) throws IOException, InterruptedException {
+	/** @param notBefore 이 시각 뒤에 같은 리비전이 이미 실패했으면 다시 빌드하지 않습니다(0이면 늘 빌드) */
+	private BuildOutcome build(String projectId, Map<String, Object> project, String by, long notBefore) throws IOException, InterruptedException {
 		File projectDir = this.projectDir(projectId);
 		Files.createDirectories(new File(projectDir, "rev").toPath());
 		String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -284,12 +390,12 @@ public class ProjectBuildService extends BaseObject {
 		if ("GIT".equals(scmType) || "SVN".equals(scmType)) {
 			String[] scm = this.updateSource(projectId, project, source, log, env);
 			if (scm[1] != null) {
-				return this.failEarly(projectId, stamp, by, log, "형상관리에서 소스를 받지 못했습니다: " + scm[1]);
+				return BuildOutcome.failure(stamp, this.failEarly(projectId, stamp, by, log, "형상관리에서 소스를 받지 못했습니다: " + scm[1]));
 			}
 			scmRevision = scm[0];
 		}
 		if (!source.isDirectory()) {
-			return this.failEarly(projectId, stamp, by, log, "소스 디렉토리가 없습니다: " + source);
+			return BuildOutcome.failure(stamp, this.failEarly(projectId, stamp, by, log, "소스 디렉토리가 없습니다: " + source));
 		}
 
 		// 2) 리비전 이름
@@ -299,7 +405,12 @@ public class ProjectBuildService extends BaseObject {
 		if (previous != null && STATUS_OK.equals(previous.get("status")) && revDir.isDirectory()) {
 			this.projectStore.setCurrentRevision(projectId, revision);
 			Files.deleteIfExists(log.toPath());
-			return "이미 빌드한 리비전이라 다시 빌드하지 않고 현재 리비전으로 정했습니다: " + revision;
+			return BuildOutcome.success(revision, "이미 빌드한 리비전이라 다시 빌드하지 않고 현재 리비전으로 정했습니다: " + revision);
+		}
+		BuildOutcome failed = this.lastFailures.get(projectId);
+		if (notBefore > 0 && failed != null && failed.revision().equals(revision) && failed.finishedAt() >= notBefore) {
+			Files.deleteIfExists(log.toPath());
+			return failed;
 		}
 		boolean onlyDetect = previous != null && STATUS_INPUT.equals(previous.get("status")) && new File(revDir, "src").isDirectory();
 		this.projectStore.startRevision(projectId, revision, scmRevision, by);
@@ -337,7 +448,7 @@ public class ProjectBuildService extends BaseObject {
 				result.put("status", STATUS_FAILED);
 				result.put("message", problem + "\n" + tail(revLog, LOG_TAIL_LINES));
 				this.projectStore.finishRevision(projectId, revision, result);
-				return "빌드에 실패했습니다(" + problem + "). 현재 리비전은 바꾸지 않았습니다. 로그: " + revLog;
+				return this.remember(projectId, BuildOutcome.failure(revision, "빌드에 실패했습니다(" + problem + "). 현재 리비전은 바꾸지 않았습니다. 로그: " + revLog));
 			}
 		}
 
@@ -346,12 +457,18 @@ public class ProjectBuildService extends BaseObject {
 		result.putAll(outputs);
 		this.projectStore.finishRevision(projectId, revision, result);
 		if (!STATUS_OK.equals(outputs.get("status"))) {
-			return String.valueOf(outputs.get("message"));
+			return this.remember(projectId, BuildOutcome.failure(revision, String.valueOf(outputs.get("message"))));
 		}
 		writeLayout(revDir, outputs);
 		this.projectStore.setCurrentRevision(projectId, revision);
+		this.lastFailures.remove(projectId);
 		this.cleanup(projectId, revision);
-		return "빌드했습니다. 현재 리비전: " + revision + " (" + outputs.get("kind") + ")";
+		return BuildOutcome.success(revision, "빌드했습니다. 현재 리비전: " + revision + " (" + outputs.get("kind") + ")");
+	}
+
+	private BuildOutcome remember(String projectId, BuildOutcome failure) {
+		this.lastFailures.put(projectId, failure);
+		return failure;
 	}
 
 	/** 리비전을 정하기 전에 실패한 것도 기록에 남깁니다(리비전 이름은 빌드 시각). */
@@ -635,8 +752,14 @@ public class ProjectBuildService extends BaseObject {
 
 	/* ---------------------------------------------------------------- 정리 */
 
-	/** 현재 리비전, 실행 폴더가 쓰는 리비전, 최근 keep-revisions개만 남기고 지웁니다. */
+	/** 현재 리비전, 실행이 쓰는 리비전, 최근 keep-revisions개만 남기고 지웁니다. */
 	private void cleanup(String projectId, String current) {
+		synchronized (this.pinLock(projectId)) {
+			this.deleteOldRevisions(projectId, current);
+		}
+	}
+
+	private void deleteOldRevisions(String projectId, String current) {
 		int keep = Integer.parseInt(this.config("keep-revisions", "3"));
 		Set<String> inUse = this.revisionsInUse(projectId);
 		List<Map<String, Object>> rows = this.projectStore.revisions(projectId);
@@ -660,9 +783,10 @@ public class ProjectBuildService extends BaseObject {
 		}
 	}
 
-	/** runs/{실행ID}/revision.txt 에 적힌 리비전들입니다. */
+	/** 실행이 받아 간 리비전(pins/{실행ID})과 테스트 서버가 쓰는 리비전(runs/{실행ID}/revision.txt)입니다. */
 	private Set<String> revisionsInUse(String projectId) {
 		Set<String> result = ConcurrentHashMap.newKeySet();
+		this.addPinnedRevisions(projectId, result);
 		File[] runs = new File(this.projectDir(projectId), "runs").listFiles();
 		if (runs == null) {
 			return result;
@@ -678,6 +802,59 @@ public class ProjectBuildService extends BaseObject {
 			}
 		}
 		return result;
+	}
+
+	/** 아직 이어질 수 있는 실행의 리비전을 모으고, 더는 필요 없는 표시는 지웁니다. */
+	private void addPinnedRevisions(String projectId, Set<String> result) {
+		File[] pins = new File(this.projectDir(projectId), PIN_DIR).listFiles();
+		if (pins == null) {
+			return;
+		}
+		int failedDays = Integer.parseInt(this.config("keep-failed-days", "7"));
+		for (File pin : pins) {
+			try {
+				boolean needed;
+				try {
+					WorkFlowExecution execution = this.executionStore.find(pin.getName());
+					needed = needsRevision(execution.status(), execution.updatedAt(), Instant.now(), failedDays);
+				} catch (IllegalArgumentException e) {
+					needed = false; // 없는 실행
+				} catch (RuntimeException e) {
+					this.warn("dstone-ai-engine project: 실행 상태를 읽지 못해 리비전을 남겨 둡니다: " + pin.getName() + ": " + e.getMessage());
+					needed = true;
+				}
+				if (needed) {
+					result.add(Files.readString(pin.toPath(), StandardCharsets.UTF_8).trim());
+				} else {
+					Files.deleteIfExists(pin.toPath());
+				}
+			} catch (IOException e) {
+				this.warn("dstone-ai-engine project: 리비전 표시를 처리하지 못했습니다: " + pin + ": " + e.getMessage());
+			}
+		}
+	}
+
+	/** 대기·진행·승인 대기·일시정지 중인 실행과, 실패한 지 failedDays일이 안 된 실행(다시 돌릴 수 있음)은 리비전이 필요합니다. */
+	static boolean needsRevision(WorkFlowExecutionStatus status, Instant updatedAt, Instant now, int failedDays) {
+		if (status == WorkFlowExecutionStatus.DONE || status == WorkFlowExecutionStatus.CANCELLED) {
+			return false;
+		}
+		if (status == WorkFlowExecutionStatus.FAILED) {
+			return updatedAt != null && updatedAt.plus(Duration.ofDays(failedDays)).isAfter(now);
+		}
+		return true;
+	}
+
+	/** 빌드 한 번의 결과입니다. finishedAt은 끝난 시각(밀리초)입니다. */
+	public record BuildOutcome(boolean ok, String revision, String message, long finishedAt) {
+
+		static BuildOutcome success(String revision, String message) {
+			return new BuildOutcome(true, revision, message, System.currentTimeMillis());
+		}
+
+		static BuildOutcome failure(String revision, String message) {
+			return new BuildOutcome(false, revision, message, System.currentTimeMillis());
+		}
 	}
 
 	/* ---------------------------------------------------------------- 도우미 */

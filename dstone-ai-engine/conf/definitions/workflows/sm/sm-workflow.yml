@@ -40,8 +40,10 @@
 #   개발 폴더는 설계를 승인하고 개발로 갈 때만 비웁니다(step16). 설계서에서 빠진 파일이 남지 않게 하려는 것입니다.
 #   [재개발]은 비우지 않고 있는 결과를 고치며, 고친 내용을 설계서에도 옮겨 적습니다. 그래서 나중에 폴더를 비워도 남습니다.
 #
-# [프로젝트와 리비전] 요청서의 '## 프로젝트ID'는 필수입니다(step02). step59가 프로젝트 관리의 현재 리비전([Build]로 빌드한
-#   소스와 산출물)을 state.projectRevision에 두고, 이 실행은 끝까지 그 리비전만 씁니다. 그 사이 새 [Build]가 있어도 영향이 없습니다.
+# [프로젝트와 리비전] 요청서의 '## 프로젝트ID'는 필수입니다(step02). step59가 형상관리에서 새 소스를 받아 빌드하고(refresh,
+#   프로젝트 관리의 [Build]와 같음. 새 커밋이 없으면 지난 리비전) 그 소스와 산출물을 state.projectRevision에 둡니다.
+#   갱신이나 빌드에 실패하면 실행도 실패합니다. 형상관리가 없는 프로젝트는 갱신하지 않고 현재 리비전을 씁니다.
+#   이 실행은 끝까지 그 리비전만 씁니다. 그 사이 새 리비전이 생겨도 영향이 없고, 실행이 끝나기 전에는 지워지지 않습니다.
 #   소스 경로도 리비전에서 옵니다(state.projectRevision.sourceRoot). 빌드한 리비전이 없으면 서버 기동 테스트 없이 개발 승인으로 갑니다.
 #   동작하지 않으면 재개발로 고칩니다(전문가 해결 경로는 없습니다).
 #
@@ -90,7 +92,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.12.0
+version: 2.13.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -135,6 +137,7 @@ steps:
     tool: resolveProjectRevision
     with:
       projectId: ${state.projectId}
+      refresh: true
     save: projectRevision
     next: step03
     onFailure: FAIL
@@ -694,6 +697,7 @@ steps:
       sourceRoot: ${state.projectRevision.sourceRoot}
       entries: ${state.referenceEntries}
       outputFile: ${input}/${state.now}/02-1.reference-code.md
+      sourceRevision: ${state.projectRevision.revision:}
     save: referenceResult
     saveError: referenceError
     next: step49

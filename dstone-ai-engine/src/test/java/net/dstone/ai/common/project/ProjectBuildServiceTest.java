@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.Attributes;
@@ -20,6 +22,8 @@ import java.util.zip.ZipEntry;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
 
 /**
  * 리비전 빌드의 산출물 찾기와 입력 검사를 빌드 도구 없이 확인합니다.
@@ -138,6 +142,28 @@ class ProjectBuildServiceTest {
 		File to = new File(this.temp.toFile(), "out");
 		ProjectBuildService.unzip(zip, "", to);
 		assertFalse(new File(this.temp.toFile(), "escape.txt").exists());
+	}
+
+	@Test
+	void revisionIsKeptWhileExecutionCanContinue() {
+		Instant now = Instant.parse("2026-11-27T00:00:00Z");
+		Instant old = now.minus(Duration.ofDays(30));
+		assertTrue(ProjectBuildService.needsRevision(WorkFlowExecutionStatus.WAITING_APPROVAL, old, now, 7));
+		assertTrue(ProjectBuildService.needsRevision(WorkFlowExecutionStatus.PAUSED, old, now, 7));
+		assertTrue(ProjectBuildService.needsRevision(WorkFlowExecutionStatus.FAILED, now.minus(Duration.ofDays(1)), now, 7));
+		assertFalse(ProjectBuildService.needsRevision(WorkFlowExecutionStatus.FAILED, old, now, 7));
+		assertFalse(ProjectBuildService.needsRevision(WorkFlowExecutionStatus.DONE, now, now, 7));
+	}
+
+	@Test
+	void onlyScmProjectWithBuildTypeIsRefreshed() {
+		Map<String, Object> project = project("MAVEN");
+		project.put("sourceDir", "/src");
+		assertFalse(ProjectBuildService.isRefreshable(project));
+		project.put("scmType", "GIT");
+		assertTrue(ProjectBuildService.isRefreshable(project));
+		project.remove("buildType");
+		assertFalse(ProjectBuildService.isRefreshable(project));
 	}
 
 	private static Map<String, Object> project(String buildType) {

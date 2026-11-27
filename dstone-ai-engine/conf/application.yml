@@ -336,6 +336,8 @@ dstone:
                 # 빌드 한 번의 시간 상한(분)과, 지우지 않고 남길 리비전 수(현재 리비전과 실행 중인 실행이 쓰는 것은 따로 남긴다)
                 build-timeout-minutes: 30
                 keep-revisions: 3
+                # 실패한 실행이 받아 간 리비전을 남겨 두는 날수(그 안에는 다시 돌릴 수 있다). 끝나지 않은 실행의 리비전은 늘 남긴다
+                keep-failed-days: 7
             # Jenkins Job을 REST API로 원격 기동하는 Tool(tools.jenkins.JenkinsTriggerBuildTool) 설정.
             # allowed-jobs가 비어 있으면(기본값) 이 Tool은 항상 실패로 끝난다 - 화이트리스트를
             # 채우는 것 자체가 곧 "이 Tool을 켠 상태"다. api-token은 DB 비밀번호와 동일한 ENC(...)
