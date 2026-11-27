@@ -354,7 +354,7 @@ steps:
     onFailure: step19
 
   - id: step19
-    name: 42-개발 승인
+    name: 42-개발완료 승인
     type: APPROVAL
     approval:
       approverRole: PL

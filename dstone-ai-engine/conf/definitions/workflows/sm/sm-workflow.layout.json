@@ -203,6 +203,14 @@
     "FAIL" : {
       "x" : 2300,
       "y" : 1054
+    },
+    "step63" : {
+      "x" : 40,
+      "y" : 1174
+    },
+    "step62" : {
+      "x" : 280,
+      "y" : 1174
     }
   },
   "edges" : {
@@ -574,19 +582,6 @@
     }, {
       "x" : 1416,
       "y" : 763
-    } ],
-    "step43|route|true" : [ {
-      "x" : 1694,
-      "y" : 521
-    }, {
-      "x" : 1694,
-      "y" : 484
-    }, {
-      "x" : 1416,
-      "y" : 484
-    }, {
-      "x" : 1416,
-      "y" : 55
     } ],
     "step45|next|" : [ {
       "x" : 1446,
@@ -1130,14 +1125,6 @@
     "step43|onFailure|" : {
       "source" : "left",
       "target" : "right"
-    },
-    "step43|route|true" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step43|route|false" : {
-      "source" : "out",
-      "target" : "in"
     },
     "step45|next|" : {
       "source" : "left",
