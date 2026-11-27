@@ -620,7 +620,7 @@ public class AgentExecutor extends BaseObject {
 		// 이 호출에서 이미 읽은 파일 범위와 받은 Skill을 적어 둘 장부입니다.
 		// 같은 범위를 또 읽으면 Tool을 실행하지 않고(RereadGuardCallback), 같은 Skill을 또 부르면 본문 대신 안내만 줍니다(SkillTool).
 		ReadHistory readHistory = this.environment.getProperty(Constants.Agent.TOOL_REREAD_GUARD, Boolean.class, Boolean.TRUE).booleanValue() ? new ReadHistory() : null;
-		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent), readHistory);
+		ToolCallback skillTool = SkillTool.build(agent.id(), this.skillsOf(agent, input), readHistory);
 		if (skillTool != null) {
 			tools.add(this.configTool.limited(skillTool));
 		}
@@ -962,10 +962,11 @@ public class AgentExecutor extends BaseObject {
 	 * </pre>
 	 *
 	 * @param agent Agent의 정의
+	 * @param input 이번 호출에서 Agent가 받은 값(skills.allowed의 ${input.…}을 채웁니다)
 	 */
-	private List<SkillDefinition> skillsOf(AgentDefinition agent) {
-		// 이름 하나씩 적은 것과 폴더 지정(projects/**)을 함께 풀어 줍니다.
-		return SkillRegistry.select(agent.skillNames(), this.skillRegistry.all());
+	private List<SkillDefinition> skillsOf(AgentDefinition agent, Object input) {
+		// ${input.…}을 이번 input으로 채운 뒤, 이름 하나씩 적은 것과 폴더 지정(projects/**)을 함께 풀어 줍니다.
+		return SkillRegistry.select(SkillRegistry.resolveEntries(agent.skillNames(), input), this.skillRegistry.all());
 	}
 
 	/**

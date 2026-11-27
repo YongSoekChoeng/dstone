@@ -4114,10 +4114,20 @@ var DstoneAiDesigner = (function () {
 		skillFolders.sort().forEach(function (folder) {
 			skillItems.push({ value: folder + "/**", label: folder + "/**", title: "skills/" + folder + " 아래 Skill 전부(Agent가 설명을 보고 골라 읽음)", group: "폴더 전체" });
 		});
+		// 하위 폴더가 있는 폴더는 입력값으로 하위 폴더 하나만 고를 수도 있다(예: projects/${input.project_id}/**). 이름이 _id로 끝나는 input마다 한 줄 만든다.
+		(picoFields(f.input) || []).filter(function (field) { return /_id$/.test(field.name); }).forEach(function (field) {
+			skillFolders.filter(function (folder) {
+				return skillFolders.some(function (other) { return other.indexOf(folder + "/") === 0; });
+			}).forEach(function (folder) {
+				var value = folder + "/${input." + field.name + "}/**";
+				skillItems.push({ value: value, label: value, title: "이번 호출의 input " + field.name + " 값과 이름이 같은 하위 폴더의 Skill만", group: "폴더 전체" });
+			});
+		});
 		skills.concat(preloadSkills).forEach(function (name) {
 			if (!(catalog.skills || []).some(function (skill) { return skill.name === name; })
 					&& !skillItems.some(function (item) { return item.value === name; })) {
-				skillItems.push({ value: name, label: name, note: "등록되지 않음" });
+				// 직접 적은 ${input.…} 폴더 지정은 엔진이 검사하므로 '등록되지 않음'을 붙이지 않는다.
+				skillItems.push(name.indexOf("${") >= 0 ? { value: name, label: name, group: "폴더 전체" } : { value: name, label: name, note: "등록되지 않음" });
 			}
 		});
 		// Sub Agent 목록: 자기 자신은 빼고, 맡을 수 없는 Agent(설명이 없거나 자기 Sub Agent가 있는 것)는 고를 수 없게 둔다.

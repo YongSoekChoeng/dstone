@@ -17,8 +17,9 @@
 # 2.3.0(2026-11-27): 실행 5def8189에서 한 회차가 기준 2건만 답해 지난 결과가 사라졌고, 다음 회차가 19건을 거의 다 다시 하다
 #   Tool 한도(120)를 써서 알린 증상과 가까운 저장 확인을 못 끝냈다. 기준마다 id를 받고 Workflow가 id로 쌓는다.
 #   이 Agent는 이번에 확인한 것만 답하고, 알린 증상 → 바뀐 파일의 기준 → 지난 FAIL·BLOCKED → 나머지 순으로 본다.
+# 2.4.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
 id: sm-verifier-agent
-version: 2.3.0
+version: 2.4.0
 description: 개발 결과를 테스트 서버에서 실행해 완료 기준마다 PASS, FAIL, BLOCKED와 관측한 근거를 낸다. 고치지 않는다.
 model:
   temperature: 0.2
@@ -69,7 +70,7 @@ skills:
     - test-environment
     - browser-testing
   allowed:
-    - projects/**
+    - projects/${input.project_id}/**
 execution:
   maxToolCalls: 120
   # 테스트 서버가 뜨기 전에는 DB·다른 서버로 가는 길을 열지 않는다(거기서 바꾼 것은 원복되지 않음)

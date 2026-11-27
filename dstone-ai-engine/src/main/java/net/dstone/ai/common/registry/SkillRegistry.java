@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import net.dstone.ai.common.consts.Constants;
 import net.dstone.ai.common.definition.skill.SkillDefinition;
+import net.dstone.ai.common.expression.ContextResolver;
 import net.dstone.ai.common.loader.YamlDefinitionLoader;
 import net.dstone.common.core.BaseObject;
 import net.dstone.common.utils.LogUtil;
@@ -146,6 +147,7 @@ public class SkillRegistry extends BaseObject {
 	 * 항목은 두 가지 모양입니다.
 	 *   sql-review      ← Skill 이름 하나
 	 *   projects/**     ← skills/projects/ 아래에 있는 Skill 전부(폴더 지정)
+	 * ${input.…}이 든 항목은 resolveEntries()로 먼저 채운 뒤 넘깁니다.
 	 *
 	 * 폴더 지정은 프로젝트마다 다른 관례 Skill을 위해 둡니다. 새 프로젝트가 생겨도 Skill 폴더만 더하면 되고,
 	 * Agent 정의는 고치지 않아도 됩니다. Agent는 Skill 설명을 보고 지금 소스에 맞는 것만 꺼내 읽습니다.
@@ -172,6 +174,69 @@ public class SkillRegistry extends BaseObject {
 			}
 		}
 		return new ArrayList<>(selected.values());
+	}
+
+	/**
+	 * <pre>
+	 * skills.allowed 항목의 ${input.…} 자리를 이번 호출의 input 값으로 채웁니다.
+	 *   projects/${input.project_id}/**  →  projects/my-project/**
+	 *
+	 * 값이 비었거나 폴더 이름 하나가 아니면(/, \, * 가 들었거나 . 또는 ..) 그 항목은 뺍니다.
+	 * 값 때문에 후보 범위가 넓어지면 안 되기 때문입니다. ${ }가 없는 항목은 그대로 둡니다.
+	 * </pre>
+	 *
+	 * @param entries skills.allowed에 적은 항목
+	 * @param input   이번 호출에서 Agent가 받은 값
+	 */
+	public static List<String> resolveEntries(List<String> entries, Object input) {
+		Map<String, Object> context = new LinkedHashMap<>();
+		context.put(Constants.WorkFlow.Context.INPUT, input);
+		List<String> resolved = new ArrayList<>();
+		for (String entry : entries) {
+			if (!isDynamic(entry)) {
+				resolved.add(entry);
+				continue;
+			}
+			String filled = entry;
+			for (ContextResolver.Reference reference : ContextResolver.references(entry)) {
+				Object value = ContextResolver.resolve(reference.text(), context, null);
+				String segment = value == null ? "" : value.toString().strip();
+				if (!isFolderName(segment)) {
+					filled = null;
+					break;
+				}
+				filled = filled.replace(reference.text(), segment);
+			}
+			if (filled != null) {
+				resolved.add(filled);
+			}
+		}
+		return resolved;
+	}
+
+	/** 호출할 때 값을 채워야 하는(${ }가 든) 항목인지 봅니다. */
+	public static boolean isDynamic(String entry) {
+		return entry != null && entry.contains(ContextResolver.PREFIX);
+	}
+
+	/**
+	 * ${ }가 든 폴더 지정이 가리킬 수 있는 가장 넓은 폴더 지정입니다. 부팅 때처럼 input 값이 없을 때 후보를 봅니다.
+	 *
+	 * @param entry projects/${input.project_id}/** 같은 항목
+	 * @return projects/** 같은 항목. ${ } 앞에 폴더 이름이 없으면 null
+	 */
+	public static String widestPattern(String entry) {
+		if (!isDynamic(entry)) {
+			return entry;
+		}
+		int slash = entry.lastIndexOf('/', entry.indexOf(ContextResolver.PREFIX));
+		return slash <= 0 ? null : entry.substring(0, slash) + FOLDER_PATTERN_SUFFIX;
+	}
+
+	/** 채운 값이 폴더 이름 하나로 쓸 수 있는 모양인지 봅니다. */
+	private static boolean isFolderName(String value) {
+		return !value.isEmpty() && !value.equals(".") && !value.equals("..")
+			&& value.indexOf('/') < 0 && value.indexOf('\\') < 0 && value.indexOf('*') < 0;
 	}
 
 	/** projects/**처럼 폴더를 가리키는 항목인지 봅니다. */

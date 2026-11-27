@@ -68,6 +68,7 @@ import net.dstone.common.utils.StringUtil;
  *   오류(기동 실패)                                         경고(로그만)
  *   skills.allowed/preload에 등록되지 않은 Skill 이름을 적음  Skill 폴더에 참고 파일이 있는데 tools.allowed에 readFile이 없음
  *   skills.preload에 폴더 지정(projects/**)을 적음         skills.allowed의 폴더 지정에 걸리는 Skill이 없음(폴더마다 한 줄 [안내])
+ *   ${ }가 든 항목이 폴더 지정이 아니거나, input에 없는 값을 읽음
  *   엔진이 붙이는 Tool 이름(Skill, TaskOutput)과 같은 이름의 Tool이나 Sub Agent가 있음
  * </pre>
  */
@@ -506,13 +507,18 @@ public class AgentRegistry extends BaseObject {
 		}
 		boolean needsReadFile = false;
 		for (String name : definition.skillNames()) {
+			if (SkillRegistry.isDynamic(name)) {
+				this.checkDynamicSkill(definition, name);
+			}
 			if (SkillRegistry.isFolderPattern(name)) {
 				// 폴더 지정(projects/**)은 그 폴더가 아직 비어 있을 수 있습니다. 모아 두었다가 check()가 폴더마다 한 줄로 알립니다.
-				if (!SkillRegistry.matchesAny(name, skills)) {
-					List<String> users = emptyFolders.get(name);
+				// ${input.…}이 든 것은 값을 아직 모르므로 그 앞 폴더에 Skill이 있는지만 봅니다.
+				String widest = SkillRegistry.widestPattern(name);
+				if (!SkillRegistry.matchesAny(widest, skills)) {
+					List<String> users = emptyFolders.get(widest);
 					if (users == null) {
 						users = new ArrayList<>();
-						emptyFolders.put(name, users);
+						emptyFolders.put(widest, users);
 					}
 					users.add(definition.id());
 				}
@@ -523,7 +529,11 @@ public class AgentRegistry extends BaseObject {
 				throw new IllegalStateException(where + "skills.allowed에 적은 '" + name + "'는 등록된 Skill이 아닙니다(conf/definitions/skills 아래 SKILL.md의 name). 등록된 Skill = " + skills.keySet());
 			}
 		}
-		for (SkillDefinition skill : SkillRegistry.select(definition.skillNames(), skills)) {
+		List<String> candidates = new ArrayList<>();
+		for (String name : definition.skillNames()) {
+			candidates.add(SkillRegistry.widestPattern(name));
+		}
+		for (SkillDefinition skill : SkillRegistry.select(candidates, skills)) {
 			needsReadFile = needsReadFile || SkillTool.hasReferenceFiles(skill);
 		}
 		for (String name : definition.preloadSkillNames()) {
@@ -539,6 +549,37 @@ public class AgentRegistry extends BaseObject {
 		if (needsReadFile && !definition.allowsAllTools() && !definition.toolNames().contains(SkillTool.READ_TOOL)) {
 			LogUtil.sysout("dstone-ai-engine agent: [경고] " + where + "Skill 폴더에 참고 파일이 있지만 tools.allowed에 " + SkillTool.READ_TOOL
 				+ "가 없습니다. 이 Agent는 Skill 본문만 읽고 참고 파일은 열지 못합니다.");
+		}
+	}
+
+	/**
+	 * <pre>
+	 * ${ }가 든 skills.allowed 항목을 검사합니다. 폴더 지정이어야 하고, ${ } 앞에 폴더 이름이 있어야 하며,
+	 * Agent input에 있는 값만 읽을 수 있습니다. 예: projects/${input.project_id}/**
+	 * </pre>
+	 *
+	 * @param definition 검사할 Agent 정의
+	 * @param entry      ${ }가 든 항목
+	 */
+	private void checkDynamicSkill(AgentDefinition definition, String entry) {
+		String where = "agent[" + definition.id() + "]의 skills.allowed의 '" + entry + "' - ";
+		List<ContextResolver.Reference> references;
+		try {
+			references = ContextResolver.references(entry);
+		} catch (RuntimeException e) {
+			throw new IllegalStateException(where + e.getMessage());
+		}
+		if (!SkillRegistry.isFolderPattern(entry) || SkillRegistry.widestPattern(entry) == null) {
+			throw new IllegalStateException(where + "${ }는 폴더 지정에만 쓰고 앞에 폴더 이름을 둡니다. 예: projects/${input.project_id}/**");
+		}
+		for (ContextResolver.Reference reference : references) {
+			if (!"input".equals(reference.root())) {
+				throw new IllegalStateException(where + "이 Agent가 받은 input만 읽을 수 있습니다(" + reference.text() + ").");
+			}
+			String problem = JsonSchemaUtil.checkPath(definition.inputSchema(), "input", reference.path());
+			if (problem != null) {
+				throw new IllegalStateException(where + problem);
+			}
 		}
 	}
 

@@ -4,13 +4,15 @@
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 2.3.0(2026-11-25): reference_code로 본뜰 기능의 코드(화면부터 SQL까지, 팝업 포함)를 받는다. 참고 파일은 거기서 고른다.
 # 2.4.0(2026-11-27): 원본 소스 루트를 source_dir로 받는다(2.9.0부터 요청서에 소스경로가 없다).
+# 2.5.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
 id: sm-architect-agent
-version: 2.4.0
+version: 2.5.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
   temperature: 0.2
   reasoning: high
 input:
+  project_id?: string, 프로젝트ID. 이 프로젝트의 관례 Skill을 고르는 데 쓴다
   base_dir: string, 작업 폴더의 절대경로
   request: string, 고객 요청서(00.request.md)의 내용. 프로젝트ID가 들어 있다
   source_dir?: string, 원본 소스 루트의 절대경로. 파일 Tool에는 이 아래의 절대경로를 주고, 상대경로는 여기에 붙인다
@@ -48,7 +50,7 @@ skills:
     - source-investigation
     - document-writing
   allowed:
-    - projects/**
+    - projects/${input.project_id}/**
 execution:
   maxAttempts: 2
   onInvalidOutput: RETRY

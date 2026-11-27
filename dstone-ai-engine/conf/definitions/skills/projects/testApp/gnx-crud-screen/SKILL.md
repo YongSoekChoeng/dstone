@@ -1,6 +1,6 @@
 ---
 # 프로젝트 testApp(패키지 kr.co.gnx, Spring MVC + MyBatis + JSP/Kendo UI)의 관례입니다.
-# skills/projects/{프로젝트ID}/ 아래 Skill은 그 프로젝트에만 맞는 관례입니다. Agent는 skills.allowed의 'projects/**' 한 줄로 받고,
+# skills/projects/{프로젝트ID}/ 아래 Skill은 그 프로젝트에만 맞는 관례입니다. Agent는 skills.allowed의 'projects/${input.project_id}/**' 한 줄로 받고,
 # 설명을 보고 지금 소스에 맞는 것만 불러 읽습니다. 범용 Skill(skills/sm)과 Agent 프롬프트에는 이런 이름을 적지 않습니다.
 # 2026-11-23 실행 0bc967d2: 그리드 버튼 핸들러를 링크 onclick으로 옮기며 this가 어긋남, 팝업 Controller가 json_string을 풀지 않음,
 #   검증이 화면 주소로 바로 들어가 업로드를 못 함 - 세 가지를 아래 "그리드 행 클릭과 팝업", "동작 검증" 절에 적었습니다.

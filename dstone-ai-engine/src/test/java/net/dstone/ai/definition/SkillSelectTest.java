@@ -58,6 +58,32 @@ public class SkillSelectTest {
 	}
 
 	@Test
+	void input_값으로_채운_폴더의_Skill만_준다() {
+		Map<String, SkillDefinition> map = new LinkedHashMap<String, SkillDefinition>();
+		map.put("a-conv", skill("skills/projects/alpha/a-conv/SKILL.md", "a-conv"));
+		map.put("b-conv", skill("skills/projects/beta/b-conv/SKILL.md", "b-conv"));
+		List<String> entries = List.of("projects/${input.project_id}/**");
+
+		List<String> resolved = SkillRegistry.resolveEntries(entries, Map.of("project_id", "alpha"));
+
+		assertThat(resolved).containsExactly("projects/alpha/**");
+		assertThat(names(SkillRegistry.select(resolved, map))).containsExactly("a-conv");
+		assertThat(SkillRegistry.widestPattern(entries.get(0))).isEqualTo("projects/**");
+		assertThat(SkillRegistry.widestPattern("${input.project_id}/**")).isNull();
+	}
+
+	@Test
+	void 값이_없거나_폴더_이름이_아니면_그_항목을_뺀다() {
+		List<String> entries = List.of("sql-review", "projects/${input.project_id}/**");
+
+		assertThat(SkillRegistry.resolveEntries(entries, Map.of())).containsExactly("sql-review");
+		assertThat(SkillRegistry.resolveEntries(entries, null)).containsExactly("sql-review");
+		for (String bad : List.of(" ", "..", "alpha/beta", "*")) {
+			assertThat(SkillRegistry.resolveEntries(entries, Map.of("project_id", bad))).containsExactly("sql-review");
+		}
+	}
+
+	@Test
 	void 걸리는_Skill이_없는_폴더_지정을_알아본다() {
 		assertThat(SkillRegistry.isFolderPattern("projects/**")).isTrue();
 		assertThat(SkillRegistry.isFolderPattern("projects")).isFalse();

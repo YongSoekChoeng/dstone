@@ -16,8 +16,9 @@
 # 2.2.0(2026-11-27): 지난 검증 뒤로 실제로 바뀐 줄(recent_changes, step40 fileChanges의 diff)을 받는다. 지난 수정이 무엇을 바꿨는지
 #   설계서 수정 이력(Agent의 설명)이 아니라 사실로 보게 하려는 것이다(실행 0fb4c669의 roomRes[0] → roomRes).
 # 2.3.0(2026-11-27): 검증 결과를 기준마다 쌓아 받는다(sm-workflow 2.14.0). carried인 FAIL은 그 뒤에 이미 고쳤을 수 있어 먼저 확인한다.
+# 2.4.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
 id: sm-auto-fix-agent
-version: 2.3.0
+version: 2.4.0
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -80,7 +81,7 @@ skills:
     - test-environment
     - browser-testing
   allowed:
-    - projects/**
+    - projects/${input.project_id}/**
 execution:
   maxToolCalls: 120
   toolPrerequisites:
