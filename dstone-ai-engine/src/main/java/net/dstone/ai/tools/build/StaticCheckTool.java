@@ -120,12 +120,14 @@ public class StaticCheckTool extends BaseObject {
 
 	/* ============================== 문서 ============================== */
 
-	@Tool(description = "Markdown 문서들의 형식 오류를 찾는다: 닫히지 않은 코드 블록(```), 칸 수가 머리줄과 다른 표 줄. ddlFile을 주면 격리 시험 서버와 같은 규칙으로 DDL을 읽어 본다. "
+	@Tool(description = "Markdown 문서들의 형식 오류를 찾는다: 닫히지 않은 코드 블록(```), 칸 수가 머리줄과 다른 표 줄. ddlFile을 주면 격리 시험 서버와 같은 규칙으로 DDL을 읽어 본다. sizeLimits를 주면 글자 수 상한을 넘은 문서도 찾는다. "
 		+ "{route: ok | problem, problems(파일:줄 내용), checked, skipped, message}를 돌려준다. 없는 문서는 건너뛴다.")
 	public Map<String, Object> checkDocuments(
 			@ToolParam(description = "검사할 Markdown 파일의 절대경로 목록") List<String> files,
-			@ToolParam(required = false, description = "DDL 파일(.sql 또는 ```sql 블록이 든 .md)의 절대경로. 없으면 비운다") String ddlFile) {
+			@ToolParam(required = false, description = "DDL 파일(.sql 또는 ```sql 블록이 든 .md)의 절대경로. 없으면 비운다") String ddlFile,
+			@ToolParam(required = false, description = "글자 수 상한을 볼 문서. {path, maxChars} 항목의 목록. 없으면 비운다") List<Map<String, Object>> sizeLimits) {
 		Report report = new Report();
+		checkSizes(sizeLimits, report);
 		if (files != null) {
 			for (int i = 0; i < files.size(); i++) {
 				String path = files.get(i);
@@ -159,6 +161,27 @@ public class StaticCheckTool extends BaseObject {
 			}
 		}
 		return report.toResult("문서");
+	}
+
+	/** 글자 수가 상한을 넘은 문서. 없는 파일과 상한이 없는 항목은 건너뜁니다 */
+	static void checkSizes(List<Map<String, Object>> sizeLimits, Report report) {
+		if (sizeLimits == null) {
+			return;
+		}
+		for (int i = 0; i < sizeLimits.size(); i++) {
+			Map<String, Object> item = sizeLimits.get(i);
+			Object path = item == null ? null : item.get("path");
+			Object max = item == null ? null : item.get("maxChars");
+			if (path == null || max == null) {
+				continue;
+			}
+			File file = new File(path.toString().trim());
+			String text = file.isFile() ? FileTool.readText(file) : null;
+			int limit = Integer.parseInt(max.toString().trim());
+			if (text != null && text.length() > limit) {
+				report.add(file.getName(), 0, "크기 초과: " + text.length() + "자로 상한 " + limit + "자를 넘음");
+			}
+		}
 	}
 
 	/** 코드 블록 짝과 표 칸 수 */

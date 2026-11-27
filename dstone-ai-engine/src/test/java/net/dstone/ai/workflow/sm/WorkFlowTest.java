@@ -73,7 +73,7 @@ public class WorkFlowTest extends WorkflowTestBase {
 		flow.jumpTo("step14");
 		// 설계서와 목록을 한 step(readFiles)에서 읽고, 목록이 없으면(required) 그 자리에서 실패한다
 		flow.step("step14");
-		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(flow.currentStepId()).isEqualTo("step13");
 		assertThat(this.chatModel.prompts()).isEmpty();
 	}
 

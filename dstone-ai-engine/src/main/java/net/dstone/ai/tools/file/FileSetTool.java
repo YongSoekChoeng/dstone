@@ -51,7 +51,8 @@ public class FileSetTool {
 	 *
 	 * 항목을 맵으로 주면 파일마다 아래를 정할 수 있습니다. 여러 문서를 TOOL step 하나로 읽어 Agent마다 넘길 때 씁니다.
 	 *   name:     결과에 이 이름으로도 내용을 둡니다(${state.저장이름.name}으로 읽음). files·missing·text는 쓸 수 없습니다.
-	 *   maxChars: 통째로 받아야 하는 파일. 이보다 크면 자르지 않고 실패합니다(readFile의 maxChars와 같음).
+	 *   maxChars: 통째로 받아야 하는 파일. 이보다 크면 자르지 않고 실패합니다.
+	 *             readFile과 달리 max-result-chars에 묶이지 않습니다(결과가 LLM 대화가 아니라 state로 가기 때문).
 	 *   required: true면 파일이 없을 때 실패합니다. 문서가 없는 채로 다음 Agent에 넘어가지 않게 합니다.
 	 * YAML 예: 설계서와 태스크아이템 목록을 한 번에
 	 *   tool: readFiles
@@ -86,7 +87,10 @@ public class FileSetTool {
 			}
 			String content = contents.get(path);
 			if (content == null) {
-				content = this.fileTool.readFile(path, maxCharsOf(options.get("maxChars")));
+				Integer maxChars = maxCharsOf(options.get("maxChars"));
+				content = maxChars != null && maxChars.intValue() > 0
+					? this.fileTool.readWholeFile(path, maxChars.intValue())
+					: this.fileTool.readFile(path);
 				if (content == null || content.startsWith(Constants.Outcome.FAIL_PREFIX)) {
 					return this.fail(content == null ? "파일을 읽지 못했습니다: " + path : content);
 				}

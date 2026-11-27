@@ -162,12 +162,14 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 
 	@Test
 	void 상한보다_큰_설계서는_잘린_채로_넘기지_않는다() throws IOException {
-		this.write("03-1.design.md", "x".repeat(60001));
+		this.write("03-1.design.md", "x".repeat(100001));
 		WorkflowStepper flow = this.atStep("step14");
 		flow.step("step14");
 
-		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(flow.execution().errorMessage()).contains("60001");
+		// 승인 뒤에 실행을 끝내지 않고 설계 승인으로 돌려보낸다. 잘린 문서 대신 실패 이유가 남는다
+		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(flow.currentStepId()).isEqualTo("step13");
+		assertThat(String.valueOf(flow.state("docs"))).contains("100001").doesNotContain("xxxxxxxxxx");
 	}
 
 	@Test

@@ -302,6 +302,7 @@ public class FileTool {
 	 * (2026-11-19, sm-workflow 개발 step이 30000자에서 잘린 설계서를 받고 출력 한도를 다 쓴 일).
 	 * 엔진은 Tool 결과를 dstone.ai.tool.max-result-chars(기본 60000자)에서 한 번 더 자릅니다.
 	 * 그래서 maxChars를 그보다 크게 적어도, 그 값을 넘는 파일은 실패입니다.
+	 * 결과가 LLM 대화에 쌓이지 않는 TOOL step 전용 Tool(readFiles)은 이 상한이 없는 readWholeFile을 씁니다.
 	 * </pre>
 	 *
 	 * @param fileFullPath 읽을 파일의 절대경로
@@ -330,6 +331,27 @@ public class FileTool {
 		}
 		return contents.substring(0, limit)
 			+ "\n\n...(파일이 커서 전체 " + contents.length() + "자 중 앞 " + limit + "자만 반환했습니다. 끝부분이 필요하면 readFileTail을 사용하세요.)";
+	}
+
+	/**
+	 * <pre>
+	 * 파일을 통째로 읽습니다. maxChars보다 크면 자르지 않고 "실패: ..."로 답합니다.
+	 * max-result-chars(LLM에게 돌려주는 Tool 결과 상한)는 적용하지 않으므로, 결과가 state로 가는 TOOL step 전용 Tool에서만 부릅니다.
+	 * </pre>
+	 *
+	 * @param fileFullPath 읽을 파일의 절대경로
+	 * @param maxChars     통째로 받을 수 있는 최대 글자 수
+	 */
+	String readWholeFile(String fileFullPath, int maxChars) {
+		String contents = this.readOrNull(fileFullPath);
+		if (contents == null) {
+			return CANNOT_READ_MESSAGE + fileFullPath;
+		}
+		if (contents.length() > maxChars) {
+			return "실패: 파일이 " + contents.length() + "자라서 통째로 읽을 수 없습니다(상한 maxChars " + maxChars
+				+ "자). 파일을 줄이거나 이 값을 올리십시오: " + fileFullPath;
+		}
+		return contents;
 	}
 
 	/**

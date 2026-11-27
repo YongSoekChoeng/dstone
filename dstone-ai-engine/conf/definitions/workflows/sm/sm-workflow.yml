@@ -17,8 +17,10 @@
 #
 # [문서 읽기] 문서는 LLM이 아니라 TOOL step이 읽어 Agent 입력으로 넘깁니다. 읽으려고 LLM을 한 번 더 부르지 않기 위해서입니다.
 #   파일이 없으면 TOOL step이 실패하므로, 앞 step이 문서를 저장하지 못한 채 다음으로 넘어가지 않습니다.
-#   maxChars: 60000(엔진의 Tool 결과 상한 max-result-chars와 같은 값)보다 크면 잘라 넘기지 않고 멈춥니다.
-#   문서를 줄이거나 두 값을 올린 뒤 이어서 실행합니다.
+#   maxChars보다 큰 문서는 잘라 넘기지 않고 실패합니다. readFiles의 maxChars는 max-result-chars에 묶이지 않고,
+#   readFile step(step04, 10, 49)은 둘 중 작은 값까지입니다.
+#   상한: 설계서 100000, 나머지 60000. 설계서는 개발·자동 수정·검증 Agent의 입력에 통째로 들어가므로 모델의 컨텍스트에 맞춰 둔 값입니다.
+#   설계 뒤(step50)에 넘은 것을 먼저 잡고(step52가 한 번 줄임), 그래도 넘으면 읽는 step이 실패합니다(step14는 설계 승인, step32·41은 개발 승인으로. 재개발 step20은 실행 실패).
 #   설계서와 태스크아이템 목록은 범용 Tool readFiles가 한 step에서 함께 읽어 state.docs({design, taskitems})에 둡니다.
 #   Agent가 문서를 고칠 수 있는 고리(재개발 step20, 자동 수정 step32, 검증 전 step41)에서는 다시 읽어 최신 내용을 넘깁니다.
 #
@@ -88,7 +90,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.11.0
+version: 2.12.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -284,7 +286,7 @@ steps:
       paths:
         - path: ${input}/${state.now}/03-1.design.md
           name: design
-          maxChars: 60000
+          maxChars: 100000
           required: true
         - path: ${input}/${state.now}/03-2.taskitems.md
           name: taskitems
@@ -292,7 +294,7 @@ steps:
           required: true
     save: docs
     next: step16
-    onFailure: FAIL
+    onFailure: step13
 
   - id: step16
     name: 21-기존개발디렉토리초기화
@@ -357,7 +359,7 @@ steps:
       paths:
         - path: ${input}/${state.now}/03-1.design.md
           name: design
-          maxChars: 60000
+          maxChars: 100000
           required: true
         - path: ${input}/${state.now}/03-2.taskitems.md
           name: taskitems
@@ -512,7 +514,7 @@ steps:
       paths:
         - path: ${input}/${state.now}/03-1.design.md
           name: design
-          maxChars: 60000
+          maxChars: 100000
           required: true
         - path: ${input}/${state.now}/03-2.taskitems.md
           name: taskitems
@@ -662,7 +664,7 @@ steps:
       paths:
         - path: ${input}/${state.now}/03-1.design.md
           name: design
-          maxChars: 60000
+          maxChars: 100000
           required: true
         - path: ${input}/${state.now}/03-2.taskitems.md
           name: taskitems
@@ -718,6 +720,11 @@ steps:
         - ${input}/${state.now}/03-1.design.md
         - ${input}/${state.now}/03-2.taskitems.md
       ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
+      sizeLimits:
+        - path: ${input}/${state.now}/03-1.design.md
+          maxChars: 100000
+        - path: ${input}/${state.now}/03-2.taskitems.md
+          maxChars: 60000
     save: docCheck
     routes:
       ok: step13
@@ -735,7 +742,9 @@ steps:
         - ${input}/${state.now}/03-3.ddl(데이터베이스).md
       request: ${state.request}
       instruction: |-
-        기계 검사가 찾은 형식 오류만 고친다. 내용(코드, 표의 값, SQL 문장)은 바꾸지 않는다.
+        기계 검사가 찾은 것만 고친다. 형식 오류를 고칠 때는 내용(코드, 표의 값, SQL 문장)을 바꾸지 않는다.
+        '크기 초과'인 문서는 같은 내용을 되풀이한 설명과 코드를 한 번만 남겨 줄인다. 구현에 필요한 코드, 이름, 값은 빼거나 요약하지 않는다.
+        그렇게 해도 상한을 넘으면 더 줄이지 않고, 요청을 나눠야 한다고 답에 적는다.
         닫히지 않은 코드 블록은 그 블록이 끝나는 곳에 닫는 줄을 넣거나, 내용 없는 여는 줄을 지운다.
         표의 칸이 어긋난 줄은 칸 안의 |를 \|로 쓰거나 `코드`로 감싸서 머리줄과 칸 수를 맞춘다.
         ${state.docCheck.message}

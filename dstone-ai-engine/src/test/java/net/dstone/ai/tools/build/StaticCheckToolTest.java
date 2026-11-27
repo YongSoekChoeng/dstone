@@ -51,7 +51,7 @@ public class StaticCheckToolTest {
 	@Test
 	void 닫히지_않은_코드_블록과_칸이_어긋난_표를_찾는다() throws IOException {
 		File doc = this.write("03-1.design.md", "# 설계\n\n| 파일 | 변경 전 | 변경 후 |\n|---|---|---|\n| A.java | `a | b` | c |\n| B.java | x | y | z |\n\n```java\nclass A {}\n```\n\n```\n");
-		Map<String, Object> result = new StaticCheckTool().checkDocuments(Arrays.asList(doc.getAbsolutePath()), null);
+		Map<String, Object> result = new StaticCheckTool().checkDocuments(Arrays.asList(doc.getAbsolutePath()), null, null);
 		assertThat(result.get("route")).isEqualTo("problem");
 		assertThat(problems(result)).hasSize(2);
 		assertThat(problems(result).get(0)).startsWith("03-1.design.md:6 ").contains("칸 수");
@@ -62,7 +62,7 @@ public class StaticCheckToolTest {
 	void 맞는_문서와_DDL은_통과한다() throws IOException {
 		File doc = this.write("03-1.design.md", "# 설계\n\n| a | b |\n| :-- | --: |\n| `x|y` | z \\| w |\n\n````md\n```sql\nselect 1;\n```\n````\n");
 		File ddl = this.write("03-3.ddl.md", "# DDL\n\n```sql\nCREATE TABLE t (id INT);\n```\n");
-		Map<String, Object> result = new StaticCheckTool().checkDocuments(Arrays.asList(doc.getAbsolutePath(), this.dir.resolve("none.md").toString()), ddl.getAbsolutePath());
+		Map<String, Object> result = new StaticCheckTool().checkDocuments(Arrays.asList(doc.getAbsolutePath(), this.dir.resolve("none.md").toString()), ddl.getAbsolutePath(), null);
 		assertThat(result.get("route")).isEqualTo("ok");
 		assertThat(result.get("checked")).isEqualTo(Integer.valueOf(1));
 		assertThat((List<?>) result.get("skipped")).hasSize(1);
@@ -71,7 +71,7 @@ public class StaticCheckToolTest {
 	@Test
 	void DDL은_격리_서버와_같은_규칙으로_읽는다() throws IOException {
 		File ddl = this.write("03-3.ddl.md", "# DDL\n\n```sql\nCREATE TABLE t (id INT);\n```\n- 설명\n```\n");
-		Map<String, Object> result = new StaticCheckTool().checkDocuments(null, ddl.getAbsolutePath());
+		Map<String, Object> result = new StaticCheckTool().checkDocuments(null, ddl.getAbsolutePath(), null);
 		assertThat(result.get("route")).isEqualTo("problem");
 		assertThat(problems(result).get(0)).contains("DDL을 읽을 수 없음").contains("닫히지 않은 코드 블록");
 	}
@@ -114,6 +114,17 @@ public class StaticCheckToolTest {
 		assertThat(problems(result)).hasSize(1);
 		assertThat(problems(result).get(0)).startsWith("a.jsp:8 ").contains("JavaScript 구문 오류");
 		assertThat(skipped.toString()).contains("JSP 코드가 섞인");
+	}
+
+	@Test
+	void 글자_수_상한을_넘은_문서를_찾는다() throws IOException {
+		File doc = this.write("03-1.design.md", "# 설계\n\n0123456789\n");
+		List<Map<String, Object>> limits = Arrays.asList(Map.<String, Object>of("path", doc.getAbsolutePath(), "maxChars", Integer.valueOf(10)));
+		Map<String, Object> result = new StaticCheckTool().checkDocuments(Arrays.asList(doc.getAbsolutePath()), null, limits);
+		assertThat(result.get("route")).isEqualTo("problem");
+		assertThat(problems(result).get(0)).startsWith("03-1.design.md ").contains("크기 초과");
+		limits = Arrays.asList(Map.<String, Object>of("path", doc.getAbsolutePath(), "maxChars", Integer.valueOf(1000)));
+		assertThat(new StaticCheckTool().checkDocuments(null, null, limits).get("route")).isEqualTo("ok");
 	}
 
 }
