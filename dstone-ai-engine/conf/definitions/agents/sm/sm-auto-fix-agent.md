@@ -17,8 +17,10 @@
 #   설계서 수정 이력(Agent의 설명)이 아니라 사실로 보게 하려는 것이다(실행 0fb4c669의 roomRes[0] → roomRes).
 # 2.3.0(2026-11-27): 검증 결과를 기준마다 쌓아 받는다(sm-workflow 2.14.0). carried인 FAIL은 그 뒤에 이미 고쳤을 수 있어 먼저 확인한다.
 # 2.4.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
+# 2.5.0(2026-11-28): 올린 문서를 찾는 Tool(knowledgeSearchDocs, knowledgeGetChunks)을 받는다. 실행 5def8189에서 문서 Tool이 설계에만 있어
+#   개발과 자동 수정은 화면 컴포넌트 설정 오류를 문서로 확인할 길이 없었다. 어느 묶음을 볼지는 요청서와 프로젝트 Skill이 정한다.
 id: sm-auto-fix-agent
-version: 2.4.0
+version: 2.5.0
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -44,6 +46,8 @@ tools:
     - readFileLines
     - readFileTail
     - searchInFiles
+    - knowledgeSearchDocs
+    - knowledgeGetChunks
     - isFileExist
     - writeFile
     - editFileTexts

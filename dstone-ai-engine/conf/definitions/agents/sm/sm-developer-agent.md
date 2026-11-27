@@ -14,8 +14,10 @@
 #   재개발이 roomRes[0].results를 roomRes.results로 잘못 바꿨고 설계서 수정 이력에도 반대 설명이 남았다. 다음 재개발은
 #   "목록이 안 보임"을 받고 그 이력만 믿어 날짜 형식과 컬럼명만 쫓다가 빈 답으로 끝났다.
 # 2.7.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
+# 2.8.0(2026-11-28): 올린 문서를 찾는 Tool(knowledgeSearchDocs, knowledgeGetChunks)을 받는다. 실행 5def8189에서 문서 Tool이 설계에만 있어
+#   개발과 자동 수정은 화면 컴포넌트 설정 오류를 문서로 확인할 길이 없었다. 어느 묶음을 볼지는 요청서와 프로젝트 Skill이 정한다.
 id: sm-developer-agent
-version: 2.7.0
+version: 2.8.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -49,6 +51,8 @@ tools:
     - appendFile
     - copyFileWithReplace
     - searchInFiles
+    - knowledgeSearchDocs
+    - knowledgeGetChunks
     - compileJava
     - checkSources
 skills:

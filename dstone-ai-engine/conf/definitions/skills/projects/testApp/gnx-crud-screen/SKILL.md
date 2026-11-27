@@ -9,8 +9,10 @@
 #   - "팝업 저장과 세션 값", "그리드 체크박스" 절에 적었습니다.
 # 2026-11-27: dstone-knowledge에 올린 Kendo UI 문서(묶음 kendo)를 언제, 어떻게 볼지 "올린 문서" 절에 적었습니다.
 #   문서는 testApp의 Kendo(v2016.1.112)보다 새 버전이라 기존 소스를 먼저 따르게 했습니다.
+# 2026-11-28(실행 5def8189): 예약 상세 팝업이 NULL 컬럼에서 ClassCastException, NumberFormatException으로 차례로 실패, DropDownList에
+#   undefined 표시, 그리드 template의 this.field 오류 - "bmap 값 꺼내기", "드롭다운과 그리드 template" 절에 적었습니다(원본 BaseMap, genexon.js, member.jsp로 확인).
 name: gnx-crud-screen
-description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 팝업 저장과 세션 값, 그리드 체크박스, 파일 업로드, 동작 검증의 관례와 Kendo UI 문서 찾는 법.
+description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서 화면·Controller·Service·DAO·MyBatis 매퍼를 찾거나 만들거나 고치거나 시험할 때 쓴다. 층별 파일 위치, 이름 규칙, 그리드 행 클릭과 팝업, 팝업 저장과 세션 값, 그리드 체크박스, 파일 업로드, bmap 조회 결과 꺼내기, 드롭다운과 그리드 template, 동작 검증의 관례와 Kendo UI 문서 찾는 법.
 ---
 기본 참고 기능은 샘플게시판이다. 새 화면을 만들 때는 이 층별 파일을 참고 파일로 삼고, 달라지는 점만 적는다.
 
@@ -25,6 +27,29 @@ description: 소스의 패키지가 kr.co.gnx로 시작하는 프로젝트에서
 
 샘플게시판 파일: kr/co/gnx/sample/board/SampleBoard{Controller,Service,DAO,VO}.java, sqlmap/mapper/sample/sampleboard-mapper.xml, views/sample/board/sampleBoard.jsp.
 샘플게시판에는 팝업이 없다. 팝업(등록·수정·조회)이 있는 참고 기능은 회원사 관리다: views/system/member/member.jsp(목록) + memberRegi.jsp(팝업) + kr/co/gnx/system/member/MemberController.java.
+
+## bmap 값 꺼내기
+
+`resultType="bmap"`은 `kr.co.gnx.comm.util.BaseMap`이다. 키는 소문자이고, **값이 NULL이면 컬럼 타입과 상관없이 빈 문자열 `""`**이 들어 있다
+(`put`이 null을 `""`로 바꾸고, `callSettersOnNulls=true`라 NULL 컬럼도 put한다). NULL이 아닌 값은 JDBC가 준 타입 그대로다.
+
+- 숫자 컬럼도 `(Integer) map.get("x")`는 NULL 행에서 ClassCastException이 난다.
+- `map.get("x") != null` 검사는 NULL 행을 거르지 못한다. 그 뒤 `Integer.parseInt(String.valueOf(...))`는 NumberFormatException이 난다.
+- 숫자는 값을 `String.valueOf`로 바꾼 뒤 비었는지 먼저 보고 변환한다.
+
+```java
+Object cnt = detail.get("attendee_cnt");
+if(cnt != null && !"".equals(String.valueOf(cnt))) vo.setAttendee_cnt(Integer.parseInt(String.valueOf(cnt)));
+```
+
+- 확인할 때는 NULL을 허용하는 컬럼이 비어 있는 행으로도 해 본다.
+
+## 드롭다운과 그리드 template
+
+- 공통코드 같은 서버 목록은 `<input class="kddl" ddcode="USE_YN" optionLabel="...">`로 적고 `genexon.initKendoUI_ddl`이 만든다(member.jsp). 항목 이름은 ddcode마다 `genexon.getDDLConf`에 있다.
+- 화면에서 직접 만든 목록을 `kendoDropDownList`에 줄 때, `dataTextField`/`dataValueField`를 쓰면 `dataSource`는 그 이름의 속성을 가진 객체 배열이어야 한다
+  (`[{text:"09:00", value:"09:00"}]`). 문자열 배열에 두 옵션을 주면 항목이 `undefined`로 보인다. 원본 화면에는 직접 만든 목록의 사용 예가 없다.
+- 그리드 컬럼 `template: function(e) {...}`의 `e`가 그 행의 데이터다. `e.필드명`으로 읽고 `this.field`처럼 `this`에서 읽지 않는다(member.jsp의 ci_url 열). 빈 값은 `genexon.nvl(값, "")`로 본다.
 
 ## 그리드 행 클릭과 팝업
 
