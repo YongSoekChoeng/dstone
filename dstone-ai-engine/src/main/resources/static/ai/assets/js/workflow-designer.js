@@ -4100,11 +4100,15 @@ var DstoneAiDesigner = (function () {
 		});
 		// 폴더 지정(예: projects/**): 그 폴더 아래 Skill을 모두 후보로 주고, Agent가 설명을 보고 맞는 것만 읽는다.
 		// 프로젝트마다 다른 관례 Skill을 Agent를 고치지 않고 늘릴 때 쓴다. skills.allowed에만 쓸 수 있다.
+		// 상위 폴더도 함께 보여 준다(projects/testApp/<Skill> → projects/**, projects/testApp/**). 엔진은 하위 폴더까지 찾는다.
 		var skillFolders = [];
 		(catalog.skills || []).forEach(function (skill) {
-			var folder = skill.path ? skill.path.replace(/^skills\//, "").replace(/\/[^\/]*\/SKILL\.md$/, "") : "";
-			if (folder && skillFolders.indexOf(folder) < 0) {
-				skillFolders.push(folder);
+			var parts = skill.path ? skill.path.replace(/^skills\//, "").split("/").slice(0, -2) : [];
+			for (var depth = 1; depth <= parts.length; depth++) {
+				var folder = parts.slice(0, depth).join("/");
+				if (skillFolders.indexOf(folder) < 0) {
+					skillFolders.push(folder);
+				}
 			}
 		});
 		skillFolders.sort().forEach(function (folder) {
