@@ -54,6 +54,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.step("step60");
 		assertThat(String.valueOf(flow.state("ddlCheck"))).contains("route=none");
 		flow.step("step43");
+		flow.step("step64");
 
 		assertThat(flow.currentStepId()).isEqualTo("step41");
 	}
@@ -62,8 +63,8 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	 * <pre>
 	 * 설계 승인에서 고른 검증 수준을 첫 검증에서 따르는지 봅니다(2.7.0).
 	 * 최소 확인이면 서버를 띄우지 않고, 간이 확인이면 서버 기동만 하고 사람에게 갑니다.
-	 * 이 판정은 정상 결과라 이력에 실패로 남지 않습니다. 2.11.0부터 step43 하나(routeValue)가 고르고,
-	 * 첫 검증인지는 step43의 limit(max 1)이 셉니다.
+	 * 이 판정은 정상 결과라 이력에 실패로 남지 않습니다. 첫 개발은 step43을 거쳐 step64가 고르고,
+	 * 첫 검증인지는 step43의 limit(max 1, scope 결정 기록)이 셉니다.
 	 * </pre>
 	 */
 	@Test
@@ -71,9 +72,10 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step43");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
 		flow.step("step43");
+		flow.step("step64");
 
 		assertThat(flow.currentStepId()).isEqualTo("step19");
-		assertThat(this.lastHistory(flow, "step43").success()).isTrue();
+		assertThat(this.lastHistory(flow, "step64").success()).isTrue();
 	}
 
 	@Test
@@ -81,9 +83,10 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step43");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 간이 확인)"));
 		flow.step("step43");
+		flow.step("step64");
 
 		assertThat(flow.currentStepId()).isEqualTo("step45");
-		assertThat(this.lastHistory(flow, "step43").success()).isTrue();
+		assertThat(this.lastHistory(flow, "step64").success()).isTrue();
 	}
 
 	@Test
@@ -100,14 +103,39 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step43");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
 		flow.step("step43");
+		flow.step("step64");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
 
-		// 재개발·자동 수정을 거쳐 다시 컴파일 확인 뒤로 온 경우: 한도(1번)를 다 써서 step43을 건너뛰고 화면 검증으로 간다
+		// 사람의 새 결정 없이 자동 수정을 거쳐 다시 컴파일 확인 뒤로 온 경우: 한도(1번)를 다 써서 step43을 건너뛰고 화면 검증으로 간다
 		flow.jumpTo("step43");
 		flow.step("step43");
 		assertThat(flow.currentStepId()).isEqualTo("step41");
 		assertThat(this.lastHistory(flow, "step43").success()).isTrue();
 		assertThat(this.lastHistory(flow, "step43").outputSummary()).contains("횟수 한도");
+	}
+
+	@Test
+	void 재개발할_때_고른_검증_수준이_설계_승인의_선택보다_앞선다() {
+		String[][] cases = { { "재개발", "step41" }, { "재개발(간이 확인)", "step45" }, { "재개발(최소 확인)", "step19" } };
+		for (String[] one : cases) {
+			WorkflowStepper flow = this.atStep("step43");
+			flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
+			flow.put("developApproval", Map.of("decision", one[0]));
+			flow.step("step43");
+
+			assertThat(flow.currentStepId()).as(one[0]).isEqualTo(one[1]);
+		}
+	}
+
+	@Test
+	void 개발_승인에서_문서_수정을_고른_뒤에는_새_설계_승인의_검증_수준을_따른다() {
+		WorkflowStepper flow = this.atStep("step43");
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 간이 확인)"));
+		flow.put("developApproval", Map.of("decision", "설계 수정"));
+		flow.step("step43");
+		flow.step("step64");
+
+		assertThat(flow.currentStepId()).isEqualTo("step45");
 	}
 
 	@Test

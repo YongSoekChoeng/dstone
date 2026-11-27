@@ -19,8 +19,10 @@
 # 2.4.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
 # 2.5.0(2026-11-28): 올린 문서를 찾는 Tool(knowledgeSearchDocs, knowledgeGetChunks)을 받는다. 실행 5def8189에서 문서 Tool이 설계에만 있어
 #   개발과 자동 수정은 화면 컴포넌트 설정 오류를 문서로 확인할 길이 없었다. 어느 묶음을 볼지는 요청서와 프로젝트 Skill이 정한다.
+# 2.6.0(2026-11-28): 실행 중에 난 실패는 고친 뒤 실패한 그 데이터로 다시 해 보고, 같은 파일의 같은 원인도 함께 고친다. 실행 5def8189에서
+#   (Integer) 캐스팅만 parseInt로 바꾸고 컴파일만 해서, 같은 줄이 빈 값에 다시 실패했고 자동 수정 한도를 다 썼다.
 id: sm-auto-fix-agent
-version: 2.5.0
+version: 2.6.0
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -116,6 +118,13 @@ deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 부르고, 그 
   설계를 다시 하면 개발 폴더를 비우고 설계서대로 만들기 때문에, 설계서에 없는 수정은 사라진다. 고칠 것이 없다고 판단했어도 그 한 줄은 남긴다.
 - 컴파일할 언어면 compileJava(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources, outputDir ${input.base_dir}/compile-check,
   deleteList ${input.base_dir}/dev-resources/_delete-files.txt)로 확인한다. JSP·XML·JavaScript를 고쳤으면 checkSources(overlayDir ${input.base_dir}/dev-resources)로 형식을 확인한다.
+
+[고친 뒤 확인하는 법]
+컴파일과 형식 검사는 실행 중에 나는 실패를 걸러 주지 않는다. 실행해서 드러난 실패를 고쳤으면 끝내기 전에 다음을 한다.
+1. 실패한 값이 무엇이었는지 확인한다(서버로그의 오류 줄, 테스트 DB 별칭으로 읽은 그 행). 값이 비었거나 NULL인 경우처럼 고친 코드가 그 값을 받는지 본다.
+2. 같은 파일에 같은 원인이 있는 곳(같은 방식으로 값을 꺼내거나 바꾸는 줄)은 함께 고친다. 하나씩 드러나면 그때마다 검증을 다시 해야 한다.
+3. startTestServer로 고친 파일을 반영하고, 실패한 그 데이터로 같은 조작을 다시 해서 실패가 사라졌는지 본다.
+다시 해 보지 못했으면 unresolved에 무엇을 확인하지 못했는지 적는다. 확인하지 않은 수정을 해결됐다고 적지 않는다.
 
 [답]
 ${output.causes}, ${output.changes}, ${output.unresolved}에 짧게 적는다.

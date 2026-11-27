@@ -9,10 +9,10 @@
 #   12~14  참고 기능      영향도분석서 '## 참고 기능'의 원본 코드를 dstone-knowledge에서 모음(step46, 48, 49)
 #   15~19  설계          설계서가 있으면 맞추고(step37) 없으면 새로 씀(step12) → 형식 확인(step50) → 승인(step13)
 #   20~26  개발          문서 읽기(step14) → 개발 폴더와 지난 검증 결과 비우기 → 개발(step17) → 보류 확인 → 컴파일(step18) → 형식 확인(step53)
-#   27~39  동작 검증      리비전·DDL 확인 → 검증 수준 고르기(step43) → 테스트 서버(step29) → 동작 검증(step35) → 결과 누적(step62) → FAIL이면 자동 수정(step34)
-#   42     개발 승인(step19). [승인]이면 끝
-#   곁가지  40 DDL 반영 승인, 41 형식 오류 고치기, 43 재개발 전 다시 읽기, 44 보류 이어서 개발,
-#          45~46 설계서 수정과 형식 고치기, 47~48 영향도·요구사항 문서 수정, 49~50 리뷰 불통과 처리
+#   27~40  동작 검증      리비전·DDL 확인 → 검증 수준 고르기(step43, 64) → 테스트 서버(step29) → 동작 검증(step35) → 결과 누적(step62) → FAIL이면 자동 수정(step34)
+#   43     개발 승인(step19). [승인]이면 끝
+#   곁가지  41 DDL 반영 승인, 42 형식 오류 고치기, 44 재개발 전 다시 읽기, 45 보류 이어서 개발,
+#          46~47 설계서 수정과 형식 고치기, 48~49 영향도·요구사항 문서 수정, 50~51 리뷰 불통과 처리
 # 한 실행이 실제로 지나온 길은 실행 관리 > 진행 기록에서 줄마다 "← 앞 step · 고른 길"로 보입니다.
 #
 # [문서 읽기] 문서는 LLM이 아니라 TOOL step이 읽어 Agent 입력으로 넘깁니다. 읽으려고 LLM을 한 번 더 부르지 않기 위해서입니다.
@@ -63,8 +63,11 @@
 #     전체 확인  테스트 서버를 띄우고 화면을 눌러 봄
 #     간이 확인  테스트 서버가 뜨는지만 봄(step45). 화면이 없는 변경(배치, 연동, 쿼리만)
 #     최소 확인  서버 없이 소스 오류만 봄. 동작이 바뀌지 않는 변경(주석, 안내 문구, 설정값 하나)
-#     step43(routeValue)이 고른 수준으로 갈 곳을 나눕니다. 생략은 첫 검증에만 적용합니다(step43의 limit max 1).
-#     재개발·자동 수정으로 다시 돌 때는 한도를 다 써서 step43을 건너뛰고 전체 확인으로 갑니다.
+#     재개발할 때는 개발 승인(step19)에서 다시 고릅니다: 재개발(전체 확인), 재개발(간이 확인), 재개발(최소 확인).
+#     step43(routeValue)이 마지막 개발 승인의 선택으로 갈 곳을 나눕니다. 개발 승인 전이거나 문서 수정을 고른 뒤라면
+#     step64가 설계 승인에서 고른 수준을 따릅니다.
+#     고른 수준은 사람의 결정 뒤 첫 검증에만 적용합니다(step43의 limit max 1, scope 결정 기록).
+#     자동 수정으로 다시 돌 때는 한도를 다 써서 step43을 건너뛰고 전체 확인으로 갑니다.
 #   DDL: 테스트 서버는 DDL을 실행하지 않습니다. step60이 DDL 문서의 테이블·컬럼과 INSERT(초기 데이터) 행이 개발 DB에 있는지 보고,
 #     없으면 step61에서 사람이 개발 DB에 반영한 뒤 승인합니다. 데이터가 없으면 화면 목록이 비어 검증이 아무것도 볼 수 없습니다.
 #   테스트 서버(step29): 리비전 + 개발 결과로 띄우고, 고객사 개발 DB는 커밋하지 않는 연결로 써서 실행이 멈추면 원복합니다.
@@ -94,7 +97,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.15.0
+version: 2.16.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -178,7 +181,7 @@ steps:
     onFailure: step06
 
   - id: step06
-    name: 49-리뷰 불통과 처리 결정
+    name: 50-리뷰 불통과 처리 결정
     type: APPROVAL
     approval:
       approverRole: PL
@@ -357,21 +360,27 @@ steps:
     onFailure: step19
 
   - id: step19
-    name: 42-개발완료 승인
+    name: 43-개발완료 승인
     type: APPROVAL
     approval:
       approverRole: PL
+      hints:
+        재개발: 의견대로 다시 개발한 뒤 테스트 서버를 띄우고 화면을 직접 눌러 확인합니다. 가장 오래 걸립니다(몇 분 이상).
+        재개발(간이 확인): 다시 개발한 뒤 테스트 서버가 정상으로 뜨는지만 봅니다. 화면은 직접 확인하세요(2분 안팎).
+        재개발(최소 확인): 다시 개발한 뒤 서버를 띄우지 않고 소스 오류만 확인합니다. 동작은 직접 확인하세요(수 초).
     save: developApproval
     routes:
       승인: END
       재개발: step20
+      재개발(간이 확인): step20
+      재개발(최소 확인): step20
       설계 수정: step25
       영향도 수정: step26
       요구사항 수정: step27
       실패: FAIL
 
   - id: step20
-    name: 43-재개발 전 설계서와 태스크아이템 목록 다시 읽기
+    name: 44-재개발 전 설계서와 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFiles
     with:
@@ -389,7 +398,7 @@ steps:
     onFailure: FAIL
 
   - id: step25
-    name: 45-설계서 수정
+    name: 46-설계서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -407,7 +416,7 @@ steps:
     next: step50
 
   - id: step26
-    name: 47-영향도분석서 수정
+    name: 48-영향도분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -422,7 +431,7 @@ steps:
     next: step09
 
   - id: step27
-    name: 48-고객요구사항분석서 수정
+    name: 49-고객요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -462,7 +471,7 @@ steps:
     onFailure: step43
 
   - id: step61
-    name: 40-DDL 반영 승인
+    name: 41-DDL 반영 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -476,14 +485,32 @@ steps:
       중지: FAIL
 
   - id: step43
-    name: 29-검증 수준 고르기(생략은 첫 검증에만)
+    name: 29-검증 수준 고르기(생략은 결정 뒤 첫 검증에만)
+    type: TOOL
+    tool: routeValue
+    with:
+      value: ${state.developApproval.decision:}
+      empty: 설계 승인
+    limit:
+      max: 1
+      scope: ${decisions:}
+      over: step41
+    routes:
+      재개발: step41
+      재개발(간이 확인): step45
+      재개발(최소 확인): step19
+      설계 승인: step64
+      설계 수정: step64
+      영향도 수정: step64
+      요구사항 수정: step64
+    onFailure: step41
+
+  - id: step64
+    name: 40-설계 승인에서 고른 검증 수준
     type: TOOL
     tool: routeValue
     with:
       value: ${state.designApproval.decision:}
-    limit:
-      max: 1
-      over: step41
     routes:
       승인(개발진행, 전체 확인): step41
       승인(개발진행, 간이 확인): step45
@@ -668,7 +695,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 50-리뷰 지적에 따른 요구사항분석서 수정
+    name: 51-리뷰 지적에 따른 요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -775,7 +802,7 @@ steps:
     onFailure: step13
 
   - id: step52
-    name: 46-설계 문서 형식 고치기
+    name: 47-설계 문서 형식 고치기
     type: AGENT
     agent: document-revise-agent
     with:
@@ -825,7 +852,7 @@ steps:
     onFailure: step18
 
   - id: step57
-    name: 44-보류 이어서 개발
+    name: 45-보류 이어서 개발
     type: AGENT
     agent: sm-developer-agent
     with:
@@ -851,7 +878,7 @@ steps:
     onFailure: step18
 
   - id: step58
-    name: 41-형식 오류 고치기
+    name: 42-형식 오류 고치기
     type: AGENT
     agent: sm-developer-agent
     with:
