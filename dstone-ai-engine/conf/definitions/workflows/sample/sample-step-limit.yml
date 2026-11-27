@@ -1,0 +1,60 @@
+# common.registry.WorkFlowRegistry가 기동할 때 이 파일을 읽어서 id로 등록해 둡니다.
+#
+# 이 Workflow는 판정 전용 step 없이 흐름을 적는 엔진 기능 세 가지를 확인해보기 위한 테스트 전용 Workflow입니다.
+# LLM을 부르지 않아서(TOOL step과 APPROVAL step뿐) 비용 없이 바로 돌려볼 수 있습니다.
+#   - settings.startTime: 시작 시각을 state에 넣습니다(시각을 구하는 TOOL step이 없어도 됨).
+#   - routeValue + routes: 값 그대로 갈 곳을 고릅니다(containsValue step 여러 개 대신 하나).
+#   - limit: step을 몇 번까지 실행할지 엔진이 셉니다(countUp step 없이 되풀이 한도).
+#
+# 동작 흐름
+# 1) route: input이 again이면 stamp로, done이면 바로 끝납니다. 그 밖의 값은 routes에 없어 실패(FAIL)입니다.
+# 2) stamp: 현재 시각을 찍고 자기 자신으로 되돌아갑니다. limit이 2번까지만 실행하고, 세 번째에는 건너뛰어 choose로 갑니다.
+#    scope가 결정 기록이라, 사람이 choose에서 새로 결정하면 다시 2번을 셉니다.
+# 3) choose: 다시 → stamp(새로 2번), 완료 → END.
+id: sample-step-limit
+version: 1.0.0
+description: 횟수 한도(limit), 시작 시각(settings.startTime), 값으로 고르는 분기(routeValue) 확인용 Workflow. LLM 비용 없음.
+input: string
+settings:
+  maxIterations: 20
+  startTime:
+    save: startedAt
+    format: yyyyMMdd-HHmm
+state:
+  startedAt: 실행을 시작한 시각(settings.startTime이 넣음)
+  stampedAt: stamp step의 결과
+  choice:    choose step의 결과
+return:
+  startedAt: ${state.startedAt}
+  decision: ${state.choice:}
+steps:
+
+  - id: route
+    type: TOOL
+    tool: routeValue
+    with:
+      value: ${input}
+    routes:
+      again: stamp
+      done: END
+    onFailure: FAIL
+
+  - id: stamp
+    type: TOOL
+    tool: getCurrentDateTime
+    save: stampedAt
+    limit:
+      max: 2
+      scope: ${decisions:}
+      over: choose
+    next: stamp
+    onFailure: FAIL
+
+  - id: choose
+    type: APPROVAL
+    approval:
+      approverRole: team-lead
+    save: choice
+    routes:
+      다시: stamp
+      완료: END

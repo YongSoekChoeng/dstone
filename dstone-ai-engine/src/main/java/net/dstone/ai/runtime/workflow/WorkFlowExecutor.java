@@ -19,6 +19,8 @@ import net.dstone.ai.common.definition.workflow.step.AgentStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.RouterStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.tools.data.DataLogic;
+import net.dstone.ai.common.definition.workflow.step.StepLimit;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
@@ -186,6 +188,12 @@ public class WorkFlowExecutor extends BaseObject {
 			ExecContext.getInstance().put("WorkFlowExecution", currentExecution);
 
 			// 처음 시작하는 실행이면 Workflow input을 남겨 둡니다(Workflow 평가 사례의 요청 폴더). 이미 있으면 그대로 둡니다.
+			// settings.startTime이 있으면 시작 시각을 state에 넣습니다. 이미 있으면(재개, 되감기) 그대로 둡니다.
+			String startTimeState = workflow.startTimeState();
+			if (startTimeState != null && !WorkFlowContext.state(currentExecution.context()).containsKey(startTimeState.trim())) {
+				WorkFlowContext.state(currentExecution.context()).put(startTimeState.trim(),
+					java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern(workflow.settings().startTime().format())));
+			}
 			if (currentIndex == 0) {
 				this.snapshotRecorder.beginExecution(workflow.id(), currentExecution.executionId(), currentExecution.context().get(Constants.WorkFlow.Context.INPUT));
 			}
@@ -228,65 +236,77 @@ public class WorkFlowExecutor extends BaseObject {
 				StepDefinition step = workflow.steps().get(currentIndex);
 
 				/****************************************************************************************
-				3) 실제로 이 step을 실행합니다. forEach가 없으면 한 번만 실행하는 runOne()을,
-				   있으면 여러 번 동시에 실행하는 runForEach()를 씁니다.
+				2-1) 횟수 한도(limit)가 있는 step이면 먼저 셉니다. 한도를 넘었으면 이 step을 실행하지 않고 limit.over로 갑니다.
+				     실행 이력에는 "한도로 건너뜀" 한 줄을 남기고, 다음 step에는 via=limit으로 왔다고 적습니다.
 				****************************************************************************************/
-				StepOutcome outcome;
-				try {
-					if (StepDefinition.forEachOf(step) != null) {
-						outcome = this.runForEach(step, currentExecution);
-					} else {
-						outcome = this.runOne(step, currentExecution, inputOverride);
-					}
-					inputOverride = NO_INPUT; // 받은 입력은 첫 step에만 씁니다.
-				} catch (Exception e) {
-					// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
-					// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
-					// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
-					// 스택은 로그 파일에 남깁니다. 실행 상태에는 한 줄 메시지만 들어가서, 그것만으로는 원인을 찾기 어렵습니다.
-					this.error("step[" + step.id() + "] 실행 중 예외가 발생했습니다(executionId=" + currentExecution.executionId() + ")\n" + ProviderErrorMessage.stackTraceOf(e));
-					return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
-				} finally {
-					// step 안에서 Tool이 띄운 것을 정리할 기회를 줍니다(성공·실패·예외 모두).
-					this.notifyStepEnded(currentExecution.executionId(), step.id());
-				}
-
-				/****************************************************************************************
-				4) 결과가 대기(APPROVAL이 사람의 결정을 기다리는 중)면, 실행을 여기서 멈춥니다.
-				****************************************************************************************/
-				if (outcome.pending()) {
-					currentExecution = currentExecution.waitingApproval(currentIndex);
-					this.executionStore.update(currentExecution);
-					return currentExecution;
-				}
-
-				/****************************************************************************************
-				5) 이번 step의 결과를 그 step의 save에 적힌 이름으로 state에 저장해서,
-				   다음 step들이 "${state.이름}"으로 가져다 쓸 수 있게 합니다(성공이든 실패든 저장합니다).
-				****************************************************************************************/
-				WorkFlowContext.saveOutput(currentExecution.context(), step.output(), outcome.input(), outcome.output(), outcome.error(), outcome.items());
-
-				/****************************************************************************************
-				6) nextStepId()로 다음에 갈 곳을 정합니다(step id, 또는 END/FAIL 예약어).
-				   ROUTER가 routes에 없는 경로를 고르면 예외를 던지는데, 여기서 잡아서 FAILED로 남깁니다.
-				****************************************************************************************/
+				StepOutcome outcome = null;
 				String nextId;
-				try {
-					nextId = this.nextStepId(workflow, step, outcome);
-				} catch (Exception e) {
-					return this.persistFailed(currentExecution, "step[" + step.id() + "]의 다음 step을 정하는 중 예외가 발생했습니다 - " + e.getMessage());
+				String overLimit = this.countLimit(currentExecution, step);
+				if (overLimit != null) {
+					inputOverride = NO_INPUT;
+					nextId = StepDefinition.limitOf(step).over();
+					this.appendLimitHistory(currentExecution, step, overLimit);
+					WorkFlowContext.setArrivedFrom(currentExecution.context(), step.id(), "limit");
+				} else {
+					/****************************************************************************************
+					3) 실제로 이 step을 실행합니다. forEach가 없으면 한 번만 실행하는 runOne()을,
+					   있으면 여러 번 동시에 실행하는 runForEach()를 씁니다.
+					****************************************************************************************/
+					try {
+						if (StepDefinition.forEachOf(step) != null) {
+							outcome = this.runForEach(step, currentExecution);
+						} else {
+							outcome = this.runOne(step, currentExecution, inputOverride);
+						}
+						inputOverride = NO_INPUT; // 받은 입력은 첫 step에만 씁니다.
+					} catch (Exception e) {
+						// StepExecutor가 던진 예외(시스템 오류: 외부 연결 실패 등)는 onFailure로 보내지 않고 그 자리에서
+						// 바로 FAILED로 끝냅니다. 재작성 루프 같은 onFailure 흐름은 "값이 틀렸다"는 비즈니스 실패를
+						// 고치려는 것이지, 시스템 오류를 되풀이하려는 것이 아니기 때문입니다.
+						// 스택은 로그 파일에 남깁니다. 실행 상태에는 한 줄 메시지만 들어가서, 그것만으로는 원인을 찾기 어렵습니다.
+						this.error("step[" + step.id() + "] 실행 중 예외가 발생했습니다(executionId=" + currentExecution.executionId() + ")\n" + ProviderErrorMessage.stackTraceOf(e));
+						return this.persistFailed(currentExecution, "step[" + step.id() + "] 실행 중 예외가 발생했습니다 - " + ProviderErrorMessage.of(e));
+					} finally {
+						// step 안에서 Tool이 띄운 것을 정리할 기회를 줍니다(성공·실패·예외 모두).
+						this.notifyStepEnded(currentExecution.executionId(), step.id());
+					}
+
+					/****************************************************************************************
+					4) 결과가 대기(APPROVAL이 사람의 결정을 기다리는 중)면, 실행을 여기서 멈춥니다.
+					****************************************************************************************/
+					if (outcome.pending()) {
+						currentExecution = currentExecution.waitingApproval(currentIndex);
+						this.executionStore.update(currentExecution);
+						return currentExecution;
+					}
+
+					/****************************************************************************************
+					5) 이번 step의 결과를 그 step의 save에 적힌 이름으로 state에 저장해서,
+					   다음 step들이 "${state.이름}"으로 가져다 쓸 수 있게 합니다(성공이든 실패든 저장합니다).
+					****************************************************************************************/
+					WorkFlowContext.saveOutput(currentExecution.context(), step.output(), outcome.input(), outcome.output(), outcome.error(), outcome.items());
+
+					/****************************************************************************************
+					6) nextStepId()로 다음에 갈 곳을 정합니다(step id, 또는 END/FAIL 예약어).
+					   ROUTER가 routes에 없는 경로를 고르면 예외를 던지는데, 여기서 잡아서 FAILED로 남깁니다.
+					****************************************************************************************/
+					try {
+						nextId = this.nextStepId(workflow, step, outcome);
+					} catch (Exception e) {
+						return this.persistFailed(currentExecution, "step[" + step.id() + "]의 다음 step을 정하는 중 예외가 발생했습니다 - " + e.getMessage());
+					}
+
+					/****************************************************************************************
+					6-1) 사람의 승인과 감독의 판정을 결정 기록에 남깁니다(${decisions}, ${arrival}).
+					     LLM을 부르는 step이 성공했으면, 그 step이 받아 쓴 결정(arrival)을 비웁니다.
+					****************************************************************************************/
+					this.noteDecision(currentExecution.context(), step, outcome, nextId);
+
+					/****************************************************************************************
+					6-2) 다음 step에 "어디서 어떤 길로 왔는지"를 적어 둡니다. 다음 step의 실행 이력에 함께 남습니다.
+					****************************************************************************************/
+					WorkFlowContext.setArrivedFrom(currentExecution.context(), step.id(), this.viaOf(step, outcome));
 				}
-
-				/****************************************************************************************
-				6-1) 사람의 승인과 감독의 판정을 결정 기록에 남깁니다(${decisions}, ${arrival}).
-				     LLM을 부르는 step이 성공했으면, 그 step이 받아 쓴 결정(arrival)을 비웁니다.
-				****************************************************************************************/
-				this.noteDecision(currentExecution.context(), step, outcome, nextId);
-
-				/****************************************************************************************
-				6-2) 다음 step에 "어디서 어떤 길로 왔는지"를 적어 둡니다. 다음 step의 실행 이력에 함께 남습니다.
-				****************************************************************************************/
-				WorkFlowContext.setArrivedFrom(currentExecution.context(), step.id(), this.viaOf(step, outcome));
 
 				/****************************************************************************************
 				7) 다음 곳으로 갑니다.
@@ -309,7 +329,7 @@ public class WorkFlowExecutor extends BaseObject {
 					return currentExecution;
 				}
 				if (Constants.WorkFlow.FAIL_SENTINEL.equals(nextId)) {
-					return this.persistFailed(currentExecution, this.failMessage(step, outcome));
+					return this.persistFailed(currentExecution, outcome == null ? "step[" + step.id() + "]이 " + overLimit + " limit.over가 FAIL이라 Workflow를 끝냈습니다." : this.failMessage(step, outcome));
 				}
 				int nextIndex = this.indexOf(workflow.steps(), nextId);
 				if (nextIndex < 0) {
@@ -668,6 +688,44 @@ public class WorkFlowExecutor extends BaseObject {
 			String verdict = Boolean.TRUE.equals(output.get("pass")) ? "통과" : "불통과";
 			WorkFlowContext.recordDecision(context, step.id(), step.name(), step.type().name(), verdict, null, textOf(output.get("reason")), nextId);
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 횟수 한도(limit)가 있는 step이면 이번 실행을 셉니다. 세는 규칙은 범용 Tool countUp과 같습니다
+	 * (같은 scope 안에서 max번까지, scope 값이 바뀌면 처음부터). 센 값은 컨텍스트의 limits에 둡니다.
+	 * scope 표현식을 계산하지 못하면 비운 것으로 봅니다(실행 전체에서 셈). 한도 때문에 흐름이 멈추지 않게 하려는 것입니다.
+	 * </pre>
+	 *
+	 * @param execution 지금 진행 중인 실행입니다.
+	 * @param step      실행하려는 step입니다.
+	 * @return 한도를 넘었으면 그 안내 글, 한도가 없거나 안이면 null
+	 */
+	private String countLimit(WorkFlowExecution execution, StepDefinition step) {
+		StepLimit limit = StepDefinition.limitOf(step);
+		if (limit == null) {
+			return null;
+		}
+		String scope = null;
+		if (limit.scope() != null) {
+			try {
+				scope = JsonSchemaUtil.toText(ContextResolver.resolve(limit.scope(), execution.context(), null));
+			} catch (ExpressionException e) {
+				this.warn("step[" + step.id() + "]의 limit.scope를 계산하지 못해 실행 전체에서 셉니다 - " + e.getMessage());
+			}
+		}
+		Map<String, Object> count = DataLogic.countUp(WorkFlowContext.limitCount(execution.context(), step.id()), limit.max(), scope);
+		WorkFlowContext.setLimitCount(execution.context(), step.id(), count);
+		return DataLogic.COUNT_OVER.equals(count.get("route")) ? "횟수 한도(limit.max " + limit.max() + "번)를 다 써서 실행하지 않고 " + limit.over() + "(으)로 갑니다." : null;
+	}
+
+	/** 횟수 한도로 건너뛴 step을 실행 이력에 한 줄 남깁니다(성공, 0ms, 사유는 결과 요약). 진행 기록에서 왜 건너뛰었는지 보이게 하려는 것입니다. */
+	private void appendLimitHistory(WorkFlowExecution execution, StepDefinition step, String message) {
+		Map<String, Object> from = WorkFlowContext.arrivedFrom(execution.context());
+		this.executionStore.appendHistory(execution.executionId(), new StepHistoryEntry(
+			step.id(), step.type(), StepDefinition.refOf(step), true, 0L, message, null, Instant.now()
+			, from == null ? null : textOf(from.get("step"))
+			, from == null ? null : textOf(from.get("via"))));
 	}
 
 	/**

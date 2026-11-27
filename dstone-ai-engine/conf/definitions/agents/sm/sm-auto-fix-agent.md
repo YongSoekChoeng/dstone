@@ -1,5 +1,5 @@
 ---
-# sm-workflow step34(자동 수정)의 Agent입니다. 동작 검증이 잡은 실패를 사람에게 가기 전에 고칩니다(최대 횟수는 step31이 셈).
+# sm-workflow step34(자동 수정)의 Agent입니다. 동작 검증이 잡은 실패를 사람에게 가기 전에 고칩니다(최대 횟수는 엔진이 step32의 limit으로 셈).
 # 사람 없이 돌기 때문에 원본에 반영하는 Tool(runShellScript 등)은 주지 않습니다.
 # 테스트 서버를 띄우기 전에는 execution.toolPrerequisites가 행 조회와 브라우저를 막습니다. 기동 실패를 고칠 때 필요한 테이블 구조 조회만 개발 DB에서 됩니다.
 # 1.2.0(2026-11-23): Skill test-environment를 받아, 시험 환경 차이로 생긴 실패는 고치지 않고 unresolved에 남긴다

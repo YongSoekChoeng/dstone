@@ -37,6 +37,7 @@ import net.dstone.ai.common.consts.StepType;
  * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 표현식입니다(예: ${state.files}).
  * @param itemVariable (옵셔널)forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"이고 표현식에서 ${item}으로 씁니다.
  * @param memory       (옵셔널)true면 이 step이 자기 대화방에서 이전에 나눈 대화를 기억합니다(재작성 루프 등).
+ * @param limit        (옵셔널)이 step을 몇 번까지 실행할지(StepLimit). 넘으면 실행하지 않고 limit.over로 갑니다.
  */
 public record AgentStepDefinition(
 	String id
@@ -52,6 +53,7 @@ public record AgentStepDefinition(
 	, String forEach
 	, String itemVariable
 	, Boolean memory
+	, StepLimit limit
 	) implements StepDefinition {
 
 	@Override

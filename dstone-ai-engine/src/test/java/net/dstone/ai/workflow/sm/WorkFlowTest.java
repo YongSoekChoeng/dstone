@@ -35,12 +35,14 @@ public class WorkFlowTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 작업_시각은_LLM_없이_정한다() {
-		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString());
-		flow.step("step00");
+	void 작업_시각은_LLM_없이_정한다() throws IOException {
+		// 2.11.0부터 시각을 구하는 step 없이 엔진이 settings.startTime으로 첫 step 전에 넣는다
+		this.writeDoc("00.request.md", "## 현업요청\n이미지 게시판\n");
+		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
+		flow.step("step01");
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(String.valueOf(flow.state("now"))).matches("\\d{8}-\\d{4}");
-		assertThat(flow.currentStepId()).isEqualTo("step01");
+		assertThat(flow.currentStepId()).isEqualTo("step02");
 		if (!this.chatModel.isLlmCall()) {
 			assertThat(this.chatModel.prompts()).isEmpty();
 		}
@@ -50,7 +52,6 @@ public class WorkFlowTest extends WorkflowTestBase {
 	void 요청서의_프로젝트ID를_LLM_없이_state에_담고_리비전을_정하러_간다() throws IOException {
 		this.writeDoc("00.request.md", "## 현업요청\n이미지 게시판\n\n## 프로젝트ID\n\tmyApp\n");
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
-		flow.step("step00");
 		flow.step("step01");
 		flow.step("step02");
 		assertThat(flow.state("projectId")).isEqualTo("myApp");
@@ -70,9 +71,8 @@ public class WorkFlowTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.stepper(WORKFLOW_ID, this.workDir.toString().replace("\\", "/"));
 		flow.put("now", now);
 		flow.jumpTo("step14");
+		// 설계서와 목록을 한 step(readFiles)에서 읽고, 목록이 없으면(required) 그 자리에서 실패한다
 		flow.step("step14");
-		assertThat(flow.state("design")).isEqualTo("설계서 내용");
-		flow.step("step15");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(this.chatModel.prompts()).isEmpty();
 	}

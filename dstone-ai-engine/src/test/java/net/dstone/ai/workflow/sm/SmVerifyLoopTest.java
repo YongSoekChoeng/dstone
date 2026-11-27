@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -52,9 +53,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		assertThat(flow.currentStepId()).isEqualTo("step60");
 		flow.step("step60");
 		assertThat(String.valueOf(flow.state("ddlCheck"))).contains("route=none");
-		flow.step("step42");
 		flow.step("step43");
-		flow.step("step44");
 
 		assertThat(flow.currentStepId()).isEqualTo("step41");
 	}
@@ -63,15 +62,14 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	 * <pre>
 	 * 설계 승인에서 고른 검증 수준을 첫 검증에서 따르는지 봅니다(2.7.0).
 	 * 최소 확인이면 서버를 띄우지 않고, 간이 확인이면 서버 기동만 하고 사람에게 갑니다.
-	 * 이 판정들은 정상 결과라 이력에 실패로 남지 않습니다.
+	 * 이 판정은 정상 결과라 이력에 실패로 남지 않습니다. 2.11.0부터 step43 하나(routeValue)가 고르고,
+	 * 첫 검증인지는 step43의 limit(max 1)이 셉니다.
 	 * </pre>
 	 */
 	@Test
 	void 컴파일만으로_승인하면_첫_검증은_서버_없이_사람에게_간다() {
-		WorkflowStepper flow = this.atStep("step42");
+		WorkflowStepper flow = this.atStep("step43");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
-		flow.step("step42");
-		assertThat(flow.currentStepId()).isEqualTo("step43");
 		flow.step("step43");
 
 		assertThat(flow.currentStepId()).isEqualTo("step19");
@@ -80,15 +78,12 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 
 	@Test
 	void 기동만_확인으로_승인하면_첫_검증은_서버_기동만_한다() {
-		WorkflowStepper flow = this.atStep("step42");
+		WorkflowStepper flow = this.atStep("step43");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 간이 확인)"));
-		flow.step("step42");
 		flow.step("step43");
-		assertThat(flow.currentStepId()).isEqualTo("step44");
-		flow.step("step44");
 
 		assertThat(flow.currentStepId()).isEqualTo("step45");
-		assertThat(this.lastHistory(flow, "step44").success()).isTrue();
+		assertThat(this.lastHistory(flow, "step43").success()).isTrue();
 	}
 
 	@Test
@@ -102,16 +97,17 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 
 	@Test
 	void 다시_돌_때는_검증을_생략하지_않고_화면_검증으로_간다() {
-		WorkflowStepper flow = this.atStep("step42");
+		WorkflowStepper flow = this.atStep("step43");
 		flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
-		flow.step("step42");
-		assertThat(flow.currentStepId()).isEqualTo("step43");
+		flow.step("step43");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 
-		// 재개발·전문가 해결·자동 수정을 거쳐 다시 컴파일 확인 뒤로 온 경우
-		flow.jumpTo("step42");
-		flow.step("step42");
+		// 재개발·자동 수정을 거쳐 다시 컴파일 확인 뒤로 온 경우: 한도(1번)를 다 써서 step43을 건너뛰고 화면 검증으로 간다
+		flow.jumpTo("step43");
+		flow.step("step43");
 		assertThat(flow.currentStepId()).isEqualTo("step41");
-		assertThat(this.lastHistory(flow, "step42").success()).isTrue();
+		assertThat(this.lastHistory(flow, "step43").success()).isTrue();
+		assertThat(this.lastHistory(flow, "step43").outputSummary()).contains("횟수 한도");
 	}
 
 	@Test
@@ -140,11 +136,12 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		Path runDir = Files.createDirectories(this.workDir.resolve("20261122-2300"));
 		Files.writeString(runDir.resolve("03-1.design.md"), "# 설계서\n## 수정 이력\n자동 수정: 고침", StandardCharsets.UTF_8);
 		WorkflowStepper flow = this.atStep("step41");
-		flow.put("design", "# 설계서(고치기 전)");
+		flow.put("docs", Map.of("design", "# 설계서(고치기 전)"));
 		flow.step("step41");
 
+		// 태스크아이템 목록이 없어도 예전처럼 설계서만 읽고 넘어간다(step41은 목록을 required로 두지 않음)
 		assertThat(flow.currentStepId()).isEqualTo("step40");
-		assertThat(String.valueOf(flow.state("design"))).contains("자동 수정: 고침");
+		assertThat(String.valueOf(flow.stateMap("docs").get("design"))).contains("자동 수정: 고침");
 	}
 
 	@Test
@@ -153,7 +150,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.put("serverCheck", Map.of("success", Boolean.FALSE, "cause", "code", "message", "컴파일 오류"));
 		flow.step("step30");
 
-		assertThat(flow.currentStepId()).isEqualTo("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step32");
 	}
 
 	@Test
@@ -162,7 +159,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		flow.put("verification", Map.of("scenarios", List.of(Map.of("result", "PASS"), Map.of("result", "FAIL"))));
 		flow.step("step36");
 
-		assertThat(flow.currentStepId()).isEqualTo("step31");
+		assertThat(flow.currentStepId()).isEqualTo("step32");
 	}
 
 	@Test
@@ -177,25 +174,29 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 자동_수정은_두_번까지고_사람이_새로_시키면_다시_센다() {
+	void 자동_수정은_두_번까지고_사람이_새로_시키면_다시_센다() throws IOException {
 		assumeFalse(this.chatModel.isLlmCall());
-		WorkflowStepper flow = this.atStep("step31");
-		flow.step("step31");
-		assertThat(flow.currentStepId()).isEqualTo("step32");
-		flow.jumpTo("step31");
-		flow.step("step31");
-		assertThat(flow.currentStepId()).isEqualTo("step32");
-		flow.jumpTo("step31");
-		flow.step("step31");
+		// 2.11.0부터 자동 수정 횟수는 step32의 limit(max 2, scope 결정 기록)이 센다
+		Path runDir = Files.createDirectories(this.workDir.resolve("20261122-2300"));
+		Files.writeString(runDir.resolve("03-1.design.md"), "# 설계서", StandardCharsets.UTF_8);
+		Files.writeString(runDir.resolve("03-2.taskitems.md"), "# 목록", StandardCharsets.UTF_8);
+		WorkflowStepper flow = this.atStep("step32");
+		flow.step("step32");
+		assertThat(flow.currentStepId()).isEqualTo("step34");
+		flow.jumpTo("step32");
+		flow.step("step32");
+		assertThat(flow.currentStepId()).isEqualTo("step34");
+		flow.jumpTo("step32");
+		flow.step("step32");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
 		// 한도를 다 쓴 것도 정상 판정이라 이력에 실패로 남지 않는다(2.6.1)
-		assertThat(this.lastHistory(flow, "step31").success()).isTrue();
+		assertThat(this.lastHistory(flow, "step32").success()).isTrue();
 
 		flow.step("step19");
 		flow.decide("재개발", "다시 해 주세요");
-		flow.jumpTo("step31");
-		flow.step("step31");
-		assertThat(flow.currentStepId()).isEqualTo("step32");
+		flow.jumpTo("step32");
+		flow.step("step32");
+		assertThat(flow.currentStepId()).isEqualTo("step34");
 	}
 
 	/** 그 step의 마지막 실행 이력입니다. */

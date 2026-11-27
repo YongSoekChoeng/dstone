@@ -58,6 +58,7 @@ import net.dstone.ai.common.consts.StepType;
  * @param onFailure    (옵셔널)실패했을 때 갈 step의 id(또는 "FAIL")입니다.
  * @param forEach      (옵셔널)이 step을 항목마다 동시에 실행할 리스트의 표현식입니다(예: ${state.tree}).
  * @param itemVariable (옵셔널)forEach 반복 중 항목을 담을 변수 이름입니다. 비워두면 "item"이고 표현식에서 ${item}으로 씁니다.
+ * @param limit        (옵셔널)이 step을 몇 번까지 실행할지(StepLimit). 넘으면 실행하지 않고 limit.over로 갑니다.
  */
 public record ToolStepDefinition(
 	String id
@@ -73,6 +74,7 @@ public record ToolStepDefinition(
 	, String onFailure
 	, String forEach
 	, String itemVariable
+	, StepLimit limit
 	) implements StepDefinition {
 
 	@Override

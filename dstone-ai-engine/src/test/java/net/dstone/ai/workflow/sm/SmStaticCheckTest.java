@@ -40,15 +40,14 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 		this.write("03-2.taskitems.md", "| TASK | 상태 |\n|---|---|\n| 1 | 대기 |\n");
 		WorkflowStepper flow = this.atStep("step50");
 		flow.step("step50");
-		assertThat(flow.currentStepId()).isEqualTo("step51");
-		assertThat(String.valueOf(flow.stateMap("docCheck").get("message"))).contains("03-1.design.md:3").contains("닫히지 않음");
-		flow.step("step51");
 		assertThat(flow.currentStepId()).isEqualTo("step52");
+		assertThat(String.valueOf(flow.stateMap("docCheck").get("message"))).contains("03-1.design.md:3").contains("닫히지 않음");
 
-		// 고쳐도 남아 있으면 한도(1번)를 다 쓴 것이라 그대로 설계 승인으로 간다
+		// 한 번 고친 뒤(step52의 limit이 1번을 셈) 다시 걸리면 한도를 다 써서 고치지 않고 설계 승인으로 간다
+		this.countOnce(flow, "step52");
 		flow.jumpTo("step50");
 		flow.step("step50");
-		flow.step("step51");
+		flow.step("step52");
 		assertThat(flow.currentStepId()).isEqualTo("step13");
 	}
 
@@ -66,13 +65,12 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step54");
 		flow.put("develop", this.develop(2, 1));
 		flow.step("step54");
-		assertThat(flow.currentStepId()).isEqualTo("step55");
-		flow.step("step55");
 		assertThat(flow.currentStepId()).isEqualTo("step57");
 
-		// 두 번째도 남으면 한도를 다 써서 컴파일 확인으로 간다
-		flow.jumpTo("step55");
-		flow.step("step55");
+		// 두 번째도 남으면 한도(step57의 limit 1번)를 다 써서 컴파일 확인으로 간다
+		this.countOnce(flow, "step57");
+		flow.jumpTo("step57");
+		flow.step("step57");
 		assertThat(flow.currentStepId()).isEqualTo("step18");
 	}
 
@@ -99,13 +97,12 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 		this.write("dev-resources/src/main/resources/sqlmap/a-mapper.xml", "<mapper namespace=\"A\">\n<select id=\"x\">SELECT 1 WHERE a < 2</select>\n</mapper>\n");
 		WorkflowStepper flow = this.atStep("step53");
 		flow.step("step53");
-		assertThat(flow.currentStepId()).isEqualTo("step56");
-		assertThat(String.valueOf(flow.stateMap("sourceCheck").get("message"))).contains("a-mapper.xml:2").contains("XML 형식 오류");
-		flow.step("step56");
 		assertThat(flow.currentStepId()).isEqualTo("step58");
+		assertThat(String.valueOf(flow.stateMap("sourceCheck").get("message"))).contains("a-mapper.xml:2").contains("XML 형식 오류");
 
-		flow.jumpTo("step56");
-		flow.step("step56");
+		this.countOnce(flow, "step58");
+		flow.jumpTo("step58");
+		flow.step("step58");
 		assertThat(flow.currentStepId()).isEqualTo("step28");
 	}
 
@@ -121,6 +118,18 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 		flow.step("step48");
 		assertThat(flow.currentStepId()).isEqualTo("step11");
 		assertThat(String.valueOf(flow.state("referenceError"))).contains("projectId");
+	}
+
+	/**
+	 * Agent step을 LLM 없이 한 번 실행한 것처럼, 그 step의 횟수 한도를 지금 결정 기록 범위에서 1번 센 상태로 둡니다.
+	 * 한도 판정은 엔진이 step 실행 전에 하므로 Agent를 부르지 않고도 "두 번째에는 건너뛴다"를 볼 수 있습니다.
+	 */
+	private void countOnce(WorkflowStepper flow, String stepId) {
+		Map<String, Object> context = flow.execution().context();
+		Object scope = net.dstone.ai.common.expression.ContextResolver.resolve("${decisions:}", context, null);
+		net.dstone.ai.runtime.workflow.execution.WorkFlowContext.setLimitCount(context, stepId,
+			net.dstone.ai.tools.data.DataLogic.countUp(null, Integer.valueOf(1), net.dstone.ai.common.schema.JsonSchemaUtil.toText(scope)));
+		this.workFlowExecutionStore.update(flow.execution());
 	}
 
 	private Map<String, Object> develop(int pending, int unfinished) {

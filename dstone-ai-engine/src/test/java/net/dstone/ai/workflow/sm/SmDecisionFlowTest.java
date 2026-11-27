@@ -56,8 +56,8 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step37 17-기존 설계서 맞춤 · document-revise-agent 또는 step12 18-아키텍처 설계 · sm-architect-agent");
-		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step26 55-영향도분석서 수정 · document-revise-agent");
+		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step37 16-기존 설계서 맞춤 · document-revise-agent 또는 step12 17-아키텍처 설계 · sm-architect-agent");
+		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step26 45-영향도분석서 수정 · document-revise-agent");
 		assertThat(pending.receivers().get("중지")).isEqualTo("실패로 끝냄(FAIL)");
 
 		flow.decide("승인(설계진행)", "공통 코드 테이블도 같이 봐 주세요");
@@ -110,21 +110,20 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		Files.writeString(folder.resolve("dev-resources/A.java"), "class A {}", StandardCharsets.UTF_8);
 
 		WorkflowStepper flow = this.atStep("step19");
-		flow.put("design", "# 설계 (옛 내용)").put("taskitems", "# 목록 (옛 내용)");
+		flow.put("docs", Map.of("design", "# 설계 (옛 내용)", "taskitems", "# 목록 (옛 내용)"));
 		flow.step("step19");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("재개발")).isEqualTo("step17 24-개발 · sm-developer-agent");
+		assertThat(pending.receivers().get("재개발")).isEqualTo("step17 22-개발 · sm-developer-agent");
 
 		flow.decide("재개발", "업로드한 파일이 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step20");
 		flow.step("step20");
-		flow.step("step21");
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step17");
-		assertThat(flow.state("design")).isEqualTo("# 설계 (재개발 반영)");
-		assertThat(flow.state("taskitems")).isEqualTo("# 목록 (재개발 반영)");
+		assertThat(flow.stateMap("docs").get("design")).isEqualTo("# 설계 (재개발 반영)");
+		assertThat(flow.stateMap("docs").get("taskitems")).isEqualTo("# 목록 (재개발 반영)");
 		// 재개발은 개발 폴더를 비우지 않습니다(비우는 step16는 설계 승인 뒤에만 지납니다).
 		assertThat(folder.resolve("dev-resources/A.java")).exists();
 		assertThat(this.chatModel.prompts()).isEmpty();

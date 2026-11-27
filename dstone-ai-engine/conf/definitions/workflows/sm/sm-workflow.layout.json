@@ -4,10 +4,6 @@
       "x" : 126,
       "y" : 31
     },
-    "step00" : {
-      "x" : 50,
-      "y" : 128
-    },
     "step01" : {
       "x" : 50,
       "y" : 210
@@ -76,10 +72,6 @@
       "x" : 606,
       "y" : 572
     },
-    "step15" : {
-      "x" : 606,
-      "y" : 662
-    },
     "step16" : {
       "x" : 606,
       "y" : 738
@@ -103,10 +95,6 @@
     "step20" : {
       "x" : 1182,
       "y" : 128
-    },
-    "step21" : {
-      "x" : 1182,
-      "y" : 210
     },
     "step25" : {
       "x" : 904,
@@ -132,10 +120,6 @@
       "x" : 1182,
       "y" : 572
     },
-    "step42" : {
-      "x" : 1182,
-      "y" : 662
-    },
     "step41" : {
       "x" : 1182,
       "y" : 738
@@ -152,17 +136,9 @@
       "x" : 1182,
       "y" : 992
     },
-    "step31" : {
-      "x" : 1758,
-      "y" : 30
-    },
     "step32" : {
       "x" : 1758,
       "y" : 128
-    },
-    "step33" : {
-      "x" : 1758,
-      "y" : 210
     },
     "step34" : {
       "x" : 1470,
@@ -180,10 +156,6 @@
       "x" : 1758,
       "y" : 496
     },
-    "step44" : {
-      "x" : 1758,
-      "y" : 572
-    },
     "step45" : {
       "x" : 1470,
       "y" : 572
@@ -192,17 +164,9 @@
       "x" : 904,
       "y" : 496
     },
-    "step56" : {
-      "x" : 1758,
-      "y" : 820
-    },
     "step58" : {
       "x" : 904,
       "y" : 820
-    },
-    "step55" : {
-      "x" : 1758,
-      "y" : 992
     },
     "step57" : {
       "x" : 904,
@@ -211,10 +175,6 @@
     "step12" : {
       "x" : 338,
       "y" : 414
-    },
-    "step51" : {
-      "x" : 2046,
-      "y" : 210
     },
     "step52" : {
       "x" : 904,
@@ -246,13 +206,6 @@
     }
   },
   "edges" : {
-    "step00|onFailure|" : [ {
-      "x" : 324,
-      "y" : 153
-    }, {
-      "x" : 324,
-      "y" : 1078
-    } ],
     "step01|onFailure|" : [ {
       "x" : 324,
       "y" : 235
@@ -442,13 +395,6 @@
       "x" : 860,
       "y" : 1078
     } ],
-    "step15|onFailure|" : [ {
-      "x" : 860,
-      "y" : 687
-    }, {
-      "x" : 860,
-      "y" : 1078
-    } ],
     "step17|onFailure|" : [ {
       "x" : 860,
       "y" : 845
@@ -542,26 +488,6 @@
       "x" : 1456,
       "y" : 1078
     } ],
-    "step21|next|" : [ {
-      "x" : 1118,
-      "y" : 235
-    }, {
-      "x" : 1118,
-      "y" : 272
-    }, {
-      "x" : 870,
-      "y" : 272
-    }, {
-      "x" : 870,
-      "y" : 845
-    } ],
-    "step21|onFailure|" : [ {
-      "x" : 1456,
-      "y" : 235
-    }, {
-      "x" : 1456,
-      "y" : 1078
-    } ],
     "step25|next|" : [ {
       "x" : 820,
       "y" : 349
@@ -636,26 +562,6 @@
       "x" : 1168,
       "y" : 1078
     } ],
-    "step42|onFailure|" : [ {
-      "x" : 1416,
-      "y" : 687
-    }, {
-      "x" : 1416,
-      "y" : 763
-    } ],
-    "step42|route|within" : [ {
-      "x" : 1396,
-      "y" : 687
-    }, {
-      "x" : 1396,
-      "y" : 634
-    }, {
-      "x" : 1714,
-      "y" : 634
-    }, {
-      "x" : 1714,
-      "y" : 521
-    } ],
     "step43|onFailure|" : [ {
       "x" : 1684,
       "y" : 521
@@ -681,36 +587,6 @@
     }, {
       "x" : 1416,
       "y" : 55
-    } ],
-    "step44|onFailure|" : [ {
-      "x" : 1694,
-      "y" : 597
-    }, {
-      "x" : 1694,
-      "y" : 642
-    }, {
-      "x" : 1416,
-      "y" : 642
-    }, {
-      "x" : 1416,
-      "y" : 763
-    } ],
-    "step44|route|true" : [ {
-      "x" : 1684,
-      "y" : 597
-    } ],
-    "step44|route|false" : [ {
-      "x" : 1704,
-      "y" : 597
-    }, {
-      "x" : 1704,
-      "y" : 650
-    }, {
-      "x" : 1416,
-      "y" : 650
-    }, {
-      "x" : 1416,
-      "y" : 763
     } ],
     "step45|next|" : [ {
       "x" : 1446,
@@ -766,32 +642,6 @@
       "x" : 1158,
       "y" : 55
     } ],
-    "step31|onFailure|" : [ {
-      "x" : 1694,
-      "y" : 55
-    }, {
-      "x" : 1694,
-      "y" : 92
-    }, {
-      "x" : 1396,
-      "y" : 92
-    }, {
-      "x" : 1396,
-      "y" : 55
-    } ],
-    "step31|route|over" : [ {
-      "x" : 1704,
-      "y" : 55
-    }, {
-      "x" : 1704,
-      "y" : 100
-    }, {
-      "x" : 1396,
-      "y" : 100
-    }, {
-      "x" : 1396,
-      "y" : 55
-    } ],
     "step32|onFailure|" : [ {
       "x" : 1684,
       "y" : 153
@@ -801,23 +651,6 @@
     }, {
       "x" : 1396,
       "y" : 108
-    }, {
-      "x" : 1396,
-      "y" : 55
-    } ],
-    "step33|next|" : [ {
-      "x" : 1684,
-      "y" : 235
-    } ],
-    "step33|onFailure|" : [ {
-      "x" : 1694,
-      "y" : 235
-    }, {
-      "x" : 1694,
-      "y" : 190
-    }, {
-      "x" : 1396,
-      "y" : 190
     }, {
       "x" : 1396,
       "y" : 55
@@ -962,45 +795,6 @@
       "x" : 2022,
       "y" : 235
     } ],
-    "step51|onFailure|" : [ {
-      "x" : 1972,
-      "y" : 235
-    }, {
-      "x" : 1972,
-      "y" : 296
-    }, {
-      "x" : 860,
-      "y" : 296
-    }, {
-      "x" : 860,
-      "y" : 521
-    } ],
-    "step51|route|within" : [ {
-      "x" : 1982,
-      "y" : 235
-    }, {
-      "x" : 1982,
-      "y" : 288
-    }, {
-      "x" : 1128,
-      "y" : 288
-    }, {
-      "x" : 1128,
-      "y" : 439
-    } ],
-    "step51|route|over" : [ {
-      "x" : 1992,
-      "y" : 235
-    }, {
-      "x" : 1992,
-      "y" : 304
-    }, {
-      "x" : 860,
-      "y" : 304
-    }, {
-      "x" : 860,
-      "y" : 521
-    } ],
     "step52|next|" : [ {
       "x" : 820,
       "y" : 439
@@ -1045,84 +839,6 @@
       "x" : 1684,
       "y" : 1017
     } ],
-    "step55|onFailure|" : [ {
-      "x" : 1694,
-      "y" : 1017
-    }, {
-      "x" : 1694,
-      "y" : 1062
-    }, {
-      "x" : 820,
-      "y" : 1062
-    }, {
-      "x" : 820,
-      "y" : 1017
-    } ],
-    "step55|route|within" : [ {
-      "x" : 1704,
-      "y" : 1017
-    }, {
-      "x" : 1704,
-      "y" : 1054
-    }, {
-      "x" : 1118,
-      "y" : 1054
-    }, {
-      "x" : 1118,
-      "y" : 1017
-    } ],
-    "step55|route|over" : [ {
-      "x" : 1714,
-      "y" : 1017
-    }, {
-      "x" : 1714,
-      "y" : 1070
-    }, {
-      "x" : 820,
-      "y" : 1070
-    }, {
-      "x" : 820,
-      "y" : 1017
-    } ],
-    "step56|onFailure|" : [ {
-      "x" : 1684,
-      "y" : 845
-    }, {
-      "x" : 1684,
-      "y" : 800
-    }, {
-      "x" : 1426,
-      "y" : 800
-    }, {
-      "x" : 1426,
-      "y" : 521
-    } ],
-    "step56|route|within" : [ {
-      "x" : 1694,
-      "y" : 845
-    }, {
-      "x" : 1694,
-      "y" : 890
-    }, {
-      "x" : 1118,
-      "y" : 890
-    }, {
-      "x" : 1118,
-      "y" : 845
-    } ],
-    "step56|route|over" : [ {
-      "x" : 1704,
-      "y" : 845
-    }, {
-      "x" : 1704,
-      "y" : 808
-    }, {
-      "x" : 1426,
-      "y" : 808
-    }, {
-      "x" : 1426,
-      "y" : 521
-    } ],
     "step57|next|" : [ {
       "x" : 820,
       "y" : 1017
@@ -1150,14 +866,6 @@
     "__START__|start|" : {
       "source" : "out",
       "target" : "in"
-    },
-    "step00|next|" : {
-      "source" : "out",
-      "target" : "in"
-    },
-    "step00|onFailure|" : {
-      "source" : "right",
-      "target" : "left"
     },
     "step01|next|" : {
       "source" : "out",
@@ -1315,14 +1023,6 @@
       "source" : "right",
       "target" : "left"
     },
-    "step15|next|" : {
-      "source" : "out",
-      "target" : "in"
-    },
-    "step15|onFailure|" : {
-      "source" : "right",
-      "target" : "left"
-    },
     "step16|next|" : {
       "source" : "out",
       "target" : "in"
@@ -1372,14 +1072,6 @@
       "target" : "in"
     },
     "step20|onFailure|" : {
-      "source" : "right",
-      "target" : "left"
-    },
-    "step21|next|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step21|onFailure|" : {
       "source" : "right",
       "target" : "left"
     },
@@ -1435,18 +1127,6 @@
       "source" : "right",
       "target" : "left"
     },
-    "step42|onFailure|" : {
-      "source" : "right",
-      "target" : "right"
-    },
-    "step42|route|within" : {
-      "source" : "right",
-      "target" : "left"
-    },
-    "step42|route|over" : {
-      "source" : "out",
-      "target" : "in"
-    },
     "step43|onFailure|" : {
       "source" : "left",
       "target" : "right"
@@ -1458,18 +1138,6 @@
     "step43|route|false" : {
       "source" : "out",
       "target" : "in"
-    },
-    "step44|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step44|route|true" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step44|route|false" : {
-      "source" : "left",
-      "target" : "right"
     },
     "step45|next|" : {
       "source" : "left",
@@ -1499,31 +1167,11 @@
       "source" : "left",
       "target" : "left"
     },
-    "step31|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step31|route|within" : {
-      "source" : "out",
-      "target" : "in"
-    },
-    "step31|route|over" : {
-      "source" : "left",
-      "target" : "right"
-    },
     "step32|next|" : {
       "source" : "out",
       "target" : "in"
     },
     "step32|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step33|next|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step33|onFailure|" : {
       "source" : "left",
       "target" : "right"
     },
@@ -1619,18 +1267,6 @@
       "source" : "right",
       "target" : "left"
     },
-    "step51|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step51|route|within" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step51|route|over" : {
-      "source" : "left",
-      "target" : "right"
-    },
     "step52|next|" : {
       "source" : "left",
       "target" : "right"
@@ -1658,30 +1294,6 @@
     "step54|route|false" : {
       "source" : "right",
       "target" : "left"
-    },
-    "step55|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step55|route|within" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step55|route|over" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step56|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step56|route|within" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step56|route|over" : {
-      "source" : "left",
-      "target" : "right"
     },
     "step57|next|" : {
       "source" : "left",

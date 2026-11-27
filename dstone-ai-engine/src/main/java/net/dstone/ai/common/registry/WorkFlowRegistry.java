@@ -30,6 +30,7 @@ import net.dstone.ai.common.definition.workflow.step.AgentStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ApprovalStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.RouterStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.StepLimit;
 import net.dstone.ai.common.definition.workflow.step.SupervisorStepDefinition;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 import net.dstone.ai.common.exception.ExpressionException;
@@ -267,6 +268,10 @@ public class WorkFlowRegistry extends BaseObject {
 				itemVariables.add(StepDefinition.itemKeyOf(step));
 			}
 			this.validateTemplate(definition, nextSteps, writes, step, "with", this.inputOf(step), itemVariables);
+			StepLimit limit = StepDefinition.limitOf(step);
+			if (limit != null && limit.scope() != null) {
+				this.validateTemplate(definition, nextSteps, writes, step, "limit.scope", limit.scope(), List.of());
+			}
 		}
 		if (definition.returnValue() != null) {
 			this.validateTemplate(definition, nextSteps, writes, null, "return", definition.returnValue(), List.of());
@@ -311,6 +316,20 @@ public class WorkFlowRegistry extends BaseObject {
 		if (settings.maxIterations() != null && settings.maxIterations().intValue() <= 0) {
 			throw this.error(definition, null, "settings.maxIterations는 1 이상이어야 합니다: " + settings.maxIterations());
 		}
+		WorkFlowDefinition.StartTime startTime = settings.startTime();
+		if (startTime != null) {
+			if (StringUtil.isEmpty(startTime.save()) || !definition.stateNames().containsKey(startTime.save().trim())) {
+				throw this.error(definition, null, "settings.startTime.save는 state:에 선언한 이름이어야 합니다(적은 값 = " + startTime.save() + ").");
+			}
+			if (StringUtil.isEmpty(startTime.format())) {
+				throw this.error(definition, null, "settings.startTime.format이 있어야 합니다. 예: yyyyMMdd-HHmm");
+			}
+			try {
+				java.time.format.DateTimeFormatter.ofPattern(startTime.format());
+			} catch (IllegalArgumentException e) {
+				throw this.error(definition, null, "settings.startTime.format이 날짜 모양으로 맞지 않습니다: " + startTime.format() + " - " + e.getMessage());
+			}
+		}
 	}
 
 	/**
@@ -339,6 +358,7 @@ public class WorkFlowRegistry extends BaseObject {
 	 * - ROUTER, APPROVAL, routes를 적은 TOOL: routes의 값들
 	 * - 그 밖: next(비어 있으면 목록의 다음 step, 마지막이면 END)
 	 * - 모두: onFailure(비어 있으면 FAIL)
+	 * - limit을 적은 step: limit.over(횟수 한도를 넘었을 때 갈 곳)
 	 * </pre>
 	 *
 	 * @param definition 검사 중인 Workflow 정의
@@ -364,18 +384,31 @@ public class WorkFlowRegistry extends BaseObject {
 			if (step.onFailure() != null) {
 				targets.add(step.onFailure());
 			}
+			StepLimit limit = StepDefinition.limitOf(step);
+			if (limit != null) {
+				if (limit.max() == null || limit.max().intValue() < 1) {
+					throw this.error(definition, step, "limit.max는 1 이상의 횟수여야 합니다.");
+				}
+				if (StringUtil.isEmpty(limit.over())) {
+					throw this.error(definition, step, "limit.over(횟수 한도를 넘었을 때 갈 step id, END, FAIL)가 있어야 합니다.");
+				}
+				if (limit.over().equals(step.id())) {
+					throw this.error(definition, step, "limit.over가 자기 자신이면 한도를 넘은 뒤 끝없이 돕니다. 다른 step으로 보내십시오.");
+				}
+				targets.add(limit.over());
+			}
 
 			List<String> stepTargets = new ArrayList<>();
 			for (String target : targets) {
 				if (StringUtil.isEmpty(target)) {
-					throw this.error(definition, step, "next/onFailure/routes에 빈 값이 있습니다.");
+					throw this.error(definition, step, "next/onFailure/routes/limit.over에 빈 값이 있습니다.");
 				}
 				if (this.isSentinel(target)) {
 					continue;
 				}
 				if (!stepsById.containsKey(target)) {
 					String hint = "SUCCESS".equals(target) ? " 성공으로 끝내는 예약어는 SUCCESS가 아니라 END입니다." : "";
-					throw this.error(definition, step, "next/onFailure/routes의 '" + target + "'는 없는 step입니다(쓸 수 있는 값 = " + stepsById.keySet() + ", END, FAIL)." + hint);
+					throw this.error(definition, step, "next/onFailure/routes/limit.over의 '" + target + "'는 없는 step입니다(쓸 수 있는 값 = " + stepsById.keySet() + ", END, FAIL)." + hint);
 				}
 				stepTargets.add(target);
 			}
@@ -703,6 +736,10 @@ public class WorkFlowRegistry extends BaseObject {
 		for (StateWrite write : writes) {
 			written.add(write.target());
 		}
+		// settings.startTime이 시작할 때 채우는 이름은 저장하는 step이 없어도 된다
+		if (definition.startTimeState() != null) {
+			written.add(definition.startTimeState().trim());
+		}
 		for (String name : definition.stateNames().keySet()) {
 			if (!written.contains(name)) {
 				throw this.error(definition, null, "state의 '" + name + "'에 저장하는 step이 없습니다. 저장할 step에 'save: " + name + "'를 적거나, state:에서 지우십시오.");
@@ -793,6 +830,13 @@ public class WorkFlowRegistry extends BaseObject {
 		String name = path.get(0);
 		if (!definition.stateNames().containsKey(name)) {
 			throw this.error(definition, owner, prefix + "'" + name + "'는 state:에 선언하지 않은 이름입니다(선언된 이름 = " + definition.stateNames().keySet() + ").");
+		}
+		if (name.equals(definition.startTimeState() == null ? null : definition.startTimeState().trim())) {
+			// settings.startTime이 첫 step 전에 넣는 시각(글자)이라 어느 step에서나 읽을 수 있습니다.
+			if (path.size() > 1) {
+				throw this.error(definition, owner, prefix + "state." + name + "는 시작 시각(글자)이라 그 아래로 더 들어갈 수 없습니다.");
+			}
+			return;
 		}
 		List<StateWrite> writers = new ArrayList<>();
 		for (StateWrite write : writes) {

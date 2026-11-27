@@ -223,6 +223,21 @@ public sealed interface StepDefinition
 	}
 
 	/**
+	 * step의 횟수 한도(limit)를 돌려줍니다. 적지 않았거나 쓸 수 없는 종류(SUPERVISOR/ROUTER/APPROVAL)면 null입니다.
+	 *
+	 * @param step limit을 꺼낼 step
+	 */
+	static StepLimit limitOf(StepDefinition step) {
+		if (step instanceof AgentStepDefinition agent) {
+			return agent.limit();
+		}
+		if (step instanceof ToolStepDefinition tool) {
+			return tool.limit();
+		}
+		return null;
+	}
+
+	/**
 	 * step의 forEach 표현식을 돌려줍니다. 비워뒀거나 forEach를 쓸 수 없는 종류(ROUTER/APPROVAL)면 null입니다.
 	 *
 	 * @param step forEach를 꺼낼 step

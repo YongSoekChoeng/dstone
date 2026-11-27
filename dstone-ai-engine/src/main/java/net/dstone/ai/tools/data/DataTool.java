@@ -78,6 +78,30 @@ public class DataTool {
 
 	/**
 	 * <pre>
+	 * 값을 글자로 그대로 돌려줍니다. TOOL step이 그 글자를 routes의 이름으로 받아 갈 곳을 나눕니다.
+	 * 여러 값으로 갈리는 분기를 containsValue step 여러 개 대신 step 하나로 적으려는 것입니다.
+	 * 값이 비었으면 empty를 돌려줍니다(empty도 비었으면 빈 글자). routes에 없는 값이면 step이 실패해 onFailure로 갑니다.
+	 *
+	 * YAML 예: 설계 승인에서 고른 검증 수준으로 갈 곳을 나눈다
+	 *   tool: routeValue
+	 *   with: { value: "${state.designApproval.decision:}" }
+	 *   routes: { "승인(개발진행, 최소 확인)": step19, "승인(개발진행, 간이 확인)": step45, "승인(개발진행, 전체 확인)": step41 }
+	 *   onFailure: step41
+	 * </pre>
+	 */
+	@Tool(description = "value를 글자로 그대로 돌려준다(비었으면 empty). TOOL step이 그 값을 routes 이름으로 받아 갈 곳을 나눈다.")
+	public String routeValue(
+			@ToolParam(required = false, description = "갈 곳을 고를 값") Object value,
+			@ToolParam(required = false, description = "값이 비었을 때 돌려줄 글자") String empty) {
+		String text = value == null ? "" : String.valueOf(value).trim();
+		if (text.isEmpty()) {
+			return empty == null ? "" : empty;
+		}
+		return text;
+	}
+
+	/**
+	 * <pre>
 	 * 되풀이 횟수를 하나 올립니다. 결과({route, count, scope, message})를 save해 두었다가 다음에 previous로 넘깁니다.
 	 * route는 한도 안이면 within, max를 다 썼으면 over입니다. 다 쓴 것도 정상 결과라서 실패로 돌려주지 않습니다.
 	 * TOOL step은 route 값으로 갈 곳을 나눕니다(routes: { within: 한번더step, over: 멈추는step }).

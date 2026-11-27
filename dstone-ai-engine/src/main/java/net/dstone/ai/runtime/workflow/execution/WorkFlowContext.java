@@ -21,6 +21,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
  *   decisions:  [ { step, name, kind, decision, approver, comment, to, at } ]  내려진 결정(승인, 판정) 기록. ${decisions}로 읽습니다
  *   arrival:    지금 step으로 오게 만든 마지막 결정(위 기록 하나). ${arrival}로 읽습니다
  *   arrivedFrom: { step, via }  지금 step에 어느 step에서 어떤 길로 왔는지(엔진 내부용). 실행 이력에 함께 남깁니다
+ *   limits:     { stepId: { count, scope, ... } }  step의 횟수 한도(limit)를 센 값(엔진 내부용)
  *
  * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 save에 적힌 이름으로 state에 저장하고(saveOutput()),
  * 뒤의 step은 "${state.이름}"으로 읽습니다(common.expression.ContextResolver).
@@ -284,6 +285,51 @@ public final class WorkFlowContext {
 		from.put("step", stepId);
 		from.put("via", via);
 		context.put(Context.ARRIVED_FROM, from);
+	}
+
+	/**
+	 * step의 횟수 한도를 지난번에 센 값입니다. 처음이면 null입니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 * @param stepId  limit을 적은 step의 id
+	 */
+	@SuppressWarnings("unchecked")
+	public static Object limitCount(Map<String, Object> context, String stepId) {
+		Object limits = context.get(Context.LIMITS);
+		return limits instanceof Map ? ((Map<String, Object>) limits).get(stepId) : null;
+	}
+
+	/**
+	 * step의 횟수 한도를 센 값을 적어 둡니다. 실행 상태와 함께 저장되어 승인 대기·재시작 뒤에도 이어집니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 * @param stepId  limit을 적은 step의 id
+	 * @param count   센 값(DataLogic.countUp의 결과)
+	 */
+	@SuppressWarnings("unchecked")
+	public static void setLimitCount(Map<String, Object> context, String stepId, Object count) {
+		Object limits = context.get(Context.LIMITS);
+		if (!(limits instanceof Map)) {
+			limits = new LinkedHashMap<String, Object>();
+			context.put(Context.LIMITS, limits);
+		}
+		((Map<String, Object>) limits).put(stepId, count);
+	}
+
+	/**
+	 * 여러 step의 횟수 한도를 처음부터 다시 세게 지웁니다. 되감기에서 그 구간의 state를 지울 때 함께 씁니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 * @param stepIds 지울 step id들
+	 */
+	@SuppressWarnings("unchecked")
+	public static void clearLimitCounts(Map<String, Object> context, List<String> stepIds) {
+		Object limits = context.get(Context.LIMITS);
+		if (limits instanceof Map) {
+			for (String stepId : stepIds) {
+				((Map<String, Object>) limits).remove(stepId);
+			}
+		}
 	}
 
 	/**

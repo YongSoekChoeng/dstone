@@ -4,7 +4,7 @@
  * 기준은 늘 Workflow 정의(YAML을 읽은 객체, model)입니다. 그림은 model을 그대로 그린 것이고,
  * 그림에서 무엇을 고치면(step 추가, 화살표 연결, 설정 변경) model을 고친 뒤 그림을 통째로 다시 그립니다.
  *   step          = model.steps의 항목 하나 = 그림의 네모 하나(네모 id = step id)
- *   화살표         = step의 next / onFailure / routes 값
+ *   화살표         = step의 next / onFailure / routes / limit.over 값
  *   시작 동그라미   = model.steps의 첫 step으로 가는 화살표(엔진은 첫 step부터 실행합니다)
  *   END / FAIL    = 끝내는 예약어
  *
@@ -38,15 +38,16 @@ var DstoneAiDesigner = (function () {
 		onFailure: { stroke: "#b91c1c", dash: "6 4" },
 		route: { stroke: "#d97706", dash: null },
 		rejectTo: { stroke: "#b91c1c", dash: "6 4" },
+		limitOver: { stroke: "#6b7280", dash: "2 4" },
 		start: { stroke: "#007b9d", dash: null }
 	};
 
 	/** step 종류별로 오른쪽 설정 칸에 보여 줄 항목(순서대로) */
 	var STEP_FIELDS = {
-		AGENT: ["agent", "with", "forEach", "itemVariable", "save", "saveError", "saveInput", "saveEach", "memory"],
+		AGENT: ["agent", "with", "forEach", "itemVariable", "save", "saveError", "saveInput", "saveEach", "memory", "limit.max", "limit.scope", "limit.over"],
 		SUPERVISOR: ["agent", "with", "forEach", "itemVariable", "save", "saveError", "saveInput", "saveEach", "memory"],
 		ROUTER: ["agent", "with", "save", "saveError", "saveInput", "memory"],
-		TOOL: ["tool", "with", "forEach", "itemVariable", "save", "saveError", "saveInput", "saveEach"],
+		TOOL: ["tool", "with", "forEach", "itemVariable", "save", "saveError", "saveInput", "saveEach", "limit.max", "limit.scope", "limit.over"],
 		APPROVAL: ["approval.artifact", "approval.approverRole", "approval.requireCommentOnReject", "save"]
 	};
 
@@ -66,7 +67,10 @@ var DstoneAiDesigner = (function () {
 		"approval.approverRole": "승인자 역할",
 		"approval.requireCommentOnReject": "반려할 때 의견 필수",
 		next: "성공하면 갈 step",
-		onFailure: "실패하면 갈 step"
+		onFailure: "실패하면 갈 step",
+		"limit.max": "이 step을 몇 번까지 실행할지(횟수 한도). 넘으면 실행하지 않고 limit.over로 감",
+		"limit.scope": "이 값이 바뀌면 처음부터 셈. 보통 ${decisions:}(사람의 결정마다). 비우면 실행 전체에서 셈",
+		"limit.over": "횟수 한도를 넘었을 때 갈 step id(또는 END, FAIL). 그림에는 회색 점선 '한도 초과' 화살표"
 	};
 
 	var urls = {};
@@ -911,6 +915,9 @@ var DstoneAiDesigner = (function () {
 		if (step.approval && step.approval.rejectTo) {
 			list.push({ kind: "rejectTo", route: null, target: String(step.approval.rejectTo) });
 		}
+		if (step.limit && step.limit.over) {
+			list.push({ kind: "limitOver", route: null, target: String(step.limit.over) });
+		}
 		return list;
 	}
 
@@ -935,6 +942,9 @@ var DstoneAiDesigner = (function () {
 			delete step.next;
 		} else if (kind === "onFailure") {
 			delete step.onFailure;
+		} else if (kind === "limitOver") {
+			// limit은 over 없이는 쓸 수 없으므로(엔진 검사) 화살표를 지우면 횟수 한도도 없앤다
+			delete step.limit;
 		} else if (kind === "route" && step.routes) {
 			delete step.routes[route];
 			removeHint(step, route);
@@ -1059,7 +1069,7 @@ var DstoneAiDesigner = (function () {
 		});
 	}
 
-	/** 흐름 순서를 셀 때 한 step에서 따라갈 곳(정상 흐름 먼저: routes(적힌 순서) 또는 next(비면 목록상 다음 step) → onFailure → rejectTo). */
+	/** 흐름 순서를 셀 때 한 step에서 따라갈 곳(정상 흐름 먼저: routes(적힌 순서) 또는 next(비면 목록상 다음 step) → onFailure → limit.over → rejectTo). */
 	function flowTargets(step, list) {
 		var targets = [];
 		if (step.routes && typeof step.routes === "object" && !Array.isArray(step.routes)) {
@@ -1074,6 +1084,9 @@ var DstoneAiDesigner = (function () {
 		}
 		if (step.onFailure) {
 			targets.push(String(step.onFailure));
+		}
+		if (step.limit && step.limit.over) {
+			targets.push(String(step.limit.over));
 		}
 		if (step.approval && step.approval.rejectTo) {
 			targets.push(String(step.approval.rejectTo));
@@ -1879,7 +1892,7 @@ var DstoneAiDesigner = (function () {
 
 	function edgeConfig(from, to, kind, route) {
 		var style = EDGE_STYLES[kind] || EDGE_STYLES.next;
-		var label = kind === "route" ? route : (kind === "onFailure" ? "실패" : (kind === "rejectTo" ? "REJECTED" : ""));
+		var label = kind === "route" ? route : (kind === "onFailure" ? "실패" : (kind === "rejectTo" ? "REJECTED" : (kind === "limitOver" ? "한도 초과" : "")));
 		var sourceStep = stepById(from);
 		if (kind === "next" && sourceStep && sourceStep.type === "SUPERVISOR") {
 			label = "통과";
@@ -2148,7 +2161,7 @@ var DstoneAiDesigner = (function () {
 	 */
 	var GRID = { margin: 14, lane: 10, gapMargin: 12, track: 8, minGutter: 30, minGap: 26, fail: 24 };
 	/** 같은 두 노드 사이에 화살표가 여럿일 때 곧은 선을 받을 차례(앞이 먼저) */
-	var STRAIGHT_PRIORITY = ["start", "next", "route", "onFailure", "rejectTo"];
+	var STRAIGHT_PRIORITY = ["start", "next", "route", "onFailure", "limitOver", "rejectTo"];
 
 	/**
 	 * 위에서 아래로, 단(column)을 나눠 자동 배치합니다. 노드 위치와 함께 화살표의 꺾는 점·연결점도 새로 정합니다.
@@ -2535,7 +2548,7 @@ var DstoneAiDesigner = (function () {
 	 * 놓는 순서를 고를 때 화살표 종류별 무게(클수록 두 노드를 더 가까이 둡니다).
 	 * FAIL로 가는 화살표는 FAIL이 그림 밖에 따로 있으므로 세지 않습니다.
 	 */
-	var ARRANGE_WEIGHT = { start: 4, next: 3, route: 2, onFailure: 2, rejectTo: 1 };
+	var ARRANGE_WEIGHT = { start: 4, next: 3, route: 2, onFailure: 2, limitOver: 1, rejectTo: 1 };
 	/**
 	 * 자리를 고를 때 쓰는 대강의 거리(px). col·row = 옆 단·위아래로 한 칸, bend = 곧게 못 가서 꺾이는 값,
 	 * upward = 앞으로 가는 화살표가 같은 단에서 위로 올라가는 값, overlap = 서로 오가는 두 화살표가 같은 줄이라 겹치는 값(한 줄 어긋나게 두는 것보다 조금 비싸게)
@@ -3181,6 +3194,9 @@ var DstoneAiDesigner = (function () {
 						showMessage("error", "with - " + e.message);
 						return;
 					}
+				} else if (key === "limit.max" && input.value.trim() !== "" && /^\d+$/.test(input.value.trim())) {
+					// 횟수는 숫자로 저장한다(글자 "2"로 두면 YAML에 따옴표가 붙는다)
+					value = parseInt(input.value.trim(), 10);
 				} else {
 					value = input.value.trim() === "" ? undefined : input.value.trim();
 				}
@@ -3306,7 +3322,7 @@ var DstoneAiDesigner = (function () {
 		}
 		return "<ul class=\"wd-edge-list\">" + list.map(function (edge) {
 			// APPROVAL의 경로 이름은 승인자가 고르는 결정 그 자체(예: 승인, 재개발)라 앞에 '경로'를 붙이지 않는다.
-			var name = edge.kind === "route" ? (step.type === "APPROVAL" ? edge.route : "경로 " + edge.route) : (edge.kind === "onFailure" ? "실패(onFailure)" : (edge.kind === "rejectTo" ? "반려(approval.rejectTo)" : "다음(next)"));
+			var name = edge.kind === "route" ? (step.type === "APPROVAL" ? edge.route : "경로 " + edge.route) : (edge.kind === "onFailure" ? "실패(onFailure)" : (edge.kind === "rejectTo" ? "반려(approval.rejectTo)" : (edge.kind === "limitOver" ? "한도 초과(limit.over, " + (step.limit && step.limit.max) + "번까지)" : "다음(next)")));
 			return "<li><a href=\"javascript:void(0)\" data-edge-select=\"1\" data-kind=\"" + escapeHtml(edge.kind) + "\" data-route=\"" + escapeHtml(edge.route || "") + "\">"
 				+ escapeHtml(name) + "</a> → " + stepLink(edge.target) + "</li>";
 		}).join("") + "</ul>";
@@ -3353,7 +3369,7 @@ var DstoneAiDesigner = (function () {
 			return;
 		}
 		var kinds = edgeKindsOf(step.type);
-		var kindNames = { next: "다음(next)", onFailure: "실패(onFailure)", route: "경로(routes)", rejectTo: "반려(approval.rejectTo)" };
+		var kindNames = { next: "다음(next)", onFailure: "실패(onFailure)", route: "경로(routes)", rejectTo: "반려(approval.rejectTo)", limitOver: "한도 초과(limit.over)" };
 		var html = "<h4>화살표</h4>"
 			+ "<p>" + stepLink(edge.from) + " → " + stepLink(current.target) + "</p>"
 			+ row("종류", "", "<select id=\"wd-edge-kind\">" + kinds.concat(kinds.indexOf(edge.kind) < 0 ? [edge.kind] : []).map(function (kind) {
@@ -3481,6 +3497,8 @@ var DstoneAiDesigner = (function () {
 					step.routes[edge.route] = target;
 				} else if (edge.kind === "rejectTo") {
 					step.approval.rejectTo = target;
+				} else if (edge.kind === "limitOver") {
+					step.limit.over = target;
 				} else {
 					step[edge.kind] = target;
 				}

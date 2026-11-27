@@ -45,37 +45,78 @@ public class FileSetTool {
 	/**
 	 * <pre>
 	 * 파일들을 읽어 둡니다. 있는 파일만, 같은 경로는 한 번만 읽습니다.
-	 * 돌려주는 값: {files: {경로: 내용}, missing: [없는 파일의 경로], text: 전부 이은 글자 하나}
+	 * 돌려주는 값: {files: {경로: 내용}, missing: [없는 파일의 경로], text: 전부 이은 글자 하나, (이름: 내용)...}
 	 * text는 파일마다 "===== 파일: 경로 =====" 줄 아래에 내용을 둔 것으로, Agent의 input에 그대로 넣기 좋습니다.
 	 * 있는 파일인데 읽지 못하면 실패입니다({success: false, message}).
+	 *
+	 * 항목을 맵으로 주면 파일마다 아래를 정할 수 있습니다. 여러 문서를 TOOL step 하나로 읽어 Agent마다 넘길 때 씁니다.
+	 *   name:     결과에 이 이름으로도 내용을 둡니다(${state.저장이름.name}으로 읽음). files·missing·text는 쓸 수 없습니다.
+	 *   maxChars: 통째로 받아야 하는 파일. 이보다 크면 자르지 않고 실패합니다(readFile의 maxChars와 같음).
+	 *   required: true면 파일이 없을 때 실패합니다. 문서가 없는 채로 다음 Agent에 넘어가지 않게 합니다.
+	 * YAML 예: 설계서와 태스크아이템 목록을 한 번에
+	 *   tool: readFiles
+	 *   with:
+	 *     paths:
+	 *       - { path: "${input}/03-1.design.md", name: design, maxChars: 60000, required: true }
+	 *       - { path: "${input}/03-2.taskitems.md", name: taskitems, maxChars: 60000, required: true }
+	 *   save: docs        → ${state.docs.design}, ${state.docs.taskitems}
 	 * </pre>
 	 *
-	 * @param paths 읽을 파일들. 경로 글자의 목록이어도 되고, {path: 경로}가 든 항목의 목록이어도 됩니다.
+	 * @param paths 읽을 파일들. 경로 글자의 목록이어도 되고, {path, name, maxChars, required}가 든 항목의 목록이어도 됩니다.
 	 */
-	@Tool(description = "파일 여러 개를 읽어 {files: {경로: 내용}, missing: [없는 경로], text: 전부 이은 글자}로 돌려준다. 있는 파일만, 같은 경로는 한 번만 읽는다.")
-	public Map<String, Object> readFiles(@ToolParam(description = "읽을 파일의 절대경로 목록. 경로 글자이거나 {path: 경로}가 든 항목") List<Object> paths) {
+	@Tool(description = "파일 여러 개를 읽어 {files: {경로: 내용}, missing: [없는 경로], text: 전부 이은 글자}로 돌려준다. 있는 파일만, 같은 경로는 한 번만 읽는다. "
+		+ "항목을 {path, name, maxChars, required}로 주면 name으로도 내용을 두고, maxChars를 넘거나 required인데 없으면 실패한다.")
+	public Map<String, Object> readFiles(@ToolParam(description = "읽을 파일의 절대경로 목록. 경로 글자이거나 {path, name, maxChars, required}가 든 항목") List<Object> paths) {
 		Map<String, String> contents = new LinkedHashMap<>();
+		Map<String, String> named = new LinkedHashMap<>();
 		List<String> missing = new ArrayList<>();
 		for (Object item : paths == null ? List.of() : paths) {
 			String path = this.pathOf(item);
+			Map<?, ?> options = item instanceof Map ? (Map<?, ?>) item : Map.of();
+			String name = options.get("name") == null ? null : options.get("name").toString().trim();
+			if (name != null && (name.isEmpty() || RESERVED_NAMES.contains(name) || named.containsKey(name))) {
+				return this.fail("readFiles의 name '" + name + "'는 쓸 수 없습니다(비었거나, files·missing·text이거나, 이미 쓴 이름).");
+			}
 			if (path == null || !this.fileTool.isFileExist(path)) {
+				if (Boolean.parseBoolean(String.valueOf(options.get("required")))) {
+					return this.fail("꼭 있어야 하는 파일이 없습니다: " + path);
+				}
 				missing.add(String.valueOf(path));
 				continue;
 			}
-			if (contents.containsKey(path)) {
-				continue;
+			String content = contents.get(path);
+			if (content == null) {
+				content = this.fileTool.readFile(path, maxCharsOf(options.get("maxChars")));
+				if (content == null || content.startsWith(Constants.Outcome.FAIL_PREFIX)) {
+					return this.fail(content == null ? "파일을 읽지 못했습니다: " + path : content);
+				}
+				contents.put(path, content);
 			}
-			String content = this.fileTool.readFile(path);
-			if (content == null || content.startsWith(Constants.Outcome.FAIL_PREFIX)) {
-				return this.fail(content == null ? "파일을 읽지 못했습니다: " + path : content);
+			if (name != null) {
+				named.put(name, content);
 			}
-			contents.put(path, content);
 		}
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("files", contents);
 		result.put("missing", missing);
 		result.put("text", joined(contents));
+		result.putAll(named);
 		return result;
+	}
+
+	/** readFiles 결과에 이미 있는 키라 name으로 쓸 수 없는 것들입니다. */
+	private static final java.util.Set<String> RESERVED_NAMES = java.util.Set.of("files", "missing", "text");
+
+	/** 항목의 maxChars 값을 숫자로 바꿉니다. 없거나 숫자가 아니면 null(설정값까지 읽고 넘으면 자름)입니다. */
+	private static Integer maxCharsOf(Object value) {
+		if (value instanceof Number number) {
+			return Integer.valueOf(number.intValue());
+		}
+		try {
+			return value == null ? null : Integer.valueOf(value.toString().trim());
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	/**

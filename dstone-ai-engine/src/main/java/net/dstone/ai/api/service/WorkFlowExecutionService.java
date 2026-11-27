@@ -384,6 +384,8 @@ public class WorkFlowExecutionService extends BaseService {
 		Map<String, Object> context = execution.context();
 		if (clearState) {
 			WorkFlowContext.removeState(context, point.savedNames());
+			// 그 구간 step의 횟수 한도도 처음부터 다시 센다(예전에 countUp step이 state에 두던 것과 같게)
+			WorkFlowContext.clearLimitCounts(context, point.steps());
 		}
 		for (String stepId : point.steps()) {
 			WorkFlowContext.clearApproval(context, stepId);

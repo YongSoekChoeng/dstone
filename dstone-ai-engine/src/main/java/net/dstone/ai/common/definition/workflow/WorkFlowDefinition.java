@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import net.dstone.ai.common.definition.SchemaDefinition;
 import net.dstone.ai.common.definition.workflow.step.StepDefinition;
+import net.dstone.ai.common.definition.workflow.step.StepLimit;
 import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
 
 /**
@@ -52,6 +53,9 @@ import net.dstone.ai.common.definition.workflow.step.ToolStepDefinition;
  *   비워두면 Constants.WorkFlow.DEFAULT_MAX_ITERATIONS가 쓰입니다.
  * - checkpoint: step 하나가 끝날 때마다 실행 상태를 DB에 저장할지입니다. 엔진은 항상 저장하므로 true만 적을 수 있습니다.
  * - onError: step 실행기가 예외(외부 연결 실패 같은 시스템 오류)를 던졌을 때의 동작입니다. STOP(그 자리에서 실패로 끝냄)만 적을 수 있습니다.
+ * - startTime: {save, format} 실행을 시작한 시각을 format(예: yyyyMMdd-HHmm)으로 적어 state.save에 둡니다.
+ *   작업 폴더 이름처럼 실행마다 정해지는 값을 시각만 구하는 TOOL step 없이 쓰려는 것입니다. 첫 step 전에 한 번만 넣고,
+ *   이미 값이 있으면(재개, 되감기) 바꾸지 않습니다. 이 이름은 어느 step에서나 읽을 수 있습니다.
  *
  * ## 최종 결과(return)
  * Workflow가 성공으로 끝났을 때 돌려줄 값입니다. step의 with와 같은 표현식이고, 맵/리스트로 여러 값을 모아도 됩니다.
@@ -90,8 +94,23 @@ public record WorkFlowDefinition(
 	 * @param checkpoint    step마다 실행 상태를 저장할지입니다. 엔진은 항상 저장하므로 true만 적을 수 있습니다.
 	 * @param maxIterations Workflow가 전체적으로 실행할 수 있는 step의 최대 횟수입니다.
 	 * @param onError       시스템 오류가 났을 때의 동작입니다. STOP만 적을 수 있습니다.
+	 * @param startTime     실행을 시작한 시각을 state에 넣을지입니다(save: state 이름, format: 날짜 모양).
 	 */
-	public record Settings(Boolean checkpoint, Integer maxIterations, String onError) {
+	public record Settings(Boolean checkpoint, Integer maxIterations, String onError, StartTime startTime) {
+	}
+
+	/**
+	 * workflow.settings.startTime 입니다.
+	 *
+	 * @param save   시각을 저장할 state 이름(state:에 선언)
+	 * @param format java.time.format.DateTimeFormatter 모양(예: yyyyMMdd-HHmm)
+	 */
+	public record StartTime(String save, String format) {
+	}
+
+	/** 시작 시각을 넣을 state 이름입니다. 적지 않았으면 null입니다. */
+	public String startTimeState() {
+		return this.settings == null || this.settings.startTime() == null ? null : this.settings.startTime().save();
 	}
 
 	/**
@@ -149,6 +168,11 @@ public record WorkFlowDefinition(
 			return;
 		}
 		StepDefinition step = this.steps.get(index);
+		// 횟수 한도를 넘으면 이 step 대신 limit.over가 일을 받으므로 그쪽도 따라갑니다.
+		StepLimit limit = StepDefinition.limitOf(step);
+		if (limit != null) {
+			this.collectReceivers(limit.over(), visited, receivers);
+		}
 		if (!(step instanceof ToolStepDefinition)) {
 			receivers.add(step);
 			return;

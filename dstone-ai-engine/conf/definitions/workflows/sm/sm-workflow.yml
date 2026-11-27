@@ -2,24 +2,25 @@
 # 어플리케이션 운영관리 Workflow입니다.
 # 요청서(00.request.md)에서 시작해 요구사항 → 영향도 분석 → 설계 → 개발 → 동작 검증 → 개발 승인까지 진행합니다.
 #
-# [흐름 한눈에 보기] name 앞 번호가 흐름 순서입니다(괄호는 step id). 정상 흐름은 01~43과 47, 곁가지는 그 밖의 번호입니다.
-#   01~04  준비         시각, 요청서, 프로젝트ID, 프로젝트 리비전(step00, 01, 02, 59)
-#   05~07  요구사항      분석 → 분석서 읽기 → 리뷰(step03, 04, 05)
-#   08~12  영향도        분석서가 있으면 맞추고(step38) 없으면 새로 씀(step08) → 승인(step09) → 읽기(step10)
-#   13~15  참고 기능      영향도분석서 '## 참고 기능'의 원본 코드를 dstone-knowledge에서 모음(step46, 48, 49)
-#   16~20  설계          설계서가 있으면 맞추고(step37) 없으면 새로 씀(step12) → 형식 확인(step50) → 승인(step13)
-#   21~27  개발          문서 읽기 → 개발 폴더 비우기 → 개발(step17) → 보류 확인 → 컴파일(step18) → 형식 확인(step53)
-#   28~43  동작 검증      리비전·DDL 확인 → 검증 수준 분기 → 테스트 서버(step29) → 동작 검증(step35) → FAIL이면 자동 수정(step34)
-#   47     개발 승인(step19). [승인]이면 끝
-#   곁가지  44 DDL 반영 승인, 45~46 형식 오류 고치기, 48~49 재개발, 50~51 보류 이어서 개발,
-#          52~54 설계서 수정과 형식 고치기, 55~56 영향도·요구사항 문서 수정, 57~58 리뷰 불통과 처리
+# [흐름 한눈에 보기] name 앞 번호가 흐름 순서입니다(괄호는 step id). 정상 흐름은 01~37과 40, 곁가지는 그 밖의 번호입니다.
+#   01~03  준비         요청서, 프로젝트ID, 프로젝트 리비전(step01, 02, 59). 작업 시각은 settings.startTime이 넣습니다
+#   04~06  요구사항      분석 → 분석서 읽기 → 리뷰(step03, 04, 05)
+#   07~11  영향도        분석서가 있으면 맞추고(step38) 없으면 새로 씀(step08) → 승인(step09) → 읽기(step10)
+#   12~14  참고 기능      영향도분석서 '## 참고 기능'의 원본 코드를 dstone-knowledge에서 모음(step46, 48, 49)
+#   15~19  설계          설계서가 있으면 맞추고(step37) 없으면 새로 씀(step12) → 형식 확인(step50) → 승인(step13)
+#   20~25  개발          문서 읽기(step14) → 개발 폴더 비우기 → 개발(step17) → 보류 확인 → 컴파일(step18) → 형식 확인(step53)
+#   26~37  동작 검증      리비전·DDL 확인 → 검증 수준 고르기(step43) → 테스트 서버(step29) → 동작 검증(step35) → FAIL이면 자동 수정(step34)
+#   40     개발 승인(step19). [승인]이면 끝
+#   곁가지  38 DDL 반영 승인, 39 형식 오류 고치기, 41 재개발 전 다시 읽기, 42 보류 이어서 개발,
+#          43~44 설계서 수정과 형식 고치기, 45~46 영향도·요구사항 문서 수정, 47~48 리뷰 불통과 처리
 # 한 실행이 실제로 지나온 길은 실행 관리 > 진행 기록에서 줄마다 "← 앞 step · 고른 길"로 보입니다.
 #
 # [문서 읽기] 문서는 LLM이 아니라 TOOL step이 읽어 Agent 입력으로 넘깁니다. 읽으려고 LLM을 한 번 더 부르지 않기 위해서입니다.
 #   파일이 없으면 TOOL step이 실패하므로, 앞 step이 문서를 저장하지 못한 채 다음으로 넘어가지 않습니다.
 #   maxChars: 60000(엔진의 Tool 결과 상한 max-result-chars와 같은 값)보다 크면 잘라 넘기지 않고 멈춥니다.
 #   문서를 줄이거나 두 값을 올린 뒤 이어서 실행합니다.
-#   Agent가 문서를 고칠 수 있는 고리(재개발, 자동 수정, 검증 전)에서는 설계서와 태스크아이템 목록을 다시 읽어 최신 내용을 넘깁니다.
+#   설계서와 태스크아이템 목록은 범용 Tool readFiles가 한 step에서 함께 읽어 state.docs({design, taskitems})에 둡니다.
+#   Agent가 문서를 고칠 수 있는 고리(재개발 step20, 자동 수정 step32, 검증 전 step41)에서는 다시 읽어 최신 내용을 넘깁니다.
 #
 # [사람의 결정] 승인 의견과 리뷰 판정은 엔진이 전달합니다. 읽는 법은 Skill handling-instructions에 있습니다.
 #   instruction: ${arrival:}    이 step으로 오게 만든 마지막 결정(승인 결정과 의견, 또는 리뷰 판정과 사유)
@@ -47,9 +48,10 @@
 #     원본 전체를 빌드하지 않고 리비전의 클래스 폴더와 의존성을 참조해 바뀐 파일(과 그것을 쓰는 원본 파일)만 컴파일합니다.
 #     실패해도 다음으로 가고, 실패 내용(state.compileError)은 다음 개발·설계 수정에 전달됩니다.
 #   설계 뒤(step50): checkDocuments가 닫히지 않은 코드 블록, 칸이 어긋난 표, DDL을 봅니다. 걸리면 형식만 고칩니다(step52, 결정마다 1번).
-#   개발 뒤(step54): 개발 Agent가 손대지 못한 보류(unfinished)가 있으면 한 번 더 부릅니다(step57, 1번).
+#   개발 뒤(step54): 개발 Agent가 손대지 못한 보류(unfinished)가 있으면 한 번 더 부릅니다(step57, 결정마다 1번).
 #     사람의 결정이나 DB 반영이 필요한 보류는 다시 불러도 할 일이 없어서 세지 않습니다. 답에 unfinished가 없으면 0으로 봅니다.
-#   컴파일 뒤(step53): checkSources가 XML, JSP의 <% %>와 태그 짝, JavaScript 구문을 봅니다. 걸리면 개발 Agent가 고칩니다(step58, 1번).
+#   컴파일 뒤(step53): checkSources가 XML, JSP의 <% %>와 태그 짝, JavaScript 구문을 봅니다. 걸리면 개발 Agent가 고칩니다(step58, 결정마다 1번).
+#   "몇 번까지"는 그 step의 limit(max, scope: ${decisions:}, over)이 셉니다. 엔진이 실행 전에 세고, 넘으면 실행하지 않고 over로 갑니다.
 #   다시 부를 때는 step17이 아니라 step57·58을 씁니다. 지난 지적을 그 경로에서만 넘겨, 새 개발에 묵은 지적이 따라가지 않게 합니다.
 #
 # [동작 검증] 컴파일이 통과하면 사람에게 묻기 전에 실제로 돌려 봅니다.
@@ -57,7 +59,8 @@
 #     전체 확인  테스트 서버를 띄우고 화면을 눌러 봄
 #     간이 확인  테스트 서버가 뜨는지만 봄(step45). 화면이 없는 변경(배치, 연동, 쿼리만)
 #     최소 확인  서버 없이 소스 오류만 봄. 동작이 바뀌지 않는 변경(주석, 안내 문구, 설정값 하나)
-#     생략은 첫 검증에만 적용합니다(step42). 재개발·자동 수정으로 다시 돌 때는 전체 확인으로 갑니다.
+#     step43(routeValue)이 고른 수준으로 갈 곳을 나눕니다. 생략은 첫 검증에만 적용합니다(step43의 limit max 1).
+#     재개발·자동 수정으로 다시 돌 때는 한도를 다 써서 step43을 건너뛰고 전체 확인으로 갑니다.
 #   DDL: 테스트 서버는 DDL을 실행하지 않습니다. step60이 DDL 문서의 테이블·컬럼과 INSERT(초기 데이터) 행이 개발 DB에 있는지 보고,
 #     없으면 step61에서 사람이 개발 DB에 반영한 뒤 승인합니다. 데이터가 없으면 화면 목록이 비어 검증이 아무것도 볼 수 없습니다.
 #   테스트 서버(step29): 리비전 + 개발 결과로 띄우고, 고객사 개발 DB는 커밋하지 않는 연결로 써서 실행이 멈추면 원복합니다.
@@ -68,24 +71,24 @@
 #     reported로 따로 넘겨 "사람이 알린 오류:" 기준으로 재현합니다. 결정 기록 전체(history) 속에서는 놓치기 쉽기 때문입니다.
 #     step40(fileChanges)이 지난 검증 뒤로 바뀐 파일을 알려 주어 바뀐 것과 지난번에 안 된 것만 깊게 봅니다.
 #     테스트 환경 탓인 실패는 BLOCKED로 내고 고치지 않습니다(Skill test-environment).
-#   자동 수정(step34): FAIL이 있으면 고칩니다. 사람의 결정 하나마다 최대 2번이고, 사람이 새로 시키면 다시 2번입니다(step31).
+#   자동 수정(step34): FAIL이 있으면 고칩니다. 사람의 결정 하나마다 최대 2번이고, 사람이 새로 시키면 다시 2번입니다(step32의 limit).
 #   바뀐 줄(diff): step40은 지난 내용의 사본을 작업 폴더 밖(${input}/.work-copy/실행 시각)에 두고 바뀐 줄을 workChanges.diff로 만듭니다.
 #     자동 수정(step34)과 개발(step17)이 recent_changes로 받습니다. 설계서 수정 이력은 Agent의 설명이라 틀릴 수 있어서,
 #     지난 수정이 무엇을 바꿨는지는 이 사실로 보게 합니다.
-#   판정 step(step30, 31, 36 등)의 "FAIL 없음", "한도를 다 씀"은 실패가 아니라 정상 결과라서 containsValue(true/false)와
-#     countUp(within/over)의 값을 routes로 받아 나눕니다. onFailure는 Tool이 정말 실패했을 때만 씁니다.
+#   판정 step(step30, 36 등)의 "FAIL 없음"은 실패가 아니라 정상 결과라서 containsValue(true/false)의 값을 routes로 받아 나눕니다.
+#     한도를 다 쓴 것도 엔진의 limit이 건너뛴 정상 결과입니다. onFailure는 Tool이 정말 실패했을 때만 씁니다.
 #
 # [참고 기능] 영향도분석서의 '## 참고 기능'(본뜰 기존 기능의 화면 경로나 주소)을 step46이 읽고, step48의 knowledgeFeatureCode가
 #   dstone-knowledge의 관계(화면 → 주소 → 메소드 → SQL, 메소드 → 팝업 화면)를 따라 원본 코드를 02-1.reference-code.md에 모읍니다.
 #   step49가 읽어 아키텍트(step12)에 넘깁니다. 보내는 쪽과 받는 쪽을 다른 기능에서 가져오거나 프로젝트 관례를 모르고 새로 짓는 일을 막습니다.
 #   '참고 기능'이 없거나 모으지 못하면 이유를 state.referenceError에 두고 그대로 설계합니다.
 #
-# [작업 폴더] "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. step00이 LLM 없이 시각만 받아 state.now에 넣습니다.
+# [작업 폴더] "입력 폴더/실행 시각(yyyyMMdd-HHmm)"입니다. settings.startTime이 첫 step 전에 시각을 state.now에 넣습니다.
 #
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.10.0
+version: 2.11.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -95,23 +98,16 @@ description: |
   D:/WorkShop/00.SM/work004
 settings:
   checkpoint: true
+  startTime:
+    save: now
+    format: yyyyMMdd-HHmm
   maxIterations: 100
   onError: STOP
 input: string, 요청서(00.request.md)가 들어 있는 폴더의 절대경로
 steps:
 
-  - id: step00
-    name: 01-사전작업
-    type: TOOL
-    tool: getToDate
-    with:
-      format: yyyyMMdd-HHmm
-    save: now
-    next: step01
-    onFailure: FAIL
-
   - id: step01
-    name: 02-고객요청서 읽기
+    name: 01-고객요청서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -121,7 +117,7 @@ steps:
     onFailure: FAIL
 
   - id: step02
-    name: 03-프로젝트ID 읽기
+    name: 02-프로젝트ID 읽기
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -132,7 +128,7 @@ steps:
     onFailure: FAIL
 
   - id: step59
-    name: 04-프로젝트 리비전 정하기
+    name: 03-프로젝트 리비전 정하기
     type: TOOL
     tool: resolveProjectRevision
     with:
@@ -142,7 +138,7 @@ steps:
     onFailure: FAIL
 
   - id: step03
-    name: 05-고객요청사항 분석
+    name: 04-고객요청사항 분석
     type: AGENT
     agent: sm-requirement-analyze-agent
     with:
@@ -153,7 +149,7 @@ steps:
     next: step04
 
   - id: step04
-    name: 06-요구사항분석서 읽기
+    name: 05-요구사항분석서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -164,7 +160,7 @@ steps:
     onFailure: FAIL
 
   - id: step05
-    name: 07-고객요청사항 분석 리뷰
+    name: 06-고객요청사항 분석 리뷰
     type: SUPERVISOR
     agent: sm-requirement-analyze-reviewer-agent
     with:
@@ -175,7 +171,7 @@ steps:
     onFailure: step06
 
   - id: step06
-    name: 57-리뷰 불통과 처리 결정
+    name: 47-리뷰 불통과 처리 결정
     type: APPROVAL
     approval:
       approverRole: PL
@@ -187,7 +183,7 @@ steps:
       중지: FAIL
 
   - id: step07
-    name: 08-기존 영향도분석서 확인
+    name: 07-기존 영향도분석서 확인
     type: TOOL
     tool: isFileExist
     with:
@@ -198,7 +194,7 @@ steps:
     onFailure: FAIL
 
   - id: step08
-    name: 10-영향도 분석
+    name: 09-영향도 분석
     type: AGENT
     agent: sm-analyze-impact-agent
     with:
@@ -211,7 +207,7 @@ steps:
     save: impactPath
 
   - id: step09
-    name: 11-영향도 분석 승인
+    name: 10-영향도 분석 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -224,7 +220,7 @@ steps:
       중지: FAIL
 
   - id: step10
-    name: 12-영향도분석서 읽기
+    name: 11-영향도분석서 읽기
     type: TOOL
     tool: readFile
     with:
@@ -235,7 +231,7 @@ steps:
     onFailure: FAIL
 
   - id: step11
-    name: 16-기존 설계서 확인
+    name: 15-기존 설계서 확인
     type: TOOL
     tool: isFileExist
     with:
@@ -246,7 +242,7 @@ steps:
     onFailure: FAIL
 
   - id: step12
-    name: 18-아키텍처 설계
+    name: 17-아키텍처 설계
     type: AGENT
     agent: sm-architect-agent
     with:
@@ -262,7 +258,7 @@ steps:
     save: architectPath
 
   - id: step13
-    name: 20-설계 승인
+    name: 19-설계 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -281,29 +277,25 @@ steps:
       중지: FAIL
 
   - id: step14
-    name: 21-상세 설계서 읽기
+    name: 20-설계서와 태스크아이템 목록 읽기
     type: TOOL
-    tool: readFile
+    tool: readFiles
     with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
-    next: step15
-    onFailure: FAIL
-
-  - id: step15
-    name: 22-태스크아이템 목록 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
-      maxChars: 60000
-    save: taskitems
+      paths:
+        - path: ${input}/${state.now}/03-1.design.md
+          name: design
+          maxChars: 60000
+          required: true
+        - path: ${input}/${state.now}/03-2.taskitems.md
+          name: taskitems
+          maxChars: 60000
+          required: true
+    save: docs
     next: step16
     onFailure: FAIL
 
   - id: step16
-    name: 23-기존개발디렉토리초기화
+    name: 21-기존개발디렉토리초기화
     type: TOOL
     tool: deleteDir
     with:
@@ -312,15 +304,15 @@ steps:
     next: step17
 
   - id: step17
-    name: 24-개발
+    name: 22-개발
     type: AGENT
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
       source_dir: ${state.projectRevision.sourceRoot}
       request: ${state.request}
-      design: ${state.design}
-      taskitems: ${state.taskitems}
+      design: ${state.docs.design}
+      taskitems: ${state.docs.taskitems}
       instruction: ${arrival:}
       history: ${decisions:}
       compile_error: ${state.compileError:}
@@ -330,7 +322,7 @@ steps:
     onFailure: FAIL
 
   - id: step18
-    name: 26-컴파일 확인
+    name: 24-컴파일 확인
     type: TOOL
     tool: compileJava
     with:
@@ -344,7 +336,7 @@ steps:
     onFailure: step19
 
   - id: step19
-    name: 47-개발 승인
+    name: 40-개발 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -358,29 +350,25 @@ steps:
       실패: FAIL
 
   - id: step20
-    name: 48-재개발 전 설계서 다시 읽기
+    name: 41-재개발 전 설계서와 태스크아이템 목록 다시 읽기
     type: TOOL
-    tool: readFile
+    tool: readFiles
     with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
-    next: step21
-    onFailure: FAIL
-
-  - id: step21
-    name: 49-재개발 전 태스크아이템 목록 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
-      maxChars: 60000
-    save: taskitems
+      paths:
+        - path: ${input}/${state.now}/03-1.design.md
+          name: design
+          maxChars: 60000
+          required: true
+        - path: ${input}/${state.now}/03-2.taskitems.md
+          name: taskitems
+          maxChars: 60000
+          required: true
+    save: docs
     next: step17
     onFailure: FAIL
 
   - id: step25
-    name: 52-설계서 수정
+    name: 43-설계서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -396,7 +384,7 @@ steps:
     next: step50
 
   - id: step26
-    name: 55-영향도분석서 수정
+    name: 45-영향도분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -409,7 +397,7 @@ steps:
     next: step09
 
   - id: step27
-    name: 56-고객요구사항분석서 수정
+    name: 46-고객요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -422,7 +410,7 @@ steps:
     next: step04
 
   - id: step28
-    name: 28-테스트할 리비전이 있는지
+    name: 26-테스트할 리비전이 있는지
     type: TOOL
     tool: containsValue
     with:
@@ -434,7 +422,7 @@ steps:
     onFailure: step19
 
   - id: step60
-    name: 29-DDL 반영 확인
+    name: 27-DDL 반영 확인
     type: TOOL
     tool: checkDdlApplied
     with:
@@ -442,13 +430,13 @@ steps:
       ddlFile: ${input}/${state.now}/03-3.ddl(데이터베이스).md
     save: ddlCheck
     routes:
-      none: step42
-      ok: step42
+      none: step43
+      ok: step43
       missing: step61
-    onFailure: step42
+    onFailure: step43
 
   - id: step61
-    name: 44-DDL 반영 승인
+    name: 38-DDL 반영 승인
     type: APPROVAL
     approval:
       approverRole: PL
@@ -461,45 +449,23 @@ steps:
       테스트 없이 진행: step19
       중지: FAIL
 
-  - id: step42
-    name: 30-첫 검증인지(검증 생략은 첫 검증에만)
-    type: TOOL
-    tool: countUp
-    with:
-      previous: ${state.verifyRound:}
-      max: 1
-    save: verifyRound
-    routes:
-      within: step43
-      over: step41
-    onFailure: step41
-
   - id: step43
-    name: 31-최소 확인으로 승인했는지
+    name: 28-검증 수준 고르기(생략은 첫 검증에만)
     type: TOOL
-    tool: containsValue
+    tool: routeValue
     with:
       value: ${state.designApproval.decision:}
-      expected: 승인(개발진행, 최소 확인)
+    limit:
+      max: 1
+      over: step41
     routes:
-      "true": step19
-      "false": step44
-    onFailure: step41
-
-  - id: step44
-    name: 32-간이 확인으로 승인했는지
-    type: TOOL
-    tool: containsValue
-    with:
-      value: ${state.designApproval.decision:}
-      expected: 승인(개발진행, 간이 확인)
-    routes:
-      "true": step45
-      "false": step41
+      승인(개발진행, 전체 확인): step41
+      승인(개발진행, 간이 확인): step45
+      승인(개발진행, 최소 확인): step19
     onFailure: step41
 
   - id: step45
-    name: 33-테스트 서버 기동만 확인
+    name: 34-테스트 서버 기동만 확인
     type: TOOL
     tool: startTestServer
     with:
@@ -513,7 +479,7 @@ steps:
     onFailure: step30
 
   - id: step29
-    name: 36-테스트 서버 기동 확인
+    name: 31-테스트 서버 기동 확인
     type: TOOL
     tool: startTestServer
     with:
@@ -527,55 +493,41 @@ steps:
     onFailure: step30
 
   - id: step30
-    name: 39-기동 실패가 개발 결과 탓인지
+    name: 35-기동 실패가 개발 결과 탓인지
     type: TOOL
     tool: containsValue
     with:
       value: ${state.serverCheck.cause:}
       expected: code
     routes:
-      "true": step31
+      "true": step32
       "false": step19
     onFailure: step19
 
-  - id: step31
-    name: 40-자동 수정 횟수 확인
+  - id: step32
+    name: 36-자동 수정 전 설계서와 태스크아이템 목록 다시 읽기
     type: TOOL
-    tool: countUp
+    tool: readFiles
     with:
-      previous: ${state.autoFixRound}
+      paths:
+        - path: ${input}/${state.now}/03-1.design.md
+          name: design
+          maxChars: 60000
+          required: true
+        - path: ${input}/${state.now}/03-2.taskitems.md
+          name: taskitems
+          maxChars: 60000
+          required: true
+    save: docs
+    limit:
       max: 2
       scope: ${decisions:}
-    save: autoFixRound
-    routes:
-      within: step32
       over: step19
-    onFailure: step19
-
-  - id: step32
-    name: 41-자동 수정 전 설계서 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
-    next: step33
-    onFailure: step19
-
-  - id: step33
-    name: 42-자동 수정 전 태스크아이템 목록 다시 읽기
-    type: TOOL
-    tool: readFile
-    with:
-      fileFullPath: ${input}/${state.now}/03-2.taskitems.md
-      maxChars: 60000
-    save: taskitems
     next: step34
     onFailure: step19
 
   - id: step34
-    name: 43-자동 수정
+    name: 37-자동 수정
     type: AGENT
     agent: sm-auto-fix-agent
     with:
@@ -584,8 +536,8 @@ steps:
       project_id: ${state.projectId}
       revision: ${state.projectRevision.revision:}
       request: ${state.request}
-      design: ${state.design}
-      taskitems: ${state.taskitems}
+      design: ${state.docs.design}
+      taskitems: ${state.docs.taskitems}
       boot_error: ${state.serverError:}
       verification: ${state.verification}
       history: ${decisions:}
@@ -595,7 +547,7 @@ steps:
     onFailure: step19
 
   - id: step35
-    name: 37-동작 검증
+    name: 32-동작 검증
     type: AGENT
     agent: sm-verifier-agent
     with:
@@ -604,7 +556,7 @@ steps:
       project_id: ${state.projectId}
       revision: ${state.projectRevision.revision:}
       requirement: ${state.requirement}
-      design: ${state.design}
+      design: ${state.docs.design}
       history: ${decisions:}
       reported: ${state.developApproval.comment:}
       previous: ${state.verification:}
@@ -615,7 +567,7 @@ steps:
     onFailure: step19
 
   - id: step36
-    name: 38-실패한 완료 기준이 있는지
+    name: 33-실패한 완료 기준이 있는지
     type: TOOL
     tool: containsValue
     with:
@@ -623,12 +575,12 @@ steps:
       field: result
       expected: FAIL
     routes:
-      "true": step31
+      "true": step32
       "false": step19
     onFailure: step19
 
   - id: step37
-    name: 17-기존 설계서 맞춤
+    name: 16-기존 설계서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -653,7 +605,7 @@ steps:
     next: step50
 
   - id: step38
-    name: 09-기존 영향도분석서 맞춤
+    name: 08-기존 영향도분석서 맞춤
     type: AGENT
     agent: document-revise-agent
     with:
@@ -673,7 +625,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 58-리뷰 지적에 따른 요구사항분석서 수정
+    name: 48-리뷰 지적에 따른 요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -690,7 +642,7 @@ steps:
     next: step04
 
   - id: step40
-    name: 35-검증 전 바뀐 파일 확인(서버 기동 전)
+    name: 30-검증 전 바뀐 파일 확인(서버 기동 전)
     type: TOOL
     tool: fileChanges
     with:
@@ -703,18 +655,24 @@ steps:
     onFailure: step29
 
   - id: step41
-    name: 34-검증 전 설계서 다시 읽기
+    name: 29-검증 전 설계서와 태스크아이템 목록 다시 읽기
     type: TOOL
-    tool: readFile
+    tool: readFiles
     with:
-      fileFullPath: ${input}/${state.now}/03-1.design.md
-      maxChars: 60000
-    save: design
+      paths:
+        - path: ${input}/${state.now}/03-1.design.md
+          name: design
+          maxChars: 60000
+          required: true
+        - path: ${input}/${state.now}/03-2.taskitems.md
+          name: taskitems
+          maxChars: 60000
+    save: docs
     next: step40
     onFailure: step19
 
   - id: step46
-    name: 13-참고 기능 시작점 읽기
+    name: 12-참고 기능 시작점 읽기
     type: TOOL
     tool: readMarkdownSection
     with:
@@ -726,7 +684,7 @@ steps:
     onFailure: step11
 
   - id: step48
-    name: 14-참고 기능 코드 모으기
+    name: 13-참고 기능 코드 모으기
     type: TOOL
     tool: knowledgeFeatureCode
     with:
@@ -740,7 +698,7 @@ steps:
     onFailure: step11
 
   - id: step49
-    name: 15-참고 기능 코드 읽기
+    name: 14-참고 기능 코드 읽기
     type: TOOL
     tool: readFile
     with:
@@ -752,7 +710,7 @@ steps:
     onFailure: step11
 
   - id: step50
-    name: 19-설계 문서 형식 확인
+    name: 18-설계 문서 형식 확인
     type: TOOL
     tool: checkDocuments
     with:
@@ -763,25 +721,11 @@ steps:
     save: docCheck
     routes:
       ok: step13
-      problem: step51
-    onFailure: step13
-
-  - id: step51
-    name: 53-설계 문서 형식 자동 수정 횟수 확인
-    type: TOOL
-    tool: countUp
-    with:
-      previous: ${state.docCheckRound:}
-      max: 1
-      scope: ${decisions:}
-    save: docCheckRound
-    routes:
-      within: step52
-      over: step13
+      problem: step52
     onFailure: step13
 
   - id: step52
-    name: 54-설계 문서 형식 고치기
+    name: 44-설계 문서 형식 고치기
     type: AGENT
     agent: document-revise-agent
     with:
@@ -797,10 +741,14 @@ steps:
         ${state.docCheck.message}
       history: ${decisions:}
     save: revision
+    limit:
+      max: 1
+      scope: ${decisions:}
+      over: step13
     next: step50
 
   - id: step53
-    name: 27-개발 결과 형식 확인
+    name: 25-개발 결과 형식 확인
     type: TOOL
     tool: checkSources
     with:
@@ -808,11 +756,11 @@ steps:
     save: sourceCheck
     routes:
       ok: step28
-      problem: step56
+      problem: step58
     onFailure: step28
 
   - id: step54
-    name: 25-손대지 못한 보류가 없는지
+    name: 23-손대지 못한 보류가 없는지
     type: TOOL
     tool: containsValue
     with:
@@ -820,47 +768,19 @@ steps:
       expected: "0"
     routes:
       "true": step18
-      "false": step55
+      "false": step57
     onFailure: step18
-
-  - id: step55
-    name: 50-보류 이어서 개발 횟수 확인
-    type: TOOL
-    tool: countUp
-    with:
-      previous: ${state.pendingRetry:}
-      max: 1
-      scope: ${decisions:}
-    save: pendingRetry
-    routes:
-      within: step57
-      over: step18
-    onFailure: step18
-
-  - id: step56
-    name: 45-형식 오류 고치기 횟수 확인
-    type: TOOL
-    tool: countUp
-    with:
-      previous: ${state.sourceCheckRound:}
-      max: 1
-      scope: ${decisions:}
-    save: sourceCheckRound
-    routes:
-      within: step58
-      over: step28
-    onFailure: step28
 
   - id: step57
-    name: 51-보류 이어서 개발
+    name: 42-보류 이어서 개발
     type: AGENT
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
       source_dir: ${state.projectRevision.sourceRoot}
       request: ${state.request}
-      design: ${state.design}
-      taskitems: ${state.taskitems}
+      design: ${state.docs.design}
+      taskitems: ${state.docs.taskitems}
       instruction: ${arrival:}
       history: ${decisions:}
       compile_error: ${state.compileError:}
@@ -869,37 +789,43 @@ steps:
         사람의 결정이나 DB 반영이 필요해 보류한 것은 그대로 보류로 둔다.
         ${state.develop.pendingReasons:}
     save: develop
+    limit:
+      max: 1
+      scope: ${decisions:}
+      over: step18
     next: step18
     onFailure: step18
 
   - id: step58
-    name: 46-형식 오류 고치기
+    name: 39-형식 오류 고치기
     type: AGENT
     agent: sm-developer-agent
     with:
       base_dir: ${input}/${state.now}
       source_dir: ${state.projectRevision.sourceRoot}
       request: ${state.request}
-      design: ${state.design}
-      taskitems: ${state.taskitems}
+      design: ${state.docs.design}
+      taskitems: ${state.docs.taskitems}
       instruction: ${arrival:}
       history: ${decisions:}
       compile_error: ${state.compileError:}
       check_result: ${state.sourceCheck.message}
     save: develop
+    limit:
+      max: 1
+      scope: ${decisions:}
+      over: step28
     next: step18
     onFailure: step28
 state:
   projectId: 요청서의 프로젝트ID(step02)
   serverCheck: 테스트 서버 기동 확인(step29, 기동만 확인이면 step45) 결과({success, cause, message, url, dbAliases})
-  verifyRound: 첫 검증인지 센 값(step42, {route, count, scope, message}). within이면 처음이라 설계 승인에서 고른 검증 생략을 따른다
   serverError: 테스트 서버 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
   projectRevision: 이 실행이 쓰는 프로젝트 리비전(step59. route는 ok 또는 none, 그 밖에 revision, sourceRoot, kind, message)
   ddlCheck: DDL과 초기 데이터가 개발 DB에 반영됐는지(step60. route는 none, ok, missing 가운데 하나, 그 밖에 missing, missingRows, message)
   ddlApproval: DDL 반영 승인(step61)의 결정
   verification: 동작 검증(step35) 결과(완료 기준마다 PASS/FAIL/BLOCKED와 근거)
   verificationError: 동작 검증 Agent가 끝내지 못한 이유
-  autoFixRound: 자동 수정 횟수({route, count, scope, message})
   autoFix: 자동 수정(step34)이 돌려준 답
   workChanges: 지난 동작 검증 뒤로 작업 폴더에서 바뀐 파일(step40, {first, changed, snapshot, summary, diff})
   request: 고객 요청서 내용
@@ -909,9 +835,8 @@ state:
   impactApproval: 영향도 분석 승인 결과
   impact: 영향도분석서 내용
   designApproval: 설계 승인 결과
-  design: 상세 설계서 내용
-  taskitems: 태스크아이템 목록 내용
-  now: 작업을 시작한 시각(yyyyMMdd-HHmm). 작업 폴더 이름으로 쓴다
+  docs: 설계서와 태스크아이템 목록({design, taskitems}, step14·20·32·41이 readFiles로 읽음. 재개발·자동 수정·검증 전에 다시 읽어 최신 내용)
+  now: 작업을 시작한 시각(yyyyMMdd-HHmm, settings.startTime이 넣음). 작업 폴더 이름으로 쓴다
   developApproval: 개발 승인(step19) 결과
   impactPath: 영향도 분석(step08)이 돌려준 답(저장 파일과 결정 필요 사항)
   architectPath: 아키텍처 설계(step12)가 돌려준 답(저장 파일과 결정 필요 사항)
@@ -923,8 +848,5 @@ state:
   referenceCode: 본뜰 기능의 코드 문서(02-1.reference-code.md, step49) 내용
   referenceError: 본뜰 기능의 코드를 모으지 못한 이유(step46~49 가운데 실패한 것. 모두 성공하면 비어 있다)
   docCheck: 설계 문서 형식 확인(step50) 결과({route, problems, checked, skipped, message})
-  docCheckRound: 설계 문서 형식 자동 수정 횟수(step51, {route, count, scope, message})
   develop: 개발 Agent(step17, 57, 58)가 돌려준 답(완료·보류 수와 보류 이유)
-  pendingRetry: 보류 이어서 개발 횟수(step55, {route, count, scope, message})
   sourceCheck: 개발 결과 형식 확인(step53) 결과({route, problems, checked, skipped, message})
-  sourceCheckRound: 형식 오류 고치기 횟수(step56, {route, count, scope, message})

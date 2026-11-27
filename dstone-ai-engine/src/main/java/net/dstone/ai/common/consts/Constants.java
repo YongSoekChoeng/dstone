@@ -229,6 +229,8 @@ public final class Constants {
 			public final static String ARRIVAL = "arrival";
 			/** 지금 step에 어느 step에서 어떤 길로 왔는지입니다({step, via}, 엔진 내부용). 실행 이력의 ARRIVED_FROM·ARRIVED_VIA로 남깁니다. */
 			public final static String ARRIVED_FROM = "arrivedFrom";
+			/** step의 횟수 한도(limit)를 센 값입니다({stepId: {route, count, scope, message}}, 엔진 내부용). */
+			public final static String LIMITS = "limits";
 		}
 
 		/**
