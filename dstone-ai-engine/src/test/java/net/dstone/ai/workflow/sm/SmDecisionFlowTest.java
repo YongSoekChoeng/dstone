@@ -31,7 +31,6 @@ import net.dstone.ai.support.WorkflowTestBase;
  * - 승인 화면은 결정마다 그 의견을 받을 step(Agent)을 보여 준다.
  * - [~ 수정]을 고르면 문서 수정 Agent가 그 의견을 지시로 받는다.
  * - [재개발]을 고르면 설계서와 목록을 다시 읽고(step20~21) 개발 폴더는 그대로 둔 채 개발로 간다(sm-workflow 2.1.0).
- * - [전문가 해결]을 고르면 설계서와 목록을 다시 읽고(step22~23) 해결 Agent(step24)가 증상을 받아 고친 뒤 컴파일 확인으로 간다(2.2.0).
  * </pre>
  */
 public class SmDecisionFlowTest extends WorkflowTestBase {
@@ -57,8 +56,8 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step37 13-기존 설계서 맞춤 · document-revise-agent 또는 step12 44-아키텍처 설계 · sm-architect-agent");
-		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step26 27-영향도분석서 수정 · document-revise-agent");
+		assertThat(pending.receivers().get("승인(설계진행)")).isEqualTo("step37 17-기존 설계서 맞춤 · document-revise-agent 또는 step12 18-아키텍처 설계 · sm-architect-agent");
+		assertThat(pending.receivers().get("영향도 수정")).isEqualTo("step26 55-영향도분석서 수정 · document-revise-agent");
 		assertThat(pending.receivers().get("중지")).isEqualTo("실패로 끝냄(FAIL)");
 
 		flow.decide("승인(설계진행)", "공통 코드 테이블도 같이 봐 주세요");
@@ -115,7 +114,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		flow.step("step19");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("재개발")).isEqualTo("step17 18-개발 · sm-developer-agent");
+		assertThat(pending.receivers().get("재개발")).isEqualTo("step17 24-개발 · sm-developer-agent");
 
 		flow.decide("재개발", "업로드한 파일이 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step20");
@@ -129,37 +128,6 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		// 재개발은 개발 폴더를 비우지 않습니다(비우는 step16는 설계 승인 뒤에만 지납니다).
 		assertThat(folder.resolve("dev-resources/A.java")).exists();
 		assertThat(this.chatModel.prompts()).isEmpty();
-	}
-
-	@Test
-	void 전문가_해결을_고르면_해결_Agent가_증상을_받고_설계서를_고친_뒤_컴파일_확인으로_간다() throws IOException {
-		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
-		Path folder = this.folder();
-		Path design = folder.resolve("03-1.design.md");
-		Files.writeString(design, "selectedFile = e.files[0];", StandardCharsets.UTF_8);
-		Files.writeString(folder.resolve("03-2.taskitems.md"), "# 목록", StandardCharsets.UTF_8);
-		String designPath = design.toString().replace("\\", "/");
-		this.chatModel.answerToolCalls("editFileTexts", "{\"filePath\": \"" + designPath + "\", \"edits\": [{\"before\": \"e.files[0];\", \"after\": \"e.files[0].rawFile;\"}]}");
-		this.chatModel.answer("{\"causes\": [\"업로드 안 됨 → Kendo 파일 객체를 그대로 보냄 → kendo.upload.min.js\"], \"changes\": [\"imageBoardView.jsp: rawFile 전송\"],"
-			+ " \"designChanges\": [], \"verification\": [\"코드만 읽음: 업로드 후 테이블 행을 확인\"], \"unresolved\": [], \"reproduced\": \"못 함 - 테스트\", \"compiled\": true, \"designSynced\": true}");
-
-		WorkflowStepper flow = this.atStep("step19");
-		flow.step("step19");
-		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("전문가 해결")).isEqualTo("step24 25-전문가 해결 · sm-troubleshooter-agent");
-
-		flow.decide("전문가 해결", "업로드한 파일이 테이블에 저장되지 않음");
-		assertThat(flow.currentStepId()).isEqualTo("step22");
-		flow.step("step22");
-		flow.step("step23");
-		flow.step("step24");
-
-		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
-		assertThat(flow.currentStepId()).isEqualTo("step18");
-		assertThat(Files.readString(design, StandardCharsets.UTF_8)).contains("e.files[0].rawFile;");
-		assertThat(String.valueOf(flow.state("troubleshoot"))).contains("rawFile");
-		String prompt = ScriptedChatModel.textOf(this.chatModel.prompts().get(0));
-		assertThat(prompt).contains("개발 승인(step19)의 결정: 전문가 해결").contains("업로드한 파일이 테이블에 저장되지 않음").contains("selectedFile = e.files[0];");
 	}
 
 	@Test

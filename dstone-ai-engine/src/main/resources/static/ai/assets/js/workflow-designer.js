@@ -1059,12 +1059,9 @@ var DstoneAiDesigner = (function () {
 		});
 	}
 
-	/** 흐름 순서를 셀 때 한 step에서 따라갈 곳(onFailure → next(비면 목록상 다음 step) → routes → rejectTo). */
+	/** 흐름 순서를 셀 때 한 step에서 따라갈 곳(정상 흐름 먼저: routes(적힌 순서) 또는 next(비면 목록상 다음 step) → onFailure → rejectTo). */
 	function flowTargets(step, list) {
 		var targets = [];
-		if (step.onFailure) {
-			targets.push(String(step.onFailure));
-		}
 		if (step.routes && typeof step.routes === "object" && !Array.isArray(step.routes)) {
 			Object.keys(step.routes).forEach(function (name) {
 				targets.push(String(step.routes[name]));
@@ -1075,6 +1072,9 @@ var DstoneAiDesigner = (function () {
 			var i = list.indexOf(step);
 			targets.push(i >= 0 && i + 1 < list.length && list[i + 1] && list[i + 1].id ? String(list[i + 1].id) : END_ID);
 		}
+		if (step.onFailure) {
+			targets.push(String(step.onFailure));
+		}
 		if (step.approval && step.approval.rejectTo) {
 			targets.push(String(step.approval.rejectTo));
 		}
@@ -1083,10 +1083,12 @@ var DstoneAiDesigner = (function () {
 
 	/**
 	 * step을 흐름 순서로 줄 세웁니다(이름 앞 순번과 자동 배치가 같이 씁니다).
-	 * 첫 step에서 출발해 화살표를 따라가며 처음 만나는 순서(깊이 우선)입니다.
-	 *  - 한 step에서는 onFailure → next(비어 있으면 엔진처럼 목록상 다음 step) → routes(적힌 순서) → rejectTo 순으로 따라간다.
-	 *  - 이미 만난 step으로 되돌아가는 화살표는 다시 따라가지 않는다.
+	 * 정상 흐름을 끝까지 먼저 세우고, 곁가지(재작업, 문서 수정, 실패 처리)는 그 뒤에 둡니다.
+	 *  1. 첫 step에서의 거리(화살표 수)를 잽니다. 거리가 줄거나 같아지는 화살표는 되돌아가는 화살표라 세지 않습니다.
+	 *  2. 남은 화살표로, 들어오는 화살표가 모두 끝난 step만 차례를 받습니다(합류하는 step은 갈래가 다 끝난 뒤).
+	 *  3. 차례를 받을 step이 여럿이면 방금 끝난 step의 첫 갈래(routes 첫째나 next)를 먼저 끝까지 따라갑니다. onFailure는 나중입니다.
 	 *  - 어디서도 닿지 않는 step은 맨 뒤에 목록 순서대로 붙인다.
+	 * 예전에는 onFailure부터 깊이 따라가서, 실패 경로가 앞 번호를 받고 정상 흐름의 step이 뒤로 밀렸습니다(sm-workflow의 "58-영향도 분석").
 	 * @return step 목록(흐름 순서)
 	 */
 	function flowOrderSteps() {
@@ -1100,19 +1102,62 @@ var DstoneAiDesigner = (function () {
 				byId[String(step.id)] = step;
 			}
 		});
-		var ordered = [];
-		var visit = function (step) {
-			if (!step || ordered.indexOf(step) >= 0) {
-				return;
-			}
-			ordered.push(step);
-			flowTargets(step, list).forEach(function (target) {
-				if (Object.prototype.hasOwnProperty.call(byId, target)) {
-					visit(byId[target]);
+		// 이 step에서 갈 수 있는 step id(END·FAIL과 겹친 것은 뺀다)
+		var targetsOf = function (step) {
+			var seen = {};
+			return flowTargets(step, list).filter(function (target) {
+				if (!Object.prototype.hasOwnProperty.call(byId, target) || seen[target]) {
+					return false;
 				}
+				seen[target] = true;
+				return true;
 			});
 		};
-		visit(list[0]);
+		var startId = String(list[0].id);
+		// 1. 첫 step에서의 거리
+		var dist = {};
+		dist[startId] = 0;
+		var queue = [startId];
+		while (queue.length > 0) {
+			var from = queue.shift();
+			targetsOf(byId[from]).forEach(function (to) {
+				if (!Object.prototype.hasOwnProperty.call(dist, to)) {
+					dist[to] = dist[from] + 1;
+					queue.push(to);
+				}
+			});
+		}
+		var isForward = function (from, to) {
+			return dist[to] > dist[from];
+		};
+		// 2. 되돌아가는 화살표를 뺀 나머지로 들어오는 화살표 수를 센다
+		var waiting = {};
+		Object.keys(dist).forEach(function (from) {
+			targetsOf(byId[from]).forEach(function (to) {
+				if (isForward(from, to)) {
+					waiting[to] = (waiting[to] || 0) + 1;
+				}
+			});
+		});
+		// 3. 첫 갈래를 먼저 끝까지 따라간다(쌓아 두고 맨 위부터 꺼냄)
+		var ordered = [];
+		var stack = [startId];
+		while (stack.length > 0) {
+			var id = stack.pop();
+			ordered.push(byId[id]);
+			var ready = [];
+			targetsOf(byId[id]).forEach(function (to) {
+				if (isForward(id, to)) {
+					waiting[to]--;
+					if (waiting[to] === 0) {
+						ready.push(to);
+					}
+				}
+			});
+			for (var r = ready.length - 1; r >= 0; r--) {
+				stack.push(ready[r]);
+			}
+		}
 		list.forEach(function (step) {
 			if (step && ordered.indexOf(step) < 0) {
 				ordered.push(step);

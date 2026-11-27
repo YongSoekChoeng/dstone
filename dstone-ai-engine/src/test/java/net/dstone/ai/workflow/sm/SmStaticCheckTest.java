@@ -117,9 +117,10 @@ public class SmStaticCheckTest extends WorkflowTestBase {
 		flow.step("step46");
 		assertThat(String.valueOf(flow.state("referenceEntries"))).contains("WEB-INF/views/board/list.jsp");
 		assertThat(flow.state("referenceError")).isNull();
-		flow.step("step47");
+		// 요청서의 프로젝트ID는 step02가 필수로 읽으므로, 그 값이 없으면 코드 모으기가 실패하고 설계로 간다
+		flow.step("step48");
 		assertThat(flow.currentStepId()).isEqualTo("step11");
-		assertThat(String.valueOf(flow.state("referenceError"))).contains("프로젝트ID");
+		assertThat(String.valueOf(flow.state("referenceError"))).contains("projectId");
 	}
 
 	private Map<String, Object> develop(int pending, int unfinished) {

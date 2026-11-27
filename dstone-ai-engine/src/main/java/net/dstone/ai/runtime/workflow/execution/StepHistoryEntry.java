@@ -18,6 +18,9 @@ import net.dstone.ai.common.consts.StepType;
  * @param outputSummary 성공했을 때의 결과 요약입니다.
  * @param failureReason 실패했거나 에러가 났을 때의 사유입니다.
  * @param executedAt    이 스텝이 끝난 시각입니다.
+ * @param arrivedFrom   이 스텝으로 오기 직전에 끝난 step의 id입니다(첫 step, 되감기, 예전 기록이면 null).
+ * @param arrivedVia    그 step에서 온 길입니다. 고른 route 이름, 실패로 왔으면 "onFailure", 되감기면 "rewind", next로 왔으면 null입니다.
  */
-public record StepHistoryEntry(String stepId, StepType stepType, String ref, boolean success, long durationMs, String outputSummary, String failureReason, Instant executedAt) {
+public record StepHistoryEntry(String stepId, StepType stepType, String ref, boolean success, long durationMs, String outputSummary, String failureReason, Instant executedAt
+	, String arrivedFrom, String arrivedVia) {
 }

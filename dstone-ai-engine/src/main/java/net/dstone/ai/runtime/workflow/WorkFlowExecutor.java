@@ -284,6 +284,11 @@ public class WorkFlowExecutor extends BaseObject {
 				this.noteDecision(currentExecution.context(), step, outcome, nextId);
 
 				/****************************************************************************************
+				6-2) 다음 step에 "어디서 어떤 길로 왔는지"를 적어 둡니다. 다음 step의 실행 이력에 함께 남습니다.
+				****************************************************************************************/
+				WorkFlowContext.setArrivedFrom(currentExecution.context(), step.id(), this.viaOf(step, outcome));
+
+				/****************************************************************************************
 				7) 다음 곳으로 갑니다.
 				   - END    : Workflow 전체를 성공으로 끝냅니다. workflow의 return을 계산한 값을 최종 결과로 남깁니다
 				              (return을 적지 않았으면 state 전체).
@@ -615,6 +620,7 @@ public class WorkFlowExecutor extends BaseObject {
 	 * @param outcome   실행 결과입니다.
 	 */
 	private void appendHistory(WorkFlowExecution execution, StepDefinition step, String historyId, StepOutcome outcome) {
+		Map<String, Object> from = WorkFlowContext.arrivedFrom(execution.context());
 		StepHistoryEntry stepHistoryEntry = new StepHistoryEntry(
 			historyId, step.type()
 			, StepDefinition.refOf(step)
@@ -623,6 +629,8 @@ public class WorkFlowExecutor extends BaseObject {
 			, (outcome.success() ? JsonSchemaUtil.toText(outcome.output()) : null)
 			, outcome.error()
 			, Instant.now()
+			, from == null ? null : textOf(from.get("step"))
+			, from == null ? null : textOf(from.get("via"))
 		);
 		this.executionStore.appendHistory(
 			execution.executionId(),
@@ -660,6 +668,24 @@ public class WorkFlowExecutor extends BaseObject {
 			String verdict = Boolean.TRUE.equals(output.get("pass")) ? "통과" : "불통과";
 			WorkFlowContext.recordDecision(context, step.id(), step.name(), step.type().name(), verdict, null, textOf(output.get("reason")), nextId);
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 방금 끝난 step에서 다음 step으로 어떤 길로 가는지 돌려줍니다.
+	 * - 실패: "onFailure"
+	 * - routes로 갈림: 고른 route 이름(APPROVAL 결정, ROUTER 경로, Tool이 돌려준 값)
+	 * - next(또는 목록상 다음): null
+	 * </pre>
+	 *
+	 * @param step    방금 끝난 step의 정의입니다.
+	 * @param outcome 그 step의 결과입니다.
+	 */
+	private String viaOf(StepDefinition step, StepOutcome outcome) {
+		if (!outcome.success()) {
+			return "onFailure";
+		}
+		return StepDefinition.routesOf(step) == null ? null : outcome.route();
 	}
 
 	/** 값을 글자로 바꿉니다. null은 null입니다. */

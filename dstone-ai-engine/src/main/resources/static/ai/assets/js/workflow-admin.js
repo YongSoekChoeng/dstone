@@ -602,14 +602,31 @@ var DstoneAiWorkflowAdmin = (function () {
 		var name = stepNameOf(h);
 		tr.innerHTML =
 			"<td><span class=\"wa-type-dot wa-type-" + escapeHtml(h.stepType) + "\"></span><span class=\"wa-step-cell\">" + escapeHtml(name || h.stepId) + "</span>"
-				+ (name && /\[\d+\]$/.test(h.stepId || "") ? "<span class=\"wa-step-cell-name\">" + escapeHtml(h.stepId.replace(/^.*(\[\d+\])$/, "$1")) + "</span>" : "") + "</td>" +
+				+ (name && /\[\d+\]$/.test(h.stepId || "") ? "<span class=\"wa-step-cell-name\">" + escapeHtml(h.stepId.replace(/^.*(\[\d+\])$/, "$1")) + "</span>" : "")
+				+ (arrivedText(h) ? "<span class=\"wa-step-cell-name\">" + escapeHtml(arrivedText(h)) + "</span>" : "") + "</td>" +
 			"<td><span class=\"wa-outcome wa-outcome-" + (h.success ? "ok" : "fail") + "\">" + (h.success ? "성공" : "실패") + "</span></td>" +
 			"<td class=\"wa-num\">" + (h.durationMs == null ? "-" : escapeHtml(durationText(h.durationMs))) + "</td>" +
 			"<td class=\"wa-line" + (h.success ? "" : " wa-text-failed") + "\">" + escapeHtml(text ? text.replace(/\s+/g, " ").substring(0, 300) : "-") + "</td>" +
 			"<td class=\"wa-num wa-doc-count\"></td>" +
 			"<td title=\"" + escapeHtml(formatTime(h.executedAt)) + "\">" + escapeHtml(clockText(h.executedAt)) + "</td>";
-		tr.title = (index + 1) + "번째 줄, " + h.stepId + (name ? " " + name : "") + ", " + DstoneAi.stepTypeLabel(h.stepType) + (h.ref ? ", " + h.ref : "");
+		tr.title = (index + 1) + "번째 줄, " + h.stepId + (name ? " " + name : "") + ", " + DstoneAi.stepTypeLabel(h.stepType) + (h.ref ? ", " + h.ref : "")
+			+ (arrivedText(h) ? "\n" + arrivedText(h) + (h.arrivedFrom ? " (" + h.arrivedFrom + ")" : "") : "");
 		return tr;
+	}
+
+	/**
+	 * 이 step에 어디서 어떤 길로 왔는지("← 43-실패한 완료 기준이 있는지 · true").
+	 * 엔진이 남긴 ARRIVED_FROM·ARRIVED_VIA로 만든다. 첫 step이나 예전 기록이면 ""
+	 */
+	function arrivedText(h) {
+		if (h.arrivedVia === "rewind") {
+			return "← 되감기";
+		}
+		if (!h.arrivedFrom) {
+			return "";
+		}
+		var via = h.arrivedVia === "onFailure" ? "실패" : h.arrivedVia;
+		return "← " + stepLabel(h.arrivedFrom) + (via ? " · " + via : "");
 	}
 
 	// [이전] 1 2 3 [다음]. 목록 표와 같은 모양. 한 페이지에 다 들어가면 단추를 숨긴다

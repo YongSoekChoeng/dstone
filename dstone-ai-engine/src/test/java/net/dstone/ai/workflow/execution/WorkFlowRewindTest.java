@@ -78,6 +78,9 @@ public class WorkFlowRewindTest extends WorkflowTestBase {
 
 		assertThat(again.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
 		assertThat(this.stepIds(again)).containsExactly("validate", "now", "now");
+		// 되감기로 다시 돈 step은 앞 step이 아니라 되감기에서 왔다고 남는다
+		assertThat(this.history(again).get(2).arrivedVia()).isEqualTo("rewind");
+		assertThat(this.history(again).get(2).arrivedFrom()).isNull();
 		assertThat(again.output()).isNotNull();
 	}
 

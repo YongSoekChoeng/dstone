@@ -227,6 +227,8 @@ public final class Constants {
 			public final static String DECISIONS = "decisions";
 			/** 지금 step으로 오게 만든 마지막 결정입니다(${arrival}). LLM을 부르는 step이 성공하면 비웁니다. */
 			public final static String ARRIVAL = "arrival";
+			/** 지금 step에 어느 step에서 어떤 길로 왔는지입니다({step, via}, 엔진 내부용). 실행 이력의 ARRIVED_FROM·ARRIVED_VIA로 남깁니다. */
+			public final static String ARRIVED_FROM = "arrivedFrom";
 		}
 
 		/**

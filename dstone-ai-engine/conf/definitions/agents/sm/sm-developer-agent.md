@@ -10,8 +10,11 @@
 # 2.5.1(2026-11-25): requiredTools(editFileTexts)를 뺐다. 개발 단계부터 다시 돌릴 때 03-2.taskitems.md가 이미 같은 내용으로 '완료' 기록돼 있으면
 #   기록할 것이 없어 editFileTexts를 부르지 않는 것이 맞는데, 이 계약이 그 정상 결과를 실패로 만들었다(실행 d9f0bcc0 step17).
 #   기록을 빼먹지 않았는지는 답의 taskitemsRecorded와 다음 승인 화면의 태스크아이템 목록으로 본다.
+# 2.6.0(2026-11-27): 지난 검증 뒤로 실제로 바뀐 줄(recent_changes, step40 fileChanges의 diff)을 받는다. 실행 0fb4c669에서
+#   재개발이 roomRes[0].results를 roomRes.results로 잘못 바꿨고 설계서 수정 이력에도 반대 설명이 남았다. 다음 재개발은
+#   "목록이 안 보임"을 받고 그 이력만 믿어 날짜 형식과 컬럼명만 쫓다가 빈 답으로 끝났다.
 id: sm-developer-agent
-version: 2.5.1
+version: 2.6.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -26,6 +29,7 @@ input:
   history?: string, 이 작업에서 지금까지 내려진 결정 전체
   compile_error?: string, 지난 컴파일 확인에서 난 오류(없으면 비어 있음)
   check_result?: string, Workflow가 다시 부른 이유(지난 개발의 보류, 개발 결과의 형식 오류). 없으면 비어 있음
+  recent_changes?: string, 지난 동작 검증 뒤로 작업 폴더에서 실제로 바뀐 줄(엔진이 기록한 diff). 없으면 비어 있음
 output:
   completed: integer, '완료'로 기록한 태스크아이템 수
   pending: integer, '보류'로 기록한 태스크아이템 수
@@ -64,6 +68,8 @@ request, design, taskitems로 세 문서의 내용을 받는다. 파일로 다�
 compile_error가 있으면 지난번 컴파일 오류다. 먼저 고친다.
 check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적힌 것(이어서 할 보류, 고칠 형식 오류)부터 처리하고, 이미 끝난 항목은 건너뛴다.
 재개발(instruction이 개발 승인의 재개발)이면 dev-resources에 지난 결과가 있다. 지시와 관련된 곳만 고치고, '완료'인 항목이라도 지시와 관련 있으면 다시 확인한다.
+재개발에서 recent_changes가 있으면 지난 검증 직전에 실제로 바뀐 줄이다. 설계서의 '## 수정 이력'은 Agent가 쓴 설명이라 틀릴 수 있고, 이것은 엔진이 기록한 사실이다.
+사람이 알린 증상이 그 무렵 생겼다면 이 diff에서 증상과 관련된 변경부터 확인한다. 지난 수정이 되던 것을 깨뜨린 경우가 많기 때문이다.
 재개발에서는 사람의 지시가 설계서보다 앞선다. 지시를 따르느라 설계서와 달라지는 것은 '보류'로 두지 않고 고친 뒤 [재개발로 고친 것을 설계서에 남기는 법]대로 설계서에 적는다.
 
 [원본을 지키는 법]

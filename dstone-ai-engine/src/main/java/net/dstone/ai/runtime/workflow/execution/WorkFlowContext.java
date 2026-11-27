@@ -20,6 +20,7 @@ import net.dstone.ai.common.consts.Constants.WorkFlow.Output;
  *   currentStep: 지금 차례인 step의 id(엔진 내부용). 정의가 바뀌어 순번이 밀려도 재개할 자리를 찾으려고 둡니다.
  *   decisions:  [ { step, name, kind, decision, approver, comment, to, at } ]  내려진 결정(승인, 판정) 기록. ${decisions}로 읽습니다
  *   arrival:    지금 step으로 오게 만든 마지막 결정(위 기록 하나). ${arrival}로 읽습니다
+ *   arrivedFrom: { step, via }  지금 step에 어느 step에서 어떤 길로 왔는지(엔진 내부용). 실행 이력에 함께 남깁니다
  *
  * step 사이에 값이 오가는 길은 state 하나뿐입니다. step이 끝나면 그 step의 save에 적힌 이름으로 state에 저장하고(saveOutput()),
  * 뒤의 step은 "${state.이름}"으로 읽습니다(common.expression.ContextResolver).
@@ -266,6 +267,34 @@ public final class WorkFlowContext {
 		if (approvals instanceof Map) {
 			((Map<String, Object>) approvals).remove(stepId);
 		}
+	}
+
+	/**
+	 * <pre>
+	 * 다음 step에 어디서 어떤 길로 가는지 적어 둡니다. 다음 step의 실행 이력에 함께 남아, 실행 경로를 거꾸로 따라갈 수 있습니다.
+	 * via는 고른 route 이름(APPROVAL 결정, ROUTER 경로, Tool이 돌려준 값), 실패로 갔으면 "onFailure", next로 갔으면 null입니다.
+	 * </pre>
+	 *
+	 * @param context 실행 컨텍스트
+	 * @param stepId  방금 끝난 step의 id(되감기면 null)
+	 * @param via     어떤 길로 가는지
+	 */
+	public static void setArrivedFrom(Map<String, Object> context, String stepId, String via) {
+		Map<String, Object> from = new LinkedHashMap<>();
+		from.put("step", stepId);
+		from.put("via", via);
+		context.put(Context.ARRIVED_FROM, from);
+	}
+
+	/**
+	 * 지금 step에 온 곳을 돌려줍니다({step, via}). 첫 step이거나 이 기록이 생기기 전의 실행이면 null입니다.
+	 *
+	 * @param context 실행 컨텍스트
+	 */
+	@SuppressWarnings("unchecked")
+	public static Map<String, Object> arrivedFrom(Map<String, Object> context) {
+		Object from = context.get(Context.ARRIVED_FROM);
+		return from instanceof Map ? (Map<String, Object>) from : null;
 	}
 
 }

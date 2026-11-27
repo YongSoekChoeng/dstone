@@ -2,6 +2,7 @@ package net.dstone.ai.tools.file;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -156,6 +157,12 @@ public class FileSetTool {
 	/** 바뀐 파일을 안내 글에 이 개수까지만 적습니다. */
 	private static final int MAX_LISTED_CHANGES = 100;
 
+	/** diff를 만들 때 이보다 큰 파일은 사본을 두지 않고 diff도 만들지 않습니다(글 파일이 아닐 가능성이 큼). */
+	private static final long DIFF_FILE_LIMIT_BYTES = 512L * 1024;
+
+	/** diff 글 전체의 상한(글자 수)입니다. 넘으면 잘라 내고 안내를 붙입니다. Agent 입력을 지나치게 키우지 않으려고. */
+	private static final int MAX_DIFF_CHARS = 30000;
+
 	/**
 	 * <pre>
 	 * 폴더 아래 파일들의 지금 상태(스냅샷)를 만들고, 지난번 스냅샷과 비교해 바뀐 파일을 알려 줍니다.
@@ -164,6 +171,11 @@ public class FileSetTool {
 	 * - changed: 새로 생기거나, 내용이 바뀌거나, 없어진 파일(없어진 것은 "(삭제) 경로")
 	 * 결과를 save해 두었다가 다음에 그 snapshot을 previous로 넘기면 "그 사이에 바뀐 것"이 됩니다.
 	 * 비교는 내용 해시로 합니다(다시 써도 내용이 같으면 바뀌지 않은 것). 아주 큰 파일만 크기와 수정 시각으로 봅니다.
+ *
+ * copyDir을 주면 무엇이 바뀌었는지(diff)도 만듭니다. 결과에 diff(파일마다 "===== 경로" 아래 unified diff)가 더해집니다.
+ * 이 폴더에 지난번 내용의 사본을 두었다가 다음 호출 때 비교하고, 비교가 끝나면 지금 내용으로 바꿔 둡니다.
+ * Agent의 자기 설명이 아니라 실제로 바뀐 줄을 다음 Agent에게 넘기려는 것입니다(지난 수정이 무엇을 되돌렸는지 보임).
+ * copyDir이 basePath 안에 있으면 스냅샷에서 뺍니다. Agent가 작업 폴더를 뒤지다 옛 사본을 읽지 않게 basePath 밖에 두기를 권합니다.
 	 *
 	 * YAML 예: 지난 검증 뒤로 작업 폴더에서 바뀐 파일
 	 *   tool: fileChanges
@@ -175,11 +187,16 @@ public class FileSetTool {
 	 * @param previous    지난번 결과의 snapshot. 처음이면 비움
 	 * @param excludeDirs 보지 않을 폴더 이름(쉼표로 여럿). 빌드 결과처럼 매번 바뀌는 폴더를 뺀다
 	 */
-	@Tool(description = "폴더 아래 파일의 스냅샷을 만들고 지난 스냅샷(previous)과 비교해 바뀐 파일을 {first, changed, snapshot, summary}로 돌려준다.")
+	public Map<String, Object> fileChanges(String basePath, Object previous, String excludeDirs) {
+		return this.fileChanges(basePath, previous, excludeDirs, null);
+	}
+
+	@Tool(description = "폴더 아래 파일의 스냅샷을 만들고 지난 스냅샷(previous)과 비교해 바뀐 파일을 {first, changed, snapshot, summary, diff}로 돌려준다. diff는 copyDir을 줄 때만.")
 	public Map<String, Object> fileChanges(
 			@ToolParam(description = "볼 폴더의 절대경로") String basePath,
 			@ToolParam(required = false, description = "지난번 결과의 snapshot({상대경로: 해시}). 처음이면 비움") Object previous,
-			@ToolParam(required = false, description = "보지 않을 폴더 이름. 쉼표로 여럿") String excludeDirs) {
+			@ToolParam(required = false, description = "보지 않을 폴더 이름. 쉼표로 여럿") String excludeDirs,
+			@ToolParam(required = false, description = "지난 내용의 사본을 둘 폴더의 절대경로. 주면 바뀐 파일의 diff를 만든다") String copyDir) {
 		if (basePath == null || basePath.isBlank() || !new File(basePath.trim()).isDirectory()) {
 			return this.fail("폴더가 없습니다: " + basePath);
 		}
@@ -192,9 +209,10 @@ public class FileSetTool {
 			}
 		}
 		File root = new File(basePath.trim());
+		File copyRoot = copyDir == null || copyDir.isBlank() ? null : new File(copyDir.trim());
 		Map<String, String> snapshot = new TreeMap<>();
 		try {
-			collect(root, root, excluded, snapshot);
+			collect(root, root, excluded, copyRoot, snapshot);
 		} catch (IOException e) {
 			return this.fail("파일을 읽지 못했습니다: " + e.getMessage());
 		}
@@ -219,7 +237,77 @@ public class FileSetTool {
 		result.put("changed", changed);
 		result.put("snapshot", snapshot);
 		result.put("summary", summary(first, changed));
+		if (copyRoot != null) {
+			try {
+				if (!first) {
+					result.put("diff", diffText(root, copyRoot, changed));
+				}
+				refreshCopy(root, copyRoot, snapshot.keySet());
+			} catch (IOException e) {
+				// diff는 덧붙이는 정보라, 만들지 못해도 바뀐 파일 목록은 그대로 돌려준다
+				result.put("diff", "diff를 만들지 못했습니다: " + e.getMessage());
+			}
+		}
 		return result;
+	}
+
+	/** 바뀐 파일마다 사본(지난 내용)과 지금 내용의 diff를 이어 붙입니다. 전체가 MAX_DIFF_CHARS를 넘으면 자릅니다. */
+	private static String diffText(File root, File copyRoot, List<String> changed) throws IOException {
+		StringBuilder text = new StringBuilder();
+		for (String path : changed) {
+			String body;
+			if (path.startsWith("(삭제) ")) {
+				body = "(이 파일이 없어졌습니다)\n";
+				path = path.substring("(삭제) ".length());
+			} else {
+				File now = new File(root, path);
+				File old = new File(copyRoot, path);
+				if (now.length() > DIFF_FILE_LIMIT_BYTES || isBinary(now)) {
+					body = "(크거나 글 파일이 아니라 diff를 만들지 않습니다)\n";
+				} else {
+					String before = old.isFile() ? Files.readString(old.toPath(), StandardCharsets.UTF_8) : "";
+					body = (old.isFile() ? "" : "(새 파일이거나 지난 내용이 없습니다)\n") + LineDiff.diff(before, Files.readString(now.toPath(), StandardCharsets.UTF_8));
+				}
+			}
+			text.append("===== ").append(path).append('\n').append(body);
+			if (text.length() > MAX_DIFF_CHARS) {
+				text.setLength(MAX_DIFF_CHARS);
+				text.append("\n...(diff가 길어 ").append(MAX_DIFF_CHARS).append("자에서 잘랐습니다. 나머지 파일은 직접 읽어 보십시오)\n");
+				break;
+			}
+		}
+		return text.toString();
+	}
+
+	/** 사본 폴더를 비우고 지금 글 파일들을 복사해 둡니다(다음 호출의 "지난 내용"). */
+	private static void refreshCopy(File root, File copyRoot, java.util.Set<String> paths) throws IOException {
+		if (copyRoot.exists()) {
+			org.springframework.util.FileSystemUtils.deleteRecursively(copyRoot);
+		}
+		for (String path : paths) {
+			File source = new File(root, path);
+			if (source.length() > DIFF_FILE_LIMIT_BYTES || isBinary(source)) {
+				continue;
+			}
+			File target = new File(copyRoot, path);
+			target.getParentFile().mkdirs();
+			Files.copy(source.toPath(), target.toPath());
+		}
+	}
+
+	/** 앞부분에 NUL 바이트가 있으면 글 파일이 아닌 것으로 봅니다. */
+	private static boolean isBinary(File file) throws IOException {
+		byte[] head = new byte[8192];
+		int read;
+		try (java.io.InputStream in = Files.newInputStream(file.toPath())) {
+			read = in.read(head);
+		}
+		for (int i = 0; i < read; i++) {
+			if (head[i] == 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** 바뀐 파일 목록을 읽기 좋은 글로 만듭니다. */
@@ -241,7 +329,7 @@ public class FileSetTool {
 	}
 
 	/** 폴더 아래 파일을 "상대경로 → 해시"로 모읍니다. 뺄 폴더는 들어가지 않습니다. */
-	private static void collect(File root, File dir, List<String> excluded, Map<String, String> snapshot) throws IOException {
+	private static void collect(File root, File dir, List<String> excluded, File copyRoot, Map<String, String> snapshot) throws IOException {
 		File[] children = dir.listFiles();
 		if (children == null) {
 			return;
@@ -249,8 +337,8 @@ public class FileSetTool {
 		Arrays.sort(children);
 		for (File child : children) {
 			if (child.isDirectory()) {
-				if (!excluded.contains(child.getName())) {
-					collect(root, child, excluded, snapshot);
+				if (!excluded.contains(child.getName()) && !(copyRoot != null && sameFile(child, copyRoot))) {
+					collect(root, child, excluded, copyRoot, snapshot);
 				}
 			} else if (child.isFile()) {
 				String relative = root.toPath().relativize(child.toPath()).toString().replace('\\', '/');
@@ -260,6 +348,11 @@ public class FileSetTool {
 	}
 
 	/** 파일 하나의 해시입니다. 아주 큰 파일은 크기와 수정 시각입니다. */
+	/** 두 경로가 같은 폴더인지 봅니다(상대경로·대소문자 표기가 달라도). */
+	private static boolean sameFile(File a, File b) throws IOException {
+		return a.getCanonicalFile().equals(b.getCanonicalFile());
+	}
+
 	private static String fingerprint(File file) throws IOException {
 		if (file.length() > HASH_LIMIT_BYTES) {
 			return "size:" + file.length() + ",modified:" + file.lastModified();

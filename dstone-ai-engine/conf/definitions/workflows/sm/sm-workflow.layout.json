@@ -220,10 +220,6 @@
       "x" : 904,
       "y" : 414
     },
-    "step47" : {
-      "x" : 2046,
-      "y" : 324
-    },
     "step48" : {
       "x" : 2046,
       "y" : 414
@@ -912,19 +908,6 @@
       "x" : 2012,
       "y" : 349
     } ],
-    "step47|onFailure|" : [ {
-      "x" : 2002,
-      "y" : 349
-    }, {
-      "x" : 2002,
-      "y" : 312
-    }, {
-      "x" : 820,
-      "y" : 312
-    }, {
-      "x" : 820,
-      "y" : 235
-    } ],
     "step48|next|" : [ {
       "x" : 1972,
       "y" : 439
@@ -1607,14 +1590,6 @@
     "step46|onFailure|" : {
       "source" : "out",
       "target" : "in"
-    },
-    "step47|next|" : {
-      "source" : "out",
-      "target" : "in"
-    },
-    "step47|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
     },
     "step48|next|" : {
       "source" : "left",

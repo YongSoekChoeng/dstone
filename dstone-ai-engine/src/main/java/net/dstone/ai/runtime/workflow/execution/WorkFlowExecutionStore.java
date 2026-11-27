@@ -290,6 +290,8 @@ public class WorkFlowExecutionStore extends BaseDao {
 		param.put("outputSummary", entry.outputSummary());
 		param.put("failureReason", entry.failureReason());
 		param.put("executedAt", Timestamp.from(entry.executedAt()));
+		param.put("arrivedFrom", entry.arrivedFrom());
+		param.put("arrivedVia", entry.arrivedVia());
 		this.sqlSessionCommon.insert(NS + "insertHistory", param);
 	}
 
@@ -339,7 +341,9 @@ public class WorkFlowExecutionStore extends BaseDao {
 			row.get("durationMs") == null ? 0L : ((Number) row.get("durationMs")).longValue(),
 			this.textOf(row.get("outputSummary")),
 			this.textOf(row.get("failureReason")),
-			this.toInstant(row.get("executedAt")));
+			this.toInstant(row.get("executedAt")),
+			this.textOf(row.get("arrivedFrom")),
+			this.textOf(row.get("arrivedVia")));
 	}
 
 	private String textOf(Object value) {

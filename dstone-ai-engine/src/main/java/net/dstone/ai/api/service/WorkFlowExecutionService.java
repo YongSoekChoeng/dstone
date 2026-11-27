@@ -391,6 +391,8 @@ public class WorkFlowExecutionService extends BaseService {
 		// 다시 시작하는 step이 받을 지시(${arrival})를 되살립니다. 그 step으로 오게 했던 마지막 결정입니다.
 		WorkFlowContext.restoreArrival(context, this.arrivalFor(workflow, context, point.fromStep()));
 		WorkFlowContext.setCurrentStep(context, point.fromStep());
+		// 실행 이력에 되감기로 이 step에 왔다고 남깁니다(앞 step에서 이어진 것이 아닙니다).
+		WorkFlowContext.setArrivedFrom(context, null, "rewind");
 		List<String> deleted = this.deleteFiles(executionId, point.deleteFiles());
 		this.fileStore.deleteSteps(executionId, point.steps());
 		WorkFlowExecution rewound = execution.rewound(point.stepIndex());

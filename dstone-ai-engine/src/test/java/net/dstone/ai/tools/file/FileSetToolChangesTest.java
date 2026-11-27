@@ -55,6 +55,48 @@ public class FileSetToolChangesTest {
 	}
 
 	@Test
+	void copyDir을_주면_지난번과_달라진_줄을_diff로_알려_준다() throws IOException {
+		FileSetTool tool = new FileSetTool();
+		Path work = this.dir.resolve("work");
+		Path copy = this.dir.resolve("copy");
+		Files.createDirectories(work.resolve("dev"));
+		StringBuilder jsp = new StringBuilder();
+		for (int i = 1; i <= 20; i++) {
+			jsp.append("line").append(i).append("\r\n");
+		}
+		String before = jsp.toString().replace("line10", "var rooms = roomRes[0].results;");
+		Files.writeString(work.resolve("dev/meetingRoom.jsp"), before, StandardCharsets.UTF_8);
+		Files.writeString(work.resolve("dev/Old.java"), "class Old {}", StandardCharsets.UTF_8);
+
+		Map<String, Object> first = tool.fileChanges(work.toString(), null, null, copy.toString());
+		assertThat(first).doesNotContainKey("diff");
+		assertThat(copy.resolve("dev/meetingRoom.jsp")).exists();
+
+		Files.writeString(work.resolve("dev/meetingRoom.jsp"), before.replace("roomRes[0].results", "roomRes.results"), StandardCharsets.UTF_8);
+		Files.delete(work.resolve("dev/Old.java"));
+		Files.writeString(work.resolve("dev/New.java"), "class New {}\n", StandardCharsets.UTF_8);
+
+		Map<String, Object> second = tool.fileChanges(work.toString(), first.get("snapshot"), null, copy.toString());
+		String diff = String.valueOf(second.get("diff"));
+		assertThat(diff).contains("===== dev/meetingRoom.jsp\n@@ -8,5 +8,5 @@\n line8\n line9\n-var rooms = roomRes[0].results;\n+var rooms = roomRes.results;\n line11\n line12\n");
+		assertThat(diff).doesNotContain("line5").doesNotContain("line14");
+		assertThat(diff).contains("===== dev/Old.java\n(이 파일이 없어졌습니다)");
+		assertThat(diff).contains("===== dev/New.java\n(새 파일이거나 지난 내용이 없습니다)\n@@ -1,0 +1,1 @@\n+class New {}");
+		// 사본은 지금 내용으로 바뀌어, 다음 호출은 그 뒤의 변화만 본다
+		Map<String, Object> third = tool.fileChanges(work.toString(), second.get("snapshot"), null, copy.toString());
+		assertThat(String.valueOf(third.get("diff"))).isEmpty();
+	}
+
+	@Test
+	void copyDir이_basePath_안에_있으면_스냅샷에서_뺀다() throws IOException {
+		FileSetTool tool = new FileSetTool();
+		Files.writeString(this.dir.resolve("A.txt"), "a", StandardCharsets.UTF_8);
+		Map<String, Object> first = tool.fileChanges(this.dir.toString(), null, null, this.dir.resolve(".copy").toString());
+		Map<String, Object> second = tool.fileChanges(this.dir.toString(), first.get("snapshot"), null, this.dir.resolve(".copy").toString());
+		assertThat((List<String>) second.get("changed")).isEmpty();
+	}
+
+	@Test
 	void 없는_폴더는_실패다() {
 		Map<String, Object> result = new FileSetTool().fileChanges(this.dir.resolve("none").toString(), null, null);
 		assertThat(result.get("success")).isEqualTo(Boolean.FALSE);

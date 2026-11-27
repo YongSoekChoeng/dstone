@@ -184,9 +184,10 @@
 
     <insert id="insertHistory" parameterType="java.util.Map">
         INSERT INTO AI_WORKFLOW_EXECUTION_STEP_HISTORY
-            (EXECUTION_ID, STEP_ID, STEP_TYPE, STEP_REF, SUCCESS, DURATION_MS, OUTPUT_SUMMARY, FAILURE_REASON, EXECUTED_AT)
+            (EXECUTION_ID, STEP_ID, STEP_TYPE, STEP_REF, SUCCESS, DURATION_MS, OUTPUT_SUMMARY, FAILURE_REASON, EXECUTED_AT, ARRIVED_FROM, ARRIVED_VIA)
         VALUES
-            (#{executionId}, #{stepId}, #{stepType}, #{stepRef}, #{success}, #{durationMs}, #{outputSummary}, #{failureReason}, #{executedAt, jdbcType=TIMESTAMP})
+            (#{executionId}, #{stepId}, #{stepType}, #{stepRef}, #{success}, #{durationMs}, #{outputSummary}, #{failureReason}, #{executedAt, jdbcType=TIMESTAMP}
+           , #{arrivedFrom, jdbcType=VARCHAR}, #{arrivedVia, jdbcType=VARCHAR})
     </insert>
 
     <!-- 실행 한 건의 스텝 기록 전부(실행한 순서대로) -->
@@ -199,6 +200,8 @@
              , OUTPUT_SUMMARY AS "outputSummary"
              , FAILURE_REASON AS "failureReason"
              , EXECUTED_AT AS "executedAt"
+             , ARRIVED_FROM AS "arrivedFrom"
+             , ARRIVED_VIA AS "arrivedVia"
           FROM AI_WORKFLOW_EXECUTION_STEP_HISTORY
          WHERE EXECUTION_ID = #{executionId}
          ORDER BY EXECUTED_AT ASC, ID ASC

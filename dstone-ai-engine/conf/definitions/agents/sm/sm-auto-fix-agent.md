@@ -13,8 +13,10 @@
 #   DB 구조가 원인이면 DDL 문서만 고치고 사람이 개발 DB에 반영하도록 unresolved에 남긴다.
 # 2.0.1(2026-11-27): stopTestServer를 뺐다(sm-verifier-agent 2.0.1과 같은 이유). 서버는 엔진이 내린다.
 # 2.1.0(2026-11-27): Skill browser-testing을 받는다(ref로 눌리지 않는 요소, iframe 안의 요소를 locator 표기로 지정).
+# 2.2.0(2026-11-27): 지난 검증 뒤로 실제로 바뀐 줄(recent_changes, step40 fileChanges의 diff)을 받는다. 지난 수정이 무엇을 바꿨는지
+#   설계서 수정 이력(Agent의 설명)이 아니라 사실로 보게 하려는 것이다(실행 0fb4c669의 roomRes[0] → roomRes).
 id: sm-auto-fix-agent
-version: 2.1.0
+version: 2.2.0
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -30,6 +32,7 @@ input:
   boot_error?: string, 테스트 서버가 뜨지 못한 이유(있으면 이것부터)
   verification?: any, 동작 검증 결과(시나리오와 관측 근거)
   history?: string, 지금까지 내려진 결정
+  recent_changes?: string, 이번 검증 직전에 작업 폴더에서 실제로 바뀐 줄(엔진이 기록한 diff). 없으면 비어 있음
 output:
   causes(array, 실패마다 원인과 근거): string
   changes(array, 고친 파일과 내용. 고치지 않았으면 이유): string
@@ -91,6 +94,8 @@ BLOCKED는 코드 문제가 아니므로 고치지 않는다. FAIL도 아래에 
 [원인 찾는 법]
 아래에 붙은 [Skill: troubleshooting] 안내를 따른다. 관측된 근거에서 출발해 원본에서 같은 일을 하는 동작하는 기능과 비교한다.
 공통 유틸을 부른다면 그것이 기대하는 값(세션, 초기화, 필수 인자)까지 읽는다.
+recent_changes가 있으면 이번 검증 직전에 실제로 바뀐 줄이다. 지난번에 되던 기준이 이번에 FAIL이면 이 diff에서 관련된 변경부터 본다.
+설계서의 '## 수정 이력'은 Agent가 쓴 설명이라 틀릴 수 있고, 이것은 엔진이 기록한 사실이다.
 재현이 필요하면 startTestServer(projectId ${input.project_id}, revision ${input.revision:}, overlayDir ${input.base_dir}/dev-resources,
 deleteList ${input.base_dir}/dev-resources/_delete-files.txt)를 부르고, 그 결과의 주소와 테스트 DB 별칭(test-…)만 쓴다.
 고친 뒤 같은 인자로 다시 부르면 바뀐 파일만 반영된다(Java·설정을 고쳤으면 앱을 다시 올리므로 다시 로그인한다).
