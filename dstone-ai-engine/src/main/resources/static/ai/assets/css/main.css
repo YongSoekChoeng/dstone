@@ -3142,17 +3142,6 @@ body.wd-full-on {
 	min-width: 120px;
 }
 
-/* 반려를 골랐을 때 보내기 단추는 빨간색 */
-.ai-body #wa-decide-submit.wa-decide-reject {
-	background: var(--cs-danger);
-	border-color: var(--cs-danger);
-}
-
-.ai-body #wa-decide-submit.wa-decide-reject:hover {
-	background: #a11f1f;
-	border-color: #a11f1f;
-}
-
 .ai-body #wa-decide-submit:disabled {
 	background: var(--cs-surface-3);
 	border-color: var(--cs-border);

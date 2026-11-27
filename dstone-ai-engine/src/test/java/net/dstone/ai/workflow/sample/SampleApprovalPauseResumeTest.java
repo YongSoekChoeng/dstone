@@ -10,6 +10,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.springframework.web.server.ResponseStatusException;
 
 import net.dstone.ai.common.consts.WorkFlowExecutionStatus;
+import net.dstone.ai.runtime.workflow.execution.WorkFlowContext;
 import net.dstone.ai.runtime.workflow.execution.WorkFlowExecution;
 import net.dstone.ai.support.WorkflowTestBase;
 
@@ -66,6 +67,37 @@ public class SampleApprovalPauseResumeTest extends WorkflowTestBase {
 		WorkFlowExecution done = this.awaitFinished(waiting.executionId());
 		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
 		assertThat(this.stepIds(done)).doesNotHaveDuplicates();
+	}
+
+	@Test
+	void 기다리는_사이_순번이_밀려도_step_id로_찾아_결정을_받는다() {
+		WorkFlowExecution waiting = this.run(WORKFLOW_ID, "승인 테스트");
+		// 앞쪽에 step이 끼어든 정의로 바뀌면, 저장된 순번은 지금 정의의 다른 자리를 가리킵니다.
+		this.workFlowExecutionStore.update(waiting.waitingApproval(waiting.currentStepIndex() + 1));
+		WorkFlowExecution shifted = this.workFlowExecutionStore.find(waiting.executionId());
+		assertThat(this.pendingApproval(shifted).stepId()).isEqualTo(this.pendingApproval(waiting).stepId());
+
+		WorkFlowExecution queued = this.workFlowExecutionService.decide(waiting.executionId(), "APPROVED", null, "tester", null);
+		assertThat(queued.currentStepIndex()).isEqualTo(waiting.currentStepIndex());
+		WorkFlowExecution done = this.awaitFinished(waiting.executionId());
+		assertThat(done.status()).isEqualTo(WorkFlowExecutionStatus.DONE);
+	}
+
+	@Test
+	void 기다리던_step이_정의에서_사라졌으면_선택지를_주지_않고_결정을_409로_거절한다() {
+		final WorkFlowExecution waiting = this.run(WORKFLOW_ID, "승인 테스트");
+		WorkFlowContext.setCurrentStep(waiting.context(), "지워진step");
+		this.workFlowExecutionStore.update(waiting);
+
+		assertThat(this.pendingApproval(this.workFlowExecutionStore.find(waiting.executionId()))).isNull();
+		ResponseStatusException refused = assertThrows(ResponseStatusException.class, new Executable() {
+			@Override
+			public void execute() {
+				SampleApprovalPauseResumeTest.this.workFlowExecutionService.decide(waiting.executionId(), "APPROVED", null, "tester", null);
+			}
+		});
+		assertThat(refused.getStatusCode().value()).isEqualTo(409);
+		assertThat(refused.getReason()).contains("지워진step");
 	}
 
 	@Test

@@ -221,9 +221,10 @@ public class WorkFlowExecutionService extends BaseService {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]은 지금 승인 대기 상태가 아닙니다(현재 상태: " + execution.status() + "). 다른 사람이 먼저 결정했을 수 있습니다.");
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
-		StepDefinition pendingStep = workflow.steps().get(execution.currentStepIndex());
-		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]이 멈춰 있는 step[" + pendingStep.id() + "]은 APPROVAL step이 아닙니다(실행을 시작한 뒤 Workflow 정의가 바뀌었을 수 있습니다).");
+		int pendingIndex = this.currentIndexOf(workflow, execution);
+		if (pendingIndex < 0 || !(workflow.steps().get(pendingIndex) instanceof ApprovalStepDefinition approval)) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]이 기다리는 승인 step[" + WorkFlowContext.currentStep(execution.context())
+				+ "]을 지금 정의에서 찾지 못했습니다. 실행을 시작한 뒤 Workflow 정의에서 이 step이 없어졌거나 종류가 바뀌었는지 확인하십시오.");
 		}
 		String chosen = decision;
 		if (StringUtil.isEmpty(chosen) && approved != null) {
@@ -231,18 +232,18 @@ public class WorkFlowExecutionService extends BaseService {
 		}
 		Map<String, String> routes = approval.decisionRoutes();
 		if (StringUtil.isEmpty(chosen) || !routes.containsKey(chosen)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 다음 중 하나를 골라야 합니다. decision에 보내십시오: " + routes.keySet()
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + approval.id() + "]은 다음 중 하나를 골라야 합니다. decision에 보내십시오: " + routes.keySet()
 				+ (StringUtil.isEmpty(chosen) ? "" : " (보낸 값: " + chosen + ")"));
 		}
 		if (approval.requiresCommentOnReject() && !ApprovalStepDefinition.DECISION_APPROVED.equals(chosen) && StringUtil.isEmpty(comment)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + pendingStep.id() + "]은 " + ApprovalStepDefinition.DECISION_APPROVED + "가 아닌 결정에 의견(comment)이 꼭 있어야 합니다.");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "step[" + approval.id() + "]은 " + ApprovalStepDefinition.DECISION_APPROVED + "가 아닌 결정에 의견(comment)이 꼭 있어야 합니다.");
 		}
 		this.checkRoom();
-		if (!this.executionStore.markQueued(execution, execution.currentStepIndex())) {
+		if (!this.executionStore.markQueued(execution, pendingIndex)) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "실행[" + executionId + "]의 상태가 그사이 바뀌었습니다. 다른 사람이 먼저 결정했을 수 있습니다. 다시 조회하십시오.");
 		}
-		WorkFlowContext.recordApproval(execution.context(), pendingStep.id(), chosen, approver, comment);
-		WorkFlowExecution queued = execution.queued(execution.currentStepIndex());
+		WorkFlowContext.recordApproval(execution.context(), approval.id(), chosen, approver, comment);
+		WorkFlowExecution queued = execution.queued(pendingIndex);
 		// 결정을 컨텍스트에 남긴 채로 저장해 둡니다. 차례를 기다리는 사이 서버가 내려가도 결정은 남습니다.
 		this.executionStore.update(queued);
 		this.enqueue(workflow, queued, false);
@@ -320,20 +321,14 @@ public class WorkFlowExecutionService extends BaseService {
 		List<StepDefinition> steps = workflow.steps();
 		List<String> warnings = new ArrayList<>();
 		String savedStepId = WorkFlowContext.currentStep(execution.context());
-		int index = execution.currentStepIndex();
-		if (savedStepId != null) {
-			index = -1;
-			for (int i = 0; i < steps.size(); i++) {
-				if (steps.get(i).id().equals(savedStepId)) {
-					index = i;
-				}
-			}
-			if (index < 0) {
+		int index = this.currentIndexOf(workflow, execution);
+		if (index < 0) {
+			if (savedStepId != null) {
 				return ResumePoint.blocked("멈췄던 step[" + savedStepId + "]이 지금 정의에 없어 이어 갈 수 없습니다.");
 			}
-		} else if (index < 0 || index >= steps.size()) {
-			return ResumePoint.blocked("멈췄던 " + (index + 1) + "번째 step이 지금 정의에 없어 이어 갈 수 없습니다.");
-		} else {
+			return ResumePoint.blocked("멈췄던 " + (execution.currentStepIndex() + 1) + "번째 step이 지금 정의에 없어 이어 갈 수 없습니다.");
+		}
+		if (savedStepId == null) {
 			warnings.add("step id 기록이 없는 예전 실행이라 순번으로 찾았습니다. 정의가 바뀌었다면 다른 step일 수 있습니다.");
 		}
 		StepDefinition step = steps.get(index);
@@ -586,6 +581,32 @@ public class WorkFlowExecutionService extends BaseService {
 		return deleted;
 	}
 
+	/**
+	 * <pre>
+	 * 실행이 지금 멈춰 있는 step이 정의의 몇 번째인지 찾습니다.
+	 * 순번이 아니라 컨텍스트에 적힌 step id로 찾습니다. 멈춘 사이 step을 끼워 넣으면 순번이 밀리기 때문입니다.
+	 * step id 기록이 없는 예전 실행만 저장된 순번을 그대로 씁니다.
+	 * </pre>
+	 *
+	 * @param workflow  지금 등록된 Workflow 정의입니다.
+	 * @param execution 확인할 실행입니다.
+	 * @return 정의 안의 순번. 지금 정의에 없으면 -1입니다.
+	 */
+	private int currentIndexOf(WorkFlowDefinition workflow, WorkFlowExecution execution) {
+		List<StepDefinition> steps = workflow.steps();
+		String savedStepId = WorkFlowContext.currentStep(execution.context());
+		if (savedStepId == null) {
+			int index = execution.currentStepIndex();
+			return index >= 0 && index < steps.size() ? index : -1;
+		}
+		for (int i = 0; i < steps.size(); i++) {
+			if (steps.get(i).id().equals(savedStepId)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
 	/** id로 step 정의를 찾습니다. 없으면 null입니다. */
 	private StepDefinition stepOf(List<StepDefinition> steps, String stepId) {
 		for (StepDefinition step : steps) {
@@ -621,8 +642,8 @@ public class WorkFlowExecutionService extends BaseService {
 			return null;
 		}
 		WorkFlowDefinition workflow = this.workFlowRegistry.resolve(execution.workflowId(), execution.caller());
-		StepDefinition pendingStep = workflow.steps().get(execution.currentStepIndex());
-		if (!(pendingStep instanceof ApprovalStepDefinition approval)) {
+		int pendingIndex = this.currentIndexOf(workflow, execution);
+		if (pendingIndex < 0 || !(workflow.steps().get(pendingIndex) instanceof ApprovalStepDefinition approval)) {
 			return null;
 		}
 		Map<String, String> receivers = new LinkedHashMap<String, String>();
