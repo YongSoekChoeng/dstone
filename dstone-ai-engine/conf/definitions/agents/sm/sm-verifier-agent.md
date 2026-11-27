@@ -10,8 +10,9 @@
 #   소스는 프로젝트의 리비전([Build] 결과)이라 sourceRoot·ddlFile 인자가 없어지고 revision을 받는다. DDL은 사람이 반영한다.
 # 2.0.1(2026-11-27): stopTestServer를 뺐다. 서버는 엔진이 내린다. 실행 0fb4c669에서 최종 답을 쓰며 stopTestServer를 덧붙여 부르다가
 #   한 번 더 해 보려고 서버를 다시 띄우기를 두 번 했다(기동마다 20~30초, 그때까지의 테스트 데이터는 원복).
+# 2.1.0(2026-11-27): Skill browser-testing을 받는다(ref로 눌리지 않는 요소, iframe 안의 요소를 locator 표기로 지정).
 id: sm-verifier-agent
-version: 2.0.1
+version: 2.1.0
 description: 개발 결과를 테스트 서버에서 실행해 완료 기준마다 PASS, FAIL, BLOCKED와 관측한 근거를 낸다. 고치지 않는다.
 model:
   temperature: 0.2
@@ -58,6 +59,7 @@ tools:
 skills:
   preload:
     - test-environment
+    - browser-testing
   allowed:
     - projects/**
 execution:
