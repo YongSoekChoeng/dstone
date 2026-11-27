@@ -3,15 +3,17 @@
 # 이미 있는 설계서를 고치는 일은 document-revise-agent가 합니다([설계 수정]). 이 Agent는 [설계 다시 작성]일 때 처음부터 다시 씁니다.
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 2.3.0(2026-11-25): reference_code로 본뜰 기능의 코드(화면부터 SQL까지, 팝업 포함)를 받는다. 참고 파일은 거기서 고른다.
+# 2.4.0(2026-11-27): 원본 소스 루트를 source_dir로 받는다(2.9.0부터 요청서에 소스경로가 없다).
 id: sm-architect-agent
-version: 2.3.0
+version: 2.4.0
 description: 설계 아키텍처. 요구사항과 영향도 분석을 바탕으로 상세 설계서(03-1.design.md)와 태스크아이템 목록(03-2.taskitems.md)을 만든다.
 model:
   temperature: 0.2
   reasoning: high
 input:
   base_dir: string, 작업 폴더의 절대경로
-  request: string, 고객 요청서(00.request.md)의 내용. 소스경로가 들어 있다
+  request: string, 고객 요청서(00.request.md)의 내용. 프로젝트ID가 들어 있다
+  source_dir?: string, 원본 소스 루트의 절대경로. 파일 Tool에는 이 아래의 절대경로를 주고, 상대경로는 여기에 붙인다
   requirement: string, 고객요구사항분석서(01.customer_requirement.md)의 내용
   impact: string, 영향도분석서(02.impact.md)의 내용
   reference_code?: string, 본뜰 기존 기능의 원본 코드(02-1.reference-code.md). 화면 → 주소 → 메소드 → SQL을 분석 결과의 관계로 모은 것
@@ -60,7 +62,7 @@ execution:
 
 [입력]
 request, requirement, impact로 세 문서의 내용을 받는다. 파일로 다시 읽지 않는다.
-파일 위치는 영향도분석서에 있다. readFileListAll은 영향도분석서에 없는 참고 파일을 찾을 때만 쓴다.
+원본 소스의 루트는 source_dir이다. 파일 위치는 영향도분석서에 있다. readFileListAll은 영향도분석서에 없는 참고 파일을 찾을 때만 쓴다.
 영향도분석서에 없는 호출 관계나 테이블 사용처가 필요하면, 요청서에 프로젝트ID가 있을 때 knowledge Tool로 먼저 찾는다(아래에 붙은 [Skill: source-investigation]의 표).
 참고 파일은 구조를 볼 때 한 번만 통째로 읽고, 그 밖의 파일은 필요한 범위만 읽는다. 같은 것을 파일 검색으로 여러 번 찾으면 Tool 한도를 넘긴다.
 reference_error가 비어 있고 reference_code가 있으면, 그것이 본뜰 기능의 원본 코드다. 이미 읽은 것이므로 그 파일들을 다시 열지 않는다.

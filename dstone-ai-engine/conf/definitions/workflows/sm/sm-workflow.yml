@@ -92,7 +92,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.13.0
+version: 2.13.1
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -205,6 +205,7 @@ steps:
     with:
       base_dir: ${input}/${state.now}
       request: ${state.request}
+      source_dir: ${state.projectRevision.sourceRoot}
       requirement: ${state.requirement}
       instruction: ${arrival:}
       history: ${decisions:}
@@ -253,6 +254,7 @@ steps:
     with:
       base_dir: ${input}/${state.now}
       request: ${state.request}
+      source_dir: ${state.projectRevision.sourceRoot}
       requirement: ${state.requirement}
       impact: ${state.impact}
       reference_code: ${state.referenceCode:}
@@ -382,6 +384,7 @@ steps:
         - ${input}/${state.now}/03-2.taskitems.md
         - ${input}/${state.now}/03-3.ddl(데이터베이스).md
       request: ${state.request}
+      source_dir: ${state.projectRevision.sourceRoot}
       instruction: ${arrival}
       history: ${decisions:}
       reference: ${state.compileError:}
@@ -396,6 +399,7 @@ steps:
       documents:
         - ${input}/${state.now}/02.impact.md
       request: ${state.request}
+      source_dir: ${state.projectRevision.sourceRoot}
       instruction: ${arrival}
       history: ${decisions:}
     save: revision
@@ -594,6 +598,7 @@ steps:
         - ${input}/${state.now}/03-2.taskitems.md
         - ${input}/${state.now}/03-3.ddl(데이터베이스).md
       request: ${state.request}
+      source_dir: ${state.projectRevision.sourceRoot}
       instruction: |-
         reference에 있는 요구사항분석서와 영향도분석서의 지금 내용에 설계 문서를 맞춘다.
         두 문서와 어긋나는 곳과 빠진 곳만 고친다. 재개발과 자동 수정으로 고친 내용('## 수정 이력')은 두 문서와 어긋나지 않는 한 그대로 둔다.
@@ -617,6 +622,7 @@ steps:
       documents:
         - ${input}/${state.now}/02.impact.md
       request: ${state.request}
+      source_dir: ${state.projectRevision.sourceRoot}
       instruction: |-
         reference에 있는 요구사항분석서의 지금 내용에 영향도분석서를 맞춘다.
         어긋나는 곳과 빠진 곳만 고치고, 나머지는 그대로 둔다.

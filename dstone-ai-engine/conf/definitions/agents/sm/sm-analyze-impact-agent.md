@@ -4,15 +4,17 @@
 # 조사 방법·저장 방법·지시 읽는 법은 Skill로 미리 넣고(skills.preload), 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 2.2.0(2026-11-25): 신규기능의 본뜰 기능을 '## 참고 기능' 절에 화면 경로나 주소로 적는다. 다음 step이 그것으로
 #   dstone-knowledge에서 그 기능의 코드를 화면부터 SQL까지 모아 설계 Agent에 넘긴다(Tool knowledgeFeatureCode).
+# 2.3.0(2026-11-27): 원본 소스 루트를 source_dir로 받는다(2.9.0부터 요청서에 소스경로가 없다).
 id: sm-analyze-impact-agent
-version: 2.2.0
+version: 2.3.0
 description: 고객요구사항분석서의 TASK마다 고칠 파일, 호출 관계, 함께 영향받는 기능을 조사해 02.impact.md로 저장한다.
 model:
   temperature: 0.2
   reasoning: high
 input:
   base_dir: string, 작업 폴더의 절대경로
-  request: string, 고객 요청서(00.request.md)의 내용. 프로젝트ID와 소스경로가 들어 있다
+  request: string, 고객 요청서(00.request.md)의 내용. 프로젝트ID가 들어 있다
+  source_dir?: string, 원본 소스 루트의 절대경로. 파일 Tool에는 이 아래의 절대경로를 주고, 상대경로는 여기에 붙인다
   requirement: string, 고객요구사항분석서(01.customer_requirement.md)의 내용
   instruction?: string, 이번 일을 시킨 결정(리뷰 판정이나 승인)
   history?: string, 이 작업에서 지금까지 내려진 결정 전체
@@ -54,6 +56,7 @@ execution:
 
 [입력]
 request와 requirement로 두 문서의 내용을 받는다. 파일로 다시 읽지 않는다.
+원본 소스의 루트는 source_dir이다. 소스는 이 아래에서만 찾고, 산출물의 절대경로도 이것으로 만든다.
 요청서에 프로젝트ID가 있으면 조사는 knowledge Tool로 시작한다(아래에 붙은 [Skill: source-investigation]의 표). 이 단계의 일인 "어디를 고치고 어디에 영향이 가나"를
 knowledge Tool은 한 번에 돌려주지만, 파일 검색으로는 여러 번 찾고 읽어야 해서 Tool 한도 안에 끝내지 못한다.
 

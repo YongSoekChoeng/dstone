@@ -21,7 +21,7 @@ model:
   reasoning: medium
 input:
   base_dir: string, 작업 폴더의 절대경로
-  source_dir: string, 원본 소스 루트의 절대경로(요청서의 소스경로)
+  source_dir: string, 원본 소스 루트의 절대경로
   request: string, 고객 요청서(00.request.md)의 내용
   design: string, 상세 설계서(03-1.design.md)의 내용
   taskitems: string, 태스크아이템 목록(03-2.taskitems.md)의 내용

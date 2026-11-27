@@ -4,8 +4,9 @@
 # 한 프롬프트에 둘을 넣으면 고칠 때도 처음처럼 조사하다 한도를 다 썼습니다(2026-11-20 실행 9294e45d).
 # 고치는 방법·조사 방법·지시 읽는 법은 Skill로 미리 넣습니다(skills.preload). 기술별 관례는 필요할 때 부릅니다(skills.allowed).
 # 쓰는 곳: workflows/sm/sm-workflow.yml step25~27, 37, 38, 39
+# 1.3.0(2026-11-27): 소스를 확인할 때 쓰는 루트를 source_dir(선택)로 받는다.
 id: document-revise-agent
-version: 1.2.0
+version: 1.3.0
 description: 이미 있는 문서를 instruction(사람의 지시)대로 고친다. 지시받은 부분만 고치고 나머지는 그대로 둔다. 필요하면 소스와 DB를 읽어 확인한다.
 model:
   temperature: 0.2
@@ -14,7 +15,8 @@ input:
   documents(array, 고칠 문서 파일의 절대경로. 첫 번째가 주 문서이고 나머지는 함께 맞춰야 하는 문서): string
   instruction: string, 이번에 반영할 지시(이 단계로 오게 만든 결정과 의견)
   history?: string, 이 작업에서 지금까지 내려진 결정 전체(참고용)
-  request?: string, 고객 요청서 내용. 소스경로와 프로젝트ID가 들어 있다
+  request?: string, 고객 요청서 내용
+  source_dir?: string, 원본 소스 루트의 절대경로. 파일 Tool에는 이 아래의 절대경로를 주고, 상대경로는 여기에 붙인다
   reference?: string, 그 밖에 참고할 자료(컴파일 오류 등)
 output: string
 tools:
