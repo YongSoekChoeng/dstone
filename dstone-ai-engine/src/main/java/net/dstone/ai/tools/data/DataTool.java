@@ -18,6 +18,7 @@ import net.dstone.ai.tools.file.FileTool;
  *   filterList   목록에서 조건에 맞는 항목만 고른다(forEach로 돌 목록을 만들 때)
  *   containsValue 목록에 그 값인 항목이 있으면 true, 없으면 false(routes로 길을 가를 때)
  *   countUp      되풀이 횟수를 센다. route가 한도 안이면 within, 다 쓰면 over(자동으로 고쳐 다시 시험하는 고리를 멈출 때)
+ *   mergeByKey   지난 목록에 이번 목록을 key로 겹쳐 쌓는다(이번에 다시 보지 않은 항목은 지난 것이 남는다)
  *   checkData    값을 서로 맞춰 본다(중복, 빠진 것, 파일이 있는지). Agent가 낸 데이터가 앞뒤가 맞는지 사람에게 보이기 전에 확인할 때
  *
  * "없음", "한도를 다 씀"은 정상 결과라서 실패로 돌려주지 않습니다. 실패로 나누면 실행 이력에 실패가 남아 진짜 오류와 섞입니다.
@@ -114,6 +115,28 @@ public class DataTool {
 			@ToolParam(description = "허용하는 최대 횟수") Integer max,
 			@ToolParam(required = false, description = "이 값이 바뀌면 처음부터 센다") String scope) {
 		return DataLogic.countUp(previous, max, scope);
+	}
+
+	/**
+	 * <pre>
+	 * 지난 목록에 이번 목록을 key 필드 값으로 겹쳐 돌려줍니다(규칙은 DataLogic.mergeByKey 참고).
+	 * Agent가 이번에 확인한 것만 답해도 지난 결과가 사라지지 않게, 저장해 둔 목록에 쌓을 때 씁니다.
+	 * 아무것도 넘기지 않으면 빈 목록이라, 쌓아 둔 것을 비울 때도 씁니다.
+	 *
+	 * YAML 예: 이번 검증 결과를 지난 결과에 쌓는다
+	 *   tool: mergeByKey
+	 *   with: { previous: "${state.allResults:}", current: "${state.round.items}", key: id, mark: carried }
+	 *   save: allResults
+	 * </pre>
+	 */
+	@Tool(description = "previous 목록에 current 목록을 key 필드 값으로 겹쳐 돌려준다. 같은 key는 current 항목으로 바뀌고, current에 없는 항목은 남고, 새 key는 뒤에 붙는다. "
+		+ "mark를 적으면 항목마다 이번에 없어서 남긴 것인지 true/false로 적는다. 아무것도 넘기지 않으면 빈 목록이다.")
+	public List<Object> mergeByKey(
+			@ToolParam(required = false, description = "지난 목록. 처음이면 비움") Object previous,
+			@ToolParam(required = false, description = "이번 목록") List<Object> current,
+			@ToolParam(description = "같은 항목인지 가리는 필드(a.b처럼 안쪽도 됨)") String key,
+			@ToolParam(required = false, description = "지난 것을 남겼는지 적을 필드 이름") String mark) {
+		return DataLogic.mergeByKey(previous, current, key, mark);
 	}
 
 	/**

@@ -136,7 +136,7 @@ public class SmKeepFixesTest extends WorkflowTestBase {
 		flow.put("compileError", "A.java:1 OLD_ERROR");
 		flow.step("step16");
 
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.currentStepId()).isEqualTo("step63");
 		assertThat(flow.state("compileError")).isNull();
 	}
 

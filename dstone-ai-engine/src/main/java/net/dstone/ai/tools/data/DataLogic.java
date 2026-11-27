@@ -216,6 +216,84 @@ public final class DataLogic {
 
 	/**
 	 * <pre>
+	 * 지난 목록에 이번 목록을 key 필드 값으로 겹쳐 하나로 만듭니다. 여러 번에 나눠 만든 결과를 쌓을 때 씁니다.
+	 *   - 같은 key가 있으면 지난 자리에 이번 항목이 들어갑니다.
+	 *   - 이번에 없는 key는 지난 항목이 그대로 남습니다.
+	 *   - 처음 보는 key는 뒤에 붙습니다.
+	 * key 값은 빈칸을 빼고 견줍니다("A 1"과 "A1"은 같음). key가 비어 있는 항목은 서로 겹치지 않고 모두 남습니다.
+	 * 이번 목록 안에 같은 key가 여럿이면 버리지 않고 모두 남깁니다.
+	 * </pre>
+	 *
+	 * @param previous 지난 목록. 목록이 아니면(처음이라 비었으면) 빈 목록으로 봅니다.
+	 * @param current  이번 목록
+	 * @param key      같은 항목인지 가리는 필드(a.b처럼 안쪽도 됨)
+	 * @param mark     적으면, 항목(맵)에 이 이름으로 "이번에 없어서 지난 것을 남겼는지"를 true/false로 적습니다.
+	 */
+	public static List<Object> mergeByKey(Object previous, List<Object> current, String key, String mark) {
+		Map<String, List<Object>> fresh = new LinkedHashMap<>();
+		List<Object> keyless = new ArrayList<>();
+		for (Object item : current == null ? List.of() : current) {
+			if (item == null) {
+				continue;
+			}
+			String id = keyOf(item, key);
+			if (id.isEmpty()) {
+				keyless.add(item);
+				continue;
+			}
+			if (!fresh.containsKey(id)) {
+				fresh.put(id, new ArrayList<>());
+			}
+			fresh.get(id).add(item);
+		}
+		List<Object> result = new ArrayList<>();
+		Set<String> replaced = new LinkedHashSet<>();
+		for (Object item : previous instanceof List<?> list ? list : List.of()) {
+			if (item == null) {
+				continue;
+			}
+			String id = keyOf(item, key);
+			if (!id.isEmpty() && fresh.containsKey(id)) {
+				// 지난 목록에 같은 key가 두 번 있어도 이번 항목은 한 번만 넣습니다.
+				if (replaced.add(id)) {
+					for (Object one : fresh.get(id)) {
+						result.add(marked(one, mark, false));
+					}
+				}
+			} else {
+				result.add(marked(item, mark, true));
+			}
+		}
+		for (Map.Entry<String, List<Object>> entry : fresh.entrySet()) {
+			if (!replaced.contains(entry.getKey())) {
+				for (Object one : entry.getValue()) {
+					result.add(marked(one, mark, false));
+				}
+			}
+		}
+		for (Object one : keyless) {
+			result.add(marked(one, mark, false));
+		}
+		return result;
+	}
+
+	/** 항목의 key 값을 빈칸 없이 돌려줍니다. 없으면 빈 글자입니다. */
+	private static String keyOf(Object item, String key) {
+		return text(get(item, key)).replaceAll("\\s+", "");
+	}
+
+	/** mark 이름이 있고 항목이 맵이면, 원래 것은 두고 표시를 더한 사본을 돌려줍니다. */
+	private static Object marked(Object item, String mark, boolean carried) {
+		if (mark == null || mark.isBlank() || !(item instanceof Map<?, ?> map)) {
+			return item;
+		}
+		Map<Object, Object> copy = new LinkedHashMap<>(map);
+		copy.put(mark.strip(), carried);
+		return copy;
+	}
+
+	/**
+	 * <pre>
 	 * 걸린 문장 목록을 Workflow가 쓸 값으로 만듭니다.
 	 *   ok        걸린 것이 없으면 true
 	 *   problems  걸린 문장 목록

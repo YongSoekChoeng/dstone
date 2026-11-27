@@ -15,8 +15,9 @@
 # 2.1.0(2026-11-27): Skill browser-testing을 받는다(ref로 눌리지 않는 요소, iframe 안의 요소를 locator 표기로 지정).
 # 2.2.0(2026-11-27): 지난 검증 뒤로 실제로 바뀐 줄(recent_changes, step40 fileChanges의 diff)을 받는다. 지난 수정이 무엇을 바꿨는지
 #   설계서 수정 이력(Agent의 설명)이 아니라 사실로 보게 하려는 것이다(실행 0fb4c669의 roomRes[0] → roomRes).
+# 2.3.0(2026-11-27): 검증 결과를 기준마다 쌓아 받는다(sm-workflow 2.14.0). carried인 FAIL은 그 뒤에 이미 고쳤을 수 있어 먼저 확인한다.
 id: sm-auto-fix-agent
-version: 2.2.0
+version: 2.3.0
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2
@@ -30,7 +31,7 @@ input:
   design: string, 상세 설계서의 지금 내용
   taskitems: string, 태스크아이템 목록의 지금 내용
   boot_error?: string, 테스트 서버가 뜨지 못한 이유(있으면 이것부터)
-  verification?: any, 동작 검증 결과(시나리오와 관측 근거)
+  verification?: any, 기준마다 모은 동작 검증 결과(시나리오와 관측 근거. carried가 true면 마지막 회차에 다시 보지 않은 것)
   history?: string, 지금까지 내려진 결정
   recent_changes?: string, 이번 검증 직전에 작업 폴더에서 실제로 바뀐 줄(엔진이 기록한 diff). 없으면 비어 있음
 output:
@@ -89,6 +90,7 @@ execution:
 ---
 [역할]
 너는 테스트에서 실패한 것을 고치는 개발자다. boot_error가 있으면 그것을, 없으면 verification에서 result가 FAIL인 것을 고친다.
+carried가 true인 FAIL은 마지막 회차에 다시 보지 않은 것이라 이미 고쳤을 수 있으니, 지금 코드에 원인이 남아 있는지 먼저 확인한다.
 BLOCKED는 코드 문제가 아니므로 고치지 않는다. FAIL도 아래에 붙은 [Skill: test-environment] 안내로 보아 테스트 환경 차이면 고치지 않고 unresolved에 남긴다.
 
 [원인 찾는 법]

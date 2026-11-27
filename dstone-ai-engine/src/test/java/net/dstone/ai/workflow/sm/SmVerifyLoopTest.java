@@ -156,7 +156,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	@Test
 	void FAIL이_있으면_자동_수정으로_간다() {
 		WorkflowStepper flow = this.atStep("step36");
-		flow.put("verification", Map.of("scenarios", List.of(Map.of("result", "PASS"), Map.of("result", "FAIL"))));
+		flow.put("verificationAll", List.of(Map.of("id", "T1", "result", "PASS"), Map.of("id", "T2", "result", "FAIL")));
 		flow.step("step36");
 
 		assertThat(flow.currentStepId()).isEqualTo("step32");
@@ -165,12 +165,37 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	@Test
 	void FAIL이_없으면_사람에게_간다() {
 		WorkflowStepper flow = this.atStep("step36");
-		flow.put("verification", Map.of("scenarios", List.of(Map.of("result", "PASS"), Map.of("result", "BLOCKED"))));
+		flow.put("verificationAll", List.of(Map.of("id", "T1", "result", "PASS"), Map.of("id", "T2", "result", "BLOCKED")));
 		flow.step("step36");
 
 		assertThat(flow.currentStepId()).isEqualTo("step19");
 		// "FAIL 없음"은 좋은 결과라 이력에 실패로 남지 않는다(2.6.1)
 		assertThat(this.lastHistory(flow, "step36").success()).isTrue();
+	}
+
+	/**
+	 * <pre>
+	 * 검증 Agent가 일부 기준만 답해도 지난 결과가 남는지 봅니다(2.14.0).
+	 * 남은 항목은 carried로 표시하고, 개발 폴더를 새로 만들 때(step63)는 비웁니다.
+	 * </pre>
+	 */
+	@Test
+	void 이번에_답하지_않은_기준은_지난_결과가_남는다() {
+		WorkflowStepper flow = this.atStep("step62");
+		flow.put("verificationAll", List.of(Map.of("id", "TASK-01 ①", "result", "PASS"), Map.of("id", "TASK-02 ①", "result", "FAIL")));
+		flow.put("verification", Map.of("scenarios", List.of(Map.of("id", "TASK-02①", "result", "PASS"))));
+		flow.step("step62");
+
+		assertThat(flow.currentStepId()).isEqualTo("step36");
+		assertThat(flow.state("verificationAll")).isEqualTo(List.of(Map.of("id", "TASK-01 ①", "result", "PASS", "carried", true),
+			Map.of("id", "TASK-02①", "result", "PASS", "carried", false)));
+		flow.step("step36");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
+
+		flow.jumpTo("step63");
+		flow.step("step63");
+		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.state("verificationAll")).isEqualTo(List.of());
 	}
 
 	@Test
