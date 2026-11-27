@@ -12,7 +12,7 @@
 	var rows = [];
 	var editing = null;
 	var FIELDS = ["projectId", "projectName", "description", "sourceDir", "scmType", "scmUrl", "scmUsername", "javaVersion", "wasContainer", "wasVersion", "contextPath",
-		"buildType", "buildArgs", "buildWebRoot", "buildClassesDir", "buildLibDir", "buildSourceDirs", "testUserId", "testStaticPaths", "useYn"];
+		"buildType", "buildArgs", "buildWebRoot", "buildClassesDir", "buildLibDir", "buildSourceDirs", "testUserId", "testStaticPaths", "testEntryGuide", "useYn"];
 	// 빌드 종류별 명령과, 저장된 인자가 없을 때 칸에 채워 보여 줄 참고용 기본값
 	var COMMANDS = {
 		MAVEN: { command: "mvn -B -DskipTests package {인자}", placeholder: "예: -pl web -am (비워도 됨)", sample: "-Dmaven.test.skip=true" },

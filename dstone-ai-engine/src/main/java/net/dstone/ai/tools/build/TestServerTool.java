@@ -746,6 +746,7 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		message.append("테스트 DB 별칭(dbQuery의 alias, 커밋하지 않은 테스트 데이터가 보임): ").append(String.join(", ", run.aliases.keySet())).append('\n');
 		message.append("DB: 고객사 개발 DB를 쓰되 커밋하지 않습니다. 실행이 멈추거나 끝나면 원복합니다. 테스트 중 DDL은 실행되지 않습니다.\n");
 		message.append(this.accountLine(run.projectId));
+		message.append(this.entryGuideNote(run.projectId));
 		String sample = this.uploadSample();
 		if (sample != null) {
 			message.append("\n업로드 테스트용 파일(browser_file_upload의 paths): ").append(sample);
@@ -775,6 +776,27 @@ public class TestServerTool extends BaseObject implements StepEndListener {
 		boolean environment = (run.guard != null && !run.guard.denied().isEmpty())
 			|| Pattern.compile("Access denied for user|password authentication failed|ORA-01017|No suitable driver|dstone 테스트 DB").matcher(text).find();
 		return environment ? CAUSE_ENVIRONMENT : CAUSE_CODE;
+	}
+
+	/** 프로젝트 관리에 적힌 '화면 들어가는 법'입니다. 적은 것이 없으면 빈 글입니다. */
+	private String entryGuideNote(String projectId) {
+		if (isBlank(projectId)) {
+			return "";
+		}
+		try {
+			Map<String, Object> project = this.projectStore.find(projectId.trim());
+			return entryGuideText(project == null ? null : project.get("testEntryGuide"));
+		} catch (RuntimeException e) {
+			return "\n화면 들어가는 법: 읽지 못했습니다(" + e.getMessage() + ")";
+		}
+	}
+
+	/** 결과 글에 붙일 '화면 들어가는 법' 문단을 만듭니다. */
+	static String entryGuideText(Object guide) {
+		if (guide == null || isBlank(guide.toString())) {
+			return "";
+		}
+		return "\n화면 들어가는 법(프로젝트 설정. 화면을 확인할 때는 이대로 들어간다):\n" + guide.toString().trim();
 	}
 
 	/** 테스트계정 안내 한 줄입니다. 비밀번호는 자리표시자만 줍니다. */

@@ -81,6 +81,7 @@
 #     자동 수정과 다음 검증은 이 누적 결과를 받습니다. 회차마다 덮어쓰면 한 번 짧게 답했을 때 지난 PASS가 사라져 전부 다시 확인하게 됩니다.
 #     테스트 환경 탓인 실패는 BLOCKED로 내고 고치지 않습니다(Skill test-environment).
 #   자동 수정(step34): FAIL이 있으면 고칩니다. 사람의 결정 하나마다 최대 2번이고, 사람이 새로 시키면 다시 2번입니다(step32의 limit).
+#   개발(step17, 57, 58)도 누적 결과를 받습니다. 재개발이 검증이 이미 찾은 원인을 보고 고치게 하려는 것입니다(설계부터 다시 개발할 때는 step63이 비움).
 #   바뀐 줄(diff): step40은 지난 내용의 사본을 작업 폴더 밖(${input}/.work-copy/실행 시각)에 두고 바뀐 줄을 workChanges.diff로 만듭니다.
 #     자동 수정(step34)과 개발(step17)이 recent_changes로 받습니다. 설계서 수정 이력은 Agent의 설명이라 틀릴 수 있어서,
 #     지난 수정이 무엇을 바꿨는지는 이 사실로 보게 합니다.
@@ -97,7 +98,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.16.0
+version: 2.17.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -339,6 +340,7 @@ steps:
       taskitems: ${state.docs.taskitems}
       instruction: ${arrival:}
       history: ${decisions:}
+      verification: ${state.verificationAll:}
       compile_error: ${state.compileError:}
       recent_changes: ${state.workChanges.diff:}
     save: develop
@@ -864,6 +866,7 @@ steps:
       taskitems: ${state.docs.taskitems}
       instruction: ${arrival:}
       history: ${decisions:}
+      verification: ${state.verificationAll:}
       compile_error: ${state.compileError:}
       check_result: |-
         지난 개발이 손대지 못하고 '보류'로 남긴 태스크아이템이 있다. 그것을 이어서 구현한다.
@@ -890,6 +893,7 @@ steps:
       taskitems: ${state.docs.taskitems}
       instruction: ${arrival:}
       history: ${decisions:}
+      verification: ${state.verificationAll:}
       compile_error: ${state.compileError:}
       check_result: ${state.sourceCheck.message}
     save: develop

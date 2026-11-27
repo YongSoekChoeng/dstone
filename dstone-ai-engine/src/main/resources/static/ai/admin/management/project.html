@@ -81,6 +81,7 @@
 						<tr><th><label for="pj-testUserId">테스트계정</label></th><td><input type="text" id="pj-testUserId" autocomplete="off" placeholder="테스트 서버 화면에 로그인할 계정 ID(운영 계정 금지)" /><div class="ai-hint">테스트 서버는 고객사 개발 DB에 붙으므로, 그 DB에 있는 테스트용 계정을 넣습니다. Agent가 화면에서 등록·수정·삭제를 해 보는 데 씁니다(테스트가 끝나면 데이터는 원복합니다).</div></td></tr>
 						<tr><th><label for="pj-testPassword">테스트계정 비밀번호</label></th><td><input type="password" id="pj-testPassword" autocomplete="new-password" /><div class="ai-hint">암호화해 저장하고 다시 보여 주지 않습니다. Agent에게도 주지 않고, 엔진이 브라우저에 입력할 때만 넣습니다. 바꿀 때만 넣으세요.</div></td></tr>
 						<tr><th><label for="pj-testStaticPaths">테스트서버 정적 경로</label></th><td><textarea id="pj-testStaticPaths" rows="3" placeholder="/Upload=D:/AppHome/myApp/uploadData/Upload&#10;/Download=D:/AppHome/myApp/uploadData/Download"></textarea><div class="ai-hint">여러 개는 줄바꿈으로 구분합니다(한 줄에 하나씩 '/주소=폴더'). 원래 서버에서 웹서버나 다른 설정이 열어 주는 주소를 적습니다. 예를 들어 앱이 웹앱 밖 폴더에 저장한 업로드 파일을 여는 주소입니다. Tomcat 테스트 서버가 그 주소를 그 폴더로 엽니다. 적지 않으면 테스트 서버에서는 그 주소가 404입니다.</div></td></tr>
+						<tr><th><label for="pj-testEntryGuide">화면 들어가는 법</label></th><td><textarea id="pj-testEntryGuide" rows="3" placeholder="로그인한 뒤 첫 화면의 왼쪽 메뉴로 들어간다. 화면 주소를 직접 열지 않는다."></textarea><div class="ai-hint">테스트 서버에서 사람이 화면에 들어가는 순서를 적습니다. Agent가 테스트 서버를 띄울 때마다 이 글을 함께 받고 그대로 들어갑니다. 안쪽 화면의 주소를 바로 열면 동작하지 않는 앱은 꼭 적으세요.</div></td></tr>
 						<tr><th><label for="pj-useYn">사용</label></th><td><select id="pj-useYn"><option value="Y">예</option><option value="N">아니오(DB Tool 에서도 숨김)</option></select></td></tr>
 					</table>
 

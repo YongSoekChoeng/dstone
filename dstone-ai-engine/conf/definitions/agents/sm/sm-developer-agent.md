@@ -16,8 +16,10 @@
 # 2.7.0(2026-11-28): 프로젝트 Skill은 project_id의 폴더(skills/projects/{프로젝트ID}/)에 있는 것만 후보로 받는다.
 # 2.8.0(2026-11-28): 올린 문서를 찾는 Tool(knowledgeSearchDocs, knowledgeGetChunks)을 받는다. 실행 5def8189에서 문서 Tool이 설계에만 있어
 #   개발과 자동 수정은 화면 컴포넌트 설정 오류를 문서로 확인할 길이 없었다. 어느 묶음을 볼지는 요청서와 프로젝트 Skill이 정한다.
+# 2.9.0(2026-11-28): 지난 검증 결과(verification)를 받고, 재개발은 지시 항목마다 원인과 고친 곳(reportedFixes)을 답한다. 실행 5def8189에서
+#   검증이 찾은 원인이 개발에 전달되지 않았고, 재개발 한 번은 "이미 구현돼 있다"며 아무것도 고치지 않고 모두 완료로 답했다.
 id: sm-developer-agent
-version: 2.8.0
+version: 2.9.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -34,12 +36,14 @@ input:
   compile_error?: string, 지난 컴파일 확인에서 난 오류(없으면 비어 있음)
   check_result?: string, Workflow가 다시 부른 이유(지난 개발의 보류, 개발 결과의 형식 오류). 없으면 비어 있음
   recent_changes?: string, 지난 동작 검증 뒤로 작업 폴더에서 실제로 바뀐 줄(엔진이 기록한 diff). 없으면 비어 있음
+  verification?: any, 기준마다 모은 지난 동작 검증 결과(시나리오와 관측 근거. carried가 true면 마지막 회차에 다시 보지 않은 것). 없으면 비어 있음
 output:
   completed: integer, '완료'로 기록한 태스크아이템 수
   pending: integer, '보류'로 기록한 태스크아이템 수
   pendingReasons(array, 보류인 태스크아이템 번호와 그 이유. 없으면 빈 목록): string
   unfinished: integer, 보류 가운데 손대지 못해 다시 부르면 이어서 할 수 있는 것의 수(파일을 아직 만들지 않음 등). 사람의 결정이나 DB 반영이 필요한 보류는 세지 않는다
   notApplied(array, 반영하지 않은 지시와 이유. 없으면 빈 목록): string
+  reportedFixes(array, 재개발일 때 지시의 항목마다 하나. 재개발이 아니면 빈 목록): string
   taskitemsRecorded: boolean, 03-2.taskitems.md의 상태 칸을 고쳐 저장했는가
   designSynced: boolean, 재개발로 고친 내용을 03-1.design.md에도 옮겨 적었는가(재개발이 아니거나 고친 것이 없으면 false)
 tools:
@@ -76,6 +80,10 @@ check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적�
 재개발(instruction이 개발 승인의 재개발)이면 dev-resources에 지난 결과가 있다. 지시와 관련된 곳만 고치고, '완료'인 항목이라도 지시와 관련 있으면 다시 확인한다.
 재개발에서 recent_changes가 있으면 지난 검증 직전에 실제로 바뀐 줄이다. 설계서의 '## 수정 이력'은 Agent가 쓴 설명이라 틀릴 수 있고, 이것은 엔진이 기록한 사실이다.
 사람이 알린 증상이 그 무렵 생겼다면 이 diff에서 증상과 관련된 변경부터 확인한다. 지난 수정이 되던 것을 깨뜨린 경우가 많기 때문이다.
+재개발에서 verification이 있으면 지난 검증이 화면에서 관측한 것이다. 지시와 관련된 FAIL·BLOCKED의 근거에 원인이 적혀 있는지 먼저 본다.
+사람이 증상을 알렸다면 코드에 그 기능이 이미 있어도 동작하지 않는다는 뜻이다. "이미 구현돼 있다"로 끝내지 말고, 화면의 조작에서 서버와 DB까지
+따라가 증상이 나는 원인(파일:줄)을 찾아 고친다. 증상을 가리는 수정(조건을 없애기, 문구만 바꾸기)은 원인을 고친 것이 아니다.
+원인을 찾지 못했거나 코드 밖(데이터, 환경)에 있으면 고쳤다고 하지 말고 그 이유를 답한다.
 재개발에서는 사람의 지시가 설계서보다 앞선다. 지시를 따르느라 설계서와 달라지는 것은 '보류'로 두지 않고 고친 뒤 [재개발로 고친 것을 설계서에 남기는 법]대로 설계서에 적는다.
 
 [원본을 지키는 법]
@@ -119,5 +127,7 @@ check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적�
 기록까지 마친 뒤에 답한다. ${output.completed}와 ${output.pending}에 건수를, ${output.pendingReasons}에 보류 항목과 이유를,
 ${output.unfinished}에 보류 가운데 손대지 못한 것(다시 부르면 이어서 할 수 있는 것)의 수를 적는다. 설계서와 달라 사람이 정해야 하는 것,
 선언을 찾지 못한 것, 사람이 DB에 반영할 것, 고쳐 봐도 남은 컴파일·형식 오류는 다시 불러도 할 수 없으므로 세지 않는다.
-${output.notApplied}에 반영하지 않은 지시와 이유를, ${output.taskitemsRecorded}에 기록 저장 여부를,
+${output.notApplied}에 반영하지 않은 지시와 이유를,
+${output.reportedFixes}에 재개발 지시의 항목마다 "항목 → 원인(파일:줄) → 고친 곳"을 한 줄씩 적는다. 고치지 못한 항목은 "항목 → 고치지 못함: 이유"로 적는다.
+${output.taskitemsRecorded}에 기록 저장 여부를,
 ${output.designSynced}에 재개발로 고친 내용을 설계서에 옮겨 적었는지를 적는다.
