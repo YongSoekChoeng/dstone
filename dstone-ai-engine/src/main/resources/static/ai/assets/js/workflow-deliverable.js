@@ -3,7 +3,7 @@
  *
  * 승인 step의 approval.deliverable이 가리키는 결과 파일을 다룬다. 어떤 Workflow인지는 모른다.
  *  - [ZIP으로 다운로드]  바뀐 파일, 삭제 목록, 문서를 받는다(모든 브라우저)
- *  - [로컬 맵핑]         결과 파일의 폴더 → 내 PC의 폴더. 같은 key(프로젝트)면 다시 쓴다
+ *  - [로컬 맵핑]         내 PC의 어느 폴더에 반영할지 고른다(폴더 하나, 또는 폴더별로). 같은 key(프로젝트)면 다시 쓴다
  *  - [로컬에 반영]       비교 목록을 보여 주고, 고른 것만 맵핑한 폴더에 쓴다
  *
  * 로컬 폴더 쓰기는 File System Access API를 쓴다(Chrome·Edge, https 또는 localhost).
@@ -99,12 +99,46 @@ var DstoneAiDeliverable = (function () {
 		});
 	}
 
+	// path가 폴더 prefix 아래에 있는지. 빈 prefix는 전부
+	function covers(prefix, path) {
+		return prefix === "" || path.indexOf(prefix + "/") === 0;
+	}
+
+	function folderOf(path) {
+		return path.substring(0, Math.max(path.lastIndexOf("/"), 0));
+	}
+
+	// '폴더별로 반영'에서 처음에 보일 폴더들. 모든 파일의 공통 폴더에서 갈라지는 바로 아래 폴더다
+	function groupsOf(paths) {
+		if (paths.length === 0) {
+			return [];
+		}
+		var common = folderOf(paths[0]);
+		paths.forEach(function (path) {
+			while (!covers(common, path)) {
+				common = folderOf(common);
+			}
+		});
+		var direct = paths.some(function (path) { return folderOf(path) === common; });
+		if (direct && common !== "") {
+			return [common];
+		}
+		var seen = {};
+		paths.forEach(function (path) {
+			var rest = common === "" ? path : path.substring(common.length + 1);
+			var slash = rest.indexOf("/");
+			var group = slash < 0 ? common : (common === "" ? "" : common + "/") + rest.substring(0, slash);
+			seen[group] = true;
+		});
+		return Object.keys(seen).sort();
+	}
+
 	// 폴더 경계로 맞는 줄 가운데 가장 긴 것을 고른다. rest는 그 폴더 아래의 경로
 	function mapPath(path, rows) {
 		var best = null;
 		rows.forEach(function (row, index) {
 			var prefix = normalizePrefix(row.prefix);
-			if (!row.handle || (prefix !== "" && path.indexOf(prefix + "/") !== 0)) {
+			if (!row.handle || !covers(prefix, path)) {
 				return;
 			}
 			if (best === null || prefix.length > best.prefix.length) {
@@ -237,6 +271,39 @@ var DstoneAiDeliverable = (function () {
 		return parentOf(root, rest, false).then(function (parent) { return parent.dir.removeEntry(parent.name); });
 	}
 
+	function exists(promise) {
+		return promise.then(function (found) { return found !== null; }).catch(function () { return false; });
+	}
+
+	// 고른 폴더가 맞는지 본다. files: [{rest(폴더 아래 경로), modified(원본에 있던 파일인지)}]
+	function inspectFolder(root, files) {
+		var modified = files.filter(function (file) { return file.modified; });
+		var targets = modified.length > 0 ? modified : files;
+		var found = 0;
+		return inOrder(targets, function (file) {
+			var slash = file.rest.indexOf("/");
+			// 고칠 파일이 있으면 그 파일을, 새 파일뿐이면 첫 폴더가 있는지를 본다
+			var look = modified.length > 0 ? readLocal(root, file.rest)
+				: slash < 0 ? Promise.resolve(true) : root.getDirectoryHandle(file.rest.substring(0, slash));
+			return exists(look).then(function (yes) {
+				if (yes) {
+					found++;
+				}
+			});
+		}).then(function () {
+			if (modified.length > 0) {
+				if (found === modified.length) {
+					return { ok: true, text: "✔ 고칠 파일 " + found + "개를 모두 찾았습니다." };
+				}
+				return { ok: false, text: "고칠 파일 " + modified.length + "개 중 " + found + "개만 있습니다. 한 단계 위나 아래 폴더를 고른 것이 아닌지 확인하세요." };
+			}
+			if (found > 0) {
+				return { ok: true, text: "✔ 폴더 구조가 맞습니다." };
+			}
+			return { ok: false, text: "생성 파일의 폴더가 하나도 없어 모두 새로 만듭니다. 맞는 폴더인지 확인하세요." };
+		});
+	}
+
 	// 배열을 차례로 처리한다(파일 쓰기를 한꺼번에 하지 않는다)
 	function inOrder(items, work) {
 		var chain = Promise.resolve();
@@ -281,7 +348,7 @@ var DstoneAiDeliverable = (function () {
 				}
 				item.root = mapped.row.handle;
 				item.rest = mapped.rest;
-				item.target = (mapped.row.alias || mapped.row.handle.name) + "/" + mapped.rest;
+				item.target = mapped.row.handle.name + "/" + mapped.rest;
 				var targetKey = folders[mapped.index] + ":" + mapped.rest;
 				if (used[targetKey]) {
 					item.state = "overlap";
@@ -535,128 +602,263 @@ var DstoneAiDeliverable = (function () {
 
 	/* ---------- 로컬 맵핑 ---------- */
 
-	// 결과 파일이 있는 폴더들(입력 칸의 추천 값)
+	// 결과 파일이 있는 모든 폴더(기준 폴더를 바꿀 때 고른다)
 	function foldersOf(paths) {
 		var seen = {};
 		paths.forEach(function (path) {
-			var parts = path.split("/");
-			for (var i = 1; i < parts.length; i++) {
-				seen[parts.slice(0, i).join("/")] = true;
+			for (var folder = folderOf(path); folder !== ""; folder = folderOf(folder)) {
+				seen[folder] = true;
 			}
 		});
 		return Object.keys(seen).sort();
 	}
 
-	function openMapping() {
-		var data = current.data;
-		var paths = data.files.concat(data.deletes).map(function (file) { return file.path; });
-		dbGet(STORE_MAPPINGS, data.key).then(function (saved) {
-			var rows = (saved && saved.length ? saved : [{ prefix: "", alias: "", handle: null }]).map(function (row) {
-				return { prefix: row.prefix, alias: row.alias, handle: row.handle };
-			});
-			openModal("로컬 맵핑 — " + data.key);
-			modalBody.appendChild(element("p", "wa-dl-help",
-				"생성된 파일의 폴더를 내 PC의 폴더에 연결합니다. 고른 폴더 아래에는 '생성된 폴더' 다음 경로만 이어 붙입니다. "
-				+ "여러 줄이 맞으면 더 긴 경로가 우선합니다. '생성된 폴더'를 비우면 나머지 전부입니다."));
-			var list = element("datalist");
-			list.id = "wa-dl-folders";
-			foldersOf(paths).forEach(function (folder) {
-				var option = element("option");
-				option.value = folder;
-				list.appendChild(option);
-			});
-			modalBody.appendChild(list);
-			var table = element("table", "wa-dl-table");
-			modalBody.appendChild(table);
-			var countEl = element("p", "wa-dl-help");
-			modalBody.appendChild(countEl);
+	function pickFolder(onPicked) {
+		window.showDirectoryPicker({ mode: "readwrite" }).then(onPicked).catch(function (err) {
+			if (err.name !== "AbortError") {
+				alert("폴더를 고르지 못했습니다: " + err.message);
+			}
+		});
+	}
 
-			function updateCounts(cells) {
-				var counts = rows.map(function () { return 0; });
-				var unmapped = [];
-				paths.forEach(function (path) {
-					var mapped = mapPath(path, rows);
-					if (mapped) {
-						counts[mapped.index]++;
-					} else {
-						unmapped.push(path);
+	// "'src' 폴더가 바로 아래에 보이는 폴더"처럼, 하나로 반영할 때 무엇을 골라야 하는지
+	function rootHint(paths) {
+		var seen = {};
+		paths.forEach(function (path) {
+			if (path.indexOf("/") > 0) {
+				seen["'" + path.substring(0, path.indexOf("/")) + "'"] = true;
+			}
+		});
+		var tops = Object.keys(seen).sort();
+		if (tops.length === 0) {
+			return "파일이 바로 들어갈 폴더를 고르세요.";
+		}
+		return tops.slice(0, 3).join(", ") + (tops.length > 3 ? " …" : "") + " 폴더가 바로 아래에 보이는 폴더를 고르세요.";
+	}
+
+	// 저장해 둔 맵핑으로 처음 화면을 만든다. 저장한 줄이 못 담는 파일은 빈 줄로 더한다
+	function mappingState(saved, paths) {
+		var rows = (saved || []).map(function (row) { return { prefix: normalizePrefix(row.prefix), handle: row.handle }; });
+		var single = rows.length === 1 && rows[0].prefix === "";
+		// split에 줄을 더하기 전에 정한다(split은 rows와 같은 배열이다)
+		var mode = single || rows.length === 0 ? "one" : "split";
+		var split = single ? [] : rows;
+		var uncovered = paths.filter(function (path) {
+			return !split.some(function (row) { return covers(row.prefix, path); });
+		});
+		groupsOf(uncovered).forEach(function (prefix) {
+			split.push({ prefix: prefix, handle: null });
+		});
+		return {
+			mode: mode,
+			one: { prefix: "", handle: single ? rows[0].handle : null },
+			split: split
+		};
+	}
+
+	function openMapping() {
+		var key = current.data.key;
+		statusEl.textContent = "생성된 파일을 읽는 중...";
+		// 고른 폴더가 맞는지 보려면 원본에 있던 파일인지(baseHash) 알아야 해서 content=true로 읽는다
+		Promise.all([
+			DstoneAi.api("GET", DstoneAi.executionUrl(current.executionId, "/deliverable?content=true")),
+			dbGet(STORE_MAPPINGS, key)
+		]).then(function (results) {
+			var data = results[0];
+			if (!data.available) {
+				throw new Error(data.reason);
+			}
+			statusEl.textContent = "";
+			drawMapping(key, data.files.concat(data.deletes), results[1]);
+		}).catch(function (err) { statusEl.textContent = "맵핑을 열지 못했습니다: " + err.message; });
+	}
+
+	function drawMapping(key, files, saved) {
+		var paths = files.map(function (file) { return file.path; }).filter(isSafePath);
+		var modified = {};
+		files.forEach(function (file) { modified[file.path] = !!file.baseHash; });
+		var state = mappingState(saved, paths);
+		var drawn = 0;
+
+		function activeRows() {
+			return state.mode === "one" ? [state.one] : state.split;
+		}
+
+		// 줄마다 그 줄로 가는 파일
+		function filesByRow(rows) {
+			// 아직 폴더를 안 고른 줄도 몇 개가 해당하는지 보여 줘야 해서 자리만 채운다
+			var all = rows.map(function (row) { return { prefix: row.prefix, handle: row.handle || true }; });
+			var result = rows.map(function () { return []; });
+			var unmapped = [];
+			paths.forEach(function (path) {
+				var mapped = mapPath(path, all);
+				if (mapped) {
+					result[mapped.index].push({ path: path, rest: mapped.rest, modified: modified[path] });
+				} else {
+					unmapped.push(path);
+				}
+			});
+			return { rows: result, unmapped: unmapped };
+		}
+
+		// 고른 폴더 이름과 확인 결과, 단추
+		function folderPart(parent, row, rowFiles) {
+			var line = element("div", "wa-dl-pick");
+			line.appendChild(button(row.handle ? "폴더 바꾸기" : "폴더 선택", function () {
+				pickFolder(function (handle) {
+					row.handle = handle;
+					draw();
+				});
+			}, !!row.handle));
+			line.appendChild(element("span", "wa-dl-folder", row.handle ? row.handle.name : "아직 고르지 않음"));
+			parent.appendChild(line);
+			if (!row.handle || rowFiles.length === 0) {
+				return;
+			}
+			var check = element("div", "wa-dl-check");
+			parent.appendChild(check);
+			var version = drawn;
+			row.handle.queryPermission({ mode: "readwrite" }).then(function (permission) {
+				if (permission !== "granted") {
+					check.textContent = "저장해 둔 폴더입니다. 반영할 때 권한을 다시 묻습니다.";
+					return null;
+				}
+				return inspectFolder(row.handle, rowFiles).then(function (result) {
+					if (version === drawn) {
+						check.textContent = result.text;
+						check.className = "wa-dl-check " + (result.ok ? "wa-dl-ok" : "wa-dl-warning");
 					}
 				});
-				cells.forEach(function (cell, index) { cell.textContent = rows[index].handle ? counts[index] + "개" : "-"; });
-				countEl.textContent = unmapped.length === 0 ? "모든 파일이 맵핑됐습니다."
-					: "맵핑 없는 파일 " + unmapped.length + "개(반영하지 않음): " + unmapped.slice(0, 5).join(", ") + (unmapped.length > 5 ? " …" : "");
-			}
+			}).catch(function (err) { check.textContent = "폴더를 확인하지 못했습니다: " + err.message; });
+		}
 
-			function draw() {
-				table.innerHTML = "";
-				var head = table.insertRow();
-				["생성된 폴더", "로컬 폴더", "별칭(알아보기용)", "파일", ""].forEach(function (name) {
-					head.appendChild(element("th", "", name));
-				});
-				var cells = [];
-				rows.forEach(function (row, index) {
-					var tr = table.insertRow();
-					var prefix = element("input");
-					prefix.type = "text";
-					prefix.value = row.prefix;
-					prefix.placeholder = "(전체)";
-					prefix.setAttribute("list", "wa-dl-folders");
-					prefix.setAttribute("aria-label", "생성된 폴더");
-					prefix.addEventListener("input", function () {
-						row.prefix = prefix.value;
-						updateCounts(cells);
-					});
-					tr.insertCell().appendChild(prefix);
-					var folderCell = tr.insertCell();
-					folderCell.appendChild(element("span", "wa-dl-folder", row.handle ? row.handle.name : "고르지 않음"));
-					folderCell.appendChild(button("폴더 선택", function () {
-						window.showDirectoryPicker({ mode: "readwrite" }).then(function (handle) {
-							row.handle = handle;
-							draw();
-						}).catch(function (err) {
-							if (err.name !== "AbortError") {
-								alert("폴더를 고르지 못했습니다: " + err.message);
-							}
-						});
-					}, true));
-					var alias = element("input");
-					alias.type = "text";
-					alias.value = row.alias || "";
-					alias.placeholder = "예: D:\\work\\my-web";
-					alias.setAttribute("aria-label", "별칭");
-					alias.addEventListener("input", function () { row.alias = alias.value; });
-					tr.insertCell().appendChild(alias);
-					cells.push(tr.insertCell());
-					tr.insertCell().appendChild(button("삭제", function () {
-						rows.splice(index, 1);
-						draw();
-					}, true));
-				});
-				updateCounts(cells);
-			}
-			draw();
+		function modeChoice(value, title, note) {
+			var label = element("label", "wa-dl-mode");
+			var radio = element("input");
+			radio.type = "radio";
+			radio.name = "wa-dl-mode";
+			radio.checked = state.mode === value;
+			radio.addEventListener("change", function () {
+				state.mode = value;
+				draw();
+			});
+			label.appendChild(radio);
+			label.appendChild(element("strong", "", title));
+			label.appendChild(element("span", "wa-dl-note", note));
+			modalBody.appendChild(label);
+		}
 
-			modalFoot.appendChild(button("줄 추가", function () {
-				rows.push({ prefix: "", alias: "", handle: null });
+		function drawSplit(grouped) {
+			modalBody.appendChild(element("p", "wa-dl-help",
+				"왼쪽의 생성된 폴더에 해당하는 내 PC의 폴더를 고르세요. 그 아래 경로가 고른 폴더에 그대로 이어집니다."));
+			var table = element("table", "wa-dl-table");
+			var head = table.insertRow();
+			["생성된 폴더", "파일", "내 PC의 폴더", ""].forEach(function (name) { head.appendChild(element("th", "", name)); });
+			var folders = foldersOf(paths);
+			state.split.forEach(function (row, index) {
+				var tr = table.insertRow();
+				var select = element("select");
+				select.setAttribute("aria-label", "생성된 폴더");
+				// 저장해 둔 폴더가 이번 결과에 없어도 지워지지 않게 목록에 남긴다
+				var options = [""].concat(folders);
+				if (options.indexOf(row.prefix) < 0) {
+					options.push(row.prefix);
+				}
+				options.forEach(function (folder) {
+					var option = element("option", "", folder === "" ? "(나머지 전부)" : folder);
+					option.value = folder;
+					select.appendChild(option);
+				});
+				select.value = row.prefix;
+				select.addEventListener("change", function () {
+					row.prefix = select.value;
+					draw();
+				});
+				tr.insertCell().appendChild(select);
+				tr.insertCell().textContent = grouped.rows[index].length + "개";
+				folderPart(tr.insertCell(), row, grouped.rows[index]);
+				tr.insertCell().appendChild(button("줄 삭제", function () {
+					state.split.splice(index, 1);
+					draw();
+				}, true));
+			});
+			modalBody.appendChild(table);
+			modalBody.appendChild(button("줄 추가", function () {
+				state.split.push({ prefix: "", handle: null });
 				draw();
 			}, true));
-			modalFoot.appendChild(element("span", "wa-dl-spacer"));
-			modalFoot.appendChild(button("취소", closeModal, true));
-			modalFoot.appendChild(button("저장", function () {
-				var kept = rows.filter(function (row) { return row.handle; }).map(function (row) {
-					return { prefix: normalizePrefix(row.prefix), alias: (row.alias || "").trim(), handle: row.handle };
+		}
+
+		function drawPreview(rows, grouped) {
+			// 폴더마다 한 파일씩, 많으면 앞의 몇 개만
+			var lines = [];
+			var seen = {};
+			rows.forEach(function (row, index) {
+				grouped.rows[index].forEach(function (file) {
+					if (row.handle && !seen[folderOf(file.path)]) {
+						seen[folderOf(file.path)] = true;
+						lines.push(file.path + "  →  " + row.handle.name + "/" + file.rest);
+					}
 				});
-				var prefixes = kept.map(function (row) { return row.prefix; });
-				if (prefixes.some(function (p, i) { return prefixes.indexOf(p) !== i; })) {
-					alert("같은 '생성된 폴더'가 두 줄 있습니다.");
-					return;
-				}
-				dbPut(STORE_MAPPINGS, data.key, kept).then(function () {
-					closeModal();
-					statusEl.textContent = "로컬 맵핑을 저장했습니다(" + kept.length + "줄).";
-				}).catch(function (err) { alert("저장하지 못했습니다: " + err.message); });
-			}));
-		}).catch(function (err) { statusEl.textContent = "맵핑을 읽지 못했습니다: " + err.message; });
+			});
+			var more = lines.length - 6;
+			if (more > 0) {
+				lines = lines.slice(0, 6).concat("… 폴더 " + more + "곳 더");
+			}
+			var chosen = 0;
+			rows.forEach(function (row, index) { chosen += row.handle ? grouped.rows[index].length : 0; });
+			modalBody.appendChild(element("p", "wa-dl-count", "파일 " + paths.length + "개 중 " + chosen + "개를 반영합니다."
+				+ (chosen < paths.length ? " 폴더를 고르지 않은 파일은 반영하지 않습니다." : "")));
+			if (lines.length === 0) {
+				return;
+			}
+			modalBody.appendChild(element("p", "wa-dl-help", "미리보기 (생성된 파일 → 쓰는 위치)"));
+			var ul = element("ul", "wa-dl-preview");
+			lines.forEach(function (line) { ul.appendChild(element("li", "", line)); });
+			modalBody.appendChild(ul);
+		}
+
+		function draw() {
+			drawn++;
+			modalBody.innerHTML = "";
+			var rows = activeRows();
+			var grouped = filesByRow(rows);
+			modeChoice("one", "프로젝트 폴더 하나에 반영", "생성된 폴더 구조 그대로 씁니다.");
+			if (state.mode === "one") {
+				var block = element("div", "wa-dl-sub");
+				block.appendChild(element("p", "wa-dl-help", rootHint(paths)));
+				folderPart(block, state.one, grouped.rows[0]);
+				modalBody.appendChild(block);
+			}
+			modeChoice("split", "폴더별로 따로 반영", "WAS와 Web처럼 위치가 나뉜 경우에 씁니다.");
+			if (state.mode === "split") {
+				drawSplit(grouped);
+			}
+			drawPreview(rows, grouped);
+		}
+
+		openModal("로컬 맵핑 — " + key);
+		draw();
+		modalFoot.appendChild(element("span", "wa-dl-spacer"));
+		modalFoot.appendChild(button("취소", closeModal, true));
+		modalFoot.appendChild(button("저장", function () {
+			var kept = activeRows().filter(function (row) { return row.handle; }).map(function (row) {
+				return { prefix: row.prefix, handle: row.handle };
+			});
+			if (kept.length === 0) {
+				alert("반영할 폴더를 고르세요.");
+				return;
+			}
+			var prefixes = kept.map(function (row) { return row.prefix; });
+			if (prefixes.some(function (p, i) { return prefixes.indexOf(p) !== i; })) {
+				alert("같은 '생성된 폴더'가 두 줄 있습니다.");
+				return;
+			}
+			dbPut(STORE_MAPPINGS, key, kept).then(function () {
+				closeModal();
+				statusEl.textContent = "로컬 맵핑을 저장했습니다. [로컬에 반영]을 누르면 비교 목록이 먼저 나옵니다.";
+			}).catch(function (err) { alert("저장하지 못했습니다: " + err.message); });
+		}));
 	}
 
 	/* ---------- 로컬에 반영 ---------- */
@@ -835,7 +1037,8 @@ var DstoneAiDeliverable = (function () {
 		// 시험에서 화면 없이 계산을 확인한다
 		logic: {
 			toLf: toLf, toCrlf: toCrlf, contentToWrite: contentToWrite, comparableHash: comparableHash, mapPath: mapPath,
-			classifyFile: classifyFile, classifyDeletion: classifyDeletion, buildPlan: buildPlan, applyPlan: applyPlan, zipParts: zipParts
+			classifyFile: classifyFile, classifyDeletion: classifyDeletion, groupsOf: groupsOf, mappingState: mappingState,
+			inspectFolder: inspectFolder, buildPlan: buildPlan, applyPlan: applyPlan, zipParts: zipParts
 		}
 	};
 })();

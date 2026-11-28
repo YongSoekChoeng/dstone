@@ -50,6 +50,8 @@ Verified live end-to-end on 2026-09-15 (real Anthropic calls, local Redis/Postgr
 
 2026-11-28: sm-workflow 2.18.0 수정 없는 재개발 잡기(실행 5def8189, 사용자: 설계 1 적용). 07:17과 09:08 재개발이 코드를 하나도 바꾸지 않고 "이미 구현됨"으로 끝났고, 안내문(2.9.0 규칙)으로는 막지 못했다. 09:08에는 넘겨받은 지난 PASS가 그 판단을 거들었다. `fileChanges`에 `route`, `filterList`에 `whereNot`을 더하고 step65·70·66·67·68·69를 넣었다. `sm-developer-agent` 2.11.0은 PASS가 아닌 검증 결과만 받는다. 실제 LLM 실행으로는 아직 확인하지 않았다.
 
+2026-11-28: 개발 결과 받기의 로컬 맵핑 화면 다시 만듦(사용자: 직관적이지 않다). 경로 입력과 별칭 칸을 없애고 `프로젝트 폴더 하나`/`폴더별로` 중에서 고른다. 폴더별 목록은 생성 파일의 공통 폴더에서 갈라지는 지점으로 만들고(`groupsOf`), 고른 폴더가 맞는지와 미리보기를 바로 보인다. 저장 형식(`prefix`, `handle`)은 그대로다. 받기 스크립트가 없어도 실행 상세는 보인다(Eclipse가 새 js를 `target/classes`에 복사하지 않아 상세 조회 전체가 실패한 일).
+
 2026-11-28: sm-workflow 2.20.0 개발 결과 받기(사용자 제안: `재개발(서버 없이)` 결과를 로컬에서 바로 확인). 승인 step에 범용 키 `approval.deliverable`, API `…/deliverable`·`…/deliverable/zip`, 화면 `workflow-deliverable.js`(ZIP, 로컬 맵핑, 비교 후 반영, 백업 ZIP). step19에 적용. 테스트 `SmDeliverableTest`, 화면은 헤드리스 Chromium에서 폴더 선택을 OPFS로 바꿔 확인(실제 폴더 선택 창과 권한 창은 미확인). 시험할 때 주의: Playwright의 시크릿 컨텍스트에서는 IndexedDB의 OPFS 핸들을 읽다가 브라우저가 꺼져 `launchPersistentContext`로 돌렸다.
 
 2026-11-28: sm-workflow 2.19.0 재개발 선택지 이름과 테스트 서버 주소(실행 5def8189, 사용자 결정). `재개발`/`재개발(간이 확인)`/`재개발(최소 확인)`을 `재개발(자동 검증)`/`재개발(직접 확인)`/`재개발(서버 없이)`로 바꿨다. "간이 확인"이 대충 본다는 말로 읽혀 직접 확인용이라는 것이 묻혔고, "최소 확인"을 고른 회차는 고친 코드가 서버에 없는데 화면이 안 바뀐다고 보게 됐다. 승인 step에 범용 키 `approval.links`(표시 이름 → 표현식, http·https만)를 더해 개발 승인 화면에 `serverCheck.url`을 보인다. 설계 승인의 선택지 이름은 그대로다. 남은 것: 직접 확인에서 기동에 실패해 자동 수정을 거치면 다음 확인은 자동 검증(step43 한도 초과 → step41)이다.

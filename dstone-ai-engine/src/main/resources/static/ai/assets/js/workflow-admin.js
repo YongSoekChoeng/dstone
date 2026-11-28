@@ -315,7 +315,10 @@ var DstoneAiWorkflowAdmin = (function () {
 		renderResult(detail);
 		renderDocs();
 		loadFiles(detail.executionId);
-		DstoneAiDeliverable.show(detail);
+		// 받기 스크립트가 없어도(복사 누락 등) 실행 상세는 보여야 한다
+		if (window.DstoneAiDeliverable) {
+			window.DstoneAiDeliverable.show(detail);
+		}
 		if (newExecution) {
 			detailPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
 		}
