@@ -24,7 +24,7 @@
 # 2.12.0(2026-11-28): 확인하지 못한 것(unresolved)을 답한다. 실행 42359899에서 추측한 원인이 확정된 수정으로 보고되고 설계서에도 남아
 #   다음 재개발이 그 설명을 이어받았다. 같은 날 troubleshooting Skill에 "눌러도 반응이 없을 때"를 더했다.
 id: sm-developer-agent
-version: 2.12.0
+version: 2.12.1
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -106,7 +106,7 @@ check_result가 있으면 dev-resources에 지난 결과가 있다. 거기 적�
      참고 파일이 없는 새 파일만 writeFile로 전체를 쓴다(쓰기 전에 isFileExist로 확인하고, 있으면 '보류').
    - 설계서에 글자 그대로 없는 클래스, 메서드, import를 쓰게 되면 선언을 찾아 확인한다. 찾지 못하면 지어내지 말고 '보류'.
    - DB에만 적용하는 항목(DDL, 메뉴·데이터 INSERT)은 소스로 만들 것이 없다. 그 SQL이 03-3.ddl(데이터베이스).md에 있으면 '완료'로 두고
-     변경 요약에 "DB 반영 필요(03-3)"라고 적는다. 자동 검증은 그 파일을 일회용 DB에 적용하고, 실제 DB 반영은 사람이 한다. 03-3에 없으면 '보류'.
+     변경 요약에 "DB 반영 필요(03-3)"라고 적는다. DB 반영은 사람이 한다. 03-3에 없으면 '보류'.
 2. 모든 태스크아이템을 끝낸 뒤 compileJava를 부른다(sourceRoot ${input.source_dir}, overlayDir ${input.base_dir}/dev-resources,
    outputDir ${input.base_dir}/compile-check, deleteList ${input.base_dir}/dev-resources/_delete-files.txt, 나머지는 비움).
    실패하면 오류 줄을 보고 dev-resources의 파일을 고쳐 다시 부른다. 최대 3번까지. 3번째도 실패하면 남은 오류를 관련 항목의 '보류' 이유로 적는다.

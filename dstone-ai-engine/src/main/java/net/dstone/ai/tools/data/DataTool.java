@@ -87,7 +87,7 @@ public class DataTool {
 	 * YAML 예: 설계 승인에서 고른 검증 수준으로 갈 곳을 나눈다
 	 *   tool: routeValue
 	 *   with: { value: "${state.designApproval.decision:}" }
-	 *   routes: { "승인(개발진행, 최소 확인)": step19, "승인(개발진행, 간이 확인)": step45, "승인(개발진행, 전체 확인)": step41 }
+	 *   routes: { "승인(개발진행, 서버 검증)": step41, "승인(개발진행, 기본 검증)": step19 }
 	 *   onFailure: step41
 	 * </pre>
 	 */

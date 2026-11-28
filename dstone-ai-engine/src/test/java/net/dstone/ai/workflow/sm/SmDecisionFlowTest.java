@@ -116,11 +116,11 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		flow.step("step19");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 		PendingApproval pending = this.pendingApproval(flow.execution());
-		assertThat(pending.receivers().get("재개발(자동 검증)")).isEqualTo("step17 25-개발 · sm-developer-agent");
+		assertThat(pending.receivers().get("재개발(서버 검증)")).isEqualTo("step17 25-개발 · sm-developer-agent");
 		assertThat(pending.links()).containsEntry("테스트 서버(마지막으로 반영한 코드)", "http://localhost:18080");
 		assertThat(pending.notes()).containsEntry("마지막 개발이 확인하지 못한 것", List.of("삭제 버튼 → 원인 추정 → 눌러서 확인"));
 
-		flow.decide("재개발(자동 검증)", "업로드한 파일이 저장되지 않음");
+		flow.decide("재개발(서버 검증)", "업로드한 파일이 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step20");
 		flow.step("step20");
 		flow.step("step65"); // 개발에 넘길 검증 결과(PASS 제외)

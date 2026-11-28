@@ -2,17 +2,18 @@
 # 어플리케이션 운영관리 Workflow입니다.
 # 요청서(00.request.md)에서 시작해 요구사항 → 영향도 분석 → 설계 → 개발 → 동작 검증 → 개발 승인까지 진행합니다.
 #
-# [흐름 한눈에 보기] name 앞 번호가 흐름 순서입니다(괄호는 step id). 정상 흐름은 01~39와 42, 곁가지는 그 밖의 번호입니다.
+# [흐름 한눈에 보기] name 앞 번호가 흐름 순서입니다(괄호는 step id). 정상 흐름은 01~41과 48, 곁가지는 그 밖의 번호입니다.
 #   01~03  준비         요청서, 프로젝트ID, 프로젝트 리비전(step01, 02, 59). 작업 시각은 settings.startTime이 넣습니다
 #   04~06  요구사항      분석 → 분석서 읽기 → 리뷰(step03, 04, 05)
 #   07~11  영향도        분석서가 있으면 맞추고(step38) 없으면 새로 씀(step08) → 승인(step09) → 읽기(step10)
 #   12~14  참고 기능      영향도분석서 '## 참고 기능'의 원본 코드를 dstone-knowledge에서 모음(step46, 48, 49)
 #   15~19  설계          설계서가 있으면 맞추고(step37) 없으면 새로 씀(step12) → 형식 확인(step50) → 승인(step13)
-#   20~26  개발          문서 읽기(step14) → 개발 폴더와 지난 검증 결과 비우기 → 개발(step17) → 보류 확인 → 컴파일(step18) → 형식 확인(step53)
-#   27~40  동작 검증      리비전·DDL 확인 → 검증 수준 고르기(step43, 64) → 테스트 서버(step29) → 동작 검증(step35) → 결과 누적(step62) → FAIL이면 자동 수정(step34)
-#   43     개발 승인(step19). [승인]이면 끝
-#   곁가지  41 DDL 반영 승인, 42 형식 오류 고치기, 44 재개발 전 다시 읽기, 45 보류 이어서 개발,
-#          46~47 설계서 수정과 형식 고치기, 48~49 영향도·요구사항 문서 수정, 50~51 리뷰 불통과 처리
+#   20~32  개발          문서 읽기(step14) → 개발 폴더와 지난 검증 결과 비우기 → 개발(step17) → 보류 확인 → 컴파일(step18) → 형식 확인(step53)
+#   33~41  서버 검증      리비전·DDL 확인 → 검증 수준 고르기(step43) → 테스트 서버(step29) → 동작 검증(step35) → 결과 누적(step62) → FAIL 확인(step36)
+#   42~44  자동 수정      기동 실패 원인 확인(step30), 설계서 다시 읽기(step32), 자동 수정(step34)
+#   48     개발 승인(step19). [승인]이면 끝
+#   곁가지  45 설계 승인의 검증 수준, 46 DDL 반영 승인, 47 형식 오류 고치기, 49 재개발 전 다시 읽기, 50 보류 이어서 개발,
+#          51~52 설계서 수정과 형식 고치기, 53~54 영향도·요구사항 문서 수정, 55~56 리뷰 불통과 처리
 # 한 실행이 실제로 지나온 길은 실행 관리 > 진행 기록에서 줄마다 "← 앞 step · 고른 길"로 보입니다.
 #
 # [문서 읽기] 문서는 LLM이 아니라 TOOL step이 읽어 Agent 입력으로 넘깁니다. 읽으려고 LLM을 한 번 더 부르지 않기 위해서입니다.
@@ -60,16 +61,15 @@
 #
 # [동작 검증] 컴파일이 통과하면 사람에게 묻기 전에 실제로 돌려 봅니다.
 #   검증 수준은 설계 승인(step13)에서 사람이 고릅니다. 설계서의 '검증 방법 제안'(sm-architect-agent)이 어느 쪽인지와 이유를 적습니다.
-#     전체 확인  테스트 서버를 띄우고 화면을 눌러 봄
-#     간이 확인  테스트 서버가 뜨는지만 봄(step45). 화면이 없는 변경(배치, 연동, 쿼리만)
-#     최소 확인  서버 없이 소스 오류만 봄. 동작이 바뀌지 않는 변경(주석, 안내 문구, 설정값 하나)
-#     재개발할 때는 개발 승인(step19)에서 다시 고릅니다: 재개발(자동 검증), 재개발(직접 확인), 재개발(서버 없이).
-#     각각 설계 승인의 전체·간이·최소 확인과 같은 길입니다. 직접 확인과 자동 검증 뒤에는 개발 승인 화면에 테스트 서버 주소가 보입니다.
-#     개발 승인(step19)의 deliverable로 바뀐 소스와 문서를 ZIP으로 받거나 로컬 폴더에 반영합니다. '서버 없이'는 이렇게 받아 확인합니다.
+#     서버 검증  테스트 서버를 띄우고 검증 Agent가 화면과 DB로 확인. 실행 동작이 바뀌는 변경(화면, 배치, 연동, 쿼리)
+#     기본 검증  서버 없이 컴파일과 형식 오류만 봄. 동작이 바뀌지 않는 변경(주석, 안내 문구, 설정값 하나)
+#     재개발할 때는 개발 승인(step19)에서 다시 고릅니다: 재개발(서버 검증), 재개발(기본 검증).
+#     서버 검증 뒤에는 개발 승인 화면에 테스트 서버 주소가 보여 직접 눌러 볼 수도 있습니다.
+#     개발 승인(step19)의 deliverable로 바뀐 소스와 문서를 ZIP으로 받거나 로컬 폴더에 반영합니다. '기본 검증'은 이렇게 받아 확인합니다.
 #     step43(routeValue)이 마지막 개발 승인의 선택으로 갈 곳을 나눕니다. 개발 승인 전이거나 문서 수정을 고른 뒤라면
 #     step64가 설계 승인에서 고른 수준을 따릅니다.
 #     고른 수준은 사람의 결정 뒤 첫 검증에만 적용합니다(step43의 limit max 1, scope 결정 기록).
-#     자동 수정으로 다시 돌 때는 한도를 다 써서 step43을 건너뛰고 전체 확인으로 갑니다.
+#     자동 수정으로 다시 돌 때는 한도를 다 써서 step43을 건너뛰고 서버 검증으로 갑니다.
 #   DDL: 테스트 서버는 DDL을 실행하지 않습니다. step60이 DDL 문서의 테이블·컬럼과 INSERT(초기 데이터) 행이 개발 DB에 있는지 보고,
 #     없으면 step61에서 사람이 개발 DB에 반영한 뒤 승인합니다. 데이터가 없으면 화면 목록이 비어 검증이 아무것도 볼 수 없습니다.
 #   테스트 서버(step29): 리비전 + 개발 결과로 띄우고, 고객사 개발 DB는 커밋하지 않는 연결로 써서 실행이 멈추면 원복합니다.
@@ -104,7 +104,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.21.0
+version: 2.22.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -188,7 +188,7 @@ steps:
     onFailure: step06
 
   - id: step06
-    name: 56-리뷰 불통과 처리 결정
+    name: 55-리뷰 불통과 처리 결정
     type: APPROVAL
     approval:
       approverRole: PL
@@ -284,14 +284,12 @@ steps:
     approval:
       approverRole: PL
       hints:
-        승인(개발진행, 전체 확인): 개발 뒤 테스트 서버를 띄우고 화면을 직접 눌러 확인합니다. 화면에 보이는 것이나 화면 동작이 바뀌는 변경은 이것을 고르세요. 가장 오래 걸립니다(몇 분 이상).
-        승인(개발진행, 간이 확인): 개발 뒤 테스트 서버가 정상으로 뜨는지만 봅니다. 화면은 열지 않습니다. 배치, 외부 연동, 쿼리만 바뀌는 변경에 맞습니다(2분 안팎).
-        승인(개발진행, 최소 확인): 개발 뒤 서버를 띄우지 않고 소스만 생성/수정합니다. 주석, 안내 문구, 설정값 하나처럼 동작이 바뀌지 않는 변경에 맞습니다(수 초).
+        승인(개발진행, 서버 검증): 개발한 뒤 테스트 서버를 띄우고 검증 Agent가 화면과 DB로 완료 기준을 확인합니다. 실패한 항목은 자동 수정을 시도합니다. 화면이나 실행 동작이 바뀌는 변경(배치, 외부 연동, 쿼리 포함)은 이것을 고르세요(몇 분 이상).
+        승인(개발진행, 기본 검증): 서버를 띄우지 않습니다. 소스를 만들거나 고친 뒤 컴파일과 형식 오류만 확인합니다. 주석, 안내 문구, 설정값 하나처럼 동작이 바뀌지 않는 변경에 맞습니다.
     save: designApproval
     routes:
-      승인(개발진행, 전체 확인): step14
-      승인(개발진행, 간이 확인): step14
-      승인(개발진행, 최소 확인): step14
+      승인(개발진행, 서버 검증): step14
+      승인(개발진행, 기본 검증): step14
       설계 수정: step25
       설계 다시 작성: step12
       영향도 수정: step26
@@ -368,14 +366,13 @@ steps:
     onFailure: step19
 
   - id: step19
-    name: 49-개발완료 승인
+    name: 48-개발완료 승인
     type: APPROVAL
     approval:
       approverRole: PL
       hints:
-        재개발(자동 검증): 의견대로 다시 개발한 뒤 테스트 서버를 띄우고 검증 Agent가 화면을 눌러 확인합니다. 가장 오래 걸립니다(몇 분 이상).
-        재개발(직접 확인): 다시 개발해 테스트 서버에 반영합니다. [테스트 서버] 주소에 들어가 직접 확인하세요. 서버는 승인 대기 30분(기본) 뒤에 내려가고 입력한 데이터는 원복됩니다(2분 안팎).
-        재개발(서버 없이): 다시 개발한 뒤 소스 오류만 확인합니다. 테스트 서버에는 반영하지 않으니, '개발 결과 받기'의 [로컬에 반영]이나 ZIP으로 받아 내 환경에서 확인하세요.
+        재개발(서버 검증): 의견대로 다시 개발한 뒤 테스트 서버에서 검증 Agent가 확인합니다. 끝나면 [테스트 서버] 주소에서 직접 눌러 볼 수 있습니다. 서버는 승인 대기 30분(기본) 뒤에 내려가고 입력한 데이터는 원복됩니다(몇 분 이상).
+        재개발(기본 검증): 의견대로 다시 개발한 뒤 컴파일과 형식 오류만 확인합니다. 테스트 서버에는 반영하지 않으니 '개발 결과 받기'의 [로컬에 반영]이나 ZIP으로 받아 내 환경에서 확인하세요.
       links:
         테스트 서버(마지막으로 반영한 코드): ${state.serverCheck.url:}
       notes:
@@ -389,16 +386,15 @@ steps:
     save: developApproval
     routes:
       승인(완료): END
-      재개발(자동 검증): step20
-      재개발(직접 확인): step20
-      재개발(서버 없이): step20
+      재개발(서버 검증): step20
+      재개발(기본 검증): step20
       설계 수정: step25
       영향도 수정: step26
       요구사항 수정: step27
       실패: FAIL
 
   - id: step20
-    name: 50-재개발 전 설계서와 태스크아이템 목록 다시 읽기
+    name: 49-재개발 전 설계서와 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFiles
     with:
@@ -416,7 +412,7 @@ steps:
     onFailure: FAIL
 
   - id: step25
-    name: 52-설계서 수정
+    name: 51-설계서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -434,7 +430,7 @@ steps:
     next: step50
 
   - id: step26
-    name: 54-영향도분석서 수정
+    name: 53-영향도분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -449,7 +445,7 @@ steps:
     next: step09
 
   - id: step27
-    name: 55-고객요구사항분석서 수정
+    name: 54-고객요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -489,12 +485,12 @@ steps:
     onFailure: step43
 
   - id: step61
-    name: 47-DDL 반영 승인
+    name: 46-DDL 반영 승인
     type: APPROVAL
     approval:
       approverRole: PL
       hints:
-        DDL 반영함: 03-3.ddl(데이터베이스).md 의 DDL과 초기 데이터(INSERT)를 개발 DB에 반영하고 commit했습니다. 반영됐는지 다시 확인한 뒤 테스트 서버로 검증합니다.
+        DDL 반영함: 03-3.ddl(데이터베이스).md 의 DDL과 초기 데이터(INSERT)를 개발 DB에 반영하고 commit했습니다. 반영됐는지 다시 확인한 뒤 앞에서 고른 검증을 이어서 진행합니다.
         테스트 없이 진행: 아직 반영하지 않고 서버 기동 테스트 없이 개발 승인으로 갑니다.
     save: ddlApproval
     routes:
@@ -600,9 +596,8 @@ steps:
       scope: ${decisions:}
       over: step41
     routes:
-      재개발(자동 검증): step41
-      재개발(직접 확인): step45
-      재개발(서버 없이): step19
+      재개발(서버 검증): step41
+      재개발(기본 검증): step19
       설계 승인: step64
       설계 수정: step64
       영향도 수정: step64
@@ -610,30 +605,15 @@ steps:
     onFailure: step41
 
   - id: step64
-    name: 46-설계 승인에서 고른 검증 수준
+    name: 45-설계 승인에서 고른 검증 수준
     type: TOOL
     tool: routeValue
     with:
       value: ${state.designApproval.decision:}
     routes:
-      승인(개발진행, 전체 확인): step41
-      승인(개발진행, 간이 확인): step45
-      승인(개발진행, 최소 확인): step19
+      승인(개발진행, 서버 검증): step41
+      승인(개발진행, 기본 검증): step19
     onFailure: step41
-
-  - id: step45
-    name: 42-테스트 서버 기동만 확인
-    type: TOOL
-    tool: startTestServer
-    with:
-      projectId: ${state.projectId}
-      revision: ${state.projectRevision.revision}
-      overlayDir: ${input}/${state.now}/dev-resources
-      deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt
-    save: serverCheck
-    saveError: serverError
-    next: step19
-    onFailure: step30
 
   - id: step29
     name: 38-테스트 서버 기동 확인
@@ -650,7 +630,7 @@ steps:
     onFailure: step30
 
   - id: step30
-    name: 43-기동 실패가 개발 결과 탓인지
+    name: 42-기동 실패가 개발 결과 탓인지
     type: TOOL
     tool: containsValue
     with:
@@ -662,7 +642,7 @@ steps:
     onFailure: step19
 
   - id: step32
-    name: 44-자동 수정 전 설계서와 태스크아이템 목록 다시 읽기
+    name: 43-자동 수정 전 설계서와 태스크아이템 목록 다시 읽기
     type: TOOL
     tool: readFiles
     with:
@@ -684,7 +664,7 @@ steps:
     onFailure: step19
 
   - id: step34
-    name: 45-자동 수정
+    name: 44-자동 수정
     type: AGENT
     agent: sm-auto-fix-agent
     with:
@@ -799,7 +779,7 @@ steps:
     next: step09
 
   - id: step39
-    name: 57-리뷰 지적에 따른 요구사항분석서 수정
+    name: 56-리뷰 지적에 따른 요구사항분석서 수정
     type: AGENT
     agent: document-revise-agent
     with:
@@ -906,7 +886,7 @@ steps:
     onFailure: step13
 
   - id: step52
-    name: 53-설계 문서 형식 고치기
+    name: 52-설계 문서 형식 고치기
     type: AGENT
     agent: document-revise-agent
     with:
@@ -956,7 +936,7 @@ steps:
     onFailure: step18
 
   - id: step57
-    name: 51-보류 이어서 개발
+    name: 50-보류 이어서 개발
     type: AGENT
     agent: sm-developer-agent
     with:
@@ -983,7 +963,7 @@ steps:
     onFailure: step18
 
   - id: step58
-    name: 48-형식 오류 고치기
+    name: 47-형식 오류 고치기
     type: AGENT
     agent: sm-developer-agent
     with:
@@ -1007,8 +987,8 @@ steps:
     onFailure: step28
 state:
   projectId: 요청서의 프로젝트ID(step02)
-  serverCheck: 테스트 서버 기동 확인(step29, 기동만 확인이면 step45) 결과({success, cause, message, url, dbAliases})
-  serverError: 테스트 서버 기동에 실패한 이유(자동 검증을 못 했거나 개발 결과의 기동 오류)
+  serverCheck: 테스트 서버 기동 확인(step29) 결과({success, cause, message, url, dbAliases})
+  serverError: 테스트 서버 기동에 실패한 이유(서버 검증을 못 했거나 개발 결과의 기동 오류)
   projectRevision: 이 실행이 쓰는 프로젝트 리비전(step59. route는 ok 또는 none, 그 밖에 revision, sourceRoot, kind, message)
   ddlCheck: DDL과 초기 데이터가 개발 DB에 반영됐는지(step60. route는 none, ok, missing 가운데 하나, 그 밖에 missing, missingRows, message)
   ddlApproval: DDL 반영 승인(step61)의 결정

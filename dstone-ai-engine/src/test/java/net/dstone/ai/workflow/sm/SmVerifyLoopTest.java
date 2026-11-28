@@ -48,7 +48,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	void 리비전이_있고_DDL이_없으면_설계서를_다시_읽으러_간다() throws Exception {
 		WorkflowStepper flow = this.atStep("step28");
 		flow.put("projectId", "myApp").put("projectRevision", Map.of("route", "ok", "revision", "r1"));
-		flow.put("designApproval", Map.of("decision", "승인(개발진행, 전체 확인)"));
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 서버 검증)"));
 		flow.step("step28");
 		assertThat(flow.currentStepId()).isEqualTo("step60");
 		flow.step("step60");
@@ -62,7 +62,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	/**
 	 * <pre>
 	 * 설계 승인에서 고른 검증 수준을 첫 검증에서 따르는지 봅니다(2.7.0).
-	 * 최소 확인이면 서버를 띄우지 않고, 간이 확인이면 서버 기동만 하고 사람에게 갑니다.
+	 * 기본 검증이면 서버를 띄우지 않고 사람에게 갑니다.
 	 * 이 판정은 정상 결과라 이력에 실패로 남지 않습니다. 첫 개발은 step43을 거쳐 step64가 고르고,
 	 * 첫 검증인지는 step43의 limit(max 1, scope 결정 기록)이 셉니다.
 	 * </pre>
@@ -70,7 +70,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	@Test
 	void 컴파일만으로_승인하면_첫_검증은_서버_없이_사람에게_간다() {
 		WorkflowStepper flow = this.atStep("step43");
-		flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 기본 검증)"));
 		flow.step("step43");
 		flow.step("step64");
 
@@ -79,29 +79,9 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	}
 
 	@Test
-	void 기동만_확인으로_승인하면_첫_검증은_서버_기동만_한다() {
-		WorkflowStepper flow = this.atStep("step43");
-		flow.put("designApproval", Map.of("decision", "승인(개발진행, 간이 확인)"));
-		flow.step("step43");
-		flow.step("step64");
-
-		assertThat(flow.currentStepId()).isEqualTo("step45");
-		assertThat(this.lastHistory(flow, "step64").success()).isTrue();
-	}
-
-	@Test
-	void 기동만_확인에서_기동에_실패하면_기동_실패_판정으로_간다() {
-		WorkflowStepper flow = this.atStep("step45");
-		flow.put("projectId", "noSuchProject").put("sourceDir", this.workDir.toString());
-		flow.step("step45");
-
-		assertThat(flow.currentStepId()).isEqualTo("step30");
-	}
-
-	@Test
 	void 다시_돌_때는_검증을_생략하지_않고_화면_검증으로_간다() {
 		WorkflowStepper flow = this.atStep("step43");
-		flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 기본 검증)"));
 		flow.step("step43");
 		flow.step("step64");
 		assertThat(flow.currentStepId()).isEqualTo("step19");
@@ -116,10 +96,10 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 
 	@Test
 	void 재개발할_때_고른_검증_수준이_설계_승인의_선택보다_앞선다() {
-		String[][] cases = { { "재개발(자동 검증)", "step41" }, { "재개발(직접 확인)", "step45" }, { "재개발(서버 없이)", "step19" } };
+		String[][] cases = { { "재개발(서버 검증)", "step41" }, { "재개발(기본 검증)", "step19" } };
 		for (String[] one : cases) {
 			WorkflowStepper flow = this.atStep("step43");
-			flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
+			flow.put("designApproval", Map.of("decision", "승인(개발진행, 기본 검증)"));
 			flow.put("developApproval", Map.of("decision", one[0]));
 			flow.step("step43");
 
@@ -130,12 +110,12 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 	@Test
 	void 개발_승인에서_문서_수정을_고른_뒤에는_새_설계_승인의_검증_수준을_따른다() {
 		WorkflowStepper flow = this.atStep("step43");
-		flow.put("designApproval", Map.of("decision", "승인(개발진행, 간이 확인)"));
+		flow.put("designApproval", Map.of("decision", "승인(개발진행, 기본 검증)"));
 		flow.put("developApproval", Map.of("decision", "설계 수정"));
 		flow.step("step43");
 		flow.step("step64");
 
-		assertThat(flow.currentStepId()).isEqualTo("step45");
+		assertThat(flow.currentStepId()).isEqualTo("step19");
 	}
 
 	@Test
@@ -246,7 +226,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		assertThat(this.lastHistory(flow, "step32").success()).isTrue();
 
 		flow.step("step19");
-		flow.decide("재개발(자동 검증)", "다시 해 주세요");
+		flow.decide("재개발(서버 검증)", "다시 해 주세요");
 		flow.jumpTo("step32");
 		flow.step("step32");
 		assertThat(flow.currentStepId()).isEqualTo("step34");
