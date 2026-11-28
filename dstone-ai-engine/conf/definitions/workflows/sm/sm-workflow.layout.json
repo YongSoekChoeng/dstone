@@ -6,859 +6,1070 @@
     },
     "step01" : {
       "x" : 50,
-      "y" : 210
+      "y" : 106
     },
     "step02" : {
       "x" : 50,
-      "y" : 324
+      "y" : 182
     },
     "step59" : {
       "x" : 50,
-      "y" : 414
+      "y" : 258
     },
     "step03" : {
       "x" : 50,
-      "y" : 496
+      "y" : 348
     },
     "step04" : {
       "x" : 50,
-      "y" : 572
+      "y" : 430
     },
     "step05" : {
       "x" : 50,
-      "y" : 662
-    },
-    "step06" : {
-      "x" : 50,
-      "y" : 738
+      "y" : 520
     },
     "step07" : {
       "x" : 50,
-      "y" : 820
+      "y" : 596
     },
     "step38" : {
       "x" : 50,
-      "y" : 902
+      "y" : 672
+    },
+    "step08" : {
+      "x" : 50,
+      "y" : 748
     },
     "step09" : {
       "x" : 50,
-      "y" : 992
+      "y" : 824
     },
     "step10" : {
-      "x" : 606,
-      "y" : 30
+      "x" : 50,
+      "y" : 900
     },
     "step46" : {
-      "x" : 606,
-      "y" : 128
+      "x" : 50,
+      "y" : 990
+    },
+    "step48" : {
+      "x" : 50,
+      "y" : 1066
+    },
+    "step49" : {
+      "x" : 50,
+      "y" : 1148
     },
     "step11" : {
-      "x" : 606,
-      "y" : 210
-    },
-    "step37" : {
-      "x" : 606,
-      "y" : 324
-    },
-    "step50" : {
-      "x" : 606,
-      "y" : 414
-    },
-    "step13" : {
-      "x" : 606,
-      "y" : 496
-    },
-    "step14" : {
-      "x" : 606,
-      "y" : 572
-    },
-    "step16" : {
-      "x" : 606,
-      "y" : 738
-    },
-    "step17" : {
-      "x" : 606,
-      "y" : 820
-    },
-    "step54" : {
-      "x" : 606,
-      "y" : 902
-    },
-    "step18" : {
-      "x" : 606,
-      "y" : 992
-    },
-    "step19" : {
-      "x" : 1182,
+      "x" : 616,
       "y" : 30
     },
-    "step20" : {
-      "x" : 1182,
-      "y" : 128
+    "step37" : {
+      "x" : 616,
+      "y" : 106
     },
-    "step25" : {
-      "x" : 904,
-      "y" : 324
+    "step12" : {
+      "x" : 616,
+      "y" : 182
     },
-    "step26" : {
-      "x" : 338,
-      "y" : 902
+    "step50" : {
+      "x" : 616,
+      "y" : 258
     },
-    "step27" : {
-      "x" : 338,
-      "y" : 572
+    "step13" : {
+      "x" : 616,
+      "y" : 348
+    },
+    "step14" : {
+      "x" : 616,
+      "y" : 430
+    },
+    "step16" : {
+      "x" : 616,
+      "y" : 520
+    },
+    "step63" : {
+      "x" : 616,
+      "y" : 596
+    },
+    "step65" : {
+      "x" : 616,
+      "y" : 672
+    },
+    "step70" : {
+      "x" : 616,
+      "y" : 748
+    },
+    "step17" : {
+      "x" : 616,
+      "y" : 824
+    },
+    "step66" : {
+      "x" : 616,
+      "y" : 900
+    },
+    "step67" : {
+      "x" : 616,
+      "y" : 990
+    },
+    "step68" : {
+      "x" : 616,
+      "y" : 1066
+    },
+    "step69" : {
+      "x" : 616,
+      "y" : 1148
+    },
+    "step54" : {
+      "x" : 1142,
+      "y" : 30
+    },
+    "step18" : {
+      "x" : 1142,
+      "y" : 106
     },
     "step53" : {
-      "x" : 1182,
-      "y" : 414
+      "x" : 1142,
+      "y" : 182
     },
     "step28" : {
-      "x" : 1182,
-      "y" : 496
+      "x" : 1142,
+      "y" : 258
     },
     "step60" : {
-      "x" : 1182,
-      "y" : 572
+      "x" : 1142,
+      "y" : 348
+    },
+    "step43" : {
+      "x" : 1142,
+      "y" : 430
     },
     "step41" : {
-      "x" : 1182,
-      "y" : 738
+      "x" : 1142,
+      "y" : 520
     },
     "step40" : {
-      "x" : 1182,
-      "y" : 820
+      "x" : 1142,
+      "y" : 596
     },
     "step29" : {
-      "x" : 1182,
-      "y" : 902
-    },
-    "step30" : {
-      "x" : 1182,
-      "y" : 992
-    },
-    "step32" : {
-      "x" : 1758,
-      "y" : 128
-    },
-    "step34" : {
-      "x" : 1470,
-      "y" : 210
+      "x" : 1142,
+      "y" : 672
     },
     "step35" : {
-      "x" : 1758,
-      "y" : 324
+      "x" : 1142,
+      "y" : 748
+    },
+    "step62" : {
+      "x" : 1142,
+      "y" : 824
     },
     "step36" : {
-      "x" : 1470,
+      "x" : 1142,
+      "y" : 900
+    },
+    "step45" : {
+      "x" : 1142,
+      "y" : 990
+    },
+    "step30" : {
+      "x" : 1142,
+      "y" : 1066
+    },
+    "step32" : {
+      "x" : 1142,
+      "y" : 1148
+    },
+    "step34" : {
+      "x" : 1500,
       "y" : 30
     },
     "step64" : {
-      "x" : 1758,
-      "y" : 572
-    },
-    "step43" : {
-      "x" : 1758,
-      "y" : 496
-    },
-    "step45" : {
-      "x" : 1470,
-      "y" : 572
+      "x" : 1500,
+      "y" : 106
     },
     "step61" : {
-      "x" : 904,
-      "y" : 496
+      "x" : 1500,
+      "y" : 182
     },
     "step58" : {
-      "x" : 904,
-      "y" : 820
+      "x" : 884,
+      "y" : 182
+    },
+    "step19" : {
+      "x" : 1500,
+      "y" : 258
+    },
+    "step20" : {
+      "x" : 1500,
+      "y" : 348
     },
     "step57" : {
-      "x" : 904,
-      "y" : 992
+      "x" : 884,
+      "y" : 106
     },
-    "step12" : {
-      "x" : 338,
-      "y" : 414
+    "step25" : {
+      "x" : 884,
+      "y" : 258
     },
     "step52" : {
-      "x" : 904,
-      "y" : 414
+      "x" : 328,
+      "y" : 348
     },
-    "step48" : {
-      "x" : 2046,
-      "y" : 414
+    "step26" : {
+      "x" : 328,
+      "y" : 748
     },
-    "step49" : {
-      "x" : 904,
-      "y" : 210
+    "step27" : {
+      "x" : 328,
+      "y" : 430
     },
-    "step08" : {
-      "x" : 338,
-      "y" : 820
+    "step06" : {
+      "x" : 1500,
+      "y" : 430
     },
     "step39" : {
-      "x" : 338,
-      "y" : 662
+      "x" : 884,
+      "y" : 430
     },
     "END" : {
-      "x" : 2122,
-      "y" : 663
+      "x" : 1576,
+      "y" : 521
     },
     "FAIL" : {
-      "x" : 2300,
-      "y" : 1054
-    },
-    "step63" : {
-      "x" : 40,
-      "y" : 1174
-    },
-    "step62" : {
-      "x" : 280,
-      "y" : 1174
+      "x" : 1782,
+      "y" : 1186
     }
   },
   "edges" : {
     "step01|onFailure|" : [ {
-      "x" : 324,
-      "y" : 235
+      "x" : 314,
+      "y" : 131
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 314,
+      "y" : 1210
     } ],
     "step02|onFailure|" : [ {
-      "x" : 324,
-      "y" : 349
+      "x" : 314,
+      "y" : 207
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 314,
+      "y" : 1210
     } ],
     "step59|onFailure|" : [ {
-      "x" : 324,
-      "y" : 439
+      "x" : 314,
+      "y" : 283
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 314,
+      "y" : 1210
     } ],
     "step04|onFailure|" : [ {
-      "x" : 324,
-      "y" : 597
+      "x" : 314,
+      "y" : 455
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 314,
+      "y" : 1210
     } ],
-    "step05|next|" : [ {
-      "x" : 284,
-      "y" : 687
+    "step05|onFailure|" : [ {
+      "x" : 264,
+      "y" : 545
+    }, {
+      "x" : 264,
+      "y" : 500
+    }, {
+      "x" : 1356,
+      "y" : 500
+    }, {
+      "x" : 1356,
+      "y" : 455
+    } ],
+    "step06|route|그대로 진행" : [ {
+      "x" : 1366,
+      "y" : 455
+    }, {
+      "x" : 1366,
+      "y" : 508
     }, {
       "x" : 284,
-      "y" : 845
+      "y" : 508
+    }, {
+      "x" : 284,
+      "y" : 621
     } ],
     "step06|route|고객요청사항 재분석" : [ {
-      "x" : 36,
-      "y" : 763
+      "x" : 1376,
+      "y" : 455
     }, {
-      "x" : 36,
-      "y" : 521
+      "x" : 1376,
+      "y" : 418
+    }, {
+      "x" : 264,
+      "y" : 418
+    }, {
+      "x" : 264,
+      "y" : 373
     } ],
     "step06|route|요구사항분석서 수정" : [ {
-      "x" : 264,
-      "y" : 763
+      "x" : 1386,
+      "y" : 455
     }, {
-      "x" : 264,
-      "y" : 687
+      "x" : 1386,
+      "y" : 492
+    }, {
+      "x" : 1098,
+      "y" : 492
+    }, {
+      "x" : 1098,
+      "y" : 455
     } ],
     "step06|route|중지" : [ {
-      "x" : 324,
-      "y" : 763
+      "x" : 1714,
+      "y" : 455
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 1714,
+      "y" : 1210
     } ],
     "step07|onFailure|" : [ {
-      "x" : 324,
-      "y" : 845
+      "x" : 314,
+      "y" : 621
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 314,
+      "y" : 1210
     } ],
     "step07|route|false" : [ {
-      "x" : 264,
-      "y" : 845
-    } ],
-    "step08|next|" : [ {
-      "x" : 304,
-      "y" : 845
+      "x" : 294,
+      "y" : 621
     }, {
-      "x" : 304,
-      "y" : 1017
-    } ],
-    "step09|route|승인(설계진행)" : [ {
-      "x" : 264,
-      "y" : 1017
-    }, {
-      "x" : 264,
-      "y" : 964
-    }, {
-      "x" : 592,
-      "y" : 964
-    }, {
-      "x" : 592,
-      "y" : 55
+      "x" : 294,
+      "y" : 773
     } ],
     "step09|route|영향도 수정" : [ {
-      "x" : 274,
-      "y" : 1017
+      "x" : 264,
+      "y" : 849
     }, {
-      "x" : 274,
-      "y" : 927
+      "x" : 264,
+      "y" : 773
     } ],
     "step09|route|영향도 재분석" : [ {
-      "x" : 294,
-      "y" : 1017
+      "x" : 36,
+      "y" : 849
     }, {
-      "x" : 294,
-      "y" : 845
+      "x" : 36,
+      "y" : 773
     } ],
     "step09|route|요구사항 수정" : [ {
-      "x" : 314,
-      "y" : 1017
+      "x" : 304,
+      "y" : 849
     }, {
-      "x" : 314,
-      "y" : 597
+      "x" : 304,
+      "y" : 455
     } ],
     "step09|route|중지" : [ {
-      "x" : 324,
-      "y" : 1017
+      "x" : 284,
+      "y" : 849
     }, {
-      "x" : 324,
-      "y" : 1078
+      "x" : 284,
+      "y" : 1210
     } ],
     "step10|onFailure|" : [ {
-      "x" : 890,
-      "y" : 55
+      "x" : 284,
+      "y" : 925
     }, {
-      "x" : 890,
-      "y" : 1078
+      "x" : 284,
+      "y" : 1210
     } ],
     "step11|onFailure|" : [ {
-      "x" : 890,
-      "y" : 235
+      "x" : 870,
+      "y" : 55
     }, {
-      "x" : 890,
-      "y" : 1078
+      "x" : 870,
+      "y" : 1210
     } ],
     "step11|route|false" : [ {
-      "x" : 562,
-      "y" : 235
+      "x" : 830,
+      "y" : 55
     }, {
-      "x" : 562,
-      "y" : 439
-    } ],
-    "step12|next|" : [ {
-      "x" : 552,
-      "y" : 439
+      "x" : 830,
+      "y" : 207
     } ],
     "step13|route|승인(개발진행, 간이 확인)" : [ {
-      "x" : 820,
-      "y" : 521
+      "x" : 850,
+      "y" : 373
     }, {
-      "x" : 820,
-      "y" : 597
+      "x" : 850,
+      "y" : 455
     } ],
     "step13|route|승인(개발진행, 최소 확인)" : [ {
-      "x" : 820,
-      "y" : 521
+      "x" : 850,
+      "y" : 373
     }, {
-      "x" : 820,
-      "y" : 597
+      "x" : 850,
+      "y" : 455
     } ],
     "step13|route|설계 수정" : [ {
-      "x" : 850,
-      "y" : 521
+      "x" : 860,
+      "y" : 373
     }, {
-      "x" : 850,
-      "y" : 349
+      "x" : 860,
+      "y" : 283
     } ],
     "step13|route|설계 다시 작성" : [ {
-      "x" : 562,
-      "y" : 521
+      "x" : 582,
+      "y" : 373
     }, {
-      "x" : 562,
-      "y" : 439
+      "x" : 582,
+      "y" : 207
     } ],
     "step13|route|영향도 수정" : [ {
-      "x" : 552,
-      "y" : 521
+      "x" : 592,
+      "y" : 373
     }, {
-      "x" : 552,
-      "y" : 927
+      "x" : 592,
+      "y" : 773
     } ],
     "step13|route|중지" : [ {
-      "x" : 890,
-      "y" : 521
+      "x" : 870,
+      "y" : 373
     }, {
-      "x" : 890,
-      "y" : 1078
+      "x" : 870,
+      "y" : 1210
     } ],
     "step14|onFailure|" : [ {
-      "x" : 860,
-      "y" : 597
+      "x" : 542,
+      "y" : 455
     }, {
-      "x" : 860,
-      "y" : 1078
+      "x" : 542,
+      "y" : 373
     } ],
     "step17|onFailure|" : [ {
       "x" : 860,
-      "y" : 845
+      "y" : 849
     }, {
       "x" : 860,
-      "y" : 1078
-    } ],
-    "step18|next|" : [ {
-      "x" : 830,
-      "y" : 1017
-    }, {
-      "x" : 830,
-      "y" : 964
-    }, {
-      "x" : 1148,
-      "y" : 964
-    }, {
-      "x" : 1148,
-      "y" : 439
+      "y" : 1210
     } ],
     "step18|onFailure|" : [ {
-      "x" : 840,
-      "y" : 1017
+      "x" : 1406,
+      "y" : 131
     }, {
-      "x" : 840,
-      "y" : 972
-    }, {
-      "x" : 1158,
-      "y" : 972
-    }, {
-      "x" : 1158,
-      "y" : 55
+      "x" : 1406,
+      "y" : 283
     } ],
-    "step19|route|승인" : [ {
-      "x" : 1406,
-      "y" : 55
+    "step19|route|승인(완료)" : [ {
+      "x" : 1734,
+      "y" : 283
     }, {
-      "x" : 1406,
-      "y" : 116
+      "x" : 1734,
+      "y" : 545
+    } ],
+    "step19|route|재개발(간이 확인)" : [ {
+      "x" : 1714,
+      "y" : 283
     }, {
-      "x" : 2032,
-      "y" : 116
+      "x" : 1714,
+      "y" : 373
+    } ],
+    "step19|route|재개발(최소 확인)" : [ {
+      "x" : 1714,
+      "y" : 283
     }, {
-      "x" : 2032,
-      "y" : 687
+      "x" : 1714,
+      "y" : 373
     } ],
     "step19|route|설계 수정" : [ {
-      "x" : 1148,
-      "y" : 55
+      "x" : 1366,
+      "y" : 283
     }, {
-      "x" : 1148,
-      "y" : 349
+      "x" : 1366,
+      "y" : 320
+    }, {
+      "x" : 1098,
+      "y" : 320
+    }, {
+      "x" : 1098,
+      "y" : 283
     } ],
     "step19|route|영향도 수정" : [ {
-      "x" : 1118,
-      "y" : 55
+      "x" : 1376,
+      "y" : 283
     }, {
-      "x" : 1118,
-      "y" : 92
+      "x" : 1376,
+      "y" : 328
     }, {
-      "x" : 582,
-      "y" : 92
+      "x" : 592,
+      "y" : 328
     }, {
-      "x" : 582,
-      "y" : 927
+      "x" : 592,
+      "y" : 773
     } ],
     "step19|route|요구사항 수정" : [ {
-      "x" : 1128,
-      "y" : 55
+      "x" : 1386,
+      "y" : 283
     }, {
-      "x" : 1128,
-      "y" : 100
-    }, {
-      "x" : 572,
-      "y" : 100
+      "x" : 1386,
+      "y" : 336
     }, {
       "x" : 572,
-      "y" : 597
+      "y" : 336
+    }, {
+      "x" : 572,
+      "y" : 455
     } ],
     "step19|route|실패" : [ {
-      "x" : 1456,
-      "y" : 55
+      "x" : 1744,
+      "y" : 283
     }, {
-      "x" : 1456,
-      "y" : 1078
+      "x" : 1744,
+      "y" : 1210
+    } ],
+    "step20|next|" : [ {
+      "x" : 1356,
+      "y" : 373
+    }, {
+      "x" : 1356,
+      "y" : 410
+    }, {
+      "x" : 840,
+      "y" : 410
+    }, {
+      "x" : 840,
+      "y" : 697
     } ],
     "step20|onFailure|" : [ {
-      "x" : 1456,
-      "y" : 153
+      "x" : 1724,
+      "y" : 373
     }, {
-      "x" : 1456,
-      "y" : 1078
+      "x" : 1724,
+      "y" : 1210
     } ],
     "step25|next|" : [ {
-      "x" : 820,
-      "y" : 349
-    }, {
-      "x" : 820,
-      "y" : 439
+      "x" : 830,
+      "y" : 283
     } ],
     "step26|next|" : [ {
-      "x" : 284,
-      "y" : 927
+      "x" : 274,
+      "y" : 773
     }, {
-      "x" : 284,
-      "y" : 1017
+      "x" : 274,
+      "y" : 849
     } ],
     "step27|next|" : [ {
       "x" : 264,
-      "y" : 597
+      "y" : 455
     } ],
     "step28|onFailure|" : [ {
-      "x" : 1158,
-      "y" : 521
-    }, {
-      "x" : 1158,
-      "y" : 55
+      "x" : 1356,
+      "y" : 283
     } ],
     "step28|route|false" : [ {
-      "x" : 1158,
-      "y" : 521
-    }, {
-      "x" : 1158,
-      "y" : 55
+      "x" : 1356,
+      "y" : 283
     } ],
     "step60|onFailure|" : [ {
-      "x" : 1406,
-      "y" : 597
+      "x" : 1396,
+      "y" : 373
     }, {
-      "x" : 1406,
-      "y" : 687
+      "x" : 1396,
+      "y" : 455
     } ],
     "step60|route|ok" : [ {
-      "x" : 1406,
-      "y" : 597
+      "x" : 1396,
+      "y" : 373
     }, {
-      "x" : 1406,
-      "y" : 687
+      "x" : 1396,
+      "y" : 455
     } ],
     "step60|route|missing" : [ {
-      "x" : 1118,
-      "y" : 597
+      "x" : 1416,
+      "y" : 373
     }, {
-      "x" : 1118,
-      "y" : 521
+      "x" : 1416,
+      "y" : 207
     } ],
     "step61|route|DDL 반영함" : [ {
-      "x" : 1128,
-      "y" : 521
+      "x" : 1436,
+      "y" : 207
     }, {
-      "x" : 1128,
-      "y" : 597
-    } ],
-    "step61|route|테스트 없이 진행" : [ {
-      "x" : 1158,
-      "y" : 521
-    }, {
-      "x" : 1158,
-      "y" : 55
+      "x" : 1436,
+      "y" : 373
     } ],
     "step61|route|중지" : [ {
-      "x" : 1168,
-      "y" : 521
+      "x" : 1744,
+      "y" : 207
     }, {
-      "x" : 1168,
-      "y" : 1078
+      "x" : 1744,
+      "y" : 1210
+    } ],
+    "step65|onFailure|" : [ {
+      "x" : 830,
+      "y" : 697
+    }, {
+      "x" : 830,
+      "y" : 773
+    } ],
+    "step70|onFailure|" : [ {
+      "x" : 840,
+      "y" : 773
+    }, {
+      "x" : 840,
+      "y" : 849
+    } ],
+    "step66|onFailure|" : [ {
+      "x" : 830,
+      "y" : 925
+    }, {
+      "x" : 830,
+      "y" : 886
+    }, {
+      "x" : 1128,
+      "y" : 886
+    }, {
+      "x" : 1128,
+      "y" : 55
+    } ],
+    "step67|onFailure|" : [ {
+      "x" : 830,
+      "y" : 1015
+    }, {
+      "x" : 830,
+      "y" : 962
+    }, {
+      "x" : 1128,
+      "y" : 962
+    }, {
+      "x" : 1128,
+      "y" : 55
+    } ],
+    "step67|route|first" : [ {
+      "x" : 840,
+      "y" : 1015
+    }, {
+      "x" : 840,
+      "y" : 970
+    }, {
+      "x" : 1128,
+      "y" : 970
+    }, {
+      "x" : 1128,
+      "y" : 55
+    } ],
+    "step67|route|changed" : [ {
+      "x" : 850,
+      "y" : 1015
+    }, {
+      "x" : 850,
+      "y" : 978
+    }, {
+      "x" : 1128,
+      "y" : 978
+    }, {
+      "x" : 1128,
+      "y" : 55
+    } ],
+    "step68|next|" : [ {
+      "x" : 542,
+      "y" : 1091
+    }, {
+      "x" : 542,
+      "y" : 925
+    } ],
+    "step68|limitOver|" : [ {
+      "x" : 850,
+      "y" : 1091
+    }, {
+      "x" : 850,
+      "y" : 1173
+    } ],
+    "step69|route|재개발" : [ {
+      "x" : 830,
+      "y" : 1173
+    }, {
+      "x" : 830,
+      "y" : 1136
+    }, {
+      "x" : 1466,
+      "y" : 1136
+    }, {
+      "x" : 1466,
+      "y" : 373
+    } ],
+    "step69|route|그대로 검증" : [ {
+      "x" : 840,
+      "y" : 1173
+    }, {
+      "x" : 840,
+      "y" : 1128
+    }, {
+      "x" : 1128,
+      "y" : 1128
+    }, {
+      "x" : 1128,
+      "y" : 55
+    } ],
+    "step69|route|실패" : [ {
+      "x" : 860,
+      "y" : 1173
+    }, {
+      "x" : 860,
+      "y" : 1210
     } ],
     "step43|onFailure|" : [ {
-      "x" : 1684,
-      "y" : 521
+      "x" : 1406,
+      "y" : 455
     }, {
-      "x" : 1684,
-      "y" : 558
+      "x" : 1406,
+      "y" : 545
+    } ],
+    "step43|route|재개발(간이 확인)" : [ {
+      "x" : 1416,
+      "y" : 455
     }, {
       "x" : 1416,
-      "y" : 558
+      "y" : 1015
+    } ],
+    "step43|route|재개발(최소 확인)" : [ {
+      "x" : 1426,
+      "y" : 455
     }, {
-      "x" : 1416,
-      "y" : 763
+      "x" : 1426,
+      "y" : 283
+    } ],
+    "step43|route|설계 승인" : [ {
+      "x" : 1446,
+      "y" : 455
+    }, {
+      "x" : 1446,
+      "y" : 131
+    } ],
+    "step43|route|설계 수정" : [ {
+      "x" : 1446,
+      "y" : 455
+    }, {
+      "x" : 1446,
+      "y" : 131
+    } ],
+    "step43|route|영향도 수정" : [ {
+      "x" : 1446,
+      "y" : 455
+    }, {
+      "x" : 1446,
+      "y" : 131
+    } ],
+    "step43|route|요구사항 수정" : [ {
+      "x" : 1446,
+      "y" : 455
+    }, {
+      "x" : 1446,
+      "y" : 131
+    } ],
+    "step43|limitOver|" : [ {
+      "x" : 1406,
+      "y" : 455
+    }, {
+      "x" : 1406,
+      "y" : 545
+    } ],
+    "step64|onFailure|" : [ {
+      "x" : 1456,
+      "y" : 131
+    }, {
+      "x" : 1456,
+      "y" : 545
+    } ],
+    "step64|route|승인(개발진행, 전체 확인)" : [ {
+      "x" : 1456,
+      "y" : 131
+    }, {
+      "x" : 1456,
+      "y" : 545
+    } ],
+    "step64|route|승인(개발진행, 간이 확인)" : [ {
+      "x" : 1476,
+      "y" : 131
+    }, {
+      "x" : 1476,
+      "y" : 1015
+    } ],
+    "step64|route|승인(개발진행, 최소 확인)" : [ {
+      "x" : 1724,
+      "y" : 131
+    }, {
+      "x" : 1724,
+      "y" : 283
     } ],
     "step45|next|" : [ {
-      "x" : 1446,
-      "y" : 597
+      "x" : 1426,
+      "y" : 1015
     }, {
-      "x" : 1446,
-      "y" : 55
+      "x" : 1426,
+      "y" : 283
     } ],
-    "step45|onFailure|" : [ {
-      "x" : 1436,
-      "y" : 597
+    "step29|onFailure|" : [ {
+      "x" : 1366,
+      "y" : 697
     }, {
-      "x" : 1436,
-      "y" : 1017
-    } ],
-    "step29|next|" : [ {
-      "x" : 1396,
-      "y" : 927
-    }, {
-      "x" : 1396,
-      "y" : 882
-    }, {
-      "x" : 1734,
-      "y" : 882
-    }, {
-      "x" : 1734,
-      "y" : 349
+      "x" : 1366,
+      "y" : 1091
     } ],
     "step30|onFailure|" : [ {
-      "x" : 1158,
-      "y" : 1017
+      "x" : 1426,
+      "y" : 1091
     }, {
-      "x" : 1158,
-      "y" : 55
-    } ],
-    "step30|route|true" : [ {
-      "x" : 1396,
-      "y" : 1017
-    }, {
-      "x" : 1396,
-      "y" : 964
-    }, {
-      "x" : 1744,
-      "y" : 964
-    }, {
-      "x" : 1744,
-      "y" : 55
+      "x" : 1426,
+      "y" : 283
     } ],
     "step30|route|false" : [ {
-      "x" : 1158,
-      "y" : 1017
+      "x" : 1426,
+      "y" : 1091
     }, {
-      "x" : 1158,
+      "x" : 1426,
+      "y" : 283
+    } ],
+    "step32|next|" : [ {
+      "x" : 1486,
+      "y" : 1173
+    }, {
+      "x" : 1486,
       "y" : 55
     } ],
     "step32|onFailure|" : [ {
-      "x" : 1684,
-      "y" : 153
+      "x" : 1426,
+      "y" : 1173
     }, {
-      "x" : 1684,
-      "y" : 108
+      "x" : 1426,
+      "y" : 283
+    } ],
+    "step32|limitOver|" : [ {
+      "x" : 1426,
+      "y" : 1173
     }, {
-      "x" : 1396,
-      "y" : 108
-    }, {
-      "x" : 1396,
-      "y" : 55
+      "x" : 1426,
+      "y" : 283
     } ],
     "step34|next|" : [ {
-      "x" : 1396,
-      "y" : 235
+      "x" : 1356,
+      "y" : 55
     }, {
-      "x" : 1396,
-      "y" : 280
-    }, {
-      "x" : 880,
-      "y" : 280
-    }, {
-      "x" : 880,
-      "y" : 1017
+      "x" : 1356,
+      "y" : 131
     } ],
     "step34|onFailure|" : [ {
-      "x" : 1416,
-      "y" : 235
-    }, {
-      "x" : 1416,
+      "x" : 1724,
       "y" : 55
-    } ],
-    "step35|next|" : [ {
-      "x" : 1714,
-      "y" : 349
     }, {
-      "x" : 1714,
-      "y" : 55
+      "x" : 1724,
+      "y" : 283
     } ],
     "step35|onFailure|" : [ {
-      "x" : 1684,
-      "y" : 349
+      "x" : 1426,
+      "y" : 773
     }, {
-      "x" : 1684,
-      "y" : 272
+      "x" : 1426,
+      "y" : 283
+    } ],
+    "step62|onFailure|" : [ {
+      "x" : 1426,
+      "y" : 849
     }, {
-      "x" : 1416,
-      "y" : 272
-    }, {
-      "x" : 1416,
-      "y" : 55
+      "x" : 1426,
+      "y" : 283
     } ],
     "step36|onFailure|" : [ {
-      "x" : 1396,
-      "y" : 55
+      "x" : 1426,
+      "y" : 925
+    }, {
+      "x" : 1426,
+      "y" : 283
     } ],
     "step36|route|true" : [ {
-      "x" : 1684,
-      "y" : 55
+      "x" : 1356,
+      "y" : 925
+    }, {
+      "x" : 1356,
+      "y" : 1173
     } ],
     "step36|route|false" : [ {
-      "x" : 1396,
-      "y" : 55
+      "x" : 1426,
+      "y" : 925
+    }, {
+      "x" : 1426,
+      "y" : 283
+    } ],
+    "step37|next|" : [ {
+      "x" : 850,
+      "y" : 131
+    }, {
+      "x" : 850,
+      "y" : 283
+    } ],
+    "step38|next|" : [ {
+      "x" : 274,
+      "y" : 697
+    }, {
+      "x" : 274,
+      "y" : 849
     } ],
     "step39|next|" : [ {
-      "x" : 274,
-      "y" : 687
+      "x" : 830,
+      "y" : 455
+    }, {
+      "x" : 830,
+      "y" : 492
     }, {
       "x" : 274,
-      "y" : 597
+      "y" : 492
+    }, {
+      "x" : 274,
+      "y" : 455
     } ],
     "step40|onFailure|" : [ {
-      "x" : 1406,
-      "y" : 845
+      "x" : 1356,
+      "y" : 621
     }, {
-      "x" : 1406,
-      "y" : 927
+      "x" : 1356,
+      "y" : 697
     } ],
     "step41|onFailure|" : [ {
-      "x" : 1158,
-      "y" : 763
+      "x" : 1426,
+      "y" : 545
     }, {
-      "x" : 1158,
+      "x" : 1426,
+      "y" : 283
+    } ],
+    "step46|onFailure|" : [ {
+      "x" : 264,
+      "y" : 1015
+    }, {
+      "x" : 264,
+      "y" : 962
+    }, {
+      "x" : 602,
+      "y" : 962
+    }, {
+      "x" : 602,
       "y" : 55
     } ],
-    "step46|next|" : [ {
-      "x" : 820,
-      "y" : 153
-    }, {
-      "x" : 820,
-      "y" : 198
-    }, {
-      "x" : 2012,
-      "y" : 198
-    }, {
-      "x" : 2012,
-      "y" : 349
-    } ],
-    "step48|next|" : [ {
-      "x" : 1972,
-      "y" : 439
-    }, {
-      "x" : 1972,
-      "y" : 386
-    }, {
-      "x" : 1138,
-      "y" : 386
-    }, {
-      "x" : 1138,
-      "y" : 235
-    } ],
     "step48|onFailure|" : [ {
-      "x" : 1982,
-      "y" : 439
+      "x" : 264,
+      "y" : 1091
     }, {
-      "x" : 1982,
-      "y" : 402
+      "x" : 264,
+      "y" : 1052
     }, {
-      "x" : 840,
-      "y" : 402
+      "x" : 602,
+      "y" : 1052
     }, {
-      "x" : 840,
-      "y" : 235
+      "x" : 602,
+      "y" : 55
     } ],
     "step49|next|" : [ {
-      "x" : 820,
-      "y" : 235
+      "x" : 264,
+      "y" : 1173
+    }, {
+      "x" : 264,
+      "y" : 1128
+    }, {
+      "x" : 602,
+      "y" : 1128
+    }, {
+      "x" : 602,
+      "y" : 55
     } ],
     "step49|onFailure|" : [ {
-      "x" : 820,
-      "y" : 235
+      "x" : 274,
+      "y" : 1173
+    }, {
+      "x" : 274,
+      "y" : 1136
+    }, {
+      "x" : 602,
+      "y" : 1136
+    }, {
+      "x" : 602,
+      "y" : 55
     } ],
     "step50|onFailure|" : [ {
       "x" : 840,
-      "y" : 439
+      "y" : 283
     }, {
       "x" : 840,
-      "y" : 521
+      "y" : 373
     } ],
     "step50|route|problem" : [ {
-      "x" : 830,
-      "y" : 439
+      "x" : 552,
+      "y" : 283
     }, {
-      "x" : 830,
-      "y" : 394
-    }, {
-      "x" : 2022,
-      "y" : 394
-    }, {
-      "x" : 2022,
-      "y" : 235
+      "x" : 552,
+      "y" : 373
     } ],
     "step52|next|" : [ {
-      "x" : 820,
-      "y" : 439
+      "x" : 562,
+      "y" : 373
+    }, {
+      "x" : 562,
+      "y" : 283
+    } ],
+    "step52|limitOver|" : [ {
+      "x" : 542,
+      "y" : 373
     } ],
     "step53|onFailure|" : [ {
-      "x" : 1406,
-      "y" : 439
+      "x" : 1396,
+      "y" : 207
     }, {
-      "x" : 1406,
-      "y" : 521
+      "x" : 1396,
+      "y" : 283
     } ],
     "step53|route|problem" : [ {
-      "x" : 1396,
-      "y" : 439
-    }, {
-      "x" : 1396,
-      "y" : 476
-    }, {
-      "x" : 1724,
-      "y" : 476
-    }, {
-      "x" : 1724,
-      "y" : 845
+      "x" : 1098,
+      "y" : 207
     } ],
     "step54|onFailure|" : [ {
-      "x" : 850,
-      "y" : 927
+      "x" : 1356,
+      "y" : 55
     }, {
-      "x" : 850,
-      "y" : 1017
+      "x" : 1356,
+      "y" : 131
     } ],
     "step54|route|false" : [ {
-      "x" : 820,
-      "y" : 927
+      "x" : 1108,
+      "y" : 55
     }, {
-      "x" : 820,
-      "y" : 980
-    }, {
-      "x" : 1684,
-      "y" : 980
-    }, {
-      "x" : 1684,
-      "y" : 1017
+      "x" : 1108,
+      "y" : 131
     } ],
     "step57|next|" : [ {
-      "x" : 820,
-      "y" : 1017
+      "x" : 1098,
+      "y" : 131
     } ],
     "step57|onFailure|" : [ {
-      "x" : 820,
-      "y" : 1017
+      "x" : 1098,
+      "y" : 131
+    } ],
+    "step57|limitOver|" : [ {
+      "x" : 1098,
+      "y" : 131
     } ],
     "step58|next|" : [ {
-      "x" : 850,
-      "y" : 845
+      "x" : 1118,
+      "y" : 207
     }, {
-      "x" : 850,
-      "y" : 1017
+      "x" : 1118,
+      "y" : 131
     } ],
     "step58|onFailure|" : [ {
-      "x" : 1138,
-      "y" : 845
+      "x" : 1108,
+      "y" : 207
     }, {
-      "x" : 1138,
-      "y" : 521
+      "x" : 1108,
+      "y" : 283
+    } ],
+    "step58|limitOver|" : [ {
+      "x" : 1108,
+      "y" : 207
+    }, {
+      "x" : 1108,
+      "y" : 283
     } ]
   },
   "ports" : {
@@ -903,24 +1114,24 @@
       "target" : "left"
     },
     "step05|next|" : {
-      "source" : "right",
-      "target" : "right"
+      "source" : "out",
+      "target" : "in"
     },
     "step05|onFailure|" : {
-      "source" : "out",
-      "target" : "in"
+      "source" : "right",
+      "target" : "left"
     },
     "step06|route|그대로 진행" : {
-      "source" : "out",
-      "target" : "in"
+      "source" : "left",
+      "target" : "right"
     },
     "step06|route|고객요청사항 재분석" : {
       "source" : "left",
-      "target" : "left"
+      "target" : "right"
     },
     "step06|route|요구사항분석서 수정" : {
-      "source" : "right",
-      "target" : "left"
+      "source" : "left",
+      "target" : "right"
     },
     "step06|route|중지" : {
       "source" : "right",
@@ -936,22 +1147,22 @@
     },
     "step07|route|false" : {
       "source" : "right",
-      "target" : "left"
-    },
-    "step08|next|" : {
-      "source" : "left",
       "target" : "right"
     },
+    "step08|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
     "step09|route|승인(설계진행)" : {
-      "source" : "right",
-      "target" : "left"
+      "source" : "out",
+      "target" : "in"
     },
     "step09|route|영향도 수정" : {
       "source" : "right",
       "target" : "left"
     },
     "step09|route|영향도 재분석" : {
-      "source" : "right",
+      "source" : "left",
       "target" : "left"
     },
     "step09|route|요구사항 수정" : {
@@ -979,12 +1190,12 @@
       "target" : "in"
     },
     "step11|route|false" : {
-      "source" : "left",
+      "source" : "right",
       "target" : "right"
     },
     "step12|next|" : {
-      "source" : "right",
-      "target" : "left"
+      "source" : "out",
+      "target" : "in"
     },
     "step13|route|승인(개발진행, 전체 확인)" : {
       "source" : "out",
@@ -1004,7 +1215,7 @@
     },
     "step13|route|설계 다시 작성" : {
       "source" : "left",
-      "target" : "right"
+      "target" : "left"
     },
     "step13|route|영향도 수정" : {
       "source" : "left",
@@ -1019,10 +1230,14 @@
       "target" : "in"
     },
     "step14|onFailure|" : {
-      "source" : "right",
+      "source" : "left",
       "target" : "left"
     },
     "step16|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step63|next|" : {
       "source" : "out",
       "target" : "in"
     },
@@ -1035,20 +1250,28 @@
       "target" : "left"
     },
     "step18|next|" : {
-      "source" : "right",
-      "target" : "left"
+      "source" : "out",
+      "target" : "in"
     },
     "step18|onFailure|" : {
       "source" : "right",
       "target" : "left"
     },
-    "step19|route|승인" : {
+    "step19|route|승인(완료)" : {
       "source" : "right",
-      "target" : "left"
+      "target" : "right"
     },
     "step19|route|재개발" : {
       "source" : "out",
       "target" : "in"
+    },
+    "step19|route|재개발(간이 확인)" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step19|route|재개발(최소 확인)" : {
+      "source" : "right",
+      "target" : "right"
     },
     "step19|route|설계 수정" : {
       "source" : "left",
@@ -1067,8 +1290,8 @@
       "target" : "left"
     },
     "step20|next|" : {
-      "source" : "out",
-      "target" : "in"
+      "source" : "left",
+      "target" : "right"
     },
     "step20|onFailure|" : {
       "source" : "right",
@@ -1087,7 +1310,7 @@
       "target" : "right"
     },
     "step28|onFailure|" : {
-      "source" : "left",
+      "source" : "right",
       "target" : "left"
     },
     "step28|route|true" : {
@@ -1095,7 +1318,7 @@
       "target" : "in"
     },
     "step28|route|false" : {
-      "source" : "left",
+      "source" : "right",
       "target" : "left"
     },
     "step60|onFailure|" : {
@@ -1111,96 +1334,220 @@
       "target" : "right"
     },
     "step60|route|missing" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step61|route|DDL 반영함" : {
       "source" : "left",
       "target" : "right"
     },
-    "step61|route|DDL 반영함" : {
-      "source" : "right",
-      "target" : "left"
-    },
     "step61|route|테스트 없이 진행" : {
-      "source" : "right",
-      "target" : "left"
+      "source" : "out",
+      "target" : "in"
     },
     "step61|route|중지" : {
       "source" : "right",
       "target" : "left"
     },
-    "step43|onFailure|" : {
+    "step65|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step65|onFailure|" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step70|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step70|onFailure|" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step66|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step66|onFailure|" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step67|onFailure|" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step67|route|first" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step67|route|changed" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step67|route|unchanged" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step68|next|" : {
       "source" : "left",
+      "target" : "left"
+    },
+    "step68|onFailure|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step68|limitOver|" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step69|route|재개발" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step69|route|그대로 검증" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step69|route|실패" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step43|onFailure|" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step43|route|재개발" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step43|route|재개발(간이 확인)" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step43|route|재개발(최소 확인)" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step43|route|설계 승인" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step43|route|설계 수정" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step43|route|영향도 수정" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step43|route|요구사항 수정" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step43|limitOver|" : {
+      "source" : "right",
+      "target" : "right"
+    },
+    "step64|onFailure|" : {
+      "source" : "left",
+      "target" : "right"
+    },
+    "step64|route|승인(개발진행, 전체 확인)" : {
+      "source" : "left",
+      "target" : "right"
+    },
+    "step64|route|승인(개발진행, 간이 확인)" : {
+      "source" : "left",
+      "target" : "right"
+    },
+    "step64|route|승인(개발진행, 최소 확인)" : {
+      "source" : "right",
       "target" : "right"
     },
     "step45|next|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step45|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step29|next|" : {
       "source" : "right",
       "target" : "left"
     },
-    "step29|onFailure|" : {
+    "step45|onFailure|" : {
       "source" : "out",
       "target" : "in"
     },
+    "step29|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step29|onFailure|" : {
+      "source" : "right",
+      "target" : "right"
+    },
     "step30|onFailure|" : {
-      "source" : "left",
+      "source" : "right",
       "target" : "left"
     },
     "step30|route|true" : {
-      "source" : "right",
-      "target" : "left"
-    },
-    "step30|route|false" : {
-      "source" : "left",
-      "target" : "left"
-    },
-    "step32|next|" : {
       "source" : "out",
       "target" : "in"
     },
+    "step30|route|false" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step32|next|" : {
+      "source" : "right",
+      "target" : "left"
+    },
     "step32|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "right",
+      "target" : "left"
+    },
+    "step32|limitOver|" : {
+      "source" : "right",
+      "target" : "left"
     },
     "step34|next|" : {
       "source" : "left",
       "target" : "right"
     },
     "step34|onFailure|" : {
-      "source" : "left",
+      "source" : "right",
       "target" : "right"
     },
     "step35|next|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "out",
+      "target" : "in"
     },
     "step35|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step36|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
-    },
-    "step36|route|true" : {
       "source" : "right",
       "target" : "left"
     },
-    "step36|route|false" : {
-      "source" : "left",
+    "step62|next|" : {
+      "source" : "out",
+      "target" : "in"
+    },
+    "step62|onFailure|" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step36|onFailure|" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step36|route|true" : {
+      "source" : "right",
       "target" : "right"
     },
+    "step36|route|false" : {
+      "source" : "right",
+      "target" : "left"
+    },
     "step37|next|" : {
-      "source" : "out",
-      "target" : "in"
+      "source" : "right",
+      "target" : "right"
     },
     "step38|next|" : {
-      "source" : "out",
-      "target" : "in"
+      "source" : "right",
+      "target" : "right"
     },
     "step39|next|" : {
       "source" : "left",
@@ -1219,32 +1566,32 @@
       "target" : "in"
     },
     "step41|onFailure|" : {
-      "source" : "left",
-      "target" : "left"
-    },
-    "step46|next|" : {
       "source" : "right",
       "target" : "left"
     },
-    "step46|onFailure|" : {
+    "step46|next|" : {
       "source" : "out",
       "target" : "in"
     },
+    "step46|onFailure|" : {
+      "source" : "right",
+      "target" : "left"
+    },
     "step48|next|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "out",
+      "target" : "in"
     },
     "step48|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "right",
+      "target" : "left"
     },
     "step49|next|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "right",
+      "target" : "left"
     },
     "step49|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "right",
+      "target" : "left"
     },
     "step50|onFailure|" : {
       "source" : "right",
@@ -1255,12 +1602,16 @@
       "target" : "in"
     },
     "step50|route|problem" : {
+      "source" : "left",
+      "target" : "right"
+    },
+    "step52|next|" : {
       "source" : "right",
       "target" : "left"
     },
-    "step52|next|" : {
-      "source" : "left",
-      "target" : "right"
+    "step52|limitOver|" : {
+      "source" : "right",
+      "target" : "left"
     },
     "step53|onFailure|" : {
       "source" : "right",
@@ -1271,8 +1622,8 @@
       "target" : "in"
     },
     "step53|route|problem" : {
-      "source" : "right",
-      "target" : "left"
+      "source" : "left",
+      "target" : "right"
     },
     "step54|onFailure|" : {
       "source" : "right",
@@ -1283,22 +1634,30 @@
       "target" : "in"
     },
     "step54|route|false" : {
+      "source" : "left",
+      "target" : "right"
+    },
+    "step57|next|" : {
       "source" : "right",
       "target" : "left"
     },
-    "step57|next|" : {
-      "source" : "left",
-      "target" : "right"
-    },
     "step57|onFailure|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "right",
+      "target" : "left"
+    },
+    "step57|limitOver|" : {
+      "source" : "right",
+      "target" : "left"
     },
     "step58|next|" : {
-      "source" : "left",
-      "target" : "right"
+      "source" : "right",
+      "target" : "left"
     },
     "step58|onFailure|" : {
+      "source" : "right",
+      "target" : "left"
+    },
+    "step58|limitOver|" : {
       "source" : "right",
       "target" : "left"
     }
