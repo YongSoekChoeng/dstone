@@ -400,7 +400,8 @@ dstone:
             #               프롬프트에 "필요한 범위만 읽는다"고 적어도 실제 실행에서 readFileLines의 73%가 범위 없이 불렸다(2026-11-05).
             # max-search-matches: searchInFiles가 한 번에 돌려주는 최대 건수(기본 100). 소스 루트 전체를 넓은 단어로 찾으면
             #               한 번에 15,000자가 넘게 와서 50으로 낮췄다(2026-11-05).
-            # max-search-file-bytes: searchInFiles가 검색하는 파일의 최대 크기(기본 1MB). 더 큰 파일은 건너뛴다.
+            # max-search-file-bytes: searchInFiles가 검색하는 파일의 최대 크기(기본 1MB). 더 큰 파일은 건너뛰고 결과에 알린다
+            #               (파일 하나를 콕 집어 검색하면 10MB까지 찾는다).
             # exclude-dirs: 목록/검색에서 빼는 폴더 이름(콤마 구분). 프로젝트 루트를 조회했을 때 .git 속 파일까지
             #               338KB가 딸려 와서 요청이 700KB로 불어나 실패한 적이 있다.
             file:

@@ -1449,6 +1449,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		});
 		decisionBodyEl.style.display = routes.length > 0 ? "" : "none";
 		renderDecisionLinks((pendingApproval && pendingApproval.links) || {});
+		renderDecisionNotes((pendingApproval && pendingApproval.notes) || {});
 
 		// 고른 결정이 목록에 그대로 있으면 새 목록의 같은 줄로 옮긴다
 		var keep = null;
@@ -1530,6 +1531,26 @@ var DstoneAiWorkflowAdmin = (function () {
 			anchor.textContent = links[name];
 			item.appendChild(anchor);
 			box.appendChild(item);
+		});
+	}
+
+	// 승인 step의 notes(표시 이름 → 줄 목록). Agent가 쓴 글이라 textContent로만 넣는다
+	function renderDecisionNotes(notes) {
+		var box = document.getElementById("wa-decide-notes");
+		var names = Object.keys(notes);
+		box.innerHTML = "";
+		box.style.display = names.length > 0 ? "" : "none";
+		names.forEach(function (name) {
+			var title = document.createElement("strong");
+			title.textContent = name + " (" + notes[name].length + "건)";
+			box.appendChild(title);
+			var list = document.createElement("ul");
+			notes[name].forEach(function (line) {
+				var item = document.createElement("li");
+				item.textContent = line;
+				list.appendChild(item);
+			});
+			box.appendChild(list);
 		});
 	}
 

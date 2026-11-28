@@ -651,7 +651,7 @@ public class WorkFlowExecutionService extends BaseService {
 		for (Map.Entry<String, String> route : approval.decisionRoutes().entrySet()) {
 			receivers.put(route.getKey(), this.receiverLabel(workflow, route.getValue()));
 		}
-		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers, approval.hints(), this.linksOf(approval, execution));
+		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers, approval.hints(), this.linksOf(approval, execution), this.notesOf(approval, execution));
 	}
 
 	/** approval.links를 지금 컨텍스트로 읽습니다. 화면에서 눌러도 안전하게 http·https 주소만 남깁니다. */
@@ -665,6 +665,33 @@ public class WorkFlowExecutionService extends BaseService {
 			}
 		}
 		return links;
+	}
+
+	/** approval.notes를 지금 컨텍스트로 읽습니다. 목록은 항목마다 한 줄로 만들고, 보여 줄 줄이 없는 것은 뺍니다. */
+	private Map<String, List<String>> notesOf(ApprovalStepDefinition approval, WorkFlowExecution execution) {
+		Map<String, List<String>> notes = new LinkedHashMap<String, List<String>>();
+		for (Map.Entry<String, String> note : approval.notes().entrySet()) {
+			Object value = ContextResolver.resolve(note.getValue(), execution.context(), null);
+			List<String> lines = new ArrayList<String>();
+			if (value instanceof List<?> items) {
+				for (Object item : items) {
+					addLine(lines, item);
+				}
+			} else {
+				addLine(lines, value);
+			}
+			if (!lines.isEmpty()) {
+				notes.put(note.getKey(), lines);
+			}
+		}
+		return notes;
+	}
+
+	private static void addLine(List<String> lines, Object value) {
+		String line = value == null ? "" : String.valueOf(value).strip();
+		if (!line.isEmpty()) {
+			lines.add(line);
+		}
 	}
 
 	/**

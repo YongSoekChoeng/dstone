@@ -77,4 +77,44 @@ class FileToolSearchTest {
 		assertThat(block).contains("FileService.java:2").contains("  1| class FileService {").contains("> 2|   void imageSave() {}").contains("  3| }");
 	}
 
+	@Test
+	void 긴_줄은_일치한_곳_주변을_보여_준다() throws Exception {
+		String line = "a".repeat(5000) + "bindClick(\"a.btn-\"+name)" + "b".repeat(5000) + "defaultClass" + "c".repeat(500);
+		Files.writeString(this.dir.resolve("lib.min.js"), line, StandardCharsets.UTF_8);
+
+		Map<String, Object> result = this.tool.searchInFiles(this.dir.toString(), "bindclick|defaultClass", "*.js", null);
+
+		String match = String.valueOf(((List<?>) result.get("matches")).get(0));
+		assertThat(match).contains("…(5001번째 글자) ").contains("bindClick(\"a.btn-\"+name)").contains("defaultClass");
+		assertThat(match.length()).isLessThan(1000);
+	}
+
+	@Test
+	void 긴_줄에_일치한_곳이_많으면_몇_곳이_더_있는지_알린다() throws Exception {
+		Files.writeString(this.dir.resolve("lib.min.js"), ("key" + "a".repeat(600)).repeat(8), StandardCharsets.UTF_8);
+
+		Map<String, Object> result = this.tool.searchInFiles(this.dir.toString(), "key", "*.js", Integer.valueOf(1));
+
+		assertThat(String.valueOf(((List<?>) result.get("matches")).get(0))).contains("3곳 더 있습니다");
+	}
+
+	@Test
+	void 크기_때문에_건너뛴_파일을_알리고_파일을_콕_집으면_찾는다() throws Exception {
+		Path big = this.dir.resolve("all.min.js");
+		Files.writeString(big, "a".repeat(2 * 1024 * 1024) + "bindClick", StandardCharsets.UTF_8);
+		byte[] binary = new byte[2 * 1024 * 1024];
+		Files.write(this.dir.resolve("image.png"), binary);
+
+		Map<String, Object> folder = this.tool.searchInFiles(this.dir.toString(), "bindClick", null, null);
+
+		assertThat((List<?>) folder.get("skippedLargeFiles")).hasSize(1);
+		assertThat(String.valueOf(folder.get("skippedLargeFiles"))).contains("all.min.js");
+		assertThat(String.valueOf(folder.get("message"))).contains("검색하지 않은 파일이 1개");
+
+		Map<String, Object> single = this.tool.searchInFiles(big.toString(), "bindClick", null, null);
+
+		assertThat((List<?>) single.get("matches")).hasSize(1);
+		assertThat(single).doesNotContainKey("skippedLargeFiles");
+	}
+
 }

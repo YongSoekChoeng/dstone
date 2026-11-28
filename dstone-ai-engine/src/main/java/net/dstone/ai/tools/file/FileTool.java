@@ -1,6 +1,8 @@
 package net.dstone.ai.tools.file;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -10,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -59,8 +62,18 @@ public class FileTool {
 	private static final int DEFAULT_MAX_SEARCH_MATCHES = 100;
 	/** 설정이 없을 때, 이보다 큰 파일은 검색에서 건너뜁니다(1MB). */
 	private static final int DEFAULT_MAX_SEARCH_FILE_BYTES = 1024 * 1024;
-	/** 검색 결과 한 줄을 이 글자 수까지만 보여줍니다(한 줄짜리 거대한 파일 대비). */
+	/** 검색 결과 한 줄이 이 글자 수를 넘으면 줄 전체 대신 일치한 곳 주변만 보여줍니다(한 줄짜리 거대한 파일 대비). */
 	private static final int MAX_MATCH_LINE_CHARS = 200;
+	/** 긴 줄에서 일치한 곳 하나를 보여 줄 때, 그 앞에 붙이는 글자 수입니다. */
+	private static final int MATCH_EXCERPT_BEFORE = 120;
+	/** 긴 줄에서 일치한 곳 하나를 보여 줄 때, 일치한 곳부터 보여 주는 글자 수입니다. */
+	private static final int MATCH_EXCERPT_AFTER = 200;
+	/** 긴 줄 하나에서 보여 주는 일치한 곳의 수입니다. 나머지는 몇 곳이 더 있는지만 알립니다. */
+	private static final int MAX_MATCH_EXCERPTS = 5;
+	/** 파일 하나를 콕 집어 검색할 때는 이 크기까지 검색합니다(10MB). 폴더 검색의 크기 상한보다 넉넉합니다. */
+	private static final int MAX_SINGLE_SEARCH_FILE_BYTES = 10 * 1024 * 1024;
+	/** 크기 때문에 건너뛴 파일은 결과에 이 개수까지 이름을 적습니다. */
+	private static final int MAX_SKIPPED_FILES_LISTED = 10;
 	/** 설정이 없을 때 목록/검색에서 빼는 폴더 이름들입니다(소스가 아닌 것들). */
 	private static final String DEFAULT_EXCLUDE_DIRS = ".git,.svn,target,node_modules,.settings,.idea,.gradle,.metadata";
 
@@ -153,6 +166,8 @@ public class FileTool {
 		+ "어떤 소스가 특정 컬럼명/테이블명/클래스명/메서드명/URL/문구를 쓰는지 찾을 때 사용한다. 파일을 하나씩 열어 보기 전에 먼저 이 Tool로 후보를 찾아라. "
 		+ "keyword는 정규식이 아니라 단순 문자열이며 대소문자를 구분하지 않는다. 여러 개를 찾으려면 |로 이어 한 번에 부른다(예: imageSave|thumbnail|getFileDAO - 그중 하나라도 있는 줄). "
 		+ "같은 파일이나 폴더에서 키워드마다 따로 부르지 마라. 찾은 줄의 앞뒤도 보려면 contextLines를 준다(readFileLines를 따로 부르지 않아도 된다). "
+		+ "아주 긴 줄(압축된 js·css 등)은 줄 전체가 아니라 일치한 곳 주변만 '…(n번째 글자) 내용…'으로 보여 준다. 다른 곳을 보려면 keyword를 더 구체적으로 한다. "
+		+ "폴더 검색은 크기 상한을 넘는 파일을 건너뛰고 skippedLargeFiles에 적는다. 필요하면 basePath에 그 파일 경로를 줘서 다시 찾는다. "
 		+ "결과가 많으면 일부만 반환하고 truncated=true와 안내(message)를 준다 - "
 		+ "그때는 keyword를 더 구체적으로 하거나 fileNamePattern/basePath로 범위를 좁혀 다시 호출한다.")
 	public Map<String, Object> searchInFiles(
@@ -203,10 +218,27 @@ public class FileTool {
 		}
 		int around = contextLines == null ? 0 : Math.max(0, Math.min(MAX_SEARCH_CONTEXT_LINES, contextLines.intValue()));
 
+		// 파일 하나를 콕 집었으면 큰 파일도 찾아 줍니다. 건너뛰었다는 안내를 받고 다시 부를 길이 있어야 합니다.
+		int sizeLimit = fileOnly ? Math.max(maxFileBytes, MAX_SINGLE_SEARCH_FILE_BYTES) : maxFileBytes;
+		int maxResultChars = this.intProperty("max-read-chars", DEFAULT_MAX_READ_CHARS);
+
 		int totalMatches = 0;
 		int searchedFiles = 0;
+		int resultChars = 0;
+		int skippedCount = 0;
+		List<String> skipped = new ArrayList<>();
 		for (File file : all) {
-			if (!this.matchesName(file.getName(), namePatterns) || file.length() > maxFileBytes) {
+			if (!this.matchesName(file.getName(), namePatterns)) {
+				continue;
+			}
+			if (file.length() > sizeLimit) {
+				// 이미지·jar 같은 바이너리는 어차피 검색 대상이 아니라서 알리지 않습니다.
+				if (!isBinary(file)) {
+					skippedCount++;
+					if (skipped.size() < MAX_SKIPPED_FILES_LISTED) {
+						skipped.add(this.toPath(file) + " (" + (file.length() / 1024) + "KB)");
+					}
+				}
 				continue;
 			}
 			String contents = this.readText(file);
@@ -221,8 +253,11 @@ public class FileTool {
 					continue;
 				}
 				totalMatches++;
-				if (matches.size() < maxMatches) {
-					matches.add(around == 0 ? this.toPath(file) + ":" + (i + 1) + ": " + this.shorten(lines[i].trim()) : this.withContext(file, lines, i, around));
+				if (matches.size() < maxMatches && resultChars < maxResultChars) {
+					String match = around == 0 ? this.toPath(file) + ":" + (i + 1) + ": " + this.matchedPart(lines[i].trim(), lowerKeywords)
+						: this.withContext(file, lines, i, around, lowerKeywords);
+					matches.add(match);
+					resultChars += match.length();
 				}
 			}
 		}
@@ -231,11 +266,20 @@ public class FileTool {
 		result.put("totalMatches", Integer.valueOf(totalMatches));
 		result.put("searchedFiles", Integer.valueOf(searchedFiles));
 		result.put("truncated", Boolean.valueOf(truncated));
+		String message = "";
 		if (truncated) {
-			result.put("message", "일치하는 줄이 많아서 전체 " + totalMatches + "건 중 " + matches.size() + "건만 반환했습니다. "
-				+ "keyword를 더 구체적으로 하거나 fileNamePattern/basePath로 범위를 좁혀 다시 호출하세요.");
+			message = "일치하는 줄이 많아서 전체 " + totalMatches + "건 중 " + matches.size() + "건만 반환했습니다. "
+				+ "keyword를 더 구체적으로 하거나 fileNamePattern/basePath로 범위를 좁혀 다시 호출하세요.";
 		} else if (totalMatches == 0) {
-			result.put("message", "일치하는 줄이 없습니다(검색한 파일 " + searchedFiles + "개). 다른 keyword나 다른 경로로 시도해 보세요.");
+			message = "일치하는 줄이 없습니다(검색한 파일 " + searchedFiles + "개). 다른 keyword나 다른 경로로 시도해 보세요.";
+		}
+		if (skippedCount > 0) {
+			result.put("skippedLargeFiles", skipped);
+			message += (message.isEmpty() ? "" : " ") + "크기 상한(" + (sizeLimit / 1024) + "KB)을 넘어 검색하지 않은 파일이 " + skippedCount + "개 있습니다(skippedLargeFiles). "
+				+ (fileOnly ? "이 Tool로는 찾을 수 없습니다." : "그 안도 봐야 하면 basePath에 그 파일 경로를 줘서 다시 호출하세요.");
+		}
+		if (!message.isEmpty()) {
+			result.put("message", message);
 		}
 		return result;
 	}
@@ -262,13 +306,14 @@ public class FileTool {
 	 *     13| ...
 	 * </pre>
 	 */
-	private String withContext(File file, String[] lines, int index, int around) {
+	private String withContext(File file, String[] lines, int index, int around, List<String> lowerKeywords) {
 		StringBuilder block = new StringBuilder();
 		block.append(this.toPath(file)).append(":").append(index + 1);
 		int from = Math.max(0, index - around);
 		int to = Math.min(lines.length - 1, index + around);
 		for (int i = from; i <= to; i++) {
-			block.append("\n").append(i == index ? "> " : "  ").append(i + 1).append("| ").append(this.shorten(lines[i]));
+			String text = i == index ? this.matchedPart(lines[i], lowerKeywords) : this.shorten(lines[i]);
+			block.append("\n").append(i == index ? "> " : "  ").append(i + 1).append("| ").append(text);
 		}
 		return block.toString();
 	}
@@ -1693,7 +1738,97 @@ public class FileTool {
 		}
 	}
 
-	/** 검색 결과의 한 줄이 너무 길면 앞부분만 남깁니다. */
+	/**
+	 * <pre>
+	 * 찾은 줄에서 보여 줄 부분을 만듭니다. 짧은 줄은 그대로 주고, 긴 줄은 일치한 곳마다 그 주변을 잘라 줍니다.
+	 * 앞부분만 자르면 압축된 파일처럼 한 줄이 아주 긴 경우에 정작 일치한 곳이 보이지 않습니다.
+	 * 먼저 키워드마다 처음 나온 곳을 담고, 자리가 남으면 나머지를 앞에서부터 담습니다.
+	 * </pre>
+	 *
+	 * @param line          찾은 줄
+	 * @param lowerKeywords 소문자로 바꾼 키워드들
+	 */
+	private String matchedPart(String line, List<String> lowerKeywords) {
+		if (line.length() <= MAX_MATCH_LINE_CHARS) {
+			return line;
+		}
+		String lower = line.toLowerCase(Locale.ROOT);
+		List<Integer> firsts = new ArrayList<>();
+		List<Integer> others = new ArrayList<>();
+		for (String keyword : lowerKeywords) {
+			int at = lower.indexOf(keyword);
+			if (at >= 0) {
+				firsts.add(Integer.valueOf(at));
+			}
+			while (at >= 0) {
+				at = lower.indexOf(keyword, at + keyword.length());
+				if (at >= 0) {
+					others.add(Integer.valueOf(at));
+				}
+			}
+		}
+		Collections.sort(firsts);
+		Collections.sort(others);
+		List<Integer> candidates = new ArrayList<>(firsts);
+		candidates.addAll(others);
+
+		// 이미 담은 조각 안에서 보이는 곳은 다시 담지 않습니다.
+		List<Integer> shown = new ArrayList<>();
+		int hidden = 0;
+		for (Integer position : candidates) {
+			if (isShown(shown, position.intValue())) {
+				continue;
+			}
+			if (shown.size() < MAX_MATCH_EXCERPTS) {
+				shown.add(position);
+			} else {
+				hidden++;
+			}
+		}
+		Collections.sort(shown);
+		StringBuilder text = new StringBuilder();
+		for (Integer position : shown) {
+			// 소문자로 바꾸며 길이가 달라지는 글자가 있어도 범위를 벗어나지 않게 맞춥니다.
+			int at = Math.min(position.intValue(), line.length());
+			int from = Math.max(0, at - MATCH_EXCERPT_BEFORE);
+			int to = Math.min(line.length(), at + MATCH_EXCERPT_AFTER);
+			if (text.length() > 0) {
+				text.append("  ");
+			}
+			text.append("…(").append(at + 1).append("번째 글자) ").append(line, from, to).append("…");
+		}
+		if (hidden > 0) {
+			text.append("  (이 줄에 일치하는 곳이 ").append(hidden).append("곳 더 있습니다. keyword를 더 구체적으로 하세요)");
+		}
+		return text.toString();
+	}
+
+	/** 그 자리가 이미 담기로 한 조각 안에서 보이는지 봅니다. */
+	private static boolean isShown(List<Integer> shown, int position) {
+		for (Integer start : shown) {
+			if (position >= start.intValue() - MATCH_EXCERPT_BEFORE && position < start.intValue() + MATCH_EXCERPT_AFTER / 2) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** 파일 앞부분에 0 바이트가 있으면 글자 파일이 아닌 것으로 봅니다. 못 읽는 파일도 바이너리로 칩니다. */
+	private static boolean isBinary(File file) {
+		try (InputStream in = Files.newInputStream(file.toPath())) {
+			byte[] head = in.readNBytes(4096);
+			for (byte b : head) {
+				if (b == 0) {
+					return true;
+				}
+			}
+			return false;
+		} catch (IOException e) {
+			return true;
+		}
+	}
+
+	/** 검색 결과에서 일치한 줄의 앞뒤 줄이 너무 길면 앞부분만 남깁니다. */
 	private String shorten(String line) {
 		if (line.length() <= MAX_MATCH_LINE_CHARS) {
 			return line;

@@ -23,8 +23,9 @@
 #   (Integer) 캐스팅만 parseInt로 바꾸고 컴파일만 해서, 같은 줄이 빈 값에 다시 실패했고 자동 수정 한도를 다 썼다.
 # 2.7.0(2026-11-28): 받는 Skill이 바뀌었다(browser-testing의 화면 들어가기·반응이 없을 때, test-environment 5절). 평가 비교에서 전후를 가르려고 버전을 올린다.
 # 2.8.0(2026-11-28): 프로젝트의 항상 읽는 Skill(preload: true)이 처음부터 프롬프트에 붙는다. 평가 비교에서 전후를 가르려고 버전을 올린다.
+# 2.8.1(2026-11-28): 본문은 그대로다. troubleshooting Skill에 "눌러도 반응이 없을 때"를 더해 평가 비교에서 전후를 가르려고 버전을 올린다.
 id: sm-auto-fix-agent
-version: 2.8.0
+version: 2.8.1
 description: 동작 검증에서 실패한 것의 원인을 테스트 서버에서 찾아 개발 결과와 설계서를 고친다.
 model:
   temperature: 0.2

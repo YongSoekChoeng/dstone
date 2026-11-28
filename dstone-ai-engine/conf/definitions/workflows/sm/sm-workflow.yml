@@ -104,7 +104,7 @@
 # 버전별로 바뀐 내용과 그 이유(실행 id 포함)는 .claude/docs/ai-engine-history.md의 sm-workflow 절에 있습니다.
 ################################################################################################################
 id: sm-workflow
-version: 2.20.0
+version: 2.21.0
 description: |
   어플리케이션 운영관리 workflow. 고객의 요청이 담긴 00.request.md 파일이 있는 폴더의 절대경로를 입력하라(파일명 제외).
   요청서에는 '현업요청'과 '프로젝트ID'(프로젝트 관리에 등록한 ID)를 적는다. 소스는 그 프로젝트의 현재 리비전([Build] 결과)을 쓴다.
@@ -378,6 +378,8 @@ steps:
         재개발(서버 없이): 다시 개발한 뒤 소스 오류만 확인합니다. 테스트 서버에는 반영하지 않으니, '개발 결과 받기'의 [로컬에 반영]이나 ZIP으로 받아 내 환경에서 확인하세요.
       links:
         테스트 서버(마지막으로 반영한 코드): ${state.serverCheck.url:}
+      notes:
+        마지막 개발이 확인하지 못한 것: ${state.develop.unresolved:}
       deliverable:
         dir: ${input}/${state.now}/dev-resources
         deleteList: ${input}/${state.now}/dev-resources/_delete-files.txt

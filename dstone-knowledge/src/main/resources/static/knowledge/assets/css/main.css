@@ -2917,6 +2917,18 @@ body.wd-full-on {
 	margin-top: 4px;
 }
 
+.wa-decide-notes {
+	margin: 0 0 14px;
+	max-height: 220px;
+	overflow: auto;
+	word-break: break-word;
+}
+
+.wa-decide-notes ul {
+	margin: 4px 0 8px;
+	padding-left: 20px;
+}
+
 .wa-decide-guide {
 	margin: 0 0 14px;
 	color: var(--cs-text-2);

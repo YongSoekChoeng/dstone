@@ -112,11 +112,13 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		WorkflowStepper flow = this.atStep("step19");
 		flow.put("docs", Map.of("design", "# 설계 (옛 내용)", "taskitems", "# 목록 (옛 내용)"));
 		flow.put("serverCheck", Map.of("success", Boolean.TRUE, "url", "http://localhost:18080"));
+		flow.put("develop", Map.of("unresolved", List.of("삭제 버튼 → 원인 추정 → 눌러서 확인")));
 		flow.step("step19");
 		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
 		PendingApproval pending = this.pendingApproval(flow.execution());
 		assertThat(pending.receivers().get("재개발(자동 검증)")).isEqualTo("step17 25-개발 · sm-developer-agent");
 		assertThat(pending.links()).containsEntry("테스트 서버(마지막으로 반영한 코드)", "http://localhost:18080");
+		assertThat(pending.notes()).containsEntry("마지막 개발이 확인하지 못한 것", List.of("삭제 버튼 → 원인 추정 → 눌러서 확인"));
 
 		flow.decide("재개발(자동 검증)", "업로드한 파일이 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step20");
@@ -163,7 +165,7 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 
 		// 두 번째에도 안 바뀌면 한도를 다 써서 다시 부르지 않고 승인으로 갑니다.
 		flow.put("docs", Map.of("design", "# 설계", "taskitems", "# 목록")).put("projectId", "myApp").put("projectRevision", Map.of("sourceRoot", "/app/myApp"));
-		this.chatModel.answer("{\"completed\":1,\"pending\":0,\"pendingReasons\":[],\"unfinished\":0,\"notApplied\":[],\"reportedFixes\":[],\"taskitemsRecorded\":true,\"designSynced\":false}");
+		this.chatModel.answer("{\"completed\":1,\"pending\":0,\"pendingReasons\":[],\"unfinished\":0,\"notApplied\":[],\"reportedFixes\":[],\"unresolved\":[],\"taskitemsRecorded\":true,\"designSynced\":false}");
 		flow.step("step68");
 		flow.step("step66");
 		flow.step("step67");
