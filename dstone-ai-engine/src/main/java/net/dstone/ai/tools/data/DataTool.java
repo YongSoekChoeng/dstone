@@ -53,8 +53,9 @@ public class DataTool {
 			@ToolParam(required = false, description = "이 필드들이 모두 비어 있지 않은 항목만") List<String> notEmpty,
 			@ToolParam(required = false, description = "이 필드들이 모두 비어 있는 항목만") List<String> empty,
 			@ToolParam(required = false, description = "이 필드들 가운데 하나라도 비어 있지 않은 항목만") List<String> anyNotEmpty,
-			@ToolParam(required = false, description = "고른 항목에서 이 필드의 값만 돌려준다") String pick) {
-		return DataLogic.filter(list, where, notEmpty, empty, anyNotEmpty, pick);
+			@ToolParam(required = false, description = "고른 항목에서 이 필드의 값만 돌려준다") String pick,
+			@ToolParam(required = false, description = "필드 → 값. 그 필드의 값이 적은 값과 같은 항목은 뺀다") Map<String, Object> whereNot) {
+		return DataLogic.filter(list, where, notEmpty, empty, anyNotEmpty, pick, whereNot);
 	}
 
 	/**

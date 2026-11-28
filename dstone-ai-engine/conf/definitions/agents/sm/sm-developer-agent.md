@@ -19,8 +19,10 @@
 # 2.9.0(2026-11-28): 지난 검증 결과(verification)를 받고, 재개발은 지시 항목마다 원인과 고친 곳(reportedFixes)을 답한다. 실행 5def8189에서
 #   검증이 찾은 원인이 개발에 전달되지 않았고, 재개발 한 번은 "이미 구현돼 있다"며 아무것도 고치지 않고 모두 완료로 답했다.
 # 2.10.0(2026-11-28): 프로젝트의 항상 읽는 Skill(preload: true)이 처음부터 프롬프트에 붙는다. 평가 비교에서 전후를 가르려고 버전을 올린다.
+# 2.11.0(2026-11-28): verification은 PASS가 아닌 것만 받는다(sm-workflow 2.18.0). 실행 5def8189 09:08 재개발이 지난 PASS를 보고
+#   "대부분 처리됐다"며 아무것도 고치지 않았다.
 id: sm-developer-agent
-version: 2.10.0
+version: 2.11.0
 description: 상세 설계서대로 개발해 dev-resources에 저장하고, compileJava로 컴파일을 확인한 뒤 결과를 03-2.taskitems.md에 기록한다. 재개발로 고친 것은 설계서에도 옮겨 적는다.
 model:
   temperature: 0.2
@@ -37,7 +39,7 @@ input:
   compile_error?: string, 지난 컴파일 확인에서 난 오류(없으면 비어 있음)
   check_result?: string, Workflow가 다시 부른 이유(지난 개발의 보류, 개발 결과의 형식 오류). 없으면 비어 있음
   recent_changes?: string, 지난 동작 검증 뒤로 작업 폴더에서 실제로 바뀐 줄(엔진이 기록한 diff). 없으면 비어 있음
-  verification?: any, 기준마다 모은 지난 동작 검증 결과(시나리오와 관측 근거. carried가 true면 마지막 회차에 다시 보지 않은 것). 없으면 비어 있음
+  verification?: any, 지난 동작 검증에서 PASS가 아닌 기준(시나리오와 관측 근거. carried가 true면 마지막 회차에 다시 보지 않은 것). 없으면 비어 있음. 여기 없다는 것이 지금 동작한다는 뜻은 아니다
 output:
   completed: integer, '완료'로 기록한 태스크아이템 수
   pending: integer, '보류'로 기록한 태스크아이템 수

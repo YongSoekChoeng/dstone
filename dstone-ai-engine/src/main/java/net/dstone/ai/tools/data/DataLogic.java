@@ -54,16 +54,31 @@ public final class DataLogic {
 	 * @param empty       이 필드들이 모두 비어 있어야 합니다.
 	 * @param anyNotEmpty 이 필드들 가운데 하나라도 비어 있지 않아야 합니다.
 	 * @param pick        적으면, 고른 항목 자체가 아니라 항목의 이 필드 값을 돌려줍니다.
+	 * @param whereNot    필드 → 값. 그 필드의 값이 적은 값과 같은 항목은 뺍니다(필드가 없는 항목은 남습니다).
 	 */
-	public static List<Object> filter(List<Object> list, Map<String, Object> where, List<String> notEmpty, List<String> empty, List<String> anyNotEmpty, String pick) {
+	public static List<Object> filter(List<Object> list, Map<String, Object> where, List<String> notEmpty, List<String> empty, List<String> anyNotEmpty, String pick,
+		Map<String, Object> whereNot) {
 		List<Object> result = new ArrayList<>();
 		for (Object item : list == null ? List.of() : list) {
-			if (item == null || !matches(item, where, notEmpty, empty, anyNotEmpty)) {
+			if (item == null || !matches(item, where, notEmpty, empty, anyNotEmpty) || sameAsAny(item, whereNot)) {
 				continue;
 			}
 			result.add(pick == null || pick.isBlank() ? item : get(item, pick));
 		}
 		return result;
+	}
+
+	/** 항목의 필드 값이 적은 값과 같은 것이 하나라도 있는지 봅니다. */
+	private static boolean sameAsAny(Object item, Map<String, Object> values) {
+		if (values != null) {
+			for (Map.Entry<String, Object> entry : values.entrySet()) {
+				Object value = get(item, entry.getKey());
+				if (value != null && text(value).equals(text(entry.getValue()))) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/** 항목 하나가 조건에 모두 맞는지 봅니다. */

@@ -222,7 +222,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 
 		flow.jumpTo("step63");
 		flow.step("step63");
-		assertThat(flow.currentStepId()).isEqualTo("step17");
+		assertThat(flow.currentStepId()).isEqualTo("step65");
 		assertThat(flow.state("verificationAll")).isEqualTo(List.of());
 	}
 

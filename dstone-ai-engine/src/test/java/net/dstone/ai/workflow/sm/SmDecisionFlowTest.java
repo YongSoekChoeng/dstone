@@ -119,6 +119,8 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 		flow.decide("재개발", "업로드한 파일이 저장되지 않음");
 		assertThat(flow.currentStepId()).isEqualTo("step20");
 		flow.step("step20");
+		flow.step("step65"); // 개발에 넘길 검증 결과(PASS 제외)
+		flow.step("step70"); // 개발 전 개발 폴더 상태
 
 		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
 		assertThat(flow.currentStepId()).isEqualTo("step17");
@@ -137,6 +139,69 @@ public class SmDecisionFlowTest extends WorkflowTestBase {
 			assertThat(with).as(stepId).contains("instruction=${arrival").contains("history=${decisions");
 		}
 		assertThat(context).doesNotContainKey(Constants.WorkFlow.Context.DECISIONS);
+	}
+
+	@Test
+	void 재개발에서_파일이_안_바뀌면_한_번_더_시키고_그래도_없으면_승인에서_멈춘다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
+		Path folder = this.folder();
+		Files.createDirectories(folder.resolve("dev-resources"));
+		Files.writeString(folder.resolve("dev-resources/A.java"), "class A {}", StandardCharsets.UTF_8);
+
+		WorkflowStepper flow = this.atStep("step65");
+		flow.put("verificationAll", List.of(Map.of("id", "T1", "result", "PASS"), Map.of("id", "T2", "result", "FAIL"), Map.of("id", "T3", "result", "BLOCKED")));
+		flow.step("step65");
+		assertThat(String.valueOf(flow.state("verificationOpen"))).contains("T2").contains("T3").doesNotContain("T1");
+		flow.step("step70");
+		// 개발이 아무것도 바꾸지 않고 끝난 것처럼 바로 비교합니다.
+		flow.jumpTo("step66");
+		flow.step("step66");
+		flow.step("step67");
+		assertThat(flow.currentStepId()).isEqualTo("step68");
+
+		// 두 번째에도 안 바뀌면 한도를 다 써서 다시 부르지 않고 승인으로 갑니다.
+		flow.put("docs", Map.of("design", "# 설계", "taskitems", "# 목록")).put("projectId", "myApp").put("projectRevision", Map.of("sourceRoot", "/app/myApp"));
+		this.chatModel.answer("{\"completed\":1,\"pending\":0,\"pendingReasons\":[],\"unfinished\":0,\"notApplied\":[],\"reportedFixes\":[],\"taskitemsRecorded\":true,\"designSynced\":false}");
+		flow.step("step68");
+		flow.step("step66");
+		flow.step("step67");
+		assertThat(flow.currentStepId()).isEqualTo("step68");
+		flow.step("step68");
+		assertThat(flow.currentStepId()).isEqualTo("step69");
+		assertThat(this.chatModel.prompts()).hasSize(1);
+		assertThat(ScriptedChatModel.textOf(this.chatModel.prompts().get(0))).contains("파일을 하나도 바꾸지 않고 끝났다");
+		flow.step("step69");
+		assertThat(flow.status()).isEqualTo(WorkFlowExecutionStatus.WAITING_APPROVAL);
+		flow.decide("그대로 검증", "");
+		assertThat(flow.currentStepId()).isEqualTo("step54");
+	}
+
+	@Test
+	void 개발이_파일을_바꾸면_지금_흐름으로_간다() throws IOException {
+		assumeFalse(this.chatModel.isLlmCall(), "미리 넣은 답으로 확인하는 테스트라 실제 LLM을 부를 때는 건너뜁니다.");
+		Path folder = this.folder();
+		Files.createDirectories(folder.resolve("dev-resources"));
+		Files.writeString(folder.resolve("dev-resources/A.java"), "class A {}", StandardCharsets.UTF_8);
+
+		WorkflowStepper flow = this.atStep("step70");
+		flow.step("step70");
+		Files.writeString(folder.resolve("dev-resources/A.java"), "class A { int x; }", StandardCharsets.UTF_8);
+		flow.jumpTo("step66");
+		flow.step("step66");
+		flow.step("step67");
+
+		assertThat(flow.currentStepId()).isEqualTo("step54");
+	}
+
+	@Test
+	void 검증한_적이_없어도_재개발_준비는_그대로_넘어간다() throws IOException {
+		this.folder();
+		WorkflowStepper flow = this.atStep("step65");
+		flow.step("step65");
+		flow.step("step70"); // 개발 폴더가 없으면 실패 갈래로 개발에 간다
+
+		assertThat(flow.status()).isNotEqualTo(WorkFlowExecutionStatus.FAILED);
+		assertThat(flow.currentStepId()).isEqualTo("step17");
 	}
 
 	/** 작업 폴더(입력 폴더/실행 시각)를 만듭니다. */

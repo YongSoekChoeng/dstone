@@ -211,7 +211,8 @@ public class FileSetTool {
 	/**
 	 * <pre>
 	 * 폴더 아래 파일들의 지금 상태(스냅샷)를 만들고, 지난번 스냅샷과 비교해 바뀐 파일을 알려 줍니다.
-	 * 돌려주는 값: {first, changed: [상대경로], snapshot: {상대경로: 내용 해시}, summary: 사람·Agent가 읽을 한 덩어리 글}
+	 * 돌려주는 값: {route, first, changed: [상대경로], snapshot: {상대경로: 내용 해시}, summary: 사람·Agent가 읽을 한 덩어리 글}
+	 * - route: first(비교할 지난 것이 없음) / changed(바뀐 파일 있음) / unchanged(바뀐 파일 없음). TOOL step이 routes로 갈 곳을 나눌 때 씁니다
 	 * - first: previous가 비어 비교할 것이 없으면 true(changed는 빈 목록)
 	 * - changed: 새로 생기거나, 내용이 바뀌거나, 없어진 파일(없어진 것은 "(삭제) 경로")
 	 * 결과를 save해 두었다가 다음에 그 snapshot을 previous로 넘기면 "그 사이에 바뀐 것"이 됩니다.
@@ -236,7 +237,7 @@ public class FileSetTool {
 		return this.fileChanges(basePath, previous, excludeDirs, null);
 	}
 
-	@Tool(description = "폴더 아래 파일의 스냅샷을 만들고 지난 스냅샷(previous)과 비교해 바뀐 파일을 {first, changed, snapshot, summary, diff}로 돌려준다. diff는 copyDir을 줄 때만.")
+	@Tool(description = "폴더 아래 파일의 스냅샷을 만들고 지난 스냅샷(previous)과 비교해 바뀐 파일을 {route, first, changed, snapshot, summary, diff}로 돌려준다. route는 first, changed, unchanged 가운데 하나다. diff는 copyDir을 줄 때만.")
 	public Map<String, Object> fileChanges(
 			@ToolParam(description = "볼 폴더의 절대경로") String basePath,
 			@ToolParam(required = false, description = "지난번 결과의 snapshot({상대경로: 해시}). 처음이면 비움") Object previous,
@@ -278,6 +279,7 @@ public class FileSetTool {
 			}
 		}
 		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("route", first ? "first" : (changed.isEmpty() ? "unchanged" : "changed"));
 		result.put("first", first);
 		result.put("changed", changed);
 		result.put("snapshot", snapshot);

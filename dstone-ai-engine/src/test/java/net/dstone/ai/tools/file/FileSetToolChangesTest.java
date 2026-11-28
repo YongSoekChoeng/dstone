@@ -35,6 +35,7 @@ public class FileSetToolChangesTest {
 
 		Map<String, Object> first = tool.fileChanges(this.dir.toString(), null, "compile-check");
 		assertThat(first.get("first")).isEqualTo(Boolean.TRUE);
+		assertThat(first.get("route")).isEqualTo("first");
 		assertThat((Map<String, String>) first.get("snapshot")).containsOnlyKeys("dev/src/A.java", "dev/src/B.java");
 
 		Files.writeString(this.dir.resolve("dev/src/A.java"), "class A { int x; }", StandardCharsets.UTF_8);
@@ -46,11 +47,13 @@ public class FileSetToolChangesTest {
 
 		Map<String, Object> second = tool.fileChanges(this.dir.toString(), first.get("snapshot"), "compile-check");
 		assertThat(second.get("first")).isEqualTo(Boolean.FALSE);
+		assertThat(second.get("route")).isEqualTo("changed");
 		assertThat((List<String>) second.get("changed")).containsExactlyInAnyOrder("dev/src/A.java", "dev/src/B2.java", "dev/src/C.java", "(삭제) dev/src/B.java");
 		assertThat(second.get("summary").toString()).contains("바뀐 파일 4개");
 
 		Map<String, Object> third = tool.fileChanges(this.dir.toString(), second.get("snapshot"), "compile-check");
 		assertThat((List<String>) third.get("changed")).isEmpty();
+		assertThat(third.get("route")).isEqualTo("unchanged");
 		assertThat(third.get("summary").toString()).contains("바뀐 파일이 없습니다");
 	}
 
