@@ -462,14 +462,14 @@
       "x" : 1734,
       "y" : 545
     } ],
-    "step19|route|재개발(간이 확인)" : [ {
+    "step19|route|재개발(직접 확인)" : [ {
       "x" : 1714,
       "y" : 283
     }, {
       "x" : 1714,
       "y" : 373
     } ],
-    "step19|route|재개발(최소 확인)" : [ {
+    "step19|route|재개발(서버 없이)" : [ {
       "x" : 1714,
       "y" : 283
     }, {
@@ -720,14 +720,14 @@
       "x" : 1406,
       "y" : 545
     } ],
-    "step43|route|재개발(간이 확인)" : [ {
+    "step43|route|재개발(직접 확인)" : [ {
       "x" : 1416,
       "y" : 455
     }, {
       "x" : 1416,
       "y" : 1015
     } ],
-    "step43|route|재개발(최소 확인)" : [ {
+    "step43|route|재개발(서버 없이)" : [ {
       "x" : 1426,
       "y" : 455
     }, {
@@ -1261,15 +1261,15 @@
       "source" : "right",
       "target" : "right"
     },
-    "step19|route|재개발" : {
+    "step19|route|재개발(자동 검증)" : {
       "source" : "out",
       "target" : "in"
     },
-    "step19|route|재개발(간이 확인)" : {
+    "step19|route|재개발(직접 확인)" : {
       "source" : "right",
       "target" : "right"
     },
-    "step19|route|재개발(최소 확인)" : {
+    "step19|route|재개발(서버 없이)" : {
       "source" : "right",
       "target" : "right"
     },
@@ -1417,15 +1417,15 @@
       "source" : "right",
       "target" : "right"
     },
-    "step43|route|재개발" : {
+    "step43|route|재개발(자동 검증)" : {
       "source" : "out",
       "target" : "in"
     },
-    "step43|route|재개발(간이 확인)" : {
+    "step43|route|재개발(직접 확인)" : {
       "source" : "right",
       "target" : "right"
     },
-    "step43|route|재개발(최소 확인)" : {
+    "step43|route|재개발(서버 없이)" : {
       "source" : "right",
       "target" : "left"
     },

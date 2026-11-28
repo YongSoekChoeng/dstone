@@ -259,7 +259,7 @@ public class WorkFlowRegistry extends BaseObject {
 			writes.addAll(this.validateOutput(definition, step));
 		}
 		this.checkStateUsed(definition, writes);
-		// 5. 표현식(step.with, step.forEach, workflow.return)
+		// 5. 표현식(step.with, step.forEach, approval.links, workflow.return)
 		for (StepDefinition step : definition.steps()) {
 			String forEach = StepDefinition.forEachOf(step);
 			List<String> itemVariables = new ArrayList<>();
@@ -268,6 +268,9 @@ public class WorkFlowRegistry extends BaseObject {
 				itemVariables.add(StepDefinition.itemKeyOf(step));
 			}
 			this.validateTemplate(definition, nextSteps, writes, step, "with", this.inputOf(step), itemVariables);
+			if (step instanceof ApprovalStepDefinition approval) {
+				this.validateTemplate(definition, nextSteps, writes, step, "approval.links", approval.links(), List.of());
+			}
 			StepLimit limit = StepDefinition.limitOf(step);
 			if (limit != null && limit.scope() != null) {
 				this.validateTemplate(definition, nextSteps, writes, step, "limit.scope", limit.scope(), List.of());

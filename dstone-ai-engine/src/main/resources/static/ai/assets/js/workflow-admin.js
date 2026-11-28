@@ -1444,6 +1444,7 @@ var DstoneAiWorkflowAdmin = (function () {
 			decisionChoices.push({ name: route, receiver: receivers[route] || "", hint: hints[route] || "" });
 		});
 		decisionBodyEl.style.display = routes.length > 0 ? "" : "none";
+		renderDecisionLinks((pendingApproval && pendingApproval.links) || {});
 
 		// 고른 결정이 목록에 그대로 있으면 새 목록의 같은 줄로 옮긴다
 		var keep = null;
@@ -1507,6 +1508,25 @@ var DstoneAiWorkflowAdmin = (function () {
 			decisionStepEl.textContent = "기다리던 승인 step을 지금 Workflow 정의에서 찾지 못해 결정할 수 없습니다. 실행을 시작한 뒤 정의가 바뀌었는지 확인하세요.";
 		}
 		renderDecisionSubmit();
+	}
+
+	// 승인 step의 links(표시 이름 → 주소). 새 창으로 연다. 서버가 http·https 주소만 보낸다
+	function renderDecisionLinks(links) {
+		var box = document.getElementById("wa-decide-links");
+		var names = Object.keys(links);
+		box.innerHTML = "";
+		box.style.display = names.length > 0 ? "" : "none";
+		names.forEach(function (name) {
+			var item = document.createElement("span");
+			item.appendChild(document.createTextNode(name + ": "));
+			var anchor = document.createElement("a");
+			anchor.href = links[name];
+			anchor.target = "_blank";
+			anchor.rel = "noopener noreferrer";
+			anchor.textContent = links[name];
+			item.appendChild(anchor);
+			box.appendChild(item);
+		});
 	}
 
 	function selectChoice(choice) {

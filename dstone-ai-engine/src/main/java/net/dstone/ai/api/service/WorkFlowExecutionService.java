@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import net.dstone.ai.common.expression.ContextResolver;
 import net.dstone.ai.api.dto.PendingApproval;
 import net.dstone.ai.api.dto.ResumePoint;
 import net.dstone.ai.api.dto.RewindPoint;
@@ -650,7 +651,20 @@ public class WorkFlowExecutionService extends BaseService {
 		for (Map.Entry<String, String> route : approval.decisionRoutes().entrySet()) {
 			receivers.put(route.getKey(), this.receiverLabel(workflow, route.getValue()));
 		}
-		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers, approval.hints());
+		return new PendingApproval(approval.id(), approval.approverRole(), new ArrayList<>(approval.decisionRoutes().keySet()), approval.artifact(), receivers, approval.hints(), this.linksOf(approval, execution));
+	}
+
+	/** approval.links를 지금 컨텍스트로 읽습니다. 화면에서 눌러도 안전하게 http·https 주소만 남깁니다. */
+	private Map<String, String> linksOf(ApprovalStepDefinition approval, WorkFlowExecution execution) {
+		Map<String, String> links = new LinkedHashMap<String, String>();
+		for (Map.Entry<String, String> link : approval.links().entrySet()) {
+			Object value = ContextResolver.resolve(link.getValue(), execution.context(), null);
+			String url = value == null ? "" : String.valueOf(value).strip();
+			if (url.startsWith("http://") || url.startsWith("https://")) {
+				links.put(link.getKey(), url);
+			}
+		}
+		return links;
 	}
 
 	/**

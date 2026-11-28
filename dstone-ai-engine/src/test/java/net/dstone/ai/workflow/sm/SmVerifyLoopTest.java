@@ -116,7 +116,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 
 	@Test
 	void 재개발할_때_고른_검증_수준이_설계_승인의_선택보다_앞선다() {
-		String[][] cases = { { "재개발", "step41" }, { "재개발(간이 확인)", "step45" }, { "재개발(최소 확인)", "step19" } };
+		String[][] cases = { { "재개발(자동 검증)", "step41" }, { "재개발(직접 확인)", "step45" }, { "재개발(서버 없이)", "step19" } };
 		for (String[] one : cases) {
 			WorkflowStepper flow = this.atStep("step43");
 			flow.put("designApproval", Map.of("decision", "승인(개발진행, 최소 확인)"));
@@ -246,7 +246,7 @@ public class SmVerifyLoopTest extends WorkflowTestBase {
 		assertThat(this.lastHistory(flow, "step32").success()).isTrue();
 
 		flow.step("step19");
-		flow.decide("재개발", "다시 해 주세요");
+		flow.decide("재개발(자동 검증)", "다시 해 주세요");
 		flow.jumpTo("step32");
 		flow.step("step32");
 		assertThat(flow.currentStepId()).isEqualTo("step34");

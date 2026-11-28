@@ -2983,6 +2983,19 @@ body.wd-full-on {
 	margin-top: 4px;
 }
 
+.wa-decide-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 20px;
+	margin: 0 0 10px;
+}
+
+.wa-decide-links a {
+	font-weight: 600;
+	text-decoration: underline;
+	word-break: break-all;
+}
+
 .wa-decide-guide {
 	margin: 0 0 14px;
 	color: var(--cs-text-2);

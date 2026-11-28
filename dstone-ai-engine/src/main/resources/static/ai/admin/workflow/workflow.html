@@ -154,6 +154,8 @@
 					-->
 					<div id="workflow-admin-decision-form" class="wa-decide" style="display:none;">
 						<p id="workflow-admin-decision-step" class="wa-decide-guide"></p>
+						<!-- 승인 step의 approval.links(열어 볼 주소). 없으면 숨는다 -->
+						<p id="wa-decide-links" class="wa-decide-links" style="display:none;"></p>
 						<!-- 결정한 사람은 세션 사용자로 남는다(바꿀 수 없다). 값은 아래 스크립트가 세션 정보로 채운다 -->
 						<input type="hidden" id="workflow-admin-approver" value="" />
 
