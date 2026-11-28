@@ -25,6 +25,12 @@ import net.dstone.ai.common.consts.StepType;
  *       requireCommentOnReject: true
  *       links:                             # 승인 화면에 보일 링크
  *         테스트 서버: ${state.serverCheck.url:}
+ *       deliverable:                       # 실행 관리 화면에서 내려받거나 로컬 폴더에 반영할 파일
+ *         dir: ${input}/output             # 새로 만들거나 고친 파일(원본 루트 기준 상대경로 그대로)
+ *         deleteList: ${input}/output/_delete-files.txt
+ *         baseDir: ${state.sourceRoot:}    # 원본. 로컬에서 따로 고친 파일을 가려낼 때 비교한다
+ *         documentDir: ${input}            # 이 폴더 바로 아래의 md 파일은 ZIP에 함께 담는다
+ *         key: ${state.projectId:}         # 같은 값이면 화면이 로컬 폴더 맵핑을 다시 쓴다
  *     save: analysisApproval               # {decision, approver, comment}
  *     routes:
  *       APPROVED: step05
@@ -71,8 +77,40 @@ public record ApprovalStepDefinition(
 	 *                               실행에는 쓰이지 않으며, 키는 고를 수 있는 결정 이름이어야 합니다.
 	 * @param links                  표시 이름 → 주소입니다. 승인 화면에 눌러서 여는 링크로 보입니다(예: 앞 step이 띄운 서버 주소).
 	 *                               값은 ${state.…}처럼 읽는 표현식이나 주소 글자이고, http·https 주소가 아니면(값이 없으면) 보이지 않습니다.
+	 * @param deliverable            승인자가 내려받아 확인할 결과 파일이 어디 있는지입니다. 없으면 화면에 내려받기가 보이지 않습니다.
 	 */
-	public record Approval(String artifact, String approverRole, String rejectTo, Boolean requireCommentOnReject, Map<String, String> hints, Map<String, String> links) {
+	public record Approval(String artifact, String approverRole, String rejectTo, Boolean requireCommentOnReject, Map<String, String> hints, Map<String, String> links, Deliverable deliverable) {
+	}
+
+	/**
+	 * <pre>
+	 * approval.deliverable 입니다. 값은 모두 ${input}, ${state.…}처럼 읽는 표현식이나 글자입니다.
+	 * </pre>
+	 *
+	 * @param dir         (필수)새로 만들거나 고친 파일이 있는 폴더입니다. 안의 상대경로가 원본 루트 기준 경로입니다.
+	 * @param deleteList  지울 파일 목록(원본 루트 기준 상대경로가 한 줄에 하나)입니다. 파일이 없으면 지울 것이 없는 것입니다.
+	 * @param baseDir     원본 폴더입니다. 로컬 파일이 원본과 같은지 비교할 때 씁니다.
+	 * @param documentDir 이 폴더 바로 아래의 md 파일을 ZIP에 함께 담습니다.
+	 * @param key         화면이 로컬 폴더 맵핑을 저장할 때 쓰는 이름입니다(예: 프로젝트 id). 비면 Workflow id를 씁니다.
+	 */
+	public record Deliverable(String dir, String deleteList, String baseDir, String documentDir, String key) {
+
+		/** 표현식을 한꺼번에 읽거나 검사할 수 있게 적은 값만 이름 → 표현식으로 돌려줍니다. */
+		public Map<String, String> templates() {
+			Map<String, String> all = new LinkedHashMap<String, String>();
+			putIfPresent(all, "dir", this.dir);
+			putIfPresent(all, "deleteList", this.deleteList);
+			putIfPresent(all, "baseDir", this.baseDir);
+			putIfPresent(all, "documentDir", this.documentDir);
+			putIfPresent(all, "key", this.key);
+			return all;
+		}
+
+		private static void putIfPresent(Map<String, String> map, String name, String value) {
+			if (value != null) {
+				map.put(name, value);
+			}
+		}
 	}
 
 	@Override
@@ -110,6 +148,11 @@ public record ApprovalStepDefinition(
 			return new LinkedHashMap<>();
 		}
 		return this.approval.links();
+	}
+
+	/** 내려받을 결과 파일의 위치입니다. 적지 않았으면 null입니다. */
+	public Deliverable deliverable() {
+		return this.approval == null ? null : this.approval.deliverable();
 	}
 
 	/** APPROVED가 아닌 결정에 의견이 꼭 있어야 하는지 봅니다. */

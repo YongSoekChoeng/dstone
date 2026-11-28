@@ -179,6 +179,9 @@
 					</div>
 				</div>
 
+				<!-- 승인 step의 approval.deliverable(개발 결과 받기). 내용은 workflow-deliverable.js가 그린다. 승인하고 끝난 실행에서도 보인다 -->
+				<div id="wa-deliverable" class="wa-deliverable" hidden></div>
+
 				<!-- 진행 기록(한 줄씩) + 고른 step의 전체 내용. 좁은 화면에서는 위아래로 놓인다 -->
 				<div class="wa-run">
 					<div class="wa-run-list">
@@ -342,6 +345,7 @@
 	<script src="/ai/assets/lib/highlight.min.js"></script>
 	<script src="/ai/assets/js/workflow-doc-viewer.js"></script>
 	<script src="/ai/assets/js/eval-case-maker.js"></script>
+	<script src="/ai/assets/js/workflow-deliverable.js"></script>
 	<script src="/ai/assets/js/workflow-admin.js"></script>
 	<script>
 		DstoneAiWorkflowAdmin.init({

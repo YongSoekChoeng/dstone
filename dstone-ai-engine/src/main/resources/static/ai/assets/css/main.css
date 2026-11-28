@@ -3568,3 +3568,144 @@ body.wd-full-on {
 .mg-error {
 	color: var(--cs-danger);
 }
+
+/* 개발 결과 받기(workflow-deliverable.js): 실행 상세의 한 칸과 맵핑·반영 팝업 */
+.wa-deliverable {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	border: 1px solid var(--cs-border, #d7dde5);
+	border-radius: 8px;
+}
+
+.wa-deliverable[hidden],
+.wa-dl-modal[hidden] {
+	display: none;
+}
+
+.wa-dl-summary {
+	font-weight: 600;
+	margin-right: auto;
+}
+
+.wa-dl-buttons {
+	display: flex;
+	gap: 8px;
+}
+
+.wa-dl-notice,
+.wa-dl-status {
+	flex-basis: 100%;
+	color: var(--cs-text-2);
+}
+
+.wa-dl-notice:empty,
+.wa-dl-status:empty {
+	display: none;
+}
+
+.wa-dl-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(15, 23, 42, 0.45);
+}
+
+.wa-dl-box {
+	display: flex;
+	flex-direction: column;
+	width: min(960px, 94vw);
+	max-height: 88vh;
+	background: #fff;
+	border-radius: 10px;
+	box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+}
+
+.wa-dl-title {
+	padding: 14px 20px;
+	border-bottom: 1px solid var(--cs-border, #d7dde5);
+	font-weight: 700;
+}
+
+.wa-dl-body {
+	overflow: auto;
+	padding: 12px 20px;
+}
+
+.wa-dl-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 20px;
+	border-top: 1px solid var(--cs-border, #d7dde5);
+}
+
+.wa-dl-spacer {
+	flex: 1;
+}
+
+.wa-dl-help {
+	margin: 0 0 10px;
+	color: var(--cs-text-2);
+}
+
+.wa-dl-warning,
+.wa-dl-list {
+	color: #b91c1c;
+}
+
+.wa-dl-warning {
+	font-weight: 600;
+}
+
+.wa-dl-list {
+	margin: 0 0 10px;
+	padding-left: 20px;
+	word-break: break-all;
+}
+
+.wa-dl-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 10px;
+}
+
+.wa-dl-table th,
+.wa-dl-table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--cs-border, #d7dde5);
+	text-align: left;
+	vertical-align: middle;
+	word-break: break-all;
+}
+
+.wa-dl-table input[type="text"] {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.wa-dl-folder {
+	margin-right: 8px;
+	font-weight: 600;
+}
+
+.wa-dl-conflict td,
+.wa-dl-removeConflict td,
+.wa-dl-missing td,
+.wa-dl-error td,
+.wa-dl-overlap td {
+	background: #fef2f2;
+}
+
+.wa-dl-same td,
+.wa-dl-gone td,
+.wa-dl-unmapped td {
+	color: var(--cs-text-2);
+}

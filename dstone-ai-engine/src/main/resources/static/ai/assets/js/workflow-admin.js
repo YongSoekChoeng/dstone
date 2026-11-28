@@ -315,6 +315,7 @@ var DstoneAiWorkflowAdmin = (function () {
 		renderResult(detail);
 		renderDocs();
 		loadFiles(detail.executionId);
+		DstoneAiDeliverable.show(detail);
 		if (newExecution) {
 			detailPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
 		}

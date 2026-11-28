@@ -7,6 +7,9 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +29,7 @@ import net.dstone.ai.api.dto.WorkFlowExecutionDetail;
 import net.dstone.ai.api.dto.WorkFlowExecutionPage;
 import net.dstone.ai.api.dto.WorkFlowExecutionSummary;
 import net.dstone.ai.api.dto.WorkFlowFileSaveRequest;
+import net.dstone.ai.api.service.WorkFlowDeliverableService;
 import net.dstone.ai.api.service.WorkFlowExecutionService;
 import net.dstone.ai.api.service.WorkFlowFileService;
 import net.dstone.ai.common.security.RequesterContext;
@@ -52,6 +56,9 @@ public class WorkFlowExecutionController extends BaseController {
 
 	@Autowired
 	WorkFlowFileService workFlowFileService;
+
+	@Autowired
+	WorkFlowDeliverableService workFlowDeliverableService;
 
 	@Autowired
 	Environment environment;
@@ -243,6 +250,47 @@ public class WorkFlowExecutionController extends BaseController {
 		try {
 			RequesterContext.checkOwner(servletRequest, this.workFlowExecutionService.find(executionId));
 			return ResponseEntity.ok((Object) this.workFlowFileService.save(executionId, request.path(), request.text(), request.baseHash()));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * <pre>
+	 * 승인 step의 approval.deliverable이 가리키는 결과 파일 목록을 돌려줍니다. 내려받을 것이 없으면 available=false와 이유입니다.
+	 * content=true면 파일 내용(base64)까지 담습니다. 화면이 로컬 폴더에 반영할 때 씁니다.
+	 * </pre>
+	 *
+	 * @param executionId    실행 id
+	 * @param content        파일 내용도 담을지
+	 * @param servletRequest 요청한 사용자를 읽을 HTTP 요청입니다(남의 실행이면 403).
+	 */
+	@GetMapping("/{executionId}/deliverable")
+	public ResponseEntity<Object> deliverable(@PathVariable String executionId, @RequestParam(defaultValue = "false") boolean content, HttpServletRequest servletRequest) {
+		try {
+			RequesterContext.checkOwner(servletRequest, this.workFlowDeliverableService.execution(executionId));
+			return ResponseEntity.ok((Object) this.workFlowDeliverableService.describe(executionId, content));
+		} catch (ResponseStatusException e) {
+			return this.rejected(e);
+		}
+	}
+
+	/**
+	 * 같은 결과 파일을 ZIP으로 내려줍니다(source/ 바뀐 파일, delete-files.txt 삭제 목록, documents/ 문서).
+	 *
+	 * @param executionId    실행 id
+	 * @param servletRequest 요청한 사용자를 읽을 HTTP 요청입니다(남의 실행이면 403).
+	 */
+	@GetMapping("/{executionId}/deliverable/zip")
+	public ResponseEntity<Object> deliverableZip(@PathVariable String executionId, HttpServletRequest servletRequest) {
+		try {
+			RequesterContext.checkOwner(servletRequest, this.workFlowDeliverableService.execution(executionId));
+			byte[] zip = this.workFlowDeliverableService.zip(executionId);
+			String name = "deliverable-" + executionId.replaceAll("[^A-Za-z0-9_-]", "_") + ".zip";
+			return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(name).build().toString())
+				.contentType(MediaType.APPLICATION_OCTET_STREAM)
+				.body((Object) zip);
 		} catch (ResponseStatusException e) {
 			return this.rejected(e);
 		}

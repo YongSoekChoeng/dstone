@@ -176,10 +176,13 @@ dstone:
             # file.edit-enabled: true면 화면에서 저장할 수 있다. false면 보기만 된다(운영 서버에서는 false 권장).
             # file.editable-extensions: 저장할 수 있는 파일 확장자(쉼표로 구분). 소스 파일은 넣지 않는다.
             # file.max-read-bytes: 화면에 보여 줄 수 있는 파일 크기 상한(바이트). 넘으면 열지 않는다.
+            # file.deliverable-max-bytes: 결과 파일 내려받기의 크기 합 상한(바이트).
             file:
                 edit-enabled: true
                 editable-extensions: md
                 max-read-bytes: 2097152
+                # 승인 step의 approval.deliverable로 한 번에 내려줄 수 있는 파일 크기 합(바이트)
+                deliverable-max-bytes: 52428800
             # Agent step 스냅숏(runtime.workflow.snapshot.StepSnapshotRecorder). Agent가 마주한 입력·파일·답을 남겨
             # 실행 관리 > 진행 기록 > [평가 사례로 만들기]로 그 장면을 평가 사례(conf/eval)로 만든다.
             # root: 비우면 {APP_HOME}/LOGS/dstone-ai-engine/snapshot. k8s처럼 LOGS가 Pod 안에만 있으면 영구 볼륨 경로로 바꾼다.

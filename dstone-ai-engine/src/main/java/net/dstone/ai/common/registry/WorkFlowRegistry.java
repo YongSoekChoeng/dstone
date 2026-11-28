@@ -259,7 +259,7 @@ public class WorkFlowRegistry extends BaseObject {
 			writes.addAll(this.validateOutput(definition, step));
 		}
 		this.checkStateUsed(definition, writes);
-		// 5. 표현식(step.with, step.forEach, approval.links, workflow.return)
+		// 5. 표현식(step.with, step.forEach, approval.links, approval.deliverable, workflow.return)
 		for (StepDefinition step : definition.steps()) {
 			String forEach = StepDefinition.forEachOf(step);
 			List<String> itemVariables = new ArrayList<>();
@@ -270,6 +270,9 @@ public class WorkFlowRegistry extends BaseObject {
 			this.validateTemplate(definition, nextSteps, writes, step, "with", this.inputOf(step), itemVariables);
 			if (step instanceof ApprovalStepDefinition approval) {
 				this.validateTemplate(definition, nextSteps, writes, step, "approval.links", approval.links(), List.of());
+				if (approval.deliverable() != null) {
+					this.validateTemplate(definition, nextSteps, writes, step, "approval.deliverable", approval.deliverable().templates(), List.of());
+				}
 			}
 			StepLimit limit = StepDefinition.limitOf(step);
 			if (limit != null && limit.scope() != null) {
@@ -505,6 +508,9 @@ public class WorkFlowRegistry extends BaseObject {
 				String rejectedRoute = approval.routes() == null ? null : approval.routes().get(ApprovalStepDefinition.DECISION_REJECTED);
 				if (rejectTo != null && rejectedRoute != null && !rejectTo.equals(rejectedRoute)) {
 					throw this.error(definition, step, "approval.rejectTo(" + rejectTo + ")와 routes.REJECTED(" + rejectedRoute + ")가 서로 다릅니다. 같은 뜻이므로 한쪽만 적거나 같은 곳을 적으십시오.");
+				}
+				if (approval.deliverable() != null && StringUtil.isEmpty(approval.deliverable().dir())) {
+					throw this.error(definition, step, "approval.deliverable에는 dir(내려받을 파일이 있는 폴더)이 있어야 합니다.");
 				}
 				for (String hintKey : approval.hints().keySet()) {
 					if (!approval.decisionRoutes().containsKey(hintKey)) {
